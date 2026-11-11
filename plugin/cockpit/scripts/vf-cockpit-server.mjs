@@ -143,6 +143,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
       const g = buildEquipeGraph(who, { nom: String(GP?.project?.name || '').replace(/ — Projet$/, '') || GP?.meta?.rootName || path.basename(root), racine: GP?.meta?.root, logos: GP?.meta?.vfLogos, git: GP?.meta?.vfGit, missions: missionsEnCours(GP), lancees: lancer.lancees() }); // 78-04 : en-tête Git et bloc de vue
       return insererGraphe(gabarit, g).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Équipe</title>').replace('</head>', () => inject + '</head>');
     },
+    ouverts: () => clients.size, // AUDC-H3 : des flux de page ouverts retiennent l'arrêt sur inactivité
     jetonValide: (j) => typeof j === 'string' && j === ptoken,
     stop() { live?.stop(); for (const c of clients) c.end(); },
   };

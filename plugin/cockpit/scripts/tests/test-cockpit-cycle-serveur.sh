@@ -83,5 +83,73 @@ assert_eq "H2.7 — avec un onglet, un changement de planning interroge le verro
 
 assert_eq "H2.8 — la connexion d'un onglet après un silence relit le verrou une fois (le second onglet coup sur coup ne relit pas)" "$(jq_ "$WORK/s.json" 'j.reveil.status')" "1"
 
+echo "=== H3 — vie du serveur : lanceurs, journal, inactivité ==="
+libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
+cat > "$AUX/get.mjs" <<'JS'
+// get.mjs <port> <chemin> [jeton] : le corps ; le jeton est celui de la page servie (en-tête x-vf-cockpit-token)
+import http from 'node:http';
+const [, , port, p, jeton] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}`, ...(jeton ? { 'x-vf-cockpit-token': jeton } : {}) } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => { process.stdout.write(b, () => process.exit(0)); }); }).on('error', () => process.exit(1));
+JS
+jeton_de() { node "$AUX/get.mjs" "$1" / | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>console.log((/VF_COCKPIT_SERVER=\\{\"token\":\"([0-9a-f]+)\"/.exec(s)||[])[1]||''))"; }
+nserv() { pgrep -f -- "$1/.vibeflow/cockpit/serve.mjs" | wc -l | tr -d ' '; }
+pid_etat() { node -e "try{console.log(JSON.parse(require('fs').readFileSync('$1/.vibeflow/cockpit/.cache/server.json','utf8')).pid)}catch{console.log('')}"; }
+LAN="node $SCRIPTS/vf-cockpit.mjs"
+LH="$WORK/labh"; mklab "$LH"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LH" --quiet > "$WORK/build-h.out" 2>&1 || cat "$WORK/build-h.out"
+PH=$(libre)
+# H3.1 deux lanceurs lancés ensemble : un seul serveur
+$LAN open --lab "$LH" --no-open --port "$PH" > "$WORK/l1.out" 2>&1 & L1=$!
+$LAN open --lab "$LH" --no-open --port "$PH" > "$WORK/l2.out" 2>&1 & L2=$!
+wait "$L1"; R1=$?; wait "$L2"; R2=$?
+assert_eq "H3.1 — deux lanceurs lancés ensemble : les deux réussissent (rc 0 et 0)" "$R1 $R2" "0 0"
+assert_eq "H3.2 — deux lanceurs lancés ensemble : UN seul serveur pour le lab (verrou de lanceur)" "$(nserv "$LH")" "1"
+assert_eq "H3.3 — les deux lanceurs rendent la même adresse" "$([ "$(grep -o 'http://127.0.0.1:[0-9]*' "$WORK/l1.out" | sed -n 1p)" = "$(grep -o 'http://127.0.0.1:[0-9]*' "$WORK/l2.out" | sed -n 1p)" ] && echo oui || echo non)" "oui"
+PID1="$(pid_etat "$LH")"; LOG="$LH/.vibeflow/cockpit/.cache/serveur.log"
+# H3.4 relance à options identiques : le serveur n'est pas remplacé
+$LAN open --lab "$LH" --no-open --port "$PH" > "$WORK/l3.out" 2>&1
+assert_eq "H3.4 — relance à options et code identiques : même serveur (PID inchangé)" "$(pid_etat "$LH")" "$PID1"
+assert_eq "H3.5 — relance identique : rien n'est écrit au journal sur un remplacement" "$(grep -c 'remplacé' "$LOG")" "0"
+# H3.6 relance qui change une option : remplacé, et écrit au journal
+$LAN open --lab "$LH" --no-open --terminal --port "$PH" > "$WORK/l4.out" 2>&1
+PID2="$(pid_etat "$LH")"
+assert_eq "H3.6 — relance avec --terminal : le serveur est remplacé (PID différent)" "$([ -n "$PID2" ] && [ "$PID2" != "$PID1" ] && echo oui || echo non)" "oui"
+assert_has "H3.7 — le remplacement est écrit au journal avec son motif" "$(cat "$LOG")" "lanceur : relance : serveur PID $PID1 remplacé (--terminal demandé"
+assert_eq "H3.8 — le journal porte la date de l'arrêt de l'ancien serveur et son motif (signal)" "$(grep -cE "^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z arrêt : signal SIGTERM \(PID $PID1\)" "$LOG")" "1"
+assert_eq "H3.9 — le journal porte la date du démarrage du nouveau serveur" "$(grep -cE "^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z démarrage : PID $PID2" "$LOG")" "1"
+# H3.10 serveur orphelin (server.json perdu) : repris, pas doublé
+rm -f "$LH/.vibeflow/cockpit/.cache/server.json"
+$LAN open --lab "$LH" --no-open --port "$PH" > "$WORK/l5.out" 2>&1
+assert_eq "H3.10 — server.json perdu, serveur du lab déjà à l'écoute : aucun second serveur lancé" "$(nserv "$LH")" "1"
+assert_eq "H3.11 — le serveur repris est le même (PID de server.json = PID d'avant) et la reprise est au journal" "$(pid_etat "$LH") $(grep -c 'sans server.json : repris' "$LOG")" "$PID2 1"
+$LAN stop --lab "$LH" > "$WORK/l6.out" 2>&1
+for _ in $(seq 1 30); do [ "$(nserv "$LH")" = 0 ] && break; sleep 0.2; done
+assert_has "H3.12 — « stop » : l'arrêt demandé et le signal reçu sont au journal" "$(cat "$LOG")" "lanceur : arrêt demandé"
+assert_eq "H3.13 — après « stop », plus aucun serveur" "$(nserv "$LH")" "0"
+
+# H3.14-H3.16 inactivité : une requête authentifiée compte comme activité ; le motif d'arrêt est au journal ; un terminal ouvert retient l'arrêt et le dit
+LI="$WORK/labi"; mklab "$LI"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LI" --quiet > "$WORK/build-i.out" 2>&1 || cat "$WORK/build-i.out"
+OUTI="$LI/.vibeflow/cockpit"; PI=$(libre)
+VF_COCKPIT_IDLE_TICK_MS=300 node "$OUTI/serve.mjs" --no-open --port "$PI" --idle-exit 0.05 > "$WORK/srv-i.out" 2>&1 & SI=$!
+for _ in $(seq 1 100); do [ -s "$OUTI/.cache/server.json" ] && break; sleep 0.1; done
+TOK="$(jeton_de "$PI")"
+assert_eq "H3.14a — témoin : le jeton de la page est lu" "$([ ${#TOK} -ge 16 ] && echo oui || echo non)" "oui"
+T0=$SECONDS; while [ $((SECONDS-T0)) -lt 8 ]; do node "$AUX/get.mjs" "$PI" /api/vf/etat "$TOK" > /dev/null; sleep 0.5; done
+assert_eq "H3.14 — idle-exit 3 s, une requête authentifiée toutes les 0,5 s pendant 8 s : le serveur vit" "$(kill -0 "$SI" 2>/dev/null && echo vivant || echo sorti)" "vivant"
+for _ in $(seq 1 40); do kill -0 "$SI" 2>/dev/null || break; sleep 0.5; done
+assert_eq "H3.15 — témoin : sans plus de requête, le même serveur s'arrête sur inactivité" "$(kill -0 "$SI" 2>/dev/null && echo vivant || echo sorti)" "sorti"
+assert_has "H3.16 — le motif de l'arrêt (inactivité) est daté au journal" "$(cat "$WORK/srv-i.out")" "Z arrêt : inactivité ("
+# terminal factice qui se déclare occupé : la rétention est dite au journal, le serveur reste
+LT="$WORK/labt"; mklab "$LT"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LT" --quiet > "$WORK/build-t.out" 2>&1 || cat "$WORK/build-t.out"
+OUTT="$LT/.vibeflow/cockpit"; PT=$(libre)
+cat > "$OUTT/vf-cockpit-terminal.mjs" <<'JS'
+export const preparerTerminal = () => ({ injection: () => '', occupe: () => true, demarrer() {}, frameSrc: () => '', routeP() {} });
+JS
+VF_COCKPIT_IDLE_TICK_MS=300 node "$OUTT/serve.mjs" --no-open --port "$PT" --idle-exit 0.05 --terminal > "$WORK/srv-t.out" 2>&1 & ST=$!
+for _ in $(seq 1 100); do [ -s "$OUTT/.cache/server.json" ] && break; sleep 0.1; done
+for _ in $(seq 1 30); do grep -q 'retenu' "$WORK/srv-t.out" && break; sleep 0.3; done
+assert_has "H3.17 — un terminal ouvert retient l'arrêt sur inactivité, et le journal le dit" "$(cat "$WORK/srv-t.out")" "arrêt sur inactivité retenu : un terminal est ouvert"
+assert_eq "H3.18 — le serveur au terminal ouvert est encore vivant" "$(kill -0 "$ST" 2>/dev/null && echo vivant || echo sorti)" "vivant"
+vf_hyg_stop "$ST" 2>/dev/null; vf_hyg_stop "$SI" 2>/dev/null
+
 echo "== bilan : $PASS réussi(s), $FAIL échec(s) =="
 [ "$FAIL" -eq 0 ]
