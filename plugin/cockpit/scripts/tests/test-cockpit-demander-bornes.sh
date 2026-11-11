@@ -45,11 +45,17 @@ H() { "$NODE" "$AUX/h.mjs" "$@"; }
 printf '#!%s\n' "$NODE" > "$AUX/claude"; cat >> "$AUX/claude" <<'JS'
 const fs = require('fs'), crypto = require('crypto'); const D = process.env.VF_FAKE_DIR; const a = process.argv.slice(2);
 if (a[0] === '--version') { console.log(process.env.VF_FAKE_VERSION || '2.1.316 (Claude Code)'); process.exit(0); }
-fs.writeFileSync(`${D}/call-${process.pid}.json`, JSON.stringify({ argv: a, pid: process.pid }));
-process.stdin.resume(); process.stdin.on('data', () => {});
+const note = (o) => fs.writeFileSync(`${D}/call-${process.pid}.json`, JSON.stringify({ argv: a, pid: process.pid, ...o }));
+const t0 = Date.now(); note({ start: t0 });
+let in_ = ''; process.stdin.resume(); process.stdin.on('data', (c) => (in_ += c));
 process.stdin.on('end', () => {
   let ms = 0; try { ms = Number(fs.readFileSync(`${D}/sleep-ms`, 'utf8')) || 0; } catch {}
-  setTimeout(() => console.log(JSON.stringify({ type: 'result', is_error: false, structured_output: { title: 't', answer: 'a', items: [] }, session_id: crypto.randomUUID() })), ms);
+  if (in_.includes('CHANGE-ME')) ms = 1500; else if (in_.includes('SLOW')) ms = 5000;
+  setTimeout(() => {
+    console.log(JSON.stringify({ type: 'result', is_error: false, structured_output: { title: 't', answer: 'a', items: [] }, session_id: crypto.randomUUID() }));
+    note({ start: t0, answered: Date.now() });
+    if (in_.includes('LINGER')) setTimeout(() => {}, 30000); // un enfant qui survit à son résultat
+  }, ms);
 });
 JS
 chmod +x "$AUX/claude"; mkdir -p "$WORK/fk"; cp "$AUX/claude" "$WORK/fk/claude"
@@ -226,6 +232,25 @@ const defs = fs.readdirSync(scripts).filter((f) => /^vf-cockpit.*\.mjs$/.test(f)
 console.log(JSON.stringify({ barre: c.includes("'/tmp/lab'\\\\'x'"), modules: defs }));
 JS
 assert_eq "D9.4 — la commande du correctif de dérive cite par citer (barre oblique inverse sûre) et un seul module définit la citation shell" "$(node "$AUX/drift-cite.mjs" "$SCRIPTS")" '{"barre":true,"modules":["vf-cockpit-git-commandes.mjs"]}'
+
+echo "=== D10 — second essai de « modifier le plan » et enfant qui survit à son résultat (AUDC-B-02) ==="
+node -e "const f='$OUT/graph.json';const g=JSON.parse(require('fs').readFileSync(f,'utf8'));g.meta=g.meta||{};g.meta.blueprint={source:'plan',stack:[],assumptions:[]};require('fs').writeFileSync(f,JSON.stringify(g))"
+demarrer
+postq() { # postq <mode> <question> <sortie>
+  H r "$PORT" POST /api/ask "{\"x-vf-cockpit-token\":\"$TOK\",\"content-type\":\"application/json\"}" "$3" "{\"question\":\"$2\",\"mode\":\"$1\"}"
+}
+JOBS=(); postq change CHANGE-ME "$WORK/d10-c.txt" & JOBS+=($!); sleep 0.4; postq ask SLOW "$WORK/d10-a.txt" & JOBS+=($!); sleep 0.4; postq ask SLOW "$WORK/d10-b.txt" & JOBS+=($!)
+wait "${JOBS[@]}"
+cat > "$AUX/conc.mjs" <<'JS'
+import fs from 'node:fs';
+const d = process.argv[2], ev = [];
+const fich = fs.readdirSync(d).filter((f) => /^call-.*\.json$/.test(f)).map((f) => JSON.parse(fs.readFileSync(`${d}/${f}`, 'utf8')));
+for (const c of fich) { ev.push([c.start, 1]); if (c.answered) ev.push([c.answered, -1]); }
+ev.sort((x, y) => x[0] - y[0] || x[1] - y[1]); let n = 0, max = 0; for (const [, k] of ev) { n += k; if (n > max) max = n; }
+console.log(max);
+JS
+assert_eq "D10.1 — « modifier le plan » : le second essai a lieu (2 exécutions pour la demande de changement) alors qu'une autre demande tient un créneau, la troisième demande simultanée reçoit 429" "$(H evs "$WORK/d10-c.txt" 'E.filter(e=>e.ev==="start").length')|$(H statut "$WORK/d10-b.txt")|$(H ncalls "$WORK/fkd")" "2|429|3"
+assert_eq "D10.2 — jamais plus de deux exécutions de l'agent en cours de réponse en même temps, second essai compris" "$(node "$AUX/conc.mjs" "$WORK/fkd")" "2"
 
 echo; echo "=== bilan : $PASS passés, $FAIL échoués ==="
 [ "$FAIL" -eq 0 ]
