@@ -631,10 +631,10 @@ annoncés aux autres phases : 79-01, 79-02, 79-05, 79-06.
 | 79-14 | Flux partagé entre onglets, veille de silence | SOCL-18 | 5 | 79-12 | § 79-10 |
 | 79-15 | Route graphe, événement `graphe` (A5), fin de la réécriture de `project.html`, `projet.json` (A29), Équipe sans reconstruction, témoin d'export (A25) | SOCL-19, SOCL-23 | 6 | 79-13, 79-14 | § 79-11a |
 | 79-16 | Coquille statique servie du module, `ETag`, CSP, `chargerOnglet` (A2), terminal posé une fois (A3) | SOCL-20 | 7 | 79-15 | § 79-11b |
-| 79-17 | Magasin `VF_ETAT` (C4, A13), observateurs de réparation retirés | SOCL-21 | 7 | 79-15 | § 79-12 |
-| 79-18 | Mise en page dans un worker, API du moteur gardée (A4) | SOCL-22 | 8 | 79-16, 79-17 | § 79-13 |
-| 79-19 | Journal des attentes (I18 réduit, P79-D-22), sonde d'abord, détachable | SOCL-24 | 9 | 79-06 | § 79-16 + P79-D-22 |
-| 79-20 | Documentation, version mineure du module, limites (pose projet, CSP, `vf-signal`) | SOCL-25 | 9 | tous | § 79-17 |
+| 79-17 | Magasin `VF_ETAT` (C4, A13), observateurs de réparation retirés | SOCL-21 | 8 (amendé : fichiers communs avec 79-16) | 79-15, 79-16 | § 79-12 |
+| 79-18 | Mise en page dans un worker, API du moteur gardée (A4) | SOCL-22 | 9 (amendé) | 79-16, 79-17 | § 79-13 |
+| 79-19 | Journal des attentes (I18 réduit, P79-D-22), sonde d'abord, détachable | SOCL-24 | 10 (amendé : compteur de suites partagé avec 79-18) | 79-06, 79-18 | § 79-16 + P79-D-22 |
+| 79-20 | Documentation, version mineure du module, limites (pose projet, CSP, `vf-signal`) | SOCL-25 | 11 (amendé) | tous | § 79-17 |
 | 79-21 | Coût borné de la correspondance de motifs du moteur (`compileGlob`), point unique, preuve générative (P79-D-32) | SOCL-26 | 3 | 79-06, 79-07 | constat de la Phase 75 |
 
 Exigences `SOCL-01` à `SOCL-26` : texte dans `REQUIREMENTS.md`. Audit de sécurité à l'exécution : 79-06, 79-07, 79-09,

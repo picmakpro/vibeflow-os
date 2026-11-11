@@ -620,7 +620,7 @@ Plans:
   4. Sept onglets ouverts sur le même lab ne tiennent qu'un flux d'événements ; fermer l'onglet élu ne recharge aucune page ; un flux muet est déclaré coupé en 45 s.
   5. Un agent clos reste rattaché à son nœud après le relâchement du verrou (registre archivé 24 h, nœud écrit dans le mandat).
   6. Ni l'index, ni l'état, ni la frise, ni les cibles, ni les verrous n'entrent dans l'export ; aucun chemin absolu ni identifiant de session n'est émis hors des routes à la demande existantes.
-**Plans:** 21 plans en 9 vagues
+**Plans:** 21 plans en 11 vagues
 
 Plans:
 
@@ -640,10 +640,10 @@ Plans:
 - [ ] 79-14-PLAN.md — Flux partagé entre onglets et veille de silence (vague 5)
 - [ ] 79-15-PLAN.md — Route graphe, fin de la réécriture de project.html, témoin d'export (vague 6)
 - [ ] 79-16-PLAN.md — Coquille statique servie du module (vague 7)
-- [ ] 79-17-PLAN.md — Magasin d'état côté page (vague 7)
-- [ ] 79-18-PLAN.md — Mise en page dans un worker (vague 8)
-- [ ] 79-19-PLAN.md — Journal des attentes par hook, détachable (vague 9)
-- [ ] 79-20-PLAN.md — Documentation et version du module (vague 9)
+- [ ] 79-17-PLAN.md — Magasin d'état côté page (vague 8)
+- [ ] 79-18-PLAN.md — Mise en page dans un worker (vague 9)
+- [ ] 79-19-PLAN.md — Journal des attentes par hook, détachable (vague 10)
+- [ ] 79-20-PLAN.md — Documentation et version du module (vague 11)
 - [ ] 79-21-PLAN.md — Coût borné de la correspondance de motifs du moteur (vague 3)
 
 ### Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation
