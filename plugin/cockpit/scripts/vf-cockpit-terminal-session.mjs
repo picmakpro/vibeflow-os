@@ -1,5 +1,5 @@
 // vf-cockpit-terminal-session — la session unique du terminal intégré : lancement de l'assistant PTY, flux, entrée, taille (71-01).
-// Export : creerSessions({ engineDir, lab, jetons }) -> { attacher, ecrire, redimensionner, lancer, etat, occupe, arreterTout }.
+// Export : creerSessions({ engineDir, lab, jetons }) -> { attacher, ecrire, redimensionner, lancer, etat, occupe, fermer, arreterTout }.
 // Une seule session. L'assistant (vf-cockpit-pty.py de l'arbre du moteur, lancé en mode isolé) ne se lance qu'à la PREMIÈRE attache, jamais avant ; il
 // n'est jamais détaché : il meurt avec le serveur. Sa sortie (descripteur 1) est le flux ; son descripteur 2 porte l'état (FIN, SIG) et n'est
 // jamais journalisé ; le descripteur 3 reçoit les tailles. Les messages nomment des états, jamais des données du terminal.
@@ -167,6 +167,12 @@ export function creerSessions({ engineDir, lab, jetons = () => [], env = process
     },
     etat: () => { const c = s && s.etat !== 'fermeture' ? s : null; return { session: c ? c.etat : 'absente', code: c ? c.code : null, signal: c ? c.signal : null }; },
     occupe: () => actif(s),
+    // fin volontaire de la SESSION (« Terminer la session », AUDC-M10) : flux fermé, puis la même fermeture bornée que l'échéance de la grâce ; la place reste prise jusqu'à la MORT de l'assistant (P71-D-05), une attache entre-temps reçoit 503
+    fermer() {
+      const c = s; if (!actif(c)) return;
+      clearTimeout(c.minuterie); const r = c.res; c.res = null; try { r?.end(); } catch {}
+      finirAttentes(c, 'absente'); c.etat = 'detachee'; expirer(c);
+    },
     arreterTout() {
       if (!s) return;
       const c = s; clearTimeout(c.minuterie); c.etat = 'terminee'; try { c.res?.end(); } catch {} c.res = null; vider(); // les flux ouverts sont fermés (P71-D-35)

@@ -7,7 +7,7 @@ export function clientTerminal(cfg) {
   const MESSAGES = Object.freeze({
     ready: 'ready', connecte: 'etat:connecte', reconnexion: 'etat:reconnexion', termine: 'etat:termine',
     refuse: 'etat:refuse', expire: 'etat:expire', arrete: 'etat:arrete', toggle: 'toggle',
-    proposition: 'proposition',
+    proposition: 'proposition', annulation: 'annulation',
   });
   const CLE_SECRET = 'vf.terminal.secret', CLE_ONGLET = 'vf.terminal.onglet', CLE_FIN = 'vf.terminal.fin';
   const MODES = Object.freeze(['default', 'acceptEdits', 'plan', 'herite']), PROPOSITION_MS = 1000;
@@ -91,6 +91,7 @@ export function clientTerminal(cfg) {
   const annuler = () => {
     const id = courante; fermee = id; courante = null; attente = null;
     if (id) fetch('/annuler', { method: 'POST', headers: Object.assign(entetes(), { 'Content-Type': 'application/json' }), body: JSON.stringify({ id }), cache: 'no-store' }).catch(() => {});
+    if (id) emettre('annulation'); // AUDC-M11 : P le sait (le statut « Confirmez-la » de son panneau revient à zéro) ; jamais pour une proposition effacée sans geste
     if (terminal) terminal.focus();
   };
   lire(); setInterval(lire, PROPOSITION_MS); // garde:sondage-precoce

@@ -5,13 +5,14 @@
 import { construireTiroir } from './vf-cockpit-terminal-tiroir-ui.mjs';
 import { STYLE_TIROIR } from './vf-cockpit-terminal-tiroir-style.mjs';
 
-export const LISTE_MESSAGES = Object.freeze(['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle', 'proposition']);
+export const LISTE_MESSAGES = Object.freeze(['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle', 'proposition', 'annulation']);
 // mesure O8 (71-06) : allow-popups ouvre une fenêtre dont l'opener est nul ; la décision du manager retient ces cinq jetons, aucun autre (jamais de navigation du haut, ni de formulaire)
 const SANDBOX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
 const TEXTES = {
   pastille: 'Terminal', titre: 'Terminal', ouvrir: 'Ouvrir le terminal (Ctrl+Maj+Espace)', ouvrirEnCours: 'Ouvrir le terminal, une session est en cours',
   windows: 'Terminal indisponible sous Windows.', localhost: "Ouvrez le cockpit à l'adresse 127.0.0.1 pour utiliser le terminal.",
   agrandir: 'Agrandir le terminal', reduire: 'Réduire le terminal', fermer: 'Fermer le terminal (Ctrl+Maj+Espace)', poignee: 'Hauteur du terminal',
+  terminer: 'Terminer la session', terminerConfirme: 'Confirmer : terminer', terminerAide: 'Ferme le shell et ce qui y tourne ; le terminal pourra être rouvert.', annonceTermine: 'Fin de la session demandée', annonceConfirme: 'Confirmez pour terminer la session',
   charge: 'Ouverture du terminal…', injoignable: 'Le terminal ne répond pas. Relancez ', commande: '/vf-cockpit --terminal', annonceOuvert: 'Terminal ouvert', annonceFerme: 'Terminal fermé', annonceProposition: 'Proposition de lancement dans le terminal.',
   // table unique état -> libellé de la barre (J1 de la critique 71) : chaque état de la carte de Q a son mot ; « Arrêté » ne sert plus qu'à l'état arrêté
   etats: { connecte: 'Connecté', reconnexion: 'Reconnexion…', termine: 'Terminé', arrete: 'Arrêté', refuse: 'Déjà ouvert', expire: 'Session expirée' },
@@ -121,8 +122,20 @@ function scriptTiroir(cfg, accepte, construire) {
         d.poignee.setAttribute('aria-valuenow', String(h)); d.poignee.setAttribute('aria-valuetext', h + ' px'); d.poignee.setAttribute('aria-valuemax', String(pleinMax())); // PU-G-142 : la valeur se lit avec son unité (« 324 px »)
       };
       const memoH = () => { perso = true; stock.ecrire('vf.terminal.h', h); };
+      // AUDC-M10 : « Terminer la session », double geste (le premier arme et change le mot, le second termine ; blur ou 5 s sans second geste : retour au repos) ; la page ne connaît que la route de P, qui parle à Q
+      let armeFin = null;
+      const desarmerFin = () => { clearTimeout(armeFin); armeFin = null; const t = d.boutonTerminer.querySelector('.vf-term-terminer-texte'); if (t) t.textContent = T.terminer; d.boutonTerminer.setAttribute('aria-label', T.terminer); };
+      d.boutonTerminer.addEventListener('click', () => {
+        if (armeFin === null) {
+          d.boutonTerminer.querySelector('.vf-term-terminer-texte').textContent = T.terminerConfirme; d.boutonTerminer.setAttribute('aria-label', T.terminerConfirme);
+          armeFin = setTimeout(desarmerFin, 5000); annoncer(T.annonceConfirme); return;
+        }
+        desarmerFin(); annoncer(T.annonceTermine);
+        fetch('/api/vf/terminal/terminer', { method: 'POST', headers: { 'x-vf-cockpit-token': jeton, 'Content-Type': 'application/json' }, body: '{}', cache: 'no-store' }).catch(() => { void 0; });
+      });
+      d.boutonTerminer.addEventListener('blur', desarmerFin);
       const pastilleEtat = () => {
-        d.point.hidden = !(session && !ouvert);
+        d.point.hidden = !(session && !ouvert); d.boutonTerminer.hidden = !session; if (!session) desarmerFin(); // AUDC-M10 : l'action n'existe que tant qu'une session tourne
         d.pastille.setAttribute('aria-label', session ? T.ouvrirEnCours : T.ouvrir); d.pastille.title = d.pastille.getAttribute('aria-label');
       };
       const etat = (cle) => {
@@ -161,7 +174,10 @@ function scriptTiroir(cfg, accepte, construire) {
         (visible ? ouvreur : d.pastille).focus();
       };
       // 72-14 : mot fixe de Q ; ouvrir est idempotent et ne donne jamais le focus au cadre, puis l'annonce seule est dite
-      const proposer = () => { ouvrir(false); if (!plein && h < 300) { h = borne(300); appliquer(); } annoncer(T.annonceProposition); };
+      // AUDC-M11 : le bandeau de Q (phrase, commande exacte, modes) a une hauteur d'environ 260 px et ne s'affiche en entier que dans 60 % du cadre : la page ne lit pas le cadre (autre origine, liste de messages fermée), elle donne donc au tiroir la hauteur qu'il lui faut,
+      // 480 px au plus et jamais plus de 60 % de la fenêtre ; une hauteur déjà plus grande n'est jamais réduite, la hauteur mémorisée n'est pas touchée
+      const hautBandeau = () => Math.min(480, Math.round(window.innerHeight * 0.6));
+      const proposer = () => { ouvrir(false); if (!plein && h < 300) { h = borne(300); appliquer(); } if (!plein && h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); } annoncer(T.annonceProposition); };
       const basculerPlein = () => {
         plein = !plein; d.region.classList.toggle('vf-term-plein-etat', plein);
         d.boutonPlein.setAttribute('aria-pressed', String(plein)); d.boutonPlein.setAttribute('aria-label', plein ? T.reduire : T.agrandir); d.boutonPlein.title = d.boutonPlein.getAttribute('aria-label');
@@ -213,6 +229,7 @@ function scriptTiroir(cfg, accepte, construire) {
           clearTimeout(minuterie); clearTimeout(chargeur); d.charge.hidden = true; retirerCarte();
         } else if (e.data === 'toggle') fermer();
         else if (e.data === 'proposition') proposer();
+        else if (e.data === 'annulation') document.dispatchEvent(new Event('vf-lancer-annule')); // AUDC-M11 : l'annulation faite dans Q se dit à la section de lancement du panneau, qui remet son statut à zéro
         else etat(e.data.slice(5));
       });
 

@@ -1,6 +1,7 @@
 // vf-cockpit-lancer — assemblage du lancement côté serveur P (72-09 ; P72-D-06, D-09 à D-12, D-16, D-17 ; LANC-01 à LANC-04, LANC-08, LANC-10).
 // Routes (jamais sans le drapeau : le registre du canal est alors vide, voir vf-cockpit-lancer-canal.mjs) :
 //   GET  /api/vf/lancer/cibles  { actif, terminal, claude, cibles } ; cible = { id, kind, principal, verbes, bloquants, avertissements, lancee } (jamais un titre, un Goal ni un nom)
+//   POST /api/vf/terminal/terminer  {} -> 200 { termine:true } : ferme la session du shell (AUDC-M10), le serveur du terminal reste actif
 //   POST /api/vf/lancer         { cible, verbe[, chat] } -> 202 { propose: true } : P PROPOSE seulement, la confirmation et l'écriture au PTY sont dans Q (72-10)
 // Messages envoyés à Q par l'IPC : { t:'cibles', cibles } (liste fermée recalculée du disque, toujours AVANT une proposition) puis { t:'proposition', … }.
 // Message reçu de Q : { t:'lancee', cible, verbe, session, at }, validé de façon fermée puis noté par le suivi (72-07). `lancee` d'une cible rendue : { etat, verbe } ou false.
@@ -17,7 +18,7 @@ import { creerPost } from './vf-cockpit-lancer-post.mjs';
 import { creerSuivi } from './vf-cockpit-lancer-suivi.mjs';
 import { canal } from './vf-cockpit-lancer-canal.mjs';
 
-const ROUTE_GET = '/api/vf/lancer/cibles', ROUTE_POST = '/api/vf/lancer';
+const ROUTE_GET = '/api/vf/lancer/cibles', ROUTE_POST = '/api/vf/lancer', ROUTE_TERMINER = '/api/vf/terminal/terminer';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/; // minuscules, comme le gabarit (MOTIF_UUID)
 const CLES_LANCEE = 'at,cible,session,t,verbe';
 const sur = (fn, repli) => { try { return fn(); } catch { return repli; } };
@@ -82,7 +83,9 @@ export function creerLancer({ root, here, ptoken, log = () => {} }) {
     if (!sur(() => c.envoyer(msgProposition), false)) return { statut: 503, corps: { refus: 'terminal-arrete' } };
     return { statut: 202, corps: { propose: true } };
   }
-  const routes = { [ROUTE_POST]: { champs: { cible: { type: 'string', max: 128, requis: true }, verbe: { type: 'string', max: 16, requis: true }, chat: { type: 'string', max: 36, requis: false } },
+  // AUDC-M10 : « Terminer la session » du tiroir ; mêmes contrôles que le lancement (hôte, origine, jeton de la page Projet, corps `{}`) ; ne passe que le message fermé { t:'terminer' } à Q, qui ferme le shell et garde son serveur
+  const terminer = async () => (sur(() => canal().envoyer({ t: 'terminer' }), false) ? { statut: 200, corps: { termine: true } } : { statut: 503, corps: { refus: 'terminal-arrete' } });
+  const routes = { [ROUTE_TERMINER]: { champs: {}, gestionnaire: terminer }, [ROUTE_POST]: { champs: { cible: { type: 'string', max: 128, requis: true }, verbe: { type: 'string', max: 16, requis: true }, chat: { type: 'string', max: 36, requis: false } },
     gestionnaire: async (demande) => proposer(demande) } };
   const post = () => (postObj ||= creerPost({ routes, jetons: () => [ptoken] })); // créé à la première requête servie ; seul le jeton de la page Projet est admis
 

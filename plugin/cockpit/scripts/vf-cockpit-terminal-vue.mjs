@@ -16,7 +16,7 @@ export function vueTerminal(cfg) {
   const COMMANDE = '/vf-cockpit --terminal';
   const CARTES = {
     refuse: { role: 'status', masque: true, titre: 'Terminal déjà ouvert', corps: ['Un terminal est déjà ouvert dans un autre onglet. Fermez-le, puis réessayez.'], bouton: 'Réessayer', d: 'M3 3h10v10H3z M6 8h4' },
-    sansamorce: { role: 'alert', titre: 'Terminal non disponible dans cet onglet', corps: ['Ce terminal ne s’ouvre que depuis un cockpit lancé avec le terminal. Tapez ', COMMANDE, ' dans Claude Code.'], d: 'M3 3h10v10H3z M6 8h4' },
+    sansamorce: { role: 'alert', titre: 'Terminal non ouvert dans cet onglet', /* AUDC-M10 : la vraie cause, l'amorce à usage unique de 60 s */ corps: ['Le terminal s’ouvre avec une clé à usage unique, valable 60 s, que le cockpit remet à l’onglet qu’il ouvre lui-même. Cet onglet n’en a pas reçu, ou elle est déjà utilisée ou périmée. Relancez ', COMMANDE, ' dans Claude Code : elle en prépare une neuve, sans redémarrer le serveur.'], d: 'M3 3h10v10H3z M6 8h4' },
     expire: { role: 'alert', titre: 'Session expirée', corps: ['Relancez ', COMMANDE, '.'], d: 'M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z M8 5v3.5l2 1.5' },
     horscadre: { role: 'alert', titre: 'Terminal indisponible', corps: ['Ce terminal ne s’ouvre que dans le cockpit. Relancez ', COMMANDE, '.'], d: 'M3 3h10v10H3z M6 8h4' },
     python: { role: 'alert', titre: 'Terminal indisponible', corps: ['Python 3 est introuvable sur ce poste. Installez-le, puis relancez ', COMMANDE, '.'], d: 'M3 3h10v10H3z M6 8h4' },
