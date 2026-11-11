@@ -130,7 +130,7 @@
 - [ ] Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git (inscrite 2026-11-05, jalon vibeflow-v2.0)
 - [ ] Phase 79: Socle du cockpit — une collecte, un flux, une route d'état (inscrite 2026-11-11, jalon vibeflow-v2.0)
 - [ ] Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation (inscrite 2026-11-11, jalon vibeflow-v2.0)
-- [ ] Phase 81: Agir sur une session depuis le cockpit (inscrite 2026-11-11, jalon vibeflow-v2.0, suspendue à une décision de Samuel)
+- [ ] Phase 81: Agir sur une session depuis le cockpit (inscrite 2026-11-11, jalon vibeflow-v2.0, reportée : `AUDC-Q3` tranchée « plus tard » le 2026-11-11)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
 
@@ -452,11 +452,13 @@ terminal en 71 (Recommandé) », puis « Oui, 69 / 71 / 72 (Recommandé) »). **
 **Audit du 2026-11-10 :** audit complet du cockpit, versé le 2026-11-11 dans `.planning/research/2026-11-10-audit-cockpit-etude.md` (demande de Samuel,
 session principale Claude Code, 2026-11-10 : « verses l'audit dans le planning pour cadrer les prochaines phases […] Et que ça soit corrigé
 et qu'on applique les choses qui ont été vues »). Il ajoute une source de cadrage aux Phases 73 à 77 sans réécrire leurs buts, et inscrit
-les Phases 79 (socle), 80 (formes) et 81 (actions sur une session, suspendue à une décision de Samuel). Ses corrections immédiates forment
+les Phases 79 (socle), 80 (formes) et 81 (actions sur une session, reportée). Ses corrections immédiates forment
 le lot 0, mission hors phase (`2026-11-10-audit-cockpit/LOT-0-MANDAT.md`) ; le suivi ligne à ligne se tient dans
 `2026-11-10-audit-cockpit/REGISTRE.md`. **Ordre recommandé pour la suite du jalon** (décision déléguée par Samuel, message session
 principale, 2026-11-08, option recommandée) : lot 0 → 79 et 80 en parallèle, 73 dès le lot 0 livré → 74 après la 79 → 75 → 76 → 77 ;
-81 seulement si Samuel le décide (`AUDC-Q3`).
+81 seulement si Samuel le décide (`AUDC-Q3`). **Décisions de fond tranchées le 2026-11-11** (registre § 5.1, Samuel retenant l'avis de
+la session principale) : fork du moteur assumé, index des sessions sur disque avec fenêtre de 24 h, `claude agents` en source de
+référence, Phase 81 reportée.
 
 ### Phase 67: Cockpit floorplan sur socle partagé
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-11-05.md — Phase 67 (corps : critères, plans, historique ; plans et critères aussi dans phases/VFDO-67-*) -->
@@ -666,7 +668,7 @@ Plans:
 
 ### Phase 81: Agir sur une session depuis le cockpit
 
-> **Non cadrée, suspendue à une décision de Samuel** (`AUDC-Q3` : elle rouvre « pas de terminal sur l'onglet Équipe », Q8 du 2026-11-06, les gestes réservés aux agents de la session courante, P68-D-03, et la frontière de la Phase 72, « Reprendre » sur les cartes Équipe). Inscrite le 2026-11-11 depuis l'audit du cockpit du 2026-11-10 (demande de Samuel, session principale Claude Code, 2026-11-10 ; numéro et découpage : décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée).
+> **Non cadrée, reportée : `AUDC-Q3` tranchée « plus tard » par Samuel le 2026-11-11** (elle rouvre « pas de terminal sur l'onglet Équipe », Q8 du 2026-11-06, les gestes réservés aux agents de la session courante, P68-D-03, et la frontière de la Phase 72, « Reprendre » sur les cartes Équipe). Inscrite le 2026-11-11 depuis l'audit du cockpit du 2026-11-10 (demande de Samuel, session principale Claude Code, 2026-11-10 ; numéro et découpage : décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée).
 
 **Goal:** Depuis la fiche d'un agent ou d'une session, ouvrir la session dans le terminal, lui écrire, demander son arrêt ou la bifurquer : chaque action prépare une commande, la touche Entrée l'exécute. Un audit de sécurité complet accompagne la phase, comme pour la 71.
 **Requirements**: TBD — famille `AGIR` réservée, posée au cadrage.

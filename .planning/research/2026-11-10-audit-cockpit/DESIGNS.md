@@ -3,7 +3,7 @@
 > Annexe de `.planning/research/2026-11-10-audit-cockpit-etude.md`. Ce fichier décrit en texte les maquettes de
 > l'audit, pour qu'un cadrage, un `vf-crafter` ou un juge puisse les citer sans ouvrir la page. Les maquettes
 > elles-mêmes sont dans `page/audit-cockpit.html` (sections « L'onglet Équipe, repensé » et « Interface et design »),
-> à ouvrir dans un navigateur. Ce sont des **propositions** : aucune n'est arbitrée, et `DESIGN.md` (direction
+> à ouvrir dans un navigateur. Leur **direction** a été retenue par Samuel le 2026-11-11, en retenant l'avis de la session principale ; leur détail reste une proposition à recetter, et `DESIGN.md` (direction
 > « Graphite ») reste la référence.
 
 ## 1. La décision de design : trois onglets, trois formes
@@ -86,8 +86,8 @@ Une voie par agent, les enfants sous leur parent, une horloge commune à tout le
 - **Axe** : graduations régulières, trait « maintenant » à droite.
 - **Deux lectures du même axe** : *Horloge* (les durées sont vraies) et *Événements* (les silences sont compressés,
   sinon une minute dense devient un trait et une nuit creuse un désert).
-- **Fenêtres** : 1 h 30, 6 h, 24 h, 7 j. La dernière dépasse la fenêtre de 24 h de la Phase 69 (P69-D-18) ; conserver
-  l'index sur disque est une décision à part (AUDC-Q2).
+- **Fenêtres** : 1 h 30, 6 h, 24 h. La maquette montre aussi « 7 j » : elle dépasse la fenêtre de 24 h de la Phase 69
+  (P69-D-18) et sort du périmètre (AUDC-Q2, tranchée le 2026-11-11 : index sur disque, fenêtre de 24 h gardée).
 - **Gestes** : un clic sur une voie ouvre la fiche de l'agent ; un clic sur un commit ouvre le tiroir Git.
 
 Ce que la frise répond : qui a tourné en parallèle, qui a attendu quoi, combien de temps d'agent a été perdu à

@@ -229,7 +229,7 @@ les sources, les bornes, le retrait, et ce qui reste à décider. Le cadrage res
   d'outil, jamais exportés (P69-D-19, P69-D-23) ; clés `doing`, `mandat`, `messages`, `outils` refusées à l'émission.
 - Retraits : la page Équipe reconstruite à chaque requête ; la collecte refaite par `vf-signal` ; la copie renommée
   de 52 modules.
-- À décider au cadrage : AUDC-Q2 (index sur disque), AUDC-Q5 (fork ou amont). Touche aussi `plugin/conductor`
+- Tranché le 2026-11-11 : index sur disque avec fenêtre de 24 h (AUDC-Q2), fork assumé (AUDC-Q5). Touche aussi `plugin/conductor`
   (registre du verrou, doctrine du team-kernel) et les managers de `plugin/dev-orchestrator` et
   `plugin/design-orchestrator` (nœud écrit dans le mandat).
 
@@ -254,7 +254,7 @@ les sources, les bornes, le retrait, et ce qui reste à décider. Le cadrage res
 - Sources : état lu des sessions (lot 0), plan de mission déjà lu pour compter les nœuds en aval, registre du verrou.
 - Ne dépend pas de la Phase 79 : la régie se construit sur le flux actuel, enrichi par le lot 0.
 - Retraits : le canevas de l'onglet Équipe ; le nom écrit trois fois ; la carte « Terminés depuis moins de 24 h ».
-- À décider au cadrage : AUDC-Q4. Recoupement déjà noté au ROADMAP avec la Phase 78 (état des worktrees).
+- Tranché le 2026-11-11 : AUDC-Q4, l'état officiel en source de référence. Recoupement déjà noté au ROADMAP avec la Phase 78 (état des worktrees).
 
 **Phase 74 — L'équipe dans le temps** (inscrite le 2026-11-03, but inchangé)
 - L'audit y apporte : la frise (AUDC-I05, DESIGNS § 4), la fiche d'agent et le lecteur (AUDC-I04, I28, M4, D8), les
@@ -263,8 +263,7 @@ les sources, les bornes, le retrait, et ce qui reste à décider. Le cadrage res
 - Trois corrections à la note d'origine : les horodatages sont dans les transcripts, pas dans `meta.json` ; « colorée
   par nœud de DAG » contredit DESIGN § 9, le nœud s'écrit sur la voie ; une frise au-delà de 24 h rouvre P69-D-18.
 - Dépend de la Phase 79 (index, route de frise). Lire le champ `usage` demande d'étendre le contrat de forme.
-- Hérite de AUDC-Q2 (tranchée au cadrage de la 79) pour les fenêtres au-delà de 24 h, et de AUDC-Q4 (tranchée au
-  cadrage de la 73). Recoupement : Phase 52 (télémétrie et coût de mission), un seul calcul à partager.
+- AUDC-Q2 et AUDC-Q4 sont tranchées (2026-11-11) : la frise s'arrête à 24 h, la fenêtre « 7 j » sort du périmètre. Recoupement : Phase 52 (télémétrie et coût de mission), un seul calcul à partager.
 
 **Phase 75 — L'activité posée sur le code** (inscrite le 2026-11-03, but inchangé)
 - L'audit y apporte : le radar de collisions (AUDC-I12), l'empreinte en direct (AUDC-I13), les trois idées de
@@ -279,7 +278,7 @@ les sources, les bornes, le retrait, et ce qui reste à décider. Le cadrage res
 - L'audit y apporte : « depuis votre dernière visite » à avancer dans l'ordre (AUDC-I14) ; le coût par phase et par
   étage dans la synthèse (AUDC-I08). Dépend de la Phase 79 pour le coût.
 
-**Phase 81 — Agir sur une session depuis le cockpit** (nouvelle, suspendue à AUDC-Q3)
+**Phase 81 — Agir sur une session depuis le cockpit** (nouvelle, reportée : AUDC-Q3 tranchée « plus tard » le 2026-11-11)
 - Absorbe : AUDC-I11 ; voisine du sujet BACKLOG « plusieurs terminaux ».
 - Forme : chaque action prépare une commande dans le terminal (`claude attach`, `--resume`, `stop`,
   `--fork-session`) ; la touche Entrée l'exécute (DESIGNS § 5).
@@ -307,6 +306,14 @@ peut valoir le mode sans permissions ; AUDC-Q2 l'index sur disque ; AUDC-Q3 des 
 AUDC-Q4 la vue d'agents de Claude Code comme source de référence ; AUDC-Q5 suivre l'amont du moteur ou assumer le
 fork. Aucune ne bloque le lot 0 ni la Phase 80. AUDC-Q2 et AUDC-Q5 se tranchent au cadrage de la Phase 79, AUDC-Q4 à
 celui de la 73, AUDC-Q3 conditionne la 81 ; AUDC-Q1 porte sur un comportement déjà livré.
+
+**Tranché le 2026-11-11.** Samuel a retenu l'avis de la session principale sur ces cinq décisions et sur la direction
+des quatre formes (Samuel, session principale Claude Code, 2026-11-11, mot pour mot : « Prends ton avis pour chaque point que tu m'as demandé. ») : fork du moteur
+assumé (AUDC-Q5) ; index des sessions sur disque, fenêtre de 24 h gardée (AUDC-Q2) ; `claude agents` en source de
+référence, transcripts en repli (AUDC-Q4) ; actions depuis l'onglet Équipe plus tard, donc Phase 81 reportée
+(AUDC-Q3) ; mode « hérité du poste » laissé tel que livré (AUDC-Q1 : cet avis n'avait pas été écrit avant la
+délégation, à reconfirmer à la prochaine recette du lancement) ; régie, frise, fiche d'agent et Projet en couloirs
+retenus comme direction, leur détail restant à recetter.
 
 Huit réouvertures d'arbitrages passés se tranchent au cadrage de la phase qui porte la ligne (registre § 5.1) ; l'une
 a sorti une ligne du lot 0 (AUDC-B-05, à trancher avec AUDC-Q1). AUDC-F6 en est sortie aussi, sans être une
