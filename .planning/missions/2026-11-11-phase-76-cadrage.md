@@ -156,7 +156,30 @@ vérification fraîche 272 532.
 
 ## Preuves E6
 
-PREUVES_E6
+Format : verdict — commande — code de sortie — SHA. Mission de cadrage : aucune suite de tests n'est jouée (aucun code).
+
+- Job `gates` de ci.yml, étapes 1 à 20 rejouées une à une sous `bash -e` (étapes 21 et 24 réservées au push sur main,
+  23 demande une installation npm réseau, non jouée) — rc 0 pour les 20 — `608db651`.
+- STATE intouché — `git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md` —
+  rc 0 — `608db651`.
+- Couverture des exigences — union des `requirements:` du frontmatter des huit plans = TRAC-01 à TRAC-12 — `1742ed24`.
+- Vérification fraîche complète des plans (`gsd-plan-checker`) — ISSUES FOUND (1 bloquant, 5 avertissements) sur
+  `1b77b255` ; après révision, vérificateur frais scopé — VERIFICATION PASSED — `1742ed24`.
+- Critique de design de l'UI-SPEC (`vf-design-judge`, frais à chaque tour) — 75/100 gaps_found sur `2baf53e6`,
+  73/100 passed sur `d0117b6b`, majeurs fermés en `7301d271`.
+- Famille `TRAC` libre — `rtk proxy grep -rIl 'TRAC-[0-9]' .planning plugin docs` — rc 1 (aucune occurrence) — `f763b556`.
+
+```json
+{
+ "preuves": [
+  {"verdict": "gate:ci-gates-1-20", "commande": "étapes 1 à 20 du job gates de .github/workflows/ci.yml, bash -e, une par une", "exit_code": 0, "sha": "608db651"},
+  {"verdict": "state-intouche", "commande": "git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md", "exit_code": 0, "sha": "608db651"},
+  {"verdict": "plans-verifies", "commande": "gsd-plan-checker frais (complet puis scopé à la révision)", "exit_code": 0, "sha": "1742ed24"},
+  {"verdict": "ui-spec-critique", "commande": "vf-design-judge frais, 73/100 passed", "exit_code": 0, "sha": "d0117b6b"},
+  {"verdict": "famille-trac-libre", "commande": "grep -rIl 'TRAC-[0-9]' .planning plugin docs", "exit_code": 1, "sha": "f763b556"}
+ ]
+}
+```
 
 ## Prochaine étape
 
