@@ -1,8 +1,8 @@
 # Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte - Context
 
 **Gathered:** 2026-11-11
-**Status:** Cadrée (2026-11-11) — frontière de questions vide côté mission ; cinq questions non bloquantes à Samuel
-(section « À Samuel ») ; bâtie sur les contrats figés de la Phase 79 (branche `feat/phase-79-socle-cockpit`, commit
+**Status:** Cadrée (2026-11-11) — frontière de questions vide côté mission ; trois questions non bloquantes à Samuel encore ouvertes, Q-75-3 et Q-75-4 tranchées
+le 2026-11-11 (section « À Samuel ») ; bâtie sur les contrats figés de la Phase 79 (branche `feat/phase-79-socle-cockpit`, commit
 `3119d82a`, `79-CONTEXT.md` § « Contrats fournis », C0 à C6, amendés par `2ae6607a` (A1-A14) et `6f66d878` (A21-A28)) ;
 les sept manques relayés à la 79 sont fermés par A21 à A27 (section « Contrats de la Phase 79 retenus »).
 
@@ -37,10 +37,10 @@ le lab ; aucune lecture réseau.
 « prévues », agent par zone fondu dans l'empreinte) ; idées 5, 6, 7 et 8 de la note du 2026-11-03 ; la part « hotspots et
 couplage » laissée à la 75 par P78-D-08.
 
-**Retire (un ajout, un retrait) :** en vigueur, `scripts/recent.mjs` du moteur, jamais appelé. Le retrait de la couche
-déclarative « Travail récent » (`recent-work.json`, tableau `ui/25-recent.js`, classes `.recent`/`.recent-in`, bascule
-binaire) touche un arbitrage rendu par Samuel (P70-D-01) : il attend sa réponse à Q-75-3 et n'est pas tranché par
-délégation. D'ici là, la couche reste, sous la forme du repli de P75-D-20 (lentille « Récent »).
+**Retire (un ajout, un retrait) :** la couche déclarative « Travail récent » (fichiers des deux dernières phases faites :
+`recent-work.json`, tableau `ui/25-recent.js`, classes `.recent`/`.recent-in`, bascule binaire) et `scripts/recent.mjs` du
+moteur, jamais appelé. L'entrée du menu « ⋯ » qui la portait reste au même endroit, avec un libellé et une pastille de
+compte, et devient le sélecteur de lentilles (P75-D-28, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).
 
 **Hors périmètre :**
 - Les constats de l'auditeur posés sur les cartes (troisième idée de AUDC-I36) : aucune source typée sur disque ; en
@@ -105,10 +105,12 @@ et ne sont pas rouverts.
   moteur est gelé (Phase 80) : le canal vit sous un espace de noms à part ; le point d'accroche dans le rendu des cartes,
   s'il en faut un, est posé dans le source du moteur (fork assumé, AUDC-Q5 ; après la vague 1 de la 79, aucun diff de
   patch). Il s'initialise par `VF_COQUILLE.surOnglet(rappel)` quand l'onglet vaut Code et se nettoie quand on le quitte
-  (amendement A30 de la 79, `74501bb0`) ; une surcouche éventuelle passe par `window.VF_SURCOUCHES` (P80-D-33 à D-41). Il sert la 75 (quatre lentilles, collisions)
-  et la relecture de la Phase 74 (AUDC-I06), qui prend la place le temps d'une relecture puis la rend. **Qui le pose :** la
-  phase exécutée la première ; l'ordre du jalon met la 79 et la 80, puis la 74, avant la 75. Si la 74 le pose, la 75 l'étend ; sinon la 75 le
-  pose et la 74 s'y branche. Point à recouper à la jointure (rapport, « À verser par la jointure »). (Panel A.)
+  (amendement A30 de la 79, `74501bb0`) ; une surcouche éventuelle passe par `window.VF_SURCOUCHES` (P80-D-33 à D-41).
+  **Qui le pose (relevé le 2026-11-11 sur `origin/feat/phase-74-equipe-dans-le-temps`) :** la 75, au plan 75-07. La 74
+  ne crée aucun canal de marquage : sa relecture (AUDC-I06, « Voir sur la carte », P74-D-12) passe par le tableau existant
+  du moteur (`showBoard`) et ne pose aucune marque de carte persistante. Le canal sert donc la 75 seule (quatre lentilles,
+  collisions) ; la relecture de la 74 pourra s'y brancher plus tard. Les fichiers d'interface de la 75 ne réutilisent pas
+  la plage de noms `ui/75-vf-*` de la 74. (Panel A.)
 - **P75-D-06 (accessibilité).** Le mot de la lentille active entre dans le nom accessible de la carte (forme posée par la
   Phase 80, AUDC-BL2) ; toute marque se lit sans la couleur ; contraste du glyphe ≥ 3:1 sur `--raise` et `--canvas` dans
   les deux thèmes.
@@ -170,9 +172,13 @@ et ne sont pas rouverts.
   cartes de nœud. (Panel C ; panel D pour I36.)
 - **P75-D-14 (normalisation des chemins).** Tout chemin est ramené à `{arbre, chemin relatif à l'arbre}`. La 79 fournit
   la cible relative à la racine réelle de l'arbre de la voie quand cet arbre est sous le lab (A22), calculée sur le
-  chemin réel par la fonction unique de la classe AUDC-A-02 (A23). Un worktree hors du dossier du lab donne « un fichier
-  hors du lab » (CKPT-22 en vigueur, question S-3 de la 79) : la lentille et le radar le **disent** (« N écritures hors
-  du lab, non vues par le radar »), jamais en silence. Une écriture dans un worktree retombe sur la carte du même chemin
+  chemin réel par la fonction unique de la classe AUDC-A-02 (A23). Depuis l'arbitrage Samuel du 2026-11-11 (Q-75-4 = S-3,
+  P75-D-29) et l'amendement A45 de la 79 (P79-D-33) : un worktree **prouvé** du même dépôt (`verifie: true` dans
+  `cockpit-git-worktrees@1`) compte comme le lab ; chaque cible arrive sous la forme `{ arbre, cible, n, dernierMs }`,
+  `arbre` valant `null` pour l'arbre principal ou le `nom` du worktree vérifié, `cible` relative à la racine réelle de
+  cet arbre ramenée au sous-dossier du lab ; le radar joint par le couple (`arbre`, `cible`) et voit ces worktrees. Un
+  dossier qui n'est pas un worktree prouvé du dépôt reste « un fichier hors du lab » : la lentille et le radar le
+  **disent** (« N écritures hors du lab, non vues par le radar »), jamais en silence. Une écriture dans un worktree retombe sur la carte du même chemin
   relatif. Seul un chemin qui a déjà une carte est dessiné ;
   les autres sont comptés (« N hors carte », « N hors du lab »), jamais affichés. Sorties de `diff-tree` : relatives au
   dépôt, préfixe du lab retiré si le lab n'est pas à la racine. (Panels B et C.)
@@ -186,6 +192,19 @@ et ne sont pas rouverts.
   une collision. Forme : un glyphe neutre de forme distincte et un mot (« écrit par 2 agents », « modifié sur 2 branches »,
   « prévu par 2 plans, vague N ») dans le pied, une section du panneau de détail avec les noms, et un compte visible sans
   lentille active à un emplacement que fixe la spécification d'interface (jamais une couleur d'alerte). (Panels B et C.)
+
+- **P75-D-30 (radar et forme A45 — précisions du 2026-11-11).** Décision déléguée par Samuel (message session principale,
+  2026-11-08), option recommandée, sur les deux points relayés par la session principale :
+  (1) la valeur « un fichier hors du lab » est une **sentinelle, pas une cible** : elle est écartée de toute jointure
+  (deux écritures non prouvées de deux agents ne font jamais une collision, bien qu'elles portent le même couple
+  (`null`, sentinelle)) et comptée à part (« N écritures hors du lab, non vues par le radar ») ; témoin capable de rougir
+  (deux agents, deux écritures non prouvées → aucune collision ; mutant « sentinelle jointe » rouge) ;
+  (2) le même chemin relatif dans deux arbres différents (`arbre` différent) n'est pas le même fichier sur le disque :
+  c'est le **même fichier logique sur deux branches**, ce qui annonce un conflit de fusion ; le radar le signale sous un
+  mot distinct (« modifié dans 2 arbres : conflit de fusion possible »), jamais confondu avec la collision dans un même
+  arbre (« écrit en même temps par 2 agents ») ; la carte, elle, est retrouvée par `cible` seule, la classification de
+  la collision par `arbre`. Témoins : un même `cible` dans deux arbres → signal « 2 arbres », pas « même arbre » ; le même
+  `cible` dans le même arbre par deux agents vivants non parent-enfant → « même arbre » ; mutants croisés.
 
 ### Gardes
 
@@ -220,27 +239,33 @@ et ne sont pas rouverts.
 
 ### Retrait
 
-- **P75-D-20 (retrait principal — CONDITIONNÉ à Q-75-3).** **État en vigueur (2026-11-11, mandat de clôture de la session
-  principale) :** Q-75-3 touche un arbitrage rendu, P70-D-01 (réponse Q1-A de Samuel, 2026-11-03, qui nomme « Travail
-  récent » parmi les actions du menu « ⋯ » avec sa pastille de compte) ; l'audit du 2026-11-10 ne range pas cette couche
-  parmi ses retraits (registre § 3). Le retrait de la couche n'est donc **pas tranché par délégation** : la couche
-  **reste, sous la forme du repli** ci-dessous, et seul `scripts/recent.mjs` est retiré sans condition. Les tâches des
-  plans qui exécutent une part du retrait portent une condition de départ (réponse de Samuel à Q-75-3, option (a)).
-  Description du retrait, applicable seulement si Samuel répond (a) — retirés : l'écriture de `recent-work.json` (`vf-cockpit-build.mjs:70-80`), le tableau
-  `ui/25-recent.js` (patchs du moteur), les classes `.recent`/`.recent-in` et l'infobulle `recentTip`, la bascule
-  binaire « Travail récent », et `scripts/recent.mjs` du moteur (jamais appelé par l'assemblage VibeFlow) ; une ligne
-  `RETRAIT` dans `VENDORED.txt` pour chacun. Le jeton `--recent` reste (P71.5-D-26, D-29 ; il porte la teinte « en
-  cours »). L'entrée du menu « ⋯ » qui portait « Travail récent » devient le sélecteur de lentilles **à la même place,
-  avec un libellé et sa pastille de compte** (compte des fichiers en cours d'écriture) : la composition de P70-D-01 est
-  tenue selon une lecture de P70-D-01 (« un emplacement et un libellé, pas l'existence de la couche ») qui est une
-  interprétation et ne vaut pas décision ; question Q-75-3. Motif : la
-  couche est une approximation déclarative (le spike la disait « à remplacer par le diff réel ») que l'empreinte observée,
-  les cartes prévues et la frise de la 74 remplacent. Retrait **dans le même lot** que la mise en service de l'empreinte,
-  jamais avant. Suites qui la citent (`test-cockpit-ecrans-recent.sh`, `test-cockpit-onglet-code.sh` C6.3,
-  `chrome-moteur-carte`, la sonde de lien symbolique M4 de `test-cockpit-securite.sh`) **adaptées, jamais supprimées** :
-  la sonde M4 est reportée sur un autre fichier écrit par le socle (doctrine du 2026-09-16, « ne pas supprimer pour
-  verdir »). **Repli, en vigueur tant que Samuel n'a pas répondu (a) :** « Récent » devient une lentille de plus, même
-  canal, même emplacement ; le retrait se réduit à `scripts/recent.mjs` seul. (Panel D.)
+- **P75-D-20 (retrait principal — ferme depuis P75-D-28).** Retirés : l'écriture de `recent-work.json`
+  (`vf-cockpit-build.mjs:70-80`), le tableau `ui/25-recent.js` (patchs du moteur), les classes `.recent`/`.recent-in` et
+  l'infobulle `recentTip`, la bascule binaire « Travail récent », et `scripts/recent.mjs` du moteur (jamais appelé par
+  l'assemblage VibeFlow) ; une trace `RETRAIT` dans `VENDORED.txt` dans la forme que lui laisse 79-01. Le jeton `--recent`
+  reste (P71.5-D-26, D-29 ; il porte la teinte « en cours »). L'entrée du menu « ⋯ » qui portait « Travail récent » reste
+  au même endroit, avec un libellé et une pastille de compte, et devient le sélecteur de lentilles : P70-D-01 est amendée
+  dans cette mesure exacte, pas au-delà (P75-D-28). Motif : la couche est une approximation déclarative que l'empreinte
+  observée prend en charge. Retrait **dans le même lot** que la mise en service de l'empreinte, jamais avant. Suites qui
+  la citent (`test-cockpit-ecrans-recent.sh`, `test-cockpit-onglet-code.sh` C6.3, `chrome-moteur-carte`, la sonde de lien
+  symbolique de `test-cockpit-securite.sh`) **adaptées, jamais supprimées** ; la sonde de lien symbolique est reportée sur
+  un autre fichier écrit par le socle (doctrine du 2026-09-16, « ne pas supprimer pour verdir »). Le tableau générique du
+  moteur (`showBoard`) reste : la relecture de la 74 s'en sert. (Panel D.)
+
+### Arbitrages de Samuel du 2026-11-11 (AskUserQuestion, session principale ; relayés mot pour mot)
+
+- **P75-D-28 (Q-75-3, couche « Travail récent ») — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11.**
+  Réponse cochée : « La remplacer (Recommandé) ». Option telle qu'elle a été présentée : « L'empreinte observée prend sa
+  place. L'entrée du menu « ⋯ » reste au même endroit, avec un libellé et une pastille de compte, et devient le sélecteur
+  de vues. C'est aussi le retrait que le jalon demande à cette phase. » P70-D-01 est amendée dans cette mesure exacte, pas
+  au-delà. Les conditions de départ posées le 2026-11-11 sur les tâches de retrait sont levées ; la branche de repli
+  (lentille « Récent ») est retirée des plans.
+- **P75-D-29 (Q-75-4 = S-3 de la 79, worktrees hors du dossier du lab) — arbitrage Samuel, AskUserQuestion session
+  principale, 2026-11-11.** Réponse cochée : « Les compter comme le lab (Recommandé) ». Option telle qu'elle a été
+  présentée : « Un worktree vérifié comme appartenant au même dépôt compte comme le lab : le fichier s'affiche par son
+  chemin relatif à la racine du worktree, aucun chemin absolu ne sort. Le radar voit alors ces worktrees. Un dossier qui
+  n'est pas un worktree du dépôt reste « hors du lab ». » CKPT-22 est précisée ainsi. Forme du contrat : amendement A45 de
+  la 79 (P79-D-33, `origin/feat/phase-79-socle-cockpit`, `6fb94fb7`) ; voir P75-D-14.
 
 ### Calcul côté serveur
 
@@ -306,22 +331,15 @@ paliers (fixés par la spécification d'interface et sa critique), format intern
   l'option (a) de la 79 suffit au direct et au radar ; seule une empreinte de mission ancienne justifierait (b). Options : (a) garder **(recommandé : suffit au direct et au radar, aucune
   donnée nouvelle sur disque)** ; (b) persister les cibles de fichiers dans l'index pour voir l'empreinte d'une mission
   ancienne, ce qui rouvre AUDC-Q2.
-- **Q-75-4 — Worktrees hors du dossier du lab (renvoie à S-3, posée par la Phase 79).** En vigueur (CKPT-22) : une
-  écriture dans un worktree hors du dossier du lab est « un fichier hors du lab » ; le radar ne la voit pas et le dit.
-  Avis de la 75 sur S-3 : l'option (b) de la 79 (un worktree du même dépôt compte comme le lab, cible relative à sa
-  racine) rendrait le radar complet sans faire sortir de chemin du poste ; c'est précisément le cas d'une flotte de
-  managers en worktrees frères. Aucun plan de la 75 ne change si (b) est retenue : la cible arrive déjà par arbre (A22).
+- **Q-75-4 — Worktrees hors du dossier du lab — TRANCHÉE** : arbitrage Samuel, AskUserQuestion session principale,
+  2026-11-11, « Les compter comme le lab (Recommandé) » (P75-D-29).
 - **Q-75-5 — Pastille de compte pleine.** Le bouton « Travail récent » livré porte en largeur de bureau une pastille de
   compte à fond plein `--recent`, alors que P71.5-D-19 et `DESIGN.md` (interdits : « un fond teinté pour un état »)
   demandent une pastille sans fond. La 75 bâtit son sélecteur sur la règle (P75-D-27). Options : (a) pastille neutre
   partout **(recommandé : la règle écrite, et le « ⋯ » la tient déjà)** ; (b) garder la pastille pleine en bureau comme
   exception écrite dans `DESIGN.md`.
-- **Q-75-3 — Retrait du « Travail récent » (touche un arbitrage rendu : non tranchée par délégation).** P70-D-01 (votre
-  réponse Q1-A du 2026-11-03) range « Travail récent » dans le menu « ⋯ » avec sa pastille. **En vigueur jusqu'à votre
-  réponse : la couche reste, sous la forme du repli (lentille « Récent »).** Le cadrage remplace cette couche par l'empreinte observée et met le sélecteur de lentilles à
-  la même place (P75-D-20). Options : (a) retirer la couche, l'entrée devient le sélecteur **(recommandé : la couche est
-  une approximation que la phase remplace par de l'observé, et c'est le retrait que le jalon exige)** ; (b) la garder comme
-  une lentille « Récent » de plus, le retrait se réduisant à `recent.mjs`.
+- **Q-75-3 — Retrait du « Travail récent » — TRANCHÉE** : arbitrage Samuel, AskUserQuestion session principale,
+  2026-11-11, « La remplacer (Recommandé) » (P75-D-28).
 </to_samuel>
 
 <phase79_contract>
