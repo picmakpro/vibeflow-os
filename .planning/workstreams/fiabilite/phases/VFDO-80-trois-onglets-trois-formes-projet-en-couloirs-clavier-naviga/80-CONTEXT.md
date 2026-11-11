@@ -455,7 +455,8 @@ Faits établis par la recherche qui corrigent la forme de décisions déjà pris
   P80-D-06 (`avancement`, `exigences {faits,total}` sur la phase, `vague` sur le plan) se posent dans la lecture du
   planning de la collecte (`plugin/cockpit/scripts/vf-cockpit-planning.mjs`, `readPlanning`) puis sont projetés sur le
   graphe (`vf-cockpit-project.mjs`) ; jamais par une lecture à part. `vf-cockpit-planning.mjs` est aussi modifié par la
-  79 et par la 75 : collision nommée dans la carte des fichiers. **La 80 pose `vague`** sur le plan (son panneau et sa
+  75 (collision nommée dans la carte des fichiers) ; aucun plan de la 79 ne le modifie (mesuré sur ses 22 plans, tête
+  `26019872`). **La 80 pose `vague`** sur le plan (son panneau et sa
   liste en ont besoin, et ses vagues 1 et 2 ne dépendent pas de la 79) ; la Phase 75 la lit et n'ajoute que
   `files_modified`. La 80 ne calcule rien côté serveur hors de cette lecture : `vf-cockpit-instantane.mjs` (A31) ne la
   concerne pas.
