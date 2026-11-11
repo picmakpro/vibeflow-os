@@ -136,14 +136,22 @@
     const direct = liste.map((w) => [idCarte(w), w.etat === 'termine']);
     if (signature(direct) !== signature(dansCarte())) { recharger(); return; }
     const parId = new Map(liste.map((w) => [idCarte(w), w]));
-    const compte = { actif: 0, enAttente: 0, termine: 0 };
-    for (const w of liste) { if (R().actif(w)) compte.actif++; else if (w.etat === 'termine') compte.termine++; else compte.enAttente++; } // même prédicat que le badge de l'en-tête (70-vf-live.js)
+    const compte = { actif: 0, enAttente: 0, auRepos: 0, attend: 0, termine: 0 };
+    for (const w of liste) { if (R().actif(w)) compte.actif++; else if (w.etat === 'termine') compte.termine++; else if (w.etat === 'au-repos') compte.auRepos++; else if (w.etat === 'attend') compte.attend++; else compte.enAttente++; } // même prédicat que le badge de l'en-tête (70-vf-live.js)
     for (const x of G.nodes) { const w = parId.get(x.id); if (w) { x.st = R().st(w); x.foot = R().piedCarte(w); } }
     G.meta.vf = { ...G.meta.vf, compte };
     await SC.rerender();
     arrivee();
   }
   document.addEventListener('vf-who', suivre);
+  // AUDC-D3 : entre deux poussées l'âge avance dans les pieds de carte et la ligne « Activité » du panneau (le tiroir a sa propre minuterie, 70-vf-live.js) : toutes les 30 s, pieds recalculés et vue redessinée
+  const rafraichirAges = async () => {
+    if (document.hidden || !window.__vfLive?.who) return;
+    const parId = new Map(equipe(window.__vfLive.who).map((w) => [idCarte(w), w]));
+    for (const x of G.nodes) { const w = parId.get(x.id); if (w) x.foot = R().piedCarte(w); }
+    await SC.rerender();
+  };
+  if (typeof setInterval === 'function') setInterval(rafraichirAges, 30000); // `typeof` : le harnais vm de test-cockpit-equipe.sh n'a pas de minuterie
   SC.on('ready', () => { arrive = true; plafond(); for (const [id, w] of parCarte()) { const x = G.nodes.find((n) => n.id === id); if (x) x.foot = R().piedCarte(w); } });
 
   // panneau d'une carte d'agent ou de session

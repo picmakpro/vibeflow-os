@@ -27,8 +27,8 @@
       "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "fenetre": "number", "busy": "boolean", "workers": "array", "sources": "object" },
       "travailleur": {
         "requis": ["kind", "id", "tree", "source"],
-        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "action", "rattachement"],
-        "etats": ["actif", "en-attente", "termine"]
+        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "action", "rattachement", "enCours"],
+        "etats": ["actif", "en-attente", "au-repos", "attend", "termine"]
       },
       "rattachement": {
         "etats": ["rattache", "non-rattache"],
@@ -103,6 +103,12 @@
     },
     "transcriptSousAgent": {
       "requis": ["isSidechain", "agentId"]
+    },
+    "vueAgents": {
+      "description": "sortie de `claude agents --json` (AUDC-V8), enrichissement optionnel de l'état des sessions ; jamais la source unique",
+      "cleSession": "sessionId",
+      "etats": { "working": "actif", "blocked": "attend", "done": "termine", "failed": "termine", "stopped": "termine" },
+      "statuts": { "busy": "actif", "waiting": "attend", "idle": "au-repos" }
     },
     "transcriptTitre": {
       "type": "custom-title",

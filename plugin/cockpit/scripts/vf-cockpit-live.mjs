@@ -66,7 +66,7 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
     try { return JSON.parse(execFileSync('bash', [dl.chemin, 'status', '--all'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, env: envEnfant(root) })); }
     catch (e) { try { return JSON.parse(e.stdout); } catch { return { error: String(e.message).slice(0, 200) }; } }
   };
-  const whoNow = (verrous) => { try { return collectWho(root, { scriptsDir, verrous }); } catch (e) { return { workers: [], sources: {}, error: e.message }; } };
+  const whoNow = (verrous) => { try { return collectWho(root, { scriptsDir, verrous, officiel: true }); } catch (e) { return { workers: [], sources: {}, error: e.message }; } };
   // « qui » : poussé seulement quand la liste change (pas à chaque seconde d'âge qui passe)
 
   let graph = buildProjectGraph(root), idx = index(graph), lock = lockStatus(), who = whoNow(lock), gitSig = null, gitSemee = false; // 78-09

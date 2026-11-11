@@ -244,7 +244,7 @@ cat > "$AUX/spec-e20b.json" <<'JSON'
 JSON
 H20B="$(mkhome e20b "$AUX/spec-e20b.json" "$LAB")"
 Q who "$LAB" "$H20B" "$NOSCRIPTS" "$NOW" > "$WORK/who-e20b.json"
-assert_eq "E20.5 — session silencieuse et un seul terminé : busy = false et la session racine est termine" "$(G "$WORK/who-e20b.json" 'j.busy+"|"+((j.workers.find(x=>x.kind==="session"&&x.id==="'$SID'")||{}).etat)')" "false|termine"
+assert_eq "E20.5 — session silencieuse et un seul terminé : busy = false et la session racine est au repos (jamais « terminé », AUDC-D2)" "$(G "$WORK/who-e20b.json" 'j.busy+"|"+((j.workers.find(x=>x.kind==="session"&&x.id==="'$SID'")||{}).etat)')" "false|au-repos"
 
 echo "=== E21 — rattachement aux nœuds de mission (P69-D-15) ==="
 LAB21="$WORK/lab21"; mkdir -p "$LAB21/.planning/missions"; git -C "$LAB21" init -q
@@ -407,7 +407,7 @@ const { litteraux, estAnglais } = await import(pathToFileURL(path.join(scripts, 
 const CONNU = {
   '70-vf-live.js': ['Driver libre', 'Session', 'Verrou', 'Nœud de DAG', '{} min', ' · orphelin', '<p>Personne. Sources lues : ', 'Personne', 'tenu depuis', 'Agent', 'Source illisible', 'Sources illisibles'],
   '72-vf-equipe.js': ['Source illisible', 'Sources illisibles'],
-  '71-vf-equipe-rendu.js': ['Session', 'en attente', '{} min', ' · orphelin', 'Agent', 'Mandat', 'Messages', 'Outils', 'Session principale', ', orphelin', 'arbre principal', ' · en attente', ', orphelin ?'], // libellés français affichés, que estAnglais prend pour de l'anglais faute d'accent (la sonde voit tout autre littéral)
+  '71-vf-equipe-rendu.js': ['Session', 'en attente', '{} min', ' · orphelin', 'Agent', 'Mandat', 'Messages', 'Outils', 'Session principale', ', orphelin', 'arbre principal', ' · en attente', ', orphelin ?', 'Mission : {}', 'agents actifs', 'agent actif', 'Agents : {} {} · {} en attente{}{} · {} {} depuis moins de 24 h.'], // AUDC-M3 : les quatre derniers sont le titre de la vue Équipe et sa ligne, déplacés de 76-vf-git-entete.js ; libellés français affichés, que estAnglais prend pour de l'anglais faute d'accent (la sonde voit tout autre littéral)
   '00-vibeflow.js': ['Projet', 'Code', ', #ask', '#btn-health{} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; } #panel .sec:has(> .list > a[data-hc-open]) { display: none; }', 'Bloquant', 'phase ne figure', 'phases ne figurent', 'non lu', 'non lus', 'header .brand', 'en planification', 'en pause', 'Phase {}{} '],
 };
 const sortie = [];
