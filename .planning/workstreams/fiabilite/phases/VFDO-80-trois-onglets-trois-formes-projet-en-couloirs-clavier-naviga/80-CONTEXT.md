@@ -155,6 +155,26 @@ La Phase 76 se branche sur le panneau de l'onglet Projet par une route à elle (
   vidée au changement d'onglet et à la remontée à la racine ; une entrée dont `rouvrir` lève une erreur est retirée et le
   bouton passe à la suivante. Un seul Retour par panneau : la 76 n'a pas besoin d'un fil d'Ariane à côté. Décision
   déléguée par Samuel (message session principale, 2026-11-08), option recommandée, sur l'avis de la session principale.
+- **P80-C76-6 — une seule porte pour les exigences et la couverture (demande de la 76, relayée par la session
+  principale le 2026-11-11 ; retrait P76-D-25, plan 76-08).** Tout code de la 80 qui lit le nœud enfant « Exigences »
+  d'une phase (`<ph>.req`), ses cartes d'exigence ou les liens « couvre » plan → exigence passe par **une seule
+  fonction**, `lireExigences(phaseId)` de `assets/ui/41-vf-projet-phase.js` (exposée aux autres modules de Projet par
+  une globale de la couche VF, l'objet du moteur étant gelé), qui rend les exigences de la phase (identifiant, texte,
+  cochée ou non) et la couverture par plan (plan → exigences couvertes). Plan par plan :
+  - **P80-D-05, liste à cocher (80-07)** : lue par `lireExigences` seulement (critère déjà écrit au plan) ;
+  - **« N exigences couvertes » des rangées de plans (80-07)** : comptée depuis la couverture rendue par
+    `lireExigences`, jamais par une lecture directe des liens ;
+  - **P80-D-08, panneau d'un plan « Exigences couvertes » (80-11)** : la section est rendue par la couche VF
+    (`41-vf-projet-panneau.js`) depuis `lireExigences` ; sur Projet, le moteur ne rend plus la liste générique des liens
+    sortants « couvre » d'un plan (elle disparaîtrait au retrait) ;
+  - **P80-D-04, graphe d'une phase** : le moteur dessine les nœuds et liens que porte le graphe ; la 80 n'y ajoute
+    aucune lecture. Après le retrait de la 76, le graphe ne montre simplement plus ni exigences ni liens « couvre » :
+    rien à rebrancher ;
+  - aucune autre lecture : les champs `exigences {faits,total}` du nœud phase (80-03) sont calculés côté collecte par
+    `piedExigences` depuis `REQUIREMENTS.md`, pas depuis le nœud (P80-C76-4).
+  Critère vérifiable dans 80-07 et 80-11 : aucune occurrence de l'identifiant du nœud `.req` ni des liens de genre
+  « couvre » dans les fichiers de la 80 hors du corps de `lireExigences`. La 80 s'exécute avant la 76 : elle lit encore le
+  nœud à sa livraison ; la 76 n'a qu'à rebrancher cette fonction sur `meta.vf.trace.exigences`.
 - **P80-C76-4 — tenu tel quel.** Le compte « x/y exigences » de la carte de phase est celui de `piedExigences` ; le champ
   structuré `exigences {faits, total}` ajouté par la 80 (P80-D-06) est calculé par la même fonction, une seule fois. La 76
   ne le recalcule pas et n'y touche pas.
@@ -460,35 +480,72 @@ plafond de 300 lignes, libellés français exacts (dictionnaire), forme exacte d
 décisions ci-dessus et l'UI-SPEC de la phase.
 </decisions>
 
-## Arbitrages de Samuel sur les réouvertures (S80-1 à S80-5)
+## À Samuel
+
+Questions au format C76-Q1 (`76-CONTEXT.md`, Phase 76, P76-D-34). Les cinq ont été posées au cadrage sous les libellés
+S80-1 à S80-5 et tranchées par Samuel le 2026-11-11 ; les décisions qui en découlent sont P80-D-52 à P80-D-56
+(section « Arbitrages de Samuel » ci-dessous).
+
+- **P80-Q-01 — Titre de vue flottant (S80-1, AUDC-M2, rouvre Q10).** Le bloc de titre, sans fond, se superpose aux
+  cartes de Code et du graphe de Projet : faut-il lui donner une place à lui ?
+  Options : (a) garder Q10 tel quel ; (b) une zone réservée au titre, 130 px au plus, flou et texte court gardés ; (c) le titre de vue monte dans l'en-tête (fil d'Ariane).
+  Recommandation : (b) — le flou et le texte court restent, seule la superposition disparaît.
+  Bloque : rien
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Zone réservée (Recommandé) »
+- **P80-Q-02 — En-tête illisible (S80-2, AUDC-M5, rouvre P70-D-22 et PU-G-001).** Neuf icônes sans libellé, trois
+  icônes trompeuses, branche tronquée : comment rendre l'en-tête lisible ?
+  Options : (a) garder ; (b) trois groupes libellés au-delà de 1 280 px, fil d'Ariane à chevron, trois icônes remplacées, badge et troncature inchangés ; (c) (b) plus le badge « au travail » libellé et la branche entière.
+  Recommandation : (b) — ne rouvre que PU-G-001 en partie, P70-D-22 intact.
+  Bloque : rien
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Trois groupes libellés (Recommandé) »
+- **P80-Q-03 — Santé en anglais (S80-3, AUDC-M8, rouvre P70-D-04 et P67-D-20).** Les constats du panneau Santé
+  restent en anglais dans une interface française : faut-il les traduire ?
+  Options : (a) garder les constats en anglais ; (b) traduire les gabarits des constats dans le collecteur, noms propres gardés ; (c) (b) et revoir l'introduction après remesure.
+  Recommandation : (b) — l'introduction n'est pas retouchée sans nouvelle mesure.
+  Bloque : rien
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Traduire les constats (Recommandé) »
+- **P80-Q-04 — Terminal absent sans explication (S80-4, reste de AUDC-M10, rouvre P71-D-02).** Sans `--terminal`,
+  rien n'existe et rien ne l'explique : faut-il le dire, et où ?
+  Options : (a) garder « rien sans l'option » ; (b) une ligne « Le terminal s'active avec --terminal » dans l'aide et la palette, sans pastille, port ni route ; (c) une pastille inerte expliquée.
+  Recommandation : (b) — explique sans rien ajouter à l'écran ni au réseau.
+  Bloque : rien
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Une ligne dans l'aide (Recommandé) »
+- **P80-Q-05 — Ouvreur Git à 44 px parmi des boutons à 36 (S80-5, AUDC-F3 en partie, rouvre P78-D-34).** L'en-tête
+  doit-il retrouver une seule taille de bouton sans perdre la cible tactile ratifiée ?
+  Options : (a) garder 44 px ; (b) dessin à 36 px, zone d'appui gardée à 44 px ; (c) 36 px partout au-delà de 999 px.
+  Recommandation : (b) — la cible d'appui de P78-D-34 est gardée et l'en-tête retrouve une taille.
+  Bloque : rien
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « 36 visibles, 44 d'appui (Recommandé) »
+
+## Arbitrages de Samuel sur les réouvertures (P80-Q-01 à P80-Q-05, ex-S80-1 à S80-5)
 
 Les cinq questions posées au cadrage ont été tranchées par Samuel : **arbitrage Samuel, AskUserQuestion session
 principale, 2026-11-11**, relayé au manager par la session principale le même jour. Chaque réponse est recopiée mot pour
 mot (libellé coché, puis l'option telle qu'elle lui a été présentée). Aucune option « révision du plan » n'a été retenue.
 Chaque arbitrage d'origine n'est amendé que dans la mesure exacte de l'option retenue, pas au-delà.
 
-- **P80-D-52 (S80-1, AUDC-M2 — amende Q10).** Réponse : « Zone réservée (Recommandé) » — « Le titre garde son flou et
+- **P80-D-52 (P80-Q-01, ex-S80-1, AUDC-M2 — amende Q10).** Réponse : « Zone réservée (Recommandé) » — « Le titre garde son flou et
   son texte court, mais dans une zone à lui (130 px au plus, que la mise en page sait déjà déduire) : les cartes ne
   passent plus dessous. Votre réponse d'origine est gardée, seule la superposition disparaît. » Option (b) du cadrage.
   Q10 (« Flou gardé, texte court ») tient : seule la superposition du bloc de titre sur les cartes disparaît. Vaut pour
   Code et pour le graphe de Projet ; les couloirs et la liste ont déjà leur `h1` dans le flux.
-- **P80-D-53 (S80-2, AUDC-M5 — amende PU-G-001 en partie ; P70-D-22 intact).** Réponse : « Trois groupes libellés
+- **P80-D-53 (P80-Q-02, ex-S80-2, AUDC-M5 — amende PU-G-001 en partie ; P70-D-22 intact).** Réponse : « Trois groupes libellés
   (Recommandé) » — « Au-delà de 1 280 px de large, les boutons sont rangés en trois groupes qui portent un libellé ; le
   fil d'Ariane prend un chevron ; les trois icônes trompeuses sont remplacées. Le badge « au travail » et la troncature
   de la branche ne changent pas : votre compromis n'est rouvert qu'en partie. » Option (b). Le badge « au travail »
   réduit à son point entre 701 et 1 639 px (P70-D-22) et la troncature de la branche (« Garder ce compromis »,
   PU-G-001) restent ; seuls le rangement en groupes libellés au-delà de 1 280 px, le chevron et les trois icônes
   (« Parcours », « Travail récent », sessions/agents) changent.
-- **P80-D-54 (S80-3, AUDC-M8 — amende P70-D-04 et, derrière lui, P67-D-20).** Réponse : « Traduire les constats
+- **P80-D-54 (P80-Q-03, ex-S80-3, AUDC-M8 — amende P70-D-04 et, derrière lui, P67-D-20).** Réponse : « Traduire les constats
   (Recommandé) » — « Les gabarits des constats passent en français dans le collecteur ; les noms propres (outils,
   services) restent tels quels. L'introduction de l'onglet n'est pas retouchée sans nouvelle mesure. » Option (b).
   Les constats du panneau Santé ne restent plus en anglais (fin de P70-D-04 sur ce point) ; P67-D-20 (l'anglais reste une
   langue admise) tient pour le reste. L'introduction de Santé n'est pas retouchée dans cette phase.
-- **P80-D-55 (S80-4, AUDC-M10 reste — amende P71-D-02).** Réponse : « Une ligne dans l'aide (Recommandé) » — « Une ligne
+- **P80-D-55 (P80-Q-04, ex-S80-4, AUDC-M10 reste — amende P71-D-02).** Réponse : « Une ligne dans l'aide (Recommandé) » — « Une ligne
   dans l'aide « ? » et dans la palette : « Le terminal s'active avec --terminal ». Aucune pastille, aucun port, aucune
   route : rien ne s'ajoute à l'écran ni au réseau. » Option (b). P71-D-02 (sans le drapeau : aucun port, aucune route,
   aucun tiroir) tient en entier ; seule une ligne de texte s'ajoute à l'aide `?` et à la palette.
-- **P80-D-56 (S80-5, AUDC-F3 en partie — amende P78-D-34).** Réponse : « 36 visibles, 44 d'appui (Recommandé) » — « Le
+- **P80-D-56 (P80-Q-05, ex-S80-5, AUDC-F3 en partie — amende P78-D-34).** Réponse : « 36 visibles, 44 d'appui (Recommandé) » — « Le
   bouton est dessiné à 36 px comme ses voisins, mais sa zone d'appui reste de 44 px : la cible tactile que vous aviez
   ratifiée est tenue, et l'en-tête retrouve une seule taille. » Option (b). Le seuil et la présence de l'icône de
   P78-D-34 (701 à 1 279 px) tiennent ; seul le dessin passe à 36 px, la zone d'appui restant de 44 px.
