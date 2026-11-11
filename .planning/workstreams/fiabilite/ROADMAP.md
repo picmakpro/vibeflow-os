@@ -544,11 +544,20 @@ référence, Phase 81 reportée.
   5. « Terminé, à relire » se vide à la lecture, dans ce navigateur seulement, en 24 h au plus ; la seule action d'une ligne est « Lire le rapport ».
   6. La Phase 74 peut brancher frise et fiche par le registre de vues et l'événement d'ouverture sans retoucher un fichier de la 73.
   7. Toutes les suites du cockpit vertes sous macOS et Linux, les témoins du canevas re-pointés (aucun supprimé pour verdir), chaque exigence prouvée par un témoin rouge avant le code.
-**Plans:** 0 plans
+**Plans:** 10 plans
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 73 to break down)
+- [ ] 73-01-PLAN.md — Socle de la suite unique et module de gouvernance
+- [ ] 73-02-PLAN.md — `ailleurs()` et route `GET /api/vf/ailleurs`
+- [ ] 73-03-PLAN.md — Champs de gouvernance de who@2 dans la collecte, LR.1 à LR.6
+- [ ] 73-04-PLAN.md — Modèle de la régie (sans DOM), feuille, exports de 71
+- [ ] 73-05-PLAN.md — Page de la régie : adaptateur, accroches de la Phase 74, états de page
+- [ ] 73-06-PLAN.md — Compositeur du titre, pastille de favicon, état « lu »
+- [ ] 73-07-PLAN.md — Pied : arbres de travail, « ailleurs », non-fuite de bout en bout
+- [ ] 73-08-PLAN.md — Retrait du canevas d'Équipe, côté serveur et côté page
+- [ ] 73-09-PLAN.md — Correspondance LE → LR, témoins W23 et de page re-pointés
+- [ ] 73-10-PLAN.md — Tiroir hors d'Équipe, README, CHANGELOG, toutes les suites
 
 ### Phase 74: L'équipe dans le temps — swim-lanes, coût, replay
 
