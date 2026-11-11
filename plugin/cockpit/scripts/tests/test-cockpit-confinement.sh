@@ -222,6 +222,59 @@ assert_eq "G11 — un dépôt --separate-git-dir sans lien retour vers le lab es
 RESG="$(node "$WORK/central.mjs" "$SCRIPTS" "$L8/sub3" "$PAR/sm" "$WORK/vrai" "$LAB")"
 assert_eq "G12 — lancerGit : le dépôt à dossier commun extérieur ne rend rien ; témoin : le sous-module lab est lu (HEAD)" "$(printf '%s' "$RESG" | cut -d'|' -f1,2)" "-|MARQUEUR-DANS-LE-LAB-SUBMOD"
 
+# G13 : règle à point fixe, preuve GÉNÉRATIVE. Pour chaque membre des métadonnées que git ouvre (premier niveau, refs/, objects/ avec info et pack), un lab dont CE membre est un lien
+# vers un dépôt extérieur marqué ; plus alternates et core.worktree étrangers. Aucun marqueur ne doit sortir (pages, graph.json, export, /api/vf/git) et gitSortant doit refuser.
+echo "=== G13 — liens dans les métadonnées git (preuve générative) ==="
+GEN="$WORK/gen"; mkdir -p "$GEN"; EXTL="$GEN/extl"; mkdir -p "$EXTL"
+G "$EXTL" init -q -b MARQUEUR-F1-BRANCH; printf 'f\n' > "$EXTL/MARQUEUR-F1-FILE"; G "$EXTL" add -A; G "$EXTL" commit -q -m "MARQUEUR-F1-SUBJ"; G "$EXTL" tag MARQUEUR-F1-TAG
+G "$EXTL" remote add origin "https://MARQUEUR-F1-REMOTE.invalid/x.git"; E1="$(G "$EXTL" rev-parse HEAD)"
+printf '%s\n' "$E1" > "$EXTL/.git/shallow"; printf '[x]\n\ty = MARQUEUR-F1-CFGWT\n' > "$EXTL/.git/config.worktree"; printf 'MARQUEUR-F1-EXCLUDE\n' >> "$EXTL/.git/info/exclude"
+EXTP="$GEN/extp"; cp -R "$EXTL" "$EXTP"; G "$EXTP" gc -q 2> /dev/null   # dépôt empaqueté : packed-refs et objects/pack
+LABG="$GEN/labg"; mkplan "$LABG"; G "$LABG" init -q -b main; G "$LABG" add -A; G "$LABG" commit -q -m "lab-base"; printf '%s\n' "$E1" > "$LABG/.git/refs/heads/main"   # main désigne un objet que seul le dépôt extérieur porte
+FAN="${E1:0:2}"
+cat > "$WORK/lire.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv;
+const { lireGit } = await import(pathToFileURL(scripts + '/vf-cockpit-git.mjs').href);
+const { gitSortant } = await import(pathToFileURL(scripts + '/vf-cockpit-git-sortant.mjs').href);
+console.log(JSON.stringify({ sortant: gitSortant(lab), git: JSON.stringify(await lireGit(lab)) }));
+JS
+mesurer() { # mesurer <nom> <lab> : « sortant|nombre de marqueurs » (pages, graph.json, export, /api/vf/git)
+  local L="$2" O="$2/.vibeflow/cockpit" R
+  node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$GEN/b-$1.out" 2>&1; node "$O/serve.mjs" --export "$GEN/x-$1.html" --include flows,notes,recent,health > "$GEN/e-$1.out" 2>&1
+  R="$(node "$WORK/lire.mjs" "$SCRIPTS" "$L")"
+  echo "$(printf '%s' "$R" | grep -o '"sortant":[a-z]*' | cut -d: -f2)|$(( $(printf '%s' "$R" | grep -o 'MARQUEUR-F1' | wc -l) + $(compte 'MARQUEUR-F1' "$O/project.html" "$O/index.html" "$O/graph.json" "$O/architecture.json" "$GEN/x-$1.html") ))"
+}
+fabriquer() { # fabriquer <membre relatif à .git> <dépôt source> : lab dont ce membre est un lien vers le même membre du dépôt source
+  local nom="${1//\//_}" L="$GEN/lab-${1//\//_}"; rm -rf "$L"; cp -R "$LABG" "$L"
+  mkdir -p "$(dirname "$L/.git/$1")"; rm -rf "$L/.git/$1"; ln -s "$2/.git/$1" "$L/.git/$1"; echo "$L"
+}
+NMEM=0; BADU=""; BADM=""
+membre() { local L; L="$(fabriquer "$1" "$2")"; local R; R="$(mesurer "${1//\//_}" "$L")"; NMEM=$((NMEM+1)); [ "${R%%|*}" = "true" ] || BADU="$BADU $1"; [ "${R##*|}" = "0" ] || BADM="$BADM $1(${R##*|})"; }
+for m in HEAD config index info shallow config.worktree objects refs objects/info refs/heads refs/tags refs/remotes refs/heads/main "objects/$FAN"; do
+  src="$EXTL"; [ "$m" = "refs/heads/main" ] && { mkdir -p "$EXTL/.git/refs/heads"; cp "$EXTL/.git/refs/heads/MARQUEUR-F1-BRANCH" "$EXTL/.git/refs/heads/main"; }
+  membre "$m" "$src"
+done
+membre packed-refs "$EXTP"; membre objects/pack "$EXTP"
+# alternates et core.worktree étrangers (config puis config.worktree)
+LA="$GEN/lab-alt"; rm -rf "$LA"; cp -R "$LABG" "$LA"; printf '%s\n' "$EXTL/.git/objects" > "$LA/.git/objects/info/alternates"
+LC="$GEN/lab-cw"; rm -rf "$LC"; cp -R "$LABG" "$LC"; printf '[core]\n\tworktree = %s\n' "$EXTL" >> "$LC/.git/config"
+LD="$GEN/lab-cwt"; rm -rf "$LD"; cp -R "$LABG" "$LD"; printf '[core]\n\tworktree = %s\n' "$EXTL" > "$LD/.git/config.worktree"
+for pair in "alternates:$LA" "core.worktree:$LC" "config.worktree:$LD"; do
+  R="$(mesurer "${pair%%:*}" "${pair#*:}")"; NMEM=$((NMEM+1)); [ "${R%%|*}" = "true" ] || BADU="$BADU ${pair%%:*}"; [ "${R##*|}" = "0" ] || BADM="$BADM ${pair%%:*}(${R##*|})"
+done
+# copie vendorisée (discover du moteur, dépôts imbriqués) : un dépôt imbriqué dont refs/ et objects/ sont des liens vers l'extérieur n'est pas lu à l'assemblage
+LN="$GEN/lab-nested"; mkplan "$LN"; mkdir -p "$LN/sub5"; cp -R "$GEN/lab-objects/.git" "$LN/sub5/.git"; rm -rf "$LN/sub5/.git/refs"; ln -s "$EXTL/.git/refs" "$LN/sub5/.git/refs"; printf 'z\n' > "$LN/sub5/z.js"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$LN" --quiet > "$GEN/b-nested.out" 2>&1; ON="$LN/.vibeflow/cockpit"
+assert_eq "G13d — dépôt imbriqué aux métadonnées liées vers l'extérieur : aucun marqueur dans les pages ni graph.json (copie vendorisée)" "$(compte 'MARQUEUR-F1' "$ON/project.html" "$ON/index.html" "$ON/graph.json" "$ON/architecture.json")" "0"
+assert_eq "G13e — la copie du moteur (lib/vf-git-sortant.mjs) est octet pour octet celle du socle (une seule règle)" "$(cmp -s "$SCRIPTS/vf-cockpit-git-sortant.mjs" "$SCRIPTS/../skills/cockpit-moteur/scripts/lib/vf-git-sortant.mjs" && echo identique || echo differe)" "identique"
+assert_ge "G13a — témoin : au moins dix-huit membres générés (la boucle n'est pas vide)" "$NMEM" 18
+assert_eq "G13 — chaque membre lié vers l'extérieur : gitSortant refuse (rouge : liste des membres lus)" "${BADU:-aucun}" "aucun"
+assert_eq "G13b — aucun marqueur du dépôt extérieur dans les pages, graph.json, l'export ni /api/vf/git (rouge : membres fuyants)" "${BADM:-aucun}" "aucun"
+# témoins positifs : dépôt normal (cp du dépôt du lab), lab sous-module, worktree vérifié — le même pipeline lit leur branche
+RN="$(node "$WORK/lire.mjs" "$SCRIPTS" "$L3")"; RS="$(node "$WORK/lire.mjs" "$SCRIPTS" "$PAR/sm")"; RW="$(node "$WORK/lire.mjs" "$SCRIPTS" "$WORK/vrai")"
+assert_eq "G13c — témoins : dépôt normal, lab sous-module et worktree vérifié sont lus (branche vue, rien de refusé)" "$(printf '%s\n' "$RN" "$RS" "$RW" | grep -c '"sortant":false')|$(printf '%s' "$RN" | grep -c 'MARQUEUR-DANS-LE-LAB-BRANCH')|$(printf '%s' "$RS" | grep -c 'MARQUEUR-DANS-LE-LAB-SUBMOD')" "3|1|1"
+
 # ---------- D : métadonnées VibeFlow de l'export ----------
 echo "=== D — export ==="
 cat > "$WORK/cles.mjs" <<'JS'

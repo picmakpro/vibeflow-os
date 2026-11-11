@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { gitSortant } from './vf-git-sortant.mjs'; // vibeflow AUDC-A-02
 
 export const toPosix = (p) => p.replace(/\\/g, '/');
 export const rel = (from, to) => toPosix(path.relative(from, to)) || '.';
@@ -204,29 +205,9 @@ export function discover(root, { includeWorktrees = false, maxLooseFiles = 5000 
   const loose = [];
   const skipped = [];
 
-  // vibeflow AUDC-A-02 : critère = dossier git et dossier commun RÉSOLUS ; hors du lab, lus seulement si le dépôt désigne ce dossier en retour (worktree vérifié, sous-module à core.worktree) ; même règle que scripts/vf-cockpit-git-sortant.mjs
-  const rootReal = fs.realpathSync(root), sous = (p) => p === rootReal || p.startsWith(rootReal + path.sep);
-  const petit = (f) => { const st = fs.statSync(f); if (!st.isFile() || st.size > 65536) throw new Error('fichier git inattendu'); return fs.readFileSync(f, 'utf8'); };
-  const gitSortant = (dir) => {
-    const dotgit = path.join(dir, '.git');
-    try {
-      const st = fs.lstatSync(dotgit);
-      let g, gitfile = false;
-      if (st.isSymbolicLink()) { g = fs.realpathSync(dotgit); if (!sous(g)) return true; gitfile = fs.statSync(g).isFile(); } else if (st.isDirectory()) g = fs.realpathSync(dotgit);
-      else if (st.isFile()) { g = dotgit; gitfile = true; } else return true;
-      if (gitfile) { const m = /^gitdir:\s*(.+)$/m.exec(petit(g)); if (!m) return true; g = fs.realpathSync(path.resolve(dir, m[1].trim())); }
-      let c = g;
-      try { c = fs.realpathSync(path.resolve(g, petit(path.join(g, 'commondir')).trim())); } catch (e) { if (e.code !== 'ENOENT') return true; }
-      if (sous(g) && sous(c)) return false;
-      if (sous(g)) return true;
-      if (path.basename(path.dirname(g)) === 'worktrees' && gitfile && st.isFile()) return c !== fs.realpathSync(path.dirname(path.dirname(g))) || fs.realpathSync(petit(path.join(g, 'gitdir')).trim()) !== fs.realpathSync(dotgit);
-      if (c !== g) return true;
-      const cfg = /^\[core\]\s*$([\s\S]*?)(?=^\[|(?![\s\S]))/m.exec(petit(path.join(g, 'config'))), wt = cfg && /^\s*worktree\s*=\s*(.+?)\s*$/m.exec(cfg[1]);
-      return !(wt && fs.realpathSync(path.resolve(g, wt[1])) === fs.realpathSync(dir));
-    } catch { return true; }
-  };
+  // vibeflow AUDC-A-02 : un dépôt dont les métadonnées git ne sont pas celles du lab (dossier git ou commun hors du lab, lien symbolique, alternates, core.worktree étranger) n'est pas lu (lib/vf-git-sortant.mjs)
   const walk = (dir, depth) => {
-    if (fs.existsSync(path.join(dir, '.git')) && !gitSortant(dir)) {
+    if (fs.existsSync(path.join(dir, '.git')) && !gitSortant(dir, root)) {
       repos.push({ abs: dir, path: rel(root, dir), worktreeOf: worktreeMain(dir) });
       return;
     }
