@@ -416,7 +416,7 @@
         "fix-n9-n10"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     },
     {
       "id": "rebase-71",
@@ -429,7 +429,7 @@
         "recette-C"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "pr-71",
@@ -439,7 +439,7 @@
         "rebase-71"
       ],
       "scope": [],
-      "status": "blocked"
+      "status": "done"
     },
     {
       "id": "fix-w1",
@@ -493,7 +493,7 @@
         "fix-w4"
       ],
       "scope": [],
-      "status": "ready"
+      "status": "done"
     }
   ]
 }
