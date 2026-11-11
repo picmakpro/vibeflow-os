@@ -50,7 +50,8 @@ const changes = (a, b) => [...new Set([...a.keys(), ...b.keys()])].filter((k) =>
 // signature de la liste « qui » (PU-G-162 : testable seule, déplacée hors de startLive sans changer son corps) : poussée seulement quand la liste change, pas à chaque seconde d'âge qui passe
 export const whoSig = (w) => JSON.stringify((w.workers || []).map((x) => [x.kind, x.id, x.tree, x.branch || '', !!x.stale, x.titre || '', x.task || '', x.parent || '', x.etat || '', x.action ? `${x.action.verbe} ${x.action.cible}` : '', x.rattachement ? [x.rattachement.etat, x.rattachement.dag, x.rattachement.noeud, x.rattachement.raison].join('|') : '']));
 
-export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mode = process.env.VF_COCKPIT_WATCH || 'auto' }) {
+// aClient : y a-t-il un onglet connecté au flux ? (AUDC-H2) Sans onglet, le filet ne collecte rien ; `reveil()` rattrape à la connexion. Défaut : toujours vrai (comportement d'avant).
+export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mode = process.env.VF_COCKPIT_WATCH || 'auto', aClient = () => true }) {
   root = path.resolve(root);
   const common = gitCommonDir(root);
   const driverDir = process.env.VF_DRIVER_DIR || (common && path.join(common, 'vf-driver'));
@@ -65,10 +66,10 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
     try { return JSON.parse(execFileSync('bash', [dl.chemin, 'status', '--all'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, env: envEnfant(root) })); }
     catch (e) { try { return JSON.parse(e.stdout); } catch { return { error: String(e.message).slice(0, 200) }; } }
   };
-  const whoNow = () => { try { return collectWho(root, { scriptsDir }); } catch (e) { return { workers: [], sources: {}, error: e.message }; } };
+  const whoNow = (verrous) => { try { return collectWho(root, { scriptsDir, verrous, officiel: true }); } catch (e) { return { workers: [], sources: {}, error: e.message }; } };
   // « qui » : poussé seulement quand la liste change (pas à chaque seconde d'âge qui passe)
 
-  let graph = buildProjectGraph(root), idx = index(graph), lock = lockStatus(), who = whoNow(), gitSig = null, gitSemee = false; // 78-09
+  let graph = buildProjectGraph(root), idx = index(graph), lock = lockStatus(), who = whoNow(lock), gitSig = null, gitSemee = false; // 78-09
   // A5 : la signature Git est asynchrone ; le premier calcul SEME gitSig sans événement (comme avant), les suivants (filet) n'émettent qu'au changement, et seulement une fois la graine posée
   signatureGit(root, { commun: common }).then((gs) => { if (!stopped && !gitSemee) { gitSemee = true; gitSig = gs; } }, () => {});
   const snapshot = () => ({ seq: state.seq, lock, who });
@@ -97,7 +98,7 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
       const t = setTimeout(() => { timers.delete(t); refresh(['confirm', ...reasons]); }, HOLD_MS); timers.add(t);
       return;
     }
-    const nlock = lockStatus();
+    const nlock = aClient() ? lockStatus() : lock; // AUDC-H2 : sans onglet, le verrou n'est pas interrogé (la connexion suivante le relit)
     const lockChanged = JSON.stringify(nlock) !== JSON.stringify(lock);
     const vfChanged = JSON.stringify(g.meta?.vf) !== JSON.stringify(graph.meta?.vf);
     graph = g; idx = nidx; lock = nlock; state.seq++; state.derniereMaj = new Date().toISOString();
@@ -138,23 +139,31 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   surveiller('planning', path.join(root, '.planning'));
   surveiller('driver', driverDir);
 
-  // filet toutes les 5 s : l'âge d'un verrou avance sans écriture, et vf-driver/ peut naître après le démarrage
-  const filet = setInterval(() => { try {
-    surveiller('driver', driverDir);
-    const nw = whoNow();
-    if (whoSig(nw) !== whoSig(who)) { who = nw; emit('who', { seq: ++state.seq, at: Date.now(), who }); }
+  // filet toutes les 5 s : l'âge d'un verrou avance sans écriture, et vf-driver/ peut naître après le démarrage.
+  // AUDC-H2 : UN seul appel au verrou par tour (partagé avec « qui »), et aucune collecte tant qu'aucun onglet n'écoute.
+  let dernierTour = Date.now();
+  const tour = () => {
+    dernierTour = Date.now();
     const n = lockStatus();
+    const nw = whoNow(n);
+    if (whoSig(nw) !== whoSig(who)) { who = nw; emit('who', { seq: ++state.seq, at: Date.now(), who }); }
     if (JSON.stringify(n) !== JSON.stringify(lock)) { lock = n; emit('lock', { seq: ++state.seq, at: Date.now(), lock }); }
     signatureGit(root, { commun: common }).then((gs) => { // 78-09 : refs, worktrees, index ; un événement sans charge au seul changement. A5 : asynchrone, un git muet ne gèle plus la boucle
       if (stopped || !gitSemee) return;
       if (gs && gs !== gitSig) { gitSig = gs; emit('git', { seq: ++state.seq, at: Date.now(), sig: gs.slice(0, 16) }); }
     }, () => {});
+  };
+  const filet = setInterval(() => { try {
+    surveiller('driver', driverDir);
+    if (aClient()) tour();
   } catch (e) { log('error', `filet : ${e.message}`); } }, NET_MS);
   filet.unref?.(); timers.add(filet);
 
   return {
     etat: () => ({ mode: state.mode, seq: state.seq, derniereMaj: state.derniereMaj }),
     snapshot,
+    // à la connexion d'un onglet : l'instantané n'a pas bougé depuis un moment (aucune collecte sans onglet), un tour le remet à jour avant d'être servi ; au plus un tour par période du filet
+    reveil() { if (!stopped && Date.now() - dernierTour >= NET_MS) { try { tour(); } catch (e) { log('error', `réveil : ${e.message}`); } } },
     stop() { stopped = true; clearTimeout(debounce); for (const t of timers) { clearTimeout(t); clearInterval(t); } for (const w of watchers.values()) { try { w.close(); } catch {} } },
   };
 }

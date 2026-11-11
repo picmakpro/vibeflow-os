@@ -7,6 +7,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { planningLayout, stateFile, GIT_SUR, shBorne, realUnder } from './vf-cockpit-paths.mjs';
+import { gitSortant } from './vf-cockpit-git-sortant.mjs';
 import { avancement, rattacherMission, etatMission } from './vf-cockpit-avancement.mjs';
 import { lireVerrous, vieDe } from './vf-cockpit-vie.mjs';
 import { COLON, NUM, normNum, texte, lireGoal, lireDependances, reTitreCase, reTitreSection, reExigences, idExigence, texteExigence, reTraceabilite, normStatut, phaseCourante } from './vf-cockpit-formats.mjs';
@@ -18,6 +19,7 @@ const MAX_LECTURE = 8 << 20;
 let CONFINE = null;
 const dedans = (p) => !CONFINE || realUnder(p, CONFINE);
 export function lireConfine(racine, fn) { const avant = CONFINE; CONFINE = fs.realpathSync(racine); try { return fn(); } finally { CONFINE = avant; } }
+export const lister = (d) => ls(d); // listage de noms sous le même confinement que `read` (AUDC-A-02)
 export const read = (f) => { try { if (!dedans(f)) return ''; const st = fs.statSync(f); return st.isFile() && st.size <= MAX_LECTURE ? fs.readFileSync(f, 'utf8') : ''; } catch { return ''; } };
 const ls = (d) => { try { return dedans(d) ? fs.readdirSync(d) : []; } catch { return []; } };
 // PU-G-147 : tout texte que le chat Projet affiche (noms de plan, de phase, de backlog, de seed, sujets de tag) se coupe au mot entier, par la même fonction que `sentence` (une seule)
@@ -95,9 +97,9 @@ export function lireDags(root, layout, phaseDirs) {
     ...[...phaseDirs].map(([k, d]) => [k.split('|')[0] === '*' || k.startsWith('|') ? null : k.split('|')[0], d, k])];
   for (const [ws, d, dossierPhase] of lots) {
     if (seen.has(d)) continue; seen.add(d);
-    for (const f of ls(d).filter((x) => x.endsWith('.dag.json'))) {
+    for (const f of ls(d).filter((x) => x.endsWith('.dag.json') || (x.startsWith('dag-') && x.endsWith('.json')))) { // AUDC-D5 : deux nommages (`<nom>.dag.json`, `dag-<nom>.json`) ; un JSON sans `nodes` est ignoré
       let j; try { j = JSON.parse(read(path.join(d, f))); } catch { continue; }
-      if (j && Array.isArray(j.nodes)) dags.push({ name: f.replace(/\.dag\.json$/, ''), ws, wsDeclare: typeof j.ws === 'string' ? j.ws : null,
+      if (j && Array.isArray(j.nodes)) dags.push({ name: f.endsWith('.dag.json') ? f.slice(0, -'.dag.json'.length) : f.slice('dag-'.length, -'.json'.length), ws, wsDeclare: typeof j.ws === 'string' ? j.ws : null,
         phase: typeof j.phase === 'string' || typeof j.phase === 'number' ? String(j.phase) : null, file: path.relative(root, path.join(d, f)).split(path.sep).join('/'), nodes: j.nodes, dossierPhase });
     }
   }
@@ -106,7 +108,10 @@ export function lireDags(root, layout, phaseDirs) {
 
 // opts : { sansTags (aucun appel git pour les tags : lecture d'un autre arbre), verrous (injectable : { etat, plat, liste }), scriptsDir, home, lab (racine du LAB observé pour l'environnement borné des sous-processus, H-1 ; défaut : root) } — la vie d'une mission se lit sur le verrou de sa phase (VFSG-06) ; lecture seulement si un nœud est `running`
 export function readPlanning(root, layout, opts = {}) {
-  root = path.resolve(root); layout = layout || planningLayout(root);
+  root = path.resolve(root);
+  // AUDC-A-02 : lecture confinée à la racine RÉELLE du lab par défaut — un lien symbolique sortant n'est jamais suivi (un confinement posé par l'appelant, N5, prime)
+  if (CONFINE === null && fs.existsSync(root)) return lireConfine(root, () => readPlanning(root, layout, opts));
+  layout = layout || planningLayout(root);
   const LAB = path.resolve(opts.lab || root); // un arbre git sous le lab (worktree) se lit avec cwd = l'arbre, mais le PATH est assaini par rapport au LAB (H-1)
   const B = path.join(root, '.planning');
   const rel = (abs) => path.relative(root, abs).split(path.sep).join('/');
@@ -163,7 +168,7 @@ export function readPlanning(root, layout, opts = {}) {
   const backlog = texte(read(path.join(B, 'BACKLOG.md')));
   const seeds = ls(path.join(B, 'seeds')).filter((f) => f.endsWith('.md')).map((f) => ({ file: rel(path.join(B, 'seeds', f)), text: texte(read(path.join(B, 'seeds', f))) }));
   let tags = [];
-  if (!opts.sansTags) { // shBorne : même plafond, même échéance globale et même PATH assaini que les autres appels git du socle (F-06, H-1) ; sortie vide = aucun tag
+  if (!opts.sansTags && !gitSortant(root)) { // shBorne : même plafond, même échéance globale et même PATH assaini que les autres appels git du socle (F-06, H-1) ; sortie vide = aucun tag
     const out = shBorne('git', [...GIT_SUR, '-C', root, 'for-each-ref', '--sort=-creatordate', '--count=30', '--format=%(refname:short)\t%(creatordate:short)\t%(contents:subject)', 'refs/tags/v*'], undefined, LAB);
     tags = out.trim().split('\n').filter(Boolean).map((l) => { const [tag, date, subject] = l.split('\t'); return { tag, date, subject }; });
   }

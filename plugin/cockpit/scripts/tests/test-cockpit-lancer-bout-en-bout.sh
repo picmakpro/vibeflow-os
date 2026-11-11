@@ -22,6 +22,7 @@ SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && p
 ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"; TA="$HERE_T/terminal-aux.mjs"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; RUN="$WORK/run"; mkdir -p "$AUX" "$WORK/home" "$WORK/bin" "$WORK/fauxbin" "$WORK/pathsans" "$RUN"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
+export VF_COCKPIT_MODE_DIR="$WORK/etat"; unset XDG_CACHE_HOME # AUDC-B-05 : le mode retenu d'un lancement accepté va dans un dossier jetable, jamais dans le dossier d'état réel de l'utilisateur ni de la CI
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
 PASS=0; FAIL=0; NONVERIF=0
@@ -265,7 +266,7 @@ manche_fin
 # ---- section CH : Chromium ----
 echo "=== CH — Chromium : bandeau, clic de confiance armé, Entrée au clavier, présélection du mode ==="
 if [ -n "$CHROME" ]; then
-  rm -f "$OUT/.cache/terminal-mode" # 72-16 (P72-D-20) : le mode retenu par les manches B survit aux relances de Q ; CH2 parle d'un PREMIER lancement, donc d'un fichier absent
+  rm -rf "$VF_COCKPIT_MODE_DIR" # 72-16 (P72-D-20, AUDC-B-05) : le mode retenu par les manches B (dossier d'état du poste, ici jetable) survit aux relances de Q ; CH2 parle d'un PREMIER lancement, donc d'un état absent
   serveur_debut "$OUT"; RESCH="$WORK/ch.json"; BASEC="$(cibles_p)"; VC="$(cible_de "$BASEC" ph-1 .principal)" # le navigateur est la session : aucun client Node ici
   echo "     [CH] Chrome : $("$CHROME" --version 2>/dev/null | head -1)"
   CHJ="$(printf '{"P":%s,"Q":%s,"amorce":"%s","ptoken":"%s","cible":"ph-1","verbe":"%s","argv":"%s/argv"}' "$SRV_PORT" "$QP" "$AMORCE" "$PTOK" "$VC" "$RUN")"

@@ -34,7 +34,7 @@ PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap c
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 PASS=0; FAIL=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
-assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
+assert_eq() { if [ "$#" -ne 3 ]; then echo "  ❌ FAIL — $1 (assert_eq a reçu $# arguments au lieu de 3 : expansion d'accolades de bash 3.2 ?)"; FAIL=$((FAIL+1)); elif [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 
 CHROME=""
 for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do
@@ -67,12 +67,16 @@ const cas = [['accepte', {}], ['accepte-ready', { data: 'ready' }], ['origine-de
   ['non-fiable', { isTrusted: false }], ['confiance-absente', { isTrusted: undefined }]];
 console.log(cas.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
 // 72-14 : la phase 71 garde ses huit valeurs (ligne 2), la phase 72 ajoute des valeurs FIXES, déclarées ici (ligne 3), avec leur table de cas (ligne 4)
-const AJOUTS_72 = ['proposition'];
+const AJOUTS_72 = ['proposition', 'annulation', 'retrait']; // annulation : AUDC-M11 (audit du cockpit, lot 0), la proposition annulée dans Q se dit au panneau de P
 console.log('liste=' + [...L].filter((v) => !AJOUTS_72.includes(v)).sort().join(','));
 console.log('ajouts72=' + AJOUTS_72.filter((v) => L.includes(v)).sort().join(','));
 const casP = [['prop', {}], ['prop-suffixe', { data: 'proposition:ouvre' }], ['prop-majuscule', { data: 'Proposition' }], ['prop-espace', { data: 'proposition ' }],
   ['prop-10000', { data: 'proposition' + 'x'.repeat(9989) }], ['prop-origine-de-P', { origin: P }], ['prop-source-autre', { source: {} }], ['prop-non-fiable', { isTrusted: false }]];
 console.log(casP.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'proposition', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+const casA = [['ann', {}], ['ann-suffixe', { data: 'annulation:x' }], ['ann-majuscule', { data: 'Annulation' }], ['ann-origine-de-P', { origin: P }], ['ann-source-autre', { source: {} }], ['ann-non-fiable', { isTrusted: false }]];
+console.log(casA.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'annulation', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+const casR = [['ret', {}], ['ret-suffixe', { data: 'retrait:x' }], ['ret-majuscule', { data: 'Retrait' }], ['ret-origine-de-P', { origin: P }], ['ret-source-autre', { source: {} }], ['ret-non-fiable', { isTrusted: false }]]; // AUDC-M11 : le bandeau a disparu de Q
+console.log(casR.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'retrait', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
 JS
 cat > "$AUX/harnais-liste-q.mjs" <<'JS'
 // harnais-liste-q.mjs <sortie> : la liste fermée de P égale l'ensemble des valeurs de la table MESSAGES du client de Q (72-14, contrat §8) ; une ligne JSON
@@ -355,10 +359,44 @@ await executer(chrome, async (s) => {
       r.haut = {};
       await cas('bas-evt', 0, 0, evenement, false);
       await cas('bas-msg', 0, 0, message, false);
-      await cas('haut-evt', 2, 3, evenement, false);
-      await cas('haut-msg', 2, 3, message, false);
+      await cas('moyen-evt', 2, 3, evenement, false); // 424 px : sous la hauteur du bandeau (AUDC-M11), rehaussé
+      await cas('moyen-msg', 2, 3, message, false);
+      await cas('haut-evt', 4, 0, evenement, false); // 544 px : déjà au-dessus de la hauteur du bandeau, jamais réduit
+      await cas('haut-msg', 4, 0, message, false);
       await cas('plein-evt', 0, 0, evenement, true);
       await cas('plein-msg', 0, 0, message, true);
+      // AUDC-M11 : « retrait » (le bandeau a disparu de Q) rend la hauteur d'avant la proposition ; la lecture suit une barrière d'ordre (deux états de Q, du même cadre, encadrent le message : le second lu = le message traité)
+      const ETAT = (t) => `document.querySelector('.vf-term-etat').textContent.includes(${JSON.stringify(t)})`;
+      const barriere = async (cause) => { await deQ('etat:termine'); await att(ETAT('Terminé'), 'état de départ de la barrière'); await cause(); await deQ('etat:connecte'); await att(ETAT('Connecté'), 'barrière franchie'); };
+      const retrait = () => barriere(() => deQ('retrait'));
+      r.reprise = {};
+      const fenetre = async (h) => { await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: h, deviceScaleFactor: 1, mobile: false }); await stabiliser(() => s.ev('window.innerHeight'), { max: 5000 }); };
+      const rcas = async (nom, grands, petits, entre, apres) => {
+        await fermer(); await regler(grands, petits); const avant = await s.ev(MES);
+        await message(); await attOuvre(); const haut = await stabiliser(() => s.ev(MES), { max: 5000 });
+        if (entre) await entre();
+        const milieu = await stabiliser(() => s.ev(MES), { max: 5000 }); await retrait(); const fin = await stabiliser(() => s.ev(MES), { max: 5000 });
+        r.reprise[nom] = { avantNow: avant.now, avantMemo: avant.memo, haut: haut.now, milieu: milieu.now, fin: fin.now, finPx: fin.px, finMemo: fin.memo, ouvert: fin.ouvert, plein: fin.plein };
+        if (apres) { await apres(); r.reprise[nom].apres = await stabiliser(() => s.ev(MES), { max: 5000 }); } // geste de l'utilisateur fini APRÈS le retrait (relâchement de la souris)
+      };
+      await rcas('bas', 0, 0); await rcas('moyen', 2, 3); await rcas('haut', 4, 0);
+      await rcas('clavier', 0, 0, async () => { await s.ev(`document.querySelector('.vf-term-poignee').focus()`); await touche('ArrowUp', 'ArrowUp', 38); });
+      await rcas('souris', 0, 0, async () => { const c = await centre('.vf-term-poignee'); await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); for (let i = 1; i <= 4; i++) await souris('mouseMoved', c.x, c.y - 10 * i); await souris('mouseReleased', c.x, c.y - 40); });
+      await rcas('fenetre', 0, 0, async () => { await fenetre(600); }, async () => { await fenetre(800); }); // la fenêtre se réduit PENDANT le bandeau : le plafond de la hauteur réglée (70 % de 600 px = 420) la baisse, c'est un changement de l'écran et non la reprise : « retrait » ne la remonte pas à 160
+      let prise = null; // glissement de la poignée À LA SOURIS commencé avant le « retrait » et fini après : le retrait n'en reprend pas la hauteur sous la main
+      await rcas('glisse', 0, 0, async () => { prise = await centre('.vf-term-poignee'); await souris('mouseMoved', prise.x, prise.y); await souris('mousePressed', prise.x, prise.y); for (let i = 1; i <= 4; i++) await souris('mouseMoved', prise.x, prise.y - 10 * i); }, async () => { await souris('mouseReleased', prise.x, prise.y - 40); });
+      await rcas('remplace', 0, 0, async () => { await barriere(() => message()); }); // une seconde proposition pendant le rehaussement : la hauteur d'origine reste celle d'avant la première
+      await rcas('plein', 0, 0, async () => { await clic('.vf-term-plein'); });
+      if (await s.ev(`document.querySelector('.vf-term-tiroir').classList.contains('vf-term-plein-etat')`)) await clic('.vf-term-plein'); // retour à l'état normal : la hauteur interne, reprise pendant le plein écran, est celle que l'on retrouve
+      r.reprise.pleinApres = await stabiliser(() => s.ev(MES), { max: 5000 });
+      await fermer(); await regler(0, 0); const seul = await s.ev(MES); await retrait(); const seulFin = await stabiliser(() => s.ev(MES), { max: 5000 }); // « retrait » sans rehaussement : rien à reprendre
+      r.reprise.seul = { avant: seul.now, fin: seulFin.now, memo: seulFin.memo };
+      // fenêtre de 360 px : la hauteur du bandeau (300 px au moins) ne tient pas (276 px au plus) ; une seconde proposition trouve le tiroir encore sous 300 px et ne doit pas prendre cette hauteur rehaussée pour celle d'origine
+      await fermer(); await fenetre(360); await regler(0, 0); const pAvant = await stabiliser(() => s.ev(MES), { max: 5000 });
+      await message(); await attOuvre(); const pHaut = await stabiliser(() => s.ev(MES), { max: 5000 });
+      await barriere(() => message()); const pMilieu = await stabiliser(() => s.ev(MES), { max: 5000 });
+      await retrait(); const pFin = await stabiliser(() => s.ev(MES), { max: 5000 }); await fenetre(800);
+      r.reprise.petit = { avant: pAvant.now, haut: pHaut.now, milieu: pMilieu.now, fin: pFin.now, memo: pFin.memo };
     });
     r.violations = [...s.violations];
     return r;
@@ -427,12 +465,12 @@ await executer(chrome, async (s) => {
   });
   }
   await essai('tu14', async () => { // J4 : focus clavier de la poignée = bague autour du grip, pas deux bandes pleine largeur
-    await s.ev(`document.querySelector('.vf-term-plein').focus()`); await touche('Tab', 'Tab', 9, 8); // Maj+Tab depuis le bouton : le clavier amène le focus sur la poignée
+    await s.ev(`(document.querySelector('.vf-term-terminer:not([hidden])') || document.querySelector('.vf-term-plein')).focus()`); await touche('Tab', 'Tab', 9, 8); // Maj+Tab depuis le premier bouton de la barre (« Terminer la session » quand une session tourne, AUDC-M10, sinon Agrandir) : le clavier amène le focus sur la poignée
     r.tu14 = await attendreEtStabiliser(() => s.ev(`(() => { const p = document.querySelector('.vf-term-poignee'), g = document.querySelector('.vf-term-grip'), cp = getComputedStyle(p), cg = getComputedStyle(g), b = g.getBoundingClientRect(), q = p.getBoundingClientRect();
       return { sur_poignee: document.activeElement === p, fv: p.matches(':focus-visible'), poignee: cp.outlineStyle, grip: cg.outlineStyle + '/' + cg.outlineWidth, opaque: cg.opacity, grip_larg: Math.round(b.width), poignee_larg: Math.round(q.width) }; })()`), (v) => !!v && v.sur_poignee === true, { max: 5000 });
   });
   await essai('tu15', async () => { // J7 : sous pointer: coarse les boutons de la barre font au moins 44 px et la barre les contient ; sous pointeur fin, 28 px
-    const mesure = () => s.ev(`(() => { const bs = [...document.querySelectorAll('.vf-term-bouton')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }); return { coarse: matchMedia('(pointer: coarse)').matches, boutons: bs.join(','), barre: Math.round(document.querySelector('.vf-term-barre').getBoundingClientRect().height), pastille: parseFloat(getComputedStyle(document.querySelector('button.vf-term-pastille')).height) }; })()`);
+    const mesure = () => s.ev(`(() => { const bs = [...document.querySelectorAll('.vf-term-bouton:not(.vf-term-terminer)')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }); const t = document.querySelector('.vf-term-terminer'); return { coarse: matchMedia('(pointer: coarse)').matches, boutons: bs.join(','), terminerH: t && !t.hidden ? Math.round(t.getBoundingClientRect().height) : -1, barre: Math.round(document.querySelector('.vf-term-barre').getBoundingClientRect().height), pastille: parseFloat(getComputedStyle(document.querySelector('button.vf-term-pastille')).height) }; })()`);
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
     r.tu15 = { fin: await attendreEtStabiliser(mesure, (v) => !!v && v.coarse === false, { max: 5000 }) };
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: true }); await s.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
@@ -837,7 +875,7 @@ echo "=== ST — script injecté (statique) : TU.13, T17.6 ==="
 node "$AUX/scriptgen.mjs" "$OUT" 0 > "$WORK/sg.out" 2>&1; SG="$(tail -n 1 "$WORK/sg.out")"
 assert_eq "TU.13.0 — témoin : le script injecté existe (taille > 500), sa première ligne est l'en-tête VibeFlow (71-07), il vient avec sa feuille" "$(rj "$SG" '(j.taille>500)+"/"+j.premiere+"/"+j.style')" "true/// VibeFlow (71-07) : tiroir du terminal/true"
 assert_eq "TU.13 — aucune adresse web écrite en entier dans le script injecté, commentaires compris (témoin : le motif trouve une adresse plantée)" "$(rj "$SG" 'j.adresses+"/"+j.temoin')" "0/1"
-assert_eq "TU.13b — un seul fetch( et il vise /api/vf/terminal ; aucun cookie ; seules clés de stockage : vf.terminal.h et vf.terminal.open" "$(rj "$SG" '(j.taille>500)+"/"+j.fetchs+"/"+j.api+"/"+j.cookie+"/"+j.cles')" "true/1/true/0/vf.terminal.h,vf.terminal.open"
+assert_eq "TU.13b — deux fetch( seulement (l'état du terminal, puis « Terminer la session » depuis l'audit du cockpit, AUDC-M10), tous deux vers /api/vf/terminal ; aucun cookie ; seules clés de stockage : vf.terminal.h et vf.terminal.open" "$(rj "$SG" '(j.taille>500)+"/"+j.fetchs+"/"+j.api+"/"+j.cookie+"/"+j.cles')" "true/2/true/0/vf.terminal.h,vf.terminal.open"
 assert_eq "T17.6 — aucun postMessage( dans le script injecté (le sens P vers le cadre est fermé), aucun attribut allow posé, Échap jamais cité (le script est vivant)" "$(rj "$SG" '(j.taille>500)+"/"+j.postmsg+"/"+j.allow+"/"+j.echap')" "true/0/0/0"
 
 echo "=== T23 — point de la pastille fermée : jamais une teinte d'état sur --raise en clair (71.5, juge de rendu 2026-11-06 ; DESIGN.md §9) ==="
@@ -924,10 +962,12 @@ mut_msg M-MSG-LISTE 's|typeof e.data === .string. && liste.indexOf(e.data) >= 0|
 mut_msg M-MSG-CONFIANCE 's|if (!e \|\| e.isTrusted !== true) return false;|if (!e) return false;|' non-fiable
 
 echo "=== TP — valeur fixe « proposition » de Q vers P (72-14 ; P72-D-09, P71-D-18 ; contrat §8) ==="
-assert_eq "TP.1 — la liste de la phase 71 garde ses huit valeurs (ligne 2 du harnais), la phase 72 ajoute exactement une valeur fixe (ligne 3)" "$(sed -n 2p "$WORK/h.out") $(sed -n 3p "$WORK/h.out")" "liste=etat:arrete,etat:connecte,etat:expire,etat:reconnexion,etat:refuse,etat:termine,ready,toggle ajouts72=proposition"
+assert_eq "TP.1 — la liste de la phase 71 garde ses huit valeurs (ligne 2 du harnais), la phase 72 ajoute une valeur fixe (« proposition »), le lot 0 de l'audit deux autres (« annulation » puis « retrait », AUDC-M11) (ligne 3)" "$(sed -n 2p "$WORK/h.out") $(sed -n 3p "$WORK/h.out")" "liste=etat:arrete,etat:connecte,etat:expire,etat:reconnexion,etat:refuse,etat:termine,ready,toggle ajouts72=annulation,proposition,retrait"
 assert_eq "TP.2 — accepteMessage : « proposition » seule passe ; refusés : suffixe, majuscule, espace final, 10 000 caractères, origine de P, autre source, non fiable" "$(sed -n 4p "$WORK/h.out")" "prop=oui prop-suffixe=non prop-majuscule=non prop-espace=non prop-10000=non prop-origine-de-P=non prop-source-autre=non prop-non-fiable=non"
+assert_eq "TP.2c — AUDC-M11 : accepteMessage : « retrait » seul passe ; refusés : suffixe, majuscule, origine de P, autre source, non fiable" "$(sed -n 6p "$WORK/h.out")" "ret=oui ret-suffixe=non ret-majuscule=non ret-origine-de-P=non ret-source-autre=non ret-non-fiable=non"
 node "$AUX/harnais-liste-q.mjs" "$OUT" > "$WORK/hq.out" 2>&1
-assert_eq "TP.3 — câblage : LISTE_MESSAGES de P = ensemble des valeurs de la table MESSAGES du client de Q (neuf valeurs), et le client appelle emettre sur la clé de « proposition »" "$(tail -n 1 "$WORK/hq.out" | node "$AUX/ev.mjs" '"q="+j.q+" p="+j.p+" egal="+j.egal+" cle="+j.cle+" appel="+j.appel')" "q=9 p=9 egal=true cle=proposition appel=true"
+assert_eq "TP.2b — AUDC-M11 : accepteMessage : « annulation » seule passe ; refusés : suffixe, majuscule, origine de P, autre source, non fiable" "$(sed -n 5p "$WORK/h.out")" "ann=oui ann-suffixe=non ann-majuscule=non ann-origine-de-P=non ann-source-autre=non ann-non-fiable=non"
+assert_eq "TP.3 — câblage : LISTE_MESSAGES de P = ensemble des valeurs de la table MESSAGES du client de Q (onze valeurs), et le client appelle emettre sur la clé de « proposition »" "$(tail -n 1 "$WORK/hq.out" | node "$AUX/ev.mjs" '"q="+j.q+" p="+j.p+" egal="+j.egal+" cle="+j.cle+" appel="+j.appel')" "q=11 p=11 egal=true cle=proposition appel=true"
 mut_prop() { # mut_prop <libellé> <nom> <expression-sed> <cas qui doit passer à « oui » dans la ligne 4>
   if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
     node "$AUX/harnais-msg.mjs" "$MUT_OUT" > "$WORK/hm-$2.out" 2>&1
@@ -964,7 +1004,7 @@ assert_eq "T17.3 — MessageEvent forgé (origine de Q, source = le cadre) : ign
 assert_eq "T17.5 — espion : après une commande tapée dans le shell, tout message d'origine Q est dans la liste fermée ; ni le marqueur, ni le secret, ni l'amorçage n'y figurent (témoin : la commande a tourné)" "$(rj "$J" '"fichier="+j.t175.fichier+" hors_liste="+j.t175.hors_liste+" marqueur="+j.t175.marqueur+" secret="+j.t175.secret+" amorce="+j.t175.amorce+" ready_et_connecte="+(j.t175.vus.includes("ready")&&j.t175.vus.includes("etat:connecte"))')" "fichier=true hors_liste=0 marqueur=0 secret=0 amorce=0 ready_et_connecte=true"
 
 assert_eq "T20.4 (J4) — poignée focalisée au clavier : le contour est sur le grip (40 px, 2 px pleins, visible), jamais sur la poignée pleine largeur (témoin : :focus-visible est vrai)" "$(rj "$J" '"sur="+j.tu14.sur_poignee+" fv="+j.tu14.fv+" poignee="+j.tu14.poignee+" grip="+j.tu14.grip+" opaque="+j.tu14.opaque+" grip_larg="+j.tu14.grip_larg+" large="+(j.tu14.poignee_larg>400)')" "sur=true fv=true poignee=none grip=solid/2px opaque=1 grip_larg=40 large=true"
-assert_eq "T20.7 (J7) — pointeur fin : boutons de 28 px, barre de 36 px ; pointer: coarse (témoin : le média est vrai) : boutons d'au moins 44 px et barre qui les contient" "$(rj "$J" '"fin="+j.tu15.fin.coarse+" "+j.tu15.fin.boutons+" "+j.tu15.fin.barre+" / tactile="+j.tu15.tactile.coarse+" "+(j.tu15.tactile.boutons.split(",").every((b)=>b.split("x").every((n)=>Number(n)>=44)))+" "+(j.tu15.tactile.barre>=44)')" "fin=false 28x28,28x28 36 / tactile=true true true"
+assert_eq "T20.7 (J7) — pointeur fin : boutons carrés de 28 px (le bouton à mot « Terminer la session », AUDC-M10, est mesuré à part : 28 px de haut, au moins 44 au toucher), barre de 36 px ; pointer: coarse (témoin : le média est vrai) : boutons d'au moins 44 px et barre qui les contient" "$(rj "$J" '"fin="+j.tu15.fin.coarse+" "+j.tu15.fin.boutons+" "+j.tu15.fin.barre+" / tactile="+j.tu15.tactile.coarse+" "+(j.tu15.tactile.boutons.split(",").every((b)=>b.split("x").every((n)=>Number(n)>=44)))+" "+(j.tu15.tactile.barre>=44)+" terminer="+j.tu15.fin.terminerH+"/"+(j.tu15.tactile.terminerH>=44)')" "fin=false 28x28,28x28 36 / tactile=true true true terminer=28/true"
 assert_eq "T20.8 (F-A1-3) — la pastille « Terminal » fermée : 32 px au pointeur fin, au moins 44 px sous pointer: coarse (témoin : le média est vrai)" "$(rj "$J" '"fin="+j.tu15.fin.pastille+" / tactile="+j.tu15.tactile.coarse+" "+(j.tu15.tactile.pastille>=44)')" "fin=32 / tactile=true true"
 
 echo "=== TU.9 / TU.10 / TU.12 — localhost, Windows, autres pages ==="
@@ -1106,29 +1146,50 @@ mut_prop_nav() { # mut_prop_nav <libellé> <nom> <expression-sed> <expression de
     assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
   else sans_effet "$1 $2"; fi
 }
-mut_prop_nav TP.10 M-LISTE-SANS-PROPOSITION "s|, 'proposition'\]);|]);|" '!(j.ouvre1&&j.ouvre1.ouvert)' "le tiroir ne s'ouvre plus (liste sans la valeur)"
+mut_prop_nav TP.10 M-LISTE-SANS-PROPOSITION "s|, 'proposition', 'annulation', 'retrait'\]);|, 'annulation', 'retrait']);|" '!(j.ouvre1&&j.ouvre1.ouvert)' "le tiroir ne s'ouvre plus (liste sans la valeur)"
 mut_prop_nav TP.11 M-PROPOSITION-COMME-ETAT 's|else if (e.data === .proposition.) proposer();||' '!(j.ouvre1&&j.ouvre1.barre==="Connecté")' "la barre perd son libellé « Connecté »"
 mut_prop_nav TP.12 M-FOCUS-VOLE 's|const proposer = () => { ouvrir(false);|const proposer = () => { ouvrir(true);|' '!(j.ouvre1&&j.ouvre1.focus==="temoin")' "le focus passe au cadre"
 
 echo "=== TH — la proposition ouvre le tiroir à 300 px au moins (PU-G-136) ==="
 run_haut "$OUT"; PH="$PJ"
 HV() { rj "$PH" "(()=>{const c=j.haut&&j.haut['$1'];if(!c)return 'absent';$2})()"; }
-assert_eq "TH.0 — témoin : aucune étape en erreur, les six cas ont été mesurés" "$(rj "$PH" '(j.erreur||JSON.stringify(j.erreurs))+" cas="+Object.keys(j.haut||{}).length')" "{} cas=6"
+assert_eq "TH.0 — témoin : aucune étape en erreur, les huit cas ont été mesurés" "$(rj "$PH" '(j.erreur||JSON.stringify(j.erreurs))+" cas="+Object.keys(j.haut||{}).length')" "{} cas=8"
 for ch in evt msg; do
   assert_eq "TH.1 ($ch) — tiroir fermé réglé à 160 px : la proposition l'ouvre à 300 px au moins (avant : 160), hauteur mesurée ET aria-valuenow" "$(HV bas-$ch 'return "avant="+c.avantNow+" ouvert="+c.ouvert+" now="+(c.now>=300)+" px="+(c.px>=300)')" "avant=160 ouvert=true now=true px=true"
-  assert_eq "TH.2 ($ch) — tiroir réglé à 424 px : la proposition le laisse à 424 (jamais réduit)" "$(HV haut-$ch 'return "avant="+c.avantNow+" now="+c.now+" px="+c.px')" "avant=424 now=424 px=424"
-  assert_eq "TH.3 ($ch) — la hauteur mémorisée (vf.terminal.h) n'est pas touchée par le rehaussement : 160 avant, 160 après (cas bas) ; 424 avant, 424 après (cas haut)" "$(HV bas-$ch 'return c.avantMemo+"/"+c.memo') $(HV haut-$ch 'return c.avantMemo+"/"+c.memo')" "160/160 424/424"
+  assert_eq "TH.2 ($ch) — tiroir réglé à 544 px (au-dessus de la hauteur du bandeau) : la proposition le laisse à 544 (jamais réduit)" "$(HV haut-$ch 'return "avant="+c.avantNow+" now="+c.now+" px="+c.px')" "avant=544 now=544 px=544"
+  assert_eq "TH.2b ($ch) — AUDC-M11 : tiroir réglé à 424 px (sous la hauteur du bandeau) : la proposition le rehausse à 480 px, 60 % de la fenêtre de 800 px (hauteur mesurée ET aria-valuenow), sans toucher la hauteur mémorisée" "$(HV moyen-$ch 'return "avant="+c.avantNow+" now="+c.now+" px="+c.px+" memo="+c.avantMemo+"/"+c.memo')" "avant=424 now=480 px=480 memo=424/424"
+  assert_eq "TH.3 ($ch) — la hauteur mémorisée (vf.terminal.h) n'est pas touchée par le rehaussement : 160 avant, 160 après (cas bas) ; 544 avant, 544 après (cas haut)" "$(HV bas-$ch 'return c.avantMemo+"/"+c.memo') $(HV haut-$ch 'return c.avantMemo+"/"+c.memo')" "160/160 544/544"
   assert_eq "TH.4 ($ch) — plein écran : la proposition ne rehausse pas (hauteur interne restée à 160, état plein conservé)" "$(HV plein-$ch 'return "avant="+c.avantNow+" now="+c.now+" plein="+c.plein+" ouvert="+c.ouvert+" memo="+c.memo')" "avant=160 now=160 plein=true ouvert=true memo=160"
 done
+RV() { rj "$PH" "(()=>{const c=j.reprise&&j.reprise['$1'];if(!c)return 'absent';$2})()"; }
+assert_eq "TH.20 — AUDC-M11 : « retrait » après une proposition : tiroir réglé à 160 px, monté à 480, repris à 160 ; réglé à 424, monté à 480, repris à 424 (hauteur mesurée ET aria-valuenow), mémoire inchangée, tiroir resté ouvert" "$(RV bas 'return [c.avantNow,c.haut,c.fin,c.finPx,c.avantMemo+">"+c.finMemo,c.ouvert].join("/")') $(RV moyen 'return [c.avantNow,c.haut,c.fin,c.finPx,c.avantMemo+">"+c.finMemo,c.ouvert].join("/")')" "160/480/160/160/160>160/true 424/480/424/424/424>424/true"
+assert_eq "TH.21 — tiroir déjà plus haut que le bandeau (544 px) : jamais rehaussé, « retrait » ne le change pas" "$(RV haut 'return [c.avantNow,c.haut,c.fin,c.avantMemo+">"+c.finMemo].join("/")')" "544/544/544/544>544"
+assert_eq "TH.22 — l'utilisateur règle le tiroir pendant le bandeau (clavier : 480 puis 504 px ; souris : 480 puis 520 px) : « retrait » ne l'écrase pas, sa hauteur reste et la mémoire la porte" "$(RV clavier 'return [c.haut,c.milieu,c.fin,c.finMemo].join("/")') $(RV souris 'return [c.haut,c.milieu,c.fin,c.finMemo].join("/")')" "480/504/504/504 480/520/520/520"
+assert_eq "TH.23 — une seconde proposition pendant le rehaussement ne fait pas oublier la hauteur d'origine : repris à 160 (pas à 480)" "$(RV remplace 'return [c.avantNow,c.haut,c.fin,c.avantMemo+">"+c.finMemo].join("/")')" "160/480/160/160>160"
+E24='(()=>{const c=j.reprise&&j.reprise.pleinApres;return c?[c.now,c.px,c.plein,c.memo].join("/"):"absent"})()' # une variable, pas d'expression à accolades dans l'argument : bash 3.2 les développe malgré les guillemets et assert_eq recevait six mots
+TH24A="$(RV plein 'return [c.avantNow,c.haut,c.fin,c.plein,c.avantMemo+">"+c.finMemo].join("/")')"; TH24B="$(rj "$PH" "$E24")"
+assert_eq "TH.24 — plein écran basculé pendant le bandeau : la reprise vaut pour la hauteur interne, retrouvée en quittant le plein écran (160 px), état plein conservé pendant ; mémoire inchangée" "$TH24A $TH24B" "160/480/160/true/160>160 160/160/false/160"
+assert_eq "TH.22c — AUDC-M11 : glissement de la poignée à la souris commencé pendant le bandeau, « retrait » reçu EN PLEIN glissement : la hauteur n'est pas reprise sous la main (480 puis 520 px), le relâchement la mémorise" "$(RV glisse 'return [c.haut,c.milieu,c.fin,c.apres.now,c.apres.memo].join("/")')" "480/520/520/520/520"
+assert_eq "TH.26 — AUDC-M11 : fenêtre de 360 px (le bandeau de 300 px ne tient pas : 276 px au plus), deux propositions de suite puis « retrait » : la seconde ne prend pas 276 px pour la hauteur d'origine, repris à 160 px, mémoire inchangée" "$(RV petit 'return [c.avant,c.haut,c.milieu,c.fin,c.memo].join("/")')" "160/276/276/160/160"
+assert_eq "TH.27 — AUDC-M11 : la fenêtre se réduit PENDANT le bandeau (800 puis 600 px) et fait baisser la hauteur (480 puis 420 px, plafond de 70 %) : « retrait » ne la remonte pas à la hauteur d'origine (420 px, pas 160), mémoire inchangée" "$(RV fenetre 'return [c.haut,c.milieu,c.fin,c.finMemo].join("/")')" "480/420/420/160"
+assert_eq "TH.25 — « retrait » sans rehaussement préalable : rien à reprendre, la hauteur (160 px) et la mémoire ne bougent pas" "$(RV seul 'return [c.avant,c.fin,c.memo].join("/")')" "160/160/160"
 mut_haut() { # mut_haut <libellé> <nom> <expression-sed> <expression de rougissement>
   if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
     VF_TIROIR_MS=20000 run_haut "$MUT_OUT"
     assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
   else sans_effet "$1 $2"; fi
 }
-mut_haut TH.9 M-HAUT-SANS-REHAUSSEMENT 's|if (!plein \&\& h < 300) { h = borne(300); appliquer(); }||' 'j.haut["bas-evt"].now<300&&j.haut["bas-msg"].now<300' "le tiroir reste sous 300 px par les deux chemins"
+mut_haut TH.20 M-REPRISE-RETIREE-P "s|else if (e.data === 'retrait') reprendre();||" 'j.reprise.bas.fin===480&&j.reprise.moyen.fin===480&&j.reprise.plein.fin===480' "le tiroir ne reprend plus sa hauteur (reste à 480 px)"
+mut_haut TH.22 M-REPRISE-ECRASE-CLAVIER "s|const memoH = () => { perso = true; reprise = null;|const memoH = () => { perso = true;|" 'j.reprise.clavier.fin===160' "la reprise écrase la hauteur réglée au clavier pendant le bandeau (retour à 160)"
+mut_haut TH.22b M-REPRISE-ECRASE-SOURIS "s|const memoH = () => { perso = true; reprise = null;|const memoH = () => { perso = true;|;s|e.preventDefault(); reprise = null; const y0|e.preventDefault(); const y0|" 'j.reprise.souris.fin===160' "la reprise écrase un glissement à la souris pendant le bandeau (ni geste ni relâchement ne l'annulent : retour à 160)"
+mut_haut TH.22c M-REPRISE-ECRASE-GLISSEMENT "s|e.preventDefault(); reprise = null; const y0|e.preventDefault(); const y0|" 'j.reprise.glisse.fin===160' "le « retrait » reçu en plein glissement reprend la hauteur sous la main (160 au lieu de 520)"
+mut_haut TH.27 M-REPRISE-NON-ANNULEE-PAR-FENETRE "s|if (v !== h) { h = v; reprise = null; appliquer(); }|if (v !== h) { h = v; appliquer(); }|" 'j.reprise.fenetre.fin===160' "la fenêtre qui se réduit pendant le bandeau n'annule pas la reprise : « retrait » écrase la hauteur (160 au lieu de 420)"
+mut_haut TH.26 M-REPRISE-OUBLIEE-AU-REMPLACEMENT "s|reprise === null \&\& h < Math.max(300, hautBandeau())|h < Math.max(300, hautBandeau())|" 'j.reprise.petit.fin===276' "la seconde proposition, trouvant le tiroir encore sous 300 px (fenêtre de 360 px), écrase la hauteur d'origine retenue (reprise à 276 au lieu de 160)"
+mut_haut TH.9 M-HAUT-SANS-REHAUSSEMENT 's|if (!plein \&\& h < 300) { h = borne(300); appliquer(); }||;s|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["bas-evt"].now<300&&j.haut["bas-msg"].now<300' "le tiroir reste sous 300 px par les deux chemins"
+mut_haut TH.14 M-HAUT-BANDEAU-ECRASE-MEMO 's|h = borne(hautBandeau()); appliquer(); }|h = borne(hautBandeau()); appliquer(); memoH(); }|' 'j.haut["moyen-evt"].memo!=="424"' "le rehaussement au bandeau écrase la hauteur mémorisée (PU-G-136)"
+mut_haut TH.13 M-HAUT-SANS-BANDEAU 's|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["moyen-evt"].now<480&&j.haut["moyen-msg"].now<480' "un tiroir de 424 px n'est pas rehaussé à la hauteur du bandeau (AUDC-M11)"
 mut_haut TH.10 M-HAUT-ECRASE-MEMO 's|h = borne(300); appliquer(); }|h = borne(300); appliquer(); memoH(); }|' 'j.haut["bas-evt"].memo!=="160"' "la hauteur mémorisée est écrasée"
-mut_haut TH.11 M-HAUT-REDUIT 's|if (!plein \&\& h < 300) { h = borne(300)|if (!plein) { h = borne(300)|' 'j.haut["haut-evt"].now!==424' "un tiroir à 424 px est ramené à 300"
+mut_haut TH.11 M-HAUT-REDUIT 's|if (!plein \&\& h < 300) { h = borne(300)|if (!plein) { h = borne(300)|' 'j.haut["haut-evt"].now!==544' "un tiroir à 544 px est ramené à 300"
 mut_haut TH.12 M-HAUT-EN-PLEIN 's|if (!plein \&\& h < 300)|if (h < 300)|' 'j.haut["plein-evt"].now>=300' "le plein écran est rehaussé"
 fi
 

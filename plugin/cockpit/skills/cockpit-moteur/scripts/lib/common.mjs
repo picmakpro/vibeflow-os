@@ -2,6 +2,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { gitSortant } from './vf-git-sortant.mjs'; // vibeflow AUDC-A-02
 
 export const toPosix = (p) => p.replace(/\\/g, '/');
 export const rel = (from, to) => toPosix(path.relative(from, to)) || '.';
@@ -204,8 +205,9 @@ export function discover(root, { includeWorktrees = false, maxLooseFiles = 5000 
   const loose = [];
   const skipped = [];
 
+  // vibeflow AUDC-A-02 : un dépôt dont les métadonnées git ne sont pas celles du lab (dossier git ou commun hors du lab, lien symbolique, alternates, core.worktree étranger) n'est pas lu (lib/vf-git-sortant.mjs)
   const walk = (dir, depth) => {
-    if (fs.existsSync(path.join(dir, '.git'))) {
+    if (fs.existsSync(path.join(dir, '.git')) && !gitSortant(dir, root)) {
       repos.push({ abs: dir, path: rel(root, dir), worktreeOf: worktreeMain(dir) });
       return;
     }

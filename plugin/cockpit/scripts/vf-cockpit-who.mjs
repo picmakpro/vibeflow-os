@@ -2,7 +2,7 @@
 // vf-cockpit-who — « qui est au travail ? » (socle du cockpit, P67-D-12, promu du spike 004). Lecture seule.
 // Exports : collectWho(root, opts) -> schéma vibeflow/cockpit-who@2 (JAMAIS de champ `doing`, P67-D-14)
 //           revealDoing(root, id, opts) -> schéma vibeflow/cockpit-doing@1 (dernière commande, à la demande)
-//           revealTranscript(root, id, opts) -> schéma vibeflow/cockpit-transcript@1 (mandat, messages, outils : jamais une sortie d'outil, P69-D-19)
+//           revealTranscript(root, id, opts) -> schéma vibeflow/cockpit-transcript@2 (mandat d'agent, fil daté de messages et d'outils : jamais une sortie d'outil, P69-D-19)
 //           agentsConnus(root, opts) -> sessions et sous-agents seuls (collecte allégée d'un clic, T-69-06) ; commandeAffichee(cmd)
 // Quatre sources disque : sessions Claude Code (~/.claude/projects), sous-agents (meta.json), verrous et
 // registre (driver-lock.sh, résolu hors de l'arbre observé : T-67-06), DAG de mission (nœuds running).
@@ -15,8 +15,9 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout, GIT_SUR, shBorne } from './vf-cockpit-paths.mjs';
 import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
 import { FENETRE, collecteAgents, indexDesNoeuds, rattacher } from './vf-cockpit-equipe.mjs';
-import { lireDags } from './vf-cockpit-planning.mjs';
+import { lireDags, lireConfine } from './vf-cockpit-planning.mjs';
 import { arbresGit } from './vf-cockpit-arbres.mjs';
+import { demander, lire } from './vf-cockpit-etat-officiel.mjs';
 import { reduireTranscript } from './vf-cockpit-transcript.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -54,7 +55,7 @@ function dernierArbre(fichier, trees, cite) {
 }
 
 // contexte de collecte des sessions et sous-agents : arbres git du lab, portée, étiquettes
-function contexte(root, { fresh, now, home }) {
+function contexte(root, { fresh, now, home, officiel = false }) {
   root = path.resolve(root);
   const arbres = arbresGit(root); // l'analyse de la liste des arbres git vit dans vf-cockpit-arbres.mjs
   const branchOf = new Map(arbres.map((a) => [a.chemin, a.branche]));
@@ -75,7 +76,10 @@ function contexte(root, { fresh, now, home }) {
   };
 
   const projects = path.join(home, '.claude', 'projects');
-  return { root, trees, label, collecte: () => collecteAgents({ projects, now, fresh, fenetre: FENETRE, inScope, label, branche, byActivity, CC, tail, formeOk, root }) };
+  return { root, trees, label, collecte: () => {
+    if (officiel) demander({ home, cwd: root }); // asynchrone : la collecte ne l'attend jamais (AUDC-V8)
+    return collecteAgents({ projects, now, fresh, fenetre: FENETRE, inScope, label, branche, byActivity, CC, tail, formeOk, root, officiel: officiel ? lire(home) : null });
+  } };
 }
 
 // sessions et sous-agents seuls : pas de verrous, de registre ni de DAG (un clic ne rejoue pas toute la collecte)
@@ -86,8 +90,8 @@ export function agentsConnus(root, { fresh = 180, now = Date.now(), home = os.ho
 const rolesDe = (ws) => new Map(ws.filter((w) => w.kind === 'subagent' && typeof w.role === 'string' && w.role).map((w) => [w.id, w.role]));
 
 // collecte interne : les travailleurs gardent `_tr` (chemin du transcript) hors de la sortie publique
-function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir } = {}) {
-  const cx = contexte(root, { fresh, now, home }); root = cx.root;
+function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir, verrous, officiel = false } = {}) { // AUDC-H2 : `verrous` = le statut déjà lu par l'appelant (un seul appel au verrou par cycle) ; AUDC-D1 : `officiel` = la vue du cockpit lit les seules sources officielles
+  const cx = contexte(root, { fresh, now, home, officiel }); root = cx.root;
   const { trees, label } = cx; const sources = {}; const workers = [];
   // 1 + 2 — sessions et sous-agents, en arbre (vf-cockpit-equipe.mjs : fenêtre de 24 h, forme Claude Code lue du contrat)
   const eq = cx.collecte();
@@ -103,7 +107,9 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
   if (dl.etat === 'absent') sources.locks = { etat: 'absente' };
   else {
     const DL = dl.chemin; let st = {};
-    try { st = JSON.parse(sh('bash', [DL, 'status', '--all'], root, root)); } catch { sources.locks = { etat: 'erreur' }; }
+    if (verrous && typeof verrous === 'object' && !verrous.error && verrous.available !== false) st = verrous; // lu une fois par le direct : jamais relu ici
+    else if (verrous && verrous.error) sources.locks = { etat: 'erreur' };
+    else try { st = JSON.parse(sh('bash', [DL, 'status', '--all'], root, root)); } catch { sources.locks = { etat: 'erreur' }; }
     st = { ...st, locks: Array.isArray(st?.locks) ? st.locks : st?.present ? [st] : [] }; // lab plat : `status --all` rend l'objet d'UN verrou, sans `locks`
     // ws et phase partent en argument d'un script : grammaire EXACTE de driver-lock.sh, sinon la cible est écartée (champs libres masqués et bornés par collectWho).
     // ws = vf_ws_name_valid (alphanumérique en tête, puis alphanumérique . _ -, jamais `..`) ; phase = vf_dl_phase_valid (chiffres séparés par des points : 69, 41.1, 1.2.3)
@@ -122,7 +128,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
 
   // rattachement des sous-agents aux nœuds de mission (P69-D-15) : une seule découverte de DAG (lireDags), partagée avec le source 4
   let dags = [];
-  try { dags = lireDags(root, planningLayout(root)); } catch {}
+  try { dags = lireConfine(root, () => lireDags(root, planningLayout(root))); } catch {} // AUDC-A-02 : un DAG lié hors du lab n'est pas lu
   const trDe = new Map(workers.filter((w) => w.kind === 'subagent' && w._tr).map((w) => [w.id, w._tr]));
   rattacher(workers, { index: indexDesNoeuds(dags), registre, mandatDe: (id) => { const c = trDe.has(id) ? premiereLigne(trDe.get(id))?.message?.content : ''; return typeof c === 'string' ? c : ''; } });
 
@@ -165,7 +171,7 @@ export function collectWho(root, opts = {}) {
   });
   const sources = { ...g.sources };
   if (typeof sources.sessions?.path === 'string') sources.sessions = { ...sources.sessions, path: sources.sessions.path.replace(opts.home || os.homedir(), '~') };
-  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees.map((t) => bornes(t, 200)), fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine'), workers, sources };
+  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees.map((t) => bornes(t, 200)), fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine' && w.etat !== 'au-repos' && w.etat !== 'attend'), workers, sources };
 }
 
 // P67-D-14 : la dernière commande ne sort que par cette révélation ponctuelle (T-67-05), réduite au programme et à son premier argument (décision de Samuel, AskUserQuestion session principale, 2026-11-02).
@@ -215,16 +221,16 @@ export function revealDoing(root, id, opts = {}) {
   return doing ? { schema: 'vibeflow/cockpit-doing@1', id, doing } : { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'sans-action' };
 }
 
-// P69-D-19 : le transcript d'un agent connu, réduit à son mandat, ses messages et ses outils (liste blanche, vf-cockpit-transcript.mjs) ; le chemin vient de la collecte, jamais de l'entrée (T-69-02)
+// P69-D-19 : le transcript d'un agent connu, réduit à son mandat (agent) et à son fil daté de messages et d'outils (liste blanche, vf-cockpit-transcript.mjs) ; le chemin vient de la collecte, jamais de l'entrée (T-69-02)
 export function revealTranscript(root, id, opts = {}) {
-  const S = 'vibeflow/cockpit-transcript@1';
+  const S = 'vibeflow/cockpit-transcript@2';
   if (typeof id !== 'string' || !ID_RE.test(id)) return { schema: S, id: String(id).slice(0, 128), erreur: 'id-invalide' };
   try { return reveler(root, id, opts, S); } catch { return { schema: S, id, erreur: 'inconnu' }; } // aucune exception ne remonte à l'appelant (F3)
 }
 function reveler(root, id, opts, S) {
   const connus = new Map(agentsConnus(root, opts).filter((x) => (x.kind === 'session' || x.kind === 'subagent') && x._tr).map((x) => [x.id, x]));
   const w = connus.get(id);
-  return w ? { schema: S, id, ...reduireTranscript(w._tr, { root: path.resolve(root), roles: rolesDe([...connus.values()]) }) } : { schema: S, id, erreur: 'inconnu' };
+  return w ? { schema: S, id, ...reduireTranscript(w._tr, { root: path.resolve(root), roles: rolesDe([...connus.values()]), kind: w.kind }) } : { schema: S, id, erreur: 'inconnu' };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {

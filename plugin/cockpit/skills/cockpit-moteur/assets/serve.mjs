@@ -26,6 +26,9 @@ const argv = process.argv.slice(2);
 const opt = (name, dflt) => { const i = argv.indexOf('--' + name); return i < 0 ? dflt : argv[i + 1]; };
 const has = (name) => argv.includes('--' + name);
 const stateFile = path.join(here, '.cache', 'server.json');
+// vibeflow AUDC-H3 : le journal (serveur.log) porte la date et le motif de chaque arrêt ; jamais un jeton ni un contenu
+const journal = (m) => console.log(`${new Date().toISOString()} ${m}`);
+let motifArret = 'fin du processus';
 const readState = () => { try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { return null; } };
 if (has('stop')) {
   const s = readState();
@@ -51,7 +54,7 @@ function exportMap(include, extraFlows = []) {
   const out = {
     ...g,
     // the remote can carry a sign-in token; the folder path is this computer's
-    meta: { ...g.meta, root: null, repos: (g.meta.repos || []).map(({ remote, ...r }) => r), exported: { at: new Date().toISOString(), include: on } },
+    meta: { ...(({ vfTouch, vfGit, ...m }) => m)(g.meta), root: null, repos: (g.meta.repos || []).map(({ remote, ...r }) => r), exported: { at: new Date().toISOString(), include: on } }, // vibeflow AUDC-B-04 : ni les plans touchés par fichier (vfTouch) ni dépôt, worktree et branche (vfGit)
     flows: on.includes('flows') ? [...g.flows, ...extraFlows.filter((f) => !g.flows.some((x) => x.id === f.id))] : [],
     tour: on.includes('flows') ? g.tour : [],
     files: on.includes('notes') ? g.files : g.files.map(({ note, ...f }) => f),
@@ -171,7 +174,7 @@ if (cli) { try { version = execFileSync(cli.cmd, [...cli.args, '--version'], { e
 // code). Loaded at start and again whenever the map is rebuilt.
 let TERM = null; // vibeflow P26 : terminal intégré, chargé seulement avec --terminal (second écouteur 127.0.0.1, aucun effet sans le drapeau)
 if (has('terminal')) { try { TERM = (await import(new URL('./vf-cockpit-terminal.mjs', import.meta.url))).preparerTerminal({ here, root, jetons: () => [token, VF?.ptoken] }); } catch (e) { console.error(`vf-cockpit : terminal indisponible : ${e.message}. Relancer « vf-cockpit build ».`); } } // vibeflow P26
-const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
+const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange, unFlux: fs.existsSync(path.join(here, 'vf-cockpit-server.mjs')) }).replace(/</g, '\\u003c')};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
 let page, G, core, MODES;
 // vibeflow P13 : serveur unique. Le direct, « au travail » et la page Projet vivent dans vf-cockpit-server.mjs, posé à côté de
 // vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
@@ -209,7 +212,7 @@ load();
 // ---------- open tabs: live reload, and idle shutdown ----------
 const tabs = new Set();
 let lastTab = Date.now();
-const broadcast = (event, data = {}) => { for (const t of tabs) t.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+const broadcast = (event, data = {}) => { for (const t of tabs) t.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); VF?.diffuserCarte?.(event, data); }; // vibeflow AUDC-H1 : la page n'ouvre qu'un flux, celui du direct : le rechargement de la carte y passe aussi
 let reloadTimer = null;
 fs.watchFile(path.join(here, 'index.html'), { interval: 1000 }, (cur, prev) => {
   if (cur.mtimeMs === prev.mtimeMs) return;
@@ -217,7 +220,13 @@ fs.watchFile(path.join(here, 'index.html'), { interval: 1000 }, (cur, prev) => {
   clearTimeout(reloadTimer);
   reloadTimer = setTimeout(() => { try { load(); broadcast('reload'); console.log('map rebuilt: reloaded open tabs'); } catch {} }, 800);
 });
-if (idleExit) setInterval(() => { if (!tabs.size && !running.size && !TERM?.occupe() && Date.now() - lastTab > idleExit) process.exit(0); }, 60000).unref(); // vibeflow P26 : une session de terminal ouverte empêche l'arrêt pour inactivité
+// vibeflow P26 : une session de terminal ouverte empêche l'arrêt pour inactivité ; AUDC-H3 : toute requête authentifiée et tout flux de page ouvert comptent comme activité, et la rétention par le terminal est écrite au journal
+let retenuDit = false;
+if (idleExit) setInterval(() => {
+  if (tabs.size || running.size || VF?.ouverts?.() || Date.now() - Math.max(lastTab, VF?.dernierFlux?.() || 0) <= idleExit) return;
+  if (TERM?.occupe()) { if (!retenuDit) { retenuDit = true; journal("arrêt sur inactivité retenu : un terminal est ouvert"); } return; }
+  motifArret = `inactivité (${idleExit / 60000} min sans requête authentifiée ni onglet)`; process.exit(0);
+}, (() => { const n = Number(process.env.VF_COCKPIT_IDLE_TICK_MS); return Number.isInteger(n) && n >= 100 && n < 60000 ? n : 60000; })()).unref(); // période de contrôle : 60 s, réglage de test seulement
 const flowsFile = path.join(here, 'custom-flows.json');
 const readFlows = () => { try { return JSON.parse(fs.readFileSync(flowsFile, 'utf8')).flows || []; } catch { return []; } };
 
@@ -226,6 +235,7 @@ const readFlows = () => { try { return JSON.parse(fs.readFileSync(flowsFile, 'ut
 // ---------- asking ----------
 const nameFor = (id) => { try { return core.q.brief(id)?.name || id; } catch { return id; } };
 const running = new Map();
+const lingering = new Map(); // vibeflow AUDC-B-02 : agents qui ont répondu sans être sortis : hors du plafond, mais atteignables par /api/cancel et bornés par le délai global
 const rel = (p) => String(p || '').replace(/\\/g, '/').replace(root.replace(/\\/g, '/') + '/', '');
 /** A shell command, in words: map lookups by name, then searches, file reads and listings. */
 function describeCommand(command) {
@@ -273,11 +283,13 @@ function parseAnswer(ev) {
 const failCode = (msg) => /not logged in|logged out|\/login|log ?in again|sign in|authenticat|unauthori[sz]ed|\b401\b/i.test(msg) ? 'not_logged_in'
   : /usage limit|rate limit|too many requests|\b429\b/i.test(msg) ? 'rate_limited' : 'cli_error';
 // Claude Code: `claude -p` with read-only tools, answering in the schema; follow-ups resume its session
+const issued = new Set(); // vibeflow AUDC-A-01 : les identifiants de session que CE serveur a rendus ; « Demander » ne reprend rien d'autre
+const noteSession = (id) => { if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.test(id)) return; issued.add(id); if (issued.size > 500) issued.delete(issued.values().next().value); };
 function claudeRun(body, mode) {
   const args = [...cli.args, '-p', '--output-format', 'stream-json', '--verbose',
     '--json-schema', JSON.stringify(mode.schema), '--append-system-prompt', mode.instructions,
     '--tools', 'Read,Grep,Glob,Bash', '--allowedTools', 'Bash(node floorplan/query.mjs:*)', 'Read', 'Grep', 'Glob'];
-  if (typeof body.session === 'string' && /^[0-9a-f-]{36}$/i.test(body.session)) args.push(`--resume=${body.session}`); // vibeflow P18 : un identifiant de session, jamais un drapeau
+  if (typeof body.session === 'string' && /^[0-9a-f-]{36}$/i.test(body.session) && issued.has(body.session)) args.push(`--resume=${body.session}`); // vibeflow P18 : un identifiant de session, jamais un drapeau
   if (model) args.push('--model', model);
   return {
     args: VF ? VF.argsAgent(args, body) : args, input: String(body.question || '').slice(0, 4000), // vibeflow P14 : confinement mesuré et modèle validé
@@ -285,7 +297,7 @@ function claudeRun(body, mode) {
       if (ev.type === 'assistant') for (const c of ev.message?.content || []) if (c.type === 'tool_use') out.progress(describeTool(c.name, c.input));
       if (ev.type !== 'result') return;
       if (ev.is_error) out.fail(String(ev.result || ev.subtype || 'Claude Code reported an error'));
-      else out.answer({ ...parseAnswer(ev), session: ev.session_id });
+      else { noteSession(ev.session_id); out.answer({ ...parseAnswer(ev), session: ev.session_id }); }
     },
   };
 }
@@ -319,14 +331,18 @@ function codexRun(body, mode) {
   };
 }
 const CLOSED = Symbol('closed'); // the browser went away mid-request
+const MAX_ASK = 2; // vibeflow AUDC-B-02 : deux exécutions de l'agent au plus en même temps (429 au-delà), chacune bornée par un délai global
+const ASK_DELAI = (() => { const n = Number(process.env.VF_COCKPIT_ASK_DELAI_MS); return Number.isInteger(n) && n >= 1000 && n <= 3600000 ? n : 600000; })();
 /** Runs the agent once for a request and resolves with its answer, streaming progress through `send`. */
 function runAgent(res, send, body) {
   return new Promise((resolve, reject) => {
+    if (running.size >= MAX_ASK) return reject(new Error('Deux questions sont déjà en cours : attendez la fin de l’une d’elles.')); // vibeflow AUDC-B-02 : la borne tient aussi au second essai de « modifier le plan »
     const M = VF ? VF.modes(MODES, body) : MODES; // vibeflow P14 : consigne de l'onglet Projet
     const run = ENGINES[engine].run(body, Object.hasOwn(M, body.mode) ? M[body.mode] : M.ask);
     const child = spawn(cli.cmd, run.args, { cwd: root, env: cliEnv(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     const id = crypto.randomBytes(6).toString('hex');
     running.set(id, child);
+    const limit = setTimeout(() => { child.kill(); if (!done) { done = true; clearTimeout(quiet); reject(new Error(`Délai dépassé : la question est arrêtée après ${Math.round(ASK_DELAI / 1000)} s.`)); } }, ASK_DELAI); // vibeflow AUDC-B-02 : le délai court jusqu'à la sortie de l'agent, réponse rendue ou non
     send('start', { id });
     child.stdin.end(run.input);
     let buf = '', stderr = '', done = false;
@@ -336,8 +352,8 @@ function runAgent(res, send, body) {
     const hush = () => { clearTimeout(quiet); if (body.mode === 'change' && !done) quiet = setTimeout(() => say('Working on the updated plan'), 12000); };
     const out = {
       progress: (text) => { if (!done) { say(text); hush(); } },
-      answer: (data) => { if (!done) { done = true; clearTimeout(quiet); resolve(data); } },
-      fail: (message) => { if (!done) { done = true; clearTimeout(quiet); reject(new Error(message)); } },
+      answer: (data) => { if (!done) { done = true; clearTimeout(quiet); running.delete(id); lingering.set(id, child); resolve(data); } },
+      fail: (message) => { if (!done) { done = true; clearTimeout(quiet); running.delete(id); lingering.set(id, child); reject(new Error(message)); } },
     };
     hush();
     child.stdout.on('data', (d) => {
@@ -353,7 +369,7 @@ function runAgent(res, send, body) {
     child.stderr.on('data', (d) => { stderr = (stderr + d).slice(-2000); });
     child.on('error', (e) => out.fail(e.message));
     child.on('close', (code) => {
-      running.delete(id);
+      running.delete(id); lingering.delete(id); clearTimeout(limit);
       out.fail(run.lastError?.() || stderr.trim() || `${engine} exited with code ${code}`);
     });
     // the browser went away (closed tab, Stop): don't leave the CLI working. Note req 'close' fires as soon as
@@ -362,11 +378,13 @@ function runAgent(res, send, body) {
   });
 }
 function ask(req, res, body) {
-  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
-  const send = (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+  let ouvert = false; // vibeflow AUDC-B-02 : le flux s'ouvre à la première émission, pour qu'un refus puisse encore être un 429
+  const send = (event, data) => { if (!ouvert) { ouvert = true; res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' }); } if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
   if (VF && VF.avantQuestion({ req, body, send }) === 'repondu') return res.end(); // vibeflow P14 : réponse locale ou refus de modèle
   if (!cli) { send('failure', { code: 'cli_missing', message: `${ENGINES[want].name} not found.` }); return res.end(); }
+  if (running.size >= MAX_ASK) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '5' }); return res.end(JSON.stringify({ error: 'Deux questions sont déjà en cours : attendez la fin de l’une d’elles.' })); } // vibeflow AUDC-B-02
   if (body.mode === 'change') return changePlan(res, send, body);
+  if (engine === 'claude' && typeof body.session === 'string' && body.session && !issued.has(body.session)) { send('failure', { code: 'session_inconnue', message: 'Cette conversation n’a pas été ouverte par ce serveur : rechargez la page pour en commencer une nouvelle.' }); return res.end(); } // vibeflow AUDC-A-01
   runAgent(res, send, body)
     .then((a) => send('answer', a), (e) => { if (e !== CLOSED) send('failure', { code: failCode(e.message), message: e.message }); })
     .finally(() => res.end());
@@ -484,6 +502,7 @@ function undoChange() {
 // ---------- http ----------
 // vibeflow P18 : un corps n'est cru que s'il est un objet JSON (null, 5, "s", [..] : 400, jamais une exception)
 const parseBody = (raw) => { try { const b = JSON.parse(raw); return b && typeof b === 'object' && !Array.isArray(b) ? b : null; } catch { return null; } };
+const sameToken = (a, b) => { if (typeof a !== 'string' || typeof b !== 'string') return false; const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && crypto.timingSafeEqual(x, y); }; // vibeflow AUDC-B-06 : comparaison en temps constant
 const bad = (res) => { res.writeHead(400, { 'Content-Type': 'application/json' }); res.end(JSON.stringify({ error: 'Requête invalide : un objet JSON est attendu.' })); };
 // vibeflow P17 : en-têtes de toutes les réponses. La page ne charge que ses scripts en ligne (empreintes), aucune origine tierce,
 // ne se laisse pas encadrer, n'envoie aucun formulaire. Les polices et logos sont des data: ; les styles en ligne sont admis (36 attributs style).
@@ -502,16 +521,24 @@ const server = http.createServer((req, res) => {
   res.setHeader('Content-Security-Policy', BASE_CSP); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
   try { route(req, res); } catch (e) { console.error(`vf-cockpit : requête en échec : ${e?.message || e}`); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch {} }
 });
+// vibeflow AUDC-B-03 bis : la page de redirection que le lanceur remet à l'ouvreur du poste est un fichier local (file://, origine opaque) : son saut vers la page
+// Projet part toujours en `Sec-Fetch-Site: cross-site`, comme celui d'un lien d'un autre site. Un seul chemin est rouvert : GET /project.html, navigation de premier
+// niveau (Mode navigate, Dest document : ni cadre, ni script, ni image, ni fetch) qui porte le SECRET D'OUVERTURE (`?o=`) écrit par le lanceur, valide tant que la clé
+// d'amorçage du terminal est armée, à usage unique, comparé en temps constant (TERM.ouvertureLanceur, vf-cockpit-terminal-amorce.mjs). Sans le secret, une page d'un
+// autre site n'obtient ni la page ni l'effet d'état qu'un chargement de la page Projet peut avoir. Sans --terminal, aucune exception.
+const ouvertureLanceur = (req, url) => req.method === 'GET' && url.pathname === '/project.html' && req.headers['sec-fetch-mode'] === 'navigate' && req.headers['sec-fetch-dest'] === 'document' && !!TERM?.ouvertureLanceur?.(url.searchParams.get('o'));
 function route(req, res) {
   // only this machine's own names: a website that points its domain at 127.0.0.1 (DNS rebinding) would
   // otherwise count as the same origin as the map, and could read its token from the page
   if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(String(req.headers.host || '').toLowerCase())) { res.writeHead(403); return res.end('unknown host'); }
   const url = new URL(req.url, `http://${req.headers.host}`);
   const sameOrigin = !req.headers.origin || req.headers.origin === `http://${req.headers.host}`;
+  if (!url.pathname.startsWith('/api/') && req.headers['sec-fetch-site'] === 'cross-site' && !ouvertureLanceur(req, url)) { res.writeHead(403); return res.end(); } // vibeflow AUDC-B-03 : une page d'un autre site n'obtient ni page ni fichier du cockpit (seule exception : ouvertureLanceur, AUDC-B-03 bis)
   if (url.pathname.startsWith('/api/')) {
     // EventSource can't send headers, so the events stream takes the token in the query string
     const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' || url.pathname === '/api/vf/events' ? url.searchParams.get('token') : null); // vibeflow P13
-    if (!sameOrigin || (given !== token && !VF?.jetonValide(given))) { res.writeHead(403); return res.end(); } // vibeflow P13
+    if (!sameOrigin || (!sameToken(given, token) && !VF?.jetonValide(given))) { res.writeHead(403); return res.end(); } // vibeflow P13
+    lastTab = Date.now(); // vibeflow AUDC-H3 : une requête authentifiée est une activité (l'arrêt sur inactivité ne regarde plus les seuls flux de page) ; après le refus 403, une requête non authentifiée ne compte jamais
     if (TERM && req.method === 'GET' && url.pathname === '/api/vf/terminal') return TERM.routeP(req, res); // vibeflow P26 : état du terminal (jamais un secret), après le Host et le jeton
     if (VF && url.pathname.startsWith('/api/vf/') && VF.route(req, res, url)) return; // vibeflow P13 : routes du serveur unique, après le Host et le jeton
     if (req.method === 'GET' && url.pathname === '/api/events') {
@@ -521,7 +548,7 @@ function route(req, res) {
       req.on('close', () => { tabs.delete(res); lastTab = Date.now(); });
       return;
     }
-    if (req.method === 'GET' && url.pathname === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ tabs: tabs.size, pid: process.pid, hash: selfHash, root })); }
+    if (req.method === 'GET' && url.pathname === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ tabs: tabs.size + (VF?.nbPages?.() || 0), pid: process.pid, hash: selfHash, root })); }
     if (req.method === 'GET' && url.pathname === '/api/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ cli: !!cli, engine, want, version, path: cli?.path || null })); }
     // requested flows are saved next to the map; build.mjs folds them into graph.json
     if (url.pathname === '/api/flows') {
@@ -543,7 +570,7 @@ function route(req, res) {
       const r = changing ? { ok: false, error: 'A change is still being made.' } : undoChange();
       res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(r));
     }
-    if (req.method === 'POST' && url.pathname === '/api/cancel') { for (const c of running.values()) c.kill(); res.writeHead(204); return res.end(); }
+    if (req.method === 'POST' && url.pathname === '/api/cancel') { for (const c of [...running.values(), ...lingering.values()]) c.kill(); res.writeHead(204); return res.end(); }
     if (req.method === 'POST' && url.pathname === '/api/export') {
       let raw = '';
       req.on('data', (d) => { raw += d; if (raw.length > 500000) req.destroy(); });
@@ -604,7 +631,9 @@ server.on('listening', () => {
   TERM?.demarrer(port); // vibeflow P26 : second écouteur du terminal, une fois server.json écrit
   const forget = () => { try { if (readState()?.pid === process.pid) fs.unlinkSync(stateFile); } catch {} };
   process.on('exit', forget);
-  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => process.exit(0));
+  process.on('exit', () => journal(`arrêt : ${motifArret} (PID ${process.pid})`)); // vibeflow AUDC-H3
+  for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { motifArret = `signal ${sig}`; process.exit(0); });
+  journal(`démarrage : PID ${process.pid}, port ${port}${TERM ? ', terminal' : ''}`);
   console.log(`Floorplan: ${u}`);
   console.log(cli
     ? `asking via ${ENGINES[engine].name} ${version || ''} (${cli.path})${model ? `, model ${model}` : ''}`

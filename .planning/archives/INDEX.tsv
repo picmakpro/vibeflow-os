@@ -20,3 +20,4 @@ date	type	source	archive	ref	motif
 2026-11-05	state	.planning/workstreams/fiabilite/STATE.md	.planning/archives/state/fiabilite-STATE-2026-11-05.md	d8dcc11e1d3ddff154ac8973c278243f90415a17	budget 8 Ko (SOBR-02), position réécrite
 2026-11-11	roadmap	.planning/workstreams/fiabilite/ROADMAP.md	.planning/archives/roadmap/fiabilite-ROADMAP-2026-11-11.md	b6062d4f7e2cad572731bc3ae488a4af0ef5f8ef	corps des Phases 71.5, 72 et 78 publiées condensés, lignes de checklist d origine (SOBR-06)
 2026-11-11	state	.planning/workstreams/fiabilite/STATE.md	.planning/archives/state/fiabilite-STATE-2026-11-11.md	4359bf64a705a21aca7ea0b5b01ba14e1e552512	position réécrite après la release v2.76.0 (SOBR-02)
+2026-11-11	backlog	.planning/BACKLOG.md	.planning/archives/backlog/racine-BACKLOG-2026-11-11.md	384470c12c10848248d876fda616ce08c0bed76d	sujets clos (SOBR-06)

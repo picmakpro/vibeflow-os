@@ -378,19 +378,11 @@ ou de `vf-new-lab`.
 - **Observé (lecture du code, sondes d'audit du lot 2 de la Phase 72) :** un script qui s'exécute dans la page Projet peut piloter le chat du cockpit : `POST /api/ask` est accepté avec le jeton de la page (`plugin/cockpit/scripts/vf-cockpit-server.mjs`, vers la l.113). Ce chat tourne en `dontAsk`, avec `--tools Read,Grep,Glob,Bash` et une liste blanche `--allowedTools` (`plugin/cockpit/scripts/vf-cockpit-agent.mjs`, vers les l.14-16).
 - **NON vérifié :** le contenu exact de la liste blanche Bash et ce qu'elle permet ; l'exécution réelle d'une commande par un chat piloté par script ; l'existence d'autres gardes.
 
+**Renvoi (2026-11-11) :** AUDC-A-01 et AUDC-B-02, fait (2026-11-11) : la reprise de session est bornée aux identifiants que le serveur a rendus et le débit à deux exécutions (429 au-delà). Le pilotage par un script de la page reste ouvert.
+
 **Déclencheur de reprise :** une passe de sécurité sur le chat du cockpit, ou toute phase qui touche `POST /api/ask`.
 
-## Cockpit : le `claude` lancé depuis le terminal reçoit `CLAUDE_EFFORT` et `CLAUDE_PID` de la session parente — NON VÉRIFIÉ (2026-11-06)
-
-**Priorité : non fixée.** À vérifier avec le vrai binaire avant toute décision.
-
-**Origine :** recette par juge de la Phase 72, 2026-11-06.
-- **Observé :** le `claude` lancé depuis le terminal du cockpit reçoit `CLAUDE_EFFORT` et `CLAUDE_PID`, ceux de la session Claude Code qui a démarré le serveur du cockpit. Le filtre de `plugin/cockpit/scripts/vf-cockpit-terminal-env.mjs` (vers la l.18, Phase 71) retire `CLAUDE_CODE_*` et `CLAUDECODE`, mais pas ces deux variables.
-- **NON vérifié :** que `CLAUDE_EFFORT` impose bien au `claude` lancé l'effort du parent (avec le vrai binaire).
-- **Attention :** retirer tout `CLAUDE_*` enlèverait aussi des réglages voulus, comme `CLAUDE_CONFIG_DIR` ; le filtre doit rester nominatif.
-
-**Déclencheur de reprise :** une passe sur l'environnement du shell du terminal, ou un lancement dont l'effort surprend.
-
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-11.md — ## Cockpit : le `claude` lancé depuis le terminal reçoit `CLAUDE_EFFORT` et `CLAUDE_PID` de la session parente — NON VÉRIFIÉ (2026-11-06) — CLOS (2026-11-11, AUDC-B-06) -->
 ## Cockpit : une proposition qui ouvre le tiroir pendant que le focus est dans la barre de question range la barre (`#ask-input`) — UX MINEURE (2026-11-06)
 
 **Priorité : non fixée.** Aucune fuite.
@@ -461,6 +453,8 @@ ou de `vf-new-lab`.
 - **Fait :** « Lancée » n'apparaît plus sans signal (« Préparée depuis la carte. »), et le message d'envoi est borné à 120 s.
 - **Non fait :** suivre l'état annulée, expirée, remplacée jusqu'à la carte. Cela exige de toucher `vf-cockpit-lancer.mjs` ou `lancer-suivi.mjs`, ou de créer un nouveau canal.
 
+**Renvoi (2026-11-11) :** AUDC-M11, fait (2026-11-11) : seule l'annulation est traitée (statut remis à zéro, annonce vidée) ; expirée et remplacée restent ouvertes.
+
 **Déclencheur de reprise :** la prochaine phase qui touche le suivi des lancements.
 
 ## Cockpit : résumé en langage courant (PU-G-104) et titres de santé à variables (PU-G-080 part C) — DIFFÉRÉ (2026-11-07)
@@ -481,6 +475,8 @@ ou de `vf-new-lab`.
 - **PU-G-195 :** tiroir Git élargissable (l'étiquette complète au survol est faite).
 - **PU-G-007 :** libellé visible sur chaque icône dès 1 000 px (la part compatible est faite).
 - **PU-G-202, PU-G-168 :** non faites, hors lots ; à relire dans le registre.
+
+**Renvoi (2026-11-11) :** PU-G-202 : AUDC-M9, fait (2026-11-11) pour la coupure du serveur (« Direct coupé » à 5 s) ; PU-G-168 : AUDC-M4, PU-G-007 : AUDC-M5, PU-G-195 : AUDC-M12, ouverts (Phases 74 et 80).
 
 **Déclencheur de reprise :** une demande d'utilisateur sur l'un de ces points.
 
@@ -562,3 +558,41 @@ ou de `vf-new-lab`.
 - **Correction ponctuelle :** STATE basculé à la main sur `vibeflow-v2.0`, phase 69 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « vibeflow-v2.0, phase 69 (Recommandé) »), dans la PR qui inscrit les Phases 73 à 77.
 
 **Déclencheur de reprise :** la prochaine inscription d'un jalon, ou la Phase 64 (contrôles branchés en nœuds du plan de bataille).
+
+
+## Cockpit : limites consignées par le lot 0 de l'audit — DIFFÉRÉ (2026-11-11)
+
+**Origine :** mission « lot 0 de l'audit du cockpit », `.planning/research/2026-11-10-audit-cockpit/REGISTRE.md` (§ « Constats nés de la mission lot 0 »). Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée. Sécurité décrite par classe, jamais par recette.
+
+### Coupure du serveur sans fermeture de flux (D-M2, AUDC-M9)
+**Priorité : moyenne.** Une coupure qui ne ferme pas la connexion (flux muet) n'est pas détectée ; il faut une veille de silence côté page. **Déclencheur de reprise :** Phase 79.
+
+### Métadonnées des dépôts imbriqués dans l'export (D-M5, AUDC-B-04)
+**Priorité : basse.** Branche, tête et worktree d'origine des dépôts imbriqués viennent d'une clé du moteur amont (`meta.repos`) et restent dans l'export. **Déclencheur de reprise :** la prochaine passe sur l'export ou sur le patch du moteur.
+
+### Requête du même site acceptée sur les pages sans jeton (D-M6, AUDC-B-03)
+**Priorité : basse.** Le texte de la règle dit « inter-sites » ; une requête du même site est acceptée. **Déclencheur de reprise :** une passe de sécurité sur les pages servies.
+
+### « Server returned 429 » affiché tel quel et session non purgée (D-M7, AUDC-B-02)
+**Priorité : basse.** La page montre le message brut du serveur et ne purge pas la session côté page ; non régressif. **Déclencheur de reprise :** Phase 80.
+
+### `stop` et `status` ignorent un serveur orphelin (D-M13, AUDC-H3)
+**Priorité : moyenne.** Quand `server.json` est perdu, les deux commandes ne voient pas le serveur resté à l'écoute. **Déclencheur de reprise :** Phase 79.
+
+### Lien du lab vers un fichier interne protégé (D-M15, AUDC-A-02)
+**Priorité : moyenne.** Un lien du lab vers un fichier interne que le serveur protège par ailleurs n'est pas masqué ; hors de la lettre d'AUDC-A-02 (cible dans le lab). **Déclencheur de reprise :** Phase 79, première vague, avec la classe restée ouverte d'AUDC-A-02.
+
+### Empreinte du code limitée à `serve.mjs` (AUDC-H3)
+**Priorité : basse.** La relance compare l'empreinte de `serve.mjs` seul ; un autre module modifié ne remplace pas le serveur. Le port n'est pas comparé. **Déclencheur de reprise :** Phase 79 (serveur lancé depuis le module, AUDC-AM4).
+
+### Formes singulières du repli de lien sans gabarit au dictionnaire (AUDC-H4)
+**Priorité : basse.** Lacune préexistante du chrome : certaines formes singulières du texte de repli d'un lien n'ont pas de gabarit au dictionnaire et restent en anglais. **Déclencheur de reprise :** la prochaine passe sur le dictionnaire.
+
+### Lecture passive : pilotes et script shell hors du point unique (AUDC-A-04)
+**Priorité : basse.** Les pilotes nommés sont fermés par une liste de sous-commandes de lecture ; un script shell du socle lance git hors du point unique, sans effet mesuré. **Déclencheur de reprise :** Phase 79, avec AUDC-A-03.
+
+### Sixième onglet qui ne charge plus (AUDC-H1)
+**Priorité : moyenne.** Un flux par page ne suffit pas au-delà de six pages ouvertes sur la même origine. **Déclencheur de reprise :** Phase 79 (flux partagé entre onglets).
+
+### Tiroir du terminal resté rehaussé après « Annuler » (AUDC-M11)
+**Priorité : à arbitrer (goût, pour Samuel).** Après « Annuler », le tiroir garde la hauteur prise pour la proposition. **Déclencheur de reprise :** la prochaine recette de Samuel sur le lancement.

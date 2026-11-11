@@ -49,6 +49,7 @@ cat > "$AUX/fakeclaude" <<'JS'
 // faux claude : --version ; sinon consigne argv dans $VF_FAKE_DIR/call-N.json et répond une réponse structurée
 import fs from 'node:fs'; const a = process.argv.slice(2);
 if (a.includes('--version')) { console.log('9.9.9 (fake)'); process.exit(0); }
+if (a[0] === 'agents') process.exit(1); // la lecture de l'état officiel des sessions (onglet Équipe) n'est pas une demande à l'agent : ni consignée, ni comptée (jointure)
 const d = process.env.VF_FAKE_DIR; const n = fs.readdirSync(d).filter((f) => f.startsWith('call-')).length + 1;
 fs.writeFileSync(`${d}/call-${n}.json`, JSON.stringify({ argv: a }));
 console.log(JSON.stringify({ type: 'result', is_error: false, structured_output: { title: 't', answer: 'a', items: [] }, session_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' }));
@@ -137,18 +138,20 @@ done
 assert_eq "B1 — 15 combinaisons (5 corps × 3 routes) : toutes en 400" "$BADN" "0"
 assert_eq "B2 — témoin : le serveur répond encore (état)" "$(sta "$PORT" GET /api/vf/etat "$TOK")" "200"
 
-echo "=== S — session de reprise : un uuid, jamais un drapeau ==="
+echo "=== S — session de reprise : un identifiant rendu par ce serveur, jamais un drapeau ==="
 srv "$OUT" "$WORK/fk"; PORT=$SRV_PORT; PTOK="$(tok "$PORT" /project.html)"
 ask() { node "$AUX/req.mjs" "$PORT" POST /api/ask "$PTOK" "{\"question\":\"Pourquoi ce statut ?\",\"mode\":\"ask\",\"session\":\"$1\"}" > /dev/null; }
 rm -f "$WORK"/fkd/call-*; ask "--dangerously-skip-permissions"
-assert_eq "S1 — témoin : l'agent a été lancé une fois" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')" "1"
+# AUDC-A-01 : un identifiant que ce serveur n'a pas rendu est refusé (avant : la forme seule était contrôlée, et l'agent était lancé sans reprise)
+assert_eq "S1 — un identifiant en forme de drapeau est refusé : l'agent n'est pas lancé" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')" "0"
 cat > "$AUX/argv.mjs" <<'JS'
 import fs from 'node:fs'; const a = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).argv; const i = a.indexOf('--setting-sources');
 console.log(JSON.stringify({ drapeau: a.some((x) => /dangerously|^--resume/.test(x)), uuid: a.includes('--resume=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'), sources: i >= 0 && a[i + 1] === '' && a.includes('--strict-mcp-config') }));
 JS
-assert_eq "S2 — l'argv ne porte ni ce drapeau ni --resume" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-1.json" | node "$AUX/ev.mjs" 'j.drapeau')" "false"
+ask ""
+assert_eq "S2 — témoin : une première question sans session lance l'agent, l'argv ne porte ni ce drapeau ni --resume" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')|$(node "$AUX/argv.mjs" "$WORK/fkd/call-1.json" | node "$AUX/ev.mjs" 'j.drapeau')" "1|false"
 ask "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-assert_eq "S3 — un uuid valide passe en --resume=<uuid>" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-2.json" | node "$AUX/ev.mjs" 'j.uuid')" "true"
+assert_eq "S3 — l'identifiant que ce serveur vient de rendre passe en --resume=<uuid>" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-2.json" | node "$AUX/ev.mjs" 'j.uuid')" "true"
 assert_eq "S4 — l'argv du confinement porte --setting-sources vide et --strict-mcp-config" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-2.json" | node "$AUX/ev.mjs" 'j.sources')" "true"
 unsrv
 
@@ -375,7 +378,8 @@ console.log(JSON.stringify({ brut: /</.test(m.decouper(out).donnees), allerRetou
 JS
 assert_eq "E1 — aucun « < » dans la zone de données, aller-retour exact, 2 balises script" "$(node "$AUX/emb.mjs" "$SCRIPTS" | node "$AUX/ev.mjs" 'j.brut+","+j.allerRetour+","+j.scripts')" "false,true,2"
 assert_eq "E2 — le moteur (build.mjs) échappe aussi chaque < en \\u003c" "$(grep -c "replace(/</g, '\\\\\\\\u003c')" "$ENG/scripts/build.mjs")" "1"
-assert_eq "E3 — l'export (serve.mjs) échappe de même" "$(grep -c "replace(/</g, '\\\\\\\\u003c')" "$ENG/assets/serve.mjs")" "1"
+assert_eq "E3 — l'export (serve.mjs) échappe de même" "$(grep -cF "JSON.stringify(out).replace(/</g, '\\\\u003c')" "$ENG/assets/serve.mjs")" "1"
+assert_eq "E3b — l'objet injecté dans les pages (version, modèle) échappe aussi chaque < (AUDC-B-06 1)" "$(grep -F 'window.FLOORPLAN_SERVER=' "$ENG/assets/serve.mjs" | grep -cF "replace(/</g, '\\\\u003c')")" "1"
 
 echo "=== C — sans vf-cockpit-server.mjs : échec franc ==="
 cp -R "$OUT" "$WORK/sortie-sans"; rm -f "$WORK/sortie-sans/vf-cockpit-server.mjs"

@@ -7,7 +7,7 @@
 
 set -uo pipefail
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
-if [ -z "$CHROME" ]; then echo "  ⊘ SUITE SAUTÉE : aucun navigateur (Chrome, Chromium) — la visite (O4, O5, O6.5-O6.19) et le panneau Format dans la page (R3.13-R3.22) ne sont PAS vérifiés, non comptés comme réussis"; exit 0; fi
+if [ -z "$CHROME" ]; then . "$(dirname "$0")/chrome-saut.sh"; vf_chrome_saut "  ⊘ SUITE SAUTÉE : aucun navigateur (Chrome, Chromium) — la visite (O4, O5, O6.5-O6.19) et le panneau Format dans la page (R3.13-R3.22) ne sont PAS vérifiés, non comptés comme réussis"; exit 0; fi
 . "$(dirname "$0")/projet-commun.sh"
 # Moteur de questions (K4, run 42500903126, R3.23) : les lignes de « Sur ce tableau » n'existent qu'après une réponse du moteur, et le champ de question est désactivé quand le serveur ne trouve aucun `claude` sur son PATH (avis no_engine : CI Linux, poste neuf). Le serveur reçoit donc un faux `claude`, identique sur le poste d'un dev et en CI (le témoin de test-cockpit-responsive.sh et de test-cockpit-visite-retours.sh) ; la réponse, elle, reste simulée dans la page. Le cas sans moteur a ses propres témoins (T9N.0, R25.0).
 FAUXBIN="$WORK/fauxbin"; mkdir -p "$FAUXBIN"; cp "$(dirname "$0")/temoins/fauxbin-claude/claude" "$FAUXBIN/claude"; chmod +x "$FAUXBIN/claude"; export PATH="$FAUXBIN:$PATH"

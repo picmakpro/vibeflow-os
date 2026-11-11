@@ -9,8 +9,8 @@
   const { h, graph: G } = SC;
   const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
   document.body.classList.add('vf-tab-' + TAB); // 70-12 (P70-D-20) : marqueur de l'onglet sur le corps de page (`vf-tab-code`, `vf-tab-project`, `vf-tab-equipe`), pour les règles de mise en page propres à un onglet
-  // titre de l'onglet du navigateur : « <nom> — Code », « <nom> — Projet » ou « Équipe · <nom> » (le viewer écrit « <nom> map », qui devenait le nom seul)
-  { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); document.title = TAB === 'equipe' ? `Équipe · ${nom}` : `${nom} — ${TAB === 'project' ? 'Projet' : 'Code'}`; }
+  // titre de l'onglet du navigateur (AUDC-X7) : un seul format, « <Onglet> · <nom> » : l'onglet d'abord, parce qu'un onglet étroit coupe par la fin et que trois pages du même projet doivent se distinguer d'un coup d'œil (le viewer écrit « <nom> map », qui devenait le nom seul)
+  { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); document.title = `${TAB === 'equipe' ? 'Équipe' : TAB === 'project' ? 'Projet' : 'Code'} · ${nom}`; }
   const ST = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué' };
   // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
   const LOGOS = G.meta.vfLogos;
@@ -131,7 +131,7 @@
   // DG-15 (retours panel, lot 6) : le bloc « Santé » du panneau (20-health.js) contrôle le CODE (clés, points d'accès, fichiers oubliés) et son graphe n'a pas de `health` sur l'onglet Projet : il y disait « Aucun problème trouvé » à côté de lignes du planning non lues. Le bouton y est déjà masqué ; le bloc l'est avec lui.
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; } #panel .sec:has(> .list > a[data-hc-open]) { display: none; }`;
   // onglet Équipe (69-05, P69-PL-09) : ni bouton de santé ni barre de question (la question porte sur le code ou le projet)
-  if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }';
+  if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; } #panel .sec:has(> .list > a[data-hc-open]) { display: none; }'; // AUDC-M3 : la santé contrôle le CODE ; sur Équipe elle disait « aucun problème » à côté de Code qui en montrait quatre (même retrait que Projet, DG-15)
   document.head.appendChild(style);
 
   // ---------- onglets ----------
@@ -139,7 +139,7 @@
   if (brand) {
     const tabs = document.createElement('nav');
     tabs.className = 'vf-tabs';
-    tabs.innerHTML = `<a href="index.html" class="${TAB === 'code' ? 'on' : ''}">Code</a><a href="project.html" class="${TAB === 'project' ? 'on' : ''}">Projet</a><a href="equipe.html" class="${TAB === 'equipe' ? 'on' : ''}">Équipe</a>`;
+    tabs.innerHTML = `<a href="index.html" class="${TAB === 'code' ? 'on' : ''}"${TAB === 'code' ? ' aria-current="page"' : ''}>Code</a><a href="project.html" class="${TAB === 'project' ? 'on' : ''}"${TAB === 'project' ? ' aria-current="page"' : ''}>Projet</a><a href="equipe.html" class="${TAB === 'equipe' ? 'on' : ''}"${TAB === 'equipe' ? ' aria-current="page"' : ''}>Équipe</a>`; // AUDC-X4 : l'onglet actif le dit aussi aux lecteurs d'écran
     brand.after(tabs);
   }
 

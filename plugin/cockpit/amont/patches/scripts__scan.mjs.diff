@@ -20,3 +20,16 @@
      if (!mapDirs.has(d)) mapDirs.set(d, isMapDir(path.join(root, d)));
      if (mapDirs.get(d)) return true;
    }
+@@ -60,10 +63,11 @@ for (const p of found.loose) if (!seen.has(p) && !inMap(p)) { seen.add(p); fileL
+ 
+ // ---------- 2. classify, read, extract ----------
+ const files = [];
++const rootReal = fs.realpathSync(root);
+ for (const { path: p, repo } of fileList) {
+   const abs = path.join(root, p);
+   let st;
+-  try { st = fs.statSync(abs); } catch { continue; }
++  try { st = fs.lstatSync(abs); if (st.isSymbolicLink()) { const r = fs.realpathSync(abs); if (r !== rootReal && !r.startsWith(rootReal + path.sep)) continue; st = fs.statSync(abs); } } catch { continue; } // vibeflow AUDC-A-02 : un lien dont la cible sort du lab n'est ni lu ni décrit
+   if (!st.isFile()) continue;
+   const { category, lang } = classify(p, st.size);
+   const f = { path: p, repo, category, lang, bytes: st.size, loc: 0 };

@@ -8,14 +8,14 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { planningLayout } from './vf-cockpit-paths.mjs';
-import { readPlanning, read, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
+import { readPlanning, lireConfine, lister, read, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
 import { texte } from './vf-cockpit-formats.mjs';
 import { trouverPhase, LIBELLES_RESTE, LIBELLES_MISSION, LIBELLES_ETAT } from './vf-cockpit-avancement.mjs';
 import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
 import { detectDrift, commandeCorrectif } from './vf-cockpit-drift.mjs';
 import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
 
-const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
+const ls = lister; // AUDC-A-02 : listage confiné au lab (un dossier lié hors du lab n'est pas listé)
 const DST = { done: 'done', running: 'active', ready: 'todo', blocked: 'todo', failed: 'blocked' }; // dag.sh : blocked = en attente des deps
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
 // projection de l'état d'avancement sur les statuts du viewer : « à recetter » prend la teinte « en cours » mais son propre statut `recette` : glyphe et mot « À recetter » sur la carte (P69-D-25, P69-PL-02, P71.5-D-20) ; l'état exact reste dans avancement.etat
@@ -58,11 +58,13 @@ const COMPAT_STATE = { planning: ['a-faire'], ready_to_plan: ['a-faire'], ready_
   verifying: ['a-recetter', 'en-cours'], ready_for_verification: ['a-recetter', 'en-cours'], complete: ['fait', 'a-recetter'], completed: ['fait', 'a-recetter'], closed: ['fait'], milestone_complete: ['fait'] };
 const etatPerime = (status, etat) => !!etat && Object.hasOwn(COMPAT_STATE, String(status ?? '').trim()) && !COMPAT_STATE[String(status).trim()].includes(etat);
 
-export function buildProjectGraph(root, { layout } = {}) {
-  root = path.resolve(root); layout = layout || planningLayout(root);
+// AUDC-A-02 : tout le planning se lit sous confinement à la racine réelle du lab — un lien symbolique sortant n'est jamais suivi
+export function buildProjectGraph(root, opts = {}) { root = path.resolve(root); return fs.existsSync(root) ? lireConfine(root, () => construireGraphe(root, opts)) : construireGraphe(root, opts); }
+function construireGraphe(root, { layout } = {}) {
+  layout = layout || planningLayout(root);
   // dérive de format mesurée AVANT la lecture : le panneau propose le correctif au lieu d'une carte vide sans explication
-  let drift; try { drift = detectDrift(root, layout); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}`, erreur: true }; }
-  const P = readPlanning(root, layout); const { rel, state, reqs } = P;
+  const P = readPlanning(root, layout); const { rel, state, reqs } = P; // AUDC-H2 : lu UNE fois, le contrôle de format reçoit cette lecture
+  let drift; try { drift = detectDrift(root, layout, P); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}`, erreur: true }; }
   P.phases = fusionner(P.phases, lireAilleurs(root)); // N5 : une phase menée dans un worktree du même dépôt prend l'avancement du worktree si elle y est plus avancée
   const { phases } = P;
   const nodes = [], files = [], links = [];

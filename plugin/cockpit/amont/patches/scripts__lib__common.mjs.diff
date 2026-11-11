@@ -1,6 +1,14 @@
 --- a/scripts/lib/common.mjs
 +++ b/scripts/lib/common.mjs
-@@ -97,7 +97,7 @@ export const HARD_IGNORE_DIRS = new Set([
+@@ -2,6 +2,7 @@
+ import fs from 'node:fs';
+ import path from 'node:path';
+ import { execFileSync } from 'node:child_process';
++import { gitSortant } from './vf-git-sortant.mjs'; // vibeflow AUDC-A-02
+ 
+ export const toPosix = (p) => p.replace(/\\/g, '/');
+ export const rel = (from, to) => toPosix(path.relative(from, to)) || '.';
+@@ -97,7 +98,7 @@ export const HARD_IGNORE_DIRS = new Set([
  ]);
  
  /** The folder the map lives in, at the codebase root. Maps made before the rename used show-code/. */
@@ -9,7 +17,7 @@
  export const LEGACY_MAP_DIR = 'show-code';
  /** True for a folder holding a map, so a project's own folder that happens to be called "floorplan" isn't taken for one. */
  export const isMapDir = (d) => ['architecture.json', 'plan.json', 'graph.json', '.cache'].some((f) => fs.existsSync(path.join(d, f)));
-@@ -108,7 +108,7 @@ export const isMapDir = (d) => ['architecture.json', 'plan.json', 'graph.json',
+@@ -108,7 +109,7 @@ export const isMapDir = (d) => ['architecture.json', 'plan.json', 'graph.json',
   */
  export function keepOutOfGit(dir) {
    const gi = path.join(dir, '.gitignore');
@@ -18,7 +26,7 @@
    fs.mkdirSync(dir, { recursive: true });
    try { if (!fs.existsSync(gi) || fs.readFileSync(gi, 'utf8') !== want) fs.writeFileSync(gi, want); } catch {}
    const tracked = (git(dir, ['ls-files', '--', '.']) || '').split('\n').filter(Boolean);
-@@ -155,6 +155,8 @@ export function classify(relPath, bytes) {
+@@ -155,6 +156,8 @@ export function classify(relPath, bytes) {
  // ---------- git ----------
  
  export function git(cwd, args) {
@@ -27,3 +35,14 @@
    try {
      return execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024, stdio: ['ignore', 'pipe', 'ignore'] }).trimEnd();
    } catch {
+@@ -202,8 +205,9 @@ export function discover(root, { includeWorktrees = false, maxLooseFiles = 5000
+   const loose = [];
+   const skipped = [];
+ 
++  // vibeflow AUDC-A-02 : un dépôt dont les métadonnées git ne sont pas celles du lab (dossier git ou commun hors du lab, lien symbolique, alternates, core.worktree étranger) n'est pas lu (lib/vf-git-sortant.mjs)
+   const walk = (dir, depth) => {
+-    if (fs.existsSync(path.join(dir, '.git'))) {
++    if (fs.existsSync(path.join(dir, '.git')) && !gitSortant(dir, root)) {
+       repos.push({ abs: dir, path: rel(root, dir), worktreeOf: worktreeMain(dir) });
+       return;
+     }

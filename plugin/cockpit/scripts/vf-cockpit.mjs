@@ -9,10 +9,12 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
+
 import { envEnfant } from './vf-cockpit-env.mjs';
-import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie, resoudreBinaire } from './vf-cockpit-paths.mjs';
+import { findLabRoot, engineDir, outputDir, verifierSortie, resoudreBinaire } from './vf-cockpit-paths.mjs';
 import { portPrefere } from './vf-cockpit-port.mjs';
-import { FICHIER_OUVRIR } from './vf-cockpit-terminal-amorce.mjs';
+import { FICHIER_OUVRIR, FICHIER_SECRET_OUVRIR } from './vf-cockpit-terminal-amorce.mjs';
+import { prendreVerrou, serveurOrphelin, noter, hashSur, pidSur } from './vf-cockpit-lanceur-verrou.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const AIDE = `Usage : node vf-cockpit.mjs [open|build|stop|status] [--lab <dossier>] [--no-open] [--port <p>] [--rebuild] [--terminal]
@@ -52,16 +54,19 @@ const portDeUrl = (u) => { const m = typeof u === 'string' ? /^http:\/\/127\.0\.
 const adresseLocale = (port) => `http://127.0.0.1:${port}`;
 const serveurVivant = (sortie) => {
   const s = lireEtat(sortie);
-  if (!s || !s.pid || !vivant(s.pid)) return null;
+  const pid = s ? pidSur(s.pid) : null;
+  if (pid === null || !vivant(pid)) return null;
   const port = portValide(s.port) ?? portDeUrl(s.url);
   if (port === null) return null;
   const pq = s.terminal ? portDeUrl(s.terminal.url) : null;
   const { terminal: _t, ...reste } = s;
-  return { ...reste, port, url: adresseLocale(port), ...(pq === null ? {} : { terminal: { url: adresseLocale(pq) } }) };
+  return { ...reste, pid, ...(Object.hasOwn(reste, 'hash') ? { hash: hashSur(reste.hash) } : {}), port, url: adresseLocale(port), ...(pq === null ? {} : { terminal: { url: adresseLocale(pq) } }) };
 };
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const adresses = (url) => `Cockpit : ${url}/ (Code) · ${url}/project.html (Projet)`;
-
+// AUDC-H3 : le journal du serveur (serveur.log) reçoit aussi les décisions du lanceur, datées, avec leur motif (jamais un jeton ni un contenu)
+// AUDC-H3 : empreinte du code que le serveur en cours a chargé (server.json.hash, écrite au démarrage) contre celle de la sortie assemblée ; différentes = le serveur tourne sur un code périmé
+const empreinteCode = (sortie) => { try { return crypto.createHash('sha1').update(fs.readFileSync(path.join(sortie, 'serve.mjs'))).digest('hex').slice(0, 12); } catch { return null; } };
 // 67-SECURITY M3 : le lanceur n'exécute JAMAIS un script du lab (serve.mjs de la sortie compris). Arrêt par signal, sur un PID que le fichier
 // d'état du lab (donc non fiable) désigne : entier > 1, ni le nôtre, vivant, et dont la ligne de commande est le serve.mjs de CETTE sortie.
 // Dit UNE fois par processus : estNotre est rappelée à chaque tour d'attente du terminal (100 fois) et l'absence de `ps` ne change pas entre deux appels.
@@ -103,7 +108,7 @@ function ecrireAmorce(sortie) {
   return valeur;
 }
 const amorcer = (lab, sortie) => { verifierSortie(lab, sortie); return ecrireAmorce(sortie); };
-const effacerAmorce = (sortie) => { try { fs.unlinkSync(path.join(sortie, '.cache', 'terminal-amorce')); } catch {} };
+const effacerAmorce = (sortie) => { for (const n of ['terminal-amorce', FICHIER_SECRET_OUVRIR]) { try { fs.unlinkSync(path.join(sortie, '.cache', n)); } catch {} } };
 // même ouvreur que serve.mjs, détaché, sorties ignorées. L'erreur ASYNCHRONE du spawn (ouvreur absent : ENOENT, pas de xdg-open) est rattrapée : sans écouteur
 // elle ferait tomber le lanceur avec une trace. `surErreur(err)` la reçoit ; par défaut elle est dite en clair avec `marche`.
 const OUVERTURE_MS = (() => { const n = Number(process.env.VF_COCKPIT_OUVERTURE_MS); return Number.isInteger(n) && n >= 100 && n <= 60000 ? n : 15000; })(); // réglage de test seulement
@@ -122,6 +127,17 @@ function ouvrir(url, marche = '', surErreur = null) {
 // le stockage d'un cadre par origine de premier niveau, port compris : un secret posé par Q au premier niveau serait illisible depuis le cadre de P). L'amorçage n'est JAMAIS dans l'argv de l'ouvreur (lisible par `ps`).
 // Le lanceur écrit une page de redirection (0600, suppression préalable puis création exclusive : aucun lien suivi) dans .cache, l'ouvreur ne reçoit
 // que son chemin. Le serveur la supprime dès l'échange de l'amorçage, et la balaie au plus tard 60 s après sa création.
+// AUDC-B-03 bis : secret d'ouverture, distinct de la clé, écrit comme elle (suppression préalable, création exclusive, 0600) ; il rend la page de redirection la seule
+// navigation inter-sites que le serveur admet vers la page Projet. Jamais imprimé ni passé à un ouvreur.
+function ecrireSecretOuvrir(sortie) {
+  const f = path.join(sortie, '.cache', FICHIER_SECRET_OUVRIR), valeur = crypto.randomBytes(32).toString('hex');
+  try {
+    try { fs.unlinkSync(f); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    const fd = fs.openSync(f, 'wx', MODE_AMORCE);
+    try { fs.writeSync(fd, valeur); } finally { fs.closeSync(fd); }
+  } catch { return null; }
+  return valeur;
+}
 function ecrirePageOuvrir(sortie, cible) {
   const f = path.join(sortie, '.cache', FICHIER_OUVRIR);
   const html = `<!doctype html>\n<meta charset="utf-8">\n<meta name="referrer" content="no-referrer">\n<meta http-equiv="refresh" content="0;url=${cible}">\n<title>Terminal</title>\n`;
@@ -135,7 +151,8 @@ function ecrirePageOuvrir(sortie, cible) {
 // Rend { page, echec } : `echec` reçoit l'erreur asynchrone de l'ouvreur (lue par attendreOuverture), null si l'ouverture n'est pas tentée.
 function ouvrirQ(s, amorce, o, sortie) {
   if (o.noOpen) return null;
-  const page = ecrirePageOuvrir(sortie, `${s.url}/project.html#t=${amorce}`);
+  const secret = ecrireSecretOuvrir(sortie);
+  const page = secret ? ecrirePageOuvrir(sortie, `${s.url}/project.html?o=${secret}#t=${amorce}`) : null;
   if (!page) { effacerAmorce(sortie); console.error("ouverture du terminal impossible : fichier inattendu dans .cache"); return null; }
   const suivi = { page, echec: null };
   ouvrir(page, '', (e) => { suivi.echec = e; });
@@ -178,8 +195,9 @@ async function demarrer(lab, sortie, o) {
   if (o.terminal) args.push('--terminal');
   // port stable par lab (O4) : --port de l'utilisateur d'abord, sinon l'empreinte du lab ; le repli port+1 reste celui du serveur
   args.push('--port', String(o.port || portPrefere(lab)));
-  // le serveur ne se fie qu'à ces deux chemins, posés ici depuis le module (jamais lus dans un .cache/ du lab)
-  const env = { ...envEnfant(lab), VF_COCKPIT_ENGINE_DIR: engineDir(resolveScriptsDir(HERE)).chemin || '', VF_COCKPIT_SCRIPTS_DIR: resolveScriptsDir(HERE) };
+  // le serveur ne se fie qu'à ces deux chemins, posés ici depuis le module (jamais lus dans un .cache/ du lab) ; le dossier de scripts est celui de CE fichier,
+  // jamais une variable VF_COCKPIT_SCRIPTS_DIR héritée de l'environnement du lanceur (AUDC-B-06)
+  const env = { ...envEnfant(lab), VF_COCKPIT_ENGINE_DIR: engineDir(HERE).chemin || '', VF_COCKPIT_SCRIPTS_DIR: HERE };
   // P71-D-03 (arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-03) : le shell du terminal reçoit le PATH D'ORIGINE du lanceur. Le serveur et ses enfants
   // gardent le PATH assaini (H-1) ; le PATH d'origine voyage dans VF_COCKPIT_PATH_ORIGINE jusqu'au filtre du shell (vf-cockpit-terminal-env.mjs), qui le restitue en PATH puis le retire.
   if (typeof process.env.PATH === 'string') env.VF_COCKPIT_PATH_ORIGINE = process.env.PATH;
@@ -207,7 +225,7 @@ async function main() {
   if (o.aide) { console.log(AIDE); return; }
   const lab = findLabRoot(o.lab || process.cwd());
   if (!lab) { console.error('aucun dossier .planning trouvé : le cockpit se construit dans un lab GSD.'); process.exit(2); }
-  const scriptsDir = resolveScriptsDir(HERE); LABV = lab;
+  const scriptsDir = HERE; LABV = lab; // AUDC-B-06 : le dossier de scripts du module, jamais une valeur héritée
   const sortie = outputDir(lab);
 
   if (o.verbe === 'status') {
@@ -218,6 +236,7 @@ async function main() {
   if (o.verbe === 'stop') {
     const s = serveurVivant(sortie);
     if (!s) { console.log('Cockpit déjà arrêté.'); return; }
+    noter(sortie, `arrêt demandé (« stop »), serveur PID ${s.pid}`);
     if (!arreter(sortie)) { console.error(`PID ${s.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté (fichier d'état du lab non fiable).`); process.exit(5); }
     for (let i = 0; i < 30 && vivant(s.pid); i++) await attendre(100);
     console.log(vivant(s.pid) ? `Le serveur (PID ${s.pid}) tarde à s'arrêter.` : 'Cockpit arrêté.');
@@ -236,13 +255,16 @@ async function main() {
     o.terminal = false;
   }
   o.avecQ = o.terminal && !win;
-  const vif = serveurVivant(sortie);
-  if (vif && !o.rebuild) {
+  const libere = await prendreVerrou(lab, sortie, { vivant, attendre }); process.on('exit', libere); // AUDC-H3 : relâché avant l'attente d'ouverture, sinon à la sortie
+  const vif = serveurVivant(sortie) || (fs.existsSync(path.join(sortie, 'serve.mjs')) && !o.rebuild ? await serveurOrphelin(lab, sortie, o.port ? Number(o.port) : portPrefere(lab), { estNotre, etatFile, adresseLocale, serveurVivant, noter }) : null);
+  const perime = !!(vif && vif.hash && empreinteCode(sortie) && vif.hash !== empreinteCode(sortie));
+  if (vif && !o.rebuild && !perime) {
     // R4 (P71-D-36) : --terminal écarté (python3 absent, Windows) alors que le serveur vit déjà : le message dit « le cockpit s'ouvre sans terminal », on l'ouvre (comme au cas sans serveur) ;
     // une relance ordinaire, sans --terminal, garde son comportement : l'adresse seule.
     if (!o.avecQ) { if (demande && !o.noOpen && estNotre(vif.pid, path.join(sortie, 'serve.mjs'))) ouvrir(vif.url, `Ouvrez ${vif.url} dans un navigateur.`); console.log(adresses(vif.url)); return; }
-    if (termOuvrable(vif, sortie)) { const suivi = ouvrirQ(vif, amorcer(lab, sortie), o, sortie); console.log(adresses(vif.url)); await attendreOuverture(suivi, sortie); return; } // O2 c : même serveur, nouvel amorçage
+    if (termOuvrable(vif, sortie)) { const suivi = ouvrirQ(vif, amorcer(lab, sortie), o, sortie); console.log(adresses(vif.url)); libere(); await attendreOuverture(suivi, sortie); return; } // O2 c : même serveur, nouvel amorçage
   }
+  if (vif) noter(sortie, `relance : serveur PID ${vif.pid} remplacé (${o.rebuild ? '--rebuild demandé' : perime ? `code du serveur changé, empreinte ${vif.hash} -> ${empreinteCode(sortie)}` : '--terminal demandé, aucun terminal enregistré pour le serveur en cours'})`);
   if (vif) { if (!arreter(sortie)) { console.error(`PID ${vif.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté.`); process.exit(5); } for (let i = 0; i < 30 && vivant(vif.pid); i++) await attendre(100); }
   if (engineDir(scriptsDir).etat !== 'trouve') { console.error('moteur du cockpit introuvable : réinstaller le module cockpit.'); process.exit(3); }
   await assemblerLab(lab, scriptsDir);
@@ -256,6 +278,7 @@ async function main() {
   if (!s) { console.error(`le serveur n'a pas démarré : voir ${path.join(sortie, '.cache', 'serveur.log')}`); process.exit(5); }
   if (!o.avecQ && !o.noOpen) ouvrir(s.url, `Ouvrez ${s.url} dans un navigateur.`);
   console.log(adresses(s.url));
+  libere();
   await attendreOuverture(suivi, sortie);
 }
 // Jamais de trace : un échec non prévu (lien symbolique planté sur le chemin de sortie en voie de réutilisation du serveur, par exemple) s'écrit en une ligne et sort avec un code documenté.

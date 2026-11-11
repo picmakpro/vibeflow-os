@@ -4,7 +4,7 @@
 // vue vit dans le hash). Badge « au travail » dans l'en-tête, sur les trois onglets. La dernière commande d'une
 // session n'est jamais dans le flux : elle se demande à l'unité (/api/vf/doing, jeton en en-tête), et reste
 // dans la ligne cliquée (ni graphe, ni localStorage, ni export). Flux coupé : un seul sondage pour les deux flux (celui-ci et le
-// rechargement du viewer), à recul — 1 s pendant 30 s, puis 5 s, puis arrêt avec un message et « Réessayer » (E-6).
+// rechargement du viewer), à recul — 1 s pendant 30 s, puis 5 s ; le message « Réessayer » arrive à 15 s et se retire seul au retour du serveur (AUDC-M9), le sondage s'arrête à 300 s (E-6).
 (() => {
   const SC = window.Floorplan, SRV = window.FLOORPLAN_SERVER;
   // page exportée ou ouverte en fichier : pas de serveur, pas de direct
@@ -12,7 +12,7 @@
   const G = SC.graph, h = SC.h;
   const TAB = G.meta.vfTab === 'project' ? 'project' : 'code';
   const probe = (window.__vfLive = { connected: false, patches: 0, applied: 0, lastLatencyMs: null, lock: null, structural: 0, who: null, sondages: 0, abandon: false,
-    reco: { vite: 1000, lent: 5000, bascule: 30000, fin: 300000 } }); // reco : en ms, modifiable par un test
+    reco: { vite: 1000, lent: 5000, bascule: 30000, banniere: 15000, fin: 300000 } }); // reco : en ms, modifiable par un test ; banniere : le message arrive à 15 s (AUDC-M9), le sondage s'arrête à fin
   const FRAICHEUR = 'Sessions écrites depuis moins de 3 min';
   const NB = '\u00a0';
 
@@ -136,6 +136,8 @@
     for (const e of document.querySelectorAll('#panel > *')) e.style.animation = 'none';
     if (p) p.scrollTop = haut;
   };
+  // AUDC-D3 : entre deux poussées, l'âge des agents avance dans la page : le tiroir ouvert est recalculé toutes les 30 s (aucun dessin si le texte est identique)
+  if (typeof setInterval === 'function') setInterval(() => { if (!document.hidden) redessiner(); }, 30000); // `typeof` : le harnais vm de test-cockpit-equipe.sh (EUI) n'a pas de minuterie
   // révélation ponctuelle : la réponse reste affichée tant que sa ligne l'est. Elle est gardée en mémoire de la page seulement (ni graphe, ni stockage, ni export) et reposée
   // par un observateur dès que le bouton réapparaît : le tiroir et le panneau d'un agent sont redessinés à chaque `who`, et une réponse qui arrive pendant un redessin
   // ne doit pas tomber dans une ligne détachée (recette 2026-11-03)
@@ -188,13 +190,13 @@
     if (!badge) badge = SC.addHeaderButton({ id: 'vf-lock', label: '…', title: 'Qui est au travail', onClick: whoPanel });
     const t = off ? { cls: 'off', text: 'Direct coupé', title: 'Le serveur du cockpit ne répond pas' } : lockText(probe.lock);
     const n = (who?.workers || []).filter(auTravail).length;
-    badge.className = 'btn ' + (n ? 'held' : t.cls); badge.title = off ? t.title : `${n ? n + ' au travail' : 'Personne au travail'} · ${t.title}`;
+    badge.className = 'btn ' + (off ? 'off' : n ? 'held' : t.cls); badge.title = off ? t.title : `${n ? n + ' au travail' : 'Personne au travail'} · ${t.title}`;
     // compact : le détail (propriétaire du verrou, étape, durée) est dans l'infobulle et dans le panneau « Au travail »
-    badge.setAttribute('aria-label', off ? t.text : n ? `${n} au travail` : 'Personne au travail'); // sinon figé à « … » (libellé de création)
+    badge.setAttribute('aria-label', off ? t.text : n ? `${n} au travail` : 'Personne au travail'); // sinon figé à « … » (libellé de création) // AUDC-M9 : direct coupé = point « off » (jamais le point qui pulse « au travail »), même avec des agents actifs
     badge.innerHTML = `<span class="dot"></span><span class="bl">${off ? t.text : n ? `${n} au travail` : 'Personne'}</span>`;
     redessiner();
   };
-  const setWho = (w) => { if (!w) return; who = probe.who = w; showLock(); document.dispatchEvent(new CustomEvent('vf-who')); }; // 69-05 : l'onglet Équipe (72-vf-equipe.js) suit le même flux
+  const setWho = (w) => { if (!w) return; who = probe.who = w; probe.whoAt = Date.now(); showLock(); document.dispatchEvent(new CustomEvent('vf-who')); }; // 69-05 : l'onglet Équipe (72-vf-equipe.js) suit le même flux
 
   // I3 (recette 2026-11-02) : une bascule en direct redessine la carte, qui rejouait son animation d'apparition (cartes, liens, colonnes,
   // panneau). On ne l'anime plus : les éléments redessinés portent `animation: none` en ligne AVANT la première image (la suite de
@@ -237,8 +239,9 @@
       const age = Date.now() - lost.t0; probe.sondages++;
       const e = await sonder();
       if (e === 'redemarre') return location.reload(); // nouveau serveur, nouveau jeton : la page se recharge
-      if (e === 'vivant') { for (const f of lost.flux.values()) f(); lost.flux.clear(); lost.timer = null; return; }
+      if (e === 'vivant') { for (const f of lost.flux.values()) f(); lost.flux.clear(); lost.timer = null; banniere(false); return; } // AUDC-M9 : le message se retire seul au retour du serveur
       if (Date.now() - lost.t0 >= probe.reco.fin) { lost.timer = null; probe.abandon = true; banniere(true); return; }
+      if (Date.now() - lost.t0 >= probe.reco.banniere) banniere(true); // AUDC-M9 : dit à 15 s, pas à 300 s ; le sondage continue
       boucle(age < probe.reco.bascule ? probe.reco.vite : probe.reco.lent);
     }, delai);
   };
@@ -260,6 +263,7 @@
       if (TAB === 'project' && lastSeq !== null && typeof d.seq === 'number' && d.seq !== lastSeq) { probe.resync = (probe.resync || 0) + 1; location.reload(); return; }
       vu(d); setWho(d.who); showLock(d.lock);
     });
+    es.addEventListener('reload', () => { if (window.FLOORPLAN_RELOAD) window.FLOORPLAN_RELOAD(); else location.reload(); }); // AUDC-H1 : la carte reconstruite recharge la page par ce flux (le viewer n'en ouvre plus un second)
     es.addEventListener('who', (e) => setWho(vu(JSON.parse(e.data)).who));
     es.addEventListener('lock', (e) => showLock(vu(JSON.parse(e.data)).lock));
     es.addEventListener('git', (e) => { const d = vu(JSON.parse(e.data)); document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: d.sig } })); }); // 78-09 : signal sans contenu, l'en-tête et le tiroir relisent leurs routes

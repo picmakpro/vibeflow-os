@@ -16,7 +16,7 @@ export function vueTerminal(cfg) {
   const COMMANDE = '/vf-cockpit --terminal';
   const CARTES = {
     refuse: { role: 'status', masque: true, titre: 'Terminal déjà ouvert', corps: ['Un terminal est déjà ouvert dans un autre onglet. Fermez-le, puis réessayez.'], bouton: 'Réessayer', d: 'M3 3h10v10H3z M6 8h4' },
-    sansamorce: { role: 'alert', titre: 'Terminal non disponible dans cet onglet', corps: ['Ce terminal ne s’ouvre que depuis un cockpit lancé avec le terminal. Tapez ', COMMANDE, ' dans Claude Code.'], d: 'M3 3h10v10H3z M6 8h4' },
+    sansamorce: { role: 'alert', titre: 'Terminal non ouvert dans cet onglet', /* AUDC-M10 : la vraie cause, l'amorce à usage unique de 60 s */ corps: ['Le terminal s’ouvre avec une clé à usage unique, valable 60 s, que le cockpit remet à l’onglet qu’il ouvre lui-même. Cet onglet n’en a pas reçu, ou elle est déjà utilisée ou périmée. Relancez ', COMMANDE, ' dans Claude Code : elle en prépare une neuve, sans redémarrer le serveur.'], d: 'M3 3h10v10H3z M6 8h4' },
     expire: { role: 'alert', titre: 'Session expirée', corps: ['Relancez ', COMMANDE, '.'], d: 'M8 2a6 6 0 1 0 0 12A6 6 0 0 0 8 2z M8 5v3.5l2 1.5' },
     horscadre: { role: 'alert', titre: 'Terminal indisponible', corps: ['Ce terminal ne s’ouvre que dans le cockpit. Relancez ', COMMANDE, '.'], d: 'M3 3h10v10H3z M6 8h4' },
     python: { role: 'alert', titre: 'Terminal indisponible', corps: ['Python 3 est introuvable sur ce poste. Installez-le, puis relancez ', COMMANDE, '.'], d: 'M3 3h10v10H3z M6 8h4' },
@@ -89,7 +89,7 @@ export function vueTerminal(cfg) {
   };
   const affichee = (intention, verbe) => { const v = VERBES_UI[verbe]; return v && typeof intention === 'string' && intention.indexOf(v[0]) === 0 ? v[1] + intention.slice(v[0].length) : intention; };
   let courant = null, minuterie = 0, compte = 0, echeance = 0, appui = false, geste = 0; // identifiant du bandeau affiché ; minuterie d'armement ; compte à rebours et son échéance ; geste de souris en cours dans le bandeau
-  const retirerProposition = () => { clearTimeout(minuterie); minuterie = 0; clearInterval(compte); compte = 0; echeance = 0; const a = document.getElementById('proposition'); if (a) a.remove(); courant = null; };
+  const retirerProposition = (remplace) => { clearTimeout(minuterie); minuterie = 0; clearInterval(compte); compte = 0; echeance = 0; const a = document.getElementById('proposition'); if (a) { a.remove(); annoncer(''); if (!remplace && a.getAttribute('data-etat') !== 'expiree') document.dispatchEvent(new Event('vf-q-retrait')); } courant = null; }; // AUDC-M11 : retirer le bandeau remet aussi à zéro la région live (« Lancement proposé … Expire dans … » ne reste pas lu après « Annuler ») ; toute annonce posée ENSUITE (préparée, expirée, nouvelle proposition) la remplace
   // « manipulé » : un bouton de souris est enfoncé dans le bandeau, ou le cadre a le focus sur le sélecteur de mode ou la case du chat ET l'utilisateur y a fait un geste (touche, saisie, clic) il y a moins de GESTE_MS ;
   // un bandeau manipulé n'est jamais remplacé sous la main (PU-G-119). Un focus posé sans geste (programme, restauration du focus) ne protège rien.
   const manipule = () => {
@@ -173,7 +173,7 @@ export function vueTerminal(cfg) {
         retirerProposition(); return;
       }
       if (courant !== p.id && manipule()) return false; // garde:manipule
-      const premier = courant !== p.id; retirerProposition(); retirerAccueil(); retirerConsigne();
+      const premier = courant !== p.id; retirerProposition(true); retirerAccueil(); retirerConsigne();
       const bloquants = p.bloquants || [], avertissements = p.avertissements || [];
       const b = el('div', 'vf-q-bandeau vf-q-collage'); b.id = 'proposition'; b.setAttribute('data-id', p.id); b.setAttribute('role', 'group'); b.setAttribute('aria-label', 'Lancement à confirmer');
       b.appendChild(el('span', 'vf-q-pastille vf-q-attention'));

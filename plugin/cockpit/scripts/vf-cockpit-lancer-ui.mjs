@@ -233,6 +233,9 @@ function scriptLancer(cfg, extraire, installer, corpsProp) {
     };
   };
 
+  // AUDC-M11 : une proposition annulée dans le terminal (évènement du tiroir, sans donnée) : le statut d'envoi « Confirmez-la » de la section revient à zéro ; la ligne d'état de lancement (préparée, lancée) n'est pas un statut et reste
+  document.addEventListener('vf-lancer-annule', () => { [].slice.call(document.querySelectorAll('#panel [data-vf-lancer] [role="status"]')).forEach((n) => { if (n.parentNode) n.parentNode.removeChild(n); }); });
+
   // Entrée sur un bouton de la section : le viewer l'écoute aussi sur window (ouvrir le nœud sélectionné) et redessine le panneau avant le clic ; la touche garde son action native
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target && ev.target.closest && ev.target.closest('[data-vf-lancer]')) ev.stopPropagation(); }); // garde:entree
 

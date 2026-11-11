@@ -234,7 +234,7 @@ echo "=== R5 — audit 2026-11-06 : A5 (git muet : la boucle reste libre, éché
 # le processus git bloqué est tué par le délai (SIGTERM sur le pid de l'emballage, exec'é en git), et la suite vérifie qu'aucun git du dépôt ne survit.
 HG="$WORK/muet"; mkdir -p "$HG"; mk_lab "$HG/lab"; G_ -C "$HG/lab" init -q -b main && G_ -C "$HG/lab" add -A && G_ -C "$HG/lab" commit -q -m init
 HGL="$(cd "$HG/lab" && pwd -P)"
-mkfifo "$HG/ff"; printf '[include]\n\tpath = %s\n' "$HG/ff" >> "$HGL/.git/config"
+mkfifo "$HGL/ff"; printf '[include]\n\tpath = %s\n' "$HGL/ff" >> "$HGL/.git/config"   # AUDC-A-02 : le FIFO vit DANS le lab (une inclusion hors du lab et du dossier git est refusée avant tout lancement de git : un git muet par ce biais n'est plus atteignable de l'extérieur)
 mkdir -p "$WORK/bin-h"; printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s/hang.log"\nexec "%s" "$@"\n' "$WORK" "$GIT_REEL" > "$WORK/bin-h/git"; chmod +x "$WORK/bin-h/git"
 cat > "$AUX/muet.mjs" <<'JS'
 // muet.mjs <scripts> <lab> <mode seq|concurrent> <journal> : signatureGit sur un git muet ; une ligne JSON {…} (durées, battement d'un minuteur de 50 ms posé avant l'appel, lancements journalisés)

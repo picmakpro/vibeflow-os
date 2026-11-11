@@ -209,7 +209,7 @@ import path from 'node:path';
 const [, , racine, ...opts] = process.argv;
 const LISTE = {
   'scripts/vf-cockpit-paths.mjs': 'socle',
-  'scripts/vf-cockpit.mjs': 'sans-git', 'scripts/vf-cockpit-build.mjs': 'sans-git', 'scripts/vf-cockpit-live.mjs': 'sans-git', 'scripts/vf-cockpit-terminal.mjs': 'sans-git', 'scripts/vf-cockpit-terminal-session.mjs': 'sans-git',
+  'scripts/vf-cockpit.mjs': 'sans-git', 'scripts/vf-cockpit-build.mjs': 'sans-git', 'scripts/vf-cockpit-live.mjs': 'sans-git', 'scripts/vf-cockpit-terminal.mjs': 'sans-git', 'scripts/vf-cockpit-terminal-session.mjs': 'sans-git', 'scripts/vf-cockpit-etat-officiel.mjs': 'sans-git',
   'skills/cockpit-moteur/assets/serve.mjs': 'sans-git', 'skills/cockpit-moteur/scripts/open.mjs': 'sans-git', 'skills/cockpit-moteur/scripts/refresh.mjs': 'sans-git',
   'skills/cockpit-moteur/scripts/lib/common.mjs': 'git-garde',
 };
@@ -275,7 +275,7 @@ JS
 PLUGIN="$(cd "$SCRIPTS/.." && pwd)"
 GARDE="$(node "$AUX/garde.mjs" "$PLUGIN" --exact)"
 assert_eq "E6.1 — aucun importeur de child_process hors liste blanche, aucun lancement de git hors vf-cockpit-paths.mjs (arbre réel de plugin/cockpit, balayage récursif)" "${GARDE:-aucun}" "aucun"
-assert_eq "E6.1a — la garde a bien ouvert des fichiers : exactement les 10 importeurs de la liste sont trouvés (pas un dossier vide)" "$(node "$AUX/garde.mjs" "$PLUGIN" --importeurs | wc -l | tr -d ' ')" "10"
+assert_eq "E6.1a — la garde a bien ouvert des fichiers : exactement les 11 importeurs de la liste sont trouvés (pas un dossier vide)" "$(node "$AUX/garde.mjs" "$PLUGIN" --importeurs | wc -l | tr -d ' ')" "11"
 # les onze fichiers plantés de l'audit (promisify, alias d'import, multiligne, autre nom de variable, chemin absolu, execSync, bash -c, témoin direct, .cjs, .js)
 PLANTES_NOMS="a-promisify.mjs b-promisify-var.mjs c-alias.mjs d-multiligne.mjs e-variable-autre-nom.mjs f-chemin-absolu.mjs g-shell.mjs h-bash-c.mjs i-temoin-direct.mjs j-cjs.cjs k-js.js"
 planter() { # planter <nom> : écrit le contenu du fichier planté sur la sortie standard
@@ -381,7 +381,11 @@ node "$AUX/sh.mjs" "$MD" "$P" "$P" log -p -1 >/dev/null 2>&1
 assert_eq "M-LECTURE — rougit E2.4 : le textconv est lancé par shBorne" "$(marque TEXTCONV)" "posé"; raz
 node "$AUX/lg.mjs" "$MD" "$P" '{}' log -p -1 >/dev/null 2>&1
 assert_eq "M-LECTURE — rougit aussi E5.2 : le textconv est lancé par lancerGit" "$(marque TEXTCONV)" "posé"; raz
-assert_has "M-LECTURE — rougit aussi E2.4b : la sortie gpg de log.showSignature s'ajoute au hash" "$(sig_mut "$MD")" "SORTIE-GPG-FACTICE"
+# AUDC-A-04 : le programme de signature est aussi neutralisé par l'environnement (gpg.program, gpg.openpgp.program) : options de lecture retirées SEULES, la sortie gpg ne s'ajoute plus (deux protections)
+assert_eq "M-LECTURE — E2.4b : options de lecture retirées, mais gpg neutralisé par l'environnement : le hash reste seul (mis à jour en place, AUDC-A-04)" "$(sig_mut "$MD" | LC_ALL=C grep -c 'SORTIE-GPG-FACTICE')" "0"
+# la sonde E2.4b garde SON mutant : options de lecture retirées ET programmes de signature de l'environnement retirés -> la sortie gpg s'ajoute au hash
+assert_eq "M-LECTURE.2 — mutant double : ancres" "$(mutant lecture2 'ins = OPTIONS_LECTURE[sous] || [];' 'ins = [];')|$(FROM="['gpg.program', INERTE]," TO="" node "$AUX/mutsub.mjs" "$WORK/mut-lecture2/vf-cockpit-git-durci.mjs")|$(FROM="['gpg.openpgp.program', INERTE]," TO="" node "$AUX/mutsub.mjs" "$WORK/mut-lecture2/vf-cockpit-git-durci.mjs")" "muté|muté|muté"
+assert_has "M-LECTURE.2 — rougit E2.4b : la sortie gpg de log.showSignature s'ajoute au hash" "$(sig_mut "$WORK/mut-lecture2")" "SORTIE-GPG-FACTICE"
 
 # M-TRONQUE : ENOBUFS ignoré -> E4.2 ne voit plus la troncature
 assert_eq "M-TRONQUE.0 — l'ancre du mutant existe" "$(mutant tronque "tronque: e.code === 'ENOBUFS'" "tronque: false && e.code === 'ENOBUFS'")" "muté"
