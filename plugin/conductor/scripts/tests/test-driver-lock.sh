@@ -1157,6 +1157,329 @@ _t68_role="$(regq "$out" ag-forged role)"
 case "$_t68_role" in *'"'*|*'\'*|'') echo "  ❌ FAIL — T68.4d, valeur de role réduite (obtenu : '$_t68_role')"; FAIL=$((FAIL+1)) ;; *) echo "  ✅ PASS — T68.4d, valeur de role réduite"; PASS=$((PASS+1)) ;; esac
 rm -rf "$VF_DRIVER_LOCK" "$REG_FILE" "$ARC_FILE"
 
+# ---------------------------------------------------------------------------------------------------
+# T68.5 à T68.10, T68.G, T68.M : rétention du registre archivé (24 h, 2 000 lignes), propriété générative et mutants
+# (P79-D-17). Aucune édition à la main du format dans les cas : l'antidatage passe par un aide, les lignes volumineuses
+# sont dérivées d'une ligne `register` réelle.
+# ---------------------------------------------------------------------------------------------------
+echo "=== T68.5 à T68.10, rétention de l'archive : fenêtre, plafond, variables, --all, temporaire occupé ==="
+antidate_file() { # <fichier> <secondes> : recule chaque "epoch": N de <secondes> (le format n'est jamais réécrit à la main)
+  [ -f "$1" ] || return 0
+  python3 -I -c 'import re,sys
+p,d=sys.argv[1],int(sys.argv[2])
+s=open(p,encoding="utf-8").read()
+open(p,"w",encoding="utf-8").write(re.sub(r"\"epoch\": (\d+)", lambda m: "\"epoch\": %d" % (int(m.group(1))-d), s))' "$1" "$2"
+}
+arch_antidate() { antidate_file "$ARC_FILE" "$1"; }
+arch_lines() { if [ -f "$1" ]; then wc -l < "$1" | tr -d ' '; else echo 0; fi; }
+t68_reset() { rm -rf "$VF_DRIVER_LOCK" "$REG_FILE" "$ARC_FILE" "$ARC_FILE.tmp"; }
+t68_cycle() { # <owner> <agent> <node> : un cycle acquire, register, close done, release
+  "$SCRIPT" acquire --owner="$1" --step=s >/dev/null 2>&1
+  "$SCRIPT" register --agent="$2" --role=vf-coder --node="$3" >/dev/null 2>&1
+  "$SCRIPT" close --agent="$2" --status=done >/dev/null 2>&1
+  "$SCRIPT" release --owner="$1" >/dev/null 2>&1
+}
+# T68.5 : une archive antidatée au-delà de la fenêtre est élaguée au release suivant ; les lignes récentes restent, dans l'ordre.
+t68_reset
+t68_cycle M68o ag-old n-old
+arch_antidate 200000
+printf 'ligne sans epoch, texte quelconque\n' >> "$ARC_FILE"
+t68_cycle M68n ag-new n-new
+out="$("$SCRIPT" registry 2>/dev/null)"
+assert "T68.5a, l'agent hors fenêtre a disparu de registry" "$(regn "$out" ag-old)" '0'
+assert "T68.5b, l'agent récent est rendu" "$(regn "$out" ag-new)" '1'
+assert "T68.5c, les lignes hors fenêtre sont élaguées de l'archive" "$(grep -c ag-old "$ARC_FILE" 2>/dev/null)" '0'
+assert "T68.5d, la ligne sans epoch est élaguée" "$(grep -c 'sans epoch' "$ARC_FILE" 2>/dev/null)" '0'
+assert "T68.5e, les lignes récentes restent, dans l'ordre (register puis close)" "$(grep -o '"event": "[a-z]*"' "$ARC_FILE" 2>/dev/null | tr -d '\n')" '"event": "register""event": "close"'
+assert "T68.5f, l'archive ne porte plus que les deux lignes récentes" "$(arch_lines "$ARC_FILE")" '2'
+# T68.6 : sans release, registry omet un agent clos hors fenêtre et garde un agent running même ancien.
+t68_reset
+"$SCRIPT" acquire --owner=M68s --step=s >/dev/null 2>&1
+"$SCRIPT" register --agent=ag-run --role=vf-coder --node=n-r >/dev/null 2>&1
+"$SCRIPT" register --agent=ag-clos --role=vf-coder --node=n-c >/dev/null 2>&1
+"$SCRIPT" close --agent=ag-clos --status=done >/dev/null 2>&1
+antidate_file "$REG_FILE" 500
+out="$(VF_DRIVER_REGISTRY_WINDOW=100 "$SCRIPT" registry 2>/dev/null)"
+assert "T68.6a, agent clos hors fenêtre omis" "$(regn "$out" ag-clos)" '0'
+assert "T68.6b, agent running ancien gardé" "$(regn "$out" ag-run)" '1'
+assert "T68.6c, window_seconds vaut la fenêtre demandée" "$out" '"window_seconds": 100'
+assert "T68.6d, count cohérent avec les agents rendus" "$out" '"count": 1'
+t68_reset
+# T68.7 : plus de 2 000 lignes récentes, dérivées d'une ligne register réelle : le release garde les 2 000 dernières.
+t68_big() { # <nombre de lignes> : archive de N lignes register récentes, identifiants ag-0001.. (ligne réelle capturée)
+  "$SCRIPT" acquire --owner=M68g --step=s >/dev/null 2>&1
+  "$SCRIPT" register --agent=ag-seed --role=vf-coder --node=n-seed >/dev/null 2>&1
+  head -1 "$REG_FILE" > "$VF_DRIVER_LOCK.seed"
+  "$SCRIPT" close --agent=ag-seed --status=done >/dev/null 2>&1
+  "$SCRIPT" release --owner=M68g >/dev/null 2>&1
+  awk -v n="$1" 'NR==1{ for (i = 1; i <= n; i++) { l = $0; sub(/"agent_id": "ag-seed"/, sprintf("\"agent_id\": \"ag-%04d\"", i), l); print l } }' "$VF_DRIVER_LOCK.seed" > "$ARC_FILE"
+  rm -f "$VF_DRIVER_LOCK.seed"
+}
+t68_big 2100
+t68_cycle M68z ag-last n-last
+assert "T68.7a, 2 000 lignes exactement" "$(arch_lines "$ARC_FILE")" '2000'
+assert "T68.7b, la plus ancienne est absente" "$(grep -c '"agent_id": "ag-0001"' "$ARC_FILE" 2>/dev/null)" '0'
+assert "T68.7c, la plus ancienne gardée est la 103e" "$(head -1 "$ARC_FILE" | grep -c '"agent_id": "ag-0103"')" '1'
+assert "T68.7d, la plus récente est la fermeture du dernier agent" "$(tail -1 "$ARC_FILE" | grep -c '"event": "close".*"agent_id": "ag-last"\|"agent_id": "ag-last".*"event": "close"')" '1'
+t68_reset
+# T68.8 : variables non numériques, vides ou nulles : retour aux défauts (patron du TTL, T24).
+for _t68_bad in abc '' 0; do
+  t68_reset
+  t68_big 2100
+  VF_DRIVER_REGISTRY_MAX="$_t68_bad" t68_cycle M68b ag-last n-last
+  assert "T68.8a, VF_DRIVER_REGISTRY_MAX='$_t68_bad' : défaut 2000" "$(arch_lines "$ARC_FILE")" '2000'
+  out="$(VF_DRIVER_REGISTRY_WINDOW="$_t68_bad" "$SCRIPT" registry 2>/dev/null)"
+  assert "T68.8b, VF_DRIVER_REGISTRY_WINDOW='$_t68_bad' : défaut 86400" "$out" '"window_seconds": 86400'
+done
+t68_reset
+# T68.9 : en mode verrou unique, registry --all rend la même sortie que registry.
+t68_cycle M68a ag-a n-a
+out="$("$SCRIPT" registry 2>/dev/null)"; out2="$("$SCRIPT" registry --all 2>/dev/null)"
+assert "T68.9a, registry --all : mode verrou unique, même sortie que registry (non vide)" "$out2" "$out"
+assert "T68.9b, registry --all : l'agent est rendu" "$out2" '"agent_id": "ag-a"'
+t68_reset
+# T68.10 : un dossier occupe le nom du temporaire : le release relâche, le courant est gardé, l'archive est identique à l'octet.
+t68_cycle M68t ag-t1 n-t1
+_t68_sum1="$(cksum < "$ARC_FILE" 2>/dev/null)"
+mkdir "$ARC_FILE.tmp"
+"$SCRIPT" acquire --owner=M68u --step=s >/dev/null 2>&1
+"$SCRIPT" register --agent=ag-t2 --role=vf-coder --node=n-t2 >/dev/null 2>&1
+"$SCRIPT" close --agent=ag-t2 --status=done >/dev/null 2>&1
+out="$("$SCRIPT" release --owner=M68u 2>"$WORK_DIR/t68-10.err")"; rc=$?
+assert "T68.10a, temporaire occupé : le release relâche quand même" "$out" '"released": true'
+assert_exit "T68.10b, temporaire occupé : exit 0" "$rc" 0
+assert "T68.10c, le registre courant est conservé avec ses 2 lignes" "$(arch_lines "$REG_FILE")" '2'
+assert "T68.10d, l'archive est identique à l'octet" "$(cksum < "$ARC_FILE" 2>/dev/null)" "$_t68_sum1"
+assert "T68.10e, stderr dit « registre non archivé »" "$(cat "$WORK_DIR/t68-10.err")" 'registre non archivé'
+rmdir "$ARC_FILE.tmp" 2>/dev/null
+t68_reset
+
+# --- Scénario court : les marqueurs que les mutants font basculer (jouable contre une copie du script) ---
+t68_markers() { # <script> <dossier de travail> -> « MARK <nom> ok|ko » (et « MARKINFO <nom> attendu obtenu » au ko)
+  local S="$1" D="$2"
+  mkdir -p "$D"
+  (
+    L="$D/DRIVER.lock"; R="$L.children.jsonl"; A="$L.children.closed.jsonl"
+    export VF_DRIVER_LOCK="$L"; unset VF_DRIVER_REGISTRY_WINDOW VF_DRIVER_REGISTRY_MAX CLAUDE_CODE_SESSION_ID
+    r() { bash "$S" "$@" 2>/dev/null; }
+    mk() { if [ "$2" = "$3" ]; then echo "MARK $1 ok"; else echo "MARK $1 ko"; echo "MARKINFO $1 attendu=[$3] obtenu=[$2]"; fi; }
+    sum() { if [ -f "$1" ]; then cksum < "$1"; else echo absent; fi; }
+    cyc() { r acquire --owner="$1" --step=s >/dev/null; r register --agent="$2" --role=vf-coder --node="$3" >/dev/null; r close --agent="$2" --status=done >/dev/null; r release --owner="$1" >/dev/null; }
+    rm -rf "$L" "$R" "$A"
+    cyc Ma ag-1 nd-1
+    out="$(r registry)"
+    mk archive-lisible "$(regq "$out" ag-1 node)/$(regq "$out" ag-1 status)" "nd-1/done"
+    r acquire --owner=Mb --step=s >/dev/null
+    r register --agent=ag-1 --role=vf-coder --node=nd-2 >/dev/null
+    out="$(r registry)"
+    mk courant-prime "$(regn "$out" ag-1)/$(regq "$out" ag-1 status)/$(regq "$out" ag-1 node)" "1/running/nd-2"
+    s1="$(sum "$A")"
+    r release --owner=Mb >/dev/null
+    s2="$(sum "$A")"
+    mk orphelin-non-verse "$([ "$s1" = "$s2" ] && [ -f "$R" ] && echo intact || echo verse)" intact
+    rm -rf "$L" "$R" "$A"
+    export VF_DRIVER_REGISTRY_WINDOW=120
+    cyc Mc ag-old n-o
+    antidate_file "$A" 1000
+    printf 'ligne sans epoch\n' >> "$A"
+    cyc Md ag-new n-n
+    mk fenetre-purge "old:$(grep -c ag-old "$A")/new:$(grep -c ag-new "$A")/sans:$(grep -c 'sans epoch' "$A")" "old:0/new:2/sans:0"
+    rm -rf "$L" "$R" "$A"
+    export VF_DRIVER_REGISTRY_WINDOW=100
+    r acquire --owner=Me --step=s >/dev/null
+    r register --agent=ag-run --role=vf-coder --node=n-r >/dev/null
+    r register --agent=ag-c --role=vf-coder --node=n-c >/dev/null
+    r close --agent=ag-c --status=done >/dev/null
+    antidate_file "$R" 500
+    out="$(r registry)"
+    mk fenetre-lecture "run:$(regn "$out" ag-run)/clos:$(regn "$out" ag-c)" "run:1/clos:0"
+    rm -rf "$L" "$R" "$A"
+    unset VF_DRIVER_REGISTRY_WINDOW; export VF_DRIVER_REGISTRY_MAX=3
+    r acquire --owner=Mf --step=s >/dev/null
+    for i in 1 2 3; do r register --agent=ag-p$i --role=vf-coder --node=n-p$i >/dev/null; r close --agent=ag-p$i --status=done >/dev/null; done
+    r release --owner=Mf >/dev/null
+    mk plafond "lignes:$(arch_lines "$A")/derniere:$(tail -n 1 "$A" | sed -n 's/.*"agent_id": "\([^"]*\)".*/\1/p')" "lignes:3/derniere:ag-p3"
+    rm -rf "$L" "$R" "$A"
+  )
+}
+
+# --- Propriété générative : cycles aléatoires reproductibles (graine imprimée), invariants I1 à I6 + témoin de couverture ---
+t68_gen() { # <script> <dossier de travail> <graine> -> « graine=… », compteurs, « MARK gen-… ok|ko »
+  mkdir -p "$2"
+  python3 -I - "$1" "$2" "$3" <<'PY'
+import json, os, random, re, subprocess, sys, time
+S, D, seed = sys.argv[1], sys.argv[2], int(sys.argv[3])
+WIN, CAP, CYC = 120, 9, 40
+rnd = random.Random(seed)
+L = os.path.join(D, "DRIVER.lock"); R = L + ".children.jsonl"; A = L + ".children.closed.jsonl"
+env = dict(os.environ, VF_DRIVER_LOCK=L, VF_DRIVER_REGISTRY_WINDOW=str(WIN), VF_DRIVER_REGISTRY_MAX=str(CAP))
+env.pop("CLAUDE_CODE_SESSION_ID", None)
+def run(*a):
+    p = subprocess.run(["bash", S] + list(a), env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    return p.returncode, p.stdout
+def lines(p):
+    try:
+        with open(p, encoding="utf-8") as f: return f.read().splitlines()
+    except OSError: return []
+def raw(p):
+    try:
+        with open(p, "rb") as f: return f.read()
+    except OSError: return None
+def ep(l):
+    m = re.search(r'"epoch": (\d+)', l); return int(m.group(1)) if m else None
+def val(l, k):
+    m = re.search(r'"%s": "([^"]*)"' % k, l); return m.group(1) if m else ""
+def fold(ls):
+    st = {}
+    for l in ls:
+        ev, i = val(l, "event"), val(l, "agent_id")
+        if not i: continue
+        if ev == "register": st[i] = {"status": "running", "node": val(l, "node"), "epoch": ep(l) or 0}
+        elif ev == "close" and i in st:
+            s = val(l, "status")
+            if s: st[i]["status"] = s
+    return st
+def antidate(p, d):
+    s = raw(p)
+    if s is None: return
+    t = re.sub(r'"epoch": (\d+)', lambda m: '"epoch": %d' % (int(m.group(1)) - d), s.decode("utf-8"))
+    with open(p, "w", encoding="utf-8") as f: f.write(t)
+def subseq(sub, full):
+    it = iter(full)
+    return all(any(x == y for y in it) for x in sub)
+viol = {}
+def bad(k, msg):
+    viol.setdefault(k, msg)
+cov = {"fenetre": 0, "plafond": 0, "running": 0, "reenregistre": 0}
+pool = ["ag-%s" % c for c in "abcdef"]
+for c in range(CYC):
+    rc, out = run("acquire", "--owner=G%d" % c, "--step=c%d" % c)
+    if '"acquired": true' not in out:
+        bad("gen-couverture", "cycle %d : acquire refusé (%s)" % (c, out.strip()[:80])); continue
+    for i, st in sorted(fold(lines(R)).items()):
+        if st["status"] == "running" and rnd.random() < 0.7: run("close", "--agent=" + i, "--status=done")
+    archived = set(fold(lines(A)).keys())
+    ids = rnd.sample(pool, rnd.randint(1, 3))
+    for n, i in enumerate(ids):
+        if i in archived: cov["reenregistre"] += 1
+        run("register", "--agent=" + i, "--role=vf-coder", "--node=n%d-%d" % (c, n))
+    for i in ids:
+        if rnd.random() < 0.7: run("close", "--agent=" + i, "--status=done")
+    if lines(A) and rnd.random() < 0.4: antidate(A, rnd.randint(WIN // 2, 2 * WIN))
+    arc_before, cur_before, bytes_before = lines(A), lines(R), raw(A)
+    running_left = any(s["status"] == "running" for s in fold(cur_before).values())
+    t0 = int(time.time())
+    run("release", "--owner=G%d" % c)
+    arc_after, cur_after = lines(A), lines(R)
+    if running_left:
+        cov["running"] += 1
+        if not os.path.exists(R) or raw(A) != bytes_before:
+            bad("gen-conservation", "cycle %d : enfant running, courant %s, archive %s" % (c, "présent" if os.path.exists(R) else "ABSENT", "inchangée" if raw(A) == bytes_before else "MODIFIÉE"))
+    else:
+        cut = t0 - WIN
+        if any(ep(l) is None or ep(l) < cut - 2 for l in arc_before): cov["fenetre"] += 1
+        if len([l for l in arc_before + cur_before if ep(l) is not None and ep(l) >= cut + 2]) > CAP: cov["plafond"] += 1
+        if os.path.exists(R): bad("gen-conservation", "cycle %d : courant encore présent sans enfant running" % c)
+        m = min(CAP, len(cur_before))
+        if m and arc_after[-m:] != cur_before[-m:]:
+            bad("gen-conservation", "cycle %d : les %d dernières lignes de l'archive ne sont pas celles du courant" % (c, m))
+        if not subseq(arc_after, arc_before + cur_before):
+            bad("gen-conservation", "cycle %d : l'archive n'est pas une sous-suite de l'archive avant release suivie du courant" % c)
+        for l in arc_after:
+            if ep(l) is None or ep(l) < cut:
+                bad("gen-fenetre", "cycle %d : ligne d'epoch %s sous la coupe %d" % (c, ep(l), cut)); break
+    if len(arc_after) > CAP:
+        bad("gen-plafond", "cycle %d : %d lignes pour un plafond de %d" % (c, len(arc_after), CAP))
+    rc, o = run("registry")
+    t1 = int(time.time()); cutr = t1 - WIN
+    try:
+        got = {a["agent_id"]: (a["status"], a["node"]) for a in json.loads(o)["agents"]}
+    except Exception:
+        bad("gen-lecture", "cycle %d : registry n'est pas un JSON" % c); continue
+    model = fold(arc_after + cur_after)
+    skip = set(i for i, s in model.items() if s["status"] != "running" and abs(s["epoch"] - cutr) <= 2)
+    exp = {i: (s["status"], s["node"]) for i, s in model.items() if i not in skip and (s["status"] == "running" or s["epoch"] >= cutr)}
+    got = {i: v for i, v in got.items() if i not in skip}
+    if got != exp:
+        bad("gen-lecture", "cycle %d : registry %s, repli indépendant %s" % (c, sorted(got.items()), sorted(exp.items())))
+print("graine=%d cycles=%d fenetre=%d plafond=%d" % (seed, CYC, WIN, CAP))
+print("couverture : fenetre_elaguee=%d plafond_elague=%d enfant_running=%d reenregistre=%d" % (cov["fenetre"], cov["plafond"], cov["running"], cov["reenregistre"]))
+if not all(cov.values()): bad("gen-couverture", "compteur de couverture à 0 : %s" % cov)
+for k in ("gen-plafond", "gen-fenetre", "gen-conservation", "gen-lecture", "gen-couverture"):
+    if k in viol:
+        print("MARK %s ko" % k); print("MARKINFO %s %s" % (k, viol[k]))
+    else:
+        print("MARK %s ok" % k)
+PY
+}
+
+echo "=== T68.G (propriété générative) et T68.M (mutants M-ARC-*) : script réel, témoin, puis copies mutées ==="
+T68_DIR="$WORK_DIR/t68m"; mkdir -p "$T68_DIR"
+T68_SEED="${VF_T68_SEED:-20261111}"
+T68_POLICY="$(cd "$(dirname "$SCRIPT")/../.." && pwd)/planning-core/scripts/workstream-policy.sh"
+T68_IDS=""; T68_KILLED=0; T68_TOTAL=6; T68_T0=$SECONDS
+t68_variant() { # <id> <ancre BRE> <expression sed s> <gen 0|1> : prépare la copie mutée, lance ses scénarios en arrière-plan
+  local id="$1" anchor="$2" expr="$3" gen="$4" d="$T68_DIR/$1" n
+  mkdir -p "$d"; T68_IDS="$T68_IDS $id"
+  cp "$SCRIPT" "$d/driver-lock.sh"; cp "$T68_POLICY" "$d/workstream-policy.sh"; cp "$d/driver-lock.sh" "$d/copie-temoin.sh"
+  if [ -n "$anchor" ]; then
+    n="$(grep -c -e "$anchor" "$d/driver-lock.sh")"
+    if [ "$n" != "1" ]; then echo "ancre non unique ($n occurrences de [$anchor])" > "$d/prepko"; return; fi
+    sed -i.bak -e "/$anchor/$expr" "$d/driver-lock.sh"; rm -f "$d/driver-lock.sh.bak"
+    if cmp -s "$d/driver-lock.sh" "$d/copie-temoin.sh"; then echo "mutant NON OPPOSABLE : la substitution n'a rien changé" > "$d/prepko"; return; fi
+    if ! bash -n "$d/driver-lock.sh" 2>/dev/null; then echo "le mutant n'est pas un script valide" > "$d/prepko"; return; fi
+  fi
+  chmod +x "$d/driver-lock.sh"
+  ( { t68_markers "$d/driver-lock.sh" "$d/w"; if [ "$gen" = 1 ]; then t68_gen "$d/driver-lock.sh" "$d/g" "$T68_SEED"; fi; } > "$d/out.txt" 2>&1 ) &
+}
+t68_ko() { sed -n 's/^MARK \(.*\) ko$/\1/p' "$1/out.txt" | LC_ALL=C sort; }
+t68_nb() { grep -c '^MARK ' "$1/out.txt"; }
+t68_eval() { # <id> <gen 0|1> <attendu : marqueurs séparés par des espaces>
+  local id="$1" gen="$2" d="$T68_DIR/$1" want got nb nbw=6
+  [ "$gen" = 1 ] && nbw=11
+  if [ -f "$d/prepko" ]; then assert_exit "M-ARC-$id — $(cat "$d/prepko")" 1 0; return; fi
+  nb="$(t68_nb "$d")"
+  if [ "$nb" != "$nbw" ]; then assert_exit "M-ARC-$id — scénarios incomplets ($nb marqueurs sur $nbw)" 1 0; sed -n '1,12p' "$d/out.txt"; return; fi
+  want="$(printf '%s\n' $3 | LC_ALL=C sort | tr '\n' ' ')"; got="$(t68_ko "$d" | tr '\n' ' ')"
+  if [ "$want" = "$got" ]; then
+    assert_exit "M-ARC-$id — mutant tué : bascule exactement {$got}" 0 0
+    T68_KILLED=$((T68_KILLED+1))
+    for m in $got; do grep "^MARKINFO $m " "$d/out.txt" | head -1 | sed 's/^/      /'; done
+  else
+    assert_exit "M-ARC-$id — ensemble basculé INATTENDU" 1 0
+    echo "     attendu: {$want}"; echo "     obtenu:  {$got}"
+    grep '^MARKINFO ' "$d/out.txt" | head -6 | sed 's/^/      /'
+  fi
+}
+mkdir -p "$T68_DIR/reel"; ( { t68_markers "$SCRIPT" "$T68_DIR/reel/w"; t68_gen "$SCRIPT" "$T68_DIR/reel/g" "$T68_SEED"; } > "$T68_DIR/reel/out.txt" 2>&1 ) &
+t68_variant temoin '' '' 0
+t68_variant ARCHIVE 'cat "$REG"; } | awk -v cut' 's@cat "$REG"; } | awk -v cut@: ; } | awk -v cut@' 1
+t68_variant FENETRE 'ep >= cut' 's@ep >= cut@1@' 1
+t68_variant PLAFOND 'tail -n "$REG_MAX"' 's@tail -n "$REG_MAX"@cat@' 1
+t68_variant COURANT 'registry_fold "$_arc" "$REG"' 's@registry_fold "$_arc" "$REG"@registry_fold "$REG" "$_arc"@' 0
+t68_variant LECTURE '$10 == "running" || $8 + 0 >= cut' 's@$10 == "running" || $8 + 0 >= cut@1@' 0
+t68_variant ORPHELIN '\[ "$_orph" -gt 0 \] || registry_archive' 's@\[ "$_orph" -gt 0 \] || registry_archive@registry_archive@' 0
+wait
+echo "  graine=$T68_SEED"
+sed -n '/^graine=/p;/^couverture :/p' "$T68_DIR/reel/out.txt"
+for _t68_m in archive-lisible courant-prime orphelin-non-verse fenetre-purge fenetre-lecture plafond gen-plafond gen-fenetre gen-conservation gen-lecture gen-couverture; do
+  _t68_v=ko; grep -q "^MARK $_t68_m ok\$" "$T68_DIR/reel/out.txt" && _t68_v=ok
+  [ "$_t68_v" = ok ]; assert_exit "T68.M réel — marqueur $_t68_m ok" "$?" 0
+  case "$_t68_m" in gen-*) assert_exit "T68.G — $_t68_m (script réel)" "$([ "$_t68_v" = ok ] && echo 0 || echo 1)" 0 ;; esac
+  [ "$_t68_v" = ok ] || grep "^MARKINFO $_t68_m " "$T68_DIR/reel/out.txt" | sed 's/^/      /'
+done
+assert_exit "T68.M témoin — la copie non mutée ne bascule aucun marqueur" "$(t68_ko "$T68_DIR/temoin" | wc -l | tr -d ' ')" 0
+t68_eval ARCHIVE 1 "archive-lisible fenetre-purge plafond gen-conservation"
+t68_eval FENETRE 1 "fenetre-purge gen-fenetre"
+t68_eval PLAFOND 1 "plafond gen-plafond"
+t68_eval COURANT 0 "courant-prime"
+t68_eval LECTURE 0 "fenetre-lecture"
+t68_eval ORPHELIN 0 "orphelin-non-verse"
+echo "  durée T68.G + T68.M : $((SECONDS-T68_T0))s"
+assert_exit "T68.M — les $T68_TOTAL mutants M-ARC-* sont tués ($T68_KILLED)" "$([ "$T68_KILLED" = "$T68_TOTAL" ] && echo 0 || echo 1)" 0
+rm -rf "$T68_DIR"
+t68_reset
+
 echo ""
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"

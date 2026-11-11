@@ -37,3 +37,40 @@ Transcription WS-AB (`DLWS_MODE=matrice bash plugin/conductor/scripts/tests/test
 653 ok, 0 ko, exit 0, 36 s (contrôle positif avant le code).
 
 Durée de la suite `test-driver-lock.sh` sur la base : environ 23 s.
+
+## Tâche 2
+
+Base des témoins : `driver-lock.sh` au code de la tâche 1 (archive versée sans fenêtre ni plafond, `registry` sans filtre,
+`--all` refusé pour `registry`). Commandes : `bash plugin/conductor/scripts/tests/test-driver-lock.sh` (314 PASS / 32 FAIL,
+exit 1, 92 s) et `bash plugin/conductor/scripts/tests/test-driver-lock-phase.sh` (101 ok / 9 ko, exit 1).
+
+| Témoin | Assertion | Attendu | Obtenu sur la base |
+|---|---|---|---|
+| T68.5a / 5c / 5d / 5f | archive antidatée de 200 000 s puis ligne sans `epoch` : agent hors fenêtre absent, lignes élaguées, 2 lignes restantes | `0`, `0`, `0`, `2` | l'ancien agent reste rendu, ses lignes et la ligne sans `epoch` restent (archive de 5 lignes) |
+| T68.6a / 6c / 6d | `registry` avec fenêtre de 100 s sur un registre antidaté de 500 s | agent clos omis, `"window_seconds": 100`, `"count": 1` | agent clos rendu, `window_seconds` constant 86400, count 2 |
+| T68.7a / 7b / 7c | 2 100 lignes récentes puis un release | 2 000 lignes, `ag-0001` absent, première ligne `ag-0103` | 2 102 lignes, tout conservé |
+| T68.8a (x3 : `abc`, vide, `0`) | `VF_DRIVER_REGISTRY_MAX` invalide : défaut 2000 | `2000` | 2 102 (variable ignorée) |
+| T68.9a / 9b | `registry --all` en verrou unique = `registry` | sortie identique, agent rendu | `Usage: … --all n'est accepte que par status`, exit 1, stdout vide |
+| T68.M réel : fenetre-purge | scénario court, fenêtre 120 s | `old:0/new:2/sans:0` | `old:2/new:2/sans:1` |
+| T68.M réel : fenetre-lecture | agent clos antidaté, agent running antidaté | `run:1/clos:0` | `run:1/clos:1` |
+| T68.M réel : plafond | plafond 3, six lignes | `lignes:3/derniere:ag-p3` | `lignes:6/derniere:ag-p3` |
+| T68.G : gen-plafond | cycle 2 | au plus 9 lignes | 16 lignes |
+| T68.G : gen-fenetre | cycle 2 | aucune ligne sous la coupe | ligne d'epoch 1794435057 sous la coupe 1794435072 |
+| T68.G : gen-lecture | cycle 1 | `registry` = repli indépendant (fenêtre) | `registry` rend des agents clos hors fenêtre que le repli écarte |
+| T68.M témoin (copie non mutée) | zéro marqueur basculé | 0 | 3 (fenetre-purge, fenetre-lecture, plafond) |
+| M-ARC-ARCHIVE, FENETRE, PLAFOND, LECTURE | préparation du mutant | ancre de compte 1 | 0 occurrence (le code de l'élagage n'existe pas encore) |
+| M-ARC-COURANT, ORPHELIN | ensemble basculé | `{courant-prime}`, `{orphelin-non-verse}` | l'ensemble contient en plus fenetre-purge, fenetre-lecture, plafond (rouges de la base) |
+| PH-ARC.6 (x9 assertions) | `registry --all` en lab partitionné : JSON, entrées de phase, compartiment, dépôt, `count` 3 | JSON `scope: lab` | exit 1, stdout vide |
+| PH-ARC.7 | `registry --all --ws=alpha` | `"error": "ws-invalid"` | stdout vide (message d'usage seulement) |
+| PH-ARC.8 | lab plat : `registry --all` = `registry` | sortie identique | stdout vide |
+
+Verts d'emblée sur la base (contrôles positifs de la portée, ils doivent le rester) : PH-ARC.1 à PH-ARC.5 et PH-ARC.9 (le
+verbe existe déjà par phase, compartiment, dépôt et sous-dossier), T68.10 (un dossier qui occupe le nom du temporaire :
+l'échec d'écriture est déjà traité par la tâche 1, même issue que T63.12 par une autre cause : ce n'est pas un rouge
+attendu), T68.5b, T68.5e, T68.6b, T68.7d, T68.8b, les marqueurs archive-lisible, courant-prime, orphelin-non-verse et la
+couverture du pilote (fenêtre élaguée 19, plafond élagué 15, enfant resté running 20, ré-enregistré 76, graine 20261111).
+gen-conservation reste vert sur la base : sans élagage, les invariants I3 à I5 tiennent trivialement ; c'est le mutant
+M-ARC-ARCHIVE qui le fait rougir (voir la section « Mutants du registre »).
+
+Durée mesurée de la suite `test-driver-lock.sh` sur la base : 92 s (pilote génératif et sept variantes lancés en parallèle,
+40 s). Remarque : le même rejeu sous charge (deux autres suites du plan voisin en parallèle) a pris 285 s.
