@@ -18,6 +18,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -69,10 +70,9 @@ mk_lab() { # $1 = dossier : lab GSD minimal, un commit
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; $ENVX = préfixe d'environnement ; pose OUT, PORT ; démarre le serveur (SRV)
   env $ENVX "$NODE" "${2:-$SCRIPTS}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
-  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true
+  SRV="$VF_PID"
+  PORT="$VF_PORT"
 }
 
 # faux driver-lock.sh TENU (comme projet-commun.sh, socle de test-cockpit-projet-graphe.sh) : une mission dont un nœud est running n'est « en cours » que si son verrou est vivant (P68-D-05) ;
@@ -566,10 +566,9 @@ JS
   env $ENVX "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$WT" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$WT/.vibeflow/cockpit"
   node "$AUX/mut.mjs" "$OUT/index.html" '"vfGit":{"etat":"ok"' '"vfGit":{"etat":"indisponible"' > "$WORK/h92.out" 2>&1 || cat "$WORK/h92.out"
-  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"; BASE="http://127.0.0.1:$PORT"
+  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$WT" $ENVX ${ENVS:-} || true
+  SRV="$VF_PID"
+  PORT="$VF_PORT"; BASE="http://127.0.0.1:$PORT"
   R92="$(cdp "$AUX/h9.js" "$BASE" premiere 2>&1 | tail -1)"; stop_srv
   assert_eq "H9.2 — première lecture sans valeur connue : « Branche indisponible », sans mot ajouté, ligne et ouvreur présents ; la lecture réussie suivante donne la branche" "$(jq_ "$R92" '[j.premiere.branche, j.premiere.etat, j.premiere.cachee, j.premiere.ouvreurCache, j.muet.branche, j.muet.ligneCachee, j.ok.branche].join("|")' 2>/dev/null)" "Branche indisponible||false|false|Branche indisponible|false|revenue"
 
@@ -577,10 +576,9 @@ JS
   env $ENVX "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$WT" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$WT/.vibeflow/cockpit"
   node "$AUX/mut.mjs" "$OUT/index.html" "if (!h1 || !h1.dataset.vfAide) return; if (document.body.classList.contains('vf-git-ouvert'))" "if (!h1 || !h1.dataset.vfAideLie) return; if (document.body.classList.contains('vf-git-ouvert'))" > "$WORK/h91f.out" 2>&1 || { cat "$WORK/h91f.out"; echo "  ❌ FAIL — M-TABINDEX-DEFINITION : mutation impossible" >&2; }
-  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"; BASE="http://127.0.0.1:$PORT"
+  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$WT" $ENVX ${ENVS:-} || true
+  SRV="$VF_PID"
+  PORT="$VF_PORT"; BASE="http://127.0.0.1:$PORT"
   RTI="$(cdp "$AUX/h9.js" "$BASE" connue 2>&1 | tail -1)"; stop_srv
   assert_eq "M-TABINDEX-DEFINITION — le mutant (le titre redevient un arrêt de Tab dès qu'il a porté une définition) rougit H9.1f : « 0/true|0/false » au lieu de « 0/true|aucun/false » (témoin : le témoin positif reste « 0/true »)" "$(jq_ "$RTI" '[j.titreConnu, j.titreIndispo].join("|")' 2>/dev/null)" "0/true|0/false"
 

@@ -14,6 +14,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export HOME="$WORK/home"; NODE="$(command -v node)"
 SRV=""; cleanup() { [ -n "$SRV" ] && vf_hyg_stop "$SRV"; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
 
@@ -77,10 +78,9 @@ node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || 
 OUT="$LAB/.vibeflow/cockpit"
 demarrer() { # demarrer [VAR=val ...] -> PORT, TOK, PTOK
   [ -n "$SRV" ] && vf_hyg_stop "$SRV"; SRV=""; rm -f "$OUT/.cache/server.json" "$WORK"/fkd/call-*.json
-  ( cd "$LAB" && export PATH="$WORK/fk:$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" && { [ "$#" -eq 0 ] || export "$@"; } && exec "$NODE" ${NODE_ARGS:+$NODE_ARGS} "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do grep -q '"port"' "$OUT/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  PORT="$(H json "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+  COCKPIT_NODE_ARGS="${NODE_ARGS:-}" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$LAB" PATH="$WORK/fk:$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" "$@" || true
+  SRV="$VF_PID"
+  PORT="$VF_PORT"
   H r "$PORT" GET / '{}' "$WORK/p.txt"; TOK="$(sed -n 's/.*VF_COCKPIT_SERVER={"token":"\([0-9a-f]*\)".*/\1/p' "$WORK/p.txt" | head -1)"
 }
 ask() { # ask <jeton> <session|""> <sortie> -> $3 (statut puis flux)

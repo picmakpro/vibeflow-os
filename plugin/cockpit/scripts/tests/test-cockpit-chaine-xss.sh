@@ -31,6 +31,7 @@ PIDS=()
 cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }
 trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 skip() { echo "  ⏭️  SAUTÉ — $1 ($2)"; SKIP=$((SKIP+1)); }
@@ -129,10 +130,9 @@ manche() {
   local m; for m in "$@"; do mutant "$o" "$m" || { R_CHARGES="mutant-sans-effet"; return; }; done
   rm -f "$WORK/MARQUEUR-SCRIPT-DU-LAB"; : > "$COLL_LOG"
   local eng="$SCRIPTS/../skills/cockpit-moteur"
-  ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  local pid=$!; PIDS+=($pid)
-  for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && grep -q '"port"' "$o/.cache/server.json" && break; sleep 0.1; done
-  local port; port="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)")"
+  COCKPIT_SORTIE="$o" COCKPIT_LOG="$WORK/serve-$label.out" cockpit_lancer "$LAB" VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" || true
+  local pid="$VF_PID"
+  local port="$VF_PORT"
   local res
   if [ -n "$CHROME" ]; then
     res="$(node "$AUX/browser.mjs" "$CHROME" "http://127.0.0.1:$port/project.html#v=n:ph-1" 1500)"
@@ -226,10 +226,9 @@ await executer(chrome, async (s) => {
     .then(async (r) => ({ ...r, violations: [...s.violations] }));
 }, { csp: true });
 JS
-o="$WORK/sortie-livre"; ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-c5.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-pid5=$!; PIDS+=($pid5)
-for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && grep -q '"port"' "$o/.cache/server.json" && break; sleep 0.1; done
-port5="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)")"
+o="$WORK/sortie-livre"; COCKPIT_SORTIE="$o" COCKPIT_LOG="$WORK/serve-c5.out" cockpit_lancer "$LAB" VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" || true
+pid5="$VF_PID"
+port5="$VF_PORT"
 X5="$(node "$AUX/italique.mjs" "$CHROME" "http://127.0.0.1:$port5/project.html")"; vf_hyg_stop "$pid5"
 assert_eq "C5.1 — la charge entre marqueurs ne devient aucun élément (img, svg, b, onerror, onload, onclick)" "$(printf '%s' "$X5" | jq_ '(j.erreur||"")+"|"+j.charges')" "|0"
 assert_eq "C5.2 — le texte de la charge est affiché tel quel et le titre de la page n'a pas bougé" "$(printf '%s' "$X5" | jq_ '[/<img src=x onerror=document.title=1>/.test(j.texte), /<svg onload=/.test(j.texte), j.titre!=="1"&&j.titre!=="2"]')" "[true,true,true]"
@@ -291,10 +290,9 @@ manche_g() {
   mkdir -p "$o/.cache/history/a"; printf '{"dir":"%s"}\n' "$LABG/evil" > "$o/.cache/skill.json"; printf '{}\n' > "$o/.cache/history/a/plan.json"; rm -f "$o/.cache/server.json"
   local m; for m in "$@"; do mutant "$o" "$m" || { R_CHARGES="mutant-sans-effet"; return; }; done
   rm -f "$WORK/MARQUEUR-SCRIPT-DU-LAB"
-  ( cd "$LABG" && VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-g-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  local pid=$!; PIDS+=($pid)
-  for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && grep -q '"port"' "$o/.cache/server.json" && break; sleep 0.1; done
-  local port; port="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)")"
+  COCKPIT_SORTIE="$o" COCKPIT_LOG="$WORK/serve-g-$label.out" cockpit_lancer "$LABG" VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" || true
+  local pid="$VF_PID"
+  local port="$VF_PORT"
   local res; res="$(node "$AUX/gitbrowser.mjs" "$CHROME" "http://127.0.0.1:$port/")"
   local want=""; case "$label" in temoing) want="marq" ;; esac
   local fin=$((SECONDS + ${VF_CDP_ECHEANCE_S:-60}))

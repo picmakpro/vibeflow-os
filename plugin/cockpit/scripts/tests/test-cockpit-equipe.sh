@@ -23,6 +23,7 @@ SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 WORK="$(cd "$WORK" && pwd -P)"
 AUX="$WORK/aux"; NOSCRIPTS="$WORK/noscripts"
 mkdir -p "$AUX" "$NOSCRIPTS"
@@ -322,10 +323,9 @@ NOW="$(node -e 'console.log(Date.now())')"
 HS="$(mkhome srv "$AUX/spec-e22.json" "$LABS")"
 OUT="$LABS/.vibeflow/cockpit"
 node "$WORK/leurre.mjs" "$(libre)" & LEURRE=$!; PIDS+=("$LEURRE")
-HOME="$HS" node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-SRV=$!; PIDS+=("$SRV")
-for _ in $(seq 1 300); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-PORT="$(G "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$LABS" HOME="$HS" || true
+SRV="$VF_PID"
+PORT="$VF_PORT"
 TOK="$(node "$AUX/token.mjs" "$PORT" /)"
 assert_eq "E22.0b — contrôle positif : serveur démarré, jeton lu dans la page, leurre vivant" "$([ "$PORT" -gt 0 ] && [ "${#TOK}" -ge 16 ] && echo serveur)|$(ps -p "$LEURRE" >/dev/null 2>&1 && echo leurre)" "serveur|leurre"
 : > "$WORK/flux.jsonl"; node "$AUX/sse.mjs" "$PORT" "$TOK" 3000 hello "$WORK/flux.jsonl"
@@ -428,10 +428,9 @@ JSON
 NOW="$(node -e 'console.log(Date.now())')"
 H23="$(mkhome e23 "$AUX/spec-e23.json" "$LABS")"
 rm -f "$OUT/.cache/server.json"
-HOME="$H23" node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve23.out" 2>&1 &
-SRV23=$!; PIDS+=("$SRV23")
-for _ in $(seq 1 300); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-PORT23="$(G "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+COCKPIT_LOG="$WORK/serve23.out" cockpit_lancer "$LABS" HOME="$H23" || true
+SRV23="$VF_PID"
+PORT23="$VF_PORT"
 S23="$(node "$AUX/fetchp.mjs" "$PORT23" /equipe.html "$WORK/equipe.html")"
 P23="$(node "$AUX/fetchp.mjs" "$PORT23" /project.html "$WORK/project23.html")"
 assert_eq "E23.0 — contrôle positif : serveur démarré et /project.html servi (200)" "$([ "$PORT23" -gt 0 ] && echo serveur)|$P23" "serveur|200"
@@ -882,10 +881,9 @@ JSON
   OUTEK="$LABEK/.vibeflow/cockpit"; cp "$OUTEK/project.html" "$WORK/project-ek.html.orig"
   ek_rafraichir() { touch "$HEK/.claude/projects/-lab/$SID/subagents/"agent-*.jsonl "$HEK/.claude/projects/-lab/"*.jsonl; }
   ek_demarrer() { rm -f "$OUTEK/.cache/server.json"; ek_rafraichir
-    HOME="$HEK" node "$OUTEK/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-ek.out" 2>&1 &
-    EK_PID=$!; PIDS+=("$EK_PID")
-    for _ in $(seq 1 300); do [ -s "$OUTEK/.cache/server.json" ] && break; sleep 0.1; done
-    EK_PORT="$(G "$OUTEK/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"; }
+    COCKPIT_LOG="$WORK/serve-ek.out" cockpit_lancer "$LABEK" HOME="$HEK" || true
+    EK_PID="$VF_PID"
+    EK_PORT="$VF_PORT"; }
   # ek_muter <ancre> <remplacement> : pose le mutant dans la page assemblée (project.html de la sortie), « muté » ou « ancre absente »
   ek_muter() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; if [ -z "${3:-}" ]; then EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; else EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html" >/dev/null || return 1; EK_FROM="$3" EK_TO="$4" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; fi; }  # $3/$4 : seconde substitution (fusion de la 68 : deux règles de pied de carte)
   ek_restaurer() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; }

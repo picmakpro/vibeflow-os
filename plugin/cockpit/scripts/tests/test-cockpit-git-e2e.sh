@@ -27,6 +27,7 @@ SRV=""; PIDS=()
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -129,10 +130,9 @@ mk_depot() { # $1 = racine : `depot` (principal, main), `wt-a` (feat/x, le LAB),
 build_lab() { env $ENVX "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"; }
 serve_out() { # $1 = dossier de sortie (contient serve.mjs), $2.. = options de serve.mjs ; $ENVX, $ENVS ; pose PORT et SRV
   local o="$1"; shift; rm -f "$o/.cache/server.json"
-  ( cd "$o/../.." && exec env $ENVX ${ENVS:-} "$NODE" "$o/serve.mjs" --no-open "$@" --port "$(libre)" > "$WORK/serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && grep -q '"port"' "$o/.cache/server.json" && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  COCKPIT_SORTIE="$o" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$o/../.." $ENVX ${ENVS:-} "$@" || true
+  SRV="$VF_PID"
+  PORT="$VF_PORT"
 }
 
 # --- B2 + B3 : un seul parcours, une seule session, sur le vrai serveur ---
