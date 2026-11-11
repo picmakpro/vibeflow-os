@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test-cockpit-reconnexion.sh — E-6 (CKPT-05) : un serveur arrêté ne fait pas tourner la page à 2 requêtes par seconde sans fin.
 #   N1 recul : requêtes rapides, puis espacées · N2 arrêt : plus aucune requête après le délai, avec un message et un bouton « Réessayer »
-#   N3 « Réessayer » relance le sondage · N4 témoin rouge : le module d'avant (le navigateur réessaie seul, chaque seconde, pour chacun des deux flux)
+#   N3 « Réessayer » relance le sondage · N4 témoin rouge : le module d'avant (le navigateur réessaie seul, chaque seconde, pour son flux — la page n'en ouvre plus qu'un, AUDC-H1)
 # Les délais sont raccourcis par la page (window.__vfLive.reco) : 200 ms jusqu'à 1,5 s, 600 ms, arrêt à 4 s. Chrome headless ; sans navigateur la suite est SAUTÉE.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
@@ -50,9 +50,9 @@ assert_eq "N2.1 — arrêt : aucune requête entre 5 s et 9 s" "$(printf '%s' "$
 assert_has "N2.2 — un message dit que le cockpit ne répond plus" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.banniere')" "ne répond plus"
 assert_has "N2.3 — le message porte le bouton « Réessayer »" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.banniere')" "Réessayer"
 assert_eq "N3.1 — « Réessayer » relance le sondage" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.apresClic>=2')" "true"
-echo "=== N4 — témoin rouge : le module d'avant (la page ne ferme pas ses flux : le navigateur réessaie seul, chaque seconde) ==="
+echo "=== N4 — témoin rouge : le module d'avant (la page ne ferme pas son flux : le navigateur réessaie seul, chaque seconde) ==="
 LABM="$WORK/lab-mutant"; cp -R "$LAB" "$LABM"; MP="$LABM/.vibeflow/cockpit/project.html"
-assert_eq "N4.0 — le mutant retire bien l'inscription de la reconnexion à recul (motif présent avant, absent après)" "$(before=$(grep -c 'window.VF_COCKPIT_STREAM_LOST = perdu;' "$MP"); sed -i.bak 's#window.VF_COCKPIT_STREAM_LOST = perdu;#/* mutant N4 */#' "$MP"; echo "$before,$(grep -c 'window.VF_COCKPIT_STREAM_LOST = perdu;' "$MP")")" "1,0"
+assert_eq "N4.0 — le mutant retire bien la fermeture du flux coupé et son inscription au sondage (motif présent avant, absent après)" "$(before=$(grep -c "es.onerror = () => { es.close(); perdu('direct', connecter); };" "$MP"); sed -i.bak "s#es.onerror = () => { es.close(); perdu('direct', connecter); };#es.onerror = () => {}; /* mutant N4 */#" "$MP"; echo "$before,$(grep -c "es.onerror = () => { es.close(); perdu('direct', connecter); };" "$MP")")" "1,0"
 RM="$(reco "$LABM" project.html)"
 assert_eq "N4.1 — témoin rouge : sans le recul, des requêtes continuent entre 5 s et 9 s (N2.1 rougirait)" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" '!j.erreur && j.tard>0')" "true"
 

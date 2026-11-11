@@ -1954,6 +1954,8 @@ async function loadCustomFlows() {
   const S = window.FLOORPLAN_SERVER;
   if (!S || typeof EventSource === 'undefined') return;
   const reload = () => { toast('Map updated'); setTimeout(() => location.reload(), 500); };
+  window.FLOORPLAN_RELOAD = reload; // vibeflow AUDC-H1 : une page n'ouvre qu'un flux ; le serveur la dit (unFlux) et le flux du direct (ui/70) porte aussi `reload`
+  if (S.unFlux) return;
   const connect = () => {
     const es = new EventSource('/api/events?token=' + encodeURIComponent(S.token));
     es.addEventListener('reload', reload);

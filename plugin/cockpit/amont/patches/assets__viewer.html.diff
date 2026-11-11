@@ -1339,7 +1339,7 @@
  $('#search-btn').onclick = openPalette;
  
  // ======================= flows =======================
-@@ -1805,16 +1954,21 @@ async function loadCustomFlows() {
+@@ -1805,16 +1954,23 @@ async function loadCustomFlows() {
    const S = window.FLOORPLAN_SERVER;
    if (!S || typeof EventSource === 'undefined') return;
    const reload = () => { toast('Map updated'); setTimeout(() => location.reload(), 500); };
@@ -1352,6 +1352,8 @@
 -    const check = () => fetch('/', { cache: 'no-store' }).then((r) => (r.ok ? reload() : next()), next);
 -    const next = () => { const age = Date.now() - t0; if (age < 30 * 60000) setTimeout(check, age < 30000 ? 1000 : 5000); };
 -    check();
++  window.FLOORPLAN_RELOAD = reload; // vibeflow AUDC-H1 : une page n'ouvre qu'un flux ; le serveur la dit (unFlux) et le flux du direct (ui/70) porte aussi `reload`
++  if (S.unFlux) return;
 +  const connect = () => {
 +    const es = new EventSource('/api/events?token=' + encodeURIComponent(S.token));
 +    es.addEventListener('reload', reload);
@@ -1370,7 +1372,7 @@
  })();
  
  async function requestFlow(prompt) {
-@@ -1862,9 +2016,9 @@ function flowStep() {
+@@ -1862,9 +2018,9 @@ function flowStep() {
    const container = b ? lcaContainer(a, b) : parentOf.get(a) || 'root';
    const bar = $('#flowbar'); bar.hidden = false;
    bar.innerHTML = `<div class="ft"><div class="fk">${h(f.title)} · step ${i + 1} of ${f.steps.length}</div><b>${h(info(a).name)}</b>${b ? ` <span>→</span> <b>${h(info(b).name)}</b>` : ''}<br><span>${h(f.steps[i].note)}</span><div class="dots">${f.steps.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div></div>
@@ -1382,7 +1384,7 @@
    $('#fl-x').onclick = stopFlow;
    // an answer's walkthrough plays on the answer board itself
    if (state.flow.inPlace) { if (state.container === 'q:answer') highlightFlow(a, b); else go('q:answer', { after: () => highlightFlow(a, b) }); }
-@@ -1951,7 +2105,10 @@ function refChip(id) {
+@@ -1951,7 +2107,10 @@ function refChip(id) {
    return `<span class="ref" data-ref="${h(id)}" style="--c:${colorOf(ii)}"><i></i>${h(b.name)}</span>`;
  }
  function md(src) {
@@ -1394,7 +1396,7 @@
    const out = [];
    let list = null;
    for (const raw of String(src || '').split('\n')) {
-@@ -1965,18 +2122,27 @@ function md(src) {
+@@ -1965,18 +2124,27 @@ function md(src) {
    return out.join('');
  }
  
@@ -1426,7 +1428,7 @@
    });
    sheet.querySelectorAll('[data-follow]').forEach((b) => b.onclick = () => { askInput.value = b.dataset.follow; submitAsk(); });
    sheet.querySelector('[data-act="steps"]')?.addEventListener('click', () => {
-@@ -2002,7 +2168,12 @@ function showAnswer(raw, question) {
+@@ -2002,7 +2170,12 @@ function showAnswer(raw, question) {
    const a = { title: String(raw.title || 'Answer'), answer: String(raw.answer || ''), items: items.slice(0, 18), steps, followups: (raw.followups || []).map(String), question };
    askState.last = a;
    if (a.items.length) { state.answer = a; go('q:answer', { force: true, after: () => renderAnswer(a) }); }
@@ -1440,7 +1442,7 @@
  }
  function showFailure(question, code, message, partial) {
    if (code === 'not_logged_in' || code === 'not_granted') setWarning(code);
-@@ -2015,7 +2186,7 @@ function setBusy(b) {
+@@ -2015,7 +2188,7 @@ function setBusy(b) {
    askState.busy = b;
    askSend.classList.toggle('stop', b);
    askSend.innerHTML = b ? `<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>` : `<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
@@ -1449,7 +1451,7 @@
  }
  function cancelAsk() {
    askState.ctl?.abort();
-@@ -2160,6 +2331,8 @@ async function submitAsk() {
+@@ -2160,6 +2333,8 @@ async function submitAsk() {
    askState.context = []; renderChips();
    if (askState.mode === 'change') return requestChange(ctxIds.length ? `${question}\n\nThis is about: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.` : question);
    const shown = question;
@@ -1458,7 +1460,7 @@
    // what Claude sees: the question plus the pinned items, by id, so it starts from them
    if (ctxIds.length) question += `\n\nFocus on these map items: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.`;
    setBusy(true);
-@@ -2191,16 +2364,7 @@ if (EXPORTED) {
+@@ -2191,16 +2366,7 @@ if (EXPORTED) {
    tag.textContent = isNaN(at) ? 'Exported copy' : `Exported ${at.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
    tag.title = 'A copy of this map to look around in. Asking questions needs Floorplan with Claude Code or Codex, in the codebase itself.';
    $('#proj-name').after(tag);
@@ -1476,7 +1478,7 @@
  }
  document.title = `${G.project.name} map`;
  $('#btn-up').onclick = up;
-@@ -2262,7 +2426,7 @@ const setPanel = (on) => {
+@@ -2262,7 +2428,7 @@ const setPanel = (on) => {
      else if (!on && sheetReturn) { if (panel.contains(document.activeElement) || document.activeElement === document.body) sheetReturn.focus?.({ preventScroll: true }); sheetReturn = null; }
    }
  };
@@ -1485,7 +1487,7 @@
  $('#btn-panel').setAttribute('aria-expanded', String(!document.body.classList.contains('no-panel')));
  // the top bar can be one or two rows tall: everything under it follows its real height
  const headerEl = document.querySelector('header');
-@@ -2281,8 +2445,11 @@ window.addEventListener('keydown', (ev) => {
+@@ -2281,8 +2447,11 @@ window.addEventListener('keydown', (ev) => {
    else if (ev.key === 'Escape') {
      if (!ctxEl.hidden || fm.classList.contains('open') || legendEl.classList.contains('open')) { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); }
      else if (isPhone() && !document.body.classList.contains('no-panel')) closeSheet(); // on a phone the first Escape puts the details sheet away
@@ -1498,7 +1500,7 @@
    else if (ev.key === 'f' || ev.key === 'F') fit(true);
    else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
    else if (ev.key === 'Enter' && typeof state.selected === 'string') open(state.selected);
-@@ -2300,22 +2467,37 @@ function setTechnical(on) {
+@@ -2300,22 +2469,37 @@ function setTechnical(on) {
    render({ keepTransform: true, after: renderPanel });
    emit('technical', technicalFlag);
  }
@@ -1539,7 +1541,7 @@
    state.answer = a; askState.last = a;
    go('q:answer', { force: true });
  }
-@@ -2332,7 +2514,7 @@ window.Floorplan = Object.freeze({
+@@ -2332,7 +2516,7 @@ window.Floorplan = Object.freeze({
    version: 1,
    graph: G, query: Q, state, agent: AGENT, exported: EXPORTED,
    // model helpers
@@ -1548,7 +1550,7 @@
    files, nodes, routes, colorOf, iconKey,
    // html helpers
    h, icon, iconI, fmt, plural, md,
-@@ -2372,6 +2554,8 @@ window.Floorplan = Object.freeze({
+@@ -2372,6 +2556,8 @@ window.Floorplan = Object.freeze({
    technical, setTechnical,
    store,
    on(event, fn) { (ext.listeners[event] ||= []).push(fn); },
@@ -1557,7 +1559,7 @@
  });
  technicalFlag = !!store.get('technical', false);
  
-@@ -2379,7 +2563,9 @@ const init = readHash();
+@@ -2379,7 +2565,9 @@ const init = readHash();
  state.container = init.v; state.selected = init.s;
  if (init.s && isPhone()) { document.body.classList.remove('no-panel'); $('#btn-panel').setAttribute('aria-expanded', 'true'); } // a shared link to a box opens its details
  const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();

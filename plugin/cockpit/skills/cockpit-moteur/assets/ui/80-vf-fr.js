@@ -121,7 +121,8 @@
 
   const probe = (window.__vfFr = { nodes: 0, attrs: 0, passes: 0, ms: 0 });
   const ATTRS = ['placeholder', 'title', 'aria-label'];
-  const SKIP = 'script,style,code,pre,textarea,.mono,.rp,.pp';
+  // AUDC-H4 : le titre et la description d'une carte sont des DONNÉES du lab (« tokens.ts » ne devient pas « Jetons ») ; « No description yet » (.desc.empty) est du chrome et reste traduit
+  const SKIP = 'script,style,code,pre,textarea,.mono,.rp,.pp,.card .title,.card .desc:not(.empty)';
   const fix = (root) => {
     const t0 = performance.now();
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
