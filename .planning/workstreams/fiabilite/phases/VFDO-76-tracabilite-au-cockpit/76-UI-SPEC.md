@@ -11,11 +11,12 @@ created: "2026-11-11"
 
 **Contrat de design** pour l'entrée et la section « Traçabilité » du panneau d'une phase, les trois sections repliées de la
 vue d'ensemble de Projet (« Jalon », « Décisions », « Mémoire des agents ») et les panneaux d'une exigence, d'une ADR,
-d'une décision et d'une entrée de mémoire. Direction « Graphite » (`DESIGN.md`). Révision du 2026-11-11 sur la critique du
-premier jet (75/100) : glyphes de forme propre, corail borné par P76-D-15bis, section de phase bornée en hauteur, nom
-accessible, mémoire réduite aux chemins absents.
+d'une décision et d'une entrée de mémoire. Direction « Graphite » (`DESIGN.md`). Révisions du 2026-11-11 sur les critiques
+des tours 1 à 4 : glyphes de forme propre, corail borné par P76-D-15bis, section de phase bornée en hauteur (budget sommé),
+bilans qui ne perdent aucune catégorie, nom accessible, mémoire réduite aux chemins absents, exigence qui ouvre ses décisions
+et ses preuves (P76-D-38).
 
-Sources lues : `76-CONTEXT.md` (P76-D-01..30, P76-D-15bis, Retour et pile commune de la Phase 80, règle A30 de la 79), `REQUIREMENTS.md`
+Sources lues : `76-CONTEXT.md` (P76-D-01..38, dont P76-D-15bis, P76-D-30, P76-D-32, P76-D-33, P76-D-38 ; Retour et pile commune de la Phase 80, règle A30 de la 79), `REQUIREMENTS.md`
 (TRAC-01..12), `DESIGN.md`, `DESIGNS.md` § 1, § 2, § 9, `78-UI-SPEC.md` (modèle), `viewer.html` (`:root`, `#panel`, `.sec`,
 `.row`, `.more`, `.group-h`, `renderPanel`, API `SC`), `ui/00-vibeflow.js` (masques `G_ST`, `.vst`, `.vf-link`, `.vf-ref`,
 `.vf-copie`, lien `data-vf-section`, `details.vf-tech`), `ui/71-vf-equipe-rendu.js` (glyphes d'Équipe), `ui/77-vf-git-tiroir.js`
@@ -41,10 +42,11 @@ fichiers de page `ui/7x-vf-trace*.js` (numéro fixé au plan ; 74 est libre aujo
 - Les sections n'existent que sur l'onglet Projet servi par le serveur (`TAB === 'project'` et `window.FLOORPLAN_SERVER`).
   Dans une page autonome ou un export : pas de section, pas de ligne « indisponible » (P76-D-11).
 - Ni fond teinté, ni texte coloré, ni liseré ou contour coloré : une teinte d'état ne vit que dans un glyphe (Q9,
-  P71.5-D-12, D-19, D-21, D-27, D-28). Le corail ne désigne que la liste fermée de P76-D-04 / P76-D-15bis (§ 10). Grille
+  P71.5-D-12, D-19, D-21, D-27, D-28). Le corail ne désigne que la liste fermée de P76-D-04 / P76-D-15bis (§ 10), confirmée par Samuel (P76-D-32). Grille
   d'espacements fermée (P71.5-D-01). Points de rupture inchangés (Q11).
 - Rien de la mémoire des agents au-delà de `name`, agent, `metadata.type`, jour du dernier commit, nombres de liens
-  entrants et sortants, chemins cités absents (P76-D-20, P76-D-22). Aucun titre ni résumé écrit par un modèle (PU-G-162).
+  entrants et sortants, chemins cités absents, et le chemin du fichier de mémoire suivi (nécessaire au verdict « hors index »,
+  montré en pied de source seulement) (P76-D-20, P76-D-22). Aucun titre ni résumé écrit par un modèle (PU-G-162).
 - **Pas de fil d'Ariane, pas de Retour propre** (P76-D-03, P76-D-30). Un seul Retour par panneau : le bouton « Retour : <titre
   du dessus> » de l'en-tête du panneau, pile commune de la Phase 80 (`window.VF_PANNEAU.retour()`, P80-C76-3). Phase et plan
   sont des nœuds du graphe : `select(id)` ou `reveal(id)` les ouvre et ils s'empilent d'eux-mêmes. Exigence, ADR, décision et
@@ -132,7 +134,7 @@ central (contradiction). Aucun de ces profils ne se confond avec un anneau, un d
 silhouette carrée ou octogonale à plats nets suffit sans la teinte. Le glyphe « lu » est neutre à dessein (le vert dit
 « fait » ailleurs ; cinq carrés verts par ligne noieraient le seul signal qui demande une action). **Décision du manager
 (décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée)** : contradiction = octogone au
-trait corail, non plein, sans « ! », détail interne de 5 px. Confirmation « Les trous en rouge » : § 12, A-1.
+trait corail, non plein, sans « ! », détail interne de 5 px. Les trous en rouge : arbitrage rendu, P76-D-32 (§ 12).
 
 ### 1.2 Niveau d'un maillon : ce que veulent dire « niveau exigence » et « niveau phase »
 
@@ -161,8 +163,8 @@ Aucun mot « périmée » : la date est une information (« modifiée le 8 nov. 
 **Les trois contradictions de mémoire partagent le même octogone** : le corail est borné (P76-D-15bis) et 16 px ne portent
 pas trois octogones différents lisibles de plus. Elles se distinguent par leur **emplacement** et leur mot : hors index vit dans la
 section « État » de l'entrée (et dans le décompte de la ligne d'agent) ; lien cassé vit sur la ligne du lien, dans « Liens
-sortants » ; chemin absent vit sur la ligne du chemin, dans « Chemins cités et absents de HEAD ». Jamais deux sur une même
-ligne.
+sortants » ; chemin absent vit sur la ligne du chemin, dans « Chemins cités et absents de HEAD ». Un seul octogone par ligne, les causes se disent
+en mots.
 
 ## 2. Panneau d'une phase : l'entrée haute et la section « Traçabilité »
 
@@ -173,11 +175,14 @@ fin de panneau, pointée par une entrée d'une ligne en haut, plutôt qu'une sec
 
 ### 2.1 Entrée haute (`{ top: true }`)
 
-Un `.sec` contenant un seul `button.vf-trace-ligne` avec `data-vf-section="vf-trace-phase"` (clic, Entrée, Espace : le
-panneau défile jusqu'à la section, brique existante). Ligne 1 : « Traçabilité » (12,5 px/500 `--text`). Ligne 2 : le bilan
-(11,5 px, `--text-3`) : « 4 exigences : 1 avec une contradiction, 1 avec un manque, 2 avec une chaîne complète » (clamp 2 lignes, § 10.1). Hauteur de l'entrée : deux lignes, ≈ 40 px. Rendue
-seulement si la phase a au moins une exigence rattachée. Nom accessible : « Traçabilité, 4 exigences, 1 avec une contradiction,
-1 avec un manque, 2 avec une chaîne complète. Aller à la section. »
+Un `.sec` contenant un seul `button.vf-trace-ligne` avec `data-vf-section="vf-trace-phase"` (clic, Entrée, Espace : le panneau
+défile jusqu'à la section, brique existante). Ligne 1 : « Traçabilité » (12,5 px/500 `--text`). Ligne 2 : un **résumé court, pas le
+bilan par catégorie** (12,5 px/400 `--text-3`, clamp 2 lignes) : « 4 exigences, 3 incomplètes dont 1 en contradiction » ;
+« 4 exigences, toutes complètes » ; le bilan complet est dans la section (§ 2.2). « Incomplète » = toute exigence qui n'est pas
+« complète » (§ 10.1). Cas le plus long : « 120 exigences, 119 incomplètes dont 40 en contradiction » (55 caractères, ≈ 1,4 ligne à
+294 px : rien n'est retranché). Hauteur au pire : `.sec` 40 + bouton (remplissage 16 + ligne 1 de 18 + écart 2 + ligne 2 de
+2 × 18 = 36) 72 = **112 px**. Rendue seulement si la phase a au moins une exigence rattachée. Nom accessible : « Traçabilité,
+4 exigences, 3 incomplètes dont 1 en contradiction. Aller à la section. »
 
 ### 2.2 Section `id="vf-trace-phase"` (position par défaut, en fin de panneau)
 
@@ -186,14 +191,14 @@ et l'état de chargement (§ 9), l'asynchrone remplit en place (`[data-ext]` reb
 
 **Structure (de haut en bas).**
 1. `h3` « Traçabilité » et compteur `.c` : « 4 exigences ».
-2. Bilan (12,5 px/400, `--text-3`, clamp 2 lignes) : « 4 exigences : 1 avec une contradiction, 1 avec un manque, 2 avec une
-   chaîne complète » ; catégories exclusives et règle de décompte : § 10.1 ; « 4 exigences, toutes avec une chaîne complète »
-   seulement si les quatre maillons sont lus pour chacune ; jamais un pourcentage (P69-D-01).
-3. **Clé des glyphes** (11,5 px, `--text-3`, clamp 3 lignes, une seule fois par section, visible en permanence, jamais au
+2. Bilan (12,5 px/400, `--text-3`, **clamp 3 lignes**) : « 4 exigences : 1 en contradiction, 1 avec un manque, 2 complètes » ;
+   catégories exclusives, **jamais une catégorie non nulle retranchée** (règle et cas le plus long : § 10.1, § 2.4) ; « 4 exigences,
+   toutes complètes » seulement si les quatre maillons sont lus pour chacune ; jamais un pourcentage (P69-D-01).
+3. **Clé des glyphes** (11,5 px/400, `--text-3`, clamp 3 lignes, une seule fois par section, visible en permanence, jamais au
    survol) : quatre paires glyphe et mot : « lu », « manque », « non lisible », « contradiction », puis « De gauche à droite :
    plan, SUMMARY, VERIFICATION, recette. » : c'est ce qui rend les colonnes de la bande identifiables sans survol.
 4. Au plus **5 lignes d'exigence** (**3 sous 700 px**), puis « + N autres exigences » (§ 7). Ordre : d'abord les lignes à
-   contradiction, puis à manque, puis à maillon non lisible, puis les chaînes complètes ; à égalité, l'ordre du ledger.
+   contradiction, puis à manque, puis à maillon non lisible, puis les complètes ; à égalité, l'ordre du ledger.
 5. Repli « Preuves attachées » (§ 3), fermé par défaut, plafonné ouvert.
 
 **Ligne d'exigence** : un seul `button type="button"`, classe `vf-trace-ligne`, pleine largeur, `margin-inline: calc(-1 *
@@ -206,17 +211,19 @@ explicites : § 2.3.
   jamais masqué par un autre : « manque : plan », « manque : SUMMARY », « manque : VERIFICATION », « manque : recette » ;
   « non lisible : SUMMARY » (etc.) ; si ce maillon est une contradiction : « contradiction : cochée, sans SUMMARY » (maillon
   SUMMARY) ou « contradiction : Complete, sans plan » (maillon plan). **« chaîne complète » seulement si les quatre maillons
-  sont « lu »** (niveau exigence ou niveau phase). Mot en 11,5 px/500 `--text-2`.
-- **Ligne 3** (absente si rien à dire) : les **mentions**, 11,5 px/400 `--text-3`, séparées par « · », dans cet ordre :
-  (a) toute autre contradiction de la liste fermée qui n'est pas le mot de la ligne 2, précédée du glyphe octogone et en toutes
-  lettres ; (b) les mentions neutres, sans glyphe : « non cochée, SUMMARY lu » ; « sans ligne de traçabilité » (P76-D-15bis) ;
-  (c) le niveau des maillons lus au niveau de la phase, sans glyphe : « lu au niveau phase : VERIFICATION, recette ».
+  sont « lu »** (niveau exigence ou niveau phase). Mot en 11,5 px/500 `--text-2`, clamp 2 lignes.
+- **Ligne 3** (absente si rien à dire ; clamp 3 lignes) : les **mentions**, 11,5 px/400 `--text-3`, séparées par « · », dans cet
+  ordre : (a) toute autre contradiction de la liste fermée qui n'est pas le mot de la ligne 2, précédée du glyphe octogone et en
+  toutes lettres ; (b) les mentions neutres, sans glyphe : « non cochée, SUMMARY lu » ; « sans ligne de traçabilité »
+  (P76-D-15bis) ; (c) le niveau des maillons lus au niveau de la phase, sans glyphe : « lu au niveau phase : VERIFICATION,
+  recette ».
 - **Emplacement des contradictions dans la bande** : « cochée, sans SUMMARY » met l'octogone à la place du maillon SUMMARY ;
   « Complete, sans plan » à la place du maillon plan. Un seul sens par emplacement.
 - **Nom accessible** (le contenu natif du bouton, sans `aria-label` qui le remplace, pour que le texte visible soit contenu
-  dans le nom) : le texte visible (identifiant, texte, mot, mentions) puis un `span.vf-trace-sr` masqué visuellement (position
-  absolue, 1 px, `overflow: hidden`, `clip-path: inset(50%)` ; exception écrite de taille) : « Plan : lu, niveau exigence.
-  SUMMARY : manque. VERIFICATION : lu, niveau phase. Recette : manque. Ouvrir l'exigence. » Glyphes `aria-hidden`.
+  dans le nom) : le texte visible (identifiant, texte, mot, mentions), **entier dans le DOM même quand un clamp le coupe à
+  l'écran**, puis un `span.vf-trace-sr` masqué visuellement (position absolue, 1 px, `overflow: hidden`, `clip-path:
+  inset(50%)` ; exception écrite de taille) : « Plan : lu, niveau exigence. SUMMARY : manque. VERIFICATION : lu, niveau phase.
+  Recette : manque. Ouvrir l'exigence. » Glyphes `aria-hidden`.
 - États : repos fond transparent ; survol `rgba(var(--ink), .06)` ; focus clavier `outline: 2px solid var(--ring);
   outline-offset: -2px` ; actif sans échelle. Un glyphe de contradiction n'est jamais posé sur `--raise` ni `--raise-2`
   (thème clair, sous 3:1).
@@ -225,33 +232,72 @@ explicites : § 2.3.
 **Aucune exigence rattachée** : sous le `h3` (compteur « 0 exigence »), la ligne neutre de § 9 ; le repli « Preuves attachées »
 reste montré s'il y a des preuves.
 
-### 2.3 Budget de hauteur de la section (bornée par des clamps, pas par la largeur)
+### 2.3 Budget de hauteur de la section (bornée par des clamps, sommée exactement)
 
-Chaque bloc de texte porte un `-webkit-line-clamp` explicite : la hauteur ne dépend donc pas de la largeur utile. Le calcul vaut
-aux largeurs de 320 px (colonne de 360 px) et de 294 px (plancher visé : colonne redimensionnée ou feuille étroite), où les mots
-et mentions passent à la ligne jusqu'à leur clamp. Lignes de 12,5 px à 18 px, de 11,5 px à 16 px.
+Chaque bloc de texte porte un `-webkit-line-clamp` explicite : la hauteur ne dépend donc pas de la largeur utile. Les clamps sont
+dimensionnés sur les cas les plus longs de § 2.4, aux largeurs utiles de 320 px (colonne de 360 px) et 294 px (plancher visé). Lignes
+de 12,5 px à 18 px, de 11,5 px à 16 px. Remplissage de `.sec` : 20 en haut (`--inset-panel`), 20 en bas (`.sec:last-child`).
 
 | Bloc | Bureau (≥ 701 px) | Feuille (≤ 700 px) |
 |------|-------------------|--------------------|
-| Titre `h3` | 24 | 24 |
-| Bilan (clamp 2 lignes de 18) | ≤ 36 | ≤ 36 |
-| Clé des glyphes (clamp 3 lignes de 16) | ≤ 48 | ≤ 48 |
-| Ligne 1 de ligne d'exigence (clamp) | 2 lignes : 36 | 1 ligne : 18 |
-| Ligne 2 (bande 16 ; mot clamp 2 lignes de 16) | ≤ 32 | ≤ 32 |
-| Ligne 3 (mentions, clamp) | 2 lignes : ≤ 32 | 1 ligne : ≤ 16 |
-| Remplissage et écarts d'une ligne (8 + 8 + 2 × `--sp-2`) | 20 | 20 |
-| **Une ligne d'exigence, au pire** | **≤ 124** | **≤ 90** |
+| `.sec`, remplissage haut + bas | 20 + 20 = 40 | 40 |
+| `h3` (ligne de 18) + marge basse `--sp-8` | 18 + 8 = 26 | 26 |
+| Bilan (clamp 3 × 18) + écart `--sp-8` | 54 + 8 = 62 | 62 |
+| Clé des glyphes (clamp 3 × 16) + écart `--sp-8` | 48 + 8 = 56 | 56 |
+| Ligne d'exigence : remplissage 8 + 8, deux écarts `--sp-2` | 16 + 4 = 20 | 20 |
+| – ligne 1 (clamp 2 × 18 ; 1 × 18 sur la feuille) | 36 | 18 |
+| – ligne 2 (max de la bande 16 et du mot, clamp 2 × 16) | 32 | 32 |
+| – ligne 3 (mentions, clamp 3 × 16) | 48 | 48 |
+| **Une ligne d'exigence, au pire** | 20 + 36 + 32 + 48 = **136** | 20 + 18 + 32 + 48 = **118** |
 | Lignes montrées | 5 | 3 |
-| « + N autres exigences » | 32 | 44 |
-| Repli « Preuves attachées » fermé (`summary`) | 32 | 44 |
-| **Section, au pire (repli fermé)** | **≤ 24 + 36 + 48 + 620 + 32 + 32 = 792** | **≤ 24 + 36 + 48 + 270 + 44 + 44 = 466** |
+| Écarts entre lignes (`--sp-2`) | 4 × 2 = 8 | 2 × 2 = 4 |
+| Sous-total des lignes | 5 × 136 + 8 = 688 | 3 × 118 + 4 = 358 |
+| Écart `--sp-8` + « + N autres exigences » (32 ; 44 tactile) | 8 + 32 = 40 | 8 + 44 = 52 |
+| Écart `--sp-8` + `summary` du repli fermé (32 ; 44 tactile) | 8 + 32 = 40 | 8 + 44 = 52 |
+| **Section, repli fermé** | 40 + 26 + 62 + 56 + 688 + 40 + 40 = **952** | 40 + 26 + 62 + 56 + 358 + 52 + 52 = **646** |
 
-Sur la feuille, 466 px au pire tient sous le plafond de la feuille (`min(56vh, 480px)` = 480 px au plus) : la section se lit sans
-défilement interne dès qu'on l'a atteinte. Le contenu existant du panneau précède la section et reste atteignable sans la
-traverser ; l'entrée haute (≈ 40 px) y mène. Repli « Preuves attachées » **ouvert plafonné** : 6 lignes de preuve (4 sous
-700 px), au plus ≈ 50 px chacune (libellé 18, chemin clampé à 1 ligne 16, remplissage 16), plus les intertitres : ≤ 356 px
-bureau, ≤ 228 px feuille ; au-delà, « + N autres fichiers de preuve » ouvre le panneau de liste (§ 6). Section ouverte au pire :
-≤ 1 148 px bureau (792 + 356), ≤ 694 px feuille (466 + 228) ; jamais de défilement interne à la section.
+Variante tactile sur un grand écran (`pointer: coarse` au-dessus de 700 px) : « + N autres » et `summary` passent à 44 px, soit
++ 12 + 12 : **976**. Les lignes d'exigence dépassent déjà 44 px, rien à ajouter.
+
+**Sur la feuille, la section défile avec la feuille** : ses 646 px sont une **borne, pas une garantie de tenir dans la feuille**
+(`min(56vh, 480px)`, 480 px au plus). Le contenu existant du panneau précède la section et reste atteignable sans la traverser ;
+l'entrée haute (≤ 112 px, § 2.1) y mène.
+
+**Repli « Preuves attachées » ouvert, plafonné** : 6 lignes de preuve (4 sous 700 px) ; une ligne = remplissage 16 + libellé 18 +
+écart 2 + chemin clampé à 1 ligne 16 = 52. Bureau : 8 (marge sous `summary`) + 6 × 52 + 5 × 2 (= 322) + 8 + 32 (« + N autres fichiers
+de preuve ») = **370** ; feuille : 8 + 4 × 52 + 3 × 2 (= 214) + 8 + 44 = **274**. Section ouverte au pire : **1 322** (952 + 370)
+bureau, **920** (646 + 274) feuille, bornes et non garanties.
+
+### 2.4 Texte tronqué : le cas le plus long, et où il se lit en entier
+
+Aucune catégorie non nulle d'un bilan, aucun maillon d'une ligne 2 d'un « Jalon », aucune mention de ligne 3 n'est retranchée : le
+clamp est choisi pour que le cas le plus long **tienne**. Mesure : nombre de caractères du cas le plus long × largeur moyenne
+(6,6 px par caractère à 12,5 px ; 6,2 px à 11,5 px), majorée de 10 % pour les retours à la ligne, divisée par la largeur utile.
+À mesurer au rendu (§ 15) ; si un cas dépasse son clamp, on raccourcit le libellé, on ne relève pas le clamp sans recalculer § 2.3.
+
+| Texte | Cas le plus long | Caractères | Lignes à 294 px (320 px) | Clamp |
+|-------|------------------|-----------|--------------------------|-------|
+| Bilan d'une phase (12,5 px) | « 120 exigences : 40 en contradiction, 40 avec un manque, 20 avec un maillon non lisible, 20 complètes » | 100 | 2,5 (2,3) | 3 |
+| Bilan du « Jalon » (12,5 px) | « 120 phases : 40 en contradiction, 40 avec un manque, 20 avec un maillon non lisible, 10 sans exigence, 10 complètes » | 115 | 2,8 (2,6) | 4 |
+| Clé des glyphes (11,5 px, avec ses quatre glyphes de 16 px) | « lu · manque · non lisible · contradiction · De gauche à droite : plan, SUMMARY, VERIFICATION, recette. » | 95 + 4 glyphes | 2,5 (2,3) | 3 |
+| Bilan « Mémoire » (12,5 px) | « 268 entrées, 12 agents, 7 entrées hors index, 33 liens cassés, 4 chemins cités absents, 143 entrées sans lien entrant » | 117 | 2,9 (2,7) | 4 |
+| Ligne 2 d'une phase du « Jalon » (11,5 px) | « 12 plans manquants, 12 SUMMARY manquants, 12 SUMMARY non lisibles, 12 VERIFICATION manquantes, 12 recettes manquantes » | 117 | 2,7 (2,5) | 3 |
+| Ligne 3 d'une phase du « Jalon » (11,5 px) | « 12 exigences en contradiction · 12 lignes de traçabilité sans exigence » | 70 | 1,6 (1,5) | 2 |
+| Ligne 3 d'une exigence (11,5 px) | « contradiction : cochée, sans SUMMARY · sans ligne de traçabilité · lu au niveau phase : VERIFICATION, recette » (avec le glyphe) | 109 | 2,5 (2,3) | 3 |
+| Mot de ligne 2 d'une exigence (11,5 px, après la bande de 84 px) | « contradiction : cochée, sans SUMMARY » | 36 | 1,2 sur 210 px | 2 |
+| Ligne 2 d'un agent (11,5 px) | « 12 entrées hors index, 12 liens cassés, 12 chemins cités absents » | 64 | 1,5 (1,4) | 2 |
+| Ligne 3 d'une entrée de mémoire (11,5 px) | « hors index, 12 liens cassés, cite un chemin absent · sans lien entrant » | 70 | 1,6 (1,5) | 3 |
+
+**Ce qui est coupé à l'écran reste lisible en entier ailleurs** (le texte complet reste dans le DOM, donc dans le nom accessible) :
+
+| Texte coupé | Où le lire en entier |
+|-------------|----------------------|
+| Texte d'une exigence en ligne 1 (clamp 2, 1 sur la feuille) | panneau de l'exigence (`.pd`, entier) et nom accessible de la ligne |
+| Titre d'ADR (une ligne, ellipsis) | `title` de la ligne, panneau de l'ADR (`.pd`) |
+| Titre de décision (coupé à 80 caractères par la route) | pied de source du panneau de la décision : « Lu dans <registre de phase> » ; la ligne entière n'est pas servie |
+| Nom de phase du « Jalon » (une ligne, ellipsis) | `title`, panneau de la phase |
+| Chemin d'une preuve (clamp 1) | `title` et copie du chemin **entier** au clic (`.vf-ref`) |
+| Mentions ou mots clampés (cas rares au-delà du cas le plus long) | panneau de l'exigence : « Chaîne » et « Mentions » ; nom accessible |
 
 ## 3. Preuves attachées (AUDC-I33)
 
@@ -260,17 +306,18 @@ Repli natif `<details class="vf-trace-repli">` dans la section de la phase, ferm
 de preuve (4 sous 700 px), puis « + N autres fichiers de preuve » (§ 7) qui ouvre le panneau de liste « Preuves de la Phase N »
 (§ 6).
 
-Contenu, par groupe `.group-h` : d'abord « Phase » (preuves de la phase), puis un groupe par plan (« 76-01 », mono) :
-- une ligne par fichier de preuve existant : libellé (12,5 px/500 `--text`) parmi « VERIFICATION », « Recette », « Trace
-  rouge », « Sécurité », « Validation » ; puis le statut lu, « statut : passed » (mot du frontmatter ou de la ligne
-  `**Statut :`, `textContent`, `--text-3`) ;
-- dessous, le chemin relatif au lab en `--mono` 11,5 px `--text-3`, **clampé à 1 ligne** (ellipsis, `title` = chemin complet),
+Contenu, **sans intertitre** (la portée se dit dans la ligne) : d'abord les preuves de la phase, puis celles de chaque plan :
+- ligne 1 de chaque preuve (12,5 px/500 `--text`) : la portée puis le libellé : « Phase · VERIFICATION », « Phase · Recette »,
+  « 76-01 · Trace rouge », parmi « VERIFICATION », « Recette », « Trace rouge », « Sécurité », « Validation » ; puis le statut lu
+  (11,5 px/400 `--text-3`, mot du frontmatter ou de la ligne `**Statut :`, `textContent`) : « statut : passed » ;
+- dessous, le chemin relatif au lab en `--mono` 11,5 px/400 `--text-3`, **clampé à 1 ligne** (ellipsis, `title` = chemin complet),
   rendu en `.vf-ref` : un clic copie le chemin **entier**, « Copié » apparaît 1,6 s (comportement existant). Le cockpit ne peut
   pas ouvrir un fichier : le chemin est copiable, pas ouvrable. `aria-label` : « Copier le chemin : <chemin> » ;
 - pour un plan qui porte des `must_haves` : une ligne « Critères du plan, 5 critères », **le compte seulement** ; la liste en
-  texte est dans le panneau de liste « Preuves de la Phase N » (12,5 px `--text-2`, ≤ 30 par page).
-- Jamais un contenu de transcript, jamais une capture, jamais une preuve déduite (P76-D-24). Un fichier absent ne produit aucune
-  ligne : son absence se lit dans le glyphe « manque » de la bande.
+  texte est dans le panneau de liste « Preuves de la Phase N » (12,5 px/400 `--text-2`, ≤ 30 par page).
+- Jamais un contenu de transcript, jamais une capture, jamais une preuve déduite (P76-D-24) ; le contenu d'un fichier de preuve
+  n'est jamais rendu (P76-D-38). Un fichier absent ne produit aucune ligne : son absence se lit dans le glyphe « manque » de la
+  bande.
 - Aucune preuve : ligne neutre de § 9.
 
 ## 4. Vue d'ensemble de Projet : trois sections repliées
@@ -287,46 +334,51 @@ sans refermer ni perdre le défilement (P76-D-06, A13 de la 79).
 
 ### 4.1 « Jalon »
 
-Bilan sous le `summary` (11,5 px, `--text-3`, clamp 2 lignes), catégories **exclusives par phase** (§ 10.1) : « 12 phases : 2 avec
-une contradiction, 7 avec un manque, 1 avec un maillon non lisible, 1 sans exigence, 1 avec toutes les chaînes complètes »
-(seules les catégories non nulles ; la somme égale le nombre de phases). Une ligne par phase (`button.vf-trace-ligne`), ≤ 30
-puis « + N autres phases » :
+Bilan sous le `summary` (12,5 px/400 `--text-3`, **clamp 4 lignes**, section repliée par défaut donc hors budget § 2.3), catégories
+**exclusives par phase** (§ 10.1) : « 12 phases : 2 en contradiction, 7 avec un manque, 1 avec un maillon non lisible, 1 sans
+exigence, 1 complète » (seules les catégories non nulles ; la somme égale le nombre de phases ; toutes complètes : « 12 phases,
+toutes complètes »). Cas le plus long et mesure : § 2.4. Une ligne par phase (`button.vf-trace-ligne`), ≤ 30 puis « + N autres
+phases » :
 - Ligne 1 : « Phase 76 » (12,5 px/500 `--text`), le nom (12,5 px/400 `--text-3`, une ligne, ellipsis), pastille de phase `.vst` à
   droite (glyphe et mot : « À faire », « En cours », « À recetter », « Fait »), `font-size` surchargé à 11,5 px (§ Typography).
-- Ligne 2 (clamp 2 lignes) : les maillons en défaut **par maillon et par état**, comptés avec leur unité, dans l'ordre plan,
-  SUMMARY, VERIFICATION, recette, « manquants » puis « non lisibles » : « 2 SUMMARY manquants, 1 SUMMARY non lisible,
-  1 VERIFICATION manquante » (« 3 plans manquants », « 2 recettes manquantes ») ; ces nombres comptent des maillons et se
-  recouvrent entre maillons (une exigence à SUMMARY et VERIFICATION manquants compte dans les deux) ; un maillon en
+- Ligne 2 (11,5 px/500 `--text-2`, **clamp 3 lignes**) : les maillons en défaut **par maillon et par état**, comptés avec leur
+  unité, dans l'ordre plan, SUMMARY, VERIFICATION, recette, « manquants » puis « non lisibles » : « 2 SUMMARY manquants, 1 SUMMARY
+  non lisible, 1 VERIFICATION manquante » (« 3 plans manquants », « 2 recettes manquantes ») ; ces nombres comptent des maillons
+  et se recouvrent entre maillons (une exigence à SUMMARY et VERIFICATION manquants compte dans les deux) ; un maillon en
   contradiction n'est pas « manquant » (§ 10.1). Tous les maillons lus pour toutes les exigences : « toutes les chaînes
   complètes » ; aucune exigence : « aucune exigence rattachée ».
-- Ligne 3 (absente si rien ; clamp 2 lignes) : (a) l'octogone puis « 1 exigence en contradiction » (cochée sans SUMMARY ou Complete
-  sans plan, comptée une fois par exigence) ; (b) mention neutre, sans glyphe : « 2 lignes de traçabilité sans exigence »
-  (**c'est l'unique emplacement de cette cause**, P76-D-15bis).
+- Ligne 3 (absente si rien ; 11,5 px/400 `--text-3`, **clamp 2 lignes**) : (a) l'octogone puis « 1 exigence en contradiction »
+  (cochée sans SUMMARY ou Complete sans plan, comptée une fois par exigence) ; (b) mention neutre, sans glyphe : « 2 lignes de
+  traçabilité sans exigence » (**c'est l'unique emplacement de cette cause**, P76-D-15bis).
+- Hauteur d'une ligne, au pire : remplissage 16 + écarts 4 + ligne 1 de 18 + ligne 2 de 3 × 16 + ligne 3 de 2 × 16 = **118 px**.
 - Clic ou Entrée : `select('ph-<N>')`, la section de § 2 s'y trouve ; pas de panneau neuf.
 
 ### 4.2 « Décisions »
 
-Bilan : « 32 ADR, 71 décisions dans 14 registres de phase ». Deux blocs :
+Bilan (12,5 px/400 `--text-3`, clamp 4 lignes) : « 32 ADR, 71 décisions dans 14 registres de phase ». Deux blocs :
 1. Une ligne par ADR (`button.vf-trace-ligne`) : identifiant `--mono` 11,5 px/500 `--text-2` (« ADR-075 ») puis le titre lu après
    le numéro (12,5 px/400 `--text`, une ligne, ellipsis, `title` = titre complet). ≤ 30 puis « + N autres ADR ». Une ADR citée
    sans section dans `docs/ADR.md` n'a pas de ligne ici (§ 5.3).
 2. Sous `.group-h` « Registres de phase », un `<details class="vf-trace-repli vf-trace-sous">` par registre, fermé : son
    `<summary>` est de rôle « sous-repli » (§ 13) : « Phase 41 » et « 12 décisions ». ≤ 30 registres, du plus récent au plus
    ancien, puis « + N autres registres ». Déplié : ses décisions (≤ 30 puis « + N autres décisions ») : identifiant mono
-   11,5 px (« P41-D-02 » ; nue « D-04 ») et début de la ligne de définition (12,5 px, `--text-2`, une ligne, ellipsis).
+   11,5 px/500 `--text-2` (« P41-D-02 » ; nue « D-04 ») et le **titre** de la définition, coupé à 80 caractères par la route
+   (12,5 px/400 `--text-2`, une ligne, ellipsis).
    Un seul niveau de pliage dans un pliage : retrait gauche `var(--sp-12)`.
 
 ### 4.3 « Mémoire des agents »
 
-Bilan : « 268 entrées, 12 agents, 7 entrées hors index, 33 liens cassés, 143 entrées sans lien entrant » (chiffres de la route,
-jamais recalculés côté page). Les compteurs ont des unités différentes (entrées, liens, chemins) et ne s'additionnent pas ; « hors
-index » et « sans lien entrant » se recouvrent (une entrée peut avoir les deux), chacun compte ses entrées (§ 10.1). Une ligne
-par agent (le dossier sous `.claude/agent-memory/`, ≤ 30 puis « + N autres agents ») :
-- Ligne 1 : nom de l'agent en `--mono` 12,5 px/500 `--text`, à droite « 24 entrées » (11,5 px, `--text-3`, tabular-nums).
-- Ligne 2 (absente si aucune contradiction ; clamp 2 lignes) : octogone puis les comptes en mots : « 3 entrées hors index, 2 liens
-  cassés, 1 chemin cité absent » (seuls les non nuls ; 11,5 px/500 `--text-2`).
-- Ligne 3 (clamp 2 lignes) : neutre, `--text-3` : « 11 entrées sans lien entrant, 4 liens résolus par nom de fichier » ; rien :
-  « aucun écart ».
+Bilan (12,5 px/400 `--text-3`, **clamp 4 lignes**, section repliée par défaut donc hors budget § 2.3) : « 268 entrées, 12 agents,
+7 entrées hors index, 33 liens cassés, 4 chemins cités absents, 143 entrées sans lien entrant » (chiffres de la route, jamais
+recalculés côté page ; seuls les compteurs non nuls s'écrivent, **« N chemins cités absents » compris**). Les compteurs ont des
+unités différentes (entrées, liens, chemins) et ne s'additionnent pas ; « hors index » et « sans lien entrant » se recouvrent (une
+entrée peut avoir les deux), chacun compte ses entrées (§ 10.1). Cas le plus long et mesure : § 2.4. Une ligne par agent (le dossier
+sous `.claude/agent-memory/`, ≤ 30 puis « + N autres agents ») :
+- Ligne 1 : nom de l'agent en `--mono` 12,5 px/500 `--text`, à droite « 24 entrées » (11,5 px/400 `--text-3`, tabular-nums).
+- Ligne 2 (absente si aucune contradiction ; **clamp 2 lignes**) : octogone puis les comptes en mots : « 3 entrées hors index,
+  2 liens cassés, 1 chemin cité absent » (seuls les non nuls ; 11,5 px/500 `--text-2`).
+- Ligne 3 (**clamp 2 lignes**, 11,5 px/400 `--text-3`) : « 11 entrées sans lien entrant, 4 liens résolus par nom de fichier » ;
+  rien : « aucun écart ».
 - Clic ou Entrée : panneau de liste de l'agent (§ 6).
 
 ## 5. Panneaux d'objet (`SC.showPanel(html, bind)`)
@@ -347,22 +399,45 @@ par agent (le dossier sous `.claude/agent-memory/`, ≤ 30 puis « + N autres ag
 
 ### 5.1 Exigence
 
-- Titre : identifiant. `.pd` : le texte de l'exigence, entier (pas de clamp), `overflow-wrap: anywhere`.
-- Section « Chaîne » (`h3`) : d'abord une phrase d'aide (11,5 px, `--text-3`) : « Niveau exigence : le fichier lu cite cette
+- Titre : identifiant. `.pd` : le texte de l'exigence, entier (pas de clamp), `overflow-wrap: anywhere`. **Ordre des sections** :
+  « Chaîne », « Décisions citées », « Preuves », « Mentions », « Rattachement ».
+- Section « Chaîne » (`h3`) : d'abord une phrase d'aide (11,5 px/400 `--text-3`) : « Niveau exigence : le fichier lu cite cette
   exigence. Niveau phase : le fichier existe pour la phase sans la citer. » Puis quatre lignes, une par maillon : glyphe de
   16 px, nom du maillon (12,5 px/500 `--text`), puis, sur la même ligne, état et niveau en toutes lettres, **seule source
   visible du niveau** : « lu, niveau exigence », « lu, niveau phase », « manque », « non lisible », et, pour une contradiction,
-  la phrase de § 10 à la place de l'état : « contradiction : case cochée au ledger, aucun SUMMARY lu » (11,5 px `--text-3`).
+  la phrase de § 10 à la place de l'état : « contradiction : case cochée au ledger, aucun SUMMARY lu » (11,5 px/400 `--text-3`).
   **Une contradiction de maillon vit ici et nulle part ailleurs dans ce panneau** (pas de section « Contradictions »). Dessous,
   la source : chemin mono copiable et le champ lu. Plan : un `.tag` par plan qui la cite (« 76-01 »), rendu en
   `button.tag.vf-trace-puce` : focus `outline: 2px solid var(--ring)`, survol `rgba(var(--ink), .1)`, cible 44 px sous
   `pointer: coarse` (`min-height: 44px`, `display: inline-flex`, `align-items: center`) ; chaque plan s'ouvre par
-  `select('f:<chemin>')`.
+  `select('f:<chemin>')` (le plan, nœud du graphe, s'empile de lui-même : P76-D-30).
+- Section « Décisions citées » (`h3`, compteur « 2 décisions ») : P76-D-38. Lit les identifiants **cités dans la ligne de
+  l'exigence au ledger** : décisions préfixées (`P<n>-D-<nn>`) et ADR ; une décision nue (`D-nn`) n'y est pas reliée (ADR-075) et
+  n'est pas montrée. Une ligne par décision citée (`button.vf-trace-ligne`, ≤ 30 puis « + N autres décisions ») : identifiant
+  `--mono` 11,5 px/500 `--text-2` puis le titre de la définition, coupé à 80 caractères par la route (12,5 px/400 `--text-2`,
+  une ligne, ellipsis, `title` = titre servi) ; pour une ADR, son titre lu après le numéro. **Aucun glyphe** : ce bloc est une
+  liste de voisins, pas un état. Nom accessible : « Décision P78-D-01, <titre>. Ouvrir la décision. » (ou « ADR-075, <titre>.
+  Ouvrir l'ADR. »). Une décision citée mais sans définition lue (ou une ADR sans section) : texte non interactif, identifiant mono
+  puis « sans définition lue » (ou « sans section dans docs/ADR.md »), `--text-3`. Aucune décision citée : « aucune décision
+  citée » (12,5 px/400 `--text-3`, neutre, jamais corail) suivi de ce qui la lèverait : « Un identifiant Pnn-D-nn ou ADR-nnn dans
+  la ligne de l'exigence au ledger la relierait. »
+- Section « Preuves » (`h3`, compteur « 2 fichiers ») : P76-D-38. Une ligne par maillon de preuve **lu** pour cette exigence :
+  VERIFICATION, recette, trace rouge de chaque plan qui la cite (`button.vf-trace-ligne`, ≤ 30 puis « + N autres fichiers de
+  preuve »). Ligne 1 : portée et libellé (« Phase · VERIFICATION », « 76-01 · Trace rouge », 12,5 px/500 `--text`) ; ligne 2
+  (11,5 px/400 `--text-3`, clamp 2) : « statut : passed » et le niveau, « niveau exigence » ou « niveau phase ». **Aucun glyphe**,
+  aucun chemin ici (le chemin copiable est dans la liste des preuves). **Le contenu du fichier n'est jamais rendu.** Un clic
+  ou Entrée ouvre le panneau de liste « Preuves de la Phase N » **positionné sur cette preuve** (§ 6). Aucune preuve lue :
+  « Aucune preuve lue pour cette exigence. VERIFICATION, recette ou trace rouge dans le dossier de la phase la relierait. »
+- **Ouverture des voisins (plan, décision, ADR, preuve)** : avant `SC.showPanel` (ou `select` pour un plan), le panneau appelle
+  `window.VF_PANNEAU.empiler({ titre, rouvrir })` avec le titre de l'exigence (texte, jamais HTML) et un `rouvrir` qui rend de
+  nouveau ce panneau ; le bouton « Retour : <titre> » de l'en-tête ramène à l'exigence et le focus revient sur la ligne qui a
+  ouvert le voisin (retrouvée par son `data-trace`, **à revalider**). Clavier : chaque ligne est un `button` natif (Tab, Entrée,
+  Espace), focus `outline: 2px solid var(--ring); outline-offset: -2px`, aucune touche globale ; l'ordre de tabulation suit l'ordre
+  des sections ci-dessus.
 - Section « Mentions » (absente si aucune), phrases neutres, sans glyphe : « Case non cochée au ledger, un SUMMARY est lu. » ;
   « Aucune ligne du tableau de traçabilité ne la nomme. »
 - Section « Rattachement » : « Phase 76, Traçabilité au cockpit » (bouton), puis « Ligne de traçabilité du ledger : Phase 76,
   Pending » si elle existe, sinon « Rattachée par le champ requirements d'un plan. »
-- Pas de section « Décisions citées » : aucune arête exigence vers décision n'est lue (P76-D-17).
 
 ### 5.2 ADR
 
@@ -371,7 +446,8 @@ décisions »), « Commits qui la citent » (≤ 30, § 5.5). Source : « Lu dan
 
 ### 5.3 Décision
 
-- Titre « P41-D-02 » ; nue « D-04, Phase 41 ». `.pd` : la ligne de définition, entière.
+- Titre « P41-D-02 » ; nue « D-04, Phase 41 ». `.pd` : le **titre** de la définition, coupé à 80 caractères par la route ; la ligne
+  entière n'est pas servie, le pied de source dit où la lire (le texte entier est ailleurs, § 2.4).
 - « Phase » : un bouton. « ADR citées » : une ligne par ADR citée ; avec section : bouton ; sans : texte mono suivi de « sans
   section dans docs/ADR.md » (`--text-3`), non interactif.
 - « Commits qui la citent » (§ 5.5). Décision nue : à la place, « Décision nue : aucun commit ne lui est relié, la citation sans
@@ -393,7 +469,8 @@ décisions »), « Commits qui la citent » (≤ 30, § 5.5). Source : « Lu dan
 - **« Chemins cités et absents de HEAD »** (absente si aucun) : **seuls** les chemins qui répondent à « cite un chemin absent »
   (P76-D-22) : relatifs au dépôt, absents de HEAD, présents dans l'historique lu. Une ligne : chemin mono, octogone,
   « absent de HEAD, présent dans l'historique lu ». Aucun autre chemin du corps n'est montré, ni compté, ni nommé ; le chemin du
-  fichier de mémoire lui-même (structure suivie par git) n'est montré que dans le pied de source.
+  fichier de mémoire suivi lui-même (structure suivie par git, nécessaire au verdict « hors index ») n'est montré que dans le pied de
+  source.
 - Jamais `description`, jamais le corps, jamais un chemin `~/` ou absolu (P76-D-20).
 
 ### 5.5 Ligne de commit
@@ -417,9 +494,12 @@ tabular-nums, `aria-live="polite"`). Pas de pagination infinie. Le changement de
 
 **Ligne d'entrée de mémoire** (liste d'un agent, `button.vf-trace-ligne`) : ligne 1 `name` mono 12,5 px/500 `--text` et `.tag`
 du type ; ligne 2 « modifiée le 8 nov. 2026 · 2 liens entrants, 3 liens sortants » (11,5 px `--text-3`) ; ligne 3 (absente si
-rien, clamp 2 lignes) : octogone puis les contradictions en mots (« hors index », « 1 lien cassé », « cite un chemin absent »),
+rien, clamp 3 lignes) : octogone puis les contradictions en mots (« hors index », « 1 lien cassé », « cite un chemin absent »),
 puis, après « · » et sans glyphe, « sans lien entrant ». **Ligne de preuve** (liste « Preuves de la Phase N ») : libellé,
-statut, chemin copiable clampé, puis les critères du plan en texte.
+statut, chemin copiable clampé, puis les critères du plan en texte. **Ouverture positionnée** (depuis « Preuves » d'une exigence, § 5.1) : le panneau s'ouvre sur la
+page qui contient la preuve visée ; sa ligne est amenée en haut de la zone visible, porte `aria-current="true"` et un fond
+`--surface-hover` (état neutre, ni teinte ni contour coloré), et prend le focus si l'ouverture vient du clavier ; le contenu du
+fichier n'est jamais rendu.
 
 ## 7. Échelle : seuils et « + N autres »
 
@@ -473,7 +553,8 @@ ou dégradé dit ce qui l'a produit puis ce qui le lèverait.**
 | Agent sans entrée | liste d'agent | « Aucune entrée suivie pour cet agent. Un fichier de mémoire suivi par git sous son dossier apparaît ici. » |
 | Aucune preuve | « Preuves attachées » | « Aucune preuve attachée. Un fichier VERIFICATION, de recette, de trace rouge, de sécurité ou de validation dans le dossier de la phase l'attacherait. » |
 | Réponse bornée | listes de commits, d'entrées | « Lecture bornée : la liste peut être incomplète. Une lecture plus courte, ou moins de commits, la lèverait. » (11,5 px `--text-3`, au-dessus de la liste ; une réponse bornée ne se présente jamais comme complète) |
-| Route en échec (503, délai, 400 inattendu) | section, panneau | boîte neutre : titre « La traçabilité est indisponible » (12,5 px/600 `--text`), cause « La lecture du dépôt a échoué ou dépassé le délai. » (12,5 px, `--text-2`), `.btn.soft` « Réessayer » ; le reste du panneau fonctionne |
+| Collecte en cours (`collecte: en-cours`, avant la première collecte) | section, panneau | « La collecte du dépôt est en cours. La traçabilité apparaît dès qu'elle est faite. » (12,5 px/400 `--text-3`) ; sans bouton : la clé `planning` de `VF_ETAT` relance l'appel |
+| Route en échec (503, délai, 400 inattendu) | section, panneau | boîte neutre : titre « La traçabilité est indisponible » (12,5 px/500 `--text`), cause « La lecture du dépôt a échoué ou dépassé le délai. » (12,5 px, `--text-2`), `.btn.soft` « Réessayer » ; le reste du panneau fonctionne |
 | Objet introuvable ou disparu | panneau | « Cet objet n'existe plus dans le dépôt. Le bouton Retour de l'en-tête rouvre la vue précédente. » |
 | Rafraîchissement par `planning` | section ouverte | le contenu se remplace sans fondu ; défilement et pliages conservés |
 
@@ -499,7 +580,7 @@ exception tacite : la règle « mot en ligne 2 si c'est le premier maillon non l
 Un mot de ligne ne masque jamais le premier trou : la ligne 2 dit toujours le premier maillon non lu de la bande ; toute autre
 contradiction passe en ligne 3. **Décisions de détail déléguées par Samuel (message session principale, 2026-11-08), option
 recommandée** : « non cochée, SUMMARY lu » est neutre (absent de la liste fermée de P76-D-04, malgré P76-D-15). Le mot « rouge »
-du but du 2026-11-03 est lu « marqué et visible » dans les teintes Graphite (A-1, § 12). Aucune phrase n'est un verdict sur le
+du but du 2026-11-03 est lu « marqué et visible » dans les teintes Graphite (P76-D-32, § 12). Aucune phrase n'est un verdict sur le
 travail : elle décrit ce que deux fichiers disent l'un de l'autre.
 
 ### 10.1 Règle de décompte des bilans
@@ -507,15 +588,17 @@ travail : elle décrit ce que deux fichiers disent l'un de l'autre.
 - **Un maillon a un seul état** parmi lu, manque, non lisible, contradiction. « Cochée, sans SUMMARY » donne au maillon SUMMARY
   l'état contradiction (jamais « manque ») ; « Complete, sans plan » donne au maillon plan l'état contradiction.
 - **Bilan d'exigences** (section de phase, entrée haute) : catégories **exclusives**, chaque exigence comptée une seule fois dans
-  la première qui s'applique, dans cet ordre : contradiction, manque, maillon non lisible, chaîne complète. Une exigence « cochée
-  sans SUMMARY » dont VERIFICATION manque compte donc en contradiction. La somme égale le nombre d'exigences ; seules les
-  catégories non nulles s'écrivent ; « chaîne complète » exige quatre maillons « lu ».
+  la première qui s'applique, dans cet ordre : « en contradiction », « avec un manque », « avec un maillon non lisible », « complètes ». Une exigence
+  « cochée sans SUMMARY » dont VERIFICATION manque compte donc en contradiction. La somme égale le nombre d'exigences ; seules les
+  catégories non nulles s'écrivent ; « complète » exige quatre maillons « lu ». « Incomplète » (entrée haute) = toute exigence non
+  complète.
 - **Bilan de jalon** : catégories **exclusives par phase**, selon la pire exigence de la phase, mêmes quatre catégories plus
-  « sans exigence » ; la somme égale le nombre de phases.
+  « sans exigence » ; la somme égale le nombre de phases ; la catégorie « complètes » compte des phases dont toutes les exigences sont
+  complètes.
 - **Ligne 2 d'une phase du Jalon** : compte des **maillons** par état, avec chevauchement entre maillons (dit au § 4.1) ;
   « manquants » exclut les maillons en contradiction ; « non lisibles » se compte à part. **Ligne 3** : « N exigences en
   contradiction » compte des exigences (une fois chacune), « N lignes de traçabilité sans exigence » compte des lignes.
-- **Bilan de mémoire** : compteurs par unité (entrées, liens, chemins), sans somme ; « hors index » et « sans lien entrant »
+- **Bilan de mémoire** : compteurs par unité (entrées, liens, chemins), sans somme, seuls les non nuls (« N chemins cités absents » compris) ; « hors index » et « sans lien entrant »
   se recouvrent et le disent ; les liens résolus par nom de fichier sont comptés à part, jamais en défaut.
 
 ## Spacing Scale
@@ -544,26 +627,38 @@ n'est modifié.
 
 ## Typography
 
-**Quatre tailles seulement**, deux graisses posées (500 et 600 ; le 400 est hérité du moteur, jamais écrit). Aucune autre taille
-(ni 11, ni 12, ni 13) dans les éléments neufs.
+**Quatre tailles seulement** : 20, 13,5 (hérité), 12,5 et 11,5 px. **Deux graisses posées** : 500 et 600 (600 réservé au titre `.pt`,
+existant) ; le 400 est hérité du moteur et n'est jamais écrit. Chaque élément nommé ci-dessous a **une seule taille, une seule
+graisse, une seule teinte**, reprises à l'identique dans sa section.
 
-| Rôle | Taille | Graisse | Interligne |
-|------|--------|---------|------------|
-| Titre de panneau d'objet (`.pt`) | 20 px | 600 | 1.3 (existant), interlettrage -.02em |
-| Corps et texte d'objet (`.pd`, définition, phrase de contradiction) | 13,5 px (hérité) | 400 hérité | 1.6 (existant) |
-| Ligne, titre de section (`.sec h3`, `summary`), libellé de maillon, ADR, bilan, cause d'erreur | 12,5 px | 500 (libellés, `summary`), 400 (texte), 600 (titre « La traçabilité est indisponible ») | 1.45 |
-| Méta : identifiants mono, sha, dates, mots d'état, clé, mentions, pagination | 11,5 px | 500 (identifiants, mots d'état), 400 (reste) | 16 px |
+| Élément | Section | Taille | Graisse | Teinte |
+|---------|---------|--------|---------|--------|
+| Titre de panneau d'objet (`.pt`) | § 5 | 20 px (interligne 1,3, -.02em, existant) | 600 | `--text` |
+| Type d'objet (`.ph .kindlabel`) | § 5 | 12,5 px | 400 hérité | `--text-3` |
+| Texte de l'exigence, titre de définition (`.pd`) | § 5.1, § 5.3 | 13,5 px (interligne 1,6, existant) | 400 hérité | `--text-2` |
+| Titre de section (`.sec h3`) et `summary` de section | § 2, § 3, § 4 | 12,5 px | 500 | `--text-3` |
+| `summary` de sous-repli (registre de phase) | § 4.2 | 12,5 px | 500 | `--text-2` |
+| Compteur `.c` | § 2, § 3, § 4 | 12,5 px | 400 hérité | `--text-4` |
+| Bilan (phase, Jalon, Décisions, Mémoire) et résumé de l'entrée haute | § 2, § 4 | 12,5 px | 400 hérité | `--text-3` |
+| Nom : « Phase 76 », agent, `name` d'entrée (mono), libellé de maillon, de preuve, de section d'erreur | § 2 à § 6 | 12,5 px | 500 | `--text` |
+| Texte de ligne : exigence, titre d'ADR, nom de phase (`--text-3`), ligne d'une liste | § 2, § 4, § 5 | 12,5 px | 400 hérité | `--text` |
+| Titre de décision dans une liste, texte de « Critères du plan », cause d'erreur | § 3, § 4.2, § 9 | 12,5 px | 400 hérité | `--text-2` |
+| Titre d'erreur « La traçabilité est indisponible » | § 9 | 12,5 px | 500 | `--text` |
+| Identifiant mono (TRAC-01, ADR-075, P41-D-02), sha | § 2 à § 6 | 11,5 px | 500 | `--text-2` |
+| Mot de ligne 2, comptes d'agent en défaut, mot d'état | § 2.2, § 4.3 | 11,5 px | 500 | `--text-2` |
+| Mentions, clé des glyphes, comptes secondaires, dates, état et niveau d'un maillon (« Chaîne »), phrase de contradiction, aide, rappel de mémoire, statut, pied de source, pagination | § 2 à § 6 | 11,5 px | 400 hérité | `--text-3` |
 
-`--mono` pour identifiants (TRAC-01, ADR-075, P41-D-02), sha, chemins, `name` de mémoire ; `--sans` ailleurs. Chiffres en
-`font-variant-numeric: tabular-nums` (compteurs, pagination).
+`--mono` pour identifiants, sha, chemins, `name` de mémoire ; `--sans` ailleurs. Chiffres en `font-variant-numeric: tabular-nums`
+(compteurs, pagination).
 
 **Surcharges des briques réemployées** (écrites sous un parent `.vf-trace`, qui enveloppe chaque section et panneau de la 76,
-sans toucher la règle d'origine) : le moteur pose des tailles hors de ces quatre (13, 11, 11,5), on les ramène.
+sans toucher la règle d'origine) : le moteur pose des tailles hors de ces quatre (13, 11) et un rayon littéral, on les ramène.
 
-| Brique | Taille d'origine | Surcharge `vf-trace-*` |
+| Brique | Valeur d'origine | Surcharge `vf-trace-*` |
 |--------|------------------|------------------------|
-| `.btn.soft` (Réessayer, Précédentes, Suivantes) | 13 px, hauteur 36 px, pastille | `font-size: 12.5px; height: 32px` (hauteur de `#ask-sheet .sh .btn`) ; 44 px sous `pointer: coarse` ; une seule hauteur pour tous les boutons de la 76 |
+| `.btn.soft` (Réessayer, Précédentes, Suivantes) | 13 px, hauteur 36 px, pastille | `font-size: 12.5px; height: 32px` (hauteur de `#ask-sheet .sh .btn`) ; 44 px sous `pointer: coarse` ; une seule hauteur pour tous les boutons de la 76 ; graisse 400 héritée |
 | `.vf-ref code` (chemin copiable) | 11 px | `font-size: 11.5px` |
+| `.vf-ref` | `border-radius: 10px` littéral | `.vf-trace .vf-ref { border-radius: var(--r-ctl) }` |
 | `.vf-copie-etat` (« Copié ») | 11 px | `font-size: 11.5px` |
 | `.vst` (pastille de phase du « Jalon ») | 11 px (glyphe `1.45em`) | `font-size: 11.5px` (glyphe 16,7 px : brique du moteur, pas un glyphe de la famille § 1.1) |
 | `.tag` (type, plan) | 11,5 px | aucune |
@@ -591,17 +686,20 @@ sur `--surface` et `--bg` ; une teinte d'état jamais sur `--raise` ni `--raise-
 | Élément | Copy |
 |---------|------|
 | CTA principal | aucun (lecture seule) ; plus proche : « Ouvrir l'exigence », « Ouvrir l'ADR », « Ouvrir la décision », « Ouvrir l'entrée », « Aller à la section » (nom accessible des lignes, jamais un libellé visible) |
-| Titres de section | « Traçabilité », « Jalon », « Décisions », « Mémoire des agents », « Preuves attachées », « Chaîne », « Mentions », « Rattachement », « Fiche », « État », « Liens sortants », « Liens entrants », « Chemins cités et absents de HEAD », « Décisions qui la citent », « Commits qui la citent », « ADR citées », « Registres de phase » |
+| Titres de section | « Traçabilité », « Jalon », « Décisions », « Mémoire des agents », « Preuves attachées », « Chaîne », « Décisions citées », « Preuves », « Mentions », « Rattachement », « Fiche », « État », « Liens sortants », « Liens entrants », « Chemins cités et absents de HEAD », « Décisions qui la citent », « Commits qui la citent », « ADR citées », « Registres de phase » |
 | Compteurs de section (avec unité) | « 4 exigences », « 12 phases », « 32 ADR », « 268 entrées », « 5 fichiers », « 12 décisions », « 3 liens » |
 | Maillons | « Plan », « SUMMARY », « VERIFICATION », « Recette » (dans la clé et les mots : plan, SUMMARY, VERIFICATION, recette) |
 | États de maillon | « lu », « manque », « non lisible », « contradiction » ; niveaux : « niveau exigence », « niveau phase » |
 | Clé des glyphes | « lu », « manque », « non lisible », « contradiction », « De gauche à droite : plan, SUMMARY, VERIFICATION, recette. » |
 | Mot de ligne (ligne 2) | « manque : plan », « manque : SUMMARY », « manque : VERIFICATION », « manque : recette », « non lisible : plan », « non lisible : SUMMARY », « non lisible : VERIFICATION », « non lisible : recette », « contradiction : cochée, sans SUMMARY », « contradiction : Complete, sans plan », « chaîne complète » |
 | Mentions (ligne 3) | « non cochée, SUMMARY lu », « sans ligne de traçabilité », « lu au niveau phase : VERIFICATION, recette », « 2 lignes de traçabilité sans exigence » (Jalon) |
-| Bilans (catégories exclusives, § 10.1) | « 4 exigences : 1 avec une contradiction, 1 avec un manque, 2 avec une chaîne complète » ; « 4 exigences : 1 avec un maillon non lisible, 3 avec une chaîne complète » ; « 4 exigences, toutes avec une chaîne complète » ; « 12 phases : 2 avec une contradiction, 7 avec un manque, 1 avec un maillon non lisible, 1 sans exigence, 1 avec toutes les chaînes complètes » ; « 32 ADR, 71 décisions dans 14 registres de phase » ; « 268 entrées, 12 agents, 7 entrées hors index, 33 liens cassés, 143 entrées sans lien entrant » |
+| Bilans (catégories exclusives, § 10.1) | « 4 exigences : 1 en contradiction, 1 avec un manque, 2 complètes » ; « 4 exigences : 1 avec un maillon non lisible, 3 complètes » ; « 4 exigences, toutes complètes » ; « 12 phases : 2 en contradiction, 7 avec un manque, 1 avec un maillon non lisible, 1 sans exigence, 1 complète » ; « 12 phases, toutes complètes » ; « 32 ADR, 71 décisions dans 14 registres de phase » ; « 268 entrées, 12 agents, 7 entrées hors index, 33 liens cassés, 4 chemins cités absents, 143 entrées sans lien entrant » |
+| Résumé de l'entrée haute | « 4 exigences, 3 incomplètes dont 1 en contradiction » ; « 4 exigences, toutes complètes » |
 | Trous du Jalon (maillons par état, § 4.1) | « 2 SUMMARY manquants, 1 SUMMARY non lisible, 1 VERIFICATION manquante », « 3 plans manquants », « 2 recettes manquantes », « 1 VERIFICATION non lisible », « toutes les chaînes complètes », « aucune exigence rattachée », « 1 exigence en contradiction » |
 | États mémoire | « hors index », « lien cassé », « cite un chemin absent », « résolu par nom de fichier », « sans lien entrant », « aucun écart » (ligne d'agent), « Dans l'index, avec au moins un lien entrant. » (section « État » d'une entrée) ; comptes d'agent : « 3 entrées hors index », « 2 liens cassés », « 1 chemin cité absent », « 11 entrées sans lien entrant », « 4 liens résolus par nom de fichier » |
-| Preuves | « VERIFICATION », « Recette », « Trace rouge », « Sécurité », « Validation », « Critères du plan, 5 critères », « statut : passed », « + 4 autres fichiers de preuve », « Preuves de la Phase 76 » |
+| Preuves | « VERIFICATION », « Recette », « Trace rouge », « Sécurité », « Validation », « Phase · VERIFICATION », « 76-01 · Trace rouge », « Critères du plan, 5 critères », « statut : passed », « + 4 autres fichiers de preuve », « Preuves de la Phase 76 », « Aucune preuve lue pour cette exigence. VERIFICATION, recette ou trace rouge dans le dossier de la phase la relierait. » |
+| Décisions citées (panneau d'exigence) | « Décisions citées », « 2 décisions », « Ouvrir la décision », « sans définition lue », « sans section dans docs/ADR.md », « aucune décision citée », « Un identifiant Pnn-D-nn ou ADR-nnn dans la ligne de l'exigence au ledger la relierait. » |
+| Collecte | « La collecte du dépôt est en cours. La traçabilité apparaît dès qu'elle est faite. » |
 | Dates, sha | « 8 nov. 2026 » (jour seul, mois abrégé français) ; sha de 7 caractères |
 | Débordement | « + 12 autres exigences », « + 2 autres ADR », « + 5 autres registres », « + 40 autres commits », « + 3 autres agents », « + 4 autres liens », « + 4 autres fichiers de preuve » ; « Précédentes », « Suivantes », « 31 à 60 sur 83 exigences » |
 | Retour | « Retour : <titre> » : libellé fourni par l'en-tête de la Phase 80, `<titre>` du lab rendu en texte ; la 76 n'écrit aucun libellé de retour |
@@ -621,10 +719,10 @@ latéral ne pousse jamais la carte (Q12).
 
 | Largeur | Comportement du panneau | Ce que la 76 vérifie |
 |---------|-------------------------|----------------------|
-| 1440 px | colonne de 360 px à droite (`--panel-w`, redimensionnable ; largeur utile de ligne 320 px) | section de phase : 5 lignes, ≤ 792 px de haut au pire (§ 2.3) ; identifiant jamais coupé ; mots qui passent à la ligne ; carte non poussée |
+| 1440 px | colonne de 360 px à droite (`--panel-w`, redimensionnable ; largeur utile de ligne 320 px) | section de phase : 5 lignes, ≤ 952 px de haut au pire, repli fermé (§ 2.3) ; identifiant jamais coupé ; mots qui passent à la ligne ; carte non poussée |
 | 1024 px (souris ≥ 1000 px) | même colonne de 360 px ; il reste ≥ 280 px de carte visible | idem ; aucun défilement horizontal |
 | 768 px et 700 à 999 px | colonne de 360 px conservée (sauf tactile), carte réduite | cibles 44 px si `pointer: coarse` ; aucune largeur fixe de ligne |
-| 390 px (≤ 700 px) | feuille basse : `left/right 8 px`, hauteur max `min(56vh, 480px)`, défilement dans la feuille | largeur utile ≈ 334 px ; **section de phase : 3 lignes, texte sur 1 ligne, ≤ 466 px au pire (§ 2.3)**, après le contenu existant que l'entrée haute (≈ 40 px) permet de sauter ; sections de la vue d'ensemble repliées ; lignes et boutons ≥ 44 px ; pagination en boutons 44 px ; aucun défilement horizontal |
+| 390 px (≤ 700 px) | feuille basse : `left/right 8 px`, hauteur max `min(56vh, 480px)`, défilement dans la feuille | largeur utile ≈ 334 px ; **section de phase : 3 lignes, texte sur 1 ligne, 646 px au pire, borne et non garantie de tenir dans la feuille (§ 2.3)**, qui défile avec la feuille, après le contenu existant que l'entrée haute (≤ 112 px) permet de sauter ; sections de la vue d'ensemble repliées ; lignes et boutons ≥ 44 px ; pagination en boutons 44 px ; aucun défilement horizontal |
 
 Largeur de panneau redimensionnée par l'utilisateur : toute ligne reste fluide (`min-width: 0`, `overflow-wrap: anywhere`, aucune
 largeur fixe en px sur un texte). Cibles tactiles ≥ 44 px dans `@media (max-width: 700px), (pointer: coarse)` (lignes,
@@ -632,19 +730,24 @@ largeur fixe en px sur un texte). Cibles tactiles ≥ 44 px dans `@media (max-wi
 neuve (le moteur anime déjà l'entrée du panneau, `panelIn`, avec sa variante mouvement réduit) ; pliage de `details` sans
 transition.
 
-## 12. À Samuel (non bloquant, le contrat tient sans réponse)
+## 12. À Samuel : rien en attente, deux arbitrages rendus
 
-Reprises du CONTEXT ; le contrat applique l'option recommandée.
-- **A-1 : « Les trous en rouge » face à Q9.** Appliqué : (a), glyphe de forme propre et mot pour une absence, octogone corail
-  pour la liste fermée de contradictions (P76-D-04, P76-D-15bis). Alternatives : corail pour tout trou ; tout neutre.
-- **A-2 : « graphe navigable » sans dessin.** Appliqué : panneaux reliés, voisinage seul. Un dessin de l'îlot de mémoire d'un
-  agent peut venir plus tard sans rien défaire (différé).
+Aucune question en attente. Les deux questions de la première version sont **tranchées** (format C76-Q1 du CONTEXT : P76-Q-01 et
+P76-Q-02) :
+- **A-1, « Les trous en rouge » face à Q9** : P76-D-32, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, option
+  « Marque neutre ». Une absence se dit par un glyphe et un mot, sans couleur ; seule une contradiction réellement lue prend un
+  octogone au trait corail (§ 1, § 10).
+- **A-2, « graphe navigable » sans dessin** : P76-D-33, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, option
+  « Panneaux reliés ». Un clic sur un objet ouvre l'objet voisin (l'exigence ouvre son plan, sa décision, sa preuve), avec un seul
+  bouton Retour ; ni canevas ni quatrième onglet (§ 0, § 5.1).
 
-Aucune autre question de goût pur n'est ouverte. Décisions de détail prises, toutes **décisions déléguées par Samuel (message
-session principale, 2026-11-08), option recommandée**, à challenger par `vf-design-judge` : famille de formes carrés et octogone
-(§ 1.1, octogone au trait à carré central : décision du manager) ; « lu » neutre ; section en fin de panneau avec entrée haute (§ 2) ; seuils de 5 et 3 lignes (§ 2.2) ; aucun fil
-d'Ariane, le Retour unique de la 80 (§ 0, § 5) ; « non cochée, SUMMARY lu » neutre (§ 10) ; un seul octogone pour les trois contradictions de
-mémoire, distinguées par leur emplacement (§ 1.3) ; rayon `--r-ctl` partout (§ Spacing).
+Aucune question de goût pur n'est ouverte. Décisions de détail prises, toutes **décisions déléguées par Samuel (message session
+principale, 2026-11-08), option recommandée**, à challenger par `vf-design-judge` : famille de formes carrés et octogone au trait à
+carré central (§ 1.1, décision du manager) ; « lu » neutre ; section en fin de panneau avec entrée haute et résumé court (§ 2) ;
+seuils de 5 et 3 lignes et budget sommé (§ 2.3) ; aucun fil d'Ariane, Retour unique de la 80 (§ 0, § 5) ; « non cochée, SUMMARY
+lu » neutre (§ 10) ; un seul octogone pour les trois contradictions de mémoire, distinguées par leur emplacement (§ 1.3) ; rayon
+`--r-ctl` partout (§ Spacing) ; blocs « Décisions citées » et « Preuves » sans glyphe, positionnés sur la preuve (§ 5.1, § 6) ;
+bilans de 12,5 px à clamp 3 (phase) ou 4 (vue d'ensemble) (§ 2.4).
 
 ## 13. Variables CSS et styles uniques par rôle
 
@@ -681,8 +784,8 @@ en dur ; seules exceptions de DESIGN § 4 (filets 1 px, tailles de contrôle).
    traçabilité » et « lignes sans exigence » en mot neutre ; « ligne sans exigence » uniquement dans le « Jalon ».
 4. Un seul mot de ligne 2 (premier maillon non lu), jamais masqué ; contradictions suivantes en ligne 3 ; emplacement de
    l'octogone dans la bande (SUMMARY ou plan) ; clé des glyphes visible en permanence.
-5. Section de phase : 5 lignes (3 sous 700 px), lignes à trou d'abord, « + N autres exigences » ; clamps explicites (bilan 2, clé 3,
-   ligne 1 : 2 ou 1, mot 2, mentions : 2 ou 1) ; hauteur ≤ 792 px bureau et ≤ 466 px feuille au pire (§ 2.3) ; repli « Preuves
+5. Section de phase : 5 lignes (3 sous 700 px), lignes à trou d'abord, « + N autres exigences » ; clamps explicites (bilan 3, clé 3,
+   ligne 1 : 2 ou 1, mot 2, mentions 3) ; hauteur 952 px bureau et 646 px feuille au pire, sommée exactement (§ 2.3) ; repli « Preuves
    attachées » ouvert plafonné à 6 lignes (4 sous 700 px) ; contenu existant du panneau non déplacé ; entrée haute d'une ligne
    qui mène à la section.
 6. Nom accessible d'une ligne d'exigence : texte visible contenu dans le nom, puis états des maillons ; niveau dit une seule fois
@@ -692,6 +795,13 @@ en dur ; seules exceptions de DESIGN § 4 (filets 1 px, tailles de contrôle).
 8. Quatre tailles de texte seulement, **briques réemployées comprises** (surcharges `.btn.soft`, `.vf-ref code`, `.vf-copie-etat`,
    `.vst`, § Typography) ; hauteur unique des boutons de la 76 (32 px, 44 px tactile) ; un style de `summary` par rôle ; chaque nombre
    avec son unité ; chaque glyphe avec son mot.
+8ter. Bilans : aucune catégorie non nulle retranchée aux largeurs 320 et 294 px (clamps 3 et 4, cas les plus longs de § 2.4) ; budget
+   de § 2.3 qui somme exactement (952 / 646 px, repli fermé), borne et non garantie sur la feuille ; tout texte coupé lisible en entier
+   ailleurs (§ 2.4) ; chaque élément nommé a une seule taille, une seule graisse (§ Typography) ; surcharges des briques
+   réemployées dont `.vf-ref` (rayon `--r-ctl`).
+8quater. Panneau d'exigence (§ 5.1) : « Décisions citées » (liste, « aucune décision citée » neutre, décision nue non reliée) et
+   « Preuves » (lignes positionnées dans le panneau des preuves, contenu jamais rendu) ; `VF_PANNEAU.empiler` avant le panneau
+   sur mesure ; aucun glyphe répété ni neuf dans ces deux blocs.
 8bis. Décompte (§ 10.1) : bilans à catégories exclusives dont la somme égale le total ; « chaîne complète » seulement si les quatre
    maillons sont lus ; « non lisible » compté et nommé dans les bilans et le « Jalon » ; un emplacement par cause et par surface
    (§ 10) ; mention neutre du niveau phase ; chips de plan interactifs (focus `--ring`, survol, 44 px tactile).
@@ -716,8 +826,11 @@ en dur ; seules exceptions de DESIGN § 4 (filets 1 px, tailles de contrôle).
   porte son propre `scrollIntoView`.
 - Numéro du ou des fichiers `ui/7x-vf-trace*.js` et poids de chaque fichier (≤ 300 lignes, gate V4).
 - Que la carte de phase en couloirs de la 80 ouvre le même panneau, section « Traçabilité » comprise (P80-C76-1).
-- Que les clamps de § 2.3 tiennent au rendu à 320 et 294 px (largeurs utiles), et que le plafond de la feuille reste `min(56vh, 480px)`.
-- Hauteur réelle de la section de phase à 1440 et 390 px (mesure au rendu : ≤ 792 px et ≤ 466 px annoncés, § 2.3, repli fermé ; ≤ 1 148 px et ≤ 694 px repli ouvert).
+- **Contrôle au rendu** : un manque doit se repérer **sans lire les mots** (le « lu » plein est plus saillant que le « manque » vide :
+  vérifier que la bande se lit d'un coup d'œil, en niveaux de gris aussi) ; si le plein domine trop, revoir l'épaisseur du carré plein
+  (10 px) avant de changer de forme.
+- Que les clamps de § 2.3 et les cas les plus longs de § 2.4 tiennent au rendu à 320 et 294 px (largeurs utiles), et que le plafond de la feuille reste `min(56vh, 480px)`.
+- Hauteur réelle de la section de phase à 1440 et 390 px (mesure au rendu : 952 px et 646 px annoncés, § 2.3, repli fermé ; 1 322 px et 920 px repli ouvert).
 
 ## UI Considerations
 
