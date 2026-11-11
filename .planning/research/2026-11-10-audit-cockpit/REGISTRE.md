@@ -30,7 +30,7 @@
   BACKLOG, rien à ajouter.
 
 Décompte au versement : 60 constats (28 au lot 0, en tout ou en partie ; AUDC-A-04 s'y ajoute le 2026-11-11, soit 29), 40 idées, 5 décisions de fond (tranchées le 2026-11-11) et
-8 réouvertures pour Samuel.
+8 réouvertures pour Samuel (cinq tranchées le 2026-11-11 : AUDC-M2, M5, M8, M10 pour la pastille et B-05 ; une neuve, AUDC-F3 en partie, née et tranchée le même jour, § 5.1).
 
 ## 1. Constats
 
@@ -240,28 +240,38 @@ le sujet dit déjà ce que dit la ligne. Rien ne se ferme d'office.
 
 ### 5.1 À Samuel
 
-Les cinq décisions de fond ont été tranchées le 2026-11-11 : Samuel a retenu l'avis de la session principale (Samuel, session principale Claude Code, 2026-11-11, mot pour mot : « Prends ton avis pour chaque point que tu m'as demandé. »). La direction des quatre formes (régie, frise, fiche d'agent, Projet en couloirs) est retenue de la même façon ; leur détail reste à recetter. Les huit réouvertures plus bas restent ouvertes.
+Les cinq décisions de fond ont été tranchées le 2026-11-11 : Samuel a retenu l'avis de la session principale (Samuel, session principale Claude Code, 2026-11-11, mot pour mot : « Prends ton avis pour chaque point que tu m'as demandé. »). La direction des quatre formes (régie, frise, fiche d'agent, Projet en couloirs) est retenue de la même façon ; leur détail reste à recetter. Des huit réouvertures plus bas, cinq sont tranchées le 2026-11-11 (AUDC-M2, M5, M8, M10 pour la pastille, B-05) ; une neuve s'y ajoute, AUDC-F3 en partie (P78-D-34), tranchée le même jour ; AUDC-BL1 (plan B), I15 et I16 restent ouvertes. Quatre réponses d'exécution, prises le 2026-11-11, suivent la table des réouvertures.
 
 | Id | Décision | Ce qui en dépend | Ce que l'audit en dit | Tranché le 2026-11-11 |
 |---|---|---|---|---|
-| AUDC-Q1 | Le mode de lancement « hérité du poste » peut valoir le mode sans permissions. Il vient de la réponse libre « choix + hérité don bypass », lue ainsi par le manager sans nouvelle question (P72-D-02). | Rien dans les lots ; c'est un comportement déjà livré. | À confirmer, ou à retirer. | Laissé tel que livré : le mode reste dans la liste, rien ne change dans le code. L'avis de la session principale n'avait pas été écrit avant la délégation : à reconfirmer à la prochaine recette du lancement. |
+| AUDC-Q1 | Le mode de lancement « hérité du poste » peut valoir le mode sans permissions. Il vient de la réponse libre « choix + hérité don bypass », lue ainsi par le manager sans nouvelle question (P72-D-02). | Rien dans les lots ; c'est un comportement déjà livré. | À confirmer, ou à retirer. | Laissé tel que livré : le mode reste dans la liste, rien ne change dans le code. L'avis de la session principale n'avait pas été écrit avant la délégation : à reconfirmer à la prochaine recette du lancement. Reconfirmé le 2026-11-11 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) : « Oui, garder ce mode (Recommandé) » ; la lecture de P72-D-02 est confirmée, rien ne change dans le code ; plus rien à reconfirmer à la recette. |
 | AUDC-Q2 | Conserver un index des sessions sur disque : une donnée persistée nouvelle (heures, durées, jetons, verbes). | Le cadrage de la Phase 79. Sans lui, l'index se recalcule depuis les transcripts à chaque démarrage (9,4 s pour 2,6 Go, à borner à la fenêtre affichée). Une fenêtre au-delà de 24 h rouvre en plus P69-D-18. | Heures, durées, jetons et verbes tiennent dans les limites de confidentialité actuelles ; les sorties d'outil restent dehors. | Oui : index sur disque, borné à heures, durées, jetons et verbes. La fenêtre de 24 h est gardée : P69-D-18 n'est pas rouverte, la fenêtre « 7 j » sort du périmètre. |
 | AUDC-Q3 | Des actions depuis l'onglet Équipe (ouvrir, écrire, arrêter une session). | La Phase 81 et « Demander l'arrêt » d'un orphelin (AUDC-D4). Rouvre Q8 (pas de terminal sur l'onglet Équipe), P68-D-03 (gestes réservés aux agents de la session courante) et la frontière de la Phase 72 (« Reprendre » sur les cartes Équipe, hors périmètre). | Possible par le double geste ; à décider après la régie. | Plus tard : la Phase 81 et les gestes sur une session restent hors des vagues en cours. |
 | AUDC-Q4 | Faire de la vue d'agents de Claude Code (`claude agents --json`) la source de référence de l'état. | Le cadrage des Phases 73 et 74. La commande est documentée mais en aperçu : son format peut changer. | Les transcripts restent le repli, derrière le contrat de forme existant. | Oui : source de référence, derrière le contrat de forme, transcripts en repli. |
 | AUDC-Q5 | Moteur vendorisé : suivre l'amont, ou assumer le fork. | AUDC-H5 et le cadrage de la Phase 79. | Les deux se défendent. Ce qui coûte, c'est de ne pas choisir. | Assumer le fork. |
 
-Réouvertures, à trancher au cadrage de la phase qui porte la ligne, ou avant de la sortir de la réserve :
+Réouvertures, à trancher au cadrage de la phase qui porte la ligne, ou avant de la sortir de la réserve. Réponses du 2026-11-11 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11.
 
 | Ligne | Décision rouverte |
 |---|---|
-| AUDC-M2 | Q10, « Flou gardé, texte court » |
-| AUDC-M5 | P70-D-22 (badge « au travail » réduit à son point) et « Garder ce compromis » sur la troncature de l'en-tête (PU-G-001) |
-| AUDC-M8 | P70-D-04, constats de Santé laissés en anglais |
-| AUDC-M10 (pastille) | P71-D-02, rien sans l'option `--terminal` |
-| AUDC-B-05 | P72-D-20, le mode retenu vit dans un fichier du lab et survit aux relances ; à trancher avec AUDC-Q1 |
+| AUDC-M2 | Q10, « Flou gardé, texte court » — tranchée : « Zone réservée (Recommandé) » ; une zone réservée au titre, flou et texte court gardés ; portée par la Phase 80 (80-20) |
+| AUDC-M5 | P70-D-22 (badge « au travail » réduit à son point) et « Garder ce compromis » sur la troncature de l'en-tête (PU-G-001) — tranchée : « Trois groupes libellés (Recommandé) » ; au-delà de 1 280 px, trois groupes libellés, chevron, trois icônes remplacées, badge et troncature inchangés ; portée par la Phase 80 (80-20) |
+| AUDC-M8 | P70-D-04, constats de Santé laissés en anglais — tranchée : « Traduire les constats (Recommandé) » ; constats traduits, noms propres gardés ; portée par la Phase 80 (80-19) |
+| AUDC-M10 (pastille) | P71-D-02, rien sans l'option `--terminal` — tranchée : « Une ligne dans l'aide (Recommandé) » ; une ligne dans l'aide et la palette, ni pastille, ni port, ni route ; portée par la Phase 80 (80-14, 80-15) |
+| AUDC-B-05 | P72-D-20, le mode retenu vit dans un fichier du lab et survit aux relances ; à trancher avec AUDC-Q1 — tranchée : « Le ranger hors du projet (Recommandé) » ; le mode retenu vit dans le dossier d'état du poste, projet par projet, et change la lettre de P72-D-20 (note d'amendement sous P72-D-20 dans `72-CONTEXT.md`) ; livrée par le lot 0 bis (9b58a6c6) |
 | AUDC-BL1 (plan B) | PU-G-026, plancher de zoom sur Code seul |
 | AUDC-I15 | PU-G-162, pas de titre généré |
 | AUDC-I16 | P78-D-06, détail de commit sans diff |
+| AUDC-F3 (en partie) | P78-D-34, bouton de thème de 44 px parmi des boutons de 36 px — tranchée : « 36 visibles, 44 d'appui (Recommandé) » ; 36 px visibles, 44 px de cible d'appui ; portée par la Phase 80 (80-17, 80-20) |
+
+Réponses d'exécution, prises le 2026-11-11 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) : ce ne sont pas des décisions de fond (AUDC-Q1 à Q5), elles règlent la conduite de l'exécution des Phases 79 et 80.
+
+| Id | Décision | Ce qui en dépend | Tranché le 2026-11-11 |
+|---|---|---|---|
+| AUDC-J1 | Fusionner les PR de chaque phase dans la branche d'intégration pendant l'exécution, ou attendre la fin. | Le rythme de l'exécution des Phases 73 à 80 et de leurs jonctions. | « Oui, au fil de l'eau (Recommandé) » : les PR de chaque phase sont fusionnées dans `integration/cockpit-audit` à mesure qu'elles passent le contrôle de sortie de la session principale ; rien ne part vers la release ni vers `main`. |
+| AUDC-J2 | Jouer d'avance, sur son compte, la mesure du confinement de `claude -p` (plan 79-06, tâche 2). | Le plan 79-06 et son verdict de confinement. | « Oui, d'avance (Recommandé) » : la mesure part dès que le banc est prêt ; un verdict « non confinable » arrête le plan et lui revient. |
+| AUDC-J3 | Qui autorise la reprise aux points de reprise des plans 79-06 et 79-07. | L'enchaînement des vagues de la Phase 79. | « Claude, sur preuves (Recommandé) » : la session principale relit la trace, fait rejouer les contrôles et passer l'audit de sécurité, puis autorise la reprise, comme décision déléguée ; un constat de sécurité haut lui revient. |
+| AUDC-J4 | Qui joue la sonde S0 du plan 79-19. | Le plan 79-19 (AUDC-I18) et la question P79-Q-04. | « Claude la joue » (ce n'était pas l'option recommandée) : la sonde est jouée par un banc qui pilote le terminal, sur son compte ; il relit le tableau ; la question P79-Q-04 reste à lui. L'amendement du plan revient à la mission d'exécution de la Phase 79. |
 
 ### 5.2 Prises au versement
 
