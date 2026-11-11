@@ -571,11 +571,20 @@ Plans:
   4. Les fichiers lus ou écrits par les agents des dernières 24 h s'allument avec le nom de l'agent ; un même fichier visé par deux agents, deux branches ou deux plans d'une même vague est signalé avant la fusion.
   5. Les fichiers que les plans non faits vont créer apparaissent en cartes « prévues ».
   6. La couche « Travail récent » est retirée ; toutes les suites du cockpit sont vertes sous macOS et Linux, chaîne XSS étendue aux chemins et noms hostiles.
-**Plans:** 0 plans — planification en cours (2026-11-11)
+**Plans:** 10 plans (planifiés le 2026-11-11 ; exécution après la Phase 79 entière et la Phase 74)
 
 Plans:
 
-- [ ] TBD (planification de la mission du 2026-11-11)
+- [ ] 75-01-PLAN.md — Calcul git : points chauds, couplage, collisions entre branches (vague 1 ; ACTV-04, 05, 06, 10)
+- [ ] 75-02-PLAN.md — Gardes : règle de citation de la CI lue dans le socle, suite d'équivalence (vague 1 ; ACTV-07)
+- [ ] 75-03-PLAN.md — Chemins, empreinte et collisions d'agents et de plans, preuve générative (vague 1 ; ACTV-08, 09, 10)
+- [ ] 75-04-PLAN.md — `files_modified` borné jusqu'à l'instantané, avec la vague de la Phase 80 (vague 1 ; ACTV-10, 11)
+- [ ] 75-05-PLAN.md — Route `/api/vf/activite`, schéma `cockpit-activite@1`, témoin d'export (vague 2 ; ACTV-04, 08, 10, 12)
+- [ ] 75-06-PLAN.md — Cartes « prévues » : annotateur, règle de rattachement extraite, export sans les prévues (vague 2 ; ACTV-11)
+- [ ] 75-07-PLAN.md — Canal de marquage, pied réservé, glyphes, nom accessible, rendu des prévues (vague 3 ; ACTV-01, 02, 03, 11)
+- [ ] 75-08-PLAN.md — Sélecteur de lentilles, menu, panneau, compte du radar (vague 4 ; ACTV-01, 02, 06, 07, 08, 10)
+- [ ] 75-09-PLAN.md — Retrait du « Travail récent » et de `recent.mjs`, suites adaptées (vague 5 ; ACTV-12, 01)
+- [ ] 75-10-PLAN.md — Chaîne XSS étendue, sans git, DESIGN.md, CHANGELOG, compteur de suites (vague 6 ; ACTV-12)
 
 ### Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire
 
