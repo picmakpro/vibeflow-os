@@ -100,10 +100,30 @@ dépôt.
   l'ouverture d'une section ou d'un panneau, calcul asynchrone, cache par empreinte (sha de HEAD + date de
   modification la plus récente sous `.planning/`, de `docs/ADR.md` et sous `.claude/agent-memory/` ; amendé le
   2026-11-11 sur `76-RESEARCH.md` : l'empreinte d'origine omettait PLAN, SUMMARY, VERIFICATION et recette), un seul calcul en vol,
-  une seule entrée en cache. `vibeflow/cockpit-project@1` n'est **pas** étendu ; `project.html` ne grossit pas. Panel
+  une seule entrée en cache. Ce qui vient du planning se lit dans l'instantané de la collecte et ne se relit jamais dans la route (P76-D-31, règles A31 et A32 de la 79). Panel
   « données » : option B retenue (A écartée : poids de page, collecte synchrone, conflit avec la 79 sur la boucle ;
   C écartée : deux sources pour le même compte). Paramètres `vue=jalon|phase|exigence|decision|adr|memoire|entree` et
   `cle=` validée par motif strict ; paramètre invalide : 400.
+- **P76-D-31 (deux régimes de lecture, par source ; amendé le 2026-11-11 sur les règles A31 et A32 de la Phase 79,
+  commit `e04c43e7` de `feat/phase-79-socle-cockpit`).** La route lit la collecte en mémoire par
+  `vf-cockpit-instantane.mjs` (`instantane()`, `surInstantane(rappel)`, livrés par le plan 79-09), jamais par HTTP,
+  sans jamais déclencher de collecte ; avant la première collecte (`null`), elle répond `collecte: en-cours` sans
+  données de planning.
+
+  | Source | Régime | Borne |
+  |---|---|---|
+  | Phases, plans (`requirements:`, `depends_on`), ledger (exigences, cases, table de traçabilité), état d'avancement et de recette | instantané `projet` (`cockpit-project@1`, déjà collecté) | celle de la collecte |
+  | Maillons manquants à l'instantané : champs d'exigences des SUMMARY, `status:` et identifiants cités des VERIFICATION, identifiants cités des recettes, liste des fichiers de preuve, `must_haves` des PLAN, définitions des registres `*-CONTEXT.md` (identifiant, phase, titre coupé à 80 caractères, ADR citées) | **ajoutés par la 76 dans la lecture du planning de la collecte**, en champs facultatifs de `cockpit-project@1` (la version ne monte pas, A32) | celle de la collecte ; poids ajouté à la page Projet mesuré et écrit au plan |
+  | `docs/ADR.md` | lecture propre de la route, point confiné (A12) | fichier ≤ 8 Mio (`MAX_LECTURE`), mis en cache |
+  | Commits citants | lecture propre, `lancerGitAsync` | P76-D-10 : `--max-count=2000`, tampon 8 Mio, échéance de 10 s, `tronque` |
+  | Mémoire des agents (fichiers suivis, liens, jour du dernier commit, chemins ayant existé) | lecture propre, point confiné + `lancerGitAsync` | au plus 2 000 fichiers lus, chacun ≤ 8 Mio, un passage git borné comme P76-D-10 ; au-delà, `tronque` |
+
+  Les lectures propres ne se font jamais à chaque requête : cache par empreinte (P76-D-06), un seul calcul en vol,
+  une seule entrée. Conséquence : la 76 touche la lecture du planning de la collecte (fichiers partagés avec la 79 et
+  la 80), ce qui est écrit dans la carte des fichiers du rapport. Décision déléguée par Samuel (message session
+  principale, 2026-11-08), option recommandée ; elle remplace la phrase d'origine de P76-D-06 « `cockpit-project@1`
+  n'est pas étendu ».
+
 - **P76-D-07 (schéma).** `vibeflow/cockpit-trace@1` déclaré dans `plugin/cockpit/scripts/vf-cockpit-interface.json`
   avec ses `requis`, `optionnels`, `etats` et `interdits` (les cinq clés de C0 plus `description`, `corps`, `texte`),
   ligne au README § Interface et à la table des routes ; tout champ de réponse déclaré (motif de
