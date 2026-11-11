@@ -385,6 +385,22 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   battement** (`heartbeat_epoch`), pas de la prise ; `leaseS` (← `lease_seconds`, ajouté par A36) est le temps écoulé
   **depuis la prise** (`acquired_epoch`), `null` s'il est illisible ; `progressAgeS` est l'âge de la dernière marque
   d'avancement. « Tient son verrou depuis » se lit dans `leaseS`, aucun champ neuf.
+- **A40 (79-16, 79-18) — CSP de la coquille, amende P79-D-15.** La coquille statique (AUDC-AM2 : 2,47 Mo identiques
+  servis à chaque page) n'est mise en cache que si ses scripts sont des fichiers. Deuxième et dernière extension de
+  CSP de la phase : `script-src` = empreintes des scripts en ligne restants (injection du jeton) **+**
+  `http://<hôte>/_vf/` ; `worker-src` = `http://<hôte>/_vf/` (au lieu de `'self'`) ; jamais `'self'`, jamais `blob:`,
+  jamais `unsafe-*`. La route `/_vf/` ne sert que des fichiers du module, par une liste fermée calculée au démarrage,
+  jamais un fichier de la sortie ni un chemin venu de la requête. Témoins : CSP servie égale à la chaîne attendue ; un
+  `.js` planté dans la sortie n'est ni servi sous `/_vf/` ni exécutable ; un nom hors liste sous `/_vf/` → 404. Audit de
+  sécurité à l'exécution. P79-D-15 se lit désormais « deux extensions : `worker-src` et `script-src` restreints au
+  préfixe du module ».
+- **A41 (79-16) — service statique de la sortie.** Plus fort qu'A37 : 79-16 **retire** le service statique des fichiers
+  de la sortie (plus rien n'y est servi qu'une page ne lise par une route), au lieu de le passer à la fonction de
+  résolution physique ; les gardes de chemin de 79-06 passent, elles, à cette fonction.
+- **A42 (79-15) — réglage d'essai.** `VF_COCKPIT_DONNEES_GABARIT` (essai seulement) : les données du graphe Projet
+  viennent du gabarit au lieu de l'instantané, pour que `test-cockpit-securite.sh` garde son pouvoir de rougir ; sans
+  le réglage, rien ne change. Les pages assemblées « en parties » de 79-15 sont une transition que 79-16 remplace par
+  la coquille : 79-15 en écrit le motif.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
