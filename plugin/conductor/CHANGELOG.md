@@ -1,5 +1,14 @@
 # Changelog — conductor
 
+## [v1.54.1] — 2026-11-12 (nœud dans le mandat, plan de mission publié ; Phase 79, SOCL-05) — non publiée
+
+**Patch** (la capacité est portée par la minor v1.54.0 du plan 79-03 : verbes `registry` et `publish-plan` ; aucune release racine, gel des publications, ADR-073 ; aucun bump de la `VERSION` racine). Doctrine du kernel seule, aucun script.
+
+- **`team-kernel.md`, section neuve « Nœud dans le mandat, plan de mission publié (Phase 79, SOCL-05) »** : chaque mandat, de tout manager quel que soit le métier, porte la ligne `Nœud` du gabarit de `mission-contracts.md` (définie une seule fois, non recopiée ici, ADR-057) ; le manager qui tient un verrou publie le résumé de son plan de mission à côté du verrou par `driver-lock.sh publish-plan`, à l'initialisation puis dans le même tour que chaque `dag.sh mark` ; le résumé ne porte jamais le texte libre d'un nœud ; un refus de publication ne bloque pas la mission (le disque fait foi).
+- **Ligne « Verrou de driver » de la table du kernel** alignée sur les treize verbes de `driver-lock.sh --help` : `mark-progress` (qui manquait déjà à la base), `registry` et `publish-plan` s'y ajoutent ; aucune autre ligne de la table n'a changé.
+- **Preuves** : bloc T46 de `test-dev-orchestrator.sh` (voir le CHANGELOG de `dev-orchestrator`), dont les gardes b3 (chaque verbe cité existe dans `--help`) et b4 (la ligne du verrou nomme chaque verbe de `--help`, classe et non liste) et leurs mutants.
+- **Retiré : rien** (doctrine de forme sans instruction ajoutée à un agent ; aucune règle ni ligne de doctrine existante n'est supprimée).
+
 ## [v1.54.0] — 2026-11-11 (non publié : registre archivé et plan de mission publié, Phase 79)
 
 **Minor** (capacité nouvelle ; aucune release racine : elle sera groupée ; aucun bump de la `VERSION` racine). Le cockpit (plan 79-09) et la régie liront ces deux données sans relire un transcript : avant ce plan, `release` supprimait le registre et le rattachement d'un agent à son nœud tombait à 14 % (AUDC-D5).
