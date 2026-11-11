@@ -645,7 +645,7 @@ Plans:
 - [ ] 79-19-PLAN.md — Journal des attentes par hook, détachable (vague 10)
 - [ ] 79-20-PLAN.md — Documentation et version du module (vague 11)
 - [ ] 79-21-PLAN.md — Coût borné de la correspondance de motifs du moteur (vague 3)
-- [ ] 79-22-PLAN.md — Transcript et détail par la table en mémoire de la collecte (vague 7 ou 8)
+- [ ] 79-22-PLAN.md — Transcript et détail par la table en mémoire de la collecte (vague 8)
 
 ### Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation
 
