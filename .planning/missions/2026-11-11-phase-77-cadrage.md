@@ -1,8 +1,10 @@
 # Mission — Phase 77, cadrage et planification (2026-11-11)
 
-**Verdict : cadrée et planifiée.** 7 plans en 5 vagues, 10 exigences `SYNT-01..10`, 27 décisions `P77-D-01..27`
-(toutes déléguées par Samuel, message session principale, 2026-11-08, option recommandée), contrat d'interface vérifié,
-plans vérifiés par une vérification fraîche (`passed`). Rien n'est exécuté.
+**Verdict : cadrée, planifiée, puis revalidée.** 8 plans en 6 vagues (77-05 scindé en 77-05 et 77-08), 10
+exigences `SYNT-01..10`, 36 décisions `P77-D-01..36` (toutes déléguées par Samuel, message session principale,
+2026-11-08, option recommandée), deux questions au format C76-Q1 (`P77-Q-01`, `P77-Q-02`, appliquées par délégation).
+Plans revalidés contre la Phase 79 à `cce6ed3f` (77-01, 77-02, 77-04), `677d19fa` et `e0336732` (77-03, A54) et `c19c7461` (77-05 à 77-08), et
+contre la Phase 74 à `33bb4aad` ; vérification fraîche finale : voir « Preuves E6 ». Rien n'est exécuté.
 
 - Compartiment `fiabilite`, jalon `vibeflow-v2.0`, mode autonome, design auto.
 - Branche `feat/phase-77-sante-synthese`, base `origin/integration/cockpit-audit` `f763b556`.
@@ -60,15 +62,46 @@ Contrats de la Phase 79 intégrés au fil de la mission. Tous viennent de `feat/
 | `74501bb0` | A30 |
 | `e04c43e7` | A31, A32 |
 
-## À Samuel (non bloquant, aussi dans `77-CONTEXT.md`)
+## Revalidation (reprise du 2026-11-11, après le rendu de 15 h)
 
-- **A77-1 — coût par phase au-delà de 24 h** (reprend S-2 de la Phase 79). En vigueur : AUDC-Q2, la fenêtre de 24 h.
-  Sur 24 h, le bloc dit ce qui consomme en ce moment, pas ce qu'a coûté une phase qui dure plusieurs jours.
-  Recommandation : garder 24 h pour cette vague, avec le titre « dernières 24 h ». Un agrégat persisté par phase, étage
-  et modèle n'est à instruire que si la question se pose ; il rouvrirait AUDC-Q2.
-- **A77-2 — retrait de la prose « Maintenant »** (P77-D-12). Ce n'est pas une réouverture : aucune décision écrite ne
-  porte sur ce texte. Il change pourtant ce que Samuel lit à l'ouverture de Projet. À voir à la recette ; le repli est
-  le trio de compteurs.
+Mandat de la session principale : revalider les sept plans contre les contrats de la Phase 79 arrivés après le rendu
+(A34 à A53, puis les plans 79-15 à 79-22), juger s'il fallait scinder 77-05, et refaire une vérification fraîche.
+Aucune réponse de Samuel ne change la phase.
+
+- **Vérifications de départ, en parallèle :** une contre la tête de la 79 (8 bloquants, 9 réserves), une de 77-07
+  contre la frise et l'agrégat de la 74 (4 bloquants, 7 réserves), une analyse de scission. Verdict : scinder.
+- **Décisions P77-D-28 à P77-D-36.** Les principales :
+  - chiffre principal « Jetons, hors cache » ;
+  - ligne « Hors jalon » ;
+  - scission de 77-05 en 77-05 et 77-08, sans renumérotation (130 occurrences, identifiants de menace de même forme) ;
+  - route en ligne de `ROUTES` avec dépendance dure sur 79-05 ;
+  - sources et minorant du coût ;
+  - compteur de suites remesuré ;
+  - ce que la 79 change sous les pieds ;
+  - cause `echec` pour des métadonnées git hors du lab ;
+  - témoin de classe sur le canal réel de la route.
+- **Section « À Samuel »** réécrite au format C76-Q1 de la Phase 76 : `P77-Q-01` et `P77-Q-02`, appliquées par
+  délégation.
+- **Corrections par deux `vf-coder` en parallèle**, sur des fichiers disjoints, en cinq passes ciblées entrecoupées de
+  vérifications fraîches :
+  - témoin aveugle de 77-03 remplacé par un journal des sous-commandes git sur le canal réel (P77-D-36) ;
+  - agrégat de la 74 lu là où 74-01 le publie (`window.__vfFriseCalculs`) ;
+  - `tronque` avec `voiesOmises` à 0 : nombre inconnu, jamais « 0 voie omise » ;
+  - garde `AVANT` chaînée par `&&` partout, après un vert à vide mesuré sous bash et sous zsh ;
+  - A51 (`surOnglet` avec `cle`) et A52 (ordre alphabétique) intégrés.
+- **Coupure à 15 h 33** (quota du compte, HTTP 429). Les deux correcteurs ont été arrêtés net. À la reprise : rien
+  écrit sous un mauvais nom, deux commits locaux poussés d'abord, agents fermés « stopped » puis repris par SendMessage
+  avec leur contexte. Ensuite, commit et push à chaque étape.
+- **Correction de la session principale sur A34** (la route va dans `vf-cockpit-server.mjs`, pas dans
+  `vf-cockpit-routes.mjs`) : rien à défaire, les plans le disaient déjà.
+
+## À Samuel (non bloquant, aussi dans `77-CONTEXT.md`, format C76-Q1 de la Phase 76)
+
+- **P77-Q-01 (ancien A77-1) — coût par phase au-delà de 24 h** (reprend S-2 de la Phase 79). Options : (a) garder la
+  fenêtre de 24 h ; (b) un agrégat persisté par phase, étage et modèle au-delà de 24 h, qui rouvre AUDC-Q2. État :
+  appliquée, option (a), P77-D-15. Bloque : 77-07.
+- **P77-Q-02 (ancien A77-2) — retrait de la prose « Maintenant »** (P77-D-12). Options : (a) retirer `lastDesc` ;
+  (b) retirer le trio de compteurs ; (c) ne rien retirer. État : appliquée, option (a), P77-D-12. Bloque : 77-02.
 
 ## Carte des fichiers
 
@@ -78,60 +111,72 @@ Chemins relatifs à `plugin/cockpit/` quand ils y sont ; `ui/` = `skills/cockpit
 | Plan | Vague | Exigences | Fichiers créés (C) ou modifiés (M) |
 |---|---|---|---|
 | 77-01 | 1 | SYNT-02, 04 | M `plugin/conductor/scripts/check-method-budget.sh`, M `plugin/conductor/scripts/check-instruction-budget.sh`, M leurs deux suites `plugin/conductor/scripts/tests/test-check-*.sh`, C deux copies figées sous `plugin/conductor/scripts/tests/fixtures/`, M `plugin/conductor/CHANGELOG.md`, RED-TRACE |
-| 77-02 | 1 | SYNT-07, 08, 09 | C `scripts/vf-cockpit-burnup.mjs`, C `scripts/vf-cockpit-blocages.mjs`, M `scripts/vf-cockpit-planning.mjs`, M `scripts/vf-cockpit-project.mjs`, M `scripts/vf-cockpit-interface.json`, C `scripts/tests/test-cockpit-burnup.sh`, C `scripts/tests/test-cockpit-blocages.sh`, M `scripts/tests/test-cockpit-projet-visite.sh` (R3.25), M `CHANGELOG.md`, RED-TRACE |
-| 77-03 | 2 | SYNT-03, 04 | C `scripts/vf-cockpit-jauges.mjs`, C `scripts/vf-cockpit-methode.mjs`, M `scripts/vf-cockpit-paths.mjs` (2 retouches, reste à 296 lignes), M `scripts/vf-cockpit-server.mjs` (une ligne dans la table des routes), M `scripts/vf-cockpit-interface.json`, C `scripts/tests/test-cockpit-jauges.sh`, M `CHANGELOG.md`, M `scripts/ci-shard-suites.sh` (racine du dépôt), RED-TRACE |
-| 77-04 | 2 | SYNT-05, 06, 07 | C `ui/74-vf-synthese-calcul.js`, C `ui/74-vf-synthese-memoire.js`, M `scripts/vf-cockpit-git.mjs` (`base.h`), C `scripts/tests/test-cockpit-synthese.sh`, RED-TRACE |
-| 77-05 | 3 | SYNT-01, 05, 06, 07 | C `ui/74-vf-synthese.js`, C `ui/74-vf-synthese-visite.js`, C `ui/74-vf-synthese-style.js`, C `scripts/tests/test-cockpit-synthese-page.sh`, C `scripts/tests/chrome-synthese.mjs`, M `scripts/ci-shard-suites.sh`, M `README.md`, M `CHANGELOG.md` (dont `base.h`), RED-TRACE |
-| 77-06 | 4 | SYNT-01, 04, 08 | C `ui/74-vf-synthese-burnup.js`, C `ui/74-vf-synthese-jauges.js`, C `scripts/tests/test-cockpit-synthese-blocs.sh`, M `scripts/ci-shard-suites.sh`, M `CHANGELOG.md`, RED-TRACE |
-| 77-07 | 5 | SYNT-10 | C `ui/74-vf-synthese-cout.js`, C `scripts/tests/test-cockpit-synthese-cout.sh`, M `scripts/ci-shard-suites.sh`, M `CHANGELOG.md`, RED-TRACE |
+| 77-02 | 1 | SYNT-07, 08, 09 | C `scripts/vf-cockpit-burnup.mjs`, C `scripts/vf-cockpit-blocages.mjs`, M `scripts/vf-cockpit-planning.mjs`, M `scripts/vf-cockpit-project.mjs`, M `scripts/vf-cockpit-interface.json`, C `scripts/tests/test-cockpit-burnup.sh`, C `scripts/tests/test-cockpit-blocages.sh`, M `scripts/tests/test-cockpit-projet-visite.sh` (R3.25), M `CHANGELOG.md`, M `README.md` et `README.fr.md` (racine, compteur de suites), RED-TRACE |
+| 77-03 | 2 | SYNT-03, 04 | C `scripts/vf-cockpit-jauges.mjs`, C `scripts/vf-cockpit-methode.mjs`, M `scripts/vf-cockpit-git-lanceur.mjs` (export de `lancerAsync`, module livré par 79-07), M `scripts/vf-cockpit-paths.mjs` (0 ligne nette), M `scripts/vf-cockpit-server.mjs` (une ligne de `ROUTES`, fichier ≤ 299 lignes), M `scripts/vf-cockpit-interface.json`, C `scripts/tests/test-cockpit-jauges.sh`, M `scripts/tests/test-cockpit-routes.sh` (liste de RK.1, A54, `Gate-Touche:`), M `CHANGELOG.md`, M `scripts/ci-shard-suites.sh` (racine), M `README.md` et `README.fr.md` (racine), RED-TRACE |
+| 77-04 | 2 | SYNT-05, 06, 07 | C `ui/74-vf-synthese-calcul.js`, C `ui/74-vf-synthese-memoire.js`, M `scripts/vf-cockpit-git.mjs` (`base.h`), M `skills/cockpit-moteur/VENDORED.txt` (lignes `AJOUT`), C `scripts/tests/test-cockpit-synthese.sh`, M `README.md` et `README.fr.md` (racine), RED-TRACE |
+| 77-05 | 3 | SYNT-01 | C `ui/74-vf-synthese.js` (coquille, registre, ligne-résumé), M `VENDORED.txt`, C `scripts/tests/test-cockpit-synthese-page.sh`, C `scripts/tests/chrome-synthese.mjs` (banc), M `scripts/ci-shard-suites.sh`, M `README.md` et `README.fr.md` (racine), RED-TRACE |
+| 77-06 | 4 | SYNT-01, 04, 08 | C `ui/74-vf-synthese-burnup.js`, C `ui/74-vf-synthese-jauges.js`, M `VENDORED.txt`, C `scripts/tests/test-cockpit-synthese-blocs.sh`, M `scripts/ci-shard-suites.sh`, M `CHANGELOG.md`, M `README.md` et `README.fr.md` (racine), RED-TRACE |
+| 77-08 | 5 | SYNT-05, 06, 07 | C `ui/74-vf-synthese-visite.js`, C `ui/74-vf-synthese-style.js`, M `VENDORED.txt`, M `scripts/tests/chrome-synthese.mjs` (ajouts au banc), C `scripts/tests/test-cockpit-synthese-visite.sh`, M `scripts/ci-shard-suites.sh`, M `README.md` (module), M `CHANGELOG.md`, M `README.md` et `README.fr.md` (racine), RED-TRACE |
+| 77-07 | 6 | SYNT-10 | C `ui/74-vf-synthese-cout.js`, M `VENDORED.txt`, C `scripts/tests/test-cockpit-synthese-cout.sh`, M `scripts/ci-shard-suites.sh`, M `CHANGELOG.md`, M `README.md` et `README.fr.md` (racine), RED-TRACE |
 
 **Fichiers partagés avec d'autres phases**, du plus exposé au moins exposé :
 
-- `plugin/cockpit/CHANGELOG.md` (77-02, 03, 05, 06, 07) : sept phases y ajoutent une entrée sous « Non publié ».
-- `scripts/vf-cockpit-server.mjs` (77-03) : une ligne dans la table des routes de la 79 (A10), à sa place
-  alphabétique, `/api/vf/methode`. Les Phases 75 et 76 posent les leurs ailleurs.
-- `scripts/vf-cockpit-paths.mjs` (77-03) : l'`export` de `lancerAsync` et un paramètre de nom sur
-  `driverLockScript`. Fichier à 296/300 lignes ; la 79 le touche aussi.
-- `scripts/vf-cockpit-project.mjs` et `scripts/vf-cockpit-planning.mjs` (77-02) : lecture du planning de la collecte,
-  touchée par la 79 (A32) et vraisemblablement par la 80 (couloirs).
-- `scripts/vf-cockpit-interface.json` (77-02, 77-03) : champs facultatifs de `cockpit-project@1`, déclaration de la
-  route des jauges ; la 79 y ajoute le bloc de l'index.
+- `README.md` et `README.fr.md` racine (compteur « N suites », 77-02 à 77-08) : chaque phase qui ajoute une suite
+  remesure ; un conflit à la fusion se résout en remesurant par `check-version-sync.sh`, jamais en prenant un côté
+  (P77-D-33).
+- `plugin/cockpit/CHANGELOG.md` (77-02, 03, 06, 08, 07) : toutes les phases y ajoutent une entrée sous « Non publié »
+  (79-20 en réécrit le titre).
+- `plugin/cockpit/skills/cockpit-moteur/VENDORED.txt` (77-04 à 77-08) : une ligne `AJOUT` par fichier `ui/` neuf, à sa
+  place alphabétique (A52), sans repère.
+- `scripts/vf-cockpit-server.mjs` (77-03) : une ligne de la table `ROUTES` (79-05), à sa place alphabétique entre
+  `/api/vf/journal` et `/api/vf/modeles`. Les Phases 75, 76 et 79-15 posent les leurs ailleurs dans la même table.
+- `scripts/tests/test-cockpit-routes.sh` (77-03) : la liste écrite à la main de RK.1 reçoit `/api/vf/methode` à sa place
+  alphabétique (A54) ; les Phases 75 et 76 y ajoutent les leurs ; conflit résolu par l'union triée.
+- `scripts/vf-cockpit-git-lanceur.mjs` (77-03) : un mot `export` devant `lancerAsync` ; le module est créé par 79-07.
+- `scripts/vf-cockpit-paths.mjs` (77-03) : paramètre `nom` de `driverLockScript`, 0 ligne nette ; descend sous 200
+  lignes avec 79-07 (plafond effectif 299, A44).
+- `scripts/vf-cockpit-project.mjs` et `scripts/vf-cockpit-planning.mjs` (77-02) : champs facultatifs de
+  `cockpit-project@1` (A32), lus par `instantane().projet` (79-09) ; partagés avec 75, 76 et 80.
+- `scripts/vf-cockpit-interface.json` (77-02, 77-03) : grammaire `optionnels` existante, déclaration de la route.
 - `scripts/vf-cockpit-git.mjs` (77-04) : champ facultatif `base.h` de `cockpit-git@1` ; la 74 lit ce contrat.
-- `scripts/ci-shard-suites.sh` (77-03, 05, 06, 07) : table des durées de suites, partagée par toutes les phases.
-- Suites : `test-cockpit-projet-visite.sh` (77-02, assertion R3.25), touchée par d'autres phases sur Projet.
-- `plugin/conductor/` (77-01) : deux gates et leurs suites ; la 79 touche d'autres fichiers du conductor (registre du
-  verrou), pas ceux-là.
-- Pas touchés par la 77 : le dictionnaire de traduction (libellés écrits en français au point d'émission),
-  `viewer.html`, les patchs du moteur et `VENDORED.txt` (les plans d'interface passent après leur retrait par la 79).
-  Si l'ordre s'inversait, chaque fichier `ui/` neuf ajouterait sa ligne `AJOUT`.
+- `scripts/ci-shard-suites.sh` racine (77-03, 05, 06, 08, 07) : table des durées, partagée par toutes les phases.
+- `test-cockpit-projet-visite.sh` (77-02, assertion R3.25).
+- `plugin/conductor/` (77-01) : deux gates, leurs suites et des fixtures (trailers `Gate-Touche:`), plus le CHANGELOG
+  du module, partagé avec 79-03 et 79-04.
+- Pas touchés : le dictionnaire de traduction, `viewer.html`, `ui/00-vibeflow.js`, `ui/20-health.js`, la liste
+  `EVENEMENTS` de `ui/69-vf-flux.js` (aucun événement neuf, pas de repère `vf-repere:phase-77` utilisé).
 
 **Ordre des vagues :**
 1. Vague 1 : 77-01 (conductor, à tout moment) et 77-02 (données du cockpit), en parallèle.
-2. Vague 2 : 77-03 et 77-04.
-3. Vague 3 : 77-05.
-4. Vague 4 : 77-06.
-5. Vague 5 : 77-07, après revalidation.
-Aucun fichier commun entre deux plans d'une même vague (vérifié par le vérificateur frais).
+2. Vague 2 : 77-03 et 77-04 (seuls fichiers communs : les deux README racine, conflit résolu par remesure).
+3. Vague 3 : 77-05 (coquille et banc).
+4. Vague 4 : 77-06 (burn-up et jauges).
+5. Vague 5 : 77-08 (dernière visite), sérialisé derrière 77-06 sur les fichiers partagés.
+6. Vague 6 : 77-07 (coût), après revalidation fraîche contre la 79 et la 74 livrées.
 
-**Ce que la 77 attend d'une autre phase :**
+**Ce que la 77 attend d'une autre phase** (vagues de la 79 entre parenthèses) :
 
 | Phase | Ce qu'elle doit livrer | Plans de la 77 concernés |
 |---|---|---|
-| 79 | 79-05 : table des routes et réponse gardée commune | 77-03 |
-| 79 | 79-09 : instantané | 77-02, dépendance douce |
-| 79 | 79-01 : retrait de l'appareil de patchs | 77-04 à 77-06, dépendance dure |
-| 79 | 79-16 : `VF_COQUILLE.surOnglet` | 77-05, 77-06, dépendance dure, sans repli (P77-D-25) |
-| 79 | 79-17 : `VF_ETAT` | dépendance douce |
-| 79 | 79-12 et 79-13 : missions côté page et frise | 77-07, dépendance dure |
-| 74 | 74-01 : agrégat de coût par phase | 77-07, dépendance douce |
-| 80 | P80-D-33 à D-41 : pile `VF_SURCOUCHES`, s'il faut une surcouche | — |
+| 79 | 79-05 (v1) : table `ROUTES`, réponse gardée | 77-03, dure |
+| 79 | 79-07 (v2) : lanceur `vf-cockpit-git-lanceur.mjs`, `envGit` | 77-03, dure |
+| 79 | 79-02 (v1) et 79-06 (v2) : lancement des suites depuis le module, `cockpit_module_copie`, `COCKPIT_MODULE` | 77-03 à 77-08, dure |
+| 79 | 79-01 (v1) et 79-11 (v4) : inventaire `AJOUT`, cliquet de colonnes | 77-04 à 77-08, dure |
+| 79 | 79-09 (v3) : `instantane()` | 77-02 (douce), 77-03 (dure pour M-COLLECTE) |
+| 79 | 79-12 (v4) : `GET /api/vf/state` | 77-08, 77-07 |
+| 79 | 79-13 (v5) : frise (`tronque`, `voiesOmises`) | 77-07, dure |
+| 79 | 79-15 (v6) : graphe servi | 77-05 |
+| 79 | 79-16 (v7) : coquille, `surOnglet(rappel, {cle})` (A51), liste `/_vf/` | 77-05 à 77-08, dure, sans repli (P77-D-25) |
+| 79 | 79-17 (v8) : `VF_ETAT` (`jeton`, `lireJson`, `lire`) | 77-05 à 77-08 |
+| 79 | 79-22 (SOCL-27, non poussé) : à relire pour 77-07 | 77-07, à revalider |
+| 74 | 74-01 : `window.__vfFriseCalculs.agreger` (sortie avec `inconnus`, `incomplet`) | 77-07, douce |
 
 **Ce que la 77 fournit :**
 - Aux autres phases :
   - `--format=tsv` des deux gates, utilisable par tout outil ;
   - champs facultatifs `burnup` et `blocagesState` de `cockpit-project@1` ;
   - champ `base.h` de `cockpit-git@1` ;
-  - lanceur asynchrone borné exporté par `vf-cockpit-paths.mjs`.
+  - lanceur asynchrone borné exporté par `vf-cockpit-git-lanceur.mjs` (ré-exporté par `vf-cockpit-paths.mjs`).
 - À la 80 : la ligne morte `ui/00-vibeflow.js:211` (lecture de `lastDesc`).
 
 ## À verser par la jointure
@@ -139,20 +184,20 @@ Aucun fichier commun entre deux plans d'une même vague (vérifié par le vérif
 Texte exact à poser par la jointure, que la mission n'a pas touché (périmètre fermé) :
 
 1. **ROADMAP, checklist du jalon** : la ligne de la Phase 77 garde sa forme et son état « à faire ». Si la jointure y
-   porte l'état de planification, la mention à ajouter est « planifiée 2026-11-11 (7 plans) ».
-2. **ROADMAP, table `## Progress`**, ligne de la Phase 77 : `0/7 | Planned | -`.
+   porte l'état de planification, la mention à ajouter est « planifiée 2026-11-11 (8 plans) ».
+2. **ROADMAP, table `## Progress`**, ligne de la Phase 77 : `0/8 | Planned | -`.
 3. **REGISTRE.md** (`.planning/research/2026-11-10-audit-cockpit/REGISTRE.md`) :
-   - colonne d'état d'AUDC-I14 : `cadrée et planifiée (Phase 77, 2026-11-11 : SYNT-05..07, plans 77-04 et 77-05)` ;
+   - colonne d'état d'AUDC-I14 : `cadrée et planifiée (Phase 77, 2026-11-11 : SYNT-05..07, plans 77-04 et 77-08)` ;
    - colonne d'état d'AUDC-I08 : `part Phase 77 cadrée et planifiée (2026-11-11 : SYNT-10, plan 77-07, dépend des Phases 79 et 74)`.
 4. **REGISTRE.md § 3 (retraits)**, ligne à ajouter :
    `| La prose recopiée du STATE sous « Maintenant » (lastDesc) | la synthèse datée | Phase 77 |`.
 5. **BACKLOG**, à ajouter, pour la Phase 80 ou la prochaine phase qui touche `ui/00-vibeflow.js` : « Retirer la
    lecture morte de `lastDesc` (`ui/00-vibeflow.js:211`), dont le producteur est retiré par la Phase 77 (P77-D-12). »
 6. **STATE** (tenu par la session principale) : décision à consigner « Phase 77 cadrée et planifiée le 2026-11-11 :
-   7 plans en 5 vagues, SYNT-01..10, deux questions non bloquantes à Samuel (A77-1, A77-2) ».
+   8 plans en 6 vagues, SYNT-01..10, deux questions appliquées par délégation (P77-Q-01, P77-Q-02) ».
 7. **Repères** : retirer `<!-- vf-cadrage:phase-77 -->` et la ligne « repère de cadrage, Phase 77 » de la table de
    traçabilité, comme prévu à la jointure.
-8. **REQUIREMENTS, pied « Last updated »** : `2026-11-11 — SYNT-01..10 posées au cadrage de la Phase 77 (P77-D-01..27, décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée)`.
+8. **REQUIREMENTS, pied « Last updated »** : `2026-11-11 — SYNT-01..10 posées au cadrage de la Phase 77 (P77-D-01..36, décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée)`.
 
 ## Limites et incidents
 
@@ -172,8 +217,14 @@ Texte exact à poser par la jointure, que la mission n'a pas touché (périmètr
 - **Étage design** : le contrat d'interface `77-UI-SPEC.md` est posé et vérifié (7 réserves non bloquantes). Les
   nœuds `craft` et `critique` de l'étage design sont à dispatcher dans la mission d'exécution (77-05, 77-06). Personne
   n'a ouvert le navigateur.
-- **Estimation** : 940 000 jetons au total pour les 7 plans, confiance basse partout, relayée telle quelle par le
-  vérificateur. Le plan le plus lourd est 77-05 (170 000). Un contrôle d'estimation reste à faire avant l'exécution.
+- **Estimation** : 1 030 000 jetons au total pour les 8 plans (150 000, 120 000, 160 000, 110 000, 110 000, 140 000,
+  110 000, 130 000 de 77-01 à 77-08), confiance basse partout, relevée telle quelle dans les plans. 77-05 a été scindé
+  (P77-D-30) : le plus lourd est désormais 77-03 (160 000). Un contrôle d'estimation reste à faire avant l'exécution.
+- **Coupure de quota** à 15 h 33 (HTTP 429) pendant la revalidation : les deux correcteurs se sont arrêtés net,
+  aucun fichier écrit sous un mauvais nom, reprise sans perte après changement de compte.
+- **Têtes de la 79 citées** : elles ne sont pas uniformes entre plans, parce que la 79 a avancé pendant la
+  revalidation. Chaque plan cite celle qu'il a relue (`cce6ed3f`, `677d19fa`, `e0336732`, `c19c7461`), toutes de la
+  même lignée. Une vérification fraîche à l'exécution relira la tête du jour.
 
 ## Coût
 
@@ -197,6 +248,13 @@ Texte exact à poser par la jointure, que la mission n'a pas touché (périmètr
 
   La plateforme ne dit pas si les compteurs du `vf-coder` sont cumulés d'un retour à l'autre : ces chiffres ne sont
   pas sommés.
+- Revalidation (après-midi) :
+  - 3 vérifications de départ en parallèle : 123 290, 250 351 et 159 395 jetons.
+  - 2 `vf-coder` en parallèle, repris 5 et 4 fois par SendMessage ; derniers retours : 433 204 et 427 555 jetons,
+    compteurs probablement cumulés, non sommés.
+  - 7 vérifications fraîches : 133 531, 168 612, 142 233, 101 656, 82 173, 84 957 jetons, plus la dernière (voir
+    « Preuves E6 »).
+  - Une vérification lancée sur `351bc9e8` a été rendue en partie obsolète par la publication des plans 79-15 à 79-20.
 
 ## Preuves E6
 
