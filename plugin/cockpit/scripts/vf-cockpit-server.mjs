@@ -54,6 +54,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
   if (dep.avertissement) log('warn', dep.avertissement);
 
   const clients = new Set();
+  let dernierFlux = 0; // AUDC-H3 : instant de la dernière fermeture d'un flux de page ; le délai d'inactivité repart de là
   // journal du direct (derniers événements poussés, borné à 100) : GET /api/vf/journal, derrière le jeton ; que des comptes et des dates, jamais de contenu interdit
   const journal = [];
   const noter = (nom, d) => {
@@ -88,7 +89,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
       res.write(`event: hello\ndata: ${JSON.stringify(snap)}\n\n`);
       clients.add(res);
       const ka = setInterval(() => res.write(': ka\n\n'), 15000);
-      req.on('close', () => { clearInterval(ka); clients.delete(res); });
+      req.on('close', () => { clearInterval(ka); clients.delete(res); dernierFlux = Date.now(); });
       return true;
     }
     if (url.pathname === '/api/vf/etat') { json(res, 200, { ...(live ? live.etat() : { mode: 'absent', seq: 0, derniereMaj: null }), clients: clients.size }); return true; }
@@ -152,6 +153,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
       memoE = { gen: genP, who, cles, html };
       return html;
     },
+    dernierFlux: () => dernierFlux,
     ouverts: () => clients.size, // AUDC-H3 : des flux de page ouverts retiennent l'arrêt sur inactivité
     jetonValide: (j) => memeJeton(j, ptoken),
     // AUDC-H1 : une page n'ouvre qu'UN flux (celui-ci). Le rechargement de la carte y passe (sans séquence ni journal : la page se recharge) et chaque flux ouvert compte comme une page ouverte.

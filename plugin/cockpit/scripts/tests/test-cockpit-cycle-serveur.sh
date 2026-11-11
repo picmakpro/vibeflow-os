@@ -171,6 +171,27 @@ assert_has "H3.17 — un terminal ouvert retient l'arrêt sur inactivité, et le
 assert_eq "H3.18 — le serveur au terminal ouvert est encore vivant" "$(kill -0 "$ST" 2>/dev/null && echo vivant || echo sorti)" "vivant"
 vf_hyg_stop "$ST" 2>/dev/null; vf_hyg_stop "$SI" 2>/dev/null
 
+# H3.25-H3.27 un flux de page (celui du direct, seul flux d'une page) ouvert plus longtemps que idle-exit puis fermé : le délai d'inactivité repart de la FERMETURE
+cat > "$AUX/flux.mjs" <<'JS'
+// flux.mjs <port> <jeton> <ms> : ouvre le flux du direct, le garde <ms> millisecondes, le ferme.
+import http from 'node:http';
+const [, , port, jeton, ms] = process.argv;
+const r = http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/events', headers: { Host: `127.0.0.1:${port}`, 'x-vf-cockpit-token': jeton } }, (res) => { res.on('data', () => {}); setTimeout(() => { r.destroy(); setTimeout(() => process.exit(0), 100); }, Number(ms)); });
+r.on('error', () => process.exit(1));
+JS
+LF="$WORK/labf"; mklab "$LF"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LF" --quiet > "$WORK/build-f.out" 2>&1 || cat "$WORK/build-f.out"
+OUTF="$LF/.vibeflow/cockpit"; PF=$(libre)
+VF_COCKPIT_IDLE_TICK_MS=300 node "$OUTF/serve.mjs" --no-open --port "$PF" --idle-exit 0.05 > "$WORK/srv-f.out" 2>&1 & SF=$!
+for _ in $(seq 1 100); do [ -s "$OUTF/.cache/server.json" ] && break; sleep 0.1; done
+TOKF="$(jeton_de "$PF")"
+node "$AUX/flux.mjs" "$PF" "$TOKF" 4500 > /dev/null 2>&1
+sleep 1.5
+assert_eq "H3.25 — flux du direct gardé 4,5 s (plus que idle-exit, 3 s) puis fermé : 1,5 s après, le serveur vit (le délai repart de la fermeture)" "$(kill -0 "$SF" 2>/dev/null && echo vivant || echo sorti)" "vivant"
+for _ in $(seq 1 40); do kill -0 "$SF" 2>/dev/null || break; sleep 0.5; done
+assert_eq "H3.26 — témoin : sans plus aucun flux ni requête, le même serveur s'arrête sur inactivité" "$(kill -0 "$SF" 2>/dev/null && echo vivant || echo sorti)" "sorti"
+assert_has "H3.27 — le motif de l'arrêt (inactivité) est daté au journal" "$(cat "$WORK/srv-f.out")" "Z arrêt : inactivité ("
+vf_hyg_stop "$SF" 2>/dev/null
+
 echo "=== AM7 — en CI, l'absence de Chrome fait échouer une suite qui en dépend ==="
 HYG="$(cd "$(dirname "$0")" && pwd)/hygiene.sh"
 cat > "$WORK/mini-chrome.sh" <<'SH'

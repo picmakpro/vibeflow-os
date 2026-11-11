@@ -223,7 +223,7 @@ fs.watchFile(path.join(here, 'index.html'), { interval: 1000 }, (cur, prev) => {
 // vibeflow P26 : une session de terminal ouverte empêche l'arrêt pour inactivité ; AUDC-H3 : toute requête authentifiée et tout flux de page ouvert comptent comme activité, et la rétention par le terminal est écrite au journal
 let retenuDit = false;
 if (idleExit) setInterval(() => {
-  if (tabs.size || running.size || VF?.ouverts?.() || Date.now() - lastTab <= idleExit) return;
+  if (tabs.size || running.size || VF?.ouverts?.() || Date.now() - Math.max(lastTab, VF?.dernierFlux?.() || 0) <= idleExit) return;
   if (TERM?.occupe()) { if (!retenuDit) { retenuDit = true; journal("arrêt sur inactivité retenu : un terminal est ouvert"); } return; }
   motifArret = `inactivité (${idleExit / 60000} min sans requête authentifiée ni onglet)`; process.exit(0);
 }, (() => { const n = Number(process.env.VF_COCKPIT_IDLE_TICK_MS); return Number.isInteger(n) && n >= 100 && n < 60000 ? n : 60000; })()).unref(); // période de contrôle : 60 s, réglage de test seulement
