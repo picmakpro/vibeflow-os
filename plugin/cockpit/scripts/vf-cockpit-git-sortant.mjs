@@ -37,7 +37,7 @@ function sansLienSortant(d, g, bud) {
 }
 // core.worktree d'un fichier de configuration et des inclusions qu'il suit : la liste des chemins résolus ; null si une inclusion sort du lab et du dossier git, ou est trop profonde
 function worktrees(f, g, racine, prof = 0) {
-  let t; try { t = petit(f); } catch (e) { if (e.code === 'ENOENT') return []; throw e; }
+  let t; try { const st = fs.statSync(f); if (!st.isFile()) return []; /* tube, périphérique : aucun core.worktree ni inclusion à y lire (git, lui, est borné par ses échéances) */ t = petit(f); } catch (e) { if (e.code === 'ENOENT') return []; throw e; }
   const out = []; let sec = '';
   for (const l of t.split(/\r?\n/)) {
     const h = /^\s*\[\s*([A-Za-z0-9.-]*)[^\]]*\](.*)$/.exec(l), reste = h ? h[2] : l;
