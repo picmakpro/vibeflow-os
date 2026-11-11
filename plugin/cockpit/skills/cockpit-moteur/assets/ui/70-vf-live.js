@@ -260,6 +260,7 @@
       if (TAB === 'project' && lastSeq !== null && typeof d.seq === 'number' && d.seq !== lastSeq) { probe.resync = (probe.resync || 0) + 1; location.reload(); return; }
       vu(d); setWho(d.who); showLock(d.lock);
     });
+    es.addEventListener('reload', () => { if (window.FLOORPLAN_RELOAD) window.FLOORPLAN_RELOAD(); else location.reload(); }); // AUDC-H1 : la carte reconstruite recharge la page par ce flux (le viewer n'en ouvre plus un second)
     es.addEventListener('who', (e) => setWho(vu(JSON.parse(e.data)).who));
     es.addEventListener('lock', (e) => showLock(vu(JSON.parse(e.data)).lock));
     es.addEventListener('git', (e) => { const d = vu(JSON.parse(e.data)); document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: d.sig } })); }); // 78-09 : signal sans contenu, l'en-tête et le tiroir relisent leurs routes

@@ -171,7 +171,7 @@ if (cli) { try { version = execFileSync(cli.cmd, [...cli.args, '--version'], { e
 // code). Loaded at start and again whenever the map is rebuilt.
 let TERM = null; // vibeflow P26 : terminal intégré, chargé seulement avec --terminal (second écouteur 127.0.0.1, aucun effet sans le drapeau)
 if (has('terminal')) { try { TERM = (await import(new URL('./vf-cockpit-terminal.mjs', import.meta.url))).preparerTerminal({ here, root, jetons: () => [token, VF?.ptoken] }); } catch (e) { console.error(`vf-cockpit : terminal indisponible : ${e.message}. Relancer « vf-cockpit build ».`); } } // vibeflow P26
-const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange })};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
+const inject = `<script>window.FLOORPLAN_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, version, model: model || null, change: canChange, unFlux: true })};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
 let page, G, core, MODES;
 // vibeflow P13 : serveur unique. Le direct, « au travail » et la page Projet vivent dans vf-cockpit-server.mjs, posé à côté de
 // vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
@@ -209,7 +209,7 @@ load();
 // ---------- open tabs: live reload, and idle shutdown ----------
 const tabs = new Set();
 let lastTab = Date.now();
-const broadcast = (event, data = {}) => { for (const t of tabs) t.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+const broadcast = (event, data = {}) => { for (const t of tabs) t.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); VF?.diffuserCarte?.(event, data); }; // vibeflow AUDC-H1 : la page n'ouvre qu'un flux, celui du direct : le rechargement de la carte y passe aussi
 let reloadTimer = null;
 fs.watchFile(path.join(here, 'index.html'), { interval: 1000 }, (cur, prev) => {
   if (cur.mtimeMs === prev.mtimeMs) return;
@@ -217,7 +217,7 @@ fs.watchFile(path.join(here, 'index.html'), { interval: 1000 }, (cur, prev) => {
   clearTimeout(reloadTimer);
   reloadTimer = setTimeout(() => { try { load(); broadcast('reload'); console.log('map rebuilt: reloaded open tabs'); } catch {} }, 800);
 });
-if (idleExit) setInterval(() => { if (!tabs.size && !running.size && !TERM?.occupe() && Date.now() - lastTab > idleExit) process.exit(0); }, 60000).unref(); // vibeflow P26 : une session de terminal ouverte empêche l'arrêt pour inactivité
+if (idleExit) setInterval(() => { if (VF?.nbPages?.()) lastTab = Date.now(); if (!tabs.size && !running.size && !TERM?.occupe() && Date.now() - lastTab > idleExit) process.exit(0); }, 60000).unref(); // vibeflow P26 : une session de terminal ouverte empêche l'arrêt pour inactivité
 const flowsFile = path.join(here, 'custom-flows.json');
 const readFlows = () => { try { return JSON.parse(fs.readFileSync(flowsFile, 'utf8')).flows || []; } catch { return []; } };
 
@@ -521,7 +521,7 @@ function route(req, res) {
       req.on('close', () => { tabs.delete(res); lastTab = Date.now(); });
       return;
     }
-    if (req.method === 'GET' && url.pathname === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ tabs: tabs.size, pid: process.pid, hash: selfHash, root })); }
+    if (req.method === 'GET' && url.pathname === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ tabs: tabs.size + (VF?.nbPages?.() || 0), pid: process.pid, hash: selfHash, root })); }
     if (req.method === 'GET' && url.pathname === '/api/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ cli: !!cli, engine, want, version, path: cli?.path || null })); }
     // requested flows are saved next to the map; build.mjs folds them into graph.json
     if (url.pathname === '/api/flows') {

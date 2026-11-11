@@ -142,6 +142,9 @@ export function attach({ here, root, token, inject, log = () => {} }) {
       return insererGraphe(gabarit, g).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Équipe</title>').replace('</head>', () => inject + '</head>');
     },
     jetonValide: (j) => typeof j === 'string' && j === ptoken,
+    // AUDC-H1 : une page n'ouvre qu'UN flux (celui-ci). Le rechargement de la carte y passe (sans séquence ni journal : la page se recharge) et chaque flux ouvert compte comme une page ouverte.
+    diffuserCarte: (nom, data) => { if (nom !== 'reload') return; const s = `event: reload\ndata: ${JSON.stringify(data || {})}\n\n`; for (const c of clients) c.write(s); },
+    nbPages: () => clients.size,
     stop() { live?.stop(); for (const c of clients) c.end(); },
   };
 }
