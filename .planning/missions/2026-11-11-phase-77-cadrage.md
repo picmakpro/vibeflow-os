@@ -258,27 +258,48 @@ Texte exact à poser par la jointure, que la mission n'a pas touché (périmètr
 
 ## Preuves E6
 
-Format : verdict, commande, code de sortie, SHA de la tête au moment du verdict.
+Format : verdict, commande, code de sortie, SHA de la tête au moment du verdict. Les gates sont rejoués sur la tête qui
+porte les plans revalidés et ce rapport avant sa dernière mise à jour (`8234f36c`).
 
 ```json
 {
  "preuves": [
-  {"verdict": "gate:check-machine-paths", "commande": "bash scripts/check-machine-paths.sh", "exit_code": 0, "sha": "9908f9ec"},
-  {"verdict": "gate:check-divergence", "commande": "bash plugin/conductor/scripts/check-divergence.sh --path .", "exit_code": 0, "sha": "9908f9ec"},
-  {"verdict": "gate:check-state-integrity", "commande": "GSD_WORKSTREAM=fiabilite bash plugin/conductor/scripts/check-state-integrity.sh", "exit_code": 0, "sha": "9908f9ec"},
-  {"verdict": "gate:check-planning-consumers-registered", "commande": "bash plugin/conductor/scripts/check-planning-consumers-registered.sh", "exit_code": 0, "sha": "9908f9ec"},
-  {"verdict": "gate:check-ajout-retrait", "commande": "bash plugin/conductor/scripts/check-ajout-retrait.sh --ci", "exit_code": 0, "sha": "9908f9ec"},
-  {"verdict": "gate:state-inchange", "commande": "git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md", "exit_code": 0, "sha": "9908f9ec"},
+  {"verdict": "gate:check-machine-paths", "commande": "bash scripts/check-machine-paths.sh", "exit_code": 0, "sha": "8234f36c"},
+  {"verdict": "gate:check-divergence", "commande": "bash plugin/conductor/scripts/check-divergence.sh --path .", "exit_code": 0, "sha": "8234f36c"},
+  {"verdict": "gate:check-state-integrity", "commande": "GSD_WORKSTREAM=fiabilite bash plugin/conductor/scripts/check-state-integrity.sh", "exit_code": 0, "sha": "8234f36c"},
+  {"verdict": "gate:check-planning-consumers-registered", "commande": "bash plugin/conductor/scripts/check-planning-consumers-registered.sh", "exit_code": 0, "sha": "8234f36c"},
+  {"verdict": "gate:check-ajout-retrait", "commande": "bash plugin/conductor/scripts/check-ajout-retrait.sh --ci", "exit_code": 0, "sha": "8234f36c"},
+  {"verdict": "gate:state-inchange", "commande": "git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md", "exit_code": 0, "sha": "8234f36c"},
   {"verdict": "gate:plan-checker", "preuve": "amont"},
   {"verdict": "gate:ui-checker", "preuve": "amont"}
  ]
 }
 ```
 
-- Vérification fraîche des plans (`gsd-plan-checker`, lecture seule, sur `870fb29f`) : `passed`, 0 bloquant, 2 FLAG
-  (77-02 : code de retour d'une suite ignoré, corrigé en `c1c77d63` ; estimation informative). Elle a vérifié au code
-  présent que la prémisse « rouge aujourd'hui » de 4 témoins est vraie. Verdict relayé, sans commande rejouable.
-- Contrat d'interface (vérificateur d'interface, chez `vf-coder`) : VERIFIED, 0 bloquant, 7 réserves. Verdict relayé.
+Les verdicts relayés sans commande rejouable, dans l'ordre :
+
+1. **Premier rendu.** Vérification fraîche sur `870fb29f` : `passed`, 2 FLAG, dont un corrigé en `c1c77d63`.
+2. **Revalidation, vérifications de départ.**
+   - Contre la tête de la 79 (`6fb94fb7`) : `issues_found`, 8 BLOCK, 9 FLAG.
+   - 77-07 contre la frise et la 74 : `issues_found`, 4 BLOCK, 7 FLAG.
+3. **Vérifications fraîches des passes de correction.** Chacune a été faite par un agent qui n'avait pas écrit les plans.
+
+   | Tête | Plans | Verdict |
+   |---|---|---|
+   | `049070f9` | 77-01 à 77-04 | 1 BLOCK : témoin aveugle de 77-03 |
+   | `fe14f936` | 77-01 à 77-04 | 3 FLAG |
+   | `fe14f936` | 77-05 à 77-08 | 2 BLOCK : agrégat de la 74, `voiesOmises` à 0 |
+   | `5db60d91` | 77-05 à 77-08 | `passed`, 3 FLAG mineurs, traités ensuite |
+   | `5db60d91` | 77-01 à 77-04 | 1 BLOCK : garde `AVANT` suivie de `;` |
+   | `e7eb0bd6` | diff de la passe | 1 BLOCK : mesure non gardée de 77-03 |
+   | `92737992` | diff de la passe | 1 BLOCK : logique inversée de l'invariant des cibles de 77-01 |
+   | `b0a099a3` | invariant de 77-01 | `passed` |
+
+   À `b0a099a3`, l'invariant a été rejoué de façon indépendante, sous bash et sous zsh, dans un dépôt jetable : 6 cas sur
+   6 au rc attendu, aucun fichier temporaire restant.
+4. **Contrat d'interface** (vérificateur d'interface, chez `vf-coder`) : VERIFIED, 0 bloquant, 7 réserves.
+5. **Limite connue, hors des cas exigés.** Le filtre de l'invariant de 77-01 ne voit ni une cible retirée qui commence
+   par `-`, ni une ligne vide retirée. Il faudra vérifier en tâche 1 qu'aucune cible ne commence par `-`.
 
 ## Prochaine étape
 
