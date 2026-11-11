@@ -15,6 +15,8 @@
   // P78-D-01, P78-D-09 : le panneau de droite lit le même nom que l'en-tête (dépôt principal, jamais « wt-a — Projet »). Posé APRÈS 00-vibeflow.js : le titre de l'onglet, déjà écrit, et les clés
   // enregistrées par nom (flux, visite) gardent leur valeur d'avant.
   G.project.name = nom.textContent;
+  // AUDC-X7 : le titre de l'onglet du navigateur (« <Onglet> · <nom> », écrit par 00-vibeflow.js avec le nom du graphe : dossier sur Code, titre de PROJECT.md sur Projet et Équipe) reprend le nom que l'en-tête affiche, le même sur les trois pages
+  { const m = /^(Code|Projet|Équipe) · /.exec(document.title); if (m) document.title = m[0] + nom.textContent; }
 
   // ---------- bloc de vue racine (P78-D-03) : dit ce que montre la vue, jamais le nom du projet — même sans git ----------
   const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';

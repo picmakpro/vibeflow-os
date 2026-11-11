@@ -3,7 +3,8 @@
 #   M7 « Mise en page… » est posé ET peint avant le calcul de mise en page d'un niveau de 70 cartes (jamais un indicateur derrière le calcul)
 #   X4 un seul anneau de focus sur tout le parcours au clavier, champ de question compris ; aria-current sur l'onglet actif ; un seul <main>
 #   X6 en mouvement réduit : plus de fondu de plongée, plus d'animation décorative (compte des animations actives)
-#   X7 un seul format de titre d'onglet du navigateur sur les trois pages : « <Onglet> · <nom> »
+#   X7 un seul format de titre d'onglet du navigateur sur les trois pages : « <Onglet> · <nom> », le même nom de lab (celui du dossier) sur les trois,
+#      même quand le titre de PROJECT.md diffère (l'en-tête, lui, affiche le titre de PROJECT.md sur Projet et Équipe : ce n'est pas lui qui fait foi)
 # Un Chrome, un profil jetable (chrome-accessibilite.mjs) ; les assertions se lisent sur sa sortie JSON. Lab construit par la suite, dans mktemp.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
 set -uo pipefail
@@ -47,6 +48,7 @@ mklab() { # un module, 70 notes dans un même dossier (un niveau de 70 cartes), 
   printf '# Module\n\nLancer `run.sh`.\n' > "$L/plugin/mod/README.md"
   printf '#!/usr/bin/env bash\necho run\n' > "$L/plugin/mod/scripts/run.sh"
   for i in $(seq -w 1 70); do printf '# Note %s\n' "$i" > "$L/lots/n$i.md"; done
+  printf '# Titre du projet (diffère du dossier)\n' > "$B/PROJECT.md"
   printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n\n### Phase 1: Socle\n**Depends on**: Nothing (first phase)\n' > "$B/ROADMAP.md"
   printf -- '---\nfiles_modified: [plugin/mod/README.md]\n---\n<objective>Faire le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
@@ -75,10 +77,11 @@ assert_eq "M7.3 — … et au moins une image a été produite depuis qu'il est 
 assert_eq "M7.4 — un petit niveau (témoin : moins de 24 cartes) ne clignote pas : l'indicateur reste éteint, sa temporisation de 160 ms inchangée" "$(E 'j.m7.petit.cartes > 0 && j.m7.petit.cartes < 24 && j.m7.petit.allume === false')" "true"
 assert_eq "M7.5 — un redessin en direct du même niveau (témoin : au moins 70 cartes) ne fait pas clignoter l'indicateur : éteint quand le calcul démarre, sa temporisation inchangée" "$(E 'j.m7.direct.cartes >= 70 && j.m7.direct.allume === false')" "true"
 echo "=== X7 — un seul format de titre d'onglet (AUDC-X7) ==="
-assert_eq "X7.1 — Code : « Code · <nom> »" "$(E "j.x7.code.titre === 'Code · ' + j.x7.code.nom")" "true"
-assert_eq "X7.2 — Projet : « Projet · <nom> »" "$(E "j.x7.projet.titre === 'Projet · ' + j.x7.projet.nom")" "true"
-assert_eq "X7.3 — Équipe : « Équipe · <nom> »" "$(E "j.x7.equipe.titre === 'Équipe · ' + j.x7.equipe.nom")" "true"
-assert_eq "X7.4 — témoin : le nom du projet est lu et non vide sur les trois pages" "$(E "[j.x7.code, j.x7.projet, j.x7.equipe].every((p) => p.nom.length > 0)")" "true"
+assert_eq "X7.1 — Code : « Code · <nom de l'en-tête> »" "$(E "j.x7.code.titre === 'Code · ' + j.x7.code.nom")" "true"
+assert_eq "X7.2 — Projet : « Projet · <nom de l'en-tête> »" "$(E "j.x7.projet.titre === 'Projet · ' + j.x7.projet.nom")" "true"
+assert_eq "X7.3 — Équipe : « Équipe · <nom de l'en-tête> »" "$(E "j.x7.equipe.titre === 'Équipe · ' + j.x7.equipe.nom")" "true"
+assert_eq "X7.4 — témoin : le nom de l'en-tête est lu et non vide sur les trois pages, et c'est le nom du dossier (le titre de PROJECT.md du lab de test en diffère)" "$(E "[j.x7.code, j.x7.projet, j.x7.equipe].every((p) => p.nom === '$(basename "$LAB")')")" "true"
+assert_eq "X7.5 — le même nom de lab sur les trois titres" "$(E "new Set([j.x7.code, j.x7.projet, j.x7.equipe].map((p) => p.titre.split(' · ').slice(1).join(' · '))).size")" "1"
 echo "=== X4 — un seul anneau de focus, repères d'accessibilité (AUDC-X4) ==="
 for PG in code projet equipe; do
   assert_eq "X4.0 ($PG) — témoin : le parcours au clavier atteint au moins 8 éléments" "$(E "j.x4.$PG.length >= 8")" "true"
