@@ -235,6 +235,13 @@ panels. Aucune ne vaut arbitrage de Samuel, et aucune ne rouvre un arbitrage dé
   `77-NN-RED-TRACE.md`. Les témoins négatifs (réseau, écriture) ont d'abord une sonde positive ; par exemple, le faux
   `gh` placé **hors du lab**, sinon le PATH assaini le retire et le témoin ne peut jamais rougir.
 
+- **P77-D-19 (installation par onglet).** Le bouton « Synthèse », la ligne-résumé, les jauges, la dernière visite et
+  le burn-up s'installent par `VF_COQUILLE.surOnglet(rappel)` quand l'onglet vaut `projet`, et se retirent quand on le
+  quitte. Le nettoyage rendu par le rappel retire écouteurs, minuteries et DOM posé. C'est la règle commune A30 de la
+  Phase 79 (commit `74501bb0`, C5). L'objet global du moteur est gelé : rien ne s'y ajoute. Une surcouche, s'il en faut
+  une, passe par `window.VF_SURCOUCHES` (Phase 80, P80-D-33 à P80-D-41). Témoin : quitter puis revenir sur l'onglet ne
+  double ni le bouton ni les écouteurs.
+
 ### Claude's Discretion
 
 - Le numéro et le nom du fichier `ui/` neuf : un numéro libre au moment de l'exécution, à vérifier contre les fichiers
