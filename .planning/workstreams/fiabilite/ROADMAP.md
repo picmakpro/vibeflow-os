@@ -599,7 +599,7 @@ Plans:
   4. Le burn-up trace les clôtures et le périmètre datés par la checklist du ROADMAP, avec « N sur M · P % » du pied de jalon ; une phase close sans date est nommée, jamais estimée.
   5. Le coût par phase et par étage sur les dernières 24 h (jetons et durée, sans monnaie) se lit dans la synthèse une fois la route de frise de la Phase 79 livrée ; une voie non rattachée est dite comme telle.
   6. Chaque comportement a un témoin montré rouge par une mutation puis vert ; toutes les suites du cockpit et du conductor sont vertes sous macOS et Linux.
-**Plans:** 0/7 plans executed (7 plans en 5 vagues, planifiés le 2026-11-11)
+**Plans:** 0/8 plans executed (8 plans en 6 vagues, planifiés le 2026-11-11, revalidés le 2026-11-11)
 
 Plans:
 
@@ -607,9 +607,10 @@ Plans:
 - [ ] 77-02-PLAN.md — vague 1 : données du planning de la collecte, dates du burn-up et blocages du STATE, retrait de `lastDesc` (SYNT-07, SYNT-08, SYNT-09)
 - [ ] 77-03-PLAN.md — vague 2 : route `GET /api/vf/methode`, lancement asynchrone borné, cache de 60 s, un seul appel en cours (SYNT-03, SYNT-04)
 - [ ] 77-04-PLAN.md — vague 2 : modules purs du calcul « depuis votre dernière visite » et de la mémoire de visite (SYNT-05, SYNT-06, SYNT-07)
-- [ ] 77-05-PLAN.md — vague 3 : bouton « Synthèse », panneau, ligne-résumé et bloc « Depuis votre dernière visite » (SYNT-01, SYNT-05, SYNT-06, SYNT-07)
+- [ ] 77-05-PLAN.md — vague 3 : coquille de la Synthèse (bouton, panneau, registre des blocs, ligne-résumé) et banc navigateur commun (SYNT-01)
 - [ ] 77-06-PLAN.md — vague 4 : blocs burn-up du jalon et santé de la méthode (SYNT-01, SYNT-04, SYNT-08)
-- [ ] 77-07-PLAN.md — vague 5, à revalider après les Phases 79 et 74 : coût par phase et par étage sur les dernières 24 h (SYNT-10)
+- [ ] 77-08-PLAN.md — vague 5 : bloc « Depuis votre dernière visite », feuille neutre, README et CHANGELOG du module (SYNT-05, SYNT-06, SYNT-07)
+- [ ] 77-07-PLAN.md — vague 6, à revalider après les Phases 79 et 74 : coût par phase et par étage sur les dernières 24 h (SYNT-10)
 
 ### Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-11-11.md — Phase 78 (corps : cadrage, demande de Samuel mot pour mot, plans ; plans aussi dans phases/VFDO-78-*) -->
