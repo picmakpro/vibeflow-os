@@ -118,6 +118,7 @@ Toutes « décision déléguée par Samuel (message session principale, 2026-11-
 - L'auditeur a écrit en mémoire versionnée des recettes de contournement ; réécrites au niveau de la classe par le
   manager à la demande de la session principale (l'auditeur n'a pas d'outil d'écriture), non indexées.
 - Le registre d'agents a reçu au premier dispatch huit entrées mal formées, fermées puis réenregistrées.
+- Une suite neuve verte en local et rouge en CI faute de `claude` sur le runner (terminal-fin) : corrigée dans le test.
 - Régressions nées de la mission et fermées dans la mission : écriture du journal du lanceur à travers un lien
   (bloquant, AUDC-H3), arrêt sur inactivité dès la fermeture d'une page (croisement de deux sous-lots), traduction du
   repli du panneau d'un lien, titres d'onglet jugés par deux suites contre l'ancien nom.
@@ -178,6 +179,7 @@ Format : verdict — commande — code de sortie — SHA.
 - Recette par captures — 9 points, 8 tenus à la première passe, H4 corrigé ensuite — cc2224fc. Captures dans le dossier
   non suivi `.playwright-mcp/audc-recette/` de l'arbre principal ; pour Samuel : bandeau de lancement à 1280×720 avant
   et après proposition, et après « Annuler ».
+- CI de la PR #227, premier passage (tête 95cf88a0) : job `gates` vert, 8 shards sur 9 verts ; shard 4 rouge sur test-cockpit-terminal-fin.sh (FIN.3 à FIN.5 : le runner n'a pas `claude`, le pré-vol du lancement refusait la proposition ; suite verte à tort en local où `claude` est sur le PATH). Corrigé dans le test (faux `claude` du dépôt sur le PATH du serveur, comme test-cockpit-lancer-bout-en-bout.sh) — 22f83ba4 ; rouge reproduit en local sans `claude` (18 PASS / 17 FAIL, rc 1), vert après (35 PASS, rc 0). Second passage de la CI : voir la PR.
 - Docs (CHANGELOG 35c51756, REGISTRE 30bb9307, BACKLOG e71f969b) — check-machine-paths, check-version-sync, check-divergence, check-planning-consumers-registered, check-dev-bootstrap, check-workstream-pointer, check-state-integrity, check-instruction-budget, check-gate-touche, check-baseline-arbitrage, check-python-isolation, test-cockpit-fr-donnees.sh (22 PASS), test-cockpit-chrome-fr.sh (97 PASS) — rc 0 — e71f969b.
 
 ## Prochaine étape
