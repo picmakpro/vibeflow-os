@@ -321,6 +321,17 @@ Relayés mot pour mot par la session principale ; canal : arbitrage Samuel, AskU
   jamais en HTML. Un seul Retour par panneau, celui de la 80 : **la 76 n'a pas de fil d'Ariane**. La pile est vidée au
   changement d'onglet, ce qui se combine avec l'initialisation par `surOnglet`. Décision déléguée par Samuel (message
   session principale, 2026-11-08), option recommandée ; amendée le 2026-11-11 sur la réponse de la 80.
+- **Reçu de la Phase 80 pour le retrait (P80-C76-6, commit `2985be64` de `feat/phase-80-trois-formes`, lu sans
+  fusion).** Tout code de la 80 qui lit le nœud `<ph>.req`, ses cartes ou les liens « couvre » passe par une seule
+  porte, `lireExigences(phaseId)` de `assets/ui/41-vf-projet-phase.js` (exigences et couverture par plan) : liste à
+  cocher (P80-D-05) et compte « N exigences couvertes » (80-07), panneau d'un plan « Exigences couvertes » (P80-D-08,
+  80-11) ; `exigences {faits,total}` vient de `piedExigences` côté collecte ; le graphe d'une phase (P80-D-04) n'est lu
+  par aucun code de la 80. Conséquences pour la 76 : 76-04 pose `meta.vf.trace.exigences` avec ce que la porte rend
+  (exigences, cochée, couverture par plan) ; 76-08 rebranche `lireExigences` sur ce champ, prouve par le témoin « porte
+  substituée » de la 80 que liste, compte par plan et panneau rendent la même chose avant et après le retrait, adapte
+  toute suite de la 80 qui affirmerait des liens « couvre » dans le graphe d'une phase (nom attendu de la session
+  principale) et la porte dans ses `files_modified` ; la garde d'exécution reste (aucun retrait si une lecture hors de
+  la porte subsiste, la 77 lit aussi Projet). Le graphe d'une phase perd ses liens « couvre » : voulu par P76-D-25.
 - **Partagé avec la Phase 73** : l'extracteur de définitions des registres (P76-D-18).
 - **Fourni à la Phase 77** : les compteurs de la mémoire par la route (P76-D-23).
 
