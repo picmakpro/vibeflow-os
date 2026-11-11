@@ -102,3 +102,46 @@ base, donc seul un mutant prouve qu'il peut rougir). Le dossier du plan en compt
 Rejeux de contrôle sur le code final : `test-driver-lock-phase.sh` 110 ok / 0 ko (24 s) ; transcription WS-AB
 (`DLWS_MODE=matrice test-driver-lock-ws.sh`) 653 ok / 0 ko (143 s sous charge) ; `check-version-sync.sh` vert (aucune
 suite ajoutée).
+
+## Tâche 3
+
+Base : `driver-lock.sh` de la tâche 2 (verbe `publish-plan` inconnu, aucun champ `dag`). Commandes :
+`bash plugin/conductor/scripts/tests/test-driver-lock.sh` : 390 PASS / 62 FAIL, exit 1, 135 s ;
+`bash plugin/conductor/scripts/tests/test-driver-lock-phase.sh` : 122 ok / 12 ko, exit 1, 28 s. Les 74 FAIL sont tous des
+assertions neuves (T69.*, M-PLAN-*, PH-PLAN.*) : aucune assertion antérieure ne rougit. Le verbe inconnu rend
+« Unknown arg: publish-plan » sur stderr, exit 1, stdout vide : l'obtenu des assertions de contenu est la chaîne vide.
+
+| Témoin | Assertion | Attendu | Obtenu sur la base |
+|---|---|---|---|
+| T69.1a à 1e | `publish-plan` du détenteur : `"published": true`, `"nodes": 3`, `"ignored": 0`, exit 0, fichier `.plan.tsv` | idem | sortie vide, exit 1, fichier absent |
+| T69.2a, 2c, 2f | `status` : champ `"dag": {"ws": "", "phase": "", "at": …}`, nœuds = ceux du DAG, `at` epoch | idem | ligne de status sans champ `dag` (`absent`) |
+| T69.3 (témoin préalable) | le plan du détenteur existe (contrôles d'intégrité non vides) | somme de contrôle non vide | vide |
+| T69.3a à 3g, 3m, 3n | refus `not-owner`, `file-required`, `file-unreadable` (absent, dossier), `plan-invalid` (x2), `plan-too-large`, `plan-unwritable`, `no-lock`, avec `"published": false` | idem | sortie vide (exit 1 par « Unknown arg ») |
+| T69.3h | sans `--owner` : `"error": "owner-required"` | idem | vide |
+| T69.3j, 3k | `python3` qui sort en 127 : `python3-missing` ; sortie 3 : `plan-invalid` | idem | vide |
+| T69.4a, 4b | republication : un nœud, `solo:ready:` | idem | vide, `absent` |
+| T69.5a, 5c | `reclaim` garde le plan ; le repreneur republie | `n1:ready:\|n2:blocked:n1\|n3:blocked:n1,n2`, `solo:ready:` | `absent` |
+| T69.6c, 6f | lignes falsifiées : seuls les nœuds valides sortent (`status` et `status --all`) | trois nœuds plus `okdep` et `fine` | `absent` |
+| T69.7a à 7f | 230 nœuds : 200 gardés, 30 ignorés ; doublon ; dépendance de 65 caractères ; 40 dépendances : 32 | idem | vide / `absent` |
+| T69.8a, 8b | aucune valeur du poste, aucune clé refusée dans une sortie non vide | sortie non vide | sortie vide |
+| T69.M réel | marqueurs `plan-publie`, `plan-sans-texte`, `plan-falsifie`, `plan-proprietaire` | `ok` | `ko` (obtenu `absent`, `fichier:` vide, `0/intact`) |
+| T69.G | `gen-plan-json` ; `gen-plan-couverture` | `ok` | `ko` : `publish-plan n'est pas un JSON` au plan 0 ; « seuls 0 relectures de status pour 60 plans » |
+| T69.M mutants | les quatre ancres existent une fois dans `driver-lock.sh` | compte 1 | compte 0 (`ancre non unique`) : les quatre mutants sont irrécupérables sur la base |
+| PH-PLAN.1 | `publish-plan --ws=alpha --phase=69` : `published true`, `scope phase`, fichier sous `phases/69/` | idem | exit 1, vide, fichier absent |
+| PH-PLAN.2 | `status --all` : `"dag": {"ws": "alpha", "phase": "69", "at": …}`, nœuds `n1`, `n2` | idem | entrée sans champ `dag` |
+| PH-PLAN.3 | compartiment nu `omega` et dépôt : `ws`/`phase` du verrou | idem | refus du verbe, aucun `dag` |
+| PH-PLAN.4 | autre session et autre propriétaire : `not-owner` | idem | vide |
+| PH-PLAN.6 | lab plat : `publish-plan` exit 0, `status` rend le champ | idem | exit 1, aucun `dag` |
+
+Verts d'emblée sur la base (contrôles positifs, ils doivent le rester) : T69.1f, 1g, 2b, 2d, 2e (le texte libre et le chemin
+du scope sont absents du fichier et de `status` : vrai à vide tant que rien n'est publié, ce sont les mutants M-PLAN-TEXTE et le
+pilote génératif qui prouvent que ces marqueurs peuvent rougir), les `exit 1` de T69.3, T69.3i et 3l (plan intact, gardés par le
+témoin préalable T69.3), T69.5b, 5d, 5e (masquage, suppression : vrais à vide sur la base), T69.G `gen-plan-noeuds` et
+`gen-plan-sans-texte` (aucun plan publié, aucune relecture : seule `gen-plan-couverture` dit que la propriété n'a pas été jouée),
+le marqueur `plan-perime-masque`, PH-PLAN.1 (git status vide, aucune valeur du poste), PH-PLAN.2 (phase 70 sans `dag`, JSON
+valide), PH-PLAN.3 (« ni zeta ni 88 »), PH-PLAN.5 (fichier supprimé, plus de `dag` : vrai à vide, PH-PLAN.1 prouve que le
+fichier existait avant). Couverture du pilote génératif (graine 20261112, 60 plans) : les 18 classes hostiles ou limites
+sont à un compteur strictement positif (dont `plus_de_200`, `dep_plus_de_32`, `doublon`).
+
+Durées mesurées sur la base : `test-driver-lock.sh` 135 s (T69.G et T69.M : 2 s, les variantes ne se préparent pas) ;
+`test-driver-lock-phase.sh` 28 s.

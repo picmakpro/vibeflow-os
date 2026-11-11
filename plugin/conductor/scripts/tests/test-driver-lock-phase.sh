@@ -19,6 +19,7 @@
 #   PH-ALL   status --all liste les verrous de phase
 #   PH-FLAT  lab plat : --phase est inerte
 #   PH-ARC   registre archive au relachement, par phase, compartiment et depot ; registry --all
+#   PH-PLAN  plan de mission publie a cote du verrou (publish-plan, champ dag de status), par phase, compartiment, depot, lab plat
 #   PH-CONC  un seul gagnant sous concurrence (meme phase) ; au plus un gagnant entre nu et phase
 #
 # Toute invocation passe par une fixture jetable (depot git sous un dossier temporaire), jamais par le verrou reel du depot.
@@ -251,6 +252,64 @@ assert "PH-ARC.8 lab plat : registry --all rend la meme sortie que registry" "$o
 o="$(dl "$LA" sA status --all)"
 assert_not "PH-ARC.9 status --all n'a pas change de forme (pas de registries)" "$o" '"registries"'
 assert "PH-ARC.9 status --all garde ses verrous" "$o" '"locks": ['
+
+echo "== PH-PLAN : plan de mission publié par phase, compartiment, dépôt, lab plat =="
+DAGSH="$(cd "$(dirname "$SCRIPT")" && pwd)/dag.sh"
+mk_dag_lab() { # <fichier> : DAG réel (dag.sh init puis add) dont ws et phase MENTENT (zeta, 88) ; texte libre porteur d'un marqueur
+  rm -f "$1"
+  ( export VF_DRIVER_LOCK="$WORK_DIR/dag-none.lock"
+    bash "$DAGSH" init --file="$1" --ws=zeta --phase=88 >/dev/null 2>&1
+    bash "$DAGSH" add --file="$1" --id=n1 --step="LIBRE-PH étape" --scope="CHEMIN-PH/a" >/dev/null 2>&1
+    bash "$DAGSH" add --file="$1" --id=n2 --step=x --deps=n1 >/dev/null 2>&1 )
+}
+PDAG="$WORK_DIR/ph-dag.json"; mk_dag_lab "$PDAG"
+pj() { printf '%s' "$1" | python3 -I -c 'import json,sys
+try:
+    d=json.load(sys.stdin)
+except Exception:
+    print("invalide"); sys.exit(0)
+exec(sys.argv[1])' "$2" 2>/dev/null; }
+LP="$(mk_lab plan)"
+GCP="$(cd "$LP" && git rev-parse --git-common-dir)"; case "$GCP" in /*) ;; *) GCP="$LP/$GCP" ;; esac; GCP="$(cd "$GCP" && pwd -P)"
+dl "$LP" sA acquire --ws=alpha --phase=69 --owner=mgrA --step=s >/dev/null
+dl "$LP" sB acquire --ws=alpha --phase=70 --owner=mgrB --step=s >/dev/null
+o="$(dl "$LP" sA publish-plan --ws=alpha --phase=69 --owner=mgrA --file="$PDAG")"; r=$?
+assert_exit "PH-PLAN.1 publish-plan de la phase 69 : exit 0" "$r" 0
+assert "PH-PLAN.1 published true" "$o" '"published": true'
+assert "PH-PLAN.1 portée phase" "$o" '"scope": "phase"'
+[ -f "$GCP/vf-driver/ws/alpha/phases/69/DRIVER.lock.plan.tsv" ]; assert_exit "PH-PLAN.1 fichier sous phases/69 du dossier commun, à côté du verrou" "$?" 0
+[ -z "$(git -C "$LP" status --porcelain --untracked-files=all)" ]; assert_exit "PH-PLAN.1 git status du lab vide (jamais dans l'arbre de travail)" "$?" 0
+assert_not "PH-PLAN.1 aucune valeur de WORK_DIR dans la réponse" "$o" "$WORK_DIR"
+o="$(dl "$LP" sA status --all)"
+printf '%s' "$o" | python3 -I -c 'import json,sys; json.load(sys.stdin)' 2>/dev/null; assert_exit "PH-PLAN.2 status --all : JSON valide" "$?" 0
+assert "PH-PLAN.2 l'entrée de la phase 69 porte son dag (ws et phase du verrou)" "$o" '"dag": {"ws": "alpha", "phase": "69", "at": '
+assert "PH-PLAN.2 nœuds de la phase 69" "$(pj "$o" 'print(",".join("%s:%s:%s" % (n["id"], n["status"], "+".join(n["deps"])) for l in d["locks"] if l.get("phase")=="69" for n in l["dag"]["nodes"]))')" 'n1:ready:,n2:blocked:n1'
+assert "PH-PLAN.2 l'entrée de la phase 70 n'a pas de champ dag" "$(pj "$o" 'print(",".join(str("dag" in l) for l in d["locks"] if l.get("phase")=="70"))')" 'False'
+s69="$(dl "$LP" sA status --ws=alpha --phase=69)"
+assert "PH-PLAN.2 status --ws --phase rend le même dag que status --all" "$(pj "$s69" 'print(json.dumps(d["dag"], sort_keys=True))')" "$(pj "$o" 'print(json.dumps([l["dag"] for l in d["locks"] if l.get("phase")=="69"][0], sort_keys=True))')"
+assert_not "PH-PLAN.2 le texte libre n'est pas publié" "$o$(cat "$GCP/vf-driver/ws/alpha/phases/69/DRIVER.lock.plan.tsv")" "LIBRE-PH"
+dl "$LP" sC acquire --ws=omega --owner=mgrC --step=s >/dev/null
+o="$(dl "$LP" sC publish-plan --ws=omega --owner=mgrC --file="$PDAG")"
+assert "PH-PLAN.3 compartiment nu : published true, portée compartiment" "$o" '"scope": "compartiment"'
+assert "PH-PLAN.3 compartiment nu : ws du verrou, phase vide (le DAG disait zeta et 88)" "$(dl "$LP" sC status --ws=omega)" '"dag": {"ws": "omega", "phase": "", "at": '
+dl "$LP" sD acquire --depot --owner=mgrD --step=s >/dev/null
+dl "$LP" sD publish-plan --depot --owner=mgrD --file="$PDAG" >/dev/null
+assert "PH-PLAN.3 dépôt : ws et phase vides" "$(dl "$LP" sD status --depot)" '"dag": {"ws": "", "phase": "", "at": '
+assert_not "PH-PLAN.3 ni zeta ni 88 ne sortent (valeurs du DAG jamais reprises)" "$(dl "$LP" sD status --all)" 'zeta'
+_ph_sum="$(cksum < "$GCP/vf-driver/ws/alpha/phases/69/DRIVER.lock.plan.tsv")"
+o="$(dl "$LP" sB publish-plan --ws=alpha --phase=69 --owner=mgrB --file="$PDAG")"; r=$?
+assert_exit "PH-PLAN.4 autre session, autre propriétaire : exit 1" "$r" 1
+assert "PH-PLAN.4 not-owner" "$o" '"reason": "not-owner"'
+assert "PH-PLAN.4 rien d'écrit (plan intact)" "$(cksum < "$GCP/vf-driver/ws/alpha/phases/69/DRIVER.lock.plan.tsv")" "$_ph_sum"
+dl "$LP" sA release --ws=alpha --phase=69 --owner=mgrA >/dev/null 2>&1
+[ ! -e "$GCP/vf-driver/ws/alpha/phases/69/DRIVER.lock.plan.tsv" ]; assert_exit "PH-PLAN.5 release de la phase 69 : le fichier de plan a disparu" "$?" 0
+assert_not "PH-PLAN.5 l'entrée n'a plus de dag" "$(dl "$LP" sA status --ws=alpha --phase=69)" '"dag"'
+assert_not "PH-PLAN.5 status --all : plus de dag pour la phase 69" "$(pj "$(dl "$LP" sA status --all)" 'print(",".join(str(l.get("dag")) for l in d["locks"] if l.get("phase")=="69"))')" 'nodes'
+LFP="$(mk_flat flatplan)"
+dl "$LFP" sA acquire --owner=mgrF --step=s >/dev/null
+o="$(dl "$LFP" sA publish-plan --owner=mgrF --file="$PDAG")"; r=$?
+assert_exit "PH-PLAN.6 lab plat : publish-plan exit 0" "$r" 0
+assert "PH-PLAN.6 lab plat : status rend le champ, ws et phase vides" "$(dl "$LFP" sA status)" '"dag": {"ws": "", "phase": "", "at": '
 
 echo "== PH-CONC : concurrence =="
 L6="$(mk_lab conc)"
