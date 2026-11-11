@@ -542,17 +542,34 @@ Plans:
 
 ### Phase 74: L'équipe dans le temps — swim-lanes, coût, replay
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
+> **Cadrée le 2026-11-11 (premier temps)** — `74-CONTEXT.md`, P74-D-01 à P74-D-28, décisions déléguées par Samuel
+> (message session principale, 2026-11-08), option recommandée ; spécification d'interface `74-UI-SPEC.md`. Inscrite le
+> 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Planification au second temps, sur les
+> contrats de la Phase 79.
 
 **Goal:** L'onglet Équipe montre les agents sur un axe de temps (une ligne par agent, colorée par nœud de DAG), le coût en jetons et en durée par mission, phase et agent, et rejoue une mission nœud par nœud avec un curseur temporel.
-**Requirements**: TBD — posées au cadrage.
-**Depends on:** Phase 69 (onglet Équipe, lien agent ↔ nœud) ; Phase 79 (index des transcripts, route de frise) ; ordre du jalon : après la 72. La Phase 79 est ajoutée depuis l'audit du 2026-11-10.
-**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 1, 2, 3) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2.
-**Plans:** 0 plans
+**Lecture du but (P74-D-01) :** but arbitré non réécrit (AUDC-V6). « Colorée par nœud de DAG » contredit `DESIGN.md` § 9 :
+le nœud s'écrit sur la voie, la couleur reste aux trois états ; signalé à Samuel pour la recette. Fenêtre de 24 h au plus
+(AUDC-Q2) : coût et relecture se lisent sur la fenêtre affichée. La relecture dérive l'état des nœuds des voies des agents
+qui les portent (aucun horodatage de transition dans les DAG).
+**Requirements**: TEMP-01, TEMP-02, TEMP-03, TEMP-04, TEMP-05, TEMP-06, TEMP-07, TEMP-08, TEMP-09, TEMP-10, TEMP-11, TEMP-12
+**Depends on:** Phase 79 (index des transcripts sur disque avec segments, compteurs et jetons dédoublonnés par message ; route de frise ; extension du contrat de forme) ; Phase 73 (régie : ouverture de la fiche depuis une ligne, place de la bascule « Régie · Frise ») ; Phase 69 (onglet Équipe, lien agent ↔ nœud) ; Phase 78 (tiroir Git ouvert sur un commit). Ordre du jalon : après la 79. Recoupements : Phase 75 (mise en évidence continue sur la carte Code : la 74 n'en pose qu'une ponctuelle) ; Phase 77 et Phase 52 (le coût réutilise le calcul de jetons de l'index de la 79, un seul calcul).
+**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 1, 2, 3) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2, `REGISTRE.md` (AUDC-I04, I05, I06, I07, I08, I21, I28, M4, D8, D9), `DESIGNS.md` § 4 et § 5.
+**Un ajout, un retrait :** retirés la boîte de transcript du panneau et son bouton « Lire le transcript » (remplacés par la fiche plein cadre), la durée unique qui compte les veilles (remplacée par la durée par segments) ; avec la Phase 73, la carte « Terminés depuis moins de 24 h » (la frise en porte l'historique).
+
+**Success Criteria** (what must be TRUE):
+
+1. Dans l'onglet Équipe, la bascule « Frise » montre toutes les sessions et tous les agents du lab des dernières 1 h 30, 6 h ou 24 h sur une horloge commune, l'enfant sous son parent, et un worker qui lance des tests pendant dix minutes reste une barre continue ; aucune voie n'a une couleur propre à son nœud.
+2. Un agent qui a attendu une réponse de l'humain montre une barre hachurée sur la durée de l'attente, et le temps perdu à attendre se lit, en durée, sur sa fiche et en tête de frise.
+3. En déplaçant le curseur au clavier, l'encart « À cet instant » dit quels nœuds du plan étaient portés par un agent au travail et quels fichiers venaient d'être écrits ; « Voir sur la carte » ouvre l'onglet Code avec ces fichiers mis en évidence.
+4. La fiche d'un agent s'ouvre en plein cadre depuis la frise et depuis la régie, dit son rattachement (parent, nœud, phase, chacun cliquable), ses durées par segments, ses jetons et ses erreurs, et son fil daté se filtre et suit le direct ; aucune sortie d'outil ni argument de commande n'y apparaît, et rien de la fiche n'est exporté.
+5. Les jetons d'une mission égalent la somme de ceux de ses agents, comptés une fois par message, et chaque total dit sa fenêtre ; les agents sans mission sont comptés à part.
+6. Les suites du cockpit restent vertes, la chaîne XSS couvre les données de frise et de fiche, et chaque comportement neuf a un témoin qui rougit sans le code.
+**Plans:** 0 plans — planification au second temps, après les contrats de la Phase 79
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 74 to break down)
+- [ ] À planifier (second temps de la mission Phase 74)
 
 ### Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte
 

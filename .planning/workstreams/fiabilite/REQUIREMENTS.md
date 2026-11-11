@@ -1042,6 +1042,18 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GITC-14 | Phase 78 | Complete — 2026-11-06 (Phase 78, PR #216, publiée en `v2.76.0` ; revue, audit en lecture, critique design et recette par juges navigateur) |
 | — | Phase 73 | repère de cadrage, Phase 73 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 74 | repère de cadrage, Phase 74 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| TEMP-01 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
+| TEMP-02 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
+| TEMP-03 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
+| TEMP-04 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
+| TEMP-05 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
+| TEMP-06 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
+| TEMP-07 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
+| TEMP-08 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
+| TEMP-09 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
+| TEMP-10 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
+| TEMP-11 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
+| TEMP-12 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
 | — | Phase 75 | repère de cadrage, Phase 75 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 76 | repère de cadrage, Phase 76 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 77 | repère de cadrage, Phase 77 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
@@ -1668,6 +1680,25 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 <!-- vf-cadrage:phase-73 -->
 
 <!-- vf-cadrage:phase-74 -->
+
+### L'équipe dans le temps — frise, fiche d'agent, coût, relecture (Phase 74 — posées au cadrage, 2026-11-11)
+
+Dérivées de P74-D-01 à P74-D-28 (`74-CONTEXT.md`), décisions déléguées par Samuel (message session principale,
+2026-11-08), option recommandée ; aucun arbitrage neuf. Préfixe `TEMP` vérifié libre le 2026-11-11. Dépendent des
+contrats de la Phase 79 (index, route de frise, contrat de forme) et de la régie de la Phase 73.
+
+- [ ] **TEMP-01**: Frise des sessions dans l'onglet Équipe, derrière une bascule « Régie · Frise » (régie par défaut, aucun quatrième onglet) : une voie par agent, l'enfant sous son parent avec un trait au dispatch, horloge commune au lab, fenêtres 1 h 30 (défaut), 6 h et 24 h, jamais au-delà ; une session vivante sans activité reste listée au repos ; une mission commencée avant la fenêtre le dit (P74-D-02, D-05, D-08 ; AUDC-I05, AUDC-Q2).
+- [ ] **TEMP-02**: Segments et événements lisibles sans la couleur : au travail (barre pleine), vous attend (hachures sans contour coloré), attend ses agents (trait fin), au repos (pointillé) ; compaction, erreur d'outil, message humain, rapport rendu posés sur la voie ; commits sur un bandeau « Dépôt » par branche, jamais attribués à un agent, un clic ouvre le tiroir Git sur le commit ; trois teintes d'état seulement, le nœud du plan écrit sur la voie, jamais une couleur par nœud (P74-D-01, D-06, D-07 ; DESIGN.md § 9).
+- [ ] **TEMP-03**: Deux lectures du même axe : Horloge (défaut, durées vraies) et Événements (silences de plus de 2 min compressés en un repère qui dit leur durée) ; l'axe dit la lecture en cours (P74-D-09).
+- [ ] **TEMP-04**: Échelle : au-delà d'un seuil de voies, les workers se replient sous leur manager avec leur compte écrit (« + N agents », dépliable) ; bandeau haut avec la courbe du nombre d'agents au travail ; la frise suit le flux partagé de la Phase 79 sans qu'aucune donnée de frise ne passe dans le flux (P74-D-10, D-11).
+- [ ] **TEMP-05**: Relecture au curseur : curseur au pointeur et aux flèches ; l'encart « À cet instant » dit l'état de chaque voie, les nœuds du plan portés par un agent au travail (dérivés des voies, jamais un statut de DAG inventé) et les fichiers écrits autour de l'instant (lus à la demande dans le fil réduit) ; « Voir sur la carte » ouvre l'onglet Code avec ces fichiers mis en évidence (P74-D-12, D-13, D-14 ; AUDC-I06).
+- [ ] **TEMP-06**: Fiche d'un agent en plein cadre dans l'onglet Équipe, ouverte depuis une voie de la frise et depuis une ligne de la régie : faits à gauche, fil à droite, une colonne au téléphone ; Échap ou « Retour » la ferme et rend le focus ; même fiche pour une session et un sous-agent, sans intertitre « Mandat » pour une session (P74-D-03, D-04 ; AUDC-I04, AUDC-M4).
+- [ ] **TEMP-07**: Faits de la fiche : rattachement « Worker de <parent> · nœud <id> · Phase <n> » dont chaque terme ouvre sa cible (trois graphes reliés) ; durée au travail par segments dont temps à attendre l'humain ; contexte au dernier tour en jetons (pourcentage seulement sur une taille de fenêtre documentée) et compactions ; appels d'outil dont erreurs ; jetons par catégorie ; fichiers écrits et lus ; toute donnée absente s'écrit « inconnu », jamais zéro (P74-D-15, D-16, D-26 ; AUDC-I21, AUDC-D9).
+- [ ] **TEMP-08**: Lecteur (reste de AUDC-D8) : un fil daté du mandat à maintenant, filtres messages, outils et erreurs, suivi en direct avec « Revenir au direct », coupe dite, mandat replié lu à la demande ; markdown des messages rendu en texte par un sous-ensemble fermé construit en nœuds DOM (jamais `innerHTML` d'une chaîne du transcript), liens non cliquables ; une erreur dit « échec » sans son texte ; jamais une sortie d'outil ni l'argument d'une commande (P74-D-17, D-18, D-19 ; P69-D-16, P69-D-19 ; AUDC-I28, PU-G-168).
+- [ ] **TEMP-09**: Coût en jetons et en durée, par agent, par mission, par phase et par étage (tête, manager, worker), chaque agrégat portant sa fenêtre ; les agents non rattachés comptés à part en « hors mission » ; temps d'agent perdu à attendre l'humain ; aucun montant en devise ni limite d'abonnement (P74-D-20, D-21, D-23, D-24 ; AUDC-I07, AUDC-I08).
+- [ ] **TEMP-10**: Un seul calcul de jetons : la somme de `message.usage` dédoublonnée par identifiant de message, posée dans l'index de la Phase 79 ; la 74 l'agrège sans jamais recompter un transcript ; aucun champ affiché qui ne soit déclaré au contrat de forme ; témoin : transcript dont un message tient sur plusieurs lignes, compté une fois (P74-D-22, D-25).
+- [ ] **TEMP-11**: Bornes : routes en GET seul derrière Host, Origin et jeton ; clés `doing`, `mandat`, `messages`, `outils`, `fil` refusées dans le flux ; ni frise, ni fiche, ni fil dans l'export ; aucune lecture réseau ; la dernière commande nulle part ; chaîne XSS étendue aux données de frise et de fiche (nom d'agent, nœud, titre, message hostiles) (P74-D-27 ; P67-D-02, P67-D-14, P69-D-23).
+- [ ] **TEMP-12**: Forme et retrait : clavier complet (bascule, voies, curseur, filtres), alternative textuelle de la frise pour lecteur d'écran, focus visible, mouvement réduit, deux thèmes, grille d'espacements fermée, aucune valeur en dur, interface en français ; retirés : la boîte de transcript du panneau et son bouton « Lire le transcript », la durée qui compte les veilles, et (avec la Phase 73) la carte « Terminés depuis moins de 24 h » ; suites du cockpit vertes, bump du module (P74-D-28 ; P71.5-D-01, Q11).
 
 <!-- vf-cadrage:phase-75 -->
 
