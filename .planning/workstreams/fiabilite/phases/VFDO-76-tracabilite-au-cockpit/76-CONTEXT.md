@@ -275,6 +275,19 @@ Relayés mot pour mot par la session principale ; canal : arbitrage Samuel, AskU
   redondants. Les liens « couvre » plan → exigence quittent le canevas avec eux. Le compte « x/y exigences » du pied
   (`piedExigences`) reste, la Phase 80 le réutilise sur ses cartes. Recoupement avec AUDC-I25 (Phase 80, bascule liste
   où « les exigences se lisent comme une liste à cocher ») : écrit dans « À verser par la jointure ».
+- **P76-D-39 (condition d'arrêt du retrait : comportementale ; décision déléguée par Samuel (message session
+  principale, 2026-11-08), option recommandée ; 2026-11-11, sur trois contrôles frais successifs qui ont chacun trouvé
+  une forme de lecture que la sonde statique de 76-08 ne voyait pas).** Une sonde par motifs ne ferme pas la classe
+  « lecteur du nœud `.req` ou des liens couvre » : chaque tour en a trouvé une forme de plus (guillemets, expression
+  régulière, `kind ===`, exclusions qui masquent le jeton). Le retrait de 76-08 ne se fait donc que sur preuve de
+  COMPORTEMENT : équivalence de la porte de la 80 (sortie normalisée identique, `cible` brute à `null` après),
+  couverture du panneau d'exigence au moins aussi complète, témoins de la 80 (PL2.9, PV2.5) et son négatif verts, et
+  toutes les suites du cockpit vertes avant et après. La sonde statique reste, fermée par défaut et sans liste
+  d'exclusions à tenir : elle inventorie chaque occurrence des jetons (fichier, ligne) dans la trace rouge, pour
+  l'exécutant et pour la revue de la phase ; elle n'est jamais une porte. Les lecteurs génériques par genre de lien
+  (rendu par `kindLabels`, voisins de toutes les arêtes) sont nommés : ils se vident proprement au retrait, ce que
+  prouvent R76.3 et les suites.
+
 - **P76-D-26 (étage design).** UI neuve (sections et panneaux) : contrat `76-UI-SPEC.md` avant les plans, critiqué par
   `vf-design-judge` contre `DESIGN.md` (seuil 70/100) ; à l'exécution, `craft` par `vf-crafter` avant le code d'UI et
   `critique` en parallèle de la revue.
