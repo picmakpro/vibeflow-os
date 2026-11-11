@@ -571,7 +571,7 @@ Plans:
   4. Les fichiers lus ou écrits par les agents des dernières 24 h s'allument avec le nom de l'agent ; un même fichier visé par deux agents, deux branches ou deux plans d'une même vague est signalé avant la fusion.
   5. Les fichiers que les plans non faits vont créer apparaissent en cartes « prévues ».
   6. La couche « Travail récent » est retirée ; toutes les suites du cockpit sont vertes sous macOS et Linux, chaîne XSS étendue aux chemins et noms hostiles.
-**Plans:** 11 plans (planifiés le 2026-11-11, corrigés après vérification ; exécution après la Phase 79 entière et la Phase 74)
+**Plans:** 12 plans (planifiés le 2026-11-11, corrigés après vérification ; exécution après la Phase 79 entière et la Phase 74)
 
 Plans:
 
@@ -584,8 +584,9 @@ Plans:
 - [ ] 75-07-PLAN.md — Canal de marquage, pied réservé, glyphes, nom accessible, rendu des prévues (vague 3 ; ACTV-01, 02, 03, 11)
 - [ ] 75-08-PLAN.md — Sélecteur de lentilles, menu, panneau, compte du radar (vague 4 ; ACTV-01, 02, 06, 07, 08, 10)
 - [ ] 75-09a-PLAN.md — Retrait côté assemblage et moteur : `recent-work.json`, `recent.mjs`, étape de `refresh.mjs`, sonde Y reportée (vague 5 ; ACTV-12)
-- [ ] 75-09b-PLAN.md — Retrait côté page : `25-recent.js`, `#btn-recent`, dictionnaires, suites adaptées (vague 6 ; ACTV-12, 01)
-- [ ] 75-10-PLAN.md — Chaîne XSS étendue, sans git, DESIGN.md, CHANGELOG, compteur de suites (vague 7 ; ACTV-12)
+- [ ] 75-09b-PLAN.md — Retrait côté page et jetons : `25-recent.js`, `#btn-recent`, survol, suites `ecrans-recent` et `responsive` adaptées (vague 6 ; ACTV-12, 01)
+- [ ] 75-09c-PLAN.md — Retrait : dictionnaires, `moteur-carte`, `chrome-moteur-carte`, `chrome-fr`, grep d'inventaire à zéro (vague 7 ; ACTV-12)
+- [ ] 75-10-PLAN.md — Chaîne XSS étendue, sans git, DESIGN.md, CHANGELOG, compteur de suites (vague 8 ; ACTV-12)
 
 ### Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire
 

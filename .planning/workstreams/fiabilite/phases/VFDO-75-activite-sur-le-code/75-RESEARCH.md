@@ -388,3 +388,54 @@ Toute la phase s'exécute **après la 79** (dépendance de jalon) ; chaque plan 
 ## Metadata
 
 **Confidence :** stack HIGH (aucune dépendance) ; architecture MEDIUM (accroches de la 79 non livrées : O-2, A4) ; pièges HIGH (mesurés ou lus). **Research date :** 2026-11-11. **Valid until :** livraison de la 79 (revalider O-2, O-4, A4, A7).
+
+## Preuves des commandes de vérification (table rejouable, ajoutée à la quatrième correction des plans)
+
+Relevé sur `fb104665`/`e5efa88a`, SANS lancer aucune suite. Règle : un motif visé par une `<automated>` doit être retrouvé dans le source de la suite qui l'imprime ; un fichier appelé doit exister (`git ls-files`) ou être créé par un plan nommé.
+
+### 1. Motifs visés sur la sortie des suites EXISTANTES
+
+Format d'impression commun (`assert_eq`) : `echo "  ✅ PASS — $1"` ou `echo "  ❌ FAIL — $1"` où `$1` est l'étiquette passée à l'assertion.
+
+| Suite (`plugin/cockpit/scripts/tests/`) | Motif des plans | Source (étiquette ou ligne) | Ligne de bilan imprimée |
+|---|---|---|---|
+| `test-cockpit-securite.sh` | `PASS — Y1 `, `PASS — Y2 ` (SANS suffixe) | l. 362-363 : `assert_eq "Y1 — l'assemblage…"`, `"Y2 — les fichiers cibles…"` | l. 433 `Résultats : $PASS PASS / $FAIL FAIL` |
+| `test-cockpit-onglet-code.sh` | `PASS — C6\.` | l. 99-108 : `"C6.0 —"` à `"C6.3 —"` | l. 134 `Résultats : …` |
+| `test-cockpit-ecrans-recent.sh` | `PASS — E1\.`, `PASS — R1\.` | l. 31-65 : `"E1.1 …"`, `"R1.1 …"` | l. 82 `Résultat : $PASS réussis, $FAIL échecs` (SINGULIER, format différent : motif `Résultat : `) |
+| `test-cockpit-responsive.sh` | `PASS — R1 `, `PASS — R3 ` (sans suffixe), `PASS — R13\.`, `PASS — R19\.` | l. 114 `"R1 — …"`, l. 122 `"R3 — …"`, l. 565-571 `"R13.x"`, l. 663-666 `"R19.x"` | l. 801 `Résultats : …` |
+| `test-cockpit-moteur-carte.sh` | `PASS — K17\.` | l. 167-171 `"K17.1 —"` à `"K17.5 —"` | l. 174 `Résultats : …` |
+| `test-cockpit-chrome-fr.sh` | `PASS — F13\.` | l. 163-167 `"F13.1 :"` à `"F13.5 :"` | l. 293 `Résultats : …` |
+| `test-cockpit-vendor.sh` | `PASS — V4 ` (le contrôle de taille ; l'identifiant exact du cliquet de 79-11 est « livré par 79-11, à revalider ») | l. 48-61 `"V4 — …"` | l. 160 `Résultats : …` |
+| `test-cockpit-chaine-xss.sh` | `PASS — C0a\.` etc. (assertions AJOUTÉES par 75-10 au format suffixé) ; existantes `C0\.` l. 180-182 | l. 180-188 `"C0.1 —"`… | l. 340 `Résultats : $PASS PASS / $FAIL FAIL / $SKIP SAUTÉ` |
+| mutants AJOUTÉS à une suite existante | `PASS — Q[0-9]*\.[0-9]* — mutant` | convention des plans : étiquette `Qn.m — mutant « nom » : rouge` (PASS = le mutant rougit) ; ces suites n'impriment pas `MUTANT-ROUGE` | — |
+| `scripts/check-version-sync.sh` | `suites' ≠ réel=` | l. 135-137 : `ko "$r : '$s suites' ≠ réel=$suites_real (find */tests/test-*.sh)"` | exit 1 sur dérive |
+| `scripts/check-machine-paths.sh` | sortie `✓ … aucun chemin absolu de machine` | exécuté pendant la correction (3 023 fichiers balayés) | exit 0 |
+
+Les suites NEUVES des plans (`test-cockpit-activite-*.sh`) n'existent pas encore : leur motif est une convention du plan (`PASS — <id> : …`, `MUTANT-ROUGE — <nom>`, `BILAN : <n> PASS, <m> FAIL`), prouvée à l'exécution par la trace du rouge.
+
+### 2. Fichiers et scripts appelés
+
+Existent (`git ls-files`, vérifiés) : `scripts/check-machine-paths.sh`, `scripts/check-version-sync.sh`, `scripts/ci-suites-perimetre.sh`, `scripts/ci-shard-suites.sh`, `scripts/check-gate-touche.sh`, les huit suites existantes du tableau 1, `chrome-moteur-carte.mjs`, `chrome-equipe-clavier.mjs`, `css-jetons.mjs`, `chrome-session.mjs`, `chrome-responsive.mjs`, `fixtures/test-cockpit-ecrans-recent/ui-harness.mjs` et `recent-doublons.json`, `vf-cockpit-git-durci.mjs`, `vf-cockpit-git-graphe.mjs`, `vf-cockpit-git-details.mjs`, `skills/cockpit-moteur/{VENDORED.txt, scripts/recent.mjs, scripts/refresh.mjs, assets/ui/25-recent.js}`.
+Absent à la base, créé ou livré par un plan nommé : `plugin/cockpit/scripts/tests/socle-serveur.sh` (livré par 79-02) ; `test-cockpit-activite-git.sh` (75-01), `-gardes.sh` (75-02), `-chemins.sh` et `-empreinte.sh` (75-03), `-planning.sh` (75-04), `-route.sh` (75-05), `-prevues.sh` (75-06), `-carte.sh` et `chrome-activite-carte.mjs` (75-07), `-lentilles.sh` et `chrome-activite-lentilles.mjs` (75-08), `-sans-git.sh` (75-10) ; `vf-cockpit-instantane.mjs` (79-09 et 79-13) ; table des routes et réponse gardée (79-05) ; gate de plafond : PAS de script `check-*plafond*` : le plafond est la série `V4` de `test-cockpit-vendor.sh` (cliquet de 79-11, nom exact à relever sur le livré).
+Plans de la Phase 80 relevés sur `origin/feat/phase-80-trois-formes` : 80-01 (clavier du canevas, `nomDeCarte`), 80-02 (pile de surcouches), 80-03 (`vague`), 80-08 (pile Retour), 80-09/11/13/14/16/19 (modifient `viewer.html`), 80-14 (modifie `test-cockpit-chrome-fr.sh`), 80-16 (`DESIGN.md`, `00-vibeflow.js`), 80-17 (`01-vf-responsive.js`, `02-vf-telephone.js`), 80-18 (README, CHANGELOG, `ci-shard-suites.sh`).
+
+### 3. Mutants de performance MESURÉS (script jetable de scratchpad de mission, non versionné ; médiane de 5 ; seuil `t(2N) <= 2,5 * t(N) + 2 ms`)
+
+| Cas | N puis 2N | Mesure | Seuil | Verdict |
+|---|---|---|---|---|
+| sain : normalisation en une passe, `'a/'.repeat(N) + '..'` | 20 000 / 40 000 | 0,63 ms puis 0,97 ms | 3,58 ms | VERT |
+| sain : `'../'.repeat(N)` | 20 000 / 40 000 | 0,69 ms puis 0,82 ms | 3,72 ms | VERT |
+| MUTANT pile recopiée à chaque segment, `'a/'.repeat(N) + '..'` | 20 000 / 40 000 | 246,7 ms puis 1 256,7 ms | 618,8 ms | ROUGE |
+| mutant pile recopiée sur `'../'.repeat(N)` | 20 000 / 40 000 | 0,84 ms puis 1,15 ms | 4,11 ms | VERT (ne tue pas : entrée non retenue comme témoin de performance) |
+| mutant `replace` en boucle (deux formes) | 10 000 à 20 000 | 0,24 → 0,39 ms ; 0,69 → 1,11 ms | — | VERT : linéaire sous V8, NON retenu |
+| sain : glob à un point de reprise, `'*'.repeat(N) + 'a'` contre `'a'.repeat(N)` | 20 000 / 40 000 | 0,29 ms puis 0,41 ms | 2,72 ms | VERT |
+| sain : glob, `'*a'.repeat(50) + 'b'` contre `'a'.repeat(N)` | 20 000 / 40 000 | 0,20 ms puis 0,41 ms | 2,51 ms | VERT |
+| MUTANT RegExp naïve, `'.*'` x 3 puis `a$` contre `'b'.repeat(N)` | 1 500 / 3 000 | 566,2 ms puis 4 389,4 ms | 1 417,5 ms | ROUGE |
+| MUTANT glob quadratique (recherche sans point de reprise) | 20 000 / 40 000 | 482,3 ms puis 1 920,0 ms | 1 207,8 ms | ROUGE |
+| RegExp `/^(?:[^/]*\/)*\.\.(?:\/.*)?$/` sur `'a/'.repeat(N) + 'x'` (relevé du vérificateur) | 20 000 / 40 000 | 0,165 ms puis 0,319 ms | — | VERT : linéaire, retiré des plans |
+
+Boucle d'événements (R8 de 75-05, module en `node`, minuteur de 20 ms, seuil d'écart 250 ms) : calcul asynchrone (`execFile`, `sleep 1`) : écart maximal 23 ms, VERT ; mutant synchrone (`execFileSync`, `sleep 1`) : écart maximal 1 022 ms, ROUGE.
+
+### 4. Grep d'inventaire du retrait rejoué
+
+Commande : celle de 75-09c et 75-10 (motifs de § Retrait, `btn-recent` compris, filtrée par les exceptions nommées). Rejeu sur l'état de la base : 130 lignes (attendu : le retrait n'est pas fait). Les fichiers que les plans nettoient intégralement (`amont/` retiré par 79-01, `25-recent.js`, `recent.mjs`, `viewer.html` hors `showChangeResult`, `scripts/build.mjs` du moteur, `refresh.mjs`, `graph-query.js`, `60-export.js`, dictionnaires, `01-`/`02-vf-…`, `00-vibeflow.js`, `vf-cockpit-build.mjs`, `chrome-moteur-carte.mjs`, `test-cockpit-moteur-carte.sh`, `DESIGN.md`, `plugin/cockpit/README.md`) retirés du relevé, il ne reste AUCUNE ligne hors exceptions nommées. Exceptions nommées (identiques dans 75-09a, 75-09b, 75-09c, 75-10) : jeton `--recent` ; « récent » du lancement (`chrome-lancer.mjs`, `test-cockpit-lancer-suivi.sh`, `test-cockpit-lancer-bout-en-bout.sh:283`, `test-cockpit-signal-mod.sh:164`) ; CHANGELOG ; mode blueprint (`serve.mjs`, `references/schema.md`, `viewer.html:671`, lecture de `G.recent?.items` par son contenu) ; `recent-hl` ; lignes dont le contenu cite le nom `refresh.mjs` (`test-cockpit-git-env.sh:213`, `references/blueprint.md:76`, `scripts/status.mjs`) ; assertions d'absence écrites par les plans (`test-cockpit-securite.sh`, `-onglet-code.sh`, `-ecrans-recent.sh`, `-chrome-fr.sh`, `-responsive.sh`, `-activite-lentilles.sh`) ; lignes `RETRAIT` de `VENDORED.txt`.
