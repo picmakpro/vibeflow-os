@@ -57,6 +57,10 @@
     if (SC.state.layout) go(); else SC.on('ready', go);
   };
 
+  // PU-G-087 : le tiroir Git (z-index 7) recouvre la carte de la visite (6) : la visite, toujours ouverte dessous, prenait la première Échap et le tiroir en demandait une seconde.
+  // Ouvrir le tiroir Git sort donc de la visite ; une seule Échap ferme alors le tiroir.
+  window.addEventListener('vf-git:etat', (e) => { const T = window.FloorplanTour; if (e.detail && e.detail.ouvert && T && T.active()) T.end(false); });
+
   const init = async () => {
     let d;
     try {

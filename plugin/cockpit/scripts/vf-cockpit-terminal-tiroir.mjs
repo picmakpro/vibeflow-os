@@ -46,29 +46,42 @@ function scriptTiroir(cfg, accepte, construire) {
     // P71-D-34 (E2), inversé en v1.3.3 : jamais sur les boutons de zoom. Tiroir fermé, la pastille garde sa place au plus bas ; si elle recouvre #zoom, c'est #zoom qui remonte juste au-dessus d'elle.
     // 71.5 (P71.5-D-06) : la barre de question #ask est un obstacle de plus, lue comme le zoom avec la même marge de 8 : la pastille se pose 8 au-dessus d'elle quand elle la recouvre (#zoom remonte ensuite
     // au-dessus de la pastille). La visite « Par où commencer » traite la pastille comme un obstacle de son côté (ui/40, obstacles()) : aucune marge fixe ici. La puce (message d'indisponibilité) se pose au-dessus du plus haut des deux.
+    // Recette du 2026-11-08, lot C (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») : de 701 à 1 279 px le zoom est en rangée au bord gauche, comme la pastille et la barre de question : trois
+    // surfaces dans la même colonne, qui montent l'une au-dessus de l'autre, la barre en bas, la pastille au-dessus d'elle, le zoom au-dessus des deux. Chacune remonte juste au-dessus (8) des obstacles qu'elle recouvre, tant qu'il en reste (le zoom
+    // peut en recouvrir deux : la barre, puis la pastille que la barre vient de faire monter). Sans pastille affichée (tiroir ouvert, puce, carte d'injoignabilité) le zoom clôt tout seul la barre.
     const eviter = (n) => {
-      const z = document.getElementById('zoom'), b = z ? z.getBoundingClientRect() : null;
-      const k = document.getElementById('ask'), kb = k ? k.getBoundingClientRect() : null;
-      const sur = (a, o) => !!o && o.width > 0 && a.left < o.right && a.right > o.left && a.top < o.bottom && a.bottom > o.top;
+      const z = document.getElementById('zoom'), k = document.getElementById('ask'), st = document.getElementById('stage');
+      const rect = (e) => { if (!e || !e.parentNode || e.hidden) return null; const b = e.getBoundingClientRect(); return b.width > 0 && b.height > 0 ? b : null; };
+      const sur = (a, o) => !!o && a.left < o.right && a.right > o.left && a.top < o.bottom && a.bottom > o.top;
+      const monter = (e, fond, obstacles) => { // e remonte au-dessus des obstacles qu'il recouvre (fond : le bas de son repère, en pixels de fenêtre)
+        e.style.bottom = '';
+        for (let i = 0; i < 4; i++) {
+          const a = rect(e); if (!a) return;
+          const hauts = obstacles().filter((o) => sur(a, o)).map((o) => o.top);
+          if (!hauts.length) return;
+          e.style.bottom = Math.round(fond - Math.min(...hauts) + 8) + 'px';
+        }
+      };
       if (n === d.pastille) {
-        if (z) z.style.bottom = '';
-        n.style.bottom = '';
-        if (!n.parentNode || n.hidden) return;
-        if (sur(n.getBoundingClientRect(), kb)) n.style.bottom = Math.round(window.innerHeight - kb.top + 8) + 'px';
-        if (!z) return;
-        const a = n.getBoundingClientRect(), s = document.getElementById('stage'), fond = s ? s.getBoundingClientRect().bottom : window.innerHeight, zb = z.getBoundingClientRect();
-        const recouvre = zb.width > 0 && a.left < zb.right && a.right > zb.left && a.top < zb.bottom && a.bottom > zb.top;
-        if (recouvre) z.style.bottom = Math.round(fond - a.top + 8) + 'px';
+        const montre = !!n.parentNode && !n.hidden;
+        if (montre) {
+          // 72.1 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, « Pastille large comme le zoom ») : la pastille prend la largeur du groupe de zoom, lue sur lui (une seule règle, aucun nombre recopié) ; min-width ne fait que l'élargir : en pile (téléphone, <= 700 px, P70-D-09) le zoom est plus étroit qu'elle et rien ne change ; dès 701 px il est en rangée comme elle et lui donne sa largeur.
+          const zb = rect(z); n.style.minWidth = zb ? zb.width + 'px' : '';
+          monter(n, window.innerHeight, () => [rect(k)]);
+        } else n.style.bottom = '';
+        if (z) monter(z, st ? st.getBoundingClientRect().bottom : window.innerHeight, () => [montre ? rect(n) : null, rect(k)]);
         return;
       }
       if (!n.parentNode || n.hidden) return;
-      n.style.bottom = '';
-      const a = n.getBoundingClientRect();
-      const haut = Math.min(sur(a, b) ? b.top : Infinity, sur(a, kb) ? kb.top : Infinity);
-      if (haut < Infinity) n.style.bottom = Math.round(window.innerHeight - haut + 8) + 'px';
+      monter(n, window.innerHeight, () => [rect(z), rect(k)]);
     };
     const eviterTout = () => { eviter(d.pastille); eviter(d.puce); };
-    window.addEventListener('resize', eviterTout);
+    window.addEventListener('resize', eviterTout); window.addEventListener('vf-zoom-replie', eviterTout); // le zoom se replie ou se déplie (ui/01-vf-responsive.js, replier()) : la pastille et lui se replacent
+    // I-1 (intégration, revue du lot A) : pendant la visite, la règle !important de html[data-vf-visite] (ui/02-vf-telephone.js) masque le style en ligne du zoom ; un évitement rejoué alors (redimensionnement) mesure le zoom à sa place masquée,
+    // ne voit aucun recouvrement et vide le style en ligne. La visite finie, le zoom retomberait sur la pastille jusqu'au redimensionnement suivant : l'évitement est donc rejoué quand l'attribut apparaît ou disparaît.
+    new MutationObserver(eviterTout).observe(document.documentElement, { attributes: true, attributeFilter: ['data-vf-visite'] });
+    // I-2 (intégration) : la feuille de détail s'ouvre ou se ferme (classe no-panel du corps) : le zoom, posé au-dessus d'elle par la feuille de style de ui/02, doit se replacer au-dessus de la pastille sans attendre un redimensionnement
+    new MutationObserver(eviterTout).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     // la barre de question apparaît, disparaît ou change de largeur sans que la fenêtre bouge (panneau ouvert ou fermé) : ResizeObserver, puis transitionend de la barre elle-même
     // (left et width transitionnent 450 ms : le dernier rappel de l'observateur tombe avant la fin de left). Filtré sur la barre : un enfant qui finit sa transition ne relance rien.
     { const ask = document.getElementById('ask');
@@ -105,7 +118,7 @@ function scriptTiroir(cfg, accepte, construire) {
         document.body.style.setProperty('--vf-term-h', ouvert && !plein ? h + 'px' : '0px');
         document.body.style.setProperty('--vf-term-reserve', reserve + 'px');
         if (reserve !== reserveVue && !glisse) { reserveVue = reserve; ajuster(); }
-        d.poignee.setAttribute('aria-valuenow', String(h)); d.poignee.setAttribute('aria-valuemax', String(pleinMax()));
+        d.poignee.setAttribute('aria-valuenow', String(h)); d.poignee.setAttribute('aria-valuetext', h + ' px'); d.poignee.setAttribute('aria-valuemax', String(pleinMax())); // PU-G-142 : la valeur se lit avec son unité (« 324 px »)
       };
       const memoH = () => { perso = true; stock.ecrire('vf.terminal.h', h); };
       const pastilleEtat = () => {
@@ -148,7 +161,7 @@ function scriptTiroir(cfg, accepte, construire) {
         (visible ? ouvreur : d.pastille).focus();
       };
       // 72-14 : mot fixe de Q ; ouvrir est idempotent et ne donne jamais le focus au cadre, puis l'annonce seule est dite
-      const proposer = () => { ouvrir(false); annoncer(T.annonceProposition); };
+      const proposer = () => { ouvrir(false); if (!plein && h < 300) { h = borne(300); appliquer(); } annoncer(T.annonceProposition); };
       const basculerPlein = () => {
         plein = !plein; d.region.classList.toggle('vf-term-plein-etat', plein);
         d.boutonPlein.setAttribute('aria-pressed', String(plein)); d.boutonPlein.setAttribute('aria-label', plein ? T.reduire : T.agrandir); d.boutonPlein.title = d.boutonPlein.getAttribute('aria-label');

@@ -48,3 +48,13 @@
 - [Gate : forme voisine lue « absent » + conduite sur indéterminé](project_gate-marqueur-ressemblant-et-conduite-indetermine.md) — Phase 60 : marqueur ressemblant = illisible ; seul `marqueur=introuvable` continue ; preuve rouge sur git archive de la tête d avant.
 - [Un inventaire statique ne voit pas l'exécution](project_inventaire-statique-ne-voit-pas-l-execution.md) — vert F2 mais anglais visible : contrôle navigateur obligatoire ; traduire avant le glossaire.
 - [Suites navigateur du cockpit sous charge](project_suites-navigateur-cockpit-sous-charge.md) — 16 yes pour reproduire ; socle chrome-session ; page = window.VibeFlow ; assert vide-contre-vide.
+- [Sonde estAnglais E23.7 : mot-outil exigé](project_sonde-estanglais-e23-7-mot-outil.md) — libellé UI cockpit sans accent ni « du/de » rougit test-cockpit-equipe.sh.
+- [Marqueur « // VibeFlow ( » en tête des ui/*.js](project_marqueur-vibeflow-extension-en-tete.md) — un commentaire avant la 1re ligne fait rougir F2 de chrome-fr.
+- [nohup invisible à ps : doublons de suite](project_nohup-ps-invisible-doublons-de-suite.md) — un seul lancement, run_in_background, un log par run ; le jeton met les doublons en file.
+- [Q lancé depuis la copie du lab](project_q-lance-depuis-la-copie-du-lab.md) — VF_COCKPIT_SCRIPTS_DIR ne pilote que P ; resynchroniser les modules de Q avant toute capture (sinon ancienne UI).
+- [La vue de Q est chargée hors page par T19](project_vue-q-chargee-hors-page-par-t19.md) — écouteur d'init sans garde typeof document = T19 rouge ; plafonds LB.S1/S3/V5 du bandeau.
+- [Sonde cockpit : port épinglé, re-rendu live](project_sonde-cockpit-port-pinne-et-rerendu-live.md) — base = voulu − sha1%100 ; ré-interroger le nœud avant clic ; innerText.
+- [Visite auto : prend Échap en profil neuf](project_visite-auto-prend-echap-en-profil-neuf.md) — fermer #tour avant un témoin clavier ; ids de conteneur « n:… », reveal et non select.
+- [Q : bandeau flex, z-index et état de départ](project_q-bandeau-flex-zindex-et-etat-de-depart.md) — static+flex garde z-index ; overlay = R2.1 rouge ; sonde de focus depuis un état connu ; T14.S3 = 1 execCommand.
+- [DG-08 : taille du PTY à la reconnexion](project_dg08-reconnexion-taille-pty.md) — /flux ignore X-VF-Taille sur shell ouvert ; le client redit sa taille ; comparer stty size et lignes xterm.
+

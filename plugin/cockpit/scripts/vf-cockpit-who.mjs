@@ -152,7 +152,7 @@ export function collectWho(root, opts = {}) {
   const g = gather(root, opts);
   // tout champ libre vient d'un fichier que d'autres écrivent : chaîne masquée et bornée, sinon absent (F2) ; les nombres sont finis ou absents ; un identifiant hors forme exclut le travailleur
   const bornes = (v, n) => masque(v).slice(0, n);
-  const LIBRES = { task: 160, cwd: 200, role: 80, branch: 200, tree: 200, lastAt: 40, parent: 128, dag: 200, treeBy: 20 }, NOMBRES = ['ageS', 'depth', 'dureeS', 'children'];
+  const LIBRES = { titre: 80, task: 160, cwd: 200, role: 80, branch: 200, tree: 200, lastAt: 40, parent: 128, dag: 200, treeBy: 20 }, NOMBRES = ['ageS', 'depth', 'dureeS', 'children'];
   const IDS = new Set(['session', 'subagent', 'registered']);
   const workers = g.workers.filter((w) => typeof w.id === 'string' && (!IDS.has(w.kind) || ID_RE.test(w.id))).map(({ _tr, ...w }) => {
     w.id = bornes(w.id, 128);

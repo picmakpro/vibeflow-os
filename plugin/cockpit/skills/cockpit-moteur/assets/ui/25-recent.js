@@ -38,6 +38,9 @@
     return m < 2 ? 'just now' : m < 60 ? `${m} minutes ago` : m < 48 * 60 ? `${Math.round(m / 60)} hours ago` : `${Math.round(m / 1440)} days ago`;
   };
   const itemsOf = (ti) => items.filter((it) => ti == null || it.task === ti);
+  // one entry per (file, task): a file touched by two tasks is still one card. Every count shown is in cards.
+  const uniq = (list) => { const seen = new Set(); return list.filter((it) => !seen.has(it.id) && seen.add(it.id)); };
+  const nCards = (list) => uniq(list).length;
 
   /** One board with just the changed cards (and how they connect), each with its note. */
   function showRecent(ti) {
@@ -47,24 +50,24 @@
       title: one ? one.title : 'Recent work',
       question: one ? (one.request ? `You asked: ${one.request}` : '') : tasks.map((t) => t.title).join(' · '),
       answer: one ? one.summary : tasks.map((t) => `**${t.title}.** ${t.summary}`).join('\n\n'),
-      items: itemsOf(ti != null ? ti : null).map((it) => ({ id: it.id, note: it.note || (it.change === 'new' ? 'New' : 'Changed') })),
+      items: uniq(itemsOf(ti != null ? ti : null)).map((it) => ({ id: it.id, note: it.note || (it.change === 'new' ? 'New' : 'Changed') })),
     });
   }
 
   const btn = SC.addHeaderButton({ id: 'btn-recent', label: 'Recent work', icon: 'recent', title: 'What was just worked on, on one board', onClick: () => showRecent() });
   const b = document.createElement('span');
   b.className = 'badge';
-  b.textContent = String(items.length);
+  b.textContent = String(nCards(items));
   btn.appendChild(b);
 
   // codebase panel: each task, what was asked, what was done, and a way to see its cards
   SC.addPanelSection('overview', () => ({
     top: true,
-    html: `<div class="sec"><h3>Recent work <span class="c">${items.length}</span></h3>${R.updatedAt ? `<div class="rw-when">Updated ${h(ago(R.updatedAt))}</div>` : ''}<div style="margin-top:var(--sp-12)">${tasks.map((t, i) => itemsOf(i).length ? `
+    html: `<div class="sec"><h3>Recent work <span class="c">${nCards(items)}</span></h3>${R.updatedAt ? `<div class="rw-when">Updated ${h(ago(R.updatedAt))}</div>` : ''}<div style="margin-top:var(--sp-12)">${tasks.map((t, i) => itemsOf(i).length ? `
       <div class="rw-task"><div class="rw-tt">${h(t.title)}</div>
         ${t.request ? `<div class="rw-q"><b>You asked:</b> ${h(t.request)}</div>` : ''}
         ${t.summary ? `<div class="rw-s">${h(t.summary)}</div>` : ''}
-        <div class="rw-a"><button class="btn soft" data-rw="${i}">${SC.iconI('recent')}Show ${SC.plural(itemsOf(i).length, 'card')}</button></div></div>` : '').join('')}</div></div>`,
+        <div class="rw-a"><button class="btn soft" data-rw="${i}">${SC.iconI('recent')}Show ${SC.plural(nCards(itemsOf(i)), 'card')}</button></div></div>` : '').join('')}</div></div>`,
     bind: (el) => el.querySelectorAll('[data-rw]').forEach((x) => x.addEventListener('click', () => showRecent(+x.dataset.rw))),
   }));
 
@@ -73,11 +76,10 @@
   SC.addPanelSection('item', (id) => {
     const key = id.startsWith('m:') ? 'f:' + id.slice(2) : id;
     const mine = items.filter((it) => it.id === key);
-    const inside = items.filter((it) => it.id !== key && SC.chain(it.id).includes(key));
+    const inside = uniq(items.filter((it) => it.id !== key && SC.chain(it.id).includes(key)));
     if (!mine.length && !inside.length) return '';
     if (!mine.length) return { top: true, html: `<div class="sec"><h3>Recent work inside <span class="c">${inside.length}</span></h3><div class="list">${inside.map((it) => {
-      const i = SC.info(it.id);
-      return `<a class="row" data-go="${h(it.id)}"><span class="dot" style="background:var(--recent)"></span><span class="rt"><div class="rn">${h(i.name)}</div>${it.note ? `<div class="rd">${h(it.note)}</div>` : ''}</span></a>`;
+      return `<a class="row" data-go="${h(it.id)}"><span class="dot" style="background:var(--recent)"></span><span class="rt"><div class="rn">${h(SC.shownName ? SC.shownName(it.id) : SC.info(it.id).name)}</div>${it.note ? `<div class="rd">${h(it.note)}</div>` : ''}</span></a>`;
     }).join('')}</div></div>` };
     return { top: true, html: `<div class="sec">${mine.map((it) => {
       const t = tasks[it.task] || {};

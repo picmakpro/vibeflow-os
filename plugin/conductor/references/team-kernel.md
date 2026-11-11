@@ -270,30 +270,61 @@ Doctrine détaillée côté dev (le protocole complet de mission) :
 des étages croisés (quand les insérer, forme DAG, budgets, invariants) :
 `dev-orchestrator-references/mission-cross-team.md`.
 
-## Fin de tour inerte
+## Fin de mandat
 
-Source unique (ADR-030) ; les agents y renvoient. Mesuré le 2026-11-05 :
+Source unique (ADR-030) ; les agents y renvoient. Un mandat se termine par un rapport typé ET par
+l'arrêt de tout ce que l'agent a lancé, dans le même tour. Mesuré le 2026-11-05 (F1-F4) puis le 2026-11-08 (F5-F7) :
 - **F1.** Un worker qui rend la main pendant qu'une commande Bash tourne en fond reçoit le statut
   « waiting on its own background work » (`completed`, résultat « may be interim ») et reste vivant.
   Dans les 5 orphelins des 3-5 novembre, la commande avait été basculée AUTOMATIQUEMENT en fond par
   le timeout Bash (120/600 s), jamais lancée en `run_in_background` : boucle `pgrep -f` qui se
   trouve elle-même, serveur jamais arrêté, suite qui ne rend pas la main, mutant qui boucle.
 - **F2.** `TaskStop` arrête la PROPRE tâche de fond de l'agent qui l'a ; sans lui : `No such tool available`.
-- **F3.** Un parent ne peut pas arrêter son enfant (`Task <enfant> is owned by <enfant>`) : seuls l'agent
-  lui-même ou la session principale le peuvent. `ListAgents` est absent des sous-agents de fond (un `TaskStop`
-  sur identifiant inconnu liste les « Running background agents »).
+- **F3.** Un parent ne peut pas arrêter son enfant vivant (`Task <enfant> is owned by <enfant>`) : seuls l'agent
+  lui-même ou la session principale le peuvent. `ListAgents` est absent des sous-agents de fond.
 - **F4.** 4 des 5 orphelins furent fermés `close --status=done` sur ce résultat intermédiaire : 0 enfant, il tournait.
+- **F5** (sonde, 2026-11-08). Un sous-agent qui rend son tour avec une tâche Bash de fond vivante EST réveillé par la
+  notification de fin de cette tâche (4 s après la fin, tâche de 75 s). Le cas du codeur K5 (2026-11-08, #223) n'est donc
+  pas « la notification ne réveille jamais » : sa tâche ne s'est jamais terminée (5 processus vivants 60 min après, 6
+  fichiers non commités). Rendre son tour en attente, c'est confier son sort à la terminaison de la tâche ; si elle pend
+  (enfant qui survit, suite qui boucle, serveur jamais arrêté), l'agent n'est jamais repris et son travail reste échoué.
+  Seule une attente en premier plan, bornée par une échéance, détecte la pendaison et permet d'arrêter puis de rapporter `blocked`.
+- **F6** (2026-11-08). `TaskStop(<agentId>)` d'un parent sur un enfant qui a rendu son rapport final rend `No task found with ID …`,
+  suivi de la liste « Running background agents », qui contient AUSSI des agents d'autres missions de la même session. Donc :
+  après rapport, `TaskStop` VÉRIFIE (« No task found » = fini) ; un enfant encore listé est vivant → réveil par `SendMessage`,
+  jamais `close --status=done`. On n'arrête jamais un agent de la liste qui n'est pas le sien, ni un agent dont on n'a pas lu
+  le dernier message (un `TaskStop` de la session principale à 03 h sur un worker listé `completed` a tué un juge en attente légitime).
+- **F7** (mesuré par le manager de la mission #223, 2026-11-08). Une commande Bash au premier plan est aussi déplacée en fond par le harnais quand un message arrive pendant qu'elle tourne (« Command was moved to the background so that a message that arrived while it was running can reach you ») : elle continue de tourner et doit être attendue ou arrêtée (`TaskStop` sur son identifiant) comme toute tâche de fond.
 
-**Worker.** Jamais de main rendue avec une tâche de fond vivante, bascule automatique comprise.
-Commandes bornées (itérations max, jamais de `pgrep -f` qui se trouve lui-même, serveur lancé =
-serveur arrêté) ; toute commande passée en fond est attendue ou arrêtée par `TaskStop` avant le
-rapport ; ce qui ne s'arrête pas → `blocked`, identifiant de tâche en finding.
+**Worker.** Aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (timeout Bash ou message entrant, F7) :
+une tâche passée en fond (même automatiquement) s'attend ou s'arrête par `TaskStop(<id de tâche>)` avant le rapport. Toute attente est
+au premier plan et bornée par une échéance explicite : tranches de sommeil sous le timeout Bash puis test de la condition, ou outil
+Monitor si disponible ; un job long se lance détaché (`nohup … &`), PID et journal consignés, puis se sonde au premier plan. Commit AVANT
+tout rejeu long. À l'échéance : arrêt de ses propres processus et `blocked` (id de tâche et PID en finding). Fin de mandat = rapport
+typé + arrêt de ses propres processus (serveurs, navigateurs, tests, `sleep`), PID consignés au lancement, jamais par motif de
+commande ; le tout dans le même tour. Commandes bornées (itérations max, jamais de `pgrep -f` qui se trouve lui-même). Un agent sans
+`Bash` ni `Agent` dans ses `tools:` (juges et rédacteurs en lecture/écriture seule) ne peut lancer aucune tâche de fond : il ne porte pas
+le bloc.
 
-**Manager.** « waiting on its own background work » n'est pas un retour : jamais `close --status=done`
-ni `dag.sh mark done` dessus ; `SendMessage` au worker pour qu'il arrête sa tâche (`TaskStop`), puis
-attente de la notification « finished ». Avant de rendre, arrêt de budget ou handoff compris :
-`driver-lock.sh orphans` à 0 ; tout enfant vivant est nommé (`agentId`) au rapport et relayé par
-`SendMessage(main)`, seule à pouvoir l'arrêter (F3) ; `close --status=stopped` après sa confirmation.
+**Manager** (porte AUSSI la règle Worker : il attend ses enfants au premier plan). « Rapport final » = bloc typé présent ET aucune
+tâche annoncée en attente (« waiting on its own background work » / « may be interim » : attente, ni `close` ni `dag.sh mark done`).
+Alors, dans cet ordre : `TaskStop(<agentId>)` de vérification D'ABORD (F6) ; « No task found » = fini → `close --status=done` ;
+« owned by <enfant> » ou agent encore listé = vivant → réveil par `SendMessage`, ni close ni balayage. Sur « No task found » SEULEMENT, balayage par
+`"$S"/worktree-procs.sh stop --path=<abs> [--max=N]` (rc 0 plus rien, 2 survivants, 3 plafond dépassé rien tué, 4 indéterminé ;
+`list` pour constater d'abord), seulement d'un worktree git SECONDAIRE ouvert pour le mandat du worker (git-dir ≠ git-common-dir), jamais le
+checkout principal ni le cwd de sa propre session ; sur un arbre partagé par plusieurs workers : `list` et nommer, `stop` seulement quand
+plus aucun enfant n'y vit. Codes de `worktree-procs.sh` : rc 4 (indéterminé) et rc 2 (survivants) ne se lisent jamais comme « propre » et se nomment
+au rapport ; rc 3 : rien tué, nommer et escalader ; rc 64 : chemin refusé, vérifier le worktree visé. Avant tout hand-back ou rapport final, arrêt de budget ou handoff compris : aucun enfant vivant,
+`driver-lock.sh orphans` à 0 (un manager sans registre, tel `vf-test-orchestrator`, prend la liste rendue par `TaskStop`, F6 ; `$S` se résout comme
+`mission-flow.md` §Résolution), sauf cas nommé (`agentId`, consigne de reprise) relayé par `SendMessage(main)`, seule à pouvoir arrêter
+un enfant vivant (F3) ; `close --status=stopped` après sa confirmation.
+
+**Head** (`vibeflow-head`). À la sortie d'un manager : `driver-lock.sh orphans` + liste des agents de fond. Pour chaque enfant de
+CETTE mission encore vivant, lire son dernier message avant tout geste. Attente légitime = l'enfant est un manager qui attend ses
+propres enfants vivants, ou sa tâche progresse (dernier message ou sortie de moins de 30 min) → réveil ou attente. Attente échouée =
+un worker dont le dernier message annonce une attente (règle Worker violée) sans progrès depuis 30 min, ou un manager silencieux depuis plus de 30 min sans enfant vivant (relance par `SendMessage`, puis `TaskStop` si aucune réponse) ; rapport rendu → `TaskStop`
+(la session principale peut l'émettre). Jamais sur un agent d'une autre mission (F6). Puis balayage (`worktree-procs.sh`) des seuls
+worktrees secondaires de la mission, mêmes bornes que le manager.
 
 ## Verrou par compartiment (lab partitionné)
 

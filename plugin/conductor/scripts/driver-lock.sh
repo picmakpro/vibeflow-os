@@ -648,7 +648,7 @@ journal_event() {
 # de vie d'un agent se lit dans la liste « Running background agents » (ListAgents est absent des
 # sous-agents) ; `orphans` liste ce qu'il faut ALLER verifier, et `close --status=stopped` se pose
 # apres la confirmation de la session principale, qui seule arrete un enfant (team-kernel.md
-# § Fin de tour inerte), jamais avant.
+# § Fin de mandat), jamais avant.
 # ---------------------------------------------------------------------------------------------
 if [ "$PARTITIONED" = 1 ]; then
   REG="$LOCK_PARENT/${LOCK_BASE}.children.jsonl"   # frere du verrou resolu ; VF_DRIVER_CHILDREN ignoree (P57-D-31)
@@ -1181,7 +1181,7 @@ case "$ACTION" in
     # orphans (issue #82) : un reclaim est le geste d'une reprise de session, donc le manager qui
     # revient (ou son remplacant, meme owner) voit d'un coup ce qui tourne encore en son nom.
     _orph="$(orphans_count)"
-    [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) encore running sous ce lock. Les relayer a la session principale (SendMessage(main)), seule a pouvoir les arreter : team-kernel.md, Fin de tour inerte ; close --status=stopped apres sa confirmation"
+    [ "$_orph" -gt 0 ] && log "registre : $_orph agent(s) consigne(s) encore running sous ce lock. Les relayer a la session principale (SendMessage(main)), seule a pouvoir les arreter : team-kernel.md, Fin de mandat ; close --status=stopped apres sa confirmation"
     printf '{"reclaimed": true, "owner": "%s", "session_id": "%s", "session_ids": %s, "generation": "%s", "lease_seconds": %s, "orphans_count": %s, "orphans": %s%s}\n' \
       "$OWNER" "$sid" "$(json_session_ids "$(lock_session_ids)")" "$(lock_gen)" "$_lease" "$_orph" "$(orphans_ids_json)" "$SCOPE_JSON"
     exit 0

@@ -8,7 +8,7 @@
 //     la droite garde son contenu ; sous 1 600 px les boutons d'action passent en icône seule (le libellé reste dans l'infobulle) ;
 //   - bornes mesurées à 1 024 px sur l'onglet Code AVEC ses boutons optionnels (Travail récent, Écrans) : aucun bouton ne sort de la fenêtre ;
 //   - infobulle : tout bouton d'en-tête sans `title` reprend son libellé (le viewer n'en pose pas sur « Parcours »), car sous 1 600 px il n'est plus qu'une icône ;
-//   - zoom au-dessus de la barre de question jusqu'à 1 279 px (comme le viewer le fait déjà sur écran tactile) ;
+//   - zoom en rangée au bord gauche, au-dessus de la pastille « Terminal » et de la barre de question, de 701 à 1 279 px (comme dès 1 280 px) ;
 //   - logo VibeFlow : le viewer inverse le logo clair du thème (il attend un logo blanc) ; nos deux logos ont déjà le bon contraste ;
 //   - sous 1 000 px : la barre de question range l'invite sur sa propre ligne ; sous 700 px le fil d'Ariane cède sa place au zoom.
 //   - fil d'Ariane (O2, recette 2026-11-03 ; budget revu après la revue de la recette 3, F1/F2) : dès 1 280 px, la colonne gauche de l'en-tête prend la largeur naturelle de son contenu (`flex: 1 1 auto`) et c'est la RECHERCHE qui cède
@@ -16,6 +16,8 @@
 //     Dans le fil, ordre de troncature : le nom du projet, puis les segments LONGS du milieu (poids 100 000), puis le premier et le dernier longs (poids 1 : ils ne cèdent qu'une fois le milieu à son plancher, à un centième de pixel près : un poids égal à 1 contre 1 000 laissait rogner le nom du projet de 1 px à 1 440 px), chaque segment long gardant 64 px ; un segment COURT (moins de 12 caractères, soit 11 au plus)
 //     ne rétrécit jamais (poids 0). Si, tous les longs réduits à leur plancher, le fil déborde encore, les segments du milieu sont masqués un à un (du plus proche du premier) derrière un « … » (infobulle : leurs noms) ; le premier et le dernier restent.
 //     Le masquage ne joue qu'à partir de 1 280 px et se rejoue au rendu du fil, au changement de nom, à la mise à jour de la largeur de la colonne gauche (badge, redimensionnement) et au chargement des polices.
+//   - sous 1 280 px (PU-G-001, PU-G-002, coque étroite 2026-11-06) : la vue d'ensemble s'écrit « Ensemble » (le nom entier reste le nom accessible) ; le niveau COURANT du fil est toujours entier (flèche « Remonter » + niveau), les niveaux d'avant cèdent d'abord (masqués un à un, du plus proche de la racine), puis, de 1 000 à 1 279 px
+//     (souris), le nom du dépôt cède au niveau courant tant qu'on est dans un dossier ; à la racine le nom du dépôt garde sa place et le libellé « Ensemble » est masqué plutôt que rogné. Le bouton Thème passe à 36 px (comme les autres boutons de la rangée) : 8 px rendus au nom ; l'ouvreur Git garde ses 44 px (P78-D-34).
 (() => {
   const style = document.createElement('style');
   style.textContent = `
@@ -47,9 +49,14 @@
       #vf-lock[data-vf-point] .bl { display: none; }
     }
     @media (min-width: 1000px) and (max-width: 1279px) {
-      #zoom { left: auto; right: calc(var(--pw) + var(--edge)); bottom: auto; top: calc(var(--hh, 64px) + var(--sp-8)); flex-direction: column; border-radius: 26px; }
-      #context { max-width: min(520px, calc(100% - var(--pw) - 104px)); }
       #ask { width: min(700px, calc(100% - var(--pw) - 48px)); }
+    }
+    /* Zone basse, axe commun de 701 à 1 279 px (recette du 2026-11-08, lot C ; PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») : le zoom n'est plus la pile
+       verticale du haut à droite (celle du viewer sous 1 000 px et sur tactile, et celle de ce fichier de 1 000 à 1 279 px), mais la rangée de 1 280 px et plus, au bord gauche --edge ; il se pose au-dessus de la pastille « Terminal »
+       (qui prend sa largeur, vf-cockpit-terminal-tiroir.mjs), elle-même au-dessus de la barre de question quand elles se recouvrent. Plus de bouton à droite : le titre retrouve sa largeur d'origine. Sous 701 px la pile du téléphone reste (P70-D-09). */
+    @media (min-width: 701px) and (max-width: 1279px) {
+      #zoom { left: var(--edge); right: auto; top: auto; bottom: calc(var(--edge) + var(--vf-ask-bas, 0px)); flex-direction: row; border-radius: 999px; } /* --vf-ask-bas : hauteur de la barre de question + 8, relue plus bas ; sans la pastille « Terminal » (cockpit sans --terminal) le zoom clôt déjà la barre */
+      #context { max-width: min(520px, calc(100% - var(--pw) - 64px)); }
     }
     @media (min-width: 1280px) {
       header .hl { flex: 1 1 auto; } /* sa largeur naturelle ; il cède après la recherche */
@@ -66,9 +73,84 @@
        (celle de 1 440 px), jamais la colonne du haut qui recouvrait les cartes. Code et Projet gardent leur position (la barre de question occupe le bas) ; sous 701 px la pile verticale du téléphone (02-vf-telephone.js) reste seule. */
     @media (min-width: 701px) { body.vf-tab-equipe #zoom { left: var(--edge); right: auto; top: auto; bottom: var(--edge); flex-direction: row; border-radius: 999px; } }
     @media (max-width: 999px) { #ask-input { flex: 1 1 100%; } }
+    #zoom[data-vf-replie] { display: none; } /* C-R6 : zoom replié, voir replier() plus bas */
+    /* 72.1 (réglage du 2026-11-06, demande de Samuel) : la pastille « Terminal » et la barre de question se centrent sur le même axe horizontal, à la même marge du bord (--edge) ; le zoom (R17.2 en fixe la position et la taille) reste empilé 8 au-dessus de la pastille, au même bord gauche.
+       Souris (>= 1 000 px, hors tactile) : la barre passe de 54 à 40 = 4 + 32 + 4 (invite et envoi de 32) et la pastille, qui garde ses 32 (T20.8), se pose à 16 + 4 = 20 du bas : (40 - 32) / 2 = 4, axe commun exact (cy identiques ; garde de l'axe : T21.12).
+       Tactile ou < 1 000 px : les cibles font 44, donc 52 = 4 + 44 + 4 comme le zoom (barre : rembourrage de 4 autour de la ligne de 44 d'ask-mode ; pastille : 52). Le rembourrage gauche de la barre reste celui du viewer. Une barre sur deux lignes (< 1 000 px) garde sa face basse sur la ligne de base. */
+    @media (min-width: 1000px) and (not (pointer: coarse)) {
+      #ask-form { padding-top: var(--sp-4); padding-bottom: var(--sp-4); padding-right: var(--sp-4); }
+      #ask-input, #ask-send { height: 32px; } #ask-send { width: 32px; }
+    }
+    @media (min-width: 701px) and (max-width: 1279px) { /* barre et pastille au même bord gauche (--edge) : la barre ne se centre plus dans l'aire laissée par le panneau (24 à 1 024 px, 28 à 768 px contre 16). Au-delà de 1 279 px elle reste centrée : la pastille ne la rencontre jamais. */
+      #ask { left: var(--edge); transform: none; width: min(700px, calc(100% - var(--pw) - 2 * var(--edge))); }
+    }
+    @media (max-width: 999px), (pointer: coarse) {
+      #ask-form { padding-top: var(--sp-4); padding-bottom: var(--sp-4); padding-right: var(--sp-4); }
+    }
     @media (max-width: 700px) { header #crumbs { display: none; } }
+    @media (max-width: 700px) { #ask { width: calc(100% - 2 * var(--edge)); bottom: var(--edge); } #ask-form { padding-left: var(--sp-16); } } /* correction ciblée du lot C (C-R2 et C-R4 : décisions déléguées par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée ; ce ne sont ni 574c8b6f ni 70bf5046 ; juge de design 84/100) : --edge vaut pour tout bord de fenêtre (DESIGN.md § 4), le bas de la barre est donc à 16 comme ses côtés (la feuille de détail et le tiroir gardent 8, hors de ce lot) ; et un seul retrait intérieur gauche du champ, 16 à toutes les largeurs (le viewer le met à 12 sous 701 px : l'invite sautait de 4 px au passage de 700 à 701 px) */
+    /* 1 280 px et plus (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, « À droite de la colonne (Recommandé) », consigné en § 10 du rapport GLOBAL de la recette (70bf5046)) : la barre part juste à droite de la colonne zoom/pastille, écart --sp-8 (x = 16 + 114 + 8 = 138), au lieu d'être centrée dans la carte (x = 160 à 1 280, 174 à 1 440 : l'écart variait avec la largeur). --vf-col : largeur de la colonne, relue sur le zoom (une seule source, plus bas). Elle finit à --edge du panneau. */
+    @media (min-width: 1280px) { #ask { left: calc(var(--edge) + var(--vf-col, 114px) + var(--sp-8)); transform: none; width: min(700px, calc(100% - var(--pw) - 2 * var(--edge) - var(--vf-col, 114px) - var(--sp-8))); } }
+    /* PU-G-001 / PU-G-002 : fil d'Ariane sous 1 280 px. Racine : libellé court (le nom entier reste le nom accessible, posé par ajuste0). Niveau courant : jamais rogné. Niveaux d'avant : les premiers à céder (masqués par ajuste0). */
+    @media (max-width: 1279px) {
+      header #crumbs button[data-vf-racine] { font-size: 0; flex: 0 1 auto; min-width: max-content; padding-inline: var(--sp-6); } /* jamais rogné : ajuste0 le masque s'il ne tient pas */
+      header #crumbs button[data-vf-racine]::before { content: attr(data-vf-racine); font-size: 13.5px; }
+      header #crumbs button.cur { flex: none; max-width: none; }
+      header #crumbs button:not(.cur):not([data-vf-racine]) { flex: 0 100000 auto; min-width: 64px; }
+      header #crumbs [data-vf-masque] { display: none; }
+    }
+    @media (min-width: 701px) and (max-width: 999px) { /* la colonne gauche garde la largeur de son contenu (nom accessible du niveau courant entier) et la recherche cède la première */
+      header .hl { flex: 1 0 auto; }
+      header .hc { flex: 2 100 120px; }
+      header[data-vf-git] .hc { flex-basis: 72px; } /* l'ouvreur Git ajoute 48 px à la rangée : la recherche en cède autant (même règle que 76-vf-git-entete.js), pour que l'en-tête se replie aux MÊMES largeurs avec et sans Git (témoin F5, Phase 78) */
+    }
+    @media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) {
+      header #theme-toggle { width: 36px; height: 36px; padding: 0; justify-content: center; } /* l'ouvreur Git garde ses 44 px (P78-D-34) */
+      header .hl { flex: 1 1 auto; } /* la colonne gauche prend la largeur naturelle de son contenu et c'est la RECHERCHE (poids 100 000, plancher de 152 px de P78-D-39) qui cède la première, comme dès 1 280 px */
+      header .hc { flex: 0 100000 400px; }
+      
+      header:has(#btn-up:not([hidden])) .hl { min-width: calc(288px + var(--vf-cur, 0px)); } /* dans un dossier : 342 px moins les 54 px laissés au niveau courant, plus sa largeur (relevée par ajuste0 : --vf-cur) ... */
+      header:has(#btn-up:not([hidden])) .brand { min-width: 30px; } /* ... et le nom du dépôt cède sa place au niveau courant */
+    }
   `;
   document.head.appendChild(style);
+  // hauteur de la barre de question + 8, pour poser le zoom au-dessus d'elle de 701 à 1 279 px (règle ci-dessus) : 0 quand la barre n'est pas affichée (tiroir du terminal ouvert, onglet Équipe). Observateur posé ici, avant celui du tiroir
+  // (vf-cockpit-terminal-tiroir.mjs) : à chaque changement de taille de la barre la variable est à jour AVANT que la pastille et le zoom se replacent.
+  const barreQ = document.getElementById('ask');
+  if (barreQ) { const poser = () => document.documentElement.style.setProperty('--vf-ask-bas', barreQ.offsetHeight ? barreQ.offsetHeight + 8 + 'px' : '0px'); if (window.ResizeObserver) new ResizeObserver(poser).observe(barreQ); window.addEventListener('resize', poser); poser(); }
+  // largeur de la colonne zoom/pastille (le zoom en rangée de 701 px et plus) : la barre de question part à sa droite dès 1 280 px (règle ci-dessus). Relue à chaque changement de taille du zoom, jamais recopiée.
+  const zoomCol = document.getElementById('zoom');
+  if (zoomCol) { const poserCol = () => { if (zoomCol.offsetWidth) document.documentElement.style.setProperty('--vf-col', zoomCol.offsetWidth + 'px'); }; poserCol(); if (window.ResizeObserver) new ResizeObserver(poserCol).observe(zoomCol); window.addEventListener('resize', poserCol); }
+  // C-R6 (revue du lot C ; décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée : le zoom se replie) : de 701 px à 1 440 px, dans une fenêtre assez basse pour que la rangée du zoom
+  // ne tienne plus sans recouvrir le titre (h1, description) ou la carte de la visite guidée (tiroir du terminal ouvert, visite), le zoom se replie (data-vf-replie, display: none) tant que le recouvrement dure. Le zoom reste au clavier (+, − et f), à la souris (Ctrl+molette) et au toucher (pincement) ; « 0 » n'est lié à rien.
+  // Mesure : on le déplie, on lit son rectangle, on le replie s'il recouvre : tout dans la même tâche, sans rendu entre les deux. Le titre ne dépend pas du zoom, la visite se replace d'elle-même autour de lui : pas de boucle.
+  const mq701 = window.matchMedia('(min-width: 701px)');
+  const replier = () => {
+    const z = document.getElementById('zoom'); if (!z) return;
+    const avant = z.getAttribute('data-vf-replie');
+    const visite = document.getElementById('tour');
+    const visiteLa = !!visite && visite.getBoundingClientRect().width > 0;
+    if (avant === 'visite' && visiteLa && mq701.matches) return; // replié par la visite : il le reste tant qu'elle est là (la carte se replace autour du zoom : sans cela il clignoterait)
+    z.removeAttribute('data-vf-replie');
+    if (avant) window.dispatchEvent(new Event('vf-zoom-replie')); // I-2 : replié, le zoom n'avait plus de style en ligne ; déplié, la pastille et lui se replacent (vf-cockpit-terminal-tiroir.mjs, eviter) AVANT la mesure ci-dessous, sinon on le mesure à sa place de base, où il ne recouvre pas le titre, puis il se relève dessus
+    let motif = null;
+    if (mq701.matches || !document.body.classList.contains('no-panel')) { // I-2 : sous 701 px le zoom ne se replie que feuille de détail ouverte (relevé au-dessus d'elle, il peut recouvrir le titre dans une fenêtre basse)
+      const b = z.getBoundingClientRect();
+      if (b.width > 0 && b.height > 0) {
+        const sur = (e) => { if (!e) return false; const c = e.getBoundingClientRect(); return c.width > 0 && c.height > 0 && getComputedStyle(e).visibility !== 'hidden' && b.left < c.right - 0.5 && b.right > c.left + 0.5 && b.top < c.bottom - 0.5 && b.bottom > c.top + 0.5; };
+        if (sur(document.querySelector('#context h1')) || sur(document.querySelector('#context p'))) motif = 'titre'; else if (sur(visite)) motif = 'visite';
+      }
+    }
+    if (motif) z.setAttribute('data-vf-replie', motif);
+    if (motif !== avant) window.dispatchEvent(new Event('vf-zoom-replie')); // la pastille et la barre se replacent (vf-cockpit-terminal-tiroir.mjs)
+  };
+  let replierRaf = 0;
+  const replierPlusTard = () => { cancelAnimationFrame(replierRaf); replierRaf = requestAnimationFrame(() => { replier(); setTimeout(replier, 450); }); }; // 450 : fin des transitions du tiroir et du panneau
+  window.addEventListener('resize', replierPlusTard);
+  new MutationObserver(replierPlusTard).observe(document.body, { childList: true, attributes: true, attributeFilter: ['class'] });
+  if (barreQ && window.ResizeObserver) new ResizeObserver(replierPlusTard).observe(barreQ);
+  setInterval(() => { if (document.getElementById('tour')) replier(); }, 500); // la carte de la visite se replace d'elle-même, sans mutation du corps de page : on la relit tant qu'elle est là
+  replierPlusTard();
   // fil d'Ariane : étiquette les segments courts (moins de 12 caractères), puis masque derrière « … » les segments du milieu tant que le fil déborde (CSS : un segment long garde 64 px)
   const fil = document.getElementById('crumbs'), nomProjet = document.getElementById('proj-name'), gauche = document.querySelector('header .hl');
   let obs = null, replieRaf = null;
@@ -79,6 +161,13 @@
     fil.querySelector('.vf-ell')?.remove();
     const bs = [...fil.querySelectorAll('button')];
     for (const b of bs) { if (b.textContent.trim().length < 12) b.setAttribute('data-vf-court', ''); else b.removeAttribute('data-vf-court'); }
+    const racine = bs.length && bs[0] === fil.firstElementChild ? bs[0] : null; // PU-G-001 : seule la vue d'ensemble prend un libellé court
+    if (racine && /^(Vue d'ensemble|Overview)$/.test(racine.textContent.trim())) { racine.setAttribute('data-vf-racine', 'Ensemble'); racine.setAttribute('aria-label', racine.textContent.trim()); }
+    const cur = fil.querySelector('button.cur'); document.querySelector('header')?.style.setProperty('--vf-cur', (cur ? cur.offsetWidth : 0) + 'px'); // largeur naturelle du niveau courant (flex: none sous 1 280 px)
+    if (!matchMedia('(min-width: 1280px)').matches && bs.length) { // PU-G-002 : le niveau courant reste entier ; les niveaux d'avant cèdent un à un, puis la racine seule si elle ne tient pas
+      for (let k = 0; k < bs.length - 1 && fil.scrollWidth > fil.clientWidth + 1; k++) { bs[k].setAttribute('data-vf-masque', ''); bs[k].nextElementSibling?.setAttribute('data-vf-masque', ''); }
+      if (bs.length === 1 && bs[0].hasAttribute('data-vf-racine') && (fil.scrollWidth > fil.clientWidth + 1 || (nomProjet && nomProjet.scrollWidth > nomProjet.clientWidth + 1))) bs[0].setAttribute('data-vf-masque', ''); // PU-G-001 : le nom du dépôt passe avant le libellé de la racine
+    }
     if (matchMedia('(min-width: 1280px)').matches && bs.length > 2) {
       const ell = document.createElement('span'); ell.className = 'vf-ell'; ell.textContent = '…'; const noms = [];
       for (let k = 1; k < bs.length - 1 && fil.scrollWidth > fil.clientWidth + 1; k++) {

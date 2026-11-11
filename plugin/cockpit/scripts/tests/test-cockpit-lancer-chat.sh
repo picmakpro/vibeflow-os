@@ -330,7 +330,7 @@ cat > "$AUX/chrome-chat.mjs" <<'JS'
 // chrome-chat.mjs <chrome> <mode> <json> : scénarios navigateur de l'option chat ; UNE ligne JSON. Modes : vue (TC.6) · e2e (TC.7). Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement
 // (la case se coche par un clic de souris ; « Lancer » exige un clic de confiance). Chaque étape est isolée : une mesure indisponible est nommée dans `erreurs`.
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import http from 'node:http';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv; const A = JSON.parse(brut); const MS = Number(process.env.VF_CHAT_MS) || 20000;
 const erreurs = {}; const essai = async (nom, f) => { try { return await f(); } catch (e) { erreurs[nom] = String(e.message).slice(0, 160); return undefined; } };
 await executer(chrome, async (s) => {
@@ -343,7 +343,7 @@ await executer(chrome, async (s) => {
   if (mode === 'vue') {
     const ev = (x) => s.ev(x); const att = (x, n) => s.attendre(x, n, MS);
     const LANCER = `document.getElementById('proposition-lancer')`, CASE = `document.getElementById('proposition-chat')`, LIGNE = `document.getElementById('proposition-ligne')`, SEL = `document.getElementById('proposition-mode')`;
-    const clic = async (sel) => geste(await ev(RECT(sel)));
+    const clic = async (sel) => { await ev(`(() => { const e = ${sel}; if (e) e.scrollIntoView({ block: 'center' }); return true; })()`); return geste(await ev(RECT(sel))); }; // LB3-S : « Préparer » est APRÈS la commande exacte et la case, dans la zone défilante du bandeau : l'utilisateur l'amène sous la souris avant de cliquer (comme clicQ, LB2)
     await s.naviguer(pathToFileURL(A.page).href); await att(`typeof window.vfTermVue === 'object'`, 'vue');
     await ev(`(() => { window.__T = { appels: [] }; window.__cb = { lancer: (m, c) => { __T.appels.push(JSON.stringify([m, c])); return new Promise(() => {}); }, annuler() {} };
       window.__base = ${JSON.stringify(A.base)}; window.__monter = (over) => { vfTermVue.proposition(Object.assign({}, __base, { modeInitial: 'default' }, over), __cb); return true; }; return true; })()`);
@@ -368,8 +368,9 @@ await executer(chrome, async (s) => {
     });
     await essai('t4', async () => { // rappel lancer(mode, avecChat) : faux par défaut, vrai après le clic sur la case
       const armee = () => att(`${LANCER}.getAttribute('aria-disabled') === 'false'`, 'armement');
-      await ev(`(__T.appels.length = 0, true)`); await monter({ id: 'c4aaaaaa44' }); await armee(); await clic(LANCER); await pause(300); const a = await ev(`__T.appels.slice()`);
-      await ev(`(__T.appels.length = 0, true)`); await monter({ id: 'c5aaaaaa55' }); await clic(CASE); await armee(); await clic(LANCER); await pause(300); const b = await ev(`__T.appels.slice()`);
+      const appels = () => attendreEtStabiliser(() => ev(`__T.appels.slice()`), (v) => Array.isArray(v) && v.length >= 1, { pas: 300, max: 5000 }); // l'appel du rappel est lu une fois posé, plus après une pause fixe
+      await ev(`(__T.appels.length = 0, true)`); await monter({ id: 'c4aaaaaa44' }); await armee(); await clic(LANCER); const a = await appels();
+      await ev(`(__T.appels.length = 0, true)`); await monter({ id: 'c5aaaaaa55' }); await clic(CASE); await armee(); await clic(LANCER); const b = await appels();
       r.t4 = JSON.stringify([a, b]);
     });
     await essai('t5', async () => { // valeurs hostiles : aucun nœud, rien d'exécuté
@@ -398,8 +399,11 @@ await executer(chrome, async (s) => {
   const evQ = async (expression) => { const x = await s.send('Runtime.evaluate', { expression, contextId: cq, returnByValue: true, awaitPromise: true }); if (x && x.exceptionDetails) throw new Error('évaluation : ' + String((x.exceptionDetails.exception || {}).description || x.exceptionDetails.text).split('\n')[0].slice(0, 120)); return x && x.result && x.result.value; };
   const attQ = async (expr, nom, ms = MS) => { const fin = Date.now() + ms; let v; do { try { v = await evQ(expr); } catch { v = false; } if (v) return v; await pause(100); } while (Date.now() < fin); throw new Error(`attente de « ${nom} » dépassée (${ms} ms)`); };
   const CASE = `document.getElementById('proposition-chat')`, LANCER = `document.getElementById('proposition-lancer')`, LIGNE = `document.getElementById('proposition-ligne')`;
-  const clicQ = async (sel) => { const c = await evQ(RECT(sel)); const d = await s.ev(`(() => { const f = document.querySelector('.vf-term-tiroir iframe') || document.querySelector('iframe'); const b = f.getBoundingClientRect(); return { x: b.left, y: b.top }; })()`); await geste({ x: c.x + d.x, y: c.y + d.y }); };
-  await essai('amorcage', async () => { await s.naviguer(`${OP}/project.html#t=${A.amorce}`); await s.attendre(`${MSG('ready')} && !location.hash`, 'cadre de Q prêt', MS); });
+  const clicQ = async (sel) => { await evQ(`(() => { const e = ${sel}; if (e) e.scrollIntoView({ block: 'center' }); return true; })()`); /* LB2 : le bandeau, plus riche, défile dans le tiroir : l'utilisateur amène l'élément sous la souris avant de cliquer */
+    /* PU-G-136 : une proposition remonte le tiroir à 300 px juste après que Q a rendu le bandeau ; le cadre bouge ET la mise en page de Q suit sa hauteur : la position visée est le composite (rect de l'élément dans Q + position du cadre dans P), lu jusqu'à deux lectures égales */
+    const lireC = async () => { const c = await evQ(RECT(sel)); const f = await positionPosee(s.ev, `document.querySelector('.vf-term-tiroir iframe') || document.querySelector('iframe')`, { max: 1000 }); return c && f ? { x: c.x + f.x, y: c.y + f.y } : null; };
+    await geste(await stabiliser(lireC, { pas: 120, max: 3000 })); };
+  await essai('amorcage', async () => { await s.naviguer(`${OP}/project.html#t=${A.amorce}`); await s.attendre(`${MSG('ready')} && !location.hash`, 'cadre de Q prêt', process.env.VF_CHAT_MS ? MS : Math.max(MS, AMORCE)); }); // amorçage : borné par l'échéance globale (par défaut), sauf VF_CHAT_MS posée explicitement
   await essai('P', async () => { await s.naviguer(`${OP}/project.html`); await s.attendre(`!!document.querySelector('button.vf-term-pastille')`, 'pastille Terminal', MS);
     await s.ev(`(() => { const b = document.createElement('button'); b.id = 'temoin'; b.textContent = 't'; b.style.cssText = 'position:fixed;left:0;top:0;width:12px;height:12px;z-index:1'; document.body.appendChild(b); b.focus(); })()`);
     for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: ' ', code: 'Space', windowsVirtualKeyCode: 32, modifiers: 10 });
@@ -410,10 +414,10 @@ await executer(chrome, async (s) => {
     await attQ(`!!${CASE}`, 'case dans le bandeau de Q'); r[nom].case = await evQ(`({ type: ${CASE}.type, coche: ${CASE}.checked, texte: ${CASE}.closest('label').textContent.trim() })`);
     if (cocher) await clicQ(CASE); r[nom].cocheApres = await evQ(`${CASE}.checked`); r[nom].affichee = await evQ(`${LIGNE}.textContent`);
     await attQ(`${LANCER}.getAttribute('aria-disabled') === 'false'`, 'bouton Lancer armé'); await clicQ(LANCER);
-    const fin = Date.now() + MS; while (taille() === av && Date.now() < fin) await pause(100); await pause(500);
+    await attendreEtStabiliser(async () => taille(), (n) => n > av, { pas: 500, max: MS }); /* ^C puis la ligne peuvent arriver en deux morceaux : la capture est lue une fois la taille posée */
     r[nom].capture = fs.readFileSync(A.capture).subarray(av).toString('latin1');
   });
-  await lancement('e1', A.cibles[0], true); await pause(2500); await lancement('e2', A.cibles[1], false);
+  await lancement('e1', A.cibles[0], true); await attQ(`!document.getElementById('proposition')`, 'bandeau de e1 retiré'); await lancement('e2', A.cibles[1], false);
   r.csp = s.violations.slice(); return r;
 }, { csp: true });
 JS
@@ -503,7 +507,7 @@ if [ -n "$CHROME" ]; then
     assert_eq "M-CASE-TOUJOURS — le mutant (case offerte sans chat) rougit TC.6 : une case existe sans conversation" "$(rj "$VJ" '(j.erreur ? "plante" : (/^[0-9]\|[0-9]\|[0-9]\|[0-9]$/.test(j.t2 || "") && j.t2 !== "0|0|0|0") ? "rouge" : "autre : " + j.t2)')" "rouge"
   else sans_effet "M-CASE-TOUJOURS"; fi
   if mutant force vf-cockpit-terminal-client.mjs '/garde:corps-lancer/s/avecChat === true ? { chat: true } : {}/{ chat: true }/'; then
-    run_e2e "$MUT_OUT"
+    VF_CHAT_MS=20000 run_e2e "$MUT_OUT"
     assert_eq "M-CLIENT-CHAT-FORCE — le mutant (chat:true même case décochée) rougit TC.7 non cochée : la ligne de reprise part alors que la ligne standard était affichée" "$(rj "$EJ" '(j.erreur ? "plante" : (j.e2 && j.e2.cocheApres === false && typeof j.e2.capture === "string" && j.e2.capture.includes(" -r ") && j.e2.capture !== "\u0003" + j.e2.affichee) ? "rouge" : "autre : " + JSON.stringify(j.e2 || j.erreurs))')" "rouge"
   else sans_effet "M-CLIENT-CHAT-FORCE"; fi
 fi

@@ -4,6 +4,7 @@
 #   Q4 modèle : préséance et liste fermée · Q5 question piégée inoffensive · Q6 le modèle ne laisse aucune trace
 #   Q7 seul Claude Code est lancé · Q8 syntaxe et jeton de /api/vf/modeles · Q9 CLI de requête · Q10 identité de phase
 #   Q11 ARGS_CONFINEMENT = « Combinaison retenue » de la mesure (dépôt seulement)
+#   Q18 retours panel lot 7 (PU-G-096 un état par phase · PU-G-147 coupe au mot · PU-G-150 lignes non comprises)
 #   Q15 « Où en est-on ? » sans STATE.md · Q16 statut lisible (réponse locale, sous-titre) · Q17 parité des tables de statuts
 # Faux binaires claude et codex (node) en tête du PATH ; aucun vrai appel. Exit 0 si tout passe, 1 sinon.
 
@@ -45,6 +46,7 @@ else if (cmd === 'tok') http.get({ host: '127.0.0.1', port: Number(a[0]), path: 
 else if (cmd === 'get') http.get({ host: '127.0.0.1', port: Number(a[0]), path: a[1], headers: { Host: `127.0.0.1:${a[0]}`, ...(a[2] ? { 'x-vf-cockpit-token': a[2] } : {}) } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => { console.log(r.statusCode); process.stdout.write(b); }); });
 else if (cmd === 'json') console.log(String(new Function('j', 'return (' + a[1] + ')')(J(a[0]))));
 else if (cmd === 'loc') { const g = (await import(pathToFileURL(path.join(a[0], 'vf-cockpit-project.mjs')).href)).buildProjectGraph(a[1]); console.log(JSON.stringify((await import(pathToFileURL(path.join(a[0], 'vf-cockpit-ask.mjs')).href)).answerLocally(g, a[2]))); }
+else if (cmd === 'locg') console.log(JSON.stringify((await import(pathToFileURL(path.join(a[0], 'vf-cockpit-ask.mjs')).href)).answerLocally(J(a[1]), a[2]))); // locg <scripts> <graphe.json> <question> : réponse locale sur un graphe fabriqué
 else if (cmd === 'cst') console.log((await import(pathToFileURL(path.join(a[0], 'vf-cockpit-agent.mjs')).href)).ARGS_CONFINEMENT.join('\n'));
 else if (cmd === 'sub') { // sub <call.json> <liste-attendue> : la liste est-elle une sous-suite contiguë, dans l'ordre, de l'argv ?
   const argv = J(a[0]).argv, want = fs.readFileSync(a[1], 'utf8').split('\n'); if (want.at(-1) === '') want.pop(); // un élément vide est légitime (--setting-sources "") : seul le saut de ligne final disparaît
@@ -227,11 +229,16 @@ assert_eq "Q15.3 — la réponse dit qu'il n'y a pas de STATE.md" "$(H json "$WO
 assert_eq "Q15.4 — pas de titre « À finir » suivi d'une liste vide" "$(H json "$WORK/q15.json" 'j.answer.split("\n").map((l,i,a)=>/^À finir/.test(l)&&!/^- /.test(a.slice(i+1).find(x=>x.trim())||"")).some(Boolean)')" "false"
 mkq "$WORK/q16" ready_to_execute; H loc "$SCRIPTS" "$WORK/q16" "Où en est-on ?" > "$WORK/q16.json"
 assert_eq "Q16.1 — la réponse locale n'a aucun statut brut (mot à tiret bas)" "$(H json "$WORK/q16.json" '/\b[a-z]+_[a-z_]+\b/.test(j.answer)')" "false"
-assert_eq "Q16.2 — la réponse locale porte le libellé français « prête à exécuter »" "$(H json "$WORK/q16.json" '/prête à exécuter/.test(j.answer)')" "true"
+assert_eq "Q16.2 — la réponse locale dit l'état de la CARTE (« fait »), cite le statut de STATE.md en français à part (« prête à exécuter »), et signale qu'ils divergent (« STATE.md semble périmé »), comme le panneau" "$(H json "$WORK/q16.json" '/Dernière phase : \[\[n:ph-1\]\] · fait/.test(j.answer)&&/Statut noté dans STATE\.md : prête à exécuter/.test(j.answer)&&/STATE\.md semble périmé/.test(j.answer)')" "true"
 "$NODE" "$SCRIPTS/vf-cockpit-project.mjs" "$WORK/q16" > "$WORK/q16g.json"
-assert_eq "Q16.3 — sous-titre du graphe (CLI) : libellé français, aucun tiret bas" "$(H json "$WORK/q16g.json" '/prête à exécuter/.test(j.project.summary)&&!/_/.test(j.project.summary)')" "true"
+assert_eq "Q16.3 — sous-titre du graphe (CLI) : état de la carte de la phase courante (PU-G-093, P69-D-08), libellé français, aucun tiret bas, jamais le statut brut de STATE.md" "$(H json "$WORK/q16g.json" '/phase 1 · fait\./.test(j.project.summary)&&!/_|prête à exécuter/.test(j.project.summary)')" "true"
+mkq "$WORK/q16c" ready_to_execute; sed -i.bak 's/^- \[x\] \*\*Phase 1/- [ ] **Phase 1/' "$WORK/q16c/.planning/ROADMAP.md"; H loc "$SCRIPTS" "$WORK/q16c" "Où en est-on ?" > "$WORK/q16c.json"
+assert_eq "Q16.5 — témoin d'accord : carte et STATE.md concordent, la réponse ne crie pas « périmé »" "$(H json "$WORK/q16c.json" '/Statut noté dans STATE\.md : prête à exécuter/.test(j.answer)&&!/semble périmé/.test(j.answer)')" "true"
 mkq "$WORK/q16b" statut_inventé; "$NODE" "$SCRIPTS/vf-cockpit-project.mjs" "$WORK/q16b" > "$WORK/q16bg.json"
 assert_eq "Q16.4 — statut inconnu : omis du sous-titre, jamais affiché brut" "$(H json "$WORK/q16bg.json" '/inventé|statut_/.test(j.project.summary)')" "false"
+mkdir -p "$WORK/q16d/.planning/phases/01-x"; printf -- '# Roadmap\n\n## Phases\n\n- [x] **Phase 1 : Socle** - fait\n- [ ] **Phase 2: Suite** - à faire\n\n### Phase 2: Suite\n**Goal** ok\n**Depends on** Phase 1 et plus\n' > "$WORK/q16d/.planning/ROADMAP.md"; printf -- '---\nstatus: executing\n---\n' > "$WORK/q16d/.planning/STATE.md"
+H loc "$SCRIPTS" "$WORK/q16d" "Que veut dire lignes non comprises ?" > "$WORK/q16d.json"
+assert_eq "Q16.6 — jointure lot 6 / lot 7 : sur un VRAI graphe (dérive mesurée par le panneau, champs ajoutés au lot 6), la réponse « lignes non comprises » donne le bon nombre (1), le bon fichier:ligne (ROADMAP.md:10) et le compte des autres écarts (3)" "$(H json "$WORK/q16d.json" '/\n1 ligne dans ce projet/.test(j.answer)&&/`\.planning\/ROADMAP\.md:10`/.test(j.answer)&&/3 lignes sont lues malgré/.test(j.answer)')" "true"
 assert_eq "Q17.1 — mêmes clés : table serveur STATUTS et table navigateur STATUT" "$("$NODE" --input-type=module -e "
 import fs from 'fs'; import { pathToFileURL } from 'url';
 const S = (await import(pathToFileURL('$SCRIPTS/vf-cockpit-project.mjs').href)).STATUTS || {};
@@ -248,6 +255,139 @@ if [ -n "$MESURE" ]; then
   assert_eq "Q11.3 — témoin rouge : la même comparaison contre la liste amputée de son dernier élément signale l'écart" "$(cmp -s "$WORK/const.txt" "$WORK/amputee.txt" && echo identique || echo different)" "different"
   assert_eq "Q11.4 — la comparaison a porté sur une constante non vide et un fichier attendu non vide" "$([ -s "$WORK/const.txt" ] && [ -s "$WORK/attendu.txt" ] && echo oui || echo non)" "oui"
 else echo "  ⊘ Q11 sauté : mesure absente du dépôt installé (non comptée comme réussie)"; fi
+
+echo "=== Q18 — retours panel lot 7 : un état par phase, coupe au mot, lignes non comprises (PU-G-096, 147, 150) ==="
+"$NODE" --input-type=module -e "
+import fs from 'fs';
+const nd = (id, o) => ({ id, label: id, kind: 'phase', st: 'todo', parent: null, ...o });
+const foot72 = '16/16 plans · ' + 'mot '.repeat(15) + 'interminément long';
+const G = { nodes: [
+  nd('ms-v2', { kind: 'milestone', label: 'v2', st: 'active', foot: '5 clos · 1 à recetter · 0 à faire · 83 %' }),
+  nd('ms-v3', { kind: 'milestone', label: 'v3', st: 'active', foot: '1 clos · 3 à faire · 25 %' }),
+  nd('ph-1', { label: 'Phase 1 · Fondations', num: '1', st: 'done', parent: 'ms-v2', foot: '2/2 plans' }),
+  nd('ph-72', { label: 'Phase 72 · Lancer le travail', num: '72', st: 'recette', parent: 'ms-v2', foot: 'à recetter · ' + foot72 }),
+  nd('ph-1.req', { kind: 'exigences', label: 'Exigences', st: 'active', parent: 'ph-1', foot: '1/2' }),
+], files: [
+  { p: 'req/AA-01', n: 'ph-1.req', name: 'AA-01', st: 'active', d: 'mot '.repeat(15) + 'centralisation de la suite' },
+], links: [], meta: { vf: { milestone: 'v2', phase: '72', status: 'ready_to_plan', lastActivity: '2026-11-05', milestones: [{ key: 'v2', id: 'n:ms-v2' }, { key: 'v3', id: 'n:ms-v3' }], drift: { nonComprisesN: 4, corrigeable: true, regles: [{ regle: 'ligne-non-comprise', n: 4 }, { regle: 'autre', n: 2 }], nonComprises: [{ fichier: '.planning/ROADMAP.md', ligne: 486, extrait: 'Une ligne qui ressemble à un champ mais qui n est pas lisible ' + 'x'.repeat(30) + 'gauche ensuite' }, { fichier: '.planning/REQUIREMENTS.md', ligne: 12, extrait: 'court' }] } } } };
+fs.writeFileSync('$WORK/q18g.json', JSON.stringify(G));
+const H = JSON.parse(JSON.stringify(G)); H.meta.vf.drift = { nonComprisesN: 0, regles: [], nonComprises: [] }; fs.writeFileSync('$WORK/q18h.json', JSON.stringify(H));
+"
+assert_eq "Q18.0 — témoin vivant : le pied de la phase dépasse 90 caractères et la coupe tombe dans un mot" "$(H json "$WORK/q18g.json" "(() => { const f = j.nodes.find((n) => n.id === 'ph-72').foot; return f.length > 90 && /[a-z]/.test(f[89]) && /[a-z]/.test(f[90]) })()")" "true"
+H locg "$SCRIPTS" "$WORK/q18g.json" "Où en est le jalon ?" > "$WORK/q18a.json"
+assert_eq "Q18.1 — « Où en est le jalon ? » : aucun « sans statut », ni dans le texte ni dans les notes" "$(H json "$WORK/q18a.json" '/sans statut/.test(j.answer + j.items.map((i) => i.note).join())')" "false"
+assert_eq "Q18.2 — la Phase 72 n'est citée qu'une fois dans le texte" "$(H json "$WORK/q18a.json" "j.answer.split('[[n:ph-72]]').length - 1")" "1"
+assert_eq "Q18.3 — chaque carte n'est listée qu'une fois dans le tableau" "$(H json "$WORK/q18a.json" 'j.items.length === new Set(j.items.map((i) => i.id)).size')" "true"
+assert_eq "Q18.4 — les autres jalons en cours sont cités et listés" "$(H json "$WORK/q18a.json" "j.answer.includes('[[n:ms-v3]]') && j.items.some((i) => i.id === 'n:ms-v3')")" "true"
+assert_eq "Q18.5 — la phase en recette ne répète pas « à recetter » dans sa propre ligne" "$(H json "$WORK/q18a.json" "!/recetter · à recetter/.test(j.answer + j.items.map((i) => i.note).join('|'))")" "true"
+H locg "$SCRIPTS" "$WORK/q18g.json" "Que contient la phase 72 ?" > "$WORK/q18p.json"
+assert_eq "Q18.6 — la carte d'une phase en recette : « à recetter » une fois, pas « sans statut »" "$(H json "$WORK/q18p.json" "!/sans statut|recetter · à recetter/.test(j.answer)")" "true"
+H locg "$SCRIPTS" "$WORK/q18g.json" "Qu'est-ce qui est en cours ?" > "$WORK/q18c.json"
+assert_eq "Q18.7 — « en cours » : aucune exigence d'une phase faite" "$(H json "$WORK/q18c.json" "!j.answer.includes('ph-1.req') && !j.items.some((i) => i.id.includes('ph-1.req') || i.id.includes('req/AA-01'))")" "true"
+assert_eq "Q18.8 — « en cours » : les jalons en cours restent listés" "$(H json "$WORK/q18c.json" "j.answer.includes('[[n:ms-v3]]') && j.answer.includes('[[n:ms-v2]]')")" "true"
+H locg "$SCRIPTS" "$WORK/q18g.json" "Quelles sont les exigences de la phase 1 ?" > "$WORK/q18r.json"
+assert_eq "Q18.9 — témoin rouge/vert PU-G-147 : la coupe à 70 caractères ne laisse pas de mot tronqué (« centr »)" "$(H json "$WORK/q18r.json" '!/centr/.test(j.answer)')" "true"
+assert_eq "Q18.10 — la coupe à 90 caractères d'une note s'arrête sur un mot entier (« … mot… », jamais « … in… »)" "$(H json "$WORK/q18a.json" "(() => { const n = j.items.find((i) => i.id === 'n:ph-72').note; return n.endsWith(' mot…') })()")" "true"
+assert_eq "Q18.11 — une note coupée reste sous 90 caractères" "$(H json "$WORK/q18a.json" 'j.items.every((i) => i.note.length <= 90)')" "true"
+for fq in "qu'est-ce que ça veut dire, « lignes du planning non comprises » ?" "Pourquoi des lignes non comprises dans le planning ?" "C'est quoi les lignes non comprises ?"; do
+  H locg "$SCRIPTS" "$WORK/q18g.json" "$fq" > "$WORK/q18f.json"
+  assert_eq "Q18.12 — réponse locale à « $fq »" "$(H json "$WORK/q18f.json" 'j !== null && j.engine === "local"')" "true"
+done
+assert_eq "Q18.13 — la réponse donne le nombre, un fichier:ligne et dit que rien n'est modifié" "$(H json "$WORK/q18f.json" "/4 ligne/.test(j.answer) && j.answer.includes('.planning/ROADMAP.md:486') && /rien n.est modifi/i.test(j.answer)")" "true"
+assert_eq "Q18.14 — l'extrait long est coupé au mot (le mot trop long est retiré, jamais tronqué en « xxxx »)" "$(H json "$WORK/q18f.json" '!/xxx/.test(j.answer)')" "true"
+assert_eq "Q18.15 — aucun mot de l'intérieur du panneau (clé de règle, « null », « undefined ») dans la réponse" "$(H json "$WORK/q18f.json" '!/ligne-non-comprise|null|undefined/.test(j.answer)')" "true"
+H locg "$SCRIPTS" "$WORK/q18h.json" "lignes du planning non comprises ?" > "$WORK/q18z.json"
+assert_eq "Q18.16 — aucune ligne non comprise : la réponse le dit, sans liste vide" "$(H json "$WORK/q18z.json" "/aucune ligne/i.test(j.answer) && !/Lignes? concern/.test(j.answer)")" "true"
+
+assert_eq "Q18.17 — témoin de linéarité : 40 000 « ligne » sans « non compris » se traitent en moins de 2 s (le motif de PU-G-150 n'est pas quadratique ; mesuré avant correction : 38 s)" "$("$NODE" --input-type=module -e "
+import { answerLocally } from '$SCRIPTS/vf-cockpit-ask.mjs';
+const t = Date.now(); answerLocally({ nodes: [], files: [], links: [], meta: { vf: {} } }, 'ligne '.repeat(40000) + 'x'); console.log(Date.now() - t < 2000);")" "true"
+
+# Q18.18 — PU-G-147 (recette du 2026-11-08) : le pied d'une exigence (sentence, 120 car.) se coupe au mot entier ; témoin rouge sur 82de0712 : « … puis avec le vr… »
+assert_eq "Q18.18 — la phrase d'une exigence coupée à 120 caractères ne finit pas dans un mot (« vr… » pour « vrai »), et reste sous 120" "$("$NODE" --input-type=module -e "
+import { sentence } from '$SCRIPTS/vf-cockpit-planning.mjs';
+const t = 'Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local.';
+const a = sentence(t, 120), mot = a.replace(/…\$/, '').split(' ').pop();
+console.log(a.endsWith('…') && a.length <= 120 && t.split(' ').includes(mot) && /\\S…\$/.test(a));")" "true"
+
+# Q18.19 à Q18.21 — PU-G-150 (recette du 2026-11-08) : la réponse « Format » répond aussi aux formulations naturelles et au mot du panneau (« Non lu »), sans capter une question sans rapport
+for fq in "Quelle est la commande pour corriger les lignes non comprises ?" "Quelles lignes du planning ne sont pas comprises ?" "Quelles lignes du planning ne sont pas lues ?" "Pourquoi les chiffres sont-ils peut-être incomplets ?" "Quelles lignes sont non lues ?"; do
+  H locg "$SCRIPTS" "$WORK/q18g.json" "$fq" > "$WORK/q18n.json"
+  assert_eq "Q18.19 — réponse locale « Format » à « $fq »" "$(H json "$WORK/q18n.json" 'j !== null && j.engine === "local" && /4 ligne/.test(j.answer)')" "true"
+done
+assert_eq "Q18.20 — le vocabulaire de la réponse est celui du panneau : « non lue » et « Non lu », plus « ligne non comprise »" "$(H json "$WORK/q18n.json" "/non lue/.test(j.answer + j.title) && /Non lu/.test(j.answer) && !/non compris/i.test(j.answer + j.title)")" "true"
+for fq in "Pourquoi la phase 72 est-elle en recette ?" "Quelles sont les lignes de commande de la phase 72 ?" "Le plan est-il incomplet ?" "Pourquoi le nombre de plans de la phase 72 est-il incomplet ?" "La ligne de commande du lanceur n'est pas comprise" "Quelle ligne de la phase 3 n'est pas lue ?" "La phase 3 n'est pas lundi, quelle ligne ?" "Quelles lignes de code ne sont pas comprises ?"; do
+  H locg "$SCRIPTS" "$WORK/q18g.json" "$fq" > "$WORK/q18m.json"
+  assert_eq "Q18.21 — témoin négatif : « $fq » ne déclenche pas la réponse « Format »" "$(H json "$WORK/q18m.json" 'j === null || !/Lignes du planning non lues/.test(j.title)')" "true"
+done
+
+# Q19 — libellés du Projet tranchés par Samuel (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe)) : accord réel des compteurs (L1)
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const nd = (id, o) => ({ id, label: id, kind: 'phase', st: 'todo', parent: null, ...o });
+const bl = (n) => Array.from({ length: n }, (_, i) => ({ p: 'dag/' + i, n: 'ph-2', name: 'b' + i, st: 'blocked', d: 'x' }));
+const mk = (nb) => ({ nodes: [nd('ms-v2', { kind: 'milestone', label: 'v2', st: 'active' }), nd('ph-2', { label: 'Phase 2 · Deux', num: '2', st: 'active', parent: 'ms-v2' }), nd('ph-2.req', { kind: 'exigences', label: 'Exigences', st: 'active', parent: 'ph-2' })],
+  files: [...bl(nb), { p: 'req/B-01', n: 'ph-2.req', name: 'B-01', st: 'todo', d: 'un' }, { p: 'req/B-02', n: 'ph-2.req', name: 'B-02', st: 'todo', d: 'deux' }], links: [], meta: { vf: { milestone: 'v2', phase: '2' } } });
+fs.writeFileSync('$WORK/q19-1.json', JSON.stringify(mk(1))); fs.writeFileSync('$WORK/q19-4.json', JSON.stringify(mk(4)));"
+H locg "$SCRIPTS" "$WORK/q19-4.json" "Qu'est-ce qui bloque ?" > "$WORK/q19a.json"
+H locg "$SCRIPTS" "$WORK/q19-1.json" "Qu'est-ce qui bloque ?" > "$WORK/q19b.json"
+assert_eq "Q19.1 — L1 : 4 éléments bloqués -> « 4 bloqués » et « 4 éléments bloqués », jamais « (s) »" "$(H json "$WORK/q19a.json" "j.title === '4 bloqués' && j.answer.startsWith('4 éléments bloqués') && !/\\(s\\)/.test(j.title + j.answer)")" "true"
+assert_eq "Q19.2 — L1 : 1 élément bloqué -> « 1 bloqué » et « 1 élément bloqué »" "$(H json "$WORK/q19b.json" "j.title === '1 bloqué' && j.answer.startsWith('1 élément bloqué ') && !/\\(s\\)/.test(j.title + j.answer)")" "true"
+H locg "$SCRIPTS" "$WORK/q19-1.json" "Quelles sont les exigences de la phase 2 ?" > "$WORK/q19c.json"
+assert_eq "Q19.3 — L1 : compteur voisin, 2 exigences -> « 2 exigences pour », sans « (s) »" "$(H json "$WORK/q19c.json" "j.answer.startsWith('2 exigences pour') && !/\\(s\\)/.test(j.answer)")" "true"
+H locg "$SCRIPTS" "$WORK/q18g.json" "Quelles sont les exigences de la phase 1 ?" > "$WORK/q19d.json"
+assert_eq "Q19.4 — L1 : compteur voisin, 1 exigence -> « 1 exigence pour »" "$(H json "$WORK/q19d.json" "j.answer.startsWith('1 exigence pour')")" "true"
+
+# Q19.5 à Q19.6 — L2 (même arbitrage, § 10) : la pastille de relance d'une phase dit « dans la Phase 2 ? » avec l'article ; un jalon garde sa forme
+H locg "$SCRIPTS" "$WORK/q19-1.json" "Que contient la phase 2 ?" > "$WORK/q19e.json"
+assert_eq "Q19.5 — L2 : relances d'une phase -> « Qu'est-ce qui reste dans la Phase 2 ? » et « Qu'est-ce qui bloque dans la Phase 2 ? »" "$(H json "$WORK/q19e.json" "j.followups.includes(\"Qu'est-ce qui reste dans la Phase 2 ?\") && j.followups.includes(\"Qu'est-ce qui bloque dans la Phase 2 ?\")")" "true"
+H locg "$SCRIPTS" "$WORK/q19-1.json" "Qu'est-ce qui reste dans le jalon v2 ?" > "$WORK/q19f.json"
+assert_eq "Q19.6 — L2 : témoin, la relance d'un jalon reste « dans v2 » (pas d'article inventé)" "$(H json "$WORK/q19f.json" "j.followups.includes(\"Qu'est-ce qui bloque dans v2 ?\")")" "true"
+
+# Q20 — revue de 82de0712..3f972a6b : R1 (aucun libellé affiché ne se coupe en plein mot) et R3 (coupe exactement sur un espace)
+mkdir -p "$WORK/lab20/.planning/phases/01-premiere"
+printf '# Roadmap\n\n## Milestone v1\n\n### Phase 1: Premiere\n**Goal:** faire la chose\n' > "$WORK/lab20/.planning/ROADMAP.md"
+printf -- '---\nphase: 01\nplan: 01\n---\n<objective>\nScaffolder le monorepo, le packaging et la chaîne de construction afin de livrer une première version installable et lisible\n</objective>\n' > "$WORK/lab20/.planning/phases/01-premiere/01-01-PLAN.md"
+assert_eq "Q20.1 — R1 : le nom d'un plan de plus de 70 caractères se coupe au mot entier (« … construction… », jamais « … afi… »), et reste sous 70" "$("$NODE" --input-type=module -e "
+import { buildProjectGraph } from '$SCRIPTS/vf-cockpit-project.mjs';
+const g = buildProjectGraph('$WORK/lab20'), f = g.files.find((x) => x.name.startsWith('01-01'));
+const obj = 'Scaffolder le monorepo, le packaging et la chaîne de construction afin de livrer une première version installable et lisible';
+const part = f.name.split(' — ').slice(1).join(' — '), tete = part.replace(/…\$/, '');
+console.log(part.endsWith('…') && part.length <= 70 && obj.startsWith(tete) && obj[tete.length] === ' ');")" "true"
+assert_eq "Q20.2 — R1 : la coupe du pied d'exigence et celle du nom sont la MÊME fonction (clip = clipMot sur 5 longueurs)" "$("$NODE" --input-type=module -e "
+import { clip, clipMot } from '$SCRIPTS/vf-cockpit-planning.mjs';
+const t = 'un deux trois quatre cinq six sept huit neuf dix onze douze';
+console.log([5, 12, 20, 33, 80].every((n) => clip(t, n) === clipMot(t, n)));")" "true"
+assert_eq "Q20.3 — R3 : une coupe qui tombe exactement sur une espace garde le mot entier avant elle (« aaaa bbbb… »), une coupe dans un mot le retire (« aaaa… »)" "$("$NODE" --input-type=module -e "
+import { clipMot } from '$SCRIPTS/vf-cockpit-planning.mjs';
+console.log(clipMot('aaaa bbbb cccc', 10) + '|' + clipMot('aaaa bbbbb', 9));")" "aaaa bbbb…|aaaa…"
+
+# Q19.7 — M1 (contre-revue) : le compteur de statuts de « Que contient la phase ? » s'accorde aussi (arbitrage de L1, § 10 du rapport GLOBAL, 3da818fe)
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const nd = (id, o) => ({ id, label: id, kind: 'phase', st: 'todo', parent: null, ...o });
+const f = (n, st, k) => Array.from({ length: n }, (_, i) => ({ p: 'p/' + st + k + i, n: 'ph-3', name: st + i, st, d: 'x' }));
+const mk = (a, b, c) => ({ nodes: [nd('ph-3', { label: 'Phase 3 · Trois', num: '3', st: 'active' })], files: [...f(a, 'blocked', 'b'), ...f(b, 'done', 'd'), ...f(c, 'active', 'a')], links: [], meta: { vf: {} } });
+fs.writeFileSync('$WORK/q19-c1.json', JSON.stringify(mk(1, 1, 1))); fs.writeFileSync('$WORK/q19-c4.json', JSON.stringify(mk(4, 27, 2)));"
+H locg "$SCRIPTS" "$WORK/q19-c4.json" "Que contient la phase 3 ?" > "$WORK/q19g.json"
+H locg "$SCRIPTS" "$WORK/q19-c1.json" "Que contient la phase 3 ?" > "$WORK/q19h.json"
+assert_eq "Q19.7 — M1 : n > 1 -> « 4 bloqués », « 27 faits », « 2 en cours » (invariable) ; n = 1 -> « 1 bloqué », « 1 fait », « 1 en cours »" "$(H json "$WORK/q19g.json" "/4 bloqués/.test(j.answer) && /27 faits/.test(j.answer) && /2 en cours/.test(j.answer)")|$(H json "$WORK/q19h.json" "/1 bloqué[,.]/.test(j.answer) && /1 fait,/.test(j.answer) && /1 en cours/.test(j.answer) && !/1 (bloqués|faits)/.test(j.answer)")" "true|true"
+
+# Q19.8 — M2 : l'article s'étend aux missions (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3f67e7aa)) ; la phase (Q19.5) et le jalon (Q19.6) ne bougent pas
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const g = JSON.parse(fs.readFileSync('$WORK/q19-1.json', 'utf8'));
+g.nodes.push({ id: 'dag-MISSION-414', label: 'Mission 414', kind: 'mission', st: 'active', parent: 'ms-v2' });
+fs.writeFileSync('$WORK/q19-m.json', JSON.stringify(g));"
+H locg "$SCRIPTS" "$WORK/q19-m.json" "Que contient la mission 414 ?" > "$WORK/q19i.json"
+assert_eq "Q19.8 — M2 : relances d'une mission -> « … reste dans la Mission 414 ? » et « … bloque dans la Mission 414 ? »" "$(H json "$WORK/q19i.json" "j.followups.includes(\"Qu'est-ce qui reste dans la Mission 414 ?\") && j.followups.includes(\"Qu'est-ce qui bloque dans la Mission 414 ?\")")" "true"
+
+# Q18.22 — M7c : sentence() du build (descriptions de l'onglet Code) coupe au mot entier ; rouge sur 82de0712 (« … avec le vr… »)
+assert_eq "Q18.22 — M7c : la phrase d'une description de fichier (build) coupée à 120 caractères ne finit pas dans un mot, et reste sous 120" "$("$NODE" --input-type=module -e "
+import { sentence } from '$SCRIPTS/vf-cockpit-build.mjs';
+const t = 'Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local.';
+const a = sentence(t, 120), mot = a.replace(/…\$/, '').split(' ').pop();
+console.log(a.endsWith('…') && a.length <= 120 && t.split(' ').includes(mot));")" "true"
 
 vf_hyg_assert
 echo ""

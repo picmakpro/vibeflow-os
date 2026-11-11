@@ -52,6 +52,7 @@ console.log(JSON.stringify({
   dcs: /registerDcsHandler\(\s*\{(?=[^}]*intermediates\s*:\s*['"]\$['"])(?=[^}]*final\s*:\s*['"]q['"])/.test(p),
   winopt: /windowOptions\s*:\s*\{\s*\}/.test(p), macopt: /macOptionIsMeta\s*:\s*false/.test(p),
   presse: n(/ClipboardAddon|navigator\s*\.\s*clipboard|execCommand\s*\(/g),
+  execVue: ((s[2] || '').match(/execCommand\s*\(/g) || []).length, execCopy: ((s[2] || '').match(/execCommand\(\s*['"]copy['"]\s*\)/g) || []).length,
   lien: /linkHandler\s*:/.test(p) && /activate/.test(p) && /window\s*\.\s*open\s*\([^)]*['"]noopener['"]/.test(p), confirm: n(/\bconfirm\s*\(/g),
   ecoute: n(/addEventListener\(\s*['"]message['"]|\bonmessage\s*=/g), postmsg: n(/\bpostMessage\s*\(/g), etoile: n(/postMessage\s*\([^)]*['"]\*['"]/g), etats,
 }));
@@ -80,7 +81,7 @@ globalThis.ResizeObserver = class { observe() {} };
 globalThis.requestAnimationFrame = () => 0;
 globalThis.FitAddon = { FitAddon: class { fit() {} } };
 globalThis.Terminal = class {
-  constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; }
+  constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; this.textarea = { addEventListener() {} }; }
   loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() {} write() {} paste() {} reset() {}
   onData(f) { onData = f; } onBinary(f) { onBinary = f; }
 };
@@ -119,7 +120,7 @@ globalThis.ResizeObserver = class { observe() {} };
 globalThis.requestAnimationFrame = () => 0;
 globalThis.FitAddon = { FitAddon: class { fit() {} } };
 globalThis.Terminal = class {
-  constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; }
+  constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; this.textarea = { addEventListener() {} }; }
   loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() {} write() {} paste() {} reset() {} resize() {} onData() {} onBinary() {}
 };
 const rep = (status, corps) => ({ status, ok: status >= 200 && status < 300, json: async () => corps, body: { getReader: () => ({ read: async () => ({ done: true }) }) } });
@@ -150,7 +151,7 @@ cat > "$AUX/chrome-client.mjs" <<'JS'
 // chrome-client.mjs <chrome> <mode> <json> : scénarios navigateur du client de Q ; UNE ligne JSON. Modes : t6 · cadre · tierce.
 // Chaque étape est isolée (essai) : une mesure indisponible est nommée dans `erreurs`, jamais un résultat vide. Amorçage et secret sont masqués en sortie.
 import { pathToFileURL } from 'node:url'; import { execFileSync } from 'node:child_process'; import fs from 'node:fs';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
 const { P, Q, amorce, tierce, secret: secretN = '', pid: pidN = 0, fichier = '', octets = 0 } = JSON.parse(brut);
 const OP = `http://127.0.0.1:${P}`, OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_CLIENT_MS) || 20000;
@@ -206,11 +207,12 @@ await executer(chrome, async (s) => {
     });
     r.violations = [...s.violations];
     r.msgs = await s.ev('JSON.stringify(window.__msgs)').then((x) => JSON.parse(x || '[]')).catch(() => []);
+    r.temoin = await s.ev(`({ cadres: document.querySelectorAll('iframe').length, href: location.href })`).catch(() => null); // la page tierce a chargé et porte le cadre de Q : la sonde s'est exécutée
     return masquer(r);
   }
 
   // --- scénarios sur le serveur réel : secret périmé (J2), serveur arrêté (J2), « Terminé » (J12), onBinary (S5), contre-pression (S3) ---
-  if (['perime', 'arret', 'termine', 'binaire', 'pression', 'popup', 'gros', 'limite'].includes(mode)) {
+  if (['perime', 'arret', 'termine', 'binaire', 'pression', 'popup', 'gros', 'limite', 'sansamorce', 'reprise'].includes(mode)) {
     const att = (expr, nom) => q.attendre(expr, nom, MS);
     const texte = () => q.ev(`(document.getElementById('etat') || {}).textContent || ''`).catch(() => '');
     const invite = () => q.ev(INVITE).catch(() => false);
@@ -222,12 +224,31 @@ await executer(chrome, async (s) => {
     };
     const etatServeur = () => q.ev(`fetch('/etat', { headers: { 'X-VF-Terminal': localStorage.getItem('vf.terminal.secret'), 'X-VF-Onglet': sessionStorage.getItem('vf.terminal.onglet') }, cache: 'no-store' }).then((x) => x.json()).then((j) => j.session)`).catch(() => '?');
     // le secret est posé dans le stockage de Q (premier niveau) : la page se charge ensuite comme après un amorçage réussi
-    await essai('secret', async () => { await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secretN)})`); });
+    if (mode !== 'sansamorce') await essai('secret', async () => { await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secretN)})`); }); // sansamorce : aucun secret rangé, comme dans un onglet où le terminal n'a jamais été ouvert
     r.mode = mode;
     if (mode === 'perime') {
       const t0 = Date.now();
       await essai('carte-expiree', async () => { await q.naviguer(); await att(`(document.getElementById('etat') || {}).textContent && document.getElementById('etat').textContent.includes('Session expirée')`, 'carte Session expirée (secret périmé)'); });
       r.duree = Date.now() - t0; r.carte = await texte();
+    } else if (mode === 'sansamorce') {
+      // PU-G-132 : aucun secret dans le stockage de Q (onglet où le terminal n'a jamais été ouvert) : la carte le dit juste, elle ne prétend pas qu'une session a expiré
+      await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `if (window.top === window) { window.__msgs = []; addEventListener('message', (e) => { if (typeof e.data === 'string') window.__msgs.push(e.data); }); }` });
+      await essai('carte-sans-amorce', async () => { await q.naviguer(); await att(`((document.getElementById('etat') || {}).textContent || '').length > 0`, 'une carte dans le cadre (secret absent)'); });
+      await pause(800); r.msgs = await s.ev('JSON.stringify(window.__msgs || [])').then((x) => JSON.parse(x || '[]')).catch(() => ['?']); // ce que P a reçu : la barre du tiroir ne doit pas dire « Session expirée »
+      r.carte = await texte();
+    } else if (mode === 'reprise') {
+      // DG-08 : un cadre qui se reconnecte à un shell déjà ouvert, à une AUTRE taille, dit sa taille : le terminal la reprend (stty size) ; sinon le shell dessine pour une grille que l'écran n'a pas
+      await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
+      await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
+      await q.ev(`localStorage.setItem('vf.terminal.accueil', '1')`); // la phrase d'accueil (LB3-S2 : dans la colonne) rétrécirait le terminal et ferait redire la taille au second cadre : elle masquerait ce que ce scénario mesure ; elle est rangée avant (son propre témoin : LB.V20)
+      await q.ev(`(() => { const f0 = window.fetch; window.fetch = function (u) { if (String(u) === '/taille') return Promise.resolve(new Response(null, { status: 204 })); return f0.apply(this, arguments); }; })()`); // le premier cadre ne dit plus sa taille : le terminal garde celle de sa création
+      await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 400, deviceScaleFactor: 1, mobile: false });
+      await essai('reconnexion', async () => { await q.naviguer(); await att(INVITE, 'invite après la reconnexion'); });
+      const GRILLE = `document.querySelectorAll('.xterm-rows > div').length`;
+      await stabiliser(() => q.ev(GRILLE).catch(() => -2), { max: 5000 }); // le terminal a pris la grille de l'écran (et dit sa taille) avant la commande
+      await essai('taille', async () => { await taper('echo TAI""LLE=$(stty size)x'); await poll(async () => /TAILLE=\d+ \d+x/.test(await lignes()), 'sortie de stty size'); });
+      const m = /TAILLE=(\d+) (\d+)x/.exec(await lignes()); r.pty = m ? Number(m[1]) : -1;
+      r.ecran = await stabiliser(() => q.ev(GRILLE).catch(() => -2), { max: 5000 });
     } else if (mode === 'arret') {
       await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
       try { process.kill(pidN, 'SIGTERM'); r.tue = true; } catch (e) { r.tue = false; }
@@ -279,7 +300,8 @@ await executer(chrome, async (s) => {
       const shells = () => { const ls = execFileSync('ps', ['-axo', 'pid=,ppid=,args=']).toString().split('\n').map((l) => l.trim().split(/\s+/)); const peres = new Set([String(pidN), ...ls.filter((c) => c[1] === String(pidN) && /vf-cockpit-terminal-processus\.mjs/.test(c.slice(2).join(' '))).map((c) => c[0])]); return ls.filter((c) => peres.has(c[1]) && /vf-cockpit-pty\.py/.test(c.slice(2).join(' '))).length; };
       const popups = async () => (await s.send('Target.getTargets')).targetInfos.filter((t) => t.type === 'page' && t.url.includes('theme=dark')).length;
       await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
-      const refocaliser = async () => { await s.send('Page.bringToFront'); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.ev(`document.querySelector('.xterm-helper-textarea').focus()`); };
+      const refocaliser = async () => { await s.send('Page.bringToFront'); await s.ev(`document.querySelector('iframe[data-t]').focus()`); await q.ev(`document.querySelector('.xterm-helper-textarea').focus()`);
+        await attendreValeur(() => q.ev(`document.hasFocus() && !!document.activeElement && document.activeElement.classList.contains('xterm-helper-textarea')`).catch(() => false), (v) => v === true, { max: 5000 }); }; // la frappe suivante se perd si le focus du cadre n'est pas posé
       await essai('invite', async () => { await q.naviguer(); await att(INVITE, 'invite du shell'); });
       await s.ev(`window.__msgs = []; addEventListener('message', (e) => window.__msgs.push(String(e.data).slice(0, 40)))`);
       r.avant = { shells: shells() };
@@ -310,7 +332,7 @@ await executer(chrome, async (s) => {
   await essai('amorcage', async () => {
     await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `if (window.top === window) { window.__prets = []; addEventListener('message', (e) => { if (typeof e.data === 'string') window.__prets.push(e.data); }); }` });
     await s.naviguer(`${OP}/project.html#t=${amorce}`);
-    await att(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)');
+    await s.attendre(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)', process.env.VF_CLIENT_MS ? MS : Math.max(MS, AMORCE)); // amorçage : borné par l'échéance globale (par défaut), sauf VF_CLIENT_MS posée explicitement (mutants à 6 s)
   });
   r.cadre1 = await cadreQ().catch(() => null);
   r.adresse1 = await s.ev('location.href').catch(() => '?');
@@ -323,7 +345,8 @@ await executer(chrome, async (s) => {
       await s.naviguer(`${OP}/project.html#t=${amorce}`);
       await att(`window.__prets.includes('etat:expire') && !location.hash`, 'etat:expire (échange refusé dans le cadre)');
     });
-    r.refus = await cadreQ().then(async (c) => ({ hash: c.fragment, port: new URL(c.url).port, carte: await s.ev(`(document.querySelector('.vf-term-etat') || {}).textContent || ''`) })).catch(() => r.refus);
+    const lireRefus = async () => { const c = await cadreQ(); return { hash: c.fragment, port: new URL(c.url).port, carte: await s.ev(`(document.querySelector('.vf-term-etat') || {}).textContent || ''`) }; };
+    r.refus = (await attendreEtStabiliser(lireRefus, (v) => !!v && v.hash === '' && v.carte.includes('Session expirée'), { max: 8000 })) || r.refus;
     // --- S3 : Q en premier niveau : secret dans son stockage, aucun cookie, terminal vivant ---
     r.secretQ = null; r.cookieQ = '?'; r.invite = false;
     await essai('q-premier-niveau', async () => {
@@ -483,7 +506,7 @@ ST="$(node "$AUX/stat.mjs" "$WORK/q/page.html")"
 assert_eq "ST.0 — témoin : la page de Q a ses quatre <script> (les deux derniers sont les scripts propres)" "$(rj "$ST" 'j.scripts')" "4"
 assert_eq "T14.S1 — gestionnaire DCS de remplacement (registerDcsHandler sur \$ et q) dans le client servi" "$(rj "$ST" 'j.dcs')" "true"
 assert_eq "T14.S2 — windowOptions vide et macOptionIsMeta faux" "$(rj "$ST" 'j.winopt+"/"+j.macopt')" "true/true"
-assert_eq "T14.S3 — aucun addon presse-papiers, navigator.clipboard ni execCommand dans les scripts propres (la page est vivante : propres > 200)" "$(rj "$ST" 'j.presse+"/"+(j.propres>200)')" "0/true"
+assert_eq "T14.S3 — aucun addon presse-papiers ni navigator.clipboard dans les scripts propres, et UN SEUL execCommand : execCommand('copy') dans la vue, pour le bouton « Copier la commande » de la carte (Q14, arbitrage de Samuel, AskUserQuestion, session principale, 2026-11-06) ; le client n'en a aucun (la page est vivante : propres > 200)" "$(rj "$ST" '(j.presse-j.execVue)+"/"+j.execVue+"/"+j.execCopy+"/"+(j.propres>200)')" "0/1/1/true"
 assert_eq "T14.S4 — linkHandler avec activate qui ouvre en noopener ; aucun confirm(" "$(rj "$ST" 'j.lien+"/"+j.confirm')" "true/0"
 assert_eq "T17.Q1 — aucun écouteur de messages entrants dans Q (la page est vivante : propres > 200)" "$(rj "$ST" 'j.ecoute+"/"+(j.propres>200)')" "0/true"
 assert_eq "T17.Q2 — au moins un postMessage( et aucun avec l'étoile" "$(rj "$ST" '(j.postmsg>=1)+"/"+j.etoile')" "true/0"
@@ -504,8 +527,11 @@ else sans_effet "M-ETOILE"; fi
 if mutant ecoute vf-cockpit-terminal-client.mjs "s|const RACCOURCI|addEventListener('message', () => {}); const RACCOURCI|"; then
   assert_eq "M-ECOUTE — le mutant rougit T17.Q1 : un écouteur de messages entrants" "$(rj "$(mut_page ecoute)" 'j.ecoute>=1')" "true"
 else sans_effet "M-ECOUTE"; fi
+if mutant execc vf-cockpit-terminal-client.mjs "s|const RACCOURCI|document.execCommand('copy'); const RACCOURCI|"; then
+  assert_eq "M-EXEC — un second execCommand (dans le client) rougit T14.S3 : le presse-papiers ne se touche que par la vue" "$(rj "$(mut_page execc)" '(j.presse-j.execVue)>=1')" "true"
+else sans_effet "M-EXEC"; fi
 if mutant clip vf-cockpit-terminal-client.mjs "s|const RACCOURCI|navigator.clipboard.writeText('x'); const RACCOURCI|"; then
-  assert_eq "M-CLIP — le mutant rougit T14.S3 : un appel au presse-papiers" "$(rj "$(mut_page clip)" 'j.presse>=1')" "true"
+  assert_eq "M-CLIP — le mutant rougit T14.S3 : un appel au presse-papiers" "$(rj "$(mut_page clip)" '(j.presse-j.execVue)>=1')" "true"
 else sans_effet "M-CLIP"; fi
 if mutant setcookie vf-cockpit-terminal-processus.mjs "s|res.setHeader('Referrer-Policy', 'no-referrer');|res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('Set-Cookie', 'a=b');|"; then
   srv "$MUT_OUT"; rq "$QP" GET / > "$WORK/m-setcookie.out"
@@ -546,7 +572,7 @@ assert_eq "T6.9 — SAF-1 : Q ouvert seul avec un amorçage (premier niveau) n'�
 assert_eq "T6.1c — SAF-1 : après l'échange fait dans le cadre, l'adresse du cadre de Q ne porte ni fragment ni autre paramètre que theme (le cadre se recharge sans l'amorçage ni le secret)" "$(rj "$J" '"url="+((j.cadre1||{}).url||"?").replace(/theme=(dark|light)$/,"theme=<t>")+" fragment=["+((j.cadre1||{}).fragment||"")+"]"')" "url=http://127.0.0.1:$T6_Q/?theme=<t> fragment=[]"
 SECRET_OK="$(rj "$J" 'j.secretOk?"oui":"non"')"
 assert_eq "T6.3 — le secret (64 hexadécimaux), posé par le cadre de Q, est lisible dans le stockage de Q (relu en premier niveau : Chrome ne partitionne pas deux origines d'un même site), terminal vivant" "secret=$SECRET_OK invite=$(rj "$J" 'j.invite')" "secret=oui invite=true"
-assert_eq "T6.8 — F4 : Q en premier niveau (ni cadre ni opener, après l'amorçage) n'ouvre pas de terminal : carte « Terminal indisponible », aucun shell (le serveur dit absente) ; puis le cadre de P, lui, donne l'invite" "carte=$(rj "$J" '(j.horsCadre||{}).carte||"?"') session=$(rj "$J" '(j.horsCadre||{}).session||"?"') cadre=$(rj "$J" 'j.invite')" "carte=Terminal indisponibleCe terminal ne s’ouvre que dans le cockpit. Relancez /vf-cockpit --terminal. session=absente cadre=true"
+assert_eq "T6.8 — F4 : Q en premier niveau (ni cadre ni opener, après l'amorçage) n'ouvre pas de terminal : carte « Terminal indisponible », aucun shell (le serveur dit absente) ; puis le cadre de P, lui, donne l'invite" "carte=$(rj "$J" '(j.horsCadre||{}).carte||"?"') session=$(rj "$J" '(j.horsCadre||{}).session||"?"') cadre=$(rj "$J" 'j.invite')" "carte=Terminal indisponibleCe terminal ne s’ouvre que dans le cockpit. Relancez /vf-cockpit --terminal.Copier la commande session=absente cadre=true"
 assert_eq "T6.2 — document.cookie vide sur P et sur Q (témoin : le secret existe bien, sinon le vide ne prouve rien)" "P=[$(rj "$J" 'j.cookieP')] Q=[$(rj "$J" 'j.cookieQ')] secret_connu=$SECRET_OK" "P=[] Q=[] secret_connu=oui"
 assert_eq "T6.4 — depuis P, le stockage du cadre de Q lève SecurityError (témoins : le secret est dans Q, le stockage de P est lisible)" "$(rj "$J" 'j.stockageCadre')/secret_dans_q=$SECRET_OK/stockage_p=$(rj "$J" 'j.stockageP')" "SecurityError/secret_dans_q=oui/stockage_p=lisible"
 assert_eq "T6.6 — le fichier d'amorçage est supprimé après l'échange" "$T6_FICHIER" "supprime"
@@ -574,30 +600,30 @@ assert_eq "T9.6 — page tierce (autre port) qui encadre Q : une violation frame
 
 echo "=== M-COOKIE / M-FRAGMENT / M-STOCKAGE / M-PREMIER-NIVEAU / M-SANS-AMORCE / M-ANCETRES — mutants jouées en navigateur ==="
 if mutant cookie vf-cockpit-terminal-client.mjs "s|localStorage.setItem(CLE_SECRET, secret);|localStorage.setItem(CLE_SECRET, secret); document.cookie = 'vfs=' + secret + '; path=/';|"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_has "M-COOKIE — le mutant rougit T6.2 : un cookie existe" "$(rj "$T6J" 'j.cookieQ')" "vfs="
 else sans_effet "M-COOKIE"; fi
 if mutant fragment vf-cockpit-terminal-client.mjs "s|history.replaceState(null, '', location.pathname + location.search);||"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_eq "M-FRAGMENT — le mutant rougit T6.1b : l'échange refusé laisse #t= dans l'adresse de Q" "$(rj "$T6J" 'j.refus.hash.slice(0,3)')" "#t="
 else sans_effet "M-FRAGMENT"; fi
 if mutant premier vf-cockpit-terminal-client.mjs "s|^    if (!encadree) { vue.carte('horscadre'); return; }||"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_eq "M-PREMIER-NIVEAU — le mutant (SAF-1 défait : l'échange refait au premier niveau de Q) rougit T6.9 : un secret est rangé par Q ouvert seul" "$(rj "$T6J" '(j.q1||{}).secret')" "range"
 else sans_effet "M-PREMIER-NIVEAU"; fi
 if mutant sansamorce vf-cockpit-terminal-tiroir.mjs "s|adresse + '#t=' + amorce|adresse|"; then
-  run_t6 "$MUT_OUT"
-  assert_eq "M-SANS-AMORCE — le mutant (l'amorçage n'est plus passé dans l'adresse du cadre de Q) rougit T6.3 : le cadre n'échange rien, aucun secret n'est rangé" "$(rj "$T6J" 'j.secretOk?"oui":"non"')" "non"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
+  assert_eq "M-SANS-AMORCE — le mutant (l'amorçage n'est plus passé dans l'adresse du cadre de Q) rougit T6.3 : le cadre n'échange rien, aucun secret n'est rangé" "$(rj "$T6J" '(j.q1&&j.q1.carte&&j.q1.carte.includes("Terminal indisponible")&&j.cadre1)?(j.secretOk?"oui":"non"):"mutant non jugé (sonde non exécutée)"')" "non"
 else sans_effet "M-SANS-AMORCE"; fi
 if mutant stockage vf-cockpit-terminal-client.mjs "s|location.replace(location.pathname + location.search)|location.replace(location.pathname + '?s=' + secret)|"; then
-  run_t6 "$MUT_OUT"
+  VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_has "M-STOCKAGE — le mutant rougit T6.1c : le secret figure dans l'adresse du cadre de Q" "$(rj "$T6J" '(j.cadre1||{}).url')" "?s="
 else sans_effet "M-STOCKAGE"; fi
 if mutant ancetres vf-cockpit-terminal-page.mjs 's|frame-ancestors \${origineP}|frame-ancestors *|'; then
   srv "$MUT_OUT"; TP="$(libre)"; node "$AUX/tierce.mjs" "$TP" "http://127.0.0.1:$QP" & TIERCE_PID=$!; PIDS+=($TIERCE_PID)
   for _ in $(seq 1 50); do rq "$TP" GET / --host "127.0.0.1:$TP" --sans-origin 2>/dev/null | grep -q '^200' && break; sleep 0.1; done
   VF_CLIENT_MS=6000 J="$(navig tierce "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"tierce\":\"http://127.0.0.1:$TP/\"}")"; vf_hyg_stop "$TIERCE_PID"; unsrv
-  assert_eq "M-ANCETRES — le mutant rougit T9.6 : aucune violation frame-ancestors (la page tierce encadre Q)" "$(rj "$J" '(j.violations||[]).some(v=>/frame-ancestors/.test(v))?"oui":"non"')" "non"
+  assert_eq "M-ANCETRES — le mutant rougit T9.6 : aucune violation frame-ancestors (la page tierce encadre Q)" "$(rj "$J" '(j.temoin&&j.temoin.cadres>=1)?((j.violations||[]).some(v=>/frame-ancestors/.test(v))?"oui":"non"):"mutant non jugé (sonde non exécutée)"')" "non"
 else sans_effet "M-ANCETRES"; fi
 
 echo "=== J2 / J12 / S5 / S3 — scénarios sur le serveur réel (secret périmé, serveur arrêté, « Terminé », onBinary, contre-pression) ==="
@@ -614,8 +640,12 @@ FAUX_SEC="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex
 scenario "$OUT" perime "$FAUX_SEC"
 assert_eq "J2.0 — témoin : le scénario n'a pas échoué globalement" "$(rj "$SCJ" 'j.erreur||"ok"')" "ok"
 assert_eq "J2.1 — secret périmé (serveur relancé) : la carte « Session expirée » s'affiche en moins de 10 s, jamais « Serveur arrêté »" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" expiree="+(j.carte||"").includes("Session expirée")+" arrete="+(j.carte||"").includes("Serveur arrêté")+" rapide="+(j.duree<10000)')" "erreurs={} expiree=true arrete=false rapide=true"
+scenario "$OUT" sansamorce ""
+assert_eq "J2.3 — PU-G-132 : aucun secret (terminal jamais ouvert dans cet onglet) : la carte dit « Terminal non disponible dans cet onglet » et la commande, jamais « Session expirée », et P ne reçoit que « ready » (jamais etat:expire : la barre du tiroir ne ment pas non plus)" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" juste="+(j.carte||"").includes("Terminal non disponible dans cet onglet")+" commande="+(j.carte||"").includes("/vf-cockpit --terminal")+" expiree="+(j.carte||"").includes("Session expirée")+" msgs="+JSON.stringify(j.msgs)')" "erreurs={} juste=true commande=true expiree=false msgs=[\"ready\"]"
 MS_SC=60000 scenario "$OUT" arret
 assert_eq "J2.2 — serveur réellement arrêté en cours de session : « Serveur arrêté », jamais « Session expirée » (témoin : le PID enregistré a reçu le signal)" "$(rj "$SCJ" '"tue="+j.tue+" erreurs="+JSON.stringify(j.erreurs)+" arrete="+((j.carte||"").includes("Serveur arrêté"))+" expiree="+((j.carte||"").includes("Session expirée"))')" "tue=true erreurs={} arrete=true expiree=false"
+scenario "$OUT" reprise
+assert_eq "DG08.1 — reconnexion à un shell déjà ouvert, cadre d'une autre taille : le terminal a la taille de l'écran (stty size rend les lignes de la grille ; le premier cadre, privé de /taille, avait créé le terminal plus haut)" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" pty="+j.pty+" ecran="+j.ecran+" egal="+(j.pty===j.ecran&&j.ecran>0)')" "erreurs={} pty=$(rj "$SCJ" 'j.ecran') ecran=$(rj "$SCJ" 'j.ecran') egal=true"
 scenario "$OUT" termine
 assert_eq "J12.1 — témoin : « exit » dans le shell affiche « Le shell s'est terminé », le serveur dit terminee" "$(rj "$SCJ" '"erreurs="+JSON.stringify(j.erreurs)+" bandeau="+(j.avant&&j.avant.bandeau)+" session="+(j.avant&&j.avant.session)')" "erreurs={} bandeau=true session=terminee"
 assert_eq "J12.2 — rechargement du cadre dans le même onglet après « Terminé » : le bandeau est toujours là et aucun nouveau shell ne démarre (session = terminee)" "$(rj "$SCJ" '"bandeau="+(j.apres&&j.apres.bandeau)+" session="+(j.apres&&j.apres.session)')" "bandeau=true session=terminee"
@@ -649,6 +679,14 @@ if mutant mj12 vf-cockpit-terminal-client.mjs "s|sessionStorage.setItem(CLE_FIN,
   scenario "$MUT_OUT" termine
   assert_eq "M-J12 — le mutant (l'état « Terminé » n'est pas retenu) rougit J12.2 : un nouveau shell démarre au rechargement" "$(rj "$SCJ" '"bandeau="+(j.apres&&j.apres.bandeau)+" session="+(j.apres&&j.apres.session)')" "bandeau=false session=vivante"
 else sans_effet "M-J12"; fi
+if mutant msa vf-cockpit-terminal-client.mjs "s|vue.carte('sansamorce'); return;|expire(); return;|"; then
+  MS_SC=8000 scenario "$MUT_OUT" sansamorce ""
+  assert_eq "M-SANS-AMORCE-CARTE — le mutant (secret absent traité de nouveau comme une expiration) rougit J2.3 : « Session expirée » sans session préalable" "$(rj "$SCJ" '"expiree="+(j.carte||"").includes("Session expirée")')" "expiree=true"
+else sans_effet "M-SANS-AMORCE-CARTE"; fi
+if mutant mrep vf-cockpit-terminal-client.mjs "s|derniere = ''; taille();|derniere = term.rows + ' ' + term.cols;|"; then
+  MS_SC=8000 scenario "$MUT_OUT" reprise
+  assert_eq "M-REPRISE-TAILLE — le mutant (la taille n'est plus redite à la connexion) rougit DG08.1 : le terminal garde la taille du premier cadre" "$(rj "$SCJ" '"egal="+(j.pty===j.ecran)')" "egal=false"
+else sans_effet "M-REPRISE-TAILLE"; fi
 if mutant ms5 vf-cockpit-terminal-client.mjs "s|term.onBinary(|void (|"; then
   MS_SC=6000 scenario "$MUT_OUT" binaire
   assert_eq "M-S5 — le mutant (onBinary non relayé) rougit S5.1 : aucun écho de rapport de souris" "$(rj "$SCJ" '"rapport="+j.rapport')" "rapport=false"

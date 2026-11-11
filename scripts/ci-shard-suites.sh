@@ -1,47 +1,325 @@
 #!/usr/bin/env bash
-# ci-shard-suites.sh — partition déterministe des suites de tests entre les shards du job de tests de la CI
-# (Phase 65, arbitrage Samuel, message session principale, 2026-10-29 : « on corrige le maximum » sur la durée de la CI).
+# ci-shard-suites.sh — partition déterministe des suites de tests entre les shards du job de tests de la CI,
+# pondérée par la DURÉE MESURÉE de chaque suite (Phase 65, arbitrage Samuel, message session principale, 2026-10-29 :
+# « on corrige le maximum » sur la durée de la CI ; mission « CI sélective », arbitrages Samuel, AskUserQuestion
+# session principale, 2026-11-07 : « PR sélective, main complète », « Module + dépendances citées »,
+# « Oui, découper projet »).
 #
-# Usage : ci-shard-suites.sh <shard> <n>      liste les suites du shard <shard> (0 ≤ shard < n), une par ligne
-#         ci-shard-suites.sh --all            liste toutes les suites (même découverte que les shards)
+# Usage : ci-shard-suites.sh <shard> <n>                   suites du shard <shard> (0 ≤ shard < n), une par ligne
+#         ci-shard-suites.sh <shard> <n> --liste <fichier> idem, mais la partition porte sur le SOUS-ENSEMBLE listé
+#                                                          dans <fichier> (une suite par ligne, lignes vides ignorées)
+#         ci-shard-suites.sh --all                         toutes les suites (même découverte que les shards)
 #
 # Découverte : `find plugin scripts -type f -path '*/tests/test-*.sh' | sort`, identique à l'ancienne étape unique —
-# aucune suite n'est ajoutée ni retirée par le découpage.
+# aucune suite n'est ajoutée ni retirée par le découpage. `--all` est STRICTEMENT inchangé (même découverte, même
+# ordre) : le mode « tout » de scripts/ci-suites-perimetre.sh lui est égal.
 #
-# Répartition : les suites LOURDES (mesurées sur le runner le 2026-10-29) ont chacune un shard réservé, dans l'ordre
-# de HEAVY (shard 0, 1, …) ; les autres sont distribuées en tourniquet sur les shards restants. Une suite lourde
-# absente du disque ne réserve rien. Le job d'agrégation rejoue la partition pour TOUS les shards et vérifie que
-# l'union est exactement la découverte et que les shards sont disjoints et non vides : une suite oubliée rougit.
+# --liste (CI sélective). Le job `changes` calcule les suites des zones touchées (scripts/ci-suites-perimetre.sh) ; chaque
+# shard rejoue ICI la partition de CE sous-ensemble. Une ligne qui n'appartient pas à la découverte, ou un doublon, est une
+# erreur (rc 65) : une suite inconnue ne peut pas être « jouée par un shard » sans que personne ne l'ait découverte. Un shard
+# peut être VIDE quand la liste est petite : c'est légitime, il se termine vert côté CI (message dédié).
 #
-# Sorties : 0 = liste rendue · 64 = usage.
+# DURÉES. La table embarquée plus bas (fonction durees) donne, pour chaque suite, sa durée en secondes mesurée sur le
+# runner : horodatage de la ligne `##[group]<suite>` jusqu'à la ligne `PASS <suite>` (ou `FAIL`) du log de chaque shard,
+# run 42400570610 du 2026-11-07, 194 suites sur 7 shards (somme 9085 s). Une entrée peut être un motif glob (`*` = tout
+# sauf `/`), pour estimer des suites qui n'existent pas encore (projet-*). Une suite absente de la table prend DEFAUT
+# secondes : la médiane des mesures (7 s). La table se remet à jour en rejouant la mesure sur un run complet de `main`.
+#
+# RÉPARTITION, déterministe (aucun aléa, aucune horloge) :
+#   1. toute suite dont l'estimation dépasse 600 s (SEUIL) a son shard RÉSERVÉ, seule sur ce shard — ordre : durée
+#      décroissante, puis chemin (shards 0, 1, …). Une suite lourde absente de la liste ne réserve rien ;
+#   2. le reste est réparti par LPT : tri par durée décroissante puis chemin ; chaque suite va au shard NON réservé le
+#      moins chargé, et à charge égale à l'indice le plus bas.
+# Trop de suites lourdes pour n (au-delà des shards, ou n shards lourds sans place pour le reste) → rc 64, comme avant.
+#
+# Le job `tests` de la CI (nom exact exigé par le ruleset) rejoue cette partition pour TOUS les shards sur la liste
+# sélectionnée et vérifie que l'union des shards est EXACTEMENT cette liste, sans doublon : une suite oubliée rougit.
+# Les shards sont donc disjoints par construction ET par contrôle.
+#
+# Sorties : 0 = liste rendue (éventuellement vide) · 64 = usage ou trop de suites lourdes · 65 = --liste hors découverte
+# (ligne inconnue, doublon, fichier illisible).
 set -u
+export LC_ALL=C
+set -o pipefail
 
-# Séparées par des espaces (les chemins de suites n'en contiennent pas ; l'awk de macOS refuse un saut de ligne dans -v).
-HEAVY="plugin/conductor/scripts/tests/test-driver-lock-ws.sh plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh"
+SEUIL=600
+DEFAUT=7
+
+# Table des durées : « <secondes> <chemin ou glob> ». Mesure du 2026-11-07, run 42400570610. test-cockpit-projet.sh
+# (1509 s) est découpée en trois suites (arbitrage Samuel, AskUserQuestion session principale, 2026-11-07 : « Oui, découper
+# projet ») : leurs durées et celle de test-cockpit-sondes-stables.sh sont MESURÉES sur le run CI 42435171473 de la PR #220 ;
+# le glob projet-* (540 s) reste en repli pour une suite de cette famille qui n'aurait pas sa ligne.
+# L'entrée exacte précède le glob : tant que la suite entière existe, sa mesure prime.
+durees() {
+  cat <<'DUREES'
+1 plugin/_internal/runtime-adapter/tests/test-agent-to-codex.sh
+0 plugin/_internal/runtime-adapter/tests/test-register-codex-agent-path-traversal.sh
+17 plugin/_internal/tests/test-divergence-deux-clones.sh
+1 plugin/_internal/tests/test-gsd-cohabitation.sh
+27 plugin/_internal/tests/test-local-patches.sh
+22 plugin/_internal/tests/test-manifest.sh
+9 plugin/_internal/tests/test-merge-hooks.sh
+2 plugin/_internal/tests/test-module-roles.sh
+0 plugin/_internal/tests/test-resolve-deps.sh
+5 plugin/_internal/tests/test-resolve-preset-role.sh
+0 plugin/_internal/tests/test-resolve-preset.sh
+39 plugin/_internal/tests/test-roles-e2e.sh
+0 plugin/_internal/tests/test-runtime-cli-dispatch.sh
+1 plugin/_internal/tests/test-vf-portable.sh
+28 plugin/_internal/tests/test-vibeflow-update-cockpit.sh
+22 plugin/_internal/tests/test-vibeflow-update-divergence.sh
+20 plugin/_internal/tests/test-vibeflow-update-nouveaux-modules.sh
+56 plugin/_internal/tests/test-vibeflow-update-role.sh
+93 plugin/_internal/tests/test-vibeflow-update.sh
+0 plugin/_internal/tests/test-windows-crlf.sh
+0 plugin/business-pilot-bundle/scripts/tests/test-business-pilot-bundle.sh
+1 plugin/cockpit/scripts/tests/test-cockpit-ailleurs.sh
+4 plugin/cockpit/scripts/tests/test-cockpit-assemblage.sh
+18 plugin/cockpit/scripts/tests/test-cockpit-avancement.sh
+56 plugin/cockpit/scripts/tests/test-cockpit-chaine-xss.sh
+18 plugin/cockpit/scripts/tests/test-cockpit-chrome-fr.sh
+62 plugin/cockpit/scripts/tests/test-cockpit-direct.sh
+0 plugin/cockpit/scripts/tests/test-cockpit-ecrans-recent.sh
+148 plugin/cockpit/scripts/tests/test-cockpit-equipe.sh
+4 plugin/cockpit/scripts/tests/test-cockpit-forme-claude.sh
+76 plugin/cockpit/scripts/tests/test-cockpit-git-commandes.sh
+33 plugin/cockpit/scripts/tests/test-cockpit-git-details.sh
+250 plugin/cockpit/scripts/tests/test-cockpit-git-e2e.sh
+136 plugin/cockpit/scripts/tests/test-cockpit-git-entete.sh
+10 plugin/cockpit/scripts/tests/test-cockpit-git-env.sh
+2 plugin/cockpit/scripts/tests/test-cockpit-git-graphe.sh
+203 plugin/cockpit/scripts/tests/test-cockpit-git-signature.sh
+157 plugin/cockpit/scripts/tests/test-cockpit-git-tiroir.sh
+84 plugin/cockpit/scripts/tests/test-cockpit-git.sh
+20 plugin/cockpit/scripts/tests/test-cockpit-hygiene.sh
+311 plugin/cockpit/scripts/tests/test-cockpit-lancer-bandeau.sh
+77 plugin/cockpit/scripts/tests/test-cockpit-lancer-bout-en-bout.sh
+62 plugin/cockpit/scripts/tests/test-cockpit-lancer-chat.sh
+1 plugin/cockpit/scripts/tests/test-cockpit-lancer-cibles.sh
+13 plugin/cockpit/scripts/tests/test-cockpit-lancer-gabarit.sh
+130 plugin/cockpit/scripts/tests/test-cockpit-lancer-mode.sh
+24 plugin/cockpit/scripts/tests/test-cockpit-lancer-post.sh
+58 plugin/cockpit/scripts/tests/test-cockpit-lancer-processus.sh
+223 plugin/cockpit/scripts/tests/test-cockpit-lancer-pty.sh
+5 plugin/cockpit/scripts/tests/test-cockpit-lancer-q.sh
+24 plugin/cockpit/scripts/tests/test-cockpit-lancer-serveur.sh
+2 plugin/cockpit/scripts/tests/test-cockpit-lancer-suivi.sh
+76 plugin/cockpit/scripts/tests/test-cockpit-lancer-ui.sh
+206 plugin/cockpit/scripts/tests/test-cockpit-lancer-xss.sh
+4 plugin/cockpit/scripts/tests/test-cockpit-marque-blanche.sh
+34 plugin/cockpit/scripts/tests/test-cockpit-moteur-carte.sh
+5 plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh
+24 plugin/cockpit/scripts/tests/test-cockpit-path-enfants.sh
+1509 plugin/cockpit/scripts/tests/test-cockpit-projet.sh
+15 plugin/cockpit/scripts/tests/test-cockpit-questions.sh
+25 plugin/cockpit/scripts/tests/test-cockpit-reconnexion.sh
+6 plugin/cockpit/scripts/tests/test-cockpit-reseau.sh
+318 plugin/cockpit/scripts/tests/test-cockpit-responsive.sh
+110 plugin/cockpit/scripts/tests/test-cockpit-retard.sh
+7 plugin/cockpit/scripts/tests/test-cockpit-robustesse.sh
+1 plugin/cockpit/scripts/tests/test-cockpit-sante.sh
+56 plugin/cockpit/scripts/tests/test-cockpit-securite.sh
+19 plugin/cockpit/scripts/tests/test-cockpit-serveur.sh
+2 plugin/cockpit/scripts/tests/test-cockpit-signal-mod.sh
+19 plugin/cockpit/scripts/tests/test-cockpit-signal.sh
+30 plugin/cockpit/scripts/tests/test-cockpit-terminal-activation.sh
+294 plugin/cockpit/scripts/tests/test-cockpit-terminal-client.sh
+178 plugin/cockpit/scripts/tests/test-cockpit-terminal-lanceur.sh
+35 plugin/cockpit/scripts/tests/test-cockpit-terminal-page.sh
+93 plugin/cockpit/scripts/tests/test-cockpit-terminal-pty-plantage.sh
+145 plugin/cockpit/scripts/tests/test-cockpit-terminal-pty.sh
+83 plugin/cockpit/scripts/tests/test-cockpit-terminal-serveur.sh
+106 plugin/cockpit/scripts/tests/test-cockpit-terminal-session.sh
+493 plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh
+37 plugin/cockpit/scripts/tests/test-cockpit-terminal-xss.sh
+692 plugin/cockpit/scripts/tests/test-cockpit-terminal-xterm.sh
+31 plugin/cockpit/scripts/tests/test-cockpit-transcript.sh
+2 plugin/cockpit/scripts/tests/test-cockpit-vendor.sh
+9 plugin/cockpit/scripts/tests/test-cockpit-vie.sh
+28 plugin/cockpit/scripts/tests/test-cockpit-visite-retours.sh
+102 plugin/cockpit/scripts/tests/test-cockpit-who.sh
+17 plugin/conductor/scripts/tests/test-check-agents.sh
+11 plugin/conductor/scripts/tests/test-check-ajout-retrait.sh
+7 plugin/conductor/scripts/tests/test-check-architecture.sh
+6 plugin/conductor/scripts/tests/test-check-artifact-fidelity.sh
+1 plugin/conductor/scripts/tests/test-check-blueprints.sh
+1 plugin/conductor/scripts/tests/test-check-branch-claim.sh
+1 plugin/conductor/scripts/tests/test-check-debug-research.sh
+11 plugin/conductor/scripts/tests/test-check-description-fidelity.sh
+1 plugin/conductor/scripts/tests/test-check-divergence.sh
+11 plugin/conductor/scripts/tests/test-check-guard-health.sh
+8 plugin/conductor/scripts/tests/test-check-instruction-budget.sh
+0 plugin/conductor/scripts/tests/test-check-legacy.sh
+2 plugin/conductor/scripts/tests/test-check-map-drift.sh
+59 plugin/conductor/scripts/tests/test-check-method-budget.sh
+0 plugin/conductor/scripts/tests/test-check-mission-invariants.sh
+2 plugin/conductor/scripts/tests/test-check-overlaps.sh
+52 plugin/conductor/scripts/tests/test-check-phase-validation.sh
+1 plugin/conductor/scripts/tests/test-check-planning-consumers-registered.sh
+39 plugin/conductor/scripts/tests/test-check-planning-not-inflight.sh
+15 plugin/conductor/scripts/tests/test-check-role-consistency.sh
+17 plugin/conductor/scripts/tests/test-check-skills.sh
+3 plugin/conductor/scripts/tests/test-check-state-integrity.sh
+1 plugin/conductor/scripts/tests/test-check-workstream-pointer.sh
+0 plugin/conductor/scripts/tests/test-conductor.sh
+2 plugin/conductor/scripts/tests/test-dag-atomic-save.sh
+37 plugin/conductor/scripts/tests/test-dag.sh
+0 plugin/conductor/scripts/tests/test-doc-and-commands.sh
+51 plugin/conductor/scripts/tests/test-driver-lock-consumers-ws.sh
+7 plugin/conductor/scripts/tests/test-driver-lock-phase-consumers.sh
+7 plugin/conductor/scripts/tests/test-driver-lock-phase.sh
+449 plugin/conductor/scripts/tests/test-driver-lock-ws.sh
+28 plugin/conductor/scripts/tests/test-driver-lock.sh
+1 plugin/conductor/scripts/tests/test-framework-version.sh
+1 plugin/conductor/scripts/tests/test-guard-agent-write.sh
+3 plugin/conductor/scripts/tests/test-guard-driver-lock-phase.sh
+248 plugin/conductor/scripts/tests/test-guard-driver-lock-ws.sh
+11 plugin/conductor/scripts/tests/test-guard-driver-lock.sh
+33 plugin/conductor/scripts/tests/test-guard-fin-de-geste.sh
+14 plugin/conductor/scripts/tests/test-notify.sh
+1 plugin/conductor/scripts/tests/test-runtime-registry.sh
+1 plugin/conductor/scripts/tests/test-scaffold-docs.sh
+0 plugin/conductor/scripts/tests/test-skill-doc-paths.sh
+41 plugin/conductor/scripts/tests/test-split-planning.sh
+1 plugin/conductor/scripts/tests/test-verify-runtime-reversibility.sh
+45 plugin/conductor/scripts/tests/test-vf-divergence-hook.sh
+0 plugin/conductor/scripts/tests/test-vf-new-lab.sh
+0 plugin/conductor/scripts/tests/test-vf-notify.sh
+1 plugin/conductor/scripts/tests/test-vf-role.sh
+1 plugin/conductor/scripts/tests/test-vf-split-planning.sh
+1 plugin/conductor/scripts/tests/test-vf-update.sh
+47 plugin/conductor/scripts/tests/test-vf-validation.sh
+0 plugin/conductor/skills/vf-new-lab/scripts/tests/test-proportion-capabilities.sh
+1 plugin/consolidator/scripts/tests/test-check-registres.sh
+8 plugin/consolidator/scripts/tests/test-consolidator.sh
+0 plugin/consolidator/scripts/tests/test-decay.sh
+1 plugin/consolidator/scripts/tests/test-guard-bash-registres.sh
+0 plugin/consolidator/scripts/tests/test-guard-read-registres.sh
+4 plugin/consolidator/scripts/tests/test-registres-role.sh
+1 plugin/consolidator/scripts/tests/test-seed-registres.sh
+0 plugin/consolidator/scripts/tests/test-windows-guards.sh
+0 plugin/content-bundle/scripts/tests/test-content-bundle.sh
+2 plugin/design-orchestrator/scripts/tests/test-design-orchestrator.sh
+34 plugin/dev-orchestrator/scripts/tests/test-check-capability-activation.sh
+1 plugin/dev-orchestrator/scripts/tests/test-check-dev-bootstrap.sh
+2 plugin/dev-orchestrator/scripts/tests/test-check-doc-drift.sh
+6 plugin/dev-orchestrator/scripts/tests/test-check-gsd-config.sh
+0 plugin/dev-orchestrator/scripts/tests/test-check-gsd-engine.sh
+1 plugin/dev-orchestrator/scripts/tests/test-check-hook-paths.sh
+50 plugin/dev-orchestrator/scripts/tests/test-check-mission-exit-ws.sh
+62 plugin/dev-orchestrator/scripts/tests/test-check-mission-exit.sh
+2 plugin/dev-orchestrator/scripts/tests/test-check-requirements-survival.sh
+26 plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh
+1 plugin/dev-orchestrator/scripts/tests/test-discover-unintegrated-docs.sh
+0 plugin/dev-orchestrator/scripts/tests/test-gsd-run.sh
+1 plugin/dev-orchestrator/scripts/tests/test-hook-exit-contract.sh
+3 plugin/dev-orchestrator/scripts/tests/test-inject-mcp-tools.sh
+7 plugin/dev-orchestrator/scripts/tests/test-restore-requirements-ledger.sh
+0 plugin/growth-bundle/scripts/tests/test-growth-bundle.sh
+1 plugin/infrastructure-audit/scripts/tests/test-audit-infra.sh
+6 plugin/installer/scripts/tests/test-build-module-catalog-role.sh
+0 plugin/installer/scripts/tests/test-build-module-catalog.sh
+0 plugin/kpi-analyst/scripts/tests/test-kpis-writer.sh
+0 plugin/planning-core/scripts/tests/test-check-planning-state.sh
+0 plugin/planning-core/scripts/tests/test-detect-gsd-engine.sh
+0 plugin/planning-core/scripts/tests/test-detect-planning-debt.sh
+1 plugin/planning-core/scripts/tests/test-planning-context-hardening.sh
+0 plugin/planning-core/scripts/tests/test-planning-core.sh
+7 plugin/planning-core/scripts/tests/test-planning-hooks.sh
+33 plugin/planning-core/scripts/tests/test-recalc-planning.sh
+2 plugin/planning-core/scripts/tests/test-workstream-policy.sh
+1 plugin/planning-core/scripts/tests/test-workstream-symlink-escape.sh
+94 plugin/product-team-bundle/scripts/tests/test-check-prd.sh
+11 plugin/product-team-bundle/scripts/tests/test-product-team-bundle.sh
+0 plugin/skill-creator/skills/skill-creator/scripts/tests/test-quick-validate.sh
+0 plugin/software-architecture/scripts/tests/test-check-file-size.sh
+1 plugin/software-architecture/scripts/tests/test-guard-file-size.sh
+3 scripts/tests/test-check-affirmation-non-mesuree.sh
+7 scripts/tests/test-check-baseline-arbitrage.sh
+6 scripts/tests/test-check-gate-touche.sh
+1 scripts/tests/test-check-gsd-core-update.sh
+1 scripts/tests/test-check-machine-paths.sh
+1 scripts/tests/test-check-push-sans-pr.sh
+8 scripts/tests/test-check-python-isolation.sh
+0 scripts/tests/test-check-release-tag.sh
+1 scripts/tests/test-hook-exit-parc.sh
+0 scripts/tests/test-measure-server-rulesets.sh
+40 scripts/tests/test-python-isolation-sites.sh
+1 scripts/tests/test-traffic-snapshot.sh
+240 plugin/cockpit/scripts/tests/test-cockpit-projet-graphe.sh
+658 plugin/cockpit/scripts/tests/test-cockpit-projet-visite.sh
+515 plugin/cockpit/scripts/tests/test-cockpit-projet-croissance.sh
+48 plugin/cockpit/scripts/tests/test-cockpit-sondes-stables.sh
+540 plugin/cockpit/scripts/tests/test-cockpit-projet-*.sh
+DUREES
+}
 
 discover() { find plugin scripts -type f -path '*/tests/test-*.sh' | LC_ALL=C sort; }
 
-usage() { echo "usage : ci-shard-suites.sh <shard> <n> | --all" >&2; exit 64; }
+usage() { echo "usage : ci-shard-suites.sh <shard> <n> [--liste <fichier>] | --all" >&2; exit 64; }
 
 if [ "${1:-}" = --all ] && [ "$#" -eq 1 ]; then discover; exit 0; fi
-[ "$#" -eq 2 ] || usage
+liste=''
+case "$#" in
+  2) ;;
+  4) [ "$3" = --liste ] || usage; liste=$4 ;;
+  *) usage ;;
+esac
 case "$1$2" in *[!0-9]*|'') usage ;; esac
 shard=$1; n=$2
 [ "$n" -ge 1 ] && [ "$shard" -lt "$n" ] || usage
 
-# Une seule passe : la liste HEAVY est lue d'abord (variable), puis la découverte. Les lourdes présentes sur le disque
-# prennent les shards 0..nh-1 dans l'ordre de HEAVY ; le reste tourne sur nh..n-1.
-discover | LC_ALL=C awk -v shard="$shard" -v n="$n" -v heavy="$HEAVY" '
-  BEGIN { nh_decl = split(heavy, H, " "); for (i = 1; i <= nh_decl; i++) if (H[i] != "") want[H[i]] = i }
-  { all[++na] = $0; if ($0 in want) present[want[$0]] = $0 }
-  END {
-    nh = 0
-    for (i = 1; i <= nh_decl; i++) if (i in present) { slot[present[i]] = nh; nh++ }
-    if (nh >= n) { printf "ci-shard-suites : %d suite(s) lourde(s) pour %d shard(s) — il faut au moins un shard de plus que de suites lourdes\n", nh, n > "/dev/stderr"; exit 64 }
-    rest = n - nh; k = 0
-    for (j = 1; j <= na; j++) {
-      t = all[j]
-      if (t in slot) { s = slot[t] } else { s = nh + k % rest; k++ }
-      if (s == shard) print t
+disc="$(discover)"
+if [ -n "$liste" ]; then
+  [ -r "$liste" ] && [ -f "$liste" ] || { echo "ci-shard-suites : --liste $liste illisible" >&2; exit 65; }
+  sel="$(grep . "$liste" | LC_ALL=C sort)"
+  dup="$(printf '%s\n' "$sel" | uniq -d)"
+  if [ -n "$dup" ]; then
+    echo "ci-shard-suites : doublon dans --liste :" >&2; printf '%s\n' "$dup" | sed 's/^/  /' >&2; exit 65
+  fi
+  inconnu="$(comm -13 <(printf '%s\n' "$disc") <(printf '%s\n' "$sel"))"
+  if [ -n "$inconnu" ]; then
+    echo "ci-shard-suites : --liste hors de la découverte (*/tests/test-*.sh) :" >&2; printf '%s\n' "$inconnu" | sed 's/^/  /' >&2; exit 65
+  fi
+else
+  sel="$disc"
+fi
+
+TAB="$(printf '\t')"
+# Étage 1 : estimation par suite (exact, puis glob dans l'ordre de la table, sinon DEFAUT) → « durée<TAB>chemin », trié.
+# Étage 2 : réservation des lourdes, LPT sur le reste, impression du shard demandé (puis tri par chemin).
+{ durees | awk '{ print "T" "\t" $0 }'; printf '%s\n' "$sel" | awk 'NF' | awk '{ print "L" "\t" $0 }'; } |
+  LC_ALL=C awk -F '\t' -v defaut="$DEFAUT" '
+    $1 == "T" {
+      line = $2; sp = index(line, " ")
+      if (sp == 0 || line ~ /^#/) next
+      sec = substr(line, 1, sp - 1) + 0; pat = substr(line, sp + 1)
+      if (pat ~ /\*/) {
+        rx = pat; gsub(/[.]/, "\\.", rx); gsub(/[*]/, "[^/]*", rx); ng++; grx[ng] = "^" rx "$"; gsec[ng] = sec
+      } else exact[pat] = sec
+      next
     }
-  }'
+    $1 == "L" {
+      p = $2
+      if (p in exact) e = exact[p]
+      else { e = defaut; for (g = 1; g <= ng; g++) if (p ~ grx[g]) { e = gsec[g]; break } }
+      printf "%d\t%s\n", e, p
+    }' |
+  LC_ALL=C sort -t "$TAB" -k1,1nr -k2,2 |
+  LC_ALL=C awk -F '\t' -v shard="$shard" -v n="$n" -v seuil="$SEUIL" '
+    { d[++na] = $1 + 0; p[na] = $2; if ($1 + 0 > seuil) nh++ }
+    END {
+      if (nh > n || (nh == n && na > nh)) {
+        printf "ci-shard-suites : %d suite(s) lourde(s) (> %d s) pour %d shard(s) — il faut au moins un shard de plus que de suites lourdes\n", nh, seuil, n > "/dev/stderr"; exit 64
+      }
+      for (s = 0; s < n; s++) load[s] = 0
+      k = 0
+      for (i = 1; i <= na; i++) {
+        if (d[i] > seuil) { s = k; k++ }
+        else { s = nh; for (j = nh + 1; j < n; j++) if (load[j] < load[s]) s = j }
+        load[s] += d[i]
+        if (s == shard) print p[i]
+      }
+    }' |
+  LC_ALL=C sort
+exit $?

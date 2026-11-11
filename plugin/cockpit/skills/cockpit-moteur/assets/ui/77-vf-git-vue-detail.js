@@ -28,6 +28,9 @@
     .vf-git-pastille { padding: 2px 8px; border-radius: 999px; background: none; font-size: 11.5px; font-weight: 400; color: var(--text-2); }
     .vf-git-p-ok::before { content: '✓ ' / ''; } .vf-git-p-warn::before { content: '◐ ' / ''; } .vf-git-p-nonsuivi::before { content: '○ ' / ''; } .vf-git-p-nonverif::before { content: '⊘ ' / ''; } /* glyphe décoratif : texte alternatif vide, le mot qui suit reste lu */ .vf-git-p-mono { font-family: var(--mono); }
     .vf-git-mention { margin-top: 8px; }
+    .vf-git-d-cmds { display: flex; flex-direction: column; gap: 4px; }
+    .vf-git-d-change { margin-top: 4px; padding-top: 8px; border-top: 1px solid var(--hair); } .vf-git-d-change .vf-git-d-fichiers-t::before { content: '△ ' / ''; } /* variante Q9 en attente : glyphe et mot en texte neutre, aucune couleur d'avertissement */
+    .vf-git-p-lecture::before { content: '◌ ' / ''; }
     @media (max-width: 999px), (pointer: coarse) { .vf-git-det .btn { min-height: 44px; } }
   `;
   document.head.appendChild(style);
@@ -66,6 +69,7 @@
     b.addEventListener('click', () => { cache.delete(sha); charger(zone, sha); });
     zone.replaceChildren(el('p', 'vf-git-d-fichiers-t', 'Indisponible'), el('p', 'vf-git-note', "Le détail de ce commit n'a pas pu être lu."), b);
   };
+  const cmds = (titre, cmd, cls, nom) => { const g = el('div', 'vf-git-d-cmds' + (cls || '')); g.append(el('p', 'vf-git-d-fichiers-t', titre), R.commande(cmd, annoncer, nom)); return g; }; // lecture et changement ne partagent plus un même bloc : le second dit ce qu'il fait
   const remplir = (zone, j) => {
     const m = j.message.split('\n'), msg = el('div', 'vf-git-d-msg'), corpsMsg = el('span', 'vf-git-d-corps');
     corpsMsg.textContent = m.length > 1 ? '\n' + m.slice(1).join('\n') : '';
@@ -79,7 +83,7 @@
       fl.appendChild(li);
     }
     if (autres > 0) fl.appendChild(el('li', 'vf-git-d-reste', `et ${autres} ${autres > 1 ? 'autres' : 'autre'}`));
-    zone.replaceChildren(msg, el('div', 'vf-git-d-meta', `${j.auteur} · ${dateLongue(j.date)}`), sha, el('p', 'vf-git-d-fichiers-t', `Fichiers (${total})`), fl, R.commande(j.commandes.show, annoncer), R.commande(j.commandes.detacher, annoncer));
+    zone.replaceChildren(msg, el('div', 'vf-git-d-meta', `${j.auteur} · ${dateLongue(j.date)}`), sha, el('p', 'vf-git-d-fichiers-t', `Fichiers (${total})`), fl, cmds('Pour lire ce commit', j.commandes.show, '', 'pour lire le commit ' + j.h.slice(0, 7)), cmds('Change votre copie de travail', j.commandes.detacher, ' vf-git-d-change', 'pour détacher HEAD sur le commit ' + j.h.slice(0, 7)));
   };
   function charger(zone, sha) {
     if (!SHA.test(sha)) { indisponible(zone, sha); return; } // jamais de requête sur un sha que la page refuse
@@ -90,15 +94,26 @@
       if (commitOk(j, sha)) { cache.set(sha, j); remplir(zone, j); } else indisponible(zone, sha);
     });
   }
-  const fermerDetail = () => { ouvertSha = null; for (const d of document.querySelectorAll('#vf-git-tiroir .vf-git-detail')) d.remove(); };
+  // 199 : la région du détail n'est plus un enfant de la liste « Commits » (un listbox ne contient que des options) : la liste est coupée sous la rangée ouverte, le détail s'intercale, la suite des rangées forme une seconde liste ; à la fermeture elle est recollée
+  const fermerDetail = () => {
+    ouvertSha = null;
+    for (const d of document.querySelectorAll('#vf-git-tiroir .vf-git-detail')) {
+      const suite = d.nextElementSibling, ol = d.previousElementSibling;
+      if (suite && suite.classList.contains('vf-git-suite') && ol) { ol.append(...suite.children); suite.remove(); }
+      d.remove();
+    }
+    for (const l of lignes()) l.removeAttribute('aria-controls');
+  };
   const ouvrirDetail = (sha) => {
     fermerDetail(); // un seul détail à la fois
     selectionner(sha);
     const ligne = lignes().find((l) => l.dataset.h === sha);
     if (!ligne) return;
     ouvertSha = sha;
-    const li = el('li', 'vf-git-detail', null, { role: 'none' }), zone = el('div', 'vf-git-det', null, { role: 'region', 'aria-label': 'Détail du commit ' + sha.slice(0, 7) });
-    li.appendChild(zone); ligne.after(li);
+    const ol = ligne.parentNode, reste = []; for (let n = ligne.nextElementSibling; n; n = n.nextElementSibling) reste.push(n);
+    const li = el('div', 'vf-git-detail'), zone = el('div', 'vf-git-det', null, { role: 'region', id: 'vf-git-detail-' + sha.slice(0, 7), 'aria-label': 'Détail du commit ' + sha.slice(0, 7) });
+    li.appendChild(zone); ol.after(li); ligne.setAttribute('aria-controls', zone.id);
+    if (reste.length) { const suite = el('ol', ol.className + ' vf-git-suite', null, { role: 'listbox', 'aria-label': 'Commits, suite' }); suite.append(...reste); li.after(suite); }
     li.addEventListener('keydown', (e) => { if (e.key === 'Escape') { e.preventDefault(); e.stopPropagation(); fermerDetail(); ligne.focus(); } });
     charger(zone, sha);
   };
@@ -107,30 +122,35 @@
   // ---------- état de chaque worktree ----------
   const wtOk = (j) => !!j && j.schema === 'vibeflow/cockpit-git-worktrees@1' && (j.etat !== 'ok' || (Array.isArray(j.worktrees) && j.worktrees.every((w) => !!w && typeof w.chemin === 'string')));
   const nb = (n) => (n == null ? '—' : n); // un compte inconnu (null) ne s'écrit jamais 0
-  const pastilles = (p) => {
+  const dAvance = (n, base) => `${pl(n, 'commit')} d'avance sur ${base || 'la base'}`; // le nom de la base ne va que dans un title, jamais dans une commande
+  const pastilles = (p, base) => {
     const l = [];
-    if (p.propre === null || p.modifies == null) return [['état illisible', '']];
+    if (p.propre === null || p.modifies == null) return [['lecture impossible', '', "git status n'a pas abouti pour ce worktree : la prochaine lecture réessaiera"]]; // échec réel, distinct de « lecture… » (en cours)
     if (p.propre) l.push(['propre', 'vf-git-p-ok']);
     if (p.modifies > 0) l.push([pl(p.modifies, 'modifié'), 'vf-git-p-warn']);
     if (p.nonSuivis > 0) l.push([(p.plus ? p.nonSuivis + '+ ' : p.nonSuivis + ' ') + (p.nonSuivis > 1 || p.plus ? 'non suivis' : 'non suivi'), 'vf-git-p-nonsuivi']);
-    if (p.avance > 0 || p.retard > 0) l.push([`↑${nb(p.avance)} ↓${nb(p.retard)}`, 'vf-git-p-mono']);
+    if (p.avance > 0 || p.retard > 0) l.push([`↑${nb(p.avance)} ↓${nb(p.retard)}`, 'vf-git-p-mono', p.avance == null || p.retard == null ? 'avance inconnue' : `${dAvance(p.avance, base)}, ${pl(p.retard, 'commit')} de retard`]);
     return l;
   };
   const appliquerWt = () => {
     const sec = document.querySelector('#vf-git-s-wt'), d = T.donnees(); // #vf-git-s-wt est le corps de la section (div.vf-git-sec-c)
-    if (!sec || !d || !wt) return;
+    if (!sec || !d) return; // wt encore nul : « lecture… » (192)
     const lignesWt = [...sec.querySelectorAll('.vf-git-wt-l')];
     (d.worktrees || []).forEach((w, i) => {
       const ou = lignesWt[i]; if (!ou) return;
       for (const x of ou.querySelectorAll('.vf-git-etat-wt')) x.remove();
-      const etat = wt.etat === 'ok' ? (wt.worktrees.find((x) => x.chemin === w.chemin) || null) : null, bloc = el('div', 'vf-git-etat-wt');
+      const etat = wt && wt.etat === 'ok' ? (wt.worktrees.find((x) => x.chemin === w.chemin) || null) : null, bloc = el('div', 'vf-git-etat-wt');
       const nv = w.verifie === false || (etat && etat.verifie === false); // P78-D-38 (A3) : lien retour non vérifié, jamais lu côté serveur : ni comptes, ni commande cd, ni bouton de copie
-      for (const [txt, cls] of nv ? [['non vérifié', 'vf-git-p-nonverif']] : etat ? pastilles(etat) : [['état indisponible', '']]) bloc.appendChild(el('span', 'vf-git-pastille' + (cls ? ' ' + cls : ''), txt));
+      for (const [txt, cls, tip] of nv ? [['non vérifié', 'vf-git-p-nonverif']] : !wt ? [['lecture…', 'vf-git-p-lecture', "Lecture de l'état de ce worktree en cours"]] : etat ? pastilles(etat, d.base && d.base.nom) : [['état indisponible', '']]) {
+        const sp = el('span', 'vf-git-pastille' + (cls ? ' ' + cls : ''), txt, tip ? { title: tip } : null);
+        if (tip && cls === 'vf-git-p-mono') { sp.setAttribute('role', 'img'); sp.setAttribute('aria-label', tip); R.aideFocus(sp, tip); } // PU-G-196 : la définition des ↑/↓ aussi au focus clavier
+        bloc.appendChild(sp);
+      }
       ou.insertBefore(bloc, ou.querySelector('.vf-git-cmd, .vf-git-sans'));
       if (nv) for (const x of ou.querySelectorAll('.vf-git-cmd, .vf-git-sans')) x.remove();
     });
     for (const x of sec.querySelectorAll('.vf-git-mention')) x.remove();
-    if (wt.etat === 'ok' && wt.approximatif) sec.appendChild(el('p', 'vf-git-note vf-git-mention', typeof wt.mention === 'string' && wt.mention ? wt.mention : WT_REPLI));
+    if (wt && wt.etat === 'ok' && wt.approximatif) sec.appendChild(el('p', 'vf-git-note vf-git-mention', typeof wt.mention === 'string' && wt.mention ? wt.mention : WT_REPLI));
   };
   const chargerWt = () => { // rend { ok, change } ; null si une demande plus récente a pris la main (seule la dernière réponse est rendue)
     const moi = ++seqWt;

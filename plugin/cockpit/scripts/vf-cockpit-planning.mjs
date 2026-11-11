@@ -20,8 +20,11 @@ const dedans = (p) => !CONFINE || realUnder(p, CONFINE);
 export function lireConfine(racine, fn) { const avant = CONFINE; CONFINE = fs.realpathSync(racine); try { return fn(); } finally { CONFINE = avant; } }
 export const read = (f) => { try { if (!dedans(f)) return ''; const st = fs.statSync(f); return st.isFile() && st.size <= MAX_LECTURE ? fs.readFileSync(f, 'utf8') : ''; } catch { return ''; } };
 const ls = (d) => { try { return dedans(d) ? fs.readdirSync(d) : []; } catch { return []; } };
-export const clip = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); return s.length > n ? s.slice(0, n - 1).trimEnd() + '…' : s; };
-export const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); const i = s.search(/[.!?](\s|$)/); return clip(i > 25 ? s.slice(0, i + 1) : s, n); };
+// PU-G-147 : tout texte que le chat Projet affiche (noms de plan, de phase, de backlog, de seed, sujets de tag) se coupe au mot entier, par la même fonction que `sentence` (une seule)
+export const clip = (s, n) => clipMot(s, n);
+// PU-G-147 : la phrase d'un pied ou d'une description se coupe au mot entier (jamais « … avec le vr… ») ; un seul mot plus long que n est coupé net
+export const clipMot = (s, n) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); if (s.length <= n) return s; let c = s.slice(0, n - 1); if (/\S/.test(c.at(-1)) && /\S/.test(s[n - 1])) { const m = c.replace(/\s*\S+$/, ''); if (m) c = m; } return c.replace(/[\s,;:·(–—-]+$/, '') + '…'; };
+export const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/\*\*/g, '').replace(/`/g, '').trim(); const i = s.search(/[.!?](\s|$)/); return clipMot(i > 25 ? s.slice(0, i + 1) : s, n); };
 export const num = (s) => parseFloat(s);
 export const fm = (txt) => { txt = texte(txt); const m = /^---\n([\s\S]*?)\n---/.exec(txt); const o = {}; if (!m) return o; for (const l of m[1].split('\n')) { const k = /^([\w-]+):[ \t]*([^\n]*)$/.exec(l); if (k) o[k[1]] = k[2].trim(); } return o; };
 export const list = (v) => (v || '').replace(/^\[|\]$/g, '').split(',').map((s) => s.trim().replace(/^["']|["']$/g, '')).filter(Boolean);
@@ -129,6 +132,10 @@ export function readPlanning(root, layout, opts = {}) {
     for (const m of txt.matchAll(reExigences())) { const id = idExigence(m); if (!reqs.has(`${ws}|${id}`)) reqs.set(`${ws}|${id}`, { id, ws: ws || null, wsKey: ws, done: m[1].toLowerCase() === 'x', text: texteExigence(m), file: rel(f) }); }
     for (const m of txt.matchAll(reTraceabilite())) { const r = reqs.get(`${ws}|${m[1]}`); if (r && !r.phase) r.phase = normNum(m[2]); }
   }
+  // DG-10 (PU-G-052) : une exigence lue dans le fichier vivant d'un compartiment ET dans l'archive de jalon (clé joker `*`), avec le même identifiant et la même phase par la traçabilité,
+  // est UNE exigence : l'entrée du fichier vivant (case à jour) reste, celle de l'archive est écartée. Sans phase connue des deux côtés, rien n'est écarté (deux archives peuvent réutiliser un identifiant).
+  const vivantes = new Set([...reqs.values()].filter((r) => r.wsKey !== '*' && r.phase).map((r) => `${r.id}|${r.phase}`));
+  for (const [k, r] of [...reqs]) if (r.wsKey === '*' && r.phase && vivantes.has(`${r.id}|${r.phase}`)) reqs.delete(k);
 
   // état : frontmatter du STATE du compartiment actif, repli sur la ligne de corps « Phase: N »
   const sf = stateFile(root, layout); const sTxt = sf ? texte(read(sf)) : '';

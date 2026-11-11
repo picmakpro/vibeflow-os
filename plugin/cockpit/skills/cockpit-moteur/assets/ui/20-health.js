@@ -20,6 +20,11 @@
   const ORDER = ['high', 'medium', 'low'];
   const count = (sev) => issues.filter((i) => i.severity === sev).length;
   const urgent = count('high') + count('medium');
+  // one number everywhere: the title, the badge and the legend (important + worth fixing + minor) all add up to the same total
+  const total = issues.length;
+  // services this project really uses (graph.health.services): the intro only names those, never a stock list
+  const services = ((SC.graph.health && SC.graph.health.services) || []).filter((x) => typeof x === 'string');
+  const SECTION = SC.graph.meta && SC.graph.meta.vfTab === 'project' ? 'Health (security only)' : 'Health'; // the project tab's other gaps are not in this check
 
   SC.icons.health = '<path d="M3 12h4l2.5-6 4 12 2.5-6H21"/>';
   SC.icons.check = '<path d="m5 12.5 4.5 4.5L19 7.5"/>';
@@ -94,14 +99,15 @@
     el.querySelectorAll('[data-hc-fix]').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); fixWith(issues[+b.dataset.hcFix]); }));
     el.querySelectorAll('[data-hc-here]').forEach((b) => b.addEventListener('click', (ev) => { ev.stopPropagation(); resolveHere(issues[+b.dataset.hcHere]); }));
   };
-  const headline = () => urgent ? `${SC.plural(urgent, 'thing')} need${urgent === 1 ? 's' : ''} attention` : issues.length ? 'Nothing urgent' : 'No problems found';
+  const headline = () => urgent ? `${SC.plural(total, 'thing')} need${total === 1 ? 's' : ''} attention` : issues.length ? 'Nothing urgent' : 'No problems found';
   const breakdown = () => `<div class="hc-sub">${ORDER.filter(count).map((s) => `<span><i class="dot" style="background:${SEV[s].color}"></i>${count(s)} ${SEV[s].word}</span>`).join('')}</div>`;
 
   function listHtml() {
     const top = `<div class="sec">
         <div class="ph"><span class="ico" style="--c:${urgent ? SEV[count('high') ? 'high' : 'medium'].color : 'var(--ok)'}">${SC.icon('health')}</span><span class="kindlabel">${PLAN ? 'Design review' : 'Health check'}</span></div>
         <h2 class="pt">${h(headline())}</h2>
-        <p class="pd">${PLAN ? 'We checked the plan for parts anyone on the internet could use, decisions the PRD leaves open, and pieces nothing connects to. Settling these now is cheaper than after it’s built.' : 'We looked for keys left in the code or sent to the browser, data and parts of your app anyone on the internet can reach (Supabase tables, Firebase rules, Stripe webhooks, endpoints), leftover files and files too big to edit safely. It’s a quick check, not a security audit.'}</p>
+        <p class="pd">${PLAN ? 'We checked the plan for parts anyone on the internet could use, decisions the PRD leaves open, and pieces nothing connects to. Settling these now is cheaper than after it’s built.' : 'We looked for keys left in the code or sent to the browser, data and parts of your app anyone on the internet can reach, leftover files and files too big to edit safely. It’s a quick check, not a security audit.'}</p>
+        ${!PLAN && services.length ? `<p class="pd">${h(`Checks specific to what this project uses: ${services.join(', ')}.`)}</p>` : ''}
         ${issues.length ? breakdown() : `<div class="hc-calm">Nothing stood out. This is a quick automatic check, not a full ${PLAN ? 'design' : 'security'} review.</div>`}
         <div class="actions"><button class="btn soft" data-hc-back>${SC.iconI('left')}Back</button></div>
       </div>`;
@@ -132,7 +138,7 @@
   if (urgent) {
     const b = document.createElement('span');
     b.className = 'badge';
-    b.textContent = urgent > 99 ? '99+' : String(urgent);
+    b.textContent = total > 99 ? '99+' : String(total);
     btn.style.setProperty('--hc-badge', count('high') ? SEV.high.color : SEV.medium.color);
     btn.style.setProperty('--hc-badge-text', 'var(--on-sev-text)');
     btn.appendChild(b);
@@ -143,7 +149,7 @@
   SC.on('panel', () => { if (isOpen && openedAt && where() !== openedAt) { isOpen = false; SC.closePanel(); } });
 
   SC.addPanelSection('overview', () => ({
-    html: `<div class="sec"><h3>${PLAN ? 'Design review' : 'Health'}</h3><div class="list"><a class="row" data-hc-open>
+    html: `<div class="sec"><h3>${PLAN ? 'Design review' : SECTION}</h3><div class="list"><a class="row" data-hc-open>
         <span class="dot" style="background:${urgent ? SEV[count('high') ? 'high' : 'medium'].color : 'var(--ok)'}"></span>
         <span class="rt"><div class="rn">${h(headline())}</div><div class="rd">${issues.length ? ORDER.filter(count).map((s) => `${count(s)} ${SEV[s].word}`).join(' · ') : PLAN ? 'Quick automatic check of the plan' : 'Quick automatic check of secrets, open endpoints and leftover files'}</div></span>
         <span class="rc">${SC.iconI('right')}</span></a></div></div>`,

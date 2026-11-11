@@ -154,12 +154,12 @@ globalThis.window = { top: {}, opener: null, innerWidth: 800, innerHeight: 600, 
 globalThis.document = { fonts: { load: () => Promise.resolve(), ready: Promise.resolve() }, getElementById: el, addEventListener() {} };
 globalThis.location = { hash: '', pathname: '/', search: '' }; globalThis.history = { replaceState() {} }; globalThis.ResizeObserver = class { observe() {} }; globalThis.requestAnimationFrame = () => 0;
 globalThis.FitAddon = { FitAddon: class { fit() {} } };
-globalThis.Terminal = class { constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; } loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() {} write() {} paste() {} reset() {} resize() {} onData() {} onBinary() {} };
+globalThis.Terminal = class { constructor() { this.rows = 24; this.cols = 80; this.parser = { registerDcsHandler() {} }; this.textarea = { addEventListener() {} }; } loadAddon() {} open() {} attachCustomKeyEventHandler() {} focus() {} write() {} paste() {} reset() {} resize() {} onData() {} onBinary() {} };
 const realSI = globalThis.setInterval; globalThis.setInterval = (f, ms, ...a) => realSI(f, Math.max(5, Math.round(ms / 50)), ...a);
 const ligne = (m) => `claude --session-id '5b9c2e0a-7d41-4f3a-9c58-0e1d2f3a4b5c' -n 'vf-phase-72-alpha' ${m ? `--permission-mode '${m}' ` : ''}'/vf-dev Planifie la Phase 72 du compartiment alpha'`;
 const ID = (n) => ('p' + String(n)).padEnd(32, 'e');
 const valide = (id, over = {}) => Object.assign({ etat: 'en-attente', id, verbe: 'planifier', intention: 'Planifie la Phase 72 du compartiment alpha', phase: '72', ws: 'alpha',
-  lignes: { default: ligne('default'), acceptEdits: ligne('acceptEdits'), plan: ligne('plan'), herite: ligne('') }, bloquants: [], avertissements: [], arme_apres_ms: 1500, expire_ms: 100000 }, over);
+  lignes: { default: ligne('default'), acceptEdits: ligne('acceptEdits'), plan: ligne('plan'), herite: ligne('') }, bloquants: [], avertissements: [], arme_apres_ms: 1500, expire_ms: 100000, duree_ms: 120000 }, over);
 const S = { prop: { etat: 'aucune' }, lancer: 204 };
 const rep = (status, corps) => ({ status, ok: status >= 200 && status < 300, json: async () => corps, body: { getReader: () => ({ read: async () => ({ done: true }) }) } });
 globalThis.fetch = (u, o = {}) => { const url = String(u); J.journal.push({ m: o.method || 'GET', u: url, b: typeof o.body === 'string' ? o.body : '' });
@@ -354,7 +354,7 @@ assert_eq "LM.Q0 — témoin : parent, Q prête (ports distincts, jamais 4456), 
 assert_eq "LM.Q1 — premier démarrage (aucun fichier) : la réponse aucune n'a QUE la clé etat (pas de mode_retenu)" "$(pbody | evj 'Object.keys(j).join(",")')" "etat"
 proposer; BQ="$(pbody)"
 assert_eq "LM.Q1 — premier démarrage, aucun fichier : mode_retenu vaut default (témoin : la proposition est en attente)" "$(printf '%s' "$BQ" | evj 'j.etat + "/" + j.mode_retenu')" "en-attente/default"
-assert_eq "LM.Q2 — clés de la réponse en-attente = celles du contrat §4 plus mode_retenu (égalité d'ensemble)" "$(printf '%s' "$BQ" | evj 'Object.keys(j).sort().join(",")')" "arme_apres_ms,avertissements,bloquants,etat,expire_ms,id,intention,lignes,mode_retenu,phase,verbe,ws"
+assert_eq "LM.Q2 — clés de la réponse en-attente = celles du contrat §4 plus mode_retenu (égalité d'ensemble)" "$(printf '%s' "$BQ" | evj 'Object.keys(j).sort().join(",")')" "arme_apres_ms,avertissements,bloquants,duree_ms,etat,expire_ms,id,intention,lignes,mode_retenu,phase,verbe,ws"
 # LM.Q6 : le fichier est posé à « plan » ; aucune requête refusée ne le touche (inode, date, droits, contenu)
 pose_mode $'plan\n'; SIG0="$(sigf)"
 S425="$(pl "$(lj "$ID" acceptEdits)")"; attente_arme "$ARME_LU"

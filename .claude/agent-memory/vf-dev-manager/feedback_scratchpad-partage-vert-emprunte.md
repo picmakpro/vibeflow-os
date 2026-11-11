@@ -1,6 +1,6 @@
 ---
 name: scratchpad-partage-vert-emprunte
-description: Les workers séquentiels d'une mission partagent le scratchpad — un fichier de résultat homonyme laissé par le précédent fait lire un vert qui n'est pas le sien
+description: Le scratchpad de session est partagé par les workers ET par les managers frères — un nom générique (run-suites.sh, base/, dag.json) se fait écraser ou fait lire un vert emprunté
 metadata:
   type: feedback
 ---
@@ -26,3 +26,10 @@ lu pendant qu'un process tourne est un `rc` d'autre chose. Même famille que
 l'objet mesuré n'est pas celui qu'on croit.
 
 Voir aussi [[project_sonde-inline-zsh-parse-le-case]] (§4, le rejeu complet n'est pas un oracle).
+
+**Extension du 2026-11-06 (retours panel, trois managers frères en parallèle) :** le scratchpad est
+celui de la SESSION, donc partagé aussi avec les autres managers lancés par la session principale.
+J'y ai écrit `run-suites.sh`, `base/` et `dag.json` ; le manager voisin utilisait les mêmes noms et a
+réécrit le script pendant que ma baseline tournait (bash lit un script par décalage : exécution
+corrompue possible). **How to apply :** dès le premier geste, tout sous un sous-dossier nommé par la
+mission (`scratchpad/<mission>/`), y compris le DAG, et le dire dans le digest des workers.

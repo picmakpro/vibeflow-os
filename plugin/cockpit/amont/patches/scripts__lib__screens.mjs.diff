@@ -5,3 +5,41 @@
  // Screens: the pages a person can open in the app (Next.js routes, React Router routes, …), so the
  // map can be entered from what people recognise ("the checkout page") instead of code layers.
  //
+@@ -22,11 +23,18 @@ const JS_LANGS = new Set(['typescript', 'javascript', 'vue', 'svelte', 'astro'])
+ 
+ // ======================= scan side =======================
+ 
++/** Source with comments blanked (same length, same lines): a route named in a comment is not a route. */
++function stripComments(src) {
++  return src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:"'`\\])\/\/[^\n]*/g, (m, pre) => pre + ' '.repeat(m.length - pre.length));
++}
++/** The size mark (vibeflow:allow-large-file …) is not a summary of the file. */
++const withoutSizeMark = (d) => String(d || '').replace(/^\s*vibeflow:allow-large-file(?:\s*\([^)]*\))?\s*/, '');
++
+ export function findScreens(src, file) {
+   if (file.category !== 'code' || !JS_LANGS.has(file.lang)) return [];
+   const p = file.path;
+   const out = [];
+-  const page = fileBasedScreen(p, src);
++  const page = fileBasedScreen(p, stripComments(src));
+   if (page) out.push(page);
+   if (file.lang === 'typescript' || file.lang === 'javascript' || file.lang === 'vue') {
+     for (const r of routerScreens(src, file)) out.push(r);
+@@ -142,7 +150,7 @@ function importBindings(code) {
+ const ROUTER_SIGNAL = /createBrowserRouter|createHashRouter|createMemoryRouter|createRoutesFromElements|useRoutes|RouterProvider|createRouter|new\s+(?:Vue)?Router\s*\(|RouteRecordRaw|RouteObject|provideRouter|RouterModule|Routes\s*=\s*\[|\broutes\s*(?::\s*[\w<>[\]\s]+)?=\s*\[/;
+ 
+ function routerScreens(src, file) {
+-  const code = src.replace(/\/\*[\s\S]*?\*\//g, (m) => m.replace(/[^\n]/g, ' ')).replace(/(^|[^:"'`\\])\/\/[^\n]*/g, (m, pre) => pre + ' '.repeat(m.length - pre.length));
++  const code = stripComments(src);
+   const out = [];
+   const bindings = importBindings(code);
+   const nests = new Map(); // hint -> nesting depth; a layout and its index child share a URL, the child wins
+@@ -628,7 +636,7 @@ export function buildScreens({ graph, scan, root }) {
+     const id = `screen:${app}:${url}`;
+     if (screens.has(id)) continue;
+     const f = files.get(c.file);
+-    screens.set(id, { id, url, file: c.file, app, fw: c.fw, name: f.auto && /\b(page|index|route)\b/i.test(f.name) ? humanUrl(url) : f.name || humanUrl(url), description: f.d || '' });
++    screens.set(id, { id, url, file: c.file, app, fw: c.fw, name: f.auto && /\b(page|index|route)\b/i.test(f.name) ? humanUrl(url) : f.name || humanUrl(url), description: withoutSizeMark(f.d) });
+   }
+   const list = [...screens.values()].sort((a, b) => a.app.localeCompare(b.app) || a.url.localeCompare(b.url));
+   for (const s of list) {

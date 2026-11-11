@@ -10,7 +10,7 @@
 //   passee = revient après l'avoir PASSÉE jusqu'au bout (autre lab) · temoins = chaque page « sans visite » avait fini son initialisation (lab connu : sélecteur de modèle posé)
 //   cookies = valeur de document.cookie relevée sur chaque page chargée (attendu : toutes vides).
 import { execFileSync } from 'node:child_process';
-import { executer, pause } from './chrome-session.mjs';
+import { executer, pause, attendreValeur } from './chrome-session.mjs';
 const [, , chrome, urlA, urlC, urlE, relance] = process.argv;
 const VISIBLE = "(() => { const t = document.getElementById('tour'); return !!t && !t.hidden; })()";
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlowTour && !!document.getElementById('tour-btn')";
@@ -24,10 +24,12 @@ await executer(chrome, async (s) => {
   await charge(urlA);
   const premiere = await visible('visite affichée au premier chargement');
   await s.ev("document.querySelector('#tour [data-x]').click()"); // la croix : « Skip » du premier pas
+  await attendreValeur(() => s.ev(VISIBLE), (v) => v === false, { max: 5000 }); // on ne recharge qu'une fois la fermeture lue (à l'échéance on recharge quand même : la lecture suivante juge)
   const croix = await sansVisite(urlA);
   // Échap : un troisième lab, vu pour la première fois (témoin : la visite s'affiche), fermée au clavier, puis rechargé sur le même port
   await charge(urlE); const echapVue = await visible('visite affichée sur le troisième lab');
   await s.ev("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
+  if (echapVue) await attendreValeur(() => s.ev(VISIBLE), (v) => v === false, { max: 5000 });
   const echap = echapVue ? await sansVisite(urlE) : 'témoin manquant';
   // relance des serveurs, dans un autre ordre : le lab A doit retrouver son adresse
   const [urlRelance, urlC2] = execFileSync(relance, { encoding: 'utf8', timeout: 120000 }).trim().split('\n');

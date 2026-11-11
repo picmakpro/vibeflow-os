@@ -1,0 +1,207 @@
+# Recette du panel — juge « Développeur solo » (profil dev) — 2026-11-08
+
+- **Profil** : dev (développeur solo : s'orienter vite dans le code, chiffres justes, lisible à toutes les largeurs, deux thèmes).
+- **Version jugée** : cockpit de la PR #218, commit a286f0fa — http://127.0.0.1:4461/ (onglet Code), /project.html (Projet).
+- **Référence** : v2.76.0 (de19669b) — http://127.0.0.1:4481/ (profil dev-old).
+- **Banc** : Playwright 1.60.0, un Chromium à la fois, fermé à la fin de chaque script ; charge machine élevée pendant toute la séance (load average 13 à 20, autres juges en parallèle), ce qui pèse sur les mesures de durée.
+- **Date** : 2026-11-08.
+- **Largeurs** : 390 × 844 (tactile), 768 × 1024 (souris et tactile), 844 × 390 (paysage tactile), 999, 1 000, 1 280, 1 440 px. **Thèmes** : clair et sombre (thème Auto piloté par le schéma de couleur du navigateur).
+- **Dossier de captures** : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/
+- Le terminal n'a pas été utilisé (hors de ce périmètre) ; aucune commande du banc n'a été lancée.
+
+## Comptes (59 propositions)
+
+| Verdict | Nombre | Ids |
+|---|---|---|
+| livré | 39 | 026, 027, 029, 030, 032, 034, 036, 037, 039, 040, 043, 045, 047, 048, 049, 050, 052, 054, 055, 057, 058, 059, 060, 061, 062, 063, 064, 067, 070, 071, 072, 074, 077, 078, 079, 081, 082, 083, 084 |
+| partiel | 5 | 038, 041, 066, 068, 080 |
+| non livré | 11 | 028, 031, 033, 046, 053, 056, 065, 069, 073, 075, 076 (toutes classe C non traitées par la mission : constat, pas une promesse rompue) |
+| régression | 1 | 035 |
+| clos par arbitrage, vérifié | 2 | 044, 051 |
+| mis de côté, constaté | 0 | — |
+| non reproduit | 1 | 042 |
+| goût (notes en plus du verdict) | 5 | 026, 029, 030, 038, 055 |
+
+Diagnostics : DG-02 livré, DG-03 livré, DG-04 livré, DG-09 clos par arbitrage vérifié, DG-12 livré.
+
+Hors registre : 2 régressions (titres de la recherche Projet ; carte de visite tronquée à 390 px), 9 autres constats.
+
+## Tableau des verdicts
+
+| Id | Verdict | Motif | Capture |
+|---|---|---|---|
+| PU-G-026 | livré | Onglet Code : noms de cartes à 12,69 px rendus à l'ouverture à toutes les largeurs (échelle 0,846 fixe), contre 2,2 à 6,4 px en v2.76.0 ; Projet reste à 7,12 px, conforme à l'arbitrage « Projet sans plancher ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-jointe-1000.png |
+| PU-G-027 | livré | « Ajuster à l'écran » garde le plancher (échelle 0,846, noms à 12,69 px après le clic) au lieu de tout faire tenir. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-027-apres-ajuster-jointe-1440.png |
+| PU-G-028 | non livré (C) | Le jalon gouvernance-labs-v1.0 garde ses 9 phases sur une ligne (toutes à y = 473), noms à 5,4 px rendus. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-028-jalon-gouvernance-jointe-1440.png |
+| PU-G-029 | livré | Traits au repos à opacité de trait 0,2 (0,5 en v2.76.0), la sélection colore toujours les voisins. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-029-liens-au-repos-jointe-1440-sombre.png |
+| PU-G-030 | livré | En sombre, pendant la sélection de « cockpit », les noms des autres cartes (growth-bundle, Racine du dépôt) restent lisibles ; en v2.76.0 ils étaient illisibles. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-030-selection-cockpit-jointe-1440-sombre.png |
+| PU-G-031 | non livré (C) | Tab parcourt l'en-tête, la barre de zoom, la question, puis les liens du panneau, jamais une carte du canevas. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/recon-code-1440.png |
+| PU-G-032 | livré | Molette seule : la carte défile (translation de 200 px, échelle inchangée) ; Ctrl + molette zoome. En v2.76.0 la molette seule zoomait. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-035-apres-molette-jointe-1440.png |
+| PU-G-033 | non livré (C) | À 390 px l'onglet Code ouvre toujours sur la carte (une seule carte visible), pas sur une liste. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-jointe-390.png |
+| PU-G-034 | livré | Une zone de toucher élargie (rect « touch-pad ») déborde la carte : un toucher à 6 px hors du bord ouvre la fiche de la carte. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-034-toucher-bord-carte-jointe-390.png |
+| PU-G-035 | **régression** | La molette ferme bien l'infobulle, mais après une navigation par la recherche l'infobulle de l'ancienne carte reste affichée et se pose sur la carte choisie ; v2.76.0 la fermait. Près du panneau, elle passe à gauche mais recouvre encore 28 px de la carte. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-035-infobulle-apres-recherche-jointe-1440.png et .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-035-infobulle-apres-recherche-v2760-1440.png |
+| PU-G-036 | livré | Texte « 2×clic ouvrir · clic droit : plus d'actions » ; au toucher, plus d'infobulle (affichage none). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-035-survol-cockpit-jointe-1440.png |
+| PU-G-037 | livré | Forme Q10 : flou sans fond gardé, description de module limitée à 3 lignes avec « Lire la suite » / « Réduire » ; les cartes peuvent glisser sous le titre (accepté). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/module-content-bundle-jointe-1000.png |
+| PU-G-038 | partiel | Limite à 3 lignes faite pour les modules ; la vue « Travail récent : Phase 61 » affiche toujours 5 lignes de « Demande d'origine » sans « Lire la suite » (aucune limite posée sur ce paragraphe). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-062-phase61-jointe-1440-sombre.png |
+| PU-G-039 | livré | À 390 px, vrai bouton « Lire la suite » de 95 × 44 px, qui bascule en « Réduire » (aria-expanded vrai). v2.76.0 : mot « Plus ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-039-module-content-bundle-jointe-390.png |
+| PU-G-040 | livré | La carte « Skills » est rangée sous « Dans design-orchestrator » ; titres de colonnes à 16 px de haut (10 px en v2.76.0). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/module-design-orchestrator-jointe-1440-sombre.png |
+| PU-G-041 | partiel | Le mot « route » reçoit maintenant le toucher (il prend le focus, v2.76.0 le laissait au canevas) mais aucune définition ne s'affiche, ni à 400 ms ni à 900 ms ; au survol souris la définition s'affiche. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-041-toucher-route-400ms-jointe-390.png |
+| PU-G-042 | non reproduit | Le lab du banc est sur « main » : aucun nom de branche avec « / » à couper. | — |
+| PU-G-043 | livré | Le chemin est découpé en segments avec une coupure possible après chaque « / » : à 1 000 px il passe à la ligne après « references/ ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/fichier-decisions-template-jointe-1000.png |
+| PU-G-044 | clos, vérifié | Paysage 844 × 390 inchangé dans son principe, pas de régression (zone utile 226 px de haut contre 174 px en v2.76.0) ; la pastille Terminal recouvre toujours une carte. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-044-paysage-jointe-844x390.png |
+| PU-G-045 | livré | Fermé par défaut à 390, 768 et 999 px, ouvert à 1 000 et 1 280 px. Mais à 768 et 999 px choisir une carte ou un fichier ne l'ouvre pas (voir points spéciaux). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-ouverture-jointe-768.png |
+| PU-G-046 | non livré (C) | Tirer la poignée de 300 px vers le haut ne change rien (feuille toujours à y = 363, 473 px de haut). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-046-poignee-tiree-jointe-390.png |
+| PU-G-047 | livré | La feuille s'ouvre dès le cadrage (v2.76.0 ne l'ouvrait pas du tout) ; mouvement de caméra de 520 ms. Un délai de 3,9 s avant le cadrage existe dans les deux versions sous la charge du banc. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-047-resultat-toucher-jointe-390.png |
+| PU-G-048 | livré | Au toucher, la fenêtre de recherche porte un bouton « Fermer » de 44 × 44 px. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-048-recherche-tactile-jointe-390.png |
+| PU-G-049 | livré | Homonymes départagés : « README.md / plugin/conductor · … » dans la recherche, « Decisions template · memory » / « · templates-memoire » sur les cartes de Travail récent, « Readme · business-pilot-bundle » dans « Utilisé par ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-049-recherche-readme-jointe-1440.png |
+| PU-G-050 | livré | Titre = vrai nom (« vf-cockpit-env.mjs »), dossier à droite (« cockpit/scripts ») au lieu de « fichier ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/recherche-vf-cockpit-jointe-1440.png |
+| PU-G-051 | clos, vérifié | « BACKLOG » ne trouve que deux fichiers de code qui citent le mot : .planning/ reste exclu, comme arbitré. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/recherche-BACKLOG-jointe-1440.png |
+| PU-G-052 | livré | Recherche Projet : RND-02 et PHIL-02 sortent une seule fois (deux fois en v2.76.0). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/projet-recherche-RND_02-jointe-1440.png |
+| PU-G-053 | non livré (C) | « non compris » : aucun résultat ; « format » ne fait pas remonter la section « Format de la planification ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/projet-recherche-non_compris-jointe-1440.png |
+| PU-G-054 | livré | Badge 41, panneau « Travail récent 41 », vue « Travail récent · 24 sur 41 cartes ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-054-travail-recent-jointe-1440-sombre.png |
+| PU-G-055 | livré | Pastilles « N récents » sur les modules, « Récent » sur les fichiers, « Touché par : Phase 61 » dans la fiche (v2.76.0 : « modifiés », « Modifié · Phase 61 »). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/fichier-decisions-template-jointe-1000.png |
+| PU-G-056 | non livré (C · Q9) | La fiche d'un fichier touché par la phase 61 ne montre aucun état Git, ni repère Git sur les cartes. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/fichier-decisions-template-jointe-1000.png |
+| PU-G-057 | livré | conductor : « 10 récents » sur la carte, « Travail récent à l'intérieur 10 » dans le panneau. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-057-conductor-ouvert-jointe-1440.png |
+| PU-G-058 | livré | Détail technique activé : « 55 lignes · 0 points d'accès · 0 utilisé par » et « Mentionne » inchangés (v2.76.0 passait à « 0 exports »). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/fichier-decisions-template-technique-jointe-1000.png |
+| PU-G-059 | livré | Échap ou fil « Vue d'ensemble » depuis Travail récent remettent « Base de code / vibeflow-os » (v2.76.0 laissait « Answer / Travail récent »). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-059-fil-vue-ensemble-jointe-1440-sombre.png |
+| PU-G-060 | livré | « Non classés » et « Fichiers qui n'appartiennent encore à aucun module. Ajoutez des motifs dans architecture.json pour les ranger. » | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-060-non-classes-jointe-1440.png |
+| PU-G-061 | livré | Infobulle d'un module : « Decisions template, Learnings template, Blockers template et 2 autres ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-057-conductor-ouvert-jointe-1440.png |
+| PU-G-062 | livré | Vue Phase 61 : « Demande d'origine : … » au titre et au panneau (plus de « You asked: »). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-062-phase61-jointe-1440-sombre.png |
+| PU-G-063 | livré | Libellé « Demande d'origine » dans Travail récent et dans la fiche d'un fichier. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/fichier-decisions-template-jointe-1000.png |
+| PU-G-064 | livré | Infobulle d'un lien : « Appels · 14 liens » ; feuille à 390 px : « Appels entre modules / 2 liens. » (v2.76.0 : « Calls connection / 5 connections »). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-064-toucher-lien-jointe-390.png |
+| PU-G-065 | non livré (C) | Descriptions toujours en anglais : « We as members, contributors, and leaders pledge… », « Only the latest published release of VibeFlow OS receives security fixes. » | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/menu-clic-droit-jointe-1440.png |
+| PU-G-066 | partiel | « 1,3 k », « 1,5 k lignes », « 1 ligne », « 1 fichier » corrects dans infobulles et statistiques ; la liste « Fichiers » du panneau d'un module affiche encore « 4.0k », « 2.1k », « 1.3k ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-066-liste-fichiers-1.3k-jointe-1440.png |
+| PU-G-067 | livré | Sur 488 résultats de recherche balayés, plus aucun « > » initial ni HTML brut (v2.76.0 : « <!-- SYNC », « <picture> <source… », « > Dire… »). Restent des liens Markdown bruts (voir hors registre). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-049-recherche-readme-jointe-1440.png |
+| PU-G-068 | partiel | La mention « (extrait brut) » existe (contracts-template.md) mais pas sur le cas signalé : la feuille de driver-lock.sh affiche « Empeche … la MEME etape en parallele » sans mention. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-047-resultat-toucher-jointe-390.png |
+| PU-G-069 | non livré (C) | « dispatch », « gates » restent sans définition au survol dans la description de la base (seul « scripts » est souligné). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/recon-code-1440.png |
+| PU-G-070 | livré | « Détecté via / tag v1.5.17 » (v2.76.0 : « Trouvé par #v1.5.17 »). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/module-design-orchestrator-jointe-1440-sombre.png |
+| PU-G-071 | livré | Type « Module » au lieu de « Service ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/module-design-orchestrator-jointe-1440-sombre.png |
+| PU-G-072 | livré | Fiche d'un Readme : section « Mentionne 3 » avec la phrase « Les fichiers, dossiers et pages que ce document nomme ou cite. », lignes « Une mention ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/fichier-README.md_design-orchestrator-jointe-1000-sombre.png |
+| PU-G-073 | non livré (C) | La description d'un module commence toujours par la phrase du module.json, sans « En clair ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/module-design-orchestrator-jointe-1440-sombre.png |
+| PU-G-074 | livré | Encart qui explique « nom généré à partir de leur chemin », nomme « /vf-cockpit build » et offre « Copier la commande » ; presse-papiers lu : « /vf-cockpit build ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-074-copier-commande-jointe-1440.png |
+| PU-G-075 | non livré (C) | Aucune date par phase ni par modification (seulement « Mis à jour il y a N minutes » global). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-054-travail-recent-jointe-1440-sombre.png |
+| PU-G-076 | non livré (C) | Fiche de DESIGN.md : « Ouvrir dans l'éditeur » seulement, pas d'aperçu. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/menu-clic-droit-jointe-1440.png |
+| PU-G-077 | livré | À 0 route, plus de bouton « Écrans » dans l'en-tête (présent en v2.76.0 et menant à « /products/:id »). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-077-entete-sans-ecrans-jointe-1280-sombre.png |
+| PU-G-078 | livré | La marque vibeflow:allow-large-file n'est plus prise pour un résumé (recherche « allow-large-file » : 0 résultat, contre 6 descriptions qui commençaient par elle en v2.76.0). Les deux phrases de la vue Écran ne sont plus atteignables à 0 écran : leur traduction n'a pas pu être vue. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-078-vue-ecran-v2760-1280-sombre.png |
+| PU-G-079 | livré | « 4 points à traiter » = « 3 à corriger · 1 mineur » (v2.76.0 : 4 contre 3 + 1 + 1). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-079-sante-jointe-1440.png |
+| PU-G-080 | partiel (attendu) | Pied et titres de section en français (« elle vérifie le code avant de rien modifier ») ; les 4 constats restent en anglais (liste plus bas). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-080-sante-suite1-jointe-1440.png |
+| PU-G-081 | livré | « 3 keys in test-cockpit-transcript.sh are probably fake … It is probably fake, made up for the test », rangées sous « À corriger bientôt » au lieu de « À corriger d'abord ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-079-sante-jointe-1440.png |
+| PU-G-082 | livré | Plus de conseil sur le fichier vendorisé de 6 657 lignes (« very large » et « unused » en v2.76.0) ; reste « One file is very large » = health.mjs, 1 146 lignes, code propre au dépôt. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-082-fichier-tres-gros-montre-jointe-1440.png |
+| PU-G-083 | livré | L'introduction ne cite plus Supabase, Firebase ni Stripe. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-079-sante-jointe-1440.png |
+| PU-G-084 | livré | Le bloc s'appelle « Santé (sécurité seulement) » et n'est plus affiché sous les écarts de format quand il n'y a rien (constaté dans le DOM : section masquée) ; v2.76.0 affichait « Santé / Aucun problème trouvé » sous les écarts. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/projet-panel-jointe-1440.png et .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-084-projet-sante-v2760-1440.png |
+| DG-02 | livré | Plus de bouton « Écrans » à 0 écran, plus de « /products/:id ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-077-entete-sans-ecrans-jointe-1280-sombre.png |
+| DG-03 | livré | « Travail récent · 24 sur 41 cartes », badge 41. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-054-travail-recent-jointe-1440-sombre.png |
+| DG-04 | livré | Vue de réponse remise à zéro (Échap et fil d'Ariane). | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-059-echap-depuis-carte-jointe-1440-sombre.png |
+| DG-09 | clos, vérifié | Exclusion de .planning/ gardée sur l'onglet Code. | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/recherche-BACKLOG-jointe-1440.png |
+| DG-12 | livré | Carte enfant « Skills » dans la colonne « Dans … ». | .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/module-design-orchestrator-jointe-1440-sombre.png |
+
+## Régressions
+
+### PU-G-035 — infobulle restée affichée après une navigation par la recherche
+- **Geste** : 1 440 × 900, clair. Survoler la carte « Racine du dépôt » (l'infobulle s'affiche), appuyer sur « / », taper « vf-cockpit.mjs », Entrée.
+- **Version jointe** : la carte change de vue (cockpit / Scripts), l'infobulle « Racine du dépôt · Configuration · 8 fichiers · 896 lignes » reste affichée (display: block) et se pose sur la carte choisie « Vf cockpit ». Capture : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-035-infobulle-apres-recherche-jointe-1440.png
+- **v2.76.0** : même geste, l'infobulle est fermée (display: none). Capture : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-035-infobulle-apres-recherche-v2760-1440.png
+- Même défaut à 768 px : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-fichier-choisi-jointe-768.png
+- Complément (pas une régression) : près du panneau, l'infobulle passe à gauche de la carte mais la recouvre de 28 px (infobulle 536 → 822 px, carte growth-bundle 794 → 1 048 px). Capture : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-035-survol-pres-du-panneau-jointe-1440-sombre.png
+
+### Hors registre — titres de la recherche de l'onglet Projet
+- **Geste** : /project.html, 1 440 px, « / », taper « format ».
+- **Version jointe** : les titres deviennent des noms de fichier avec ancre : « BACKLOG.md#formats-de-sortie-hétérogènes-entre-les-12-suites-de-dev-… », « 2026-11-05-unslop-espacements.dag.json#propositions », « 20-04-PLAN.md » ; la colonne de droite affiche « planning. » et « planning/missions. » (le point de « .planning » passe à la fin). Capture : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/projet-recherche-format-jointe-1440.png
+- **v2.76.0** : titres lisibles « Formats de sortie hétérogènes entre les 12 suites de dev-orchestrator », « propositions », « 20-04 — Fermer le sens OUVERTURE… ». Capture : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/projet-recherche-format-v2760-1440.png
+- Probable effet de bord de PU-G-050 (vrai nom de fichier en titre) appliqué à l'onglet Projet, où les éléments ne sont pas des fichiers.
+
+### Hors registre — carte « Par où commencer » tronquée à 390 px
+- **Geste** : ouverture de l'onglet Code à 390 × 844 tactile, première visite.
+- **Version jointe** : la carte n'affiche que « Par où commencer · Étape 1 sur 4 · La base de code », le titre « vibeflow-os » est coupé derrière la barre de progression et le texte de l'étape n'apparaît pas. Capture : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-jointe-390.png
+- **v2.76.0** : titre et texte complets. Capture : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-v2760-390.png
+
+## Non livrés détaillés (tous classe C, non traités par la mission : constats)
+
+- **PU-G-028** — /project.html, 1 440 px, double-clic sur le jalon gouvernance-labs-v1.0 : 9 phases sur une ligne, noms à 5,4 px. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-028-jalon-gouvernance-jointe-1440.png
+- **PU-G-031** — Code, 1 440 px, clic sur le fond puis 25 × Tab : focus sur « route », zoom, question, modèle, envoyer, « scripts », « Copier la commande », « Afficher 17 cartes », puis les liens du panneau ; aucune carte du canevas. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/recon-code-1440.png
+- **PU-G-033** — Code, 390 tactile : ouverture sur la carte (une carte visible). .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-jointe-390.png
+- **PU-G-046** — 390 tactile, toucher « Racine du dépôt » puis tirer la poignée de 300 px vers le haut : la feuille ne bouge pas. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-046-poignee-tiree-jointe-390.png
+- **PU-G-053** — Projet, recherche « non compris » : 0 résultat ; « format » ne donne pas la section. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/projet-recherche-non_compris-jointe-1440.png
+- **PU-G-056** — fiche de decisions-template.md (touché par 61-02) à 1 000 px : aucun état Git. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/fichier-decisions-template-jointe-1000.png
+- **PU-G-065** — Racine du dépôt : « Code of conduct », « Security », « Contributing » décrits en anglais. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/menu-clic-droit-jointe-1440.png
+- **PU-G-069** — description de la base : « dispatch », « gates » sans définition. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/recon-code-1440.png
+- **PU-G-073** — design-orchestrator : pas de phrase « En clair ». .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/module-design-orchestrator-jointe-1440-sombre.png
+- **PU-G-075** — Travail récent : aucune date par phase. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-054-travail-recent-jointe-1440-sombre.png
+- **PU-G-076** — DESIGN.md : pas d'aperçu. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/menu-clic-droit-jointe-1440.png
+
+## Points spéciaux de Samuel
+
+### Carte Code lisible à l'ouverture
+Mesure : pour chaque titre de carte, taille de police calculée × échelle réelle (largeur rendue / largeur CSS), juste après le chargement (3,5 s), sans zoomer ; hauteur de la boîte englobante en plus. Version jointe : **12,69 px partout** (minimum = médiane = maximum, boîte de 16,5 px de haut) à 1 440, 1 280, 1 000 et 768 px, et aussi à 390 px ; l'échelle de la carte vaut 0,846 à toutes les largeurs. Cartes visibles à l'ouverture (sur 27) : 7 à 1 440 et 1 280, 4 à 1 000 et 768, 1 à 390. v2.76.0, même geste : 6,39 px à 1 440, 5,38 px à 1 280, 3,62 px à 1 000, 2,16 px à 768 (2,25 px à 390), toutes les 27 cartes visibles. L'attendu (≥ 12 px) est tenu partout. Le prix : la vue d'ensemble n'est plus une vue d'ensemble (à 1 000 px, 4 cartes sur 27 dont 2 sous le panneau et la carte de visite), et « Ajuster à l'écran » ne dézoome plus au-delà du plancher ; dans un module, la colonne « Utilise » et parfois « Dans … » restent sous le panneau à 1 440 px. Onglet Projet : 7,12 px rendus dans les deux versions (pas de plancher, conforme à l'arbitrage, non compté comme un manque). Captures : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-jointe-1440.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-jointe-1280.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-jointe-1000.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-jointe-768.png, et .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-v2760-1440.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-v2760-1280.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-v2760-1000.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-v2760-768.png.
+
+### Panneau de détail fermé sous 1 000 px
+| Largeur | À l'ouverture | Après choix d'une carte | Après choix d'un fichier (recherche) | Fermeture |
+|---|---|---|---|---|
+| 390 tactile | fermé (opacité 0) | ouvert en feuille du bas | ouvert (fiche du fichier) | bouton « Fermer » 44 × 36 px : refermé proprement |
+| 768 souris | fermé | **reste fermé** | **reste fermé** | s'ouvre seulement par le bouton « Afficher ou masquer le détail » |
+| 768 tactile | fermé | **reste fermé** | — | idem |
+| 999 souris | fermé | **reste fermé** (clic et double-clic) | **reste fermé** | idem |
+| 1 000 | ouvert | ouvert | ouvert | bouton du panneau : refermé |
+| 1 280 | ouvert | ouvert | ouvert | bouton du panneau : refermé |
+Le seuil est exact (999 fermé, 1 000 ouvert) et la fermeture est propre partout. Mais entre 600 et 999 px, choisir une carte ou un fichier n'ouvre jamais le panneau et rien ne signale que la fiche existe : un développeur sur tablette clique une carte et ne voit rien (v2.76.0 l'affichait en permanence à 768 px). Captures : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-ouverture-jointe-768.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-fichier-choisi-jointe-768.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-tablette-toucher-carte-jointe-768.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-fichier-clic-jointe-999.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-referme-jointe-768.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-ouverture-jointe-1000.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-carte-choisie-jointe-390.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-referme-jointe-390.png. Petit défaut à 1 280 px : après fermeture, la carte ne se recentre pas sur le fichier choisi, qui sort du champ (.claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-referme-jointe-1280.png).
+
+### Santé
+- **Compte exact** : bouton « Contrôle de santé : 4 points à traiter », titre « 4 points à traiter », légende « 3 à corriger · 1 mineur » = 4 (v2.76.0 : 4 contre 3 + 1 + 1 = 5).
+- **Clés factices** : les trois fichiers de test sont signalés « probably fake » (« is a test or example file … It is probably fake, made up for the test »), rangés sous « À corriger bientôt » au lieu de « À corriger d'abord ». Mais la demande « Corriger avec Claude » reste celle d'un vrai secret (« Security fix: hard-coded secrets … assume they are compromised »).
+- **Fichiers tiers** : plus de conseil « découper » ni « supprimer » sur le fichier vendorisé de 6 657 lignes ; le seul fichier « very large » est health.mjs (1 146 lignes, code du dépôt), légitime.
+- **Phrases encore en anglais (toutes)** : « 3 keys in test-cockpit-transcript.sh are probably fake » ; « Test cockpit transcript (plugin/cockpit/scripts/tests/test-cockpit-transcript.sh) is a test or example file and contains 3 keys (passwords or keys) in the format of a real one. It is probably fake, made up for the test. If it is a real key, treat it as leaked and replace it. » ; « 2 keys in test-cockpit-equipe.sh are probably fake » et son texte (« … contains 2 keys (a GitHub access token) in the format of a real one … ») ; « 2 keys in test-cockpit-securite.sh are probably fake » et son texte (« … (an Amazon Web Services (AWS) access key) … ») ; « One file is very large » ; « This file has over 1,000 lines. AI assistants read and edit big files less reliably: they lose track of what's where and can break one part while fixing another. Splitting them into smaller files by job makes future changes safer. » ; sur le tableau « Montrer sur la carte » : titre « One file is very large » et carte « 1,146 lines » ; la demande « Corriger avec Claude » en entier (« Security fix: hard-coded secrets. Do not print, echo or repeat any secret value… », « For each one: 1. Replace the literal with an environment variable lookup… », « Because the old values are in git history, assume they are compromised. »).
+- Captures : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-079-sante-jointe-1440.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-080-sante-suite1-jointe-1440.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-082-fichier-tres-gros-montre-jointe-1440.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-081-corriger-avec-claude-jointe-1440.png, et v2.76.0 .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-079-sante-v2760-1440-sombre.png.
+
+### Libellés français sur l'onglet Code
+Balayage du texte visible, des aria-label, title, placeholder et aria-description dans 14 états (accueil, menus Types de liens, Exporter, Parcours, visite en 4 étapes, Santé, Travail récent, module conductor, fiches driver-lock et DESIGN.md, recherche, menu clic droit, 390 px et son menu Plus). Aucun aria-label, title ni placeholder en anglais. Mots et phrases anglais vus (liste complète en section « Mots anglais vus ») : les constats de Santé et la demande « Corriger avec Claude » ; la page transitoire au chargement et au passage Projet → Code ; le format « 4.0k » de la liste « Fichiers » ; les descriptions de fichiers (classe C) ; les liens Markdown bruts « [English](./README.md) ».
+
+## Avis de goût
+- **PU-G-026 (composition de l'ouverture)** — 6/10 : les noms sont enfin lisibles, mais l'ouverture montre un grand vide entre « Racine du dépôt » et « growth-bundle » et 4 à 7 cartes sur 27 ; je perds la carte d'ensemble que je venais chercher.
+- **PU-G-029 (traits au repos)** — 8/10 : la carte respire, les traits restent devinables, et la sélection les rallume avec une couleur franche.
+- **PU-G-030 (cartes atténuées en sombre)** — 8/10 : on lit les voisines sans perdre la mise en avant de la carte choisie.
+- **PU-G-038 (bloc de titre)** — 6/10 : « Lire la suite » est propre sur les modules, mais le paragraphe de 5 lignes de la vue Phase écrase le haut de la carte.
+- **PU-G-055 (« récents »)** — 8/10 : « 10 récents » et « Touché par : Phase 61 » disent juste ce qu'ils veulent dire et laissent « modifié » libre pour Git.
+
+## Mots anglais vus
+- **Contrôle de santé** (onglet Code, panneau) : les 4 titres et 4 textes de constats cités plus haut ; tableau « Montrer sur la carte » : « One file is very large », « 1,146 lines » ; demande « Corriger avec Claude » entière. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-079-sante-jointe-1440.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-082-fichier-tres-gros-montre-jointe-1440.png, .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-081-corriger-avec-claude-jointe-1440.png
+- **Page transitoire au chargement de l'onglet Code et au passage Projet → Code** (de 60 ms à plus de 600 ms selon la charge, déjà là en v2.76.0) : « Search files, routes, modules », « Flows », « Ask anything about this codebase... », « checking... », « Laying out… » ; titres de fenêtre « vibeflow-os map » et « VibeFlow · Code ». .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/changement-onglet-projet-vers-code-600ms-jointe-1440.png
+- **Format de nombres anglais** : « 4.0k », « 2.1k », « 1.7k », « 1.6k », « 1.4k », « 1.3k », « 1.1k », « 1.0k » dans la liste « Fichiers » d'un module. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-066-liste-fichiers-1.3k-jointe-1440.png
+- **Descriptions de fichiers** (classe C, PU-G-065) : « We as members, contributors, and leaders pledge to make participation in our community a harassment-free experience… », « Only the latest published release of VibeFlow OS receives security fixes. », « English · Issues and pull requests written in French are welcome too — the maintainers work in French day to day. », « Skill Packager - Creates a distributable .skill file of a skill folder Usage: … », « [English](./README.md) · Français ». .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/menu-clic-droit-jointe-1440.png
+- Noms générés depuis le nom de fichier (pas des libellés d'interface, signalés pour mémoire) : « Code of conduct », « Security », « Contributing », « Test check agents », « Workstream planning consumers », « Readme ».
+
+## Constats hors registre
+1. **Régression — titres de la recherche Projet** (détail plus haut). .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/projet-recherche-format-jointe-1440.png
+2. **Régression — carte de visite tronquée à 390 px** (détail plus haut). .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-jointe-390.png
+3. **Panneau qui ne s'ouvre pas au choix d'une carte entre 600 et 999 px** (détail dans les points spéciaux). .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-fichier-choisi-jointe-768.png
+4. **Liens Markdown bruts** dans les descriptions des deux README de la racine (« [English](./README.md) · Français »), sur les cartes, dans la recherche et dans Travail récent. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-fichier-clic-jointe-999.png
+5. **Homonymes dans un même dossier** : dans « Racine du dépôt », deux cartes « Readme » (README.md et README.fr.md) impossibles à distinguer par le titre ; l'infobulle du module dit « Readme, Readme ». .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-fichier-clic-jointe-999.png
+6. **En-tête à 1 000 px dans une sous-vue** : le nom du projet est réduit à « v ». .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/module-content-bundle-jointe-1000.png
+7. **« Copier la commande »** : aucun retour visible après la copie (le libellé ne change pas, pas de message), alors que la copie fonctionne. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-074-copier-commande-jointe-1440.png
+8. **Demande « Corriger avec Claude » sur une clé factice** : traite la clé de test comme un vrai secret à faire tourner. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-081-corriger-avec-claude-jointe-1440.png
+9. **Échap juste après un clic sur « Travail récent »** : tant que le focus est sur ce bouton, Échap ne quitte pas le tableau (il faut d'abord cliquer le fond) ; comportement de v2.76.0 non vérifié. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-059-apres-echap-jointe-1440-sombre.png
+10. **Paysage 844 × 390** : la pastille Terminal recouvre la carte « Racine du dépôt » (déjà le cas en v2.76.0). .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-044-paysage-jointe-844x390.png
+11. **Taper sur un port de carte** (petit cercle au bord) à 390 px ne sélectionne ni la carte ni le lien, dans les deux versions. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-034-toucher-bord-carte-jointe-390.png
+
+## Note globale du périmètre : 74/100
+- **Utilité 23/30** : recherche avec dossier, homonymes départagés, fiches cohérentes entre les deux modes et Santé débarrassée des faux conseils : je m'oriente vraiment plus vite ; mais la vue d'ensemble ne montre plus l'ensemble et la fiche ne s'ouvre pas sous 1 000 px.
+- **Lisibilité 19/25** : 12,7 px partout dès l'ouverture, colonnes lisibles, chemins coupés sur « / », nombres « 1,3 k » ; il reste les constats Santé en anglais, « 4.0k » et le Markdown brut.
+- **Confiance 19/25** : les compteurs concordent enfin (41 / 24 sur 41, 10 / 10, 4 = 3 + 1) et les clés factices sont dites factices ; mais l'infobulle périmée posée sur la mauvaise carte et les titres Projet en « fichier#ancre » entament la confiance.
+- **Finition 13/20** : carte de visite tronquée à 390 px, nom de projet « v » à 1 000 px, page anglaise transitoire, copie sans retour.
+
+**Trois irritants principaux**
+1. L'infobulle d'une carte reste affichée après une navigation par la recherche et se pose sur la carte choisie (régression). .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-035-infobulle-apres-recherche-jointe-1440.png
+2. Entre 768 et 999 px, choisir une carte ou un fichier n'ouvre pas la fiche, sans aucun signe qu'elle existe. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-045-fichier-choisi-jointe-768.png
+3. Le contrôle de santé parle encore anglais dans tous ses constats, jusqu'à la demande à coller dans Claude Code. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-080-sante-suite1-jointe-1440.png
+
+**Trois meilleures améliorations (vs v2.76.0)**
+1. Noms de cartes lisibles dès l'ouverture : 12,69 px contre 2,2 à 6,4 px. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-jointe-1000.png (v2.76.0 : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-026-ouverture-code-v2760-1000.png)
+2. Des chiffres qui concordent : Santé 4 = 3 + 1, « 24 sur 41 cartes », conductor 10 / 10, mêmes statistiques en détail technique. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/PU-G-054-travail-recent-jointe-1440-sombre.png
+3. La vue d'un module devenue juste : « Skills » dans « Dans … », « Module », « Détecté via tag », « 2,8 k », titres de colonnes lisibles. .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/module-design-orchestrator-jointe-1440-sombre.png (v2.76.0 : .claude/worktrees/panel-captures-2026-11-06/recette-2026-11-08/dev/module-design-orchestrator-v2760-1440-sombre.png)
+
+## Ce que je n'ai pas pu juger
+- **PU-G-042** : le lab du banc est sur « main », aucun nom de branche avec « / » à couper.
+- **PU-G-078, traductions** : à 0 écran, la vue « Écran » n'est plus atteignable ; seule la partie « marque de taille » est jugée.
+- **PU-G-047, durée et toucher pendant l'animation** : la machine tournait à 20 images par seconde (load average 15 à 20) ; le délai de 3,9 s avant le cadrage est le même en v2.76.0 et vient sans doute de la charge ; je n'ai pas testé un toucher pendant le mouvement.
+- **PU-G-046** : gestes simulés par l'automate, pas sur un vrai appareil.
+- **PU-G-084** : le bloc « Santé (sécurité seulement) » est masqué quand rien n'est trouvé ; son titre est constaté dans le DOM, pas vu à l'écran.
+- Terminal : hors de ce périmètre, non ouvert.

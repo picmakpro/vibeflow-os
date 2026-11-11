@@ -1,0 +1,380 @@
+diff --git a/plugin/cockpit/scripts/tests/test-cockpit-equipe.sh b/plugin/cockpit/scripts/tests/test-cockpit-equipe.sh
+index 6416f31f..f2bac14b 100644
+--- a/plugin/cockpit/scripts/tests/test-cockpit-equipe.sh
++++ b/plugin/cockpit/scripts/tests/test-cockpit-equipe.sh
+@@ -404,7 +404,7 @@ const [, , scripts, ...fichiers] = process.argv;
+ const { litteraux, estAnglais } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-fr-inventaire.mjs')).href);
+ const CONNU = {
+   '70-vf-live.js': ['Driver libre', 'Session', 'Verrou', 'Nœud de DAG', '{} min', ' · orphelin', '<p>Personne. Sources lues : ', 'Personne'],
+-  '71-vf-equipe-rendu.js': ['Session', 'en attente', '{} min', ' · orphelin', 'Agent', 'Mandat', 'Messages', 'Outils'], // libellés français affichés, que estAnglais prend pour de l'anglais faute d'accent (la sonde voit tout autre littéral)
++  '71-vf-equipe-rendu.js': ['Session', 'en attente', '{} min', ' · orphelin', 'Agent', 'Mandat', 'Messages', 'Outils', 'Session principale', ', orphelin', 'arbre principal', ' · en attente'], // libellés français affichés, que estAnglais prend pour de l'anglais faute d'accent (la sonde voit tout autre littéral)
+   '00-vibeflow.js': ['Projet', 'Code', ', #ask', '#btn-health{} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }', 'header .brand', 'en planification', 'en pause', 'Phase {}{} '],
+ };
+ const sortie = [];
+@@ -533,7 +533,7 @@ assert_eq "EUI.3 — fin2h est dans un details.vf-termines fermé dont le résum
+ assert_has "EUI.4 — un agent rattaché porte le lien vers son nœud de mission" "$(cat "$WORK/arbre.html")" 'href="project.html#r=f%3A.planning%2Fmissions%2Fm1.dag.json%23revue-p3"'
+ assert_eq "EUI.5 — agentsDuNoeud : le lien vers la carte de w1 pour le nœud rattaché, une chaîne vide pour un nœud sans agent" "$(G "$WORK/vm-noeud.json" 'j.erreur||(String(j.retour.a).includes("equipe.html#r=n%3Aag-w1")+"|"+JSON.stringify(j.retour.b))')" 'true|""'
+ assert_eq "EUI.6 — pied(a-bash) dit « actif » et « lance une commande »" "$(G "$WORK/vm-pied.json" 'j.erreur||(String(j.retour).includes("actif")+"|"+String(j.retour).includes("lance une commande"))')" "true|true"
+-assert_eq "EUI.7 — chaque session et sous-agent de l'arbre (5) porte un bouton data-vf-doing" "$(grep -o 'data-vf-doing=' "$WORK/arbre.html" | wc -l | tr -d ' ')" "5"
++assert_eq "EUI.7 — chaque session et sous-agent en cours de l'arbre (4) porte un bouton data-vf-doing ; le terminé (fin2h) n'en porte pas (P71.5-D-24 : le bouton reste dans la ligne d'agent, il n'a plus d'objet sur un agent fini)" "$(grep -o 'data-vf-doing=' "$WORK/arbre.html" | wc -l | tr -d ' ')|$(grep -c 'data-vf-doing="fin2h"' "$WORK/arbre.html" | tr -d ' ')" "4|0"
+ 
+ echo "=== E29 — correction d'audit : champs libres, forme typée, taille des meta.json (F2, F3, F4 ; P69-D-23) ==="
+ cat > "$AUX/spec-e29.json" <<'JSON'
+@@ -640,7 +640,7 @@ try {
+ JS
+ cat > "$AUX/vm70.mjs" <<'JS'
+ // vm70.mjs <70-vf-live.js> <71-vf-equipe-rendu.js> : le tiroir et le badge hors navigateur (vm), un `who` livré par un EventSource factice.
+-// Sortie : { badge, panneau } (texte du badge, titre du panneau « Au travail (N) »), ou { erreur }.
++// Sortie : { badge, panneau } (texte du badge, effectif « N actifs » du panneau « Au travail »), ou { erreur }.
+ import fs from 'node:fs';
+ import vm from 'node:vm';
+ const [, , f70, f71] = process.argv;
+@@ -659,7 +659,7 @@ try {
+   const w = [{ kind: 'subagent', id: 'a', etat: 'actif', tree: '.' }, { kind: 'subagent', id: 'f', etat: 'termine', tree: '.', parent: 'a' }, { kind: 'subagent', id: 'w', etat: 'en-attente', tree: '.' }, { kind: 'lock', id: 'v', tree: '.' }, { kind: 'dag-node', id: 'd', tree: '.', etat: 'actif' }, { kind: 'registered', id: 'r', tree: '.' }]; // un actif, un terminé, un en attente, puis ce qui n'est pas un agent
+   ES.last.l.who({ data: JSON.stringify({ seq: 1, who: { workers: w, sources: {} } }) });
+   bouton.onClick();
+-  console.log(JSON.stringify({ badge: bouton.innerHTML.replace(/<[^>]*>/g, ''), panneau: (/Au travail \((\d+)\)/.exec(panneau) || [])[1] || 'titre absent' }));
++  console.log(JSON.stringify({ badge: bouton.innerHTML.replace(/<[^>]*>/g, ''), panneau: (/class="aw-count"><b>(\d+)<\/b>/.exec(panneau) || [])[1] || 'titre absent' }));
+ } catch (e) { console.log(JSON.stringify({ erreur: 'exécution : ' + String(e.message).slice(0, 160) })); }
+ JS
+ cat > "$AUX/juge71.mjs" <<'JS'
+@@ -678,11 +678,11 @@ try {
+   const html = R.arbre([piege, lieP], h);
+   if (!html.includes('Nœud &lt;x-noeud&gt;')) ko.push('noeud d\'un agent rattaché non échappé ou absent');
+   if (html.includes('<x-')) ko.push('balise piégée dans l\'arbre');
+-  for (const [cle, attendu] of [['id', 'i&quot;&gt;&lt;x-id&gt;'], ['rôle', '&lt;x-role&gt;'], ['branche', '&lt;x-branch&gt;'], ['cible', '&lt;x-cible&gt;'], ['raison', '&lt;x-raison&gt;']]) if (!html.includes(attendu)) ko.push(cle + ' non échappé(e) ou absent(e) de l\'arbre');
++  for (const [cle, attendu] of [['id', 'i&quot;&gt;&lt;x-id&gt;'], ['rôle', '&lt;x-role&gt;'], ['branche', 'title="&lt;x-branch&gt;"'], ['cible', '&lt;x-cible&gt;'], ['raison', '&lt;x-raison&gt;']]) if (!html.includes(attendu)) ko.push(cle + ' non échappé(e) ou absent(e) de l\'arbre');
+   if (/data-vf-agent="[^"]*<x-/.test(html) || /data-vf-agent="i"/.test(html)) ko.push('attribut data-vf-agent brut');
+   if (R.pied(piege) !== 'actif · ' + 'lit <x-cible>') ko.push('pied : texte brut attendu, obtenu ' + R.pied(piege));
+   if (R.arbre([piege], h).includes('project.html#r=')) ko.push('lien deviné vers un nœud pour un agent non rattaché');
+-  if (!R.arbre([piege], h).includes('non rattaché (')) ko.push('« non rattaché » absent');
++  if (!R.arbre([piege], h).includes('non rattaché : &lt;x-raison&gt;')) ko.push('« non rattaché » absent');
+   const lie = { kind: 'subagent', id: 'k', etat: 'actif', role: '<x-role>', task: '<x-tache>', rattachement: { etat: 'rattache', dag: 'D', noeud: 'N' } };
+   const liste = R.agentsDuNoeud([lie, piege], 'f:D#N', h);
+   if (liste.includes('<x-')) ko.push('balise piégée dans la liste d\'un nœud');
+@@ -706,15 +706,15 @@ U72="$UI/72-vf-equipe.js"
+ assert_eq "EUI2.1 — 71 : id, rôle, branche, cible, raison et tâche piégés sortent échappés ; un agent non rattaché n'a aucun lien de nœud" "$(J71 "$RENDU")" "ok"
+ M "$RENDU" "$MUT/71-id.js" 'data-vf-agent="${h(w.id)}"' 'data-vf-agent="${w.id}"'
+ assert_has "EUI2.2 — mutant : data-vf-agent brut -> détecté" "$(J71 "$MUT/71-id.js")" "balise piégée dans l'arbre"
+-M "$RENDU" "$MUT/71-role.js" "' · ' + h(w.role)" "' · ' + w.role"
++M "$RENDU" "$MUT/71-role.js" '<b>${h(w.role || '"'"'Agent'"'"')}</b>' '<b>${w.role || '"'"'Agent'"'"'}</b>'
+ assert_has "EUI2.3 — mutant : rôle brut dans bloc() -> détecté" "$(J71 "$MUT/71-role.js")" "balise piégée dans l'arbre"
+-M "$RENDU" "$MUT/71-pied.js" 'h(pied(w))' 'pied(w)'
+-assert_has "EUI2.4 — mutant : pied(w) brut dans l'arbre (il porte la cible) -> détecté" "$(J71 "$MUT/71-pied.js")" "balise piégée dans l'arbre"
+-M "$RENDU" "$MUT/71-branche.js" "' · ' + h(w.branch)" "' · ' + w.branch"
++M "$RENDU" "$MUT/71-pied.js" "' · ' + h(v)" "' · ' + v"
++assert_has "EUI2.4 — mutant : verbe et cible bruts dans l'arbre (la cible vient de l'action) -> détecté" "$(J71 "$MUT/71-pied.js")" "balise piégée dans l'arbre"
++M "$RENDU" "$MUT/71-branche.js" 'title="${h(court(w))}"' 'title="${court(w)}"'
+ assert_has "EUI2.5 — mutant : branche brute -> détecté" "$(J71 "$MUT/71-branche.js")" "balise piégée dans l'arbre"
+ M "$RENDU" "$MUT/71-lien.js" "w.rattachement && w.rattachement.etat === 'rattache' ?" "w.rattachement ?"
+ assert_has "EUI2.6 — mutant : lien vers un nœud pour tout rattachement (même non établi) -> détecté" "$(J71 "$MUT/71-lien.js")" "lien deviné"
+-M "$RENDU" "$MUT/71-noeudrole.js" 'h(w.role || '"'"'Agent'"'"')' '(w.role || '"'"'Agent'"'"')'
++M "$RENDU" "$MUT/71-noeudrole.js" '<span>${h(w.role || '"'"'Agent'"'"')}</span>' '<span>${w.role || '"'"'Agent'"'"'}</span>'
+ assert_has "EUI2.7 — mutant : rôle brut dans la liste d'un nœud -> détecté" "$(J71 "$MUT/71-noeudrole.js")" "balise piégée dans la liste d'un nœud"
+ # le panneau de l'onglet Équipe (72) : mêmes propriétés, via le panneau d'un agent piégé
+ assert_eq "EUI2.8 — panneau d'un agent piégé (72) : aucune balise, le pied et la raison échappés" "$(V72 "$U72" "$RENDU" piege | node "$AUX/jq.mjs" 'j.erreur||(!j.html.includes("<x-")&&j.html.includes("&lt;x-cible&gt;")&&j.html.includes("&lt;x-raison&gt;")&&!j.html.includes("project.html#r=")?"ok":"panneau : "+j.html.slice(0,200))')" "ok"
+@@ -736,7 +736,7 @@ M "$U72" "$MUT/72-arrivee.js" '^    arrivee();$' '    void 0;'
+ assert_eq "EUI2.16 — mutant : plus de révélation après le rendu -> aucune carte révélée, détecté" "$(V72 "$MUT/72-arrivee.js" "$RENDU" arrivee | node "$AUX/jq.mjs" 'j.erreur||("["+j.reveals.join(",")+"]")')" "[]"
+ 
+ # F5a : le badge et le titre du tiroir ne comptent que les agents actifs (ni terminé, ni en attente)
+-assert_eq "EUI2.17 — un actif, un terminé, un en attente, un verrou, un nœud de DAG, un enregistrement : badge « 1 au travail » et titre « Au travail (1) » (seuls les agents actifs comptent)" "$(node "$AUX/vm70.mjs" "$UI/70-vf-live.js" "$RENDU" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "1 au travail|1"
++assert_eq "EUI2.17 — un actif, un terminé, un en attente, un verrou, un nœud de DAG, un enregistrement : badge « 1 au travail » et effectif « 1 actif » du panneau (seuls les agents actifs comptent)" "$(node "$AUX/vm70.mjs" "$UI/70-vf-live.js" "$RENDU" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "1 au travail|1"
+ M "$RENDU" "$MUT/71-actif.js" "w.etat !== 'termine' \&\& w.etat !== 'en-attente'" "true"
+ assert_eq "EUI2.18 — mutant : le terminé et l'agent en attente comptent -> 3, détecté" "$(node "$AUX/vm70.mjs" "$UI/70-vf-live.js" "$MUT/71-actif.js" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "3 au travail|3"
+ M "$UI/70-vf-live.js" "$MUT/70-badge.js" "window.__vfEquipeRendu.actif(w)" "!w.stale"
+@@ -803,14 +803,14 @@ try {
+   const R = ctx.window.__vfEquipeRendu;
+   const S = { kind: 'session', id: 'S', etat: 'actif', tree: '.' }, A = { kind: 'subagent', id: 'A', etat: 'en-attente', parent: 'S', tree: '.' }, F = { kind: 'subagent', id: 'F', etat: 'termine', parent: 'S', tree: '.' };
+   const html = R.arbre([S, A, F], h);
+-  for (const [nom, attendu] of [['titre session', '<b>Session</b>'], ['titre sous-agent', '<b>Sous-agent</b>'], ['titre du bloc des terminés', 'Terminés depuis moins de 24 h (1)']]) if (!html.includes(attendu)) ko.push(nom);
++  for (const [nom, attendu] of [['titre session', 'Session principale'], ['rôle sous-agent', '<b>Agent</b>'], ['mot lu « en attente »', '(en attente)'], ['mot visible « en attente »', ' · en attente'], ['mot lu « terminé »', '(terminé)'], ['titre du bloc des terminés', 'Terminés depuis moins de 24 h (1)']]) if (!html.includes(attendu)) ko.push(nom);
+   if (!R.pied(A).startsWith('en attente')) ko.push('pied en attente : ' + R.pied(A));
+   if (!R.pied(F).startsWith('terminé')) ko.push('pied terminé : ' + R.pied(F));
+   if (!R.pied(S).startsWith('actif')) ko.push('pied actif : ' + R.pied(S));
+ } catch (e) { ko.push('exécution : ' + String(e.message).slice(0, 100)); }
+ console.log(ko.length ? ko.join(' ; ') : 'ok');
+ JS
+-assert_eq "EUI2.20 — libellés exacts : Session, Sous-agent, « en attente », « terminé », bloc « Terminés depuis moins de 24 h (1) »" "$(node "$AUX/libelles71.mjs" "$RENDU")" "ok"
++assert_eq "EUI2.20 — libellés exacts : Session principale, rôle, « en attente » (lu et visible), « terminé », bloc « Terminés depuis moins de 24 h (1) »" "$(node "$AUX/libelles71.mjs" "$RENDU")" "ok"
+ M "$RENDU" "$MUT/71-attente.js" "'en attente'" "'en-attente'"
+ assert_has "EUI2.21 — mutant : « en attente » devient « en-attente » -> détecté" "$(node "$AUX/libelles71.mjs" "$MUT/71-attente.js")" "pied en attente"
+ M "$RENDU" "$MUT/71-noeud.js" 'Nœud ${h(w.rattachement.noeud)}' 'Nœud ${w.rattachement.noeud}'
+diff --git a/plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js b/plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js
+index f48c3bbe..e98d83c1 100644
+--- a/plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js
++++ b/plugin/cockpit/skills/cockpit-moteur/assets/ui/70-vf-live.js
+@@ -13,7 +13,8 @@
+   const TAB = G.meta.vfTab === 'project' ? 'project' : 'code';
+   const probe = (window.__vfLive = { connected: false, patches: 0, applied: 0, lastLatencyMs: null, lock: null, structural: 0, who: null, sondages: 0, abandon: false,
+     reco: { vite: 1000, lent: 5000, bascule: 30000, fin: 300000 } }); // reco : en ms, modifiable par un test
+-  const FRAICHEUR = 'sessions écrites depuis moins de 3 min';
++  const FRAICHEUR = 'Sessions écrites depuis moins de 3 min';
++  const NB = '\u00a0';
+ 
+   const style = document.createElement('style');
+   style.textContent = `
+@@ -24,28 +25,71 @@
+     @keyframes vfpulse { 50% { opacity: .25; } }
+     /* D2 (recette 2026-11-02) : le tiroir reprend la marge des panneaux ouverts par showPanel (.sec : 18px 20px 6px, 22 px en premier et dernier enfant) ; sur grand écran sa boîte suit son contenu (plafonnée à la fenêtre, défilement au-delà) au lieu de s'étirer jusqu'en bas.
+        Sous 701 px le panneau est un tiroir du bas dont la mise en page appartient au viewer : on n'y touche pas. */
+-    .vf-whop { padding: 22px 20px; }
++    .vf-whop { --fil: rgba(var(--ink), .2); padding: var(--inset-panel); }
+     @media (min-width: 701px) { #panel:has(> .vf-whop) { bottom: auto; max-height: calc(100vh - var(--hh, 64px) - 20px); overflow: auto; } }
+-    .vf-whop h3 { margin: 0 0 4px; } .vf-whop h4 { margin: 16px 0 6px; color: var(--text-3); }
+-    .vf-whop .regle { color: var(--text-3); font-size: 12px; margin: 0 0 10px; }
+-    .vf-who { padding: 8px 0; border-top: 1px solid rgba(var(--ink), .08); font-size: 13px; }
+-    .vf-who span { color: var(--text-3); } .vf-who div { color: var(--text-2); margin-top: 2px; }
+-    .vf-who.stale { opacity: .55; }
+-    .vf-who button { margin-top: 6px; font: inherit; font-size: 12px; cursor: pointer; padding: 3px 10px; border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); }
+-    .vf-who button:hover { background: rgba(var(--ink), .07); color: var(--text); } .vf-who button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
++    .vf-whop h3 { margin: 0; } .vf-whop h4 { margin: var(--sp-16) 0 var(--sp-6); color: var(--text-3); }
++    .vf-whop .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
++    .aw-head { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-12); }
++    .aw-count { font-size: 12px; color: var(--text-3); } .aw-count b { color: var(--text); font-weight: 600; font-variant-numeric: tabular-nums; }
++    .aw-driver { display: flex; align-items: center; gap: var(--sp-8); margin: var(--sp-8) 0 var(--sp-12); font-size: 12px; color: var(--text-3); }
++    .aw-driver .d { width: 6px; height: 6px; border-radius: 50%; background: var(--st-active); flex: none; }
++    .aw-driver .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
++    .aw-driver .n { font: 500 11.5px var(--mono, monospace); font-variant-numeric: tabular-nums; white-space: nowrap; }
++    .aw-g { width: 16px; height: 16px; flex: none; display: block; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
++    .aw-s-actif { color: var(--st-active); } .aw-s-attente { color: var(--text-2); } .aw-s-termine { color: var(--st-done); } .aw-s-bloque { color: var(--st-blocked); } .aw-s-orphelin { color: var(--text-3); }
++    .aw-pulse { animation: vfpulse 1.6s ease-in-out infinite; }
++    @media (prefers-reduced-motion: reduce) { .aw-pulse { animation: none; } .r-caret { transition: none !important; } }
++    /* l'arbre : un fil de 1 px (--fil) relie le glyphe d'un parent à ceux de ses enfants, avec un coude vers chacun ; les traits s'arrêtent à 4 px des glyphes */
++    .r-tree, .r-tree ul { list-style: none; margin: 0; padding: 0; }
++    .r-ag { position: relative; }
++    .r-line { position: relative; display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: start; }
++    .r-line > .r-row, .r-line > .r-tog, .r-line > .r-doing { grid-row: 1; }
++    .r-line > .r-row { grid-column: 1; } .r-line > .r-tog { grid-column: 2; } .r-line > .r-doing { grid-column: 3; }
++    .r-line > .vf-doing, .r-line > .r-noeud { grid-column: 1 / -1; }
++    .r-tog, .r-doing { width: 44px; height: 44px; margin-top: calc(-1 * var(--sp-4)); display: flex; align-items: center; justify-content: center; border: 0; background: none; color: var(--text-3); cursor: pointer; border-radius: 8px; padding: 0; }
++    .r-doing { margin-right: calc(-1 * var(--sp-12)); } .r-line > .r-tog:not(:has(+ .r-doing)) { margin-right: calc(-1 * var(--sp-12)); }
++    .r-tog:hover, .r-doing:hover { color: var(--text); background: rgba(var(--ink), .05); }
++    .r-tog:focus-visible, .r-doing:focus-visible, .r-more:focus-visible, .aw-sec:focus-visible, a.r-row:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; border-radius: 8px; }
++    .r-caret { transition: transform .15s var(--ease); } .r-tog[aria-expanded=true] .r-caret { transform: rotate(90deg); }
++    .r-row { display: grid; grid-template-columns: 16px minmax(0, 1fr); column-gap: var(--sp-8); align-items: start; padding: var(--sp-8) 0; min-height: 44px; box-sizing: border-box; color: inherit; text-decoration: none; border-radius: 8px; }
++    .r-row .aw-g { margin-top: var(--sp-2); } a.r-row:hover { background: rgba(var(--ink), .05); }
++    .r-main { min-width: 0; display: flex; flex-direction: column; gap: var(--sp-2); }
++    .r-top { display: flex; align-items: baseline; justify-content: space-between; gap: var(--sp-8); }
++    .r-task { flex: 1; min-width: 0; font-size: 13px; line-height: 20px; font-weight: 500; color: var(--text); overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
++    .r-t { flex: none; font: 500 11.5px/20px var(--mono, monospace); color: var(--text-3); font-variant-numeric: tabular-nums; white-space: nowrap; }
++    .r-t i { font-style: normal; font-family: var(--sans); font-weight: 400; font-size: 12px; } .r-t.ecrit { color: var(--text-2); }
++    .r-meta { min-width: 0; font-size: 12px; line-height: 16px; color: var(--text-3); overflow-wrap: anywhere; }
++    .r-meta b { font-weight: 500; color: var(--text-2); font-family: var(--mono, monospace); font-size: 11.5px; white-space: nowrap; }
++    .r-chip, .r-flag { display: inline-block; margin-left: var(--sp-6); padding: 0 var(--sp-6); border-radius: 999px; border: 1px solid rgba(var(--ink), .2); font: 500 11px/16px var(--mono, monospace); color: var(--text-2); max-width: 152px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; vertical-align: bottom; }
++    .r-flag { border-style: dashed; font-family: var(--sans); }
++    .r-calme > .r-line .r-meta { color: var(--text-2); } .r-stale > .r-line .r-task { color: var(--text-3); } .r-sess > .r-line .r-task { font-weight: 600; }
++    .r-fini .r-row { align-items: center; } .r-fini .r-task { font-weight: 400; color: var(--text-2); } .r-fini .r-t { line-height: 20px; } .r-fini .aw-g { margin-top: 0; }
++    .r-line > .r-noeud { margin: 0 0 var(--sp-4) var(--sp-24); min-height: 44px; display: flex; align-items: center; font-size: 12px; justify-self: start; }
++    .vf-whop .vf-doing { margin: 0 0 var(--sp-8) var(--sp-24); padding: var(--sp-8) var(--sp-12); border-radius: 8px; background: var(--raise); font: 12px/1.5 var(--mono, monospace); color: var(--text-2); word-break: break-word; }
++    .vf-whop .vf-doing[hidden] { display: none; }
++    .r-kids { margin-left: var(--sp-8); } .r-kids[hidden] { display: none; } .r-kids > li { padding-left: var(--sp-16); }
++    .r-kids > li::after { content: ""; position: absolute; left: 0; top: 0; width: 12px; height: 18px; border-left: 1px solid var(--fil); border-bottom: 1px solid var(--fil); border-bottom-left-radius: 8px; }
++    .r-kids > li:not(:last-child)::before { content: ""; position: absolute; left: 0; top: 18px; bottom: 0; border-left: 1px solid var(--fil); }
++    .r-ag.has-kids:not(.closed) > .r-line::before { content: ""; position: absolute; left: 8px; top: 30px; bottom: 0; border-left: 1px solid var(--fil); }
++    .r-tl > li { position: relative; }
++    .r-tl > li:not(:first-child)::before { content: ""; position: absolute; left: 8px; top: 0; height: calc(50% - 12px); border-left: 1px solid var(--fil); }
++    .r-tl > li:not(:last-child)::after { content: ""; position: absolute; left: 8px; top: calc(50% + 12px); bottom: 0; border-left: 1px solid var(--fil); }
++    .aw-sec { display: flex; align-items: center; justify-content: space-between; min-height: 44px; margin: var(--sp-8) 0 0; font-size: 12px; color: var(--text-3); font-weight: 500; cursor: pointer; list-style: none; }
++    .aw-sec::-webkit-details-marker { display: none; }
++    details[open] > .aw-sec .r-caret { transform: rotate(90deg); }
++    .r-more { display: flex; align-items: center; min-height: 44px; padding-left: var(--sp-24); font-size: 12px; color: var(--text-2); text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 4px; }
++    .aw-sec2 { display: flex; justify-content: space-between; margin: var(--sp-16) 0 var(--sp-4); font-size: 12px; color: var(--text-3); font-weight: 500; }
++    .r-verr { display: grid; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--text-3); }
++    .r-verr li { display: flex; justify-content: space-between; gap: var(--sp-12); padding: var(--sp-4) 0; } .r-verr b { color: var(--text-2); font-weight: 500; } .r-verr .n { font: 500 11.5px var(--mono, monospace); font-variant-numeric: tabular-nums; white-space: nowrap; }
++    .aw-foot { margin: var(--sp-12) 0 0; color: var(--text-3); font-size: 12px; line-height: 20px; }
+     .sec button[data-vf-doing], .sec button[data-vf-transcript] { font: inherit; font-size: 12px; cursor: pointer; padding: var(--sp-4) var(--sp-12); border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); margin: var(--sp-6) var(--sp-6) 0 0; transition: background .2s var(--ease), color .2s var(--ease); }
+     .sec button[data-vf-doing]:hover, .sec button[data-vf-transcript]:hover { background: rgba(var(--ink), .07); color: var(--text); } .sec button[data-vf-doing]:focus-visible, .sec button[data-vf-transcript]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+     /* Q12a : les liens « Nœud … » et « Voir dans l'onglet Équipe » s'alignent sur la colonne de texte (le retrait de 12 px vient du padding de .vf-link, fait pour la liste « Sources lues ») */
+-    .vf-who > a.vf-link, body.vf-tab-equipe .sec > a.vf-link { padding: var(--sp-6) 0; }
+-    body.vf-tab-equipe .sec > a.vf-link { margin-inline: 0; }
++    body.vf-tab-equipe .sec > a.vf-link { padding: var(--sp-6) 0; margin-inline: 0; }
++    .vf-whop .src { color: var(--text-4); font-size: 11px; margin-top: var(--sp-16); }
+     a.vf-link { text-decoration: underline; text-decoration-color: rgba(var(--ink), .35); text-underline-offset: 3px; }
+     a.vf-link:hover { color: var(--text); text-decoration-color: currentColor; } a.vf-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+     .vf-nr { white-space: nowrap; }
+-    .vf-who .vf-doing { margin-top: 6px; font-family: var(--mono, monospace); font-size: 12px; word-break: break-word; }
+-    .vf-whop .src { color: var(--text-4); font-size: 11px; margin-top: 14px; }
+-    .vf-arbre-enfants { margin-left: 14px; padding-left: 10px; border-left: 1px solid rgba(var(--ink), .12); }
+-    .vf-who .vf-pied { color: var(--text-3); font-size: 12px; } .vf-who .vf-link { display: inline-block; margin: 4px 10px 0 0; font-size: 12px; color: var(--text-2); }
+-    .vf-termines > summary { cursor: pointer; padding: 8px 0; color: var(--text-3); font-size: 12px; }
+     .vf-transcript { max-height: 320px; overflow-y: auto; margin-top: var(--sp-8); font-size: 12px; color: var(--text-2); }
+     .vf-transcript h4 { margin: var(--sp-12) 0 var(--sp-4); color: var(--text-3); } .vf-transcript > h4:first-child { margin-top: 0; } .vf-transcript p, .vf-transcript li { margin: var(--sp-2) 0; word-break: break-word; }
+     .vf-transcript ul { margin: var(--sp-4) 0 0; padding-left: var(--sp-16); }
+@@ -78,16 +122,39 @@
+     const x = tenus.find((y) => y.ws ? mots[1] === y.ws && (mots[3] || '') === ph(y) : y.scope === w.tree) || (tenus.length === 1 ? tenus[0] : undefined);
+     return typeof x?.age_seconds === 'number' ? x.age_seconds : w.ageS;
+   };
++  // verrous et nœuds : un verrou dit « tenu depuis … » (durée au sens explicite) ; un nœud de DAG périmé n'est plus montré (P71.5-D-14), un nœud récent reste (aucun agent ne le porte forcément)
++  const ligneVerrou = (w) => `<li><span><b>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : String(w.tree || '').replace(/^compartiment /, ''))}</b>${w.id ? ' · ' + h(w.id) : ''}</span><span class="n">tenu depuis${NB}${h(duree(ageDe(w)))}</span></li>`;
++  const ligneNoeud = (w) => `<li><span><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b>${w.task ? ' · ' + h(w.task) : ''}</span><span class="n">${h(duree(ageDe(w)))}</span></li>`;
++  const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
++  const driverLigne = () => {
++    const l = probe.lock, tenus = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present);
++    if (!tenus.length) return '<p class="aw-driver"><span class="t">Driver libre</span></p>';
++    const x = tenus[0];
++    return `<p class="aw-driver"><span class="d"></span><span class="t">Driver ${h(x.owner || '?')}${x.step ? ' · ' + h(x.step) : ''}</span><span class="n">tenu depuis${NB}${h(duree(x.age_seconds))}</span></p>`;
++  };
+   const htmlTiroir = () => {
+     const ws = who?.workers || [], act = ws.filter(auTravail), reste = ws.filter((w) => !AGENT(w));
+-    const row = (w) => `<div class="vf-who ${w.stale ? 'stale' : ''}"><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b> <span>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''} · ${h(duree(ageDe(w)))}${w.orphan ? ' · orphelin' : w.stale ? ' · périmé' : ''}</span><div>${h(w.task || '')}</div></div>`;
++    const finis = ws.filter((w) => AGENT(w) && w.etat === 'termine').length;
++    const verrous = reste.filter((w) => w.kind === 'lock'), autres = reste.filter((w) => w.kind !== 'lock' && !w.stale && !(w.kind === 'dag-node' && act.length)); // un nœud en cours est déjà porté par l'agent qui le travaille
+     const SOURCES = { sessions: 'Sessions et sous-agents', locks: 'Verrous du dépôt', dags: 'Plans de la mission' }; // clés de la collecte, jamais affichées telles quelles (P70-D-04)
+     const src = Object.entries(who?.sources || {}).map(([k, v]) => `${SOURCES[k] || k} : ${v.etat}`).join(' · ');
+     const arbre = window.__vfEquipeRendu.arbre(ws, h);
+-    return (`<div class="vf-whop"><h3>Au travail (${act.length})</h3><p class="regle">${h(lockText(probe.lock).text)}.</p><p class="regle">Règle de fraîcheur : ${FRAICHEUR}, actifs et terminés depuis moins de 24 h ; la dernière commande et le transcript ne s'affichent que sur demande.</p>${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}${reste.length ? `<h4>Verrous et nœuds</h4>${reste.map(row).join('')}` : ''}<p class="src">${h(src)}</p></div>`);
++    return (`<div class="vf-whop"><div class="aw-head"><h3>Au travail</h3><span class="aw-count"><b>${act.length}</b> ${act.length > 1 ? 'actifs' : 'actif'} · ${pluriel(finis, 'terminé', 'terminés')}</span></div>${driverLigne()}`
++      + `${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}`
++      + `${verrous.length ? `<div class="aw-sec2"><span>Verrous tenus</span><span>${verrous.length}</span></div><ul class="r-verr">${verrous.map(ligneVerrou).join('')}</ul>` : ''}`
++      + `${autres.length ? `<div class="aw-sec2"><span>Nœuds du plan</span><span>${autres.length}</span></div><ul class="r-verr">${autres.map(ligneNoeud).join('')}</ul>` : ''}`
++      + `<p class="aw-foot">${h(FRAICHEUR)}, terminés depuis moins de 24${NB}h. Transcript${NB}: dans l'onglet Équipe.</p><p class="src">${h(src)}</p></div>`);
++  };
++  // replis : l'ensemble des parents repliés vit dans la mémoire de la page (ni graphe, ni stockage, ni export) ; reposé après chaque dessin du tiroir
++  const replies = new Set();
++  const appliquerReplis = () => {
++    for (const b of document.querySelectorAll('.vf-whop [data-vf-repli]')) {
++      const clos = replies.has(b.dataset.vfRepli), ul = document.getElementById(b.getAttribute('aria-controls'));
++      b.setAttribute('aria-expanded', String(!clos)); if (ul) ul.hidden = clos; b.closest('li')?.classList.toggle('closed', clos);
++    }
+   };
+   let dernier = '';
+-  const whoPanel = () => { dernier = htmlTiroir(); SC.showPanel(dernier); };
++  const whoPanel = () => { dernier = htmlTiroir(); SC.showPanel(dernier); appliquerReplis(); };
+   // tant que le tiroir est ouvert il suit le flux : redessiné à chaque `who` qui change l'arbre, l'état ou la dernière action (pas d'image identique), en gardant le défilement
+   // et l'état replié ou déplié des « Terminés » ; les commandes demandées sont reposées par l'observateur ci-dessous
+   const cleDe = (d) => d.closest('[data-vf-agent]')?.dataset.vfAgent || ''; // le bloc « Terminés » est repéré par l'agent qui le porte (stable quand un terminé s'y ajoute)
+@@ -97,7 +164,7 @@
+     if (html === dernier) return;
+     const p = document.getElementById('panel'), haut = p ? p.scrollTop : 0;
+     const ouverts = new Set([...document.querySelectorAll('.vf-whop details.vf-termines[open]')].map(cleDe));
+-    dernier = html; SC.showPanel(html);
++    dernier = html; SC.showPanel(html); appliquerReplis();
+     for (const d of document.querySelectorAll('.vf-whop details.vf-termines')) if (ouverts.has(cleDe(d))) d.open = true;
+     for (const e of document.querySelectorAll('#panel > *')) e.style.animation = 'none';
+     if (p) p.scrollTop = haut;
+@@ -114,8 +181,8 @@
+   // focus clavier (UIFN-12) : chaque `who` redessine le panneau et le tiroir, le bouton focalisé est remplacé et le focus tombe sur le corps de la page.
+   // On retient la clé du bouton « Voir la dernière commande » / « Lire le transcript » qui a le focus ; après un redessin, si le focus est perdu, il revient au bouton de même clé.
+   // Un focus qui s'en va ailleurs (bouton encore dans la page) efface la clé : jamais de focus volé à quelqu'un qui est parti.
+-  const BTN = '[data-vf-doing],[data-vf-transcript]', DANS_PANNEAU = '#panel [data-vf-doing],#panel [data-vf-transcript]';
+-  const cleBtn = (b) => (b.dataset.vfDoing !== undefined ? 'doing:' + b.dataset.vfDoing : 'transcript:' + b.dataset.vfTranscript);
++  const BTN = '[data-vf-doing],[data-vf-transcript],[data-vf-repli]', DANS_PANNEAU = '#panel [data-vf-doing],#panel [data-vf-transcript],#panel [data-vf-repli]';
++  const cleBtn = (b) => (b.dataset.vfDoing !== undefined ? 'doing:' + b.dataset.vfDoing : b.dataset.vfRepli !== undefined ? 'repli:' + b.dataset.vfRepli : 'transcript:' + b.dataset.vfTranscript);
+   let cleFocus = null;
+   document.addEventListener('focusin', (ev) => { const b = ev.target.closest?.(DANS_PANNEAU); cleFocus = b ? cleBtn(b) : null; });
+   document.addEventListener('focusout', (ev) => { const b = ev.target; if (b.matches?.(BTN)) queueMicrotask(() => { if (b.isConnected && document.activeElement !== b) cleFocus = null; }); });
+@@ -125,6 +192,12 @@
+     if (b) b.focus({ preventScroll: true });
+   };
+   new MutationObserver(() => { rendreFocus(); if (demandes.size) for (const b of document.querySelectorAll('#panel [data-vf-doing]')) poser(b); }).observe(document.getElementById('panel') || document.documentElement, { childList: true, subtree: true });
++  document.addEventListener('click', (ev) => {
++    const r = ev.target.closest?.('.vf-whop [data-vf-repli]');
++    if (!r) return;
++    const id = r.dataset.vfRepli; if (replies.has(id)) replies.delete(id); else replies.add(id);
++    appliquerReplis();
++  });
+   document.addEventListener('click', async (ev) => {
+     const b = ev.target.closest?.('[data-vf-doing]');
+     if (!b) return;
+diff --git a/plugin/cockpit/skills/cockpit-moteur/assets/ui/71-vf-equipe-rendu.js b/plugin/cockpit/skills/cockpit-moteur/assets/ui/71-vf-equipe-rendu.js
+index 17af858e..47ee3670 100644
+--- a/plugin/cockpit/skills/cockpit-moteur/assets/ui/71-vf-equipe-rendu.js
++++ b/plugin/cockpit/skills/cockpit-moteur/assets/ui/71-vf-equipe-rendu.js
+@@ -2,8 +2,7 @@
+ // liens sont des chaînes dont toute valeur interpolée passe par h() (passé en paramètre), le transcript est un fragment bâti par createElement et
+ // textContent seulement (jamais d'HTML interprété). Pose window.__vfEquipeRendu, utilisé par 70-vf-live.js (tiroir, onglet Projet) et 72-vf-equipe.js.
+ (() => {
+-  const KIND = { session: 'Session', subagent: 'Sous-agent' };
+-  const ETAT = { actif: 'actif', 'en-attente': 'en attente', termine: 'terminé' };
++  const ETAT = { actif: 'actif', 'en-attente': 'en attente', termine: 'terminé', bloque: 'bloqué' };
+   const etat = (w) => ETAT[w.etat] || 'actif';
+   const dedans = (w) => w && (w.kind === 'session' || w.kind === 'subagent') && typeof w.id === 'string';
+   // un agent « actif » : session ou sous-agent ni terminé ni en attente (effectifs de l'onglet Équipe et badge de l'en-tête)
+@@ -28,22 +27,58 @@
+       : w.kind === 'subagent' ? `<span class="vf-nr">non rattaché (${h((w.rattachement && w.rattachement.raison) || 'inconnu')})</span>` : '';
+   };
+ 
+-  const bloc = (w, enfants, tous, h) => {
+-    const vers = versNoeud(w, h);
+-    const sous = enfants.length ? `<div class="vf-arbre-enfants">${liste(enfants, tous, h)}</div>` : '';
+-    return `<div class="vf-who${w.etat === 'termine' || w.stale ? ' stale' : ''}" data-vf-agent="${h(w.id)}"><b>${h(KIND[w.kind])}${w.role ? ' · ' + h(w.role) : ''}</b>`
+-      + ` <span>${h(w.tree || '')}${w.branch ? ' · ' + h(w.branch) : ''}${w.orphan ? ' · orphelin' : ''}</span>`
+-      + `<div>${h(w.task || '')}</div><div class="vf-pied">${h(pied(w))}</div>`
+-      + `<a class="vf-link" href="${h(lien('equipe.html', carte(w)))}">Voir dans l'onglet Équipe</a> ${vers}`
+-      + `<button type="button" data-vf-doing="${h(w.id)}">Voir la dernière commande</button><div class="vf-doing" hidden></div>${sous}</div>`;
++  // ---------- tiroir « Au travail » (P71.5-D-14, D-23, D-24) : une ligne par agent, des fils entre les points, les terminés regroupés en bas ----------
++  // glyphes d'état en SVG en ligne (forme différente par état : la couleur ne porte jamais l'état seule) ; tracés sur une grille de 16
++  const NB = ' ';
++  const GLYPHE = {
++    actif: '<circle cx="8" cy="8" r="4" fill="currentColor" stroke="none"/>',
++    attente: '<circle cx="8" cy="8" r="5.5"/><path d="M6.6 5.8v4.4M9.4 5.8v4.4"/>',
++    termine: '<path d="M3.5 8.4l3 3 6-6.4"/>',
++    bloque: '<path d="M8 2.5l6 10.5H2z"/><path d="M8 6.6v3M8 11.4v.1"/>',
++    orphelin: '<circle cx="8" cy="8" r="5.5" stroke-dasharray="2 2.4"/>',
++    repli: '<path d="M6 4l4 4-4 4"/>',
++    commande: '<path d="M3 4.5l4 3.5-4 3.5"/><path d="M9 12h4"/>',
+   };
++  const glyphe = (nom, cls) => `<svg class="aw-g${cls ? ' ' + cls : ''}" viewBox="0 0 16 16" aria-hidden="true" focusable="false">${GLYPHE[nom]}</svg>`;
++  const GLYPHE_ETAT = { actif: 'actif', 'en-attente': 'attente', termine: 'termine', bloque: 'bloque' };
++  const MOT = { actif: 'actif', 'en-attente': 'en attente', termine: 'terminé', bloque: 'bloqué' };
++  const CALME_S = 120; // un agent actif sans écriture depuis 2 min est dit « sans nouvelle depuis … » (seuil dérivé, P71.5-D-14)
++  const GENERIQUE = 'lance une commande'; // l'action de presque tous : elle n'informe pas, on ne la montre pas
++  const tpath = (t) => String(t || '').replace(/^\.claude\/worktrees\//, '');
++  const court = (w) => String(w.branch || tpath(w.tree));
++  const calme = (w) => w.etat === 'actif' && typeof w.ageS === 'number' && w.ageS >= CALME_S;
++  const verbe = (w) => { const a = w.action || {}; if (!a.verbe || a.verbe === GENERIQUE) return ''; return [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' '); };
++  const aVivant = (w, enfants) => w.etat !== 'termine' || (enfants.get(w.id) || []).some((k) => aVivant(k, enfants));
+ 
+-  // enfants terminés regroupés dans un details fermé, au pied de la liste
+-  const liste = (agents, tous, h) => {
+-    const vivants = agents.filter((w) => w.etat !== 'termine'), finis = agents.filter((w) => w.etat === 'termine');
+-    const un = (w) => bloc(w, tous.get(w.id) || [], tous, h);
+-    return vivants.map(un).join('')
+-      + (finis.length ? `<details class="vf-termines"><summary>Terminés depuis moins de 24 h (${finis.length})</summary>${finis.map(un).join('')}</details>` : '');
++  // la durée dit de quoi elle parle : tenue d'un sous-agent en cours, ancienneté de la dernière écriture d'une session, durée d'un terminé
++  const temps = (w, h) => {
++    const dur = h(duree(w.dureeS != null ? w.dureeS : w.ageS));
++    if (w.kind === 'session') return `<span class="r-t ecrit"><i>écrit il y a${NB}</i>${h(duree(w.ageS))}</span>`;
++    return `<span class="r-t"><i>${w.etat === 'termine' ? 'a duré' : 'depuis'}${NB}</i>${dur}</span>`;
++  };
++
++  const ligne = (w, parent, enfants, tous, h) => {
++    const sess = w.kind === 'session', fini = w.etat === 'termine', ks = (tous.get(w.id) || []).filter((k) => aVivant(k, tous)).sort((a, b) => (b.dureeS || 0) - (a.dureeS || 0));
++    const nom = w.orphan ? 'orphelin' : GLYPHE_ETAT[w.etat] || 'actif';
++    const tache = sess ? 'Session principale' : w.task || '';
++    const raison = w.rattachement && w.rattachement.raison;
++    const hors = w.kind === 'subagent' && !noeud(w) && !fini;
++    const sr = ` <span class="sr">(${MOT[w.etat] || 'actif'}${w.orphan ? ', orphelin' : ''}${w.stale ? ', donnée ancienne' : ''}${hors ? ', non rattaché : ' + h(raison || 'inconnu') : ''})</span>`;
++    // branche et arbre : une fois sur la session, puis en puce seulement quand ils diffèrent du parent (frontière Phase 78)
++    const puce = !sess && (!parent || court(parent) !== court(w)) ? `<span class="r-chip" title="${h(court(w))}">${h(tpath(w.tree) === 'arbre principal' ? 'main' : tpath(w.tree) || court(w))}</span>` : '';
++    const marques = (w.orphan ? '<span class="r-flag">orphelin</span>' : '') + (w.stale ? '<span class="r-flag">donnée ancienne</span>' : '') + (hors && raison === 'ambigu' ? '<span class="r-flag">non rattaché (ambigu)</span>' : '');
++    const v = verbe(w);
++    const meta = sess ? `${h(tpath(w.tree))}${w.branch ? ' · ' + h(w.branch) : ''}${marques}`
++      : `<b>${h(w.role || 'Agent')}</b>${calme(w) ? ' · sans nouvelle depuis ' + h(duree(w.ageS)) : ''}${w.etat === 'en-attente' ? ' · en attente' : w.etat === 'bloque' ? ' · bloqué' : ''}${!calme(w) && v ? ' · ' + h(v) : ''}${puce}${marques}`;
++    const corps = `<span class="r-top"><span class="r-task">${h(tache)}${sr}</span>${temps(w, h)}</span>${fini ? '' : `<span class="r-meta">${meta}</span>`}`;
++    const rang = `<a class="r-row" href="${h(lien('equipe.html', carte(w)))}" title="Voir dans l'onglet Équipe">${glyphe(nom, (w.etat === 'actif' && !w.orphan ? 'aw-pulse ' : '') + 'aw-s-' + nom)}<span class="r-main">${corps}</span></a>`;
++    const repli = ks.length ? `<button type="button" class="r-tog" data-vf-repli="${h(w.id)}" aria-expanded="true" aria-controls="k-${h(w.id)}" aria-label="Sous-agents de ${h(w.role || 'la session')}, ${ks.length}">${glyphe('repli', 'r-caret')}</button>` : '';
++    const doing = !fini ? `<button type="button" class="r-doing" data-vf-doing="${h(w.id)}" aria-label="Voir la dernière commande de ${h(tache)}" title="Voir la dernière commande">${glyphe('commande')}</button><div class="vf-doing" hidden></div>` : '';
++    const n = noeud(w);
++    const vers = n ? `<a class="vf-link r-noeud" href="${h(lien('project.html', n))}">Nœud ${h(w.rattachement.noeud)}</a>` : '';
++    const cls = `r-ag${ks.length ? ' has-kids' : ''}${sess ? ' r-sess' : ''}${calme(w) ? ' r-calme' : ''}${w.stale ? ' r-stale' : ''}${fini ? ' r-fini' : ''}`;
++    return `<li class="${cls}" data-vf-agent="${h(w.id)}"><div class="r-line">${rang}${repli}${doing}${vers}</div>`
++      + (ks.length ? `<ul class="r-kids" id="k-${h(w.id)}">${ks.map((k) => ligne(k, w, enfants, tous, h)).join('')}</ul>` : '') + '</li>';
+   };
+ 
+   const arbre = (workers, h) => {
+@@ -54,7 +89,13 @@
+       const p = w.kind === 'subagent' && w.parent !== w.id && connus.has(w.parent) ? w.parent : null;
+       if (p === null) racines.push(w); else enfants.set(p, [...(enfants.get(p) || []), w]);
+     }
+-    return liste(racines, enfants, h);
++    const vivants = racines.filter((w) => aVivant(w, enfants));
++    // les terminés qui ne portent aucun agent en cours : un seul bloc, les plus récents d'abord, les 5 premiers ; le reste est dans l'onglet Équipe
++    const hors = tous.filter((w) => w.etat === 'termine' && !aVivant(w, enfants)).sort((a, b) => (a.ageS || 0) - (b.ageS || 0));
++    const montres = hors.slice(0, 5), autres = hors.length - montres.length;
++    return (vivants.length ? `<ul class="r-tree">${vivants.map((r) => ligne(r, null, enfants, enfants, h)).join('')}</ul>` : '')
++      + (hors.length ? `<details class="vf-termines"><summary class="aw-sec"><span>Terminés depuis moins de 24 h (${hors.length})</span>${glyphe('repli', 'r-caret')}</summary><ul class="r-tree r-tl">${montres.map((w) => ligne(w, null, enfants, enfants, h)).join('')}</ul>`
++        + (autres > 0 ? `<a class="r-more" href="equipe.html">Les ${autres} autres dans l'onglet Équipe</a>` : '') + '</details>' : '');
+   };
+ 
+   const agentsDuNoeud = (workers, ref, h) => {

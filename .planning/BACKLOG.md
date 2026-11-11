@@ -433,3 +433,132 @@ ou de `vf-new-lab`.
 - **NON mesuré :** le comportement d'un Claude Code plus ancien (fichier de hooks refusé, plugin entier refusé, ou hooks seuls ignorés) ; aucune version minimale n'est écrite pour le mod.
 
 **Déclencheur de reprise :** un utilisateur sur une version ancienne de Claude Code, ou la prochaine phase qui touche le mod vf-signal. Mesure dans un `HOME` jetable avec une version ancienne installée à part.
+
+## Cockpit : seconde vague de PU-G-015 et PU-G-133 (part Équipe) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.** Aucune fuite ; réglages d'usage relevés par le panel utilisateurs (`.planning/missions/2026-11-06-panel-utilisateurs-GLOBAL.md`).
+
+**Origine :** jointure des retours du panel utilisateurs du cockpit, 2026-11-07.
+- **PU-G-015 (part equipe-git) :** `70-vf-live.js` doit fermer les menus du moteur quand « Au travail » s'ouvre, et « Au travail » doit se fermer sur un événement envoyé par le moteur. Non fait : les deux parts de la proposition chevauchent le moteur et la coque.
+- **PU-G-133 :** le nom de session est dérivable sans risque dans `vf-cockpit-equipe-carte.mjs` (environ deux lignes de la ligne « Lancée depuis la carte », une fois que `lancer-suivi` enregistre le nom). Afficher le mode de permission toucherait P72-D-20 (le mode vit dans un fichier tenu par le terminal, illisible par la page) : **décision de Samuel**, recommandation « nom seul ».
+
+**Déclencheur de reprise :** la prochaine phase qui touche `70-vf-live.js` ou la carte « Lancée depuis la carte ».
+
+## Cockpit : entrée « Clic droit » du menu et libellés de `viewer.html` (PU-G-110) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.**
+
+**Origine :** retours du panel utilisateurs, groupe projet et lancement, 2026-11-07.
+- **PU-G-110 :** l'entrée du menu clic droit est un point d'extension de `viewer.html` (moteur vendorisé), hors de portée d'un lot qui ne le patche pas ; la remontée sous le titre est faite, pas l'entrée du menu.
+
+**Déclencheur de reprise :** la prochaine synchro du moteur (`amont/SYNCHRO.md`) ou un patch de `viewer.html`.
+
+## Cockpit : synchronisation complète des états de lancement — annulée, expirée, remplacée (PU-G-113) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : non fixée.**
+
+**Origine :** retours du panel utilisateurs, lot 8 lancer et bandeau, 2026-11-07.
+- **Fait :** « Lancée » n'apparaît plus sans signal (« Préparée depuis la carte. »), et le message d'envoi est borné à 120 s.
+- **Non fait :** suivre l'état annulée, expirée, remplacée jusqu'à la carte. Cela exige de toucher `vf-cockpit-lancer.mjs` ou `lancer-suivi.mjs`, ou de créer un nouveau canal.
+
+**Déclencheur de reprise :** la prochaine phase qui touche le suivi des lancements.
+
+## Cockpit : résumé en langage courant (PU-G-104) et titres de santé à variables (PU-G-080 part C) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.**
+
+**Origine :** retours du panel utilisateurs, 2026-11-07.
+- **PU-G-104 :** le repli « Détails techniques » est fait ; le **résumé en langage courant** n'a aucune source dans les données du cockpit.
+- **PU-G-080 part C :** environ 25 titres à variables dans `plugin/cockpit/skills/cockpit-moteur/assets/lib/health.mjs` (17 sites) restent en anglais. Le pied de la santé et les titres fixes sont traduits ; il faut des clés à `{}` au dictionnaire et traduire les phrases au moment de l'assemblage.
+
+**Déclencheur de reprise :** la prochaine passe sur le panneau Santé ou sur le dictionnaire.
+
+## Cockpit : classes C de l'onglet Équipe et du tiroir Git (195, 007, 202, 168) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.** Nouvelles interactions, jamais des réglages.
+
+**Origine :** retours du panel utilisateurs, groupe équipe-git, 2026-11-07.
+- **PU-G-195 :** tiroir Git élargissable (l'étiquette complète au survol est faite).
+- **PU-G-007 :** libellé visible sur chaque icône dès 1 000 px (la part compatible est faite).
+- **PU-G-202, PU-G-168 :** non faites, hors lots ; à relire dans le registre.
+
+**Déclencheur de reprise :** une demande d'utilisateur sur l'un de ces points.
+
+## Cockpit : état « bloqué » du tiroir « Au travail » sans source (contrat `who@2`) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.**
+
+**Origine :** diagnostic DG-06 du panel utilisateurs, 2026-11-07.
+- **Observé :** aucune source ne produit l'état « bloqué » : le contrat `who@2` n'a que actif, en attente, terminé. Le code est resté inerte, sans rien supprimer ; le seul signal de blocage vu est « sans nouvelle depuis … ». Un état « en échec » demanderait une spécification.
+
+**Déclencheur de reprise :** une évolution du contrat `who`.
+
+## Cockpit : deux idées et un temps serveur laissés par le panel (DG-09, DG-11) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.**
+
+**Origine :** diagnostics du panel utilisateurs, 2026-11-07.
+- **DG-09 :** l'exclusion de `vf-cockpit-code-vf.mjs` est voulue (`IGNORE`, P67-D-17), close. Idée non faite : un état vide de la recherche qui dit « le planning se lit dans l'onglet Projet ».
+- **DG-11 :** « Chargement des actions… » est posé ; le **temps serveur** de `lancer.mjs` reste à mesurer et à réduire.
+
+**Déclencheur de reprise :** la prochaine phase qui touche la recherche ou `lancer.mjs`.
+
+## Cockpit : mineurs de la relecture du groupe projet et lancement, dont deux décisions à prendre — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.**
+
+**Origine :** rapport du groupe projet et lancement, retours du panel utilisateurs, 2026-11-07.
+- **Espace de fin de ligne** à `plugin/cockpit/scripts/vf-cockpit-terminal-client.mjs:127`.
+- **Couleurs système** absentes de la liste noire de LB.S4 (`test-cockpit-lancer-bandeau.sh`).
+- **`keypress` hors Chromium** : la retenue de l'Entrée tenue n'est sondée que sous Chromium.
+- **Point 158 :** `current_phase` entre parenthèses dans un message de règle, gardé (c'est le nom du champ à écrire dans `STATE.md`).
+- **Quatre px sans variable** (12,5 px deux fois, 44 px, 560 px, 240 px), listés en exceptions nommées dans LB.S4 : **à Samuel de dire s'il amende la règle R3 de la Phase 72.**
+- **`ui/40-tour.js` à 298 lignes**, au seuil de 300 lignes : le prochain ajout le dépasse.
+
+**Déclencheur de reprise :** la prochaine phase qui touche le terminal, LB.S4 ou la visite.
+
+## Cockpit : résiduels de la Phase 72 jamais consignés (course `lstat`, temporaires après SIGKILL, points de goût) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.**
+
+**Origine :** `.planning/missions/2026-11-05-phase-72-lancer-depuis-cartes.md`, sections « Consignés, non corrigés » et « Points de goût pour Samuel » ; contrôle fait le 2026-11-07 contre ce fichier.
+- **Course `lstat`/ouverture** sur le dossier support du mode (L1) : consignée par la mission, pas corrigée.
+- **Temporaires non balayés après SIGKILL** (S-3) : consignés par la mission, pas corrigés.
+- **Points de goût :** intentions en ASCII sans accent (alphabet fermé de la ligne, voulu) ; bouton principal « Cadrer » désactivé sur une phase finie ; pas de bouton « Lancer » sur la carte (l'action est le verbe) ; message du refus 409 générique (quatre causes indistinguables côté serveur) ; ligne `VFP>` vide ajoutée par le Ctrl-C avant la ligne proposée ; « Lancée » et la récence ne survivent pas à une relance du cockpit (en partie traité par PU-G-113, ci-dessus).
+
+**Déclencheur de reprise :** la prochaine recette de Samuel sur le lancement depuis les cartes.
+
+## Cockpit : sens des liens de phase restant à l'ancienne lecture (suite de PU-G-100) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.** À trancher par Samuel.
+
+**Origine :** jointure des retours du panel utilisateurs, 2026-11-07. PU-G-100 (6b3d90ee) a corrigé le panneau d'une phase et les titres de colonnes de l'onglet Projet ; lien et ordre des cartes inchangés.
+- **Reste lu dans l'ancien sens :** le panneau d'un fichier-plan (lien plan vers plan `depends_on`, `plugin/cockpit/scripts/vf-cockpit-project.mjs:130`) liste le prérequis sous « Utilisé par » avec la pastille « Mention » ; l'infobulle d'arête « Phase 1 → Phase 2 · Dépend de » aussi.
+- Lectures déjà fausses avant la jointure, hors demande du panel.
+
+**Déclencheur de reprise :** la prochaine passe sur le panneau d'un fichier-plan ou sur les infobulles d'arête.
+
+## Cockpit : titre « Health (security only) » et témoin S5.1 visent un bloc masqué sur Projet (DG-15) — DIFFÉRÉ (2026-11-07)
+
+**Priorité : basse.** À trancher par Samuel : garder ou retirer. Aucune suppression faite.
+
+**Origine :** jointure des retours du panel utilisateurs, 2026-11-07.
+- `ui/20-health.js:27` pose « Health (security only) » seulement quand l'onglet est Projet, or DG-15 masque tout le bloc santé sur Projet (`ui/00-vibeflow.js:134`) : ce titre n'est visible nulle part. Sa clé de dictionnaire et le témoin S5.1 de `test-cockpit-sante.sh` visent donc un bloc masqué.
+
+**Déclencheur de reprise :** la prochaine passe sur le panneau Santé ou le dictionnaire.
+## Cockpit / équipe : distinguer « attend une tâche de fond » de « terminé » (#223, cause 3)
+
+**Priorité : à arbitrer.** `[cockpit/équipe, #223 cause 3]` Distinguer « attend une tâche de fond » de « terminé » : l'indice transcript (tâche de fond lancée, jamais reprise ni notifiée, dernier message assistant en end_turn) a une précision mesurée d'environ 20 à 40 % (1 vrai positif sur 5, 2026-11-08) et ne dit pas si la tâche tourne ; il faut l'état du registre de tâches du harnais, non exposé dans les transcripts. À reprendre si le harnais l'expose ; sinon indice « tâche de fond sans retour lu » sur lecture de queue bornée, à arbitrer.
+
+## Team-kernel : témoin d'exécution de la doctrine Fin de mandat (#223)
+
+**Priorité : à arbitrer.** `[team-kernel, #223]` Témoin d'exécution de la doctrine Fin de mandat : la garde `test-fin-de-mandat.sh` vérifie que les prompts PORTENT la consigne, pas qu'un worker l'APPLIQUE. Un témoin de comportement (registre driver-lock : enfant fermé sans rapport final, ou `worktree-procs.sh list` non vide au close) reste à concevoir.
+## Jalon inscrit sans `gsd-new-milestone` : le STATE ne bascule jamais au démarrage de sa première phase — DIFFÉRÉ (2026-11-03)
+
+**Origine :** session principale du 2026-11-03. Samuel constate que le STATE du compartiment `fiabilite` pointe toujours `equipe-produit-v1.0` avec la Phase 67 « closed ». Inscription demandée par Samuel (session principale Claude Code, 2026-11-03).
+- **Constat, mesuré :** sur `main` et sur `feat/phase-69-suivi-travail`, le frontmatter du STATE dit `milestone: equipe-produit-v1.0`, `milestone_name: « l'équipe produit » — Phases 57-66`, `current_phase: 67`. Or la 67 appartient à `vibeflow-v2.0`, et `equipe-produit-v1.0` n'est pas clos (Phases 63 à 66 ouvertes).
+- **Cause :** la forme « section de jalon distincte, **sans `gsd-new-milestone`** », posée par `11882c80` (gouvernance-labs, 2026-09-23) puis recopiée pour ECC, equipe-produit et vibeflow-v2.0 (`16387283`), sert à inscrire un jalon **sans le démarrer**, parce que le STATE ne tient qu'une position. Elle ne prévoit pas le geste suivant : basculer le STATE quand une phase de ce jalon démarre vraiment. La 67 a été exécutée, releasée et close sans que personne bascule.
+- **Piste :** au démarrage d'une phase (cadrage, plan ou exécution), comparer le jalon de la phase dans le ROADMAP à celui du STATE ; s'ils diffèrent, proposer la bascule (édition à la main du frontmatter, jamais `state record-session`, destructif), jamais d'office. Témoin rouge : un STATE sur `equipe-produit-v1.0` et une phase 69 de `vibeflow-v2.0` qui démarre → aucune alerte aujourd'hui.
+- **Correction ponctuelle :** STATE basculé à la main sur `vibeflow-v2.0`, phase 69 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « vibeflow-v2.0, phase 69 (Recommandé) »), dans la PR qui inscrit les Phases 73 à 77.
+
+**Déclencheur de reprise :** la prochaine inscription d'un jalon, ou la Phase 64 (contrôles branchés en nœuds du plan de bataille).

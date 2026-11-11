@@ -6,6 +6,8 @@
   {"texte": "Cache", "raison": "identique dans les deux langues : le même mot en français"},
   {"texte": "Exports", "raison": "identique dans les deux langues : le même mot en français"},
   {"texte": "Migration", "raison": "identique dans les deux langues : le même mot en français"},
+  {"texte": "{} mention", "raison": "identique dans les deux langues : le même mot en français, avec le même pluriel"},
+  {"texte": "{} mentions", "raison": "identique dans les deux langues : le même mot en français, avec le même pluriel"},
   {"texte": "Model Context Protocol", "raison": "identique dans les deux langues : le même mot en français"},
   {"texte": "Route", "raison": "identique dans les deux langues : le même mot en français"},
   {"texte": "Script", "raison": "identique dans les deux langues : le même mot en français"},

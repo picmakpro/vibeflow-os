@@ -19,11 +19,13 @@
   // ---------- bloc de vue racine (P78-D-03) : dit ce que montre la vue, jamais le nom du projet — même sans git ----------
   const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
   const pl = (n, mot) => `${n} ${mot}${n > 1 ? 's' : ''}`;
+  const AIDE_BRANCHE = "Branche : une ligne de travail du dépôt. HEAD détaché : le dossier n'est sur aucune branche, il est posé sur un commit précis.";
+  const AIDE_MISSIONS = "Missions : les plans de bataille en cours dans .planning/missions. Les agents (sessions et sous-agents) sont comptés à part, dans la ligne du dessous et sur les cartes.";
   const texteVue = () => {
     const VF = G.meta.vf || {}, depot = V && (V.etat === 'ok' || V.etat === 'indisponible'); // un dépôt détecté ; sinon « dossier »
     if (TAB === 'code') {
       const b = V && V.etat === 'ok' ? (V.detache ? 'HEAD détaché' : V.branche ? `branche ${V.branche}` : '') : '';
-      return { k: 'Code', h1: b ? `Le code, ${b}` : 'Le code du projet',
+      return { k: 'Code', h1: b ? `Le code, ${b}` : 'Le code du projet', aide: b ? AIDE_BRANCHE : '', // PU-G-193 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06, Q3) : les termes Git restent, définis au survol
         p: `${pl((G.files || []).length, 'fichier')} et ${pl((G.routes || []).length, 'route')} lus dans le ${depot ? 'dépôt' : 'dossier'}.` };
     }
     if (TAB === 'project') { // P78-D-03 : le sous-titre résume la vue (phase en cours, phases faites sur le total du jalon), il ne redit jamais le titre
@@ -34,15 +36,30 @@
     }
     const M = Array.isArray(VF.missions) ? VF.missions : [], c = VF.compte || {};
     const repos = !M.length && !c.actif && !c.enAttente; // aucune mission et personne au travail
-    return { k: 'Équipe', h1: M.length === 1 ? `Mission : ${M[0]}` : M.length > 1 ? `${M.length} missions en cours` : 'Aucune mission en cours', p: repos ? "L'équipe est au repos." : G.project.summary || '' };
+    // PU-G-166 : le titre compte les MISSIONS (nœuds `mission` actifs du graphe Projet, un plan = une mission) ; « actifs » compte les AGENTS (sessions et sous-agents actifs de l'écoute des sessions) : la ligne le dit
+    const agents = typeof c.actif === 'number' ? `Agents : ${c.actif} ${c.actif > 1 ? 'actifs' : 'actif'} · ${c.enAttente || 0} en attente · ${c.termine || 0} ${c.termine > 1 ? 'terminés' : 'terminé'} depuis moins de 24 h.` : G.project.summary || '';
+    return { k: 'Équipe', h1: M.length === 1 ? `Mission : ${M[0]}` : M.length > 1 ? `${M.length} missions en cours` : 'Aucune mission en cours', aide: AIDE_MISSIONS, p: repos ? "L'équipe est au repos." : agents };
   };
+  // S6 (revue de la recette du 2026-11-08) : tiroir Git ouvert (body.vf-git-ouvert), le titre est masqué dessous (opacity 0, 77-vf-git-tiroir.js) ; il ne reste pas un arrêt de Tab (focus invisible, bulle par-dessus le tiroir) ; le tabindex revient à la fermeture ; F6a (3e tour) : il ne revient que si le titre porte encore une définition (data-vf-aide), jamais sur le seul fait qu'il en a porté une (un dépôt « indisponible » la retire : le titre n'est alors plus un arrêt)
+  const tabTitre = () => { const h1 = document.querySelector('#context h1'); if (!h1 || !h1.dataset.vfAide) return; if (document.body.classList.contains('vf-git-ouvert')) h1.removeAttribute('tabindex'); else h1.tabIndex = 0; };
+  new MutationObserver(tabTitre).observe(document.body, { attributes: true, attributeFilter: ['class'] });
   const ecrireVue = () => { // réécrit le bloc que renderContext vient de poser ; sous-vues et réponses (q:answer) inchangées
     const ctx = document.querySelector('#context'), k = ctx && ctx.querySelector('.k'), h1 = ctx && ctx.querySelector('h1');
     if (!k || !h1) return;
     const t = texteVue();
     k.textContent = t.k; h1.classList.add('vf-ctx-titre');
-    h1.replaceChildren(); // F13 : le titre ne se coupe qu'après « / » ou « - » : un <wbr> (élément DOM, jamais de HTML) suit chaque séparateur ; textContent reste le texte exact
-    t.h1.split(/(?<=[/-])/).forEach((morceau, i) => { if (i) h1.appendChild(document.createElement('wbr')); h1.appendChild(document.createTextNode(morceau)); });
+    // PU-G-193 (recette du 2026-11-08) : la définition du titre (Branche, HEAD détaché ; Missions) se montre aussi au focus clavier : le titre est atteignable par Tab et sa bulle lit la définition de la vue courante
+    const R = window.VFGitRendu;
+    if (t.aide) { h1.setAttribute('title', t.aide); h1.setAttribute('aria-description', t.aide); h1.dataset.vfAide = t.aide; if (R && R.aideFocus && !h1.dataset.vfAideLie) { h1.dataset.vfAideLie = '1'; R.aideFocus(h1, () => h1.dataset.vfAide || ''); } tabTitre(); }
+    else { h1.removeAttribute('title'); h1.removeAttribute('aria-description'); delete h1.dataset.vfAide; if (h1.dataset.vfAideLie) h1.removeAttribute('tabindex'); } // aide en texte constant, jamais le nom de la branche
+    h1.replaceChildren(); // F13, PU-G-042 : le titre se coupe d'abord après « / » (un <wbr>, élément DOM, jamais de HTML) ; un morceau à traits d'union (.vf-ctx-seg, inline-block) reste d'un bloc tant qu'il tient, et ne se coupe après un trait d'union que s'il dépasse seul la ligne ; textContent reste le texte exact
+    t.h1.split(/(?<=[ /])/).forEach((m, i, a) => {
+      const [, mot, esp] = /^([^ ]*)( *)$/.exec(m) || [, m, ''];
+      if (i && a[i - 1].endsWith('/')) h1.appendChild(document.createElement('wbr'));
+      if (mot.includes('-')) { const sg = document.createElement('span'); sg.className = 'vf-ctx-seg'; // bloc insécable : le trait d'union ne coupe que si le morceau seul dépasse la ligne
+        mot.split(/(?<=-)/).forEach((x, j) => { if (j) sg.appendChild(document.createElement('wbr')); sg.appendChild(document.createTextNode(x)); }); h1.appendChild(sg); } else h1.appendChild(document.createTextNode(mot));
+      if (esp) h1.appendChild(document.createTextNode(esp));
+    });
     let d = ctx.querySelector('.cd');
     if (!d) { d = document.createElement('p'); d.className = 'cd'; d.id = 'ctx-desc'; h1.after(d); }
     d.textContent = t.p;
@@ -60,9 +77,9 @@
   const cadrage = () => { const b = SC.state && SC.state.bounds, T = SC.state && SC.state.t; if (!b || !T) return null; const a = SC.freeArea(), k = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1); return { y: a.y, cadree: Math.abs(T.k - k) <= k * 0.005 && Math.abs(T.x - (a.x + (a.w - b.w * k) / 2 - b.x * k)) <= 1 && Math.abs(T.y - (a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k)) <= 1 }; };
   const ecrireEtRecadrer = () => { const avant = cadrage(); ecrireVue(); const apres = avant && avant.cadree ? cadrage() : null; if (apres && apres.y !== avant.y) SC.fit(false); };
   const styleVue = document.createElement('style');
-  styleVue.textContent = '.vf-ctx-titre { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }';
+  styleVue.textContent = '.vf-ctx-titre { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }\n.vf-ctx-seg { display: inline-block; max-width: 100%; vertical-align: top; overflow-wrap: anywhere; }';
   document.head.appendChild(styleVue);
-  // le premier rendu peut précéder ce fichier (l'analyseur rend la main entre deux scripts) : on réécrit aussi à l'arrivée du fichier, puis à « ready »
+  // le premier rendu attend DOMContentLoaded (donc ce fichier) ; la réécriture à l'arrivée du fichier est un garde défensif et idempotent, puis « render » et « ready » prennent le relais
   SC.on('render', (e) => { if (e && e.container === 'root') ecrireEtRecadrer(); });
   SC.on('ready', () => { if (SC.state && SC.state.container === 'root') ecrireEtRecadrer(); });
   if (SC.state && SC.state.container === 'root') ecrireEtRecadrer();
@@ -80,6 +97,7 @@
     .vf-git-ligne:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; } /* anneau DANS la pastille : à l'extérieur il mordait sur le nom juste au-dessus */
     .vf-git-branche, .vf-git-wt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .vf-git-branche { flex: 0 1 auto; }
+    .vf-git-ligne-etat { flex: none; white-space: pre; }
     .vf-git-wt { flex: 0 2 auto; white-space: pre; } /* l'espace avant le point médian est le premier caractère de l'élément : sans white-space: pre il s'effondre en tête d'élément flex */
     .vf-git-ligne .kbd { color: var(--text-2); margin-left: 6px; opacity: 0; transition: opacity 150ms var(--ease); flex: none; }
     .vf-git-ligne:hover .kbd, .vf-git-ligne:focus-visible .kbd { opacity: 1; }
@@ -120,8 +138,9 @@
   ligne.setAttribute('aria-expanded', 'false'); ligne.setAttribute('aria-controls', 'vf-git-tiroir');
   const spBranche = document.createElement('span'); spBranche.className = 'vf-git-branche';
   const spWt = document.createElement('span'); spWt.className = 'vf-git-wt';
+  const spEtat = document.createElement('span'); spEtat.className = 'vf-git-ligne-etat';
   const kbd = document.createElement('span'); kbd.className = 'kbd'; kbd.textContent = 'g'; kbd.setAttribute('aria-hidden', 'true');
-  ligne.append(spBranche, spWt, kbd);
+  ligne.append(spBranche, spWt, spEtat, kbd);
   bloc.appendChild(ligne);
 
   // ouvreur tactile : bouton icône (glyphe branche, constant) en tête de .hr ; caché au-dessus de 1000 px
@@ -140,22 +159,28 @@
   const entete = document.querySelector('header'), recherche = document.querySelector('#search-btn');
   if (recherche) recherche.setAttribute('data-vf-invite', 'Chercher…'); // P78-D-39 : libellé court, lu par la requête de 1000 à 1279 px (voir le style) ; inerte ailleurs
   const sans = (o) => { const c = Object.assign({}, o); delete c.schema; return JSON.stringify(c); };
+  let connue = V && V.etat === 'ok' ? V : null; // PU-G-003 : dernière lecture CONFIRMÉE (branche, worktree) ; une lecture « indisponible » (git muet, machine chargée) ne l'efface jamais
   const lire = (d) => {
     const change = sans(V) !== sans(d); V = d;
     if (change && TAB === 'code') ecrireEtRecadrer(); // le bloc de vue Code cite la branche de la même lecture que la seconde ligne
     if (entete) entete.toggleAttribute('data-vf-git', d.etat !== 'absent'); // l'ouvreur est posé : le plancher et l'invite courts s'appliquent
-    if (d.etat === 'absent') { ligne.hidden = true; ouvreur.hidden = true; return; } // le dépôt a disparu en cours de route : tout se tait
+    if (d.etat === 'absent') { connue = null; ligne.hidden = true; ouvreur.hidden = true; return; } // le dépôt a disparu en cours de route : tout se tait
     ligne.hidden = false; ouvreur.hidden = false;
-    const indispo = d.etat === 'indisponible';
-    const texteBranche = indispo ? 'Branche indisponible' : d.detache ? `HEAD détaché · ${d.sha7 || ''}` : String(d.branche || '');
+    if (d.etat === 'ok') connue = d;
+    const indispo = d.etat === 'indisponible' && !connue; // rien de connu : « Branche indisponible »
+    const nonConfirme = d.etat === 'indisponible' && !!connue; // dernière valeur gardée, un glyphe et un mot en texte neutre (ni halo, ni couleur)
+    const c = connue && d.etat === 'indisponible' ? connue : d;
+    const nomBranche = c.detache ? `HEAD détaché · ${c.sha7 || ''}` : String(c.branche || '');
+    const texteBranche = indispo ? 'Branche indisponible' : nonConfirme ? `○ ${nomBranche}` : nomBranche;
     spBranche.textContent = texteBranche;
-    spWt.textContent = d.worktree && !indispo ? ` · worktree ${d.worktree}` : '';
-    const lisible = indispo ? 'branche indisponible' : d.detache ? 'HEAD détaché' : 'branche ' + d.branche;
-    ligne.title = texteBranche + spWt.textContent;
+    spWt.textContent = c.worktree && !indispo ? ` · worktree ${c.worktree}` : '';
+    spEtat.textContent = nonConfirme ? ' · non confirmée' : '';
+    const lisible = indispo ? 'branche indisponible' : (c.detache ? 'HEAD détaché' : 'branche ' + c.branche) + (nonConfirme ? ', lecture non confirmée' : '');
+    ligne.title = texteBranche + spWt.textContent + spEtat.textContent;
     ligne.setAttribute('aria-label', `Historique Git, ${lisible}. Ouvrir (g)`);
     ouvreur.setAttribute('aria-label', `Historique Git, ${lisible}. Ouvrir (g)`); ouvreur.title = ouvreur.getAttribute('aria-label');
-    ligne.classList.toggle('vf-git-detache', !!d.detache);
-    ligne.classList.toggle('vf-git-indispo', indispo);
+    ligne.classList.toggle('vf-git-detache', !!c.detache && !indispo);
+    ligne.classList.toggle('vf-git-indispo', indispo || nonConfirme);
   };
   lire(V);
 

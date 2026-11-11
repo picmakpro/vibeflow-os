@@ -3,7 +3,7 @@
 // Espacements (71.5) : jetons de viewer.html (--sp-*, --edge, --inset-*), lus tels quels (la feuille vit dans la page hôte). Posés AVANT cette feuille : un var() inconnu ferait tomber la déclaration entière.
 export const STYLE_TIROIR = `
 .vf-term-pastille, .vf-term-puce { position: fixed; left: var(--edge); bottom: var(--edge); z-index: 6; border-radius: 999px; background: var(--raise); border: 1px solid var(--hair-2); font: 500 13px var(--sans); }
-.vf-term-pastille { height: 32px; display: inline-flex; align-items: center; gap: var(--sp-6); padding: 0 var(--sp-12) 0 var(--sp-8); color: var(--text-2); cursor: pointer; box-shadow: var(--shadow-card); transition: background .15s, color .15s; }
+.vf-term-pastille { height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-6); padding: 0 var(--sp-12); color: var(--text-2); cursor: pointer; box-shadow: var(--shadow-card); transition: background .15s, color .15s; }
 .vf-term-pastille:hover { background: var(--raise-2); color: var(--text); }
 .vf-term-pastille[hidden], .vf-term-point[hidden] { display: none; }
 .vf-term-pastille svg, .vf-term-bouton svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
@@ -53,7 +53,12 @@ body.vf-term-ouvert #ask { display: none; }
 @media (max-width: 999px), (pointer: coarse) { .vf-term-tiroir { left: var(--sp-8); right: var(--sp-8); bottom: var(--sp-8); } }
 /* feuille de détail ouverte (<= 700 px) : la pastille se pose au-dessus d'elle, 8 d'écart. dérivé : min(56vh, 480px) est la hauteur max du #panel de viewer.html (règle #panel du @media (max-width: 700px), l.548) : à tenir ensemble. !important : eviter() pose un bottom en ligne. */
 @media (max-width: 700px) { body:not(.no-panel) .vf-term-pastille, body:not(.no-panel) .vf-term-puce { bottom: calc(var(--sp-8) + min(56vh, 480px) + var(--sp-8)) !important; } }
-@media (pointer: coarse) { .vf-term-barre { height: 52px; } .vf-term-bouton { width: 44px; height: 44px; } .vf-term-pastille { height: 44px; } }
+@media (pointer: coarse) { .vf-term-barre { height: 52px; } .vf-term-bouton { width: 44px; height: 44px; } }
+/* 72.1 : souris (>= 1 000 px, hors tactile) : la pastille garde ses 32 (T20.8) et se centre sur l'axe de la barre de question (40, ui/01-vf-responsive.js) : 16 + (40 - 32) / 2 = 16 + 4 au-dessus du bas (garde de l'axe : T21.12). */
+@media (min-width: 1000px) and (not (pointer: coarse)) { .vf-term-pastille { bottom: calc(var(--edge) + var(--sp-4)); } }
+/* 72.1 : cibles de 44 (tactile ou < 1 000 px, comme le zoom du viewer) : la pastille égale le groupe de zoom (4 + 44 + 4) et la barre de question (52). Téléphone (<= 700 px) : zoom, pastille et barre au même bord gauche --edge (16), le bas restant à 8 (comme le tiroir et la barre) ; recette du 2026-11-08, lot C (arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px »). */
+@media (max-width: 999px), (pointer: coarse) { .vf-term-pastille { height: 52px; } }
+@media (max-width: 700px) { .vf-term-pastille, .vf-term-puce { left: var(--edge); bottom: var(--edge); } } /* correction ciblée du lot C (C-R2 : décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée) : le bas de la zone basse à --edge, comme la barre de question ; le tiroir reste à 8 */
 @media (prefers-reduced-motion: reduce) { .vf-term-tiroir.vf-term-entree { animation: none; } .vf-term-grip, .vf-term-pastille, .vf-term-bouton { transition: none; } }
 html.theme-switching .vf-term-tiroir, html.theme-switching .vf-term-tiroir * { animation: none !important; transition: none !important; }
 `;

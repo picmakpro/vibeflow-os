@@ -26,7 +26,7 @@ for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Googl
   [ -n "$c" ] || continue
   if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi
 done
-if [ -z "$CHROME" ]; then echo "  ⊘ SUITE SAUTÉE (navigateur) : LU.1 à LU.14 et les mutants NON vérifiés, non comptés comme réussis"; fi
+if [ -z "$CHROME" ]; then echo "  ⊘ SUITE SAUTÉE (navigateur) : LU.1 à LU.14, LU.16 à LU.18 et les mutants NON vérifiés, non comptés comme réussis"; fi
 
 cat > "$AUX/ev.mjs" <<'JS'
 import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); const v = new Function('j', 'return (' + process.argv[2] + ')')(j); console.log(typeof v === 'string' ? v : JSON.stringify(v));
@@ -44,9 +44,9 @@ const PLANTE = 'innerHTML outerHTML insertAdjacentHTML document.write eval( new 
 const adr = /https?:\/\//g;
 const ATTENDUS = { 'phase-finie': 'La phase est terminée.', 'terminal-absent': 'Le terminal est indisponible sur ce poste.', 'terminal-arrete': 'Le terminal est arrêté. Relancez /vf-cockpit --terminal.',
   'premier-plan-occupe': 'Un programme occupe déjà le terminal.', 'claude-introuvable': 'La commande claude est introuvable.', 'python3-absent': 'Python 3 est introuvable sur ce poste.',
-  'phase-hors-motif': "Le numéro de phase n'est pas lançable.", 'compartiment-hors-motif': "Le nom du compartiment n'est pas lançable.", 'mission-hors-phase': 'Une mission hors phase ne se lance pas depuis sa carte.',
+  'phase-hors-motif': "Le numéro de phase n'est pas lançable.", 'compartiment-hors-motif': "Le nom du compartiment n'est pas lançable.", 'mission-hors-phase': "Cette mission n'est rattachée à aucune phase : le lancement depuis une carte ne part que d'un numéro de phase. Pour la reprendre, ouvrez une session Claude Code dans le terminal, tapez /vf-dev et nommez la mission.",
   'dependance-non-close': "Une phase dont celle-ci dépend n'est pas close (lecture de la prose du ROADMAP, indicative).", 'mission-vivante': 'Une mission vivante travaille déjà sur cette phase.',
-  'phase-plus-avancee-ailleurs': 'La phase est plus avancée dans un autre arbre de travail.', 'lancement-recent': 'Cette cible a déjà été lancée récemment.',
+  'phase-plus-avancee-ailleurs': "Une version plus récente de ce travail existe à part (autre arbre de travail). Le lancement part du dossier principal, qui n'a pas cette avance : consultez cette version avant de lancer.", 'phase-sans-plan': "Aucun plan à exécuter pour cette phase : cadrez puis planifiez d'abord.", 'lancement-recent': 'Cette cible a déjà été lancée récemment.',
   'travail-non-commite': "Du travail non commité existe dans l'arbre de travail." };
 const mo = m.MOTIFS || {}, ecart = [...new Set([...Object.keys(ATTENDUS), ...Object.keys(mo)])].filter((k) => mo[k] !== ATTENDUS[k]);
 const lib = m.LIBELLES_VERBES || {};
@@ -64,7 +64,7 @@ cat > "$AUX/page-lancer.mjs" <<'JS'
 // Le journal ne compte pas /__* ni /favicon.ico ; il garde méthode et chemin de tout le reste, plus le détail des POST et la validité du jeton des GET de la liste.
 import http from 'node:http'; import fs from 'node:fs'; import { execFileSync } from 'node:child_process'; import { pathToFileURL } from 'node:url';
 const [, , module_, port, ta] = process.argv; const WORKD = process.env.LU_WORK;
-let inj = ''; try { inj = (await import(pathToFileURL(module_).href)).injectionLancer({ indisponible: false }) || ''; } catch { inj = ''; }
+let inj = ''; try { inj = (await import(pathToFileURL(module_).href)).injectionLancer({ indisponible: false, expireMs: process.env.LU_EXPIRE_MS ? Number(process.env.LU_EXPIRE_MS) : undefined }) || ''; } catch { inj = ''; }
 function aide() { // exécutée dans la page : le faux viewer (boucle des sections de viewer.html, écouteur d'Entrée de window)
   window.__err = []; window.__sections = { item: [] }; window.__redraws = 0; window.__sel = null; window.__M72 = undefined; window.__prop = 0;
   document.addEventListener('vf-lancer-propose', () => { window.__prop++; }); // SP-1 : le signal de proposition acceptée que le tiroir écoute
@@ -92,7 +92,7 @@ const page = (ordre) => ['<!doctype html><html><head><meta charset="utf-8">', '<
   '</head><body><div id="panel"></div></body></html>'].join('\n');
 const cache = {};
 const pageCsp = (ordre) => { if (!cache[ordre]) { const html = page(ordre), f = `${WORKD}/page-${ordre}.html`; fs.writeFileSync(f, html); cache[ordre] = { html, csp: execFileSync('node', [ta, 'csp-v275', f], { encoding: 'utf8' }).trim() }; } return cache[ordre]; };
-const S = { liste: null, listeRaw: null, listeStatus: 200, post: { status: 202, body: '{"propose":true}', delai: 0 }, panne: false };
+const S = { liste: null, listeRaw: null, listeStatus: 200, listeDelai: 0, post: { status: 202, body: '{"propose":true}', delai: 0 }, panne: false };
 const journal = [], posts = [], gets = [];
 http.createServer((q, r) => {
   const u = new URL(q.url, 'http://x'), p = u.pathname, morceaux = []; q.on('data', (d) => morceaux.push(d));
@@ -100,7 +100,7 @@ http.createServer((q, r) => {
     const brut = Buffer.concat(morceaux).toString('utf8'), json = (st, c) => { r.writeHead(st, { 'Content-Type': 'application/json' }); r.end(c); };
     if (p === '/__scenario') {
       const o = JSON.parse(brut || '{}'); if (o.reset) { journal.length = 0; posts.length = 0; gets.length = 0; }
-      for (const k of ['liste', 'listeRaw', 'listeStatus', 'panne']) if (k in o) S[k] = o[k];
+      for (const k of ['liste', 'listeRaw', 'listeStatus', 'listeDelai', 'panne']) if (k in o) S[k] = o[k];
       if (o.post) S.post = Object.assign({ status: 202, body: '{"propose":true}', delai: 0 }, o.post);
       return json(200, '{}');
     }
@@ -113,7 +113,7 @@ http.createServer((q, r) => {
     const jeton = q.headers['x-vf-cockpit-token'] === 'jeton-test';
     if (p === '/api/vf/lancer/cibles' && q.method === 'GET') {
       gets.push({ jeton }); if (!jeton) return json(403, '{"refus":"jeton"}');
-      r.writeHead(S.listeStatus, { 'Content-Type': 'application/json' }); return r.end(S.listeRaw !== null ? S.listeRaw : JSON.stringify(S.liste));
+      const rend = () => { r.writeHead(S.listeStatus, { 'Content-Type': 'application/json' }); r.end(S.listeRaw !== null ? S.listeRaw : JSON.stringify(S.liste)); }; if (S.listeDelai) setTimeout(rend, S.listeDelai); else rend(); return;
     }
     if (p === '/api/vf/lancer' && q.method === 'POST') {
       const ct = q.headers['content-type'] || '', origin = q.headers.origin || ''; posts.push({ ct, jeton, origin, corps: brut });
@@ -130,7 +130,7 @@ cat > "$AUX/chrome-lancer-ui.mjs" <<'JS'
 // Chaque mode joue ses étapes isolées par `essai` (la première en échec arrête le mode : la mesure absente est nommée dans `erreurs`, jamais un résultat vide).
 // Gestes par Input.dispatchMouseEvent / Input.dispatchKeyEvent seulement. Toute sonde négative joint son témoin positif (la carte valide rend sa section) dans le MÊME mode.
 import { pathToFileURL } from 'node:url';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, attendreEtStabiliser, positionPosee } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv; const A = JSON.parse(brut);
 const OP = `http://127.0.0.1:${A.P}`, MS = Number(process.env.VF_LU_MS) || 6000, J = JSON.stringify;
 const erreurs = {}; let echec = false;
@@ -141,7 +141,7 @@ const attNode = async (pred, nom, ms = MS) => { const fin = Date.now() + ms; let
 const E = (id, kind, principal, verbes, extra = {}) => ({ id, kind, principal, verbes, bloquants: [], avertissements: [], lancee: false, ...extra });
 const liste = (cibles, extra = {}) => ({ actif: true, terminal: 'actif', claude: true, cibles, ...extra });
 const BASE = liste([E('ph-72', 'phase', 'planifier', ['cadrer', 'planifier', 'executer']), E('dag-m1', 'mission', 'reprendre', ['reprendre'])]);
-const defaut = (o = {}) => scen({ reset: true, liste: BASE, listeRaw: null, listeStatus: 200, post: { status: 202, body: '{"propose":true}', delai: 0 }, panne: false, ...o });
+const defaut = (o = {}) => scen({ reset: true, listeDelai: 0, liste: BASE, listeRaw: null, listeStatus: 200, post: { status: 202, body: '{"propose":true}', delai: 0 }, panne: false, ...o });
 const HOSTILE = '<img src=x onerror=window.__M72=1>', TOUCH = '"; touch M #';
 const VISIBLE = `!!document.querySelector('#panel [data-vf-lancer]:not([hidden])')`;
 const STATUT = `((document.querySelector('#panel [data-vf-lancer] [role="status"]') || {}).textContent || '')`;
@@ -158,7 +158,7 @@ await executer(chrome, async (s) => {
   await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
   await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   await s.send('Page.addScriptToEvaluateOnNewDocument', { source: ESPION });
-  const centreDe = (expr) => s.ev(`(() => { const e = ${expr}; if (!e) return null; const r = e.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`);
+  const centreDe = async (expr) => { const p = await positionPosee(s.ev, expr); return p ? { x: p.cx, y: p.cy } : null; }; // le geste vise le centre lu une fois l'élément posé (deux lectures égales), pas celui d'une mise en page en mouvement
   const souris = (type, x, y, n = 1) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: n });
   const BTN = (t) => `[...document.querySelectorAll('#panel [data-vf-lancer] button')].find((b) => b.textContent.trim() === ${J(t)})`;
   const clicExpr = async (expr, nom, fois = 1) => { const c = await centreDe(expr); if (!c) throw new Error(`élément absent : ${nom}`); await souris('mouseMoved', c.x, c.y); for (let i = 1; i <= fois; i++) { await souris('mousePressed', c.x, c.y, i); await souris('mouseReleased', c.x, c.y, i); } };
@@ -210,7 +210,7 @@ await executer(chrome, async (s) => {
       etatx: { etat: 'x', verbe: 'planifier' }, verbex: { etat: 'vue', verbe: 'x;y' }, chaine: 'vue', un: 1, vide: {} };
     await essai('liste', async () => {
       await defaut({ liste: liste(Object.entries(L7).map(([k, v]) => { const e = E('l-' + k, 'phase', 'planifier', ['planifier']); if (v === undefined) delete e.lancee; else e.lancee = v; return e; })) }); await ouvrir();
-      for (const k of Object.keys(L7)) R[k] = (await carte('n:l-' + k)).lignes.filter((l) => l.indexOf('Lancée') === 0).join('|');
+      for (const k of Object.keys(L7)) { const lg = (await carte('n:l-' + k)).lignes; R[k] = lg.filter((l) => l.indexOf('Lancée') === 0 || l.indexOf('Commande préparée') === 0 || l.indexOf('Préparée depuis') === 0).join('|'); R[k + 'L'] = lg.filter((l) => l.indexOf('Lancée') === 0).join('|'); } // LB1 PU-G-113 : « attendue » n'est plus une « Lancée »
     });
   } else if (mode === 'lu8') {
     await essai('hostile', async () => {
@@ -226,7 +226,8 @@ await executer(chrome, async (s) => {
     await essai('entree', async () => {
       await defaut(); await ouvrir(); await carte('n:ph-72', 'Phase 72'); await s.ev(`document.querySelector('#panel [data-vf-lancer] button.primary').focus()`);
       R.avant = await s.ev('window.__redraws'); await touche('Enter', 'Enter', 13, '\r');
-      await s.stable(`({ r: window.__redraws, p: ${STATUT}.length })`, 'après la touche Entrée'); const j = await jrn();
+      /* le message de la réponse est attendu AVANT de juger la stabilité (une réponse lente ne laisse plus deux lectures égales à vide) */
+      await attendreEtStabiliser(() => s.ev(`({ r: window.__redraws, p: ${STATUT}.length })`), (v) => !!v && v.p > 0, { pas: 250, max: MS }); const j = await jrn();
       R.posts = j.posts.length; R.redessine = (await s.ev('window.__redraws')) - R.avant;
     });
   } else if (mode === 'lu10') {
@@ -270,6 +271,44 @@ await executer(chrome, async (s) => {
       await defaut({ liste: liste([E('v-inconnu', 'phase', 'planifier', ['bidule', 'planifier', 'executer']), sans, E('v-hors', 'phase', 'bidule', ['executer']), E('v-vide', 'phase', 'planifier', []), E('v-inval', 'phase', 'x', ['x', 'y'])]) }); await ouvrir();
       for (const k of ['inconnu', 'sans', 'hors', 'vide', 'inval']) R[k] = await carte('n:v-' + k);
     });
+  } else if (mode === 'lu16') { // LB1 : PU-G-116 (retour immédiat, focus gardé), PU-G-111 (aide au survol et au clavier), PU-G-110 (sous le titre)
+    await essai('liste', async () => {
+      await defaut({ liste: liste([E('ph-72', 'phase', 'planifier', ['cadrer', 'planifier', 'executer'])]), post: { status: 202, body: '{"propose":true}', delai: 4000 } }); await ouvrir();
+      R.carte = await carte('n:ph-72', 'Phase 72');
+      R.sousTitre = await s.ev(`(() => { const pt = document.querySelector('#panel .pt'); return !!pt.nextElementSibling && pt.nextElementSibling.contains(document.querySelector('[data-vf-lancer]')) && pt.parentNode.classList.contains('sec'); })()`);
+      await s.ev(`document.querySelector('#panel [data-vf-lancer] button[data-verbe="planifier"]').focus()`);
+      R.aide = await s.ev(`(() => { const b = document.querySelector('#panel [data-vf-lancer] button[data-verbe="planifier"]'), a = document.getElementById('vf-lancer-aide'), d = document.getElementById(b.getAttribute('aria-describedby'));
+        return { visible: !a.hidden, texte: a.textContent, titre: b.title, decrit: d ? d.textContent : null, horsBouton: d ? !b.contains(d) : null }; })()`);
+      await clic('Planifier');
+      R.pendant = await s.stable(`(() => { const b = document.querySelector('#panel [data-vf-lancer] button[data-verbe="planifier"]'); return { txt: b.textContent, busy: b.getAttribute('aria-busy'), focus: document.activeElement === b, zone: document.querySelector('#panel [data-vf-lancer]').getAttribute('aria-busy') }; })()`, 'bouton en préparation');
+      await att(`/Proposition envoyée/.test(document.getElementById('panel').textContent)`, 'message après la réponse', 8000);
+      R.apres = await s.ev(`(() => ({ focus: document.activeElement && document.activeElement.dataset ? document.activeElement.dataset.verbe : null, txt: document.activeElement.textContent, busy: document.querySelector('#panel [data-vf-lancer]').getAttribute('aria-busy') }))()`);
+    });
+  } else if (mode === 'lu17') { // LB1 : PU-G-113 (le message d'envoi est borné à la durée d'une proposition) et PU-G-125 (Exécuter sans plan)
+    await essai('envoi', async () => {
+      await defaut({ liste: liste([E('ph-72', 'phase', 'cadrer', ['cadrer', 'planifier', 'executer']), E('ph-45', 'phase', 'executer', ['executer', 'cadrer'])]) }); await ouvrir();
+      await carte('n:ph-72', 'Phase 72'); await clic('Cadrer'); await att(`/Proposition envoyée/.test(${STATUT})`, 'message d\'envoi');
+      R.avant = await s.ev(STATUT);
+      await att(`/n'est plus valable/.test(${STATUT})`, 'message borné à la durée de la proposition', 8000); R.apres = await s.ev(STATUT);
+    });
+    await essai('sansplan', async () => {
+      R.sans = await s.ev(`(() => { const z = document.querySelector('#panel [data-vf-lancer]'); const b = z.querySelector('button[data-verbe="executer"]'); return { dansMenu: !!b.closest('details'), note: [...z.querySelectorAll('details div.pd')].map((e) => e.textContent), decrit: document.getElementById(b.getAttribute('aria-describedby')).textContent, actif: !b.disabled && b.getAttribute('aria-disabled') !== 'true' }; })()`);
+      await carte('n:ph-45', 'Phase 45');
+      R.avec = await s.ev(`(() => { const z = document.querySelector('#panel [data-vf-lancer]'); const b = z.querySelector('button[data-verbe="executer"]'); return { note: z.querySelectorAll('details div.pd').length, decrit: document.getElementById(b.getAttribute('aria-describedby')).textContent }; })()`);
+    });
+  } else if (mode === 'lu18') { // LB1 : DG-11 (section absente tant que la liste ne répond pas : elle se dit « en chargement ») et mission hors phase
+    await essai('lent', async () => {
+      await defaut({ liste: liste([E('ph-51', 'phase', 'cadrer', ['cadrer', 'planifier'])]), listeDelai: 2500 }); await ouvrir();
+      await choisir('n:ph-51', 'Phase 51'); await att(VISIBLE, 'section en chargement', 1800);
+      R.charge = await s.ev(`document.querySelector('#panel [data-vf-lancer]').innerText.replace(/\\s+/g, ' ').trim() + '|' + document.querySelector('#panel [data-vf-lancer]').getAttribute('aria-busy') + '|' + document.querySelectorAll('#panel [data-vf-lancer] button').length`);
+      await att(`document.querySelectorAll('#panel [data-vf-lancer] button').length > 0`, 'boutons après la réponse', 8000);
+      R.pret = await s.ev(`document.querySelector('#panel [data-vf-lancer]').getAttribute('aria-busy') + '|' + document.querySelectorAll('#panel [data-vf-lancer] button').length`);
+    });
+    await essai('inconnue', async () => {
+      await defaut({ liste: liste([E('ph-51', 'phase', 'cadrer', ['cadrer'])]), listeDelai: 1200 }); await ouvrir();
+      await choisir('n:ph-99', 'Phase 99'); await pause(2500);
+      R.absente = await s.ev(`(() => { const z = document.querySelector('#panel [data-vf-lancer]'); return z.hidden + '|' + z.children.length; })()`);
+    });
   } else { throw new Error('mode inconnu : ' + mode); }
   return R;
 }, { csp: true });
@@ -293,7 +332,7 @@ sans_effet() { assert_eq "$1 — mutant sans effet (module absent ou ligne marqu
 SRVN=0
 run_lu() { # run_lu <module> <mode> -> LJ LU_PORT ; un serveur factice neuf, un Chrome neuf
   SRVN=$((SRVN+1)); LU_PORT="$(libre)"
-  LU_WORK="$WORK" node "$AUX/page-lancer.mjs" "$1" "$LU_PORT" "$TA" > "$WORK/srv-$SRVN.out" 2>&1 </dev/null & LU_PID=$!; PIDS+=($LU_PID)
+  LU_EXPIRE_MS="${LU_EXPIRE_MS:-}" LU_WORK="$WORK" node "$AUX/page-lancer.mjs" "$1" "$LU_PORT" "$TA" > "$WORK/srv-$SRVN.out" 2>&1 </dev/null & LU_PID=$!; PIDS+=($LU_PID)
   for _ in $(seq 1 100); do [ "$(rq "$LU_PORT" GET /__journal 2>/dev/null | head -1)" = "200" ] && break; sleep 0.1; done
   LJ="$(node "$AUX/chrome-lancer-ui.mjs" "$CHROME" "$2" "{\"P\":$LU_PORT}")"; vf_hyg_stop "$LU_PID"
 }
@@ -309,7 +348,21 @@ assert_eq "LU.S5 — aucun innerHTML, outerHTML, insertAdjacentHTML, document.wr
 assert_eq "LU.S6 — LIBELLES_VERBES : exactement cadrer, planifier, executer, verifier, reprendre (ordre fermé), figé, libellés accentués" "$(rj "$ST" "${ABS}(j.cles+\"|\"+j.valeurs+\"|\"+j.fige)")" "cadrer,planifier,executer,verifier,reprendre|Cadrer,Planifier,Exécuter,Vérifier,Reprendre|true"
 CIB="$SCRIPTS/vf-cockpit-lancer-cibles.mjs"; PJ="$(node "$AUX/parite.mjs" "$MOD" "$CIB")"
 assert_eq "LU.S8 — ST-2 : chaque code de la table de cibles (liste DÉRIVÉE du module réel, au moins 14 codes) a un texte dans MOTIFS de l'interface" "$(rj "$PJ" '(j.n>=14?"n>=14":"liste trop courte "+j.n)+"/sans="+j.sans.join()')" "n>=14/sans="
-assert_eq "LU.S7 — MOTIFS : les quatorze codes de 72-03 et leurs textes, mot pour mot, aucun code en plus" "$(rj "$ST" "${ABS}j.ecart")" "aucun"
+assert_eq "LU.S7 — MOTIFS : les quatorze codes de 72-03 et phase-sans-plan (LB1) avec leurs textes, mot pour mot, aucun code en plus" "$(rj "$ST" "${ABS}j.ecart")" "aucun"
+
+# LU.S9 (lot 8 LB3-S, revue LB1-LB2, finding c) : la durée de validité que la page connaît suit la variable que Q lit (VF_COCKPIT_LANCER_EXPIRE_MS, 1 000 à 600 000), et non une constante : défaut 120 s, valeur hors bornes ou illisible = défaut
+expire_servi() { VF_COCKPIT_LANCER_ARME_MS="${3:-}" VF_COCKPIT_LANCER_EXPIRE_MS="$2" node -e "import(process.argv[1]).then((m) => { const h = m.injectionLancer({}); const x = /\"expireMs\":([0-9]+)/.exec(h); console.log(x ? x[1] : 'absent'); })" "$1" 2>&1 | tail -1; }
+assert_eq "LU.S9 — expireMs du script servi : variable absente 120000 ; 30000 -> 30000 ; 600000 -> 600000 ; 500 (hors bornes) -> 120000 ; 'abc' -> 120000" "$(expire_servi "$MOD" ''),$(expire_servi "$MOD" 30000),$(expire_servi "$MOD" 600000),$(expire_servi "$MOD" 500),$(expire_servi "$MOD" abc)" "120000,30000,600000,120000,120000"
+if mutant M-EXPIRE-CONSTANTE 's|^const EXPIRE_PAGE_MS = (() => {|const EXPIRE_PAGE_MS = 120000; const EXPIRE_ENV_IGNOREE = (() => {|'; then
+  assert_eq "M-EXPIRE-CONSTANTE — le mutant (durée codée en dur) rougit LU.S9 : la variable posée à 30000 n'est plus suivie (témoin : le défaut, lui, reste 120000)" "$(expire_servi "$MUT_MOD" ''),$(expire_servi "$MUT_MOD" 30000)" "120000,120000"
+else sans_effet M-EXPIRE-CONSTANTE; fi
+# LU.S10 (lot 8 LB3-S2, revue du delta, finding F7) : la page retient EXACTEMENT la durée que Q retient (lancer-q : expire > arme, sinon défaut) ; témoin : mêmes réponses que le module de Q lui-même, pour toutes les combinaisons
+q_servi() { VF_COCKPIT_LANCER_ARME_MS="${2:-}" VF_COCKPIT_LANCER_EXPIRE_MS="$1" node -e "import(process.argv[1]).then((m) => console.log(m.EXPIRE_MS))" "$SCRIPTS/vf-cockpit-lancer-q.mjs" 2>&1 | tail -1; }
+combi() { local e="$1" a="$2" q p; q="$(q_servi "$e" "$a")"; p="$(expire_servi "$MOD" "$e" "$a")"; [ "$q" = "$p" ] && echo "$e/$a=$p" || echo "$e/$a=ECART(Q $q, page $p)"; }
+assert_eq "LU.S10 — la page suit la règle de cohérence de Q : (expire/arme) 1500/2000 -> 120000 (Q et page) ; 2000/2000 -> 120000 ; 2001/2000 -> 2001 ; 1000/500 -> 120000 (plancher d'armement 1000) ; 1500/1000 -> 1500 ; 30000/abc -> 30000 ; 600000/10000 -> 600000" "$(combi 1500 2000),$(combi 2000 2000),$(combi 2001 2000),$(combi 1000 500),$(combi 1500 1000),$(combi 30000 abc),$(combi 600000 10000)" "1500/2000=120000,2000/2000=120000,2001/2000=2001,1000/500=120000,1500/1000=1500,30000/abc=30000,600000/10000=600000"
+if mutant M-EXPIRE-SANS-COHERENCE 's|return expire > arme ? expire : 120000;|return expire;|'; then
+  assert_eq "M-EXPIRE-SANS-COHERENCE — le mutant (la page ignore expire > arme) rougit LU.S10 : avec 1500/2000 la page prend 1500 là où Q sert 120000 (témoin : le module de Q sert bien 120000, et 1500/1000 reste 1500)" "$(expire_servi "$MUT_MOD" 1500 2000),$(q_servi 1500 2000),$(expire_servi "$MUT_MOD" 1500 1000)" "1500,120000,1500"
+else sans_effet M-EXPIRE-SANS-COHERENCE; fi
 
 if [ -n "$CHROME" ]; then
 echo "=== LU.15 — port du serveur factice ==="
@@ -342,7 +395,8 @@ assert_eq "LU.6 — sans le code travail-non-commite aucune ligne de ce motif ; 
 
 echo "=== LU.7 — état « lancée » ==="
 run_lu "$MOD" lu7; J="$LJ"
-assert_eq "LU.7 — lancee = true : « Lancée depuis la carte. » ; forme riche attendue, vue, terminée : « Lancée : Planifier, … »" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+[j.vrai,j.attendue,j.vue,j.terminee].join("¤")')" "{} Lancée depuis la carte.¤Lancée : Planifier, en attente de la session.¤Lancée : Planifier, session en cours.¤Lancée : Planifier, session terminée."
+assert_eq "LU.7 — lancee = true : « Préparée depuis la carte. » (jamais « Lancée » sans signal d'exécution, PU-G-113) ; forme riche attendue, vue, terminée : « Lancée : Planifier, … »" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+[j.vrai,j.attendue,j.vue,j.terminee].join("¤")')" "{} Préparée depuis la carte.¤Commande préparée dans le terminal : Planifier. Elle ne démarre qu'avec Entrée dans le terminal ; en attente de la session.¤Lancée : Planifier, session en cours.¤Lancée : Planifier, session terminée."
+assert_eq "LU.7 (PU-G-113) — forme sans état (lancee = true) et état attendue (ligne seulement posée dans le terminal, rien n'a démarré) : aucune ligne « Lancée » ; vue et terminée en ont une (témoin)" "$(rj "$J" '"vrai="+j.vraiL+"|attendue="+j.attendueL+"|vue="+j.vueL+"|terminee="+j.termineeL')" "vrai=|attendue=|vue=Lancée : Planifier, session en cours.|terminee=Lancée : Planifier, session terminée."
 assert_eq "LU.7 — false, null, absent, {etat:x}, {etat:vue, verbe:x;y}, 'vue', 1, {} : aucune ligne « Lancée » (témoin : les quatre formes valides en ont une)" "$(rj "$J" '[j.faux,j.nul,j.absent,j.etatx,j.verbex,j.chaine,j.un,j.vide].map((x)=>x===undefined?"?":x).join("¤")+" temoin="+(j.vrai&&j.vue&&j.terminee&&j.attendue?"oui":"non")')" "¤¤¤¤¤¤¤ temoin=oui"
 
 echo "=== LU.8 — rendu hostile ==="
@@ -377,6 +431,19 @@ assert_eq "LU.13 — actif:false, cibles absent, corps non JSON, statut 404, cib
 run_lu "$MOD" lu14; J="$LJ"
 assert_eq "LU.14 — verbe inconnu ignoré (principal Planifier, autre Exécuter) ; principal absent : premier verbe de l'ordre fermé (Cadrer, puis Exécuter) ; principal hors liste : Exécuter" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+["inconnu","sans","hors"].map((k)=>j[k]?j[k].princ.join()+"+"+j[k].autres.join():"?").join(" ")')" "{} Planifier:btn primary+Exécuter:btn soft Cadrer:btn primary+Exécuter:btn soft Exécuter:btn primary+"
 assert_eq "LU.14 — verbes vide ou sans verbe valide : « Aucune action disponible. » et aucun bouton" "$(rj "$J" '["vide","inval"].map((k)=>j[k]?j[k].lignes.join("|")+"/"+j[k].nb:"?").join(" ")')" "Aucune action disponible./0 Aucune action disponible./0"
+
+echo "=== LU.16 à LU.18 — LB1 : retour immédiat, aide, sous le titre, message borné, sans plan, chargement ==="
+run_lu "$MOD" lu16; J="$LJ"
+assert_eq "LU.16 (PU-G-110) — la section est placée sous le titre du panneau, dans son en-tête" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+j.sousTitre')" "{} true"
+assert_eq "LU.16 (PU-G-111) — au focus clavier, la phrase d'aide s'affiche, est le title du bouton et sa description liée (hors du bouton)" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+[j.aide.visible,j.aide.texte===j.aide.titre,j.aide.decrit===j.aide.titre,j.aide.horsBouton,j.aide.texte.indexOf("Planifier :")===0].join()')" "{} true,true,true,true,true"
+assert_eq "LU.16 (PU-G-116) — pendant l'attente du serveur : le bouton dit « Préparation… », aria-busy, le focus RESTE sur lui" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+JSON.stringify(j.pendant)')" '{} {"txt":"Préparation…","busy":"true","focus":true,"zone":"true"}'
+assert_eq "LU.16 (PU-G-116) — après la réponse : le focus est sur le bouton « Planifier » reconstruit, plus aucun aria-busy" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+JSON.stringify(j.apres)')" '{} {"focus":"planifier","txt":"Planifier","busy":null}'
+LU_EXPIRE_MS=1500 run_lu "$MOD" lu17; J="$LJ"
+assert_eq "LU.17 (PU-G-113) — le message « Proposition envoyée » est borné à la durée d'une proposition : il cède la place à une phrase qui ne prétend plus rien" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+(j.avant||"").slice(0,22)+"|"+(j.apres||"").slice(0,48)')" "{} Proposition envoyée au|La proposition envoyée il y a plus de deux minut"
+assert_eq "LU.17 (PU-G-125) — phase sans plan (principal Cadrer) : « Exécuter » du menu avertit « cadrez puis planifiez d'abord », reste actif (le serveur juge) ; phase avec plan : aucun avertissement" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+JSON.stringify([j.sans.dansMenu,j.sans.note,j.sans.actif,j.sans.decrit.indexOf("cadrez puis planifiez")>0,j.avec.note,j.avec.decrit.indexOf("cadrez")])')" '{} [true,["Attention : Aucun plan à exécuter pour cette phase : cadrez puis planifiez d'"'"'abord."],true,true,0,-1]'
+run_lu "$MOD" lu18; J="$LJ"
+assert_eq "LU.18 (DG-11) — la liste met 2,5 s à répondre : la section n'est pas absente, elle dit « Chargement des actions… » (aria-busy, aucun bouton), puis rend ses boutons" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+j.charge+" => "+j.pret')" "{} Lancer du travail Chargement des actions…|true|0 => null|2"
+assert_eq "LU.18 (DG-11) — carte absente de la liste (témoin du chargement ci-dessus) : la section se retire d'elle-même, rien d'affiché" "$(rj "$J" 'JSON.stringify(j.erreurs)+" "+j.absente')" "{} true|0"
 
 echo "=== Mutants — chaque garde du module a sa sonde ==="
 if mutant M-TEXTE-RETIRE "/^  'lancement-recent':/d"; then

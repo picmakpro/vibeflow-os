@@ -266,6 +266,29 @@ assert_eq "T24.14 — fixture --gros : tronque = vrai et réponse en moins de 2 
 assert_eq "T24.15 — fixture normale : tronque = faux" "$(RX 'j.r.tronque===false?"ok":"tronque="+j.r.tronque')" "ok"
 assert_eq "T24.16 — fixture --gros : le mandat tient en 8 000 caractères, de 1 à 50 messages de 2 000 caractères au plus (hors mention de coupe)" "$(G "$WORK/red-gros.json" 'j.absent||(()=>{const MENTION=/ … \(tronqué, [0-9 ]+ caractères\)$/;const m=j.r.messages||[];return String(j.r.mandat).replace(MENTION,"").length<=8000&&m.length>=1&&m.length<=50&&m.every((x)=>String(x).replace(MENTION,"").length<=2000)?"ok":"mandat="+String(j.r.mandat).length+" messages="+m.length+" max="+Math.max(0,...m.map((x)=>String(x).length))})()')" "ok"
 
+# T24g — PU-G-170 : les répétitions consécutives de la liste « Outils » sont regroupées ; la liste blanche reste fermée (aucune valeur d'entrée ne sort)
+cat > "$AUX/mk-rep.mjs" <<'JS'
+// mk-rep.mjs <fichier> <racineLab> : mandat, puis Bash x3 (commandes distinctes, secrètes), Read a.js, Bash x1, Read a.js x2, Read b.js
+import fs from 'node:fs';
+const [, , out, lab] = process.argv;
+let k = 0; const side = (o) => JSON.stringify({ cwd: lab, sessionId: 'sess-synthetique', gitBranch: 'main', version: '2.1.317', isSidechain: true, agentId: 'rep1', timestamp: new Date(Date.now() - 600000 + 1000 * k++).toISOString(), ...o });
+const tu = (name, input) => side({ type: 'assistant', message: { role: 'assistant', content: [{ type: 'tool_use', id: 'u' + k, name, input }] } });
+fs.writeFileSync(out, [side({ type: 'user', message: { role: 'user', content: 'MANDAT-REP-170' } }),
+  tu('Bash', { command: 'echo CMD-SECRET-170-A' }), tu('Bash', { command: 'echo CMD-SECRET-170-B' }), tu('Bash', { command: 'echo CMD-SECRET-170-C' }),
+  tu('Read', { file_path: `${lab}/src/a.js` }), tu('Bash', { command: 'echo CMD-SECRET-170-D' }),
+  tu('Read', { file_path: `${lab}/src/a.js` }), tu('Read', { file_path: `${lab}/src/a.js` }), tu('Read', { file_path: `${lab}/src/b.js` })].join('\n') + '\n');
+JS
+node "$AUX/mk-rep.mjs" "$AUX/fx/agent-rep.jsonl" "$LAB0"
+node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/agent-rep.jsonl" "$LAB0" > "$WORK/red-rep.json"
+FMT='(j.r.outils||[]).map((o)=>[o.outil,o.verbe,o.cible,o.n===undefined?"":o.n].join("|")).join(",")'
+assert_eq "T24.17 — PU-G-170 : trois Bash consécutifs ne font qu'une entrée « × 3 », un Bash seul n'a pas de n, deux Read de même cible se regroupent, une autre cible reste à part, l'ordre est gardé" "$(G "$WORK/red-rep.json" "j.absent||($FMT)")" "Bash|lance une commande||3,Read|lit|src/a.js|,Bash|lance une commande||,Read|lit|src/a.js|2,Read|lit|src/b.js|"
+assert_eq "T24.18 — le regroupement ne fait sortir aucune valeur d'entrée (apparié à T24.17 : les 4 commandes sont dans la fixture, aucune dans la sortie)" "$(grep -c 'CMD-SECRET-170' "$AUX/fx/agent-rep.jsonl")|$(G "$WORK/red-rep.json" 'j.absent||JSON.stringify(j.r).includes("CMD-SECRET-170")')" "4|false"
+mkdir -p "$WORK/mut-scripts"; cp "$SCRIPTS/vf-cockpit-transcript.mjs" "$SCRIPTS/vf-cockpit-lecture.mjs" "$WORK/mut-scripts/"
+sed 's#outils: regrouper(#outils: ((x) => x)(#' "$SCRIPTS/vf-cockpit-transcript.mjs" > "$WORK/mut-scripts/vf-cockpit-transcript.mjs"
+cmp -s "$SCRIPTS/vf-cockpit-transcript.mjs" "$WORK/mut-scripts/vf-cockpit-transcript.mjs" && echo "MUTANT VIDE : regrouper"
+node "$AUX/red.mjs" "$WORK/mut-scripts" "$AUX/fx/agent-rep.jsonl" "$LAB0" > "$WORK/red-rep-mut.json"
+assert_eq "T24.19 — mutant (regroupement retiré) : huit entrées au lieu de cinq, détecté" "$(G "$WORK/red-rep-mut.json" 'j.absent||(j.r.outils||[]).length')|$(G "$WORK/red-rep.json" 'j.absent||(j.r.outils||[]).length')" "8|5"
+
 # =====================================================================================================================
 echo "=== T25 — GET /api/vf/transcript : jeton, identifiants, fenêtre, aucune fuite (P69-D-19, P69-D-23 ; CKPT-25) ==="
 LABS="$WORK/labsrv"; mkdir -p "$LABS/src" "$LABS/.planning/phases/01-x"
@@ -395,6 +418,11 @@ VT() { G "$WORK/vm-t.json" "j.erreur||($1)"; }
 assert_eq "T26.1 — transcript() ne crée que des balises div, h4, p, ul, li, pre, span (ni img ni script), et en crée" "$(VT '(()=>{const ok=new Set(["div","h4","p","ul","li","pre","span"]);const t=j.tags;const hors=[...new Set(t.filter((x)=>!ok.has(x)))];return !t.length?"aucune balise créée":hors.length?"hors liste : "+hors.join(","):"ok"})()')" "ok"
 assert_eq "T26.2 — un nœud a pour texte exactement <img src=x onerror=alert(1)>" "$(VT 'j.tags.length?String(j.textes.includes("<img src=x onerror=alert(1)>")):"aucune balise créée"')" "true"
 assert_eq "T26.3 — aucune affectation innerHTML (appariée à la création de balises)" "$(VT 'j.tags.length?String(j.innerHTML):"aucune balise créée"')" "0"
+cat > "$AUX/pilote-transcript-n.js" <<'JS'
+__r = !!window.__vfEquipeRendu.transcript({ mandat: 'm', messages: [], outils: [{ outil: 'Bash', verbe: 'lance une commande', cible: '', n: 14 }, { outil: 'Read', verbe: 'lit', cible: 'src/a.js' }] }, document);
+JS
+node "$AUX/vm-rendu.mjs" "$RENDU" "$AUX/pilote-transcript-n.js" > "$WORK/vm-tn.json"
+assert_eq "T26.5 — PU-G-170 : le transcript dit « lance une commande (Bash) × 14 » pour 14 appels, et rien après un appel seul" "$(G "$WORK/vm-tn.json" 'j.erreur||j.textes.filter((t)=>/\(Bash\)|\(Read\)/.test(t)).join("|")')" "lance une commande (Bash) × 14|lit src/a.js (Read)"
 assert_eq "T26.4 — arbre() avec l'échappement standard : la description piégée sort en &lt;img, jamais en <img" "$(G "$WORK/vm-a.json" 'j.erreur||(String(j.retour).includes("&lt;img")+"|"+!String(j.retour).includes("<img"))')" "true|true"
 CSPV="default-src 'none'; script-src ; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
 rafraichir
@@ -454,17 +482,17 @@ JS
   const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }, M = { kind: 'subagent', id: 'M1', etat: 'actif', role: 'vf-dev-manager', tree: '.', parent: 'S1', task: 'manager', dureeS: 60 };
   const C = { kind: 'subagent', id: 'C1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task: 'coder', dureeS: 30 }, F = { kind: 'subagent', id: 'F1', etat: 'termine', role: 'vf-reviewer', tree: '.', parent: 'M1', task: 'revu', dureeS: 90 };
   if (!await attendre(() => flux() && document.querySelector('#vf-lock'))) return 'badge absent';
-  emettre([S, M, C, F]); await sleep(200);
+  emettre([S, M, C, F]);
   document.querySelector('#vf-lock').click();
   const titre = () => { const h3 = document.querySelector('.vf-whop h3'); return h3 ? h3.textContent + '|' + ((document.querySelector('.vf-whop .aw-count') || {}).textContent || 'effectif absent') : 'tiroir absent'; };
-  const avant = titre();
+  const avant = await attendre(() => /3 actifs/.test(titre()) && titre(), 5000) || titre(); // le tiroir porte l'état émis avant de le mesurer
   const d = document.querySelector('.vf-whop details.vf-termines'); if (d) d.open = true;
-  emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F]); await sleep(300);
+  emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F]);
   const apres = await attendre(() => titre() !== avant && titre(), 3000) || titre();
   const dans = !!document.querySelector('.vf-whop details.vf-termines [data-vf-agent="C1"]');
   const ouvert = !!(document.querySelector('.vf-whop details.vf-termines') || {}).open;
-  emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F, { kind: 'subagent', id: 'N1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task: 'nouveau', dureeS: 1 }]); await sleep(300);
-  const nouveau = !!document.querySelector('.vf-whop [data-vf-agent="N1"]') ;
+  emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F, { kind: 'subagent', id: 'N1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task: 'nouveau', dureeS: 1 }]);
+  const nouveau = !!(await attendre(() => document.querySelector('.vf-whop [data-vf-agent="N1"]'), 5000));
   return [avant, apres, 'C1 replié=' + dans, 'Terminés resté ouvert=' + ouvert, 'N1 visible=' + nouveau].join(' | ');
 })()
 JS
@@ -493,7 +521,8 @@ JS
   const t1 = await attendre(() => long() > 0 && long(), 6000) || long(), c1 = await attendre(() => cmd() > 0 && cmd(), 6000) || cmd();
   for (let i = 0; i < 4; i++) { bouge(); await sleep(250); }
   const t2 = long(), c2 = cmd();
-  VF.select('n:ag-ag1'); await sleep(400);
+  VF.select('n:ag-ag1');
+  await attendre(() => !document.querySelector('.vf-transcript'), 5000); // la disparition est le résultat attendu : on l'attend, plus de délai fixe
   const apres = !document.querySelector('.vf-transcript');
   return ['transcript lu=' + (t1 > 0), 'transcript après 4 who=' + (t2 > 0), 'commande lue=' + (c1 > 0), 'commande après 4 who=' + (c2 > 0), 'disparu avec l\'agent=' + apres].join(' | ');
 })()
@@ -512,11 +541,14 @@ JS
 (async () => { $COMMUN
   const VF = window.VibeFlow; if (!await attendre(() => flux() && VF && VF.state && VF.state.layout && document.querySelector('#vf-lock'))) return 'page absente';
   const base = window.__vfLive.who.workers.filter((w) => w.kind === 'session' || w.kind === 'subagent');
-  emettre([...base, { kind: 'lock', id: 'v1', tree: '.', task: 'verrou' }, { kind: 'dag-node', id: 'd1', tree: '.', task: 'nœud', etat: 'actif' }, { kind: 'registered', id: 'r1', tree: '.', task: 'registre' }]); await sleep(400);
+  emettre([...base, { kind: 'lock', id: 'v1', tree: '.', task: 'verrou' }, { kind: 'dag-node', id: 'd1', tree: '.', task: 'nœud', etat: 'actif' }, { kind: 'registered', id: 'r1', tree: '.', task: 'registre' }]);
+  await attendre(() => window.__vfLive.who.workers.some((w) => w.id === 'v1'), 5000); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); // l'état émis est appliqué et rendu
+  await attendre(() => { const b = ((document.querySelector('#vf-lock .bl') || {}).textContent || '').replace(/\\D/g, ''), st = ((document.querySelector('.vf-stats b') || {}).textContent || '').replace(/\\D/g, ''); return b !== '' && b === st; }, 5000);
   const badge = (document.querySelector('#vf-lock .bl') || {}).textContent || '';
   const stat = (document.querySelector('.vf-stats b') || {}).textContent || '';
   const lib = (document.querySelector('#search-btn .st') || {}).textContent || '';
-  document.querySelector('#search-btn').click(); const si = document.querySelector('#search'); si.value = 'vf-dev-manager'; si.dispatchEvent(new Event('input')); await sleep(300);
+  document.querySelector('#search-btn').click(); const si = document.querySelector('#search'); si.value = 'vf-dev-manager'; si.dispatchEvent(new Event('input'));
+  await attendre(() => document.querySelectorAll('#results .r').length > 0, 5000);
   const trouves = document.querySelectorAll('#results .r').length;
   return ['badge=' + badge.replace(/\\D/g, ''), 'actifs=' + stat, 'titre=' + document.title, 'libelle=' + lib, 'trouves=' + (trouves > 0)].join(' | ');
 })()
@@ -556,7 +588,7 @@ import fs from 'node:fs';
 const [, , out, lab, mode] = process.argv; const motif = 'tokensecret'.repeat(355).slice(0, 3900);
 const L = [JSON.stringify({ type: 'user', isSidechain: true, agentId: 'f4', message: { role: 'user', content: 'MANDAT-VISIBLE-69' } })]; let n = 0;
 while (n < 8.5 * 1048576) {
-  const c = mode === 'outils' ? [{ type: 'tool_use', id: 'u', name: 'Read', input: { file_path: `${lab}/src/a.js` } }] : [{ type: 'text', text: motif }];
+  const c = mode === 'outils' ? [{ type: 'tool_use', id: 'u', name: 'Read', input: { file_path: `${lab}/src/a${L.length}.js` } }] : [{ type: 'text', text: motif }]; // une cible distincte par appel : des appels identiques consécutifs sont regroupés (PU-G-170), ils ne feraient plus 200 outils
   const l = JSON.stringify({ type: 'assistant', isSidechain: true, agentId: 'f4', message: { role: 'assistant', content: c } }); L.push(l); n += l.length + 1;
 }
 fs.writeFileSync(out, L.join('\n') + '\n');

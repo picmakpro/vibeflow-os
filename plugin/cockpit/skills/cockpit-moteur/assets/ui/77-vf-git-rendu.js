@@ -21,6 +21,29 @@
   const ico = (d) => { const s = sv('svg', { class: 'i', viewBox: '0 0 24 24', 'aria-hidden': 'true' }); sv('path', { d }, s); return s; };
   const pl = (n, mot, plur) => `${n} ${n > 1 ? plur || mot + 's' : mot}`;
   const avance = (a) => a == null ? el('span', 'meta', '—', { role: 'img', 'aria-label': 'avance inconnue', title: 'avance inconnue' }) : el('span', 'meta', pl(a, 'commit')); // null = inconnu (dépôt sans base, au-delà de la limite) : jamais « 0 commit »
+  // PU-G-193 et 196 (recette du 2026-11-08, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « Les partiels qui te concernaient ») : la définition d'un terme Git ne passait que par `title`, visible au survol de la souris
+  // seulement. aideFocus la montre aussi au FOCUS clavier, dans une bulle visuelle unique (texte posé en textContent, jamais du HTML ; aria-hidden : le lecteur d'écran lit déjà la même phrase par aria-description ou aria-label).
+  // Échap la ferme sans fermer le tiroir ; elle se ferme aussi au départ du focus et suit l'élément quand il défile.
+  let bulle = null, ancre = null, clavier = false; // clavier : la dernière entrée était une touche (un focus posé par script ne vaut :focus-visible qu'après une touche ou sur un élément déjà visible au clavier) ; un clic de souris la remet à faux
+  document.addEventListener('keydown', () => { clavier = true; }, true); document.addEventListener('pointerdown', () => { clavier = false; }, true);
+  const cacher = () => { if (bulle) bulle.hidden = true; ancre = null; };
+  const placer = () => {
+    if (!bulle || bulle.hidden || !ancre) return;
+    const r = ancre.getBoundingClientRect(), b = bulle.getBoundingClientRect(), bas = r.bottom + 6 + b.height <= window.innerHeight - 8;
+    bulle.style.top = Math.max(8, bas ? r.bottom + 6 : r.top - 6 - b.height) + 'px';
+    bulle.style.left = Math.max(8, Math.min(r.left, window.innerWidth - b.width - 8)) + 'px';
+  };
+  const montrer = (e, texte) => {
+    if (!bulle) { bulle = el('div', 'vf-git-bulle glass', null, { role: 'tooltip', 'aria-hidden': 'true' }); bulle.hidden = true; document.body.appendChild(bulle); window.addEventListener('scroll', placer, true); } // le focus fait défiler l'élément dans sa fenêtre : la bulle le suit (elle ne se ferme pas au défilement, sinon le focus clavier d'un élément hors champ ne la montrerait jamais)
+    bulle.textContent = texte; bulle.hidden = false; ancre = e; placer();
+  };
+  const aideFocus = (e, texte) => {
+    e.setAttribute('tabindex', '0');
+    e.addEventListener('focus', () => { if (clavier || e.matches(':focus-visible')) montrer(e, typeof texte === 'function' ? texte() : texte); }); // texte : une chaîne, ou une fonction quand la définition change avec la vue (titre de la vue)
+    e.addEventListener('blur', cacher);
+    e.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && bulle && !bulle.hidden && ancre === e) { ev.stopPropagation(); ev.preventDefault(); cacher(); } });
+    return e;
+  };
   const relatif = (at, maintenant) => {
     const s = Math.max(0, Math.floor(((maintenant == null ? Date.now() : maintenant) - at * 1000) / 1000)), m = Math.floor(s / 60), h = Math.floor(m / 60), j = Math.floor(h / 24);
     if (s < 60) return "à l'instant";
@@ -32,10 +55,11 @@
   const complet = (at) => new Date(at * 1000).toLocaleString('fr-FR', { dateStyle: 'long', timeStyle: 'short' });
 
   // ---------- commande à copier : le texte copié est le textContent du <code> affiché, jamais une copie transformée (T-78-24) ----------
-  const commande = (texte, annonce) => {
+  // `nom` (200) : ce que fait la commande, court (« cd vers bisect-ci ») ; il n'entre que dans l'aria-label, par setAttribute, jamais en HTML ni dans la commande copiée
+  const commande = (texte, annonce, nom) => {
     if (texte == null) return el('div', 'vf-git-sans', 'Aucune commande proposée');
     const ligne = el('div', 'vf-git-cmd'), code = el('code', null, texte, { title: texte }), retour = el('span', 'vf-git-retour');
-    const b = el('button', 'vf-git-btn', null, { type: 'button', 'aria-label': `Copier la commande : ${texte}` });
+    const b = el('button', 'vf-git-btn', null, { type: 'button', 'aria-label': 'Copier la commande' + (nom ? ' ' + nom : '') });
     b.appendChild(ico(COPIE));
     ligne.append(code, retour, b);
     let minuterie = null;
@@ -43,7 +67,7 @@
     const refus = () => { // API presse-papiers refusée : la commande est sélectionnée, la rangée le dit
       const r = document.createRange(); r.selectNodeContents(code);
       const sel = window.getSelection(); sel.removeAllRanges(); sel.addRange(r);
-      dire('Copie impossible, commande sélectionnée');
+      dire('Copie impossible, commande sélectionnée'); if (annonce) annonce('Copie impossible, commande sélectionnée');
     };
     b.addEventListener('click', () => {
       try { navigator.clipboard.writeText(code.textContent).then(() => { dire('Copiée', true); if (annonce) annonce('Commande copiée'); }, refus); } catch (e) { refus(); }
@@ -107,34 +131,38 @@
   };
 
   // ---------- sections repliables et listes ----------
-  const section = (titre, n, corps, ouvert, id) => {
+  const section = (titre, n, corps, ouvert, id, aide) => { // aide : définition en texte constant (title au survol, aria-description au focus), jamais une donnée lue de git
     const s = el('section', 'vf-git-sec'), b = el('button', 'vf-git-sec-t', null, { type: 'button', 'aria-expanded': String(!!ouvert), 'aria-controls': id });
+    if (aide) { b.setAttribute('title', aide); b.setAttribute('aria-description', aide); aideFocus(b, aide); }
     b.append(el('span', 'vf-git-sec-n', titre));
     if (n != null) b.appendChild(el('span', 'meta', n));
     b.appendChild(ico('M9 6l6 6-6 6'));
     const c = el('div', 'vf-git-sec-c', null, { id, role: 'region', 'aria-label': titre });
     c.hidden = !ouvert; c.appendChild(corps);
-    b.addEventListener('click', () => { const o = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(o)); c.hidden = !o; });
+    b.addEventListener('click', () => { const o = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(o)); c.hidden = !o; if (o) s.scrollIntoView({ block: 'nearest' }); }); // à l'ouverture, la section se rend visible (197) : rien ne bouge si elle l'est déjà
     s.append(b, c);
     return s;
   };
   const liste = (lignes) => { const d = el('div', 'vf-git-liste'); d.append(...lignes); return d; };
   const ligne = (...enfants) => { const d = el('div', 'vf-git-ligne-d'); d.append(...enfants); return d; };
   const mono = (t, cls) => el('span', 'vf-git-mono' + (cls ? ' ' + cls : ''), t, { title: t });
+  const AIDE_DETACHE = "HEAD détaché : ce dossier n'est sur aucune branche, il est posé sur un commit précis.";
   const sectionWorktrees = (l, annonce) => {
     if (!l || !l.length) return null;
     return section('Worktrees', l.length, liste(l.map((w) => {
       const d = el('div', 'vf-git-wt-l'), t = ligne(mono(w.nom, 'vf-git-gras'));
       if (w.ici) t.appendChild(el('span', 'vf-git-ici', 'ici'));
-      d.append(t, ligne(mono(w.detache ? 'HEAD détaché' : w.branche || '—')));
-      if (!w.ici) d.appendChild(commande(w.commande, annonce));
+      const br = mono(w.detache ? 'HEAD détaché' : w.branche || '—');
+      if (w.detache) { br.setAttribute('title', AIDE_DETACHE); br.setAttribute('aria-description', AIDE_DETACHE); aideFocus(br, AIDE_DETACHE); } // PU-G-193 : le terme reste, sa définition au survol ET au focus
+      d.append(t, ligne(br));
+      if (!w.ici) d.appendChild(commande(w.commande, annonce, 'cd vers ' + w.nom));
       return d;
-    })), true, 'vf-git-s-wt');
+    })), true, 'vf-git-s-wt', "Worktrees : copies de travail du dépôt, chacune dans son propre dossier et sur sa propre branche. " + AIDE_DETACHE);
   };
   const sectionTags = (l) => !l || !l.length ? null : section('Tags', l.length, liste(l.map((t) => ligne(mono(t.nom, 'vf-git-gras'), mono(t.h7), el('span', null, relatif(t.at))))), false, 'vf-git-s-tags');
   const sectionStash = (l, annonce) => {
     if (!l || !l.length) return null;
-    return section('Stash', l.length, liste(l.map((s) => { const d = el('div', 'vf-git-st'); d.append(ligne(mono(s.ref, 'vf-git-gras vf-git-entier'), el('span', 'vf-git-msg', s.message), mono(s.branche || ''), el('span', null, relatif(s.at))), commande(s.commande, annonce)); return d; })), false, 'vf-git-s-stash');
+    return section('Stash', l.length, liste(l.map((s) => { const d = el('div', 'vf-git-st'); d.append(ligne(mono(s.ref, 'vf-git-gras vf-git-entier'), el('span', 'vf-git-msg', s.message), mono(s.branche || ''), el('span', null, relatif(s.at))), commande(s.commande, annonce, 'pour voir le stash ' + s.ref)); return d; })), false, 'vf-git-s-stash');
   };
   const sectionAuteurs = (auteurs, parBranche) => {
     if (!auteurs || !auteurs.length) return null;
@@ -154,7 +182,7 @@
     if (!l || !l.length) return d;
     const b = el('button', 'vf-git-merg-b', pl(l.length, 'branche mergée', 'branches mergées'), { type: 'button', 'aria-expanded': 'false' }), c = el('div', 'vf-git-liste');
     c.hidden = true;
-    for (const m of l) { const w = el('div', 'vf-git-wt-l'); w.append(ligne(mono(m.nom)), commande(m.commande, annonce)); c.appendChild(w); }
+    for (const m of l) { const w = el('div', 'vf-git-wt-l'); w.append(ligne(mono(m.nom)), commande(m.commande, annonce, 'de suppression de la branche ' + m.nom)); c.appendChild(w); }
     b.addEventListener('click', () => { const o = b.getAttribute('aria-expanded') !== 'true'; b.setAttribute('aria-expanded', String(o)); c.hidden = !o; });
     d.append(b, c);
     return d;
@@ -162,12 +190,13 @@
 
   // ---------- états : chargement, vide, indisponible ----------
   const etatChargement = () => { const d = el('div', 'vf-git-etat'); d.append(el('div', 'vf-git-fantome'), el('div', 'vf-git-fantome'), el('div', 'vf-git-fantome'), el('p', 'vf-git-note', 'Lecture du dépôt')); return d; };
-  const etatVide = (cmd, annonce) => { const d = el('div', 'vf-git-etat'); d.append(el('h3', 'vf-git-titre', 'Aucun commit pour l\'instant'), el('p', 'vf-git-note', 'Le dépôt existe mais son historique est vide.'), commande(cmd, annonce)); return d; };
-  const etatIndisponible = (cmd, reessayer, annonce) => {
+  const etatVide = (cmd, annonce) => { const d = el('div', 'vf-git-etat'); d.append(el('h3', 'vf-git-titre', 'Aucun commit pour l\'instant'), el('p', 'vf-git-note', 'Le dépôt existe mais son historique est vide.'), commande(cmd, annonce, 'du premier commit')); return d; };
+  const etatIndisponible = (cmd, reessayer, annonce, delai) => { // delai : git a répondu « indisponible » (muet ou trop lent) ; sinon aucune réponse exploitable
+    const raison = delai ? 'Git a mis trop de temps à répondre (machine chargée ?). Réessayer.' : "La lecture du dépôt n'a pas abouti. Réessayer.";
     const d = el('div', 'vf-git-etat vf-git-carte'), b = el('button', 'btn soft', 'Réessayer', { type: 'button' });
     b.addEventListener('click', () => { if (reessayer) reessayer(); });
-    d.append(el('h3', 'vf-git-titre', 'Git est indisponible'), el('p', 'vf-git-note', 'La lecture du dépôt a échoué ou dépassé le délai.'), b, commande(cmd, annonce));
+    d.append(el('h3', 'vf-git-titre', 'Git est indisponible'), el('p', 'vf-git-note', raison), b, commande(cmd, annonce, 'de diagnostic'));
     return d;
   };
-  window.VFGitRendu = Object.freeze({ graphe, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande, etatChargement, etatVide, etatIndisponible, relatif, section, ico, el });
+  window.VFGitRendu = Object.freeze({ graphe, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande, etatChargement, etatVide, etatIndisponible, relatif, section, ico, el, aideFocus });
 })();

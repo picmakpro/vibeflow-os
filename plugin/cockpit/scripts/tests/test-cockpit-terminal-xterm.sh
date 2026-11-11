@@ -102,7 +102,7 @@ function png(buf) {
 // trous le long d'un trait : un pixel du trait sans encre (luminance > 60 dans ±2 densités autour de l'axe) est un trou
 const PHASES = [0, 0.25, 0.5, 0.75];
 const trous = (arr) => arr.reduce((n, v) => n + (v ? 0 : 1), 0);
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
 const { P, Q, amorce, plein, hostile, sortieHex, recepteurHex, avecRecepteur, densite, dossier, journal, recepteurPy } = JSON.parse(brut);
 const OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_XTERM_MS) || 20000;
@@ -122,6 +122,8 @@ const ESPION = `(() => { const E = window.__esp = { clip: 0, exec: 0, confirm: 0
 // Le contexte du cadre est retrouvé par sondage des identifiants (le socle n'expose pas les évènements) : le plus récent à porter window.vfTermVue.
 const OP = `http://127.0.0.1:${P}`, SBX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
 let ctx = 0, theme = 'dark';
+// amorçage (Chrome à froid : premier chargement de P, du cadre de Q, premier terminal) : borné par AMORCE (échéance globale), jamais par MS ; les attentes suivantes restent à MS
+let froid = true; const msA = () => (froid && !process.env.VF_XTERM_MS ? Math.max(MS, AMORCE) : MS); // VF_XTERM_MS posé (mutant M-CTRLC) : échéance courte voulue, comme dans les autres suites
 const monde = async (sp, etendue = 600) => {
   let trouve = 0;
   for (let id = 1; id < etendue; id++) {
@@ -139,6 +141,8 @@ const RALENTI = `(() => { if (location.origin !== ${JSON.stringify(OQ)}) return;
   Object.defineProperty(window, 'Terminal', { configurable: true, get() { return T; }, set(v) { T = class extends v {
     write(d, cb) {
       if (E.libere) return super.write(d, cb);
+      // télémétrie seule : clôtures du client (write('') posées par son minuteur de silence, 150 ms) VUES avant la libération ; elles sont retenues comme toute écriture, puis rejouées dans l'ordre
+      if (d === '') E.vides = (E.vides || 0) + 1;
       E.file.push([d, cb]); E.retenus++;
       if (!E.armee && typeof d !== 'string') { const t = E.queue + new TextDecoder('latin1').decode(d); E.queue = t.slice(-16);
         if (t.includes('GROS-PRET')) { E.armee = true;
@@ -157,13 +161,13 @@ await executer(chrome, async (sp) => {
   };
   const ouvrirCadre = async () => {
     ctx = 0;
-    await sp.naviguer(`${OP}/project.html`); await sp.attendre(`document.readyState === 'complete'`, 'page P', MS);
+    await sp.naviguer(`${OP}/project.html`); await sp.attendre(`document.readyState === 'complete'`, 'page P', msA());
     await sp.ev(`(() => { document.querySelectorAll('iframe[data-t]').forEach((f) => f.remove()); const f = document.createElement('iframe'); f.dataset.t = '1'; f.setAttribute('sandbox', ${JSON.stringify(SBX)});
       f.style.cssText = 'position:fixed;left:0;top:0;width:100vw;height:100vh;border:0;z-index:99999'; f.src = '${OQ}/?theme=${theme}'; document.body.appendChild(f); })()`);
-    const fin = Date.now() + MS;
+    const fin = Date.now() + msA();
     let essais = 0;
     while (!ctx) { ctx = await monde(sp, 600 * 5 ** Math.min(essais++, 3)); if (!ctx) { if (Date.now() > fin) throw new Error('contexte du cadre de Q introuvable'); await pause(150); } }
-    await attCadre(`!!document.querySelector('.xterm-helper-textarea') || !!document.querySelector('#etat:not([hidden])')`, 'terminal ou carte dans le cadre');
+    await attCadre(`!!document.querySelector('.xterm-helper-textarea') || !!document.querySelector('#etat:not([hidden])')`, 'terminal ou carte dans le cadre', msA());
     await sp.ev(`document.querySelector('iframe[data-t]').focus()`); await evCadre(`(document.querySelector('.xterm-helper-textarea') || document.body).focus()`);
   };
   const s = { send: sp.send, ev: evCadre, attendre: attCadre, naviguer: ouvrirCadre };
@@ -183,9 +187,10 @@ await executer(chrome, async (sp) => {
     // SAF-1 : l'amorçage passe par la page Projet, qui monte le cadre de Q ; l'échange se fait dans le cadre (prêt = message ready de Q, après son rechargement sans fragment)
     await sp.send('Page.addScriptToEvaluateOnNewDocument', { source: `if (window.top === window) { window.__prets = []; addEventListener('message', (e) => { if (typeof e.data === 'string') window.__prets.push(e.data); }); }` });
     await sp.naviguer(`http://127.0.0.1:${P}/project.html#t=${amorce}`);
-    await sp.attendre(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)', MS);
+    await sp.attendre(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)', msA());
   });
-  await essai('invite', async () => { await s.naviguer(); await att(`${TXT}.includes('VFP>')`, 'invite du shell'); r.invite = true; });
+  await essai('invite', async () => { await s.naviguer(); await attCadre(`${TXT}.includes('VFP>')`, 'invite du shell', msA()); r.invite = true; });
+  froid = false; // le terminal a répondu une fois (ou l'amorçage a échoué nommé) : tout ce qui suit est une attente ordinaire
   if (!r.invite) return r;
 
   if (mode === 'collage') { // F2 (P71-D-26) : un texte à retour à la ligne ou à caractère de contrôle n'atteint le shell qu'après « Coller »
@@ -195,55 +200,59 @@ await executer(chrome, async (sp) => {
       ta.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true })); return true; })()`);
     const bouton = (nom) => s.ev(`[...document.querySelectorAll('#collage button')].find((b) => b.textContent === ${JSON.stringify(nom)}).click()`);
     const existe = async (n) => (await import('node:fs')).existsSync(M(n));
+    // on mesure une fois posé : l'attente est POSITIVE (bandeau, octet reçu, marqueur créé) ; les durées fixes qui suivent ne servent qu'à prouver une absence
+    const attBandeau = () => attendreValeur(bandeau, (v) => v === true);
+    const attEnt = (sous) => attendreValeur(ent, (v) => typeof v === 'string' && v.includes(sous));
+    const attExiste = (n) => attendreValeur(() => existe(n), (v) => v === true);
     await s.ev(`(() => { window.__ent = []; const f0 = window.fetch; window.fetch = function (u, o) { if (String(u) === '/entree' && o && o.body) window.__ent.push(new TextDecoder().decode(o.body)); return f0.apply(this, arguments); }; })()`);
     // une ligne collée sans Entrée reste dans la ligne de commande du shell : Ctrl+U la vide avant chaque cas qui crée un marqueur
-    const vide = async () => { await touche({ key: 'u', code: 'KeyU', windowsVirtualKeyCode: 85, modifiers: 2 }); await pause(300); await s.ev(`window.__ent.length = 0`); };
+    const vide = async () => { await touche({ key: 'u', code: 'KeyU', windowsVirtualKeyCode: 85, modifiers: 2 }); await attEnt('\u0015'); await s.ev(`window.__ent.length = 0`); };
     r.c = {};
-    await essai('une-ligne', async () => { await coller('echo UNE""LIGNE'); await pause(400); r.c.une = { bandeau: await bandeau(), entre: (await ent()).includes('echo UNE""LIGNE') }; });
+    await essai('une-ligne', async () => { await coller('echo UNE""LIGNE'); await attEnt('echo UNE""LIGNE'); r.c.une = { bandeau: await bandeau(), entre: (await ent()).includes('echo UNE""LIGNE') }; });
     await essai('multi', async () => {
-      await vide(); await coller(`touch ${M('m1')}\n`); await pause(1200);
+      await vide(); await coller(`touch ${M('m1')}\n`); await attBandeau(); await pause(1200);
       r.c.multi = { bandeau: await bandeau(), entre: await ent(), marqueur: await existe('m1'), focus: await s.ev(`document.activeElement.textContent`),
         cibles: await s.ev(`[...document.querySelectorAll('#collage button')].map((b) => Math.round(b.getBoundingClientRect().height)).join(',')`) };
     });
     await essai('annuler', async () => { await bouton('Annuler'); await pause(1200); r.c.annuler = { bandeau: await bandeau(), entre: await ent(), marqueur: await existe('m1') }; });
     await essai('echap', async () => {
-      await coller(`touch ${M('m2')}\n`); await pause(300); const avant = await bandeau();
+      await coller(`touch ${M('m2')}\n`); await attBandeau(); const avant = await bandeau();
       await touche({ key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27 }); await pause(1200);
       r.c.echap = { avant, bandeau: await bandeau(), entre: await ent(), marqueur: await existe('m2') };
     });
     await essai('remplace', async () => {
-      await vide(); await coller(`touch ${M('rA')}\n`); await coller(`touch ${M('rB')}\n`); await pause(300); const n = await nb();
-      await bouton('Coller'); await pause(2000);
+      await vide(); await coller(`touch ${M('rA')}\n`); await coller(`touch ${M('rB')}\n`); await attendreValeur(nb, (v) => v === 1); const n = await nb();
+      await bouton('Coller'); await attExiste('rB'); await pause(2000);
       r.c.remplace = { bandeaux: n, A: await existe('rA'), B: await existe('rB') };
     });
     await essai('ligne-abandonne', async () => {
-      await coller(`touch ${M('l1')}\n`); await pause(200); await coller('echo SUITE""OK'); await pause(500);
+      await coller(`touch ${M('l1')}\n`); await attBandeau(); await coller('echo SUITE""OK'); await attEnt('echo SUITE""OK'); await pause(600); // attente positive faite : la fenêtre fixe prouve que l'ancien texte (touch l1) n'est PAS envoyé
       r.c.abandonne = { bandeau: await bandeau(), entre: (await ent()).includes('echo SUITE""OK'), marqueur: await existe('l1') };
     });
-    await essai('controle', async () => { await vide(); await coller('echo \u001b[31mx'); await pause(300); r.c.controle = { bandeau: await bandeau(), texte: await s.ev(`(document.querySelector('#collage .vf-q-texte') || {}).textContent`) }; await bouton('Annuler'); });
+    await essai('controle', async () => { await vide(); await coller('echo \u001b[31mx'); await attBandeau(); r.c.controle = { bandeau: await bandeau(), texte: await s.ev(`(document.querySelector('#collage .vf-q-texte') || {}).textContent`) }; await bouton('Annuler'); });
     await essai('html', async () => {
-      await coller('<img src=x onerror=window.__pwn=1>\n'); await pause(500);
+      await coller('<img src=x onerror=window.__pwn=1>\n'); await attBandeau(); await pause(500);
       r.c.html = { img: await s.ev(`document.querySelectorAll('#collage img, #collage script').length`), pwn: await s.ev(`window.__pwn === undefined`), litteral: await s.ev(`document.getElementById('collage').textContent.includes('<img src=x')` ), enfants: await s.ev(`document.getElementById('collage-apercu').children.length`) };
       await bouton('Annuler');
     });
     await essai('c12', async () => { // charge au-delà du 275e caractère : visible dans le DOM du bandeau AVANT le clic, rien d'exécuté avant le clic
-      const charge = `touch ${M('c12')}`; await coller('a'.repeat(275) + '; ' + charge + '\n'); await pause(400);
+      const charge = `touch ${M('c12')}`; await coller('a'.repeat(275) + '; ' + charge + '\n'); await attBandeau(); await pause(400);
       r.c.c12 = { visible: await s.ev(`document.getElementById('collage-apercu').textContent.includes(${JSON.stringify(charge)})`), marqueur: await existe('c12'),
         zone: await s.ev(`(() => { const z = document.getElementById('collage-apercu'); return z.tabIndex === 0 && getComputedStyle(z).overflowY === 'auto'; })()`) };
       await bouton('Annuler');
     });
-    await essai('compte', async () => { await coller('ab\ncd\nef'); await pause(300); r.c.compte = await s.ev(`document.querySelector('#collage .vf-q-decompte').textContent`); await bouton('Annuler'); });
+    await essai('compte', async () => { await coller('ab\ncd\nef'); await attBandeau(); r.c.compte = await s.ev(`document.querySelector('#collage .vf-q-decompte').textContent`); await bouton('Annuler'); });
     await essai('invisibles', async () => { // U+202E et U+200B rendus visibles à l'affichage ; le texte envoyé reste octet pour octet l'original (sha256)
-      await vide(); await s.ev(`window.__ent.length = 0`); const orig = 'echo a\u202eb\u200bc\n'; await coller(orig); await pause(300);
+      await vide(); await s.ev(`window.__ent.length = 0`); const orig = 'echo a\u202eb\u200bc\n'; await coller(orig); await attBandeau();
       const aff = await s.ev(`document.getElementById('collage-apercu').textContent`);
-      await bouton('Coller'); await pause(800); const h = async (x) => (await import('node:crypto')).createHash('sha256').update(x, 'utf8').digest('hex');
+      await bouton('Coller'); await attendreEtStabiliser(ent, (v) => typeof v === 'string' && v.length > 0); const h = async (x) => (await import('node:crypto')).createHash('sha256').update(x, 'utf8').digest('hex');
       r.c.invis = { u202e: aff.includes('\u27e8U+202E\u27e9'), u200b: aff.includes('\u27e8U+200B\u27e9'), brut: !aff.includes('\u202e') && !aff.includes('\u200b'),
         sha: (await h(await ent())) === (await h(orig.replace(/\n/g, '\r'))) };
     });
     await essai('long', async () => { // borne d'affichage dite, et levée par « Tout afficher »
-      await coller('z'.repeat(30000) + '\n'); await pause(600);
+      await coller('z'.repeat(30000) + '\n'); await attBandeau();
       const note = await s.ev(`(document.querySelector('#collage .vf-q-reste .vf-q-texte') || {}).textContent`); const avant = await s.ev(`document.getElementById('collage-apercu').textContent.length`);
-      await bouton('Tout afficher'); const apres = await s.ev(`document.getElementById('collage-apercu').textContent.length`);
+      await bouton('Tout afficher'); const apres = await attendreValeur(() => s.ev(`document.getElementById('collage-apercu').textContent.length`), (v) => v >= 30000);
       r.c.long = { note, avant, apres, reste: await s.ev(`!!document.querySelector('#collage .vf-q-reste')`) }; await bouton('Annuler');
     });
     // N9 (P71-D-30) : UNE ligne portant un invisible ou un caractère de contrôle d'affichage demande confirmation ; « Coller » reste le seul chemin vers le shell
@@ -251,36 +260,37 @@ await executer(chrome, async (sp) => {
     r.c.n9 = {};
     for (const [nom, car] of [['bidi', '\u202e'], ['zwsp', '\u200b'], ['tag', '\u{E0041}']]) {
       await essai(`n9-${nom}`, async () => {
-        await vide(); const orig = `echo hello${car}; touch ${M('n9' + nom)}; `; await coller(orig); await pause(600);
+        await vide(); const orig = `echo hello${car}; touch ${M('n9' + nom)}; `; await coller(orig); await attBandeau(); await pause(600);
         const sans = { bandeau: await bandeau(), marqueur: await existe('n9' + nom), entre: (await ent()) };
-        await bouton('Coller'); await pause(600); await entree(); await pause(1500);
+        await bouton('Coller'); await attEnt('hello'); await entree(); await attExiste('n9' + nom);
         r.c.n9[nom] = { ...sans, apres: await existe('n9' + nom) };
       });
     }
-    await essai('n9-ordinaire', async () => { await vide(); await coller('echo café àî""OK'); await pause(500); r.c.n9.ordinaire = { bandeau: await bandeau(), entre: (await ent()).includes('café') }; });
+    await essai('n9-ordinaire', async () => { await vide(); await coller('echo café àî""OK'); await attEnt('café'); r.c.n9.ordinaire = { bandeau: await bandeau(), entre: (await ent()).includes('café') }; });
     // N10 (P71-D-30) : ce qui est confirmé est visible sans défilement ; les suites de lignes vides sont repliées ; le dépassement est dit ; l'envoi reste l'original (sha256)
     await essai('n10', async () => {
-      await vide(); const orig = '\n'.repeat(60) + `touch ${M('n10')}\n`; await coller(orig); await pause(600);
-      const mesure = await s.ev(`(() => { const z = document.getElementById('collage-apercu'); return { txt: z.textContent, debord: z.scrollHeight > z.clientHeight + 1, avert: !!document.querySelector('#collage .vf-q-depasse'), focus: document.activeElement.textContent }; })()`);
-      const sans = await existe('n10'); await bouton('Coller'); await pause(2500); const h = async (x) => (await import('node:crypto')).createHash('sha256').update(x, 'utf8').digest('hex');
+      await vide(); const orig = '\n'.repeat(60) + `touch ${M('n10')}\n`; await coller(orig); await attBandeau();
+      const mesure = await stabiliser(() => s.ev(`(() => { const z = document.getElementById('collage-apercu'); return { txt: z.textContent, debord: z.scrollHeight > z.clientHeight + 1, avert: !!document.querySelector('#collage .vf-q-depasse'), focus: document.activeElement.textContent }; })()`));
+      await pause(600); // fenêtre d'absence après le bandeau : rien ne doit avoir tourné avant « Coller »
+      const sans = await existe('n10'); await bouton('Coller'); await attExiste('n10'); const h = async (x) => (await import('node:crypto')).createHash('sha256').update(x, 'utf8').digest('hex');
       r.c.n10 = { replie: mesure.txt.includes('⟨' + 60 + ' lignes vides⟩'), charge: mesure.txt.includes(`touch ${M('n10')}`), debord: mesure.debord, avert: mesure.avert, focus: mesure.focus, longueur: mesure.txt.length,
         sans, apres: await existe('n10'), sha: (await h(await ent())) === (await h(orig.replace(/\n/g, '\r'))) };
     });
     await essai('n10-depasse', async () => {
-      await vide(); await coller('ligne\n'.repeat(200)); await pause(600);
-      r.c.n10d = await s.ev(`(() => { const z = document.getElementById('collage-apercu'); const w = document.querySelector('#collage .vf-q-depasse'); return { debord: z.scrollHeight > z.clientHeight + 1, texte: w ? w.textContent : '', focus: document.activeElement.textContent }; })()`);
+      await vide(); await coller('ligne\n'.repeat(200)); await attBandeau();
+      r.c.n10d = await stabiliser(() => s.ev(`(() => { const z = document.getElementById('collage-apercu'); const w = document.querySelector('#collage .vf-q-depasse'); return { debord: z.scrollHeight > z.clientHeight + 1, texte: w ? w.textContent : '', focus: document.activeElement.textContent }; })()`));
       await bouton('Tout afficher').catch(() => {}); await bouton('Annuler');
     });
     await essai('depot', async () => {
       const lance = (code) => s.ev(`(() => { const ta = document.querySelector('.xterm-helper-textarea'); ${code} })()`);
       r.c.depot = { drop: await lance(`const dt = new DataTransfer(); dt.setData('text/plain', 'touch ${M('d1')}\\n'); return ta.dispatchEvent(new DragEvent('drop', { dataTransfer: dt, bubbles: true, cancelable: true }));`) };
-      await pause(300); r.c.depot.bandeau = await bandeau(); if (r.c.depot.bandeau) await bouton('Annuler');
+      await attBandeau(); r.c.depot.bandeau = await bandeau(); if (r.c.depot.bandeau) await bouton('Annuler');
       r.c.depot.avant = await lance(`return ta.dispatchEvent(new InputEvent('beforeinput', { inputType: 'insertFromDrop', data: 'a\\nb', bubbles: true, cancelable: true }));`);
-      await pause(300); r.c.depot.bandeau2 = await bandeau(); if (r.c.depot.bandeau2) await bouton('Annuler');
+      await attBandeau(); r.c.depot.bandeau2 = await bandeau(); if (r.c.depot.bandeau2) await bouton('Annuler');
       await pause(500); r.c.depot.entre = (await ent()).includes('touch ' + M('d1')) || (await ent()).includes('a\rb') || (await ent()).includes('a\nb'); r.c.depot.marqueur = await existe('d1');
     });
     await essai('coller', async () => {
-      await vide(); await coller(`touch ${M('ok')}\n`); await pause(300); r.c.avantColler = await existe('ok'); await bouton('Coller'); await pause(2500);
+      await vide(); await coller(`touch ${M('ok')}\n`); await attBandeau(); r.c.avantColler = await existe('ok'); await bouton('Coller'); await attExiste('ok');
       r.c.coller = { marqueur: await existe('ok'), bandeau: await bandeau(), entree_ok: (await ent()) === 'touch ' + M('ok') + '\r' };
     });
     return r;
@@ -297,16 +307,17 @@ await executer(chrome, async (sp) => {
       r.boite[d] = { pixels: 0, trous: 0, phases: {}, cellule: 0 };
       // la phase est le décalage vertical sous-pixel de la grille (px CSS) : à densité fractionnaire, les coutures entre lignes en dépendent
       for (const ph of PHASES) {
-        await s.ev(`document.getElementById('terminal').style.top = '${ph}px'`); await pause(300);
-        await taper(BOITE);
+        await s.ev(`document.getElementById('terminal').style.top = '${ph}px'`);
         const GEO = `(() => { const w = document.createTreeWalker(document.querySelector('.xterm-rows'), NodeFilter.SHOW_TEXT); let n, hit = null;
           while ((n = w.nextNode())) { const i = n.data.indexOf('╭──────╮'); if (i >= 0) hit = { n, i }; }
           if (!hit) return null; const rg = document.createRange(); rg.setStart(hit.n, hit.i); rg.setEnd(hit.n, hit.i + 1); const a = rg.getBoundingClientRect();
           rg.setStart(hit.n, hit.i + 7); rg.setEnd(hit.n, hit.i + 8); const b = rg.getBoundingClientRect(); const ligne = hit.n.parentElement.closest('.xterm-rows > div').getBoundingClientRect();
           return { ox: a.left, cw: (b.right - a.left) / 8, oy: ligne.top, ch: ligne.height, dpr: devicePixelRatio }; })()`;
+        await taper('clear'); await att(`!(${GEO})`, 'boîte de la phase précédente effacée'); // sinon l\'attente suivante trouverait l\'ancienne boîte (phases 2 à 4)
+        await taper(BOITE);
         await att(`!!(${GEO})`, "boîte à l'écran");
-        await pause(400); // la grille est posée : la capture suit
-        const g = await s.ev(GEO), shot = await s.send('Page.captureScreenshot', { format: 'png' }), im = png(Buffer.from(shot.data, 'base64')), S = g.dpr;
+        const g = await stabiliser(() => s.ev(GEO)); // la grille est posée (deux lectures identiques) : la capture suit
+        const shot = await s.send('Page.captureScreenshot', { format: 'png' }), im = png(Buffer.from(shot.data, 'base64')), S = g.dpr;
         const encre = (x, y, axe) => { for (let k = -2 * S; k <= 2 * S; k++) { const X = Math.round(axe === 'v' ? x + k : x), Y = Math.round(axe === 'v' ? y : y + k); if (im.lum(X, Y) > 60) return true; } return false; };
         const vert = (col) => { const a = [], x = (g.ox + (col + 0.5) * g.cw) * S; for (let y = Math.ceil((g.oy + 0.5 * g.ch) * S) + 2 * S; y < (g.oy + 3.5 * g.ch) * S - 2 * S; y++) a.push(encre(x, y, 'v')); return a; };
         const hori = (row) => { const a = [], y = (g.oy + (row + 0.5) * g.ch) * S; for (let x = Math.ceil((g.ox + 0.5 * g.cw) * S) + 2 * S; x < (g.ox + 7.5 * g.cw) * S - 2 * S; x++) a.push(encre(x, y, 'h')); return a; };
@@ -322,11 +333,12 @@ await executer(chrome, async (sp) => {
       await taper(`clear; printf '${L('https://ok.test/', 'LIENOK')} ${L('javascript:void(0)', 'LIENJS')} ${L('data:text/html,x', 'LIENDATA')}\\n'`);
       await att(`${TXT}.includes('LIENOK') && ${TXT}.includes('LIENDATA') && !${TXT}.includes('printf')`, "trois liens à l'écran");
       for (const lib of ['LIENOK', 'LIENJS', 'LIENDATA']) {
-        const pt = await s.ev(`(() => { const w = document.createTreeWalker(document.querySelector('.xterm-rows'), NodeFilter.SHOW_TEXT); let n, hit = null;
+        const pt = await stabiliser(() => s.ev(`(() => { const w = document.createTreeWalker(document.querySelector('.xterm-rows'), NodeFilter.SHOW_TEXT); let n, hit = null;
           while ((n = w.nextNode())) { const i = n.data.lastIndexOf(${JSON.stringify(lib)}); if (i >= 0 && n.data.indexOf('printf') < 0) hit = { n, i }; }
-          if (!hit) return null; const rg = document.createRange(); rg.setStart(hit.n, hit.i + 1); rg.setEnd(hit.n, hit.i + 3); const b = rg.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+          if (!hit) return null; const rg = document.createRange(); rg.setStart(hit.n, hit.i + 1); rg.setEnd(hit.n, hit.i + 3); const b = rg.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`));
         if (!pt) throw new Error(`cellule ${lib} absente de la grille`);
-        await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x - 2, y: pt.y }); await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x, y: pt.y }); await pause(150);
+        await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x - 2, y: pt.y }); await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x, y: pt.y });
+        if (lib === 'LIENOK') await attendreValeur(() => s.ev(`!!document.querySelector('.xterm-cursor-pointer')`), (v) => v === true, { max: 3000 }); else await pause(150); // seul le lien https est un lien survolable : les deux autres n'ont aucun état à attendre
         await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: pt.x, y: pt.y, button: 'left', clickCount: 1 });
         await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: pt.x, y: pt.y, button: 'left', clickCount: 1 });
         await pause(300);
@@ -339,12 +351,13 @@ await executer(chrome, async (sp) => {
   if (mode === 'ecran') { // E3 (hauteur utile) et G3 (barre de défilement discrète) : le cadre de Q est redimensionné, la grille et la barre sont mesurées dans la page réelle
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1000, height: 700, deviceScaleFactor: 1, mobile: false });
     const cadre = (w, h) => sp.ev(`document.querySelector('iframe[data-t]').style.cssText = 'position:fixed;left:0;top:0;width:${w}px;height:${h}px;border:0;z-index:99999'`);
+    await s.ev(`(() => { const b = [...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris'); if (b) b.click(); return true; })()`); await attendreValeur(() => s.ev(`!document.getElementById('accueil')`), (v) => v === true, { max: 3000 }); // LB3-S2 : l'accueil, dans la colonne, retire sa hauteur au terminal ; E3 mesure la hauteur utile du terminal SEUL (l'accueil a son témoin : LB.V20)
     r.e3 = {};
     for (const h of [160, 208, 280, 328, 570]) {
       await essai(`e3-${h}`, async () => {
-        await cadre(600, h); await pause(900);
-        r.e3[h] = await s.ev(`(() => { const l = document.querySelectorAll('.xterm-rows > div'), d = l[l.length - 1].getBoundingClientRect(), z = document.querySelector('.xterm-screen').getBoundingClientRect();
-          return { bas: Math.round(d.bottom * 100) / 100, visible: window.innerHeight, lignes: l.length, ecran: Math.round(z.height) }; })()`);
+        await cadre(600, h);
+        r.e3[h] = await attendreEtStabiliser(() => s.ev(`(() => { const l = document.querySelectorAll('.xterm-rows > div'), d = l[l.length - 1].getBoundingClientRect(), z = document.querySelector('.xterm-screen').getBoundingClientRect();
+          return { bas: Math.round(d.bottom * 100) / 100, visible: window.innerHeight, lignes: l.length, ecran: Math.round(z.height) }; })()`), (v) => v && v.visible === h, { pas: 300, max: 6000 });
       });
     }
     const CURSEUR = `(() => { const sl = document.querySelector('.xterm-scrollable-element > .scrollbar.vertical > .slider'); if (!sl) return null;
@@ -360,24 +373,25 @@ await executer(chrome, async (sp) => {
       await att(`${barre} !== 'absente'`, 'barre de défilement dans le DOM');
       r.g3 = { fin0: await s.ev(`${TXT}.includes('300')`) };
       await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 300 }); await pause(500); r.g3.dehors = await s.ev(barre); // pointeur hors du cadre
-      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 300, y: 300 }); await pause(500); r.g3.survol = await s.ev(barre);
-      r.g5 = { sombre: await s.ev(CURSEUR) };
-      await s.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 300, y: 300, deltaX: 0, deltaY: -400 }); await pause(500);
-      r.g3.fin1 = await s.ev(`${TXT}.includes('300')`);
-      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 300 }); await pause(1600); r.g3.apres = await s.ev(barre);
-      await touche({ key: 'PageUp', code: 'PageUp', windowsVirtualKeyCode: 33, modifiers: 8 }); await pause(400); r.g3.clavier = await s.ev(barre);
-      await pause(1800); r.g3.repos = await s.ev(barre);
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 300, y: 300 }); r.g3.survol = await attendreValeur(() => s.ev(barre), (v) => v === '1');
+      r.g5 = { sombre: await attendreEtStabiliser(() => s.ev(CURSEUR), (v) => v !== null && v !== undefined) };
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 300, y: 300, deltaX: 0, deltaY: -400 });
+      r.g3.fin1 = await attendreValeur(() => s.ev(`${TXT}.includes('300')`), (v) => v === false);
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 300 }); await pause(1600); /* durée du retardateur produit conservée : l'état de départ de G3.5 (xterm natif replié) en dépend */ r.g3.apres = await attendreValeur(() => s.ev(barre), (v) => v === '0', { max: 2500 }); // minuteur produit 1 000 ms (vf-cockpit-terminal-client.mjs, montrerBarre) : déjà écoulé après la pause, borne ~2,5x
+      await touche({ key: 'PageUp', code: 'PageUp', windowsVirtualKeyCode: 33, modifiers: 8 }); await pause(400); r.g3.clavier = await s.ev(barre); // échantillon FIXE conservé : la barre native d'xterm se montre aussi au défilement, un sondage jusqu'à « 1 » verrait le mutant (montrerBarre retiré) lui aussi — M-BARRE-CLAVIER perdrait sa discrimination
+      r.g3.repos = await attendreValeur(() => s.ev(barre), (v) => v === '0', { max: 2500 }); // ~1 000 ms de minuteur produit depuis PageUp (déjà 400 ms écoulées), borne ~2,5x : une régression du retardateur reste rouge
     });
     // R2 : tout l'espace du cadre suit le fond du thème (le fond de la zone de défilement de xterm est noir par défaut) — styles calculés et colonne de pixels, dans les deux thèmes
     r.fond = {};
+    await essai('accueil-range', async () => { await s.ev(`(() => { const b = [...document.querySelectorAll('#accueil button')].find((x) => x.textContent === 'Compris'); if (b) b.click(); return true; })()`); await attendreValeur(() => s.ev(`!document.getElementById('accueil')`), (v) => v === true, { max: 3000 }); }); // LB3 (PU-G-140) : la phrase d'accueil de la première ouverture se pose sur le bas du cadre ; R2 mesure le fond du cadre une fois rangée, comme le fait un utilisateur
     const FOND = `(() => { const t = getComputedStyle(document.getElementById('terminal')).backgroundColor, v = getComputedStyle(document.querySelector('.xterm-viewport')).backgroundColor; return { terminal: t, viewport: v }; })()`;
     for (const th of ['dark', 'light']) {
       if (th !== theme) { theme = th; await s.naviguer(); }
       r.fond[th] = {};
       for (const h of [160, 208, 280, 328, 570]) {
         await essai(`fond-${th}-${h}`, async () => {
-          await cadre(600, h); await pause(900);
-          const st = await s.ev(FOND), shot = await s.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 600, height: h, scale: 1 } }), im = png(Buffer.from(shot.data, 'base64'));
+          await cadre(600, h); await attendreEtStabiliser(() => s.ev(`window.innerHeight`), (v) => v === h, { max: 5000 });
+          const st = await stabiliser(() => s.ev(FOND)), shot = await s.send('Page.captureScreenshot', { format: 'png', clip: { x: 0, y: 0, width: 600, height: h, scale: 1 } }), im = png(Buffer.from(shot.data, 'base64'));
           const attendu = th === 'light' ? 255 : 25; let hors = 0, bas = -1;
           for (let y = 0; y < Math.min(h, im.h); y++) { const l = im.lum(560, y); if (Math.abs(l - attendu) > 6) hors++; bas = l; }
           r.fond[th][h] = { ...st, hors, bas: Math.round(bas), attendu: th === 'light' ? 'rgb(255, 255, 255)' : 'rgb(25, 25, 25)' };
@@ -389,8 +403,8 @@ await executer(chrome, async (sp) => {
       await cadre(600, 570); await pause(700);
       await taper('clear; seq 1 300'); await att(`${TXT}.includes('300')`, '300 lignes imprimées (clair)');
       await att(`${barre} !== 'absente'`, 'barre de défilement dans le DOM (clair)');
-      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 300, y: 300 }); await pause(500);
-      r.g5.clair = await s.ev(CURSEUR);
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 300, y: 300 });
+      r.g5.clair = await attendreEtStabiliser(() => s.ev(CURSEUR), (v) => v !== null && v !== undefined);
     });
     return r;
   }
@@ -410,25 +424,35 @@ await executer(chrome, async (sp) => {
       r.rejeu.recharges = 5;
       r.rejeu.avant = (await lire()).slice(n0).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
       const n1 = (await lire()).length;
-      await s.send('Input.insertText', { text: 'q' }); await pause(1200);
+      await s.send('Input.insertText', { text: 'q' });
+      const dep = async () => (await lire()).slice(n1).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
+      await attendreValeur(dep, (t) => t.startsWith('71') && /1b5b3f/.test(t));
       const apres = (await lire()).slice(n1).filter((l) => l.startsWith('I ')).map((l) => l.slice(2));
       r.rejeu.apres = apres.join(''); r.rejeu.frappe = apres.join('').startsWith('71');
       // R1 (réserve) : une frappe pendant un gros rejeu (60000 questions CPR dans le tampon) : xterm fait stopPropagation, l'autorisation « humaine » ne doit pas survivre à l'événement
+      const ng = (await lire()).length;
       await s.send('Input.insertText', { text: 'g' }); await att(`${TXT}.includes('GROS-PRET')`, 'GROS-PRET');
+      // ce qui s'ÉCOULE, pas seulement ce qui apparaît : les 60000 réponses VIVES (ESC[ligne;colonneR) du premier `g` traversent encore tampons Node, tube, assistant PTY et tty quand GROS-PRET est à l'écran. n2 n'est relevé qu'une fois le compte exact atteint (sinon leur fin, « 1R… », serait lue comme une fuite du cadre suivant). L'ancienne pause(1200) de R1.2 les laissait s'écouler sans le dire.
+      const vives = async () => (await lire()).slice(ng).filter((l) => l.startsWith('I ')).map((l) => Buffer.from(l.slice(2), 'hex').toString('latin1')).join('').split('R').length - 1;
+      const nVives = await attendreValeur(vives, (v) => v >= 60000, { pas: 500, max: 60000 });
+      if (!(nVives >= 60000)) throw new Error(`réponses vives du premier gros rejeu : ${nVives} sur 60000 relevées en 60 s`);
       let tai = -1, stab = 0; const fin2 = Date.now() + 30000; while (stab < 12 && Date.now() < fin2) { const t = (await lire()).length; if (t === tai) stab++; else { stab = 0; tai = t; } await pause(100); }
       const n2 = (await lire()).length;
       await s.send('Page.addScriptToEvaluateOnNewDocument', { source: RALENTI });
       theme = 'light'; await s.naviguer();
       await att(`!!(window.__ralenti && window.__ralenti.libere && window.__ralenti.cle && window.__ralenti.traite)`, 'rejeu rendu à xterm, frappe tombée, analyse finie');
       r.rejeu.ralenti = await s.ev(`(() => { const e = window.__ralenti; return 'cle=' + e.cle + ' libere=' + e.libere + ' moment=' + e.moment; })()`);
+      console.error('DIAG R1.3 vides=' + await s.ev(`window.__ralenti.vides || 0`).catch(() => 'illisible')); // télémétrie seule (stderr) : combien de clôtures de silence le ralentisseur a rejetées ; hors du JSON jugé
       tai = -1; stab = 0; const fin3 = Date.now() + 30000; while (stab < 12 && Date.now() < fin3) { const t = (await lire()).length; if (t === tai) stab++; else { stab = 0; tai = t; } await pause(100); }
       const gros = (await lire()).slice(n2).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
       // la sortie du navigateur passe par un tube de 64 Ko que process.exit() tronque : un relevé de fuite (60000 réponses) est borné, jamais recopié en entier
       r.rejeu.gros = gros.length > 400 ? gros.slice(0, 200) + '…' + gros.length / 2 + ' octets' : gros;
+      console.error('DIAG R1.3 reponses-vives=' + nVives + ' journal@n2=' + n2 + ' journal@jugement=' + (await lire()).length); // télémétrie (stderr) : un futur rouge dit s'il restait un écoulement
       // R1.4 : une frappe RÉELLE (CDP, événement de confiance) après le rejeu arrive au shell, seule
       const n3 = (await lire()).length;
       for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: 'k', code: 'KeyK', text: type === 'keyDown' ? 'k' : undefined, windowsVirtualKeyCode: 75 });
-      await pause(1500);
+      await attendreValeur(async () => (await lire()).slice(n3).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join(''), (t) => t.includes('6b'));
+      await pause(1500); // la fenêtre fixe reste : elle prouve qu'aucun octet de plus n'arrive
       r.rejeu.reelle = (await lire()).slice(n3).filter((l) => l.startsWith('I ')).map((l) => l.slice(2)).join('');
       await s.send('Input.insertText', { text: 'x' });
     });
@@ -443,17 +467,20 @@ await executer(chrome, async (sp) => {
       r.taille0 = await s.ev(`(${TXT}.match(/TAILLE (\\d+x\\d+)/) || [])[1] || ''`);
     });
     await essai('winch', async () => { // fenêtre agrandie -> ResizeObserver -> POST /taille -> SIGWINCH -> WINCH dans la grille
+      const LIRE = `(() => { const m = ${TXT}.match(/WINCH (\\d+x\\d+)/g) || []; return { winch: m.length ? m[m.length - 1].slice(6) : '', n: m.length, lignes: document.querySelector('.xterm-rows').childElementCount }; })()`;
+      const avant = await s.ev(LIRE); // état relevé AVANT le geste : seul un WINCH postérieur à l'agrandissement vaut mesure
       await s.send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 1000, deviceScaleFactor: 1, mobile: false });
       const cond = `(() => { const m = ${TXT}.match(/WINCH (\\d+)x(\\d+)/g); if (!m) return false; const d = m[m.length - 1].match(/(\\d+)x(\\d+)/); return Number(d[1]) === document.querySelector('.xterm-rows').childElementCount; })()`;
       await att(cond, 'WINCH <lignes>x<colonnes> aux dimensions de la grille');
-      r.winch = await s.ev(`(() => { const m = ${TXT}.match(/WINCH (\\d+x\\d+)/g); return m[m.length - 1].slice(6); })()`);
-      r.lignes = await s.ev(`document.querySelector('.xterm-rows').childElementCount`);
+      // les deux valeurs se lisent dans le même instant, et seulement une fois posées : l'agrandissement produit parfois deux WINCH (la grille se réajuste après le premier), et une lecture prise entre les deux les désaccordait une fois sur deux en CI Linux (runs 42386847278, 42396920032, 42400570610)
+      const lu = await attendreEtStabiliser(() => s.ev(LIRE), (v) => v && (v.n > avant.n || v.winch !== avant.winch), { pas: 400, max: 10000 });
+      r.winch = lu && lu.winch; r.lignes = lu && lu.lignes;
     });
     await essai('sigint', async () => {
       await touche({ key: 'c', code: 'KeyC', windowsVirtualKeyCode: 67, modifiers: 2 });
       await att(`${TXT}.includes('SIGINT-RECU')`, 'SIGINT-RECU');
       r.sigint = true;
-      r.debutApres = await s.ev(`${TXT}.includes('TEMOIN-PLEIN-ECRAN-DEBUT')`);
+      r.debutApres = await attendreValeur(() => s.ev(`${TXT}.includes('TEMOIN-PLEIN-ECRAN-DEBUT')`), (v) => v === false);
     });
     if (avecRecepteur) await essai('touches', async () => {
       await att(`${TXT}.includes('VFP>')`, 'invite du shell après Ctrl-C');
@@ -484,7 +511,7 @@ await executer(chrome, async (sp) => {
     r.avant = await s.ev(`JSON.parse(JSON.stringify(window.__esp))`);
   });
   await essai('lien', async () => {
-    const pt = await s.ev(`(() => { const sp = [...document.querySelectorAll('.xterm-rows span')].find((x) => x.textContent.indexOf('LIEN') >= 0); if (!sp) return null; const b = sp.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
+    const pt = await stabiliser(() => s.ev(`(() => { const sp = [...document.querySelectorAll('.xterm-rows span')].find((x) => x.textContent.indexOf('LIEN') >= 0); if (!sp) return null; const b = sp.getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`));
     if (!pt) throw new Error('cellule LIEN absente de la grille');
     r.cellule = true;
     await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: pt.x - 3, y: pt.y });
@@ -696,6 +723,10 @@ if mutant depot vf-cockpit-terminal-client.mjs "/addEventListener('drop'/d; /add
   run_collage "$MUT_OUT"
   assert_eq "M-DEPOT — écoutes de dépôt retirées : drop et beforeinput ne sont plus annulés (le navigateur insérerait le texte dans la zone de saisie), T21.9 rouge" "$(rouge "drop_annule=$(rj "$CJ" 'j.c.depot.drop===false') beforeinput_annule=$(rj "$CJ" 'j.c.depot.avant===false')" "drop_annule=true beforeinput_annule=true")" "rouge"
 else sans_effet "M-DEPOT"; fi
+if mutant abandon-envoie vf-cockpit-terminal-client.mjs 's|const abandonner = () => { if (propose !== null) { propose = null;|const abandonner = () => { if (propose !== null) { term.paste(propose); propose = null;|'; then
+  run_collage "$MUT_OUT"
+  assert_eq "M-ABANDON-ENVOIE — abandonner() envoie l'ancien texte au lieu de l'oublier : « touch l1 » part au shell quand une ligne remplace le bandeau, T21.6 rouge (la fenêtre d'absence de 600 ms laisse le marqueur apparaître)" "$(rouge "marqueur=$(rj "$CJ" 'j.c.abandonne.marqueur')" "marqueur=false")" "rouge"
+else sans_effet "M-ABANDON-ENVOIE"; fi
 
 if mutant n9-sans-cf vf-cockpit-terminal-vue.mjs 's|const INVISIBLE = /\[\\p{Cc}\\p{Cf}\\p{Cs}\\u{E0000}-\\u{E007F}\]/u;|const INVISIBLE = /[\\p{Cc}\\p{Cs}]/u;|'; then
   run_collage "$MUT_OUT"

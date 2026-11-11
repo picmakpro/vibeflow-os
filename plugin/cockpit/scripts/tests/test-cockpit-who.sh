@@ -356,8 +356,9 @@ cat > "$AUX/tiroir.js" <<'JS'
   const SC = window.VibeFlow || window.Floorplan, pa = document.getElementById('panel');
   const att = async (f) => { for (let i = 0; i < 100; i++) { const v = f(); if (v) return v; await new Promise((r) => setTimeout(r, 50)); } return null; };
   const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+  const posee = () => att(() => !pa.getAnimations({ subtree: true }).some((a) => a.playState === 'running' && a.effect.getComputedTiming().iterations !== Infinity) && (pa.getBoundingClientRect().width > 0)); // panneau posé : plus de transition finie en cours (les animations infinies, ex. .aw-pulse, ne se posent jamais : filtrées)
   // panneau de référence : un panneau ouvert par SC.showPanel avec le gabarit commun (.sec), mesuré dans le même Chrome
-  SC.showPanel('<div class="sec"><h3>Référence</h3><p>x</p></div>'); await pause(700);
+  SC.showPanel('<div class="sec"><h3>Référence</h3><p>x</p></div>'); await posee();
   const refMarge = Math.round(pa.querySelector('.sec h3').getBoundingClientRect().left - pa.getBoundingClientRect().left);
   document.getElementById('vf-lock').click();
   const w = await att(() => pa.querySelector('.vf-whop'));
@@ -366,7 +367,7 @@ cat > "$AUX/tiroir.js" <<'JS'
   bouton.click();
   const zone = bouton.nextElementSibling;
   await att(() => !zone.hidden && zone.textContent);
-  await pause(700);
+  await posee();
   const tr = pa.getBoundingClientRect(), h3 = w.querySelector('h3'), hr = h3.getBoundingClientRect();
   const m = { vh: innerHeight, vw: innerWidth, refMarge, marge: Math.round(hr.left - tr.left), h3Dedans: hr.left >= tr.left && hr.right <= tr.right && hr.top >= tr.top,
     h3Rogne: h3.scrollWidth > h3.clientWidth + 1, debordeX: pa.scrollWidth > pa.clientWidth + 1, hauteur: Math.round(tr.height), doing: zone.textContent, overflowY: getComputedStyle(pa).overflowY, titre: h3.textContent + '|' + ((pa.querySelector('.aw-count') || {}).textContent || 'effectif absent') };
@@ -511,10 +512,11 @@ assert_eq "W20.1 — F-9 : un DAG à nœuds nuls ne fait pas planter l'émetteur
 Q who "$L20" "$HOME_T" "$NOSCRIPTS" > "$WORK/who20.json" 2>/dev/null
 assert_eq "W20.2 — F-9 : les nœuds valides du même DAG sont encore lus" "$(G "$WORK/who20.json" 'j.workers.filter(w=>w.kind==="dag-node").map(w=>w.id).sort().join(",")' 2>/dev/null)" "n20,z"
 assert_eq "W20.3 — F-6 : chaque ls-files --error-unmatch de who.mjs met -- devant le chemin" "$(grep -c "'ls-files', '--error-unmatch', '--', f" "$SCRIPTS/vf-cockpit-who.mjs")" "1"
-git -C "$L20" status >/dev/null 2>&1; touch -t 202001010000 "$L20/.git/index"; M0="$(stat -f %m "$L20/.git/index" 2>/dev/null || stat -c %Y "$L20/.git/index")"
+# date de modification : GNU/uutils d'abord (`stat -f` y rend l'état du SYSTÈME DE FICHIERS, pas la date) ; sur BSD/macOS `stat -c` échoue et le repli `stat -f %m` prend le relais
+git -C "$L20" status >/dev/null 2>&1; touch -t 202001010000 "$L20/.git/index"; M0="$(stat -c %Y "$L20/.git/index" 2>/dev/null || stat -f %m "$L20/.git/index")"
 printf '\n' >> "$L20/.planning/ROADMAP.md"   # sale : git status voudrait rafraîchir l'index
 HOME="$HOME_T" node "$SCRIPTS/vf-cockpit-signal.mjs" "$L20" > /dev/null 2>&1
-M1="$(stat -f %m "$L20/.git/index" 2>/dev/null || stat -c %Y "$L20/.git/index")"
+M1="$(stat -c %Y "$L20/.git/index" 2>/dev/null || stat -f %m "$L20/.git/index")"
 assert_eq "W20.4 — F-5 : la date de modification de .git/index ne bouge pas après l'émetteur" "$M1" "$M0"
 
 # ---------- W21 — la clause `..` de la grammaire ws, prouvée par le COMPORTEMENT (Phase 70, plan 70-11, UIFN-13) ----------
@@ -576,6 +578,213 @@ node "$AUX/mk-sub-act.mjs" "$SD22/agent-sa.jsonl" "$L22" sa "-"
 M22B="$(mut17 memo vf-cockpit-who.mjs 'm.taille === st.size) return m.arbre;' 'true) return m.arbre;')"
 assert_eq "M-MEMO.0 — l'ancre du mutant existe" "$M22B" "muté"
 assert_eq "M-MEMO — rougit W22.4 : un mémo jamais invalidé par la taille ne voit pas la ligne ajoutée" "$(node "$AUX/w22-grow.mjs" "$WORK/mut17-memo" "$L22" "$H22" "$SD22/agent-sa.jsonl" "$WA")" "cwd|arbre principal#cwd|arbre principal"
+
+echo "=== W23 — titre de carte de session : le custom-title (/rename), jamais l'ai-title (PU-G-162) ==="
+# arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : liste blanche de lecture amendée pour le seul champ customTitle
+cat > "$AUX/w23-titre.mjs" <<'JS'
+import fs from 'node:fs'; import path from 'node:path'; import { execFileSync } from 'node:child_process'; import { pathToFileURL } from 'node:url';
+const [, , S, base] = process.argv;
+const home = path.join(base, 'home'), noscripts = path.join(base, 'noscripts'), proj = path.join(home, '.claude', 'projects', 'slug');
+fs.mkdirSync(noscripts, { recursive: true }); fs.mkdirSync(proj, { recursive: true });
+const mkLab = (nom, branche) => { const d = path.join(base, nom); fs.mkdirSync(d, { recursive: true }); const g = (...a) => execFileSync('git', ['-C', d, ...a], { stdio: 'pipe' });
+  g('init', '-q', '-b', branche); g('-c', 'user.name=t', '-c', 'user.email=t@t', 'commit', '-q', '--allow-empty', '-m', 'i'); return d; };
+const CP = (...c) => String.fromCodePoint(...c), SEC = 'ghp_' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4', BIDI = CP(0x202e), ZW = CP(0x200b), TAG = CP(0xe0041);
+const lab = mkLab('lab', 'ma-branche'), lab2 = mkLab('lab2', 'feat/' + BIDI + 'evil' + ZW + 'x');
+const labR = fs.realpathSync(lab), labR2 = fs.realpathSync(lab2);
+const ligne = (o) => JSON.stringify({ cwd: labR, timestamp: new Date().toISOString(), gitBranch: 'ma-branche', ...o });
+const ua = (id, t, o = {}) => ligne({ type: 'user', sessionId: id, message: { role: 'user', content: t }, ...o });
+const session = (id, extra, filler = 0, o = {}) => {
+  const L = [...extra, ua(id, 'bonjour', o)];
+  for (let i = 0; i < filler; i++) L.push(ligne({ type: 'assistant', sessionId: id, message: { role: 'assistant', content: [{ type: 'text', text: 'x'.repeat(900) }] }, ...o }));
+  if (filler) L.push(ua(id, 'fin', o));
+  fs.writeFileSync(path.join(proj, id + '.jsonl'), L.join('\n') + '\n');
+};
+const ct = (id, t) => JSON.stringify({ type: 'custom-title', customTitle: t, sessionId: id }), at = (id, t) => JSON.stringify({ type: 'ai-title', aiTitle: t, sessionId: id });
+session('s1', [ct('s1', 'Mon chantier carte')]); session('s2', [at('s2', 'TITRE-IA-SECRET-MODELE')]);
+session('s3', [ct('s3', '<img src=x onerror=alert(1)></script>' + String.fromCharCode(0, 7, 0x2028, 0x2029) + '\r\n\t' + CP(0x85) + BIDI + ZW + TAG + ' ' + SEC + ' ' + 'z'.repeat(500))]);
+session('s4', [ct('s4', 'TITRE-TROP-LOIN')], 400); session('s5', []);
+session('s6', [ct('s6', 'x'.repeat(69) + ' ' + SEC)]);                                   // secret à cheval sur la borne de 80
+session('s7', [ct('s7', 'a'.repeat(79) + CP(0x1f600) + 'zzz')]);                          // coupe au milieu d'une paire de substitution
+session('s9', [], 0, { cwd: labR2, gitBranch: 'sans-importance' });                       // branche hostile (bidi, largeur nulle)
+session('s10', [ct('s10', 'Old'), ct('s10', '')]); session('s11', [ct('s11', 'Old'), ct('s11', String.fromCharCode(0))]); session('s12', [ct('s12', 'Old'), ct('s12', 'New')]);
+const imp = (f) => import(pathToFileURL(path.join(S, f)).href);
+const who = (await imp('vf-cockpit-who.mjs')).collectWho(lab, { home, scriptsDir: noscripts, fresh: 600 });
+const who2 = (await imp('vf-cockpit-who.mjs')).collectWho(lab2, { home, scriptsDir: noscripts, fresh: 600 });
+const { buildEquipeGraph } = await imp('vf-cockpit-equipe-carte.mjs');
+const graph = buildEquipeGraph(who, { nom: 'x' }), graph2 = buildEquipeGraph(who2, { nom: 'x' });
+const n = (id, g = graph) => g.nodes.find((x) => x.id === 'se-' + id), w = (id) => who.workers.find((x) => x.id === id);
+const CTRL = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]'), CF = /\p{Cf}/u, json = JSON.stringify({ who, graph }), h = n('s3')?.label || '', hw = w('s3')?.titre;
+// mémo et lecture ratée : directement sur lecture.mjs
+const L = await imp('vf-cockpit-lecture.mjs'), mf = path.join(base, 'memo.jsonl'), uf = path.join(base, 'illisible.jsonl');
+const ecris = (f, t) => fs.writeFileSync(f, JSON.stringify({ type: 'custom-title', customTitle: t }) + '\n');
+const T0 = new Date(Date.now() - 60000), T1 = new Date(Date.now() + 10000), ecrisA = (t, d) => { ecris(mf, t); fs.utimesSync(mf, d, d); };
+ecrisA('AAAAAA', T0); const m1 = L.titreSession(mf); ecrisA('BBBBBBB', T0); const m2 = L.titreSession(mf); ecrisA('CCCCCCC', T1); const m3 = L.titreSession(mf); // m2 : même date, taille différente ; m3 : même taille, date différente
+ecris(uf, 'ZZ'); fs.chmodSync(uf, 0); const u1 = L.titreSession(uf); fs.chmodSync(uf, 0o644); const u2 = L.titreSession(uf);
+const { whoSig } = await imp('vf-cockpit-live.mjs'), deux = JSON.parse(JSON.stringify(who)); deux.workers.find((x) => x.id === 's1').titre = 'Autre nom';
+const iface = JSON.parse(fs.readFileSync(path.join(S, 'vf-cockpit-interface.json'), 'utf8')).schemas['vibeflow/cockpit-who@2'].travailleur;
+const permis = new Set([...iface.requis, ...iface.optionnels]), nonDeclares = [...new Set(who.workers.flatMap((x) => Object.keys(x)).filter((k) => !permis.has(k)))];
+console.log(JSON.stringify({ t1a: n('s1')?.label, t1b: n('s5')?.label, t1c: !!n('s1')?.details.includes('Identifiant : s1'), t2a: n('s2')?.label, t2b: json.includes('TITRE-IA-SECRET-MODELE'),
+  t3a: [h.startsWith('<img src=x'), h.length <= 80, CTRL.test(h), h.includes('A1b2C3d4'), /\[masqué\]/.test(h)], t3b: [typeof hw === 'string' && hw.length <= 80, CTRL.test(hw || ''), String(hw).includes('A1b2C3d4')],
+  t3cf: [CF.test(h), CF.test(hw || '')], t4: [n('s4')?.label, json.includes('TITRE-TROP-LOIN')],
+  t6: [(n('s6')?.label || '').includes('ghp_'), (n('s6')?.label || '').length <= 80, (n('s6')?.label || '').length],
+  t7: [n('s7')?.label.isWellFormed(), String(w('s7')?.titre).isWellFormed(), n('s7')?.label.length],
+  t8: [n('s9', graph2)?.label, n('s9', graph2)?.details.includes('Branche : feat/evilx'), CF.test(JSON.stringify(graph2))],
+  t10: [n('s10')?.label, n('s11')?.label, n('s12')?.label], t11: [m1, m2, m3], t12: [u1, u2], t13: nonDeclares, t14: [whoSig(who) !== whoSig(deux), whoSig(who) === whoSig(JSON.parse(JSON.stringify(who)))] }));
+JS
+w23() { node "$AUX/w23-titre.mjs" "$1" "$2" > "$2.json" 2>"$2.err"; }
+g23() { node "$AUX/get.mjs" "$1.json" "$2"; }
+mkdir -p "$WORK/w23a" && w23 "$SCRIPTS" "$WORK/w23a"
+assert_eq "W23.0 — contrôle positif : la fabrique rend un JSON lisible" "$(g23 "$WORK/w23a" 'typeof j.t1b')" "string"
+assert_eq "W23.1 — custom-title -> titre de la carte ; sans titre -> « Session principale · <branche> »" "$(g23 "$WORK/w23a" '[j.t1a,j.t1b].join("|")')" "Mon chantier carte|Session principale · ma-branche"
+assert_eq "W23.2 — l'identifiant de session passe au détail de la carte" "$(g23 "$WORK/w23a" 'j.t1c')" "true"
+assert_eq "W23.3 — ai-title seul : aucun titre lu, carte « Session principale · <branche> », l'ai-title n'est nulle part dans la sortie" "$(g23 "$WORK/w23a" '[j.t2a,j.t2b].join("|")')" "Session principale · ma-branche|false"
+assert_eq "W23.4 — custom-title hostile (balises, contrôles, U+2028, 500 car., secret) : texte inerte, ≤ 80, sans contrôle, masqué (carte)" "$(g23 "$WORK/w23a" 'j.t3a.join(",")')" "true,true,false,false,true"
+assert_eq "W23.5 — custom-title hostile : le champ titre de la collecte est ≤ 80, sans contrôle, masqué" "$(g23 "$WORK/w23a" 'j.t3b.join(",")')" "true,false,false"
+assert_eq "W23.6 — custom-title hors de la fenêtre de 256 Kio : non lu, pas d'escalade de lecture" "$(g23 "$WORK/w23a" 'j.t4.join("|")')" "Session principale · ma-branche|false"
+assert_eq "W23.7 — la classe entière : U+202E, U+200B et U+E0041 (Cf) ne sortent ni dans le libellé ni dans le titre" "$(g23 "$WORK/w23a" 'j.t3cf.join(",")')" "false,false"
+assert_eq "W23.8 — un secret à cheval sur la borne de 80 est masqué avant la coupe : aucun fragment « ghp_ », ≤ 80, le secret entier est retiré (69 car. restent)" "$(g23 "$WORK/w23a" 'j.t6.join(",")')" "false,true,69"
+assert_eq "W23.9 — une coupe à 80 ne laisse jamais une moitié de paire de substitution (libellé et titre bien formés, 79 unités)" "$(g23 "$WORK/w23a" 'j.t7.join(",")')" "true,true,79"
+assert_eq "W23.10 — la branche du libellé passe par la classe d'affichage : bidi et largeur nulle retirés (libellé, détail, graphe entier)" "$(g23 "$WORK/w23a" 'j.t8.join("|")')" "Session principale · feat/evilx|true|false"
+assert_eq "W23.11 — le titre le plus récent l'emporte, même vide ou blanc (l'utilisateur l'a vidé) : jamais l'ancien" "$(g23 "$WORK/w23a" 'j.t10.join("|")')" "Session principale · ma-branche|Session principale · ma-branche|New"
+assert_eq "W23.12 — le mémo est invalidé par la taille (même date) ET par la date (même taille)" "$(g23 "$WORK/w23a" 'j.t11.join("|")')" "AAAAAA|BBBBBBB|CCCCCCC"
+assert_eq "W23.13 — un fichier illisible n'est pas mémorisé comme « pas de titre » : chmod 000 puis 644 relit" "$(g23 "$WORK/w23a" 'j.t12.join("|")')" "|ZZ"
+assert_eq "W23.14 — toute clé d'un travailleur est déclarée au contrat vf-cockpit-interface.json (requis ∪ optionnels), titre compris" "$(g23 "$WORK/w23a" 'j.t13.join(",")')" ""
+assert_eq "W23.15 — un /rename seul change la signature whoSig : deux collectes qui ne diffèrent que par `titre` donnent deux signatures, une collecte identique en donne une seule" "$(g23 "$WORK/w23a" 'j.t14.join(",")')" "true,true"
+assert_eq "W23.16 — LIBRES.titre vaut 80 dans who.mjs (garde statique : le titre est déjà borné à 80 en amont, aucune sortie ne le distingue)" "$(grep -c "LIBRES = { titre: 80," "$SCRIPTS/vf-cockpit-who.mjs")" "1"
+mut23() { mut17 "w23-$1" "$2" "$3" "$4" >/dev/null; mkdir -p "$WORK/w23-$1-b"; w23 "$WORK/mut17-w23-$1" "$WORK/w23-$1-b"; }
+L23="vf-cockpit-lecture.mjs"
+mut23 controles $L23 "replace(CLASSE_GLOBALE, ' ').replace(/ {2,}/g" "replace(/zzzzzz/gu, ' ').replace(/ {2,}/g"
+assert_eq "M-W23-CONTROLES — mutant (nettoyage des contrôles retiré) : W23.4 rougit" "$(g23 "$WORK/w23-controles-b" 'j.t3a.join(",")')" "true,true,true,false,true"
+mut23 cf $L23 '\p{Cf}]/u;' ']/u;'
+assert_eq "M-W23-CF — mutant (classe sans \\p{Cf}) : W23.7 rougit" "$(g23 "$WORK/w23-cf-b" 'j.t3cf.join(",")')" "true,true"
+mut23 aititle $L23 "d.type === 'custom-title' && typeof d.customTitle === 'string' ? { t: d.customTitle } : null" "(d.type === 'ai-title' && typeof d.aiTitle === 'string' ? { t: d.aiTitle } : null) || (d.type === 'custom-title' && typeof d.customTitle === 'string' ? { t: d.customTitle } : null)"
+assert_eq "M-W23-AITITLE — mutant (ai-title lu) : W23.3 rougit" "$(g23 "$WORK/w23-aititle-b" '[j.t2a,j.t2b].join("|")')" "TITRE-IA-SECRET-MODELE|true"
+mut23 escalade $L23 ", [FENETRES[0]], etat)" ", FENETRES, etat)"
+assert_eq "M-W23-ESCALADE — mutant (escalade vers 2 puis 8 Mio) : W23.6 rougit" "$(g23 "$WORK/w23-escalade-b" 'j.t4.join("|")')" "TITRE-TROP-LOIN|true"
+mut23 sansmasque $L23 "masqueCoupe(propre, BORNE_TITRE).trim()" "propre.slice(0, BORNE_TITRE).trim()"
+assert_eq "M-W23-SANSMASQUE — mutant (couper sans masquer) : W23.8 rougit (fragment du secret rendu)" "$(g23 "$WORK/w23-sansmasque-b" 'j.t6.join(",")')" "true,true,80"
+mut23 paire $L23 "return d >= 0xd800 && d <= 0xdbff ? r.slice(0, -1) : r; //" "return r; //"
+assert_eq "M-W23-PAIRE — mutant (coupe sans garde de paire de substitution) : W23.9 rougit" "$(g23 "$WORK/w23-paire-b" 'j.t7.join(",")')" "false,false,80"
+mut23 vide $L23 "(d.type === 'custom-title' && typeof d.customTitle === 'string' ? { t: d.customTitle } : null)" "(d.type === 'custom-title' && typeof d.customTitle === 'string' && d.customTitle.trim() ? { t: d.customTitle } : null)"
+assert_eq "M-W23-VIDE — mutant (un titre vide est ignoré) : W23.11 rougit (l'ancien « Old » ressort)" "$(g23 "$WORK/w23-vide-b" 'j.t10.join("|")')" "Old|Session principale · ma-branche|New"
+mut23 memo $L23 "if (c && c.mt === st.mtimeMs && c.size === st.size) return c.titre;" "if (c) return c.titre;"
+assert_eq "M-W23-MEMO — mutant (mémo jamais invalidé) : W23.12 rougit" "$(g23 "$WORK/w23-memo-b" 'j.t11.join("|")')" "AAAAAA|AAAAAA|AAAAAA"
+mut23 memotaille $L23 "c.mt === st.mtimeMs && c.size === st.size) return c.titre;" "c.mt === st.mtimeMs) return c.titre;"
+assert_eq "M-W23-MEMO-TAILLE — mutant (mémo invalidé par la date seule) : W23.12 rougit sur la taille" "$(g23 "$WORK/w23-memotaille-b" 'j.t11.join("|")')" "AAAAAA|AAAAAA|CCCCCCC"
+mut23 memodate $L23 "c.mt === st.mtimeMs && c.size === st.size) return c.titre;" "c.size === st.size) return c.titre;"
+assert_eq "M-W23-MEMO-DATE — mutant (mémo invalidé par la taille seule) : W23.12 rougit sur la date" "$(g23 "$WORK/w23-memodate-b" 'j.t11.join("|")')" "AAAAAA|BBBBBBB|BBBBBBB"
+mut23 erreur $L23 "  if (etat.erreur) return '';
+" ""
+assert_eq "M-W23-ERREUR — mutant (échec de lecture mémorisé comme « pas de titre ») : W23.13 rougit" "$(g23 "$WORK/w23-erreur-b" 'j.t12.join("|")')" "|"
+mut23 branche vf-cockpit-equipe-carte.mjs "['Session principale', nettoieTitre(branche)]" "['Session principale', w.branch]"
+assert_eq "M-W23-BRANCHE — mutant (branche brute dans le libellé) : W23.10 rougit" "$(g23 "$WORK/w23-branche-b" 'j.t8[0]')" "$(node -e 'console.log("Session principale · feat/"+String.fromCodePoint(0x202e)+"evil"+String.fromCodePoint(0x200b)+"x")')"
+mut23 branchedet vf-cockpit-equipe-carte.mjs "const branche = retireAffichage(w.branch);" "const branche = w.branch || '';"
+assert_eq "M-W23-BRANCHE-DETAIL — mutant (branche brute dans le détail et le résumé) : W23.10 rougit sur le détail" "$(g23 "$WORK/w23-branchedet-b" 'j.t8[1]')" "false"
+mut23 iface vf-cockpit-interface.json '"task", "titre",' '"task",'
+assert_eq "M-W23-IFACE — mutant (contrat sans `titre`) : W23.14 rougit" "$(g23 "$WORK/w23-iface-b" 'j.t13.join(",")')" "titre"
+mut23 sig vf-cockpit-live.mjs "x.titre || ''" "0 && x.titre || ''"
+assert_eq "M-W23-SIG — mutant du juge (titre neutralisé dans whoSig par « 0 && x.titre || '' », un grep resterait vert) : W23.15 rougit" "$(g23 "$WORK/w23-sig-b" 'j.t14.join(",")')" "false,true"
+mut17 w23-lib vf-cockpit-who.mjs "LIBRES = { titre: 80," "LIBRES = {" >/dev/null
+assert_eq "M-W23-LIBRES — mutant (titre retiré de LIBRES) : W23.16 rougit" "$(grep -c "LIBRES = { titre: 80," "$WORK/mut17-w23-lib/vf-cockpit-who.mjs")" "0"
+
+echo "=== W24 — masque des jetons à format reconnu : collés à un mot ou après « _ », jamais un identifiant ordinaire (retour de revue, 2026-11-06) ==="
+# arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : « Corriger maintenant (Recommandé) » — `\b` laissait fuir xxxghp_…, key_sk-…, 1ghp_…, idAKIA…, xBearer …
+cat > "$AUX/w24.mjs" <<'JS'
+// w24.mjs <dossier des scripts> <racine du dépôt> <N> <essais> — positifs, négatifs (dont les noms réels du dépôt), preuve générative de temps
+import { pathToFileURL } from 'node:url';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+const [, , dir, repo, nArg, essaisArg] = process.argv;
+const imp = (f) => import(pathToFileURL(path.join(dir, f)).href);
+const L = await imp('vf-cockpit-lecture.mjs'), A = await imp('vf-cockpit-arbres.mjs'), W = await imp('vf-cockpit-who.mjs');
+const T = 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4', a = (n) => 'a'.repeat(n), ab = 'Ab3'.repeat(16), proj = 'Ab3_-'.repeat(20);
+// [nom, texte, corps qui ne doit plus sortir]
+const POS = [
+  ['ghp-nu', 'ghp_' + T, T], ['ghp-colle-mot', 'xxxghp_' + T, T], ['ghp-apres-souligne', 'tok_ghp_' + T, T], ['ghp-apres-chiffre', '1ghp_' + T, T], ['ghp-apres-deux-points', 'tok:ghp_' + T, T],
+  ['gho-colle', 'idgho_' + T, T], ['ghu-colle', 'idghu_' + T, T], ['ghs-colle', 'idghs_' + T, T], ['ghr-colle', 'idghr_' + T, T],
+  ['sk-nu', 'sk-' + a(24), a(24)], ['sk-apres-souligne', 'key_sk-' + a(30), a(30)], ['sk-apres-espace', 'key sk-' + a(30), a(30)], ['sk-apres-chiffre', '1sk-' + a(20), a(20)],
+  ['sk-colle-mot-alnum', 'idsk-' + ab, ab], ['sk-colle-mot-proj', 'idsk-proj-' + proj, proj], ['sk-colle-mot-ant', 'ksk-ant-api03-' + proj, proj],
+  ['akia-nu', 'AKIA' + 'A'.repeat(16), 'A'.repeat(16)], ['akia-colle-mot', 'idAKIA' + 'A'.repeat(16), 'A'.repeat(16)], ['akia-apres-chiffre', '1AKIA' + 'B7'.repeat(8), 'B7'.repeat(8)],
+  ['bearer-nu', 'Bearer ' + a(20), a(20)], ['bearer-colle-mot', 'xBearer ' + a(30), a(30)], ['bearer-apres-souligne', '_Bearer ' + a(16), a(16)], ['bearer-apres-chiffre', '1Bearer ' + a(30), a(30)],
+  ['pat-nu', 'github_pat_' + T, T], ['pat-colle-mot', 'my_github_pat_' + T, T], ['pat-colle-chiffre', '9github_pat_' + T, T],
+  ['xox-nu', 'xoxb-123456789', '123456789'], ['xox-colle-mot', 'axoxb-123456789', '123456789'], ['xox-apres-souligne', 'k_xoxp-123456789-abc', '123456789'],
+];
+// identifiants ordinaires : jamais modifiés
+const NEG = ['task-runner', 'desk-lamp', 'mask-image', 'risk-assessment-2026-11-06-panel', 'ask-user', 'gsd-ask-user-question-batch-mode-2026', 'kiosk-mode', 'whisk-ey', 'Task-1', 'sk-learn', 'the sk-ok plan',
+  'AKIAS', 'AKIAS_BUCKET', 'AKIA-docs', 'ghp_court', 'high_priority', 'laughs_and_cries_over_everything', 'Hughs_Hughs', 'xoxo-hugs', 'github_pat_', 'my_github_pat_rotation',
+  'Bearer token is required for this endpoint', 'Bearer authentication scheme is used', 'Flagbearer internationalization', 'Pallbearer ceremonyarrangements-x',
+  'Task-Force-Review-2026-11-06-Panel-Alpha-Beta-Gamma', 'Desk-Lamp2Of3', 'ask-' + 'user-question-for-the-planning-of-the-next-release-2026-11-06-A1', 'feat/retours-equipe-git', 'gsd-quick', 'cockpit-moteur',
+  'task-admin-dashboard-redesign-for-the-q4-planning-board', 'ask-internationalizationcounterrevolutionaryelectroencephalo', 'desk-proj-Plan2'];
+const git = (...x) => { try { return execFileSync('git', ['-C', repo, ...x], { encoding: 'utf8', maxBuffer: 1 << 28 }); } catch { return ''; } };
+const corpus = new Set(NEG);
+for (const l of [...git('ls-files').split('\n'), ...git('for-each-ref', '--format=%(refname)').split('\n'), ...git('for-each-ref', '--format=%(refname:short)').split('\n')]) { if (!l) continue; corpus.add(l); for (const c of l.split('/')) if (c) corpus.add(c); }
+const appelants = { masque: (t) => L.masque(t), titre: (t) => L.nettoieTitre(t), arbres: (t) => A.nettoie(t, 400), commande: (t) => W.commandeAffichee(t), coupe: (t) => L.masqueCoupe(t + ' ' + 'Z'.repeat(900), 600) };
+const manque = [], fausse = [];
+for (const [nom, t, corps] of POS) for (const [an, f] of Object.entries(appelants)) { const r = f(t); if (!r.includes('[masqué]') || r.includes(corps)) manque.push(nom + '@' + an); }
+for (const s of corpus) { const r = L.masque(s); if (r !== s) fausse.push(s.slice(0, 80)); }
+for (const s of NEG) for (const [an, f] of Object.entries(appelants)) { if (an === 'coupe') continue; const r = f(s); if (r.includes('[masqué]')) fausse.push(an + ':' + s); }
+// ---- preuve générative de temps : entrées de taille N puis 2N, presque valides (jamais un jeton complet), rapport 2N/N attendu proche de 2 (4 si quadratique)
+const N = Number(nArg), essais = Number(essaisArg), rep = (m, n) => m.repeat(Math.ceil(n / m.length)).slice(0, n), LS = ' ';
+const GEN = {
+  ghp: (n) => rep('ghp_', n), 'ghp-presque': (n) => rep('ghp_' + a(19) + LS, n), sk: (n) => 'sk-' + '-'.repeat(n - 3), 'sk-repete': (n) => rep('sk-', n), 'ask-repete': (n) => rep('ask-', n),
+  'sk-presque': (n) => rep('sk-' + a(15) + LS, n), 'lettre-sk-presque': (n) => rep('xsk-' + a(39) + '!', n), 'lettre-sk-sans-majuscule': (n) => rep('ask-' + a(120), n), 'proj-presque': (n) => rep('ask-proj-' + 'A1'.repeat(17) + ' ', n),
+  alnum: (n) => a(n), 'alnum-long-apres-sk': (n) => 'x' + rep('sk-', 3) + a(n), bearer: (n) => rep('Bearer ', n), 'bearer-espaces': (n) => 'Bearer' + ' '.repeat(n - 7) + '!', 'bearer-presque': (n) => rep('xBearer ' + a(23) + ' ', n),
+  'bearer-u2028': (n) => rep('Bearer' + LS + a(15) + LS, n), akia: (n) => rep('AKIA', n), 'akia-presque': (n) => rep('AKIA' + 'A'.repeat(15) + LS, n), xox: (n) => rep('xoxb', n), pat: (n) => rep('github_pat_', n), 'pat-presque': (n) => rep('github_pat_' + a(19) + LS, n),
+};
+const mesure = (f) => { let best = Infinity; for (let e = 0; e < essais; e++) { let reps = 1, t = 0; for (;;) { const t0 = performance.now(); for (let i = 0; i < reps; i++) f(); t = performance.now() - t0; if (t >= 30 || reps >= 256 || t * reps > 400 && reps > 1) break; reps = Math.min(256, Math.max(reps * 2, Math.ceil(reps * 40 / Math.max(t, 0.05)))); } best = Math.min(best, t / reps); } return best; };
+const rapports = []; const pire = { r: 0, nom: '', t1: 0, t2: 0 }; let lent = 0;
+// masque et coupe lisent toute l'entrée (rapport 2N/N) ; titre, arbres et commande bornent l'entrée AVANT les masques (4 000 car.) : leur temps est constant, jugé en absolu (noyé de bruit en rapport)
+const LECTEURS = { masque: (t) => () => L.masque(t, t.length), coupe: (t) => () => L.masqueCoupe(t, t.length >> 1), titre: (t) => () => L.nettoieTitre(t), arbres: (t) => () => A.nettoie(t, 200), commande: (t) => () => W.commandeAffichee(t) };
+const BORNES = new Set(['titre', 'arbres', 'commande']);
+for (const [g, mk] of Object.entries(GEN)) for (const [lec, mkf] of Object.entries(LECTEURS)) {
+  let t1 = mesure(mkf(mk(N))), t2 = mesure(mkf(mk(2 * N))), r = t2 / Math.max(t1, 0.001);
+  if (BORNES.has(lec)) { if (t2 > 100) lent++; rapports.push(1); continue; }
+  if (r > 3) { t1 = Math.min(t1, mesure(mkf(mk(N)))); t2 = Math.min(t2, mesure(mkf(mk(2 * N)))); r = t2 / Math.max(t1, 0.001); } // une seconde mesure avant de conclure : la charge du poste déforme une mesure, jamais deux
+  rapports.push(r); if (r > pire.r) { pire.r = r; pire.nom = g + '/' + lec; pire.t1 = t1; pire.t2 = t2; }
+}
+console.log(JSON.stringify({ positifs: POS.length * Object.keys(appelants).length, manque, corpus: corpus.size, fausse, mesures: rapports.length, pire: { ...pire, r: +pire.r.toFixed(2), t1: +pire.t1.toFixed(3), t2: +pire.t2.toFixed(3) }, redos: pire.r <= 3 && lent === 0 ? 'lineaire' : 'SUPERLINEAIRE' }));
+JS
+w24() { node "$AUX/w24.mjs" "$1" "$REPO24" "${2:-50000}" "${3:-2}" 2>"$WORK/w24.err"; }
+REPO24="$(git -C "$SCRIPTS" rev-parse --show-toplevel 2>/dev/null)"
+W24J="$WORK/w24.json"; w24 "$SCRIPTS" 50000 2 > "$W24J"
+g24() { node "$AUX/get.mjs" "$W24J" "$1"; }
+assert_eq "W24.0 — contrôle positif : la sonde rend un JSON lisible, 29 cas collés ou nus × 5 lecteurs (masque, titre, arbres, commande, coupe)" "$(g24 'j.positifs')" "145"
+assert_eq "W24.1 — chaque jeton à format reconnu est masqué, nu, collé à un mot, à un chiffre ou après « _ », par les cinq lecteurs, et son corps ne sort pas" "$(g24 'j.manque.join(",")')" ""
+assert_eq "W24.2 — négatif : aucun identifiant ordinaire n'est masqué (task-runner, ask-user, risk-assessment-…, Bearer comme mot, AKIAS…) ni aucun nom de fichier, de branche ou de skill du dépôt" "$(g24 'j.fausse.join(" | ")')" ""
+assert_eq "W24.3 — le jeu négatif est bien rempli (plus de 1 000 chaînes : fichiers, composants de chemin, refs du dépôt)" "$(g24 'j.corpus > 1000')" "true"
+assert_eq "W24.4 — ReDoS : sur des entrées presque valides de 50 000 puis 100 000 caractères (ghp_ répété, sk- et tirets, alphanumérique sans fin, U+2028, Bearer et espaces), 5 lecteurs, le temps reste linéaire (rapport 2N/N ≤ 3)" "$(g24 'j.redos')" "lineaire"
+assert_eq "W24.5 — la mesure ReDoS a bien eu lieu (20 générateurs × 5 lecteurs)" "$(g24 'j.mesures')" "100"
+echo "     pire rapport 2N/N : $(g24 'j.pire.nom') = $(g24 'j.pire.r') (N : $(g24 'j.pire.t1') ms, 2N : $(g24 'j.pire.t2') ms)"
+# mutants : chacun doit rougir sur SA assertion, et le témoin vert reste vert sur le dépôt
+mut24() { local nom="$1" f="vf-cockpit-lecture.mjs"; shift; mut17 "w24-$nom" "$f" "$1" "$2" >/dev/null || { echo "ancre absente"; return 1; }; shift 2; while [ $# -ge 2 ]; do FROM="$1" TO="$2" node "$AUX/mutsub.mjs" "$WORK/mut17-w24-$nom/$f" >/dev/null || { echo "ancre absente"; return 1; }; shift 2; done; node "$AUX/w24.mjs" "$WORK/mut17-w24-$nom" "$REPO24" "${MUT_N:-20000}" 1 2>/dev/null > "$WORK/w24-$nom.json"; }
+r24() { node "$AUX/get.mjs" "$WORK/w24-$1.json" "$2"; }
+# corps élargi à 1 caractère, un motif à la fois : le négatif rougit
+mut24 ghp1 '/gh[pousr]_[A-Za-z0-9]{20,}/g' '/gh[pousr]_[A-Za-z0-9]{1,}/g'
+assert_eq "M-W24-GHP1 — mutant (corps ghp_ de 1 caractère) : W24.2 rougit sur laughs_and_cries_over_everything" "$(r24 ghp1 'j.fausse.filter(s => /laughs_and/.test(s)).length > 0')" "true"
+mut24 sk1 '/(?<![A-Za-z])sk-[A-Za-z0-9_-]{16,}/g' '/(?<![A-Za-z])sk-[A-Za-z0-9_-]{1,}/g'
+assert_eq "M-W24-SK1 — mutant (corps sk- de 1 caractère) : W24.2 rougit sur sk-learn" "$(r24 sk1 'j.fausse.filter(s => /sk-learn/.test(s)).length > 0')" "true"
+mut24 sk2 '|[A-Za-z0-9]{40,})/g' '|[A-Za-z0-9]{1,})/g'
+assert_eq "M-W24-SK2 — mutant (corps sk- collé à un mot de 1 caractère) : W24.2 rougit sur Desk-Lamp2Of3" "$(r24 sk2 'j.fausse.filter(s => /Desk-Lamp2Of3/.test(s)).length > 0')" "true"
+mut24 akia1 '/AKIA[A-Z0-9]{16}/g' '/AKIA[A-Z0-9]{1}/g'
+assert_eq "M-W24-AKIA1 — mutant (corps AKIA de 1 caractère) : W24.2 rougit sur AKIAS" "$(r24 akia1 'j.fausse.filter(s => /AKIAS/.test(s)).length > 0')" "true"
+mut24 bear1 '/(?<![A-Za-z])Bearer\s+[A-Za-z0-9._~+\/=-]{16,}/gi' '/(?<![A-Za-z])Bearer\s+[A-Za-z0-9._~+\/=-]{1,}/gi'
+assert_eq "M-W24-BEAR1 — mutant (corps Bearer de 1 caractère) : W24.2 rougit sur « Bearer token is required »" "$(r24 bear1 'j.fausse.filter(s => /Bearer token/.test(s)).length > 0')" "true"
+mut24 bear2 '/(?<=[A-Za-z])Bearer\s+[A-Za-z0-9._~+\/=-]{24,}/gi' '/(?<=[A-Za-z])Bearer\s+[A-Za-z0-9._~+\/=-]{1,}/gi'
+assert_eq "M-W24-BEAR2 — mutant (corps Bearer collé à un mot de 1 caractère) : W24.2 rougit sur Pallbearer" "$(r24 bear2 'j.fausse.filter(s => /Pallbearer/.test(s)).length > 0')" "true"
+# frontière de lettre retirée : « task- », « risk- » sont masqués
+mut24 sklarge '/(?<![A-Za-z])sk-[A-Za-z0-9_-]{16,}/g' '/sk-[A-Za-z0-9_-]{16,}/g'
+assert_eq "M-W24-SKLARGE — mutant (plus aucune frontière avant sk-) : W24.2 rougit sur risk-assessment-2026-11-06-panel" "$(r24 sklarge 'j.fausse.filter(s => /risk-assessment/.test(s)).length > 0')" "true"
+# lookaheads majuscule et chiffre retirés, puis corps de la branche proj|ant|svcacct|admin ramené à 1
+mut24 sklook '(?=[A-Za-z0-9_-]{0,127}[A-Z])(?=[A-Za-z0-9_-]{0,127}\d)' ''
+assert_eq "M-W24-SKLOOK — mutant (sk- collé à une lettre sans lookahead majuscule ni chiffre) : W24.2 rougit sur task-admin-dashboard-redesign-for-the-q4-planning-board ET sur le mot minuscule de plus de 40 lettres" "$(r24 sklook 'j.fausse.filter(s => /task-admin-dashboard/.test(s)).length + "," + j.fausse.filter(s => /ask-internationalization/.test(s)).length')" "5,5"
+mut24 skpref '{36,}|' '{1,}|'
+assert_eq "M-W24-SKPREF — mutant (corps proj|ant|svcacct|admin de 1 caractère) : W24.2 rougit sur desk-proj-Plan2" "$(r24 skpref 'j.fausse.filter(s => /desk-proj-Plan2/.test(s)).length > 0')" "true"
+# `\b` remis partout : les cas collés refuient
+mut24 bord '/gh[pousr]_' '/\bgh[pousr]_' '/github_pat_' '/\bgithub_pat_' '(?<![A-Za-z])sk-[A-Za-z0-9_-]{16,}' '\bsk-[A-Za-z0-9_-]{16,}' '(?<=[A-Za-z])sk-(?=' '\bsk-(?=' '/AKIA[A-Z0-9]{16}/g' '/\bAKIA[A-Z0-9]{16}/g' '/xox[baprs]-' '/\bxox[baprs]-' '/(?<![A-Za-z])Bearer' '/\bBearer' '/(?<=[A-Za-z])Bearer' '/\bBearer'
+assert_eq "M-W24-BORD — mutant (\\b remis devant tous les motifs) : W24.1 rougit sur xxxghp_, key_sk-, idAKIA, xBearer, my_github_pat_, axoxb-, 1ghp_" "$(r24 bord 'j.manque.map(s => s.split("@")[0]).filter((s, i, t) => t.indexOf(s) === i).join(",")')" "ghp-colle-mot,ghp-apres-souligne,ghp-apres-chiffre,gho-colle,ghu-colle,ghs-colle,ghr-colle,sk-apres-souligne,sk-apres-chiffre,sk-colle-mot-alnum,sk-colle-mot-proj,sk-colle-mot-ant,akia-colle-mot,akia-apres-chiffre,bearer-colle-mot,bearer-apres-souligne,bearer-apres-chiffre,pat-colle-mot,pat-colle-chiffre,xox-colle-mot,xox-apres-souligne"
+# lookahead non borné : la preuve générative rougit (taille réduite, le mutant est quadratique)
+mut24 redos '(?=[A-Za-z0-9_-]{0,127}[A-Z])(?=[A-Za-z0-9_-]{0,127}\d)' '(?=[A-Za-z0-9_-]*[A-Z])(?=[A-Za-z0-9_-]*\d)'
+assert_eq "M-W24-REDOS — mutant (lookaheads de sk- non bornés, quadratiques) : W24.4 rougit (rapport 2N/N > 3)" "$(r24 redos 'j.redos')" "SUPERLINEAIRE"
 
 vf_hyg_assert
 

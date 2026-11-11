@@ -24,22 +24,46 @@ PIDS=()
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 
-# sha256 du module d'AVANT ce plan (HEAD b93fb088, relevé par Node sur `git show`). Constante figée : elle ne se met JAMAIS à jour.
-BASE_EQUIPE_CARTE_SHA256="cd40e07b3202a10a122c929c892d2459278efec2f3ba145941d0b9b68aa46f47"
+# sha256 de la copie figée ci-dessous. Elle a été rafraîchie à la jointure du panel utilisateurs (2026-11-07) : c'était le module d'AVANT 72-07 (HEAD b93fb088, sha cd40e07b…) ;
+# c'est maintenant le module courant SANS la fonction 72-07 (les trois lignes `garde:lancees`, `garde:ligne-valide`, `garde:ligne-insert` neutralisées), parce que PU-G-134/162/163/164/165 (titre, description, état, identifiant)
+# ont changé la sortie de toute carte sans rapport avec les lancements. Rafraîchie une seconde fois le 2026-11-08 (lot B2, 3f972a6b, PU-G-163 : repli de description et résumé du groupe « Terminés »), même soustraction. Constante figée : elle ne se met plus à jour qu'en refaisant cette même soustraction.
+BASE_EQUIPE_CARTE_SHA256="0178ba6335306a8c13b0f1d6a525833f3330e9e6277b015e11cee9a6bf73e076"
 
-# --- copie figée de vf-cockpit-equipe-carte.mjs d'avant le plan 72-07 (octet pour octet) ---
+# --- copie figée de vf-cockpit-equipe-carte.mjs sans la fonction du plan 72-07 (octet pour octet ; elle importe vf-cockpit-lecture.mjs, copié à côté avant usage) ---
 cat > "$AUX/base/vf-cockpit-equipe-carte.mjs" <<'BASE_EQUIPE_CARTE_FIGEE'
 // vf-cockpit-equipe-carte — le graphe de l'onglet Équipe (69-05, P69-D-17), au format du viewer.
-// Export : buildEquipeGraph(who, { nom, racine, logos }) -> graphe vibeflow/cockpit-equipe@1.
-// Module pur ; schéma vibeflow/cockpit-equipe@1 ; aucun champ de transcript : seuls les champs de la collecte `who`
-// (déjà bornés et masqués par collectWho) entrent dans une carte. Les sortes de carte (session, agent, terminés) n'ont
+// Export : buildEquipeGraph(who, { nom, racine, logos, git, missions, lancees }) -> graphe vibeflow/cockpit-equipe@1 ; missionsEnCours(gp) -> libellés des missions actives (78-04).
+// `lancees` (optionnel) : Map session -> { phase, ws, verbe } produite par le registre de vf-cockpit-lancer-suivi.mjs (72-07) ; elle ajoute
+// la ligne « Lancée depuis la carte : … » sur la carte de SESSION concernée, valeurs revalidées. Absente ou invalide : sortie inchangée.
+// Titre d'une carte de SESSION (PU-G-162, arbitrage Samuel, AskUserQuestion session principale, 2026-11-06) : `w.titre`, le `custom-title` du transcript (nom donné avec /rename, lu, nettoyé,
+// masqué et borné à 80 caractères par la collecte `who`), sinon « Session principale · <branche> ». L'`ai-title` (texte du modèle), le dernier prompt et le premier message ne sont jamais lus ;
+// l'identifiant de session passe dans le détail. Amendement de la liste blanche P69-D-19/P69-D-23 pour ce seul champ.
+// Module pur (aucun fichier lu, aucun transcript ouvert) ; schéma vibeflow/cockpit-equipe@1 : seuls les champs de la collecte `who`
+// (le titre de session et le reste, déjà nettoyés, bornés et masqués par collectWho) entrent dans une carte ; la branche repasse par `retireAffichage`. Les sortes de carte (session, agent, terminés) n'ont
 // ni pictogramme ni couleur : le viewer prend son repli. Aucun fichier (`files` vide), aucun lien.
+import { retireAffichage, nettoieTitre } from './vf-cockpit-lecture.mjs';
 const SORTES = new Set(['session', 'subagent']);
-const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); return t.length > n ? t.slice(0, n - 1) + '…' : t; };
-const ST = { actif: 'active', 'en-attente': 'active', termine: 'done' };
+const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); if (t.length <= n) return t; const c = t.charCodeAt(n - 2); return t.slice(0, c >= 0xd800 && c <= 0xdbff ? n - 2 : n - 1) + '…'; }; // jamais une moitié de paire de substitution
+// PU-G-165 : un seul état par carte — « en attente » n'a pas de pastille (le pied le dit), il n'est jamais projeté sur « En cours » ; ui/71 (`st`) tient la même table
+const ST = { actif: 'active', 'en-attente': undefined, termine: 'done', bloque: 'blocked' };
+const GENERIQUE = 'lance une commande'; // l'action de presque tous : elle n'informe pas (même seuil que ui/71)
 const ETAT = { actif: 'actif', 'en-attente': 'en attente', termine: 'terminé' };
 
-export function buildEquipeGraph(who, { nom = 'Projet', racine, logos } = {}) {
+// 78-04 : libellés des missions en cours (nœuds `mission` d'état `active` du graphe Projet), au plus 10, sans contrôle ni préfixe « Mission »
+export function missionsEnCours(gp) {
+  const out = [];
+  for (const n of Array.isArray(gp?.nodes) ? gp.nodes : []) {
+    if (out.length >= 10) break;
+    if (n && n.kind === 'mission' && n.st === 'active' && typeof n.label === 'string') {
+      // S6 (revue 2026-11-06) : même classe que `nettoie` (A8) — tout caractère de catégorie Cf, pas la seule plage bidi ; parité testée sur les quatre copies (test-cockpit-git-commandes.sh, R4.1)
+      const l = clip(n.label.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/gu, '').replace(/^Mission\s+/, ''), 120);
+      if (l) out.push(l);
+    }
+  }
+  return out;
+}
+
+export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, missions, lancees } = {}) {
   const travailleurs = (Array.isArray(who?.workers) ? who.workers : []).filter((w) => w && SORTES.has(w.kind) && typeof w.id === 'string');
   const idCarte = (w) => (w.kind === 'session' ? 'se-' : 'ag-') + w.id;
   const parId = new Map(); // identifiant de travailleur -> carte (Map : jamais un objet indexé par une valeur lue sur disque, T-69-09)
@@ -55,18 +79,28 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos } = {}) {
     const parent = sous ? parId.get(w.parent) ?? null : null;
     const fini = w.etat === 'termine';
     if (fini && parent) termines.set(parent, (termines.get(parent) || 0) + 1);
+    const branche = retireAffichage(w.branch); // S6 : la branche passe par la même classe d'affichage que le titre (contrôles, Cf, bidi)
     const lignes = [];
     if (w.role) lignes.push(`Rôle : ${w.role}`);
     lignes.push(`État : ${ETAT[w.etat] || 'actif'}`);
-    if (w.branch) lignes.push(`Branche : ${w.branch}`);
+    if (!sous) lignes.push(`Identifiant : ${w.id.slice(0, 8)}`);
+    const l = undefined; // copie figée : sans la ligne de lancement (72-07)
+    const t = '';
+    if (branche) lignes.push(`Branche : ${branche}`);
     if (w.tree) lignes.push(`Arbre : ${w.tree}`);
     if (w.rattachement?.etat === 'rattache') lignes.push(`Nœud de mission : ${w.rattachement.noeud} (${w.rattachement.dag})`);
+    // PU-G-134/163/164 : la description d'une carte n'est plus vide — étiquette de lancement, tâche (à défaut la dernière action si elle informe), puis branche et arbre d'une session
+    const a = w.action || {}, act = a.verbe && a.verbe !== GENERIQUE ? [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' ') : '';
+    const arbre = !sous && w.tree ? (w.tree === 'arbre principal' ? w.tree : `arbre ${String(w.tree).replace(/^\.claude\/worktrees\//, '')}`) : '';
+    const lieu = !sous ? [branche ? `Branche ${branche}` : '', arbre].filter(Boolean).join(' · ') : '';
+    // PU-G-163 (recette du 2026-11-08) : un agent ou une session sans rien à dire ne montre plus « Pas encore de description » — le repli dit ce qui est connu (nature, état)
+    const resume = [t ? `Depuis Phase ${l.phase}` : '', w.task || act, lieu].filter(Boolean).join(' · ') || `${sous ? 'Agent sans tâche annoncée' : 'Session sans tâche annoncée'} · ${ETAT[w.etat] || 'actif'}`;
     nodes.push({ ...base, id: idCarte(w), parent: fini && parent ? `${parent}~termines` : parent, kind: sous ? 'agent' : 'session',
-      label: sous ? clip([w.role, w.task].filter(Boolean).join(' · ') || 'Agent', 80) : `Session ${w.id.slice(0, 8)}`,
-      summary: clip(w.task || '', 200), details: lignes.join('\n\n'), st: ST[w.etat] || 'active', foot: '' });
+      label: sous ? clip([w.role, w.task].filter(Boolean).join(' · ') || 'Agent', 80) : clip(typeof w.titre === 'string' && w.titre.trim() ? w.titre : ['Session principale', nettoieTitre(branche)].filter(Boolean).join(' · '), 80),
+      summary: clip(resume, 200), details: lignes.join('\n\n'), st: Object.hasOwn(ST, w.etat) ? ST[w.etat] : 'active', foot: '' });
   }
   for (const [carte, n] of termines) {
-    nodes.push({ ...base, id: `${carte}~termines`, parent: carte, kind: 'terminés', label: `Terminés depuis moins de 24 h (${n})`, summary: '', details: '', st: 'done', foot: '' });
+    nodes.push({ ...base, id: `${carte}~termines`, parent: carte, kind: 'terminés', label: `Terminés depuis moins de 24 h (${n})`, summary: `${n} agent${n > 1 ? 's' : ''} de cette session, terminé${n > 1 ? 's' : ''} depuis moins de 24 h.`, details: '', st: 'done', foot: '' });
   }
   const etatSource = (s) => ({ etat: s?.etat === 'lue' || s?.etat === 'absente' || s?.etat === 'erreur' || s?.etat === 'forme-inconnue' ? s.etat : 'absente' });
   const sources = {};
@@ -75,12 +109,13 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos } = {}) {
     schema: 'vibeflow/cockpit-equipe@1',
     meta: { generatedAt: new Date().toISOString(), rootName: nom, root: racine, vfLogos: logos, audience: 'everyone', agent: 'claude', repos: [], counts: { files: 0, loc: 0 }, vfTab: 'equipe',
       kindLabels: { import: 'Dépend de', event: 'Enchaînement', data: 'Couvre', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient' },
-      vf: { compte, fenetre: who?.fenetre ?? null, sources } },
+      vf: { compte, fenetre: who?.fenetre ?? null, sources, missions: Array.isArray(missions) ? missions : [] }, ...(git ? { vfGit: git } : {}) },
     project: { name: `${nom} — Équipe`, summary: `${compte.actif} actifs · ${compte.enAttente} en attente · ${compte.termine} terminés depuis moins de 24 h.` },
     nodes, files: [], links: [], flows: [], routes: [], tour: [],
   };
 }
 BASE_EQUIPE_CARTE_FIGEE
+cp "$SCRIPTS/vf-cockpit-lecture.mjs" "$AUX/base/vf-cockpit-lecture.mjs" # dépendance partagée (retireAffichage, nettoieTitre) : la même des deux côtés de la comparaison A/B
 
 # --- harnais du suivi : ls.mjs <module> <scénario> [<equipe.mjs>] — une ligne de sortie, « ABSENT » si l'import échoue ---
 cat > "$AUX/ls.mjs" <<'JS'
@@ -222,10 +257,13 @@ const VARS = [['absent', OPT], ['undefined', { ...OPT, lancees: undefined }], ['
 const noeud = (g, id) => g.nodes.find((n) => n.id === id);
 const essai = (who, lancees, id, L) => { // la ligne L juste après « État : », aucun autre champ du graphe ne change
   const base = normBase(Bz(who, OPT)); const g = norm(N(who, { ...OPT, lancees }));
-  const nb = noeud(base, id), ng = noeud(g, id); const lg = nb.details.split('\n\n'); const i = lg.findIndex((l) => l.startsWith('État : '));
+  const nb = noeud(base, id), ng = noeud(g, id); const lg = nb.details.split('\n\n'); let i = lg.findIndex((l) => l.startsWith('État : ')); if (lg[i + 1] && lg[i + 1].startsWith('Identifiant : ')) i++; // PU-G-162 : la ligne « Identifiant : » (sessions) suit « État : », la ligne de lancement vient juste après
   const attendu = [...lg.slice(0, i + 1), L, ...lg.slice(i + 1)].join('\n\n');
-  const reste = JSON.stringify({ ...g, nodes: g.nodes.map((n) => (n.id === id ? { ...n, details: nb.details } : n)) }) === JSON.stringify(base);
-  return `details:${ng.details === attendu ? 'ok' : 'ko'}|reste:${reste ? 'ok' : 'ko'}`;
+  // depuis c7d96740 (PU-G-134/163), la description d'une carte de session lancée s'ouvre sur « Depuis Phase N » ; le reste de la description est celui de la copie figée
+  const R = (/Phase (\d+)/.exec(L) || [])[1];
+  const attenduResume = nb.summary ? `Depuis Phase ${R} · ${nb.summary}` : `Depuis Phase ${R}`;
+  const reste = JSON.stringify({ ...g, nodes: g.nodes.map((n) => (n.id === id ? { ...n, details: nb.details, summary: nb.summary } : n)) }) === JSON.stringify(base);
+  return `details:${ng.details === attendu ? 'ok' : 'ko'}|resume:${ng.summary === attenduResume ? 'ok' : 'ko'}|reste:${reste ? 'ok' : 'ko'}`;
 };
 const W2 = { workers: [sess(S1, { role: 'manager' }), sess(S2)], sources: {} };
 const SC = {
@@ -249,7 +287,7 @@ const SC = {
     const map = new Map(ids.map((id, i) => [id, H[i]])); map.set(S2, V('72', 'alpha', 'verifier'));
     let exc = 0, g; try { g = norm(N(who, { ...OPT, lancees: map })); } catch { exc = 1; return `exc:1`; }
     const base = normBase(Bz(who, OPT)); const nb = noeud(base, 'se-' + S2), ng = noeud(g, 'se-' + S2);
-    const reste = JSON.stringify({ ...g, nodes: g.nodes.map((n) => (n.id === ng.id ? { ...n, details: nb.details } : n)) }) === JSON.stringify(base);
+    const reste = JSON.stringify({ ...g, nodes: g.nodes.map((n) => (n.id === ng.id ? { ...n, details: nb.details, summary: nb.summary } : n)) }) === JSON.stringify(base);
     const hostile = /\$\(|touch M|onerror|72;x|piege|constructor|alpha\\n/.test(JSON.stringify(g));
     return `exc:${exc}|reste:${reste ? 'ok' : 'ko'}|temoin:${ng.details.includes('Lancée depuis la carte : Phase 72 · alpha · Vérifier') ? 'ok' : 'ko'}|hostile:${hostile ? 'presente' : 'aucune'}`;
   },
@@ -265,7 +303,7 @@ const SC = {
     const who = { workers: [sess(S1, { name: P, nom: P, title: P, customTitle: P })], sources: {} };
     const a = JSON.stringify(norm(N(who, { ...OPT, lancees: new Map([[S1, V('72', 'alpha', 'planifier')]]) })));
     const b = norm(N(who, OPT));
-    return `absent:${/onerror|<img/.test(a + JSON.stringify(b)) ? 'non' : 'oui'}|label:${noeud(b, 'se-' + S1).label === 'Session ' + S1.slice(0, 8) ? 'ok' : 'ko'}`;
+    return `absent:${/onerror|<img/.test(a + JSON.stringify(b)) ? 'non' : 'oui'}|label:${noeud(b, 'se-' + S1).label === 'Session principale' ? 'ok' : 'ko'}`;
   },
 };
 console.log(SC[sc]());
@@ -275,7 +313,7 @@ JS
 MUT_DIR=""
 mutant() { # mutant <nom> <fichier> <expression-sed>
   local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"
-  for f in vf-cockpit-lancer-suivi.mjs vf-cockpit-equipe-carte.mjs; do [ -f "$SCRIPTS/$f" ] && cp "$SCRIPTS/$f" "$d/$f"; done
+  for f in vf-cockpit-lancer-suivi.mjs vf-cockpit-equipe-carte.mjs vf-cockpit-lecture.mjs; do [ -f "$SCRIPTS/$f" ] && cp "$SCRIPTS/$f" "$d/$f"; done
   MUT_DIR="$d"; f="$d/$2"; [ -f "$f" ] || return 1
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
@@ -305,7 +343,7 @@ SAIN_LS33="terminee"
 SAIN_LS35="0,0,0|vue,terminee,vue"
 SAIN_LS36="1,0,0"
 SAIN_LE1="63|0"
-SAIN_LE2="details:ok|reste:ok"
+SAIN_LE2="details:ok|resume:ok|reste:ok"
 SAIN_LE4="exc:0|reste:ok|temoin:ok|hostile:aucune"
 SAIN_LE5="diff:se-22222222-2222-4222-8222-222222222222|noeuds:true|ligne:ok"
 
@@ -336,13 +374,29 @@ assert_eq "LS4.3 — le module n'importe rien, n'écrit rien, ne journalise rien
 assert_eq "LS4.4 — constantes et libellés des cinq verbes" "$(LSM ls44)" "600000|86400000|200|cadrer,planifier,executer,verifier,reprendre|Cadrer,Planifier,Exécuter,Vérifier,Reprendre|true"
 
 echo "== LE carte Équipe =="
-assert_eq "LE.0 — la copie figée est le module d'avant (sha256)" "$(shasum -a 256 "$AUX/base/vf-cockpit-equipe-carte.mjs" | cut -d' ' -f1)" "$BASE_EQUIPE_CARTE_SHA256"
+assert_eq "LE.0 — la copie figée est figée : son sha256 est celui de la constante (module courant moins la fonction 72-07, rafraîchi le 2026-11-07)" "$(shasum -a 256 "$AUX/base/vf-cockpit-equipe-carte.mjs" | cut -d' ' -f1)" "$BASE_EQUIPE_CARTE_SHA256"
+# LE.0b : la copie ne diffère du module courant QUE par l'import 72-07 et les trois lignes garde:lancees / garde:ligne-valide / garde:ligne-insert (neutralisées en `const l = undefined;` et `const t = '';`) ;
+# sans cela un rafraîchissement silencieux de la copie rendrait la comparaison A/B tautologique (la copie suivrait le module, LE.1 à LE.5 ne verraient plus rien)
+cat > "$AUX/copie.mjs" <<'JS'
+import fs from 'node:fs';
+const [, , courant, copie] = process.argv;
+const att = fs.readFileSync(courant, 'utf8').split('\n').flatMap((l) => l.startsWith('import { LIBELLES_VERBES, entreeLanceeValide }') || l.includes('// garde:ligne-insert') ? [] : l.includes('// garde:lancees') ? ['    const l = undefined; // copie figée : sans la ligne de lancement (72-07)'] : l.includes('// garde:ligne-valide') ? ["    const t = '';"] : [l]);
+const obt = fs.readFileSync(copie, 'utf8').split('\n');
+const trim = (a) => { while (a.length && a[a.length - 1] === '') a.pop(); return a; };
+const A = trim(att), O = trim(obt);
+const i = A.findIndex((l, k) => l !== O[k]);
+console.log(i < 0 && A.length === O.length ? 'identique' : 'écart ligne ' + ((i < 0 ? Math.min(A.length, O.length) : i) + 1) + ' : attendu [' + (A[i] ?? '').slice(0, 80) + '] obtenu [' + (O[i] ?? '').slice(0, 80) + ']');
+JS
+assert_eq "LE.0b — la copie figée ne diffère du module courant que par l'import 72-07 et les trois lignes garde:lancees / garde:ligne-valide / garde:ligne-insert" "$(node "$AUX/copie.mjs" "$SCRIPTS/vf-cockpit-equipe-carte.mjs" "$AUX/base/vf-cockpit-equipe-carte.mjs")" "identique"
+sed '/^const ST = /s/done/fini/' "$AUX/base/vf-cockpit-equipe-carte.mjs" > "$AUX/base-mutee.mjs"
+cmp -s "$AUX/base-mutee.mjs" "$AUX/base/vf-cockpit-equipe-carte.mjs" && assert_eq "LE.0c — mutant sans effet (cible de sed absente)" "sans effet" "effet"
+assert_eq "LE.0c — mutant : une quatrième différence dans la copie (état « done » renommé) rougit LE.0b" "$(node "$AUX/copie.mjs" "$SCRIPTS/vf-cockpit-equipe-carte.mjs" "$AUX/base-mutee.mjs" | cut -c1-12)" "écart ligne "
 assert_eq "LE.1 — sept jeux who × neuf valeurs de paramètre : sortie identique octet pour octet à la copie figée (generatedAt neutralisé)" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" identique 2>&1)" "$SAIN_LE1"
-assert_eq "LE.2 — la ligne « Lancée depuis la carte : Phase 72 · alpha · Planifier » juste après « État : », aucun autre champ ne change" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" ligne 2>&1)" "$SAIN_LE2"
+assert_eq "LE.2 — la ligne « Lancée depuis la carte : Phase 72 · alpha · Planifier » juste après « État : » (et de « Identifiant : » qui le suit sur une session, PU-G-162), la description s'ouvre sur « Depuis Phase 72 » (c7d96740), aucun autre champ ne change" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" ligne 2>&1)" "$SAIN_LE2"
 assert_eq "LE.3 — sans compartiment : « Lancée depuis la carte : Phase 72 · Planifier »" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" sans-ws 2>&1)" "$SAIN_LE2"
 assert_eq "LE.4 — valeurs hostiles : aucune ligne, aucune exception, rien d'hostile dans le JSON ; le témoin positif de la même Map donne sa ligne" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" hostile 2>&1)" "$SAIN_LE4"
 assert_eq "LE.5 — un sous-agent clé de la Map et une clé absente de who : rien ; seule la session valide de la même Map change" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" hors-session 2>&1)" "$SAIN_LE5"
-assert_eq "LE.6 — name, nom, title, customTitle hostiles : absents de la sortie, libellé « Session <8 premiers caractères> »" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" noms 2>&1)" "absent:oui|label:ok"
+assert_eq "LE.6 — name, nom, title, customTitle hostiles : absents de la sortie, libellé « Session principale » (sans titre ni branche, PU-G-162)" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" noms 2>&1)" "absent:oui|label:ok"
 
 echo "== Mutants =="
 mut_ls M-FORME-LIBRE '/garde:forme/d' ls12 "$SAIN_LS12" LS1.2

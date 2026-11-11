@@ -52,7 +52,7 @@
   let badge = null, who = null;
   const lockText = (l) => {
     const held = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present); // lab plat : un seul verrou, sans `locks`
-    if (!held.length) return { cls: '', text: 'Driver libre', title: 'Aucun verrou de driver tenu' };
+    if (!held.length) return { cls: '', text: 'Driver libre', title: "Personne n'a la main" };
     const x = held[0];
     return { cls: 'held', text: `${x.owner || '?'} · ${x.step || ''} · ${x.age_seconds ?? '?'} s`, title: held.map((y) => `${[y.scope === 'depot' ? 'dépôt' : y.scope, y.ws].filter(Boolean).join(' ')}${y.scope || y.ws ? ' : ' : ''}${y.owner || '?'}${y.step ? ` (${y.step})` : ''}`).join('\n') }; // lab plat : pas de scope, jamais « undefined : … » ; recette 68 R12 (P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04) : la portée « depot » s'affiche « dépôt » (libellé seul, la valeur scope du JSON reste depot)
   };
@@ -62,26 +62,35 @@
   // « au travail » : un agent (session ou sous-agent) `actif` ; ni verrou, ni nœud de DAG, ni terminé, ni agent en attente (P69-D-14, P69-D-33). Même prédicat que
   // les effectifs de l'onglet Équipe (71-vf-equipe-rendu.js) : pour une même collecte, le badge égale « actifs ».
   const auTravail = (w) => window.__vfEquipeRendu.actif(w);
-  // P68-D-39 : l'âge d'un verrou est celui du flux `lock` (age_seconds, rafraîchi à chaque événement), jamais l'ageS du `who`, figé tant que la liste ne change pas (whoSig l'exclut) ;
-  // le verrou se retrouve par son propriétaire (et sa portée quand plusieurs verrous ont le même), repli sur l'ageS du `who` si le flux ne le porte pas
-  const ageDe = (w) => {
-    if (w.kind !== 'lock') return w.ageS;
+  // P68-D-39 : le verrou se lit dans le flux `lock` (rafraîchi à chaque événement), jamais dans l'ageS du `who`, figé tant que la liste ne change pas (whoSig l'exclut) ;
+  // il se retrouve par son propriétaire (et sa portée quand plusieurs verrous ont le même)
+  const verrouDe = (w) => {
     const l = probe.lock, tenus = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present && x.owner === w.id);
     // correspondance EXACTE sur la portée et le compartiment (M-3), jamais par sous-chaîne (`fiabilite` n'est pas `fiabilite-2`) : `tree` d'un compartiment se lit en mots
     // (mot 1 = le nom, mot 3 = la phase éventuelle, comme l'écrit vf-cockpit-who.mjs), celui d'un verrou sans compartiment est sa portée ; aucun libellé n'est reconstruit ici
     const mots = String(w.tree).split(' '), ph = (y) => /^[0-9]+(\.[0-9]+)*$/.test(String(y.phase)) ? String(y.phase) : '';
-    const x = tenus.find((y) => y.ws ? mots[1] === y.ws && (mots[3] || '') === ph(y) : y.scope === w.tree) || (tenus.length === 1 ? tenus[0] : undefined);
-    return typeof x?.age_seconds === 'number' ? x.age_seconds : w.ageS;
+    return tenus.find((y) => y.ws ? mots[1] === y.ws && (mots[3] || '') === ph(y) : y.scope === w.tree) || (tenus.length === 1 ? tenus[0] : undefined);
   };
+  // PU-G-179 : « tenu depuis » dit la date de PRISE (lease_seconds), jamais l'âge du dernier battement (age_seconds, qui repart à 0) ; absente : « tenu » sans durée
+  const ageDe = (w) => (w.kind !== 'lock' ? w.ageS : typeof verrouDe(w)?.lease_seconds === 'number' ? verrouDe(w).lease_seconds : null);
+  const tenuDepuis = (n) => (typeof n === 'number' ? 'tenu depuis' + NB + h(duree(n)) : 'tenu');
+  // le détenteur d'un verrou (PU-G-177, 179) : une session de la collecte se nomme par son titre, jamais par son identifiant brut ; un verrou dont `session_ids` n'en nomme aucune de la collecte dit « aucune session active »
+  // (une session muette sans enfant n'est pas dans `who` : ni « orphelin » ni « introuvable » ; `session_ids` vide, ou collecte pas encore reçue : aucun verdict)
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
+  const sessions = () => (who?.workers || []).filter((w) => w.kind === 'session');
+  const detenteur = (id) => (sessions().some((s) => s.id === id) ? window.__vfEquipeRendu.nomDeSession(who.workers, id) : UUID.test(String(id)) ? null : id || null);
+  const sansSession = (x) => !!who && Array.isArray(x?.session_ids) && x.session_ids.length > 0 && !x.session_ids.some((i) => sessions().some((s) => s.id === i));
   // verrous et nœuds : un verrou dit « tenu depuis … » (durée au sens explicite) ; un nœud de DAG périmé n'est plus montré (P71.5-D-14), un nœud récent reste (aucun agent ne le porte forcément)
-  const ligneVerrou = (w) => `<li><span><b>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : String(w.tree || '').replace(/^compartiment /, ''))}</b>${w.id ? ' · ' + h(w.id) : ''}</span><span class="n">tenu depuis${NB}${h(duree(ageDe(w)))}</span></li>`;
+  const ligneVerrou = (w) => { const nom = detenteur(w.id), vide = sansSession(verrouDe(w)), gl = window.__vfEquipeRendu.glyphe;
+    return `<li><span>${vide ? gl('orphelin', 'aw-s-orphelin') : ''}<b>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : String(w.tree || '').replace(/^compartiment /, ''))}</b>${nom ? ' · ' + h(nom) : ''}</span><span class="n">${vide ? 'aucune session active · ' : ''}${tenuDepuis(ageDe(w))}</span></li>`; };
+  const ligneOrph = (w) => `<li><span>${window.__vfEquipeRendu.glyphe('orphelin', 'aw-s-orphelin')}<b>${h(w.role || 'Agent')}</b>${w.task ? ' · ' + h(w.task) : ''}</span><span class="n">orphelin ?${typeof w.ageS === 'number' ? ` · consigné depuis${NB}${h(duree(w.ageS))}` : ''}</span></li>`; // PU-G-182 : le registre dit « jamais fermé », pas « processus mort » : le « ? » est exact
   const ligneNoeud = (w) => `<li><span><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b>${w.task ? ' · ' + h(w.task) : ''}</span><span class="n">${h(duree(ageDe(w)))}</span></li>`;
   const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
   const driverLigne = () => {
     const l = probe.lock, tenus = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present);
-    if (!tenus.length) return '<p class="aw-driver"><span class="t">Driver libre</span></p>';
-    const x = tenus[0];
-    return `<p class="aw-driver"><span class="d"></span><span class="t">Driver ${h(x.owner || '?')}${x.step ? ' · ' + h(x.step) : ''}</span><span class="n">tenu depuis${NB}${h(duree(x.age_seconds))}</span></p>`;
+    if (!tenus.length) return '<p class="aw-driver"><span class="t">' + "Personne n'a la main" + '</span></p>';
+    const x = tenus[0], nom = detenteur(x.owner) || (UUID.test(String(x.owner)) ? 'non listée' : '?'); // PU-G-177 : la session qui pilote, en clair
+    return `<p class="aw-driver"><span class="d"></span><span class="t">Session qui pilote : ${h(nom)}${x.step ? ' · ' + h(x.step) : ''}</span><span class="n">${tenuDepuis(x.lease_seconds)}</span></p>`;
   };
   // le CSS du tiroir vit avec ses rendus (71-vf-equipe-rendu.js, chargé après ce fichier) : posé une fois, au premier dessin
   let cssPose = false;
@@ -90,15 +99,18 @@
     poserCss();
     const ws = who?.workers || [], act = ws.filter(auTravail), reste = ws.filter((w) => !AGENT(w));
     const finis = ws.filter((w) => AGENT(w) && w.etat === 'termine').length;
-    const verrous = reste.filter((w) => w.kind === 'lock'), autres = reste.filter((w) => w.kind !== 'lock' && !w.stale && !(w.kind === 'dag-node' && act.length)); // un nœud en cours est déjà porté par l'agent qui le travaille
+    const verrous = reste.filter((w) => w.kind === 'lock'), orph = reste.filter((w) => w.orphan), autres = reste.filter((w) => w.kind !== 'lock' && !w.orphan && !w.stale && !(w.kind === 'dag-node' && act.length)); // un nœud en cours est déjà porté par l'agent qui le travaille
     const SOURCES = { sessions: 'Sessions et sous-agents', locks: 'Verrous du dépôt', dags: 'Plans de la mission' }; // clés de la collecte, jamais affichées telles quelles (P70-D-04)
-    const src = Object.entries(who?.sources || {}).map(([k, v]) => `${SOURCES[k] || k} : ${v.etat}`).join(' · ');
+    // PU-G-180 : le pied ne dit rien quand tout est lu et ne nomme qu'une source illisible (une source absente n'est pas une panne)
+    const mal = Object.entries(who?.sources || {}).filter(([, v]) => v && (v.etat === 'erreur' || v.etat === 'forme-inconnue')).map(([k]) => SOURCES[k] || k);
+    const src = mal.length ? `${mal.length > 1 ? 'Sources illisibles' : 'Source illisible'} : ${mal.join(', ')}` : '';
     const arbre = window.__vfEquipeRendu.arbre(ws, h);
-    return (`<div class="vf-whop"><div class="aw-head"><h3>Au travail</h3><span class="aw-count"><b>${act.length}</b> ${act.length > 1 ? 'actifs' : 'actif'} · ${pluriel(finis, 'terminé', 'terminés')}</span></div>${driverLigne()}`
-      + `${arbre || (reste.length ? '' : '<p>Personne. Sources lues : ' + h(src) + '</p>')}`
-      + `${verrous.length ? `<div class="aw-sec2"><span>Verrous tenus</span><span>${verrous.length}</span></div><ul class="r-verr">${verrous.map(ligneVerrou).join('')}</ul>` : ''}`
+    return (`<div class="vf-whop"><div class="aw-head"><h3>Au travail</h3><span class="aw-count"><b>${act.length}</b> ${act.length > 1 ? 'actifs' : 'actif'} · ${pluriel(finis, 'terminé', 'terminés')}</span></div>${window.__vfEquipeRendu.surveiller(ws)}${driverLigne()}`
+      + `${act.length ? '' : '<p>Personne ne travaille en ce moment</p>'}${arbre}`
+      + `${verrous.length ? `<div class="aw-sec2"><span>Qui a la main</span><span>${verrous.length}</span></div><p class="aw-aide">Un verrou évite que deux sessions modifient la même chose en même temps : rien à faire de votre côté.</p><ul class="r-verr">${verrous.map(ligneVerrou).join('')}</ul>` : ''}`
+      + `${orph.length ? `<div class="aw-sec2"><span>Agents sans verrou tenu</span><span>${orph.length}</span></div><ul class="r-verr">${orph.map(ligneOrph).join('')}</ul>` : ''}`
       + `${autres.length ? `<div class="aw-sec2"><span>Nœuds du plan</span><span>${autres.length}</span></div><ul class="r-verr">${autres.map(ligneNoeud).join('')}</ul>` : ''}`
-      + `<p class="aw-foot">${h(FRAICHEUR)}, terminés depuis moins de 24${NB}h. Transcript${NB}: dans l'onglet Équipe.</p><p class="src">${h(src)}</p></div>`);
+      + `<p class="aw-foot">${h(FRAICHEUR)}, terminés depuis moins de 24${NB}h. Transcript${NB}: dans l'onglet Équipe.</p>${src ? `<p class="src">${h(src)}</p>` : ''}</div>`);
   };
   // replis : l'ensemble des parents repliés vit dans la mémoire de la page (ni graphe, ni stockage, ni export) ; reposé après chaque dessin du tiroir
   const replies = new Set();
@@ -139,12 +151,12 @@
   const BTN = '[data-vf-doing],[data-vf-transcript],[data-vf-repli]', DANS_PANNEAU = '#panel [data-vf-doing],#panel [data-vf-transcript],#panel [data-vf-repli]';
   const cleBtn = (b) => (b.dataset.vfDoing !== undefined ? 'doing:' + b.dataset.vfDoing : b.dataset.vfRepli !== undefined ? 'repli:' + b.dataset.vfRepli : 'transcript:' + b.dataset.vfTranscript);
   let cleFocus = null;
-  document.addEventListener('focusin', (ev) => { const b = ev.target.closest?.(DANS_PANNEAU); cleFocus = b ? cleBtn(b) : null; });
+  document.addEventListener('focusin', (ev) => { const b = ev.target.closest?.(DANS_PANNEAU); cleFocus = b ? cleBtn(b) : ev.target.matches?.('#panel > .vf-whop h3') ? 'titre' : null; }); // 'titre' : le focus posé sur le titre du tiroir à son ouverture (73-vf-tiroir-travail.js, PU-G-203) survit lui aussi à un redessin
   document.addEventListener('focusout', (ev) => { const b = ev.target; if (b.matches?.(BTN)) queueMicrotask(() => { if (b.isConnected && document.activeElement !== b) cleFocus = null; }); });
   const rendreFocus = () => {
     if (!cleFocus || (document.activeElement && document.activeElement !== document.body)) return;
-    const b = [...document.querySelectorAll(DANS_PANNEAU)].find((x) => cleBtn(x) === cleFocus);
-    if (b) b.focus({ preventScroll: true });
+    const b = cleFocus === 'titre' ? document.querySelector('#panel > .vf-whop h3') : [...document.querySelectorAll(DANS_PANNEAU)].find((x) => cleBtn(x) === cleFocus);
+    if (b) { if (cleFocus === 'titre') b.tabIndex = -1; b.focus({ preventScroll: true }); }
   };
   new MutationObserver(() => { rendreFocus(); if (demandes.size) for (const b of document.querySelectorAll('#panel [data-vf-doing]')) poser(b); }).observe(document.getElementById('panel') || document.documentElement, { childList: true, subtree: true });
   document.addEventListener('click', (ev) => {
@@ -164,7 +176,7 @@
       const r = await fetch('/api/vf/doing?id=' + encodeURIComponent(id), { headers: { 'x-floorplan-token': SRV.token }, cache: 'no-store' });
       const d = r.ok ? await r.json() : null;
       // `doing` vide : le serveur remonte à la dernière commande Bash de la session ; sans appel Bash lisible il n'y a rien à montrer, jamais un texte de l'assistant en repli (D3)
-      texte = d?.doing || (d?.erreur === 'inconnu' ? 'Plus active : rien à montrer.' : d?.erreur === 'sans-action' ? "Aucune commande Bash dans la fin du journal de cette session." : 'Indisponible.');
+      texte = d?.doing || (d?.erreur === 'inconnu' ? 'Plus active : rien à montrer.' : d?.erreur === 'sans-action' ? "Aucune commande récente." : 'Indisponible.');
     } catch { texte = 'Indisponible.'; }
     if (demandes.size >= 50) demandes.delete(demandes.keys().next().value);
     demandes.set(id, texte);

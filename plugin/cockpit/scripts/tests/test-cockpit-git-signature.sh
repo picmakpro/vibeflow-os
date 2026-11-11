@@ -162,6 +162,7 @@ cat > "$AUX/r31.js" <<'JS'
 const [base, page, lab] = ARGS;
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!window.VibeFlow`, 'page rendue');
+await s.attendre('!!(window.__vfLive && window.__vfLive.connected)', 'flux direct branché avant le commit'); // un commit joué avant l'abonnement du flux n'émet aucun signal
 await s.ev(`(() => { window.__sig = 0; window.__marque = 1; document.addEventListener('vf-git:signal', () => { window.__sig++; }); })()`);
 const { execFileSync } = await import('node:child_process');
 execFileSync('git', ['-C', lab, 'commit', '-q', '--allow-empty', '-m', 'commit de R3.1'], { stdio: 'ignore' });
@@ -272,11 +273,11 @@ import { pathToFileURL } from 'node:url';
 const [, , scripts, muet, hors] = process.argv;
 const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
 const t = Date.now(); const a = (await m.lireGit(muet)).etat; const ms = Date.now() - t; const b = (await m.lireGit(hors)).etat;
-console.log(JSON.stringify({ muet: a, hors: b, borne: ms < 9000 }));
+console.log(JSON.stringify({ muet: a, hors: b, borne: ms < 13000 }));
 JS
 mkdir -p "$WORK/sans-depot"
 LM="$(node "$AUX/lire-muet.mjs" "$SCRIPTS" "$HGL" "$WORK/sans-depot" 2>&1 | tail -1)"
-assert_eq "R5.6 — A5 : lireGit d'un git muet rend « indisponible » (jamais « absent ») dans l'échéance de 5 s ; un lab hors dépôt reste « absent »" "$(jq_ "$LM" '[j.muet, j.hors, j.borne].join("|")')" "indisponible|absent|true"
+assert_eq "R5.6 — A5 : lireGit d'un git muet rend « indisponible » (jamais « absent ») dans l'échéance de 15 s (REG-D-01 : une seule borne de lancement de 10 s est subie, l'assemblage s'arrête sur un git muet) ; un lab hors dépôt reste « absent »" "$(jq_ "$LM" '[j.muet, j.hors, j.borne].join("|")')" "indisponible|absent|true"
 sleep 0.5
 assert_eq "R5.7 — aucun git du dépôt muet ne survit à lireGit (pgrep)" "$(pgrep -f "$HGL" | wc -l | tr -d ' ')" "0"
 assert_eq "R5.8 — le direct appelle la signature en asynchrone, graine et filet (les deux appels de signatureGit portent .then) : un git muet ne gèle plus le serveur" "$(grep -c "signatureGit(root, " "$SCRIPTS/vf-cockpit-live.mjs" | tr -d ' ')|$(grep -c "signatureGit(root, { commun: common }).then(" "$SCRIPTS/vf-cockpit-live.mjs" | tr -d ' ')" "2|2"
@@ -296,7 +297,8 @@ R="$(MUET "$MD" "$HGL" seq)"
 assert_eq "M-SIGNATURE-SYNC — le git de la signature redevient synchrone : rouge sur R5.1 (la boucle est gelée : le minuteur de 50 ms ne sonne qu'après 300 ms)" "$(jq_ "$R" 'j.bloc < 300')" "false"
 sleep 0.5
 assert_eq "R5.9 — aucun git du dépôt muet ne survit aux mutants (pgrep)" "$(pgrep -f "$HGL" | wc -l | tr -d ' ')" "0"
-ME="$(mkmod sansdistinct)"; mutate "$ME/vf-cockpit-git.mjs" "if (sonde.delai) return" "if (false) return" || echo "  ❌ mutation M-ABSENT impossible"
+# REG-D-01 : l'état distinct tient par TROIS gardes en profondeur (l'en-tête traduit un git muet en « indisponible », l'assemblage s'arrête dessus, la sonde A5 le redit) ; M-ABSENT les retire toutes
+ME="$(mkmod sansdistinct)"; mutate "$ME/vf-cockpit-git.mjs" "if (sonde.delai) return" "if (false) return" && mutate "$ME/vf-cockpit-git.mjs" "vide(muet ? 'indisponible' : 'absent'" "vide('absent'" && mutate "$ME/vf-cockpit-git.mjs" "if (muet) return" "if (false) return" || echo "  ❌ mutation M-ABSENT impossible"
 LM="$(node "$AUX/lire-muet.mjs" "$ME" "$HGL" "$WORK/sans-depot" 2>&1 | tail -1)"
 assert_eq "M-ABSENT — l'état distinct est retiré : rouge sur R5.6 (un git muet redevient « absent »)" "$(jq_ "$LM" '[j.muet, j.hors].join("|")')" "absent|absent"
 sleep 0.5

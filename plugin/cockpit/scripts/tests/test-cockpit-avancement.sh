@@ -236,6 +236,24 @@ printf '# Recette\n\n**Statut : FAITE — close**\n' | wr "$B/phases/05-cinq/05-
 echo ok > "$B/phases/05-cinq/05-VERIFICATION.md"
 initgit "$L4"
 
+# lab L7 (PU-G-098) : phases sans plan ni mission vivante — rien commencé : « cadrage, plan, exécution » précèdent le reste ; un CONTEXT retire « cadrage » ; une mission vivante ou un plan les retire
+L7="$WORK/lab-l7"; B="$L7/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+## Phases
+
+- [ ] **Phase 1: Vide** - rien
+- [ ] **Phase 2: Cadrée** - un CONTEXT
+- [ ] **Phase 3: Vivante** - mission en cours, aucun plan
+- [ ] **Phase 4: Planifiée** - un plan
+MD
+mkdir -p "$B/phases/01-vide"
+echo ctx | wr "$B/phases/02-cadree/02-CONTEXT.md"
+wr "$B/missions/MISSION-3.dag.json" <<'JSON'
+{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}
+JSON
+plans "$B/phases/04-planifiee" 04 1 0
+initgit "$L7"
+
 # lab L5 : mutation — phase 1 cochée, phase 2 avec un PLAN sans SUMMARY, STATE sur la phase 2
 L5="$WORK/lab-l5"; B="$L5/.planning"
 wr "$B/ROADMAP.md" <<'MD'
@@ -264,6 +282,7 @@ graph "$L" "$WORK/gl.json"; plan "$L" "$WORK/pl.json"
 graph "$L3" "$WORK/g3.json"
 graph "$L4" "$WORK/g4.json"; plan "$L4" "$WORK/p4.json"
 graph "$L5" "$WORK/g5.json"
+graph "$L7" "$WORK/g7.json"; plan "$L7" "$WORK/p7.json"
 plan "$L6" "$WORK/p6.json"
 
 # ---------- A0 — contrôles positifs des fixtures (verts avant et après le code) ----------
@@ -314,6 +333,13 @@ for i in 1 2 3 4 5; do
   case $i in 1) e='[]';; 2|3) e='["verification","cloture"]';; 4) e='["recette","verification","cloture"]';; 5) e='["cloture"]';; esac
   assert_eq "A5.$i — reste de la phase $i du lab L4" "$(G "$WORK/p4.json" "JSON.stringify(j.phases[$((i-1))].avancement?.reste)")" "$e"
 done
+
+# PU-G-098 : une phase sans plan ni mission vivante dit ce qui reste depuis le début
+for i in 1 2 3 4; do
+  case $i in 1) e='["cadrage","plan","execution","verification","cloture"]';; 2) e='["plan","execution","verification","cloture"]';; 3|4) e='["verification","cloture"]';; esac
+  assert_eq "A5.1$i — reste de la phase $i du lab L7 (PU-G-098)" "$(G "$WORK/p7.json" "JSON.stringify(j.phases[$((i-1))].avancement?.reste)")" "$e"
+done
+assert_eq "A5.15 — la carte de la phase 1 du lab L7 écrit « Reste : cadrage, plan, exécution, vérification, clôture. », celle de la phase 2 « plan, exécution, vérification, clôture »" "$(NDF "$WORK/g7.json" ph-1 .details | grep -c 'Reste : cadrage, plan, exécution, vérification, clôture\.')|$(NDF "$WORK/g7.json" ph-2 .details | grep -c 'Reste : plan, exécution, vérification, clôture\.')|$(NDF "$WORK/g7.json" ph-4 .details | grep -c 'Reste : vérification, clôture\.')" "1|1|1"
 
 # ---------- A6 — aucune connexion sortante (T-69-11) ----------
 echo "=== A6 — aucune connexion sortante ==="

@@ -1,0 +1,1362 @@
+diff --git a/.planning/missions/2026-11-05-unslop-espacements.dag.json b/.planning/missions/2026-11-05-unslop-espacements.dag.json
+index c4c0faa2..b396c646 100644
+--- a/.planning/missions/2026-11-05-unslop-espacements.dag.json
++++ b/.planning/missions/2026-11-05-unslop-espacements.dag.json
+@@ -59,7 +59,7 @@
+         "propositions"
+       ],
+       "scope": [],
+-      "status": "running"
++      "status": "done"
+     },
+     {
+       "id": "gout",
+@@ -69,7 +69,7 @@
+         "critique:directions"
+       ],
+       "scope": [],
+-      "status": "blocked"
++      "status": "ready"
+     },
+     {
+       "id": "design-md",
+@@ -99,7 +99,7 @@
+         "audit"
+       ],
+       "scope": [],
+-      "status": "running"
++      "status": "done"
+     },
+     {
+       "id": "critique:shell",
+@@ -109,7 +109,7 @@
+         "craft:shell"
+       ],
+       "scope": [],
+-      "status": "blocked"
++      "status": "done"
+     },
+     {
+       "id": "craft:code",
+@@ -119,7 +119,7 @@
+         "audit"
+       ],
+       "scope": [],
+-      "status": "running"
++      "status": "done"
+     },
+     {
+       "id": "critique:code",
+@@ -129,7 +129,7 @@
+         "craft:code"
+       ],
+       "scope": [],
+-      "status": "blocked"
++      "status": "done"
+     },
+     {
+       "id": "craft:projet",
+@@ -139,7 +139,7 @@
+         "audit"
+       ],
+       "scope": [],
+-      "status": "running"
++      "status": "done"
+     },
+     {
+       "id": "critique:projet",
+@@ -149,7 +149,7 @@
+         "craft:projet"
+       ],
+       "scope": [],
+-      "status": "blocked"
++      "status": "done"
+     },
+     {
+       "id": "craft:equipe",
+@@ -159,7 +159,7 @@
+         "audit"
+       ],
+       "scope": [],
+-      "status": "running"
++      "status": "done"
+     },
+     {
+       "id": "critique:equipe",
+@@ -169,7 +169,7 @@
+         "craft:equipe"
+       ],
+       "scope": [],
+-      "status": "blocked"
++      "status": "done"
+     },
+     {
+       "id": "craft:tiroir",
+@@ -179,7 +179,7 @@
+         "audit"
+       ],
+       "scope": [],
+-      "status": "running"
++      "status": "done"
+     },
+     {
+       "id": "critique:tiroir",
+@@ -189,7 +189,7 @@
+         "craft:tiroir"
+       ],
+       "scope": [],
+-      "status": "blocked"
++      "status": "done"
+     },
+     {
+       "id": "impl:espacements",
+@@ -203,7 +203,7 @@
+         "critique:tiroir"
+       ],
+       "scope": [],
+-      "status": "blocked"
++      "status": "running"
+     },
+     {
+       "id": "impl:couleurs",
+@@ -307,6 +307,108 @@
+       ],
+       "scope": [],
+       "status": "ready"
++    },
++    {
++      "id": "sources-anti-slop",
++      "step": "lecture des sources publiques anti-slop",
++      "stage": "",
++      "deps": [],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "anti-slop",
++      "step": "audit des motifs slop existants + alternatives (fragment demo)",
++      "stage": "",
++      "deps": [],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "graphite-corrige",
++      "step": "Graphite corrige AA + a recetter + glyphes M1 (fragment demo)",
++      "stage": "",
++      "deps": [],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "demo",
++      "step": "page demo locale assemblee, zoomable",
++      "stage": "",
++      "deps": [
++        "anti-slop",
++        "graphite-corrige",
++        "au-travail"
++      ],
++      "scope": [],
++      "status": "ready"
++    },
++    {
++      "id": "critique:demo",
++      "step": "juge frais fragments demo",
++      "stage": "",
++      "deps": [
++        "anti-slop",
++        "graphite-corrige",
++        "au-travail"
++      ],
++      "scope": [],
++      "status": "ready"
++    },
++    {
++      "id": "teintes-etat",
++      "step": "4 jeux alternatifs vert/rouge/orange (demande directe Samuel)",
++      "stage": "",
++      "deps": [],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "critique:teintes",
++      "step": "juge frais 4 jeux de teintes",
++      "stage": "",
++      "deps": [
++        "teintes-etat"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "spec-couleurs",
++      "step": "jetons de couleur figes + regles anti-slop + DESIGN.md (spec)",
++      "stage": "",
++      "deps": [],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "critique:spec-couleurs",
++      "step": "juge frais spec couleurs",
++      "stage": "",
++      "deps": [
++        "spec-couleurs"
++      ],
++      "scope": [],
++      "status": "done"
++    },
++    {
++      "id": "impl:au-travail",
++      "step": "vf-coder : refonte Au travail (A3 fils)",
++      "stage": "",
++      "deps": [],
++      "scope": [],
++      "status": "running"
++    },
++    {
++      "id": "impl:couleurs-antislop",
++      "step": "vf-coder : jetons couleur + regles anti-slop + DESIGN.md",
++      "stage": "",
++      "deps": [
++        "critique:spec-couleurs"
++      ],
++      "scope": [],
++      "status": "running"
+     }
+   ]
+ }
+diff --git a/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-CONTEXT.md b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-CONTEXT.md
+index dc285801..1bdca551 100644
+--- a/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-CONTEXT.md
++++ b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-CONTEXT.md
+@@ -18,12 +18,49 @@ Sources : `71.5-AUDIT.md`, `71.5-RECHERCHE-GRILLE.md`, specs `71.5-SPEC-*.md`.
+ - **P71.5-D-05 — Rail des onglets à 4 px, onglet 4 × 12.** Même régime que D-02..04 (transmis par la session principale le 2026-11-05 : « Il suit la grille retenue »). Motif : 3 est hors grille ; 4 × 12 garde la piste à 34,2 px de haut et sous la borne `min-width: 342px` de `ui/01` (Phase 78). R13.4 passe de `3px/3px` à `4px/4px` dans le même commit que DESIGN.md §5.
+ - **P71.5-D-06 — Chevauchement de la pastille Terminal corrigé dans la 71.5** (à ≤ 700 px sur la barre de question et la feuille de détail ; de 701 à ~1 270 px panneau ouvert, sur la barre de question). Décision d'ordonnancement de la session principale, 2026-11-05 — pas un arbitrage de Samuel.
+ 
++- **P71.5-D-09 — `--gutter` passe de 28 à 24, avec `GUTTER = 24` dans le même commit** (`viewer.html` ~l.920 et ~l.1113). Révisée le même jour : une première rédaction gardait 28 en exception au motif que la gouttière touchait la mise en page ELK ; le juge frais de `critique:code` (tour 2) a montré que `GUTTER` n'entre pas dans les dimensions ELK, et le crafter coque a mesuré que les deux valeurs changées ensemble gardent la carte à 300 × 158 (seule la réserve d'ombre perd 4 px par côté). 24 est dans la grille : aucune exception nécessaire. Décision du manager, 2026-11-05.
++- **P71.5-D-10 — Défaut existant hors périmètre : cartes du téléphone trop larges** (`--gutter: 20px` sous 700 px contre `GUTTER` JS : 316 au lieu de 300). Le corriger change la taille des cartes ; consigné pour le backlog, non traité ici. Décision du manager, 2026-11-05.
++- **P71.5-D-11 — Lecture de D-02** : la visite guidée est un conteneur flottant, donc 20 sur ses quatre bords (12 px plus haute : R1 et R3 rejoués sans affaiblissement) ; `#ask-form` garde 16 à gauche comme la recherche, 12 côté bouton ; `#modal` garde 24 de bord de fenêtre. Décision du manager, 2026-11-05.
++
+ ## Décisions autonomes du manager
+ 
+ - **P71.5-D-07 — Pas de `vf-reviewer` sur le diff.** Retouche CSS et rendu ; règle de Samuel « UI : quick sans rituels » (2026-11-03). Le vert : juge frais ≥ 70/100 et suites existantes vertes, sans assertion affaiblie.
+ - **P71.5-D-08 — Direction de palette C « Atelier » écartée** (64/100 au juge frais, sous le seuil ; ne sort pas du terne). Ses neutres chauds restent une option d'assemblage si Samuel le demande.
+ 
+-## En attente de Samuel
++## Retour de Samuel sur le lot de goût (2026-11-05)
++
++Session principale Claude Code, 2026-11-05, dicté, transmis par la session principale, mot pour mot : « Je trouve globalement que la version d'avant est mieux. Là, je constate... alors, les couleurs sont mieux avant, finalement. Et en fait, le truc qui me plaît le moins, honnêtement, c'est... par exemple, quand je regarde le A2 graphite vivant, 79, cette image-là qui est tout en haut, en mode sombre, et même en mode normal, en fait, je vois une espèce de bordure sur la carte historique à gauche. Alors ça, pour moi, ça fait très IA, en fait. Je pense qu'on pourrait peut-être revoir ce truc-là. Et la version de droite me satisfait moins bien, signal tempéré, avec une bordure sur les cartes en haut. Je trouve ça vraiment pas fou. Et en plus, on retrouve la bordure très IA slope dans ce qu'on voit là, dans l'onglet à droite. On voit le message principal en bleu qui est maintenant vibeflow v2 et qui montre la phase en cours. Pareil, ça, je trouve que ça fait très IA slope. Donc, utilise le skills impeccable et autres skills que tu vas trouver sur Internet. Je sais qu'il y en a beaucoup pour éviter ce genre de trucs. Par contre, je trouve que le travail proposé pour la section au travail est beaucoup mieux. Pour le coup, c'est mieux. Je pense qu'on peut faire encore mieux avec des fils d'Ariane entre chaque point. Ça serait beaucoup mieux. Et sinon, pour l'icône et l'hiérarchie, là, Malheureusement, je ne peux pas trop voir comme ça. Donc, en image, en tout cas, ça ne rend pas fou. Peut-être si je pouvais zoomer sur les screenshots, ça serait plus clair, ou ouvrir directement une vue démo. Avec tous les composants côte à côte. En tout cas, je trouve ça au final pas trop dans ce qu'on demande. Par contre, il y a des choses qui sont bien. Par exemple, je regarde M1 glyphes et statut. Je trouve ça pas mal. Il y a des choses que je trouve pas mal quand même. Voilà. Dis-moi sur quels axes on peut les améliorer. Dis-moi si tu trouves des skills appropriés pour ça. Je pense qu'un impeccable, normalement, fonctionnera très bien. Il y aura d'autres skills aussi pour les propositions. Du coup, renvoie tout ça au design manager. »
++
++- **P71.5-D-12 — Palettes A2 et B2 rejetées ; on repart de Graphite.** Seules les corrections AA nécessaires et une éventuelle couleur « à recetter » sont reproposées. Retour de Samuel ci-dessus.
++- **P71.5-D-13 — Anti-« AI slop » en priorité** : liserés et bordures colorés (latéral, haut de carte), bandeau coloré du message principal du panneau ; chaque motif reçoit une alternative sobre (typographie, poids, espace, contraste neutre). Même source.
++- **P71.5-D-14 — « Au travail » : direction approuvée** (« beaucoup mieux »), à améliorer par des « fils d'Ariane entre chaque point ». Même source.
++- **P71.5-D-15 — Icônes et hiérarchie : page démo locale zoomable**, composants côte à côte, avant/après, clair/sombre ; M1 (glyphes de statut) gardée comme base. Même source.
++
++- **P71.5-D-16 — Thème clair : teintes d'état propres, plus lumineuses à contraste égal.** Samuel, session principale Claude Code, 2026-11-05, sur la page démo, mot pour mot : « les couleurs en theme claire ne ressortes pas bien je trouve, toute celle qui sont plutot ternes / foncées ». Proposition à montrer (glyphes, anneau bloqué, familles du graphe), contraste mesuré tenu (3:1 graphique, 4,5:1 texte coloré), sans fond teinté ni liseré.
++
++- **P71.5-D-17 — Teintes de mise en avant à reproposer.** Samuel, message direct dans la session du manager, 2026-11-05, saisie texte, mot pour mot : « je n'aime pas les couleurs out simplement, fait d'autre propositions. Je parle là des couleurs de mise en avant le vert, le rouge, le orange/jaune c'est bien. » Lecture retenue : les trois teintes d'état (vert fait/récent, rouge bloqué, orange/jaune en cours/attention) sont à reproposer en plusieurs jeux ; les sens et les glyphes restent. Ambiguïté levée par Samuel, AskUserQuestion, session principale, 2026-11-05 : « Vert, rouge et orange » — ce sont bien ces trois teintes qui déplaisent.
++
++## Lot de goût tranché (2026-11-05)
++
++Arbitrages Samuel, AskUserQuestion, session principale Claude Code, 2026-11-05, réponses mot pour mot (questions G1-G12 de la page démo `scratchpad/715/demo/index.html`) :
++
++- **P71.5-D-18 — G1 anti-slop :** « Oui, tout (Recommandé) » — tous les motifs de `anti-slop.md` reçoivent leur alternative sobre.
++- **P71.5-D-19 — G2 pastille :** « Oui, sans fond (Recommandé) » — glyphe M1 coloré + mot neutre, sans fond teinté.
++- **P71.5-D-20 — G3 à recetter :** « Celle de « en cours » (Recommandé) » — même teinte que « en cours », distingué par glyphe et mot (classe `vst-recette`).
++- **P71.5-D-21 — G4 barres :** « Neutres sauf en cours (Recommandé) ».
++- **P71.5-D-22 — G5 corrections AA :** « Appliquer (Recommandé) ».
++- **P71.5-D-23 — G6 Au travail :** « Fils de liaison (Recommandé) » — avec, au codage, des fils un cran plus visibles et la durée sur la ligne de tâche.
++- **P71.5-D-24 — G7 dernière commande :** « Le garder (Recommandé) ».
++- **P71.5-D-25 — G8 surtitre Projet :** « Le supprimer (Recommandé) ».
++- **P71.5-D-26 — G9 verts :** « Fusionner (Recommandé) » — `--ok` et `--recent` ne font plus qu'un.
++- **G10** (teintes claires propres) : sans objet, le jeu choisi porte ses propres valeurs claires.
++- **P71.5-D-27 — G11 teintes de mise en avant :** première réponse « (b) Vifs propres (Recommandé) », donnée sous une recommandation que le juge frais venait de renverser (en sombre, (b) est à Δ 3,2 / 4,2 de l'actuel) ; la session principale a prévenu Samuel du renversement et reposé la question ; réponse définitive : « (d) Pastel lumineux (Recommandé) ». Vigilance : le jaune beurre de (d) peut accrocher l'œil sur le graphite (à juger sur de vrais écrans) ; l'orange clair tire vers la moutarde (Samuel prévenu).
++- **P71.5-D-28 — G12 carte bloquée :** « Symbole et mot seuls (Recommandé) » — plus d'anneau coloré.
++
++- **P71.5-D-29 — Aucun jeton de couleur supprimé ni renommé.** Les Phases 72 et 78, parallèles, consomment ces variables : `--ok`, `--ok-bg`, `--warn-sheet` restent en alias (`--ok: var(--recent)`…), `--warn-bg` garde son nom avec sa nouvelle valeur neutre, `--ok-text` reste (alias de la valeur verte texte). Décision du manager, 2026-11-05.
++- **P71.5-D-30 — Jaune beurre sombre du jeu (d) appliqué tel que choisi (#ffe08a)** ; le juge sur rendu réel dira s'il accroche l'œil en lecture longue, et la variante tempérée #f0d17c sera alors proposée à Samuel. Décision du manager, 2026-11-05 (vigilance demandée par la session principale).
++
++## En attente de Samuel (soldé le 2026-11-05 par le lot ci-dessus)
+ 
+ - Direction de palette (A2 « Graphite vivant » / B2 « Signal tempéré »), dont la question de DA de l'accent bleu fonctionnel contre « aucune couleur de marque » (DESIGN.md §1, §9).
+ - « Au travail » : option A2 retenue par le juge ; bouton « Voir la dernière commande » gardé ou retiré ; nœuds de DAG périmés retirés du résumé ; seuil « calme » à 120 s.
+diff --git a/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-code.md b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-code.md
+new file mode 100644
+index 00000000..ef538cb5
+--- /dev/null
++++ b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-code.md
+@@ -0,0 +1,151 @@
++# 71.5 — Spec espacements, nœud `craft:code` (cartes du moteur + page Code) — tour 2
++
++Auteur : vf-crafter, 2026-11-05. Spec seule, aucun fichier de code touché. À exécuter par vf-coder.
++Grille VALIDÉE (P71.5-D-01..D-03, `71.5-CONTEXT.md` ; règles `71.5-RECHERCHE-GRILLE.md` §c) : fermée, **2, 4, 6, 8, 12, 16, 20, 24, 32** (ni 10, ni 14, ni 22).
++Jetons déclarés par `craft:shell` (non redéclarés ici) : primitifs `--sp-2 … --sp-32` ; sémantiques `--inset-card` 16, `--inset-box` 12, `--inset-row` 8 12, `--inset-pill` 2 8.
++Carte : padding 16 sur les 4 côtés, gap 8 (D-03). Plus aucun `[EN ATTENTE goût]` dans ce nœud.
++Mapping par rôle : 1->2, 3->4 (ou 2 pastille), 5->4/6, 7->8, 9->8, 10->8 (gap icône-texte, squish) ou 12 (padding de boîte, marge entre paragraphes), 11/13->12, 14->12 (intérieur) ou 16 (entre blocs), 15/17/18->16, 22->20/24.
++
++Fichiers (sous `plugin/cockpit/skills/cockpit-moteur/assets/`) : `viewer.html` (V), `ui/20-health.js`, `ui/25-recent.js`, `ui/30-screens.js`. Lignes relues sur le worktree le 2026-11-05.
++Dans les gabarits JS (backticks) `var(--sp-8)` s'écrit tel quel (résolu par le document).
++
++## 1. Règle de rythme interne (une règle pour toutes les variantes)
++
++Règles de la grille appliquées : lignes d'une carte 8 ; icône -> texte 8 ; pastilles côte à côte et puce -> libellé 6 ; intervalle serré 4 ; **intérieur ≤ extérieur** (chaque niveau englobe le suivant). Le vide entre deux éléments d'un contenant vient d'UNE source (`gap`), jamais d'un `margin` empilé dessus.
++
++| Niveau (englobement) | Padding | Écarts internes | Où |
++|---|---|---|---|
++| Carte du graphe | `var(--inset-card)` (16, 4 côtés) | `gap: var(--sp-8)` entre tête, titre, description, note, pied ; icône -> titre 8 | `.card` et toutes ses variantes (`.dir .module .external .recent .recent-in .has-note .st-*` héritent, aucune ne redéclare) |
++| Boîte / item de panneau (12) | `var(--inset-box)` (12, 4 côtés) | titre -> texte 6 ; texte -> texte 6 ; texte -> rangée d'actions 12 ; item -> item 12 ; puce -> libellé 8 (point de 8) | `.hc-issue`, `.rw-task`, `.hc-calm` |
++| Note (8 12) | `var(--sp-8) var(--sp-12)` | gap 8 ; titre -> corps 4 | `.anote` (dans une carte à 16), `.rw-note` (dans un `.rw-task` à 12) |
++| Pastille | `var(--inset-pill)` (2 8), `line-height: 16px`, hauteur 20 | gap interne 6 | `.meta`, `.method`, `.rw` (et `.vst`, `.tag`, `.xtag` hors périmètre, §3) |
++
++Justification par englobement (pas par « contenant - 2 ») : la note 8x12 est contenue dans une carte à 16 (`.anote`) et dans une boîte à 12 (`.rw-note`) : 8 ≤ 12 ≤ 16, vertical comme horizontal. Item -> item 12 : « boîte 12 ≤ écart à sa voisine 12 » (grille §c).
++Retrait du corps sous un titre à point : UN seul, `var(--sp-16)` = point 8 + gap 8 (le `.dot` fait 8 ; `.rw-tt::before` passe de 7 à 8).
++Écart entre cartes du graphe : vérifié, il vient d'ELK, `'elk.spacing.nodeNode': '32'` (V:1031), donc ≥ 16 ; ce nœud n'y touche pas.
++Hors nœud (non touchés) : rayons, tailles de police, hauteurs de contrôle (boutons de 30 : voir §6), `line-height` des textes courants (`.desc` 19, `.title` 1,3). La seule exception de `line-height` est celle des pastilles (§2.1), posée pour fixer leur hauteur d'espacement.
++
++Écarts relevés : pastilles à 4 hauteurs (`.meta` ~18, `.vst` ~17, `.rw` 19, `.method` ~19) -> 20 ; boîtes d'information à 5 paddings -> 12 / 8x12 ; `.hc-n` à 4 contre 6 pour le même rôle ; retrait 17 (`.hc-*`) contre 16 (`.rw-*`) ; marqueur 8 (`.hc-t .dot`) contre 7 (`.rw-tt::before`) ; `.anote` : `margin-top: 4px` EMPILÉ sur le `gap` de la carte (11 px effectifs).
++
++## 2. Table par sélecteur
++
++### 2.1 `viewer.html` (cartes, l.156-239)
++
++| Fichier:ligne | Sélecteur | Propriété : actuel -> cible | Motif |
++|---|---|---|---|
++| V:160 | `.card` | `padding: 16px 18px` -> `var(--inset-card)` | 18 hors grille (D-03) |
++| V:160 | `.card` | `gap: 7px` -> `var(--sp-8)` | 7 hors grille (D-03) ; ligne de carte = 8 |
++| V:171 | `.head` | `gap: 10px` -> `var(--sp-8)` | 10 hors grille ; icône -> texte = 8 |
++| V:177 | `.foot` | `gap: 8px` -> `var(--sp-8)` | jeton seul |
++| V:177 | `.foot` | `min-height: 23px` -> `var(--sp-20)` | 23 hors grille ; = hauteur de pastille (20). `FOOT_H` devient 20 + 8 = 28 (§4.1) |
++| V:~181 | `.meta` | `padding: 2px 8px` -> `var(--inset-pill)` ; ajouter `line-height: 16px` | pastille : hauteur 20 |
++| V:~185 | `.method` | `padding: 3px 8px` -> `var(--inset-pill)` ; ajouter `line-height: 16px` | 3 hors grille ; hauteur 20 |
++| V:~195 | `.rw` | `gap: 5px` -> `var(--sp-6)` ; `padding: 4px 8px 4px 7px` -> `var(--inset-pill)` ; `line-height: 1` -> `16px` | 5 et 7 hors grille ; hauteur 20 (avant 19) |
++| V:200 | `svg.lod-low .rw` | `font-size: 18px; padding: 6px 12px` -> `font-size: 18px; padding: var(--sp-4) var(--sp-12); line-height: 20px` | **correctif du juge n°1** : `line-height: 16px` ne doit pas écraser la surcharge de zoom ; hauteur 28 en unités du graphe (avant 30) ; 6 -> 4 = pas du zoom ×1,5 de la base 2 8 arrondi sur la grille, géométrie dérivée (exception 4) |
++| V:~201 | `.card.has-note .title::after` | `margin-left: 8px` -> `var(--sp-8)` | jeton seul |
++| V:~202 | `.card.connector` | `gap: 10px` -> `var(--sp-8)` ; `padding: 0 14px 0 10px` -> `0 var(--sp-12) 0 var(--sp-8)` | 10 et 14 hors grille ; asymétrie CONSERVÉE exprès (icône à fond teinté à gauche, glyphe nu à droite : compensation optique, à commenter `/* optique */`) |
++| V:~207 | `.anote` | `margin-top: 4px` -> SUPPRIMÉ | marge empilée sur le `gap` de la carte |
++| V:~207 | `.anote` | `gap: 9px` -> `var(--sp-8)` ; `padding: 9px 11px` -> `var(--sp-8) var(--sp-12)` | 9 et 11 hors grille ; note |
++
++Non touchés : `.fo-pad` / `--gutter` 28 (V:159, 62, 514, 920, 1113 : marge d'ombre, exception E2 de `71.5-SPEC-shell.md`, couplée à la constante JS `GUTTER` ; la grille §c proposait 24 « à valider sur capture » : NON repris ici, pour ne pas toucher la mise en page ELK sans capture), `.ico`, `.title`, `.desc`, `.rpath`, arêtes.
++Les numéros `~` se déplacent de 1 à 3 lignes selon l'ordre d'application : repérer par sélecteur.
++
++### 2.2 `ui/20-health.js` (gabarit CSS l.28-46)
++
++| Ligne | Sélecteur | Propriété : actuel -> cible | Motif |
++|---|---|---|---|
++| 29 | `.hc-issue` | `padding: 12px 14px` -> `var(--inset-box)` ; `margin-bottom: 8px` -> `var(--sp-12)` | 14 hors grille ; item -> item 12 (boîte ≤ écart) |
++| 31 | `.hc-t` | `gap: 9px` -> `var(--sp-8)` | 9 hors grille ; point -> libellé |
++| 32 | `.hc-t .dot` | `margin-top: 6px` -> `var(--sp-6)` | jeton seul |
++| 33 | `.hc-d` | `margin: 6px 0 0 17px` -> `var(--sp-6) 0 0 var(--sp-16)` | 17 = 16 + 1 sans cause ; retrait unique |
++| 34 | `.hc-n` | `margin: 4px 0 0 17px` -> `var(--sp-6) 0 0 var(--sp-16)` | 4 contre 6 (même rôle) ; 17 |
++| 35 | `.hc-w` | `margin: 6px 0 0 17px` -> `var(--sp-6) 0 0 var(--sp-16)` | 17 |
++| 36 | `.hc-a` | `gap: 6px` -> `var(--sp-6)` ; `margin: 10px 0 0 17px` -> `var(--sp-12) 0 0 var(--sp-16)` | 10 et 17 hors grille |
++| 37 | `.hc-a .btn` | `padding: 0 12px` -> `0 var(--sp-12)` ; `gap: 6px` -> `var(--sp-6)` | jeton seul |
++| 39 | `.hc-calm` | `margin-top: 14px` -> `var(--sp-16)` ; `padding: 11px 13px` -> `var(--inset-box)` | 11, 13, 14 hors grille |
++| 40 | `.hc-sub` | `gap: 4px 14px` -> `var(--sp-4) var(--sp-12)` ; `margin-top: 12px` -> `var(--sp-12)` | 14 hors grille |
++| 41 | `.hc-sub span` | `gap: 6px` -> `var(--sp-6)` | jeton seul |
++
++### 2.3 `ui/25-recent.js` (CSS l.17-32, HTML l.63 et l.84)
++
++| Ligne | Sélecteur | Propriété : actuel -> cible | Motif |
++|---|---|---|---|
++| 20 | `.rw-task` | `padding: 12px 14px` -> `var(--inset-box)` ; `margin-bottom: 8px` -> `var(--sp-12)` | jumeau exact de `.hc-issue` |
++| 22 | `.rw-tt` | `gap: 9px` -> `var(--sp-8)` | 9 hors grille |
++| 23 | `.rw-tt::before` | `width/height: 7px` -> `8px` (taille du `.dot`, V:359) | 7 hors grille ; retrait 16 = 8 + 8 |
++| 24, 26 | `.rw-q`, `.rw-s` | `margin: 6px 0 0 16px` -> `var(--sp-6) 0 0 var(--sp-16)` | jeton seul |
++| 27 | `.rw-a` | `gap: 6px` -> `var(--sp-6)` ; `margin: 10px 0 0 16px` -> `var(--sp-12) 0 0 var(--sp-16)` | 10 hors grille |
++| 28 | `.rw-a .btn` | `padding: 0 12px` -> `0 var(--sp-12)` ; `gap: 6px` -> `var(--sp-6)` | jeton seul |
++| 29 | `.rw-note` | `margin-top: 10px` -> `var(--sp-12)` ; `padding: 10px 12px` -> `var(--sp-8) var(--sp-12)` | 10 hors grille ; note dans une boîte à 12 |
++| 30 | `.rw-note .rw-h` | `margin-bottom: 3px` -> `var(--sp-4)` | 3 hors grille |
++| 31 | `.rw-when` | `margin-top: 4px` -> `var(--sp-4)` | jeton seul |
++| 63 | gabarit HTML | `style="margin-top:10px"` -> `style="margin-top:var(--sp-12)"` | inline, 10 hors grille |
++| 84 | gabarit HTML (`.rw-q` dans `.rw-note`) | `style="margin:6px 0 0"` -> `style="margin:var(--sp-6) 0 0"` | **juge, mineur** : inline à tokeniser |
++
++### 2.4 `ui/30-screens.js` (gabarit CSS l.14-25)
++
++| Ligne | Sélecteur | Propriété : actuel -> cible | Motif |
++|---|---|---|---|
++| 16 | `#sc-menu .sc-f` | `top: -6px; margin: -6px -6px 4px; padding: 10px 10px 6px` -> `top: calc(-1 * var(--sp-6)); margin: calc(-1 * var(--sp-6)) calc(-1 * var(--sp-6)) var(--sp-4); padding: var(--sp-12) var(--sp-12) var(--sp-6)` | -6 compense le `padding: 6px` de `.menu` (V:244) : à garder lié (`/* optique */`) ; 10 -> 12 : champ à 6 visibles du bord (avant 4) |
++| 17 | `#sc-menu .sc-f input` | `padding: 0 12px` -> `0 var(--sp-12)` | jeton seul |
++| 19 | `#sc-menu .sc-g` | `padding: 10px 12px 4px` -> `var(--sp-12) var(--sp-12) var(--sp-4)` | 10 -> 12 (marge au-dessus d'un titre de groupe) |
++| 20 | `#sc-menu .sc-r` | `padding: 9px 12px` -> `var(--inset-row)` | jumeau de `.mi`, `.row`, `.vf-ms`, `#legend label` |
++| 24 | `#sc-menu .sc-none` | `padding: 14px 12px` -> `var(--sp-16) var(--sp-12)` | 14 hors grille ; état vide plus aéré |
++
++## 3. Jumeaux hors périmètre : valeurs de référence à reprendre à l'identique
++
++- Pastille : `.vst` (ui/00:30) `padding: 2px 8px` -> `var(--inset-pill)` + `line-height: 16px` ; `.tag`, `.xtag` (V:331, 371) -> `var(--inset-pill)`.
++  Zoom d'éloignement (ui/00:68-70, `.foot .meta` et `.foot .vst`, `padding: 3px 10px`, polices 19 et 17) -> `padding: var(--sp-4) var(--sp-12); line-height: 20px` (hauteur 28, comme `.rw` de V:200) ; **supprimer** le `line-height: 1.25` de `.meta` et poser 20px sur les deux, sinon la hauteur ne s'aligne pas (juge n°1). `row-gap: 4px` du pied inchangé (4 sur la grille).
++- Boîte pleine `--inset-box` : `.callout` (V:372), `#tooltip` (V:298), `#sc-gloss` (ui/10:146), `.vf-now`, `#vf-reco`.
++- Ligne de liste `--inset-row` : `.mi`, `#legend label`, `.vf-ms`, `.row` (V:361).
++- Carte-boîte du tiroir (`.vf-q-carte`, `.vf-term-carte`) : `--inset-card`. `--sp-*` à recopier dans `S-term` avant usage.
++
++## 4. Couplage géométrique et suites
++
++### 4.1 Couplage JS (à modifier avec le CSS)
++
++| Fichier:ligne | Constante | Avant -> après | Calcul |
++|---|---|---|---|
++| V:940 | `room = w - 36 - (route ? 0 : 40)` | -> `w - 32 - (route ? 0 : 38)` | padding 2 x 16 ; icône 30 + gap 8 = 38 (avant 2 x 18 ; 30 + 10) |
++| V:918 | `FOOT_H = 30` | -> `28` | foot min-height 20 + gap 8 (avant 23 + 7) |
++| V:917 | `NOTE_H = 64` | -> `60` | `.anote` : 2 x 18,1 de texte + 2 x 8 = 52,25 + gap 8 = 60,25 (avant 65,25 pour un budget de 64) |
++| V:919 | `TITLE2_H = 10` | inchangé | 2e ligne de titre 19,5 -> +9,75 |
++| V:1023 | connecteur `textW(...) + 84` | -> `+ 76` | padding 20 (12 + 8) + icône 26 + 2 gaps de 8 + glyphe 14 (avant 24 + 26 + 20 + 14) |
++| V:916 | `SIZES` | inchangé | pile la plus haute (nœud, 3 lignes de description) : 32 + 30 + 8 + 57 + 8 + 20 = 155 contre 128 + 28 = 156 : 1 px de marge, comme avant ; à valider par la mesure |
++| V:920 | `GUTTER = 28` | inchangé | exception E2 |
++
++Les cartes avec pied se raccourcissent de 2 px (FOOT_H 30 -> 28) ; les cartes avec note de 4 px. Aucun autre effet sur la mise en page ELK.
++Aux zooms `lod-mid` / `lod-low` du Projet, le pied (pastilles de 28) dépasse `FOOT_H` comme avant (36 contre 36,75 avant) : à mesurer (§7).
++
++### 4.2 Suites : assertions qui bougent = AUCUNE ; contrôles à rejouer sans les affaiblir
++
++Aucune suite ne cite `.card`, `.anote`, `.rw`, `.meta`, `.hc-*`, `.rw-*`, `#sc-menu`, `FOOT_H`, `NOTE_H` ni `w - 36` (grep). Contrôles géométriques sensibles à ces changements, à REJOUER tels quels (interdit de les retirer ou de les affaiblir ; s'ils rougissent, corriger le CSS, pas le test) :
++- `test-cockpit-responsive.sh` R1 (aucune superposition, y compris entre cartes), R3 (aucun rognage), R19, R20 (titre `#context h1` / première carte) ;
++- `scripts/tests/chrome-equipe-clavier.mjs:149-151` (marge du badge `.card .foot .vst`, `card.right - vst.right`, passe de 18 à 16) et son assertion EK10 (`test-cockpit-equipe.sh:924`, marge >= 0 à 390/1024/1440) ;
++- `scripts/tests/chrome-mission.mjs:11-13` (`dedansTexte`, `dedansPastille` : texte et pastille entiers dans la carte « abandonnée », 1440, clair et sombre) ;
++- `test-cockpit-equipe.sh:950` (EK10.2, mutant : sans la règle `.foot .meta { min-width: 0; overflow: hidden; ... } .foot .vst { flex: none; }` le badge DOIT sortir de sa carte à 1440 px). Les hauteurs de pied ne changent pas cette logique ; vérifier que le mutant rougit toujours (témoin positif d'abord).
++
++## 5. Traçabilité du moteur vendorisé (VENDORED.txt, `amont/patches`) — correctif du juge n°2
++
++`viewer.html` est déjà patché ; `ui/20-health.js`, `ui/25-recent.js`, `ui/30-screens.js` sont des fichiers AMONT non patchés à ce jour (aucune ligne dans `VENDORED.txt`). Tout octet modifié sans patch fait rougir `test-cockpit-vendor.sh` V6/V7. Étapes, dans le même commit que les retouches de CSS :
++1. Avant toute retouche : `bash plugin/cockpit/amont/synchro.sh verifier` doit rendre 0 (témoin).
++2. Nouvel identifiant **P27** (le dernier posé est P26). `skills/cockpit-moteur/VENDORED.txt` :
++   - ajouter `,P27` à la ligne `PATCH assets/viewer.html …` (l.6) et un fragment de description « espacements : grille 71.5, jetons --sp-* / --inset-*, FOOT_H, NOTE_H, largeur de titre » ;
++   - ajouter 3 lignes machine : `PATCH assets/ui/20-health.js P27 espacements …`, `PATCH assets/ui/25-recent.js P27 …`, `PATCH assets/ui/30-screens.js P27 …` (format : `PATCH <chemin> <Pn[,Pm]> <description>`) ;
++   - mettre à jour la ligne `TAILLE assets/viewer.html <N> .html, hors gate` (l.45) au nombre de lignes final du fichier (2393 aujourd'hui pour 2390 inscrit : déjà décalée, recompter après toutes les retouches de tous les nœuds qui touchent `viewer.html`). Les `ui/20|25|30` n'ont pas de ligne `TAILLE` (V4 la réserve aux fichiers avec marqueur de taille) : n'en ajouter que s'ils dépassent 300 lignes (non).
++3. Générer les diffs hors réseau : `bash plugin/cockpit/amont/synchro.sh regenerer-patch assets/ui/20-health.js` (idem `25-recent.js`, `30-screens.js`, puis `assets/viewer.html` pour réécrire `amont/patches/assets__viewer.html.diff`). Fichiers attendus : `amont/patches/assets__ui__20-health.js.diff`, `…25-recent.js.diff`, `…30-screens.js.diff`.
++4. Vérifier : `synchro.sh verifier` rend 0 (amont retrouvé à l'octet), puis `bash plugin/cockpit/scripts/tests/test-cockpit-vendor.sh` vert (V6.1, V6.2 témoin, V7 « diff présent » pour les 3 nouveaux PATCH). Le manifeste `amont-92d6854.sha256` ne change PAS (l'amont est inchangé).
++`viewer.html` est aussi touché par `craft:shell` : un seul porteur du diff (P27 couvre les deux), à coordonner par le manager.
++
++## 6. Points à remonter (hors nœud)
++
++- Boutons `.hc-a .btn` / `.rw-a .btn` à 30 px de haut : sous la cible tactile de 44 (règle d'accessibilité) ; hauteur de contrôle, exception 5 de la grille (hors périmètre). À arbitrer (hauteur tactile à ≤ 700 px, ou zone cliquable étendue).
++- `--gutter` 28 vs grille : voir §2.1 (non repris).
++- Choix de ce nœud : trois niveaux d'englobement (16 / 12 / 8x12) plutôt qu'une valeur unique de boîte. `.anote` à 12 de padding alourdirait la carte de 8 px et obligerait `NOTE_H` à 68.
++
++## 7. Vérification attendue après exécution (vf-coder)
++
++1. Aucune valeur de `padding|margin|gap` hors {0, 2, 4, 6, 8, 12, 16, 20, 24, 32} dans les quatre fichiers (rejouer `inventaire.mjs` sur le périmètre) ; exceptions écrites : `--gutter`, `calc(-1 * var(--sp-6))`, `8px` de `.rw-tt::before` (taille), pas de `line-height` d'espacement hors pastilles.
++2. Mesure des pastilles `.meta`, `.method`, `.rw`, `.vst` en `offsetHeight` (unités du graphe) : **20 au zoom d'ouverture, 28 à `lod-mid` ET à `lod-low`** (Projet et Code) ; en pixels écran à l'échelle de zoom, ne rien conclure.
++3. Captures APRÈS Code + Projet 1280/1440, sombre + clair, comparées aux `avant/` : aucune carte rognée, pied et note entiers, cartes à ±4 px de hauteur.
++4. Suites : §4.2 vertes sans modification, `test-cockpit-vendor.sh` vert (§5).
+diff --git a/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-couleurs.md b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-couleurs.md
+new file mode 100644
+index 00000000..94174541
+--- /dev/null
++++ b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-couleurs.md
+@@ -0,0 +1,233 @@
++# 71.5-SPEC-couleurs : jetons figés, règles de composant, DESIGN.md
++
++Nœud `spec-couleurs` (tour 2/3), mission design Phase 71.5. Aucun fichier de code touché. Non commitée.
++Sources : décisions P71.5-D-18 à D-30 (`71.5-CONTEXT.md`, arbitrages Samuel, AskUserQuestion, session principale, 2026-11-05 ; D-29 et D-30 : décisions du manager, 2026-11-05) ; démo `scratchpad/715/demo/` (`socle.md` tour 2, `anti-slop.md` tour 2, `teintes.md`).
++Numéros de ligne : relevés sur le worktree `phase-71-5` au HEAD `f6ff6c0b` (P27, espacements, déjà commité ; `synchro.sh verifier` vert, 48 fichiers) ; **repérer par sélecteur**, la ligne n'est qu'un guide.
++Mesures : WCAG 2.x, `--surface` / `--bg` (sombre #191919 / #0f0f0f, clair #fff / #f3f3f1). Seuils : glyphe, trait, remplissage 3:1 sur les deux ; texte 4,5:1.
++
++## 1. Table des jetons figés
++
++Jeu de mise en avant : **(d) Pastel lumineux** (D-27). Sombre : vert #9ece6a, jaune beurre #ffe08a (tel quel, D-30), corail #ff9aa8. Clair : vert #009e5a, moutarde #b88100, rouge #f2384a. Neutres : corrections AA du socle tour 2 (D-22). Verts fusionnés (D-26). **Aucun jeton supprimé ni renommé (D-29)** : les Phases 72 et 78 les lisent. Le jeu (d) porte ses propres valeurs claires (G10 sans objet) : les « teintes claires propres » du tour 3 de `socle.md` ne sont pas adoptées.
++
++### 1.1 Table
++
++| Jeton | Sombre : avant → après (surface / fond) | Clair : avant → après (surface / fond) | Note |
++|---|---|---|---|
++| `--text` | #ececec inchangé (14,88 / 16,23) | #161616 inchangé (18,10 / 16,29) | inchangé |
++| `--text-2` | #b4b4b4 → #c6c6c6 (10,29 / 11,22) | #3f3f3f inchangé (10,53 / 9,48) | sombre : relevé pour garder l'écart avec `--text-3` |
++| `--text-3` | #8b8b8b → #a8a8a8 (7,39 / 8,06) | #595959 inchangé (7,00 / 6,30) | sombre : écart `--text-3`/`--text-4` = 1,62 |
++| `--text-4` | #5c5c5c → #828282 (4,58 / 4,99) | #666666 inchangé (5,74 / 5,17) | sombre sur `--raise` : 4,09 (voir §1.3) |
++| `--accent` | indéfini → =`--on` #ececec (14,88 / 16,23) | indéfini → =`--on` #161616 (18,10 / 16,29) | neutre ; 3 usages JS + `accent-color` le lisent déjà |
++| `--recent` | #4ade80 → #9ece6a (9,62 / 10,49) | #157a3a → #009e5a (3,48 / 3,13) | absorbe `--ok` (D-26) |
++| `--ok` | #6fd7a8 → =`--recent` = #9ece6a (9,62 / 10,49) | #1a8a5b → =`--recent` = #009e5a (3,48 / 3,13) | ALIAS conservé (P71.5-D-29) : valeur fusionnée (D-26) |
++| `--st-done` | =`--recent` inchangé = #9ece6a (9,62 / 10,49) | =`--recent` inchangé = #009e5a (3,48 / 3,13) | alias, inchangé |
++| `--st-active` | =`--sev-medium` inchangé = #ffe08a (13,63 / 14,86) | =`--sev-medium` inchangé = #b88100 (3,40 / 3,06) | alias, inchangé |
++| `--st-recette` | (absent) → =`--st-active` = #ffe08a (13,63 / 14,86) | (absent) → =`--st-active` = #b88100 (3,40 / 3,06) | nouveau (D-20) ; classe `vst-recette` |
++| `--st-todo` | =`--text-4` inchangé = #828282 (4,58 / 4,99) | =`--text-4` inchangé = #666666 (5,74 / 5,17) | alias ; suit `--text-4` (AA gagné) |
++| `--st-blocked` | =`--sev-high` inchangé = #ff9aa8 (8,74 / 9,53) | =`--sev-high` inchangé = #f2384a (3,86 / 3,47) | alias, inchangé |
++| `--sev-high` | #f28b8b → #ff9aa8 (8,74 / 9,53) | #c94a4a → #f2384a (3,86 / 3,47) |  |
++| `--sev-medium` | #f0c36b → #ffe08a (13,63 / 14,86) | #946000 → #b88100 (3,40 / 3,06) | voir §1.3 (beurre) et moutarde |
++| `--sev-low` | #8b8b8b inchangé (5,16 / 5,63) | #666666 inchangé (5,74 / 5,17) | inchangé |
++| `--warn-text` | #f3d79b → #ffe9a8 (14,63 / 15,95 / 12,75 avec fond de boîte) | #6b4500 → #986300 (5,10 / 4,59 / 4,55 avec fond de boîte) | texte : 4,5:1 sur surface et fond |
++| `--err-text` | #f6a5a5 → #ffb3bc (10,40 / 11,34 / 9,07 avec fond de boîte) | #b42323 → #da1637 (5,06 / 4,55 / 4,52 avec fond de boîte) |  |
++| `--recent-text` | (absent) → #9ece6a (9,62 / 10,49 / 8,39 avec fond de boîte) | (absent) → #007f3d (5,12 / 4,61 / 4,57 avec fond de boîte) | CRÉÉ en plus ; texte vert 4,5:1 |
++| `--ok-text` | #a9e5c9 → =`--recent-text` = #9ece6a (9,62 / 10,49 / 8,39 avec fond de boîte) | #14603f → =`--recent-text` = #007f3d (5,12 / 4,61 / 4,57 avec fond de boîte) | ALIAS conservé (D-29) |
++| `--warn-bg` | rgba(240,195,107,.08) → rgba(var(--ink), .05) | rgba(217,160,40,.16) → rgba(var(--ink), .05) | GARDE son nom (D-29) ; valeur neutre |
++| `--note-bg` | (absent) → rgba(var(--ink), .05) | (absent) → rgba(var(--ink), .05) | CRÉÉ en plus : fond neutre de boîte (même valeur) |
++| `--ok-bg` | rgba(111,215,168,.08) → =`--note-bg` | rgba(26,138,91,.12) → =`--note-bg` | ALIAS conservé (D-29) |
++| `--warn-sheet` | rgba(46,38,18,.9) → =`--menu-solid` | rgba(255,244,214,.97) → =`--menu-solid` | ALIAS conservé (D-29) ; feuille neutre |
++| `--on-sev-text` | #0f0f0f inchangé (sur medium 14,86, sur high 9,53) | #fff → #161616 (sur medium 5,32, sur high 4,69) | encre sur puce pleine |
++| `--on-recent-text` | #0b1f12 inchangé (sur recent 9,43) | #fff → #161616 (sur recent 5,20) | encre sur puce pleine |
++| `--k-contains` | #4a4a4a → #686868 (3,16 / 3,44) | #8d8d8d → #868686 (3,64 / 3,28) | trait de lien sur `--bg` (3:1) |
++| `--n-worker`, `--k-queue`, `--m-PUT` | #f0c36b → #ffe08a (13,63 / 14,86) | #a8710c → #b88100 (3,40 / 3,06) | suivent `--sev-medium` (déjà égales avant) |
++| `--n-library`, `--m-GET` | #6fd7a8 → #9ece6a (9,62 / 10,49) | #1a8a5b → #009e5a (3,48 / 3,13) | suivent `--recent` |
++| `--n-infra`, `--m-DELETE` | #f28b8b → #ff9aa8 (8,74 / 9,53) | #c94a4a → #f2384a (3,86 / 3,47) | suivent `--sev-high` |
++| `--n-test`, `--k-event` | #f19ac7 → #ea7fbe (6,93 / 7,56) | #c43c86 / #c43a85 → inchangé | sombre : ΔE 4,9 avec `--sev-high` avant, 9,1 après |
++| `KIND_COLORS.mission` | #f19ac7 → #ea7fbe (6,93 / 7,56) | #c43a85 inchangé (4,89 / 4,40) | aligné sur `--n-test` |
++| `KIND_COLORS.graine` | #8fd16a → #a3a3a3 (6,97 / 7,60) | #3f7d20 → #666666 (5,74 / 5,17) | sombre : ΔE 1,8 avec `--recent` (identiques à l'œil) ; neutre (= `--n-config`) |
++
++
++
++Familles `--n-*` / `--k-*` / `--m-*` non listées : inchangées. Règle posée : **ce qui valait la teinte d'état avant la suit (même valeur)**, pour que « même teinte = même sens » reste vrai ; ce qui entre en collision avec le nouveau jeu est décalé (rose sombre) ou rendu neutre (graine).
++
++### 1.2 Contrôles faits
++- Tous les glyphes et remplissages d'état tiennent ≥ 3:1 sur `--surface` ET `--bg`, deux thèmes. Marge faible : clair `--sev-medium` #b88100 = 3,40 / **3,06** (fond) ; `--recent` clair 3,13 (fond).
++- **Aucune teinte d'état ne tient 3:1 sur `--raise` ni sur `--raise-2` en clair** : sur `--raise` (#ebebe8) moutarde 2,85 et vert 2,91 ; sur `--raise-2` (#e0e0dc, la piste des barres) moutarde **2,57**, vert 2,63, rouge 2,92. Règle : **en thème clair, une teinte d'état (glyphe, trait, remplissage) ne se pose ni sur `--raise` ni sur `--raise-2`**. Seules les variantes texte `--*-text` (≥ 4,5 sur `--surface`) peuvent y reposer : sur `--raise-2` clair, `--warn-text` #986300 = 3,85, `--recent-text` #007f3d = 3,87. Application : le remplissage de la barre « en cours » prend `--warn-text` (§3 #5) ; le remplissage neutre `--text-3` fait 5,29 (clair) et 5,95 (sombre) sur `--raise-2`. Cas concerné à surveiller : `.module` (fond `--raise`) ne porte aucun glyphe d'état.
++- Textes d'état : `--warn-text`, `--err-text`, `--recent-text` ≥ 4,5:1 sur surface et fond dans les deux thèmes. Sur `--warn-bg`/`--note-bg` posé directement sur `--bg` clair (#e7e7e5) ils tombent à 4,09 à 4,13 : **ces fonds neutres ne se posent que sur `--surface`** (cas actuel : callout, `.hc-calm`, `.xp-err`, `.engine.warn`, `.rw-task` dans des panneaux ou cartes).
++- Puces pleines : encre `#161616` sur le clair (5,20 à 5,32 ; **4,69** sur rouge, marge faible), blanc impossible (3,47). Sombre : encre sombre ≥ 9,4.
++- Daltonisme (Machado, `teintes.md`) : aucun jeu n'est sûr par la couleur seule (écarts < 8) ; le glyphe et le mot portent le sens, la couleur renforce. Point faible de (d) : rouge/orange clair (3,5).
++
++### 1.3 Vigilances de Samuel, avec mesure
++- **Beurre sombre #ffe08a** : appliqué tel que choisi (D-30). Mesure pour le juge de rendu : luminance relative 0,764 contre 0,565 pour `--text-2` (#c6c6c6) et 0,839 pour `--text` ; vert 0,525, corail 0,472. Le jaune est le plus brillant de tout l'écran hors texte principal. **Variante tempérée notée pour après rendu : #f0d17c** (L OKLCH 0,87, luminance 0,656, 11,82 / 12,89), ou #eacb75 (0,615). Si Samuel la valide : remplacer en bloc `--sev-medium`, `--n-worker`, `--k-queue`, `--m-PUT`, palette xterm `yellow`, `tokens.ts` `st-active` (sombre).
++- **Moutarde claire #b88100** (L 0,64, C 0,134, h 79) : assumée. À 3,06 sur le fond, c'est la limite du seuil ; on ne fait pas un jaune vif à 3:1 sur #f3f3f1. Elle tire vers le brun-moutarde ; `--n-script` clair #c06a1d est à ΔE 6,1 (déjà proche avant), `KIND_COLORS.jalon` #b45309 à 11,3.
++- Le sombre #9ece6a est plus jaune (h 130) que l'ancien #4ade80 (h 150) ; `--n-data` #63d2b8 est à ΔE 10,1.
++
++### 1.4 Jetons : alias, créés, retirés (D-29)
++**Retirés : aucun. Renommés : aucun.** Alias conservés : `--ok: var(--recent)`, `--ok-bg: var(--note-bg)`, `--ok-text: var(--recent-text)`, `--warn-sheet: var(--menu-solid)`. `--warn-bg` garde son nom, valeur `rgba(var(--ink), .05)` (littérale, car `terminal-style` la recopie à l'identique). **Créés en plus** : `--note-bg`, `--recent-text`, `--accent` (= `--on` ; lu aujourd'hui sans jamais être défini : `viewer.html` `--c:var(--accent)` ×3, points de parcours, `ui/60-export.js` `accent-color`), `--st-recette` (= `--st-active`).
++
++## 2. Où chaque jeton vit
++
++| Jeton ou groupe | Fichier:ligne (HEAD `f6ff6c0b`) | Geste |
++|---|---|---|
++| `--text-2/3/4`, `--recent`, `--on-recent-text`, `--ok`, `--sev-*`, `--warn-*`, `--ok-*`, `--err-text` (sombre) | `plugin/cockpit/skills/cockpit-moteur/assets/viewer.html` `:root` l.40-46 | valeurs du §1.1 ; `--ok`, `--ok-bg`, `--ok-text`, `--warn-sheet` passent en alias ; `--warn-bg` en valeur neutre ; ajouter `--note-bg`, `--recent-text`, `--accent: var(--on)` (une fois, dans `:root`, suit `--on` du thème) |
++| idem (clair) | `viewer.html` `:root[data-theme="light"]` l.81-86 (`--on-sev-text` l.83) | idem ; `--on-recent-text` et `--on-sev-text` → `#161616` |
++| `--k-*`, `--n-*`, `--m-*` | `viewer.html` l.57-61 (sombre), l.95-99 (clair) | `--k-contains`, `--k-event` (sombre), `--k-queue`, `--n-worker`, `--n-library`, `--n-infra`, `--n-test` (sombre), `--m-GET`, `--m-PUT`, `--m-DELETE` |
++| `--st-*` | `ui/00-vibeflow.js` l.25 | **garder** (tableau « Statuts » de DESIGN.md et `m5_statuts` de `test-cockpit-marque-blanche.sh:116`) ; ajouter `--st-recette: var(--st-active)` |
++| alias `--n-terminés` | `ui/00-vibeflow.js` l.75 | inchangé |
++| `--accent` (lecteurs) | `viewer.html` l.1573, 1602, 1606 ; `ui/60-export.js` l.20 | aucun changement : la variable existe enfin |
++| Copie Q du document du terminal | `plugin/cockpit/scripts/vf-cockpit-terminal-style.mjs` l.15-35 (sombre), l.36-43 (clair) ; `VARIABLES_RECOPIEES` l.6-9 | mêmes valeurs que viewer.html (sonde T18, 41 variables) : `--text-2/3/4`, `--recent`, `--sev-high/medium`, `--warn-text`, `--err-text`, **`--warn-bg`** (nom gardé, valeur `rgba(var(--ink), .05)`) ; liste et compte inchangés |
++| Thème xterm | `scripts/vf-cockpit-terminal-vue.mjs` l.29-32 (SOMBRE), l.34-37 (CLAIR) | voir §2.1 |
++| Palette des flux | `viewer.html` l.1645 `['#a78bfa','#38bdf8','#34d399','#fbbf24','#f472b6']` | **inchangée** : 5 teintes catégorielles sans état, en dur dans le JS vendorisé (dette connue) ; ΔE 8,7 (vert) et 9,5 (jaune) avec les teintes d'état |
++| `KIND_COLORS` | `scripts/vf-cockpit-types.mjs` l.15-19 | `mission` → `['#c43a85', '#ea7fbe']` ; `graine` → `['#666666', '#a3a3a3']` ; les 6 autres inchangées. Table conservée : `ui/80-vf-fr.js` l.93-99 pose `--n-<type>` |
++| Jetons TS de vf-signal | `plugin/cockpit/signal/hooks/tokens.ts` l.11-24 | sombre : `st-done` #9ece6a, `st-active` #ffe08a, `st-todo` #828282, `st-blocked` #ff9aa8, `text-2` #c6c6c6, `text-3` #a8a8a8, `text-4` #828282 ; clair : `st-done` #009e5a, `st-active` #b88100, `st-blocked` #f2384a ; M10 les compare à DESIGN.md |
++| **Fonds verts teintés de « récent »** | `ui/25-recent.js` l.20 (`.rw-task`), l.29 (`.rw-note`), l.30 (`.rw-h`) ; `viewer.html` l.315 (`#tooltip .trw`), l.316 (`#tooltip .trh`) | règle §3 #18 |
++| **Verbes HTTP** | `viewer.html` l.195 (`.method`), emplois l.975, 1524, 1743 | règle §3 #19 |
++
++### 2.1 Palette xterm (`vf-cockpit-terminal-vue.mjs`)
++La sonde `palette.mjs` (dans `test-cockpit-terminal-page.sh` l.77-96) lie `red`↔`--sev-high`, `green`↔`--recent`, `yellow`↔`--sev-medium`, `white`↔`--text-2`, `brightBlack`↔`--text-3`, `brightRed`↔`--err-text`, `brightYellow`↔`--warn-text`, `brightWhite`↔`--text`, `blue/magenta/cyan`↔`--k-http/call/data`.
++- **SOMBRE** : `red` #ff9aa8, `green` #9ece6a, `yellow` #ffe08a, `white` #c6c6c6, `brightBlack` #a8a8a8, `brightRed` #ffb3bc, `brightYellow` #ffe9a8, `brightGreen` #b9e08e (sans origine ; 11,82 sur surface). `blue` #7aa7ff, `magenta` #b49cff, `cyan` #63d2b8, `black` #2b2b2b, `brightBlue/Magenta/Cyan` inchangés.
++- **CLAIR** : l'ANSI est du TEXTE. #009e5a / #b88100 / #f2384a sur #fff donnent 3,48 / 3,40 / 3,86 : sous 4,5. Donc `green` #007f3d, `yellow` #986300, `red` #da1637 (5,12 / 5,10 / 5,06) ; `brightGreen` #007f3d, `brightYellow` #986300, `brightRed` #da1637 (les « vives » du clair valaient déjà plus sombres ; elles se confondent avec le normal, sans conséquence xterm). `white` #3f3f3f, `brightBlack` #595959 inchangés. **Effet sur la sonde** : l'origine de `green`, `yellow`, `red` en clair passe à `--recent-text`/`--warn-text`/`--err-text` (table `ORIGINE` sensible au thème pour ces trois clés ; le contrôle reste, il compare une autre variable).
++
++### 2.2 Suites qui figent une couleur (valeur attendue après changement ; aucune vérification retirée)
++| Suite | Ligne | Aujourd'hui | Après |
++|---|---|---|---|
++| `plugin/cockpit/signal/tests/graphite.test.tsx` | 12-13 | `SOMBRE {done #4ade80, active #f0c36b, todo #5c5c5c, blocked #f28b8b, t2 #b4b4b4, t3 #8b8b8b, t4 #5c5c5c}` ; `CLAIR {done #157a3a, active #946000, blocked #c94a4a}` | `SOMBRE {done #9ece6a, active #ffe08a, todo #828282, blocked #ff9aa8, t2 #c6c6c6, t3 #a8a8a8, t4 #828282}` ; `CLAIR {done #009e5a, active #b88100, todo #666666, blocked #f2384a}` |
++| `signal/tests/lot-b.test.tsx` | 10 | `SOMBRE {active #f0c36b, todo #5c5c5c, blocked #f28b8b}` | `{active #ffe08a, todo #828282, blocked #ff9aa8}` |
++| `signal/tests/rv-recette.test.tsx` | 10 | `SOMBRE {active #f0c36b, blocked #f28b8b}` | `{active #ffe08a, blocked #ff9aa8}` |
++| `scripts/tests/test-cockpit-terminal-page.sh` | 236 à 244 (T19.2, T19.4) | mutants `green: '#4ade80'` → `#4ade81` ; `--recent: #4ade80;` → `#4ade7f;` | `green: '#9ece6a'` → `'#9ece6b'` ; `--recent: #9ece6a;` → `#9ece69;` ; messages `--recent=#9ece6a, palette=#9ece6b` et `--recent=#9ece69, palette=#9ece6a` |
++| idem | 239-240 (T19.3) | mutant retire `brightRed: '#b42323',` (clair) | `brightRed: '#da1637',` ; message inchangé |
++| idem | 77-96 (`ORIGINE` de `palette.mjs`) | thème unique | sensible au thème pour `green`, `yellow`, `red` (§2.1). `NOMS` de `parite.mjs` (l.63) : **inchangé** (`--warn-bg` garde son nom) |
++| `scripts/tests/test-cockpit-signal-mod.sh` | 131, 164-171 | fixtures autonomes | **rien à changer**. M10 réel relit `tokens.ts` contre `DESIGN.md` : les deux changent ensemble, `n=16` |
++| `scripts/tests/test-cockpit-marque-blanche.sh` | 116, 125 | `--st-active: var(--sev-medium)` | inchangé (la ligne reste telle quelle) |
++| même fichier | 113-121 (M5.3) | aucun hex ni `rgb(` littéral dans `00-vibeflow.js` et `*vf*.js` | masques de glyphe avec `%23` (jamais `#`), teintes en variables, sinon M5.3 rougit |
++
++### 2.3 Traçage du moteur vendorisé (DESIGN.md §9 : « le tracer dans `VENDORED.txt` »)
++**État vérifié au HEAD `f6ff6c0b`** : `bash plugin/cockpit/amont/synchro.sh verifier` rend `amont v0.6.0 @ 92d6854 retrouvé à l'octet (48 fichiers)` ; les diffs de P27 sont à jour. Précondition : relancer ce verbe juste avant de commencer ; s'il est rouge, P27 n'est pas fini, s'arrêter.
++Fichiers vendorisés touchés par cette spec : **`assets/viewer.html`** (`VENDORED.txt` l.6) et **`assets/ui/25-recent.js`** (l.20) : patch **P28**. **`ui/20-health.js`** (l.19) et **`ui/60-export.js`** (l.18) : aucune retouche, car `--ok`, `--ok-bg`, `--ok-text`, `--warn-bg` restent en alias/valeur neutre (D-29) ; ne pas régénérer leur diff. `00-vibeflow.js` est un AJOUT : pas de diff.
++Procédure, **avant toute édition** (la version amont s'obtient en inversant le diff existant sur le fichier encore non édité ; `git show HEAD:<chemin>` rendrait la version déjà patchée, utile seulement pour un fichier sans diff, ce qui n'est le cas d'aucun des deux) :
++```bash
++cd <worktree phase-71-5>; A="$PWD/plugin/cockpit"; M="$A/skills/cockpit-moteur"; D="$(mktemp -d)"   # hors de tout dépôt
++for F in assets/viewer.html assets/ui/25-recent.js; do
++  mkdir -p "$D/w/$(dirname $F)" "$D/fp/skills/floorplan/$(dirname $F)"; cp "$M/$F" "$D/w/$F"
++  (cd "$D/w" && GIT_CEILING_DIRECTORIES="$D" git apply -p1 -R "$A/amont/patches/$(printf '%s' "$F" | sed 's|/|__|g').diff")
++  grep "  $F\$" "$A/amont/amont-92d6854.sha256"; shasum -a 256 "$D/w/$F"      # les deux sha256 doivent être identiques
++  cp "$D/w/$F" "$D/fp/skills/floorplan/$F"
++done; FC="$D/fp"                                                           # faux clone amont
++```
++(Rejoué à blanc le 2026-11-05 : viewer.html `682e2bcd…8587`, 25-recent.js `e326a65e…01c1`, identiques au manifeste.) Puis éditer, puis, pour chacun :
++```bash
++bash "$A/amont/synchro.sh" regenerer-patch assets/viewer.html "$FC"
++bash "$A/amont/synchro.sh" regenerer-patch assets/ui/25-recent.js "$FC"
++```
++Puis `VENDORED.txt` : l.6 ajouter `,P28` à la liste et compléter la description (« couleurs 71.5 : fonds teintés retirés, pastille et glyphes, jetons d'alias ») ; l.20 `P27` → `P27,P28` ; l.51 `TAILLE assets/viewer.html 2406` → le `wc -l` réel d'après édition (V4). Enfin `bash plugin/cockpit/amont/synchro.sh verifier` puis `bash plugin/cockpit/scripts/tests/test-cockpit-vendor.sh` : tous deux verts. Si le codeur des espacements édite encore `viewer.html`, attendre son commit (le faux clone doit venir d'un fichier cohérent avec son diff).
++
++## 3. Règles de composant (anti-slop, D-18)
++Constat d'abord : l'inventaire de `anti-slop.md` parlait de « capitales espacées » ; **le HEAD n'en contient aucune** (`uppercase` : 0 occurrence). Le « kicker » réel est le span `Projet` (`ui/00-vibeflow.js` l.116) et `.ph .kindlabel` (**`viewer.html` l.352**, `text-transform: capitalize`).
++
++| # | Sélecteur (fichier:ligne) | Avant | Après |
++|---|---|---|---|
++| 1 | `.vst` (`ui/00-vibeflow.js` l.30-31, 33, 35 ; lod l.69-71) | pilule teintée : fond `color-mix(--c-st 14 %)`, texte teinté, `padding var(--inset-pill)`, `line-height:16px` | pastille unique : `display:inline-flex; align-items:center; padding:var(--inset-pill); line-height:16px` (hauteur de 20 px = 16 + 2 × 2, aucune `height` posée) ; `border-radius:999px; font-size:11px; font-weight:500; color:var(--text-2); background:none`. Le glyphe (`::before`, `width/height:.9em`, `background:var(--c-st)`, masque SVG M1 en `%23`) est la seule couleur. Glyphes : done = coche ; active = demi-disque dans un anneau ; recette = anneau + point ; todo = anneau ; blocked = anneau barré horizontalement ; abandonnee = anneau barré en diagonale (#3) |
++| 2 | `.vst-recette` (nouveau ; `ui/00-vibeflow.js` l.108 `ETAT_UI['a-recetter']`) | `['vst-active','À recetter']` | `['vst-recette','À recetter']` ; `.vst-recette { --c-st: var(--st-active); }` + glyphe anneau-point (D-20) |
++| 3 | `.vst-abandonnee` (l.35 ; réécriture JS l.161 `vst-todo` → `vst-abandonnee`) | `--c-st: var(--st-todo)`, pas de glyphe propre | `--c-st: var(--text-3)` ; glyphe : anneau (r 6) barré d'une diagonale de bas-gauche à haut-droite, distinct de « bloqué » (barre horizontale) et de « à faire » (anneau seul). **`vst-prete` n'est pas créé** : « prête à planifier » n'est pas un état du code (la démo l'avait ajouté pour comparer) |
++| 4 | `.rw` pastille « récent » (`viewer.html` l.205-210 ; `.rw::before` l.206) | pilule verte 13 % + point 6 px | même pastille que `.vst` : glyphe « disque plein » `--recent` + mot `--text-2` 500, sans fond ; `svg.lod-low .rw` (l.210) inchangé |
++| 5 | `.vf-bar` (`ui/00-vibeflow.js` l.42-43 ; markup l.105) | remplissage `var(--c-st, var(--st-done))`, vert à 100 % | piste `--raise-2`, 6 px, remplissage `var(--text-3)` (5,29 clair / 5,95 sombre sur la piste) ; **seul** `.vf-bar.st-active i` (en cours, < 100 %) prend **`var(--warn-text)`** (clair #986300 = 3,85:1 sur la piste, sombre #ffe9a8 = 11,78), parce qu'une teinte d'état ne se pose pas sur `--raise-2` en clair (§1.2) : la barre en cours est ainsi une moutarde plus foncée que le glyphe. Le marqueur l.105 ajoute `st-${m.st}` à la barre. 100 % = neutre |
++| 6 | `.card.st-active` (l.39) | anneau 1,5 px `--st-active` + halo `0 8px 28px` 22 % | `background: var(--surface-hover); box-shadow: var(--shadow-card)` ; l'état se lit dans le pied (glyphe + mot) |
++| 7 | `.card.st-blocked` (l.40) | anneau 1,5 px rouge | aucun anneau (D-28) : `box-shadow: var(--shadow-card)`, glyphe anneau-barré + mot « Bloqué », titre 600 `--text` |
++| 8 | `.card.st-done .desc` (l.41) | `opacity: .78` | `color: var(--text-3)` sans opacité ; titres `st-done` et `st-todo` : `font-weight:500; color:var(--text-2)` |
++| 9 | `.card.recent`, `:hover`, `.recent-in` (`viewer.html` l.202-204, 209) | anneau vert 1,5 px (62 %/85 %) et 1 px (30 %) | `box-shadow: var(--shadow-card)` seule ; la règle `body.no-recent … { box-shadow }` devient redondante (garder `body.no-recent .rw { display:none }`) |
++| 10 | `.vf-now`, `.vf-now b` (`ui/00-vibeflow.js` l.48-49 ; markup l.114) | fond `st-active` 8 %, libellé teinté 68 % | `background:none; padding: var(--sp-12) 0 0; border-top:1px solid var(--hair)` ; `b` : `12px; font-weight:500; color:var(--text-3)`, casse normale ; l'état = une pastille (#1) |
++| 11 | Surtitre `Projet` (`ui/00-vibeflow.js` l.116) | `<div class="ph"><span class="kind">Projet</span></div>` | supprimé du balisage (D-25) ; `h2.pt` porte seul |
++| 12 | `.ico` (`viewer.html` l.182-183 ; `#context .k .ico` l.159 ; `.card.connector .ico` l.213 ; `.chip .ico` l.407-408) | tuile 30 px, `background: color-mix(--c 13 %)`, rayon 10 | icône nue : `background:none; width/height:auto`, svg 16 px, trait 1,75. Icônes de nœud de l'onglet Code : `color: var(--c)` (famille `--n-*`) conservé. Projet et Équipe (injection `TAB !== 'code'`, `ui/00-vibeflow.js` l.73) : `--c` forcé à `var(--text-2)` |
++| 13 | `.callout` (l.382), `.engine.warn` (l.424-425), `#ask-warn` (l.433), `.hc-calm` (`ui/20-health.js` l.39), `.xp-err` (`ui/60-export.js` l.25) | fonds `--warn-bg`, `--ok-bg`, `--warn-sheet` teintés | **aucun changement de sélecteur** : les jetons gardent leur nom et portent désormais une valeur neutre (§1.1, D-29). Les mots restent en `--warn-text`/`--ok-text`/`--err-text` (variantes ≥ 4,5:1) |
++| 14 | `.engine.ok i` (l.423) | `box-shadow: 0 0 8px color-mix(--ok 80 %)` : lueur | supprimée ; `background: var(--ok)` (alias) |
++| 15 | `.stats` trio (`viewer.html` l.361-364) | 3 tuiles `rgba(var(--ink), .04)` | ligne unique : `display:flex; gap: var(--sp-24)`, `div { background:none; padding:0 }`, chiffres tabulaires |
++| 16 | `.node.sel .card` (l.177-178), `.pulse` (l.247) | halo `0 0 0 6px rgba(var(--ink), .05)`, `drop-shadow(0 0 6px …)` | retirer le halo 6 px et le `drop-shadow` ; l'anneau 1,5 px à 50 % (neutre, fonctionnel) et `--shadow-lift` restent |
++| 17 | **Une seule intention d'élévation par carte** | anneau + ombre sur `recent`, `st-active`, `st-blocked`, sélection | une carte = `--shadow-card` (ou `--shadow-lift` au survol) ; l'état n'ajoute ni anneau ni halo. Exception : l'anneau de sélection (neutre) |
++| 18 | **Travaux récents** : `.rw-task` (`ui/25-recent.js` l.20), `.rw-note` (l.29), `.rw-h` (l.30) ; `#tooltip .trw` (`viewer.html` l.315), `#tooltip .trh` (l.316-317) | fond vert 6 % / 9 %, titre de bloc `var(--recent)` en 11,5 px 600 | `.rw-task`, `.rw-note`, `.trw` : `background: var(--note-bg)` (posé sur `--elev`/`--surface`), texte `--text` ; le point `.rw-tt::before` (disque plein `--recent`, 8 px) garde la couleur ; `.rw-h` et `.trh` : `color: var(--text-2)` (10,29 / 10,53), et `#tooltip .trh::before { background: var(--recent) }` pour que le disque plein reste vert. `#btn-recent svg.i` (l.18, trait vert 3:1) et `.badge` plein `--recent` + `--on-recent-text` (l.19, 9,4 / 5,2) : inchangés |
++| 19 | **Verbes HTTP** `.method` (`viewer.html` l.195 ; emplois l.975, 1524, 1743) | texte `--m` sur fond `color-mix(--m 14 %)`, 10,5 px 600 : en clair le verbe coloré tombe à 3,4 (PUT), 3,5 (GET), 3,9 (DELETE) sur blanc, sous 4,5 | **reco mesurée** : pas de fond ; verbe en `--text-2` mono 10,5 px 500 (10,53 clair / 10,29 sombre), précédé d'un point `--m` 6 px (`::before`, `background: var(--m)`). Point : sombre 7,4 à 13,6 sur surface ; clair 3,40 (PUT), 3,48 (GET), 3,86 (DELETE), 4,70 (POST), 4,74 (CALL), 5,45 (PATCH), tous ≥ 3. Alternative écartée : sept jetons `--m-*-text` à créer. Le verbe écrit en toutes lettres porte déjà le sens |
++
++### 3.1 `lod-mid` / `lod-low` et la pastille de 20 px (F9)
++Posés par la recette 69 et les espacements : `svg.lod-mid .foot .vst, svg.lod-low .foot .vst { font-size: 17px; padding: var(--sp-4) var(--sp-12); line-height: 20px }` (`ui/00-vibeflow.js` l.71) ; `svg.lod-low .rw` : 18 px, même padding, `line-height 20px` (`viewer.html` l.210) ; `svg.lod-mid .foot .meta, svg.lod-low .foot .meta` : 19 px (l.70). **Conservés tels quels**, en unités du graphe (l'échelle les ramène à ~9-10 px à l'écran). Ce que cette spec ne change pas : police 17 px, padding 4 × 12, line-height 20 px, hauteur de pastille de 28 unités. Ce qui change : le fond disparaît (le padding devient une zone vide qui garde la hauteur et l'alignement du pied) et le glyphe, en `em`, passe à ~15 unités avec la police. Le « 20 px » de la règle #1 est donc la hauteur à l'échelle 1 (16 + 2 × 2), obtenue sans propriété `height` : les paliers lod la dépassent sans conflit.
++Risque `lod-low` : l'anneau vert « récent » et le halo « en cours » disparaissent, le pied reste visible (l.70-71), le titre passe déjà à 22 px (`viewer.html` l.224). À valider par un juge sur capture éloignée avant/après.
++
++## 4. Textes de remplacement pour DESIGN.md
++Le format des tableaux du §2 est lu par le test M10 (`| libellé | \`--variable\` | #sombre | #clair |`, `| statut | \`--st-x\` | \`var(--…)\` |`) : ne rien reformater. Base : DESIGN.md au HEAD `f6ff6c0b` (§4 et §5 déjà réécrits pour les espacements ; ne remplacer que ce qui suit).
++
++### 4.1 §1 Identité visuelle : remplacer les puces « Ambiance » et « Couleur de marque »
++- **Ambiance** : un graphite sombre et calme, presque monochrome. L'information porte la couleur, jamais la décoration : trois teintes d'état pastel (vert, jaune, corail) sur des neutres.
++- **Couleur de marque** : aucune. Le logo (`.mark`, 22 px de haut) est une image blanche, inversée en noir sur le thème clair. Il n'y a plus d'accent unique : `--accent` vaut `--on` (neutre). Les teintes de mise en avant sont les trois couleurs d'état de §2, en jeu « pastel lumineux » : vert (fait, récent), jaune sombre / moutarde claire (en cours), corail / rouge (bloqué, haute sévérité). Elles ne servent qu'un glyphe, un trait ou un remplissage de barre, jamais un fond ni un contour.
++
++### 4.2 §2 Palette : tables à remplacer
++Système (lignes à modifier) :
++| Texte secondaire | `--text-2` | `#c6c6c6` | `#3f3f3f` |
++| Texte tertiaire | `--text-3` | `#a8a8a8` | `#595959` |
++| Texte éteint | `--text-4` | `#828282` | `#666666` |
++| Accent (neutre) | `--accent` | `var(--on)` | `var(--on)` |
++| Fond de boîte d'information | `--note-bg`, `--warn-bg` | encre à 5 % | noir à 5 % |
++
++Sémantique :
++| Sens | Variable | Sombre | Clair |
++|---|---|---|---|
++| Récent / fait, succès | `--recent` (encre dessus `--on-recent-text`) | `#9ece6a` | `#009e5a` |
++| Sévérité haute (erreur, bloqué) | `--sev-high` | `#ff9aa8` | `#f2384a` |
++| Sévérité moyenne (attention, en cours) | `--sev-medium` | `#ffe08a` | `#b88100` |
++| Sévérité basse | `--sev-low` | `#8b8b8b` | `#666666` |
++Sous le tableau : « `--ok` est un alias de `--recent`, `--ok-bg` de `--note-bg`, `--ok-text` de `--recent-text`, `--warn-sheet` de `--menu-solid` (P71.5-D-26, D-29) : on garde les noms, on ne crée plus d'usage nouveau. »
++
++Texte d'état (le texte coloré lit ≥ 4,5:1) :
++| Sens | Variable | Sombre | Clair |
++|---|---|---|---|
++| Succès, récent | `--recent-text` (`--ok-text`) | `#9ece6a` | `#007f3d` |
++| Attention | `--warn-text` | `#ffe9a8` | `#986300` |
++| Erreur | `--err-text` | `#ffb3bc` | `#da1637` |
++| Encre sur puce pleine | `--on-sev-text`, `--on-recent-text` | `#0f0f0f`, `#0b1f12` | `#161616` |
++
++Statuts de travail (tableau à compléter d'une ligne) :
++| Statut | Variable | Doit valoir |
++|---|---|---|
++| Fait | `--st-done` | `var(--recent)` |
++| En cours | `--st-active` | `var(--sev-medium)` |
++| À recetter | `--st-recette` | `var(--st-active)` |
++| À faire | `--st-todo` | `var(--text-4)` |
++| Bloqué | `--st-blocked` | `var(--sev-high)` |
++Note : « À recetter » a la teinte de « en cours » et se distingue par son glyphe (anneau et point) et son mot (P71.5-D-20). Le glyphe est la seule couleur d'une pastille ; le mot est en `--text-2`. Une famille du graphe qui valait une teinte d'état la suit (`--n-worker`, `--k-queue`, `--m-PUT` = `--sev-medium` ; `--n-library`, `--m-GET` = `--recent` ; `--n-infra`, `--m-DELETE` = `--sev-high`). **En thème clair, une teinte d'état ne se pose ni sur `--raise` ni sur `--raise-2`** (2,6 à 2,9:1) : seules les variantes texte y reposent.
++
++### 4.3 §5 Composants : lignes à remplacer
++- **Carte** (`.card`) : fond `--surface`, rayon `--r-card`, `--shadow-card`, c'est sa seule élévation. Variantes :
++  - `recent` : aucune bordure ni anneau ; le récent se dit par la pastille `.rw` ;
++  - `st-active` : palier `--surface-hover`, titre 600 `--text` ; `st-done` et `st-todo` : titre 500 `--text-2` ;
++  - `st-blocked` : aucun anneau ; glyphe anneau-barré et mot « Bloqué » dans le pied ;
++  - `dir` : verre `--dir-bg` ; `module` : fond `--raise` ; `external` : contour seul, fond transparent ;
++  - `has-note` : point de 6 px après le titre (`--sev-medium`).
++- **Pastille de statut** (`.vst`, `.rw`) : 20 px de haut à l'échelle 1 (`line-height 16` + `padding var(--inset-pill)`), pilule, sans fond. Un glyphe coloré (coche fait, demi-disque en cours, anneau-point à recetter, anneau à faire, anneau barré bloqué, anneau barré en diagonale abandonnée, disque plein récent) suivi du mot en `--text-2`, 11 px, 500. Le glyphe suit la taille de police (`em`), donc les paliers du zoom d'éloignement.
++- **Barre de progression** (`.vf-bar`) : 6 px, piste `--raise-2`, remplissage `--text-3` neutre ; seule la barre d'un élément en cours (< 100 %) prend `--warn-text`. Une barre à 100 % est neutre.
++- **Boîte d'information** (callout, `.engine.warn`, `.hc-calm`, `.xp-err`, travaux récents) : fond neutre (`--warn-bg`, `--ok-bg`, `--note-bg`) posé sur `--surface`, jamais un fond teinté.
++- **Verbe HTTP** (`.method`) : point `--m` de 6 px et verbe en `--text-2`, sans fond.
++- **Chip, badge** : en pilule. Le texte sur fond rouge ou jaune est `--on-sev-text` (encre, jamais un blanc en dur).
++(Les autres puces du §5, dont le groupe d'onglets, sont inchangées.)
++
++### 4.4 §7 Icônes : remplacer la seconde puce (l.188)
++- La couleur de l'icône vient du texte qui la porte, avec une seule exception : les icônes de nœud du graphe de code (onglet Code : carte, résultat de recherche) prennent la couleur de leur famille (`--n-*`), parce que ce type est l'information. Ailleurs (Projet, Équipe, panneaux) l'icône est nue, de la couleur de son texte, sans tuile ni fond coloré. Jamais d'icône en couleur pleine, sauf le glyphe d'une pastille de statut.
++
++### 4.5 §9 Règles strictes : lignes à ajouter
++**Toujours**
++- Faire lire l'état sans la couleur : un glyphe de forme distincte et un mot ; la couleur ne fait que renforcer (daltonisme, niveaux de gris, zoom éloigné).
++- Poser les textes colorés sur `--surface` avec une variante `--*-text` à 4,5:1 ; un glyphe, un trait ou une barre d'état à 3:1 sur `--surface` et `--bg`.
++**Jamais**
++- Un liseré, un contour ou une bordure colorés (latéral, haut, ou anneau de carte) : la couleur d'un état ne dessine pas un conteneur.
++- Un fond teinté pour un état (bandeau, callout, pastille, tuile d'icône, hero-metric, puce de verbe) : une boîte d'information est neutre.
++- Un halo coloré (ombre diffuse ou lueur, y compris `drop-shadow`, `box-shadow` flou teinté).
++- Deux intentions d'élévation sur une même carte (anneau et ombre, halo et ombre) : une seule.
++- Une teinte d'état (glyphe, trait, remplissage) sur `--raise` ou `--raise-2` en thème clair (sous 3:1) : seules les variantes texte y reposent.
++- Un titre de section en capitales espacées (« kicker ») au-dessus d'un titre.
++Et remplacer la première puce de « Jamais » par : « Une couleur de marque, un accent unique ou un dégradé décoratif : l'interface reste neutre, seule l'information porte la couleur (trois teintes d'état). »
++
++## 5. Points de décision et risques
++1. **Beurre #ffe08a** (D-30) : appliqué ; juge sur rendu, variante #f0d17c (§1.3) à proposer à Samuel ensuite.
++2. **ANSI clair en texte lisible** (§2.1) : demande l'édition de `ORIGINE` dans `palette.mjs` (même contrôle, autre variable). Sinon le terminal clair garde 3,4:1.
++3. **Barre « en cours » en clair** (§3 #5) : la barre prend `--warn-text` (#986300), plus foncée que le glyphe #b88100 : à valider à l'œil. Alternative mesurée : piste plus claire en clair (`rgba(var(--ink), .05)` sur surface), mais 2,98:1 avec la moutarde, donc écartée.
++4. **F10, à valider sur rendu** : en thème clair, la variante `st-active` d'une carte (palier `--surface-hover` #fbfbfa sur `--surface` #fff) est presque invisible ; hors le titre en 600, rien ne distingue la carte en cours des autres. Si le juge la juge illisible, ajouter un palier neutre plus marqué en clair (`--raise` interdit pour une teinte, pas pour un neutre) ou un pied plus lisible.
++5. **F11, à valider sur rendu** : les glyphes « en cours » (demi-disque dans un anneau) et « à recetter » (anneau et point) sont proches à 10 px et partagent l'ambre ; la distinction repose sur la forme et le mot. Si le juge les confond, agrandir à 12 px ou plein/vide.
++6. Marges faibles à re-mesurer au rendu : moutarde 3,06 (fond), rouge puce pleine 4,69, `--text-4` sombre sur `--raise` 4,09 (ne pas y mettre de texte lu).
++7. Écart de graisse : la démo `socle.html` dessine le mot de pastille en 600, cette spec fige 500 (DESIGN §3, « Petit »).
++8. Hors périmètre, relevés : palette des flux en dur (l.1645) ; alias `--n-terminés` (`ui/00-vibeflow.js` l.75).
+diff --git a/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-projet-equipe.md b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-projet-equipe.md
+new file mode 100644
+index 00000000..153accae
+--- /dev/null
++++ b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-projet-equipe.md
+@@ -0,0 +1,165 @@
++# Phase 71.5 — Spec des espacements : pages Projet et Équipe (tour 2, grille validée)
++
++Nœuds `craft:projet` et `craft:equipe` (vf-crafter, 2026-11-05). Un seul crafter : les deux pages partagent `ui/70-vf-live.js`.
++Aucun fichier de code touché. Sources : `71.5-AUDIT.md`, `71.5-CONTEXT.md` (P71.5-D-01 à D-05), `71.5-RECHERCHE-GRILLE.md` §c, `71.5-SPEC-shell.md`.
++
++**Grille validée par Samuel** (P71.5-D-01, AskUserQuestion, session principale, 2026-11-05) : fermée, 2, 4, 6, 8, 12, 16, 20, 24, 32 (ni 10, ni 14, ni 22).
++Primitifs `--sp-2 … --sp-32` ; sémantiques `--edge` 16, `--inset-panel` 20, `--gap-section` 24, `--inset-card` 16, `--inset-box` 12, `--inset-row` 8 x 12, `--inset-pill` 2 x 8.
++Tous déclarés par `craft:shell` (`:root` de `viewer.html`, copie `S-term`) : **cette spec ne les redéclare pas**. `--pad-panel` n'existe plus.
++Règles appliquées : items de liste 2 ; libellé -> contenu 4 ou 6 ; titre de section -> contenu 8 ; blocs frères 12 ; sections et groupes 24 ; intérieur <= extérieur.
++
++Fichiers (sous `plugin/cockpit/skills/cockpit-moteur/assets/ui/`) : `00` = `00-vibeflow.js`, `70` = `70-vf-live.js`, `71` = `71-vf-equipe-rendu.js`, `72` = `72-vf-equipe.js`.
++**Lignes marquées « REFONTE »** : le tiroir « Au travail » (70:27-50 hors `#vf-lock`, et les gabarits 71) sera probablement refondu (maquette A2, en attente de Samuel). Ces lignes sont **remplacées si la refonte Au travail est retenue** ; elles valent sinon. L'onglet Équipe (72, panneau d'un agent, transcript, bouton `.sec button`) et la page Projet ne sont pas concernés.
++
++## 0. Vérification faite (sans toucher au code)
++
++Injection en direct de `crafter/proj.css` (jetons posés localement, valeurs de cette spec) sur le cockpit partagé 4601, Chromium propre, 1280 x 800, thème sombre, avant/après.
++Dossier : `/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/5237320c-23bb-4599-a818-cdbd167e39c2/scratchpad/715/crafter/` (`proj.css`, `tiroir.mjs`, `mesure.mjs`, captures du tour 1).
++
++**Limite honnête** : le serveur 4601 (partagé, que je ne gère pas) s'est arrêté pendant le tour. Mesuré sur la grille finale : le tiroir « Au travail » et la piste d'onglets. **Calculé, non remesuré** : lignes `.vf-ms`, `.vf-link`, `.vf-now`, panneaux d'ensemble et transcript (mesurés au tour 1 sur la grille provisoire, recalculés ici). À rejouer par le coder ou le juge. Suites de test non rejouées (aucun code modifié).
++
++| Mesure (1280) | Avant | Après | État |
++|---|---|---|---|
++| Tiroir : bord -> titre ; titre -> règle ; règle -> règle ; règle -> 1er agent | 22 ; 4 ; 10 ; 10 | 20 ; 6 ; 12 ; 12 | mesuré |
++| Tiroir : « Verrous et nœuds » avant / après ; bord bas | 16 / 6 ; 33 | 24 / 8 ; 20 | mesuré |
++| Tiroir : marge gauche du titre | 20 | 20 (= `.sec`, W16.3 vert) | mesuré |
++| Piste d'onglets (rail 4, `a` 4 x 12, marge gauche 12) | 200 x 34,2 | 196 x 34,2 ; en-tête 64 / 56 / 100 inchangé | mesuré (tour 1, même valeur) |
++| Zoom 768 / 1024 / 1440 | 308,108 / 574,72 / 16,842 | identiques | mesuré (tour 1) |
++| `.vf-ms` hauteur (16 + 6 + 6 + 2 x 8) | 46 | 44 | calculé |
++| `.vf-link` ligne simple (15 + 2 x 8) | 30 | 31 | calculé |
++| `.vf-now` hauteur | 146,9 | ~147,9 (12 x 12, titre -> texte 3 -> 4) | calculé |
++| Transcript : titre -> liste d'outils | 12 (marge UA) | 4 | mesuré tour 1 |
++
++## 1. Points tranchés (plus d'EN ATTENTE sur ces lignes)
++
++- **Onglets (D-05)** : rail `--sp-4`, onglet `--sp-4 --sp-12`, marge gauche du groupe 14 -> `--sp-12`. Même valeur que `ui/02:30` (coque, 4 x 8 en téléphone).
++- **Panneaux (D-02)** : `.vf-whop` lit `--inset-panel` sur les quatre côtés (avant 22 x 20). W16.3 reste vert (mesuré : 20 = 20).
++- **Alignement des trois listes (ex-G4)** : `.vf-ms`, `.vf-link` (lignes de liste) et `.row` (coque) lisent le même `--inset-row` 8 x 12 : texte aligné sur la même verticale. Dépendance coque : `.row` = `--inset-row` (sa spec le pose). Les liens en ligne d'un agent (`.vf-who > a.vf-link`, panneau Équipe) gardent 6 vertical et 0 horizontal, comme aujourd'hui.
++- **Boutons « Voir la dernière commande » / « Lire le transcript »** : 4 x 12 (contrôle, pas pastille : 10 -> 12 plutôt que 8). Seul choix de ma part dans le mapping 10 -> 8 ou 12.
++
++## 2. Table par sélecteur
++
++« = » : valeur déjà sur la grille, seule l'écriture change.
++
++### 2.1 Section Projet
++
++| Fichier:ligne | Sélecteur | Propriété | Actuel -> cible | Motif |
++|---|---|---|---|---|
++| 00:26 | `.vf-tabs` | gap | 2 -> `--sp-2` (=) | jeton |
++| 00:26 | `.vf-tabs` | padding | 3 -> `--sp-4` | D-05 ; test R13.4 ; **égale ui/02:30 (coque)** |
++| 00:26 | `.vf-tabs` | margin-left | 14 -> `--sp-12` | 14 hors grille ; groupe -> logo, intérieur de l'en-tête |
++| 00:27 | `.vf-tabs a` | padding | 5 x 13 -> `--sp-4 --sp-12` | D-05 ; piste 34,2 conservée, borne 342 de la Phase 78 respectée |
++| 00:30 | `.vst` | padding | 2 x 8 -> `--inset-pill` (=) | jeton sémantique |
++| 00:42 | `.vf-bar` | margin-top | 6 -> `--sp-6` (=) | libellé -> barre (hauteur 6 : DESIGN §5, hors nœud) |
++| 00:44 | `.vf-ms` | padding | 9 x 12 -> `--inset-row` | 9 impair ; aligné sur `.row` et `.vf-link` |
++| 00:44 | `.vf-ms` | margin-bottom | 4 -> `--sp-2` | items de liste : 2 |
++| 00:46 | `.vf-ms .t` | gap | 8 -> `--sp-8` (=) | jeton |
++| 00:48 | `.vf-now` | padding | 12 x 14 -> `--inset-box` | 14 hors grille ; boîte d'information : un seul padding (12) |
++| 00:49 | `.vf-now b` | margin-bottom | 3 -> `--sp-4` | libellé -> contenu |
++| 00:50 | `.vf-link` | padding | 6 x 10 -> `--inset-row` | ligne de liste, même squish que `.vf-ms` et `.row` |
++| 00:50 | `.vf-link` | gap | 8 -> `--sp-8` (=) | jeton |
++| nouveau, près de 00:50 | `.sec > .vf-link + .vf-link` | margin-top | aucun -> `--sp-2` | items de liste : 2 (lignes collées aujourd'hui) |
++| 00:68 | `svg.lod-mid .foot, svg.lod-low .foot` | row-gap | 4 -> `--sp-4` (=) | jeton |
++| 00:69, 00:70 | `svg.lod-* .foot .meta`, `.foot .vst` | padding | 3 x 10 -> `--sp-4 --sp-8` | pastille agrandie par le lod (police 17-19 px) : plus haute que `--inset-pill`, exception écrite en commentaire ; 10 -> 8 |
++| 00:97 | style en ligne `p.pd` (dérive) | margin-top | 8px -> `var(--sp-8)` | jeton |
++| 00:113 | style en ligne `.vf-now` | margin-top | 12px -> `var(--sp-12)` | blocs frères 12 |
++| 00:113 | style en ligne `div` (description) | margin-top | 6px -> `var(--sp-6)` | libellé -> contenu |
++| 00:117 | style en ligne `.stats.vf-stats` | margin-top | **14 -> `var(--sp-12)`** | blocs frères : un seul intervalle, 12 |
++
++Ne pas modifier le littéral `'#btn-health{} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }'` (00 ; liste `CONNU`, `test-cockpit-equipe.sh:408`) ni `--st-active: var(--sev-medium)` (M5.1). Aucune couleur littérale (M5.3).
++
++### 2.2 Section Équipe
++
++| Fichier:ligne | Sélecteur | Propriété | Actuel -> cible | Motif | Refonte |
++|---|---|---|---|---|---|
++| 72:23 | style en ligne `.stats.vf-stats` | margin-top | **14 -> `var(--sp-12)`** | blocs frères 12 (comme 00:117) | non |
++| 72:24 | style en ligne `p.pd` | margin-top | 12 -> `var(--sp-12)` (=) | jeton | non |
++| 71 (toutes lignes) | aucune déclaration d'espacement | | aucun changement | les gabarits emploient les classes de 70 | gabarits remplacés si refonte |
++| 70:20 | `#vf-lock` | gap | 6 -> `--sp-6` (=) | jeton (bouton d'en-tête) | non |
++| 70:36 | `.sec button[data-vf-doing], .sec button[data-vf-transcript]` | padding / margin | 3 x 10 / 6 6 0 0 -> `--sp-4 --sp-12` / `--sp-6 --sp-6 0 0` | 3 hors grille ; bouton du panneau d'un agent (Équipe) | non |
++| 70:39 | `.vf-who > a.vf-link, body.vf-tab-equipe .sec > a.vf-link` | padding | `padding-left/right: 0` -> `padding: var(--sp-6) 0` | garde le 6 vertical d'aujourd'hui malgré le nouveau `.vf-link` 8 x 12 ; la ligne 70:38 (commentaire « retrait de 10 px ») devient « retrait de 12 px » | non pour le lien du panneau agent ; REFONTE pour `.vf-who` |
++| 70:48 | `.vf-transcript` | margin-top | 8 -> `--sp-8` (=) | jeton | non |
++| 70:49 | `.vf-transcript h4` | margin | 10 0 4 -> `--sp-12 0 --sp-4` | 10 -> 12 entre blocs ; titre -> contenu 4 (sous-titre dense) | non |
++| 70:49 | `.vf-transcript p, li` | margin | 2 0 -> `--sp-2 0` (=) | items 2 | non |
++| nouveau après 70:50 | `.vf-transcript ul` | margin / padding-left | UA 12 0 / 40 -> `--sp-4 0 0` / `--sp-16` | « Outils » -> liste 12 contre 4 ailleurs ; 40 hors grille | non |
++| 70:51 | `#vf-reco` | gap | 12 -> `--sp-12` (=) | jeton | non |
++| 70:51 | `#vf-reco` | padding | 12 14 12 18 -> `--inset-box --inset-box --inset-box --sp-16` | boîte d'information 12 ; gauche 16 gardé (rayon 20 : le texte ne doit pas coller à la courbe), valeur sur la grille | non |
++| 70:51 | `#vf-reco` | max-width | `calc(100vw - 32px)` -> `calc(100vw - 2 * var(--edge))` | jeton | non |
++| 70:51 | `#vf-reco` | bottom | 96 -> `calc(var(--edge) + <hauteur de #ask> + var(--sp-8))` si la coque nomme la hauteur de la barre ; sinon 96 inchangé | exception 4 (géométrie dérivée) : la barre de question passe à `bottom: var(--edge)` (coque, 20 -> 16), le calage manuel de 96 devient faux de 4 px. Je n'ai pas pu mesurer `#ask` (serveur arrêté) : à confirmer sur capture | non |
++| 70:52 | `#vf-reco button` | padding | 7 x 14 -> `--sp-8 --sp-16` | 7 et 14 hors grille ; bouton rond | non |
++
++**Tiroir « Au travail » : REFONTE possible (remplacées si la refonte Au travail est retenue)**
++
++| Fichier:ligne | Sélecteur | Propriété | Actuel -> cible | Motif |
++|---|---|---|---|---|
++| 70:27 | `.vf-whop` | padding | 22 x 20 -> `var(--inset-panel)` (quatre côtés) | D-02 ; jumeau de `.sec` ; W16.3 |
++| 70:28 | `#panel:has(> .vf-whop)` (>= 701 px) | max-height | `calc(100vh - var(--hh, 64px) - 20px)` -> `calc(100vh - var(--hh, 64px) - var(--sp-4) - var(--edge))` | 20 = 4 (haut `--hh + 4`) + 16 (bas du panneau) : même valeur, plus de 20 magique |
++| 70:25 (commentaire) | | | « `.sec` : 18px 20px 6px, 22 px … » | à remettre à jour avec les valeurs finales de la coque |
++| nouveau avant 70:29 | `.vf-whop p` | margin | UA (13,5 sur « Personne. Sources lues », 11 en bas de `.src`) -> `0` | marges navigateur hors grille ; CSS seule, ne PAS ajouter de classe au `<p>` (70:85 : le littéral `'<p>Personne. Sources lues : '` est dans `CONNU`, `test-cockpit-equipe.sh:406`) |
++| 70:29 | `.vf-whop h3` | margin | 0 0 4 -> `0 0 var(--sp-6)` | titre du panneau : jumeau de `.pt` (6) |
++| 70:29 | `.vf-whop h4` | margin | 16 0 6 -> `var(--gap-section) 0 var(--sp-8)` | groupe de même rang qu'une section : 24 ; titre -> contenu 8 comme `.sec h3` |
++| 70:30 | `.vf-whop .regle` | margin | 0 0 10 -> `0 0 var(--sp-12)` | 10 -> 12 entre paragraphes |
++| 70:31 | `.vf-who` | padding | 8 0 -> `--sp-8 0` (=) | jeton |
++| 70:32 | `.vf-who div` | margin-top | 2 -> `--sp-2` (=) | lignes de texte serrées |
++| 70:34 | `.vf-who button` | margin-top / padding | 6 / 3 x 10 -> `--sp-6` / `--sp-4 --sp-12` | jumeau exact de 70:36 : une seule valeur de bouton |
++| 70:43 | `.vf-who .vf-doing` | margin-top | 6 -> `--sp-6` (=) | jeton |
++| 70:44 | `.vf-whop .src` | margin | `margin-top: 14` (+ 11 UA) -> `margin: var(--gap-section) 0 0` | même relation que le `h4` : nouveau groupe, 24 |
++| 70:45 | `.vf-arbre-enfants` | margin-left / padding-left | 14 / 10 -> `--sp-12` / `--sp-8` | 14 et 10 hors grille |
++| nouveau après 70:46 | `.vf-who .vf-arbre-enfants` | margin-top | **2 (hérité de `.vf-who div`) -> `--sp-8`** | les sous-agents se collaient à 2 px du bouton du parent |
++| 70:46 | `.vf-who .vf-link` | margin | 4 10 0 0 -> `--sp-4 --sp-8 0 0` | 10 -> 8 ; l'espace du gabarit ajoute ~3 px |
++| 70:47 | `.vf-termines > summary` | padding | 8 0 -> `--sp-8 0` (=) | jeton |
++| 71:33-46 | gabarits `bloc`, `liste` | structure | inchangée | ne pas emballer liens et boutons : contrat `bouton.nextElementSibling` = `.vf-doing` des suites |
++
++## 3. Rythme vertical de chaque page
++
++| Pas | Rôle | Où |
++|---|---|---|
++| `--sp-2` | items de liste ; lignes de texte serrées | `.vf-ms`, `.vf-link + .vf-link`, `.vf-who div`, transcript p/li |
++| `--sp-4` / `--sp-6` | libellé -> son contenu | `.vf-now b` 4, `.vf-bar` 6, titre du panneau 6, titre de transcript 4 |
++| `--sp-8` | titre de section -> contenu ; bloc imbriqué | `h4` du tiroir, `.vf-arbre-enfants`, `.vf-transcript` |
++| `--sp-12` | entre blocs frères | `.vf-now`, `.vf-stats`, `p.pd`, `.regle` |
++| `--gap-section` 24 | entre groupes ou sections | `h4` et `.src` du tiroir ; entre `.sec` (coque) |
++
++**Page Projet (panneau d'ensemble).**
++- Titre `.pt` -> « Maintenant » : 12 (inchangé). « Maintenant » -> compteurs : 14 -> **12**. Dans « Maintenant » : titre -> texte 3 -> **4**, texte -> description 6.
++- Boîte « Maintenant » : 12 x 12 (avant 12 x 14), alignée sur `.callout`, `#tooltip` de la coque.
++- Lignes de liste : « Prochaines phases » 0 -> **2** ; « Jalons » 4 -> **2** ; `.row` (Code) 2. Texte des trois listes sur la même verticale (`--inset-row`).
++- Entre sections : coque, 24 (`--gap-section`).
++
++**Page Équipe.**
++- Panneau d'ensemble : titre -> compteurs 14 -> **12** ; compteurs -> texte 12 ; « Sources lues » : 3 lignes à 2 d'intervalle (avant 0), squish 8 x 12.
++- Tiroir « Au travail » (REFONTE possible) : bord 20 ; titre -> règle 4 -> **6** ; règle -> règle 10 -> **12** ; règle -> premier agent 10 -> **12** ; « Verrous et nœuds » 16 avant / 6 après -> **24 avant / 8 après** ; ligne des sources 14 + 11 UA -> **24 + 0** ; bord bas 33 -> **20**.
++- Dans un agent : nom -> tâche 2, tâche -> pied 2, pied -> lien 4, lien -> bouton 6, bouton -> commande lue 6, **bouton -> sous-agents 2 -> 8**.
++- Transcript : titre -> contenu 4 partout (outils : 12 -> 4), retrait de liste 40 -> 16.
++
++## 4. Suites de test concernées (jamais retirer ni affaiblir)
++
++| Fichier:ligne | Assertion figée | Impact | Nouvelle valeur |
++|---|---|---|---|
++| `test-cockpit-responsive.sh:434` (R13.4, mesure `chrome-responsive.mjs:85`) | `"3\|13px\|3px/3px"` | **change** (D-05) | `"3\|13px\|4px/4px"` ; libellé « piste à 3 px » -> « piste à 4 px » (l.5 en-tête et l.434), même commit que `ui/00:26-27`, `ui/02:30` et DESIGN.md §5 |
++| `test-cockpit-responsive.sh:447, 478-492` (R14.4, R17.1/R17.2) | zoom `340,108,52,144` ; `308\|108\|52\|144`, `574\|72\|42\|114`, `16\|842\|114\|42` | ne bougent pas | mêmes valeurs : en-tête 64 / 56 / 100 inchangé, `#zoom` déjà sur la grille (mesuré) |
++| `test-cockpit-who.sh:386-390` (W16.3 marge du titre du tiroir >= marge de `.sec h3` ; W16.6 tiroir dans la fenêtre et défile) | marges relatives | reste vert | aucune valeur à changer : 20 = 20 mesuré. Rougit si la coque change `.sec` sans que `.vf-whop` lise `--inset-panel` |
++| `test-cockpit-equipe.sh:406-408` (inventaire du français, `CONNU`) | littéraux `'<p>Personne. Sources lues : '`, `'#btn-health{} … #panel .stats:not(.vf-stats) …'` | ne pas toucher à ces chaînes | inchangées (marges du `<p>` en CSS seule) |
++| `test-cockpit-marque-blanche.sh` M5.1, M5.3 | `--st-active: var(--sev-medium)` unique ; aucune couleur littérale | pas d'impact | inchangées |
++| `test-cockpit-equipe.sh`, `chrome-equipe-clavier.mjs`, `test-cockpit-who.sh` (`bouton.nextElementSibling` = `.vf-doing`) | structure DOM bouton -> `.vf-doing` | gabarit 71:37-38 intact | aucun empaquetage |
++| `chrome-responsive.mjs:28-33, 77` ; mutant R4.2 `test-cockpit-responsive.sh:302` | en-tête sur une rangée, éléments alignés ; `header .hl { flex: 1 1 0; min-width: 342px; }` | à rejouer | piste 200 -> 196 px, ligne de la Phase 78 non touchée |
++| `test-cockpit-who.sh` (tiroir : refonte A2) | structures du tiroir | si la refonte est retenue | les assertions W16.x suivent la refonte, jamais affaiblies |
++
++Rejouer au minimum : `test-cockpit-responsive.sh`, `test-cockpit-who.sh`, `test-cockpit-equipe.sh`, `test-cockpit-marque-blanche.sh`, `test-cockpit-projet.sh`.
++
++## 5. Signalements (hors de ces deux nœuds)
++
++- **Coque** : `ui/02-vf-telephone.js:30` redéclare `.vf-tabs` (4 et 4 x 8 dans sa spec : identique). `ui/00:26-27` et `ui/02:30` se changent ENSEMBLE.
++- **Coque** : `.row` doit lire `--inset-row` et `.list` rester à 2 pour que l'alignement des trois listes tienne ; `.sec` doit lire `--inset-panel` (20) et `--gap-section` (24).
++- **`#vf-reco { bottom }`** : à recalculer quand la barre de question passe à `bottom: var(--edge)` (voir 2.2), à vérifier sur capture.
++- **Texte des lignes de liste** : avec `--inset-row`, le texte des listes Projet démarre 12 px après le bord alors que `.row` (Code) déborde par `margin: 0 -10px` : alignement avec le titre de section, hors de ce nœud (audit §5). Si la coque change cette marge négative, la suivre.
++- **Cibles tactiles** : boutons « Voir la dernière commande » / « Lire le transcript » à 25 px de haut (4 x 12), onglets à 26 px : sous les 44 px d'accessibilité ; correctif = taille minimale tactile, pas un espacement. À arbitrer par le manager.
++- **Typographie** : le titre du tiroir (`.vf-whop h3`) est un `h3` au style navigateur (19 px), pas `.pt` (20 px / 600) : hors nœud, et dans la zone de refonte.
++- **Séparation des deux liens d'un agent** (71:37) : `margin-right: 8` plus l'espace du gabarit (~3 px) ; non exprimable en jeton sans emballage (contrat `nextElementSibling`). Laissé.
++
++## 6. Ordre d'application pour vf-coder
++
++1. Attendre les jetons `--sp-*` et sémantiques posés dans `:root` par `craft:shell`.
++2. Décider du sort de la refonte « Au travail » : si retenue, ne pas appliquer les lignes REFONTE de 70 ni les gabarits 71 (les nouveaux composants liront les mêmes jetons).
++3. `ui/70` (hors REFONTE) puis `ui/00` puis `ui/72`. Style en ligne : remplacer la valeur littérale par `var(--sp-N)` dans la même chaîne.
++4. Rejouer §4, puis capture avant/après (`capture.mjs`, `ONLY=projet,equipe`) et remesurer les lignes « calculé » du §0.
+diff --git a/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-shell.md b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-shell.md
+new file mode 100644
+index 00000000..31aea491
+--- /dev/null
++++ b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-shell.md
+@@ -0,0 +1,324 @@
++# 71.5 — SPEC nœud `craft:shell`, tour 2 (grille P71.5-D-01..06 : 2, 4, 6, 8, 12, 16, 20, 24, 32)
++
++vf-crafter, 2026-11-05. Aucun fichier de code touché. Périmètre : en-tête (espacements seuls), `#context` (V:145, D-04), chrome flottant, panneau latéral, palette, barre de question, modale, media queries, `ui/01 02 05 10 40 60 75`.
++Sources : `V` = `plugin/cockpit/skills/cockpit-moteur/assets/viewer.html`, `ui/NN` = `.../assets/ui/NN-*.js` (leur CSS vit dans le même document que `V` : `var(--*)` y résout). Numéros de ligne relevés sur la base rebasée (078e58da, #211).
++Briques : référentiel impeccable (`layout.md`, `polish.md`) + `71.5-RECHERCHE-GRILLE.md` §b-c (règles de choix). Aucune brique manquante.
++
++## 0. Verdicts mesurés (Chromium propre, serveur partagé 4601 sur la nouvelle base, CSS d'essai injecté après chargement ; `.../scratchpad/715/essai-coque3.mjs`)
++
++- **Zoom : rectangles identiques AVANT/APRÈS** à 390 (sauf `y` 638 -> 640, voir ci-dessous), 800 `340,108,52,144`, 1024 `574,72,42,114`. R14.4 et R17.1/R17.2 inchangés : `#zoom` est déjà à 4 / 2 / 16 / 16. Sur ce lab (`--terminal`), à 1280/1440/1640 le zoom est à `y=802` parce que `vf-cockpit-terminal-tiroir.mjs` (#211) pose `style.bottom` en ligne (56 px) au-dessus de la pastille (16, 852, 100x32) : c'est du JS, la spec ne le touche pas. Les labs des suites n'ont pas de terminal : `16|842|114|42` (1440) attendu inchangé.
++- **Barre de question** : `bottom 20 -> 16` la descend de 4 px (1440 : y 826 -> 830) ; à 390 sa hauteur passe de 102 à 100 (le zoom, calé sur `--vf-ask-h`, passe de y 638 à 640 et reste au-dessus de la barre : 782 <= 784). Avec le terminal, la barre (x >= 160 à 1280, 174 à 1440) ne chevauche pas la pastille (x 16-116). **Chevauchement résiduel hors de ma main (D-06)** : à 1024 px la barre (x 24-608, y 830-884) recouvre toujours la pastille (x 16-116, y 852-884) ; idem avant ma spec (826-880).
++- **Onglets 4 x 12, rail 4** : piste 34 px de haut inchangée ; largeur 200 -> 196 (desktop), 170 -> 172 (390). Fil d'Ariane + `.btn` 12 + `#crumbs button` 6x8 : l'en-tête ne fait que rétrécir ; aucun bouton hors de la fenêtre et `hscroll = 0` à 390/800/1024/1280/1440/1640.
++- **Borne 342 (Phase 78) et mutant R4.2** : avec `header .hl { min-width: 400px }` injecté à 1024, un bouton sort toujours de la fenêtre APRÈS comme AVANT (`sortent 1`, `hscroll 20`) : le témoin rouge tient. La ligne `header .hl { flex: 1 1 0; min-width: 342px; }` n'est pas touchée.
++- **`--gutter` 28 -> 24 (P71.5-D-09, révisée)** : `.fo-pad { padding: var(--gutter) }` (V:159) est couplé à la constante JS `GUTTER = 28` (V:920 ; V:1113 : le `foreignObject` fait `c.width + 2 * GUTTER`). Mesuré : `--gutter: 24px` seul fait passer la carte de 300x158 à 308x166 ; avec `GUTTER = 24` dans le MÊME commit la carte garde 300x158, seule la réserve d'ombre perd 4 px par côté (le `foreignObject` est `overflow: visible`). 24 est dans la grille : aucune exception. Je garde la décision de la D-09 telle quelle ; la ligne `--gutter` de V:62 (28) et celle de V:514 sont traitées par le nœud qui possède V:159/V:920 (cartes) : un seul commit pour les trois endroits.
++- **D-10 (hors périmètre, consigné)** : sous 700 px, V:514 `--gutter: 20px` contre `GUTTER` JS rend déjà les cartes 16 px trop larges (316x174 mesuré). Non traité ici : le corriger changerait leur taille.
++
++## 1. Jetons (T0 : `:root` de `V`, sous la ligne 62 ; `S-term` recopie le même bloc)
++
++```css
++  /* Espacement (71.5, P71.5-D-01) : grille fermée 2 4 6 8 12 16 20 24 32. Un primitif ne change JAMAIS de valeur. */
++  --sp-2: 2px; --sp-4: 4px; --sp-6: 6px; --sp-8: 8px; --sp-12: 12px;
++  --sp-16: 16px; --sp-20: 20px; --sp-24: 24px; --sp-32: 32px;
++  --edge: var(--sp-16);                         /* tout ce qui touche un bord de fenêtre */
++  --inset-panel: var(--sp-20);                  /* bord d'un conteneur flottant (D-02) */
++  --gap-section: var(--sp-24);                  /* entre deux sections d'un panneau */
++  --inset-card: var(--sp-16);                   /* cartes (D-03) */
++  --inset-box: var(--sp-12);                    /* boîtes d'information */
++  --inset-row: var(--sp-8) var(--sp-12);        /* lignes de liste, items de menu */
++  --inset-pill: var(--sp-2) var(--sp-8);        /* pastilles, tags ; code en ligne : --sp-2 --sp-6 */
++```
++
++Ancrage : `--pw: calc(var(--panel-w) + 32px)` (V:62) devient `calc(var(--panel-w) + 2 * var(--sp-16))` (même valeur : marge droite du panneau + écart). `--sp-0` de la recherche n'est pas posé (`0` s'écrit `0`). `--gutter` : voir §0 (24 avec `GUTTER = 24`).
++
++**Règle** : dans tout CSS de la coque, une valeur de `padding`, `margin`, `gap`, `inset`, `top/right/bottom/left` s'écrit `var(--sp-N)`, un sémantique, `calc()` de jetons, `0` ou `auto`. Négatif : `calc(-1 * var(--sp-N))`. Bord de fenêtre : `var(--edge)`.
++
++**Exceptions écrites (liste fermée de la recherche + une)** :
++- E1 : filets, bordures, liserés (1 / 1,5 px), `outline`, `outline-offset`, `box-shadow`, `translate`.
++- E2 : alignement optique, écrit `calc(var(--sp-N) + 1px) /* optique : ... */` ; aucun cas dans ma plage.
++- E3 (D-11, décision du manager) : les barres d'UNE ligne (`#flowbar`, `#ask-warn`) sont des contrôles : 12 en haut, en bas et côté bouton (le glyphe est aligné, pas la boîte), `--inset-panel` 20 côté texte. `#ask-sheet` est une feuille flottante : 20 sur ses quatre bords (voir `.sh`, `.sb`).
++- E4 : géométries dérivées, commentées `/* dérivé : ... */` : `#tour bottom: 76px` (16 + 42 de zoom + 18 ; la visite positionne sa carte en JS, `ui/40:218,230`, la valeur CSS n'est que le repli), `#toast bottom: 96px`, `#flowmenu/#legend top: 44px` (bouton 36 + 8), `#context::before inset` (halo), `#palette padding-top: 14vh` (unité de fenêtre).
++- E5 : hauteurs et tailles de contrôle (24/28/32/36/44, hauteur 36 de `.vf-sheet-bar`), `width/height/min/max`, et les `calc(100% - var(--pw) - Npx)` / `calc(100vh - 170px)` de largeur ou de hauteur maximale (borne de composition).
++
++Sonde de conformité, **par DÉCLARATION** (pas par ligne : plusieurs déclarations par ligne, styles en ligne des gabarits JS inclus) : `.../scratchpad/715/sonde-grille.mjs` (30 lignes, à copier dans le commit du codeur ou à rejouer depuis le scratchpad) :
++`node sonde-grille.mjs viewer.html ui/01-vf-responsive.js ui/02-vf-telephone.js ui/05-theme.js ui/10-glossary.js ui/40-tour.js ui/60-export.js ui/75-vf-modele.js` ; sortie attendue vide, code 0, hors lignes portant `dérivé` ou `optique` en commentaire (E2/E4).
++Principe : propriétés `padding|margin|gap|row-gap|column-gap|inset|top|right|bottom|left` (+ `-top|-right|-bottom|-left|-block|-inline`) avec un `(?<![\w-])` devant (donc `border-top-left-radius`, `--x-padding` ne sont jamais captés) ; on retire de l'intérieur vers l'extérieur tout `var(--...)` (jetons ET replis `var(--hh, 56px)`), et il ne doit rester aucun `Npx`. Témoin vérifié : `border-top-left-radius: 11px` ignoré, `padding: 3px 9px` signalé (code 1). Base mesurée avant toute retouche : 255 déclarations sur ces huit fichiers (dont les cartes de `viewer.html`:156-239, hors de ce nœud : le codeur filtre sur sa plage). Pas de test permanent proposé (un ajout = un retrait) ; au manager de décider.
++
++## 2. Table des changements de VALEUR
++
++Tout littéral déjà sur la grille (2, 4, 6, 8, 12, 16, 20, 24, 32) de la plage devient `var(--sp-N)` à valeur identique (substitution pure, non listée ligne à ligne sauf quand elle relie des redéclarations). Motifs : H = hors grille, J = jumeau aligné, R = rythme (§3), O = D-0x.
++
++### 2.1 En-tête (espacements seuls) et titre de vue
++
++| Réf | Sélecteur : propriété | Actuel -> nouveau | Motif |
++|---|---|---|---|
++| V:102 | `.kbd` padding | `1px 6px` -> `var(--sp-2) var(--sp-6)` | H ; code en ligne |
++| V:105 | `header` gap, padding | `12px`, `0 16px` -> `var(--sp-12)`, `0 var(--edge)` | substitution |
++| V:111 | `.brand` gap ; padding-right | `10px` -> `var(--sp-8)` ; `6px` | H ; icône <-> texte = 8 |
++| V:114 | `#crumbs .sep` padding | `0 1px` -> `0` | H (1 -> 0, hors bordure) |
++| V:115 | `#crumbs button` padding | `6px 10px` -> `var(--sp-6) var(--sp-8)` | H ; jumeau de la version téléphone (V:523, déjà 6 8) |
++| V:118 | `.btn` padding | `0 14px` -> `0 var(--sp-12)` | H ; intérieur 14 -> 12 |
++| V:130 | `#search-btn` gap ; padding | `10px` -> `var(--sp-8)` ; `0 8px 0 16px` | H |
++| ui/01:63 | `.vf-ell` padding | `0 6px` | substitution |
++| V:145 | `#context` left | `24px` -> `var(--edge)` | O D-04 ; `max-width: min(520px, calc(100% - var(--pw) - 64px))` inchangée (E5) : le bord droit recule de 8 px, la largeur ne change pas |
++| ui/01:25 (commentaire) | « piste à 3 px, padding 13 px » | périmé | **à signaler à la Phase 78** (elle possède la ligne) ; la borne 342 reste valide, je ne propose aucune retouche de la ligne |
++
++Phone V:525 `#context { left: 16px; right: 16px }` -> `var(--edge)` (valeur identique).
++
++### 2.2 Onglets : redéclarations qui bougent ENSEMBLE (D-05, R13.4)
++
++| Réf | Propriété | Actuel -> nouveau | Propriétaire |
++|---|---|---|---|
++| ui/00:26 | `.vf-tabs` padding ; margin-left | `3px` -> `var(--sp-4)` ; `14px` -> `var(--sp-12)` | **nœud projet/équipe** (doit égaler ma valeur) |
++| ui/00:27 | `.vf-tabs a` padding | `5px 13px` -> `var(--sp-4) var(--sp-12)` | idem |
++| ui/02:30 | `.vf-tabs` padding ; margin-left | `3px` -> `var(--sp-4)` ; `6px` | moi |
++| ui/02:30 | `.vf-tabs a` padding | `5px 8px` -> `var(--sp-4) var(--sp-8)` | moi |
++
++Le `margin-left: 14px` (ui/00:26, 14 hors grille) passe à 12 : l'en-tête n'en est que plus court (borne 342 non atteinte : 336 de contenu). Même commit : DESIGN.md §5 (« 3 px » -> « 4 px », le manager) et R13.4.
++
++### 2.3 Chrome flottant (V:241-313)
++
++| Réf | Sélecteur : propriété | Actuel -> nouveau | Motif |
++|---|---|---|---|
++| V:241, 510, ui/01:50, 67, ui/02:21 | `#zoom` left/bottom/top/right, padding, gap | **valeurs inchangées** ; `var(--edge)`, `calc(var(--hh, 64px) + var(--sp-8))`, `calc(var(--pw) + var(--edge))`, `var(--sp-4)`, `var(--sp-2)` ; ui/02:21 `bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--sp-8))` | substitution, cinq endroits dans le même commit. Le `style.bottom` en ligne de `vf-cockpit-terminal-tiroir.mjs` reste le seul maître quand la pastille recouvre le zoom |
++| V:248 | `#flowmenu .r` | `10px 12px` -> `var(--inset-row)` | H ; J |
++| V:257 | `#flowmenu .yours` | `1px 7px`, margin-left 6 -> `var(--inset-pill)`, `var(--sp-6)` | H |
++| V:258 | `#flowmenu .new` gap | `10px` -> `var(--sp-8)` | H |
++| V:262 | `.ff textarea` padding | `11px 13px` -> `var(--inset-box)` | H ; boîte |
++| V:264 | `.ff .ffa` margin-top | `10px` -> `var(--sp-12)` | R |
++| V:269 | `#legend label` gap ; padding | `10px` -> `var(--sp-8)` ; `9px 12px` -> `var(--inset-row)` | H ; J |
++| V:283 | `.mi` gap ; padding | `10px` -> `var(--sp-8)` ; `9px 12px` -> `var(--inset-row)` | H ; J |
++| V:287 | `.mi-sep` margin | `5px 8px` -> `var(--sp-4) var(--sp-8)` | H |
++| V:289 | `#flowbar` padding | `14px 14px 14px 20px` -> `var(--sp-12) var(--sp-12) var(--sp-12) var(--inset-panel)` | H ; barre d'une ligne = contrôle (D-11, E3) : 20 côté texte, 12 ailleurs |
++| V:289 | `#flowbar` top | `calc(var(--hh, 64px) + var(--sp-12))` | substitution |
++| V:295 | `#flowbar .dots` margin-top | `8px` | substitution |
++| V:298 | `#tooltip` padding | `11px 13px` -> `var(--inset-box)` | H ; boîte |
++| V:304 | `#tooltip .th` gap | `10px` -> `var(--sp-8)` | H |
++| V:305 | `#tooltip .trw` margin-top ; padding | `9px` -> `var(--sp-8)` ; `8px 10px` -> `var(--inset-row)` | H ; R (même intervalle que `.th`) ; boîte dans boîte : 8x12 < 12 |
++| V:308 | `#tooltip .trn` margin-top | `3px` -> `var(--sp-4)` | H |
++| V:309 | `#tooltip .th span` gap | `5px` -> `var(--sp-6)` | H ; puce <-> libellé |
++| V:310 | `#loading` padding | `10px 16px` -> `var(--sp-8) var(--sp-16)` | H |
++| V:326 | `#madewith` bottom ; padding | `20px` -> `var(--edge)` ; `8px 15px 8px 12px` -> `var(--sp-8) var(--sp-16) var(--sp-8) var(--sp-12)` | H ; bord de fenêtre (aligné sur le zoom et la barre de question) |
++| V:331 | `.xtag` padding | `3px 9px` -> `var(--inset-pill)` | H |
++
++### 2.4 Panneau latéral (V:314-373)
++
++| Réf | Sélecteur : propriété | Actuel -> nouveau | Motif |
++|---|---|---|---|
++| V:315 | `#panel` top / right / bottom | `calc(var(--hh, 64px) + var(--sp-4))` / `var(--edge)` / `var(--edge)` | substitution |
++| V:319 | `#panel-resize` | `top: calc(var(--hh, 64px) + var(--sp-4) + var(--edge))` ; `bottom: var(--sp-32)` ; `right: calc(var(--panel-w) + var(--edge) - var(--sp-6))` | valeurs identiques (20, 32, 6), dérivées du panneau |
++| V:336 | `.sec` | `18px 20px 6px` -> `calc(var(--gap-section) - var(--sp-4)) var(--inset-panel) var(--sp-4)` | H ; entre deux `.sec` : 20 + 4 = 24 = `--gap-section` |
++| V:337 | `.sec:first-child` padding-top | `22px` -> `var(--inset-panel)` | H ; O D-02 |
++| V:338 | `.sec:last-child` padding-bottom | `22px` -> `var(--inset-panel)` | H ; O D-02 |
++| V:341 | `.ph` gap | `10px` -> `var(--sp-8)` | H ; icône <-> texte |
++| V:346 | `.pp` margin-top ; padding | `14px` -> `var(--sp-12)` ; `8px 10px 8px 12px` -> `var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-12)` | R ; H |
++| V:349 | `.actions` margin-top | `14px` -> `var(--sp-12)` | R |
++| V:352 | `.stats div` padding | `10px 12px` -> `var(--inset-row)` | H |
++| V:355 | `.bar` margin ; gap | `14px 0 10px` -> `var(--sp-12) 0 var(--sp-8)` ; `3px` -> `var(--sp-4)` | R ; H |
++| V:357 | `.legend-row` gap | `4px 14px` -> `var(--sp-4) var(--sp-12)` | H |
++| V:360-361 | `.list` margin ; `.row` padding | `0 -10px` -> `0 calc(-1 * var(--sp-12))` ; `9px 10px` -> `var(--inset-row)` | H ; le négatif égale le padding horizontal de la ligne (texte aligné sur le bord intérieur du panneau) |
++| V:366 | `.row .rd` margin-top | `1px` -> `var(--sp-2)` | H |
++| V:369 | `.more` padding | `6px 10px` -> `var(--sp-6) var(--sp-12)` | H ; dans `.list`, aligné sur le texte des lignes |
++| V:371 | `.tag` padding | `3px 10px` -> `var(--inset-pill)` | H |
++| V:372 | `.callout` margin-top ; padding | `14px` -> `var(--sp-12)` ; `11px 13px` -> `var(--inset-box)` | R ; H |
++
++### 2.5 Palette, barre de question, modale (V:374-479, ui/75)
++
++| Réf | Sélecteur : propriété | Actuel -> nouveau | Motif |
++|---|---|---|---|
++| V:378 | `#palette .in` | `0 20px` -> `0 var(--inset-panel)` | substitution sémantique |
++| V:381 | `#results .r` padding | `10px 12px` -> `var(--inset-row)` | H |
++| V:387 | `#results .empty` padding | `22px` -> `var(--sp-24)` | H |
++| V:388 | `#palette .hint` | `12px 20px` -> `var(--sp-12) var(--inset-panel)` | substitution |
++| V:391 | `#ask` bottom ; gap | `20px` -> `var(--edge)` ; `10px` -> `var(--sp-8)` | H ; bord de fenêtre ; R (pile warn / sheet / form : 8) |
++| V:392 | `#ask-form` padding ; gap | `8px 8px 8px 18px` -> `var(--sp-8) var(--sp-8) var(--sp-8) var(--sp-16)` ; `10px` -> `var(--sp-8)` | H ; une pastille à contrôles de 38 px garde 8 autour du contrôle et 16 à gauche du texte : jumeau exact de `#search-btn` (`0 8px 0 16px`), pas un panneau |
++| V:395 | `.chip` gap | `7px` -> `var(--sp-8)` | H |
++| V:403 | `#ask-mode` padding ; margin-left | `3px` -> `var(--sp-4)` ; `-10px` -> `calc(-1 * var(--sp-8))` | H ; le négatif égale le gap de `#ask-form` (8) ; piste 34 -> 36, sous les 38 du bouton d'envoi |
++| V:411 | `.engine` padding ; gap | `4px 10px` -> `var(--inset-pill)` ; `7px` -> `var(--sp-6)` | H ; pastille standard ; point <-> libellé |
++| V:416 | `.einfo` margin-left | `1px` -> `var(--sp-2)` | H |
++| V:423 | `#ask-warn` padding | `12px 14px 12px 16px` -> `var(--sp-12) var(--sp-12) var(--sp-12) var(--inset-panel)` | H ; D-11, E3 |
++| V:426 | `#ask-warn code` | `1px 7px` -> `var(--sp-2) var(--sp-6)` | H ; code en ligne unifié |
++| V:430 | `#ask-warn button` | `6px 12px` | substitution (bouton-pastille) |
++| V:435 | `#ask-sheet .sh` | `12px 12px 4px 20px` -> `var(--inset-panel) var(--inset-panel) var(--sp-4)` | H ; D-11 : feuille flottante, 20 sur les quatre bords (la ligne d'en-tête gagne 8 px de haut) |
++| V:438 | `#ask-sheet .sb` | `6px 20px 18px` -> `var(--sp-6) var(--inset-panel) var(--inset-panel)` | H ; D-02 |
++| V:439-440 | `.sb p`, `.sb ul/ol` margin-bottom | `10px` -> `var(--sp-12)` | H ; R |
++| V:440 | `.sb ul/ol` padding-left | `20px` -> `var(--sp-20)` | substitution (indentation de puces, pas un bord) |
++| V:441 | `.sb li` margin | `3px 0` -> `var(--sp-2) 0` | H ; items de liste = 2 |
++| V:442 | `.sb code` | `1px 6px` -> `var(--sp-2) var(--sp-6)` | H ; J |
++| V:444 | `.ref` padding | `0 9px 0 7px` -> `0 var(--sp-8)` | H |
++| V:447-448 | `.progress` gap ; `.progress div` gap | `7px` -> `var(--sp-8)` ; `10px` -> `var(--sp-8)` | H |
++| V:453 | `.followups button` | `7px 13px` -> `var(--sp-6) var(--sp-12)` | H ; J : jumeau de `#ask-warn button` |
++| V:455 | `.sheet-actions` margin-top | `12px` | substitution |
++| V:460 | `#modal` padding | `24px` -> `var(--sp-24)` | substitution |
++| V:462 | `#modal .box` | `22px 24px 20px` -> `var(--inset-panel)` | H ; O D-02 (modale = conteneur flottant) |
++| V:465 | `#modal pre` | `14px 16px`, margin-top 12 -> `var(--sp-12) var(--sp-16)`, `var(--sp-12)` | H |
++| V:466 | `#modal .ma` margin-top | `18px` -> `var(--sp-12)` | H ; R (rangée d'actions = 12 partout) |
++| V:467 | `#toast` padding | `10px 16px` -> `var(--sp-8) var(--sp-16)` ; bottom 96 (E4) | H |
++| V:469 | `.group-h` margin | `14px 0 4px` -> `var(--sp-12) 0 var(--sp-4)` | R |
++| ui/75:26 | `#vf-modele` padding | `4px 2px` | substitution |
++
++### 2.6 Media queries (V:480-560, EN DERNIER ; aucun prélude `@media` modifié)
++
++Valeurs déjà sur la grille (4, 6, 8, 12, 16) : substitution pure (`header` `6px 12px` / `0 8px`, puis `6px 8px` / `0 4px` ; `#flowmenu, #legend` top `calc(var(--hh, 56px) + var(--sp-4))`, left/right `var(--sp-8)` ; `#panel` left/right/bottom `var(--sp-8)` ; `#ask` bottom `var(--sp-8)` ; `#tour` left/right `var(--sp-8)`). Les `calc(100% - 16px)` de largeur deviennent `calc(100% - 2 * var(--sp-8))`. Lignes à changer :
++
++| Réf | Sélecteur : propriété | Actuel -> nouveau | Motif |
++|---|---|---|---|
++| V:530 | `#context .ctx-more` margin ; padding | `-8px 0 -12px -10px` -> `calc(-1 * var(--sp-8)) 0 calc(-1 * var(--sp-12)) calc(-1 * var(--sp-12))` ; `0 10px` -> `0 var(--sp-12)` | H ; le négatif égale le padding (le texte ne bouge pas, la cible de 44 px gagne 4 px) |
++| V:541 | `#ask-form` padding-left (téléphone) | `14px` -> `var(--sp-12)` | H ; garde l'écart de 4 px avec le bureau (16) |
++| V:514 | `--gutter: 20px` (téléphone) | **inchangé** | défaut existant à remonter (§0) |
++
++### 2.7 ui/02 (téléphone), ui/05, ui/10, ui/40, ui/60
++
++| Réf | Sélecteur : propriété | Actuel -> nouveau | Motif |
++|---|---|---|---|
++| ui/02:24 | `.vf-sheet-bar` margin-bottom | `-4px` -> `calc(-1 * var(--sp-4))` | substitution |
++| ui/02:25 | `.vf-sheet-grip` | `top: var(--sp-8)` ; `margin-left: -18px` supprimé, `left: 50%` + `transform: translateX(-50%)` | E4 dérivée (centrage au lieu de -18 à la main) ; rendu identique |
++| ui/02:26, 34, 35 | `.vf-sheet-x` right 4 ; badge top/right 8 ; `#vf-plus-menu` top `calc(var(--hh, 56px) + var(--sp-4))`, left/right 8, padding 6 | substitution | |
++| ui/02:36 | `.vf-pl-i` gap ; padding | `10px` -> `var(--sp-8)` ; `0 12px` | H |
++| ui/05:22 | `#theme-toggle::before` inset | `4px` | substitution |
++| ui/10:146 | `#sc-gloss` padding | `11px 13px` -> `var(--inset-box)` | H |
++| ui/10:149 | `#sc-gloss b` margin-bottom | `2px` | substitution |
++| ui/40:13 | `#tour` left ; width ; padding | `var(--edge)` ; `min(360px, calc(100vw - 2 * var(--edge)))` ; `16px 16px 12px 20px` -> `var(--inset-panel)` | H ; D-02 quatre bords (le tour grandit de 12 px de haut et rétrécit son texte de 8 px de large : rejouer R1/R3 et la capture) ; `bottom: 76px` (E4) |
++| ui/40:14 | `#tour.right` right | `var(--edge)` | substitution |
++| ui/40:20 | `#tour .tt` padding-right | `22px` -> `var(--sp-20)` | H ; égale 20 de bord + zone de la croix |
++| ui/40:22 | `#tour .tip` margin-top | `10px` -> `var(--sp-8)` | H ; R |
++| ui/40:23 | `#tour .tf` gap ; margin-top | `10px` -> `var(--sp-8)` ; `14px` -> `var(--sp-12)` | H ; R |
++| ui/40:31 | `#tour .tx` top/right | `10px` -> `var(--sp-12)` | H |
++| ui/40:18-26 | `.tk` mb 4 gap 6 ; `.tn` mt 6 ; `.dots` gap 4 ; `.acts` gap 8 | substitution | |
++| ui/60:17 | `.xp-opts` margin | `14px 0 4px` -> `var(--sp-12) 0 var(--sp-4)` ; gap 2 | R |
++| ui/60:18 | `.xp-opt` padding | `10px 12px` -> `var(--inset-row)` | H |
++| ui/60:20 | `.xp-opt input` margin | `3px 0 0` -> `var(--sp-4) 0 0` | H |
++| ui/60:24-25 | `.xp-note` mt ; `.xp-err` padding, mt | `10px` -> `var(--sp-12)` ; `8px 12px` -> `var(--inset-row)` | H ; R |
++
++### 2.8 Styles en ligne des gabarits JS de `viewer.html` (la sonde les attrape aussi)
++
++| Réf | Gabarit | Actuel -> nouveau | Motif |
++|---|---|---|---|
++| V:1511 | `<span class="method" style="--m:...;margin-top:1px">` (ligne `a.row`) | `margin-top:1px` -> `margin-top:var(--sp-2)` | H ; alignement optique : la pastille `.method` perd 2 px de hauteur (3 -> 2 de padding), 2 px de marge la recentrent sur la première ligne ; jumeau de `.row .rd` (2) |
++| V:1590 | `<div class="stats" style="margin-top:14px">` | `margin-top:var(--sp-12)` | R ; jumeau de `ui/00:117` (`.vf-stats`) et `ui/72:23`, passés à 12 par le nœud projet/équipe : les trois s'écrivent 12 |
++| V:1625 | `<p class="pd" style="margin-top:8px">` | `margin-top:var(--sp-8)` | substitution |
++| V:1652 | `<div class="list" style="margin-top:12px">` | `margin-top:var(--sp-12)` | substitution |
++
++`style="margin-top:var(--sp-12)"` est valide en attribut (les variables résolvent dans un style en ligne).
++
++### 2.9 Replis de `var(--hh, Npx)` : valeurs inchangées, ligne par ligne
++
++Le repli n'est qu'un secours avant la première mesure (`syncHeader`, V:2273 pose `--hh` à `header.offsetHeight`) : c'est une dimension (E5), pas un espacement. Il reste égal à la hauteur minimale d'en-tête du contexte où la règle s'applique, et seul l'addend se tokenise :
++
++| Réf | Contexte | Repli | Écriture |
++|---|---|---|---|
++| V:145 (`#context`), V:289 (`#flowbar`), V:315 et V:319 (`#panel`, `#panel-resize`) | bureau, en-tête 64 | `64px` | `calc(var(--hh, 64px) + var(--sp-8))` etc. |
++| V:493 (`#flowmenu, #legend`), V:510 (`#zoom`), V:547 (menus) | `@media` <= 999 / 700, en-tête min 56 | `56px` | `calc(var(--hh, 56px) + var(--sp-4))`, `calc(var(--hh, 56px) + var(--sp-8))` |
++| ui/01:50 (`#zoom`, 1000-1279 px) | en-tête 64 | `64px` | `calc(var(--hh, 64px) + var(--sp-8))` |
++| ui/02:35 (`#vf-plus-menu`, <= 700 px) | en-tête min 56 | `56px` | `calc(var(--hh, 56px) + var(--sp-4))` |
++
++Les trois `#zoom` (V:510, ui/01:50, ui/02:21) gardent donc chacun leur repli (56, 64, et 8 sans repli de `--hh` pour ui/02:21 qui lit `--vf-ask-h` : `var(--vf-ask-h, var(--sp-8))`).
++
++### 2.10 Cibles tactiles : plancher sous `(pointer: coarse)`, le bureau ne change pas
++
++Les lignes qui rétrécissent (squish 9/10 -> 8) ne descendent jamais plus bas sur écran tactile : une règle additive, AVANT les media queries à ajouter dans `V` (plage 480-560, juste avant `@media (max-width: 700px)`) :
++
++```css
++@media (pointer: coarse) { /* cible tactile >= 44 px : les lignes qui rétrécissent (71.5) gardent leur zone de toucher */
++  #results .r, .mi, #legend label, .followups button, .xp-opt { min-height: 44px; box-sizing: border-box; }
++}
++```
++`.xp-opt` vit dans `ui/60` : même règle posée dans le CSS de `ui/60-export.js` (`@media (pointer: coarse) { .xp-opt { min-height: 44px; box-sizing: border-box; } }`) pour qu'elle voyage avec la règle qu'elle borne.
++Mesure à 390 px, `hasTouch` + `isMobile` (`(pointer: coarse)` vrai), hauteurs en px (`.../scratchpad/715/essai-tactile.mjs`) :
++
++| Ligne | AVANT | APRÈS padding seul | APRÈS padding + plancher |
++|---|---|---|---|
++| `#legend label` | 33 | 31 | 44 (42,7 lu pendant l'animation `menuIn` à 0,97 : 44 x 0,97) |
++| `.mi` | 33 | 31 | 44 (idem) |
++| `.followups button` | 29 | 27 | 44 |
++| `#results .r` | 49,5 | 45,6 | 45,6 (déjà >= 44, le plancher ne joue pas) |
++| `.xp-opt` | 57,5 | 53,5 | 53,5 (idem) |
++
++Sur écran tactile, les trois premières lignes GAGNENT donc 11 à 15 px (elles étaient déjà sous 44 : le plancher corrige l'existant et ne vient pas du rétrécissement). Bureau (`pointer: fine`) : 31 / 31 / 27 (gain de densité de 2 px, attendu).
++
++### 2.11 Tokens dans `S-term` (document séparé du cadre du terminal)
++
++`S-term` recopie le bloc de §1 en entier : les 9 primitifs ET les 7 sémantiques (même ordre, mêmes valeurs ; aligné sur le tiroir, qui les recopie tous). Une valeur absente tomberait en silence sur la valeur initiale. Rien d'autre dans `S-term` n'est de ma plage.
++
++### 2.12 Rayons : hors périmètre
++
++Le rail passe à 4 px : le rayon concentrique idéal de l'onglet serait 12 - 4 = 8, mais l'onglet garde **9** (DESIGN.md §4 : « Onglet dans son groupe 9 px »). Exception écrite, les rayons sont hors du périmètre de la 71.5 : remontés à Samuel (déjà consigné en §5 de l'audit).
++
++## 3. Rythme vertical (panneau, barre de question, feuilles)
++
++Un intervalle par rôle, sur la plage de la grille (impeccable : tight vs generous, pas une valeur répétée) :
++
++| Rôle | Valeur | Où |
++|---|---|---|
++| bord d'un conteneur flottant -> contenu | `--inset-panel` 20 ; barres d'une ligne (`#flowbar`, `#ask-warn`) : 12 haut, bas et côté bouton (E3) | `.sec` premier/dernier, `#tour`, `#ask-sheet`, `#ask-warn`, `#flowbar`, `#modal .box`, `#palette` |
++| entre sections d'un panneau | `--gap-section` 24 | `.sec` : 20 de haut + 4 de bas, jamais d'autre valeur |
++| entre blocs frères | 12 | `.ph` -> bloc, `.pp`, `.actions`, `.callout`, `.bar`, rangées d'actions (`.sheet-actions`, `.ffa`, `.tf`, `.ma`), `.group-h`, paragraphes de la feuille |
++| titre de section -> contenu ; bloc -> légende | 8 | `.sec h3`, `.bar` -> légende, `#tooltip`, pile de la barre de question, `.tip` |
++| titre -> sous-texte ; lignes de méta | 6 ; 4 | `.pt`, `.tn` ; `.tp`, `.trn`, `.tk` |
++| items d'une liste | 2 (`.list`, `.xp-opts`, `.sb li`) ; le squish est dans `--inset-row` | |
++| icône <-> texte | 8 ; puce <-> libellé, pastilles côte à côte 6 | |
++
++Règles : (1) entre frères, `gap` du parent flex/grid, sinon UNE marge haute sur le second (jamais basse + haute qui s'additionnent) ; (2) intérieur <= extérieur : ligne 8 < boîte 12 <= écart entre boîtes 12 < panneau 20 ; (3) pas de 10 ni de 14 nulle part.
++Barre de question, de haut en bas : `#ask-sheet` -> `#ask-warn` -> `#ask-form`, intervalle 8, bord bas `--edge`. Feuille : en-tête 20 (haut, côtés) puis 4, corps 6 puis 20 en bas (D-11). Forme : 8 autour des contrôles, 16 à gauche du texte.
++
++## 4. Suites concernées (jamais retirer, jamais affaiblir)
++
++| Assertion | Attendu |
++|---|---|
++| `test-cockpit-responsive.sh:434` R13.4 (3 pages x 390/1024/1440) | **change** : `"3\|13px\|3px/3px"` -> `"3\|13px\|4px/4px"`, libellé « rail à 4 px (DESIGN.md §5, P71.5-D-05) ». Même commit que ui/00:26-27, ui/02:30 et DESIGN.md §5 |
++| `:447` R14.4 (Code, Projet à 800 px) | inchangé `340,108,52,144` (mesuré) |
++| `:478-492` R17.1 / R17.2 | inchangés : 768 `308\|108\|52\|144`, 1024 `574\|72\|42\|114`, 1440 `16\|842\|114\|42` ; R17.1 `16\|16\|row` (labs sans terminal ; avec terminal, le `bottom` en ligne de #211 s'applique, hors de cette spec) |
++| `:302` mutant R4.2 | inchangé : ligne 342 intacte ; témoin rouge confirmé à 400 px (un bouton sort, `hscroll 20`, avant et après) |
++| `:260` O2b, `:533` R21 | inchangés : aucun prélude `@media` touché ; l'en-tête ne fait que rétrécir |
++| R1/R3/R19/R20, R13.1, R14.2, R14.5, R15 | inchangés, **toutes à rejouer** : points de vigilance = `#ask` à 16 de bas (zoom du téléphone +2 px), `#context` à x=16, le tour à 20 de marge, la piste d'onglets à 172 px à 390 |
++| Suites du tiroir (T21.1, T22.x, TU.x, T20.x, mutant pastille) | hors de ce nœud ; la spec ne touche ni `S-tiroir` ni le `style.bottom` du zoom |
++| Mesure de carte (R-cartes, si elle existe) | `--gutter` 24 exige `GUTTER = 24` : rejouer toute mesure de taille de carte (300x158 attendu inchangé) |
++| `test-cockpit-signal-mod.sh`, `test-cockpit-marque-blanche.sh` (citent DESIGN.md) | à relire : DESIGN.md §4 et §5 sont réécrits (§6) |
++| `test-cockpit-vendor.sh` V6.1, V6.2, V7 (et V4 pour `TAILLE`) | **doivent rester verts** : procédure de §5 ; un octet modifié sans diff rougit V6 |
++| Cibles tactiles (R14 tactile / 44 px, si mesurées à 390) | le plancher de §2.10 ne peut que relever les hauteurs ; rejouer à 390 px |
++
++## 5. Traçabilité du moteur vendorisé (`VENDORED.txt`, `amont/patches`) : même procédure que `71.5-SPEC-code.md` §5
++
++Tout octet modifié hors patch fait rougir `test-cockpit-vendor.sh` V6/V7. Le dernier identifiant posé est P26 ; **P27** est celui de la 71.5 (le nœud code le crée). Fichiers de ma plage :
++
++| Fichier | Statut actuel | Action dans `VENDORED.txt` (`plugin/cockpit/skills/cockpit-moteur/`) | Diff `amont/patches/` |
++|---|---|---|---|
++| `assets/viewer.html` | PATCH (l.6, P1...P23) | ajouter `,P27` UNE seule fois (le nœud code le fait déjà : ne pas le doubler) | `assets__viewer.html.diff` réécrit (existe : régénération sans clone) |
++| `assets/ui/40-tour.js` | PATCH (l.15, P25) | `P25` -> `P25,P27` | `assets__ui__40-tour.js.diff` réécrit (existe : sans clone) |
++| `assets/ui/05-theme.js` | amont non patché | nouvelle ligne `PATCH assets/ui/05-theme.js P27 espacements : jetons de la grille 71.5` | `assets__ui__05-theme.js.diff` créé |
++| `assets/ui/10-glossary.js` | amont non patché | nouvelle ligne `PATCH assets/ui/10-glossary.js P27 espacements : boîte d'information (--inset-box)` | `assets__ui__10-glossary.js.diff` créé |
++| `assets/ui/60-export.js` | amont non patché | nouvelle ligne `PATCH assets/ui/60-export.js P27 espacements : grille 71.5, plancher tactile de .xp-opt` | `assets__ui__60-export.js.diff` créé |
++| `assets/ui/01-vf-responsive.js`, `02-vf-telephone.js`, `75-vf-modele.js` | `AJOUT` (l.20, 21, 25) | rien : un fichier ajouté n'a ni patch ni diff | aucun |
++
++Étapes, dans le même commit que les retouches :
++1. AVANT toute retouche : `bash plugin/cockpit/amont/synchro.sh verifier` doit rendre 0 (témoin).
++2. **Faux clone pour les trois fichiers jamais patchés** : `regenerer-patch <chemin>` SANS clone échoue sur un fichier sans diff existant (`amont/synchro.sh:85-87` : « ni clone ni diff existant »). Construire, AVANT de toucher aux trois fichiers (et hors de tout dépôt), un faux clone `$FC/skills/floorplan/<chemin>` rempli depuis l'état amont :
++   ```bash
++   M=plugin/cockpit/skills/cockpit-moteur; FC="$(mktemp -d)"; mkdir -p "$FC/skills/floorplan/assets/ui"
++   for f in 05-theme 10-glossary 60-export; do git show "HEAD:$M/assets/ui/$f.js" > "$FC/skills/floorplan/assets/ui/$f.js"; done
++   shasum -a 256 "$FC"/skills/floorplan/assets/ui/*.js   # témoin : doit égaler les trois lignes ui/05, ui/10, ui/60 de amont-92d6854.sha256
++   ```
++   Témoin déjà rejoué sur la base : `9fb61d68...` (05), `c41b2ce2...` (10), `f62e11ba...` (60) = le manifeste (HEAD est donc l'amont à l'octet pour ces trois fichiers ; si HEAD a bougé, le témoin le dira).
++3. Après toutes les retouches : `bash plugin/cockpit/amont/synchro.sh regenerer-patch assets/ui/05-theme.js "$FC"` (idem `10-glossary.js`, `60-export.js`) ; puis SANS clone `regenerer-patch assets/ui/40-tour.js` et `regenerer-patch assets/viewer.html` (les diffs existent, l'inversion les reconstruit).
++4. `synchro.sh verifier` rend 0, puis `bash plugin/cockpit/scripts/tests/test-cockpit-vendor.sh` vert (V6.1, V6.2 témoin, V7 « diff présent » pour les trois nouveaux PATCH). Le manifeste `amont-92d6854.sha256` ne change PAS.
++5. **`TAILLE assets/viewer.html`** : un seul porteur, le nœud code (il recompte après les retouches de TOUS les nœuds qui touchent `viewer.html`, dont celui-ci). Ce nœud n'écrit pas cette ligne. `ui/40` n'a pas de ligne `TAILLE` (V4 la réserve aux fichiers à marqueur de taille).
++
++## 6. Documents et commentaires à tenir en phase (même commit)
++
++- **DESIGN.md §4, l.116-120**, à réécrire (le manager) : 
++  - l.116-117 : « **Pas de base** : grille fermée de 8 avec demi-pas : 2, 4, 6, 8, 12, 16, 20, 24, 32 (ni 10, ni 14, ni 22). Jetons primitifs `--sp-2` à `--sp-32` (un primitif ne change jamais de valeur) et sept jetons sémantiques : `--edge` 16, `--inset-panel` 20, `--gap-section` 24, `--inset-card` 16, `--inset-box` 12, `--inset-row` 8 x 12, `--inset-pill` 2 x 8. Règle : aucune valeur d'espacement hors jeton (exceptions écrites : filets, alignement optique commenté, géométries dérivées, hauteurs de contrôle). »
++  - l.118 : « Les plus fréquents sont 6, 8 et 12 px. » (le 10 disparaît)
++  - l.119 : « **Gouttière de carte** : `--gutter` 24 px (réserve d'ombre, égale à la constante `GUTTER` du viewer). **Panneau latéral** : `--panel-w` 360 px (+ 32 px de marge, `--pw`). »
++  - l.120 : « **Carte** : padding 16 sur les quatre côtés (`--inset-card`), gap 8 px entre ses lignes. »
++  - §5 `.vf-tabs` (l.143) : « 3 px de padding » -> « 4 px de padding » ; l'onglet actif et la ligne « Onglet dans son groupe 9 px » du tableau des rayons restent (exception écrite, §2.12).
++- `test-cockpit-responsive.sh` : commentaires « piste à 3 px » de la l.5, de la l.390 et le libellé R13.4 de la l.434 -> « rail à 4 px », avec l'attendu `4px/4px` (pas d'autre ligne de la suite).
++- `ui/01-vf-responsive.js:25` : le commentaire « piste à 3 px, padding 13 px : 122 de texte + 6 x 13 ... = 342 » devient « rail à 4 px, padding 12 px : 122 de texte + 6 x 12 ... » et la somme est à recompter (la borne 342 ne change pas : 336 de contenu). **Conflit possible avec la Phase 78**, qui possède la ligne : la retouche est un commentaire, jamais la règle `header .hl { flex: 1 1 0; min-width: 342px; }` ; si la 78 a déjà modifié la ligne, ne rien écraser, ré-appliquer la phrase après son merge.
++
++## 7. Points à remonter
++
++- `--gutter` 24 + `GUTTER = 24` (V:159, V:920) : D-09 révisée, un seul commit, au nœud cartes ; D-10 (cartes du téléphone 316 contre 300) consignée, non traitée.
++- D-06 : à 1024 px, la barre de question recouvre la pastille Terminal (avant comme après ma spec).
++- Lecture de D-02 retenue par le manager (D-11) : barres d'une ligne = contrôles (12 haut/bas), `#ask-sheet` 20 sur ses quatre bords, `#ask-form` 16 à gauche, `#modal` 24 de bord de fenêtre, tour à 20 sur ses quatre bords (12 px plus haute : rejouer R1/R3), `bottom: 76` de la visite = géométrie dérivée du JS.
++- Contrat croisé : `ui/00:26-27` (onglets, §2.2) ; tout bord intérieur de panneau (`.vf-whop`, `#vf-reco`) lit `--inset-panel`, toute boîte d'information (`.hc-calm`, `.vf-now`, `.anote`, `#vf-reco`) lit `--inset-box` ; `.vf-stats`/`.stats` à 12 partout (`V:1590`, `ui/00:117`, `ui/72:23`).
++- Cibles tactiles : le plancher de 44 px (§2.10) corrige aussi l'existant (33 / 33 / 29 px avant) sur écran tactile : changement visible, voulu.
++- Rayons (9 des onglets, concentrique 8) : hors périmètre, à Samuel.
++- Phase 78 : voir §6, `ui/01:25`.
+diff --git a/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-tiroir.md b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-tiroir.md
+new file mode 100644
+index 00000000..d7b3573a
+--- /dev/null
++++ b/.planning/workstreams/fiabilite/phases/VFDO-71.5-unslop-espacements-cockpit/71.5-SPEC-tiroir.md
+@@ -0,0 +1,174 @@
++# 71.5 — Spec « tiroir du terminal » (nœud craft:tiroir), tour 2
++
++Auteur : vf-crafter, 2026-11-05. Aucun fichier de code touché. Aligné sur la grille validée (`71.5-CONTEXT.md` P71.5-D-01..06 ; `71.5-RECHERCHE-GRILLE.md` §c) :
++échelle fermée `2 4 6 8 12 16 20 24 32` (ni 10, ni 14, ni 22), primitifs `--sp-N` + sémantiques `--edge` 16, `--inset-panel` 20, `--gap-section` 24, `--inset-card` 16, `--inset-box` 12, `--inset-row` 8 x 12, `--inset-pill` 2 x 8. Cartes 16 / gap 8 (D-03).
++Base relue : la branche porte la v1.3.3 (#211, `078e58da`) : **la pastille garde sa place au plus bas et c'est `#zoom` qui remonte au-dessus d'elle** (`z.style.bottom`, `fond` = bas de `#stage`) ; seule la puce garde l'ancienne règle. Tout ce qui suit est écrit contre ce code, pas contre la v1.3.2.
++
++Sigles : `ST` = `plugin/cockpit/scripts/vf-cockpit-terminal-tiroir-style.mjs`, `SQ` = `plugin/cockpit/scripts/vf-cockpit-terminal-style.mjs`, `TI` = `plugin/cockpit/scripts/vf-cockpit-terminal-tiroir.mjs`. `-tiroir-ui.mjs` ne pose aucun espacement : rien à changer.
++
++## 0. Jetons : où ils vivent, comment le cadre du terminal les reçoit
++
++- `ST` est une feuille de la page hôte (viewer) : elle voit le `:root` de `viewer.html` et écrit `var(--sp-N)` / `var(--edge)` directement, sans copie ni repli. **Ordre** : T0 (jetons dans `viewer.html`) mergé AVANT le lot tiroir : un `var()` inconnu fait tomber la déclaration entière (`left`, `bottom` perdus).
++- `SQ` est un document d'une autre origine : il ne voit pas ce `:root`. Les jetons y sont **recopiés**, comme ses couleurs (précédent l.15-35, sonde T18). Une source unique supposerait une étape de build commune à `viewer.html` (statique) et à la page de Q : hors périmètre ; on garde « copie + sonde de parité », étendue aux jetons.
++- Copie, dans le bloc `SOMBRE` de `SQ` (après `--ease`), **texte identique au bloc T0 de `71.5-SPEC-shell.md` §1** (la sonde compare le texte normalisé des valeurs, `var(--sp-16)` compris) ; jamais dans `CLAIR` (la sonde retombe sur le sombre pour le clair) ; `--sp-0` n'est pas posé (`0` s'écrit `0`) :
++  ```
++  --sp-2: 2px; --sp-4: 4px; --sp-6: 6px; --sp-8: 8px; --sp-12: 12px; --sp-16: 16px; --sp-20: 20px; --sp-24: 24px; --sp-32: 32px;
++  --edge: var(--sp-16); --inset-panel: var(--sp-20); --gap-section: var(--sp-24); --inset-card: var(--sp-16);
++  --inset-box: var(--sp-12); --inset-row: var(--sp-8) var(--sp-12); --inset-pill: var(--sp-2) var(--sp-8);
++  ```
++  16 variables recopiées au total (9 primitifs + 7 sémantiques). `SQ` n'en emploie que 2, 4 (si `.vf-q-collage`), 6, 8, 12, 16 et `--inset-card` ; on recopie les 16 pour que le bloc se compare d'un bloc à l'autre, sans cas par cas.
++- Mettre à jour l'en-tête de `SQ` (« 25 variables » → « 41 ») et `VARIABLES_RECOPIEES` (+16 noms, même ordre que le bloc, en fin de liste). L'en-tête « aucune couleur en dur » s'étend aux espacements.
++
++## 1. Table par sélecteur
++
++« Jeton seul » = valeur calculée inchangée (la mise en jeton est le geste). Seuls 10, 14 sortent de la grille dans ces fichiers (1, 7, 18 aussi côté cartes/code). Les hauteurs/largeurs d'éléments (32, 36, 28, 44, 52, 320, grip 40 x 4, points 6 et 8) ne sont pas des espacements : inchangées (exception E5).
++
++### 1.1 `ST`
++
++| Ligne | Sélecteur | Propriété | Actuel → nouveau | Motif |
++|---|---|---|---|---|
++| 4 | `.vf-term-pastille, .vf-term-puce` | `left`, `bottom` | `16px` → `var(--edge)` | bord de fenêtre ; même bord que `#zoom` |
++| 5 | `.vf-term-pastille` | `gap` | `6px` → `var(--sp-6)` | puce/point ↔ libellé : 6 |
++| 5 | `.vf-term-pastille` | `padding` | `0 12px 0 10px` → `0 var(--sp-12) 0 var(--sp-8)` | **10 → 8** : pictogramme de 16 dans une pastille de 32 = 8 de chaque côté (concentrique avec le rayon), 12 côté point/libellé. Largeur 100 → 98 px, non mesurée par les suites (T20.8 ne mesure que la hauteur) |
++| 10 | `.vf-term-puce` | `padding` | `6px 12px` → `var(--sp-6) var(--sp-12)` | jeton |
++| 10 | `.vf-term-puce` | `max-width` | `calc(100vw - 32px)` → `calc(100vw - 2 * var(--edge))` | une marge à gauche, une à droite |
++| 11 | `.vf-term-tiroir` | `left`, `bottom` | `16px` → `var(--edge)` | jeton |
++| 11 | `.vf-term-tiroir` | `right` | `max(16px, var(--pw, 0px))` → `max(var(--edge), var(--pw, 0px))` | `--pw` = 360 + 2 x 16 : 16 entre tiroir et panneau |
++| 14 | `.vf-term-tiroir.vf-term-plein-etat` | `top` | `calc(var(--hh, 64px) + 12px)` → `calc(var(--hh, 64px) + var(--sp-4))` | **aligné sur le haut du panneau** (V:315, `hh + 4`) : deux conteneurs flottants côte à côte au même plan ont le même haut. 12 était déjà sur la grille, mais c'est un écart d'alignement de 8 px, pas un choix. Couplé à `TI` l.77 (§1.3) |
++| 15 | `@keyframes vf-term-entree` | `translateY` | `16px` → `var(--sp-16)` | jeton |
++| 17 | `.vf-term-barre` | `gap` | `8px` → `var(--sp-8)` | jeton |
++| 17 | `.vf-term-barre` | `padding` | `0 8px 0 14px` → `0 var(--sp-8) 0 var(--sp-12)` | **14 → 12** (hors grille) : le titre s'aligne sur le bord gauche du texte du terminal (`#terminal` padding 12) et sur le bandeau de Q (§1.2). Droite 8 inchangée (bouton 28 dans 36 : 4 de marge verticale, glyphe de 16 centré) |
++| 40 | `.vf-term-carte` | `width` | `min(360px, calc(100% - 32px))` → `min(360px, calc(100% - 2 * var(--sp-16)))` | jeton (marge intérieure au tiroir, pas bord de fenêtre) |
++| 40 | `.vf-term-carte` | `padding` | `16px 18px` → `var(--inset-card)` | D-03 : 16 sur les quatre côtés |
++| 42 | `.vf-term-carte code` | `padding` | `1px 6px` → `var(--sp-2) var(--sp-6)` | code en ligne : 2 x 6 (recherche §c) ; vérifier à la capture que la boîte de 20 px ne mord pas la ligne voisine |
++| 48 | `body.vf-term-haut #tour` | `margin-bottom` | `44px` → inchangé, commentaire `/* dérivé : hauteur de la pastille tactile (44) */` | exception E4 (géométrie dérivée) ; `ui/40` en est propriétaire |
++| 49 | `@media (max-width: 999px), (pointer: coarse)` `.vf-term-tiroir` | `left`, `right`, `bottom` | `8px` → `var(--sp-8)` (x3) | bords à 8 = panneau (8) et barre de question (8) sur petit écran ; ce n'est pas `--edge` (16) |
++| 50 | `@media (max-width: 700px)` | `bottom: 72px` | **supprimer la règle de base** ; remplacer par la règle de feuille ouverte du §2.3 | 72 était une constante périmée (ask 54 → 102 px) ; le placement au-dessus de `#ask` est désormais fait par `TI` (§2.3) |
++| 51 | `@media (pointer: coarse)` | hauteurs barre / boutons / pastille | `52 / 44 / 44` | inchangé (E5, cibles tactiles) |
++
++Non modifiés exprès : `.vf-term-poignee { top: -12px; height: 24px }` (zone de saisie de 24 centrée sur le bord : 12 = moitié, dérivé), `translate(-50%, -50%)`, `inset: 0`, filets `1px`.
++
++### 1.2 `SQ` (jetons recopiés au §0)
++
++| Ligne | Sélecteur | Propriété | Actuel → nouveau | Motif |
++|---|---|---|---|---|
++| 45 | `#terminal` | `padding` | `8px 12px` → `var(--sp-8) var(--sp-12)` | valeurs **calculées identiques** : `cs.paddingTop/Bottom` (`client.mjs:173`, mutant `M-SANS-MARGE`, xterm:725) inchangés ; colonnes/lignes de xterm inchangées |
++| 55 | `.vf-q-carte` | `gap` | `7px` → `var(--sp-8)` | D-03 |
++| 55 | `.vf-q-carte` | `padding` | `16px 18px` → `var(--inset-card)` | D-03 ; jumelle de `.vf-term-carte` |
++| 55 | `.vf-q-carte` | `width` | `min(360px, calc(100% - 32px))` → `min(360px, calc(100% - 2 * var(--sp-16)))` | jeton |
++| 57, 58 | `.vf-q-titre`, `.vf-q-corps` | `margin` | `0` | inchangé |
++| 60 | `.vf-q-commande` | `padding` | `1px 6px` → `var(--sp-2) var(--sp-6)` | code en ligne, jumeau de `.vf-term-carte code` |
++| 61 | `.vf-q-bandeau` | `margin` | `8px` → `var(--sp-8)` | jeton |
++| 61 | `.vf-q-bandeau` | `gap` | `10px` → `var(--sp-8)` | point d'état ↔ texte : 8 |
++| 61 | `.vf-q-bandeau` | `padding` | `0 8px 0 14px` → `0 var(--sp-8) 0 var(--sp-12)` | 14 → 12 (intérieur), même bord que la barre du tiroir et le texte de xterm |
++| 68 | `.vf-q-bouton` | `padding` | `0 14px` → `0 var(--sp-12)` | 14 → 12 ; bouton 4 px plus étroit |
++| 70 | `.vf-q-collage` | `gap` | `6px 10px` → `var(--sp-6) var(--sp-8)` | 10 → 8 |
++| 70 | `.vf-q-collage` | `padding` | `6px 8px 6px 14px` → `var(--sp-6) var(--sp-8) var(--sp-6) var(--sp-12)` | 14 → 12, aligné sur le bandeau |
++| 71 | `#etat:not([hidden]) ~ .vf-q-collage` | `bottom` | `52px` → `calc(44px + var(--sp-8))` | dérivé : hauteur du bandeau + sa marge ; commentaire `/* dérivé */` |
++| 74 | `.vf-q-apercu` | `padding` | `6px 10px` → `var(--sp-6) var(--sp-12)` | boîte d'information : 12 horizontal |
++| 76 | `.vf-q-reste` | `gap` | `10px` → `var(--sp-8)` | 10 → 8 |
++
++### 1.3 `TI` : marges posées en JS
++
++| Ligne | Expression | Verdict |
++|---|---|---|
++| 77 | `window.innerHeight - hh - 12 - 16` (`pleinMax`) | **`- 12` → `- 4`**, pour rester d'accord avec `ST` l.14 (`+ var(--sp-4)`). Aucune assertion listée ne dépend de `pleinMax` (T22 plafonne à 70 %, bien en dessous : 504 contre 628 en 720 px) |
++| 85 | `reserve = ouvert && !plein ? h + 28 : 0` | `28` = bas 16 + 12 de respiration : dérivé (E4). Ajouter le commentaire `// dérivé : bas 16 + respiration 12`, valeur inchangée. À ≤ 999 px le tiroir est à `bottom: 8` : la réserve garde 8 px de trop, côté sûr ; ne pas toucher (T21.3 / T21.6) |
++| 55 (v1.3.3 : l.~58) | `+ 8` dans `z.style.bottom = … + 8` et dans la nouvelle ligne `ask` | marge de 8 entre deux objets : sur la grille |
++
++## 2. Chevauchement de la pastille : diagnostic, correction minimale de `eviter`, correction CSS
++
++### 2.1 Diagnostic (mesuré, Chromium, thème sombre, serveur 4601 sur la v1.3.3)
++
++Pastille fermée (z-index 6), état AVANT (v1.3.3) : sur 28 relevés (14 largeurs x panneau fermé/ouvert) la pastille recouvre :
++- **≤ 700 px**, panneau fermé : `#ask` (ask 8..382 x 734..836 à 390 ; pastille 16..116 x 728..772) ; panneau de détail ouvert (feuille de 363 à 836 à 390) : `#panel` et `#zoom`.
++- **701 à 1260 px, panneau ouvert** : `#ask` (701, 768, 900, 1000, 1024, 1100, 1200, 1260 ; ex. 1024 : ask 24..608, pastille 16..116). À 1280 et 1440 : aucun.
++
++Cause : (i) `ST` l.50 `bottom: 72px` à ≤ 700 px est une constante périmée (la barre de question fait 102 px sur deux lignes) ; (ii) `eviter` de `TI` ne connaît que `#zoom` ; (iii) la feuille de détail (z 5) est plus haute que la pastille et ne compte pour rien ; (iv) quand le panneau s'ouvre après le chargement, `eviter` ne repasse pas (il ne repasse qu'au `resize`).
++
++### 2.2 Correction minimale de `eviter` (`TI` l.47) : `#ask` devient un obstacle
++
++Comportement ajouté, rien d'autre : la pastille se pose 8 px au-dessus de `#ask` quand elle le recouvre ; `#zoom` continue de remonter au-dessus de la pastille (code v1.3.3 conservé, le littéral **`if (recouvre) z.style.bottom`** reste tel quel : mutant M-PASTILLE-SUR-ZOOM intact) ; la puce se pose au-dessus du plus haut des deux obstacles. Code testé (injecté dans Chromium, remplace le corps de `eviter` jusqu'à `const eviterTout`) :
++
++```js
++const eviter = (n) => {
++  const z = document.getElementById('zoom'), b = z ? z.getBoundingClientRect() : null;
++  // 71.5 (P71.5-D-06) : la barre de question #ask est un obstacle de plus, lu comme le zoom, avec la même marge de 8
++  const k = document.getElementById('ask'), kb = k ? k.getBoundingClientRect() : null;
++  const sur = (a, o) => !!o && o.width > 0 && a.left < o.right && a.right > o.left && a.top < o.bottom && a.bottom > o.top;
++  if (n === d.pastille) {
++    if (z) z.style.bottom = '';
++    n.style.bottom = '';
++    document.body.classList.remove('vf-term-haut');
++    if (!n.parentNode || n.hidden) return;
++    const surAsk = sur(n.getBoundingClientRect(), kb);
++    if (surAsk) n.style.bottom = Math.round(window.innerHeight - kb.top + 8) + 'px';
++    document.body.classList.toggle('vf-term-haut', surAsk);
++    if (!z) return;
++    const a = n.getBoundingClientRect(), s = document.getElementById('stage'), fond = s ? s.getBoundingClientRect().bottom : window.innerHeight, zb = z.getBoundingClientRect();
++    const recouvre = zb.width > 0 && a.left < zb.right && a.right > zb.left && a.top < zb.bottom && a.bottom > zb.top;
++    if (recouvre) z.style.bottom = Math.round(fond - a.top + 8) + 'px';
++    document.body.classList.toggle('vf-term-haut', recouvre || surAsk);
++    return;
++  }
++  if (!n.parentNode || n.hidden) return;
++  n.style.bottom = '';
++  const a = n.getBoundingClientRect();
++  const haut = Math.min(sur(a, b) ? b.top : Infinity, sur(a, kb) ? kb.top : Infinity);
++  if (haut < Infinity) n.style.bottom = Math.round(window.innerHeight - haut + 8) + 'px';
++};
++```
++- `vf-term-haut` (qui remonte la visite de 44, `ST` l.48) est posé aussi quand la pastille est relevée au-dessus de `#ask` : sans cela la visite (bas 76) recouvrait la pastille relevée (mesuré : 8 largeurs rouges sur `#tour` avant ce correctif).
++- **Re-déclenchement** (sinon la correction est périmée dès que le panneau s'ouvre après le chargement) : après `window.addEventListener('resize', eviterTout);` ajouter
++  ```js
++  { const ask = document.getElementById('ask'); if (ask) { if (window.ResizeObserver) new ResizeObserver(eviterTout).observe(ask); ask.addEventListener('transitionend', eviterTout); } }
++  ```
++  `ResizeObserver` couvre l'apparition/disparition (la barre passe en `display: none` tiroir ouvert et à ≤ 700 feuille ouverte) et le changement de largeur ; `transitionend` est indispensable : `left` et `width` de la barre transitionnent 450 ms, le dernier rappel du `ResizeObserver` tombe avant la fin de `left` (mesuré : pastille restée relevée à 1200 px, panneau refermé, sans lui ; avec lui, 10 relevés sur 10 propres). Aucune boucle : `eviter` n'écrit jamais sur `#ask`.
++- Tiroir ouvert : la pastille est masquée, `#ask` aussi (`body.vf-term-ouvert #ask { display: none }`) ; à la fermeture `eviter(d.pastille)` (déjà appelé l.~142) repose la même position : T21.4 (« même bas ») inchangé.
++
++### 2.3 Feuille de détail ouverte à ≤ 700 px (CSS, `ST`)
++
++La feuille (`#panel`, `bottom: 8`, `max-height: min(56vh, 480px)`, `viewer.html:535`) est un objet plus haut que la pastille : on garde la reco du tour 1 (la pastille flotte au-dessus, pas de rangement). Remplacer la règle de la l.50 par :
++```css
++@media (max-width: 700px) { body:not(.no-panel) .vf-term-pastille, body:not(.no-panel) .vf-term-puce { bottom: calc(var(--sp-8) + min(56vh, 480px) + var(--sp-8)) !important; } }
++```
++`!important` obligatoire : `eviter` pose un `style.bottom` en ligne (mesuré) qu'une feuille de style ordinaire ne bat pas. Commentaire à écrire dans `ST` : « feuille de détail ouverte : au-dessus d'elle, 8 d'écart ».
++
++### 2.4 Mesure après correction (CSS + `eviter` injectés ; Chromium ; `.../scratchpad/715/mes-cand3.mjs`, `mes-cand4.mjs`, `mes-cand5.mjs`, `nouv-eviter.txt`, `cand2.css`)
++
++Pastille (fermée) contre `#panel`, `#ask`, `#zoom`, `#context`, `header`, `#tour`, `#flowbar` : **0 chevauchement sur 28 relevés** avant ajout de `transitionend`/`vf-term-haut` dans l'ordre : 390x844, 600x900, 700x900 ; 701x900, 768x1024, 900x900, 1000x800, 1024x768, 1100x800, 1200x800, 1260x800 ; 1280x800, 1280x720, 1440x900 ; panneau fermé et ouvert, plus 1000/1024/1200/1260/768 rejoués avec la version finale. À 1280 et plus : rectangles identiques à la v1.3.3 (pastille 16,752 ; zoom 16,702 : `bottom` 16, zoom relevé de 50 au-dessus) : **aucune dérive sur les largeurs des suites T21**. Exemples à 390x844 : pastille 682..726, zoom 530..674, ask 734..836 (trois objets empilés, 8 d'écart) ; feuille ouverte : pastille 311..355 au-dessus de la feuille (363). Réserve : à 390 px feuille ouverte la pastille recouvre un nœud du graphe ; conséquence de « toujours accessible ».
++Avec la règle de base de l.50 supprimée (§1.1) le résultat ne change pas par construction (`eviter` repart de `bottom: ''`, la pastille à `--edge` recouvre `#ask` et monte) ; le résultat en CSS réel est à re-mesurer par vf-coder avec `mes-cand4.mjs` sans injection.
++
++## 3. Suites concernées
++
++**Valeurs figées qui BOUGENT** : T18.0 seule (extension, jamais retrait). Ni T22.1/.3/.4, TU.5, TU.7 (hauteurs du tiroir : `height: 320px`, `defaut()`, `borne()` intacts ; `pleinMax` 628 → 636 en 720 px reste au-dessus des plafonds testés), ni T20.4 (grip 40 x 4), T20.7/T20.8 (hauteurs 28/36/32/44), ni xterm:725 (padding calculé 8/12 identique), ni T21.1-T21.6 (positions à 1440x900 et 1280x720 identiques mesurées) ne changent.
++
++| Assertion | Changement |
++|---|---|
++| `test-cockpit-terminal-page.sh` T18.0 | `NOMS` de `parite.mjs` (heredoc, l.~62) +16 noms (les 9 primitifs et les 7 sémantiques du §0) ; titre « les 25 noms » → « les 41 noms » ; valeur `PARITE 25/25` → **`PARITE 41/41`** ; en-tête du test (l.10) idem. T18.1/T18.2 inchangées (`""`) mais couvrent désormais les espacements. |
++| T18.7 (nouveau) | mutant `sed 's/--sp-8: 8px/--sp-8: 9px/'` sur `SQ` : doit donner `variable --sp-8 (sombre) : viewer.html=8px, Q=9px` (forme de T18.3). Second mutant : `--inset-card: var(--sp-16)` → `var(--sp-12)` dans `SQ` : `variable --inset-card (sombre) : viewer.html=var(--sp-16), Q=var(--sp-12)`. Conditionnel à T0 mergé. |
++| **T21.7 (nouveau, D-06)** | dans `chrome-geom.mjs` (ou son jumeau), nouveau relevé « pastille fermée, sans chevauchement de `#ask` (s'il est affiché), `#panel`, `#zoom`, `#tour` » à 390x844, 700x900, 768x1024, 1000x800, 1200x800, 1260x800, panneau fermé ET ouvert (bouton `#btn-panel`, attendre 900 ms pour la transition), puis, pour chacun, mesure. Valeur attendue `[]`. Titre : « T21.7 (D-06) — tiroir fermé : la pastille ne recouvre ni la barre de question, ni la feuille de détail, ni le zoom, ni la visite, panneau fermé et ouvert, de 390 à 1260 px ». Ne touche pas T21.0 (`n=8` : les huit relevés existants restent). |
++| T21.8 (nouveau, témoin) | « T21.7 : le témoin est vrai » : au moins 12 relevés pris, au moins 6 avec `#ask` affiché ET panneau ouvert (sinon T21.7 est vert à vide). Valeur `ok`. |
++| M-PASTILLE-SUR-ASK (nouveau mutant) | `mut_geom M-PASTILLE-SUR-ASK vf-cockpit-terminal-tiroir.mjs 's|if (surAsk) n.style.bottom|if (false) n.style.bottom|' <groupe T21.7>` : doit rougir T21.7 (au moins un relevé en défaut). Second mutant, `s|ask.addEventListener('transitionend', eviterTout);||` : doit rougir T21.7 sur un relevé « panneau refermé » (c'est le cas stale mesuré). |
++| M-PASTILLE-SUR-ZOOM (`tiroir.sh:578`, `s|if (recouvre) z.style.bottom|if (false) z.style.bottom|`) | **intact** : le littéral est conservé tel quel dans le code du §2.2. |
++| T20.5 et les relevés de collage (`run_collage`, T21.11-T21.13) | à rejouer : la carte et le bandeau/bouton/collage de Q passent de 18 → 16 et de 14 → 12 (plus de place pour le contenu, aucune régression attendue ; mesures directes). |
++| M-AJUSTE-SANS-TIROIR, M-ASK-RESTE, M-VISITE-RESTE, T18.3-T18.6 | textes sources figés (`body.vf-term-ouvert #stage {`, `body.vf-term-ouvert #ask { display: none; }`, `window.VibeFlowTour.end();`, `--surface: #191919`, `--ring:`, `--text: #161616`) : ne pas reformater ces lignes. |
++
++Aucun contrôle retiré ou affaibli ; deux assertions de plus (T21.7, T21.8), deux de plus (T18.7), trois mutants de plus.
++
++## 4. Remontées pour le manager
++
++- Décisions appliquées : D-06 (correction dans la 71.5, bande 701-1270 incluse, par `eviter`), feuille ouverte (reco conservée), haut du tiroir aligné sur le panneau (c'est un écart d'alignement, donc un espacement ; couplé à `pleinMax`).
++- La v1.3.3 a changé la mécanique : la pastille ne bouge plus pour le zoom, le zoom monte. La spec de la coque (`71.5-SPEC-shell.md`) doit préserver `ui/02:21` (`#stage > #zoom`, `bottom: calc(var(--vf-ask-h) + 8)`) : `eviter` pose `z.style.bottom` en ligne, qui prime ; ne pas écrire `!important` sur ce `bottom`. Les zones `--vf-ask-h` et `#ask bottom: 16` (shell §2, V:391, 20 → 16) bougent de 4 px : sans effet sur la correction (elle lit des rectangles, pas des constantes).
++- Au 701-1270 px panneau ouvert, la pastille monte d'environ 66 px (de 16 à ~82 du bas) : c'est le prix de l'évitement dynamique ; sans panneau elle reste à 16.
++- Reste hors de ce nœud : le zoom est caché sous la feuille ouverte à ≤ 700 px (z-index auto sous 5), coque `V`/`ui/02`.
++- Parallélisme : `ST`, `SQ`, `TI` et `tests/test-cockpit-terminal-*.sh` n'ont aucun fichier en commun avec L1-L6 ; seul T0 précède. Un seul propriétaire pour `test-cockpit-terminal-tiroir.sh` et `test-cockpit-terminal-page.sh`.
++
++## 5. Gestes pour vf-coder (ordre)
++
++1. T0 mergé (`viewer.html` porte les 16 jetons du §0).
++2. `SQ` : bloc de jetons dans `SOMBRE`, `VARIABLES_RECOPIEES` +16, en-têtes ; table §1.2.
++3. `ST` : table §1.1 et règle §2.3 ; commentaires E4 (l.48, `ST` + `SQ` l.71).
++4. `TI` : `eviter` du §2.2, observateurs, `pleinMax` `- 4`, commentaire de `reserve`. Ne pas reformater `if (recouvre) z.style.bottom`.
++5. Tests : T18.0 → 41/41 + T18.7 ; T21.7, T21.8 + deux mutants.
++6. Rejouer `test-cockpit-terminal-page.sh`, `-tiroir.sh` (T20, T21, T22, TU), `-xterm.sh` (E3, xterm:725) ; refaire la mesure de chevauchement sur le code réel (sans injection) aux largeurs du §2.4.

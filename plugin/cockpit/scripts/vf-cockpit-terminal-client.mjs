@@ -50,7 +50,7 @@ export function clientTerminal(cfg) {
   // 2. terminal
   if (!encadree) { vue.carte('horscadre'); return; }
   emettre('ready');
-  if (!localStorage.getItem(CLE_SECRET)) { expire(); return; }
+  if (!localStorage.getItem(CLE_SECRET)) { vue.carte('sansamorce'); return; } // aucun secret : le terminal n'a jamais été ouvert dans cet onglet, ce n'est pas une expiration (PU-G-132) ; rien n'est dit à P, la barre du tiroir ne prétend pas non plus qu'une session a expiré
   const entetes = () => ({ 'X-VF-Terminal': localStorage.getItem(CLE_SECRET) || '', 'X-VF-Onglet': onglet() });
   const modeServi = (p) => { // la présélection vient de Q (valeur servie), relue contre la liste fermée ; rien n'est gardé dans le navigateur
     const v = p.mode_retenu; // garde:mode-lecture
@@ -59,16 +59,21 @@ export function clientTerminal(cfg) {
   const forme = (j) => {
     const s = (v, max) => typeof v === 'string' && v.length <= max, ent = (v, lo, hi) => Number.isInteger(v) && v >= lo && v <= hi, liste = (v) => Array.isArray(v) && v.length <= 20 && v.every((c) => s(c, 40));
     if (!j || typeof j !== 'object' || j.etat !== 'en-attente' || typeof j.id !== 'string' || !/^[A-Za-z0-9_-]{8,64}$/.test(j.id) || !s(j.verbe, 40) || !s(j.intention, 200) || !s(j.phase, 20) || !(j.ws === null || s(j.ws, 40))) return null;
-    if (!j.lignes || typeof j.lignes !== 'object' || MODES.some((m) => typeof j.lignes[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes[m])) || !liste(j.bloquants) || !liste(j.avertissements) || !ent(j.arme_apres_ms, 0, 10000) || !ent(j.expire_ms, 1, 600000)) return null;
+    if (!j.lignes || typeof j.lignes !== 'object' || MODES.some((m) => typeof j.lignes[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes[m])) || !liste(j.bloquants) || !liste(j.avertissements) || !ent(j.arme_apres_ms, 0, 10000) || !ent(j.expire_ms, 1, 600000) || !ent(j.duree_ms, 1000, 600000)) return null;
     if ((j.chat !== undefined || j.lignes_chat !== undefined) && (j.chat !== true || !j.lignes_chat || typeof j.lignes_chat !== 'object' || MODES.some((m) => typeof j.lignes_chat[m] !== 'string' || !/^[\x20-\x7e]{1,400}$/.test(j.lignes_chat[m])))) return null; // 72-13 : chat (vrai) et lignes_chat vont ensemble, sinon « aucune »
-    return { chat: j.chat === true ? true : undefined, lignesChat: j.chat === true ? Object.fromEntries(MODES.map((m) => [m, j.lignes_chat[m]])) : undefined, id: j.id, verbe: j.verbe, intention: j.intention, phase: j.phase, ws: j.ws, lignes: Object.fromEntries(MODES.map((m) => [m, j.lignes[m]])), bloquants: j.bloquants.slice(), avertissements: j.avertissements.slice(), arme_apres_ms: j.arme_apres_ms, expire_ms: j.expire_ms }; };
-  let attente = null, courante = null, fermee = null, pret = false, terminal = null, enVol = false;
-  const afficher = () => { if (!pret || attente === null || courante === attente.id) return; courante = attente.id; vue.proposition(Object.assign({}, attente), { lancer, annuler }); };
+    return { chat: j.chat === true ? true : undefined, lignesChat: j.chat === true ? Object.fromEntries(MODES.map((m) => [m, j.lignes_chat[m]])) : undefined, id: j.id, verbe: j.verbe, intention: j.intention, phase: j.phase, ws: j.ws, lignes: Object.fromEntries(MODES.map((m) => [m, j.lignes[m]])), bloquants: j.bloquants.slice(), avertissements: j.avertissements.slice(), arme_apres_ms: j.arme_apres_ms, expire_ms: j.expire_ms, duree_ms: j.duree_ms }; };
+  let attente = null, courante = null, fermee = null, pret = false, terminal = null, enVol = false, premiere = true, ancienne = null, entreeTenue = false; // entreeTenue : armée par la prise de focus du terminal lui-même, quelle qu'en soit la source (garde:point-fixe-focus)
+  // LB2 (Q7, PU-G-118 et PU-G-119) : une proposition d'une visite précédente (cadre neuf, déjà plus vieille que VISITE_MS) est effacée au premier sondage, jamais montrée puis remplacée sous le clic ;
+  // le cadre qui se recharge dans la MÊME visite (thème) garde son nom de fenêtre et retrouve sa proposition tant qu'elle n'a pas expiré ; un bandeau manipulé n'est pas remplacé (la vue rend false : on réessaie au sondage suivant)
+  const VISITE_MS = 30000, memeVisite = window.name === 'vf-q-visite'; window.name = 'vf-q-visite';
+  const afficher = () => { if (!pret || attente === null || courante === attente.id) return; const p = attente; if (vue.proposition(Object.assign({}, p), { lancer, annuler }) === false) return; courante = p.id; };
   const lire = async () => {
     if (enVol) return; enVol = true; try {
       const r = await fetch('/proposition', { headers: entetes(), cache: 'no-store' }); if (!r.ok) return;
-      const j = await r.json().catch(() => null), p = forme(j);
+      const j = await r.json().catch(() => null), p = forme(j), debut = premiere; premiere = false;
       if (!p) { attente = null; if (courante !== null) { courante = null; vue.proposition(null); } return; } // garde:aucune
+      if (debut && !memeVisite && p.duree_ms - p.expire_ms > VISITE_MS) ancienne = p.id; // garde:visite
+      if (p.id === ancienne) { fermee = p.id; if (pret) fetch('/annuler', { method: 'POST', headers: Object.assign(entetes(), { 'Content-Type': 'application/json' }), body: JSON.stringify({ id: p.id }), cache: 'no-store' }).catch(() => {}); return; } // jamais montrée ; effacée dans Q dès que cet onglet est le propriétaire du terminal (avant, Q répond 409 : on réessaie au sondage suivant), sans prise de focus
       if (p.id === fermee) return; // garde:fermee
       const nouveau = attente === null || p.id !== attente.id; attente = Object.assign(p, { modeInitial: modeServi(j) });
       if (nouveau) emettre('proposition'); // garde:emission
@@ -80,7 +85,7 @@ export function clientTerminal(cfg) {
       body: JSON.stringify(Object.assign({ id: courante, mode }, avecChat === true ? { chat: true } : {})), cache: 'no-store' }); } catch (e) { return 'reseau'; } // garde:corps-lancer
     if (r.status === 204 || r.status === 404) { fermee = id; if (courante === id) { courante = null; attente = null; } }
     if (r.status !== 204) return r.status === 404 ? 'absente' : { 409: 'occupe', 425: 'attendre', 410: 'sans-session' }[r.status] || 'refus';
-    if (terminal) terminal.focus(); // garde:apres-usage
+    if (terminal) terminal.focus(); // garde:apres-usage : Entrée a pu déclencher le clic et rester tenue ; la prise de focus arme la retenue (garde:point-fixe-focus)
     return 'ok';
   };
   const annuler = () => {
@@ -95,6 +100,8 @@ export function clientTerminal(cfg) {
     attendre(POLICES_MS),
   ]);
   const demarrer = () => {
+    // les deux phrases que la bibliothèque dit d'elle-même (nom du champ de saisie lu par un lecteur d'écran, sortie trop abondante) : posées avant open() ; `if` : une bibliothèque de substitution (banc LB.C2 à C7) n'a pas `strings`
+    if (Terminal.strings) { Terminal.strings.promptLabel = 'Saisie du terminal'; Terminal.strings.tooMuchOutput = 'Trop de sortie pour être annoncée : parcourez les lignes à la main pour la lire'; }
     const term = new Terminal({
       fontFamily: '"JetBrains Mono", ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace', fontSize: 13, lineHeight: 1, letterSpacing: 0,
       fontWeight: '400', fontWeightBold: '600', drawBoldTextInBrightColors: false, minimumContrastRatio: 4.5,
@@ -107,7 +114,9 @@ export function clientTerminal(cfg) {
     const fit = new FitAddon.FitAddon();
     term.loadAddon(fit);
     term.open(document.getElementById('terminal'));
+    term.textarea.addEventListener('focus', () => { entreeTenue = true; }); // garde:point-fixe-focus : point fixe unique, CHAQUE prise de focus du terminal (bouton de Q, bouton du parent par iframe.focus(), retour d'onglet, tout chemin futur) retient les Entrée en répétition jusqu'au relâchement ou à une pression fraîche
     term.attachCustomKeyEventHandler((e) => {
+      if (e.key === 'Enter' && entreeTenue) { if (e.type === 'keyup' || !e.repeat) entreeTenue = false; else { e.preventDefault(); return false; } } // garde:entree-tenue : seules les répétitions de l'Entrée du clic sont retenues ; son relâchement ou une nouvelle pression (repeat faux) lève la retenue, rien ne dépend d'un délai
       if (e.code === RACCOURCI.code && e.ctrlKey === RACCOURCI.ctrl && e.shiftKey === RACCOURCI.shift && !e.altKey && !e.metaKey) {
         e.preventDefault(); if (e.type === 'keydown') emettre('toggle'); return false;
       }
@@ -117,7 +126,7 @@ export function clientTerminal(cfg) {
     // collage et dépôt de texte : un texte à retour à la ligne, à caractère de contrôle ou invisible (Cf, Tag, bidi) n'atteint le shell qu'après « Coller » (le collage entre crochets ne suffit pas : certains shells exécutent dès la réception)
     const SUR = /[\u0000-\u001f\u007f-\u009f\u2028\u2029]/;
     let propose = null;
-    const abandonner = () => { if (propose !== null) { propose = null; vue.collage(null); term.focus(); } };
+    const abandonner = () => { if (propose !== null) { propose = null; vue.collage(null); term.focus(); } }; 
     const soumettre = (t) => {
       abandonner();
       if (!t) return;
@@ -230,7 +239,7 @@ export function clientTerminal(cfg) {
       if (r.status === 403) { if (await secretPerime()) { expire(); return 'stop'; } return 'echec'; } // 403 sans Origin : secret périmé ou serveur d'ailleurs, la sonde départage
       if (r.status === 409) { vue.carte('refuse', () => { vue.effacer(); boucle(); }); emettre('refuse'); return 'stop'; }
       if (r.status !== 200) return 'echec';
-      derniere = term.rows + ' ' + term.cols;
+      derniere = ''; taille(); // DG-08 : le terminal a peut-être été créé à une autre taille (cadre rechargé, tiroir agrandi entre-temps) : la taille de CE cadre lui est redite à chaque connexion
       if (dejaVu) term.reset();
       dejaVu = true; vue.effacer(); emettre('connecte'); rouvrir();
       const lecteur = r.body.getReader();

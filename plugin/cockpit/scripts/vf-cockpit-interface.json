@@ -6,7 +6,7 @@
     "description": "objet posé par readPlanning sur chaque phase ; lu par vf-signal par l'émetteur signal@1 ; version 2 : état de mission abandonnee et inconnu, champ mission.vie (P68-D-16, P68-D-23) ; cascade de vie (P68-D-26, P68-D-27, P68-D-33) : verrou de la phase (même périmé), sinon verrou du compartiment, sinon verrou de dépôt (dont l'ancien .planning/DRIVER.lock) ; un verrou présent, même périmé, arrête la cascade (P68-D-27, P68-D-36) ; périmé ou aucun verrou : abandonnee ; source illisible : inconnu ; un âge de progression négatif est traité comme absent",
     "requis": { "version": "number", "etat": "string", "plans": "object", "correctifs": "number", "mission": "any", "reste": "array" },
     "etats": ["a-faire", "en-cours", "a-recetter", "fait"],
-    "reste": ["recette", "verification", "cloture"],
+    "reste": ["cadrage", "plan", "execution", "recette", "verification", "cloture"],
     "missionEtats": ["running", "abandonnee", "inconnu", "failed", "done", "ready"],
     "vie": { "requis": { "tenu": "boolean", "stale": "any", "progressAgeS": "any", "ttl": "any" } }
   },
@@ -27,7 +27,7 @@
       "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "fenetre": "number", "busy": "boolean", "workers": "array", "sources": "object" },
       "travailleur": {
         "requis": ["kind", "id", "tree", "source"],
-        "optionnels": ["role", "task", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "action", "rattachement"],
+        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "action", "rattachement"],
         "etats": ["actif", "en-attente", "termine"]
       },
       "rattachement": {
@@ -103,6 +103,12 @@
     },
     "transcriptSousAgent": {
       "requis": ["isSidechain", "agentId"]
+    },
+    "transcriptTitre": {
+      "type": "custom-title",
+      "champ": "customTitle",
+      "typeChamp": "string",
+      "refuse": ["ai-title"]
     }
   }
 }

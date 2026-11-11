@@ -6,7 +6,7 @@
 // CLI : node vf-cockpit-build.mjs [<lab>] [--quiet]   Codes : 0 ok · 2 pas de .planning · 3 moteur absent · 4 échec d'une étape.
 import fs from 'node:fs';
 import path from 'node:path';
-import { read as lireGarde } from './vf-cockpit-planning.mjs';
+import { read as lireGarde, clipMot } from './vf-cockpit-planning.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { findLabRoot, engineDir, envGit, configFiltres, filtresEtat, MAX_FILTRES, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
@@ -24,7 +24,15 @@ export const fichiersExecution = (scriptsDir) => fs.readdirSync(scriptsDir).filt
 const GITIGNORE = '# Sortie générée par le cockpit VibeFlow : ignorée par git (ce fichier compris).\n*\n';
 const fin = (code, msg) => { const e = new Error(msg); e.code = code; return e; };
 const read = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
-const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/[`*]/g, '').trim(); const i = s.search(/[.!?](\s|$)/); s = i > 25 ? s.slice(0, i + 1) : s; return s.length > n ? s.slice(0, n - 1) + '…' : s; };
+// PU-G-067 : le résumé d'un fichier est une phrase, jamais du balisage. Markdown : le « > » des citations est retiré, les commentaires et balises HTML connues
+// (<picture>, <img>, <p>…) aussi — liste fermée de balises, pour qu'un « <lab> » ou un « <chemin> » de la prose reste intact.
+const BALISES_HTML = 'a|abbr|b|br|center|code|details|div|em|h[1-6]|hr|i|img|kbd|li|ol|p|picture|source|span|strong|sub|summary|sup|svg|table|tbody|td|th|thead|tr|ul';
+export const nettoyerMarkdown = (s) => String(s || '').replace(/<!--[\s\S]*?-->/g, ' ').replace(new RegExp(`</?(?:${BALISES_HTML})(?:\\s[^>]*)?/?>`, 'gi'), ' ').replace(/^[ \t]*(?:>[ \t]?)+/gm, '');
+// PU-G-068 : un résumé dont le texte source a perdu ses accents (mots français qui en portent toujours, sans aucun caractère accentué) reste tel quel —
+// on ne réécrit pas le fichier source — mais se dit « extrait brut ». Liste fermée de mots, jamais une règle de langue.
+const MOTS_SANS_ACCENT = /\b(etapes?|deja|apres|verifie[rsz]?|verifiables?|generer|necessaires?|creer|executer|systemes?|systematique|resultats?|donnees|ecrire|ecrit|prefere|empeche\w*|regles?|ecarts?|defauts?|deploiement|problemes?|derniere|entrees?|memoire|developpe\w*|evenements?|evite[rsz]?|definit|apres)\b/i; // sans mot qui existe aussi en anglais (reference, complete, different, detect…)
+export const extraitBrut = (d) => (d && !/[^\x00-\x7f]/.test(d) && MOTS_SANS_ACCENT.test(d) ? `${d} (extrait brut)` : d);
+export const sentence = (s, n = 200) => { s = String(s || '').replace(/\s+/g, ' ').replace(/[`*]/g, '').trim(); const i = s.search(/[.!?](\s|$)/); return clipMot(i > 25 ? s.slice(0, i + 1) : s, n); }; // PU-G-147 : coupe au mot entier, comme la version du planning
 // R6 : environnement du moteur. Liste des filtres lue et bornée : filtres vidés, marqueur VF_COCKPIT_GIT_DURCI posé (le moteur lit git). Liste illisible ou au-delà de MAX_FILTRES : le marqueur n'est PAS posé, git() du
 // moteur reste fermé (patch P27 de common.mjs : carte sans fichiers suivis ni head) ; `ferme` dit pourquoi. Même règle fail-closed que lancerGit : un filtre inconnu n'est pas un filtre absent.
 export function etatMoteur(lab) {
@@ -82,8 +90,8 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
     let d = '';
     if (fmBlock) { d = /^description:\s*"?(.*?)"?\s*$/m.exec(fmBlock)?.[1] || ''; const nm = /^name:\s*(.*)$/m.exec(fmBlock)?.[1]; if (nm) f.name = nm.trim(); }
     else if (/\.(sh|bash)$/.test(f.p)) d = txt.split('\n').slice(txt.startsWith('#!') ? 1 : 0).filter((l, i, a) => /^#/.test(l) && a.slice(0, i).every((x) => /^#/.test(x))).map((l) => l.replace(/^#+\s?/, '')).join(' ');
-    else if (f.p.endsWith('.md')) d = txt.replace(/^#.*$/gm, '').split(/\n\s*\n/).find((p) => p.trim().length > 30) || '';
-    if (d) { f.d = sentence(d); f.auto = false; decrits++; }
+    else if (f.p.endsWith('.md')) d = nettoyerMarkdown(txt.replace(/^#.*$/gm, '')).split(/\n\s*\n/).map((p) => p.replace(/\s+/g, ' ').trim()).find((p) => p.length > 30) || '';
+    if (d) { f.d = extraitBrut(sentence(d)); f.auto = false; decrits++; }
   }
   const touch = Object.create(null); // un chemin `constructor` ou `__proto__` du lab n'est qu'une clé
   for (const f of project.files) for (const p of f.touched || []) (touch[p] ||= []).push({ ref: 'f:' + f.p, label: f.name.slice(0, 90), st: f.st });

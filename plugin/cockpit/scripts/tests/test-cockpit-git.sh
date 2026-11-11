@@ -495,6 +495,65 @@ assert_eq "M-SYNC-GRAPHE — la requête légère n'est servie qu'APRÈS la lect
 assert_eq "M-ENTETE.0 — mutant avec effet (le miroir asynchrone ne détecte plus le worktree)" "$(mutant entete "const worktree = haut && reel(haut) !== reel(racine) ? path.basename(haut) : null;" "const worktree = null; // MUTANT")" "effet"
 assert_eq "M-ENTETE — la parité rougit sur les worktrees (wt-b, wt-det) et sur eux seuls" "$(node "$AUX/parite-entete.mjs" "$WORK/mut/entete" "$LAB" "$WORK/wt-b" "$WORK/wt-det" "$WORK/hors-depot" "$WORK/r-vide" "$WORK/r-master" 2>&1 | tail -1 | tr '|' '\n' | cut -c1-4 | paste -sd'|' -)" "egal|DIFF|DIFF|egal|egal|egal"
 
+echo "=== S10 — REG-D-01 (PU-G-191, PU-G-003) : latence par lancement, échéance de 15 s, git muet jamais « absent », une seule lecture à la fois ==="
+# Cause mesurée (diagnostic DG-01) : 12 à 13 lancements git en SÉRIE sous UNE échéance globale ; sous la charge du poste chaque lancement attend 0,1 à 0,45 s d'ordonnancement et l'échéance de 5 s sautait.
+# Un `git` emballé dort avant chaque lancement (la charge simulée) puis exécute le vrai. Les échéances réduites (BORNES.echeanceMs posée par le témoin) gardent les cas lents courts, jamais l'échéance par défaut qu'asserte S10.4.
+cat > "$AUX/reg.mjs" <<'JS'
+// reg.mjs <scripts> <lab> <cas> [échéance en ms] : une ligne.
+//   lecture : « graphe|en-tête de la route »   muet : « graphe|en-tête porté par le graphe|route en-tête|en-tête synchrone (avecEcheance) »
+//   vol : trois lectures du même lab dont deux arrivent PENDANT la première, puis une quatrième après la fin
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab, cas, ech] = process.argv;
+const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
+const m = await imp('vf-cockpit-git.mjs'), p = await imp('vf-cockpit-paths.mjs'), e = await imp('vf-cockpit-git-entete.mjs');
+if (ech) m.BORNES.echeanceMs = Number(ech);
+const route = () => new Promise((ok) => m.routeGit({ method: 'GET' }, null, new URL('http://x/api/vf/git/entete'), { root: lab, json: (_r, _c, o) => ok(o) }));
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+if (cas === 'echeance') console.log(m.BORNES.echeanceMs);
+else if (cas === 'lecture') { const [g, en] = await Promise.all([m.lireGit(lab), route()]); console.log(`${g.etat}|${en.etat}`); }
+else if (cas === 'muet') {
+  const sync = p.avecEcheance(Number(ech), () => e.enteteGit(lab)).etat; // synchrone d'abord : il tient la boucle le temps de ses lancements
+  const [g, en] = await Promise.all([m.lireGit(lab), route()]);
+  console.log(`${g.etat}|${g.entete && g.entete.etat}|${en.etat}|${sync}`);
+} else if (cas === 'vol') {
+  const a = m.lireGit(lab); await pause(60); const b = m.lireGit(lab); await pause(60); const c = m.lireGit(lab);
+  const [ra, rb, rc] = await Promise.all([a, b, c]);
+  console.log(`${ra.etat}|${rb.etat}|${rc.etat}|${rb === rc}|${ra === rb}`);
+  const d = await m.lireGit(lab);
+  console.log(`${d.etat}|${d === rc}`);
+}
+JS
+mklat() { mkdir -p "$WORK/lat-$1"; printf '#!/bin/sh\nsleep %s\nexec "%s" "$@"\n' "$1" "$GIT_REEL" > "$WORK/lat-$1/git"; chmod +x "$WORK/lat-$1/git"; }
+mklat 0.45; mklat 1.8; mklat 3.1
+REG() { local d="$1"; shift; PATH="$WORK/lat-$d:$PATH" node "$AUX/reg.mjs" "$@" 2>&1 | tail -1; }
+REGS() { node "$AUX/reg.mjs" "$@" 2>&1 | tail -1; }
+assert_eq "S10.1 — 0,45 s d'attente par lancement (12 x 0,45 > 5 s : rouge à 5b7111f5) : la lecture du graphe et celle de l'en-tête aboutissent" "$(REG 0.45 "$SCRIPTS" "$LAB" lecture)" "ok|ok"
+assert_eq "S10.2 — 1,8 s par lancement et une échéance de 3 s : indisponible honnête, jamais un faux ok (le graphe et la route de l'en-tête disent la même chose)" "$(REG 1.8 "$SCRIPTS" "$LAB" lecture 3000)" "indisponible|indisponible"
+assert_eq "S10.3 — git muet dès le premier lancement (3,1 s, échéance 3 s) : graphe, en-tête du graphe, route de l'en-tête ET enteteGit synchrone disent « indisponible », jamais « absent » (PU-G-003)" "$(REG 3.1 "$SCRIPTS" "$LAB" muet 3000)" "indisponible|indisponible|indisponible|indisponible"
+assert_eq "S10.4 — l'échéance globale par défaut est de 15 000 ms (REG-D-01 étend P78-D-41)" "$(REGS "$SCRIPTS" "$LAB" echeance)" "15000"
+assert_eq "S10.5 — témoin positif A5 : « absent » reste « pas un dépôt git » (hors dépôt, sans latence) : graphe, en-tête du graphe, route, synchrone" "$(REGS "$SCRIPTS" "$WORK/hors-depot" muet 3000)" "absent|absent|absent|absent"
+# mono-vol : le git emballé compte les `worktree list` (un par lecture du graphe) et dort 0,4 s dessus pour que deux appels arrivent pendant la première lecture
+WRAPV="$WORK/wrap-vol"; mkdir -p "$WRAPV"; COMPTEV="$WORK/vol.compte"
+printf '#!/bin/sh\nfor a in "$@"; do [ "$a" = worktree ] && { echo w >> "%s"; sleep 0.4; }; done\nexec "%s" "$@"\n' "$COMPTEV" "$GIT_REEL" > "$WRAPV/git"; chmod +x "$WRAPV/git"
+rm -f "$COMPTEV"; VOL="$(PATH="$WRAPV:$PATH" node "$AUX/reg.mjs" "$SCRIPTS" "$LAB" vol 2>&1 | tr '\n' ' ')"
+assert_eq "S10.6 — trois lectures du même lab, deux arrivant pendant la première : états ok, les deux dernières PARTAGENT une seule lecture (même objet), distincte de la première ; un appel après la fin relance une lecture neuve" "$VOL" "ok|ok|ok|true|false ok|false "
+assert_eq "S10.6 — jamais empilées : 3 lectures du graphe en tout (la première, UNE seule suivante pour les deux appels arrivés pendant elle, puis celle de l'appel d'après) ; sans mono-vol : 4" "$(grep -c w "$COMPTEV")" "3"
+mutantF() { # nom, fichier, de, vers : copie les scripts, applique la mutation au fichier ; rend « effet » ou « sans-effet »
+  rm -rf "$WORK/mut/$1"; mkdir -p "$WORK/mut/$1"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$WORK/mut/$1/"
+  local r; r="$(node "$AUX/mut.mjs" "$WORK/mut/$1/$2" "$3" "$4")"
+  [ "$r" = applique ] && ! cmp -s "$SCRIPTS/$2" "$WORK/mut/$1/$2" && echo effet || echo sans-effet
+}
+assert_eq "M-MONOVOL.0 — mutant avec effet (la lecture en cours n'est plus partagée)" "$(mutantF monovol vf-cockpit-git.mjs 'const v = EN_VOL.get(cle);' 'const v = undefined;')" "effet"
+rm -f "$COMPTEV"; VOLM="$(PATH="$WRAPV:$PATH" node "$AUX/reg.mjs" "$WORK/mut/monovol" "$LAB" vol 2>&1 | head -1)"
+assert_eq "M-MONOVOL — rougit S10.6 : plus de partage (trois lectures distinctes) et 4 lectures du graphe au lieu de 3" "$VOLM|$(grep -c w "$COMPTEV")" "ok|ok|ok|false|false|4"
+assert_eq "M-ECHEANCE.0 — mutant avec effet (l'échéance revient à 5 000 ms)" "$(mutantF echeance vf-cockpit-git.mjs 'echeanceMs: 15000' 'echeanceMs: 5000')" "effet"
+assert_eq "M-ECHEANCE — rougit S10.1 (indisponible à 0,45 s par lancement) et S10.4 (5000)" "$(PATH="$WORK/lat-0.45:$PATH" node "$AUX/reg.mjs" "$WORK/mut/echeance" "$LAB" lecture 2>&1 | tail -1)|$(node "$AUX/reg.mjs" "$WORK/mut/echeance" "$LAB" echeance 2>&1 | tail -1)" "indisponible|ok|5000"
+assert_eq "M-MUET-ASYNC.0 — mutant avec effet (l'en-tête asynchrone retraduit un git muet en « absent »)" "$(mutantF muetasync vf-cockpit-git.mjs "vide(muet ? 'indisponible' : 'absent'" "vide('absent'")" "effet"
+assert_eq "M-MUET-ASYNC — rougit S10.3 : l'en-tête porté par le graphe et la route disent « absent » ; le graphe et la version synchrone restent indisponibles (le mutant ne touche qu'un côté)" "$(REG 3.1 "$WORK/mut/muetasync" "$LAB" muet 3000)" "indisponible|absent|absent|indisponible"
+assert_eq "M-MUET-SYNC.0 — mutant avec effet (enteteGit synchrone retraduit un git muet en « absent »)" "$(mutantF muetsync vf-cockpit-git-entete.mjs "vide(muet ? 'indisponible' : 'absent'" "vide('absent'")" "effet"
+assert_eq "M-MUET-SYNC — rougit S10.3 sur la version synchrone seule (parité R3.3 rompue)" "$(REG 3.1 "$WORK/mut/muetsync" "$LAB" muet 3000)" "indisponible|indisponible|indisponible|absent"
+
 stop_srv
 vf_hyg_assert
 echo ""

@@ -4,6 +4,7 @@
 #   D3 clavier, focus, coexistence avec le Terminal et le zoom, mobile
 #   D7 détail d'un commit sous sa rangée · D8 clavier du graphe, état des worktrees · D9 rafraîchissement par vf-git:signal (78-10)
 #   D10 correction design de la critique fraîche (F2 étiquettes, F12 stash, F14 glyphes muets, F15 tailles et graisses)
+#   Recette du 2026-11-08 (PU-G-193, 196) : D18.1 à D18.4 et D16.3b — la définition d'un terme Git (HEAD détaché, Worktrees, ↑/↓) se montre aussi au focus clavier, Échap la ferme sans fermer le tiroir ; mutants M-BULLE-ECHAP, M-BULLE-FOCUS.
 #   Mutants (D12 : M-SEQ-WT, M-ANNONCE) : M-HTML, M-COPIE, M-GLOBAL-G, M-HORS-DEPOT, M-DETAIL-HTML, M-SELECTION, M-RAFALE, M-NONVERIFIE (D11 : worktree non vérifié, audit A3). La réponse `/api/vf/git` est figée (temoins/git-tiroir.json) et servie par un `fetch` remplacé dans la page.
 #   Chrome headless en CDP (SAUTÉ, jamais compté réussi, sans navigateur), ports éphémères. Exit 0 si tout passe, 1 sinon.
 
@@ -109,7 +110,7 @@ window.__vfDet.erreurs = {}; window.__vfDetReqs = [];
     const m = /^\/api\/vf\/git\/(commit|worktrees)(\?|$)/.exec(url);
     if (!m) return f1(u, i);
     window.__vfDetReqs.push({ url, route: m[1], methode: (i && i.method) || 'GET', headers: (i && i.headers) || {} });
-    if (m[1] === 'worktrees') return rep(200, window.__vfDet.worktrees);
+    if (m[1] === 'worktrees') return window.__vfDet.delaiWt ? new Promise((ok) => setTimeout(() => ok(rep(200, window.__vfDet.worktrees)), window.__vfDet.delaiWt)).then((r) => r) : rep(200, window.__vfDet.worktrees);
     const sha = decodeURIComponent((/sha=([^&]*)/.exec(url) || [])[1] || '');
     if (window.__vfDet.erreurs[sha]) return rep(window.__vfDet.erreurs[sha], { erreur: 'commit-inconnu' });
     return rep(200, Object.assign({}, window.__vfDet.commit, { h: sha, h7: sha.slice(0, 7), commandes: { show: 'git show --stat --end-of-options ' + sha.slice(0, 7), detacher: 'git switch --detach --end-of-options ' + sha.slice(0, 7) } })); }; }
@@ -156,6 +157,7 @@ JS
   echo "=== D2 — sections, graphe, étiquettes, commandes à copier, XSS ==="
   cat > "$AUX/d2.js" <<'JS'
 const [base] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs) : on mesure une fois posé
 await s.naviguer(base + '/');
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#vf-git-ligne') && getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
@@ -199,8 +201,7 @@ const cible = `[...document.querySelectorAll('#vf-git-tiroir .vf-git-cmd code')]
 await s.ev(`${cible}.parentNode.querySelector('button').click()`);
 await s.attendre(`window.__copies.length === 1`, 'copie');
 out.copie = await s.ev(`({ spy: window.__copies[0], affiche: ${cible}.textContent, retour: ${cible}.parentNode.querySelector('.vf-git-retour').textContent, live: document.querySelector('#vf-git-tiroir .vf-git-live').textContent, label: ${cible}.parentNode.querySelector('button').getAttribute('aria-label') })`);
-await s.ev(`new Promise((r) => setTimeout(r, 1900))`);
-out.copie.apres = await s.ev(`${cible}.parentNode.querySelector('.vf-git-retour').textContent`);
+out.copie.apres = await attendreValeur(() => s.ev(`${cible}.parentNode.querySelector('.vf-git-retour').textContent`), (v) => v === '', { max: 4000 }); // minuterie produit 1600 ms : borne 4 s (≈ 2,5 x) — une régression du minuteur (retour jamais effacé) reste rouge
 await s.ev(`window.__refuse = true; ${cible}.parentNode.querySelector('button').click()`);
 await s.attendre(`/Copie impossible/.test(${cible}.parentNode.querySelector('.vf-git-retour').textContent)`, 'copie refusée');
 out.refus = await s.ev(`({ retour: ${cible}.parentNode.querySelector('.vf-git-retour').textContent, selection: String(window.getSelection()), affiche: ${cible}.textContent })`);
@@ -209,6 +210,7 @@ await s.ev(`new Promise((r) => setTimeout(r, 400))`);
 out.xss = await s.ev(`(() => { const T = ${T}, tx = T.textContent;
   return { img: T.querySelectorAll('img, script, b, u, iframe, style').length, svgEtrangers: [...T.querySelectorAll('svg')].filter((s) => !s.classList.contains('vf-git-gcol') && !s.classList.contains('i')).length, surveillants: T.querySelectorAll('[onload], [onerror]').length,
     lit: ['<svg/onload=alert(1)>', '<img src=x onerror=alert(2)>', '<b>x</b>', '<script>alert(3)</script>', '<iframe src=x>', 'WIP <u>essai</u>', '<b>vieille</b>'].map((t) => tx.includes(t)).join(',') }; })()`);
+out.aide = await s.ev(`(() => { const b = [...${T}.querySelectorAll('.vf-git-sec-t')].find((x) => /^Worktrees/.test(x.textContent)); return { title: b.getAttribute('title'), desc: b.getAttribute('aria-description'), detache: [...${T}.querySelectorAll('.vf-git-wt-l .vf-git-mono')].filter((m) => m.textContent === 'HEAD détaché').map((m) => m.getAttribute('title')) }; })()`); // PU-G-193 : le terme Git reste, sa définition au survol (title) et au focus (aria-description)
 out.alerte = await s.ev(`window.__alerte`);
 out.csp = s.violations.length;
 out.errs = await s.ev(`window.__errs`);
@@ -220,6 +222,7 @@ return out;
 JS
   R2="$(cdp "$AUX/d2.js" "$BASE")"
   assert_eq "D2.1 — ordre des sections et état initial : Worktrees et Graphe ouvertes, Tags, Stash, Auteurs fermées avec compteur" "$(jq_ "$R2" 'j.sections.join("|")' 2>/dev/null)" "Worktrees:true:3|Graphe:true:|Tags:false:2|Stash:false:2|Auteurs et activité:false:3"
+  assert_eq "D2.1 — PU-G-193 : « Worktrees » reste, avec sa définition constante au survol (title) et au focus (aria-description), identiques ; chaque « HEAD détaché » porte la sienne" "$(jq_ "$R2" '[/^Worktrees : copies de travail du dépôt/.test(j.aide.title), j.aide.title === j.aide.desc, /[<>]/.test(j.aide.title), j.aide.detache.length > 0 && j.aide.detache.every((t) => /^HEAD détaché : ce dossier/.test(t))].join("|")' 2>/dev/null)" "true|true|false|true"
   assert_eq "D2.1 — section sans donnée masquée (Tags, Stash), Graphe gardée même sans rangée" "$(jq_ "$R2" '[j.sansDonnee.join(","), j.grapheVide].join("|")' 2>/dev/null)" "Worktrees,Graphe,Auteurs et activité|true"
   assert_eq "D2.2 — 6 couloirs au plus (colonne de 96 px, nœud le plus à droite à 88) et « +17 » servi" "$(jq_ "$R2" '[j.graphe.largeurs.join(","), j.graphe.maxCx, j.graphe.plus].join("|")' 2>/dev/null)" "96|88|+17"
   assert_eq "D2.2 — nœud r=4, trait 1,75, quart de cercle de rayon 16 (arc A16 16), colonne aria-hidden" "$(jq_ "$R2" '[j.graphe.r, j.graphe.trait, j.graphe.arcs > 0, j.graphe.ariaHidden].join("|")' 2>/dev/null)" "4|1.75|true|true"
@@ -229,20 +232,22 @@ JS
   assert_eq "D2.2 — rangée de 40 px (colonne 40 px) à 1440, 44 px à 768" "$(jq_ "$R2" '[j.graphe.hLi, j.graphe.hSvg, j.mobile.li, j.mobile.svg].join("|")' 2>/dev/null)" "40|40|44|44"
   assert_eq "D2.3 — étiquettes : 2 pilules puis « +4 » (2 en trop sur la rangée + refsPlus 2 servi), le title liste le reste" "$(jq_ "$R2" '[j.etiq.pilules, j.etiq.plus, /v0\.9/.test(j.etiq.titre) && /feat\/quatre/.test(j.etiq.titre) && /et 2 autres/.test(j.etiq.titre)].join("|")' 2>/dev/null)" "2|+4|true"
   assert_eq "D2.3 — mergées : « 4 branches mergées » repliées puis dépliées (4 noms, 3 commandes, 1 absence dite)" "$(jq_ "$R2" '[j.merg0.texte, j.merg0.ouvert, j.merg0.cache, j.merg1.ouvert, j.merg1.cache, j.merg1.noms.length, j.merg1.codes, j.merg1.sans].join("|")' 2>/dev/null)" "4 branches mergées|false|true|true|false|4|3|1"
-  assert_eq "D2.4 — copie : l'API reçoit exactement le texte du <code> affiché (hostile compris), « Copiée », annonce, retour effacé après 1,6 s" "$(jq_ "$R2" '[j.copie.spy === j.copie.affiche, j.copie.spy.includes("<b>vieille</b>"), j.copie.retour, j.copie.live, j.copie.apres === "", j.copie.label === "Copier la commande : " + j.copie.affiche].join("|")' 2>/dev/null)" "true|true|Copiée|Commande copiée|true|true"
+  assert_eq "D2.4 — copie : l'API reçoit exactement le texte du <code> affiché (hostile compris), « Copiée », annonce, retour effacé après 1,6 s, nom court du bouton (200 : la commande n'y figure plus)" "$(jq_ "$R2" '[j.copie.spy === j.copie.affiche, j.copie.spy.includes("<b>vieille</b>"), j.copie.retour, j.copie.live, j.copie.apres === "", j.copie.label === "Copier la commande de suppression de la branche <b>vieille</b>"].join("|")' 2>/dev/null)" "true|true|Copiée|Commande copiée|true|true"
   assert_eq "D2.4 — copie refusée : « Copie impossible, commande sélectionnée » et la commande est la sélection" "$(jq_ "$R2" '[j.refus.retour, j.refus.selection === j.refus.affiche].join("|")' 2>/dev/null)" "Copie impossible, commande sélectionnée|true"
   assert_eq "D2.5 — XSS : 0 img, script, b, u, iframe ; aucun svg étranger ; aucun attribut onload ; chaînes hostiles lues telles quelles" "$(jq_ "$R2" '[j.xss.img, j.xss.svgEtrangers, j.xss.surveillants, j.xss.lit].join("|")' 2>/dev/null)" "0|0|0|true,true,true,true,true,true,true"
   assert_eq "D2.5 — aucun alert, 0 violation CSP, 0 erreur de page" "$(jq_ "$R2" '[j.alerte, j.csp, j.errs.length].join("|")' 2>/dev/null)" "0|0|0"
   cat > "$AUX/d2b.js" <<'JS'
 const [base] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs) : on mesure une fois posé
 await s.naviguer(base + '/');
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#vf-git-ligne') && getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
 const out = {}, T = `document.querySelector('#vf-git-tiroir')`, attente = (ms) => s.ev(`new Promise((r) => setTimeout(r, ${ms}))`);
 // D2.6 : indisponible, puis « Réessayer » (nouveau GET) avec le témoin rétabli
+out.brancheAvant = await s.ev(`document.querySelector('.vf-git-branche').textContent`); // la lecture du chargement a réussi : une branche est connue
 await s.ev(`window.__vfGit.reponse = { schema: 'vibeflow/cockpit-git@1', etat: 'indisponible', entete: { etat: 'indisponible', depot: 'depot' }, commandes: { vide: null, diagnostic: 'git status' } }; document.querySelector('#vf-git-ligne').click()`);
 await s.attendre(`/Git est indisponible/.test(${T}.textContent)`, 'carte indisponible');
-out.indispo = await s.ev(`({ code: [...${T}.querySelectorAll('.vf-git-cmd code')].map((c) => c.textContent), bouton: [...${T}.querySelectorAll('button')].some((b) => b.textContent === 'Réessayer'), ligne: document.querySelector('#vf-git-ligne').textContent, reqs: window.__vfReqs.length })`);
+out.indispo = await s.ev(`({ code: [...${T}.querySelectorAll('.vf-git-cmd code')].map((c) => c.textContent), bouton: [...${T}.querySelectorAll('button')].some((b) => b.textContent === 'Réessayer'), ligne: document.querySelector('#vf-git-ligne').textContent, brancheLue: document.querySelector('.vf-git-branche').textContent, etat: document.querySelector('.vf-git-ligne-etat').textContent, reqs: window.__vfReqs.length, note: (() => { const n = ${T}.querySelector('.vf-git-etat .vf-git-note'), r = n.getBoundingClientRect(), t = ${T}.getBoundingClientRect(); return { ws: getComputedStyle(n).whiteSpace, debord: n.scrollWidth > n.clientWidth + 1 || r.right > t.right + 1, lignes: r.height > 1.8 * parseFloat(getComputedStyle(n).fontSize) ? 2 : 1, texte: n.textContent.slice(0, 40), large: Math.round(r.width) }; })() })`);
 await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__TEMOIN_REF)); [...${T}.querySelectorAll('button')].find((b) => b.textContent === 'Réessayer').click()`);
 await s.attendre(`document.querySelectorAll('#vf-git-tiroir li[role=option]').length === 40`, 'rangées après Réessayer');
 out.reessai = await s.ev(`({ reqs: window.__vfReqs.length, page: !!document.querySelector('#proj-name') })`);
@@ -251,24 +256,26 @@ await s.ev(`window.__vfGit.reponse = { schema: 'vibeflow/cockpit-git@1', etat: '
 await s.attendre(`/Aucun commit pour l.instant/.test(${T}.textContent)`, 'état vide');
 out.vide = await s.ev(`({ code: [...${T}.querySelectorAll('.vf-git-cmd code')].map((c) => c.textContent), rangees: ${T}.querySelectorAll('li[role=option]').length })`);
 // chargement : rien avant 150 ms, puis aria-busy et trois rangées fantômes
-await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__TEMOIN_REF)); window.__vfGit.delai = 500; void window.VFGitTiroir.recharger(); 0`);
+await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__TEMOIN_REF)); window.__vfGit.delai = 4000; void window.VFGitTiroir.recharger(); 0`); // réponse tenue 4 s : la fenêtre « chargement » reste ouverte sous une CI lente (l'attendu ne change pas : fantômes tant que la réponse n'est pas là)
 await attente(60);
 out.avant150 = await s.ev(`({ busy: ${T}.querySelector('[aria-busy="true"]') !== null || ${T}.querySelector('.vf-git-corps').getAttribute('aria-busy') === 'true', fantomes: ${T}.querySelectorAll('.vf-git-fantome').length })`);
-await attente(200);
-out.pendant = await s.ev(`({ busy: ${T}.querySelector('.vf-git-corps').getAttribute('aria-busy'), fantomes: ${T}.querySelectorAll('.vf-git-fantome').length, texte: /Lecture du dépôt/.test(${T}.textContent), anim: ${T}.querySelector('.vf-git-fantome') ? getComputedStyle(${T}.querySelector('.vf-git-fantome')).animationName : 'none' })`);
+out.pendant = await attendreValeur(() => s.ev(`({ busy: ${T}.querySelector('.vf-git-corps').getAttribute('aria-busy'), fantomes: ${T}.querySelectorAll('.vf-git-fantome').length, texte: /Lecture du dépôt/.test(${T}.textContent), anim: ${T}.querySelector('.vf-git-fantome') ? getComputedStyle(${T}.querySelector('.vf-git-fantome')).animationName : 'none' })`), (v) => v.fantomes > 0 && v.busy === 'true', { pas: 50, max: 1000 }); // squelette posé par la minuterie produit de 150 ms : borne 1 s (≈ 6 x), lecture voulue dans la fenêtre « chargement » (réponse tenue 4 s)
 await s.attendre(`document.querySelectorAll('#vf-git-tiroir li[role=option]').length === 40`, 'rangées après le délai');
 out.apres = await s.ev(`({ busy: ${T}.querySelector('.vf-git-corps').getAttribute('aria-busy'), fantomes: ${T}.querySelectorAll('.vf-git-fantome').length })`);
 out.errs = await s.ev(`window.__errs`);
 return out;
 JS
   R2B="$(cdp "$AUX/d2b.js" "$BASE")"
-  assert_eq "D2.6 — indisponible : carte « Git est indisponible », « Réessayer », commande git status, l'en-tête dit « Branche indisponible »" "$(jq_ "$R2B" '[j.indispo.code.join(","), j.indispo.bouton, /Branche indisponible/.test(j.indispo.ligne)].join("|")' 2>/dev/null)" "git status|true|true"
-  assert_eq "D2.6 — « Réessayer » relance un GET (2 requêtes en tout), la page continue, 40 rangées" "$(jq_ "$R2B" '[j.reessai.reqs, j.reessai.page].join("|")' 2>/dev/null)" "2|true"
+  assert_eq "D2.6 — indisponible : carte « Git est indisponible », « Réessayer », commande git status" "$(jq_ "$R2B" '[j.indispo.code.join(","), j.indispo.bouton].join("|")' 2>/dev/null)" "git status|true"
+  assert_eq "D2.6b — PU-G-191 : la note d'indisponibilité se replie en texte normal sur plusieurs lignes dans le tiroir et ne dépasse pas (la classe d'état de l'en-tête ne s'applique plus à rien dans le tiroir ; rouge : white-space pre, une ligne rognée)" "$(jq_ "$R2B" '[j.indispo.note.ws, j.indispo.note.debord, j.indispo.note.lignes >= 2].join("|")' 2>/dev/null)" "normal|false|true"
+  assert_eq "D2.6 — l'en-tête, déjà lu une fois, garde la dernière branche (« ○ <branche> », « non confirmée ») et ne dit pas « Branche indisponible » (PU-G-003 ; « Branche indisponible » reste réservé à la première lecture sans valeur connue, H9.1)" "$(jq_ "$R2B" '[j.brancheAvant.length > 0, j.indispo.brancheLue === "○ " + j.brancheAvant, /non confirmée/.test(j.indispo.etat), /non confirmée/.test(j.indispo.ligne), /Branche indisponible/.test(j.indispo.ligne)].join("|")' 2>/dev/null)" "true|true|true|true|false"
+  assert_eq "D2.6 — « Réessayer » relance un GET (3 requêtes en tout : la lecture, sa relance automatique unique, puis le clic), la page continue, 40 rangées" "$(jq_ "$R2B" '[j.reessai.reqs, j.reessai.page].join("|")' 2>/dev/null)" "3|true"
   assert_eq "D2.6 — vide : « Aucun commit pour l'instant », commande git commit -m \"premier commit\", aucune rangée" "$(jq_ "$R2B" '[j.vide.code.join(","), j.vide.rangees].join("|")' 2>/dev/null)" 'git commit -m "premier commit"|0'
   assert_eq "D2.6 — chargement : rien à 60 ms ; à 260 ms aria-busy, 3 rangées fantômes, « Lecture du dépôt », sans animation ; réponse reçue : plus rien" "$(jq_ "$R2B" 'JSON.stringify([j.avant150.busy, j.avant150.fantomes, j.pendant.busy, j.pendant.fantomes, j.pendant.texte, j.pendant.anim, j.apres.busy, j.apres.fantomes])' 2>/dev/null)" '[false,0,"true",3,true,"none",null,0]'
   assert_eq "D2.x — aucune erreur de page (états)" "$(jq_ "$R2B" 'j.errs.length' 2>/dev/null)" "0"
   echo "=== D3 — clavier, focus, coexistence, mobile ==="
   cat > "$AUX/touche.js" <<'JS'
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs) : on mesure une fois posé
 // aide partagée des scénarios D3 (recopiée en tête de chaque corps) : une vraie frappe CDP, avec ses modificateurs
 const VK = { Escape: 27, '/': 191, '=': 187, '-': 189 }, CODE = { Escape: 'Escape', '/': 'Slash', '=': 'Equal', '-': 'Minus' };
 const touche = async (key, o = {}) => {
@@ -280,7 +287,7 @@ const OUVERT = `(() => { const t = document.querySelector('#vf-git-tiroir'); ret
 JS
   cat > "$AUX/d3a.js" <<'JS'
 const [base] = ARGS;
-await fenetre(1440); await s.naviguer(base + '/'); await pret();
+await fenetre(1440); await s.naviguer(base + '/#t'); await pret(); // « #t » : un fragment empêche la visite guidée de se lancer seule (40-tour.js:249 rejoue SC.fit(true) à 450 ms : elle faisait varier k et poser `anim` comme un « f », rendant D3.3 non discriminant)
 await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
 const out = {}, fermer = () => s.ev(`window.VFGitTiroir.fermer()`);
 await s.ev(`document.activeElement && document.activeElement.blur()`);
@@ -310,6 +317,7 @@ await touche('g'); out.ouverture = await s.ev(etat);
 await touche('Escape'); out.echapTiroir = await s.ev(etat);
 await touche('g'); await s.ev(`document.querySelector('#vf-git-ligne').focus()`); await touche('Escape'); out.echapLigne = await s.ev(etat);
 await s.ev(`document.querySelector('#vf-git-ligne').focus()`); await touche('Escape'); out.echapFerme = await s.ev(etat);
+await s.ev(`document.activeElement && document.activeElement.blur()`); await touche('Escape'); out.echapCanvas = await s.ev(etat); // focus sur le canvas (body) : le viewer lève la sélection
 await s.ev(`VibeFlow.select(window.__id)`); await touche('g'); await touche('/'); await s.attendre(`!!document.activeElement && document.activeElement.id === 'search'`, 'focus dans la palette'); out.palette1 = await s.ev(`({ palette: document.querySelector('#palette').classList.contains('open'), ouvert: ${OUVERT} })`);
 await touche('Escape'); out.palette2 = await s.ev(`({ palette: document.querySelector('#palette').classList.contains('open'), ouvert: ${OUVERT} })`);
 // D3.3 : #context masqué tiroir ouvert, f p + - vivants
@@ -318,8 +326,18 @@ await s.attendre(`getComputedStyle(document.querySelector('#context')).opacity =
 out.ctxOuvert = await s.ev(`document.body.classList.contains('vf-git-ouvert')`);
 const k = () => s.ev(`VibeFlow.state.t.k`), panneau = () => s.ev(`document.body.classList.contains('no-panel')`);
 const p0 = await panneau(); await s.ev(`document.querySelector('#vf-git-tiroir .vf-git-titre-t').focus()`); await touche('p'); out.p = [p0, await panneau()];
-const k0 = await k(); await touche('='); const k1 = await k(); await touche('-'); const k2 = await k(); await touche('f'); await s.ev(`new Promise((r) => setTimeout(r, 700))`); const k3 = await k();
-out.zoom = { plus: k1 > k0, moins: k2 < k1, fit: k3 !== k2 };
+const k0 = await k(); await touche('='); const k1 = await attendreEtStabiliser(k, (v) => v > k0, { max: 5000 }); await touche('-'); const k2 = await attendreEtStabiliser(k, (v) => v < k1, { max: 5000 }); // « -» ramène le zoom à son point de départ, qui EST déjà l'ajustement (viewer.html fit()) : un « f » lu alors ne changeait rien d'observable. De plus le viewer se REPLACE seul (fit(false) à chaque mise en page du graphe, ~300 ms après un zoom dans cette page) : un état « non ajusté » ne dure donc pas.
+// Discriminant : « k change » ne prouve pas que « f » marche si quelque chose d'autre ajuste la vue. C'était le cas : la visite guidée (40-tour.js:249) rejoue SC.fit(true) à 450 ms, ce qui ramenait k à 1,1 et posait `anim` comme un « f » (démontré : avec « f » rendu inopérant, D3.3 restait vert). La page est donc ouverte avec un fragment (#t, qui empêche la visite de se lancer seule) et l'observable propre à « f » est l'ajustement ANIMÉ : fit(true) pose la classe `anim` sur #viewport (viewer.html setT).
+// On pose un état non ajusté (« = »), on le relève IMMÉDIATEMENT (kz), on frappe « f », on attend un état postérieur différent ET la classe `anim` vue pendant « f » ; si une remise en page est passée entre le relevé et « f » (kz périmé), on recommence (3 essais). Un « f » mort (M-AJUSTEMENT) échoue aux 3.
+await s.ev(`window.__animVue = 0; { const vp = document.querySelector('#viewport'); new MutationObserver((ms) => { for (const m of ms) if (vp.classList.contains('anim') && !(m.oldValue || '').split(' ').includes('anim')) window.__animVue++; }).observe(vp, { attributes: true, attributeFilter: ['class'], attributeOldValue: true }); }`);
+let kz = k2, k3 = k2, animVue = false;
+for (let essai = 0; essai < 3 && !(k3 !== kz && animVue); essai++) {
+  await touche('='); await touche('='); kz = await k();
+  await s.ev(`window.__animVue = 0`);
+  await touche('f'); k3 = await attendreEtStabiliser(k, (v) => v !== kz, { pas: 50, max: 2000 });
+  animVue = await s.ev(`window.__animVue > 0`);
+}
+out.zoom = { plus: k1 > k0, moins: k2 < k1, fit: k3 !== kz && animVue };
 await fermer();
 await s.attendre(`getComputedStyle(document.querySelector('#context')).opacity === '1'`, '#context rendu');
 out.ctxFerme = await s.ev(`!document.body.classList.contains('vf-git-ouvert')`);
@@ -327,7 +345,7 @@ out.errs = await s.ev(`window.__errs`);
 return out;
 JS
   { cat "$AUX/touche.js"; cat "$AUX/d3a.js"; } > "$AUX/d3a-complet.js"
-  R3="$(cdp "$AUX/d3a-complet.js" "$BASE")"
+  R3="$(cdp "$AUX/d3a-complet.js" "$BASE")"; [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R3" > "$TIROIR_TRACE-d3a.json"
   assert_eq "D3.1 — touche g ouvre puis ferme" "$(jq_ "$R3" '[j.g1, j.g2].join("|")' 2>/dev/null)" "true|false"
   assert_eq "D3.1 — g ignorée dans INPUT, TEXTAREA, contenteditable (la lettre est tapée)" "$(jq_ "$R3" '[j.champ_input, j.champ_textarea, j.champ_edit].map((c) => c.ouvert + ":" + c.valeur.includes("g")).join("|")' 2>/dev/null)" "false:true|false:true|false:true"
   assert_eq "D3.1 — g ignorée avec Ctrl, Alt, Meta et palette ouverte" "$(jq_ "$R3" '[...j.modif, j.palette].join("|")' 2>/dev/null)" "false|false|false|false"
@@ -335,7 +353,8 @@ JS
   assert_eq "D3.2 — ouvrir porte le focus sur le titre du tiroir" "$(jq_ "$R3" '[j.sel0, j.ouverture.ouvert, j.ouverture.titre].join("|")' 2>/dev/null)" "true|true|true"
   assert_eq "D3.2 — Échap (focus dans le tiroir) : fermé, focus rendu à la seconde ligne, sélection et vue inchangées" "$(jq_ "$R3" '[j.echapTiroir.ouvert, j.echapTiroir.focus, j.echapTiroir.selection, j.echapTiroir.vue].join("|")' 2>/dev/null)" "false|vf-git-ligne|true|root"
   assert_eq "D3.2 — Échap (focus sur la seconde ligne) : fermé, sélection inchangée" "$(jq_ "$R3" '[j.echapLigne.ouvert, j.echapLigne.selection].join("|")' 2>/dev/null)" "false|true"
-  assert_eq "D3.2 — tiroir fermé, Échap sur la seconde ligne : le viewer garde son comportement (sélection levée)" "$(jq_ "$R3" '[j.echapFerme.ouvert, j.echapFerme.selection].join("|")' 2>/dev/null)" "false|false"
+  assert_eq "D3.2 — tiroir fermé, Échap sur la seconde ligne : le viewer la laisse à ce contrôle, la sélection n'est pas perdue (PU-G-175, lot code-moteur : hors du canvas, Échap ne lève plus la sélection)" "$(jq_ "$R3" '[j.echapFerme.ouvert, j.echapFerme.selection].join("|")' 2>/dev/null)" "false|true"
+  assert_eq "D3.2 — tiroir fermé, Échap focus sur le canvas : le viewer garde son comportement (sélection levée)" "$(jq_ "$R3" '[j.echapCanvas.ouvert, j.echapCanvas.selection].join("|")' 2>/dev/null)" "false|false"
   assert_eq "D3.2 — palette ouverte au-dessus du tiroir : Échap ferme la palette, le tiroir reste" "$(jq_ "$R3" '[j.palette1.palette, j.palette1.ouvert, j.palette2.palette, j.palette2.ouvert].join("|")' 2>/dev/null)" "true|true|false|true"
   assert_eq "D3.3 — body.vf-git-ouvert, #context transparent puis rendu à la fermeture" "$(jq_ "$R3" '[j.ctxOuvert, j.ctxFerme].join("|")' 2>/dev/null)" "true|true"
   assert_eq "D3.3 — p, +, -, f marchent tiroir ouvert (panneau basculé, zoom + puis -, ajustement)" "$(jq_ "$R3" '[j.p[0] !== j.p[1], j.zoom.plus, j.zoom.moins, j.zoom.fit].join("|")' 2>/dev/null)" "true|true|true|true"
@@ -468,7 +487,7 @@ out.reqs = await s.ev(`window.__vfDetReqs.filter((r) => r.route === 'commit').ma
 out.jeton = await s.ev(`window.__vfDetReqs.filter((r) => r.route === 'commit').every((r) => r.headers['x-vf-cockpit-token'] === window.VF_COCKPIT_SERVER.token && !!window.VF_COCKPIT_SERVER.token)`);
 out.ouvert = await s.ev(`(() => { const d = document.querySelector('.vf-git-detail'), L = ${LIGNES}[2], q = (x) => d.querySelector(x), fl = [...d.querySelectorAll('.vf-git-d-fichiers > li')], reste = fl.filter((l) => l.classList.contains('vf-git-d-reste')), vrais = fl.filter((l) => !l.classList.contains('vf-git-d-reste'));
   const f1 = vrais[1], bin = vrais.find((l) => /binaire/.test(l.textContent)), ren = vrais.find((l) => /ancien-nom/.test(l.textContent));
-  return { apresRangee: L.nextElementSibling === d, nb: document.querySelectorAll('.vf-git-detail').length, sujet: q('.vf-git-d-sujet').textContent, msg: q('.vf-git-d-msg').textContent, ws: getComputedStyle(q('.vf-git-d-msg')).whiteSpace, poids: getComputedStyle(q('.vf-git-d-sujet')).fontWeight,
+  return { apresRangee: d.previousElementSibling.lastElementChild === L && !d.closest('[role=listbox]'), nb: document.querySelectorAll('.vf-git-detail').length, sujet: q('.vf-git-d-sujet').textContent, msg: q('.vf-git-d-msg').textContent, ws: getComputedStyle(q('.vf-git-d-msg')).whiteSpace, poids: getComputedStyle(q('.vf-git-d-sujet')).fontWeight,
     meta: q('.vf-git-d-meta').textContent, sha: q('.vf-git-d-sha code').textContent, sel: getComputedStyle(q('.vf-git-d-sha code')).userSelect, titre: q('.vf-git-d-fichiers-t').textContent, nVrais: vrais.length, reste: reste.map((l) => l.textContent),
     plus: f1.querySelector('.vf-git-d-plus').textContent, moins: f1.querySelector('.vf-git-d-moins').textContent, cPlus: getComputedStyle(f1.querySelector('.vf-git-d-plus')).color, cMoins: getComputedStyle(f1.querySelector('.vf-git-d-moins')).color, attPlus: window.__couleur('--ok-text'), attMoins: window.__couleur('--err-text'),
     bin: !!bin, ren: ren ? ren.textContent : '', cmds: [...d.querySelectorAll('.vf-git-cmd code')].map((c) => c.textContent), region: q('[role=region]').getAttribute('aria-label'), diff: /^@@|^diff --git/m.test(d.textContent) }; })()`);
@@ -513,9 +532,8 @@ await s.attendre(`document.querySelectorAll('.vf-git-detail').length === 1`, 'Es
 out.espace = await s.ev(etat);
 // un seul détail à la fois : un clic sur une autre rangée déplace le détail
 await s.ev(`${LIGNES}[3].click()`);
-await s.attendre(`document.querySelectorAll('.vf-git-detail').length >= 1 && ${LIGNES}[3].nextElementSibling.classList.contains('vf-git-detail')`, 'détail sous la rangée 3');
-await pause(150);
-out.unSeul = await s.ev(`({ details: document.querySelectorAll('.vf-git-detail').length, sous3: ${LIGNES}[3].nextElementSibling.classList.contains('vf-git-detail') })`);
+await s.attendre(`document.querySelectorAll('.vf-git-detail').length >= 1 && ${LIGNES}[3].parentNode.nextElementSibling.classList.contains('vf-git-detail')`, 'détail sous la rangée 3');
+out.unSeul = await attendreEtStabiliser(() => s.ev(`({ details: document.querySelectorAll('.vf-git-detail').length, sous3: ${LIGNES}[3].parentNode.lastElementChild === ${LIGNES}[3] && ${LIGNES}[3].parentNode.nextElementSibling.classList.contains('vf-git-detail') })`), (v) => v.details === 1, { max: 3000 });
 await s.ev(`${LIGNES}[3].click()`); await s.attendre(`document.querySelectorAll('.vf-git-detail').length === 0`, 'tout replié');
 out.libelle = await s.ev(`(() => { const r = window.VFGitTiroir.donnees().rangees[0], L = ${LIGNES}[0]; return { label: L.getAttribute('aria-label'), h7: r.h7, s: r.s }; })()`);
 // D8.2 : états des worktrees
@@ -550,13 +568,12 @@ await s.attendre(`${LIGNES}.length === 41`, 'rafraîchi : une rangée de plus');
 await pause(700);
 const c1 = await s.ev(cpt);
 out.deltas = { git: c1.git - c0.git, wt: c1.wt - c0.wt, commit: c1.commit - c0.commit };
-out.selection = await s.ev(`({ sel: ${LIGNES}.filter((l) => l.getAttribute('aria-selected') === 'true').map((l) => l.dataset.h), attendu: '${sha}', detailSous: !!document.querySelector('.vf-git-detail') && document.querySelector('.vf-git-detail').previousElementSibling.dataset.h === '${sha}', premiere: ${LIGNES}[0].dataset.h, live: [...document.querySelectorAll('#vf-git-tiroir [aria-live]')].map((e) => e.textContent).join('|') })`);
+out.selection = await s.ev(`({ sel: ${LIGNES}.filter((l) => l.getAttribute('aria-selected') === 'true').map((l) => l.dataset.h), attendu: '${sha}', detailSous: !!document.querySelector('.vf-git-detail') && document.querySelector('.vf-git-detail').previousElementSibling.lastElementChild.dataset.h === '${sha}', premiere: ${LIGNES}[0].dataset.h, live: [...document.querySelectorAll('#vf-git-tiroir [aria-live]')].map((e) => e.textContent).join('|') })`);
 out.ecartPos = Math.abs((await s.ev(pos)) - p0);
 // D9.2 : la sha sélectionnée disparaît
 await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__vfDet.apres)); window.__vfGit.reponse.rangees = window.__vfGit.reponse.rangees.filter((r) => r.h !== '${sha}'); document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'x' } }))`);
 await s.attendre(`${LIGNES}.length === 40 && !${LIGNES}.some((l) => l.dataset.h === '${sha}')`, 'sha disparue');
-await pause(200);
-out.disparue = await s.ev(`({ details: document.querySelectorAll('.vf-git-detail').length, sel: ${LIGNES}.filter((l) => l.getAttribute('aria-selected') === 'true').length, tab: ${LIGNES}.filter((l) => l.getAttribute('tabindex') === '0').length, carte: /Git est indisponible/.test(document.querySelector('#vf-git-tiroir').textContent) })`);
+out.disparue = await attendreEtStabiliser(() => s.ev(`({ details: document.querySelectorAll('.vf-git-detail').length, sel: ${LIGNES}.filter((l) => l.getAttribute('aria-selected') === 'true').length, tab: ${LIGNES}.filter((l) => l.getAttribute('tabindex') === '0').length, carte: /Git est indisponible/.test(document.querySelector('#vf-git-tiroir').textContent) })`), (v) => v.details === 0, { max: 5000 });
 // D9.3 : tiroir fermé, aucune requête
 await s.ev(`window.VFGitTiroir.fermer()`); await pause(100);
 const f0 = await s.ev(cpt);
@@ -564,8 +581,8 @@ await s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { 
 const f1 = await s.ev(cpt);
 out.ferme = { git: f1.git - f0.git, wt: f1.wt - f0.wt, commit: f1.commit - f0.commit };
 // à la réouverture, le signal manqué est rattrapé
-await s.ev(`window.VFGitTiroir.ouvrir()`); await pause(700);
-const f2 = await s.ev(cpt);
+await s.ev(`window.VFGitTiroir.ouvrir()`);
+const f2 = await attendreEtStabiliser(() => s.ev(cpt), (c) => c.git - f1.git >= 1, { max: 5000 }); // le signal manqué est rattrapé : on attend la relecture, puis la stabilité (aucune requête en trop)
 out.reouverture = { git: f2.git - f1.git, wt: f2.wt - f1.wt };
 // D9.4 : 375 px
 await fenetre(375, 800); await s.naviguer(base + '/'); await pret();
@@ -630,8 +647,7 @@ await s.ev(`(() => { const nul = { modifies: null, nonSuivis: null, plus: false,
   for (const w of window.__vfDet.worktrees.worktrees) { w.verifie = w.chemin !== '/tmp/wt-b'; if (!w.verifie) Object.assign(w, nul); } })()`);
 await s.ev(`document.querySelector('#vf-git-ligne').click()`);
 await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l .vf-git-etat-wt').length === 3`, 'tiroir ouvert, états des trois worktrees');
-await pause(200);
-out.wt = await s.ev(`[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l')].map((w) => ({ nom: (w.querySelector('.vf-git-gras') || {}).textContent, pastilles: [...w.querySelectorAll('.vf-git-pastille')].map((p) => p.textContent), cmd: w.querySelectorAll('.vf-git-cmd, .vf-git-sans').length, boutons: w.querySelectorAll('button').length, texte: w.textContent }))`);
+out.wt = await stabiliser(() => s.ev(`[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l')].map((w) => ({ nom: (w.querySelector('.vf-git-gras') || {}).textContent, pastilles: [...w.querySelectorAll('.vf-git-pastille')].map((p) => p.textContent), cmd: w.querySelectorAll('.vf-git-cmd, .vf-git-sans').length, boutons: w.querySelectorAll('button').length, texte: w.textContent }))`), { max: 5000 });
 out.nv = await s.ev(`(() => { const p = document.querySelector('.vf-git-p-nonverif'); if (!p) return null; const c = getComputedStyle(p), N = window.__couleur('--text-2');
   return { glyphe: getComputedStyle(p, '::before').content, neutre: c.color === N, fond: c.backgroundColor === 'rgba(0, 0, 0, 0)' || c.backgroundImage === 'none' && c.backgroundColor === 'transparent' }; })()`);
 out.etiquettes = await s.ev(`({ ref: document.querySelectorAll('#vf-git-tiroir .vf-git-ref').length, avecCmd: document.querySelectorAll('#vf-git-tiroir .vf-git-ref button, #vf-git-tiroir .vf-git-ref code').length, cdWtB: document.querySelector('#vf-git-tiroir').textContent.includes("/tmp/wt-b") })`);
@@ -662,22 +678,24 @@ await sig(); await pause(900);
 out.inchange = await s.ev(`window.__ann.splice(0)`);
 // b) 2 : le graphe change (réponse « apres » du témoin)
 await s.ev(`window.__vfGit.reponse = window.__vfDet.apres`);
-await sig(); await pause(900);
+await sig(); await attendreValeur(() => s.ev(`window.__ann.length`), (n) => n >= 1, { max: 10000 }); await pause(900); // l'annonce arrive ; la pause prouve qu'il n'y en a qu'UNE
 out.change = await s.ev(`window.__ann.splice(0)`);
 // b) 3 : la relecture échoue (réponse hors schéma), deux rafales d'affilée
 await s.ev(`window.__vfGit.reponse = { schema: 'autre@1', etat: 'ok', rangees: [] }`);
-await sig(); await pause(900); await sig(); await pause(900);
+await sig(); await attendreValeur(() => s.ev(`window.__ann.length`), (n) => n >= 1, { max: 10000 }); await pause(900); await sig(); await pause(900); // 1er échec attendu, puis la pause du 2e prouve qu'il n'est PAS réannoncé
 out.echec = await s.ev(`window.__ann.splice(0)`);
 // a) page neuve : réponses des worktrees retardées, rendues dans le désordre
 await ouvrirTiroir(base, true);
 await s.ev(`(() => { window.__wtRes = []; const f = window.fetch; window.fetch = (u, i) => { const url = typeof u === 'string' ? u : u.url;
   if (url.includes('/api/vf/git/worktrees')) return new Promise((ok) => window.__wtRes.push((o) => ok(new Response(JSON.stringify(o), { status: 200, headers: { 'content-type': 'application/json' } }))));
   return f(u, i); }; })()`);
-await sig(); await pause(700); await sig(); await pause(700);
-out.demandes = await s.ev(`window.__wtRes.length`);
+const nWt = () => s.ev(`window.__wtRes.length`);
+await sig(); await attendreValeur(nWt, (n) => n >= 1, { max: 10000 }); await pause(700); await sig();
+out.demandes = await attendreEtStabiliser(nWt, (n) => n >= 2, { max: 10000 });
 const etat = (n) => s.ev(`(() => { const o = JSON.parse(JSON.stringify(window.__vfDet.worktrees)); o.worktrees[0].modifies = ${n}; return o; })()`);
 const vieux = await etat(3), neuf = await etat(9);
-await s.ev(`window.__wtRes[1](${JSON.stringify(neuf)})`); await pause(300); // la plus RÉCENTE répond d'abord
+await s.ev(`window.__wtRes[1](${JSON.stringify(neuf)})`); // la plus RÉCENTE répond d'abord
+await attendreValeur(() => s.ev(`[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l')][0].textContent`), (t) => /9 modifiés/.test(t), { max: 5000 }); // rendue avant de résoudre la plus ancienne
 await s.ev(`window.__wtRes[0](${JSON.stringify(vieux)})`); await pause(400); // puis la plus ancienne
 out.pastilles = await s.ev(`[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l')][0].textContent`);
 out.errs = await s.ev(`window.__errs`);
@@ -723,13 +741,13 @@ const sig = () => s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', 
 await s.ev(`(() => { window.__ann = []; const t = document.querySelector('#vf-git-tiroir');
   new MutationObserver((ms) => { for (const m of ms) { const e = m.target.nodeType === 1 ? m.target : m.target.parentElement; if (e && e.closest('.vf-git-live') && m.addedNodes.length) window.__ann.push([...m.addedNodes].map((n) => n.textContent).join('')); } }).observe(t, { subtree: true, childList: true, characterData: true }); })()`);
 await s.ev(`window.__vfGit.reponse = { schema: 'autre@1', etat: 'ok', rangees: [] }`);
-await sig(); await pause(900);
+await sig(); await attendreValeur(() => s.ev(`window.__ann.length`), (n) => n >= 1, { max: 10000 }); await pause(900);
 out.echec1 = await s.ev(`window.__ann.splice(0)`);
 await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__TEMOIN_REF))`);
 await sig(); await pause(900);
 out.succes = await s.ev(`window.__ann.splice(0)`);
 await s.ev(`window.__vfGit.reponse = { schema: 'autre@1', etat: 'ok', rangees: [] }`);
-await sig(); await pause(900);
+await sig(); await attendreValeur(() => s.ev(`window.__ann.length`), (n) => n >= 1, { max: 10000 }); await pause(900);
 out.echec2 = await s.ev(`window.__ann.splice(0)`);
 out.errs = await s.ev(`window.__errs`);
 return out;
@@ -760,26 +778,26 @@ const mesure = `(() => { const num = (c) => (c.match(/[\\d.]+/g) || []).map(Numb
   const min = (sel) => { const L = [...document.querySelectorAll(sel)]; return L.length ? Math.min(...L.map(ratio)) : -1; };
   return { sans: min('#vf-git-tiroir .vf-git-sans'), meta: min('#vf-git-tiroir .meta'), kbd: min('.vf-git-ligne .kbd'), pastille: min('#vf-git-tiroir .vf-git-pastille') }; })()`;
 // le thème « auto » suit prefers-color-scheme (Chrome headless sous Linux : clair) : la mesure « sombre » le pose elle-même, sinon elle mesurerait le clair deux fois (78-10, correction CI Linux)
-await s.ev(`document.documentElement.setAttribute('data-theme', 'dark')`); await pause(300);
+await s.ev(`document.documentElement.setAttribute('data-theme', 'dark')`);
 out.themes = [await s.ev(`document.documentElement.getAttribute('data-theme')`)];
-out.sombre = await s.ev(mesure);
-await s.ev(`document.documentElement.setAttribute('data-theme', 'light')`); await pause(300);
+out.sombre = await stabiliser(() => s.ev(mesure), { max: 5000 });
+await s.ev(`document.documentElement.setAttribute('data-theme', 'light')`);
 out.themes.push(await s.ev(`document.documentElement.getAttribute('data-theme')`));
-out.clair = await s.ev(mesure);
+out.clair = await stabiliser(() => s.ev(mesure), { max: 5000 });
 await s.ev(`document.documentElement.setAttribute('data-theme', 'dark')`);
 // G6 : une seule région vive, une annonce par copie, coche le temps du « Copiée »
 await s.ev(`(() => { navigator.clipboard.writeText = () => Promise.resolve(); window.__ann = []; const t = document.querySelector('#vf-git-tiroir');
   new MutationObserver((ms) => { for (const m of ms) { const r = m.target.nodeType === 1 ? m.target.closest('[aria-live]') : m.target.parentElement && m.target.parentElement.closest('[aria-live]'); if (r && m.addedNodes.length) window.__ann.push([r.className, [...m.addedNodes].map((n) => n.textContent).join('')]); } }).observe(t, { subtree: true, childList: true, characterData: true }); })()`);
 const bouton = `document.querySelector('#vf-git-s-wt .vf-git-cmd .vf-git-btn')`;
 out.iconeAvant = await s.ev(`${bouton}.querySelector('path').getAttribute('d')`);
-await s.ev(`${bouton}.click()`); await pause(250);
-out.iconeCoche = await s.ev(`${bouton}.querySelector('path').getAttribute('d')`);
-out.retour = await s.ev(`${bouton}.parentElement.querySelector('.vf-git-retour').textContent`);
+await s.ev(`${bouton}.click()`);
+const coche = await attendreValeur(() => s.ev(`({ d: ${bouton}.querySelector('path').getAttribute('d'), retour: ${bouton}.parentElement.querySelector('.vf-git-retour').textContent })`), (v) => v.retour !== '', { max: 1500 }); // « Copiée » posé au retour de la promesse, avant l'effacement produit à 1600 ms : borne 1,5 s ; « Copiée » affiché (icône et texte posés par le même appel du produit) : on lit les deux à cet instant, avant l'effacement à 1600 ms
+out.iconeCoche = coche.d;
+out.retour = coche.retour;
 await s.ev(`${LIGNES}[2].click()`);
 await s.attendre(`!!document.querySelector('.vf-git-detail .vf-git-d-fichiers')`, 'détail ouvert');
-await s.ev(`document.querySelector('.vf-git-det .vf-git-cmd .vf-git-btn').click()`); await pause(250);
-await pause(1700);
-out.iconeApres = await s.ev(`${bouton}.querySelector('path').getAttribute('d')`);
+await s.ev(`document.querySelector('.vf-git-det .vf-git-cmd .vf-git-btn').click()`);
+out.iconeApres = await attendreValeur(() => s.ev(`${bouton}.querySelector('path').getAttribute('d')`), (d) => d === out.iconeAvant, { max: 4000 }); // minuterie produit 1600 ms : borne 4 s (≈ 2,5 x), une régression du minuteur reste rouge
 out.regions = await s.ev(`document.querySelectorAll('#vf-git-tiroir [aria-live]').length`);
 out.copies = await s.ev(`window.__ann.filter((a) => /Commande copiée/.test(a[1]))`);
 out.errs = await s.ev(`window.__errs`);
@@ -795,6 +813,189 @@ JS
   assert_eq "D15.4 — une seule région aria-live dans le tiroir, une annonce « Commande copiée » par copie (deux copies : deux annonces), toutes de la même région" "$(jq_ "$R15" '[j.regions, j.copies.length, new Set(j.copies.map((c) => c[0])).size].join("|")' 2>/dev/null)" "1|2|1"
   assert_eq "D15.5 — icône de copie : coche le temps du « Copiée », puis de nouveau l'icône de copie" "$(jq_ "$R15" '[j.iconeAvant, j.iconeCoche, j.retour, j.iconeApres === j.iconeAvant].join("|")' 2>/dev/null)" "M9 9h10v10H9zM5 15V5h10|M5 13l4 4L19 7|Copiée|true"
   assert_eq "D15.x — aucune erreur de page" "$(jq_ "$R15" 'j.errs.length' 2>/dev/null)" "0"
+  # D16 (GT1, PU-G-192/194/195/196/197) : « lecture… » tant que l'état des worktrees n'est pas lu (distinct d'un échec « lecture impossible »), infobulle des ↑↓, détail d'un commit :
+  # la commande qui change la copie de travail porte son étiquette. SURFACE DURCIE : un nom de base hostile n'entre que dans un title/aria-label (setAttribute), jamais dans une commande ni en HTML.
+  cat > "$AUX/d16.js" <<'JS'
+const [base] = ARGS; const out = {};
+const HOSTILE = `ma"b'$(touch x);<img src=x onerror=alert(1)>`;
+await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
+await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
+await s.ev(`(() => { window.__vfGit.reponse.base.nom = ${JSON.stringify(HOSTILE)}; const W = window.__vfDet.worktrees.worktrees;
+  Object.assign(W[0], { propre: false, modifies: 1, nonSuivis: 0, avance: 312, retard: 4 });
+  Object.assign(W[1], { modifies: null, nonSuivis: null, plus: false, propre: null, avance: null, retard: null });
+  window.__vfDet.delaiWt = 1200; })()`);
+await s.ev(`document.querySelector('#vf-git-ligne').click()`);
+await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l').length === 3`, 'tiroir ouvert');
+const etats = `[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l')].map((w) => [...w.querySelectorAll('.vf-git-pastille')].map((p) => p.textContent).join('/'))`;
+out.enCours = await s.ev(etats);
+await s.attendre(`/lecture impossible/.test(document.querySelector('#vf-git-s-wt').textContent)`, 'état lu', 6000);
+out.lu = await s.ev(etats);
+out.avance = await s.ev(`(() => { const p = document.querySelector('#vf-git-s-wt .vf-git-p-mono'); return { txt: p.textContent, title: p.getAttribute('title'), aria: p.getAttribute('aria-label') }; })()`);
+await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {}); // voir D2 : sans focus de fenêtre, aucun évènement « focus »
+await s.ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))`); // dernière entrée = une touche (voir D2)
+await s.ev(`document.querySelector('#vf-git-s-wt .vf-git-p-mono').focus()`);
+await attendreValeur(() => s.ev(`!!document.querySelector('.vf-git-bulle') && !document.querySelector('.vf-git-bulle').hidden`), (v) => v === true, { max: 2000 }).catch(() => {}); // attente bornée : un mutant qui ne montre rien doit rougir, pas planter
+out.focusAvance = await s.ev(`(() => { const p = document.querySelector('#vf-git-s-wt .vf-git-p-mono'), b = document.querySelector('.vf-git-bulle'); const r = b && !b.hidden ? b.getBoundingClientRect() : null; return { tab: p.tabIndex, actif: document.activeElement === p, texte: b && !b.hidden ? b.textContent : null, vu: !!r && r.width > 0 && r.right <= innerWidth && r.bottom <= innerHeight, balises: b ? b.querySelectorAll('*').length : -1 }; })()`);
+await s.ev(`document.activeElement.blur()`);
+out.attendu = `312 commits d'avance sur ${HOSTILE}, 4 commits de retard`;
+out.inerte = await s.ev(`({ balises: document.querySelectorAll('#vf-git-tiroir img, #vf-git-tiroir script').length, alertes: window.__alerte, cmdHostile: [...document.querySelectorAll('#vf-git-tiroir .vf-git-cmd code')].some((c) => c.textContent.includes('touch x')) })`);
+await s.ev(`document.querySelector('#vf-git-tiroir li[role=option]').click()`);
+await s.attendre(`!!document.querySelector('.vf-git-det .vf-git-cmd')`, 'détail');
+out.detail = await s.ev(`(() => { const G = [...document.querySelectorAll('.vf-git-det .vf-git-d-cmds')], N = window.__couleur('--text-3');
+  return { n: G.length, titres: G.map((g) => g.firstChild.textContent), cmds: G.map((g) => g.querySelector('code').textContent.split(' ').slice(0, 2).join(' ')), change: G.map((g) => g.classList.contains('vf-git-d-change')), neutre: G.every((g) => getComputedStyle(g.firstChild).color === N), glyphe: getComputedStyle(G[1].firstChild, '::before').content, hostile: document.querySelector('.vf-git-det').textContent.includes('touch x') }; })()`);
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d16.js"; } > "$AUX/d16-complet.js"
+  R16="$(cdp "$AUX/d16-complet.js" "$BASE")"
+  assert_eq "D16.1 — PU-G-192 : tant que git status n'est pas lu, chaque worktree dit « lecture… » (jamais « état illisible »)" "$(jq_ "$R16" 'j.enCours.join(" | ")' 2>/dev/null)" "lecture… | lecture… | lecture…"
+  assert_eq "D16.2 — PU-G-192 : une lecture qui échoue (comptes null) se distingue de la lecture en cours : « lecture impossible »" "$(jq_ "$R16" 'j.lu.join(" | ")' 2>/dev/null)" "1 modifié/↑312 ↓4 | lecture impossible | 1 modifié"
+  assert_eq "D16.3 — PU-G-196 : infobulle ↑/↓ « 312 commits d'avance sur <base>, 4 commits de retard » (title et aria-label identiques, nom de base lu comme texte)" "$(jq_ "$R16" '[j.avance.title === j.attendu, j.avance.aria === j.attendu, j.avance.txt].join("|")' 2>/dev/null)" "true|true|↑312 ↓4"
+  assert_eq "D16.3b — PU-G-196 : au focus clavier, l'indicateur ↑/↓ (atteignable par Tab) montre la même phrase que son aria-label dans une bulle visible, nom de base lu comme texte (aucun élément dans la bulle)" "$(jq_ "$R16" '[j.focusAvance.tab, j.focusAvance.actif, j.focusAvance.texte === j.attendu, j.focusAvance.vu, j.focusAvance.balises].join("|")' 2>/dev/null)" "0|true|true|true|0"
+  assert_eq "D16.4 — surface durcie : un nom de base hostile ne crée ni <img>, ni <script>, ni alerte, et n'entre dans aucune commande affichée" "$(jq_ "$R16" '[j.inerte.balises, j.inerte.alertes, j.inerte.cmdHostile, j.detail.hostile].join("|")' 2>/dev/null)" "0|0|false|false"
+  assert_eq "D16.5 — PU-G-194 : deux groupes, lecture puis « Change votre copie de travail » (git show / git switch --detach), séparé, texte neutre, glyphe décoratif" "$(jq_ "$R16" '[j.detail.n, j.detail.titres.join("/"), j.detail.cmds.join("/"), j.detail.change.join(), j.detail.neutre, /^"△ " \/ ""$/.test(j.detail.glyphe)].join("|")' 2>/dev/null)" "2|Pour lire ce commit/Change votre copie de travail|git show/git switch|false,true|true|true"
+  assert_eq "D16.x — aucune erreur de page" "$(jq_ "$R16" 'j.errs.length' 2>/dev/null)" "0"
+  # D18 (recette du 2026-11-08, PU-G-193) : la définition d'un terme Git se montre AUSSI au focus clavier (le title ne se montre qu'au survol) ; Échap la ferme sans fermer le tiroir ; elle suit l'élément qui défile ; le départ du focus la ferme.
+  # Scénario neuf et isolé (page fraîche, états des worktrees lus) : le focus de la fenêtre est posé AVANT tout, sinon element.focus() ne déclenche aucun évènement « focus » ; les lectures de la bulle sont des attentes bornées (un mutant qui ne montre rien doit ROUGIR, pas planter).
+  cat > "$AUX/d18.js" <<'JS'
+const [base] = ARGS; const out = { detache: {} };
+await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {});
+await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
+await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
+await s.ev(`document.querySelector('#vf-git-ligne').click()`);
+await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l').length >= 3`, 'tiroir ouvert, worktrees rendus');
+await attendreValeur(() => s.ev(`!!document.querySelector('#vf-git-s-wt .vf-git-etat-wt')`), (v) => v === true, { max: 6000 }); // états lus : plus de rendu à venir sous le focus
+const T = `document.querySelector('#vf-git-tiroir')`, DETACHE = `[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l .vf-git-mono')].find((x) => x.textContent === 'HEAD détaché')`;
+const BULLE = `(() => { const b = document.querySelector('.vf-git-bulle'); if (!b || b.hidden) return null; const r = b.getBoundingClientRect(); return { texte: b.textContent, vu: r.width > 0 && r.height > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight, role: b.getAttribute('role') }; })()`;
+const lire = async (fin) => { let v; for (let i = 0; i < 20; i++) { v = await s.ev(BULLE); if (fin(v)) return v; await pause(100); } return v; };
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+const echap = (cible) => s.ev(`${cible}.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true }))`);
+const ouvert = () => s.ev(`(() => { const t = ${T}; return !!t && !t.hidden; })()`);
+// le titre de la vue se juge tiroir FERMÉ (S6, revue du 2026-11-08 : tiroir ouvert il est masqué dessous et n'est plus un arrêt de Tab, EK18) : on referme le tiroir, on juge le titre, on le rouvre
+await s.ev(`document.querySelector('#vf-git-ligne').click()`); await s.attendre(`${T}.hidden`, 'tiroir refermé');
+await s.ev(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Tab', bubbles: true }))`); // la dernière entrée est une touche (le chemin des vraies touches est vérifié à la main)
+await s.attendre(`!!document.querySelector('#context h1[data-vf-aide]')`, 'titre de la vue avec sa définition');
+await s.ev(`document.querySelector('#context h1').focus()`);
+out.h1 = await lire((v) => v !== null);
+out.h1tab = await s.ev(`document.querySelector('#context h1').tabIndex`);
+await s.ev(`document.activeElement.blur()`);
+await lire((v) => v === null);
+await s.ev(`document.querySelector('#vf-git-ligne').click()`); await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l').length >= 3`, 'tiroir rouvert, worktrees rendus');
+await attendreValeur(() => s.ev(`!!document.querySelector('#vf-git-s-wt .vf-git-etat-wt')`), (v) => v === true, { max: 6000 });
+await s.ev(`${DETACHE}.focus()`);
+out.detache.bulle = await lire((v) => v !== null);
+out.detache.atteignable = await s.ev(`(() => { const m = ${DETACHE}; return { tab: m.tabIndex, desc: m.getAttribute('aria-description') === m.getAttribute('title'), actif: document.activeElement === m }; })()`);
+await echap(DETACHE);
+out.detache.apresEchap = { bulle: await lire((v) => v === null), tiroir: await ouvert() };
+await echap(DETACHE); // second Échap (bulle déjà fermée) : c'est lui qui ferme le tiroir, preuve que le premier ne le faisait pas par impuissance
+out.detache.secondEchap = await ouvert();
+if (!out.detache.secondEchap) { await s.ev(`document.querySelector('#vf-git-ligne').click()`); await s.attendre(`!${T}.hidden`, 'tiroir rouvert'); }
+await s.ev(`[...${T}.querySelectorAll('.vf-git-sec-t')].find((x) => /^Worktrees/.test(x.textContent)).focus()`);
+out.worktrees = await lire((v) => v !== null);
+await s.ev(`document.activeElement.blur()`);
+out.depart = await lire((v) => v === null);
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/d18.js"; } > "$AUX/d18-complet.js"
+  R18="$(cdp "$AUX/d18-complet.js" "$BASE")"
+  assert_eq "D18.1 — PU-G-193 : au focus clavier, « HEAD détaché » (atteignable par Tab, même phrase en aria-description) montre sa définition dans une bulle visible, dans la fenêtre" "$(jq_ "$R18" '[j.detache.atteignable.tab, j.detache.atteignable.desc, j.detache.atteignable.actif, !!j.detache.bulle && j.detache.bulle.vu, !!j.detache.bulle && /^HEAD détaché : ce dossier n.est sur aucune branche/.test(j.detache.bulle.texte)].join("|")' 2>/dev/null)" "0|true|true|true|true"
+  assert_eq "D18.2 — PU-G-193 : Échap ferme la bulle SANS fermer le tiroir (le premier Échap ne sert qu'à elle) ; un second Échap, bulle fermée, ferme le tiroir (témoin : il aurait pu se fermer)" "$(jq_ "$R18" '[j.detache.apresEchap.bulle === null, j.detache.apresEchap.tiroir, j.detache.secondEchap].join("|")' 2>/dev/null)" "true|true|false"
+  assert_eq "D18.3 — PU-G-193 : le bouton « Worktrees » montre aussi sa définition au focus ; elle se ferme quand le focus part" "$(jq_ "$R18" '[!!j.worktrees && /^Worktrees : copies de travail du dépôt/.test(j.worktrees.texte), j.depart === null].join("|")' 2>/dev/null)" "true|true"
+  assert_eq "D18.4 — PU-G-193 : le titre de la vue (« Le code, <branche> », définition Branche / HEAD détaché) est atteignable par Tab et montre sa définition au focus clavier" "$(jq_ "$R18" '[j.h1tab, !!j.h1 && /^Branche : une ligne de travail du dépôt/.test(j.h1.texte)].join("|")' 2>/dev/null)" "0|true"
+  assert_eq "D18.x — aucune erreur de page" "$(jq_ "$R18" '(j.errs || []).length' 2>/dev/null)" "0"
+  # D17 (GT2, PU-G-198/199/200/201 ; DG-01 part page, PU-G-191) : focus visible à l'ouverture, détail hors de la liste, noms des boutons Copier, Échap à 390 px, une relance automatique unique.
+  # SURFACE DURCIE : le nom d'une branche entre dans un aria-label (setAttribute) et nulle part ailleurs ; la commande copiée reste celle du <code> affiché.
+  cat > "$AUX/d17a.js" <<'JS'
+const [base] = ARGS; const out = {};
+const HOSTILE = `ma"b'$(touch x);<img src=x onerror=alert(1)>`;
+await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
+await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
+await s.ev(`(() => { const R = window.__vfGit.reponse; R.worktrees[1].nom = 'bisect-ci'; R.mergees[0] = { nom: ${JSON.stringify(HOSTILE)}, commande: "git branch -d --end-of-options 'ma\\"b'\\\\''$(touch x);<img src=x onerror=alert(1)>'" };
+  window.__copies = []; navigator.clipboard.writeText = (t) => { window.__copies.push(t); return window.__refuse ? Promise.reject(new Error('refus')) : Promise.resolve(); }; })()`);
+await touche('g');
+await s.attendre(`${OUVERT} && ${LIGNES}.length === 40`, 'tiroir ouvert au clavier');
+out.focus = await stabiliser(() => s.ev(`(() => { const t = document.querySelector('#vf-git-tiroir .vf-git-titre-t'), c = getComputedStyle(t); return { sur: document.activeElement === t, style: c.outlineStyle, largeur: c.outlineWidth, couleur: c.outlineColor, anneau: window.__couleur('--ring') }; })()`), { max: 5000 });
+// 199 : la région du détail sort de la liste et se relie par aria-controls
+await s.ev(`${LIGNES}[2].click()`);
+await s.attendre(`!!document.querySelector('.vf-git-det .vf-git-d-fichiers')`, 'détail ouvert');
+out.detail = await s.ev(`(() => { const z = document.querySelector('.vf-git-det'), L = ${LIGNES}[2], id = L.getAttribute('aria-controls');
+  return { horsListe: !z.closest('[role=listbox]'), role: z.getAttribute('role'), relie: !!id && document.getElementById(id) === z, options: document.querySelectorAll('#vf-git-tiroir [role=listbox] > [role=option]').length, orphelins: [...document.querySelectorAll('#vf-git-tiroir [role=listbox] > :not([role=option])')].length, listes: document.querySelectorAll('#vf-git-tiroir [role=listbox]').length, autres: ${LIGNES}.filter((l, i) => i !== 2 && l.hasAttribute('aria-controls')).length }; })()`);
+// 200 : noms courts des boutons Copier, nom hostile inerte, texte copié = texte affiché
+await s.ev(`[...document.querySelectorAll('#vf-git-tiroir .vf-git-sec-t')].forEach((b) => { if (b.getAttribute('aria-expanded') !== 'true') b.click(); }); document.querySelector('#vf-git-tiroir .vf-git-merg-b').click()`);
+out.noms = await s.ev(`[...document.querySelectorAll('#vf-git-tiroir .vf-git-btn')].map((b) => b.getAttribute('aria-label'))`);
+out.attributs = await s.ev(`[...document.querySelectorAll('#vf-git-tiroir .vf-git-btn')].every((b) => [...b.attributes].map((a) => a.name).sort().join() === 'aria-label,class,type')`);
+out.hostile = await s.ev(`(() => { const b = [...document.querySelectorAll('#vf-git-tiroir .vf-git-btn')].find((x) => x.parentNode.querySelector('code').textContent.includes('touch x')); const code = b.parentNode.querySelector('code');
+  return { label: b.getAttribute('aria-label'), attendu: 'Copier la commande de suppression de la branche ' + ${JSON.stringify(HOSTILE)}, balises: document.querySelectorAll('#vf-git-tiroir img, #vf-git-tiroir script, #vf-git-tiroir [onerror]').length, alertes: window.__alerte, code: code.textContent }; })()`);
+await s.ev(`[...document.querySelectorAll('#vf-git-tiroir .vf-git-btn')].find((x) => x.parentNode.querySelector('code').textContent.includes('touch x')).click()`);
+await s.attendre(`window.__copies.length === 1`, 'copie du nom hostile');
+out.copie = await s.ev(`({ spy: window.__copies[0], live: document.querySelector('#vf-git-tiroir .vf-git-live').textContent, alertes: window.__alerte })`);
+await s.ev(`window.__refuse = true; document.querySelector('#vf-git-s-wt .vf-git-btn').click()`);
+out.refus = await attendreValeur(() => s.ev(`document.querySelector('#vf-git-tiroir .vf-git-live').textContent`), (t) => /impossible/.test(t), { max: 10000 });
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d17a.js"; } > "$AUX/d17a-complet.js"
+  cat > "$AUX/d17b.js" <<'JS'
+const [base, w0] = ARGS, w = w0 || 390; const out = {};
+await fenetre(Number(w), 800); await s.naviguer(base + '/');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#vf-plus') && !!document.querySelector('#vf-git-tiroir')`, 'page prête');
+// le vrai chemin à cette largeur : de 1000 px, la seconde ligne de l'en-tête (le menu « ⋯ » n'est posé que jusqu'à 999 px, l'ouvreur n'y figure qu'à 700 px et moins) ; à 390 px, l'entrée « Historique Git » du menu
+if (Number(w) >= 1000) await s.ev(`document.querySelector('#vf-git-ligne').click()`);
+else { await s.ev(`document.querySelector('#vf-plus').click()`);
+  await s.ev(`[...document.querySelectorAll('#vf-plus-menu button')].find((b) => /Git/.test(b.textContent)).click()`); }
+await s.attendre(`!document.querySelector('#vf-git-tiroir').hidden`, 'tiroir ouvert');
+out.ouvert = await s.ev(`document.activeElement.classList.contains('vf-git-titre-t')`);
+await touche('Escape');
+out.ferme = await attendreValeur(() => s.ev(`document.querySelector('#vf-git-tiroir').hidden`), (h) => h === true, { max: 5000 });
+out.focus = await stabiliser(() => s.ev(`document.activeElement.id`), { max: 5000 });
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d17b.js"; } > "$AUX/d17b-complet.js"
+  cat > "$AUX/d17c.js" <<'JS'
+const [base] = ARGS; const out = {};
+await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
+await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).display !== 'none'`, 'seconde ligne');
+const T = `document.querySelector('#vf-git-tiroir')`;
+const INDISPO = `{ schema: 'vibeflow/cockpit-git@1', etat: 'indisponible', entete: { etat: 'indisponible', depot: 'depot' }, commandes: { vide: null, diagnostic: 'git status' } }`;
+// mock de route : la première lecture répond « indisponible », les suivantes le bon état
+await s.ev(`(() => { const f = window.fetch.bind(window), bon = JSON.parse(JSON.stringify(window.__TEMOIN_REF)); let n = 0; window.fetch = (u, i) => { if (/\\/api\\/vf\\/git(\\?|$)/.test(typeof u === 'string' ? u : u.url)) { n++; window.__vfGit.reponse = n === 1 ? ${INDISPO} : bon; } return f(u, i); }; })()`);
+await s.ev(`document.querySelector('#vf-git-ligne').click()`);
+await attendreValeur(() => s.ev(`${LIGNES}.length === 40`), (v) => v === true, { pas: 100, max: 10000 }); // ne lève pas : sans relance, le mutant doit rendre une trace, pas une erreur de scénario
+out.relance = await s.ev(`({ reqs: window.__vfReqs.length, carte: /Git est indisponible/.test(${T}.textContent), busy: ${T}.querySelector('.vf-git-corps').getAttribute('aria-busy') })`);
+// toujours « indisponible » : une seule relance, jamais de boucle, puis la raison humaine
+await s.ev(`window.__vfGit.reponse = ${INDISPO}; window.fetch = (u, i) => { if (/\\/api\\/vf\\/git(\\?|$)/.test(typeof u === 'string' ? u : u.url)) { window.__vfReqs.push({ url: u }); return Promise.resolve(new Response(JSON.stringify(${INDISPO}), { status: 200, headers: { 'content-type': 'application/json' } })); } return Promise.resolve(new Response('{}')); }; window.__avant = window.__vfReqs.length; window.VFGitTiroir.fermer(); window.VFGitTiroir.recharger()`);
+await s.attendre(`/Git est indisponible/.test(${T}.textContent)`, 'carte indisponible');
+await pause(700);
+out.boucle = await s.ev(`({ reqs: window.__vfReqs.length - window.__avant, texte: ${T}.querySelector('.vf-git-carte .vf-git-note').textContent })`);
+// aucune réponse exploitable (hors schéma) : même relance unique, autre raison
+await s.ev(`window.fetch = (u, i) => { window.__vfReqs.push({ url: u }); return Promise.resolve(new Response(JSON.stringify({ schema: 'autre@1' }), { status: 200, headers: { 'content-type': 'application/json' } })); }; window.__avant = window.__vfReqs.length; window.VFGitTiroir.recharger()`);
+await attendreValeur(() => s.ev(`(${T}.querySelector('.vf-git-carte .vf-git-note') || {}).textContent || ''`), (t) => /n'a pas abouti/.test(t), { max: 10000 }); // raison propre à cette réponse, avant de prouver qu'il n'y a pas de boucle
+await pause(700);
+out.horsSchema = await s.ev(`({ reqs: window.__vfReqs.length - window.__avant, texte: ${T}.querySelector('.vf-git-carte .vf-git-note').textContent })`);
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  { cat "$AUX/touche.js"; cat "$AUX/clavier.js"; cat "$AUX/d17c.js"; } > "$AUX/d17c-complet.js"
+  R17="$(cdp "$AUX/d17a-complet.js" "$BASE")"
+  [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R17" > "$TIROIR_TRACE-d17a.json"
+  assert_eq "D17.1 — PU-G-198 : après la touche g, le titre « Historique Git » a le focus ET un anneau visible (2 px, couleur --ring)" "$(jq_ "$R17" '[j.focus.sur, j.focus.style !== "none", j.focus.largeur, j.focus.couleur === j.focus.anneau].join("|")' 2>/dev/null)" "true|true|2px|true"
+  assert_eq "D17.2 — PU-G-199 : la région « Détail du commit » est hors de toute liste, reliée par aria-controls à sa rangée seule ; les 40 options restent, aucun enfant de liste qui ne soit une option" "$(jq_ "$R17" '[j.detail.horsListe, j.detail.role, j.detail.relie, j.detail.options, j.detail.orphelins, j.detail.autres].join("|")' 2>/dev/null)" "true|region|true|40|0|0"
+  assert_eq "D17.3 — PU-G-200 : noms courts « Copier la commande cd vers bisect-ci », « … pour voir le stash stash@{0} », jamais la commande entière" "$(jq_ "$R17" '[j.noms.includes("Copier la commande cd vers bisect-ci"), j.noms.includes("Copier la commande pour voir le stash stash@{0}"), j.noms.every((n) => !/--end-of-options|cd --/.test(n))].join("|")' 2>/dev/null)" "true|true|true"
+  assert_eq "D17.4 — PU-G-200 (surface durcie) : un nom de branche hostile n'entre que dans l'aria-label (texte exact), aucun attribut ajouté, ni <img>, ni <script>, ni alerte" "$(jq_ "$R17" '[j.hostile.label === j.hostile.attendu, j.attributs, j.hostile.balises, j.hostile.alertes].join("|")' 2>/dev/null)" "true|true|0|0"
+  assert_eq "D17.5 — PU-G-200 : la commande copiée est octet pour octet celle affichée (nom hostile compris), annoncée « Commande copiée » dans la région vive ; un refus s'annonce aussi" "$(jq_ "$R17" '[j.copie.spy === j.hostile.code, j.copie.live, j.refus].join("|")' 2>/dev/null)" "true|Commande copiée|Copie impossible, commande sélectionnée"
+  assert_eq "D17.x — aucune erreur de page" "$(jq_ "$R17" 'j.errs.length' 2>/dev/null)" "0"
+  for W in 1440 390; do # à 1440 px la seconde ligne est visible : le focus lui revient (témoin « comme à 1440 px ») ; à 390 px seul « Plus d'actions » l'est
+    R17B="$(cdp "$AUX/d17b-complet.js" "$BASE" "$W")"; ATT="vf-git-ligne"; [ "$W" = 390 ] && ATT="vf-plus"
+    assert_eq "D17.6 [$W px] — PU-G-201 : tiroir ouvert par son vrai chemin (seconde ligne dès 1000 px, menu « Plus d'actions » à 390 px), Échap le ferme et rend le focus à $ATT" "$(jq_ "$R17B" '[j.ouvert, j.ferme, j.focus].join("|")' 2>/dev/null)" "true|true|$ATT"
+  done
+  R17C="$(cdp "$AUX/d17c-complet.js" "$BASE")"
+  [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$R17C" > "$TIROIR_TRACE-d17c.json"
+  assert_eq "D17.7 — PU-G-191 : première lecture « indisponible » puis bon état : UNE relance automatique, les 40 rangées, aucune carte d'erreur" "$(jq_ "$R17C" '[j.relance.reqs, j.relance.carte, j.relance.busy === null].join("|")' 2>/dev/null)" "2|false|true"
+  assert_eq "D17.8 — PU-G-191 : toujours « indisponible » : deux requêtes exactement (jamais de boucle), raison humaine « Git a mis trop de temps à répondre (machine chargée ?). Réessayer. »" "$(jq_ "$R17C" '[j.boucle.reqs, j.boucle.texte].join("|")' 2>/dev/null)" "2|Git a mis trop de temps à répondre (machine chargée ?). Réessayer."
+  assert_eq "D17.9 — PU-G-191 : réponse hors schéma : même relance unique, raison distincte (« n'a pas abouti »)" "$(jq_ "$R17C" '[j.horsSchema.reqs, j.horsSchema.texte].join("|")' 2>/dev/null)" "2|La lecture du dépôt n'a pas abouti. Réessayer."
+  assert_eq "D17.y — aucune erreur de page (relance)" "$(jq_ "$R17C" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
   # --- copies privées du module pour les mutants (build lit assets/ui/*.js) : chaque mutant a son propre lab et son propre serveur ---
   mkmod() { local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"; echo "$d/scripts"; }
@@ -811,11 +1012,19 @@ EOF
     build_serve "$L" "$M"; RM="$(cdp "$AUX/$5" "http://127.0.0.1:$PORT")"; stop_srv
     [ -n "${TIROIR_TRACE:-}" ] && printf '%s\n' "$RM" > "$TIROIR_TRACE-$1.json"
   }
+  # D18.4b (K5-2, CI Linux, run 42512568864) : sous Linux `document.fonts.ready` est déjà résolu quand le script du viewer s'achève ; le viewer posait alors le premier rendu et `ready` AVANT les scripts d'extension. Condition reproduite sur tout poste par une copie du module dont le viewer attend `Promise.resolve()` (comme H7.1b) : le scénario D18 complet y est rejoué et le titre de la vue doit toujours être atteignable par Tab ET montrer sa définition au focus.
+  MP="$(mkmod mpolices)"
+  mutate "$MP/../skills/cockpit-moteur/assets/viewer.html" "const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();" "const fontsReady = Promise.resolve();" || { echo "  ❌ FAIL — D18.4b : mutation impossible"; FAIL=$((FAIL+1)); }
+  build_serve "$DEPOT" "$MP"; R18B="$(cdp "$AUX/d18-complet.js" "http://127.0.0.1:$PORT")"; stop_srv
+  assert_eq "D18.4b — polices déjà prêtes avant les scripts d'extension (Linux, CI) : le titre de la vue est atteignable par Tab et montre sa définition au focus clavier (même attendu que D18.4)" "$(jq_ "$R18B" '[j.h1tab, !!j.h1 && /^Branche : une ligne de travail du dépôt/.test(j.h1.texte)].join("|")' 2>/dev/null)" "0|true"
+  assert_eq "D18.xb — polices déjà prêtes : aucune erreur de page" "$(jq_ "$R18B" '(j.errs || []).length' 2>/dev/null)" "0"
   mutant M-HTML 77-vf-git-rendu.js "l1.appendChild(el('span', 'vf-git-msg', r.s));" "{ const m = el('span', 'vf-git-msg'); m.innerHTML = r.s; l1.appendChild(m); }" d2.js
   assert_eq "M-HTML — rougit D2.5 (un message rendu en HTML fait naître un <img>) alors que les 40 rangées sont là (pas une panne d'un autre ordre)" "$(jq_ "$RM" '[j.xss.img > 0, j.xss.lit.includes("false"), j.ouvert.rangees].join("|")' 2>/dev/null)" "true|true|40"
   mutant M-COPIE 77-vf-git-rendu.js "writeText(code.textContent)" "writeText(code.textContent.slice(0, -1))" d2.js
   assert_eq "M-COPIE — rougit D2.4 (le texte reçu par l'API n'est plus celui du <code>) alors que la copie a bien eu lieu" "$(jq_ "$RM" '[j.copie.spy === j.copie.affiche, typeof j.copie.spy, j.copie.retour].join("|")' 2>/dev/null)" "false|string|Copiée"
-  mutant M-GLOBAL-G 77-vf-git-tiroir.js "if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(t.tagName) >= 0)) return;" "if (false) return;" d3a-complet.js
+  mutant M-AJUSTEMENT ../viewer.html "else if (ev.key === 'f' || ev.key === 'F') fit(true);" "else if (ev.key === 'f' || ev.key === 'F') { }" d3a-complet.js
+assert_eq "M-AJUSTEMENT — rougit D3.3 (la touche f ne fait rien : ni changement de k ni ajustement animé fit(true)) alors que + et - marchent" "$(jq_ "$RM" '[j.zoom.plus, j.zoom.moins, j.zoom.fit].join("|")' 2>/dev/null)" "true|true|false"
+mutant M-GLOBAL-G 77-vf-git-tiroir.js "if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(t.tagName) >= 0)) return;" "if (false) return;" d3a-complet.js
   assert_eq "M-GLOBAL-G — rougit D3.1 (g ouvre le tiroir depuis un champ de saisie) alors que g hors champ marche toujours" "$(jq_ "$RM" '[j.champ_input.ouvert, j.g1, j.g2].join("|")' 2>/dev/null)" "true|true|false"
   mutant M-HORS-DEPOT 77-vf-git-tiroir.js "if (!V || V.etat === 'absent' || !V.depot) return; // sans dépôt" "if (false) return; // sans dépôt" d3n-complet.js nogit
   assert_eq "M-HORS-DEPOT — rougit D3.1 hors dépôt (le tiroir existe alors qu'aucun ouvreur n'existe) alors que la page est rendue" "$(jq_ "$RM" '[j.tiroir, j.ligne].join("|")' 2>/dev/null)" "true|false"
@@ -833,6 +1042,8 @@ EOF
   assert_eq "M-ANNONCE — rougit D12.1 (une relecture sans changement annonce quand même) alors que l'annonce d'un vrai changement (D12.2) est là" "$(jq_ "$RM" '[j.inchange.length > 0, j.change.length >= 1].join("|")' 2>/dev/null)" "true|true"
   mutant M-AVANCE-ZERO 77-vf-git-rendu.js "const avance = (a) => a == null ?" "const avance = (a) => (a = a || 0) == null ?" d13-complet.js
   assert_eq "M-AVANCE-ZERO — rougit D13.1 (le retour à « avance || 0 » affiche « 0 commit » pour un avance null) alors que les témoins positifs D13.2 tiennent" "$(jq_ "$RM" '[(j.branches.find((b) => b.nom === "feat/inconnue") || {}).txt, j.branches.map((b) => b.txt).join("/")].join("|")' 2>/dev/null)" "0 commit|0 commit/0 commit/3 commits"
+  mutant M-ECHAPPEMENT 77-vf-git-vue-detail.js "bloc.appendChild(sp);" "if (tip && cls === 'vf-git-p-mono') sp.innerHTML = tip; bloc.appendChild(sp);" d16-complet.js
+  assert_eq "M-ECHAPPEMENT — rougit D16.4 (le nom de base hostile rendu en HTML fait naître un <img>) alors que l'infobulle D16.3 et les états D16.1 tiennent" "$(jq_ "$RM" '[j.inerte.balises > 0, j.enCours.join("/") === "lecture…/lecture…/lecture…"].join("|")' 2>/dev/null)" "true|true"
   mutant M-AVANCE-WT 77-vf-git-vue-detail.js "const nb = (n) => (n == null ? '—' : n);" "const nb = (n) => (n || 0);" d13-complet.js
   assert_eq "M-AVANCE-WT — rougit D13.3 (la pastille d'un worktree à avance inconnue redit « ↑0 ») alors que les branches D13.1 tiennent" "$(jq_ "$RM" '[j.wt, (j.branches.find((b) => b.nom === "feat/inconnue") || {}).txt].join("|")' 2>/dev/null)" "↑0 ↓1|—"
   mutant M-ECHEC-DIT 77-vf-git-vue-detail.js $'echecDit = false;\n      if (g.change || w.change)' $'if (g.change || w.change)' d14-complet.js
@@ -849,6 +1060,20 @@ EOF
   assert_eq "M-LIVE-DOUBLE — rougit D15.4 (deux régions vives, deux régions distinctes pour les deux annonces) alors que chaque copie est annoncée" "$(jq_ "$RM" '[j.regions, j.copies.length, new Set(j.copies.map((c) => c[0])).size].join("|")' 2>/dev/null)" "2|2|2"
   mutant M-COCHE 77-vf-git-rendu.js "dire('Copiée', true);" "dire('Copiée');" d15-complet.js
   assert_eq "M-COCHE — rougit D15.5 (l'icône reste celle de la copie pendant le « Copiée ») alors que le retour textuel est là" "$(jq_ "$RM" '[j.iconeCoche === j.iconeAvant, j.retour].join("|")' 2>/dev/null)" "true|Copiée"
+  mutant M-FOCUS-198 77-vf-git-tiroir.js ".vf-git-titre-t:focus-visible { outline: 2px solid var(--ring);" ".vf-git-titre-t:focus-visible { outline: none;" d17a-complet.js
+  assert_eq "M-FOCUS-198 — rougit D17.1 (le titre a le focus mais plus d'anneau) alors que le focus est bien posé" "$(jq_ "$RM" '[j.focus.sur, j.focus.style === "none"].join("|")' 2>/dev/null)" "true|true"
+  mutant M-DETAIL-LISTE 77-vf-git-vue-detail.js "li.appendChild(zone); ol.after(li);" "li.appendChild(zone); ligne.after(li);" d17a-complet.js
+  assert_eq "M-DETAIL-LISTE — rougit D17.2 (le détail revient dans la liste) alors que la région reste reliée par aria-controls" "$(jq_ "$RM" '[j.detail.horsListe, j.detail.relie].join("|")' 2>/dev/null)" "false|true"
+  mutant M-LABEL-HTML 77-vf-git-rendu.js "const b = el('button', 'vf-git-btn', null, { type: 'button', 'aria-label': 'Copier la commande' + (nom ? ' ' + nom : '') });" "const b = (() => { const h = document.createElement('div'); h.innerHTML = '<button class=\"vf-git-btn\" type=\"button\" aria-label=\"Copier la commande' + (nom ? ' ' + nom : '') + '\"></button>'; return h.firstChild; })();" d17a-complet.js
+  assert_eq "M-LABEL-HTML — rougit D17.4 (le nom hostile écrit en HTML casse l'aria-label et ajoute des attributs) alors que les boutons existent et que la copie D17.5 fonctionne" "$(jq_ "$RM" '[j.hostile.label === j.hostile.attendu, j.attributs, j.copie.spy === j.hostile.code].join("|")' 2>/dev/null)" "false|false|true"
+  mutant M-ECHAP-390 77-vf-git-tiroir.js ".some((d) => getComputedStyle(d).visibility !== 'hidden')" ".some(() => true)" d17b-complet.js
+  assert_eq "M-ECHAP-390 — rougit D17.6 (le panneau fermé du téléphone, role=dialog invisible, bloque Échap : le tiroir reste ouvert, le focus part sur le corps) alors que le tiroir s'ouvre" "$(jq_ "$RM" '[j.ouvert, j.ferme, j.focus].join("|")' 2>/dev/null)" "true|false|"
+  mutant M-BULLE-ECHAP 77-vf-git-rendu.js "if (ev.key === 'Escape' && bulle && !bulle.hidden && ancre === e) {" "if (false) {" d18-complet.js
+  assert_eq "M-BULLE-ECHAP — rougit D18.2 (la bulle n'a plus son Échap : le premier Échap atteint le tiroir et le ferme, la bulle disparaît avec lui) alors que la bulle s'était bien ouverte (D18.1)" "$(jq_ "$RM" '[!!j.detache.bulle && j.detache.bulle.vu, j.detache.apresEchap.bulle === null, j.detache.apresEchap.tiroir].join("|")' 2>/dev/null)" "true|true|false"
+  mutant M-BULLE-FOCUS 77-vf-git-rendu.js "if (clavier || e.matches(':focus-visible')) montrer(e, typeof texte === 'function' ? texte() : texte);" "void 0;" d18-complet.js
+  assert_eq "M-BULLE-FOCUS — rougit D18.1 et D18.3 (le focus clavier ne montre plus rien : retour au title seul) alors que les éléments sont atteignables par Tab" "$(jq_ "$RM" '[j.detache.atteignable.tab, j.detache.bulle === null, j.worktrees === null, j.h1 === null].join("|")' 2>/dev/null)" "0|true|true|true"
+  mutant M-RELANCE 77-vf-git-tiroir.js "if (relance !== true && (!j ||" "if (false && (!j ||" d17c-complet.js
+  assert_eq "M-RELANCE — rougit D17.7 (plus de relance : une requête, la carte d'erreur au premier « indisponible ») alors que le bon état aurait été servi à la seconde" "$(jq_ "$RM" '[j.relance.reqs, j.relance.carte].join("|")' 2>/dev/null)" "1|true"
 fi
 
 echo "=== D10 — correction design de la critique fraîche (78-10 : F2, F12, F14, F15) ==="

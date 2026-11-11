@@ -70,7 +70,7 @@ const mauvaisGabarits = Object.entries(dico).filter(([k]) => k.includes('{}')).f
 const TEMOINS = /\b(and|of|the|at|top|up|here|calls?|steps?|show|changes|endpoints|uses|resolve|still|generated|names|again|worth|fixing|minor|inside|updated|click|recent|work)\b/i;
 const FAUTES = [[/\bde (le|les)\b/i, '« de le » / « de les » non contracté'], [/\bde [aeiouyàâéèêîôû]/i, '« de » devant voyelle non élidé'], [/(^|[^\d])1 [a-zàâéèêîôû]+s\b/i, '« 1 » suivi d\'un pluriel'], [/Utilise liens|Appuyez sur Lecture/, 'valeur fautive connue'], [/mis à jour (minutes|heures|jours|secondes)/i, 'ordre des gabarits : « mis à jour » coupe l\'expression de durée'], [/^(.+) : \1$/, 'doublon « X : X »']];
 const CORPUS = ['Calls · 3', 'up ·', '3 calls', '1 call', 'Show 2 changes', '1 step', 'Affects 2 places in here', '1 important · 1 worth fixing · 1 minor', '3 endpoints', 'Uses connection', 'Resolve on the map',
-  'Claude Code and GSD', '3 files and endpoints still use generated names. Run the skill again to describe them.', 'Press Play to follow it through the code, one step at a time.',
+  'Claude Code and GSD', '3 files and endpoints still use generated names: they are named after their file, with no description. To describe them, run this command again.', 'Press Play to follow it through the code, one step at a time.',
   'It also relies on Stripe and Postgres. They sit at the edge of the map; the lines show which parts talk to them.', 'Replay this tour any time from', 'at the top.', 'the tour button (icon)', 'There is no tour for the Team tab', 'A one-minute tour of this project',
   'Answers come from the Claude Code CLI on this computer, which can read the source', 'Nothing stood out. This is a quick automatic check, not a full Anthropic review.',
   'Inside kpi-analyst', 'Updated 3 minutes ago', 'Recent work: Recent work', '2×click', 'right-click', 'click'];
@@ -78,7 +78,9 @@ const jugement = (e) => { const o = tr(e); if (o == null || o === e) return `non
 const f11 = CORPUS.map(jugement);
 // recette 2026-11-04 (juge Playwright, P70-D-04) : formes exactes ; l'ordre des gabarits ne doit pas faire revenir « il y a 3 mis à jour minutes »
 const suite = [tr('Updated 3 minutes ago'), tr('Inside kpi-analyst'), tr('Inside equipe-produit'), tr('Recent work: Recent work'), tr('2×click'), tr('right-click'), tr('Top of the world'), tr('click')];
-console.log(JSON.stringify({ mauvaisGabarits, f11, suite, corpus: CORPUS, inventaire: inv.length, liste: inv, dict: Object.keys(dico).length, motifs: code.__vfFrTraduire.motifs, gabarits: code.__vfFrTraduire.gabarits, exclusions: excl.length,
+// lot Langue (rcm lot 4, 2026-11-06) : formes lues par le panel — LG1 anglais résiduel, LG2 libellés reformulés
+const lg = ['Readme and 7 more', 'A, B and 1 more', 'You asked: foo', 'You asked:', 'Exported Nov 5, 2026', 'Unassigned', 'Everything behind /products/:id', 'The screen itself', '9 connections.', '1 connection.', 'Calls connection', '115 files · 48k lines', '1.3k lines', '1 lines', 'Changed · Phase 61', '10 changed', '1 changed', 'Matched by', 'more', 'Back to map', 'Nothing stood out. This is a quick automatic check, not a full security review.', '10 changed inside · Phase 61', "Qu'est-ce qui bloque ?", "Qu'est-ce qui est en cours ?"].map((e) => tr(e));
+console.log(JSON.stringify({ mauvaisGabarits, f11, suite, lg, svc: [code.__vfFrType('service'), code.__vfFrType('Service')], corpus: CORPUS, inventaire: inv.length, liste: inv, dict: Object.keys(dico).length, motifs: code.__vfFrTraduire.motifs, gabarits: code.__vfFrTraduire.gabarits, exclusions: excl.length,
   nonTraduits, sansObjet, problemesDico: controler(dico), problemesTemoin: fautive,
   f6: { etapes: [tr('Previous step'), tr('Next step')], motif: tr('Answer · 3 cards'), exact: tr('Fit to screen'), gabarit: tr('Your Claude session expired. Sign in again.'), vide: tr(''), espaces: tr('   '), inconnu: tr('Ma phrase de données'), projet: proj.__vfFrTraduire('File'), code: code.__vfFrTraduire('File'), pluriels: [proj.__vfFrTraduire('files'), code.__vfFrTraduire('files')], donnees: [tr('Top of the world'), tr('Fix with Claude Code'), tr('3 of 4'), tr('Health check: nothing urgent')],
     types: typeof code.__vfFrType === 'function' ? [code.__vfFrType('library'), code.__vfFrType('Library'), code.__vfFrType('Ma donnée'), code.__vfFrType('config'), tr('library')] : 'absent' }}));
@@ -164,6 +166,44 @@ assert_eq "F13.3 : « Recent work: Recent work » (fil d'Ariane) ne dit qu'une f
 assert_eq "F13.4 : indications de souris « 2×click », « right-click », « click » en français" "$(lire "$WORK/m.json" '[...j.suite.slice(4,6), j.suite[7]]')" '["2×clic","clic droit","clic"]'
 assert_eq "F13.5 : le gabarit libre « Inside {} » n'abîme pas une autre donnée (« Top of the world » reste intacte)" "$(lire "$WORK/m.json" 'j.suite[6]')" "null"
 
+echo "[F14] lot Langue : anglais résiduel et libellés reformulés (PU-G-060 à 064, 066, 070, 078, 055, 036, 148, 161) ; DG-14 apostrophe"
+assert_eq "F14.1 : « Readme and 7 more » → « Readme et 7 autres » ; « 1 more » au singulier" "$(lire "$WORK/m.json" 'j.lg.slice(0,2)')" '["Readme et 7 autres","A, B et 1 autre"]'
+assert_eq "F14.2 : une seule formule, « Demande d'origine », pour « You asked: » avec ou sans suite (PU-G-062, PU-G-063)" "$(lire "$WORK/m.json" 'j.lg.slice(2,4)')" '["Demande d'"'"'origine : foo","Demande d'"'"'origine :"]'
+assert_eq "F14.3 : « Exported <date> » → « Exporté le 5 nov. 2026 » (PU-G-161)" "$(lire "$WORK/m.json" 'j.lg[4]')" "Exporté le 5 nov. 2026"
+assert_eq "F14.4 : « Unassigned », « Everything behind … », « The screen itself » (PU-G-060, PU-G-078)" "$(lire "$WORK/m.json" 'j.lg.slice(5,8)')" '["Non classés","Tout ce qu'"'"'il y a derrière /products/:id","L'"'"'écran lui-même"]'
+assert_eq "F14.5 : « 9 connections. » (point final), « 1 connection. », « Calls connection » (PU-G-064)" "$(lire "$WORK/m.json" 'j.lg.slice(8,11)')" '["9 liens.","1 lien.","Appels entre modules"]'
+assert_eq "F14.6 : chiffres : « 48 k lignes », « 1,3 k lignes », « 1 ligne » au singulier (PU-G-066)" "$(lire "$WORK/m.json" 'j.lg.slice(11,14).map((x) => x.replace(/\u00a0/g, "_"))')" '["115 fichiers · 48_k lignes","1,3_k lignes","1 ligne"]'
+assert_eq "F14.7 : « Changed » ne veut plus dire « modifié » : « Touché par : … », « 10 récents », « 1 récent » (PU-G-055)" "$(lire "$WORK/m.json" 'j.lg.slice(14,17)')" '["Touché par : Phase 61","10 récents","1 récent"]'
+assert_eq "F14.8 : « Matched by » → « Détecté via » ; hint « more » → « plus d'actions » ; « Back to map » sans le mot carte (PU-G-070, PU-G-036, PU-G-148)" "$(lire "$WORK/m.json" 'j.lg.slice(17,20)')" '["Détecté via","plus d'"'"'actions","Quitter le tableau"]'
+assert_eq "F14.9 : « revue de sécurité complète » ; « 10 récents à l'intérieur » (PU-G-161, PU-G-055)" "$(lire "$WORK/m.json" '[j.lg[20], j.lg[21]]')" '["Rien de saillant. C'"'"'est un contrôle automatique rapide, pas une revue de sécurité complète.","10 récents à l'"'"'intérieur · Phase 61"]'
+assert_eq "F14.10 : PU-G-071 — le type « service » (module à agents, kindOf de vf-cockpit-code-vf.mjs) s'affiche « module » / « Module » ; le kind, lui, ne change pas (icône, légende)" "$(lire "$WORK/m.json" 'j.svc')" '["module","Module"]'
+# DG-14 : la pastille « Qu'est-ce qui bloque ? » garde son apostrophe de bout en bout ; l'apostrophe perdue du panel venait du FAUX claude du banc (« Qu est-ce qui bloque ? » écrit sans apostrophe dans sa sortie JSON), pas du cockpit
+assert_eq "DG-14.1 : la couche française n'altère pas une phrase de relance française (rend null, texte intact)" "$(lire "$WORK/m.json" 'j.lg.slice(22,24)')" "[null,null]"
+assert_eq "DG-14.2 : la source des relances locales porte l'apostrophe (vf-cockpit-ask.mjs)" "$(grep -cF "Qu'est-ce qui bloque ?" "$SCRIPTS/vf-cockpit-ask.mjs")" "1"
+assert_eq "DG-14.3 : le chip du viewer écrit le texte reçu tel quel (h() n'ôte pas l'apostrophe) — témoin : une entrée sans apostrophe reste sans apostrophe" "$(node -e 'const u=(s)=>s.replace(/&#39;/g,String.fromCharCode(39));console.log(u("Qu&#39;est-ce qui bloque ?")+"|"+u("Qu est-ce qui bloque ?"))')" "Qu'est-ce qui bloque ?|Qu est-ce qui bloque ?"
+
+echo "[F15] recette 2026-11-08 : les phrases que la bibliothèque du terminal dit d'elle-même sont posées en français (« Terminal input », annoncé à chaque entrée dans le terminal)"
+XTERM="$SCRIPTS/../skills/cockpit-moteur/assets/vendor/xterm/xterm.js"; CLIENT="$SCRIPTS/vf-cockpit-terminal-client.mjs"
+cat > "$AUX/biblio.mjs" <<'JS'
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scriptsDir, xtermF, clientF, mode] = process.argv;
+const { chainesBibliotheque, bibliothequeNonTraitee } = await import(pathToFileURL(path.join(scriptsDir, 'vf-cockpit-fr-inventaire.mjs')).href);
+const x = fs.readFileSync(xtermF, 'utf8'), c = fs.readFileSync(clientF, 'utf8');
+if (mode === 'defauts') console.log(JSON.stringify(Object.keys(chainesBibliotheque(x)).sort()));
+else if (mode === 'reel') console.log(JSON.stringify(bibliothequeNonTraitee(x, c)));
+else if (mode === 'sans') console.log(JSON.stringify(bibliothequeNonTraitee(x, c.replace(/^.*Terminal\.strings\..*$/gm, ''))));
+else if (mode === 'anglais') console.log(JSON.stringify(bibliothequeNonTraitee(x, c.replace("'Saisie du terminal'", "'Terminal input'"))));
+else if (mode === 'autre-langue') console.log(JSON.stringify(bibliothequeNonTraitee(x, c.replace("'Saisie du terminal'", "'Keyboard entry field'"))));
+JS
+assert_eq "F15.1 : l'inventaire voit les deux phrases d'interface du bundle xterm (nom du champ de saisie, sortie trop abondante)" "$(node "$AUX/biblio.mjs" "$SCRIPTS" "$XTERM" "$CLIENT" defauts)" '["promptLabel","tooMuchOutput"]'
+assert_eq "F15.2 : le client du terminal les pose toutes en français (aucune clé non traitée)" "$(node "$AUX/biblio.mjs" "$SCRIPTS" "$XTERM" "$CLIENT" reel)" '[]'
+assert_eq "F15.3 témoin : sans surcharge, les deux sont signalées" "$(node "$AUX/biblio.mjs" "$SCRIPTS" "$XTERM" "$CLIENT" sans)" '["promptLabel","tooMuchOutput"]'
+assert_eq "F15.4 témoin : la valeur d'origine « Terminal input » reposée à l'identique est signalée" "$(node "$AUX/biblio.mjs" "$SCRIPTS" "$XTERM" "$CLIENT" anglais)" '["promptLabel"]'
+assert_eq "F15.5 témoin : une autre valeur anglaise est signalée aussi" "$(node "$AUX/biblio.mjs" "$SCRIPTS" "$XTERM" "$CLIENT" autre-langue)" '["promptLabel"]'
+assert_eq "F15.6 : le libellé français du champ de saisie est posé tel quel dans le client" "$(grep -cF "Terminal.strings.promptLabel = 'Saisie du terminal'" "$CLIENT")" "1"
+
 echo "[F3] témoin du détecteur : une chaîne anglaise inventée"
 T3="$WORK/t3"; cp -R "$SORTIE" "$T3"
 node -e 'const f=process.argv[1],fs=require("fs");let h=fs.readFileSync(f,"utf8");h=h.replace("</body>","<script>const m = \"Pending approval from the review board\";</script></body>");fs.writeFileSync(f,h)' "$T3/project.html"
@@ -212,7 +252,7 @@ else
   O12="$LAB12/.vibeflow/cockpit"; ln -s "$SCRIPTS" "$WORK/scripts-hote"; rm -f "$O12/.cache/server.json"
   ( cd "$LAB12" && HOME="$WORK/home" VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$WORK/scripts-hote" exec node "$O12/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve12.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
   SRV12=$!; PIDS+=($SRV12)
-  for _ in $(seq 1 100); do grep -q '"port"' "$O12/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+  for _ in $(seq 1 300); do grep -q '"port"' "$O12/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   P12="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$O12/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
   assert_eq "F12.0 : serveur du lab jetable démarré" "$([ "$P12" -gt 0 ] && echo oui || echo non)" "oui"
   REAL_HOME="$REAL_HOME" node "$SCRIPTS/tests/chrome-fr-rendu.mjs" "$CHROME" "http://127.0.0.1:$P12/index.html" "http://127.0.0.1:$P12/project.html" > "$WORK/rendu12.json" 2>"$WORK/rendu12.err"
@@ -235,7 +275,7 @@ printf -- '---\nmilestone: v1\nstatus: ready_to_plan\ncurrent_phase: 1\ncurrent_
 node "$SCRIPTS/vf-cockpit-build.mjs" "$L9" --quiet >/dev/null 2>&1 || { echo "assemblage F9 impossible"; exit 1; }
 perl -e 'alarm 300; exec @ARGV' node "$SCRIPTS/tests/chrome-statut.mjs" "$CHROME" "file://$L9/.vibeflow/cockpit/project.html" > "$WORK/f9.json" 2>/dev/null
 assert_eq "F9.1 : aucun texte visible de la page Projet ne porte « ready_to_plan »" "$(lire "$WORK/f9.json" '(j.erreur||j.visibles)')" "[]"
-assert_eq "F9.2 : sous-titre et pastille en français" "$(lire "$WORK/f9.json" '[j.sousTitre, j.pastille]')" '["Phase 1, 0 phase faite sur 1.","prête à planifier"]'
+assert_eq "F9.2 : sous-titre et pastille en français" "$(lire "$WORK/f9.json" '[j.sousTitre, j.pastille]')" '["Phase 1, 0 phase faite sur 1.","À faire"]'
 # F10 : N2 (P68-D-38) — le tiroir « Au travail » dit « dépôt » (serveur réel, flux `who` simulé)
 export VF_COCKPIT_PORT_BASE=$((30000 + (RANDOM * 11) % 30000))
 U10="$(node "$SCRIPTS/vf-cockpit.mjs" open --no-open --lab "$L9" 2>/dev/null | sed -En 's#^Cockpit : (http://127\.0\.0\.1:[0-9]+)/ .*#\1/project.html#p' | head -1)"

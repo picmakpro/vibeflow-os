@@ -64,7 +64,7 @@ jamais à mi-course.
 Tu n'as pas l'outil Task : tu ne dispatches personne — la critique appartient à
 `vf-design-judge` (via le manager), les arbitrages au manager. Tu n'as pas l'accès web : un
 besoin de recherche (benchmark, doc d'un toolkit) remonte au manager dans ton rapport. Une question qui défie la DA ou l'intention → statut `human_needed`, JAMAIS auto-tranchée.
-**Fin de tour inerte** : rends la main sans tâche de fond vivante (bascule auto du timeout Bash comprise) ; commandes bornées, `TaskStop` avant le rapport, sinon `blocked` — `team-kernel.md` §Fin de tour inerte.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (`TaskStop(<id de tâche>)`) ; attente au premier plan, bornée par une échéance ; commit avant tout rejeu long ; au rapport, tes processus arrêtés par PID consigné, sans motif de commande, dans le même tour, sinon `blocked` — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 

@@ -27,11 +27,15 @@
     @keyframes vf-git-entree { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
     .vf-git-barre { flex: none; display: flex; align-items: center; gap: 8px; height: 36px; padding: 0 8px 0 16px; background: var(--raise); border-bottom: 1px solid var(--hair); }
     .vf-git-titre-t { margin: 0; font: 600 13px var(--sans); color: var(--text); }
-    .vf-git-titre-t:focus { outline: none; }
+    .vf-git-titre-t:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; } /* 198 : le titre reçoit le focus à l'ouverture ; l'anneau se voit au clavier (DESIGN.md §9), jamais à la souris */
+    .vf-git-titre-t:focus:not(:focus-visible) { outline: none; }
     .vf-git-fermer { margin-left: auto; }
     .vf-git-fermer, .vf-git-btn { flex: none; width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--text-2); cursor: pointer; }
     .vf-git-fermer:hover, .vf-git-btn:hover { background: var(--raise-2); color: var(--text); }
     .vf-git-tiroir button:focus-visible, .vf-git-rangee:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+    .vf-git-bulle { position: fixed; z-index: 45; max-width: 280px; padding: 8px 12px; border-radius: 12px; font: 400 12.5px/1.5 var(--sans); color: var(--text-2); pointer-events: none; } /* PU-G-193, 196 : définition d'un terme Git au focus */
+    .vf-git-bulle[hidden] { display: none; }
+    .vf-git-mono[tabindex]:focus-visible, .vf-git-pastille[tabindex]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
     .vf-git-aide { margin: 0; padding: 8px 16px; font-size: 12.5px; color: var(--text-3); }
     .vf-git-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; font-family: var(--sans); overflow-x: hidden; }
     .vf-git-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
@@ -60,6 +64,7 @@
     .vf-git-ref { flex: 0 1 auto; min-width: 0; max-width: 140px; display: inline-flex; align-items: center; gap: 4px; overflow: hidden; white-space: nowrap; padding: 2px 8px; border-radius: 999px; font-size: 11.5px; font-weight: 400; background: rgba(var(--ink), .06); color: var(--text-2); }
     .vf-git-ref-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; } /* seul le nom de la ref cède (ellipse) ; HEAD, l'icône et le message restent entiers */
     .vf-git-ref-head { flex: none; max-width: none; }
+    .vf-git-ref:hover, .vf-git-rangee:focus-visible .vf-git-ref { flex: none; max-width: 100%; } /* 195 : l'étiquette tronquée se montre entière au survol de la pastille ou au focus de la rangée (le title porte déjà le nom) ; le message cède */
     .vf-git-ref svg { flex: none; width: 12px; height: 12px; }
     .vf-git-ref-cur { background: var(--on); color: var(--on-text); } .vf-git-ref-tag { background: var(--raise); }
     .vf-git-ref-distante { background: none; border: 1px solid var(--hair-2); color: var(--text-3); }
@@ -107,7 +112,7 @@
   let ouvert = false, donnees = null, seq = 0, avant = null;
   const annoncer = (t) => { live.textContent = t; };
   const visible = (e) => !!e && !e.hidden && e.getClientRects().length > 0;
-  const ligne = () => document.querySelector('#vf-git-ligne'), ouvreur = () => document.querySelector('#vf-git-ouvreur');
+  const ligne = () => document.querySelector('#vf-git-ligne'), ouvreur = () => document.querySelector('#vf-git-ouvreur'), plus = () => document.querySelector('#vf-plus'); // plus : « Plus d'actions » du téléphone, qui porte l'ouvreur sous 700 px
   const emettre = (nom, detail) => window.dispatchEvent(new CustomEvent(nom, { detail }));
 
   const eviter = () => { // sans nommer personne : le tiroir se cale sur le bas de la scène (qui rétrécit quand un panneau bas s'ouvre) puis monte au-dessus de tout petit élément posé dans le coin bas-gauche (zoom, pastilles, puces) ; en mobile, aucun évitement
@@ -130,7 +135,7 @@
     donnees = j;
     corps.replaceChildren();
     if (j && j.entete && typeof j.entete === 'object') emettre('vf-git:entete', j.entete); // l'en-tête suit la lecture, même indisponible
-    if (!j || (j.etat !== 'ok' && j.etat !== 'vide')) { corps.append(R.etatIndisponible(j && j.commandes ? j.commandes.diagnostic : 'git status', recharger, annoncer)); return; }
+    if (!j || (j.etat !== 'ok' && j.etat !== 'vide')) { corps.append(R.etatIndisponible(j && j.commandes ? j.commandes.diagnostic : 'git status', recharger, annoncer, !!j && j.etat === 'indisponible')); return; }
     if (j.etat === 'vide') { corps.append(R.etatVide(j.commandes.vide, annoncer)); return; }
     const g = R.el('div'), pied = j.bornes && j.bornes.tronque ? 'Historique tronqué : seuls les commits les plus récents sont lus.' : `${j.rangees.length} commits affichés.`;
     g.append(j.rangees.length ? R.graphe(j.rangees, { couloirsMax: j.couloirsMax, replies: j.replies, tactile: MOBILE.matches }) : R.el('p', 'vf-git-note', 'Aucun commit à afficher.'));
@@ -139,13 +144,15 @@
     corps.append(...[R.sectionWorktrees(j.worktrees, annoncer), R.section('Graphe', null, g, true, 'vf-git-s-graphe'), R.sectionTags(j.tags), R.sectionStash(j.stash, annoncer), R.sectionAuteurs(j.auteurs, j.parBranche)].filter(Boolean));
     crochet('rendu', corps, j);
   };
-  function recharger() { // GET de même origine ; au-delà de 150 ms, rangées fantômes ; une réponse périmée est ignorée
+  function recharger(relance) { // GET de même origine ; au-delà de 150 ms, rangées fantômes ; une réponse périmée est ignorée ; une réponse « indisponible » ou nulle est relancée UNE fois (191), jamais en boucle
     const moi = ++seq, SRV = window.FLOORPLAN_SERVER || {};
     const attente = setTimeout(() => { if (moi === seq) { corps.setAttribute('aria-busy', 'true'); corps.replaceChildren(R.etatChargement()); } }, 150);
     return fetch('/api/vf/git', { method: 'GET', headers: { 'x-floorplan-token': SRV.token || '' }, cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null)).catch(() => null)
       .then((j) => { // rend { ok, change } (null si périmée) : 77-vf-git-vue-detail n'annonce qu'une relecture réussie qui a changé quelque chose
-        clearTimeout(attente); if (moi !== seq) return null; corps.removeAttribute('aria-busy');
+        clearTimeout(attente); if (moi !== seq) return null;
+        if (relance !== true && (!j || j.etat === 'indisponible' || !valide(j))) return recharger(true); // la relance prend la main : son propre ++seq périme celle-ci
+        corps.removeAttribute('aria-busy');
         const bon = valide(j) && (j.etat === 'ok' || j.etat === 'vide'), change = !(bon && donnees && JSON.stringify(j) === JSON.stringify(donnees));
         montrer(valide(j) ? j : null); eviter(); return { ok: bon, change };
       });
@@ -159,12 +166,12 @@
     eviter(); titre.focus({ preventScroll: true });
     emettre('vf-git:etat', { ouvert: true }); crochet('etat', true);
   };
-  const fermer = () => {
+  const fermer = (sansFocus) => { // sansFocus === true : un autre tiroir latéral s'ouvre (73-vf-tiroir-travail.js) et prend le focus
     if (!ouvert) return;
     ouvert = false; seq++; corps.removeAttribute('aria-busy');
     tiroir.hidden = true; tiroir.classList.remove('vf-git-entree'); document.body.classList.remove('vf-git-ouvert');
-    const cible = [ligne(), ouvreur()].find(visible) || (avant && document.contains(avant) && visible(avant) ? avant : null);
-    if (cible) cible.focus({ preventScroll: true });
+    const cible = [ligne(), ouvreur(), plus()].find(visible) || (avant && document.contains(avant) && visible(avant) ? avant : null);
+    if (cible && sansFocus !== true) cible.focus({ preventScroll: true });
     emettre('vf-git:etat', { ouvert: false }); crochet('etat', false);
   };
   const basculer = () => (ouvert ? fermer() : ouvrir());
@@ -172,10 +179,10 @@
   fermerB.addEventListener('click', fermer);
   window.addEventListener('vf-git:basculer', basculer);
 
-  const surcouche = () => !!document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden]), [role="dialog"]:not([hidden]), [aria-modal="true"]');
+  const surcouche = () => !!document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden])') || [...document.querySelectorAll('[role="dialog"]:not([hidden]), [aria-modal="true"]')].some((d) => getComputedStyle(d).visibility !== 'hidden'); // 201 : le panneau fermé d'un téléphone reste un role=dialog (visibility: hidden), il ne couvre rien
   const echap = (e) => { if (ouvert && e.key === 'Escape' && !e.defaultPrevented && !surcouche()) { e.stopPropagation(); e.preventDefault(); fermer(); } };
   tiroir.addEventListener('keydown', echap);
-  document.addEventListener('keydown', (e) => { const l = ligne(), o = ouvreur(); if ((l && l === e.target) || (o && o === e.target)) echap(e); }, true);
+  document.addEventListener('keydown', (e) => { const l = ligne(), o = ouvreur(), p = plus(); if ((l && l === e.target) || (o && o === e.target) || (p && p === e.target)) echap(e); }, true);
   window.addEventListener('keydown', (e) => { // touche g : ni dans un champ, ni palette ouverte, ni avec Ctrl, Alt ou Meta, ni sans ouvreur
     if ((e.key !== 'g' && e.key !== 'G') || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing) return;
     const t = e.target;
