@@ -680,8 +680,9 @@ annoncés aux autres phases : 79-01, 79-02, 79-05, 79-06.
 | 79-19 | Journal des attentes (I18 réduit, P79-D-22), sonde d'abord, détachable | SOCL-24 | 10 (amendé : compteur de suites partagé avec 79-18) | 79-06, 79-18 | § 79-16 + P79-D-22 |
 | 79-20 | Documentation, version mineure du module, limites (pose projet, CSP, `vf-signal`) | SOCL-25 | 11 (amendé) | tous | § 79-17 |
 | 79-21 | Coût borné de la correspondance de motifs du moteur (`compileGlob`), point unique, preuve générative (P79-D-32) | SOCL-26 | 3 | 79-06, 79-07 | constat de la Phase 75 |
+| 79-22 | `/api/vf/transcript` et `/api/vf/doing` par la table en mémoire de la collecte, lecture non bloquante (A48 point 47, sorti de 79-13 par la vérification fraîche) | SOCL-27 | 7 ou 8 (fixée par le plan) | 79-13, 79-15 | A48, A50 |
 
-Exigences `SOCL-01` à `SOCL-26` : texte dans `REQUIREMENTS.md`. Audit de sécurité à l'exécution : 79-06, 79-07, 79-09,
+Exigences `SOCL-01` à `SOCL-27` : texte dans `REQUIREMENTS.md`. Audit de sécurité à l'exécution : 79-06, 79-07, 79-09,
 79-12, 79-13, 79-16, 79-18, 79-19, 79-21.
 
 </decisions>
