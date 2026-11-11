@@ -125,9 +125,11 @@
   const ATTRS = ['placeholder', 'title', 'aria-label'];
   // AUDC-H4 : le titre et la description d'une carte sont des DONNÉES du lab (« tokens.ts » ne devient pas « Jetons ») ; « No description yet » (.desc.empty) est du chrome et reste traduit
   // même propriété ailleurs où le viewer reprend ces données : titre et description du panneau de détail (.pt, .pd), nom et description d'une ligne de liste ou d'un résultat de recherche (.rn, .rd), nom d'une carte dans l'infobulle (.tt), fil d'Ariane
-  const SKIP = 'script,style,code,pre,textarea,.mono,.rp,.pp,.card .title,.card .desc:not(.empty),#panel .pt,#panel .pd:not(.empty),.row:not(.vf-rep) .rn,.row:not(.vf-rep) .rd,#results .rn,#results .rd';
+  const SKIP = 'script,style,code,pre,textarea,.mono,.rp,.pp,.card .title,.card .desc:not(.empty),#panel .pt,.row .rn,.row:not(.vf-rep) .rd,#results .rn,#results .rd';
   // deux emplacements mêlent donnée et chrome : l'infobulle d'une carte (le nom) et celle d'un lien (« A contains B », gabarit) ; le fil d'Ariane (« Overview », « Réponse : titre » sont du chrome, un nom de dossier est une donnée)
-  const DONNEE = (n) => { const p = n.parentElement, t = n.nodeValue; return p.matches('#tooltip .tt') ? !/ contains /.test(t) : p.matches('#crumbs button') ? t.trim() !== 'Overview' && !t.includes(': ') : false; };
+  // (« #panel .pd » : la description d'une carte ou d'un lien est une donnée ; le texte de repli que le viewer calcule pour un lien sans description (« 1 connection. », « 3 connections across 2 endpoints. ») n'en est pas une et reste traduit ; les rangées d'une réponse (.row.vf-rep) gardent leur NOM de carte intact, leur note reste traduite)
+  const REPLI_LIEN = /^\d+ connections?( across \d+ endpoints?)?(, matched from call sites to route definitions)?\.$/;
+  const DONNEE = (n) => { const p = n.parentElement, t = n.nodeValue; return p.matches('#panel .pd:not(.empty)') ? !REPLI_LIEN.test(t.trim()) : p.matches('#tooltip .tt') ? !/ contains /.test(t) : p.matches('#crumbs button') ? t.trim() !== 'Overview' && !t.includes(': ') : false; };
   const fix = (root) => {
     const t0 = performance.now();
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -137,7 +139,7 @@
       const v = tr(n.nodeValue); if (v != null) { n.nodeValue = v; probe.nodes++; }
     }
     const els = root.nodeType === 1 ? [root, ...root.querySelectorAll('[placeholder],[title],[aria-label]')] : [];
-    for (const el of els) for (const a of ATTRS) { const x = el.getAttribute?.(a); const v = x ? tr(x) : null; if (v != null) { el.setAttribute(a, v); probe.attrs++; } }
+    for (const el of els) for (const a of ATTRS) { if (a === 'title' && el.matches?.('.row.vf-rep')) continue; /* AUDC-H4 : le `title` d'une rangée de réponse reprend le nom de la carte (et sa note) : donnée du lab */ const x = el.getAttribute?.(a); const v = x ? tr(x) : null; if (v != null) { el.setAttribute(a, v); probe.attrs++; } }
     probe.passes++; probe.ms += performance.now() - t0;
   };
   document.documentElement.lang = 'fr';
