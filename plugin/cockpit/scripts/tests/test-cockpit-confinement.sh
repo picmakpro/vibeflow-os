@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 # test-cockpit-confinement.sh — confinement du lab et de l'export (lot 0 de l'audit du cockpit : AUDC-A-02, AUDC-B-01, AUDC-B-04).
 #   A  un lien symbolique du lab vers l'extérieur n'est jamais suivi à l'assemblage : rien de sa cible dans les pages ni dans l'export (témoin positif : le même contenu, en fichier normal, y est)
-
-
+#   B  un worktree déclaré mais non vérifié n'élargit pas la liste des arbres du lab (témoin positif : un vrai worktree y est)
 # Isolation git, aucun serveur ni navigateur. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -64,6 +63,25 @@ for M in "$MK_MD" "$MK_SH"; do
 done
 assert_eq "A4 — $MK_PLAN (lien dans .planning/) : ni dans la page Projet, ni dans l'export" "$(compte "$MK_PLAN" "$OUT/project.html" "$OUT/index.html" "$EXP")" "0"
 assert_eq "A5 — le contenu planning du lab reste lu (témoin : plan du lab dans la page Projet)" "$([ "$(compte 'Poser le socle' "$OUT/project.html")" -ge 1 ] && echo oui || echo non)" "oui"
+
+# ---------- B : worktree déclaré non vérifié ----------
+echo "=== B — arbres du lab ==="
+AUTRE="$WORK/autre"; mkdir -p "$AUTRE"; G "$AUTRE" init -q; echo x > "$AUTRE/f"; G "$AUTRE" add -A; G "$AUTRE" commit -q -m autre
+G "$LAB" worktree add -q "$WORK/vrai" -b vrai > /dev/null 2>&1
+mkdir -p "$LAB/.git/worktrees/forge"
+printf '%s\n' "$AUTRE/.git" > "$LAB/.git/worktrees/forge/gitdir"; printf 'ref: refs/heads/forge\n' > "$LAB/.git/worktrees/forge/HEAD"; printf '../..\n' > "$LAB/.git/worktrees/forge/commondir"
+LISTE="$(G "$LAB" worktree list --porcelain)"
+assert_eq "B0 — le fixture est vivant : git liste bien l'entrée déclarée" "$(printf '%s\n' "$LISTE" | grep -c "^worktree $AUTRE\$")" "1"
+cat > "$WORK/arbres.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv;
+const { arbresGit } = await import(pathToFileURL(scripts + '/vf-cockpit-arbres.mjs').href);
+console.log(arbresGit(lab).map((a) => a.chemin).join('\n'));
+JS
+ARB="$(node "$WORK/arbres.mjs" "$SCRIPTS" "$LAB")"
+assert_eq "B1 — l'entrée déclarée mais non vérifiée n'est pas un arbre du lab" "$(printf '%s\n' "$ARB" | grep -c "^$AUTRE\$")" "0"
+assert_eq "B2 — témoin positif : le vrai worktree reste un arbre du lab" "$(printf '%s\n' "$ARB" | grep -c "^$WORK/vrai\$")" "1"
+assert_eq "B3 — témoin positif : l'arbre principal reste le premier" "$(printf '%s\n' "$ARB" | head -1)" "$LAB"
 
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
