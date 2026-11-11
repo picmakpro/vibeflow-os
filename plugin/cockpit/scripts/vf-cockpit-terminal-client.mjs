@@ -7,7 +7,7 @@ export function clientTerminal(cfg) {
   const MESSAGES = Object.freeze({
     ready: 'ready', connecte: 'etat:connecte', reconnexion: 'etat:reconnexion', termine: 'etat:termine',
     refuse: 'etat:refuse', expire: 'etat:expire', arrete: 'etat:arrete', toggle: 'toggle',
-    proposition: 'proposition', annulation: 'annulation',
+    proposition: 'proposition', annulation: 'annulation', retrait: 'retrait',
   });
   const CLE_SECRET = 'vf.terminal.secret', CLE_ONGLET = 'vf.terminal.onglet', CLE_FIN = 'vf.terminal.fin';
   const MODES = Object.freeze(['default', 'acceptEdits', 'plan', 'herite']), PROPOSITION_MS = 1000;
@@ -16,7 +16,7 @@ export function clientTerminal(cfg) {
   const vue = window.vfTermVue;
   // le terminal n'existe que dans le cadre embarqué par P : une page de premier niveau (popup ouvert par P, onglet seul) n'a ni cadre parent ni opener nul
   const encadree = window.top !== window && window.opener === null;
-  const emettre = (cle) => { if (encadree && MESSAGES[cle]) window.parent.postMessage(MESSAGES[cle], cfg.origineP); };
+  const emettre = (cle) => { if (encadree && MESSAGES[cle]) window.parent.postMessage(MESSAGES[cle], cfg.origineP); }; document.addEventListener('vf-q-retrait', () => emettre('retrait')); // AUDC-M11 : la vue dit que le bandeau n'est plus là (Annuler, lancement, expiration)
   const attendre = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const expire = () => { vue.carte('expire'); emettre('expire'); };
 

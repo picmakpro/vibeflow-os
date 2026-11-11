@@ -1,12 +1,14 @@
 #!/usr/bin/env bash
 # test-cockpit-lancer-mode.sh — le mode retenu survit aux relances du cockpit (LANC-09 ; P72-D-02bis, P72-D-20 ; plan 72-16).
-# Support : un fichier d'UN mot, <sortie>/.cache/terminal-mode (0600, non suivi par git), tenu par le seul processus de Q (vf-cockpit-lancer-mode.mjs) :
-# écrit par Q au POST /lancer ACCEPTÉ, lu une fois au démarrage, servi par GET /proposition (clé mode_retenu, état en-attente seulement).
+# Support (AUDC-B-05 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) : un fichier d'UN mot dans le dossier d'état DU POSTE, projet par projet
+# (<base>/<empreinte du lab>/terminal-mode, dossiers 0700, fichier 0600 ; base = $VF_COCKPIT_MODE_DIR ici, jamais l'état réel de l'utilisateur), tenu par le seul processus de Q
+# (vf-cockpit-lancer-mode.mjs) : écrit par Q au POST /lancer ACCEPTÉ, lu une fois au démarrage, servi par GET /proposition (clé mode_retenu, état en-attente seulement).
+# L'ancien <sortie>/.cache/terminal-mode n'est plus jamais lu (un lab reçu ne peut plus apporter de présélection) ; aucun fichier n'est créé sous le lab par un lancement accepté.
 #   LM.S statique : module, frontière de P, table des routes de Q, client sans stockage du mode, aucun message IPC, aucun journal de valeur
 #   LM.U module (node pur, doublures de fs) : revalidation, formes du chemin, écriture atomique, valeur gardée en mémoire, lecteur concurrent
 #   LM.Q processus de Q réel (parent factice, vrai shell, faux claude) : survie à la relance (autre port, SIGKILL), forge avant démarrage, écriture seulement sur un lancement accepté
 #   LM.P P réel (--terminal, Q réelle) : aucune route ne rend le fichier, aucune écriture par P, le mode ne figure dans aucune réponse de P
-#   LM.G git : fichier ignoré, build rejoué, purge de serve.mjs · LM.C client (doublures Node) : présélection servie, stockage du navigateur absent du chemin du mode
+#   LM.G le support n'est pas dans le lab : chemin du poste, build rejoué, purge de serve.mjs · LM.C client (doublures Node) : présélection servie, stockage du navigateur absent du chemin du mode
 #   M-* mutants (copies de la sortie ou des sources) : « mutant sans effet » = FAIL ; « non jouée : module absent » tant que le module n'existe pas
 # Chaque refus a son témoin positif ; aucune attente d'armement n'est une durée codée en dur (arme_apres_ms est lu). Chrome non requis. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
@@ -16,6 +18,7 @@ SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && p
 ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"; TA="$HERE_T/terminal-aux.mjs"; MOD="$SCRIPTS/vf-cockpit-lancer-mode.mjs"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; RUN="$WORK/run"; mkdir -p "$AUX" "$WORK/home" "$WORK/bin" "$WORK/fauxbin" "$RUN" "$WORK/temoins" "$WORK/u"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
+STATE="$WORK/etat"; mkdir -p "$STATE"; chmod 700 "$STATE"; export VF_COCKPIT_MODE_DIR="$STATE"; unset XDG_CACHE_HOME # jamais le dossier d'état réel de l'utilisateur ni de la CI
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
 PASS=0; FAIL=0; NONJOUE=0
@@ -67,9 +70,9 @@ JS
 # u.mjs <dossier-du-module> <travail> <cas> : faits LM.U, une ligne JSON. Cas : tout · fifo (seul, car la FIFO peut BLOQUER un module sans O_NONBLOCK)
 cat > "$AUX/u.mjs" <<'JS'
 import fs from 'node:fs'; import path from 'node:path'; import { execFileSync, spawn } from 'node:child_process'; import { pathToFileURL } from 'node:url';
-const [, , dir, travail, cas] = process.argv;
+const [, , dir, travail, cas] = process.argv; process.umask(0o022); // umask connu : les droits constatés ne dépendent pas de celui de l'appelant
 const M = await import(pathToFileURL(path.join(dir, 'vf-cockpit-lancer-mode.mjs')).href);
-let n = 0; const frais = () => { const d = path.join(travail, 'x' + process.pid + '-' + (++n)); fs.mkdirSync(d, { recursive: true }); return d; };
+let n = 0; const frais = () => { const d = path.join(travail, 'x' + process.pid + '-' + (++n)); fs.mkdirSync(d, { recursive: true }); fs.chmodSync(d, 0o700); return d; };
 const pose = (octets, droits = 0o600) => { const f = path.join(frais(), 'terminal-mode'); fs.writeFileSync(f, octets); fs.chmodSync(f, droits); return f; };
 const lire = (f, opts = {}) => { try { return M.creerMemoireMode({ fichier: f, ...opts }).lire(); } catch (e) { return 'EXC:' + e.message; } };
 const R = {};
@@ -115,7 +118,7 @@ const noms = (t) => t.appels.map((a) => a[0]);
   for (const v of ['bypassPermissions', 'toString', 42, undefined, null, 'Plan', ['plan']]) rs.push(m.ecrire(v));
   R.u4hors = { rend: rs.join(','), appels: t.appels.length - dep, lu: m.lire(), existe: fs.existsSync(f) }; }
 // dossier support redirigé : .cache devenu un lien vers un autre dossier -> aucune écriture, aucune exception ; témoin : un vrai dossier -> écrit
-{ const essai = (lien) => { const racine = frais(), cible = frais(), cache = path.join(racine, '.cache'); if (lien) fs.symlinkSync(cible, cache); else fs.mkdirSync(cache);
+{ const essai = (lien) => { const racine = frais(), cible = frais(), cache = path.join(racine, '.cache'); if (lien) fs.symlinkSync(cible, cache); else { fs.mkdirSync(cache); fs.chmodSync(cache, 0o700); }
     const m = M.creerMemoireMode({ fichier: path.join(cache, 'terminal-mode') }); let exc = 'aucune', r; try { r = m.ecrire('plan'); } catch (e) { exc = e.message; }
     return [r, exc, fs.readdirSync(cible).length, fs.readdirSync(cache).filter((x) => x === 'terminal-mode').length].join(','); };
   R.u4lien = essai(true); R.u4vrai = essai(false); }
@@ -128,6 +131,107 @@ if (cas !== 'rapide') { const d = frais(), f = path.join(d, 'terminal-mode');
   const vus = new Set(); let lectures = 0, ko = 0; const fin = Date.now() + 60000;
   while (!fini && Date.now() < fin) { try { const t = fs.readFileSync(f, 'utf8'); lectures++; if (t === 'plan\n' || t === 'acceptEdits\n') vus.add(t.trim()); else ko++; } catch { /* pas encore créé */ } await new Promise((r) => setImmediate(r)); }
   R.u6 = { lectures, ko, vus: [...vus].sort().join(','), fini }; }
+// ---- support du poste (AUDC-B-05) : clé, base, droits, dossiers forgés, ancien fichier jamais lu (un module sans ce support ne fait plus planter les faits U1 à U6 : perr)
+try { const crypto = await import('node:crypto'); const sha = (c) => crypto.createHash('sha256').update(c, 'utf8').digest('hex').slice(0, 32);
+  const racine = frais(), autre = frais(), lienRacine = path.join(frais(), 'lien'); fs.symlinkSync(racine, lienRacine);
+  const rr = fs.realpathSync(racine), ra = fs.realpathSync(autre);
+  R.p1 = { egalSha: M.cleProjet(racine) === sha(rr), long: M.cleProjet(racine).length, hex: /^[0-9a-f]{32}$/.test(M.cleProjet(racine)), autre: M.cleProjet(autre) !== M.cleProjet(racine), lien: M.cleProjet(lienRacine) === M.cleProjet(racine), absente: M.cleProjet(path.join(racine, 'nexiste-pas')), egalAutre: M.cleProjet(autre) === sha(ra) };
+  const env = (base) => ({ VF_COCKPIT_MODE_DIR: base });
+  const mode = (m) => (fs.statSync(m).mode & 0o777).toString(8);
+  const base = path.join(frais(), 'etat'), dossier = path.join(base, M.cleProjet(racine)), fichier = path.join(dossier, 'terminal-mode');
+  const m1 = M.creerMemoireModePoste({ racine, env: env(base) }); const w1 = m1.ecrire('acceptEdits');
+  const m2 = M.creerMemoireModePoste({ racine, env: env(base) }); const mA = M.creerMemoireModePoste({ racine: autre, env: env(base) });
+  R.p2 = { ecrit: w1, fichier: fs.existsSync(fichier), contenu: fs.readFileSync(fichier, 'utf8').trim(), permF: mode(fichier), permD: mode(dossier), permB: mode(base), relu: m2.lire(), autreProjet: mA.lire(), nomSansChemin: path.basename(dossier) === M.cleProjet(racine) && !dossier.endsWith(rr) && !fs.readdirSync(base).some((x) => x.includes(path.basename(rr))), aucunSousRacine: fs.readdirSync(racine).length };
+  mA.ecrire('plan'); R.p2.deux = [M.creerMemoireModePoste({ racine, env: env(base) }).lire(), M.creerMemoireModePoste({ racine: autre, env: env(base) }).lire()].join(',');
+  // l'ancien fichier du lab n'est jamais lu, ni retiré, ni réécrit
+  { const lab = frais(), b = path.join(frais(), 'etat'); const vieux = path.join(lab, '.vibeflow', 'cockpit', '.cache', 'terminal-mode'); fs.mkdirSync(path.dirname(vieux), { recursive: true, mode: 0o700 }); fs.chmodSync(path.dirname(vieux), 0o700);
+    const lus = ['herite', 'acceptEdits', 'plan'].map((v) => { fs.writeFileSync(vieux, v + '\n', { mode: 0o600 }); fs.chmodSync(vieux, 0o600); return M.creerMemoireModePoste({ racine: lab, env: env(b) }).lire(); });
+    const memo = M.creerMemoireModePoste({ racine: lab, env: env(b) }); memo.ecrire('plan');
+    R.p3 = { lus: lus.join(','), vieuxIntact: fs.readFileSync(vieux, 'utf8').trim(), vieuxDroits: mode(vieux), nouveau: fs.existsSync(path.join(b, M.cleProjet(lab), 'terminal-mode')) }; }
+  // base forgée ou inutilisable : lecture default, écriture fausse, aucune exception, RIEN sous la racine du lab
+  const essaiBase = (prepare) => { const lab = frais(), cible = frais(), b = path.join(frais(), 'etat'); const fe = prepare({ lab, cible, b }); const k = M.cleProjet(lab); let exc = 'aucune', w, lu; try { const m = M.creerMemoireModePoste({ racine: lab, env: env(b) }); lu = m.lire(); w = m.ecrire('acceptEdits'); } catch (e) { exc = e.message; }
+    return [lu, w, exc, fs.readdirSync(lab).length, fs.readdirSync(cible).length, (() => { try { return fs.readFileSync(path.join(b, k || 'x', 'terminal-mode'), 'utf8').trim(); } catch { return 'absent'; } })()].join(','); };
+  const poseValide = (b, k) => { fs.mkdirSync(path.join(b, k), { recursive: true, mode: 0o700 }); fs.chmodSync(b, 0o700); fs.chmodSync(path.join(b, k), 0o700); fs.writeFileSync(path.join(b, k, 'terminal-mode'), 'plan\n', { mode: 0o600 }); };
+  R.p4 = {
+    temoin: essaiBase(({ lab, b }) => { poseValide(b, M.cleProjet(lab)); }),
+    baseLien: essaiBase(({ cible, b }) => { fs.symlinkSync(cible, b); }),
+    baseLarge: essaiBase(({ lab, b }) => { poseValide(b, M.cleProjet(lab)); fs.chmodSync(b, 0o755); }),
+    cleLien: essaiBase(({ lab, cible, b }) => { fs.mkdirSync(b, { mode: 0o700 }); fs.chmodSync(b, 0o700); fs.writeFileSync(path.join(cible, 'terminal-mode'), 'plan\n', { mode: 0o600 }); fs.symlinkSync(cible, path.join(b, M.cleProjet(lab))); }),
+    cleLarge: essaiBase(({ lab, b }) => { poseValide(b, M.cleProjet(lab)); fs.chmodSync(path.join(b, M.cleProjet(lab)), 0o755); }),
+    baseFichier: essaiBase(({ b }) => { fs.writeFileSync(b, 'x'); }),
+    baseInscriptible: essaiBase(({ b }) => { fs.mkdirSync(b, { mode: 0o500 }); fs.chmodSync(b, 0o500); }),
+  };
+  for (const k of ['baseInscriptible']) { const fin = R.p4[k]; if (typeof process.getuid === 'function' && process.getuid() === 0) R.p4[k] = 'root:' + fin; }
+  const relatif = M.creerMemoireModePoste({ racine, env: { VF_COCKPIT_MODE_DIR: 'relatif/etat' } }); R.p5 = { relatifLu: relatif.lire(), relatifEcrit: relatif.ecrire('plan'), racineAbsente: M.creerMemoireModePoste({ racine: path.join(racine, 'absente'), env: env(base) }).ecrire('plan'), sousRacine: fs.readdirSync(racine).length, sousCwd: fs.existsSync(path.join(process.cwd(), 'relatif')) };
+  // convention : XDG_CACHE_HOME, puis $HOME/.cache, sous vibeflow/cockpit-mode ; XDG relatif ignoré ; surcharge prioritaire
+  R.p6 = [M.baseEtat({ env: { XDG_CACHE_HOME: '/x/y', HOME: '/h' } }), M.baseEtat({ env: { HOME: '/h' } }), M.baseEtat({ env: { XDG_CACHE_HOME: 'rel', HOME: '/h' } }), M.baseEtat({ env: { VF_COCKPIT_MODE_DIR: '/s', XDG_CACHE_HOME: '/x', HOME: '/h' } }), M.baseEtat({ env: { VF_COCKPIT_MODE_DIR: 'rel', HOME: '/h' } })].join(' | ');
+  // confinement (AUDC-B-05, correction ciblée) : base ET dossier du projet, jugés sur leur chemin RÉEL, jamais sous la racine réelle du lab ni égaux à elle, quelle que soit la source de la base
+  const confine = (fab) => { const lab = frais(), hors = frais(), k = M.cleProjet(lab); const { env, dir } = fab({ lab, hors }); fs.mkdirSync(path.join(dir, k), { recursive: true, mode: 0o700 }); fs.chmodSync(dir, 0o700); fs.chmodSync(path.join(dir, k), 0o700);
+    const f = path.join(dir, k, 'terminal-mode'); fs.writeFileSync(f, 'plan\n', { mode: 0o600 }); fs.chmodSync(f, 0o600);
+    const m = M.creerMemoireModePoste({ racine: lab, env }); const lu = m.lire(), w = m.ecrire('acceptEdits'); return [lu, w, fs.readFileSync(f, 'utf8').trim()].join(','); };
+  R.p7 = [
+    confine(({ lab }) => ({ env: { VF_COCKPIT_MODE_DIR: path.join(lab, 'etat') }, dir: path.join(lab, 'etat') })),
+    confine(({ lab }) => ({ env: { XDG_CACHE_HOME: path.join(lab, 'xdg'), HOME: '/nulle/part' }, dir: path.join(lab, 'xdg', 'vibeflow', 'cockpit-mode') })),
+    confine(({ lab }) => ({ env: { HOME: path.join(lab, 'h') }, dir: path.join(lab, 'h', '.cache', 'vibeflow', 'cockpit-mode') })),
+    confine(({ lab }) => ({ env: { VF_COCKPIT_MODE_DIR: lab }, dir: lab })),
+    confine(({ lab, hors }) => { fs.mkdirSync(path.join(lab, 'reel'), { mode: 0o700 }); fs.symlinkSync(path.join(lab, 'reel'), path.join(hors, 'lien')); return { env: { VF_COCKPIT_MODE_DIR: path.join(hors, 'lien', 'sous') }, dir: path.join(lab, 'reel', 'sous') }; }),
+    confine(({ hors }) => ({ env: { VF_COCKPIT_MODE_DIR: path.join(hors, 'etat') }, dir: path.join(hors, 'etat') })),
+  ].join(' ');
+  // clause « propriétaire » des dossiers d'état : lstat simulé d'un autre uid -> refus en lecture et en écriture ; le même uid -> accepté
+  { const d = frais(), f = path.join(d, 'terminal-mode'); fs.writeFileSync(f, 'plan\n', { mode: 0o600 }); fs.chmodSync(f, 0o600); const mien = fs.lstatSync(d).uid;
+    const autre = (uid) => ({ ...fs, lstatSync: (x, ...a) => { const st = fs.lstatSync(x, ...a); return x === d ? { isSymbolicLink: () => st.isSymbolicLink(), isDirectory: () => st.isDirectory(), uid, mode: st.mode } : st; } });
+    const mu = (fsx) => { const m = M.creerMemoireMode({ fichier: f, fs: fsx }); return [m.lire(), m.ecrire('acceptEdits')].join(','); };
+    R.p7uid = [mu(autre(mien + 1)), mu(autre(mien))].join('|'); }
+  // ---- confinement par IDENTITÉ (AUDC-B-05, tour 2) : la garde ne dépend d'aucune forme textuelle de chemin
+  const swap = (x) => x.split('').map((c) => (c === c.toUpperCase() ? c.toLowerCase() : c.toUpperCase())).join('');
+  const sonde = frais(); R.fsci = swap(sonde) !== sonde && fs.existsSync(swap(sonde)); // système de fichiers insensible à la casse ?
+  const labAcc = path.join(travail, 'é-' + process.pid + '-' + (++n)); fs.mkdirSync(labAcc, { mode: 0o700 }); R.nfdok = labAcc.normalize('NFD') !== labAcc && fs.existsSync(labAcc.normalize('NFD')); // insensible à la normalisation ?
+  const prepose = (phys, lab) => { const k = M.cleProjet(lab); fs.mkdirSync(path.join(phys, k), { recursive: true, mode: 0o700 }); fs.chmodSync(phys, 0o700); fs.chmodSync(path.join(phys, k), 0o700); const f = path.join(phys, k, 'terminal-mode'); fs.writeFileSync(f, 'plan\n', { mode: 0o600 }); fs.chmodSync(f, 0o600); };
+  const entrees = (lab) => fs.readdirSync(lab, { recursive: true }).length;
+  const essai = (lab, baseStr, phys) => { if (phys) prepose(phys, lab); const avant = entrees(lab); const m = M.creerMemoireModePoste({ racine: lab, env: { VF_COCKPIT_MODE_DIR: baseStr } }); const lu = m.lire(), w = m.ecrire('acceptEdits'); return [lu, w, entrees(lab) - avant].join(','); };
+  R.p8 = {};
+  R.p8.casse = R.fsci ? [
+    (() => { const lab = frais(); return essai(lab, swap(lab) + '/etat', lab + '/etat'); })(),
+    (() => { const lab = path.join(frais(), 'sous'); fs.mkdirSync(lab, { mode: 0o700 }); return essai(lab, swap(path.dirname(lab)) + '/sous/etat', lab + '/etat'); })(),
+  ].join(' ') : 'nonjouable';
+  R.p8.nfd = R.nfdok ? essai(labAcc, (labAcc + '/etat').normalize('NFD'), labAcc + '/etat') : 'nonjouable';
+  R.p8.freres = (() => { const par = frais(), lab = path.join(par, 'lab'), f1 = path.join(par, 'lab-frere'), f2 = path.join(par, 'labo'); for (const d of [lab, f1, f2]) fs.mkdirSync(d, { mode: 0o700 }); return [essai(lab, f1 + '/etat', null), essai(lab, f2 + '/etat', null)].join(' '); })();
+  R.p8.illisible = (typeof process.getuid === 'function' && process.getuid() === 0) ? 'root' : (() => { const par = frais(), lab = path.join(par, 'lab'), ferme = path.join(par, 'ferme'); fs.mkdirSync(lab, { mode: 0o700 }); fs.mkdirSync(ferme, { mode: 0o700 }); fs.chmodSync(ferme, 0o000); try { return essai(lab, ferme + '/etat', null); } finally { fs.chmodSync(ferme, 0o700); } })();
+  // nouveau jugement juste avant l'écriture : un ancêtre du support devient un lien vers l'intérieur du lab APRÈS le premier jugement (pendant la création des dossiers) ; aucun fichier ne doit être écrit
+  { const lab = frais(), hors = frais(); fs.mkdirSync(path.join(lab, 'reel'), { mode: 0o700 }); const lien = path.join(hors, 'lien2');
+    const fsx = { ...fs, mkdirSync: (d, o) => { if (!fs.existsSync(lien)) fs.symlinkSync(path.join(lab, 'reel'), lien); return fs.mkdirSync(d, o); } };
+    const m = M.creerMemoireModePoste({ racine: lab, env: { VF_COCKPIT_MODE_DIR: path.join(lien, 'etat') }, fs: fsx }); const w = m.ecrire('acceptEdits');
+    R.p8.rejuge = [w, fs.readdirSync(lab, { recursive: true }).filter((x) => path.basename(x).startsWith('terminal-mode')).length].join(','); }
+  // premier jugement de ecrire : la base devient un lien vers l'intérieur du lab APRÈS la création de la mémoire et AVANT l'écriture : AUCUNE entrée (dossiers compris) ne doit apparaître sous le lab
+  { const lab = frais(), hors = frais(); fs.mkdirSync(path.join(lab, 'reel'), { mode: 0o700 }); const lien = path.join(hors, 'lien3');
+    const m = M.creerMemoireModePoste({ racine: lab, env: { VF_COCKPIT_MODE_DIR: path.join(lien, 'etat') } }); fs.symlinkSync(path.join(lab, 'reel'), lien);
+    const avant = entrees(lab); const w = m.ecrire('acceptEdits'); R.p8.jug1 = [w, entrees(lab) - avant].join(','); }
+  // preuve générative légère : graine fixe, formes de chemin vers l'intérieur du lab (casse par composant, NFC/NFD, `.`, `..`, lien d'ancêtre) et vers l'extérieur (frères à préfixe commun, cousins)
+  { const GRAINE = 20261111, N = 60; let a = GRAINE; const rng = () => { a |= 0; a = (a + 0x6D2B79F5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
+    const pick = (l) => l[Math.floor(rng() * l.length)];
+    const casse = (x) => x.split('/').map((c) => pick([c, c.toUpperCase(), c.toLowerCase(), swap(c)])).join('/');
+    const gen = path.join(travail, 'gen-' + process.pid + '-' + (++n)); fs.mkdirSync(gen, { mode: 0o700 });
+    const G = { graine: GRAINE, n: N, dedans: 0, dehors: 0, formes: {}, ko: [] };
+    for (let i = 0; i < N; i++) {
+      const dedans = i % 2 === 0; const accent = rng() < 0.5; const lab = path.join(gen, (accent ? 'é' : 'l') + 'ab' + i); fs.mkdirSync(lab, { mode: 0o700 });
+      let forme, base, phys = lab + '/etat', attendu;
+      if (dedans) {
+        forme = pick(['casse', 'nfd', 'point', 'pointpoint', 'lien', 'combo']); attendu = 'default,false,0';
+        if (forme === 'casse' && !R.fsci) forme = 'point'; if (forme === 'combo' && !R.fsci) forme = 'pointpoint'; if (forme === 'nfd' && !(accent && R.nfdok)) forme = 'point';
+        if (forme === 'casse') base = casse(lab) + '/etat'; else if (forme === 'nfd') base = (lab + '/etat').normalize('NFD'); else if (forme === 'point') base = lab + '/./etat';
+        else if (forme === 'pointpoint') base = lab + '/etat/../etat'; else if (forme === 'combo') base = casse(lab) + '/./etat/../etat';
+        else { const hors = path.join(gen, 'h' + i); fs.mkdirSync(hors, { mode: 0o700 }); fs.mkdirSync(path.join(lab, 'reel'), { mode: 0o700 }); fs.symlinkSync(path.join(lab, 'reel'), path.join(hors, 'l')); base = path.join(hors, 'l', 'etat'); phys = path.join(lab, 'reel', 'etat'); }
+        G.dedans++;
+      } else {
+        forme = pick(['frere', 'cousin', 'prefixe', 'frere-casse']); attendu = 'default,true,0'; phys = null;
+        let sib; if (forme === 'cousin') { const c = path.join(gen, 'c' + i); fs.mkdirSync(c, { mode: 0o700 }); sib = path.join(c, path.basename(lab)); } else sib = lab + (forme === 'prefixe' ? '-bis' : 'x');
+        fs.mkdirSync(sib, { mode: 0o700 }); base = (forme === 'frere-casse' && R.fsci ? casse(sib) : sib) + '/etat'; G.dehors++;
+      }
+      G.formes[(dedans ? 'dedans/' : 'dehors/') + forme] = 1 + (G.formes[(dedans ? 'dedans/' : 'dehors/') + forme] || 0);
+      const res = essai(lab, base, phys); if (res !== attendu) G.ko.push(i + ':' + (dedans ? 'dedans/' : 'dehors/') + forme + '=' + res);
+    }
+    R.gen = G; }
+} catch (e) { R.perr = e.message; }
 console.log(JSON.stringify(R));
 JS
 cat > "$AUX/borne.sh" <<'SH'
@@ -220,7 +324,12 @@ mklab() { local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle";
   printf -- '---\nwave: 1\nfiles_modified: [src/u.js]\n---\n<objective>Poser le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"; }
-LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"; FM="$OUT/.cache/terminal-mode"
+cle_de() { node -e "console.log(require('crypto').createHash('sha256').update(require('fs').realpathSync(process.argv[1]),'utf8').digest('hex').slice(0,32))" "$1"; } # dérivation INDÉPENDANTE du module (le contrat : sha256 du chemin réel, 32 hexadécimaux)
+fm_de() { echo "$STATE/$(cle_de "$1")/terminal-mode"; }
+LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"; FM="$(fm_de "$LAB")"; FM_VIEUX="$OUT/.cache/terminal-mode" # FM_VIEUX : l'ancien emplacement (dans le lab), plus jamais lu
+etat_dirs() { local d; d="$(dirname "${1:-$FM}")"; mkdir -p "$STATE" "$d"; chmod 700 "$STATE" "$d"; } # dossiers du support, posés comme Q les poserait (0700)
+lab_liste() { /usr/bin/find "$1" -path "$1/.git" -prune -o -print | sort; } # tout ce qui existe sous le lab (hors .git)
+etat_liste() { /usr/bin/find "$STATE" 2>/dev/null | sort | tr '\n' ';'; }
 # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed>... -> MUT_OUT ; code 1 si le module manque, la cible manque ou la copie n'a pas changé
 mutant() {
   [ "$MODULE_OK" = 1 ] || return 1 # tant que le module n'existe pas, aucun mutant ne se joue (« non jouée : module absent »)
@@ -238,6 +347,7 @@ fifo_u() { if [ -f "$1/vf-cockpit-lancer-mode.mjs" ]; then "$AUX/borne.sh" 20 no
 # faits client : (dossier-du-client) -> JSON des doublures
 facts_c() { node "$AUX/cdoubles.mjs" "$1/vf-cockpit-terminal-client.mjs" 2>&1 | tail -1; }
 cq() { uq "$1" "$2"; }
+uqp() { uq "$1" "(j.perr ? 'plante: ' + j.perr : ($2))"; } # faits du support du poste (LM.U7 à LM.U12) : la cause de l'échec reste lisible
 PLANPUR='plan'
 
 echo "=== LM.S — statique : module, frontière de P, routes de Q, client, IPC, journal ==="
@@ -255,6 +365,9 @@ if [ "$MODULE_OK" = 1 ]; then
   assert_eq "LM.S2 — frontière statique : aucun fichier côté P ne nomme terminal-mode ni lancer-mode (témoin : au moins 15 fichiers examinés, liste dérivée par find)" "$([ "${PR%%:*}" -ge 15 ] && echo "assez:${PR##*:}" || echo "trop peu (${PR%%:*}):${PR##*:}")" "assez:0"
   assert_eq "LM.S2 — le seul importeur du module est vf-cockpit-terminal-processus.mjs (égalité d'ensemble ; témoin : le processus nomme bien le module)" "$(importeurs "$COCKPIT") $([ "$(grep -c 'lancer-mode' "$SCRIPTS/vf-cockpit-terminal-processus.mjs" | tr -d ' ')" -ge 1 ] && echo nomme)" "vf-cockpit-terminal-processus.mjs, nomme"
 else nonjouee "LM.S2" "module absent (elle s'écrit avec le module)"; fi
+# LM.S7 : la ligne garde:mode-support du processus (code, sans le commentaire) ne nomme ni la sortie (here), ni .cache, ni FICHIER_MODE : le support n'est plus dans le lab
+SUPPORT_CODE="$(grep 'garde:mode-support' "$SCRIPTS/vf-cockpit-terminal-processus.mjs" | sed 's#//.*##')"
+assert_eq "LM.S7 — la ligne garde:mode-support (code, hors commentaire) construit le support du poste par la racine seule : ni here, ni .cache, ni FICHIER_MODE, ni path.join (témoin : la ligne existe et appelle creerMemoireModePoste)" "$(printf '%s' "$SUPPORT_CODE" | grep -c -E 'here|\.cache|FICHIER_MODE|path\.join' | tr -d ' ') $(printf '%s' "$SUPPORT_CODE" | grep -c 'creerMemoireModePoste' | tr -d ' ')" "0 1"
 SF="$(node "$AUX/stat.mjs" "$SCRIPTS/vf-cockpit-terminal-processus.mjs" "$SCRIPTS/vf-cockpit-terminal-client.mjs")"
 ROUTES_BASE='/amorce:POST,/annuler:POST,/entree:POST,/etat:GET,/flux:GET,/lancer:POST,/proposition:GET,/taille:POST'
 if [ "$MODULE_OK" = 1 ]; then assert_eq "LM.S3 — la table fermée routes de Q : mêmes clés et méthodes que la base (huit routes, aucune de plus)" "$(uq "$SF" j.routes)" "$ROUTES_BASE"
@@ -283,6 +396,22 @@ assert_eq "LM.U4 — échec du rename : le temporaire est retiré (aucun reste, 
 assert_eq "LM.U4 — ecrire(bypassPermissions | toString | 42 | undefined | null | Plan | tableau) : faux, AUCUN appel de fs, mémoire inchangée (default), aucun fichier" "$(uq "$UF" '[j.u4hors.rend, j.u4hors.appels, j.u4hors.lu, j.u4hors.existe].join("/")')" "false,false,false,false,false,false,false/0/default/false"
 assert_eq "LM.U5 — la valeur lue au démarrage reste celle de la mémoire : fichier réécrit de l'extérieur après la création, lire() inchangé" "$(uq "$UF" 'j.u5.join(",")')" "plan,plan"
 assert_eq "LM.U6 — lecteur concurrent pendant 500 écritures alternées (deux processus) : chaque lecture vaut plan ou acceptEdits, jamais vide ni autre chose (témoin : au moins 100 lectures réussies, les deux valeurs vues)" "$(uq "$UF" '[j.u6.fini, j.u6.lectures >= 100, j.u6.ko, j.u6.vus].join("/")')" "true/true/0/acceptEdits,plan"
+assert_eq "LM.U7 — clé du projet : sha256 du chemin RÉEL (calculé ici indépendamment), 32 hexadécimaux, deux dossiers -> deux clés, un lien vers le dossier -> la même clé, racine absente -> null" "$(uqp "$UF" '[j.p1.egalSha, j.p1.long, j.p1.hex, j.p1.autre, j.p1.lien, String(j.p1.absente), j.p1.egalAutre].join("/")')" "true/32/true/true/true/null/true"
+assert_eq "LM.U8 — support du poste : <base>/<clé>/terminal-mode créé par l'écriture, fichier 0600, dossier du projet 0700, base 0700 (créée) ; relu par une autre mémoire ; l'autre projet ne le voit pas ; le nom du dossier n'est pas le chemin ; rien sous la racine ; deux projets gardent chacun leur mot" "$(uqp "$UF" '[j.p2.ecrit, j.p2.fichier, j.p2.contenu, j.p2.permF, j.p2.permD, j.p2.permB, j.p2.relu, j.p2.autreProjet, j.p2.nomSansChemin, j.p2.aucunSousRacine, j.p2.deux].join("/")')" "true/true/acceptEdits/600/700/700/acceptEdits/default/true/0/acceptEdits,plan"
+assert_eq "LM.U9 — l'ancien <sortie>/.cache/terminal-mode (herite, acceptEdits, plan ; 0600) n'est JAMAIS lu : default ; une écriture ne le retire ni ne le réécrit (contenu et droits inchangés) et crée bien le nouveau fichier" "$(uqp "$UF" 'j.p3.lus + "/" + j.p3.vieuxIntact + "/" + j.p3.vieuxDroits + "/" + j.p3.nouveau')" "default,default,default/plan/600/true"
+assert_eq "LM.U10 — dossier d'état forgé ou inutilisable (lecture, écriture, exception, entrées du lab, entrées de la cible, contenu du fichier du projet après coup) : témoin valide -> plan,true puis acceptEdits ; base lien -> default,false ; base 0755 -> default,false, contenu intact ; dossier du projet = lien -> default,false, cible intacte ; dossier du projet 0755 -> default,false ; base = fichier ordinaire ; base 0500 -> default,false ; jamais d'exception, jamais rien sous le lab" "$(uqp "$UF" 'Object.values(j.p4).map((x) => x.replace(/^root:/, "")).join(" ")')" "plan,true,aucune,0,0,acceptEdits default,false,aucune,0,0,absent default,false,aucune,0,0,plan default,false,aucune,0,1,plan default,false,aucune,0,0,plan default,false,aucune,0,0,absent default,false,aucune,0,0,absent"
+assert_eq "LM.U11 — base relative (surcharge) -> aucun support : default, écriture fausse, rien sous la racine ni dans le dossier courant ; racine introuvable -> écriture fausse" "$(uqp "$UF" '[j.p5.relatifLu, j.p5.relatifEcrit, j.p5.racineAbsente, j.p5.sousRacine, j.p5.sousCwd].join("/")')" "default/false/false/0/false"
+assert_eq "LM.U12 — convention de base : XDG_CACHE_HOME/vibeflow/cockpit-mode, sinon HOME/.cache/vibeflow/cockpit-mode, XDG relatif ignoré, surcharge VF_COCKPIT_MODE_DIR prioritaire, surcharge relative -> aucune base" "$(uqp "$UF" 'j.p6 + "<fin>"')" "/x/y/vibeflow/cockpit-mode | /h/.cache/vibeflow/cockpit-mode | /h/.cache/vibeflow/cockpit-mode | /s | <fin>"
+assert_eq "LM.U13 — confinement : base sous le lab par la surcharge, par XDG_CACHE_HOME, par HOME, base égale à la racine, base atteinte par un lien d'un ancêtre vers l'intérieur du lab (fichier plan préposé) : default, écriture fausse, fichier préposé intact ; témoin : base hors du lab -> plan, true, acceptEdits" "$(uqp "$UF" 'j.p7')" "default,false,plan default,false,plan default,false,plan default,false,plan default,false,plan plan,true,acceptEdits"
+assert_eq "LM.U14 — clause propriétaire du dossier d'état : lstat simulé d'un autre uid -> default et écriture fausse ; le même uid -> plan, true (témoin)" "$(uqp "$UF" 'j.p7uid')" "default,false|plan,true"
+FSCI="$(uqp "$UF" 'j.fsci')"; NFDOK="$(uqp "$UF" 'j.nfdok')"
+assert_eq "LM.U15 — confinement par identité, casse : base sous le lab écrite dans une autre casse (chemin entier, puis un ancêtre du lab seul) : default, écriture fausse, 0 entrée créée sous le lab (système de fichiers insensible à la casse : $FSCI ; sinon non jouable, dit)" "$(uqp "$UF" 'j.p8.casse')" "$([ "$FSCI" = true ] && echo 'default,false,0 default,false,0' || echo nonjouable)"
+assert_eq "LM.U15 — confinement par identité, Unicode : base en NFD face à un lab accentué : default, écriture fausse, 0 entrée créée (insensible à la normalisation : $NFDOK ; sinon non jouable, dit)" "$(uqp "$UF" 'j.p8.nfd')" "$([ "$NFDOK" = true ] && echo 'default,false,0' || echo nonjouable)"
+assert_eq "LM.U15 — frontière de composant : un frère dont le nom commence comme le lab (lab-frere, labo) est ACCEPTÉ (support écrit hors du lab, 0 entrée sous le lab)" "$(uqp "$UF" 'j.p8.freres')" "default,true,0 default,true,0"
+assert_eq "LM.U15 — un ancêtre illisible (stat refusée) : aucun support, default, écriture fausse, 0 entrée sous le lab" "$(uqp "$UF" 'j.p8.illisible')" "$([ "$(id -u)" = 0 ] && echo root || echo 'default,false,0')"
+assert_eq "LM.U16 — nouveau jugement avant l'écriture : un ancêtre du support devient un lien vers l'intérieur du lab pendant la création des dossiers : écriture fausse, aucun fichier terminal-mode sous le lab" "$(uqp "$UF" 'j.p8.rejuge')" "false,0"
+assert_eq "LM.U17 — preuve générative (graine 20261111, 60 cas alternés dedans/dehors : casse par composant, NFC/NFD, point, point-point, lien d'ancêtre ; frères à préfixe, cousins) : dedans -> default, écriture fausse, 0 entrée créée sous le lab ; dehors -> support accepté ; aucun écart" "$(uqp "$UF" 'j.gen.graine + "/" + j.gen.n + "/" + (j.gen.dedans >= 25) + "/" + (j.gen.dehors >= 25) + "/" + (Object.keys(j.gen.formes).length >= 6) + "/" + j.gen.ko.join(";")')" "20261111/60/true/true/true/"
+assert_eq "LM.U16 — premier jugement de l'écriture : la base devient un lien vers l'intérieur du lab entre la création de la mémoire et l'écriture : écriture fausse et AUCUNE entrée créée sous le lab, dossiers compris" "$(uqp "$UF" 'j.p8.jug1')" "false,0"
 
 echo "=== LM.C — client (doublures Node) : présélection servie, stockage du navigateur hors du chemin du mode ==="
 CF="$(facts_c "$SCRIPTS")"
@@ -293,32 +422,20 @@ assert_eq "LM.C2 — mode_retenu absent, bypassPermissions, Plan, nombre, tablea
 assert_eq "LM.C3 — AUCUN getItem, setItem ni removeItem sur une clé contenant « mode », avant, pendant ni après un POST /lancer 204 (ni après 409, 425, 400, 500) ; témoin : le secret, lui, est lu" "$(cq "$CF" "$C3EXPR")" "0/true"
 assert_eq "LM.C4 — le corps de POST /lancer reste exactement { id, mode } (chat:true seulement s'il est coché) ; le 204 rend ok" "$(cq "$CF" 'j.st204 + "|" + j.corps.slice(0, 2).join("|")')" 'ok|{"id":"…","mode":"plan"}|{"id":"…","mode":"acceptEdits","chat":true}'
 
-echo "=== LM.G — git : fichier ignoré, build rejoué, purge de serve.mjs ==="
-mkdir -p "$OUT/.cache"; printf 'plan\n' > "$FM"; chmod 600 "$FM"
-touch "$LAB/non-ignore.txt"; TEM_G="$(git -C "$LAB" status --porcelain | grep -c 'non-ignore.txt')"; rm -f "$LAB/non-ignore.txt"
-assert_eq "LM.G1 — sur un lab bâti par le build RÉEL puis le fichier posé : git check-ignore -q rend 0 et git status --porcelain n'en montre rien (témoin : un fichier non ignoré du lab, lui, paraît)" "$(git -C "$LAB" check-ignore -q .vibeflow/cockpit/.cache/terminal-mode; echo "rc$?") $(git -C "$LAB" status --porcelain | grep -c 'terminal-mode' | tr -d ' ') $TEM_G" "rc0 0 1"
+echo "=== LM.G — le support n'est pas dans le lab : build rejoué, ancien fichier laissé, purge de serve.mjs ==="
+mkdir -p "$OUT/.cache"; printf 'herite\n' > "$FM_VIEUX"; chmod 600 "$FM_VIEUX"; etat_dirs; printf 'plan\n' > "$FM"; chmod 600 "$FM"
 node "$SCRIPTS/vf-cockpit.mjs" build --lab "$LAB" > "$WORK/build2.out" 2>&1
-assert_eq "LM.G2 — build REJOUÉ sur ce lab : le fichier existe encore, même contenu (la sortie est régénérée, pas ce fichier)" "$(cat "$FM" 2>/dev/null | tr -d '\n')" "plan"
+assert_eq "LM.G2 — build REJOUÉ sur ce lab : le fichier du poste existe encore (plan) ; l'ancien fichier du lab, lui, n'est ni lu ni retiré par le build (herite, 0600)" "$(cat "$FM" 2>/dev/null | tr -d '\n') $(cat "$FM_VIEUX" 2>/dev/null | tr -d '\n') $(node -e "console.log((require('fs').statSync(process.argv[1]).mode & 0o777).toString(8))" "$FM_VIEUX" 2>/dev/null)" "plan herite 600"
 SERVE="$COCKPIT/skills/cockpit-moteur/assets/serve.mjs"
 assert_eq "LM.G3 — serve.mjs : aucun rmSync du dossier .cache entier (0) ; sa purge nomme skill.json et history (témoins : 1 et 1)" "$(grep -c "rmSync(path.join(here, '.cache')" "$SERVE" | tr -d ' ') $(grep -c "rmSync(path.join(here, '.cache', 'skill.json')" "$SERVE" | tr -d ' ') $(grep -c "rmSync(historyDir" "$SERVE" | tr -d ' ')" "0 1 1"
-chemin_support() { # chemin_support <processus.mjs> -> chemin relatif au lab que construit la ligne garde:mode-support (évaluée avec here = la sortie, root = le lab)
-  node -e "
-const fs = require('fs'), path = require('path'); const l = fs.readFileSync(process.argv[1], 'utf8').split('\n').find((x) => x.includes('garde:mode-support')) || '';
-const m = /fichier:\s*(path\.join\([^)]*\))/.exec(l); if (!m) { console.log('introuvable'); process.exit(0); }
-const here = process.argv[2], root = process.argv[3], FICHIER_MODE = 'terminal-mode'; console.log(path.relative(root, new Function('path', 'here', 'root', 'FICHIER_MODE', 'return ' + m[1])(path, here, root, FICHIER_MODE)));" "$1" "$OUT" "$LAB"
-}
-if [ "$MODULE_OK" = 1 ]; then
-  CS="$(chemin_support "$SCRIPTS/vf-cockpit-terminal-processus.mjs")"
-  assert_eq "LM.G1 — le chemin construit par le processus (ligne garde:mode-support) est le chemin ignoré par git du lab (témoin : il vaut .vibeflow/cockpit/.cache/terminal-mode)" "$CS $(mkdir -p "$LAB/$(dirname "$CS")"; : > "$LAB/$CS.essai"; git -C "$LAB" check-ignore -q -- "$CS.essai"; echo "rc$?"; rm -f "$LAB/$CS.essai")" ".vibeflow/cockpit/.cache/terminal-mode rc0"
-else nonjouee "LM.G1 (chemin du processus)" "module absent"; fi
-rm -f "$FM"
+rm -f "$FM" "$FM_VIEUX"
 
 # ---- manche : un parent sur la sortie voulue, amorçage, [flux de l'onglet A, invite] ----
 NM=0; QP=0; CP=0; PP=0; SECRET=""; PARENT=""; FPID=""; FLUX=""; QPID=""; ARME=2000
 manche_debut() { # manche_debut <sortie> [sans-flux] -> QP CP PP SECRET PARENT QPID FPID FLUX
   NM=$((NM+1)); local s="$1" am="$WORK/amorce.$NM" po="$WORK/parent-$NM.out"; FLUX="$WORK/flux-$NM.out"; : > "$FLUX"; FPID=""; rm -f "$RUN/argv" "$RUN/argv.tmp" "$RUN/recept.hex"; mkdir -p "$s/.cache"
   node -e "console.log(require('crypto').randomBytes(24).toString('hex'))" > "$am.tmp"; (umask 077; tr -d '\n' < "$am.tmp" > "$s/.cache/terminal-amorce"; tr -d '\n' < "$am.tmp" > "$am")
-  VF_COCKPIT_LANCER_ARME_MS=$ARME node "$AUX/parent.mjs" "$s" "$LAB" "$ENG" "$WORK" > "$po" 2>&1 < /dev/null & PARENT=$!; PIDS+=($PARENT)
+  VF_COCKPIT_LANCER_ARME_MS=$ARME node "$AUX/parent.mjs" "$s" "${MLAB:-$LAB}" "$ENG" "$WORK" > "$po" 2>&1 < /dev/null & PARENT=$!; PIDS+=($PARENT)
   for _ in $(seq 1 100); do grep -q '^PRET ' "$po" 2>/dev/null && break; sleep 0.1; done
   read -r _ QP CP PP < <(grep '^PRET ' "$po" | head -1); QP="${QP:-0}"; CP="${CP:-0}"; PP="${PP:-0}"
   QPID="$(command pgrep -P "$PARENT" | head -1)"
@@ -343,7 +460,7 @@ ID=""; ARME_LU=0
 proposer() { envoyer "$CIBLES" > /dev/null; envoyer "$(prop ph-1 cadrer)" > /dev/null; local b; b="$(pbody)"; ID="$(printf '%s' "$b" | evj 'j.id' 2>/dev/null)"; ARME_LU="$(printf '%s' "$b" | evj 'j.arme_apres_ms' 2>/dev/null)"; ARME_LU="${ARME_LU:-2000}"; }
 mode_servi() { pbody | evj 'j.etat === "en-attente" ? j.mode_retenu : "(" + j.etat + ")"' 2>/dev/null; }
 sigf() { node "$AUX/sigf.mjs" "$FM"; }
-pose_mode() { mkdir -p "$OUT/.cache"; rm -f "$FM"; printf '%s' "$1" > "$FM"; chmod "${2:-600}" "$FM"; }
+pose_mode() { etat_dirs; rm -f "$FM"; printf '%s' "$1" > "$FM"; chmod "${2:-600}" "$FM"; }
 sigfacts() { printf '%s' "$1" | evj "$2" 2>/dev/null; }
 attendre_q_sortie() { local i; for i in $(seq 1 80); do kill -0 "$1" 2>/dev/null || return 0; sleep 0.2; done; return 1; }
 
@@ -377,8 +494,10 @@ assert_eq "LM.Q9 — aucun message IPC ne porte le mode : le message lancee (té
 manche_fin
 
 echo "--- LM.Q3 — survie à une relance réelle, sur un autre port"
-rm -f "$FM"; manche_debut "$OUT"; QPB="$QP"; QPIDB="$QPID"; proposer; attente_arme "$ARME_LU"; S3="$(pl "$(lj "$ID" plan)")"; SIGB="$(sigf)"
-assert_eq "LM.Q3 — lancement accepté en plan (204) : le fichier existe, vaut plan, droits 0600" "$S3 $(sigfacts "$SIGB" 'j.contenu.trim() + "/" + j.perm')" "204 plan/600"
+rm -rf "$STATE"; manche_debut "$OUT"; QPB="$QP"; QPIDB="$QPID"; proposer; attente_arme "$ARME_LU"; LISTE_LAB0="$(lab_liste "$LAB")"; S3="$(pl "$(lj "$ID" plan)")"; SIGB="$(sigf)"
+assert_eq "LM.Q3 — lancement accepté en plan (204) : le fichier existe À L'EMPLACEMENT du poste (clé dérivée ici indépendamment), vaut plan, droits 0600" "$S3 $(sigfacts "$SIGB" 'j.contenu.trim() + "/" + j.perm')" "204 plan/600"
+assert_eq "LM.Q3 — droits constatés sur ce que Q a créé (la base du poste n'existait pas) : fichier 600, dossier du projet 700, base 700" "$(node -e "const f=require('fs'),m=(p)=>(f.statSync(p).mode&0o777).toString(8);console.log([m(process.argv[1]),m(require('path').dirname(process.argv[1])),m(process.argv[2])].join('/'))" "$FM" "$STATE")" "600/700/700"
+assert_eq "LM.Q3 — aucun fichier ni dossier créé sous le lab par un lancement accepté (liste de tout ce que contient le lab, hors .git : identique avant et après) ; le dossier d'état ne contient que la clé et le fichier" "$([ "$LISTE_LAB0" = "$(lab_liste "$LAB")" ] && echo lab-inchange || echo lab-change) $(find "$STATE" -mindepth 1 | sed "s#^$STATE/##" | sort | sed "s#$(cle_de "$LAB")#CLE#" | tr '\n' ',')" "lab-inchange CLE,CLE/terminal-mode,"
 rq "$CP" POST /stop > /dev/null; attendre_q_sortie "$QPIDB" > /dev/null; manche_fin
 manche_debut "$OUT" sans-flux; QPC="$QP"; QPIDC="$QPID"; proposer
 assert_eq "LM.Q3 — après arrêt (message arret) puis relance sur la même sortie : PORT DIFFÉRENT (témoin de la prémisse : le stockage du navigateur de l'origine Q ne survit pas) et mode_retenu vaut plan" "$([ "$QPC" != "$QPB" ] && echo autre-port) $(mode_servi)" "autre-port plan"
@@ -386,20 +505,23 @@ manche_fin
 manche_debut "$OUT"; QPIDC="$QPID"; QPC="$QP"; proposer; attente_arme "$ARME_LU"; S4="$(pl "$(lj "$ID" acceptEdits)")"
 kill -9 "$QPIDC" 2>/dev/null; attendre_q_sortie "$QPIDC" > /dev/null; manche_fin
 manche_debut "$OUT" sans-flux; proposer
-assert_eq "LM.Q4 — second lancement en acceptEdits (204) puis mort de Q par SIGKILL : après relance (autre port) acceptEdits (le dernier gagne ; le fichier est celui du dernier 204, jamais d'un temporaire : aucun .tmp)" "$S4 $([ "$QP" != "$QPC" ] && echo autre-port) $(mode_servi) $(/bin/ls -a "$OUT/.cache" | grep -c 'terminal-mode.*tmp' | tr -d ' ')" "204 autre-port acceptEdits 0"
+assert_eq "LM.Q4 — second lancement en acceptEdits (204) puis mort de Q par SIGKILL : après relance (autre port) acceptEdits (le dernier gagne ; le fichier est celui du dernier 204, jamais d'un temporaire : aucun .tmp)" "$S4 $([ "$QP" != "$QPC" ] && echo autre-port) $(mode_servi) $(/bin/ls -a "$(dirname "$FM")" | grep -c 'terminal-mode.*tmp' | tr -d ' ')" "204 autre-port acceptEdits 0"
 manche_fin
 
 echo "--- LM.Q5 — fichier forgé AVANT le démarrage : jamais la valeur forgée"
 forge_cas() { # forge_cas <nom> -> mode servi par une Q démarrée sur ce fichier forgé
   case "$1" in
     bypass) pose_mode $'bypassPermissions\n' ;; json) pose_mode '{"mode":"plan"}' ;; long) pose_mode "plan$(printf 'x%.0s' $(seq 1 40))" ;;
-    lien) rm -f "$FM"; printf 'plan\n' > "$WORK/cible-plan"; chmod 600 "$WORK/cible-plan"; mkdir -p "$OUT/.cache"; ln -s "$WORK/cible-plan" "$FM" ;;
+    lien) pose_mode ''; rm -f "$FM"; printf 'plan\n' > "$WORK/cible-plan"; chmod 600 "$WORK/cible-plan"; ln -s "$WORK/cible-plan" "$FM" ;;
     droits) pose_mode $'plan\n' 644 ;; valide) pose_mode $'acceptEdits\n' ;;
+    dirlarge) pose_mode $'plan\n'; chmod 755 "$(dirname "$FM")" ;;
+    dirlien) rm -rf "$(dirname "$FM")"; etat_dirs; rm -rf "$(dirname "$FM")"; rm -rf "$WORK/cle-cible"; mkdir -p "$WORK/cle-cible"; chmod 700 "$WORK/cle-cible"; printf 'plan\n' > "$WORK/cle-cible/terminal-mode"; chmod 600 "$WORK/cle-cible/terminal-mode"; ln -s "$WORK/cle-cible" "$(dirname "$FM")" ;;
   esac
   manche_debut "$OUT" sans-flux; proposer; local r; r="$(mode_servi)"; manche_fin; echo "$r"
+  rm -rf "$(dirname "$FM")" # dirlien : retire le lien seul ; les autres : repart d'un dossier neuf
 }
-QF=""; for c in bypass json long lien droits valide; do QF="$QF $(forge_cas "$c")"; done
-assert_eq "LM.Q5 — fichier forgé avant le démarrage (bypassPermissions, JSON hostile, plan + 40 octets, lien vers un fichier plan, droits 0644) : mode_retenu default, jamais la valeur forgée ; témoin positif : acceptEdits valide rend acceptEdits" "${QF# }" "default default default default default acceptEdits"
+QF=""; for c in bypass json long lien droits dirlarge dirlien valide; do QF="$QF $(forge_cas "$c")"; done
+assert_eq "LM.Q5 — fichier forgé avant le démarrage (bypassPermissions, JSON hostile, plan + 40 octets, lien vers un fichier plan, droits 0644, dossier du projet en 0755, dossier du projet remplacé par un lien) : mode_retenu default, jamais la valeur forgée ; témoin positif : acceptEdits valide rend acceptEdits" "${QF# }" "default default default default default default default acceptEdits"
 rm -f "$FM"
 
 echo "--- LM.Q7 — course entre deux onglets ; LM.Q8 — armement et Entrée dus avec herite"
@@ -414,6 +536,49 @@ Q8A="$(mode_servi) $(pl "$(lj "$ID" herite)") $([ "$(wc -c < "$FLUX" | tr -d ' '
 attente_arme "$ARME_LU"; Q8B="$(pl "$(lj "$ID" herite)") $(node "$TA" attendre "$FLUX" "$LH" 8000)"; sleep 2; Q8C="$([ -e "$RUN/argv" ] && echo claude-a-tourne || echo claude-absent)"
 assert_eq "LM.Q8 — fichier à herite : présélection herite servie ; avant armement POST /lancer rend 425 et 0 octet au shell ; après armement 204, la ligne paraît à l'invite et le faux claude n'a PAS tourné (aucun retour chariot ; l'Entrée reste un geste du client, Chrome : LB.E2)" "$Q8A / $Q8B $Q8C" "herite 425 flux-inchange / 204 TROUVE claude-absent"
 manche_fin; rm -f "$FM"
+
+echo "--- LM.Q10 — l'ancien fichier du lab n'est plus jamais lu ; deux projets ne partagent pas leur mode ; rien de l'emplacement n'est servi (AUDC-B-05)"
+q_vieux() { # q_vieux <sortie> -> mode servi avec un ancien fichier « herite » préposé, statut du lancement en plan, contenu final de l'ancien fichier, contenu du nouveau
+  local s="$1" vieux="$1/.cache/terminal-mode" r st; rm -rf "$STATE"; mkdir -p "$s/.cache"; chmod 700 "$s/.cache"; printf 'herite\n' > "$vieux"; chmod 600 "$vieux"
+  manche_debut "$s"; proposer; r="$(mode_servi)"; attente_arme "$ARME_LU"; st="$(pl "$(lj "$ID" plan)")"; manche_fin
+  echo "$r $st $(tr -d '\n' < "$vieux") $([ -f "$FM" ] && tr -d '\n' < "$FM" || echo absent)"
+}
+q_aucun() { # q_aucun <sortie> -> statut du lancement, « lab-inchange » si rien n'est apparu sous le lab, mode du fichier du poste
+  local s="$1" lab st l0 l1; lab="$(cd "$s/../.." && pwd -P)"; rm -rf "$STATE"; mkdir -p "$s/.cache"; chmod 700 "$s/.cache"; rm -f "$s/.cache/terminal-mode"
+  manche_debut "$s"; proposer; attente_arme "$ARME_LU"; l0="$(lab_liste "$lab")"; st="$(pl "$(lj "$ID" acceptEdits)")"; l1="$(lab_liste "$lab")"; manche_fin
+  echo "$st $([ "$l0" = "$l1" ] && echo lab-inchange || echo lab-change) $([ -f "$FM" ] && tr -d '\n' < "$FM" || echo absent)"
+}
+LAB2="$WORK/lab2"; mklab "$LAB2"; OUT2="$LAB2/.vibeflow/cockpit"; FM2="$(fm_de "$LAB2")"
+q_deux() { # q_deux <sortie> -> « <mode servi à LAB2 avant tout lancement> <mode servi à LAB> <mode servi à LAB2> » après plan sur LAB puis acceptEdits sur LAB2
+  local s="$1" a b c; rm -rf "$STATE"
+  manche_debut "$s"; proposer; attente_arme "$ARME_LU"; pl "$(lj "$ID" plan)" > /dev/null; manche_fin
+  MLAB="$LAB2" manche_debut "$s"; proposer; a="$(mode_servi)"; attente_arme "$ARME_LU"; pl "$(lj "$ID" acceptEdits)" > /dev/null; manche_fin
+  manche_debut "$s" sans-flux; proposer; b="$(mode_servi)"; manche_fin
+  MLAB="$LAB2" manche_debut "$s" sans-flux; proposer; c="$(mode_servi)"; manche_fin
+  echo "$a $b $c"
+}
+QV="$(q_vieux "$OUT")"
+assert_eq "LM.Q10 — (a) lab reçu avec l'ancien fichier préréglé sur herite : Q présélectionne default, le lancement en plan rend 204, l'ancien fichier n'est ni lu, ni retiré, ni réécrit (herite) et le nouveau vaut plan" "$QV" "default 204 herite plan"
+QVA=""; for v in acceptEdits herite; do rm -rf "$STATE"; mkdir -p "$OUT/.cache"; printf '%s\n' "$v" > "$FM_VIEUX"; chmod 600 "$FM_VIEUX"; manche_debut "$OUT" sans-flux; proposer; QVA="$QVA $(mode_servi)"; manche_fin; done
+rm -f "$FM_VIEUX"
+assert_eq "LM.Q10 — (a) ancien fichier acceptEdits puis herite (0600), état du poste vide : default les deux fois" "${QVA# }" "default default"
+QA="$(q_aucun "$OUT")"
+assert_eq "LM.Q10 — un lancement accepté (acceptEdits) ne crée AUCUN fichier ni dossier sous le lab et pose le mot au seul emplacement du poste" "$QA" "204 lab-inchange acceptEdits"
+QD="$(q_deux "$OUT")"
+assert_eq "LM.Q10 — (c) deux projets : plan lancé sur l'un ne présélectionne rien sur l'autre (default) ; acceptEdits lancé sur l'autre ne change pas le premier (plan) ; chacun garde le sien après relance ; les deux fichiers sont distincts" "$QD $([ "$FM" != "$FM2" ] && [ -f "$FM" ] && [ -f "$FM2" ] && echo fichiers-distincts)" "default plan acceptEdits fichiers-distincts"
+q_confine() { # q_confine <sortie> -> « <mode servi> <statut du lancement en plan> <contenu final du fichier préposé sous le lab> » : surcharge pointée SOUS le lab, ancien mot herite préposé
+  local s="$1" K B r st; K="$(cle_de "$LAB")"; B="$LAB/etat-forge"; rm -rf "$B"; mkdir -p "$B/$K"; chmod 700 "$B" "$B/$K"; printf 'herite\n' > "$B/$K/terminal-mode"; chmod 600 "$B/$K/terminal-mode"
+  export VF_COCKPIT_MODE_DIR="$B"; manche_debut "$s"; proposer; r="$(mode_servi)"; attente_arme "$ARME_LU"; st="$(pl "$(lj "$ID" plan)")"; manche_fin; export VF_COCKPIT_MODE_DIR="$STATE"
+  echo "$r $st $(tr -d '\n' < "$B/$K/terminal-mode") $(/usr/bin/find "$B" | wc -l | tr -d ' ')"; rm -rf "$B"
+}
+QC="$(q_confine "$OUT")"
+assert_eq "LM.Q10 — (f) surcharge pointée sous le lab avec un mot herite préposé : Q présélectionne default, le lancement en plan rend 204, le fichier préposé reste herite et rien de plus n'apparaît sous le lab (deux entrées : dossier et fichier de la clé, plus la base)" "$QC" "default 204 herite 3"
+# rien de l'emplacement dans ce que Q sert à la page : la proposition, /etat et la page, avant puis après un lancement
+rm -rf "$STATE"; pose_mode $'plan\n'; manche_debut "$OUT"; proposer; QCLE="$(cle_de "$LAB")"
+SERVI="$(pget; pget; rq "$QP" GET /etat --sans-origin --entete 'sec-fetch-site:same-origin' --secret "$SECRET" --onglet A; rq "$QP" GET / --corps-vers "$WORK/q-page.html" --secret "$SECRET" --onglet A; cat "$WORK/q-page.html" 2>/dev/null)"
+attente_arme "$ARME_LU"; pl "$(lj "$ID" plan)" > /dev/null; SERVI="$SERVI $(pget; rq "$QP" GET /etat --sans-origin --entete 'sec-fetch-site:same-origin' --secret "$SECRET" --onglet A)"
+assert_eq "LM.Q10 — (e, Q) ni le chemin du dossier d'état, ni celui du lab, ni du poste, ni l'empreinte, ni cockpit-mode ne figurent dans ce que Q sert à la page (proposition, /etat, page, avant et après un lancement ; témoin : mode_retenu est bien servi, la réponse n'est pas vide)" "$(printf '%s' "$SERVI" | grep -c -a -F -e "$STATE" -e "$WORK" -e "$REAL_HOME" -e "$QCLE" -e cockpit-mode | tr -d ' ') $(printf '%s' "$SERVI" | grep -c -a 'mode_retenu' | tr -d ' ' | sed 's/^[1-9][0-9]*$/servi/')" "0 servi"
+manche_fin; rm -rf "$STATE"
 
 echo "=== LM.P — P réel (--terminal, Q réelle) : aucune route ne rend le fichier, aucune écriture par P, aucun mode dans ses réponses ==="
 cat > "$AUX/ptok.mjs" <<'JS'
@@ -445,19 +610,20 @@ p1_run() {
   local o="$1" paths="$WORK/p1-paths.$PS_N" f n=0 tot=0 trav="" st c
   { grep -oh "pathname === '[^']*'" "$SCRIPTS/vf-cockpit-server.mjs" "$SERVE" | sed "s/.*'\(.*\)'/\1/"; printf '%s\n' / /index.html /project.html /api/vf/etat /.cache/server.json /api/vf/lancer/cibles /api/vf/terminal; } | sort -u | grep -v '/api/vf/events' > "$paths"
   while IFS= read -r f; do n=$((n+1)); gp "$f" --corps-vers "$WORK/p1.body" > "$WORK/p1.out"; c="$(grep -c -a "$SENT" "$WORK/p1.body" "$WORK/p1.out" | awk -F: '{s+=$NF} END {print s+0}')"; tot=$((tot + c)); done < "$paths"
-  for f in /.cache/terminal-mode /..%2F.cache/terminal-mode //.cache/terminal-mode /%2e%2e/.cache/terminal-mode /api/vf/../.cache/terminal-mode; do
+  local cle; cle="$(cle_de "$(cd "$o/../.." && pwd -P)")"
+  for f in /.cache/terminal-mode /..%2F.cache/terminal-mode //.cache/terminal-mode /%2e%2e/.cache/terminal-mode /api/vf/../.cache/terminal-mode "/$cle/terminal-mode" "/cockpit-mode/$cle/terminal-mode" "/$cle"; do
     gp "$f" --corps-vers "$WORK/p1.body" > "$WORK/p1.out"; st="$(sed -n 1p "$WORK/p1.out")"; c="$(grep -c -a "$SENT" "$WORK/p1.body" "$WORK/p1.out" | awk -F: '{s+=$NF} END {print s+0}')"; tot=$((tot + c)); trav="$trav$st,"
   done
   echo "$n ${trav%,} $tot"
 }
 {
-  pose_mode "$SENT"$'\n'; SIGP="$(sigf)"
+  pose_mode "$SENT"$'\n'; SIGP="$(sigf)"; ETP="$(etat_liste)"
   psrv_debut "$OUT"; FPID=""
   assert_eq "LM.P0 — témoin : P répond (port et jeton), GET /api/vf/lancer/cibles rend 200, la sortie du serveur n'est pas vide" "$([ "$PS_PORT" -gt 0 ] && echo port) $([ -n "$PS_TOK" ] && echo jeton) $(sta "$PS_PORT" GET /api/vf/lancer/cibles --jeton "$PS_TOK")" "port jeton 200"
   P1="$(p1_run "$OUT")"; read -r P1N P1T P1S <<< "$P1"
-  assert_eq "LM.P1 — GET de chaque chemin de P dérivé du disque (au moins 5 : témoin) et de cinq sondes de traversée (/.cache/terminal-mode, /..%2F…, //…, /%2e%2e/…, /api/vf/../…) : aucune réponse ne contient la sentinelle ; aucune sonde de traversée ne rend 200" "$([ "${P1N:-0}" -ge 5 ] && echo assez || echo "trop peu (${P1N:-0})") $(printf '%s' "${P1T:-}" | grep -c 200 | tr -d ' ') ${P1S:-?}" "assez 0 0"
+  assert_eq "LM.P1 — GET de chaque chemin de P dérivé du disque (au moins 5 : témoin) et de cinq sondes de traversée (/.cache/terminal-mode, /..%2F…, //…, /%2e%2e/…, /api/vf/../…) : aucune réponse ne contient la sentinelle ; aucune sonde de traversée ne rend 200 (huit sondes : l'ancien chemin, ses variantes encodées, et l'emplacement du poste par la clé)" "$([ "${P1N:-0}" -ge 5 ] && echo assez || echo "trop peu (${P1N:-0})") $(printf '%s' "${P1T:-}" | grep -c 200 | tr -d ' ') ${P1S:-?}" "assez 0 0"
   P2="$(for r in /api/vf/lancer /api/vf/doing /api/vf/etat /api/vf/journal /api/vf/transcript /; do for b in '{"mode":"plan"}' '{"mode":"bypassPermissions"}'; do rq "$PS_PORT" POST "$r" --jeton "$PS_TOK" --entete "$JSONH" --corps "$b" --echeance 3000; done; done)"
-  assert_eq "LM.P2 — POST sur les routes de P (jeton de P, corps {mode:plan} ou {mode:bypassPermissions}) : le fichier est octet pour octet inchangé et aucune réponse ne contient la sentinelle" "$([ "$(sigf)" = "$SIGP" ] && echo inchange || echo change) $(printf '%s' "$P2" | grep -c -a "$SENT" | tr -d ' ')" "inchange 0"
+  assert_eq "LM.P2 — POST sur les routes de P (jeton de P, corps {mode:plan} ou {mode:bypassPermissions}) : le fichier est octet pour octet inchangé, le dossier d'état n'a reçu ni fichier ni dossier, et aucune réponse ne contient la sentinelle" "$([ "$(sigf)" = "$SIGP" ] && echo inchange || echo change) $([ "$(etat_liste)" = "$ETP" ] && echo etat-inchange || echo etat-change) $(printf '%s' "$P2" | grep -c -a "$SENT" | tr -d ' ')" "inchange etat-inchange 0"
   # LM.P3 : un lancement accepté de bout en bout, puis aucune réponse de P ne porte le mode
   p3_run() { # p3_run -> P3R « lancee=<oui|non> fuites=<n> » (variable globale : jamais en sous-shell, il y vit des processus) ; nécessite psrv_debut déjà fait
     local sec c id vb cibles ln i
@@ -481,10 +647,10 @@ p1_run() {
 }
 
 # ---- mutants : chacun joué sur une copie de la sortie (ou des sources) ; l'attendu est l'observable du DÉFAUT, jamais « pas le sain » ----
-FM_OUT="$FM"; sur() { FM="$1/.cache/terminal-mode"; }; sur_out() { FM="$FM_OUT"; }
+FM_OUT="$FM"; sur() { :; }; sur_out() { FM="$FM_OUT"; }; surp() { FM="$(fm_de "$(cd "$1/../.." && pwd -P)")"; } # Q de manche : la racine est toujours $LAB (même fichier) ; P réel : la racine est le lab muté (surp)
 MODF=vf-cockpit-lancer-mode.mjs; PROCF=vf-cockpit-terminal-processus.mjs
 mut_forge() { # mut_forge <sortie> <contenu|LIEN> -> mode servi par une Q démarrée sur la sortie mutée avec ce fichier
-  sur "$1"; if [ "$2" = LIEN ]; then rm -f "$FM"; mkdir -p "$1/.cache"; printf 'plan\n' > "$WORK/cible-plan"; chmod 600 "$WORK/cible-plan"; ln -s "$WORK/cible-plan" "$FM"; else pose_mode "$2"; fi
+  sur "$1"; if [ "$2" = LIEN ]; then pose_mode ''; rm -f "$FM"; printf 'plan\n' > "$WORK/cible-plan"; chmod 600 "$WORK/cible-plan"; ln -s "$WORK/cible-plan" "$FM"; else pose_mode "$2"; fi
   manche_debut "$1" sans-flux; proposer; local r; r="$(mode_servi)"; manche_fin; sur_out; echo "$r"
 }
 echo "=== M-SANS-REVALIDATION — lire rend le contenu brut (LM.U2, LM.Q5) ==="
@@ -501,7 +667,7 @@ if mutant bom "$MODF" 's#{ fatal: true, ignoreBOM: true }#{ fatal: true }#'; the
   assert_eq "M-BOM — sous le mutant LM.U2 rougit : un BOM devant plan est lu plan" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u2bom')" "plan"
 else sans_effet "M-BOM"; fi
 echo "=== M-DOSSIER-LIEN — contrôle du dossier support retiré (LM.U4) ==="
-if mutant dossier-lien "$MODF" '/garde:mode-dossier/,/catch (e) { if (!e/d'; then
+if mutant dossier-lien "$MODF" "s#if (ls.isSymbolicLink() || !ls.isDirectory()) return 'ko';##" "s#if (typeof os.getuid === 'function' && (ls.uid !== os.getuid() || (ls.mode & 0o077) !== 0)) return 'ko';##"; then
   assert_eq "M-DOSSIER-LIEN — sous le mutant LM.U4 rougit : l'écriture traverse le lien (true, un fichier dans le dossier visé)" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u4lien')" "true,aucune,1,1"
 else sans_effet "M-DOSSIER-LIEN"; fi
 echo "=== M-SUIT-LIEN — O_NOFOLLOW retiré (LM.U3, LM.Q5) ==="
@@ -536,7 +702,7 @@ if mutant tmp-reste "$MODF" '/garde:mode-unlink/d'; then
   assert_eq "M-TEMPORAIRE-RESTE — sous le mutant LM.U4 rougit : après l'échec du rename un temporaire reste dans le dossier" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u4rename.restes.indexOf(".tmp") >= 0')" "true"
 else sans_effet "M-TEMPORAIRE-RESTE"; fi
 echo "=== M-RELECTURE-A-CHAQUE-SONDAGE — lire relit le disque (LM.U5) ==="
-if mutant relecture "$MODF" 's#lire: () => memoire,#lire: () => charger(fichier, fs, modes, os),#'; then
+if mutant relecture "$MODF" 's#lire: () => memoire,#lire: () => charger(fichier, dirs, fs, modes, os),#'; then
   assert_eq "M-RELECTURE-A-CHAQUE-SONDAGE — sous le mutant LM.U5 rougit : le fichier réécrit de l'extérieur est relu (acceptEdits)" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u5.join(",")')" "plan,acceptEdits"
 else sans_effet "M-RELECTURE-A-CHAQUE-SONDAGE"; fi
 echo "=== M-ECRITURE-A-LA-DEMANDE — l'écriture part à la réception de POST /lancer, avant consommer (LM.Q6) ==="
@@ -566,21 +732,59 @@ else sans_effet "M-NOUVELLE-ROUTE"; fi
 echo "=== M-MODE-VERS-P — le mode ajouté au message lancee (LM.S5, LM.P3) ==="
 if mutant mode-vers-p "$PROCF" 's#process.send(msg);#process.send({ ...msg, mode: demande.mode });#'; then
   assert_eq "M-MODE-VERS-P — sous le mutant LM.S5 rougit : une ligne process.send( porte le mode" "$(node "$AUX/stat.mjs" "$MUT_OUT/$PROCF" "$MUT_OUT/vf-cockpit-terminal-client.mjs" | evj j.envoisMode)" "1"
-  sur "$MUT_OUT"; pose_mode "$SENT"$'\n'; psrv_debut "$MUT_OUT"; P3R=""; p3_run
+  surp "$MUT_OUT"; pose_mode "$SENT"$'\n'; psrv_debut "$MUT_OUT"; P3R=""; p3_run
   assert_eq "M-MODE-VERS-P — sous le mutant LM.P3 rougit : P refuse le message lancee à clé de plus (forme fermée) : la cible n'est jamais marquée lancée (son témoin positif)" "$P3R" "lancee=non fuites=0"; psrv_fin; sur_out
 else sans_effet "M-MODE-VERS-P"; fi
 echo "=== M-P-LIT-LE-FICHIER — une route de P répond le contenu du fichier (LM.P1, LM.S2) ==="
-if mutant p-lit "vf-cockpit-server.mjs" "s#if (url.pathname === '/api/vf/journal') {#if (url.pathname === '/api/vf/journal') { res.writeHead(200); res.end(fs.readFileSync(path.join(here, '.cache', 'terminal-mode'))); return true; } if (url.pathname === '/api/vf/journal-origine') {#"; then
+if mutant p-lit "vf-cockpit-server.mjs" "s#if (url.pathname === '/api/vf/journal') {#if (url.pathname === '/api/vf/journal') { const B = process.env.VF_COCKPIT_MODE_DIR; res.writeHead(200); res.end(fs.readdirSync(B).map((k) => { try { return fs.readFileSync(path.join(B, k, 'terminal-mode')); } catch (e) { return ''; } }).join('')); return true; } if (url.pathname === '/api/vf/journal-origine') {#"; then
   if [ "$MODULE_OK" = 1 ]; then assert_eq "M-P-LIT-LE-FICHIER — sous le mutant LM.S2 rougit : le fichier de P nomme terminal-mode (au moins une référence)" "$(p_refs "$MUT_OUT" | awk -F: '{print ($2 >= 1) ? "reference" : "aucune"}')" "reference"
   else nonjouee "M-P-LIT-LE-FICHIER (LM.S2)" "module absent"; fi
-  sur "$MUT_OUT"; pose_mode "$SENT"$'\n'; psrv_debut "$MUT_OUT"; P1M="$(p1_run "$MUT_OUT")"; read -r _ _ P1MS <<< "$P1M"
+  surp "$MUT_OUT"; pose_mode "$SENT"$'\n'; psrv_debut "$MUT_OUT"; P1M="$(p1_run "$MUT_OUT")"; read -r _ _ P1MS <<< "$P1M"
   assert_eq "M-P-LIT-LE-FICHIER — sous le mutant LM.P1 rougit : la route servie rend la sentinelle (au moins une occurrence)" "$([ "${P1MS:-0}" -ge 1 ] && echo sentinelle-servie || echo "rien (${P1MS:-?})")" "sentinelle-servie"; psrv_fin; sur_out
 else sans_effet "M-P-LIT-LE-FICHIER"; fi
-echo "=== M-SERVEUR-OUVRE-LE-CHEMIN — le fichier placé hors du dossier ignoré (LM.G1) ==="
-if mutant chemin "$PROCF" "/garde:mode-support/s#path.join(here, '.cache', FICHIER_MODE)#path.join(root, FICHIER_MODE)#"; then
-  CSM="$(chemin_support "$MUT_OUT/$PROCF")"; mkdir -p "$LAB/$(dirname "$CSM")"; : > "$LAB/$CSM.essai"
-  assert_eq "M-SERVEUR-OUVRE-LE-CHEMIN — sous le mutant LM.G1 rougit : le chemin construit est à la racine du lab, hors du dossier que git ignore (check-ignore rend 1)" "$CSM $(git -C "$LAB" check-ignore -q -- "$CSM.essai"; echo "rc$?")" "terminal-mode rc1"; rm -f "${LAB:?}/${CSM:?}.essai"
-else sans_effet "M-SERVEUR-OUVRE-LE-CHEMIN"; fi
+echo "=== M-ANCIEN-FICHIER — le support revient dans le lab : l'ancien fichier est relu et réécrit (LM.Q10, LM.Q3) ==="
+if mutant ancien "$PROCF" "s#creerMemoireModePoste({ racine: root })#creerMemoireMode({ fichier: path.join(here, '.cache', 'terminal-mode') })#" "s#import { creerMemoireModePoste }#import { creerMemoireMode }#"; then
+  assert_eq "M-ANCIEN-FICHIER — sous le mutant LM.Q10 (a) rougit : l'ancien fichier herite est servi, puis réécrit par le lancement (plan)" "$(q_vieux "$MUT_OUT")" "herite 204 plan absent"
+  assert_eq "M-ANCIEN-FICHIER — sous le mutant LM.Q10 (aucun fichier sous le lab) rougit : le lancement crée le fichier sous le lab, rien au poste" "$(q_aucun "$MUT_OUT")" "204 lab-change absent"
+  assert_eq "M-ANCIEN-FICHIER — sous le mutant LM.S7 rougit : la ligne garde:mode-support nomme here, .cache et path.join" "$(grep 'garde:mode-support' "$MUT_OUT/$PROCF" | sed 's#//.*##' | grep -c -E 'here|\.cache|path\.join' | tr -d ' ')" "1"
+else sans_effet "M-ANCIEN-FICHIER"; fi
+echo "=== M-CLE-COMMUNE — la clé ne dépend plus du projet (LM.U7, LM.U8, LM.Q10) ==="
+if mutant cle-commune "$MODF" "s#update(fs.realpathSync(racine), 'utf8')#update('commun', 'utf8')#"; then
+  assert_eq "M-CLE-COMMUNE — sous le mutant LM.U7 / LM.U8 rougissent : deux dossiers donnent la même clé, l'autre projet lit le mot du premier" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.p1.autre + "/" + j.p1.egalSha + "/" + j.p2.autreProjet')" "false/false/acceptEdits"
+  assert_eq "M-CLE-COMMUNE — sous le mutant LM.Q10 (c) rougit : le second projet présélectionne le mot du premier (plan au lieu de default)" "$(q_deux "$MUT_OUT")" "plan acceptEdits acceptEdits"
+else sans_effet "M-CLE-COMMUNE"; fi
+echo "=== M-DROITS-0644 — le fichier est créé en 0644 (LM.U4, LM.U8) ==="
+if mutant droits-0644 "$MODF" "s#fs.openSync(tmp, 'wx', 0o600)#fs.openSync(tmp, 'wx', 0o644)#"; then
+  assert_eq "M-DROITS-0644 — sous le mutant LM.U4 / LM.U8 rougissent : le fichier final est 644" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.u4.perm + "/" + j.p2.permF')" "644/644"
+else sans_effet "M-DROITS-0644"; fi
+echo "=== M-DOSSIER-DROITS — le contrôle des droits du dossier d'état est retiré (LM.U10) ==="
+if mutant dossier-droits "$MODF" "s# || (ls.mode & 0o077) !== 0##"; then
+  assert_eq "M-DOSSIER-DROITS — sous le mutant LM.U10 rougit : une base en 0755 et un dossier de projet en 0755 sont lus (plan) et écrits (acceptEdits)" "$(uq "$(facts_u "$MUT_OUT" rapide)" '[j.p4.baseLarge, j.p4.cleLarge].join(" ")')" "plan,true,aucune,0,0,acceptEdits plan,true,aucune,0,0,acceptEdits"
+else sans_effet "M-DOSSIER-DROITS"; fi
+echo "=== M-CONFINEMENT — la garde de confinement de la base est retirée (LM.U13, LM.Q10 f) ==="
+if mutant confinement "$MODF" 's#const garde = () => horsDuLab(base, racine, fs) && horsDuLab(dossier, racine, fs);#const garde = () => true;#'; then
+  assert_eq "M-CONFINEMENT — sous le mutant LM.U13 rougit : toutes les bases sous le lab sont lues (plan) et écrites (acceptEdits)" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.p7')" "plan,true,acceptEdits plan,true,acceptEdits plan,true,acceptEdits plan,true,acceptEdits plan,true,acceptEdits plan,true,acceptEdits"
+  assert_eq "M-CONFINEMENT — sous le mutant LM.Q10 (f) rougit : Q présélectionne herite depuis le lab et y réécrit plan" "$(q_confine "$MUT_OUT")" "herite 204 plan 3"
+else sans_effet "M-CONFINEMENT"; fi
+echo "=== M-IDENTITE-PAR-CHAINE — le confinement est jugé sur la forme textuelle du chemin, sans identité (LM.U15, LM.U17) ==="
+if mutant garde-chaine "$MODF" 's#if (st.dev === rid.dev && st.ino === rid.ino) return false;#if (p === path.resolve(racine)) return false;#' 's#for (const depart of \[e, resolu\])#for (const depart of [e])#'; then
+  MF="$(facts_u "$MUT_OUT" rapide)"
+  assert_eq "M-IDENTITE-PAR-CHAINE — sous le mutant LM.U15 rougit : la base écrite dans une autre casse est acceptée, lue (plan) et réécrite" "$(uqp "$MF" 'j.p8.casse')" "$([ "$FSCI" = true ] && echo 'plan,true,0 plan,true,0' || echo nonjouable)"
+  GEN_LIEN="$(uqp "$UF" '(j.gen.formes["dedans/lien"] || 0) > 0 || j.fsci')" # le mutant laisse passer les formes lien (toujours) et la casse (si le système y est insensible) : l'attendu suit ce que le générateur a réellement produit
+  assert_eq "M-IDENTITE-PAR-CHAINE — sous le mutant LM.U17 rougit : la preuve générative trouve au moins un écart (le générateur a produit des formes que le mutant laisse passer : $GEN_LIEN)" "$(uqp "$MF" 'j.gen.ko.length > 0')" "$GEN_LIEN"
+else sans_effet "M-IDENTITE-PAR-CHAINE"; fi
+echo "=== M-SANS-PREMIER-JUGEMENT — le jugement avant création est retiré (LM.U16 premier jugement) ==="
+if mutant sans-jugement-1 "$MODF" '/garde:mode-jugement-1/d'; then
+  assert_eq "M-SANS-PREMIER-JUGEMENT — sous le mutant le témoin du premier jugement rougit : les dossiers sont créés sous le lab (le nouveau jugement refuse seulement le fichier)" "$(uqp "$(facts_u "$MUT_OUT" rapide)" 'j.p8.jug1')" "false,2"
+else sans_effet "M-SANS-PREMIER-JUGEMENT"; fi
+echo "=== M-SANS-REJUGEMENT — le jugement avant l'écriture est retiré (LM.U16) ==="
+if mutant sans-rejuge "$MODF" '/garde:mode-rejuge/d'; then
+  assert_eq "M-SANS-REJUGEMENT — sous le mutant LM.U16 rougit : le fichier est écrit sous le lab" "$(uqp "$(facts_u "$MUT_OUT" rapide)" 'j.p8.rejuge')" "true,1"
+else sans_effet "M-SANS-REJUGEMENT"; fi
+echo "=== M-DOSSIER-PROPRIETAIRE — la seule clause propriétaire du dossier d'état est retirée (LM.U14) ==="
+if mutant dossier-proprio "$MODF" "s#ls.uid !== os.getuid() || ##"; then
+  assert_eq "M-DOSSIER-PROPRIETAIRE — sous le mutant LM.U14 rougit : un dossier d'un autre uid est lu (plan) et écrit (le même fichier relu donne acceptEdits)" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.p7uid')" "plan,true|acceptEdits,true"
+else sans_effet "M-DOSSIER-PROPRIETAIRE"; fi
 echo "=== M-STOCKAGE-RESTE — repli sur le stockage du navigateur (LM.S4, LM.C3) ==="
 if mutant stockage-reste vf-cockpit-terminal-client.mjs "/garde:mode-lecture/s#.*#const v = p.mode_retenu !== undefined ? p.mode_retenu : localStorage.getItem('vf.terminal.mode'); // garde:mode-lecture#"; then
   assert_eq "M-STOCKAGE-RESTE — sain/mutant/occurrences : LM.C3 sain sur le client livré, rouge sous le mutant (getItem d'une clé mode) ; LM.S4 compte 1 occurrence sous le mutant" "$(cq "$CF" "$C3EXPR")/$(cq "$(facts_c "$MUT_OUT")" "$C3EXPR")/$(node "$AUX/stat.mjs" "$MUT_OUT/$PROCF" "$MUT_OUT/vf-cockpit-terminal-client.mjs" | evj j.cliCleMode)" "0/true/1/true/1"
