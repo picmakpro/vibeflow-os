@@ -337,6 +337,34 @@ Noms internes des fonctions et modules neufs, découpage fin des fichiers d'inte
 inventés seulement : dépôt public), ordre des tâches dans une vague.
 </decisions>
 
+## Contrats fournis (à la Phase 74, réponses du 2026-11-11 ; complètent P73-D-20)
+
+Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée ; les règles 2 et 3
+reprennent les propositions de la Phase 74, relayées par la session principale le 2026-11-11, et s'écrivent des deux côtés.
+
+- **P73-C1 — `vf-agent:ouvrir` et ses déclencheurs.** `declencheur` ∈ `nom` (clic, Entrée ou Espace sur le nom d'une
+  ligne), `ancre` (arrivée par `#r=n:se-<id>` / `n:ag-<id>`), `rapport` (bouton « Lire le rapport »). La Phase 74 peut
+  annuler les trois. Annulé (`preventDefault`) : la régie ne fait rien d'autre — le détail en flux de la ligne reste dans
+  l'état où il était (ni déplié, ni replié), le lecteur de repli n'est pas ouvert, rien n'est marqué lu, le focus reste à
+  qui l'a reçu (la 74 le rend à `declencheur` à sa fermeture, P74-D-03). Non annulé : `nom` et `ancre` déplient le
+  détail en flux de la ligne (`ancre` défile et met le focus sur la ligne, P73-D-29) ; `rapport` ouvre le lecteur de repli.
+- **P73-C2 — Lecteur de repli et export `__vfEquipeRendu.transcript`.** L'export vit tant que le lecteur de repli
+  existe, et le lecteur de repli existe tant qu'un déclencheur peut rester non annulé. Le retrait est fait par la Phase 74,
+  dans le plan qui livre sa fiche (ou un plan suivant de la 74), en un seul geste : branche de repli dans les fichiers de
+  la régie et export ensemble, après un témoin qui prouve l'annulation des trois déclencheurs. C'est la seule exception à
+  « la 74 ne modifie aucun fichier de la 73 » (P73-D-20) : un retrait, jamais un ajout. Tant que ce plan n'a pas tourné,
+  la 73 garde les deux.
+- **P73-C3 — Qui émet `vf-agent:lu`.** Celui qui ouvre : la régie l'émet quand son lecteur de repli s'ouvre ; quand la
+  Phase 74 a annulé `vf-agent:ouvrir`, c'est la 74 qui l'émet à l'ouverture de sa fiche. La régie écoute
+  `vf-agent:lu` quelle qu'en soit la source pour mettre à jour « Terminé, à relire » (P73-D-14).
+- **P73-C4 — Bascule « Régie · Frise ».** Dessinée par la 73 dès deux vues déclarées : `role="tablist"` de nom accessible
+  « Vue de l'équipe » (`aria-label`), deux onglets `role="tab"` nommés par leur libellé (« Régie », « Frise » — le
+  `libelle` passé à `declarer`). La 73 garde la position choisie dans `sessionStorage`, clé `vibeflow-cockpit:equipe-vue`,
+  valeur = `id` de la vue ; valeur absente ou inconnue → « Régie » (P74-D-02 : position gardée pour la page, jamais dans
+  un fichier du lab).
+- **P73-C5 — Accusé de réception.** La Phase 74 amende P74-D-28 (3), P74-D-30 et P74-D-41 pour suivre P73-D-14 (le pli
+  « Terminés » du tiroir est retiré par la 73) et P73-D-20.
+
 <code_context>
 ## Existing Code Insights (état présent après le lot 0, `f763b556`)
 
