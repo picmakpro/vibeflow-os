@@ -553,7 +553,7 @@ annoncés aux autres phases : 79-01, 79-02, 79-05, 79-06.
 | 79-08 | Index incrémental pur, jetons, segments, contrat de forme étendu | SOCL-12 | 2 | 79-01 | § 79-07a |
 | 79-09 | Collecte hors boucle, registre lu, cache de scan, verrous projetés (A15), signature du `who` (A17), silence et échec (A20) | SOCL-13 | 3 | 79-03, 79-06, 79-07, 79-08 | § 79-07b |
 | 79-10 | Traduction au point d'émission, observateur global retiré | SOCL-14 | 3 | 79-01, 79-06 | § 79-14 |
-| 79-11 | Plafond en colonnes en cliquet, code navigateur rangé | SOCL-15 | 3 | 79-01, 79-06 | § 79-15 |
+| 79-11 | Plafond en colonnes en cliquet, code navigateur rangé | SOCL-15 | 4 (amendé : fichier commun `test-cockpit-chrome-fr.sh` avec 79-10) | 79-01, 79-06, 79-10 | § 79-15 |
 | 79-12 | Route d'état, événements `etat` et `vie`, `vf-signal` par la route | SOCL-16 | 4 | 79-05, 79-09 | § 79-08 |
 | 79-13 | Route de frise, `cibles` en mémoire (A21-A24, A28), événement `frise` | SOCL-17 | 5 | 79-12 | § 79-09 |
 | 79-14 | Flux partagé entre onglets, veille de silence | SOCL-18 | 5 | 79-12 | § 79-10 |

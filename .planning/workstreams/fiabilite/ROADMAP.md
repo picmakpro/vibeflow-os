@@ -634,7 +634,7 @@ Plans:
 - [ ] 79-08-PLAN.md — Index incrémental des transcripts et contrat de forme étendu (vague 2)
 - [ ] 79-09-PLAN.md — Collecte hors de la boucle, registre lu, verrous projetés (vague 3)
 - [ ] 79-10-PLAN.md — Traduction au point d'émission (vague 3)
-- [ ] 79-11-PLAN.md — Plafond en colonnes et code navigateur rangé (vague 3)
+- [ ] 79-11-PLAN.md — Plafond en colonnes et code navigateur rangé (vague 4)
 - [ ] 79-12-PLAN.md — Route d'état et vf-signal par la route (vague 4)
 - [ ] 79-13-PLAN.md — Route de frise et cibles en mémoire (vague 5)
 - [ ] 79-14-PLAN.md — Flux partagé entre onglets et veille de silence (vague 5)
