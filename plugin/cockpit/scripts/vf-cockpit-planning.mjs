@@ -164,9 +164,10 @@ export function readPlanning(root, layout, opts = {}) {
   for (const ph of phases.values()) {
     const dir = phaseDirs.get(`${ph.ws || ''}|${ph.n}`) || phaseDirs.get(`*|${ph.n}`);
     ph.avancement = avancement({ ph, fichiers: ls(dir), missions: parPhase.get(ph.key) || [], lire: (f) => read(path.join(dir, f)) });
-    // P80-D-44 : la vague de chaque plan, lue ici une fois ; seul un entier >= 1 passe, sinon null (T-80-06)
+    // P80-D-44 : la vague de chaque plan, lue ici une fois ; seuls des chiffres décimaux >= 1 passent (ni 0x10 ni 1e1), sinon null (T-80-06)
     ph.plans = ls(dir).filter((f) => /-PLAN\.md$/.test(f)).sort().map((f) => {
-      const w = Number(fm(read(path.join(dir, f))).wave); return { id: f.replace('-PLAN.md', ''), fichier: f, vague: Number.isInteger(w) && w >= 1 ? w : null };
+      const w = fm(read(path.join(dir, f))).wave; const n = /^\d+$/.test(w ?? '') ? Number(w) : 0;
+      return { id: f.replace('-PLAN.md', ''), fichier: f, vague: n >= 1 && Number.isSafeInteger(n) ? n : null };
     });
   }
   const backlog = texte(read(path.join(B, 'BACKLOG.md')));
