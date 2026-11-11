@@ -6,6 +6,7 @@
 #   FIN.3  page Projet réelle sous Chrome : le libellé de « Terminer la session » tient dans l'en-tête à 1280, 1440 et 1024 px ; « Terminer la session » demande un double geste, le premier ne termine rien, le second fait disparaître le shell ; la barre dit « Terminé »
 #   FIN.4  bandeau de lancement à la hauteur par défaut : la phrase « écrit cette ligne sans la lancer » et la liste des modes sont visibles, le tiroir s'ajuste au bandeau ;
 #          après « Annuler », le statut du panneau (« Proposition envoyée… Confirmez-la ») ET l'annonce du cadre du terminal (« Lancement proposé : … Expire dans … ») reviennent à zéro
+# Le poste d'essai n'a pas besoin de `claude` : un faux, posé dans le PATH d'origine du shell, tient le pré-vol du lancement.
 # Chaque absence a son témoin positif dans le même scénario. Sans Chrome : FIN.1, FIN.3 et FIN.4 annoncent « NON vérifiée ». Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -37,6 +38,9 @@ echo \$\$ > "$RUN/shell.pid"
 exec /bin/sh -i
 SH
 chmod +x "$WORK/bin/shell-test"; export SHELL="$WORK/bin/shell-test"
+# faux `claude` dans le PATH D'ORIGINE du shell : le pré-vol du lancement (« claude-introuvable ») refuse la proposition sur un poste sans `claude` (runner de CI), et FIN.3/FIN.4 attendent le bandeau.
+# Le faux n'est jamais lancé ici (le shell de test ne reçoit aucune commande) : seule sa présence dans le PATH compte.
+mkdir -p "$WORK/fauxbin"; cp "$HERE_T/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"; export VF_COCKPIT_PATH_ORIGINE="$WORK/fauxbin:$PATH"
 rq() { node "$TA" req "$@"; }
 sj() { node "$AUX/ev.mjs" "$1" < "$OUT/.cache/server.json" 2>/dev/null; }
 mklab() {
