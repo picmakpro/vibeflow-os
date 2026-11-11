@@ -136,7 +136,9 @@ Relayés mot pour mot par la session principale ; canal : arbitrage Samuel, AskU
 ### Données : chemin, schéma, sécurité
 
 - **P76-D-06 (route à la demande).** Les données arrivent par une route propre, `GET /api/vf/tracabilite`, appelée à
-  l'ouverture d'une section ou d'un panneau, calcul asynchrone, cache par empreinte (sha de HEAD + `seq` de l'instantané de la collecte pour tout ce qui vient de `.planning/` + date
+  l'ouverture d'une section ou d'un panneau, calcul asynchrone, cache par empreinte (signature git de l'instantané, `instantane().git.sig` de la règle A47 de la Phase 79, à la place
+  d'un `rev-parse` à chaque requête — amendé le 2026-11-11 sur la vérification fraîche des plans — + `seq` de
+  l'instantané de la collecte pour tout ce qui vient de `.planning/` + date
   de modification de `docs/ADR.md` et de `.claude/agent-memory/` et de ses sous-dossiers d'agent ; amendé deux fois le
   2026-11-11 : `76-RESEARCH.md` a montré que l'empreinte d'origine omettait PLAN, SUMMARY, VERIFICATION et recette, puis
   le vérificateur frais a montré qu'un parcours de `.planning/` à chaque requête contredit A31 ; la collecte surveille
@@ -342,8 +344,9 @@ tout changement passe par un amendement daté ici.
 
 **C76-Q1 — Écrire une question en attente.**
 
-- **Où.** Dans le registre `*-CONTEXT.md` d'un dossier de phase (`phases/<préfixe>-<N>-<slug>/` d'un compartiment, ou
-  de `.planning/phases/`, archives `*-phases/` comprises), dans la section dont le titre de niveau 2 commence
+- **Où.** Dans le registre `*-CONTEXT.md` d'un dossier de phase non archivé (`phases/<préfixe>-<N>-<slug>/` d'un
+  compartiment, ou de `.planning/phases/` ; les archives `*-phases/` ne sont pas lues : une question d'un jalon clos
+  n'attend plus rien — amendé le 2026-11-11 sur la vérification fraîche des plans), dans la section dont le titre de niveau 2 commence
   exactement par « À Samuel » (ligne `## À Samuel`, suffixe libre après). Une seule section par fichier ; toute autre
   section, et tout autre fichier, n'est jamais lu comme une question.
 - **Une entrée** est une puce de premier niveau dont la première ligne commence exactement par
@@ -416,12 +419,13 @@ tout changement passe par un amendement daté ici.
   (état « à vérifier », P76-D-36), `appliquee-hors-recommandation` (l'option appliquée n'est pas la
   recommandée : « mal formée »), `decision-introuvable` (la décision citée par « appliquée » n'est pas définie dans le
   registre : état « à vérifier »). Une entrée « mal formée » garde `id`, `phase`, `fichier`, `ligne` et `defauts`
-  quand ils sont lisibles, rien d'autre.
+  quand ils sont lisibles, rien d'autre ; une entrée « à vérifier » garde tous ses champs lus, plus `defauts` (amendé le
+  2026-11-11).
 - **Bornes.** Textes passés par le nettoyage de la 76 (aucun chemin absolu ni `~/`) et coupés aux longueurs ci-dessus ;
   la page les rend en texte, jamais en HTML. Au plus 200 entrées, triées par phase puis identifiant ; au-delà,
   `tronque: true`. Fichier absent ou illisible : rien, sans erreur. Section vide : `registresLus` compté, aucune entrée.
 - **Ce que la 73 consomme** : dans « À vous », les seules entrées `etat` = `en-attente` ; à part, repliée, une liste
-  « Appliquées par délégation, contestables » des entrées `etat` = `appliquee` (question, option appliquée, décision
+  (libellé choisi par la 73 : « Décisions prises pour vous, contestables (N) ») des entrées `etat` = `appliquee` (question, option appliquée, décision
   qui l'applique), jamais mêlée à « À vous » et jamais cachée ; le `bilan` pour dire ce qui n'est pas lu (« N questions
   écrites dans un autre format, non lues ») et ce qui est à vérifier. Elle n'affiche jamais une entrée `mal-formee` ou
   `a-verifier` comme une question qui attend une réponse. Tant que la lecture de la 76 n'existe pas (la 73 s'exécute
