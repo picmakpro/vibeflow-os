@@ -74,3 +74,31 @@ M-ARC-ARCHIVE qui le fait rougir (voir la section « Mutants du registre »).
 
 Durée mesurée de la suite `test-driver-lock.sh` sur la base : 92 s (pilote génératif et sept variantes lancés en parallèle,
 40 s). Remarque : le même rejeu sous charge (deux autres suites du plan voisin en parallèle) a pris 285 s.
+
+## Mutants du registre
+
+Six copies mutées de `driver-lock.sh` (policy posée à côté), chacune sur une ligne neuve de ce plan, ancre de compte 1,
+`bash -n` valide, `cmp` différent de la copie témoin. Scénario court `t68_markers` (6 marqueurs) pour tous ; pilote
+génératif `t68_gen` (marqueurs `gen-*`, graine 20261111) contre le script réel et contre les trois mutants dont il est le
+témoin le plus sûr. Témoin préalable : la copie non mutée ne bascule aucun marqueur. Ensembles mesurés, relus un par un,
+puis figés dans la suite (rejeu final : 346 PASS / 0 FAIL, 155 s sous charge, 60 s pour T68.G + T68.M).
+
+| Mutant | Ancre (ligne neuve) | Substitution | Marqueurs basculés | Première assertion violée (attendu, obtenu) |
+|---|---|---|---|---|
+| M-ARC-ARCHIVE | `cat "$REG"; } \| awk -v cut` | `cat "$REG"` remplacé par `:` (le temporaire ne reprend plus le courant) | archive-lisible, fenetre-purge, plafond, gen-conservation, gen-couverture | archive-lisible `nd-1/done`, obtenu `/` ; fenetre-purge `old:0/new:2/sans:0`, obtenu `old:0/new:0/sans:0` ; plafond `lignes:3/derniere:ag-p3`, obtenu `lignes:0/derniere:` ; gen-conservation cycle 0, les 4 dernières lignes de l'archive ne sont pas celles du courant ; gen-couverture compteurs `{fenetre 0, plafond 6, running 16, reenregistre 0}` |
+| M-ARC-FENETRE | `ep >= cut` | condition remplacée par `1` (plus d'élagage par fenêtre) | fenetre-purge, gen-fenetre | fenetre-purge `old:0/new:2/sans:0`, obtenu `old:2/new:2/sans:0` ; gen-fenetre cycle 9, ligne d'epoch sous la coupe |
+| M-ARC-PLAFOND | `tail -n "$REG_MAX"` | remplacé par `cat` (plus d'élagage par plafond) | plafond, gen-plafond | plafond `lignes:3/derniere:ag-p3`, obtenu `lignes:6/derniere:ag-p3` ; gen-plafond cycle 2, 12 lignes pour un plafond de 9 |
+| M-ARC-COURANT | `registry_fold "$_arc" "$REG"` | ordre inversé : le courant avant l'archive | courant-prime | `1/running/nd-2`, obtenu `1/done/nd-1` |
+| M-ARC-LECTURE | `$10 == "running" \|\| $8 + 0 >= cut` | condition remplacée par `1` (plus de fenêtre en lecture) | fenetre-lecture | `run:1/clos:0`, obtenu `run:1/clos:1` |
+| M-ARC-ORPHELIN | `[ "$_orph" -gt 0 ] \|\| registry_archive` | archivage même avec un enfant running | orphelin-non-verse | `intact`, obtenu `verse` |
+
+Relecture des ensembles : chacun vient d'une cause lue. M-ARC-ARCHIVE fait aussi rougir gen-couverture, ce qui n'était
+pas prévu à l'écriture du plan : sans reprise du courant, l'archive reste vide, la fenêtre et le ré-enregistrement ne sont
+plus jamais exercés par le pilote (compteurs à 0) ; c'est le témoin de couverture qui fait son travail, l'ensemble est
+figé avec lui. Les deux mutants M-ARC-LECTURE et M-ARC-ORPHELIN sont ajoutés au-delà des quatre du plan : sans eux les
+marqueurs fenetre-lecture et orphelin-non-verse n'avaient aucun mutant qui les fasse rougir (le second est vert sur la
+base, donc seul un mutant prouve qu'il peut rougir). Le dossier du plan en compte donc six, pas quatre.
+
+Rejeux de contrôle sur le code final : `test-driver-lock-phase.sh` 110 ok / 0 ko (24 s) ; transcription WS-AB
+(`DLWS_MODE=matrice test-driver-lock-ws.sh`) 653 ok / 0 ko (143 s sous charge) ; `check-version-sync.sh` vert (aucune
+suite ajoutée).

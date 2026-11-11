@@ -1469,7 +1469,7 @@ for _t68_m in archive-lisible courant-prime orphelin-non-verse fenetre-purge fen
   [ "$_t68_v" = ok ] || grep "^MARKINFO $_t68_m " "$T68_DIR/reel/out.txt" | sed 's/^/      /'
 done
 assert_exit "T68.M témoin — la copie non mutée ne bascule aucun marqueur" "$(t68_ko "$T68_DIR/temoin" | wc -l | tr -d ' ')" 0
-t68_eval ARCHIVE 1 "archive-lisible fenetre-purge plafond gen-conservation"
+t68_eval ARCHIVE 1 "archive-lisible fenetre-purge plafond gen-conservation gen-couverture"
 t68_eval FENETRE 1 "fenetre-purge gen-fenetre"
 t68_eval PLAFOND 1 "plafond gen-plafond"
 t68_eval COURANT 0 "courant-prime"
