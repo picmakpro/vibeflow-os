@@ -216,6 +216,8 @@ et ne sont pas rouverts.
   arbre (« écrit en même temps par 2 agents ») ; la carte, elle, est retrouvée par `cible` seule, la classification de
   la collision par `arbre`. Témoins : un même `cible` dans deux arbres → signal « 2 arbres », pas « même arbre » ; le même
   `cible` dans le même arbre par deux agents vivants non parent-enfant → « même arbre » ; mutants croisés.
+  Priorité d'affichage d'une collision sur une carte : agents > arbres > branches > prévu (`RANG_SOURCE` de
+  `ui/75-vf-marques.js`) ; cette décision prime sur `75-UI-SPEC.md` § 5.2, qui ne nomme que trois niveaux.
 
 - **P75-D-31 (texte d'état des cibles coupées, A48).** Décision déléguée par Samuel (message session principale,
   2026-11-08), option recommandée : quand une voie porte `cibles.tronque` (liste coupée à 200 entrées) ou qu'une cible
@@ -418,8 +420,9 @@ l'aide commune. La 75 ne s'exécute de toute façon qu'après la 79 (dépendance
 Facultatif retenu : A28, `GET /api/vf/frise?champs=cibles`.
 
 **Amendements suivants de la 79 (tête `29fd3e71`), pris en compte par les plans :** A30 (`VF_COQUILLE.surOnglet`), A31 à
-A33 (instantané en mémoire, champs du planning, lab en sous-dossier), A34 (table des routes et réponse gardée dans le
-module neuf `vf-cockpit-routes.mjs`, annotateurs par ordre alphabétique de nom, points d'extension `attach(…, routes)` et
+A33 (instantané en mémoire, champs du planning, lab en sous-dossier), A34 (mécanisme des routes et réponse gardée dans le
+module neuf `vf-cockpit-routes.mjs` ; la table `ROUTES` elle-même reste dans `vf-cockpit-server.mjs`, où une route neuve
+ajoute UNE ligne `[chemin, lecteur, régime?]` à sa place alphabétique — 79-05, tête `673c879d`, annotateurs par ordre alphabétique de nom, points d'extension `attach(…, routes)` et
 `assembler(…, annotateurs)`, compteur de suites au nombre rendu par le gate), A35 et A36 (instantané avec `at`, sans
 voies brutes ; `rattachement` joint par la projection ; 2 000 voies au plus), A37 (une seule règle de chemin).
 A45 (P79-D-33 : forme `{ arbre, cible, n, dernierMs }`, worktrees prouvés comptés comme le lab), A46 (collision de
@@ -432,6 +435,11 @@ A48 (`351bc9e8`) : mutants d'interface par `cockpit_module_copie` et `COCKPIT_MO
 ligne `AJOUT` de `VENDORED.txt` ; `cibles.tronque` par voie (liste coupée à 200), `voiesOmises` à côté de `tronque`, cible
 coupée terminée par `…` dans ses 120 caractères : une cible coupée ne se joint jamais à sa jumelle entière, le radar
 dit qu'il ne peut pas conclure ; `/api/vf/transcript` lit la table en mémoire de la collecte.
+A51 et A52 (`c19c7461`) : `VF_COQUILLE.surOnglet(rappel, { cle })` — une `cle` déjà inscrite remplace la
+précédente, le nettoyage rendu est appelé avant chaque changement d'onglet ; le canal et ses consommateurs s'inscrivent
+avec `cle` = nom du fichier et retirent leurs couches au changement d'onglet (P75-D-05) ; `ROUTES`, `ANNOTATEURS` et
+lignes `AJOUT` de `VENDORED.txt` en ordre alphabétique contrôlé, sans repère ; seul `EVENEMENTS` de `ui/69-vf-flux.js`
+porte un repère par phase (`// vf-repere:phase-75`).
 </phase79_contract>
 
 <canonical_refs>

@@ -120,7 +120,7 @@ aucun canal ; sa relecture « Voir sur la carte » (P74-D-12) passe par `showBoa
 
 | Fichier | Plan(s) de la 75 | Partagé avec | Nature |
 |---|---|---|---|
-| `plugin/cockpit/scripts/vf-cockpit-routes.mjs` (module neuf de 79-05, A34) | 75-05 | 79 (79-05), 76 (`/api/vf/tracabilite`), 77 (`/api/vf/methode`) | une ligne, place alphabétique (`/api/vf/activite`) |
+| `plugin/cockpit/scripts/vf-cockpit-server.mjs` (table `ROUTES` de 79-05 ; le mécanisme vit dans `vf-cockpit-routes.mjs`) | 75-05 | 79 (79-05), 76 (`/api/vf/tracabilite`), 77 (`/api/vf/methode`) | une ligne `[chemin, lecteur, régime?]`, place alphabétique (`/api/vf/activite`) ; `test-cockpit-routes.sh` non modifié |
 | `plugin/cockpit/scripts/vf-cockpit-interface.json` | 75-05 | 79, 74, 76, 77 | schéma `vibeflow/cockpit-activite@1` |
 | `plugin/cockpit/scripts/vf-cockpit-planning.mjs`, `vf-cockpit-project.mjs` | 75-04 | 79 (79-09), 80 (`vague`, `avancement`, `exigences`) | champ facultatif `files_modified` seulement |
 | `plugin/cockpit/scripts/vf-cockpit-build.mjs` | 75-06 (annotateur `prevues`, 1 ligne, ordre alphabétique de nom), 75-09a (retrait) | 79 (79-05, table des annotateurs, A27/A34) | |
@@ -145,7 +145,7 @@ aucun canal ; sa relecture « Voir sur la carte » (P74-D-12) passe par `showBoa
 | 75-02 Gardes | 1 | — | 79-01 | ACTV-07 | `vf-cockpit-activite-gardes.mjs`, `tests/test-cockpit-activite-gardes.sh` (neufs) |
 | 75-03 Chemins, empreinte, collisions | 1 | — | 79-07, 79-09, 79-13 | ACTV-08, 09, 10 | `vf-cockpit-activite-chemins.mjs`, `-empreinte.mjs`, `-collisions.mjs`, `tests/test-cockpit-activite-chemins.sh`, `-empreinte.sh` (neufs) |
 | 75-04 `files_modified` | 1 | — | 79-09 ; plan de la 80 qui pose `vague` | ACTV-10, 11 | `vf-cockpit-planning.mjs`, `vf-cockpit-project.mjs` ; `tests/test-cockpit-activite-planning.sh` (neuf) |
-| 75-05 Route et schéma | 2 | 01-04 | 79-02, 79-05, 79-06, 79-09, 79-12, 79-13, 79-15 | ACTV-04, 08, 10, 12 | `vf-cockpit-activite.mjs` (neuf), `vf-cockpit-routes.mjs` (1 ligne), `vf-cockpit-interface.json`, `tests/test-cockpit-activite-route.sh` (neuf) |
+| 75-05 Route et schéma | 2 | 01-04 | 79-02, 79-05, 79-06, 79-09, 79-12, 79-13, 79-15 | ACTV-04, 08, 10, 12 | `vf-cockpit-activite.mjs` (neuf), `vf-cockpit-server.mjs` (1 ligne dans `ROUTES`), `vf-cockpit-interface.json`, `tests/test-cockpit-activite-route.sh` (neuf) |
 | 75-06 Cartes prévues | 2 | 03, 04 | 79-01, 79-02, 79-05, 79-09, 79-15 | ACTV-11 | `vf-cockpit-activite-prevues.mjs` (neuf), `vf-cockpit-build.mjs` (1 ligne) ; moteur `build.mjs`, `lib/common.mjs`, `serve.mjs` ; `tests/test-cockpit-activite-prevues.sh` (neuf) |
 | 75-07 Canal, pied réservé, marques | 3 | 05, 06 | 79-01, 79-02, 79-11, 79-16, 79-17, 79-18 ; 74 ; clavier du canevas de la 80 | ACTV-01, 02, 03, 10, 11 | `viewer.html`, `ui/75-vf-marques.js`, `ui/75-vf-marques-glyphes.js` (neufs), `VENDORED.txt`, `tests/test-cockpit-activite-carte.sh`, `chrome-activite-carte.mjs` (neufs) |
 | 75-08 Sélecteur, menu, panneau, radar | 4 | 05, 07 | 79-16, 79-17, 79-18 ; surcouches de la 80 ; 74 | ACTV-01, 02, 06, 07, 08, 10 | `ui/75-vf-activite.js`, `-menu.js`, `-tables.js`, `-panneau.js`, `-collisions.js` (neufs), `ui/02-vf-telephone.js`, `viewer.html`, `VENDORED.txt`, `tests/test-cockpit-activite-lentilles.sh`, `chrome-activite-lentilles.mjs` (neufs) |
