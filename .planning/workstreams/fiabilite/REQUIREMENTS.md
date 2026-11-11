@@ -1064,7 +1064,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | FORM-15 | Phase 80 | Pending |
 | FORM-16 | Phase 80 | Pending |
 | FORM-17 | Phase 80 | Pending |
-| FORM-18 | Phase 80 | Pending — après avis de Samuel (S80-1 à S80-5) |
+| FORM-18 | Phase 80 | Pending — réouvertures tranchées (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) |
 
 **Coverage:**
 - Milestone 1 (v1) : 14 requirements — Complete ✓
@@ -1698,7 +1698,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 <!-- vf-cadrage:phase-80 -->
 
 ### Trois onglets, trois formes (Phase 80 — posées au cadrage, 2026-11-11)
-> Dérivent de P80-D-01..51 (`80-CONTEXT.md` ; décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée, tranchées par panel sur faits établis). Famille neuve `FORM`, réservée par le ROADMAP, vérifiée libre le 2026-11-11 (0 occurrence de `FORM-<n>` sous `.planning/` et `plugin/` à `f763b556`). FORM-18 attend l'avis de Samuel.
+> Dérivent de P80-D-01..58 (`80-CONTEXT.md` ; décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée, tranchées par panel sur faits établis ; P80-D-52 à P80-D-56 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11). Famille neuve `FORM`, réservée par le ROADMAP, vérifiée libre le 2026-11-11 (0 occurrence de `FORM-<n>` sous `.planning/` et `plugin/` à `f763b556`). FORM-18 attend l'avis de Samuel.
 
 - [ ] **FORM-01**: Canevas au clavier : un seul arrêt de tabulation pour le canevas (Code, et Projet en mode graphe), flèches entre cartes par voisin spatial, Origine/Fin, Entrée plonge et Échap remonte avec le focus rendu à une carte ; `listbox` nommé, cartes `option` avec titre, mot d'état et compte ; arêtes masquées aux lecteurs d'écran ; témoin : 0 carte atteinte aujourd'hui → exactement 1 arrêt et une flèche qui change de carte (AUDC-BL2, P80-D-10).
 - [ ] **FORM-02**: Surcouches : pile unique, Échap au niveau du document ferme le dessus, modales avec piège à Tab, `inert` derrière et focus rendu à l'ouvreur, non modales sans prise de focus (Q5), terminal exclu d'Échap et son `inert` jamais levé par la pile, panneau fermé non tabulable ; les trois listes recopiées retirées ; témoins : palette ouverte + Tab + Échap → fermée, export + 15 Tab → focus dedans, panneau fermé → 0 élément tabulable (AUDC-M6, P80-D-11).
@@ -1717,7 +1717,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **FORM-15**: Lien de vue : le fragment porte vue, sélection, zoom et tiroir Git ; « Copier le lien de cette vue » ; l'état des tiroirs survit au changement d'onglet (P80-D-21).
 - [ ] **FORM-16**: Onglets sans rechargement sur la coquille de la Phase 79 (`VF_COQUILLE.chargerOnglet`) : routage, `vf:onglet`, Précédent/Suivant, focus annoncé, titre « <Onglet> · <nom> » ; tiroirs, zoom et historique du terminal gardés, amorce du terminal inchangée (AUDC-I30, AUDC-X7 reste, AUDC-F7, P80-D-22).
 - [ ] **FORM-17**: Non-régression : toutes les suites du cockpit vertes sous macOS et Linux, aucune affaiblie ; chaque comportement porte un témoin rouge sur la base puis vert, un mutant par garde ; mouvement réduit tenu (zéro animation active) ; plafond de 300 lignes par extension ; compteur de suites, table de durées et CHANGELOG du module tenus par le plan d'assemblage (P80-D-24, P80-D-25, P80-D-26).
-- [ ] **FORM-18**: Après avis de Samuel seulement : titre de vue (AUDC-M2, rouvre Q10), en-tête (AUDC-M5, rouvre P70-D-22 et PU-G-001), Santé en français (AUDC-M8, rouvre P70-D-04), explication du terminal sans `--terminal` (AUDC-M10 reste, rouvre P71-D-02), taille de l'ouvreur Git (AUDC-F3 en partie, rouvre P78-D-34) — questions S80-1 à S80-5 de `80-CONTEXT.md` ; non exécutable tant qu'elles ne sont pas tranchées.
+- [ ] **FORM-18**: Réouvertures tranchées (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; P80-D-52 à P80-D-56) : titre de vue dans une zone réservée de 130 px au plus, flou et texte court gardés (AUDC-M2, amende Q10) ; en-tête en trois groupes libellés au-delà de 1 280 px, fil d'Ariane à chevron, trois icônes trompeuses remplacées, badge « au travail » et troncature de la branche inchangés (AUDC-M5, amende PU-G-001 en partie) ; constats de Santé traduits en français dans le collecteur, noms propres gardés, introduction non retouchée (AUDC-M8, amende P70-D-04) ; une ligne « Le terminal s'active avec --terminal » dans l'aide `?` et la palette, sans pastille, port ni route (reste de AUDC-M10, amende P71-D-02) ; ouvreur Git dessiné à 36 px avec une zone d'appui de 44 px (AUDC-F3 en partie, amende P78-D-34) ; chaque point porte un témoin rouge sur la base puis vert.
 
 ---
 *Requirements defined: 2026-06-04*

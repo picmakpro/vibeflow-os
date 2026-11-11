@@ -1,7 +1,7 @@
 # Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation - Context
 
 **Gathered:** 2026-11-11
-**Status:** Cadrée (2026-11-11) — frontière de questions vide ; cinq réouvertures rangées « À Samuel », non bloquantes
+**Status:** Cadrée (2026-11-11) — frontière de questions vide ; cinq réouvertures tranchées par Samuel le 2026-11-11 (P80-D-52 à P80-D-56)
 
 Cadrage par le manager de la mission Phase 80 (`vf-dev-manager`, worktree `.claude/worktrees/phase-80`, branche
 `feat/phase-80-trois-formes`, base `origin/integration/cockpit-audit` `f763b556`, lot 0 de l'audit déjà fusionné). Jalon
@@ -26,8 +26,8 @@ Les jetons défaillants (contraste, tailles, chiffres) sont repris. Les onglets 
 une fois la coquille de la Phase 79 livrée.
 
 **Absorbe (part restante après le lot 0 seulement) :** AUDC-BL1, BL2, M1, M6, M12, X1, X2, X3, X5, X7 (onglets sans
-rechargement ; les titres sont livrés), X8, F1, F3, F4, F5, F7 ; idées I23 à I27, I29, I30 ; et, **après avis de Samuel
-seulement**, AUDC-M2, M5, M8 et la pastille de M10 (plan à part, non exécutable en l'état).
+rechargement ; les titres sont livrés), X8, F1, F3, F4, F5, F7 ; idées I23 à I27, I29, I30 ; et AUDC-M2, M5, M8 et la pastille de M10
+(réouvertures tranchées par Samuel le 2026-11-11, P80-D-52 à P80-D-56).
 
 **Déjà livré par le lot 0, hors plans :** AUDC-X4, X6, X7 (format de titre « <Onglet> · <nom> »), M7, M10 (vraie cause,
 « Terminer »), M11 (tiroir du terminal rehaussé à min(480 px, 60 %) ; resté rehaussé après « Annuler » : en attente du
@@ -432,6 +432,27 @@ Faits établis par la recherche qui corrigent la forme de décisions déjà pris
   (la feuille s'ouvre au téléphone) et « Ouvrir la phase » est dans la feuille. Au bureau, la sélection suit le focus
   dans les couloirs et la liste.
 
+### Reprise du 2026-11-11 (arbitrages rendus, contrats de la 79 à la tête `317d34c7`)
+
+- **P80-D-57 (redécoupage du plan « après avis »).** Le plan unique des réouvertures devient des plans exécutables, placés
+  dans les vagues ordinaires après la fusion de la Phase 79 : titre de vue et en-tête (P80-D-52, P80-D-53, P80-D-56 :
+  mêmes fichiers d'en-tête et `viewer.html`), Santé en français dans le collecteur (P80-D-54), ligne de l'aide et de la
+  palette (P80-D-55, registre des raccourcis de 80-14). Plus aucun plan non autonome. Décision déléguée par Samuel
+  (message session principale, 2026-11-08), option recommandée.
+- **P80-D-58 (règles de la 79 à la tête `317d34c7`, amendements A34 à A44 ; même délégation).** Chaque plan de la 80 les
+  tient : (a) un fichier de code du module fait **299 lignes au plus** (`check-file-size.sh`, A44) ; (b) aucune ligne de
+  plus de **160 colonnes** dans un fichier neuf (cliquet de colonnes de 79-11, baseline 0 pour un fichier neuf) ; (c) le
+  code du tiroir du terminal et du lancement vit sous `assets/ui/tiroir/` et la page du terminal sous
+  `assets/ui/terminal/` (A43) : F1 vise `assets/ui/terminal/vue.js` (et sa feuille de style) et
+  `assets/ui/tiroir/lancer.js`, plus `vf-cockpit-terminal-vue.mjs` ni `vf-cockpit-lancer-ui.mjs` ; (d) coquille et CSP
+  (A40, A41) : aucun script en ligne ajouté à `viewer.html` ni à la coquille, les extensions neuves sont des fichiers du
+  module servis sous `/_vf/`, et aucune suite ne lit un fichier de la sortie par service statique ; (e) le compteur de
+  suites s'écrit au nombre réel compté par le gate, jamais en littéral recopié (A34) ; (f) Santé : la 79 garde les
+  motifs `R` et `P` de `80-vf-fr.js` pour reconnaître les constats traduits à l'affichage (A43, A44) — P80-D-54 traduit
+  à la source dans le collecteur sans retirer ces motifs ; (g) références exactes : aide de lancement `socle-serveur.sh`
+  (79-02, retouchée par 79-11), coquille et `chargerOnglet` (79-16), `VF_ETAT` (79-17), worker de mise en page (79-18),
+  porte du flux `window.VF_FLUX` (79-14).
+
 ### Claude's Discretion
 
 Noms exacts des fichiers neufs (dans la plage `ui/` qui garantit l'ordre de chargement), découpage interne sous le
@@ -439,43 +460,42 @@ plafond de 300 lignes, libellés français exacts (dictionnaire), forme exacte d
 décisions ci-dessus et l'UI-SPEC de la phase.
 </decisions>
 
-## À Samuel
+## Arbitrages de Samuel sur les réouvertures (S80-1 à S80-5)
 
-Cinq points rouvrent un arbitrage déjà rendu (les quatre lignes désignées par le registre, et S80-5 relevé au craft).
-L'arbitrage en vigueur tient ; les plans sont bâtis dessus ; ces cinq
-points sont rangés dans un plan à part, « après avis de Samuel », non exécutable en l'état. Rien d'autre n'en dépend.
+Les cinq questions posées au cadrage ont été tranchées par Samuel : **arbitrage Samuel, AskUserQuestion session
+principale, 2026-11-11**, relayé au manager par la session principale le même jour. Chaque réponse est recopiée mot pour
+mot (libellé coché, puis l'option telle qu'elle lui a été présentée). Aucune option « révision du plan » n'a été retenue.
+Chaque arbitrage d'origine n'est amendé que dans la mesure exacte de l'option retenue, pas au-delà.
 
-- **S80-1 — Titre de vue flottant (AUDC-M2, rouvre Q10 « Flou gardé, texte court »).** Le bloc de titre, sans fond, se
-  superpose aux cartes. Options : (a) garder Q10 tel quel ; (b) une zone réservée au titre, que `freeArea()` déduit déjà
-  (jusqu'à 130 px), avec le flou gardé ; (c) le titre de vue monte dans l'en-tête (fil d'Ariane). Recommandation : (b),
-  le flou et le texte court restent, seule la superposition disparaît. Avec les couloirs, la question ne vaut plus que
-  pour Code et le graphe de Projet.
-- **S80-2 — En-tête (AUDC-M5, rouvre P70-D-22 et « Garder ce compromis », PU-G-001).** Neuf icônes sans libellé,
-  triangle pour « Parcours », icône « récent » qui ressemble à un chargement, point beige pour « N au travail », branche
-  tronquée. Options : (a) garder ; (b) trois groupes libellés au-delà de 1 280 px, fil d'Ariane à chevron, icônes
-  remplacées pour les trois faux amis, badge et troncature inchangés ; (c) (b) plus le badge « au travail » libellé et la
-  branche entière dans l'en-tête. Recommandation : (b) — elle ne rouvre que PU-G-001 en partie ; la branche entière est
-  déjà donnée par la ligne d'état (P80-D-18), ce qui laisse P70-D-22 intact.
-- **S80-3 — Santé en anglais (AUDC-M8, rouvre P70-D-04 et, derrière lui, P67-D-20).** Options : (a) garder les constats en
-  anglais ; (b) traduire les gabarits des constats (collecteur vendorisé `health.mjs`), sans toucher aux noms propres ;
-  (c) (b) et revoir l'introduction après remesure de la détection des services (déjà fondée sur le dépôt, d'après le
-  cadrage). Recommandation : (b), avec remesure avant toute retouche de l'introduction.
-- **S80-4 — Pastille du terminal sans `--terminal` (AUDC-M10 reste, rouvre P71-D-02).** Sans l'option, rien n'existe et
-  rien ne l'explique. Options : (a) garder « rien sans l'option » ; (b) une ligne d'explication dans l'aide `?` et la
-  palette (« Le terminal s'active avec `--terminal` »), aucune pastille, aucun port, aucune route ; (c) une pastille
-  inerte expliquée. Recommandation : (b) — elle explique sans rien ajouter à l'écran et ne touche ni à la politique de
-  contenu ni au périmètre réseau.
+- **P80-D-52 (S80-1, AUDC-M2 — amende Q10).** Réponse : « Zone réservée (Recommandé) » — « Le titre garde son flou et
+  son texte court, mais dans une zone à lui (130 px au plus, que la mise en page sait déjà déduire) : les cartes ne
+  passent plus dessous. Votre réponse d'origine est gardée, seule la superposition disparaît. » Option (b) du cadrage.
+  Q10 (« Flou gardé, texte court ») tient : seule la superposition du bloc de titre sur les cartes disparaît. Vaut pour
+  Code et pour le graphe de Projet ; les couloirs et la liste ont déjà leur `h1` dans le flux.
+- **P80-D-53 (S80-2, AUDC-M5 — amende PU-G-001 en partie ; P70-D-22 intact).** Réponse : « Trois groupes libellés
+  (Recommandé) » — « Au-delà de 1 280 px de large, les boutons sont rangés en trois groupes qui portent un libellé ; le
+  fil d'Ariane prend un chevron ; les trois icônes trompeuses sont remplacées. Le badge « au travail » et la troncature
+  de la branche ne changent pas : votre compromis n'est rouvert qu'en partie. » Option (b). Le badge « au travail »
+  réduit à son point entre 701 et 1 639 px (P70-D-22) et la troncature de la branche (« Garder ce compromis »,
+  PU-G-001) restent ; seuls le rangement en groupes libellés au-delà de 1 280 px, le chevron et les trois icônes
+  (« Parcours », « Travail récent », sessions/agents) changent.
+- **P80-D-54 (S80-3, AUDC-M8 — amende P70-D-04 et, derrière lui, P67-D-20).** Réponse : « Traduire les constats
+  (Recommandé) » — « Les gabarits des constats passent en français dans le collecteur ; les noms propres (outils,
+  services) restent tels quels. L'introduction de l'onglet n'est pas retouchée sans nouvelle mesure. » Option (b).
+  Les constats du panneau Santé ne restent plus en anglais (fin de P70-D-04 sur ce point) ; P67-D-20 (l'anglais reste une
+  langue admise) tient pour le reste. L'introduction de Santé n'est pas retouchée dans cette phase.
+- **P80-D-55 (S80-4, AUDC-M10 reste — amende P71-D-02).** Réponse : « Une ligne dans l'aide (Recommandé) » — « Une ligne
+  dans l'aide « ? » et dans la palette : « Le terminal s'active avec --terminal ». Aucune pastille, aucun port, aucune
+  route : rien ne s'ajoute à l'écran ni au réseau. » Option (b). P71-D-02 (sans le drapeau : aucun port, aucune route,
+  aucun tiroir) tient en entier ; seule une ligne de texte s'ajoute à l'aide `?` et à la palette.
+- **P80-D-56 (S80-5, AUDC-F3 en partie — amende P78-D-34).** Réponse : « 36 visibles, 44 d'appui (Recommandé) » — « Le
+  bouton est dessiné à 36 px comme ses voisins, mais sa zone d'appui reste de 44 px : la cible tactile que vous aviez
+  ratifiée est tenue, et l'en-tête retrouve une seule taille. » Option (b). Le seuil et la présence de l'icône de
+  P78-D-34 (701 à 1 279 px) tiennent ; seul le dessin passe à 36 px, la zone d'appui restant de 44 px.
 
-- **S80-5 — Ouvreur Git à 44 px parmi des boutons à 36 (AUDC-F3, rouvre P78-D-34, ratifiée par Samuel le
-  2026-11-05).** Relevé par le craft de navigation : F3 demande une seule taille de bouton d'en-tête, mais l'icône
-  44 px de l'ouvreur Git de 701 à 1 279 px est un arbitrage ratifié. En vigueur : l'ouvreur reste à 44 px ; le lot jetons
-  n'aligne que le bouton de thème (F3 au sens strict). Options : (a) garder ; (b) visuel à 36 px avec une zone d'appui
-  de 44 px (cible tactile tenue) ; (c) 36 px partout au-delà de 999 px. Recommandation : (b), la cible d'appui de
-  P78-D-34 est gardée et l'en-tête retrouve une taille. Rangé dans le plan « après avis de Samuel ».
-
-Signalés sans réouverture : le tiroir du terminal resté rehaussé après « Annuler » (AUDC-M11, en attente du regard de
-Samuel depuis le lot 0, non touché) ; la source exacte de la borne « un tiroir latéral ne pousse jamais la carte » est
-PU-G-204, pas Q12.
+Le plan « après avis de Samuel » est redécoupé en plans exécutables (P80-D-49 accomplie). Signalé sans réouverture :
+AUDC-M11 est tranché hors de cette phase (lot de correctifs à part) ; la source exacte de la borne « un tiroir latéral ne
+pousse jamais la carte » est PU-G-204, pas Q12.
 
 <canonical_refs>
 ## Canonical References
