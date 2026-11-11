@@ -7,7 +7,7 @@
 //   GET /api/vf/etat    { mode, seq, derniereMaj, clients }
 //   GET /api/vf/journal  { evenements } : les 100 derniers événements du direct (nom, séquence, date, compte), sans contenu
 //   GET /api/vf/doing?id=  dernière commande d'UNE session, à la demande (schéma vibeflow/cockpit-doing@1)
-//   GET /api/vf/transcript?id=  transcript réduit d'UN agent connu (mandat, messages, outils), à la demande (schéma vibeflow/cockpit-transcript@1)
+//   GET /api/vf/transcript?id=  transcript réduit d'UN agent connu (mandat d'agent, fil daté de messages et d'outils), à la demande (schéma vibeflow/cockpit-transcript@2)
 //   GET /api/vf/modeles    { modeles, defaut, lab } : liste fermée des modèles, défaut effectif, identifiant du lab
 //   GET /api/vf/git        topologie Git du lab (schéma vibeflow/cockpit-git@1), lecture seule (78-05)
 //   GET /api/vf/git/entete dépôt, branche, worktree (schéma vibeflow/cockpit-git-entete@1)

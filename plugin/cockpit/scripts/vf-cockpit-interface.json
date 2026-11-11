@@ -21,7 +21,7 @@
       "arbre": { "requis": ["label", "branche", "principal", "courant", "phaseActive", "retard"], "optionnels": [] },
       "retard": { "requis": ["base", "main", "origin", "fetchAgeS"], "optionnels": [] },
       "etatsVerrous": ["lue", "absente", "erreur"],
-      "interdits": ["doing", "mandat", "messages", "outils"]
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"]
     },
     "vibeflow/cockpit-who@2": {
       "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "fenetre": "number", "busy": "boolean", "workers": "array", "sources": "object" },
@@ -34,7 +34,7 @@
         "etats": ["rattache", "non-rattache"],
         "raisons": ["sans-citation", "inconnu", "ambigu"]
       },
-      "interdits": ["doing", "mandat", "messages", "outils"],
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"],
       "kinds": ["session", "subagent", "lock", "registered", "dag-node"],
       "etatsSource": ["lue", "absente", "erreur", "forme-inconnue"]
     },
@@ -46,7 +46,7 @@
       "statuts": ["done", "active", "todo", "blocked"],
       "meta": { "requis": ["vfTab", "vf", "kindLabels"] }
     },
-    "vibeflow/cockpit-transcript@1": {
+    "vibeflow/cockpit-transcript@2": {
       "requis": { "schema": "string", "id": "string" },
       "optionnels": ["mandat", "fil", "tronque", "erreur"]
     },
@@ -55,7 +55,7 @@
       "noeud": { "requis": ["id", "label", "kind"] },
       "lien": { "requis": ["a", "b", "k"] },
       "statuts": ["done", "active"],
-      "interdits": ["doing", "mandat", "messages", "outils"],
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"],
       "meta": { "requis": ["vfTab", "vf", "kindLabels"] }
     },
     "vibeflow/cockpit-doing@1": {
@@ -66,7 +66,7 @@
       "requis": { "schema": "string", "etat": "string", "entete": "object", "base": "object", "worktrees": "array", "rangees": "array", "couloirsMax": "number", "replies": "number", "refsIgnorees": "number", "horsFenetre": "array", "mergees": "array", "tags": "array", "stash": "array", "auteurs": "array", "parBranche": "array", "bornes": "object", "commandes": "object" },
       "etats": ["ok", "vide", "indisponible", "absent"],
       "rangee": { "requis": ["h", "h7", "p", "at", "an", "s", "col", "entrants", "sortants", "largeur", "ouvertBas", "fusion", "racine", "teinte", "refs", "refsPlus"] },
-      "interdits": ["doing", "mandat", "messages", "outils"]
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"]
     },
     "vibeflow/cockpit-git-commit@1": {
       "description": "détail d'un commit sans diff (78-08, GET /api/vf/git/commit?sha=) : requis vaut pour etat ok ; sha-invalide (400) et commit-inconnu (404) ne portent que schema et etat ; indisponible (200) aussi",

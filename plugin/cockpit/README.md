@@ -340,7 +340,7 @@ Schémas lisibles dans `scripts/vf-cockpit-interface.json` (copié à l'identiqu
 `readPlanning` sur chaque phase : décompte de plans, correctifs, état dérivé, mission rattachée ; **monté de `@1` à `@2`** pour dire l'état de vie d'une mission :
 `abandonnee`, `inconnu` et le champ `vie`), `vibeflow/cockpit-signal@1` (ce que la pane lit : phases, jalons, missions, verrous, worktrees et retard, équipe),
 `vibeflow/cockpit-who@2` (arbre des agents : parent, état, action, rattachement, fenêtre de 24 h ; remplace `@1`),
-`vibeflow/cockpit-transcript@1` (transcript réduit) et `vibeflow/cockpit-equipe@1`. Les autres schémas restent à `@1`.
+`vibeflow/cockpit-transcript@2` (transcript réduit ; **monté de `@1` à `@2`** : `messages` et `outils` remplacés par le fil daté `fil`) et `vibeflow/cockpit-equipe@1`. Les autres schémas restent à `@1`.
 
 ## Code tiers
 

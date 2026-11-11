@@ -100,7 +100,7 @@ ENT='(j.fil||[]).map((e)=>(e.genre==="message"?"m:"+e.texte:"o:"+e.outil+"/"+e.v
 assert_eq "D8.0 — témoin : la route rend un agent connu (pas d'erreur)" "$(G "$WORK/t-agent.json" 'j.erreur||"ok"')" "ok"
 assert_eq "D8.1 — agent : le champ fil est UN tableau ordonné, messages et outils entrelacés dans l'ordre du fichier" "$(G "$WORK/t-agent.json" "Array.isArray(j.fil)?$ENT:\"pas de tableau fil\"")" "m:MSG-AGENT-1,o:Bash/lance une commande/,o:Read/lit/src/b.js,m:MSG-AGENT-2"
 assert_eq "D8.2 — une heure (ISO 8601) par ligne, croissante" "$(G "$WORK/t-agent.json" '(()=>{const f=j.fil;if(!Array.isArray(f)||!f.length)return "pas de fil";const ok=f.every((e)=>typeof e.t==="string"&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/.test(e.t)&&!isNaN(Date.parse(e.t)));const cr=f.every((e,i)=>i===0||Date.parse(f[i-1].t)<=Date.parse(e.t));return ok&&cr?"ok":"heures : "+f.map((e)=>e.t).join(",")})()')" "ok"
-assert_eq "D8.3 — plus de deux listes séparées (ni messages ni outils), schéma inchangé" "$(G "$WORK/t-agent.json" 'Array.isArray(j.fil)?("messages" in j)+"|"+("outils" in j)+"|"+j.schema:"pas de fil"')" "false|false|vibeflow/cockpit-transcript@1"
+assert_eq "D8.3 — plus de deux listes séparées (ni messages ni outils), schéma @2 (forme cassante : messages et outils retirés)" "$(G "$WORK/t-agent.json" 'Array.isArray(j.fil)?("messages" in j)+"|"+("outils" in j)+"|"+j.schema:"pas de fil"')" "false|false|vibeflow/cockpit-transcript@2"
 assert_eq "D8.4 — aucune sortie d'outil ni argument d'outil, aucune clé input (apparié aux positifs)" "$(G "$WORK/t-agent.json" '(()=>{const s=JSON.stringify(j);if(!(s.includes("MSG-AGENT-1")&&s.includes("MANDAT-DE-AGENT")))return "positifs absents";const f=(o)=>!!o&&typeof o==="object"&&Object.entries(o).some(([k,v])=>k==="input"||f(v));return s.includes("SORTIE-OUTIL-SECRETE")||s.includes("ARG-SECRET")||f(j)?"fuite":"ok"})()')" "ok"
 assert_eq "D7.1 — agent : le mandat est lu dans son dispatch" "$(G "$WORK/t-agent.json" 'j.mandat')" "MANDAT-DE-AGENT"
 assert_eq "D7.2 — session : aucun mandat (témoin : le fil de la session est rendu)" "$(G "$WORK/t-session.json" '(()=>{if(!(j.fil||[]).some((e)=>e.texte==="MSG-SESSION-2"))return "fil absent";return JSON.stringify(j.mandat||"")})()')" '""'
@@ -135,6 +135,14 @@ assert_eq "D7.4 — mandat présent : l'intertitre et le texte sont rendus" "$(G
 assert_eq "D8.6 — le rendu dit l'heure de chaque ligne du fil, du message comme de l'outil" "$(G "$WORK/vm.json" 'j.erreur||(()=>{const l=j.textes.filter((t)=>t.includes("MSG-RENDU")||t.includes("(Read)"));return l.length===2&&l.every((t)=>/\d\d:\d\d:\d\d/.test(t))?"ok":JSON.stringify(l)})()')" "ok"
 rend '{"mandat":"","fil":[],"tronque":false}'
 assert_eq "D7.5 — fil vide : pas d'exception, pas d'intertitre « Mandat »" "$(G "$WORK/vm.json" 'j.erreur||String(j.titres.includes("Mandat"))')" "false"
+
+# --- contrat : le contenu de transcript transite sous fil, les gardes-fous le connaissent ---
+cat > "$WORK/interdits.mjs" <<'JS'
+import fs from 'node:fs';
+const c = JSON.parse(fs.readFileSync(process.argv[2] + '/vf-cockpit-interface.json', 'utf8')).schemas;
+console.log(Object.entries(c).filter(([, v]) => Array.isArray(v.interdits) && v.interdits.includes('messages')).map(([k, v]) => k.split('/')[1] + ':' + v.interdits.includes('fil')).sort().join(','));
+JS
+assert_eq "D8.9 — les quatre schémas (equipe, git, signal, who) qui interdisent messages et outils interdisent aussi fil (tripwire du flux)" "$(node "$WORK/interdits.mjs" "$SCRIPTS")" "cockpit-equipe@1:true,cockpit-git@1:true,cockpit-signal@1:true,cockpit-who@2:true"
 
 echo; echo "Résultat : $PASS réussis, $FAIL échoués"
 [ "$FAIL" -eq 0 ]

@@ -228,6 +228,7 @@ globalThis.__vfOnEvent('patch', { seq: 1, patch: [], at: 1 });                  
 globalThis.__vfOnEvent('who', { seq: 2, at: 2, who: { workers: [{ id: 'w', detail: [{ x: [{ mandat: VALEUR }] }] }] } });       // mandat à trois niveaux de profondeur
 globalThis.__vfOnEvent('patch', { seq: 3, patch: [], at: 3, outils: VALEUR });                                                  // outils à la racine
 globalThis.__vfOnEvent('who', { seq: 4, at: 4, who: { workers: [{ id: 'w', sub: { messages: [VALEUR] } }] } });               // messages dans un travailleur
+globalThis.__vfOnEvent('who', { seq: 6, at: 6, who: { workers: [{ id: 'w', sub: { fil: [{ texte: VALEUR }] } }] } });             // fil daté (AUDC-D8) dans un travailleur
 sortie.flux = await flux;
 globalThis.__vfSnap = { seq: 5, lock: { available: false }, who: { workers: [{ id: 'w', sub: { mandat: VALEUR } }], sources: {} } };
 sortie.hello = await lire(500);
@@ -345,7 +346,7 @@ TOK="$(node "$AUX/token.mjs" "$PORT" /)"
 RQ() { node "$AUX/req.mjs" "$PORT" "$@"; }
 assert_eq "T25.0 — contrôle positif : serveur démarré, jeton lu, leurre vivant, la fixture du HOME porte les 8 marqueurs négatifs" "$([ "$PORT" -gt 0 ] && [ "${#TOK}" -ge 16 ] && echo serveur)|$(ps -p "$LEURRE" >/dev/null 2>&1 && echo leurre)|$(n=0; for m in "${NEG[@]}"; do grep -q -- "$m" "$SUBD/agent-ag1.jsonl" && n=$((n+1)); done; echo "$n")" "serveur|leurre|8"
 RQ GET "/api/vf/transcript?id=ag1" "$TOK" > "$WORK/t1.out"; sed '1,2d' "$WORK/t1.out" > "$WORK/t1.body"
-assert_eq "T25.1 — avec le jeton : statut 200, schéma vibeflow/cockpit-transcript@1, mandat visible" "$(sed -n 1p "$WORK/t1.out")|$(node "$AUX/jget.mjs" "$WORK/t1.body" 'j.schema')|$(node "$AUX/jget.mjs" "$WORK/t1.body" 'String(j.mandat).includes("MANDAT-VISIBLE-69")')" "200|vibeflow/cockpit-transcript@1|true"
+assert_eq "T25.1 — avec le jeton : statut 200, schéma vibeflow/cockpit-transcript@2, mandat visible" "$(sed -n 1p "$WORK/t1.out")|$(node "$AUX/jget.mjs" "$WORK/t1.body" 'j.schema')|$(node "$AUX/jget.mjs" "$WORK/t1.body" 'String(j.mandat).includes("MANDAT-VISIBLE-69")')" "200|vibeflow/cockpit-transcript@2|true"
 assert_eq "T25.2 — la réponse porte le mandat et le message visibles et aucun marqueur négatif (ni le jeton factice)" "pos=$(positifs "$WORK/t1.body")|neg=$(fuites "$WORK/t1.body")" "pos=2|neg=0"
 assert_eq "T25.3 — sans jeton : 403 (apparié à T25.1)" "$(RQ GET "/api/vf/transcript?id=ag1" | sed -n 1p)" "403"
 RQ GET "/api/vf/transcript?id=..%2Fetc" "$TOK" > "$WORK/t4.out"
@@ -399,7 +400,7 @@ dg() { printf '%s' "$DG" | node "$AUX/jq.mjs" "$1"; }
 dm() { printf '%s' "$DM" | node "$AUX/jq.mjs" "$1"; }
 assert_eq "T25.16a — témoin positif : un hello propre part, puis le hello et l'événement propre arrivent dans le flux" "$(dg 'j.helloPropre.ev.length+","+j.flux.ev.slice(0,2).join("/")')" "1,hello/patch"
 assert_eq "T25.16 — un snapshot portant une clé mandat : le hello n'est jamais émis, la réponse est close" "$(dg 'j.hello.ev.length+","+j.hello.fini')" "0,true"
-assert_eq "T25.16b — dans le flux, les événements portant mandat, outils ou messages (toute profondeur) sont refusés : seul l'événement propre passe" "$(dg 'j.flux.ev.filter(e=>e!=="hello").join(",")')" "patch"
+assert_eq "T25.16b — dans le flux, les événements portant mandat, outils, messages ou fil (toute profondeur) sont refusés : seul l'événement propre passe" "$(dg 'j.flux.ev.filter(e=>e!=="hello").join(",")')" "patch"
 assert_eq "T25.16c — la valeur interdite ne figure nulle part dans la sortie du serveur (flux, hello, journal des refus)" "$(dg 'j.fuite')" "false"
 assert_eq "T25.17 — témoin : une copie dont la garde d'émission rend toujours faux laisse passer le hello à clé mandat, l'original le refuse" "$APPLIQUE|copie:$(dm 'j.hello.ev.length')|original:$(dg 'j.hello.ev.length')" "appliqué|copie:1|original:0"
 
