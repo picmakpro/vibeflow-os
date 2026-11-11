@@ -87,7 +87,8 @@ TL="$WORK/lab-term"; mklab "$TL"; OT="$TL/.vibeflow/cockpit"; serve "$TL" "$OT" 
 pilote() { # pilote <port> <module> <racine-terminal> <sections>
   REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-surcouches.mjs" "$CHROME" "http://127.0.0.1:$1" "$2" "${3:-}" "${4:-su1,su2,su3,su4}" 2>"$WORK/mesure.err"
 }
-R="$(pilote "$PORT" "$PILE" "http://127.0.0.1:$PORT_T")"
+# SU_SECTIONS : mise au point (sections jouées) ; SU_SANS_MUTANTS=1 saute les mutants
+R="$(pilote "$PORT" "$PILE" "http://127.0.0.1:$PORT_T" "${SU_SECTIONS:-su1,su2,su3,su4}")"
 [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/mesure.json"
 [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }
 E() { printf '%s' "$R" | node "$AUX/ev.mjs" "$1"; }
@@ -138,12 +139,15 @@ assert_eq "SU5.1 — « #palette.open, #flowmenu.open » absent de 02, 73 et 77 
 echo "=== SU6 — coquille de la 79 ==="
 echo "  ⏳ ATTENTE — SU6.1 (coquille de la 79 absente : témoin exécutable après la 79, exigé vert par la jointure)"
 echo "=== Mutants (copie de la sortie du lab) ==="
+[ -z "${SU_SANS_MUTANTS:-}" ] || { echo "  ⊘ mutants sautés (SU_SANS_MUTANTS) : mise au point seulement"; vf_hyg_assert; exit 0; }
 mutant() { # mutant <nom> <sections> <motif sed> <assertion> : copie la sortie et le module, applique le motif, rejoue, attend ROUGE
-  local nom="$1" sec="$2" motif="$3" test="$4" m="$WORK/mut-$1" nj nh port RM
-  rm -rf "$m"; cp -R "$O" "$m"; cp "$PILE" "$m.js"; sed -i.bak "$motif" "$m/index.html" "$m.js"
-  nj="$(node "$AUX/chg.mjs" "$PILE" "$m.js")"; nh="$(node "$AUX/chg.mjs" "$O/index.html" "$m/index.html")"
-  { [ "$nj" -ge 1 ] && [ "$nj" = "$nh" ]; } || { echo "  ❌ FAIL — mutant $nom : $nj ligne(s) du module, $nh de la page (attendu : égales, au moins une)"; FAIL=$((FAIL+1)); return; }
-  serve "$LAB" "$m"; port="$SERVED"; RM="$(pilote "$port" "$m.js" "" "$sec")"
+  local nom="$1" sec="$2" motif="$3" test="$4" ml="$WORK/lab-mut-$1" nj nh port RM
+  rm -rf "$ml"; cp -R "$LAB" "$ml"; cp "$PILE" "$ml.js"; local m="$ml/.vibeflow/cockpit" # un lab entier : le tiroir Git a besoin de son dépôt
+  sed -i.bak "$motif" "$m/index.html" "$ml.js"
+  nj="$(node "$AUX/chg.mjs" "$PILE" "$ml.js")"; nh="$(node "$AUX/chg.mjs" "$O/index.html" "$m/index.html")"
+  { [ "$nj" -ge 1 ] && [ "$nj" = "$nh" ]; } || {
+    echo "  ❌ FAIL — mutant $nom : $nj ligne(s) du module, $nh de la page (attendu : égales, au moins une)"; FAIL=$((FAIL+1)); return; }
+  serve "$ml" "$m"; port="$SERVED"; RM="$(pilote "$port" "$ml.js" "" "$sec")"
   if [ "$(printf '%s' "$RM" | node "$AUX/ev.mjs" "$test")" = "false" ]; then
     echo "  ✅ PASS — $nom : le mutant rougit"; PASS=$((PASS+1)); MUTANTS=$((MUTANTS+1))
   else echo "  ❌ FAIL — $nom : le mutant ne rougit pas"; echo "     sortie: ${RM:0:400}"; FAIL=$((FAIL+1)); fi
@@ -151,10 +155,10 @@ mutant() { # mutant <nom> <sections> <motif sed> <assertion> : copie la sortie e
 mutant M-INERT-TOUT su2 's#for (const x of e.inertes)#for (const x of document.querySelectorAll("[inert]"))#' \
   "j.su2.apres.split(',').includes('vf-temoin-inert')"
 mutant M-PIEGE su2 "s#if (ev.key === 'Tab' && modale)#if (false)#" 'j.su2.arrets.every(Boolean) && j.su2.maj'
-mutant M-PALETTE su1 "s#document.getElementById('pal-x').click();#void 0;#" 'j.su1.ferme'
-mutant M-ECHAP-VIDE su4 's#{ // vf-echap$#{ ev.preventDefault(); ev.stopPropagation();#' \
+mutant M-PALETTE su1 "s#par('pal-x').click()#void 0#" 'j.su1.ferme'
+mutant M-ECHAP-VIDE su4i 's#{ // vf-echap$#{ ev.preventDefault(); ev.stopPropagation();#' \
   "j.su4.vide_index.temoin[0] === false && j.su4.vide_index.vue === 1"
-mutant M-SANS-PREVENT su4 's#const consomme = (ev) => { ev.preventDefault();#const consomme = (ev) => {#' \
+mutant M-SANS-PREVENT su4i 's#const consomme = (ev) => { ev.preventDefault();#const consomme = (ev) => {#' \
   'j.su4.consomme_index.temoin[0] === true'
 mutant M-UNICITE su1 's#if (window.VF_SURCOUCHES) return;##' 'j.su1.identite && j.su1.nouveaux === 0'
 echo "  ⏳ ATTENTE — M-PERSISTANT (marqueur vf-coquille: persistant retiré : exécutable après la 79, exigé rouge par la jointure)"

@@ -42,8 +42,9 @@ await executer(chrome, async (s) => {
   const charger = async (page, base = racine) => {
     await s.naviguer(`${base}/${page}?lang=en`); await s.attendre(PRET, `page prête (${page})`);
     await s.attendre("!!document.querySelector('#viewport .node')", `cartes (${page})`);
-    await pause(300); await echap(); // la visite guidée s'ouvre au premier passage : Échap la ferme
-    await s.attendre("!(window.VibeFlowTour && window.VibeFlowTour.active())", `visite fermée (${page})`); await pause(150);
+    await pause(1300); // la visite guidée démarre seule 700 ms après `ready` au premier passage : on la laisse venir, puis Échap la ferme
+    if (await s.ev('!!(window.VibeFlowTour && window.VibeFlowTour.active())')) await echap();
+    await s.attendre("!(window.VibeFlowTour && window.VibeFlowTour.active())", `visite fermée (${page})`); await pause(300);
     await s.ev('document.activeElement && document.activeElement.blur()');
   };
   const palette = "document.getElementById('palette').classList.contains('open')";
@@ -56,7 +57,8 @@ await executer(chrome, async (s) => {
   if (veut('su1')) {
     await charger('index.html'); const r = {};
     await s.ev("document.getElementById('btn-export').focus()"); await barre(); await s.attendre(palette, 'palette ouverte');
-    await pause(100); await tab(); await pause(100); await echap(); await pause(300);
+    await pause(100); await tab(); await s.ev('document.activeElement.blur()'); await pause(100); // focus hors du champ (la croix n'existe qu'au toucher)
+    await echap(); await pause(300);
     r.ferme = !(await s.ev(palette)); r.retour = await s.ev('document.activeElement && document.activeElement.id');
     await s.ev("document.getElementById('pal-x').click()"); await s.attendre(`!(${palette})`, 'palette refermée'); // départ d'un état connu
     await s.ev("document.getElementById('btn-export').focus()"); await barre(); await s.attendre(palette, 'palette rouverte');
@@ -104,14 +106,14 @@ await executer(chrome, async (s) => {
     r.focus = await s.ev('document.activeElement && document.activeElement.id');
     await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
     await charger('index.html');
-    if (!(await s.ev(ferme))) await s.ev("document.getElementById('btn-panel').click()");
-    await pause(300); await s.ev("document.getElementById('btn-panel').click()"); await pause(80);
+    if (await s.ev(ferme)) await s.ev("document.getElementById('btn-panel').click()");
+    await pause(700); await s.ev("document.getElementById('btn-panel').click()"); await pause(80);
     r.reduit = await s.ev("document.body.classList.contains('no-panel') ? getComputedStyle(document.getElementById('panel')).visibility : 'ouvert'");
     await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
     o.su3 = r;
   }
 
-  if (veut('su4')) {
+  if (veut('su4') || veut('su4i')) { // su4i : Code seulement (les mutants tournent sur une copie sans session d'équipe)
     const r = {};
     await charger('index.html');
     await s.ev("VibeFlow.reveal('f:src/util.js')"); await pause(800); const sel = await s.ev('JSON.stringify(VibeFlow.state.selected)');
@@ -121,16 +123,21 @@ await executer(chrome, async (s) => {
     r.dessusTiroir = await s.ev("!!window.VF_SURCOUCHES && window.VF_SURCOUCHES.dessus() === document.getElementById('vf-git-tiroir')");
     await barre(); await s.attendre(palette, 'palette sur le tiroir'); await pause(100);
     r.dessusPalette = await s.ev("!!window.VF_SURCOUCHES && window.VF_SURCOUCHES.dessus() === document.getElementById('palette')");
-    await s.ev("document.getElementById('search').blur()"); await tab(); await echap(); await pause(300);
+    await s.ev("document.getElementById('search').blur()"); await tab(); await s.ev('document.activeElement.blur()'); await echap(); await pause(300);
     r.palFerme = !(await s.ev(palette)); r.tiroirResteOuvert = await s.ev("!document.getElementById('vf-git-tiroir').hidden");
-    await s.ev('document.activeElement && document.activeElement.blur()'); await echap(); await pause(400);
+    await s.ev('document.activeElement && document.activeElement.blur()');
+    if (process.env.SU_DIAG) { // mise au point seulement
+      r.diag = await s.ev('JSON.stringify({ a: document.activeElement.tagName, o: window.VF_SURCOUCHES.ouverte() })');
+    }
+    await echap(); await pause(400);
     r.tiroirFerme = await s.ev("document.getElementById('vf-git-tiroir').hidden");
     r.selGardee = (await s.ev('JSON.stringify(VibeFlow.state.selected)')) === sel;
-    await echap(); await pause(400); r.selLevee = (await s.ev('VibeFlow.state.selected')) == null;
+    await s.ev('document.activeElement && document.activeElement.blur()'); await echap(); await pause(400); // le tiroir a rendu le focus à son ouvreur
+    r.selLevee = (await s.ev('VibeFlow.state.selected')) == null;
     // SU4.4 à SU4.6 : contrat Échap consommé, sur le Code puis sur l'Équipe
-    for (const page of ['index.html', 'equipe.html']) {
+    for (const page of veut('su4i') ? ['index.html'] : ['index.html', 'equipe.html']) {
       await charger(page); await poser(); const k = page.split('.')[0];
-      await barre(); await s.attendre(palette, `palette (${k})`); await pause(100); await tab(); await pause(100);
+      await barre(); await s.attendre(palette, `palette (${k})`); await pause(100); await tab(); await s.ev('document.activeElement.blur()'); await pause(100);
       await echap(); await pause(300); const a = await relever();
       r[`consomme_${k}`] = { ferme: !(await s.ev(palette)), temoin: a.t, vue: a.v, interdit: a.i };
       await poser(); r[`ouverte_${k}`] = await s.ev('!!window.VF_SURCOUCHES && window.VF_SURCOUCHES.ouverte()');
@@ -149,7 +156,8 @@ await executer(chrome, async (s) => {
         await s.ev("document.querySelector('.vf-term-pastille').click()");
         await s.attendre("document.body.classList.contains('vf-term-ouvert') && !document.querySelector('.vf-term-tiroir').hidden", 'Terminal ouvert');
         await s.ev("document.querySelector('.vf-term-tiroir .vf-term-poignee').focus()"); await poser(); await echap(); await pause(300);
-        const t = await relever(); r.terminal = { temoin: t.t, vue: t.v, ouverte: await s.ev('!!window.VF_SURCOUCHES && window.VF_SURCOUCHES.ouverte()') };
+        const t = await relever(); r.terminal = { temoin: t.t, vue: t.v, ouverte: await s.ev('!!window.VF_SURCOUCHES && window.VF_SURCOUCHES.ouverte()'),
+          dessus: await s.ev('(() => { const d = window.VF_SURCOUCHES.dessus(); return d ? d.tagName + "#" + d.id + "." + d.className : null; })()') };
       } catch (e) { r.terminal = { sautee: String(e.message) }; }
     }
     o.su4 = r;
