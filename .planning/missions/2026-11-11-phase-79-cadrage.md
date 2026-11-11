@@ -464,6 +464,24 @@ Incidents de coût : plafond de 20 sous-agents simultanés (levé à 100), coupu
 
 ## Preuves E6
 
+Format : verdict, commande, code de sortie, SHA de la tête au moment du verdict (commandes rejouées sur la tête d4d0cd41).
+
+```json
+{
+ "preuves": [
+  {"verdict": "state:inchange", "commande": "git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md", "exit_code": 0, "sha": "d4d0cd41"},
+  {"verdict": "gate:check-machine-paths", "commande": "bash scripts/check-machine-paths.sh", "exit_code": 0, "sha": "d4d0cd41"},
+  {"verdict": "invariants:sain", "commande": "bash plugin/conductor/scripts/check-mission-invariants.sh", "exit_code": 3, "sha": "d4d0cd41"},
+  {"verdict": "plans:22", "commande": "ls .planning/workstreams/fiabilite/phases/VFDO-79-*/ | grep -c PLAN.md", "exit_code": 0, "sha": "d4d0cd41"},
+  {"verdict": "flags:desarmes", "commande": "bash plugin/dev-orchestrator/scripts/gsd-run.sh config-get workflow._auto_chain_active --ws fiabilite", "exit_code": 0, "sha": "d4d0cd41"},
+  {"verdict": "plancheck:aucun-bloquant", "commande": "gsd-plan-checker frais sur les 22 plans (lecture seule)", "exit_code": 0, "sha": "677d19fa"}
+ ]
+}
+```
+
+`check-mission-invariants.sh` rend 3 pour SAIN (convention du script). La vérification finale par plan-checker est un
+agent, pas une commande : son code est celui du verdict « aucun bloquant ».
+
 Commandes jouées par le manager dans le worktree de la phase, sorties recopiées (chemins du poste retirés).
 
 - `git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md` → `rc=0` (STATE jamais touché), rejoué avant chaque commit.
