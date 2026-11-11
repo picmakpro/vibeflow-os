@@ -106,7 +106,10 @@ export function lireDags(root, layout, phaseDirs) {
 
 // opts : { sansTags (aucun appel git pour les tags : lecture d'un autre arbre), verrous (injectable : { etat, plat, liste }), scriptsDir, home, lab (racine du LAB observé pour l'environnement borné des sous-processus, H-1 ; défaut : root) } — la vie d'une mission se lit sur le verrou de sa phase (VFSG-06) ; lecture seulement si un nœud est `running`
 export function readPlanning(root, layout, opts = {}) {
-  root = path.resolve(root); layout = layout || planningLayout(root);
+  root = path.resolve(root);
+  // AUDC-A-02 : lecture confinée à la racine RÉELLE du lab par défaut — un lien symbolique sortant n'est jamais suivi (un confinement posé par l'appelant, N5, prime)
+  if (CONFINE === null && fs.existsSync(root)) return lireConfine(root, () => readPlanning(root, layout, opts));
+  layout = layout || planningLayout(root);
   const LAB = path.resolve(opts.lab || root); // un arbre git sous le lab (worktree) se lit avec cwd = l'arbre, mais le PATH est assaini par rapport au LAB (H-1)
   const B = path.join(root, '.planning');
   const rel = (abs) => path.relative(root, abs).split(path.sep).join('/');
