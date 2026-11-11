@@ -242,11 +242,26 @@ panels. Aucune ne vaut arbitrage de Samuel, et aucune ne rouvre un arbitrage dé
   une, passe par `window.VF_SURCOUCHES` (Phase 80, P80-D-33 à P80-D-41). Témoin : quitter puis revenir sur l'onglet ne
   double ni le bouton ni les écouteurs.
 
+- **P77-D-20 (accès aux données côté serveur, A31 et A32 de la Phase 79, commit `e04c43e7`).**
+  - Burn-up et blocages du STATE : deux **champs facultatifs de `cockpit-project@1`**, ajoutés dans la lecture du
+    planning de la collecte (A32), `burnup` (P77-D-13) et `blocagesState` (P77-D-10). Jamais une lecture propre à une
+    route. La page les lit dans les données de Projet ; un serveur les lit par `instantane().projet` (plan 79-09).
+  - Coût par phase et par étage : calculé **côté page** par un module pur, à partir de la frise
+    (`VF_ETAT.lire('frise')` ou `GET /api/vf/frise`) et des missions de l'instantané d'état (jointure A8). Aucune route
+    neuve. Dépend du plan 79-13, qui livre `frise`.
+  - Jauges : la seule lecture propre à la phase, hors de la collecte, bornée ainsi :
+    - aucun sous-processus au chargement d'une page ni à la collecte ; seulement à l'ouverture de la synthèse ;
+    - au plus un lancement des deux gates en cours, que partagent les requêtes simultanées ;
+    - résultat en cache 60 s ; une requête dans cette fenêtre ne lance rien ;
+    - échéance de 10 s par gate, au-delà « indisponible » ;
+    - lancement asynchrone, le serveur continue de répondre pendant ce temps.
+    La réponse passe par la réponse gardée commune (A11). Cette décision fixe la durée du cache, laissée à discrétion
+    plus bas.
+
 ### Claude's Discretion
 
 - Le numéro et le nom du fichier `ui/` neuf : un numéro libre au moment de l'exécution, à vérifier contre les fichiers
   posés par les autres phases.
-- La durée du cache de la route des jauges, entre 30 s et 5 min.
 - La forme exacte du TSV, sous réserve de P77-D-03 : en-tête versionné, chemins relatifs, un verdict par ligne.
 - Le libellé exact du bouton et de la ligne-résumé, fixé par `77-UI-SPEC.md` dans les bornes de P77-D-02.
 </decisions>
