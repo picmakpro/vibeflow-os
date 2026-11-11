@@ -11,6 +11,7 @@ import path from 'node:path';
 import { lancerGitAsync, finDans } from './vf-cockpit-paths.mjs';
 import { nettoie, brancheBaseAsync } from './vf-cockpit-arbres.mjs';
 import { masque } from './vf-cockpit-lecture.mjs';
+import { gitSortant } from './vf-cockpit-git-sortant.mjs';
 import { detailCommit, etatWorktrees, worktreeVerifie } from './vf-cockpit-git-details.mjs';
 import { FORMAT_JOURNAL, CHAMPS_REFS, MOTIF_SHA, lireJournal, lireRefs, lireWorktrees, ordonner, placer, etiquettes, teinte } from './vf-cockpit-git-graphe.mjs';
 import { cmdCd, cmdSwitch, cmdBranchSupprimer, cmdStashShow, cmdCommitInitial, cmdStatus } from './vf-cockpit-git-commandes.mjs';
@@ -48,6 +49,7 @@ async function enteteDetail(lab, fin) {
   let muet = false;
   const git = async (...a) => { try { const r = await lancerGitAsync(lab, a, { fin }); if (r.delai) muet = true; return String(r.sortie ?? '').trim(); } catch { return ''; } };
   const vide = (etat, depot) => ({ etat, depot: nettoie(depot, 200), branche: null, worktree: null, detache: false, sha7: null });
+  if (gitSortant(lab)) return { entete: vide('absent', path.basename(path.resolve(lab))), muet }; // AUDC-A-02 : le .git du lab désigne un dépôt hors du lab : ni branche ni dépôt servis
   const commun = await git('rev-parse', '--path-format=absolute', '--git-common-dir');
   if (!commun) return { entete: vide(muet ? 'indisponible' : 'absent', path.basename(path.resolve(lab))), muet };
   const racine = path.basename(commun) === '.git' ? path.dirname(commun) : commun.replace(/[\\/]+$/, '').replace(/\.git$/, '');
@@ -60,7 +62,7 @@ async function enteteDetail(lab, fin) {
   if (sha7 && !muet) return { entete: { etat: 'ok', ...base, branche: null, detache: true, sha7: nettoie(sha7, 40) }, muet };
   return { entete: { etat: 'indisponible', ...base, branche: null, detache: false, sha7: null }, muet };
 }
-const enteteAsync = async (lab, fin) => (await enteteDetail(lab, fin)).entete;
+export const enteteAsync = async (lab, fin) => (await enteteDetail(lab, fin)).entete;
 
 const refLog = (r) => r.ref; // REF-QUALIFIEE : jamais un nom court (« -x » serait lu comme une option)
 const court = (ref) => ref.replace(/^refs\/(heads|remotes)\//, '');

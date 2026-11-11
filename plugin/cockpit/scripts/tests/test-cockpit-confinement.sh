@@ -113,6 +113,16 @@ assert_eq "G2 — témoin positif : un dépôt imbriqué normal du lab est lu" "
 assert_eq "G3 — un .git du lab lié vers un dépôt extérieur n'est pas lu (branche, tag, message, sha)" "$(compte 'MARQUEUR-EXT' "$O2/project.html" "$O2/index.html" "$O2/graph.json")" "0"
 assert_eq "G4 — un dépôt imbriqué dont le gitfile désigne un dépôt extérieur n'est pas lu" "$(compte 'MARQUEUR-EXT' "$O5/project.html" "$O5/index.html" "$O5/graph.json")" "0"
 
+cat > "$WORK/entete.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv;
+const { enteteAsync } = await import(pathToFileURL(scripts + '/vf-cockpit-git.mjs').href);
+const { finDans } = await import(pathToFileURL(scripts + '/vf-cockpit-paths.mjs').href);
+const e = await enteteAsync(lab, finDans(8000)); console.log(e.etat + '|' + (e.branche || ''));
+JS
+assert_eq "G5 — témoin positif : l'en-tête Git en direct lit la branche du dépôt du lab" "$(node "$WORK/entete.mjs" "$SCRIPTS" "$L3")" "ok|MARQUEUR-DANS-LE-LAB-BRANCH"
+assert_eq "G6 — l'en-tête Git en direct ne lit pas un .git du lab lié vers un dépôt extérieur" "$(node "$WORK/entete.mjs" "$SCRIPTS" "$L2")" "absent|"
+
 # ---------- N : noms listés et pointeur de compartiment ----------
 echo "=== N — noms et pointeur ==="
 mkdir -p "$DEHORS/dossier-phase"; printf '<objective>x</objective>\n' > "$DEHORS/dossier-phase/01-99-PLAN.md"
