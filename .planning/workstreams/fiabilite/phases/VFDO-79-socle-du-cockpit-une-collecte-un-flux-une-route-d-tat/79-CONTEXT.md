@@ -485,6 +485,10 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   - 49, **fourni** (spécification) : `frise` est émis au plus une fois par tour de collecte (5 s avec un client), et
     seulement si la signature change ; plusieurs changements dans un tour se fondent en un événement.
   - 50 : noté (`test-cockpit-frise-vue.sh` pour la 74, `test-cockpit-frise.sh` reste à 79-13).
+- **A49 — écarts propres aux plans de la fin de phase.** Les écarts nommés dans la section « Écarts » de chaque plan
+  sont retenus tels qu'écrits, le plan fait foi pour le détail : 79-15-a, c, d ; 79-16-a à d ; 79-17-a à e (dont 79-17-b,
+  la porte `VF_FLUX` du magasin, déjà dite en A43) ; 79-18-a à c ; 79-19-a à f. Aucun ne touche un contrat C0 à C6.
+  Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
