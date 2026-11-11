@@ -16,18 +16,19 @@
     }
   `;
   document.head.appendChild(style);
-  // mouvement réduit : sans animation, aucun animationend ne vient plus ; les deux entrées (tiroir Git, tiroir du terminal) retirent leur classe sur cet évènement, il leur est donné tout de suite,
+  // mouvement réduit : sans animation, aucun animationend ne vient plus ; les entrées de tiroir (classe vf-<tiroir>-entree : Git, et tout tiroir qui suit la même forme) retirent leur classe sur cet évènement, il leur est donné tout de suite,
   // et le contour statique d'une carte (classe flash) est retiré après les 700 ms du clignotement qu'il remplace : aucun état ne reste posé
   const reduit = window.matchMedia('(prefers-reduced-motion: reduce)');
   const minuteries = new WeakMap();
+  const entree = (e) => Array.from(e.classList).some((c) => /^vf-[a-z]+-entree$/.test(c)); // forme commune des entrées de tiroir ; aucun nom de tiroir n'est cité ici (une page sans le terminal n'en porte aucune trace)
   const regarder = (e) => {
     if (!e.classList) return;
-    if (e.classList.contains('vf-git-entree') || e.classList.contains('vf-term-entree')) setTimeout(() => e.dispatchEvent(new Event('animationend', { bubbles: true })), 0);
+    if (entree(e)) setTimeout(() => e.dispatchEvent(new Event('animationend', { bubbles: true })), 0);
     if (e.classList.contains('flash') && !minuteries.has(e)) minuteries.set(e, setTimeout(() => { minuteries.delete(e); e.classList.remove('flash'); }, 700));
     else if (!e.classList.contains('flash') && minuteries.has(e)) { clearTimeout(minuteries.get(e)); minuteries.delete(e); }
   };
   new MutationObserver((ms) => {
     if (!reduit.matches) return;
-    for (const m of ms) { regarder(m.target); for (const n of m.addedNodes) { regarder(n); if (n.querySelectorAll) n.querySelectorAll('.vf-git-entree, .vf-term-entree, .flash').forEach(regarder); } }
+    for (const m of ms) { regarder(m.target); for (const n of m.addedNodes) { regarder(n); if (n.querySelectorAll) n.querySelectorAll('[class*="-entree"], .flash').forEach(regarder); } }
   }).observe(document.documentElement, { attributes: true, attributeFilter: ['class'], childList: true, subtree: true });
 })();
