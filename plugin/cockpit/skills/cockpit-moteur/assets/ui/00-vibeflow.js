@@ -9,8 +9,8 @@
   const { h, graph: G } = SC;
   const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
   document.body.classList.add('vf-tab-' + TAB); // 70-12 (P70-D-20) : marqueur de l'onglet sur le corps de page (`vf-tab-code`, `vf-tab-project`, `vf-tab-equipe`), pour les règles de mise en page propres à un onglet
-  // titre de l'onglet du navigateur : « <nom> — Code », « <nom> — Projet » ou « Équipe · <nom> » (le viewer écrit « <nom> map », qui devenait le nom seul)
-  { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); document.title = TAB === 'equipe' ? `Équipe · ${nom}` : `${nom} — ${TAB === 'project' ? 'Projet' : 'Code'}`; }
+  // titre de l'onglet du navigateur (AUDC-X7) : un seul format, « <Onglet> · <nom> » : l'onglet d'abord, parce qu'un onglet étroit coupe par la fin et que trois pages du même projet doivent se distinguer d'un coup d'œil (le viewer écrit « <nom> map », qui devenait le nom seul)
+  { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); document.title = `${TAB === 'equipe' ? 'Équipe' : TAB === 'project' ? 'Projet' : 'Code'} · ${nom}`; }
   const ST = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué' };
   // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
   const LOGOS = G.meta.vfLogos;

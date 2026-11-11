@@ -73,6 +73,11 @@ assert_eq "M7.1 — quand le calcul démarre, l'indicateur est déjà allumé" "
 assert_eq "M7.2 — … et opaque (pas un fondu qui n'a pas commencé)" "$(E 'j.m7.gros.opacite')" "1"
 assert_eq "M7.3 — … et au moins une image a été produite depuis qu'il est allumé (il est peint, pas seulement posé)" "$(E 'j.m7.gros.images >= 1')" "true"
 assert_eq "M7.4 — un petit niveau (témoin : moins de 24 cartes) ne clignote pas : l'indicateur reste éteint, sa temporisation de 160 ms inchangée" "$(E 'j.m7.petit.cartes > 0 && j.m7.petit.cartes < 24 && j.m7.petit.allume === false')" "true"
+echo "=== X7 — un seul format de titre d'onglet (AUDC-X7) ==="
+assert_eq "X7.1 — Code : « Code · <nom> »" "$(E "j.x7.code.titre === 'Code · ' + j.x7.code.nom")" "true"
+assert_eq "X7.2 — Projet : « Projet · <nom> »" "$(E "j.x7.projet.titre === 'Projet · ' + j.x7.projet.nom")" "true"
+assert_eq "X7.3 — Équipe : « Équipe · <nom> »" "$(E "j.x7.equipe.titre === 'Équipe · ' + j.x7.equipe.nom")" "true"
+assert_eq "X7.4 — témoin : le nom du projet est lu et non vide sur les trois pages" "$(E "[j.x7.code, j.x7.projet, j.x7.equipe].every((p) => p.nom.length > 0)")" "true"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

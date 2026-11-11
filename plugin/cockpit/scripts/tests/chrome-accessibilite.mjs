@@ -1,7 +1,7 @@
 // chrome-accessibilite.mjs — mesures des finitions d'interface immédiates (lot 0 de l'audit, AUDC-M7, X4, X6, X7), dans un vrai Chrome headless.
 // Usage : node chrome-accessibilite.mjs <chrome> <racine-du-serveur>
 //   UN Chrome, plusieurs pages (?lang=en : les libellés du moteur tels qu'il les écrit). Rend une ligne JSON { <clé>: valeur } ou { erreur }.
-//   Clés : m7 · x4 · x6 · x7
+//   Clés : m7 · x7 · x4 · x6
 import { executer, pause, stabiliser, attendreValeur } from './chrome-session.mjs';
 const [, , chrome, racine] = process.argv;
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
@@ -39,5 +39,14 @@ await executer(chrome, async (s) => {
   };
   o.m7 = { gros: await mesurerNiveau("VibeFlow.reveal('f:lots/n05.md')", 'dossier de 70 notes') };
   o.m7.petit = await mesurerNiveau("VibeFlow.go('root')", 'racine');
+
+  const touche = async (key, code, vk) => { await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk }); };
+  // ---------- X7 : un seul format de titre d'onglet, repères d'accessibilité des trois pages ----------
+  o.x7 = {};
+  for (const [cle, page] of [['code', 'index.html'], ['projet', 'project.html'], ['equipe', 'equipe.html']]) {
+    await charger(page, page);
+    o.x7[cle] = JSON.parse(await s.ev(`JSON.stringify({ titre: document.title, main: document.querySelectorAll('main').length, courants: [...document.querySelectorAll('[aria-current]')].map((e) => e.textContent.trim() + '=' + e.getAttribute('aria-current')), nom: document.querySelector('#proj-name').textContent })`));
+  }
+
   return o;
 });

@@ -150,7 +150,7 @@ JS
     assert_eq "H2.2 — $pg : #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
     assert_eq "H2.2 — $pg : aucun suffixe « — Projet » ni « — Équipe » dans l'en-tête" "$(jq_ "$R" '/ — (Projet|Équipe)/.test(j.entete) ? "suffixe" : "propre"' 2>/dev/null)" "propre"
     assert_eq "H2.2 — $pg : la seconde ligne dit la branche" "$(jq_ "$R" '/feat\/x/.test(j.ligne||"") ? "oui" : "non"' 2>/dev/null)" "oui"
-    case "$pg" in /project.html) assert_eq "H2.2 — titre de l'onglet du navigateur inchangé (R6.1)" "$(jq_ "$R" 'j.titre === j.attendu + " — Projet" ? "inchangé" : j.titre' 2>/dev/null)" "inchangé";; esac
+    case "$pg" in /project.html) assert_eq "H2.2 — titre de l'onglet du navigateur inchangé (R6.1)" "$(jq_ "$R" 'j.titre === "Projet · " + j.attendu ? "inchangé" : j.titre' 2>/dev/null)" "inchangé";; esac
   done
   # H2.3 : une réécriture de project.html par le direct garde le nom du dépôt
   printf '<objective>Second plan ajouté par le test H2.3</objective>\n' > "$WT/.planning/phases/01-x/01-02-PLAN.md" # un plan neuf change la structure : le direct réécrit project.html
@@ -388,13 +388,13 @@ await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow && !!document.querySelector('#panel .pt')`, 'page et panneau rendus');
 return await stabiliser(() => s.ev(`(() => { const G = window.VibeFlow.graph, T = G.meta.vfTab, p = document.querySelector('#panel');
   return { nom: document.querySelector('#proj-name').textContent, pt: [...p.querySelectorAll('.pt')].map((e) => e.textContent), panneauWt: /wt-a/.test((() => { const c = p.cloneNode(true); c.querySelectorAll('.vf-cmd').forEach((e) => e.remove()); return c.textContent; })()), /* hors la commande de correctif du panneau Format, qui cite le chemin absolu du lab (PU-G-153) ; le titre et les en-têtes restent jugés */ suffixe: / — (Projet|Équipe)/.test(p.innerText),
-    titre: document.title, attendu: T === 'equipe' ? 'Équipe · ' + G.meta.rootName : G.meta.rootName + ' — ' + (T === 'project' ? 'Projet' : 'Code') }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
+    titre: document.title, attendu: (T === 'equipe' ? 'Équipe' : T === 'project' ? 'Projet' : 'Code') + ' · ' + G.meta.rootName }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
 JS
   ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
   for pg in / /project.html /equipe.html; do
     R="$(cdp "$AUX/h7-nom.js" "$BASE" "$pg" 2>&1 | tail -1)"
     assert_eq "H7.1 — $pg (lab dans un worktree wt-a) : le panneau dit « depot », sans « wt-a » ni suffixe « — Projet » / « — Équipe »" "$(jq_ "$R" '[j.nom, j.pt.join("+"), j.panneauWt, j.suffixe].join("|")' 2>/dev/null)" "depot|depot|false|false"
-    assert_eq "H7.1 — $pg : le titre de l'onglet garde sa forme (nom du dossier du lab, R6.1 inchangé)" "$(jq_ "$R" 'j.titre === j.attendu ? "inchangé" : j.titre + " ≠ " + j.attendu' 2>/dev/null)" "inchangé"
+    assert_eq "H7.1 — $pg : le titre de l'onglet a la forme unique « <Onglet> · <nom du dossier du lab> » (AUDC-X7 ; le nom du dossier, R6.1, reste inchangé)" "$(jq_ "$R" 'j.titre === j.attendu ? "inchangé" : j.titre + " ≠ " + j.attendu' 2>/dev/null)" "inchangé"
   done
   # F6, F8, F11 : couleurs et anneau de focus de la seconde ligne
   cat > "$AUX/h7-ligne.js" <<'JS'
