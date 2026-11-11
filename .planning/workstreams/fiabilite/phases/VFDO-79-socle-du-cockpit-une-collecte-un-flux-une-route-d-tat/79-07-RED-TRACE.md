@@ -80,3 +80,18 @@ Contrôles de la session principale, recopiés :
 - fichiers touchés hors files_modified : 79-07-PLAN.md seul (amendement daté b17f5510) ;
 - rapport de l'auditeur lu dans son propre transcript : passed, aucun constat haut ;
 - rejeu indépendant sur une copie détachée à bca33d4b, retirée depuis : git-config-depot 75 PASS / 9 FAIL, exactement A8, A9, A10, A12, D6.1 à D6.5 ; 19 identifiants de la règle, 17 assertions de mutants ; copies du module identiques ; 0 realpathSync(, 0 path.resolve(, 1 export de cheminPhysique ; git-sortant 150 lignes, paths 166 ; graine 424242 conforme ; git-env 134 / 0 ; git-details 136 / 0 ; confinement 66 / 0. Avancement et terminal-serveur non rejouées par elle (le rejeu de l'exécuteur fait foi).
+
+## Tâche 4 — le scan juge un lien comme sa cible (D-M15)
+
+`scan.mjs` : `rootReal` et la résolution d'un lien passent par `cheminPhysique` ; un lien n'est lu que si sa cible physique est sous la racine réelle du lab et est un fichier retenu par la marche (liste git ou marche : ni dossier git, ni sortie du cockpit et son `.cache`, ni fichier ignoré). Plus aucun `realpathSync(` dans le fichier (2 avant).
+
+Suite test-cockpit-git-config-depot.sh après la tâche 4 : 85 PASS / 5 FAIL, les cinq étant D6.1 à D6.5 (tâche 5). A8, A9, A10, A11, A12 verts. Suites rejouées seules, vertes : assemblage 49/0, git-env 134/0, securite 92/0, vendor 87/0, confinement 66/0.
+
+| Mutant du moteur (copie de scan.mjs, assemblage depuis l'arbre muté sur une copie du lab des liens) | Effet | Attendu | Obtenu |
+|---|---|---|---|
+| M-MEMBRE (le lien n'est plus jugé que sur « sa cible est dans le lab ») | A8, A9, A10 rougissent ; A12 reste verte | `cfg=4 cac=4 ign=4 ext=0` | `cfg=4 cac=4 ign=4 ext=0` (marqueurs présents dans les pages : le contenu lié sort) |
+| M-JS-SCAN (la résolution du lien redevient le realpath JS, qui replie `..`) | A12 rougit ; A8, A9, A10 restent verts | `cfg=0 cac=0 ign=0 ext=4` | `cfg=0 cac=0 ign=0 ext=4` (le fichier extérieur sort) |
+
+Chacun garde A11 vert (fichier normal, lien interne vers un fichier listé, leurre intérieur décrits). Le « 4 » est le nombre d'occurrences du marqueur dans les quatre pages.
+
+Correction de la suite (sans effet sur un verdict de production) : la ligne de D6.4 portait `.sorlk_t()` au lieu de `.sort()` (renommage de variable fautif des tâches 1 à 3) ; corrigée dans le commit des mutants.

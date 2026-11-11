@@ -445,6 +445,27 @@ lk_b5() { echo "$(lk_garde "$1" worktree "$LK_BC" "$LK_B/wt1")|$(lk_garde "$1" w
 assert_eq "B5.1 — worktreeVerifie refuse un gitfile dont le gitdir passe par un lien à maillon divergent" "$(lk_b5 "$SCRIPTS" | cut -d'|' -f1)" "refuse"
 assert_eq "B5.2 — témoin : un vrai worktree est vérifié" "$(lk_b5 "$SCRIPTS" | cut -d'|' -f2)" "verifie"
 
+# M-MEMBRE, M-JS-SCAN : mutants du moteur (arbre temporaire : scripts du socle + copie du moteur dont scan.mjs est muté, assemblage lancé depuis cet arbre sur une copie du lab des liens ; aucun serveur)
+lk_mut_moteur() { # NOM ANCRE REMPLACEMENT : construit une copie du lab, l'assemble avec le moteur muté, rend « cfg=… cac=… ign=… ext=… pos=… »
+  local m="$WORK/mm-$1" l="$LK_RACINE/mm-$1" o
+  rm -rf "$m" "$l"; mkdir -p "$m/scripts" "$m/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$m/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$m/skills/cockpit-moteur"
+  FROM="$2" TO="$3" node "$AUX/mutsub.mjs" "$m/skills/cockpit-moteur/scripts/scan.mjs" > "$AUX/mm-$1.res" 2>&1
+  cp -R "$LK_A" "$l"; rm -f "$l/lab/.vibeflow/cockpit/"*.html "$l/lab/.vibeflow/cockpit/"*.json
+  node "$m/scripts/vf-cockpit-build.mjs" "$l/lab" --quiet > "$AUX/mm-$1.out" 2>&1
+  o="$l/lab/.vibeflow/cockpit"
+  echo "cfg=$(compte "$MK_CFG" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") cac=$(compte "$MK_CAC" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") ign=$(compte "$MK_IGN" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") ext=$(compte "$MK_EXT" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") pos=$([ "$(compte "$MK_POS" "$o/index.html")" -ge 1 ] && [ "$(compte 'src/interne.sh' "$o/graph.json")" -ge 1 ] && [ "$(compte "$MK_LEU" "$o/index.html")" -ge 1 ] && echo oui || echo non)"
+}
+lk_mut_moteur membre "|| !seen.has(toPosix(path.relative(rootReal, r)))" "" > "$AUX/mm-membre.val"
+assert_eq "M-MEMBRE.0 — l'ancre du mutant existe (le lien est jugé sur l'appartenance de sa cible à la liste du moteur)" "$(cat "$AUX/mm-membre.res")" "muté"
+LK_MM="$(cat "$AUX/mm-membre.val")"
+assert_eq "M-MEMBRE — rougit A8, A9 et A10 (le lien n'est plus jugé que sur « sa cible est dans le lab » : configuration du dossier git, sortie du cockpit et fichier ignoré sortent) ; A12 reste vert (la cible extérieure est encore refusée)" "$(printf '%s' "$LK_MM" | sed 's/ pos=.*//')" "cfg=4 cac=4 ign=4 ext=0"
+assert_eq "M-MEMBRE — témoins positifs verts (A11) : fichier normal, lien interne vers un fichier listé et leurre intérieur toujours décrits" "$(printf '%s' "$LK_MM" | sed 's/.* pos=//')" "oui"
+lk_mut_moteur js "const r = cheminPhysique(abs);" "const r = fs.realpathSync(abs);" > "$AUX/mm-js.val"
+assert_eq "M-JS-SCAN.0 — l'ancre du mutant existe (la résolution d'un lien passe par cheminPhysique)" "$(cat "$AUX/mm-js.res")" "muté"
+LK_MJ="$(cat "$AUX/mm-js.val")"
+assert_eq "M-JS-SCAN — rougit A12 (la résolution redevient le realpath JS qui replie « .. » : le fichier extérieur sort) ; A8, A9 et A10 restent verts (l'appartenance à la liste les écarte encore)" "$(printf '%s' "$LK_MJ" | sed 's/ pos=.*//')" "cfg=0 cac=0 ign=0 ext=4"
+assert_eq "M-JS-SCAN — témoins positifs verts (A11)" "$(printf '%s' "$LK_MJ" | sed 's/.* pos=//')" "oui"
+
 echo "=== G18 — verrou de pilotage, gitdir et inclusion à maillon divergent (gitSortant) ==="
 LK_Y="$LK_RACINE/g18"
 lk_depot() { mkdir -p "$1"; "$GIT_REEL" init -q "$1"; }
@@ -566,7 +587,7 @@ LK_E0="$("$GIT_REEL" -C "$LK_P4" status --porcelain=v2 --branch)|$("$GIT_REEL" -
 LK_R4="$(node "$AUX/sonde.mjs" "$SCRIPTS" "$LK_P4" refus 2>"$AUX/err")"
 LK_E1="$("$GIT_REEL" -C "$LK_P4" status --porcelain=v2 --branch)|$("$GIT_REEL" -C "$LK_P4" rev-parse HEAD)|$("$GIT_REEL" -C "$LK_P4" config --get-regexp '^alias' | wc -l | tr -d ' ')"
 LK_14='["config","diff","diff-tree","for-each-ref","log","ls-files","rev-list","rev-parse","show","show-ref","stash","status","symbolic-ref","worktree"]'
-assert_eq "D6.4 — hors liste fermée : merge, blame, checkout et un alias déclaré par le dépôt sont refusés par les trois points d'entrée, aucun marqueur MG ni ALIAS, dépôt inchangé ; la liste exportée vaut littéralement les 14 noms" "refus=$(pg "$LK_R4" 'j.refus.every((r)=>r.a&&r.b&&r.c)') liste=$(pg "$LK_R4" "JSON.stringify([...(j.liste||[])].sorlk_t())===JSON.stringify($LK_14)") marques=$(lk_t MG)$(lk_t ALIAS) depot=$([ "$LK_E0" = "$LK_E1" ] && echo inchangé || echo modifié)" "refus=true liste=true marques=absentabsent depot=inchangé"; raz
+assert_eq "D6.4 — hors liste fermée : merge, blame, checkout et un alias déclaré par le dépôt sont refusés par les trois points d'entrée, aucun marqueur MG ni ALIAS, dépôt inchangé ; la liste exportée vaut littéralement les 14 noms" "refus=$(pg "$LK_R4" 'j.refus.every((r)=>r.a&&r.b&&r.c)') liste=$(pg "$LK_R4" "JSON.stringify([...(j.liste||[])].sort())===JSON.stringify($LK_14)") marques=$(lk_t MG)$(lk_t ALIAS) depot=$([ "$LK_E0" = "$LK_E1" ] && echo inchangé || echo modifié)" "refus=true liste=true marques=absentabsent depot=inchangé"; raz
 LK_P5="$LK_RACINE/pilotes-memo"; cp -R "$LK_P" "$LK_P5"; mkdir -p "$AUX/wrap"
 printf '#!/bin/sh\necho "$*" >> "$VF_JOURNAL"\nexec "$VF_GIT_REEL" "$@"\n' > "$AUX/wrap/git"; chmod +x "$AUX/wrap/git"; rm -f "$AUX/journal"
 LK_R5="$(VF_JOURNAL="$AUX/journal" VF_GIT_REEL="$GIT_REEL" node "$AUX/sonde.mjs" "$SCRIPTS" "$LK_P5" memo "$AUX/fakegit.sh" "$AUX/fake.out" "$AUX/journal" "$AUX/wrap" "$GIT_REEL" 2>"$AUX/err")"
