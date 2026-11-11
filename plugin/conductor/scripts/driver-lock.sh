@@ -33,16 +33,19 @@
 #   driver-lock.sh register --agent=<id> --role=<role> [--node=<id DAG>] [--parent=<id>] [--depth=<n>] [--owner=<id>]
 #   driver-lock.sh close    --agent=<id> --status=done|failed|stopped   # ferme une entree (append)
 #   driver-lock.sh orphans                                              # entrees encore `running`, feuille -> racine
-#   driver-lock.sh registry                                             # dernier etat de chaque agent (archive puis courant), lecture seule
+#   driver-lock.sh registry [--all]                                     # dernier etat de chaque agent (archive puis courant, fenetre de 24 h), lecture seule
 #   Au `release` sans enfant `running`, le registre courant est VERSE dans l'archive frere
 #   <registre sans .jsonl>.closed.jsonl (par defaut <lock>.children.closed.jsonl) avant d'etre supprime :
-#   un agent clos reste lisible par `registry` apres le relachement (P79-D-17).
+#   un agent clos reste lisible par `registry` apres le relachement (P79-D-17). L'archive ne garde que les lignes
+#   de moins de 24 h et au plus 2 000 lignes (les plus recentes), elagage a chaque archivage, par le detenteur.
+#   `registry --all` rend un registre par verrou du lab, y compris un verrou relache qui ne porte plus qu'une archive.
 #
 # Sortie : JSON une ligne (parsing). Exit 0 = action reussie ; exit 1 = refus (lock tenu, pas owner…).
 #
 # Variables : VF_DRIVER_LOCK (defaut .planning/DRIVER.lock), VF_DRIVER_TTL (defaut 1800 s),
 #             VF_DRIVER_SESSION_MAX (defaut 8, plafond LRU de session_ids),
-#             VF_DRIVER_CHILDREN (defaut <lock>.children.jsonl, registre des agents dispatches).
+#             VF_DRIVER_CHILDREN (defaut <lock>.children.jsonl, registre des agents dispatches),
+#             VF_DRIVER_REGISTRY_WINDOW (defaut 86400 s) et VF_DRIVER_REGISTRY_MAX (defaut 2000 lignes) : retention de l'archive.
 # Reference : ADR-053 + .planning/phases/VFDO-09-*/09-CADRAGE-swarm.md §2.
 #
 # LAB PARTITIONNE (Phase 57) — un verrou NOMME par cible, au lieu du verrou unique :
@@ -122,6 +125,10 @@ META="$LOCK_DIR/meta"
 case "$TTL" in ''|*[!0-9]*) TTL=1800 ;; esac  # garde : TTL non numerique -> defaut (L3)
 SESSION_MAX="${VF_DRIVER_SESSION_MAX:-8}"
 case "$SESSION_MAX" in ''|*[!0-9]*) SESSION_MAX=8 ;; esac  # meme garde que TTL (D-32-03, plafond LRU)
+REG_WINDOW="${VF_DRIVER_REGISTRY_WINDOW:-86400}"
+case "$REG_WINDOW" in ''|*[!0-9]*|0*) REG_WINDOW=86400 ;; esac  # meme garde que TTL, nul ou a zero de tete -> defaut (P79-D-17)
+REG_MAX="${VF_DRIVER_REGISTRY_MAX:-2000}"
+case "$REG_MAX" in ''|*[!0-9]*|0*) REG_MAX=2000 ;; esac
 
 ACTION=""; OWNER=""; STEP=""
 WS=""; WS_GIVEN=0; DEPOT=0; ALL=0; PHASE=""; PHASE_GIVEN=0
@@ -146,8 +153,8 @@ for arg in "$@"; do
   esac
 done
 
-# --all n'est accepte que par status (P57-D-31) : message d'usage sur stderr, rien sur stdout, exit 1.
-if [ "$ALL" = 1 ] && [ "$ACTION" != status ]; then
+# --all n'est accepte que par status et registry (P57-D-31, P79-D-17) : message d'usage sur stderr, rien sur stdout, exit 1.
+if [ "$ALL" = 1 ] && [ "$ACTION" != status ] && [ "$ACTION" != registry ]; then
   echo "Usage: $0 status --all (--all n'est accepte que par status)" >&2
   exit 1
 fi
@@ -735,19 +742,23 @@ registry_fold() {
 }
 
 # Verse le registre courant dans l'archive frere, puis supprime le courant. Appelee par le detenteur,
-# verrou encore tenu : un seul ecrivain. Temporaire de nom fixe renomme sur l'archive (un lecteur
+# verrou encore tenu : un seul ecrivain. Le flux (ancienne archive puis courant) est elague avant d'etre ecrit :
+# seules les lignes portant un `"epoch": N` avec N >= instant - REG_WINDOW restent (une ligne sans epoch est
+# elaguee), puis les REG_MAX dernieres. Temporaire de nom fixe renomme sur l'archive (un lecteur
 # concurrent ne voit jamais de ligne partielle). Silencieuse au succes ; sur tout echec : message sur
 # stderr, temporaire retire, archive intacte, registre courant conserve, code non nul (le release
 # n'en tient jamais compte).
 registry_archive() {
   [ -f "$REG" ] || return 0
   if [ ! -s "$REG" ]; then rm -f "$REG"; return 0; fi
-  local _arc _tmp; _arc="$(arch_path)"; _tmp="$_arc.tmp"
+  local _arc _tmp _cut; _arc="$(arch_path)"; _tmp="$_arc.tmp"; _cut=$(( $(now) - REG_WINDOW ))
   if { [ -e "$_arc" ] || [ -L "$_arc" ]; } && { [ ! -f "$_arc" ] || [ -L "$_arc" ]; }; then
     log "registre non archivé : le nom de l'archive n'est pas un fichier regulier, registre courant conserve"
     return 1
   fi
-  if { if [ -f "$_arc" ]; then cat "$_arc"; fi; cat "$REG"; } > "$_tmp" 2>/dev/null && mv -f "$_tmp" "$_arc" 2>/dev/null; then
+  if { { if [ -f "$_arc" ]; then cat "$_arc"; fi; cat "$REG"; } | awk -v cut="$_cut" '
+         match($0, /"epoch": [0-9]+/) { ep = substr($0, RSTART + 9, RLENGTH - 9) + 0; if (ep >= cut) print }
+       ' | tail -n "$REG_MAX" > "$_tmp"; } 2>/dev/null && mv -f "$_tmp" "$_arc" 2>/dev/null; then
     rm -f "$REG"
     return 0
   fi
@@ -774,19 +785,62 @@ orphans_json() {
   printf '[%s]' "$out"
 }
 # Verbe `registry` (P79-D-17) : dernier etat de chaque agent, archive puis courant (le courant prime).
+# Fenetre de lecture : seuls les agents `running` ou enregistres depuis moins de REG_WINDOW secondes sont rendus.
 # Lecture seule, aucun chemin dans la sortie ; chaque valeur est reduite des caracteres qui casseraient le JSON
 # (guillemet, antislash, caracteres de controle) : un fichier falsifie ne produit jamais un JSON invalide.
 registry_json() {
-  local _present=false _arc; _arc="$(arch_path)"
+  local _present=false _arc _cut; _arc="$(arch_path)"; _cut=$(( $(now) - REG_WINDOW ))
   if [ -f "$REG" ] || [ -f "$_arc" ]; then _present=true; fi
-  registry_fold "$_arc" "$REG" | SCJ="$SCOPE_JSON" awk -F'\t' -v present="$_present" -v win=86400 '
+  registry_fold "$_arc" "$REG" | SCJ="$SCOPE_JSON" awk -F'\t' -v present="$_present" -v win="$REG_WINDOW" -v cut="$_cut" '
     function clean(v) { gsub(/[\\"]/, "", v); gsub(/[[:cntrl:]]/, "", v); return v }
-    {
+    $10 == "running" || $8 + 0 >= cut {
       out = out sprintf("%s{\"agent_id\": \"%s\", \"parent\": \"%s\", \"role\": \"%s\", \"node\": \"%s\", \"owner\": \"%s\", \"generation\": \"%s\", \"dispatched_at\": \"%s\", \"epoch\": %d, \"depth\": %d, \"status\": \"%s\"}",
         (n++ > 0 ? ", " : ""), clean($1), clean($2), clean($3), clean($4), clean($5), clean($6), clean($7), $8 + 0, $9 + 0, clean($10))
     }
     END { printf "{\"present\": %s, \"window_seconds\": %d, \"count\": %d, \"agents\": [%s]%s}\n", present, win, n + 0, out, ENVIRON["SCJ"] }
   '
+}
+
+# `registry --all` (P79-D-17) : un objet `registry` par verrou du lab, y compris un verrou relache qui ne porte plus qu'une
+# archive (que status --all n'enumere pas). Boucles propres (celles de vf_dl_status_all ne sont pas dupliquees) ; sous-shell
+# qui reassigne les globales derivees du verrou, comme vf_dl_entry. Un dossier sans registre ni archive n'a pas d'entree.
+vf_dl_reg_entry() { # <dossier du verrou> <suffixe de portee>
+  (
+    LOCK_DIR="$1"; SCOPE_JSON="$2"
+    LOCK_PARENT="$(dirname "$LOCK_DIR")"; LOCK_BASE="$(basename "$LOCK_DIR")"
+    REG="$LOCK_PARENT/${LOCK_BASE}.children.jsonl"
+    [ -f "$REG" ] || [ -f "$(arch_path)" ] || exit 0
+    registry_json
+  )
+}
+RA_OBJS=""; RA_COUNT=0
+vf_dl_reg_add() { # <dossier du verrou> <suffixe de portee>
+  local o c; o="$(vf_dl_reg_entry "$1" "$2")"
+  [ -n "$o" ] || return 0
+  c="$(printf '%s' "$o" | sed -n 's/^{"present": [a-z]*, "window_seconds": [0-9]*, "count": \([0-9]*\),.*/\1/p')"
+  RA_COUNT=$((RA_COUNT + ${c:-0}))
+  if [ -z "$RA_OBJS" ]; then RA_OBJS="$o"; else RA_OBJS="$RA_OBJS, $o"; fi
+}
+registry_all_json() {
+  local rd rn rp rq
+  vf_dl_reg_add "$LOCK_ROOT/repo/DRIVER.lock" ", \"scope\": \"depot\", \"ws\": \"\", \"location\": \"$LOCATION\""
+  vf_dl_reg_add "$LEGACY_DIR" ", \"scope\": \"depot\", \"ws\": \"\", \"location\": \"checkout\", \"scope_reason\": \"legacy-fallback\", \"legacy_lock\": true"
+  for rd in "$LOCK_ROOT"/ws/*/; do
+    [ -e "$rd" ] || continue
+    rd="${rd%/}"; rn="${rd##*/}"
+    [ -L "$rd" ] && continue
+    vf_ws_name_valid "$rn" || continue
+    vf_dl_reg_add "$rd/DRIVER.lock" ", \"scope\": \"compartiment\", \"ws\": \"$rn\", \"location\": \"$LOCATION\""
+  done
+  for rp in "$LOCK_ROOT"/ws/*/phases/*/; do
+    [ -e "$rp" ] || continue
+    rp="${rp%/}"; rq="${rp##*/}"; rn="$(basename "$(dirname "$(dirname "$rp")")")"
+    [ -L "$rp" ] && continue
+    vf_ws_name_valid "$rn" && vf_dl_phase_valid "$rq" || continue
+    vf_dl_reg_add "$rp/DRIVER.lock" ", \"scope\": \"phase\", \"ws\": \"$rn\", \"phase\": \"$rq\", \"location\": \"$LOCATION\""
+  done
+  printf '{"present": %s, "scope": "lab", "location": "%s", "window_seconds": %s, "count": %s, "registries": [%s]}\n' \
+    "$([ -n "$RA_OBJS" ] && echo true || echo false)" "$LOCATION" "$REG_WINDOW" "$RA_COUNT" "$RA_OBJS"
 }
 
 # Enfants directs encore `running` d'un agent donne (ids JSON) : rendu par `close`, pour qu'un
@@ -1424,7 +1478,8 @@ case "$ACTION" in
 
   registry)
     # Lecture seule, exit 0 dans tous les cas (aucun fichier cree ni modifie) : dernier etat de chaque agent,
-    # archive du relachement puis registre courant.
+    # archive du relachement puis registre courant. --all : un registre par verrou du lab partitionne.
+    if [ "$ALL" = 1 ] && [ "$PARTITIONED" = 1 ]; then registry_all_json; exit 0; fi
     registry_json
     exit 0
     ;;
