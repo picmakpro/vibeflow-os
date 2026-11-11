@@ -100,8 +100,11 @@ et ne sont pas rouverts.
   de taille). Le couplage, relationnel, n'est pas agrégé. Le nœud « non assignés » (616 fichiers sur 1 397 ici) suit la
   même règle ; son poids est dit, pas corrigé (le rattachement relève de l'extracteur de la 67). (Panel A.)
 - **P75-D-05 (canal de marquage unique).** Un seul mécanisme de la page pose les marques de carte : une couche nommée, une
-  table `id → {palier, glyphe, mot, infobulle}`, l'agrégat aux ancêtres, une couche active à la fois, exposé par l'API
-  `window.Floorplan` (patch du moteur vendorisé tracé dans `VENDORED.txt`). Il sert la 75 (quatre lentilles, collisions)
+  table `id → {palier, glyphe, mot, infobulle}`, l'agrégat aux ancêtres, une couche active à la fois. L'objet global du
+  moteur est gelé (Phase 80) : le canal vit sous un espace de noms à part ; le point d'accroche dans le rendu des cartes,
+  s'il en faut un, est posé dans le source du moteur (fork assumé, AUDC-Q5 ; après la vague 1 de la 79, aucun diff de
+  patch). Il s'initialise par `VF_COQUILLE.surOnglet(rappel)` quand l'onglet vaut Code et se nettoie quand on le quitte
+  (amendement A30 de la 79, `74501bb0`) ; une surcouche éventuelle passe par `window.VF_SURCOUCHES` (P80-D-33 à D-41). Il sert la 75 (quatre lentilles, collisions)
   et la relecture de la Phase 74 (AUDC-I06), qui prend la place le temps d'une relecture puis la rend. **Qui le pose :** la
   phase exécutée la première ; l'ordre du jalon met la 74 avant la 75. Si la 74 le pose, la 75 l'étend ; sinon la 75 le
   pose et la 74 s'y branche. Point à recouper à la jointure (rapport, « À verser par la jointure »). (Panel A.)
@@ -137,7 +140,10 @@ et ne sont pas rouverts.
   travail : P78-D-21 intacte, P78-D-23 et P78-D-32 (décisions de manager) gardées. Le non-committé passe par l'empreinte
   des agents (P75-D-12). (Panel B, option a'.)
 - **P75-D-11 (dégradation).** Lab hors dépôt ou git absent : les lentilles git sont absentes du sélecteur, la carte est
-  identique octet pour octet (P78-D-11). Erreur, délai, sortie trop longue : « indisponible » sur la lentille seule, jamais
+  identique en données à celle d'un lab avec git en lentille « Aucune » : mêmes cartes, mêmes liens, aucune marque
+  (P78-D-11). La réserve du pied (P75-D-03) est posée dans les deux cas, donc la géométrie ne dépend pas de git ; la
+  lecture « octet pour octet » de la version d'avant la phase est abandonnée pour cette seule raison (75-RESEARCH.md O-1,
+  critique de la spec F3). Erreur, délai, sortie trop longue : « indisponible » sur la lentille seule, jamais
   un résultat partiel présenté comme complet (P78-D-22). Fenêtre vide : « aucune modification sur 90 jours ».
 
 ### Empreinte des agents (direct)
@@ -227,6 +233,15 @@ et ne sont pas rouverts.
   la sonde M4 est reportée sur un autre fichier écrit par le socle (doctrine du 2026-09-16, « ne pas supprimer pour
   verdir »). Repli si Samuel refuse le retrait (Q-75-3) : « Récent » devient une lentille de plus, même canal, même
   emplacement ; le retrait se reporte sur `scripts/recent.mjs` seul. (Panel D.)
+
+### Calcul côté serveur
+
+- **P75-D-22 (où se calculent empreinte, normalisation et collisions).** Côté serveur, dans la réponse de
+  `/api/vf/activite`, pour être testés sans navigateur ; la page ne fait que poser les marques. Accès en mémoire à la
+  projection de frise et aux données Projet demandés à la 79 (manques n° 8 et n° 9, 2026-11-11). Repli si refusé : la
+  page lit `GET /api/vf/frise?champs=cibles` (A28) et le radar d'agents passe côté page, testé par sonde de navigateur.
+  Le schéma `vibeflow/cockpit-activite@1` sert des tableaux de tuples, jamais un chemin comme clé d'objet (`porteInterdit`
+  teste les clés : un fichier nommé `fil` ferait refuser la réponse). (75-RESEARCH.md O-2.)
 
 ### Vérification attendue des plans
 
