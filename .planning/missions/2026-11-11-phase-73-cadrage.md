@@ -8,8 +8,9 @@ de compartiment. **Vague :** cadrée en même temps que les Phases 74, 75, 76, 7
 
 ## Verdict
 
-**Plans écrits et vérifiés.** 10 plans en 7 vagues d'exécution (regroupées en trois temps : données pures, rendu,
-retraits et témoins), famille d'exigences neuve `REGI` (16 exigences), cadrage `73-CONTEXT.md` (décisions P73-D-01 à
+**Plans écrits et vérifiés.** 11 plans en 8 vagues d'exécution (le onzième, 73-11, ajouté à la reprise : section
+« Reprise du 2026-11-11 » plus bas) ; à l'origine 10 plans en 7 vagues (regroupées en trois temps : données pures, rendu,
+retraits et témoins), famille d'exigences neuve `REGI` (17 exigences depuis la reprise), cadrage `73-CONTEXT.md` (décisions P73-D-01 à
 P73-D-36), spec d'interface `73-UI-SPEC.md` passée à la critique (80/100 au second tour), vérification fraîche
 indépendante `passed` (0 bloquant, 3 avertissements corrigés). Tous les plans sont marqués « à revalider » contre les
 contrats des Phases 79 et 80 qu'ils lisent, chacun avec son repli sur la forme présente.
@@ -60,14 +61,17 @@ information de la Phase 80 (pile `VF_SURCOUCHES`, P80-D-33..41, SHA à vérifier
 
 ## Questions à Samuel (non bloquantes ; l'arbitrage en vigueur tient)
 
-Détail et options dans `73-CONTEXT.md` § « À Samuel ».
+Détail et options dans `73-CONTEXT.md` § « À Samuel », réécrite à la reprise au format C76-Q1 de la Phase 76 :
+S-1 → P73-Q-01 (en attente, ne bloque rien), S-2 → P73-Q-02 (appliquée, P73-D-06), S-3 → P73-Q-03 (tranchée),
+S-4 → P73-Q-04 (appliquée, P73-D-15).
 
 - **S-1** Pastilles du tiroir Git de la Phase 78 sur fond d'avertissement, en tension avec Q9. Recommandation :
   les neutraliser dans un correctif du tiroir Git, hors de la 73.
 - **S-2** Question de l'assistant en suspens lue au transcript : rouvrirait la décision D2 du lot 0. Recommandation :
   garder D2.
-- **S-3** Arbitrages en attente écrits en prose dans les CONTEXT : non lus. Recommandation : une convention structurée,
-  plus tard (sujet de BACKLOG).
+- **S-3** — **tranchée par Samuel** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11), autrement que
+  la recommandation du manager : « Poser le format maintenant (Recommandé) ». Devient P73-Q-03 (« tranchée ») et
+  P73-D-37 ; plan 73-11.
 - **S-4** Notification du système : reportée. Recommandation : la reporter.
 
 ## Carte des fichiers
@@ -109,14 +113,16 @@ Détail et options dans `73-CONTEXT.md` § « À Samuel ».
 | 73-07 Pied : arbres de travail, ailleurs, non-fuite | 5 | 05, 02 | REGI-08, 13, 14, 16 | `ui/72-vf-regie-pied.js` ; créés `tests/chrome-regie-pied.mjs`, `tests/chrome-regie-fuite.mjs`, `tests/regie-rg-pied.sh` |
 | 73-08 Retrait du canevas d'Équipe | 6 | 06, 07 | REGI-03, 14, 16 | `vf-cockpit-server.mjs`, `vf-cockpit-equipe-carte.mjs`, `ui/72-vf-equipe.js`, `vf-cockpit-interface.json`, `tests/test-cockpit-equipe.sh`, `tests/chrome-equipe-clavier.mjs`, `tests/chrome-moteur-carte.mjs`, `tests/test-cockpit-moteur-carte.sh`, `tests/test-cockpit-lancer-serveur.sh` ; créé `tests/regie-rg-retrait.sh` |
 | 73-09 LE → LR, témoins re-pointés | 6 | 06, 07 | REGI-01, 12, 14, 16 | `tests/test-cockpit-lancer-suivi.sh`, `test-cockpit-who.sh`, `test-cockpit-equipe-etats.sh`, `test-cockpit-responsive.sh`, `test-cockpit-projet-visite.sh`, `test-cockpit-git-entete.sh`, `test-cockpit-accessibilite.sh`, `chrome-accessibilite.mjs` |
-| 73-10 Tiroir hors d'Équipe, README, CHANGELOG, toutes les suites | 7 | 08, 09 | REGI-11, 15, 16 | `ui/70-vf-live.js`, `ui/71-vf-equipe-rendu.js`, `tests/test-cockpit-equipe.sh`, `tests/test-cockpit-transcript.sh`, `README.md`, `README.fr.md`, `plugin/cockpit/CHANGELOG.md`, `plugin/cockpit/README.md` ; créé `tests/regie-rg-tiroir.sh` |
+| 73-10 Tiroir hors d'Équipe, README, CHANGELOG, toutes les suites | 7 | 08, 09 | REGI-11, 15, 16 | `ui/70-vf-live.js`, `ui/71-vf-equipe-rendu.js`, `tests/test-cockpit-equipe.sh`, `tests/test-cockpit-transcript.sh`, `README.md`, `README.fr.md`, `plugin/cockpit/CHANGELOG.md`, `plugin/cockpit/README.md` ; créé `tests/regie-rg-tiroir.sh` (73-02 porte aussi `tests/test-cockpit-routes.sh`, A54 de la 79) |
+| 73-11 Questions en attente des cadrages, décisions prises pour vous | 8 | 04, 05, 06, 10 | REGI-17, 01, 12, 14, 16 | créés `ui/72-vf-regie-questions-lecture.js`, `ui/72-vf-regie-questions-source.js`, `ui/72-vf-regie-questions-rendu.js`, `tests/vm-regie-questions.mjs`, `tests/chrome-regie-questions.mjs`, `tests/regie-rg-questions.sh` ; modifiés `ui/72-vf-regie-modele.js`, `ui/72-vf-regie-rendu.js`, `ui/72-vf-regie-source.js`, `ui/90-vf-titre.js`, `VENDORED.txt`, `plugin/cockpit/CHANGELOG.md`, `plugin/cockpit/README.md`, `73-UI-SPEC.md` § 18 |
 
 (Chemins relatifs à `plugin/cockpit/` pour `scripts/`, `tests/` = `plugin/cockpit/scripts/tests/`, `ui/` =
 `plugin/cockpit/skills/cockpit-moteur/assets/ui/`.)
 
 ### Ordre des vagues et contrats entre phases
 
-- **Ordre :** 1 (73-01) → 2 (73-02, 73-03) → 3 (73-04) → 4 (73-05) → 5 (73-06, 73-07) → 6 (73-08, 73-09) → 7 (73-10).
+- **Ordre :** 1 (73-01) → 2 (73-02, 73-03) → 3 (73-04) → 4 (73-05) → 5 (73-06, 73-07) → 6 (73-08, 73-09) → 7 (73-10)
+  → 8 (73-11). La 73 s'exécute avant la 76 ; 73-11 pose l'emplacement des questions, que 76-09 remplit.
   Les vagues 6 et 7 concentrent les fichiers partagés et se jouent après rebase sur la 79 ou la 80, selon celle qui
   fusionne la première.
 - **Ce que la 73 attend :**
@@ -130,26 +136,55 @@ Détail et options dans `73-CONTEXT.md` § « À Samuel ».
     vues (P74-D-02), événements `vf-agent:ouvrir` (annulable) et `vf-agent:lu`, attributs `data-vf-agent` /
     `data-vf-noeud` / `data-vf-etat`, ancres `#r=` traitées par la régie, retrait de la carte « Terminés depuis moins
     de 24 h » ;
+  - à la 74, depuis la reprise : contrats P73-C1 à C5 du CONTEXT (déclencheurs annulables `nom`, `ancre`, `rapport` ;
+    retrait par la 74 de `ouvrirRepli` et de l'export `transcript`, témoins verts après retrait nommés ; émission de
+    `vf-agent:lu` par qui ouvre ; bascule `role="tablist"` « Vue de l'équipe », position en `sessionStorage`) ;
+  - à la 76 : l'affichage de `meta.vf.questions` (C76-Q2) dans « À vous » et en liste « Décisions prises pour vous,
+    contestables (N) » ; la section « À Samuel » de la 73 au format C76-Q1, premier cas réel de sa lecture ;
   - à la 79 : les champs facultatifs de `who@2` (A32) ;
   - à la 81 : la régie comme surface où poseront « Répondre » et l'arrêt d'un orphelin.
+
+## Reprise du 2026-11-11 (après-midi)
+
+Mandat de reprise relayé par la session principale : Samuel a tranché S-3 autrement que la recommandation du manager
+(arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 : « Poser le format maintenant (Recommandé) »), d'où
+un plan de plus et la revalidation des dix plans contre les contrats voisins qui avaient bougé. Verrou de phase repris
+(génération `DRIVER.lock.gen.1794406296.65763`). Une coupure de la session (quota du compte, HTTP 429, vers 15 h 33) a
+arrêté net le manager et son worker : retouches non commitées relues et gardées (commit `153f77e7`), entrée du registre
+fermée en `stopped`, reprise par deux workers neufs en parallèle (plafond de sous-agents relevé à 100 par Samuel).
+
+- **Décisions ajoutées** : P73-D-37 (S-3, troisième source de « À vous ») ; P73-D-38 (compositeur du titre sans
+  observateur, aucune baseline d'observateurs à relever) ; P73-D-39 à P73-D-42 (questions sur Équipe avant la coquille,
+  module de lecture à part, tri dans un rang, libellés). Section « À Samuel » réécrite au format C76-Q1 (P73-Q-01 en
+  attente, P73-Q-02 et 04 appliquées, P73-Q-03 tranchée). Contrats fournis à la 74 (P73-C1 à C5). REGI-17.
+- **Plan 73-11** (vague 8) : questions en attente lues dans `meta.vf.questions` (contrat de la 76), « Décisions prises
+  pour vous, contestables (N) » à part et jamais comptées, emplacement qui dit « pas encore livrée » tant que 76-09 n'est
+  pas exécuté ; 36 mutants nommés.
+- **Revalidation** : 73-01 à 73-10 contre 79@5eaa6c41 et 80@0f042552 ; 73-11 contre 76@98708342, 79@5eaa6c41,
+  80@0f042552. Chaque dépendance cite le plan de la 79 qui la livre (dont 79-09, 79-16, 79-17, 79-22).
+  Changements de fond : A54 (route `ailleurs` + `test-cockpit-routes.sh`, RK.1/RK.7) dans 73-02 ; Échap de la régie sur
+  `defaultPrevented`, écoute en remontée, RG15.9 à trois cas ; montage par `surOnglet(…, { cle })`, RG15.10 (réexécution,
+  aucune référence conservée) ; RG1.12 (fragment lu après `pushState`) ; fenêtre rouge 73-05 → 73-08/09/10 déclarée,
+  L3 traité dans 73-08.
+- **Vérifications fraîches de la reprise** : revalidation `ac173592` passed (1 avertissement, L3, fermé) ; delta
+  73-01..10 : 3 bloquants (têtes de revalidation, A54, mutants d'Échap incapables de rougir) → corrigés en `a73960a0` ;
+  73-11 : 1 bloquant (tri contraire à P73-D-41) → corrigé en `9982d088` ; contrôle final scopé au diff de ces deux
+  corrections : voir Preuves E6.
 
 ## À verser par la jointure (texte exact à poser ; la mission n'a pas touché ces fichiers)
 
 1. `.planning/workstreams/fiabilite/ROADMAP.md`, ligne de checklist de la Phase 73 (ligne ~127) : ajouter à la fin
-   « — cadrée et planifiée le 2026-11-11 (10 plans, REGI-01..16) ». Table `## Progress` : Phase 73 → `0/10 | Planned`.
+   « — cadrée et planifiée le 2026-11-11 (11 plans, REGI-01..17) ». Table `## Progress` : Phase 73 → `0/11 | Planned`.
 2. `.planning/research/2026-11-10-audit-cockpit/REGISTRE.md`, colonne d'état des lignes `AUDC-I01`, `I02`, `I03`,
-   `I09`, `I10`, `I21`, `I34`, `I38`, `D4`, `M3`, `F2` : « planifié — Phase 73 (73-01..73-10) » ; pour `AUDC-I09` :
+   `I09`, `I10`, `I21`, `I34`, `I38`, `D4`, `M3`, `F2` : « planifié — Phase 73 (73-01..73-11) » ; pour `AUDC-I09` :
    « planifié en partie — Phase 73 (titre et pastille) ; notification du système reportée ».
-3. `.planning/workstreams/fiabilite/BACKLOG.md`, trois sujets :
+3. `.planning/workstreams/fiabilite/BACKLOG.md`, deux sujets :
    - « Notification du système pour le cockpit (AUDC-I09, part reportée par P73-D-15) : en option éteinte par défaut,
      trois motifs, texte borné au motif et au nombre ; examen des bornes à faire (texte hors de la page). »
-   - « Convention structurée pour les arbitrages en attente écrits dans les CONTEXT (S-3 de la Phase 73), lue ensuite par
-     le cockpit via `vf-cockpit-registres.mjs` (Phase 76). »
    - « Pastilles « modifiés » du tiroir Git sur fond d'avertissement, en tension avec Q9 (S-1 de la Phase 73). »
 4. `.planning/workstreams/fiabilite/STATE.md` : aucune écriture par la mission ; la jointure marque la Phase 73
-   « planifiée, 10 plans » à sa convenance.
-5. Question à relayer à la Phase 79 (non bloquante, A3 de 73-RESEARCH) : un champ numérique de prise du verrou
-   (`priseS`) dans la projection A15 ; en attendant, la ligne de mission dit « dernier signe il y a N min » (73-04).
+   « planifiée, 11 plans » à sa convenance.
+5. Plus de question ouverte vers la 79 : `priseS` est résolu par A36/A39 (`leaseS`, `ageS`), repris dans 73-04.
 
 ## Limites
 
@@ -177,15 +212,20 @@ Agents dispatchés : 11 distincts — 3 éclaireurs, 1 `vf-crafter` (2 tours), 3
 `vf-design-judge` (frais à chaque tour), 1 `vf-coder` (planification puis correction ciblée ; il a lancé 1 chercheur, 1
 cartographe, 1 planificateur et 3 tours de checker), 1 `gsd-plan-checker` frais (repris une fois pour compléter C2-C4).
 Lancements refusés par le plafond : 3. Tours de critique : 2. Tours de correction des plans : 1.
+Reprise (après-midi) : 2 `vf-coder` neufs (plan 73-11 avec 1 `gsd-planner` ; retouches de 73-01..10, repris 7 fois en
+correction ciblée), 1 `vf-coder` arrêté net par la coupure de quota (repris sur disque), 4 `gsd-plan-checker` frais
+(révision `ac173592` ; delta 73-01..10 ; 73-11 ; contrôle final scopé au diff des corrections). Lancements refusés : 0
+(plafond relevé à 100). La dernière passe (`24e2d6f3`) n'est que du texte (marquage « à revalider », libellés, coquille,
+un mutant nommé ajouté) : relue par son auteur avec `verify plan-structure`, `bash -n` et `zsh -n`, sans checker de plus.
 
 ## Preuves E6
 
 ```json
 {
   "preuves": [
-    { "verdict": "gate:state-intact", "commande": "git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md", "exit_code": 0, "sha": "69636215f31fdc29e6b15381018de787aed4a49a" },
-    { "verdict": "gate:check-machine-paths", "commande": "bash scripts/check-machine-paths.sh", "exit_code": 0, "sha": "69636215f31fdc29e6b15381018de787aed4a49a" },
-    { "verdict": "gate:check-mission-invariants", "commande": "bash plugin/conductor/scripts/check-mission-invariants.sh", "exit_code": 3, "sha": "69636215f31fdc29e6b15381018de787aed4a49a" },
+    { "verdict": "gate:state-intact", "commande": "git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md", "exit_code": 0, "sha": "24e2d6f32475b16c5a96fe769830d4dee9c8cf45" },
+    { "verdict": "gate:check-machine-paths", "commande": "bash scripts/check-machine-paths.sh", "exit_code": 0, "sha": "24e2d6f32475b16c5a96fe769830d4dee9c8cf45" },
+    { "verdict": "gate:check-mission-invariants", "commande": "bash plugin/conductor/scripts/check-mission-invariants.sh", "exit_code": 3, "sha": "24e2d6f32475b16c5a96fe769830d4dee9c8cf45" },
     { "verdict": "revue", "preuve": "amont" },
     { "verdict": "gate:plan-checker-interne", "preuve": "amont" },
     { "verdict": "gate:critique-design", "preuve": "amont" }
