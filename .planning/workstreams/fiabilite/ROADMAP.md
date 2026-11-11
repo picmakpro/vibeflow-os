@@ -606,7 +606,7 @@ Plans:
 
 ### Phase 79: Socle du cockpit — une collecte, un flux, une route d'état
 
-> **Cadrée et planifiée le 2026-11-11** par le manager de la phase (décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée ; arbitrages AUDC-Q2, Q4, Q5 du 2026-11-11 en vigueur). Contrats fournis aux Phases 73, 74, 75, 76, 77 et 80 : `79-CONTEXT.md` § « Contrats fournis » et amendements A1 à A48. Questions à Samuel, non bloquantes : S-1 à S-4.
+> **Cadrée et planifiée le 2026-11-11** par le manager de la phase (décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée ; arbitrages AUDC-Q2, Q4, Q5 du 2026-11-11 en vigueur). Contrats fournis aux Phases 73, 74, 75, 76, 77 et 80 : `79-CONTEXT.md` § « Contrats fournis » et amendements A1 à A54. Questions à Samuel, non bloquantes : S-1 à S-4.
 
 **Goal:** Le serveur du cockpit collecte sans bloquer et sert un état unique : un index incrémental des transcripts, une route d'état en JSON lue par la page et par `vf-signal`, un seul flux d'événements partagé entre les onglets, des données sorties de la page, et un serveur lancé depuis le module plutôt que depuis une copie dans le lab.
 **Requirements**: SOCL-01, SOCL-02, SOCL-03, SOCL-04, SOCL-05, SOCL-06, SOCL-07, SOCL-08, SOCL-09, SOCL-10, SOCL-11, SOCL-12, SOCL-13, SOCL-14, SOCL-15, SOCL-16, SOCL-17, SOCL-18, SOCL-19, SOCL-20, SOCL-21, SOCL-22, SOCL-23, SOCL-24, SOCL-25, SOCL-26, SOCL-27

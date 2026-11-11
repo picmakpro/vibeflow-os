@@ -519,6 +519,12 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   d'être le premier : l'ordre alphabétique entre persistants est seul garanti). 79-16 part de la base où 80-02 est fusionné et reprend ce fichier tel que livré, marqueur compris ;
   témoin : un persistant de fixture est évalué une seule fois sur deux changements d'onglet, avant toute extension
   d'onglet. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+- **A54 (73 à 77, 80 — règle de C0) — ajouter une route ou un annotateur.** La liste de RK.1 de
+  `test-cockpit-routes.sh` (chemins de `ROUTES`) et celle de AN.1 (noms d'`ANNOTATEURS`) sont écrites à la main ; les
+  sondes de classe (RK.7) sont dérivées de `ROUTES`. Toute phase qui ajoute une route (ou un annotateur) : porte
+  `test-cockpit-routes.sh` dans ses `files_modified` ; constate RK.1 (ou AN.1) rouge avant l'ajout ; ajoute son chemin
+  (ou son nom) à la liste à sa place alphabétique ; exige ensuite PASS RK.1 et PASS RK.7 (ou PASS AN.1). Corrige la
+  phrase contraire de 79-05. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.

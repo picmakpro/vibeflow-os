@@ -1705,7 +1705,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 <!-- vf-cadrage:phase-79 -->
 
 ### Socle du cockpit (Phase 79 — posées au cadrage, 2026-11-11)
-> Dérivent de `79-CONTEXT.md` (contrats C0 à C6, amendements A1 à A48, décisions P79-D-01 à D-33 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée ; arbitrages en vigueur AUDC-Q2, Q4, Q5 du 2026-11-11). Famille `SOCL`, réservée au ROADMAP pour la Phase 79. Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin, rouge sur le code de la base `integration/cockpit-audit` avant le code.
+> Dérivent de `79-CONTEXT.md` (contrats C0 à C6, amendements A1 à A54, décisions P79-D-01 à D-33 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée ; arbitrages en vigueur AUDC-Q2, Q4, Q5 du 2026-11-11). Famille `SOCL`, réservée au ROADMAP pour la Phase 79. Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin, rouge sur le code de la base `integration/cockpit-audit` avant le code.
 
 - [ ] **SOCL-01**: Fork assumé : `plugin/cockpit/amont/` retiré avec ses contrôles ; `VENDORED.txt` réduit à l'origine, à la sentinelle du moteur et à l'inventaire du plafond ; le contrôle de confinement de l'agent ne saute plus en silence hors de `amont/` (Q11.0) (AUDC-H5, P79-D-07).
 - [ ] **SOCL-02**: Une aide commune `socle-serveur.sh` lance, attend, interroge et arrête le serveur dans les suites ; toutes les suites qui lançaient `<sortie>/serve.mjs` passent par elle et chaque serveur lancé reste vu par l'hygiène des suites (AUDC-AM7, A6, P79-D-23).
