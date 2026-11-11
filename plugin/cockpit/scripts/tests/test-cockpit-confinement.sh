@@ -11,6 +11,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"
 cleanup() { if [ -n "${KEEP:-}" ]; then echo "WORK=$WORK"; else rm -rf "$WORK"; fi; }; trap cleanup EXIT
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
+assert_ge() { if [ "${2:--1}" -ge "$3" ] 2>/dev/null; then echo "  ✅ PASS — $1 ($2 >= $3)"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (obtenu $2, attendu >= $3)"; FAIL=$((FAIL+1)); fi; }
 G() { git -C "$1" -c user.email=t@t -c user.name=t "${@:2}"; }
 wr() { mkdir -p "$(dirname "$1")"; cat > "$1"; }
 
@@ -274,6 +275,58 @@ assert_eq "G13b — aucun marqueur du dépôt extérieur dans les pages, graph.j
 # témoins positifs : dépôt normal (cp du dépôt du lab), lab sous-module, worktree vérifié — le même pipeline lit leur branche
 RN="$(node "$WORK/lire.mjs" "$SCRIPTS" "$L3")"; RS="$(node "$WORK/lire.mjs" "$SCRIPTS" "$PAR/sm")"; RW="$(node "$WORK/lire.mjs" "$SCRIPTS" "$WORK/vrai")"
 assert_eq "G13c — témoins : dépôt normal, lab sous-module et worktree vérifié sont lus (branche vue, rien de refusé)" "$(printf '%s\n' "$RN" "$RS" "$RW" | grep -c '"sortant":false')|$(printf '%s' "$RN" | grep -c 'MARQUEUR-DANS-LE-LAB-BRANCH')|$(printf '%s' "$RS" | grep -c 'MARQUEUR-DANS-LE-LAB-SUBMOD')" "3|1|1"
+
+# G14 : preuve générée depuis l'ÉNUMÉRATION d'un vrai dépôt (jamais une liste écrite à la main). Chaque chemin sous .git (fichier ou dossier ; échantillon d'au plus 200, au moins un par dossier)
+# est remplacé, tour à tour, par un lien vers l'équivalent d'un dépôt extérieur : gitSortant doit refuser. Même chose en mode reftable si git le permet.
+echo "=== G14 — énumération d'un vrai dépôt ==="
+cat > "$WORK/enumerer.mjs" <<'JS'
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, repo, ext, travail] = process.argv;
+const { gitSortant } = await import(pathToFileURL(scripts + '/vf-cockpit-git-sortant.mjs').href);
+const tous = [];
+(function marche(d, rel) { for (const e of fs.readdirSync(d, { withFileTypes: true })) { if (e.isSymbolicLink()) continue; const r = rel ? rel + '/' + e.name : e.name; tous.push(r); if (e.isDirectory()) marche(path.join(d, e.name), r); } })(path.join(repo, '.git'), '');
+let pris = tous;
+if (tous.length > 200) { const vus = new Set(), un = new Set(); for (const r of tous) { const d = path.dirname(r); if (!vus.has(d)) { vus.add(d); un.add(r); } } const pas = Math.ceil(tous.length / (200 - un.size)); tous.forEach((r, i) => { if (i % pas === 0) un.add(r); }); pris = [...un]; }
+const faux = []; const lab = path.join(travail, 'lab');
+const temoin = gitSortant(repo);
+for (const r of pris) {
+  fs.rmSync(lab, { recursive: true, force: true }); fs.cpSync(repo, lab, { recursive: true, verbatimSymlinks: true });
+  fs.rmSync(path.join(lab, '.git', r), { recursive: true, force: true }); fs.symlinkSync(path.join(ext, '.git', r), path.join(lab, '.git', r));
+  if (!gitSortant(lab)) faux.push(r);
+}
+fs.rmSync(lab, { recursive: true, force: true });
+const a = (re) => pris.some((r) => re.test(r));
+console.log(JSON.stringify({ total: tous.length, essais: pris.length, temoin, faux, couvre: { worktree: a(/^worktrees\/[^/]+\/HEAD$/), logs: a(/^logs\//), tags: a(/^(refs\/tags\/|packed-refs$)/), reftable: a(/^reftable\/.+\.ref$/), pack: a(/^objects\/pack\/.+\.(pack|idx)$/) } }));
+JS
+mkenum() { # mkenum <dossier> [options init] : un vrai dépôt (commits, tags, stash, branche, worktree enregistré, refs empaquetées, paquet)
+  local R="$1"; shift; mkdir -p "$R"; G "$R" init -q -b main "$@"; for i in 1 2 3; do printf 'v%s\n' "$i" > "$R/f$i.txt"; G "$R" add -A; G "$R" commit -q -m "c$i"; done
+  G "$R" tag legere; G "$R" tag -a annotee -m "a"; G "$R" branch b2; printf 'sale\n' >> "$R/f1.txt"; G "$R" stash -q; G "$R" worktree add -q "$R-wt" -b bw 2> /dev/null
+  G "$R" remote add origin https://exemple.invalid/x.git; G "$R" pack-refs --all 2> /dev/null; G "$R" branch b3; G "$R" repack -q -d 2> /dev/null; return 0; }
+mkenum "$GEN/reel"; RES14="$(node "$WORK/enumerer.mjs" "$SCRIPTS" "$GEN/reel" "$EXTL" "$GEN/trav")"
+assert_ge "G14a — témoin : l'énumération porte au moins quarante chemins et l'échantillon au moins quarante essais" "$(printf '%s' "$RES14" | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const j=JSON.parse(s);console.log(j.total>=40&&j.essais>=40?j.essais:0)})")" 40
+assert_eq "G14a2 — témoin : l'échantillon couvre worktrees/<id>/HEAD, logs, tags et paquets" "$(printf '%s' "$RES14" | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const c=JSON.parse(s).couvre;console.log([c.worktree,c.logs,c.tags,c.pack].join())})")" "true,true,true,true"
+assert_eq "G14 — chaque chemin énuméré sous .git remplacé par un lien vers l'extérieur : gitSortant refuse (rouge : chemins lus à tort) ; témoin : le dépôt réel est lu" "$(printf '%s' "$RES14" | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const j=JSON.parse(s);console.log((j.temoin===false?'lu':'refuse')+' '+(j.faux.length?j.faux.join(','):'aucun'))})")" "lu aucun"
+echo "  ($(printf '%s' "$RES14" | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const j=JSON.parse(s);console.log(j.total+' chemins énumérés, '+j.essais+' essais')})"))"
+if G "$WORK" init -q --ref-format=reftable "$GEN/rt-essai" 2> /dev/null; then
+  mkenum "$GEN/reft" --ref-format=reftable; RT="$(node "$WORK/enumerer.mjs" "$SCRIPTS" "$GEN/reft" "$EXTL" "$GEN/trav")"
+  assert_eq "G14b0 — témoin : l'échantillon reftable couvre les tables (*.ref)" "$(printf '%s' "$RT" | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>console.log(JSON.parse(s).couvre.reftable))")" "true"
+  assert_eq "G14b — mode reftable : chaque chemin énuméré remplacé par un lien vers l'extérieur est refusé ; témoin : le dépôt reftable est lu" "$(printf '%s' "$RT" | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>{const j=JSON.parse(s);console.log((j.temoin===false?'lu':'refuse')+' '+(j.faux.length?j.faux.join(','):'aucun')+' '+(j.total>=20?'assez':'peu'))})")" "lu aucun assez"
+else echo "  (git de ce poste sans reftable : G14b non joué)"; fi
+# témoin : un lien dont la cible reste DANS le dossier git (le verrou de pilotage .git/vf-driver/…/DRIVER.lock) ne fait rien lire d'extérieur : le dépôt reste lu
+LV="$GEN/lab-verrou"; rm -rf "$LV"; cp -R "$GEN/reel" "$LV"; mkdir -p "$LV/.git/vf-driver/ws"; : > "$LV/.git/vf-driver/ws/DRIVER.lock.gen.1"; ln -s DRIVER.lock.gen.1 "$LV/.git/vf-driver/ws/DRIVER.lock"
+LX="$GEN/lab-verrou-ext"; rm -rf "$LX"; cp -R "$GEN/reel" "$LX"; mkdir -p "$LX/.git/vf-driver"; ln -s "$EXTL/.git/HEAD" "$LX/.git/vf-driver/DRIVER.lock"
+printf '%s\n' "$(node "$WORK/sortant.mjs" "$SCRIPTS" "$LV" "$LX")" > "$WORK/verrou.txt"
+assert_eq "G14c — lien relatif vers un voisin du dossier git (verrou de pilotage) : lu ; lien vers l'extérieur au même endroit : refusé" "$(cat "$WORK/verrou.txt")" "false,true"
+# inclusions de configuration : un fichier hors du lab et du dossier git est refusé (include, includeIf, inclusion en chaîne) ; un fichier du lab est permis (témoin)
+printf '[remote "origin"]\n\turl = https://MARQUEUR-F1-REMOTE.invalid/inc.git\n' > "$GEN/inclus-ext.cfg"; printf '[include]\n\tpath = %s\n' "$GEN/inclus-ext.cfg" > "$GEN/relais-ext.cfg"
+for v in a b c d; do rm -rf "$GEN/lab-inc-$v"; cp -R "$GEN/reel" "$GEN/lab-inc-$v"; done
+printf '[include]\n\tpath = %s\n' "$GEN/inclus-ext.cfg" >> "$GEN/lab-inc-a/.git/config"
+printf '[includeIf "gitdir:**"]\n\tpath = %s\n' "$GEN/inclus-ext.cfg" >> "$GEN/lab-inc-b/.git/config"
+printf '[include]\n\tpath = relais.cfg\n' >> "$GEN/lab-inc-c/.git/config"; cp "$GEN/relais-ext.cfg" "$GEN/lab-inc-c/.git/relais.cfg"
+printf '[color]\n\tui = auto\n' > "$GEN/lab-inc-d/inclus-lab.cfg"; printf '[include]\n\tpath = %s\n' "$GEN/lab-inc-d/inclus-lab.cfg" >> "$GEN/lab-inc-d/.git/config"
+assert_eq "G15 — include.path, includeIf et inclusion en chaîne vers un fichier hors du lab : refusés ; témoin : inclusion d'un fichier du lab : lue" "$(node "$WORK/sortant.mjs" "$SCRIPTS" "$GEN/lab-inc-a" "$GEN/lab-inc-b" "$GEN/lab-inc-c" "$GEN/lab-inc-d")" "true,true,true,false"
+RI="$(mesurer "include" "$GEN/lab-inc-a")"
+assert_eq "G15b — include.path extérieur : aucun marqueur (remote.origin.url extérieure) dans les pages, graph.json, l'export ni /api/vf/git" "${RI##*|}" "0"
 
 # ---------- D : métadonnées VibeFlow de l'export ----------
 echo "=== D — export ==="
