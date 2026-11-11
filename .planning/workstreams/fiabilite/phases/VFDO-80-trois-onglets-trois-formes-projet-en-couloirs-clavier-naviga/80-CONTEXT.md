@@ -224,6 +224,18 @@ La Phase 76 se branche sur le panneau de l'onglet Projet par une route à elle (
   `VF_COQUILLE.chargerOnglet(nom)`, A2 de la 79) et rejetée pour un nom hors de `code`, `projet`, `equipe` ; aller vers
   l'onglet courant la résout aussitôt. Un appelant qui doit agir après l'arrivée attend cette promesse ; une extension
   liée à l'onglet ne s'initialise jamais sur elle mais par `VF_COQUILLE.surOnglet` (A30 de la 79).
+  **Fragment d'adresse au changement d'onglet (question de la Phase 73, RG1.12, relayée par la session principale le
+  2026-11-11 ; décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée).** Le fragment
+  appartient à l'onglet : il porte l'état de vue de cet onglet (`v=`, `s=`, et `z=`, `git=1` de 80-13). Au changement
+  d'onglet par `aller(nom)`, le fragment courant n'est **pas** conservé : l'adresse d'arrivée porte le fragment de l'état
+  de vue mémorisé de l'onglet d'arrivée (P80-D-21), ou aucun. Pour arriver avec un fragment précis (par exemple un
+  `#vf-…` de la régie), l'appelant le passe explicitement : `VF_ONGLETS.aller(nom, { fragment: '#…' })` le pose tel
+  quel sur l'adresse d'arrivée (un seul `pushState`, après la résolution de `chargerOnglet`), et il est lisible par
+  `location.hash` dès la résolution de la promesse. Au retour arrière (`popstate`), le navigateur rend l'adresse exacte
+  de l'entrée d'historique, fragment compris ; le routeur charge l'onglet de cette adresse sans réécrire le fragment.
+  Un fragment ne désigne jamais un élément d'un autre onglet que celui de l'adresse. Témoins dans 80-10 : fragment
+  courant non reporté sur l'onglet d'arrivée ; `aller('equipe', { fragment: '#vf-x' })` → `location.hash === '#vf-x'`
+  à la résolution ; retour arrière → fragment de l'entrée restitué à l'identique.
 - **Clavier du canevas (Phase 75)** : les attributs (rôle, nom, `tabindex`) sont reposés à chaque `on('render')` ; la 75
   peut ajouter sa couche visuelle sans les écraser ; le nom accessible d'une carte est construit par une fonction unique
   que la 75 peut enrichir (mot d'activité) sans couleur seule.
