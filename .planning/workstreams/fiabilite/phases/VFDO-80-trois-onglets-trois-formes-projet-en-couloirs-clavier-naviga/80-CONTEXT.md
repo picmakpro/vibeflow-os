@@ -516,6 +516,39 @@ Faits établis par la recherche qui corrigent la forme de décisions déjà pris
   (79-02, retouchée par 79-11), coquille et `chargerOnglet` (79-16), `VF_ETAT` (79-17), worker de mise en page (79-18),
   porte du flux `window.VF_FLUX` (79-14).
 
+- **P80-D-59 (réexécution des extensions par la coquille, A51 et écart 79-16-a de la 79, tête `c19c7461` ; décision
+  déléguée par Samuel, message session principale, 2026-11-08, option recommandée).** Fait lu à la source (79-16) : la
+  coquille RÉ-EXÉCUTE le moteur et les extensions `ui/` à chaque changement d'onglet, dans l'ordre alphabétique et avant
+  le premier rendu, après avoir défait par une « portée d'onglet » les écouteurs posés sur `window`, `document`, `html`
+  et `body`, les minuteries et les observateurs ; seuls les scripts qui portent `vf-coquille: persistant` dans leurs huit
+  premières lignes s'exécutent une fois par chargement de la coquille. En conséquence :
+  (a) **Pile de surcouches unique** : `ui/00-vf-surcouches.js` porte `vf-coquille: persistant` et une garde d'unicité à
+  l'évaluation (`if (window.VF_SURCOUCHES) return;`, utile aussi avant la 79) ; son écouteur d'Échap en capture sur
+  `window` est donc posé une seule fois par chargement de la coquille, avant toute extension d'onglet et toute vue ;
+  `VF_SURCOUCHES` garde la même identité d'un onglet à l'autre. Une entrée porte `persistant: true` (terminal, posé une
+  fois par la coquille, A3) ou non ; les entrées d'onglet sont retirées au changement d'onglet par le nettoyage d'une
+  inscription `VF_COQUILLE.surOnglet(rappel, { cle: '00-vf-surcouches.js' })` (les surcouches d'onglet sont recréées par
+  leurs extensions réexécutées, et les tiroirs gardés se réinscrivent à leur réouverture, FORM-15/16).
+  (b) **Routage des onglets** : `ui/00-vf-onglets.js` (80-10) porte aussi `vf-coquille: persistant` et une garde
+  d'unicité : un seul écouteur `popstate`, un seul `VF_ONGLETS` ; `aller(nom)` garde sa promesse (premier rendu).
+  (c) **Pile Retour du panneau** (`42-vf-panneau-retour.js`, 80-08) : extension d'onglet ordinaire, réexécutée ;
+  `VF_PANNEAU` est recréé vide à chaque arrivée sur Projet, ce qui est le comportement voulu (pile vidée au changement
+  d'onglet) ; les appelants lisent `window.VF_PANNEAU` au moment de l'appel, jamais une référence gardée.
+  (d) **Autres extensions de la 80, vagues 4 à 9** : idiome A51 — tout écouteur, minuterie ou observateur est posé dans
+  un rappel `VF_COQUILLE.surOnglet(rappel, { cle: '<nom du fichier>' })` et retiré dans la fonction qu'il rend ; les
+  accroches au moteur qui doivent précéder le premier rendu (`on('render')`, `addPanelSection`, `addHeaderButton`)
+  restent posées à l'évaluation, puisque le moteur est lui-même réexécuté. Les extensions des vagues 1 à 3, écrites
+  avant la 79, sont réexécutées comme les extensions existantes ; leur passage à l'idiome A51 est une tâche de la
+  jointure, sauf (a), déjà persistant.
+  Témoin dans 80-02 (et 80-10 pour (b)), après la 79 : deux changements d'onglet → un seul écouteur d'Échap de la pile
+  sur `window` (compté par instrumentation), `VF_SURCOUCHES` identique, entrée du terminal gardée, entrées d'onglet
+  retirées ; mutant (marqueur `vf-coquille: persistant` retiré) → deux écouteurs ou entrée du terminal perdue, rouge.
+- **P80-D-60 (ancres de la 79, A52).** `ROUTES`, `ANNOTATEURS` et les lignes `AJOUT <chemin>` de `VENDORED.txt` sont en
+  ordre alphabétique contrôlé, sans repère : chaque plan de la 80 insère à sa place alphabétique (deux champs par ligne
+  `AJOUT`). Un nom d'événement de la 80 dans la liste `EVENEMENTS` de `ui/69-vf-flux.js` (79-14) va derrière
+  `// vf-repere:phase-80` ; la 80 n'en prévoit aucun à ce jour. L'ancre `"statuts"` du bloc `vibeflow/cockpit-project@1`
+  est libre (79-08 n'y touche pas).
+
 ### Claude's Discretion
 
 Noms exacts des fichiers neufs (dans la plage `ui/` qui garantit l'ordre de chargement), découpage interne sous le
