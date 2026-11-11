@@ -45,11 +45,13 @@ function scinder(t, max) {
 
 // pied d'une carte de phase, part des exigences (PU-G-097, Q9 option A : mot en texte neutre, aucun glyphe ajouté — le pied n'a pas d'emplacement de pastille) :
 // une phase faite dont des exigences ne sont pas cochées dit « N exigence(s) non cochée(s) » (la pastille voisine dit « Fait ») au lieu de « 3/14 exigences », qui se lisait comme un travail à moitié fait
+// P80-C76-4 : le compte des exigences d'une phase, calculé UNE fois ici (pied de carte et champ `exigences`)
+const compteExigences = (reqs) => ({ faits: reqs.filter((r) => r.done).length, total: reqs.length });
 function piedExigences(etat, reqs) {
-  if (!reqs.length) return '';
-  const ouvertes = reqs.filter((r) => !r.done).length;
+  const { faits, total } = compteExigences(reqs); const ouvertes = total - faits;
+  if (!total) return '';
   if (etat === 'fait' && ouvertes) return `${ouvertes} exigence${ouvertes > 1 ? 's' : ''} non cochée${ouvertes > 1 ? 's' : ''}`;
-  return `${reqs.length - ouvertes}/${reqs.length} exigences`;
+  return `${faits}/${total} exigences`;
 }
 
 // PU-G-093 : l'état d'une phase est celui de sa carte (fichiers du dossier, P69-D-08) ; STATE.md ne dit que s'il s'accorde avec elle. Statuts de STATE compatibles avec chaque état de carte ;
@@ -122,7 +124,11 @@ function construireGraphe(root, { layout } = {}) {
     const but = propre(ph.goal), ligne = propre(ph.line), { resume, reste: suite } = but ? scinder(but, 400) : { resume: sentence(ligne || ph.name, 200), reste: '' };
     node({ id, parent: msId, label: `Phase ${ph.n} · ${ph.name}`, kind: 'phase', num: ph.n, ws: ph.ws, summary: resume,
       details: [suite, av.reste.length ? `Reste : ${av.reste.map((c) => LIBELLES_RESTE[c]).join(', ')}.` : '', av.ailleurs ? `Avancement lu dans le worktree ${av.ailleurs.arbre}${av.ailleurs.branche ? ` (branche ${av.ailleurs.branche})` : ''} : plus avancé que celui de l'arbre courant.` : '', av.mission ? `Mission : ${av.mission.nom} (${LIBELLES_MISSION[av.mission.etat] || av.mission.etat}).` : '', ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ligne ? `Ligne de ROADMAP : ${ligne}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
-      st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', piedExigences(av.etat, phReqs), av.ailleurs ? `dans worktree ${av.ailleurs.arbre}` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [] });
+      st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', piedExigences(av.etat, phReqs), av.ailleurs ? `dans worktree ${av.ailleurs.arbre}` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [],
+      // P80-D-06 : les comptes en champs ; la mission se réduit à { nom, etat } (A25 : aucune clé de verrou dans cockpit-project@1)
+      avancement: { version: av.version, etat: av.etat, plans: { ...av.plans }, correctifs: av.correctifs, reste: av.reste,
+        mission: av.mission ? { nom: av.mission.nom, etat: av.mission.etat } : null },
+      exigences: compteExigences(phReqs) });
     for (const pf of planFiles) {
       const txt = texte(read(path.join(dir, pf))); const meta = fm(txt); const pid = pf.replace('-PLAN.md', '');
       const obj = objectif(txt) || /^#\s+(.*)$/m.exec(txt)?.[1] || '';
