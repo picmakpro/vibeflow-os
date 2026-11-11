@@ -3,7 +3,7 @@
 #   Q1 forme courante locale · Q2 raisonnement -> agent confiné (argv = combinaison mesurée) · Q3 onglet Code, même confinement
 #   Q4 modèle : préséance et liste fermée · Q5 question piégée inoffensive · Q6 le modèle ne laisse aucune trace
 #   Q7 seul Claude Code est lancé · Q8 syntaxe et jeton de /api/vf/modeles · Q9 CLI de requête · Q10 identité de phase
-#   Q11 ARGS_CONFINEMENT = « Combinaison retenue » de la mesure (dépôt seulement)
+#   Q11 ARGS_CONFINEMENT = « Combinaison retenue » de la mesure la plus récente (dépôt de dev seulement ; Q11.0 : jamais sautée dans le dépôt)
 #   Q18 retours panel lot 7 (PU-G-096 un état par phase · PU-G-147 coupe au mot · PU-G-150 lignes non comprises)
 #   Q15 « Où en est-on ? » sans STATE.md · Q16 statut lisible (réponse locale, sous-titre) · Q17 parité des tables de statuts
 # Faux binaires claude et codex (node) en tête du PATH ; aucun vrai appel. Exit 0 si tout passe, 1 sinon.
@@ -87,7 +87,12 @@ poser() { # poser <jeton> <question> [extra-json] -> $WORK/ev.jsonl
 }
 FK="$WORK/fk"; mkfake "$FK" claude; BASEPATH="$FK:$PATH"
 # --- combinaison attendue : extraite de la mesure (dépôt) ou comparée à la constante (lab) ---
-MESURE=""; [ -f "$SCRIPTS/../amont/synchro.sh" ] && MESURE="$(find "$SCRIPTS/../../../.planning" -name '67-MESURE-claude-p.md' 2>/dev/null | head -1)"
+# racine_depot : racine du dépôt de dev quand le module est posé sous plugin/cockpit de cette racine ET qu'elle porte .planning/ ; rien sinon
+racine_depot() { local m r; m="$(cd "$SCRIPTS/.." && pwd -P)"; r="$(cd "$SCRIPTS/../../.." 2>/dev/null && pwd -P)"; [ -n "$r" ] && [ "$m" = "$r/plugin/cockpit" ] && [ -d "$r/.planning" ] && printf '%s' "$r"; }
+DEPOT="$(racine_depot)"
+# mesure_de <racine> : la mesure du confinement au plus grand numéro de phase sous .planning/ (tri numérique du préfixe, jamais lexical ni par date) ; rien s'il n'y en a pas
+mesure_de() { find "$1/.planning" -name '*-MESURE-claude-p.md' 2>/dev/null | awk -F/ '{ n=$NF; sub(/-.*/, "", n); printf "%012d\t%s\n", n+0, $0 }' | LC_ALL=C sort | tail -1 | cut -f2-; }
+MESURE=""; [ -n "$DEPOT" ] && MESURE="$(mesure_de "$DEPOT")"
 H cst "$SCRIPTS" > "$WORK/const.txt"
 if [ -n "$MESURE" ]; then awk '/^## Combinaison retenue$/{f=1;next} /^## /{f=0} f && /^- `/' "$MESURE" | sed 's/^- `//; s/`$//' > "$WORK/attendu.txt"; echo "  (combinaison attendue lue dans la mesure)"
 else cp "$WORK/const.txt" "$WORK/attendu.txt"; echo "  (mesure absente : comparaison à la constante)"; fi
@@ -249,9 +254,6 @@ const a = Object.keys(S).sort().join(','), b = Object.keys(B).sort().join(',');
 console.log(a && a === b && Object.keys(S).every((k) => S[k] === B[k]) ? 'identiques' : 'divergent ' + a + ' | ' + b);")" "identiques"
 
 echo "=== Q11 — constante = mesure ==="
-# racine_depot : racine du dépôt de dev quand le module est posé sous plugin/cockpit de cette racine ET qu'elle porte .planning/ ; rien sinon
-racine_depot() { local m r; m="$(cd "$SCRIPTS/.." && pwd -P)"; r="$(cd "$SCRIPTS/../../.." 2>/dev/null && pwd -P)"; [ -n "$r" ] && [ "$m" = "$r/plugin/cockpit" ] && [ -d "$r/.planning" ] && printf '%s' "$r"; }
-DEPOT="$(racine_depot)"
 if [ -n "$DEPOT" ]; then
   assert_eq "Q11.0a — dépôt de dev : la mesure du confinement est trouvée (un saut ici passerait pour un vert)" "$([ -n "$MESURE" ] && echo oui || echo non)" "oui"
 fi

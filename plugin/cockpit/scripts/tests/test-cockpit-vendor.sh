@@ -1,23 +1,20 @@
 #!/usr/bin/env bash
-# test-cockpit-vendor.sh — copie vendorisée de floorplan (CKPT-02, CKPT-03 volet code ; P67-D-03, D-07, D-11).
+# test-cockpit-vendor.sh — copie vendorisée de floorplan (CKPT-02, CKPT-03 volet code ; P67-D-03, D-07, D-11 ; P79-D-07).
 #   V1 sentinelles et licence · V2 licences tierces · V3 rien que check-skills ou la CI jugeraient
-#   V4 tailles et marqueurs · V6 amont retrouvé à l'octet · V7 ajouts, patchs, retraits · V8 binaires
-#   V9 vendor xterm, police des traits de boîte (JetBrains Mono 2.304 Regular, V9.5), assistant du terminal, P26 et TAILLE de serve.mjs (Phase 71)
-# Les contrôles de patchs (V6, V7) sont sautés audiblement quand amont/ est absent (lab installé).
+#   V4 tailles et marqueurs · V8 binaires · V10 fork assumé : ni dossier amont ni journal de patchs, sentinelle du moteur lue (79-01)
+#   V9 vendor xterm, police des traits de boîte, assistant du terminal
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 MOTEUR="$SCRIPTS/../skills/cockpit-moteur"
-AMONT="$SCRIPTS/../amont"
 CHKSIZE="$SCRIPTS/../../software-architecture/scripts/check-file-size.sh"
 WORK="$(mktemp -d)"; trap 'rm -rf "$WORK"' EXIT
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 assert_ge() { if [ "$2" -ge "$3" ] 2>/dev/null; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 ($2 < $3)"; FAIL=$((FAIL+1)); fi; }
-skip() { echo "  ⏭  SKIP — $1 (amont/ absent : lab installé)"; }
 nlines() { awk 'END{print NR}' "$1"; }
 
 echo "=== V1 — sentinelles et licence ==="
@@ -60,25 +57,6 @@ if [ -f "$CHKSIZE" ]; then
   grep -v 'vibeflow:allow-large-file' "$MOTEUR/assets/serve.mjs" > "$WORK/serve-sans-marqueur.mjs"
   bash "$CHKSIZE" "$WORK/serve-sans-marqueur.mjs" >/dev/null 2>&1; assert_eq "V4 — témoin : serve.mjs sans marqueur est bloqué (exit 2)" "$?" "2"
 fi
-
-echo "=== V6 — amont retrouvé à l'octet ==="
-if [ -f "$AMONT/synchro.sh" ]; then
-  bash "$AMONT/synchro.sh" verifier "$MOTEUR" >/dev/null 2>&1; assert_eq "V6.1 — synchro.sh verifier rend 0" "$?" "0"
-  cp -R "$MOTEUR" "$WORK/alt"
-  printf '\n' >> "$WORK/alt/references/schema.md"
-  bash "$AMONT/synchro.sh" verifier "$WORK/alt" >/dev/null 2>&1; assert_eq "V6.2 — témoin : un octet amont modifié hors patch rend 1" "$?" "1"
-else skip "V6"; fi
-
-echo "=== V7 — ajouts, patchs, retraits ==="
-if [ -d "$AMONT/patches" ]; then
-  while read -r k f rest; do
-    case "$k" in
-      AJOUT) assert_eq "V7 — ajout présent : $f" "$([ -e "$MOTEUR/$f" ] && echo oui || echo non)" "oui" ;;
-      PATCH) assert_eq "V7 — diff présent pour $f" "$([ -s "$AMONT/patches/$(printf '%s' "$f" | sed 's|/|__|g').diff" ] && echo oui || echo non)" "oui" ;;
-      RETRAIT) assert_eq "V7 — retrait effectif : $f" "$([ -e "$MOTEUR/$f" ] && echo present || echo absent)" "absent" ;;
-    esac
-  done < "$MOTEUR/VENDORED.txt"
-else skip "V7"; fi
 
 echo "=== V8 — binaires ==="
 assert_eq "V8.1 — cinq .woff2 non vides (quatre polices du cockpit, JetBrains Mono 2.304 Regular)" "$(find "$MOTEUR" -name '*.woff2' -size +0 | grep -c .)" "5"
@@ -129,12 +107,6 @@ for n in xterm.js xterm.css addon-fit.js; do
 done
 assert_eq "V9.3 — une ligne AJOUT terminal/vf-cockpit-pty.py" "$(grep -cx 'AJOUT terminal/vf-cockpit-pty.py' "$MOTEUR/VENDORED.txt")" "1"
 assert_eq "V9.3 — l'assistant existe sous le moteur" "$([ -s "$MOTEUR/terminal/vf-cockpit-pty.py" ] && echo oui || echo non)" "oui"
-assert_eq "V9.4 — la ligne PATCH assets/serve.mjs cite P26" "$(grep '^PATCH assets/serve.mjs ' "$MOTEUR/VENDORED.txt" | awk '{print $3}' | tr ',' '\n' | grep -cx P26)" "1"
-taille_de() { awk '$1=="TAILLE" && $2=="assets/serve.mjs"{print $3}' "$1"; }
-assert_eq "V9.4 — TAILLE assets/serve.mjs = lignes réelles" "$(taille_de "$MOTEUR/VENDORED.txt")" "$(nlines "$MOTEUR/assets/serve.mjs")"
-# témoin positif : une TAILLE décalée de 1 dans une copie est vue
-sed "s|^TAILLE assets/serve.mjs .*|TAILLE assets/serve.mjs $(( $(nlines "$MOTEUR/assets/serve.mjs") + 1 ))|" "$MOTEUR/VENDORED.txt" > "$WORK/VENDORED-decale.txt"
-assert_eq "V9.4 — témoin : une TAILLE décalée de 1 est vue" "$([ "$(taille_de "$WORK/VENDORED-decale.txt")" != "$(nlines "$MOTEUR/assets/serve.mjs")" ] && echo vu || echo aveugle)" "vu"
 
 echo "--- V9.5 — police des traits de boîte (J3 de la critique 71) ---"
 FT="$MOTEUR/assets/vendor/fonts"

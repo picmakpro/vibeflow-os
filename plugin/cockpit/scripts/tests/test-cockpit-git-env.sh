@@ -201,7 +201,7 @@ echo "=== E6 — garde : aucun appel git hors de vf-cockpit-paths.mjs (A7 : list
 #  Règle 1 : tout fichier JS (mjs, cjs, js, jsx, mts, cts, ts, tsx), HORS dossiers tests, node_modules et .git, balayé RÉCURSIVEMENT, qui importe child_process (import, require, import dynamique,
 #            process.getBuiltinModule) doit figurer dans la liste blanche. Règle 2 : un importeur de la liste, autre que le socle (vf-cockpit-paths.mjs), ne lance rien dont un argument contient le mot git
 #            (appel direct, alias d'import, promisify, objet d'import, chaîne require(...).fn, identifiant résolu par sa déclaration) ; seule exception : common.mjs du moteur vendorisé, tant que sa garde
-#            VF_COCKPIT_GIT_DURCI (ligne PATCH de VENDORED.txt) est en tête de git(). --exact : une entrée de la liste qui n'importe plus child_process est périmée. --importeurs : liste les importeurs trouvés.
+#            VF_COCKPIT_GIT_DURCI (commentaire de provenance P27 de common.mjs, E8.4) est en tête de git(). --exact : une entrée de la liste qui n'importe plus child_process est périmée. --importeurs : liste les importeurs trouvés.
 #  Limite assumée (analyse textuelle, pas un AST) : un nom de module construit (« child_ » + « process »), un import(...).then(({ execFile }) => …) ou un eval ne sont pas suivis.
 cat > "$AUX/garde.mjs" <<'JS'
 import fs from 'node:fs';
@@ -427,17 +427,18 @@ assert_eq "E8.3a — le scan a bien tourné sans marqueur et n'écrit aucun HEAD
 : > "$WORK/git.log"; rm -rf "$WORK/o83b"
 VF_COCKPIT_GIT_DURCI=1 PATH="$WORK/bin:$PATH" node "$MOTEUR/scripts/scan.mjs" "$LAB8" --out="$WORK/o83b/.cache/scan.json" >/dev/null 2>&1
 assert_has "E8.3b — témoin : avec le marqueur, l'emballage journalise des appels git (le journal vide de E8.3 prouve donc quelque chose)" "$(cat "$WORK/git.log")" "ARGV"
-# E8.4 — le numéro du patch est dans VENDORED.txt ET dans le commentaire de common.mjs
-NUMP="$(grep -o '// vibeflow P[0-9]*' "$MOTEUR/scripts/lib/common.mjs" | grep -o 'P[0-9]*' | sort -u | tr '\n' ' ')"
-LIGNEP="$(grep '^PATCH scripts/lib/common.mjs' "$MOTEUR/VENDORED.txt")"
-OKP=non; for n in $NUMP; do [[ "$LIGNEP" == *"$n"* ]] && [[ "$LIGNEP" == *VF_COCKPIT_GIT_DURCI* ]] && OKP=oui; done
-assert_eq "E8.4 — la ligne PATCH de common.mjs nomme un numéro présent dans le commentaire du fichier et décrit la garde" "$OKP" "oui"
+# E8.4 — la trace de provenance « // vibeflow P<n> : » est juste au-dessus de la garde de git() dans common.mjs et dit « environnement durci »
+trace_provenance() { awk '/VF_COCKPIT_GIT_DURCI/ && /process\.env/ {print prev; exit} {prev=$0}' "$1/scripts/lib/common.mjs" | grep -qE '^ *// vibeflow P[0-9]+ :.*environnement durci' && echo presente || echo absente; }
+assert_eq "E8.4 — la garde de git() est précédée d'un commentaire de provenance « // vibeflow P<n> : » qui dit « environnement durci »" "$(trace_provenance "$MOTEUR")" "presente"
 # mutants du moteur
 rm -rf "$WORK/mut-garde"; cp -R "$MOTEUR" "$WORK/mut-garde"
 assert_eq "M-GARDE.0 — l'ancre du mutant existe (garde présente dans le moteur)" "$(sans_garde "$WORK/mut-garde")" "muté"
 : > "$WORK/git.log"; rm -rf "$WORK/o8m"
 env -u VF_COCKPIT_GIT_DURCI PATH="$WORK/bin:$PATH" GIT_DIR="$L/.git" node "$WORK/mut-garde/scripts/scan.mjs" "$LAB8" --out="$WORK/o8m/.cache/scan.json" >/dev/null 2>&1
 assert_has "M-GARDE — rougit E8.3 : sans la garde le moteur lance git (journal non vide)" "$(cat "$WORK/git.log")" "ARGV"
+rm -rf "$WORK/mut-trace"; cp -R "$MOTEUR" "$WORK/mut-trace"
+assert_eq "M-TRACE.0 — l'ancre du mutant existe (marque de provenance P27 dans common.mjs)" "$(FROM="// vibeflow P27 :" TO="//" node "$AUX/mutsub.mjs" "$WORK/mut-trace/scripts/lib/common.mjs" 2>&1)" "muté"
+assert_eq "M-TRACE — rougit E8.4 : la copie sans la marque de provenance fait dire « absente »" "$(trace_provenance "$WORK/mut-trace")" "absente"
 MT="$WORK/mut-env-moteur"; rm -rf "$MT"; mkdir -p "$MT/scripts" "$MT/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$MT/scripts/"; cp -R "$MOTEUR" "$MT/skills/cockpit-moteur"
 assert_eq "M-ENV-MOTEUR.0 — l'ancre du mutant existe dans vf-cockpit-build.mjs" "$(FROM="env: etatMoteur(lab).env" TO="env: envEnfant(lab)" node "$AUX/mutsub.mjs" "$MT/scripts/vf-cockpit-build.mjs" 2>&1)" "muté"
 rm -rf "$LAB8/.vibeflow"; GIT_DIR="$L/.git" node "$MT/scripts/vf-cockpit-build.mjs" "$LAB8" --quiet >/dev/null 2>&1
