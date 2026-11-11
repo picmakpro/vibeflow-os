@@ -182,6 +182,65 @@ Format : verdict — commande — code de sortie — SHA.
 - CI de la PR #227, premier passage (tête 95cf88a0) : job `gates` vert, 8 shards sur 9 verts ; shard 4 rouge sur test-cockpit-terminal-fin.sh (FIN.3 à FIN.5 : le runner n'a pas `claude`, le pré-vol du lancement refusait la proposition ; suite verte à tort en local où `claude` est sur le PATH). Corrigé dans le test (faux `claude` du dépôt sur le PATH du serveur, comme test-cockpit-lancer-bout-en-bout.sh) — 22f83ba4 ; rouge reproduit en local sans `claude` (18 PASS / 17 FAIL, rc 1), vert après (35 PASS, rc 0). Second passage de la CI : voir la PR.
 - Docs (CHANGELOG 35c51756, REGISTRE 30bb9307, BACKLOG e71f969b) — check-machine-paths, check-version-sync, check-divergence, check-planning-consumers-registered, check-dev-bootstrap, check-workstream-pointer, check-state-integrity, check-instruction-budget, check-gate-touche, check-baseline-arbitrage, check-python-isolation, test-cockpit-fr-donnees.sh (22 PASS), test-cockpit-chrome-fr.sh (97 PASS) — rc 0 — e71f969b.
 
+```json
+{
+ "preuves": [
+  {
+   "verdict": "gate:test-cockpit-suites",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-*.sh (79 suites, une par une)",
+   "exit_code": 0,
+   "sha": "5e8a4c76"
+  },
+  {
+   "verdict": "gate:synchro-vendor",
+   "commande": "bash plugin/cockpit/amont/synchro.sh verifier",
+   "exit_code": 0,
+   "sha": "5e8a4c76"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-git-config-depot.sh",
+   "exit_code": 0,
+   "sha": "864f8b89"
+  },
+  {
+   "verdict": "audit",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-confinement.sh",
+   "exit_code": 0,
+   "sha": "864f8b89"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-fr-donnees.sh",
+   "exit_code": 0,
+   "sha": "a9e9bd13"
+  },
+  {
+   "verdict": "gate:test-cockpit-chrome-fr",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-chrome-fr.sh",
+   "exit_code": 0,
+   "sha": "e71f969b"
+  },
+  {
+   "verdict": "gate:check-machine-paths",
+   "commande": "bash scripts/check-machine-paths.sh",
+   "exit_code": 0,
+   "sha": "e71f969b"
+  },
+  {
+   "verdict": "revue",
+   "commande": "bash plugin/cockpit/scripts/tests/test-cockpit-terminal-fin.sh",
+   "exit_code": 0,
+   "sha": "22f83ba4"
+  },
+  {
+   "verdict": "recette",
+   "preuve": "amont"
+  }
+ ]
+}
+```
+
 ## Prochaine étape
 
 Relecture de la PR par Samuel, puis la Phase 79 en première vague avec la classe restante d'AUDC-A-02 et AUDC-A-03.
