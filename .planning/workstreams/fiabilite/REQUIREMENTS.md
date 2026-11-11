@@ -1056,6 +1056,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | TRAC-10 | Phase 76 | Pending |
 | TRAC-11 | Phase 76 | Pending |
 | TRAC-12 | Phase 76 | Pending |
+| TRAC-13 | Phase 76 | Pending |
 | — | Phase 77 | repère de cadrage, Phase 77 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 79 | repère de cadrage, Phase 79 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 80 | repère de cadrage, Phase 80 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
@@ -1686,7 +1687,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 <!-- vf-cadrage:phase-76 -->
 
 ### Traçabilité au cockpit (Phase 76 — posées au cadrage, 2026-11-11)
-> Dérivent de P76-D-01..29 (`76-CONTEXT.md` ; décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée ; aucune n'est un arbitrage de Samuel). Famille neuve `TRAC` (vérifiée libre le 2026-11-11 dans tous les ledgers et dans tout le dépôt). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code ; lecture seule, aucun réseau, rien dans l'export.
+> Dérivent de P76-D-01..36 (`76-CONTEXT.md` ; décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sauf P76-D-32 à P76-D-34 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11). Famille neuve `TRAC` (vérifiée libre le 2026-11-11 dans tous les ledgers et dans tout le dépôt). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code ; lecture seule, aucun réseau, rien dans l'export.
 
 - [ ] **TRAC-01**: Section « Traçabilité » du panneau d'une phase : une ligne par exigence rattachée (table de traçabilité du ledger, à défaut `requirements:` d'un PLAN), une bande de quatre maillons lus (plan, SUMMARY, VERIFICATION, recette), chacun avec son niveau (exigence ou phase), et le premier trou dit en un mot ; absence simple en glyphe et mot neutres (P76-D-04, P76-D-13, P76-D-14).
 - [ ] **TRAC-02**: Contradictions du ledger montrées, jamais corrigées : case cochée sans SUMMARY lu et statut « Complete » sans plan lu en glyphe à trait corail et mot ; case non cochée avec SUMMARY lu, exigence sans ligne de traçabilité et ligne sans exigence en mot neutre ; jamais de fond teinté ni de texte coloré (P76-D-04, P76-D-15, P76-D-15bis).
@@ -1700,6 +1701,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **TRAC-10**: Route `GET /api/vf/tracabilite` à la demande, schéma `vibeflow/cockpit-trace@1` déclaré au contrat de forme et au README (champs et `interdits`), règles C0 de la Phase 79 (hôte, `Origin`, jeton en temps constant, GET seul, `no-store`, garde `porteInterdit` sur la réponse, 503 si elle se déclenche), paramètres validés (400 sinon), cache par empreinte, un calcul en vol ; le planning lu dans l'instantané de la collecte (manques ajoutés en champs facultatifs de `cockpit-project@1`), ADR, commits et mémoire par lecture confinée bornée (P76-D-06 à P76-D-09, P76-D-31).
 - [ ] **TRAC-11**: Confidentialité et dégradation : aucune donnée de la phase dans l'export ni dans une page autonome ; aucun chemin absolu ni `~/` dans une réponse ; tout texte venu des fichiers rendu en `textContent` ; lab sans `docs/ADR.md`, sans compartiment, sans mémoire, sans git ou à traçabilité « Étape N » : une ligne neutre qui le dit, rien ne casse ailleurs (P76-D-11, P76-D-12).
 - [ ] **TRAC-12**: Un ajout, un retrait et non-régression : le nœud enfant « Exigences » et ses cartes d'exigence quittent le graphe Projet (le compte « x/y exigences » du pied reste) ; ligne au `CHANGELOG.md` du module ; toutes les suites du cockpit vertes sous macOS et Linux, compteur de suites des README à jour (P76-D-25, P76-D-27, P76-D-29).
+- [ ] **TRAC-13**: Questions en attente : la lecture du planning lit les entrées au format C76-Q1 des sections « À Samuel » des registres de phase et pose le champ facultatif `meta.vf.questions` de `cockpit-project@1` (C76-Q2) ; une entrée hors grammaire est « mal formée » avec son défaut, jamais « en attente » ; une question n'est « tranchée » que par sa ligne `État` canonique ; identifiant en double, phase incohérente, citation incohérente, fichier absent et section vide ont chacun leur témoin rouge ; la régie de la Phase 73 consomme la liste (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; P76-D-34 à P76-D-36).
 
 <!-- vf-cadrage:phase-77 -->
 

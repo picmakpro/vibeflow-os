@@ -1,7 +1,7 @@
 # Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire - Context
 
 **Gathered:** 2026-11-11
-**Status:** Cadrée (2026-11-11) — frontière de questions vide ; deux confirmations non bloquantes « À Samuel »
+**Status:** Cadrée (2026-11-11), reprise le même jour : A-1 et A-2 tranchées par Samuel, format des questions en attente posé (P76-D-34 à P76-D-36) ; une question en attente (P76-Q-03)
 
 Cadrage porté par le manager de la mission Phase 76 (`vf-dev-manager`, worktree `.claude/worktrees/phase-76`, branche
 `feat/phase-76-tracabilite`, base `integration/cockpit-audit` `f763b556`). Jalon `vibeflow-v2.0`, compartiment
@@ -12,7 +12,7 @@ AUDC-I33, `DESIGNS.md` § 1, § 7, § 9) ; rapport du lot 0 (`.planning/missions
 contrats figés de la Phase 79 (`79-CONTEXT.md` § Contrats fournis, commit `3119d82a` de la branche
 `feat/phase-79-socle-cockpit`, lus sans fusion).
 
-**Exigences :** TRAC-01 à TRAC-12. Préfixe neuf, vérifié libre le 2026-11-11 dans tous les ledgers
+**Exigences :** TRAC-01 à TRAC-13 (TRAC-13 ajoutée à la reprise : questions en attente). Préfixe neuf, vérifié libre le 2026-11-11 dans tous les ledgers
 (`.planning/workstreams/*/REQUIREMENTS.md`, `.planning/milestones/*REQUIREMENTS*.md`) et dans tout le dépôt (aucun
 `TRAC-<n>` ; `TRACE-…` est un identifiant de preuve de la Phase 41, sans rapport).
 
@@ -61,6 +61,38 @@ dépôt.
   dernière commande jamais dans le flux, un fichier ou l'export (P67-D-14).
 - Titre jamais généré (PU-G-162) : aucun résumé rédigé par un modèle d'une ADR, d'une décision ou d'une mémoire.
 - Rien sans l'option `--terminal` (P71-D-02) ; le double geste reste dû (la phase n'ajoute aucune action).
+
+### Arbitrages de Samuel rendus à la reprise (2026-11-11)
+
+Relayés mot pour mot par la session principale ; canal : arbitrage Samuel, AskUserQuestion session principale,
+2026-11-11.
+
+- **P76-D-32 (A-1, les trous ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).** Option retenue :
+  « Marque neutre (Recommandé) » — « Une absence se dit par un glyphe et un mot, sans couleur. Seule une contradiction
+  réellement lue (deux sources qui se contredisent) prend un octogone au trait corail. C'est ce que les plans prévoient
+  déjà. » Confirme P76-D-04 et P76-D-15bis ; P76-Q-01 passe de « en attente » à « tranchée ».
+- **P76-D-33 (A-2, graphe navigable ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).** Option
+  retenue : « Panneaux reliés (Recommandé) » — « Dans l'onglet Projet, un clic sur un objet ouvre l'objet voisin
+  (l'exigence ouvre son plan, sa décision, sa preuve), avec un seul bouton Retour. Ni canevas ni quatrième onglet. »
+  Confirme P76-D-01 et P76-D-30 ; P76-Q-02 passe à « tranchée ».
+- **P76-D-34 (questions en attente : poser le format maintenant ; arbitrage Samuel, AskUserQuestion session
+  principale, 2026-11-11).** Option retenue : « Poser le format maintenant (Recommandé) », présentée mot pour mot :
+  « Un format court pour une question en attente (identifiant, question, options, recommandation, ce qu'elle bloque),
+  que les sept cadrages suivent déjà presque. La Phase 76 le lit, la régie de la 73 l'affiche dans « À vous ». Coût :
+  un plan de plus dans la 76 et un dans la 73. Le manager de la 73 recommandait, lui, de reporter. » Née de la question
+  S-3 de la Phase 73. Répartition fixée par la session principale : la 76 est propriétaire du format et de sa lecture
+  (C76-Q1, C76-Q2, plan 76-09, TRAC-13) ; la 73 est propriétaire de l'affichage.
+- **P76-D-35 (forme du format ; décision déléguée par Samuel (message session principale, 2026-11-08), option
+  recommandée).** Le format reprend la forme que les sept sections « À Samuel » suivent déjà presque (puce, identifiant
+  en gras, titre, options lettrées, recommandation) et la rend lisible par machine : identifiant préfixé selon la
+  convention du dépôt (`P<n>-Q-<nn>`), champs sur des lignes étiquetées d'un ensemble fermé, état toujours écrit.
+  Écartés : un bloc YAML ou JSON (illisible pour l'humain qui répond, rompt avec la forme des sept cadrages) ; un
+  fichier de questions à part (une question vit à côté des décisions qu'elle conditionne).
+- **P76-D-36 (lecture fermée par défaut ; décision déléguée par Samuel (message session principale, 2026-11-08), option
+  recommandée).** Une entrée qui ne respecte pas la grammaire n'est jamais rendue « en attente » : elle est « mal
+  formée », avec son défaut nommé. Une question n'est « tranchée » que par une ligne `État` canonique. Une incohérence
+  lue (ligne `État : en attente` alors qu'une décision du même registre cite son identifiant avec « arbitrage
+  Samuel ») rend l'état « à vérifier », jamais « en attente ».
 
 ### Forme et emplacement
 
@@ -277,6 +309,84 @@ dépôt.
 - **Partagé avec la Phase 73** : l'extracteur de définitions des registres (P76-D-18).
 - **Fourni à la Phase 77** : les compteurs de la mémoire par la route (P76-D-23).
 
+### Contrats fournis (questions en attente, P76-D-34)
+
+Posés le 2026-11-11 pour la Phase 73, qui affiche la liste dans « À vous ». La 76 est propriétaire de C76-Q1 et C76-Q2 ;
+tout changement passe par un amendement daté ici.
+
+**C76-Q1 — Écrire une question en attente.**
+
+- **Où.** Dans le registre `*-CONTEXT.md` d'un dossier de phase (`phases/<préfixe>-<N>-<slug>/` d'un compartiment, ou
+  de `.planning/phases/`, archives `*-phases/` comprises), dans la section dont le titre de niveau 2 commence
+  exactement par « À Samuel » (ligne `## À Samuel`, suffixe libre après). Une seule section par fichier ; toute autre
+  section, et tout autre fichier, n'est jamais lu comme une question.
+- **Une entrée** est une puce de premier niveau dont la première ligne commence exactement par
+  `- **P<n>-Q-<nn> — <titre>.**`, suivie de la question sur la même ligne et sur ses lignes de suite non étiquetées :
+  - `<n>` est le numéro de la phase du registre, décimale comprise (`P71.5-Q-01`), et doit être celui du dossier ;
+  - `<nn>` a au moins deux chiffres ;
+  - le séparateur entre identifiant et titre est ` — ` (tiret cadratin) ; le titre finit par un point avant `**`.
+- **Champs** : chacun sur une ligne de suite indentée de deux espaces, une seule fois, dans cet ordre, étiquettes d'un
+  ensemble fermé :
+  - `Options : (a) … ; (b) … .` — au moins deux options, lettres consécutives à partir de `a` ;
+  - `Recommandation : (<lettre>) — <motif>.` — lettre prise parmi les options ; ou `Recommandation : aucune — <motif>.`
+    quand aucune n'est recommandable (goût pur) ;
+  - `Bloque : <liste>` — éléments séparés par `, ` : un plan `<NN>-<NN>` (ou `<NN.N>-<NN>`), une phase `Phase <N>`, ou
+    le seul mot `rien` ;
+  - `État : en attente`, ou, une fois tranchée,
+    `État : tranchée — arbitrage Samuel, <canal>, <AAAA-MM-JJ> — option (<lettre>) — « <mot pour mot> »`.
+- **Passage de « en attente » à « tranchée ».** On ne supprime ni ne déplace l'entrée : on remplace la seule ligne
+  `État` par la forme tranchée (canal, date ISO, option, citation exacte entre guillemets français), et on écrit au
+  registre la décision qui en découle (`P<n>-D-<nn>`), qui cite l'identifiant de la question.
+- **Ce qui n'est pas une question** : toute ligne de la section qui n'est pas une entrée (prose, puce d'un autre format
+  comme `- **S-1 — …**`, puce imbriquée). La lecture ne la rend jamais comme une question ; elle compte les puces de
+  premier niveau d'un autre format (« non structurées »).
+
+**C76-Q2 — Ce que la lecture du planning rend à la page.**
+
+- **Où.** Champ facultatif `meta.vf.questions` de `vibeflow/cockpit-project@1`, posé dans la lecture du planning de la
+  collecte (règle A32 de la Phase 79) ; la version ne monte pas. Absent si aucun registre lu n'a de section « À Samuel ».
+- **Forme.**
+
+  ```json
+  {
+    "liste": [
+      {
+        "id": "P76-Q-03",
+        "phase": "ph-76",
+        "ws": "fiabilite",
+        "fichier": ".planning/workstreams/fiabilite/phases/VFDO-76-tracabilite-au-cockpit/76-CONTEXT.md",
+        "ligne": 312,
+        "titre": "≤ 80 caractères",
+        "question": "≤ 240 caractères",
+        "options": [{ "cle": "a", "texte": "≤ 160 caractères" }],
+        "recommandation": "a",
+        "bloque": [{ "type": "plan", "id": "76-04" }, { "type": "phase", "n": "81" }],
+        "etat": "en-attente",
+        "tranchee": null,
+        "defauts": []
+      }
+    ],
+    "bilan": { "enAttente": 1, "tranchees": 0, "aVerifier": 0, "malFormees": 0, "nonStructurees": 0, "registresLus": 1 },
+    "tronque": false
+  }
+  ```
+
+- **Valeurs.** `etat` ∈ `en-attente`, `tranchee`, `a-verifier`, `mal-formee`. `recommandation` est une lettre ou `null`
+  (« aucune »). `bloque` vaut `[]` pour `rien`. `tranchee` vaut `null` sauf si `etat` = `tranchee`, et porte alors
+  `{ canal, date, option, citation }` (citation ≤ 240 caractères). `defauts` est fermé : `etat-absent`,
+  `etat-invalide`, `options-invalides`, `recommandation-hors-options`, `bloque-invalide`, `champ-repete`,
+  `champ-manquant`, `phase-incoherente` (le `<n>` de l'identifiant n'est pas celui du dossier), `identifiant-double`
+  (même identifiant deux fois dans le planning lu : toutes ses occurrences sont « mal formée »), `citation-incoherente`
+  (état « à vérifier », P76-D-36). Une entrée « mal formée » garde `id`, `phase`, `fichier`, `ligne` et `defauts`
+  quand ils sont lisibles, rien d'autre.
+- **Bornes.** Textes passés par le nettoyage de la 76 (aucun chemin absolu ni `~/`) et coupés aux longueurs ci-dessus ;
+  la page les rend en texte, jamais en HTML. Au plus 200 entrées, triées par phase puis identifiant ; au-delà,
+  `tronque: true`. Fichier absent ou illisible : rien, sans erreur. Section vide : `registresLus` compté, aucune entrée.
+- **Ce que la 73 consomme** : les entrées `etat` = `en-attente`, et le `bilan` pour dire ce qui n'est pas lu
+  (« N questions écrites dans un autre format, non lues ») ; elle n'affiche jamais une entrée `mal-formee` ou
+  `a-verifier` comme une question qui attend une réponse. Tant que la lecture de la 76 n'existe pas (la 73 s'exécute
+  avant), le champ est absent et la 73 le dit dans son emplacement ; le plan 76-09 le remplit.
+
 ### Claude's Discretion
 
 Découpage exact en fichiers sous `plugin/cockpit/scripts/` (chaque fichier ≤ 300 lignes, gate V4), numéro des fichiers
@@ -285,16 +395,28 @@ Découpage exact en fichiers sous `plugin/cockpit/scripts/` (chaque fichier ≤ 
 
 ## À Samuel
 
-Questions qui ne bloquent rien : l'arbitrage en vigueur tient et les plans sont bâtis dessus.
+Section écrite au format C76-Q1. A-1 et A-2 de la première version sont tranchées (P76-D-32, P76-D-33) ; elles
+restent ici, réécrites au format, comme premiers cas réels pour la lecture.
 
-- **A-1 — « Les trous en rouge » (but du 2026-11-03) face à Q9 (2026-11-06, ni couleur d'alerte).** En vigueur : Q9.
-  Options : (a) glyphe neutre et mot pour une absence, trait corail sur le glyphe pour une contradiction lue
-  (P76-D-04) ; (b) trait corail pour tout trou ; (c) tout neutre. Recommandation : (a), seule lecture qui tient les
-  deux textes ; elle garde le corail pour ce qui demande une action.
-- **A-2 — « Graphe navigable » et « graphe de liens » (but du 2026-11-03) réalisés sans dessin.** En vigueur : la
-  direction « trois onglets, trois formes » retenue le 2026-11-11. Options : (a) panneaux reliés, voisinage seul
-  (P76-D-01) ; (b) en plus, un dessin de l'îlot de mémoire d'un agent (moins de 30 nœuds) ; (c) un canevas des
-  décisions. Recommandation : (a) ; (b) peut venir plus tard sans rien défaire.
+- **P76-Q-01 — Les trous en rouge face à Q9.** Le but du 2026-11-03 dit « les trous en rouge », Q9 interdit toute
+  couleur d'alerte : comment marquer un trou ?
+  Options : (a) glyphe et mot neutres pour une absence, octogone au trait corail pour une contradiction lue ; (b) trait corail pour tout trou ; (c) tout neutre.
+  Recommandation : (a) — seule lecture qui tient les deux textes.
+  Bloque : 76-06, 76-07
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (a) — « Une absence se dit par un glyphe et un mot, sans couleur. Seule une contradiction réellement lue (deux sources qui se contredisent) prend un octogone au trait corail. C'est ce que les plans prévoient déjà. »
+- **P76-Q-02 — Graphe navigable réalisé sans dessin.** Le but parle de « graphe navigable » et de « graphe de liens » :
+  dessin ou panneaux reliés ?
+  Options : (a) panneaux reliés, voisinage seul ; (b) en plus, un dessin de l'îlot de mémoire d'un agent ; (c) un canevas des décisions.
+  Recommandation : (a) — tient la direction « trois onglets, trois formes ».
+  Bloque : 76-06, 76-07
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (a) — « Dans l'onglet Projet, un clic sur un objet ouvre l'objet voisin (l'exigence ouvre son plan, sa décision, sa preuve), avec un seul bouton Retour. Ni canevas ni quatrième onglet. »
+- **P76-Q-03 — Poids ajouté à la page Projet.** La règle A32 de la Phase 79 fait entrer les manques du planning
+  (maillons, définitions de décisions, preuves, questions) dans `cockpit-project@1`, environ 0,4 Mo de JSON de plus
+  selon le planificateur : garder ?
+  Options : (a) garder et mesurer à l'exécution ; (b) une exception à A32 pour les définitions de décisions, lues par la route.
+  Recommandation : (a) — mesure écrite dans la trace de 76-04, la règle commune reste entière.
+  Bloque : rien
+  État : en attente
 
 <canonical_refs>
 ## Canonical References
