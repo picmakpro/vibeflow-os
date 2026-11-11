@@ -2,6 +2,7 @@
 # test-cockpit-confinement.sh — confinement du lab et de l'export (lot 0 de l'audit du cockpit : AUDC-A-02, AUDC-B-01, AUDC-B-04).
 #   A  un lien symbolique du lab vers l'extérieur n'est jamais suivi à l'assemblage : rien de sa cible dans les pages ni dans l'export (témoin positif : le même contenu, en fichier normal, y est)
 #   B  un worktree déclaré mais non vérifié n'élargit pas la liste des arbres du lab (témoin positif : un vrai worktree y est)
+#   D  l'export ne porte plus les clés vfTouch et vfGit (témoin positif : il garde les logos et l'onglet pour s'afficher)
 # Isolation git, aucun serveur ni navigateur. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -82,6 +83,23 @@ ARB="$(node "$WORK/arbres.mjs" "$SCRIPTS" "$LAB")"
 assert_eq "B1 — l'entrée déclarée mais non vérifiée n'est pas un arbre du lab" "$(printf '%s\n' "$ARB" | grep -c "^$AUTRE\$")" "0"
 assert_eq "B2 — témoin positif : le vrai worktree reste un arbre du lab" "$(printf '%s\n' "$ARB" | grep -c "^$WORK/vrai\$")" "1"
 assert_eq "B3 — témoin positif : l'arbre principal reste le premier" "$(printf '%s\n' "$ARB" | head -1)" "$LAB"
+
+# ---------- D : métadonnées VibeFlow de l'export ----------
+echo "=== D — export ==="
+cat > "$WORK/cles.mjs" <<'JS'
+import fs from 'node:fs';
+// la page exportée est celle de la sortie (marque blanche) : sa zone de données commence par window.VF_COCKPIT
+const h = fs.readFileSync(process.argv[2], 'utf8'); const D = '<script>window.VF_COCKPIT = ';
+const a = h.indexOf(D), b = h.indexOf(';</script>', a);
+if (a < 0 || b < 0) { console.log('ZONE-DE-DONNEES-INTROUVABLE'); process.exit(0); }
+const g = JSON.parse(h.slice(a + D.length, b));
+console.log(Object.keys(g.meta).filter((k) => /^vf/.test(k)).sort().join(','));
+JS
+node -e "const g=JSON.parse(require('fs').readFileSync('$OUT/graph.json','utf8'));console.log(Object.keys(g.meta).filter(k=>k==='vfTouch'||k==='vfGit').sort().join(','))" > "$WORK/source.txt"
+assert_eq "D0 — témoin : la page servie porte bien vfTouch et vfGit (sinon le test ne prouve rien)" "$(cat "$WORK/source.txt")" "vfGit,vfTouch"
+CLES="$(node "$WORK/cles.mjs" "$EXP")"
+assert_eq "D1 — l'export ne porte ni vfTouch ni vfGit" "$(printf '%s' "$CLES" | tr ',' '\n' | grep -cE '^(vfTouch|vfGit)$')" "0"
+assert_eq "D2 — témoin positif : il garde les logos et l'onglet pour s'afficher" "$(printf '%s' "$CLES" | tr ',' '\n' | grep -cE '^(vfLogos|vfTab)$')" "2"
 
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
