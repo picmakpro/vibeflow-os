@@ -11,6 +11,7 @@ SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 AUX="$WORK/aux"; HOME_T="$WORK/home"; NOSCRIPTS="$WORK/noscripts"
 mkdir -p "$AUX" "$HOME_T/.claude/scripts" "$NOSCRIPTS"
 
@@ -345,12 +346,9 @@ LABD="$(cd "$LABD" && pwd -P)"
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LABD" --quiet > "$WORK/build-d.out" 2>&1 || cat "$WORK/build-d.out"
 HD="$WORK/homed"; mkdir -p "$HD/.claude/projects/-lab"
 node "$AUX/mk-d3.mjs" "$HD/.claude/projects/-lab/$SID.jsonl" "$LABD" cmd-puis-texte
-PORTD="$(node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
 OUTD="$LABD/.vibeflow/cockpit"
-( cd "$LABD" && HOME="$HD" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$OUTD/serve.mjs" --no-open --port "$PORTD" > "$WORK/serve-d.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-SRVD=$!; PIDS+=($SRVD)
-for _ in $(seq 1 100); do grep -q '"port"' "$OUTD/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-PORTD="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUTD/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+cockpit_lancer "$LABD" HOME="$HD" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS"
+SRVD="${VF_PID:-}"; PORTD="${VF_PORT:-0}"
 cat > "$AUX/tiroir.js" <<'JS'
 (async () => {
   const SC = window.VibeFlow || window.Floorplan, pa = document.getElementById('panel');

@@ -5,7 +5,6 @@
 #   E « < » du graphe · C échec franc sans le serveur du cockpit · T timeouts · R regex de chemin bornée
 # Chaque famille a son témoin (positif ou rouge) ; la suite rougit sur un module antérieur aux correctifs. Exit 0 si tout passe.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$SCRIPTS/../skills/cockpit-moteur"
@@ -13,6 +12,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
@@ -90,11 +90,9 @@ MD
   node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build-$(basename "$L").out" 2>&1 || cat "$WORK/build-$(basename "$L").out"
 }
 srv() { # srv <sortie> [PATH-extra] -> SRV_PORT SRV_PID ; serveur depuis la sortie, avec les deux chemins du module (comme le lanceur)
-  local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && PATH="${2:+$2:}$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  local o="$1" lab; lab="$(cd "$1/../.." && pwd)"
+  COCKPIT_SORTIE="$o" cockpit_lancer "$lab" PATH="${2:+$2:}$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS"
+  SRV_PID="${VF_PID:-}"; SRV_PORT="${VF_PORT:-0}"
 }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
 tok() { node "$AUX/req.mjs" "$1" GET "$2" | sed -n 's/.*VF_COCKPIT_SERVER={"token":"\([0-9a-f]*\)".*/\1/p' | head -1; }
@@ -383,7 +381,8 @@ assert_eq "E3b — l'objet injecté dans les pages (version, modèle) échappe a
 
 echo "=== C — sans vf-cockpit-server.mjs : échec franc ==="
 cp -R "$OUT" "$WORK/sortie-sans"; rm -f "$WORK/sortie-sans/vf-cockpit-server.mjs"
-( cd "$LAB"; node "$WORK/sortie-sans/serve.mjs" --no-open --port $(libre) > "$WORK/c.out" 2>&1 & CP=$!; sleep 2; if kill -0 $CP 2>/dev/null; then echo vivant > "$WORK/c.etat"; vf_hyg_stop $CP; else echo mort > "$WORK/c.etat"; fi; wait $CP 2>/dev/null )
+COCKPIT_SORTIE="$WORK/sortie-sans" COCKPIT_LOG="$WORK/c.out" cockpit_lancer "$LAB" 2>/dev/null; CRC=$?
+if [ "$CRC" = 1 ]; then echo mort > "$WORK/c.etat"; else echo vivant > "$WORK/c.etat"; cockpit_arreter; fi
 assert_eq "C1 — le serveur refuse de démarrer (jamais de repli sur l'agent amont)" "$(cat "$WORK/c.etat")" "mort"
 assert_has "C2 — message en français" "$(cat "$WORK/c.out")" "est absent"
 
