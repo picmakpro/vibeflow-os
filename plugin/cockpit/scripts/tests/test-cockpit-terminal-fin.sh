@@ -91,7 +91,7 @@ terminer() { rq "$SRV_PORT" POST /api/vf/terminal/terminer --jeton "$1" --corps 
 assert_eq "FIN.2 — sans jeton de page : refusé (403), le shell vit encore" "$(terminer "mauvais-jeton") $(vivant "${SH1:-0}")" "403 oui"
 assert_eq "FIN.2 — avec le jeton de la page : accepté (200)" "$(terminer "$PTOK")" "200"
 assert_eq "FIN.2 — le processus du shell a disparu" "$(mort_avant "${SH1:-0}" 20 && echo oui || echo non)" "oui"
-assert_eq "FIN.2 — la session est terminée" "$(node "$TA" etat "$QP" "$SEC" | sed -n 3p | node "$AUX/ev.mjs" 'j.session')" "terminee"
+assert_eq "FIN.2 — la session n'est plus vivante (la place est en fermeture puis libre : « absente », jamais « vivante »)" "$(node "$TA" etat "$QP" "$SEC" | sed -n 3p | node "$AUX/ev.mjs" 'j.session')" "absente"
 rm -f "$RUN/shell.pid"
 node "$TA" flux "$QP" "$SEC" "$ONG" "$WORK/flux2.bin" 30000 > /dev/null 2>&1 & FL2=$!; PIDS+=($FL2)
 for _ in $(seq 1 80); do [ -s "$RUN/shell.pid" ] && break; sleep 0.1; done
@@ -101,6 +101,25 @@ vf_hyg_stop "$FL"; vf_hyg_stop "$FL2"
 unsrv
 srv
 assert_eq "FIN.2 — sans session : la demande est inoffensive (200)" "$(terminer "$(curl -s "http://127.0.0.1:$SRV_PORT/project.html" | grep -o 'VF_COCKPIT_SERVER={"token":"[0-9a-f]*"' | head -1 | sed 's/.*"token":"//;s/"//')")" "200"
+unsrv
+
+# ---------- FIN.2b : une seule session (P71-D-05) ----------
+echo "=== FIN.2b — shell qui ignore les signaux : la place reste prise jusqu'à sa mort ==="
+printf '#!/bin/sh\necho $$ > "%s/shell.pid"\ntrap "" HUP TERM INT\nexec sleep 40\n' "$RUN" > "$WORK/bin/shell-tetu"; chmod +x "$WORK/bin/shell-tetu"
+SHELL_AVANT="$SHELL"; export SHELL="$WORK/bin/shell-tetu"
+srv
+PTOK="$(curl -s "http://127.0.0.1:$SRV_PORT/project.html" | grep -o 'VF_COCKPIT_SERVER={"token":"[0-9a-f]*"' | head -1 | sed 's/.*"token":"//;s/"//')"
+printf '%s' "$AMORCE" > "$WORK/amorce.txt"; SEC="$(node "$TA" amorcer "$QP" "$WORK/amorce.txt" | sed -n 2p)"
+ONG="$(node -e "console.log(require('crypto').randomBytes(16).toString('hex'))")"
+node "$TA" flux "$QP" "$SEC" "$ONG" "$WORK/fluxT1.bin" 30000 > /dev/null 2>&1 & FT=$!; PIDS+=($FT)
+for _ in $(seq 1 80); do [ -s "$RUN/shell.pid" ] && break; sleep 0.1; done
+SHT="$(cat "$RUN/shell.pid" 2>/dev/null)"
+assert_eq "FIN.2b — témoin : le shell obstiné tourne" "$(vivant "${SHT:-0}")" "oui"
+terminer "$PTOK" > /dev/null
+ATT="$(rq "$QP" GET /flux --secret "$SEC" --onglet "$ONG" --echeance 1500 | sed -n 1p)"
+assert_eq "FIN.2b — ré-attache immédiate : refusée (503) tant que l'ancien shell vit, jamais un second shell" "$ATT $(vivant "${SHT:-0}")" "503 oui"
+assert_eq "FIN.2b — l'ancien shell finit par mourir (fermeture bornée)" "$(mort_avant "${SHT:-0}" 25 && echo oui || echo non)" "oui"
+export SHELL="$SHELL_AVANT"; vf_hyg_stop "$FT"
 unsrv
 
 # ---------- FIN.3 et FIN.4 : page Projet réelle ----------

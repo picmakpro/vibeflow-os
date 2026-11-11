@@ -184,8 +184,8 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
   const ppid0 = process.ppid;
   process.on('disconnect', () => { if (phase !== 'arret') sortir(); });
   setInterval(() => { if (process.ppid !== ppid0 && phase !== 'arret') sortir(); }, 500).unref();
-  // AUDC-M10 : fin volontaire de la SESSION (le shell), jamais du serveur : flux fermé, EOF et signal à l'assistant, la place se libère ; une attache neuve lance un autre shell. Sans session : sans effet.
-  const terminer = () => { if (phase !== 'arret') sessions.arreterTout(); };
+  // AUDC-M10 : fin volontaire de la SESSION (le shell), jamais du serveur : flux fermé, EOF et signal à l'assistant, la place reste prise jusqu'à la mort de l'ancien shell (une attache entre-temps : 503), puis une attache neuve lance un autre shell. Sans session : sans effet.
+  const terminer = () => { if (phase !== 'arret') sessions.fermer(); };
   return { jetons: (j) => { jetons = j || []; }, cibles: recevoirCibles, proposition: recevoirProposition, arret, terminer };
 }
 
