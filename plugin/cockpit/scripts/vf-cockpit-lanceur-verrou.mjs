@@ -5,6 +5,28 @@ import path from 'node:path';
 import http from 'node:http';
 import { confiner } from './vf-cockpit-paths.mjs';
 
+// AUDC-H3 : tout fichier que le lanceur écrit dans la sortie du lab (journal, état) y reste. Contrôle de sortie (confiner : ni lien symbolique, ni dossier parent hors du lab),
+// ouverture sans suivre de lien (O_NOFOLLOW) et type vérifié sur le descripteur ouvert : fichier régulier, un seul lien dur. Rend le descripteur, ou null.
+const SANS_LIEN = fs.constants.O_NOFOLLOW || 0;
+export function ouvrirSur(lab, f, { ajout = false, mode = 0o600 } = {}) {
+  try {
+    confiner(lab, f);
+    const fd = fs.openSync(f, fs.constants.O_WRONLY | fs.constants.O_CREAT | SANS_LIEN | (ajout ? fs.constants.O_APPEND : fs.constants.O_TRUNC), mode);
+    try { const st = fs.fstatSync(fd); if (st.isFile() && st.nlink === 1) return fd; } catch {}
+    fs.closeSync(fd);
+  } catch {}
+  return null;
+}
+// Une valeur de server.json (fichier que le lab peut fournir) n'entre jamais dans une ligne ni dans un fichier sans forme valide.
+export const hashSur = (h) => (h === undefined || h === null ? undefined : typeof h === 'string' && /^[0-9a-f]{1,64}$/.test(h) ? h : 'illisible'); // illisible = code inconnu : le serveur est remplacé
+export const pidSur = (v) => (Number.isInteger(v) && v > 0 ? v : null);
+// Journal du serveur (serveur.log), décisions du lanceur datées avec leur motif (jamais un jeton ni un contenu). Une ligne = une ligne : aucun retour à la ligne n'y passe.
+export function noter(sortie, msg) {
+  const fd = ouvrirSur(path.resolve(sortie, '..', '..'), path.join(sortie, '.cache', 'serveur.log'), { ajout: true });
+  if (fd === null) return;
+  try { fs.writeSync(fd, `${new Date().toISOString()} lanceur : ${String(msg).replace(/[\r\n\u2028\u2029]+/g, ' ')}\n`); } catch {} finally { fs.closeSync(fd); }
+}
+
 // AUDC-H3 : verrou de lanceur — deux lanceurs ne se croisent pas. Fichier créé en exclusif (jamais un lien suivi), PID du détenteur ;
 // un détenteur mort, ou un verrou de plus de 2 minutes, est repris. Le second lanceur attend, puis trouve le serveur déjà là.
 const VERROU_MAX_MS = 120000;
@@ -41,7 +63,7 @@ export async function serveurOrphelin(lab, sortie, port0, { estNotre, etatFile, 
   let racine; try { racine = fs.realpathSync(lab); } catch { return null; }
   for (let p = port0; p <= Math.min(65535, port0 + 20); p++) {
     const page = await lireHttp(p, '/');
-    const jeton = page && page.code === 200 ? /VF_COCKPIT_SERVER=\{"token":"([0-9a-f]+)"/.exec(page.corps)?.[1] : null;
+    const jeton = page && page.code === 200 ? /VF_COCKPIT_SERVER=\{"token":"([0-9a-f]{1,128})"/.exec(page.corps)?.[1] : null;
     if (!jeton) continue;
     const st = await lireHttp(p, '/api/status', jeton);
     let o = null; try { o = JSON.parse(st?.corps || ''); } catch {}
@@ -49,7 +71,8 @@ export async function serveurOrphelin(lab, sortie, port0, { estNotre, etatFile, 
     let r; try { r = fs.realpathSync(o.root); } catch { continue; }
     if (r !== racine || !estNotre(o.pid, path.join(sortie, 'serve.mjs'), lab)) continue;
     // adopté : server.json est réécrit (0600) pour que `status`, `stop` et les relances le retrouvent
-    try { fs.writeFileSync(etatFile(sortie), JSON.stringify({ pid: o.pid, port: p, url: adresseLocale(p), token: jeton, hash: o.hash, startedAt: new Date().toISOString() }, null, 2), { mode: 0o600 }); } catch { return null; }
+    const fd = ouvrirSur(lab, etatFile(sortie)); if (fd === null) return null; // jamais à travers un lien, jamais hors du lab
+    try { fs.writeSync(fd, JSON.stringify({ pid: o.pid, port: p, url: adresseLocale(p), token: jeton, hash: hashSur(o.hash), startedAt: new Date().toISOString() }, null, 2)); } catch { return null; } finally { fs.closeSync(fd); }
     noter(sortie, `serveur déjà à l'écoute (PID ${o.pid}, port ${p}) sans server.json : repris, aucun second serveur lancé`);
     return serveurVivant(sortie);
   }

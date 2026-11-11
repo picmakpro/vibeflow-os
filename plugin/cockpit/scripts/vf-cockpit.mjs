@@ -14,7 +14,7 @@ import { envEnfant } from './vf-cockpit-env.mjs';
 import { findLabRoot, engineDir, outputDir, verifierSortie, resoudreBinaire } from './vf-cockpit-paths.mjs';
 import { portPrefere } from './vf-cockpit-port.mjs';
 import { FICHIER_OUVRIR } from './vf-cockpit-terminal-amorce.mjs';
-import { prendreVerrou, serveurOrphelin } from './vf-cockpit-lanceur-verrou.mjs';
+import { prendreVerrou, serveurOrphelin, noter, hashSur, pidSur } from './vf-cockpit-lanceur-verrou.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const AIDE = `Usage : node vf-cockpit.mjs [open|build|stop|status] [--lab <dossier>] [--no-open] [--port <p>] [--rebuild] [--terminal]
@@ -54,19 +54,19 @@ const portDeUrl = (u) => { const m = typeof u === 'string' ? /^http:\/\/127\.0\.
 const adresseLocale = (port) => `http://127.0.0.1:${port}`;
 const serveurVivant = (sortie) => {
   const s = lireEtat(sortie);
-  if (!s || !s.pid || !vivant(s.pid)) return null;
+  const pid = s ? pidSur(s.pid) : null;
+  if (pid === null || !vivant(pid)) return null;
   const port = portValide(s.port) ?? portDeUrl(s.url);
   if (port === null) return null;
   const pq = s.terminal ? portDeUrl(s.terminal.url) : null;
   const { terminal: _t, ...reste } = s;
-  return { ...reste, port, url: adresseLocale(port), ...(pq === null ? {} : { terminal: { url: adresseLocale(pq) } }) };
+  return { ...reste, pid, ...(Object.hasOwn(reste, 'hash') ? { hash: hashSur(reste.hash) } : {}), port, url: adresseLocale(port), ...(pq === null ? {} : { terminal: { url: adresseLocale(pq) } }) };
 };
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const adresses = (url) => `Cockpit : ${url}/ (Code) · ${url}/project.html (Projet)`;
 // AUDC-H3 : le journal du serveur (serveur.log) reçoit aussi les décisions du lanceur, datées, avec leur motif (jamais un jeton ni un contenu)
 // AUDC-H3 : empreinte du code que le serveur en cours a chargé (server.json.hash, écrite au démarrage) contre celle de la sortie assemblée ; différentes = le serveur tourne sur un code périmé
 const empreinteCode = (sortie) => { try { return crypto.createHash('sha1').update(fs.readFileSync(path.join(sortie, 'serve.mjs'))).digest('hex').slice(0, 12); } catch { return null; } };
-const noter = (sortie, msg) => { try { fs.appendFileSync(path.join(sortie, '.cache', 'serveur.log'), `${new Date().toISOString()} lanceur : ${msg}\n`); } catch {} };
 // 67-SECURITY M3 : le lanceur n'exécute JAMAIS un script du lab (serve.mjs de la sortie compris). Arrêt par signal, sur un PID que le fichier
 // d'état du lab (donc non fiable) désigne : entier > 1, ni le nôtre, vivant, et dont la ligne de commande est le serve.mjs de CETTE sortie.
 // Dit UNE fois par processus : estNotre est rappelée à chaque tour d'attente du terminal (100 fois) et l'absence de `ps` ne change pas entre deux appels.

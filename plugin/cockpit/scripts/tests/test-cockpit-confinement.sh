@@ -210,6 +210,50 @@ CLES="$(node "$WORK/cles.mjs" "$EXP")"
 assert_eq "D1 — l'export ne porte ni vfTouch ni vfGit" "$(printf '%s' "$CLES" | tr ',' '\n' | grep -cE '^(vfTouch|vfGit)$')" "0"
 assert_eq "D2 — témoin positif : il garde les logos et l'onglet pour s'afficher" "$(printf '%s' "$CLES" | tr ',' '\n' | grep -cE '^(vfLogos|vfTab)$')" "2"
 
+# ---------- H : journal du lanceur et fichier d'état écrits dans la sortie du lab, jamais à travers un lien (AUDC-H3) ----------
+echo "=== H — journal du lanceur ==="
+LH="$WORK/lab-h"; mkplan "$LH"; SH="$LH/.vibeflow/cockpit"; mkdir -p "$SH/.cache"; printf '// serve factice\n' > "$SH/serve.mjs"
+sleep 600 & SLP=$!
+etat_h() { printf '{"pid":%s,"port":5000,"hash":"%s"}\n' "$SLP" "$1" > "$SH/.cache/server.json"; }
+lancer_h() { node "$SCRIPTS/vf-cockpit.mjs" open --lab "$LH" --no-open > "$WORK/h.out" 2>&1; echo $?; }
+LOGH="$SH/.cache/serveur.log"
+etat_h abcdef012345; RC=$(lancer_h)
+assert_eq "H0 — témoin positif : le journal normal s'écrit (relance, empreinte lue, une ligne datée)" "$(grep -c 'lanceur : relance : serveur PID '"$SLP"' remplacé (code du serveur changé, empreinte abcdef012345 -> ' "$LOGH")" "1"
+assert_eq "H0b — le serveur du lab n'est pas reconnu (sleep) : sortie 5, rien d'arrêté" "$RC $(kill -0 "$SLP" 2>/dev/null && echo vivant || echo mort)" "5 vivant"
+# lien symbolique vers un fichier extérieur, puis vers un fichier interne du lab : jamais suivi, jamais écrit
+: > "$WORK/cible-ext.log"; : > "$SH/.cache/autre-interne.log"; rm -f "$LOGH"
+ln -s "$WORK/cible-ext.log" "$LOGH"; etat_h abcdef012345; lancer_h > /dev/null
+assert_eq "H1 — journal lié vers un fichier extérieur : la cible reste vide" "$(wc -c < "$WORK/cible-ext.log" | tr -d ' ')" "0"
+rm -f "$LOGH"; ln -s "$SH/.cache/autre-interne.log" "$LOGH"; etat_h abcdef012345; lancer_h > /dev/null
+assert_eq "H2 — journal lié vers un fichier interne du lab : la cible reste vide aussi" "$(wc -c < "$SH/.cache/autre-interne.log" | tr -d ' ')" "0"
+assert_eq "H2b — le lien lui-même est resté un lien (non remplacé)" "$([ -L "$LOGH" ] && echo lien || echo autre)" "lien"
+# valeur de server.json sans forme valide : jamais reprise dans une ligne, jamais de retour à la ligne injecté
+rm -f "$LOGH"; printf '{"pid":%s,"port":5000,"hash":"zz\\nFORGE-LIGNE 1999-01-01 lanceur : arrêt"}\n' "$SLP" > "$SH/.cache/server.json"; lancer_h > /dev/null
+assert_eq "H3 — hash illisible : aucun octet de sa valeur au journal" "$(grep -c 'FORGE' "$LOGH")" "0"
+assert_eq "H3b — chaque ligne du journal commence par une date (aucune ligne injectée)" "$(grep -vc '^[0-9]\{4\}-[0-9]\{2\}-[0-9]\{2\}T' "$LOGH")" "0"
+assert_eq "H3c — la relance est tout de même journalisée (hash illisible = code inconnu, serveur à remplacer)" "$(grep -c 'relance : serveur PID' "$LOGH")" "1"
+kill "$SLP" 2>/dev/null; wait "$SLP" 2>/dev/null
+# reprise d'un serveur orphelin : server.json écrit dans la sortie, jamais à travers un lien, et sans valeur sans forme
+cat > "$WORK/orphelin.mjs" <<'JS'
+import http from 'node:http'; import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, lab, hash] = process.argv;
+const { serveurOrphelin } = await import(pathToFileURL(scripts + '/vf-cockpit-lanceur-verrou.mjs').href);
+const srv = http.createServer((q, r) => { if (q.url === '/api/status') { r.end(JSON.stringify({ pid: process.pid, root: lab, hash })); } else r.end('<script>window.VF_COCKPIT_SERVER={"token":"abc123"}</script>'); });
+await new Promise((ok) => srv.listen(0, '127.0.0.1', ok));
+const sortie = path.join(lab, '.vibeflow', 'cockpit'); const etatFile = (s) => path.join(s, '.cache', 'server.json');
+await serveurOrphelin(lab, sortie, srv.address().port, { estNotre: () => true, etatFile, adresseLocale: (p) => `http://127.0.0.1:${p}`, serveurVivant: () => null, noter: () => {} });
+srv.close(); process.exit(0);
+JS
+LO="$WORK/lab-o"; mkplan "$LO"; SO="$LO/.vibeflow/cockpit"; mkdir -p "$SO/.cache"
+node "$WORK/orphelin.mjs" "$SCRIPTS" "$LO" abcdef012345; J="$(cat "$SO/.cache/server.json" 2>/dev/null)"
+assert_eq "H4 — témoin positif : un orphelin du lab repris, server.json écrit avec son empreinte" "$(printf '%s' "$J" | grep -c '"hash": "abcdef012345"')" "1"
+rm -f "$SO/.cache/server.json"; : > "$WORK/etat-ext.json"; ln -s "$WORK/etat-ext.json" "$SO/.cache/server.json"
+node "$WORK/orphelin.mjs" "$SCRIPTS" "$LO" abcdef012345
+assert_eq "H5 — server.json lié vers un fichier extérieur : la cible reste vide" "$(wc -c < "$WORK/etat-ext.json" | tr -d ' ')" "0"
+rm -f "$SO/.cache/server.json"; node "$WORK/orphelin.mjs" "$SCRIPTS" "$LO" 'zz
+FORGE'
+assert_eq "H6 — empreinte annoncée sans forme valide : aucun octet de sa valeur dans server.json" "$(grep -c 'FORGE' "$SO/.cache/server.json")" "0"
+
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
