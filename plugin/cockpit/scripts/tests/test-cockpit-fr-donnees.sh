@@ -10,8 +10,7 @@ export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; ENG="$SCRIPTS/../skills/cockpit-moteur"
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
 if [ -z "$CHROME" ]; then
-  if [ -n "${CI:-}" ]; then echo "  ❌ FAIL — aucun navigateur en CI : la traduction des données n'est PAS vérifiée"; exit 1; fi
-  echo "  ⊘ SUITE SAUTÉE : aucun navigateur — la traduction des données n'est PAS vérifiée, non compté comme réussi"; exit 0
+  . "$(dirname "$0")/chrome-saut.sh"; vf_chrome_saut "  ⊘ SUITE SAUTÉE : aucun navigateur — la traduction des données n'est PAS vérifiée, non compté comme réussi"; exit 0
 fi
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
