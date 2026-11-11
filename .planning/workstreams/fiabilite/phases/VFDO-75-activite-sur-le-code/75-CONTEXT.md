@@ -256,6 +256,11 @@ et ne sont pas rouverts.
   son plan des collisions « prévues » lit `vague` sans la poser et dépend du plan de la 80 qui la pose. Les deux
   fichiers sont partagés avec la 79 et la 80.
 
+- **P75-D-25 (critère d'arrêt de la réserve du pied).** Si la réserve du pied (P75-D-03) fait changer de palier de
+  niveau de détail le zoom d'ouverture de la carte Code (seuils k = 0,65 et 0,42) à 1440 ou à 390 px, ou fait rougir une
+  suite voisine sur un chiffre de hauteur, l'exécution s'arrête et remonte au manager, sans réécrire d'attendu. Décision
+  déléguée par Samuel (message session principale, 2026-11-08), option recommandée (critique de la spec, G19).
+
 ### Vérification attendue des plans
 
 - **P75-D-21.** Chaque comportement porte un témoin qui rougit sur la base et verdit après ; les mutants des suites du
