@@ -114,7 +114,7 @@ assert_eq "H3.5 — relance identique : rien n'est écrit au journal sur un remp
 $LAN open --lab "$LH" --no-open --terminal --port "$PH" > "$WORK/l4.out" 2>&1
 PID2="$(pid_etat "$LH")"
 assert_eq "H3.6 — relance avec --terminal : le serveur est remplacé (PID différent)" "$([ -n "$PID2" ] && [ "$PID2" != "$PID1" ] && echo oui || echo non)" "oui"
-assert_has "H3.7 — le remplacement est écrit au journal avec son motif" "$(cat "$LOG")" "lanceur : relance : serveur PID $PID1 remplacé (--terminal demandé"
+assert_has "H3.7 — le remplacement est écrit au journal avec son motif exact (aucun terminal enregistré)" "$(cat "$LOG")" "lanceur : relance : serveur PID $PID1 remplacé (--terminal demandé, aucun terminal enregistré"
 assert_eq "H3.8 — le journal porte la date de l'arrêt de l'ancien serveur et son motif (signal)" "$(grep -cE "^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z arrêt : signal SIGTERM \(PID $PID1\)" "$LOG")" "1"
 assert_eq "H3.9 — le journal porte la date du démarrage du nouveau serveur" "$(grep -cE "^20[0-9]{2}-[0-9]{2}-[0-9]{2}T[0-9:.]+Z démarrage : PID $PID2" "$LOG")" "1"
 # H3.10 serveur orphelin (server.json perdu) : repris, pas doublé
@@ -122,6 +122,15 @@ rm -f "$LH/.vibeflow/cockpit/.cache/server.json"
 $LAN open --lab "$LH" --no-open --port "$PH" > "$WORK/l5.out" 2>&1
 assert_eq "H3.10 — server.json perdu, serveur du lab déjà à l'écoute : aucun second serveur lancé" "$(nserv "$LH")" "1"
 assert_eq "H3.11 — le serveur repris est le même (PID de server.json = PID d'avant) et la reprise est au journal" "$(pid_etat "$LH") $(grep -c 'sans server.json : repris' "$LOG")" "$PID2 1"
+# H3.19-H3.21 empreinte du code : un serveur chargé avec un autre code que la sortie assemblée est remplacé et le journal le dit ; la relance suivante, à code identique, ne remplace pas
+echo '// empreinte changée' >> "$LH/.vibeflow/cockpit/serve.mjs"
+$LAN open --lab "$LH" --no-open --port "$PH" > "$WORK/l7.out" 2>&1
+PID3="$(pid_etat "$LH")"
+assert_eq "H3.19 — code de la sortie changé depuis le démarrage du serveur : le serveur est remplacé (PID différent)" "$([ -n "$PID3" ] && [ "$PID3" != "$PID2" ] && echo oui || echo non)" "oui"
+assert_has "H3.20 — le remplacement pour code changé est écrit au journal avec les deux empreintes" "$(cat "$LOG")" "remplacé (code du serveur changé, empreinte "
+$LAN open --lab "$LH" --no-open --port "$PH" > "$WORK/l8.out" 2>&1
+assert_eq "H3.21 — relance suivante, code identique : même serveur (le test H3.19 ne remplace pas à chaque relance)" "$(pid_etat "$LH")" "$PID3"
+assert_eq "H3.22 — le verrou de lanceur vit sous .cache : rien n'est posé à côté du dossier du cockpit dans .vibeflow" "$(ls -A "$LH/.vibeflow" | tr '\n' ' ')" "cockpit "
 $LAN stop --lab "$LH" > "$WORK/l6.out" 2>&1
 for _ in $(seq 1 30); do [ "$(nserv "$LH")" = 0 ] && break; sleep 0.2; done
 assert_has "H3.12 — « stop » : l'arrêt demandé et le signal reçu sont au journal" "$(cat "$LOG")" "lanceur : arrêt demandé"

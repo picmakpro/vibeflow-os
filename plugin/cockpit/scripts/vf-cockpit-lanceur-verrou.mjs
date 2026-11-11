@@ -9,7 +9,7 @@ import { confiner } from './vf-cockpit-paths.mjs';
 // un détenteur mort, ou un verrou de plus de 2 minutes, est repris. Le second lanceur attend, puis trouve le serveur déjà là.
 const VERROU_MAX_MS = 120000;
 export async function prendreVerrou(lab, sortie, { vivant, attendre }) {
-  const f = path.join(path.dirname(sortie), 'cockpit-lanceur.lock');
+  const f = path.join(sortie, '.cache', 'lanceur.lock'); // sous le dossier ignoré de la sortie
   fs.mkdirSync(path.dirname(f), { recursive: true }); confiner(lab, f);
   const fin = Date.now() + VERROU_MAX_MS;
   for (;;) {

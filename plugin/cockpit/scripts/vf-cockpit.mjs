@@ -64,6 +64,8 @@ const serveurVivant = (sortie) => {
 const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const adresses = (url) => `Cockpit : ${url}/ (Code) · ${url}/project.html (Projet)`;
 // AUDC-H3 : le journal du serveur (serveur.log) reçoit aussi les décisions du lanceur, datées, avec leur motif (jamais un jeton ni un contenu)
+// AUDC-H3 : empreinte du code que le serveur en cours a chargé (server.json.hash, écrite au démarrage) contre celle de la sortie assemblée ; différentes = le serveur tourne sur un code périmé
+const empreinteCode = (sortie) => { try { return crypto.createHash('sha1').update(fs.readFileSync(path.join(sortie, 'serve.mjs'))).digest('hex').slice(0, 12); } catch { return null; } };
 const noter = (sortie, msg) => { try { fs.appendFileSync(path.join(sortie, '.cache', 'serveur.log'), `${new Date().toISOString()} lanceur : ${msg}\n`); } catch {} };
 // 67-SECURITY M3 : le lanceur n'exécute JAMAIS un script du lab (serve.mjs de la sortie compris). Arrêt par signal, sur un PID que le fichier
 // d'état du lab (donc non fiable) désigne : entier > 1, ni le nôtre, vivant, et dont la ligne de commande est le serve.mjs de CETTE sortie.
@@ -242,13 +244,14 @@ async function main() {
   o.avecQ = o.terminal && !win;
   const libere = await prendreVerrou(lab, sortie, { vivant, attendre }); process.on('exit', libere); // AUDC-H3 : relâché avant l'attente d'ouverture, sinon à la sortie
   const vif = serveurVivant(sortie) || (fs.existsSync(path.join(sortie, 'serve.mjs')) && !o.rebuild ? await serveurOrphelin(lab, sortie, o.port ? Number(o.port) : portPrefere(lab), { estNotre, etatFile, adresseLocale, serveurVivant, noter }) : null);
-  if (vif && !o.rebuild) {
+  const perime = !!(vif && vif.hash && empreinteCode(sortie) && vif.hash !== empreinteCode(sortie));
+  if (vif && !o.rebuild && !perime) {
     // R4 (P71-D-36) : --terminal écarté (python3 absent, Windows) alors que le serveur vit déjà : le message dit « le cockpit s'ouvre sans terminal », on l'ouvre (comme au cas sans serveur) ;
     // une relance ordinaire, sans --terminal, garde son comportement : l'adresse seule.
     if (!o.avecQ) { if (demande && !o.noOpen && estNotre(vif.pid, path.join(sortie, 'serve.mjs'))) ouvrir(vif.url, `Ouvrez ${vif.url} dans un navigateur.`); console.log(adresses(vif.url)); return; }
     if (termOuvrable(vif, sortie)) { const suivi = ouvrirQ(vif, amorcer(lab, sortie), o, sortie); console.log(adresses(vif.url)); libere(); await attendreOuverture(suivi, sortie); return; } // O2 c : même serveur, nouvel amorçage
   }
-  if (vif) noter(sortie, `relance : serveur PID ${vif.pid} remplacé (${o.rebuild ? '--rebuild demandé' : '--terminal demandé, le serveur en cours n\'a pas de terminal'})`);
+  if (vif) noter(sortie, `relance : serveur PID ${vif.pid} remplacé (${o.rebuild ? '--rebuild demandé' : perime ? `code du serveur changé, empreinte ${vif.hash} -> ${empreinteCode(sortie)}` : '--terminal demandé, aucun terminal enregistré pour le serveur en cours'})`);
   if (vif) { if (!arreter(sortie)) { console.error(`PID ${vif.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté.`); process.exit(5); } for (let i = 0; i < 30 && vivant(vif.pid); i++) await attendre(100); }
   if (engineDir(scriptsDir).etat !== 'trouve') { console.error('moteur du cockpit introuvable : réinstaller le module cockpit.'); process.exit(3); }
   await assemblerLab(lab, scriptsDir);
