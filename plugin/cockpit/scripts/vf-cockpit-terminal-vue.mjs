@@ -89,7 +89,7 @@ export function vueTerminal(cfg) {
   };
   const affichee = (intention, verbe) => { const v = VERBES_UI[verbe]; return v && typeof intention === 'string' && intention.indexOf(v[0]) === 0 ? v[1] + intention.slice(v[0].length) : intention; };
   let courant = null, minuterie = 0, compte = 0, echeance = 0, appui = false, geste = 0; // identifiant du bandeau affiché ; minuterie d'armement ; compte à rebours et son échéance ; geste de souris en cours dans le bandeau
-  const retirerProposition = () => { clearTimeout(minuterie); minuterie = 0; clearInterval(compte); compte = 0; echeance = 0; const a = document.getElementById('proposition'); if (a) a.remove(); courant = null; };
+  const retirerProposition = () => { clearTimeout(minuterie); minuterie = 0; clearInterval(compte); compte = 0; echeance = 0; const a = document.getElementById('proposition'); if (a) { a.remove(); annoncer(''); } courant = null; }; // AUDC-M11 : retirer le bandeau remet aussi à zéro la région live (« Lancement proposé … Expire dans … » ne reste pas lu après « Annuler ») ; toute annonce posée ENSUITE (préparée, expirée, nouvelle proposition) la remplace
   // « manipulé » : un bouton de souris est enfoncé dans le bandeau, ou le cadre a le focus sur le sélecteur de mode ou la case du chat ET l'utilisateur y a fait un geste (touche, saisie, clic) il y a moins de GESTE_MS ;
   // un bandeau manipulé n'est jamais remplacé sous la main (PU-G-119). Un focus posé sans geste (programme, restauration du focus) ne protège rien.
   const manipule = () => {

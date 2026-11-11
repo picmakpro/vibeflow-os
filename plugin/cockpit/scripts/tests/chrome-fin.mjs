@@ -77,6 +77,7 @@ await executer(chrome, async (sp) => {
     await attendreP(`!!document.querySelector('.vf-term-tiroir:not([hidden])')`, 'tiroir ouvert');
     await trouverCtx(); await attendreQ(`!!document.getElementById('proposition')`, 'bandeau de proposition');
     r.statutEnvoi = await stabiliser(() => sp.ev(STATUT)); // témoin positif de l'annulation : le panneau dit d'abord « Proposition envoyée »
+    r.annonceAvant = await stabiliser(() => evQ(`document.getElementById('annonce').textContent`)); // témoin positif : la région lue par lecteur d'écran dit « Lancement proposé : … » tant que la proposition est là
   });
   // M11 : mesures du bandeau une fois posé
   await essai('mesures', async () => {
@@ -95,6 +96,7 @@ await executer(chrome, async (sp) => {
     await clicQ(`[...document.querySelectorAll('#proposition button')].find((b) => b.textContent === 'Annuler')`, 'Annuler');
     await attendreQ(`!document.getElementById('proposition')`, 'bandeau retiré après Annuler');
     const fin = Date.now() + 4000; let t; do { t = await sp.ev(STATUT); if (!t) break; await pause(100); } while (Date.now() < fin); r.statutApresAnnuler = t;
+    r.annonceApresAnnuler = await stabiliser(() => evQ(`document.getElementById('annonce').textContent`)); // AUDC-M11 : « Annuler » remet aussi à zéro la région live du cadre (plus d'« Expire dans … » lu après l'annulation)
   });
   // M10 : le shell tourne dans le tiroir (invite) ; « Terminer la session » à double geste
   await essai('terminer', async () => {
