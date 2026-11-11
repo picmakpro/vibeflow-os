@@ -6,6 +6,7 @@ wave: 5
 depends_on: ["75-06", "75-07", "75-08"]
 cross_phase:
   - "79-01 (appareil de patchs `plugin/cockpit/amont/` retiré, `VENDORED.txt` réduit : aucun diff de patch régénéré ; la trace du retrait côté `VENDORED.txt` est dans 75-09b)"
+  - "79-06 (touche `test-cockpit-securite.sh`) et 79-10 : relire l'état livré des fichiers communs"
   - "79-02 (`socle-serveur.sh` : migration des suites qui lancent le serveur, déjà faite)"
   - "79-15 (`serve.mjs`, export : état livré relu ; `serve.mjs` n'est PAS modifié ici)"
 files_modified:
@@ -72,6 +73,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 
 <precondition>
 75-06, 75-07 et 75-08 livrés ET verts (rejouer leurs suites en tête) : sinon arrêt, le retrait ne part jamais avant la mise en service. Refaire la mesure d'inventaire : `rtk proxy grep -rnI -E "recent-work|25-recent|recentTip|recent\.mjs|no-recent|Travail récent|Recent work|graph\.recent|\.recent-in|\.recent\b|'rw'|\.rw\b|Récent|btn-recent" plugin scripts .github DESIGN.md README.md README.fr.md` (hors CHANGELOG), la comparer à la table de 75-RESEARCH § Retrait (numéros de ligne périmés par la 79 et la 80) : toute différence est consignée. Compter les assertions de chaque suite à adapter AVANT. Relever les autres consommateurs de `.cache/changes.json` (écrit par `refresh.mjs:137` « for recent.mjs ») : s'il n'y en a aucun, le dire dans la trace et retirer l'écriture et son commentaire ; sinon la laisser et corriger le commentaire.
+Dépendances vers 79-15 à 79-21 : à revalider à l'écriture de 79-15..21 (plans pas encore écrits sur la branche de la 79 au moment de cette planification).
 </precondition>
 
 <tasks>
@@ -96,7 +98,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
   Mutants : suppression avant `verifierSortie` (Q1 rouge sur lien symbolique), `verifierSortie` neutralisé (Q3 rouge).
   </action>
   <verify>
-    <automated>O="${TMPDIR:-/tmp}/75-09a-t1.out"; bash plugin/cockpit/scripts/tests/test-cockpit-securite.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O" || exit 1; rtk proxy grep -q "PASS — Y1 " "$O" || exit 1; rtk proxy grep -q "PASS — Y2 " "$O" || exit 1; rtk proxy grep -q "PASS — Q3\." "$O" || exit 1; test "$(rtk proxy grep -c 'PASS — Q[0-9]*\.[0-9]* — mutant' "$O")" -ge 1 || exit 1; O2="${TMPDIR:-/tmp}/75-09a-t1b.out"; bash plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh > "$O2" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O2")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O2" || exit 1; rtk proxy grep -q "PASS — C6\." "$O2" || exit 1; rtk proxy grep -q "PASS — Q2\." "$O2" || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
+    <automated>O="${TMPDIR:-/tmp}/75-09a-t1.out"; bash plugin/cockpit/scripts/tests/test-cockpit-securite.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O" || exit 1; rtk proxy grep -q "PASS — Y1 " "$O" || exit 1; rtk proxy grep -q "PASS — Y2 " "$O" || exit 1; rtk proxy grep -q "PASS — Q1\." "$O" || exit 1; rtk proxy grep -q "PASS — Q3\." "$O" || exit 1; test "$(rtk proxy grep -c -E 'PASS — Q[0-9]+b?\.[0-9]+ — mutant' "$O")" -ge 2 || exit 1; O2="${TMPDIR:-/tmp}/75-09a-t1b.out"; bash plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh > "$O2" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O2")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O2" || exit 1; rtk proxy grep -q "PASS — C6\." "$O2" || exit 1; rtk proxy grep -q "PASS — Q2\." "$O2" || exit 1; rtk proxy grep -q "PASS — Q4\." "$O2" || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
     <fails_when>le nombre d'assertions d'une suite adaptée baisse (suite affaiblie pour verdir), Q3 reste vert avec `verifierSortie` neutralisé, ou le fichier hérité est supprimé sans passer par `verifierSortie`</fails_when>
   </verify>
   <acceptance_criteria>
@@ -131,7 +133,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
   </behavior>
   <action>Témoin Q5 d'abord (rouge sur la base), puis retrait de `recent.mjs` et de l'étape de `refresh.mjs`. Mutant : étape de `refresh.mjs` conservée (Q5 rouge).</action>
   <verify>
-    <automated>O="${TMPDIR:-/tmp}/75-09a-t2a.out"; bash plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O" || exit 1; rtk proxy grep -q "PASS — Q5\." "$O" || exit 1; test "$(rtk proxy grep -c 'PASS — Q[0-9]*\.[0-9]* — mutant' "$O")" -ge 1 || exit 1; test ! -e plugin/cockpit/skills/cockpit-moteur/scripts/recent.mjs || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
+    <automated>O="${TMPDIR:-/tmp}/75-09a-t2a.out"; bash plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O" || exit 1; rtk proxy grep -q "PASS — Q5\." "$O" || exit 1; test "$(rtk proxy grep -c -E 'PASS — Q[0-9]+b?\.[0-9]+ — mutant' "$O")" -ge 1 || exit 1; test ! -e plugin/cockpit/skills/cockpit-moteur/scripts/recent.mjs || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
     <fails_when>un appelant de `recent.mjs` subsiste, ou l'étape de `refresh.mjs` guide encore vers un script supprimé</fails_when>
   </verify>
   <done>Le moteur ne recommande plus un script supprimé.</done>
@@ -149,7 +151,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
   </behavior>
   <action>Témoin d'abord (Q6, Q7 rouges), puis retraits. Mutant : `recentWork` conservé (Q6 rouge).</action>
   <verify>
-    <automated>O="${TMPDIR:-/tmp}/75-09a-t2b.out"; bash plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O" || exit 1; rtk proxy grep -q "PASS — Q6\." "$O" || exit 1; rtk proxy grep -q "PASS — Q7\." "$O" || exit 1; test "$(rtk proxy grep -c 'PASS — Q[0-9]*\.[0-9]* — mutant' "$O")" -ge 1 || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
+    <automated>O="${TMPDIR:-/tmp}/75-09a-t2b.out"; bash plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O" || exit 1; rtk proxy grep -q "PASS — Q6\." "$O" || exit 1; rtk proxy grep -q -E "PASS — Q6\.[0-9]+ — mutant" "$O" || exit 1; rtk proxy grep -q "PASS — Q7\." "$O" || exit 1; test "$(rtk proxy grep -c -E 'PASS — Q[0-9]+b?\.[0-9]+ — mutant' "$O")" -ge 1 || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
     <fails_when>`recentWork` subsiste dans l'export</fails_when>
   </verify>
   <done>Le moteur ne produit plus la partie « Recent work » de l'export.</done>
