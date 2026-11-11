@@ -395,6 +395,30 @@ décisions citées ; le texte d'origine reste au-dessus pour l'historique.
   de collecte. Chaque plan le dit en précondition vérifiable. Rien ne se déplace dans l'ordre de la 74 : le jalon la
   place déjà après la 79. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
 
+### Contrats fournis aux autres phases
+
+Un changement de nom, de forme ou d'emplacement de ces contrats passe par un amendement daté ici, avant tout plan qui le
+porte.
+
+- **P74-C1 — Calculs de la frise et du coût, pour la Phase 77 (plan 77-07) et la Phase 52.** Livré par le plan 74-01 :
+  `window.__vfFriseCalculs`, objet gelé posé par `ui/74-vf-frise-calculs.js` à l'évaluation du script (fonctions pures,
+  aucune donnée, aucun état d'onglet, aucune inscription `surOnglet`). Il est réévalué à chaque arrivée sur un onglet
+  (A51 de la 79) : le lecteur le lit au moment de l'appel, jamais une référence gardée ; avant l'évaluation du script il
+  vaut `undefined`, le lecteur le teste et se tait. Fonctions : `etatA`, `noeudsPortes`, `etages`, `agreger`, `delta`,
+  `voiesAutour`, `fichiersA`, `commitsParBranche`, `couverture`, `fmtJetons`, `fmtDuree`, `fmtHeure`, `fmtNombre`. Le
+  coût : `agreger(voies, par, { missions, phases, fenetreLibelle, tronque })`, `par` ∈ `'agent' | 'mission' | 'etage'`,
+  rend `{ lignes, horsMission, total, inconnus, incomplet, fenetreDurees, fenetreJetons }` ; une ligne vaut
+  `{ cle, libelle, travailS, attenteHumainS, entree, sortie, cacheLu, cacheCree, enfants? }` ; en `'mission'`, chaque
+  ligne porte ses `phases` (jointure `dag === missions[].fichier`, puis `phaseKey === phases[].key`) ; `horsMission`
+  n'est jamais répartie ; `incomplet` recopie le `tronque` passé. `voies` est la liste `voies[]` d'une réponse
+  `vibeflow/cockpit-frise@1` que l'appelant lit lui-même ; `etages(voies)` rend `Map id -> 'tete' | 'manager' |
+  'worker'` (P74-D-42). Inchangé depuis la tête `33bb4aad` de la 74 (vérifié au commit `fd7347bb`).
+- **P74-C2 — Branchement du canal de marquage, pour la Phase 75.** Livré par le plan 74-06 : section « Contrat fourni à
+  la Phase 75 » de 74-06-PLAN.md (`window.__vfFrise.voirSurLaCarte(fichiers, titre)`, `finirRelecture()`, entrées
+  `{ arbre, cible }`), P74-D-47.
+- **P74-C3 — Ouverture de la fiche, pour la Phase 73.** Livré par 74-05 : annulation de `vf-agent:ouvrir` pour `nom`,
+  `ancre`, `rapport`, focus rendu à `declencheur`, `vf-agent:lu` émis ; retrait du lecteur de repli par 74-10 (P73-C2).
+
 ### Claude's Discretion
 
 Laissés à la spécification d'interface et à la planification, dans les bornes ci-dessus : la géométrie de la frise
