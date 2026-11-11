@@ -13,7 +13,7 @@ import { spawn, execFileSync } from 'node:child_process';
 import { envEnfant } from './vf-cockpit-env.mjs';
 import { findLabRoot, engineDir, outputDir, verifierSortie, resoudreBinaire } from './vf-cockpit-paths.mjs';
 import { portPrefere } from './vf-cockpit-port.mjs';
-import { FICHIER_OUVRIR } from './vf-cockpit-terminal-amorce.mjs';
+import { FICHIER_OUVRIR, FICHIER_SECRET_OUVRIR } from './vf-cockpit-terminal-amorce.mjs';
 import { prendreVerrou, serveurOrphelin, noter, hashSur, pidSur } from './vf-cockpit-lanceur-verrou.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -108,7 +108,7 @@ function ecrireAmorce(sortie) {
   return valeur;
 }
 const amorcer = (lab, sortie) => { verifierSortie(lab, sortie); return ecrireAmorce(sortie); };
-const effacerAmorce = (sortie) => { try { fs.unlinkSync(path.join(sortie, '.cache', 'terminal-amorce')); } catch {} };
+const effacerAmorce = (sortie) => { for (const n of ['terminal-amorce', FICHIER_SECRET_OUVRIR]) { try { fs.unlinkSync(path.join(sortie, '.cache', n)); } catch {} } };
 // même ouvreur que serve.mjs, détaché, sorties ignorées. L'erreur ASYNCHRONE du spawn (ouvreur absent : ENOENT, pas de xdg-open) est rattrapée : sans écouteur
 // elle ferait tomber le lanceur avec une trace. `surErreur(err)` la reçoit ; par défaut elle est dite en clair avec `marche`.
 const OUVERTURE_MS = (() => { const n = Number(process.env.VF_COCKPIT_OUVERTURE_MS); return Number.isInteger(n) && n >= 100 && n <= 60000 ? n : 15000; })(); // réglage de test seulement
@@ -127,6 +127,17 @@ function ouvrir(url, marche = '', surErreur = null) {
 // le stockage d'un cadre par origine de premier niveau, port compris : un secret posé par Q au premier niveau serait illisible depuis le cadre de P). L'amorçage n'est JAMAIS dans l'argv de l'ouvreur (lisible par `ps`).
 // Le lanceur écrit une page de redirection (0600, suppression préalable puis création exclusive : aucun lien suivi) dans .cache, l'ouvreur ne reçoit
 // que son chemin. Le serveur la supprime dès l'échange de l'amorçage, et la balaie au plus tard 60 s après sa création.
+// AUDC-B-03 bis : secret d'ouverture, distinct de la clé, écrit comme elle (suppression préalable, création exclusive, 0600) ; il rend la page de redirection la seule
+// navigation inter-sites que le serveur admet vers la page Projet. Jamais imprimé ni passé à un ouvreur.
+function ecrireSecretOuvrir(sortie) {
+  const f = path.join(sortie, '.cache', FICHIER_SECRET_OUVRIR), valeur = crypto.randomBytes(32).toString('hex');
+  try {
+    try { fs.unlinkSync(f); } catch (e) { if (e.code !== 'ENOENT') throw e; }
+    const fd = fs.openSync(f, 'wx', MODE_AMORCE);
+    try { fs.writeSync(fd, valeur); } finally { fs.closeSync(fd); }
+  } catch { return null; }
+  return valeur;
+}
 function ecrirePageOuvrir(sortie, cible) {
   const f = path.join(sortie, '.cache', FICHIER_OUVRIR);
   const html = `<!doctype html>\n<meta charset="utf-8">\n<meta name="referrer" content="no-referrer">\n<meta http-equiv="refresh" content="0;url=${cible}">\n<title>Terminal</title>\n`;
@@ -140,7 +151,8 @@ function ecrirePageOuvrir(sortie, cible) {
 // Rend { page, echec } : `echec` reçoit l'erreur asynchrone de l'ouvreur (lue par attendreOuverture), null si l'ouverture n'est pas tentée.
 function ouvrirQ(s, amorce, o, sortie) {
   if (o.noOpen) return null;
-  const page = ecrirePageOuvrir(sortie, `${s.url}/project.html#t=${amorce}`);
+  const secret = ecrireSecretOuvrir(sortie);
+  const page = secret ? ecrirePageOuvrir(sortie, `${s.url}/project.html?o=${secret}#t=${amorce}`) : null;
   if (!page) { effacerAmorce(sortie); console.error("ouverture du terminal impossible : fichier inattendu dans .cache"); return null; }
   const suivi = { page, echec: null };
   ouvrir(page, '', (e) => { suivi.echec = e; });

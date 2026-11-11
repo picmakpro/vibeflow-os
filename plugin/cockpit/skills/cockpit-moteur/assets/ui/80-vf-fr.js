@@ -129,17 +129,33 @@
   // deux emplacements mêlent donnée et chrome : l'infobulle d'une carte (le nom) et celle d'un lien (« A contains B », gabarit) ; le fil d'Ariane (« Overview », « Réponse : titre » sont du chrome, un nom de dossier est une donnée)
   // (« #panel .pd » : la description d'une carte ou d'un lien est une donnée ; le texte de repli que le viewer calcule pour un lien sans description (« 1 connection. », « 3 connections across 2 endpoints. ») n'en est pas une et reste traduit ; les rangées d'une réponse (.row.vf-rep) gardent leur NOM de carte intact, leur note reste traduite)
   const REPLI_LIEN = /^\d+ connections?( across \d+ endpoints?)?(, matched from call sites to route definitions)?\.$/;
-  const DONNEE = (n) => { const p = n.parentElement, t = n.nodeValue; return p.matches('#panel .pd:not(.empty)') ? !REPLI_LIEN.test(t.trim()) : p.matches('#tooltip .tt') ? !/ contains /.test(t) : p.matches('#crumbs button') ? t.trim() !== 'Overview' && !t.includes(': ') : false; };
+  // le glossaire enveloppe un mot de la description (« endpoints ») dans un <span class="sc-term"> : c'est l'ANCÊTRE .pd, pas le parent du nœud, qui dit que le texte est une donnée (AUDC-H4, restes) ; le texte de repli se juge sur la description entière
+  const DONNEE = (n) => { const p = n.parentElement, t = n.nodeValue, pd = p.closest('#panel .pd:not(.empty)'); return pd ? !REPLI_LIEN.test(pd.textContent.trim()) : p.matches('#tooltip .tt') ? !/ contains /.test(t) : p.matches('#crumbs button') ? t.trim() !== 'Overview' && !t.includes(': ') : false; };
+  // « 42 files in plugin/cockpit/signal/ » : la description que le MOTEUR fabrique pour une carte dossier (viewer.html, `${plural(n, 'file')} in ${chemin}/`) ; le gabarit est du chrome, le chemin une donnée jamais traduite.
+  // Forme stricte et entière : une description du lab qui ne la reproduit pas à l'identique n'est jamais touchée (AUDC-H4, restes ; la traduction au point d'émission relève de la Phase 79)
+  const DOSSIER = /^(\d+) files? in (\S.*\/)$/;
+  // l'IDENTITÉ de l'item, jamais la forme du texte : une description de carte FICHIER égale au gabarit est une donnée. Panneau : l'item sélectionné est un dossier (id « d: ») ; ligne de liste : son `data-go` est un dossier ; résultat de recherche : son type affiché est « dir » (ou « dossier » une fois traduit) — branche DÉFENSIVE : l'index de recherche du produit n'a pas de dossier, elle ne se déclenche pas aujourd'hui
+  const estDossier = (p) => {
+    if (p.matches('.row:not(.vf-rep) .rd')) return String(p.closest('.row').getAttribute('data-go') || '').startsWith('d:');
+    if (p.matches('#results .rd')) return /^(dir|dossier)$/.test((p.closest('.r')?.querySelector('.rk')?.textContent || '').trim());
+    if (!p.matches('#panel .pd:not(.empty)')) return false;
+    // même cible que renderPanel() : `selected` s'il est une chaîne (connecteur « x:in:|x:out: » retiré, « m: » ramené à « f: »), sinon le CONTENEUR ouvert (dossier ouvert par go(), sans sélection) ; un objet (lien) n'est pas un dossier
+    const st = window.VibeFlow?.state, sel = st?.selected;
+    if (sel && typeof sel === 'object') return false;
+    return (sel ? String(sel).replace(/^x:(?:in|out):/, '').replace(/^m:/, 'f:') : String(st?.container ?? '')).startsWith('d:');
+  };
+  const dossier = (n) => { const p = n.parentElement, t = n.nodeValue.trim(), m = DOSSIER.exec(t); if (!m || !p || !estDossier(p)) return null; const nom = G.meta.vfTab === 'project' ? 'élément' : 'fichier'; return n.nodeValue.replace(t, () => `${m[1]} ${nom}${m[1] === '1' ? '' : 's'} dans ${m[2]}`); };
   const fix = (root) => {
     const t0 = performance.now();
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
     for (let n = w.nextNode(); n; n = w.nextNode()) {
+      const d = n.parentElement ? dossier(n) : null; if (d != null) { if (d !== n.nodeValue) { n.nodeValue = d; probe.nodes++; } continue; }
       if (n.parentElement?.closest(SKIP) || (n.parentElement && DONNEE(n))) continue;
       const k = typeDuTexte(n); if (k != null && k !== n.nodeValue) { n.nodeValue = k; probe.nodes++; continue; }
       const v = tr(n.nodeValue); if (v != null) { n.nodeValue = v; probe.nodes++; }
     }
     const els = root.nodeType === 1 ? [root, ...root.querySelectorAll('[placeholder],[title],[aria-label]')] : [];
-    for (const el of els) for (const a of ATTRS) { if (a === 'title' && el.matches?.('.row.vf-rep')) continue; /* AUDC-H4 : le `title` d'une rangée de réponse reprend le nom de la carte (et sa note) : donnée du lab */ const x = el.getAttribute?.(a); const v = x ? tr(x) : null; if (v != null) { el.setAttribute(a, v); probe.attrs++; } }
+    for (const el of els) for (const a of ATTRS) { if (a === 'title' && el.matches?.('.row.vf-rep')) continue; if (a === 'aria-label' && el.matches?.('#viewport .node')) continue; /* AUDC-H4 : le nom accessible d'une carte (posé par le viewer à l'atterrissage au clavier) est son nom de donnée */ /* AUDC-H4 : le `title` d'une rangée de réponse reprend le nom de la carte (et sa note) : donnée du lab */ const x = el.getAttribute?.(a); const v = x ? tr(x) : null; if (v != null) { el.setAttribute(a, v); probe.attrs++; } }
     probe.passes++; probe.ms += performance.now() - t0;
   };
   document.documentElement.lang = 'fr';

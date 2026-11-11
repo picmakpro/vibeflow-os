@@ -13,7 +13,7 @@
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { FICHIER_AMORCE, FICHIER_OUVRIR, DUREE_AMORCE_MS, nouveauSecret, egal, consommerAmorce } from './vf-cockpit-terminal-amorce.mjs';
+import { FICHIER_AMORCE, FICHIER_OUVRIR, FICHIER_SECRET_OUVRIR, DUREE_AMORCE_MS, nouveauSecret, egal, consommerAmorce } from './vf-cockpit-terminal-amorce.mjs';
 import { creerSessions, resoudrePython3, TAILLE_MAX } from './vf-cockpit-terminal-session.mjs';
 import { preparerPage, pageTerminal } from './vf-cockpit-terminal-page.mjs';
 import { creerEtatLancer } from './vf-cockpit-lancer-q.mjs';
@@ -51,8 +51,9 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
   const secret = nouveauSecret();
   const fichierAmorce = path.join(here, '.cache', FICHIER_AMORCE);
   const fichierOuvrir = path.join(here, '.cache', FICHIER_OUVRIR);
-  const retirerOuvrir = () => { try { fs.unlinkSync(fichierOuvrir); } catch {} };
-  const balayerOuvrir = () => { try { const st = fs.lstatSync(fichierOuvrir); if (Date.now() - st.mtimeMs > DUREE_AMORCE_MS) retirerOuvrir(); } catch {} };
+  const fichierSecret = path.join(here, '.cache', FICHIER_SECRET_OUVRIR); // AUDC-B-03 bis : meurt avec la clé et la page de redirection
+  const retirerOuvrir = () => { try { fs.unlinkSync(fichierOuvrir); } catch {} try { fs.unlinkSync(fichierSecret); } catch {} };
+  const balayerOuvrir = () => { try { const st = fs.lstatSync(fichierOuvrir); if (Date.now() - st.mtimeMs > DUREE_AMORCE_MS) retirerOuvrir(); } catch {} try { const st = fs.lstatSync(fichierSecret); if (Date.now() - st.mtimeMs > DUREE_AMORCE_MS) fs.unlinkSync(fichierSecret); } catch {} };
   preparerPage({ engineDir });
   // P71-D-34 puis P71-D-36 (R3) : python3 se vérifie à CHAQUE lancement de shell (premier démarrage, « Relancer le shell », nouvelle session), jamais une fois pour toutes :
   // il peut disparaître en cours de session. Journalisé une fois par absence (remise à zéro quand il revient), annoncé par /etat. Une session déjà vivante n'en dépend pas.

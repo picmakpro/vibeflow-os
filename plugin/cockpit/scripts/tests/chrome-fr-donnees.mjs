@@ -65,5 +65,45 @@ await executer(chrome, async (s) => {
   // formes plurielles du texte de repli d'un lien (calculé par le viewer, sans donnée du lab) : posées dans le panneau, avec le balisage de viewer.html ; elles doivent être traduites
   await s.ev(`(() => { const p = document.getElementById('panel'); for (const t of ['3 connections.', '2 connections across 3 endpoints.', '2 connections across 3 endpoints, matched from call sites to route definitions.']) { const e = document.createElement('p'); e.className = 'pd vf-test-repli'; e.textContent = t; p.appendChild(e); } })()`);
   const replis = await stabiliser(() => s.ev("[...document.querySelectorAll('#panel .vf-test-repli')].map((e) => e.textContent)"), { pas: 400, max: 6000 });
-  return { ...cartes, lien, reponse, reponseTitres, reponseNote, replis, nAretes: aretes ? aretes.length : 0, gabarits, descPosee: desc, panneau, panneauVide, recherche, ligne, miette, infobulle };
+  // AUDC-H4 (restes, lot 0 bis) : (1) le nom accessible d'une carte atteinte au clavier (aria-label posé par le viewer) est le nom de la donnée ; (2) une description qui contient un mot du glossaire (« endpoints »)
+  // garde ce mot (le glossaire l'enveloppe dans un <span> : l'ancêtre .pd, pas le parent, porte la donnée) ; (3) « N files in <chemin>/ » est une phrase de gabarit du moteur : le gabarit est traduit, le chemin jamais
+  await s.ev(`${FP}.go(${JSON.stringify(conteneur)})`);
+  await s.attendre(`window.VibeFlow.state.container === ${JSON.stringify(conteneur)} && !!window.VibeFlow.state.chipEls`, 'cartes atteignables');
+  await s.ev(`${FP}.reveal(${JSON.stringify(pose.Tokens)}, { focus: true })`);
+  const ariaCarte = await stabiliser(() => s.ev(`(() => { const g = ${FP}.state.chipEls.get(${JSON.stringify(pose.Tokens)}); return g ? g.getAttribute('aria-label') : null; })()`), { pas: 400, max: 6000 });
+  await s.ev(`(() => { ${FP}.info(${JSON.stringify(pose.Health)}).f.d = 'Lists the endpoints anyone can use'; })()`);
+  await s.ev(`${FP}.select(${JSON.stringify(pose.Health)})`);
+  await s.attendre("!!document.querySelector('#panel .pd .sc-term')", 'glossaire posé dans la description');
+  const descGlossaire = await stabiliser(() => s.ev("(document.querySelector('#panel .pd') || {}).textContent"), { pas: 400, max: 6000 });
+  const dossierId = await s.ev(`(() => { const vus = new Set(); const file = ['root']; while (file.length) { const c = file.shift(); if (vus.has(c)) continue; vus.add(c); let ks = []; try { ks = ${FP}.children(c) || []; } catch (e) { continue; } for (const i of ks) { try { if (${FP}.info(i).type === 'dir') return i; } catch (e) {} file.push(i); } } return null; })()`);
+  let dossier = null;
+  if (dossierId) {
+    await s.ev(`${FP}.select(${JSON.stringify(dossierId)})`);
+    await s.attendre("!!document.querySelector('#panel .pd')", 'panneau du dossier');
+    dossier = await stabiliser(() => s.ev("(document.querySelector('#panel .pd') || {}).textContent"), { pas: 400, max: 6000 });
+  }
+  // dossier OUVERT (go, sans sélection : `selected` nul, le panneau décrit le conteneur) puis entité de connecteur (`x:in:<dossier>`) : le panneau est jugé sur l'item qu'il décrit
+  let dossierOuvert = null, dossierConnecteur = null;
+  if (dossierId) {
+    await s.ev(`${FP}.select(null)`);
+    await s.ev(`${FP}.go(${JSON.stringify(dossierId)})`);
+    await s.attendre(`window.VibeFlow.state.container === ${JSON.stringify(dossierId)} && !window.VibeFlow.state.selected && !!document.querySelector('#panel .pd')`, 'dossier ouvert sans sélection');
+    dossierOuvert = await stabiliser(() => s.ev("(document.querySelector('#panel .pd') || {}).textContent"), { pas: 400, max: 6000 });
+    await s.ev(`${FP}.select(${JSON.stringify('x:in:' + dossierId)})`);
+    await s.attendre(`window.VibeFlow.state.selected === ${JSON.stringify('x:in:' + dossierId)}`, 'connecteur sélectionné');
+    dossierConnecteur = await stabiliser(() => s.ev("(document.querySelector('#panel .pd') || {}).textContent"), { pas: 400, max: 6000 });
+    await s.ev(`${FP}.select(null)`);
+  }
+  // lignes de liste (identité = l'item porté par `data-go` : « d: » = dossier du moteur, « f: » = fichier du lab) ; formes qui ne sont pas le gabarit : intactes ; fichier dont la description EST le gabarit : intacte
+  await s.ev(`(() => { const p = document.getElementById('panel'); for (const [id, t] of [['d:x', '1 file in src/lib/'], ['d:x', '12 files in src/mes files in/'], ['d:x', '3 files in src/ were changed'], ['d:x', '3 files in src'], ['f:x', '3 files in x/']]) { const a = document.createElement('a'); a.className = 'row vf-test-dossier'; a.setAttribute('data-go', id); a.innerHTML = '<span class="rt"><div class="rn">x</div><div class="rd"></div></span>'; a.querySelector('.rd').textContent = t; p.appendChild(a); } const b = document.createElement('p'); b.className = 'pd vf-test-dossier'; b.textContent = 'See 3 files in src/ and more'; p.appendChild(b); })()`);
+  const dossiersPoses = await stabiliser(() => s.ev("[...document.querySelectorAll('.vf-test-dossier .rd, p.vf-test-dossier')].map((e) => e.textContent)"), { pas: 400, max: 6000 });
+  // résultats de recherche (identité = le type affiché à droite : « dir » pour un dossier du moteur, « file » pour un fichier du lab)
+  await s.ev(`(() => { const r = document.getElementById('results'); for (const [k, t] of [['dir', '5 files in src/'], ['file', '3 files in x/']]) { const d = document.createElement('div'); d.className = 'r vf-test-res'; d.innerHTML = '<span class="rt"><div class="rn">x</div><div class="rd"></div></span><span class="rk"></span>'; d.querySelector('.rd').textContent = t; d.querySelector('.rk').textContent = k; r.appendChild(d); } })()`);
+  const resultatsPoses = await stabiliser(() => s.ev("[...document.querySelectorAll('.vf-test-res .rd')].map((e) => e.textContent)"), { pas: 400, max: 6000 });
+  // panneau d'une carte FICHIER du lab dont la description est mot pour mot le gabarit : une donnée, intacte
+  await s.ev(`(() => { ${FP}.info(${JSON.stringify(pose.Tokens)}).f.d = '3 files in x/'; })()`);
+  await s.ev(`${FP}.select(${JSON.stringify(pose.Tokens)})`);
+  await s.attendre("!!document.querySelector('#panel .pd')", 'panneau du fichier');
+  const panneauGabarit = await stabiliser(() => s.ev("(document.querySelector('#panel .pd') || {}).textContent"), { pas: 400, max: 6000 });
+  return { ariaCarte, descGlossaire, dossierId, dossier, dossierOuvert, dossierConnecteur, dossiersPoses, resultatsPoses, panneauGabarit, ...cartes, lien, reponse, reponseTitres, reponseNote, replis, nAretes: aretes ? aretes.length : 0, gabarits, descPosee: desc, panneau, panneauVide, recherche, ligne, miette, infobulle };
 });

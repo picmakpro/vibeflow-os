@@ -27,6 +27,8 @@ mklab() {
   local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle"
   printf 'export const u = () => 1;\n' > "$L/src/util.js"; printf 'export const jeton = 1;\n' > "$L/src/tokens.ts"; printf "import { u } from './util.js';\nexport const ouvrir = u() + 2;\n" > "$L/src/open.mjs"; printf 'export const sante = 3;\n' > "$L/src/health.mjs"; printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n' > "$B/ROADMAP.md"
   printf '<objective>Faire le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+  # un dossier de plus de 24 fichiers : le viewer le découpe en cartes « dossier » (D7), sans toucher au conteneur de src/ mesuré par D1..D6
+  mkdir -p "$L/big/a" "$L/big/b"; for i in $(seq 1 13); do printf 'export const v%s = 1;\n' "$i" > "$L/big/a/f$i.js"; printf 'export const w%s = 1;\n' "$i" > "$L/big/b/g$i.js"; done
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
   node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 }
@@ -68,6 +70,15 @@ assert_eq "D6.4 — panneau « réponse » : la NOTE d'une rangée reste traduit
 assert_eq "D6.5 — repli d'un lien, formes plurielles et « across m endpoints » (balisage du viewer posé dans le panneau) : toutes traduites" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.replis.filter((t) => /connection|endpoint|across/.test(t)).length + "/" + j.replis.length')" "0/3"
 assert_eq "D5.5 — gabarits à noms : « Tokens contient Open » (chrome traduit, noms gardés)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.gabarits.lien')" "Tokens contient Open"
 assert_eq "D5.6 — « Inside Tokens » → « Dans Tokens », « Everything behind Health » garde « Health »" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.gabarits.dans + "|" + j.gabarits.derriere')" "Dans Tokens|Tout ce qu'il y a derrière Health"
+assert_eq "D7.1 — carte atteinte au clavier : le nom accessible (aria-label) est le nom de la donnée" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.ariaCarte')" "Tokens"
+assert_eq "D7.2 — description d'un panneau contenant un mot du glossaire (« endpoints ») : gardée mot pour mot" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.descGlossaire')" "Lists the endpoints anyone can use"
+assert_eq "D7.3 — témoin : un dossier a été trouvé à la racine" "$(printf '%s' "$R" | node "$AUX/ev.mjs" '!!j.dossierId')" "true"
+assert_eq "D7.4 — panneau d'un dossier : « N files in chemin/ » dit « N fichiers dans chemin/ » (ici big/a/), chemin intact" "$(printf '%s' "$R" | node "$AUX/ev.mjs" '/^\d+ fichiers? dans \S+\/$/.test(j.dossier || "") ? "fr:" + j.dossier.replace(/^\d+ /, "N ") : "autre:" + j.dossier')" "fr:N fichiers dans big/a/"
+assert_eq "D7.8 — dossier OUVERT (go, sans sélection) : le panneau décrit le conteneur, le gabarit est traduit" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.dossierOuvert')" "13 fichiers dans big/a/"
+assert_eq "D7.9 — entité de connecteur (x:in:<dossier>) : jugée sur l'item décrit, gabarit traduit" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.dossierConnecteur')" "13 fichiers dans big/a/"
+assert_eq "D7.5 — lignes de liste : singulier, chemin contenant « files in », formes qui ne sont pas le gabarit (suffixe, sans « / ») intactes, ligne FICHIER dont la description est le gabarit intacte" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.dossiersPoses.join("|")')" "1 fichier dans src/lib/|12 fichiers dans src/mes files in/|3 files in src/ were changed|3 files in src|3 files in x/|See 3 files in src/ and more"
+assert_eq "D7.6 — résultats de recherche : le dossier du moteur est traduit, le fichier dont la description est le gabarit non" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.resultatsPoses.join("|")')" "5 fichiers dans src/|3 files in x/"
+assert_eq "D7.7 — panneau d'une carte FICHIER du lab dont la description est le gabarit : intacte (donnée, jugée par l'identité de l'item, pas par la forme du texte)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.panneauGabarit')" "3 files in x/"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ "$FAIL" -eq 0 ]

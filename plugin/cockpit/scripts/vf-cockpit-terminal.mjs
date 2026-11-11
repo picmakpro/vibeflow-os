@@ -17,6 +17,7 @@ import { TAILLE_MAX, resoudrePython3 } from './vf-cockpit-terminal-session.mjs';
 import { injectionTiroir } from './vf-cockpit-terminal-tiroir.mjs';
 import { injectionLancer } from './vf-cockpit-lancer-ui.mjs';
 import { definir } from './vf-cockpit-lancer-canal.mjs';
+import { ouvertureValide } from './vf-cockpit-terminal-amorce.mjs';
 
 const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
 const json = (res, statut, objet) => { res.writeHead(statut, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(objet)); };
@@ -57,6 +58,7 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
     injection: () => injectionTiroir({ indisponible: false }) + injectionLancer({ indisponible: false }),
     frameSrc: () => (portQ ? `; frame-src http://127.0.0.1:${portQ}` : ''),
     occupe: () => occupe,
+    ouvertureLanceur: (secret) => ouvertureValide(path.join(here, '.cache'), secret), // AUDC-B-03 bis : navigation inter-sites de la page de redirection du lanceur (secret d'ouverture + clé armée)
     routeP(req, res) { envoyer({ t: 'jetons', jetons: jetons() }); json(res, 200, etat === 'actif' ? { etat: 'actif', port: portQ } : { etat: 'arrete' }); return true; },
     demarrer(portP) {
       const fichier = path.join(here || '.', 'vf-cockpit-terminal-processus.mjs');

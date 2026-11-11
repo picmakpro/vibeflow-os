@@ -521,13 +521,19 @@ const server = http.createServer((req, res) => {
   res.setHeader('Content-Security-Policy', BASE_CSP); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
   try { route(req, res); } catch (e) { console.error(`vf-cockpit : requête en échec : ${e?.message || e}`); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch {} }
 });
+// vibeflow AUDC-B-03 bis : la page de redirection que le lanceur remet à l'ouvreur du poste est un fichier local (file://, origine opaque) : son saut vers la page
+// Projet part toujours en `Sec-Fetch-Site: cross-site`, comme celui d'un lien d'un autre site. Un seul chemin est rouvert : GET /project.html, navigation de premier
+// niveau (Mode navigate, Dest document : ni cadre, ni script, ni image, ni fetch) qui porte le SECRET D'OUVERTURE (`?o=`) écrit par le lanceur, valide tant que la clé
+// d'amorçage du terminal est armée, à usage unique, comparé en temps constant (TERM.ouvertureLanceur, vf-cockpit-terminal-amorce.mjs). Sans le secret, une page d'un
+// autre site n'obtient ni la page ni l'effet d'état qu'un chargement de la page Projet peut avoir. Sans --terminal, aucune exception.
+const ouvertureLanceur = (req, url) => req.method === 'GET' && url.pathname === '/project.html' && req.headers['sec-fetch-mode'] === 'navigate' && req.headers['sec-fetch-dest'] === 'document' && !!TERM?.ouvertureLanceur?.(url.searchParams.get('o'));
 function route(req, res) {
   // only this machine's own names: a website that points its domain at 127.0.0.1 (DNS rebinding) would
   // otherwise count as the same origin as the map, and could read its token from the page
   if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(String(req.headers.host || '').toLowerCase())) { res.writeHead(403); return res.end('unknown host'); }
   const url = new URL(req.url, `http://${req.headers.host}`);
   const sameOrigin = !req.headers.origin || req.headers.origin === `http://${req.headers.host}`;
-  if (!url.pathname.startsWith('/api/') && req.headers['sec-fetch-site'] === 'cross-site') { res.writeHead(403); return res.end(); } // vibeflow AUDC-B-03 : une page d'un autre site n'obtient ni page ni fichier du cockpit
+  if (!url.pathname.startsWith('/api/') && req.headers['sec-fetch-site'] === 'cross-site' && !ouvertureLanceur(req, url)) { res.writeHead(403); return res.end(); } // vibeflow AUDC-B-03 : une page d'un autre site n'obtient ni page ni fichier du cockpit (seule exception : ouvertureLanceur, AUDC-B-03 bis)
   if (url.pathname.startsWith('/api/')) {
     // EventSource can't send headers, so the events stream takes the token in the query string
     const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' || url.pathname === '/api/vf/events' ? url.searchParams.get('token') : null); // vibeflow P13
