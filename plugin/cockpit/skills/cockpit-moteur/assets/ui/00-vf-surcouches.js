@@ -80,10 +80,11 @@
   window.addEventListener('focusin', (ev) => { avant = courant; courant = ev.target; }, true);
   window.addEventListener('mousedown', (ev) => { // clic sur le fond ou sur la croix : même raison que pour Échap
     const h = [...pile].reverse().find((e) => e.modale && e.el.isConnected);
-    if (h && (ev.target === h.el || (ev.target.closest && ev.target.closest('#pal-x')))) lever(h);
+    if (h && (ev.target === h.el || (ev.target.closest && ev.target.closest('#pal-x, #results')))) lever(h);
   }, true);
   window.addEventListener('keydown', (ev) => {
     const modale = [...pile].reverse().find((e) => e.modale && e.el.isConnected);
+    if (ev.key === 'Enter' && modale && modale.el === par('palette')) lever(modale); // choisir un résultat : le moteur rend le focus au panneau dans la foulée
     if (ev.key === 'Tab' && modale) piege(ev, modale);
     else if (ev.key === 'Escape') echap(ev);
   }, true);
@@ -107,7 +108,8 @@
       const r = document.querySelector('.vf-term-tiroir'), on = !!r && !r.hidden, dedansT = !!r && pile.some((e) => e.el === r);
       if (on && !dedansT) ouvrir(r, { persistant: true }); else if (r && !on && dedansT) retirer(r);
       const ferme = document.body.classList.contains('no-panel'), p = par('panel'), a = document.activeElement;
-      if (ferme && !sansPanneau && p && a && p.contains(a)) { // le panneau qui se ferme ne garde pas le focus (jamais body)
+      if (ferme && !sansPanneau && p && a && p.contains(a) && !pile.some((e) => e.el === p)) {
+        // le panneau qui se ferme ne garde pas le focus (jamais body) ; un tiroir inscrit dedans (« Au travail ») rend le sien
         const c = [par('btn-panel'), canevas(), par('stage')].find(visible);
         if (c) { if (!c.hasAttribute('tabindex') && c.tabIndex < 0) c.tabIndex = -1; c.focus({ preventScroll: true }); }
       }
