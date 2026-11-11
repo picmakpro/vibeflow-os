@@ -294,6 +294,57 @@ Même régime : décisions déléguées par Samuel (message session principale, 
   la dernière visite, 77-06 pour le burn-up et les jauges. Un seul plan aurait porté trop de fichiers pour un
   exécutant. D'où 7 plans en 5 vagues, et le coût (77-07) toujours à part.
 
+### Décisions du manager à la revalidation (2026-11-11, contrats de la Phase 79 jusqu'à A47, Phase 74 à `522591aa`)
+
+Même régime : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée. Elles
+suivent deux vérifications fraîches des plans contre la tête de la 79 (8 bloquants, 9 réserves) et de 77-07 contre la
+74 et la frise (4 bloquants, 7 réserves). La référence de la 79 qui fait foi est la tête relue par la correction, citée
+dans chaque plan.
+
+- **P77-D-28 (chiffre principal du coût).** Colonne « Jetons, hors cache » = entrée + sortie. Le cache lu et le cache
+  créé vont dans une colonne secondaire : ils comptent du texte relu, dominent les totaux et feraient lire une
+  consommation qui n'en est pas une.
+- **P77-D-29 (phase hors jalon).** Une voie rattachée à une phase hors du jalon en cours va dans une ligne « Hors
+  jalon », après les phases du jalon. Elle est rattachée : elle ne va jamais dans « Non rattaché ».
+- **P77-D-30 (scission de 77-05).** 77-05 portait 29 témoins, 8 mutants, 9 fichiers et un banc navigateur neuf. Il est
+  scindé en deux plans :
+  - 77-05 garde le bouton, le panneau, le registre des blocs, la ligne-résumé et crée le banc ;
+  - un plan neuf **77-08** porte le bloc « Depuis votre dernière visite », sa feuille neutre et sa suite.
+  Aucune renumérotation : environ 130 occurrences dans 11 fichiers, et des identifiants de menace de même forme
+  (`T-77-0N`), rendaient une renumérotation risquée. Ordre d'exécution :
+  - 77-05 en vague 3 ;
+  - 77-06 en vague 4 ;
+  - 77-08 en vague 5, sérialisé derrière 77-06 sur les fichiers partagés ;
+  - 77-07 en vague 6.
+- **P77-D-31 (route des jauges et table des routes).** 77-03 dépend durement de 79-05 :
+  - `/api/vf/methode` n'existe jamais comme branche hors table ;
+  - elle est une ligne de `ROUTES` dans `vf-cockpit-server.mjs` ; `vf-cockpit-routes.mjs` porte le mécanisme ;
+  - son lecteur `(ctx, req, url)` rend un corps et transforme tout échec en « indisponible » sans jamais rejeter ;
+  - les enfants qu'elle lance reçoivent l'environnement git durci du socle (79-07).
+  Le lanceur asynchrone est exporté par le module qui l'héberge après 79-07. `vf-cockpit-paths.mjs` y gagne 0 ligne
+  nette : il descend sous 200 lignes avec 79-07, et le plafond effectif est de 299 (A44).
+- **P77-D-32 (sources du bloc coût).** La frise est lue par `VF_ETAT.lire('frise')`, sinon par `GET /api/vf/frise`.
+  Les missions sont lues par `VF_ETAT.lire('etat')`, sinon par `GET /api/vf/state` (79-12). Les règles d'affichage :
+  - la route rend 500 voies au plus ;
+  - quand `tronque` est vrai, chaque total est un **minorant**, dit en toutes lettres (« au moins ») et jamais présenté
+    comme complet (A43, A47) ;
+  - chacun des cinq états de `source.etat` a son rendu ; « Aucune activité » seulement si l'état est `ok` et la liste
+    vide ;
+  - toute réponse autre que 200 ou 404 donne « indisponible ».
+  L'agrégat de la 74 (74-01) est consommé par un adaptateur explicite, mission → phase par `phaseKey`. La ligne
+  « Non rattaché » reçoit trois cas : `horsMission`, les missions sans phase, les voies sans rattachement.
+- **P77-D-33 (compteur de suites).** Chaque plan qui ajoute une suite met à jour « N suites » dans les deux README
+  racine au nombre réel du gate (`check-version-sync.sh`), jamais à un littéral. Un conflit sur cette ligne à la
+  fusion se résout en remesurant, jamais en prenant un côté.
+- **P77-D-34 (ce que la 79 change sous les pieds).**
+  - Chaque fichier `ui/` neuf a sa ligne `AJOUT` dans `VENDORED.txt` (inventaire du plafond, 79-01) et tient le cliquet
+    de 160 colonnes (79-11). P77-D-17 est corrigée sur ce point.
+  - Les mutants portent sur une copie du module chargée de façon prouvée, et le serveur se lance par l'aide commune
+    (79-02, 79-06).
+  - Tout invariant « inchangé » se mesure depuis le commit de départ du plan, jamais depuis `f763b556`.
+  - Le jeton de page passe par `VF_ETAT` seulement, une fois 79-17 livré.
+  - La précondition sur `surOnglet` prouve que la coquille le définit.
+
 ### Claude's Discretion
 
 - Le numéro et le nom du fichier `ui/` neuf : un numéro libre au moment de l'exécution, à vérifier contre les fichiers
