@@ -111,6 +111,9 @@ export function collecteAgents(ctx) {
      } catch { inconnuSub++; }
     }
   }
+  // AUDC-D4 : un agent vivant dont le parent (session ou agent) est terminé est orphelin ; le parent terminé se lit dans la même collecte
+  const etatDe = new Map(workers.filter((w) => w.kind === 'session' || w.kind === 'subagent').map((w) => [w.id, w.etat]));
+  for (const w of workers) if (w.kind === 'subagent' && w.etat !== 'termine' && etatDe.get(w.parent) === 'termine') w.orphan = true;
   const inconnue = inconnuSub > 0 || (inconnuSession > 0 && live + subLive === 0);
   return { workers, source: { etat: inconnue ? 'forme-inconnue' : 'lue', path: projects, recentFiles: scanned, liveSessions: live, liveSubagents: subLive, formeInconnue: inconnuSub + inconnuSession } };
 }

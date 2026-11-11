@@ -34,6 +34,7 @@ export function missionsEnCours(gp) {
 export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, missions, lancees } = {}) {
   const travailleurs = (Array.isArray(who?.workers) ? who.workers : []).filter((w) => w && SORTES.has(w.kind) && typeof w.id === 'string');
   const idCarte = (w) => (w.kind === 'session' ? 'se-' : 'ag-') + w.id;
+  const parDe = new Map(travailleurs.map((w) => [w.id, w])); // pour remonter au-dessus d'un parent terminé (AUDC-D4)
   const parId = new Map(); // identifiant de travailleur -> carte (Map : jamais un objet indexé par une valeur lue sur disque, T-69-09)
   for (const w of travailleurs) if (!parId.has(w.id)) parId.set(w.id, idCarte(w));
   const compte = { actif: 0, enAttente: 0, auRepos: 0, attend: 0, termine: 0 };
@@ -44,13 +45,16 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, miss
   for (const w of travailleurs) {
     if (w.etat === 'termine') compte.termine++; else if (w.etat === 'en-attente') compte.enAttente++; else if (w.etat === 'au-repos') compte.auRepos++; else if (w.etat === 'attend') compte.attend++; else compte.actif++;
     const sous = w.kind === 'subagent';
-    const parent = sous ? parId.get(w.parent) ?? null : null;
+    // un orphelin (vivant, parent terminé) se rattache au premier ancêtre non terminé : jamais sous le bloc « Terminés » (AUDC-D4)
+    let pid = w.parent; for (let i = 0; sous && w.orphan === true && i < 8 && parDe.get(pid)?.etat === 'termine'; i++) pid = parDe.get(pid).parent;
+    const parent = sous ? parId.get(pid) ?? null : null;
     const fini = w.etat === 'termine';
     if (fini && parent) termines.set(parent, (termines.get(parent) || 0) + 1);
     const branche = retireAffichage(w.branch); // S6 : la branche passe par la même classe d'affichage que le titre (contrôles, Cf, bidi)
     const lignes = [];
     if (w.role) lignes.push(`Rôle : ${w.role}`);
     lignes.push(`État : ${ETAT[w.etat] || 'actif'}`);
+    if (sous && w.orphan === true) lignes.push('Orphelin : son parent est terminé, cet agent travaille encore.');
     if (!sous) lignes.push(`Identifiant : ${w.id.slice(0, 8)}`);
     const l = lancees instanceof Map && w.kind === 'session' ? lancees.get(w.id) : undefined; // garde:lancees
     const t = l && entreeLanceeValide(l) ? `Lancée depuis la carte : Phase ${l.phase}${l.ws ? ` · ${l.ws}` : ''} · ${LIBELLES_VERBES[l.verbe]}` : ''; // garde:ligne-valide
@@ -63,7 +67,7 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, miss
     const arbre = !sous && w.tree ? (w.tree === 'arbre principal' ? w.tree : `arbre ${String(w.tree).replace(/^\.claude\/worktrees\//, '')}`) : '';
     const lieu = !sous ? [branche ? `Branche ${branche}` : '', arbre].filter(Boolean).join(' · ') : '';
     // PU-G-163 (recette du 2026-11-08) : un agent ou une session sans rien à dire ne montre plus « Pas encore de description » — le repli dit ce qui est connu (nature, état)
-    const resume = [t ? `Depuis Phase ${l.phase}` : '', w.task || act, lieu].filter(Boolean).join(' · ') || `${sous ? 'Agent sans tâche annoncée' : 'Session sans tâche annoncée'} · ${ETAT[w.etat] || 'actif'}`;
+    const resume = [sous && w.orphan === true ? 'Orphelin' : '', t ? `Depuis Phase ${l.phase}` : '', w.task || act, lieu].filter(Boolean).join(' · ') || `${sous ? 'Agent sans tâche annoncée' : 'Session sans tâche annoncée'} · ${ETAT[w.etat] || 'actif'}`;
     nodes.push({ ...base, id: idCarte(w), parent: fini && parent ? `${parent}~termines` : parent, kind: sous ? 'agent' : 'session',
       label: sous ? clip([w.role, w.task].filter(Boolean).join(' · ') || 'Agent', 80) : clip(typeof w.titre === 'string' && w.titre.trim() ? w.titre : ['Session principale', nettoieTitre(branche)].filter(Boolean).join(' · '), 80),
       summary: clip(resume, 200), details: lignes.join('\n\n'), st: Object.hasOwn(ST, w.etat) ? ST[w.etat] : 'active', foot: '' });

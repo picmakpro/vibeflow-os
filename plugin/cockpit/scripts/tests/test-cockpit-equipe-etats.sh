@@ -143,6 +143,22 @@ const S = {
     collecte(monter({ session: { ageS: 300 } }));
     ok('D2.20 — sans l\'option officiel, la commande n\'est jamais lancée', !fs.existsSync(marque));
   },
+  // ---- D4 : un worker vivant sous un manager terminé est orphelin ----
+  D4() {
+    console.log('=== D4 — orphelin ===');
+    const vif = collecte(monter({ session: { ageS: 600 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 600, outil: 'Agent' }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 30 }] }));
+    ok('D4.0 — témoin : sous un manager vivant (muet), le worker n\'est pas orphelin', !!sous(vif, 'wrk') && sous(vif, 'wrk').orphan !== true, sous(vif, 'wrk'));
+    const o = collecte(monter({ session: { ageS: 600 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 600, fini: true }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 30 }] }));
+    eq('D4.1 — un worker vivant sous un manager terminé est « orphelin » dans la collecte', [sous(o, 'wrk')?.etat, sous(o, 'wrk')?.orphan], ['actif', true]);
+    ok('D4.2 — le manager terminé n\'est pas orphelin', sous(o, 'mgr')?.orphan !== true);
+    const ft = collecte(monter({ session: { ageS: 600 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 600, fini: true }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 700, fini: true }] }));
+    ok('D4.3 — un worker terminé sous un manager terminé n\'est pas orphelin', sous(ft, 'wrk')?.orphan !== true && !!sous(ft, 'wrk'));
+    const g = carte.buildEquipeGraph(o, {}), nd = g.nodes.find((x) => x.id === 'ag-wrk');
+    ok('D4.4 — sur la carte, le worker orphelin n\'est pas rangé sous « Terminés » : son parent est la session', !!nd && nd.parent === 'se-' + SID, nd?.parent);
+    ok('D4.5 — la carte le nomme « orphelin » (détail et résumé)', !!nd && /Orphelin/.test(nd.details) && /^Orphelin/.test(nd.summary), nd);
+    const t = texte(rendu().arbre(o.workers, h));
+    ok('D4.6 — le tiroir le nomme « orphelin ? »', /orphelin \?/.test(t) && !/Terminés depuis/.test(t), t);
+  },
 };
 
 for (const s of sections) { if (!S[s]) { console.log(`  ❌ FAIL — section inconnue ${s}`); fail++; continue; } await S[s](); }
@@ -159,7 +175,7 @@ run() { # sections...
   PASS=$((PASS + $(echo "$t" | cut -d' ' -f2))); FAIL=$((FAIL + $(echo "$t" | cut -d' ' -f3)))
 }
 
-run D1 D2
+run D1 D2 D4
 
 echo
 echo "=== Bilan : $PASS réussi(s), $FAIL échec(s) ==="
