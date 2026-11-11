@@ -11,14 +11,18 @@
   const carte = (w) => (w.kind === 'session' ? 'n:se-' : 'n:ag-') + w.id;
   const noeud = (w) => (w.rattachement && w.rattachement.etat === 'rattache' ? `f:${w.rattachement.dag}#${w.rattachement.noeud}` : null);
 
+  // AUDC-D3 : l'âge d'un agent non terminé avance entre deux poussées du `who` : on ajoute le temps écoulé depuis la réception (posée par 70-vf-live.js, `whoAt`) ; un terminé ne vieillit pas
+  const ecoule = () => { const t = window.__vfLive && window.__vfLive.whoAt; return typeof t === 'number' ? Math.max(0, Math.round((Date.now() - t) / 1000)) : 0; };
+  const vif = (w, v) => (typeof v === 'number' && w.etat !== 'termine' ? v + ecoule() : v);
+  const ageDe = (w) => vif(w, w.ageS), tenueDe = (w) => vif(w, w.dureeS);
   // même format que l'ancien age() du tiroir : secondes, minutes, heures, jours
   const duree = (s) => (s == null ? '' : s < 90 ? `${s} s` : s < 5400 ? `${Math.round(s / 60)} min` : s < 172800 ? `${Math.round(s / 3600)} h` : `${Math.round(s / 86400)} j`);
 
   // PU-G-173 : la durée dit de quoi elle parle — ancienneté de la dernière écriture (« dernière activité il y a … »), tenue d'un agent (« au travail depuis … », « a duré … »)
   const quand = (w) => {
-    const dur = w.kind === 'subagent' && w.etat !== 'en-attente' && w.dureeS != null ? w.dureeS : null;
+    const dur = w.kind === 'subagent' && w.etat !== 'en-attente' && w.dureeS != null ? tenueDe(w) : null;
     if (dur != null) return `${w.etat === 'termine' ? 'a duré' : 'au travail depuis'} ${duree(dur)}`;
-    return w.ageS == null ? '' : `dernière activité il y a ${duree(w.ageS)}`;
+    return w.ageS == null ? '' : `dernière activité il y a ${duree(ageDe(w))}`;
   };
   const action = (w) => { const a = w.action || {}; return [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' '); };
   const pied = (w) => [etat(w), quand(w), action(w)].filter(Boolean).join(' · ');
@@ -59,8 +63,8 @@
   const LONGUE_S = 900; // PU-G-183 : une commande en cours sans écriture depuis 15 min (une commande qui tourne n'écrit rien dans le transcript : l'âge de la dernière écriture est sa durée)
   const tpath = (t) => String(t || '').replace(/^\.claude\/worktrees\//, '');
   const court = (w) => String(w.branch || tpath(w.tree));
-  const calme = (w) => w.etat === 'actif' && typeof w.ageS === 'number' && w.ageS >= CALME_S;
-  const longue = (w) => calme(w) && w.ageS >= LONGUE_S && (w.action || {}).verbe === GENERIQUE;
+  const calme = (w) => w.etat === 'actif' && typeof w.ageS === 'number' && ageDe(w) >= CALME_S;
+  const longue = (w) => calme(w) && ageDe(w) >= LONGUE_S && (w.action || {}).verbe === GENERIQUE;
   const verbe = (w) => { const a = w.action || {}; if (!a.verbe || a.verbe === GENERIQUE) return ''; return [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' '); };
   // PU-G-186 : le titre d'une session passe par ce seul point : le nom donné avec /rename (`titre`, le `custom-title` du transcript) quand la collecte le porte, sinon « Session principale » ; plusieurs sessions de même titre se distinguent par leur arbre, puis par leur identifiant court
   const titreDe = (w) => (w && typeof w.titre === 'string' && w.titre.trim()) || 'Session principale';
@@ -76,8 +80,8 @@
 
   // la durée dit de quoi elle parle : tenue d'un sous-agent en cours, ancienneté de la dernière écriture d'une session, durée d'un terminé
   const temps = (w, h) => {
-    const dur = h(duree(w.dureeS != null ? w.dureeS : w.ageS));
-    if (w.kind === 'session') return `<span class="r-t ecrit"><i>écrit il y a${NB}</i>${h(duree(w.ageS))}</span>`;
+    const dur = h(duree(w.dureeS != null ? tenueDe(w) : ageDe(w)));
+    if (w.kind === 'session') return `<span class="r-t ecrit"><i>écrit il y a${NB}</i>${h(duree(ageDe(w)))}</span>`;
     return `<span class="r-t"><i>${w.etat === 'termine' ? 'a duré' : 'depuis'}${NB}</i>${dur}</span>`;
   };
 
@@ -95,7 +99,7 @@
     const marques = (orphe ? '<span class="r-flag">orphelin ?</span>' : '') + (w.stale ? '<span class="r-flag">donnée ancienne</span>' : '') + (hors && raison === 'ambigu' ? '<span class="r-flag">non rattaché (ambigu)</span>' : '');
     const v = verbe(w);
     const meta = sess ? `${h(tpath(w.tree))}${w.branch ? ' · ' + h(w.branch) : ''}${marques}`
-      : `<b>${h(w.role || 'Agent')}</b>${calme(w) ? (longue(w) ? ' · commande en cours, sans nouvelle depuis ' : w.enCours ? ' · outil en cours, sans nouvelle depuis ' : ' · sans nouvelle depuis ') + h(duree(w.ageS)) : ''}${w.etat === 'en-attente' ? ' · en attente' : w.etat === 'bloque' ? ' · bloqué' : ''}${!calme(w) && v ? ' · ' + h(v) : ''}${puce}${marques}`;
+      : `<b>${h(w.role || 'Agent')}</b>${calme(w) ? (longue(w) ? ' · commande en cours, sans nouvelle depuis ' : w.enCours ? ' · outil en cours, sans nouvelle depuis ' : ' · sans nouvelle depuis ') + h(duree(ageDe(w))) : ''}${w.etat === 'en-attente' ? ' · en attente' : w.etat === 'bloque' ? ' · bloqué' : ''}${!calme(w) && v ? ' · ' + h(v) : ''}${puce}${marques}`;
     const corps = `<span class="r-top"><span class="r-task">${h(tache)}${sr}</span>${temps(w, h)}</span>${fini ? '' : `<span class="r-meta">${meta}</span>`}`;
     const rang = `<a class="r-row" href="${h(lien('equipe.html', carte(w)))}" title="${h(tache)} — voir dans l'onglet Équipe">${glyphe(nom, (w.etat === 'actif' && !orphe ? 'aw-pulse ' : '') + 'aw-s-' + nom)}<span class="r-main">${corps}</span></a>`;
     const repli = ks.length ? `<button type="button" class="r-tog" data-vf-repli="${h(w.id)}" aria-expanded="true" aria-controls="k-${h(w.id)}" aria-label="Sous-agents de ${h(w.role || 'la session')}, ${ks.length}">${glyphe('repli', 'r-caret')}</button>` : '';

@@ -136,6 +136,8 @@
     for (const e of document.querySelectorAll('#panel > *')) e.style.animation = 'none';
     if (p) p.scrollTop = haut;
   };
+  // AUDC-D3 : entre deux poussées, l'âge des agents avance dans la page : le tiroir ouvert est recalculé toutes les 30 s (aucun dessin si le texte est identique)
+  if (typeof setInterval === 'function') setInterval(() => { if (!document.hidden) redessiner(); }, 30000); // `typeof` : le harnais vm de test-cockpit-equipe.sh (EUI) n'a pas de minuterie
   // révélation ponctuelle : la réponse reste affichée tant que sa ligne l'est. Elle est gardée en mémoire de la page seulement (ni graphe, ni stockage, ni export) et reposée
   // par un observateur dès que le bouton réapparaît : le tiroir et le panneau d'un agent sont redessinés à chaque `who`, et une réponse qui arrive pendant un redessin
   // ne doit pas tomber dans une ligne détachée (recette 2026-11-03)
@@ -194,7 +196,7 @@
     badge.innerHTML = `<span class="dot"></span><span class="bl">${off ? t.text : n ? `${n} au travail` : 'Personne'}</span>`;
     redessiner();
   };
-  const setWho = (w) => { if (!w) return; who = probe.who = w; showLock(); document.dispatchEvent(new CustomEvent('vf-who')); }; // 69-05 : l'onglet Équipe (72-vf-equipe.js) suit le même flux
+  const setWho = (w) => { if (!w) return; who = probe.who = w; probe.whoAt = Date.now(); showLock(); document.dispatchEvent(new CustomEvent('vf-who')); }; // 69-05 : l'onglet Équipe (72-vf-equipe.js) suit le même flux
 
   // I3 (recette 2026-11-02) : une bascule en direct redessine la carte, qui rejouait son animation d'apparition (cartes, liens, colonnes,
   // panneau). On ne l'anime plus : les éléments redessinés portent `animation: none` en ligne AVANT la première image (la suite de

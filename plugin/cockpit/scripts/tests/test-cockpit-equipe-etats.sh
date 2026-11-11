@@ -159,6 +159,27 @@ const S = {
     const t = texte(rendu().arbre(o.workers, h));
     ok('D4.6 — le tiroir le nomme « orphelin ? »', /orphelin \?/.test(t) && !/Terminés depuis/.test(t), t);
   },
+  // ---- D3 : « À surveiller » et « commande en cours depuis 15 min » de bout en bout ; l'âge avance dans la page ----
+  D3() {
+    console.log('=== D3 — alerte de silence ===');
+    const un = (ageS, outil) => collecte(monter({ session: { ageS }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS, outil: 'Agent' }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS, outil }] }));
+    const rd = rendu();
+    const c = un(1000, 'Bash');
+    const tc = texte(rd.surveiller(c.workers) + rd.arbre(c.workers, h));
+    ok('D3.1 — collecteur réel : un worker muet 1 000 s dans une commande déclenche « commande en cours depuis plus de 15 min »', /À surveiller.*1 commande en cours depuis plus de 15 min/.test(tc), tc);
+    ok('D3.2 — et sa ligne dit « commande en cours, sans nouvelle depuis 17 min »', /commande en cours, sans nouvelle depuis 17 min/.test(tc), tc);
+    const m = un(200, 'Read');
+    ok('D3.3 — collecteur réel : muet 200 s hors commande : « À surveiller · 1 agent sans nouvelle depuis plus de 2 min »', /À surveiller.*1 agent sans nouvelle depuis plus de 2 min/.test(texte(rd.surveiller(m.workers))), texte(rd.surveiller(m.workers)));
+    ok('D3.4 — témoin : un worker qui écrit (30 s) ne déclenche rien', rd.surveiller(un(30, 'Bash').workers) === '');
+    // l'âge avance entre deux poussées : la page le recalcule depuis la réception du dernier `who`
+    const vive = (ecouleS, ageS) => { const sb = { window: { __vfLive: { whoAt: Date.now() - ecouleS * 1000 } }, document: {} }; vm.createContext(sb); vm.runInContext(fs.readFileSync(path.join(ui, '71-vf-equipe-rendu.js'), 'utf8'), sb); return sb.window.__vfEquipeRendu; };
+    const w = [{ kind: 'subagent', id: 'a', etat: 'actif', tree: '.', role: 'vf-coder', task: 'x', ageS: 60, dureeS: 100, action: { verbe: 'lance une commande', cible: '' } }];
+    eq('D3.5 — témoin : sans temps écoulé, un agent à 60 s n\'est pas à surveiller', vive(0).surveiller(w), '');
+    const v = vive(960);
+    ok('D3.6 — 16 min après la réception, le même agent est « commande en cours depuis plus de 15 min » sans nouveau `who`', /commande en cours depuis plus de 15 min/.test(texte(v.surveiller(w))), texte(v.surveiller(w)));
+    ok('D3.7 — son âge affiché a avancé (17 min), la durée « depuis » aussi', /sans nouvelle depuis 17 min/.test(texte(v.arbre(w, h))) && /depuis 18 min/.test(texte(v.arbre(w, h))), texte(v.arbre(w, h)));
+    ok('D3.8 — un terminé ne vieillit pas dans la page', /a duré 2 min/.test(texte(vive(960).arbre([{ kind: 'subagent', id: 'b', etat: 'termine', tree: '.', role: 'vf-coder', task: 'y', ageS: 60, dureeS: 120 }], h))));
+  },
 };
 
 for (const s of sections) { if (!S[s]) { console.log(`  ❌ FAIL — section inconnue ${s}`); fail++; continue; } await S[s](); }
@@ -175,7 +196,7 @@ run() { # sections...
   PASS=$((PASS + $(echo "$t" | cut -d' ' -f2))); FAIL=$((FAIL + $(echo "$t" | cut -d' ' -f3)))
 }
 
-run D1 D2 D4
+run D1 D2 D4 D3
 
 echo
 echo "=== Bilan : $PASS réussi(s), $FAIL échec(s) ==="
