@@ -323,6 +323,13 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   prouvé sur une fixture à la forme du contrat de la 76, et qui reste vide en le disant tant que la lecture de la 76
   n'existe pas ; le plan de la 76 le remplit. La forme n'est pas inventée par la 73 : 73-11 n'est finalisé qu'avec les
   contrats de la 76.
+  Contrats retenus : C76-Q1 et C76-Q2 de la Phase 76 (`76-CONTEXT.md`, commits `ca76de20` puis `02bf1f39`, P76-D-34 à
+  P76-D-37). « À vous » ne liste que `etat` = `en-attente`. Les entrées `etat` = `appliquee` (option recommandée appliquée
+  sous délégation, contestable, P76-D-37) forment une liste à part, repliée, « Décisions prises pour vous,
+  contestables (N) » (question, option appliquée, décision qui l'applique, lien vers la phase) : jamais mêlée à « À vous »,
+  jamais cachée, jamais comptée dans le nombre du titre ni dans la pastille. Les autres états (`tranchee`, `a-verifier`,
+  `mal-formee`, non structurées) ne sont dits que par le bilan. Libellé choisi par le manager (décision déléguée par Samuel
+  (message session principale, 2026-11-08), option recommandée).
 
 ### Claude's Discretion
 
@@ -380,9 +387,11 @@ inventés seulement : dépôt public), ordre des tâches dans une vague.
 | aucun appel réseau sortant ; lecture seule sur `.planning/` | P73-D-06 lit l'en-tête des VERIFICATION ; P73-D-15 sans réseau |
 | PU-G-162 titre par `custom-title` seul | nom écrit une fois par ligne |
 
-## À Samuel (format C76-Q1 de la Phase 76 ; questions non bloquantes, l'option recommandée est appliquée en attendant)
+## À Samuel (format C76-Q1 de la Phase 76, amendé par P76-D-37)
 
-Une question tranchée garde son entrée ; seule sa ligne « État » change, et la décision qui en découle est au registre.
+Une question tranchée ou appliquée garde son entrée ; seule sa ligne « État » change, et la décision qui en découle est
+au registre. P73-Q-01 reste « en attente » sans rien bloquer : son option recommandée (corriger le tiroir Git) n'est
+appliquée par aucune décision de ce registre, la régie se bornant à rendre ses propres pastilles neutres (P73-D-10).
 Anciens libellés : S-1 → P73-Q-01, S-2 → P73-Q-02, S-3 → P73-Q-03, S-4 → P73-Q-04.
 
 - **P73-Q-01 — Pastilles du tiroir Git sur fond d'avertissement.** Le tiroir Git de la Phase 78 pose « modifiés » sur un
@@ -397,7 +406,7 @@ Anciens libellés : S-1 → P73-Q-01, S-2 → P73-Q-02, S-3 → P73-Q-03, S-4 �
   Options : (a) garder D2 ; (b) admettre ce repli au transcript.
   Recommandation : (a) — la source officielle couvre le cas quand elle est disponible.
   Bloque : rien
-  État : en attente
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P73-D-06
 - **P73-Q-03 — Questions en attente écrites dans les cadrages.** Le but dit que la régie montre « les arbitrages en
   attente, reliés à leur phase et à ce qu'ils bloquent » ; les questions écrites en prose dans les cadrages n'y
   paraissaient pas.
@@ -410,7 +419,7 @@ Anciens libellés : S-1 → P73-Q-01, S-2 → P73-Q-02, S-3 → P73-Q-03, S-4 �
   Options : (a) la reporter ; (b) l'ajouter dans la Phase 73 en option éteinte par défaut.
   Recommandation : (a) — un examen de bornes à part, pour un gain faible tant que le titre et la pastille existent.
   Bloque : rien
-  État : en attente
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P73-D-15
 
 <deferred>
 ## Deferred Ideas
