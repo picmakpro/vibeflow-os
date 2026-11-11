@@ -209,7 +209,7 @@ import path from 'node:path';
 const [, , racine, ...opts] = process.argv;
 const LISTE = {
   'scripts/vf-cockpit-paths.mjs': 'socle',
-  'scripts/vf-cockpit.mjs': 'sans-git', 'scripts/vf-cockpit-build.mjs': 'sans-git', 'scripts/vf-cockpit-live.mjs': 'sans-git', 'scripts/vf-cockpit-terminal.mjs': 'sans-git', 'scripts/vf-cockpit-terminal-session.mjs': 'sans-git',
+  'scripts/vf-cockpit.mjs': 'sans-git', 'scripts/vf-cockpit-build.mjs': 'sans-git', 'scripts/vf-cockpit-live.mjs': 'sans-git', 'scripts/vf-cockpit-terminal.mjs': 'sans-git', 'scripts/vf-cockpit-terminal-session.mjs': 'sans-git', 'scripts/vf-cockpit-etat-officiel.mjs': 'sans-git',
   'skills/cockpit-moteur/assets/serve.mjs': 'sans-git', 'skills/cockpit-moteur/scripts/open.mjs': 'sans-git', 'skills/cockpit-moteur/scripts/refresh.mjs': 'sans-git',
   'skills/cockpit-moteur/scripts/lib/common.mjs': 'git-garde',
 };
@@ -275,7 +275,7 @@ JS
 PLUGIN="$(cd "$SCRIPTS/.." && pwd)"
 GARDE="$(node "$AUX/garde.mjs" "$PLUGIN" --exact)"
 assert_eq "E6.1 — aucun importeur de child_process hors liste blanche, aucun lancement de git hors vf-cockpit-paths.mjs (arbre réel de plugin/cockpit, balayage récursif)" "${GARDE:-aucun}" "aucun"
-assert_eq "E6.1a — la garde a bien ouvert des fichiers : exactement les 10 importeurs de la liste sont trouvés (pas un dossier vide)" "$(node "$AUX/garde.mjs" "$PLUGIN" --importeurs | wc -l | tr -d ' ')" "10"
+assert_eq "E6.1a — la garde a bien ouvert des fichiers : exactement les 11 importeurs de la liste sont trouvés (pas un dossier vide)" "$(node "$AUX/garde.mjs" "$PLUGIN" --importeurs | wc -l | tr -d ' ')" "11"
 # les onze fichiers plantés de l'audit (promisify, alias d'import, multiligne, autre nom de variable, chemin absolu, execSync, bash -c, témoin direct, .cjs, .js)
 PLANTES_NOMS="a-promisify.mjs b-promisify-var.mjs c-alias.mjs d-multiligne.mjs e-variable-autre-nom.mjs f-chemin-absolu.mjs g-shell.mjs h-bash-c.mjs i-temoin-direct.mjs j-cjs.cjs k-js.js"
 planter() { # planter <nom> : écrit le contenu du fichier planté sur la sortie standard

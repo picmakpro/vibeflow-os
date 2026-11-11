@@ -383,7 +383,7 @@ vf_hyg_stop "$LEURRE"
 
 # --- M-JETON : copie de la sortie dont le contrôle du jeton est neutralisé (le test de T25.3 sait rougir) ---
 MJ="$LABS/.vibeflow/mut-jeton"; cp -R "$OUT" "$MJ"
-sed -i.bak "s#if (!sameOrigin || (given !== token \&\& !VF?.jetonValide(given)))#if (false)#" "$MJ/serve.mjs"
+sed -i.bak "s#if (!sameOrigin || (!sameToken(given, token) \&\& !VF?.jetonValide(given)))#if (false)#" "$MJ/serve.mjs"
 rafraichir
 demarrer "$MJ" "$H"; PORT="$SRV_PORT"
 assert_eq "T25.15 — témoin : sans contrôle de jeton, la route répond 200 sans jeton (le mutant est vu)" "appliqué:$(grep -c 'if (false)' "$MJ/serve.mjs")|sans-jeton:$(RQ GET "/api/vf/transcript?id=ag1" | sed -n 1p)" "appliqué:1|sans-jeton:200"

@@ -60,6 +60,7 @@ mkfake() { # mkfake <dossier> <nom>
 const fs = require('fs'); const D = process.env.VF_FAKE_DIR;
 const n = fs.readdirSync(D).filter((f) => /^call-\d+\.json$/.test(f)).length + 1;
 if (process.argv[2] === '--version') { fs.writeFileSync(`${D}/call-${n}.json`, JSON.stringify({ argv: ['--version'] })); console.log('2.1.316 (Claude Code)'); process.exit(0); }
+if (process.argv[2] === 'agents') process.exit(1); // la lecture de l'état officiel des sessions (onglet Équipe) n'est pas une demande à l'agent : ni consignée, ni comptée (jointure)
 let stdin = ''; process.stdin.on('data', (c) => (stdin += c));
 process.stdin.on('end', () => { fs.writeFileSync(`${D}/call-${n}.json`, JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd(), stdin })); console.log(JSON.stringify({ type: 'result', is_error: false, result: JSON.stringify({ title: 'Faux', answer: 'FAUX-AGENT-REPONSE', items: [], steps: [], followups: [] }), session_id: 'fake-session' })); });
 JS

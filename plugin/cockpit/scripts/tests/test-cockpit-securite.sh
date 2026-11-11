@@ -49,6 +49,7 @@ cat > "$AUX/fakeclaude" <<'JS'
 // faux claude : --version ; sinon consigne argv dans $VF_FAKE_DIR/call-N.json et répond une réponse structurée
 import fs from 'node:fs'; const a = process.argv.slice(2);
 if (a.includes('--version')) { console.log('9.9.9 (fake)'); process.exit(0); }
+if (a[0] === 'agents') process.exit(1); // la lecture de l'état officiel des sessions (onglet Équipe) n'est pas une demande à l'agent : ni consignée, ni comptée (jointure)
 const d = process.env.VF_FAKE_DIR; const n = fs.readdirSync(d).filter((f) => f.startsWith('call-')).length + 1;
 fs.writeFileSync(`${d}/call-${n}.json`, JSON.stringify({ argv: a }));
 console.log(JSON.stringify({ type: 'result', is_error: false, structured_output: { title: 't', answer: 'a', items: [] }, session_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' }));

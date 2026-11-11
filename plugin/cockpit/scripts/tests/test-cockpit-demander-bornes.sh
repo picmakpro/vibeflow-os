@@ -45,6 +45,7 @@ H() { "$NODE" "$AUX/h.mjs" "$@"; }
 printf '#!%s\n' "$NODE" > "$AUX/claude"; cat >> "$AUX/claude" <<'JS'
 const fs = require('fs'), crypto = require('crypto'); const D = process.env.VF_FAKE_DIR; const a = process.argv.slice(2);
 if (a[0] === '--version') { console.log(process.env.VF_FAKE_VERSION || '2.1.316 (Claude Code)'); process.exit(0); }
+if (a[0] === 'agents') process.exit(1); // la lecture de l'état officiel des sessions (onglet Équipe) n'est pas une demande à l'agent : ni consignée, ni comptée (jointure)
 const note = (o) => fs.writeFileSync(`${D}/call-${process.pid}.json`, JSON.stringify({ argv: a, pid: process.pid, ...o }));
 const t0 = Date.now(); note({ start: t0 });
 let in_ = ''; process.stdin.resume(); process.stdin.on('data', (c) => (in_ += c));
