@@ -17,14 +17,24 @@ wr() { mkdir -p "$(dirname "$1")"; cat > "$1"; }
 # ---------- A : lab portant des liens symboliques sortants ----------
 DEHORS="$WORK/dehors"; mkdir -p "$DEHORS"
 MK_MD="MARQUEUR-EXT-JS"; MK_SH="MARQUEUR-EXT-SH"; MK_PLAN="MARQUEUR-EXT-PLAN"; MK_OK="MARQUEUR-DANS-LE-LAB"
+MK_MOD="MARQUEUR-EXT-MOD"; MK_VER="MARQUEUR-EXT-VER"; MK_DAG="MARQUEUR-EXT-DAG"; MK_OKMOD="MARQUEUR-DANS-LE-LAB-MOD"; MK_OKVER="MARQUEUR-DANS-LE-LAB-VER"; MK_OKDAG="MARQUEUR-DANS-LE-LAB-DAG"
 printf '/** %s : module du poste hors du lab, décrit par son commentaire d en-tête. */\nexport const e = 1;\n' "$MK_MD" > "$DEHORS/ext.js"
 printf '#!/bin/sh\n# %s : script du poste hors du lab, décrit par son en-tête.\necho ok\n' "$MK_SH" > "$DEHORS/ext.sh"
 printf '<objective>%s : plan du poste hors du lab</objective>\n' "$MK_PLAN" > "$DEHORS/plan.md"
+printf '{"type":"agent","description":"%s : module du poste hors du lab, décrit par son module.json."}\n' "$MK_MOD" > "$DEHORS/module.json"
+printf '9.9.9-%s\n' "$MK_VER" > "$DEHORS/VERSION"
+printf '{"nodes":[{"id":"%s","status":"running","step":"x"}]}\n' "$MK_DAG" > "$DEHORS/ext.dag.json"
 
 LAB="$WORK/lab"; B="$LAB/.planning"; mkdir -p "$LAB/src"
 printf 'export const u = 1;\n' > "$LAB/src/u.js"
 printf '#!/bin/sh\n# %s : script du lab lui-même, décrit par son en-tête.\necho ok\n' "$MK_OK" > "$LAB/src/normal.sh"
 ln -s "$DEHORS/ext.js" "$LAB/src/ext.js"; ln -s "$DEHORS/ext.sh" "$LAB/src/ext.sh"
+# modules du lab (page Code VibeFlow : module.json et VERSION lus hors du scan) : m1 lié hors du lab, m2 normal (témoin positif)
+mkdir -p "$LAB/plugin/m1" "$LAB/plugin/m2"; ln -s "$DEHORS/module.json" "$LAB/plugin/m1/module.json"; ln -s "$DEHORS/VERSION" "$LAB/plugin/m1/VERSION"
+printf '{"type":"agent","description":"%s : module du lab lui-même."}\n' "$MK_OKMOD" > "$LAB/plugin/m2/module.json"; printf '1.2.3-%s\n' "$MK_OKVER" > "$LAB/plugin/m2/VERSION"
+# DAG de mission : un lien sortant (ext) et un fichier du lab (ok), tous deux avec un nœud en cours
+mkdir -p "$LAB/.planning/missions"; ln -s "$DEHORS/ext.dag.json" "$LAB/.planning/missions/ext.dag.json"
+printf '{"nodes":[{"id":"%s","status":"running","step":"x"}]}\n' "$MK_OKDAG" > "$LAB/.planning/missions/ok.dag.json"
 wr "$B/ROADMAP.md" <<'MD'
 ## Milestones
 
@@ -59,11 +69,21 @@ echo "=== A — liens symboliques sortants ==="
 assert_eq "A0 — l'assemblage et l'export ont produit leurs fichiers" "$([ -s "$OUT/graph.json" ] && [ -s "$OUT/project.html" ] && [ -s "$EXP" ] && echo oui || echo non)" "oui"
 assert_eq "A1 — témoin positif : le contenu d'un fichier normal du lab est décrit dans la page Code" "$([ "$(compte "$MK_OK" "$OUT/index.html")" -ge 1 ] && echo oui || echo non)" "oui"
 assert_eq "A2 — témoin positif : il est aussi dans l'export" "$([ "$(compte "$MK_OK" "$EXP")" -ge 1 ] && echo oui || echo non)" "oui"
-for M in "$MK_MD" "$MK_SH"; do
-  assert_eq "A3 — $M : ni dans les pages, ni dans graph.json, ni dans l'export" "$(compte "$M" "$OUT/index.html" "$OUT/project.html" "$OUT/graph.json" "$EXP")" "0"
+assert_eq "A1b — témoin positif : le module et la version du lab sont décrits dans la page Code" "$([ "$(compte "$MK_OKMOD" "$OUT/index.html")" -ge 1 ] && [ "$(compte "$MK_OKVER" "$OUT/index.html")" -ge 1 ] && echo oui || echo non)" "oui"
+for M in "$MK_MD" "$MK_SH" "$MK_MOD" "$MK_VER"; do
+  assert_eq "A3 — $M : ni dans les pages, ni dans graph.json, ni dans l'export" "$(compte "$M" "$OUT/index.html" "$OUT/project.html" "$OUT/graph.json" "$OUT/architecture.json" "$EXP")" "0"
 done
 assert_eq "A4 — $MK_PLAN (lien dans .planning/) : ni dans la page Projet, ni dans l'export" "$(compte "$MK_PLAN" "$OUT/project.html" "$OUT/index.html" "$EXP")" "0"
 assert_eq "A5 — le contenu planning du lab reste lu (témoin : plan du lab dans la page Projet)" "$([ "$(compte 'Poser le socle' "$OUT/project.html")" -ge 1 ] && echo oui || echo non)" "oui"
+cat > "$WORK/qui.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab, home] = process.argv;
+const { collectWho } = await import(pathToFileURL(scripts + '/vf-cockpit-who.mjs').href);
+console.log(JSON.stringify(collectWho(lab, { home })));
+JS
+mkdir -p "$WORK/home"; QUI="$(node "$WORK/qui.mjs" "$SCRIPTS" "$LAB" "$WORK/home")"
+assert_eq "A6 — témoin positif : le DAG du lab alimente l'équipe" "$(printf '%s' "$QUI" | grep -o "$MK_OKDAG" | wc -l | tr -d ' ' | awk '{print ($1>=1)?"oui":"non"}')" "oui"
+assert_eq "A7 — un DAG lié hors du lab n'alimente pas l'équipe" "$(printf '%s' "$QUI" | grep -o "$MK_DAG" | wc -l | tr -d ' ')" "0"
 
 # ---------- B : worktree déclaré non vérifié ----------
 echo "=== B — arbres du lab ==="
