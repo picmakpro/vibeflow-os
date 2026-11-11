@@ -525,6 +525,21 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   `test-cockpit-routes.sh` dans ses `files_modified` ; constate RK.1 (ou AN.1) rouge avant l'ajout ; ajoute son chemin
   (ou son nom) à la liste à sa place alphabétique ; exige ensuite PASS RK.1 et PASS RK.7 (ou PASS AN.1). Corrige la
   phrase contraire de 79-05. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+- **A55 (80 et toute phase, règle de C5) — échec d'un chargement d'onglet, premier chargement compris.** Relevé à la
+  source : 79-16 (R5) laisse l'onglet affiché intact quand un changement d'onglet échoue, mais ne dit rien du premier
+  chargement, où aucun onglet n'est affiché. Contrat : (1) `VF_COQUILLE.etat()` rend à tout moment
+  `{ onglet, phase, motif }`, `phase` ∈ `chargement` | `pret` | `echec`, `motif` = `lecture` ou `null` ; un
+  consommateur inscrit après coup lit l'échec par là, jamais par un événement déjà parti. (2) À chaque chargement en
+  échec (premier ou changement), la coquille émet sur `document` un `CustomEvent` annulable `vf:coquille-echec`,
+  `detail: { onglet, initial }` ; les rappels de `surOnglet` ne sont pas appelés. (3) Premier chargement en échec : si
+  aucun écouteur n'a appelé `preventDefault()`, la coquille affiche elle-même, dans la zone du canevas, le texte fixe
+  « Lecture impossible : les données de cet onglet n'ont pas pu être lues. » et un bouton « Réessayer » qui rappelle
+  `chargerOnglet(onglet)` ; jamais une page blanche, jamais le corps de la réponse (T-79-1608), ni couleur d'alerte ni
+  fond teinté. (4) Un script persistant (A53) apprend l'échec en posant à son évaluation un écouteur tardif
+  `document.addEventListener('vf:coquille-echec', …)` (aucune lecture à l'évaluation) : les persistants sont évalués
+  avant le premier chargement, l'écouteur existe donc toujours à temps ; il appelle `preventDefault()` s'il affiche
+  son propre état. Aucune exigence nouvelle : SOCL-20 couvre ce comportement. Décision déléguée par Samuel (message
+  session principale, 2026-11-08), option recommandée.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.

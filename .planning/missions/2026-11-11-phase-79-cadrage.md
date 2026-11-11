@@ -24,7 +24,7 @@ Dossier de phase : `.planning/workstreams/fiabilite/phases/VFDO-79-socle-du-cock
   par la vérification fraîche).
 - **Exigences :** famille `SOCL-01` à `SOCL-27`, posée dans REQUIREMENTS.md, chacune portée par un plan (table de
   traçabilité : `Pending`).
-- **Contrats fournis** aux Phases 73, 74, 75, 76, 77 et 80 : C0 à C6, puis 53 amendements (A1 à A54), figés dans
+- **Contrats fournis** aux Phases 73, 74, 75, 76, 77 et 80 : C0 à C6, puis 53 amendements (A1 à A55), figés dans
   `79-CONTEXT.md` § « Contrats fournis ».
 - **Décisions :** P79-D-01 à P79-D-33. Une seule est un arbitrage de Samuel (P79-D-33) ; toutes les autres sont des
   décisions déléguées (option recommandée).
@@ -145,6 +145,8 @@ du manager en fin de mission ; « aucun relevé » là où rien n'est connu) :
 | A53 | Scripts persistants de la coquille : marqueur `vf-coquille: persistant`, trois conditions, aucune liste fermée, ordre de premier chargement garanti ; 79-16 part de la base où 80-02 est fusionné | 80, toute phase | Phase 80 : 80-02, 80-10 |
 
 - **A54** (73 à 77, 80) : ajouter une route ou un annotateur — listes RK.1 et AN.1 de `test-cockpit-routes.sh` écrites à la main, sondes RK.7 dérivées de `ROUTES` ; la phase porte la suite dans ses `files_modified`, constate le rouge, insère à sa place alphabétique, exige PASS RK.1, RK.7 (AN.1). Autres phases à retoucher : 75 (`/api/vf/activite`), 76 (`/api/vf/tracabilite`), 77 (`/api/vf/methode`), toute phase qui ajoute un annotateur.
+
+- **A55** (80, toute phase) : échec d'un chargement d'onglet, premier compris — `VF_COQUILLE.etat()`, événement annulable `vf:coquille-echec` `{ onglet, initial }`, message fixe et « Réessayer » de la coquille si personne n'annule ; autres phases : 80 (80-21).
 
 ## Décisions
 
@@ -338,7 +340,7 @@ recouvrement nommé de la vague 1 (79-02 et 79-05 sur `T/test-cockpit-lancer-mod
 
 **ROADMAP et REQUIREMENTS — citations à mettre à jour :** l'encadré du corps de la Phase 79 au ROADMAP et l'en-tête
 du bloc `SOCL` de REQUIREMENTS citent « amendements A1 à A48 » (et « P79-D-01 à D-33 » pour REQUIREMENTS) ; texte à
-poser : « amendements A1 à A54, décisions P79-D-01 à P79-D-33 (P79-D-33 : arbitrage Samuel, AskUserQuestion session
+poser : « amendements A1 à A55, décisions P79-D-01 à P79-D-33 (P79-D-33 : arbitrage Samuel, AskUserQuestion session
 principale, 2026-11-11) ».
 
 **REGISTRE de l'audit** (`.planning/research/2026-11-10-audit-cockpit/REGISTRE.md`) — colonne « État » (§ 1, § 2),
