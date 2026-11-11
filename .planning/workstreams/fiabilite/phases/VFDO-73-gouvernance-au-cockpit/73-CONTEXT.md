@@ -244,9 +244,10 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   régénérer, neutre vis-à-vis du retrait de `plugin/cockpit/amont/` par la 79 (C6). Un fichier d'interface neuf prend sa
   ligne `AJOUT` dans `VENDORED.txt`, à sa place dans le tri, ou rien si la 79 a déjà réduit `VENDORED.txt` à l'origine.
 - **P73-D-26 (plafond des fichiers d'interface).** Chaque fichier `ui/*.js` neuf ou touché reste ≤ 300 lignes
-  (`70-vf-live.js` est à 285, `00-vibeflow.js` à 298) : les ajouts vont dans des fichiers neufs ; dans 00 et 70, une ligne
-  existante modifiée au plus.
-
+  (`70-vf-live.js` est à 285, `00-vibeflow.js` à 298) : les ajouts vont dans des fichiers neufs ; dans 00 et 70, seules
+  des lignes existantes sont modifiées (aucun ajout net de ligne), au plus deux par fichier (titre et garde d'ancre dans
+  00 ; pli du tiroir et bouton « N au travail » dans 70). La contrainte qui fait foi est le plafond, mesuré par la suite
+  de vendorisation. Précisé le 2026-11-11 après la critique de la spec (tour 2, finding 8).
 - **P73-D-28 (règles communes de la Phase 79, amendement `2ae6607a`).** Toute route posée par la 73 (seule
   `GET /api/vf/ailleurs`) prend une ligne de la table des routes, en ordre alphabétique, et passe par la fonction
   d'accès exportée unique (contrôles, garde d'émission, 503) si le plan 79-05 a fusionné (A10/A11) ; côté page, le jeton
@@ -257,6 +258,22 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   couvrant les champs ajoutés (A17), fonction d'AUDC-I10 en fin de `vf-cockpit-etat-officiel.mjs` (A18), `cockpit-equipe@1`
   servi tel quel (A19), `sortisSilence` et `finMotif` dans `who@2` (A20). Un plan qui lit A15, A16 ou A20 est marqué
   « à revalider » tant que le plan correspondant de la 79 n'a pas fusionné, et dit son repli sur la forme présente.
+
+- **P73-D-29 (clé de ligne, critique tour 2).** Un agent affiché deux fois (« À vous » et l'arbre) a deux lignes ; la
+  clé de mise à jour et de focus est `section + identifiant`, jamais l'identifiant seul ; l'ancre `#r=n:…` cible la ligne
+  de « À vous » si elle existe, sinon celle de l'arbre ; une ligne qui change de section garde le focus sur la ligne de
+  même section si elle subsiste, sinon le rend au titre de la section (`tabindex="-1"`), jamais à la jumelle.
+- **P73-D-30 (ligne 2 d'une session, critique tour 2).** Ordre de priorité de la seconde ligne, du premier au dernier
+  coupé : nœud, travail non commité (« N modifiés »), arbre, « Lancée depuis la carte » ; le détail déplié (§ 7 de la
+  spec) reprend tous ces champs, rien n'est seulement dans une ellipse.
+- **P73-D-31 (fenêtre de stall inconnue).** Quand la fenêtre est inconnue (P73-D-09), l'état « suspect » n'est pas
+  émis : la décroissance s'arrête à « silencieux ».
+- **P73-D-32 (contrôles secondaires, critique tour 2).** « Les N autres », les `summary` (« Relus… », « Arbres de
+  travail ») et les liens en ligne sont des liens au style lien existant ou des `.btn` doux, jamais un quatrième style ;
+  cible de 44 px en `pointer: coarse` ; place dans l'ordre de tabulation ; `section#vf-equipe` porte `role="main"` ;
+  chaque message d'état (« Source illisible », « Direct coupé », « Aucun agent ne correspond ») dit sa résolution en une
+  demi-phrase. Les autres mineurs de la critique (échelle typographique, contraste à recalculer, tiroir Git sur la
+  colonne de droite entre 1 000 et 1 370 px) sont traités dans le plan d'interface.
 
 ### Claude's Discretion
 
