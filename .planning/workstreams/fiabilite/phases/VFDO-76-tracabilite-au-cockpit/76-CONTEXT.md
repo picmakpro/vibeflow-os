@@ -79,11 +79,11 @@ dépôt.
   fixé au plan).
 - **P76-D-03 (navigation).** Ouverture d'un objet par `select(id)` (panneau sans changer de vue) et `reveal(id)` de la
   page, déjà exportés ; Retour par la pile de sélections commune que la Phase 80 pose sur Projet
-  (`VibeFlow.panneau.retour()` et bouton « Retour » de l'en-tête du panneau, P80-C76-3) : la 76 y empile en appelant
+  (`window.VF_PANNEAU.retour()` et bouton « Retour » de l'en-tête du panneau, P80-C76-3) : la 76 y empile en appelant
   `select`, sans pile propre ; fil d'Ariane et ancre par objet ; un commit s'ouvre dans le tiroir Git existant
   (Phase 78, détail sans diff) ; une phase s'ouvre dans son panneau Projet (identifiant stable `ph-<N>` ou
   `ph-<N>@<ws>`). Clavier : tout lien est un élément focalisable natif, Échap ferme, ordre de tabulation dans le
-  panneau. Amendé le 2026-11-11 sur la réponse de la Phase 80 (pile locale abandonnée).
+  panneau. Amendé le 2026-11-11 sur la réponse de la Phase 80 (pile locale abandonnée ; nom corrigé par la 80 le même jour : l'objet global du moteur est gelé, P80-D-33 à P80-D-41). Une surcouche éventuelle passe par la pile commune `window.VF_SURCOUCHES` de la 80 (`ouvrir`, `dessus`, `ouverte`).
 - **P76-D-04 (trous : glyphe et mot).** Une ligne d'exigence porte une bande de quatre glyphes (plan, SUMMARY,
   VERIFICATION, recette) et un seul mot pour le premier trou (« manque : VERIFICATION »). Absence simple : glyphe
   neutre et mot neutre (même registre que « N exigences non cochées », PU-G-097). Contradiction lue (case cochée au
@@ -234,7 +234,7 @@ dépôt.
   `fn(cible)` à chaque rendu, une carte de couloir ou une ligne de liste ouvre le même panneau par `select(id)`,
   identifiant de phase `ph-<N>` ou `ph-<N>@<ws>` ; P80-C76-2, `setOverview` ne remplace que le corps, les sections
   `addPanelSection('overview')` restent posées après lui ; P80-C76-3, pas de `SC.openNode` : `select(id)` et
-  `reveal(id)`, Retour par la pile commune `VibeFlow.panneau.retour()` ; P80-C76-4, « x/y exigences » reste
+  `reveal(id)`, Retour par la pile commune `window.VF_PANNEAU.retour()` ; P80-C76-4, « x/y exigences » reste
   `piedExigences`, et le champ facultatif `exigences {faits,total}` que la 80 ajoute au nœud de phase sort du même
   calcul, la 76 ne le recalcule pas. **Séquence** : le lot moteur et les onglets sans rechargement de la 80 passent
   après la fusion de la 79 entière ; les plans de la 76 qui se branchent sur le panneau dépendent donc de la **80
