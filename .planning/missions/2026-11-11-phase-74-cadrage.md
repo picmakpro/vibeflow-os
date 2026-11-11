@@ -15,6 +15,7 @@ cockpit, demande de Samuel, session principale Claude Code, 2026-11-11).
 - Recherche : `74-RESEARCH.md`.
 - Plans : neuf (74-01 à 74-09), cinq vagues ; vérification fraîche des plans : PASS au second passage (§ Preuves E6).
 - Corps de la section `### Phase 74:` du ROADMAP réécrit (titre, checklist, `## Progress` intacts).
+- PR : #228 vers `integration/cockpit-audit`, ouverte, non mergée (publications gelées).
 
 ## Plan de bataille (DAG)
 
