@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # test-cockpit-direct-coupe.sh — AUDC-M9 (lot 0 de l'audit du cockpit) : une coupure du direct se dit à temps, puis la bannière se retire seule.
 #   C1 à 5,5 s de la coupure la pastille dit « Direct coupé » (classe, libellé, infobulle), sans bannière
+#   C1b avec un agent actif la coupure l'emporte sur « au travail » (classe, pulsation)
 #   C2 la bannière n'arrive pas avant 13 s et arrive à 15 s environ (avant : à 300 s)
 #   C3 au retour du réseau la bannière se retire seule (avant : elle restait jusqu'à un clic) et le flux est rouvert une fois
 # Coupure simulée dans le navigateur (réseau hors ligne + perte du flux signalée à la page), sur les trois onglets. Chrome headless ;
@@ -52,6 +53,8 @@ for PAGE in project.html ""; do
   assert_eq "C1.1 — à 5,5 s la pastille est en classe « off » (/${PAGE})" "$(printf '%s' "$R" | node "$AUX/ev.mjs" '/(^| )off( |$)/.test(j.a5.cls)')" "true"
   assert_eq "C1.2 — à 5,5 s le libellé dit « Direct coupé » (/${PAGE})" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.a5.txt')" "Direct coupé"
   assert_eq "C1.3 — à 5,5 s l'infobulle dit que le serveur ne répond pas, sans bannière (/${PAGE})" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.a5.title + "|" + j.a5.banniere')" "Le serveur du cockpit ne répond pas|false"
+  assert_eq "C1.4 — témoin : avec un agent actif la pastille est « held » avant la coupure (/${PAGE})" "$(printf '%s' "$R" | node "$AUX/ev.mjs" '/(^| )held( |$)/.test(j.avantCoupure.cls) && j.avantCoupure.pulse !== "none"')" "true"
+  assert_eq "C1.5 — avec un agent actif, la coupure l'emporte : classe « off », plus « held », plus de pulsation (/${PAGE})" "$(printf '%s' "$R" | node "$AUX/ev.mjs" '/(^| )off( |$)/.test(j.a5.cls) && !/held/.test(j.a5.cls) && j.a5.pulse === "none"')" "true"
   assert_eq "C2.1 — pas de bannière avant 13 s (/${PAGE})" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.avant13.banniere')" "false"
   assert_eq "C2.2 — la bannière arrive entre 13 s et 18 s (/${PAGE})" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.tBanniere !== null && j.tBanniere >= 13000 && j.tBanniere <= 18000')" "true"
   assert_eq "C3.1 — au retour du réseau la bannière se retire seule en moins de 8 s (/${PAGE})" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.tBanniere !== null && j.tRetrait !== null')" "true"

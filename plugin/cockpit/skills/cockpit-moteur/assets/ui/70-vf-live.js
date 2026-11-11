@@ -188,9 +188,9 @@
     if (!badge) badge = SC.addHeaderButton({ id: 'vf-lock', label: '…', title: 'Qui est au travail', onClick: whoPanel });
     const t = off ? { cls: 'off', text: 'Direct coupé', title: 'Le serveur du cockpit ne répond pas' } : lockText(probe.lock);
     const n = (who?.workers || []).filter(auTravail).length;
-    badge.className = 'btn ' + (n ? 'held' : t.cls); badge.title = off ? t.title : `${n ? n + ' au travail' : 'Personne au travail'} · ${t.title}`;
+    badge.className = 'btn ' + (off ? 'off' : n ? 'held' : t.cls); badge.title = off ? t.title : `${n ? n + ' au travail' : 'Personne au travail'} · ${t.title}`;
     // compact : le détail (propriétaire du verrou, étape, durée) est dans l'infobulle et dans le panneau « Au travail »
-    badge.setAttribute('aria-label', off ? t.text : n ? `${n} au travail` : 'Personne au travail'); // sinon figé à « … » (libellé de création)
+    badge.setAttribute('aria-label', off ? t.text : n ? `${n} au travail` : 'Personne au travail'); // sinon figé à « … » (libellé de création) // AUDC-M9 : direct coupé = point « off » (jamais le point qui pulse « au travail »), même avec des agents actifs
     badge.innerHTML = `<span class="dot"></span><span class="bl">${off ? t.text : n ? `${n} au travail` : 'Personne'}</span>`;
     redessiner();
   };
