@@ -542,7 +542,7 @@ Plans:
 
 ### Phase 74: L'équipe dans le temps — swim-lanes, coût, replay
 
-> **Cadrée le 2026-11-11** — `74-CONTEXT.md`, P74-D-01 à P74-D-55, décisions déléguées par Samuel
+> **Cadrée le 2026-11-11** — `74-CONTEXT.md`, P74-D-01 à P74-D-56, décisions déléguées par Samuel
 > (message session principale, 2026-11-08), option recommandée ; spécification d'interface `74-UI-SPEC.md`. Inscrite le
 > 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Planifiée le 2026-11-11 (10 plans, 6
 > vagues), revalidée le même jour contre les Phases 79 (`673c879d`, A1 à A49), 73 (`b5abfeec`, P73-C1 à C5) et 80

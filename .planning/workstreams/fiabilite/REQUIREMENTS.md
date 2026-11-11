@@ -1683,7 +1683,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 
 ### L'équipe dans le temps — frise, fiche d'agent, coût, relecture (Phase 74 — posées au cadrage, 2026-11-11)
 
-Dérivées de P74-D-01 à P74-D-55 (`74-CONTEXT.md`), décisions déléguées par Samuel (message session principale,
+Dérivées de P74-D-01 à P74-D-56 (`74-CONTEXT.md`), décisions déléguées par Samuel (message session principale,
 2026-11-08), option recommandée, sauf P74-D-46 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 :
 la couleur dit l'état, le nœud s'écrit sur la voie). Préfixe `TEMP` vérifié libre le 2026-11-11. Dépendent des
 contrats de la Phase 79 (figés au commit `3119d82a`, revalidés à la reprise du 2026-11-11), de la régie de la Phase 73 et de

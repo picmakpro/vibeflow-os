@@ -388,6 +388,13 @@ décisions citées ; le texte d'origine reste au-dessus pour l'historique.
   fiche fermée, aucun écouteur ni abonnement doublé. Décision déléguée par Samuel (message session principale,
   2026-11-08), option recommandée.
 
+- **P74-D-56 (la 74 part après la 79 entière).** La Phase 74 s'exécute sur une base où les 22 plans de la Phase 79 sont
+  fusionnés : 79-13 (route de frise, `reduireCible`) et 79-22 (`/api/vf/transcript` et le détail en cours par la table en
+  mémoire, SOCL-27, vague 8, commit `26019872`) touchent des fichiers que la 74 touche aussi
+  (`test-cockpit-transcript.sh`), et la relecture au curseur ne tient sa charge que si une lecture de fil ne relance plus
+  de collecte. Chaque plan le dit en précondition vérifiable. Rien ne se déplace dans l'ordre de la 74 : le jalon la
+  place déjà après la 79. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+
 ### Claude's Discretion
 
 Laissés à la spécification d'interface et à la planification, dans les bornes ci-dessus : la géométrie de la frise
