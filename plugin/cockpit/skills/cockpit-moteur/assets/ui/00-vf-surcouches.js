@@ -69,6 +69,7 @@
     const t = ev.target, a = actives(), h = a[a.length - 1];
     if (ev.defaultPrevented || !h || vivantes().length || pile.some((e) => !e.fermer && e.el.contains(t))) return;
     if (h.modale) {
+      lever(h); // le moteur rend le focus à l'origine EN fermant : l'inert doit déjà être levé (il ne l'est qu'à l'observation, trop tard)
       if (h.el === par('palette') && t.id === 'search') return; // le champ garde son propre Échap
       consomme(ev); h.fermer(); return;
     }
@@ -77,6 +78,10 @@
   };
   let avant = null, courant = null; // les deux derniers éléments focalisés : l'ouvreur d'une modale ouverte par le moteur
   window.addEventListener('focusin', (ev) => { avant = courant; courant = ev.target; }, true);
+  window.addEventListener('mousedown', (ev) => { // clic sur le fond ou sur la croix : même raison que pour Échap
+    const h = [...pile].reverse().find((e) => e.modale && e.el.isConnected);
+    if (h && (ev.target === h.el || (ev.target.closest && ev.target.closest('#pal-x')))) lever(h);
+  }, true);
   window.addEventListener('keydown', (ev) => {
     const modale = [...pile].reverse().find((e) => e.modale && e.el.isConnected);
     if (ev.key === 'Tab' && modale) piege(ev, modale);
@@ -91,7 +96,7 @@
   const accroches = () => { // tout ce qui dépend du document de l'onglet ; rend le nettoyage
     refs.moteur = window.Floorplan || null;
     const st = document.createElement('style'); st.textContent = CSS; document.head.appendChild(st);
-    const SUIVIES = [['modal', () => par('modal').querySelector('[data-close]').click(), true], ['palette', () => par('pal-x').click(), true]];
+    const SUIVIES = [['modal', () => par('modal').querySelector('[data-close]').click(), true], ['palette', () => par('pal-x').click(), false]];
     let sansPanneau = document.body.classList.contains('no-panel');
     const synchro = () => {
       for (const [id, fermer, rendu] of SUIVIES) { // la pile OBSERVE la classe `open` : elle ne ferme rien d'elle-même (sauf la palette, par Échap)
