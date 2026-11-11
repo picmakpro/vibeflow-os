@@ -275,6 +275,16 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   demi-phrase. Les autres mineurs de la critique (échelle typographique, contraste à recalculer, tiroir Git sur la
   colonne de droite entre 1 000 et 1 370 px) sont traités dans le plan d'interface.
 
+- **P73-D-33 (surcouches et objet global du moteur, information de la Phase 80, 2026-11-11).** La régie ne pose
+  aucune surcouche propre : le détail de ligne est en flux, la fiche de la 74 n'est pas une surcouche (P74-D-03). Le seul
+  cas est le repli de `vf-agent:ouvrir` (lecteur actuel dans le panneau latéral) : s'il existe, il passe par la pile de
+  la Phase 80 `window.VF_SURCOUCHES.ouvrir(el, {modale, ouvreur, fermer})` (P80-D-33..41, `80-CONTEXT.md` sur
+  `feat/phase-80-trois-formes`, SHA à vérifier à la jointure) pour le focus et l'Échap, sinon il garde le comportement
+  présent. La régie n'ajoute rien à l'objet global du moteur (gelé par la 80) : ses contrats vivent sous ses propres
+  globales (`window.__vfEquipeVues`) et les événements de document de P73-D-20 ; `select(id)` et `reveal(id)` ne sont
+  pas utilisés par la régie (l'ancre est traitée par la régie, P73-D-20). Plan concerné marqué « à revalider » jusqu'à
+  la fusion de la 80.
+
 ### Claude's Discretion
 
 Noms internes des fonctions et modules neufs, découpage fin des fichiers d'interface, forme exacte des fixtures (noms
