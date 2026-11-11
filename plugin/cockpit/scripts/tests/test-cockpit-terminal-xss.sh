@@ -13,7 +13,6 @@
 # en-têtes forgés) ; la partie navigateur (T16.0, T16.3-T16.5 : stockage, fenêtre, messages) est annoncée « ⊘ … NON vérifiée, non comptée ».
 # Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; TA="$HERE_T/terminal-aux.mjs"
 ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"
@@ -22,6 +21,7 @@ export REAL_HOME="$HOME"; export HOME="$WORK/home"
 export CHROME_SESSION="$HERE_T/chrome-session.mjs"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0; NONVERIF=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
@@ -130,10 +130,9 @@ manche() {
   local m; for m in "$@"; do mutant "$o" "$m" || { R_MARQUEUR="mutant-sans-effet"; return; }; done
   rm -f "$MARQUEUR" "$o/.cache/server.json"; mkdir -p "$o/.cache"
   local amorce; amorce="$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")"; (umask 077; printf '%s' "$amorce" > "$o/.cache/terminal-amorce"; printf '%s' "$amorce" > "$WORK/amorce.copy")
-  ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  local pid=$!; PIDS+=($pid)
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  local port q sec _c; port="$(node "$AUX/ev.mjs" j.port < "$o/.cache/server.json")"; q="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; q="${q##*:}"
+  COCKPIT_SORTIE="$o" COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$label.out" cockpit_lancer "$LAB" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" --terminal
+  local pid="$VF_PID"
+  local port q sec _c; port="${VF_PORT:-0}"; q="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; q="${q##*:}"
   read -r _c sec < <(node "$TA" amorcer "$q" "$WORK/amorce.copy" | tr '\n' ' ')
   [[ "$sec" =~ ^[0-9a-f]{64}$ ]] || { R_MARQUEUR="session-impossible"; vf_hyg_stop "$pid"; return; }
   node "$TA" flux "$q" "$sec" onglet-A "$WORK/flux-$label.bin" 120000 > "$WORK/flux-$label.log" 2>&1 & local fpid=$!; PIDS+=($fpid)
