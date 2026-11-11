@@ -91,7 +91,8 @@ export function collecteAgents(ctx) {
         const at = byActivity(last, tree, file);
         const desc = [...inclus.values()].some((x) => x.etat !== 'termine');
         // état LU, jamais deviné : l'état officiel quand il est là (vous attend, close), sinon l'écriture du transcript ; une session au repos n'est jamais « terminé » (AUDC-D2)
-        const off = officiel?.get(id)?.etat;
+        // liste officielle lue avec succès et de forme attendue : une session du lab qui n'y figure plus (ni écrite récemment, ni portant des agents vivants) est close ; liste absente, en échec ou illisible : jamais « close »
+        const off = officiel?.get(id)?.etat || (officiel && !officiel.has(id) && age > fresh && !desc ? 'termine' : undefined);
         const etatSession = off === 'termine' || off === 'attend' || off === 'actif' ? off : off === 'au-repos' ? (desc ? 'en-attente' : 'au-repos') : age <= fresh ? 'actif' : desc ? 'en-attente' : 'au-repos';
         workers.push(action({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ...(titreSession(file) ? { titre: titreSession(file) } : {}), ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: etatSession, _tr: file }));
       }

@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ID_RE } from './vf-cockpit-lecture.mjs';
+import { envEnfant } from './vf-cockpit-env.mjs';
 
 export const REPIT_MS = 10000; // au plus une commande toutes les 10 s
 export const VALIDITE_MS = 60000; // une lecture plus vieille que 60 s n'est plus rendue : retour à la lecture des transcripts
@@ -25,7 +26,7 @@ export function formeEtats(json, CC = contrat()) {
     const st = typeof e.state === 'string' && Object.hasOwn(etats, e.state) ? etats[e.state] : null;
     const su = typeof e.status === 'string' && Object.hasOwn(statuts, e.status) ? statuts[e.status] : null;
     const etat = st === 'termine' || st === 'attend' ? st : su || st;
-    if (etat) out.set(e[CC.cleSession], { etat });
+    out.set(e[CC.cleSession], { etat: etat || null }); // une session listée d'état inconnu est VIVANTE : présente, sans état
   }
   return out;
 }
@@ -43,7 +44,7 @@ export function rafraichir({ home, cwd, commande = 'claude' } = {}) {
     let fini = false;
     const clos = (carte) => { if (fini) return; fini = true; c.enCours = null; if (carte) { c.carte = carte; c.at = Date.now(); } else c.carte = null; resolve(carte); };
     try {
-      execFile(commande, ['agents', '--json'], { cwd, env: { ...process.env, HOME: home }, timeout: DELAI_MS, maxBuffer: MAX_OCTETS, windowsHide: true }, (err, out) => {
+      execFile(commande, ['agents', '--json'], { cwd, env: { ...envEnfant(cwd), HOME: home } /* PATH assaini : jamais un `claude` posé dans le lab (audit H-1) */, timeout: DELAI_MS, maxBuffer: MAX_OCTETS, windowsHide: true }, (err, out) => {
         if (err) return clos(null);
         let j = null; try { j = JSON.parse(String(out)); } catch {}
         clos(formeEtats(j));
