@@ -949,6 +949,46 @@ out=$("$SCRIPT" release --owner=M63)
 assert "T63.6, release sans enfant running : children_running 0" "$out" '"released": true, "owner": "M63", "children_running": 0}'
 _t63_gone=$([ -f "$REG_FILE" ] && echo yes || echo no)
 assert "T63.7, registre supprimé par un release propre" "$_t63_gone" 'no'
+# T63.8 à T63.12 (P79-D-17) : le release propre verse le registre dans l'archive frère, qui survit au relâchement.
+ARC_FILE="$VF_DRIVER_LOCK.children.closed.jsonl"
+regq() { printf '%s' "$1" | python3 -c 'import json,sys; d=json.load(sys.stdin); a=[x for x in d["agents"] if x["agent_id"]==sys.argv[1]]; print(a[0][sys.argv[2]] if a else "")' "$2" "$3" 2>/dev/null; }
+regn() { printf '%s' "$1" | python3 -c 'import json,sys; d=json.load(sys.stdin); print(len([x for x in d["agents"] if x["agent_id"]==sys.argv[1]]))' "$2" 2>/dev/null; }
+_t63_arc=$([ -f "$ARC_FILE" ] && echo yes || echo no)
+assert "T63.8, l'archive frère du registre existe après le release propre" "$_t63_arc" 'yes'
+out=$("$SCRIPT" registry 2>/dev/null); rc=$?
+json_ok "$out"; assert_exit "T63.9, registry rend un JSON valide (parse réel)" $? 0
+assert_exit "T63.9b, registry : exit 0" "$rc" 0
+assert "T63.9c, registry : present true" "$out" '"present": true'
+assert "T63.10a, count 4 (un agent par identifiant)" "$out" '"count": 4'
+assert "T63.10b, ag-reviewer : nœud revue-A" "$(regq "$out" ag-reviewer node)" 'revue-A'
+assert "T63.10c, ag-reviewer : statut stopped" "$(regq "$out" ag-reviewer status)" 'stopped'
+assert "T63.10d, ag-planner : rôle gsd-planner" "$(regq "$out" ag-planner role)" 'gsd-planner'
+assert "T63.10e, ag-planner : parent ag-coder" "$(regq "$out" ag-planner parent)" 'ag-coder'
+assert "T63.10f, ag-planner : statut failed (dernière ligne gagne)" "$(regq "$out" ag-planner status)" 'failed'
+assert "T63.10g, ag-coder : statut done" "$(regq "$out" ag-coder status)" 'done'
+assert "T63.10h, ag-deep : statut stopped" "$(regq "$out" ag-deep status)" 'stopped'
+_t63_sum1="$(cksum < "$ARC_FILE" 2>/dev/null)"; _t63_ls1="$(ls -A "$(dirname "$VF_DRIVER_LOCK")" 2>/dev/null)"
+"$SCRIPT" registry >/dev/null 2>&1; out2=$("$SCRIPT" registry 2>/dev/null)
+_t63_sum2="$(cksum < "$ARC_FILE" 2>/dev/null)"; _t63_ls2="$(ls -A "$(dirname "$VF_DRIVER_LOCK")" 2>/dev/null)"
+assert "T63.11a, lecture seule : somme de contrôle de l'archive inchangée" "$_t63_sum2" "$_t63_sum1"
+assert "T63.11b, lecture seule : liste du dossier du verrou inchangée" "$_t63_ls2" "$_t63_ls1"
+assert "T63.11c, orphans : present false" "$("$SCRIPT" orphans)" '"present": false'
+assert "T63.11d, orphans : count 0" "$("$SCRIPT" orphans)" '"count": 0'
+case "$out2" in *"$WORK_DIR"*) echo "  ❌ FAIL — T63.11e, registry ne porte aucun chemin du poste"; FAIL=$((FAIL+1)) ;; *) if [ -n "$out2" ]; then echo "  ✅ PASS — T63.11e, registry ne porte aucun chemin du poste"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T63.11e, registry ne porte aucun chemin du poste (sortie vide)"; FAIL=$((FAIL+1)); fi ;; esac
+# T63.12 : un dossier occupe le nom de l'archive (échec d'écriture sur tout utilisateur) : le release relâche quand même.
+rm -f "$ARC_FILE"; mkdir -p "$ARC_FILE"
+"$SCRIPT" acquire --owner=M63c --step=exec-C >/dev/null
+"$SCRIPT" register --agent=ag-t12 --role=vf-coder --node=exec-C >/dev/null
+"$SCRIPT" close --agent=ag-t12 --status=done >/dev/null
+out=$("$SCRIPT" release --owner=M63c 2>"$WORK_DIR/t63-12.err"); rc=$?
+assert "T63.12a, archive non écrivable : le release relâche quand même" "$out" '"released": true'
+assert_exit "T63.12b, archive non écrivable : exit 0" "$rc" 0
+_t63_cur=$([ -f "$REG_FILE" ] && awk 'END { print NR }' "$REG_FILE" || echo absent)
+assert "T63.12c, le registre courant est conservé avec ses 2 lignes" "$_t63_cur" '2'
+_t63_dir=$([ -d "$ARC_FILE" ] && [ -z "$(ls -A "$ARC_FILE")" ] && echo intact || echo touche)
+assert "T63.12d, l'archive (le dossier) est intacte" "$_t63_dir" 'intact'
+assert "T63.12e, stderr dit « registre non archivé »" "$(cat "$WORK_DIR/t63-12.err")" 'registre non archivé'
+rm -rf "$ARC_FILE" "$REG_FILE" "$WORK_DIR/t63-12.err"
 
 echo "=== T64, sans registre : aucun verbe ne plante, compte 0 partout ==="
 rm -rf "$VF_DRIVER_LOCK" "$REG_FILE"
@@ -1071,6 +1111,51 @@ out=$(PATH="$_t67_binmv:$PATH"; mv_noclobber "$_t67_d/s8" "$_t67_d/absent/dst");
 [ -z "$out" ]; assert_exit "T67.10, mv_noclobber : aucune sortie parasite quand le déplacement échoue" "$?" 0
 rm -rf "$_t67_d"
 rm -rf "$_t67_bin" "$_t67_binmv"
+
+# ---------------------------------------------------------------------------------------------------
+# T68 : registre archivé au relâchement et verbe registry (P79-D-17). T68.1 à T68.4 ; la rétention et les
+# mutants viennent à la tâche suivante du plan.
+# ---------------------------------------------------------------------------------------------------
+echo "=== T68, archive du registre : lecture par registry (le courant prime, orphelin non versé, dix clés) ==="
+rm -rf "$VF_DRIVER_LOCK" "$REG_FILE" "$ARC_FILE"
+out=$("$SCRIPT" registry 2>/dev/null); rc=$?
+assert "T68.1a, sans registre ni archive : present false" "$out" '"present": false'
+assert "T68.1b, sans registre ni archive : count 0" "$out" '"count": 0'
+assert "T68.1c, sans registre ni archive : agents []" "$out" '"agents": []'
+assert_exit "T68.1d, sans registre ni archive : exit 0" "$rc" 0
+"$SCRIPT" acquire --owner=M68 --step=exec-A >/dev/null
+"$SCRIPT" register --agent=ag-x --role=vf-coder --node=n-old >/dev/null
+"$SCRIPT" close --agent=ag-x --status=done >/dev/null
+"$SCRIPT" release --owner=M68 >/dev/null 2>&1
+"$SCRIPT" acquire --owner=M68b --step=exec-B >/dev/null
+"$SCRIPT" register --agent=ag-x --role=vf-coder --node=n-new >/dev/null
+out=$("$SCRIPT" registry 2>/dev/null)
+assert "T68.2a, ag-x ré-enregistré : rendu une seule fois" "$(regn "$out" ag-x)" '1'
+assert "T68.2b, ag-x : statut running (le courant prime sur l'archive)" "$(regq "$out" ag-x status)" 'running'
+assert "T68.2c, ag-x : le nœud neuf" "$(regq "$out" ag-x node)" 'n-new'
+_t68_sum1="$(cksum < "$ARC_FILE" 2>/dev/null)"
+"$SCRIPT" release --owner=M68b >/dev/null 2>&1
+_t68_sum2="$(cksum < "$ARC_FILE" 2>/dev/null)"
+assert "T68.3a, release avec un enfant running : l'archive n'est pas touchée" "$_t68_sum2" "$_t68_sum1"
+_t68_cur=$([ -f "$REG_FILE" ] && echo yes || echo no)
+assert "T68.3b, release avec un enfant running : le registre courant est gardé" "$_t68_cur" 'yes'
+out=$("$SCRIPT" registry 2>/dev/null)
+assert "T68.3c, registry rend encore cet enfant, running" "$(regq "$out" ag-x status)" 'running'
+_t68_bad=$(printf '%s' "$out" | python3 -c 'import json,sys; d=json.load(sys.stdin); k=sorted(["agent_id","parent","role","node","owner","generation","dispatched_at","epoch","depth","status"]); print(len([a for a in d["agents"] if sorted(a.keys())!=k]) + (0 if d["agents"] else 1))' 2>/dev/null)
+assert "T68.4a, chaque entrée porte exactement les dix clés" "$_t68_bad" '0'
+for _t68_k in doing mandat messages outils fil; do
+  case "$out" in *"\"$_t68_k\""*) echo "  ❌ FAIL — T68.4b, clé refusée « $_t68_k » dans la sortie"; FAIL=$((FAIL+1)) ;; *) if [ -n "$out" ]; then echo "  ✅ PASS — T68.4b, clé refusée « $_t68_k » absente"; PASS=$((PASS+1)); else echo "  ❌ FAIL — T68.4b, clé « $_t68_k » : sortie vide"; FAIL=$((FAIL+1)); fi ;; esac
+done
+"$SCRIPT" acquire --owner=M68c --step=exec-C >/dev/null
+"$SCRIPT" close --agent=ag-x --status=done >/dev/null
+"$SCRIPT" release --owner=M68c >/dev/null 2>&1
+# Ligne d'archive falsifiée : dérivée d'une ligne réelle (aide python), jamais écrite à la main.
+head -1 "$ARC_FILE" | python3 -c 'import sys,re; l=sys.stdin.readline().rstrip("\n"); l=l.replace("\"agent_id\": \"ag-x\"","\"agent_id\": \"ag-forged\""); l=re.sub(r"\"role\": \"[^\"]*\"", lambda m: "\"role\": \"ev\\\"il\\\\z\"", l); print(l)' >> "$ARC_FILE" 2>/dev/null
+out=$("$SCRIPT" registry 2>/dev/null)
+json_ok "$out"; assert_exit "T68.4c, archive falsifiée : registry reste un JSON valide" $? 0
+_t68_role="$(regq "$out" ag-forged role)"
+case "$_t68_role" in *'"'*|*'\'*|'') echo "  ❌ FAIL — T68.4d, valeur de role réduite (obtenu : '$_t68_role')"; FAIL=$((FAIL+1)) ;; *) echo "  ✅ PASS — T68.4d, valeur de role réduite"; PASS=$((PASS+1)) ;; esac
+rm -rf "$VF_DRIVER_LOCK" "$REG_FILE" "$ARC_FILE"
 
 echo ""
 echo "=================================="
