@@ -12,13 +12,13 @@
 #   M-*  mutants (copies de la sortie ou du moteur, jamais le module) : M-INHERIT, M-ATTENTE-NON-BORNEE, M-ENVLARGE, M-CWD, M-SI-ABSENT, M-SANS-I, M-SANS-L, M-SIGINT, M-CTRLC, M-RESIZE, M-NOEOF, M-GROUPES-FIGES, M-PYTHON3-CWD, M-SORTIE-SANS-KILL, M-ARRET-SANS-KILL, M-RELEVE-VIDE, M-ZOMBIE, M-ETAT-PROC, M-CHEF-REAPE
 # Les attentes cherchent des sous-chaînes (le noyau double les fins de ligne, l'écho ^C précède la sortie). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"; TA="$HERE_T/terminal-aux.mjs"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/bin" "$WORK/run" "$WORK/temoins" "$WORK/ailleurs"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 # P71-D-33 : Q tourne dans un processus enfant du serveur ; « les enfants du serveur » = les assistants, enfants de ce processus (pgrep -P ne voit qu'un étage)
 pgrep() { if [ "$1" = "-P" ] && [ $# -eq 2 ]; then local c; for c in $(command pgrep -P "$2"); do if ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs'; then command pgrep -P "$c"; else echo "$c"; fi; done; else command pgrep "$@"; fi; }
 PASS=0; FAIL=0
@@ -129,9 +129,12 @@ srv() { # srv <sortie> [moteur] -> SRV_PORT SRV_PID SRV_O SRV_OUT ; ENVX = argum
   local o="$1" eng="${2:-$ENG}" lab; lab="$(cd "$1/../.." && pwd)"; [ -n "$SRV_CWD" ] && lab="$SRV_CWD"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN-$RANDOM.out"; mkdir -p "$o/.cache" "$RUN"; rm -f "$o/.cache/server.json"
   AMORCE="$(amorce_neuve)"; (umask 077; printf '%s' "$AMORCE" > "$o/.cache/terminal-amorce"; printf '%s' "$AMORCE" > "$WORK/amorce.copy")
-  ( cd "$lab" && exec env ${ENVX[@]+"${ENVX[@]}"} VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" VFT_RUN="$RUN" node "$o/serve.mjs" --no-open --terminal --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+  local _ev=() _un=() _sv=() _x _pu=0 _n # ENVX peut porter « -u NOM » (option d'env) : l'aide ne passe que des NOM=valeur, NOM est donc retiré de l'environnement le temps du lancement
+  for _x in ${ENVX[@]+"${ENVX[@]}"}; do if [ "$_pu" = 1 ]; then _un+=("$_x"); _pu=0; elif [ "$_x" = -u ]; then _pu=1; else _ev+=("$_x"); fi; done
+  for _n in ${_un[@]+"${_un[@]}"}; do if [ -n "${!_n+x}" ]; then _sv+=("$_n=${!_n}"); fi; unset "$_n"; done
+  COCKPIT_SORTIE="$o" COCKPIT_PRET=terminal COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${_ev[@]+"${_ev[@]}"} VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" VFT_RUN="$RUN" --terminal
+  for _x in ${_sv[@]+"${_sv[@]}"}; do export "${_x%%=*}=${_x#*=}"; done
+  SRV_PID="$VF_PID"
 }
 sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
 unsrv() { vf_hyg_stop "$SRV_PID"; }

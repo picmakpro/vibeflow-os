@@ -13,7 +13,6 @@
 #   M-* mutants (copies de la sortie) : M-ANCETRES, M-XFO, M-EMPREINTE, M-THEME, M-PARITE (a à f), M-PALETTE (a à d)
 # Aucun navigateur : serveur lancé directement avec --terminal, pages lues par terminal-aux.mjs. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$SCRIPTS/../skills/cockpit-moteur"; TA="$HERE_T/terminal-aux.mjs"; VIEWER="$ENG/assets/viewer.html"
@@ -21,6 +20,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 # écouteurs du serveur ET de son processus du terminal (Q y écoute, P71-D-33) ; lignes vides écartées
 ecoutes_srv() { local c; { node "$TA" ecoutes "$1"; for c in $(command pgrep -P "$1"); do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && node "$TA" ecoutes "$c"; done; } | sed '/^$/d'; }
 PASS=0; FAIL=0
@@ -124,11 +124,9 @@ srv() { # srv <sortie> <0|1 terminal> [moteur] -> SRV_PORT SRV_PID SRV_O SRV_OUT
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN-$RANDOM.out"; rm -f "$o/.cache/server.json" "$o/.cache/terminal-amorce"
   local flag=(); mkdir -p "$o/.cache"
   if [ "$term" = 1 ]; then flag=(--terminal); (umask 077; amorce_neuve > "$o/.cache/terminal-amorce"); fi
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open ${flag[@]+"${flag[@]}"} --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  if [ "$term" = 1 ]; then for _ in $(seq 1 50); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done; fi
-  SRV_PORT="$(sj j.port)"; SRV_PORT="${SRV_PORT:-0}"; SRV_TOK="$(sj j.token)"
+  COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" ${flag[@]+"${flag[@]}"}
+  if [ "$term" = 1 ]; then attendre 5 grep -qs '"terminal"' "$o/.cache/server.json"; fi # la clé terminal manque quand le moteur refuse l'assistant : attente bornée, sans échec
+  SRV_PID="$VF_PID"; SRV_PORT="${VF_PORT:-0}"; SRV_TOK="$VF_JETON"
 }
 sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
