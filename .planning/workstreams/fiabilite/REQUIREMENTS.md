@@ -1041,6 +1041,23 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GITC-13 | Phase 78 | Complete — 2026-11-06 (Phase 78, PR #216, publiée en `v2.76.0` ; revue, audit en lecture, critique design et recette par juges navigateur) |
 | GITC-14 | Phase 78 | Complete — 2026-11-06 (Phase 78, PR #216, publiée en `v2.76.0` ; revue, audit en lecture, critique design et recette par juges navigateur) |
 | — | Phase 73 | repère de cadrage, Phase 73 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| REGI-01 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-02 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-03 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-04 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-05 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-06 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-07 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-08 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-09 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-10 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-11 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-12 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-13 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-14 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-15 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-16 | Phase 73 | Pending — 2026-11-11 (cadrage) |
+| REGI-17 | Phase 73 | Pending — 2026-11-11 (cadrage, P73-D-37) |
 | — | Phase 74 | repère de cadrage, Phase 74 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 75 | repère de cadrage, Phase 75 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 76 | repère de cadrage, Phase 76 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
@@ -1711,6 +1728,27 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 <!-- Cadrage parallèle des Phases 73 à 77, 79 et 80 (2026-11-11) : chaque phase insère son bloc d'exigences juste après son repère, sans toucher à aucun repère. Repères retirés à la jointure. -->
 
 <!-- vf-cadrage:phase-73 -->
+
+### Gouvernance au cockpit — la régie (Phase 73 — posées au cadrage, 2026-11-11)
+> Dérivent de P73-D-01..36 (`73-CONTEXT.md` ; décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sur la direction « régie » retenue par Samuel le 2026-11-11, registre § 5.1). Famille neuve `REGI` (vérifiée libre le 2026-11-11 dans tous les ledgers `.planning/workstreams/*/REQUIREMENTS.md`, le dépôt et les branches des Phases 7x/8x, d'intégration et `main`). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code.
+
+- [ ] **REGI-01**: Régie : l'onglet Équipe montre quatre sections dans l'ordre « À vous », « Au travail », « Terminé, à relire », « Au repos » ; un agent qui attend figure dans « À vous » et à sa place dans l'arbre ; compteurs de section = lignes, sous-titre = agents distincts en vie ; état vide dit, jamais une section masquée (P73-D-01).
+- [ ] **REGI-02**: Rendu côté page depuis `who@2` et le flux `lock`, par une fonction indépendante de la source ; un adaptateur unique lit `window.VF_ETAT` s'il existe, sinon l'événement `vf-who` ; témoin : la même entrée rend le même DOM par les deux sources (P73-D-02).
+- [ ] **REGI-03**: Retrait du canevas d'Équipe : plus aucune carte, plus de rechargement de page quand l'ensemble des agents change ; l'enveloppe garde `vibeflow/cockpit-equipe@1` avec `nodes` vide et sa `meta` (en-tête et parité R4.1 inchangés) ; aucun fichier du moteur vendorisé modifié (P73-D-03, P73-D-24).
+- [ ] **REGI-04**: « À vous » : sessions à l'état officiel « vous attend » et phases dont un `*-VERIFICATION.md` porte `status: human_needed` (en-tête seul, ligne de niveau phase reliée à sa carte dans Projet) ; ainsi que les questions en attente des cadrages (REGI-17) ; rien d'autre n'y entre (P73-D-06, P73-D-37).
+- [ ] **REGI-05**: Classement par impact : aval = nœuds non terminés en aval du nœud rattaché dans un plan de mission publié (résumé à côté du verrou, champ `dag`, Phase 79) ou déjà découvert, jamais deviné ; trois rangs (connu > 0, inconnu, connu = 0), la plus ancienne attente d'abord ; libellés « retient N nœuds », « retient toute la mission · N nœuds », « impact inconnu » (P73-D-07).
+- [ ] **REGI-06**: Tenant du verrou par mission sur la ligne de mission, verrou de dépôt en en-tête ; la page n'utilise qu'une liste blanche de champs du flux `lock` ; témoin : chemin absolu et identifiant de session sentinelles absents du DOM, du stockage et de l'export (P73-D-08).
+- [ ] **REGI-07**: Alerte du watchdog : « verrou abandonné » depuis `stale`, « sans progrès depuis N min » au-delà de la fenêtre de stall lue à une seule source (environnement, sinon ligne par défaut du script) ; extraction impossible = rien marqué ; témoin de mutation de la ligne source (P73-D-09).
+- [ ] **REGI-08**: Arbres de travail : bloc replié en pied de régie, joint par chemin depuis `GET /api/vf/git` et `GET /api/vf/git/worktrees`, relu sur l'événement `git` ; aucun appel git neuf ; pastilles neutres (P73-D-10).
+- [ ] **REGI-09**: Vivacité : « au travail » → « silencieux » (> 120 s) → « suspect » (> fenêtre de stall) ; commande en cours « au travail » jusqu'à 15 min ; orphelin sous la ligne grisée de son parent, mot neutre, sans action ; `sortisSilence` dit en pied de section quand non nul ; glyphes du lot 0 inchangés, aucune couleur d'alerte (P73-D-11, P73-D-13, P73-D-19).
+- [ ] **REGI-10**: « Attend ses agents (N) » : champ facultatif `attendAgents` de `who@2`, lu sur la dernière ligne `turn_duration` (absent = 0), sessions seules, ni `actif` ni écrasé par une écriture plus récente (P73-D-12).
+- [ ] **REGI-11**: « Terminé, à relire » : « lu » = transcript ouvert dans ce navigateur, `localStorage` par lab (identifiants et heure), purge à 24 h, jamais exporté ; « Tout marquer comme relu » ; « échec » ou « arrêté » écrit sur la ligne selon `finMotif` ; le tiroir « Au travail » n'est plus ouvert sur Équipe et son pli des terminés devient « N à relire dans Équipe » (P73-D-14, P73-D-15).
+- [ ] **REGI-12**: Titre « (N) vous attendent » et pastille de favicon neutre, par un compositeur unique du titre ; témoin : le préfixe survit à un événement `git` et à la traduction ; seul motif « vous attend » ; jamais de focus volé (P73-D-15).
+- [ ] **REGI-13**: « Ailleurs sur ce poste » : nombre et nom du lab des sessions « vous attend » hors des arbres du lab, depuis la liste officielle ; `cwd` ne sort jamais du module ; « un autre dossier » pour le dossier personnel ou un chemin court ; le nom d'un autre lab ne vit que dans la page servie, par sa propre route `GET /api/vf/ailleurs` (jamais dans l'export, un fichier du lab, `who@2`, l'état ni le flux de `vf-signal`) ; témoin de non-fuite à sentinelles précédé de son témoin positif, mutants qui laissent passer `cwd` ou versent la liste dans `who@2` (P73-D-16, P73-D-28).
+- [ ] **REGI-14**: Un seul style de bouton pour les actions de la régie, seule action « Lire le rapport » ; nom d'un agent écrit une fois par ligne ; section Santé ni calculée ni injectée sur Équipe (P73-D-17, P73-D-18).
+- [ ] **REGI-15**: Accroches de la Phase 74 : `section#vf-equipe`, registre `window.__vfEquipeVues`, bascule dessinée dès deux vues, événements `vf-agent:ouvrir` (annulable, repli sur le lecteur actuel) et `vf-agent:lu`, attributs `data-vf-agent` / `data-vf-noeud` / `data-vf-etat` ; ancres `#r=n:se-<id>` / `n:ag-<id>` traitées par la régie (P73-D-20).
+- [ ] **REGI-16**: Non-régression : témoins du canevas re-pointés (LE.* → LR.* pour la ligne « Lancée depuis la carte », champ `lancee`), nettoyage de la branche à l'émission, export d'Équipe sans contenu de régie, recherche par lignes ; une suite neuve au plus et compteur des README recompté ; toutes les suites du cockpit vertes sous macOS et Linux (P73-D-04, P73-D-05, P73-D-21, P73-D-22, P73-D-25).
+- [ ] **REGI-17**: Questions en attente des cadrages, troisième source de « À vous » : les entrées `etat` = `en-attente` de `meta.vf.questions` (contrat C76-Q2 de la Phase 76), chacune reliée à sa phase et à ce qu'elle bloque, classées par la règle de P73-D-07 ; les entrées `appliquee` (options appliquées sous délégation, contestables) en liste repliée à part, « Décisions prises pour vous, contestables (N) », jamais comptées dans le titre ni la pastille ; le bilan des autres états dit en une ligne (« N questions écrites dans un autre format, non lues ») ; jamais une entrée `mal-formee` ou `a-verifier` montrée comme une question qui attend ; champ absent (lecture de la 76 pas encore livrée) → l'emplacement le dit ; prouvé sur une fixture à la forme du contrat (P73-D-37, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).
 
 <!-- vf-cadrage:phase-74 -->
 
