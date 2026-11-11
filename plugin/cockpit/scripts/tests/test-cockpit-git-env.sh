@@ -381,7 +381,11 @@ node "$AUX/sh.mjs" "$MD" "$P" "$P" log -p -1 >/dev/null 2>&1
 assert_eq "M-LECTURE — rougit E2.4 : le textconv est lancé par shBorne" "$(marque TEXTCONV)" "posé"; raz
 node "$AUX/lg.mjs" "$MD" "$P" '{}' log -p -1 >/dev/null 2>&1
 assert_eq "M-LECTURE — rougit aussi E5.2 : le textconv est lancé par lancerGit" "$(marque TEXTCONV)" "posé"; raz
-assert_has "M-LECTURE — rougit aussi E2.4b : la sortie gpg de log.showSignature s'ajoute au hash" "$(sig_mut "$MD")" "SORTIE-GPG-FACTICE"
+# AUDC-A-04 : le programme de signature est aussi neutralisé par l'environnement (gpg.program, gpg.openpgp.program) : options de lecture retirées SEULES, la sortie gpg ne s'ajoute plus (deux protections)
+assert_eq "M-LECTURE — E2.4b : options de lecture retirées, mais gpg neutralisé par l'environnement : le hash reste seul (mis à jour en place, AUDC-A-04)" "$(sig_mut "$MD" | LC_ALL=C grep -c 'SORTIE-GPG-FACTICE')" "0"
+# la sonde E2.4b garde SON mutant : options de lecture retirées ET programmes de signature de l'environnement retirés -> la sortie gpg s'ajoute au hash
+assert_eq "M-LECTURE.2 — mutant double : ancres" "$(mutant lecture2 'ins = OPTIONS_LECTURE[sous] || [];' 'ins = [];')|$(FROM="['gpg.program', INERTE]," TO="" node "$AUX/mutsub.mjs" "$WORK/mut-lecture2/vf-cockpit-git-durci.mjs")|$(FROM="['gpg.openpgp.program', INERTE]," TO="" node "$AUX/mutsub.mjs" "$WORK/mut-lecture2/vf-cockpit-git-durci.mjs")" "muté|muté|muté"
+assert_has "M-LECTURE.2 — rougit E2.4b : la sortie gpg de log.showSignature s'ajoute au hash" "$(sig_mut "$WORK/mut-lecture2")" "SORTIE-GPG-FACTICE"
 
 # M-TRONQUE : ENOBUFS ignoré -> E4.2 ne voit plus la troncature
 assert_eq "M-TRONQUE.0 — l'ancre du mutant existe" "$(mutant tronque "tronque: e.code === 'ENOBUFS'" "tronque: false && e.code === 'ENOBUFS'")" "muté"

@@ -9,6 +9,7 @@ import path from 'node:path';
 import { execFileSync, execFile } from 'node:child_process';
 import { envEnfant } from './vf-cockpit-env.mjs';
 import { gitSortant } from './vf-cockpit-git-sortant.mjs';
+import { DURCISSEMENT_CONFIG, DURCISSEMENT_ENV } from './vf-cockpit-git-durci.mjs';
 
 const isDir = (p) => { try { return fs.statSync(p).isDirectory(); } catch { return false; } };
 const isFile = (p) => { try { return fs.statSync(p).isFile(); } catch { return false; } };
@@ -130,11 +131,12 @@ export const GIT_SUR = ['--no-optional-locks', '-c', 'core.fsmonitor=false'];
 // Un enfant git ne reçoit AUCUNE variable GIT_* héritée (GIT_DIR l'emporte sur `-C` : un dépôt leurre détourne la lecture) ; fsmonitor et verrous optionnels sont réglés par
 // l'environnement (GIT_CONFIG_COUNT), ce qui couvre aussi un enfant qui ne reçoit pas nos arguments (le moteur d'assemblage). GIT_SUR reste en arguments (défense en profondeur).
 export const GIT_HERITE = /^GIT_/i;
+// AUDC-A-04 : la classe « une option de configuration du dépôt désigne un programme ou ouvre le réseau pendant une lecture » est fermée par vf-cockpit-git-durci.mjs (portée « commande » + environnement).
 export function envGit(lab, { env = process.env, config = [] } = {}) {
   const e = {};
   for (const [k, v] of Object.entries(envEnfant(lab, env))) if (!GIT_HERITE.test(k)) e[k] = v;
-  const paires = [['core.fsmonitor', 'false'], ...config];
-  e.GIT_OPTIONAL_LOCKS = '0'; e.GIT_CONFIG_COUNT = String(paires.length);
+  const paires = [...DURCISSEMENT_CONFIG, ...config];
+  Object.assign(e, DURCISSEMENT_ENV); e.GIT_CONFIG_COUNT = String(paires.length);
   paires.forEach(([k, v], i) => { e[`GIT_CONFIG_KEY_${i}`] = k; e[`GIT_CONFIG_VALUE_${i}`] = v; });
   e.VF_COCKPIT_GIT_DURCI = '1'; // lu par la garde du moteur (plan 78-07)
   return e;
