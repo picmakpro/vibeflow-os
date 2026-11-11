@@ -203,6 +203,13 @@ La Phase 76 se branche sur le panneau de l'onglet Projet par une route à elle (
   lit pas `VF_SURCOUCHES.ouverte()` pour décider : au moment où elle reçoit l'appui, la pile a déjà fermé la
   surcouche. Témoin au plan 80-02 : surcouche ouverte + Échap → `defaultPrevented` vrai et un écouteur de vue posé sur
   `document` n'est pas appelé ; aucune surcouche + Échap → l'écouteur de vue est appelé avec `defaultPrevented` faux.
+  Règle côté consommateur (précision du 2026-11-11, même canal) : `stopPropagation()` n'arrête pas les autres écouteurs
+  en capture sur `window` ; une vue écoute donc Échap **en phase de remontée, sur `document` ou sur sa racine, jamais en
+  capture sur `window`**. La pile pose son écouteur une seule fois, de façon synchrone, à l'évaluation de son fichier
+  (`ui/00-vf-surcouches.js`, premier des extensions dans l'ordre de chargement, avant toute autre extension et toute
+  vue ; même ordre dans la coquille de la 79). Le témoin de 80-02 nomme le cas interdit : un écouteur de vue posé en
+  capture sur `window` avant la pile reçoit l'appui avec `defaultPrevented` faux — constat documenté, pas un défaut de
+  la pile.
   Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
 - **Tiroir Git, ouverture sur un commit (Phase 74)** : une seule entrée publique,
   `window.VFGitTiroir.ouvrirSur(sha)`, livrée par le plan 80-06 (vague 2). Elle valide le SHA par le motif strict
