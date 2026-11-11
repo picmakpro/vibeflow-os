@@ -15,7 +15,7 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout, GIT_SUR, shBorne } from './vf-cockpit-paths.mjs';
 import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
 import { FENETRE, collecteAgents, indexDesNoeuds, rattacher } from './vf-cockpit-equipe.mjs';
-import { lireDags } from './vf-cockpit-planning.mjs';
+import { lireDags, lireConfine } from './vf-cockpit-planning.mjs';
 import { arbresGit } from './vf-cockpit-arbres.mjs';
 import { reduireTranscript } from './vf-cockpit-transcript.mjs';
 
@@ -122,7 +122,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
 
   // rattachement des sous-agents aux nœuds de mission (P69-D-15) : une seule découverte de DAG (lireDags), partagée avec le source 4
   let dags = [];
-  try { dags = lireDags(root, planningLayout(root)); } catch {}
+  try { dags = lireConfine(root, () => lireDags(root, planningLayout(root))); } catch {} // AUDC-A-02 : un DAG lié hors du lab n'est pas lu
   const trDe = new Map(workers.filter((w) => w.kind === 'subagent' && w._tr).map((w) => [w.id, w._tr]));
   rattacher(workers, { index: indexDesNoeuds(dags), registre, mandatDe: (id) => { const c = trDe.has(id) ? premiereLigne(trDe.get(id))?.message?.content : ''; return typeof c === 'string' ? c : ''; } });
 
