@@ -96,5 +96,20 @@ assert_eq "D1.3 — un identifiant bien formé mais jamais rendu par ce serveur 
 assert_eq "D1.4 — le refus ne lance pas l'agent" "$(H ncalls "$WORK/fkd")" "$AVANT"
 assert_eq "D1.5 — l'identifiant refusé n'atteint aucun argv" "$(H argvs "$WORK/fkd" | grep -cF -- "$INCONNU")" "0"
 
+echo "=== D2 — deux exécutions au plus, un délai global, 429 au-delà (AUDC-B-02) ==="
+rm -f "$WORK"/fkd/call-*.json; echo 3000 > "$WORK/fkd/sleep-ms"
+JOBS=(); for i in 1 2 3; do ask "$TOK" "" "$WORK/d2-$i.txt" & JOBS+=($!); done; wait "${JOBS[@]}" # jamais un « wait » nu : il attendrait aussi le serveur
+ST="$(for i in 1 2 3; do H statut "$WORK/d2-$i.txt"; done | sort | tr '\n' ',')"
+assert_eq "D2.1 — trois demandes simultanées : deux flux (200), une réponse 429" "$ST" "200,200,429,"
+assert_eq "D2.2 — seuls deux agents ont été lancés" "$(H ncalls "$WORK/fkd")" "2"
+echo 0 > "$WORK/fkd/sleep-ms"; ask "$TOK" "" "$WORK/d2-4.txt"
+assert_eq "D2.3 — témoin : une fois les deux terminées, une nouvelle demande passe" "$(H statut "$WORK/d2-4.txt")|$(H evs "$WORK/d2-4.txt" 'E.some(e=>e.ev==="answer")')" "200|true"
+demarrer VF_COCKPIT_ASK_DELAI_MS=1500; echo 8000 > "$WORK/fkd/sleep-ms"
+T0=$(date +%s); ask "$TOK" "" "$WORK/d2-5.txt"; T1=$(date +%s)
+assert_eq "D2.4 — délai global : l'agent trop lent est arrêté, la demande échoue (failure, aucun answer) avant la fin de son attente" "$(H evs "$WORK/d2-5.txt" 'E.some(e=>e.ev==="failure")+","+E.some(e=>e.ev==="answer")')|$([ $((T1-T0)) -lt 6 ] && echo court || echo long)" "true,false|court"
+sleep 1; PIDF="$(H json "$(ls "$WORK"/fkd/call-*.json | head -1)" 'j.pid')"
+assert_eq "D2.5 — l'agent arrêté n'est plus en vie" "$(kill -0 "$PIDF" 2>/dev/null && echo vivant || echo mort)" "mort"
+echo 0 > "$WORK/fkd/sleep-ms"
+
 echo; echo "=== bilan : $PASS passés, $FAIL échoués ==="
 [ "$FAIL" -eq 0 ]

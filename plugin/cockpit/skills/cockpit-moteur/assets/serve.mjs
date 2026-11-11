@@ -321,6 +321,8 @@ function codexRun(body, mode) {
   };
 }
 const CLOSED = Symbol('closed'); // the browser went away mid-request
+const MAX_ASK = 2; // vibeflow AUDC-B-02 : deux exécutions de l'agent au plus en même temps (429 au-delà), chacune bornée par un délai global
+const ASK_DELAI = (() => { const n = Number(process.env.VF_COCKPIT_ASK_DELAI_MS); return Number.isInteger(n) && n >= 1000 && n <= 3600000 ? n : 600000; })();
 /** Runs the agent once for a request and resolves with its answer, streaming progress through `send`. */
 function runAgent(res, send, body) {
   return new Promise((resolve, reject) => {
@@ -329,6 +331,7 @@ function runAgent(res, send, body) {
     const child = spawn(cli.cmd, run.args, { cwd: root, env: cliEnv(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     const id = crypto.randomBytes(6).toString('hex');
     running.set(id, child);
+    const limit = setTimeout(() => { if (!done) { done = true; clearTimeout(quiet); child.kill(); reject(new Error(`Délai dépassé : la question est arrêtée après ${Math.round(ASK_DELAI / 1000)} s.`)); } }, ASK_DELAI); // vibeflow AUDC-B-02
     send('start', { id });
     child.stdin.end(run.input);
     let buf = '', stderr = '', done = false;
@@ -338,8 +341,8 @@ function runAgent(res, send, body) {
     const hush = () => { clearTimeout(quiet); if (body.mode === 'change' && !done) quiet = setTimeout(() => say('Working on the updated plan'), 12000); };
     const out = {
       progress: (text) => { if (!done) { say(text); hush(); } },
-      answer: (data) => { if (!done) { done = true; clearTimeout(quiet); resolve(data); } },
-      fail: (message) => { if (!done) { done = true; clearTimeout(quiet); reject(new Error(message)); } },
+      answer: (data) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); resolve(data); } },
+      fail: (message) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); reject(new Error(message)); } },
     };
     hush();
     child.stdout.on('data', (d) => {
@@ -355,19 +358,20 @@ function runAgent(res, send, body) {
     child.stderr.on('data', (d) => { stderr = (stderr + d).slice(-2000); });
     child.on('error', (e) => out.fail(e.message));
     child.on('close', (code) => {
-      running.delete(id);
+      running.delete(id); clearTimeout(limit);
       out.fail(run.lastError?.() || stderr.trim() || `${engine} exited with code ${code}`);
     });
     // the browser went away (closed tab, Stop): don't leave the CLI working. Note req 'close' fires as soon as
     // the body is read, so watch the response instead.
-    res.on('close', () => { if (!done) { done = true; clearTimeout(quiet); child.kill(); reject(CLOSED); } });
+    res.on('close', () => { clearTimeout(limit); if (!done) { done = true; clearTimeout(quiet); child.kill(); reject(CLOSED); } });
   });
 }
 function ask(req, res, body) {
-  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
-  const send = (event, data) => { if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
+  let ouvert = false; // vibeflow AUDC-B-02 : le flux s'ouvre à la première émission, pour qu'un refus puisse encore être un 429
+  const send = (event, data) => { if (!ouvert) { ouvert = true; res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' }); } if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
   if (VF && VF.avantQuestion({ req, body, send }) === 'repondu') return res.end(); // vibeflow P14 : réponse locale ou refus de modèle
   if (!cli) { send('failure', { code: 'cli_missing', message: `${ENGINES[want].name} not found.` }); return res.end(); }
+  if (running.size >= MAX_ASK) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '5' }); return res.end(JSON.stringify({ error: 'Deux questions sont déjà en cours : attendez la fin de l’une d’elles.' })); } // vibeflow AUDC-B-02
   if (body.mode === 'change') return changePlan(res, send, body);
   if (engine === 'claude' && typeof body.session === 'string' && body.session && !issued.has(body.session)) { send('failure', { code: 'session_inconnue', message: 'Cette conversation n’a pas été ouverte par ce serveur : rechargez la page pour en commencer une nouvelle.' }); return res.end(); } // vibeflow AUDC-A-01
   runAgent(res, send, body)
