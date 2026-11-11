@@ -11,7 +11,7 @@ created: 2026-11-11
 
 > Contrat de design pour le planificateur. Spec seulement : aucun code, aucune valeur nouvelle hors jetons. Les couloirs et la
 > liste de l'onglet Projet sont dans `80-UI-SPEC.md` ; ce fichier n'en dessine rien. Hors de ce fichier aussi : la section
-> « À Samuel » du CONTEXT (S80-1 à S80-4 : titre de vue, en-tête, Santé, pastille du terminal).
+> « À Samuel » du CONTEXT (S80-1 à S80-4 : titre de vue, en-tête, Santé, pastille du terminal), désormais tranchés : titre P80-D-52 (zone réservée ≤ 130 px, flou et texte court gardés), en-tête P80-D-53 (trois groupes libellés au-delà de 1 280 px, chevron, trois icônes remplacées, badge et troncature inchangés), terminal P80-D-55 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11), ouvreur Git P80-D-56.
 > Décisions tenues : P80-D-10 à D-22, D-25, D-26. Direction « Graphite » (`DESIGN.md` racine) fait foi.
 > Les contrastes marqués « calc. » sont calculés à la main (luminance relative WCAG) : le plan les remesure sur rendu, dans les deux thèmes.
 
@@ -96,7 +96,7 @@ par la pile : jamais le `inert` du terminal).
 
 **Ordre d'Échap (un cran par appui, du plus récent au plus ancien), avec la cible qui l'autorise.** 1 modale du dessus de pile (toute cible : elle contient le focus) ; 2 menu ou bulle ouvert (toute cible) ;
 3 parcours `#flowbar` (toute cible) ; 4 volet bas du tiroir Git (focus dans le volet ou sur sa rangée) ; 5 tiroir non modal du dessus de pile (focus dans le tiroir, sur son ouvreur, ou sur `body` ou le canevas) ;
-6 feuille de détail au téléphone (toute cible, comme aujourd'hui) ; 7 désélectionner, puis 8 remonter d'un niveau : **réservés aux cibles `body`, `documentElement`, canevas et éléments de la vue DOM de Projet (cartes de couloir, rangées de liste, intérieur de phase : cette vue compte comme canevas, `80-UI-SPEC.md` § 5)** (garde PU-G-175 du moteur, inchangée : un Échap venu d'un bouton du
+6 feuille de détail (≤ 999 px ou pointeur grossier ; toute cible, comme aujourd'hui) ; 7 désélectionner, puis 8 remonter d'un niveau : **réservés aux cibles `body`, `documentElement`, canevas et éléments de la vue DOM de Projet (cartes de couloir, rangées de liste, intérieur de phase : cette vue compte comme canevas, `80-UI-SPEC.md` § 5)** (garde PU-G-175 du moteur, inchangée : un Échap venu d'un bouton du
 panneau ou d'un menu ne perd pas ce qu'il vient d'afficher). Un champ de saisie (barre de question, `<select>`, `<textarea>`, champ éditable) hors palette : Échap ne descend pas la chaîne et ne vide pas le champ ; seule la surcouche
 qui le contient (crans 1 à 5) le consomme. Au bureau, le panneau de détail ne se ferme pas par Échap (`p` et son bouton, comme aujourd'hui) ; il n'est pas une surcouche. Écouté au document, en capture ; `stopPropagation` quand la pile a consommé l'appui.
 
@@ -171,7 +171,7 @@ aria-labelledby=<titre>`.
 Registre unique des raccourcis : une entrée = `{ groupe, onglets, touche, libellé, action, palette }` (`palette: false` pour une rangée d'aide seule : Plonger, Sélectionner, Tab, Échap) ; l'aide, la palette (colonne raccourci) et le test de
 cohérence lisent ce registre. Un raccourci absent du registre n'existe pas pour l'utilisateur. Libellé neuf = entrée du dictionnaire 80.
 Noms de touches : Échap, Entrée, Retour arrière, Origine, Fin, Maj, Ctrl, ⌘ ; flèches par glyphe avec `aria-label` (« flèche gauche »).
-Ligne sur le terminal : S80-4 (hors spec, ne rien poser sans l'avis de Samuel).
+**Ligne sur le terminal (P80-D-55, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 : « Une ligne dans l'aide (Recommandé) »).** L'aide `?` et la palette portent, **seulement quand le cockpit tourne sans `--terminal`**, la ligne de texte seul « Le terminal s'active avec --terminal » : aucune pastille, aucun port, aucune route, aucune action ; rangée `palette: false` dans l'aide, résultat d'information non exécutable dans la palette (« Terminal ») ; avec `--terminal`, la ligne est absente.
 
 ---
 
@@ -182,7 +182,7 @@ Ligne sur le terminal : S80-4 (hors spec, ne rien poser sans l'avis de Samuel).
 Le bloc « bord de carte » (`#vf-coin`) vit dans `#stage`, donc il monte avec la réserve du tiroir du terminal (`body.vf-term-ouvert #stage { bottom }`) : il ne
 le recouvre jamais (P71-D-35, sans rien déduire d'autre). Position, `position: absolute` : `right: calc(var(--pw) + var(--edge))` (bord droit de la zone
 libre, à gauche du panneau ouvert ; 16 du bord quand `body.no-panel`) ; `bottom: calc(<hauteur de #ask> + var(--edge) + var(--sp-8))` quand la barre de question existe
-(mesurée, relue à chaque changement de hauteur, comme `--vf-ask-h` au téléphone), sinon `var(--edge)` (Équipe, export). Même transition de `right`
+(mesurée, relue à chaque changement de hauteur, comme `--vf-ask-h` en feuille de détail), sinon `var(--edge)` (Équipe, export). Même transition de `right`
 que `#ask` (nulle en mouvement réduit). `z-index: 3` (sous `#ask` 4, panneau 5, tiroirs 7 et 8, palette 40). Il se pose par-dessus le canevas sans le pousser ni
 changer `freeArea()`.
 
@@ -229,7 +229,7 @@ entièrement hors champ de ce côté (une carte coupée ne compte pas).
 - **Forme** : pilule `.glass`, hauteur 28 (32 au tactile), padding 0 12, chevron 16 tourné vers le bord + texte 12 / 500 `--text-2` ; « 16 cartes par là » / « 1 carte par là ». Zone d'appui 44 × 44 minimum
   (pseudo-élément qui déborde de 8 de chaque côté ; jamais de recouvrement entre deux zones d'appui).
 - **Place** : au milieu du bord correspondant du champ de lecture (§ 4.6) rentré de 8 ; le repère gauche se pose donc au bord droit du tiroir Git quand il est ouvert, jamais dessous. Le compte inclut les cartes cachées sous une surcouche. Haut : sous le titre ; bas : au bord haut de la zone basse (jamais sur la barre de question) ; droite : avant le panneau.
-  Le repère droit remonte pour rester à 8 de `#vf-coin` ; le repère gauche pour rester à 8 de `#zoom` quand celui-ci est en pile verticale (téléphone).
+  Le repère droit remonte pour rester à 8 de `#vf-coin` ; le repère gauche pour rester à 8 de `#zoom` quand celui-ci est en pile verticale (largeur ≤ 700 px).
 - **Geste** : clic ou Entrée = amener la carte hors champ la plus proche de ce bord dans le champ (`bringIntoView`), sans changer la sélection ni le zoom.
 - **Clavier** : ce sont des `button` dans l'ordre de Tab, juste après l'arrêt du canevas ; `aria-label` « 16 cartes hors champ à gauche. Aller à la plus proche. ».
   Annonce quand le nombre change : aucune (éviter le bavardage).
@@ -248,7 +248,7 @@ entièrement hors champ de ce côté (une carte coupée ne compte pas).
 | 1 000 à 1 279, tactile | selon l'état | ligne d'état seule (pas de minicarte au doigt) | selon l'existant | idem | idem |
 | ≤ 999 | feuille de détail | aucun bloc ; repères seuls | colonne verticale à gauche au-dessus de la barre (existant) | existant | existant |
 
-**Téléphone** (≤ 999 ou tactile) : zone basse dégagée, de bas en haut : barre de question, zoom, rien d'autre ; pastille « Terminal » au bord gauche bas (existant).
+**Feuille de détail** (≤ 999 px ou pointeur grossier, `80-UI-SPEC.md` § 0 point 6 ; zone basse testée à 390 et 800 px) : zone basse dégagée, de bas en haut : barre de question, zoom, rien d'autre ; pastille « Terminal » au bord gauche bas (existant).
 Aucun élément ne recouvre la carte sélectionnée : les repères gardent 8 d'écart avec zoom et pastille et se masquent si la feuille de détail est ouverte
 (`body:not(.no-panel)`). Cibles ≥ 44 × 44 (repères, boutons de zoom portés de 34 à 44 de zone d'appui sans changer leur taille visible de 34 si la pile l'exige).
 
@@ -310,10 +310,10 @@ Jeton visé, valeur actuelle (lue dans le code), valeur proposée, contraste vis
 | X5 b | carte `st-active` et `st-recette` en clair | fond `color-mix(--raise 70%, --surface)` (gris lu « désactivé ») | fond `var(--surface)` ; l'état se dit par glyphe, mot et titre 600 `--text` ; sombre : inchangé (`--raise` allégé) | inchangé | titre `--text` sur `--surface` ≥ 15:1 ; aucun contour ni fond teinté ajouté (Q9) |
 | X5 c | cartes estompées (`svg.dim`) | `opacity: .55` sur les enfants de la carte ; WebKit `.28` sur le `foreignObject` | `.72` sur les enfants de la carte SAUF la pastille d'état (`.vst`, `.rw`), laissée à `opacity: 1` pour que le glyphe garde 3:1 (3,5:1 pour « En cours ») ; WebKit : même règle sur les enfants, plus sur le `foreignObject` ; les textes `--text-3` et `--text-4` y sont ramenés à `--text-2` | texte ≥ 4,5:1 (calc. 5,9) | texte ≥ 4,5:1 (calc. 4,7 pour `--text-2`) |
 | F1 | `<details>` et `<select>` | triangle natif ; `<select>` natifs (`#vf-modele`, `#proposition-mode` de la page du terminal) | composants à la charte ci-dessous | non-texte ≥ 3:1 | idem |
-| F3 | taille du bouton de thème (l'ouvreur Git en est exclu : S80-5) | 44 par défaut (`05-theme.js`), 36 de 1 000 à 1 279 souris seulement | un jeton `--hdr-btn` : 36 à partir de 1 000 px sans tactile, 44 en dessous et au tactile ; tout bouton d'en-tête le lit (`.btn`, `.btn.icon`, `#theme-toggle`, `#flows-btn`, `#filters-btn`, `#btn-panel`, `#hdr-ext > button`) | cible ≥ 36, ≥ 44 tactile | idem |
+| F3 | taille du bouton de thème (l'ouvreur Git : dessiné à 36 px, P80-D-56) | 44 par défaut (`05-theme.js`), 36 de 1 000 à 1 279 souris seulement | un jeton `--hdr-btn` : 36 à partir de 1 000 px sans tactile, 44 en dessous et au tactile ; tout bouton d'en-tête le lit (`.btn`, `.btn.icon`, `#theme-toggle`, `#flows-btn`, `#filters-btn`, `#btn-panel`, `#hdr-ext > button`) | cible ≥ 36, ≥ 44 tactile | idem |
 | F4 | chiffres dans des phrases | `font-family: var(--mono)` sur `#vf-lock`, `.aw-driver .n`, `.r-t`, `.r-meta b`, `.r-verr .n` | `font-family: inherit` (Inter) + `font-variant-numeric: tabular-nums`, graisse 500 ; le mono reste pour sha, chemins, branche et touches | sans objet (couleur héritée) | idem |
 | F5 | pastilles du menu « ⋯ » (`#vf-plus .badge`, `.vf-pl-i .badge`) | `background: var(--on)` : noir en clair, quasi blanc en sombre | par source, comme au bureau : Santé `--hc-badge` (sévérité) avec `--on-sev-text` ; Récent `--recent` avec `--on-recent-text` ; le point de 8 sur « ⋯ » prend la teinte de la pastille la plus haute, sinon `--on` | `--on-recent-text` sur `--recent` ≥ 9:1 ; encre sur sévérité ≥ 7:1 (calc.) | `--on-recent-text` `#161616` sur `#009e5a` 5,2:1 ; `--on-sev-text` sur `#b88100` 5,3:1 |
-| X8 | hauteur des onglets au téléphone | `padding: var(--sp-4) var(--sp-8); 13px` ≈ 26 | onglet visuel 36 de haut, zone d'appui 44 (pseudo-élément) ; piste `--raise` de 44 ; en-tête sur une rangée (P70-D-01) | cible ≥ 44 | idem |
+| X8 | hauteur des onglets (largeur ≤ 700 px) | `padding: var(--sp-4) var(--sp-8); 13px` ≈ 26 | onglet visuel 36 de haut, zone d'appui 44 (pseudo-élément) ; piste `--raise` de 44 ; en-tête sur une rangée (P70-D-01) | cible ≥ 44 | idem |
 
 **Disclosure `<details>` (F1).** Marqueur natif retiré (`list-style: none`, `::-webkit-details-marker`). Chevron 16 (icône §7) en `currentColor`, `--text-3` ; fermé : vers la droite ; ouvert : tourné de 90°
 (transition 150 ms, nulle en mouvement réduit). Zone du `summary` ≥ 32 de haut (44 tactile), 13 / 500, anneau § 0 en décalage -2. Étendu aux « Détails techniques », au menu du lancement, aux sections du tiroir Git, à « Historique »
@@ -323,8 +323,7 @@ des couloirs. Jamais un triangle natif.
 `color-scheme` posé par thème pour que la liste native suive le sombre et le clair ; focus : anneau § 0 ; désactivé : `--text-4`, pas d'opacité. La liste déroulante garde l'apparence du système (accepté). La
 page du terminal est une autre origine : elle reprend les mêmes valeurs dans sa feuille (seule exception à « zéro valeur en dur », à signaler au plan) ou reçoit les jetons du thème si le mécanisme existe.
 
-**Une seule hauteur de bouton d'en-tête.** Cf. F3. Point de décision non tranché ici (S80-5 du CONTEXT) : l'ouvreur Git `#vf-git-ouvreur` est à 44 parmi des boutons à 36 de 701 à 1 279 px (P78-D-20, seuil ratifié par P78-D-34). Deux lectures
-possibles pour Samuel ou le juge : le laisser à 44 (arbitrage tenu, jamais touché par la 80) ou l'aligner sur `--hdr-btn` en gardant une zone d'appui de 44 par pseudo-élément (le visuel passe à 36 sans retoucher P78-D-34).
+**Une seule hauteur de bouton d'en-tête.** Cf. F3. Tranché (P80-D-56) : l'ouvreur Git `#vf-git-ouvreur`, à 44 parmi des boutons à 36 de 701 à 1 279 px (P78-D-20, P78-D-34), est **dessiné à 36 px, avec une zone d'appui de 44 px** par pseudo-élément ; il lit `--hdr-btn` comme les autres boutons d'en-tête.
 Le plan ne touche pas à cet ouvreur avant réponse (D-20).
 
 ---
@@ -343,6 +342,7 @@ Le plan ne touche pas à cet ouvreur avant réponse (D-20).
 | Annonce de la palette | « N résultats » / « 1 résultat » / « Aucun résultat » |
 | Aide | titre « Raccourcis clavier » ; « Vue : Code » ; groupes « Partout », « La carte », « Projet : couloirs et liste », « Équipe » ; « Fermer » ; pied « Tout est aussi dans la palette : ⌘K ou /. » ; libellés de rangées = ceux du registre (ci-dessous) |
 | Registre (palette et aide, un libellé par entrée) | « Rechercher », « Afficher les raccourcis », « Ouvrir l'historique Git », « Ajuster à l'écran », « Cadrer la sélection et ses voisins », « Monter d'un niveau », « Afficher ou masquer le détail », « Zoom avant », « Zoom arrière », « Basculer couloirs, liste, graphe », « Poser une question à l'agent », « Copier le lien de cette vue », « Carte voisine », « Première carte », « Dernière carte », « Plonger dans la carte », « Fermer ou remonter d'un cran », « Zone suivante » |
+| Ligne terminal (sans `--terminal` seulement) | « Le terminal s'active avec --terminal » |
 | Onglets | « Aller à Code », « Aller à Projet », « Aller à Équipe » |
 | Minicarte | « Minicarte : N cartes visibles sur M » ; « ; une partie du champ est sous l'historique Git » |
 | Repères | « N cartes par là » / « 1 carte par là » ; étiquette « N cartes hors champ à gauche. Aller à la plus proche. » (gauche, droite, en haut, en bas) |
@@ -372,6 +372,7 @@ Aucun tiret cadratin dans ces textes. Les libellés d'actions n'emploient pas «
 | Copies | « Copier le sha » : libellé « Copié » 2 s (±0,5 s) puis restauré, région live polie renseignée ; presse-papiers refusé : « Copie impossible » + sha sélectionné ; « Copier le lien de cette vue » : toast « Lien copié » ou, sur échec, le message d'adresse |
 | Palette | `role=combobox/listbox`, `aria-activedescendant` suit les flèches ; `>` ne montre que des actions ; état vide conforme ; aucune action n'appelle `fetch` ni ne remplit autre chose que la barre (Q4) |
 | Aide `?` | s'ouvre par `?` hors saisie, jamais dans un champ ; groupes filtrés par onglet ; chaque ligne vient du registre ; à 1 024 × 768 `scrollWidth` ≤ `clientWidth`, hauteur ≤ 80vh avec défilement interne ; chaque rangée a le libellé du registre, identique dans la palette ; champ vide : les huit actions usuelles listées au § 3.1, dans l'ordre |
+| Ligne terminal | sans `--terminal` : l'aide `?` et la palette contiennent « Le terminal s'active avec --terminal », texte seul, ni pastille, ni port, ni route, ni action ; avec `--terminal` : absente |
 | Vue DOM de Projet (champ de lecture) | à 1 440, 1 024 et 390 px, tiroir Git, panneau et tiroir du terminal ouverts : après Fin, ↓ sur la dernière rangée ou une flèche, le rectangle de l'élément focalisé ou sélectionné n'intersecte ni `#ask`, ni `#vf-coin`, ni la pastille « Terminal », ni la feuille de détail, ni le tiroir Git, ni le panneau ; aucun défilement horizontal en feuille de détail (390 et 800 px, `80-UI-SPEC.md` § 7) |
 | Focus orphelin (famille) | repère de bord tombé à 0 et « Afficher 100 de plus » épuisé, avec le focus dessus : `document.activeElement` suit l'ordre unique de `80-UI-SPEC.md` § 5 (critère « Focus orphelin » de ce fichier) ; jamais `body` ; forme Graphe : jamais un `h1` absent |
 | Champ de lecture | après « Ajuster », « Cadrer », une flèche ou un repère : aucune carte focalisée, sélectionnée ou cible n'intersecte `#vf-coin` ni le tiroir Git ouvert (rectangles), le plancher 11/13 tenu ; ouvrir ou fermer le tiroir laisse `state.t` inchangé (PU-G-204) ; un repère n'intersecte aucune surcouche |
@@ -398,5 +399,5 @@ Aucun tiret cadratin dans ces textes. Les libellés d'actions n'emploient pas «
 3. **DESIGN.md § 9 (« deux intentions d'élévation ») contre l'anneau de focus sur une carte qui porte `--shadow-card`.** Le focus étant un état d'interaction et non d'élévation, la spec garde l'anneau (cohérent avec X4 du lot 0) et propose l'exemption écrite du § 0 pour DESIGN.md § 9. À confirmer par le juge de design.
 4. **DESIGNS § 7 « Barre d'état en pied » contre P80-D-18** : une ligne jointe à la minicarte, pas une bande pleine largeur. La décision prime ; le texte de DESIGNS est périmé sur ce point. DESIGNS § 7 range aussi « agents » et « phases » dans la palette : D-14 les repousse après la 79.
 5. **DESIGN.md § 4 (hauteurs de contrôle 24, 28, 32, 36, 44) contre les rangées de 40 px du tiroir Git** (existantes) : elles sont gardées ; la spec propose d'ajouter « rangée de liste dense : 40, 44 tactile » aux exceptions écrites de § 4 (lot jetons). La palette, nouvelle, reste à 36.
-6. **Ouvreur Git à 44 parmi des boutons à 36** : voir § 6, rangé en S80-5 du CONTEXT, sans être tranché.
+6. **Ouvreur Git** : dessiné à 36 px, zone d'appui de 44 px (P80-D-56), aligné sur `--hdr-btn`.
 7. **Touche « Cadrer la sélection »** : `C` est choisie par cette spec (D-17 ne donne pas de touche ; `Maj+F` écarté : `F` majuscule appelle déjà « Ajuster » dans l'écouteur global) ; décision déléguée à consigner.
