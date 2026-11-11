@@ -2919,6 +2919,29 @@ obligatoire. La limite de fond est inchangée : G-2 reste déclarative et modifi
 juge. Les chemins sont lus en `git diff -z`, noms non ASCII et spéciaux compris. Commits `f76de68b`,
 `3e426f02`, `42d490b1`, `46254135`.
 
+### Amendement du 2026-11-12 — G-1 : une ligne de délégation ne vaut pas citation d'arbitrage
+
+> **ADR-072 : amendement du 2026-11-12** — Samuel, message session principale, 2026-11-12 : « oui tu
+> as raison », en réponse au constat que la garde accepte la ligne de délégation ; durcissement
+> avant la release = option recommandée, décision déléguée par Samuel, message session principale,
+> 2026-11-08. Ce n'est pas un arbitrage détaillé de Samuel sur la règle elle-même. Le texte
+> d'origine (citation = mot-clé, deux virgules, date ISO) décrit l'état du 2026-09-17 et reste
+> l'historique ; cet amendement le complète sans le réécrire.
+
+G-1 jugeait « citation d'arbitrage conforme » toute ligne portant « arbitrage », « décision » ou
+« decision », au moins deux virgules et une date ISO. Une ligne « décision déléguée par X (canal,
+date), option recommandée » a cette forme sans dire qu'un arbitrage direct a eu lieu : elle
+dit qu'une décision a été confiée. Elle passait donc pour un arbitrage détaillé. Désormais, une ligne
+qui porte le radical « delegu » ou « délégu », toute casse, avec ou sans accent, ne vaut pas citation ;
+une autre ligne du même message qui porte une citation directe reste acceptée, et c'est elle qui est
+recopiée dans le rapport. Un seul prédicat sert les trois usages de la citation : hausse de la colonne
+des instructions, retrait d'une ligne dont la cible existe encore, neutralisation d'une sentinelle.
+
+Limite qui demeure : la garde vérifie toujours la forme, jamais la véracité. Une citation directe
+fabriquée passe ; une orthographe ou un homoglyphe qui évite le radical (« confiée ») n'est pas
+détecté. G-2 (`Gate-Touche`) et `check-ajout-retrait.sh` ne demandent pas de citation d'arbitrage :
+leur trailer est déclaratif : ils ne sont pas concernés.
+
 ## ADR-073 : Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag
 
 **Date** : 2026-09-23 · **Statut** : Validée (non gatée machine) · **Décideur** : Samuel ·
