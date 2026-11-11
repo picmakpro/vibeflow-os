@@ -115,7 +115,8 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   (P69-D-15). Une session détentrice du verrou d'une mission sans nœud rattaché : « retient toute la mission » = nombre de
   nœuds non terminés de ce DAG, seulement s'il est visible. Tri en trois rangs : impact connu > 0 (décroissant), impact
   inconnu, impact connu = 0 ; dans un rang, la plus ancienne attente d'abord. Libellés : « retient N nœuds », « retient
-  toute la mission · N nœuds », « impact inconnu ». Source des DAG : le résumé de plan publié à côté du verrou par la 79 (amendement A16, plan 79-03 :
+  toute la mission · N nœuds », « impact inconnu ». Une ligne de niveau phase (`human_needed`) porte « impact inconnu » : aucun plan de mission
+  ne la rattache à un nœud. Source des DAG : le résumé de plan publié à côté du verrou par la 79 (amendement A16, plan 79-03 :
   identifiants, dépendances, statut, compartiment et phase, jamais le texte des nœuds), désigné par le champ `dag` de
   l'état des verrous (A15) ; en plus, les DAG déjà découverts aujourd'hui. Une mission sans plan publié reste « impact
   inconnu ». Plans dépendants marqués « à revalider » jusqu'à la fusion de 79-03.
