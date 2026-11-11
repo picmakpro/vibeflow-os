@@ -226,6 +226,7 @@ const readFlows = () => { try { return JSON.parse(fs.readFileSync(flowsFile, 'ut
 // ---------- asking ----------
 const nameFor = (id) => { try { return core.q.brief(id)?.name || id; } catch { return id; } };
 const running = new Map();
+const lingering = new Map(); // vibeflow AUDC-B-02 : agents qui ont répondu sans être sortis : hors du plafond, mais atteignables par /api/cancel et bornés par le délai global
 const rel = (p) => String(p || '').replace(/\\/g, '/').replace(root.replace(/\\/g, '/') + '/', '');
 /** A shell command, in words: map lookups by name, then searches, file reads and listings. */
 function describeCommand(command) {
@@ -332,7 +333,7 @@ function runAgent(res, send, body) {
     const child = spawn(cli.cmd, run.args, { cwd: root, env: cliEnv(), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
     const id = crypto.randomBytes(6).toString('hex');
     running.set(id, child);
-    const limit = setTimeout(() => { if (!done) { done = true; clearTimeout(quiet); child.kill(); reject(new Error(`Délai dépassé : la question est arrêtée après ${Math.round(ASK_DELAI / 1000)} s.`)); } }, ASK_DELAI); // vibeflow AUDC-B-02
+    const limit = setTimeout(() => { child.kill(); if (!done) { done = true; clearTimeout(quiet); reject(new Error(`Délai dépassé : la question est arrêtée après ${Math.round(ASK_DELAI / 1000)} s.`)); } }, ASK_DELAI); // vibeflow AUDC-B-02 : le délai court jusqu'à la sortie de l'agent, réponse rendue ou non
     send('start', { id });
     child.stdin.end(run.input);
     let buf = '', stderr = '', done = false;
@@ -342,8 +343,8 @@ function runAgent(res, send, body) {
     const hush = () => { clearTimeout(quiet); if (body.mode === 'change' && !done) quiet = setTimeout(() => say('Working on the updated plan'), 12000); };
     const out = {
       progress: (text) => { if (!done) { say(text); hush(); } },
-      answer: (data) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); running.delete(id); resolve(data); } },
-      fail: (message) => { if (!done) { done = true; clearTimeout(quiet); clearTimeout(limit); running.delete(id); reject(new Error(message)); } },
+      answer: (data) => { if (!done) { done = true; clearTimeout(quiet); running.delete(id); lingering.set(id, child); resolve(data); } },
+      fail: (message) => { if (!done) { done = true; clearTimeout(quiet); running.delete(id); lingering.set(id, child); reject(new Error(message)); } },
     };
     hush();
     child.stdout.on('data', (d) => {
@@ -359,12 +360,12 @@ function runAgent(res, send, body) {
     child.stderr.on('data', (d) => { stderr = (stderr + d).slice(-2000); });
     child.on('error', (e) => out.fail(e.message));
     child.on('close', (code) => {
-      running.delete(id); clearTimeout(limit);
+      running.delete(id); lingering.delete(id); clearTimeout(limit);
       out.fail(run.lastError?.() || stderr.trim() || `${engine} exited with code ${code}`);
     });
     // the browser went away (closed tab, Stop): don't leave the CLI working. Note req 'close' fires as soon as
     // the body is read, so watch the response instead.
-    res.on('close', () => { clearTimeout(limit); if (!done) { done = true; clearTimeout(quiet); child.kill(); reject(CLOSED); } });
+    res.on('close', () => { if (!done) { done = true; clearTimeout(quiet); child.kill(); reject(CLOSED); } });
   });
 }
 function ask(req, res, body) {
@@ -553,7 +554,7 @@ function route(req, res) {
       const r = changing ? { ok: false, error: 'A change is still being made.' } : undoChange();
       res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(r));
     }
-    if (req.method === 'POST' && url.pathname === '/api/cancel') { for (const c of running.values()) c.kill(); res.writeHead(204); return res.end(); }
+    if (req.method === 'POST' && url.pathname === '/api/cancel') { for (const c of [...running.values(), ...lingering.values()]) c.kill(); res.writeHead(204); return res.end(); }
     if (req.method === 'POST' && url.pathname === '/api/export') {
       let raw = '';
       req.on('data', (d) => { raw += d; if (raw.length > 500000) req.destroy(); });

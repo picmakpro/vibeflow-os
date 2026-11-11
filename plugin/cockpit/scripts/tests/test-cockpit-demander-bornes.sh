@@ -251,6 +251,15 @@ console.log(max);
 JS
 assert_eq "D10.1 — « modifier le plan » : le second essai a lieu (2 exécutions pour la demande de changement) alors qu'une autre demande tient un créneau, la troisième demande simultanée reçoit 429" "$(H evs "$WORK/d10-c.txt" 'E.filter(e=>e.ev==="start").length')|$(H statut "$WORK/d10-b.txt")|$(H ncalls "$WORK/fkd")" "2|429|3"
 assert_eq "D10.2 — jamais plus de deux exécutions de l'agent en cours de réponse en même temps, second essai compris" "$(node "$AUX/conc.mjs" "$WORK/fkd")" "2"
+rm -f "$WORK"/fkd/call-*.json; demarrer VF_COCKPIT_ASK_DELAI_MS=3000
+postq ask LINGER "$WORK/d10-l.txt"; PIDL="$(H json "$(ls "$WORK"/fkd/call-*.json | head -1)" 'j.pid')"
+assert_eq "D10.3 — l'agent qui a répondu mais n'est pas sorti n'est pas tué d'office à la réponse" "$(H evs "$WORK/d10-l.txt" 'E.some(e=>e.ev==="answer")')|$(kill -0 "$PIDL" 2>/dev/null && echo vivant || echo mort)" "true|vivant"
+sleep 4
+assert_eq "D10.4 — le délai global l'arrête malgré sa réponse déjà rendue" "$(kill -0 "$PIDL" 2>/dev/null && echo vivant || echo mort)" "mort"
+rm -f "$WORK"/fkd/call-*.json; demarrer
+postq ask LINGER "$WORK/d10-l2.txt"; PIDL="$(H json "$(ls "$WORK"/fkd/call-*.json | head -1)" 'j.pid')"
+H r "$PORT" POST /api/cancel "{\"x-vf-cockpit-token\":\"$TOK\"}" "$WORK/d10-x.txt"; sleep 1
+assert_eq "D10.5 — /api/cancel atteint aussi l'agent qui a répondu mais n'est pas sorti" "$(H statut "$WORK/d10-x.txt")|$(kill -0 "$PIDL" 2>/dev/null && echo vivant || echo mort)" "204|mort"
 
 echo; echo "=== bilan : $PASS passés, $FAIL échoués ==="
 [ "$FAIL" -eq 0 ]
