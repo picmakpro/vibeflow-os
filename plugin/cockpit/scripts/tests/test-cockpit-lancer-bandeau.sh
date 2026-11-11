@@ -26,7 +26,7 @@ PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap c
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 PASS=0; FAIL=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
-assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
+assert_eq() { if [ "$#" -ne 3 ]; then echo "  ❌ FAIL — $1 (assert_eq a reçu $# arguments au lieu de 3 : expansion d'accolades de bash 3.2 ?)"; FAIL=$((FAIL+1)); elif [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; }
 
 CHROME=""
@@ -337,7 +337,7 @@ await new Promise((ok) => q.listen(Number(portQ), '127.0.0.1', ok)); await new P
 fs.writeFileSync(`${run}/pret`, `${process.pid}\n`);
 JS
 cat > "$AUX/chrome-bandeau.mjs" <<'JS'
-// chrome-bandeau.mjs <chrome> <mode> <json> : scénarios navigateur du bandeau de proposition ; UNE ligne JSON. Modes : vue (LB.V) · client (LB.E1 à E7) · froid (LB.E8).
+// chrome-bandeau.mjs <chrome> <mode> <json> : scénarios navigateur du bandeau de proposition ; UNE ligne JSON. Modes : vue (LB.V) · client (LB.E1 à E7) · froid (LB.E8) · reprise (LB.R, AUDC-M11).
 // Q factice dans un cadre sandbox de P factice, plein viewport (ou de taille nulle), secret posé dans le stockage de Q ; gestes par Input.dispatchMouseEvent seulement.
 // Chaque étape est isolée (essai) : une mesure indisponible est nommée dans `erreurs`, jamais un résultat vide.
 // Bornes d'attente : les plafonds d'attente POSITIVE sont à MS (20 s par défaut) : sur un produit cassé, N essais perdus × 20 s peuvent dépasser l'échéance globale de la session (VF_CDP_GLOBAL_MS, 600 s) ;
@@ -978,6 +978,58 @@ await executer(chrome, async (s) => {
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
 
+  if (mode === 'reprise') {
+    // AUDC-M11 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, « Redescendre ensuite ») : tiroir RÉEL de P et Q RÉEL de bout en bout, fenêtre de 700 px (hauteur du bandeau : 60 % = 420 px).
+    // Chaque cas règle la hauteur du tiroir au clavier, fait arriver une proposition (le tiroir monte à 420 px), retire le bandeau par la cause voulue, puis lit la hauteur UNE FOIS le message « retrait » reçu (borné, jamais une pause fixe) et stable.
+    await scenario({ prop: null });
+    await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secret)})`);
+    await s.naviguer(`${OP}/project.html?sp1=1`); await s.attendre(`document.readyState === 'complete'`, 'page P', AM);
+    const POIGNEE = `document.querySelector('.vf-term-poignee')`;
+    const MES = `({ now: Number(${POIGNEE}.getAttribute('aria-valuenow')), px: Math.round(document.querySelector('.vf-term-tiroir').getBoundingClientRect().height), memo: localStorage.getItem('vf.terminal.h'), ouvert: !document.querySelector('.vf-term-tiroir').hidden })`;
+    const mesure = () => stabiliser(() => s.ev(MES), { max: 5000 });
+    const touche = async (key, modifiers = 0) => { for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, code: key, windowsVirtualKeyCode: { Home: 36, ArrowUp: 38 }[key], modifiers }); };
+    const regler = async (grands, petits) => { await s.ev(`${POIGNEE}.focus()`); await touche('Home'); for (let i = 0; i < grands; i++) await touche('ArrowUp', 8); for (let i = 0; i < petits; i++) await touche('ArrowUp'); }; // Home = 160 px, Maj+flèche = 96, flèche = 24
+    const msgs = (d) => s.ev(`window.__msgs.filter((m) => m.d === ${JSON.stringify(d)}).length`);
+    const apresMsg = (d, n) => attendreEtStabiliser(() => msgs(d), (v) => v >= n, { pas: 150, max: 6000 }); // le message est reçu PUIS le compte est stable ; l'attente n'est jamais fatale (un message absent rend le compte, l'assertion juge)
+    const clicCadre = async (expr) => { const dans = await positionPosee(q.ev, expr), ext = await positionPosee(s.ev, `document.querySelector('.vf-term-tiroir iframe')`); if (!dans || !ext) throw new Error('élément du cadre introuvable'); const c = { x: ext.x + dans.cx, y: ext.y + dans.cy };
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y }); await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c.x, y: c.y, button: 'left', clickCount: 1 }); await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c.x, y: c.y, button: 'left', clickCount: 1 }); };
+    await essai('ouvrir', async () => { await s.attendre(`!!document.querySelector('button.vf-term-pastille')`, 'pastille Terminal', AM); await s.ev(`document.querySelector('button.vf-term-pastille').click()`); await s.attendre(`!!document.querySelector('.vf-term-tiroir iframe')`, 'cadre du tiroir', MS); await trouverCtx(s, AM); });
+    let n = 0; r.reprise = {};
+    const cas = (nom, grands, petits, cause, entre) => essai(nom, async () => {
+      if (grands !== null) await regler(grands, petits); const avant = await mesure(), id = ID(300 + (++n)), r0 = await msgs('retrait'), p0 = await msgs('proposition');
+      await scenario({ prop: valide(id, Object.assign({ arme_apres_ms: 600 }, cause === 'expirer' ? { expire_ms: 3000 } : {})), lancers: [] });
+      await q.attendre(`!!document.getElementById('proposition') && document.getElementById('proposition').dataset.id === ${JSON.stringify(id)}`, 'bandeau de la proposition', MS);
+      await apresMsg('proposition', p0 + 1);
+      const haut = await attendreEtStabiliser(() => s.ev(MES), (v) => v.now >= 420, { max: 5000 });
+      if (entre) await entre();
+      if (cause === 'annuler' || cause === 'utilisateur') await q.ev(`${ANNULER}.click()`);
+      else if (cause === 'lancer') { await attendreArme(); await clicCadre(LANCER); await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après le lancement', MS); }
+      else if (cause === 'expirer') await q.attendre(`!!document.querySelector('#proposition[data-etat=expiree]')`, 'bandeau expiré', 15000);
+      const recus = await apresMsg('retrait', r0 + 1), fin = await mesure();
+      if (cause === 'expirer') { await q.ev(`[...document.querySelectorAll('#proposition button')].find((b) => b.textContent === 'Fermer').click()`); } // « Fermer » le bandeau expiré : la hauteur est déjà reprise, aucun second message
+      const apresFermer = cause === 'expirer' ? await stabiliser(() => msgs('retrait'), { pas: 300, max: 3000 }) : recus;
+      r.reprise[nom] = [avant.now, haut.now, recus - r0, apresFermer - r0, fin.now, fin.px, avant.memo + '>' + fin.memo, fin.ouvert].join('/');
+    });
+    // avant/haut/retraits/retraits-apres-Fermer/fin/px/mémo/ouvert
+    await cas('defaut', null, 0, 'annuler'); // page neuve, aucune hauteur réglée ni mémorisée : 36 % de 700 px = 252 px par défaut
+    await cas('annuler', 0, 0, 'annuler');
+    await cas('lancer', 1, 2, 'lancer');
+    await cas('expirer', 0, 0, 'expirer');
+    await cas('utilisateur', 0, 0, 'utilisateur', async () => { await s.ev(`${POIGNEE}.focus()`); await touche('ArrowUp'); await s.attendre(`Number(${POIGNEE}.getAttribute('aria-valuenow')) === 444`, 'hauteur réglée par l\'utilisateur', MS); });
+    await cas('assez-haut', 3, 0, 'annuler');
+    await essai('remplace', async () => { // une proposition qui en remplace une autre pendant le rehaussement : aucun « retrait », la hauteur d'origine n'est pas oubliée
+      await regler(0, 0); const avant = await mesure(), r0 = await msgs('retrait'), p0 = await msgs('proposition');
+      for (const k of [1, 2]) {
+        const id = ID(400 + k); await scenario({ prop: valide(id, { arme_apres_ms: 600 }), lancers: [] });
+        await q.attendre(`!!document.getElementById('proposition') && document.getElementById('proposition').dataset.id === ${JSON.stringify(id)}`, 'bandeau ' + k, MS); await apresMsg('proposition', p0 + k);
+      }
+      const haut = await attendreEtStabiliser(() => s.ev(MES), (v) => v.now >= 420, { max: 5000 }), entre = (await stabiliser(() => msgs('retrait'), { pas: 300, max: 3000 })) - r0;
+      await q.ev(`${ANNULER}.click()`); await apresMsg('retrait', r0 + 1); const fin = await mesure();
+      r.reprise.remplace = [avant.now, haut.now, entre, fin.now, avant.memo + '>' + fin.memo].join('/');
+    });
+    return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
+  }
+
   if (mode === 'froid') {
     await scenario({ prop: valide(ID_A), lancers: [] }); await q.naviguer(`${OQ}/?theme=dark`, 'nulle');
     const recus = async () => JSON.parse(await s.ev('JSON.stringify(window.__msgs)')).filter((m) => m.d === 'proposition');
@@ -1000,6 +1052,8 @@ JS
 
 # --- outils de la suite ---------------------------------------------------------------------------------------------------------------------------------
 rj() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "$2" 2>/dev/null; }
+rep_() { rj "$RJ" "(j.erreur ? 'plante: ' + j.erreur : (j.reprise || {})['$1'] === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.reprise['$1'])"; } # rep_ <cas> : la ligne d'un cas de LB.R
+rouge_rep() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : (j.reprise || {})['$2'] === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.reprise['$2'] === '$3' ? 'sain' : 'rouge')"; } # rouge_rep <sortie> <cas> <valeur saine> : « rouge » seulement si la mesure existe ET s'écarte de la forme saine
 # verdict d'une sonde : « sain » si l'expression est vraie, « rouge » si elle est fausse, « plante » si le scénario a rendu une erreur (jamais un rouge pour une mauvaise raison)
 verdict() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : ($2) ? 'sain' : 'rouge')"; }
 mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_DIR ; code 1 si la cible manque ou si la copie n'a pas changé
@@ -1035,7 +1089,7 @@ assert_eq "LB.S1 — canal : écouteurs de messages entrants = 0, postMessage( =
 assert_eq "LB.S1 — aucune écriture innerHTML, outerHTML ni insertAdjacentHTML ; aucun appel à confirm(" "$(rj "$ST" 'j.html+"/"+j.confirm')" "0/0"
 assert_eq "LB.S1 — lignes de littéral de couleur : vue 6 / client 0 ; .style : 0 / 0 ; cssText : 0 / 0 ; rgb( ou hsl( : vue 3 / client 0 ; <chiffre>px : vue 0 / client 1" \
   "$(rj "$LV" 'j.couleur+"/"+j.style+"/"+j.css+"/"+j.rgb+"/"+j.px')|$(rj "$LC" 'j.couleur+"/"+j.style+"/"+j.css+"/"+j.rgb+"/"+j.px')" "6/0/0/3/0|0/0/0/0/1"
-assert_eq "LB.S2 — la table MESSAGES a exactement dix clés (neuf, plus annulation depuis AUDC-M11) dont proposition ; l'unique postMessage( vise cfg.origineP" "$(rj "$ST" 'j.cles+"/"+j.proposition+"/"+j.cible')" "10/true/true"
+assert_eq "LB.S2 — la table MESSAGES a exactement onze clés (neuf, plus annulation puis retrait depuis AUDC-M11) dont proposition ; l'unique postMessage( vise cfg.origineP" "$(rj "$ST" 'j.cles+"/"+j.proposition+"/"+j.cible')" "11/true/true"
 assert_eq "LB.S3 — client <= 290 lignes, vue <= 302 lignes (le chiffre mesuré : client $(rj "$LC" j.lignes), vue $(rj "$LV" j.lignes)) ; le plafond a été relevé de 280/215 par le lot 8 (LB2), qui ajoute à la vue les phrases en clair, une explication par mode et pour la case du chat, le compte à rebours et le bandeau expiré ; celui de la vue est passé de 290 à 310 pour la consigne « Appuyez sur Entrée » qui reste visible après la préparation (P5, revue du 2026-11-08 : décision déléguée par Samuel, message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5, option recommandée : relever le plafond plutôt que compresser le code) ; F6c (3e tour) : remis au plus juste, 301 lignes mesurées plus une ligne d'avance, car les correctifs F2, F4 et F6b tiennent dans des lignes existantes ou dans la feuille de style (décision déléguée par Samuel, message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5, option recommandée : remettre le plafond au plus juste après les ajouts)" "$(rj "$LC" 'j.lignes<=290')/$(rj "$LV" 'j.lignes<=302')" "true/true"
 assert_eq "LB.S4 — aucun fiabilite ni gouvernance dans la vue ni le client ; aucun appel confirm(" "$(rj "$LV" 'j.compartiments+"/"+j.confirm')|$(rj "$LC" 'j.compartiments+"/"+j.confirm')" "0/0|0/0"
 regles_prop() { grep -F '#proposition' "$1"; } # les règles de la proposition dans la feuille de Q : toutes portent #proposition
@@ -1170,6 +1224,16 @@ if [ -n "$CHROME" ]; then
   FAUX_INJ="$SCRIPTS" faux "$SCRIPTS"; SJ1="$(navig sp1 '"emu":true')"; unfaux
   assert_eq "LB.F3 — SP-1 : page rechargée sans fragment, tiroir fermé (aucun cadre avant), clic Lancer sur une carte : 202, cadre de Q monté, bandeau dans Q, le focus de P n'est pas pris par le cadre" \
     "$(rj "$SJ1" "(j.erreur ? 'plante: ' + j.erreur : j.sp1 !== undefined ? j.sp1 : 'erreur: ' + ((j.erreurs || {}).sp1 || 'étape absente'))")" "0/true/true/true"
+  # LB.R — AUDC-M11 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) : le tiroir reprend sa hauteur quand le bandeau disparaît de Q ; chaque cas : avant/haut/retraits/retraits après « Fermer »/fin/px/mémo/ouvert
+  FAUX_INJ="$SCRIPTS" faux "$SCRIPTS"; RJ="$(navig reprise)"; unfaux
+  assert_eq "LB.R0 — témoin : aucune étape en erreur, les sept cas ont été mesurés" "$(rj "$RJ" '(j.erreur||JSON.stringify(j.erreurs))+" cas="+Object.keys(j.reprise||{}).length')" "{} cas=7"
+  assert_eq "LB.R7 — hauteur par défaut jamais réglée (page neuve, rien en mémoire) : le tiroir monte de 252 à 420 px puis reprend 252 px, et la mémoire reste VIDE (la reprise ne fait pas passer la hauteur pour un réglage de l'utilisateur)" "$(rep_ defaut)" "252/420/1/1/252/252/null>null/true"
+  assert_eq "LB.R1 — « Annuler » : le tiroir monte de 160 à 420 px, puis reprend 160 px (hauteur mesurée ET aria-valuenow), un seul message retrait, hauteur mémorisée intacte (160 avant, 160 après), tiroir resté ouvert" "$(rep_ annuler)" "160/420/1/1/160/160/160>160/true"
+  assert_eq "LB.R2 — lancement (clic de confiance sur « Préparer », 204) : de 304 à 420 px, puis reprend 304 px, un seul retrait, mémo intacte" "$(rep_ lancer)" "304/420/1/1/304/304/304>304/true"
+  assert_eq "LB.R3 — expiration (compte à rebours de 3 s) : le bandeau expiré remplace le bandeau, le tiroir reprend 160 px à ce moment ; « Fermer » sur le bandeau expiré n'émet pas un second retrait" "$(rep_ expirer)" "160/420/1/1/160/160/160>160/true"
+  assert_eq "LB.R4 — l'utilisateur règle le tiroir au clavier pendant le bandeau (420 puis 444 px) : « Annuler » ne l'écrase pas, 444 px reste, la mémoire porte sa hauteur (160 avant, 444 après)" "$(rep_ utilisateur)" "160/420/1/1/444/444/160>444/true"
+  assert_eq "LB.R5 — tiroir déjà assez haut (448 px, au-dessus des 420 du bandeau) : jamais rehaussé, rien n'est repris à « Annuler » (448 avant, pendant et après), mémo intacte" "$(rep_ assez-haut)" "448/448/1/1/448/448/448>448/true"
+  assert_eq "LB.R6 — une proposition en remplace une autre pendant le rehaussement : aucun retrait n'est émis par le remplacement (0), la hauteur d'origine n'est pas oubliée (160 à la fin, après « Annuler »)" "$(rj "$RJ" "(j.erreur ? 'plante: ' + j.erreur : (j.reprise || {}).remplace === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.reprise.remplace)")" "160/420/0/160/160>160"
   assert_eq "LB.P — le serveur factice écoute des ports >= 4600 et différents de 4456 (Q $FQ0, P $FP0)" "$([ "$FQ0" -ge 4600 ] && [ "$FP0" -ge 4600 ] && [ "$FQ0" -ne 4456 ] && [ "$FP0" -ne 4456 ] && [ "$FQ0" -ne "$FP0" ] && echo oui || echo non)" "oui"
 fi
 
@@ -1277,7 +1341,7 @@ for m in "consigne-absente|s#annoncer(ANNONCE_PREPAREE); montrerConsigne(rest); 
   else sans_effet "M-${MU}"; fi
 done
 # 3e tour (F2, F4, F6b) : un mutant par garde, chacun doit rougir LB.V25b (la consigne survit à une Entrée tenue ; une proposition puis une carte la remplacent ; elle reste au-dessus du bandeau d'état)
-for m in "consigne-tenue|s#(ev.key === 'Enter' \&\& !ev.repeat \&\& ev.target#(ev.key === 'Enter' \&\& ev.target#|une Entrée tenue retire la consigne" "proposition-garde-consigne|s#retirerProposition(); retirerAccueil(); retirerConsigne();#retirerProposition(); retirerAccueil();#|une nouvelle proposition laisse la consigne" "carte-garde-consigne|/const c = CARTES\[type\]/{n;s#retirerConsigne();##;}|une carte laisse la consigne"; do
+for m in "consigne-tenue|s#(ev.key === 'Enter' \&\& !ev.repeat \&\& ev.target#(ev.key === 'Enter' \&\& ev.target#|une Entrée tenue retire la consigne" "proposition-garde-consigne|s#retirerProposition(true); retirerAccueil(); retirerConsigne();#retirerProposition(true); retirerAccueil();#|une nouvelle proposition laisse la consigne" "carte-garde-consigne|/const c = CARTES\[type\]/{n;s#retirerConsigne();##;}|une carte laisse la consigne"; do
   MN="${m%%|*}"; MR="${m#*|}"; MS_="${MR%%|*}"; MD="${MR#*|}"; MU="$(printf %s "$MN" | tr a-z A-Z)"
   if mutant "$MN" vf-cockpit-terminal-vue.mjs "$MS_"; then
     [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v25b"]'; assert_eq "M-${MU} — le mutant ($MD) rougit LB.V25b (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v25b === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v25b === '$V25B_SAIN' ? 'sain' : 'rouge')")" "rouge"; }
@@ -1383,6 +1447,27 @@ if [ -n "$CHROME" ]; then
     FAUX_INJ="$MUT_DIR" faux "$SCRIPTS"; MJ="$(navig sp1 '"emu":true')"; unfaux
     assert_eq "M-SP1-ECOUTE — le mutant rougit LB.F3 : le tiroir n'écoute plus le signal (témoin : la carte a affiché le message d'envoi)" "$(rouge_sp1 "$MJ")" "rouge"
   else sans_effet "M-SP1-ECOUTE"; fi
+  # LB.R — mutants de AUDC-M11 (chaque mutant doit rougir le cas visé ; témoin : le cas est mesuré, jamais « plante »)
+  if mutant_inj reprise-retiree vf-cockpit-terminal-tiroir.mjs "s|else if (e.data === 'retrait') reprendre();||"; then
+    FAUX_INJ="$MUT_DIR" faux "$SCRIPTS"; MJ="$(navig reprise '"only":["ouvrir","annuler"]')"; unfaux
+    assert_eq "M-REPRISE-RETIREE — le mutant rougit LB.R1 : le tiroir ne reprend plus sa hauteur après « Annuler » (reste à 420 px)" "$(rouge_rep "$MJ" annuler '160/420/1/1/160/160/160>160/true')" "rouge"
+  else sans_effet "M-REPRISE-RETIREE"; fi
+  if mutant_inj reprise-touche-memo vf-cockpit-terminal-tiroir.mjs "s|h = borne(v); appliquer(); };|h = borne(v); appliquer(); memoH(); };|"; then
+    FAUX_INJ="$MUT_DIR" faux "$SCRIPTS"; MJ="$(navig reprise '"only":["ouvrir","defaut"]')"; unfaux
+    assert_eq "M-REPRISE-TOUCHE-MEMO — le mutant rougit LB.R7 : la reprise écrit la hauteur dans la mémoire (252 au lieu de rien)" "$(rouge_rep "$MJ" defaut '252/420/1/1/252/252/null>null/true')" "rouge"
+  else sans_effet "M-REPRISE-TOUCHE-MEMO"; fi
+  if mutant_inj reprise-ecrase-usager vf-cockpit-terminal-tiroir.mjs "s|const memoH = () => { perso = true; reprise = null;|const memoH = () => { perso = true;|"; then
+    FAUX_INJ="$MUT_DIR" faux "$SCRIPTS"; MJ="$(navig reprise '"only":["ouvrir","utilisateur"]')"; unfaux
+    assert_eq "M-REPRISE-ECRASE-USAGER — le mutant rougit LB.R4 : la reprise écrase la hauteur réglée par l'utilisateur pendant le bandeau (160 px au lieu de 444)" "$(rouge_rep "$MJ" utilisateur '160/420/1/1/444/444/160>444/true')" "rouge"
+  else sans_effet "M-REPRISE-ECRASE-USAGER"; fi
+  if mutant retrait-non-emis vf-cockpit-terminal-client.mjs "s|document.addEventListener('vf-q-retrait', () => emettre('retrait'));||"; then
+    FAUX_INJ="$SCRIPTS" faux "$MUT_DIR"; MJ="$(navig reprise '"only":["ouvrir","annuler"]')"; unfaux
+    assert_eq "M-RETRAIT-NON-EMIS — le mutant rougit LB.R1 : Q n'émet plus rien quand le bandeau disparaît, le tiroir reste rehaussé" "$(rouge_rep "$MJ" annuler '160/420/1/1/160/160/160>160/true')" "rouge"
+  else sans_effet "M-RETRAIT-NON-EMIS"; fi
+  if mutant remplace-emet vf-cockpit-terminal-vue.mjs "s|retirerProposition(true); retirerAccueil();|retirerProposition(); retirerAccueil();|"; then
+    FAUX_INJ="$SCRIPTS" faux "$MUT_DIR"; MJ="$(navig reprise '"only":["ouvrir","remplace"]')"; unfaux
+    assert_eq "M-REMPLACE-EMET — le mutant rougit LB.R6 : le remplacement d'une proposition par une autre émet un retrait (le tiroir redescendrait entre deux bandeaux)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : (j.reprise || {}).remplace === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.reprise.remplace === '160/420/0/160/160>160' ? 'sain' : 'rouge')")" "rouge"
+  else sans_effet "M-REMPLACE-EMET"; fi
   if mutant texte-retire vf-cockpit-terminal-vue.mjs "s/'lancement-recent': 'Cette cible a déjà été lancée récemment.', //"; then
     run_vue "$MUT_DIR" "\"only\":[\"v9\"],\"codes\":$CODES"
     assert_eq "M-ST2-TEXTE — le mutant rougit LB.V9 : un code de la table de cibles n'a plus de texte dans la vue (témoin : la liste dérivée a ses $NCODES codes et la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v9 === '$NCODES/' ? 'sain' : /^$NCODES\\/./.test(j.v9 || '') ? 'rouge' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"

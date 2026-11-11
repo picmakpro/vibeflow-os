@@ -5,7 +5,7 @@
 import { construireTiroir } from './vf-cockpit-terminal-tiroir-ui.mjs';
 import { STYLE_TIROIR } from './vf-cockpit-terminal-tiroir-style.mjs';
 
-export const LISTE_MESSAGES = Object.freeze(['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle', 'proposition', 'annulation']);
+export const LISTE_MESSAGES = Object.freeze(['ready', 'etat:connecte', 'etat:reconnexion', 'etat:termine', 'etat:refuse', 'etat:expire', 'etat:arrete', 'toggle', 'proposition', 'annulation', 'retrait']);
 // mesure O8 (71-06) : allow-popups ouvre une fenêtre dont l'opener est nul ; la décision du manager retient ces cinq jetons, aucun autre (jamais de navigation du haut, ni de formulaire)
 const SANDBOX = 'allow-scripts allow-same-origin allow-popups allow-popups-to-escape-sandbox';
 const TEXTES = {
@@ -102,7 +102,7 @@ function scriptTiroir(cfg, accepte, construire) {
 
     const monter = (origineQ) => {
       let ouvert = false, plein = false, cadre = null, ouvreur = null, minuterie = null, session = false, chargeur = null;
-      let h = MIN, glisse = false, reserveVue = 0, perso = false;
+      let h = MIN, glisse = false, reserveVue = 0, perso = false, reprise = null; // reprise : la hauteur d'avant le rehaussement de la proposition (null : rien à reprendre)
       const pleinMax = () => Math.max(MIN, window.innerHeight - (parseFloat(getComputedStyle(document.body).getPropertyValue('--hh')) || 64) - 4 - 16); // haut = en-tête + 4 (comme #panel, viewer.html), bas = 16 (--edge) : couplé à plein-etat de la feuille
       const borne = (v) => Math.max(MIN, Math.min(pleinMax(), Math.round(v)));
       // P71-D-37 (G4) : hauteur par défaut = 36 % de la fenêtre, entre 220 px (≈ 10 lignes sous la barre de 36 px) et 380 px (au-delà, le terminal mange la carte sans gain de lecture) :
@@ -121,7 +121,7 @@ function scriptTiroir(cfg, accepte, construire) {
         if (reserve !== reserveVue && !glisse) { reserveVue = reserve; ajuster(); }
         d.poignee.setAttribute('aria-valuenow', String(h)); d.poignee.setAttribute('aria-valuetext', h + ' px'); d.poignee.setAttribute('aria-valuemax', String(pleinMax())); // PU-G-142 : la valeur se lit avec son unité (« 324 px »)
       };
-      const memoH = () => { perso = true; stock.ecrire('vf.terminal.h', h); };
+      const memoH = () => { perso = true; reprise = null; stock.ecrire('vf.terminal.h', h); }; // AUDC-M11 : un réglage de l'utilisateur annule la reprise, sa hauteur reste
       // AUDC-M10 : « Terminer la session », double geste (le premier arme et change le mot, le second termine ; blur ou 5 s sans second geste : retour au repos) ; la page ne connaît que la route de P, qui parle à Q
       let armeFin = null;
       const desarmerFin = () => { clearTimeout(armeFin); armeFin = null; const t = d.boutonTerminer.querySelector('.vf-term-terminer-texte'); if (t) t.textContent = T.terminer; d.boutonTerminer.setAttribute('aria-label', T.terminer); };
@@ -177,7 +177,10 @@ function scriptTiroir(cfg, accepte, construire) {
       // AUDC-M11 : le bandeau de Q (phrase, commande exacte, modes) a une hauteur d'environ 260 px et ne s'affiche en entier que dans 60 % du cadre : la page ne lit pas le cadre (autre origine, liste de messages fermée), elle donne donc au tiroir la hauteur qu'il lui faut,
       // 480 px au plus et jamais plus de 60 % de la fenêtre ; une hauteur déjà plus grande n'est jamais réduite, la hauteur mémorisée n'est pas touchée
       const hautBandeau = () => Math.min(480, Math.round(window.innerHeight * 0.6));
-      const proposer = () => { ouvrir(false); if (!plein && h < 300) { h = borne(300); appliquer(); } if (!plein && h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); } annoncer(T.annonceProposition); };
+      const proposer = () => { ouvrir(false); if (!plein && reprise === null && h < Math.max(300, hautBandeau())) reprise = h; if (!plein && h < 300) { h = borne(300); appliquer(); } if (!plein && h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); } annoncer(T.annonceProposition); };
+      // AUDC-M11 : le bandeau a disparu de Q (Annuler, lancement, expiration : message fixe « retrait ») : le tiroir reprend la hauteur d'avant la proposition, sauf si l'utilisateur l'a réglé depuis ; la hauteur mémorisée n'est jamais touchée,
+      // le tiroir reste ouvert, et en plein écran la reprise vaut pour la hauteur interne (celle qu'on retrouve en quittant le plein écran)
+      const reprendre = () => { if (reprise === null) return; const v = reprise; reprise = null; h = borne(v); appliquer(); };
       const basculerPlein = () => {
         plein = !plein; d.region.classList.toggle('vf-term-plein-etat', plein);
         d.boutonPlein.setAttribute('aria-pressed', String(plein)); d.boutonPlein.setAttribute('aria-label', plein ? T.reduire : T.agrandir); d.boutonPlein.title = d.boutonPlein.getAttribute('aria-label');
@@ -187,7 +190,7 @@ function scriptTiroir(cfg, accepte, construire) {
       // hauteur mémorisée, bornée à la fenêtre actuelle
       const memo = Number(stock.lire('vf.terminal.h')) || 0;
       perso = memo > 0; h = perso ? Math.min(borne(memo), plafondMemo()) : defaut();
-      window.addEventListener('resize', () => { const v = perso ? Math.min(borne(h), plafondMemo()) : defaut(); if (v !== h) { h = v; appliquer(); } });
+      window.addEventListener('resize', () => { const v = perso ? Math.min(borne(h), plafondMemo()) : defaut(); if (v !== h) { h = v; reprise = null; appliquer(); } });
       document.body.appendChild(d.pastille); document.body.appendChild(d.region); document.body.appendChild(d.annonce);
       eviter(d.pastille);
       d.region.addEventListener('animationend', () => d.region.classList.remove('vf-term-entree'));
@@ -205,7 +208,7 @@ function scriptTiroir(cfg, accepte, construire) {
       // poignée : souris (capture du pointeur, le cadre n'avale plus les mouvements) et clavier
       d.poignee.addEventListener('pointerdown', (e) => {
         if (e.button !== 0 || plein) return;
-        e.preventDefault(); const y0 = e.clientY, h0 = h; glisse = true; document.body.classList.add('resizing'); d.poignee.setPointerCapture(e.pointerId);
+        e.preventDefault(); reprise = null; const y0 = e.clientY, h0 = h; glisse = true; document.body.classList.add('resizing'); d.poignee.setPointerCapture(e.pointerId);
         const bouge = (m) => { h = borne(h0 + (y0 - m.clientY)); appliquer(); };
         const fin = () => {
           glisse = false; document.body.classList.remove('resizing'); d.poignee.removeEventListener('pointermove', bouge); appliquer();
@@ -229,6 +232,7 @@ function scriptTiroir(cfg, accepte, construire) {
           clearTimeout(minuterie); clearTimeout(chargeur); d.charge.hidden = true; retirerCarte();
         } else if (e.data === 'toggle') fermer();
         else if (e.data === 'proposition') proposer();
+        else if (e.data === 'retrait') reprendre();
         else if (e.data === 'annulation') document.dispatchEvent(new Event('vf-lancer-annule')); // AUDC-M11 : l'annulation faite dans Q se dit à la section de lancement du panneau, qui remet son statut à zéro
         else etat(e.data.slice(5));
       });
