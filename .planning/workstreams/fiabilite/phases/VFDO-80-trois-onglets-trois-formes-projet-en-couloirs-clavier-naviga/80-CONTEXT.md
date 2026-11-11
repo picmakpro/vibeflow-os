@@ -144,6 +144,17 @@ La Phase 76 se branche sur le panneau de l'onglet Projet par une route à elle (
   sélectionne la carte de couloir au lieu de basculer sur le graphe. Le Retour commun est une **pile de sélections du
   panneau** posée par la 80 sur l'onglet Projet (`window.VF_PANNEAU.retour()` — l'objet `VibeFlow` du moteur est gelé (`Object.freeze`), d'où une globale à part, un bouton « Retour » dans l'en-tête du
   panneau, désactivé quand la pile est vide) ; la 76 y empile en appelant `select`.
+- **P80-C76-5 — tenu, forme générique.** La pile accepte aussi une entrée qui n'est pas un nœud du graphe (exigence,
+  ADR, décision, entrée de mémoire de la 76, panneau sur mesure ouvert par `showPanel`) :
+  `window.VF_PANNEAU.empiler({ titre, rouvrir })`, où `titre` est une chaîne courte (rendue en texte, jamais en HTML) et
+  `rouvrir` une fonction sans argument qui rouvre ce panneau. Une sélection de nœud s'empile d'elle-même (le panneau
+  courant est empilé avant chaque `select` ou `showPanel` qui le remplace) ; une entrée générique s'empile par cet appel,
+  juste avant d'ouvrir le panneau suivant. Le bouton « Retour » montre « Retour » suivi du titre de l'entrée du dessus
+  (« Retour : Phase 72 », « Retour : REQ-12 »), tronqué au milieu, nom complet dans son nom accessible ; Retour dépile et
+  appelle `rouvrir` (ou `select` pour un nœud) sans réempiler. La pile est bornée (32 entrées, la plus ancienne tombe),
+  vidée au changement d'onglet et à la remontée à la racine ; une entrée dont `rouvrir` lève une erreur est retirée et le
+  bouton passe à la suivante. Un seul Retour par panneau : la 76 n'a pas besoin d'un fil d'Ariane à côté. Décision
+  déléguée par Samuel (message session principale, 2026-11-08), option recommandée, sur l'avis de la session principale.
 - **P80-C76-4 — tenu tel quel.** Le compte « x/y exigences » de la carte de phase est celui de `piedExigences` ; le champ
   structuré `exigences {faits, total}` ajouté par la 80 (P80-D-06) est calculé par la même fonction, une seule fois. La 76
   ne le recalcule pas et n'y touche pas.
