@@ -36,17 +36,20 @@ created: "2026-11-11"
 
 ## Per-Task Verification Map
 
-La table par tâche est tenue par les plans (`<automated>` + `<fails_when>` sur chaque tâche). Table de couverture par exigence :
+La table par tâche est tenue par les plans (`<automated>` + `<fails_when>` sur chaque tâche). Table de couverture par exigence, réalignée le 2026-11-11 sur 8 plans en 6 vagues (scission de 77-05, P77-D-30 ; revalidation contre la Phase 79 à `67f7f481`, la Phase 74 à `dbdae634`) :
 
 | Exigence | Plan | Vague | Témoin rouge sur le code présent | Suite |
 |----------|------|-------|----------------------------------|-------|
-| SYNT-02, SYNT-04 (côté gate) | 77-01 | 1 | `--format=tsv` rend 64 à la base ; sans l'option, sortie identique à la copie figée (`cmp`) ; `--auto`/`--archive`/`--dry-run`/`--format=json` rendent 64 ; ligne `NON-APPLICABLE` en lab tiers | `test-check-method-budget.sh` (TF1..TF13, MF1..MF8), `test-check-instruction-budget.sh` (TI1..TI9, MI1..MI6) |
-| SYNT-07 (blocages), SYNT-08 (données), SYNT-09 | 77-02 | 1 | champs `burnup` et `blocagesState` absents du graphe à la base ; texte de `last_activity_desc` présent à la base, absent après | `test-cockpit-burnup.sh`, `test-cockpit-blocages.sh`, `test-cockpit-projet-visite.sh` (R3.25 réécrite) |
-| SYNT-03, SYNT-04 (côté route) | 77-03 | 2 | route 404 à la base ; 0 appel sur 3 tours de collecte ; 1 appel pour 2 GET simultanés et dans les 60 s ; non-gel du serveur < 200 ms ; chemins absents ; lab tiers « non applicable » ; faux `gh` hors du lab | `test-cockpit-jauges.sh` |
-| SYNT-05, SYNT-06, SYNT-07 (calcul pur et mémoire) | 77-04 | 2 | modules purs absents à la base ; fixtures par catégorie ; filtre sur la date rougit ; `base.h` | `test-cockpit-synthese.sh` |
-| SYNT-01, SYNT-05, SYNT-06, SYNT-07 (page) | 77-05 | 3 | bouton et panneau absents à la base ; fichiers partagés intacts ; aucun fond teinté ; clé de stockage unique ; pas de doublon après changement d'onglet ; registre de blocs (RB1) | `test-cockpit-synthese-page.sh` |
-| SYNT-01, SYNT-04, SYNT-08 (page : burn-up et jauges) | 77-06 | 4 | blocs 2 et 3 absents à la base ; « N sur M · P % » égal au pied de jalon ; verdicts en mot et glyphe | `test-cockpit-synthese-blocs.sh` |
-| SYNT-10 | 77-07 | 5 | module pur absent ; voie sans rattachement comptée « non rattaché » ; aucune monnaie ; plan à revalider après les Phases 79 et 74 | `test-cockpit-synthese-cout.sh` |
+| SYNT-02, SYNT-04 (côté gate) | 77-01 | 1 | `--format=tsv` rend 64 à la base ; sans l'option, sortie identique à la copie figée (`cmp`) ; `--auto`/`--archive`/`--dry-run`/`--format=json` rendent 64 ; ligne `NON-APPLICABLE` en lab tiers ; invariants « inchangé » mesurés depuis `AVANT` (RED-TRACE) | `test-check-method-budget.sh` (TF1..TF13, MF1..MF8), `test-check-instruction-budget.sh` (TI1..TI9, MI1..MI6) |
+| SYNT-07 (blocages), SYNT-08 (données), SYNT-09 | 77-02 | 1 | champs `burnup` et `blocagesState` absents du graphe à la base ; texte de `last_activity_desc` présent à la base, absent après ; BU11 sur `instantane().projet` (conditionné à 79-09) ; facultatifs déclarés dans `meta.vf.optionnels` | `test-cockpit-burnup.sh`, `test-cockpit-blocages.sh` (rangé ici, plus à 77-04), `test-cockpit-projet-visite.sh` (R3.25 réécrite) |
+| SYNT-03, SYNT-04 (côté route) | 77-03 | 2 | route 404 à la base ; ligne de `ROUTES` (dépendances DURES sur 79-05 et 79-07) ; 0 appel sur 3 tours de collecte ; 1 appel pour 2 GET simultanés et dans les 60 s ; non-gel du serveur < 200 ms ; chemins absents ; lab tiers « non applicable » ; faux `gh` hors du lab ; JR1..JR9 plus JR10 (environnement git durci) ; mutants dont M-ENV-GIT et M-COLLECTE (`vf-cockpit-collecte-etapes.mjs`, `live.mjs`) | `test-cockpit-jauges.sh` |
+| SYNT-05, SYNT-06, SYNT-07 (calcul pur et mémoire) | 77-04 | 2 | modules purs absents à la base ; fixtures par catégorie ; filtre sur la date rougit ; `base.h` ; section SV ; lignes `AJOUT`, plafond de 299, cliquet de 160 points de code ; mutants par `cockpit_module_copie` | `test-cockpit-synthese.sh` |
+| SYNT-01 (coquille) | 77-05 | 3 | bouton et panneau absents à la base ; fichiers partagés intacts depuis `AVANT` ; registre de blocs inscrit avant ou après la coquille (RB1) ; pas de doublon après changement d'onglet (O1) ; aucun jeton ni requête interdite (W11a, CS1) ; ligne-résumé prouvée par un bloc témoin du banc (W18) ; banc `chrome-synthese.mjs` créé avec sonde positive par outil | `test-cockpit-synthese-page.sh` |
+| SYNT-01, SYNT-04, SYNT-08 (page : burn-up et jauges) | 77-06 | 4 | blocs 2 et 3 absents à la base ; « N sur M · P % » égal au pied de jalon ; verdicts en mot et glyphe ; aucune lecture des gates au chargement (JA1) ; mutants sur copie de module chargée | `test-cockpit-synthese-blocs.sh` |
+| SYNT-05, SYNT-06, SYNT-07 (page : dernière visite) | 77-08 | 5 | bloc 1 absent à la base ; clé de stockage unique (W11) ; aucun fond teinté (W4) ; XSS inerte (W15) ; « Tout vu » et `storage` sans vol de focus (W13v) ; ordre final des blocs (OB1) ; documentation de l'effacement, de la persistance et de `base.h` (D1) ; rejeu de la suite de 77-05 | `test-cockpit-synthese-visite.sh` |
+| SYNT-10 | 77-07 | 6 | module pur absent ; voie sans rattachement comptée « non rattaché » (trois cas) ; aucune monnaie ; total coupé dit minorant avec le nombre de voies omises (CO11) ; cinq états de la frise (CO12) ; phase hors jalon (CO10) ; plan à revalider après les Phases 79 et 74 | `test-cockpit-synthese-cout.sh` |
+
+À réaligner après exécution : les identifiants de témoins de 77-01 à 77-04 sont ceux des plans à leur état commité ; la colonne ci-dessus les cite sans les redéfinir.
 
 *Le détail témoin / mutation / sonde positive par exigence est celui de la section « Validation Architecture » de `77-RESEARCH.md` ; chaque plan le recopie dans ses tâches.*
 
@@ -57,9 +60,11 @@ La table par tâche est tenue par les plans (`<automated>` + `<fails_when>` sur 
 - [ ] copies figées des deux gates (A/B octet pour octet) et section « TSV » dans leurs suites — SYNT-02
 - [ ] `test-cockpit-jauges.sh` + fixtures TSV figées ; faux gates et faux `gh` placés hors du lab — SYNT-03, 04
 - [ ] `test-cockpit-burnup.sh` + lignes de checklist figées — SYNT-08
-- [ ] `test-cockpit-synthese.sh` (calcul pur et mémoire), `test-cockpit-synthese-page.sh`, `test-cockpit-synthese-blocs.sh` et `test-cockpit-synthese-cout.sh` (navigateur) — SYNT-01, 04, 05, 06, 07, 08, 10
+- [ ] `test-cockpit-synthese.sh` (calcul pur et mémoire), `test-cockpit-synthese-page.sh`, `test-cockpit-synthese-blocs.sh`, `test-cockpit-synthese-visite.sh` et `test-cockpit-synthese-cout.sh` (navigateur) — SYNT-01, 04, 05, 06, 07, 08, 10
+- [ ] banc `chrome-synthese.mjs` (77-05) : chaque outil sous sonde positive ; mutants d'interface sur une copie du module (`COCKPIT_MODULE`, `cockpit_module_copie`) chargée de façon prouvée
+- [ ] « N suites » des deux README racine remesuré au compte du gate par chaque plan qui ajoute une suite (P77-D-33)
 - [ ] réécriture de l'assertion R3.25 de `test-cockpit-projet-visite.sh` — SYNT-09
-- [ ] ligne de durée dans `scripts/ci-shard-suites.sh` pour chaque suite de page
+- [ ] ligne de durée dans `scripts/ci-shard-suites.sh` et ligne `AJOUT` dans `VENDORED.txt` (fichiers `ui/` neufs) pour chaque suite et chaque fichier de page
 
 ---
 
