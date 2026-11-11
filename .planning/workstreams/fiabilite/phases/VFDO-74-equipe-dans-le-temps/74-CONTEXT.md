@@ -238,6 +238,32 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   (A13) ; « Voir sur la carte » passe par l'onglet Code tel que la coquille l'expose (A2, routage de la Phase 80) ; la 74
   ne pose aucune route serveur (la règle A10/A11 ne la concerne que si un plan en ajoute une, par une ligne de la table).
 
+### Points de la recherche (`74-RESEARCH.md`)
+
+- **P74-D-38 (fil réduit, trois ajouts facultatifs).** Le réducteur `cockpit-transcript@2` ne lit que les lignes de
+  l'agent : il n'a ni l'issue d'un outil, ni les compactions, ni les messages de l'humain. Il gagne trois champs
+  facultatifs, sans changement de version (C0) : `echec: true` sur une ligne d'outil dont le résultat apparié par
+  identifiant porte le drapeau d'erreur (seul le drapeau est lu, jamais le contenu du résultat) ; une ligne
+  `{ t, genre: 'compaction' }` ; une ligne `{ t, genre: 'humain' }` sans texte (« Message de l'humain »). Témoin : un
+  résultat d'outil porteur d'un secret n'apparaît jamais dans la sortie.
+- **P74-D-39 (« · déduit »).** Les segments de C3 ne disent pas leur provenance : la mention « déduit » ne s'applique
+  qu'à l'état présent d'une voie dont `etatOfficiel` est nul, jamais à un segment passé.
+- **P74-D-40 (tiroir Git ouvert sur un commit).** Le tiroir Git n'expose aucune ouverture sur un commit : la 74 ajoute
+  une fonction publique `ouvrir(sha)` au module de détail du tiroir (Phase 78), sans changer son rendu. Les commits de
+  la frise sont rangés par branche côté page, en descendant le premier parent depuis chaque branche (même règle que la
+  teinte du graphe Git côté serveur).
+- **P74-D-41 (retrait de la durée qui compte les veilles, précisé).** Dans l'onglet Équipe, toute durée affichée par la
+  74 vient de `durees.travailS` ; la ligne du tiroir « Au travail » passe sur la même source dans le plan des retraits
+  (après la 73). Si la régie de la 73 a remplacé ce tiroir, ce point tombe avec lui et le retrait (2) se limite à la
+  fiche.
+- **P74-D-42 (étages).** Tête = voie de genre session ; manager = sous-agent qui a au moins une voie enfant ; worker =
+  sous-agent sans voie enfant. La profondeur seule classerait manager un worker lancé par la tête.
+- **P74-D-43 (modules et traduction).** Tout le rendu de la 74 vit dans des modules neufs `ui/74-vf-*.js` (préfixe
+  libre, inclus seuls par ordre alphabétique, CSP adaptée au service) qui commencent par `// VibeFlow (` et marquent
+  leurs données pour que la traduction de la page (`80-vf-fr.js`, modifié par la 79) ne les réécrive pas. Rayons et
+  espacements par variables seulement (garde `css-jetons.mjs`). Aucun bump de version du module dans la 74 : un seul
+  pour la vague, à la jointure.
+
 ### Claude's Discretion
 
 Laissés à la spécification d'interface et à la planification, dans les bornes ci-dessus : la géométrie de la frise
