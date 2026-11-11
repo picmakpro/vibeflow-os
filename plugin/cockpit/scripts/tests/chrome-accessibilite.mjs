@@ -62,5 +62,18 @@ await executer(chrome, async (s) => {
   await s.ev("document.getElementById('vf-depart')?.remove()");
   o.x4 = { arrets };
 
+  // ---------- X6 : mouvement réduit ----------
+  // animations actives (en cours ou sur le point de l'être) relevées dans la foulée d'une plongée : on attend que les cartes du niveau soient posées, puis on compte tout de suite
+  const ANIMS = "document.getAnimations().filter((a) => a.playState === 'running' || a.playState === 'pending').length";
+  const plonger = async () => {
+    await s.ev("VibeFlow.go('root')"); await s.attendre(`VibeFlow.state.container === 'root' && ${VUE_POSEE}`, 'retour à la racine');
+    await s.ev("VibeFlow.reveal('f:lots/n05.md')"); await s.attendre("VibeFlow.state.container !== 'root' && document.querySelectorAll('#viewport .node').length >= 70", 'cartes du niveau de 70 notes');
+    return { actives: await s.ev(ANIMS), cartes: await s.ev("document.querySelectorAll('#viewport .node').length"), transitions: await s.ev("getComputedStyle(document.querySelector('#viewport')).transitionDuration") };
+  };
+  await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
+  await charger('index.html', 'x6 témoin'); o.x6 = { temoin: await plonger() };
+  await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+  await charger('index.html', 'x6 réduit');
+  o.x6.reduit = { repos: await s.ev(ANIMS), ...(await plonger()) };
   return o;
 });

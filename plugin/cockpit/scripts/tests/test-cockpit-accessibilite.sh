@@ -85,6 +85,11 @@ assert_eq "X4.2 — un seul style d'anneau sur tout le parcours (largeur, trait,
 assert_eq "X4.3 — le champ de question a son anneau" "$(E "!!j.x4.arrets.find((a) => a.cle === 'ask-input').anneau")" "true"
 assert_eq "X4.4 — aria-current=page sur l'onglet actif, et sur lui seul (Code, Projet, Équipe)" "$(E "[j.x7.code.courants.join(), j.x7.projet.courants.join(), j.x7.equipe.courants.join()].join('|')")" "Code=page|Projet=page|Équipe=page"
 assert_eq "X4.5 — un seul <main> par page (Code, Projet, Équipe)" "$(E "[j.x7.code.main, j.x7.projet.main, j.x7.equipe.main].join('|')")" "1|1|1"
+echo "=== X6 — mouvement réduit (AUDC-X6) ==="
+assert_eq "X6.0 — témoin : sans préférence, la plongée anime (plus de 20 animations actives) sur un niveau de 70 cartes" "$(E 'j.x6.temoin.cartes >= 70 && j.x6.temoin.actives > 20')" "true"
+assert_eq "X6.1 — en mouvement réduit, aucune animation active au repos" "$(E 'j.x6.reduit.repos')" "0"
+assert_eq "X6.2 — … ni pendant la plongée (niveau de 70 cartes bien posé)" "$(E 'j.x6.reduit.cartes >= 70 && j.x6.reduit.actives')" "0"
+assert_eq "X6.3 — … le fondu et le mouvement de caméra de la plongée durent 0 s" "$(E "j.x6.reduit.transitions.split(',').every((d) => parseFloat(d) === 0)")" "true"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
