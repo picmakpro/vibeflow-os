@@ -304,20 +304,23 @@ Même régime : décisions déléguées par Samuel (message session principale, 
 
 ## À Samuel
 
-Questions qui ne bloquent rien : l'arbitrage en vigueur tient et le plan est bâti dessus.
+Questions au format C76-Q1 (Phase 76, P76-D-34, P76-D-35, P76-D-37). Aucune ne bloque : l'option recommandée est
+appliquée sous délégation, contestable.
 
-- **A77-1 — Coût par phase au-delà de 24 h (reprend S-2 de la Phase 79).** En vigueur : AUDC-Q2, la fenêtre de 24 h,
-  donc le coût « des dernières 24 h » par phase et par étage. Avis du cadrage : sur 24 h, le bloc répond à « qu'est-ce
-  qui consomme en ce moment ? », mais pas à « combien a coûté la Phase N ? ». Une phase du jalon a duré plusieurs jours
-  (les clôtures datées du jalon s'étalent du 11-03 au 11-06, les inscriptions du 11-01 au 11-11). Options :
-  - (a) garder 24 h ;
-  - (b) un agrégat persisté par phase, étage et modèle (jetons et durées seulement, sans heure par agent), au-delà de
-    24 h.
-  **Recommandation :** (a) pour cette vague, avec le titre « dernières 24 h » ; (b) à instruire si la question « combien
-  a coûté la phase » se pose réellement. (b) rouvre AUDC-Q2 : décision de Samuel seulement.
-- **A77-2 — Le retrait de la prose « Maintenant » (P77-D-12).** Ce n'est pas une réouverture : aucune décision écrite
-  ne porte sur ce texte. Il change pourtant ce que Samuel lit à l'ouverture de Projet. Recommandation : le retirer ; le
-  repli est le trio de compteurs. Signalé pour la recette, pas à trancher avant.
+- **P77-Q-01 — Coût par phase au-delà de 24 h (A77-1 ; reprend S-2 de la Phase 79).** Sur 24 h, le bloc « coût »
+  répond à « qu'est-ce qui consomme en ce moment ? », pas à « combien a coûté la Phase N ? », alors qu'une phase du jalon
+  dure plusieurs jours (clôtures datées du 11-03 au 11-06). Faut-il un agrégat au-delà de la fenêtre ?
+  Options : (a) garder la fenêtre de 24 h (AUDC-Q2), bloc titré « dernières 24 h » ; (b) un agrégat persisté par phase, étage et modèle (jetons et durées seulement, sans heure par agent), au-delà de 24 h — rouvre AUDC-Q2.
+  Recommandation : (a) — rien n'est rouvert ; (b) à instruire seulement si la question « combien a coûté la phase » se pose réellement.
+  Bloque : 77-07
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P77-D-15
+- **P77-Q-02 — Retrait de la prose « Maintenant » (A77-2).** Le retrait de la phase (un ajout, un retrait) enlève la
+  prose recopiée du STATE sous « Maintenant » (`lastDesc`), que la synthèse datée remplace. Aucune décision écrite ne
+  porte sur ce texte, mais il change ce que Samuel lit à l'ouverture de Projet.
+  Options : (a) retirer la prose `lastDesc` ; (b) retirer plutôt le trio de compteurs `.vf-stats` (touche `ui/00-vibeflow.js`, partagé) ; (c) ne rien retirer et justifier l'exception.
+  Recommandation : (a) — la synthèse prend exactement sa place, sans toucher un fichier partagé ; à voir à la recette.
+  Bloque : 77-02
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P77-D-12
 
 <canonical_refs>
 ## Canonical References
