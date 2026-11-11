@@ -63,9 +63,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 <tasks>
 
 <task type="tdd" tdd="true">
-  <name>Tâche 1 (CONDITIONNÉE) : dictionnaires, cartes du moteur et fils d'Ariane : `moteur-carte`, `chrome-moteur-carte`, `chrome-fr`</name>
-  Condition de départ : réponse de Samuel à Q-75-3 consignée, option (a) ; à défaut de réponse ou si (b), appliquer le repli de P75-D-20 : « Récent » reste une lentille de plus, même canal, même emplacement, le retrait se réduit à `recent.mjs`.
-  Sous le repli : les entrées « Recent work » des dictionnaires et les suites `moteur-carte`, `chrome-moteur-carte` et `chrome-fr` restent telles quelles (F13.3 inchangée) ; le grep d'inventaire n'exige plus zéro pour les motifs de la couche, seulement pour `recent.mjs`. Plan VIDE sous le repli : aucune tâche non conditionnée.
+  <name>Tâche 1 : dictionnaires, cartes du moteur et fils d'Ariane : `moteur-carte`, `chrome-moteur-carte`, `chrome-fr`</name>
   <files>plugin/cockpit/skills/cockpit-moteur/assets/ui/78-vf-fr-dict-a.js, plugin/cockpit/skills/cockpit-moteur/assets/ui/80-vf-fr.js, plugin/cockpit/scripts/tests/test-cockpit-moteur-carte.sh, plugin/cockpit/scripts/tests/chrome-moteur-carte.mjs, plugin/cockpit/scripts/tests/test-cockpit-chrome-fr.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09c-RED-TRACE.md</files>
   <read_first>
   - test-cockpit-moteur-carte.sh (K17), chrome-moteur-carte.mjs (l. ~242-254), test-cockpit-chrome-fr.sh (F13.3 « Recent work: Recent work », F2 non-traduits)

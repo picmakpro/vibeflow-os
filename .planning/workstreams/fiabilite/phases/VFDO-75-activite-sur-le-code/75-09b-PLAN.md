@@ -26,7 +26,7 @@ autonomous: true
 requirements: [ACTV-12, ACTV-01]
 must_haves:
   truths:
-    - "P75-D-20, seconde moitié (scission J16) : retirés, dans le MÊME LOT que la mise en service de l'empreinte (75-07, 75-08, jamais avant) : `ui/25-recent.js`, les classes `.recent` et `.recent-in`, `.rw`, `recentTip`, la bascule binaire « Travail récent » du menu « Types de liens », `#btn-recent` ; le jeton `--recent` RESTE (il porte « en cours »)"
+    - "P75-D-20 (ferme depuis P75-D-28, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, option (a)), seconde moitié (scission J16) : retirés, dans le MÊME LOT que la mise en service de l'empreinte (75-07, 75-08, jamais avant) : `ui/25-recent.js`, les classes `.recent` et `.recent-in`, `.rw`, `recentTip`, la bascule binaire « Travail récent » du menu « Types de liens », `#btn-recent` ; le jeton `--recent` RESTE (il porte « en cours »)"
     - "Un ajout, un retrait : le créneau d'en-tête et l'entrée du « ⋯ » qui portaient « Travail récent » deviennent `#btn-lentilles` à la MÊME place (P70-D-01 tenue) ; toutes les références à `#btn-recent` sont migrées, `ui/00-vibeflow.js:111` (`#btn-recent:hover svg.i`) comprise (B2) ; budget de largeur de l'en-tête à 1 024 px tenu (R13.3) ; « huit entrées » tenu"
     - "Doctrine du 2026-09-16 : suites ADAPTÉES, JAMAIS supprimées ni affaiblies ; nombre d'assertions de chaque suite avant et après (après >= avant) ; intention de chaque assertion modifiée nommée dans la trace"
     - "Dictionnaires et suites voisines (`moteur-carte`, `chrome-moteur-carte`, `chrome-fr`) : retirés par 75-09c (scission Q7), jamais par ce plan"
@@ -39,7 +39,7 @@ must_haves:
       provides: "R1 et R2 lus sur le canal ; E1 à E4 intacts"
   key_links:
     - from: plugin/cockpit/scripts/tests/test-cockpit-responsive.sh
-      to: plugin/cockpit/skills/cockpit-moteur/assets/ui/74-vf-activite.js
+      to: plugin/cockpit/skills/cockpit-moteur/assets/ui/75-vf-activite.js
       via: "`#btn-lentilles` injecté à la place de `btn-recent` ; « huit entrées »"
       pattern: "btn-lentilles"
 ---
@@ -82,10 +82,10 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 <tasks>
 
 <task type="tdd" tdd="true">
-  <name>Tâche 0 (NON conditionnée) : trace du retrait de `scripts/recent.mjs` dans `VENDORED.txt`</name>
+  <name>Tâche 0 : trace du retrait de `scripts/recent.mjs` dans `VENDORED.txt`</name>
   <files>plugin/cockpit/skills/cockpit-moteur/VENDORED.txt, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09b-RED-TRACE.md</files>
   <behavior>
-  - Q8a : `VENDORED.txt` porte la trace du retrait de `scripts/recent.mjs` (ligne `RETRAIT` si la forme livrée par 79-01 en porte, sinon l'inventaire du plafond, 75-RESEARCH O-4) ; retrait de `recent.mjs` seul : NON conditionné par Q-75-3
+  - Q8a : `VENDORED.txt` porte la trace du retrait de `scripts/recent.mjs` (ligne `RETRAIT` si la forme livrée par 79-01 en porte, sinon l'inventaire du plafond, 75-RESEARCH O-4)
   </behavior>
   <action>Poser la ligne selon la forme livrée ; consigner la forme dans la trace.</action>
   <verify>
@@ -96,9 +96,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 </task>
 
 <task type="tdd" tdd="true">
-  <name>Tâche 1 (tracer ; CONDITIONNÉE) : la page ne porte plus la couche : en-tête, légende, classes, `#btn-recent` migré, `25-recent.js`</name>
-  Condition de départ : réponse de Samuel à Q-75-3 consignée, option (a) ; à défaut de réponse ou si (b), appliquer le repli de P75-D-20 : « Récent » reste une lentille de plus, même canal, même emplacement, le retrait se réduit à `recent.mjs`.
-  Sous le repli : `ui/25-recent.js`, `.recent`/`.recent-in`, `recentTip`, la bascule et `#btn-recent` restent ; le sélecteur reçoit la lentille « Récent » dans le même canal, à l'emplacement de l'ancienne entrée, entrée et pastille conservées ; `ecrans-recent` et `responsive` ne changent pas ; seule la trace du retrait de `recent.mjs` (tâche 0) est posée.
+  <name>Tâche 1 (tracer) : la page ne porte plus la couche : en-tête, légende, classes, `#btn-recent` migré, `25-recent.js`</name>
   <files>plugin/cockpit/skills/cockpit-moteur/assets/viewer.html, plugin/cockpit/skills/cockpit-moteur/assets/ui/25-recent.js, plugin/cockpit/skills/cockpit-moteur/assets/ui/00-vibeflow.js, plugin/cockpit/skills/cockpit-moteur/assets/ui/01-vf-responsive.js, plugin/cockpit/skills/cockpit-moteur/assets/ui/02-vf-telephone.js, plugin/cockpit/skills/cockpit-moteur/VENDORED.txt, plugin/cockpit/scripts/tests/test-cockpit-ecrans-recent.sh, plugin/cockpit/scripts/tests/fixtures/test-cockpit-ecrans-recent/recent-doublons.json, plugin/cockpit/scripts/tests/test-cockpit-responsive.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09b-RED-TRACE.md</files>
   <read_first>
   - 75-RESEARCH.md § « Retrait » (table des fichiers) ; 75-UI-SPEC « Sondes visuelles à rejouer » (S1, S13) et « Sélecteur de lentilles » (Place et forme : références à migrer)
@@ -106,6 +104,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
   </read_first>
   <behavior>
   - Q8 (S13) : la page ne contient plus `#btn-recent`, `.rw`, `.recent`, `.recent-in`, `no-recent`, `recentTip`, la ligne « Surligner le travail récent » de « Types de liens » ; `rtk proxy grep -rn "btn-recent" assets/ui assets/viewer.html` vide (B2) ; aucune règle `.recent` ou `.recent-in` active ; le jeton `--recent` défini et employé par le glyphe « en cours » ; l'ensemble des jetons identique (P71.5-D-29)
+  - Q8b : `showBoard` (tableau générique du moteur, défini dans `viewer.html` et exposé par `SC.showBoard`) RESTE : la Phase 74 s'en sert pour « Voir sur la carte » et `20-health.js`, `30-screens.js` l'appellent ; le retrait de `ui/25-recent.js` (qui n'en est qu'un appelant) ne l'emporte pas ; témoin : `SC.showBoard` défini et appelable ; mutant « `showBoard` retiré avec la couche » rouge
   - Q9 (S1) : `#btn-lentilles` à la place EXACTE : bureau, créneau ancien (entre Santé et la boussole) ; jusqu'à 999 px, entrée du « ⋯ » entre « Santé » et « Par où commencer » ; « huit entrées » et budget de 1 024 px tenus (R13.3) ; règle de survol `#btn-lentilles:hover svg.i` posée (mutant « règle de survol non migrée » rouge)
   - Q10 (ecrans-recent) : E1 à E4 intacts ; R1 et R2 deviennent « compte du sélecteur = cartes (un fichier écrit par deux agents = une carte) » et « agrégat du nœud = cartes » lus sur le canal ; `recent-doublons.json` devient une table de marques ; assertions après >= avant
   - Q11 (responsive) : `btn-recent` injecté remplacé par `btn-lentilles` ; R1, R3, R19, R20 et « huit entrées » non affaiblis
@@ -116,7 +115,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
   Mutants : `btn-recent` laissé (Q8), jeton `--recent` supprimé (Q8), entrée du « ⋯ » déplacée (Q9), survol non migré (Q9).
   </action>
   <verify>
-    <automated>O="${TMPDIR:-/tmp}/75-09b-t1.out"; bash plugin/cockpit/scripts/tests/test-cockpit-ecrans-recent.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultat : ' "$O" || exit 1; rtk proxy grep -q "PASS — E1\." "$O" || exit 1; rtk proxy grep -q "PASS — R1\." "$O" || exit 1; rtk proxy grep -q "PASS — Q8\." "$O" || exit 1; rtk proxy grep -q "PASS — Q10\." "$O" || exit 1; test "$(rtk proxy grep -c 'PASS — Q[0-9]*\.[0-9]* — mutant' "$O")" -ge 2 || exit 1; O2="${TMPDIR:-/tmp}/75-09b-t1b.out"; bash plugin/cockpit/scripts/tests/test-cockpit-responsive.sh > "$O2" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O2")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O2" || exit 1; rtk proxy grep -q "PASS — R1 " "$O2" || exit 1; rtk proxy grep -q "PASS — R3 " "$O2" || exit 1; rtk proxy grep -q "PASS — R13\." "$O2" || exit 1; rtk proxy grep -q "PASS — R19\." "$O2" || exit 1; rtk proxy grep -q "PASS — Q11\." "$O2" || exit 1; test ! -e plugin/cockpit/skills/cockpit-moteur/assets/ui/25-recent.js || exit 1; test "$(rtk proxy grep -rc btn-recent plugin/cockpit/skills/cockpit-moteur/assets/ui plugin/cockpit/skills/cockpit-moteur/assets/viewer.html | rtk proxy grep -v ':0$' | rtk proxy grep -c .)" -eq 0 || exit 1; O3="${TMPDIR:-/tmp}/75-vendor.out"; bash plugin/cockpit/scripts/tests/test-cockpit-vendor.sh > "$O3" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O3")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O3" || exit 1; rtk proxy grep -q "PASS — V4 " "$O3" || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
+    <automated>O="${TMPDIR:-/tmp}/75-09b-t1.out"; bash plugin/cockpit/scripts/tests/test-cockpit-ecrans-recent.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultat : ' "$O" || exit 1; rtk proxy grep -q "PASS — E1\." "$O" || exit 1; rtk proxy grep -q "PASS — R1\." "$O" || exit 1; rtk proxy grep -q "PASS — Q8\." "$O" || exit 1; rtk proxy grep -q "PASS — Q8b\." "$O" || exit 1; rtk proxy grep -q "PASS — Q10\." "$O" || exit 1; test "$(rtk proxy grep -c 'PASS — Q[0-9]*\.[0-9]* — mutant' "$O")" -ge 2 || exit 1; O2="${TMPDIR:-/tmp}/75-09b-t1b.out"; bash plugin/cockpit/scripts/tests/test-cockpit-responsive.sh > "$O2" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O2")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O2" || exit 1; rtk proxy grep -q "PASS — R1 " "$O2" || exit 1; rtk proxy grep -q "PASS — R3 " "$O2" || exit 1; rtk proxy grep -q "PASS — R13\." "$O2" || exit 1; rtk proxy grep -q "PASS — R19\." "$O2" || exit 1; rtk proxy grep -q "PASS — Q11\." "$O2" || exit 1; test ! -e plugin/cockpit/skills/cockpit-moteur/assets/ui/25-recent.js || exit 1; test "$(rtk proxy grep -rc btn-recent plugin/cockpit/skills/cockpit-moteur/assets/ui plugin/cockpit/skills/cockpit-moteur/assets/viewer.html | rtk proxy grep -v ':0$' | rtk proxy grep -c .)" -eq 0 || exit 1; O3="${TMPDIR:-/tmp}/75-vendor.out"; bash plugin/cockpit/scripts/tests/test-cockpit-vendor.sh > "$O3" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O3")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O3" || exit 1; rtk proxy grep -q "PASS — V4 " "$O3" || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
     <fails_when>le nombre d'assertions baisse, une référence à `#btn-recent` subsiste (dont `00-vibeflow.js:111`), ou le jeton `--recent` a disparu</fails_when>
   </verify>
   <acceptance_criteria>

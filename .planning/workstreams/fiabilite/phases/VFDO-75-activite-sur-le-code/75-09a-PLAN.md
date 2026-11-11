@@ -22,7 +22,7 @@ autonomous: true
 requirements: [ACTV-12]
 must_haves:
   truths:
-    - "P75-D-20, première moitié (scission J16 : 75-09a assemblage et moteur, 75-09b page ; même lot et même PR que 75-07 et 75-08, jamais avant) : l'écriture de `recent-work.json` (`vf-cockpit-build.mjs:70-80`), la lecture et la ligne de rapport du moteur (`scripts/build.mjs`), `scripts/recent.mjs` (jamais appelé par l'assemblage VibeFlow), l'étape « Mark recent work » de `scripts/refresh.mjs:173` (elle demande d'exécuter `recent.mjs` : sans elle, un moteur à jour guiderait vers un script supprimé), `recentWork` de `graph-query.js` et la partie d'export « Recent work » de `ui/60-export.js` sont retirés ; le jeton `--recent` RESTE (P71.5-D-26, D-29)"
+    - "P75-D-20 (ferme depuis P75-D-28, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, option (a)), première moitié (scission J16 : 75-09a assemblage et moteur, 75-09b page ; même lot et même PR que 75-07 et 75-08, jamais avant) : l'écriture de `recent-work.json` (`vf-cockpit-build.mjs:70-80`), la lecture et la ligne de rapport du moteur (`scripts/build.mjs`), `scripts/recent.mjs` (jamais appelé par l'assemblage VibeFlow), l'étape « Mark recent work » de `scripts/refresh.mjs:173` (elle demande d'exécuter `recent.mjs` : sans elle, un moteur à jour guiderait vers un script supprimé), `recentWork` de `graph-query.js` et la partie d'export « Recent work » de `ui/60-export.js` sont retirés ; le jeton `--recent` RESTE (P71.5-D-26, D-29)"
     - "Doctrine du 2026-09-16 (« ne pas supprimer pour verdir ») : `test-cockpit-securite.sh` et `test-cockpit-onglet-code.sh` sont ADAPTÉS, jamais supprimés ni affaiblis ; le nombre d'assertions de chacune ne baisse pas ; chaque assertion modifiée garde son intention, nommée dans la trace"
     - "ACTV-12, série de sondes « Y » de `test-cockpit-securite.sh` (et non « M4 » : la lettre M4 y désigne autre chose) : le lien symbolique posé sur `recent-work.json` est reporté sur `.gitignore` SEUL (écrit par le socle, `vf-cockpit-build.mjs:82` ; pas `graph.json`) ; Y1 et Y2 inchangés ; témoin rouge : `verifierSortie` neutralisé, `dehors.txt` réécrit"
     - "`recent-work.json` hérité d'un assemblage précédent est supprimé au prochain assemblage (`rmSync` avec `force`, APRÈS `verifierSortie`) ; aucune migration"
@@ -77,9 +77,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 <tasks>
 
 <task type="tdd" tdd="true">
-  <name>Tâche 1a (tracer ; CONDITIONNÉE) : l'assemblage n'écrit plus `recent-work.json` et supprime l'ancien, la sonde Y reportée sur `.gitignore`</name>
-  Condition de départ : réponse de Samuel à Q-75-3 consignée, option (a) ; à défaut de réponse ou si (b), appliquer le repli de P75-D-20 : « Récent » reste une lentille de plus, même canal, même emplacement, le retrait se réduit à `recent.mjs`.
-  Sous le repli : `recent-work.json` reste écrit par l'assemblage et lu par le moteur ; la sonde Y garde sa cible actuelle (elle n'est pas reportée) ; C6.3 reste inchangée ; le grep d'inventaire n'exige plus zéro pour `recent-work`. L'assertion « un plan non fait donne une carte prévue » (Q2b) n'est pas conditionnée : elle a sa tâche 1b.
+  <name>Tâche 1a (tracer) : l'assemblage n'écrit plus `recent-work.json` et supprime l'ancien, la sonde Y reportée sur `.gitignore`</name>
   <files>plugin/cockpit/scripts/vf-cockpit-build.mjs, plugin/cockpit/skills/cockpit-moteur/scripts/build.mjs, plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh, plugin/cockpit/scripts/tests/test-cockpit-securite.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09a-RED-TRACE.md</files>
   <read_first>
   - plugin/cockpit/scripts/vf-cockpit-build.mjs (l. 70-82 : `recent`, `recent-work.json`, `GITIGNORE`) et le moteur `scripts/build.mjs` (lecture de `recent-work.json`, ligne de rapport)
@@ -109,12 +107,12 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 </task>
 
 <task type="tdd" tdd="true">
-  <name>Tâche 1b (NON conditionnée) : une carte `prevu` pour un plan non fait, assertion de C6.3 ajoutée</name>
+  <name>Tâche 1b : une carte `prevu` pour un plan non fait, assertion de C6.3 ajoutée</name>
   <files>plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09a-RED-TRACE.md</files>
   <behavior>
   - Q2b : un plan non fait dont `files_modified` vise un fichier absent donne une carte `st: prevu` (fixture : ROADMAP non cochée) ; assertion AJOUTÉE à `test-cockpit-onglet-code.sh` (ACTV-11), aucune assertion existante modifiée ; rouge sur la base (aucune carte)
   </behavior>
-  <action>Assertion `Q2b.1 — …` ajoutée, rouge sur la base, verte après 75-06 ; ne dépend ni du retrait ni de la réponse à Q-75-3.</action>
+  <action>Assertion `Q2b.1 — …` ajoutée, rouge sur la base, verte après 75-06 ; ne dépend pas du retrait de la couche.</action>
   <verify>
     <automated>O="${TMPDIR:-/tmp}/75-09a-t1b.out"; bash plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh > "$O" 2>&1 || exit 1; test "$(rtk proxy grep -c '❌ FAIL' "$O")" -eq 0 || exit 1; rtk proxy grep -q 'Résultats : ' "$O" || exit 1; rtk proxy grep -q "PASS — Q2b\." "$O" || exit 1; bash scripts/check-machine-paths.sh || exit 1</automated>
     <fails_when>l'assertion Q2b est verte sur la base, ou une assertion existante a été modifiée</fails_when>
@@ -123,13 +121,13 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 </task>
 
 <task type="tdd" tdd="true">
-  <name>Tâche 2a (NON conditionnée) : `recent.mjs` et l'étape « Mark recent work » de `refresh.mjs` retirés</name>
+  <name>Tâche 2a : `recent.mjs` et l'étape « Mark recent work » de `refresh.mjs` retirés</name>
   <files>plugin/cockpit/skills/cockpit-moteur/scripts/recent.mjs, plugin/cockpit/skills/cockpit-moteur/scripts/refresh.mjs, plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09a-RED-TRACE.md</files>
   <read_first>
   - plugin/cockpit/skills/cockpit-moteur/scripts/refresh.mjs (l. ~137 écriture de `changes.json` « for recent.mjs », l. ~173 l'étape « Mark recent work »)
   </read_first>
   <behavior>
-  - Q5 : `scripts/recent.mjs` n'existe plus ; `refresh.mjs` ne recommande plus d'exécuter `recent.mjs` (sa sortie ne contient plus l'étape « Mark recent work », rouge sur la base) ; aucun appelant de `recent.mjs` (grep des appelants, vide). Retrait de `recent.mjs` seul, jamais appelé : NON conditionné par Q-75-3
+  - Q5 : `scripts/recent.mjs` n'existe plus ; `refresh.mjs` ne recommande plus d'exécuter `recent.mjs` (sa sortie ne contient plus l'étape « Mark recent work », rouge sur la base) ; aucun appelant de `recent.mjs` (grep des appelants, vide).
   </behavior>
   <action>Témoin Q5 d'abord (rouge sur la base), puis retrait de `recent.mjs` et de l'étape de `refresh.mjs`. Mutant : étape de `refresh.mjs` conservée (Q5 rouge).</action>
   <verify>
@@ -140,9 +138,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 </task>
 
 <task type="tdd" tdd="true">
-  <name>Tâche 2b (CONDITIONNÉE) : `recentWork` et la partie d'export « Recent work » retirés</name>
-  Condition de départ : réponse de Samuel à Q-75-3 consignée, option (a) ; à défaut de réponse ou si (b), appliquer le repli de P75-D-20 : « Récent » reste une lentille de plus, même canal, même emplacement, le retrait se réduit à `recent.mjs`.
-  Sous le repli : `recentWork` de `graph-query.js` et la partie d'export « Recent work » de `60-export.js` restent (la couche vit comme lentille « Récent ») ; Q6 et Q7 ne sont pas posés ; le grep d'inventaire n'exige plus zéro pour les motifs de la couche.
+  <name>Tâche 2b : `recentWork` et la partie d'export « Recent work » retirés</name>
   <files>plugin/cockpit/skills/cockpit-moteur/assets/graph-query.js, plugin/cockpit/skills/cockpit-moteur/assets/ui/60-export.js, plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh, .planning/workstreams/fiabilite/phases/VFDO-75-activite-sur-le-code/75-09a-RED-TRACE.md</files>
   <read_first>
   - plugin/cockpit/skills/cockpit-moteur/assets/graph-query.js (l. ~101-102, ~172 : `recentWork`), plugin/cockpit/skills/cockpit-moteur/assets/ui/60-export.js (l. ~35 : « Recent work »)

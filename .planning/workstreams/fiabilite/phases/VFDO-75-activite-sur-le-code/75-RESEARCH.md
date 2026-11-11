@@ -62,7 +62,7 @@ Quatre frictions factuelles sont signalées en tête (Obstacles) : la réservati
 | Gardes (suites, gates) | API / socle | — | lecture confinée du lab, rien d'exécuté (P68-D-34) |
 | Empreinte, normalisation, collisions d'agents et de plans | API / socle | Navigateur (repli O-2) | données en mémoire du serveur (C3, A27) |
 | Cartes prévues | Assemblage (annotateur A27) | — | le graphe Code s'écrit sur disque à l'assemblage |
-| Marques, sélecteur, panneau | Navigateur (`viewer.html` + `ui/74-vf-activite.js`) | — | DOM en place, aucune relance du placement |
+| Marques, sélecteur, panneau | Navigateur (`viewer.html` + `ui/75-vf-activite.js`) | — | DOM en place, aucune relance du placement |
 
 ## Standard Stack
 
@@ -145,7 +145,7 @@ assemblage : build du moteur ──▶ annotateur « prévues » (table de vf-co
   - `cardFoot` réserve `<span class="mk"></span>` à droite sur toute carte de fichier et de nœud dès que `Floorplan.marques.reserver(true)` est appelé **avant le premier rendu** ; `cardExtraH` compte alors toujours `FOOT_H`. La réservation se décide au chargement (sélecteur présent), jamais par lentille (O-1).
   - `Floorplan.marques` : `poser(couche, table)` avec `table = [[id, palier, glyphe, mot, infobulle]]`, `retirer(couche)`, `active()`. Agrégat aux ancêtres par `chain(id)` (déjà exposé) : palier max + compte. Application **en place** par `state.chipEls` (rempli par `draw`, `:1201`) : contenu de `.mk` et `aria-label` de la carte, sans `render()` ni `rerender()` (ce dernier relance la mise en page, `:2564`). À l'événement `render` (navigation), réapplication de la couche active aux cartes nouvellement dessinées.
   - Pile de couches : `poser` d'une autre couche masque la précédente, `retirer` la rend (témoin ACTV-03). La 74 (relecture, AUDC-I06) pose sa couche par la même API ; si elle l'a déjà livrée, la 75 l'étend (**à revalider** à la jointure, D-05).
-- **`ui/74-vf-activite.js`** (neuf ; les scripts `ui/` sont insérés par ordre de nom, `scripts/build.mjs:448`, donc après `70-vf-live.js` et avant les dictionnaires `78-80`) : bouton sélecteur à la place de `btn-recent` (même `addHeaderButton`, même passage dans le menu « ⋯ » par `02-vf-telephone.js`), légende des paliers, sections « Change souvent avec » et collisions par `addPanelSection('item', …)`, abonnements `VF_ETAT` au `ready`. Chaînes en français (convention `ui/*vf*`), rendues par `h()` ou `textContent`.
+- **`ui/75-vf-activite.js`** (neuf ; les scripts `ui/` sont insérés par ordre de nom, `scripts/build.mjs:448`, donc après `70-vf-live.js` et avant les dictionnaires `78-80`) : bouton sélecteur à la place de `btn-recent` (même `addHeaderButton`, même passage dans le menu « ⋯ » par `02-vf-telephone.js`), légende des paliers, sections « Change souvent avec » et collisions par `addPanelSection('item', …)`, abonnements `VF_ETAT` au `ready`. Chaînes en français (convention `ui/*vf*`), rendues par `h()` ou `textContent`.
 
 ### P4 — Cartes prévues (ACTV-11)
 
@@ -194,7 +194,7 @@ Commande : `rtk proxy grep -rnI -E "recent-work|25-recent|recentTip|recent\.mjs|
 | Fichier : lignes | Devient |
 |---|---|
 | `plugin/cockpit/scripts/vf-cockpit-build.mjs:70-80` | écriture de `recent-work.json` retirée ; un `recent-work.json` hérité de la sortie supprimé (`rmSync force` après `verifierSortie`) |
-| M`assets/ui/25-recent.js`, M`scripts/recent.mjs` | supprimés ; `btn-recent` remplacé par le sélecteur (`74-vf-activite.js`) |
+| M`assets/ui/25-recent.js`, M`scripts/recent.mjs` | supprimés ; `btn-recent` remplacé par le sélecteur (`75-vf-activite.js`) |
 | M`assets/viewer.html:203, 220-227, 795-805, 982, 985, 997-998, 1036-1037, 1059, 1062-1072, 1615-1619` | `.rw`, `.recent`, `.recent-in`, `no-recent`, `recentTip`, bascule de légende retirés ; pied réservé à `.mk` ; jeton `--recent` **gardé** |
 | M`assets/viewer.html:2249` (`showChangeResult`) | lit `G.recent` en mode plan seulement ; `const PLAN = !!G.meta.blueprint;` (`:671`), jamais posé par VibeFlow → laissé, noté |
 | M`scripts/build.mjs:258-291, 415, 472-474` | lecture de `recent-work.json` et ligne de rapport retirées (consommateur devenu mort) |
@@ -305,7 +305,7 @@ Forme proposée du schéma (aucune clé interdite, tableaux de tuples) :
 1. **D-11 face au pied réservé (O-1)** — RESOLVED : « identique » porte sur les données, la réserve du pied est posée avec ou sans git (P75-D-11, P75-D-25 pour le critère d'arrêt).
 2. **Manques 8 et 9** — RESOLVED : fermés par A31 de la 79 (`vf-cockpit-instantane.mjs`, P75-D-23).
 3. **Lab sous-dossier du dépôt et A22** — RESOLVED : A33 de la 79 (cible relative au lab tel qu'il apparaît dans l'arbre de la voie).
-4. **Qui pose le canal (74 ou 75, D-05)** — RESOLVED pour le nom (`VF_MARQUES`, hors de l'objet gelé, P75-D-05) ; reste à constater à l'exécution de 75-07 si la 74 l'a déjà posé (point « à revalider »).
+4. **Qui pose le canal (74 ou 75, D-05)** — RESOLVED : `VF_MARQUES`, hors de l'objet gelé ; la 74 ne crée aucun canal, 75-07 le crée (P75-D-05 mis à jour).
 
 ## Environment Availability
 
@@ -371,7 +371,7 @@ Toute la phase s'exécute **après la 79** (dépendance de jalon) ; chaque plan 
 | 75-03 Chemins, empreinte, collisions | 1 | S`vf-cockpit-activite-chemins.mjs`, S`vf-cockpit-activite-empreinte.mjs`, T`test-cockpit-activite-empreinte.sh` | **à revalider** (O-2 : forme des voies de l'accesseur) |
 | 75-04 Route et schéma | 2 | S`vf-cockpit-activite.mjs`, S`vf-cockpit-server.mjs` (1 ligne), S`vf-cockpit-interface.json`, S`vf-cockpit-project.mjs` (champ `vague`), T`test-cockpit-activite-route.sh` | après 79-05 ; **à revalider** (manques 8, 9) |
 | 75-05 Cartes prévues | 2 | S`vf-cockpit-activite-prevues.mjs`, S`vf-cockpit-build.mjs` (1 ligne d'annotateur), M`scripts/build.mjs`, M`scripts/lib/common.mjs`, T`test-cockpit-activite-prevues.sh` | moteur ; **à revalider** (A4) |
-| 75-06 Canal et page | 3 | M`assets/viewer.html`, M`assets/ui/74-vf-activite.js`, M`assets/ui/00-vibeflow.js`, M`assets/serve.mjs` (prévues hors export), T`test-cockpit-activite-carte.sh`, T`chrome-activite.mjs` | après la vague 3 de la 79 et la 74 (D-05) |
+| 75-06 Canal et page | 3 | M`assets/viewer.html`, M`assets/ui/75-vf-activite.js`, M`assets/ui/00-vibeflow.js`, M`assets/serve.mjs` (prévues hors export), T`test-cockpit-activite-carte.sh`, T`chrome-activite.mjs` | après la vague 3 de la 79 et la 74 (D-05) |
 | 75-07 Retrait | 4 | S`vf-cockpit-build.mjs`, M`assets/ui/25-recent.js` (suppr.), M`scripts/recent.mjs` (suppr.), M`assets/viewer.html`, M`scripts/build.mjs`, M`assets/graph-query.js`, M`assets/ui/60-export.js`, M`assets/ui/78-vf-fr-dict-a.js`, M`assets/ui/80-vf-fr.js`, M`assets/ui/01-vf-responsive.js`, M`assets/ui/02-vf-telephone.js`, M`VENDORED.txt`, T`test-cockpit-ecrans-recent.sh` (+ fixture), T`test-cockpit-onglet-code.sh`, T`test-cockpit-moteur-carte.sh`, T`chrome-moteur-carte.mjs`, T`test-cockpit-responsive.sh`, T`test-cockpit-chrome-fr.sh`, T`test-cockpit-securite.sh` | même lot que 75-06 (D-20), jamais avant |
 | 75-08 Non-régression et docs | 4 | T`test-cockpit-chaine-xss.sh`, `plugin/cockpit/CHANGELOG.md`, `plugin/cockpit/README.md`, `DESIGN.md`, `README.md` + `README.fr.md` (compteur « N suites » : +6) | seul plan qui touche le compteur ; relecture SOBR-04 au rapport |
 
@@ -434,8 +434,8 @@ Plans de la Phase 80 relevés sur `origin/feat/phase-80-trois-formes` : 80-01 (c
 | MUTANT glob quadratique (recherche sans point de reprise) | 20 000 / 40 000 | 482,3 ms puis 1 920,0 ms | 1 207,8 ms | ROUGE |
 | RegExp `/^(?:[^/]*\/)*\.\.(?:\/.*)?$/` sur `'a/'.repeat(N) + 'x'` (relevé du vérificateur) | 20 000 / 40 000 | 0,165 ms puis 0,319 ms | — | VERT : linéaire, retiré des plans |
 | `compileGlob('**/a/**/b/**/*.js').test('a/'.repeat(N) + 'x')`, code du moteur tel quel (75-06) | 20 000 / 40 000 | 855,0 ms puis 3 444,6 ms | 2 139,4 ms | ROUGE : le moteur est super-linéaire sur un motif à plusieurs `**` (finding) |
-| sain : même test avec le chemin borné à 4 096 octets AVANT `test` (V-N2N de 75-06) | 20 000 / 40 000 | 0,01 ms puis 0,02 ms | 2,02 ms | VERT |
-| MUTANT « borne retirée » (même test sans borne) | 20 000 / 40 000 | 756,7 ms puis 3 034,2 ms | 1 893,7 ms | ROUGE |
+| (historique, plus posé côté 75 : P79-D-32 corrige `compileGlob` au point unique `scripts/lib/vf-glob.mjs`, plan 79-21) même test avec le chemin borné à 4 096 octets AVANT `test` | 20 000 / 40 000 | 0,01 ms puis 0,02 ms | 2,02 ms | VERT |
+| (historique) MUTANT « borne retirée » | 20 000 / 40 000 | 756,7 ms puis 3 034,2 ms | 1 893,7 ms | ROUGE |
 | sain à la limite de la borne (N = 2 000, 4 001 octets) | 2 000 | 7,64 ms | assertion absolue <= 50 ms | VERT |
 | `compileGlob` sur motifs à un seul `**` ou `*` (`plugin/**/*.mjs`, `src/*/*/*/*.ts`, `**/*`) | 20 000 / 40 000 | <= 0,05 ms | — | VERT |
 
@@ -448,3 +448,9 @@ Commande : celle de 75-09c et 75-10, motifs de § Retrait (`btn-recent` compris)
 ### 5. Contrats de la Phase 79 relus au commit 29fd3e71 (A34 à A37)
 
 La table des routes et la réponse gardée vivent dans `plugin/cockpit/scripts/vf-cockpit-routes.mjs` (module neuf de 79-05) ; points d'extension d'essai `attach(…, routes)` et `assembler(…, annotateurs)` ; annotateurs rangés dans l'ordre alphabétique de leur nom ; `vf-cockpit-server.mjs` n'est pas touché par la 75. L'instantané porte `at` et n'expose pas les voies brutes : la projection `frise` y entre au plan 79-13, `rattachement` y est joint, 2 000 voies au plus. Une seule règle de chemin : la fonction de résolution physique de 79-07.
+
+### 6. Contrats de la Phase 79 relus au commit 6fb94fb7 (A34 à A45, P79-D-28 à D-33), Phases 80 et 74
+
+- A45 / P79-D-33 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, « Les compter comme le lab ») : `cibles` = `{ arbre, cible, n, dernierMs }`, jointure par (`arbre`, `cible`), worktrees vérifiés du même dépôt comptés comme le lab. A43 : `cibles` null pour une voie de forme inconnue, cible coupée à 120 caractères (jamais jointe), 500 voies au plus. A44 : 299 lignes au plus par fichier. A40, A41 : CSP `script-src` limité aux scripts du module sous `/_vf/` (liste fermée), sortie non servie en statique. P79-D-32 / 79-21 : `compileGlob` corrigé au point unique `scripts/lib/vf-glob.mjs`, 75-06 en dépend.
+- Phase 74 (`origin/feat/phase-74-equipe-dans-le-temps`) : utilise des fichiers `ui/74-vf-*` ; les fichiers neufs de la 75 sont `ui/75-vf-*` (`75-vf-marques.js`, `75-vf-marques-glyphes.js`, `75-vf-activite.js`, `-menu`, `-tables`, `-panneau`, `-collisions`). La 74 ne crée aucun canal de marquage.
+- `showBoard` est défini dans `viewer.html` (exposé par `SC.showBoard`), appelé par `20-health.js`, `25-recent.js` et `30-screens.js` : le retrait de `25-recent.js` ne l'emporte pas (la 74 s'en sert).
