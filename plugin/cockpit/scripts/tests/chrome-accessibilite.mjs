@@ -59,6 +59,7 @@ await executer(chrome, async (s) => {
     const ANNEAU = `(() => { const a = document.activeElement; if (!a || a === document.body) return JSON.stringify({ fin: true });
       const sig = (e) => { const c = getComputedStyle(e); return (c.outlineStyle !== 'none' && parseFloat(c.outlineWidth) > 0) ? c.outlineWidth + ' ' + c.outlineStyle + ' ' + c.outlineColor : ''; };
       let r = sig(a); if (!r) { const f = a.closest('form'); if (f && sig(f)) r = sig(f); }
+      if (!r && a.matches('g.node')) { const c = a.querySelector('.card'); if (c) r = sig(c); } // 80-01 (P80-D-36) : l'anneau d'une carte du canevas se dessine sur sa .card, jamais sur le g
       const W = (window.__tabIds ||= new WeakMap()); if (!W.has(a)) W.set(a, (window.__tabN = (window.__tabN || 0) + 1));
       return JSON.stringify({ n: W.get(a), cle: a.id || a.tagName.toLowerCase() + '.' + String(a.className && a.className.baseVal !== undefined ? a.className.baseVal : a.className || '').split(/\\s+/)[0], anneau: r }); })()`;
     await s.ev("(() => { document.activeElement && document.activeElement.blur(); const d = document.createElement('span'); d.id = 'vf-depart'; d.tabIndex = -1; d.setAttribute('style', 'position:fixed;left:0;top:0;width:0;height:0'); document.body.prepend(d); d.focus(); })()");
