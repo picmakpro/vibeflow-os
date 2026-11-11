@@ -217,6 +217,15 @@ assert_eq "D9.2 — aucune comparaison directe (=== ou !==) d'un jeton du cockpi
 LAB9="$WORK/lab9"; cp -R "$LAB" "$LAB9"; rm -rf "$LAB9/.vibeflow"
 VF_COCKPIT_SCRIPTS_DIR="$WORK/leurre" node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB9" --quiet > "$WORK/d9.out" 2>&1; RC9=$?
 assert_eq "D9.3 — l'assembleur lancé directement prend le dossier de scripts de son propre emplacement, jamais une valeur héritée (code 0, sortie présente)" "$RC9|$([ -f "$LAB9/.vibeflow/cockpit/serve.mjs" ] && echo oui || echo non)" "0|oui"
+cat > "$AUX/drift-cite.mjs" <<'JS'
+import path from 'node:path'; import { pathToFileURL } from 'node:url'; import fs from 'node:fs';
+const [, , scripts] = process.argv;
+const { commandeCorrectif } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-drift.mjs')).href);
+const c = commandeCorrectif('/tmp/lab\\x');
+const defs = fs.readdirSync(scripts).filter((f) => /^vf-cockpit.*\.mjs$/.test(f) && fs.readFileSync(path.join(scripts, f), 'utf8').split('\n').some((l) => !l.trim().startsWith('//') && (l.includes("replace(/'/g") || l.includes("replace(/['"))));
+console.log(JSON.stringify({ barre: c.includes("'/tmp/lab'\\\\'x'"), modules: defs }));
+JS
+assert_eq "D9.4 — la commande du correctif de dérive cite par citer (barre oblique inverse sûre) et un seul module définit la citation shell" "$(node "$AUX/drift-cite.mjs" "$SCRIPTS")" '{"barre":true,"modules":["vf-cockpit-git-commandes.mjs"]}'
 
 echo; echo "=== bilan : $PASS passés, $FAIL échoués ==="
 [ "$FAIL" -eq 0 ]
