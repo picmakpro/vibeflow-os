@@ -604,17 +604,37 @@ Plans:
 
 ### Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
+> **Cadrée le 2026-11-11** (`75-CONTEXT.md`, P75-D-01..31, décisions déléguées, option recommandée, sauf P75-D-28 et P75-D-29 (arbitrages Samuel, AskUserQuestion session principale, 2026-11-11) ; questions au format C76-Q1, P75-Q-06 en attente, bloque 75-10). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
 
 **Goal:** La carte Code se colore par l'activité : fréquence de changement croisée avec la taille, fichiers qui changent ensemble, fichiers couverts par un gate ou une suite et zones sans témoin, fichiers lus ou modifiés par la mission en cours.
-**Requirements**: TBD — posées au cadrage.
-**Depends on:** Phase 67 (onglet Code) ; Phase 69 pour l'empreinte des agents ; Phase 79 (index des transcripts) ; ordre du jalon : après la 74. La Phase 79 est ajoutée depuis l'audit du 2026-11-10.
-**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 5, 6, 7, 8) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2.
-**Plans:** 0 plans
+**Requirements**: ACTV-01, ACTV-02, ACTV-03, ACTV-04, ACTV-05, ACTV-06, ACTV-07, ACTV-08, ACTV-09, ACTV-10, ACTV-11, ACTV-12
+**Depends on:** Phase 67 (onglet Code) ; Phase 69 (empreinte des agents) ; Phase 79 (contrats C0 à C6 figés le 2026-11-11, amendés A1-A28 : route de frise et champ `cibles` en mémoire, magasin `VF_ETAT`, coquille et graphe servi, retrait de l'appareil de patchs en vague 1) ; Phase 74 (canal de marquage partagé avec la relecture AUDC-I06, P75-D-05) ; ordre du jalon : après la 74. Partage la carte Code avec la Phase 80 (elle la rend navigable, la 75 la marque).
+**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 5, 6, 7, 8) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2 (AUDC-I12, I13, I36).
+**Retrait (un ajout, un retrait) :** la couche déclarative « Travail récent » et `scripts/recent.mjs` du moteur ; l'entrée du menu « ⋯ » reste au même endroit et devient le sélecteur de lentilles (P75-D-28, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).
+
+**Success Criteria** (what must be TRUE):
+  1. Dans l'onglet Code, une lentille choisie dans le menu (Points chauds, Couplage, Gardes, Empreinte) marque chaque carte d'un glyphe à paliers et d'un mot, lisibles sans couleur, sans fond teinté ni couleur d'alerte, et sans déplacer aucune carte.
+  2. Les points chauds et le couplage viennent de `git log` local sur 90 jours plafonnés, recalculés seulement quand HEAD ou les refs changent, sans lecture réseau ni écriture dans le lab ; sans git, la carte est identique.
+  3. Les fichiers qu'aucune suite ni aucun gate ne nomme se lisent « aucune suite ne le nomme » sur un lab VibeFlow ; ailleurs la lentille se dit absente.
+  4. Les fichiers lus ou écrits par les agents des dernières 24 h s'allument avec le nom de l'agent ; un même fichier visé par deux agents, deux branches ou deux plans d'une même vague est signalé avant la fusion, y compris dans les worktrees prouvés du dépôt hors du dossier du lab (P75-D-29).
+  5. Les fichiers que les plans non faits vont créer apparaissent en cartes « prévues ».
+  6. La couche « Travail récent » et `scripts/recent.mjs` sont retirés ; toutes les suites du cockpit sont vertes sous macOS et Linux, chaîne XSS étendue aux chemins et noms hostiles.
+**Plans:** 12 plans en 9 vagues (planifiés le 2026-11-11, corrigés après vérification ; exécution après la Phase 79 entière, la 80 et la 74)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 75 to break down)
+- [ ] 75-01-PLAN.md — Calcul git : points chauds, couplage, collisions entre branches (vague 1 ; ACTV-04, 05, 06, 10)
+- [ ] 75-02-PLAN.md — Gardes : règle de citation de la CI lue dans le socle, suite d'équivalence (vague 1 ; ACTV-07)
+- [ ] 75-03-PLAN.md — Chemins, empreinte et collisions d'agents et de plans, preuve générative (vague 1 ; ACTV-08, 09, 10)
+- [ ] 75-04-PLAN.md — `files_modified` borné jusqu'à l'instantané, avec la vague de la Phase 80 (vague 1 ; ACTV-10, 11)
+- [ ] 75-05-PLAN.md — Route `/api/vf/activite`, schéma `cockpit-activite@1`, témoin d'export (vague 2 ; ACTV-04, 08, 10, 12)
+- [ ] 75-06-PLAN.md — Cartes « prévues » : annotateur, règle de rattachement extraite, export sans les prévues (vague 3 ; ACTV-11)
+- [ ] 75-07-PLAN.md — Canal de marquage, pied réservé, glyphes, nom accessible, rendu des prévues (vague 4 ; ACTV-01, 02, 03, 11)
+- [ ] 75-08-PLAN.md — Sélecteur de lentilles, menu, panneau, compte du radar (vague 5 ; ACTV-01, 02, 06, 07, 08, 10)
+- [ ] 75-09a-PLAN.md — Retrait côté assemblage et moteur : `recent-work.json`, `recent.mjs`, étape de `refresh.mjs`, sonde Y reportée (vague 6 ; ACTV-12)
+- [ ] 75-09b-PLAN.md — Retrait côté page et jetons : `25-recent.js`, `#btn-recent`, survol, suites `ecrans-recent` et `responsive` adaptées (vague 7 ; ACTV-12, 01)
+- [ ] 75-09c-PLAN.md — Retrait : dictionnaires, `moteur-carte`, `chrome-moteur-carte`, `chrome-fr`, grep d'inventaire à zéro (vague 8 ; ACTV-12)
+- [ ] 75-10-PLAN.md — Chaîne XSS étendue, sans git, DESIGN.md, CHANGELOG, compteur de suites (vague 9 ; ACTV-12)
 
 ### Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire
 

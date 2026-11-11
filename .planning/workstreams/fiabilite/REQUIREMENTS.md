@@ -1072,6 +1072,18 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | TEMP-11 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
 | TEMP-12 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
 | — | Phase 75 | repère de cadrage, Phase 75 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| ACTV-01 | Phase 75 | Pending — 2026-11-11 (cadrage) |
+| ACTV-02 | Phase 75 | Pending — 2026-11-11 (cadrage) |
+| ACTV-03 | Phase 75 | Pending — 2026-11-11 (cadrage) |
+| ACTV-04 | Phase 75 | Pending — 2026-11-11 (cadrage) |
+| ACTV-05 | Phase 75 | Pending — 2026-11-11 (cadrage) |
+| ACTV-06 | Phase 75 | Pending — 2026-11-11 (cadrage) |
+| ACTV-07 | Phase 75 | Pending — 2026-11-11 (cadrage) |
+| ACTV-08 | Phase 75 | Pending — 2026-11-11 (cadrage) |
+| ACTV-09 | Phase 75 | Pending — 2026-11-11 (cadrage) |
+| ACTV-10 | Phase 75 | Pending — 2026-11-11 (cadrage) |
+| ACTV-11 | Phase 75 | Pending — 2026-11-11 (cadrage) |
+| ACTV-12 | Phase 75 | Pending — 2026-11-11 (cadrage) |
 | — | Phase 76 | repère de cadrage, Phase 76 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 77 | repère de cadrage, Phase 77 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 79 | repère de cadrage, Phase 79 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
@@ -1786,6 +1798,23 @@ la Phase 80.
 - [ ] **TEMP-12**: Forme et retrait : clavier complet (voies, curseur, filtres ; la bascule est celle de la régie), alternative textuelle de la frise pour lecteur d'écran, focus visible, mouvement réduit, deux thèmes, grille d'espacements fermée, aucune valeur en dur, interface en français ; retirés : la boîte de transcript du panneau et son bouton « Lire le transcript », la durée qui compte les veilles, la carte « Terminés depuis moins de 24 h » du canevas si elle existe encore, et le lecteur de repli de la régie avec l'export `transcript` (74-10, P73-C2) ; suites du cockpit vertes ; aucun bump propre, un seul pour la vague à la jointure (P74-D-28, D-43, D-51, D-53 ; P71.5-D-01, Q11).
 
 <!-- vf-cadrage:phase-75 -->
+
+### L'activité posée sur le code (Phase 75 — posées au cadrage, 2026-11-11)
+
+> Dérivent de P75-D-01..21 (`75-CONTEXT.md` ; décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée, sur panels de recherche ; aucune ne vaut arbitrage humain). Famille neuve `ACTV`, vérifiée libre le 2026-11-11 sur tous les ledgers `.planning/workstreams/*/REQUIREMENTS.md`. Contrats de la Phase 79 consommés : `feat/phase-79-socle-cockpit`, `3119d82a`, C0 à C6.
+
+- [ ] **ACTV-01**: Lentilles exclusives (Aucune, Points chauds, Couplage, Gardes, Empreinte) choisies dans le menu qui portait « Travail récent », à la même place et avec sa pastille de compte ; aucun bouton d'en-tête ni 4ᵉ onglet, rien ne pousse la carte ; témoin : géométrie de chaque carte identique avant et après bascule de lentille et après une mise à jour en direct, aucune relance du placement (P75-D-02, D-03, P70-D-01, P78-D-04).
+- [ ] **ACTV-02**: Forme des marques : glyphe à trois paliers en teinte neutre + mot chiffré dans l'emplacement droit du pied ; teinte « en cours » réservée au fichier en cours d'écriture ; ni fond, liseré, anneau, halo ni dégradé ; contraste ≥ 3:1 dans les deux thèmes ; la marque se lit sans couleur et son mot entre dans le nom accessible de la carte ; carte de nœud = palier maximal + compte (P75-D-01, D-04, D-06, Q9, P71.5-D-19, D-21, D-28).
+- [ ] **ACTV-03**: Canal de marquage unique de la page (couche nommée, table id → palier, glyphe, mot, infobulle ; agrégat aux ancêtres ; une couche active) sous un espace de noms à part (l'objet global du moteur est gelé, Phase 80), initialisé par `VF_COQUILLE.surOnglet` (A30 de la 79), partagé avec la relecture de la Phase 74 (AUDC-I06) ; témoin : deux couches posées successivement, seule la dernière est visible et la première revient à son retrait (P75-D-05).
+- [ ] **ACTV-04**: Données git calculées par une tâche asynchrone sur la signature de HEAD et des refs, mono-vol, cache en mémoire, via `envGit` et `lancerGitAsync` ; route GET bornée sous `/api/vf/` derrière les contrôles C0 et `porteInterdit`, schéma `vibeflow/cockpit-activite@1` déclaré ; rien écrit dans le lab ; aucun `fetch` ; une requête pendant le calcul répond ; témoin : HEAD inchangé → aucun `git log` relancé (P75-D-09, P78-D-15, AUDC-A-04).
+- [ ] **ACTV-05**: Points chauds : commits hors merges des 90 derniers jours plafonnés à 5 000, × `loc`, en rang et trois paliers par quantiles ; renommages suivis (`-M`) ; plafond mordu et clone superficiel écrits sur la lentille ; témoins sur un dépôt fixture : plafond, fenêtre, renommage, merge exclu (P75-D-07).
+- [ ] **ACTV-06**: Couplage : seuils ≥ 5 révisions communes, ≥ 5 par fichier, degré ≥ 30 %, commits de 30 fichiers au plus, liste fixe de bruit ; montré à la sélection d'une carte seulement (5 voisins au plus avec leur %) et dans une section « Change souvent avec » du panneau ; aucun lien ajouté au graphe ; mutants sur chaque seuil (P75-D-08).
+- [ ] **ACTV-07**: Gardes : un fichier est gardé quand une suite découverte ou un gate appelé par `ci.yml` nomme son chemin (ou son nom non ambigu), sans la part « module » ; glyphe « est une garde » ; zone sans témoin dite « aucune suite ne le nomme » ; rien du lab exécuté ; sur un lab non VibeFlow la lentille est absente et le dit ; suite d'équivalence contre `scripts/ci-suites-perimetre.sh` sur des diffs témoins (P75-D-16, D-17, P68-D-34).
+- [ ] **ACTV-08**: Empreinte en direct depuis `cibles` des voies de la frise (C3), en mémoire seulement : « en cours » / « modifié » / « lu » / « fini » d'après l'état officiel ; nom = rôle, nœud, arbre, jamais l'identifiant brut ; « empreinte en cours de relecture » tant que `cibles.etat` vaut `en-construction` ; « écritures par commande non vues » dit ; jamais d'argument, de sortie d'outil ni d'export ; agrégat « agent par zone » sur les nœuds (P75-D-12, D-13, AUDC-I13, I36, AUDC-Q2, Q4).
+- [ ] **ACTV-09**: Normalisation des chemins : cible ramenée à `{arbre, chemin dans l'arbre}` (A45 de la 79 : `arbre` = `null` ou nom d'un worktree prouvé du dépôt, qui compte comme le lab, P75-D-29, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11), seul un chemin qui a une carte est dessiné, le reste compté (« hors carte », « hors du lab » pour un dossier qui n'est pas un worktree prouvé) ; preuve générative sur les formes de chemin (lien symbolique, `..`, worktree hors du lab, Unicode, U+2028) (P75-D-14, AUDC-A-02).
+- [ ] **ACTV-10**: Radar de collisions : même fichier écrit par deux agents (arbres différents tant que les deux existent ; même arbre si vivants ensemble et non parent-enfant), modifié sur deux branches (merge-base par paire de HEAD distincts, ≤ 12 HEAD, plafond écrit), ou prévu par deux plans d'une même vague ; lectures exclues ; glyphe neutre distinct + mot + noms au panneau + compte visible sans lentille ; jamais `git status` périodique ni `git diff` contre l'arbre de travail ; « radar incomplet » pendant la reconstruction (P75-D-10, D-15, AUDC-I12, P78-D-21).
+- [ ] **ACTV-11**: Cartes « prévues » : fichiers des `files_modified` des plans non faits absents du scan, injectés après la construction du graphe avec le statut `prévu`, rattachés par les globs ou « non assignés », non comptés par Santé, sans « ouvrir » ni « taille » ; chemin hors du lab ou malformé ignoré et compté (P75-D-18, AUDC-I36).
+- [ ] **ACTV-12**: Retrait et non-régression : couche « Travail récent » (`recent-work.json`, `ui/25-recent.js`, classes `.recent`, bascule) et `scripts/recent.mjs` retirés dans le même lot que la mise en service de l'empreinte (P75-D-28, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; P70-D-01 amendée dans cette mesure) ; jeton `--recent` gardé ; suites qui la citent adaptées, jamais supprimées ; toutes les suites du cockpit vertes sous macOS et Linux ; chaîne XSS étendue (chemin, branche, rôle, titre hostiles) ; dégradation sans git identique (P78-D-11) ; `DESIGN.md` § 2 (graphe de code) et CHANGELOG du module à jour ; relecture SOBR-04 (P75-D-11, D-20, D-21).
 
 <!-- vf-cadrage:phase-76 -->
 
