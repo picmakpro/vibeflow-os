@@ -193,7 +193,7 @@ assert_eq "R2.1d — un fichier suivi modifié sans add : aucun événement (lim
 fenetre 11000 "$WORK/w2e.sse" true
 assert_eq "R2.2a — témoin : le journal d'argv voit les appels de la signature (for-each-ref)" "$([ "$(sous_cmds "$WORK/git.log" | grep -c '^for-each-ref$')" -ge 1 ] && echo oui || echo non)" "oui"
 assert_eq "R2.2b — 11 s sans changement : aucune sous-commande log, status ni diff" "$(sous_cmds "$WORK/git.log" | grep -cE '^(log|status|diff)$')" "0"
-assert_eq "R2.2c — sous-commandes vues : seulement for-each-ref, worktree, show-ref, symbolic-ref, rev-list, rev-parse" "$(sous_cmds "$WORK/git.log" | sort -u | grep -vxE 'for-each-ref|worktree|show-ref|symbolic-ref|rev-list|rev-parse' | tr '\n' ' ')" ""
+assert_eq "R2.2c — sous-commandes vues : seulement for-each-ref, worktree, show-ref, symbolic-ref, rev-list, rev-parse, plus config (lecture des pilotes nommés du dépôt, 79-07)" "$(sous_cmds "$WORK/git.log" | sort -u | grep -vxE 'for-each-ref|worktree|show-ref|symbolic-ref|rev-list|rev-parse|config' | tr '\n' ' ')" ""
 stop_srv
 # R2 (revue serveur 2026-11-06, S3) : la mesure vise le dépôt de CETTE suite (celui qui contient le dossier du script), jamais un chemin de poste ; hors dépôt : SAUTÉ, jamais un PASS.
 # Le plafond est large (250 ms sur la médiane de 7 appels, 3 git par appel) : il garde contre un coût démesuré, pas contre la charge de la machine (48 à 55 ms mesurés sous charge contre un plafond de 50).

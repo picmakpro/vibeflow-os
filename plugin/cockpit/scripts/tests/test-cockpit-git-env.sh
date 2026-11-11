@@ -374,8 +374,10 @@ assert_eq "M-FILTRES — rougit E2.1 : le filtre déclaré par le dépôt est la
 node "$AUX/lg.mjs" "$MD" "$P" '{}' status --porcelain -- f.txt >/dev/null 2>&1
 assert_eq "M-FILTRES — rougit aussi E5.1 : le filtre est lancé par lancerGit" "$(marque PROC)" "posé"; raz
 
-# M-LECTURE : OPTIONS_LECTURE non insérées -> E2.4 et E5.2 voient le textconv se lancer, E2.4b la sortie gpg
-assert_eq "M-LECTURE.0 — l'ancre du mutant existe" "$(mutant lecture 'ins = OPTIONS_LECTURE[sous] || [];' 'ins = [];')" "muté"
+# M-LECTURE : OPTIONS_LECTURE non insérées ET pilotes non vidés (79-07, A-04 : le vidage ferme seul la classe, les deux protections sont indépendantes ; chacune retirée seule laisse E2.4 et E5.2 verts)
+# -> E2.4 et E5.2 voient le textconv se lancer, E2.4b la sortie gpg
+LK_VIDE='envGit(lab, { config: configFiltres(p.unites) })'
+assert_eq "M-LECTURE.0 — l'ancre du mutant existe (options de lecture, puis vidage de shBorne et de lancerGit)" "$(mutant lecture 'ins = OPTIONS_LECTURE[sous] || [];' 'ins = [];')|$(FROM="$LK_VIDE" TO='envGit(lab)' node "$AUX/mutsub.mjs" "$WORK/mut-lecture/vf-cockpit-git-lanceur.mjs")|$(FROM="$LK_VIDE" TO='envGit(lab)' node "$AUX/mutsub.mjs" "$WORK/mut-lecture/vf-cockpit-git-lanceur.mjs")" "muté|muté|muté"
 MD="$WORK/mut-lecture"
 node "$AUX/sh.mjs" "$MD" "$P" "$P" log -p -1 >/dev/null 2>&1
 assert_eq "M-LECTURE — rougit E2.4 : le textconv est lancé par shBorne" "$(marque TEXTCONV)" "posé"; raz
@@ -482,13 +484,15 @@ assert_eq "E9.5 — 300 filtres (au-delà de la borne) : lancerGit et lancerGitA
 S9="$(node "$AUX/sh.mjs" "$SCRIPTS" "$F300" "$F300" status --porcelain 2>/dev/null)"
 assert_eq "E9.5a — shBorne status, 300 filtres : sortie vide (inconnu), aucun programme lancé" "$(marque F9)|${S9:-vide}" "absent|vide"; raz
 R="$(LG "$F300" '{}' log -1 --format=%s)"
-assert_eq "E9.5b — la borne ne vise que les sous-commandes filtrantes : log reste lu sur le même dépôt" "$(G "$R" 'j.ok+"|"+j.sortie.trim()')" "true|un"
+assert_eq "E9.5b — la borne vise toute sous-commande (79-07, A-04 : les pilotes sont vidés pour tout lancement) : log est refusé aussi sur le même dépôt" "$(G "$R" '[j.ok,j.refuse,JSON.stringify(j.sortie)].join(":")')" 'false:true:""'
 # liste des filtres illisible (git config en échec) : status n'est pas lancé non plus (un filtre inconnu n'est pas un filtre absent)
 mkdir -p "$WORK/bin-cfg"; printf '#!/bin/sh\ncase "$*" in *--get-regexp*) exit 2;; esac\nexec "%s" "$@"\n' "$GIT_REEL" > "$WORK/bin-cfg/git"; chmod +x "$WORK/bin-cfg/git"
 R="$(PATH="$WORK/bin-cfg:$PATH" LG "$F70" '{}' status --porcelain)"; R2="$(PATH="$WORK/bin-cfg:$PATH" LGA "$F70" '{}' status --porcelain)"
 assert_eq "E9.6 — liste des filtres illisible (git config --get-regexp rend 2) : status refusé en synchrone et en asynchrone, aucun programme lancé" "$(marque F9)|$(G "$R" '[j.ok,j.refuse].join(":")')|$(G "$R2" '[j.ok,j.refuse].join(":")')" "absent|false:true|false:true"; raz
 R="$(PATH="$WORK/bin-cfg:$PATH" LG "$F70" '{}' rev-parse HEAD)"
-assert_eq "E9.6a — témoin : le même emballage laisse passer les autres commandes (rev-parse ok) : le refus vient de la liste illisible" "$(G "$R" 'j.ok')" "true"
+assert_eq "E9.6a — toute sous-commande est refusée quand la liste est illisible (79-07, A-04) : rev-parse aussi" "$(G "$R" '[j.ok,j.refuse].join(":")')" "false:true"
+R="$(LG "$F70" '{}' rev-parse HEAD)"
+assert_eq "E9.6b — témoin : sans l'emballage, la liste du même dépôt est lisible et rev-parse est lu : le refus vient de la liste illisible" "$(G "$R" 'j.ok')" "true"
 
 # A2 : sous-modules — la config de .git/modules/<n>/config n'est jamais lue par un status lancé par le cockpit
 mk_sous_module() { # mk_sous_module <dossier> : super-dépôt `repo` + sous-module `sub` dont la configuration (sous .git/modules) déclare un filtre qui pose SUBCLEAN
