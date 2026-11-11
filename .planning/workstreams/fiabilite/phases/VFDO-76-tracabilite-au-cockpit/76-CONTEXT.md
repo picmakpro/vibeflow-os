@@ -97,9 +97,11 @@ dépôt.
 ### Données : chemin, schéma, sécurité
 
 - **P76-D-06 (route à la demande).** Les données arrivent par une route propre, `GET /api/vf/tracabilite`, appelée à
-  l'ouverture d'une section ou d'un panneau, calcul asynchrone, cache par empreinte (sha de HEAD + date de
-  modification la plus récente sous `.planning/`, de `docs/ADR.md` et sous `.claude/agent-memory/` ; amendé le
-  2026-11-11 sur `76-RESEARCH.md` : l'empreinte d'origine omettait PLAN, SUMMARY, VERIFICATION et recette), un seul calcul en vol,
+  l'ouverture d'une section ou d'un panneau, calcul asynchrone, cache par empreinte (sha de HEAD + `seq` de l'instantané de la collecte pour tout ce qui vient de `.planning/` + date
+  de modification de `docs/ADR.md` et de `.claude/agent-memory/` et de ses sous-dossiers d'agent ; amendé deux fois le
+  2026-11-11 : `76-RESEARCH.md` a montré que l'empreinte d'origine omettait PLAN, SUMMARY, VERIFICATION et recette, puis
+  le vérificateur frais a montré qu'un parcours de `.planning/` à chaque requête contredit A31 ; la collecte surveille
+  déjà `.planning/`, son `seq` suffit), un seul calcul en vol,
   une seule entrée en cache. Ce qui vient du planning se lit dans l'instantané de la collecte et ne se relit jamais dans la route (P76-D-31, règles A31 et A32 de la 79). Panel
   « données » : option B retenue (A écartée : poids de page, collecte synchrone, conflit avec la 79 sur la boucle ;
   C écartée : deux sources pour le même compte). Paramètres `vue=jalon|phase|exigence|decision|adr|memoire|entree` et
