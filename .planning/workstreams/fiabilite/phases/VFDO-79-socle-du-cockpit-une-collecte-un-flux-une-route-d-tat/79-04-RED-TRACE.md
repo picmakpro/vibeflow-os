@@ -29,3 +29,32 @@ Résultat de la suite sur la base : 448 OK / 19 KO / 0 SKIP ; les 19 KO sont tou
 ✗ T46 mutant (a5) m12 : zone « Digest de mission » privée de « identifiants distincts » : témoin positif absent (le contrôle refuse déjà le fichier réel)
 ✗ T46 mutant (a5) m13 : zone « Digest de mission » privée de « register --node » : témoin positif absent (le contrôle refuse déjà le fichier réel)
 ```
+
+## Tâche 1 — vert après la doctrine, traces des treize mutants (raison vérifiée)
+
+Suite après la ligne Nœud et le paragraphe « Nœud du mandat » : 467 OK / 0 KO / 0 SKIP ; 19 lignes « ✓ T46 » (six assertions,
+dont le témoin de couverture de a2 : n = 1 500, sept classes ; treize mutants). Raisons : m1 écart `classe=court` (plus de
+accents graves, rien n'est lu) ; m2 la ligne qui suit « - Mission : » est « - Étape courante » ; m3 écart `classe=plein`
+(64 caractères, lu=[]) ; m4 `lu7900=[]` ; m5 `lu8100=["revue-p3"]` ; m6 à m13 ancre absente de la zone.
+
+```
+✓ T46 (a1) : la ligne Nœud suit « - Mission : » dans le bloc de digest (≤ 30 lignes)
+✓ T46 (a2) : aller-retour gabarit -> lecteur réel, génératif (graine 79, 1 500 identifiants, sept classes)
+✓ T46 (a2) témoin de couverture : n ≥ 1 000 et les sept classes court, moyen, plein, trop-long, debut-separateur, deux-points, hors-alphabet
+✓ T46 (a3) : fenêtre de 8 000 caractères — ligne à 7 900 lue, à 8 100 non lue
+✓ T46 (a4) : vrai dag.sh add — added revue-p3::s1, remapped vrai, hors motif donc non lu ; revue-p3 lu ; limite écrite dans la zone
+✓ T46 (a5) : la zone « Digest de mission » porte les 8 ancres (forme lue, fenêtre, remap, voix unique)
+✓ T46 mutant (a2) m1 : accents graves retirés de la ligne du gabarit (DISCRIMINANT) : mutant refusé — ECART classe=court longueur=5 "FOn5Z" lu=[] attendu=true
+✓ T46 mutant (a1) m2 : ligne Nœud déplacée en fin de bloc (DISCRIMINANT) : mutant refusé — la ligne qui suit « - Mission : » est « - Étape courante : <n° + objectif + critères de succès> », pas
+✓ T46 mutant (a2) m3 : lecteur à motif {0,31} au lieu de {0,63} (DISCRIMINANT) : mutant refusé — ECART classe=plein longueur=64 "l.nLVmH2SiYiCZKtn6IvH.UkNyL5mkIeC1Qp08nfSoNGD3r-RVNTKjTd0d3sIdUZ" lu=[] attend
+✓ T46 mutant (a3) m4 : lecteur à fenêtre de 4 000 (DISCRIMINANT) : mutant refusé — attendu lu7900=["revue-p3"] lu8100=[], obtenu lu7900=[] lu8100=[]
+✓ T46 mutant (a3) m5 : lecteur à fenêtre de 16 000 (DISCRIMINANT) : mutant refusé — attendu lu7900=["revue-p3"] lu8100=[], obtenu lu7900=["revue-p3"] lu8100=["revue-p3"]
+✓ T46 mutant (a5) m6 : zone « Digest de mission » privée de « citationsDuMandat » (DISCRIMINANT) : mutant refusé — absent de la zone : « citationsDuMandat » 
+✓ T46 mutant (a5) m7 : zone « Digest de mission » privée de « [A-Za-z0-9][A-Za-z0-9._-]{0,63} » (DISCRIMINANT) : mutant refusé — absent de la zone : « [A-Za-z0-9][A-Za-z0-9._-]{0,63} » 
+✓ T46 mutant (a5) m8 : zone « Digest de mission » privée de « 8 000 » (DISCRIMINANT) : mutant refusé — absent de la zone : « 8 000 » 
+✓ T46 mutant (a5) m9 : zone « Digest de mission » privée de « added » (DISCRIMINANT) : mutant refusé — absent de la zone : « added » 
+✓ T46 mutant (a5) m10 : zone « Digest de mission » privée de « remapped » (DISCRIMINANT) : mutant refusé — absent de la zone : « remapped » 
+✓ T46 mutant (a5) m11 : zone « Digest de mission » privée de « :: » (DISCRIMINANT) : mutant refusé — absent de la zone : « :: » 
+✓ T46 mutant (a5) m12 : zone « Digest de mission » privée de « identifiants distincts » (DISCRIMINANT) : mutant refusé — absent de la zone : « identifiants distincts » 
+✓ T46 mutant (a5) m13 : zone « Digest de mission » privée de « register --node » (DISCRIMINANT) : mutant refusé — absent de la zone : « register --node » 
+```
