@@ -584,12 +584,21 @@ Plans:
 
 ### Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
+> **Cadrée et planifiée le 2026-11-11** (mission de cadrage parallèle, `77-CONTEXT.md`, P77-D-01..24 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Deux questions non bloquantes à Samuel (A77-1, A77-2).
 
 **Goal:** Le cockpit montre en jauges les budgets de la méthode (densité des agents, skills, taille du ROADMAP et du BACKLOG, baseline d'instructions), résume ce qui a changé depuis la dernière visite, et trace le burn-up du jalon en pourcentage strict.
-**Requirements**: TBD — posées au cadrage.
-**Depends on:** Phase 69 (avancement des phases et du jalon) ; Phase 79 pour le coût par phase ; ordre du jalon : après la 76. La Phase 79 est ajoutée depuis l'audit du 2026-11-10.
-**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 12, 15, 16) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2.
+**Requirements**: SYNT-01, SYNT-02, SYNT-03, SYNT-04, SYNT-05, SYNT-06, SYNT-07, SYNT-08, SYNT-09, SYNT-10
+**Depends on:** Phase 69 (avancement des phases et du jalon) ; Phase 79 : table des routes et réponse gardée commune (79-05), instantané de la collecte (79-09), appareil de patchs retiré et installation par onglet `VF_COQUILLE.surOnglet` avant les plans du cockpit ; route de frise (79-13) pour le seul coût par phase et par étage ; Phase 74 pour l'agrégat de coût partagé (AUDC-I08) ; ordre du jalon : après la 76. Le plan des gates (`plugin/conductor`) ne dépend d'aucune phase.
+**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 12, 15, 16) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2, registre AUDC-I08 et AUDC-I14 ; contrats de la Phase 79 (`79-CONTEXT.md`, commits `3119d82a` et `2ae6607a` de `feat/phase-79-socle-cockpit`).
+**Retrait (un ajout, un retrait):** la prose recopiée du STATE sous « Maintenant » (`lastDesc`), remplacée par la synthèse datée (P77-D-12).
+
+**Success Criteria** (what must be TRUE):
+  1. Sur Projet, un bouton « Synthèse » ouvre dans le panneau en place « Depuis votre dernière visite », le burn-up et la santé de la méthode, sans 4ᵉ onglet, sans couleur d'alerte ni fond teinté, sans pousser la carte, et sans modifier `ui/00-vibeflow.js` ni `ui/20-health.js`.
+  2. Chaque jauge reprend la valeur, le budget et le verdict que produit le gate (`--format=tsv` en lecture seule de `check-method-budget.sh` et `check-instruction-budget.sh`), appelé à la demande hors de la collecte, sans réseau ni écriture dans `.planning/` ; « non applicable » ou « indisponible », jamais 0, quand le gate ne mesure pas.
+  3. « Depuis votre dernière visite » montre les phases avancées, les commits arrivés, les sessions finies (avec la réserve des 24 h) et les blocages nouveaux ou levés, à partir d'un repère par lab gardé dans le navigateur, sur liste fermée, qui n'avance qu'après 30 min d'absence ou sur « Tout vu ».
+  4. Le burn-up trace les clôtures et le périmètre datés par la checklist du ROADMAP, avec « N sur M · P % » du pied de jalon ; une phase close sans date est nommée, jamais estimée.
+  5. Le coût par phase et par étage sur les dernières 24 h (jetons et durée, sans monnaie) se lit dans la synthèse une fois la route de frise de la Phase 79 livrée ; une voie non rattachée est dite comme telle.
+  6. Chaque comportement a un témoin montré rouge par une mutation puis vert ; toutes les suites du cockpit et du conductor sont vertes sous macOS et Linux.
 **Plans:** 0/7 plans executed (7 plans en 5 vagues, planifiés le 2026-11-11)
 
 Plans:
