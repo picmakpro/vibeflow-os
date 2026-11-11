@@ -354,6 +354,19 @@ reprennent les propositions de la Phase 74, relayées par la session principale 
   la régie et export ensemble, après un témoin qui prouve l'annulation des trois déclencheurs. C'est la seule exception à
   « la 74 ne modifie aucun fichier de la 73 » (P73-D-20) : un retrait, jamais un ajout. Tant que ce plan n'a pas tourné,
   la 73 garde les deux.
+  Ce que la 74 retire, exactement (fixé par 73-05, section dépendance, commit `f0f1eaef`) : (1) la fonction unique
+  `ouvrirRepli(id, ouvreur)` de `plugin/cockpit/skills/cockpit-moteur/assets/ui/72-vf-regie-source.js` — seule à appeler
+  `GET /api/vf/transcript`, `__vfEquipeRendu.transcript`, `SC.showPanel` et `VF_SURCOUCHES.ouvrir`, seule à émettre
+  `vf-agent:lu` côté 73 — et son seul appel, la branche `declencheur === 'rapport'` de l'écouteur de `vf-agent:ouvrir`
+  (`grep -c ouvrirRepli` rend 2 avant le retrait, 0 après) ; (2) la propriété `transcript` de
+  `window.__vfEquipeRendu = { …, transcript, … }` dans `plugin/cockpit/skills/cockpit-moteur/assets/ui/71-vf-equipe-rendu.js`
+  (ligne 230 de la base `f763b556` ; après 73-08 la régie en est le seul consommateur). Témoins de la 73 qui doivent
+  rester VERTS après le retrait : RG15.1, RG15.2, RG15.3, RG15.4, RG15.5, RG15.8, RG15.9 (crans 2 à 4, le cran 1 joué avec
+  une surcouche factice), RG1.11, RG16.1, RG0.11 ; et, pour leurs clauses qui ne dépendent pas du repli, RG15.6 (trois
+  déclencheurs annulés, dépliage de `nom` et `ancre`), RG15.7 (jamais de `lu` sur un `ouvrir` annulé), RG11.10 (annulé :
+  ni requête ni panneau). Deviennent sans objet, à retirer avec le repli par la 74 et à dire dans son commit : la clause
+  non annulée de RG11.10, la clause « `rapport` non annulé ouvre le repli » de RG15.6, la clause « son lecteur s'ouvre,
+  `lu` émis » de RG15.7 ; le mutant M-LU-SI-ANNULE reste une garde.
 - **P73-C3 — Qui émet `vf-agent:lu`.** Celui qui ouvre : la régie l'émet quand son lecteur de repli s'ouvre ; quand la
   Phase 74 a annulé `vf-agent:ouvrir`, c'est la 74 qui l'émet à l'ouverture de sa fiche. La régie écoute
   `vf-agent:lu` quelle qu'en soit la source pour mettre à jour « Terminé, à relire » (P73-D-14).
