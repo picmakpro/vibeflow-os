@@ -217,6 +217,13 @@ et ne sont pas rouverts.
   la collision par `arbre`. Témoins : un même `cible` dans deux arbres → signal « 2 arbres », pas « même arbre » ; le même
   `cible` dans le même arbre par deux agents vivants non parent-enfant → « même arbre » ; mutants croisés.
 
+- **P75-D-31 (texte d'état des cibles coupées, A48).** Décision déléguée par Samuel (message session principale,
+  2026-11-08), option recommandée : quand une voie porte `cibles.tronque` (liste coupée à 200 entrées) ou qu'une cible
+  est coupée par « … » dans ses 120 caractères, la cible coupée n'est jamais jointe à sa jumelle entière et la lentille
+  Empreinte comme le radar le disent par la phrase exacte « Radar incomplet : cibles coupées. » (même registre que
+  « Radar incomplet : historique tronqué. ») ; texte fixé ici en complément de `75-UI-SPEC.md`, qui ne le porte pas,
+  et repris par 75-08 L6.
+
 ### Gardes
 
 - **P75-D-16 (source).** Règle de citation déjà jouée par la CI (`scripts/ci-suites-perimetre.sh`, arbitrage Samuel,
