@@ -556,11 +556,11 @@ Plans:
 
 ### Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte
 
-> **Cadrée le 2026-11-11** (`75-CONTEXT.md`, P75-D-01..21, décisions déléguées, option recommandée ; trois questions non bloquantes à Samuel, Q-75-1 à Q-75-3). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
+> **Cadrée le 2026-11-11** (`75-CONTEXT.md`, P75-D-01..21, décisions déléguées, option recommandée ; quatre questions non bloquantes à Samuel, Q-75-1 à Q-75-4). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
 
 **Goal:** La carte Code se colore par l'activité : fréquence de changement croisée avec la taille, fichiers qui changent ensemble, fichiers couverts par un gate ou une suite et zones sans témoin, fichiers lus ou modifiés par la mission en cours.
 **Requirements**: ACTV-01, ACTV-02, ACTV-03, ACTV-04, ACTV-05, ACTV-06, ACTV-07, ACTV-08, ACTV-09, ACTV-10, ACTV-11, ACTV-12
-**Depends on:** Phase 67 (onglet Code) ; Phase 69 (empreinte des agents) ; Phase 79 (contrats C0 à C6 figés le 2026-11-11 : route de frise et champ `cibles` en mémoire, magasin `VF_ETAT`, coquille et graphe servi, retrait de l'appareil de patchs en vague 1) ; Phase 74 (canal de marquage partagé avec la relecture AUDC-I06, P75-D-05) ; ordre du jalon : après la 74. Partage la carte Code avec la Phase 80 (elle la rend navigable, la 75 la marque).
+**Depends on:** Phase 67 (onglet Code) ; Phase 69 (empreinte des agents) ; Phase 79 (contrats C0 à C6 figés le 2026-11-11, amendés A1-A28 : route de frise et champ `cibles` en mémoire, magasin `VF_ETAT`, coquille et graphe servi, retrait de l'appareil de patchs en vague 1) ; Phase 74 (canal de marquage partagé avec la relecture AUDC-I06, P75-D-05) ; ordre du jalon : après la 74. Partage la carte Code avec la Phase 80 (elle la rend navigable, la 75 la marque).
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 5, 6, 7, 8) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2 (AUDC-I12, I13, I36).
 **Retrait (un ajout, un retrait) :** la couche déclarative « Travail récent » (fichiers des deux dernières phases) et `scripts/recent.mjs` du moteur ; l'entrée du menu devient le sélecteur de lentilles (P75-D-20).
 

@@ -1,10 +1,10 @@
 # Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte - Context
 
 **Gathered:** 2026-11-11
-**Status:** Cadrée (2026-11-11) — frontière de questions vide côté mission ; trois questions non bloquantes à Samuel
+**Status:** Cadrée (2026-11-11) — frontière de questions vide côté mission ; quatre questions non bloquantes à Samuel
 (section « À Samuel ») ; bâtie sur les contrats figés de la Phase 79 (branche `feat/phase-79-socle-cockpit`, commit
-`3119d82a`, `79-CONTEXT.md` § « Contrats fournis », C0 à C6) ; sept manques relayés à la 79 (section « Contrats de la
-Phase 79 retenus »), plans concernés marqués « à revalider ».
+`3119d82a`, `79-CONTEXT.md` § « Contrats fournis », C0 à C6, amendés par `2ae6607a` (A1-A14) et `6f66d878` (A21-A28)) ;
+les sept manques relayés à la 79 sont fermés par A21 à A27 (section « Contrats de la Phase 79 retenus »).
 
 Cadrage par le manager de la mission Phase 75 (`vf-dev-manager`, worktree `.claude/worktrees/phase-75`, branche
 `feat/phase-75-activite-sur-le-code`, base `origin/integration/cockpit-audit` à `f763b556` : release `v2.77.0` alignée,
@@ -147,8 +147,9 @@ et ne sont pas rouverts.
   lectures: [...] (≤ 200) }`), lu par la page via le magasin `window.VF_ETAT` (C4). **En mémoire seulement**, jamais dans
   l'index sur disque (C1, AUDC-Q2 tenue ; question S-1 de la 79). Pendant la reconstruction au démarrage
   (`cibles.etat: "en-construction"`), la lentille et le radar disent « empreinte en cours de relecture, radar incomplet »,
-  jamais « aucune collision ». Lectures : `Read` seul attendu (`Grep` et `Glob` ont pour cible un dossier ou rien : manque
-  n° 4 relayé à la 79). Jamais l'argument, jamais la sortie
+  jamais « aucune collision ». Fraîcheur : la signature de l'événement `frise` couvre les `cibles` (A21) ; la page relit
+  `GET /api/vf/frise?champs=cibles` (A28) à son changement, jamais par sondage. Lectures = `Read` seul ; écritures =
+  `Write`, `Edit`, `MultiEdit`, `NotebookEdit` ; `Grep`, `Glob`, `Bash` ne produisent aucune cible (A24). Jamais l'argument, jamais la sortie
   d'outil, jamais exporté ; section exclue de l'export (P69-D-16, D-19, P67-D-14). Limite dite sur la lentille :
   « écritures par commande non vues ». (Panel C, options a et b.)
 - **P75-D-13 (états et noms).** Trois degrés, d'après l'état de l'agent tel que la 79 le publie (`claude agents --json`
@@ -160,12 +161,12 @@ et ne sont pas rouverts.
   agents de l'équipe dans les arbres du lab ; un filtre par mission s'offre quand le rattachement existe ; un agent non
   rattaché est dit tel, jamais deviné (P69-D-15). « Agent par zone » (AUDC-I36) = l'agrégat de cette lentille sur les
   cartes de nœud. (Panel C ; panel D pour I36.)
-- **P75-D-14 (normalisation des chemins).** Tout chemin est ramené à `{arbre, chemin relatif à l'arbre}`. Contrat C3 tel
-  que figé : une cible est relative au lab, ou le libellé « un fichier hors du lab ». La 75 retire donc le préfixe du
-  worktree de la voie (`arbre`) quand la cible commence par lui ; une écriture d'un worktree hors du lab est comptée
-  « hors du lab », pas dessinée (perte assumée tant que la 79 ne fournit pas la cible relative à l'arbre : manque n° 2).
-  Le jugement physique du chemin (classe AUDC-A-02) est attendu de la 79 (manque n° 3). Une écriture dans un worktree
-  retombe sur la carte du même chemin relatif. Seul un chemin qui a déjà une carte est dessiné ;
+- **P75-D-14 (normalisation des chemins).** Tout chemin est ramené à `{arbre, chemin relatif à l'arbre}`. La 79 fournit
+  la cible relative à la racine réelle de l'arbre de la voie quand cet arbre est sous le lab (A22), calculée sur le
+  chemin réel par la fonction unique de la classe AUDC-A-02 (A23). Un worktree hors du dossier du lab donne « un fichier
+  hors du lab » (CKPT-22 en vigueur, question S-3 de la 79) : la lentille et le radar le **disent** (« N écritures hors
+  du lab, non vues par le radar »), jamais en silence. Une écriture dans un worktree retombe sur la carte du même chemin
+  relatif. Seul un chemin qui a déjà une carte est dessiné ;
   les autres sont comptés (« N hors carte », « N hors du lab »), jamais affichés. Sorties de `diff-tree` : relatives au
   dépôt, préfixe du lab retiré si le lab n'est pas à la racine. (Panels B et C.)
 
@@ -198,7 +199,11 @@ et ne sont pas rouverts.
 ### Cartes « prévues » (AUDC-I36)
 
 - **P75-D-18.** Les fichiers des `files_modified` des plans non faits qui n'existent pas encore (aujourd'hui jetés par le
-  filtre de `vf-cockpit-build.mjs:77`) sont injectés **après** la construction du graphe par le moteur, avec un statut
+  filtre de `vf-cockpit-build.mjs:77`) sont injectés par un **annotateur** inscrit d'une ligne dans la table de
+  `vf-cockpit-build.mjs` (A27, plan 79-05), donc **après** la construction du graphe par le moteur et à chaque
+  assemblage ; un changement de `.planning/` seul ne reconstruit pas le graphe Code : la carte prévue suit l'assemblage,
+  tandis que la collision « prévue » (P75-D-15), calculée côté serveur sur les données Projet rafraîchies à chaque
+  événement `structural`, reste fraîche. Statut
   `prévu` (mécanisme `st-*` et glyphe `.vst` existants), rattachés à un nœud par les globs du moteur, sinon « non
   assignés ». Jamais injectés dans le scan (Santé les compterait « inutilisés »). Les actions « ouvrir » et « taille »
   sont absentes sur une carte prévue. Chemin `files_modified` hors du lab ou malformé : ignoré, compté. (Panel D.)
@@ -250,6 +255,11 @@ paliers (fixés par la spécification d'interface et sa critique), format intern
   l'option (a) de la 79 suffit au direct et au radar ; seule une empreinte de mission ancienne justifierait (b). Options : (a) garder **(recommandé : suffit au direct et au radar, aucune
   donnée nouvelle sur disque)** ; (b) persister les cibles de fichiers dans l'index pour voir l'empreinte d'une mission
   ancienne, ce qui rouvre AUDC-Q2.
+- **Q-75-4 — Worktrees hors du dossier du lab (renvoie à S-3, posée par la Phase 79).** En vigueur (CKPT-22) : une
+  écriture dans un worktree hors du dossier du lab est « un fichier hors du lab » ; le radar ne la voit pas et le dit.
+  Avis de la 75 sur S-3 : l'option (b) de la 79 (un worktree du même dépôt compte comme le lab, cible relative à sa
+  racine) rendrait le radar complet sans faire sortir de chemin du poste ; c'est précisément le cas d'une flotte de
+  managers en worktrees frères. Aucun plan de la 75 ne change si (b) est retenue : la cible arrive déjà par arbre (A22).
 - **Q-75-3 — Retrait du « Travail récent ».** P70-D-01 (votre réponse Q1-A du 2026-11-03) range « Travail récent » dans le
   menu « ⋯ » avec sa pastille. Le cadrage remplace cette couche par l'empreinte observée et met le sélecteur de lentilles à
   la même place (P75-D-20). Options : (a) retirer la couche, l'entrée devient le sélecteur **(recommandé : la couche est
@@ -273,16 +283,16 @@ aide commune de lancement des suites).
 la vague 1 de la 79 : aucun diff de patch régénéré, `VENDORED.txt` réduit (origine, sentinelle, plafond), suites lancées par
 l'aide commune. La 75 ne s'exécute de toute façon qu'après la 79 (dépendance de jalon).
 
-**Manques relayés à la 79 le 2026-11-11 (session principale) ; plans concernés « à revalider » :**
-1. Une signature qui change quand les `cibles` changent (l'événement `frise` signe l'index, qui ne les contient pas).
-2. La cible relative à l'arbre de la voie (sinon : préfixe retiré par la 75, worktrees hors du lab perdus, P75-D-14).
-3. La cible calculée sur le chemin réel (classe AUDC-A-02).
-4. `lectures` = `Read` seul.
-5. Garantie écrite : `cibles` et la frise n'entrent jamais dans l'export autonome.
-6. Le point d'enregistrement d'une route GET neuve (`/api/vf/activite`) sous C0 et `porteInterdit`, après la vague 1.
-7. `GET /api/vf/graphe?onglet=code` sert le graphe construit sur disque (l'injection des cartes « prévues » après la
-   construction y passe, P75-D-18).
-Facultatif : `?champs=cibles` sur `/api/vf/frise`, pour ne pas relire les segments à chaque mise à jour de l'empreinte.
+**Manques relayés à la 79 le 2026-11-11 (session principale), tous fermés par le second amendement `6f66d878` :**
+1. Signature des `cibles` → A21 (la signature `frise` couvre la projection entière, cibles comprises).
+2. Cible relative à l'arbre → A22 (sous le lab ; hors du lab : CKPT-22 en vigueur, S-3).
+3. Chemin réel → A23.
+4. Outils de lecture → A24 (`Read` seul).
+5. Export → A25, devenue règle de C0 ; `/api/vf/activite` suit la même règle, avec son témoin à marqueur unique et son
+   témoin positif.
+6. Route neuve → A10, A11, A26 (une ligne de la table, réponse gardée commune).
+7. Graphe Code → A27 (`graph.json` sur disque, annotateur inscrit d'une ligne).
+Facultatif retenu : A28, `GET /api/vf/frise?champs=cibles`.
 </phase79_contract>
 
 <canonical_refs>
