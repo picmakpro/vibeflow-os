@@ -583,7 +583,7 @@ Plans:
   4. Rien de la mémoire des agents au-delà de sa structure n'entre dans la page ; aucune donnée de la phase n'entre dans l'export ; un lab sans ADR, sans mémoire, sans compartiment ou sans git voit une ligne neutre et rien ne casse.
   5. Le nœud « Exigences » quitte le graphe Projet ; toutes les suites du cockpit sont vertes sous macOS et Linux.
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 10, 11, 14) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2.
-**Plans:** 8 plans
+**Plans:** 9 plans
 
 Plans:
 
@@ -595,6 +595,7 @@ Plans:
 - [ ] 76-06-PLAN.md — Page : section de phase, preuves, Jalon, panneau d'exigence — vague 4, TRAC-01/02/03/04/09/11
 - [ ] 76-07-PLAN.md — Page : Décisions, Mémoire, panneaux d'ADR, de décision, d'entrée, commits — vague 5, TRAC-05/06/07/08/09/11
 - [ ] 76-08-PLAN.md — Retrait du nœud `.req`, puis clôture — vague 6, TRAC-12
+- [ ] 76-09-PLAN.md — Questions en attente : lecture des sections « À Samuel » et champ `meta.vf.questions` — vague 4, TRAC-13
 
 ### Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up
 

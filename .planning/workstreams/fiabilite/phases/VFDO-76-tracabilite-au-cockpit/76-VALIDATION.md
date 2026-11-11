@@ -19,8 +19,8 @@ created: "2026-11-11"
 |----------|-------|
 | **Framework** | Bash (`assert_eq`) + harnais Node ; mutants par copie + `mutsub.mjs` ; Chrome sans tête via `chrome-session.mjs` (exécution seulement) |
 | **Config file** | aucun ; aide commune `plugin/cockpit/scripts/tests/socle-serveur.sh` (livrée par la 79, plan 79-02) |
-| **Quick run command** | la suite du plan en cours : `bash plugin/cockpit/scripts/tests/test-cockpit-tracabilite-<chaine|decisions|memoire|collecte|route|page|panneaux>.sh` |
-| **Full suite command** | les sept suites `test-cockpit-tracabilite-*.sh`, puis `test-cockpit-vendor.sh`, `bash scripts/check-version-sync.sh`, suites touchées par le retrait (`test-cockpit-projet-graphe.sh`, `test-cockpit-questions.sh`) |
+| **Quick run command** | la suite du plan en cours : `bash plugin/cockpit/scripts/tests/test-cockpit-tracabilite-<chaine|decisions|memoire|collecte|route|page|panneaux>.sh`, ou `bash plugin/cockpit/scripts/tests/test-cockpit-questions-attente.sh` (plan 76-09) |
+| **Full suite command** | les sept suites `test-cockpit-tracabilite-*.sh` et `test-cockpit-questions-attente.sh`, puis `test-cockpit-vendor.sh`, `bash scripts/check-version-sync.sh`, suites touchées par le retrait (`test-cockpit-projet-graphe.sh`, `test-cockpit-questions.sh`) |
 | **Estimated runtime** | selon suite ; jamais lancée au moment du plan |
 
 ---
@@ -48,7 +48,7 @@ Rempli par les plans (un témoin rouge par exigence, joué avant le code). Voir 
 
 ## Wave 0 Requirements
 
-- [ ] Sept suites `plugin/cockpit/scripts/tests/test-cockpit-tracabilite-{chaine,decisions,memoire,collecte,route,page,panneaux}.sh` — créées chacune par son plan, témoin rouge joué avant le code (plans 76-01 à 76-07)
+- [ ] Huit suites `plugin/cockpit/scripts/tests/test-cockpit-tracabilite-{chaine,decisions,memoire,collecte,route,page,panneaux}.sh` et `test-cockpit-questions-attente.sh` (TRAC-13) — créées chacune par son plan (76-01 à 76-07, 76-09), témoin rouge joué avant le code
 - [ ] Fabrication du lab (ledger, dossiers de phase, ADR, CONTEXT à doublon, commits citants, mémoire)
 - [ ] Mise à jour des assertions retirées : `test-cockpit-projet-graphe.sh` (P1.4, P5.3, R1.9, R2.9), `test-cockpit-questions.sh`
 
