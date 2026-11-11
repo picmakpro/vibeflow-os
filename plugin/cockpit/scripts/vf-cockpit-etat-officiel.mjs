@@ -22,7 +22,7 @@ export function formeEtats(json, CC = contrat()) {
   if (!Array.isArray(json) || !CC.cleSession) return null;
   const etats = CC.etats || {}, statuts = CC.statuts || {}, out = new Map();
   for (const e of json) {
-    if (!e || typeof e !== 'object' || typeof e[CC.cleSession] !== 'string' || !ID_RE.test(e[CC.cleSession])) continue;
+    if (!e || typeof e !== 'object' || typeof e[CC.cleSession] !== 'string' || !ID_RE.test(e[CC.cleSession])) return null; // une entrée illisible rend TOUTE la liste illisible (dérive de format) : jamais une session vivante prise pour absente
     const st = typeof e.state === 'string' && Object.hasOwn(etats, e.state) ? etats[e.state] : null;
     const su = typeof e.status === 'string' && Object.hasOwn(statuts, e.status) ? statuts[e.status] : null;
     const etat = st === 'termine' || st === 'attend' ? st : su || st;

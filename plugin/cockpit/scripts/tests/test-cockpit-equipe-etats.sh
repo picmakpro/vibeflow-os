@@ -217,6 +217,10 @@ const S = {
     eq('D2b.4 — ni une session dont un agent écrit encore', sess(await cas(autre, 0, { session: { ageS: 600 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 600, outil: 'Agent' }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 20 }] }))?.etat, 'en-attente');
     eq('D2b.5 — commande en échec : jamais « close », lecture des transcripts', sess(await cas('', 1, { session: { ageS: 300 } }))?.etat, 'au-repos');
     eq('D2b.6 — liste de forme inattendue (un objet) : jamais « close »', sess(await cas('{"sessions":[]}', 0, { session: { ageS: 300 } }))?.etat, 'au-repos');
+    const renomme = JSON.stringify([{ pid: 1, kind: 'interactive', session_id: SID, status: 'busy' }]);
+    eq('D2b.10 — liste non vide dont la clé de session est renommée (dérive de format) : illisible, jamais « close »', sess(await cas(renomme, 0, { session: { ageS: 300 } }))?.etat, 'au-repos');
+    eq('D2b.11 — liste non vide à identifiant invalide : illisible, jamais « close »', sess(await cas(JSON.stringify([{ sessionId: '../x', status: 'idle' }]), 0, { session: { ageS: 300 } }))?.etat, 'au-repos');
+    eq('D2b.12 — une entrée illisible parmi des entrées lisibles rend toute la liste illisible', sess(await cas(JSON.stringify([JSON.parse(autre)[0], { pid: 3 }]), 0, { session: { ageS: 300 } }))?.etat, 'au-repos');
     // chemin réel du serveur : startLive -> whoNow doit demander l'état officiel (un test par collectWho seul ne voit pas le câblage)
     fs.rmSync(marque, { force: true });
     const homeLive = monter({ session: { ageS: 300 } }); process.env.HOME = homeLive; process.env.VF_FAKE_SORTIE = autre;
