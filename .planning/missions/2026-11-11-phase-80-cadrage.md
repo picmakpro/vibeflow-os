@@ -127,13 +127,29 @@ option recommandée » ; aucune ne vaut arbitrage de Samuel. Les plus engageante
 spatial (P80-D-10) ; pile de surcouches unique (P80-D-11) ; tout `viewer.html` après la fusion de la 79 (P80-D-15) ;
 panneau par-dessus, sans réserve (P80-D-29 révisée) ; Entrée plonge et Espace sélectionne à toute largeur (P80-D-51).
 
-## À Samuel (non bloquant)
+## Questions à Samuel — tranchées
 
-S80-1 titre de vue flottant (rouvre Q10), S80-2 en-tête (rouvre P70-D-22 et PU-G-001), S80-3 Santé en français (rouvre
-P70-D-04), S80-4 explication du terminal sans `--terminal` (rouvre P71-D-02), S80-5 ouvreur Git à 44 px (rouvre
-P78-D-34). Recommandation (b) pour chacune ; options dans `80-CONTEXT.md` § « À Samuel ». Rangées dans 80-19.
-Signalés : tiroir du terminal resté rehaussé après « Annuler » (AUDC-M11, inchangé) ; la borne « un tiroir latéral ne
-pousse jamais la carte » a pour source PU-G-204, pas Q12.
+Les cinq questions du cadrage (S80-1 à S80-5, devenues P80-Q-01 à P80-Q-05 au format C76-Q1 de la Phase 76) ont été
+tranchées : **arbitrage Samuel, AskUserQuestion session principale, 2026-11-11**, option (b) pour chacune — « Zone
+réservée (Recommandé) », « Trois groupes libellés (Recommandé) », « Traduire les constats (Recommandé) », « Une ligne
+dans l'aide (Recommandé) », « 36 visibles, 44 d'appui (Recommandé) ». Décisions P80-D-52 à P80-D-56 ; Q10, PU-G-001 (en
+partie), P70-D-04, P71-D-02 et P78-D-34 amendés dans la mesure exacte de l'option retenue. L'ancien plan « après avis »
+est redécoupé en plans exécutables (P80-D-57). AUDC-M11 est tranché hors de cette phase (lot de correctifs à part).
+
+## Reprise du 2026-11-11 (après les arbitrages)
+
+- Section « À Samuel » remise au format C76-Q1 (P80-Q-01 à 05, `État : tranchée`).
+- Contrats ajoutés ou corrigés à la demande des phases voisines : P80-C76-6 (une seule porte `lireExigences` pour les
+  exigences et la couverture, retrait du nœud « Exigences » par la 76 sans effet sur les témoins de la 80, P80-D-04) ;
+  pour la 74 : la fiche d'agent, le lecteur et la régie ne sont pas des surcouches, `VFGitTiroir.ouvrirSur(sha)`
+  (80-06), promesse de `VF_ONGLETS.aller` (80-10).
+- Règles de la 79 à sa tête (amendements A34 à A48) portées par P80-D-58 : 299 lignes, 160 colonnes, code du terminal
+  et du lancement sous `assets/ui/terminal/` et `assets/ui/tiroir/`, aucun script en ligne, fichiers sous `/_vf/`,
+  compteur de suites au nombre réel, mutants d'interface par `cockpit_module_copie` après la 79.
+- Design : quatrième critique fraîche (rattrapage de P80-D-50) — passed, 87 et 88/100, majeur sous 1 000 px fermé ;
+  mineurs corrigés (définitions « feuille de détail » et « panneau latéral »).
+- Coupure de session vers 15 h 33 (quota du compte) : brouillons de 80-19 et 80-20 retrouvés complets et commités,
+  enfant arrêté fermé au registre, travail repris en deux lots parallèles.
 
 ## À verser par la jointure
 
