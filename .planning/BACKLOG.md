@@ -565,7 +565,7 @@ ou de `vf-new-lab`.
 **Origine :** mission « lot 0 de l'audit du cockpit », `.planning/research/2026-11-10-audit-cockpit/REGISTRE.md` (§ « Constats nés de la mission lot 0 »). Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée. Sécurité décrite par classe, jamais par recette.
 
 ### Coupure du serveur sans fermeture de flux (D-M2, AUDC-M9)
-**Priorité : moyenne.** Une coupure qui ne ferme pas la connexion (flux muet) n'est pas détectée ; il faut une veille de silence côté page. **Déclencheur de reprise :** Phase 79.
+**Priorité : moyenne.** Une coupure qui ne ferme pas la connexion (flux muet) n'est pas détectée ; il faut une veille de silence côté page. **Plan :** 79-12 et 79-14 (Phase 79, planifiée le 2026-11-11). **Déclencheur de reprise :** Phase 79.
 
 ### Métadonnées des dépôts imbriqués dans l'export (D-M5, AUDC-B-04)
 **Priorité : basse.** Branche, tête et worktree d'origine des dépôts imbriqués viennent d'une clé du moteur amont (`meta.repos`) et restent dans l'export. **Déclencheur de reprise :** la prochaine passe sur l'export ou sur le patch du moteur.
@@ -577,22 +577,109 @@ ou de `vf-new-lab`.
 **Priorité : basse.** La page montre le message brut du serveur et ne purge pas la session côté page ; non régressif. **Déclencheur de reprise :** Phase 80.
 
 ### `stop` et `status` ignorent un serveur orphelin (D-M13, AUDC-H3)
-**Priorité : moyenne.** Quand `server.json` est perdu, les deux commandes ne voient pas le serveur resté à l'écoute. **Déclencheur de reprise :** Phase 79.
+**Priorité : moyenne.** Quand `server.json` est perdu, les deux commandes ne voient pas le serveur resté à l'écoute. **Plan :** 79-06 (Phase 79, planifiée le 2026-11-11). **Déclencheur de reprise :** Phase 79.
 
 ### Lien du lab vers un fichier interne protégé (D-M15, AUDC-A-02)
-**Priorité : moyenne.** Un lien du lab vers un fichier interne que le serveur protège par ailleurs n'est pas masqué ; hors de la lettre d'AUDC-A-02 (cible dans le lab). **Déclencheur de reprise :** Phase 79, première vague, avec la classe restée ouverte d'AUDC-A-02.
+**Priorité : moyenne.** Un lien du lab vers un fichier interne que le serveur protège par ailleurs n'est pas masqué ; hors de la lettre d'AUDC-A-02 (cible dans le lab). **Déclencheur de reprise :** Phase 79, première vague, avec la classe restée ouverte d'AUDC-A-02. **Plan :** 79-07 (Phase 79, planifiée le 2026-11-11).
 
 ### Empreinte du code limitée à `serve.mjs` (AUDC-H3)
-**Priorité : basse.** La relance compare l'empreinte de `serve.mjs` seul ; un autre module modifié ne remplace pas le serveur. Le port n'est pas comparé. **Déclencheur de reprise :** Phase 79 (serveur lancé depuis le module, AUDC-AM4).
+**Priorité : basse.** La relance compare l'empreinte de `serve.mjs` seul ; un autre module modifié ne remplace pas le serveur. Le port n'est pas comparé. **Plan :** 79-06 (ligne « Lot 0, H3 » du registre ; AUDC-AM4 : 79-06 et 79-16 ; empreinte calculée sur les fichiers de code du module, P79-D-31), Phase 79, planifiée le 2026-11-11. **Déclencheur de reprise :** Phase 79 (serveur lancé depuis le module, AUDC-AM4).
 
 ### Formes singulières du repli de lien sans gabarit au dictionnaire (AUDC-H4)
 **Priorité : basse.** Lacune préexistante du chrome : certaines formes singulières du texte de repli d'un lien n'ont pas de gabarit au dictionnaire et restent en anglais. **Déclencheur de reprise :** la prochaine passe sur le dictionnaire.
 
 ### Lecture passive : pilotes et script shell hors du point unique (AUDC-A-04)
-**Priorité : basse.** Les pilotes nommés sont fermés par une liste de sous-commandes de lecture ; un script shell du socle lance git hors du point unique, sans effet mesuré. **Déclencheur de reprise :** Phase 79, avec AUDC-A-03.
+**Priorité : basse.** Les pilotes nommés sont fermés par une liste de sous-commandes de lecture ; un script shell du socle lance git hors du point unique, sans effet mesuré. **Plan :** 79-07 (Phase 79, planifiée le 2026-11-11). **Déclencheur de reprise :** Phase 79, avec AUDC-A-03.
 
 ### Sixième onglet qui ne charge plus (AUDC-H1)
-**Priorité : moyenne.** Un flux par page ne suffit pas au-delà de six pages ouvertes sur la même origine. **Déclencheur de reprise :** Phase 79 (flux partagé entre onglets).
+**Priorité : moyenne.** Un flux par page ne suffit pas au-delà de six pages ouvertes sur la même origine. **Plan :** 79-14 (ligne AUDC-H1 du registre ; Phase 79, planifiée le 2026-11-11). **Déclencheur de reprise :** Phase 79 (flux partagé entre onglets).
 
 ### Tiroir du terminal resté rehaussé après « Annuler » (AUDC-M11)
 **Priorité : à arbitrer (goût, pour Samuel).** Après « Annuler », le tiroir garde la hauteur prise pour la proposition. **Déclencheur de reprise :** la prochaine recette de Samuel sur le lancement.
+
+
+## Cockpit : limites consignées par la Phase 79 — DIFFÉRÉ (2026-11-11)
+
+**Origine :** cadrage de la Phase 79, `.planning/workstreams/fiabilite/phases/VFDO-79-socle-du-cockpit-une-collecte-un-flux-une-route-d-tat/79-CONTEXT.md`. Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée.
+
+### Chemins absolus dans la route d'état (A38)
+**Priorité : moyenne.** `signal.root`, `equipe.root` et `equipe.workers[].cwd` restent des chemins absolus, de forme inchangée depuis la Phase 69, servis par `hello` et par `GET /api/vf/state`. Les masquer change la forme : schéma `@2`. Mots de l'amendement A38 (79-12) : « Limite nommée, inchangée depuis la Phase 69 : `signal.root`, `equipe.root` et `equipe.workers[].cwd` sont des chemins absolus de forme inchangée (C0 « Versions »), servis comme ils le sont déjà par `hello` ; les masquer demanderait un schéma `@2`, hors de cette phase (à verser au BACKLOG par la jointure). » Même sujet que l'entrée « Chemins absolus servis à la page locale » demandée à la jointure : une seule entrée, celle-ci. **Déclencheur de reprise :** la prochaine version de `cockpit-signal` ou de `cockpit-who`.
+
+### Renommage complet des pages et retrait de `vf-cockpit-rename.mjs` (P79-D-08)
+**Priorité : basse.** La Phase 79 écrit les noms VibeFlow dans les sources exécutées par Node ; les pages restent renommées comme du texte. Le renommage complet de `viewer.html` et `ui/*.js`, puis le retrait de `vf-cockpit-rename.mjs`, se font en geste séparé. **Déclencheur de reprise :** la fusion de la Phase 80.
+
+### Dernière action limitée à l'arbre principal, lab lui-même worktree lié (A46)
+**Priorité : basse.** La dernière action d'un agent (`who`, `doing`) garde sa règle : un fichier d'un worktree hors de l'arbre principal y reste « un fichier hors du lab » ; l'étendre touche le collecteur `who`. Un lab qui est lui-même un worktree lié prend pour arbre principal le premier arbre de git, comme `who`. (Le `nom` de worktree non unique est fermé par défaut dans la phase : deux worktrees vérifiés au même `nom` ne sont pas admis.) **Déclencheur de reprise :** Phase 73 (régie).
+
+### `127.0.0.1` et `localhost` tiennent deux flux (A43)
+**Priorité : basse.** Deux origines distinctes : le flux partagé entre onglets ne les réunit pas. **Déclencheur de reprise :** la prochaine passe sur le flux partagé.
+
+### Messages de `serve.mjs` en français sous `?lang=en` (A43)
+**Priorité : basse.** Les messages du serveur sont écrits en français à la source et le restent en mode anglais. **Déclencheur de reprise :** la prochaine passe sur `?lang=en`.
+
+### Identifiants de menace à aligner entre les plans de la Phase 79
+**Priorité : basse.** Chaque plan numérote ses menaces dans sa propre plage (`T-79-1NN` pour 79-01, plan × 100 + rang) ; l'alignement de la forme entre les 22 plans n'a pas été vérifié à la planification. **Déclencheur de reprise :** l'audit de sécurité de la première vague exécutée.
+
+## Cockpit : réserves consignées par les cadrages des Phases 73, 74, 75, 77 et 80 — DIFFÉRÉ (2026-11-11)
+
+**Origine :** rapports de cadrage `.planning/missions/2026-11-11-phase-73-cadrage.md`, `-74-`, `-75-`, `-77-` et `-80-` (sections « À verser par la jointure »), jointure du 2026-11-11. Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sauf la question P73-Q-01, tranchée plus bas.
+
+### Pastilles « modifiés » du tiroir Git sur fond d'avertissement, en tension avec Q9 (S-1 de la Phase 73, P73-Q-01) — PLANIFIÉ (2026-11-11)
+**Priorité : non fixée.** Texte du rapport 73 : « Pastilles « modifiés » du tiroir Git sur fond d'avertissement, en tension avec Q9 (S-1 de la Phase 73). » Le tiroir Git de la Phase 78 pose « modifiés » sur un fond d'avertissement, en tension avec Q9 (« ni fond teinté ») ; la régie de la Phase 73 rend ses propres pastilles neutres (P73-D-10) et ne touche pas le tiroir. **Décision :** arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, réponse : « Les neutraliser (Recommandé) » — option (b) de P73-Q-01 : un correctif du tiroir Git, hors de la Phase 73, porté par l'exécution de la Phase 80. Le rapport 73 est antérieur à cette réponse et dit encore la question « en attente ». **Déclencheur de reprise :** l'exécution de la Phase 80.
+
+### Notification du système pour le cockpit (AUDC-I09, part reportée par P73-D-15)
+**Priorité : non fixée.** Option éteinte par défaut, trois motifs, texte borné au motif et au nombre ; examen des bornes à faire (texte hors de la page). La Phase 73 livre le titre d'onglet et la pastille de favicon ; l'API de notification du système est reportée. **Déclencheur de reprise :** une demande d'utilisateur de la notification hors de la page, ou la prochaine passe sur le compositeur du titre.
+
+### Coût en devise et limites d'abonnement de 5 h et de 7 jours (Phase 74, P74-D-20, P74-D-24)
+**Priorité : non fixée.** Coût en devise au tarif public et limites d'abonnement de 5 h et de 7 jours (relais par la ligne d'état), écartés de la Phase 74 (P74-D-20, P74-D-24 ; questions P74-Q-02, P74-Q-03). La 74 lit le coût en jetons et en durée ; un montant demanderait une table de tarifs tenue à jour dans le module, et la Phase 52 pose « jamais estimé ». Les limites demandent un relais par le script de ligne d'état, hors de ce que lit le socle ; elles restent avec le plafond de coût (AUDC-I35). **Déclencheur de reprise :** le cadrage d'AUDC-I35 (plafond de coût), ou la Phase 52.
+
+### Constats de l'auditeur posés sur les cartes de l'onglet Code (AUDC-I36, troisième idée ; Phase 75, P75-D-19)
+**Priorité : non fixée.** `vf-auditer` n'écrit rien sur disque : ses constats ne vivent que dans des transcripts ou en prose dans les `*-SECURITY.md`. **Déclencheur de reprise :** un fichier de constats de `vf-auditer`, typé et versionné, existe. Recoupe Santé (AUDC-M8, Phase 80).
+
+### Retirer la lecture morte de `lastDesc` (Phase 77, P77-D-12)
+**Priorité : basse.** Retirer la lecture morte de `lastDesc` (`ui/00-vibeflow.js:211`), dont le producteur est retiré par la Phase 77 (P77-D-12). **Déclencheur de reprise :** la Phase 80, ou la prochaine phase qui touche `ui/00-vibeflow.js`.
+
+### Mode focus recomposé (AUDC-I27, sous-graphe par ELK ; Phase 80)
+**Priorité : non fixée.** En réserve après le worker de mise en page de la Phase 79 ; la Phase 80 livre seulement « cadrer la sélection et ses voisins » (80-12, P80-D-17). **Déclencheur de reprise :** le worker de mise en page de la Phase 79 (79-18) est livré.
+
+## Outillage de planning : deux écarts relevés par les cadrages 76 et 80 — DIFFÉRÉ (2026-11-11)
+
+**Origine :** rapports de cadrage des Phases 76 et 80 (« À verser par la jointure »), 2026-11-11. Aucun sujet existant de ce fichier ne porte l'un ou l'autre (recherche faite à la jointure).
+
+### `check-method-budget.sh` (`rangement_memoires`) juge une mémoire « hors index » par sous-chaîne (Phase 76)
+**Priorité : basse.** `check-method-budget.sh` (`rangement_memoires`) juge une mémoire « hors index » par sous-chaîne (`grep -qF` du nom de fichier) : `a.md` est trouvé dans `xa.md`. Le cockpit (Phase 76) juge par égalité exacte. À aligner. **Déclencheur de reprise :** la prochaine modification de `check-method-budget.sh`, ou l'exécution de la Phase 76.
+
+### Gate `check.decision-coverage-plan` : `could-not-parse` sur les identifiants préfixés `P80-D-NN` (Phase 80)
+**Priorité : basse.** Le gate rend `could-not-parse` sur les identifiants de décision préfixés `P80-D-NN` ; la couverture de P80-D-01..60 a été vérifiée à la main. Le préfixage est la convention de `CLAUDE.md` (ADR-075) : toute phase qui l'applique peut rencontrer la même réponse. À suivre ici, comme le demande le rapport 80. **Déclencheur de reprise :** la prochaine planification d'une phase dont les décisions sont préfixées, ou toute passe sur ce gate.
+
+## Cockpit : constats du lot 0 bis — DIFFÉRÉ (2026-11-11)
+
+**Origine :** rapport `.planning/missions/2026-11-11-audit-cockpit-lot-0-bis.md`, section « Limites et points ouverts ». Priorité et déclencheur : décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+
+### Isolation du dossier d'état par les suites qui lancent un vrai terminal
+**Priorité : basse.** Mots du rapport : « Rien n'oblige par machine une future suite qui lance un vrai terminal à isoler le dossier d'état. » **Déclencheur de reprise :** la prochaine passe sur le terminal ou le lancement.
+
+### Bloc défilant du bandeau : 7 px de dépassement sous son pied collant
+**Priorité : basse.** Mots du rapport : « Constat de la recette, sans lien avec M11 : le bloc défilant du bandeau dépasse de 7 px sous son pied collant. » **Déclencheur de reprise :** la prochaine passe sur le terminal ou le lancement.
+
+### « Confirmez-la dans le terminal » gardé environ 1 s après « Lancer »
+**Priorité : basse.** Mots du rapport : « Après « Lancer », le panneau de P garde « Confirmez-la dans le terminal » environ 1 s avant « Commande préparée ». » **Déclencheur de reprise :** la prochaine passe sur le terminal ou le lancement.
+
+## Outillage de flotte : cinq écarts relevés à la mission de jointure — DIFFÉRÉ (2026-11-11)
+
+**Priorité : non fixée.** **Origine :** session principale, 2026-11-11, pendant les cadrages simultanés des phases du cockpit.
+- **Mode à blanc de E7 :** le gate de sortie n'a pas de mode à blanc pour E7 ; le contrôler sans archiver demande une copie privée du dossier.
+- **Balayage par worktree :** le balayage des processus par worktree ne voit pas un serveur de test lancé depuis un dossier temporaire.
+- **Registre des agents par compartiment :** E1 compte les agents des missions sœurs, et un worker qui oublie `--phase` reste inscrit au compartiment (neuf entrées le 2026-11-11).
+- **Photo de départ unique :** la photo de départ du budget est unique et partagée par des missions simultanées ; E7 reste indéterminé.
+- **Plafond de sous-agents simultanés :** le plafond du harnais (20 par défaut, réglable) a fait sauter des contrôles à sept managers lancés ensemble.
+
+**Déclencheur de reprise :** la prochaine passe sur les gates de sortie de mission, le registre des agents ou l'hygiène des workers.
+
+## Sondes instables en CI : deux suites du cockpit — DIFFÉRÉ (2026-11-11)
+
+**Priorité : non fixée.** **Origine :** session principale, 2026-11-11.
+- `test-cockpit-lancer-bandeau.sh` : rouge puis vert, relevé pendant le lot 0 de l'audit.
+- `test-cockpit-responsive.sh`, cas R15c.2 : rouge sur la PR de release, vert au second passage, même code.
+
+Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesurer une fois le rendu posé, attendre la stabilité, ne jamais affaiblir la sonde. **Déclencheur de reprise :** un nouveau rouge d'une de ces deux suites, ou la prochaine passe sur leurs sondes.
