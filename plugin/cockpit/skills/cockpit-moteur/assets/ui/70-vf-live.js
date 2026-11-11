@@ -4,7 +4,7 @@
 // vue vit dans le hash). Badge « au travail » dans l'en-tête, sur les trois onglets. La dernière commande d'une
 // session n'est jamais dans le flux : elle se demande à l'unité (/api/vf/doing, jeton en en-tête), et reste
 // dans la ligne cliquée (ni graphe, ni localStorage, ni export). Flux coupé : un seul sondage pour les deux flux (celui-ci et le
-// rechargement du viewer), à recul — 1 s pendant 30 s, puis 5 s, puis arrêt avec un message et « Réessayer » (E-6).
+// rechargement du viewer), à recul — 1 s pendant 30 s, puis 5 s ; le message « Réessayer » arrive à 15 s et se retire seul au retour du serveur (AUDC-M9), le sondage s'arrête à 300 s (E-6).
 (() => {
   const SC = window.Floorplan, SRV = window.FLOORPLAN_SERVER;
   // page exportée ou ouverte en fichier : pas de serveur, pas de direct
@@ -12,7 +12,7 @@
   const G = SC.graph, h = SC.h;
   const TAB = G.meta.vfTab === 'project' ? 'project' : 'code';
   const probe = (window.__vfLive = { connected: false, patches: 0, applied: 0, lastLatencyMs: null, lock: null, structural: 0, who: null, sondages: 0, abandon: false,
-    reco: { vite: 1000, lent: 5000, bascule: 30000, fin: 300000 } }); // reco : en ms, modifiable par un test
+    reco: { vite: 1000, lent: 5000, bascule: 30000, banniere: 15000, fin: 300000 } }); // reco : en ms, modifiable par un test ; banniere : le message arrive à 15 s (AUDC-M9), le sondage s'arrête à fin
   const FRAICHEUR = 'Sessions écrites depuis moins de 3 min';
   const NB = '\u00a0';
 
@@ -237,8 +237,9 @@
       const age = Date.now() - lost.t0; probe.sondages++;
       const e = await sonder();
       if (e === 'redemarre') return location.reload(); // nouveau serveur, nouveau jeton : la page se recharge
-      if (e === 'vivant') { for (const f of lost.flux.values()) f(); lost.flux.clear(); lost.timer = null; return; }
+      if (e === 'vivant') { for (const f of lost.flux.values()) f(); lost.flux.clear(); lost.timer = null; banniere(false); return; } // AUDC-M9 : le message se retire seul au retour du serveur
       if (Date.now() - lost.t0 >= probe.reco.fin) { lost.timer = null; probe.abandon = true; banniere(true); return; }
+      if (Date.now() - lost.t0 >= probe.reco.banniere) banniere(true); // AUDC-M9 : dit à 15 s, pas à 300 s ; le sondage continue
       boucle(age < probe.reco.bascule ? probe.reco.vite : probe.reco.lent);
     }, delai);
   };
