@@ -13,7 +13,6 @@
 # Chaque refus a son témoin positif ; aucune attente d'armement n'est une durée codée en dur (arme_apres_ms est lu). Chrome non requis. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-libre() { local p i; for i in 1 2 3 4 5 6 7 8 9 10; do p="$(node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"; [ "$p" -ge 4600 ] && [ "$p" != 4456 ] && { echo "$p"; return; }; done; echo 0; }
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; COCKPIT="$(cd "$SCRIPTS/.." && pwd)"
 ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"; TA="$HERE_T/terminal-aux.mjs"; MOD="$SCRIPTS/vf-cockpit-lancer-mode.mjs"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; RUN="$WORK/run"; mkdir -p "$AUX" "$WORK/home" "$WORK/bin" "$WORK/fauxbin" "$RUN" "$WORK/temoins" "$WORK/u"
@@ -21,6 +20,7 @@ export REAL_HOME="$HOME"; export HOME="$WORK/home"
 STATE="$WORK/etat"; mkdir -p "$STATE"; chmod 700 "$STATE"; export VF_COCKPIT_MODE_DIR="$STATE"; unset XDG_CACHE_HOME # jamais le dossier d'état réel de l'utilisateur ni de la CI
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 PASS=0; FAIL=0; NONJOUE=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
@@ -596,10 +596,9 @@ psrv_debut() { # psrv_debut <sortie> -> PS_PID PS_PORT PS_QP PS_TOK PS_N (serveu
   PS_N=$((PS_N+1)); NM=$((NM+1)); local o="$1" lab am; PS_OUT="$1"; lab="$(cd "$1/../.." && pwd)"; am="$WORK/amorce.$NM"
   rm -f "$RUN/shell.pid" "$RUN/argv" "$o/.cache/server.json" "$o/.cache/terminal-amorce"; mkdir -p "$o/.cache"
   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" > "$am.tmp"; (umask 077; tr -d '\n' < "$am.tmp" > "$o/.cache/terminal-amorce"; tr -d '\n' < "$am.tmp" > "$am")
-  ( cd "$lab" && VF_COCKPIT_PATH_ORIGINE="$WORK/fauxbin:$PATH" VF_COCKPIT_LANCER_ARME_MS=$ARME VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-$NM.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  PS_PID=$!; PIDS+=($PS_PID); PS_SERVE="$WORK/serve-$NM.out"; PS_AM="$am"
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  PS_PORT="$(node "$AUX/ev.mjs" j.port < "$o/.cache/server.json" 2>/dev/null)"; PS_PORT="${PS_PORT:-0}"
+  COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$NM.out" cockpit_lancer "$lab" VF_COCKPIT_PATH_ORIGINE="$WORK/fauxbin:$PATH" VF_COCKPIT_LANCER_ARME_MS=$ARME VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" --terminal
+  PS_PID="$VF_PID"; PS_SERVE="$WORK/serve-$NM.out"; PS_AM="$am"
+  PS_PORT="${VF_PORT:-0}"
   PS_QP="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json" 2>/dev/null)"; PS_QP="${PS_QP##*:}"; PS_QP="${PS_QP:-0}"
   rq "$PS_PORT" GET /project.html --corps-vers "$WORK/page-$NM.html" > /dev/null; PS_TOK="$(node "$AUX/ptok.mjs" "$WORK/page-$NM.html")"
 }

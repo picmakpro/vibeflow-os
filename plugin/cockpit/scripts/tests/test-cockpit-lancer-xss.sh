@@ -29,6 +29,7 @@ export VF_COCKPIT_MODE_DIR="$WORK/etat"; unset XDG_CACHE_HOME # AUDC-B-05 : le m
 export CHROME_SESSION="$HERE_T/chrome-session.mjs"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0; NONVERIF=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
@@ -253,10 +254,9 @@ manche() {
   [ -z "$R_ERR" ] || return 0
   rm -f "$o/.cache/server.json"; mkdir -p "$o/.cache"
   local amorce; amorce="$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")"; (umask 077; printf '%s' "$amorce" > "$o/.cache/terminal-amorce"; printf '%s' "$amorce" > "$WORK/amorce.copy")
-  ( cd "$L" && VF_COCKPIT_ENGINE_DIR="$ENG_USE" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  local pid=$!; PIDS+=($pid)
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  port="$(node "$AUX/ev.mjs" j.port < "$o/.cache/server.json")"; q="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; q="${q##*:}"
+  COCKPIT_SORTIE="$o" COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$label.out" cockpit_lancer "$L" VF_COCKPIT_ENGINE_DIR="$ENG_USE" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" --terminal
+  local pid="$VF_PID"
+  port="${VF_PORT:-0}"; q="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; q="${q##*:}"
   local _c; sec=""; read -r _c sec < <(node "$TA" amorcer "$q" "$WORK/amorce.copy" | tr '\n' ' ')
   [[ "$sec" =~ ^[0-9a-f]{64}$ ]] || { R_ERR="session-impossible"; assert_eq "[$label] — session légitime établie" "$R_ERR" ""; vf_hyg_stop "$pid"; return 0; }
   FLUX="$WORK/flux-$label.bin"; rm -f "$FLUX"
@@ -432,10 +432,9 @@ manche_res() {
   [ -z "$R_ERR" ] || return 0
   rm -f "$o/.cache/server.json"; mkdir -p "$o/.cache"
   local amorce; amorce="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"; (umask 077; printf '%s' "$amorce" > "$o/.cache/terminal-amorce")
-  ( cd "$L" && PATH="$WORK/askbin:$PATH" VF_COCKPIT_ENGINE_DIR="$ENG_USE" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  local pid=$!; PIDS+=($pid)
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  local rport rq; rport="$(node "$AUX/ev.mjs" j.port < "$o/.cache/server.json")"; rq="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; rq="${rq##*:}"
+  COCKPIT_SORTIE="$o" COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$label.out" cockpit_lancer "$L" PATH="$WORK/askbin:$PATH" VF_COCKPIT_ENGINE_DIR="$ENG_USE" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" --terminal
+  local pid="$VF_PID"
+  local rport rq; rport="${VF_PORT:-0}"; rq="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; rq="${rq##*:}"
   R_RES="$(node "$HERE_T/temoins/lancer-xss.mjs" "$CHROME" "{\"mode\":\"residuel\",\"P\":$rport,\"Q\":$rq,\"amorce\":\"$amorce\",\"cible\":\"ph-4\"}")"
   sleep 2; [ -e "$RUN/argv" ] && R_ARGV=oui
   echo "     [$label] mesure : argv=$R_ARGV charge=${R_RES:0:900}"
