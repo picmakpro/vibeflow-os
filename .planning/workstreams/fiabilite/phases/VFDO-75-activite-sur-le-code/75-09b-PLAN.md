@@ -2,7 +2,7 @@
 phase: 75-activite-sur-le-code
 plan: 09b
 type: execute
-wave: 6
+wave: 7
 depends_on: ["75-07", "75-08", "75-09a"]
 cross_phase:
   - "79-01 (`VENDORED.txt` réduit à l'origine, la sentinelle et l'inventaire du plafond : ligne `RETRAIT` à confirmer sur la forme livrée, 75-RESEARCH O-4 ; aucun diff de patch)"
@@ -48,7 +48,7 @@ must_haves:
 <objective>
 Retirer côté page la couche déclarative « Travail récent » : page, bouton, jetons de survol (ACTV-12 ; ACTV-01 pour la place exacte du sélecteur). Le retrait se répartit en 75-09a (assemblage et moteur), 75-09b (page et jetons, ce plan) et 75-09c (dictionnaires et suites voisines).
 
-Placement : après la Phase 79 ENTIÈRE, après la Phase 74, après 75-09a (donc après 75-07 et 75-08). `viewer.html` : touché en vagues 3, 4 et ici (6) seulement ; `02-vf-telephone.js` : 75-08 (vague 4) puis commentaires ici. Aucun diff de patch ; suites par `socle-serveur.sh`.
+Placement : après la Phase 79 ENTIÈRE, après la Phase 74, après 75-09a (donc après 75-07 et 75-08). `viewer.html` : touché en vagues 4, 5 et ici (7) seulement ; `02-vf-telephone.js` : 75-08 (vague 5) puis commentaires ici. Aucun diff de patch ; suites par `socle-serveur.sh`.
 
 Purpose: tenir « un ajout = un retrait » côté page sans rien perdre des preuves.
 Output: retrait dans le source de la page, deux suites adaptées, une trace avant/après.
@@ -82,7 +82,7 @@ Mutants côté page (A48 point 41 de la 79 ; 79-06 et 79-02, aide `plugin/cockpi
 
 <precondition>
 75-09a, 75-07, 75-08 livrés ET verts. Relire `VENDORED.txt` livré (O-4). Refaire le grep d'inventaire (commande de 75-09a, `btn-recent` compris) et consigner l'écart avec la table de 75-RESEARCH § Retrait. Compter les assertions de chaque suite à adapter AVANT. Mesurer les lignes de `viewer.html` (cliquet 79-11).
-Dépendances vers 79-15 à 79-21, revalidées : 79-16 (vague 7 : touche `viewer.html`, `VENDORED.txt` et `test-cockpit-responsive.sh`, que ce plan adapte : relire l'état livré avant d'adapter) ; 79-17 (vague 8 : `VENDORED.txt`) ; 79-18 (vague 9 : `viewer.html`) ; 79-11 (V4 et cliquet de colonnes : le retrait ne fait que baisser) ; 79-20 : `V12` de `test-cockpit-vendor.sh`, rejoué par la dernière commande. Revalidé sur la tête 94d6d3a0 de la 79 (relue à la source, correction n° 10 ; numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
+Dépendances vers 79-15 à 79-21, revalidées : 79-16 (vague 7 : touche `viewer.html`, `VENDORED.txt` et `test-cockpit-responsive.sh`, que ce plan adapte : relire l'état livré avant d'adapter) ; 79-17 (vague 8 : `VENDORED.txt`) ; 79-18 (vague 9 : `viewer.html`) ; 79-11 (V4 et cliquet de colonnes : le retrait ne fait que baisser) ; 79-20 : `V12` de `test-cockpit-vendor.sh`, rejoué par la dernière commande. Revalidé sur la tête d4d0cd41 de la 79 (relue à la source, correction n° 10 ; numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
 </precondition>
 
 <tasks>

@@ -2,7 +2,7 @@
 phase: 75-activite-sur-le-code
 plan: 09c
 type: execute
-wave: 7
+wave: 8
 depends_on: ["75-09b"]
 cross_phase:
   - "79-01 (aucun diff de patch ; `VENDORED.txt` : pas touché ici, 75-09b l'a fait)"
@@ -62,7 +62,7 @@ Mutants côté page (A48 point 41 de la 79 ; 79-06 et 79-02, aide `plugin/cockpi
 
 <precondition>
 75-09b livré et vert. Compter les assertions de `test-cockpit-moteur-carte.sh` et `test-cockpit-chrome-fr.sh` AVANT adaptation. Relire `ui/80-vf-fr.js` et `test-cockpit-chrome-fr.sh` tels que livrés par 79-10, 80-14 et 80-19.
-Dépendances vers 79-15 à 79-21, revalidées : aucune pièce de 79-15 à 79-19 n'est consommée ; 79-20 touche `test-cockpit-vendor.sh` (`V12`), rejoué par la dernière commande : vert exigé. Revalidé sur la tête 94d6d3a0 de la 79 (relue à la source, correction n° 10 ; numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
+Dépendances vers 79-15 à 79-21, revalidées : aucune pièce de 79-15 à 79-19 n'est consommée ; 79-20 touche `test-cockpit-vendor.sh` (`V12`), rejoué par la dernière commande : vert exigé. Revalidé sur la tête d4d0cd41 de la 79 (relue à la source, correction n° 10 ; numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
 </precondition>
 
 <tasks>

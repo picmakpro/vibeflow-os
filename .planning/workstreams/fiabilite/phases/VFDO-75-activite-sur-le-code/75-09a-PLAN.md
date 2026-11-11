@@ -2,7 +2,7 @@
 phase: 75-activite-sur-le-code
 plan: 09a
 type: execute
-wave: 5
+wave: 6
 depends_on: ["75-06", "75-07", "75-08"]
 cross_phase:
   - "79-01 (appareil de patchs `plugin/cockpit/amont/` retiré, `VENDORED.txt` réduit : aucun diff de patch régénéré ; la trace du retrait côté `VENDORED.txt` est dans 75-09b)"
@@ -44,7 +44,7 @@ must_haves:
 <objective>
 Retirer côté assemblage et moteur la couche déclarative « Travail récent » et `scripts/recent.mjs` (ACTV-12). Moitié « données » du retrait ; la moitié « page » est 75-09b. Un ajout, un retrait : contrepartie de 75-07 et 75-08, dans le même lot.
 
-Placement : après la Phase 79 ENTIÈRE, après la Phase 74, après 75-06, 75-07, 75-08 (le sélecteur existe déjà). Fichiers disjoints de 75-09b ; `vf-cockpit-build.mjs` : ligne d'annotateur de 75-06 (vague 2) puis retrait ici. Aucun diff de patch ; suites par `socle-serveur.sh`.
+Placement : après la Phase 79 ENTIÈRE, après la Phase 74, après 75-06, 75-07, 75-08 (le sélecteur existe déjà). Fichiers disjoints de 75-09b ; `vf-cockpit-build.mjs` : ligne d'annotateur de 75-06 (vague 3) puis retrait ici. Aucun diff de patch ; suites par `socle-serveur.sh`.
 
 Purpose: tenir « un ajout = un retrait » sans rien perdre des preuves.
 Output: retrait dans l'assemblage et le moteur, deux suites adaptées, une trace avant/après.
@@ -73,7 +73,7 @@ Suites NOUVELLES de ce plan : ligne `PASS — <id> : <texte>` (un espace après 
 
 <precondition>
 75-06, 75-07 et 75-08 livrés ET verts (rejouer leurs suites en tête) : sinon arrêt, le retrait ne part jamais avant la mise en service. Refaire la mesure d'inventaire : `rtk proxy grep -rnI -E "recent-work|25-recent|recentTip|recent\.mjs|no-recent|Travail récent|Recent work|graph\.recent|\.recent-in|\.recent\b|'rw'|\.rw\b|Récent|btn-recent" plugin scripts .github DESIGN.md README.md README.fr.md` (hors CHANGELOG), la comparer à la table de 75-RESEARCH § Retrait (numéros de ligne périmés par la 79 et la 80) : toute différence est consignée. Compter les assertions de chaque suite à adapter AVANT. Relever les autres consommateurs de `.cache/changes.json` (écrit par `refresh.mjs:137` « for recent.mjs ») : s'il n'y en a aucun, le dire dans la trace et retirer l'écriture et son commentaire ; sinon la laisser et corriger le commentaire.
-Dépendances vers 79-15 à 79-21, revalidées : `serve.mjs` (export) est touché par 79-15, 79-16 et 79-18 : relire l'état livré, ce plan ne le modifie pas ; `test-cockpit-securite.sh` (que ce plan adapte) est aussi modifié par 79-02, 79-06, 79-15 et 79-16 : relire l'état livré ; aucune autre pièce de 79-15 à 79-21 n'est consommée. Revalidé sur la tête 94d6d3a0 de la 79 (relue à la source, correction n° 10 ; numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
+Dépendances vers 79-15 à 79-21, revalidées : `serve.mjs` (export) est touché par 79-15, 79-16 et 79-18 : relire l'état livré, ce plan ne le modifie pas ; `test-cockpit-securite.sh` (que ce plan adapte) est aussi modifié par 79-02, 79-06, 79-15 et 79-16 : relire l'état livré ; aucune autre pièce de 79-15 à 79-21 n'est consommée. Revalidé sur la tête d4d0cd41 de la 79 (relue à la source, correction n° 10 ; numéros lus dans les `files_modified` et les contrats des plans eux-mêmes).
 </precondition>
 
 <tasks>
