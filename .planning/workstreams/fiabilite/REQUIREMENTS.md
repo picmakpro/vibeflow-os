@@ -1040,7 +1040,6 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | GITC-12 | Phase 78 | Complete — 2026-11-06 (Phase 78, PR #216, publiée en `v2.76.0` ; revue, audit en lecture, critique design et recette par juges navigateur) |
 | GITC-13 | Phase 78 | Complete — 2026-11-06 (Phase 78, PR #216, publiée en `v2.76.0` ; revue, audit en lecture, critique design et recette par juges navigateur) |
 | GITC-14 | Phase 78 | Complete — 2026-11-06 (Phase 78, PR #216, publiée en `v2.76.0` ; revue, audit en lecture, critique design et recette par juges navigateur) |
-| — | Phase 73 | repère de cadrage, Phase 73 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | REGI-01 | Phase 73 | Pending — 2026-11-11 (cadrage) |
 | REGI-02 | Phase 73 | Pending — 2026-11-11 (cadrage) |
 | REGI-03 | Phase 73 | Pending — 2026-11-11 (cadrage) |
@@ -1058,7 +1057,6 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | REGI-15 | Phase 73 | Pending — 2026-11-11 (cadrage) |
 | REGI-16 | Phase 73 | Pending — 2026-11-11 (cadrage) |
 | REGI-17 | Phase 73 | Pending — 2026-11-11 (cadrage, P73-D-37) |
-| — | Phase 74 | repère de cadrage, Phase 74 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | TEMP-01 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
 | TEMP-02 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
 | TEMP-03 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
@@ -1071,7 +1069,6 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | TEMP-10 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
 | TEMP-11 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
 | TEMP-12 | Phase 74 | Pending — posée au cadrage (2026-11-11) |
-| — | Phase 75 | repère de cadrage, Phase 75 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | ACTV-01 | Phase 75 | Pending — 2026-11-11 (cadrage) |
 | ACTV-02 | Phase 75 | Pending — 2026-11-11 (cadrage) |
 | ACTV-03 | Phase 75 | Pending — 2026-11-11 (cadrage) |
@@ -1084,7 +1081,6 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | ACTV-10 | Phase 75 | Pending — 2026-11-11 (cadrage) |
 | ACTV-11 | Phase 75 | Pending — 2026-11-11 (cadrage) |
 | ACTV-12 | Phase 75 | Pending — 2026-11-11 (cadrage) |
-| — | Phase 76 | repère de cadrage, Phase 76 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | TRAC-01 | Phase 76 | Pending |
 | TRAC-02 | Phase 76 | Pending |
 | TRAC-03 | Phase 76 | Pending |
@@ -1098,7 +1094,6 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | TRAC-11 | Phase 76 | Pending |
 | TRAC-12 | Phase 76 | Pending |
 | TRAC-13 | Phase 76 | Pending |
-| — | Phase 77 | repère de cadrage, Phase 77 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | SYNT-01 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
 | SYNT-02 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
 | SYNT-03 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
@@ -1109,7 +1104,6 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | SYNT-08 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
 | SYNT-09 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
 | SYNT-10 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; dépend de la Phase 79 (C3) et de l'agrégat de la Phase 74) |
-| — | Phase 79 | repère de cadrage, Phase 79 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | SOCL-01 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | SOCL-02 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | SOCL-03 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
@@ -1137,7 +1131,6 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | SOCL-25 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | SOCL-26 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | SOCL-27 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| — | Phase 80 | repère de cadrage, Phase 80 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | FORM-01 | Phase 80 | Pending |
 | FORM-02 | Phase 80 | Pending |
 | FORM-03 | Phase 80 | Pending |
@@ -1206,6 +1199,11 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - La famille PROT (5 IDs) est inscrite par la Phase 41 le 2026-09-18, portant le ledger du
   milestone à 35 IDs — dont PROT-01 hors d'atteinte sans accès admin (mesuré le 2026-09-17) et
   PROT-05 créée en cours de phase par le recadrage sans admin (décision du manager, 2026-09-17).
+- Milestone vibeflow-v2.0 — cadrages du 2026-11-11 (audit du cockpit) : **109 exigences neuves, toutes
+  Pending**, en sept familles — `SOCL-01..27` (Phase 79, 27), `FORM-01..18` (Phase 80, 18), `REGI-01..17`
+  (Phase 73, 17), `TEMP-01..12` (Phase 74, 12), `ACTV-01..12` (Phase 75, 12), `TRAC-01..13` (Phase 76, 13),
+  `SYNT-01..10` (Phase 77, 10) — mappées aux **93 plans** écrits (79 : 22, 80 : 21, 73 : 11, 74 : 10, 75 : 12,
+  76 : 9, 77 : 8), **0 non-mappé**, **0 doublon** (une ligne de traçabilité par exigence, recomptée à la source).
 
 ## Milestone fiabilite-v1.0 — « ce qui survit » (démarré 2026-08-15)
 
@@ -1772,10 +1770,6 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [x] **GITC-13**: Lectures git existantes durcies : `vf-cockpit-who.mjs`, `vf-cockpit-arbres.mjs`, `vf-cockpit-planning.mjs`, `vf-cockpit-paths.mjs` et le moteur passent par un environnement git unique (variables `GIT_*` héritées retirées, filtres du dépôt neutralisés) ; témoin : dépôt piégé (`filter.<x>.process`, `GIT_DIR` hérité) qui déclenche sans la parade et plus avec (P78-D-25).
 - [x] **GITC-14**: Attribution worktree des sous-agents : l'onglet Équipe montre le dernier worktree cité sur l'ensemble des appels de l'agent, pas le `cwd` de la session parente ; témoin : transcript dont le dernier appel ne cite aucun chemin (P78-D-26).
 
-<!-- Cadrage parallèle des Phases 73 à 77, 79 et 80 (2026-11-11) : chaque phase insère son bloc d'exigences juste après son repère, sans toucher à aucun repère. Repères retirés à la jointure. -->
-
-<!-- vf-cadrage:phase-73 -->
-
 ### Gouvernance au cockpit — la régie (Phase 73 — posées au cadrage, 2026-11-11)
 > Dérivent de P73-D-01..36 (`73-CONTEXT.md` ; décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sur la direction « régie » retenue par Samuel le 2026-11-11, registre § 5.1). Famille neuve `REGI` (vérifiée libre le 2026-11-11 dans tous les ledgers `.planning/workstreams/*/REQUIREMENTS.md`, le dépôt et les branches des Phases 7x/8x, d'intégration et `main`). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code.
 
@@ -1796,8 +1790,6 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 - [ ] **REGI-15**: Accroches de la Phase 74 : `section#vf-equipe`, registre `window.__vfEquipeVues`, bascule dessinée dès deux vues, événements `vf-agent:ouvrir` (annulable, repli sur le lecteur actuel) et `vf-agent:lu`, attributs `data-vf-agent` / `data-vf-noeud` / `data-vf-etat` ; ancres `#r=n:se-<id>` / `n:ag-<id>` traitées par la régie (P73-D-20).
 - [ ] **REGI-16**: Non-régression : témoins du canevas re-pointés (LE.* → LR.* pour la ligne « Lancée depuis la carte », champ `lancee`), nettoyage de la branche à l'émission, export d'Équipe sans contenu de régie, recherche par lignes ; une suite neuve au plus et compteur des README recompté ; toutes les suites du cockpit vertes sous macOS et Linux (P73-D-04, P73-D-05, P73-D-21, P73-D-22, P73-D-25).
 - [ ] **REGI-17**: Questions en attente des cadrages, troisième source de « À vous » : les entrées `etat` = `en-attente` de `meta.vf.questions` (contrat C76-Q2 de la Phase 76), chacune reliée à sa phase et à ce qu'elle bloque, classées par la règle de P73-D-07 ; les entrées `appliquee` (options appliquées sous délégation, contestables) en liste repliée à part, « Décisions prises pour vous, contestables (N) », jamais comptées dans le titre ni la pastille ; le bilan des autres états dit en une ligne (« N questions écrites dans un autre format, non lues ») ; jamais une entrée `mal-formee` ou `a-verifier` montrée comme une question qui attend ; champ absent (lecture de la 76 pas encore livrée) → l'emplacement le dit ; prouvé sur une fixture à la forme du contrat (P73-D-37, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).
-
-<!-- vf-cadrage:phase-74 -->
 
 ### L'équipe dans le temps — frise, fiche d'agent, coût, relecture (Phase 74 — posées au cadrage, 2026-11-11)
 
@@ -1820,8 +1812,6 @@ la Phase 80.
 - [ ] **TEMP-11**: Bornes : routes en GET seul derrière Host, Origin et jeton ; clés `doing`, `mandat`, `messages`, `outils`, `fil` refusées dans le flux ; ni frise, ni fiche, ni fil dans l'export ; aucune lecture réseau ; la dernière commande nulle part ; chaîne XSS étendue aux données de frise et de fiche (nom d'agent, nœud, titre, message hostiles) (P74-D-27 ; P67-D-02, P67-D-14, P69-D-23).
 - [ ] **TEMP-12**: Forme et retrait : clavier complet (voies, curseur, filtres ; la bascule est celle de la régie), alternative textuelle de la frise pour lecteur d'écran, focus visible, mouvement réduit, deux thèmes, grille d'espacements fermée, aucune valeur en dur, interface en français ; retirés : la boîte de transcript du panneau et son bouton « Lire le transcript », la durée qui compte les veilles, la carte « Terminés depuis moins de 24 h » du canevas si elle existe encore, et le lecteur de repli de la régie avec l'export `transcript` (74-10, P73-C2) ; suites du cockpit vertes ; aucun bump propre, un seul pour la vague à la jointure (P74-D-28, D-43, D-51, D-53 ; P71.5-D-01, Q11).
 
-<!-- vf-cadrage:phase-75 -->
-
 ### L'activité posée sur le code (Phase 75 — posées au cadrage, 2026-11-11)
 
 > Dérivent de P75-D-01..21 (`75-CONTEXT.md` ; décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée, sur panels de recherche ; aucune ne vaut arbitrage humain). Famille neuve `ACTV`, vérifiée libre le 2026-11-11 sur tous les ledgers `.planning/workstreams/*/REQUIREMENTS.md`. Contrats de la Phase 79 consommés : `feat/phase-79-socle-cockpit`, `3119d82a`, C0 à C6.
@@ -1838,8 +1828,6 @@ la Phase 80.
 - [ ] **ACTV-10**: Radar de collisions : même fichier écrit par deux agents (arbres différents tant que les deux existent ; même arbre si vivants ensemble et non parent-enfant), modifié sur deux branches (merge-base par paire de HEAD distincts, ≤ 12 HEAD, plafond écrit), ou prévu par deux plans d'une même vague ; lectures exclues ; glyphe neutre distinct + mot + noms au panneau + compte visible sans lentille ; jamais `git status` périodique ni `git diff` contre l'arbre de travail ; « radar incomplet » pendant la reconstruction (P75-D-10, D-15, AUDC-I12, P78-D-21).
 - [ ] **ACTV-11**: Cartes « prévues » : fichiers des `files_modified` des plans non faits absents du scan, injectés après la construction du graphe avec le statut `prévu`, rattachés par les globs ou « non assignés », non comptés par Santé, sans « ouvrir » ni « taille » ; chemin hors du lab ou malformé ignoré et compté (P75-D-18, AUDC-I36).
 - [ ] **ACTV-12**: Retrait et non-régression : couche « Travail récent » (`recent-work.json`, `ui/25-recent.js`, classes `.recent`, bascule) et `scripts/recent.mjs` retirés dans le même lot que la mise en service de l'empreinte (P75-D-28, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; P70-D-01 amendée dans cette mesure) ; jeton `--recent` gardé ; suites qui la citent adaptées, jamais supprimées ; toutes les suites du cockpit vertes sous macOS et Linux ; chaîne XSS étendue (chemin, branche, rôle, titre hostiles) ; dégradation sans git identique (P78-D-11) ; `DESIGN.md` § 2 (graphe de code) et CHANGELOG du module à jour ; relecture SOBR-04 (P75-D-11, D-20, D-21).
-
-<!-- vf-cadrage:phase-76 -->
 
 ### Traçabilité au cockpit (Phase 76 — posées au cadrage, 2026-11-11)
 > Dérivent de P76-D-01..37 (`76-CONTEXT.md` ; décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sauf P76-D-32 à P76-D-34 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11). Famille neuve `TRAC` (vérifiée libre le 2026-11-11 dans tous les ledgers et dans tout le dépôt). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code ; lecture seule, aucun réseau, rien dans l'export.
@@ -1858,8 +1846,6 @@ la Phase 80.
 - [ ] **TRAC-12**: Un ajout, un retrait et non-régression : le nœud enfant « Exigences » et ses cartes d'exigence quittent le graphe Projet (le compte « x/y exigences » du pied reste) ; ligne au `CHANGELOG.md` du module ; toutes les suites du cockpit vertes sous macOS et Linux, compteur de suites des README à jour (P76-D-25, P76-D-27, P76-D-29).
 - [ ] **TRAC-13**: Questions en attente : la lecture du planning lit les entrées au format C76-Q1 des sections « À Samuel » des registres de phase et pose le champ facultatif `meta.vf.questions` de `cockpit-project@1` (C76-Q2) ; une entrée hors grammaire est « mal formée » avec son défaut, jamais « en attente » ; une question n'est « tranchée » ou « appliquée » (option recommandée appliquée sous délégation, contestable) que par sa ligne `État` canonique ; identifiant en double, phase incohérente, citation incohérente, fichier absent et section vide ont chacun leur témoin rouge ; la régie de la Phase 73 consomme la liste, « en attente » dans « À vous », « appliquée » à part (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; P76-D-34 à P76-D-37).
 
-<!-- vf-cadrage:phase-77 -->
-
 ### Santé de la méthode et synthèse (Phase 77 — posées au cadrage, 2026-11-11)
 > Dérivent de P77-D-01..18 (`77-CONTEXT.md` ; décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée ; aucun arbitrage neuf). Famille neuve `SYNT`, vérifiée libre le 2026-11-11 sur `f763b556` (`.planning/` entier, ledgers de compartiment et archives compris). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code.
 
@@ -1874,10 +1860,8 @@ la Phase 80.
 - [ ] **SYNT-09**: Retrait : `lastDesc` n'est plus produit, la prose recopiée du STATE disparaît sous « Maintenant » ; témoin : l'assemblage de Projet ne porte plus le texte de `last_activity_desc` (P77-D-12).
 - [ ] **SYNT-10**: Coût par phase et par étage sur les dernières 24 h : jetons (entrée, sortie, cache lu et créé) et durée de travail par phase (via le DAG de la mission) et par étage (rôle), « non rattaché » pour une voie sans mission, jamais de monnaie ; source `GET /api/vf/frise` (C3 de la Phase 79) ; plan dépendant de la Phase 79 (et de l'agrégat de la Phase 74 s'il existe), à revalider quand elles auront livré (P77-D-15, P77-D-16).
 
-<!-- vf-cadrage:phase-79 -->
-
 ### Socle du cockpit (Phase 79 — posées au cadrage, 2026-11-11)
-> Dérivent de `79-CONTEXT.md` (contrats C0 à C6, amendements A1 à A55, décisions P79-D-01 à D-33 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée ; arbitrages en vigueur AUDC-Q2, Q4, Q5 du 2026-11-11). Famille `SOCL`, réservée au ROADMAP pour la Phase 79. Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin, rouge sur le code de la base `integration/cockpit-audit` avant le code.
+> Dérivent de `79-CONTEXT.md` (contrats C0 à C6, amendements A1 à A55, décisions P79-D-01 à P79-D-33 (P79-D-33 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; les autres : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée) ; arbitrages en vigueur AUDC-Q2, Q4, Q5 du 2026-11-11). Famille `SOCL`, réservée au ROADMAP pour la Phase 79. Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin, rouge sur le code de la base `integration/cockpit-audit` avant le code.
 
 - [ ] **SOCL-01**: Fork assumé : `plugin/cockpit/amont/` retiré avec ses contrôles ; `VENDORED.txt` réduit à l'origine, à la sentinelle du moteur et à l'inventaire du plafond ; le contrôle de confinement de l'agent ne saute plus en silence hors de `amont/` (Q11.0) (AUDC-H5, P79-D-07).
 - [ ] **SOCL-02**: Une aide commune `socle-serveur.sh` lance, attend, interroge et arrête le serveur dans les suites ; toutes les suites qui lançaient `<sortie>/serve.mjs` passent par elle et chaque serveur lancé reste vu par l'hygiène des suites (AUDC-AM7, A6, P79-D-23).
@@ -1907,8 +1891,6 @@ la Phase 80.
 - [ ] **SOCL-26**: La correspondance de motifs du moteur a un coût borné, au point unique, quelle que soit l'entrée fournie par le lab (motif à plusieurs `**`, chemin très long) ; preuve générative de croissance au plus linéaire (constat de la Phase 75, P79-D-32).
 - [ ] **SOCL-27**: `/api/vf/transcript` et `/api/vf/doing` retrouvent l'agent dans la table en mémoire de la collecte et lisent le fichier sans bloquer la boucle : N requêtes ne déclenchent aucune collecte ; aucun chemin ne sort, y compris sur le chemin d'erreur (AUDC-H2, A48, A50).
 
-<!-- vf-cadrage:phase-80 -->
-
 ### Trois onglets, trois formes (Phase 80 — posées au cadrage, 2026-11-11)
 > Dérivent de P80-D-01..58 (`80-CONTEXT.md` ; décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée, tranchées par panel sur faits établis ; P80-D-52 à P80-D-56 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11). Famille neuve `FORM`, réservée par le ROADMAP, vérifiée libre le 2026-11-11 (0 occurrence de `FORM-<n>` sous `.planning/` et `plugin/` à `f763b556`). FORM-18 attend l'avis de Samuel.
 
@@ -1933,7 +1915,7 @@ la Phase 80.
 
 ---
 *Requirements defined: 2026-06-04*
-*Last updated: 2026-11-11 — **UIFN-01, 02, 03, 05, 08, 09, 11, 12, 13 et 14 cochées** à l'alignement du planning sur ce qui est publié en `v2.76.0` (preuves écrites sur chaque ligne ; UIFN-10 et LANC-12 restent décochées, motifs à leur ligne de table ; alignement demandé par Samuel (session principale Claude Code, 2026-11-11)) ; précédent : 2026-11-06 — GITC-01..14 et LANC-01..11 cochées ; précédent : 2026-11-05 — TERM-01..12 et UIFN-04, 06, 07 cochées ; précédent : 2026-11-04 — VFSG-01..13 et CKPT-13..28 cochées ; précédent : 2026-11-03 — **CKPT-19..28 posées** (mise à jour du cadrage de la Phase 69 : équipe au travail, P69-D-12..24, arbitrages Samuel, AskUserQuestion session principale, 2026-11-03) ; précédent : 2026-11-03 — **CKPT-01..12 cochées** (Phase 67 close : suites du cockpit rejouées vertes, recette humaine validée par Samuel, `67-CLOTURE.md`) ; précédent : 2026-10-29 — **PLTF-02 cochée** (Phase 62 close : décision A, réexamen 2027-01-31) ; précédent : 2026-10-29 — COLB-01..07 cochées à la porte de la Phase 61 (preuve citée au SUMMARY de chaque plan et à `61-08-SUMMARY.md`) ; COLB-08 décochée (procédure de recette livrée, preuve humaine attendue : P61-B-01 lab et humains, P61-B-02 trois semaines) ; COLB-09 partielle (critère 6 `clients` au code 2, en attente de la liste) ; lectures RATIFIÉES (arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 (« Oui aux propositions par défaut pour 60 et 61 »)) : COLB-01 sur P61-H-01 (armement au poste `product` ou `dev`, jamais `solo`), COLB-01 et COLB-05 sur P61-PL-03 (un refus d'armement relaie un code sans faire échouer l'installation) et P61-PL-08 (une mise à jour rafraîchit un hook déjà posé mais n'arme jamais un clone ; un lab dont le poste a été posé avant cette version s'arme par `role <poste>`) ; précédent : 2026-10-29 — PLTF-01..02 posées à la préparation de la Phase 62 (PLTF-01 cochée sur preuve du dossier, PLTF-02 décochée : décision de Samuel) ; précédent : 2026-10-22 — RLPO-11 cochée par override (critère 6 non mesuré, Samuel, session principale, 2026-10-22) ; précédent : 2026-10-20 — RLPO-01..10 et 12 cochées à la porte de la Phase 58 (RLPO-11 en attente du critère 6) ; précédent : 2026-10-16 — RLPO-01..12 posées à la planification de la Phase 58, dérivées de P58-D-01..20 sans arbitrage neuf ; précédent : 2026-10-10 — DLWS-01..08 posées au cadrage de la Phase 57, dérivées de P57-D-01..15 sans arbitrage neuf ; précédent : 2026-10-08 — jalon `equipe-produit-v1.0` inscrit (Phases 57-62, six familles réservées et vérifiées libres, exigences posées au cadrage) ; précédent : 2026-10-08 — **clôture de `fiabilite-v1.0`** : WSAW-01..07 cochées (déjà Complete en traçabilité, seules les cases avaient dérivé), WSCH-01..05 cochées (WSCH-01 avec réserve de recette en session), AGTS-02 reste reportée avec trace ; snapshot `.planning/milestones/fiabilite-v1.0-REQUIREMENTS.md` ; précédent : 2026-09-25 — jalon `ecc-inspiration-v1.0` inscrit (Phases 51-56, six familles réservées et vérifiées libres, exigences posées au cadrage, aucune ligne de traçabilité tant qu'aucun ID n'existe) ; précédent : 2026-09-23 — **HEAD-01 fermée** (correction d'un ledger périmé) :
+*Last updated: 2026-11-11 — **jointure des sept cadrages de l'audit du cockpit** : SOCL-01..27, FORM-01..18, REGI-01..17, TEMP-01..12, ACTV-01..12, TRAC-01..13 et SYNT-01..10 posées (109 exigences, Pending ; familles neuves, préfixes vérifiés libres) ; repères de cadrage retirés ; réouvertures tranchées (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) ; les autres décisions des cadrages : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée ; précédent : 2026-11-11 — **UIFN-01, 02, 03, 05, 08, 09, 11, 12, 13 et 14 cochées** à l'alignement du planning sur ce qui est publié en `v2.76.0` (preuves écrites sur chaque ligne ; UIFN-10 et LANC-12 restent décochées, motifs à leur ligne de table ; alignement demandé par Samuel (session principale Claude Code, 2026-11-11)) ; précédent : 2026-11-06 — GITC-01..14 et LANC-01..11 cochées ; précédent : 2026-11-05 — TERM-01..12 et UIFN-04, 06, 07 cochées ; précédent : 2026-11-04 — VFSG-01..13 et CKPT-13..28 cochées ; précédent : 2026-11-03 — **CKPT-19..28 posées** (mise à jour du cadrage de la Phase 69 : équipe au travail, P69-D-12..24, arbitrages Samuel, AskUserQuestion session principale, 2026-11-03) ; précédent : 2026-11-03 — **CKPT-01..12 cochées** (Phase 67 close : suites du cockpit rejouées vertes, recette humaine validée par Samuel, `67-CLOTURE.md`) ; précédent : 2026-10-29 — **PLTF-02 cochée** (Phase 62 close : décision A, réexamen 2027-01-31) ; précédent : 2026-10-29 — COLB-01..07 cochées à la porte de la Phase 61 (preuve citée au SUMMARY de chaque plan et à `61-08-SUMMARY.md`) ; COLB-08 décochée (procédure de recette livrée, preuve humaine attendue : P61-B-01 lab et humains, P61-B-02 trois semaines) ; COLB-09 partielle (critère 6 `clients` au code 2, en attente de la liste) ; lectures RATIFIÉES (arbitrage Samuel, AskUserQuestion session principale, 2026-10-29 (« Oui aux propositions par défaut pour 60 et 61 »)) : COLB-01 sur P61-H-01 (armement au poste `product` ou `dev`, jamais `solo`), COLB-01 et COLB-05 sur P61-PL-03 (un refus d'armement relaie un code sans faire échouer l'installation) et P61-PL-08 (une mise à jour rafraîchit un hook déjà posé mais n'arme jamais un clone ; un lab dont le poste a été posé avant cette version s'arme par `role <poste>`) ; précédent : 2026-10-29 — PLTF-01..02 posées à la préparation de la Phase 62 (PLTF-01 cochée sur preuve du dossier, PLTF-02 décochée : décision de Samuel) ; précédent : 2026-10-22 — RLPO-11 cochée par override (critère 6 non mesuré, Samuel, session principale, 2026-10-22) ; précédent : 2026-10-20 — RLPO-01..10 et 12 cochées à la porte de la Phase 58 (RLPO-11 en attente du critère 6) ; précédent : 2026-10-16 — RLPO-01..12 posées à la planification de la Phase 58, dérivées de P58-D-01..20 sans arbitrage neuf ; précédent : 2026-10-10 — DLWS-01..08 posées au cadrage de la Phase 57, dérivées de P57-D-01..15 sans arbitrage neuf ; précédent : 2026-10-08 — jalon `equipe-produit-v1.0` inscrit (Phases 57-62, six familles réservées et vérifiées libres, exigences posées au cadrage) ; précédent : 2026-10-08 — **clôture de `fiabilite-v1.0`** : WSAW-01..07 cochées (déjà Complete en traçabilité, seules les cases avaient dérivé), WSCH-01..05 cochées (WSCH-01 avec réserve de recette en session), AGTS-02 reste reportée avec trace ; snapshot `.planning/milestones/fiabilite-v1.0-REQUIREMENTS.md` ; précédent : 2026-09-25 — jalon `ecc-inspiration-v1.0` inscrit (Phases 51-56, six familles réservées et vérifiées libres, exigences posées au cadrage, aucune ligne de traçabilité tant qu'aucun ID n'existe) ; précédent : 2026-09-23 — **HEAD-01 fermée** (correction d'un ledger périmé) :
 `intent-routing.md` renvoie déjà à `head-governance.md` (lignes 15 et 17, commit `5829bd0`,
 2026-09-15) et la case ci-dessus est déjà cochée avec sa preuve — seule cette note de bas de
 fichier était restée en contradiction avec le disque, corrigée sans rouvrir de travail ; précédent :
