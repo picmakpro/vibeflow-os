@@ -350,6 +350,21 @@ dans chaque plan.
   touchée, et le détail reste dans le journal du serveur. Décision déléguée par Samuel (message session principale,
   2026-11-08), option recommandée.
 
+- **P77-D-36 (classe « programme déclaré par le lab » : la preuve passe par le canal réel).** En `--format=tsv`, la
+  passe de rangement est sautée (P77-D-03). Le gate n'y lance plus que des commandes git qui n'exécutent aucun pilote de
+  contenu. Un témoin « pilote jamais exécuté » serait donc vert avec ou sans durcissement : c'est un négatif aveugle,
+  écarté. La propriété prouvée devient :
+  - la route ne lance le gate qu'en mode TSV ;
+  - un git de journalisation placé sur le chemin de lancement (hors du lab) relève les sous-commandes git réellement
+    exécutées par la route ; elles appartiennent à une liste fermée, au départ celle que le mode TSV garde (`rev-parse`,
+    `worktree list`) ;
+  - un mutant qui réintroduit une commande capable d'exécuter un pilote (par exemple la lecture des fichiers modifiés de
+    la passe de rangement) dans le chemin TSV rend le témoin rouge ;
+  - sonde positive : le même journal voit cette commande quand le gate est lancé en mode archivage, à la main.
+  Le durcissement `envGit(lab)` des enfants reste une défense en profondeur, prouvée par son propre témoin (aucun `GIT_*`
+  hérité). Il ne promet pas plus que ce que 79-07 livre pour un enfant non git. Décision déléguée par Samuel (message
+  session principale, 2026-11-08), option recommandée.
+
 ### Claude's Discretion
 
 - Le numéro et le nom du fichier `ui/` neuf : un numéro libre au moment de l'exécution, à vérifier contre les fichiers
