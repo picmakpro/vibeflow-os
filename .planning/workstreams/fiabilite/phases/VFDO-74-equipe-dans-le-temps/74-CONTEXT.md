@@ -72,7 +72,7 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   Cette lecture contredit `DESIGN.md` § 9 (trois teintes d'état, une couleur ne code jamais une catégorie libre) et Q9.
   La frise est bâtie sur `DESIGN.md` : **le nœud du plan s'écrit sur la voie** (seconde ligne de la colonne de gauche,
   étiquette du segment quand il change), **la couleur reste aux trois états**. Le but du ROADMAP n'est pas réécrit
-  (AUDC-V6) : une note de lecture y renvoie à cette décision. Remonté à Samuel (section « À Samuel », point 1).
+  (AUDC-V6) : une note de lecture y renvoie à cette décision. Confirmée par Samuel le 2026-11-11 (P74-D-46).
 - **P74-D-02 (place de la frise).** Une bascule à deux positions dans l'en-tête de l'onglet Équipe, « Régie · Frise »,
   régie par défaut (l'attention d'abord, DESIGNS § 2). Pas de quatrième onglet (P78-D-04). La position choisie est
   gardée pour la page, jamais dans un fichier du lab. La bascule elle-même est posée avec la régie si la Phase 73 la livre
@@ -280,6 +280,17 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   la page ; le rappel rend une fonction de nettoyage qui retire les abonnements à `VF_ETAT`, les minuteries, les
   écouteurs et le DOM posé quand on quitte l'onglet Équipe. Chaque plan qui pose du rendu l'écrit dans ses critères.
 
+### Arbitrage de Samuel
+
+- **P74-D-46 (couleur de la frise, confirme P74-D-01).** Arbitrage Samuel, AskUserQuestion session principale,
+  2026-11-11. Question telle qu'elle a été posée : le but écrit dit « une frise colorée par nœud du plan de bataille » ;
+  `DESIGN.md` § 9 réserve la couleur aux états ; le cadrage a suivi la règle de design. Réponse, mot pour mot (libellé
+  coché) : « Suivre la règle de design (Recommandé) » — option telle qu'elle a été présentée : « La couleur continue de
+  dire l'état ; le nom du nœud s'écrit en toutes lettres sur chaque voie de la frise. C'est ce que les plans prévoient
+  déjà. » Conséquence : P74-D-01 vaut arbitrage ; aucun plan ne change ; le but du ROADMAP n'est pas réécrit (AUDC-V6),
+  sa note de lecture cite cet arbitrage. Les trois autres points « À Samuel » (devise, limites de 5 h et de 7 jours,
+  relecture par dérivation) et le genre `silence` restent des décisions déléguées, option recommandée.
+
 ### Claude's Discretion
 
 Laissés à la spécification d'interface et à la planification, dans les bornes ci-dessus : la géométrie de la frise
@@ -290,12 +301,12 @@ voies (P74-D-10), le mécanisme de mise en évidence sur la carte Code (P74-D-12
 <specifics>
 ## À Samuel
 
-Quatre points, aucun ne bloque la planification ; l'arbitrage en vigueur tient et le plan est bâti dessus.
+Quatre points, aucun ne bloque la planification ; le premier est tranché (P74-D-46), les trois autres restent des options
+recommandées appliquées sous délégation, l'arbitrage en vigueur tient et le plan est bâti dessus.
 
-1. **« Colorée par nœud de DAG »** (but de la Phase 74, ton arbitrage du 2026-11-03, AskUserQuestion session principale) contredit `DESIGN.md` § 9 et Q9.
-   La frise est bâtie sur `DESIGN.md` : le nœud s'écrit sur la voie, la couleur reste aux trois états (P74-D-01). Options :
-   (a) garder `DESIGN.md` (recommandé : une couleur par nœud demanderait une palette libre que Graphite interdit, et
-   la couleur cesserait de dire l'état) ; (b) colorer par nœud, en rouvrant Q9. À voir à la recette.
+1. **« Colorée par nœud de DAG »** — **tranché** (P74-D-46, arbitrage Samuel, AskUserQuestion session principale,
+   2026-11-11) : « Suivre la règle de design (Recommandé) ». La couleur dit l'état, le nœud s'écrit en toutes lettres sur
+   chaque voie. Le point reste listé ici pour mémoire.
 2. **Pas de montant en devise** (P74-D-20) : le coût se lit en jetons et en durée, comme le dit le but. DESIGNS § 5
    proposait un « coût estimé au tarif public ». Recommandé : ne pas l'ajouter (table de tarifs à tenir, estimation que la
    Phase 52 refuse). Si tu le veux, il entre dans une phase ultérieure, pas dans la 74.

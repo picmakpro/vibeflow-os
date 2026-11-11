@@ -542,7 +542,7 @@ Plans:
 
 ### Phase 74: L'équipe dans le temps — swim-lanes, coût, replay
 
-> **Cadrée le 2026-11-11 (premier temps)** — `74-CONTEXT.md`, P74-D-01 à P74-D-45, décisions déléguées par Samuel
+> **Cadrée le 2026-11-11 (premier temps)** — `74-CONTEXT.md`, P74-D-01 à P74-D-46, décisions déléguées par Samuel
 > (message session principale, 2026-11-08), option recommandée ; spécification d'interface `74-UI-SPEC.md`. Inscrite le
 > 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03). Planifiée le 2026-11-11 (9 plans, 5
 > vagues) sur les contrats de la Phase 79 (`3119d82a`, amendements `2ae6607a` et `74501bb0`) ; les plans 74-04 à 74-09
@@ -550,7 +550,8 @@ Plans:
 
 **Goal:** L'onglet Équipe montre les agents sur un axe de temps (une ligne par agent, colorée par nœud de DAG), le coût en jetons et en durée par mission, phase et agent, et rejoue une mission nœud par nœud avec un curseur temporel.
 **Lecture du but (P74-D-01) :** but arbitré non réécrit (AUDC-V6). « Colorée par nœud de DAG » contredit `DESIGN.md` § 9 :
-le nœud s'écrit sur la voie, la couleur reste aux trois états ; signalé à Samuel pour la recette. Fenêtre de 24 h au plus
+le nœud s'écrit sur la voie, la couleur reste aux trois états ; confirmé par Samuel (P74-D-46, arbitrage Samuel,
+AskUserQuestion session principale, 2026-11-11 : « Suivre la règle de design (Recommandé) »). Fenêtre de 24 h au plus
 (AUDC-Q2) : coût et relecture se lisent sur la fenêtre affichée. La relecture dérive l'état des nœuds des voies des agents
 qui les portent (aucun horodatage de transition dans les DAG).
 **Requirements**: TEMP-01, TEMP-02, TEMP-03, TEMP-04, TEMP-05, TEMP-06, TEMP-07, TEMP-08, TEMP-09, TEMP-10, TEMP-11, TEMP-12

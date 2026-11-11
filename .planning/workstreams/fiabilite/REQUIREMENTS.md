@@ -1683,8 +1683,9 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 
 ### L'équipe dans le temps — frise, fiche d'agent, coût, relecture (Phase 74 — posées au cadrage, 2026-11-11)
 
-Dérivées de P74-D-01 à P74-D-45 (`74-CONTEXT.md`), décisions déléguées par Samuel (message session principale,
-2026-11-08), option recommandée ; aucun arbitrage neuf. Préfixe `TEMP` vérifié libre le 2026-11-11. Dépendent des
+Dérivées de P74-D-01 à P74-D-46 (`74-CONTEXT.md`), décisions déléguées par Samuel (message session principale,
+2026-11-08), option recommandée, sauf P74-D-46 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 :
+la couleur dit l'état, le nœud s'écrit sur la voie). Préfixe `TEMP` vérifié libre le 2026-11-11. Dépendent des
 contrats de la Phase 79 (figés au commit `3119d82a` : index, route de frise, flux, contrat de forme) et de la régie de la Phase 73.
 
 - [ ] **TEMP-01**: Frise des sessions dans l'onglet Équipe, derrière une bascule « Régie · Frise » (régie par défaut, aucun quatrième onglet) : une voie par agent, l'enfant sous son parent avec un trait au dispatch, horloge commune au lab, fenêtres 1 h 30 (défaut), 6 h et 24 h, jamais au-delà ; une session vivante sans activité reste listée au repos ; une mission commencée avant la fenêtre le dit (P74-D-02, D-05, D-08 ; AUDC-I05, AUDC-Q2).
