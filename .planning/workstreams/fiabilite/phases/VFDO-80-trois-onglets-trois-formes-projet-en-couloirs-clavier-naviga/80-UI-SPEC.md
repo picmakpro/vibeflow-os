@@ -275,8 +275,8 @@ Une section de plan n'affiche pas une ligne dont la valeur est vide : elle dispa
   « Retour » précédé d'un chevron du moteur tourné vers la gauche ; 13 px / 500 ; 36 px au bureau, 44 px au tactile.
 - Pile de sélections du panneau (`VibeFlow.panneau.retour()`) : un clic sur une carte, une rangée ou un nœud du canevas
   **repart d'une pile vide** ; un lien interne au panneau (plan, exigence, phase) **empile** ; Retour dépile et rappelle
-  `select` sans empiler. Plafond 20, le plus ancien sort. Fermer le panneau vide la pile. Échap ferme le panneau, jamais ne
-  dépile.
+  `select` sans empiler. Plafond 20, le plus ancien sort. Fermer le panneau vide la pile. Au bureau, Échap ne ferme pas le panneau
+  (il se ferme par `p` ou son bouton) et ne dépile jamais ; au téléphone, Échap ferme la feuille.
 - Pile vide : `aria-disabled="true"` (il reste focalisable et annoncé « Retour, indisponible »), texte `--text-4`, aucun
   survol. Le nom : « Retour » ; description : « Revenir à la sélection précédente » (`aria-describedby`, pas de `title` seul).
 - Il ne change ni la vue, ni la forme, ni le niveau : c'est la pile du panneau. « Monter » reste la remontée de niveau.

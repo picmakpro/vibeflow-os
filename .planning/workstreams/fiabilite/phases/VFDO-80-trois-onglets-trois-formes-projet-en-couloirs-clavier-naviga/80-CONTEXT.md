@@ -343,7 +343,7 @@ Toutes « décision déléguée par Samuel (message session principale, 2026-11-
   jamais un fond teinté ; `--st-active` clair passe à une valeur ≥ 3,5:1 sur `--bg` sans toucher `--sev-medium` (pour ne
   pas faire tomber le texte des puces), et l'exception s'écrit dans `DESIGN.md`. Pas une réouverture : aucun registre ne
   porte un arbitrage de Samuel sur cette valeur ; `DESIGN.md` reste la référence et change avec sa justification mesurée.
-- **P80-D-32 (raccourcis proposés par le craft).** Maj+F pour « cadrer la sélection et ses voisins » (P80-D-17) ; Espace
+- **P80-D-32 (raccourcis proposés par le craft).** une touche pour « cadrer la sélection et ses voisins » (P80-D-17, fixée par P80-D-45) ; Espace
   sélectionne au téléphone ; les repères de bord sont des boutons dans l'ordre de tabulation. L'aide `?` les liste.
 
 ### Amendement du 2026-11-11 après la recherche (`80-RESEARCH.md`)
@@ -395,6 +395,13 @@ Faits établis par la recherche qui corrigent la forme de décisions déjà pris
   liste en ont besoin, et ses vagues 1 et 2 ne dépendent pas de la 79) ; la Phase 75 la lit et n'ajoute que
   `files_modified`. La 80 ne calcule rien côté serveur hors de cette lecture : `vf-cockpit-instantane.mjs` (A31) ne la
   concerne pas.
+
+- **P80-D-45 (touche de « cadrer la sélection et ses voisins », remplace la touche de P80-D-32).** `C` (« Cadrer »),
+  lue comme `c`, ignorée avec ⌘, Ctrl ou Alt (⌘C et Ctrl+C restent la copie), dans un champ de saisie et sur Équipe ;
+  libre dans l'écouteur global du moteur et dans le registre. Maj+F écartée : `F` majuscule appelle déjà « Ajuster ».
+- **P80-D-46 (deux lignes de `DESIGN.md` écrites par le lot jetons).** L'exemption de l'anneau de focus dans la règle
+  « deux intentions d'élévation » (§ 9) et l'exception des rangées de 40 px du tiroir Git existant (§ 4), textes proposés
+  dans `80-UI-SPEC-NAVIGATION.md`.
 
 ### Claude's Discretion
 
