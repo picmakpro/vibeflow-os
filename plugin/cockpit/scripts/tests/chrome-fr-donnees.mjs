@@ -44,5 +44,20 @@ await executer(chrome, async (s) => {
   // fil d'Ariane : un dossier du lab dont le nom est un mot du dictionnaire
   // gabarits dont les variables sont des noms du lab (infobulle d'un lien, en-tête d'une carte ouverte) : le chrome est traduit, les noms jamais
   const gabarits = await s.ev("({ lien: window.__vfFrTraduire('Tokens contains Open'), dans: window.__vfFrTraduire('Inside Tokens'), derriere: window.__vfFrTraduire('Everything behind Health'), temoin: window.__vfFrTraduire('Inside Parent') })");
-  return { ...cartes, gabarits, descPosee: desc, panneau, panneauVide, recherche, ligne, miette, infobulle };
+  // panneau d'un LIEN sans description (vrai clic) : le texte de repli est calculé par le viewer (« 1 connection. »), sans donnée du lab : il reste du chrome, traduit
+  await s.ev(`${FP}.go(${JSON.stringify(conteneur)})`);
+  await s.attendre(`window.VibeFlow.state.container === ${JSON.stringify(conteneur)} && !!window.VibeFlow.state.edgeEls && window.VibeFlow.state.edgeEls.size > 0`, 'liens du conteneur');
+  const aretes = await s.ev(`[...${FP}.state.edgeEls.entries()].filter(([, v]) => v.e.k !== 'contains').map(([k]) => k)`);
+  let lien = null;
+  if (aretes && aretes.length) {
+    await s.ev(`${FP}.state.edgeEls.get(${JSON.stringify(aretes[0])}).g.dispatchEvent(new MouseEvent('click', { bubbles: true }))`);
+    await s.attendre("!!document.querySelector('#panel .pt') && document.querySelector('#panel .pt').textContent.includes('→')", 'panneau du lien');
+    lien = await stabiliser(() => s.ev("({ titre: document.querySelector('#panel .pt').textContent, desc: [...document.querySelectorAll('#panel .pd')].map((e) => e.textContent).join('|') })"), { pas: 400, max: 6000 });
+  }
+  // panneau « réponse » réel (showBoard, sans question au modèle) : le nom de chaque carte listée est une donnée du lab
+  await s.ev(`${FP}.showBoard({ title: 'Résultat', items: [${JSON.stringify(pose.Tokens)}, ${JSON.stringify(pose.Open)}], steps: [${JSON.stringify(pose.Health)}, ${JSON.stringify(pose.Open)}] })`);
+  await s.ev(`${FP}.select(null)`); // la sélection du lien reste sinon affichée à la place de la réponse
+  await s.attendre("document.querySelectorAll('#panel .row.vf-rep .rn').length >= 4", 'panneau réponse');
+  const reponse = await stabiliser(() => s.ev("[...document.querySelectorAll('#panel .row.vf-rep .rn')].map((e) => e.textContent)"), { pas: 400, max: 6000 });
+  return { ...cartes, lien, reponse, nAretes: aretes ? aretes.length : 0, gabarits, descPosee: desc, panneau, panneauVide, recherche, ligne, miette, infobulle };
 });

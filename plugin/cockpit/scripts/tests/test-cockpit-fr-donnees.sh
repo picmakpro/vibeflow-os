@@ -3,6 +3,7 @@
 #   D1 les titres de cartes d'un lab portant tokens.ts, open.mjs, health.mjs restent ceux que le moteur écrit : Tokens, Open, Health (avant : « Jetons », « Ouvrir », « Santé »)
 #   D2 une description de carte qui est une phrase du dictionnaire (« Health ») reste telle quelle
 #   D4 le panneau de détail d'une carte garde son titre (« Tokens ») et sa description (« Health ») ; D5 une ligne de liste, un résultat de recherche, l'infobulle et le fil d'Ariane gardent le nom (et la description) de la donnée
+#   D6 le texte de repli du panneau d'un lien (sans description) reste traduit ; les noms de cartes d'un panneau « réponse » ne le sont pas
 #   D3 témoins : le chrome reste traduit (bouton « Santé », « Pas encore de description » d'une carte sans description)
 # Chrome headless ; sans navigateur la suite est SAUTÉE hors CI, et ÉCHOUE en CI (jamais un vert à vide).
 set -uo pipefail
@@ -24,7 +25,7 @@ import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); cons
 JS
 mklab() {
   local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle"
-  printf 'export const u = () => 1;\n' > "$L/src/util.js"; printf 'export const jeton = 1;\n' > "$L/src/tokens.ts"; printf 'export const ouvrir = 2;\n' > "$L/src/open.mjs"; printf 'export const sante = 3;\n' > "$L/src/health.mjs"; printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n' > "$B/ROADMAP.md"
+  printf 'export const u = () => 1;\n' > "$L/src/util.js"; printf 'export const jeton = 1;\n' > "$L/src/tokens.ts"; printf "import { u } from './util.js';\nexport const ouvrir = u() + 2;\n" > "$L/src/open.mjs"; printf 'export const sante = 3;\n' > "$L/src/health.mjs"; printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n' > "$B/ROADMAP.md"
   printf '<objective>Faire le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
   node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
@@ -59,6 +60,9 @@ assert_eq "D5.1 — ligne de liste : nom et description gardés" "$(printf '%s' 
 assert_eq "D5.2 — résultat de recherche : nom et description gardés" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.recherche.nom + "|" + j.recherche.desc')" "Tokens|Health"
 assert_eq "D5.3 — infobulle d'une carte : le nom est gardé" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.infobulle')" "Tokens"
 assert_eq "D5.4 — fil d'Ariane : le nom est gardé" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.miette')" "Tokens"
+assert_eq "D6.0 — témoin : le conteneur porte au moins un lien (hors « contient »), le panneau du lien a été ouvert par un vrai clic" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.nAretes > 0 && !!j.lien')" "true"
+assert_eq "D6.1 — panneau d'un lien sans description : le texte de repli du viewer reste traduit (aucun « connection » anglais)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.lien ? (/connection|endpoint/.test(j.lien.desc) ? "anglais:" + j.lien.desc : "traduit") : "absent"')" "traduit"
+assert_eq "D6.2 — panneau « réponse » réel : les noms de cartes listées (rangées de la réponse et du parcours) sont ceux des fichiers" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.reponse.join(",")')" "Tokens,Open,1. Health,2. Open"
 assert_eq "D5.5 — gabarits à noms : « Tokens contient Open » (chrome traduit, noms gardés)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.gabarits.lien')" "Tokens contient Open"
 assert_eq "D5.6 — « Inside Tokens » → « Dans Tokens », « Everything behind Health » garde « Health »" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.gabarits.dans + "|" + j.gabarits.derriere')" "Dans Tokens|Tout ce qu'il y a derrière Health"
 vf_hyg_assert
