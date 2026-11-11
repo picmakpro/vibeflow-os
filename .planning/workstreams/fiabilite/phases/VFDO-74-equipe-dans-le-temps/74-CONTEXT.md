@@ -366,6 +366,13 @@ décisions citées ; le texte d'origine reste au-dessus pour l'historique.
   `__vfEquipeRendu`), après le témoin de l'annulation des trois déclencheurs `nom`, `ancre`, `rapport` ; seule exception
   à P73-D-20. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
 
+- **P74-D-54 (rouge intermédiaire des suites de la 73).** Dès 74-05, la fiche annule `vf-agent:ouvrir` : les témoins
+  de la 73 qui chargent la page assemblée et attendent le lecteur de repli rougissent jusqu'à leur réécriture en 74-08
+  et au retrait de 74-10. Ce rouge est toléré entre ces plans à trois conditions : il est nommé témoin par témoin dans le
+  SUMMARY de 74-05, aucun autre témoin ne rougit, et la branche d'exécution ne pousse pas vers sa PR entre 74-05 et
+  74-10 (la PR ne voit que l'état final). Les suites de la 73 ne sont modifiées que par 74-10, dans les limites de
+  P73-C2. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+
 ### Claude's Discretion
 
 Laissés à la spécification d'interface et à la planification, dans les bornes ci-dessus : la géométrie de la frise
