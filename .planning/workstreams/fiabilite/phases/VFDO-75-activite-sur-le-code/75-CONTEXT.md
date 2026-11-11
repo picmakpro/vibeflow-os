@@ -1,8 +1,8 @@
 # Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte - Context
 
 **Gathered:** 2026-11-11
-**Status:** Cadrée (2026-11-11) — frontière de questions vide côté mission ; trois questions non bloquantes à Samuel encore ouvertes, Q-75-3 et Q-75-4 tranchées
-le 2026-11-11 (section « À Samuel ») ; bâtie sur les contrats figés de la Phase 79 (branche `feat/phase-79-socle-cockpit`, commit
+**Status:** Cadrée (2026-11-11) — frontière de questions vide côté mission ; section « À Samuel » au format C76-Q1 : P75-Q-03 et P75-Q-04 tranchées
+le 2026-11-11, P75-Q-01, 02 et 05 appliquées par délégation, P75-Q-06 (amendements de `DESIGN.md`) en attente, bloque 75-10 ; bâtie sur les contrats figés de la Phase 79 (branche `feat/phase-79-socle-cockpit`, commit
 `3119d82a`, `79-CONTEXT.md` § « Contrats fournis », C0 à C6, amendés par `2ae6607a` (A1-A14) et `6f66d878` (A21-A28)) ;
 les sept manques relayés à la 79 sont fermés par A21 à A27 (section « Contrats de la Phase 79 retenus »).
 
@@ -140,7 +140,7 @@ et ne sont pas rouverts.
   sélection d'une carte seulement** : ses voisins (5 au plus, avec leur %) portent la marque, et une section « Change
   souvent avec » s'ajoute au panneau de détail. Jamais de liens globaux ajoutés au graphe (1 905 liens déjà). (Panel B.)
 - **P75-D-09 (calcul, cache, route).** Une tâche asynchrone recalcule points chauds, couplage, gardes et collisions
-  committées sur la **signature de HEAD et des refs** (règle de P78-D-15, ~30 ms), en incrémental quand l'ancien HEAD est
+  committées sur la **signature de HEAD, des refs et des worktrees** lue dans `instantane().git.sig` (A47 de la 79 ; jamais de lecture git par requête, A31), en incrémental quand l'ancien HEAD est
   un ancêtre ; mono-vol ; résultat en mémoire, servi par une route GET bornée sous `/api/vf/`, derrière Host, Origin et
   jeton, schéma `vibeflow/cockpit-activite@1` déclaré dans `vf-cockpit-interface.json`. Hors de la boucle de collecte
   (cible AUDC-H2) ; une requête pendant le calcul répond. Toute lecture git passe par `envGit` et `lancerGitAsync`
@@ -420,6 +420,11 @@ A45 (P79-D-33 : forme `{ arbre, cible, n, dernierMs }`, worktrees prouvés compt
 quand `git.sig` change et ne lit jamais git à chaque requête — A31 tenue ; `instantane().frise` porte jusqu'à 2 000
 voies avec `tronque`, la borne de 500 ne valant que pour la réponse HTTP de `/api/vf/frise` ; le radar dit « incomplet »
 quand `tronque` est vrai et « en cours de lecture » quand `git` vaut `null`).
+A48 (`351bc9e8`) : mutants d'interface par `cockpit_module_copie` et `COCKPIT_MODULE` (copie du module dont un
+`ui/*.js` est muté) ; les fichiers neufs `ui/75-vf-*.js` entrent seuls dans la liste fermée de `/_vf/`, seul geste la
+ligne `AJOUT` de `VENDORED.txt` ; `cibles.tronque` par voie (liste coupée à 200), `voiesOmises` à côté de `tronque`, cible
+coupée terminée par `…` dans ses 120 caractères : une cible coupée ne se joint jamais à sa jumelle entière, le radar
+dit qu'il ne peut pas conclure ; `/api/vf/transcript` lit la table en mémoire de la collecte.
 </phase79_contract>
 
 <canonical_refs>

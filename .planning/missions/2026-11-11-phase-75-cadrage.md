@@ -17,6 +17,29 @@ vérification, spécification d'interface `75-UI-SPEC.md` acceptée à **81/100*
 8 vagues**, dont la dernière vérification fraîche rend `passed` (0 bloquant, 0 majeur, 6 mineurs ouverts ci-dessous).
 Aucune exécution, aucun fichier de code ni de test ; STATE.md intact.
 
+## Reprise du 2026-11-11 (après les arbitrages de Samuel)
+
+- **Q-75-3 et Q-75-4 tranchées** (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) : P75-D-28 (retrait
+  ferme, P70-D-01 amendée dans cette mesure exacte) et P75-D-29 (worktree prouvé du dépôt = le lab, A45 de la 79).
+  Conditions de départ levées, branche de repli retirée des plans (témoin : grep vide, commit `9ddbe831`).
+- **Radar précisé** (P75-D-30, déléguée) : sentinelle « hors du lab » jamais jointe ; même cible dans deux arbres =
+  « conflit de fusion possible », distinct de la collision dans un même arbre ; priorité agents > arbres > branches >
+  prévu ; A46 (nom de worktree ambigu → sentinelle).
+- **Contrats de la 79 jusqu'à A47** (`daae8bc9`) : clé de recalcul = `instantane().git.sig` (A31 tenue, aucune lecture
+  git par requête) ; `git: null` → « en cours de lecture » ; `frise` jusqu'à 2 000 voies, `tronque` → « Radar
+  incomplet : historique tronqué ». `compileGlob` corrigé par la 79 au point unique (79-21, P79-D-32) ; la 75 n'y pose
+  plus de borne propre.
+- **Canal de marquage** (P75-D-05 amendée, déléguée ; coordination tranchée par la session principale) : posé par la
+  75 (75-07) ; le geste « Voir sur la carte » de la 74 est rebranché dessus dans le même lot (deux endroits de
+  `ui/74-vf-frise-carte.js` : `voirSurLaCarte` et `finirRelecture` ; suite `test-cockpit-frise-curseur.sh`, C8b retiré,
+  C8 étendu). API : `VF_MARQUES.poser(couche, entrées, { exclusif })`, `VF_MARQUES.retirer(couche)` (restitue la couche
+  précédente), `active()`, `lire(id)`. Ordre de chargement indépendant du nom (résolution tardive, témoin). Fichiers
+  neufs de la 75 renommés `ui/75-vf-*`.
+- **« À Samuel » au format C76-Q1** : P75-Q-01 à P75-Q-06 ; P75-Q-06 (amendements de `DESIGN.md`) en attente, bloque 75-10,
+  dont la tâche de point de contrôle humain est bloquante (`autonomous: false`).
+- **Plans 75-05 à 75-10** : « à revalider à l'écriture de 79-15..21 » (seuls 79-01 à 79-14 sont écrits sur la branche
+  de la 79 au moment de la reprise).
+
 ## Plan de bataille (DAG)
 
 | Nœud | Contenu | Porteur | Issue |
