@@ -649,17 +649,77 @@ Plans:
 
 ### Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-11 depuis l'audit du cockpit du 2026-11-10 (demande de Samuel, session principale Claude Code, 2026-11-10 ; numéro et découpage : décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée).
+> **Cadrée le 2026-11-11** par le manager de la mission (`80-CONTEXT.md`, P80-D-01 à P80-D-60, décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée ; cinq réouvertures rangées « À Samuel », S80-1 à S80-5). Inscrite le 2026-11-11 depuis l'audit du cockpit du 2026-11-10 (demande de Samuel, session principale Claude Code, 2026-11-10).
 
 **Goal:** L'onglet Projet se lit d'un regard à toute largeur (les phases rangées par état, le graphe à la demande), chaque carte du canevas est atteignable au clavier et nommée pour un lecteur d'écran, et l'on ne se perd plus sur la carte du code : un ajustement qui montre tout, une minicarte, une palette de commandes, des surcouches qui retiennent le focus.
-**Requirements**: TBD — famille `FORM` réservée, posée au cadrage.
-**Depends on:** Phase 71.5 (jetons de couleur et d'espacement) ; Phase 78 (en-tête). Les onglets sans rechargement attendent la Phase 79. En parallèle de la 79.
-**Sources:** `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2 ; `2026-11-10-audit-cockpit/DESIGNS.md` § 6 et § 7 ; registre `AUDC-BL1`, `BL2`, `M1`, `M2`, `M5`, `M6`, `M8`, `M10`, `M12`, `X1` à `X3`, `X5`, `X7`, `X8`, `F1`, `F3` à `F5`, `F7`, `I23` à `I27`, `I29`, `I30`.
-**Plans:** 0 plans
+**Requirements**: FORM-01 à FORM-18 (FORM-18 après avis de Samuel).
+**Depends on:** Phase 71.5 (jetons de couleur et d'espacement) ; Phase 78 (en-tête). Vagues 1 et 2 sans dépendance à la Phase 79 ; le lot moteur (`viewer.html`), les jetons et les onglets sans rechargement après la fusion de la Phase 79 (contrats C5, C6 et amendement A1 à A7 de `79-CONTEXT.md`, commits `3119d82a` et `2ae6607a` de `feat/phase-79-socle-cockpit`). Fournit à la Phase 76 les contrats P80-C76-1 à 4 (panneau de Projet) et aux Phases 73 et 74 la pile de surcouches.
+**Sources:** `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2 ; `2026-11-10-audit-cockpit/DESIGNS.md` § 6 et § 7 ; registre `AUDC-BL1`, `BL2`, `M1`, `M2`, `M5`, `M6`, `M8`, `M10`, `M12`, `X1` à `X3`, `X5`, `X7`, `X8`, `F1`, `F3` à `F5`, `F7`, `I23` à `I27`, `I29`, `I30` (X4, X6, M7, M11 et les parts lot 0 de M10 et X7 sont livrés).
+**Retraits:** le canevas comme vue par défaut de Projet ; les vignettes Backlog, Graines et Releases ; les copies de la formule de cadrage ; les listes « surcouche ouverte » recopiées.
+**Success Criteria** (what must be TRUE):
+  1. À 1440, 1024 et 390 px, la racine de Projet montre les phases en quatre couloirs par état, titres lisibles sans zoom ; le graphe s'ouvre par une bascule ; au téléphone, une liste triable.
+  2. Au clavier seul, on atteint, parcourt et ouvre toute carte du canevas, et chaque surcouche retient le focus puis se ferme à Échap en rendant le focus à son ouvreur.
+  3. Sur Code, la minicarte et les repères de bord mènent à toute carte hors champ sans descendre sous le plancher de lisibilité ; `+` et `-` gardent la carte sélectionnée en place ; la palette atteint vues, actions et onglets.
+  4. Le tiroir Git est lisible à 1024 × 768 sans pousser la carte ; les jetons repris passent les seuils de contraste mesurés dans les deux thèmes.
+  5. Après la Phase 79, changer d'onglet ne recharge plus la page et garde tiroirs, zoom et historique du terminal.
+  6. Toutes les suites du cockpit vertes sous macOS et Linux ; chaque comportement porte un témoin rouge sur la base puis vert.
+**Plans:** 21 plans en 11 vagues (vagues 1 à 3 sans dépendance à la Phase 79 ; à partir de 80-09 : 79-01 à 79-18 fusionnés ; 80-18 après 79-20 ; P80-Q-01 à P80-Q-05 tranchées, FORM-18 portée par 80-14, 80-15, 80-19 et 80-20)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 80 to break down)
+**Vague 1**
+
+- [ ] 80-01-PLAN.md — Clavier du canevas (un arrêt de tabulation, voisin spatial, anneau sur la carte)
+- [ ] 80-02-PLAN.md — Pile de surcouches, panneau fermé hors tabulation, retrait des trois listes
+- [ ] 80-03-PLAN.md — Données de Projet (avancement, exigences, vague, recette ; DIFFÉRÉ retiré du pied)
+
+**Vague 2** *(bloquée tant que la vague 1 n'est pas terminée)*
+
+- [ ] 80-04-PLAN.md — Projet en couloirs, ?vue=, naviguer(), visite, contrats C76-1/2/3
+- [ ] 80-05-PLAN.md — Coin bas-droit : minicarte, repères, ligne d'état, zone basse du téléphone
+- [ ] 80-06-PLAN.md — Tiroir Git : pagination, worktrees repliés, volet bas, poignée de largeur, ouvrirSur(sha)
+
+**Vague 3** *(bloquée tant que la vague 2 n'est pas terminée)*
+
+- [ ] 80-07-PLAN.md — Forme Liste, intérieur de phase, touche v, mémoire par lab
+- [ ] 80-08-PLAN.md — Pile Retour du panneau VF_PANNEAU (C76-3, C76-5)
+
+**Vague 4** *(bloquée tant que la vague 3 n'est pas terminée)*
+
+- [ ] 80-09-PLAN.md — Lot moteur A1 : cadrage unique, champ de lecture, zoom réversible, garde de saisie
+
+**Vague 5** *(bloquée tant que la vague 4 n'est pas terminée)*
+
+- [ ] 80-10-PLAN.md — Onglets sans rechargement, « Réessayer », VF_ONGLETS.aller
+- [ ] 80-11-PLAN.md — Lot moteur A2 : vocabulaire du panneau de Projet
+- [ ] 80-12-PLAN.md — Cadrer la sélection et ses voisins (touche C)
+
+**Vague 6** *(bloquée tant que la vague 5 n'est pas terminée)*
+
+- [ ] 80-13-PLAN.md — Lot moteur A3 : lien de vue (z=, git=1), mémoire des tiroirs
+
+**Vague 7** *(bloquée tant que la vague 6 n'est pas terminée)*
+
+- [ ] 80-14-PLAN.md — Lot moteur B : palette, registre des raccourcis, ARIA, copier le lien, ligne du terminal (P80-D-55)
+
+**Vague 8** *(bloquée tant que la vague 7 n'est pas terminée)*
+
+- [ ] 80-15-PLAN.md — Aide ?, ligne du terminal (P80-D-55)
+- [ ] 80-16-PLAN.md — Jetons X5, DESIGN.md, découpe de 00-vibeflow.js
+- [ ] 80-19-PLAN.md — Santé en français (P80-Q-03, P80-D-54)
+- [ ] 80-21-PLAN.md — Échec d'un changement d'onglet : Lecture impossible, Réessayer
+
+**Vague 9** *(bloquée tant que la vague 8 n'est pas terminée)*
+
+- [ ] 80-17-PLAN.md — Finitions F1, F3, F4, F5 (après 80-16 : colonnes-baseline.txt partagé)
+
+**Vague 10** *(bloquée tant que la vague 9 n'est pas terminée)*
+
+- [ ] 80-20-PLAN.md — Titre de vue, en-tête en trois groupes, chevron, icônes, ouvreur Git 36/44 (P80-Q-01, P80-Q-02, P80-Q-05)
+
+**Vague 11** *(bloquée tant que la vague 10 n'est pas terminée)*
+
+- [ ] 80-18-PLAN.md — Assemblage : compteur des README, table du partage CI, CHANGELOG, non-régression
 
 ### Phase 81: Agir sur une session depuis le cockpit
 
