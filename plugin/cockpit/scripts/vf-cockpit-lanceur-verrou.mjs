@@ -5,14 +5,20 @@ import path from 'node:path';
 import http from 'node:http';
 import { confiner } from './vf-cockpit-paths.mjs';
 
-// AUDC-H3 : tout fichier que le lanceur écrit dans la sortie du lab (journal, état) y reste. Contrôle de sortie (confiner : ni lien symbolique, ni dossier parent hors du lab),
-// ouverture sans suivre de lien (O_NOFOLLOW) et type vérifié sur le descripteur ouvert : fichier régulier, un seul lien dur. Rend le descripteur, ou null.
-const SANS_LIEN = fs.constants.O_NOFOLLOW || 0;
+// AUDC-H3 : tout fichier que le lanceur écrit dans la sortie du lab (journal, état) y reste. Rien n'est modifié ni bloqué avant le contrôle : aucun composant du chemin sous le lab n'est un lien
+// symbolique (lstat de chacun), le fichier existant est régulier et à un seul lien dur (lstat), l'ouverture ne suit pas de lien et ne bloque pas (O_NOFOLLOW, O_NONBLOCK), le type est revérifié sur
+// le descripteur, et la troncature (mode non ajout) n'a lieu qu'ensuite. Rend le descripteur, ou null.
+const BAS = (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0);
 export function ouvrirSur(lab, f, { ajout = false, mode = 0o600 } = {}) {
   try {
     confiner(lab, f);
-    const fd = fs.openSync(f, fs.constants.O_WRONLY | fs.constants.O_CREAT | SANS_LIEN | (ajout ? fs.constants.O_APPEND : fs.constants.O_TRUNC), mode);
-    try { const st = fs.fstatSync(fd); if (st.isFile() && st.nlink === 1) return fd; } catch {}
+    let p = path.resolve(lab);
+    for (const c of path.relative(p, path.resolve(f)).split(path.sep)) {
+      p = path.join(p, c); let st; try { st = fs.lstatSync(p); } catch (e) { if (e.code === 'ENOENT') break; throw e; }
+      if (st.isSymbolicLink() || (p === path.resolve(f) && (!st.isFile() || st.nlink !== 1))) return null;
+    }
+    const fd = fs.openSync(f, fs.constants.O_WRONLY | fs.constants.O_CREAT | BAS | (ajout ? fs.constants.O_APPEND : 0), mode);
+    try { const st = fs.fstatSync(fd); if (st.isFile() && st.nlink === 1) { if (!ajout) fs.ftruncateSync(fd, 0); return fd; } } catch {}
     fs.closeSync(fd);
   } catch {}
   return null;

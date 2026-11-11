@@ -335,6 +335,25 @@ assert_eq "H5 — server.json lié vers un fichier extérieur : la cible reste v
 rm -f "$SO/.cache/server.json"; node "$WORK/orphelin.mjs" "$SCRIPTS" "$LO" 'zz
 FORGE'
 assert_eq "H6 — empreinte annoncée sans forme valide : aucun octet de sa valeur dans server.json" "$(grep -c 'FORGE' "$SO/.cache/server.json")" "0"
+# H7-H9 : rien n'est modifié ni bloqué AVANT le contrôle du type et du nombre de liens ; aucun composant du chemin n'est un lien
+printf 'PRECIEUX\n' > "$LO/precieux.txt"; rm -f "$SO/.cache/server.json"; ln "$LO/precieux.txt" "$SO/.cache/server.json"   # lien dur vers un fichier du lab
+node "$WORK/orphelin.mjs" "$SCRIPTS" "$LO" abcdef012345
+assert_eq "H7 — server.json à deux liens durs : le fichier lié n'est pas tronqué ni réécrit (refus avant toute troncature)" "$(cat "$LO/precieux.txt")" "PRECIEUX"
+cat > "$WORK/noter.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, sortie] = process.argv;
+const { noter } = await import(pathToFileURL(scripts + '/vf-cockpit-lanceur-verrou.mjs').href);
+noter(sortie, 'essai'); process.exit(0);
+JS
+LF8="$WORK/lab-f8"; mkplan "$LF8"; SF8="$LF8/.vibeflow/cockpit"; mkdir -p "$SF8/.cache"; mkfifo "$SF8/.cache/serveur.log"   # tube nommé à la place du journal
+node "$WORK/noter.mjs" "$SCRIPTS" "$SF8" > /dev/null 2>&1 & FP=$!
+sleep 3; assert_eq "H8 — journal remplacé par un tube nommé : le lanceur n'est pas figé (il refuse et rend la main)" "$(kill -0 "$FP" 2>/dev/null && echo fige || echo libre)" "libre"
+kill -9 "$FP" 2> /dev/null; wait "$FP" 2> /dev/null
+LF9="$WORK/lab-f9"; mkplan "$LF9"; SF9="$LF9/.vibeflow/cockpit"; mkdir -p "$SF9" "$LF9/autre-dossier"; ln -s "$LF9/autre-dossier" "$SF9/.cache"   # .cache lié vers un dossier INTERNE du lab
+node "$WORK/noter.mjs" "$SCRIPTS" "$SF9"
+assert_eq "H9 — .cache lié vers un dossier interne du lab : rien n'y est écrit (aucun composant du chemin n'est un lien)" "$(ls "$LF9/autre-dossier" | wc -l | tr -d ' ')" "0"
+LF10="$WORK/lab-f10"; mkplan "$LF10"; SF10="$LF10/.vibeflow/cockpit"; mkdir -p "$SF10/.cache"; node "$WORK/noter.mjs" "$SCRIPTS" "$SF10"
+assert_eq "H10 — témoin positif : sans lien ni tube, le journal s'écrit" "$(grep -c 'lanceur : essai' "$SF10/.cache/serveur.log")" "1"
 
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
