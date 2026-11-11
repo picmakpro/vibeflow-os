@@ -447,6 +447,12 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
     hors de l'arbre principal sous la forme textuelle `<chemin relatif> (worktree <nom>)` ;
   - le radar de la Phase 75 joint les cibles par le couple (`arbre`, `cible`).
   Plans touchés : 79-13 (cibles, voie, transcript), 79-08 et 79-09 si le libellé `arbre` de la voie y est calculé.
+- **A46 (79-13, limites d'A45).** Deux limites nommées, versées au BACKLOG par la jointure : (1) le `nom` d'un worktree
+  n'est pas unique (deux worktrees au même nom de dossier rendent le couple (`arbre`, `cible`) ambigu pour le radar ;
+  `cockpit-git-worktrees@1` le dit déjà) ; (2) la dernière action d'un agent (`who`, `doing`, P69-D-16) garde sa règle
+  actuelle : un fichier d'un worktree hors de l'arbre principal y reste « un fichier hors du lab » ; l'étendre touche
+  le collecteur `who` et se décide avec la régie (Phase 73). Décision déléguée par Samuel (message session principale,
+  2026-11-08), option recommandée.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
