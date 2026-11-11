@@ -3,7 +3,7 @@
 #   FIN.1  onglet de Q ouvert à la main (aucun secret) : la carte dit la vraie cause (amorce à usage unique, 60 s, déjà utilisée ou périmée) et le remède (relancer la commande)
 #   FIN.2  POST /api/vf/terminal/terminer : refusé sans le jeton de la page ; avec lui, le shell disparaît (processus), la session est « terminée », le serveur reste actif
 #          (une attache neuve lance un autre shell) ; sans session, la demande est inoffensive
-#   FIN.3  page Projet réelle sous Chrome : « Terminer la session » demande un double geste, le premier ne termine rien, le second fait disparaître le shell ; la barre dit « Terminé »
+#   FIN.3  page Projet réelle sous Chrome : le libellé de « Terminer la session » tient dans l'en-tête à 1280, 1440 et 1024 px ; « Terminer la session » demande un double geste, le premier ne termine rien, le second fait disparaître le shell ; la barre dit « Terminé »
 #   FIN.4  bandeau de lancement à la hauteur par défaut : la phrase « écrit cette ligne sans la lancer » et la liste des modes sont visibles, le tiroir s'ajuste au bandeau ;
 #          après « Annuler », le statut du panneau (« Proposition envoyée… Confirmez-la ») ET l'annonce du cadre du terminal (« Lancement proposé : … Expire dans … ») reviennent à zéro
 # Chaque absence a son témoin positif dans le même scénario. Sans Chrome : FIN.1, FIN.3 et FIN.4 annoncent « NON vérifiée ». Exit 0 si tout passe, 1 sinon.
@@ -141,6 +141,9 @@ if [ -n "$CHROME" ]; then
   assert_eq "FIN.4 — après « Annuler », le statut du panneau revient à zéro" "$(g 'j.statutApresAnnuler')" ""
   assert_eq "FIN.4 (AUDC-M11) — témoin : tant que la proposition est là, la région live du cadre dit « Lancement proposé »" "$(g 'j.annonceAvant' | grep -c 'Lancement proposé')" "1"
   assert_eq "FIN.4 (AUDC-M11) — après « Annuler », la région live du cadre revient à zéro (plus d'annonce « Lancement proposé … Expire dans … »)" "$(g 'j.annonceApresAnnuler')" ""
+  for L in 1280 1440 1024; do
+    assert_eq "FIN.3 (AUDC-M10) — à $L px, le libellé « Terminer la session » tient dans l'en-tête du tiroir, à droite de son glyphe, sur la même ligne" "$(g "JSON.stringify(j.geo[$L])")" '{"dansBarre":true,"cote":true,"memeLigne":true}'
+  done
   assert_eq "FIN.3/4 — aucune étape du scénario n'a échoué" "$(g 'JSON.stringify(j.erreurs)')" "{}"
   unsrv
   # fenêtre plus basse (1280 x 720 : tiroir de 259 px par défaut, avant la proposition) : la phrase reste visible, le tiroir ne dépasse pas 60 % de la fenêtre

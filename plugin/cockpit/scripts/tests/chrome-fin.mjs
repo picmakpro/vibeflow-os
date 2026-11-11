@@ -101,6 +101,13 @@ await executer(chrome, async (sp) => {
   // M10 : le shell tourne dans le tiroir (invite) ; « Terminer la session » à double geste
   await essai('terminer', async () => {
     await attendreP(`!!document.querySelector('.vf-term-terminer') && !document.querySelector('.vf-term-terminer').hidden`, 'bouton « Terminer la session »');
+    // AUDC-M10 : le libellé « Terminer la session » tient dans l'en-tête du tiroir (à droite de son glyphe, sur la même ligne, entre les bords haut et bas de la barre) à 1280, 1440 et 1024 px
+    r.geo = {};
+    for (const L of [1280, 1440, 1024]) {
+      await sp.send('Emulation.setDeviceMetricsOverride', { width: L, height: hauteur, deviceScaleFactor: 1, mobile: false });
+      r.geo[L] = await stabiliser(() => sp.ev(`(() => { const b = document.querySelector('.vf-term-terminer'), t = b && b.querySelector('.vf-term-terminer-texte'), i = b && b.querySelector('svg'), bar = document.querySelector('.vf-term-barre'); if (!t || !i || !bar || b.hidden) return 'absent'; const R = (e) => { const g = e.getBoundingClientRect(); return { x: g.left, y: g.top, r: g.right, b: g.bottom }; }; const T = R(t), I = R(i), B = R(bar), X = R(b); return { dansBarre: T.y >= B.y - 0.5 && T.b <= B.b + 0.5 && X.y >= B.y - 0.5 && X.b <= B.b + 0.5, cote: T.x >= I.r - 1, memeLigne: Math.abs((T.y + T.b) / 2 - (I.y + I.b) / 2) <= 3 }; })()`), { pas: 300, max: 6000 });
+    }
+    await sp.send('Emulation.setDeviceMetricsOverride', { width: largeur, height: hauteur, deviceScaleFactor: 1, mobile: false });
     const pid = Number(fs.readFileSync(pidShell, 'utf8').trim()); r.pidVivantAvant = vivant(pid);
     await clicP(`document.querySelector('.vf-term-terminer')`, 'Terminer (1er geste)');
     r.apresPremier = await stabiliser(() => sp.ev(`document.querySelector('.vf-term-terminer').textContent`));

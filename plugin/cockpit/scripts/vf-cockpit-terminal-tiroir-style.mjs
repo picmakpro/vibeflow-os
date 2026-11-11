@@ -29,7 +29,7 @@ export const STYLE_TIROIR = `
 .vf-term-espace { flex: 1; }
 .vf-term-bouton { width: 28px; height: 28px; display: grid; place-items: center; border: 0; border-radius: 8px; background: none; color: var(--text-2); cursor: pointer; transition: background .15s, color .15s; }
 .vf-term-bouton:hover { background: var(--raise-2); color: var(--text); }
-.vf-term-bouton.vf-term-terminer { width: auto; gap: var(--sp-6); padding: 0 var(--sp-8); font: 400 12px var(--sans); } /* AUDC-M10 : bouton à mot, le glyphe seul ne disait pas ce qu'il fait */
+.vf-term-bouton.vf-term-terminer { display: inline-flex; flex-direction: row; align-items: center; justify-content: center; white-space: nowrap; width: auto; gap: var(--sp-6); padding: 0 var(--sp-8); font: 400 12px var(--sans); } /* AUDC-M10 : bouton à mot, le glyphe seul ne disait pas ce qu'il fait ; en ligne (flex), jamais en grille : la grille de .vf-term-bouton posait le mot SOUS le glyphe, hors de la barre */
 .vf-term-terminer[hidden] { display: none; }
 .vf-term-pastille:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
 .vf-term-poignee:focus-visible { outline: none; }
