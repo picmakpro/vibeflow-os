@@ -223,6 +223,14 @@ Relayés mot pour mot par la session principale ; canal : arbitrage Samuel, AskU
 - **P76-D-17 (arêtes).** Décision → commits qui la citent (P76-D-10) ; ADR → décisions et commits qui la citent ;
   décision → ADR qu'elle cite dans sa ligne de définition ; décision → sa phase. Toutes lues dans un texte, jamais
   inférées.
+- **P76-D-38 (l'exigence ouvre son plan, sa décision, sa preuve ; mise en œuvre de P76-D-33, décision déléguée par
+  Samuel (message session principale, 2026-11-08), option recommandée).** La réponse de Samuel à A-2 promet que
+  « l'exigence ouvre son plan, sa décision, sa preuve ». Plan : déjà lu (`requirements:`). Décision : arête lue,
+  exigence → décisions préfixées (`P<n>-D-<nn>`, ADR) **citées dans la ligne de l'exigence au ledger** (les lignes des
+  familles du jalon les citent : « (P78-D-01, P78-D-09) ») ; une décision nue n'y est pas reliée (ADR-075) ; aucune
+  citation : « aucune décision citée », mot neutre. Preuve : chaque maillon de preuve lu (VERIFICATION, recette, trace
+  rouge du plan) s'ouvre dans le panneau des preuves de la phase, positionné sur lui, avec son chemin copiable ; le
+  contenu du fichier n'est pas rendu. Amende P76-D-17 (arête ajoutée) et P76-D-24 (preuve ouvrable).
 - **P76-D-18 (extracteur partagé avec la Phase 73).** La 73 lit les mêmes registres pour sa file des arbitrages en
   attente (idée 9). Un seul extracteur de définitions, fonction pure dans un module dédié (nom proposé :
   `plugin/cockpit/scripts/vf-cockpit-registres.mjs`) : si la 73, exécutée avant, l'a livré, la 76 l'importe et
