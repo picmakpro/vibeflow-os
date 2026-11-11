@@ -22,6 +22,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -80,10 +81,9 @@ mk_lab() {
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module, ou TIROIR_SCRIPTS pour jouer la suite contre une copie) ; pose OUT, PORT ; démarre le serveur (SRV)
   env $ENVX "$NODE" "${2:-${TIROIR_SCRIPTS:-$SCRIPTS}}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
-  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true
+  SRV="$VF_PID"
+  PORT="$VF_PORT"
 }
 DEPOT="$WORK/depot"; mk_lab "$DEPOT"
 $GIT -C "$DEPOT" init -q -b main && $GIT -C "$DEPOT" add -A && $GIT -C "$DEPOT" commit -q -m init
@@ -422,10 +422,9 @@ JS
   "$NODE" "${TIROIR_SCRIPTS:-$SCRIPTS}/vf-cockpit-build.mjs" "$TL" --quiet > "$WORK/build-term.out" 2>&1 || cat "$WORK/build-term.out"
   OUT_T="$TL/.vibeflow/cockpit"; mkdir -p "$OUT_T/.cache"; rm -f "$OUT_T/.cache/server.json"
   (umask 077; node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" | tr -d '\n' > "$OUT_T/.cache/terminal-amorce")
-  ( cd "$TL" && SHELL=/bin/sh VF_COCKPIT_TERM_GRACE_MS=5000 VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="${TIROIR_SCRIPTS:-$SCRIPTS}" exec "$NODE" "$OUT_T/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-term.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$OUT_T/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  PORT_T="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT_T/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-term.out" cockpit_lancer "$TL" SHELL=/bin/sh VF_COCKPIT_TERM_GRACE_MS=5000 VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="${TIROIR_SCRIPTS:-$SCRIPTS}" --terminal || true
+  SRV="$VF_PID"
+  PORT_T="$VF_PORT"
   cat > "$AUX/d3t.js" <<'JS'
 const [base] = ARGS;
 await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();

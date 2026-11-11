@@ -14,6 +14,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export HOME="$WORK/home"
 trap 'vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0
 assert_eq() { if [ "$#" -ne 3 ]; then echo "  ❌ FAIL — $1 (assert_eq a reçu $# arguments au lieu de 3 : expansion d'accolades de bash 3.2 ?)"; FAIL=$((FAIL+1)); elif [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
@@ -148,9 +149,9 @@ $LAN stop --lab "$LV" > /dev/null 2>&1
 
 # H3.14-H3.16 inactivité : une requête authentifiée compte comme activité ; le motif d'arrêt est au journal ; un terminal ouvert retient l'arrêt et le dit
 LI="$WORK/labi"; mklab "$LI"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LI" --quiet > "$WORK/build-i.out" 2>&1 || cat "$WORK/build-i.out"
-OUTI="$LI/.vibeflow/cockpit"; PI=$(libre)
-VF_COCKPIT_IDLE_TICK_MS=300 node "$OUTI/serve.mjs" --no-open --port "$PI" --idle-exit 0.05 > "$WORK/srv-i.out" 2>&1 & SI=$!
-for _ in $(seq 1 100); do [ -s "$OUTI/.cache/server.json" ] && break; sleep 0.1; done
+OUTI="$LI/.vibeflow/cockpit"
+COCKPIT_LOG="$WORK/srv-i.out" cockpit_lancer "$LI" VF_COCKPIT_IDLE_TICK_MS=300 --idle-exit 0.05 || true
+SI="$VF_PID"; PI="$VF_PORT"
 TOK="$(jeton_de "$PI")"
 assert_eq "H3.14a — témoin : le jeton de la page est lu" "$([ ${#TOK} -ge 16 ] && echo oui || echo non)" "oui"
 T0=$SECONDS; while [ $((SECONDS-T0)) -lt 8 ]; do node "$AUX/get.mjs" "$PI" /api/vf/etat "$TOK" > /dev/null; sleep 0.5; done
@@ -160,12 +161,12 @@ assert_eq "H3.15 — témoin : sans plus de requête, le même serveur s'arrête
 assert_has "H3.16 — le motif de l'arrêt (inactivité) est daté au journal" "$(cat "$WORK/srv-i.out")" "Z arrêt : inactivité ("
 # terminal factice qui se déclare occupé : la rétention est dite au journal, le serveur reste
 LT="$WORK/labt"; mklab "$LT"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LT" --quiet > "$WORK/build-t.out" 2>&1 || cat "$WORK/build-t.out"
-OUTT="$LT/.vibeflow/cockpit"; PT=$(libre)
+OUTT="$LT/.vibeflow/cockpit"
 cat > "$OUTT/vf-cockpit-terminal.mjs" <<'JS'
 export const preparerTerminal = () => ({ injection: () => '', occupe: () => true, demarrer() {}, frameSrc: () => '', routeP() {} });
 JS
-VF_COCKPIT_IDLE_TICK_MS=300 node "$OUTT/serve.mjs" --no-open --port "$PT" --idle-exit 0.05 --terminal > "$WORK/srv-t.out" 2>&1 & ST=$!
-for _ in $(seq 1 100); do [ -s "$OUTT/.cache/server.json" ] && break; sleep 0.1; done
+COCKPIT_LOG="$WORK/srv-t.out" cockpit_lancer "$LT" VF_COCKPIT_IDLE_TICK_MS=300 --idle-exit 0.05 --terminal || true
+ST="$VF_PID"; PT="$VF_PORT"
 for _ in $(seq 1 30); do grep -q 'retenu' "$WORK/srv-t.out" && break; sleep 0.3; done
 assert_has "H3.17 — un terminal ouvert retient l'arrêt sur inactivité, et le journal le dit" "$(cat "$WORK/srv-t.out")" "arrêt sur inactivité retenu : un terminal est ouvert"
 assert_eq "H3.18 — le serveur au terminal ouvert est encore vivant" "$(kill -0 "$ST" 2>/dev/null && echo vivant || echo sorti)" "vivant"
@@ -180,9 +181,9 @@ const r = http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/event
 r.on('error', () => process.exit(1));
 JS
 LF="$WORK/labf"; mklab "$LF"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LF" --quiet > "$WORK/build-f.out" 2>&1 || cat "$WORK/build-f.out"
-OUTF="$LF/.vibeflow/cockpit"; PF=$(libre)
-VF_COCKPIT_IDLE_TICK_MS=300 node "$OUTF/serve.mjs" --no-open --port "$PF" --idle-exit 0.05 > "$WORK/srv-f.out" 2>&1 & SF=$!
-for _ in $(seq 1 100); do [ -s "$OUTF/.cache/server.json" ] && break; sleep 0.1; done
+OUTF="$LF/.vibeflow/cockpit"
+COCKPIT_LOG="$WORK/srv-f.out" cockpit_lancer "$LF" VF_COCKPIT_IDLE_TICK_MS=300 --idle-exit 0.05 || true
+SF="$VF_PID"; PF="$VF_PORT"
 TOKF="$(jeton_de "$PF")"
 node "$AUX/flux.mjs" "$PF" "$TOKF" 4500 > /dev/null 2>&1
 sleep 1.5

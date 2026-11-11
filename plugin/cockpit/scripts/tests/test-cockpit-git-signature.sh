@@ -19,6 +19,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -113,9 +114,8 @@ mk_lab() { # $1 = dossier : lab GSD minimal
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; pose OUT, PORT, TOK ; démarre le serveur (SRV), git emballé
   "$NODE" "${2:-$SCRIPTS}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"; rm -f "$OUT/.cache/server.json"
-  PATH="$WORK/bin:$PATH" "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
+  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" PATH="$WORK/bin:$PATH" || true
+  SRV="$VF_PID"
   PORT=0; TOK=""
   for _ in $(seq 1 50); do # le fichier peut être lu à moitié écrit : on relit jusqu'à un port valide et un jeton
     PORT="$("$NODE" "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"

@@ -19,6 +19,7 @@ UI="$SCRIPTS/../skills/cockpit-moteur/assets/ui"
 WORK="$(mktemp -d)"
 trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 WORK="$(cd "$WORK" && pwd -P)"
 AUX="$WORK/aux"; mkdir -p "$AUX"
 PIDS=()
@@ -335,10 +336,9 @@ node "$AUX/mk-f3.mjs" "$SUBD/agent-xsec.jsonl" "$LABS" "$SECRET_F3"
 rafraichir() { touch "$SUBD/agent-mgr1.jsonl" "$SUBD/agent-ag1.jsonl" "$SUBD/agent-ximg.jsonl" "$SUBD/agent-xsec.jsonl" "$H/.claude/projects/-lab/$SID.jsonl"; }
 demarrer() { # $1 dossier de sortie, $2 HOME -> SRV_PID SRV_PORT (le serveur est celui de la sortie assemblée ; sa racine est <sortie>/../..)
   local o="$1"; rm -f "$o/.cache/server.json"
-  HOME="$2" node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-$(basename "$o").out" 2>&1 &
-  SRV_PID=$!; PIDS+=("$SRV_PID")
-  for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && break; sleep 0.1; done
-  SRV_PORT="$(G "$o/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+  COCKPIT_SORTIE="$o" COCKPIT_LOG="$WORK/serve-$(basename "$o").out" cockpit_lancer "$o/../.." HOME="$2" || true
+  SRV_PID="$VF_PID"
+  SRV_PORT="$VF_PORT"
 }
 node "$WORK/leurre.mjs" "$(libre)" & LEURRE=$!; PIDS+=("$LEURRE")
 demarrer "$OUT" "$H"; SRV="$SRV_PID"; PORT="$SRV_PORT"
