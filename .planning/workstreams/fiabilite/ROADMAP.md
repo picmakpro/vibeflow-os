@@ -544,7 +544,7 @@ référence, Phase 81 reportée.
   5. « Terminé, à relire » se vide à la lecture, dans ce navigateur seulement, en 24 h au plus ; la seule action d'une ligne est « Lire le rapport ».
   6. La Phase 74 peut brancher frise et fiche par le registre de vues et l'événement d'ouverture sans retoucher un fichier de la 73.
   7. Toutes les suites du cockpit vertes sous macOS et Linux, les témoins du canevas re-pointés (aucun supprimé pour verdir), chaque exigence prouvée par un témoin rouge avant le code.
-**Plans:** 10 plans
+**Plans:** 11 plans
 
 Plans:
 
@@ -558,6 +558,7 @@ Plans:
 - [ ] 73-08-PLAN.md — Retrait du canevas d'Équipe, côté serveur et côté page
 - [ ] 73-09-PLAN.md — Correspondance LE → LR, témoins W23 et de page re-pointés
 - [ ] 73-10-PLAN.md — Tiroir hors d'Équipe, README, CHANGELOG, toutes les suites
+- [ ] 73-11-PLAN.md — Questions en attente des cadrages dans « À vous », décisions prises pour vous à part (REGI-17)
 
 ### Phase 74: L'équipe dans le temps — swim-lanes, coût, replay
 
