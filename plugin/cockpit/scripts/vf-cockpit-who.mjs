@@ -2,7 +2,7 @@
 // vf-cockpit-who — « qui est au travail ? » (socle du cockpit, P67-D-12, promu du spike 004). Lecture seule.
 // Exports : collectWho(root, opts) -> schéma vibeflow/cockpit-who@2 (JAMAIS de champ `doing`, P67-D-14)
 //           revealDoing(root, id, opts) -> schéma vibeflow/cockpit-doing@1 (dernière commande, à la demande)
-//           revealTranscript(root, id, opts) -> schéma vibeflow/cockpit-transcript@1 (mandat, messages, outils : jamais une sortie d'outil, P69-D-19)
+//           revealTranscript(root, id, opts) -> schéma vibeflow/cockpit-transcript@1 (mandat, fil daté de messages et d'outils : jamais une sortie d'outil, P69-D-19)
 //           agentsConnus(root, opts) -> sessions et sous-agents seuls (collecte allégée d'un clic, T-69-06) ; commandeAffichee(cmd)
 // Quatre sources disque : sessions Claude Code (~/.claude/projects), sous-agents (meta.json), verrous et
 // registre (driver-lock.sh, résolu hors de l'arbre observé : T-67-06), DAG de mission (nœuds running).

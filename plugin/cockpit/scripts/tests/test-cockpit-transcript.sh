@@ -4,7 +4,7 @@
 # Fixtures reconstruites dans mktemp, SYNTHÉTIQUES (aucun transcript réel de ~/.claude/projects n'est lu ni copié). Le code testé est chargé depuis
 # l'emplacement de la suite (module, serveur assemblé, couche d'affichage) : jamais depuis l'installation du poste.
 #   T0  contrôles positifs : chaque marqueur négatif est présent dans la fixture, à son emplacement de sortie d'outil
-#   T24 reduireTranscript : mandat, messages et outils visibles ; aucune sortie d'outil ; borne, masque, durée
+#   T24 reduireTranscript : mandat et fil daté (messages et outils) visibles ; aucune sortie d'outil ; borne, masque, durée
 #   T25 GET /api/vf/transcript : jeton, identifiants, fenêtre de 24 h, aucun marqueur dans le flux, les fichiers, le journal ni l'export ;
 #       mutants M-JETON (contrôle du jeton neutralisé) et M-PORTE (garde d'émission neutralisée) : les négatifs savent rougir
 #   T26 rendu en texte (vm, puis Chrome s'il est présent) et CSP de /equipe.html égale à celle de v2.75.0
@@ -65,7 +65,9 @@ let m;
 try { m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-transcript.mjs')).href); } catch { console.log(JSON.stringify({ absent: 'module absent' })); process.exit(0); }
 if (typeof m.reduireTranscript !== 'function') { console.log(JSON.stringify({ absent: 'reduireTranscript absent' })); process.exit(0); }
 const t0 = Date.now();
-try { const r = await m.reduireTranscript(fichier, { root }); console.log(JSON.stringify({ r, ms: Date.now() - t0 })); } catch (e) { console.log(JSON.stringify({ absent: 'exception : ' + String(e.message).slice(0, 80) })); }
+// AUDC-D8 : la réduction rend UN fil daté ; les assertions historiques lisent deux projections de ce fil (messages, outils), ajoutées ici à côté de la réponse réelle (`fil` reste présent)
+const vue = (r) => ({ ...r, messages: (r.fil || []).filter((e) => e.genre === 'message').map((e) => e.texte), outils: (r.fil || []).filter((e) => e.genre === 'outil').map(({ t, genre, ...o }) => o) });
+try { const r = vue(await m.reduireTranscript(fichier, { root })); console.log(JSON.stringify({ r, ms: Date.now() - t0 })); } catch (e) { console.log(JSON.stringify({ absent: 'exception : ' + String(e.message).slice(0, 80) })); }
 JS
 cat > "$AUX/jget.mjs" <<'JS'
 // jget.mjs <fichier.json> <expression sur j> : valeur (chaîne telle quelle, sinon JSON) ; « non-json » si le fichier n'est pas un JSON
@@ -284,7 +286,7 @@ FMT='(j.r.outils||[]).map((o)=>[o.outil,o.verbe,o.cible,o.n===undefined?"":o.n].
 assert_eq "T24.17 — PU-G-170 : trois Bash consécutifs ne font qu'une entrée « × 3 », un Bash seul n'a pas de n, deux Read de même cible se regroupent, une autre cible reste à part, l'ordre est gardé" "$(G "$WORK/red-rep.json" "j.absent||($FMT)")" "Bash|lance une commande||3,Read|lit|src/a.js|,Bash|lance une commande||,Read|lit|src/a.js|2,Read|lit|src/b.js|"
 assert_eq "T24.18 — le regroupement ne fait sortir aucune valeur d'entrée (apparié à T24.17 : les 4 commandes sont dans la fixture, aucune dans la sortie)" "$(grep -c 'CMD-SECRET-170' "$AUX/fx/agent-rep.jsonl")|$(G "$WORK/red-rep.json" 'j.absent||JSON.stringify(j.r).includes("CMD-SECRET-170")')" "4|false"
 mkdir -p "$WORK/mut-scripts"; cp "$SCRIPTS/vf-cockpit-transcript.mjs" "$SCRIPTS/vf-cockpit-lecture.mjs" "$WORK/mut-scripts/"
-sed 's#outils: regrouper(#outils: ((x) => x)(#' "$SCRIPTS/vf-cockpit-transcript.mjs" > "$WORK/mut-scripts/vf-cockpit-transcript.mjs"
+sed 's#fil: regrouper(#fil: ((x) => x)(#' "$SCRIPTS/vf-cockpit-transcript.mjs" > "$WORK/mut-scripts/vf-cockpit-transcript.mjs"
 cmp -s "$SCRIPTS/vf-cockpit-transcript.mjs" "$WORK/mut-scripts/vf-cockpit-transcript.mjs" && echo "MUTANT VIDE : regrouper"
 node "$AUX/red.mjs" "$WORK/mut-scripts" "$AUX/fx/agent-rep.jsonl" "$LAB0" > "$WORK/red-rep-mut.json"
 assert_eq "T24.19 — mutant (regroupement retiré) : huit entrées au lieu de cinq, détecté" "$(G "$WORK/red-rep-mut.json" 'j.absent||(j.r.outils||[]).length')|$(G "$WORK/red-rep.json" 'j.absent||(j.r.outils||[]).length')" "8|5"
@@ -357,7 +359,7 @@ assert_eq "T25.7 — terminé depuis 25 h (hors fenêtre) : 200 et erreur inconn
 assert_eq "T25.8 — la réponse du transcript porte Cache-Control: no-store" "$(sed -n 2p "$WORK/t1.out" | node "$AUX/jq.mjs" 'j["cache-control"]')" "no-store"
 assert_eq "T25.9 — POST avec jeton : 405" "$(RQ POST "/api/vf/transcript?id=ag1" "$TOK" '{}' | sed -n 1p)" "405"
 RQ GET "/api/vf/transcript?id=xsec" "$TOK" > "$WORK/t10.out"; sed '1,2d' "$WORK/t10.out" > "$WORK/t10.body"
-assert_eq "T25.9b — la route masque le secret d'un message, d'une cible d'outil et d'un nom d'outil (apparié aux positifs : message et 2 outils rendus, 3 masques)" "$(sed -n 1p "$WORK/t10.out")|$(node "$AUX/jget.mjs" "$WORK/t10.body" 'String(j.messages).includes("MESSAGE-VISIBLE-69")&&(j.outils||[]).length===2?(JSON.stringify(j).includes("ghp_")?"fuite":(JSON.stringify(j).split("[masqué]").length-1)+" masques"):"positifs absents : "+JSON.stringify(j).slice(0,120)')" "200|3 masques"
+assert_eq "T25.9b — la route masque le secret d'un message, d'une cible d'outil et d'un nom d'outil (apparié aux positifs : message et 2 outils rendus, 3 masques)" "$(sed -n 1p "$WORK/t10.out")|$(node "$AUX/jget.mjs" "$WORK/t10.body" '(j.fil||[]).some((e)=>e.genre==="message"&&String(e.texte).includes("MESSAGE-VISIBLE-69"))&&(j.fil||[]).filter((e)=>e.genre==="outil").length===2?(JSON.stringify(j).includes("ghp_")?"fuite":(JSON.stringify(j).split("[masqué]").length-1)+" masques"):"positifs absents : "+JSON.stringify(j).slice(0,120)')" "200|3 masques"
 # flux : le hello liste ag1 (positif) ; une session neuve force un événement who ; ni mandat ni message dans le flux
 rafraichir
 : > "$WORK/flux.jsonl"; node "$AUX/sse.mjs" "$PORT" "$TOK" 12000 who "$WORK/flux.jsonl" & CSSE=$!
@@ -405,7 +407,7 @@ assert_eq "T25.17 — témoin : une copie dont la garde d'émission rend toujour
 echo "=== T26 — rendu en texte et CSP inchangée (P69-D-23 ; CKPT-26) ==="
 RENDU="$UI/71-vf-equipe-rendu.js"
 cat > "$AUX/pilote-transcript.js" <<'JS'
-__r = !!window.__vfEquipeRendu.transcript({ mandat: '<img src=x onerror=alert(1)>', messages: ['<script>x()</script>'], outils: [{ outil: 'Read', verbe: 'lit', cible: 'src/a.js' }] }, document);
+__r = !!window.__vfEquipeRendu.transcript({ mandat: '<img src=x onerror=alert(1)>', fil: [{ t: '2026-11-10T10:00:00.000Z', genre: 'message', texte: '<script>x()</script>' }, { t: '2026-11-10T10:00:01.000Z', genre: 'outil', outil: 'Read', verbe: 'lit', cible: 'src/a.js' }] }, document);
 JS
 cat > "$AUX/pilote-arbre.js" <<'JS'
 __r = window.__vfEquipeRendu.arbre([
@@ -419,10 +421,10 @@ assert_eq "T26.1 — transcript() ne crée que des balises div, h4, p, ul, li, p
 assert_eq "T26.2 — un nœud a pour texte exactement <img src=x onerror=alert(1)>" "$(VT 'j.tags.length?String(j.textes.includes("<img src=x onerror=alert(1)>")):"aucune balise créée"')" "true"
 assert_eq "T26.3 — aucune affectation innerHTML (appariée à la création de balises)" "$(VT 'j.tags.length?String(j.innerHTML):"aucune balise créée"')" "0"
 cat > "$AUX/pilote-transcript-n.js" <<'JS'
-__r = !!window.__vfEquipeRendu.transcript({ mandat: 'm', messages: [], outils: [{ outil: 'Bash', verbe: 'lance une commande', cible: '', n: 14 }, { outil: 'Read', verbe: 'lit', cible: 'src/a.js' }] }, document);
+__r = !!window.__vfEquipeRendu.transcript({ mandat: 'm', fil: [{ t: '2026-11-10T10:00:00.000Z', genre: 'outil', outil: 'Bash', verbe: 'lance une commande', cible: '', n: 14 }, { t: '2026-11-10T10:00:01.000Z', genre: 'outil', outil: 'Read', verbe: 'lit', cible: 'src/a.js' }] }, document);
 JS
 node "$AUX/vm-rendu.mjs" "$RENDU" "$AUX/pilote-transcript-n.js" > "$WORK/vm-tn.json"
-assert_eq "T26.5 — PU-G-170 : le transcript dit « lance une commande (Bash) × 14 » pour 14 appels, et rien après un appel seul" "$(G "$WORK/vm-tn.json" 'j.erreur||j.textes.filter((t)=>/\(Bash\)|\(Read\)/.test(t)).join("|")')" "lance une commande (Bash) × 14|lit src/a.js (Read)"
+assert_eq "T26.5 — PU-G-170 : le transcript dit « lance une commande (Bash) × 14 » pour 14 appels, et rien après un appel seul" "$(G "$WORK/vm-tn.json" 'j.erreur||j.textes.filter((t)=>/\(Bash\)|\(Read\)/.test(t)).map((t)=>t.replace(/^\d\d:\d\d:\d\d /,"")).join("|")')" "lance une commande (Bash) × 14|lit src/a.js (Read)"
 assert_eq "T26.4 — arbre() avec l'échappement standard : la description piégée sort en &lt;img, jamais en <img" "$(G "$WORK/vm-a.json" 'j.erreur||(String(j.retour).includes("&lt;img")+"|"+!String(j.retour).includes("<img"))')" "true|true"
 CSPV="default-src 'none'; script-src ; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
 rafraichir
@@ -642,7 +644,7 @@ import { pathToFileURL } from 'node:url';
 const [, , scripts, fichier, root] = process.argv; const orig = fs.realpathSync; let n = 0;
 fs.realpathSync = (...a) => { n++; return orig(...a); };
 const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-transcript.mjs')).href);
-const r = m.reduireTranscript(fichier, { root }); console.log(JSON.stringify({ n, outils: r.outils.length }));
+const r = m.reduireTranscript(fichier, { root }); console.log(JSON.stringify({ n, outils: r.fil.filter((e) => e.genre === 'outil').length })); // AUDC-D8 : le fil porte messages et outils
 JS
 assert_eq "T24G2 (point 9) — 8,5 Mio de tool_use Read : au plus 2 appels à realpath par outil gardé (200 outils, 410 appels), donc pas d'étiquette sur les outils écartés" "$(node "$AUX/cnt.mjs" "$SCRIPTS" "$AUX/fx/f4-outils.jsonl" "$AUX/f4/lab" | node "$AUX/jq.mjs" 'j.outils===200&&j.n>0&&j.n<=410?"ok":"n="+j.n+" outils="+j.outils')" "ok"
 cat > "$AUX/mk-long.mjs" <<'JS'
@@ -692,7 +694,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 const [, , scripts, fichier, lab, B, M] = process.argv;
 const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-transcript.mjs')).href);
-const r = m.reduireTranscript(fichier, { root: lab });
+const r0 = m.reduireTranscript(fichier, { root: lab }), r = { mandat: r0.mandat, messages: r0.fil.filter((e) => e.genre === 'message').map((e) => e.texte) }; // AUDC-D8 : les messages sont lus dans le fil
 const coupe = (x, c, n) => x.endsWith(` … (tronqué, ${n} caractères)`) && x.slice(0, x.length - ` … (tronqué, ${n} caractères)`.length) === c.repeat(Number(n.replace(/ /g, '')));
 console.log([coupe(r.messages[0], 'a', B), r.messages[1] === 'b'.repeat(2000), r.messages[2] === 'c'.repeat(40), coupe(r.mandat, 'm', M)].join('|'));
 JS

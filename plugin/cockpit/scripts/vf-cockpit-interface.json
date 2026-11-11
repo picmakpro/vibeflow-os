@@ -48,7 +48,7 @@
     },
     "vibeflow/cockpit-transcript@1": {
       "requis": { "schema": "string", "id": "string" },
-      "optionnels": ["mandat", "messages", "outils", "tronque", "erreur"]
+      "optionnels": ["mandat", "fil", "tronque", "erreur"]
     },
     "vibeflow/cockpit-equipe@1": {
       "requis": { "schema": "string", "meta": "object", "project": "object", "nodes": "array", "files": "array", "links": "array", "flows": "array" },
