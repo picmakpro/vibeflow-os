@@ -200,6 +200,61 @@ const S = {
     const ligneEquipe = src.split('\n').find((x) => x.includes("TAB === 'equipe') style.textContent += '#btn-health")) || '';
     ok('M3.8 — la feuille de l\'onglet Équipe masque le bloc « Santé » du panneau (lignes de Code non analysées ici)', ligneEquipe.includes('#panel .sec:has(> .list > a[data-hc-open]) { display: none; }'), ligneEquipe);
   },
+  // ---- D2b : « close » par absence d'une liste officielle lue ; câblage par le chemin réel du serveur ; environnement de l'enfant ----
+  async D2b() {
+    console.log('=== D2b — état officiel : absence, chemin réel du serveur, environnement ===');
+    const officiel = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-etat-officiel.mjs')).href);
+    const bin = path.join(work, 'bin2'); fs.mkdirSync(bin, { recursive: true });
+    const marque = path.join(work, 'appels2.txt');
+    fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\necho "$@" >> "$VF_FAKE_MARK"\n[ -n "$VF_FAKE_SORTIE" ] && printf "%s" "$VF_FAKE_SORTIE"\nexit "${VF_FAKE_RC:-0}"\n', { mode: 0o755 });
+    const PATH0 = process.env.PATH;
+    process.env.PATH = bin + path.delimiter + PATH0; process.env.VF_FAKE_MARK = marque; process.env.VF_FAKE_RC = '0';
+    const autre = JSON.stringify([{ sessionId: '22222222-2222-4222-8222-222222222222', kind: 'interactive', pid: 2, cwd: lab, status: 'idle' }]);
+    const cas = async (sortie, rc, spec) => { process.env.VF_FAKE_SORTIE = sortie; process.env.VF_FAKE_RC = String(rc); const home = monter(spec); await officiel.rafraichir({ home, cwd: lab }); return collecte(home, { officiel: true }); };
+    eq('D2b.1 — une liste officielle lue sans cette session : elle est close (« termine »)', sess(await cas(autre, 0, { session: { ageS: 300 } }))?.etat, 'termine');
+    eq('D2b.2 — une liste officielle VIDE lue avec succès : close aussi', sess(await cas('[]', 0, { session: { ageS: 300 } }))?.etat, 'termine');
+    eq('D2b.3 — mais jamais une session écrite il y a 20 s (elle peut être hors liste, par exemple lancée sans terminal)', sess(await cas(autre, 0, { session: { ageS: 20 } }))?.etat, 'actif');
+    eq('D2b.4 — ni une session dont un agent écrit encore', sess(await cas(autre, 0, { session: { ageS: 600 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 600, outil: 'Agent' }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 20 }] }))?.etat, 'en-attente');
+    eq('D2b.5 — commande en échec : jamais « close », lecture des transcripts', sess(await cas('', 1, { session: { ageS: 300 } }))?.etat, 'au-repos');
+    eq('D2b.6 — liste de forme inattendue (un objet) : jamais « close »', sess(await cas('{"sessions":[]}', 0, { session: { ageS: 300 } }))?.etat, 'au-repos');
+    // chemin réel du serveur : startLive -> whoNow doit demander l'état officiel (un test par collectWho seul ne voit pas le câblage)
+    fs.rmSync(marque, { force: true });
+    const homeLive = monter({ session: { ageS: 300 } }); process.env.HOME = homeLive; process.env.VF_FAKE_SORTIE = autre;
+    const live = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-live.mjs')).href);
+    const sortie = path.join(work, 'sortie'); fs.mkdirSync(sortie, { recursive: true });
+    let h0 = null; try { h0 = live.startLive({ root: lab, sortie, mode: 'poll' }); } catch (e) { console.log('     startLive : ' + e.message); }
+    for (let i = 0; i < 30 && !fs.existsSync(marque); i++) await new Promise((r) => setTimeout(r, 100));
+    ok('D2b.7 — le serveur (startLive, chemin réel de whoNow) demande l\'état officiel à `claude agents --json`', fs.existsSync(marque) && /agents --json/.test(fs.readFileSync(marque, 'utf8')), fs.existsSync(marque));
+    h0?.stop();
+    // environnement de l'enfant : un `claude` posé dans le lab n'est jamais exécuté, même si le PATH le désigne (audit H-1)
+    const piege = path.join(lab, 'claude'), piegeMarque = path.join(work, 'piege.txt');
+    fs.writeFileSync(piege, '#!/bin/sh\necho appele > "' + piegeMarque + '"\n', { mode: 0o755 });
+    process.env.PATH = lab + path.delimiter + bin + path.delimiter + PATH0; fs.rmSync(marque, { force: true });
+    await cas(autre, 0, { session: { ageS: 300 } });
+    ok('D2b.8 — témoin : le claude du chemin sûr est bien lancé', fs.existsSync(marque));
+    ok('D2b.9 — l\'enfant est lancé avec un PATH assaini : le programme posé dans le lab n\'est jamais exécuté', !fs.existsSync(piegeMarque));
+    fs.rmSync(piege, { force: true }); process.env.PATH = PATH0;
+  },
+  // ---- D3b : l'âge avance dans les pieds de carte et le panneau de l'onglet Équipe sans nouveau who ----
+  async D3b() {
+    console.log('=== D3b — minuterie de l\'onglet Équipe ===');
+    const minuteries = []; let rerendus = 0, sections = null;
+    const G = { meta: { vfTab: 'equipe', vf: {} }, project: { name: 'P' }, nodes: [{ id: 'ag-a', foot: '' }] };
+    const SC = { graph: G, h, exists: () => false, on() {}, setOverview() {}, addPanelSection(_, f) { sections = f; }, rerender: async () => { rerendus++; }, fit() {}, reveal() {}, plafond() {} };
+    const sb = { window: { Floorplan: SC, FLOORPLAN_SERVER: {}, __vfLive: {} }, document: { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], addEventListener() {}, hidden: false, documentElement: {} }, location: { hash: '' }, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
+      MutationObserver: class { observe() {} }, setInterval: (f, ms) => { minuteries.push([f, ms]); return 1; }, setTimeout, fetch: async () => ({ ok: false }), console };
+    vm.createContext(sb);
+    vm.runInContext(fs.readFileSync(path.join(ui, '71-vf-equipe-rendu.js'), 'utf8'), sb);
+    vm.runInContext(fs.readFileSync(path.join(ui, '72-vf-equipe.js'), 'utf8'), sb);
+    ok('D3b.1 — l\'onglet Équipe arme une minuterie de recalcul', minuteries.length >= 1, minuteries.length);
+    const w = { kind: 'subagent', id: 'a', etat: 'actif', tree: '.', role: 'vf-coder', task: 'x', ageS: 60, dureeS: 100 };
+    sb.window.__vfLive = { who: { workers: [w] }, whoAt: Date.now() - 600000 };
+    for (const [f] of minuteries) await f();
+    ok('D3b.2 — le pied de la carte a avancé sans nouveau who (10 min de plus)', /dernière activité il y a 11 min|au travail depuis 12 min/.test(G.nodes[0].foot), G.nodes[0].foot);
+    ok('D3b.3 — la vue est redessinée', rerendus >= 1, rerendus);
+    const panneau = sections ? sections('n:ag-a') : '';
+    ok('D3b.4 — la ligne « Activité » du panneau porte le même âge avancé', /au travail depuis 12 min/.test(texte(panneau)), texte(panneau));
+  },
 };
 
 for (const s of sections) { if (!S[s]) { console.log(`  ❌ FAIL — section inconnue ${s}`); fail++; continue; } await S[s](); }
@@ -216,7 +271,7 @@ run() { # sections...
   PASS=$((PASS + $(echo "$t" | cut -d' ' -f2))); FAIL=$((FAIL + $(echo "$t" | cut -d' ' -f3)))
 }
 
-run D1 D2 D4 D3 M3
+run D1 D2 D2b D4 D3 D3b M3
 
 echo
 echo "=== Bilan : $PASS réussi(s), $FAIL échec(s) ==="
