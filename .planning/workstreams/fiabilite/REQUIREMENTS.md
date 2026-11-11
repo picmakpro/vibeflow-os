@@ -1085,6 +1085,19 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | ACTV-11 | Phase 75 | Pending — 2026-11-11 (cadrage) |
 | ACTV-12 | Phase 75 | Pending — 2026-11-11 (cadrage) |
 | — | Phase 76 | repère de cadrage, Phase 76 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| TRAC-01 | Phase 76 | Pending |
+| TRAC-02 | Phase 76 | Pending |
+| TRAC-03 | Phase 76 | Pending |
+| TRAC-04 | Phase 76 | Pending |
+| TRAC-05 | Phase 76 | Pending |
+| TRAC-06 | Phase 76 | Pending |
+| TRAC-07 | Phase 76 | Pending |
+| TRAC-08 | Phase 76 | Pending |
+| TRAC-09 | Phase 76 | Pending |
+| TRAC-10 | Phase 76 | Pending |
+| TRAC-11 | Phase 76 | Pending |
+| TRAC-12 | Phase 76 | Pending |
+| TRAC-13 | Phase 76 | Pending |
 | — | Phase 77 | repère de cadrage, Phase 77 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | — | Phase 79 | repère de cadrage, Phase 79 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | SOCL-01 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
@@ -1817,6 +1830,23 @@ la Phase 80.
 - [ ] **ACTV-12**: Retrait et non-régression : couche « Travail récent » (`recent-work.json`, `ui/25-recent.js`, classes `.recent`, bascule) et `scripts/recent.mjs` retirés dans le même lot que la mise en service de l'empreinte (P75-D-28, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; P70-D-01 amendée dans cette mesure) ; jeton `--recent` gardé ; suites qui la citent adaptées, jamais supprimées ; toutes les suites du cockpit vertes sous macOS et Linux ; chaîne XSS étendue (chemin, branche, rôle, titre hostiles) ; dégradation sans git identique (P78-D-11) ; `DESIGN.md` § 2 (graphe de code) et CHANGELOG du module à jour ; relecture SOBR-04 (P75-D-11, D-20, D-21).
 
 <!-- vf-cadrage:phase-76 -->
+
+### Traçabilité au cockpit (Phase 76 — posées au cadrage, 2026-11-11)
+> Dérivent de P76-D-01..37 (`76-CONTEXT.md` ; décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sauf P76-D-32 à P76-D-34 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11). Famille neuve `TRAC` (vérifiée libre le 2026-11-11 dans tous les ledgers et dans tout le dépôt). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code ; lecture seule, aucun réseau, rien dans l'export.
+
+- [ ] **TRAC-01**: Section « Traçabilité » du panneau d'une phase : une ligne par exigence rattachée (table de traçabilité du ledger, à défaut `requirements:` d'un PLAN), une bande de quatre maillons lus (plan, SUMMARY, VERIFICATION, recette), chacun avec son niveau (exigence ou phase), et le premier trou dit en un mot ; absence simple en glyphe et mot neutres (P76-D-04, P76-D-13, P76-D-14).
+- [ ] **TRAC-02**: Contradictions du ledger montrées, jamais corrigées : case cochée sans SUMMARY lu et statut « Complete » sans plan lu en glyphe à trait corail et mot ; case non cochée avec SUMMARY lu, exigence sans ligne de traçabilité et ligne sans exigence en mot neutre ; jamais de fond teinté ni de texte coloré (P76-D-04, P76-D-15, P76-D-15bis).
+- [ ] **TRAC-03**: Vue d'ensemble « Jalon » : une ligne par phase du jalon actif avec le nombre de trous par maillon ; la ligne ouvre le panneau de la phase (P76-D-02, P76-D-05).
+- [ ] **TRAC-04**: Preuves de vérification attachées à la phase et à ses plans (AUDC-I33) : fichiers VERIFICATION (et `status:`), recette (et statut), RED-TRACE, SECURITY, VALIDATION, en liens vers leurs chemins relatifs, et critères `must_haves` des PLAN quand ils existent ; jamais un contenu de transcript ni une preuve déduite (P76-D-24).
+- [ ] **TRAC-05**: Décisions : ADR de `docs/ADR.md` et définitions des registres `*-CONTEXT.md` des dossiers de phase (préfixées, ou nues qualifiées par la phase de leur registre) ; section « Décisions » de la vue d'ensemble agrégée par ADR puis par registre ; panneau d'une ADR ou d'une décision avec ses voisins lus (phase, ADR citées, décisions et commits qui la citent) (P76-D-16, P76-D-17).
+- [ ] **TRAC-06**: Commits citants : un passage `git log` borné (référence résolue en sha, `--max-count=2000`, point git durci, asynchrone), corps des messages lu pour extraire les identifiants puis jeté ; on sert sha court, jour et sujet ; une décision nue n'est reliée à aucun commit ; borne atteinte ou délai dépassé : `tronque` ; un commit s'ouvre dans le tiroir Git (P76-D-03, P76-D-10).
+- [ ] **TRAC-07**: Mémoire des agents, périmètre et champs : seuls les fichiers suivis sous `.claude/agent-memory/`, lus par le point confiné ; montrés : `name`, agent, `metadata.type`, jour du dernier commit, nombre de liens entrants et sortants ; jamais `description`, corps, `~/` ni chemin absolu ; `.claude/` non suivi : état vide qui le dit avec un nombre, sans noms (P76-D-19, P76-D-20).
+- [ ] **TRAC-08**: Mémoire des agents, liens et états : extraction hors code et hors classes POSIX, résolution par `name:` puis par nom de fichier (état propre, compté), « cassé » sinon ; états distincts « hors index » (égalité exacte), « sans lien entrant » (filtre neutre) et « cite un chemin absent » (relatif au dépôt, absent de HEAD, présent dans l'historique lu) ; aucun verdict « périmée » tiré d'une date (P76-D-21, P76-D-22, P76-D-23).
+- [ ] **TRAC-09**: Navigation de proche en proche : chaque objet a un panneau qui liste ses voisins lus, ouverts d'un geste ; Retour par la pile commune de la Phase 80 (sans fil d'Ariane propre), ancre par objet ; clavier complet (focus natif, Échap) ; au plus 30 voisins d'une sorte puis « + N autres » ; aucun canevas, aucun quatrième onglet, aucune modification de `viewer.html` (P76-D-01, P76-D-02, P76-D-03, P76-D-05).
+- [ ] **TRAC-10**: Route `GET /api/vf/tracabilite` à la demande, schéma `vibeflow/cockpit-trace@1` déclaré au contrat de forme et au README (champs et `interdits`), règles C0 de la Phase 79 (hôte, `Origin`, jeton en temps constant, GET seul, `no-store`, garde `porteInterdit` sur la réponse, 503 si elle se déclenche), paramètres validés (400 sinon), cache par empreinte, un calcul en vol ; le planning lu dans l'instantané de la collecte (manques ajoutés en champs facultatifs de `cockpit-project@1`), ADR, commits et mémoire par lecture confinée bornée (P76-D-06 à P76-D-09, P76-D-31).
+- [ ] **TRAC-11**: Confidentialité et dégradation : aucune donnée de la phase dans l'export ni dans une page autonome ; aucun chemin absolu ni `~/` dans une réponse ; tout texte venu des fichiers rendu en `textContent` ; lab sans `docs/ADR.md`, sans compartiment, sans mémoire, sans git ou à traçabilité « Étape N » : une ligne neutre qui le dit, rien ne casse ailleurs (P76-D-11, P76-D-12).
+- [ ] **TRAC-12**: Un ajout, un retrait et non-régression : le nœud enfant « Exigences » et ses cartes d'exigence quittent le graphe Projet (le compte « x/y exigences » du pied reste) ; ligne au `CHANGELOG.md` du module ; toutes les suites du cockpit vertes sous macOS et Linux, compteur de suites des README à jour (P76-D-25, P76-D-27, P76-D-29).
+- [ ] **TRAC-13**: Questions en attente : la lecture du planning lit les entrées au format C76-Q1 des sections « À Samuel » des registres de phase et pose le champ facultatif `meta.vf.questions` de `cockpit-project@1` (C76-Q2) ; une entrée hors grammaire est « mal formée » avec son défaut, jamais « en attente » ; une question n'est « tranchée » ou « appliquée » (option recommandée appliquée sous délégation, contestable) que par sa ligne `État` canonique ; identifiant en double, phase incohérente, citation incohérente, fichier absent et section vide ont chacun leur témoin rouge ; la régie de la Phase 73 consomme la liste, « en attente » dans « À vous », « appliquée » à part (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; P76-D-34 à P76-D-37).
 
 <!-- vf-cadrage:phase-77 -->
 
