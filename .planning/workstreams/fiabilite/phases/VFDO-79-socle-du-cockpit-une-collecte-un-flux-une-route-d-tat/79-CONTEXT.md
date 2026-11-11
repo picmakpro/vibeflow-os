@@ -538,7 +538,8 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   fond teinté. (4) Un script persistant (A53) apprend l'échec en posant à son évaluation un écouteur tardif
   `document.addEventListener('vf:coquille-echec', …)` (aucune lecture à l'évaluation) : les persistants sont évalués
   avant le premier chargement, l'écouteur existe donc toujours à temps ; il appelle `preventDefault()` s'il affiche
-  son propre état. Aucune exigence nouvelle : SOCL-20 couvre ce comportement. Décision déléguée par Samuel (message
+  son propre état. Posé à l'évaluation, hors de la fenêtre de portée d'un onglet, cet écouteur n'a pas besoin de
+  `VF_COQUILLE.natif` (A53). Aucune exigence nouvelle : SOCL-20 couvre ce comportement. Décision déléguée par Samuel (message
   session principale, 2026-11-08), option recommandée.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
