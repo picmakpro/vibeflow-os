@@ -40,6 +40,16 @@
 #   de moins de 24 h et au plus 2 000 lignes (les plus recentes), elagage a chaque archivage, par le detenteur.
 #   `registry --all` rend un registre par verrou du lab, y compris un verrou relache qui ne porte plus qu'une archive.
 #
+# Plan de mission publie a cote du verrou (A16, SOCL-04), detenteur seul :
+#   driver-lock.sh publish-plan --owner=<id> --file=<DAG de mission> [--ws=<sujet> [--phase=<N>]|--depot]   # resume du plan : id, dependances, statut
+#   Ecrit <lock>.plan.tsv (frere du verrou, jamais dans l'arbre de travail en lab partitionne sous git), reduit a l'identifiant,
+#   aux dependances et au statut de chaque noeud, avec le compartiment et la phase DU VERROU (jamais ceux du DAG). Le texte libre
+#   d'un noeud (etape, perimetre) n'est ni publie ni relu. Bornes : 1 Mio, 200 noeuds, 32 dependances, 64 caracteres.
+#   `status` et `status --all` le rendent dans le champ `dag` de l'entree, present seulement quand un plan valide est publie
+#   pour la generation courante du verrou (masque apres une reprise) ; supprime au `release` et au `recover`.
+#   Refus nommes (published false, exit 1) : no-lock, not-owner, file-required, file-unreadable, plan-too-large, python3-missing,
+#   plan-invalid, plan-unwritable.
+#
 # Sortie : JSON une ligne (parsing). Exit 0 = action reussie ; exit 1 = refus (lock tenu, pas owner…).
 #
 # Variables : VF_DRIVER_LOCK (defaut .planning/DRIVER.lock), VF_DRIVER_TTL (defaut 1800 s),
@@ -118,6 +128,8 @@
 # vf-driver/, hors perimetre.
 
 set -uo pipefail
+# Mode UTF-8 inconditionnel sous -I (qui ignore PYTHON*), Windows cp1252 compris (#153) : forme courte commune, verifiee par check-python-isolation.sh.
+PYX="-Xutf8"
 
 LOCK_DIR="${VF_DRIVER_LOCK:-.planning/DRIVER.lock}"
 TTL="${VF_DRIVER_TTL:-1800}"
@@ -130,13 +142,14 @@ case "$REG_WINDOW" in ''|*[!0-9]*|0*) REG_WINDOW=86400 ;; esac  # meme garde que
 REG_MAX="${VF_DRIVER_REGISTRY_MAX:-2000}"
 case "$REG_MAX" in ''|*[!0-9]*|0*) REG_MAX=2000 ;; esac
 
-ACTION=""; OWNER=""; STEP=""
+ACTION=""; OWNER=""; STEP=""; PLAN_FILE=""
 WS=""; WS_GIVEN=0; DEPOT=0; ALL=0; PHASE=""; PHASE_GIVEN=0
 AGENT=""; ROLE=""; NODE=""; PARENT=""; DEPTH=""; CSTATUS=""
 for arg in "$@"; do
   case "$arg" in
-    acquire|heartbeat|release|status|recover|takeover|reclaim|mark-progress|register|close|orphans|registry) ACTION="$arg" ;;
+    acquire|heartbeat|release|status|recover|takeover|reclaim|mark-progress|register|close|orphans|registry|publish-plan) ACTION="$arg" ;;
     --owner=*)  OWNER="${arg#*=}" ;;
+    --file=*)   PLAN_FILE="${arg#*=}" ;;
     --step=*)   STEP="${arg#*=}" ;;
     --ws=*)     WS="${arg#*=}"; WS_GIVEN=1 ;;
     --phase=*)  PHASE="${arg#*=}"; PHASE_GIVEN=1 ;;
@@ -279,6 +292,7 @@ vf_dl_refuse() { # <raison> <hint> [sujet-valide]
     recover)                 key='"recovered": false' ;;
     register)                key='"registered": false' ;;
     close)                   key='"closed": false' ;;
+    publish-plan)            key='"published": false' ;;
     *)                       key="\"error\": \"$reason\"" ;;
   esac
   printf '{%s, "reason": "%s", "hint": "%s"%s}\n' "$key" "$reason" "$hint" "$extra"
@@ -592,6 +606,7 @@ rewrite_meta() {
 
 # Supprime lien + generation pointee (ou le dossier reel d'un lock legacy).
 drop_lock() {
+  rm -f "$(plan_path)" 2>/dev/null   # le plan publie meurt avec son verrou (release, recover)
   if [ -L "$LOCK_DIR" ]; then
     local gen; gen="$(readlink "$LOCK_DIR")"
     rm -f "$LOCK_DIR"
@@ -850,6 +865,80 @@ children_running_of_json() {
   printf '[%s]' "$out"
 }
 
+# Plan de mission publie (A16) : fichier TSV frere du verrou, une ligne d'en-tete
+# `vibeflow/driver-plan@1<TAB>generation<TAB>epoch<TAB>ws<TAB>phase` puis une ligne `id<TAB>statut<TAB>dep,dep` par noeud.
+# Fonction, pas variable : vf_dl_entry reassigne LOCK_PARENT et LOCK_BASE dans un sous-shell.
+plan_path() { printf '%s\n' "$LOCK_PARENT/${LOCK_BASE}.plan.tsv"; }
+plan_refuse() { # <raison> : refus nomme de publish-plan (rien n'est ecrit), exit 1
+  printf '{"published": false, "reason": "%s"%s}\n' "$1" "$SCOPE_JSON"; exit 1
+}
+# Projection du DAG du manager par liste blanche : ligne 1 = nombre d'elements de `nodes` non gardes, puis une ligne
+# `id<TAB>statut<TAB>deps` par noeud garde. Le texte libre (step, scope) n'est jamais lu. Code 2 : plan illisible ou de
+# mauvaise forme (le contenu n'est jamais ecrit sur stdout ni dans un message). Fonction : un heredoc dans un `$(...)`
+# est mal lu par bash 3.2.
+plan_project() { # <fichier DAG>
+  python3 -I $PYX - "$1" <<'PY'
+import json, re, sys
+ID = re.compile(r"\A[A-Za-z0-9._:-]{1,64}\Z")
+ST = ("blocked", "ready", "running", "done", "failed")
+try:
+    with open(sys.argv[1], "rb") as f:
+        d = json.loads(f.read().decode("utf-8"))
+except Exception:
+    sys.exit(2)
+if not isinstance(d, dict) or not isinstance(d.get("nodes"), list):
+    sys.exit(2)
+rows, seen = [], set()
+for n in d["nodes"]:
+    if not isinstance(n, dict):
+        continue
+    i, s = n.get("id"), n.get("status")
+    if not (isinstance(i, str) and ID.match(i) and isinstance(s, str) and s in ST):
+        continue
+    if i in seen or len(rows) >= 200:
+        continue
+    dl = []
+    if isinstance(n.get("deps"), list):
+        for x in n["deps"]:
+            if isinstance(x, str) and ID.match(x):
+                dl.append(x)
+                if len(dl) >= 32:
+                    break
+    seen.add(i)
+    rows.append("%s\t%s\t%s" % (i, s, ",".join(dl)))
+sys.stdout.write("%d\n" % (len(d["nodes"]) - len(rows)) + "".join(r + "\n" for r in rows))
+PY
+}
+# Fragment `, "dag": {...}` de la ligne de status d'un verrou present, ou rien. Reconstruit par awk champ par champ depuis
+# le TSV : un fichier falsifie ne produit jamais de JSON invalide ni de champ non valide, et status ne depend pas de python3.
+# Rien si le fichier est absent, si l'en-tete n'a pas le schema attendu, si sa generation differe de celle du verrou
+# (reprise), si l'epoch ou ws/phase sortent de leur classe. Une ligne de noeud invalide est ecartee (jamais d'intervalle
+# {n,m} : l'awk BSD ne les tient pas).
+plan_dag_json() {
+  local _p; _p="$(plan_path)"
+  { [ -f "$_p" ] && [ ! -L "$_p" ]; } || return 0
+  PG="$(lock_gen)" LC_ALL=C awk -F'\t' '
+    function okid(s) { return (length(s) >= 1 && length(s) <= 64 && s ~ /^[A-Za-z0-9._:-]+$/) }
+    function okst(s) { return (s == "blocked" || s == "ready" || s == "running" || s == "done" || s == "failed") }
+    NR == 1 {
+      if (NF != 5 || $1 != "vibeflow/driver-plan@1" || $2 != ENVIRON["PG"] || $3 !~ /^[1-9][0-9]*$/ || length($3) > 15) { bad = 1; exit }
+      if ($4 !~ /^[A-Za-z0-9._-]*$/ || length($4) > 64 || $5 !~ /^[0-9.]*$/ || length($5) > 32) { bad = 1; exit }
+      ws = $4; ph = $5; at = $3; next
+    }
+    {
+      if (NF != 3) next
+      id = $1; st = $2
+      if (!okid(id) || !okst(st)) next
+      if ((id in seen) || n >= 200) next
+      seen[id] = 1; n++
+      nd = split($3, dp, ","); deps = ""; k = 0
+      for (i = 1; i <= nd && k < 32; i++) if (okid(dp[i])) { deps = deps (k > 0 ? ", " : "") "\"" dp[i] "\""; k++ }
+      out = out (n > 1 ? ", " : "") "{\"id\": \"" id "\", \"deps\": [" deps "], \"status\": \"" st "\"}"
+    }
+    END { if (NR < 1 || bad) exit; printf ", \"dag\": {\"ws\": \"%s\", \"phase\": \"%s\", \"at\": %s, \"nodes\": [%s]}", ws, ph, at, out }
+  ' "$_p"
+}
+
 json_status() {
   # children_running (issue #82) : nombre d'entrees du registre encore `running`, sur les DEUX
   # branches (lock absent compris) : un lock relache avec des enfants consignes ouverts est
@@ -877,8 +966,8 @@ json_status() {
   pe="$(meta_get progress_epoch)"
   case "$pe" in ''|*[!0-9]*) pe="null" ;; esac
   page="$(progress_age)" && : || page="null"
-  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s, "progress_epoch": %s, "progress_age_seconds": %s, "children_running": %s%s}\n' \
-    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff" "$pe" "$page" "$children" "$SCOPE_JSON"
+  printf '{"present": true, "owner": "%s", "step": "%s", "age_seconds": %s, "ttl": %s, "stale": %s, "generation": "%s", "session_ids": %s, "lease_seconds": %s, "guard_effective": %s, "progress_epoch": %s, "progress_age_seconds": %s, "children_running": %s%s%s}\n' \
+    "$o" "$s" "$age" "$TTL" "$stale" "$gen" "$sids" "$lease" "$guard_eff" "$pe" "$page" "$children" "$SCOPE_JSON" "$(plan_dag_json)"
 }
 
 # Une entree de status --all : la ligne de json_status d'UN verrou, dans un sous-shell qui reassigne les
@@ -1484,8 +1573,48 @@ case "$ACTION" in
     exit 0
     ;;
 
+  publish-plan)
+    # Publie le resume du plan de mission du detenteur (A16) : identifiant, dependances, statut de chaque noeud, jamais le
+    # texte libre. Ordre des refus : owner, --file, verrou, detenteur, fichier, taille, python3, projection, ecriture.
+    # compartiment et phase ecrits = ceux du verrou resolu, jamais ceux du DAG.
+    require_owner
+    [ -n "$PLAN_FILE" ] || plan_refuse file-required
+    lock_present || plan_refuse no-lock
+    [ "$(meta_get owner)" = "$OWNER" ] || plan_refuse not-owner
+    { [ -f "$PLAN_FILE" ] && [ -r "$PLAN_FILE" ]; } || plan_refuse file-unreadable
+    [ "$(wc -c < "$PLAN_FILE" | tr -d ' ')" -le 1048576 ] || plan_refuse plan-too-large
+    command -v python3 >/dev/null 2>&1 || plan_refuse python3-missing
+    _pp="$(plan_project "$PLAN_FILE" 2>/dev/null)"; _prc=$?
+    case "$_prc" in
+      0) ;;
+      127) plan_refuse python3-missing ;;
+      *) plan_refuse plan-invalid ;;
+    esac
+    _pign="$(printf '%s\n' "$_pp" | sed -n 1p)"
+    case "$_pign" in ''|*[!0-9]*) plan_refuse plan-invalid ;; esac
+    _pnodes="$(printf '%s\n' "$_pp" | awk 'NR > 1' | awk 'END { print NR }')"
+    _pws=""; _pph=""
+    if [ "$PARTITIONED" = 1 ]; then
+      case "$SCOPE" in
+        compartiment) _pws="$WS" ;;
+        phase) _pws="$WS"; _pph="$PHASE" ;;
+      esac
+    fi
+    _plan="$(plan_path)"; _ptmp="$_plan.tmp"
+    if [ -e "$_plan" ] || [ -L "$_plan" ]; then
+      { [ -f "$_plan" ] && [ ! -L "$_plan" ]; } || plan_refuse plan-unwritable
+    fi
+    if ! { printf 'vibeflow/driver-plan@1\t%s\t%s\t%s\t%s\n' "$(lock_gen)" "$(now)" "$_pws" "$_pph"; printf '%s\n' "$_pp" | sed 1d; } > "$_ptmp" 2>/dev/null \
+       || ! mv -f "$_ptmp" "$_plan" 2>/dev/null; then
+      rm -f "$_ptmp" 2>/dev/null
+      plan_refuse plan-unwritable
+    fi
+    printf '{"published": true, "owner": "%s", "nodes": %s, "ignored": %s%s}\n' "$OWNER" "$_pnodes" "$_pign" "$SCOPE_JSON"
+    exit 0
+    ;;
+
   *)
-    echo "Usage: $0 {acquire|takeover|reclaim|heartbeat|mark-progress|release|status|recover|register|close|orphans|registry} [--owner=ID] [--step=X] [--agent=ID] [--role=R] [--node=N] [--parent=ID] [--depth=D] [--status=S]" >&2
+    echo "Usage: $0 {acquire|takeover|reclaim|heartbeat|mark-progress|release|status|recover|register|close|orphans|registry|publish-plan} [--owner=ID] [--step=X] [--agent=ID] [--role=R] [--node=N] [--parent=ID] [--depth=D] [--status=S] [--file=F]" >&2
     exit 1
     ;;
 esac
