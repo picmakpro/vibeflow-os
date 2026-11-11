@@ -1,0 +1,150 @@
+{
+  "nodes": [
+    {
+      "id": "fusions",
+      "step": "fusions lot 0 bis + 7 cadrages",
+      "stage": "",
+      "deps": [],
+      "scope": [
+        ".planning/**",
+        "plugin/cockpit/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "lotA1-req",
+      "step": "ledger REQUIREMENTS",
+      "stage": "",
+      "deps": [
+        "fusions"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/REQUIREMENTS.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "lotA2-roadmap",
+      "step": "ROADMAP + archive datée",
+      "stage": "",
+      "deps": [
+        "fusions"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/ROADMAP.md",
+        ".planning/archives/roadmap/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "lotA3-state",
+      "step": "STATE + archive",
+      "stage": "",
+      "deps": [
+        "fusions"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/STATE.md",
+        ".planning/archives/state/**"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "lotB-registre",
+      "step": "registre audit + docs versement",
+      "stage": "",
+      "deps": [
+        "fusions"
+      ],
+      "scope": [
+        ".planning/research/2026-11-10-audit-cockpit/**",
+        ".planning/research/2026-11-10-audit-cockpit-etude.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "lotC-backlog",
+      "step": "BACKLOG",
+      "stage": "",
+      "deps": [
+        "fusions"
+      ],
+      "scope": [
+        ".planning/BACKLOG.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "lotD-asamuel",
+      "step": "sections À Samuel des 7 CONTEXT",
+      "stage": "",
+      "deps": [
+        "fusions"
+      ],
+      "scope": [
+        ".planning/workstreams/fiabilite/phases/VFDO-7*/*-CONTEXT.md",
+        ".planning/workstreams/fiabilite/phases/VFDO-80*/80-CONTEXT.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "lotE-dag715",
+      "step": "DAG 71.5 docs+livraison",
+      "stage": "",
+      "deps": [
+        "fusions"
+      ],
+      "scope": [
+        ".planning/missions/2026-11-05-unslop-espacements.dag.json"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "coherence",
+      "step": "vérification fraîche de cohérence",
+      "stage": "",
+      "deps": [
+        "lotA1-req",
+        "lotA2-roadmap",
+        "lotA3-state",
+        "lotB-registre",
+        "lotC-backlog",
+        "lotD-asamuel",
+        "lotE-dag715"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "gates",
+      "step": "gates du job CI rejoués",
+      "stage": "",
+      "deps": [
+        "coherence"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "livraison",
+      "step": "push + PR brouillon + rapport",
+      "stage": "",
+      "deps": [
+        "gates"
+      ],
+      "scope": [],
+      "status": "done"
+    },
+    {
+      "id": "correction",
+      "step": "correction ciblée : gate STATE + constats du vérificateur",
+      "stage": "",
+      "deps": [
+        "coherence"
+      ],
+      "scope": [],
+      "status": "done"
+    }
+  ],
+  "ws": "fiabilite"
+}
