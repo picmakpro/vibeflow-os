@@ -85,7 +85,7 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
   const g = JSON.parse(read(path.join(sortie, 'graph.json')));
   let decrits = 0;
   for (const f of g.files) {
-    const txt = lireConfine(lab, () => lireGarde(path.join(lab, f.p))).slice(0, 6000); // AUDC-A-02 : jamais la cible d'un lien symbolique sortant du lab
+    const txt = lireConfine(lab, () => lireGarde(path.join(lab, f.p))).slice(0, 6000); // AUDC-A-02 : défense en profondeur assumée — le scan écarte déjà un lien sortant, donc aucun cas de suite ne dépend de ce seul confinement ; il garde l'assemblage sûr si la liste du scan change
     const fmBlock = /^---\n([\s\S]*?)\n---/.exec(txt)?.[1];
     let d = '';
     if (fmBlock) { d = /^description:\s*"?(.*?)"?\s*$/m.exec(fmBlock)?.[1] || ''; const nm = /^name:\s*(.*)$/m.exec(fmBlock)?.[1]; if (nm) f.name = nm.trim(); }
