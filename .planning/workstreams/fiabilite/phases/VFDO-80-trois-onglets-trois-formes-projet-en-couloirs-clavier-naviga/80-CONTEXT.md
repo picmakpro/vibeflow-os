@@ -387,6 +387,15 @@ Faits établis par la recherche qui corrigent la forme de décisions déjà pris
   réserve (la mise en page est identique panneau ouvert ou fermé) ; elle permet d'amener la carte sélectionnée hors du
   panneau.
 
+- **P80-D-44 (où se posent les champs de Projet, A31/A32 de la 79, commit `e04c43e7`).** Les champs facultatifs de
+  P80-D-06 (`avancement`, `exigences {faits,total}` sur la phase, `vague` sur le plan) se posent dans la lecture du
+  planning de la collecte (`plugin/cockpit/scripts/vf-cockpit-planning.mjs`, `readPlanning`) puis sont projetés sur le
+  graphe (`vf-cockpit-project.mjs`) ; jamais par une lecture à part. `vf-cockpit-planning.mjs` est aussi modifié par la
+  79 et par la 75 : collision nommée dans la carte des fichiers. **La 80 pose `vague`** sur le plan (son panneau et sa
+  liste en ont besoin, et ses vagues 1 et 2 ne dépendent pas de la 79) ; la Phase 75 la lit et n'ajoute que
+  `files_modified`. La 80 ne calcule rien côté serveur hors de cette lecture : `vf-cockpit-instantane.mjs` (A31) ne la
+  concerne pas.
+
 ### Claude's Discretion
 
 Noms exacts des fichiers neufs (dans la plage `ui/` qui garantit l'ordre de chargement), découpage interne sous le
@@ -441,7 +450,7 @@ PU-G-204, pas Q12.
 - `.planning/research/2026-11-10-audit-cockpit/A4-interface-parcours.md`
 - `.planning/missions/2026-11-11-audit-cockpit-lot-0.md` (« Décisions », « Limites », « Fichiers par sous-lot »)
 - `79-CONTEXT.md` § « Contrats fournis », branche `feat/phase-79-socle-cockpit`, commit `3119d82a`, et son
-  « Amendement du 2026-11-11 » (A1 à A7, A10, A11), commit `2ae6607a`, second amendement (A15 à A28), commit `6f66d878`, et A30 (`surOnglet`), commit `74501bb0`
+  « Amendement du 2026-11-11 » (A1 à A7, A10, A11), commit `2ae6607a`, second amendement (A15 à A28), commit `6f66d878`, A30 (`surOnglet`), commit `74501bb0`, et A31/A32, commit `e04c43e7`
 - `DESIGN.md` (direction « Graphite »)
 - `plugin/cockpit/CHANGELOG.md` § Non publié (Q4 à Q14 du 2026-11-06, PU-G-001, PU-G-026, PU-G-204)
 - Registres d'arbitrage : `70-CONTEXT.md` (P70-D-04, P70-D-22), `71-CONTEXT.md` (P71-D-02, P71-D-27, P71-D-35),
