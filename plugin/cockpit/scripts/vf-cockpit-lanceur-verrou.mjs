@@ -20,8 +20,9 @@ export async function prendreVerrou(lab, sortie, { vivant, attendre }) {
       return () => { if (rendu) return; rendu = true; try { if (fs.readFileSync(f, 'utf8') === String(process.pid)) fs.unlinkSync(f); } catch {} };
     } catch (e) {
       if (e.code !== 'EEXIST') throw e;
-      let pid = 0, age = 0;
-      try { pid = Number(fs.readFileSync(f, 'utf8')); age = Date.now() - fs.statSync(f).mtimeMs; } catch { continue; }
+      let pid = 0, age = 0, vide = false;
+      try { const t = fs.readFileSync(f, 'utf8'); vide = t === ''; pid = Number(t); age = Date.now() - fs.statSync(f).mtimeMs; } catch { continue; }
+      if (vide && age < 2000) { await attendre(50); continue; } // créé à l'instant, PID pas encore écrit : jamais pris pour un verrou périmé
       if (!Number.isInteger(pid) || pid <= 1 || !vivant(pid) || age > VERROU_MAX_MS) { try { fs.unlinkSync(f); } catch {} continue; }
       if (Date.now() > fin) { console.error('un autre lanceur tient le verrou depuis plus de 2 minutes : relancer plus tard.'); process.exit(5); }
       await attendre(100);

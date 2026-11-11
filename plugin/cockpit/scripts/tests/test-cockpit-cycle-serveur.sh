@@ -136,6 +136,16 @@ for _ in $(seq 1 30); do [ "$(nserv "$LH")" = 0 ] && break; sleep 0.2; done
 assert_has "H3.12 — « stop » : l'arrêt demandé et le signal reçu sont au journal" "$(cat "$LOG")" "lanceur : arrêt demandé"
 assert_eq "H3.13 — après « stop », plus aucun serveur" "$(nserv "$LH")" "0"
 
+# H3.23-H3.24 verrou créé à l'instant (PID pas encore écrit) : jamais pris pour un verrou périmé
+LV="$WORK/labv"; mklab "$LV"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LV" --quiet > "$WORK/build-v.out" 2>&1 || cat "$WORK/build-v.out"
+LKV="$LV/.vibeflow/cockpit/.cache/lanceur.lock"; mkdir -p "$(dirname "$LKV")"; : > "$LKV"
+$LAN open --lab "$LV" --no-open --port "$(libre)" > "$WORK/lv.out" 2>&1 & LVP=$!
+sleep 1
+assert_eq "H3.23 — verrou fraîchement créé et vide : le second lanceur attend, il ne le reprend pas (le fichier reste vide)" "$([ -s "$LKV" ] && echo repris || echo vide) $(kill -0 "$LVP" 2>/dev/null && echo attend || echo sorti)" "vide attend"
+rm -f "$LKV"; wait "$LVP"
+assert_eq "H3.24 — témoin : le verrou libéré, le lanceur finit et un seul serveur tourne" "$(nserv "$LV")" "1"
+$LAN stop --lab "$LV" > /dev/null 2>&1
+
 # H3.14-H3.16 inactivité : une requête authentifiée compte comme activité ; le motif d'arrêt est au journal ; un terminal ouvert retient l'arrêt et le dit
 LI="$WORK/labi"; mklab "$LI"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LI" --quiet > "$WORK/build-i.out" 2>&1 || cat "$WORK/build-i.out"
 OUTI="$LI/.vibeflow/cockpit"; PI=$(libre)
@@ -180,26 +190,41 @@ assert_eq "AM7.2 — en CI, sans Chrome : la suite sort non-zéro (1)" "$(rc_min
 assert_has "AM7.3 — le message dit l'absence de navigateur en CI" "$(cat "$WORK/mini.out")" "AM7 aucun navigateur"
 assert_eq "AM7.4 — témoin positif : en CI, avec un Chrome trouvé, la suite sort 0" "$(rc_mini CI=true FAUX_CHROME=/usr/bin/chrome-factice)" "0"
 assert_eq "AM7.5 — échappatoire explicite VF_CHROME_OPTIONNEL en CI : sort 0" "$(rc_mini CI=true VF_CHROME_OPTIONNEL=1)" "0"
-# couverture PAR EXÉCUTION : chaque suite qui appelle vf_chrome_saut (chrome-saut.sh, le mécanisme du point de saut) est jouée en CI=true sur une copie dont la
+# couverture : toute suite qui cherche un navigateur est classée (helper, filet ou hors) ; une suite « hors » rougit ; chaque suite qui appelle vf_chrome_saut (chrome-saut.sh, le mécanisme du point de saut) est jouée en CI=true sur une copie dont la
 # recherche de Chrome est neutralisée (chemin macOS retiré, noms du PATH remplacés) : elle doit sortir non-zéro avec le message AM7, APRÈS avoir écrit son saut « aucun navigateur »
 CP="$(cd "$(dirname "$0")/.." && pwd)"; trap 'rm -f "$CP"/tests/zz-am7-*.sh; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT # copies neutralisées posées à côté des suites (leurs chemins relatifs doivent résoudre), retirées à la sortie
-NSAUT=0; BAD=""
+# critère sur le CODE (jamais sur une formule de message) : toute suite qui CHERCHE un navigateur pose CHROME="" (ou EKCHROME="") avant sa recherche
+# classer <suite> : « helper » (appelle vf_chrome_saut : jouée plus bas), « filet » (hygiene.sh sourcé AVANT la recherche + vf_hyg_fin dans un trap EXIT), « hors » (rien ne la fait échouer en CI)
+classer() {
+  local f="$1" lh lc
+  grep -q 'vf_chrome_saut' "$f" && { echo helper; return; }
+  lh="$(grep -n 'hygiene.sh' "$f" | sed -n 1p | cut -d: -f1)"; lc="$(grep -n 'CHROME=""' "$f" | sed -n 1p | cut -d: -f1)"
+  if [ -n "$lh" ] && [ -n "$lc" ] && [ "$lh" -lt "$lc" ] && grep -q 'vf_hyg_fin' "$f" && grep -Eq 'trap .*EXIT' "$f"; then echo filet; else echo hors; fi
+}
+# le classeur lui-même doit pouvoir rougir : suites factices à formulations de saut différentes
+printf '%s\n' 'CHROME=""' 'echo "  pas de navigateur, on passe"; exit 0' > "$WORK/f-hors.sh"
+printf '%s\n' '. "$(dirname "$0")/hygiene.sh"; vf_hyg_init' 'trap vf_hyg_fin EXIT' 'CHROME=""' 'echo saut' > "$WORK/f-filet.sh"
+printf '%s\n' '. "$(dirname "$0")/hygiene.sh"; vf_hyg_init' 'trap "echo fin" EXIT' 'CHROME=""' 'echo saut' > "$WORK/f-sansfin.sh"
+printf '%s\n' 'CHROME=""' '[ -z "$CHROME" ] && { . "$(dirname "$0")/chrome-saut.sh"; vf_chrome_saut "x"; }' > "$WORK/f-helper.sh"
+assert_eq "AM7.6b — le classeur sépare : formulation libre sans filet = hors ; filet complet = filet ; filet sans vf_hyg_fin = hors ; helper = helper" "$(classer "$WORK/f-hors.sh") $(classer "$WORK/f-filet.sh") $(classer "$WORK/f-sansfin.sh") $(classer "$WORK/f-helper.sh")" "hors filet hors helper"
+NSAUT=0; NSUITES=0; BAD=""
 for f in "$(dirname "$0")"/test-*.sh; do
   b="$(basename "$f")"; [ "$b" = test-cockpit-cycle-serveur.sh ] && continue
-  grep -qi 'aucun navigateur' "$f" && grep -q 'CHROME=""' "$f" || continue
-  if ! grep -q 'vf_chrome_saut' "$f"; then # sans helper : seul le filet de sortie de hygiene.sh peut échouer, il doit donc être sourcé AVANT la recherche de Chrome
-    lh="$(grep -n 'hygiene.sh' "$f" | sed -n 1p | cut -d: -f1)"; lc="$(grep -n 'CHROME=""' "$f" | sed -n 1p | cut -d: -f1)"
-    { [ -n "$lh" ] && [ -n "$lc" ] && [ "$lh" -lt "$lc" ]; } || BAD="$BAD $b(saut hors du filet de hygiene.sh)"
-    continue
-  fi
+  grep -q 'CHROME=""' "$f" || continue
+  NSUITES=$((NSUITES+1))
+  case "$(classer "$f")" in
+    hors) BAD="$BAD $b(rien ne la fait échouer en CI sans Chrome)"; continue ;;
+    filet) continue ;;
+  esac
   NSAUT=$((NSAUT+1))
   sed 's#"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ##; s#google-chrome google-chrome-stable chromium chromium-browser#navigateur-inexistant-xyz#' "$f" > "$CP/tests/zz-am7-$b"
   cmp -s "$f" "$CP/tests/zz-am7-$b" && { BAD="$BAD $b(recherche non neutralisée)"; continue; }
   env -u CHROME_BIN -u VF_CHROME_OPTIONNEL CI=true bash "$CP/tests/zz-am7-$b" > "$WORK/am-$b.out" 2> "$WORK/am-$b.err" < /dev/null; rc=$?
-  { [ "$rc" -ne 0 ] && grep -q 'AM7 aucun navigateur' "$WORK/am-$b.err" && grep -q 'aucun navigateur' "$WORK/am-$b.out"; } || BAD="$BAD $b(rc=$rc)"
+  { [ "$rc" -ne 0 ] && grep -q 'AM7 aucun navigateur' "$WORK/am-$b.err"; } || BAD="$BAD $b(rc=$rc)"
 done
 rm -f "$CP"/tests/zz-am7-*.sh
-assert_ge "AM7.6a — témoin : au moins six suites appellent le helper du point de saut" "$NSAUT" 6
+assert_ge "AM7.6a — témoin : au moins vingt suites cherchent un navigateur, dont au moins six appellent le helper du point de saut" "$NSUITES" 20
+assert_ge "AM7.6c — au moins six suites appellent le helper" "$NSAUT" 6
 assert_eq "AM7.6 — chaque suite qui saute sa moitié navigateur sort non-zéro en CI sans Chrome, sur place (rouge : aucune)" "${BAD:-aucune}" "aucune"
 
 echo "== bilan : $PASS réussi(s), $FAIL échec(s) =="
