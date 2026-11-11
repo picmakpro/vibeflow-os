@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // vf-cockpit-fr-inventaire — inventaire déterministe des chaînes d'interface ANGLAISES d'un rendu servi (67-07, CKPT-09).
-// Base de la synchro amont : à rejouer après chaque resynchronisation du moteur (amont/SYNCHRO.md).
+// Filet de la traduction : à rejouer après toute édition du moteur ou de ses pages servies.
 // Entrées : le HTML des pages servies (index.html, project.html) et le source de serve.mjs de la sortie.
 // Sortie : liste triée et dédoublonnée (ordre des points de code), `${…}` d'un gabarit écrit `{}`.
 // Exports : inventaire({ html: [...], serveur }), litteraux(src), textesHtml(html), estAnglais(chaine), chainesBibliotheque(xterm), bibliothequeNonTraitee(xterm, client).
