@@ -9,7 +9,7 @@ import path from 'node:path';
 import { read as lireGarde, clipMot } from './vf-cockpit-planning.mjs';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
-import { findLabRoot, engineDir, envGit, configFiltres, filtresEtat, MAX_FILTRES, outputDir, resolveScriptsDir, verifierSortie } from './vf-cockpit-paths.mjs';
+import { findLabRoot, engineDir, envGit, configFiltres, filtresEtat, MAX_FILTRES, outputDir, verifierSortie } from './vf-cockpit-paths.mjs';
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { enteteGit } from './vf-cockpit-git-entete.mjs';
 import { ecrireArchitecture } from './vf-cockpit-code.mjs';
@@ -55,7 +55,7 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
   const t0 = Date.now();
   const lab = findLabRoot(labArg || process.cwd());
   if (!lab) throw fin(2, 'aucun dossier .planning trouvé : le cockpit se construit dans un lab GSD.');
-  const scriptsDir = sd || resolveScriptsDir(HERE);
+  const scriptsDir = sd || HERE; // AUDC-B-06 : le dossier de scripts de l'assembleur est son propre emplacement, jamais une VF_COCKPIT_SCRIPTS_DIR héritée
   const eng = engineDir(scriptsDir);
   if (eng.etat !== 'trouve') throw fin(3, 'moteur du cockpit introuvable : réinstaller le module cockpit.');
   const sortie = outputDir(lab);

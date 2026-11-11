@@ -10,7 +10,7 @@ import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
 import { spawn, execFileSync } from 'node:child_process';
 import { envEnfant } from './vf-cockpit-env.mjs';
-import { findLabRoot, engineDir, outputDir, resolveScriptsDir, verifierSortie, resoudreBinaire } from './vf-cockpit-paths.mjs';
+import { findLabRoot, engineDir, outputDir, verifierSortie, resoudreBinaire } from './vf-cockpit-paths.mjs';
 import { portPrefere } from './vf-cockpit-port.mjs';
 import { FICHIER_OUVRIR } from './vf-cockpit-terminal-amorce.mjs';
 
@@ -178,8 +178,9 @@ async function demarrer(lab, sortie, o) {
   if (o.terminal) args.push('--terminal');
   // port stable par lab (O4) : --port de l'utilisateur d'abord, sinon l'empreinte du lab ; le repli port+1 reste celui du serveur
   args.push('--port', String(o.port || portPrefere(lab)));
-  // le serveur ne se fie qu'à ces deux chemins, posés ici depuis le module (jamais lus dans un .cache/ du lab)
-  const env = { ...envEnfant(lab), VF_COCKPIT_ENGINE_DIR: engineDir(resolveScriptsDir(HERE)).chemin || '', VF_COCKPIT_SCRIPTS_DIR: resolveScriptsDir(HERE) };
+  // le serveur ne se fie qu'à ces deux chemins, posés ici depuis le module (jamais lus dans un .cache/ du lab) ; le dossier de scripts est celui de CE fichier,
+  // jamais une variable VF_COCKPIT_SCRIPTS_DIR héritée de l'environnement du lanceur (AUDC-B-06)
+  const env = { ...envEnfant(lab), VF_COCKPIT_ENGINE_DIR: engineDir(HERE).chemin || '', VF_COCKPIT_SCRIPTS_DIR: HERE };
   // P71-D-03 (arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-03) : le shell du terminal reçoit le PATH D'ORIGINE du lanceur. Le serveur et ses enfants
   // gardent le PATH assaini (H-1) ; le PATH d'origine voyage dans VF_COCKPIT_PATH_ORIGINE jusqu'au filtre du shell (vf-cockpit-terminal-env.mjs), qui le restitue en PATH puis le retire.
   if (typeof process.env.PATH === 'string') env.VF_COCKPIT_PATH_ORIGINE = process.env.PATH;
@@ -207,7 +208,7 @@ async function main() {
   if (o.aide) { console.log(AIDE); return; }
   const lab = findLabRoot(o.lab || process.cwd());
   if (!lab) { console.error('aucun dossier .planning trouvé : le cockpit se construit dans un lab GSD.'); process.exit(2); }
-  const scriptsDir = resolveScriptsDir(HERE); LABV = lab;
+  const scriptsDir = HERE; LABV = lab; // AUDC-B-06 : le dossier de scripts du module, jamais une valeur héritée
   const sortie = outputDir(lab);
 
   if (o.verbe === 'status') {

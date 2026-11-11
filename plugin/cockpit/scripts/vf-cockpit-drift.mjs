@@ -9,6 +9,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL, fileURLToPath } from 'node:url';
 import { planningLayout, stateFile } from './vf-cockpit-paths.mjs';
+import { citer } from './vf-cockpit-git-commandes.mjs';
 import { readPlanning, fm, read } from './vf-cockpit-planning.mjs'; // read borné partagé : fichier régulier, plafond de taille (jamais un tube ni /dev/zero)
 import { DEP_TETE, texte, lignesNonComprises } from './vf-cockpit-formats.mjs'; // mêmes motifs que la lecture : « compris » = consommé par planning
 
@@ -22,7 +23,7 @@ const nonComprise = (fichier, x) => ({ regle: 'ligne-non-comprise', niveau: 'ign
 
 // PU-G-153 : la commande du correctif, COMPLÈTE et rejouable telle quelle depuis n'importe quel dossier (chemin du script et du lab absolus, entre apostrophes).
 // Un tube plutôt qu'un fichier « drift.patch » : écrit dans le dossier courant puis lu depuis le lab (`git -C`), il n'était trouvé que si les deux étaient le même.
-const apostrophes = (s) => `'${String(s).replace(/'/g, `'\\''`)}'`;
+const apostrophes = (s) => citer(String(s)); // AUDC-B-06 : la seule citation shell du module (vf-cockpit-git-commandes.mjs)
 export const commandeCorrectif = (root) => { root = path.resolve(root); return `node ${apostrophes(fileURLToPath(import.meta.url))} ${apostrophes(root)} --diff | git -C ${apostrophes(root)} apply -`; };
 
 export function detectDrift(root, layout) {
