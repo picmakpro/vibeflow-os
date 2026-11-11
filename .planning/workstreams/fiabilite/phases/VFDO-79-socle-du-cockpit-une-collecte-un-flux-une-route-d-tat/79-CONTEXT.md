@@ -381,6 +381,10 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   de C2. Limite nommée, inchangée depuis la Phase 69 : `signal.root`, `equipe.root` et `equipe.workers[].cwd` sont
   des chemins absolus de forme inchangée (C0 « Versions »), servis comme ils le sont déjà par `hello` ; les masquer
   demanderait un schéma `@2`, hors de cette phase (à verser au BACKLOG par la jointure).
+- **A39 (73) — âge d'un verrou.** Relevé dans `driver-lock.sh` : `ageS` (← `age_seconds`) est l'âge du **dernier
+  battement** (`heartbeat_epoch`), pas de la prise ; `leaseS` (← `lease_seconds`, ajouté par A36) est le temps écoulé
+  **depuis la prise** (`acquired_epoch`), `null` s'il est illisible ; `progressAgeS` est l'âge de la dernière marque
+  d'avancement. « Tient son verrou depuis » se lit dans `leaseS`, aucun champ neuf.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
