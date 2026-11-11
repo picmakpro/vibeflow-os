@@ -606,17 +606,44 @@ Plans:
 
 ### Phase 79: Socle du cockpit — une collecte, un flux, une route d'état
 
-> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-11 depuis l'audit du cockpit du 2026-11-10 (demande de Samuel, session principale Claude Code, 2026-11-10 ; numéro et découpage : décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée).
+> **Cadrée et planifiée le 2026-11-11** par le manager de la phase (décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée ; arbitrages AUDC-Q2, Q4, Q5 du 2026-11-11 en vigueur). Contrats fournis aux Phases 73, 74, 75, 76, 77 et 80 : `79-CONTEXT.md` § « Contrats fournis » et amendements A1 à A29. Questions à Samuel, non bloquantes : S-1 à S-4.
 
 **Goal:** Le serveur du cockpit collecte sans bloquer et sert un état unique : un index incrémental des transcripts, une route d'état en JSON lue par la page et par `vf-signal`, un seul flux d'événements partagé entre les onglets, des données sorties de la page, et un serveur lancé depuis le module plutôt que depuis une copie dans le lab.
-**Requirements**: TBD — famille `SOCL` réservée, posée au cadrage.
-**Depends on:** Phase 67 (serveur unique) ; Phase 69 (collecteur `who`). Vient après le lot zéro de l'audit (mission hors phase). Les Phases 74, 75 et 77 en dépendent ; la 73 n'en dépend pas. En parallèle de la 80.
-**Sources:** `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2 ; registre `AUDC-D5`, `D9`, `H1`, `H2`, `H4`, `H5`, `AM1` à `AM7`, `AB1`, `A-03`, `M7`, `I18` à `I20`, `I22`, `I31`, `I32`, `I37`.
-**Plans:** 0 plans
+**Requirements**: SOCL-01, SOCL-02, SOCL-03, SOCL-04, SOCL-05, SOCL-06, SOCL-07, SOCL-08, SOCL-09, SOCL-10, SOCL-11, SOCL-12, SOCL-13, SOCL-14, SOCL-15, SOCL-16, SOCL-17, SOCL-18, SOCL-19, SOCL-20, SOCL-21, SOCL-22, SOCL-23, SOCL-24, SOCL-25
+**Depends on:** Phase 67 (serveur unique) ; Phase 69 (collecteur `who`) ; lot zéro de l'audit (livré dans la base `integration/cockpit-audit`). Les Phases 74, 75 et 77 en dépendent (contrats C1 à C3) ; la 73, la 76 et la 80 consomment C2, C4, C5 et la règle de routes A10-A11 et placent leurs plans après la première vague de la 79.
+**Sources:** `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2 ; registre `AUDC-D5`, `D9`, `H1`, `H2`, `H3`, `H4`, `H5`, `AM1` à `AM7`, `AB1`, `A-02` (classe restante), `A-03`, `A-04` (limites), `D-M2`, `D-M13`, `D-M15`, `M7`, `I18` à `I20`, `I22`, `I31`, `I32`, `I37`.
+**Un ajout, un retrait:** ajoute l'index, les routes d'état, de frise et de graphe, le flux partagé, la coquille statique, le worker de mise en page ; retire la copie renommée du code dans chaque lab, l'appareil de patchs du moteur, la page Équipe reconstruite à chaque requête, la réécriture de `project.html` à chaque changement, la collecte refaite par `vf-signal` quand le serveur tourne, l'observateur global de traduction et les observateurs de réparation.
+**Success Criteria** (what must be TRUE):
+  1. Aucun code ni contrat n'est lu ou évalué depuis la sortie du cockpit dans le lab : un code planté dans la sortie ne s'exécute jamais, ni côté serveur ni côté page ; la classe des chemins jugés sur leur forme écrite est fermée par une preuve générative.
+  2. Pendant une collecte et un remplissage d'index, une requête au serveur répond en moins de 50 ms au 99ᵉ centile (témoin rouge sur la base : pics de 416 à 470 ms).
+  3. `GET /api/vf/state`, `GET /api/vf/frise` et `GET /api/vf/graphe` servent les contrats C2, C3 et C5 sous les contrôles de C0 ; `vf-signal` ne refait plus sa collecte quand un serveur du lab tourne.
+  4. Sept onglets ouverts sur le même lab ne tiennent qu'un flux d'événements ; fermer l'onglet élu ne recharge aucune page ; un flux muet est déclaré coupé en 45 s.
+  5. Un agent clos reste rattaché à son nœud après le relâchement du verrou (registre archivé 24 h, nœud écrit dans le mandat).
+  6. Ni l'index, ni l'état, ni la frise, ni les cibles, ni les verrous n'entrent dans l'export ; aucun chemin absolu ni identifiant de session n'est émis hors des routes à la demande existantes.
+**Plans:** 20 plans en 9 vagues
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 79 to break down)
+- [ ] 79-01-PLAN.md — Fork assumé : retrait de l'appareil de patchs du moteur (vague 1)
+- [ ] 79-02-PLAN.md — Aide commune de lancement du serveur dans les suites, migration (vague 1)
+- [ ] 79-03-PLAN.md — Registre du verrou archivé 24 h, verbe registry, plan de mission publié (vague 1, conductor)
+- [ ] 79-04-PLAN.md — Nœud écrit dans chaque mandat, doctrine de publication (vague 2, références)
+- [ ] 79-05-PLAN.md — Table des routes, réponse gardée, annotateurs du graphe Code (vague 1)
+- [ ] 79-06-PLAN.md — Serveur lancé depuis le module, sortie = données, empreinte, orphelin, mesure du confinement (vague 2)
+- [ ] 79-07-PLAN.md — Résolution physique des chemins, cible interne protégée, pilotes git (vague 2)
+- [ ] 79-08-PLAN.md — Index incrémental des transcripts et contrat de forme étendu (vague 2)
+- [ ] 79-09-PLAN.md — Collecte hors de la boucle, registre lu, verrous projetés (vague 3)
+- [ ] 79-10-PLAN.md — Traduction au point d'émission (vague 3)
+- [ ] 79-11-PLAN.md — Plafond en colonnes et code navigateur rangé (vague 3)
+- [ ] 79-12-PLAN.md — Route d'état et vf-signal par la route (vague 4)
+- [ ] 79-13-PLAN.md — Route de frise et cibles en mémoire (vague 5)
+- [ ] 79-14-PLAN.md — Flux partagé entre onglets et veille de silence (vague 5)
+- [ ] 79-15-PLAN.md — Route graphe, fin de la réécriture de project.html, témoin d'export (vague 6)
+- [ ] 79-16-PLAN.md — Coquille statique servie du module (vague 7)
+- [ ] 79-17-PLAN.md — Magasin d'état côté page (vague 7)
+- [ ] 79-18-PLAN.md — Mise en page dans un worker (vague 8)
+- [ ] 79-19-PLAN.md — Journal des attentes par hook, détachable (vague 9)
+- [ ] 79-20-PLAN.md — Documentation et version du module (vague 9)
 
 ### Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation
 

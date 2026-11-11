@@ -310,6 +310,10 @@ sans en retirer rien.
   79 par amendement.
 - **A28 (75, facultatif retenu) — `?champs=cibles`.** `GET /api/vf/frise?champs=cibles` rend chaque voie réduite à
   `id`, `arbre` et `cibles` ; `champs` inconnu → 400 `{ "erreur": "champs-invalides" }`.
+- **A29 (recherche) — fichier de données de l'outil de requête.** Quand le serveur cesse de réécrire `project.html`
+  (C5), il écrit à chaque changement un fichier de données `projet.json` (`cockpit-project@1`, 0600, temporaire puis
+  renommage) dans la sortie, lu par l'outil de requête de l'agent « Demander » ; aucune donnée nouvelle, jamais
+  exporté.
 - **Note C3.** Le coût en monnaie et les limites de 5 h et de 7 jours sont hors de cette vague (P74-D-20, P74-D-24).
 
 ## À Samuel
@@ -330,6 +334,11 @@ Questions qui ne bloquent rien : l'arbitrage en vigueur tient et le plan est bâ
   ces worktrees. Options : (a) garder ainsi ; (b) un worktree du même dépôt compte comme le lab, la cible restant
   relative à sa racine (aucun chemin absolu). Recommandation : (b), aucun chemin du poste ne sort et le radar devient
   complet ; à confirmer par Samuel, l'arbitrage en vigueur tient d'ici là.
+- **S-4 — Réduire AUDC-I18 ?** I18 voulait un journal des hooks qui remplace la relecture des transcripts ; l'index
+  (C1) et l'état officiel (AUDC-Q4) font ce travail. En vigueur : le plan garde une forme minimale (journal des
+  attentes, P79-D-22), détachable, que la sonde de première vague peut rendre inutile. Options : (a) garder la forme
+  minimale ; (b) retirer I18 de la phase si la sonde montre que l'état officiel voit les attentes de permission.
+  Recommandation : (b) sur sonde verte, (a) sinon. C'est une modification de périmètre : à Samuel.
 
 <decisions>
 ## Implementation Decisions
@@ -343,6 +352,142 @@ Aucune ne vaut arbitrage de Samuel.
 - **P79-D-03 (index).** C1 : cache du lab, non fiable à la lecture, un seul écrivain, 24 h, sans cible.
 - **P79-D-04 (cibles).** En mémoire seulement (arbitrage AUDC-Q2 en vigueur) ; question S-1.
 - **P79-D-05 (coût).** Sur la fenêtre de 24 h (arbitrage AUDC-Q2 en vigueur) ; question S-2.
+- **P79-D-06 (amendements).** A1 à A28 retenus tels qu'écrits ; aucun retour des six phases refusé.
+
+Décisions tranchées par trois panels de recherche (relevés du code présent, 2026-11-11) :
+
+- **P79-D-07 (fork, AUDC-H5).** L'appareil de patchs (`plugin/cockpit/amont/`, 19 diffs, outil de synchro, manifeste)
+  est retiré en première vague (plan 79-01) avec les contrôles V6, V7 et V9.4 de `test-cockpit-vendor.sh`.
+  `VENDORED.txt` reste : origine (v0.6.0 et son commit), sentinelle de détection du moteur, inventaire du plafond ;
+  `LICENSE`, `LICENCES-TIERCES.txt` et les empreintes des ressources tierces restent. La règle de `DESIGN.md` § 9 qui
+  prescrit de tracer chaque patch est réécrite dans le même plan.
+- **P79-D-08 (renommage, AUDC-AM4).** Option (a) : les noms VibeFlow sont écrits une fois dans les six sources
+  exécutées par Node (`serve.mjs`, `graph-query.js`, `query-cli.mjs` et les trois modules VibeFlow écrits sous l'ancien
+  nom) ; les pages restent renommées comme du texte (à l'assemblage, puis en mémoire au service de la coquille). Ni
+  `viewer.html` ni `ui/*.js` ne sont touchés par ce renommage (conflit certain avec la Phase 80). Le renommage complet
+  des pages et le retrait de `vf-cockpit-rename.mjs` viennent après la fusion de la 80, en geste séparé (BACKLOG, à
+  verser par la jointure). Le module renommé à la publication est écarté (code testé ≠ code installé).
+- **P79-D-09 (code depuis le module, AUDC-A-03).** Le lanceur démarre le `serve.mjs` du module avec
+  `--sortie=<chemin réel>` en dernier argument ; le serveur revérifie la sortie ; aucun module n'est plus copié dans la
+  sortie, ni le contrat de forme (E8 fermé : la garde d'émission lit le contrat du module). L'identité d'un serveur
+  est « `serve.mjs` du module + `--sortie=` exact en fin de ligne de commande » (deux labs dont l'un est le préfixe de
+  l'autre ne se confondent plus). L'agent « Demander » lance les scripts de requête du module : **nouvelle mesure du
+  confinement de `claude -p` obligatoire** dans le plan (le confinement est mesuré, jamais édité à la main). Les
+  scripts de page (E9) sont fermés par la coquille servie depuis le module (C5) : dépendance dure, la phase ne se livre
+  pas avec AM4 sans C5, et le README (l. 204-205) n'est réécrit qu'après C5. Limite écrite : en pose projet ou
+  locale, le module vit sous `.claude/` du lab ; la garantie devient « la sortie du cockpit n'est jamais source de
+  code » ; garde : le lanceur refuse un module dont le chemin réel est sous la sortie ou sous `.vibeflow/`.
+- **P79-D-10 (empreinte et orphelin, H3, D-M13).** Une seule fonction calcule l'empreinte de tout le code évalué du
+  module (serveur, modules, cœur de requête, contrat), au lanceur et au serveur ; une mise à jour du plugin est donc
+  vue à la relance. `status` et `stop` détectent un serveur orphelin sans `server.json` par la même détection que
+  `open`, séparée de l'adoption (`status` n'écrit rien). Le filtre de `hygiene.sh` porte `--sortie=<dossier de test>`,
+  jamais `serve.mjs` seul (règle du crash du 2026-11-02 : filtre jamais vide, plafond, leurre).
+- **P79-D-11 (classe A-02, D-M15, A-04).** Règle unique : un chemin n'est jugé que par sa résolution physique complète ;
+  échec de résolution = dehors (fermé par défaut), seule exception la forme exacte du verrou de pilotage. Une seule
+  fonction partagée par le socle et le moteur (aujourd'hui copiée octet pour octet). Preuve **générative** : chaînes de
+  liens internes de profondeurs variées, égalité exigée entre le verdict de la garde et la résolution réelle (cinq tours
+  du lot 0 sur des listes de cas). Un lien du lab est jugé comme son chemin cible le serait (segment caché, sortie du
+  cockpit, dossier git, fichier ignoré). Tous les pilotes nommés déclarés (filtres, textconv, commandes de diff,
+  pilotes de fusion) sont vidés pour tout lancement de git, quelle que soit la sous-commande ; `driver-lock.sh` lancé
+  par le cockpit reçoit l'environnement git unique, et l'appel direct de `vf-cockpit-live.mjs` passe par le lanceur
+  borné. Audit de sécurité obligatoire à l'exécution de ce plan et du plan AM4.
+- **P79-D-12 (collecte hors boucle, H2).** Un seul collecteur dans un `worker_threads` (tour du filet + index), le code
+  synchrone actuel y tourne tel quel ; la garde `porteInterdit` reste au point d'émission, dans le thread principal ;
+  mémoire du worker plafonnée ; un seul écrivain de l'index (l'ancien worker est terminé avant qu'un nouveau écrive).
+  Preuve : sonde de latence de boucle (requête légère toutes les 100 ms) pendant un tour et pendant un remplissage
+  d'index sur une grosse fixture, p99 < 50 ms et max < 100 ms ; témoin rouge sur la base (pics de 416 à 470 ms) ;
+  fixture « ligne géante » : le serveur répond toujours, `collecte.etat` = `partielle`.
+- **P79-D-13 (segments, D9).** Entre deux horodatages consécutifs d'une voie : appel `AskUserQuestion` ouvert ou
+  permission en cours → `attend-humain` ; appel `Agent`, `Task` ou `SendMessage` ouvert, ou fin de tour avec des agents
+  de fond en cours → `attend-agents` ; autre appel ouvert → `travail` même long ; écart ≤ 180 s → `travail` ; fin de
+  tour puis écart → `repos` ; autre écart > 180 s → `silence`. Durée au travail = somme des segments `travail`.
+  « Bloqué » vient de l'état officiel. Contrat de forme revérifié sur la version de Claude Code du poste.
+- **P79-D-14 (flux partagé, H1, D-M2).** `BroadcastChannel` + élection par Web Locks (`navigator.locks`), canal
+  suffixé par l'empreinte du lab ; repli un flux par page hors contexte sûr ou sans ces primitives. La veille de 45 s
+  compare des instants (un onglet de fond a des minuteries ralenties). Preuve : sept onglets, un seul flux compté par
+  `/api/status`, le septième lit `/api/vf/state` en 200 ; l'onglet élu fermé, un autre reprend sans navigation ; témoin
+  rouge sur la base (sixième onglet bloqué).
+- **P79-D-15 (mise en page en worker, AM3, M7).** `worker-src 'self'` et un fichier de worker ELK servi par le module
+  (jamais `blob:`) ; le worker reçoit la CSP de sa propre réponse ; l'export autonome garde ELK en ligne, sans worker.
+  README (l. 36) amendé : seule extension de CSP de la phase. Preuve : CSP servie égale à la chaîne attendue ; aucune
+  tâche longue de plus de 200 ms pendant la mise en page d'une fixture ; export ouvert en fichier qui affiche le
+  canevas.
+- **P79-D-16 (traduction au point d'émission, H4).** Les chaînes du moteur sont écrites en français dans leurs fichiers
+  (fork assumé) ; l'observateur global de `80-vf-fr.js` est retiré ; l'inventaire du rendu servi reste le filet.
+  `?lang=en` : retiré, sauf si la recherche trouve un arbitrage qui le fixe (alors gardé et cité).
+- **P79-D-17 (registre du verrou, D5).** Archive au relâchement : le registre courant est versé dans un fichier frère
+  (`…closed.jsonl`) puis supprimé comme aujourd'hui (les assertions T63.7 et WS-VERBS-3.22 restent vraies) ; rétention
+  24 h par `epoch` et plafond de 2 000 lignes, élagage sous le verrou ; verbe de lecture seule `registry` (dernier état
+  par agent, registre courant + archive) ; `orphans` et `status` inchangés. Commits avec `Gate-Touche:`.
+- **P79-D-18 (nœud dans le mandat, I37).** Une ligne `- Nœud : \`<id>\`` au gabarit du digest
+  (`mission-contracts.md`) et la règle au kernel (`team-kernel.md`), avec la publication du plan de mission (A16) ;
+  jamais dans le corps d'un agent (`vf-dev-manager.md` à 250 lignes, budget d'instructions armé).
+- **P79-D-19 (plafond en colonnes, AM5).** 160 colonnes, cliquet par fichier dans V4 de `test-cockpit-vendor.sh`
+  (baseline versionnée du nombre de lignes longues par fichier, qui ne peut que baisser ; une hausse exige une
+  citation d'arbitrage ; le marqueur des gros fichiers ne vaut pas pour les colonnes). Pas dans `check-file-size.sh`
+  (autre module, distribué). Le code navigateur sérialisé de cinq modules est rangé : `ui/NN-vf-*.js` pour la page
+  principale, `assets/ui/terminal/` pour la page du terminal, les trois feuilles en `.css`.
+- **P79-D-20 (socle de test, AM7).** `socle-serveur.sh` (A6) en première vague ; les suites que la 79 modifie ensuite
+  le sourcent ; une attente bornée remplace une pause fixe là où le plan touche une suite. Pas de migration en masse
+  des 79 suites (conflits avec les six autres phases).
+- **P79-D-21 (démarrage, AB1).** `claude --version` en asynchrone ; cache du scan par date de modification.
+- **P79-D-22 (journal des hooks, I18).** La forme écrite d'I18 (le journal remplace la relecture des transcripts) est
+  dépassée par C1 et AUDC-Q4. Planifiée à la place, en dernière vague et détachable : un journal d'attente minimal par
+  un hook `command` en forme exec, sur `SessionStart`, `SessionEnd`, `SubagentStart`, `SubagentStop`, `Stop` et
+  `Notification` (attentes de permission ou de réponse) ; champs `t`, `ev`, `session`, `agent`, `role`, `type` de
+  table fermée ; jamais `prompt`, `tool_input`, `tool_response`, `message`, titre, `cwd` ni chemin de transcript ;
+  fichier par jour sous le cache du cockpit, ouvert sans suivre les liens, 0600 ; rien si le lab n'a pas de cockpit.
+  Une sonde, première tâche du plan, dit si `claude agents --json` montre déjà une attente de permission : si oui, le
+  plan s'arrête sans code et le retrait d'I18 est proposé à Samuel (question S-4).
+- **P79-D-23 (aide de lancement, AM7).** Révise P79-D-20 sur mesure de la recherche : la migration des suites qui
+  lancent le serveur vers `socle-serveur.sh` se fait **en une fois au plan 79-02** (première vague), parce que le plan
+  du serveur lancé depuis le module doit changer ces mêmes suites de toute façon ; il ne change ensuite que l'aide. Le
+  nom et les fonctions sont ceux de l'amendement A6 (le nom proposé par la recherche, `serveur-commun.sh`, est écarté).
+  Restent hors de la migration : `test-cockpit-questions.sh` et `test-cockpit-git-env.sh` (plan 79-01) ; aucune autre
+  mutualisation du préambule des suites.
+- **P79-D-24 (`?lang=en`).** Gardé : P67-D-20 et P70-D-03 le fixent, SEED-005 s'y appuie. La traduction au point
+  d'émission garde le texte anglais comme clé et une table française ; `?lang=en` rend la clé.
+- **P79-D-25 (plafond de 300 lignes).** Dur (V4 de `test-cockpit-vendor.sh`) : un fichier proche du plafond
+  (`vf-cockpit-paths.mjs` 296, `vf-cockpit.mjs` 273, `ui/70-vf-live.js` 285) ne grossit que par extraction d'un
+  module neuf, jamais par marqueur de gros fichier.
+- **P79-D-26 (transition).** La reconnaissance d'un serveur accepte aussi l'ancienne forme (`<sortie>/serve.mjs`) le
+  temps d'une version ; l'assemblage purge de la sortie le code laissé par une version précédente.
+- **P79-D-27 (documentation).** Un seul plan (79-20) touche le CHANGELOG, le README, `VERSION` et `module.json` du module
+  cockpit ; les autres consignent dans leur SUMMARY. Capacité nouvelle : version mineure, sans release (ADR-073, gel des
+  publications).
+
+### Découpage imposé aux plans (2026-11-11)
+
+Source de vérité pour les planificateurs : numéros, objet, vague, dépendances. Les fichiers viennent de
+`79-RESEARCH.md` (section de chaque plan, dont la numérotation diffère : colonne « Recherche ») ; un plan n'ajoute un
+fichier hors de sa liste qu'en le disant, et deux plans d'une même vague n'ont aucun fichier en commun. Numéros déjà
+annoncés aux autres phases : 79-01, 79-02, 79-05, 79-06.
+
+| Plan | Objet | Exigences | Vague | Dépend de | Recherche |
+|---|---|---|---|---|---|
+| 79-01 | Fork assumé : retrait de l'appareil de patchs, `VENDORED.txt` réduit, Q11.0, `DESIGN.md` § 9 | SOCL-01 | 1 | — | § 79-01 |
+| 79-02 | `socle-serveur.sh` (A6) et migration des suites qui lancent le serveur | SOCL-02 | 1 | — | § 79-02 |
+| 79-03 | Registre archivé au relâchement, 24 h, verbe `registry` ; plan de mission publié à côté du verrou (A16) | SOCL-03, SOCL-04 | 1 | — | § 79-03 + P79-D-17 |
+| 79-04 | Nœud écrit dans chaque mandat, publication du plan de mission (doctrine) | SOCL-05 | 2 | 79-03 | § 79-04 |
+| 79-05 | Table des routes `/api/vf/*`, réponse gardée exportée, table des annotateurs du graphe Code (A10, A11, A27) | SOCL-06 | 1 | — | nouveau (amendements) |
+| 79-06 | Serveur lancé depuis le module, sortie = données, E8, identité `--sortie`, empreinte, orphelin, version asynchrone, nouvelle mesure du confinement | SOCL-07, SOCL-08, SOCL-09 | 2 | 79-01, 79-02, 79-05 | § 79-05 |
+| 79-07 | Résolution physique (classe A-02, preuve générative), D-M15, pilotes nommés et enfants shell (A-04) | SOCL-10, SOCL-11 | 2 | 79-01 | § 79-06 |
+| 79-08 | Index incrémental pur, jetons, segments, contrat de forme étendu | SOCL-12 | 2 | 79-01 | § 79-07a |
+| 79-09 | Collecte hors boucle, registre lu, cache de scan, verrous projetés (A15), signature du `who` (A17), silence et échec (A20) | SOCL-13 | 3 | 79-03, 79-06, 79-07, 79-08 | § 79-07b |
+| 79-10 | Traduction au point d'émission, observateur global retiré | SOCL-14 | 3 | 79-01, 79-06 | § 79-14 |
+| 79-11 | Plafond en colonnes en cliquet, code navigateur rangé | SOCL-15 | 3 | 79-01, 79-06 | § 79-15 |
+| 79-12 | Route d'état, événements `etat` et `vie`, `vf-signal` par la route | SOCL-16 | 4 | 79-05, 79-09 | § 79-08 |
+| 79-13 | Route de frise, `cibles` en mémoire (A21-A24, A28), événement `frise` | SOCL-17 | 5 | 79-12 | § 79-09 |
+| 79-14 | Flux partagé entre onglets, veille de silence | SOCL-18 | 5 | 79-12 | § 79-10 |
+| 79-15 | Route graphe, événement `graphe` (A5), fin de la réécriture de `project.html`, `projet.json` (A29), Équipe sans reconstruction, témoin d'export (A25) | SOCL-19, SOCL-23 | 6 | 79-13, 79-14 | § 79-11a |
+| 79-16 | Coquille statique servie du module, `ETag`, CSP, `chargerOnglet` (A2), terminal posé une fois (A3) | SOCL-20 | 7 | 79-15 | § 79-11b |
+| 79-17 | Magasin `VF_ETAT` (C4, A13), observateurs de réparation retirés | SOCL-21 | 7 | 79-15 | § 79-12 |
+| 79-18 | Mise en page dans un worker, API du moteur gardée (A4) | SOCL-22 | 8 | 79-16, 79-17 | § 79-13 |
+| 79-19 | Journal des attentes (I18 réduit, P79-D-22), sonde d'abord, détachable | SOCL-24 | 9 | 79-06 | § 79-16 + P79-D-22 |
+| 79-20 | Documentation, version mineure du module, limites (pose projet, CSP, `vf-signal`) | SOCL-25 | 9 | tous | § 79-17 |
+
+Exigences `SOCL-01` à `SOCL-25` : texte dans `REQUIREMENTS.md`. Audit de sécurité à l'exécution : 79-06, 79-07, 79-09,
+79-12, 79-13, 79-16, 79-18, 79-19.
 
 </decisions>
 
