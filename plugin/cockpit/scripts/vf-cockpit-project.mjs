@@ -119,6 +119,7 @@ function construireGraphe(root, { layout } = {}) {
     const planFiles = ls(dir).filter((f) => /-PLAN\.md$/.test(f)).sort();
     const sums = new Set(ls(dir).filter((f) => /-SUMMARY\.md$/.test(f)).map((f) => f.replace('-SUMMARY.md', '')));
     const av = ph.avancement;
+    const vagues = new Map((ph.plans || []).map((x) => [x.fichier, x.vague])); // P80-D-44 : posée par readPlanning
     const enCours = P.dags.filter((d) => d.phaseKey === ph.key && d.etat === 'running').flatMap((d) => d.nodes.filter((x) => x?.status === 'running')); // un plan non fait est actif si un nœud running d'une mission rattachée le désigne (P69-PL-04) ; seule une mission vivante désigne un plan actif (VFSG-06)
     const phReqs = ownReqs(ph); const id = phId(ph);
     const but = propre(ph.goal), ligne = propre(ph.line), { resume, reste: suite } = but ? scinder(but, 400) : { resume: sentence(ligne || ph.name, 200), reste: '' };
@@ -134,7 +135,8 @@ function construireGraphe(root, { layout } = {}) {
       const obj = objectif(txt) || /^#\s+(.*)$/m.exec(txt)?.[1] || '';
       const touched = list(meta.files_modified); const p = rel(path.join(dir, pf));
       file({ p, n: id, name: `${pid} — ${clip(obj.split('\n').find((l) => l.trim()) || '', 70)}`, d: sentence(obj, 220), st: sums.has(pid) || ph.done ? 'done' : enCours.some((x) => x.id === pid || (Array.isArray(x.scope) && x.scope.includes(p))) ? 'active' : 'todo',
-        foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, touched });
+        foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, touched,
+        vague: vagues.get(pf) ?? null });
       for (const dep of list(meta.depends_on)) { const dp = planFiles.find((x) => x.startsWith(dep.length <= 3 ? `${pf.split('-')[0]}-${dep.padStart(2, '0')}` : dep)); if (dp) link('f:' + rel(path.join(dir, dp)), 'f:' + p, 'import', 'puis'); }
       for (const r of list(meta.requirements)) { const rq = reqOf(r, ph.ws); if (rq) link('f:' + p, 'f:' + reqPath(rq), 'data', 'couvre'); }
     }
@@ -164,7 +166,7 @@ function construireGraphe(root, { layout } = {}) {
   const bl = node({ id: 'backlog', parent: null, label: 'Backlog', kind: 'backlog', summary: 'Ce qui est consigné, différé ou investigué, hors des jalons.' });
   for (const m of P.backlog.matchAll(/^## ([^\n]*)\n([\s\S]*?)(?=^## |(?![\s\S]))/gm)) {
     const [title, status] = m[1].split(/(?<!\s)\s+—\s+(?=[A-ZÉ]{4,}|consigné|mesuré)/);
-    file({ p: `.planning/BACKLOG.md#${title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 60)}`, n: bl, name: clip(title, 80), d: sentence(m[2].replace(/^>.*$/gm, ''), 220), st: /INVESTIGUÉ|mesuré/i.test(status || '') ? 'done' : 'todo', foot: clip(status || '', 40) });
+    file({ p: `.planning/BACKLOG.md#${title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 60)}`, n: bl, name: clip(title, 80), d: sentence(m[2].replace(/^>.*$/gm, ''), 220), st: /INVESTIGUÉ|mesuré/i.test(status || '') ? 'done' : 'todo', foot: '' }); // P80-D-07 : le statut n'est plus répété au pied, la pastille le dit
   }
   const sd = node({ id: 'seeds', parent: null, label: 'Graines', kind: 'graine', summary: 'Idées de jalons futurs, avec leurs déclencheurs.' });
   for (const s of P.seeds) file({ p: s.file, n: sd, name: clip(/^#\s+(.*)$/m.exec(s.text)?.[1] || path.basename(s.file), 80), d: sentence(s.text.replace(/^---[\s\S]*?---/, '').replace(/^#.*$/gm, ''), 220), st: 'todo' });

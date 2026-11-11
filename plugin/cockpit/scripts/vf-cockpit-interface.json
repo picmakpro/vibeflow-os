@@ -43,7 +43,8 @@
       "noeud": { "requis": ["id", "label", "kind"] },
       "element": { "requis": ["p", "n", "name"] },
       "lien": { "requis": ["a", "b", "k"] },
-      "statuts": ["done", "active", "todo", "blocked"],
+      "statuts": ["done", "active", "recette", "todo", "blocked"],
+      "optionnels": { "noeud": ["avancement", "exigences"], "element": ["vague"] },
       "meta": { "requis": ["vfTab", "vf", "kindLabels"] }
     },
     "vibeflow/cockpit-transcript@2": {
