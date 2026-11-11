@@ -608,7 +608,7 @@ gp() { local p="$1"; shift; rq "$PS_PORT" GET "$p" --jeton "$PS_TOK" --echeance 
 # p1_run <sortie> -> « <nombre de chemins> <statuts de traversée> <occurrences de la sentinelle> » : GET de chaque chemin de P dérivé du disque, puis des sondes de traversée
 p1_run() {
   local o="$1" paths="$WORK/p1-paths.$PS_N" f n=0 tot=0 trav="" st c
-  { grep -oh "pathname === '[^']*'" "$SCRIPTS/vf-cockpit-server.mjs" "$SERVE" | sed "s/.*'\(.*\)'/\1/"; printf '%s\n' / /index.html /project.html /api/vf/etat /.cache/server.json /api/vf/lancer/cibles /api/vf/terminal; } | sort -u | grep -v '/api/vf/events' > "$paths"
+  { grep -oh "pathname === '[^']*'" "$SERVE" | sed "s/.*'\(.*\)'/\1/"; node --input-type=module -e "import('file://$SCRIPTS/vf-cockpit-server.mjs').then((m) => { for (const l of m.ROUTES) console.log(l[0]); })"; printf '%s\n' / /index.html /project.html /api/vf/etat /.cache/server.json /api/vf/lancer/cibles /api/vf/terminal; } | sort -u | grep -v '/api/vf/events' > "$paths"
   while IFS= read -r f; do n=$((n+1)); gp "$f" --corps-vers "$WORK/p1.body" > "$WORK/p1.out"; c="$(grep -c -a "$SENT" "$WORK/p1.body" "$WORK/p1.out" | awk -F: '{s+=$NF} END {print s+0}')"; tot=$((tot + c)); done < "$paths"
   local cle; cle="$(cle_de "$(cd "$o/../.." && pwd -P)")"
   for f in /.cache/terminal-mode /..%2F.cache/terminal-mode //.cache/terminal-mode /%2e%2e/.cache/terminal-mode /api/vf/../.cache/terminal-mode "/$cle/terminal-mode" "/cockpit-mode/$cle/terminal-mode" "/$cle"; do
@@ -736,7 +736,7 @@ if mutant mode-vers-p "$PROCF" 's#process.send(msg);#process.send({ ...msg, mode
   assert_eq "M-MODE-VERS-P — sous le mutant LM.P3 rougit : P refuse le message lancee à clé de plus (forme fermée) : la cible n'est jamais marquée lancée (son témoin positif)" "$P3R" "lancee=non fuites=0"; psrv_fin; sur_out
 else sans_effet "M-MODE-VERS-P"; fi
 echo "=== M-P-LIT-LE-FICHIER — une route de P répond le contenu du fichier (LM.P1, LM.S2) ==="
-if mutant p-lit "vf-cockpit-server.mjs" "s#if (url.pathname === '/api/vf/journal') {#if (url.pathname === '/api/vf/journal') { const B = process.env.VF_COCKPIT_MODE_DIR; res.writeHead(200); res.end(fs.readdirSync(B).map((k) => { try { return fs.readFileSync(path.join(B, k, 'terminal-mode')); } catch (e) { return ''; } }).join('')); return true; } if (url.pathname === '/api/vf/journal-origine') {#"; then
+if mutant p-lit "vf-cockpit-server.mjs" "s#  \['/api/vf/journal', lireJournal, HISTORIQUE\],#  ['/api/vf/journal', (c) => { const B = process.env.VF_COCKPIT_MODE_DIR; return { contenu: fs.readdirSync(B).map((k) => { try { return fs.readFileSync(path.join(B, k, 'terminal-mode')); } catch (e) { return ''; } }).join('') }; }, HISTORIQUE],#"; then
   if [ "$MODULE_OK" = 1 ]; then assert_eq "M-P-LIT-LE-FICHIER — sous le mutant LM.S2 rougit : le fichier de P nomme terminal-mode (au moins une référence)" "$(p_refs "$MUT_OUT" | awk -F: '{print ($2 >= 1) ? "reference" : "aucune"}')" "reference"
   else nonjouee "M-P-LIT-LE-FICHIER (LM.S2)" "module absent"; fi
   surp "$MUT_OUT"; pose_mode "$SENT"$'\n'; psrv_debut "$MUT_OUT"; P1M="$(p1_run "$MUT_OUT")"; read -r _ _ P1MS <<< "$P1M"
