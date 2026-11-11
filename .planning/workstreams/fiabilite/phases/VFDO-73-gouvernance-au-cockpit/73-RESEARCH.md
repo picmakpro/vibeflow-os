@@ -598,24 +598,24 @@ Ordre de pose relatif à la coquille de la 79 (C5) : V1 et V2 sont indépendants
 
 ## Open Questions
 
-1. **Que faire du couple `tenu` / « depuis » avec la 79 ?**
+1. **Que faire du couple `tenu` / « depuis » avec la 79 ?** — RESOLVED (73-04, hypothèse A3 : libellé « dernier signe il y a N min » ; la demande du champ `priseS` à la 79 reste à renvoyer par la session principale ; plan « à revalider »)
    - Ce qu'on sait : `tenu` est un booléen ; A15 exclut `lease_seconds` ; la spec veut « depuis N » (C3).
    - Ce qui manque : un champ numérique de prise dans la projection.
    - Recommandation : plan de verrou en V1/V2 avec repli A3 (libellé « dernier signe ») et une demande, à renvoyer par la session principale à la 79, d'un champ `priseS` ; le plan est marqué « à revalider ».
 
-2. **Faut-il rouvrir D-24 pour la santé ?**
+2. **Faut-il rouvrir D-24 pour la santé ?** — RESOLVED (non : P73-D-24 tient ; 73-08, hypothèse A2, garde de non-régression)
    - Ce qu'on sait : C6bis.
    - Recommandation : non. Hypothèse A2 ; si le jugement de design exige le retrait réel, le dire dans « À Samuel », pas dans un plan.
 
-3. **LE → LR : garder LE.0b ?**
+3. **LE → LR : garder LE.0b ?** — RESOLVED (73-09, hypothèse A8 : les LR s'écrivent avant la réduction d'`equipe-carte.mjs`, valeur saine de LR.1 capturée par 73-03)
    - Ce qu'on sait : LE.0b et LE.1 ne peuvent pas tenir tels quels.
    - Recommandation : A8 ; la vague 3 écrit les LR AVANT de réduire `equipe-carte.mjs` et consigne la valeur saine de LR.1 capturée sur le code actuel.
 
-4. **Forme réelle de `claude agents --json` sur ce poste ?**
+4. **Forme réelle de `claude agents --json` sur ce poste ?** — RESOLVED (aucune sonde dans cette phase : la forme est couverte par le contrat de forme du lot 0 et AUDC-Q4, avec les transcripts en repli ; 73-02 traite une liste absente, une entrée sans `cwd` chaîne ou une forme inattendue comme « pas de ligne » (RG13.6) et ne s'appuie que sur des fixtures ; la sonde sur un poste vivant reste une vérification manuelle listée dans 73-VALIDATION.md)
    - Ce qu'on sait : sources tierces (A13), fixtures des suites.
    - Recommandation : une sonde réelle en Wave 0, hors de cette phase de planification (aucun processus lancé ici) ; tant qu'elle manque, la régie traite une liste absente ou de forme inattendue comme « pas de ligne ».
 
-5. **Quelle part de la jointure agent → arbre est utile ?**
+5. **Quelle part de la jointure agent → arbre est utile ?** — RESOLVED (73-07, hypothèse A5 : une branche unique, jamais devinée)
    - Recommandation : A5, ne pas investir plus (l'information est secondaire, ligne 2).
 
 ## Environment Availability

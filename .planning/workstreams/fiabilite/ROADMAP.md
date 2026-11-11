@@ -528,7 +528,7 @@ référence, Phase 81 reportée.
 
 ### Phase 73: Gouvernance au cockpit — arbitrages en attente, worktrees et verrous
 
-> **Cadrée le 2026-11-11** (`73-CONTEXT.md`, P73-D-01..28 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sur la direction « régie » retenue par Samuel le 2026-11-11, registre § 5.1). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
+> **Cadrée le 2026-11-11** (`73-CONTEXT.md`, P73-D-01..36 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sur la direction « régie » retenue par Samuel le 2026-11-11, registre § 5.1). Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
 
 **Goal:** Le cockpit montre ce qui attend une décision humaine (arbitrages en attente, reliés à leur phase et à ce qu'ils bloquent), qui tient le verrou de driver, quels worktrees et branches existent avec leur travail non commité, et l'alerte du watchdog posée sur le nœud de mission concerné. Forme ajoutée par l'audit du 2026-11-10 : l'onglet Équipe devient une régie — « À vous », « Au travail », « Terminé, à relire », « Au repos » — à la place de son canevas.
 **Requirements**: REGI-01, REGI-02, REGI-03, REGI-04, REGI-05, REGI-06, REGI-07, REGI-08, REGI-09, REGI-10, REGI-11, REGI-12, REGI-13, REGI-14, REGI-15, REGI-16
