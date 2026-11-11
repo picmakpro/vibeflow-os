@@ -15,7 +15,7 @@ d'une décision et d'une entrée de mémoire. Direction « Graphite » (`DESIGN.
 des tours 1 à 4 : glyphes de forme propre, corail borné par P76-D-15bis, section de phase bornée en hauteur (budget sommé),
 bilans qui ne perdent aucune catégorie, nom accessible, mémoire réduite aux chemins absents, exigence qui ouvre ses décisions
 et ses preuves (P76-D-38), puis tour 5 : gabarits fermés (aucune ligne ne liste un nombre libre d'états), budget
-recalculé sur le pire cas à la largeur plancher de 260 px.
+recalculé sur le pire cas à la largeur utile plancher de 248 px (tour 6 : barre de défilement de 12 px comptée).
 
 Sources lues : `76-CONTEXT.md` (P76-D-01..38, dont P76-D-15bis, P76-D-30, P76-D-32, P76-D-33, P76-D-38 ; Retour et pile commune de la Phase 80, règle A30 de la 79), `REQUIREMENTS.md`
 (TRAC-01..12), `DESIGN.md`, `DESIGNS.md` § 1, § 2, § 9, `78-UI-SPEC.md` (modèle), `viewer.html` (`:root`, `#panel`, `.sec`,
@@ -49,15 +49,17 @@ fichiers de page `ui/7x-vf-trace*.js` (numéro fixé au plan ; 74 est libre aujo
   entrants et sortants, chemins cités absents, et le chemin du fichier de mémoire suivi (nécessaire au verdict « hors index »,
   montré en pied de source seulement) (P76-D-20, P76-D-22). Aucun titre ni résumé écrit par un modèle (PU-G-162).
 - **Pas de fil d'Ariane, pas de Retour propre** (P76-D-03, P76-D-30). Un seul Retour par panneau : le bouton « Retour : <titre
-  du dessus> » de l'en-tête du panneau, pile commune de la Phase 80 (`window.VF_PANNEAU.retour()`, P80-C76-3). **Un seul chemin
-  d'empilement** : la pile commune empile d'elle-même le nœud (phase, plan) que l'on quitte par `select(id)` ou `reveal(id)` ; la
-  76 n'appelle `window.VF_PANNEAU.empiler({ titre, rouvrir })` (P80-C76-5) que pour le **panneau sur mesure qu'elle quitte**
-  (exigence, ADR, décision, entrée de mémoire, liste), **une seule fois par départ**, juste avant d'ouvrir le voisin (nœud ou
-  autre panneau sur mesure) ; `titre` est une donnée du lab, rendue en texte, jamais en HTML ; `rouvrir` rend de nouveau le panneau
-  quitté. Conséquence : un Retour ramène toujours au panneau quitté **en une pression** (du plan à l'exigence, de l'exigence à
-  la phase). La pile est vidée au changement d'onglet. **À revalider avec la 80** : que le bouton de l'en-tête reste présent
-  au-dessus d'un panneau posé par `SC.showPanel`, le sens exact de `titre` (la vue que l'on quitte) et l'absence de double
-  empilement d'un nœud ; sinon, point à rouvrir avec la 80, jamais un bouton « Retour » propre à la 76.
+  du dessus> » de l'en-tête du panneau, pile commune de la Phase 80 (`window.VF_PANNEAU.retour()`, P80-C76-3).
+  **Règle d'empilement, une seule phrase : le panneau quitté est empilé exactement une fois, par la pile commune quand le départ
+  passe par `select`/`reveal` d'un nœud (phase, plan), par la 76 dans tous les autres cas, c'est-à-dire quand elle quitte un
+  panneau sur mesure (exigence, ADR, décision, entrée de mémoire, liste) et quand elle quitte un nœud par `SC.showPanel` (phase vers
+  exigence, phase vers liste) : la 76 appelle alors `window.VF_PANNEAU.empiler({ titre, rouvrir })` (P80-C76-5) juste avant
+  d'ouvrir le voisin.** `titre` est une donnée du lab, rendue en texte, jamais en HTML, **bornée à 40 caractères par la 76 avant
+  l'appel** (« … » en fin ; le texte entier est dans le panneau) ; `rouvrir` rend de nouveau le panneau quitté. Un Retour ramène
+  toujours au panneau quitté en une pression. La pile est vidée au changement d'onglet. **À revalider avec la 80** : que le bouton
+  de l'en-tête reste présent au-dessus d'un panneau posé par `SC.showPanel` ; que le départ d'un nœud par `SC.showPanel` n'est pas
+  vu par la pile commune (d'où l'appel de la 76) et n'est donc pas empilé deux fois ; le sens exact de `titre` ; le clamp du
+  bouton côté 80 (§ 15). Sinon, point à rouvrir avec la 80, jamais un bouton « Retour » propre à la 76.
 - **Gabarits fermés** (règle de classe, § 2.4) : aucune ligne de liste, aucun bilan, aucun résumé n'énumère un nombre libre
   d'états. Chaque ligne est un gabarit à emplacements fermés, dans un ordre fixe, aux nombres plafonnés à 4 chiffres
   (« 9 999+ ») ; la longueur au pire se calcule sur le gabarit rempli, pas sur une donnée observée. L'énumération détaillée vit
@@ -111,7 +113,7 @@ croix (ignoré), disque plein (actif), anneau et pause, anneau pointillé, annea
 œil. La famille ci-dessous est faite de **carrés à angles vifs** (`rx` 1,5, plats de 7 px ou plus) et d'un **octogone au
 trait** : aucune de ces formes n'y figure.
 
-**Glyphes de 16 px fixes** : `width: 16px; height: 16px` sur `.vf-trace-g`, jamais `1.45em` ; ils ne suivent ni la police ni
+**Glyphes de 16 px fixes** : `width: 16px; height: 16px` sur `.vf-trace-g`, jamais `1.45em` ; **chaque paire glyphe et mot** (bande, légende, état d'un lien, état de la section « État ») est un `display: inline-flex; align-items: center; gap: var(--sp-4)` : le glyphe de 16 px tient dans la ligne de 16 ou 18 px et **la hauteur de ligne est conservée** ; ils ne suivent ni la police ni
 le zoom d'éloignement. Masque : patron `GLYPHE(...)` de `00-vibeflow.js` (viewBox 16), teinté par `--c-st`. Chaque corps
 du tableau se copie **tel quel** dans `GLYPHE(...)`. Le masque ne lit que l'opacité : tout élément au trait porte
 `stroke='black'` et `fill='none'` explicites (sans `stroke` explicite, il disparaît), tout élément plein porte `fill='black'`.
@@ -152,11 +154,16 @@ Seul un maillon « lu » a un niveau (P76-D-14).
 - **Niveau phase** : le fichier existe pour la phase mais ne cite pas l'identifiant ; il dit que la phase a une VERIFICATION
   ou une recette, pas qu'elle couvre cette exigence. Seuls VERIFICATION et recette peuvent être de niveau phase.
 
-**Une seule source du niveau par surface, une seule visible dans le panneau d'une exigence.** Ligne de liste (§ 2.2) : la
-mention visible « lu au niveau phase : VERIFICATION, recette » (absente quand tous les maillons lus sont de niveau exigence),
-reprise à l'identique dans le texte masqué `.vf-trace-sr` pour le lecteur d'écran (même texte, pas une seconde source) ; jamais
-un `title`, jamais un `aria-label` de glyphe (les glyphes sont `aria-hidden`). Panneau d'une exigence : la ligne du maillon dans
-« Chaîne » (§ 5.1), **seulement** ; ni « Mentions » ni l'aide ne le répètent.
+**Une seule source du niveau par surface** (règle de classe, toutes les surfaces balayées) :
+- **Ligne de liste** (§ 2.2) : le texte masqué `.vf-trace-sr` est l'unique source accessible du niveau (un « lu, niveau … » par
+  maillon lu, jamais repris ailleurs dans ce texte, pas dans « Mentions » non plus). La mention visible « lu au niveau phase :
+  VERIFICATION, recette » n'en est que le rendu visuel et **n'est visible en ligne que si elle est la première mention** (priorité c,
+  soit seulement quand la ligne n'a ni contradiction ni mention neutre) ; sinon elle compte dans « et N autres mentions » et le
+  niveau se lit dans « Chaîne ».
+- **Panneau d'une exigence** (§ 5.1) : la ligne du maillon dans « Chaîne » **seulement**. Ni « Preuves » (sa ligne 2 ne porte que le
+  statut), ni « Mentions », ni l'aide ne le répètent.
+- **Panneaux de liste et de preuve** (§ 6), **bilans, « Jalon », légende** : aucun niveau.
+Jamais un `title`, jamais un `aria-label` de glyphe (les glyphes sont `aria-hidden`).
 
 ### 1.3 États de la mémoire des agents
 
@@ -188,7 +195,7 @@ Un `.sec` contenant un seul `button.vf-trace-ligne` avec `data-vf-section="vf-tr
 défile jusqu'à la section, brique existante). Ligne 1 : « Traçabilité » (12,5 px/500 `--text`). Ligne 2 : **gabarit fermé à trois
 emplacements** (12,5 px/400 `--text-3`, clamp 2 lignes) : « 4 exigences, 3 incomplètes dont 1 en contradiction » ; toutes complètes : « 4 exigences, toutes
 complètes ». « Incomplète » = toute exigence qui n'est pas « complète » (§ 10.1). Au plafond : « 9 999+ exigences, 9 999+ incomplètes dont 9 999+ en contradiction » :
-2 (2) lignes à 260 px (320 px). Hauteur au pire : `.sec` 40 + bouton (remplissage 16 + ligne 1 de 18 + écart 2 + ligne 2
+2 (2) lignes à 248 px (308 px). Hauteur au pire : `.sec` 40 + bouton (remplissage 16 + ligne 1 de 18 + écart 2 + ligne 2
 de 2 × 18 = 36) 72 = **112 px**. Rendue seulement si la phase a au moins une exigence rattachée. Nom accessible : « Traçabilité,
 4 exigences, 3 incomplètes dont 1 en contradiction. Aller à la section. »
 
@@ -224,12 +231,13 @@ var(--sp-12))`, `padding: var(--inset-row)`, rayon `var(--r-ctl)`, sur le fond d
   « non lisible : plan », « non lisible : SUMMARY », « non lisible : VERIFICATION », « non lisible : recette » ; « contradiction :
   cochée, sans SUMMARY » (maillon SUMMARY) ; « contradiction : Complete, sans plan » (maillon plan). **« chaîne complète »
   seulement si les quatre maillons sont « lu »** (niveau exigence ou niveau phase). Mot en 11,5 px/500 `--text-2`, clamp 2
-  lignes (pire mot : 2 (1) lignes, sur 176 px (236 px) de large après la bande).
+  lignes (pire mot : 2 (1) lignes, sur 164 px (224 px) de large après la bande).
 - **Ligne 3** (absente si aucune mention ; clamp 2 lignes) : **une seule mention, la première par priorité, puis un compte** :
   « <mention> · et N autres mentions » (N de 1 à 3 ; « et 1 autre mention » au singulier ; pas de suffixe s'il n'y en a qu'une).
   Priorité : (a) une contradiction de la liste fermée qui n'est pas le mot de la ligne 2, précédée de l'octogone ; (b) une
   mention neutre, sans glyphe : « non cochée, SUMMARY lu » ou « sans ligne de traçabilité » (P76-D-15bis) ; (c) le niveau, sans
-  glyphe : « lu au niveau phase : VERIFICATION, recette » (au plus deux maillons, ensemble fermé). Une exigence a au plus quatre
+  glyphe : « lu au niveau phase : VERIFICATION, recette » (au plus deux maillons, ensemble fermé), **visible seulement quand il est la
+  première mention** (ni (a) ni (b)) ; sinon il compte dans « et N autres mentions » (§ 1.2). Une exigence a au plus quatre
   mentions sur cette ligne (une contradiction, deux neutres, un niveau). **Toutes sont lisibles en entier** dans « Mentions » et
   « Chaîne » du panneau de l'exigence et dans le texte masqué de la ligne.
 - **Emplacement des contradictions dans la bande** : « cochée, sans SUMMARY » met l'octogone à la place du maillon SUMMARY ;
@@ -238,12 +246,12 @@ var(--sp-12))`, `padding: var(--inset-row)`, rayon `var(--r-ctl)`, sur le fond d
   dans le nom) : le texte visible (identifiant, texte, mot, mention et compte), **entier dans le DOM même quand un clamp le coupe
   à l'écran**, puis un `span.vf-trace-sr` masqué visuellement (position absolue, 1 px, `overflow: hidden`, `clip-path:
   inset(50%)` ; exception écrite de taille) qui énumère tout : « Plan : lu, niveau exigence. SUMMARY : manque. VERIFICATION : lu,
-  niveau phase. Recette : manque. Mentions : non cochée, SUMMARY lu ; sans ligne de traçabilité. Ouvrir l'exigence. » Glyphes
-  `aria-hidden`.
+  niveau phase. Recette : manque. Mentions : non cochée, SUMMARY lu ; sans ligne de traçabilité. Ouvrir l'exigence. » (le niveau n'est
+  dit qu'au maillon, jamais repris dans « Mentions » : § 1.2). Glyphes `aria-hidden`.
 - États : repos fond transparent ; survol `rgba(var(--ink), .06)` ; focus clavier `outline: 2px solid var(--ring);
   outline-offset: -2px` ; actif sans échelle. Un glyphe de contradiction n'est jamais posé sur `--raise` ni `--raise-2`
   (thème clair, sous 3:1).
-- Clic, Entrée, Espace : ouvre le panneau de l'exigence (§ 5.1) ; focus sur son titre si l'activation vient du clavier.
+- Clic, Entrée, Espace : ouvre le panneau de l'exigence (§ 5.1) après avoir empilé le panneau de la phase (départ d'un nœud par `SC.showPanel`, § 0 ; titre « Phase 76 ») ; focus sur son titre si l'activation vient du clavier.
 
 **Aucune exigence rattachée** : sous le `h3` (compteur « 0 exigence »), la ligne neutre de § 9 ; le repli « Preuves attachées »
 reste montré s'il y a des preuves.
@@ -251,11 +259,11 @@ reste montré s'il y a des preuves.
 ### 2.3 Budget de hauteur de la section (bornée par des clamps, sommée exactement)
 
 Chaque bloc de texte porte un `-webkit-line-clamp` explicite, dimensionné sur le **pire cas autorisé par le contrat de copy**
-(gabarit rempli aux plafonds, § 2.4) à la **largeur plancher réelle de 260 px**. Cette largeur est celle d'une ligne dans un
-panneau de 300 px : le moteur borne `--panel-w` à 300 px au moins (`setPanelWidth`, `clamp(…, 300, …)`, `viewer.html` l. 2378),
-moins 2 × 20 px de `.sec` ; elle vaut 320 px à la largeur par défaut de 360 px, 334 px sur la feuille à 390 px de large, au moins
-264 px sur la feuille à 320 px de large. Lignes de 12,5 px à 18 px, de 11,5 px à 16 px. Remplissage de `.sec` : 20 en haut
-(`--inset-panel`), 20 en bas (`.sec:last-child`).
+(gabarit rempli aux plafonds, § 2.4) à la **largeur utile plancher réelle de 248 px**. Largeur utile = largeur du panneau − 12 px de
+barre de défilement (`#panel::-webkit-scrollbar { width: 12px }`, `viewer.html` l. 361) − 2 × 20 px de remplissage de `.sec`. Le moteur
+borne `--panel-w` à 300 px au moins (`setPanelWidth`, `clamp(…, 300, …)`, `viewer.html` l. 2378) : **300 − 12 − 40 = 248 px** au
+plancher, **360 − 52 = 308 px** par défaut, 252 px sur la feuille à 320 px de large (panneau de 304 px), 322 px à 390 px de large.
+Lignes de 12,5 px à 18 px, de 11,5 px à 16 px. Remplissage de `.sec` : 20 en haut (`--inset-panel`), 20 en bas (`.sec:last-child`).
 
 | Bloc | Bureau (≥ 701 px) | Feuille (≤ 700 px) |
 |------|-------------------|--------------------|
@@ -289,8 +297,8 @@ contient **que des fichiers de preuve** : les critères d'un plan n'y figurent p
 **1 258** (888 + 370) bureau, **888** (614 + 274) feuille, bornes et non garanties.
 
 **Lignes des autres listes, au pire** (hors budget de la section, qui est repliée ou dans un panneau de liste) : ligne du « Jalon »
-152 px (remplissage 16 + écarts 6 + ligne 1 de 18 + ligne 2 de 48 + ligne 3 de 32 + ligne 4 de 32) ; ligne d'agent
-118 px ; ligne d'entrée de mémoire 120 px.
+155 px (remplissage 16 + écarts 6 + **ligne 1 de 21**, la pastille `.vst` faisant 20,7 px de haut, + ligne 2 de 48 + ligne 3 de 32 + ligne 4 de 32) ; ligne d'agent
+102 px ; ligne d'entrée de mémoire 120 px ; pagination 72 px (84 px tactile) ; puces de plan 46 px (94 px tactile).
 
 ### 2.4 Gabarits fermés : le pire cas calculé, et où lire le détail
 
@@ -301,31 +309,43 @@ un mot du lexique ; les nombres sont plafonnés à 4 chiffres (« 9 999+ » au-d
 ouvert) ; le seul texte libre est une donnée du lab (texte d'exigence, titre, nom), clampée à 1 ou 2 lignes et lisible en entier
 ailleurs. Un emplacement nul s'écrit dans un bilan (gabarit constant) et s'omet dans une ligne de liste (gabarit réduit) ; **dans
 les deux cas le pire cas est le gabarit entièrement rempli aux plafonds**, pas une valeur observée. Aucune catégorie n'est retranchée
-sous un clamp : le clamp est choisi pour que le pire cas **tienne**, et un libellé qui ne tient pas se raccourcit (jamais le
-clamp ne se relève sans recalculer § 2.3). Pluriel : singulier pour 0 et 1 (« 0 non lisible », « 1 complète »).
+sous un clamp : le clamp est choisi pour que le pire cas **tienne avec une réserve**, et un libellé qui ne tient pas se raccourcit
+(jamais le clamp ne se relève sans recalculer § 2.3). Pluriel : singulier pour 0 et 1 (« 0 non lisible », « 1 complète »).
 
 Mesure : simulation d'un retour à la ligne glouton, avec des largeurs de caractère prudentes (Inter : 6,5 px minuscule, 8,3 px
 capitale, 7,5 px chiffre à 12,5 px ; 0,92 de ces valeurs à 11,5 px ; espace 3,4 px ; majorées de 4 %), calculée par script sur les
-gabarits ci-dessous, à 260 px et 320 px ; clamp = max(lignes simulées, ⌈remplissage à 260 px + 0,3⌉). **À mesurer au rendu** (§ 15).
+gabarits ci-dessous aux largeurs utiles de **248 px** (plancher) et **308 px** (défaut) ; **clamp = lignes simulées à 248 px, + 1 si la
+dernière ligne remplit plus de 85 % de la largeur** (réserve de 15 %, au-delà des 8 % demandés). **À mesurer au rendu** (§ 15).
 
-| Gabarit | Pire cas (plafonds) | Caractères | Lignes à 260 px (320 px) | Clamp |
-|---------|---------------------|-----------|--------------------------|-------|
-| Résumé de l'entrée haute (12,5 px) | « 9 999+ exigences, 9 999+ incomplètes dont 9 999+ en contradiction » | 65 | 2 (2) | 2 |
-| Bilan d'une phase (12,5 px) | « Par exigence : 9 999+ en contradiction · 9 999+ avec un manque · 9 999+ non lisibles · 9 999+ complètes » | 103 | 3 (2) | 3 |
-| Bilan du « Jalon » (12,5 px) | « Par phase : 9 999+ en contradiction · 9 999+ avec un manque · 9 999+ non lisibles · 9 999+ sans exigence · 9 999+ complètes » | 123 | 4 (3) | 4 |
-| Bilan « Décisions » (12,5 px) | « 9 999+ ADR · 9 999+ décisions · 9 999+ registres de phase » | 57 | 2 (2) | 2 |
-| Bilan « Mémoire » (12,5 px) | « 9 999+ entrées · 9 999+ agents · 9 999+ entrées hors index · 9 999+ liens cassés · 9 999+ chemins cités absents · 9 999+ entrées sans lien entrant » | 146 | 4 (3) | 4 |
-| Légende des glyphes (11,5 px, quatre glyphes de 16 px) | « Légende : lu · manque · non lisible · contradiction. Colonnes : plan, SUMMARY, VERIFICATION, recette. » | 4 paires + phrase | 4 (3) | 4 |
-| Ligne 2 d'une phase du « Jalon » (11,5 px) | « Maillons non lus : plan 9 999+ · SUMMARY 9 999+ · VERIFICATION 9 999+ · recette 9 999+ » | 86 | 3 (2) | 3 |
-| Ligne 3 d'une phase du « Jalon » (11,5 px, avec l'octogone) | « 9 999+ en contradiction · 9 999+ avec un manque · 9 999+ non lisibles » | 69 | 2 (2) | 2 |
-| Ligne 4 d'une phase du « Jalon » (11,5 px) | « 9 999+ lignes de traçabilité sans exigence » | 42 | 1 (1) | 2 |
-| Mot de ligne 2 d'une exigence (11,5 px, 176 px puis 236 px après la bande) | « contradiction : cochée, sans SUMMARY » | 36 | 2 (1) | 2 |
-| Ligne 3 d'une exigence, mention et compte (11,5 px, avec l'octogone) | « contradiction : cochée, sans SUMMARY · et 3 autres mentions » | 59 | 2 (2) | 2 |
-| Ligne 3 d'une exigence, niveau seul (11,5 px) | « lu au niveau phase : VERIFICATION, recette » | 42 | 1 (1) | 2 |
-| Ligne 2 d'un agent (11,5 px, avec l'octogone) | « 9 999+ entrées hors index · 9 999+ liens cassés · 9 999+ chemins cités absents » | 78 | 2 (2) | 3 |
-| Ligne 3 d'un agent (11,5 px) | « 9 999+ entrées sans lien entrant · 9 999+ liens résolus par nom de fichier » | 74 | 2 (2) | 2 |
-| Ligne 2 d'une entrée de mémoire (11,5 px) | « modifiée le 28 sept. 2026 · 9 999+ liens entrants · 9 999+ liens sortants » | 73 | 2 (2) | 2 |
-| Ligne 3 d'une entrée de mémoire (11,5 px, avec l'octogone) | « hors index · 9 999+ liens cassés · 9 999+ chemins cités absents · sans lien entrant » | 83 | 2 (2) | 3 |
+| Gabarit | Pire cas (plafonds) | Caractères | Lignes à 248 px (308 px) | Dernière ligne à 248 px | Clamp |
+|---------|---------------------|-----------|--------------------------|-------------------------|-------|
+| Résumé de l'entrée haute (12,5 px) | « 9 999+ exigences, 9 999+ incomplètes dont 9 999+ en contradiction » | 65 | 2 (2) | 67 % | 2 |
+| Bilan d'une phase (12,5 px) | « Par exigence : 9 999+ en contradiction · 9 999+ avec un manque · 9 999+ non lisibles · 9 999+ complètes » | 103 | 3 (2) | 64 % | 3 |
+| Bilan du « Jalon » (12,5 px) | « Par phase : 9 999+ en contradiction · 9 999+ avec un manque · 9 999+ non lisibles · 9 999+ sans exigence · 9 999+ complètes » | 123 | 4 (3) | 24 % | 4 |
+| Bilan « Décisions » (12,5 px) | « 9 999+ ADR · 9 999+ décisions · 9 999+ registres de phase » | 57 | 2 (2) | 45 % | 2 |
+| Bilan « Mémoire » (12,5 px) | « 9 999+ entrées · 9 999+ agents · 9 999+ entrées hors index · 9 999+ liens cassés · 9 999+ chemins cités absents · 9 999+ entrées sans lien entrant » | 146 | 4 (3) | 59 % | 4 |
+| Légende des glyphes (11,5 px, quatre glyphes de 16 px) | « Légende : lu · manque · non lisible · contradiction. Colonnes : plan, SUMMARY, VERIFICATION, recette. » | 4 paires + phrase | 4 (3) | 59 % | 4 |
+| Ligne 2 d'une phase du « Jalon » (11,5 px) | « Maillons non lus : plan 9 999+ · SUMMARY 9 999+ · VERIFICATION 9 999+ · recette 9 999+ » | 86 | 3 (2) | 15 % | 3 |
+| Ligne 3 d'une phase du « Jalon » (11,5 px, avec l'octogone) | « 9 999+ en contradiction · 9 999+ avec un manque · 9 999+ non lisibles » | 69 | 2 (2) | 62 % | 2 |
+| Ligne 4 d'une phase du « Jalon » (11,5 px) | « 9 999+ lignes de traçabilité sans exigence » | 42 | 1 (1) | 92 % | 2 |
+| Mot de ligne 2 d'une exigence (11,5 px ; 164 px puis 224 px après la bande) | « contradiction : cochée, sans SUMMARY » | 36 | 2 (1) | 34 % | 2 |
+| Ligne 3 d'une exigence, mention et compte (11,5 px, avec l'octogone) | « contradiction : cochée, sans SUMMARY · et 3 autres mentions » | 59 | 2 (2) | 45 % | 2 |
+| Ligne 3 d'une exigence, niveau seul (11,5 px) | « lu au niveau phase : VERIFICATION, recette » | 42 | 2 (1) | 16 % | 2 |
+| Ligne 2 d'un agent (11,5 px, avec l'octogone) | « 9 999+ entrées hors index · 9 999+ liens cassés · 9 999+ chemins cités absents » | 78 | 2 (2) | 83 % | 2 |
+| Ligne 3 d'un agent (11,5 px) | « 9 999+ entrées sans lien entrant · 9 999+ liens résolus par nom de fichier » | 74 | 2 (2) | 70 % | 2 |
+| Ligne 2 d'une entrée de mémoire (11,5 px) | « modifiée le 28 sept. 2026 · 9 999+ liens entrants · 9 999+ liens sortants » | 73 | 2 (2) | 69 % | 2 |
+| Ligne 3 d'une entrée de mémoire (11,5 px, avec l'octogone) | « hors index · 9 999+ liens cassés · 9 999+ chemins cités absents · sans lien entrant » | 83 | 2 (2) | 89 % | 3 |
+| Compte de pagination (11,5 px) | « 9 999+ à 9 999+ sur 9 999+ fichiers de preuve » | 45 | 2 (1) | 15 % | 2 |
+
+**Autres éléments à longueur variable : une règle écrite chacun** (tour 6, classe « tout élément à longueur variable ») :
+
+| Élément | Règle fermée | Pire cas calculé |
+|---------|--------------|------------------|
+| Pagination (§ 6) | **toujours deux lignes**, à toute largeur : ligne 1, le compte « N à M sur T <unité> » (11,5 px/400 `--text-3`, clamp 2), ligne 2, les deux boutons côte à côte (`flex: 1 1 0`, `gap: var(--sp-8)`, `white-space: nowrap`, 32 px ; 44 px tactile) | 72 px (84 px tactile) ; boutons « Précédentes » et « Suivantes » sur une ligne à 248 px |
+| « + N autres <sorte> » | `white-space: nowrap`, `overflow: hidden`, `text-overflow: ellipsis`, `title` = libellé entier ; N plafonné à « 9 999+ » ; sorte du lexique fermé (exigences, ADR, registres, commits, agents, liens, décisions, phases, fichiers de preuve, critères, entrées, plans) | libellé le plus large : « + 9 999+ autres fichiers de preuve » = 201 px pour 224 px de largeur interne au plancher (248 − 2 × 12) : tient sans ellipsis |
+| Puces de plan du panneau d'exigence (§ 5.1) | **au plus 3 puces** `.tag`, puis une 4e puce « + N » (N plafonné à « 9 999+ ») qui ouvre le panneau de liste « Plans de l'exigence <identifiant> » (§ 6) ; `flex-wrap: wrap`, `gap: var(--sp-6)` ; identifiant de plan d'une ligne, `max-width: 100%`, ellipsis, `title` | 2 rangées au plus (puce la plus large simulée : 89 px) : 46 px (94 px tactile) |
+| Titre passé à `empiler` (§ 0) | borné à 40 caractères par la 76, « … » en fin ; texte entier dans le panneau ; clamp du bouton de la 80 à valider (§ 15) | 40 caractères au plus |
+| Toute autre donnée du lab (nom d'agent ou d'entrée, type de mémoire, titre d'ADR ou de décision, nom de phase, statut, chemin) | une ligne, `min-width: 0`, `overflow: hidden`, `text-overflow: ellipsis`, `title` = valeur entière ; aucune autre largeur libre | une ligne |
 
 **Ce qui est coupé à l'écran reste lisible en entier ailleurs** (le texte complet reste dans le DOM, donc dans le nom accessible) :
 
@@ -340,6 +360,7 @@ gabarits ci-dessous, à 260 px et 320 px ; clamp = max(lignes simulées, ⌈remp
 | Titre de décision (coupé à 80 caractères par la route, « … » ajouté par la route) | pied de source du panneau de la décision, qui dit la coupe et où lire la définition entière (§ 5.3) |
 | Nom de phase du « Jalon » (une ligne, ellipsis) | `title`, panneau de la phase |
 | Nom d'agent (mono, une ligne, ellipsis) | `title`, titre du panneau de liste de l'agent |
+| Titre empilé (40 caractères) | titre du panneau quitté, lu en entier à sa réouverture |
 | Chemin d'une preuve (clamp 1) | `title` et copie du chemin **entier** au clic (`.vf-ref`) |
 | Statut d'une preuve (une ligne, ellipsis) | `title`, panneau de liste « Preuves de la Phase N » |
 
@@ -383,7 +404,7 @@ emplacements**, zéros écrits, catégories **exclusives par phase** (§ 10.1) :
 · 1 non lisible · 1 sans exigence · 1 complète » ; toutes complètes : « Par phase : toutes complètes ». Pire cas : § 2.4. Une ligne
 par phase (`button.vf-trace-ligne`), ≤ 30 puis « + N autres phases ». **Chaque ligne est un gabarit fermé de quatre lignes
 au plus** :
-- Ligne 1 : « Phase 76 » (12,5 px/500 `--text`), le nom (12,5 px/400 `--text-3`, une ligne, ellipsis), pastille de phase `.vst` à
+- Ligne 1 (21 px de haut) : « Phase 76 » (12,5 px/500 `--text`), le nom (12,5 px/400 `--text-3`, une ligne, ellipsis), pastille de phase `.vst` à
   droite (glyphe et mot : « À faire », « En cours », « À recetter », « Fait »), `font-size` surchargé à 11,5 px (§ Typography).
 - Ligne 2 (11,5 px/500 `--text-2`, **clamp 3 lignes**) : **bande fixe de quatre compteurs, un par maillon**, toujours les quatre, dans l'ordre
   du tableau de la phase : « Maillons non lus : plan 0 · SUMMARY 2 · VERIFICATION 1 · recette 3 ». Un compteur compte les
@@ -394,14 +415,14 @@ au plus** :
   premier emplacement seulement quand « en contradiction » est non nul ; tout complet : « toutes complètes ».
 - Ligne 4 (absente si nulle ; 11,5 px/400 `--text-3`, **clamp 2 lignes**) : un emplacement unique, sans glyphe : « 2 lignes de traçabilité sans
   exigence » (**c'est l'unique emplacement de cette cause**, P76-D-15bis).
-- Hauteur d'une ligne, au pire : 152 px (§ 2.3). Le détail de chaque exigence vit dans le panneau de la phase.
+- Hauteur d'une ligne, au pire : 155 px (§ 2.3, ligne 1 comptée à 21 px : pastille `.vst` de 20,7 px). Le détail de chaque exigence vit dans le panneau de la phase.
 - Clic ou Entrée : `select('ph-<N>')`, la section de § 2 s'y trouve ; pas de panneau neuf.
 
 ### 4.2 « Décisions »
 
 Bilan (12,5 px/400 `--text-3`, clamp 2 lignes), **gabarit fermé à trois emplacements** : « 32 ADR · 71 décisions · 14 registres de phase ». Deux blocs :
 1. Une ligne par ADR (`button.vf-trace-ligne`) : identifiant `--mono` 11,5 px/500 `--text-2` (« ADR-075 ») puis le titre lu après
-   le numéro (12,5 px/400 `--text`, une ligne, ellipsis, `title` = titre complet). ≤ 30 puis « + N autres ADR ». Une ADR citée
+   le numéro (12,5 px/400 `--text-2`, une ligne, ellipsis, `title` = titre complet). ≤ 30 puis « + N autres ADR ». Une ADR citée
    sans section dans `docs/ADR.md` n'a pas de ligne ici (§ 5.3).
 2. Sous `.group-h` « Registres de phase », un `<details class="vf-trace-repli vf-trace-sous">` par registre, fermé : son
    `<summary>` est de rôle « sous-repli » (§ 13) : « Phase 41 » et « 12 décisions ». ≤ 30 registres, du plus récent au plus
@@ -420,7 +441,7 @@ entrées (§ 10.1). Pire cas : § 2.4. Une ligne par agent (le dossier sous `.cl
 **gabarit fermé de trois lignes au plus** :
 - Ligne 1 : nom de l'agent en `--mono` 12,5 px/500 `--text` (une ligne, ellipsis, `title`), à droite « 24 entrées » (11,5 px/400
   `--text-3`, tabular-nums).
-- Ligne 2 (absente si les trois sont nuls ; **clamp 3 lignes**, 11,5 px/500 `--text-2`) : octogone puis **trois emplacements**, nuls
+- Ligne 2 (absente si les trois sont nuls ; **clamp 2 lignes**, 11,5 px/500 `--text-2`) : octogone puis **trois emplacements**, nuls
   omis : « 3 entrées hors index · 2 liens cassés · 1 chemin cité absent ».
 - Ligne 3 (absente si les deux sont nuls ; **clamp 2 lignes**, 11,5 px/400 `--text-3`) : **deux emplacements**, nuls omis : « 11 entrées
   sans lien entrant · 4 liens résolus par nom de fichier ».
@@ -455,8 +476,9 @@ entrées (§ 10.1). Pire cas : § 2.4. Une ligne par agent (le dossier sous `.cl
   **Une contradiction de maillon vit ici et nulle part ailleurs dans ce panneau** (pas de section « Contradictions »). Dessous,
   la source : chemin mono copiable et le champ lu. Plan : un `.tag` par plan qui la cite (« 76-01 »), rendu en
   `button.tag.vf-trace-puce` : focus `outline: 2px solid var(--ring)`, survol `rgba(var(--ink), .1)`, cible 44 px sous
-  `pointer: coarse` (`min-height: 44px`, `display: inline-flex`, `align-items: center`) ; chaque plan s'ouvre par
-  `select('f:<chemin>')` (le plan, nœud du graphe, s'empile de lui-même : P76-D-30).
+  `pointer: coarse` (`min-height: 44px`, `display: inline-flex`, `align-items: center`) ; **au plus 3 puces, puis une 4e puce « + N »**
+  (N plafonné à « 9 999+ ») qui ouvre le panneau de liste « Plans de l'exigence <identifiant> » (§ 6, § 2.4) ; chaque plan s'ouvre par
+  `select('f:<chemin>')` après l'empilement du panneau de l'exigence (§ 0).
 - Section « Décisions citées » (`h3`, compteur « 2 décisions ») : P76-D-38. Lit les identifiants **cités dans la ligne de
   l'exigence au registre des exigences** : décisions préfixées (`P<n>-D-<nn>`) et ADR ; une décision nue (`D-nn`) n'y est pas reliée (ADR-075) et
   n'est pas montrée. Une ligne par décision citée (`button.vf-trace-ligne`, ≤ 30 puis « + N autres décisions ») : identifiant
@@ -469,16 +491,16 @@ entrées (§ 10.1). Pire cas : § 2.4. Une ligne par agent (le dossier sous `.cl
   la ligne de l'exigence au registre des exigences la relierait. »
 - Section « Preuves » (`h3`, compteur « 2 fichiers ») : P76-D-38. Une ligne par maillon de preuve **lu** pour cette exigence :
   VERIFICATION, recette, trace rouge de chaque plan qui la cite (`button.vf-trace-ligne`, ≤ 30 puis « + N autres fichiers de
-  preuve »). Ligne 1 : portée et libellé (« Phase · VERIFICATION », « 76-01 · Trace rouge », 12,5 px/500 `--text`) ; ligne 2
-  (11,5 px/400 `--text-3`, clamp 2) : « statut : passed » et le niveau, « niveau exigence » ou « niveau phase ». **Aucun glyphe**,
-  aucun chemin ici (le chemin copiable est dans la liste des preuves). **Le contenu du fichier n'est jamais rendu.** Un clic
+  preuve »). Ligne 1 : portée et libellé (« Phase · VERIFICATION », « 76-01 · Trace rouge », 12,5 px/500 `--text`, une ligne) ; ligne 2
+  (11,5 px/400 `--text-3`, une ligne, ellipsis) : **le statut seul**, « statut : passed » ; **le niveau n'y figure pas** (il vit dans
+  « Chaîne » seulement, § 1.2). **Aucun glyphe**, aucun chemin ici (le chemin copiable est dans la liste des preuves). **Le contenu du fichier n'est jamais rendu.** Un clic
   ou Entrée ouvre le panneau de liste « Preuves de la Phase N » **positionné sur cette preuve** (§ 6). Aucune preuve lue :
   « Aucune preuve lue pour cette exigence. VERIFICATION, recette ou trace rouge dans le dossier de la phase la relierait. »
-- **Ouverture des voisins (plan, décision, ADR, preuve) : un seul chemin d'empilement** (§ 0). Au clic sur une ligne de voisin, le
-  panneau de l'exigence appelle **une fois** `window.VF_PANNEAU.empiler({ titre, rouvrir })` avec le titre de l'exigence (texte,
-  jamais HTML) et un `rouvrir` qui rend de nouveau ce panneau, puis ouvre le voisin : `SC.showPanel` pour une décision, une ADR ou la
-  liste des preuves ; `select('f:<chemin>')` pour un plan (nœud : la pile commune empile d'elle-même le nœud que l'on quitte, la 76
-  ne l'empile pas une seconde fois). Le bouton « Retour : <titre> » de l'en-tête ramène à l'exigence **en une pression** et le
+- **Ouverture des voisins (plan, décision, ADR, preuve, liste des plans) : la règle d'empilement de § 0.** Le panneau de l'exigence est
+  un panneau sur mesure : au clic sur une ligne de voisin, il appelle **une fois** `window.VF_PANNEAU.empiler({ titre, rouvrir })`
+  avec l'identifiant de l'exigence (texte, jamais HTML, ≤ 40 caractères) et un `rouvrir` qui rend de nouveau ce panneau, puis ouvre le
+  voisin (`SC.showPanel` pour une décision, une ADR ou une liste ; `select('f:<chemin>')` pour un plan). L'exigence a été empilée
+  elle-même à son arrivée par la phase (départ d'un nœud par `SC.showPanel`, § 2.2). Le bouton « Retour : <titre> » de l'en-tête ramène à l'exigence **en une pression** et le
   focus revient sur la ligne qui a ouvert le voisin (retrouvée par son `data-trace`, **à revalider**). Clavier : chaque ligne est
   un `button` natif (Tab, Entrée, Espace), focus `outline: 2px solid var(--ring); outline-offset: -2px`, aucune touche globale ;
   l'ordre de tabulation suit l'ordre des sections ci-dessus.
@@ -536,17 +558,20 @@ peut être incomplète. »
 ## 6. Panneaux de liste et pagination
 
 Ouverts par « + N autres », par une ligne d'agent ou par un registre au-delà du seuil. Gabarit de § 5 (Retour de l'en-tête, titre
-`.pt` : « Exigences de la Phase 76 », « Preuves de la Phase 76 », « Entrées de vf-dev-manager », « ADR »). Corps : 30 lignes par
-page, puis `<nav aria-label="Pagination">` : `.btn.soft` « Précédentes » et « Suivantes » (`disabled` à la borne), au centre
-« 31 à 60 sur 83 exigences » (l'unité suit la sorte : ADR, commits, entrées, liens, fichiers de preuve ; 11,5 px `--text-3`,
-tabular-nums, `aria-live="polite"`). Pas de pagination infinie. Le changement de page replace le focus sur le titre. Boutons de
-32 px de haut (44 px tactile), `font-size` 12,5 px (§ Typography).
+`.pt` : « Exigences de la Phase 76 », « Preuves de la Phase 76 », « Plans de l'exigence TRAC-01 », « Entrées de vf-dev-manager », « ADR »). Corps : 30 lignes par
+page, puis `<nav aria-label="Pagination">` en **deux lignes fixes à toute largeur** (§ 2.4) : ligne 1, le compte « 31 à 60 sur 83
+exigences » (l'unité suit la sorte : ADR, commits, entrées, liens, fichiers de preuve, plans ; nombres plafonnés à « 9 999+ » ;
+11,5 px/400 `--text-3`, tabular-nums, clamp 2, `aria-live="polite"`) ; ligne 2, `.btn.soft` « Précédentes » et « Suivantes »
+(`disabled` à la borne), côte à côte (`flex: 1 1 0`, `white-space: nowrap`). Pas de pagination infinie. Le changement de page replace
+le focus sur le titre. Boutons de 32 px de haut (44 px tactile), `font-size` 12,5 px (§ Typography). Hauteur de la pagination :
+72 px (84 px tactile).
 
 **Ligne d'entrée de mémoire** (liste d'un agent, `button.vf-trace-ligne`, **gabarit fermé de trois lignes**) : ligne 1 `name` mono
 12,5 px/500 `--text` (une ligne, ellipsis, `title`) et `.tag` du type ; ligne 2 (clamp 2, 11,5 px/400 `--text-3`) « modifiée le 8 nov. 2026 · 2 liens
-entrants · 3 liens sortants » ; ligne 3 (absente si rien ; clamp 3, 11,5 px/400 `--text-3`) : octogone puis **quatre emplacements au plus**, nuls
-omis, dans cet ordre : « hors index · 1 lien cassé · 1 chemin cité absent · sans lien entrant » (les trois premiers en
-`--text-2`/500 derrière l'octogone ; « sans lien entrant » neutre en dernier). Pire cas : § 2.4. **Ligne de preuve** (liste « Preuves de la
+entrants · 3 liens sortants » ; ligne 3 (absente si rien ; clamp 3) : octogone puis **quatre emplacements au plus**, nuls
+omis, dans cet ordre : « hors index · 1 lien cassé · 1 chemin cité absent · sans lien entrant » ; **deux familles nommées** : les trois
+premiers (contradictions, derrière l'octogone) en 11,5 px/500 `--text-2`, le quatrième « sans lien entrant » (filtre neutre) en
+11,5 px/400 `--text-3`. Pire cas : § 2.4. **Ligne de preuve** (liste « Preuves de la
 Phase N ») : portée et libellé, statut (une ligne, ellipsis), chemin copiable clampé à 1 ligne, puis, pour un plan, « Critères du
 plan, 5 critères » et la liste de ses critères en texte (12,5 px/400 `--text-2`, ≤ 30 par page). **Ouverture positionnée** (depuis
 « Preuves » d'une exigence, § 5.1) : le panneau s'ouvre sur la page qui contient la preuve visée ; sa ligne est amenée en haut de la
@@ -560,7 +585,7 @@ si l'ouverture vient du clavier ; le contenu du fichier n'est jamais rendu.
 - **Ailleurs, dans un panneau ou une section : au plus 30 voisins d'une même sorte** (exigences d'une liste, ADR, décisions,
   commits, liens, entrées, agents, registres, critères d'un plan, fichiers de preuve d'un panneau de liste).
 - Au-delà : `button.vf-trace-plus` (**`height: 32px`**, taille de contrôle de la liste fermée, 44 px sous `pointer: coarse` ; 12,5 px/500 `--text-2`, `padding: 0 var(--sp-12)`, survol `rgba(var(--ink), .06)`, focus
-  `--ring`) qui ouvre le panneau de liste paginé (§ 6). Le libellé nomme toujours la sorte : « + 12 autres exigences », « + 2 autres
+  `--ring`) qui ouvre le panneau de liste paginé (§ 6). N est plafonné à « 9 999+ » et le libellé tient sur une ligne (règle de § 2.4). Le libellé nomme toujours la sorte : « + 12 autres exigences », « + 2 autres
   ADR », « + 5 autres registres », « + 40 autres commits », « + 3 autres agents ». Jamais la classe `.more` du moteur (texte
   non interactif en `--text-4`). Le total est celui de la route, jamais calculé par la page.
 
@@ -697,17 +722,17 @@ sa section.
 | `summary` de sous-repli (registre de phase) | § 4.2 | 12,5 px / 18 px | 500 | `--text-2` |
 | Compteur `.c` | § 2, § 3, § 4 | 12,5 px / 18 px | 400 hérité | `--text-4` |
 | Bilan (phase, Jalon, Décisions, Mémoire), résumé de l'entrée haute, ligne neutre d'état vide ou dégradé (§ 9), phrase « Décision nue » | § 2, § 4, § 5, § 9 | 12,5 px / 18 px | 400 hérité | `--text-3` |
-| Nom en ligne : « Phase 76 », libellé de maillon, de preuve, de lien ; mot d'état de la section « État » d'une entrée (« hors index ») | § 2 à § 6 | 12,5 px / 18 px | 500 | `--text` |
+| Nom en ligne : « Phase 76 », libellé de maillon, de preuve, de lien ; mot d'état de la section « État » d'une entrée (« hors index ») ; bouton de « Rattachement » ; libellé « Critères du plan, 5 critères » | § 2 à § 6 | 12,5 px / 18 px | 500 | `--text` |
 | Nom mono : agent, `name` d'entrée, nom cible d'un lien ; bouton « + N autres » (12,5 px/500 `--text-2`) | § 4.3, § 5.4, § 6, § 7 | 12,5 px / 18 px | 500 | `--text` (mono) ; `--text-2` pour « + N » |
-| Texte de ligne : exigence, titre d'ADR, sujet de commit, valeur d'une « Fiche » | § 2, § 4, § 5 | 12,5 px / 18 px | 400 hérité | `--text` |
-| Nom de phase du « Jalon » | § 4.1 | 12,5 px / 18 px | 400 hérité | `--text-3` |
-| Titre de décision en liste, ligne de critères, cause d'erreur | § 3, § 4.2, § 6, § 9 | 12,5 px / 18 px | 400 hérité | `--text-2` |
+| Texte de ligne : exigence, sujet de commit, valeur d'une « Fiche » | § 2, § 4, § 5 | 12,5 px / 18 px | 400 hérité | `--text` |
+| Nom de phase du « Jalon » ; phrase neutre de la section « État » (« Dans l'index, avec au moins un lien entrant. ») | § 4.1, § 5.4 | 12,5 px / 18 px | 400 hérité | `--text-3` |
+| Titre d'ADR et titre de décision en liste (une seule teinte), ligne de critères, cause d'erreur | § 3, § 4.2, § 6, § 9 | 12,5 px / 18 px | 400 hérité | `--text-2` |
 | Titre d'erreur « La traçabilité est indisponible » | § 9 | 12,5 px / 18 px | 500 | `--text` |
-| Boutons `.btn.soft` | § 6, § 9 | 12,5 px / 18 px (hauteur 32 px) | 400 hérité | `--text` |
+| Boutons `.btn.soft` et `.vf-trace-plus` (`--text-2` pour ce dernier) | § 6, § 7, § 9 | 12,5 px / 18 px (hauteur 32 px) | 400 hérité | `--text` |
 | Identifiant mono (TRAC-01, ADR-075, P41-D-02), sha | § 2 à § 6 | 11,5 px / 16 px | 500 | `--text-2` |
-| Mot de ligne 2 d'une exigence, comptes d'agent ou d'entrée en défaut (lignes de liste) | § 2.2, § 4.3, § 6 | 11,5 px / 16 px | 500 | `--text-2` |
-| Mentions et compte, légende des glyphes, comptes secondaires de ligne (lignes 3 et 4), dates, jour de commit, statut | § 2 à § 6 | 11,5 px / 16 px | 400 hérité | `--text-3` |
-| État et niveau d'un maillon dans « Chaîne » (« lu, niveau exigence »), état d'un lien (« résolu »), étiquette de « Fiche », phrase de contradiction, aide, rappel de mémoire, « absent de HEAD… », pied de source, pagination | § 5, § 6 | 11,5 px / 16 px | 400 hérité | `--text-3` |
+| Mot de ligne 2 d'une exigence ; **ligne 2 d'une phase du « Jalon »** (« Maillons non lus : … ») ; comptes d'agent en défaut ; contradictions de la ligne 3 d'une entrée (les trois premiers emplacements) | § 2.2, § 4.1, § 4.3, § 6 | 11,5 px / 16 px | 500 | `--text-2` |
+| Mentions et compte, légende des glyphes, comptes secondaires de ligne (lignes 3 et 4 du « Jalon », ligne 3 d'un agent, **« sans lien entrant » de la ligne 3 d'une entrée**), dates, jour de commit, statut | § 2 à § 6 | 11,5 px / 16 px | 400 hérité | `--text-3` |
+| État et niveau d'un maillon dans « Chaîne » (« lu, niveau exigence »), état d'un lien (« résolu »), étiquette de « Fiche », phrase de contradiction, **phrases de « Mentions » et de « Rattachement » (« Ligne du tableau de traçabilité : Phase 76, Pending »)**, aide, rappel de mémoire, « absent de HEAD… », pied de source, **compte de pagination** | § 5, § 6 | 11,5 px / 16 px | 400 hérité | `--text-3` |
 | Chemin copiable (`.vf-ref code`, mono) et chemin cité (mono) | § 3, § 5.4 | 11,5 px / 16 px | 400 hérité | `--text-3` |
 | Commit : sujet (12,5 px/400 `--text`), sha (11,5 px/500 `--text-2`), jour (11,5 px/400 `--text-3`) | § 5.5 | voir l'élément | voir l'élément | voir l'élément |
 
@@ -720,9 +745,10 @@ sans toucher la règle d'origine) : le moteur pose des tailles hors de ces quatr
 | Brique | Valeur d'origine | Surcharge `vf-trace-*` |
 |--------|------------------|------------------------|
 | `.btn.soft` (Réessayer, Précédentes, Suivantes) | 13 px, hauteur 36 px, pastille | `font-size: 12.5px; height: 32px` (hauteur de `#ask-sheet .sh .btn`) ; 44 px sous `pointer: coarse` ; une seule hauteur pour tous les boutons de la 76 ; graisse 400 héritée |
-| `.vf-ref code` (chemin copiable) | 11 px | `font-size: 11.5px` |
+| `.vf-ref code` (chemin copiable) | 11 px, `overflow-wrap: break-word` | `.vf-trace .vf-ref code { font-size: 11.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; min-width: 0 }` |
+| `.vf-ref` (ligne du chemin) | `display: block`, `padding: var(--inset-row)` | `.vf-trace .vf-ref { display: flex; align-items: center; gap: var(--sp-8); min-height: 32px }`, **`min-height: 44px` sous `max-width: 700px` ou `pointer: coarse`** ; `code` en `flex: 1 1 0` |
 | `.vf-ref` | `border-radius: 10px` littéral | `.vf-trace .vf-ref { border-radius: var(--r-ctl) }` |
-| `.vf-copie-etat` (« Copié ») | 11 px | `font-size: 11.5px` |
+| `.vf-copie-etat` (« Copié ») | 11 px, `float: right`, `margin-left: 8px` | `.vf-trace .vf-ref .vf-copie-etat { font-size: 11.5px; float: none; margin: 0; flex: none }` : à droite du chemin, dans la même rangée flex, 1,6 s |
 | `.vst` (pastille de phase du « Jalon ») | 11 px (glyphe `1.45em`) | `font-size: 11.5px` (glyphe 16,7 px : brique du moteur, pas un glyphe de la famille § 1.1) |
 | `.tag` (type, plan) | 11,5 px | aucune |
 | `.group-h` | 12,5 px | aucune ; sa variante `.gd` (12 px) n'est pas employée |
@@ -764,7 +790,7 @@ sur `--surface` et `--bg` ; une teinte d'état jamais sur `--raise` ni `--raise-
 | Décisions citées (panneau d'exigence) | « Décisions citées », « 2 décisions », « Ouvrir la décision », « sans définition lue », « sans section dans docs/ADR.md », « aucune décision citée », « Un identifiant Pnn-D-nn ou ADR-nnn dans la ligne de l'exigence au registre des exigences la relierait. » |
 | Collecte | « La collecte du dépôt est en cours. La traçabilité apparaît dès qu'elle est faite. » |
 | Dates, sha | « 8 nov. 2026 » (jour seul, mois abrégé français) ; sha de 7 caractères |
-| Débordement | « + 12 autres exigences », « + 2 autres ADR », « + 5 autres registres », « + 40 autres commits », « + 3 autres agents », « + 4 autres liens », « + 4 autres fichiers de preuve » ; « Précédentes », « Suivantes », « 31 à 60 sur 83 exigences » |
+| Débordement | « + 12 autres exigences », « + 2 autres ADR », « + 5 autres registres », « + 40 autres commits », « + 3 autres agents », « + 4 autres liens », « + 4 autres fichiers de preuve », « + 5 autres plans », « + 9 999+ autres exigences » (plafond) ; titre de liste « Plans de l'exigence TRAC-01 » ; « Précédentes », « Suivantes », « 31 à 60 sur 83 exigences » |
 | Retour | « Retour : <titre> » : libellé fourni par l'en-tête de la Phase 80, `<titre>` du lab rendu en texte ; la 76 n'écrit aucun libellé de retour |
 | Chargement | « Lecture de la traçabilité » |
 | État vide (titre) | la phrase d'absence du cas, § 9 (une seule phrase suivie de ce qui le lèverait) |
@@ -792,14 +818,14 @@ latéral ne pousse jamais la carte (Q12).
 
 | Largeur | Comportement du panneau | Ce que la 76 vérifie |
 |---------|-------------------------|----------------------|
-| 1440 px | colonne de 360 px à droite (`--panel-w`, redimensionnable de 300 à 720 px ; largeur utile de ligne 320 px, **260 px au plancher de 300 px**) | section de phase : 5 lignes, 888 px de haut au pire, repli fermé, calculé à 260 px (§ 2.3) ; identifiant jamais coupé ; gabarits sans retranchement (§ 2.4) ; carte non poussée |
+| 1440 px | colonne de 360 px à droite (`--panel-w`, redimensionnable de 300 à 720 px ; largeur utile de ligne **308 px**, **248 px au plancher de 300 px**, barre de défilement de 12 px comptée) | section de phase : 5 lignes, 888 px de haut au pire, repli fermé, calculé à 248 px (§ 2.3) ; identifiant jamais coupé ; gabarits sans retranchement (§ 2.4) ; carte non poussée |
 | 1024 px (souris ≥ 1000 px) | même colonne de 360 px ; il reste ≥ 280 px de carte visible | idem ; aucun défilement horizontal |
 | 768 px et 700 à 999 px | colonne de 360 px conservée (sauf tactile), carte réduite | cibles 44 px si `pointer: coarse` ; aucune largeur fixe de ligne |
-| 390 px (≤ 700 px) | feuille basse : `left/right 8 px`, hauteur max `min(56vh, 480px)`, défilement dans la feuille | largeur utile 334 px (264 px à 320 px de large) ; **section de phase : 3 lignes, texte sur 1 ligne, 614 px au pire, borne et non garantie de tenir dans la feuille (§ 2.3)**, qui défile avec la feuille, après le contenu existant que l'entrée haute (≤ 112 px) permet de sauter ; sections de la vue d'ensemble repliées ; lignes et boutons ≥ 44 px ; pagination en boutons 44 px ; aucun défilement horizontal |
+| 390 px (≤ 700 px) | feuille basse : `left/right 8 px`, hauteur max `min(56vh, 480px)`, défilement dans la feuille | largeur utile 322 px (252 px à 320 px de large) ; **section de phase : 3 lignes, texte sur 1 ligne, 614 px au pire, borne et non garantie de tenir dans la feuille (§ 2.3)**, qui défile avec la feuille, après le contenu existant que l'entrée haute (≤ 112 px) permet de sauter ; sections de la vue d'ensemble repliées ; lignes et boutons ≥ 44 px ; pagination en boutons 44 px ; aucun défilement horizontal |
 
 Largeur de panneau redimensionnée par l'utilisateur : toute ligne reste fluide (`min-width: 0`, `overflow-wrap: anywhere`, aucune
 largeur fixe en px sur un texte). Cibles tactiles ≥ 44 px dans `@media (max-width: 700px), (pointer: coarse)` (lignes,
-`.vf-trace-commit`, `.vf-trace-plus`, `summary`, boutons de pagination). Mouvement : aucune animation
+`.vf-trace-commit`, `.vf-trace-plus`, `summary`, boutons de pagination, puces de plan, **`.vf-ref` (`min-height: 44px`)**). Mouvement : aucune animation
 neuve (le moteur anime déjà l'entrée du panneau, `panelIn`, avec sa variante mouvement réduit) ; pliage de `details` sans
 transition.
 
@@ -820,7 +846,7 @@ carré central (§ 1.1, décision du manager) ; « lu » neutre ; section en fin
 seuils de 5 et 3 lignes et budget sommé (§ 2.3) ; aucun fil d'Ariane, Retour unique de la 80 (§ 0, § 5) ; « non cochée, SUMMARY
 lu » neutre (§ 10) ; un seul octogone pour les trois contradictions de mémoire, distinguées par leur emplacement (§ 1.3) ; rayon
 `--r-ctl` partout (§ Spacing) ; blocs « Décisions citées » et « Preuves » sans glyphe, positionnés sur la preuve (§ 5.1, § 6) ;
-bilans de 12,5 px à clamp 3 (phase) ou 4 (vue d'ensemble) (§ 2.4) ; gabarits fermés pour toute ligne de liste, bilan et résumé, plafond « 9 999+ » (§ 2.4) ; légende des glyphes en teinte neutre (§ 2.2) ; section en fin de panneau, un seul chemin d'empilement (§ 0).
+bilans de 12,5 px à clamp 3 (phase) ou 4 (vue d'ensemble) (§ 2.4) ; gabarits fermés pour toute ligne de liste, bilan et résumé, plafond « 9 999+ » (§ 2.4) ; légende des glyphes en teinte neutre (§ 2.2) ; règle d'empilement unique attribuée par mécanisme de départ (§ 0) ; pagination sur deux lignes fixes, puces de plan plafonnées à 3 (§ 2.4) ; largeurs utiles comptant la barre de défilement de 12 px (§ 2.3) ; section en fin de panneau, un seul chemin d'empilement (§ 0).
 
 ## 13. Variables CSS et styles uniques par rôle
 
@@ -858,27 +884,32 @@ en dur ; seules exceptions de DESIGN § 4 (filets 1 px, tailles de contrôle).
 4. Un seul mot de ligne 2 (premier maillon non lu), jamais masqué ; contradictions suivantes en ligne 3 ; emplacement de
    l'octogone dans la bande (SUMMARY ou plan) ; légende des glyphes visible en permanence.
 5. Section de phase : 5 lignes (3 sous 700 px), lignes à trou d'abord, « + N autres exigences » (`height: 32px`) ; clamps explicites
-   (bilan 3, légende 4, ligne 1 : 2 ou 1, mot 2, mention et compte 2) calculés sur le pire cas à 260 px ; hauteur 888 px bureau
+   (bilan 3, légende 4, ligne 1 : 2 ou 1, mot 2, mention et compte 2) calculés sur le pire cas à 248 px (barre de défilement comptée) ; hauteur 888 px bureau
    et 614 px feuille au pire, sommée exactement (§ 2.3) ; repli « Preuves attachées » ouvert plafonné à 6 lignes (4 sous 700 px), sans
    critères de plan ; contenu existant du panneau non déplacé ; entrée haute d'une ligne qui mène à la section.
 6. Nom accessible d'une ligne d'exigence : texte visible contenu dans le nom, puis états des maillons ; niveau dit une seule fois par
-   surface : mention visible (reprise dans le texte masqué) en ligne, « Chaîne » seule dans le panneau ; « niveau phase » et « niveau exigence » expliqués.
+   surface (§ 1.2) : texte masqué de la ligne comme source accessible unique, mention visible seulement si elle est la première, « Chaîne »
+   seule dans le panneau, « Preuves » (ligne 2) sans niveau ; « niveau phase » et « niveau exigence » expliqués.
 7. Mémoire : seuls les chemins « cite un chemin absent », relatifs ; jamais `description` ni corps ; trois contradictions
    distinguées par emplacement et mot ; bilan cohérent (hors index compté) ; aucun mot « périmée ».
 8. Quatre tailles de texte seulement, **briques réemployées comprises** (surcharges `.btn.soft`, `.vf-ref code`, `.vf-copie-etat`,
    `.vst`, § Typography) ; hauteur unique des boutons de la 76 (32 px, 44 px tactile) ; un style de `summary` par rôle ; chaque nombre
    avec son unité ; chaque glyphe avec son mot.
 8ter. Gabarits fermés (§ 2.4) : aucune ligne de liste, aucun bilan, aucun résumé n'énumère un nombre libre d'états ; pire cas calculé
-   sur le gabarit rempli aux plafonds (« 9 999+ ») à 260 et 320 px ; budget de § 2.3 qui somme exactement (888 / 614 px, repli
+   sur le gabarit rempli aux plafonds (« 9 999+ ») à 248 et 308 px, réserve de 15 % sur la dernière ligne ; budget de § 2.3 qui somme exactement (888 / 614 px, repli
    fermé), borne et non garantie sur la feuille ; tout texte coupé lisible en entier
    ailleurs (§ 2.4) ; chaque élément nommé a une seule taille, une seule graisse (§ Typography) ; surcharges des briques
    réemployées dont `.vf-ref` (rayon `--r-ctl`).
 8quater. Panneau d'exigence (§ 5.1) : « Décisions citées » (liste, « aucune décision citée » neutre, décision nue non reliée) et
-   « Preuves » (lignes positionnées dans le panneau des preuves, contenu jamais rendu) ; un seul `VF_PANNEAU.empiler` par départ d'un
-   panneau sur mesure, jamais pour un nœud ; un Retour ramène au panneau quitté en une pression ; aucun glyphe répété ni neuf dans ces deux blocs.
+   « Preuves » (lignes positionnées dans le panneau des preuves, contenu jamais rendu) ; le panneau quitté est empilé une seule fois, par la pile
+   commune (nœud quitté par `select`/`reveal`) ou par la 76 (panneau sur mesure, ou nœud quitté par `SC.showPanel`) ; un Retour ramène au
+   panneau quitté en une pression ; aucun glyphe répété ni neuf dans ces deux blocs.
 8bis. Décompte (§ 10.1) : bilans à catégories exclusives dont la somme égale le total ; « chaîne complète » seulement si les quatre
    maillons sont lus ; « non lisible » compté et nommé dans les bilans et le « Jalon » ; un emplacement par cause et par surface
    (§ 10) ; mention neutre du niveau phase ; chips de plan interactifs (focus `--ring`, survol, 44 px tactile).
+8sexies. Éléments à longueur variable (§ 2.4) : pagination sur deux lignes fixes, « + N » nowrap plafonné, puces de plan ≤ 3 avec renvoi,
+   titre empilé ≤ 40 caractères ; `.vf-ref` : `min-height: 44px` tactile, `code` nowrap avec ellipsis, « Copié » dans la rangée flex ; paires
+   glyphe et mot en `inline-flex` centré ; ligne 1 du Jalon comptée à 21 px.
 8quinquies. Légende des glyphes neutre (seule exception à l'octogone corail) ; mots anglais affichés tous classés (§ Copywriting :
    A donnée, B littéral inscrit au garde, C remplacé) ; coupe de titre visible (« … ») et dite dans le panneau ; interlignes déclarés ;
    éléments des § 5.2 à § 5.5 présents dans le tableau de typographie.
@@ -901,6 +932,7 @@ en dur ; seules exceptions de DESIGN § 4 (filets 1 px, tailles de contrôle).
 - Crochet de sélection d'un commit par son sha dans le tiroir Git de la 78 (§ 5.5).
 - Que `[data-vf-section]` (§ 2.1) reste actif après la 79 et la 80 (gestionnaire de `00-vibeflow.js`) ; sinon, l'entrée haute
   porte son propre `scrollIntoView`.
+- **Clamp du bouton « Retour : <titre> » de la 80** : le titre est borné à 40 caractères par la 76 ; vérifier que le bouton de la 80 le tient sur une ligne ou le clampe (aucune hypothèse écrite ici).
 - Numéro du ou des fichiers `ui/7x-vf-trace*.js` et poids de chaque fichier (≤ 300 lignes, gate V4).
 - Que la carte de phase en couloirs de la 80 ouvre le même panneau, section « Traçabilité » comprise (P80-C76-1).
 - **Contrôle au rendu** : un manque doit se repérer **sans lire les mots** (le « lu » plein est plus saillant que le « manque » vide :
@@ -910,7 +942,7 @@ en dur ; seules exceptions de DESIGN § 4 (filets 1 px, tailles de contrôle).
   sinon, chanfreins plus nets : `<path d='M6 1.8h4l4.2 4.2v4L10 14.2H6L1.8 10V6z' fill='none' stroke='black' stroke-width='1.75'
   stroke-linejoin='round'/><rect x='6' y='6' width='4' height='4' rx='1' fill='black'/>` (tracé relu : chanfreins de 4,2 px, carré central
   de 4 px à plus de 2 px du trait).
-- Que les clamps de § 2.3 et les gabarits de § 2.4 tiennent au rendu à 260 px et 320 px (largeurs utiles), pire cas rempli aux plafonds, et que le plafond de la feuille reste `min(56vh, 480px)`.
+- Que les clamps de § 2.3 et les gabarits de § 2.4 tiennent au rendu à 248 px et 308 px (largeurs utiles, barre de défilement de 12 px comptée : `::-webkit-scrollbar` forcé, **à contrôler aussi là où la barre est en surimpression**, où la largeur utile est de 260 px), pire cas rempli aux plafonds, et que le plafond de la feuille reste `min(56vh, 480px)`.
 - Hauteur réelle de la section de phase à 1440 et 390 px (mesure au rendu : 888 px et 614 px annoncés  § 2.3  repli fermé ; 1 258 px et 888 px repli ouvert).
 
 ## UI Considerations
