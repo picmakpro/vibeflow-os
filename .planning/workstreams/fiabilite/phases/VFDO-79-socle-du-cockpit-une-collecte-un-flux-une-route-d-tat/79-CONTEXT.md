@@ -144,12 +144,12 @@ le dire ici, en amendement daté, avant d'être exécuté.
   | `segments` | `[debutMs, finMs, genre][]` (≤ 500) | `genre` ∈ `travail`, `attend-agents`, `attend-humain`, `repos`, `silence` ; coupés à `[depuis, jusqua]` |
   | `evenements` | `[tMs, genre][]` (≤ 500) | `genre` ∈ `compaction`, `erreur`, `humain`, `rapport`, `dispatch` |
   | `enCours` | `{ verbe, depuisMs }` \| null | verbe de la table fermée du socle, jamais l'entrée de l'outil |
-  | `rattachement` | `{ dag, noeud, source: "registre" \| "mandat" }` \| null | nœud du plan de mission (AUDC-I37) |
+  | `rattachement` | `{ dag, noeud, source: "registre" \| "mandat" \| "enfants" }` \| null | nœud du plan de mission (AUDC-I37) ; `noeud` null si `source: "enfants"` (amendement A14) |
   | `cibles` | `{ etat: "ok" \| "en-construction", ecritures: [{cible, n, dernierMs}] (≤ 200), lectures: [...] (≤ 200) }` | **en mémoire seulement**, reconstruites au démarrage par une passe en tâche de fond sur la fenêtre ; cible réduite (C0) |
 
 - **Hors de la frise :** les commits (Git, routes `/api/vf/git*`), le fil daté d'un agent (route existante
-  `/api/vf/transcript`, `cockpit-transcript@2`), le coût en monnaie et les limites de 5 h et de 7 jours (ligne d'état,
-  Phase 74).
+  `/api/vf/transcript`, `cockpit-transcript@2`), le coût en monnaie et les limites de 5 h et de 7 jours (hors de
+  cette vague, voir l'amendement).
 - **Erreurs :** 400, 403, 405, 503 `emission-refusee`. Index en cours de construction : 200 avec
   `source.etat: "en-construction"` et les voies déjà connues.
 
@@ -201,6 +201,65 @@ le dire ici, en amendement daté, avant d'être exécuté.
   `message.usage`, `stop_reason`, blocs d'appel et de résultat d'outil limités à leurs identifiants et au drapeau
   d'erreur, `compact_boundary`, `turn_duration`), description de `vueAgents` réécrite selon AUDC-Q4, `verifieSur`
   revérifié. La Phase 74 n'a donc pas à étendre le contrat pour lire les jetons.
+
+### Amendement du 2026-11-11 (retours des Phases 74, 76, 77 et 80, relayés par la session principale)
+
+Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée. Elles complètent C0 à C6
+sans en retirer rien.
+
+- **A1 (80) — adresses des onglets.** `/`, `/project.html` et `/equipe.html` restent servies, toutes trois par la même
+  coquille ; le fragment (`#r=…`, `#v=…&s=…`) est lu tel quel par le moteur, inchangé.
+- **A2 (80) — changement d'onglet sans rechargement.** La coquille est à la 79 : elle expose
+  `VF_COQUILLE.chargerOnglet(nom)` (`nom` ∈ `code`, `projet`, `equipe`), qui lit `GET /api/vf/graphe?onglet=<nom>` et
+  réinitialise le moteur avec ce graphe dans le même document, et rend une promesse résolue après le premier rendu.
+  Le routage (adresse, événement `vf:onglet`, focus, historique) est à la Phase 80, qui l'appelle.
+- **A3 (80) — terminal.** L'iframe et l'amorce du terminal (sous `--terminal`) sont posées une fois par chargement de la
+  coquille, jamais par onglet ; l'amorce reste à usage unique et garde son délai de 60 s.
+- **A4 (80) — mise en page en worker.** L'API globale du moteur (`window.Floorplan` dans le source, servie sous
+  `window.VibeFlow`) garde l'événement `render`, émis après la pose des positions calculées par le worker ;
+  `state.layout.children` (x, y, w, h) et `freeArea()` restent exposés avec la même forme.
+- **A5 (80) — champs ajoutés au graphe Projet en direct.** Le payload `patch` reste `st`, `foot`, `sum`. Événement
+  ajouté au flux C4 : `graphe` `{ seq, at, onglet, sig }`, émis quand la signature complète du graphe d'un onglet
+  change ; le lecteur relit `GET /api/vf/graphe?onglet=<onglet>`. Les champs facultatifs que la 80 ajoute au nœud de
+  phase de `cockpit-project@1` arrivent ainsi sans qu'elle touche à `vf-cockpit-live.mjs`, qui reste à la 79.
+- **A6 (80) — aide commune des suites.** Fichier `plugin/cockpit/scripts/tests/socle-serveur.sh`, à sourcer, livré
+  par le plan 79-02 (première vague). Fonctions : `cockpit_lancer <lab> [options du serveur…]` (lance le serveur,
+  attend qu'il écoute, exporte `VF_PORT`, `VF_JETON`, `VF_PID`, `VF_SORTIE`) ; `cockpit_arreter` ; `cockpit_get
+  <chemin>` (GET avec l'hôte et le jeton, corps sur la sortie, code HTTP dans `VF_CODE`) ; `attendre <délai en s>
+  <commande…>` (attente active bornée, à la place d'une pause fixe). La signature ne change pas quand le plan 79-06
+  lance le serveur depuis le module.
+- **A7 (80) — ordre.** Le plan **79-01** retire `plugin/cockpit/amont/` en première vague. Fichiers du moteur que la
+  79 modifie : `assets/serve.mjs`, `assets/graph-query.js`, `assets/query-cli.mjs`, `scripts/scan.mjs`,
+  `scripts/lib/common.mjs`, `scripts/lib/vf-git-sortant.mjs`, `assets/viewer.html`, et sous `assets/ui/` au moins
+  `70-vf-live.js`, `75-vf-modele.js`, `78-vf-fr-dict-a.js`, `79-vf-fr-dict-b.js`, `80-vf-fr.js`. `viewer.html` n'est
+  touché par la 79 qu'à partir de sa troisième vague (coquille, worker, traduction). La liste finale, fichiers d'ui
+  traduits ou débarrassés d'observateurs compris (dont peut-être `40-tour.js` et `05-theme.js`), est celle des
+  `files_modified` des plans ; elle sera renvoyée à la session principale avec leur SHA.
+- **A8 (74) — jointure nœud, mission, phase.** `rattachement.dag` d'une voie vaut exactement
+  `signal.missions[].fichier` : même source (le fichier du plan de mission) et même réduction (texte nettoyé, 200
+  caractères au plus).
+- **A9 (74) — commits.** `cockpit-git@1` n'est pas modifié par la 79. Fait relevé : `rangees[].at` est l'heure
+  d'auteur en **secondes** Unix (`%at`), à multiplier par 1000 pour la frise ; la marche est bornée à 500 commits
+  (`BORNES.base`), donc les 24 h ne sont couvertes que si elles tiennent dans cette borne : à mesurer par la 74.
+- **A10 (76, 77, et toute phase) — règle de C0 : une route neuve, une ligne.** La 79 livre en première vague (plan
+  **79-05**) une table des routes de `vf-cockpit-server.mjs` : une route GET `/api/vf/*` s'ajoute par une entrée
+  d'une ligne (chemin, lecteur), sans retoucher la répartition. Deux phases qui ajoutent chacune une route ajoutent
+  chacune une ligne ; l'ordre des lignes est alphabétique par chemin pour que deux insertions ne tombent pas au même
+  endroit.
+- **A11 (76, 77, et toute phase) — règle de C0 : réponse gardée commune.** Le même plan exporte une fonction unique
+  qui applique à une réponse JSON les contrôles de C0, la garde `porteInterdit`, `Cache-Control: no-store` et le 503
+  `emission-refusee` ; une route neuve l'appelle et ne recopie aucun contrôle.
+- **A12 (76) — lecture du lab.** Le point de lecture confiné de `vf-cockpit-planning.mjs` (ou son successeur nommé
+  par le plan qui traite la classe restante d'AUDC-A-02) reste l'API unique de lecture d'un fichier du lab ; il lit
+  tout chemin sous la racine réelle du lab, dossiers cachés compris (`.planning/`, `.claude/agent-memory/`, `docs/`).
+  La 79 change la façon de juger un chemin (résolution physique), pas ce qu'il couvre.
+- **A13 (76) — jeton et planning côté page.** La coquille expose `VF_ETAT.jeton()` et `VF_ETAT.lireJson(chemin)`
+  (GET avec `x-vf-cockpit-token`) : aucun script de page ne lit le jeton autrement. L'événement `structural` reste
+  émis à chaque changement de `.planning/`, et la clé `planning` de `VF_ETAT` (`{ seq, at }`) change avec lui.
+- **A14 (77) — voie du manager.** `rattachement` peut valoir `{ dag, noeud: null, source: "enfants" }` : une voie sans
+  nœud propre dont tous les enfants rattachés pointent le même plan de mission reçoit ce plan ; enfants sur plusieurs
+  plans ou aucun enfant rattaché → `null`. Le coût de l'étage manager se somme ainsi par mission et par phase.
+- **Note C3.** Le coût en monnaie et les limites de 5 h et de 7 jours sont hors de cette vague (P74-D-20, P74-D-24).
 
 ## À Samuel
 
