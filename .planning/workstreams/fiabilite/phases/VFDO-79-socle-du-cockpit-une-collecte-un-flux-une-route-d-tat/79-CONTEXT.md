@@ -461,6 +461,30 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   l'index, donc jusqu'à 2 000 voies (borne de sûreté d'A35), avec `tronque: true` si l'index a dû évincer des voies ;
   la borne de 500 voies (A43) ne vaut que pour la réponse HTTP de `/api/vf/frise`, qui dit elle aussi `tronque`. Livré
   par 79-13. Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+- **A48 (74, points 41 à 50) — réponses.** Décision déléguée par Samuel (message session principale, 2026-11-08), option
+  recommandée.
+  - 41, **déjà couvert** (79-06, livré avec l'aide de 79-02) : `cockpit_module_copie` rend une copie du module (moteur lié)
+    et `COCKPIT_MODULE` désigne le module que `cockpit_lancer` démarre ; après 79-16 la coquille et `/_vf/` sont servis
+    depuis ce module. Emploi : `COCKPIT_MODULE="$(cockpit_module_copie)"`, muter
+    `"$COCKPIT_MODULE"/skills/cockpit-moteur/assets/ui/<fichier>.js`, puis `cockpit_lancer <lab>`. Capacité commune à
+    toutes les phases ; 79-16 vérifie qu'un `ui/*.js` muté dans la copie est bien celui qui est servi.
+  - 42, **fourni** (A40, 79-16) : la liste fermée de `/_vf/` est calculée au démarrage depuis le dossier `ui/` du module ;
+    un fichier neuf `ui/NN-vf-*.js` y entre de lui-même, la CSP n'a pas à changer. Seul geste : la ligne `AJOUT` de
+    `VENDORED.txt` (inventaire du plafond), comme aujourd'hui.
+  - 43, **déjà couvert** (79-08) : bloc `claudeCode.index` de `vf-cockpit-interface.json`.
+  - 44, **fourni** (79-13) : une cible coupée finit par `…` (U+2026) dans les 120 caractères ; le suffixe
+    ` (worktree <nom>)` du transcript s'ajoute après la coupe et n'est pas compté.
+  - 45, **fourni** (79-13) : `cibles.tronque` (booléen) par voie, vrai si `ecritures` ou `lectures` a été coupé à 200.
+  - 46, **fourni** (79-13) : la réponse de frise garde `tronque` et ajoute `voiesOmises` (entier, voies retirées par la
+    borne de 500).
+  - 47, **fourni** (79-13) : `/api/vf/transcript` et `/api/vf/doing` retrouvent l'agent dans la table en mémoire de la
+    collecte (identifiant → transcript, jamais exportée hors du serveur) au lieu d'une collecte complète par requête,
+    et lisent le fichier sans bloquer la boucle, avec les bornes actuelles ; témoin : N requêtes ne déclenchent aucune
+    collecte.
+  - 48, **déjà couvert** (79-09, A36) : le rattachement lit le verbe `registry` (registre courant et archive de 24 h).
+  - 49, **fourni** (spécification) : `frise` est émis au plus une fois par tour de collecte (5 s avec un client), et
+    seulement si la signature change ; plusieurs changements dans un tour se fondent en un événement.
+  - 50 : noté (`test-cockpit-frise-vue.sh` pour la 74, `test-cockpit-frise.sh` reste à 79-13).
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
