@@ -10,7 +10,7 @@ complètes), coupée une fois par l'arrêt de la session (quota du compte, HTTP 
 
 ## Résultat
 
-- **Cadrée** : `76-CONTEXT.md`, décisions P76-D-01 à P76-D-38 (dont 15bis). P76-D-32 à P76-D-34 sont des arbitrages
+- **Cadrée** : `76-CONTEXT.md`, décisions P76-D-01 à P76-D-39 (dont 15bis). P76-D-32 à P76-D-34 sont des arbitrages
   de Samuel (AskUserQuestion session principale, 2026-11-11) ; toutes les autres sont « décision déléguée par Samuel
   (message session principale, 2026-11-08), option recommandée ». Aucun arbitrage passé rouvert.
 - **Exigences** : famille neuve `TRAC`, TRAC-01 à TRAC-13, derrière le repère de la Phase 76 du ledger.
@@ -49,6 +49,9 @@ livraison.
   fichier, chemins absents relatifs) ; pas de « périmée » devinée.
 - **Questions en attente** (P76-D-34 à D-37) : format C76-Q1, lecture C76-Q2, état « appliquée » pour une option
   recommandée appliquée sous délégation (contestable, jamais mêlée à « À vous »).
+- **Retrait sur preuve de comportement** (P76-D-39) : la condition d'arrêt de 76-08 est l'équivalence de la porte de la
+  80, la couverture du panneau d'exigence, PL2.9 et PV2.5, le négatif de la 80 et toutes les suites vertes avant et
+  après sous `CI=1` ; une sonde statique n'est jamais une porte.
 - **Un ajout, un retrait** (P76-D-25) : le nœud « Exigences » et les liens « couvre » quittent le graphe Projet ; la
   porte `window.VF_EXIGENCES.lireExigences` de la 80 est rebranchée sur `meta.vf.trace.exigences`, le panneau
   d'exigence de la 76 remplace « Couverte par » avant le retrait.
@@ -65,9 +68,18 @@ livraison.
   - À `0a6a3440` : 4 bloquants (`cible` de la porte ; lecteur générique de `viewer.html` ; M-GARDE sans ancre ; compte
     `muté` et archives de 76-09).
   - À `7116c87f` : 2 bloquants (`cible` brute non observable ; sonde aveugle aux lecteurs en expression régulière).
-  - À `e99e6184` : VERDICT_FINAL.
+  - À `e99e6184` : 1 bloquant (sonde statique aveugle à `kind === 'exigences'`, exclusion qui masquait le jeton
+    `couvre`). Troisième tour sur la même famille : P76-D-39 rend la condition d'arrêt du retrait comportementale, la
+    sonde devient un inventaire.
+  - À `239783d8` : 1 bloquant (une suite Chrome sautée comptait comme preuve) ; à `cc3591e0` : 3 bloquants
+    (détection de Chrome absent sur « AM7 », `rc` d'après non vérifiés, négatif de la 80 affaibli). Les suites sont
+    rejouées sous `CI=1`, lancées par un lanceur à codes 0/1/3/4 ; le manager a mesuré que 14 des 79 suites n'écrivent
+    pas de ligne `Résultats`, et l'ensemble joué vient du journal du lanceur.
+  - À `b2fd07bf` : **0 bloquant, 0 avertissement**, 3 infos (tête de la 80 à relire au rebase, négatif plus strict que
+    celui de 80-07, ordre entre les codes 1 et 4 du lanceur à écrire).
 - **Revalidation amont** : plans revalidés contre la 79 à `677d19fa` et la 80 à `47ab9fd3` (PL2.9 lu à 80-07
-  `94f65905`, PV2.5 à 80-11 `63d908f6`) ; diff jusqu'aux têtes suivantes relu par le dernier contrôleur : IMPACT_TETES.
+  `94f65905`, PV2.5 à 80-11 `63d908f6`) ; plans revalidés ensuite jusqu'à la 79 à `5eaa6c41` et la 80 à `c8207707` ; chaque diff relu par un contrôleur frais : aucun impact sur
+  la 76. La 80 est à `9443e492` à la fin de la mission (seul `80-CONTEXT.md` a changé, 12 lignes, à relire au rebase).
 
 ## Carte des fichiers
 
@@ -83,7 +95,7 @@ et plans cités) ; 76-06, 76-07 et 76-08 **après** la Phase 80.
 | 76-05 Route `GET /api/vf/tracabilite` | 3 | TRAC-10, 11, 05, 06, 07 | créés : `scripts/vf-cockpit-trace.mjs`, `vf-cockpit-trace-vues.mjs`, `scripts/tests/test-cockpit-tracabilite-route.sh` ; modifiés : `scripts/vf-cockpit-server.mjs` (une ligne de `ROUTES`), `vf-cockpit-interface.json`, `README.md`, `scripts/tests/test-cockpit-routes.sh` (RK.1, A54, `Gate-Touche:`) | 79-02, 79-05, 79-06, 79-07, 79-09 |
 | 76-06 Page : phase, preuves, Jalon, exigence | 4 | TRAC-01, 02, 03, 04, 09, 11 | créés : `skills/cockpit-moteur/assets/ui/74-vf-trace.js`, `74-vf-trace-rendu.js`, `74-vf-trace-sections.js`, `74-vf-trace-style.js`, `74-vf-trace-exigence.js`, `74-vf-trace-liste.js`, `scripts/tests/test-cockpit-tracabilite-page.sh`, `chrome-tracabilite.mjs`, `chrome-tracabilite-exigence.mjs` ; modifiés : `skills/cockpit-moteur/VENDORED.txt` (lignes `AJOUT`), `scripts/vf-cockpit-fr-exclusions.json` | 79-02, 79-05, 79-06, 79-12, 79-14, 79-16, 79-17 ; 80 (P80-C76-1 à 5) |
 | 76-07 Page : Décisions, Mémoire, panneaux | 5 | TRAC-05, 06, 07, 08, 09, 11 | créés : `ui/74-vf-trace-decisions.js`, `74-vf-trace-memoire.js`, `scripts/tests/test-cockpit-tracabilite-panneaux.sh`, `chrome-tracabilite-panneaux.mjs`, `chrome-tracabilite-memoire.mjs` ; modifiés : `ui/74-vf-trace.js`, `74-vf-trace-liste.js`, `74-vf-trace-style.js`, `VENDORED.txt`, `vf-cockpit-fr-exclusions.json` | 79-02, 79-06, 79-16, 79-17 ; 80 |
-| 76-08 Retrait du nœud `.req`, clôture | 6 | TRAC-12 | modifiés : `scripts/vf-cockpit-project.mjs`, `vf-cockpit-types.mjs`, `vf-cockpit-ask.mjs`, `skills/cockpit-moteur/assets/ui/41-vf-projet-phase.js` (région `porte-exigences` seulement), `scripts/tests/test-cockpit-projet-graphe.sh`, `test-cockpit-questions.sh` (`Gate-Touche:`), `CHANGELOG.md` ; créés : `scripts/tests/retrait-lecteurs.mjs`, `retrait-lecteurs-exclusions.json`, `chrome-tracabilite-couverture.mjs` ; hors module : `README.md`, `README.fr.md` (compteur de suites), `scripts/ci-shard-suites.sh` | 79-01, 79-02, 79-05, 79-06, 79-10, 79-11, 79-15, 79-21 ; 80-07 (PL2.9), 80-11 (PV2.5) |
+| 76-08 Retrait du nœud `.req`, clôture | 6 | TRAC-12 | modifiés : `scripts/vf-cockpit-project.mjs`, `vf-cockpit-types.mjs`, `vf-cockpit-ask.mjs`, `skills/cockpit-moteur/assets/ui/41-vf-projet-phase.js` (région `porte-exigences` seulement), `scripts/tests/test-cockpit-projet-graphe.sh`, `test-cockpit-questions.sh` (`Gate-Touche:`), `CHANGELOG.md` ; créés : `scripts/tests/retrait-lecteurs.mjs` (inventaire), `rejouer-suites.sh` (lanceur à codes 0/1/3/4), `chrome-tracabilite-couverture.mjs` ; hors module : `README.md`, `README.fr.md` (compteur de suites), `scripts/ci-shard-suites.sh` | 79-01, 79-02, 79-05, 79-06, 79-10, 79-11, 79-15, 79-21 ; 80-07 (PL2.9), 80-11 (PV2.5) |
 | 76-09 Questions en attente | 4 | TRAC-13 | créés : `scripts/vf-cockpit-questions-attente.mjs`, `scripts/tests/test-cockpit-questions-attente.sh` ; modifiés : `vf-cockpit-trace-collecte.mjs`, `vf-cockpit-interface.json` | 79-09, 79-15 |
 
 Chaque plan écrit aussi sa trace rouge `76-0N-RED-TRACE.md` (76-08 : `76-08-PORTE-AVANT.json`,
@@ -146,8 +158,10 @@ Texte exact à poser par la session principale.
   dans le nom accessible d'une ligne ; une phrase d'empilement du § 5.1 ; hauteur réelle de `.vf-ref` dans le budget du
   repli de preuves ; surcharge `line-height` de `.tag` et écart de pagination ; gabarit des lignes du § 5.4 ; deux
   graisses pour `.vf-trace-plus` ; taille de « Lecture bornée » ; alignement des paires glyphe-mot sur deux lignes.
-- 76-08 : la sonde de lecteurs est fermée par défaut (sur-appariement par sous-chaîne, exclusions nommées) ; un jeton
-  coupé en deux littéraux lui échappe (limite écrite) ; la liste d'exclusions initiale se complète à l'exécution.
+- 76-08 : la sonde statique n'est qu'un inventaire (P76-D-39) ; un lecteur hors des suites du cockpit et des témoins de
+  la 80 ne serait vu que par la revue de la phase. Les sauts hors Chrome qui sortent 0 (par ex. « hors dépôt : SAUTÉ »)
+  sont traités pareil avant et après. La 77 n'est pas exécutée : un lecteur de Projet qu'elle ajoutera est à
+  revalider à son exécution (elle rejoue R76.3 et R76.4).
 - 76-06 et 76-07 : le garde d'inventaire du français est supposé s'invoquer comme dans `test-cockpit-chrome-fr.sh`.
 - Un fichier de mémoire modifié sur place, sans commit, n'invalide le cache de la route qu'au changement suivant.
 - `check-version-sync.sh` § 9 (compteur des suites) rouge entre 76-01 et 76-08, écart assumé dans chaque plan.
@@ -160,11 +174,35 @@ Texte exact à poser par la session principale.
 Premier passage : 12 lancements et 5 reprises, 2 144 605 jetons de sous-agents. Reprise : 7 lancements (un juge de
 design par tour 3 à 6, quatre contrôleurs de plans dont un audit de témoins) et une dizaine de reprises de correction
 par SendMessage (codeur des plans : quatre révisions et la reprise après coupure ; codeur de l'UI-SPEC : tours 4 à 6) ;
-jetons de sous-agents reçus à la reprise : COUT_REPRISE.
+jetons de sous-agents reçus à la reprise (somme des blocs) : 8 346 024. Deux révisions de plus ont été
+nécessaires pour la condition d'arrêt de 76-08 (révisions 5 à 8), après P76-D-39.
 
 ## Preuves E6
 
-PREUVES_E6
+Format : verdict — commande — code de sortie — SHA. Mission de cadrage : aucune suite de tests n'est jouée (aucun code).
+
+- Job `gates` de ci.yml, étapes 1 à 20 rejouées une à une sous `bash -e` (21 et 24 réservées au push sur main ; 23
+  demande une installation npm réseau, non jouée) — rc 0 pour les 20 — `b2fd07bf` (rejeu précédent : `608db651`, rc 0).
+- STATE intouché — `git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md` —
+  rc 0 — tête de la branche.
+- Couverture des exigences — union des `requirements:` du frontmatter des neuf plans = TRAC-01 à TRAC-13 ; texte du
+  ledger recoupé par les contrôleurs frais — `b2fd07bf`.
+- Plans : contrôleurs `gsd-plan-checker` frais, lecture complète — ISSUES FOUND à `d4e1b8f2`, `0a6a3440`, `7116c87f`,
+  `e99e6184`, `239783d8`, `cc3591e0` ; **0 bloquant, 0 avertissement** à `b2fd07bf`.
+- UI-SPEC : `gsd-ui-checker` VERIFIED (`a0468f32`) ; juge de design frais 92/100 `passed` (`4cc56286`).
+- Suites sans ligne `Résultats` — `grep -q 'Résultats'` sur les 79 `test-cockpit-*.sh` — 14 sans — base de la branche.
+
+```json
+{
+ "preuves": [
+  {"verdict": "gate:ci-gates-1-20", "commande": "étapes 1 à 20 du job gates de .github/workflows/ci.yml, bash -e, une par une", "exit_code": 0, "sha": "b2fd07bf"},
+  {"verdict": "state-intouche", "commande": "git diff --quiet origin/integration/cockpit-audit -- .planning/workstreams/fiabilite/STATE.md", "exit_code": 0, "sha": "b2fd07bf"},
+  {"verdict": "plans-verifies", "commande": "gsd-plan-checker frais, fermeture de 76-08, 0 bloquant 0 avertissement", "exit_code": 0, "sha": "b2fd07bf"},
+  {"verdict": "ui-spec-verifie", "commande": "gsd-ui-checker VERIFIED", "exit_code": 0, "sha": "a0468f32"},
+  {"verdict": "ui-spec-critique", "commande": "vf-design-judge frais, 92/100 passed", "exit_code": 0, "sha": "4cc56286"}
+ ]
+}
+```
 
 ## Prochaine étape
 
