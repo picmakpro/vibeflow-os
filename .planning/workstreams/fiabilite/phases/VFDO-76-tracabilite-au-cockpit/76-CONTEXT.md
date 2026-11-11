@@ -340,8 +340,9 @@ tout changement passe par un amendement daté ici.
   - `<n>` est le numéro de la phase du registre, décimale comprise (`P71.5-Q-01`), et doit être celui du dossier ;
   - `<nn>` a au moins deux chiffres ;
   - le séparateur entre identifiant et titre est ` — ` (tiret cadratin) ; le titre finit par un point avant `**`.
-- **Champs** : chacun sur une ligne de suite indentée de deux espaces, une seule fois, dans cet ordre, étiquettes d'un
-  ensemble fermé :
+- **Champs** : chacun sur une ligne de suite indentée de deux espaces, une seule fois, étiquettes d'un ensemble fermé ;
+  l'ordre ci-dessous est conseillé, non contrôlé (amendé le 2026-11-11 : aucun défaut ne le nomme, un ordre différent
+  n'est pas une question mal formée) :
   - `Options : (a) … ; (b) … .` — au moins deux options, lettres consécutives à partir de `a` ;
   - `Recommandation : (<lettre>) — <motif>.` — lettre prise parmi les options ; ou `Recommandation : aucune — <motif>.`
     quand aucune n'est recommandable (goût pur) ;
