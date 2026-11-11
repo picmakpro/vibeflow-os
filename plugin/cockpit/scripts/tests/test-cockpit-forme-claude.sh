@@ -4,6 +4,7 @@
 # rend la source forme-inconnue, jamais un arbre faux.
 #   F0  fixture conforme (m, w, t listés, source lue) · F1 à F10 une amputation par champ lu (agent absent ET source forme-inconnue)
 #   F11 le contrat déclare chaque champ lu (dont custom-title, F11.7 à F11.10) · F12 parent absent du dossier · F13 le manager de profondeur 1 sans parentAgentId reste listé
+#   F17 index incrémental des transcripts : le contrat déclare chaque champ lu (bloc claudeCode.index), amputation par champ, test miroir, vueAgents et verifieSur (79-08)
 #   F14 35 vieux meta.json dégradés hors fenêtre ne changent rien · F15 forme arrêtée {agentType, stoppedByUser}
 #   F16 coût de collecte à l'échelle du poste : zéro ouverture hors fenêtre sur 1 000 meta.json
 # Le code testé est chargé depuis le dossier de ce script (jamais depuis le répertoire courant).
@@ -48,7 +49,7 @@ const now = Number(nowMs);
 const dir = path.join(home, '.claude', 'projects', '-lab'); const sub = path.join(dir, sid, 'subagents');
 fs.mkdirSync(sub, { recursive: true });
 const iso = (ms) => new Date(ms).toISOString();
-const base = (o) => ({ cwd: lab, sessionId: sid, gitBranch: 'main', version: '2.1.317', ...o });
+const base = (o) => ({ cwd: lab, sessionId: sid, gitBranch: 'main', version: '2.1.322', ...o });
 const put = (f, lignes, ageS) => { fs.writeFileSync(f, lignes.map((l) => JSON.stringify(l)).join('\n') + '\n'); const t = (now - ageS * 1000) / 1000; fs.utimesSync(f, t, t); };
 const H30 = 108000;
 put(path.join(dir, sid + '.jsonl'), [
@@ -190,6 +191,50 @@ assert_eq "F16.1 — zéro ouverture d'un fichier agent-old*" "$(G "$WORK/f16.js
 assert_eq "F16.2 — les 3 candidats actifs (m, c2, wk) sont listés et la source est lue" "$(G "$WORK/f16.json" '["m","c2","wk"].every(k=>j.sous.some(s=>s[0]===k))+"|"+j.source')" "true|lue"
 assert_eq "F16.3 — l'ancêtre anc, hors fenêtre, est listé en-attente (recherche ciblée sur parentAgentId)" "$(G "$WORK/f16.json" '(j.sous.find(s=>s[0]==="anc")||[null,"absent"])[1]')" "en-attente"
 assert_eq "F16.4 — collectWho < 3 000 ms sur 1 004 meta.json (plafond)" "$(G "$WORK/f16.json" 'j.ms < 3000')" "true"
+
+echo "=== F17 — l'index des transcripts lit exactement les champs déclarés au contrat (79-08, SOCL-12) ==="
+cat > "$AUX/mk-forme-index.mjs" <<'JS'
+// mk-forme-index.mjs <scripts> <work> <version> : fixture conforme construite de la liste `requis` du contrat, puis une amputation par champ requis déclaré
+// (et un changement de type par champ numérique) ; imprime { conforme, amputations: { chemin: forme }, types: { chemin: forme }, mesuresNulles, hors, horsDeclare, miroir }
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , SC, WORK, VERSION] = process.argv; const imp = (n) => import(pathToFileURL(path.join(SC, n)).href);
+const idx = await imp('vf-cockpit-index.mjs'), voie = await imp('vf-cockpit-index-voie.mjs'); const CC = JSON.parse(fs.readFileSync(path.join(SC, 'vf-cockpit-interface.json'), 'utf8')).claudeCode; const B = CC.index;
+const T0 = Date.parse('2026-11-01T09:00:00Z'), LAB = path.join(WORK, 'lab'); fs.mkdirSync(LAB, { recursive: true });
+const ts = (t) => new Date(T0 + t).toISOString(); const R = {};
+const lignes = () => [
+  { type: 'user', cwd: LAB, sessionId: 'sess-f17', version: VERSION, timestamp: ts(0), message: { role: 'user', content: 'x' } },
+  { type: 'assistant', cwd: LAB, sessionId: 'sess-f17', version: VERSION, timestamp: ts(1000), message: { id: 'm1', model: 'claude-test-1', stop_reason: 'tool_use', usage: { input_tokens: 10, output_tokens: 5, cache_read_input_tokens: 100, cache_creation_input_tokens: 0 }, content: [{ type: 'tool_use', id: 't1', name: 'Read', input: {} }] } },
+  { type: 'user', cwd: LAB, sessionId: 'sess-f17', version: VERSION, timestamp: ts(2000), message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 't1', content: 'x' }] } },
+];
+const retire = (o, ch) => { const k = ch.split('.'); let a = o; for (const x of k.slice(0, -1)) a = a[x]; delete a[k[k.length - 1]]; };
+const pose = (o, ch, v) => { const k = ch.split('.'); let a = o; for (const x of k.slice(0, -1)) a = a[x]; a[k[k.length - 1]] = v; };
+const cible = { lignesDatees: (L) => L[0], assistant: (L) => L[1], appel: (L) => L[1].message.content[0], resultat: (L) => L[2].message.content[0] };
+let n = 0;
+const joue = (L) => { const d = path.join(WORK, `f17-${++n}`, 'projects', '-lab'); fs.mkdirSync(d, { recursive: true }); const f = path.join(d, 'sess-f17.jsonl'); fs.writeFileSync(f, L.map((l) => JSON.stringify(l)).join('\n') + '\n'); fs.utimesSync(f, (T0 + 3000) / 1000, (T0 + 3000) / 1000);
+  const i = idx.construire(idx.enumerer(path.join(d, '..')), { maintenant: T0 + 3600e3, CC }); return { i, v: i.voies[0] }; };
+const { i: iOk, v: vOk } = joue(lignes()); R.conforme = vOk ? `${vOk.forme}|${vOk.jetons.entree}|${vOk.jetons.sortie}` : 'absente'; R.bilan = JSON.stringify(idx.bilan(iOk).versionsHorsContrat);
+R.bilanAutre = JSON.stringify(idx.bilan(joue(lignes()).i).versionsHorsContrat.length); { const i2 = idx.construire(idx.enumerer(path.join(WORK, 'f17-1', 'projects')), { maintenant: T0 + 3600e3, CC: { ...CC, verifieSur: '9.9.9' } }); R.horsContratEssai = JSON.stringify(idx.bilan(i2).versionsHorsContrat); }
+R.amputations = {}; R.types = {};
+for (const [bloc, spec] of Object.entries(B)) for (const ch of spec.requis || []) { if (!cible[bloc]) continue; const L = lignes(); retire(cible[bloc](L), ch); const { v } = joue(L); R.amputations[`${bloc}.${ch}`] = v ? `${v.forme}|${v.jetons === null && v.compteurs === null && v.durees === null}` : 'absente'; if (B.types[ch] === 'number') { const M = lignes(); pose(cible[bloc](M), ch, 'x'); const w = joue(M).v; R.types[`${bloc}.${ch}`] = w ? w.forme : 'absente'; } }
+// test miroir : tout littéral passé à lire( est déclaré au contrat ; aucun accès direct `.message.` hors de l'accesseur
+const declares = new Set(Object.values(B).flatMap((b) => (b && typeof b === 'object' && !Array.isArray(b) ? [...(b.requis || []), ...(b.facultatifs || [])] : [])));
+const analyse = (src) => ({ nonDeclares: [...src.matchAll(/\blire\([^,()]+,\s*'([^']+)'\)/g)].map((m) => m[1]).filter((c) => !declares.has(c)), directs: (src.replace(/\/\/.*$/gm, '').match(/\.message\./g) || []).length });
+const src = fs.readFileSync(path.join(SC, 'vf-cockpit-index-voie.mjs'), 'utf8');
+R.miroir = JSON.stringify(analyse(src)); R.temoinDirect = JSON.stringify(analyse(src + "\nconst x = d.message.id;\n").directs); R.temoinNonDeclare = JSON.stringify(analyse(src + "\nlire(d, 'nouveau.champ');\n").nonDeclares);
+console.log(JSON.stringify(R));
+JS
+FV="$(node -e 'const l=require("fs").readFileSync(process.argv[1],"utf8");console.log((l.match(/version: .([0-9.]+)./)||[])[1])' "$AUX/mk-forme.mjs")"
+node "$AUX/mk-forme-index.mjs" "$SCRIPTS" "$WORK/f17" "$FV" > "$WORK/f17.json" 2> "$WORK/f17.err" || head -3 "$WORK/f17.err"
+assert_eq "F17.0 — le bloc claudeCode.index déclare le plancher : timestamp, message.id, usage entrée et sortie, id et name d'un appel, tool_use_id d'un résultat" "$(G "$IFACE" '(b=>[b.lignesDatees.requis,b.assistant.requis,b.appel.requis,b.resultat.requis].flat().join(","))(j.claudeCode.index)')" "timestamp,message.id,message.usage.input_tokens,message.usage.output_tokens,id,name,tool_use_id"
+assert_eq "F17.1 — fixture conforme à la forme déclarée : voie ok aux jetons attendus (témoin positif)" "$(G "$WORK/f17.json" 'j.conforme')" "ok|10|5"
+for c in lignesDatees.timestamp assistant.message.id assistant.message.usage.input_tokens assistant.message.usage.output_tokens appel.id appel.name resultat.tool_use_id; do
+  assert_eq "F17.2.$c — amputer le champ requis déclaré : voie inconnue, mesures nulles" "$(G "$WORK/f17.json" "j.amputations[\"$c\"]")" "inconnue|true"; done
+for c in assistant.message.usage.input_tokens assistant.message.usage.output_tokens; do assert_eq "F17.2t.$c — changer le type du champ numérique : voie inconnue" "$(G "$WORK/f17.json" "j.types[\"$c\"]")" "inconnue"; done
+assert_eq "F17.2n — autant d'amputations jouées que de champs requis déclarés (anti-vert-à-vide)" "$(G "$WORK/f17.json" 'Object.keys(j.amputations).length')" "7"
+assert_eq "F17.3 — test miroir : tout littéral lu est déclaré, aucun accès direct .message. hors de l'accesseur" "$(G "$WORK/f17.json" 'j.miroir')" '{"nonDeclares":[],"directs":0}'
+assert_eq "F17.3b — témoins : un accès direct supplémentaire compte 1, un littéral non déclaré est vu" "$(G "$WORK/f17.json" 'j.temoinDirect+"|"+j.temoinNonDeclare')" '1|["nouveau.champ"]'
+assert_eq "F17.4 — vueAgents.description dit source de référence et repli, sans l'ancienne formulation" "$(G "$IFACE" '(d=>/source de référence/.test(d)&&/repli/.test(d)&&!/enrichissement optionnel|jamais la source unique/.test(d))(j.claudeCode.vueAgents.description)')" "true"
+assert_eq "F17.5 — verifieSur égale la version des lignes de la fixture conforme ; aucune version hors contrat avec le contrat réel, une avec un contrat d'essai" "$(G "$IFACE" 'j.claudeCode.verifieSur'),$(G "$WORK/f17.json" 'j.bilan+"|"+j.horsContratEssai')" "$FV,[]|[\"$FV\"]"
 
 echo ""
 echo "=================================="

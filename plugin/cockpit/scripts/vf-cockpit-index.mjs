@@ -38,7 +38,8 @@ const hash = (b) => crypto.createHash('sha256').update(b).digest('hex').slice(0,
 function identiteSous(c, CC, seuil) {
   const meta = c.meta, f = formeSousAgent(meta, { isSidechain: true, agentId: c.id }, c.id, CC);
   if (!f) return null;
-  const role = typeof meta.agentType === 'string' ? masqueCoupe(retireAffichage(meta.agentType), BORNES.role) : null;
+  const brut = meta.agentType; // garde:index-role : le rôle est le type d'agent, jamais la description de la tâche
+  const role = typeof brut === 'string' ? masqueCoupe(retireAffichage(brut), BORNES.role) : null;
   return { id: c.id, kind: 'subagent', session: c.session, parent: typeof meta.parentAgentId === 'string' && meta.spawnDepth >= seuil ? meta.parentAgentId : c.session, depth: typeof meta.spawnDepth === 'number' ? meta.spawnDepth : null,
     role, background: meta.requestShape === 'background', fini: meta.finished === true, arrete: f === 'arretee' && meta.stoppedByUser === true };
 }
@@ -135,7 +136,7 @@ export function mettreAJour(index, candidats, opts = {}) {
 function majMeta(voie, c, CC, seuil) {
   const i = identiteSous(c, CC, seuil);
   if (!i) { inconnue(voie); return; }
-  Object.assign(voie, { parent: i.parent, depth: i.depth, role: i.role /* garde:index-role */, background: i.background, fini: i.fini, arrete: i.arrete });
+  Object.assign(voie, { parent: i.parent, depth: i.depth, role: i.role, background: i.background, fini: i.fini, arrete: i.arrete });
 }
 
 export const construire = (candidats, opts = {}) => mettreAJour(indexVide((opts.CC || CONTRAT.claudeCode)?.verifieSur), candidats, opts).index;

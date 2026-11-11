@@ -75,3 +75,12 @@ Limite dite : sous M-MSGID tout échec n'est pas à message à cheval ; certains
 ## Tâche 3 — M-CLOS (amendement du 2026-11-11, I2.12)
 
 - M-CLOS (`garde:index-clos` : `travail.clos.includes(id)` remplacé par `false`) : le run ne plante pas ; seul I2.12 diffère de la sortie normale du scénario ; la voie A, B, A reste en forme `ok` avec les jetons de A comptés deux fois au lieu de passer en forme inconnue aux mesures nulles.
+
+## Tâche 4 — fichier non fiable, contenu sans fuite, contrat étendu (F17)
+
+Déviation déclarée : la validation complète du fichier (`validerIndex`) et le contrat étendu ont été écrits avec les modules ; I6, P3 et I7 n'ont donc pas de rouge « sur le code de la tâche 3 ». Leur capacité à rougir est prouvée par les mutants ci-dessous et par les témoins positifs (I6.0, I7.0, P3.2).
+
+- F17 sur l'instantané de la base (contrat sans bloc `claudeCode.index`, `vueAgents` ancien, `verifieSur` 2.1.317) : 16 FAIL (F17.0, F17.1, F17.2.* ×7, F17.2t.* ×2, F17.2n, F17.3, F17.3b, F17.4, F17.5), les suites F0 à F16 inchangées vertes.
+- M-VALIDE (`garde:index-valide` : `return r;` remplacé par une acceptation inconditionnelle) : le run ne plante pas, la propriété P3.1 rougit (index accepté qui viole un invariant : clés interdites, segments, jetons, curseur) ; un premier essai a montré que le vérificateur indépendant plantait sur un index mal formé : un plantage du vérificateur compte maintenant comme une violation, jamais comme un vert.
+- M-FUITE (`garde:index-role` : le rôle lu dans `meta.description` au lieu de `meta.agentType`) : I7.1 rougit et nomme `role` (balayage de 30 transcripts générés et des fixtures).
+- Résultats au vert : `test-cockpit-index.sh` 109 PASS / 0 FAIL ; `test-cockpit-forme-claude.sh` 76 PASS / 0 FAIL ; `test-cockpit-who.sh` 157, `test-cockpit-signal.sh` 76, `test-cockpit-equipe-etats.sh` 86, `test-cockpit-transcript.sh` 103, `test-cockpit-vendor.sh` 87 PASS, 0 FAIL ; `check-file-size.sh` et `check-machine-paths.sh` rendent 0.

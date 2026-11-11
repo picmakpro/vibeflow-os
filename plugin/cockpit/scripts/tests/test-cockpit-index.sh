@@ -270,6 +270,100 @@ if [ -n "$M" ]; then prop "$M" retention --graine=1 --n=40; A="$(pj 'j.plantage=
 M="$(mutant clos vf-cockpit-index-voie.mjs 'travail.clos.includes(id)' 'false')" || M=""
 if [ -n "$M" ]; then cas clos "$M"; assert_eq "M-CLOS — I2.12 rouge, et seul I2.12 : sans la garde, les jetons de A sont comptés deux fois, sans plantage" "$(diffcles "$WORK/m-clos/cas.json" "$WORK/cas.json")" '["I2.12"]'; else assert_eq "M-CLOS — mutant applicable" "non" "oui"; fi
 
+cat > "$AUX/hostile.mjs" <<'JS'
+// hostile.mjs <scripts> <work> <fixtures> : charge des fichiers d'index hostiles et imprime { cas: "etat|raison" } (jugé par la suite)
+import fs from 'node:fs'; import path from 'node:path'; import { execFileSync } from 'node:child_process'; import { pathToFileURL } from 'node:url';
+const [, , SC, WORK, FIX] = process.argv; const imp = (n) => import(pathToFileURL(path.join(SC, n)).href); const idx = await imp('vf-cockpit-index.mjs'), ca = await imp('vf-cockpit-index-cache.mjs');
+const T0 = Date.parse('2026-11-01T09:00:00Z'), H = 3600e3, LAB = path.join(WORK, 'lab'), R = {}, MAINT = T0 + H;
+const dest = path.join(WORK, 'hx', 'projects'); fs.cpSync(path.join(FIX, 'projects'), dest, { recursive: true });
+const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else { fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replaceAll('@LAB@', LAB).replaceAll('@AUTRE@', WORK + '/autre')); fs.utimesSync(p, (T0 + H) / 1000, (T0 + H) / 1000); } } }; walk(dest);
+const O = { maintenant: MAINT, arbreDe: (c) => (c === LAB ? { arbre: null } : null), memoHors: new Map() };
+const base = idx.construire(idx.enumerer(dest), O); const dir = path.join(WORK, 'hostile'); fs.mkdirSync(dir, { recursive: true }); let n = 0;
+const essai = (nom, mut, opts = {}, mode = 0o600) => { const m = JSON.parse(JSON.stringify(base)); mut(m); const f = path.join(dir, `i${++n}.json`); fs.writeFileSync(f, JSON.stringify(m), { mode }); fs.chmodSync(f, mode); const r = ca.chargerIndex(f, LAB, { maintenant: MAINT, ...opts }); R[nom] = `${r.etat}|${r.raison}`; return f; };
+essai('I6.0', () => {});
+essai('I6.1', (m) => { m.schema = 'autre'; }); essai('I6.2', (m) => { m.schema = 'vibeflow/cockpit-index@2'; }); essai('I6.3', (m) => { m.voies = {}; });
+essai('I6.4', () => {}, { bornes: { voiesMax: 1 } }); essai('I6.5', (m) => { m.voies[0].id = '../x'; });
+essai('I6.6a', (m) => { m.voies[0].arbre = '/etc'; }); essai('I6.6b', (m) => { m.voies[0].arbre = 'a/b'; }); essai('I6.6c', (m) => { m.voies[0].arbre = 'a\\b'; }); essai('I6.6d', (m) => { m.voies[0].arbre = '..'; });
+const v0 = (m) => m.voies.find((v) => v.id === 'sess-aaaa0001');
+essai('I6.7', (m) => { v0(m).segments = [[T0 + 10, T0 + 20, 'travail'], [T0 + 1, T0 + 5, 'silence']]; });
+essai('I6.8', (m) => { v0(m).segments = Array.from({ length: 501 }, (_, i) => [T0 + i * 10, T0 + i * 10 + 5, i % 2 ? 'travail' : 'silence']); });
+essai('I6.9', (m) => { v0(m).debut = 1000; }); essai('I6.10', (m) => { v0(m).fin = MAINT + 2 * 86400e3; });
+essai('I6.11a', (m) => { v0(m).curseur.octets = -1; }); essai('I6.11b', (m) => { v0(m).curseur.octets = 1.5; }); essai('I6.11c', (m) => { v0(m).curseur.octets = v0(m).curseur.taille + 1; });
+essai('I6.12', (m) => { v0(m).curseur.ouverts = Object.fromEntries(Array.from({ length: 65 }, (_, i) => [`t${i}`, { v: 'lit', t: T0, c: 'autre' }])); });
+essai('I6.13', (m) => { v0(m).curseur.etat.doing = 1; }); essai('I6.14', (m) => { v0(m).cibles = { ecritures: [] }; });
+essai('I6.15', () => {}, { bornes: { fichierOctets: 100 } });
+const ok = essai('I6.16', () => {}); const lien = path.join(dir, 'lien.json'); fs.symlinkSync(ok, lien); const rl = ca.chargerIndex(lien, LAB, { maintenant: MAINT }); R['I6.16'] = `${rl.etat}|${rl.raison}`;
+const tube = path.join(dir, 'tube.json'); execFileSync('mkfifo', [tube]); const rt = ca.chargerIndex(tube, LAB, { maintenant: MAINT }); R['I6.17'] = `${rt.etat}|${rt.raison}`;
+essai('I6.18', () => {}, {}, 0o644); essai('I6.19', () => {}, { uid: process.getuid() + 1 });
+const f = path.join(dir, 'reconstruit.json'); fs.writeFileSync(f, '{"schema":"x"}', { mode: 0o600 }); const ch = ca.chargerIndex(f, LAB, { maintenant: MAINT });
+const strip = (i) => { const c = JSON.parse(JSON.stringify(i)); delete c.genereA; return JSON.stringify(c); };
+R['I6.20'] = `${ch.etat}|${strip(idx.mettreAJour(ch.index, idx.enumerer(dest), O).index) === strip(base)}`;
+console.log(JSON.stringify(R));
+JS
+cat > "$AUX/fuite.mjs" <<'JS'
+// fuite.mjs <scripts> <work> <fixtures> <tests> : balayage de contenu de l'index écrit sur disque (marqueurs posés dans chaque champ hors liste blanche)
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , SC, WORK, FIX, TESTS] = process.argv; const imp = (n) => import(pathToFileURL(path.join(SC, n)).href); const idx = await imp('vf-cockpit-index.mjs'), ca = await imp('vf-cockpit-index-cache.mjs'), voie = await imp('vf-cockpit-index-voie.mjs');
+const { gen, T0 } = await import(pathToFileURL(path.join(TESTS, 'index-generateur.mjs')).href); const LAB = path.join(WORK, 'lab'), R = {}, H = 3600e3;
+const dest = path.join(WORK, 'fu', 'projects'); fs.cpSync(path.join(FIX, 'projects'), dest, { recursive: true });
+const walk = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) walk(p); else { fs.writeFileSync(p, fs.readFileSync(p, 'utf8').replaceAll('@LAB@', LAB).replaceAll('@AUTRE@', WORK + '/autre')); fs.utimesSync(p, (T0 + H) / 1000, (T0 + H) / 1000); } } }; walk(dest);
+const txt = []; for (let k = 0; k < 30; k++) { const id = `sess-f${k}`, g = gen(900 + k, { lab: LAB, id }), f = path.join(dest, '-lab', id + '.jsonl'); fs.writeFileSync(f, g.buf); fs.utimesSync(f, (T0 + H) / 1000, (T0 + H) / 1000); txt.push(g.buf.toString()); }
+const tout = txt.join('') + fs.readFileSync(path.join(dest, '-lab', 'sess-aaaa0001.jsonl'), 'utf8') + fs.readFileSync(path.join(dest, '-lab', 'sess-aaaa0001', 'subagents', 'agent-mgr00001.meta.json'), 'utf8');
+R.presents = ['MARQ-TEXTE', 'MARQ-COMMANDE', 'MARQ-CIBLE', 'MARQ-SORTIE', 'MARQ-TUR', 'MARQ-BRANCHE', 'MARQ-TITRE'].filter((m) => !tout.includes(m)).concat(tout.includes(LAB) ? [] : ['lab']);
+const index = idx.construire(idx.enumerer(dest), { maintenant: T0 + 2 * H, arbreDe: (c) => (c === LAB ? { arbre: null } : null), memoHors: new Map() });
+const fich = path.join(LAB, '.vibeflow', 'cockpit', '.cache', 'index-transcripts.json'); ca.ecrireIndex(fich, LAB, index);
+const disque = JSON.parse(fs.readFileSync(fich, 'utf8')), brut = fs.readFileSync(fich, 'utf8');
+const fuites = (o, p = []) => { const r = []; if (typeof o === 'string' && (o.includes('MARQ-') || o.includes(LAB) || o.includes(WORK))) r.push(p.join('.').replace(/^voies\.\d+\./, '').replace(/\.\d+(?=\.|$)/g, '.#')); else if (o && typeof o === 'object') for (const k of Object.keys(o)) r.push(...fuites(o[k], [...p, k])); return r; };
+const INTERD = [...JSON.parse(fs.readFileSync(path.join(SC, 'vf-cockpit-interface.json'), 'utf8')).schemas['vibeflow/cockpit-who@2'].interdits, 'cibles', 'ecritures', 'lectures', 'cible'];
+const cles = (o, d = 0) => { const r = []; if (d > 14 || !o || typeof o !== 'object') return r; for (const k of Object.keys(o)) { if (INTERD.includes(k)) r.push(k); r.push(...cles(o[k], d + 1)); } return r; };
+R.voies = disque.voies.length; R.fuites = [...new Set(fuites(disque))]; R.brut = /MARQ-|doing/.test(brut) || brut.includes(LAB);
+R.temoinMarqueur = fuites({ voies: [{ id: 'x', role: 'MARQ-TEXTE' }] }).join(','); R.temoinCle = cles({ a: { b: { doing: 1 } } }).join(','); R.temoinCible = cles({ a: [{ b: { cibles: 1 } }] }).join(',');
+R.cles = [...new Set(cles(disque))]; const pub = disque.voies.map((v) => voie.publique(v)); const C3 = ['id', 'kind', 'session', 'parent', 'depth', 'role', 'arbre', 'background', 'debut', 'fin', 'dispatchA', 'fini', 'arrete', 'modeles', 'compteurs', 'jetons', 'durees', 'segments', 'evenements', 'enCours', 'rattachement'];
+R.publique = pub.every((p) => Object.keys(p).every((k) => C3.includes(k)) && !('curseur' in p) && !('etatOfficiel' in p) && !('cibles' in p) && p.rattachement === null);
+console.log(JSON.stringify(R));
+JS
+cc() { node "$AUX/$1.mjs" "${2:-$SCRIPTS}" "$3" "$FIX" "$SCRIPTS/tests" 2>/dev/null; }
+echo "=== I6 — fichier d'index hostile ==="
+mkdir -p "$WORK/h1/lab" && ( cd "$WORK" && node "$AUX/hostile.mjs" "$SCRIPTS" "$WORK/h1" "$FIX" > "$WORK/hostile.json" 2>"$WORK/hostile.err" ) ; hj() { node "$AUX/get.mjs" "$WORK/hostile.json" "j[\"$1\"]"; }
+assert_eq "I6.0 — témoin positif : l'index valide produit par le module est accepté" "$(hj I6.0)" "lu|"
+assert_eq "I6.1 — mauvais schéma écarté" "$(hj I6.1)" "ecarte|schema: version inconnue"
+assert_eq "I6.2 — mauvaise version écartée" "$(hj I6.2)" "ecarte|schema: version inconnue"
+assert_eq "I6.3 — voies qui n'est pas une liste" "$(hj I6.3)" "ecarte|voies: pas une liste"
+assert_eq "I6.4 — plus de voiesMax voies (borne d'essai abaissée)" "$(hj I6.4)" "ecarte|voies: trop nombreuses"
+assert_eq "I6.5 — identifiant à forme de chemin relatif" "$(hj I6.5)" "ecarte|voie: id: identifiant"
+for k in a b c d; do assert_eq "I6.6$k — arbre à forme de chemin" "$(hj I6.6$k)" "ecarte|voie: arbre: forme de chemin"; done
+assert_eq "I6.7 — segments non croissants" "$(hj I6.7)" "ecarte|voie: segments: forme ou ordre"
+assert_eq "I6.8 — segments en nombre excessif" "$(hj I6.8)" "ecarte|voie: segments: nombre"
+assert_eq "I6.9 — instant avant 2020" "$(hj I6.9)" "ecarte|voie: debut: instant"
+assert_eq "I6.10 — instant à plus d'un jour dans le futur" "$(hj I6.10)" "ecarte|voie: fin: instant"
+assert_eq "I6.11a — curseur.octets négatif" "$(hj I6.11a)" "ecarte|voie: curseur.octets: forme"
+assert_eq "I6.11b — curseur.octets non entier" "$(hj I6.11b)" "ecarte|voie: curseur.octets: forme"
+assert_eq "I6.11c — curseur.octets supérieur à la taille" "$(hj I6.11c)" "ecarte|voie: curseur.octets: au-delà de la taille"
+assert_eq "I6.12 — plus de 64 appels ouverts" "$(hj I6.12)" "ecarte|voie: curseur.ouverts: forme"
+assert_eq "I6.13 — clé interdite à toute profondeur" "$(hj I6.13)" "ecarte|cle-interdite: doing"
+assert_eq "I6.14 — clé de cible" "$(hj I6.14)" "ecarte|cle-interdite: cibles"
+assert_eq "I6.15 — fichier de plus de fichierOctets" "$(hj I6.15)" "ecarte|fichier trop gros"
+assert_eq "I6.16 — lien symbolique refusé" "$(hj I6.16)" "ecarte|ouverture refusée (lien ou fichier illisible)"
+assert_eq "I6.17 — tube (fichier non ordinaire) refusé sans bloquer" "$(hj I6.17)" "ecarte|pas un fichier ordinaire"
+assert_eq "I6.18 — mode 0644 refusé" "$(hj I6.18)" "ecarte|droits trop larges"
+assert_eq "I6.19 — propriétaire différent refusé" "$(hj I6.19)" "ecarte|autre propriétaire"
+assert_eq "I6.20 — après écart, la mise à jour reconstruit un index égal à celui d'une passe" "$(hj I6.20)" "ecarte|true"
+echo "=== P3 — fuzz du chargement ==="
+GC="${VF_SEED:-$((RANDOM * 32768 + RANDOM))}"; echo "graine=$GC (rejouable : VF_SEED=$GC)"
+for g in 1 2 "$GC"; do prop "$SCRIPTS" chargement --graine=$g; assert_eq "P3.1 — graine $g : 200 mutations d'un index valide, zéro index accepté qui viole un invariant (vérificateur écrit à part)" "$(pj "$VERT")" "true"; done
+prop "$SCRIPTS" chargement --graine=1; assert_eq "P3.2 — couverture du fuzz : au moins 20 % de mutations écartées et 5 % acceptées" "$(pj 'j.couverture.comptes.ecartees>=40&&j.couverture.comptes.acceptees>=10')" "true"
+M="$(mutant valide vf-cockpit-index-cache.mjs 'return r;' "return { ok: true, raison: '' };")" || M=""
+if [ -n "$M" ]; then prop "$M" chargement --graine=1; assert_eq "M-VALIDE — P3.1 rouge : sans plantage, un index accepté viole un invariant" "$(pj 'j.plantage===null&&j.echecs.length>0&&j.echecs.every((e)=>e.classes.includes("index-accepte"))')" "true"; else assert_eq "M-VALIDE — mutant applicable" "non" "oui"; fi
+echo "=== I7 — aucun contenu de transcript dans l'index ==="
+mkdir -p "$WORK/f1/lab"; cc fuite "$SCRIPTS" "$WORK/f1" > "$WORK/fuite.json"; fj() { node "$AUX/get.mjs" "$WORK/fuite.json" "$1"; }
+assert_eq "I7.0 — témoins : un marqueur injecté est trouvé, une clé interdite à profondeur 3 et une clé de cible aussi" "$(fj '[j.temoinMarqueur,j.temoinCle,j.temoinCible].join("|")')" "role|doing|cibles"
+assert_eq "I7.1 — témoin positif : chaque marqueur est présent dans les transcripts générés et le chemin du lab aussi" "$(fj 'j.presents')" "[]"
+assert_eq "I7.1 — balayage génératif : 30 transcripts générés et les fixtures, aucun marqueur ni chemin du lab dans l'index écrit" "$(fj 'JSON.stringify([j.voies>=30,j.fuites,j.brut])')" "[true,[],false]"
+assert_eq "I7.2 — aucune des cinq clés du contrat ni clé de cible à toute profondeur du fichier" "$(fj 'j.cles')" "[]"
+assert_eq "I7.3 — publique(voie) : champs de C3 seulement, sans curseur ni etatOfficiel ni cibles, rattachement nul" "$(fj 'j.publique')" "true"
+M="$(mutant role vf-cockpit-index.mjs 'meta.agentType' 'meta.description')" || M=""
+if [ -n "$M" ]; then mkdir -p "$WORK/f2/lab"; cc fuite "$M" "$WORK/f2" > "$WORK/fuite2.json"; assert_eq "M-FUITE — I7.1 rouge et nomme role (le rôle prend la description de tâche)" "$(node "$AUX/get.mjs" "$WORK/fuite2.json" 'j.fuites')" '["role"]'; else assert_eq "M-FUITE — mutant applicable" "non" "oui"; fi
+
 echo ""; echo "Résultats : $PASS PASS / $FAIL FAIL"
 [ $((PASS+FAIL)) -eq 0 ] && { echo "aucune assertion jouée"; exit 1; }
 [ "$FAIL" -eq 0 ]

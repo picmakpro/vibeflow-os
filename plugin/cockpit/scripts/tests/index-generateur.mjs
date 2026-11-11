@@ -10,7 +10,7 @@ export function gen(seed, { lab, id, abandonne = false }) {
   const L = [], ouverts = [], jet = new Map(), o = { appels: 0, erreurs: 0, questions: 0, compactions: 0, tours: 0, refus: 0 };
   let t = 0, cum = 0, fin = false, derniere = null, nMsg = 0, nAppel = 0;
   const ligne = (obj, meta) => { const g = L.length ? t - L[L.length - 1].t : 0; L.push({ s: typeof obj === 'string' ? obj : JSON.stringify(obj), t, ouverts: ouverts.length, finTour: fin, gapAvant: meta.dated ? g : 0, ...meta }); };
-  const daté = (type, extra) => ({ cwd: lab, sessionId: id, version: '2.1.322', timestamp: new Date(T0 + t).toISOString(), type, ...extra });
+  const daté = (type, extra) => ({ cwd: lab, sessionId: id, version: '2.1.322', gitBranch: 'MARQ-BRANCHE', timestamp: new Date(T0 + t).toISOString(), type, ...extra });
   const ecart = () => { let g = pick([1000, 30000, 179000, 180000, 181000, 400000, 3600000, 1000, 2000]); if (cum + g > 20 * 3600e3) g = 1000; cum += g; t += g; };
   const resultat = (erreur) => { const i = int(0, ouverts.length - 1), [cid] = ouverts.splice(i, 1); if (erreur) o.erreurs++; fin = false; ligne(daté('user', { message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: cid, ...(erreur ? { is_error: true } : {}), content: 'MARQ-SORTIE' }] }, toolUseResult: 'MARQ-TUR' }), { type: 'user', dated: true }); };
   const message = (forceAppel) => {
@@ -33,7 +33,7 @@ export function gen(seed, { lab, id, abandonne = false }) {
     else if (x < 0.75 && ouverts.length) resultat(r() < 0.3);
     else if (x < 0.80) { o.compactions++; ligne(daté('system', { subtype: 'compact_boundary' }), { type: 'system' }); }
     else if (x < 0.86) { o.tours++; fin = true; ligne(daté('system', { subtype: 'turn_duration', pendingBackgroundAgentCount: int(0, 3) }), { type: 'system' }); }
-    else if (x < 0.91) ligne({ type: 'attachment', sessionId: id, note: 'MARQ-TEXTE' }, { type: 'bruit' });
+    else if (x < 0.91) ligne(r() < 0.5 ? { type: 'attachment', sessionId: id, note: 'MARQ-TEXTE' } : { type: 'custom-title', customTitle: 'MARQ-TITRE', sessionId: id }, { type: 'bruit' });
     else if (x < 0.945) { fin = false; ligne(daté('user', { message: { role: 'user', content: 'x'.repeat(5000) } }), { type: 'user', geante: true }); }
     else { fin = false; const refus = r() < 0.4; if (refus) o.refus++; ligne(daté('user', { message: { role: 'user', content: 'MARQ-TEXTE' }, ...(refus ? { permissionDecision: { decision: 'reject' } } : {}) }), { type: 'user', dated: true }); }
   }

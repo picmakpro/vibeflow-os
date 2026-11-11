@@ -1,6 +1,6 @@
 // index-propriete — propriétés génératives de l'index des transcripts (79-08, tâche 3). Le code testé est importé d'un dossier de scripts passé en paramètre (copie mutée comprise).
 // Usage : node index-propriete.mjs DOSSIER_DES_SCRIPTS MODE [--graine=N] [--n=40] [--genere=normal|degenere|une-coupe]
-// MODE : incrementalite | reecritures | couverture-temoin | cout | retention. Imprime `graine=N` puis, en dernière ligne, un JSON { plantage, graine, echecs: [{ champs, classes }], couverture: { comptes, manque }, octetsLus } ; sortie 0 dans tous les cas.
+// MODE : incrementalite | reecritures | couverture-temoin | cout | retention | chargement (fuzz du fichier d'index). Imprime `graine=N` puis, en dernière ligne, un JSON { plantage, graine, echecs: [{ champs, classes }], couverture: { comptes, manque }, octetsLus } ; sortie 0 dans tous les cas.
 import fs from 'node:fs'; import os from 'node:os'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
 import { T0, rng, gen, coupes, classesDeCoupe, manque } from './index-generateur.mjs';
 const [, , SC, MODE, ...reste] = process.argv, arg = (k, d) => (reste.find((a) => a.startsWith(`--${k}=`)) || `=${d}`).split('=')[1];
@@ -64,6 +64,29 @@ try {
       if (lus > permis) sortie.echecs.push({ champs: ['cout.octets-lus'], classes: ['ajout'], graine: graine * 1000 + k });
     }
     fs.readSync = rs;
+  } else if (MODE === 'chargement') {
+    const t = tour(graine * 1000 + 1), ref = T0 + t.g.tFin + 3600e3; ecrire(t.f, t.g.buf, t.mt); const base = M.idx.construire(M.idx.enumerer(t.proj), { maintenant: ref, memoHors: new Map() }), r = t.r;
+    const INTERDITES = new Set(['doing', 'mandat', 'messages', 'outils', 'fil', 'cibles', 'ecritures', 'lectures', 'cible']);
+    // vérificateur d'invariants écrit à part du validateur du module
+    const viole = (i) => { const v = []; const ent = (x) => Number.isInteger(x) && x >= 0, inst = (x) => Number.isFinite(x) && x >= Date.UTC(2020, 0, 1) && x <= ref + 86400e3;
+      const cle = (o, d = 0) => { if (d > 12 || !o || typeof o !== 'object') return; for (const k of Object.keys(o)) { if (INTERDITES.has(k)) v.push(`cle:${k}`); cle(o[k], d + 1); } }; cle(i);
+      if (i.schema !== 'vibeflow/cockpit-index@1' || !Array.isArray(i.voies) || i.voies.length > 2000 || i.fenetreS !== 86400) v.push('entete');
+      for (const x of Array.isArray(i.voies) ? i.voies : []) {
+        if (!/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(String(x.id)) || !/^[A-Za-z0-9][A-Za-z0-9_-]{0,127}$/.test(String(x.session))) v.push('id'); if (x.arbre !== null && (typeof x.arbre !== 'string' || /[/\\]/.test(x.arbre))) v.push('arbre');
+        for (const k of ['debut', 'fin']) if (x[k] !== null && !inst(x[k])) v.push(k); const c = x.curseur;
+        if (!c || !ent(c.octets) || !ent(c.taille) || c.octets > c.taille || Object.keys(c.ouverts || {}).length > 64) v.push('curseur');
+        if ((x.forme === 'inconnue') !== (x.jetons === null)) v.push('forme-mesures'); if (Array.isArray(x.segments)) { if (x.segments.length > 500 || x.segments.some((s, k) => !inst(s[0]) || !inst(s[1]) || s[1] <= s[0] || (k && s[0] < x.segments[k - 1][1]))) v.push('segments'); }
+        if (x.compteurs && Object.values(x.compteurs).some((n) => !ent(n))) v.push('compteurs'); if (x.jetons && Object.values(x.jetons).some((n) => !ent(n))) v.push('jetons');
+      } return v; };
+    const chemins2 = []; const marche = (o, p) => { chemins2.push(p); if (o && typeof o === 'object') for (const k of Object.keys(o)) marche(o[k], [...p, k]); }; marche(base, []);
+    const AUTRES = [null, 'x', 5, [], {}, true, -1, 1e308, '../../x', '__proto__', 1.5, 'a'.repeat(300)]; let ecartees = 0, acceptees = 0;
+    for (let n = 0; n < 200; n++) {
+      const m = JSON.parse(JSON.stringify(base)), p = chemins2[Math.floor(r() * chemins2.length)], op = r(); let hote = m; for (const k of p.slice(0, -1)) hote = hote[k]; const k = p[p.length - 1];
+      if (p.length === 0) { hote = null; }
+      if (hote && k !== undefined) { if (op < 0.2) delete hote[k]; else if (op < 0.65) hote[k] = AUTRES[Math.floor(r() * AUTRES.length)]; else if (op < 0.8) hote[k] = typeof hote[k] === 'number' ? hote[k] + 1 : hote[k]; else if (typeof hote === 'object' && !Array.isArray(hote)) hote[['doing', 'cibles', 'mandat'][Math.floor(r() * 3)]] = 1; else hote[k] = hote[k]; }
+      const rep = M.cache.validerIndex(m, { maintenant: ref }); if (!rep.ok) { ecartees++; continue; } acceptees++; let vv; try { vv = viole(m); } catch { vv = ['verificateur-plante-sur-index-accepte']; } if (vv.length) sortie.echecs.push({ champs: [...new Set(vv)], classes: ['index-accepte'], graine: n });
+    }
+    sortie.couverture = { comptes: { ecartees, acceptees, total: 200 }, manque: [] };
   } else if (MODE === 'retention') {
     for (let k = 0; k < N; k++) {
       const t = tour(graine * 1000 + k + 700), g = gen(graine * 1000 + k + 700, { lab: LAB, id: t.id, abandonne: true }), r = t.r, wid = `w${k}`, H = 3600e3;
