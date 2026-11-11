@@ -1133,6 +1133,7 @@ mut_haut() { # mut_haut <libellé> <nom> <expression-sed> <expression de rougiss
   else sans_effet "$1 $2"; fi
 }
 mut_haut TH.9 M-HAUT-SANS-REHAUSSEMENT 's|if (!plein \&\& h < 300) { h = borne(300); appliquer(); }||;s|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["bas-evt"].now<300&&j.haut["bas-msg"].now<300' "le tiroir reste sous 300 px par les deux chemins"
+mut_haut TH.14 M-HAUT-BANDEAU-ECRASE-MEMO 's|h = borne(hautBandeau()); appliquer(); }|h = borne(hautBandeau()); appliquer(); memoH(); }|' 'j.haut["moyen-evt"].memo!=="424"' "le rehaussement au bandeau écrase la hauteur mémorisée (PU-G-136)"
 mut_haut TH.13 M-HAUT-SANS-BANDEAU 's|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["moyen-evt"].now<480&&j.haut["moyen-msg"].now<480' "un tiroir de 424 px n'est pas rehaussé à la hauteur du bandeau (AUDC-M11)"
 mut_haut TH.10 M-HAUT-ECRASE-MEMO 's|h = borne(300); appliquer(); }|h = borne(300); appliquer(); memoH(); }|' 'j.haut["bas-evt"].memo!=="160"' "la hauteur mémorisée est écrasée"
 mut_haut TH.11 M-HAUT-REDUIT 's|if (!plein \&\& h < 300) { h = borne(300)|if (!plein) { h = borne(300)|' 'j.haut["haut-evt"].now!==544' "un tiroir à 544 px est ramené à 300"

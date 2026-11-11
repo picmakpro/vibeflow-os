@@ -129,6 +129,12 @@ if [ -n "$CHROME" ]; then
   assert_eq "FIN.4 (1280 x 720) — la phrase « écrit cette ligne sans la lancer » est visible à la hauteur par défaut" "$(g 'j.phrase')" "visible"
   assert_eq "FIN.4 (1280 x 720) — le tiroir ne dépasse pas 60 % de la fenêtre (432 px)" "$(g 'j.tiroir <= 432')" "true"
   unsrv
+  # fenêtre très basse (1280 x 500) : le rehaussement garde le plafond de 60 % (300 px) et ne met jamais le tiroir en plein écran (PU-G-136)
+  srv
+  R="$(chrome_fin "$(printf '{"mode":"session","P":%s,"Q":%s,"amorce":"%s","pidShell":"%s","largeur":1280,"hauteur":500}' "$SRV_PORT" "$QP" "$AMORCE" "$RUN/shell.pid")")"
+  echo "     [mesures 500] $(printf '%s' "$R" | node "$AUX/ev.mjs" 'JSON.stringify({tiroir:j.tiroir,plein:j.plein,erreurs:j.erreurs})')"
+  assert_eq "FIN.5 (1280 x 500) — la proposition ouvre le tiroir (témoin : mesuré, ≥ 300 px) sans le mettre en plein écran, au plus 60 % de la fenêtre (300 px)" "$(g 'j.plein+" "+(j.tiroir>=300&&j.tiroir<=300)')" "false true"
+  unsrv
 else nonverif "FIN.3"; nonverif "FIN.4"; fi
 
 echo

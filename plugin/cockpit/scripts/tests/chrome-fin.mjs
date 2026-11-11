@@ -82,6 +82,7 @@ await executer(chrome, async (sp) => {
   await essai('mesures', async () => {
     await positionPosee(evQ, `document.getElementById('proposition')`);
     r.tiroir = await stabiliser(() => sp.ev(`Math.round(document.querySelector('.vf-term-tiroir').getBoundingClientRect().height)`));
+    r.plein = await sp.ev(`document.querySelector('.vf-term-tiroir').classList.contains('vf-term-plein-etat')`);
     r.cadre = await stabiliser(() => evQ(`window.innerHeight`));
     r.bandeau = await stabiliser(() => evQ(`(() => { const b = document.getElementById('proposition'); return { client: b.clientHeight, defile: b.scrollHeight }; })()`));
     // visible = l'élément tient dans le cadre ET ses bords haut et bas (à 2 px à l'intérieur) répondent au test de position : ni sous le pied collé, ni rogné par le défilement
