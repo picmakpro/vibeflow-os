@@ -180,13 +180,27 @@ assert_eq "AM7.2 — en CI, sans Chrome : la suite sort non-zéro (1)" "$(rc_min
 assert_has "AM7.3 — le message dit l'absence de navigateur en CI" "$(cat "$WORK/mini.out")" "AM7 aucun navigateur"
 assert_eq "AM7.4 — témoin positif : en CI, avec un Chrome trouvé, la suite sort 0" "$(rc_mini CI=true FAUX_CHROME=/usr/bin/chrome-factice)" "0"
 assert_eq "AM7.5 — échappatoire explicite VF_CHROME_OPTIONNEL en CI : sort 0" "$(rc_mini CI=true VF_CHROME_OPTIONNEL=1)" "0"
-# couverture : toute suite qui cherche un navigateur passe par hygiene.sh et son trap EXIT (sinon la garde ne s'applique pas à elle)
-HORS=""
+# couverture PAR EXÉCUTION : chaque suite qui appelle vf_chrome_saut (chrome-saut.sh, le mécanisme du point de saut) est jouée en CI=true sur une copie dont la
+# recherche de Chrome est neutralisée (chemin macOS retiré, noms du PATH remplacés) : elle doit sortir non-zéro avec le message AM7, APRÈS avoir écrit son saut « aucun navigateur »
+CP="$(cd "$(dirname "$0")/.." && pwd)"; trap 'rm -f "$CP"/tests/zz-am7-*.sh; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT # copies neutralisées posées à côté des suites (leurs chemins relatifs doivent résoudre), retirées à la sortie
+NSAUT=0; BAD=""
 for f in "$(dirname "$0")"/test-*.sh; do
-  grep -qE '^[[:space:]]*(EK)?CHROME=""|(^|[;[:space:]])(EK)?CHROME=""' "$f" || continue
-  grep -q 'hygiene.sh' "$f" && grep -q 'vf_hyg_fin' "$f" || HORS="$HORS $(basename "$f")"
+  b="$(basename "$f")"; [ "$b" = test-cockpit-cycle-serveur.sh ] && continue
+  grep -qi 'aucun navigateur' "$f" && grep -q 'CHROME=""' "$f" || continue
+  if ! grep -q 'vf_chrome_saut' "$f"; then # sans helper : seul le filet de sortie de hygiene.sh peut échouer, il doit donc être sourcé AVANT la recherche de Chrome
+    lh="$(grep -n 'hygiene.sh' "$f" | sed -n 1p | cut -d: -f1)"; lc="$(grep -n 'CHROME=""' "$f" | sed -n 1p | cut -d: -f1)"
+    { [ -n "$lh" ] && [ -n "$lc" ] && [ "$lh" -lt "$lc" ]; } || BAD="$BAD $b(saut hors du filet de hygiene.sh)"
+    continue
+  fi
+  NSAUT=$((NSAUT+1))
+  sed 's#"/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" ##; s#google-chrome google-chrome-stable chromium chromium-browser#navigateur-inexistant-xyz#' "$f" > "$CP/tests/zz-am7-$b"
+  cmp -s "$f" "$CP/tests/zz-am7-$b" && { BAD="$BAD $b(recherche non neutralisée)"; continue; }
+  env -u CHROME_BIN -u VF_CHROME_OPTIONNEL CI=true bash "$CP/tests/zz-am7-$b" > "$WORK/am-$b.out" 2> "$WORK/am-$b.err" < /dev/null; rc=$?
+  { [ "$rc" -ne 0 ] && grep -q 'AM7 aucun navigateur' "$WORK/am-$b.err" && grep -q 'aucun navigateur' "$WORK/am-$b.out"; } || BAD="$BAD $b(rc=$rc)"
 done
-assert_eq "AM7.6 — toute suite qui cherche un navigateur utilise hygiene.sh et son filet de sortie (hors couverture : aucune)" "${HORS:-aucune}" "aucune"
+rm -f "$CP"/tests/zz-am7-*.sh
+assert_ge "AM7.6a — témoin : au moins six suites appellent le helper du point de saut" "$NSAUT" 6
+assert_eq "AM7.6 — chaque suite qui saute sa moitié navigateur sort non-zéro en CI sans Chrome, sur place (rouge : aucune)" "${BAD:-aucune}" "aucune"
 
 echo "== bilan : $PASS réussi(s), $FAIL échec(s) =="
 [ "$FAIL" -eq 0 ]

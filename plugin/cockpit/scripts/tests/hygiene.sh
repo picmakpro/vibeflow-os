@@ -120,11 +120,10 @@ vf_hyg_assert() {
 # AUDC-AM7 — en CI, l'absence de Chrome fait ÉCHOUER la suite qui en dépend, au lieu d'un saut qui sort 0 (28 suites sautaient leur moitié navigateur sans garde).
 # Une suite qui dépend d'un navigateur pose CHROME (ou EKCHROME, suite Équipe) à la chaîne vide, puis le cherche : vide à la sortie = introuvable.
 # Hors CI (CI vide) le saut local reste permis. Échappatoires explicites : VF_CHROME_OPTIONNEL=1, et CHAINE_SANS_NAVIGATEUR (simulation voulue de la suite chaîne-xss).
-# Appelée par vf_hyg_fin, donc depuis le trap EXIT de chaque suite : le dossier de travail est supprimé ici (sauf KEEP) avant le « exit 1 », qui coupe le reste du trap.
+# Même condition que vf_chrome_saut (chrome-saut.sh, le mécanisme du point de saut). Appelée par vf_hyg_fin, donc depuis le trap EXIT de chaque suite : le dossier de travail est supprimé ici (sauf KEEP) avant le « exit 1 », qui coupe le reste du trap.
 vf_hyg_chrome_ci() {
-  [ -n "${CI:-}" ] || return 0
-  [ -z "${VF_CHROME_OPTIONNEL:-}" ] || return 0
-  [ -z "${CHAINE_SANS_NAVIGATEUR:-}" ] || return 0
+  . "$(dirname "${BASH_SOURCE[0]}")/chrome-saut.sh"
+  vf_chrome_ci_exige || return 0
   local v
   for v in CHROME EKCHROME; do
     if eval "[ \"\${$v+set}\" = set ] && [ -z \"\${$v}\" ]"; then

@@ -235,7 +235,7 @@ assert_eq "F8.3 : le rendu servi ne contient pas le nom amont (hors lignes de li
 echo "[F12] rendu dans Chrome : capitalisation, statut de STATE, texte visible (UIFN-06, UIFN-07)"
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
 if [ -z "$CHROME" ]; then
-  echo "  ⊘ F12 SAUTÉ : aucun navigateur (Chrome, Chromium) — le rendu visible NON vérifié, non compté comme réussi"
+  . "$SCRIPTS/tests/chrome-saut.sh"; vf_chrome_saut "  ⊘ F12 SAUTÉ : aucun navigateur (Chrome, Chromium) — le rendu visible NON vérifié, non compté comme réussi"
 else
   . "$SCRIPTS/tests/hygiene.sh"; vf_hyg_init
   libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -269,7 +269,7 @@ fi
 
 echo "[F9] recette 68 R11 (P68-D-35) : le statut STATE brut n'est jamais affiché sur la page Projet (navigateur)"
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
-if [ -z "$CHROME" ]; then echo "  ⊘ F9 SAUTÉ : aucun navigateur — le statut affiché n'est PAS vérifié, non compté comme réussi"; else
+if [ -z "$CHROME" ]; then . "$SCRIPTS/tests/chrome-saut.sh"; vf_chrome_saut "  ⊘ F9 SAUTÉ : aucun navigateur — le statut affiché n'est PAS vérifié, non compté comme réussi"; else
 L9="$WORK/lab9"; mkdir -p "$L9/.planning"; printf -- '- [ ] **Phase 1: Socle** - premier jet\n' > "$L9/.planning/ROADMAP.md"
 printf -- '---\nmilestone: v1\nstatus: ready_to_plan\ncurrent_phase: 1\ncurrent_phase_name: Socle\n---\n' > "$L9/.planning/STATE.md"; git -C "$L9" init -q 2>/dev/null
 node "$SCRIPTS/vf-cockpit-build.mjs" "$L9" --quiet >/dev/null 2>&1 || { echo "assemblage F9 impossible"; exit 1; }
