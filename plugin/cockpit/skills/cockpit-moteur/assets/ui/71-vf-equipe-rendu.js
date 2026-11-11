@@ -143,8 +143,7 @@
     const dit = (texte) => { f.appendChild(el('p', texte)); };
     if (!d || d.erreur) { dit(d && d.erreur === 'inconnu' ? 'Plus dans la fenêtre de 24 h : rien à montrer.' : 'Indisponible.'); return f; }
     if (d.tronque) dit('Transcript tronqué : seule la fin du fichier est lue.');
-    f.appendChild(el('h4', 'Mandat'));
-    f.appendChild(el('pre', d.mandat || ''));
+    if (typeof d.mandat === 'string' && d.mandat) { f.appendChild(el('h4', 'Mandat')); f.appendChild(el('pre', d.mandat)); } // AUDC-D7 : jamais un intertitre sans mandat dessous (une session n'en a pas)
     f.appendChild(el('h4', 'Fil des échanges'));
     // AUDC-D8 : UN fil dans l'ordre du transcript, une heure par ligne (l'heure locale du poste, rendue depuis l'ISO 8601 du réducteur)
     const hms = (t) => { const d = new Date(t); return Number.isNaN(d.getTime()) ? '' : [d.getHours(), d.getMinutes(), d.getSeconds()].map((x) => String(x).padStart(2, '0')).join(':'); };

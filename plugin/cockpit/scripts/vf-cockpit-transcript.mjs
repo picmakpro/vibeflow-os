@@ -1,6 +1,6 @@
 // vf-cockpit-transcript — dernière action lisible, citations du mandat et réducteur de transcript à liste blanche (P69-D-16, P69-D-19, P69-D-23).
 // Exports : VERBES (table fermée), etiquette(name, input, root) -> { outil, verbe, cible }, derniereAction(fichier, root) -> { verbe, cible } | null,
-//           citationsDuMandat(texte) -> [identifiant], reduireTranscript(fichier, { root, roles }) -> { mandat, fil, tronque } (fil : [{ t, genre: 'message', texte } | { t, genre: 'outil', outil, verbe, cible, n? }])
+//           citationsDuMandat(texte) -> [identifiant], reduireTranscript(fichier, { root, roles, kind }) -> { mandat, fil, tronque } (fil : [{ t, genre: 'message', texte } | { t, genre: 'outil', outil, verbe, cible, n? }])
 // Lecture seule, aucun réseau ; liste blanche ; aucune valeur d'entrée d'outil ne sort hors de la cible réduite (chemin du lab, hôte, type d'agent, nom de skill ou de serveur).
 import fs from 'node:fs';
 import path from 'node:path';
@@ -80,19 +80,19 @@ function fenetre(fichier, octets, depuisLaFin) {
 }
 const json = (l) => { try { return JSON.parse(l); } catch { return null; } };
 
-// liste blanche : mandat = contenu chaîne de la première ligne `user` ; fil = les blocs `text` des lignes `assistant` et le nom et la cible réduite des blocs `tool_use`, UN seul tableau
+// liste blanche : mandat (agent seulement : kind 'session' n'en a pas) = contenu chaîne de la première ligne `user` ; fil = les blocs `text` des lignes `assistant` et le nom et la cible réduite des blocs `tool_use`, UN seul tableau
 // dans l'ordre du fichier, chaque ligne avec son heure (AUDC-D8). Tout le reste (lignes user ultérieures, api-request*, attachment, blocs thinking et tool_result, champ des résultats d'outils) n'est jamais lu.
 // Le coût est borné par ce qui sort (F4) : la fenêtre n'est qu'analysée ; masque et étiquette (donc realpath) ne s'appliquent qu'aux 50 messages et 200 outils gardés.
 // PU-G-170 : des appels consécutifs du fil de même étiquette (même outil, même verbe, même cible) ne font plus qu'une entrée, avec leur nombre `n` (absent pour un appel seul) et l'heure du premier ; le regroupement ne lit que l'étiquette déjà réduite, jamais une valeur d'entrée (liste blanche inchangée)
 const regrouper = (fil) => fil.reduce((acc, e) => { const d = acc[acc.length - 1]; if (d && d.genre === 'outil' && e.genre === 'outil' && d.outil === e.outil && d.verbe === e.verbe && d.cible === e.cible) d.n = (d.n || 1) + 1; else acc.push({ ...e }); return acc; }, []);
 // l'heure d'une ligne : l'horodatage du transcript, relu comme une date et rendu en ISO 8601 ; jamais la chaîne du fichier telle quelle
 const heure = (v) => { if (typeof v !== 'string') return null; const ms = Date.parse(v); return Number.isFinite(ms) ? new Date(ms).toISOString() : null; };
-export function reduireTranscript(fichier, { root, roles } = {}) {
-  try { return reduire(fichier, root, roles); } catch { return { mandat: '', fil: [], tronque: true }; } // aucune exception ne remonte à l'appelant
+export function reduireTranscript(fichier, { root, roles, kind } = {}) {
+  try { return reduire(fichier, root, roles, kind); } catch { return { mandat: '', fil: [], tronque: true }; } // aucune exception ne remonte à l'appelant
 }
-function reduire(fichier, root, roles) {
+function reduire(fichier, root, roles, kind) {
   let tronque = false, mandat = '';
-  const tete = fenetre(fichier, TETE, false);
+  const tete = kind === 'session' ? null : fenetre(fichier, TETE, false); // AUDC-D7 : une session n'a pas de mandat (sa première ligne est ce que l'utilisateur a tapé) ; celui d'un agent est son dispatch, première ligne de son transcript
   if (tete?.coupe && !tete.texte.includes('\n')) tronque = true; // la première ligne dépasse la fenêtre de tête : le mandat est illisible
   if (tete) { const p = json(tete.texte.split('\n')[0]); if (p?.type === 'user' && typeof p.message?.content === 'string') { const c = p.message.content; if (c.length > BORNE_MANDAT) tronque = true; mandat = coupe(c, BORNE_MANDAT); } }
   const q = fenetre(fichier, QUEUE, true);

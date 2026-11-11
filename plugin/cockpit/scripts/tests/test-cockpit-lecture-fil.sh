@@ -102,6 +102,8 @@ assert_eq "D8.1 — agent : le champ fil est UN tableau ordonné, messages et ou
 assert_eq "D8.2 — une heure (ISO 8601) par ligne, croissante" "$(G "$WORK/t-agent.json" '(()=>{const f=j.fil;if(!Array.isArray(f)||!f.length)return "pas de fil";const ok=f.every((e)=>typeof e.t==="string"&&/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d(\.\d+)?Z$/.test(e.t)&&!isNaN(Date.parse(e.t)));const cr=f.every((e,i)=>i===0||Date.parse(f[i-1].t)<=Date.parse(e.t));return ok&&cr?"ok":"heures : "+f.map((e)=>e.t).join(",")})()')" "ok"
 assert_eq "D8.3 — plus de deux listes séparées (ni messages ni outils), schéma inchangé" "$(G "$WORK/t-agent.json" 'Array.isArray(j.fil)?("messages" in j)+"|"+("outils" in j)+"|"+j.schema:"pas de fil"')" "false|false|vibeflow/cockpit-transcript@1"
 assert_eq "D8.4 — aucune sortie d'outil ni argument d'outil, aucune clé input (apparié aux positifs)" "$(G "$WORK/t-agent.json" '(()=>{const s=JSON.stringify(j);if(!(s.includes("MSG-AGENT-1")&&s.includes("MANDAT-DE-AGENT")))return "positifs absents";const f=(o)=>!!o&&typeof o==="object"&&Object.entries(o).some(([k,v])=>k==="input"||f(v));return s.includes("SORTIE-OUTIL-SECRETE")||s.includes("ARG-SECRET")||f(j)?"fuite":"ok"})()')" "ok"
+assert_eq "D7.1 — agent : le mandat est lu dans son dispatch" "$(G "$WORK/t-agent.json" 'j.mandat')" "MANDAT-DE-AGENT"
+assert_eq "D7.2 — session : aucun mandat (témoin : le fil de la session est rendu)" "$(G "$WORK/t-session.json" '(()=>{if(!(j.fil||[]).some((e)=>e.texte==="MSG-SESSION-2"))return "fil absent";return JSON.stringify(j.mandat||"")})()')" '""'
 assert_eq "D8.5 — session : même forme de fil daté, la première ligne user n'en est pas un message" "$(G "$WORK/t-session.json" "(()=>{const f=j.fil;if(!Array.isArray(f))return 'pas de fil';return $ENT+'|'+f.every((e)=>typeof e.t==='string'&&!isNaN(Date.parse(e.t)))})()")" "m:MSG-SESSION-1,o:Read/lit/src/a.js,m:MSG-SESSION-2|true"
 
 # --- D7 : le rendu ne pose jamais un intertitre « Mandat » vide ---
@@ -127,9 +129,12 @@ JS
 rend() { printf '__r = !!window.__vfEquipeRendu.transcript(%s, document);\n' "$1" > "$WORK/pilote.js"; node "$WORK/vm-rendu.mjs" "$UI/71-vf-equipe-rendu.js" "$WORK/pilote.js" > "$WORK/vm.json"; }
 FIL='[{"t":"2026-11-10T10:00:00.000Z","genre":"message","texte":"MSG-RENDU"},{"t":"2026-11-10T10:00:05.000Z","genre":"outil","outil":"Read","verbe":"lit","cible":"src/a.js"}]'
 rend "{\"mandat\":\"\",\"fil\":$FIL,\"tronque\":false}"
+assert_eq "D7.3 — mandat vide : aucun intertitre « Mandat » (témoin : le fil est rendu)" "$(G "$WORK/vm.json" 'j.erreur||(j.textes.some((t)=>t.includes("MSG-RENDU"))?String(j.titres.includes("Mandat")):"fil non rendu")')" "false"
 rend "{\"mandat\":\"MANDAT-RENDU\",\"fil\":$FIL,\"tronque\":false}"
+assert_eq "D7.4 — mandat présent : l'intertitre et le texte sont rendus" "$(G "$WORK/vm.json" 'j.erreur||(String(j.titres.includes("Mandat"))+"|"+String(j.textes.includes("MANDAT-RENDU")))')" "true|true"
 assert_eq "D8.6 — le rendu dit l'heure de chaque ligne du fil, du message comme de l'outil" "$(G "$WORK/vm.json" 'j.erreur||(()=>{const l=j.textes.filter((t)=>t.includes("MSG-RENDU")||t.includes("(Read)"));return l.length===2&&l.every((t)=>/\d\d:\d\d:\d\d/.test(t))?"ok":JSON.stringify(l)})()')" "ok"
 rend '{"mandat":"","fil":[],"tronque":false}'
+assert_eq "D7.5 — fil vide : pas d'exception, pas d'intertitre « Mandat »" "$(G "$WORK/vm.json" 'j.erreur||String(j.titres.includes("Mandat"))')" "false"
 
 echo; echo "Résultat : $PASS réussis, $FAIL échoués"
 [ "$FAIL" -eq 0 ]
