@@ -97,3 +97,36 @@ recopiée ; c : corps d'agent avec la ligne) ; le mutant b2 est « identique » 
 ✗ T46 mutant (b3) : verbe de publication remplacé par status (plus cité) : témoin positif absent (le contrôle refuse déjà le fichier réel)
 ✗ T46 mutant (b4) : verbe de publication retiré de la ligne « Verrou de driver » : témoin positif absent (le contrôle refuse déjà le fichier réel)
 ```
+
+## Tâche 2 — vert après la doctrine du kernel, traces des dix-huit mutants (raison vérifiée)
+
+Suite après la section neuve et la ligne « Verrou de driver » alignée : 490 OK / 0 KO / 0 SKIP ; 42 lignes « ✓ T46 » (19 de la
+tâche 1, cinq assertions b1 à b4 et c, dix-huit mutants). `test-fin-de-mandat.sh` : 56 ok, 0 ko. Raisons : b1 ancre absente de la
+section (treize) ; b2 « le kernel recopie la ligne du gabarit » ; b3 « verbe cité inconnu de --help : publier-fantome » puis
+« verbe de publication non cité » ; b4 « verbe(s) de --help absent(s) de la ligne : publish-plan » ; c « le fichier porte la ligne ».
+
+```
+✓ T46 (b1) : le kernel porte la section « Nœud dans le mandat, plan de mission publié » et ses 13 ancres
+✓ T46 (b2) : la ligne du gabarit n'est définie qu'au contrat (une fois), le kernel n'en porte ni la ligne ni l'espace réservé
+✓ T46 (b3) : chaque driver-lock.sh <verbe> cité dans la section existe dans --help, et « publish-plan » est cité
+✓ T46 (b4) : la ligne « Verrou de driver » nomme chacun des 13 verbes que --help documente (mark-progress, registry, publish-plan compris)
+✓ T46 (c) : aucun corps d'agent (37 corps d agent) ne porte la ligne du gabarit ni l'espace réservé
+✓ T46 mutant (b1) 1 : section du kernel privée de « ligne `Nœud` » (DISCRIMINANT) : mutant refusé — absent de la section : « ligne `Nœud` » 
+✓ T46 mutant (b1) 2 : section du kernel privée de « dev-orchestrator-references/mission-contracts.md » (DISCRIMINANT) : mutant refusé — absent de la section : « dev-orchestrator-references/mission-contracts.md » 
+✓ T46 mutant (b1) 3 : section du kernel privée de « §Digest de mission » (DISCRIMINANT) : mutant refusé — absent de la section : « §Digest de mission » 
+✓ T46 mutant (b1) 4 : section du kernel privée de « dag.sh add » (DISCRIMINANT) : mutant refusé — absent de la section : « dag.sh add » 
+✓ T46 mutant (b1) 5 : section du kernel privée de « remapped » (DISCRIMINANT) : mutant refusé — absent de la section : « remapped » 
+✓ T46 mutant (b1) 6 : section du kernel privée de « plan de mission » (DISCRIMINANT) : mutant refusé — absent de la section : « plan de mission » 
+✓ T46 mutant (b1) 7 : section du kernel privée de « à côté du verrou » (DISCRIMINANT) : mutant refusé — absent de la section : « à côté du verrou » 
+✓ T46 mutant (b1) 8 : section du kernel privée de « dag.sh init » (DISCRIMINANT) : mutant refusé — absent de la section : « dag.sh init » 
+✓ T46 mutant (b1) 9 : section du kernel privée de « dag.sh mark » (DISCRIMINANT) : mutant refusé — absent de la section : « dag.sh mark » 
+✓ T46 mutant (b1) 10 : section du kernel privée de « status --all » (DISCRIMINANT) : mutant refusé — absent de la section : « status --all » 
+✓ T46 mutant (b1) 11 : section du kernel privée de « jamais le texte libre » (DISCRIMINANT) : mutant refusé — absent de la section : « jamais le texte libre » 
+✓ T46 mutant (b1) 12 : section du kernel privée de « ne bloque pas la mission » (DISCRIMINANT) : mutant refusé — absent de la section : « ne bloque pas la mission » 
+✓ T46 mutant (b1) 13 : section du kernel privée de « le disque fait foi » (DISCRIMINANT) : mutant refusé — absent de la section : « le disque fait foi » 
+✓ T46 mutant (b2) : kernel avec la ligne du gabarit recopiée (DISCRIMINANT) : mutant refusé — le kernel recopie la ligne du gabarit
+✓ T46 mutant (b3) : verbe de publication remplacé par un verbe fantôme (DISCRIMINANT) : mutant refusé — verbe cité inconnu de --help : publier-fantome
+✓ T46 mutant (b3) : verbe de publication remplacé par status (plus cité) (DISCRIMINANT) : mutant refusé — verbe de publication « publish-plan » non cité dans la section
+✓ T46 mutant (b4) : verbe de publication retiré de la ligne « Verrou de driver » (DISCRIMINANT) : mutant refusé — verbe(s) de --help absent(s) de la ligne « Verrou de driver » : publish-plan
+✓ T46 mutant (c) : vf-dev-manager.md avec la ligne du gabarit ajoutée (DISCRIMINANT) : mutant refusé — le fichier porte la ligne du gabarit
+```
