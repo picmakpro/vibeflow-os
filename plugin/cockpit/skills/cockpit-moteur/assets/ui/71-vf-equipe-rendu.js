@@ -2,11 +2,11 @@
 // liens sont des chaînes dont toute valeur interpolée passe par h() (passé en paramètre), le transcript est un fragment bâti par createElement et
 // textContent seulement (jamais d'HTML interprété). Pose window.__vfEquipeRendu, utilisé par 70-vf-live.js (tiroir, onglet Projet) et 72-vf-equipe.js.
 (() => {
-  const ETAT = { actif: 'actif', 'en-attente': 'en attente', termine: 'terminé', bloque: 'bloqué' };
+  const ETAT = { actif: 'actif', 'en-attente': 'en attente', 'au-repos': 'au repos', attend: 'vous attend', termine: 'terminé', bloque: 'bloqué' };
   const etat = (w) => ETAT[w.etat] || 'actif';
   const dedans = (w) => w && (w.kind === 'session' || w.kind === 'subagent') && typeof w.id === 'string';
   // un agent « actif » : session ou sous-agent ni terminé ni en attente (effectifs de l'onglet Équipe et badge de l'en-tête)
-  const actif = (w) => !!dedans(w) && w.etat !== 'termine' && w.etat !== 'en-attente';
+  const actif = (w) => !!dedans(w) && w.etat !== 'termine' && w.etat !== 'en-attente' && w.etat !== 'au-repos' && w.etat !== 'attend';
   const lien = (page, ref) => `${page}#r=${encodeURIComponent(ref)}`;
   const carte = (w) => (w.kind === 'session' ? 'n:se-' : 'n:ag-') + w.id;
   const noeud = (w) => (w.rattachement && w.rattachement.etat === 'rattache' ? `f:${w.rattachement.dag}#${w.rattachement.noeud}` : null);
@@ -23,8 +23,8 @@
   const action = (w) => { const a = w.action || {}; return [a.verbe, a.cible].filter((x) => typeof x === 'string' && x).join(' '); };
   const pied = (w) => [etat(w), quand(w), action(w)].filter(Boolean).join(' · ');
   // pied d'une CARTE (PU-G-165) : la pastille dit déjà « En cours », « Fait » ou « Bloqué » ; seul « en attente », sans pastille, garde son mot ; l'action générique est tue
-  const piedCarte = (w) => [w.etat === 'en-attente' ? etat(w) : '', quand(w), (w.action || {}).verbe === GENERIQUE ? '' : action(w)].filter(Boolean).join(' · ');
-  const st = (w) => (w.etat === 'termine' ? 'done' : w.etat === 'bloque' ? 'blocked' : w.etat === 'en-attente' ? undefined : 'active'); // même table que vf-cockpit-equipe-carte.mjs
+  const piedCarte = (w) => [w.etat === 'en-attente' || w.etat === 'au-repos' || w.etat === 'attend' ? etat(w) : '', quand(w), (w.action || {}).verbe === GENERIQUE ? '' : action(w)].filter(Boolean).join(' · ');
+  const st = (w) => (w.etat === 'termine' ? 'done' : w.etat === 'bloque' ? 'blocked' : w.etat === 'en-attente' || w.etat === 'au-repos' || w.etat === 'attend' ? undefined : 'active'); // même table que vf-cockpit-equipe-carte.mjs
 
   // PU-G-167 : « inconnu » et « sans-citation » ne disent rien à l'utilisateur ; toute autre raison (ambigu, valeur inattendue) reste affichée, échappée
   const raisonDe = (w) => (w.rattachement && w.rattachement.raison) || 'inconnu';
@@ -45,13 +45,15 @@
     termine: '<path d="M3.5 8.4l3 3 6-6.4"/>',
     bloque: '<path d="M8 2.5l6 10.5H2z"/><path d="M8 6.6v3M8 11.4v.1"/>',
     orphelin: '<circle cx="8" cy="8" r="5.5" stroke-dasharray="2 2.4"/>',
+    repos: '<circle cx="8" cy="8" r="5.5"/><path d="M5.8 8h4.4"/>', // « au repos » : un tiret dans un anneau (AUDC-D2)
+    attend: '<circle cx="8" cy="8" r="5.5"/><path d="M6.4 6.4a1.7 1.7 0 1 1 2.4 1.5c-.5.3-.8.6-.8 1.2M8 11.3v.1"/>', // « vous attend » : un point d'interrogation dans un anneau
     repli: '<path d="M6 4l4 4-4 4"/>',
     surveiller: '<circle cx="8" cy="8" r="5.5"/><path d="M8 5v3.4l2.2 1.3"/>', // un cadran : « du temps passe » (PU-G-181, PU-G-183) ; la forme porte le sens, jamais une couleur d'alerte (Q9, Règle actuelle)
     commande: '<path d="M1.5 8s2.3-4.5 6.5-4.5S14.5 8 14.5 8s-2.3 4.5-6.5 4.5S1.5 8 1.5 8z"/><circle cx="8" cy="8" r="1.8"/>', // un œil : « voir », jamais l'invite d'un terminal (PU-G-187)
   };
   const glyphe = (nom, cls) => `<svg class="aw-g${cls ? ' ' + cls : ''}" viewBox="0 0 16 16" aria-hidden="true" focusable="false">${GLYPHE[nom]}</svg>`;
-  const GLYPHE_ETAT = { actif: 'actif', 'en-attente': 'attente', termine: 'termine', bloque: 'bloque' };
-  const MOT = { actif: 'actif', 'en-attente': 'en attente', termine: 'terminé', bloque: 'bloqué' };
+  const GLYPHE_ETAT = { actif: 'actif', 'en-attente': 'attente', 'au-repos': 'repos', attend: 'attend', termine: 'termine', bloque: 'bloque' };
+  const MOT = { actif: 'actif', 'en-attente': 'en attente', 'au-repos': 'au repos', attend: 'vous attend', termine: 'terminé', bloque: 'bloqué' };
   const CALME_S = 120; // un agent actif sans écriture depuis 2 min est dit « sans nouvelle depuis … » (seuil dérivé, P71.5-D-14)
   const GENERIQUE = 'lance une commande'; // l'action de presque tous : elle n'informe pas, on ne la montre pas
   const LONGUE_S = 900; // PU-G-183 : une commande en cours sans écriture depuis 15 min (une commande qui tourne n'écrit rien dans le transcript : l'âge de la dernière écriture est sa durée)
@@ -165,7 +167,7 @@
     .aw-driver .t { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .aw-driver .n { font: 500 11.5px var(--mono, monospace); font-variant-numeric: tabular-nums; white-space: nowrap; }
     .aw-g { width: 16px; height: 16px; flex: none; display: block; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
-    .aw-s-actif { color: var(--st-active); } .aw-s-attente { color: var(--text-2); } .aw-s-termine { color: var(--st-done); } .aw-s-bloque { color: var(--st-blocked); } .aw-s-orphelin { color: var(--text-3); }
+    .aw-s-actif { color: var(--st-active); } .aw-s-attente, .aw-s-repos, .aw-s-attend { color: var(--text-2); } .aw-s-termine { color: var(--st-done); } .aw-s-bloque { color: var(--st-blocked); } .aw-s-orphelin { color: var(--text-3); }
     .aw-pulse { animation: vfrespire 2.4s ease-in-out infinite; }
     @keyframes vfrespire { 50% { transform: scale(.82); } }
     @media (prefers-reduced-motion: reduce) { .aw-pulse { animation: none; } .r-caret { transition: none !important; } }

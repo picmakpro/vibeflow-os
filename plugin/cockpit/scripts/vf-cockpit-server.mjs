@@ -55,7 +55,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
   const noter = (nom, d) => {
     const e = { evenement: nom, seq: d?.seq ?? null, at: d?.at ?? Date.now() };
     if (nom === 'patch') e.statuts = Array.isArray(d.patch) ? d.patch.length : 0;
-    else if (nom === 'who') e.actifs = (d.who?.workers || []).filter((w) => !w.stale && w.etat !== 'termine').length;
+    else if (nom === 'who') e.actifs = (d.who?.workers || []).filter((w) => !w.stale && w.etat !== 'termine' && w.etat !== 'au-repos' && w.etat !== 'attend').length;
     journal.push(e); if (journal.length > 100) journal.shift();
   };
   const diffuser = (nom, data) => {

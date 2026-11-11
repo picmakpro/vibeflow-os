@@ -17,6 +17,7 @@ import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE, premiereLigne 
 import { FENETRE, collecteAgents, indexDesNoeuds, rattacher } from './vf-cockpit-equipe.mjs';
 import { lireDags } from './vf-cockpit-planning.mjs';
 import { arbresGit } from './vf-cockpit-arbres.mjs';
+import { demander, lire } from './vf-cockpit-etat-officiel.mjs';
 import { reduireTranscript } from './vf-cockpit-transcript.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
@@ -54,7 +55,7 @@ function dernierArbre(fichier, trees, cite) {
 }
 
 // contexte de collecte des sessions et sous-agents : arbres git du lab, portée, étiquettes
-function contexte(root, { fresh, now, home }) {
+function contexte(root, { fresh, now, home, officiel = false }) {
   root = path.resolve(root);
   const arbres = arbresGit(root); // l'analyse de la liste des arbres git vit dans vf-cockpit-arbres.mjs
   const branchOf = new Map(arbres.map((a) => [a.chemin, a.branche]));
@@ -75,7 +76,10 @@ function contexte(root, { fresh, now, home }) {
   };
 
   const projects = path.join(home, '.claude', 'projects');
-  return { root, trees, label, collecte: () => collecteAgents({ projects, now, fresh, fenetre: FENETRE, inScope, label, branche, byActivity, CC, tail, formeOk, root }) };
+  return { root, trees, label, collecte: () => {
+    if (officiel) demander({ home, cwd: root }); // asynchrone : la collecte ne l'attend jamais (AUDC-V8)
+    return collecteAgents({ projects, now, fresh, fenetre: FENETRE, inScope, label, branche, byActivity, CC, tail, formeOk, root, officiel: officiel ? lire(home) : null });
+  } };
 }
 
 // sessions et sous-agents seuls : pas de verrous, de registre ni de DAG (un clic ne rejoue pas toute la collecte)
@@ -86,8 +90,8 @@ export function agentsConnus(root, { fresh = 180, now = Date.now(), home = os.ho
 const rolesDe = (ws) => new Map(ws.filter((w) => w.kind === 'subagent' && typeof w.role === 'string' && w.role).map((w) => [w.id, w.role]));
 
 // collecte interne : les travailleurs gardent `_tr` (chemin du transcript) hors de la sortie publique
-function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir } = {}) {
-  const cx = contexte(root, { fresh, now, home }); root = cx.root;
+function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir, officiel = false } = {}) {
+  const cx = contexte(root, { fresh, now, home, officiel }); root = cx.root;
   const { trees, label } = cx; const sources = {}; const workers = [];
   // 1 + 2 — sessions et sous-agents, en arbre (vf-cockpit-equipe.mjs : fenêtre de 24 h, forme Claude Code lue du contrat)
   const eq = cx.collecte();
@@ -165,7 +169,7 @@ export function collectWho(root, opts = {}) {
   });
   const sources = { ...g.sources };
   if (typeof sources.sessions?.path === 'string') sources.sessions = { ...sources.sessions, path: sources.sessions.path.replace(opts.home || os.homedir(), '~') };
-  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees.map((t) => bornes(t, 200)), fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine'), workers, sources };
+  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees.map((t) => bornes(t, 200)), fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine' && w.etat !== 'au-repos' && w.etat !== 'attend'), workers, sources };
 }
 
 // P67-D-14 : la dernière commande ne sort que par cette révélation ponctuelle (T-67-05), réduite au programme et à son premier argument (décision de Samuel, AskUserQuestion session principale, 2026-11-02).

@@ -136,8 +136,8 @@
     const direct = liste.map((w) => [idCarte(w), w.etat === 'termine']);
     if (signature(direct) !== signature(dansCarte())) { recharger(); return; }
     const parId = new Map(liste.map((w) => [idCarte(w), w]));
-    const compte = { actif: 0, enAttente: 0, termine: 0 };
-    for (const w of liste) { if (R().actif(w)) compte.actif++; else if (w.etat === 'termine') compte.termine++; else compte.enAttente++; } // même prédicat que le badge de l'en-tête (70-vf-live.js)
+    const compte = { actif: 0, enAttente: 0, auRepos: 0, attend: 0, termine: 0 };
+    for (const w of liste) { if (R().actif(w)) compte.actif++; else if (w.etat === 'termine') compte.termine++; else if (w.etat === 'au-repos') compte.auRepos++; else if (w.etat === 'attend') compte.attend++; else compte.enAttente++; } // même prédicat que le badge de l'en-tête (70-vf-live.js)
     for (const x of G.nodes) { const w = parId.get(x.id); if (w) { x.st = R().st(w); x.foot = R().piedCarte(w); } }
     G.meta.vf = { ...G.meta.vf, compte };
     await SC.rerender();

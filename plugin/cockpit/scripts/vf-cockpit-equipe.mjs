@@ -27,7 +27,7 @@ export function formeSousAgent(meta, premiere, id, CC) {
 }
 
 export function collecteAgents(ctx) {
-  const { projects, now, fresh, fenetre = FENETRE, inScope, label, branche, byActivity, CC, tail, root } = ctx;
+  const { projects, now, fresh, fenetre = FENETRE, inScope, label, branche, byActivity, CC, tail, root, officiel } = ctx; // officiel : Map session -> { etat } de `claude agents --json`, optionnelle (AUDC-V8)
   const action = (w) => { if (w.etat === 'actif') { const a = derniereAction(w._tr, root); if (a) w.action = a; } return w; }; // P69-D-16 : agents actifs seulement
   if (!fs.existsSync(projects)) return { workers: [], source: { etat: 'absente', path: projects } };
   const seuil = CC?.metaSousAgent?.requisSiProfondeur?.parentAgentId ?? 2;
@@ -80,17 +80,20 @@ export function collecteAgents(ctx) {
         for (const x of [c, ...anc]) if (!inclus.has(x.id)) inclus.set(x.id, { c: x, etat: null });
       }
       for (const v of inclus.values()) v.etat = final(v.c);
-      if (age > fresh && !inclus.size) continue;
+      if (age >= fenetre && !inclus.size) continue; // AUDC-D2 : toute session écrite depuis moins de 24 h reste listée
       scanned++;
       const last = tail(file);
       if (last && !ctx.formeOk(last)) { inconnuSession++; continue; }
       const tree = inScope(last?.cwd);
       if (!tree) continue;
       if (age <= fresh) live++;
-      if (age <= fresh || inclus.size) {
+      {
         const at = byActivity(last, tree, file);
         const desc = [...inclus.values()].some((x) => x.etat !== 'termine');
-        workers.push(action({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ...(titreSession(file) ? { titre: titreSession(file) } : {}), ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: age <= fresh ? 'actif' : desc ? 'en-attente' : 'termine', _tr: file }));
+        // état LU, jamais deviné : l'état officiel quand il est là (vous attend, close), sinon l'écriture du transcript ; une session au repos n'est jamais « terminé » (AUDC-D2)
+        const off = officiel?.get(id)?.etat;
+        const etatSession = off === 'termine' || off === 'attend' || off === 'actif' ? off : off === 'au-repos' ? (desc ? 'en-attente' : 'au-repos') : age <= fresh ? 'actif' : desc ? 'en-attente' : 'au-repos';
+        workers.push(action({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ...(titreSession(file) ? { titre: titreSession(file) } : {}), ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: etatSession, _tr: file }));
       }
       for (const { c, etat } of inclus.values()) {
         const sl = tail(c.tr); if (sl && !ctx.formeOk(sl)) { inconnuSub++; continue; } // dernière ligne hors forme : l'agent est exclu

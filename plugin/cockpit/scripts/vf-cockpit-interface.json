@@ -28,7 +28,7 @@
       "travailleur": {
         "requis": ["kind", "id", "tree", "source"],
         "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "action", "rattachement", "enCours"],
-        "etats": ["actif", "en-attente", "termine"]
+        "etats": ["actif", "en-attente", "au-repos", "attend", "termine"]
       },
       "rattachement": {
         "etats": ["rattache", "non-rattache"],

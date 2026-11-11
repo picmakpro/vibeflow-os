@@ -101,9 +101,51 @@ const S = {
     eq('D1.12 — un agent muet dont un descendant écrit encore attend celui-ci : « en attente » même avec un outil sans résultat', [sous(pe, 'mgr')?.etat, sous(pe, 'wrk')?.etat], ['en-attente', 'actif']);
     eq('D1.9 — l\'action tirée de l\'outil en cours est celle d\'un fichier lu, jamais l\'argument', [sous(e, 'wrk')?.etat, sous(e, 'wrk')?.action?.verbe, sous(e, 'wrk')?.enCours], ['actif', 'lit', true]);
   },
+  // ---- D2 : une session de moins de 24 h reste listée, avec un état lu ----
+  async D2() {
+    console.log('=== D2 — sessions au repos ===');
+    const t = collecte(monter({ session: { ageS: 60 } }));
+    eq('D2.0 — témoin : une session écrite il y a 60 s est « actif »', sess(t)?.etat, 'actif');
+    const r = collecte(monter({ session: { ageS: 300 } }));
+    eq('D2.1 — une session au repos depuis 5 min reste listée, « au-repos »', sess(r)?.etat, 'au-repos');
+    eq('D2.2 — au repos depuis 3 h : listée aussi', sess(collecte(monter({ session: { ageS: 10800 } })))?.etat, 'au-repos');
+    ok('D2.3 — écrite il y a 25 h : hors fenêtre, absente', !sess(collecte(monter({ session: { ageS: 90000 } }))));
+    const fin = collecte(monter({ session: { ageS: 900 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 900, fini: true }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 900, fini: true }] }));
+    eq('D2.4 — une session au repos dont les agents ont fini n\'est JAMAIS dite « terminé »', sess(fin)?.etat, 'au-repos');
+    const att = collecte(monter({ session: { ageS: 600 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 600, outil: 'Agent' }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 20 }] }));
+    eq('D2.5 — une session dont un agent écrit encore reste « en-attente »', sess(att)?.etat, 'en-attente');
+    eq('D2.6 — une session seulement au repos ne rend pas la collecte « busy »', collecte(monter({ session: { ageS: 300 } })).busy, false);
+    const g = carte.buildEquipeGraph(r, {}), nd = g.nodes.find((x) => x.id === 'se-' + SID);
+    ok('D2.7 — la carte de la session au repos dit « au repos » et n\'a pas la pastille « En cours »', !!nd && /État : au repos/.test(nd.details) && nd.st === undefined, nd);
+    eq('D2.8 — le compte de la carte sépare les sessions au repos', [g.meta.vf.compte.actif, g.meta.vf.compte.auRepos], [0, 1]);
+    const rd = rendu();
+    ok('D2.9 — le tiroir écrit « au repos » (mot) pour la session', /au repos/.test(texte(rd.arbre(r.workers, h))), texte(rd.arbre(r.workers, h)));
+    ok('D2.10 — « au repos » n\'est pas un agent actif (effectifs, badge)', rd.actif(sess(r)) === false);
+    // état officiel (enrichissement optionnel) : faux `claude` sur le chemin de recherche
+    const officiel = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-etat-officiel.mjs')).href);
+    const bin = path.join(work, 'bin'); fs.mkdirSync(bin, { recursive: true });
+    const marque = path.join(work, 'appels.txt');
+    fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\necho "$@" >> "$VF_FAKE_MARK"\n[ -n "$VF_FAKE_SORTIE" ] && printf "%s" "$VF_FAKE_SORTIE"\nexit "${VF_FAKE_RC:-0}"\n', { mode: 0o755 });
+    process.env.PATH = bin + path.delimiter + process.env.PATH; process.env.VF_FAKE_MARK = marque;
+    const cas = async (sortie, rc, age) => { process.env.VF_FAKE_SORTIE = sortie; process.env.VF_FAKE_RC = String(rc); const home = monter({ session: { ageS: age } }); await officiel.rafraichir({ home, cwd: lab }); return collecte(home, { officiel: true }); };
+    const entree = (o) => JSON.stringify([{ sessionId: SID, kind: 'interactive', pid: 1, cwd: lab, ...o }]);
+    const home0 = monter({ session: { ageS: 300 } }); process.env.VF_FAKE_SORTIE = entree({ status: 'waiting' }); process.env.VF_FAKE_RC = '0';
+    eq('D2.11 — avant toute lecture asynchrone, la collecte ne bloque pas et garde la lecture des transcripts', sess(collecte(home0, { officiel: true }))?.etat, 'au-repos');
+    eq('D2.12 — status « waiting » : la session « vous attend »', sess(await cas(entree({ status: 'waiting' }), 0, 300))?.etat, 'attend');
+    eq('D2.13 — status « busy » : « actif » même avec un transcript muet', sess(await cas(entree({ status: 'busy' }), 0, 900))?.etat, 'actif');
+    eq('D2.14 — status « idle » : « au-repos » même avec un transcript frais', sess(await cas(entree({ status: 'idle' }), 0, 20))?.etat, 'au-repos');
+    eq('D2.15 — state « done » : la session est close (« termine »)', sess(await cas(entree({ state: 'done' }), 0, 300))?.etat, 'termine');
+    eq('D2.16 — commande en échec : lecture des transcripts', sess(await cas('', 1, 300))?.etat, 'au-repos');
+    eq('D2.17 — sortie illisible : lecture des transcripts', sess(await cas('pas du json', 0, 300))?.etat, 'au-repos');
+    eq('D2.18 — forme inattendue (un objet, pas une liste) : lecture des transcripts', sess(await cas('{"sessionId":"x","status":"waiting"}', 0, 300))?.etat, 'au-repos');
+    eq('D2.19 — un état inconnu est ignoré : lecture des transcripts', sess(await cas(entree({ status: 'inventé' }), 0, 300))?.etat, 'au-repos');
+    fs.rmSync(marque, { force: true });
+    collecte(monter({ session: { ageS: 300 } }));
+    ok('D2.20 — sans l\'option officiel, la commande n\'est jamais lancée', !fs.existsSync(marque));
+  },
 };
 
-for (const s of sections) { if (!S[s]) { console.log(`  ❌ FAIL — section inconnue ${s}`); fail++; continue; } S[s](); }
+for (const s of sections) { if (!S[s]) { console.log(`  ❌ FAIL — section inconnue ${s}`); fail++; continue; } await S[s](); }
 console.log(`__TOTAL__ ${pass} ${fail}`);
 process.exit(fail ? 1 : 0);
 JS
@@ -117,7 +159,7 @@ run() { # sections...
   PASS=$((PASS + $(echo "$t" | cut -d' ' -f2))); FAIL=$((FAIL + $(echo "$t" | cut -d' ' -f3)))
 }
 
-run D1
+run D1 D2
 
 echo
 echo "=== Bilan : $PASS réussi(s), $FAIL échec(s) ==="

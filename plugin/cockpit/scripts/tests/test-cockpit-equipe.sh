@@ -244,7 +244,7 @@ cat > "$AUX/spec-e20b.json" <<'JSON'
 JSON
 H20B="$(mkhome e20b "$AUX/spec-e20b.json" "$LAB")"
 Q who "$LAB" "$H20B" "$NOSCRIPTS" "$NOW" > "$WORK/who-e20b.json"
-assert_eq "E20.5 — session silencieuse et un seul terminé : busy = false et la session racine est termine" "$(G "$WORK/who-e20b.json" 'j.busy+"|"+((j.workers.find(x=>x.kind==="session"&&x.id==="'$SID'")||{}).etat)')" "false|termine"
+assert_eq "E20.5 — session silencieuse et un seul terminé : busy = false et la session racine est au repos (jamais « terminé », AUDC-D2)" "$(G "$WORK/who-e20b.json" 'j.busy+"|"+((j.workers.find(x=>x.kind==="session"&&x.id==="'$SID'")||{}).etat)')" "false|au-repos"
 
 echo "=== E21 — rattachement aux nœuds de mission (P69-D-15) ==="
 LAB21="$WORK/lab21"; mkdir -p "$LAB21/.planning/missions"; git -C "$LAB21" init -q

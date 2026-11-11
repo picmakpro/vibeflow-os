@@ -13,9 +13,9 @@ import { retireAffichage, nettoieTitre } from './vf-cockpit-lecture.mjs';
 const SORTES = new Set(['session', 'subagent']);
 const clip = (s, n) => { const t = String(s ?? '').replace(/\s+/g, ' ').trim(); if (t.length <= n) return t; const c = t.charCodeAt(n - 2); return t.slice(0, c >= 0xd800 && c <= 0xdbff ? n - 2 : n - 1) + '…'; }; // jamais une moitié de paire de substitution
 // PU-G-165 : un seul état par carte — « en attente » n'a pas de pastille (le pied le dit), il n'est jamais projeté sur « En cours » ; ui/71 (`st`) tient la même table
-const ST = { actif: 'active', 'en-attente': undefined, termine: 'done', bloque: 'blocked' };
+const ST = { actif: 'active', 'en-attente': undefined, 'au-repos': undefined, attend: undefined, termine: 'done', bloque: 'blocked' }; // « au repos » et « vous attend » (AUDC-D2) : un mot au pied, pas de pastille « En cours »
 const GENERIQUE = 'lance une commande'; // l'action de presque tous : elle n'informe pas (même seuil que ui/71)
-const ETAT = { actif: 'actif', 'en-attente': 'en attente', termine: 'terminé' };
+const ETAT = { actif: 'actif', 'en-attente': 'en attente', 'au-repos': 'au repos', attend: 'vous attend', termine: 'terminé' };
 
 // 78-04 : libellés des missions en cours (nœuds `mission` d'état `active` du graphe Projet), au plus 10, sans contrôle ni préfixe « Mission »
 export function missionsEnCours(gp) {
@@ -36,13 +36,13 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, miss
   const idCarte = (w) => (w.kind === 'session' ? 'se-' : 'ag-') + w.id;
   const parId = new Map(); // identifiant de travailleur -> carte (Map : jamais un objet indexé par une valeur lue sur disque, T-69-09)
   for (const w of travailleurs) if (!parId.has(w.id)) parId.set(w.id, idCarte(w));
-  const compte = { actif: 0, enAttente: 0, termine: 0 };
+  const compte = { actif: 0, enAttente: 0, auRepos: 0, attend: 0, termine: 0 };
   const nodes = [];
   const termines = new Map(); // carte parente -> nombre d'enfants terminés
   const base = { tags: [], paths: [], packages: [], hosts: [], stats: { files: 0, loc: 0, langs: {}, repos: ['.'] } };
 
   for (const w of travailleurs) {
-    if (w.etat === 'termine') compte.termine++; else if (w.etat === 'en-attente') compte.enAttente++; else compte.actif++;
+    if (w.etat === 'termine') compte.termine++; else if (w.etat === 'en-attente') compte.enAttente++; else if (w.etat === 'au-repos') compte.auRepos++; else if (w.etat === 'attend') compte.attend++; else compte.actif++;
     const sous = w.kind === 'subagent';
     const parent = sous ? parId.get(w.parent) ?? null : null;
     const fini = w.etat === 'termine';
@@ -79,7 +79,7 @@ export function buildEquipeGraph(who, { nom = 'Projet', racine, logos, git, miss
     meta: { generatedAt: new Date().toISOString(), rootName: nom, root: racine, vfLogos: logos, audience: 'everyone', agent: 'claude', repos: [], counts: { files: 0, loc: 0 }, vfTab: 'equipe',
       kindLabels: { import: 'Dépend de', event: 'Enchaînement', data: 'Couvre', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient' },
       vf: { compte, fenetre: who?.fenetre ?? null, sources, missions: Array.isArray(missions) ? missions : [] }, ...(git ? { vfGit: git } : {}) },
-    project: { name: `${nom} — Équipe`, summary: `${compte.actif} actifs · ${compte.enAttente} en attente · ${compte.termine} terminés depuis moins de 24 h.` },
+    project: { name: `${nom} — Équipe`, summary: `${compte.actif} actifs · ${compte.enAttente} en attente${compte.attend ? ` · ${compte.attend} vous attendent` : ''}${compte.auRepos ? ` · ${compte.auRepos} au repos` : ''} · ${compte.termine} terminés depuis moins de 24 h.` },
     nodes, files: [], links: [], flows: [], routes: [], tour: [],
   };
 }
