@@ -144,15 +144,16 @@
     if (!d || d.erreur) { dit(d && d.erreur === 'inconnu' ? 'Plus dans la fenêtre de 24 h : rien à montrer.' : 'Indisponible.'); return f; }
     if (d.tronque) dit('Transcript tronqué : seule la fin du fichier est lue.');
     if (typeof d.mandat === 'string' && d.mandat) { f.appendChild(el('h4', 'Mandat')); f.appendChild(el('pre', d.mandat)); } // AUDC-D7 : jamais un intertitre sans mandat dessous (une session n'en a pas)
-    f.appendChild(el('h4', 'Fil des échanges'));
+    const fil = Array.isArray(d.fil) ? d.fil : [];
+    if (fil.length) f.appendChild(el('h4', 'Fil des échanges')); // jamais un intertitre sans contenu dessous
     // AUDC-D8 : UN fil dans l'ordre du transcript, une heure par ligne (l'heure locale du poste, rendue depuis l'ISO 8601 du réducteur)
-    const hms = (t) => { const d = new Date(t); return Number.isNaN(d.getTime()) ? '' : [d.getHours(), d.getMinutes(), d.getSeconds()].map((x) => String(x).padStart(2, '0')).join(':'); };
+    const hms = (t) => { if (typeof t !== 'string') return ''; const d = new Date(t); return Number.isNaN(d.getTime()) ? '' : [d.getHours(), d.getMinutes(), d.getSeconds()].map((x) => String(x).padStart(2, '0')).join(':'); };
     const ul = el('ul');
-    for (const e of Array.isArray(d.fil) ? d.fil : []) {
+    for (const e of fil) {
       const corps = e.genre === 'message' ? String(e.texte || '') : `${e.verbe || ''} ${e.cible || ''} (${e.outil || ''})${Number.isInteger(e.n) && e.n > 1 ? ' × ' + e.n : ''}`.replace(/\s+/g, ' '); // PU-G-170 : les répétitions consécutives sont regroupées par le réducteur
       ul.appendChild(el('li', `${hms(e.t)} ${corps}`.trim()));
     }
-    f.appendChild(ul);
+    if (fil.length) f.appendChild(ul);
     return f;
   };
 

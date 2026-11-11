@@ -134,7 +134,9 @@ rend "{\"mandat\":\"MANDAT-RENDU\",\"fil\":$FIL,\"tronque\":false}"
 assert_eq "D7.4 — mandat présent : l'intertitre et le texte sont rendus" "$(G "$WORK/vm.json" 'j.erreur||(String(j.titres.includes("Mandat"))+"|"+String(j.textes.includes("MANDAT-RENDU")))')" "true|true"
 assert_eq "D8.6 — le rendu dit l'heure de chaque ligne du fil, du message comme de l'outil" "$(G "$WORK/vm.json" 'j.erreur||(()=>{const l=j.textes.filter((t)=>t.includes("MSG-RENDU")||t.includes("(Read)"));return l.length===2&&l.every((t)=>/\d\d:\d\d:\d\d/.test(t))?"ok":JSON.stringify(l)})()')" "ok"
 rend '{"mandat":"","fil":[],"tronque":false}'
-assert_eq "D7.5 — fil vide : pas d'exception, pas d'intertitre « Mandat »" "$(G "$WORK/vm.json" 'j.erreur||String(j.titres.includes("Mandat"))')" "false"
+assert_eq "D7.5 — fil vide et mandat vide : pas d'exception, aucun intertitre (ni « Mandat » ni « Fil des échanges »)" "$(G "$WORK/vm.json" 'j.erreur||JSON.stringify(j.titres)')" "[]"
+rend '{"mandat":"","fil":[{"t":null,"genre":"message","texte":"MSG-SANS-HEURE"},{"t":"pas une date","genre":"message","texte":"MSG-HEURE-ILLISIBLE"}],"tronque":false}'
+assert_eq "D8.8 — une ligne sans heure lisible n'en affiche aucune (jamais l'heure de l'époque), témoin : les deux lignes sont rendues" "$(G "$WORK/vm.json" 'j.erreur||JSON.stringify(j.textes.filter((t)=>t.includes("MSG-")))')" '["MSG-SANS-HEURE","MSG-HEURE-ILLISIBLE"]'
 
 # --- contrat : le contenu de transcript transite sous fil, les gardes-fous le connaissent ---
 cat > "$WORK/interdits.mjs" <<'JS'
