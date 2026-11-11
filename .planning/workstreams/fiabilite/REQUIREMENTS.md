@@ -1099,6 +1099,16 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | TRAC-12 | Phase 76 | Pending |
 | TRAC-13 | Phase 76 | Pending |
 | — | Phase 77 | repère de cadrage, Phase 77 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
+| SYNT-01 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
+| SYNT-02 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
+| SYNT-03 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
+| SYNT-04 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
+| SYNT-05 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
+| SYNT-06 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
+| SYNT-07 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
+| SYNT-08 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
+| SYNT-09 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
+| SYNT-10 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; dépend de la Phase 79 (C3) et de l'agrégat de la Phase 74) |
 | — | Phase 79 | repère de cadrage, Phase 79 : ses lignes de traçabilité s'insèrent juste dessous (repère retiré à la jointure) |
 | SOCL-01 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | SOCL-02 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
@@ -1849,6 +1859,20 @@ la Phase 80.
 - [ ] **TRAC-13**: Questions en attente : la lecture du planning lit les entrées au format C76-Q1 des sections « À Samuel » des registres de phase et pose le champ facultatif `meta.vf.questions` de `cockpit-project@1` (C76-Q2) ; une entrée hors grammaire est « mal formée » avec son défaut, jamais « en attente » ; une question n'est « tranchée » ou « appliquée » (option recommandée appliquée sous délégation, contestable) que par sa ligne `État` canonique ; identifiant en double, phase incohérente, citation incohérente, fichier absent et section vide ont chacun leur témoin rouge ; la régie de la Phase 73 consomme la liste, « en attente » dans « À vous », « appliquée » à part (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; P76-D-34 à P76-D-37).
 
 <!-- vf-cadrage:phase-77 -->
+
+### Santé de la méthode et synthèse (Phase 77 — posées au cadrage, 2026-11-11)
+> Dérivent de P77-D-01..18 (`77-CONTEXT.md` ; décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée ; aucun arbitrage neuf). Famille neuve `SYNT`, vérifiée libre le 2026-11-11 sur `f763b556` (`.planning/` entier, ledgers de compartiment et archives compris). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code.
+
+- [ ] **SYNT-01**: Synthèse sur Projet : un bouton d'en-tête « Synthèse » ouvre dans le panneau en place trois blocs (depuis votre dernière visite, burn-up, santé de la méthode), plus une ligne-résumé neutre en section d'ensemble ; aucun 4ᵉ onglet, `ui/00-vibeflow.js` et `ui/20-health.js` non modifiés, carte jamais poussée ; ni couleur d'alerte ni fond teinté, glyphe et mot, grille d'espacements fermée ; libellés français au point d'émission (P77-D-01, P77-D-02).
+- [ ] **SYNT-02**: Sortie machine des gates : `check-method-budget.sh` et `check-instruction-budget.sh` acceptent `--format=tsv` en lecture seule (en-tête versionné, une ligne par mesure déjà calculée, chemins relatifs à la racine, budgets effectifs) ; `--auto`/`--archive` refusés (64) ; pas de réseau ni de passe de rangement ; sans l'option, la sortie texte est identique octet pour octet ; trailer `Gate-Touche:` (P77-D-03).
+- [ ] **SYNT-03**: Route des jauges : `GET /api/vf/methode` à la demande, jamais dans la collecte ; cache court, un seul appel en cours, lancement asynchrone borné (le serveur répond pendant qu'un gate tourne) ; script résolu comme `driverLockScript`, jamais pris dans le lab observé ni dans `.vibeflow/` ; règles d'accès C0 de la Phase 79 ; aucun chemin du poste dans la réponse ; `.planning/` inchangé après l'appel (P77-D-04).
+- [ ] **SYNT-04**: Jauges : chaque budget mesuré par les deux gates (STATE, paragraphe de STATE, BACKLOG, ROADMAP, index MEMORY, worktrees, agents 251/300, skills 500, socle de démarrage et sa baseline) montre valeur, budget, unité et verdict en mot ; « non applicable dans ce lab » pour le gate de densité hors dépôt de distribution, « indisponible » pour un gate absent, ancien (64), de version inconnue ou hors délai — jamais 0 (P77-D-05, P77-D-06).
+- [ ] **SYNT-05**: Mémoire de la dernière visite : stockage local du navigateur, clé `vibeflow-cockpit:derniere-visite:<lab>` (jamais la clé de la visite guidée, jamais une clé par origine) ; objet `v:1` sur liste fermée (`vu`, `phases`, `tete`, `blocages` en condensats), 8 Ko au plus, sans titre, sujet, identifiant de session, commande, chemin ni texte ; valeur invalide → « première visite sur ce poste » (P77-D-07, P77-D-08).
+- [ ] **SYNT-06**: Avance du repère : deux instantanés ; rotation au chargement après 30 min d'absence seulement ; réécriture au passage en arrière-plan, fusion où le repère le plus récent gagne ; geste « Tout vu » propagé aux autres onglets ; effacement et limites dits dans la documentation du module (P77-D-09).
+- [ ] **SYNT-07**: Contenu de la synthèse : phases dont l'état a changé ; commits non-ancêtres du sommet mémorisé (jamais un filtre sur la date ; « plus de 500 » hors fenêtre) ; sessions finies depuis la visite, « au moins N » avec la réserve des 24 h quand la visite est plus ancienne ; blocages (nœud échoué, agent qui attend, section des blocages du STATE lue en lecture seule et nettoyée), nouveaux nommés, levés comptés ; différence calculée par un module pur testé sous node (P77-D-10, P77-D-11).
+- [ ] **SYNT-08**: Burn-up : dates de clôture et d'inscription lues dans la checklist du ROADMAP (`complete`, `completed`, `close`, `inscrite`), jamais la date d'un commit ; courbe SVG en escalier à deux séries neutres avec équivalent texte, liste datée au téléphone ; « N sur M · P % » produit par la fonction du pied de jalon (CKPT-16) ; phase close sans date nommée sous le graphe, jamais estimée ; champ facultatif `meta.vf.burnup` (P77-D-13, P77-D-14).
+- [ ] **SYNT-09**: Retrait : `lastDesc` n'est plus produit, la prose recopiée du STATE disparaît sous « Maintenant » ; témoin : l'assemblage de Projet ne porte plus le texte de `last_activity_desc` (P77-D-12).
+- [ ] **SYNT-10**: Coût par phase et par étage sur les dernières 24 h : jetons (entrée, sortie, cache lu et créé) et durée de travail par phase (via le DAG de la mission) et par étage (rôle), « non rattaché » pour une voie sans mission, jamais de monnaie ; source `GET /api/vf/frise` (C3 de la Phase 79) ; plan dépendant de la Phase 79 (et de l'agrégat de la Phase 74 s'il existe), à revalider quand elles auront livré (P77-D-15, P77-D-16).
 
 <!-- vf-cadrage:phase-79 -->
 
