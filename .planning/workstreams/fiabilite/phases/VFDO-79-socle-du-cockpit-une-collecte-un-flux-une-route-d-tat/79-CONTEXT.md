@@ -408,6 +408,19 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   au point unique (la fonction ou son entrée), jamais appelant par appelant ; témoin de performance génératif, rouge
   avant, vert après (tailles N et 2N, croissance au plus linéaire). Décision déléguée par Samuel (message session
   principale, 2026-11-08), option recommandée.
+- **A43 (79-10, 79-11, 79-13, 79-14) — écarts du lot 4.** 79-11 range le code du tiroir et du lancement sous
+  `assets/ui/tiroir/` (un fichier `ui/*.js` de premier niveau serait inclus dans la page sans `--terminal`) et la page du
+  terminal sous `assets/ui/terminal/` ; les lignes longues déplacées sont conservées (leur repli dépasserait le plafond de
+  300 lignes), le cliquet compte aussi les `.css`. 79-13 : l'attente de permission s'ajoute à la réponse comme segment de
+  queue `attend-humain` de `fin` à `jusqua` (le dernier segment persisté n'est pas retypé) ; `cibles` vaut `null` pour une
+  voie de forme inconnue ; une fenêtre vide après bornage → 400 `bornes-invalides` ; 500 voies au plus par réponse ;
+  cible coupée à 120 caractères ; `/api/vf/transcript` passe à la même règle de chemin (A23) : un lien du lab vers le lab
+  s'y affiche sous son chemin résolu. 79-14 : la porte du flux côté page est `window.VF_FLUX` (lue par le magasin
+  `VF_ETAT` de 79-17) ; repli un flux par page aussi quand l'empreinte du lab est illisible ; `127.0.0.1` et `localhost`
+  sont deux origines, donc deux flux (limite, dite par 79-20). 79-10 : les messages de `serve.mjs` sont écrits en
+  français à la source (ils le restent sous `?lang=en`, limite) ; l'aide de page `node …/serve.mjs` est réécrite par
+  79-16 ; **les constats de Santé produits à l'assemblage restent affichés comme aujourd'hui** : 79-10 ne change pas
+  leur rendu (P70-D-04 et sa réouverture AUDC-M8 appartiennent à la Phase 80).
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
