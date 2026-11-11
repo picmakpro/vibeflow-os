@@ -331,26 +331,56 @@ paliers (fixés par la spécification d'interface et sa critique), format intern
 </decisions>
 
 <to_samuel>
-## À Samuel (non bloquant — l'arbitrage en vigueur tient, le plan est bâti dessus)
+## À Samuel
 
-- **Q-75-1 — Carte de chaleur.** Le but dit « la carte Code se colore par l'activité ». Le cadrage le lit « se marque » :
-  glyphe à paliers neutre et mot, la teinte « en cours » réservée à l'écriture en direct (P75-D-01), parce que Q9 et
-  `DESIGN.md` § 9 interdisent couleur d'alerte et fond teinté. Options : (a) garder cette lecture **(recommandé : porte le
-  sens sans rouvrir Q9)** ; (b) ouvrir une vraie carte de chaleur (fond ou dégradé), ce qui rouvre Q9 et § 9.
-- **Q-75-2 — Empreinte au-delà de 24 h (renvoie à S-1, posée par la Phase 79).** L'empreinte est gardée en mémoire sur
-  24 h, jamais écrite dans l'index sur disque (AUDC-Q2 : heures, durées, jetons, verbes ; C1). Avis de la 75 sur S-1 :
-  l'option (a) de la 79 suffit au direct et au radar ; seule une empreinte de mission ancienne justifierait (b). Options : (a) garder **(recommandé : suffit au direct et au radar, aucune
-  donnée nouvelle sur disque)** ; (b) persister les cibles de fichiers dans l'index pour voir l'empreinte d'une mission
-  ancienne, ce qui rouvre AUDC-Q2.
-- **Q-75-4 — Worktrees hors du dossier du lab — TRANCHÉE** : arbitrage Samuel, AskUserQuestion session principale,
-  2026-11-11, « Les compter comme le lab (Recommandé) » (P75-D-29).
-- **Q-75-5 — Pastille de compte pleine.** Le bouton « Travail récent » livré porte en largeur de bureau une pastille de
-  compte à fond plein `--recent`, alors que P71.5-D-19 et `DESIGN.md` (interdits : « un fond teinté pour un état »)
-  demandent une pastille sans fond. La 75 bâtit son sélecteur sur la règle (P75-D-27). Options : (a) pastille neutre
-  partout **(recommandé : la règle écrite, et le « ⋯ » la tient déjà)** ; (b) garder la pastille pleine en bureau comme
-  exception écrite dans `DESIGN.md`.
-- **Q-75-3 — Retrait du « Travail récent » — TRANCHÉE** : arbitrage Samuel, AskUserQuestion session principale,
-  2026-11-11, « La remplacer (Recommandé) » (P75-D-28).
+Section écrite au format C76-Q1 de la Phase 76 (`76-CONTEXT.md`, `origin/feat/phase-76-tracabilite`, « Contrats fournis
+(questions en attente, P76-D-34) »). Les anciens libellés Q-75-1 à Q-75-5 sont rappelés entre parenthèses ; les relevés
+de la session principale et les réponses de Samuel du 2026-11-11 les citent.
+
+- **P75-Q-01 — Carte de chaleur (Q-75-1).** Le but dit « la carte Code se colore par l'activité », Q9 et `DESIGN.md` § 9
+  interdisent couleur d'alerte et fond teinté : comment colorer ?
+  Options : (a) se marque : glyphe à paliers neutre et mot, teinte « en cours » réservée à l'écriture en direct ; (b) vraie carte de chaleur à fond ou dégradé, qui rouvre Q9 et § 9.
+  Recommandation : (a) — porte le sens sans rouvrir Q9.
+  Bloque : rien
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P75-D-01
+- **P75-Q-02 — Empreinte au-delà de 24 h (Q-75-2).** L'empreinte est gardée en mémoire sur 24 h, jamais dans l'index sur
+  disque (AUDC-Q2) ; faut-il voir l'empreinte d'une mission plus ancienne ? Renvoie à S-1 de la Phase 79.
+  Options : (a) garder en mémoire sur 24 h ; (b) persister les cibles de fichiers dans l'index, ce qui rouvre AUDC-Q2.
+  Recommandation : (a) — suffit au direct et au radar, aucune donnée nouvelle sur disque.
+  Bloque : rien
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P75-D-12
+- **P75-Q-03 — Retrait de la couche « Travail récent » (Q-75-3).** P70-D-01 range « Travail récent » dans le menu « ⋯ »
+  avec sa pastille ; la phase la remplace par l'empreinte observée.
+  Options : (a) la remplacer : l'entrée du menu reste au même endroit et devient le sélecteur ; (b) la garder comme lentille « Récent », le retrait se réduisant à `scripts/recent.mjs`.
+  Recommandation : (a) — approximation remplacée par de l'observé, retrait demandé par le jalon.
+  Bloque : rien
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (a) — « L'empreinte observée prend sa place. L'entrée du menu « ⋯ » reste au même endroit, avec un libellé et une pastille de compte, et devient le sélecteur de vues. C'est aussi le retrait que le jalon demande à cette phase. »
+- **P75-Q-04 — Worktrees hors du dossier du lab (Q-75-4, S-3 de la Phase 79).** Une écriture dans un worktree hors du
+  dossier du lab est-elle « hors du lab » ?
+  Options : (a) oui, le radar ne la voit pas et le dit ; (b) un worktree vérifié du même dépôt compte comme le lab.
+  Recommandation : (b) — radar complet, aucun chemin du poste ne sort.
+  Bloque : rien
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Un worktree vérifié comme appartenant au même dépôt compte comme le lab : le fichier s'affiche par son chemin relatif à la racine du worktree, aucun chemin absolu ne sort. Le radar voit alors ces worktrees. Un dossier qui n'est pas un worktree du dépôt reste « hors du lab ». »
+- **P75-Q-05 — Pastille de compte pleine (Q-75-5).** Le bouton « Travail récent » livré porte en bureau une pastille à fond
+  plein `--recent`, contre P71.5-D-19 et l'interdit « fond teinté pour un état » de `DESIGN.md`.
+  Options : (a) pastille neutre partout ; (b) garder la pastille pleine en bureau comme exception écrite dans `DESIGN.md`.
+  Recommandation : (a) — la règle écrite, et le « ⋯ » la tient déjà.
+  Bloque : rien
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P75-D-27
+- **P75-Q-06 — Amendements de DESIGN.md par la Phase 75.** Le plan 75-10 doit modifier `DESIGN.md` ; ses amendements vous
+  sont montrés avant application : 1) § 2 « Graphe de code » : puce « Lentilles d'activité (Phase 75) » ; 2) § 5 Carte :
+  retrait de la variante `recent` (anneau, `.rw`, `.recent-in`), ajout de `st-prevu` ; 3) § 5 Pastille de statut :
+  `(.vst, .rw)` devient `(.vst)`, ajout de la marque de lentille `.lm` et de ses glyphes ; 4) § 4 Carte : pied de 28
+  unités réservé à toute carte marquable de l'onglet Code ; 5) § 7 Icônes : liste des glyphes de pastille élargie,
+  l'exception « glyphe d'une pastille de statut » couvre le glyphe « en cours » ; 6) § 9 Toujours : variante texte
+  `--recent-text` sur `.card.module` en clair ; 7) § 5 Composants : menu à rangées radio avec légende hors du
+  `role="menu"` (`#lens-menu`), bouton-compte de la rangée `.k`, pastille neutre `--on` sans exception ; 8) § 2 :
+  `--recent` = « récent, succès, en cours d'écriture » ; § 6 : respiration du glyphe sur les cartes ; § 4 : compensation
+  de la bordure de 1,5 px de la carte prévue ; 9) tableau « Statuts de travail » : aucune ligne `--st-prevu` ajoutée.
+  Options : (a) appliquer les neuf amendements tels que listés ; (b) n'en appliquer qu'une partie, à désigner par numéro ; (c) n'en appliquer aucun, `DESIGN.md` reste tel quel et l'écart est consigné.
+  Recommandation : (a) — chaque amendement décrit ce que la phase livre ; sans eux, le code et la direction divergent.
+  Bloque : 75-10
+  État : en attente
 </to_samuel>
 
 <phase79_contract>
@@ -385,6 +415,11 @@ A33 (instantané en mémoire, champs du planning, lab en sous-dossier), A34 (tab
 module neuf `vf-cockpit-routes.mjs`, annotateurs par ordre alphabétique de nom, points d'extension `attach(…, routes)` et
 `assembler(…, annotateurs)`, compteur de suites au nombre rendu par le gate), A35 et A36 (instantané avec `at`, sans
 voies brutes ; `rattachement` joint par la projection ; 2 000 voies au plus), A37 (une seule règle de chemin).
+A45 (P79-D-33 : forme `{ arbre, cible, n, dernierMs }`, worktrees prouvés comptés comme le lab), A46 (collision de
+`nom` de worktree fermée par défaut), A47 (`daae8bc9` : `instantane()` porte `git: { sig, at } | null`, la 75 recalcule
+quand `git.sig` change et ne lit jamais git à chaque requête — A31 tenue ; `instantane().frise` porte jusqu'à 2 000
+voies avec `tronque`, la borne de 500 ne valant que pour la réponse HTTP de `/api/vf/frise` ; le radar dit « incomplet »
+quand `tronque` est vrai et « en cours de lecture » quand `git` vaut `null`).
 </phase79_contract>
 
 <canonical_refs>
