@@ -108,7 +108,7 @@ export function mettreAJour(index, candidats, opts = {}) {
       voie.enCours = voie.forme === 'inconnue' ? null : enCours(voie);
       voie.curseur.tete = tete; voie.curseur.mtimeMs = o.st.mtimeMs; voie.curseur.taille = o.st.size;
       if (neuve) {
-        if (voie.debut === null && voie.forme === 'ok') continue; // aucune ligne datée encore : rien à indexer, retenté au prochain tour
+        if (voie.debut === null && voie.forme === 'ok') { parId.delete(id); index.voies = index.voies.filter((v) => v.id !== id); continue; } // aucune ligne datée encore : rien à indexer, retenté au prochain tour
         const r = opts.arbreDe === undefined ? { arbre: null } : arbreDe(t.cwd ?? null);
         if (!r || (r.arbre !== null && !/^[^/\\]{1,200}$/.test(String(r.arbre)))) { memoHors.set(c.fichier, cle); parId.delete(id); index.voies = index.voies.filter((v) => v.id !== id); continue; }
         voie.arbre = r.arbre; parId.set(id, voie); index.voies = index.voies.filter((v) => v.id !== id); index.voies.push(voie);
