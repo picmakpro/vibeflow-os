@@ -488,6 +488,40 @@ assert_eq "G17.2 — pour chaque lien généré : cheminPhysique(lien) = realpat
 assert_eq "G17.3 — mode plusProcheParent : propriété générative (physique du lien + reste du nom si dossier, null sinon), fichier et dossier supprimés, traversée d'un lien, refus (.. après un absent, lien pendant, boucle)" "$(pg "$LK_F" 'j.g173&&j.g173.echecs===0&&j.det&&Object.values(j.det).every(v=>v===true)?"ok":JSON.stringify([j.g173,Object.entries(j.det||{}).filter(([k,v])=>v!==true).map(([k])=>k)])')" "ok"
 assert_eq "G17.4 — bornes : non chaîne, vide, octet nul = null ; chemin relatif pris au dossier courant (. = dossier courant natif)" "$(pg "$LK_F" 'j.bornes&&Object.values(j.bornes).every(v=>v===true)?"ok":JSON.stringify(Object.entries(j.bornes||{}).filter(([k,v])=>v!==true).map(([k])=>k))')" "ok"
 
+echo "=== M — mutants de la règle physique (copies du dossier des scripts, une ancre chacun) ==="
+# mutant_sur NOM FICHIER ANCRE REMPLACEMENT : copie de tous les *.mjs du dossier de scripts et du contrat JSON, substitution de l'ancre dans le fichier désigné ; « muté » ou « ancre absente »
+mutant_sur() { local d="$WORK/mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/" 2>/dev/null; FROM="$3" TO="$4" node "$AUX/mutsub.mjs" "$d/$2" 2>&1; }
+LK_POSITIF() { lk_garde "$1" sortant "$LK_Y/g5/lab"; } # témoin positif commun : un gitfile ordinaire vers un dossier du lab est lu (le mutant se charge)
+# M-LEXICAL : un lien est de nouveau jugé sur sa cible écrite -> la propriété générative G16.1 rougit
+LK_N1="$(mutant_sur lexical vf-cockpit-git-sortant.mjs "return r === null ? verrouPilotage(lien, lien.slice(racine.length + 1)) : dans(r, racine);" "return dans(path.resolve(path.dirname(lien), fs.readlinkSync(lien)), racine);")"
+LK_MD="$WORK/mut-lexical"; LK_JM="$(lk_g16 "$LK_MD" module)"
+assert_eq "M-LEXICAL.0 — l'ancre du mutant existe" "$LK_N1" "muté"
+assert_eq "M-LEXICAL — rougit G16.1 : le modèle lexical rendu au module trouve une contre-preuve (graine=$LK_GRAINE)" "$(pg "$LK_JM" 'j.desaccords>=1')" "true"
+assert_eq "M-LEXICAL — témoins positifs verts : un dépôt ordinaire reste lu, l'oracle et la couverture sont ceux de G16.0 et G16.3" "$(LK_POSITIF "$LK_MD")|$(pg "$LK_JM" 'j.desaccordOracles===0&&j.couverture.arbres>=450')" "false|true"
+# M-JS : l'appel natif devient le realpath JS (un seul helper local) -> G16.1, G17.2, A13, A14 et B5.1 rougissent
+LK_N2="$(mutant_sur js vf-cockpit-git-sortant.mjs "const natif = (p) => fs.realpathSync.native(p);" "const natif = (p) => fs.realpathSync(p);")"
+LK_MD="$WORK/mut-js"; LK_JM="$(lk_g16 "$LK_MD" module)"; LK_FM="$(lk_g16 "$LK_MD" fonction)"
+assert_eq "M-JS.0 — l'ancre du mutant existe" "$LK_N2" "muté"
+assert_eq "M-JS — rougit G16.1 (graine=$LK_GRAINE)" "$(pg "$LK_JM" 'j.desaccords>=1')" "true"
+assert_eq "M-JS — rougit G17.2 : cheminPhysique(lien) diffère du realpath natif" "$(pg "$LK_FM" 'j.g172.echecs>=1')" "true"
+assert_eq "M-JS — rougit A13 : le DAG extérieur lié par un maillon divergent alimente de nouveau l'équipe" "$(lk_a13 "$LK_MD")" "ok=oui ext=1"
+assert_eq "M-JS — rougit A14 : la sortie liée par un maillon divergent passe les deux gardes" "$(lk_a14 "$LK_MD")" "passe|passe"
+assert_eq "M-JS — rougit B5.1 : le gitfile forgé est de nouveau vérifié" "$(lk_b5 "$LK_MD" | cut -d'|' -f1)" "verifie"
+assert_eq "M-JS — témoins positifs verts : sortie ordinaire (A14b), vrai worktree (B5.2), dépôt ordinaire lu" "$(lk_garde "$LK_MD" verifier "$LK_RACINE/a14b/lab" "$LK_RACINE/a14b/lab/.vibeflow/cockpit")|$(lk_b5 "$LK_MD" | cut -d'|' -f2)|$(LK_POSITIF "$LK_MD")" "passe|verifie|false"
+# M-REPLI : un échec rend le chemin écrit au lieu de null -> G16.1 (liens non résolus jugés dedans) et G17.2 rougissent
+LK_N3="$(mutant_sur repli vf-cockpit-git-sortant.mjs "try { return natif(abs); } catch (e) { if (!plusProcheParent || e.code !== 'ENOENT') return null; }" "try { return natif(abs); } catch (e) { if (!plusProcheParent || e.code !== 'ENOENT') return abs; }")"
+LK_MD="$WORK/mut-repli"; LK_JM="$(lk_g16 "$LK_MD" module)"; LK_FM="$(lk_g16 "$LK_MD" fonction)"
+assert_eq "M-REPLI.0 — l'ancre du mutant existe" "$LK_N3" "muté"
+assert_eq "M-REPLI — rougit G16.1 : un lien qui ne résout pas n'est plus sortant (graine=$LK_GRAINE)" "$(pg "$LK_JM" 'j.desaccords>=1')" "true"
+assert_eq "M-REPLI — rougit G17.2 : cheminPhysique d'un lien non résolu rend la forme écrite" "$(pg "$LK_FM" 'j.g172.echecs>=1')" "true"
+assert_eq "M-REPLI — témoins positifs verts : dépôt ordinaire lu, oracles concordants" "$(LK_POSITIF "$LK_MD")|$(pg "$LK_JM" 'j.desaccordOracles===0')" "false|true"
+# M-VERROU : toute cible sans barre oblique est tolérée pendante sous le verrou -> G18.2 rougit (cible d'une autre forme)
+LK_N4="$(mutant_sur verrou vf-cockpit-git-sortant.mjs '/^DRIVER\.lock\.gen\.\d+\.\d+$/' '/^[^/]+$/')"
+LK_MD="$WORK/mut-verrou"
+assert_eq "M-VERROU.0 — l'ancre du mutant existe" "$LK_N4" "muté"
+assert_eq "M-VERROU — rougit G18.2 : le lien DRIVER.lock de cible d'une autre forme est toléré (le dernier des cinq cas)" "$(lk_g18_2 "$LK_MD")" "true,true,true,true,false"
+assert_eq "M-VERROU — témoins positifs verts : la forme exacte du verrou reste tolérée, le dépôt ordinaire lu" "$(lk_g18_1 "$LK_MD")|$(LK_POSITIF "$LK_MD")" "false|false"
+
 echo "=== D6 — pilotes nommés (filter, textconv, commande de diff, pilote de fusion) vidés pour tout lancement ; liste fermée ; mémo ; enfants shell (A-04, SOCL-11) ==="
 # Dépôt piégé : un fichier f soumis à diff=tc merge=mg filter=fl, trois commits, un remisage, une branche side conflictuelle ; la configuration est posée EN DERNIER (aucun leurre ne tourne à la construction)
 LK_P="$(nouveau_depot "$LK_RACINE/pilotes")"
