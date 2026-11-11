@@ -59,3 +59,19 @@ Déviation déclarée : les assertions des tâches 1 et 2 (I0 à I2, I5, I8) son
 - I8.5 : voiesMax 3 sur 5 voies : les 3 plus récentes, evinces 2, tronque, fenetreS 86400 | attendu: [[["sess-v2","sess-v3","sess-v4"],2,true,86400]] | obtenu:  [undefined]
 
 Résultat sur la base : 49 FAIL, 1 PASS (I0.2, témoin positif d'entrée vert dès l'écriture de la fixture). I0.1 : obtenu `module absent` ; toutes les autres : obtenu `undefined` (le scénario s'arrête à l'import).
+
+## Tâche 3 — propriété d'incrémentalité : mutants (graine 1, 40 transcripts)
+
+Base : modules absents, `plantage: import: …` (rouge de base). Code de la tâche 2 : P1.1, P2.1, P1.6, P1.7 verts (graines fixes 1, 2, 3 plus une graine fraîche). Couverture (graine 1) : chaque classe de coupe observée au moins 14 fois. Chaque mutant : copie des scripts, une substitution sur la ligne `garde:index-NOM`, `cmp` prouve la différence, `node --check` prouve qu'elle compile.
+
+- M-MSGID (mode incrementalite) : plantage=None ; 40 échecs sur 40 ; champs en écart : {'invariant.jetons': 40, 'compteurs.reponsesApi': 39, 'jetons.entree': 39, 'jetons.sortie': 39, 'jetons.cacheLu': 39, 'jetons.cacheCree': 39, 'invariant.compteurs': 39, 'curseur.clos.#': 37} ; classes des échecs : {'entre-lignes': 40, 'appel-ouvert': 40, 'message-a-cheval': 39, 'bloc-coupe-une-ligne': 36, 'entre-lignes-meme-message': 36, 'milieu-de-ligne': 31}
+- M-OCTETS (mode incrementalite) : plantage=None ; 20 échecs sur 40 ; champs en écart : {'invariant.compteurs': 15, 'compteurs.appels': 11, 'evenements.#': 11, 'evenements.#.#': 9, 'compteurs.erreurs': 6, 'segments.#.#': 6, 'jetons.sortie': 4, 'invariant.jetons': 4} ; classes des échecs : {'milieu-de-ligne': 20, 'entre-lignes': 20, 'appel-ouvert': 20, 'message-a-cheval': 20, 'entre-lignes-meme-message': 18, 'bloc-coupe-une-ligne': 17}
+- M-TETE (mode reecritures) : plantage=None ; 4 échecs sur 40 ; champs en écart : {'fin': 3, 'compteurs.appels': 2, 'jetons.sortie': 2, 'segments.#': 2, 'enCours.verbe': 2, 'enCours.depuisMs': 2, 'curseur.usage.sortie': 2, 'durees.travailS': 1} ; classes des échecs : {'ajout': 4, 'reecrire-tete': 4, 'recreer': 1, 'raccourcir': 1}
+- M-RELIT (mode cout) : plantage=None ; 6 échecs sur 40 ; champs en écart : {'cout.octets-lus': 6} ; classes des échecs : {'ajout': 6} ; octets lus par ajout [67138, 44829, 48322, 40535, 52009, 25591] pour un permis de [26806, 18967, 18686, 19127, 22325, 10568]
+- M-OUVERT (mode retention) : plantage=None ; 2 échecs sur 40 ; champs en écart : {'gardee-a-tort': 2} ; classes des échecs : {'abandonne-en-plein-appel': 2, 'hors-fenetre': 2}
+
+Limite dite : sous M-MSGID tout échec n'est pas à message à cheval ; certains ne diffèrent que par `jetons.contexteMax` et `curseur.clos` (le message précédent n'est pas clos à la reprise) ; la suite exige donc le message à cheval seulement des échecs qui comptent deux fois `jetons.sortie`.
+
+## Tâche 3 — M-CLOS (amendement du 2026-11-11, I2.12)
+
+- M-CLOS (`garde:index-clos` : `travail.clos.includes(id)` remplacé par `false`) : le run ne plante pas ; seul I2.12 diffère de la sortie normale du scénario ; la voie A, B, A reste en forme `ok` avec les jetons de A comptés deux fois au lieu de passer en forme inconnue aux mesures nulles.

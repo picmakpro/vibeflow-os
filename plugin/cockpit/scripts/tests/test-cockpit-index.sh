@@ -230,6 +230,46 @@ c "I8.3 — abandonné en plein appel : présent avec enCours à +1 h, purgé à
 c "I8.4 — le manager (ancêtre) hors fenêtre reste tant que le worker est gardé" I8.4 '["mgr00001","wrk00001"]'
 c "I8.5 — voiesMax 3 sur 5 voies : les 3 plus récentes, evinces 2, tronque, fenetreS 86400" I8.5 '[["sess-v2","sess-v3","sess-v4"],2,true,86400]'
 
+cat > "$AUX/subst.mjs" <<'JS'
+// subst.mjs fichier marqueur de vers : remplace, sur la ligne qui porte le marqueur, la première occurrence de `de` par `vers` ; exit 1 si rien n'a changé
+import fs from 'node:fs';
+const [, , f, marq, de, vers] = process.argv; let ok = false;
+const l = fs.readFileSync(f, 'utf8').split('\n').map((x) => { if (!ok && x.includes(marq) && x.includes(de)) { ok = true; return x.replace(de, vers); } return x; });
+if (!ok) process.exit(1); fs.writeFileSync(f, l.join('\n'));
+JS
+PROP="$SCRIPTS/tests/index-propriete.mjs"
+prop() { local d="$1" m="$2"; shift 2; node "$PROP" "$d" "$m" "$@" 2>/dev/null | tail -1 > "$WORK/prop.json"; }
+pj() { node "$AUX/get.mjs" "$WORK/prop.json" "$1"; }
+# mutant NOM FICHIER DE VERS : copie du module sans tests/, une substitution sur la ligne `garde:index-NOM` ; rend le dossier, ou vide si le mutant est sans effet ou ne compile pas
+mutant() { local nom="$1" fichier="$2" de="$3" vers="$4" d; d="$WORK/mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d"/
+  node "$AUX/subst.mjs" "$d/$fichier" "garde:index-$nom" "$de" "$vers" || return 1; cmp -s "$SCRIPTS/$fichier" "$d/$fichier" && return 1; node --check "$d/$fichier" 2>/dev/null || return 1; echo "$d"; }
+VERT='j.plantage===null&&j.echecs.length===0'
+echo "=== I3 — propriété d'incrémentalité (générative, graine imprimée) ==="
+GF="${VF_SEED:-$((RANDOM * 32768 + RANDOM))}"; echo "graine=$GF (rejouable : VF_SEED=$GF)"
+for g in 1 2 3 "$GF"; do prop "$SCRIPTS" incrementalite --graine=$g --n=40; assert_eq "P1.1 — graine $g : 40 transcripts, coupes tirées, l'index par ajouts égale l'index d'une passe (invariants P1.3 compris : durées, segments, jetons et compteurs contre l'oracle du générateur)" "$(pj "$VERT&&j.couverture.manque.length===0")" "true"; done
+prop "$SCRIPTS" incrementalite --graine=1 --n=40; assert_eq "P1.4 — chaque classe de coupe observée au moins 8 fois (oracle du générateur)" "$(pj 'j.couverture.manque.join(",")+"|"+Object.keys(j.couverture.comptes).length')" "|10"
+prop "$SCRIPTS" couverture-temoin --graine=1 --n=40 --genere=degenere; assert_eq "P1.5a — témoin : un générateur aux seules fins de ligne et bloc de 1 Mio manque milieu-de-ligne, ligne-geante et bloc-coupe-une-ligne" "$(pj 'j.couverture.manque.filter((k)=>["milieu-de-ligne","bloc-coupe-une-ligne","ligne-geante"].includes(k)).length')" "3"
+prop "$SCRIPTS" couverture-temoin --graine=1 --n=40 --genere=une-coupe; assert_eq "P1.5b — témoin : une coupe unique en fin de fichier manque toutes les classes" "$(pj 'j.couverture.manque.length')" "9"
+prop "$SCRIPTS" cout --graine=2; assert_eq "P1.6 — un ajout lit au plus les octets restants plus 1 024 ; témoin positif : la première lecture compte plus de zéro octet" "$(pj 'j.plantage===null&&j.echecs.length===0&&j.octetsLus.premiere.every((n)=>n>0)&&j.octetsLus.ajout.every((n)=>n>0)')" "true"
+for g in 1 2 3 "$GF"; do prop "$SCRIPTS" retention --graine=$g --n=40; assert_eq "P1.7 — graine $g : rétention générative (fenêtre, état officiel, ancêtre ; un transcript abandonné en plein appel depuis plus de 24 h n'est jamais gardé seul)" "$(pj "$VERT")" "true"; done
+for g in 1 2 3 "$GF"; do prop "$SCRIPTS" reecritures --graine=$g --n=40; assert_eq "P2.1 — graine $g : suites d'ajouts, raccourcissements, réécritures de tête et recréations, égalité avec une passe sur l'état courant" "$(pj "$VERT")" "true"; done
+echo "=== Mutants — chacun rouge pour sa seule raison ==="
+M="$(mutant msgid vf-cockpit-index.mjs 'c.dernierMsgId = travail.dernierMsgId; c.usage = travail.usage; c.maxClos = travail.maxClos;' 'c.dernierMsgId = null; c.usage = null; c.maxClos = 0;')" || M=""
+if [ -n "$M" ]; then prop "$M" incrementalite --graine=1 --n=40; assert_eq "M-MSGID — P1 rouge : sans plantage, champs en écart seulement jetons, réponses ou état du message (curseur), tout échec qui compte deux fois la sortie porte un message à cheval, la passe unique reste juste" "$(pj 'j.plantage===null&&j.echecs.length>0&&j.echecs.every((e)=>e.champs.every((c)=>/^(jetons\..*|compteurs\.reponsesApi|curseur\.(dernierMsgId|usage(\..*)?|maxClos|clos(\..*)?)|invariant\.(jetons|compteurs))$/.test(c)))&&j.echecs.filter((e)=>e.champs.includes("jetons.sortie")).every((e)=>e.classes.includes("message-a-cheval"))&&j.echecs.some((e)=>e.classes.includes("message-a-cheval"))')" "true"; else assert_eq "M-MSGID — mutant applicable (sans effet ou illisible)" "non" "oui"; fi
+M="$(mutant octets vf-cockpit-index.mjs 'c.octets = fin;' 'c.octets = pos;')" || M=""
+if [ -n "$M" ]; then prop "$M" incrementalite --graine=1 --n=40; assert_eq "M-OCTETS — P1 rouge : sans plantage, chaque échec porte une coupe au milieu d'une ligne" "$(pj 'j.plantage===null&&j.echecs.length>0&&j.echecs.every((e)=>e.classes.includes("milieu-de-ligne"))')" "true"; else assert_eq "M-OCTETS — mutant applicable" "non" "oui"; fi
+M="$(mutant tete vf-cockpit-index.mjs 'voie.curseur.tete !== null && tete !== voie.curseur.tete' 'false')" || M=""
+if [ -n "$M" ]; then prop "$M" reecritures --graine=1 --n=40; assert_eq "M-TETE — P2.1 rouge : sans plantage, chaque suite en échec porte une réécriture de première ligne" "$(pj 'j.plantage===null&&j.echecs.length>0&&j.echecs.every((e)=>e.classes.includes("reecrire-tete"))')" "true"; else assert_eq "M-TETE — mutant applicable" "non" "oui"; fi
+M="$(mutant relit vf-cockpit-index.mjs 'teteDiff || voie.curseur.octets > o.st.size' 'true')" || M="$(mutant relit vf-cockpit-index.mjs 'teteDiff || o.st.size < voie.curseur.octets' 'true')" || M=""
+if [ -n "$M" ]; then prop "$M" incrementalite --graine=1 --n=40; A="$(pj "$VERT")"; prop "$M" reecritures --graine=1 --n=40; B="$(pj "$VERT")"; prop "$M" cout --graine=2; assert_eq "M-RELIT — l'égalité tient (P1.1 et P2.1 verts) et seul P1.6 (le coût) rougit" "$A,$B,$(pj 'j.plantage===null&&j.echecs.length>0')" "true,true,true"; else assert_eq "M-RELIT — mutant applicable" "non" "oui"; fi
+cas() { local d="$WORK/m-$1"; mkdir -p "$d/lab"; node "$AUX/cas.mjs" "$2" "$d" "$FIX" 2>/dev/null > "$d/cas.json"; }
+diffcles() { node -e 'const a=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")),b=JSON.parse(require("fs").readFileSync(process.argv[2],"utf8"));console.log(JSON.stringify(Object.keys(a).filter((k)=>JSON.stringify(a[k])!==JSON.stringify(b[k])).sort()))' "$1" "$2"; }
+M="$(mutant retention vf-cockpit-index.mjs '|| vivantes.has(v.id)' '|| vivantes.has(v.id) || Object.keys(v.curseur.ouverts).length > 0')" || M=""
+if [ -n "$M" ]; then prop "$M" retention --graine=1 --n=40; A="$(pj 'j.plantage===null&&j.echecs.length>0&&j.echecs.every((e)=>e.classes.includes("abandonne-en-plein-appel")&&e.champs.length===1&&e.champs[0]==="gardee-a-tort")')"; prop "$M" incrementalite --graine=1 --n=40; B="$(pj "$VERT")"; prop "$M" reecritures --graine=1 --n=40; C="$(pj "$VERT")"; cas ouvert "$M"
+  assert_eq "M-OUVERT — P1.7 rouge (voies gardées à tort : toutes abandonnées en plein appel hors fenêtre), I8.3 rouge et seul I8.3, l'égalité d'incrémentalité reste verte" "$A,$B,$C,$(diffcles "$WORK/m-ouvert/cas.json" "$WORK/cas.json")" 'true,true,true,["I8.3"]'; else assert_eq "M-OUVERT — mutant applicable" "non" "oui"; fi
+M="$(mutant clos vf-cockpit-index-voie.mjs 'travail.clos.includes(id)' 'false')" || M=""
+if [ -n "$M" ]; then cas clos "$M"; assert_eq "M-CLOS — I2.12 rouge, et seul I2.12 : sans la garde, les jetons de A sont comptés deux fois, sans plantage" "$(diffcles "$WORK/m-clos/cas.json" "$WORK/cas.json")" '["I2.12"]'; else assert_eq "M-CLOS — mutant applicable" "non" "oui"; fi
+
 echo ""; echo "Résultats : $PASS PASS / $FAIL FAIL"
 [ $((PASS+FAIL)) -eq 0 ] && { echo "aucune assertion jouée"; exit 1; }
 [ "$FAIL" -eq 0 ]
