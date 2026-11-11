@@ -443,7 +443,11 @@ assert_eq "X7.5 — A3, graphe (GET /api/vf/git) : chaque worktree porte verifie
 # mutants A3
 D="$(mutant_dir lien)"
 A="$(muter "$D/vf-cockpit-git-details.mjs" "export function worktreeVerifie(communReel, chemin) {" "export function worktreeVerifie(communReel, chemin) { return true;")"
-assert_eq "X7 M-LIEN — la vérification est neutralisée (cible présente)" "$A" "applique"
+# AUDC-A-02 : le lancement git du socle refuse désormais, de lui-même, un dossier dont le dossier git n'est pas dans le lab ni ne désigne le lab en retour (seconde défense, en amont de worktreeVerifie) :
+# les mutants de worktreeVerifie neutralisent aussi cette seconde défense, sinon le trou qu'ils rouvrent resterait masqué (la sonde mesure toujours la défense mutée, seule)
+SANS_SORTANT() { muter "$1/vf-cockpit-git-sortant.mjs" "export function gitSortant(dir, racineLab = dir) {" "export function gitSortant(dir, racineLab = dir) { return false;"; }
+A="$A|$(SANS_SORTANT "$D")"
+assert_eq "X7 M-LIEN — la vérification est neutralisée, seconde défense comprise (cibles présentes)" "$A" "applique|applique"
 NSM="$(STATUTS "$D" "$WORK/m-lien.json")"
 assert_eq "X7 M-LIEN — rouge sur X7.1 ET X7.2 : les 4 faux sont « vérifiés » et 4 status sont lancés ailleurs que dans lab3 et lab3-wt (journal d'argv)" "$(J "$WORK/m-lien.json" 'j.worktrees.filter(w=>w.verifie).length')|$NSM" "6|4"
 D="$(mutant_dir retour)"
@@ -460,7 +464,8 @@ assert_eq "X7 M-PERE — rouge sur X7.1 : le worktree d'un AUTRE dépôt (vw) de
 assert_eq "X7 M-PERE — rouge aussi sur X7.2 : un status est lancé dans le worktree de l'autre dépôt (journal d'argv)" "$NSM" "1"
 D="$(mutant_dir principal)"
 A="$(muter "$D/vf-cockpit-git-details.mjs" "if (st.isDirectory()) return reelOuNull(dotgit) === communReel;" "if (st.isDirectory()) return true;")"
-assert_eq "X7 M-PRINCIPAL — tout dossier .git est accepté comme dépôt principal (cible présente)" "$A" "applique"
+A="$A|$(SANS_SORTANT "$D")"
+assert_eq "X7 M-PRINCIPAL — tout dossier .git est accepté comme dépôt principal, seconde défense comprise (cibles présentes)" "$A" "applique|applique"
 NSM="$(STATUTS "$D" "$WORK/m-principal.json")"
 assert_eq "X7 M-PRINCIPAL — rouge sur X7.1 : le principal d'un autre dépôt (victime) devient « vérifié » et son status est lancé (journal d'argv : 1)" "$(J "$WORK/m-principal.json" 'j.worktrees.map(w=>w.nom+":"+w.verifie).sort().join(" ")')|$NSM" "dossier:false lab3-wt:true lab3:true victime:true vw:false w4:false|1"
 
