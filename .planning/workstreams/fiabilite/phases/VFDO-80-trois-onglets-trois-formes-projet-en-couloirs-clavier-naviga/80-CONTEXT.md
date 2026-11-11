@@ -181,9 +181,31 @@ La Phase 76 se branche sur le panneau de l'onglet Projet par une route à elle (
 
 ## Contrats fournis aux autres phases
 
-- **Pile de surcouches (Phases 73, 74)** : `window.VF_SURCOUCHES.ouvrir(el, { modale, ouvreur, fermer })` (globale à part : l'objet `VibeFlow` du moteur est gelé), `dessus()`,
-  `ouverte()`. Toute surcouche nouvelle (fiche d'agent, lecteur plein cadre de la 74, régie de la 73) s'y enregistre au
-  lieu de recopier une liste. Échap ferme le dessus de pile ; le terminal y est enregistré mais exclu d'Échap.
+- **Pile de surcouches (Phases 73, 74)** : `window.VF_SURCOUCHES.ouvrir(el, { modale, ouvreur, fermer })` (globale à
+  part : l'objet `VibeFlow` du moteur est gelé), `dessus()`, `ouverte()`. Une **surcouche** (modale ou tiroir posé
+  par-dessus la page : palette, export, aide, tiroirs Git et « Au travail », visite) s'y enregistre au lieu de recopier
+  une liste ; Échap ferme le dessus de pile ; le terminal y est enregistré mais exclu d'Échap. Corrigé le 2026-11-11 à
+  la demande de la Phase 74 (relayée par la session principale) : la fiche d'agent et le lecteur plein cadre de la 74
+  (P74-D-44) et la régie de la 73 (P73-D-33) **ne sont pas des surcouches** : ce sont des vues de l'onglet Équipe, sans
+  `VF_SURCOUCHES.ouvrir`. Quand l'une d'elles est affichée et qu'aucune surcouche n'est ouverte, la pile ne prend pas
+  Échap : il revient à la page, et c'est la vue de la 74 qui décide de son effet (retour à la vue précédente de
+  l'onglet) ; les crans « désélectionner » et « remonter » de la 80 ne valent que sur le canevas et la vue DOM de
+  Projet (cibles `body`/canevas, PU-G-175), jamais dans une vue d'Équipe. Si une surcouche est ouverte par-dessus une
+  vue d'Équipe, Échap ferme d'abord la surcouche. `window.VF_PANNEAU` (pile Retour) n'existe que sur l'onglet Projet et
+  se vide au changement d'onglet : il n'agit ni sur la fiche d'agent ni sur le lecteur.
+- **Tiroir Git, ouverture sur un commit (Phase 74)** : une seule entrée publique,
+  `window.VFGitTiroir.ouvrirSur(sha)`, livrée par le plan 80-06 (vague 2). Elle valide le SHA par le motif strict
+  existant, ouvre le tiroir s'il est fermé, ouvre le volet bas de détail sur ce commit (détail lu par la route
+  existante du commit, sans dépendre de la page de rangées chargée), amène sa rangée dans la vue si elle est déjà
+  rendue, et rend une promesse résolue à `true` quand le détail est affiché, à `false` si le SHA est invalide ou
+  introuvable (jamais une exception, jamais une pagination sans fin). `VFGitTiroir.ouvrir()` et `VFGitVolet.ouvrir`
+  restent internes : la 74 n'a pas à les composer. Décision déléguée par Samuel (message session principale,
+  2026-11-08), option recommandée.
+- **Changement d'onglet (Phases 73, 74, 77)** : `window.VF_ONGLETS.aller(nom)` (plan 80-10, après la fusion de la 79)
+  rend une promesse résolue **après le premier rendu** de l'onglet chargé (elle enchaîne la promesse de
+  `VF_COQUILLE.chargerOnglet(nom)`, A2 de la 79) et rejetée pour un nom hors de `code`, `projet`, `equipe` ; aller vers
+  l'onglet courant la résout aussitôt. Un appelant qui doit agir après l'arrivée attend cette promesse ; une extension
+  liée à l'onglet ne s'initialise jamais sur elle mais par `VF_COQUILLE.surOnglet` (A30 de la 79).
 - **Clavier du canevas (Phase 75)** : les attributs (rôle, nom, `tabindex`) sont reposés à chaque `on('render')` ; la 75
   peut ajouter sa couche visuelle sans les écraser ; le nom accessible d'une carte est construit par une fonction unique
   que la 75 peut enrichir (mot d'activité) sans couleur seule.
