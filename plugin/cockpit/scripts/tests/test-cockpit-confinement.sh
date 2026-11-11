@@ -174,6 +174,24 @@ console.log(dirs.map((d) => gitSortant(d)).join(','));
 JS
 printf 'gitdir: %s\n' "$AUTRE/.git" > "$WORK/gitfile-forge"; mkdir -p "$WORK/faux-wt"; cp "$WORK/gitfile-forge" "$WORK/faux-wt/.git"
 assert_eq "B4 — gitSortant : dépôt du lab, vrai worktree = faux ; .git lié vers l'extérieur, gitfile forgé vers un autre dépôt = vrai" "$(node "$WORK/sortant.mjs" "$SCRIPTS" "$LAB" "$WORK/vrai" "$L2" "$WORK/faux-wt")" "false,false,true,true"
+# point central : tout lancement git du socle (shBorne, lancerGit, lancerGitAsync) refuse un dossier dont le .git désigne un dépôt hors du lab
+cat > "$WORK/central.mjs" <<'JS'
+import { pathToFileURL } from 'node:url';
+const [, , scripts, rogue, normal, wt, lab] = process.argv;
+const P = await import(pathToFileURL(scripts + '/vf-cockpit-paths.mjs').href);
+const { arbresGit } = await import(pathToFileURL(scripts + '/vf-cockpit-arbres.mjs').href);
+const b = (o) => (o || '').trim();
+const out = [];
+for (const d of [rogue, normal]) out.push(b(P.lancerGit(d, ['symbolic-ref', '--quiet', '--short', 'HEAD']).sortie) || '-');
+for (const d of [rogue, normal]) out.push(b((await P.lancerGitAsync(d, ['symbolic-ref', '--quiet', '--short', 'HEAD'], { fin: Date.now() + 8000 })).sortie) || '-');
+for (const d of [rogue, normal]) out.push(b(P.shBorne('git', [...P.GIT_SUR, '-C', d, 'symbolic-ref', '--quiet', '--short', 'HEAD'], d, d)) || '-');
+out.push(arbresGit(rogue).length + ':' + arbresGit(rogue)[0].chemin.includes('ext-depot'));
+out.push(b(P.lancerGit(wt, ['symbolic-ref', '--quiet', '--short', 'HEAD'], { lab }).sortie) || '-');
+console.log(out.join('|'));
+JS
+RES="$(node "$WORK/central.mjs" "$SCRIPTS" "$L2" "$L3" "$WORK/vrai" "$LAB")"
+assert_eq "G7 — lancerGit, lancerGitAsync, shBorne et arbresGit : rien d'un .git sortant ; témoins : dépôt du lab et worktree vérifié lus" "$RES" "-|MARQUEUR-DANS-LE-LAB-BRANCH|-|MARQUEUR-DANS-LE-LAB-BRANCH|-|MARQUEUR-DANS-LE-LAB-BRANCH|1:false|vrai"
+
 
 # ---------- D : métadonnées VibeFlow de l'export ----------
 echo "=== D — export ==="

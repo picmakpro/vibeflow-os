@@ -1,15 +1,15 @@
 // vf-cockpit-git-sortant — le `.git` d'un dossier désigne-t-il un dossier git hors de ce dossier ? (AUDC-A-02, socle du cockpit.) Lecture seule, fs seul, aucun git.
-// Export : gitSortant(dir) -> booléen.
+// Export : gitSortant(dir, racineLab = dir) -> booléen (point central : les lanceurs git de vf-cockpit-paths.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
 
 const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
 // AUDC-A-02 : vrai quand `<dir>/.git` existe et désigne un dossier git HORS de la racine réelle de `dir` — lien symbolique sortant, ou fichier `gitdir:` sortant qui n'est pas un worktree
 // vérifié (lien retour de <admin>/gitdir = ce `.git`, comme worktreeVerifie). Un dépôt ordinaire du lab et un worktree légitime restent lus. Même règle dans la copie vendorisée (scan, lib/common.mjs).
-export function gitSortant(dir) {
+export function gitSortant(dir, racineLab = dir) {
   const dotgit = path.join(dir, '.git'); let st;
   try { st = fs.lstatSync(dotgit); } catch { return false; }
-  const racine = real(dir);
+  const racine = real(racineLab); // le lab : un dépôt imbriqué ou un sous-module du lab reste lu, seul un dossier git hors du lab sort
   const dedans = (p) => p === racine || p.startsWith(racine + path.sep);
   try {
     if (st.isDirectory()) return false;
