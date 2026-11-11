@@ -35,7 +35,8 @@ export function planningLayout(root) {
   if (!compartiments.length) return { forme: 'plat', actif: null, compartiments: [{ ws: null, dir: base }] };
   let actif = null;
   try {
-    const pf = path.join(base, 'active-workstream'); const st = fs.statSync(pf); // jamais un fichier non régulier ni démesuré (un lien vers /dev/zero ne finit pas)
+    const pf = path.join(base, 'active-workstream'); if (!realUnder(pf, root)) throw 0; const st = fs.statSync(pf); // AUDC-A-02 : un pointeur lié hors du lab est ignoré comme absent
+    // jamais un fichier non régulier ni démesuré (un lien vers /dev/zero ne finit pas)
     const nom = st.isFile() && st.size <= 4096 ? fs.readFileSync(pf, 'utf8').trim() : '';
     if (compartiments.some((c) => c.ws === nom)) actif = nom;
   } catch {}
@@ -64,7 +65,6 @@ export function trustedScriptsDir() {
 
 const real = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
 export const realUnder = (p, dir) => { const r = real(p), d = real(dir); return r === d || r.startsWith(d + path.sep); };
-
 // T-67-06 : jamais un script pris dans l'arbre observé. Comparaison sur realpath (un lien `.claude/scripts -> plugin/x` ne passe pas) :
 // aucun candidat sous le lab, sauf le dossier de scripts du module (posé par le lanceur) s'il n'est pas dans la sortie .vibeflow/ du lab.
 export function driverLockScript({ scriptsDir, labRoot, home } = {}) {
