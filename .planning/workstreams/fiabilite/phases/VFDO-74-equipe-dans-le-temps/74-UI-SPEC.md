@@ -1,14 +1,14 @@
 # Phase 74 : L'équipe dans le temps — UI-SPEC (craft-equipe-temps)
 
 **Contrat de design** pour la bascule « Régie · Frise », la frise, le curseur, la fiche d'agent (lecteur plein cadre) et le coût.
-Direction « Graphite » (`DESIGN.md`, fait foi). Sources lues : `74-CONTEXT.md` (P74-D-01 à D-45), les contrats C0 à C6 de la Phase 79 (route de frise `vibeflow/cockpit-frise@1`), `DESIGNS.md` § 2, 4, 5, 9 et la page
+Direction « Graphite » (`DESIGN.md`, fait foi). Sources lues : `74-CONTEXT.md` (P74-D-01 à D-52 ; D-46 à D-52 amendent le texte d'origine et font foi), les contrats C0 à C6 de la Phase 79 (route de frise `vibeflow/cockpit-frise@1`), `DESIGNS.md` § 2, 4, 5, 9 et la page
 d'audit (maquettes 2 et 3), `71-vf-equipe-rendu.js`, `72-vf-equipe.js`, `vf-cockpit-transcript.mjs` (bornes), `78-UI-SPEC.md` (modèle).
 Aucune brique externe de craft consultée : dégradation sur les premiers principes (contraste WCAG, grille 2 px, hiérarchie). Aucune
 décision du CONTEXT n'est rouverte.
 
 **Règle des espaces insécables, qui prime sur la graphie des chaînes de ce document** : les chaînes ci-dessous sont écrites avec des espaces ordinaires par lisibilité ; à l'écran, toute espace avant `: ; ! ?` et dans les nombres, durées et unités (« 1 h 30 », « 168 k », « 1 204 », « 14 h 32 ») est une espace insécable U+00A0, sans exception. Le témoin de la § 9 mesure le rendu, pas la graphie de la spec.
 
-**Choix de forme acceptés (P74-D-30), inscrits dans le corps :** « attend ses agents » en trait neutre (§ 2) ; clic sur la colonne de gauche = fiche, clic dans la zone des segments = curseur (§ 2, § 3) ; faits de la fiche sur l'horizon de l'index, 24 h, libellé visible (§ 4) ; « autour de t » = ± 2 min (§ 3) ; synthèse en entrée et sortie, cache dans le détail (§ 5) ; liens `#r=` du tiroir « Au travail » redirigés vers la fiche (§ 4) ; téléphone : colonne de gauche collante de 120 et pistes en défilement horizontal propre à la frise, largeur minimale 480 (§ 2) ; position de la bascule en `sessionStorage` (§ 1). Glyphes : P74-D-29 (§ 2, § 8).
+**Choix de forme acceptés (P74-D-30), inscrits dans le corps :** « attend ses agents » en trait neutre (§ 2) ; clic sur la colonne de gauche = fiche, clic dans la zone des segments = curseur (§ 2, § 3) ; faits de la fiche sur l'horizon de l'index, 24 h, libellé visible (§ 4) ; « autour de t » = ± δ, δ = max(2 min, pas du curseur / 2) (§ 3, P74-D-49) ; synthèse en entrée et sortie, cache dans le détail (§ 5) ; ouverture de la fiche par l'événement `vf-agent:ouvrir` de la régie (§ 4, § 8) ; téléphone : colonne de gauche collante de 120 et pistes en défilement horizontal propre à la frise, largeur minimale 480 (§ 2) ; bascule dessinée et sa position gardée par la régie de la 73, la 74 n'en garde aucune (§ 1). Glyphes : P74-D-29 (§ 2, § 8).
 
 **Règles de lecture.** Libellés en français ; les espaces avant `: ; ! ?` et dans les durées, nombres et unités (« 1 h 30 », « 168 k »,
 « 1 024 ») sont insécables (U+00A0) ; aucun tiret cadratin dans le copy. Tout texte venu des traces (nom d'agent, nœud, titre, message,
@@ -27,9 +27,17 @@ session, aucun quatrième onglet. Le moteur n'est pas modifié (P74-D-31) : tout
 | Mono | 11,5 px / 400 ou 500 / 14 (16 hors voie) | axe, heures, nœud, branche, chemin, cible, code, « +N », « 14 min », jetons |
 Aucune autre taille (ni 10,5, ni 11, ni 15,5).
 
-## 1. Bascule « Régie · Frise » (P74-D-02)
+## 1. Bascule « Régie · Frise » (P74-D-02, amendée par P74-D-51)
 
-**Forme.** Groupe à deux positions dans l'en-tête de la zone de contenu de l'onglet Équipe, aligné à droite de la ligne de titre (le titre
+**Qui la dessine (P74-D-51).** La bascule est dessinée par la régie de la Phase 73 : la frise se déclare comme une vue
+(`window.__vfEquipeVues.declarer({ id: 'frise', libelle: 'Frise', monter, demonter })`, dans `section#vf-equipe`) et la 74 ne pose aucune
+bascule propre, aucun fichier de la 73 n'est modifié. Cette section décrit ce que la frise **attend** de cette bascule, et non un composant de la 74 : position
+« Frise » à côté de « Régie », libellé exact « Frise », défaut Régie, aucun onglet de page ajouté (P78-D-04). La bascule est un `role="tablist"` de nom accessible
+« Vue de l'équipe », avec les onglets « Régie » et « Frise ». **Sa position est gardée par la 73 ; la 74 n'en garde aucune** (aucune clé de stockage, aucun état
+de bascule propre). La 74 monte et démonte sa vue à l'appel de la régie et conserve la vue d'origine (`hidden`, `inert`) pendant que la fiche est ouverte. Les états
+et tailles ci-dessous sont l'attente de la 74 ; en cas d'écart, la 73 fait foi pour le dessin et la 74 s'y aligne.
+
+**Forme (attendue de la régie).** Groupe à deux positions dans l'en-tête de la zone de contenu de l'onglet Équipe, aligné à droite de la ligne de titre (le titre
 de vue de la 73 reste à gauche). Même modèle que `.vf-tabs` : piste `--raise`, rayon `var(--r-ctl)`, `padding var(--sp-4)`, gap `--sp-2` ; positions
 « Régie » et « Frise », 13 px / 500 / 18, `padding var(--sp-4) var(--sp-12)`, rayon `8px` (valeur admise par la garde `css-jetons.mjs`, concentrique avec la piste) ; graisse 500 dans tous les états (jamais de changement de graisse, donc aucune variation de largeur) ; la position active se dit par `--surface` et l'ombre de 1 px
 du groupe d'onglets. Hauteur de la piste : 36 (taille de contrôle), 44 en `pointer: coarse` (positions 44 de haut).
@@ -44,10 +52,9 @@ Ce n'est ni un onglet de page ni un lien : le groupe n'a pas d'URL. Défaut : R�
 | focus clavier | `outline: 2px solid var(--ring); outline-offset: 2px` |
 | fiche ouverte | la bascule est masquée (la fiche porte son propre « Retour ») |
 
-**Clavier et ARIA.** `role="tablist"` nommé « Vue de l'équipe : régie ou frise » ; deux `role="tab"` (`aria-selected`, `aria-controls`),
+**Clavier et ARIA.** `role="tablist"` nommé « Vue de l'équipe » ; deux `role="tab"` (`aria-selected`, `aria-controls`),
 chacune pilote un `role="tabpanel"` ; tabulation itinérante (une seule position dans l'ordre de tabulation), ← → déplacent ET activent,
-Début / Fin. La position choisie est gardée pour la page (mémoire de la page, relue après rechargement par une clé de `sessionStorage`
-neuve, jamais exportée, jamais écrite dans le lab). Le changement de vue n'est pas animé.
+Début / Fin. La position choisie est gardée par la 73, pas par la 74. Le changement de vue n'est pas animé.
 
 ## 2. Frise
 
@@ -89,6 +96,9 @@ coude de rayon `8px` vers chaque enfant (pas de `opacity` pour l'atténuer). Sur
 **Ordre des voies.** Par heure du premier segment de l'arbre, stable (un nouvel arbre s'ajoute en bas) ; enfants sous leur parent, par
 heure de dispatch. Une session vivante sans activité dans la fenêtre reste listée, au repos (P74-D-05). Un filet `--hair` sépare deux arbres.
 
+**Couleur (P74-D-01, confirmée par P74-D-46).** La couleur dit l'état, jamais le nœud : le nom du nœud s'écrit en toutes lettres sur chaque voie.
+Arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, réponse « Suivre la règle de design (Recommandé) ». Aucune couleur par nœud (`DESIGN.md` § 9) ; le but du ROADMAP n'est pas réécrit (AUDC-V6).
+
 **Segments (P74-D-06).** Lus dans `segments` de la voie (C3, genres `travail`, `attend-humain`, `attend-agents`, `repos`, `silence`), sur la ligne de la barre, une sorte par état, lisible sans la couleur. Le genre `silence` (aucun signe de vie) ne dessine rien : un blanc. Les quatre autres :
 | État | Forme | Teinte |
 |---|---|---|
@@ -96,7 +106,7 @@ heure de dispatch. Une session vivante sans activité dans la fenêtre reste lis
 | Vous attend | même barre remplie du motif de hachures (SVG `<pattern>`, traits à 45°, épaisseur `--sp-2`, pas `--sp-6`, dérivés des jetons), **aucun contour** | `--st-active` |
 | Attend ses agents | trait fin, épaisseur `--frise-trait`, extrémités rondes | `--text-3` (neutre) |
 | Au repos | pointillé neutre (`stroke-dasharray: 0 var(--sp-8)`, extrémités rondes de `--frise-trait`) | `--text-4` |
-Une erreur ne teinte jamais une voie. Un segment commencé avant la fenêtre est coupé net à gauche (rayon 0 de ce côté) ; un segment en
+Une erreur ne teinte jamais une voie (« échec » vient du réducteur, P74-D-48). Un segment commencé avant la fenêtre est coupé net à gauche (rayon 0 de ce côté) ; un segment en
 cours finit sur le trait « maintenant ». `silence` : rien n'est dessiné (un blanc, distinct du repos, P74-D-36). Chaque segment porte un `title` « au travail, 14:02 à 14:40, 38 min » (durées vraies, même en lecture
 Événements). Aucune bordure, aucun halo, aucun dégradé.
 
@@ -116,10 +126,10 @@ de « +N » (mono 11,5 px, `--text-3`) : le compte est écrit, rien n'est agrég
 d'agents au travail, remplie `--raise-2` (neutre), trait supérieur 1,5 px `--text-3`, échelle 0 à max(4, pic). Pas de teinte, pas de
 courbe de coût. `aria-hidden` ; le maximum est dit dans la colonne.
 
-**Bandeau « Dépôt » (P74-D-07).** Colonne : « Dépôt » puis « 7 commits sur 1 h 30 ». Source : la route Git existante (`vibeflow/cockpit-git@1`), jamais la route de frise ; `rangees[].at` est en secondes Unix, converti en millisecondes pour l'axe (P74-D-33). La marche de la route est bornée à 500 commits : quand le commit le plus ancien lu est postérieur au début de la fenêtre et que la borne est atteinte, la colonne ajoute une ligne 12,5 px `--text-3` « Dépôt incomplet avant 14 h 05 » (l'heure du plus ancien commit lu) et un filet vertical `--hair-2` à cet instant sur les sous-voies ; aucun commit n'est dessiné avant lui. Une sous-voie de `--frise-depot` par branche (nom mono 11,5 px
-`--text-3`, ellipsis), 4 branches visibles puis « + N branches » (même mécanique de repli qu'ailleurs). Commit : losange plein
+**Bandeau « Dépôt » (P74-D-07).** Colonne : « Dépôt » puis « 7 commits sur 1 h 30 ». Source : la route Git existante (`vibeflow/cockpit-git@1`), jamais la route de frise ; `rangees[].at` est en secondes Unix, converti en millisecondes pour l'axe (P74-D-33). La route Git se lit au montage puis sur `VF_ETAT.abonner('git')`, jamais au rythme de l'événement `frise` (P74-D-50). La marche de la route est bornée à 500 commits et topologique : le plus ancien commit lu ne borne rien seul. Quand la marche est tronquée et que le plus récent des instants entre le plus ancien commit lu et la plus récente rangée dont un parent n'a pas été lu (secondes × 1000) tombe dans la fenêtre, la colonne ajoute une ligne 12,5 px `--text-3` « Dépôt peut-être incomplet avant 14 h 05 » (cette heure) et un filet vertical `--hair-2` à cet instant sur les sous-voies ; aucun commit n'est dessiné avant lui. Une sous-voie de `--frise-depot` par branche (nom mono 11,5 px
+`--text-3`, ellipsis), 4 branches visibles puis « + N branches » (même mécanique de repli qu'ailleurs). Dernière sous-voie : « Autres commits (branches fusionnées ou sans nom) », qui reçoit les commits atteints par aucune branche (descente du premier parent : la chaîne de la base d'abord, puis les branches locales, puis les distantes) ; jamais pliée, comptée (« Autres commits » suivi du nombre, en mono 11,5 px `--text-3`). Commit : losange plein
 `--frise-glyphe` en `--text-2` (`--recent` est réservé à la coche du rapport rendu), bouton HTML superposé de 24 × 24 (44 en coarse), `aria-label` « Commit a1b2c3d, branche feat/x, 14 h 32. Ouvrir dans le
-tiroir Git ». Clic ou Entrée appelle `ouvrir(sha)` du tiroir Git (fonction publique ajoutée par la 74 au module de détail du tiroir, sans changer son rendu, P74-D-40). Les commits sont rangés par branche côté page, en descendant le premier parent depuis chaque branche. Jamais rattaché à une voie. Deux commits à moins de `--sp-12` :
+tiroir Git ». Clic ou Entrée passe UNIQUEMENT par `window.VFGitTiroir.ouvrirSur(sha)`, l'entrée publique de la Phase 80 (80-06), qui rend une promesse : `true` si le détail est affiché, `false` si le SHA est invalide ou introuvable, jamais d'exception ; si `false`, rien d'autre ne se passe et aucun message ne s'affiche (les autres appels du tiroir et du volet sont internes à la 80, interdits à la 74) ; aucune insertion sous la rangée, et la 74 ne modifie plus `ui/77-vf-git-vue-detail.js` (P74-D-50, amende D-40). Les commits sont rangés par branche côté page, en descendant le premier parent depuis chaque branche. Jamais rattaché à une voie. Deux commits à moins de `--sp-12` :
 un losange et le nombre (« 3 »), un seul bouton par commit ou par groupe, qui ouvre le plus récent ; son `aria-label` liste tous les commits du groupe (« 3 commits, de 14 h 30 à 14 h 32, branche feat/x : a1b2c3d, d4e5f6a, 9b8c7d6. Ouvrir le plus récent dans le tiroir Git »).
 
 **Axe et « maintenant ».** Graduations : 1 h 30 toutes les 15 min, 6 h toutes les heures, 24 h toutes les 4 h, étiquettes mono 11,5 px
@@ -138,6 +148,8 @@ d'abord, tout ou rien par manager) en une ligne « + 7 agents » (bouton, `aria-
 dépliable ; la ligne dit le nombre au travail « maintenant ». Si 12 voies ne suffisent pas après repli, le corps des voies défile
 verticalement (bandeau haut et axe collés) et la synthèse écrit « 18 voies, 12 repliées ». Les pistes d'une ligne repliée restent vides.
 
+**Réponse tronquée (P74-D-52).** Quand `tronque` est vrai (dont la coupe à 500 voies), une ligne 12,5 px `--text-3` sous la synthèse dit : « N voies ne sont pas montrées : la lecture est tronquée. » (N = `voiesOmises`, le nombre de voies retirées par la borne de 500 ; « 1 voie n'est pas montrée : … ») ; les totaux de coût disent « incomplet » (§ 5). `arbre` absent ou nul désigne l'arbre principal : aucun libellé « inconnu » (colonne de gauche, fiche, tableau).
+
 **Mission tronquée (P74-D-08).** Segments coupés à gauche (ci-dessus) et, sous la synthèse, une ligne 12,5 px `--text-3` quand au moins une voie est
 concernée : « 3 voies commencées avant la fenêtre : elles sont coupées à gauche. » (« 1 voie … : elle est coupée à gauche. »).
 
@@ -154,7 +166,7 @@ l'humain », « Rapport rendu », « Commit », « Lancement d'un agent ».
 | En construction (`source.etat` = `en-construction`) | les voies déjà connues sont dessinées ; ligne neutre 12,5 px `--text-3` sous la synthèse : « Lecture des traces en cours : la frise peut être incomplète. » |
 | Partielle (`partielle`) | frise dessinée ; même ligne : « Certaines traces n'ont pas pu être lues : la frise est partielle. » |
 | Forme inconnue (`forme-inconnue`) | pas de voies ; carte d'état comme « Indisponible » (titre en `--text`), titre « La frise ne se lit pas », cause « Le format des traces a changé. Mettez VibeFlow à jour. », sans « Réessayer » |
-| Indisponible (`indisponible`, ou 503, ou délai) | carte ci-dessous |
+| Indisponible (`indisponible`, ou 503, ou délai, ou 400 `bornes-invalides`) | carte ci-dessous |
 | Vide (aucune voie) | titre 15 px 600 « Rien à raconter sur cette fenêtre » ; ligne 12,5 px `--text-3` « Aucune session ni aucun agent n'a été vu sur les dernières 1 h 30. Essayez une fenêtre plus large. » (à 24 h : « … sur les dernières 24 h. » sans la dernière phrase, il n'y a pas de fenêtre plus large) ; la barre d'outils reste active |
 | Indisponible | carte `--warn-bg`, `--r-ctl`, `--inset-box` ; titre « La frise est indisponible » (13 px, 600, `--text`) ; cause « La lecture des traces locales a échoué ou dépassé le délai. » ; bouton « Réessayer » (lecture GET) ; le reste de l'onglet continue |
 | Direct | abonnement `VF_ETAT.abonner('frise', …)` : l'événement `frise` (signature seule) déclenche une relecture authentifiée de `GET /api/vf/frise` (P74-D-11), `depuis` et `jusqua` suivant la fenêtre ; aucune donnée de frise dans le flux : les voies se remplacent sans fondu, défilement, curseur et dépliages conservés par identifiant d'agent ; annonce `aria-live="polite"` « Frise mise à jour » au plus une fois par minute. Le focus survit à la relecture : l'élément focalisé est retrouvé par son identifiant (`data-id` : agent, sha de commit, manager d'un repli, repère du curseur) ; s'il a disparu, le focus va à la voie du parent, sinon au repère du curseur |
@@ -178,11 +190,11 @@ instant. » Avec curseur : titre `h3` 15 px 600 « À cet instant, 14 h 32 » et
 en colonnes (≥ 1 000 px), empilés en dessous, intertitres 12,5 px 500 `--text-3` :
 1. « Les voies » : une ligne par voie (glyphe, nom, mot d'état à t : « au travail », « vous attend », « attend ses agents », « au repos »,
    « pas encore lancé », « terminé ») ; suffixe « · déduit » en `--text-3` pour l'état présent d'une voie dont `etatOfficiel` est nul (état tiré des segments) ; tout état à un instant passé est tiré des segments et se lit sans suffixe (P74-D-23, D-39 : les segments ne disent pas leur provenance).
-2. « Nœuds du plan portés » : par nœud, id mono + « porté par vf-coder, au travail » ou « porté, agent au repos » ; chaque id est un lien
+2. « Nœuds du plan portés » : par nœud, id mono + l'état de la voie qui porte le nœud (P74-D-49), en quatre formulations : « porté par vf-coder, au travail », « porté par vf-coder, vous attend », « porté par vf-coder, attend ses agents », « porté par vf-coder, au repos » ; chaque id est un lien
    vers sa carte de mission. Une ligne de bilan « 6 autres nœuds du plan : aucun agent ». Un manager rattaché par ses agents n'a pas de ligne ici (aucun nœud). Note 12,5 px `--text-3` : « L'état du plan est déduit
    des voies des agents, il n'est pas rejoué. » (P74-D-13 : jamais `ready` ni `blocked`).
-3. « Fichiers écrits à 2 min près » : jusqu'à 8 chemins (mono 11,5 px, ellipsis à gauche), puis « et 4 autres » ; vide : « Aucun fichier écrit à
-   cet instant. » Lus à la demande dans les fils réduits des voies au travail à t (`cockpit-transcript@2`, P74-D-14), **au plus six fils par instant**, gardés en cache dans la page jusqu'à l'événement `frise` suivant (P74-D-35). Au-delà de six voies, ou quand t est plus ancien que le fil réduit (50 messages, 200 outils), la ligne dit « Fichiers non lus : au-delà de six voies au travail. » ou « Fichiers non lus : instant plus ancien que le fil lu. » selon la cause, au lieu d'une liste vide. Pendant la lecture : `aria-busy="true"` et « Lecture des fichiers » (12,5 px `--text-3`). Si une lecture échoue : « Les fichiers n'ont pas pu être lus. » et bouton « Réessayer » (nouvelle lecture des fils concernés). Bouton « Voir sur la carte » (`.btn.soft`, `aria-label` « Voir ces 8 fichiers
+3. « Fichiers écrits autour de cet instant » : jusqu'à 8 chemins (mono 11,5 px, ellipsis à gauche), puis « et 4 autres » ; vide : « Aucun fichier écrit à
+   cet instant. » « Autour de t » = ± δ, δ = max(2 min, pas du curseur / 2) (P74-D-49). Sont cherchées les voies dont le travail recoupe [t − δ, t + δ] ; le premier filtre est `cibles[].dernierMs` (dans la fenêtre : écrit ; avant : non écrit ; après : incertain, et seul ce cas lit le fil réduit, `cockpit-transcript@2`). **Lecture 250 ms après le dernier déplacement du curseur ou au relâché**, jamais à chaque pas ; au plus deux lectures en vol et six par instant, cache par (voie, `fin`) gardé tant que `fin` ne bouge pas (P74-D-35 amendée). Une cible du fil réduit de forme « <chemin> (worktree <nom>) » s'affiche telle quelle ; une cible coupée (finissant par « … ») ne se pose sur aucune carte. **Liste partielle** : au-delà de six voies à lire, la liste montre les fichiers des voies lues et la ligne dit « N voies non lues » (jamais six lectures jetées, jamais la liste entière remplacée). « Fichiers non lus : instant plus ancien que le fil lu. » reste dit quand le fil est tronqué et que son premier élément est après t − δ (50 messages, 200 outils), au lieu d'une liste vide. Pendant la lecture : `aria-busy="true"` et « Lecture des fichiers » (12,5 px `--text-3`). Si une lecture échoue : « Les fichiers n'ont pas pu être lus. » et bouton « Réessayer » (nouvelle lecture des fils concernés). Bouton « Voir sur la carte » (`.btn.soft`, `aria-label` « Voir ces 8 fichiers
    sur la carte »), absent si la liste est vide : il ouvre l'onglet Code, tel que la coquille l'expose, avec ces fichiers mis en évidence (mise en évidence ponctuelle, P74-D-12 et D-37).
 
 ## 4. Fiche d'agent, lecteur plein cadre (P74-D-03, D-04, D-15 à D-19)
@@ -196,7 +208,7 @@ et un sous-agent ont la même fiche ; pour une session, ni intertitre ni ligne �
 « Worker de [vf-dev-manager] · nœud [exec-lot-a] · [Phase 73] ». Chaque terme entre crochets est un lien souligné (jamais la pastille) : fiche
 du parent (la vue se remplace, le focus va au titre, « Retour » ramène toujours à la vue d'origine), carte de mission, phase. Session : « Session · arbre
 principal · branche feat/x ». Non rattaché : « Pas lié à une phase du projet » ; ambigu : « Non rattaché (ambigu) ». Jamais un lien deviné.
-**Ouverture et fermeture.** Depuis une voie de la frise ou une ligne de la régie (même fonction, avec l'élément d'origine). Échap ou « Retour » ferme ; la fiche n'est pas une surcouche (P74-D-44) : elle ne s'inscrit pas dans `window.VF_SURCOUCHES`, et Échap ne la ferme que si `VF_SURCOUCHES.ouverte()` est faux ; une éventuelle surcouche de la 74 passe par `VF_SURCOUCHES.ouvrir(el, { modale, ouvreur, fermer })` ; le focus revient à l'élément d'origine, ou, s'il a disparu, à la voie du même agent, sinon à la bascule. Pendant que la fiche est ouverte, la vue d'origine reste dans le DOM, `hidden` et `inert` : son état (fenêtre, lecture, curseur, défilement, dépliages, filtres de la régie) est conservé et rendu intact au retour ; elle continue de se mettre à jour en tâche de fond.
+**Ouverture et fermeture.** Depuis une voie de la frise ou une ligne de la régie (même fonction, avec l'élément d'origine). Échap ou « Retour » ferme ; la fiche et le lecteur sont des vues de l'onglet Équipe, pas des surcouches (P74-D-44) : elles ne s'inscrivent pas dans `window.VF_SURCOUCHES`. **Échap** ferme la fiche et rend le focus à l'élément qui l'a ouverte ; il ne fait rien sur la fiche si une surcouche est ouverte par-dessus (`VF_SURCOUCHES.ouverte()` vrai) : la surcouche se ferme d'abord, la fiche au Échap suivant ; une éventuelle surcouche de la 74 passe par `VF_SURCOUCHES.ouvrir(el, { modale, ouvreur, fermer })` ; le focus revient à l'élément d'origine, ou, s'il a disparu, à la voie du même agent, sinon à la bascule. Pendant que la fiche est ouverte, la vue d'origine reste dans le DOM, `hidden` et `inert` : son état (fenêtre, lecture, curseur, défilement, dépliages, filtres de la régie) est conservé et rendu intact au retour ; elle continue de se mettre à jour en tâche de fond.
 
 **Deux colonnes** (au-dessus de 999 px : faits `minmax(280px, 360px)` puis fil `1fr`, gap `--gap-section` ; de 700 à 999 px : faits 280 ;
 points de rupture inchangés, Q11). Les deux colonnes ont chacune leur défilement vertical sur toute la hauteur de la zone ; aucune boîte de
@@ -214,7 +226,7 @@ deux colonnes, libellé 12,5 px / 16 `--text-3` au-dessus, valeur 15 px / 600 / 
 | « Appels d'outil » | « 214 » | `compteurs.appels` |
 | « En échec » | « 6 » | `compteurs.erreurs` |
 Deux blocs de lignes en dessous : « Jetons » (« Entrée », « Sortie », « Cache lu », « Cache écrit », valeur à droite, mono 11,5 px, 16) et « Fichiers » (« Écrits »,
-« Lus »), lus dans `cibles` ; tant que `cibles.etat` vaut `en-construction`, la valeur est « en cours de lecture » (ni zéro ni « inconnu »). Une donnée que la source ne donne pas s'écrit « inconnu » (`--text-3`, même gabarit que la valeur) : jamais un zéro. Aucune action sur la
+« Lus »), lus dans `cibles`, comptés par couple (`arbre`, `cible`) ; au plafond (`cibles.tronque` vrai, coupe à 200 entrées) le compte dit « 200 ou plus » ; un fichier d'un worktree s'affiche « <chemin> (worktree <nom>) » (mono), un fichier de l'arbre principal (`arbre` absent ou nul) sans suffixe ; tant que `cibles.etat` vaut `en-construction`, la valeur est « en cours de lecture » (ni zéro ni « inconnu »). Une donnée que la source ne donne pas s'écrit « inconnu » (`--text-3`, même gabarit que la valeur) : jamais un zéro. Aucune action sur la
 session, aucun coût en devise, aucune dernière commande.
 **États des faits.** Chargement : `aria-busy="true"` et « Lecture des faits » ; échec : « Les faits sont indisponibles. » et bouton « Réessayer » (nouvelle lecture de la route de frise). L'événement `frise` relance, via `VF_ETAT.lireJson()`, la lecture des faits et du fil de la fiche ouverte (le fil gagne ses nouvelles lignes, voir « Direct »).
 **Téléphone (≤ 700 px, 390 px visé).** Une colonne ; sous l'en-tête, les faits sont repliés dans un `<details>` « Faits de l'agent » (résumé de 44 de haut :
@@ -225,7 +237,7 @@ cumulables, boutons-bascule (`aria-pressed`), pilule `999px`, 28 de haut (44 coa
 montré ; enfoncés, ils se cumulent (union). Enfoncé : fond `--on`, texte `--on-text` et coche 12 devant le mot (la forme double la couleur) ; sinon
 fond `rgba(var(--ink), .06)`, texte `--text-2`.
 **Ligne** : grille heure (mono 11,5 px / 16 `--text-3`, « 14:32:10 », colonne `--sp-24` × 3 en `calc`), glyphe 16 (`svg.i`), texte 12,5 px / 20 `--text`.
-Le fil réduit porte les messages de l'agent, les messages de l'humain (ligne `humain`, heure seule, sans texte : « Message de l'humain ») et les compactions (ligne `compaction`, heure seule : « Compaction ») (P74-D-38). Glyphes : message de l'agent deux traits, message de l'humain point plein, compaction triangle vide, outil chevron, échec croix (`--sev-high`, le seul glyphe teinté du
+Le fil garde ses lignes « Compaction » et « Message de l'humain » (rendu inchangé : ligne `humain`, heure seule, sans texte ; ligne `compaction`, heure seule). Leur source change (P74-D-48) : elles sont fusionnées côté page depuis les `evenements` de la voie, bornées au plus ancien horodatage du fil, et non plus produites par le réducteur ; « échec » (`echec: true`) vient seul du réducteur. Glyphes : message de l'agent deux traits, message de l'humain point plein, compaction triangle vide, outil chevron, échec croix (`--sev-high`, le seul glyphe teinté du
 fil). Outil : verbe et cible réduite (« modifie vf-cockpit-equipe.mjs », mono pour la cible), « × 4 » si regroupé ; une ligne d'outil
 portant `echec: true` ajoute « échec » en `--text-2` après la cible, jamais le texte de l'erreur (P74-D-19, seul le drapeau est lu). Aucun commit n'est attribué à un agent dans le fil. Survol : fond `rgba(var(--ink), .06)` sauf sur les lignes `echec` (aucun fond : la croix `--sev-high` reste sur `--surface`) ; ces lignes marquent le survol par l'heure en `--text`.
 **Message.** Rendu en texte par un sous-ensemble fermé (P74-D-18) : paragraphes, listes, code en ligne, blocs de code, emphase, construits en
@@ -253,7 +265,7 @@ sortie. » suivie du lien souligné « Détail du coût ». (c) Dans la section 
 d'outils) : « Agent », « Mission et phase » (défaut), « Étage ». Tableau `<table>` avec `<caption>` (le titre), colonnes « Au travail », « À vous attendre »,
 « Entrée », « Sortie », « Cache lu », « Cache écrit » (en-têtes 11,5 px / 14 `--text-3`, valeurs 12,5 px / 16, chiffres tabulaires alignés à droite), lignes séparées par un
 filet `--hair`, `--inset-row`. « Mission et phase » : une ligne par mission (bouton qui déplie ses phases, `aria-expanded`), phases en retrait `--sp-16` ;
-« Étage » : « Têtes » (voies de genre session), « Managers » (sous-agent ayant au moins une voie enfant), « Workers » (sous-agent sans voie enfant) ; la profondeur seule ne classe jamais (P74-D-42). Chaque regroupement finit par une ligne « Total ». « Hors mission » existe dans « Mission et phase » : dernière ligne de niveau mission, jamais découpée par phase, jamais répartie, note 12,5 px `--text-3` « agents sans nœud de plan rattaché » ; un manager rattaché par ses agents compte dans sa mission et sa phase (P74-D-34, jointure par `phaseKey`). Dans « Agent » et « Étage », les agents hors mission figurent à leur place, leur seconde ligne dit « hors mission » ; « Total » vaut la somme des lignes et la même valeur dans les trois regroupements. Tri fixe : « Au travail » décroissant. Les jetons de C3 sont des totaux de l'index sur 24 h, non découpés par la fenêtre : les quatre colonnes de jetons sont coiffées de « Jetons, sur les dernières 24 h », les deux colonnes de durée de la fenêtre (durées coupées à la fenêtre par le serveur) ; sont comptés les agents vus dans la fenêtre. Aucune barre, aucune teinte, aucun total en devise.
+« Étage » : « Têtes » (voies de genre session), « Managers » (sous-agent ayant au moins une voie enfant), « Workers » (sous-agent sans voie enfant) ; la profondeur seule ne classe jamais (P74-D-42). Chaque regroupement finit par une ligne « Total » ; quand `tronque` est vrai (§ 2, P74-D-52), la ligne « Total » dit « Total (incomplet) » et un `title` le précise. « Hors mission » existe dans « Mission et phase » : dernière ligne de niveau mission, jamais découpée par phase, jamais répartie, note 12,5 px `--text-3` « agents sans nœud de plan rattaché » ; un manager rattaché par ses agents compte dans sa mission et sa phase (P74-D-34, jointure par `phaseKey`). Dans « Agent » et « Étage », les agents hors mission figurent à leur place, leur seconde ligne dit « hors mission » ; « Total » vaut la somme des lignes et la même valeur dans les trois regroupements. Tri fixe : « Au travail » décroissant. Les jetons de C3 sont des totaux de l'index sur 24 h, non découpés par la fenêtre : les quatre colonnes de jetons sont coiffées de « Jetons, sur les dernières 24 h », les deux colonnes de durée de la fenêtre (durées coupées à la fenêtre par le serveur) ; sont comptés les agents vus dans la fenêtre. Aucune barre, aucune teinte, aucun total en devise.
 **Téléphone.** Chaque ligne devient un bloc (nom, puis liste de définitions sur deux colonnes) ; pas de défilement horizontal.
 **Formats (fr).** Jetons : < 1 000 « 842 » ; < 100 000 « 12,4 k » (une décimale) ; < 1 000 000 « 168 k » ; au-delà « 1,8 M » ; « jetons » suit quand il n'y a
 pas d'autre libellé ; décimale à virgule, espace insécable avant « k » et « M ». Comptes : séparateur de milliers en espace insécable (« 1 204 »).
@@ -284,7 +296,7 @@ d'axe et de fil : « 14:32 », « 14:32:10 » (mono) ; dans une phrase : « 14 h
 Les libellés exacts sont donnés en contexte aux §§ 1 à 5 (guillemets français) ; table des libellés d'action et de nom de région :
 | Où | Libellé |
 |---|---|
-| Bascule | « Régie », « Frise » ; nom du groupe « Vue de l'équipe : régie ou frise » |
+| Bascule (dessinée par la 73) | « Régie », « Frise » ; nom du groupe « Vue de l'équipe » |
 | Frise | « Lecture », « Horloge », « Événements », « Fenêtre », « 1 h 30 », « 6 h », « 24 h », « maintenant », « Agents au travail », « Dépôt » |
 | Colonne | « Ouvrir la fiche de <nom> » (`aria-label`), « + 7 agents », « Replier les agents » |
 | États (mots) | « au travail », « vous attend », « attend ses agents », « au repos », « terminé », « pas encore lancé » |
@@ -298,9 +310,9 @@ Aucun texte de la 74 n'emploie « coût estimé », « euro », « tarif » ou u
 
 **Retiré** : (1) la boîte de transcript de 320 px à défilement imbriqué et son bouton « Lire le transcript » (rendu `transcript()` de `71-vf-equipe-rendu.js`,
 `zoneDe` de `72-vf-equipe.js`), remplacés par la fiche ; (2) la durée unique d'un agent qui compte ses veilles, remplacée par la somme des segments ; (3) avec la
-73, la carte « Terminés depuis moins de 24 h » (compensée par la frise sur 24 h).
-**Glyphes** : La table est unique (P74-D-29) : celle de la régie, à défaut `GLYPHE` de `71-vf-equipe-rendu.js` ; un glyphe d'état n'existe qu'à un endroit. Les liens `#r=` du tiroir « Au travail » ont la fiche pour cible (P74-D-30).
-**Le tiroir « Au travail » change en deux points seulement** : ses liens `#r=` ont la fiche pour cible, et la durée de ses lignes lit `durees.travailS` (P74-D-41, si la régie de la 73 ne l'a pas remplacé). Son groupe des terminés de moins de 24 h reste inchangé (P69-D-18).
+73, le pli « Terminés » du tiroir « Au travail » est retiré et le tiroir quitte l'onglet Équipe (P73-D-14, 73-10) : le retrait (3) de la 74 se réduit à la carte « Terminés depuis moins de 24 h » du canevas, si elle existe encore (compensée par la frise sur 24 h, P74-D-51).
+**Glyphes** : La table est unique (P74-D-29) : celle de la régie, à défaut `GLYPHE` de `71-vf-equipe-rendu.js` ; un glyphe d'état n'existe qu'à un endroit. Les ouvertures de fiche depuis la régie passent par l'événement de document `vf-agent:ouvrir`, que la fiche annule pour s'ouvrir (déclencheurs convenus avec la 73) ; elle émet `vf-agent:lu` à l'ouverture d'un agent terminé (P74-D-51). Glyphes d'état : `__vfEquipeRendu.GLYPHE_ETAT` (73-04).
+**Le tiroir « Au travail » ne fait plus partie de ce que la 74 touche (P74-D-51)** : il quitte l'onglet Équipe, son pli « Terminés » est retiré par la 73, et la durée de ses lignes (ancien P74-D-41) tombe. `__vfEquipeRendu.transcript` reste exporté tant que le lecteur de repli de la 73 l'utilise. La 74 ne modifie aucun fichier de la 73.
 **Inchangé** : les onglets Code et Projet ; `.vf-tabs` et l'en-tête ; les points de rupture (700, 999, 1 279 tactile) ;
 la bascule de thème ; la recherche de l'onglet Équipe ; le mode « hérité du poste » ; les routes en GET seules et le contrat de forme (tenu par la 79) ; aucune clé
 `doing`, `mandat`, `messages`, `outils`, `fil` dans le flux ; aucun export de frise, fiche ou fil.
@@ -310,8 +322,20 @@ la bascule de thème ; la recherche de l'onglet Équipe ; le mode « hérité du
 Propriétés mesurables qu'un test en navigateur pourrait asserter (pas le test).
 | Règle | Témoin mesurable |
 |---|---|
-| Bascule à deux positions, un seul onglet | `[role=tablist]` de l'en-tête Équipe : 2 `[role=tab]`, un seul `aria-selected="true"` ; le nombre d'onglets de page reste 3 |
-| Défaut régie, choix gardé pour la page | position initiale = Régie ; après un rechargement, la position choisie est restituée ; aucun fichier du lab modifié |
+| Bascule dessinée par la 73, un seul onglet | `[role=tablist]` de nom « Vue de l'équipe » : onglets « Régie » et « Frise », un seul `aria-selected="true"` ; le nombre d'onglets de page reste 3 ; la frise est montée par `__vfEquipeVues.declarer({ id: 'frise', … })` et les modules de la 74 ne contiennent aucun `role="tablist"` de bascule |
+| Position de la bascule gardée par la 73 | les modules de la 74 n'écrivent aucune clé de `sessionStorage` ni de `localStorage` ; aucun fichier du lab modifié |
+| Couleur par état, citée | l'arbitrage « arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 » (P74-D-46) est cité dans la spec ; aucune couleur de voie ne dépend du nœud |
+| Fil : source des lignes | les lignes « Compaction » et « Message de l'humain » viennent des `evenements` de la voie, bornées au plus ancien horodatage du fil ; « échec » vient du réducteur ; rendu inchangé |
+| Autour de t = ± δ | δ = max(2 min, pas du curseur / 2) ; les voies lues sont celles dont le travail recoupe [t − δ, t + δ] ; avec un pas de 16 min, δ = 8 min |
+| Nœuds portés : état de la voie | un nœud porté par une voie « vous attend » dit « vous attend », par une voie « attend ses agents » dit « attend ses agents » ; quatre formulations, jamais `ready` ni `blocked` |
+| Lecture différée du curseur | des déplacements espacés de moins de 250 ms ne déclenchent aucune lecture de `/api/vf/transcript` avant 250 ms après le dernier, ou le relâché |
+| Liste partielle des fichiers | avec 9 voies à lire : six lues, les fichiers de ces six listés, et le texte « 3 voies non lues » ; jamais « Fichiers non lus » pour toute la liste |
+| Réponse tronquée | `tronque` vrai : le texte « N voies ne sont pas montrées » avec N = `voiesOmises`, et « incomplet » dans les totaux de coût |
+| Arbre absent ou nul | `arbre` absent ou nul : « arbre principal » ; aucun « inconnu » pour l'arbre |
+| Worktree d'un fichier | une cible de forme `<chemin> (worktree <nom>)` s'affiche ainsi, lue `{ arbre: <nom>, cible }` ; une cible finissant par « … » ne produit aucun « Voir sur la carte » |
+| « 200 ou plus » | `cibles.tronque` vrai (coupe à 200 entrées) : le compte dit « 200 ou plus », jamais « 200 » |
+| Bornes invalides | réponse 400 `bornes-invalides` : carte « La frise est indisponible » |
+| Fiche : retour du tiroir | la fiche s'ouvre sur l'événement `vf-agent:ouvrir` annulé ; `vf-agent:lu` est émis à l'ouverture d'un agent terminé |
 | Voie = `--frise-voie` | hauteur de chaque cellule de voie = 32 px (44 en coarse), même valeur que sa piste |
 | Barre pleine = au travail | `rect[data-etat="travail"]` : hauteur = `--sp-8`, `fill` résolu = `--st-active`, aucun `stroke` |
 | Vous attend hachuré sans contour | `rect[data-etat="attend"]` : `fill="url(#…)"` vers un `<pattern>`, `stroke="none"`, aucun `border` ; la couleur des traits du motif = `--st-active` |
@@ -339,7 +363,7 @@ Propriétés mesurables qu'un test en navigateur pourrait asserter (pas le test)
 | « inconnu », jamais zéro | pour un champ absent, le texte de la valeur est « inconnu » ; aucun « 0 » pour une donnée non fournie |
 | Contexte en jetons | « Contexte au dernier tour » n'a jamais de « % » ; sa valeur vient de `jetons.contexteDernier` |
 | Table de glyphes unique | chaque glyphe d'état de la frise et de la fiche est un `<use>` ou un tracé de la table de la régie (ou de `GLYPHE`) ; aucun tracé d'état défini dans les fichiers de la 74 |
-| Fichiers à t | si le fil lu ne couvre pas t, le texte « Fichiers non lus » remplace la liste ; « Voir sur la carte » est absent |
+| Fichiers à t | si le fil lu est tronqué et commence après t − δ, le texte « Fichiers non lus : instant plus ancien que le fil lu. » remplace la liste ; « Voir sur la carte » est absent |
 | États de source | `source.etat` = `en-construction` : voies dessinées et ligne « Lecture des traces en cours » ; `partielle` : ligne « partielle » ; `forme-inconnue` : carte sans « Réessayer » ; `indisponible` : carte avec « Réessayer » |
 | Fichiers écrits et lus en construction | `cibles.etat` = `en-construction` : valeur « en cours de lecture », jamais « 0 » |
 | Direct | un événement `frise` provoque une seule relecture de `GET /api/vf/frise` ; le DOM du flux ne contient aucune donnée de frise |
@@ -368,25 +392,26 @@ Propriétés mesurables qu'un test en navigateur pourrait asserter (pas le test)
 | XSS | nom d'agent, nœud, titre, message hostiles : aucun élément injecté dans la frise, l'encart, la fiche ni le tableau de coût |
 | Repère distinct du commit | le repère du curseur est une poignée verticale (largeur `--sp-4`), pas un losange ; zone de saisie 24 × 24 au pointeur fin, 44 × 44 en coarse ; `outline` de focus 2 px `--ring` |
 | Fenêtre excluant le curseur | un changement de fenêtre dont la plage exclut l'instant retire le curseur et annonce « Le curseur est sorti de la fenêtre » |
-| Causes de « Fichiers non lus » | au-delà de six voies au travail : « … au-delà de six voies au travail. » ; instant plus ancien que le fil : « … instant plus ancien que le fil lu. » |
+| Causes de non-lecture | au-delà de six voies à lire : « N voies non lues » avec la liste partielle des voies lues ; instant plus ancien que le fil : « Fichiers non lus : instant plus ancien que le fil lu. » |
 | États des faits | pendant la lecture : `aria-busy="true"` et « Lecture des faits » ; échec : « Les faits sont indisponibles. » et « Réessayer » qui relance |
 | `frise` relance la fiche | un événement `frise` pendant qu'une fiche est ouverte provoque une relecture des faits et du fil par `VF_ETAT.lireJson()` ; une nouvelle ligne du fil apparaît sans fermer la fiche |
 | Libellé du retour | « Retour à la frise » si la fiche vient de la frise, « Retour à la régie » si elle vient de la régie ; le focus revient à l'origine |
 | Fond des bandes collées | le `background` résolu de la courbe et de l'axe collés est `--surface` opaque (alpha 1) ; l'écart entre frise, encart et coût = `--gap-section` |
 | Suivi du bas | sur ordinateur, `scrollTop + clientHeight` de la colonne du fil ≥ `scrollHeight` − 24 px garde le fil en bas ; sur téléphone la mesure est celle de la zone de contenu ; « Revenir au direct » est `position: sticky` au bas du conteneur visible |
-| Bascule à graisse constante | `font-weight` = 500 dans les deux positions et tous les états ; la position active se distingue par `--surface` et l'ombre |
-| Échap et surcouches | avec `VF_SURCOUCHES.ouverte()` vrai, Échap ne ferme pas la fiche ; avec lui faux, elle se ferme et le focus revient à l'origine ; la fiche n'apparaît pas dans la pile de `VF_SURCOUCHES` |
+| Bascule à graisse constante | portée par la Phase 73 (bascule dessinée par la régie) ; la 74 n'en a pas de témoin |
+| Échap et surcouches | la fiche et le lecteur sont des vues de l'onglet Équipe ; avec `VF_SURCOUCHES.ouverte()` vrai, Échap ferme la surcouche et pas la fiche ; avec lui faux, la fiche se ferme et le focus revient à l'élément qui l'a ouverte ; la fiche n'apparaît pas dans la pile de `VF_SURCOUCHES` |
 | Espace de noms | après chargement, l'objet global du moteur a les mêmes clés qu'avant ; les fonctions de la 74 sont sous `window.__vfFrise` et `window.__vfFiche` |
 | Cycle de vie de l'onglet | quitter l'onglet Équipe puis y revenir ne double aucun abonnement `VF_ETAT`, minuterie, observateur ni écouteur de la frise, de la fiche et du lecteur (même nombre d'abonnés avant et après) ; l'initialisation passe par `VF_COQUILLE.surOnglet(rappel)` |
-| Commit vers le tiroir | un clic sur un commit appelle `ouvrir(sha)` avec le sha de ce commit (et lui seul) ; les commits sont rangés sous la branche obtenue en descendant les premiers parents |
+| Commit vers le tiroir | un clic sur un commit passe uniquement par `window.VFGitTiroir.ouvrirSur(sha)` (Phase 80, 80-06) avec le sha de ce commit (et lui seul), aucun autre appel du tiroir ni du volet ; la promesse rendue à `false` (SHA invalide ou introuvable) ne produit rien d'autre et aucun message ; aucune insertion sous la rangée ; aucune modification de `ui/77-vf-git-vue-detail.js` |
+| Rangement des commits | commits rangés sous la branche obtenue en descendant les premiers parents (base, puis branches locales, puis distantes) ; les commits atteints par aucune forment la dernière ligne « Autres commits (branches fusionnées ou sans nom) », jamais pliée, comptée |
 | Étages | une voie de genre session est « Tête » ; un sous-agent avec au moins une voie enfant est « Manager » ; sans voie enfant « Worker », quelle que soit sa profondeur |
 | Données non traduites | un message d'agent, un nom, un nœud ou une cible valant « Close » ou « Search » reste inchangé après l'observateur de traduction ; tout nœud de texte de donnée a un ancêtre `code`, `pre` ou `.mono` |
 | « · déduit » | le suffixe n'apparaît que sur l'état présent d'une voie dont `etatOfficiel` est nul, jamais sur un état à un instant passé ni un segment |
 | Vide à 24 h | à 24 h, le texte vide ne contient pas « fenêtre plus large » ; à 1 h 30 ou 6 h il la contient |
-| Dépôt incomplet | route Git bornée à 500 avec commit le plus ancien lu après le début de la fenêtre : le texte « Dépôt incomplet avant <heure> » est présent et l'heure vaut celle de ce commit ; sinon absent ; aucun « 60 derniers commits » |
+| Dépôt peut-être incomplet | marche tronquée et plus récent des instants (plus ancien commit lu, plus récente rangée dont un parent n'est pas lu) dans la fenêtre : le texte « Dépôt peut-être incomplet avant <heure> » est présent et l'heure vaut cet instant ; sinon absent ; aucun « Dépôt incomplet avant » ni « 60 derniers commits » ; la route Git est lue au montage et sur `git`, jamais à l'événement `frise` |
 | Heure des commits | un commit d'`at` en secondes se pose à l'abscisse de la milliseconde correspondante (pas d'écart d'un facteur 1 000) |
 | Manager rattaché par ses agents | voie d'un manager de `rattachement.source = "enfants"` : seconde ligne « rattaché par ses agents », aucun id de nœud ; la fiche porte la même phrase ; son coût figure dans sa mission et sa phase |
-| Six lectures par instant | un déplacement du curseur déclenche au plus six lectures de `/api/vf/transcript` ; la septième voie et au-delà donnent « Fichiers non lus. » ; un second déplacement sans événement `frise` relit zéro fil déjà en cache |
+| Six lectures par instant | un instant déclenche au plus six lectures de `/api/vf/transcript` et au plus deux en vol ; les voies au-delà de la sixième sont comptées dans « N voies non lues » (liste partielle, pas « Fichiers non lus » pour toute la liste) ; un second déplacement sans que `fin` bouge relit zéro fil déjà en cache (cache par voie et `fin`) |
 | Lecture des fichiers | pendant la lecture, `aria-busy="true"` sur le groupe « Fichiers » et le texte « Lecture des fichiers » ; échec : « Les fichiers n'ont pas pu être lus. » et un bouton « Réessayer » qui relance |
 | Focus conservé à la relecture | focus sur une voie, un commit, un « + N agents » ou le repère, puis événement `frise` : `document.activeElement` porte le même `data-id` ; élément disparu : focus sur la voie du parent ou le repère |
 | Retour intact | après « Retour », fenêtre, lecture, curseur, défilement et dépliages de la frise sont ceux d'avant l'ouverture ; pendant l'ouverture la vue d'origine est `hidden` et `inert` ; `activeElement` = l'élément d'origine |
