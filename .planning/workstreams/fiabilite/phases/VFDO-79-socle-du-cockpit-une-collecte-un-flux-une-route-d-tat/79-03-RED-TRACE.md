@@ -145,3 +145,33 @@ sont à un compteur strictement positif (dont `plus_de_200`, `dep_plus_de_32`, `
 
 Durées mesurées sur la base : `test-driver-lock.sh` 135 s (T69.G et T69.M : 2 s, les variantes ne se préparent pas) ;
 `test-driver-lock-phase.sh` 28 s.
+
+Rejeu sur le code de la tâche 3 : `test-driver-lock.sh` 452 PASS / 0 FAIL (235 s sous charge : plusieurs plans écrivent dans le
+même arbre ; T69.G + T69.M : 33 s) ; `test-driver-lock-phase.sh` 134 ok / 0 ko (22 s).
+
+## Mutants du plan
+
+Quatre copies mutées de `driver-lock.sh` (policy posée à côté), chacune sur une ligne neuve de ce plan, ancre de compte 1,
+`bash -n` valide, `cmp` différent de la copie témoin. Scénario court `t69_markers` (cinq marqueurs) pour tous ; pilote génératif
+`t69_gen` (marqueurs `gen-plan-*`, graine 20261112, 60 plans, 20 relus après falsification) contre le script réel, M-PLAN-TEXTE
+et M-PLAN-VALIDATION. Témoin préalable : la copie non mutée ne bascule aucun marqueur. Ensembles mesurés, relus un par un, puis
+figés dans la suite.
+
+| Mutant | Ancre (ligne neuve) | Substitution | Marqueurs basculés | Première assertion violée (attendu, obtenu) |
+|---|---|---|---|---|
+| M-PLAN-GENERATION | `$2 != ENVIRON["PG"]` (en-tête relu par awk) | comparaison de génération remplacée par `0` | plan-perime-masque | `absent`, obtenu `n1:ready:\|n2:blocked:n1\|n3:blocked:n1,n2` (le plan d'avant la reprise reste rendu) |
+| M-PLAN-TEXTE | `",".join(dl)` (projection python) | `",".join(dl + [str(n.get("step", ""))])` : le texte libre `step` rejoint les dépendances | plan-publie, plan-sans-texte, plan-falsifie, gen-plan-noeuds, gen-plan-sans-texte | plan-sans-texte `fichier:0/status:0/scope:0`, obtenu `fichier:2/status:0/scope:0` ; plan-publie `…n3:blocked:n1,n2`, obtenu `…n3:blocked:n1,n2,x` ; gen-plan-noeuds plan 0 : 4 nœuds publiés pour 2 attendus ; gen-plan-sans-texte plan 0 : texte libre publié |
+| M-PLAN-VALIDATION | `!okid(id) \|\| !okst(st)` (relecture par awk) | condition remplacée par `0` : plus de validation des lignes de nœud | plan-falsifie, gen-plan-json | plan-falsifie `…\|fine:done:n1/absent`, obtenu `invalide/absent` (un identifiant à guillemet casse le JSON) ; gen-plan-json plan 0 falsifié : `status` n'est pas un JSON |
+| M-PLAN-PROPRIETAIRE | `\|\| plan_refuse not-owner` | contrôle du détenteur remplacé par `true` | plan-proprietaire | `1/intact`, obtenu `0/ecrase` (un autre propriétaire écrase le plan) |
+
+Relecture des ensembles. Chacun vient d'une cause lue, deux d'entre eux élargis par rapport à ce que le plan laissait attendre.
+M-PLAN-TEXTE : le texte libre publié est le `step` ; dans le DAG du scénario, `step` du nœud n3 vaut `x`, valide comme
+identifiant, donc il ressort comme dépendance (plan-publie et plan-falsifie, qui comparent les dépendances) ; les `step` des
+nœuds n1 et n2 portent des espaces et un accent, invalides comme dépendances à la relecture mais présents dans le fichier
+(plan-sans-texte) ; dans le pilote, un `step` à tabulation et saut de ligne casse les lignes du TSV, d'où un décompte de nœuds
+faux (gen-plan-noeuds) en plus du marqueur de texte (gen-plan-sans-texte). M-PLAN-VALIDATION : sans validation, la ligne
+falsifiée à identifiant à guillemet produit un JSON invalide ; gen-plan-noeuds ne rougit pas parce que la relecture de
+`status` échoue déjà sur le JSON (gen-plan-json) avant la comparaison des nœuds : l'ensemble est figé tel que mesuré. M-PLAN-GENERATION
+et M-PLAN-PROPRIETAIRE rougissent exactement le marqueur prévu. Le dossier du plan compte donc quatre mutants M-PLAN-*, dont
+chaque marqueur du scénario court et chaque marqueur `gen-plan-*` sauf `gen-plan-couverture` est basculé par au moins un mutant ;
+`gen-plan-couverture` est prouvé par la base (« seuls 0 relectures de status pour 60 plans », voir « Tâche 3 »).

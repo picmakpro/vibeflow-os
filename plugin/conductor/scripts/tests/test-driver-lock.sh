@@ -1894,8 +1894,8 @@ for _t69_m in plan-publie plan-sans-texte plan-perime-masque plan-falsifie plan-
 done
 assert_exit "T69.M témoin — la copie non mutée ne bascule aucun marqueur" "$(t69_ko "$T69_DIR/temoin" | wc -l | tr -d ' ')" 0
 t69_eval GENERATION 0 "plan-perime-masque"
-t69_eval TEXTE 1 "plan-sans-texte gen-plan-sans-texte"
-t69_eval VALIDATION 1 "plan-falsifie gen-plan-json gen-plan-noeuds"
+t69_eval TEXTE 1 "plan-publie plan-sans-texte plan-falsifie gen-plan-noeuds gen-plan-sans-texte"
+t69_eval VALIDATION 1 "plan-falsifie gen-plan-json"
 t69_eval PROPRIETAIRE 0 "plan-proprietaire"
 echo "  durée T69.G + T69.M : $((SECONDS-T69_T0))s"
 assert_exit "T69.M — les $T69_TOTAL mutants M-PLAN-* sont tués ($T69_KILLED)" "$([ "$T69_KILLED" = "$T69_TOTAL" ] && echo 0 || echo 1)" 0
