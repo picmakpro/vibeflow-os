@@ -180,6 +180,26 @@ const S = {
     ok('D3.7 — son âge affiché a avancé (17 min), la durée « depuis » aussi', /sans nouvelle depuis 17 min/.test(texte(v.arbre(w, h))) && /depuis 18 min/.test(texte(v.arbre(w, h))), texte(v.arbre(w, h)));
     ok('D3.8 — un terminé ne vieillit pas dans la page', /a duré 2 min/.test(texte(vive(960).arbre([{ kind: 'subagent', id: 'b', etat: 'termine', tree: '.', role: 'vf-coder', task: 'y', ageS: 60, dureeS: 120 }], h))));
   },
+  // ---- M3 : le titre de la vue Équipe est vrai, la santé d'Équipe ne contredit plus celle de Code ----
+  M3() {
+    console.log('=== M3 — titre et santé de la vue Équipe ===');
+    const rd = rendu();
+    const t = (M, c) => (typeof rd.titreEquipe === 'function' ? rd.titreEquipe(M, c) : '(titreEquipe absent)');
+    eq('M3.1 — sept agents actifs, aucune mission : « 7 agents actifs », jamais « Aucune mission en cours »', t([], { actif: 7 }), '7 agents actifs');
+    eq('M3.2 — un seul agent actif : « 1 agent actif »', t([], { actif: 1 }), '1 agent actif');
+    eq('M3.3 — personne ni mission : « Aucune mission en cours » reste vrai', t([], { actif: 0 }), 'Aucune mission en cours');
+    eq('M3.4 — une mission : le titre la nomme (PU-G-166 inchangé)', t(['Phase 73'], { actif: 3 }), 'Mission : Phase 73');
+    eq('M3.5 — deux missions : « 2 missions en cours » (PU-G-166 inchangé)', t(['a', 'b'], { actif: 3 }), '2 missions en cours');
+    const w = collecte(monter({ session: { ageS: 20 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 20, outil: 'Agent' }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 5 }] }));
+    const g = carte.buildEquipeGraph(w, {});
+    eq('M3.6 — de bout en bout (collecteur réel puis carte) : le titre dit le nombre d\'agents actifs', t([], g.meta.vf.compte), '3 agents actifs');
+    const l = typeof rd.ligneAgents === 'function' ? rd.ligneAgents({ actif: 0, enAttente: 0, auRepos: 2, attend: 1, termine: 4 }) : '(absent)';
+    ok('M3.7 — la ligne des agents dit aussi ceux qui vous attendent et ceux au repos', /1 vous attend/.test(l) && /2 au repos/.test(l), l);
+    // santé : sur l'onglet Équipe, le bloc « Santé » du panneau (contrôle du CODE) est retiré, comme sur le Projet (DG-15)
+    const src = fs.readFileSync(path.join(ui, '00-vibeflow.js'), 'utf8');
+    const ligneEquipe = src.split('\n').find((x) => x.includes("TAB === 'equipe') style.textContent += '#btn-health")) || '';
+    ok('M3.8 — la feuille de l\'onglet Équipe masque le bloc « Santé » du panneau (lignes de Code non analysées ici)', ligneEquipe.includes('#panel .sec:has(> .list > a[data-hc-open]) { display: none; }'), ligneEquipe);
+  },
 };
 
 for (const s of sections) { if (!S[s]) { console.log(`  ❌ FAIL — section inconnue ${s}`); fail++; continue; } await S[s](); }
@@ -196,7 +216,7 @@ run() { # sections...
   PASS=$((PASS + $(echo "$t" | cut -d' ' -f2))); FAIL=$((FAIL + $(echo "$t" | cut -d' ' -f3)))
 }
 
-run D1 D2 D4 D3
+run D1 D2 D4 D3 M3
 
 echo
 echo "=== Bilan : $PASS réussi(s), $FAIL échec(s) ==="

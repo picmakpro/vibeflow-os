@@ -118,6 +118,12 @@
     return dit.length ? `<p class="aw-surv">${glyphe('surveiller', 'aw-s-attente')}<span><b>À surveiller</b> · ${dit.join(' · ')}</span></p>` : '';
   };
 
+  // AUDC-M3 : le titre de la vue Équipe dit le vrai : la mission quand il y en a, sinon le nombre d'agents actifs, « Aucune mission en cours » seulement quand personne ne travaille (PU-G-166 : le titre compte les missions)
+  const titreEquipe = (M, c) => {
+    const m = Array.isArray(M) ? M : [], a = c && typeof c.actif === 'number' ? c.actif : 0;
+    return m.length === 1 ? `Mission : ${m[0]}` : m.length > 1 ? `${m.length} missions en cours` : a > 0 ? `${a} ${a > 1 ? 'agents actifs' : 'agent actif'}` : 'Aucune mission en cours';
+  };
+  const ligneAgents = (c) => `Agents : ${c.actif} ${c.actif > 1 ? 'actifs' : 'actif'} · ${c.enAttente || 0} en attente${c.attend ? ` · ${c.attend} vous attend${c.attend > 1 ? 'ent' : ''}` : ''}${c.auRepos ? ` · ${c.auRepos} au repos` : ''} · ${c.termine || 0} ${c.termine > 1 ? 'terminés' : 'terminé'} depuis moins de 24 h.`;
   const arbre = (workers, h) => {
     noms = nommer(workers);
     const tous = (Array.isArray(workers) ? workers : []).filter(dedans);
@@ -218,5 +224,5 @@
     .aw-foot { margin: var(--sp-12) 0 0; color: var(--text-3); font-size: 12px; line-height: 20px; }
   `;
 
-  window.__vfEquipeRendu = { glyphe, nomDeSession: (workers, id) => nommer(workers).get(id) || null, arbre, agentsDuNoeud, transcript, pied, piedCarte, st, duree, versNoeud, actif, surveiller, css: CSS };
+  window.__vfEquipeRendu = { glyphe, nomDeSession: (workers, id) => nommer(workers).get(id) || null, arbre, agentsDuNoeud, transcript, pied, piedCarte, st, duree, versNoeud, actif, surveiller, titreEquipe, ligneAgents, css: CSS };
 })();

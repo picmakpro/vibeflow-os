@@ -35,10 +35,10 @@
       return { k: 'Projet', h1: VF.milestone ? `Jalon ${VF.milestone}` : 'Le projet', p: p ? p + '.' : tout ? tout + '.' : '' };
     }
     const M = Array.isArray(VF.missions) ? VF.missions : [], c = VF.compte || {};
-    const repos = !M.length && !c.actif && !c.enAttente; // aucune mission et personne au travail
+    const repos = !M.length && !c.actif && !c.enAttente && !c.attend; // aucune mission et personne au travail (ni qui vous attende)
     // PU-G-166 : le titre compte les MISSIONS (nœuds `mission` actifs du graphe Projet, un plan = une mission) ; « actifs » compte les AGENTS (sessions et sous-agents actifs de l'écoute des sessions) : la ligne le dit
-    const agents = typeof c.actif === 'number' ? `Agents : ${c.actif} ${c.actif > 1 ? 'actifs' : 'actif'} · ${c.enAttente || 0} en attente · ${c.termine || 0} ${c.termine > 1 ? 'terminés' : 'terminé'} depuis moins de 24 h.` : G.project.summary || '';
-    return { k: 'Équipe', h1: M.length === 1 ? `Mission : ${M[0]}` : M.length > 1 ? `${M.length} missions en cours` : 'Aucune mission en cours', aide: AIDE_MISSIONS, p: repos ? "L'équipe est au repos." : agents };
+    const R = window.__vfEquipeRendu, agents = typeof c.actif === 'number' && R ? R.ligneAgents(c) : G.project.summary || '';
+    return { k: 'Équipe', h1: R ? R.titreEquipe(M, c) : M.length === 1 ? `Mission : ${M[0]}` : M.length > 1 ? `${M.length} missions en cours` : 'Aucune mission en cours', aide: AIDE_MISSIONS, p: repos ? "L'équipe est au repos." : agents };
   };
   // S6 (revue de la recette du 2026-11-08) : tiroir Git ouvert (body.vf-git-ouvert), le titre est masqué dessous (opacity 0, 77-vf-git-tiroir.js) ; il ne reste pas un arrêt de Tab (focus invisible, bulle par-dessus le tiroir) ; le tabindex revient à la fermeture ; F6a (3e tour) : il ne revient que si le titre porte encore une définition (data-vf-aide), jamais sur le seul fait qu'il en a porté une (un dépôt « indisponible » la retire : le titre n'est alors plus un arrêt)
   const tabTitre = () => { const h1 = document.querySelector('#context h1'); if (!h1 || !h1.dataset.vfAide) return; if (document.body.classList.contains('vf-git-ouvert')) h1.removeAttribute('tabindex'); else h1.tabIndex = 0; };

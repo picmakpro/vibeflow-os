@@ -131,7 +131,7 @@
   // DG-15 (retours panel, lot 6) : le bloc « Santé » du panneau (20-health.js) contrôle le CODE (clés, points d'accès, fichiers oubliés) et son graphe n'a pas de `health` sur l'onglet Projet : il y disait « Aucun problème trouvé » à côté de lignes du planning non lues. Le bouton y est déjà masqué ; le bloc l'est avec lui.
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; } #panel .sec:has(> .list > a[data-hc-open]) { display: none; }`;
   // onglet Équipe (69-05, P69-PL-09) : ni bouton de santé ni barre de question (la question porte sur le code ou le projet)
-  if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }';
+  if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; } #panel .sec:has(> .list > a[data-hc-open]) { display: none; }'; // AUDC-M3 : la santé contrôle le CODE ; sur Équipe elle disait « aucun problème » à côté de Code qui en montrait quatre (même retrait que Projet, DG-15)
   document.head.appendChild(style);
 
   // ---------- onglets ----------
