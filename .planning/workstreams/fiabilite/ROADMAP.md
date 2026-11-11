@@ -590,11 +590,17 @@ Plans:
 **Requirements**: TBD — posées au cadrage.
 **Depends on:** Phase 69 (avancement des phases et du jalon) ; Phase 79 pour le coût par phase ; ordre du jalon : après la 76. La Phase 79 est ajoutée depuis l'audit du 2026-11-10.
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 12, 15, 16) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2.
-**Plans:** 0 plans
+**Plans:** 0/7 plans executed (7 plans en 5 vagues, planifiés le 2026-11-11)
 
 Plans:
 
-- [ ] TBD (run /gsd-plan-phase 77 to break down)
+- [ ] 77-01-PLAN.md — vague 1 : gates, `--format=tsv` dans `check-method-budget.sh` et `check-instruction-budget.sh`, lecture seule, texte identique octet pour octet (SYNT-02, SYNT-04)
+- [ ] 77-02-PLAN.md — vague 1 : données du planning de la collecte, dates du burn-up et blocages du STATE, retrait de `lastDesc` (SYNT-07, SYNT-08, SYNT-09)
+- [ ] 77-03-PLAN.md — vague 2 : route `GET /api/vf/methode`, lancement asynchrone borné, cache de 60 s, un seul appel en cours (SYNT-03, SYNT-04)
+- [ ] 77-04-PLAN.md — vague 2 : modules purs du calcul « depuis votre dernière visite » et de la mémoire de visite (SYNT-05, SYNT-06, SYNT-07)
+- [ ] 77-05-PLAN.md — vague 3 : bouton « Synthèse », panneau, ligne-résumé et bloc « Depuis votre dernière visite » (SYNT-01, SYNT-05, SYNT-06, SYNT-07)
+- [ ] 77-06-PLAN.md — vague 4 : blocs burn-up du jalon et santé de la méthode (SYNT-01, SYNT-04, SYNT-08)
+- [ ] 77-07-PLAN.md — vague 5, à revalider après les Phases 79 et 74 : coût par phase et par étage sur les dernières 24 h (SYNT-10)
 
 ### Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-11-11.md — Phase 78 (corps : cadrage, demande de Samuel mot pour mot, plans ; plans aussi dans phases/VFDO-78-*) -->

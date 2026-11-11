@@ -258,6 +258,8 @@ Taille de STATE.md                          21 sur 8 Ko      ligne 1 : nom (12,5
 - Un type à plusieurs mesures (STATE, ROADMAP, index MEMORY, agents, skills, worktrees par dépôt) = UNE jauge de synthèse (la mesure la plus proche ou au-delà de son budget, son chemin relatif en ligne 3) ; ses AUTRES mesures hors budget ou à surveiller suivent en sous-liste (`<ul>` de lignes plus compactes : chemin mono + « 21 sur 8 Ko » + `.vst`), 5 au plus, puis `.more` « et 4 autres ». Une mesure dans le budget n'est listée qu'une fois (dans la synthèse du type).
 - Bloc `h3` suivi d'une ligne de bilan : « 11 jauges · 8 dans le budget · 3 dépassées » (catégories non nulles, accordées ; « à surveiller », « non applicables », « indisponibles », « format non reconnu »).
 
+> Renvoi (planification, 2026-11-11) : les jetons de la première colonne sont ceux que le plan 77-01 FIXE en liste fermée dans la sortie TSV des gates (`OK`, `AVERTISSEMENT`, `DEPASSE`, `NON-VERIFIABLE`, `NON-APPLICABLE`) ; les jetons texte historiques cités ci-dessous (`OK+LIGNES-EN-HAUSSE`, `AVERTISSEMENT-ADR029`, `ARCHIVABLE`, `RANGEABLE`…) restent ceux de la sortie texte, inchangée, et se ramènent à ces cinq jetons côté gate. La version d'en-tête inconnue d'un TSV donne la jauge « Indisponible » (P77-D-05) ; « Format non reconnu » ne vaut que pour un jeton inconnu ou un champ de chemin rejeté.
+
 Vocabulaire de verdict, FERMÉ (forme du glyphe reprise d'une classe `.vst-*` ; mot affiché ; teinte neutre) :
 
 | Sens (jeton du gate, fixé par le plan 77-01) | Glyphe (classe) | Mot affiché | Barre |
