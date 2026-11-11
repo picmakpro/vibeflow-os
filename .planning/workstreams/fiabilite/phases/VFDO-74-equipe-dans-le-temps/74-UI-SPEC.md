@@ -1,7 +1,7 @@
 # Phase 74 : L'équipe dans le temps — UI-SPEC (craft-equipe-temps)
 
 **Contrat de design** pour la bascule « Régie · Frise », la frise, le curseur, la fiche d'agent (lecteur plein cadre) et le coût.
-Direction « Graphite » (`DESIGN.md`, fait foi). Sources lues : `74-CONTEXT.md` (P74-D-01 à D-44), les contrats C0 à C6 de la Phase 79 (route de frise `vibeflow/cockpit-frise@1`), `DESIGNS.md` § 2, 4, 5, 9 et la page
+Direction « Graphite » (`DESIGN.md`, fait foi). Sources lues : `74-CONTEXT.md` (P74-D-01 à D-45), les contrats C0 à C6 de la Phase 79 (route de frise `vibeflow/cockpit-frise@1`), `DESIGNS.md` § 2, 4, 5, 9 et la page
 d'audit (maquettes 2 et 3), `71-vf-equipe-rendu.js`, `72-vf-equipe.js`, `vf-cockpit-transcript.mjs` (bornes), `78-UI-SPEC.md` (modèle).
 Aucune brique externe de craft consultée : dégradation sur les premiers principes (contraste WCAG, grille 2 px, hiérarchie). Aucune
 décision du CONTEXT n'est rouverte.
@@ -14,7 +14,7 @@ décision du CONTEXT n'est rouverte.
 « 1 024 ») sont insécables (U+00A0) ; aucun tiret cadratin dans le copy. Tout texte venu des traces (nom d'agent, nœud, titre, message,
 cible) s'écrit en `textContent` ou `createElementNS` : jamais `innerHTML` d'une chaîne de données (P74-D-27). Classes neuves en `vf-frise-*`
 et `vf-fiche-*`, dans des modules neufs `ui/74-vf-*.js` (P74-D-43), qui commencent par `// VibeFlow (`. Rayons : seulement `999px`, `8px` ou `var(--r-card)`, `var(--r-ctl)`, `var(--r-panel)` ; espacements : variables seulement (garde `css-jetons.mjs`). **Données non traduites** : tout nom d'agent, nœud, titre, message, cible, branche ou chemin est posé dans un élément que la traduction de la page (`80-vf-fr.js`) saute déjà (`code`, `pre` ou classe `.mono`) ; pour un texte en police sans (nom, message), la classe `.mono` sert de marque et `.vf-donnee` rétablit `--sans`. Un message « Close » reste « Close ». Aucune couleur par nœud, aucun montant en devise, aucune action sur une
-session, aucun quatrième onglet. Le moteur n'est pas modifié (P74-D-31) : tout le rendu vit dans des modules `ui/*vf*`. L'objet global du moteur est gelé : la 74 n'y ajoute aucune fonction, les siennes vivent sous `window.__vfFrise` et `window.__vfFiche` (P74-D-44). Toute lecture de la page passe par `VF_ETAT.jeton()` et `VF_ETAT.lireJson()` (P74-D-37), aucune par un `fetch` direct ni une route posée par la 74.
+session, aucun quatrième onglet. Le moteur n'est pas modifié (P74-D-31) : tout le rendu vit dans des modules `ui/*vf*`. L'objet global du moteur est gelé : la 74 n'y ajoute aucune fonction, les siennes vivent sous `window.__vfFrise` et `window.__vfFiche` (P74-D-44). **Cycle de vie (P74-D-45)** : la frise, la fiche et le lecteur s'initialisent par `VF_COQUILLE.surOnglet(rappel)` et se nettoient en quittant l'onglet (abonnements `VF_ETAT`, minuteries, observateurs, écouteurs) ; revenir sur Équipe ne double aucun abonnement. Toute lecture de la page passe par `VF_ETAT.jeton()` et `VF_ETAT.lireJson()` (P74-D-37), aucune par un `fetch` direct ni une route posée par la 74.
 
 **Typographie par rôle (échelle de `DESIGN.md` § 3, tout le reste en découle).** Une seule taille de mono pour toute la 74 : 11,5 px.
 | Rôle | Taille / graisse / hauteur de ligne | Où |
@@ -208,7 +208,7 @@ deux colonnes, libellé 12,5 px / 16 `--text-3` au-dessus, valeur 15 px / 600 / 
 | Libellé | Valeur | Remarque |
 |---|---|---|
 | « Au travail » | « 2 h 14 » | `durees.travailS`, somme des segments (P74-D-26), jamais `dureeS` |
-| « À vous attendre » | « 18 min » | `durees.attenteHumainS` ; « · déduit » si `etatOfficiel` est nul |
+| « À vous attendre » | « 18 min » | `durees.attenteHumainS`, somme de segments passés : jamais de mention « déduit » (P74-D-39) |
 | « Contexte au dernier tour » | « 168 k jetons » | `jetons.contexteDernier`, toujours en jetons, jamais en pourcentage (aucune taille de fenêtre documentée, P74-D-16) ; `contexteMax` n'est pas affiché |
 | « Compactions » | « 3 » | `compteurs.compactions`, comptées seulement, sans taille |
 | « Appels d'outil » | « 214 » | `compteurs.appels` |
@@ -300,7 +300,8 @@ Aucun texte de la 74 n'emploie « coût estimé », « euro », « tarif » ou u
 `zoneDe` de `72-vf-equipe.js`), remplacés par la fiche ; (2) la durée unique d'un agent qui compte ses veilles, remplacée par la somme des segments ; (3) avec la
 73, la carte « Terminés depuis moins de 24 h » (compensée par la frise sur 24 h).
 **Glyphes** : La table est unique (P74-D-29) : celle de la régie, à défaut `GLYPHE` de `71-vf-equipe-rendu.js` ; un glyphe d'état n'existe qu'à un endroit. Les liens `#r=` du tiroir « Au travail » ont la fiche pour cible (P74-D-30).
-**Inchangé** : le tiroir « Au travail » et ses lignes ; les onglets Code et Projet ; `.vf-tabs` et l'en-tête ; les points de rupture (700, 999, 1 279 tactile) ;
+**Le tiroir « Au travail » change en deux points seulement** : ses liens `#r=` ont la fiche pour cible, et la durée de ses lignes lit `durees.travailS` (P74-D-41, si la régie de la 73 ne l'a pas remplacé). Son groupe des terminés de moins de 24 h reste inchangé (P69-D-18).
+**Inchangé** : les onglets Code et Projet ; `.vf-tabs` et l'en-tête ; les points de rupture (700, 999, 1 279 tactile) ;
 la bascule de thème ; la recherche de l'onglet Équipe ; le mode « hérité du poste » ; les routes en GET seules et le contrat de forme (tenu par la 79) ; aucune clé
 `doing`, `mandat`, `messages`, `outils`, `fil` dans le flux ; aucun export de frise, fiche ou fil.
 
@@ -376,6 +377,7 @@ Propriétés mesurables qu'un test en navigateur pourrait asserter (pas le test)
 | Bascule à graisse constante | `font-weight` = 500 dans les deux positions et tous les états ; la position active se distingue par `--surface` et l'ombre |
 | Échap et surcouches | avec `VF_SURCOUCHES.ouverte()` vrai, Échap ne ferme pas la fiche ; avec lui faux, elle se ferme et le focus revient à l'origine ; la fiche n'apparaît pas dans la pile de `VF_SURCOUCHES` |
 | Espace de noms | après chargement, l'objet global du moteur a les mêmes clés qu'avant ; les fonctions de la 74 sont sous `window.__vfFrise` et `window.__vfFiche` |
+| Cycle de vie de l'onglet | quitter l'onglet Équipe puis y revenir ne double aucun abonnement `VF_ETAT`, minuterie, observateur ni écouteur de la frise, de la fiche et du lecteur (même nombre d'abonnés avant et après) ; l'initialisation passe par `VF_COQUILLE.surOnglet(rappel)` |
 | Commit vers le tiroir | un clic sur un commit appelle `ouvrir(sha)` avec le sha de ce commit (et lui seul) ; les commits sont rangés sous la branche obtenue en descendant les premiers parents |
 | Étages | une voie de genre session est « Tête » ; un sous-agent avec au moins une voie enfant est « Manager » ; sans voie enfant « Worker », quelle que soit sa profondeur |
 | Données non traduites | un message d'agent, un nom, un nœud ou une cible valant « Close » ou « Search » reste inchangé après l'observateur de traduction ; tout nœud de texte de donnée a un ancêtre `code`, `pre` ou `.mono` |

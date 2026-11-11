@@ -10,7 +10,7 @@ Cadrage par le manager de la mission Phase 74 (`vf-dev-manager`, worktree `.clau
 compartiment `fiabilite`. Cadrée en même temps que les Phases 73, 75, 76, 77, 79 et 80, dans la vague lancée par Samuel le
 2026-11-11 (session principale Claude Code : « lancer en parallèle les cadrages et plans de toutes les phases »).
 
-**Sources :** but arbitré le 2026-11-03 (bloc Phase 74 du ROADMAP) ; note `.planning/notes/2026-11-03-cockpit-idees-recherche.md`
+**Sources :** but arbitré le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 ; bloc Phase 74 du ROADMAP) ; note `.planning/notes/2026-11-03-cockpit-idees-recherche.md`
 (idées 1, 2, 3 et complément du 2026-11-11) ; étude `.planning/research/2026-11-10-audit-cockpit-etude.md` (§ 3, § 6, § 7,
 § 8.2) ; `REGISTRE.md` (AUDC-I04, I05, I06, I07, I08, I21, I28, M4, D8, D9 ; § 3 ; § 5) ; `DESIGNS.md` (§ 2, § 4, § 5, § 9) ;
 annexes A1 (§ 3, § 4), A5 (§ 3), A6 (ligne d'état, transcripts) ; rapport du lot 0 `.planning/missions/2026-11-11-audit-cockpit-lot-0.md` ;
@@ -161,7 +161,7 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   table de tarifs à tenir à jour dans le module, et la Phase 52 pose « jamais estimé ». La proposition « coût estimé au
   tarif public » de DESIGNS § 5 n'est pas reprise ; signalé à Samuel (point 2), sans bloquer.
 - **P74-D-21 (agrégats).** Par agent ; par mission (agents rattachés à un nœud d'un DAG de mission) ; par phase (mission →
-  phase) ; par étage (tête = session, manager, worker, d'après le rôle et la profondeur). Les agents non rattachés forment
+  phase) ; par étage (tête, manager, worker, selon la règle de P74-D-42 : jamais la profondeur seule). Les agents non rattachés forment
   une ligne « hors mission », comptée à part, jamais répartie. Chaque agrégat porte sa fenêtre (« sur les dernières 6 h ») :
   un coût de phase sur 24 h n'est jamais présenté comme le coût de la phase.
 - **P74-D-22 (le calcul partagé avec la Phase 52).** Un seul calcul : **la somme des jetons de `message.usage`,
@@ -171,7 +171,8 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   jointure » du rapport).
 - **P74-D-23 (temps perdu à attendre l'humain).** Somme des segments « vous attend » d'un agent ou d'une fenêtre, tirés
   de l'état officiel (« bloquée », AUDC-Q4) et, en repli et pour l'historique, d'une question ou d'une permission sans
-  réponse dans le transcript (déduction, dite comme telle dans la fiche).
+  réponse dans le transcript. Les segments ne disent pas leur provenance (C3) : seule la mention de l'état présent d'une
+  voie sans état officiel dit « déduit » (P74-D-39).
 - **P74-D-24 (limites d'abonnement).** Les limites de 5 h et de 7 jours ne sont pas dans la 74 : publiées pour la session
   principale seulement, pour trois abonnements, via la ligne d'état (A6 § 3), elles demandent un relais par le script de
   ligne d'état, hors de ce que lit le socle. Elles restent avec le plafond de coût (réserve, AUDC-I35). Signalé à Samuel
@@ -199,7 +200,8 @@ cadrages) : les faits ont été relevés par le manager lui-même dans le code e
   « Lire le transcript » : remplacés par la fiche plein cadre. (2) La durée unique d'un agent qui compte ses veilles :
   remplacée par la durée par segments. (3) Partagé avec la 73 (registre § 3) : la carte « Terminés depuis moins de 24 h ».
   La 73 la retire avec le canevas de l'onglet ; la 74 en porte la compensation pour l'historique (la frise sur 24 h,
-  P69-D-18 tenue). Si la 73 ne la retire pas, la 74 le fait.
+  P69-D-18 tenue). Si la 73 ne la retire pas, la 74 le fait. Le retrait vise la carte seule : le groupe repliable des
+  terminés de moins de 24 h du tiroir « Au travail » (rendu livré de CKPT-20, P69-D-18) reste en place.
 
 ### Jointure avec la régie et la spécification d'interface
 
@@ -288,9 +290,9 @@ voies (P74-D-10), le mécanisme de mise en évidence sur la carte Code (P74-D-12
 <specifics>
 ## À Samuel
 
-Trois points, aucun ne bloque la planification ; l'arbitrage en vigueur tient et le plan est bâti dessus.
+Quatre points, aucun ne bloque la planification ; l'arbitrage en vigueur tient et le plan est bâti dessus.
 
-1. **« Colorée par nœud de DAG »** (but de la Phase 74, ton arbitrage du 2026-11-03) contredit `DESIGN.md` § 9 et Q9.
+1. **« Colorée par nœud de DAG »** (but de la Phase 74, ton arbitrage du 2026-11-03, AskUserQuestion session principale) contredit `DESIGN.md` § 9 et Q9.
    La frise est bâtie sur `DESIGN.md` : le nœud s'écrit sur la voie, la couleur reste aux trois états (P74-D-01). Options :
    (a) garder `DESIGN.md` (recommandé : une couleur par nœud demanderait une palette libre que Graphite interdit, et
    la couleur cesserait de dire l'état) ; (b) colorer par nœud, en rouvrant Q9. À voir à la recette.
@@ -300,6 +302,10 @@ Trois points, aucun ne bloque la planification ; l'arbitrage en vigueur tient et
 3. **Limites de 5 h et de 7 jours hors de la 74** (P74-D-24), alors que AUDC-I07 les plaçait ici. Recommandé : en réserve
    avec le plafond de coût (AUDC-I35), parce qu'elles ne concernent que la session principale et demandent un relais par
    la ligne d'état.
+4. **« Rejoue une mission nœud par nœud »** (même but) est tenu par dérivation : à l'instant t, un nœud est dit porté
+   par un agent au travail, au repos ou par aucun agent, d'après les voies (P74-D-13) ; le statut exact du DAG (`ready`,
+   `blocked`…) n'est pas rejoué, faute d'horodatage dans les plans de mission. Recommandé : s'en tenir là ; à voir à la
+   recette. Si tu veux le statut exact, il faut horodater les transitions de `dag.sh` (conductor), hors de cette phase.
 </specifics>
 
 <canonical_refs>
