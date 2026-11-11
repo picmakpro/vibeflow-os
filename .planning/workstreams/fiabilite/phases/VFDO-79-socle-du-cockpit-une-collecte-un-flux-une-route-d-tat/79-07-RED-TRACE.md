@@ -56,3 +56,17 @@ Suite test-cockpit-git-config-depot.sh après la tâche 3 : seuls A8, A9, A10, A
 Chaque mutant garde ses témoins positifs verts (dépôt ordinaire lu, oracles concordants, sortie ordinaire A14b, vrai worktree B5.2, forme exacte du verrou).
 
 Amendement daté (voir le plan, commit séparé) : les ancres de mutation de `worktreeVerifie` employées par X7 de test-cockpit-git-details.sh (M-RETOUR, M-PERE, M-PRINCIPAL) manquaient à la liste du plan ; premier jet de la tâche 3 : 8 échecs X7 de test-cockpit-git-details.sh (ancres absentes, mutants sans effet) ; corrigé en gardant `reelOuNull` (alias de `cheminPhysique`) et les lignes d'ancre à l'identique.
+
+## Point d'arrêt après la tâche 3
+
+`AVANT` : voir la première ligne de cette trace. Commits `(79-07)` de la session, dans l'ordre : `6c6a8479` (témoins rouges), `0180f45c` (extraction du lanceur), `199d725b` (règle physique), `d99b396a` (ancres de worktreeVerifie), `b17f5510` (amendement daté du plan), `d4db658e` (mutants de la règle physique) ; le commit de cette rubrique suit.
+
+Suites vertes, jouées seules : test-cockpit-git-env.sh, -vendor.sh, -confinement.sh, -git-details.sh, -avancement.sh, -terminal-serveur.sh, -signal.sh, -path-enfants.sh, -assemblage.sh. Contrôles de la tâche 3 : OK-REGLE-PHYSIQUE (aucun échec hors A8, A9, A10, A12, D6.1 à D6.5 ; 19 identifiants de la règle verts ; 17 assertions de mutants vertes ; copies du module identiques ; aucun appel du realpath JS ni de la résolution lexicale dans le module partagé ; module de 150 lignes), OK-GRAINE-REJOUABLE (graine 424242), OK-NON-REGRESSION-SOCLE.
+Rouge de charge, hors plan : test-cockpit-securite.sh FB3.5 (délai de 10 s du cas génératif), rouge aussi sur un instantané antérieur au plan.
+
+Ensemble exact des rouges attendus dans test-cockpit-git-config-depot.sh : A8, A9, A10, A12 (tâche 4, scan.mjs) et D6.1, D6.2, D6.3, D6.4, D6.5 (tâche 5, pilotes nommés) ; tout le reste est vert.
+Mutants M-LEXICAL, M-JS, M-REPLI et M-VERROU : causes, attendus, obtenus et graine (4217) dans la section « Tâche 3 » ci-dessus.
+Amendement du plan : les ancres de mutation de worktreeVerifie (X7), voir le plan, commit `b17f5510`.
+Interface de 79-13 : `cheminPhysique(chemin, { plusProcheParent = false } = {})` existe, exportée de vf-cockpit-git-sortant.mjs, copie octet pour octet dans le moteur, figée par G17.
+
+État : porte non levée. Un constat de l'audit de sécurité intermédiaire (obligatoire, amendement de la porte) est à obtenir avant la tâche 4 ; la reprise est une décision de la session principale. L'arbre est partiellement rouge par construction (A8, A9, A10, A12, D6.1 à D6.5) : ne pas fusionner ici.
