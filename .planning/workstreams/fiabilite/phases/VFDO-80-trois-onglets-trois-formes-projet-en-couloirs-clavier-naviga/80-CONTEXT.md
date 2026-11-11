@@ -543,7 +543,17 @@ Faits établis par la recherche qui corrigent la forme de décisions déjà pris
   Témoin dans 80-02 (et 80-10 pour (b)), après la 79 : deux changements d'onglet → un seul écouteur d'Échap de la pile
   sur `window` (compté par instrumentation), `VF_SURCOUCHES` identique, entrée du terminal gardée, entrées d'onglet
   retirées ; mutant (marqueur `vf-coquille: persistant` retiré) → deux écouteurs ou entrée du terminal perdue, rouge.
-- **P80-D-60 (ancres de la 79, A52).** `ROUTES`, `ANNOTATEURS` et les lignes `AJOUT <chemin>` de `VENDORED.txt` sont en
+  **Conditions d'A53 de la 79 (commit `cce6ed3f`), tenues par (a) et (b) :** le marqueur `vf-coquille: persistant` est
+  dans les huit premières lignes des deux fichiers ; garde d'unicité à l'évaluation ; aucun état lié à un onglet — la
+  pile n'installe à l'évaluation que son objet et son écouteur en capture sur `window`, et pose dans un rappel
+  `surOnglet(…, { cle: '00-vf-surcouches.js' })` tout ce qui dépend du document de l'onglet (observation de `#modal` et
+  `#palette` du moteur, purge des entrées d'onglet) ; `VF_ONGLETS` n'installe à l'évaluation que son objet et son
+  écouteur `popstate`, et n'appelle `chargerOnglet` qu'à l'appel de `aller` ; aucun des deux fichiers ne lit l'objet du
+  moteur (`Floorplan`/`VibeFlow`) à l'évaluation. Ordre : bibliothèques, puis persistants par ordre alphabétique —
+  `00-vf-onglets.js` puis `00-vf-surcouches.js` —, puis premier onglet ; `VF_ONGLETS` ne dépend pas de la pile (aucune
+  écoute d'Échap), la pile passe donc avant toute extension d'onglet et toute vue. Avant la 79 (pas de
+  `VF_COQUILLE`), les deux fichiers posent ces mêmes accroches une fois à l'évaluation (document unique).
+- **P80-D-60 (ancres de la 79, A52 ; classe persistante lue du marqueur au démarrage, sans liste ni baseline, A53).** `ROUTES`, `ANNOTATEURS` et les lignes `AJOUT <chemin>` de `VENDORED.txt` sont en
   ordre alphabétique contrôlé, sans repère : chaque plan de la 80 insère à sa place alphabétique (deux champs par ligne
   `AJOUT`). Un nom d'événement de la 80 dans la liste `EVENEMENTS` de `ui/69-vf-flux.js` (79-14) va derrière
   `// vf-repere:phase-80` ; la 80 n'en prévoit aucun à ce jour. L'ancre `"statuts"` du bloc `vibeflow/cockpit-project@1`
