@@ -280,6 +280,20 @@ option recommandée.
   - L'assertion R3.25 de `test-cockpit-projet-visite.sh` lit la prose `lastDesc`. Elle est réécrite dans le plan du
     retrait (P77-D-12), pour asserter l'absence du texte.
 
+### Décisions du manager après la planification (2026-11-11)
+
+Même régime : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée.
+
+- **P77-D-25 (installation par onglet sans repli).** Les plans 77-05 et 77-06 dépendent durement de
+  `VF_COQUILLE.surOnglet` (Phase 79). Aucun repli n'est prévu : la 77 s'exécute après la 79 dans l'ordre du jalon. Si
+  la 79 ne livre pas cette fonction, les deux plans restent bloqués et la question remonte, au lieu de poser une
+  initialisation au chargement que la règle A30 interdit.
+- **P77-D-26 (retrait de `lastDesc` sans montée de version).** Ce champ n'a jamais été déclaré dans `cockpit-project@1`
+  (`vf-cockpit-interface.json`). Son retrait ne change donc pas la version du schéma. La jointure le confirme.
+- **P77-D-27 (sept plans).** Le planificateur a scindé l'interface en deux plans : 77-05 pour le bouton, le panneau et
+  la dernière visite, 77-06 pour le burn-up et les jauges. Un seul plan aurait porté trop de fichiers pour un
+  exécutant. D'où 7 plans en 5 vagues, et le coût (77-07) toujours à part.
+
 ### Claude's Discretion
 
 - Le numéro et le nom du fichier `ui/` neuf : un numéro libre au moment de l'exécution, à vérifier contre les fichiers
