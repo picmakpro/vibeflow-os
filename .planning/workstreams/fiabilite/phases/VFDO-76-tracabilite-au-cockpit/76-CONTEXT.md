@@ -1,7 +1,7 @@
 # Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire - Context
 
 **Gathered:** 2026-11-11
-**Status:** Cadrée (2026-11-11), reprise le même jour : A-1 et A-2 tranchées par Samuel, format des questions en attente posé (P76-D-34 à P76-D-36) ; une question en attente (P76-Q-03)
+**Status:** Cadrée (2026-11-11), reprise le même jour : A-1 et A-2 tranchées par Samuel, format des questions en attente posé (P76-D-34 à P76-D-37) ; une question appliquée par délégation, contestable (P76-Q-03)
 
 Cadrage porté par le manager de la mission Phase 76 (`vf-dev-manager`, worktree `.claude/worktrees/phase-76`, branche
 `feat/phase-76-tracabilite`, base `integration/cockpit-audit` `f763b556`). Jalon `vibeflow-v2.0`, compartiment
@@ -93,6 +93,13 @@ Relayés mot pour mot par la session principale ; canal : arbitrage Samuel, AskU
   formée », avec son défaut nommé. Une question n'est « tranchée » que par une ligne `État` canonique. Une incohérence
   lue (ligne `État : en attente` alors qu'une décision du même registre cite son identifiant avec « arbitrage
   Samuel ») rend l'état « à vérifier », jamais « en attente ».
+
+- **P76-D-37 (état « appliquée » ; décision déléguée par Samuel (message session principale, 2026-11-08), option
+  recommandée ; amendement du 2026-11-11 sur demande de la session principale).** Une question dont l'option
+  recommandée a été appliquée sous délégation n'est ni « en attente » ni « tranchée » : elle prend l'état
+  « appliquée », écrit dans la même section et lu par la même lecture, pour que la régie la montre à part, contestable,
+  sans la mêler aux questions qui bloquent. Écarté : la sortir de la section (Samuel perdrait le moyen de la contester) ;
+  la laisser « en attente » (la file « À vous » perdrait son sens).
 
 ### Forme et emplacement
 
@@ -332,10 +339,17 @@ tout changement passe par un amendement daté ici.
     quand aucune n'est recommandable (goût pur) ;
   - `Bloque : <liste>` — éléments séparés par `, ` : un plan `<NN>-<NN>` (ou `<NN.N>-<NN>`), une phase `Phase <N>`, ou
     le seul mot `rien` ;
-  - `État : en attente`, ou, une fois tranchée,
-    `État : tranchée — arbitrage Samuel, <canal>, <AAAA-MM-JJ> — option (<lettre>) — « <mot pour mot> »`.
-- **Passage de « en attente » à « tranchée ».** On ne supprime ni ne déplace l'entrée : on remplace la seule ligne
-  `État` par la forme tranchée (canal, date ISO, option, citation exacte entre guillemets français), et on écrit au
+  - `État : en attente` ; ou, une fois tranchée par Samuel,
+    `État : tranchée — arbitrage Samuel, <canal>, <AAAA-MM-JJ> — option (<lettre>) — « <mot pour mot> »` ; ou, quand
+    l'option recommandée a été appliquée sous délégation sans que Samuel ait répondu à cette question,
+    `État : appliquée — décision déléguée par Samuel (<canal>, <AAAA-MM-JJ>), option (<lettre>) — P<n>-D-<nn>`, la
+    lettre étant celle de `Recommandation` et `P<n>-D-<nn>` la décision du même registre qui l'applique.
+- **Trois états, trois sens.** « en attente » : une réponse de Samuel est attendue et retient ce que dit `Bloque`.
+  « appliquée » : rien n'est bloqué, le travail avance sur l'option recommandée, mais Samuel ne l'a pas tranchée et peut
+  la contester. « tranchée » : Samuel a répondu, sur cette question. Une question appliquée que Samuel conteste ou
+  confirme passe à « tranchée » ; si sa réponse diffère de l'option appliquée, la décision `P<n>-D-<nn>` est amendée.
+- **Changement d'état.** On ne supprime ni ne déplace l'entrée : on remplace la seule ligne `État` par la nouvelle
+  forme ; pour « tranchée », la forme porte (canal, date ISO, option, citation exacte entre guillemets français), et on écrit au
   registre la décision qui en découle (`P<n>-D-<nn>`), qui cite l'identifiant de la question.
 - **Ce qui n'est pas une question** : toute ligne de la section qui n'est pas une entrée (prose, puce d'un autre format
   comme `- **S-1 — …**`, puce imbriquée). La lecture ne la rend jamais comme une question ; elle compte les puces de
@@ -363,27 +377,33 @@ tout changement passe par un amendement daté ici.
         "bloque": [{ "type": "plan", "id": "76-04" }, { "type": "phase", "n": "81" }],
         "etat": "en-attente",
         "tranchee": null,
+        "appliquee": null,
         "defauts": []
       }
     ],
-    "bilan": { "enAttente": 1, "tranchees": 0, "aVerifier": 0, "malFormees": 0, "nonStructurees": 0, "registresLus": 1 },
+    "bilan": { "enAttente": 1, "appliquees": 0, "tranchees": 0, "aVerifier": 0, "malFormees": 0, "nonStructurees": 0, "registresLus": 1 },
     "tronque": false
   }
   ```
 
-- **Valeurs.** `etat` ∈ `en-attente`, `tranchee`, `a-verifier`, `mal-formee`. `recommandation` est une lettre ou `null`
+- **Valeurs.** `etat` ∈ `en-attente`, `appliquee`, `tranchee`, `a-verifier`, `mal-formee`. `recommandation` est une lettre ou `null`
   (« aucune »). `bloque` vaut `[]` pour `rien`. `tranchee` vaut `null` sauf si `etat` = `tranchee`, et porte alors
-  `{ canal, date, option, citation }` (citation ≤ 240 caractères). `defauts` est fermé : `etat-absent`,
+  `{ canal, date, option, citation }` (citation ≤ 240 caractères). `appliquee` vaut `null` sauf si `etat` =
+  `appliquee`, et porte alors `{ canal, date, option, decision }` (`decision` = `P<n>-D-<nn>`). `defauts` est fermé : `etat-absent`,
   `etat-invalide`, `options-invalides`, `recommandation-hors-options`, `bloque-invalide`, `champ-repete`,
   `champ-manquant`, `phase-incoherente` (le `<n>` de l'identifiant n'est pas celui du dossier), `identifiant-double`
   (même identifiant deux fois dans le planning lu : toutes ses occurrences sont « mal formée »), `citation-incoherente`
-  (état « à vérifier », P76-D-36). Une entrée « mal formée » garde `id`, `phase`, `fichier`, `ligne` et `defauts`
+  (état « à vérifier », P76-D-36), `appliquee-hors-recommandation` (l'option appliquée n'est pas la
+  recommandée : « mal formée »), `decision-introuvable` (la décision citée par « appliquée » n'est pas définie dans le
+  registre : état « à vérifier »). Une entrée « mal formée » garde `id`, `phase`, `fichier`, `ligne` et `defauts`
   quand ils sont lisibles, rien d'autre.
 - **Bornes.** Textes passés par le nettoyage de la 76 (aucun chemin absolu ni `~/`) et coupés aux longueurs ci-dessus ;
   la page les rend en texte, jamais en HTML. Au plus 200 entrées, triées par phase puis identifiant ; au-delà,
   `tronque: true`. Fichier absent ou illisible : rien, sans erreur. Section vide : `registresLus` compté, aucune entrée.
-- **Ce que la 73 consomme** : les entrées `etat` = `en-attente`, et le `bilan` pour dire ce qui n'est pas lu
-  (« N questions écrites dans un autre format, non lues ») ; elle n'affiche jamais une entrée `mal-formee` ou
+- **Ce que la 73 consomme** : dans « À vous », les seules entrées `etat` = `en-attente` ; à part, repliée, une liste
+  « Appliquées par délégation, contestables » des entrées `etat` = `appliquee` (question, option appliquée, décision
+  qui l'applique), jamais mêlée à « À vous » et jamais cachée ; le `bilan` pour dire ce qui n'est pas lu (« N questions
+  écrites dans un autre format, non lues ») et ce qui est à vérifier. Elle n'affiche jamais une entrée `mal-formee` ou
   `a-verifier` comme une question qui attend une réponse. Tant que la lecture de la 76 n'existe pas (la 73 s'exécute
   avant), le champ est absent et la 73 le dit dans son emplacement ; le plan 76-09 le remplit.
 
@@ -416,7 +436,7 @@ restent ici, réécrites au format, comme premiers cas réels pour la lecture.
   Options : (a) garder et mesurer à l'exécution ; (b) une exception à A32 pour les définitions de décisions, lues par la route.
   Recommandation : (a) — mesure écrite dans la trace de 76-04, la règle commune reste entière.
   Bloque : rien
-  État : en attente
+  État : appliquée — décision déléguée par Samuel (message session principale, 2026-11-08), option (a) — P76-D-31
 
 <canonical_refs>
 ## Canonical References
