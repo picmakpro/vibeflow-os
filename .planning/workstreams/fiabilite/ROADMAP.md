@@ -634,7 +634,7 @@ Plans:
   4. Le tiroir Git est lisible à 1024 × 768 sans pousser la carte ; les jetons repris passent les seuils de contraste mesurés dans les deux thèmes.
   5. Après la Phase 79, changer d'onglet ne recharge plus la page et garde tiroirs, zoom et historique du terminal.
   6. Toutes les suites du cockpit vertes sous macOS et Linux ; chaque comportement porte un témoin rouge sur la base puis vert.
-**Plans:** 19 plans en 10 vagues (vagues 1 à 3 sans dépendance à la Phase 79 ; à partir de 80-09, précondition : Phase 79 fusionnée en entier)
+**Plans:** 20 plans en 10 vagues (vagues 1 à 3 sans dépendance à la Phase 79 ; à partir de 80-09 : 79-01 à 79-18 fusionnés ; 80-18 après 79-20 ; S80-1 à S80-5 tranchées, FORM-18 portée par 80-14, 80-15, 80-19 et 80-20)
 
 Plans:
 
@@ -648,7 +648,7 @@ Plans:
 
 - [ ] 80-04-PLAN.md — Projet en couloirs, ?vue=, naviguer(), visite, contrats C76-1/2/3
 - [ ] 80-05-PLAN.md — Coin bas-droit : minicarte, repères, ligne d'état, zone basse du téléphone
-- [ ] 80-06-PLAN.md — Tiroir Git : pagination, worktrees repliés, volet bas, poignée de largeur
+- [ ] 80-06-PLAN.md — Tiroir Git : pagination, worktrees repliés, volet bas, poignée de largeur, ouvrirSur(sha)
 
 **Vague 3** *(bloquée tant que la vague 2 n'est pas terminée)*
 
@@ -661,7 +661,7 @@ Plans:
 
 **Vague 5** *(bloquée tant que la vague 4 n'est pas terminée)*
 
-- [ ] 80-10-PLAN.md — Onglets sans rechargement, « Réessayer »
+- [ ] 80-10-PLAN.md — Onglets sans rechargement, « Réessayer », VF_ONGLETS.aller
 - [ ] 80-11-PLAN.md — Lot moteur A2 : vocabulaire du panneau de Projet
 - [ ] 80-12-PLAN.md — Cadrer la sélection et ses voisins (touche C)
 
@@ -671,21 +671,22 @@ Plans:
 
 **Vague 7** *(bloquée tant que la vague 6 n'est pas terminée)*
 
-- [ ] 80-14-PLAN.md — Lot moteur B : palette, registre des raccourcis, ARIA, copier le lien
+- [ ] 80-14-PLAN.md — Lot moteur B : palette, registre des raccourcis, ARIA, copier le lien, ligne du terminal (P80-D-55)
 
 **Vague 8** *(bloquée tant que la vague 7 n'est pas terminée)*
 
-- [ ] 80-15-PLAN.md — Aide ?
+- [ ] 80-15-PLAN.md — Aide ?, ligne du terminal (P80-D-55)
 - [ ] 80-16-PLAN.md — Jetons X5, DESIGN.md, découpe de 00-vibeflow.js
 - [ ] 80-17-PLAN.md — Finitions F1, F3, F4, F5
+- [ ] 80-19-PLAN.md — Santé en français (S80-2, P80-D-54)
 
 **Vague 9** *(bloquée tant que la vague 8 n'est pas terminée)*
 
-- [ ] 80-18-PLAN.md — Assemblage : compteur des README, table du partage CI, CHANGELOG, non-régression
+- [ ] 80-20-PLAN.md — Titre de vue, en-tête en trois groupes, chevron, icônes, ouvreur Git 36/44 (S80-1, S80-3, S80-5)
 
 **Vague 10** *(bloquée tant que la vague 9 n'est pas terminée)*
 
-- [ ] 80-19-PLAN.md — Après avis de Samuel (S80-1 à S80-5), autonomous: false, FORM-18
+- [ ] 80-18-PLAN.md — Assemblage : compteur des README, table du partage CI, CHANGELOG, non-régression
 
 ### Phase 81: Agir sur une session depuis le cockpit
 
