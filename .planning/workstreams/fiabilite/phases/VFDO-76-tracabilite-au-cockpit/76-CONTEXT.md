@@ -97,8 +97,9 @@ dépôt.
 ### Données : chemin, schéma, sécurité
 
 - **P76-D-06 (route à la demande).** Les données arrivent par une route propre, `GET /api/vf/tracabilite`, appelée à
-  l'ouverture d'une section ou d'un panneau, calcul asynchrone, cache par empreinte (sha de HEAD + dates de
-  modification de `docs/ADR.md`, des `*-CONTEXT.md`, du ledger et de `.claude/agent-memory/`), un seul calcul en vol,
+  l'ouverture d'une section ou d'un panneau, calcul asynchrone, cache par empreinte (sha de HEAD + date de
+  modification la plus récente sous `.planning/`, de `docs/ADR.md` et sous `.claude/agent-memory/` ; amendé le
+  2026-11-11 sur `76-RESEARCH.md` : l'empreinte d'origine omettait PLAN, SUMMARY, VERIFICATION et recette), un seul calcul en vol,
   une seule entrée en cache. `vibeflow/cockpit-project@1` n'est **pas** étendu ; `project.html` ne grossit pas. Panel
   « données » : option B retenue (A écartée : poids de page, collecte synchrone, conflit avec la 79 sur la boucle ;
   C écartée : deux sources pour le même compte). Paramètres `vue=jalon|phase|exigence|decision|adr|memoire|entree` et
@@ -240,6 +241,16 @@ dépôt.
   après la fusion de la 79 entière ; les plans de la 76 qui se branchent sur le panneau dépendent donc de la **80
   exécutée**, pas seulement de la première vague de la 79 (dépendance déclarée dans les plans, **à revalider** à
   l'exécution).
+- **Règle de page de la Phase 79** (amendement A30, commit `74501bb0` de `feat/phase-79-socle-cockpit`, C5) : toute
+  extension qui dépend de l'onglet s'initialise par `VF_COQUILLE.surOnglet(rappel)`, jamais au seul chargement ; les
+  sections de panneau et la lecture de `GET /api/vf/tracabilite` de la 76 s'installent quand l'onglet vaut Projet et
+  le rappel rend leur nettoyage (écouteurs, minuteries, DOM posé). **À revalider** après exécution de la 79.
+- **P76-D-30 (objets qui ne sont pas des nœuds).** Phase et plan sont des nœuds du graphe : ouverts par `select(id)`.
+  Exigence (après le retrait de P76-D-25), ADR, décision, entrée de mémoire : panneaux sur mesure par
+  `SC.showPanel(html, bind)`. Leur entrée dans la pile Retour commune de la 80 est demandée à la 80 (une entrée de pile
+  qui rouvre un panneau sur mesure) ; tant qu'elle n'est pas confirmée, le fil d'Ariane de la 76 sert de retour pour
+  ces panneaux. **À revalider.** Décision déléguée par Samuel (message session principale, 2026-11-08), option
+  recommandée.
 - **Partagé avec la Phase 73** : l'extracteur de définitions des registres (P76-D-18).
 - **Fourni à la Phase 77** : les compteurs de la mémoire par la route (P76-D-23).
 
