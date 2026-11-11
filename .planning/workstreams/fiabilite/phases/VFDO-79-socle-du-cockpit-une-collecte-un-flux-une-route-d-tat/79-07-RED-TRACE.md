@@ -95,3 +95,28 @@ Suite test-cockpit-git-config-depot.sh après la tâche 4 : 85 PASS / 5 FAIL, le
 Chacun garde A11 vert (fichier normal, lien interne vers un fichier listé, leurre intérieur décrits). Le « 4 » est le nombre d'occurrences du marqueur dans les quatre pages.
 
 Correction de la suite (sans effet sur un verdict de production) : la ligne de D6.4 portait `.sorlk_t()` au lieu de `.sort()` (renommage de variable fautif des tâches 1 à 3) ; corrigée dans le commit des mutants.
+
+## Tâche 5 — pilotes nommés vidés pour tout lancement, liste fermée, enfants shell sous envGit
+
+`vf-cockpit-git-durci.mjs` exporte `SOUS_COMMANDES_AUTORISEES` (14 noms) et `PILOTES_NOMMES` ; le lanceur lit une fois les pilotes (une commande `config --name-only --get-regexp`), vide toutes les unités (`filter.<nom>` : quatre clés ; `diff.<nom>.textconv`, `diff.<nom>.command`, `merge.<nom>.driver` : une clé) pour toute sous-commande, refuse hors liste fermée, mémorise la lecture `PILOTES_TTL_MS` (2000 ms, jamais pour une liste illisible), lance les enfants non git sous `envGit(lab)`. `SOUS_COMMANDES_FILTRANTES` n'existe plus dans `plugin/cockpit` ; `envEnfant(lab)` : 0 occurrence dans le lanceur.
+
+test-cockpit-git-config-depot.sh : 103 PASS / 0 FAIL (D6.1 à D6.5 verts, D7.0 témoin non muté conforme).
+
+| Mutant (copie du lanceur, une ancre) | D6.1, D6.2, D6.3, D6.4, D6.5 | Lecture |
+|---|---|---|
+| M-PORTEE (vidage limité à status, diff, ls-files, stash) | r, r, v, v, r | D6.2 rouge comme prévu ; D6.1 (log -p) et D6.5 (lecture après la fenêtre) rougissent aussi |
+| M-FILTRES-SEULS (seuls les filtres sont lus) | r, r, v, v, r | D6.1 et D6.2 rouges comme prévu ; D6.5 rouge aussi (pilote de diff tardif non vidé) |
+| M-LISTE (plus de refus hors liste) | v, v, v, r, v | D6.4 seul |
+| M-BASH (enfants non git sous envEnfant seul) | v, v, r, v, v | D6.3 seul |
+| M-MEMO (mémo sans expiration) | v, v, v, v, r | D6.5 seul |
+| M-OPTIONS (OPTIONS_LECTURE retirées seules) | v, v, v, v, v | VERT, redondance voulue : le vidage ferme seul (deux protections indépendantes) |
+
+Écart au plan, mesuré (amendement daté du 2026-11-12 dans le plan) : M-OPTIONS était rouge sur D6.1 avec la sonde d'origine : sans options de lecture, `log -p`, `show` et `diff` sortent en code 128 (pilotes vidés) avec une sortie vide, lue à tort comme un refus de shBorne. La sonde ne compte plus un refus de shBorne que si lancerGit a réussi sur la même ligne.
+
+Suites de l'environnement durci, rejouées seules : test-cockpit-git-env.sh 135 / 0 (E9.5b et E9.6a récrites au sens neuf : toute sous-commande refusée au-delà de la borne ou si la liste est illisible ; E9.6b témoin positif ; M-LECTURE devient le mutant double options retirées ET vidage retiré, chacune retirée seule laisse E2.4 et E5.2 verts), test-cockpit-git-signature.sh 45 / 0 (R2.2c : la sous-commande `config` de la lecture des pilotes est admise).
+
+### Les douze suites qui nomment vf-cockpit-paths.mjs, après reciblage (chacune jouée seule)
+
+Liste relevée par `rtk proxy grep -l 'vf-cockpit-paths.mjs'` sur les suites du module : assemblage 49/0, avancement 69/0, confinement 66/0, git-config-depot 103/0, git-env 135/0, git 118/0, lancer-cibles 51/0, path-enfants 37/0, securite 92/0, signal 76/0, terminal-lanceur 111/0, vendor 87/0. En plus : git-details 136/0, who 157/0, git-signature 45/0.
+
+Preuve mécanique qu'aucun mutant ni aucune ancre ne vise dans paths.mjs un texte qui n'y est plus : `grep -nE '(paths|git-sortant)(\.mjs)?'` filtré sur les lignes de mutation (mutant, mutsub, sed -i, FROM=, muter) de ces suites ne rend que (a) test-cockpit-avancement.sh l.484 (ancre de `st.isFile() && st.size <= 4096 …`, présente 1 fois dans paths.mjs), (b) des mutants de git-sortant.mjs (git-config-depot, git-details), dont le texte n'a pas été déplacé ; les mutants gitnomnu et whonomnu de test-cockpit-terminal-lanceur.sh visaient `timeout: Math.floor(reste), env, maxBuffer })` (0 occurrence dans paths.mjs, 1 dans le lanceur) : reciblés sur le lanceur, ils rougissent de nouveau (assertions « gitnomnu — le mutant (nom nu) exécute le leurre « git » du lab » et « whonomnu — … », passées sous la forme « rouge détecté »). Les assertions `.0` d'existence d'ancre de chaque suite, toutes vertes, couvrent le reste.

@@ -60,7 +60,7 @@ if (mode === 'lecture') {
   for (const [lib, args, tard] of JSON.parse(process.argv[5])) {
     const a = m.lancerGit(depot, args), b = await m.lancerGitAsync(depot, args);
     const c = m.shBorne('git', [...m.GIT_SUR, '-C', depot, ...args], depot, depot);
-    sortie.lignes.push({ lib, tard: !!tard, a: !!a.refuse, b: !!b.refuse, c: c.length === 0 });
+    sortie.lignes.push({ lib, tard: !!tard, a: !!a.refuse, b: !!b.refuse, c: c.length === 0 && a.ok }); // c : sortie vide de shBorne alors que lancerGit a réussi (un échec sans pilote n'est pas un refus)
   }
 } else if (mode === 'env') { // D6.2 : les paires GIT_CONFIG_* vues par un faux binaire git
   const [fake, out] = process.argv.slice(5); process.env.VF_FAKE_OUT = out; fs.rmSync(out, { force: true });
@@ -593,6 +593,41 @@ printf '#!/bin/sh\necho "$*" >> "$VF_JOURNAL"\nexec "$VF_GIT_REEL" "$@"\n' > "$A
 LK_R5="$(VF_JOURNAL="$AUX/journal" VF_GIT_REEL="$GIT_REEL" node "$AUX/sonde.mjs" "$SCRIPTS" "$LK_P5" memo "$AUX/fakegit.sh" "$AUX/fake.out" "$AUX/journal" "$AUX/wrap" "$GIT_REEL" 2>"$AUX/err")"
 assert_eq "D6.5 — mémo : deux lancements successifs = une seule lecture des pilotes ; un pilote déclaré entre les deux n'est pas vidé pendant la fenêtre ; il l'est après PILOTES_TTL_MS" "$(pg "$LK_R5" 'j.lectures1+"|"+j.tardifB+"|"+j.tardifC+"|"+j.lectures2')" "1|false|true|2"
 
+
+echo "=== D7 — mutants des pilotes nommés (copies du dossier des scripts, une ancre chacun ; A-04, SOCL-11) ==="
+# lk_d6 DOSSIER NOM : rejoue D6.1 à D6.5 sur un dossier de scripts (muté) et rend cinq jetons « v » (conforme) ou « r » (rouge), dans l'ordre D6.1 à D6.5 ; dépôts piégés recopiés (jamais ceux de D6)
+lk_d6() {
+  local d="$1" n="$2" e1 e0 r t1 t2 t3 t4 t5 p1 p4 p5
+  p1="$LK_RACINE/dm1-$n"; p4="$LK_RACINE/dm4-$n"; p5="$LK_RACINE/dm5-$n"; rm -rf "$p1" "$p4" "$p5"; cp -R "$LK_P" "$p1"; cp -R "$LK_P" "$p4"; cp -R "$LK_P" "$p5"
+  raz; r="$(node "$AUX/sonde.mjs" "$d" "$p1" pilotes "$LK_LISTE" 2>"$AUX/err")"
+  [ "$(lk_t TC)$(lk_t CMD)$(lk_t MG)$(lk_t FL)|$(pg "$r" 'j.lignes.filter((l)=>!l.tard&&(l.a||l.b||l.c)).map((l)=>l.lib).join(",")')" = "absentabsentabsentabsent|" ] && t1=v || t1=r; raz
+  r="$(node "$AUX/sonde.mjs" "$d" "$p1" env "$AUX/fakegit.sh" "$AUX/fake.out" 2>"$AUX/err")"
+  [ "$(pg "$r" '["diff.tc.textconv","diff.tc.command","merge.mg.driver","filter.fl.clean","filter.fl.smudge","filter.fl.process"].every((k)=>j.paires[k]==="")&&j.paires["filter.fl.required"]==="false"')" = "true" ] && t2=v || t2=r
+  r="$(node "$AUX/sonde.mjs" "$d" "$LK_LAB3" bash "$AUX/fake-lock.sh" "$ORD/.git" 2>"$AUX/err")"
+  [ "$(pg "$r" 'j.herites.length===0&&j.count===true&&j.gitdir===".git"?"ok":JSON.stringify(j)')" = "ok" ] && t3=v || t3=r
+  raz; e0="$("$GIT_REEL" -C "$p4" status --porcelain=v2 --branch)|$("$GIT_REEL" -C "$p4" rev-parse HEAD)|$("$GIT_REEL" -C "$p4" config --get-regexp '^alias' | wc -l | tr -d ' ')"
+  r="$(node "$AUX/sonde.mjs" "$d" "$p4" refus 2>"$AUX/err")"
+  e1="$("$GIT_REEL" -C "$p4" status --porcelain=v2 --branch)|$("$GIT_REEL" -C "$p4" rev-parse HEAD)|$("$GIT_REEL" -C "$p4" config --get-regexp '^alias' | wc -l | tr -d ' ')"
+  [ "$(pg "$r" 'j.refus.every((r)=>r.a&&r.b&&r.c)')|$(lk_t MG)$(lk_t ALIAS)|$([ "$e0" = "$e1" ] && echo inchangé || echo modifié)" = "true|absentabsent|inchangé" ] && t4=v || t4=r; raz
+  rm -f "$AUX/journal"
+  r="$(VF_JOURNAL="$AUX/journal" VF_GIT_REEL="$GIT_REEL" node "$AUX/sonde.mjs" "$d" "$p5" memo "$AUX/fakegit.sh" "$AUX/fake.out" "$AUX/journal" "$AUX/wrap" "$GIT_REEL" 2>"$AUX/err")"
+  [ "$(pg "$r" 'j.lectures1+"|"+j.tardifB+"|"+j.tardifC+"|"+j.lectures2')" = "1|false|true|2" ] && t5=v || t5=r
+  echo "$t1,$t2,$t3,$t4,$t5"
+}
+assert_eq "D7.0 — témoin : sur le module non muté, D6.1 à D6.5 sont conformes" "$(lk_d6 "$SCRIPTS" ref)" "v,v,v,v,v"
+LK_ANC='const r = lancer(binaire, argv, dir, envGit(lab, { config: configFiltres(p.unites) }), maxBuffer);'
+assert_eq "M-PORTEE.0 — l'ancre du mutant existe" "$(mutant_sur portee vf-cockpit-git-lanceur.mjs "$LK_ANC" "const r = lancer(binaire, argv, dir, envGit(lab, { config: ['status', 'diff', 'ls-files', 'stash'].includes(sous) ? configFiltres(p.unites) : [] }), maxBuffer);")" "muté"
+assert_eq "M-PORTEE — rougit D6.2 (le vidage ne vaut plus que pour status, diff, ls-files et stash : rev-parse ne reçoit plus les pilotes vidés) ; D6.1 et D6.5 rougissent aussi (log -p et la lecture après la fenêtre), D6.3 et D6.4 restent conformes" "$(lk_d6 "$WORK/mut-portee" portee)" "r,r,v,v,r"
+assert_eq "M-FILTRES-SEULS.0 — l'ancre du mutant existe" "$(mutant_sur filtres-seuls vf-cockpit-git-lanceur.mjs '  return f ? `filter.${f[1]}` : motifDiff.test(cle) || motifFusion.test(cle) ? cle : null;' '  return f ? `filter.${f[1]}` : null;')" "muté"
+assert_eq "M-FILTRES-SEULS — rougit D6.1 et D6.2 (seuls les filtres sont lus, comme avant : textconv et commande de diff ne sont plus vidés) ; D6.5 rougit aussi (le pilote déclaré tardivement n'est pas vidé), D6.3 et D6.4 restent conformes" "$(lk_d6 "$WORK/mut-filtres-seuls" filtres-seuls)" "r,r,v,v,r"
+assert_eq "M-LISTE.0 — l'ancre du mutant existe" "$(mutant_sur liste vf-cockpit-git-lanceur.mjs 'const autorisee = (sous) => SOUS_COMMANDES_AUTORISEES.includes(sous);' 'const autorisee = () => true;')" "muté"
+assert_eq "M-LISTE — rougit D6.4 (plus de refus hors liste) ; D6.1 à D6.3 et D6.5 restent conformes" "$(lk_d6 "$WORK/mut-liste" liste)" "v,v,v,r,v"
+assert_eq "M-BASH.0 — l'ancre du mutant existe" "$(mutant_sur bash vf-cockpit-git-lanceur.mjs "if (cmd !== 'git') return lancer(cmd, args, cwd, envGit(lab), 1 << 20).sortie;" "if (cmd !== 'git') return lancer(cmd, args, cwd, envEnfant(lab), 1 << 20).sortie;")" "muté"
+assert_eq "M-BASH — rougit D6.3 (les enfants non git reprennent l'environnement d'enfant seul : GIT_DIR hérité)" "$(lk_d6 "$WORK/mut-bash" bash)" "v,v,r,v,v"
+assert_eq "M-MEMO.0 — l'ancre du mutant existe" "$(mutant_sur memo vf-cockpit-git-lanceur.mjs 'return m && Date.now() - m.t < PILOTES_TTL_MS ? m.p : null;' 'return m ? m.p : null;')" "muté"
+assert_eq "M-MEMO — rougit D6.5 (mémo sans expiration : le pilote déclaré après la fenêtre n'est jamais vidé)" "$(lk_d6 "$WORK/mut-memo" memo)" "v,v,v,v,r"
+assert_eq "M-OPTIONS.0 — l'ancre du mutant existe" "$(mutant_sur options vf-cockpit-git-lanceur.mjs 'ins = OPTIONS_LECTURE[sous] || [];' 'ins = [];')" "muté"
+assert_eq "M-OPTIONS — reste VERT sur D6.1 : redondance voulue, le vidage ferme seul (deux protections indépendantes : options de lecture et pilotes vidés)" "$(lk_d6 "$WORK/mut-options" options)" "v,v,v,v,v"
 echo "=== D5 — aucune trace hors du dossier temporaire ==="
 HORS="$(find "$SCRIPTS/.." -newer "$AUX/sonde.mjs" -type f \( -name 'SSH' -o -name 'UPLOAD' -o -name 'GPG' -o -name 'CLE-*' \) 2>/dev/null | head -3)"
 assert_eq "D5.1 — aucun marqueur de leurre dans l'arbre du module" "$HORS" ""
