@@ -341,6 +341,41 @@ sans en retirer rien.
   dans l'arbre de la voie** : pour un worktree, la racine de comparaison est `<racine réelle du worktree>/<chemin du lab
   dans le dépôt>`, ce qui donne le même chemin que les cartes de l'onglet Code. Un fichier de l'arbre hors de ce
   sous-dossier devient « un fichier hors du lab ». A22 est précisé en ce sens.
+### Amendement du 2026-11-11, second (écarts relevés à la planification et par la vérification fraîche)
+
+Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée. Chaque point reprend
+un écart écrit dans le plan cité ; le plan fait foi pour le détail.
+
+- **A34 (79-05).** Le contrôle d'accès de `serve.mjs` reste le portail unique ; la réponse gardée applique en plus un
+  vérificateur intérieur de même verdict (défense en profondeur, égalité des verdicts prouvée). Les routes
+  antérieures `etat`, `journal` et `modeles` restent hors de la réponse gardée (comportement constant : la page lit un
+  503 de `etat` comme « redémarre ») ; `doing` et `transcript` hors garde par décision (C0). Un sous-routeur (Git, lanceur)
+  reste un délégué hors table : « une ligne par route » vaut pour les routes à un chemin. Points d'extension d'essai
+  `attach(…, routes)` et `assembler(…, annotateurs)` ; module neuf `vf-cockpit-routes.mjs` ; annotateurs dans l'ordre
+  alphabétique de leur nom. Le compteur de suites s'écrit toujours au nombre réel du gate, jamais en littéral recopié.
+- **A35 (79-08).** Quatrième module `vf-cockpit-index-cache.mjs` ; le curseur porte l'état complet du pli (champs
+  internes jamais servis) ; champs internes `forme`, `tronque`, `versions`, `evinces`. **`rattachement` n'est pas
+  persisté** (il change sans que le transcript change) : la projection de la frise (79-13) le joint depuis la collecte
+  (A8, A14). Une permission en attente n'est pas lisible dans un transcript : l'index type `attend-humain` sur un appel
+  `AskUserQuestion` ouvert ; l'attente de permission vient de l'état officiel à la projection (79-13) et du journal des
+  attentes (79-19). Noms lus déclarés au contrat de forme : nom d'appel d'outil (jamais gardé), `origin.kind`,
+  `permissionDecision.decision`, `pendingBackgroundAgentCount`, `version`. `dispatch` sur la voie du lanceur, `rapport`
+  sur la voie qui rend. Bornes de sûreté : 2 000 voies, index de 32 Mio, ligne de 32 Mio (au-delà, sautée), bloc de
+  1 Mio, instants entre 2020 et maintenant plus un jour. Voies ancêtres hors fenêtre gardées comme dans le collecteur
+  `who`. `tete` = empreinte des 1 024 premiers octets (ou de la première ligne si plus courte).
+- **A36 (79-09).** Verbe `registry`. Liste blanche A15 complétée de `leaseS` et `sansSession` (booléen calculé dans le
+  serveur ; la liste d'identifiants ne sort pas). Avant la première collecte, `hello.lock` vaut
+  `{ seq: 0, at, verrous: { etat: "absente", plat: false, liste: [] } }` ; `hello` peut attendre la première collecte
+  5 s au plus. L'instantané (A31) porte aussi `at` et n'expose pas les voies brutes (79-13 y ajoute la projection
+  `frise`). `GET /api/vf/etat` gagne un champ facultatif `collecte`. Cache du scan par fichier (chemin, taille, date),
+  pas par dossier. Fichiers hors de la liste de la recherche, imposés par A15, A17, A20 : listés dans le plan.
+- **A37 (79-06, 79-07, 79-16) — une seule règle de chemin.** Les gardes de chemin neuves de 79-06 (même vague que
+  79-07) utilisent la résolution native fermée par défaut (échec = refus) ; le service statique de `serve.mjs` et ces
+  gardes passent à la fonction de résolution physique de 79-07 au plan 79-16, qui touche `serve.mjs` de toute façon.
+  `test-cockpit-confinement.sh` n'est touché que par 79-06 en vague 2 : les sections neuves de 79-07 vont dans
+  `test-cockpit-git-config-depot.sh`.
+- **P79-D-28 (79-03).** `registry --all` (comme `status --all`) et deux variables de réglage de la rétention, pour les
+  suites, retenus.
 - **Note C3.** Le coût en monnaie et les limites de 5 h et de 7 jours sont hors de cette vague (P74-D-20, P74-D-24).
 
 ## À Samuel
