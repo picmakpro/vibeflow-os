@@ -292,6 +292,16 @@ recommandée ; l'option recommandée vient du panel ou de l'éclaireur cité. Au
   coquille, la régie garde l'initialisation présente (au chargement de `equipe.html`) ; chaque plan d'interface écrit les
   deux cas dans sa dépendance envers la 79 et est marqué « à revalider » jusqu'à la fusion de la coquille.
 
+- **P73-D-35 (calcul côté serveur, règles A31/A32 de la Phase 79, `e04c43e7`).** Les données de gouvernance calculées
+  côté serveur (nature de l'attente, impact en aval, `attendAgents`, ligne de phase `human_needed`, `lancee`) s'ajoutent
+  dans la lecture de la collecte comme champs facultatifs de `who@2` (A32), jamais par une lecture à part ; après le plan
+  79-09, elles se calculent sur `instantane()` / `surInstantane()` de `vf-cockpit-instantane.mjs` (A31), sans déclencher
+  de collecte ni rappeler une route par HTTP. Seule exception, motivée par la borne de P73-D-16 (le nom d'un autre lab ne
+  vit que dans la page servie) : `GET /api/vf/ailleurs` ne passe pas par `who@2` ni par l'instantané ; elle dérive de la
+  dernière lecture officielle déjà tenue en mémoire par `vf-cockpit-etat-officiel.mjs` (aucun appel de commande neuf) et
+  répond par la réponse gardée commune (A11) quand elle existe. Avant la 79, les plans gardent les sources actuelles et
+  disent ce qui change après.
+
 ### Claude's Discretion
 
 Noms internes des fonctions et modules neufs, découpage fin des fichiers d'interface, forme exacte des fixtures (noms
