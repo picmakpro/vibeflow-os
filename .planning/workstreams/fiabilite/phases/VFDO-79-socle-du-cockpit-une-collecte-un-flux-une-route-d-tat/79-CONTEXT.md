@@ -489,6 +489,12 @@ un écart écrit dans le plan cité ; le plan fait foi pour le détail.
   sont retenus tels qu'écrits, le plan fait foi pour le détail : 79-15-a, c, d ; 79-16-a à d ; 79-17-a à e (dont 79-17-b,
   la porte `VF_FLUX` du magasin, déjà dite en A43) ; 79-18-a à c ; 79-19-a à f. Aucun ne touche un contrat C0 à C6.
   Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+- **A50 (79-13, retouche A48) — précisions retenues.** `cibles.tronque` est vrai aussi quand le plafond total de
+  20 000 entrées écarte une entrée ; avant le premier tour, pour un agent né depuis le dernier tour, au-delà de 16
+  lectures en vol ou après 10 s, `/api/vf/transcript` et `/api/vf/doing` rendent le corps `inconnu` (aucun code
+  neuf) ; `frise` part une fois par tour, pas à chaque paquet de la passe de fond ; la table en mémoire des agents est
+  un module neuf `vf-cockpit-agents-table.mjs`, nourri par la collecte du tour, jamais par une seconde. Décision déléguée
+  par Samuel (message session principale, 2026-11-08), option recommandée.
 - **P79-D-29 (rétention des voies, 79-08).** Une voie n'est gardée au-delà de 24 h après sa dernière ligne que si
   l'état officiel la dit vivante ; un appel ouvert seul ne suffit pas (un transcript abandonné en plein appel serait
   gardé sans fin). Borne en vigueur : AUDC-Q2.
