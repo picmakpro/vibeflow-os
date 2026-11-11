@@ -71,6 +71,7 @@ L'annonce vient du focus (nom de la carte) précédé du nom du `listbox` ; aucu
 
 **Remontée.** `Échap` ou Retour arrière remonte. Le focus revient sur la carte qu'on vient de quitter (elle existe maintenant comme carte du
 niveau supérieur) ; à défaut (carte absente d'un niveau filtré), sur la première carte. Le titre de vue ne prend jamais le focus.
+En forme Graphe, la cible de repli est la carte itinérante, sinon `#stage` (`tabindex=-1`), jamais `body` ni un `h1` qui n'existe pas dans cette forme : règle unique « cible de repli du focus » de `80-UI-SPEC.md` § 5.
 
 **Flèches.** ←/→ : voisin spatial entre couches ; ↑/↓ : dans la colonne ; Origine/Fin : première et dernière en ordre de lecture ; aucune boucle
 aux extrémités (la flèche est sans effet, aucun son). La carte focalisée est ramenée dans le champ de lecture (§ 4.6 : marge 16, jamais sous une surcouche), sans changer le zoom.
@@ -95,13 +96,13 @@ par la pile : jamais le `inert` du terminal).
 
 **Ordre d'Échap (un cran par appui, du plus récent au plus ancien), avec la cible qui l'autorise.** 1 modale du dessus de pile (toute cible : elle contient le focus) ; 2 menu ou bulle ouvert (toute cible) ;
 3 parcours `#flowbar` (toute cible) ; 4 volet bas du tiroir Git (focus dans le volet ou sur sa rangée) ; 5 tiroir non modal du dessus de pile (focus dans le tiroir, sur son ouvreur, ou sur `body` ou le canevas) ;
-6 feuille de détail au téléphone (toute cible, comme aujourd'hui) ; 7 désélectionner, puis 8 remonter d'un niveau : **réservés aux cibles `body`, `documentElement` et canevas** (garde PU-G-175 du moteur, inchangée : un Échap venu d'un bouton du
+6 feuille de détail au téléphone (toute cible, comme aujourd'hui) ; 7 désélectionner, puis 8 remonter d'un niveau : **réservés aux cibles `body`, `documentElement`, canevas et éléments de la vue DOM de Projet (cartes de couloir, rangées de liste, intérieur de phase : cette vue compte comme canevas, `80-UI-SPEC.md` § 5)** (garde PU-G-175 du moteur, inchangée : un Échap venu d'un bouton du
 panneau ou d'un menu ne perd pas ce qu'il vient d'afficher). Un champ de saisie (barre de question, `<select>`, `<textarea>`, champ éditable) hors palette : Échap ne descend pas la chaîne et ne vide pas le champ ; seule la surcouche
 qui le contient (crans 1 à 5) le consomme. Au bureau, le panneau de détail ne se ferme pas par Échap (`p` et son bouton, comme aujourd'hui) ; il n'est pas une surcouche. Écouté au document, en capture ; `stopPropagation` quand la pile a consommé l'appui.
 
 **Retour du focus.** À la fermeture : à l'ouvreur s'il est dans le DOM et visible ; sinon la carte itinérante du canevas ; sinon `#stage` (`tabindex=-1`). Le focus qui n'était pas dans la surcouche fermée ne bouge pas.
 **Une action de palette qui change la vue pose le focus propre à l'action, qui l'emporte sur le retour à l'ouvreur** : Ajuster, Cadrer, Zoom, Monter : la carte itinérante (la sélectionnée si visible ; Monter : la carte quittée) ; Basculer couloirs, liste, graphe :
-l'élément sélectionné de la nouvelle vue (même règle que `v` dans `80-UI-SPEC.md`) ; Ouvrir l'historique Git : le titre du tiroir ; Afficher ou masquer le détail : `#btn-panel` ; Poser une question : le champ de la barre ; Aller à un onglet : le `h1` de la vue chargée (D-22) ;
+l'élément équivalent de la nouvelle vue, sinon la cible de repli de sa forme (couloirs et liste : élément sélectionné, sinon `h1` ; Graphe : carte itinérante, sinon `#stage` ; même règle que `v` dans `80-UI-SPEC.md`) ; Ouvrir l'historique Git : le titre du tiroir ; Afficher ou masquer le détail : `#btn-panel` ; Poser une question : le champ de la barre ; Aller à un onglet : la cible de repli de la vue chargée (D-22 ; règle de `80-UI-SPEC.md` § 5 : `h1` en couloirs ou en liste, carte itinérante sinon `#stage` en Graphe et sur Code) ;
 Afficher les raccourcis : l'aide ; Copier le lien : l'élément actif d'avant. Sans règle propre, retour à l'ouvreur.
 **Focus dans le panneau à sa fermeture** (`p`, son bouton, ou sélection vidée) : `#btn-panel` s'il est visible, sinon la carte itinérante ; jamais `body`.
 
@@ -164,7 +165,7 @@ aria-labelledby=<titre>`.
 |---|---|---|
 | Partout | les trois onglets | Rechercher : / ou ⌘K · Afficher les raccourcis : ? · Ouvrir l'historique Git : G · Fermer ou remonter d'un cran : Échap · Zone suivante : Tab |
 | La carte | Code, graphe de Projet | Carte voisine : ← ↑ ↓ → · Première carte, Dernière carte : Origine, Fin · Plonger dans la carte : Entrée · Monter d'un niveau : Retour arrière · Ajuster à l'écran : F · Cadrer la sélection et ses voisins : C · Zoom avant, Zoom arrière : + et - · Afficher ou masquer le détail : P |
-| Projet : couloirs et liste | Projet | Changer de vue : V ; les touches de parcours des couloirs sont déclarées par le plan des couloirs dans le même registre (`80-UI-SPEC.md`) |
+| Projet : couloirs et liste | Projet | Changer de vue : V · Phase voisine : ← ↑ ↓ → · Première phase, Dernière phase : Origine, Fin · Plonger dans la phase : Entrée (bureau ; au téléphone Entrée sélectionne et la feuille porte « Ouvrir la phase ») · Désélectionner puis monter d'un niveau : Échap (la vue DOM compte comme canevas) ; libellés neufs au dictionnaire 80, déclarés par le plan des couloirs dans le même registre (`80-UI-SPEC.md`) |
 | Équipe | Équipe | les raccourcis propres de l'onglet, déclarés dans le registre par ses plans (+ - F P C y sont neutralisés, PU-G-137, donc absents) |
 
 Registre unique des raccourcis : une entrée = `{ groupe, onglets, touche, libellé, action, palette }` (`palette: false` pour une rangée d'aide seule : Plonger, Tab, Échap) ; l'aide, la palette (colonne raccourci) et le test de
@@ -232,6 +233,7 @@ entièrement hors champ de ce côté (une carte coupée ne compte pas).
 - **Geste** : clic ou Entrée = amener la carte hors champ la plus proche de ce bord dans le champ (`bringIntoView`), sans changer la sélection ni le zoom.
 - **Clavier** : ce sont des `button` dans l'ordre de Tab, juste après l'arrêt du canevas ; `aria-label` « 16 cartes hors champ à gauche. Aller à la plus proche. ».
   Annonce quand le nombre change : aucune (éviter le bavardage).
+- **Focus orphelin.** Un repère dont le compte tombe à 0 disparaît ; s'il avait le focus (typiquement après un clic ou Entrée qui vient d'amener sa dernière carte), le focus va sur **la carte ramenée**, sinon sur la carte itinérante, sinon sur `#stage` ; jamais `body`. C'est une instance de la règle de famille « focus orphelin » de `80-UI-SPEC.md` § 5 (équivalent, fruit du geste, voisin, arrêt itinérant, repli).
 - **Mouvement réduit** : pas de fondu, pas d'apparition animée ; compte et présence mis à jour d'un coup. Forme statique gardée (le repère est le même, immobile).
 - Un repère qui recouvrirait la carte sélectionnée ou la carte focalisée est masqué le temps du recouvrement (jamais de carte cachée par un repère).
 
@@ -261,6 +263,11 @@ le placement et le compte des repères. Un déplacement minimal sort la cible de
 du coin (largeur moins le bloc, ou hauteur moins le bloc), par le plus grand `kFit`. Le plancher 11/13 (PU-G-026) reste : ce que la formule rogne est atteint par les repères. Ouvrir ou fermer le tiroir ne recadre jamais la carte (aucun appel à `fit`) ;
 seul le prochain geste utilise le champ de lecture. Un repère dont la position tomberait sous une surcouche est décalé (§ 4.4) ou masqué s'il n'y a pas de place.
 
+**Extension aux vues DOM de Projet (couloirs, liste, intérieur de phase).** La règle vaut aussi pour un contenu défilant sous des éléments fixes : le champ de lecture d'une vue DOM est sa zone de défilement moins `#ask`, `#vf-coin`
+(en bas), le tiroir Git (à gauche, quand il est ouvert) et le panneau (à droite, quand il est ouvert). La vue le dit en CSS : `padding-bottom` et `scroll-padding-block-end` dérivés de `#ask` + `#vf-coin` mesurés, `scroll-padding-inline-start`/`-end` égaux à la
+largeur du tiroir Git (+ `--edge`) et à `--pw` quand ils sont ouverts, avec une extrémité défilable de la même largeur pour que le défilement soit possible (aucun couloir ne bouge : `80-UI-SPEC.md` § 1.1 et § 3). Une carte ou rangée focalisée, sélectionnée ou
+atteinte par Fin n'est jamais laissée dessous.
+
 ---
 
 ## 5. Tiroir Git
@@ -269,7 +276,7 @@ Position, `z-index` et rôle inchangés (`aside`, `position: fixed`, par-dessus 
 
 **Rangées paginées.** Au départ ≤ 110 rangées de commits ; sous la dernière, une rangée-bouton « Afficher 100 de plus » : hauteur 36, pleine largeur du corps, fond `--raise`, rayon 10,
 12 / 500 `--text-2`, à droite « 502 restants » en mono 11 `--text-3` (tabulaire) ; moins de 100 restants : « Afficher les 37 derniers ». Une fois tout affiché : pied « Tous les 612 commits sont affichés ».
-Le pied permanent devient « 110 commits affichés sur 612 ». Au clic : le focus va sur la première rangée ajoutée (tabulation itinérante gardée), annonce polie « 100 commits de plus affichés, 502 restants ».
+Le pied permanent devient « 110 commits affichés sur 612 ». Au clic : le focus va sur la première rangée ajoutée (tabulation itinérante gardée), annonce polie « 100 commits de plus affichés, 502 restants ». Quand ce clic épuise la liste, le bouton disparaît avec le focus dessus : le focus est déjà sur la première rangée ajoutée ; si le bouton disparaît sans clic (rechargement du tiroir), règle de famille « focus orphelin » (`80-UI-SPEC.md` § 5 : équivalent, voisin précédent, arrêt itinérant, titre du tiroir).
 Même règle pour Tags, Stash et Auteurs au-delà de 110 lignes. Le bouton a l'anneau § 0.
 
 **Worktrees repliés.** Section fermée au départ ; titre « Worktrees · 7 » (compte en `--text-3`, tabulaire). Les autres sections gardent leur état actuel (Graphe ouvert, Tags, Stash, Auteurs fermés).
@@ -364,6 +371,8 @@ Aucun tiret cadratin dans ces textes. Les libellés d'actions n'emploient pas «
 | Copies | « Copier le sha » : libellé « Copié » 2 s (±0,5 s) puis restauré, région live polie renseignée ; presse-papiers refusé : « Copie impossible » + sha sélectionné ; « Copier le lien de cette vue » : toast « Lien copié » ou, sur échec, le message d'adresse |
 | Palette | `role=combobox/listbox`, `aria-activedescendant` suit les flèches ; `>` ne montre que des actions ; état vide conforme ; aucune action n'appelle `fetch` ni ne remplit autre chose que la barre (Q4) |
 | Aide `?` | s'ouvre par `?` hors saisie, jamais dans un champ ; groupes filtrés par onglet ; chaque ligne vient du registre ; à 1 024 × 768 `scrollWidth` ≤ `clientWidth`, hauteur ≤ 80vh avec défilement interne ; chaque rangée a le libellé du registre, identique dans la palette ; champ vide : les huit actions usuelles listées au § 3.1, dans l'ordre |
+| Vue DOM de Projet (champ de lecture) | à 1 440, 1 024 et 390 px, tiroir Git, panneau et tiroir du terminal ouverts : après Fin, ↓ sur la dernière rangée ou une flèche, le rectangle de l'élément focalisé ou sélectionné n'intersecte ni `#ask`, ni `#vf-coin`, ni le tiroir Git, ni le panneau (`80-UI-SPEC.md` § 7) |
+| Focus orphelin (famille) | repère de bord tombé à 0 avec le focus dessus : focus sur la carte ramenée, sinon la carte itinérante, sinon `#stage` ; « Afficher 100 de plus » épuisé : première rangée ajoutée ; jamais `body` ; forme Graphe : jamais un `h1` absent |
 | Champ de lecture | après « Ajuster », « Cadrer », une flèche ou un repère : aucune carte focalisée, sélectionnée ou cible n'intersecte `#vf-coin` ni le tiroir Git ouvert (rectangles), le plancher 11/13 tenu ; ouvrir ou fermer le tiroir laisse `state.t` inchangé (PU-G-204) ; un repère n'intersecte aucune surcouche |
 | Zoom | `+` puis `-` rend `state.t` identique (aller-retour exact) ; le centre est la carte sélectionnée visible |
 | Bloc bas-droit | à 1 440 et 1 024, panneau ouvert et fermé, tiroir Git ouvert et fermé, terminal ouvert : aucune intersection entre `#vf-coin`, `#zoom`, `#ask`, pastille et tiroir du terminal (rectangles) ; minicarte ≤ 144 × 96 ; absente < 1 000 px |

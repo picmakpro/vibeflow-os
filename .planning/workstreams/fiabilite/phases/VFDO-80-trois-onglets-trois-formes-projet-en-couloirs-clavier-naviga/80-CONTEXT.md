@@ -385,7 +385,8 @@ Faits établis par la recherche qui corrigent la forme de décisions déjà pris
 - **P80-D-43 (extrémité défilable des couloirs, précise P80-D-29).** Panneau ouvert, le rail des couloirs gagne une
   extrémité défilable de la largeur du panneau : l'étendue défilable s'allonge, aucun couloir ne bouge. Ce n'est pas une
   réserve (la mise en page est identique panneau ouvert ou fermé) ; elle permet d'amener la carte sélectionnée hors du
-  panneau.
+  panneau. Même règle au bord gauche pour le tiroir Git (extrémité défilable, `scroll-padding-inline-start`) :
+  aucun couloir ne bouge, PU-G-204 tenu.
 
 - **P80-D-44 (où se posent les champs de Projet, A31/A32 de la 79, commit `e04c43e7`).** Les champs facultatifs de
   P80-D-06 (`avancement`, `exigences {faits,total}` sur la phase, `vague` sur le plan) se posent dans la lecture du
