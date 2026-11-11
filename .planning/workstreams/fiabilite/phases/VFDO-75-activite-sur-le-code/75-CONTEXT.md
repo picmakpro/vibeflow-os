@@ -106,7 +106,7 @@ et ne sont pas rouverts.
   patch). Il s'initialise par `VF_COQUILLE.surOnglet(rappel)` quand l'onglet vaut Code et se nettoie quand on le quitte
   (amendement A30 de la 79, `74501bb0`) ; une surcouche éventuelle passe par `window.VF_SURCOUCHES` (P80-D-33 à D-41). Il sert la 75 (quatre lentilles, collisions)
   et la relecture de la Phase 74 (AUDC-I06), qui prend la place le temps d'une relecture puis la rend. **Qui le pose :** la
-  phase exécutée la première ; l'ordre du jalon met la 74 avant la 75. Si la 74 le pose, la 75 l'étend ; sinon la 75 le
+  phase exécutée la première ; l'ordre du jalon met la 79 et la 80, puis la 74, avant la 75. Si la 74 le pose, la 75 l'étend ; sinon la 75 le
   pose et la 74 s'y branche. Point à recouper à la jointure (rapport, « À verser par la jointure »). (Panel A.)
 - **P75-D-06 (accessibilité).** Le mot de la lentille active entre dans le nom accessible de la carte (forme posée par la
   Phase 80, AUDC-BL2) ; toute marque se lit sans la couleur ; contraste du glyphe ≥ 3:1 sur `--raise` et `--canvas` dans
@@ -341,6 +341,12 @@ l'aide commune. La 75 ne s'exécute de toute façon qu'après la 79 (dépendance
 6. Route neuve → A10, A11, A26 (une ligne de la table, réponse gardée commune).
 7. Graphe Code → A27 (`graph.json` sur disque, annotateur inscrit d'une ligne).
 Facultatif retenu : A28, `GET /api/vf/frise?champs=cibles`.
+
+**Amendements suivants de la 79 (tête `29fd3e71`), pris en compte par les plans :** A30 (`VF_COQUILLE.surOnglet`), A31 à
+A33 (instantané en mémoire, champs du planning, lab en sous-dossier), A34 (table des routes et réponse gardée dans le
+module neuf `vf-cockpit-routes.mjs`, annotateurs par ordre alphabétique de nom, points d'extension `attach(…, routes)` et
+`assembler(…, annotateurs)`, compteur de suites au nombre rendu par le gate), A35 et A36 (instantané avec `at`, sans
+voies brutes ; `rattachement` joint par la projection ; 2 000 voies au plus), A37 (une seule règle de chemin).
 </phase79_contract>
 
 <canonical_refs>
