@@ -933,8 +933,8 @@
 +  hideTip(); // the cards are about to be redrawn
    const view = buildView(state.container);
 -  const loading = setTimeout(() => $('#loading').classList.add('on'), 160);
-+  // vibeflow AUDC-M7 : le calcul tourne sur le fil principal, une temporisation ne s'y déclenche jamais pendant un gros niveau (2,3 s de canevas blanc à 70 cartes) : à partir de 24 cartes l'indicateur est allumé tout de suite (sans fondu) et peint (une image) AVANT le calcul
-+  const gros = view.visible.length >= 24, indicateur = $('#loading');
++  // vibeflow AUDC-M7 : le calcul tourne sur le fil principal, une temporisation ne s'y déclenche jamais pendant un gros niveau (2,3 s de canevas blanc à 70 cartes) : pour une navigation seulement (go, premier rendu : jamais un redessin en direct, qui garde la temporisation), l'indicateur est allumé tout de suite (sans fondu) et peint (une image) AVANT le calcul
++  const gros = !!opts.nav && view.visible.length >= 24, indicateur = $('#loading');
 +  const loading = gros ? 0 : setTimeout(() => indicateur.classList.add('on'), 160);
 +  if (gros) { indicateur.classList.add('on', 'now'); await new Promise((ok) => { const t = setTimeout(ok, 120); requestAnimationFrame(() => setTimeout(() => { clearTimeout(t); ok(); }, 0)); }); }
    let res;
@@ -1131,6 +1131,15 @@
    state.container = container; state.selected = sel;
    if (push) setHash(container, sel);
    if (!changed && state.layout && !force) { applySelection(); renderPanel(); if (after) after(); return; }
+@@ -1369,7 +1481,7 @@ async function go(container, { select: sel = null, push = true, zoomFrom = null,
+     await new Promise((ok) => setTimeout(ok, 260));
+   }
+   vp.classList.remove('anim'); vp.style.opacity = '0';
+-  await render({ after: () => { vp.classList.add('anim'); requestAnimationFrame(() => { vp.style.opacity = '1'; }); setTimeout(() => vp.classList.remove('anim'), 340); renderPanel(); if (after) after(); } });
++  await render({ nav: true, after: () => { vp.classList.add('anim'); requestAnimationFrame(() => { vp.style.opacity = '1'; }); setTimeout(() => vp.classList.remove('anim'), 340); renderPanel(); if (after) after(); } });
+ }
+ function open(item) {
+   if (item.startsWith('x:')) { reveal(connEntity(item)); return; }
 @@ -1380,10 +1492,16 @@ function open(item) {
    go(item, { zoomFrom: item });
  }
@@ -1581,7 +1590,7 @@
 -fontsReady.then(() => render({ after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
 +// vibeflow K5 : le premier rendu et `ready` attendent aussi que les scripts d'extension (ui/*.js, posés APRÈS ce script par la page) aient été exécutés (DOMContentLoaded) : polices déjà prêtes (Linux), `fontsReady` est résolue à la fin de ce script et le rendu partait avant eux (titre du panneau, définitions au focus posés sur un rendu déjà fait, écouteurs de `ready` posés trop tard)
 +const extensionsPosees = document.readyState === 'loading' ? new Promise((ok) => document.addEventListener('DOMContentLoaded', ok, { once: true })) : Promise.resolve();
-+Promise.all([fontsReady, extensionsPosees]).then(() => render({ after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
++Promise.all([fontsReady, extensionsPosees]).then(() => render({ nav: true, after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
  })();
  </script>
  <!--__UI_EXTENSIONS__-->

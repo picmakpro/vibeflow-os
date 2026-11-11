@@ -38,6 +38,9 @@ await executer(chrome, async (s) => {
     return JSON.parse(await s.ev('JSON.stringify(window.__m7.calcul || null)'));
   };
   o.m7 = { gros: await mesurerNiveau("VibeFlow.reveal('f:lots/n05.md')", 'dossier de 70 notes') };
+  // redessin en direct (poussée du serveur : VibeFlow.render) sur le même niveau de 70 cartes : même calcul, mais aucun indicateur d'avance (il ne vaut que pour une navigation)
+  await s.ev('window.__m7 = {}'); await s.ev('VibeFlow.render()'); await s.attendre('!!window.__m7.calcul', 'calcul du redessin en direct');
+  o.m7.direct = JSON.parse(await s.ev('JSON.stringify(window.__m7.calcul)')); await s.attendre(VUE_POSEE, 'vue posée après le redessin'); await pause(400);
   o.m7.petit = await mesurerNiveau("VibeFlow.go('root')", 'racine');
 
   const touche = async (key, code, vk) => { await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk }); };
