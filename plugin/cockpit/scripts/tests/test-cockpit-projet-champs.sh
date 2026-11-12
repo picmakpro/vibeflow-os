@@ -239,7 +239,7 @@ mutchamp() { # nom ancre remplacement id expression attendu
 }
 A5='2|en-cours|{"faits":1,"total":3}|1'
 assert_eq "M-PLANS — le mutant rougit PC1.5 : plans { faits: total, total }" \
-  "$(mutchamp plans 'plans: { ...av.plans }' 'plans: { faits: av.plans.total, total: av.plans.total }' ph-4 "$AV5" "$A5")" rougit
+  "$(mutchamp plans 'faits: plansFaits, total' 'faits: av.plans.total, total' ph-4 "$AV5" "$A5")" rougit
 assert_eq "M-CORR — le mutant rougit PC1.5 : correctifs figé à 0" "$(mutchamp corr 'correctifs: av.correctifs,' 'correctifs: 0,' ph-4 "$AV5" "$A5")" rougit
 assert_eq "M-VERS — le mutant rougit PC1.5 : version null" "$(mutchamp vers 'version: av.version' 'version: null' ph-4 "$AV5" "$A5")" rougit
 assert_eq "M-ETAT — le mutant rougit PC1.5 : etat figé à fait" "$(mutchamp etat 'etat: av.etat, plans' 'etat: "fait", plans' ph-4 "$AV5" "$A5")" rougit
