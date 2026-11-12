@@ -661,6 +661,10 @@ else ko "DEL retrait cible presente, delegation seule" "rc=1 LIGNE-RETIREE-CIBLE
 case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE:*) hasinfo=1 ;; *) hasinfo=0 ;; esac
 [ "$hasinfo" -eq 1 ] && ok "DEL refus retrait, delegation seule -> INFO-LIGNE-DELEGATION-ECARTEE presente" \
   || ko "DEL refus retrait, delegation seule : ligne d'information" "INFO-LIGNE-DELEGATION-ECARTEE presente" "absente :: $out"
+last="$(printf '%s\n' "$out" | tail -1)"
+case "$last" in LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE:*) lastok=1 ;; *) lastok=0 ;; esac
+[ "$lastok" -eq 1 ] && ok "DEL refus retrait, delegation seule -> derniere ligne = verdict" \
+  || ko "DEL refus retrait, delegation seule : derniere ligne" "LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE: ..." "derniere ligne = $last"
 
 # --- DEL 6 : retrait de ligne, delegation + citation directe -> rc 0, la ligne DIRECTE est recopiee -------
 cas_retrait del6 "chore: retire a.md de la baseline, fichier conserve
@@ -684,6 +688,10 @@ else ko "DEL sentinelle supprimee, delegation seule" "rc=1 SENTINELLE-NEUTRALISE
 case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE:*) hasinfo=1 ;; *) hasinfo=0 ;; esac
 [ "$hasinfo" -eq 1 ] && ok "DEL refus sentinelle, delegation seule -> INFO-LIGNE-DELEGATION-ECARTEE presente" \
   || ko "DEL refus sentinelle, delegation seule : ligne d'information" "INFO-LIGNE-DELEGATION-ECARTEE presente" "absente :: $out"
+last="$(printf '%s\n' "$out" | tail -1)"
+case "$last" in SENTINELLE-NEUTRALISEE:*) lastok=1 ;; *) lastok=0 ;; esac
+[ "$lastok" -eq 1 ] && ok "DEL refus sentinelle, delegation seule -> derniere ligne = verdict" \
+  || ko "DEL refus sentinelle, delegation seule : derniere ligne" "SENTINELLE-NEUTRALISEE: ..." "derniere ligne = $last"
 
 # --- DEL 8 : sentinelle supprimee, delegation + citation directe -> rc 0 ------------------------------------
 cas_sentinelle del8 "chore: retire la sentinelle armed
