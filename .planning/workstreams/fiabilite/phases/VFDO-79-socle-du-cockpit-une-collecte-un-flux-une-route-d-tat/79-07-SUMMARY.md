@@ -65,3 +65,7 @@ Suites jouées seules : git-config-depot 126/0, git-env 135/0, git-signature 47/
 ## Correction ciblée n°2 (2026-11-12) — git absent
 
 Régression de la tâche 5 : git introuvable rendait un délai au lieu d'une absence (H5.1b rouge à la tête). `absent` est propagé de la lecture des pilotes au refus, le refus fermé tient pour tout autre échec. D10.1 à D10.3 et M-ABSENT dans test-cockpit-git-config-depot.sh (le témoin tourne en CI Linux : PATH du processus de la sonde sans git). H7.5b non reproduit (PASS à la tête avant et après correctif, PASS à la base) : rien corrigé. Suites jouées seules : git-config-depot 131/0, git-entete 136/0, git-signature 47/0, git-details 136/0, terminal-lanceur 111/0, git 118/0, who 157/0, confinement 111/0. test-cockpit-git-env.sh non touchée.
+
+## Correction ciblée n°3 (2026-11-12)
+
+D10.4 à D10.6 (faux git à code 128, à délai dépassé, échéance passée : jamais « absent »), M-ABSENT-LARGE (le mutant de l'audit rougit D10.4 et D10.6), D10.7 et M-BINAIRE (aucun appelant de production ne passe `binaire` : limite lecture/lancement gardée), dossier de travail de la suite sous TMPDIR. Aucun code produit touché. test-cockpit-git-config-depot.sh 138/0.
