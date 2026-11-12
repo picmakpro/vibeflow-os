@@ -9,7 +9,6 @@
 # Faux binaires claude et codex (node) en tête du PATH ; aucun vrai appel. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"; mkdir -p "$WORK/aux" "$WORK/home"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"
@@ -18,6 +17,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"  # cockpit_lancer : le serveur de la sortie du lab, lancé, attendu et arrêté par l'aide commune (A6)
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -89,12 +89,10 @@ printf '<objective>Faire le socle</objective>\n' > "$LAB/.planning/phases/01-x/0
 git -C "$LAB" init -q && git -C "$LAB" add -A && git -C "$LAB" -c user.email=t@t -c user.name=t commit -q -m init
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 OUT="$LAB/.vibeflow/cockpit"; LABR="$(cd "$LAB" && pwd -P)"
-demarrer() { # demarrer <dossier-faux> <PATH> [VAR=val ...] -> PORT, TOK, PTOK ; VF_FAKE_DIR = <dossier-faux>
-  local FK="$1" P="$2"; shift 2; stop_srv; rm -f "$OUT/.cache/server.json"; [ -n "${NOCLEAR:-}" ] || rm -f "$FK"/call-*.json
-  env PATH="$P" VF_FAKE_DIR="$FK" VF_COCKPIT_ENGINE_DIR="$MODDIR/skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" "$@" "$NODE" "$OUT/serve.mjs" --no-open --port $(libre) > "$WORK/serve.out" 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT=$(H json "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0); TOK=$(H tok "$PORT" /); PTOK=$(H tok "$PORT" /project.html)
+demarrer() { # demarrer <dossier-faux> <PATH> [VAR=val ...] -> PORT, TOK, PTOK ; VF_FAKE_DIR = <dossier-faux> ; le serveur est lancé par cockpit_lancer (NOM=valeur passés tels quels)
+  local FK="$1" P="$2"; shift 2; stop_srv; [ -n "${NOCLEAR:-}" ] || rm -f "$FK"/call-*.json
+  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$LAB" PATH="$P" VF_FAKE_DIR="$FK" VF_COCKPIT_ENGINE_DIR="$MODDIR/skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" "$@" || echo "     (cockpit_lancer : le serveur de la suite n'a pas démarré, code $?)" >&2
+  SRV="$VF_PID"; PORT="$VF_PORT"; TOK=$(H tok "$PORT" /); PTOK=$(H tok "$PORT" /project.html)
   [ -n "${NOCLEAR:-}" ] || rm -f "$FK"/call-*.json # le --version du démarrage n'est pas une question
 }
 poser() { # poser <jeton> <question> [extra-json] -> $WORK/ev.jsonl
@@ -224,14 +222,25 @@ assert_eq "Q9.2 — status done : JSON à clé items, exit 0" "$(node "$SCRIPTS/
 node "$SCRIPTS/vf-cockpit-query.mjs" nimporte > "$WORK/inc.out" 2>/dev/null; RCINC=$?
 assert_eq "Q9.3 — commande inconnue : exit 1 ET la liste des commandes (un plantage ne passe pas pour un refus)" "$RCINC $(grep -c '^commandes : overview' "$WORK/inc.out")" "1 1"
 QCLI="$MODDIR/skills/cockpit-moteur/assets/query-cli.mjs"
-assert_eq "Q9.4 — query-cli (moteur du module) : overview rend un JSON à clés project et counts, exit 0 ; find rend un résultat qui nomme util" "$(node "$QCLI" overview > "$WORK/qo.json" 2>/dev/null; echo $?)$(H json "$WORK/qo.json" '"project" in j&&"counts" in j' 2>/dev/null) $(node "$QCLI" find util 2>/dev/null | grep -c util)" "0true 1"
+assert_eq "Q9.4 — query-cli (moteur du module) : overview rend un JSON à clés project et counts, exit 0 ; find rend un résultat qui nomme util" "$(node "$QCLI" overview > "$WORK/qo.json" 2>/dev/null; echo $?)$(H json "$WORK/qo.json" '"project" in j&&"counts" in j' 2>/dev/null) $(node "$QCLI" find util 2>/dev/null | grep -q util && echo oui || echo non)" "0true oui"
 mkdir -p "$WORK/lab95/.vibeflow/cockpit" "$WORK/dehors95"
-printf 'require("fs").writeFileSync("PWNED-Q95","x"); process.exit(7);\n' > "$WORK/lab95/.vibeflow/cockpit/graph.json"
+GJCODE='try { process.getBuiltinModule("fs").writeFileSync("PWNED-Q95", "x"); } catch {} process.exit(7);' # du code qui a un effet visible dans n'importe quel contexte d'évaluation
+printf '%s\n' "$GJCODE" > "$WORK/lab95/.vibeflow/cockpit/graph.json"
 ( cd "$WORK/lab95" && node "$QCLI" overview > "$WORK/q95.out" 2>/dev/null; echo $? > "$WORK/q95.rc" )
 assert_eq "Q9.5 — graph.json qui ressemble à du code : lu comme une donnée, jamais évalué (exit 1, JSON à clé error, aucun fichier PWNED créé)" "$(cat "$WORK/q95.rc") $(H json "$WORK/q95.out" '"error" in j' 2>/dev/null) $(find "$WORK/lab95" -name 'PWNED*' | grep -c .)" "1 true 0"
+MQ2="$WORK/mut-q97"; rm -rf "$MQ2"; mkdir -p "$MQ2"; cp "$MODDIR/skills/cockpit-moteur/assets/query-cli.mjs" "$MODDIR/skills/cockpit-moteur/assets/graph-query.js" "$MQ2/"
+ANC_E="const G = JSON.parse(fs.readFileSync(file, 'utf8'));"; ANC_C="if (!file.startsWith(lab + path.sep)) throw new Error('graph.json is outside the lab: refused');"
+assert_eq "Q9.7.0 — ancres des mutants de query-cli : lecture de graph.json et contrôle de confinement, chacune une fois" "$(grep -cF -- "$ANC_E" "$QCLI")|$(grep -cF -- "$ANC_C" "$QCLI")" "1|1"
+H mut "$QCLI" "$ANC_E" "const G = (new Function(fs.readFileSync(file, 'utf8'))(), {});" > "$MQ2/query-cli.mjs"
+( cd "$WORK/lab95" && node "$MQ2/query-cli.mjs" overview > /dev/null 2>&1 )
+assert_eq "Q9.7 — mutant « graph.json évalué » : la sonde de Q9.5 le voit (le fichier PWNED apparaît) ; sans mutant (Q9.5) il n'apparaît pas" "$(find "$WORK/lab95" -name 'PWNED*' | grep -c .)" "1"
+rm -f "$WORK/lab95"/PWNED*
 printf '{"project":{"name":"DEHORS-95"},"nodes":[],"files":[]}\n' > "$WORK/dehors95/graph.json"; rm -f "$WORK/lab95/.vibeflow/cockpit/graph.json"; ln -s "$WORK/dehors95/graph.json" "$WORK/lab95/.vibeflow/cockpit/graph.json"
 ( cd "$WORK/lab95" && node "$QCLI" overview > "$WORK/q96.out" 2>/dev/null; echo $? > "$WORK/q96.rc" )
 assert_eq "Q9.6 — graph.json lien vers un fichier hors du lab : refusé (exit 1, JSON à clé error), le contenu du fichier visé n'est jamais rendu" "$(cat "$WORK/q96.rc") $(H json "$WORK/q96.out" '"error" in j' 2>/dev/null) $(grep -c 'DEHORS-95' "$WORK/q96.out")" "1 true 0"
+H mut "$QCLI" "$ANC_C" "" > "$MQ2/query-cli.mjs"
+( cd "$WORK/lab95" && node "$MQ2/query-cli.mjs" overview > "$WORK/q98.out" 2>/dev/null )
+assert_eq "Q9.8 — mutant « contrôle de confinement retiré » : la sonde de Q9.6 le voit (le contenu du fichier hors du lab est rendu)" "$(grep -c 'DEHORS-95' "$WORK/q98.out")" "1"
 cd "$WORK"
 
 echo "=== Q10 — identité de phase ==="

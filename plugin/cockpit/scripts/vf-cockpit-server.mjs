@@ -1,8 +1,9 @@
 // vf-cockpit-server — le crochet VibeFlow du serveur unique (67-04, P67-D-13, P67-D-14). Le serveur patché
 // (serve.mjs, patch P13) l'importe à côté de lui et lui délègue tout /api/vf/* APRÈS son contrôle du Host et du
 // jeton : même port que la page, aucun en-tête CORS. Le direct vient de vf-cockpit-live.mjs.
-// Export : attach({ here, root, token, inject, log, routes = ROUTES }) -> { ptoken, load, pageProjet, pageEquipe, jetonValide, route, stop,
-//   avantQuestion, modes, argsAgent } (les trois derniers : crochets P14 des questions, 67-05), ROUTES, repondreGardee.
+// Export : attach({ here, root, token, inject, log, routes = ROUTES, scriptsDir = trustedScriptsDir() }) -> { ptoken, load, pageProjet, pageEquipe, jetonValide,
+//   route, stop, avantQuestion, modes, argsAgent, substituerConsigne } (les quatre derniers : crochets P14 des questions, 67-05 ; 79-06 : le dossier du module,
+//   parent du dossier de scripts, remplace le jeton `<module>` des consignes et des règles de l'agent ; refusé ou introuvable, l'agent est indisponible), ROUTES, repondreGardee.
 // Routes GET /api/vf/* : la table ROUTES (une ligne par route : chemin, lecteur, régime). Ajouter une route = un lecteur et UNE ligne à sa place
 //   alphabétique ; sa réponse sort par repondreGardee (accès contrôlé, garde d'émission, no-store, 503 emission-refusee). Régimes HISTORIQUE (réponse
 //   JSON simple, comportement antérieur) et FLUX (le lecteur écrit le flux). Mécanisme : vf-cockpit-routes.mjs. Le sous-routeur Git (/api/vf/git…)
@@ -16,7 +17,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { startLive } from './vf-cockpit-live.mjs';
 import { revealDoing, revealTranscript } from './vf-cockpit-who.mjs';
-import { resolveScriptsDir } from './vf-cockpit-paths.mjs';
+import { resolveScriptsDir, trustedScriptsDir } from './vf-cockpit-paths.mjs';
+import { dossierModule, substituerModule } from './vf-cockpit-module.mjs';
 import { ID_RE } from './vf-cockpit-lecture.mjs';
 import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
 import { buildEquipeGraph, missionsEnCours } from './vf-cockpit-equipe-carte.mjs';
@@ -86,7 +88,8 @@ export const ROUTES = [
   ['/api/vf/transcript', lireTranscript, HISTORIQUE],
 ];
 
-export function attach({ here, root, token, inject, log = () => {}, routes = ROUTES }) {
+export function attach({ here, root, token, inject, log = () => {}, routes = ROUTES, scriptsDir = trustedScriptsDir() }) {
+  const dossier = dossierModule(scriptsDir); // racine réelle du module (null si introuvable : jamais une exception ici, l'agent est refusé à la question)
   const ptoken = crypto.randomBytes(16).toString('hex'); // onglet Projet : dit de quel onglet vient une requête
   let pageP = null, GP = null, gabarit = null, genP = 0, memoE = null; // genP : génération du gabarit ; memoE : la page Équipe déjà construite (AUDC-B-03)
   const load = () => { // relue après chaque réécriture de project.html par le direct
@@ -154,11 +157,15 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
     }
     return 'agent';
   }
-  const modes = (MODES, body) => (body.project && GP ? { ...MODES, ask: { ...MODES.ask, instructions: instructions(GP) } } : MODES); // flow et change gardent leur schéma
-  const argsAgent = (args, body) => argsConfines(args, { modele: body.modeleResolu || resoudreModele({ env: process.env }).modele });
+  const substituerConsigne = (texte) => substituerModule(texte, dossier); // lève (français) si le dossier du module est refusé : appelée à la question, jamais au chargement
+  const modes = (MODES, body) => { // flow et change gardent leur schéma ; chaque consigne reçoit le chemin du module à la place du jeton
+    const base = body.project && GP ? { ...MODES, ask: { ...MODES.ask, instructions: instructions(GP) } } : MODES;
+    return Object.fromEntries(Object.entries(base).map(([nom, m]) => [nom, { ...m, instructions: substituerConsigne(m.instructions) }]));
+  };
+  const argsAgent = (args, body) => argsConfines(args, { modele: body.modeleResolu || resoudreModele({ env: process.env }).modele, dossierModule: dossier });
 
   return {
-    ptoken, load, route, avantQuestion, modes, argsAgent,
+    ptoken, load, route, avantQuestion, modes, argsAgent, substituerConsigne,
     pageProjet: () => pageP,
     // onglet Équipe (69-05, P69-D-17) : construite en mémoire depuis le gabarit de project.html, jamais écrite ; jeton de la page Code (inject tel quel)
     // AUDC-B-03 : mémorisée tant que rien n'a changé (même gabarit, même instantané du direct, mêmes cartes lancées) : une requête de plus ne reconstruit pas 2,5 Mo

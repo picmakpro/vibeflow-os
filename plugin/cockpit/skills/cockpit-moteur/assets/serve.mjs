@@ -245,7 +245,7 @@ function describeCommand(command) {
   if (wrapped) c = wrapped[2].replace(/\\(["'])/g, '$1');
   const cmds = c.split(/\s*(?:&&|;|\|\|?)\s*/).filter(Boolean);
   // agents often chain several lookups in one command; describe each one, by name
-  const parts = cmds.map((x) => /query\.mjs\s+(\w+)\s*(.*)$/.exec(x)).filter(Boolean);
+  const parts = cmds.map((x) => /query(?:-cli)?\.mjs\s+(\w+)\s*(.*)$/.exec(x)).filter(Boolean); // vibeflow 79-06 : aussi query-cli.mjs, le script de requête du moteur
   if (parts.length) {
     const one = ([, cmd, rest]) => {
       const a = rest.replace(/--\w+\s+\S+/g, '').replace(/["']/g, '').trim();
@@ -288,7 +288,7 @@ const noteSession = (id) => { if (typeof id !== 'string' || !/^[0-9a-f-]{36}$/i.
 function claudeRun(body, mode) {
   const args = [...cli.args, '-p', '--output-format', 'stream-json', '--verbose',
     '--json-schema', JSON.stringify(mode.schema), '--append-system-prompt', mode.instructions,
-    '--tools', 'Read,Grep,Glob,Bash', '--allowedTools', 'Bash(node floorplan/query.mjs:*)', 'Read', 'Grep', 'Glob'];
+    '--tools', 'Read,Grep,Glob,Bash']; // vibeflow 79-06 : les outils et leurs règles viennent de VF.argsAgent (liste mesurée, scripts du module) ; aucune règle relative à la sortie ici
   if (typeof body.session === 'string' && /^[0-9a-f-]{36}$/i.test(body.session) && issued.has(body.session)) args.push(`--resume=${body.session}`); // vibeflow P18 : un identifiant de session, jamais un drapeau
   if (model) args.push('--model', model);
   return {

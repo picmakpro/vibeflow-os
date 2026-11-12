@@ -320,11 +320,11 @@ assert_eq "AM7.S12 — mutant am7:stale (effacement et contrôle du pid retirés
 rm -rf "$HORS"
 
 echo "=== AM7.K — la classe « lancement direct du serveur » est fermée (A6, P79-D-23) ==="
-# Exceptions : suites que le plan 79-01 édite et que 79-06 migre. Liste écrite une seule fois, elle ne peut que rétrécir.
-EXC_LANCEMENT="test-cockpit-questions.sh test-cockpit-git-env.sh"
+# Exceptions : suites que le plan 79-01 édite et que 79-06 migre. Liste écrite une seule fois, elle ne peut que rétrécir (79-06, tâche 3 : test-cockpit-questions.sh migrée, retirée).
+EXC_LANCEMENT="test-cockpit-git-env.sh"
 DIR_T="$(cd "$(dirname "$0")" && pwd)"
 printf '%s\n' "node \"\$O/$SV$PJ $NO1$NO2 --port 1" "\"\$NODE\" \$NA \"\$O/$SV$PJ $NO1$NO2" "node $IMP$ORT /x/sonde.mjs $NO1$NO2 --port 2" "# node \"\$O/$SV$PJ $NO1$NO2 (commentaire : jamais compté)" > "$WORK/k1.txt"
-assert_eq "AM7.K1 — le détecteur nomme les trois formes brutes (node, \$NODE avec arguments, --import) et ignore le commentaire ; il voit une ligne dans test-cockpit-questions.sh (pas aveugle)" "$(cockpit_lancement_brut "$WORK/k1.txt" | grep -c .) $([ "$(cockpit_lancement_brut "$DIR_T/test-cockpit-questions.sh" | grep -c .)" -ge 1 ] && echo voit || echo aveugle)" "3 voit"
+assert_eq "AM7.K1 — le détecteur nomme les trois formes brutes (node, \$NODE avec arguments, --import) et ignore le commentaire (la couverture sur fichier réel est portée par AM7.K2)" "$(cockpit_lancement_brut "$WORK/k1.txt" | grep -c .)" "3"
 cp "$DIR_T/test-cockpit-assemblage.sh" "$WORK/k2-intacte.sh"; cp "$WORK/k2-intacte.sh" "$WORK/k2-augmentee.sh"
 printf '%s\n' "node \"\$OUT/$SV$PJ $NO1$NO2 --port 1 &" >> "$WORK/k2-augmentee.sh"
 assert_eq "AM7.K2 — copie de test-cockpit-assemblage.sh (migrée) : intacte non nommée, augmentée d'une ligne de lancement brute nommée" "intacte=$(cockpit_lancement_brut "$WORK/k2-intacte.sh" | grep -c .) augmentee=$(cockpit_lancement_brut "$WORK/k2-augmentee.sh" | grep -c .)" "intacte=0 augmentee=1"
