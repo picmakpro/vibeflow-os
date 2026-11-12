@@ -209,3 +209,11 @@ Contrôles cités par la session principale, recopiés tels qu'elle les rapporte
 - rejeu indépendant sur un export de `24271323`, retiré depuis : securite 100 PASS / 0 FAIL, questions 133 / 0 ; AM4.1 à AM4.4 verts ;
 - constat F1 lu à la source (`vf-cockpit.mjs`, repli sur le `serve.mjs` de la sortie) ;
 - audit intermédiaire : aucun constat haut (relayé par le manager, non relu par la session principale dans le transcript de l'auditeur).
+
+## S3, point 1 : mesure F4 (lot 3) close (2026-11-12, 07 h 47, heure lue dans le message de la session principale)
+
+Mesure jouée par S3 (commit 85bdcad6, 11 appels haiku, un par forme) : dix compositions refusées sans effet de bord, témoin positif autorisé ; résultat dans `79-MESURE-claude-p.md`, section « Lot 3 ». Réponse de la session principale : le verdict « confinable » tient pour les compositions mesurées ; reprendre S3 par F1.
+
+Contrôles de la session principale, recopiés tels qu'elle les rapporte : les onze relevés bruts recomptés depuis les flux ; pour les dix cas composés (point-virgule, commande hors liste en tête, tube, deux formes de substitution, redirection hors du lab et dans le lab, saut de ligne, esperluette, « ou ») : mode annoncé dontAsk, une tentative chacun avec la commande composée prévue, un refus dans le résultat final, aucun fichier créé dans le lab ni à côté, aucune ligne d'appel du script autorisé ; témoin : autorisé, aucun refus, une ligne d'appel ; aucun constat haut.
+
+Reprise : point 2 du mandat S3 (F1 de `vf-cockpit.mjs`), puis F2, F3, réserve equipe en worktree détaché, 33 verdicts, FB3.5, tâche 5, 6a, 6b. Aucun code de S3 écrit à ce jour.

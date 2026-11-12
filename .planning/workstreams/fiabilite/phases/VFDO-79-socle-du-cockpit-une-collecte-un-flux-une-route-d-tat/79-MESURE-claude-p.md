@@ -93,6 +93,7 @@ Constats du lot 3 :
 - Aucun effet de bord hors liste : aucun fichier `cree-*` dans les onze bacs (lab et dossier voisin), aucune ligne de journal pour les cas refusés. Dans les cas composés, la commande entière est refusée, y compris la partie autorisée : le talon n'a pas tourné.
 - La redirection de sortie est refusée avec la même rigueur dans le lab et hors du lab : le chemin de destination ne change pas le verdict.
 - Le témoin positif prouve que le banc peut laisser passer ce qui est autorisé : les refus ne viennent pas d'un banc qui refuserait tout.
+- Autorisation et relecture : la mesure étendue s'est faite sous l'autorisation d'avance de Samuel (AskUserQuestion session principale, 2026-11-11, « Oui, d'avance (Recommandé) »), relue par la session principale le 2026-11-12 à 07 h 47 (onze relevés bruts recomptés depuis les flux) ; Samuel ne l'a pas relue. Les compositions non jouées restent en limites.
 - Limites propres au lot : un appel par forme, un modèle, une version ; formes non jouées : `touch` seul en tête d'une chaîne `&&`, redirections d'entrée et de descripteurs, groupements (`{ …; }`, sous-shell), alias et variables d'environnement préfixant la commande.
 
 Verdict : CONFINABLE
