@@ -59,7 +59,7 @@ Ancres de mutants (`.0`) écrites à cette tâche (jouées avec le code aux tâc
 | M-MODULE.0, M-PREFIXE.0, M-ANCIENNE.0 | `vf-cockpit-serveur-vivant.mjs` | `// m:module`, `// m:prefixe`, `// m:ancienne` |
 | M-STATUS.0 | `vf-cockpit-serveur-vivant.mjs` | `export function detecterServeur` |
 
-Rouge préexistant, hors AM4 et hors ancres : `test-cockpit-securite.sh`, `FB3.5` (« le cas génératif tient en moins de 10 s »), sonde de durée qui rougit sous charge : constaté rouge dans la suite complète, identique sur un instantané de la tête d'avant les changements de cette session (91 PASS / 1 FAIL, même ligne), la machine étant chargée par les autres plans de la phase (charge de 17 à 47) ; la même mesure rejouée seule rend 9 766 ms (borne 10 000 ms : marge de 2 %). Défaut de la sonde, signalé et non corrigé (ADR-031) : il rougit le décompte « aucune assertion préexistante rouge » de la vérification de la tâche 1 tant que la charge dure. Aucune autre assertion préexistante n'a rougi dans les cinq suites.
+Rouge préexistant connu, jugé seul : `test-cockpit-securite.sh`, `FB3.5` (« le cas génératif tient en moins de 10 s »), à la limite par construction : la sonde mesure une durée contre une borne de 10 s. Rejouée seule : 9 766 ms pour une borne de 10 s (marge de 2 %) ; sous charge (charge machine de 17 à 47) : au-delà de la borne ; rouge aussi sur un instantané de la tête d'avant les changements de cette session (91 PASS / 1 FAIL, même ligne). La borne ne monte pas, la sonde n'est pas affaiblie ; elle est comptée comme rouge préexistant connu. Aucune autre assertion préexistante n'a rougi dans les cinq suites.
 
 ## Baselines statiques (tâche 4a)
 
