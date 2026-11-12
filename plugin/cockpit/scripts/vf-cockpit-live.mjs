@@ -66,6 +66,7 @@ export function startLive({
 
   // première collecte : graine posée sans événement (comme la lecture de démarrage d'avant) ; tant qu'elle n'est pas revenue,
   // `snapshot()` rend un « qui » vide de la forme du repli du serveur
+  let refusee = false; // la garde d'émission a refusé le dernier résultat : collecte.etat vaut « partielle »
   let graph = null, idx = new Map(), lock = { available: false }, who = { workers: [], sources: {} }, semeeTour = false;
   let gitSig = null, gitSemee = false, gitInfo = null, projetGarde = null; // 78-09 ; gitInfo : { sig, at } posé dans l'instantané (A47)
   const collecte = collecteur({ racine: root, sortie, scriptsDir, home: os.homedir(), log });
@@ -77,7 +78,7 @@ export function startLive({
     if (stopped || !graph) return;
     const inst = { seq: state.seq, at: Date.now(), git: gitInfo, projet: graph };
     if (!garde(projetGarde === graph ? { ...inst, projet: null } : inst)) {
-      log('error', 'instantané refusé : contenu interdit, instantané précédent gardé'); return;
+      log('error', 'instantané refusé : contenu interdit, instantané précédent gardé'); refusee = true; return;
     }
     projetGarde = graph;
     try { poser(inst); } catch (e) { log('error', `instantané non posé : ${e.message}`); }
@@ -123,6 +124,8 @@ export function startLive({
   };
   const surVerrous = (n) => { if (JSON.stringify(n) !== JSON.stringify(lock)) { lock = n; emit('lock', { seq: ++state.seq, at: Date.now(), lock }); } };
   const surTour = ({ verrous: n, equipe: nw }) => {
+    if (!garde({ verrous: n, equipe: nw })) { refusee = true; log('error', 'tour refusé : contenu interdit, état précédent gardé'); return; } // avant toute pose et toute émission
+    refusee = false;
     if (!semeeTour) { semeeTour = true; who = nw; lock = n; return; }
     const avant = state.seq;
     if (whoSig(nw) !== whoSig(who)) { who = nw; emit('who', { seq: ++state.seq, at: Date.now(), who }); }
@@ -200,7 +203,7 @@ export function startLive({
 
   return {
     etat: () => ({
-      mode: state.mode, seq: state.seq, derniereMaj: state.derniereMaj, collecte: { ...collecte.etat(), mode: state.mode, clients: nbClients() },
+      mode: state.mode, seq: state.seq, derniereMaj: state.derniereMaj, collecte: { ...(({ etat, ...c }) => ({ ...c, etat: refusee && etat === 'ok' ? 'partielle' : etat }))(collecte.etat()), mode: state.mode, clients: nbClients() },
     }),
     snapshot,
     // à la connexion d'un onglet : l'instantané n'a pas bougé depuis un moment (aucune collecte sans onglet), un tour le remet à jour avant d'être servi ; au plus un tour par période du filet

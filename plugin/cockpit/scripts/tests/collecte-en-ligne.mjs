@@ -5,8 +5,8 @@
 // Export : creerCollecteEnLigne({ racine, scriptsDir, home }) -> { demander, surResultat, pret, etat, arreter }
 import { creerMemoire, etapePlanning, etapeVerrous, etapeTour } from '../vf-cockpit-collecte-etapes.mjs';
 
-export function creerCollecteEnLigne({ racine, scriptsDir, home }) {
-  const memo = creerMemoire(), base = { racine, scriptsDir, home };
+export function creerCollecteEnLigne({ racine, sortie, scriptsDir, home }) {
+  const memo = creerMemoire(), base = { racine, sortie, scriptsDir, home };
   const ecouteurs = new Set(), attendants = new Set();
   let enVol = false, attente = null, id = 0, fini = false, arrete = false, derniereA = null, dureeMs = null;
   const dire = (m) => { for (const f of ecouteurs) { try { f(m); } catch {} } };

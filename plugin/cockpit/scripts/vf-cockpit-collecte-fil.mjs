@@ -2,11 +2,11 @@
 // (jamais lues d'une variable d'environnement ni d'un fichier du lab). Traite les demandes UNE à UNE dans l'ordre de réception et poste leurs
 // résultats ; il ne diffuse rien et n'importe que les étapes.
 // Demande { id, planning, verrous, tour, motifs } -> messages { id, type: 'planning' (graphe | erreur, motifs) | 'verrous' | 'tour' (verrous,
-// equipe, erreurs, dureeMs) | 'fini' }.
+// equipe, erreurs, dureeMs) | 'index' (rapport en comptes, jamais les voies) | 'fini' }. workerData.sansIndex : relance sans l'index.
 import { parentPort, workerData } from 'node:worker_threads';
 import { creerMemoire, etapePlanning, etapeVerrous, etapeTour } from './vf-cockpit-collecte-etapes.mjs';
 
-const { racine, scriptsDir, home } = workerData, base = { racine, scriptsDir, home }, memo = creerMemoire();
+const { racine, sortie, scriptsDir, home, sansIndex } = workerData, base = { racine, sortie, scriptsDir, home }, memo = creerMemoire();
 
 parentPort.on('message', (m) => {
   const { id, motifs = [] } = m;
@@ -18,6 +18,9 @@ parentPort.on('message', (m) => {
     let verrous; try { verrous = etapeVerrous(base); } catch { verrous = { error: 'lecture impossible' }; }
     parentPort.postMessage({ type: 'verrous', id, verrous });
   }
-  if (m.tour) parentPort.postMessage({ type: 'tour', id, ...etapeTour({ ...base, memo }) });
+  if (m.tour) {
+    const { index, ...tour } = etapeTour({ ...base, memo, sansIndex: !!sansIndex });
+    parentPort.postMessage({ type: 'tour', id, ...tour }); parentPort.postMessage({ type: 'index', id, index });
+  }
   parentPort.postMessage({ type: 'fini', id });
 });

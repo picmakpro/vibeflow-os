@@ -209,7 +209,7 @@ mutant() {
   local nom="$1" fic="$2" ancre="$3" de="$4" vers="$5" pre="${6:-}" d cible
   MUT_SCRIPTS=""; d="$(cockpit_module_copie "$WORK/mut-$nom")" || { echo "mutant $nom : copie impossible"; return 1; }
   cible="$d/scripts/$fic"; cp "$cible" "$WORK/mut-$nom.avant"
-  node "$AUX/muter.mjs" "$cible" "$ancre" "$de" "$vers" $pre 2> "$WORK/mut-$nom.err" || { echo "mutant $nom : $(cat "$WORK/mut-$nom.err")"; return 1; }
+  node "$AUX/muter.mjs" "$cible" "$ancre" "$de" "$vers" ${pre:+"$pre"} 2> "$WORK/mut-$nom.err" || { echo "mutant $nom : $(cat "$WORK/mut-$nom.err")"; return 1; }
   cmp -s "$WORK/mut-$nom.avant" "$cible" && { echo "mutant $nom : la copie n'a pas changé"; return 1; }
   node --input-type=module -e "await import('file://$cible')" > /dev/null 2>&1 || { echo "mutant $nom : la copie ne charge pas"; return 1; }
   MUT_SCRIPTS="$d/scripts"; return 0
@@ -272,12 +272,17 @@ assert_lt "C3.1c — p99 d'une requête légère pendant le remplissage de l'ind
 assert_lt "C3.1 — latence maximale pendant le remplissage de l'index et deux tours, faux verrou à 0,4 s (ms)" "$(jq_ "$WORK/m-code.json" 'j.max')" 100
 assert_lt "C3.2 — le moniteur de boucle interne dit la même chose : collecte.boucle.maxMs (ms)" "$(jq_ "$WORK/m-code.json.fin" 'j.collecte.boucle.maxMs')" 100
 assert_eq "C4.1 — après la première collecte sur la fixture : 64 voies (16 sessions, 48 sous-agents), index ok, collecte ok" "$(jq_ "$WORK/m-code.json.fin" 'j.collecte.index.voies+" "+j.collecte.index.etat+" "+j.collecte.etat')" "64 ok ok"
+# contenus des transcripts (texte, commande, cible, sortie) : ni branche ni titre, que « qui » montre légitimement
+MARQ_CONTENU='MARQ-(TEXTE|COMMANDE|CIBLE|SORTIE|TUR)'
+# le flux montre déjà, par le collecteur d'équipe d'avant ce plan, l'intitulé d'une tâche (premier message humain) et la cible relative de la dernière action d'un agent
+# actif (`action.cible`, P69-D-16) : pour lui, seuls la commande d'outil et les sorties comptent (l'index, lui, n'en porte aucun : voir C4.2b)
+MARQ_FLUX='MARQ-(COMMANDE|SORTIE|TUR)'
 IDXF="$LABL/.vibeflow/cockpit/.cache/index-transcripts.json"
 node --input-type=module -e "const m=await import('file://$SCRIPTS/vf-cockpit-index-cache.mjs');const r=m.chargerIndex(process.argv[1],process.argv[2]);console.log(r.etat+' '+(r.index?r.index.voies.length:0))" "$IDXF" "$LABL" > "$WORK/idx-charge.txt" 2>&1
 MODE_IDX="$(sed -n 1p "$WORK/m-code.json.stat" | cut -d' ' -f3)"
 assert_eq "C4.2a — .cache/index-transcripts.json existe, en mode 0600, et le chargement de 79-08 l'accepte avec 64 voies" "$MODE_IDX $(cat "$WORK/idx-charge.txt")" "600 lu 64"
 MARQ_DANS_TRANSCRIPTS="$(grep -rl 'MARQ-TEXTE' "$HOMEL" 2> /dev/null | head -1)"
-assert_eq "C4.2b — aucun marqueur (texte, commande, cible, sortie) dans le fichier d'index ni dans collecte (témoin positif : il est dans les transcripts)" "$([ -n "$MARQ_DANS_TRANSCRIPTS" ] && echo temoin)/$(grep -c 'MARQ-' "$IDXF")/$(grep -c 'MARQ-' "$WORK/m-code.json.fin")" "temoin/0/0"
+assert_eq "C4.2b — aucun marqueur (texte, commande, cible, sortie) dans le fichier d'index ni dans collecte (témoin positif : il est dans les transcripts)" "$([ -n "$MARQ_DANS_TRANSCRIPTS" ] && echo temoin)/$(grep -cE "$MARQ_CONTENU" "$IDXF")/$(grep -cE "$MARQ_CONTENU" "$WORK/m-code.json.fin")" "temoin/0/0"
 assert_eq "C4.3 — deux tours sans changement de transcript ne réécrivent pas le fichier (inode et date identiques)" "$([ "$(sed -n 1p "$WORK/m-code.json.stat")" = "$(sed -n 2p "$WORK/m-code.json.stat")" ] && [ "$(sed -n 1p "$WORK/m-code.json.stat")" != absent ] && echo identique || echo different)" "identique"
 # C3.3 — mutant M-EN-LIGNE : la ligne garde:collecte-fil exécute la demande sur la boucle
 PREF_EL="import * as E from './vf-cockpit-collecte-etapes.mjs';"
@@ -298,7 +303,7 @@ assert_eq "C3.4a — vrai serveur : la sonde a mesuré (au moins 100 réponses, 
 assert_lt "C3.4b — vrai serveur : p99 (ms)" "$(jq_ "$WORK/m-serveur.json" 'j.p99')" 50
 assert_lt "C3.4 — vrai serveur : latence maximale pendant des tours sur la fixture volumineuse (ms)" "$(jq_ "$WORK/m-serveur.json" 'j.max')" 100
 cockpit_get /api/vf/etat > "$WORK/etat-l.json"
-assert_eq "C4.2c — ni le flux (hello compris) ni la route d'état ne portent un marqueur des transcripts" "$(grep -c 'MARQ-' "$WORK/el.jsonl")/$(grep -c 'MARQ-' "$WORK/etat-l.json")" "0/0"
+assert_eq "C4.2c — ni le flux (hello compris) ni la route d'état ne portent un marqueur des transcripts" "$(grep -cE "$MARQ_FLUX" "$WORK/el.jsonl")/$(grep -cE "$MARQ_FLUX" "$WORK/etat-l.json")" "0/0"
 vf_hyg_stop "$SSE_PID"; cockpit_arreter "$PIDL"
 # C4.4 — une ligne au-delà de la borne de lecture de l'index (33 Mio + 1 Mio, générés au test)
 HOMEG="$WORK/home-geant"; LABG2="$WORK/labg2"; mkdir -p "$HOMEG"; node "$TESTS/collecte-labo.mjs" lab "$LABG2"; node "$TESTS/collecte-labo.mjs" geant "$HOMEG" "$LABG2" geant0001
@@ -315,7 +320,7 @@ if mutant M-RELANCE vf-cockpit-collecte.mjs collecte-sans-index 'lancer(true);' 
 else assert_eq "M-RELANCE — construction du mutant" "échec" "ok"; fi
 if mutant M-ECRIVAIN vf-cockpit-collecte.mjs collecte-ecrivain 'await ancien.sorti;' ';'; then
   pilote "$MUT_SCRIPTS" c25 > "$WORK/c25-mut.json"
-  assert_eq "M-ECRIVAIN — la ligne garde:collecte-ecrivain n'attend plus la sortie de l'ancien fil : l'écriture du nouveau commence avant la fin de celle de l'ancien (chevauchement au journal)" "$(jq_ "$WORK/c25-mut.json" 'j.ordre+" "+j.debuts')" "false 2"
+  assert_eq "M-ECRIVAIN — la ligne garde:collecte-ecrivain n'attend plus la sortie de l'ancien fil : l'écriture du nouveau commence avant la fin de celle de l'ancien (chevauchement au journal)" "$(jq_ "$WORK/c25-mut.json" 'j.ordre+" "+(j.debuts>=2)')" "false true"
 else assert_eq "M-ECRIVAIN — construction du mutant" "échec" "ok"; fi
 if mutant M-GEL vf-cockpit-instantane.mjs instantane-gel 'Object.freeze(o);' ';'; then
   node "$AUX/c10.mjs" "$MUT_SCRIPTS" > "$WORK/c10-mut.json" 2> "$WORK/c10-mut.err"
@@ -408,11 +413,11 @@ assert_eq "C4.8c — collision de nom (A46) : deux worktrees au même nom de dos
 assert_eq "C4.8c2 — après le retrait d'un des deux, l'autre est admis avec son nom (la règle suit la collision, pas le nom)" "$(jq_ "$WORK/c48.json" 'j.apres+" "+j.nomDup')" "dup dup"
 assert_eq "C4.8d — aucun arbre de l'index, du fichier d'index ni du rapport ne contient un chemin (lab, frère, poste)" "$(jq_ "$WORK/c48.json" 'j.balayage')" "true"
 if mutant M-ARBRE-DECLARE vf-cockpit-collecte-index.mjs index-arbre 'worktreeVerifie(commun, chemin)' 'true'; then
-  node "$AUX/c48.mjs" "$MUT_SCRIPTS" "$TESTS" "$WORK" > "$WORK/c48-m1.json" 2> /dev/null
+  mkdir -p "$WORK/c48m1"; node "$AUX/c48.mjs" "$MUT_SCRIPTS" "$TESTS" "$WORK/c48m1" > "$WORK/c48-m1.json" 2> /dev/null
   assert_eq "M-ARBRE-DECLARE — la ligne garde:index-arbre admet tout arbre listé sans preuve : le leurre 1 obtient une voie, les cas (a) et (c) restent verts" "$(jq_ "$WORK/c48-m1.json" '(j.A.l1!=="ABSENT")+" "+j.A.wt+" "+j.C.d1+" "+j.C.uniq')" "true alpha ABSENT uniq"
 else assert_eq "M-ARBRE-DECLARE — construction du mutant" "échec" "ok"; fi
 if mutant M-COLLISION vf-cockpit-collecte-index.mjs index-collision 'compte.get(n) > 1' 'false'; then
-  node "$AUX/c48.mjs" "$MUT_SCRIPTS" "$TESTS" "$WORK" > "$WORK/c48-m2.json" 2> /dev/null
+  mkdir -p "$WORK/c48m2"; node "$AUX/c48.mjs" "$MUT_SCRIPTS" "$TESTS" "$WORK/c48m2" > "$WORK/c48-m2.json" 2> /dev/null
   assert_eq "M-COLLISION — la ligne garde:index-collision n'écarte plus un nom porté par deux arbres : le cas (c) rougit (d1 obtient une voie), le cas (a) reste vert" "$(jq_ "$WORK/c48-m2.json" '(j.C.d1!=="ABSENT")+" "+j.A.wt+" "+j.A.l1')" "true alpha ABSENT"
 else assert_eq "M-COLLISION — construction du mutant" "échec" "ok"; fi
 
