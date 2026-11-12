@@ -167,7 +167,7 @@ mutant() { # mutant <nom> <fichier> <expression-sed> [ligne ajoutée] -> MUT_OUT
       [ -z "${4:-}" ] || printf '%s\n' "$4" >> "$(_cockpit_module_cible "$MUT_MOD" "$(basename "$2")")"
       printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
   esac
-  f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+  f="$d/.vibeflow/cockpit/$2"; [ -f "$f" ] || return 1   # page de la copie du lab (donnée) : même chemin que MUT_OUT/<fichier>
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; [ -n "${4:-}" ] && printf '%s\n' "$4" >> "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 mutant_eng() { # mutant_eng <nom> <expression-sed> -> MUT_ENG : copie du moteur dont l'assistant est muté
