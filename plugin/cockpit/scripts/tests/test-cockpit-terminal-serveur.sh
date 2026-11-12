@@ -9,7 +9,7 @@
 #   S2  lecture du mode d'un fichier : même valeur sous macOS, GNU et uutils (faux `stat` des trois familles)
 #   TC  T-71-10 : le secret se compare en temps constant (égalité condensée + timingSafeEqual, aucune comparaison directe)
 #   TM  moteur : un assistant sous .vibeflow/ ou en lien symbolique est refusé (terminal inerte, rien n'est lancé)
-#   M-* mutants (copies de la sortie) : M-ORIGIN, M-HOST, M-JETON, M-SANSORIGIN, M-EXPIRE, M-RETIRE, M-BALAI, M-REJEU, M-SERVI, M-LOG, M-URL, M-TD1, M-TEMPS-CONSTANT, M-EGAL, M-MOTEUR-VIBEFLOW, M-MOTEUR-LIEN
+#   M-* mutants (copies du module par cockpit_module_muter) : M-ORIGIN, M-HOST, M-JETON, M-SANSORIGIN, M-EXPIRE, M-RETIRE, M-BALAI, M-REJEU, M-SERVI, M-LOG, M-URL, M-TD1, M-TEMPS-CONSTANT, M-EGAL, M-MOTEUR-VIBEFLOW, M-MOTEUR-LIEN
 # Chaque refus a son témoin positif ; « 0 assistant » = aucun enfant du serveur dont la ligne de commande contient vf-cockpit-pty.py.
 # Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
@@ -74,12 +74,17 @@ mklab() {
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build-$(basename "$L").out" 2>&1 || cat "$WORK/build-$(basename "$L").out"
 }
 SRVN=0
-srv() { # srv <sortie> <0|1> : serveur lancé directement depuis la sortie, comme le lanceur ; AMORCE posé en 0600 (copie dans $WORK/amorce.copy)
-  local o="$1" term="${2:-0}" lab; lab="$(cd "$1/../.." && pwd)"
+# 79-06 : le code ne vit plus dans la sortie. MOD_DEPOT = racine du module du dépôt ; mod_de <sortie> = racine du module que COMMANDE cette sortie
+# (table posée par mutant() : sortie TAB module ; par défaut le module du dépôt). ENG0 = le moteur du module du dépôt (ENG peut être remplacé par une copie).
+MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODS_TABLE="$WORK/.mods"; : > "$MODS_TABLE"; export MODS_TABLE MOD_DEPOT; ENG0="$ENG"
+mod_de() { local m; m="$(awk -F'\t' -v s="${1:-}" '$1==s{m=$2} END{print m}' "$MODS_TABLE" 2>/dev/null)"; printf '%s\n' "${m:-$MOD_DEPOT}"; }
+srv() { # srv <sortie> <0|1> : serveur du MODULE de la sortie visée, lancé par l'aide ; AMORCE posé en 0600 (copie dans $WORK/amorce.copy) ; ENG remplacé = moteur copié (contenu identique : même empreinte)
+  local o="$1" term="${2:-0}" lab ev=(); lab="$(cd "$1/../.." && pwd)"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN-$RANDOM.out"; rm -f "$o/.cache/server.json" "$o/.cache/terminal-amorce"
   local flag=(); mkdir -p "$o/.cache"
   if [ "$term" = 1 ]; then flag=(--terminal); AMORCE="$(amorce_neuve)"; (umask 077; printf '%s' "$AMORCE" > "$o/.cache/terminal-amorce"); (umask 077; printf '%s' "$AMORCE" > "$WORK/amorce.copy"); fi
-  COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" ${flag[@]+"${flag[@]}"}
+  [ "$ENG" = "$ENG0" ] || ev=(VF_COCKPIT_ENGINE_DIR="$ENG")
+  COCKPIT_MODULE="$(mod_de "$o")" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${ev[@]+"${ev[@]}"} ${flag[@]+"${flag[@]}"}
   if [ "$term" = 1 ]; then attendre 5 grep -qs '"terminal"' "$o/.cache/server.json"; fi # la clé terminal manque quand le moteur refuse l'assistant : attente bornée, sans échec
   SRV_PID="$VF_PID"; SRV_PORT="${VF_PORT:-0}"
 }
@@ -88,9 +93,13 @@ unsrv() { vf_hyg_stop "$SRV_PID"; }
 srvq() { srv "${1:-$OUT}" 1; QP="$(sj '(j.terminal&&j.terminal.url)||""')"; QP="${QP##*:}"; QP="${QP:-1}"; TOK="$(sj j.token)"; }
 echanger() { local r; r="$(node "$TA" amorcer "$QP" "$WORK/amorce.copy")"; EC_CODE="$(printf '%s\n' "$r" | sed -n 1p)"; SECRET="$(printf '%s\n' "$r" | sed -n 2p)"; }
 pty_compte() { local n=0 p; for p in $(pgrep -P "$SRV_PID" 2>/dev/null); do ps -o command= -p "$p" 2>/dev/null | grep -q 'vf-cockpit-pty.py' && n=$((n+1)); done; echo "$n"; }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : données) et MUT_MOD (racine de la copie du module)
+  local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  case "$(basename "$2")" in
+    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 temoin_compteur() { # lance un assistant sur un serveur jetable : prouve que pty_compte voit un PTY
@@ -394,6 +403,7 @@ unsrv
 echo "=== TC — T-71-10 : comparaison du secret en temps constant (sonde statique sur le chemin de comparaison) ==="
 sonde_tc() { # sonde_tc <dossier de sortie> -> « egal=<n> directes=<n> condense=<oui|non> » : usages de egal() sur le secret, comparaisons directes, timingSafeEqual dans egal()
   local d="$1" e dir c
+  [ -f "$d/vf-cockpit-terminal-processus.mjs" ] || d="$(mod_de "$1")/scripts"   # 79-06 : une sortie ne porte plus de code, le module qu'elle commande oui ; un dossier jetable qui porte les fichiers reste lu tel quel
   e="$(grep -c "egal(req.headers\['x-vf-terminal'\], secret)" "$d/vf-cockpit-terminal-processus.mjs" || true)"
   dir="$(grep -v '^ *//' "$d/vf-cockpit-terminal-processus.mjs" | grep -cE "x-vf-terminal'\] *[!=]==?|[!=]==? *req\.headers\['x-vf-terminal'\]|[!=]==? *secret\b|\bsecret *[!=]==" || true)"
   c="$(grep -c 'crypto.timingSafeEqual' "$d/vf-cockpit-terminal-amorce.mjs" || true)"
