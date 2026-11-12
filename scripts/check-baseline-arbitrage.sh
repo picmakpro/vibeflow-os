@@ -43,6 +43,35 @@
 # assume (repudiation, T-41-58), coherent avec la convention de tracabilite du `CLAUDE.md` : le
 # fait redevient relisable, l'attribution reste humaine.
 #
+# LIGNE DE DELEGATION EXCLUE (2026-11-12). Une ligne du message qui porte le radical « deleg » (apres
+# repli de la casse et des accents, donc « delegue », « déléguée », « délégation », « delegate »,
+# « DÉLÉGATION »…) ne vaut PAS citation, meme avec le mot-cle, deux virgules et une date :
+# « décision déléguée par X (canal, date), option recommandée » dit qu'une decision a ete confiee, pas
+# qu'un arbitrage direct a eu lieu — la meme forme pouvait donc passer pour un arbitrage detaille. Une
+# AUTRE ligne du meme message qui porte une citation directe reste acceptee, et c'est elle (jamais la
+# ligne de delegation) qui est recopiee sur la sortie. La regle vaut pour les trois usages de la
+# citation (hausse, retrait d'une ligne dont la cible existe encore, neutralisation de sentinelle) : un
+# seul predicat les sert. Origine : « Samuel, message session principale, 2026-11-12 : "oui tu as
+# raison", en réponse au constat que la garde accepte la ligne de délégation ; durcissement avant la
+# release = option recommandée, décision déléguée par Samuel, message session principale,
+# 2026-11-08 ». Ce n'est PAS un arbitrage detaille de Samuel sur la regle elle-meme.
+# PRECISION DU 2026-11-12, decision de la session principale (message du 2026-11-12) : le radical est
+# « deleg » et non « delegu », car « décision prise par délégation de X (…, 2026-11-08), option
+# recommandée » dit la meme chose que « décision déléguée ». Ce n'est PAS un arbitrage detaille de
+# Samuel. FAUX REFUS ASSUMES : une ligne qui porte un tel mot pour une autre raison (« délégation de
+# paiement », « delegate() », « délégué syndical ») sur la MEME ligne qu'une citation directe n'est plus
+# une citation ; la sortie le dit (INFO-LIGNE-DELEGATION-ECARTEE) et le remede est le meme dans tous les
+# cas : mettre la citation directe sur sa propre ligne. Forme recommandee pour la ligne de delegation :
+# « décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; prise
+# par la session principale le 2026-11-12 » — une ligne qui ne sert pas de citation.
+# LIMITE QUI DEMEURE : une citation DIRECTE fabriquee passe toujours (verification de forme, jamais de
+# veracite, voir ci-dessus), et une paraphrase sans le radical (« confiée », « sur mandat ») passe aussi.
+# Le radical est cherche en octets (locale C) apres repli explicite de É/é/È/è et de l'accent combinant
+# AIGU seul (U+0301 ; tout autre accent combinant, grave ou circonflexe, n'est pas replie) ; un
+# homoglyphe ou une orthographe qui evite « deleg » (« dele-g ») n'est pas detecte. Quand un refus
+# ecarte une ligne de delegation, la sortie ajoute INFO-LIGNE-DELEGATION-ECARTEE avant le verdict
+# (information seule, les lignes de verdict sont inchangees).
+#
 # CASCADE DE RESOLUTION DE LA BASE (nommee, imprimee sur echec) : valeur de --base-ref si fournie,
 # sinon la premiere ref qui resout parmi refs/remotes/origin/main, origin/main, refs/heads/main,
 # main. Aucune ne resout -> rc 2. La base est ENSUITE `git merge-base HEAD <ref>` — JAMAIS `HEAD^`,
@@ -164,31 +193,68 @@ fi
 
 HEAD_SHA="$(git rev-parse HEAD)"
 
+# Point UNIQUE de la regle de citation : les trois usages (hausse, retrait de ligne, sentinelle) passent
+# par citation_ok / extract_citation_line, qui passent tous deux par ligne_citation_ok. Une ligne qui
+# porte le radical « deleg » (toute casse, avec ou sans accent) NE VAUT PAS citation : c'est la forme
+# d'une decision deleguee, pas d'un arbitrage direct. La comparaison se fait en locale C (octets) : le
+# tolower de certains awk ne baisse pas « É », donc les accents sont replies EXPLICITEMENT (É, é, È, è
+# vers e, accent aigu combinant U+0301 retire) avant de chercher « deleg ».
+AWK_CITATION_LIB='
+function est_delegation(s,   t) {
+  t = s
+  gsub(/É/, "é", t); gsub(/È/, "è", t)
+  gsub(/\314\201/, "", t)
+  t = tolower(t)
+  gsub(/é/, "e", t); gsub(/è/, "e", t)
+  return index(t, "deleg") > 0
+}
+function ligne_forme_ok(s,   kw, nc, l) {
+  l = s
+  kw = (index(s, "arbitrage") > 0) || (index(s, "décision") > 0) || (index(s, "decision") > 0)
+  nc = gsub(/,/, ",", l)
+  return (kw && nc >= 2 && (s ~ /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)) ? 1 : 0
+}
+function ligne_citation_ok(s) {
+  if (est_delegation(s)) return 0
+  return ligne_forme_ok(s)
+}
+function ligne_ecartee(s) {
+  return (est_delegation(s) && ligne_forme_ok(s)) ? 1 : 0
+}
+'
+
 citation_ok() {
   # <message complet> sur stdin (via printf par l'appelant) -> exit 0 si une ligne conforme existe.
-  awk '
-    {
-      line = $0
-      kw = (index(line, "arbitrage") > 0) || (index(line, "décision") > 0) || (index(line, "decision") > 0)
-      ncommas = gsub(/,/, ",", line)
-      has_date = ($0 ~ /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)
-      if (kw && ncommas >= 2 && has_date) { found = 1 }
-    }
+  LC_ALL=C awk "$AWK_CITATION_LIB"'
+    { if (ligne_citation_ok($0)) found = 1 }
     END { exit (found ? 0 : 1) }
   '
 }
 
 extract_citation_line() {
-  # <message complet> sur stdin -> imprime la premiere ligne conforme trouvee.
-  awk '
-    {
-      line = $0
-      kw = (index(line, "arbitrage") > 0) || (index(line, "décision") > 0) || (index(line, "decision") > 0)
-      ncommas = gsub(/,/, ",", line)
-      has_date = ($0 ~ /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)
-      if (kw && ncommas >= 2 && has_date && !found) { print $0; found = 1 }
-    }
+  # <message complet> sur stdin -> imprime la premiere ligne conforme trouvee (jamais une ligne de
+  # delegation : meme predicat que citation_ok).
+  LC_ALL=C awk "$AWK_CITATION_LIB"'
+    { if (ligne_citation_ok($0) && !found) { print $0; found = 1 } }
   '
+}
+
+delegation_ecartee() {
+  # <message complet> sur stdin -> exit 0 si une ligne a la forme d'une citation mais est ecartee
+  # parce qu'elle porte le radical de delegation (sert au seul message d'information des refus).
+  LC_ALL=C awk "$AWK_CITATION_LIB"'
+    { if (ligne_ecartee($0)) found = 1 }
+    END { exit (found ? 0 : 1) }
+  '
+}
+
+info_delegation() {
+  # <sha complet du commit impute> -> imprime INFO-LIGNE-DELEGATION-ECARTEE si son message en porte une.
+  # Appelee AVANT la ligne de verdict : la derniere ligne de sortie d'un refus reste le verdict (l'etape CI
+  # en prend `tail -1` pour son annotation).
+  if git log -1 --format=%B "$1" 2>/dev/null | delegation_ecartee; then
+    echo "INFO-LIGNE-DELEGATION-ECARTEE: $(git rev-parse --short "$1") — une ligne de délégation ne vaut pas citation, porter la citation directe sur sa propre ligne"
+  fi
 }
 
 baseline_exists_at() { git cat-file -e "${1}:${BASELINE_PATH}" 2>/dev/null; }
@@ -359,6 +425,7 @@ printf '%s\n' "$HAUSSES" | while IFS= read -r p; do
       prevv="$(instr_at_ref "${culprit}^" "$p")"
       curv="$(instr_at_ref "$culprit" "$p")"
       shortsha="$(git rev-parse --short "$culprit")"
+      [ -n "$culprit" ] && info_delegation "$culprit"
       echo "HAUSSE-SANS-ARBITRAGE: ${p} instructions ${prevv} -> ${curv} (commit ${shortsha})"
       echo "RC1" >> "$FACTS.rc"
     fi
@@ -392,6 +459,7 @@ printf '%s\n' "$RETRAITS" | while IFS= read -r p; do
   if [ "$target_exists" -eq 1 ] && [ "$retrait_citation_ok" -eq 0 ]; then
     shortsha="indetermine"
     [ -n "$culprit" ] && shortsha="$(git rev-parse --short "$culprit")"
+    [ -n "$culprit" ] && info_delegation "$culprit"
     echo "LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE: ${p} (commit ${shortsha})"
     echo "RC1" >> "$FACTS.rc"
   elif [ "$target_exists" -eq 1 ] && [ "$retrait_citation_ok" -eq 1 ]; then
@@ -439,6 +507,7 @@ printf '%s\n' "$SENTINEL_PATHS" | while IFS= read -r sp; do
     if [ "$sentinel_citation_ok" -eq 0 ]; then
       shortsha="indetermine"
       [ -n "$culprit" ] && shortsha="$(git rev-parse --short "$culprit")"
+      [ -n "$culprit" ] && info_delegation "$culprit"
       echo "SENTINELLE-NEUTRALISEE: ${sp} (commit ${shortsha})"
       echo "RC1" >> "$FACTS.rc"
     fi

@@ -275,7 +275,7 @@
    try { return execFileSync(process.execPath, [path.join(dir, 'scripts', name), root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, timeout: 120000 }); }
    catch (e) { throw Object.assign(new Error(String(e.stdout || '') + String(e.stderr || '') || e.message), { checks: true }); }
  }
-@@ -509,16 +500,41 @@ function undoChange() {
+@@ -509,16 +500,47 @@ function undoChange() {
  }
  
  // ---------- http ----------
@@ -300,13 +300,19 @@
 +  res.setHeader('Content-Security-Policy', BASE_CSP); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
 +  try { route(req, res); } catch (e) { console.error(`vf-cockpit : requête en échec : ${e?.message || e}`); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch {} }
 +});
++// vibeflow AUDC-B-03 bis : la page de redirection que le lanceur remet à l'ouvreur du poste est un fichier local (file://, origine opaque) : son saut vers la page
++// Projet part toujours en `Sec-Fetch-Site: cross-site`, comme celui d'un lien d'un autre site. Un seul chemin est rouvert : GET /project.html, navigation de premier
++// niveau (Mode navigate, Dest document : ni cadre, ni script, ni image, ni fetch) qui porte le SECRET D'OUVERTURE (`?o=`) écrit par le lanceur, valide tant que la clé
++// d'amorçage du terminal est armée, à usage unique, comparé en temps constant (TERM.ouvertureLanceur, vf-cockpit-terminal-amorce.mjs). Sans le secret, une page d'un
++// autre site n'obtient ni la page ni l'effet d'état qu'un chargement de la page Projet peut avoir. Sans --terminal, aucune exception.
++const ouvertureLanceur = (req, url) => req.method === 'GET' && url.pathname === '/project.html' && req.headers['sec-fetch-mode'] === 'navigate' && req.headers['sec-fetch-dest'] === 'document' && !!TERM?.ouvertureLanceur?.(url.searchParams.get('o'));
 +function route(req, res) {
    // only this machine's own names: a website that points its domain at 127.0.0.1 (DNS rebinding) would
    // otherwise count as the same origin as the map, and could read its token from the page
    if (![`127.0.0.1:${port}`, `localhost:${port}`].includes(String(req.headers.host || '').toLowerCase())) { res.writeHead(403); return res.end('unknown host'); }
    const url = new URL(req.url, `http://${req.headers.host}`);
    const sameOrigin = !req.headers.origin || req.headers.origin === `http://${req.headers.host}`;
-+  if (!url.pathname.startsWith('/api/') && req.headers['sec-fetch-site'] === 'cross-site') { res.writeHead(403); return res.end(); } // vibeflow AUDC-B-03 : une page d'un autre site n'obtient ni page ni fichier du cockpit
++  if (!url.pathname.startsWith('/api/') && req.headers['sec-fetch-site'] === 'cross-site' && !ouvertureLanceur(req, url)) { res.writeHead(403); return res.end(); } // vibeflow AUDC-B-03 : une page d'un autre site n'obtient ni page ni fichier du cockpit (seule exception : ouvertureLanceur, AUDC-B-03 bis)
    if (url.pathname.startsWith('/api/')) {
      // EventSource can't send headers, so the events stream takes the token in the query string
 -    const given = req.headers['x-floorplan-token'] || (url.pathname === '/api/events' ? url.searchParams.get('token') : null);
@@ -319,7 +325,7 @@
      if (req.method === 'GET' && url.pathname === '/api/events') {
        res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
        res.write('retry: 1000\n\n'); // reconnect quickly after a restart
-@@ -526,7 +542,7 @@ const server = http.createServer((req, res) => {
+@@ -526,7 +548,7 @@ const server = http.createServer((req, res) => {
        req.on('close', () => { tabs.delete(res); lastTab = Date.now(); });
        return;
      }
@@ -328,7 +334,7 @@
      if (req.method === 'GET' && url.pathname === '/api/health') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ cli: !!cli, engine, want, version, path: cli?.path || null })); }
      // requested flows are saved next to the map; build.mjs folds them into graph.json
      if (url.pathname === '/api/flows') {
-@@ -534,33 +550,13 @@ const server = http.createServer((req, res) => {
+@@ -534,33 +556,13 @@ const server = http.createServer((req, res) => {
        if (req.method === 'POST' || req.method === 'DELETE') {
          let raw = '';
          req.on('data', (d) => { raw += d; if (raw.length > 50000) req.destroy(); });
@@ -365,7 +371,7 @@
          return;
        }
      }
-@@ -568,12 +564,12 @@ const server = http.createServer((req, res) => {
+@@ -568,12 +570,12 @@ const server = http.createServer((req, res) => {
        const r = changing ? { ok: false, error: 'A change is still being made.' } : undoChange();
        res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(r));
      }
@@ -380,7 +386,7 @@
          try {
            const x = exportMap(Array.isArray(body.include) ? body.include.map(String) : EXPORT_DEFAULT, cleanFlows(body.flows));
            res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Content-Disposition': `attachment; filename="${x.name}"`, 'Cache-Control': 'no-store' });
-@@ -589,19 +585,28 @@ const server = http.createServer((req, res) => {
+@@ -589,19 +591,28 @@ const server = http.createServer((req, res) => {
      if (req.method === 'POST' && url.pathname === '/api/ask') {
        let raw = '';
        req.on('data', (d) => { raw += d; if (raw.length > 20000) req.destroy(); });
@@ -413,7 +419,7 @@
  // another map (or anything else) on the port: take the next free one
  let port = wantPort;
  server.on('error', (e) => {
-@@ -614,11 +619,15 @@ server.on('listening', () => {
+@@ -614,11 +625,15 @@ server.on('listening', () => {
    const u = `http://127.0.0.1:${port}`;
    try {
      fs.mkdirSync(path.dirname(stateFile), { recursive: true });

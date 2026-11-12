@@ -206,6 +206,32 @@ commentaire d'en-tête près, tour 4) et de 234c9b97.
 }
 ```
 
+## Clôture (2026-11-12)
+
+Mandat de clôture de la session principale après la CI de la PR #227 et une seconde recette par juge à captures.
+
+- **CI rouge du shard 6 (`test-cockpit-lancer-bandeau.sh`, LB.E11, LB.E12, LB.E14)** : instabilité de sonde
+  préexistante, pas une régression d'AUDC-M11. La même famille de rouge (moitié témoin « Entrée fraîche = 1 » à 0,
+  diagnostic « Entrée fraîche perdue ») existait sur 312d9637, avant le code du lot 0 bis (première tentative rouge,
+  seconde verte) ; la propriété protégée (répétitions = 0 octet) n'a jamais rougi ; le code M11 côté Q se borne à un
+  évènement de document et un message vers le parent, que le faux P de ces cas ignore. Une relance des jobs en échec,
+  une fois : verte. Sonde non modifiée faute de mesure qui localise la lecture prématurée (limite pour le socle de test
+  de la Phase 79).
+- **AUDC-H4, trois restes (b16c57fc)** : nom accessible d'une carte, mot du glossaire dans une description, gabarit
+  « N files in <chemin>/ » d'une carte dossier. Trois tours de revue ; le deuxième a trouvé une régression sondée
+  (panneau d'un dossier ouvert sans sélection), corrigée en jugeant l'item que le panneau décrit.
+- **AUDC-B-03 contre l'ouverture du terminal (017dd0b5)** : défaut confirmé dans le vrai Chrome (la page de
+  redirection locale du lanceur partait en inter-sites, 403, clé non échangée ; mesuré aussi dans Firefox sur les
+  en-têtes). Correctif : une seule exception, liée à un secret d'ouverture à usage unique distinct de la clé et à une
+  clé armée ; une lecture sûre unique partagée par l'échange, l'armement et le secret. Audit, revue, puis regard frais
+  de sécurité : `passed`, aucun bloquant ni majeur. Restent ouverts : une page du même site passe la porte sans secret
+  (réserve héritée D-M6, à arbitrer) ; le secret reste dans l'adresse après usage ; le retrait du secret à l'échange
+  et au balayage n'a pas de témoin ; Safari non mesuré.
+- Décisions de la session principale (« décision déléguée par Samuel (message session principale, 2026-11-11 :
+  « tranche pour chacun de ces points »), prise par la session principale ») : le nom lisible des cartes de fichiers
+  est gardé ; le second onglet du même navigateur qui ouvre le terminal sans nouvelle clé est voulu, la phrase du
+  README part au plan de documentation de la Phase 79.
+
 ## Prochaine étape
 
 Relecture de la PR #227 par Samuel (lot 0 et lot 0 bis), puis la Phase 79 en première vague.
