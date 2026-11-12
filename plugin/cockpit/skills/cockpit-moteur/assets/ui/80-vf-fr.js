@@ -1,15 +1,15 @@
 // vibeflow:fr
-// VibeFlow (67-07) : le chrome du viewer en français, sans toucher au viewer. Le dictionnaire (phrases exactes, fichiers
-// 78 et 79 → window.__vfFrDict) et les motifs ci-dessous sont appliqués aux nœuds de texte et aux attributs
-// (placeholder, title, aria-label) au chargement puis à chaque mutation du DOM. Les données (noms de cartes,
-// descriptions) sont déjà en français : on ne traduit qu'une phrase connue en entier, jamais un mot dans une phrase.
-// Seuls `nodeValue` et les valeurs d'attribut sont écrits, jamais du HTML. Pose aussi les couleurs des types de
-// l'onglet Projet (meta.kindColors). ?lang=en désactive. Fonction pure : window.__vfFrTraduire(texte) → phrase ou null.
+// VibeFlow (67-07, 79-10) : le chrome du viewer en français. Le traducteur `window.__vfFrT` (nommé `t` dans chaque fichier du moteur)
+// traduit au point d'émission : la clé est le texte anglais source, la valeur vient de la table (fichiers 78 et 79 → window.__vfFrDict).
+// Ce fichier est posé AVANT le script principal (emplacement UI_I18N de la page) : la table existe quand un fichier appelle `t` au chargement.
+// Sous ?lang=en (ligne `garde:lang-en`), `t` rend la clé et rien d'autre n'est posé. Fonction pure : window.__vfFrTraduire(texte) → phrase ou null.
+// Reste de l'ancien mécanisme (retiré à la tâche 6 du plan 79-10) : le moteur de reconnaissance d'une forme rendue (noyau, motifs R, gabarits P).
 (() => {
-  const SC = window.Floorplan;
-  const G = SC && SC.graph;
-  const projet = () => G?.meta?.vfTab === 'project';
-  const T = Object.assign({}, window.__vfFrDict || {});
+  const EN = new URLSearchParams(location.search).get('lang') === 'en'; // garde:lang-en
+  const D = window.FLOORPLAN; // la donnée de la page, posée avant ce script : l'onglet se lit là, jamais dans l'objet du moteur (absent à ce moment)
+  const projet = () => D?.meta?.vfTab === 'project';
+  const TBL = Object.assign({}, window.__vfFrDict || {}); // copie INTACTE de la table, clés à `{}` comprises
+  const T = Object.assign({}, TBL);
   // clés à variables (`{}`) : une phrase de gabarit, la variable prise telle quelle puis traduite à son tour ; une valeur peut
   // porter « singulier|pluriel » (le premier `{}` est le compte, un « s » final facultatif est toléré dans la clé) et omettre
   // des `{}`, jamais en ajouter. Un gabarit au texte fixe court (< 16 caractères : « {} of {} », « {} with {} ») ne s'applique que si une variable
@@ -25,9 +25,10 @@
   for (const [k, v] of Object.entries(T)) if (k.includes('{}')) { delete T[k]; P.push([new RegExp('^' + k.split('{}').map(esc).join('(.*?)') + (v.includes('|') && /[a-z]$/.test(k) ? 's?' : '') + '$'), v.split('|').map((x) => x.split('{}')), k.replace(/\{\}/g, '').length, LISTES.includes(k), LIBRES.includes(k), /^\{\} \w+ ago$/.test(k), NOMS.includes(k)]); }
   P.sort((a, b) => b[2] - a[2]); // du plus précis au plus général : « {} and {} » ne capture plus une phrase longue qui contient « and »
   // l'onglet Code garde des fichiers ; sur l'onglet Projet, un « fichier » est un plan, une exigence, une étape
-  Object.assign(T, projet()
-    ? { File: 'Élément', file: 'élément', Files: 'Éléments', 'Files involved': 'Éléments concernés', 'Search files, routes, modules': 'Chercher une carte, un plan, une exigence' }
-    : { File: 'Fichier', file: 'fichier', Files: 'Fichiers', 'Files involved': 'Fichiers concernés', 'Search files, routes, modules': 'Chercher un fichier, une route, un module' });
+  const SURCHARGE = projet()
+    ? { File: 'Élément', file: 'élément', Files: 'Éléments', 'Files involved': 'Éléments concernés', 'Search files, routes, modules': 'Chercher une carte, un plan, une exigence', '{} file': '{} élément|{} éléments' }
+    : { File: 'Fichier', file: 'fichier', Files: 'Fichiers', 'Files involved': 'Fichiers concernés', 'Search files, routes, modules': 'Chercher un fichier, une route, un module', '{} file': '{} fichier|{} fichiers' };
+  Object.assign(T, SURCHARGE);
   // sous-titre de la carte Projet (« Jalon v1 · phase 1 (Socle) · ready_to_plan. »), fabriqué par le socle avec le statut STATE brut : seul le dernier segment, un statut connu, est traduit (recette 68 R11, P68-D-35)
   const STATUTS = { ready_to_plan: 'prête à planifier', ready_to_execute: 'prête à exécuter', milestone_complete: 'jalon terminé', executing: 'en exécution', planning: 'en planification', verifying: 'en vérification', paused: 'en pause', completed: 'terminée', complete: 'terminée', closed: 'clos' };
   const R = [
@@ -43,7 +44,7 @@
     [/^(.+) and (\d+) more$/, (_, a, n) => `${a} et ${n} ${n > 1 ? 'autres' : 'autre'}`], // « Readme and 7 more » : liste de noms du viewer, le dernier segment est un compte
     [/^(Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec) (\d{1,2}), (\d{4})$/, (_, m, d, y) => `${d} ${{ Jan: 'janv.', Feb: 'févr.', Mar: 'mars', Apr: 'avr.', May: 'mai', Jun: 'juin', Jul: 'juil.', Aug: 'août', Sep: 'sept.', Oct: 'oct.', Nov: 'nov.', Dec: 'déc.' }[m]} ${y}`], // date de l'en-tête d'export (toLocaleDateString en anglais)
     [/^\(\+(\d+) more\)$/, (_, n) => `(+${n} autres)`], [/^\+(\d+) more$/, (_, n) => `+${n} autres`],
-    [/^(\d+) cards?$/, (_, n) => `${n} carte${n > 1 ? 's' : ''}`], [/^(\d+) files?$/, (_, n) => `${n} ${G.meta.vfTab === 'project' ? 'élément' : 'fichier'}${n > 1 ? 's' : ''}`],
+    [/^(\d+) cards?$/, (_, n) => `${n} carte${n > 1 ? 's' : ''}`], [/^(\d+) files?$/, (_, n) => `${n} ${projet() ? 'élément' : 'fichier'}${n > 1 ? 's' : ''}`],
     [/^Theme: (.+)\. Press for (.+)\.$/, (_, a, b) => `Thème : ${T[a] || a}. Appuyer pour ${(T[b.replace(/\.$/, '')] || b).toLowerCase()}.`],
   ];
     // « de » + variable : élision (« d'Anthropic »), contraction (« du CLI », « des … ») ; seulement là où la variable suit « de »
@@ -88,6 +89,24 @@
     infra: 'infrastructure', external: 'service externe', misc: 'divers', endpoint: "point d'accès", function: 'fonction', class: 'classe', route: 'route', dir: 'dossier', module: 'module' };
   const type = (s) => { const t = typeof s === 'string' ? s.trim() : '', k = Object.prototype.hasOwnProperty.call(TYPES, t.toLowerCase()) ? TYPES[t.toLowerCase()] : null; return k == null ? null : s.replace(t, () => (/^[A-Z]/.test(t) ? k[0].toUpperCase() + k.slice(1) : k)); };
   window.__vfFrType = type;
+  // le traducteur (79-10, P79-D-24) : t(clé, ...variables). `{}` rempli dans l'ordre, forme « singulier|pluriel » choisie sur la PREMIÈRE variable,
+  // « de » + variable lié (lier). `@contexte` en fin de clé : la clé complète puis la clé sans contexte. Clé sans valeur : la clé remplie.
+  // Sous ?lang=en : la clé remplie, aucune valeur de table lue.
+  const TT = { ...TBL, ...SURCHARGE }, a = (c) => Object.prototype.hasOwnProperty.call(TT, c), sans = (c) => c.replace(/@[\w-]+$/, '');
+  const plein = (f, v) => f.split('{}').reduce((x, p, i) => (i ? x + String(v[i - 1] ?? '') + p : x + p), '');
+  const lie = (f, v) => f.split('{}').reduce((x, p, i) => { if (!i) return x + p; const [m, w] = lier(x, String(v[i - 1] ?? '')); return m + w + p; }, '');
+  const trad = (cle, ...v) => {
+    if (EN) return plein(sans(cle), v);
+    const val = a(cle) ? TT[cle] : a(sans(cle)) ? TT[sans(cle)] : sans(cle), f = val.split('|');
+    return lie(f[f.length > 1 && Number(v[0]) !== 1 ? 1 : 0], v);
+  };
+  trad.pl = (n, mot) => (EN ? `${n} ${mot}${Number(n) === 1 ? '' : 's'}` : trad(`{} ${mot}`, n));
+  trad.mot = (n, cle) => { if (EN) return cle; const v = trad(cle); return Number(n) === 1 && SING[v] ? SING[v] : v; };
+  trad.k = (x) => (EN ? x : kfr(x));
+  trad.type = (x) => (EN ? null : type(x));
+  trad.constat = (x) => (EN ? x : (tr(x) ?? x));
+  trad.langue = EN ? undefined : 'fr';
+  window.__vfFrT = trad;
   const typeDuTexte = (n) => {
     const p = n.parentElement, t = n.nodeValue; if (!p) return null;
     if (p.matches('.kindlabel, #results .rk, #context .k')) return type(t);
@@ -101,8 +120,19 @@
     }
     return null;
   };
-  if (!SC || new URLSearchParams(location.search).get('lang') === 'en') return;
+  if (EN) return;
 
+  // squelette : le texte et les attributs du balisage statique de la page, en UNE passe, avant tout rendu de donnée (clé exacte seulement)
+  const ATTRS = ['placeholder', 'title', 'aria-label'];
+  const ecrit = (n, v) => { const x = v.trim(); if (x && a(x)) n.nodeValue = v.replace(x, () => trad(x)); };
+  const marche = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  for (let n = marche.nextNode(); n; n = marche.nextNode()) if (!n.parentElement?.closest('script,style,textarea,pre,code')) ecrit(n, n.nodeValue);
+  for (const el of document.body.querySelectorAll('[placeholder],[title],[aria-label]')) {
+    for (const at of ATTRS) { const x = (el.getAttribute(at) || '').trim(); if (x && a(x)) el.setAttribute(at, trad(x)); }
+  }
+
+  // l'ancien glue (observateurs, écouteurs de rendu, couleurs, styles, lang) : tout de suite si l'objet du moteur existe, sinon au chargement de la page
+  const glue = (SC) => { const G = SC.graph;
   // couleurs des types : sombre par défaut, clair sous data-theme="light" (même règle que le viewer)
   const C = G.meta.kindColors || {};
   if (Object.keys(C).length) {
@@ -122,7 +152,6 @@
   // la mise en page de l'en-tête (libellés français plus longs) est le travail de 01-vf-responsive.js
 
   const probe = (window.__vfFr = { nodes: 0, attrs: 0, passes: 0, ms: 0 });
-  const ATTRS = ['placeholder', 'title', 'aria-label'];
   // AUDC-H4 : le titre et la description d'une carte sont des DONNÉES du lab (« tokens.ts » ne devient pas « Jetons ») ; « No description yet » (.desc.empty) est du chrome et reste traduit
   // même propriété ailleurs où le viewer reprend ces données : titre et description du panneau de détail (.pt, .pd), nom et description d'une ligne de liste ou d'un résultat de recherche (.rn, .rd), nom d'une carte dans l'infobulle (.tt), fil d'Ariane
   const SKIP = 'script,style,code,pre,textarea,.mono,.rp,.pp,.card .title,.card .desc:not(.empty),#panel .pt,.row .rn,.row:not(.vf-rep) .rd,#results .rn,#results .rd';
@@ -144,7 +173,7 @@
     if (sel && typeof sel === 'object') return false;
     return (sel ? String(sel).replace(/^x:(?:in|out):/, '').replace(/^m:/, 'f:') : String(st?.container ?? '')).startsWith('d:');
   };
-  const dossier = (n) => { const p = n.parentElement, t = n.nodeValue.trim(), m = DOSSIER.exec(t); if (!m || !p || !estDossier(p)) return null; const nom = G.meta.vfTab === 'project' ? 'élément' : 'fichier'; return n.nodeValue.replace(t, () => `${m[1]} ${nom}${m[1] === '1' ? '' : 's'} dans ${m[2]}`); };
+  const dossier = (n) => { const p = n.parentElement, t = n.nodeValue.trim(), m = DOSSIER.exec(t); if (!m || !p || !estDossier(p)) return null; const nom = projet() ? 'élément' : 'fichier'; return n.nodeValue.replace(t, () => `${m[1]} ${nom}${m[1] === '1' ? '' : 's'} dans ${m[2]}`); };
   const fix = (root) => {
     const t0 = performance.now();
     const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
@@ -173,4 +202,7 @@
   const zones = () => { for (const id of ['panel', 'context']) { const z = document.getElementById(id); if (z) fix(z); } };
   SC.on?.('panel', zones); SC.on?.('render', zones);
   const v = tr(document.title); if (v != null) document.title = v;
+  };
+  const lancer = () => { if (window.Floorplan) glue(window.Floorplan); };
+  if (window.Floorplan || document.readyState !== 'loading') lancer(); else document.addEventListener('DOMContentLoaded', lancer, { once: true });
 })();
