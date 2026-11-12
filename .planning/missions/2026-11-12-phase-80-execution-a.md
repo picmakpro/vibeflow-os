@@ -106,8 +106,11 @@ texte est de 8,8:1 en clair, 9,2:1 en sombre. Les captures sont hors dépôt, tr
   Worktrees dans D16.3b, D18.1 et M-BULLE-ECHAP (l.~829, 865, 884), M-DETAIL-LISTE reciblé sur `77-vf-git-volet.js`,
   et M-ECHAP-390 reciblé sur la pile (l.~1069). En-tête, `build_serve` et lancement du terminal intacts.
 - **`test-cockpit-responsive.sh`** : l.129, `panneau` en `textContent`.
-- **README racine** : compteur de suites porté de 213 à 221 (huit suites neuves de ce segment). La jointure additionne
-  les suites de la 79.
+- **README racine** : compteur de suites laissé à 213, la valeur de la base commune. Ce segment ajoute huit suites
+  (221 sur la branche seule). Je l'avais porté à 221, mais `integration/cockpit-audit` l'avait passé à 214 entre-temps
+  (ab8f3e64). La PR était donc en conflit, et une PR en conflit ne déclenche pas la CI. Comme il m'était demandé de ne
+  pas fusionner la base, je l'ai remis à 213. La jointure posera la somme réelle (base, 79 et ces huit suites).
+  check-version-sync est rouge sur la PR pour cette seule raison (classe c).
 - **`colonnes-baseline.txt`** : `02-vf-telephone.js` passe de 56 à 55 lignes longues ; 73 et 77 sont inchangés.
 - **`scripts/ci-shard-suites.sh`** : nos suites neuves sont absentes de la table des durées (7 s par défaut) ; elles
   sont découvertes d'office par le motif `tests/test-*.sh`.
@@ -180,7 +183,8 @@ texte est de 8,8:1 en clair, 9,2:1 en sombre. Les captures sont hors dépôt, tr
 
 Job `gates` de `ci.yml` rejoué étape par étape sous `bash -e` (macOS) sur `5e994093` :
 - étapes 1 à 5, 7 à 20 et 23 : rc=0 ;
-- étape 6 (check-version-sync) : rc=1, à cause du compteur des README, puis rc=0 après le passage à 221 ;
+- étape 6 (check-version-sync) : rc=1, à cause du compteur des README seulement. Il est rc=0 avec 221, mais le
+  compteur est laissé à 213 pour la jointure (voir plus haut) ;
 - étapes 21 et 24 (push vers `main`) : non jouées.
 
 test-cockpit-vendor : 143/0. Dépôt public : 0 occurrence de chemin de poste ou d'identifiant de session dans les
@@ -222,7 +226,7 @@ Durée : de 22 h 16 à environ 05 h 40 le lendemain, dont 15 minutes d'arrêt po
 {"verdict":"80-08 panneau-retour 41/0","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-panneau-retour.sh","exit_code":0,"sha":"1857a51d"},
 {"verdict":"responsive 378/0","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-responsive.sh","exit_code":0,"sha":"1857a51d"},
 {"verdict":"vendor 143/0","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-vendor.sh","exit_code":0,"sha":"5e994093"},
-{"verdict":"check-version-sync après compteur 221","commande":"bash scripts/check-version-sync.sh","exit_code":0,"sha":"5e994093+README"},
+{"verdict":"check-version-sync avec compteur 221 (compteur ensuite laissé à 213 pour la jointure, classe c)","commande":"bash scripts/check-version-sync.sh","exit_code":0,"sha":"e868ec93"},
 {"verdict":"gates ci.yml étapes 1-5, 7-20, 23","commande":"bash -e <étape extraite de .github/workflows/ci.yml>","exit_code":0,"sha":"5e994093"}
 ]}
 ```
