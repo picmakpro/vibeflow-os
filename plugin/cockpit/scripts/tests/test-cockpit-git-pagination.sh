@@ -166,6 +166,29 @@ out.e = await lire(); out.errs = await s.ev(`window.__errs`);
 return out;
 JS
   R1="$(cdp "$AUX/gp1.js" "$BASE")"
+  cat > "$AUX/gp1b.js" <<'JS'
+const [base] = ARGS, { ouvrirPage, LIGNE, RANGEES, pause } = await import(process.env.GP_ENTREE);
+const att = (e, l) => s.attendre(e, l, 4000).catch(() => null), out = {};
+const SEC = { tags: ['vf-git-s-tags', '.vf-git-ligne-d'], stash: ['vf-git-s-stash', '.vf-git-st'], aut: ['vf-git-s-aut', '.vf-git-aut'] };
+await ouvrirPage(s, base);
+await s.ev(`(() => { const R = window.__vfGit.reponse, h = 'abcdef1', at = 1794000000;
+  R.tags = Array.from({ length: 130 }, (_, i) => ({ nom: 't' + i, h7: h, at }));
+  R.stash = Array.from({ length: 120 }, (_, i) => ({ ref: 'stash@{' + i + '}', h7: h, at, message: 'm' + i, branche: 'main',
+    commande: "git stash show --stat 'stash@{" + i + "}'" }));
+  R.auteurs = Array.from({ length: 115 }, (_, i) => ({ nom: 'a' + i, commits: i + 1, dernier: at })); })()`);
+await s.ev(`${LIGNE}.click()`); await att(`${RANGEES}.length > 0`, 'rangées');
+for (const [k, [id, sel]] of Object.entries(SEC)) {
+  await s.ev(`document.querySelector('[aria-controls=${id}]').click()`); await pause(100);
+  const B = `document.querySelector('#${id} .vf-git-plus-b')`, N = `document.querySelectorAll('#${id} ${sel}').length`;
+  out[k] = await s.ev(`({ n0: ${N}, lib: ${B}?.querySelector('.vf-git-plus-l').textContent, rest: ${B}?.querySelector('.vf-git-plus-n').textContent })`);
+  await s.ev(`${B}?.click()`); await pause(200);
+  Object.assign(out[k], await s.ev(`({ n1: ${N}, bouton: !!${B}, focus: [...document.querySelectorAll('#${id} ${sel}')].indexOf(document.activeElement),
+    live: document.querySelector('#vf-git-tiroir .vf-git-live').textContent })`));
+}
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  R1B="$(cdp "$AUX/gp1b.js" "$BASE")"
   trace gp1 "$R1"
   assert_eq "GP1.1 — 612 commits : 100 rangées à l'ouverture, « 512 restants », pied « 100 commits affichés sur 612 »" \
     "$(jq_ "$R1" '[j.a.n, j.a.libelle, j.a.restants, j.a.pied].join("|")' 2>/dev/null)" \
@@ -185,6 +208,12 @@ JS
   assert_eq "GP1.5 — bouton disparu sans clic (rechargement à 105) : focus sur la dernière rangée (voisin précédent), jamais body" \
     "$(jq_ "$R1" '[j.e.n, j.e.actif, j.e.corps].join("|")' 2>/dev/null)" \
     "105|104|false"
+  GP16="100,30 restants,130,false,100,30 lignes de plus affichées, 0 restant"
+  GP16="$GP16|100,20 restants,120,false,100,20 lignes de plus affichées, 0 restant"
+  GP16="$GP16|100,15 restants,115,false,100,15 lignes de plus affichées, 0 restant"
+  assert_eq "GP1.6 — Tags, Stash, Auteurs au-delà de 110 lignes : 100 d'abord, reste au clic, focus sur la première ajoutée, annonce" \
+    "$(jq_ "$R1B" '["tags", "stash", "aut"].map((k) => { const o = j[k];
+      return [o.n0, o.rest, o.n1, o.bouton, o.focus, o.live].join(","); }).join("|")' 2>/dev/null)" "$GP16"
   assert_eq "GP1 — aucune erreur de page" "$(jq_ "$R1" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
 fi
@@ -247,6 +276,11 @@ out.petit = await s.ev(`(() => { const T = document.querySelector('#vf-git-tiroi
   return { l: Math.round(T.getBoundingClientRect().width), h: h(v), corps: h(c), wt: document.querySelector('#vf-git-s-wt').hidden,
     police: Math.min(...tx.map((e) => parseFloat(getComputedStyle(e).fontSize))),
     debord: v.scrollWidth > v.clientWidth || z.scrollWidth > z.clientWidth }; })()`);
+// GP2.6 : le détail s'ouvre, Graphe est replié, « Fermer le détail » : un focus visible (le titre du tiroir), jamais body
+await s.ev(`document.querySelector('[aria-controls=vf-git-s-graphe]').click()`);
+await s.ev(`${VOL}?.querySelector('.vf-git-fermer')?.click()`); await pause(200);
+out.repli = await s.ev(`({ corps: document.activeElement === document.body, titre: document.activeElement.classList.contains('vf-git-titre-t'),
+  volets: document.querySelectorAll('.vf-git-detail').length })`);
 out.errs = await s.ev(`window.__errs`);
 return out;
 JS
@@ -274,6 +308,8 @@ JS
   assert_eq "GP2.5 — contenu hostile rendu en texte : 0 img, script, onerror créé, aucune alerte" \
     "$(jq_ "$R2" '[j.hostile.balises, j.hostile.lit, j.hostile.alerte].join("|")' 2>/dev/null)" \
     "0|true|0"
+  assert_eq "GP2.6 — Fermer le détail avec la rangée dans une section repliée : le focus va au titre du tiroir, jamais à body" \
+    "$(jq_ "$R2" '[j.repli.corps, j.repli.titre, j.repli.volets].join("|")' 2>/dev/null)" "false|true|0"
   assert_eq "GP2 — aucune erreur de page" "$(jq_ "$R2" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
 fi
@@ -411,6 +447,17 @@ await att(`${RANGEES}.length === 100`, '100 rangées');
 await s.ev(`document.querySelector('.vf-git-plus-b')?.click()`); await pause(300);
 await s.ev(`${LIGNE}.click()`); await pause(300); await s.ev(`${LIGNE}.click()`); await pause(1200);
 out.apres = await s.ev(SNAP); out.maj = await lire();
+// GP3.5 : la barre de défilement du corps reste saisissable, la poignée est en retrait (2 px, 24 px en haut et en bas)
+out.barre = await s.ev(`(() => { const c = ${T}.querySelector('.vf-git-corps'), r = c.getBoundingClientRect(), t = ${T}.getBoundingClientRect();
+  const p = ${P}.getBoundingClientRect(), e = document.elementFromPoint(r.right - 3, r.top + r.height / 2);
+  return { poignee: !!(e && e.closest('.vf-git-poignee')), droite: Math.round(t.right - p.right), haut: Math.round(p.top - t.top),
+    bas: Math.round(t.bottom - p.bottom), defile: c.scrollHeight > c.clientHeight }; })()`);
+// GP3.6 : la largeur choisie revient quand la place revient (Fin, fenêtre étroite, fenêtre large)
+await s.ev(`${P}?.focus()`); await touche(s, 'End', 'End', 35); out.rev = { fin: (await lire()).now };
+await s.send('Emulation.setDeviceMetricsOverride', { width: 1100, height: 900, deviceScaleFactor: 1, mobile: false }); await pause(600);
+out.rev.petit = (await lire()).now;
+await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }); await pause(600);
+out.rev.retour = (await lire()).now;
 // GP3.4 : 900 px, aucune poignée ; mouvement réduit : glisser à la souris sans animation
 await s.send('Emulation.setDeviceMetricsOverride', { width: 900, height: 900, deviceScaleFactor: 1, mobile: false }); await pause(500);
 out.petit = await s.ev(`(() => { const p = ${P}; return { present: !!p, visible: !!p && p.getClientRects().length > 0 }; })()`);
@@ -447,6 +494,10 @@ JS
   assert_eq "GP3.4 — 900 px : aucune poignée visible ; mouvement réduit : 0 animation active pendant le glisser, largeur suivie (420)" \
     "$(jq_ "$R3" '[j.petit.visible, j.anims.join(), j.glisse.now, j.glisse.larg].join("|")' 2>/dev/null)" \
     "false|0,0,0,0,0|420|420"
+  assert_eq "GP3.5 — la barre de défilement n'est pas recouverte par la poignée, qui est en retrait de 2 px et de 24 px en haut et en bas" \
+    "$(jq_ "$R3" '[j.barre.defile, j.barre.poignee, j.barre.droite, j.barre.haut, j.barre.bas].join("|")' 2>/dev/null)" "true|false|2|24|24"
+  assert_eq "GP3.6 — fenêtre à 1100 px : 428 ; retour à 1440 px : la largeur choisie (maximum) revient" \
+    "$(jq_ "$R3" '[j.rev.fin, j.rev.petit, j.rev.retour].join("|")' 2>/dev/null)" "768|428|768"
   assert_eq "GP3 — aucune erreur de page" "$(jq_ "$R3" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
 fi
@@ -472,7 +523,7 @@ out.couleurs = await s.ev(`(() => { const P = [...document.querySelectorAll('#vf
 if (mode === 'cap') {
   for (const [theme, nom] of [['light', 'clair'], ['dark', 'sombre']]) {
     await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: theme }] }); await pause(500);
-    await cap('tiroir-git-worktrees-modifies-' + nom);
+    await cap('tiroir-git-worktrees-modifies-' + nom + '-v2');
   }
 }
 return out;
@@ -492,14 +543,21 @@ await s.ev(`${LIGNE}.click()`); await att(`${RANGEES}.length === 100`, '100 rang
 await s.ev(`document.querySelector('.vf-git-plus-b').scrollIntoView({ block: 'end' })`); await pause(400);
 for (const [t, n] of themes) {
   await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: t }] }); await pause(500);
-  await cap('tiroir-git-pagination-' + n);
+  await cap('tiroir-git-pagination-' + n + '-v2');
 }
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 768, deviceScaleFactor: 1, mobile: false });
 await s.ev(`document.querySelector('#vf-git-tiroir .vf-git-corps').scrollTop = 0; document.querySelectorAll('#vf-git-tiroir li[role=option]')[2].focus()`);
 await touche(s, 'Enter', 'Enter', 13); await att(`!!document.querySelector('.vf-git-detail .vf-git-d-fichiers')`, 'détail lu'); await pause(400);
 for (const [t, n] of themes) {
   await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: t }] }); await pause(500);
-  await cap('tiroir-git-volet-1024-' + n);
+  await cap('tiroir-git-volet-1024-' + n + '-v2');
+}
+await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await s.ev(`window.VFGitTiroir.fermer(); document.querySelector('#vf-git-ligne').click()`); await pause(500);
+await s.ev(`document.querySelector('.vf-git-poignee').focus()`); await touche(s, 'ArrowRight', 'ArrowRight', 39, 8); await pause(300);
+for (const [t, n] of themes) {
+  await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: t }] }); await pause(500);
+  await cap('tiroir-git-poignee-' + n + '-v2');
 }
 return {};
 JS

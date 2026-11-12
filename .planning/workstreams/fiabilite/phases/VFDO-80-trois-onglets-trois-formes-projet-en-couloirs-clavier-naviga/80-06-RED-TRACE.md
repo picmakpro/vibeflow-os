@@ -61,3 +61,12 @@ M-TOUT, M-EPUISE, M-BORNE, M-POUSSE, M-PAGINE, M-MOTIF, M-VOLET-LIE, M-PASTILLE 
 Vert final : `test-cockpit-git-pagination.sh` 39 PASS, 0 FAIL ; `test-cockpit-git-tiroir.sh` 194 PASS, 0 FAIL ;
 `test-cockpit-surcouches.sh` 45 PASS ; `test-cockpit-git-entete.sh` 81 PASS ; `test-cockpit-vendor.sh` 138 PASS sur la tête plus les fichiers de ce plan
 (dans l'arbre partagé V6.1 rougit sur des fichiers d'un voisin, aucun des miens : `synchro.sh verifier` rend 0 sur la copie tête plus mes fichiers).
+
+## Correction ciblée (amendement E), rouges sur la tête dca16a42
+
+| Cas | Attendu | Obtenu |
+|-----|---------|--------|
+| GP1.6 Tags 130, Stash 120, Auteurs 115 | `100, N restants, tout au clic, focus 100, annonce « N lignes de plus affichées, 0 restant »` | `130,,130,false,-1,` (tout rendu d'un coup, ni bouton ni focus), idem 120 et 115 |
+| GP2.6 Fermer le détail, Graphe replié | `false\|true\|0` (titre du tiroir) | `true\|false\|0` (focus sur body) |
+| GP3.5 barre de défilement | `true\|false\|2\|24\|24` | `true\|true\|0\|0\|0` (la poignée recouvre la barre, sans retrait) |
+| GP3.6 largeur qui revient | `768\|428\|768` | `768\|428\|428` |
