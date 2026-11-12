@@ -12,10 +12,11 @@
 # qui « echoue » par un plantage (rc 2) ou une plage vide (rc 3) la ou le cas attendait un flip 0/1
 # n'est PAS compte comme tue. La ligne de succes d'un mutant a une forme UNIQUE, exigee par le verify
 # du plan : « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ».
-# Section DELEGATION (2026-11-12) : une ligne portant le radical « delegu » ne vaut pas citation (hausse,
-# retrait de ligne, sentinelle). Cinq verifications de mutant s'y ajoutent, soit QUATORZE au total :
+# Section DELEGATION (2026-11-12) : une ligne portant le radical « deleg » ne vaut pas citation (hausse,
+# retrait de ligne, sentinelle). Six verifications de mutant s'y ajoutent, soit QUINZE au total :
 # MUT-10 (exclusion retiree), MUT-10b (meme mutant, usage sentinelle), MUT-11 (radical reduit a « delegue »),
-# MUT-12 (repli de l'accent combinant retire), MUT-13 (test de forme de la ligne d'information retire).
+# MUT-12 (repli de l'accent combinant retire), MUT-13 (test de forme de la ligne d'information retire),
+# MUT-14 (radical remis a « delegu » : « delegation » et « delegate » ne seraient plus ecartes).
 # MUT-10 a MUT-12 suivent le patron rc_mutant/rc_original ; MUT-13 compare la presence de la ligne
 # INFO-LIGNE-DELEGATION-ECARTEE (rc 1 des deux cotes) et a sa propre ligne de succes.
 set -uo pipefail
@@ -819,7 +820,7 @@ else
 fi
 
 # --- MUT-11 : reduit le radical a « delegue » (une forme « deleguons » / « deleguant » doit rester ecartee) --
-MUT11_OLD='  return index(t, "delegu") > 0'
+MUT11_OLD='  return index(t, "deleg") > 0'
 MUT11_NEW='  return index(t, "delegue") > 0'
 MUT11_PATH="$(make_mutant mut11 "$MUT11_OLD" "$MUT11_NEW")"; MUT11_STAT=$?
 cas_hausse mut11 "chore: hausse instructions a.md, forme sans e (MUT-11)

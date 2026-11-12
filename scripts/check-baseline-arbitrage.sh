@@ -43,26 +43,34 @@
 # assume (repudiation, T-41-58), coherent avec la convention de tracabilite du `CLAUDE.md` : le
 # fait redevient relisable, l'attribution reste humaine.
 #
-# LIGNE DE DELEGATION EXCLUE (2026-11-12). Une ligne du message qui porte le radical « delegu » ou
-# « délégu », toute casse, avec ou sans accent, ne vaut PAS citation, meme avec le mot-cle, deux
-# virgules et une date : « décision déléguée par X (canal, date), option recommandée » dit qu'une
-# decision a ete confiee, pas qu'un arbitrage direct a eu lieu — la meme forme pouvait donc passer
-# pour un arbitrage detaille. Une AUTRE ligne du meme message qui porte une citation directe reste
-# acceptee, et c'est elle (jamais la ligne de delegation) qui est recopiee sur la sortie. La regle
-# vaut pour les trois usages de la citation (hausse, retrait d'une ligne dont la cible existe encore,
-# neutralisation de sentinelle) : un seul predicat les sert. Origine : « Samuel, message session
-# principale, 2026-11-12 : "oui tu as raison", en réponse au constat que la garde accepte la ligne de
-# délégation ; durcissement avant la release = option recommandée, décision déléguée par Samuel,
-# message session principale, 2026-11-08 ». Ce n'est PAS un arbitrage detaille de Samuel sur la
-# regle elle-meme. LIMITE QUI DEMEURE : une citation DIRECTE fabriquee passe toujours (verification
-# de forme, jamais de veracite, voir ci-dessus) ; le radical est cherche en octets (locale C) apres
-# repli explicite de É/é/È/è et de l'accent combinant AIGU seul (U+0301 ; tout autre accent combinant,
-# grave ou circonflexe, n'est pas replie). Ne sont PAS couvertes, par choix de ne pas elargir le
-# radical (question de regle, remontee au manager) : « delegation » et « délégation » (« décision prise
-# par délégation de X (…, 2026-11-08), option recommandée » reste CONFORME), « delegate », « confiée »,
-# un homoglyphe ou une orthographe qui evite « delegu » (« deleg-u »). Quand un refus ecarte une ligne
-# de delegation, la sortie ajoute INFO-LIGNE-DELEGATION-ECARTEE (information seule, les lignes de
-# verdict sont inchangees).
+# LIGNE DE DELEGATION EXCLUE (2026-11-12). Une ligne du message qui porte le radical « deleg » (apres
+# repli de la casse et des accents, donc « delegue », « déléguée », « délégation », « delegate »,
+# « DÉLÉGATION »…) ne vaut PAS citation, meme avec le mot-cle, deux virgules et une date :
+# « décision déléguée par X (canal, date), option recommandée » dit qu'une decision a ete confiee, pas
+# qu'un arbitrage direct a eu lieu — la meme forme pouvait donc passer pour un arbitrage detaille. Une
+# AUTRE ligne du meme message qui porte une citation directe reste acceptee, et c'est elle (jamais la
+# ligne de delegation) qui est recopiee sur la sortie. La regle vaut pour les trois usages de la
+# citation (hausse, retrait d'une ligne dont la cible existe encore, neutralisation de sentinelle) : un
+# seul predicat les sert. Origine : « Samuel, message session principale, 2026-11-12 : "oui tu as
+# raison", en réponse au constat que la garde accepte la ligne de délégation ; durcissement avant la
+# release = option recommandée, décision déléguée par Samuel, message session principale,
+# 2026-11-08 ». Ce n'est PAS un arbitrage detaille de Samuel sur la regle elle-meme.
+# PRECISION DU 2026-11-12, decision de la session principale (message du 2026-11-12) : le radical est
+# « deleg » et non « delegu », car « décision prise par délégation de X (…, 2026-11-08), option
+# recommandée » dit la meme chose que « décision déléguée ». Ce n'est PAS un arbitrage detaille de
+# Samuel. FAUX REFUS ASSUMES : une ligne qui porte un tel mot pour une autre raison (« délégation de
+# paiement », « delegate() », « délégué syndical ») sur la MEME ligne qu'une citation directe n'est plus
+# une citation ; la sortie le dit (INFO-LIGNE-DELEGATION-ECARTEE) et le remede est le meme dans tous les
+# cas : mettre la citation directe sur sa propre ligne. Forme recommandee pour la ligne de delegation :
+# « décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; prise
+# par la session principale le 2026-11-12 » — une ligne qui ne sert pas de citation.
+# LIMITE QUI DEMEURE : une citation DIRECTE fabriquee passe toujours (verification de forme, jamais de
+# veracite, voir ci-dessus), et une paraphrase sans le radical (« confiée », « sur mandat ») passe aussi.
+# Le radical est cherche en octets (locale C) apres repli explicite de É/é/È/è et de l'accent combinant
+# AIGU seul (U+0301 ; tout autre accent combinant, grave ou circonflexe, n'est pas replie) ; un
+# homoglyphe ou une orthographe qui evite « deleg » (« dele-g ») n'est pas detecte. Quand un refus
+# ecarte une ligne de delegation, la sortie ajoute INFO-LIGNE-DELEGATION-ECARTEE avant le verdict
+# (information seule, les lignes de verdict sont inchangees).
 #
 # CASCADE DE RESOLUTION DE LA BASE (nommee, imprimee sur echec) : valeur de --base-ref si fournie,
 # sinon la premiere ref qui resout parmi refs/remotes/origin/main, origin/main, refs/heads/main,
@@ -187,10 +195,10 @@ HEAD_SHA="$(git rev-parse HEAD)"
 
 # Point UNIQUE de la regle de citation : les trois usages (hausse, retrait de ligne, sentinelle) passent
 # par citation_ok / extract_citation_line, qui passent tous deux par ligne_citation_ok. Une ligne qui
-# porte le radical « delegu » (toute casse, avec ou sans accent) NE VAUT PAS citation : c'est la forme
+# porte le radical « deleg » (toute casse, avec ou sans accent) NE VAUT PAS citation : c'est la forme
 # d'une decision deleguee, pas d'un arbitrage direct. La comparaison se fait en locale C (octets) : le
 # tolower de certains awk ne baisse pas « É », donc les accents sont replies EXPLICITEMENT (É, é, È, è
-# vers e, accent aigu combinant U+0301 retire) avant de chercher « delegu ».
+# vers e, accent aigu combinant U+0301 retire) avant de chercher « deleg ».
 AWK_CITATION_LIB='
 function est_delegation(s,   t) {
   t = s
@@ -198,7 +206,7 @@ function est_delegation(s,   t) {
   gsub(/\314\201/, "", t)
   t = tolower(t)
   gsub(/é/, "e", t); gsub(/è/, "e", t)
-  return index(t, "delegu") > 0
+  return index(t, "deleg") > 0
 }
 function ligne_forme_ok(s,   kw, nc, l) {
   l = s

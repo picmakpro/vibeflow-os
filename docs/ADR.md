@@ -2932,19 +2932,31 @@ G-1 jugeait « citation d'arbitrage conforme » toute ligne portant « arbitrage
 « decision », au moins deux virgules et une date ISO. Une ligne « décision déléguée par X (canal,
 date), option recommandée » a cette forme sans dire qu'un arbitrage direct a eu lieu : elle
 dit qu'une décision a été confiée. Elle passait donc pour un arbitrage détaillé. Désormais, une ligne
-qui porte le radical « delegu » ou « délégu », toute casse, avec ou sans accent, ne vaut pas citation ;
+qui porte le radical « delegu » ou « délégu », toute casse, avec ou sans accent, ne vaut pas citation
+(radical élargi à « deleg » le même jour, voir la précision ci-dessous) ;
 une autre ligne du même message qui porte une citation directe reste acceptée, et c'est elle qui est
 recopiée dans le rapport. Un seul prédicat sert les trois usages de la citation : hausse de la colonne
 des instructions, retrait d'une ligne dont la cible existe encore, neutralisation d'une sentinelle.
 
 Limite qui demeure : la garde vérifie toujours la forme, jamais la véracité. Une citation directe
-fabriquée passe ; une orthographe ou un homoglyphe qui évite le radical n'est pas détecté. Ne sont
-pas couvertes : « délégation » et « delegate » (« décision prise par délégation de X (…, 2026-11-08),
-option recommandée » reste conforme), « confiée ». Seul l'accent combinant aigu (U+0301) est replié.
-Élargir le radical est une question de règle, laissée ouverte. Quand un refus écarte une ligne de
-délégation, la sortie ajoute une ligne d'information `INFO-LIGNE-DELEGATION-ECARTEE`, sans modifier
-les lignes de verdict. G-2 (`Gate-Touche`) et `check-ajout-retrait.sh` ne demandent pas de citation d'arbitrage :
-leur trailer est déclaratif : ils ne sont pas concernés.
+fabriquée passe ; une paraphrase sans le radical (« confiée », « sur mandat »), un homoglyphe ou une
+orthographe qui l'évite n'est pas détecté. Seul l'accent combinant aigu (U+0301) est replié. Quand un
+refus écarte une ligne de délégation, la sortie ajoute une ligne d'information
+`INFO-LIGNE-DELEGATION-ECARTEE`, imprimée avant le verdict, sans modifier les lignes de verdict.
+G-2 (`Gate-Touche`) et `check-ajout-retrait.sh` ne demandent pas de citation d'arbitrage : leur
+trailer est déclaratif, ils ne sont pas concernés.
+
+**Précision du 2026-11-12, décision de la session principale** (message du 2026-11-12, en réponse à la
+question de règle laissée ouverte ; ce n'est pas un arbitrage détaillé de Samuel). Le radical devient
+« deleg » après repli des accents et de la casse : « décision prise par délégation de X (…,
+2026-11-08), option recommandée » dit la même chose que « décision déléguée » et passait encore.
+« délégation » et « delegate » sont donc écartés comme « déléguée ». Faux refus assumés : une ligne qui
+porte un tel mot pour une autre raison (« délégation de paiement », « delegate() », « délégué
+syndical ») sur la même ligne qu'une citation directe n'est plus une citation ; la sortie le dit
+(`INFO-LIGNE-DELEGATION-ECARTEE`) et le remède est unique : mettre la citation directe sur sa propre
+ligne. Forme recommandée pour la ligne de délégation : « décision déléguée par Samuel (message
+session principale, 2026-11-08), option recommandée ; prise par la session principale le 2026-11-12 »,
+une ligne qui ne sert pas de citation.
 
 ## ADR-073 : Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag
 
