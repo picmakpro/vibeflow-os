@@ -8,6 +8,7 @@
 // Aucun secret dans l'argv ni l'environnement de l'enfant : jetons et environnement d'origine du shell passent par l'IPC.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { fork } from 'node:child_process';
 import { realUnder, resoudreBinaire } from './vf-cockpit-paths.mjs';
 import { envEnfant } from './vf-cockpit-env.mjs';
@@ -61,7 +62,7 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
     ouvertureLanceur: (secret) => ouvertureValide(path.join(here, '.cache'), secret), // AUDC-B-03 bis : navigation inter-sites de la page de redirection du lanceur (secret d'ouverture + clé armée)
     routeP(req, res) { envoyer({ t: 'jetons', jetons: jetons() }); json(res, 200, etat === 'actif' ? { etat: 'actif', port: portQ } : { etat: 'arrete' }); return true; },
     demarrer(portP) {
-      const fichier = path.join(here || '.', 'vf-cockpit-terminal-processus.mjs');
+      const fichier = path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-terminal-processus.mjs'); // le processus du terminal vient du module, jamais de la sortie (AUDC-A-03)
       try {
         enfant = fork(fichier, [], { env: envDuProcessusTerminal(root), stdio: ['inherit', 'inherit', 'inherit', 'ipc'], serialization: 'json' });
       } catch (e) { log(`le serveur du terminal ne démarre pas (${e.code || 'erreur'}).`); return; }

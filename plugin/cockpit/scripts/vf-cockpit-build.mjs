@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // vf-cockpit-build — assemble le cockpit d'un lab GSD sous <lab>/.vibeflow/cockpit (67-03, P67-D-06).
 // Sans modèle : scan, architecture mécanique (onglet Code brut), graphe Projet du socle, build du moteur
-// vendorisé, épissure des deux pages, copie du code d'exécution. Aucun appel à `claude`.
+// vendorisé, épissure des deux pages. La sortie ne porte que des données : le code s'exécute depuis le module. Aucun appel à `claude`.
 // Exports : assembler({ lab, quiet, scriptsDir, annotateurs }), fichiersExecution(scriptsDir), OUTILS_ASSEMBLAGE, ANNOTATEURS, appliquerAnnotateurs.
 // Annotateurs du graphe Code (A27) : une ligne `[nom, fonction]` par annotateur, à sa place alphabétique ;
 // il tourne à chaque assemblage et modifie `g` en mémoire seulement.
@@ -12,16 +12,24 @@ import { read as lireGarde, lireConfine, clipMot } from './vf-cockpit-planning.m
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { findLabRoot, engineDir, envGit, configFiltres, filtresEtat, MAX_FILTRES, outputDir, verifierSortie } from './vf-cockpit-paths.mjs';
+import { OUTILS_ASSEMBLAGE, fichiersExecution } from './vf-cockpit-module.mjs';
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { enteteGit } from './vf-cockpit-git-entete.mjs';
 import { ecrireArchitecture } from './vf-cockpit-code.mjs';
 import { insererGraphe } from './vf-cockpit-embed.mjs';
-import { renommerHtml, renommerTexte, MARQUEUR_LICENCE } from './vf-cockpit-rename.mjs';
+import { renommerPageMoteur, MARQUEUR_LICENCE } from './vf-cockpit-rename.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-// outils d'assemblage et de test : jamais recopiés dans la sortie (le motif général les y mettrait)
-export const OUTILS_ASSEMBLAGE = [/^vf-cockpit-build\.mjs$/, /^vf-cockpit-rename\.mjs$/, /^vf-cockpit-code.*\.mjs$/, /^vf-cockpit-fr-.*\.mjs$/];
-export const fichiersExecution = (scriptsDir) => fs.readdirSync(scriptsDir).filter((f) => /^vf-cockpit-.*\.mjs$/.test(f) && !OUTILS_ASSEMBLAGE.some((re) => re.test(f))).sort();
+export { OUTILS_ASSEMBLAGE, fichiersExecution }; // déplacés dans vf-cockpit-module.mjs (79-06) : ré-exportés pour leurs importeurs
+// la sortie ne porte plus que des données : l'assemblage purge ce que les versions précédentes y ont laissé (code et contrat), jamais autre chose
+const CODE_ANCIEN = [/\.mjs$/, /^vf-cockpit-interface\.json$/];
+function purgerCodeAncien(sortie) {
+  for (const f of fs.readdirSync(sortie)) {
+    if (!CODE_ANCIEN.some((re) => re.test(f))) continue;
+    const p = path.join(sortie, f);
+    try { if (!fs.lstatSync(p).isDirectory()) fs.rmSync(p, { force: true }); } catch {} // le lien lui-même, jamais sa cible
+  }
+}
 
 const GITIGNORE = '# Sortie générée par le cockpit VibeFlow : ignorée par git (ce fichier compris).\n*\n';
 const fin = (code, msg) => { const e = new Error(msg); e.code = code; return e; };
@@ -126,6 +134,7 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd, annotate
   if (fs.existsSync(path.dirname(sortie))) verifierSortie(lab, path.dirname(sortie)); // M4 : aucun lien symbolique avant la moindre écriture
   fs.mkdirSync(sortie, { recursive: true });
   verifierSortie(lab, sortie);
+  purgerCodeAncien(sortie); // avant toute écriture : la sortie n'est jamais source de code (P79-D-26)
 
   const ferme = etatMoteur(lab).ferme; // R6 : dit dans le résumé quand git du moteur reste fermé
   run(eng.chemin, 'scan.mjs', lab); // le moteur refuse un dossier de sortie non vide qui n'est pas encore une carte : .gitignore après
@@ -151,20 +160,17 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd, annotate
   fs.writeFileSync(path.join(sortie, 'graph.json'), JSON.stringify(g));
 
   // les deux pages : même viewer, données différentes
-  const html = read(path.join(sortie, 'index.html'));
+  const html = renommerPageMoteur(read(path.join(sortie, 'index.html'))); // A48 : la page du moteur est renommée AVANT l'insertion des données
   fs.writeFileSync(path.join(sortie, 'index.html'), insererGraphe(html, { ...g, meta: { ...g.meta, repos: [] } }).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Code</title>'));
   project.meta.root = g.meta.root; project.meta.vfLogos = g.meta.vfLogos; project.meta.vfGit = g.meta.vfGit;
   fs.writeFileSync(path.join(sortie, 'project.html'), insererGraphe(html, project).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Projet</title>'));
 
-  // code d'exécution du socle, licences, pointeur de dossier de scripts (jamais de modèle ni de dernière commande)
-  for (const f of fichiersExecution(scriptsDir)) fs.copyFileSync(path.join(scriptsDir, f), path.join(sortie, f));
-  for (const f of ['index.html', 'project.html']) { // marque blanche : la sortie seulement, jamais la copie amont ni les données du lab
-    const p = path.join(sortie, f); const h = renommerHtml(read(p));
+  // bannière de licence (marque blanche : déjà faite sur la page du moteur, jamais sur les données du lab)
+  for (const f of ['index.html', 'project.html']) {
+    const p = path.join(sortie, f); const h = read(p);
     const licence = `<!-- ${MARQUEUR_LICENCE} : logiciel tiers sous licence MIT, voir LICENSE et LICENCES-TIERCES.txt (floorplan) -->`;
     fs.writeFileSync(p, /^<!doctype[^\n]*\n/i.test(h) ? h.replace(/^(<!doctype[^\n]*\n)/i, `$1${licence}\n`) : `${licence}\n${h}`);
   }
-  for (const f of ['serve.mjs', 'query.mjs', ...fichiersExecution(scriptsDir)]) { const p = path.join(sortie, f); fs.writeFileSync(p, renommerTexte(read(p))); }
-  fs.copyFileSync(path.join(scriptsDir, 'vf-cockpit-interface.json'), path.join(sortie, 'vf-cockpit-interface.json'));
   for (const f of ['LICENSE', 'LICENCES-TIERCES.txt']) fs.copyFileSync(path.join(eng.chemin, f), path.join(sortie, f));
   fs.mkdirSync(path.join(sortie, '.cache'), { recursive: true });
   fs.writeFileSync(path.join(sortie, '.cache', 'vf-cockpit.json'), JSON.stringify({ scriptsDir, engineDir: eng.chemin, builtAt: new Date().toISOString() }, null, 2));

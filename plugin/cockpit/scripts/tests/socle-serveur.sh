@@ -19,7 +19,7 @@
 #       est passée par --sortie=<chemin réel> placé en DERNIER argument (jamais par l'environnement) ; l'aide pose alors VF_COCKPIT_SCRIPTS_DIR et
 #       VF_COCKPIT_ENGINE_DIR sur cette racine, sauf valeur passée par la suite en NOM=valeur (elle gagne). Posée, elle ajoute le code 5 de cockpit_lancer :
 #       le serveur lancé ne publie pas l'empreinte de la racine visée (cockpit_module_charge) — un mutant non chargé rougit au lancement, jamais vert à vide.
-#       Absente : l'ancien comportement (serve.mjs de la sortie), aucune variable ajoutée.
+#       Absente : le module du dépôt (dérivé de l'emplacement de l'aide), sans variable ajoutée par l'aide (serve.mjs les pose lui-même quand elles manquent).
 #   cockpit_module_copie [destination]   copie COMPLÈTE du module (scripts sans tests/, skills), jamais un lien (Node résout le lien du point d'entrée : le code
 #       muté ne serait jamais chargé) ; imprime SEUL le chemin absolu de la racine de la copie ; code 0 ou 1 ; n'exporte rien (COCKPIT_MODULE="$(cockpit_module_copie)")
 #   cockpit_module_muter <nom> <fichier-du-module> <expression sed>   copie, mutation, exporte COCKPIT_MODULE vers la copie ; code 1 si la cible manque ou si la
@@ -32,11 +32,9 @@
 # Les lignes marquées am7:… portent chacune un effet de bord prouvé par un mutant (test-cockpit-cycle-serveur.sh, AM7.S10 à AM7.S12).
 _CK_DEPOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"   # racine du module du dépôt, dérivée de l'emplacement de l'aide (calculée au « source »)
 _CK_NOOPEN="--no-open"
-# <sortie> en $1 : en mode module le script est celui du module et la sortie voyage dans _CK_FIN (dernier argument) ; sinon l'ancienne forme
+# <sortie> en $1 : le script est toujours celui d'un module (COCKPIT_MODULE, défaut : celui du dépôt), la sortie voyage dans _CK_FIN (dernier argument)
 _cockpit_commande() {
-  _CK_FIN=""
-  if [ -n "${COCKPIT_MODULE:-}" ]; then _CK_SCRIPT="$COCKPIT_MODULE/skills/cockpit-moteur/assets/serve.mjs"; _CK_FIN="--sortie=$1"
-  else _CK_SCRIPT="$1/serve.mjs"; fi
+  _CK_SCRIPT="${COCKPIT_MODULE:-$_CK_DEPOT}/skills/cockpit-moteur/assets/serve.mjs"; _CK_FIN="--sortie=$1"   # la sortie ne porte plus de code : toujours le serve.mjs d'un module
 }
 _cockpit_vivant() { local s; s="$(ps -o stat= -p "$1" 2>/dev/null)"; case "$s" in ''|Z*) return 1 ;; esac; return 0; }
 # lit server.json : « port pid jeton terminal(0|1) » ; rien si illisible (JSON à moitié écrit)

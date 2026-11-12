@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // vf-cockpit-fr-inventaire — inventaire déterministe des chaînes d'interface ANGLAISES d'un rendu servi (67-07, CKPT-09).
 // Filet de la traduction : à rejouer après toute édition du moteur ou de ses pages servies.
-// Entrées : le HTML des pages servies (index.html, project.html) et le source de serve.mjs de la sortie.
+// Entrées : le HTML des pages servies (index.html, project.html) et le source de serve.mjs du moteur du module.
 // Sortie : liste triée et dédoublonnée (ordre des points de code), `${…}` d'un gabarit écrit `{}`.
 // Exports : inventaire({ html: [...], serveur }), litteraux(src), textesHtml(html), estAnglais(chaine), chainesBibliotheque(xterm), bibliothequeNonTraitee(xterm, client).
 // CLI : node vf-cockpit-fr-inventaire.mjs <sortie> [--json]   Code 0 ; 2 sortie sans index.html.
@@ -15,7 +15,7 @@
 // tracé SVG, identifiant sans espace en minuscules (classe, événement, clé), ni marque de français (accent, mot-outil).
 import fs from 'node:fs';
 import path from 'node:path';
-import { pathToFileURL } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 
 const MOTS_FR = new Set(['le', 'la', 'les', 'des', 'du', 'un', 'une', 'est', 'et', 'ou', 'pour', 'sur', 'dans', 'par', 'aux', 'ce', 'cette', 'qui', 'que', 'vous', 'nous', 'votre', 'avec', 'sans', 'aucun', 'aucune', 'jamais', 'tous', 'toutes', 'où', 'au', 'cours', 'fait']);
 const AVANT_REGEX = new Set(['return', 'typeof', 'case', 'in', 'of', 'delete', 'void', 'throw', 'new', 'else', 'do', 'yield', 'await']);
@@ -181,7 +181,7 @@ export function bibliothequeNonTraitee(xterm, client) {
 
 export function inventaireDeSortie(sortie) {
   const lire = (f) => { try { return fs.readFileSync(path.join(sortie, f), 'utf8'); } catch { return ''; } };
-  return inventaire({ html: [lire('index.html'), lire('project.html')].filter(Boolean), serveur: lire('serve.mjs') });
+  return inventaire({ html: [lire('index.html'), lire('project.html')].filter(Boolean), serveur: (() => { try { return fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'cockpit-moteur', 'assets', 'serve.mjs'), 'utf8'); } catch { return ''; } })() }); // serve.mjs est dans le moteur du module, plus dans la sortie
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {
