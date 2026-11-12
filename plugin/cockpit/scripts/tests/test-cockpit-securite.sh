@@ -428,6 +428,40 @@ srv "$LM/.vibeflow/cockpit"; XM="$(CDP_PRET="$PRET_CARTES" node "$HERE_T/chrome-
 assert_has "X3 — témoin rouge : sans h() sur le pied de carte, le champ « foot » est détecté" "$(printf '%s' "$XM" | node "$AUX/ev.mjs" 'j.resultats?[...new Set(j.resultats.flatMap(r=>r.valeur||[]))]:"mesure indisponible : "+j.erreur')" "foot"
 fi
 
+
+echo "=== AM4 — le serveur est lancé depuis le module : un fichier planté dans la sortie ne s'exécute jamais (SOCL-07, A-03, 79-06) ==="
+# La sortie du lab est inscriptible par tout processus du lab : tant qu'elle fournit du code, un fichier planté vaut exécution. Chaque témoin négatif exige AUSSI un serveur vivant
+# (cockpit_vivant) : un serveur mort ne doit jamais passer pour un marqueur qui ne s'exécute pas. Témoin positif AM4.4 : le même marqueur dans une copie du MODULE s'exécute.
+mk_marqueur() { # <fichier à planter> <témoin> <module réel> : le marqueur s'exécute D'ABORD (import en tête), puis tout le module réel est ré-exporté : rien ne casse pour une autre raison que le marqueur
+  printf "import fs from 'node:fs';\nfs.writeFileSync('%s', 'exécuté');\n" "$2" > "$2.mjs"
+  printf "import 'file://%s';\nexport * from 'file://%s';\n" "$2.mjs" "$3" > "$1"
+}
+am4_lancer() { # <lab> [options] : lancement par l'aide (mode par défaut), dossiers du module posés comme le fait srv, état du mode terminal jetable
+  local l="$1"; shift
+  cockpit_lancer "$l" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" VF_COCKPIT_MODE_DIR="$WORK/etat" "$@"
+}
+am4_temoin() { # <fichier témoin> : « présent|absent vivant|mort » après une attente bornée par l'horloge (jamais une pause fixe)
+  attendre 2 test -e "$1"; printf '%s %s' "$([ -e "$1" ] && echo présent || echo absent)" "$(cockpit_vivant && echo vivant || echo mort)"
+}
+unset XDG_CACHE_HOME
+L41="$WORK/lab-am41"; mklab "$L41"; M41="$WORK/marq-am41"; mk_marqueur "$L41/.vibeflow/cockpit/vf-cockpit-server.mjs" "$M41" "$SCRIPTS/vf-cockpit-server.mjs"
+COCKPIT_LOG="$WORK/am41.out" am4_lancer "$L41" > /dev/null 2>&1; R41="$(am4_temoin "$M41")"; cockpit_arreter
+assert_eq "AM4.1 — un vf-cockpit-server.mjs planté dans la sortie ne s'exécute jamais (témoin absent ET serveur vivant : $R41)" "$R41" "absent vivant"
+L42="$WORK/lab-am42"; mklab "$L42"; M42="$WORK/marq-am42"; Q42="$L42/.vibeflow/cockpit/query.mjs"
+{ printf '%s\n' "void import('node:fs').then((m) => m.writeFileSync('$M42', 'exécuté'));"; cat "$Q42" 2> /dev/null; } > "$Q42.neuf"; mv "$Q42.neuf" "$Q42"
+COCKPIT_LOG="$WORK/am42.out" am4_lancer "$L42" > /dev/null 2>&1; R42="$(am4_temoin "$M42")"; cockpit_arreter
+assert_eq "AM4.2 — un cœur de requête planté dans <sortie>/query.mjs n'est jamais évalué (témoin absent ET serveur vivant : $R42)" "$R42" "absent vivant"
+L43="$WORK/lab-am43"; mklab "$L43"; M43="$WORK/marq-am43"; mk_marqueur "$L43/.vibeflow/cockpit/vf-cockpit-terminal-processus.mjs" "$M43" "$SCRIPTS/vf-cockpit-terminal-processus.mjs"
+COCKPIT_LOG="$WORK/am43.out" am4_lancer "$L43" --terminal > /dev/null 2>&1; R43="$(am4_temoin "$M43")"; cockpit_arreter
+assert_eq "AM4.3 — un processus de terminal planté dans la sortie n'est jamais lancé par fork (témoin absent ET serveur vivant : $R43)" "$R43" "absent vivant"
+L44="$WORK/lab-am44"; mklab "$L44"; M44="$WORK/marq-am44"; C44="$(cockpit_module_copie)"; mk_marqueur "$C44/scripts/vf-cockpit-server.mjs" "$M44" "$SCRIPTS/vf-cockpit-server.mjs"
+COCKPIT_MODULE="$C44" COCKPIT_LOG="$WORK/am44.out" am4_lancer "$L44" > /dev/null 2>&1; RC44=$?; attendre 2 test -e "$M44"
+assert_eq "AM4.4 — témoin positif : le même marqueur posé dans une copie du module s'exécute et le serveur de cette copie démarre (lancement rc=$RC44, serveur du module : $(head -c 160 "$WORK/am44.out" 2> /dev/null | tr '\n' ' '))" "$RC44 $([ -e "$M44" ] && echo présent || echo absent)" "0 présent"
+cockpit_arreter
+
+# ancre du mutant M-TERM (« le fork revient à la sortie ») : le fichier forké est celui du dossier du module, voisin de vf-cockpit-terminal.mjs (écrite ici, jouée avec le code ; rouge tant que le fork vise le dossier de la sortie)
+assert_eq "M-TERM.0 — ancre présente : le terminal forke vf-cockpit-terminal-processus.mjs pris à côté de son propre fichier (import.meta.url), jamais dans la sortie" "$(grep -cF "path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-terminal-processus.mjs'" "$SCRIPTS/vf-cockpit-terminal.mjs")" "1"
+
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

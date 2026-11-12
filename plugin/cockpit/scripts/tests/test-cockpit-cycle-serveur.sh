@@ -335,6 +335,145 @@ DET=cockpit_lancement_brut; [ "$AIDE" = oui ] || DET=brut_base
 # shellcheck disable=SC2086
 K3_N="$($DET $K3_FICHIERS | cut -d: -f1 | sort -u | awk 'END { print NR }')"
 assert_eq "AM7.K3 — aucune suite hors exceptions ne lance le serveur à la main (suites nommées par le détecteur ; base : 43)" "$K3_N" "0"
+
+echo "=== AM4 — serveur lancé depuis le module : empreinte, orphelin, identité, garde du module, version asynchrone (SOCL-07, SOCL-08, AUDC-H3, D-M13, AUDC-AB1 ; 79-06) ==="
+MODROOT="$(cd "$SCRIPTS/.." && pwd -P)"
+am4_lab() { mklab "$1"; node "$SCRIPTS/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/am4-build-$(basename "$1").out" 2>&1 || cat "$WORK/am4-build-$(basename "$1").out"; }
+am4_serveurs() { ps -eo args | P="$1/.vibeflow/cockpit" awk 'index($0, ENVIRON["P"]) { n++ } END { print n + 0 }'; } # serveurs dont la ligne de commande porte la sortie du lab (le motif passe par l'environnement : jamais dans la ligne d'awk)
+am4_ouvrir() { node "$1/scripts/vf-cockpit.mjs" open --lab "$2" --no-open --port "$3"; } # le lanceur d'une copie du module : <racine> <lab> <port>
+am4_arreter() { node "$1/scripts/vf-cockpit.mjs" stop --lab "$2" > /dev/null 2>&1; }
+am4_mort() { ! _cockpit_vivant "$1"; }
+am4_journal() { grep -c "$2" "$1/.vibeflow/cockpit/.cache/serveur.log" 2> /dev/null; }
+
+# AM4.7 (H3) : un octet ajouté à un module AUTRE que serve.mjs d'une copie du module : le second open relance le serveur (empreinte de tout le code du module)
+L47="$WORK/lab-am47"; mklab "$L47"; C47="$(cockpit_module_copie)"; P47="$(libre)"
+am4_ouvrir "$C47" "$L47" "$P47" > "$WORK/am47-1.out" 2>&1; PID47A="$(pid_etat "$L47")"
+printf '\n// octet\n' >> "$C47/scripts/vf-cockpit-agent.mjs"
+am4_ouvrir "$C47" "$L47" "$P47" > "$WORK/am47-2.out" 2>&1; PID47B="$(pid_etat "$L47")"
+assert_eq "AM4.7 — un octet changé dans un module autre que serve.mjs d'une copie du module : le second open relance le serveur et le journal dit « code du serveur changé »" "$([ -n "$PID47A" ] && [ -n "$PID47B" ] && [ "$PID47A" != "$PID47B" ] && echo relancé || echo réutilisé) journal=$(am4_journal "$L47" 'remplacé (code du serveur changé')" "relancé journal=1"
+am4_arreter "$C47" "$L47"
+# AM4.20 (P79-D-31) : un module NEUF que rien n'importe entre dans l'empreinte sans retouche d'une liste ; témoin positif dans la même assertion : sans modification, le second open réutilise
+L420="$WORK/lab-am420"; mklab "$L420"; C420="$(cockpit_module_copie)"; P420="$(libre)"
+printf '// module neuf, que rien n importe\nexport const ESSAI = 1;\n' > "$C420/scripts/vf-cockpit-essai-am420.mjs"
+am4_ouvrir "$C420" "$L420" "$P420" > "$WORK/am420-1.out" 2>&1; PA420="$(pid_etat "$L420")"
+am4_ouvrir "$C420" "$L420" "$P420" > "$WORK/am420-2.out" 2>&1; PB420="$(pid_etat "$L420")"
+printf '\n// octet\n' >> "$C420/scripts/vf-cockpit-essai-am420.mjs"
+am4_ouvrir "$C420" "$L420" "$P420" > "$WORK/am420-3.out" 2>&1; PC420="$(pid_etat "$L420")"
+assert_eq "AM4.20 — un module neuf vf-cockpit-*.mjs ajouté à une copie puis modifié d'un octet fait relancer open ; sans modification le serveur est réutilisé (liste trouvée à l'exécution, jamais figée)" "$([ -n "$PA420" ] && [ "$PA420" = "$PB420" ] && echo réutilisé-sans-changement || echo relancé-à-tort) $([ -n "$PC420" ] && [ "$PB420" != "$PC420" ] && echo relancé-après-octet || echo réutilisé-malgré-octet) journal=$(am4_journal "$L420" 'remplacé (code du serveur changé')" "réutilisé-sans-changement relancé-après-octet journal=1"
+am4_arreter "$C420" "$L420"
+
+# AM4.8 (D-M13) : serveur vivant et server.json supprimé : status le dit vivant SANS rien écrire, stop l'arrête
+L48="$WORK/lab-am48"; am4_lab "$L48"; cockpit_lancer "$L48"; P48="$VF_PORT"; S48="$VF_PID"
+rm -f "$L48/.vibeflow/cockpit/.cache/server.json"
+ST48="$(node "$SCRIPTS/vf-cockpit.mjs" status --lab "$L48" --port "$P48" 2>&1)"
+assert_eq "AM4.8a — serveur vivant sans server.json : status le dit vivant (PID donné) et le fichier reste absent (un status qui adopte ou qui se tait rougit)" "vivant=$(printf '%s' "$ST48" | grep -c 'PID ') fichier=$([ -e "$L48/.vibeflow/cockpit/.cache/server.json" ] && echo présent || echo absent)" "vivant=1 fichier=absent"
+node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L48" --port "$P48" > /dev/null 2>&1; attendre 5 am4_mort "$S48"
+assert_eq "AM4.8b — serveur vivant sans server.json : stop l'arrête (processus disparu)" "$(am4_mort "$S48" && echo arrêté || echo vivant)" "arrêté"
+cockpit_arreter
+
+# AM4.9 : serveur LEURRE (page à jeton, /api/status à racine du lab, PID d'un autre processus) : ni vu comme le nôtre par status, ni arrêté par stop (témoin négatif : il garde la reconnaissance de sur-reconnaître)
+cat > "$AUX/leurre.mjs" <<'JS'
+// leurre.mjs <port> <pid> <lab> : répond comme un serveur du cockpit (page portant un jeton, /api/status donnant ce PID et la racine du lab)
+import http from 'node:http';
+const [, , port, pid, lab] = process.argv;
+http.createServer((req, res) => {
+  if (req.url === '/api/status') { res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify({ tabs: 0, pid: Number(pid), hash: 'abcdef012345', root: lab })); }
+  res.writeHead(200, { 'Content-Type': 'text/html' }); res.end('<html><script>window.VF_COCKPIT_SERVER={"token":"' + '0123456789abcdef'.repeat(2) + '"};</script></html>');
+}).listen(Number(port), '127.0.0.1');
+JS
+L49="$WORK/lab-am49"; mklab "$L49"; P49="$(libre)"
+node -e "setTimeout(()=>{},3e5)" "$WORK/am49-etranger" > /dev/null 2>&1 < /dev/null & D49=$!; PIDS+=("$D49")
+node "$AUX/leurre.mjs" "$P49" "$D49" "$L49" > "$WORK/am49-http.out" 2>&1 < /dev/null & H49=$!; PIDS+=("$H49")
+attendre 5 test "$(node "$AUX/get.mjs" "$P49" /api/status | grep -c "\"pid\":$D49")" = 1
+ST49="$(node "$SCRIPTS/vf-cockpit.mjs" status --lab "$L49" --port "$P49" 2>&1)"; node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L49" --port "$P49" > /dev/null 2>&1
+assert_eq "AM4.9 — leurre (réponses d'un serveur du cockpit, PID d'un autre processus) : status dit arrêté et stop laisse ce processus vivant (leurre bien en écoute : $(node "$AUX/get.mjs" "$P49" /api/status | grep -c "\"pid\":$D49"))" "vu=$(printf '%s' "$ST49" | grep -c 'PID ') etranger=$(am4_mort "$D49" && echo arrêté || echo vivant) leurre=$(am4_mort "$H49" && echo arrêté || echo vivant)" "vu=0 etranger=vivant leurre=vivant"
+vf_hyg_stop "$D49"; vf_hyg_stop "$H49"
+
+# AM4.10 : deux labs dont l'un est le préfixe de l'autre (nom avec espace), servis par le même module : l'arrêt de l'un laisse l'autre vivant, dans les deux sens
+LA="$WORK/labs-am410/lab"; LB="$WORK/labs-am410/lab bis"; am4_lab "$LA"; am4_lab "$LB"
+cockpit_lancer "$LA"; SA="$VF_PID"; cockpit_lancer "$LB"; SB="$VF_PID"
+node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$LA" > /dev/null 2>&1; attendre 5 am4_mort "$SA"
+R410A="a:$(am4_mort "$SA" && echo arrêté || echo vivant) b:$(am4_mort "$SB" && echo arrêté || echo vivant)"
+cockpit_lancer "$LA"; SA="$VF_PID"
+node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$LB" > /dev/null 2>&1; attendre 5 am4_mort "$SB"
+R410B="a:$(am4_mort "$SA" && echo arrêté || echo vivant) b:$(am4_mort "$SB" && echo arrêté || echo vivant)"
+assert_eq "AM4.10 — deux labs dont l'un est le préfixe de l'autre (même module) : stop de lab laisse lab bis vivant, puis stop de lab bis laisse lab vivant" "$R410A | $R410B" "a:arrêté b:vivant | a:vivant b:arrêté"
+cockpit_arreter "$SA"; cockpit_arreter "$SB"
+
+# AM4.11 (transition P79-D-26) : un serveur de l'ancienne forme (ligne de commande « node <sortie>/serve.mjs », sans --sortie=) désigné par server.json est encore arrêté par stop ; un second, dont le chemin n'est pas celui de cette sortie, ne l'est pas
+L411="$WORK/lab-am411"; L411B="$WORK/lab-am411b"; mklab "$L411"; mklab "$L411B"; mkdir -p "$L411/.vibeflow/cockpit/.cache" "$L411B/.vibeflow/cockpit/.cache"
+printf 'setInterval(() => {}, 1000);\n' > "$L411/.vibeflow/cockpit/serve.mjs"; cp "$L411/.vibeflow/cockpit/serve.mjs" "$L411B/.vibeflow/cockpit/serve.mjs"
+node "$L411/.vibeflow/cockpit/serve.mjs" > /dev/null 2>&1 < /dev/null & F411=$!; PIDS+=("$F411")
+node "$L411B/.vibeflow/cockpit/serve.mjs" > /dev/null 2>&1 < /dev/null & F411B=$!; PIDS+=("$F411B")
+attendre 5 test "$(ps -o args= -p "$F411" 2> /dev/null | grep -c serve.mjs)" = 1
+printf '{"pid":%s,"port":1,"url":"http://127.0.0.1:1","token":"x"}\n' "$F411" > "$L411/.vibeflow/cockpit/.cache/server.json"
+node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L411" > /dev/null 2>&1; attendre 5 am4_mort "$F411"
+R411A="$(am4_mort "$F411" && echo arrêté || echo vivant)"
+printf '{"pid":%s,"port":1,"url":"http://127.0.0.1:1","token":"x"}\n' "$F411B" > "$L411/.vibeflow/cockpit/.cache/server.json"
+node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L411" > /dev/null 2>&1
+assert_eq "AM4.11 — ancienne forme node <sortie>/serve.mjs désignée par server.json : stop l'arrête ; un faux d'une AUTRE sortie désigné de même n'est pas arrêté" "ancienne:$R411A autre:$(am4_mort "$F411B" && echo arrêté || echo vivant)" "ancienne:arrêté autre:vivant"
+vf_hyg_stop "$F411"; vf_hyg_stop "$F411B"
+
+# AM4.12 (garde du module) : un module dont le chemin réel est sous la sortie ou sous le .vibeflow/ du lab (lien symbolique compris) est refusé (code 3, rien lancé) ; sous .claude/ du lab (pose projet) il est admis
+L412="$WORK/lab-am412"; mklab "$L412"; P412="$(libre)"
+C412A="$(cockpit_module_copie "$L412/.vibeflow/mod-a")"; C412B="$(cockpit_module_copie "$L412/.vibeflow/cockpit/mod-b")"; ln -s "$L412/.vibeflow/mod-a" "$L412/lien-module"
+am4_ouvrir "$C412A" "$L412" "$P412" > "$WORK/am412-a.out" 2>&1; RA412=$?; NA412="$(am4_serveurs "$L412")"; am4_arreter "$C412A" "$L412"; node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L412" > /dev/null 2>&1
+am4_ouvrir "$C412B" "$L412" "$P412" > "$WORK/am412-b.out" 2>&1; RB412=$?; NB412="$(am4_serveurs "$L412")"; am4_arreter "$C412B" "$L412"; node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L412" > /dev/null 2>&1
+am4_ouvrir "$L412/lien-module" "$L412" "$P412" > "$WORK/am412-c.out" 2>&1; RC412=$?; NC412="$(am4_serveurs "$L412")"; am4_arreter "$L412/lien-module" "$L412"; node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$L412" > /dev/null 2>&1
+assert_eq "AM4.12a — module sous .vibeflow/, sous la sortie, ou atteint par un lien symbolique : refus (code 3) et aucun serveur lancé" "sous-vibeflow=$RA412/$NA412 sous-sortie=$RB412/$NB412 lien=$RC412/$NC412" "sous-vibeflow=3/0 sous-sortie=3/0 lien=3/0"
+C412C="$(cockpit_module_copie "$L412/.claude/mod-c")"
+am4_ouvrir "$C412C" "$L412" "$P412" > "$WORK/am412-d.out" 2>&1; RD412=$?
+assert_eq "AM4.12b — témoin positif : un module posé sous .claude/ du lab (pose projet) est admis, le serveur démarre" "$RD412/$(am4_serveurs "$L412")" "0/1"
+am4_arreter "$C412C" "$L412"
+
+# AM4.13 : un lab dont le chemin réel contient « --sortie= » est refusé au lancement (ps joint les arguments par des espaces : le chemin serait ambigu), code 5, rien lancé
+L413="$WORK/labs-am413/lab --sortie=piege"; mklab "$L413"
+$LAN open --lab "$L413" --no-open --port "$(libre)" > "$WORK/am413.out" 2>&1; R413=$?; N413="$(am4_serveurs "$L413")"
+assert_eq "AM4.13 — lab dont le chemin contient un faux argument de sortie : refus (code 5) et aucun serveur lancé" "$R413/$N413" "5/0"
+$LAN stop --lab "$L413" > /dev/null 2>&1
+
+# AM4.14 (AUDC-AB1) : claude --version est lu en asynchrone : le serveur écoute et publie server.json PENDANT que cette lecture est bloquée ; /api/health rend version: null puis la version
+mkdir -p "$WORK/fk14"; LIBERE14="$WORK/libere14"; rm -f "$LIBERE14"
+cat > "$WORK/fk14/claude" <<JS
+#!/usr/bin/env node
+// faux claude : --version attend un fichier de libération (borne de 30 s : jamais un processus oublié) ; toute autre demande échoue
+const fs = require('fs');
+if (process.argv[2] !== '--version') process.exit(1);
+const t = setInterval(() => { if (fs.existsSync('$LIBERE14')) { clearInterval(t); console.log('9.9.9 (fake)'); process.exit(0); } }, 100);
+setTimeout(() => process.exit(0), 30000);
+JS
+chmod +x "$WORK/fk14/claude"
+L414="$WORK/lab-am414"; am4_lab "$L414"
+COCKPIT_ATTENTE=6 COCKPIT_LOG="$WORK/am414.out" cockpit_lancer "$L414" PATH="$WORK/fk14:$PATH"; RC414=$?
+cockpit_get /api/status > /dev/null 2>&1; ST414="$VF_CODE"
+cockpit_get /api/health > "$WORK/am414-h1.json" 2> /dev/null; AV414="$(node -e 'try{console.log(JSON.stringify(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).version))}catch{console.log("illisible")}' "$WORK/am414-h1.json")"
+: > "$LIBERE14"
+am4_version() { cockpit_get /api/health > "$WORK/am414-h2.json" 2> /dev/null; [ "$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).version||"")}catch{}' "$WORK/am414-h2.json")" != "" ]; }
+attendre 10 am4_version; AP414="$(am4_version && echo apparue || echo absente)"
+assert_eq "AM4.14 — lecture de claude --version bloquée : le lancement rend 0, /api/status répond 200 et /api/health rend version null AVANT la libération, la version apparaît après" "lancement=$RC414 status=$ST414 avant=$AV414 après=$AP414" "lancement=0 status=200 avant=null après=apparue"
+cockpit_arreter; : > "$LIBERE14"
+
+# AM4.19 : témoin d'effet de l'aide — le serveur lancé charge BIEN la copie visée (jamais un mutant non chargé qui laisserait une suite verte à vide)
+L419="$WORK/lab-am419"; am4_lab "$L419"
+cockpit_module_muter am419 vf-cockpit-types.mjs '1s/^/ /'; C419="$COCKPIT_MODULE"
+cockpit_lancer "$L419"; RC419=$?
+CH419A="$(cockpit_module_charge "$C419" && echo 0 || echo 1)"; CH419B="$(cockpit_module_charge "$MODROOT" && echo 0 || echo 1)"
+assert_eq "AM4.19 — serveur lancé sur une copie du module dont un octet a changé : le lancement rend 0, cockpit_module_charge de CETTE copie rend 0 et celle du module du dépôt rend 1" "lancement=$RC419 copie=$CH419A dépôt=$CH419B" "lancement=0 copie=0 dépôt=1"
+cockpit_arreter; unset COCKPIT_MODULE
+C419B="$(cockpit_module_copie)"; UI419="$(ls "$C419B/skills/cockpit-moteur/assets/ui" 2> /dev/null | sed -n 1p)"
+[ -z "$UI419" ] || printf '\n// octet\n' >> "$C419B/skills/cockpit-moteur/assets/ui/$UI419"
+assert_eq "AM4.19b — la copie du module est complète et sans lien : aucun lien symbolique, et muter assets/ui/ dans la copie laisse le fichier du dépôt identique (cmp)" "liens=$(find "$C419B" -type l | awk 'END{print NR}') fichier=${UI419:+présent} dépôt=$(cmp -s "$MODROOT/skills/cockpit-moteur/assets/ui/$UI419" "$C419B/skills/cockpit-moteur/assets/ui/$UI419" && echo modifié || echo intact)" "liens=0 fichier=présent dépôt=intact"
+
+# ancres des mutants des tâches 4a et 5 (écrites ici, jouées avec le code) : elles rougissent tant que le code visé n'existe pas ; contrat d'ancres : un nom exporté, ou un marqueur de commentaire « // m:<nom> » posé sur la ligne que le mutant édite
+SV="$SCRIPTS/vf-cockpit-serveur-vivant.mjs"
+assert_eq "M-VERSION-SYNC.0 — ancre présente : claude --version est lu par execFile (asynchrone) dans serve.mjs du moteur" "$(grep -cF "execFile(cli.cmd, [...cli.args, '--version']" "$MODROOT/skills/cockpit-moteur/assets/serve.mjs")" "1"
+assert_eq "M-LISTE-FIGEE.0 — ancre présente : l'ensemble du code évalué est trouvé à l'exécution par fichiersCodeEvalue (vf-cockpit-module.mjs)" "$(grep -cF 'export function fichiersCodeEvalue' "$SCRIPTS/vf-cockpit-module.mjs" 2> /dev/null)" "1"
+assert_eq "M-ESTNOTRE.0 — ancre présente : estNotre (vf-cockpit-serveur-vivant.mjs)" "$(grep -cF 'export function estNotre' "$SV" 2> /dev/null)" "1"
+assert_eq "M-MODULE.0 — ancre présente : l'identité exige le serve.mjs du module (marqueur m:module)" "$(grep -cF '// m:module' "$SV" 2> /dev/null)" "1"
+assert_eq "M-PREFIXE.0 — ancre présente : l'identité exige la fin de ligne exacte --sortie=<chemin réel> (marqueur m:prefixe)" "$(grep -cF '// m:prefixe' "$SV" 2> /dev/null)" "1"
+assert_eq "M-ANCIENNE.0 — ancre présente : la forme de la version précédente est encore reconnue (marqueur m:ancienne)" "$(grep -cF '// m:ancienne' "$SV" 2> /dev/null)" "1"
+assert_eq "M-STATUS.0 — ancre présente : detecterServeur sépare détecter d'adopter (vf-cockpit-serveur-vivant.mjs)" "$(grep -cF 'export function detecterServeur' "$SV" 2> /dev/null)" "1"
+
 vf_hyg_assert
 
 echo "== bilan : $PASS réussi(s), $FAIL échec(s) =="

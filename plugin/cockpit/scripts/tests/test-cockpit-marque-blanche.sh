@@ -129,6 +129,50 @@ assert_eq "M5.3 — aucune couleur littérale hors lignes marquées vf-couleur-o
 bad=0; for f in $M5FILES; do while IFS= read -r l; do r=$(printf '%s' "$l" | sed -n 's/.*vf-couleur-ok:[[:space:]]*//p' | sed 's/[[:space:]]*\*\/.*$//'); [ "${#r}" -ge 10 ] || { bad=$((bad+1)); echo "     raison absente ou trop courte : $(basename "$f")"; }; done < <(grep 'vf-couleur-ok:' "$f"); done
 assert_eq "M5.4 — chaque marqueur vf-couleur-ok: porte une raison d'au moins 10 caractères" "$bad" "0"
 
+
+echo "=== AM4 — les noms VibeFlow sont écrits une fois dans les six sources exécutées par Node (P79-D-08 option a, 79-06) ==="
+# les six sources : serve.mjs, graph-query.js, query-cli.mjs (moteur) et, côté scripts, vf-cockpit-embed.mjs, vf-cockpit-lancer-post.mjs, vf-cockpit-server.mjs ;
+# la liste jugée est CALCULÉE (tout le code d'exécution du dossier de scripts + les trois fichiers du moteur), jamais figée
+cat > "$AUX/execution.mjs" <<'JS'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const m = await import(pathToFileURL(path.join(process.argv[2], 'vf-cockpit-build.mjs')).href);
+console.log(m.fichiersExecution(process.argv[2]).join('\n'));
+JS
+cat > "$AUX/occurrences.mjs" <<'JS'
+// occurrences.mjs <dossier de scripts> <dossier du moteur> : compte les occurrences (compterOccurrences, l'outil d'assemblage : lignes de licence exemptées) dans la liste calculée ; « total liste détail »
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, moteur] = process.argv;
+const { compterOccurrences } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-rename.mjs')).href);
+const { fichiersExecution } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-build.mjs')).href);
+const liste = [...fichiersExecution(scripts).map((f) => path.join(scripts, f)), ...['serve.mjs', 'graph-query.js', 'query-cli.mjs'].map((f) => path.join(moteur, 'assets', f))];
+let total = 0; const detail = [];
+for (const f of liste) { const c = compterOccurrences(fs.readFileSync(f, 'utf8')); total += c; if (c) detail.push(`${path.basename(f)}=${c}`); }
+console.log(`${total} ${liste.length} ${detail.join(',') || 'aucune'}`);
+JS
+read -r AM4_N AM4_LISTE AM4_DETAIL <<< "$(node "$AUX/occurrences.mjs" "$SCRIPTS" "$MOTEUR")"
+echo "     (liste jugée : $AM4_LISTE fichiers ; occurrences par fichier : $AM4_DETAIL)"
+assert_ge "AM4.17a — témoin d'exposition : la liste des sources jugées est calculée et non vide" "$AM4_LISTE" 9
+assert_eq "AM4.17 — aucune occurrence du nom amont dans les sources exécutées par Node (hors lignes de licence)" "$AM4_N" "0"
+assert_eq "AM4.17b — témoin positif : le compteur voit le nom amont dans une chaîne jetable" "$(printf '%s\n' 'le moteur Floor''plan' | occ)" "1"
+MODROOT="$(cd "$SCRIPTS/.." && pwd -P)"; ENTETE_ANCIEN="$(printf 'x-%s-token' "floor""plan")"
+cat > "$AUX/entete.mjs" <<'JS'
+// entete.mjs <port> <chemin> <nom d'en-tête> <jeton> : statut HTTP de la requête portant ce seul en-tête de jeton
+import http from 'node:http';
+const [, , port, p, nom, jeton] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}`, [nom]: jeton } }, (r) => { r.resume(); r.on('end', () => console.log(r.statusCode)); }).on('error', () => console.log('000'));
+JS
+COCKPIT_MODULE="$MODROOT" COCKPIT_LOG="$WORK/am418.out" cockpit_lancer "$LAB"; RC418=$?
+cockpit_get / > "$WORK/am418.html" 2> /dev/null
+P418="$(grep -c 'VF_COCKPIT_SERVER' "$WORK/am418.html")"
+cockpit_get /api/vf/etat > /dev/null 2>&1; N418="$VF_CODE"
+A418="$(node "$AUX/entete.mjs" "${VF_PORT:-0}" /api/vf/etat "$ENTETE_ANCIEN" "${VF_JETON:-x}")"
+cockpit_arreter
+assert_eq "AM4.18 — de bout en bout, serveur du module sur la sortie assemblée (rc=$RC418) : la page fournit VF_COCKPIT_SERVER, l'en-tête de jeton VibeFlow reçoit 200 et l'ancien 403" "page=$P418 neuf=$N418 ancien=$A418" "page=1 neuf=200 ancien=403"
+assert_eq "M-NOM.0 — ancre présente : l'en-tête de jeton est écrit sous son nom VibeFlow dans vf-cockpit-lancer-post.mjs" "$(grep -cF "ENTETE_JETON = 'x-vf-cockpit-token'" "$SCRIPTS/vf-cockpit-lancer-post.mjs")" "1"
+
 vf_hyg_assert
 echo ""
 echo "=================================="

@@ -135,6 +135,24 @@ sed 's#^  if (diagnostic && !quiet) console.log(diagnostic);$##' "$MUT6/vf-cockp
 assert_eq "A6.8 — mutant (affichage du diagnostic retiré : 0 occurrence restante) : plus aucune ligne « non comprise » en sortie, A6.2 rougirait" "$(grep -c 'console.log(diagnostic)' "$MUT6/vf-cockpit-build.mjs")|$(node "$AUX/asm.mjs" "$MUT6" "$LAB6" "$SCRIPTS" 2>&1 | grep -c 'non comprise')" "0|0"
 assert_eq "A6.9 — témoin du mutant : le build réel, lui, affiche le diagnostic par le même chemin" "$(node "$AUX/asm.mjs" "$SCRIPTS" "$LAB6" "$SCRIPTS" 2>&1 | grep -c 'non comprise')" "1"
 
+
+echo "=== AM4 — la sortie ne porte plus que des données : purge du code des versions précédentes, aucun code à l'assemblage (SOCL-07, P79-D-26, 79-06) ==="
+am4_code() { ls -A "$1" | grep -E '\.mjs$|^vf-cockpit-interface\.json$' | tr '\n' ' '; } # fichiers de code présents à la racine d'une sortie
+L15="$WORK/lab15"; cp -R "$LAB" "$L15"; rm -rf "$L15/.vibeflow"; O15="$L15/.vibeflow/cockpit"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$L15" --quiet > "$WORK/am15-a.out" 2>&1
+# sortie d'une version précédente : du code, le contrat ET des données du lab (custom-flows.json) ; l'assemblage suivant purge le code seulement
+for f in serve.mjs query.mjs vf-cockpit-server.mjs vf-cockpit-terminal-processus.mjs vf-cockpit-interface.json; do printf '// code d une version précédente\n' > "$O15/$f"; done
+printf '{"flows":[{"id":"gardé"}]}\n' > "$O15/custom-flows.json"; AV15="$(cksum < "$O15/custom-flows.json")"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$L15" --quiet > "$WORK/am15-b.out" 2>&1; RC15=$?
+assert_eq "AM4.15a — après assemblage, la sortie d'une version précédente ne porte plus aucun fichier de code ni de contrat (assemblage rc=$RC15)" "$RC15|$(am4_code "$O15")" "0|"
+assert_eq "AM4.15b — témoin positif : les données restent (custom-flows.json identique, LICENSE et graph.json présents) : une purge de tout le dossier rougit" "$([ "$(cksum < "$O15/custom-flows.json" 2> /dev/null)" = "$AV15" ] && echo identique || echo perdu) $([ -s "$O15/LICENSE" ] && echo licence || echo sans) $([ -s "$O15/graph.json" ] && echo graphe || echo sans)" "identique licence graphe"
+L16="$WORK/lab16"; cp -R "$LAB" "$L16"; rm -rf "$L16/.vibeflow"; O16="$L16/.vibeflow/cockpit"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$L16" --quiet > "$WORK/am16.out" 2>&1
+assert_eq "AM4.16 — une sortie fraîchement assemblée ne contient aucun *.mjs ni vf-cockpit-interface.json (témoin d'exposition : la liste des fichiers de la sortie n'est pas vide)" "$(ls -A "$O16" | awk 'END{print (NR >= 5) ? "liste-non-vide" : "liste-vide"}') code=[$(am4_code "$O16")]" "liste-non-vide code=[]"
+# ancres des mutants de la tâche 4a (écrites ici, jouées avec le code) ; elles rougissent tant que le code visé n'existe pas
+assert_eq "M-PURGE-LARGE.0 — ancre présente : la purge de l'assemblage vise une liste de motifs de code (CODE_ANCIEN dans vf-cockpit-build.mjs)" "$(grep -cF 'const CODE_ANCIEN =' "$SCRIPTS/vf-cockpit-build.mjs")" "1"
+assert_eq "M-ORDRE.0 — ancre présente : la page du moteur est renommée par renommerPageMoteur avant l'insertion des données (vf-cockpit-rename.mjs)" "$(grep -cF 'export function renommerPageMoteur' "$SCRIPTS/vf-cockpit-rename.mjs")" "1"
+
 vf_hyg_assert
 echo ""
 echo "=================================="

@@ -320,6 +320,31 @@ assert_eq "F4 — contrat illisible : aucun événement hello n'est émis" "$(no
 assert_eq "EQ.3 — contrat illisible : /equipe.html n'émet aucune donnée d'équipe (ni 200 avec la page)" "$(node "$AUX/statut.mjs" "$F4PORT" /equipe.html | grep -c '^200|page')" "0"
 vf_hyg_stop "$F4PID"
 
+
+echo "=== AM4 — la garde d'émission lit le contrat du MODULE, jamais celui de la sortie (E8, P79-D-09, 79-06) ==="
+# Un lab par témoin : copie du lab assemblé, sans .cache ; la sortie garde sa forme <lab>/.vibeflow/cockpit (forme exigée du serveur du module).
+am4_lab() { rm -rf "$1"; cp -R "$LAB" "$1"; rm -rf "$1/.vibeflow/cockpit/.cache"; }
+am4_flux() { # <lab> <fichier> : le serveur lancé est celui de VF_PORT / VF_JETON ; une ligne JSON par événement (hello compris)
+  : > "$2"; node "$AUX/sse.mjs" "$VF_PORT" "$VF_JETON" 2000 hello "$2"
+}
+# AM4.5 : le contrat de la SORTIE est vidé (liste de clés interdites vide) : s'il était lu, la garde fermerait tout. Le contrat du module, intact, est seul lu : le hello sort.
+L45="$WORK/lab-am45"; am4_lab "$L45"
+node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));for(const k of Object.keys(j.schemas||{}))if(j.schemas[k]&&Array.isArray(j.schemas[k].interdits))j.schemas[k].interdits=[];fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$SCRIPTS/vf-cockpit-interface.json" "$L45/.vibeflow/cockpit/vf-cockpit-interface.json"
+cockpit_lancer "$L45"; V45="$(cockpit_vivant && echo vivant || echo mort)"
+am4_flux "$L45" "$WORK/am45.jsonl"
+assert_eq "AM4.5 — contrat de la sortie vidé : il est ignoré, la garde lit celui du module et le flux émet son hello (${V45})" "$V45 hello=$(node "$AUX/ev.mjs" "$WORK/am45.jsonl" 'E.filter(e=>e.event==="hello").length')" "vivant hello=1"
+cockpit_arreter
+# AM4.6 (F4 déplacée côté module) : copie du MODULE sans son contrat : le serveur est VIVANT (contrôle de vie) et rien n'est émis (fermé par défaut, P69-D-23)
+L46="$WORK/lab-am46"; am4_lab "$L46"; C46="$(cockpit_module_copie)"; rm -f "$C46/scripts/vf-cockpit-interface.json"
+COCKPIT_MODULE="$C46" cockpit_lancer "$L46"; V46="$(cockpit_vivant && echo vivant || echo mort)"
+am4_flux "$L46" "$WORK/am46.jsonl"
+assert_eq "AM4.6 — copie du module sans son contrat : serveur vivant, aucun hello émis et /equipe.html sans donnée d'équipe (contrat illisible ferme tout)" "$V46 hello=$(node "$AUX/ev.mjs" "$WORK/am46.jsonl" 'E.filter(e=>e.event==="hello").length') equipe=$(node "$AUX/statut.mjs" "${VF_PORT:-0}" /equipe.html | grep -c '^200|page')" "vivant hello=0 equipe=0"
+cockpit_arreter
+# ancre du mutant M-CONTRAT-OUVERT (« contrat illisible -> flux ouvert ») : la constante porteInterdit ferme sur une liste vide ; elle existe déjà : ancre VERTE dès cette tâche (l'assertion d'effet vient avec le serveur du module)
+assert_eq "M-CONTRAT-OUVERT.0 — ancre présente : porteInterdit ferme le flux quand la liste de clés interdites est vide (vf-cockpit-server.mjs du module)" "$(grep -cF 'const porteInterdit = (o) => !INTERDITS.length ||' "$SCRIPTS/vf-cockpit-server.mjs")" "1"
+# ancre du mutant M-CONTRAT (« le serveur relit le contrat dans la sortie ») : le contrat est lu à côté du fichier du serveur (import.meta.url), jamais depuis here ; ancre verte aussi
+assert_eq "M-CONTRAT.0 — ancre présente : le contrat est lu à côté de vf-cockpit-server.mjs (import.meta.url), jamais depuis la sortie" "$(grep -cF "fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json')" "$SCRIPTS/vf-cockpit-server.mjs")" "1"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
