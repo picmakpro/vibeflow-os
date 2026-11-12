@@ -34,3 +34,28 @@ la base. Résultat : 2 PASS / 12 FAIL (CN0, H0 verts). Mesure indépendante lue 
 | CN2.5 sans `--terminal` | `[0, false, 0]` | `sans mesure` | pas de bloc à mesurer (la mesure de fond, avec bloc, est portée par le mutant M-TERMINAL) |
 | CN2.6 intersections | `["true,true,true,true", null, true]` | `["false,false,false,false", null, false]` | bloc absent à 1440 et 1024 px, ligne d'état absente au tactile à 1100 px |
 | CN2.9 témoin | aucune section en échec | `cn22, cn24` | les sections lèvent faute de bloc |
+
+## Tâche 3 — feuille de détail, tactile, terminal ouvert, focus orphelin, mouvement réduit (CN3)
+
+Deux rejeux de la suite de la tête (pilote et suite de la tête, module d'une copie `git archive`).
+
+**Sur la base 342a8763** (aucun des trois modules) : 5 PASS / 28 FAIL sur la suite entière. Rouges propres à CN3 : CN3.1 (tactile et moyen : aucun repère, `n = 0`), CN3.2
+(`[true, false, false, true]` : onglets de 26,2 px, zone d'appui nulle), CN3.3a, CN3.3b, CN3.3c (pas de bloc, pas de repère), CN3.4a, CN3.4b, CN3.4c
+(`activeElement` = `body`, `itin = "f:lots/n05.md"` : aucun repère donc rien à rendre), CN3.5 (« élément absent : button.vf-repere[data-bord=droite] »).
+
+**Sur la tête de la tâche 2 (9e60d903)** : 28 PASS / 3 FAIL. Les repères de la tâche 1 portent déjà CN3.1, CN3.3a, CN3.3b, CN3.3c, CN3.4a, CN3.4b et CN3.5 : ces sept cas sont verts avant
+le code de la tâche 3 (ils ne rougissent que sur la base, voir ci-dessus). Rouges réels de la tâche 3 :
+
+| Cas | Attendu | Obtenu à 9e60d903 | Cause |
+|---|---|---|---|
+| CN3.2 onglets du téléphone | `[true, true, true, true]` | `[true, false, false, true]` | onglet de 26,2 px, une sonde à 3 px au-dessus et au-dessous tombe sur la piste, pas sur l'onglet (les boutons de zoom sont déjà à 44 x 44 : dernier élément vrai) |
+| CN3.4c plus aucun repère | `[true, 0, "g", true]` | `[true, 1, "button", false]` | le pilote laissait un repère « haut » (dix clics sur « - » ne ramènent pas toutes les cartes dans le champ) : pilote corrigé (il recentre ensuite la boîte des cartes dans le champ), pas le module |
+| H0 | aucun processus de la suite | un renderer d'aide de Chrome en train de mourir | aléa de charge connu (rejeu : vert) |
+
+Rejeu final de la suite de la tête : 33 PASS / 0 FAIL (cinq mutants rougissent leur assertion).
+
+## Défaut trouvé à la capture (CN2.3, mesure ajoutée après coup)
+
+La capture claire à 1440 px montrait le cadre du champ de la minicarte plein et sombre : la règle `.vf-mini .vf-mc rect { fill: var(--text-4) }` (cartes) l'emportait sur
+`.vf-mini .vf-mf { fill: none }` (même groupe, spécificité supérieure). CN2.3 n'en disait rien (géométrie seule). Mesure ajoutée (`getComputedStyle(cadre).fill === 'none'`, tiroir Git
+fermé et ouvert), jouée avant la correction : `vide: false` aux deux états (`CN_SOLO=cn2:cn23`), puis `vide: true` après la règle `rect:not(.vf-mf)`.

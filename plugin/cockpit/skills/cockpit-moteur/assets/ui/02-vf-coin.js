@@ -16,13 +16,18 @@
       padding: var(--sp-8); border-radius: var(--r-ctl); transition: right .45s var(--ease); }
     #vf-coin[hidden], .vf-mini[hidden] { display: none; }
     .vf-mini { display: block; width: 144px; height: 96px; border-radius: 8px; background: rgba(var(--ink), .06); }
-    .vf-mini .vf-mc rect { fill: var(--text-4); } .vf-mini .vf-mc rect.sel { fill: var(--text); }
+    .vf-mini .vf-mc rect:not(.vf-mf) { fill: var(--text-4); } .vf-mini .vf-mc rect.sel { fill: var(--text); }
     .vf-mini .vf-mf { fill: none; stroke: var(--text-2); stroke-width: 1.5; vector-effect: non-scaling-stroke; }
     .vf-mini .vf-mh line { stroke: var(--text-3); stroke-width: 1; }
     .vf-coin-etat:not(:empty) { margin-top: var(--sp-8); padding-top: var(--sp-8); border-top: 1px solid var(--hair); }
     .vf-mini[hidden] + .vf-coin-etat { margin-top: 0; padding-top: 0; border-top: 0; }
     @media (max-width: 999px) { #vf-coin { display: none; } } /* feuille de détail : aucun bloc, les repères seuls */
     @media (pointer: coarse) { .vf-mini { display: none; } } /* au doigt : la ligne d'état seule */
+    @media (max-width: 700px) { /* téléphone (AUDC-X8) : onglet visuel de 36, piste de 44, zone d'appui de 44 par un pseudo-élément */
+      header .vf-tabs { padding: var(--sp-4); }
+      header .vf-tabs a { position: relative; display: inline-flex; align-items: center; box-sizing: border-box; min-height: 36px; padding: 0 var(--sp-8); }
+      header .vf-tabs a::after { content: ""; position: absolute; inset: -4px 0; }
+    }
   `;
   document.head.appendChild(style);
 

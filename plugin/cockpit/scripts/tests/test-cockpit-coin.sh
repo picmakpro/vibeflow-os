@@ -67,6 +67,10 @@ LAB="$WORK/lab"; mklab "$LAB"
 SC_BASE="${CN_SCRIPTS:-$SCRIPTS}"; ln -s "$SC_BASE" "$WORK/scripts-hote"
 build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
 assert_eq "CN0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
+if [ -n "${CN_SOLO:-}" ]; then # une seule mesure brute, hors suite : CN_SOLO=<mode>[:<sections>] ; CN_SOLO=shots avec CN_SHOTS=<dossier> : les captures
+  SOLO_S=""; case "$CN_SOLO" in *:*) SOLO_S="${CN_SOLO#*:}";; esac
+  mesurer "${CN_SOLO%%:*}" "$SOLO_S"; vf_hyg_stop "$SRV"; vf_hyg_assert; exit 0
+fi
 
 echo "=== CN1 — repères « N cartes par là » ==="
 R="$(mesurer cn1)"; [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }; [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/cn1.json"
@@ -90,12 +94,12 @@ assert_eq "CN2.1 — 1440 px : minicarte <= 144 x 96, bloc à 16 px de la zone l
 assert_eq "CN2.2 — clic au centre de la minicarte : le cadre du champ se recentre sur ce point, state.t.k inchangé" \
   "$(E "(() => { const c = j.cn2.c22; if (!c) return 'sans clic';
     return [Math.abs(c.visee[0] - c.centre[0]) < 1.5 && Math.abs(c.visee[1] - c.centre[1]) < 1.5, c.k[0] === c.k[1]]; })()")" "[true,true]"
-assert_eq "CN2.3 — tiroir Git : freeArea().w et state.t identiques (PU-G-204), hachure (--text-3) sur la part du cadre couverte, nom de la minicarte" \
+assert_eq "CN2.3 — tiroir Git : freeArea().w et state.t identiques (PU-G-204), hachure (--text-3) sur la part couverte, cadre sans fond, nom" \
   "$(E "(() => { const c = j.cn2.c23; if (!c || !c.hf || !c.ho) return 'sans mesure';
     return [c.av.ouvert === false && c.ap.ouvert === true, c.av.w === c.ap.w, JSON.stringify(c.av.t) === JSON.stringify(c.ap.t), c.hf.affiche === false,
-      c.ho.affiche, Math.abs(c.ho.part - c.attendu) < 0.005, Math.abs(c.ho.gauche - c.debut) < 0.005, c.ho.trait, /sous l'historique Git$/.test(c.ho.nom),
+      c.ho.affiche, Math.abs(c.ho.part - c.attendu) < 0.005, Math.abs(c.ho.gauche - c.debut) < 0.005, c.ho.trait, c.ho.vide && c.hf.vide, /sous l'historique Git$/.test(c.ho.nom),
       !/historique Git/.test(c.hf.nom), /^Minicarte : \d+ cartes? visibles? sur \d+/.test(c.hf.nom)]; })()")" \
-  "[true,true,true,true,true,true,true,true,true,true,true]"
+  "[true,true,true,true,true,true,true,true,true,true,true,true]"
 NOMB='vf/<img/src=x/onerror=window.__xss=1>/branche-tres-longue-pour-lellipse'
 assert_eq "CN2.4 — ligne d'état : branche entière en title et étiquette, ellipse au milieu (10 + … + 8), un seul role=status, heure qui suit vf-who" \
   "$(E "(() => { const c = j.cn2.c24; if (!c || !c.base) return 'sans mesure'; const b = c.base, n = '$NOMB';
@@ -112,6 +116,54 @@ assert_eq "CN2.6 — 1440 et 1024 px, panneau et tiroir Git ouverts ou non : blo
   "$(E "(() => { const m = j.cn2.c26; if (!m || m.length !== 6) return 'sans mesure';
     return [m.slice(0, 4).map((x) => x.coin && x.ok).join(), m[4].coin, m[5].coin && !m[5].mini && m[5].etat]; })()")" '["true,true,true,true",null,true]'
 assert_eq "CN2.9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
+echo "=== CN3 — feuille de détail (390 et 800 px), onglets, focus orphelin, mouvement réduit ==="
+R="$(mesurer cn3)"; [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }; [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/cn3.json"
+for F in tactile moyen; do
+  assert_eq "CN3.1 ($F) — feuille ouverte : aucun repère ; fermée : repères et zoom à 44 x 44 d'appui sans recouvrement, rien sur la carte sélectionnée" \
+    "$(E "(() => { const f = j.cn3.f.$F; if (!f) return 'sans mesure'; const o = f.ouvert, c = f.ferme;
+      return [o.ferme === false && o.n === 0, c.n > 0, c.appui, c.zones.every(([w, h]) => w >= 44 && h >= 44), c.libre, c.vue, c.couvre === 0,
+        c.zoom === 3]; })()")" \
+    "[true,true,true,true,true,true,true,true]"
+done
+assert_eq "CN3.2 — 390 px tactile : onglets de 36 de haut, zone d'appui de 44 (AUDC-X8) ; boutons de zoom à 44 x 44" \
+  "$(E "(() => { const t = j.cn3.tabs; if (!t || !t.onglets) return 'sans mesure';
+    return [t.onglets.length >= 3, t.onglets.every((o) => Math.abs(o.h - 36) <= 1), t.onglets.every((o) => o.haut && o.bas),
+      t.zoom.length === 3 && t.zoom.every(([w, h]) => w >= 44 && h >= 44)]; })()")" \
+  "[true,true,true,true]"
+O4='j.cn3.orphelin'
+assert_eq "CN3.4a — le repère droit épuisé par Entrée, focus dessus : il disparaît, le focus va à la carte qu'il vient d'amener (jamais body)" \
+  "$(E "(() => { const a = $O4.a; if (!a || !a.apres) return 'sans mesure';
+    return [a.focus, a.n >= 1, a.repere === false, a.apres.tag === 'g', a.apres.id === a.dernier]; })()")" "[true,true,true,true,true]"
+assert_eq "CN3.4b — le repère bas tombe à 0 sans geste sur lui, focus dessus : le focus va au voisin précédent (haut), seul repère restant après lui" \
+  "$(E "(() => { const b = $O4.b; if (!b || !b.apres) return 'sans mesure';
+    return [b.focus, b.apres.tag, b.apres.bord, b.restants.includes('haut'), !b.restants.includes('bas')]; })()")" \
+  '[true,"button","haut",true,true]'
+assert_eq "CN3.4c — plus aucun repère : le focus va à la carte itinérante du canevas, jamais body" \
+  "$(E "(() => { const c = $O4.c; if (!c || !c.apres) return 'sans mesure';
+    return [c.focus, c.restants, c.apres.tag, c.apres.id !== null && c.apres.id === c.apres.itin]; })()")" '[true,0,"g",true]'
+assert_eq "CN3.5 — mouvement réduit : aucune animation active après un repère, un clic de minicarte et l'ouverture du tiroir Git" \
+  "$(E "j.cn3.ro.media ? [j.cn3.ro.repere, j.cn3.ro.mini, j.cn3.ro.tiroir] : 'sans mesure'")" "[0,0,0]"
+assert_eq "CN3.9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
+vf_hyg_stop "$SRV"
+# le même lab lancé avec --terminal : la pastille « Terminal » et le tiroir du terminal (CN3.3)
+LABT="$WORK/lab-term"; cp -R "$LAB" "$LABT"; build_serve "$LABT" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur" --terminal
+assert_eq "CN3.0 — serveur du lab lancé avec --terminal démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
+R="$(mesurer term)"; [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }; [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/term.json"
+assert_eq "CN3.3a — 1440 px, tiroir du terminal ouvert : bloc et repères au-dessus du tiroir (rectangles disjoints)" \
+  "$(E "(() => { const a = j.term.a; if (!a) return 'sans mesure';
+    return [a.ok, a.noms.includes('#vf-coin'), a.noms.includes('.vf-term-tiroir'), a.noms.some((n) => n.includes('vf-repere'))]; })()")" "[true,true,true,true]"
+assert_eq "CN3.3b — 1440 et 1024 px, tiroir fermé puis ouvert : pastille, bloc, zoom, barre, tiroir et repères disjoints deux à deux" \
+  "$(E "(() => { const b = j.term.b; if (!b || b.length !== 2) return 'sans mesure';
+    const rep = (n) => n.some((q) => q.includes('vf-repere')), tous = (n, l) => l.every((q) => n.includes(q));
+    return b.map((x) => [x.ferme.ok, tous(x.ferme.noms, ['.vf-term-pastille', '#vf-coin', '#zoom', '#ask']), rep(x.ferme.noms),
+      x.ouvert.ok, tous(x.ouvert.noms, ['#vf-coin', '.vf-term-tiroir']), rep(x.ouvert.noms)].join()); })()")" \
+  '["true,true,true,true,true,true","true,true,true,true,true,true"]'
+for F in tactile moyen; do
+  assert_eq "CN3.3c ($F) — feuille de détail : chaque repère à 8 px au moins de la pastille « Terminal » et du zoom (toujours comptée)" \
+    "$(E "(() => { const c = j.term.c.$F; if (!c) return 'sans mesure';
+      return [c.pastille, c.n > 0, c.ecarts.every(([p, z]) => p >= 7.99 && (z === null || z >= 7.99))]; })()")" "[true,true,true]"
+done
+assert_eq "CN3.3z — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
 
 echo "=== Mutants (copie du module dans \$WORK) ==="
@@ -135,6 +187,12 @@ mutant M-TERMINAL assets/ui/02-vf-ligne-etat.js "s.appendChild(ls);" \
   "s.appendChild(ls); const tm = document.createElement('span'); tm.className = 'vf-term-seg'; tm.textContent = 'Terminal'; ls.appendChild(tm);" cn2 cn25
 assert_eq "M-TERMINAL — le mutant rougit CN2.5 (un segment « Terminal » ajouté sans --terminal) (témoin : le bloc existe)" \
   "$(E "[j.cn2.c25.term, j.cn2.c25.texte]" "$RM")" "[1,true]"
+mutant M-ORPHELIN assets/ui/02-vf-reperes.js "if (fruit && S && S.focaliser(fruit)) return;" "if (fruit === 0) return;" cn3 cn34
+assert_eq "M-ORPHELIN — le mutant rougit CN3.4a (le focus orphelin ne va plus à la carte amenée) (témoin : le repère droit a bien disparu)" \
+  "$(E "[j.cn3.orphelin.a.apres.tag === 'g', j.cn3.orphelin.a.repere]" "$RM")" "[false,false]"
+mutant M-ONGLETS assets/ui/02-vf-coin.js "inset: -4px 0;" "inset: 0;" cn3 cn32
+assert_eq "M-ONGLETS — le mutant rougit CN3.2 (la zone d'appui des onglets retombe à 36 px) (témoin : l'onglet visuel reste à 36)" \
+  "$(E "[j.cn3.tabs.onglets.every((o) => o.haut && o.bas), j.cn3.tabs.onglets.every((o) => Math.abs(o.h - 36) <= 1)]" "$RM")" "[false,true]"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

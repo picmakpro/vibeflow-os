@@ -29,6 +29,17 @@ const OUTIL = `window.__cn = {
     for (let i = 0; i < rs.length; i++) for (let j = i + 1; j < rs.length; j++) { const a = rs[i], b = rs[j];
       if (!(a.r <= b.l || b.r <= a.l || a.b <= b.t || b.b <= a.t)) ok = false; }
     return ok; },
+  zone(e) { const b = e.getBoundingClientRect(), ny = Math.max(0, (44 - b.height) / 2), nx = Math.max(0, (44 - b.width) / 2);
+    return { l: b.left - nx, t: b.top - ny, r: b.right + nx, b: b.bottom + ny, w: b.width + 2 * nx, h: b.height + 2 * ny, ny, nx }; },
+  appui(e) { const z = this.zone(e), b = e.getBoundingClientRect(), cx = b.left + b.width / 2, cy = b.top + b.height / 2;
+    return [[cx, z.t + 1], [cx, z.b - 1], [z.l + 1, cy], [z.r - 1, cy]].every(([x, y]) => {
+      const q = document.elementFromPoint(x, y); return !!q && e.contains(q); }); },
+  ecart(a, b) { const x = Math.max(a.l - b.r, b.l - a.r), y = Math.max(a.t - b.b, b.t - a.b); return Math.max(x, y); },
+  repsel() { return [...document.querySelectorAll('button.vf-repere')]; },
+  idDe(g) { for (const [i, x] of VibeFlow.state.chipEls) if (x === g) return i; return null; },
+  actif() { const a = document.activeElement, g = a.closest ? a.closest('g.node') : null;
+    return { tag: a.tagName.toLowerCase(), bord: a.dataset ? a.dataset.bord || null : null, id: g ? this.idDe(g) : null,
+      itin: VF_CANEVAS.carteItinerante() }; },
   actives() { return document.getAnimations().filter((a) => a.playState === 'running' || a.playState === 'pending').length; } }`;
 const KEYS = { Tab: 9, Enter: 13, Escape: 27 };
 
@@ -40,7 +51,8 @@ await executer(chrome, async (s) => {
   const vue = (w, h, mobile) => s.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile });
   const touche = async (nom) => {
     for (const type of ['keyDown', 'keyUp']) {
-      await s.send('Input.dispatchKeyEvent', { type, key: nom, code: nom, windowsVirtualKeyCode: KEYS[nom], nativeVirtualKeyCode: KEYS[nom] });
+      const texte = nom === 'Enter' && type === 'keyDown' ? '\r' : undefined;
+      await s.send('Input.dispatchKeyEvent', { type, key: nom, code: nom, text: texte, windowsVirtualKeyCode: KEYS[nom], nativeVirtualKeyCode: KEYS[nom] });
     }
   };
   const souris = (type, x, y) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
@@ -52,7 +64,11 @@ await executer(chrome, async (s) => {
   };
   const lireVue = () => s.ev('JSON.stringify([VibeFlow.state.container, document.querySelectorAll("#viewport .node").length])');
   const charger = async (page, w = 1440, h = 900, mobile = false) => {
-    await vue(w, h, mobile); await s.naviguer(`${racine}/${page}?lang=en`); await s.attendre(PRET, `page ${page}`);
+    await vue(w, h, mobile); await s.naviguer(`${racine}/${page}?lang=en`);
+    if (mode === 'term') { // le tiroir du terminal se rouvre de lui-même d'une page à l'autre (stockage) : chaque page part tiroir fermé
+      await s.ev("localStorage.removeItem('vf.terminal.open'); localStorage.removeItem('vf.terminal.h')"); await s.naviguer(`${racine}/${page}?lang=en`);
+    }
+    await s.attendre(PRET, `page ${page}`);
     await s.attendre("!!document.querySelector('#viewport .node')", `cartes ${page}`); await s.attendre(POSEE, `vue posée ${page}`);
     await stabiliser(lireVue, { pas: 120, max: 5000 });
     await pause(1200); // la visite guidée du premier passage démarre après le chargement : Échap jusqu'à sa fermeture
@@ -116,7 +132,7 @@ await executer(chrome, async (s) => {
         const a = h.getBoundingClientRect(), b = f.getBoundingClientRect(), l = q('.vf-mh line'), p = document.createElement('i');
         p.style.color = 'var(--text-3)'; document.body.appendChild(p); const c = getComputedStyle(p).color; p.remove();
         return { affiche: h.style.display !== 'none' && a.width > 0, part: a.width / b.width, gauche: (a.left - b.left) / b.width,
-          trait: getComputedStyle(l).stroke === c,
+          trait: getComputedStyle(l).stroke === c, vide: getComputedStyle(f).fill === 'none',
           nom: document.querySelector('#vf-minicarte').getAttribute('aria-label') }; })())`;
       const av = await lire(VUE), hf = await lire(HACH);
       await s.ev('VFGitTiroir.ouvrir()'); await s.attendre('VFGitTiroir.ouvert()', 'tiroir Git ouvert');
@@ -164,6 +180,110 @@ await executer(chrome, async (s) => {
       await s.send('Emulation.setTouchEmulationEnabled', { enabled: false });
     });
     return o;
+  }
+  const tactile = (on) => s.send('Emulation.setTouchEmulationEnabled', { enabled: on });
+  const feuilleFermee = async () => {
+    if (!await s.ev("document.body.classList.contains('no-panel')")) await s.ev("document.getElementById('btn-panel').click()");
+    await s.attendre("document.body.classList.contains('no-panel')", 'feuille fermée');
+  };
+  // la zone basse en feuille de détail : repères et boutons de zoom (zones d'appui de 44, sans recouvrement, hors de la carte sélectionnée)
+  const BASSE = `JSON.stringify((() => { const S = VibeFlow.state, g = S.chipEls.get(S.selected), c = g && g.querySelector('.card').getBoundingClientRect();
+    const R = __cn.repsel(), Z = [...document.querySelectorAll('#zoom button')], tous = [...R, ...Z], zs = tous.map((e) => __cn.zone(e));
+    let libre = true; for (let i = 0; i < zs.length; i++) for (let j = i + 1; j < zs.length; j++) if (__cn.ecart(zs[i], zs[j]) < -0.01) libre = false;
+    const coupe = (e) => { const b = e.getBoundingClientRect(); return !!c && b.left < c.right && b.right > c.left && b.top < c.bottom && b.bottom > c.top; };
+    return { n: R.length, appui: R.every((e) => __cn.appui(e)), zones: zs.map((z) => [Math.round(z.w), Math.round(z.h)]), libre,
+      vue: !!c && c.right > 0 && c.left < innerWidth && c.bottom > 0 && c.top < innerHeight, couvre: tous.filter(coupe).length, zoom: Z.length }; })())`;
+  if (mode === 'cn3') {
+    o.cn3 = { f: {}, tabs: {}, orphelin: {}, ro: {} };
+    for (const [cle, w, h, doigt] of [['tactile', 390, 844, true], ['moyen', 800, 900, false]]) {
+      await sec('cn31', async () => {
+        await tactile(doigt); await charger('index.html', w, h, doigt); await gros();
+        if (await s.ev("document.body.classList.contains('no-panel')")) await s.ev("document.getElementById('btn-panel').click()");
+        await s.attendre("!document.body.classList.contains('no-panel')", 'feuille ouverte'); await pause(400);
+        const ouvert = await lire(`JSON.stringify({ ferme: document.body.classList.contains('no-panel'), n: __cn.repsel().length })`);
+        await feuilleFermee(); await s.ev('VF_CANEVAS.amenerDansLeChamp(VibeFlow.state.selected)'); await rep();
+        o.cn3.f[cle] = { ouvert, ferme: await lire(BASSE) };
+      });
+    }
+    await sec('cn32', async () => { // onglets du téléphone : visuel de 36, zone d'appui de 44 (une sonde 3 px au-dessus et au-dessous reste dans l'onglet)
+      await tactile(true); await charger('index.html', 390, 844, true);
+      o.cn3.tabs = await lire(`JSON.stringify({ onglets: [...document.querySelectorAll('.vf-tabs a')].map((a) => {
+        const b = a.getBoundingClientRect(), x = b.left + b.width / 2;
+        const u = document.elementFromPoint(x, b.top - 3), d = document.elementFromPoint(x, b.bottom + 3);
+        return { h: b.height, haut: !!u && a.contains(u), bas: !!d && a.contains(d) }; }),
+        zoom: [...document.querySelectorAll('#zoom button')].map((e) => [e.offsetWidth, e.offsetHeight]) })`);
+    });
+    await tactile(false);
+    await sec('cn34', async () => { // focus orphelin : fruit du geste, voisin, carte itinérante ; jamais body
+      await charger('index.html'); await gros();
+      const F = (b) => `(() => { const e = document.querySelector('button.vf-repere[data-bord=${b}]'); if (e) e.focus(); return !!e; })()`;
+      const o4 = o.cn3.orphelin = { a: {}, b: {}, c: {} }; await rep(); o4.a.focus = await s.ev(F('droite'));
+      let proche = null, n = 0;
+      const DR = "!!document.querySelector('button.vf-repere[data-bord=droite]')";
+      for (; n < 12 && await s.ev(DR); n++) { proche = await s.ev('__cn.procheDroite()'); await touche('Enter'); await pause(200); }
+      o4.a = { ...o4.a, n, dernier: proche, apres: await lire('JSON.stringify(__cn.actif())'), repere: await s.ev(DR) };
+      await s.ev("document.getElementById('z-fit').click()"); await rep(); o4.b.focus = await s.ev(F('bas'));
+      await s.ev('VF_CANEVAS.deplacer({ x: 0, y: -6000 })'); await rep();
+      o4.b = { ...o4.b, apres: await lire('JSON.stringify(__cn.actif())'), restants: (await lire('JSON.stringify(__cn.reperes())')).map((r) => r.bord) };
+      o4.c.focus = await s.ev(F('haut'));
+      for (let i = 0; i < 10; i++) await s.ev("document.getElementById('z-out').click()");
+      await s.ev(`(() => { const S = VibeFlow.state, F = VF_CANEVAS.champDeLecture(), cs = S.layout.children, { k, x, y } = S.t, m = (f) => Math[f];
+        const x0 = m('min')(...cs.map((c) => c.x * k + x)), x1 = m('max')(...cs.map((c) => (c.x + c.width) * k + x));
+        const y0 = m('min')(...cs.map((c) => c.y * k + y)), y1 = m('max')(...cs.map((c) => (c.y + c.height) * k + y));
+        VF_CANEVAS.deplacer({ x: F.x + F.w / 2 - (x0 + x1) / 2, y: F.y + F.h / 2 - (y0 + y1) / 2 }); })()`);
+      await rep(); o4.c = { ...o4.c, restants: (await lire('JSON.stringify(__cn.reperes())')).length, apres: await lire('JSON.stringify(__cn.actif())') };
+    });
+    await sec('cn35', async () => { // mouvement réduit : aucune animation active après un repère, un clic de minicarte, l'ouverture du tiroir Git
+      await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
+      await charger('index.html'); await gros(); await s.ev('__cn.place("toutDroite")'); await rep(); o.cn3.ro = {};
+      await clicSur('button.vf-repere[data-bord=droite]'); o.cn3.ro.repere = await s.ev('__cn.actives()');
+      const m = await lire("JSON.stringify(__cn.r('#vf-minicarte'))"); await clic(m.l + m.w / 2, m.t + m.h / 2); o.cn3.ro.mini = await s.ev('__cn.actives()');
+      await s.ev('VFGitTiroir.ouvrir()'); await pause(60); o.cn3.ro.tiroir = await s.ev('__cn.actives()');
+      o.cn3.ro.media = await s.ev("matchMedia('(prefers-reduced-motion: reduce)').matches");
+    });
+    return o;
+  }
+  if (mode === 'term') { // le lab lancé avec --terminal : la pastille « Terminal » et le tiroir du terminal
+    o.term = { a: null, b: [], c: {} };
+    const OUV = "(() => { const r = document.querySelector('.vf-term-tiroir'); return !!r && !r.hidden && r.getBoundingClientRect().height > 0; })()";
+    const DISJ = `JSON.stringify((() => { const L = ['.vf-term-pastille', '#vf-coin', '#zoom', '#ask', '.vf-term-tiroir',
+      ...__cn.repsel().map((e) => 'button.vf-repere[data-bord=' + e.dataset.bord + ']')].filter((q) => __cn.r(q));
+      return { noms: L, ok: __cn.disjoints(L) }; })())`;
+    const ouvrirTiroir = async () => {
+      await clicSur('button.vf-term-pastille'); await s.attendre(OUV, 'tiroir du terminal ouvert');
+      await stabiliser(() => s.ev("JSON.stringify(__cn.r('.vf-term-tiroir'))"), { pas: 200, max: 5000 });
+      await s.ev("document.getElementById('z-fit').click()"); await rep();
+    };
+    await sec('cn33a', async () => { await charger('index.html'); await gros(); await ouvrirTiroir(); o.term.a = await lire(DISJ); });
+    await sec('cn33b', async () => {
+      for (const w of [1440, 1024]) {
+        await charger('index.html', w, 900); await gros(); await rep(); const ferme = await lire(DISJ); await ouvrirTiroir();
+        o.term.b.push({ w, ferme, ouvert: await lire(DISJ) });
+      }
+    });
+    for (const [cle, w, h, doigt] of [['tactile', 390, 844, true], ['moyen', 800, 900, false]]) {
+      await sec('cn33c', async () => { // feuille de détail : chaque repère à 8 px au moins de la pastille et du zoom
+        await tactile(doigt); await charger('index.html', w, h, doigt); await gros(); await feuilleFermee();
+        await s.ev('VF_CANEVAS.amenerDansLeChamp(VibeFlow.state.selected)'); await rep();
+        o.term.c[cle] = await lire(`JSON.stringify((() => { const p = __cn.r('.vf-term-pastille'), z = __cn.r('#zoom'), R = __cn.repsel();
+          const bx = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom }; };
+          return { pastille: !!p, zoom: !!z, n: R.length, ecarts: R.map((e) => [p ? __cn.ecart(bx(e), p) : null, z ? __cn.ecart(bx(e), z) : null]) }; })())`);
+      });
+    }
+    await tactile(false);
+    return o;
+  }
+  if (mode === 'shots') { // captures pour la critique de design (hors suite) : coin à 1440 px, zone basse à 390 px, deux thèmes ; CN_SHOTS = dossier
+    const fs = await import('node:fs'); fs.mkdirSync(process.env.CN_SHOTS, { recursive: true });
+    for (const [cle, w, h, doigt] of [['1440', 1440, 900, false], ['390', 390, 844, true]]) for (const th of ['dark', 'light']) {
+      await tactile(doigt); await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: th }] });
+      await charger('index.html', w, h, doigt); await s.ev(`document.documentElement.setAttribute('data-theme', '${th}')`); await gros();
+      if (doigt) { await feuilleFermee(); await s.ev('VF_CANEVAS.amenerDansLeChamp(VibeFlow.state.selected)'); }
+      else if (th === 'dark') { await s.ev('VFGitTiroir.ouvrir()'); await pause(500); }
+      await rep(); await pause(500); const r = await s.send('Page.captureScreenshot', { format: 'png' });
+      fs.writeFileSync(`${process.env.CN_SHOTS}/coin-${cle}-${th}.png`, Buffer.from(r.data, 'base64'));
+    }
+    await tactile(false); return o;
   }
   return o;
 });
