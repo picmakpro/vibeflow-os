@@ -3,6 +3,7 @@
 #   A  un lien symbolique du lab vers l'extérieur n'est jamais suivi à l'assemblage : rien de sa cible dans les pages ni dans l'export (témoin positif : le même contenu, en fichier normal, y est)
 #   B  un worktree déclaré mais non vérifié n'élargit pas la liste des arbres du lab (témoin positif : un vrai worktree y est)
 #   D  l'export ne porte plus les clés vfTouch et vfGit (témoin positif : il garde les logos et l'onglet pour s'afficher)
+#   GLOB  coût borné de la correspondance de motifs du moteur (79-21, SOCL-26) : équivalence à la copie gelée, croissance, plafonds, mutants
 # Isolation git, aucun serveur ni navigateur. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -407,6 +408,393 @@ node "$WORK/noter.mjs" "$SCRIPTS" "$SF9"
 assert_eq "H9 — .cache lié vers un dossier interne du lab : rien n'y est écrit (aucun composant du chemin n'est un lien)" "$(ls "$LF9/autre-dossier" | wc -l | tr -d ' ')" "0"
 LF10="$WORK/lab-f10"; mkplan "$LF10"; SF10="$LF10/.vibeflow/cockpit"; mkdir -p "$SF10/.cache"; node "$WORK/noter.mjs" "$SCRIPTS" "$SF10"
 assert_eq "H10 — témoin positif : sans lien ni tube, le journal s'écrit" "$(grep -c 'lanceur : essai' "$SF10/.cache/serveur.log")" "1"
+
+# ---------- GLOB : coût borné de la correspondance de motifs (79-21, P79-D-32, SOCL-26) ----------
+# Aucun serveur, aucun navigateur : scripts d'aide en heredoc dans $GL_AUX ; copie gelée de l'ancienne implémentation, équivalence générative à graine,
+# banc de croissance validé sur témoin, plafonds nommés. Variables VF_GLOB_GRAINE (entier ou alea), VF_GLOB_N (nombre de motifs), VF_GLOB_FAMILLES.
+GL_LIB="$(cd "$SCRIPTS/../skills/cockpit-moteur/scripts/lib" && pwd -P)"; GL_AUX="$WORK/gl"; mkdir -p "$GL_AUX"
+GL_GRAINE_DEFAUT=79210101; GL_GRAINE="${VF_GLOB_GRAINE:-$GL_GRAINE_DEFAUT}"; [ "$GL_GRAINE" = alea ] && GL_GRAINE="$(date +%s)"; GL_N="${VF_GLOB_N:-4000}"
+cat > "$GL_AUX/ancien.mjs" <<'JS'
+// copie gelée de la base, ne se modifie jamais ; toute retouche est une décision de plan (79-21).
+export const toPosix = (p) => p.replace(/\\/g, '/');
+const GLOB_CHARS = /[*?{[]/;
+
+export function globToRegExp(glob) {
+  const g = toPosix(glob).replace(/^\.\//, '').replace(/\/$/, '');
+  let re = '';
+  let braces = 0;
+  for (let i = 0; i < g.length; ) {
+    const c = g[i];
+    if (c === '*') {
+      if (g[i + 1] === '*') {
+        const atStart = i === 0 || g[i - 1] === '/';
+        const atEnd = i + 2 === g.length || g[i + 2] === '/';
+        if (atStart && atEnd) {
+          if (i + 2 === g.length) { re += '.*'; i += 2; }
+          else { re += '(?:.*/)?'; i += 3; }
+          continue;
+        }
+        re += '.*'; i += 2; continue;
+      }
+      re += '[^/]*'; i++; continue;
+    }
+    if (c === '?') { re += '[^/]'; i++; continue; }
+    if (c === '{') { braces++; re += '(?:'; i++; continue; }
+    if (c === '}' && braces) { braces--; re += ')'; i++; continue; }
+    if (c === ',' && braces) { re += '|'; i++; continue; }
+    // a whole segment like [id], [...slug] or [[...slug]] is a folder name (Next.js, SvelteKit), not a character class
+    if (c === '[' && (i === 0 || g[i - 1] === '/')) {
+      const end = g.indexOf('/', i) < 0 ? g.length : g.indexOf('/', i);
+      const seg = g.slice(i, end);
+      if (/^\[\[?(\.\.\.)?[A-Za-z_$][\w$-]*\]\]?$/.test(seg)) { re += seg.replace(/[.[\]$\\]/g, '\\$&'); i = end; continue; }
+    }
+    if (c === '[') {
+      const j = g.indexOf(']', i + 1);
+      if (j > i) { re += '[' + g.slice(i + 1, j).replace(/^!/, '^').replace(/\\/g, '\\\\') + ']'; i = j + 1; continue; }
+    }
+    re += c.replace(/[.+^$()|\\\]]/g, '\\$&');
+    i++;
+  }
+  return new RegExp('^' + re + '$');
+}
+
+/** Compile a glob. A pattern with no wildcards also matches everything under it as a directory. */
+export function compileGlob(glob) {
+  const g = toPosix(glob).replace(/^\.\//, '').replace(/\/$/, '');
+  const literalPrefix = g.split(GLOB_CHARS)[0];
+  if (!GLOB_CHARS.test(g)) {
+    return { glob, specificity: g.length, test: (p) => p === g || p.startsWith(g + '/') };
+  }
+  // A glob that names directories (src/components/{a,b}) also matches everything beneath them.
+  const re = globToRegExp(g);
+  const under = globToRegExp(g + '/**');
+  return { glob, specificity: literalPrefix.length, test: (p) => re.test(p) || under.test(p) };
+}
+
+export const source = (g) => globToRegExp(g).source;
+JS
+cat > "$GL_AUX/equiv.mjs" <<'JS'
+// equiv.mjs <dossier lib> <copie gelée> <mode> <graine> <n> — équivalence de compileGlob contre la copie gelée de la base (79-21).
+// Modes : couverture, equiv, invalides, nonchaines. Sortie : une ligne de verdict (la première contre-preuve, jamais plus de 300 caractères).
+import { pathToFileURL } from 'node:url';
+const [, , lib, gele, mode, graineArg, nArg] = process.argv;
+const vieux = await import(pathToFileURL(gele).href);
+const neuf = await import(pathToFileURL(lib + '/common.mjs').href);
+const GRAINE = Number(graineArg), N = Number(nArg);
+function mulberry32(a) { return () => { a |= 0; a = (a + 0x6d2b79f5) | 0; let t = Math.imul(a ^ (a >>> 15), 1 | a); t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t; return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+const rnd = mulberry32(GRAINE);
+const pick = (a) => a[Math.floor(rnd() * a.length)];
+const chance = (p) => rnd() < p;
+const esc = (s) => JSON.stringify(s);
+const CAR = ['a', 'b', 'c', 'é', '-'];
+const mot = () => { let s = ''; const n = Math.floor(rnd() * 4); for (let i = 0; i < n; i++) s += pick(CAR); return s; };
+const motSlash = () => { let s = ''; const n = Math.floor(rnd() * 4); for (let i = 0; i < n; i++) s += chance(0.3) ? '/' : pick(CAR); return s; };
+// jetons : { t: texte, k: classes, i: instanciation (chemin qui devrait correspondre) }
+const lit = (t, k = []) => ({ t, k, i: () => t });
+const arme = (t) => t.replace(/\*\*/g, () => motSlash()).replace(/\*/g, () => mot());
+const acc = (arms, k) => ({ t: arms.t, k: ['accolades', ...k], i: () => arme(pick(arms.a)) });
+const JOKERS = [
+  { t: '*', k: ['etoile'], i: () => mot() }, { t: '**', k: ['dbl-isole', 'dbl'], i: () => motSlash() }, { t: '?', k: ['joker-point'], i: () => pick(CAR) },
+  { t: '**/', k: ['dbl', 'dbl-isole'], i: () => (chance(0.5) ? '' : motSlash() + '/') }, { t: '/**', k: ['dbl', 'dbl-isole'], i: () => (chance(0.5) ? '' : '/' + motSlash()) },
+];
+const ACCOLADES = [
+  acc({ t: '{a,b}', a: ['a', 'b'] }, []), acc({ t: '{a,b/c}', a: ['a', 'b/c'] }, []), acc({ t: '{a*,b}', a: ['a*', 'b'] }, []),
+  acc({ t: '{*,**}', a: ['*', '**'] }, ['dbl']), acc({ t: '{a,{b,c}}', a: ['a', 'b', 'c'] }, ['accolades-imbriquees']),
+];
+const CLASSES = [
+  { t: '[abc]', k: ['classe'], i: () => (chance(0.33) ? pick(['d', 'x', 'é']) : pick(['a', 'b', 'c'])) },
+  { t: '[!a]', k: ['classe', 'classe-niee'], i: () => (chance(0.33) ? 'a' : pick(['b', 'c', 'é'])) },
+  { t: '[a-c]', k: ['classe'], i: () => (chance(0.33) ? 'd' : pick(['a', 'b', 'c'])) },
+];
+const DYN = [
+  { t: '[id]', k: ['dynamique'], i: () => (chance(0.5) ? '[id]' : mot() || 'z') }, { t: '[...slug]', k: ['dynamique'], i: () => (chance(0.5) ? '[...slug]' : mot() || 'z') },
+  { t: '[[...slug]]', k: ['dynamique'], i: () => (chance(0.5) ? '[[...slug]]' : mot() || 'z') },
+];
+const SPECIAUX = ['.', '(', ')', '|', '+', '^', '$'].map((t) => lit(t, ['special']));
+const LITS = ['a', 'b', 'c', 'é', '.', '-', ','].map((t) => lit(t, t === '.' ? ['special'] : []));
+const SLASH = lit('/');
+const DBL = [JOKERS[1], JOKERS[3], JOKERS[4]];
+function jeton() {
+  const r = rnd();
+  if (r < 0.3) return pick(LITS);
+  if (r < 0.45) return SLASH;
+  if (r < 0.65) return pick(JOKERS);
+  if (r < 0.75) return pick(ACCOLADES);
+  if (r < 0.82) return pick(CLASSES);
+  if (r < 0.87) return pick(DYN);
+  return pick(SPECIAUX);
+}
+function motif() {
+  const m = rnd();
+  let js = [];
+  if (m < 0.1) { const n = 1 + Math.floor(rnd() * 5); for (let i = 0; i < n; i++) js.push(chance(0.2) ? SLASH : pick([...LITS.slice(0, 5), ...SPECIAUX])); }
+  else if (m < 0.2) { const n = 3 + Math.floor(rnd() * 2); for (let i = 0; i < n; i++) { js.push(pick(DBL)); js.push(pick(LITS.slice(0, 3))); js.push(SLASH); } }
+  else { const n = 1 + Math.floor(rnd() * 7); for (let i = 0; i < n; i++) js.push(jeton()); }
+  let t = js.map((j) => j.t).join('');
+  const k = new Set(js.flatMap((j) => j.k));
+  const joker = js.some((j) => /[*?{[]/.test(j.t));
+  if (!joker) k.add('sans-joker');
+  if (js.filter((j) => j.t.includes('**') || j === JOKERS[1]).length >= 3) k.add('trois-dbl');
+  if (chance(0.25)) { t = './' + t; k.add('point-barre'); }
+  if (chance(0.25)) { t += '/'; k.add('barre-finale'); }
+  if (chance(0.06)) { t = t.replace(/\//g, '\\'); }
+  return { t, k, js };
+}
+const PIECES = ['a', 'b', 'c', '/', '.js', 'é', '-', ',', '\n', '\r', '(', '|', '$', 'id'];
+function chemins(m) {
+  const out = [];
+  for (let n = 0; n < 4; n++) {
+    let p = m.js.map((j) => j.i()).join('');
+    if (m.t.startsWith('./') || m.t.includes('\\')) p = p.replace(/\\/g, '/');
+    if (chance(0.25)) { const r = Math.floor(rnd() * 4); if (r === 0) p += 'x'; else if (r === 1) p += '/'; else if (r === 2) p += '/z'; else if (p.length) { const q = Math.floor(rnd() * p.length); p = p.slice(0, q) + pick(['x', 'q', '/']) + p.slice(q + 1); } }
+    out.push(p);
+  }
+  for (let n = 0; n < 4; n++) { let p = ''; const c = Math.floor(rnd() * 9); for (let i = 0; i < c; i++) p += pick(PIECES); out.push(p); }
+  return out;
+}
+const tente = (f, g) => { try { return { v: f(g) }; } catch (e) { return { e: e.name + ': ' + e.message }; } };
+const court = (s) => (s.length > 290 ? s.slice(0, 290) + '…' : s);
+const verdict = (c, p) => { try { return String(c.test(p)); } catch (e) { return 'levée ' + e.name; } };
+// première divergence d'une paire (motif, chemins), ou null
+function ecart(g, ps) {
+  const o = tente(vieux.compileGlob, g), n = tente(neuf.compileGlob, g);
+  if (o.e !== undefined || n.e !== undefined) return o.e === n.e ? null : `graine=${GRAINE} motif=${esc(g)} message : attendu ${esc(o.e)} obtenu ${esc(n.e)}`;
+  for (const champ of ['glob', 'specificity']) if (o.v[champ] !== n.v[champ]) return `graine=${GRAINE} motif=${esc(g)} champ ${champ} : attendu ${esc(o.v[champ])} obtenu ${esc(n.v[champ])}`;
+  for (const p of ps) { const a = verdict(o.v, p), b = verdict(n.v, p); if (a !== b) return `graine=${GRAINE} motif=${esc(g)} chemin=${esc(p)} verdict : attendu ${a} obtenu ${b}`; }
+  return null;
+}
+if (mode === 'couverture' || mode === 'equiv') {
+  const cls = {};
+  for (let i = 0; i < N; i++) {
+    const m = motif(); const ps = chemins(m);
+    if (mode === 'equiv') { const e = ecart(m.t, ps); if (e) { console.log(court(e)); process.exit(0); } continue; }
+    const o = tente(vieux.compileGlob, m.t);
+    for (const c of m.k) {
+      const s = (cls[c] ||= { m: 0, oui: 0, non: 0 }); s.m++;
+      if (o.v) for (const p of ps) { if (o.v.test(p)) s.oui++; else s.non++; }
+    }
+  }
+  if (mode === 'equiv') console.log('identique');
+  else {
+    const tous = ['sans-joker', 'etoile', 'dbl-isole', 'joker-point', 'accolades', 'accolades-imbriquees', 'classe', 'classe-niee', 'dynamique', 'point-barre', 'barre-finale', 'trois-dbl', 'special'];
+    const bas = tous.filter((c) => !cls[c] || cls[c].m < 150 || cls[c].oui < 20 || cls[c].non < 20);
+    console.log(`graine=${GRAINE} motifs=${N} classes : ${tous.map((c) => `${c}=${cls[c]?.m ?? 0}/${cls[c]?.oui ?? 0}/${cls[c]?.non ?? 0}`).join(' ')}`);
+    console.log(bas.length ? 'sous le minimum : ' + bas.join(' ') : 'complète');
+  }
+} else if (mode === 'nonchaines') {
+  const motifs = ['*', '**', 'u*', '**/undefined', '{null,undefined}', '1?', '**/12', '?2', 'n*l', '*/*', '{a,b}', '[0-9]*', '**/[a-z]*', '.', '[object Object]', '**/object*', 'a/**', '{1,2}?', 'tr??', 'tr*e'];
+  const sym = Symbol('s');
+  const entrees = [undefined, null, 12, true, false, {}, [], ['a/b'], { toString() { return 'a/b'; } }, 0, -1, 1.5, 12n, sym, new String('abc')];
+  let r = 'identique';
+  fin: for (const g of motifs) {
+    const o = tente(vieux.compileGlob, g), n = tente(neuf.compileGlob, g);
+    for (const x of entrees) {
+      const f = (c) => { try { return String(c.v.test(x)); } catch (e) { return 'levée ' + e.name; } };
+      const a = f(o), b = f(n);
+      if (a !== b) { r = court(`motif=${esc(g)} entrée=${typeof x === 'symbol' ? 'Symbol' : esc(String(x))} attendu ${a} obtenu ${b}`); break fin; }
+    }
+  }
+  console.log(r);
+} else if (mode === 'invalides') {
+  const ERR = ['[', '{', '}', ',', ']'];
+  const alpha = [...LITS, ...SPECIAUX, SLASH, ...JOKERS, ...CLASSES, ...DYN, ...ACCOLADES];
+  // alternative de niveau supérieur dans une source de regex : barre verticale hors de tout groupe, hors classe, échappements sautés
+  const hautNiveau = (s) => { let d = 0; for (let i = 0; i < s.length; i++) { const c = s[i]; if (c === '\\') { i++; continue; } if (c === '[') { i++; while (i < s.length && s[i] !== ']') { if (s[i] === '\\') i++; i++; } continue; } if (c === '(') d++; else if (c === ')') d--; else if (c === '|' && d === 0) return true; } return false; };
+  const n3 = { leve: 0, haut: 0, autre: 0 };
+  const fixes = [['a[{/*.js,/', 'zz/']];
+  const biais = () => { const f = pick([() => '[', () => '{', () => '}', () => ',', () => ']']); return f(); };
+  const motsInvalides = [];
+  for (const [g] of fixes) motsInvalides.push(g);
+  for (let i = 0; i < N; i++) {
+    let g = '';
+    if (chance(0.3)) g = pick(['a', '', 'b/']) + '[' + pick(['', 'a', '/']) + '{' + pick(['/', 'a/', '']) + pick(['*', '?', '**']) + pick(['.js', '', 'b']) + ',' + pick(['/', 'a', '']);
+    else { const n = 1 + Math.floor(rnd() * 6); for (let j = 0; j < n; j++) g += chance(0.4) ? pick(ERR) : pick(alpha).t; }
+    motsInvalides.push(g);
+  }
+  const res = { leve: 'identique', haut: 'identique', autre: 'identique' };
+  const note = (k, m) => { if (res[k] === 'identique') res[k] = court(m); };
+  for (const g of motsInvalides) {
+    const o = tente(vieux.compileGlob, g);
+    const ps = [...(g === fixes[0][0] ? [fixes[0][1]] : []), ...chemins({ t: g, js: [] }), 'a/b', 'a', '/', 'zz/', 'a/zz', 'a{/x.js', 'a[{/x.js,/'];
+    if (o.e !== undefined) {
+      n3.leve++;
+      const n = tente(neuf.compileGlob, g);
+      if (n.e !== o.e) note('leve', `graine=${GRAINE} motif=${esc(g)} message : attendu ${esc(o.e)} obtenu ${esc(n.e)}`);
+      continue;
+    }
+    const haut = hautNiveau(vieux.source(g)) || hautNiveau(vieux.source(g + '/**'));
+    const n = tente(neuf.compileGlob, g);
+    if (n.e !== undefined) { note(haut ? 'haut' : 'autre', `graine=${GRAINE} motif=${esc(g)} levée neuve : ${esc(n.e)}`); continue; }
+    if (haut) {
+      n3.haut++;
+      const mauvais = ps.find((p) => n.v.test(p));
+      if (mauvais !== undefined) note('haut', `graine=${GRAINE} motif=${esc(g)} chemin=${esc(mauvais)} verdict : attendu false obtenu true (alternative de niveau supérieur)`);
+      continue;
+    }
+    n3.autre++;
+    const e = ecart(g, ps);
+    if (e) note('autre', e);
+  }
+  if (n3.leve < 100) note('leve', `couverture insuffisante levées=${n3.leve}`);
+  if (n3.haut < 10) note('haut', `couverture insuffisante niveau-supérieur=${n3.haut}`);
+  if (n3.autre < 100) note('autre', `couverture insuffisante autres=${n3.autre}`);
+  console.log(`leve: ${res.leve}`); console.log(`haut: ${res.haut}`); console.log(`autre: ${res.autre}`);
+  console.log(`compteurs: levées=${n3.leve} niveau-supérieur=${n3.haut} autres=${n3.autre}`);
+}
+JS
+cat > "$GL_AUX/perf.mjs" <<'JS'
+// perf.mjs — croissance du coût de compileGlob (79-21). Modes : mesure <lib> <F> <N>, pilote <lib> <F>, banc.
+// Les motifs, unités de répétition, tailles et jumeaux positifs des cinq familles vivent ICI et nulle part ailleurs.
+import { pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
+import { fileURLToPath } from 'node:url';
+const [, , mode, a1, a2, a3] = process.argv;
+const FAMILLES = {
+  F1: { motif: '**/a/**/a/**/a/*.js', unite: 'a/', taille: 280, jumeau: 'a/a/a/x.js' },
+  F2: { motif: '**/a/**/a/**/a/**/a/*.js', unite: 'a/', taille: 100, jumeau: 'a/a/a/a/x.js' },
+  F3: { motif: '**/**/a/**/**/a/*.js', unite: 'a/', taille: 100, jumeau: 'a/a/x.js' },
+  F4: { motif: '**/{a,a/a}/**/{a,a/a}/**/{a,a/a}/*.js', unite: 'a/', taille: 150, jumeau: 'a/a/a/x.js' },
+  F5: { motif: 'a**a**a**a**b', unite: 'a', taille: 130, jumeau: 'aaaab' },
+};
+const chemin = (f, n) => (f.unite.repeat(n));
+const mediane = (v) => [...v].sort((x, y) => x - y)[Math.floor(v.length / 2)];
+const ns = () => process.hrtime.bigint();
+// procédure commune : échauffement, lots d'au moins 20 ms, trois essais entrelacés (N, 2N, N, 2N…), médiane par taille ; ms par appel
+function procedure(appelN, appel2N, petit) {
+  let sink = 0;
+  for (let i = 0; i < 3; i++) sink += petit() ? 1 : 0;
+  sink += appelN() ? 1 : 0; sink += appel2N() ? 1 : 0;
+  const calibre = (f) => { let r = 1; for (;;) { const t0 = ns(); for (let i = 0; i < r; i++) sink += f() ? 1 : 0; const d = Number(ns() - t0) / 1e6; if (d >= 20 || r >= 1 << 22) return r; r *= 2; } };
+  const R1 = calibre(appelN), R2 = calibre(appel2N);
+  const lot = (f, r) => { const t0 = ns(); for (let i = 0; i < r; i++) sink += f() ? 1 : 0; return Number(ns() - t0) / 1e6 / r; };
+  const e1 = [], e2 = [];
+  for (let k = 0; k < 3; k++) { e1.push(lot(appelN, R1)); e2.push(lot(appel2N, R2)); }
+  if (sink < 0) console.error('x');
+  return { t1: mediane(e1), t2: mediane(e2) };
+}
+if (mode === 'mesure') {
+  const f = FAMILLES[a2]; const N = Number(a3);
+  const { compileGlob } = await import(pathToFileURL(a1 + '/common.mjs').href);
+  const c = compileGlob(f.motif);
+  const p1 = chemin(f, N), p2 = chemin(f, 2 * N);
+  if (c.test(p2) !== false) { console.log(JSON.stringify({ forme: 'le chemin mesuré correspond' })); process.exit(0); }
+  console.log(JSON.stringify(procedure(() => c.test(p1), () => c.test(p2), () => c.test(chemin(f, Math.max(1, N >> 2))))));
+} else if (mode === 'jumeau') {
+  const { compileGlob } = await import(pathToFileURL(a1 + '/common.mjs').href);
+  const f = FAMILLES[a2];
+  const c = compileGlob(f.motif);
+  console.log(c.test(f.jumeau) === true && c.test(chemin(f, FAMILLES[a2].taille)) === false ? 'ok' : 'forme');
+} else if (mode === 'pilote') {
+  const lib = a1; const selection = (process.env.VF_GLOB_FAMILLES || 'F1 F2 F3 F4 F5').split(/\s+/).filter(Boolean);
+  const moi = fileURLToPath(import.meta.url);
+  for (const nom of selection) {
+    if (a2 && a2 !== nom) continue;
+    const f = FAMILLES[nom];
+    let meilleur = null, delai = false, forme = null;
+    for (let s = 0; s < 3; s++) {
+      let sortie;
+      try { sortie = JSON.parse(execFileSync(process.execPath, [moi, 'mesure', lib, nom, String(f.taille)], { timeout: 20000, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })); }
+      catch (e) { if (e.code === 'ETIMEDOUT' || e.signal) { delai = true; break; } forme = 'échec ' + e.message.slice(0, 80); break; }
+      if (sortie.forme) { forme = sortie.forme; break; }
+      if (!meilleur || sortie.t2 / Math.max(sortie.t1, 1e-9) < meilleur.t2 / Math.max(meilleur.t1, 1e-9)) meilleur = sortie;
+      if (sortie.t2 <= 2.5 * sortie.t1 + 1) break;
+    }
+    const fmt = (x) => x.toFixed(3);
+    if (forme) console.log(`${nom} ratio=forme(${forme}) plafond=forme`);
+    else if (delai && !meilleur) console.log(`${nom} ratio=délai plafond=délai`);
+    else {
+      const r = meilleur.t2 / Math.max(meilleur.t1, 1e-9);
+      const rok = meilleur.t2 <= 2.5 * meilleur.t1 + 1;
+      console.log(`${nom} ratio=${rok ? 'ok' : `rouge t1=${fmt(meilleur.t1)}ms t2=${fmt(meilleur.t2)}ms rapport=${r.toFixed(2)}`}${delai ? ' (délai)' : ''} plafond=${meilleur.t2 <= 250 ? 'ok' : `rouge t2=${fmt(meilleur.t2)}ms`}`);
+    }
+  }
+} else if (mode === 'banc') {
+  // deux fonctions de référence, mêmes procédure et critère : une linéaire, une quadratique ; chacune consomme son résultat
+  const lin = (n) => () => { let s = 0; for (let i = 0; i < n; i++) s += (i * 7) ^ (s >>> 3); return s > 0; };
+  const quad = (n) => () => { let s = 0; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) s += (i ^ j) & 3; return s > 0; };
+  const serie = (g, n) => { const r = []; for (let k = 0; k < 3; k++) { const m = procedure(g(n), g(2 * n), g(n >> 2)); r.push(m); } return r; };
+  const meilleurRapport = (rs) => Math.min(...rs.map((m) => m.t2 / Math.max(m.t1, 1e-9)));
+  const critere = (rs) => rs.some((m) => m.t2 <= 2.5 * m.t1 + 1);
+  const rl = serie(lin, 4000000), rq = serie(quad, 2500);
+  console.log(`lineaire=${critere(rl) ? 'laisse-passer' : 'rouge'} quadratique=${meilleurRapport(rq) >= 3.2 ? 'vu' : 'aveugle'} (rapports ${meilleurRapport(rl).toFixed(2)} ${meilleurRapport(rq).toFixed(2)})`);
+}
+JS
+cat > "$GL_AUX/plafonds.mjs" <<'JS'
+// plafonds.mjs <dossier lib> <C0..C4> — plafonds nommés de la correspondance de motifs (79-21). Tailles dérivées des constantes exportées.
+// Sortie : « ok » ou une phrase d'échec ; jamais d'exception qui interrompt la suite.
+import { pathToFileURL } from 'node:url';
+const [, , lib, cas] = process.argv;
+const ms = (f) => { const t0 = process.hrtime.bigint(); const r = f(); return [r, Number(process.hrtime.bigint() - t0) / 1e6]; };
+if (cas === 'C4') {
+  const { compileGlob } = await import(pathToFileURL(lib + '/common.mjs').href);
+  const m = '{'.repeat(500) + 'a' + '}'.repeat(500);
+  try { const c = compileGlob(m); console.log(c.test('a') === true && c.test('b') === false ? 'ok' : 'échec : verdict'); } catch (e) { console.log('échec : ' + e.name); }
+  process.exit(0);
+}
+let g;
+try { g = await import(pathToFileURL(lib + '/vf-glob.mjs').href); } catch (e) { console.log('échec : module de correspondance absent ou illisible (' + e.code + ')'); process.exit(0); }
+const { MAX_MOTIF, MAX_PAS, automateDe } = g;
+if (cas === 'C0') {
+  const entier = (x) => Number.isInteger(x);
+  console.log(entier(MAX_MOTIF) && MAX_MOTIF >= 256 && MAX_MOTIF <= 4096 && entier(MAX_PAS) && MAX_PAS >= 1000000 && MAX_PAS <= 10000000 && typeof automateDe === 'function' ? 'ok' : `échec : constantes ${MAX_MOTIF} ${MAX_PAS} ${typeof automateDe}`);
+  process.exit(0);
+}
+if (!Number.isInteger(MAX_MOTIF) || !Number.isInteger(MAX_PAS)) { console.log('échec : constantes absentes'); process.exit(0); }
+const { compileGlob } = await import(pathToFileURL(lib + '/common.mjs').href);
+if (cas === 'C1') {
+  const c = compileGlob('a/**'); const p = 'a/' + 'x'.repeat(MAX_PAS - 2);
+  const [v, t] = ms(() => c.test(p));
+  console.log(v === false && t < 250 ? 'ok' : `échec : verdict ${v} en ${t.toFixed(1)} ms`);
+} else if (cas === 'C2') {
+  let c, r = 'ok';
+  const m = 'a['.repeat(25000);
+  try { c = compileGlob(m); if (c.test('a[') !== false || c.test(m) !== false) r = 'échec : le motif géant correspond'; } catch (e) { r = 'échec : levée ' + e.name; }
+  console.log(r);
+} else if (cas === 'C3') {
+  const rep = [];
+  const exact = 'a'.repeat(MAX_MOTIF - 1) + '*', plus = 'a'.repeat(MAX_MOTIF) + '*';
+  const ce = compileGlob(exact), cp = compileGlob(plus);
+  if (ce.test('a'.repeat(MAX_MOTIF - 1) + 'xy') !== true) rep.push('motif de MAX_MOTIF caractères inerte');
+  if (cp.test('a'.repeat(MAX_MOTIF) + 'xy') !== false) rep.push('motif de MAX_MOTIF+1 caractères actif');
+  const co = compileGlob('**/a/**/b/**/*.js');
+  if (co.test('a/b/'.repeat(500) + 'x.js') !== true) rep.push('chemin ordinaire long jugé faux');
+  if (co.test('a/b/'.repeat(500) + 'x.ts') !== false) rep.push('chemin ordinaire long jugé vrai à tort');
+  console.log(rep.length ? 'échec : ' + rep.join(', ') : 'ok');
+}
+JS
+glequiv() { node "$GL_AUX/equiv.mjs" "$GL_LIB" "$GL_AUX/ancien.mjs" "$1" "$GL_GRAINE" "$2" 2>&1; }
+glligne() { awk -v k="$1" 'index($0, k ": ") == 1 { print substr($0, length(k) + 3) }'; }
+echo "=== GLOB — coût borné de la correspondance de motifs (P79-D-32, SOCL-26) ==="
+GL_COUV="$(glequiv couverture "$GL_N")"; echo "  $(printf '%s\n' "$GL_COUV" | head -1)"; echo "  rejeu : VF_GLOB_GRAINE=$GL_GRAINE VF_GLOB_N=$GL_N bash test-cockpit-confinement.sh"
+assert_eq "GLOB.E0 — couverture de l'équivalence : chaque classe de motifs atteinte (150 motifs, 20 correspondances, 20 non-correspondances)" "$(printf '%s\n' "$GL_COUV" | tail -1)" "complète"
+assert_eq "GLOB.E1 — équivalence : verdict, specificity et glob identiques à la copie gelée sur $GL_N motifs bien formés (huit chemins chacun)" "$(glequiv equiv "$GL_N" | head -1)" "identique"
+assert_eq "GLOB.E2 — entrées non chaînes (undefined, null, nombre, objet) : verdict de la copie gelée" "$(glequiv nonchaines "$GL_N" | head -1)" "identique"
+GL_INV="$(glequiv invalides 2000)"; echo "  $(printf '%s\n' "$GL_INV" | glligne compteurs)"
+assert_eq "GLOB.E3a — motif malformé que l'ancienne compilation levait : la même SyntaxError, à la compilation" "$(printf '%s\n' "$GL_INV" | glligne leve | head -1)" "identique"
+assert_eq "GLOB.E3b — motif malformé à alternative de niveau supérieur (a[{/*.js,/ et le chemin zz/) : inerte, ne correspond plus à rien" "$(printf '%s\n' "$GL_INV" | glligne haut | head -1)" "identique"
+assert_eq "GLOB.E3c — tout autre motif malformé : équivalence exacte" "$(printf '%s\n' "$GL_INV" | glligne autre | head -1)" "identique"
+GL_PO="$(for F in F1 F2 F3 F4 F5; do node "$GL_AUX/perf.mjs" jumeau "$GL_LIB" "$F" 2>&1 | head -1; done | sort -u | tr -d '\n')"
+assert_eq "GLOB.P0 — forme des cinq familles : le jumeau positif est jugé vrai, le chemin mesuré est jugé faux" "$GL_PO" "ok"
+GL_BANC="$(node "$GL_AUX/perf.mjs" banc 2>&1 | head -1)"; echo "  banc : $GL_BANC"
+assert_eq "GLOB.P3 — banc de mesure : il laisse passer un coût linéaire et voit un coût quadratique" "$(printf '%s\n' "$GL_BANC" | awk '{print $1, $2}')" "lineaire=laisse-passer quadratique=vu"
+if [ "$(printf '%s\n' "$GL_BANC" | awk '{print $1, $2}')" = "lineaire=laisse-passer quadratique=vu" ]; then GL_PIL="$(node "$GL_AUX/perf.mjs" pilote "$GL_LIB" 2>&1)"
+else GL_PIL="$(printf 'F%s ratio=banc-invalide plafond=banc-invalide\n' 1 2 3 4 5)"; fi
+for F in F1 F2 F3 F4 F5; do
+  assert_eq "GLOB.P1.$F — rapport t(2N)/t(N) au plus 2,5 (plancher de bruit 1 ms, meilleure de trois séries)" "$(printf '%s\n' "$GL_PIL" | sed -n "s/^$F ratio=\(.*\) plafond=.*\$/\1/p")" "ok"
+  assert_eq "GLOB.P2.$F — plafond absolu : t(2N) au plus 250 ms" "$(printf '%s\n' "$GL_PIL" | sed -n "s/^$F .* plafond=//p")" "ok"
+done
+for C in C0 C1 C3 C4; do
+  case "$C" in
+    C0) T="constantes MAX_MOTIF et MAX_PAS bornées et exportées, automateDe exporté";;
+    C1) T="chemin au-delà du budget : le testeur rend faux, en moins de 250 ms";;
+    C3) T="frontières : MAX_MOTIF caractères fonctionne, un de plus est inerte ; un chemin ordinaire très long est jugé juste";;
+    C4) T="500 accolades imbriquées : compile et correspond sans dépassement de pile";;
+  esac
+  assert_eq "GLOB.$C — $T" "$(node "$GL_AUX/plafonds.mjs" "$GL_LIB" "$C" 2>&1 | head -1)" "ok"
+done
+GL_C2="$(node "$GL_AUX/plafonds.mjs" "$GL_LIB" C2 2> "$GL_AUX/c2.err" | head -1)"
+GL_C2L="$(awk 'END{print NR}' "$GL_AUX/c2.err")"; GL_C2M="$(awk '{ if (length($0) > m) m = length($0) } END{print m + 0}' "$GL_AUX/c2.err")"
+assert_eq "GLOB.C2 — motif géant de crochets non fermés : ne lève pas, rend faux, un avis d'une ligne de moins de 200 caractères sur stderr" "$GL_C2 / $GL_C2L ligne / $([ "$GL_C2M" -lt 200 ] && echo court || echo long)" "ok / 1 ligne / court"
 
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
