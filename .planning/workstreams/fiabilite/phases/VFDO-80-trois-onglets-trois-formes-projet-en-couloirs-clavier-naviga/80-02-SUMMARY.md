@@ -44,11 +44,8 @@ duration: non mesurée
 ## Non-régression (rejeux isolés, comparés à une copie `git archive` de 680364f1)
 - test-cockpit-equipe : EK15.6 vert sur la base, rouge avec la première pile (le rescue du focus du panneau pré-empte « Au travail ») ; corrigé (le rescue
   ne joue pas quand un tiroir inscrit porte le panneau) : 215 PASS / 0 FAIL. (La copie archive de la base montre 4 rouges EA2.11/EA2.16/EA3.5/EA3.9 : témoins « code d'avant <sha> » qui exigent l'historique git, artefact de l'archive.)
-- test-cockpit-git-tiroir : 193 PASS / 2 FAIL, base 194 / 0. Les D8.* rouges du premier rejeu étaient des aléas de charge. Reste M-ECHAP-390 : son motif
-  `.some((d) => getComputedStyle(d).visibility !== 'hidden')` est la liste retirée par le retrait 4 ; à reciblé sur `visible()` de la pile (suite hors périmètre, trailer Gate-Touche requis).
-- test-cockpit-responsive : 376 / 2 FAIL (base 378 / 0). R5.3 est déterministe : il lit `#panel.innerText` panneau fermé (701-999 px), `visibility: hidden` (P80-D-34)
-  le vide ; la suite doit lire `textContent`, ou le plan changer : à trancher. R15c.2 passe isolé (`true|true|true|true` sur la tête et sur la base, même lab) et rougit dans le
-  rejeu complet sous charge : aléa de charge probable, non établi.
+- test-cockpit-git-tiroir : 194 PASS / 0 FAIL (base 194 / 0) après reciblage du mutant M-ECHAP-390 sur `00-vf-surcouches.js` (commit dédié, Gate-Touche). Les D8.* rouges du premier rejeu étaient des aléas de charge.
+- test-cockpit-responsive : 378 PASS / 0 FAIL (base 378 / 0) après `panneau: textContent` (l.129, commit dédié, aucune assertion retirée) ; R5.2 reste vert avec le texte caché compté. R15c.2 : rouge dans deux rejeux complets sous charge, vert isolé trois fois (`true|true|true|true`), aléa de charge.
 - moteur-carte, terminal-tiroir, vendor : verts.
 
 ## Points ouverts
