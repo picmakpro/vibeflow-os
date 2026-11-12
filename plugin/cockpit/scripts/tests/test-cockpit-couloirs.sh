@@ -138,14 +138,11 @@ for CLE in 1440 1024; do
       parseFloat($X.tiroir.debut) >= $X.tiroir.tiroir[1] - $X.tiroir.tiroir[0] + 16, $X.tiroir.carte[0] >= $X.tiroir.tiroir[1] - 0.5]")" \
     '[true,true,true,true,true]'
 done
-for CLE in 800 1100t; do
+for CLE in 800 390 1100t; do
   X="j.cl312$CLE"
-  assert_eq "CL3.12 ($CLE) — panneau en colonne latérale (701 à 999 px, tactile à 1 100 px) : la carte sélectionnée est amenée hors de lui" \
-    "$(E4 "[parseFloat($X.panneau.fin) >= $X.panneau.pw, $X.panneau.pw >= 360, $X.panneau.carte[1] <= $X.panneau.panneau[0] + 0.5]")" '[true,true,true]'
+  assert_eq "CL3.12 ($CLE) — feuille de détail : ni extrémité ni scroll-padding-inline ; aucun défilement horizontal (panneau et tiroir Git ouverts ou non)" \
+    "$(E4 "[$X.repos, $X.panneau, $X.tiroir, $X.ferme].every((m) => ['auto', '0px'].includes(m.debut) && ['auto', '0px'].includes(m.fin) && m.larg)")" "true"
 done
-X="j.cl312390"
-assert_eq "CL3.12 (390) — feuille de détail : ni extrémité ni scroll-padding-inline ; aucun défilement horizontal (feuille et tiroir Git ouverts ou non)" \
-  "$(E4 "[$X.repos, $X.panneau, $X.tiroir, $X.ferme].every((m) => ['auto', '0px'].includes(m.debut) && ['auto', '0px'].includes(m.fin) && m.larg)")" "true"
 assert_eq "CL3.13 — 800 px, graphe, panneau ouvert : la bascule flottante ne chevauche pas le panneau" \
   "$(E4 '[j.cl313.ouvert, j.cl313.fl[1] <= j.cl313.panneau[0]]')" '[true,true]'
 assert_eq "CL3.9b — témoin : aucune section du pilote n'a échoué (panneau, visite, direct, orphelin, bords)" "$(E4 'Object.keys(j.erreurs).join()')" ""

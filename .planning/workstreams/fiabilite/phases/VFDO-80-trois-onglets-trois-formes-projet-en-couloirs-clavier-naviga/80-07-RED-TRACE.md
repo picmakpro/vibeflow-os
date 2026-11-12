@@ -46,3 +46,7 @@ Résultat sur la base : 3 PASS / 39 FAIL (PL0, PL3.3b, H0 verts : le serveur dé
 ```
 
 Raisons : la forme « liste » n'existe pas (obtenu : aucune table, bascule à deux segments « Couloirs », « Graphe », pas de touche v, pas de mémoire) ; PL2.9 : « window.VF_EXIGENCES » est indéfinie sur la base. Les sections de mutants échouent en « mutation impossible » : les fichiers à muter n'existent pas.
+
+## Correction ciblée (2026-11-12)
+Témoin PL2.10 (une seule source des plans « Fait ») rouge avant correction du lab : attendu `[3,3,3]`, obtenu `[3,2,2]` (trois rangées Fait dans la phase, ligne d'état et rangée de la racine à 2 : un plan sans SUMMARY sous une phase cochée). Vert (`[3,3,3]`) une fois le SUMMARY posé : la faute est celle du lab, la divergence de règle vient du producteur.
+Mutants ajoutés, chacun rouge sur sa cible avec son témoin vert : M-XSS-LISTE → PL1.4 · M-XSS-PLAN → PL2.2b · M-PHASE → PL3.10 (le choix d'une phase réécrit la racine et la mémoire). Avant la correction, PL3.5 à 800 px n'était pas joué ouvert : le témoin ajouté passe avec P80-D-50 b rétabli.

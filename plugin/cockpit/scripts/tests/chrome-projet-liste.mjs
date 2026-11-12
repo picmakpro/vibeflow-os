@@ -75,6 +75,8 @@ await executer(chrome, async (s) => {
   if (mode === 'pl1') {
     await sec('pl11', async () => {
       await charger('?vue=liste');
+      o.pl14 = await lire(`JSON.stringify({ img: document.querySelectorAll('section.vf-projet img').length, flag: String(window.__x),
+        titre: (document.querySelector('${ligne('n:ph-5')} .vp-titre') || {}).textContent })`);
       o.pl11 = await lire(`JSON.stringify({ tables: document.querySelectorAll('section.vf-projet table').length, lignes: ${LIGNES},
         tri: [...document.querySelectorAll('section.vf-projet table:first-of-type th')].filter((t) => t.getAttribute('aria-sort') !== 'none')
           .map((t) => [t.querySelector('[data-tri]').dataset.tri, t.getAttribute('aria-sort')]) })`);
@@ -91,12 +93,17 @@ await executer(chrome, async (s) => {
 
   if (mode === 'pl2') {
     await sec('pl21', async () => {
-      await charger('?vue=liste'); await plonger('n:ph-1');
+      await charger('?vue=liste'); o.pl210r = await lire(`JSON.stringify(document.querySelector('${ligne('n:ph-1')}').closest('tr').children[2].textContent)`);
+      await plonger('n:ph-1');
+      o.pl210 = await lire(`JSON.stringify({ fait: document.querySelectorAll('section.vf-projet .vp-ligne[data-id^="f:"] .vst-done').length,
+        ligne: document.querySelector('.vp-etat-l').textContent })`);
       o.pl21 = await lire(`JSON.stringify({ h1: document.getElementById('vf-projet-titre').textContent, h3: [...document.querySelectorAll('section.vf-projet h3')].map((e) => e.textContent),
         plans: [...document.querySelectorAll('section.vf-projet .vp-ligne[data-id^="f:"]')].map((e) => [(e.querySelector('.vp-pid') || {}).textContent,
           (e.querySelector('.vst') || {}).textContent, (e.querySelector('.vp-cov') || {}).textContent || '']) })`);
       o.pl22 = await lire(`JSON.stringify({ li: [...document.querySelectorAll('section.vf-projet ul.vp-exig li')].map((e) => e.textContent.replace(/\\s+/g, ' ').trim()),
-        input: document.querySelectorAll('section.vf-projet input').length, img: document.querySelectorAll('section.vf-projet img').length, flag: String(window.__x),
+        input: document.querySelectorAll('section.vf-projet input').length, t: String(window.__t),
+        titrePlan: (document.querySelector('section.vf-projet .vp-ligne[data-id^="f:"]:not(.x) .vp-pid + .vp-titre') || {}).textContent,
+        titres: [...document.querySelectorAll('section.vf-projet .vp-plan .vp-titre')].map((e) => e.textContent), img: document.querySelectorAll('section.vf-projet img').length, flag: String(window.__x),
         h2: [...document.querySelectorAll('section.vf-projet h2')].map((e) => e.textContent),
         fois: document.querySelector('section.vf-projet').textContent.split('onerror=window.__x=1').length - 1 })`);
       o.pl24a = (await etat()).hid;
@@ -200,6 +207,9 @@ await executer(chrome, async (s) => {
       await clic('section.vf-projet table:first-of-type [data-tri="plans"]'); r.asc = await lire(`JSON.stringify([${LIGNES}, (document.querySelector('th[aria-sort="ascending"] [data-tri]') || {}).dataset.tri, (__pl.etat(), JSON.parse(__pl.etat()).statut)])`);
       await clic('section.vf-projet table:first-of-type [data-tri="plans"]'); r.desc = await lire(`JSON.stringify([${LIGNES}, document.querySelector('th[aria-sort="descending"]') ? 1 : 0, JSON.parse(__pl.etat()).statut])`);
       await s.ev("VibeFlow.graph.nodes.find((n) => n.id === 'ph-3').exigences = undefined"); await clic('section.vf-projet table:first-of-type [data-tri="exigences"]');
+      r.chev = await lire(`JSON.stringify((() => { const th = document.querySelector('section.vf-projet th[aria-sort]:not([aria-sort="none"])'), c = th && th.querySelector('.vp-chev');
+        return [!!c && !!c.querySelector('svg'), !!c && getComputedStyle(c).transform !== 'none', th && getComputedStyle(th.querySelector('button')).fontWeight,
+          document.querySelectorAll('section.vf-projet table:first-of-type th .vp-chev').length]; })())`);
       r.abs = await lire(`JSON.stringify([${LIGNES}, (document.querySelector('${ligne('n:ph-3')}').closest('tr').querySelector('.vp-sr') || {}).textContent || null])`);
       o.pl34 = r;
     });
@@ -210,10 +220,19 @@ await executer(chrome, async (s) => {
       r.bascule = await lire(`JSON.stringify((() => { const g = document.querySelector('.vp-tete .vp-bascule'), h = document.querySelector('.vp-tete h1'), v = document.querySelector('section.vf-projet').getBoundingClientRect(), b = g.getBoundingClientRect();
         return { hauteurs: [...g.querySelectorAll('button')].map((x) => x.getBoundingClientRect().height), dessous: b.top >= h.getBoundingClientRect().bottom - 1, largeur: Math.round(b.width), vue: Math.round(v.width) }; })())`);
       const defil = async () => lire(`JSON.stringify((() => { const v = document.querySelector('section.vf-projet'), c = getComputedStyle(v); return [v.scrollWidth <= v.clientWidth, ['auto', '0px'].includes(c.scrollPaddingInlineStart), ['auto', '0px'].includes(c.scrollPaddingInlineEnd)]; })())`);
+      r.aucune = await lire(`JSON.stringify(document.querySelector('${ligne('n:ph-2')}').closest('tr').children[3].innerText.trim())`);
       r.ferme390 = await defil(); await s.ev("VibeFlow.select('n:ph-3')"); await pause(500); r.ouvert390 = await defil();
       await charger('?vue=liste', 600, 900); r.ferme600 = await defil(); await s.ev("VibeFlow.select('n:ph-3')"); await pause(500); r.ouvert600 = await defil();
-      await charger('?vue=liste', 800, 900); r.ferme800 = await defil();
+      await charger('?vue=liste', 800, 900); r.ferme800 = await defil(); await s.ev("VibeFlow.select('n:ph-3')"); await pause(500); r.ouvert800 = await defil();
       o.pl35 = r;
+    });
+    await sec('pl39', async () => { // un choix fait dans une phase ne réécrit ni la forme de la racine ni la mémoire
+      await charger('?vue=couloirs', 1440, 900, false, true); const r = {};
+      await focus('.vp-carte[data-id="n:ph-1"]'); await presser('Enter', 600); await s.attendre("VibeFlow.state.container === 'n:ph-1'", 'plongée'); await pause(400);
+      await presser('v', 300, 0, 'v'); r.v1 = (await etat()).forme; await presser('v', 300, 0, 'v'); r.v2 = (await etat()).forme;
+      for (let i = 0; i < 3 && (await etat()).c !== 'root'; i++) await presser('Escape', 700);
+      await pause(300); r.racine = (await etat()).forme; r.memoire = await lire("JSON.stringify(localStorage.getItem(__vfProjetMemoire.cle()))");
+      o.pl39 = r;
     });
     await sec('pl36', async () => {
       await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });

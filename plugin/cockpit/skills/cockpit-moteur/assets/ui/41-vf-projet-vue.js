@@ -17,7 +17,7 @@
   const inscrireForme = (nom, def) => { if (FORMES.includes(nom) && def && typeof def.rendre === 'function') REG[nom + ':' + (def.niveau || 'racine')] = def; };
   // T-80-08 : une valeur hors de la liste vaut la forme par défaut, jamais insérée dans le DOM
   const demandee = new URLSearchParams(location.search).get('vue');
-  let forme = FORMES.includes(demandee) ? demandee : 'couloirs', vivant = false, section = null, corps = null,
+  let forme = FORMES.includes(demandee) ? demandee : 'couloirs', formePhase = null, vivant = false, section = null, corps = null,
     statut = null, flottant = null,
     conteneur = null, avantVisite = null, ro = null, debutPose = 0, precedents = new Map();
   const ouverts = new Set(), noeuds = () => new Map((G.nodes || []).map((n) => [n.id, n]));
@@ -26,7 +26,8 @@
   const niveau = () => { const c = String(state.container); if (c === 'root' || conteneurJalon()) return 'racine';
     const n = c.startsWith('n:') ? noeuds().get(c.slice(2)) : null; return n && n.kind === 'phase' ? 'phase' : 'autre'; };
   // couloirs n'a pas de sens dans une phase
-  const effective = () => { const n = niveau(); return n === 'autre' || forme === 'graphe' ? 'graphe' : n === 'phase' ? 'liste' : forme; };
+  const effective = () => { const n = niveau(); if (n === 'autre') return 'graphe';
+    return n === 'phase' ? formePhase || (forme === 'graphe' ? 'graphe' : 'liste') : forme; };
   const affichee = () => effective() !== 'graphe'; // un jalon vu en couloirs ou en liste est ramené à la racine (P80-C76-3)
 
   const style = document.createElement('style');
@@ -87,9 +88,9 @@
       padding: var(--inset-row); border: 1.5px solid transparent; background: none; font-size: 13px; color: var(--text); }
     .vp-rangees li + li { border-top: 1px solid var(--hair); } .vp-r-t { min-width: 0; overflow-wrap: anywhere; } .vp-r-d { font-family: var(--mono);
       font-size: 12px; color: var(--text-3); }
-    /* colonne latérale (dès 701 px : le moteur ne passe en feuille qu'à 700 px) : le panneau se pose PAR-DESSUS ;
-       une extrémité défilable (hors flux) permet d'amener une carte hors de lui */
-    @media (min-width: 701px) {
+    /* panneau latéral (dès 1000 px, pointeur fin : P80-D-50 b) : le panneau se pose PAR-DESSUS ; une extrémité défilable (hors flux)
+       permet d'amener une carte hors de lui ; en dessous, feuille de détail et aucun défilement horizontal */
+    @media (min-width: 1000px) and (pointer: fine) {
       section.vf-projet { scroll-padding-inline-end: var(--pw, 0px); }
       section.vf-projet::after { content: ""; position: absolute; top: 0; left: 100%; width: var(--pw, 0px); height: var(--sp-2); }
       section.vf-projet.vp-tiroir { scroll-padding-inline-start: var(--vp-debut, 0px);
@@ -210,7 +211,8 @@
     if (!FORMES.includes(nom) || nom === effective()) return false;
     const act = document.activeElement, surSegment = !!(act && act.closest && act.closest('[data-forme]'));
     const eq = equivalent && act && corps.contains(act) && act.dataset ? act.dataset.id : null; // touche v : l'élément équivalent de la nouvelle forme
-    forme = nom; if (memoriser && MEM) MEM.ecrire(nom);
+    // le choix fait dans une phase ne touche ni la forme de la racine ni la mémoire
+    if (niveau() === 'racine') { forme = nom; if (memoriser && MEM) MEM.ecrire(nom); } else formePhase = nom;
     marquerBascule(); classes(); if (affichee()) dessiner(); mesurerBas();
     if (equivalent && !surSegment) {
       const C = window.VF_CANEVAS, id = C && C.carteItinerante && C.carteItinerante();
@@ -253,7 +255,7 @@
       else ouverts.delete(d.dataset.cle); } }, true);
     // visite (P80-D-09, P80-D-38) : elle se joue sur le graphe, sans patch de 40-tour.js ; la forme d'avant revient à sa fin
     const tourActif = () => !!(window.FloorplanTour && window.FloorplanTour.active && window.FloorplanTour.active());
-    const versGraphe = () => { if (affichee() && avantVisite === null) { avantVisite = forme; basculer('graphe', { url: false }); } };
+    const versGraphe = () => { if (affichee() && avantVisite === null) { avantVisite = effective(); basculer('graphe', { url: false }); } };
     ecoute(document, 'click', (ev) => { if (ev.target.closest && ev.target.closest('#tour-btn') && !tourActif()) versGraphe(); }, true);
     const carteVisite = document.getElementById('tour');
     if (carteVisite) {

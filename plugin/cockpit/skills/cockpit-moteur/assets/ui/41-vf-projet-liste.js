@@ -28,7 +28,7 @@
   const nombres = (c, unite) => (!c ? `<span class="vp-sr">donnée non disponible</span>` : c.total > 0
     ? `<span class="vp-nb">${c.faits}</span><span class="vp-u"> ${c.faits > 1 ? unite : unite.replace(/s$/, '')}</span>`
       + ` sur <span class="vp-nb">${c.total}</span>` : unite === 'plans' ?
-      'pas de plan' : 'aucune');
+      'pas de plan' : 'aucune<span class="vp-u"> exigence</span>');
   const cellule = (d, st, mot) => {
     const c = d.c, cache = c.coupe ? ` aria-describedby="vp-d-${sain(c.id)}"` : '', cur = state.selected === c.id ? ' aria-current="true"' : '';
     return `<tr role="row"><td role="cell"><button type="button" class="vp-ligne" data-id="${h(c.id)}" tabindex="-1" aria-label="${h(c.nom)}"${cache}${cur}>`
@@ -40,7 +40,8 @@
   const entetes = () => COLS.map(([col, lib]) => { const actif = tri.col === col;
     const sens = tri.sens > 0 ? 'ascending' : 'descending';
     return `<th role="columnheader" scope="col" aria-sort="${actif ? sens : 'none'}"><button type="button" data-tri="${col}">`
-      + `<span class="vp-sr">Trier par </span>${lib}<span class="vp-chev" aria-hidden="true">${actif ? (tri.sens > 0 ? ' ▴' : ' ▾') : ''}</span>`
+      + `<span class="vp-sr">Trier par </span>${lib}`
+      + (actif ? `<span class="vp-chev ${tri.sens > 0 ? 'haut' : 'bas'}" aria-hidden="true">${SC.iconI('drill')}</span>` : '')
       + '</button></th>'; }).join('');
   const table = (b) => {
     const cartes = Object.values(b.couloirs).flat(), defs = new Map(M().COULOIRS.map((c) => [c[0], c]));
@@ -125,6 +126,9 @@
     .vp-table th { padding: var(--sp-8) var(--sp-12); text-align: left; font-size: 12px; font-weight: 500; color: var(--text-3);
       border-bottom: 1px solid var(--hair); }
     .vp-table th button { min-height: 32px; padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; }
+    .vp-chev { display: inline-block; margin-inline-start: var(--sp-4); } .vp-chev svg { width: 12px; height: 12px; vertical-align: -2px; }
+    .vp-chev.haut { transform: rotate(-90deg); } .vp-chev.bas { transform: rotate(90deg); }
+    .vp-table th[aria-sort="ascending"] button, .vp-table th[aria-sort="descending"] button { color: var(--text); font-weight: 600; }
     .vp-table th button:focus-visible { outline: 2px solid var(--ring); outline-offset: var(--sp-2); }
     .vp-table td { padding: var(--inset-row); font-size: 13px; color: var(--text-2); border-top: 1px solid var(--hair); vertical-align: baseline; }
     .vp-table tbody tr { position: relative; } .vp-table tbody tr:first-child td { border-top: 0; }

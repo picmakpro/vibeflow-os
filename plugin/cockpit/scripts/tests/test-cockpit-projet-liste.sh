@@ -31,8 +31,8 @@ mklabl() { # mklab + titres de 52, 53 et 70 caractères ; phase 1 : trois plans 
   sed -i.bak -e "s/Phase 4: Reprise/Phase 4: $T52/" -e "s/Phase 6: Recette/Phase 6: $T53/" -e "s/Phase 3: Liens/Phase 3: $T70/" "$B/ROADMAP.md"; rm -f "$B/ROADMAP.md.bak"
   printf -- '- [x] **R-1**: premier texte\n- [ ] **R-2**: <img src=x onerror=window.__x=1>\n\n| R-1 | Phase 1 | Complete |\n| R-2 | Phase 1 | Pending |\n' | wr "$B/REQUIREMENTS.md"
   printf -- '---\nwave: 1\nrequirements: [R-1, R-2]\n---\n<objective>Plan un</objective>\n' | wr "$B/phases/01-socle/01-01-PLAN.md"
-  printf -- '---\nwave: 2\nrequirements: [R-1]\n---\n<objective>Plan deux</objective>\n' | wr "$B/phases/01-socle/01-02-PLAN.md"
-  printf -- '<objective>%s</objective>\n' "$T70" | wr "$B/phases/01-socle/01-03-PLAN.md"
+  printf -- '---\nwave: 2\nrequirements: [R-1]\n---\n<objective><img src=x onerror=window.__t=1></objective>\n' | wr "$B/phases/01-socle/01-02-PLAN.md"
+  printf -- '<objective>%s</objective>\n' "$T70" | wr "$B/phases/01-socle/01-03-PLAN.md"; echo ok > "$B/phases/01-socle/01-03-SUMMARY.md"
   git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m liste
 }
 mklabs() { local L="$1"; mklab "$L"; rm -f "$L/.planning/REQUIREMENTS.md"; git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m sans; }
@@ -47,6 +47,8 @@ assert_eq "PL1.1 — ?vue=liste : un table par bloc, rangées En cours, À recet
 assert_eq "PL1.2 — la bascule a trois boutons aria-pressed, un seul à true (Liste)" \
   "$(E1 'j.pl12')" '[["Couloirs","false"],["Liste","true"],["Graphe","false"]]'
 assert_eq "PL1.3 — clic sur la rangée de la phase 2 : sélection et aria-current sur la rangée" "$(E1 '[j.pl13.sel, j.pl13.cur]')" '["n:ph-2",["n:ph-2"]]'
+assert_eq "PL1.4 — T-80-15 : un titre de phase hostile du ROADMAP est rendu en texte à la racine (0 img, rien d'exécuté)" \
+  "$(E1 '[j.pl14.img, j.pl14.flag, j.pl14.titre]')" '[0,"undefined","<img src=x onerror=window.__x=1>"]'
 assert_eq "PL1.9 — témoin : aucune section du pilote n'a échoué" "$(E1 'Object.keys(j.erreurs).join()')" ""
 
 echo "=== PL2 — intérieur d'une phase en liste ==="
@@ -57,6 +59,10 @@ assert_eq "PL2.1 — phase 1 : h1 « Phase 1 », vagues 1, 2, Sans vague ; statu
 assert_eq "PL2.2 — exigences : ul sans input, Cochée / Non cochée, texte une fois, rendu en texte (0 img, rien d'exécuté)" \
   "$(E2 '[j.pl22.li.length, j.pl22.li[0].includes("Cochée") && !j.pl22.li[0].includes("Non"), j.pl22.li[1].includes("Non cochée"), j.pl22.input, j.pl22.img, j.pl22.flag, j.pl22.fois, j.pl22.h2]')" \
   '[2,true,true,0,0,"undefined",1,["Plans","Exigences"]]'
+assert_eq "PL2.10 — une seule source : les plans « Fait » de la vue de la phase sont ceux que dit la ligne d'état et la rangée de la racine (témoin rouge : plan sans SUMMARY sous une phase cochée)" \
+  "$(E2 '[j.pl210.fait, Number(j.pl210.ligne.match(/^(\d+) plan/)[1]), Number(j.pl210r.match(/^(\d+)/)[1])]')" '[3,3,3]'
+assert_eq "PL2.2b — T-80-15 : un titre de plan hostile est rendu en texte dans la phase (0 img, rien d'exécuté)" \
+  "$(E2 '[j.pl22.img, j.pl22.t, j.pl22.titres.includes("<img src=x onerror=window.__t=1>")]')" '[0,"undefined",true]'
 assert_eq "PL2.3 — un seul arrêt de tabulation pour les plans ; ↓ d'une vague à l'autre, ↑, Fin, Origine ; la sélection suit" \
   "$(E2 '[j.pl23.n, j.pl23.t0, j.pl23.suite.map((x) => x[1]), j.pl23.sel]')" '[3,1,[1,2,2,1,2,0],true]'
 assert_eq "PL2.4 — à l'entrée le focus est sur le h1 ; Échap remonte à la racine, focus sur la rangée de la phase 1" \
@@ -97,10 +103,15 @@ assert_eq "PL3.3 — mémoire par lab et par classe de largeur ; défaut liste �
 assert_eq "PL3.3b — rien de neuf sous .planning/ du lab" "$(git -C "$LAB" status --porcelain -- .planning | wc -l | tr -d ' ')" "0"
 assert_eq "PL3.4 — tri par Plans : ascendant puis descendant, annonces, sans plan en dernier ; donnée absente après « aucune », texte masqué" \
   "$(E3 '[j.pl34.asc[0].join(), j.pl34.asc[1], j.pl34.asc[2], j.pl34.desc[0].join(), j.pl34.desc[1], j.pl34.desc[2], j.pl34.abs[0].slice(-1)[0], j.pl34.abs[1]]')" \
-  '["n:ph-3,n:ph-4,n:ph-1,n:ph-2,n:ph-6,n:ph-5","plans","Trié par Plans, croissant","n:ph-2,n:ph-6,n:ph-1,n:ph-4,n:ph-3,n:ph-5",1,"Trié par Plans, décroissant","n:ph-3","donnée non disponible"]'
-assert_eq "PL3.5 — 390 px : rôles posés, quatre boutons de tri ≥ 44 px, bascule à trois segments ≥ 44 px pleine largeur sous le h1 ; aucun défilement horizontal (390 et 600, feuille ouverte ou non ; 800 fermé)" \
-  "$(E3 '[j.pl35.roles.join(), j.pl35.tri.length, Math.min(...j.pl35.tri) >= 44, j.pl35.bascule.hauteurs.length, Math.min(...j.pl35.bascule.hauteurs) >= 44, j.pl35.bascule.dessous, j.pl35.bascule.largeur >= j.pl35.bascule.vue - 40, j.pl35.ferme390.join(), j.pl35.ouvert390.join(), j.pl35.ferme600.join(), j.pl35.ouvert600.join(), j.pl35.ferme800.join()]')" \
-  '["true,true,true,true",4,true,3,true,true,true,"true,true,true","true,true,true","true,true,true","true,true,true","true,true,true"]'
+  '["n:ph-3,n:ph-4,n:ph-1,n:ph-2,n:ph-6,n:ph-5","plans","Trié par Plans, croissant","n:ph-1,n:ph-2,n:ph-6,n:ph-4,n:ph-3,n:ph-5",1,"Trié par Plans, décroissant","n:ph-3","donnée non disponible"]'
+assert_eq "PL3.4b — l'en-tête actif porte le chevron du moteur tourné, en graisse 600 ; un seul chevron" \
+  "$(E3 '[j.pl34.chev[0], j.pl34.chev[1], j.pl34.chev[2], j.pl34.chev[3]]')" '[true,true,"600",1]'
+assert_eq "PL3.5b — 390 px : « aucune exigence » dit son mot" "$(E3 'j.pl35.aucune')" 'aucune exigence'
+assert_eq "PL3.10 — un choix fait dans une phase (v, v) ne réécrit ni la forme de la racine ni la mémoire" \
+  "$(E3 '[j.pl39.v1, j.pl39.v2, j.pl39.racine, j.pl39.memoire]')" '["graphe","liste","couloirs",null]'
+assert_eq "PL3.5 — 390 px : rôles posés, quatre boutons de tri ≥ 44 px, bascule à trois segments ≥ 44 px pleine largeur sous le h1 ; aucun défilement horizontal (390, 600 et 800 px, feuille ou panneau ouvert ou non : P80-D-50 b)" \
+  "$(E3 '[j.pl35.roles.join(), j.pl35.tri.length, Math.min(...j.pl35.tri) >= 44, j.pl35.bascule.hauteurs.length, Math.min(...j.pl35.bascule.hauteurs) >= 44, j.pl35.bascule.dessous, j.pl35.bascule.largeur >= j.pl35.bascule.vue - 40, j.pl35.ferme390.join(), j.pl35.ouvert390.join(), j.pl35.ferme600.join(), j.pl35.ouvert600.join(), j.pl35.ferme800.join(), j.pl35.ouvert800.join()]')" \
+  '["true,true,true,true",4,true,3,true,true,true,"true,true,true","true,true,true","true,true,true","true,true,true","true,true,true","true,true,true"]'
 assert_eq "PL3.6 — mouvement réduit : aucune animation active après une bascule et un tri" "$(E3 'j.pl36.join()')" "0,0"
 assert_eq "PL3.9 — témoin : aucune section du pilote n'a échoué (v, mémoire, tri, largeurs)" "$(E3 'Object.keys(j.erreurs).join()')" ""
 R3B="$(mesurer chrome-projet-liste.mjs pl3b)"; sonde "$R3B"; E3B() { E "$1" "$R3B"; }
@@ -139,6 +150,16 @@ mutant M-PORTE 41-vf-projet-phase.js "lu = window.VF_EXIGENCES.lireExigences(id)
   chrome-projet-liste.mjs pl2b pl29; LAB="$LAB_SAUVE"
 assert_eq "M-PORTE — le mutant rougit PL2.9 (lecture directe du nœud) alors que le rendu avec la vraie porte reste identique (témoin : la section a joué)" \
   "$(E "[j.pl29.fausse.li.length !== 2, j.pl29.vraie.li === 0, !!j.pl29.graphe]" "$RM")" '[true,true,true]'
+mutant M-XSS-LISTE 41-vf-projet-liste.js '<span class="vp-titre">${h(c.titre)}</span>' '<span class="vp-titre">${c.titre}</span>' chrome-projet-liste.mjs pl1 pl11,pl14
+assert_eq "M-XSS-LISTE — le mutant rougit PL1.4 (titre de phase sans h() : un img naît à la racine) (témoin : la table existe)" \
+  "$(E "[j.pl14.img > 0, j.pl11.tables >= 1]" "$RM")" "[true,true]"
+mutant M-XSS-PLAN 41-vf-projet-phase.js '<span class="vp-titre">${h(t.affiche)}</span>' '<span class="vp-titre">${t.affiche}</span>' chrome-projet-liste.mjs pl2 pl21,pl22
+assert_eq "M-XSS-PLAN — le mutant rougit PL2.2b (titre de plan sans h() : un img naît dans la phase) (témoin : les plans existent)" \
+  "$(E "[j.pl22.img > 0, j.pl21.plans.length === 3]" "$RM")" "[true,true]"
+mutant M-PHASE 41-vf-projet-vue.js "if (niveau() === 'racine') { forme = nom; if (memoriser && MEM) MEM.ecrire(nom); } else formePhase = nom;" \
+  "forme = nom; if (memoriser && MEM) MEM.ecrire(nom);" chrome-projet-liste.mjs pl3a pl39
+assert_eq "M-PHASE — le mutant rougit PL3.10 (le choix d'une phase réécrit la racine et la mémoire) (témoin : v bascule dans la phase)" \
+  "$(E "[j.pl39.racine !== 'couloirs', j.pl39.v1 === 'graphe']" "$RM")" "[true,true]"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
