@@ -2,7 +2,7 @@
 // Usage : node chrome-clavier-canevas.mjs <chrome> <racine-du-serveur>   Rend UNE ligne JSON { cc1 … cc62 } ou { erreur }. ?lang=en : libellés du moteur.
 // Chaque section est isolée (sec) : une section qui échoue (module absent ou muté) laisse ses champs vides, les autres sont mesurées.
 import { executer, pause, stabiliser } from './chrome-session.mjs';
-const [, , chrome, racine] = process.argv;
+const [, , chrome, racine, mode] = process.argv; // mode « cc7 » : seul le niveau à connecteurs, sur le lab à deux modules qui s'importent
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!VibeFlow.state && !!VibeFlow.state.layout";
 const POSEE = "(() => { const v = document.querySelector('#viewport'); return !!v && v.style.opacity !== '0' && !v.classList.contains('anim'); })()";
 const OUTIL = `window.__cc = {
@@ -74,6 +74,15 @@ await executer(chrome, async (s) => {
     return r ? { c: r.c, e: JSON.parse(r.e) } : { c: null, e: vide };
   };
 
+  if (mode === 'cc7') { // CC7 : un niveau à connecteurs (cartes x:) : options nommées d'après l'entité liée et la direction, jamais l'id interne
+    o.cc7 = { x: [] }; await charger('index.html');
+    await sec('cc7', async () => {
+      await niveau('n:m-m1'); await pause(300);
+      o.cc7 = await lire(`JSON.stringify({ x: [...VibeFlow.state.chipEls].filter(([i]) => i.startsWith('x:'))
+        .map(([i, g]) => [i, g.getAttribute('role'), g.getAttribute('aria-label')]), n: VibeFlow.state.chipEls.size })`);
+    });
+    return o;
+  }
   // ---------- CC1, CC2 : Code, 1440 px, niveau « non classé » : 19 cartes, des liens, plusieurs couches ----------
   await charger('index.html'); await niveau('n:unassigned');
   o.cc1 = { arretsCanevas: 0, carte: false, arrets: 0, listbox: {}, mouv: {} }; o.cc2 = {}; o.cc22 = {};
@@ -124,8 +133,16 @@ await executer(chrome, async (s) => {
   await sec('cc31', async () => { // CC3.1 : la sélection suit le focus ; Échap désélectionne ; Espace resélectionne
     await presser('Home'); const a1 = await presser('ArrowRight'), e1 = await presser('Escape'), sp = await presser('Space');
     o.cc31 = { suit: [a1.sel === a1.id && a1.id !== null, a1.sa], echap: [e1.sel, e1.id === a1.id, e1.sa], espace: [sp.sel === a1.id, sp.sa] };
-    await s.ev('VibeFlow.render()'); await pause(600); const r3 = await etat(); // CC3.3 : un redessin recrée les cartes
-    o.cc33 = { avant: sp.id, apres: r3.id, t0: r3.t0 };
+    await s.ev('window.__rd = 0; VibeFlow.on("render", () => { window.__rd++; })'); // CC3.3 : un redessin recrée les cartes
+    await s.ev('VibeFlow.render()'); await s.attendre('window.__rd > 0', 'redessin'); await stabiliser(lireVue, { pas: 120, max: 3000 });
+    const r3 = await etat(); o.cc33 = { avant: sp.id, apres: r3.id, t0: r3.t0 };
+  });
+  o.cc8 = {};
+  await sec('cc8', async () => { // CC8 : le focus est ailleurs (champ de question) : un redessin ne le vole pas
+    await s.ev("document.getElementById('ask-input').focus()");
+    const av = await s.ev('document.activeElement.id');
+    await s.ev('window.__rd = 0'); await s.ev('VibeFlow.render()'); await s.attendre('window.__rd > 0', 'redessin (focus ailleurs)');
+    await stabiliser(lireVue, { pas: 120, max: 3000 }); o.cc8 = { avant: av, apres: await s.ev('document.activeElement.id') };
   });
   await sec('cc34', async () => { // CC3.4 : tiroir Git ouvert : la carte focalisée est ramenée hors de lui, zoom inchangé
     await s.ev('VFGitTiroir.ouvrir()'); await s.attendre('VFGitTiroir.ouvert()', 'tiroir Git ouvert');
@@ -158,10 +175,11 @@ await executer(chrome, async (s) => {
       const f = await etat(); await ecouteRender('__cc.etat()'); await s.ev("VibeFlow.go('n:m-vide')"); const rv = await premierRender(); await pause(500);
       const live = await s.ev("(document.getElementById('vf-canevas-live') || { textContent: null }).textContent");
       const v = await lire("JSON.stringify({ vide: document.querySelector('#empty').textContent," +
-        " ti: document.getElementById('stage').getAttribute('tabindex') })");
+        " ti: document.getElementById('stage').getAttribute('tabindex')," +
+        " role: document.getElementById('svg').getAttribute('role'), nomSvg: document.getElementById('svg').getAttribute('aria-label') })");
       await touche(retour); await s.attendre("VibeFlow.state.container === 'root'", 'remontée du niveau vide'); await pause(700);
       const b = await etat();
-      o.cc35[retour] = { focus: f.id, c: rv.c, stage: rv.e.stage, tag: rv.e.tag, live, vide: v.vide, ti: v.ti, retour: [b.c, b.id, b.tag] };
+      o.cc35[retour] = { focus: f.id, c: rv.c, stage: rv.e.stage, tag: rv.e.tag, live, vide: v.vide, ti: v.ti, role: v.role, nomSvg: v.nomSvg, retour: [b.c, b.id, b.tag] };
     });
   }
 
@@ -169,11 +187,12 @@ await executer(chrome, async (s) => {
   o.cc6 = { sombre: {}, clair: {}, clic: {}, fleche: false };
   await sec('cc6', async () => {
     await niveau('n:unassigned'); await tab(true); await presser('ArrowRight');
-    const anneau = (th) => lire(`(() => { document.documentElement.setAttribute('data-theme', '${th}'); const p = document.createElement('i');
-      p.style.color = 'var(--ring)'; document.body.appendChild(p); const ring = getComputedStyle(p).color; p.remove();
+    const anneau = async (th) => { await s.ev(`document.documentElement.setAttribute('data-theme', '${th}')`); await pause(600); // les transitions de la carte sont finies
+      return lire(`(() => { const p = document.createElement('i'); p.style.color = 'var(--ring)'; p.style.boxShadow = 'var(--shadow-card)';
+      document.body.appendChild(p); const ring = getComputedStyle(p).color, repos = getComputedStyle(p).boxShadow; p.remove();
       const g = document.activeElement, k = getComputedStyle(g.querySelector('.card'));
       return JSON.stringify({ l: k.outlineWidth, st: k.outlineStyle, couleur: k.outlineColor, ring,
-        gOutline: getComputedStyle(g).outlineStyle, ombre: k.boxShadow }); })()`);
+        gOutline: getComputedStyle(g).outlineStyle, ombre: k.boxShadow, repos }); })()`); };
     o.cc6 = { sombre: await anneau('dark'), clair: await anneau('light') };
     const c = await lire("(() => { const r = document.querySelectorAll('.card')[1].getBoundingClientRect();" +
       " return JSON.stringify({ x: r.x + r.width / 2, y: r.y + r.height / 2 }); })()");

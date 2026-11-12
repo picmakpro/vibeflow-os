@@ -84,7 +84,7 @@ build_serve() {
   for _ in $(seq 1 300); do grep -q '"port"' "$O/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$O/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
 }
-mesurer() { REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-clavier-canevas.mjs" "$CHROME" "http://127.0.0.1:$PORT" 2>"$WORK/mesure.err"; }
+mesurer() { REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-clavier-canevas.mjs" "$CHROME" "http://127.0.0.1:$PORT" "${1:-}" 2>"$WORK/mesure.err"; }
 LAB="$WORK/lab"; mklab "$LAB"; node "$AUX/mk-agents.mjs" "$HOME" "$LAB" aaaa1111-2222-3333-4444-555555555555
 SC_BASE="${CC_SCRIPTS:-$SCRIPTS}"; ln -s "$SC_BASE" "$WORK/scripts-hote"
 build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
@@ -136,7 +136,7 @@ assert_eq "CC3.4 — tiroir Git ouvert : la carte focalisée est ramenée hors d
 for RET in Backspace Escape; do
   assert_eq "CC3.5 ($RET) — niveau sans carte : focus sur #stage (tabindex=-1), jamais body, région live ; au retour, la carte quittée" \
     "$(E "[j.cc35.$RET.focus, j.cc35.$RET.stage, j.cc35.$RET.ti, /^Niveau .+, aucune carte\$/.test(j.cc35.$RET.live), j.cc35.$RET.vide,
-      j.cc35.$RET.retour]")" '["n:m-vide",true,"-1",true,"Nothing inside.",["root","n:m-vide","g"]]'
+      j.cc35.$RET.retour, j.cc35.$RET.role, j.cc35.$RET.nomSvg]")" '["n:m-vide",true,"-1",true,"Nothing inside.",["root","n:m-vide","g"],null,null]'
 done
 echo "=== CC4 — feuille de détail : 390 px tactile et 800 px pointeur fin ==="
 for F in tactile moyen; do
@@ -148,16 +148,27 @@ assert_eq "CC5.1 — equipe.html : des cartes (témoin), aucun tabindex (cartes,
   "$(E '[j.cc5.cartes > 0, j.cc5.tab, j.cc5.opt, j.cc5.lb, j.cc5.svgTab, j.cc5.stageTab]')" "[true,0,0,null,null,null]"
 echo "=== CC6 — anneau sur la .card, mouvement réduit ==="
 for TH in sombre clair; do
-  assert_eq "CC6.1 ($TH) — anneau de 2 px de la couleur de --ring sur la .card, pas sur le g, sans l'anneau doux de .sel" \
-    "$(E "[j.cc6.$TH.l, j.cc6.$TH.st, j.cc6.$TH.couleur === j.cc6.$TH.ring, j.cc6.$TH.gOutline, !/1\\.5px/.test(j.cc6.$TH.ombre)]")" \
+  assert_eq "CC6.1 ($TH) — anneau de 2 px de la couleur de --ring sur la .card, pas sur le g, avec l'ombre du repos (--shadow-card) et sans l'anneau doux ni l'ombre de .sel" \
+    "$(E "[j.cc6.$TH.l, j.cc6.$TH.st, j.cc6.$TH.couleur === j.cc6.$TH.ring, j.cc6.$TH.gOutline, j.cc6.$TH.ombre === j.cc6.$TH.repos]")" \
     '["2px","solid",true,"none",true]'
 done
 assert_eq "CC6.1c — après un simple clic : focus sur la carte mais aucun contour (anneau réservé au clavier) ; les flèches marchent ensuite" \
   "$(E '[j.cc6.clic.focus, j.cc6.clic.contours, j.cc6.fleche]')" "[true,0,true]"
 assert_eq "CC6.2 — mouvement réduit : aucune animation active après flèche, plongée et remontée ; focus posé au rendu" \
   "$(E '[j.cc62.fleche, j.cc62.plongee, j.cc62.remontee, j.cc62.auRender, j.cc62.racine]')" '[0,0,0,true,"root"]'
+assert_eq "CC8.1 — focus dans le champ de question : un redessin ne le déplace pas sur une carte" \
+  "$(E '[j.cc8.avant, j.cc8.apres]')" '["ask-input","ask-input"]'
 assert_eq "CC9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
+# lab à deux modules qui s'importent : le niveau du premier porte un connecteur sortant (CC7)
+L2="$WORK/lab2"; mkdir -p "$L2/plugin/m1" "$L2/plugin/m2" "$L2/.planning"; printf '# Deux modules\n' > "$L2/.planning/PROJECT.md"
+printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n\n### Phase 1: Socle\n**Depends on**: Nothing (first phase)\n' > "$L2/.planning/ROADMAP.md"
+for m in m1 m2; do printf '{"name":"%s","type":"skill","description":"Module."}\n' "$m" > "$L2/plugin/$m/module.json"; done
+printf "import { b } from '../m2/b.js';\nexport const a = () => b();\n" > "$L2/plugin/m1/a.js"; printf 'export const b = () => 1;\n' > "$L2/plugin/m2/b.js"
+git -C "$L2" init -q && git -C "$L2" add -A && git -C "$L2" -c user.email=t@t -c user.name=t commit -q -m init
+build_serve "$L2" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"; R7="$(mesurer cc7)"; vf_hyg_stop "$SRV"
+assert_eq "CC7.1 — niveau à connecteurs : cartes x: options nommées « Vers/Depuis <entité> », jamais l'id interne, comptées dans la liste" \
+  "$(E '[j.cc7.x.length >= 1, j.cc7.x.every((c) => c[1] === "option" && /^(Vers|Depuis) [^:]+(, reliée à \d+ cartes?|, aucune liaison)$/.test(c[2]) && !c[2].includes(c[0]))]' "$R7")" "[true,true]"
 
 echo "=== Mutants (copie du module dans \$WORK) ==="
 mutant() { # mutant <nom> <ancien> <nouveau> -> RM (mesure du mutant) ; une mutation impossible compte comme un échec
@@ -183,6 +194,9 @@ assert_eq "M-EQUIPE — le mutant rougit CC5.1 (garde d'Équipe retirée : #svg 
 mutant M-REPLI-BODY "const g = liste.length ? state.chipEls.get(cible) : stage;" "const g = liste.length ? state.chipEls.get(cible) : null;"
 assert_eq "M-REPLI-BODY — le mutant rougit CC3.5 (niveau sans carte : le focus reste où le retrait du DOM le laisse) (témoin : CC3.2 reste vert)" \
   "$(E '[j.cc35.Escape.stage, j.cc32.remonte.c]' "$RM")" '[false,"root"]'
+mutant M-FOCUS-VOLE "    if (!focusDans) return;" "    void focusDans;"
+assert_eq "M-FOCUS-VOLE — le mutant rougit CC8.1 (garde focusDans retirée : le redessin vole le focus) (témoin : CC3.3 reste vert)" \
+  "$(E '[j.cc8.apres !== "ask-input", j.cc33.avant === j.cc33.apres]' "$RM")" "[true,true]"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

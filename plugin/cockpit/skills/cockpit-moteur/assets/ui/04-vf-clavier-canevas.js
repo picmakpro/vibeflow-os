@@ -13,7 +13,7 @@
   style.textContent = `
     g.node:focus, #stage:focus, #stage:focus-visible { outline: none; }
     g.node:focus-visible .card { outline: 2px solid var(--ring); outline-offset: 2px; }
-    g.node:focus-visible.sel .card, g.node:focus-visible.sel .card.external { box-shadow: var(--shadow-lift); }
+    g.node:focus-visible.sel .card, g.node:focus-visible.sel .card.external { box-shadow: var(--shadow-card); } /* anneau seul, ombre du repos */
     svg.dim g.node:focus-visible:not(.hl) .card > *, html.wk svg.dim g.node:focus-visible:not(.hl) foreignObject { opacity: 1; }
     #vf-canevas-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
   `;
@@ -60,6 +60,10 @@
     if (!carte) return '';
     const txt = (q) => { const e = carte.querySelector(q); return e ? e.textContent.trim() : ''; };
     let titre = ''; try { titre = SC.shownName(id); } catch (e) { void e; }
+    if (id.startsWith('x:')) { // carte connecteur : nom affiché de l'entité liée et direction, jamais l'identifiant interne
+      const c = ((state.view && state.view.connectors) || []).find((x) => x.id === id);
+      titre = `${c && c.side === 'in' ? 'Depuis' : 'Vers'} ${txt('.lbl')}`;
+    }
     const mot = txt('.vst') || ((carte.className.match(/\bst-([\w-]+)/) || [])[1] || ''); // mot d'état : la pastille de la carte rendue, à défaut son statut
     const n = liens(id);
     return [titre || txt('.title'), mot, txt('.foot .meta'), n ? `reliée à ${n} carte${n > 1 ? 's' : ''}` : 'aucune liaison'].filter(Boolean).join(', ');
@@ -93,6 +97,7 @@
     memo = cible;
     live.textContent = liste.length ? '' : `Niveau ${niveau()}, aucune carte`;
     if (liste.length) poser(liste, cible);
+    else { svg.removeAttribute('role'); svg.removeAttribute('aria-label'); } // niveau sans carte : plus de listbox, la région live parle
     if (!focusDans) return;
     const g = liste.length ? state.chipEls.get(cible) : stage; // jamais body : une carte, sinon #stage
     if (g && document.activeElement !== g) g.focus({ preventScroll: true });
@@ -111,6 +116,7 @@
   };
   const deplacer = ({ x = 0, y = 0 }) => { // seule écriture de translation de la couche VF : le zoom (state.t.k) ne bouge jamais
     if (!x && !y) return;
+    const bulle = document.getElementById('tooltip'); if (bulle && !bulle.hidden) bulle.hidden = true; // comme applyTransform : la carte bouge sous la bulle
     const { k } = state.t, nx = state.t.x + x, ny = state.t.y + y;
     state.t = { k, x: nx, y: ny };
     vp.style.transform = `translate(${nx}px,${ny}px) scale(${k})`;
@@ -143,8 +149,7 @@
     if (!id) return;
     if (ev.key === 'Enter') { ev.preventDefault(); ev.stopPropagation(); SC.open(id); return; } // plonge ; l'Entrée du moteur ouvrirait state.selected
     if (ev.key === ' ') {
-      ev.preventDefault(); ev.stopPropagation(); SC.select(id);
-      if (feuille() && document.body.classList.contains('no-panel')) document.getElementById('btn-panel').click(); // la feuille de détail s'ouvre
+      ev.preventDefault(); ev.stopPropagation(); SC.select(id); // le moteur ouvre lui-même la feuille de détail (téléphone)
       return;
     }
     const dir = TOUCHES[ev.key];

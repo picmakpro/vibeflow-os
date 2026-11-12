@@ -101,3 +101,12 @@ Chaque mutant est une copie du module dans `$WORK` (jamais le module), un lab pr
 - M-REPLI-BODY : le repli sur `#stage` retiré. « le mutant rougit CC3.5 (témoin : CC3.2 reste vert) » — niveau sans carte : le focus n'est plus sur `#stage`.
 
 Résultat de la suite finale : 29 PASS / 0 FAIL (dont les quatre mutants).
+
+## Correction ciblée du 2026-11-12 (amendement daté du plan) — rouge sur le code précédent (e8e1a1cf), puis vert
+
+- CC7.1 (niveau à connecteurs, lab à deux modules `m1` importe `m2`, `go('n:m-m1')`) : obtenu `[["x:out:n:m-m2","option","x:out:n:m-m2, reliée à 1 carte"]]` — le nom est l'identifiant interne ; attendu « Vers m2, reliée à 1 carte ».
+- CC6.1 (sombre) et (clair) : attendu `[…, true]` (ombre de la carte focalisée = `--shadow-card`), obtenu `[…, false]` (`--shadow-lift`).
+- CC3.5 (Backspace) et (Escape) : attendu `…,null,null]` (`#svg` sans rôle ni nom quand N = 0), obtenu `…,"listbox","Carte : lab, 3 cartes"]` (ancien nom périmé).
+- Mutant M-FOCUS-VOLE (garde `focusDans` retirée) : « le mutant rougit CC8.1 (témoin : CC3.3 reste vert) ». CC3.3 attend maintenant l'évènement `render`.
+- Code mort retiré : le clic sur `#btn-panel` à l'Espace (mutant E5 survivant, aucun comportement observable).
+- Rejeu : clavier-canevas 32 PASS / 0 FAIL (cinq mutants), accessibilite 35/0, vendor 130/0.
