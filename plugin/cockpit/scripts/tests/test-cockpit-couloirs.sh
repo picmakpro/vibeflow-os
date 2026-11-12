@@ -3,7 +3,7 @@
 #   CL1 couloirs par défaut, graphe à ?vue=graphe, section de panneau, adresse de naviguer
 #   CL2 en-tête de jalon, ligne d'état, troncature, listes, XSS, contrastes, mouvement réduit
 #   CL3 clavier, panneau par-dessus, zone basse, visite, direct, focus orphelin, bords latéraux (pilote : chrome-couloirs-clavier.mjs)
-#   Mutants (copie du module dans $WORK, jamais le module) : M-FOOT, M-XSS, M-POUSSE, M-ORPHELIN, M-EXTREMITE.
+#   Mutants (copie du module dans $WORK, jamais le module) : M-FOOT, M-XSS, M-POUSSE, M-ORPHELIN, M-EXTREMITE, M-POINTEUR (CL4).
 #   CL_SCRIPTS = dossier de scripts à bâtir (rejeu sur la base).
 # Sans navigateur : SUITE SAUTÉE (exit 0, message explicite), jamais un vert à vide.
 set -uo pipefail
@@ -161,6 +161,27 @@ for CLE in 1440 1024 390 800 1100t; do
 done
 assert_eq "CL3.6b — témoins : la feuille de détail est mesurée à 390 px ; #ask et la pastille sont mesurés à 1440 px ; aucune section du pilote n'a échoué" \
   "$(E5 "[j.cl36['390'].feuille.vus.includes('feuille'), j.cl36['1440'].base.vus.includes('ask'), Object.keys(j.erreurs).join()]")" '[true,true,""]'
+
+echo "=== CL4 — témoins de pointeur (le poste voit ce que la CI Linux voit : Chrome sans tête = aucun pointeur) ==="
+# décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; prise par la session principale le 2026-11-12
+printf '#!/bin/bash\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$AUX/chrome-sans-pointeur"; chmod +x "$AUX/chrome-sans-pointeur"
+build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+RPN="$(node "$HERE_T/chrome-pointeur.mjs" "$AUX/chrome-sans-pointeur" "http://127.0.0.1:$PORT" none 2>/dev/null)"
+RPC="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" coarse 2>/dev/null)"
+RPE="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" etranger 2>/dev/null)"; vf_hyg_stop "$SRV"
+assert_eq "CL4.1 — sans aucun pointeur (Chrome de la CI Linux) : ni fine ni coarse, et le panneau latéral s'applique (scroll-padding de fin posé, pas auto)" \
+  "$(E '[j.pointeur.fine, j.pointeur.coarse, j.spie !== "auto" && j.spie !== ""]' "$RPN")" '[false,false,true]'
+assert_eq "CL4.2 — pointeur grossier (toucher émulé) : coarse vrai, la feuille de détail s'applique, aucun scroll-padding de fin (auto)" \
+  "$(E '[j.pointeur.coarse, j.spie]' "$RPC")" '[true,"auto"]'
+# limite connue, dite : la pastille « Terminal » est lue par sa nature (bouton fixe sous body), pas par un attribut neutre posé par le terminal
+# (contrat porté à la jointure avec la Phase 79). Un bouton fixe étranger EST donc pris pour elle : #ask + #vf-coin + pastille croissent.
+assert_eq "CL4.3 — limite connue : un bouton fixe étranger sous body est pris pour la pastille (la zone basse de la vue grandit : $(E 'j.avant + " -> " + j.apres' "$RPE"))" \
+  "$(E '[j.avant !== j.apres]' "$RPE")" '[true]'
+CHROME_REEL="$CHROME"; CHROME="$AUX/chrome-sans-pointeur"
+mutant M-POINTEUR 41-vf-projet-vue.js "@media (min-width: 1000px) and (not (pointer: coarse)) {" "@media (min-width: 1000px) and (pointer: fine) {" chrome-pointeur.mjs none ""
+CHROME="$CHROME_REEL"
+assert_eq "M-POINTEUR — le mutant (ancienne requête (pointer: fine)) rougit CL4.1 : sans pointeur le panneau latéral ne s'applique plus (témoin : le Chrome est bien sans pointeur)" \
+  "$(E '[j.pointeur.fine, j.pointeur.coarse, j.spie === "auto" || j.spie === ""]' "$RM")" '[false,false,true]'
 
 echo "=== Mutants (copie du module dans \$WORK) ==="
 mutant M-FOOT 41-vf-projet-modele.js "const av = n && n.avancement, ex = n && n.exigences, seg = [];" \
