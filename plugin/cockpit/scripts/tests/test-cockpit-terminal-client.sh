@@ -8,7 +8,7 @@
 #   T17  T17.Q4 Ctrl+Maj+Espace dans le cadre -> message toggle reçu par P, T17.Q5 tout message reçu est dans la liste fermée
 #   O4   O4.1 même onglet = reprise (le second cadre se reconnecte) · O4.2 autre onglet (sessionStorage vide) = carte « Terminal déjà ouvert »
 #   O8   MESURE-O8 : liens (window.open) bloqués ou ouverts sous le sandbox minimal puis avec allow-popups, opener nul (mesure, non comptée)
-#   M-*  mutants (copies de la sortie, « mutant sans effet » = FAIL) : M-COOKIE, M-FRAGMENT, M-STOCKAGE, M-PREMIER-NIVEAU, M-SANS-AMORCE, M-ETOILE, M-ECOUTE + M-CLIP, M-ANCETRES, M-SETCOOKIE
+#   M-*  mutants (copies du module par cockpit_module_muter, « mutant sans effet » = FAIL) : M-COOKIE, M-FRAGMENT, M-STOCKAGE, M-PREMIER-NIVEAU, M-SANS-AMORCE, M-ETOILE, M-ECOUTE + M-CLIP, M-ANCETRES, M-SETCOOKIE
 # Sans Chrome : les sections statiques tournent, la suite annonce « SUITE SAUTÉE (navigateur) » et ne compte rien d'invérifié comme réussi.
 # Variables : VF_CLIENT_MS (échéance d'une attente navigateur, 20000 par défaut). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
@@ -62,7 +62,9 @@ cat > "$AUX/pagegen.mjs" <<'JS'
 // pagegen.mjs <sortie> <moteur> <theme> <fichier> : page rendue par le module de la sortie (sans serveur)
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs';
 const [, , sortie, moteur, theme, out] = process.argv;
-const m = await import(pathToFileURL(`${sortie}/vf-cockpit-terminal-page.mjs`).href);
+// 79-06 : le code n'est plus dans la sortie : le module est celui que commande cette sortie (table MODS_TABLE : sortie TAB module ; défaut MOD_DEPOT)
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === sortie && r) racine = r; } } catch {}
+const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-page.mjs`).href);
 m.preparerPage({ engineDir: moteur }); fs.writeFileSync(out, m.pageTerminal({ theme, origineP: 'http://127.0.0.1:4242' }).html);
 JS
 cat > "$AUX/queue.mjs" <<'JS'
@@ -474,19 +476,27 @@ mklab() {
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 }
 SRVN=0
-srv() { # srv <sortie> -> SRV_PORT SRV_PID SRV_O SRV_OUT QP AMORCE ; serveur lancé directement avec --terminal, comme le lanceur
+# 79-06 : le code ne vit plus dans la sortie. MOD_DEPOT = racine du module du dépôt ; mod_de <sortie> = racine du module que COMMANDE cette sortie
+# (table posée par mutant() : sortie TAB module ; par défaut le module du dépôt). La table est lue par bash (awk) et par les petits scripts node.
+MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODS_TABLE="$WORK/.mods"; : > "$MODS_TABLE"; export MODS_TABLE MOD_DEPOT
+mod_de() { local m; m="$(awk -F'\t' -v s="${1:-}" '$1==s{m=$2} END{print m}' "$MODS_TABLE" 2>/dev/null)"; printf '%s\n' "${m:-$MOD_DEPOT}"; }
+srv() { # srv <sortie> -> SRV_PORT SRV_PID SRV_O SRV_OUT QP AMORCE ; serveur du MODULE de la sortie visée, lancé avec --terminal par l'aide
   local o="$1" lab; lab="$(cd "$1/../.." && pwd)"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN.out"; rm -f "$o/.cache/server.json" "$o/.cache/terminal-amorce"; mkdir -p "$o/.cache"
   AMORCE="$(amorce_neuve)"; (umask 077; printf '%s' "$AMORCE" > "$o/.cache/terminal-amorce")
-  COCKPIT_PRET=terminal COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" --terminal
+  COCKPIT_MODULE="$(mod_de "$o")" COCKPIT_PRET=terminal COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" --terminal
   SRV_PID="$VF_PID"
   SRV_PORT="${VF_PORT:-0}"; QP="$(sj '(j.terminal&&j.terminal.url)||"http://127.0.0.1:0"')"; QP="${QP##*:}"
 }
 sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : données) et MUT_MOD (racine de la copie du module) ; code 1 si la cible manque ou si la copie n'a pas changé
+  local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  case "$(basename "$2")" in
+    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; }
@@ -539,7 +549,7 @@ if mutant setcookie vf-cockpit-terminal-processus.mjs "s|res.setHeader('Referrer
 else sans_effet "M-SETCOOKIE"; fi
 
 echo "=== N11 — file d'entrée : un morceau vide est retiré sans envoi, jamais de boucle de POST vides (sans navigateur) ==="
-file_vide() { node "$AUX/queue.mjs" "$1/vf-cockpit-terminal-client.mjs"; }
+file_vide() { node "$AUX/queue.mjs" "$(mod_de "$1")/scripts/vf-cockpit-terminal-client.mjs"; }
 assert_eq "N11.1 — un morceau vide (onData vide) ne part jamais : 0 POST vide, la file est vidée (l'octet utile suivant part seul, une fois)" "$(file_vide "$OUT")" "apresVide=0 total=1 vides=0 utiles=1"
 if mutant videtout vf-cockpit-terminal-client.mjs 's|while (file.length && file\[0\].length === 0) file.shift();||;s|if (!corps.length) break;||'; then
   assert_eq "M-VIDE-TOUT — le mutant (le code d'avant : ni retrait ni garde) rougit N11.1 : boucle de POST vides (plus de 100 en 300 ms)" "$(file_vide "$MUT_OUT" | awk '{ split($3, v, "="); print (v[2] > 100) ? "rouge" : "identique : " $0 }')" "rouge"
@@ -549,7 +559,7 @@ if mutant videenvoi vf-cockpit-terminal-client.mjs 's|if (!corps.length) break;|
 else sans_effet "M-VIDE-ENVOI"; fi
 
 echo "=== G2 / E4 — fin du flux : arrêt volontaire dit tout de suite, Python 3 absent dit en clair, vraie coupure = reconnexion (sans navigateur) ==="
-etat_fin() { node "$AUX/etat.mjs" "$1/vf-cockpit-terminal-client.mjs" "$2"; }
+etat_fin() { node "$AUX/etat.mjs" "$(mod_de "$1")/scripts/vf-cockpit-terminal-client.mjs" "$2"; }
 assert_eq "G2.1 — /etat {\"etat\":\"arret\"} à la fin du flux : la carte « Serveur arrêté » s'affiche tout de suite (moins de 500 ms, pas de « Reconnexion… »), P reçoit etat:arrete, un seul flux" "$(etat_fin "$OUT" arret)" "cartes=arrete@vite bandeaux=non flux=1 messages=ready,etat:connecte,etat:arrete"
 assert_eq "G2.2 — témoin : une vraie coupure (serveur injoignable) garde la reconnexion : aucune carte avant 30 s, le bandeau « Reconnexion… » est posé, le flux est réessayé" "$(etat_fin "$OUT" coupure)" "cartes=@jamais bandeaux=oui flux=>=2 messages=ready,etat:reconnexion"
 assert_eq "E4.1 — /etat indisponible/python3-absent : la carte « python » s'affiche tout de suite, jamais « arrete », pas d'etat:arrete vers P, pas de boucle (un seul flux)" "$(etat_fin "$OUT" python)" "cartes=python@vite bandeaux=non flux=1 messages=ready"
