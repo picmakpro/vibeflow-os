@@ -1144,7 +1144,10 @@ async function render(opts = {}) {
   if (gros) { indicateur.classList.add('on', 'now'); await new Promise((ok) => { const tm = setTimeout(ok, 120); requestAnimationFrame(() => setTimeout(() => { clearTimeout(tm); ok(); }, 0)); }); }
   let res;
   try { res = await layout(view); }
-  catch (e) { console.error(e); clearTimeout(loading); indicateur.classList.remove('on', 'now'); $('#empty').hidden = false; $('#empty').textContent = 'Layout failed: ' + e.message; return; }
+  catch (e) {
+    console.error(e); clearTimeout(loading); indicateur.classList.remove('on', 'now'); $('#empty').hidden = false;
+    $('#empty').textContent = `${t('Layout failed:')} ${e.message}`; return;
+  }
   clearTimeout(loading);
   indicateur.classList.remove('on', 'now');
   if (token !== renderToken) return;
