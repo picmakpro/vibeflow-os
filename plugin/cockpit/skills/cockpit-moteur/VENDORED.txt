@@ -37,6 +37,7 @@ AJOUT assets/ui/41-vf-projet-clavier.js
 AJOUT assets/ui/41-vf-projet-modele.js
 AJOUT assets/ui/41-vf-projet-rendu.js
 AJOUT assets/ui/41-vf-projet-vue.js
+AJOUT assets/ui/42-vf-panneau-retour.js
 AJOUT assets/ui/70-vf-live.js
 AJOUT assets/ui/71-vf-equipe-rendu.js
 AJOUT assets/ui/72-vf-equipe.js
