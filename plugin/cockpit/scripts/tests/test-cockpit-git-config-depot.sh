@@ -17,7 +17,7 @@ set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 export GIT_AUTHOR_NAME=t GIT_AUTHOR_EMAIL=t@t.test GIT_COMMITTER_NAME=t GIT_COMMITTER_EMAIL=t@t.test
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
-WORK="$(mktemp -d)"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"
 trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 AUX="$WORK/aux"; MARQ="$WORK/marques"; LEURRES="$WORK/leurres"
@@ -80,9 +80,12 @@ if (mode === 'lecture') {
     sortie.refus.push({ n, a: !!a.refuse, b: !!b.refuse, c: c.length === 0 });
   }
   const d = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git-durci.mjs')).href); sortie.liste = d.SOUS_COMMANDES_AUTORISEES ?? null;
-} else if (mode === 'absent') { // D10 : git introuvable (ENOENT à la lecture des pilotes) ; sans argument, le PATH est celui du poste
-  if (process.argv[5] === 'sans-git') process.env.PATH = '/nonexistent';
-  const a = m.lancerGit(depot, ['status', '--porcelain']), b = await m.lancerGitAsync(depot, ['status', '--porcelain']);
+} else if (mode === 'absent') { // D10 : git introuvable (ENOENT à la lecture des pilotes), ou faux git du PATH (argv[6]) : code non nul, délai dépassé, échéance passée
+  const x = process.argv[5];
+  if (x === 'sans-git') process.env.PATH = '/nonexistent'; else if (process.argv[6]) process.env.PATH = process.argv[6] + path.delimiter + process.env.PATH;
+  const L = ['status', '--porcelain'], ms = x === 'lent' ? 400 : x === 'echeance' ? -1000 : null;
+  const a = ms === null ? m.lancerGit(depot, L) : m.avecEcheance(ms, () => m.lancerGit(depot, L));
+  const b = await m.lancerGitAsync(depot, L, ms === null ? {} : { fin: Date.now() + ms });
   sortie.s = [a.absent, a.delai, a.refuse === true].join(','); sortie.a = [b.absent, b.delai, b.refuse === true].join(',');
 } else if (mode === 'memo') { // D6.5 : une seule lecture des pilotes dans la fenêtre du mémo, limite de la fenêtre
   const [fake, out, journal, wrap, reel] = process.argv.slice(5); process.env.VF_FAKE_OUT = out; process.env.PATH = wrap + path.delimiter + process.env.PATH;
@@ -719,13 +722,25 @@ LK_NC="$(mutant_sur compris vf-cockpit-git-durci.mjs "$LK_PAT" "$LK_PAL")|$(FROM
 assert_eq "M-COMPRIS.0 — les deux ancres du mutant existent (motif élargi, refus de la clé non comprise retiré)" "$LK_NC" "muté|muté"
 assert_eq "M-COMPRIS — rougit D8.2 : sans le refus, la clé non comprise est écartée en silence et la lecture aboutit" "$(pg "$(lire "$WORK/mut-compris" "$ORD" ordinaire)" 'j.sujet')" "SUJET-DEUX"
 echo "=== D10 — git introuvable : la lecture des pilotes échoue par absence, le refus dit « absent » et jamais « délai » ==="
-lk_d10() { pg "$(node "$AUX/sonde.mjs" "$1" "$ORD" absent "$2" 2>/dev/null)" 'j.s+"|"+j.a'; }
+lk_d10() { pg "$(node "$AUX/sonde.mjs" "$1" "$ORD" absent "$2" ${3:-} 2>/dev/null)" 'j.s+"|"+j.a'; }
+mkdir -p "$AUX/g128" "$AUX/glent"; printf '#!/bin/sh\nexit 128\n' > "$AUX/g128/git"; printf '#!/bin/sh\nsleep 5\n' > "$AUX/glent/git"; chmod +x "$AUX/g128/git" "$AUX/glent/git"
 assert_eq "D10.1 — git introuvable : lancerGit et lancerGitAsync refusent avec absent=true, delai=false (refus fermé)" "$(lk_d10 "$SCRIPTS" sans-git)" "true,false,true|true,false,true"
 assert_eq "D10.2 — témoin positif : git présent, aucun refus (absent=false, delai=false)" "$(lk_d10 "$SCRIPTS" avec-git)" "false,false,false|false,false,false"
 assert_eq "D10.3 — témoin : un autre échec de lecture (clé listée non comprise) reste un refus fermé « délai » (absent=false, delai=true)" "$(lk_d10 "$WORK/mut-inconnue" avec-git)" "false,true,true|false,true,true"
+assert_eq "D10.4 — un faux git du PATH qui sort en code 128 : refus fermé « délai », jamais « absent » (absent=false, delai=true)" "$(lk_d10 "$SCRIPTS" faux "$AUX/g128")" "false,true,true|false,true,true"
+assert_eq "D10.5 — un faux git qui dépasse le délai (échéance de 400 ms) : « délai », jamais « absent »" "$(lk_d10 "$SCRIPTS" lent "$AUX/glent")" "false,true,true|false,true,true"
+assert_eq "D10.6 — échéance déjà passée : rien n'est lancé, « délai », jamais « absent »" "$(lk_d10 "$SCRIPTS" echeance)" "false,true,true|false,true,true"
 LK_NA="$(mutant_sur absent vf-cockpit-git-lanceur.mjs 'return { ...REFUS_GIT, absent: p.absent, delai: !p.fiable && !p.absent };' 'return { ...REFUS_GIT, delai: !p.fiable };')|$(FROM='return { ...REFUS_GIT, absent: p.absent, delai: !p.fiable && !p.absent };' TO='return { ...REFUS_GIT, delai: !p.fiable };' node "$AUX/mutsub.mjs" "$WORK/mut-absent/vf-cockpit-git-lanceur.mjs")"
 assert_eq "M-ABSENT.0 — les deux ancres existent (lancerGit, lancerGitAsync)" "$LK_NA" "muté|muté"
+LK_NM="$(mutant_sur absent-large vf-cockpit-git-lanceur.mjs 'absent: r.absent };' 'absent: r.absent || r.code === 128 || r.echeance || r.tronque };')"
+assert_eq "M-ABSENT-LARGE.0 — l'ancre existe (absent élargi à code 128, échéance, sortie tronquée)" "$LK_NM" "muté"
+assert_eq "M-ABSENT-LARGE — rougit D10.4 (code 128) et D10.6 (échéance passée) ; D10.1, D10.2, D10.3 et D10.5 restent verts" "$(lk_d10 "$WORK/mut-absent-large" sans-git)/$(lk_d10 "$WORK/mut-absent-large" avec-git)/$(lk_d10 "$WORK/mut-absent-large" faux "$AUX/g128")/$(lk_d10 "$WORK/mut-absent-large" lent "$AUX/glent")/$(lk_d10 "$WORK/mut-absent-large" echeance)" "true,false,true|true,false,true/false,false,false|false,false,false/true,false,true|true,false,true/false,true,true|false,true,true/true,false,true|true,false,true"
 assert_eq "M-ABSENT — rougit D10.1 : git introuvable redevient « délai » (absent=false, delai=true), le refus reste fermé ; D10.2 reste vert" "$(lk_d10 "$WORK/mut-absent" sans-git)|$(lk_d10 "$WORK/mut-absent" avec-git)" "false,true,true|false,true,true|false,false,false|false,false,false"
+# Limite connue gardée : la lecture des pilotes lance toujours `git`, le lancement suit `binaire` (réservé aux tests). Aucun appelant de production ne doit le passer.
+lk_bin() { find "$1" -type f \( -name '*.mjs' -o -name '*.js' \) -not -path '*/tests/*' -not -path '*/node_modules/*' -exec grep -hE '(^|[^A-Za-z_])binaire[[:space:]]*:' {} + 2>/dev/null | grep -vE '^[[:space:]]*(//|\*)' | wc -l | tr -d ' '; }
+assert_eq "D10.7 — aucun appelant de production (module du cockpit hors tests) ne passe le paramètre binaire à lancerGit ni à lancerGitAsync (0 occurrence de « binaire: »)" "$(lk_bin "$SCRIPTS/..")" "0"
+mutant_sur binaire vf-cockpit-git-lanceur.mjs '// A1 : jamais lancé' '// A1 : jamais lancé' >/dev/null; printf 'import { lancerGit } from "./vf-cockpit-git-lanceur.mjs";\nlancerGit(process.cwd(), ["status"], { binaire: "/x/git" });\n' > "$WORK/mut-binaire/injecte.mjs"
+assert_eq "M-BINAIRE — rougit D10.7 : un appelant qui passe binaire (fichier injecté dans une copie) est compté (1) ; la copie sans injection compte 0" "$(lk_bin "$WORK/mut-binaire")|$(rm -f "$WORK/mut-binaire/injecte.mjs"; lk_bin "$WORK/mut-binaire")" "1|0"
 echo "=== D5 — aucune trace hors du dossier temporaire ==="
 HORS="$(find "$SCRIPTS/.." -newer "$AUX/sonde.mjs" -type f \( -name 'SSH' -o -name 'UPLOAD' -o -name 'GPG' -o -name 'CLE-*' \) 2>/dev/null | head -3)"
 assert_eq "D5.1 — aucun marqueur de leurre dans l'arbre du module" "$HORS" ""
