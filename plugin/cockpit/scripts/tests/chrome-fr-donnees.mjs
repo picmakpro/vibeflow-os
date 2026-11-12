@@ -43,7 +43,7 @@ await executer(chrome, async (s) => {
   const infobulle = await stabiliser(() => s.ev("(document.querySelector('#tooltip .tt') || {}).textContent"), { pas: 400, max: 6000 });
   // fil d'Ariane : un dossier du lab dont le nom est un mot du dictionnaire
   // gabarits dont les variables sont des noms du lab (infobulle d'un lien, en-tête d'une carte ouverte) : le chrome est traduit, les noms jamais
-  const gabarits = await s.ev("({ lien: window.__vfFrTraduire('Tokens contains Open'), dans: window.__vfFrTraduire('Inside Tokens'), derriere: window.__vfFrTraduire('Everything behind Health'), temoin: window.__vfFrTraduire('Inside Parent') })");
+  const gabarits = await s.ev("({ lien: window.__vfFrT('{} contains {}', 'Tokens', 'Open'), dans: window.__vfFrT('Inside {}', 'Tokens'), derriere: window.__vfFrT('Everything behind {}', 'Health'), temoin: window.__vfFrT('Inside {}', 'Parent') })");
   // panneau d'un LIEN sans description (vrai clic) : le texte de repli est calculé par le viewer (« 1 connection. »), sans donnée du lab : il reste du chrome, traduit
   await s.ev(`${FP}.go(${JSON.stringify(conteneur)})`);
   await s.attendre(`window.VibeFlow.state.container === ${JSON.stringify(conteneur)} && !!window.VibeFlow.state.edgeEls && window.VibeFlow.state.edgeEls.size > 0`, 'liens du conteneur');
@@ -62,9 +62,6 @@ await executer(chrome, async (s) => {
   // attribut `title` de chaque rangée (nom de la carte, suivi de la note quand il y en a une) et note de la rangée : le nom reste donnée, la note reste traduite
   const reponseTitres = await stabiliser(() => s.ev("[...document.querySelectorAll('#panel .row.vf-rep')].map((e) => e.getAttribute('title'))"), { pas: 400, max: 6000 });
   const reponseNote = await stabiliser(() => s.ev("(document.querySelector('#panel .row.vf-rep .rd') || {}).textContent"), { pas: 400, max: 6000 });
-  // formes plurielles du texte de repli d'un lien (calculé par le viewer, sans donnée du lab) : posées dans le panneau, avec le balisage de viewer.html ; elles doivent être traduites
-  await s.ev(`(() => { const p = document.getElementById('panel'); for (const t of ['3 connections.', '2 connections across 3 endpoints.', '2 connections across 3 endpoints, matched from call sites to route definitions.']) { const e = document.createElement('p'); e.className = 'pd vf-test-repli'; e.textContent = t; p.appendChild(e); } })()`);
-  const replis = await stabiliser(() => s.ev("[...document.querySelectorAll('#panel .vf-test-repli')].map((e) => e.textContent)"), { pas: 400, max: 6000 });
   // AUDC-H4 (restes, lot 0 bis) : (1) le nom accessible d'une carte atteinte au clavier (aria-label posé par le viewer) est le nom de la donnée ; (2) une description qui contient un mot du glossaire (« endpoints »)
   // garde ce mot (le glossaire l'enveloppe dans un <span> : l'ancêtre .pd, pas le parent, porte la donnée) ; (3) « N files in <chemin>/ » est une phrase de gabarit du moteur : le gabarit est traduit, le chemin jamais
   await s.ev(`${FP}.go(${JSON.stringify(conteneur)})`);
@@ -94,6 +91,15 @@ await executer(chrome, async (s) => {
     dossierConnecteur = await stabiliser(() => s.ev("(document.querySelector('#panel .pd') || {}).textContent"), { pas: 400, max: 6000 });
     await s.ev(`${FP}.select(null)`);
   }
+  // lignes de liste RÉELLES : le panneau du nœud qui porte le dossier liste ses enfants ; la description du dossier est émise par le viewer, traduite au point d'émission
+  let lignesReelles = null;
+  const parentDossier = dossierId ? await s.ev(`${FP}.parentOf(${JSON.stringify(dossierId)})`) : null;
+  if (parentDossier) {
+    await s.ev(`${FP}.select(${JSON.stringify(parentDossier)})`);
+    await s.attendre("!!document.querySelector('#panel .row[data-go^=\"d:\"] .rd')", 'lignes de dossiers du moteur');
+    lignesReelles = await stabiliser(() => s.ev("[...document.querySelectorAll('#panel .row[data-go^=\"d:\"] .rd')].map((e) => e.textContent).sort()"), { pas: 400, max: 6000 });
+    await s.ev(`${FP}.select(null)`);
+  }
   // lignes de liste (identité = l'item porté par `data-go` : « d: » = dossier du moteur, « f: » = fichier du lab) ; formes qui ne sont pas le gabarit : intactes ; fichier dont la description EST le gabarit : intacte
   await s.ev(`(() => { const p = document.getElementById('panel'); for (const [id, t] of [['d:x', '1 file in src/lib/'], ['d:x', '12 files in src/mes files in/'], ['d:x', '3 files in src/ were changed'], ['d:x', '3 files in src'], ['f:x', '3 files in x/']]) { const a = document.createElement('a'); a.className = 'row vf-test-dossier'; a.setAttribute('data-go', id); a.innerHTML = '<span class="rt"><div class="rn">x</div><div class="rd"></div></span>'; a.querySelector('.rd').textContent = t; p.appendChild(a); } const b = document.createElement('p'); b.className = 'pd vf-test-dossier'; b.textContent = 'See 3 files in src/ and more'; p.appendChild(b); })()`);
   const dossiersPoses = await stabiliser(() => s.ev("[...document.querySelectorAll('.vf-test-dossier .rd, p.vf-test-dossier')].map((e) => e.textContent)"), { pas: 400, max: 6000 });
@@ -105,5 +111,5 @@ await executer(chrome, async (s) => {
   await s.ev(`${FP}.select(${JSON.stringify(pose.Tokens)})`);
   await s.attendre("!!document.querySelector('#panel .pd')", 'panneau du fichier');
   const panneauGabarit = await stabiliser(() => s.ev("(document.querySelector('#panel .pd') || {}).textContent"), { pas: 400, max: 6000 });
-  return { ariaCarte, descGlossaire, dossierId, dossier, dossierOuvert, dossierConnecteur, dossiersPoses, resultatsPoses, panneauGabarit, ...cartes, lien, reponse, reponseTitres, reponseNote, replis, nAretes: aretes ? aretes.length : 0, gabarits, descPosee: desc, panneau, panneauVide, recherche, ligne, miette, infobulle };
+  return { ariaCarte, descGlossaire, lignesReelles, dossierId, dossier, dossierOuvert, dossierConnecteur, dossiersPoses, resultatsPoses, panneauGabarit, ...cartes, lien, reponse, reponseTitres, reponseNote, nAretes: aretes ? aretes.length : 0, gabarits, descPosee: desc, panneau, panneauVide, recherche, ligne, miette, infobulle };
 });
