@@ -15,3 +15,28 @@ Raison du rouge : la page se charge (CL0 vert, canevas rendu), la vue n'existe p
 | CL1.3 | `[true,"n:ph-1"]` | section absente (le clic échoue : aucune carte `.vp-carte[data-id="n:ph-1"]`) | aucune carte de couloir |
 | CL1.4 | `[["?vue=graphe","#s=x"],["?vue=couloirs","#s=x"]]` | `[["","#s=x"],["?vue=couloirs","#s=x"]]` | `naviguer` n'ajoute pas `vue=graphe` |
 | CL1.9 | `[]` | `[cl13]` | la section cl13 a échoué (cause : CL1.3) |
+
+## Tâches 2 et 3 : CL2 et CL3 sur la base (6 PASS / 51 FAIL)
+
+Rejeu de la suite entière, pilotes de la tête, module servi = `git archive` du commit des témoins de la tâche 1 (`plugin/cockpit`, aucun fichier `41-vf-projet-*`,
+`naviguer` sans `vue=graphe`). Raison du rouge : la vue n'existe pas. Le fixture est vivant : CL0 vert, CL1.2 vert (canevas, témoin), les mesures de pilote qui ne
+dépendent pas de la vue rendent des valeurs réelles (CL3.1 : `[[null,0],["a",null],",,,,,,,,"]` : la tabulation atterrit sur un lien d'en-tête, aucune carte à `tabindex=0`).
+
+| Cas | Obtenu sur la base | Raison |
+|---|---|---|
+| CL1.1 | `[0,"visible",false]` | aucun couloir, canevas visible |
+| CL1.3 | section absente | aucune carte de couloir à cliquer |
+| CL2.1 à CL2.6, CL2.8 | `mesure absente : Cannot read properties of null (reading 'synth' / '0' / 'liste' …)` | aucun `.vp-jalon`, aucune carte |
+| CL2.7a | PASS dans ce rejeu (artefact : la suite lisait les `41-*` de l'arbre, pas de la base) ; corrigé à `$SC_BASE` : sur la base `ls` rend 0 fichier et `css-jetons` rend 1 (`0\|rc=1`) | témoin de présence des fichiers |
+| CL2.7b | `mesure absente` (aucun `.vp-carte`) | pas de carte à mesurer |
+| CL3.1 | `[[null,0],["a",null],",,,,,,,,"]` | aucun arrêt de carte, la suite de flèches ne trouve aucune carte |
+| CL3.2 | `[",,,,,,",false]` | aucune carte focalisable, `body` à chaque appui |
+| CL3.3a, CL3.3b, CL3.4 | sélection nulle, conteneur inchangé | aucune carte |
+| CL3.5, CL3.7, CL3.8, CL3.9, CL3.10 | `mesure absente` (carte ou `VF_PROJET` absents) | aucune vue |
+| CL3.11a, CL3.11b | `[null,null,null,null]` | aucune carte à focaliser puis retirer |
+| CL3.11c | PASS (témoin) | le champ de question n'est touché par rien : vert sur la base, garde contre un vol de focus futur |
+| CL3.12 (1440, 1024, 800, 390, 1100t) | `mesure absente : Cannot read properties of null (reading 'fin')` | aucune vue, aucun scroll-padding |
+| CL3.6 (cinq largeurs) | `mesure absente : Cannot read properties of null (reading 'haut')` | aucune vue |
+| mutants (cinq) | `mutation impossible : motif absent` | le fichier muté n'existe pas : un mutant sans effet n'est jamais compté vert |
+
+CL1.4 est vert dans ce rejeu (les pilotes de la tête portent le `naviguer` de la tâche 1) ; il était rouge sur la base de la tâche 1 (`[["","#s=x"],…]`, voir plus haut).
