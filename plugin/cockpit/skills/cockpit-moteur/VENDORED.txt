@@ -35,6 +35,7 @@ AJOUT assets/vendor/xterm/xterm.js
 AJOUT assets/vibeflow-logo-clair.svg
 AJOUT assets/vibeflow-logo-sombre.svg
 AJOUT scripts/lib/vf-git-sortant.mjs
+AJOUT scripts/lib/vf-glob.mjs
 AJOUT terminal/vf-cockpit-pty.py
 TAILLE assets/serve.mjs
 TAILLE assets/vendor/elk.bundled.js
