@@ -122,7 +122,9 @@
     }
     const sur = (cible, type, fn) => { cible.addEventListener(type, fn); pose.push(() => cible.removeEventListener(type, fn)); };
     sur(window, 'resize', maj); sur(window, 'vf-git:etat', maj);
-    sur(document, 'transitionend', (ev) => { if (ev.target.closest && ev.target.closest('#vf-git-tiroir, #panel, #ask, #vf-coin')) maj(); });
+    for (const e of ['transitionend', 'animationend']) { // le tiroir Git entre par une animation : on relit une fois posé
+      sur(document, e, (ev) => { if (ev.target.closest && ev.target.closest('#vf-git-tiroir, #panel, #ask, #vf-coin')) maj(); });
+    }
     SC.on('render', maj); SC.on('panel', maj);
     maj();
     return () => { vivant = false; pose.splice(0).forEach((f) => f()); for (const b of ORDRE) if (els[b]) { els[b].remove(); delete els[b]; } };

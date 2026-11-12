@@ -83,33 +83,58 @@ assert_eq "CN1.3 — Tab depuis la carte itinérante : un repère (button), nom 
 assert_eq "CN1.9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
 echo "=== CN2 — bloc bas-droit, minicarte, hachure du tiroir Git, ligne d'état ==="
 R="$(mesurer cn2)"; [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }; [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/cn2.json"
-assert_eq "CN2.1 — 1440 px, panneau ouvert : minicarte <= 144 x 96, bloc à 16 px de la zone libre (32 du panneau), 8 px au-dessus de #ask ; fermé : à 16 px du bord" \
+assert_eq "CN2.1 — 1440 px : minicarte <= 144 x 96, bloc à 16 px de la zone libre (32 du panneau) et 8 px au-dessus de #ask ; fermé : 16 px du bord" \
   "$(E "(() => { const c = j.cn2.c21 || {}, k = c.coin, m = c.mini; if (!k || !m) return 'bloc absent';
     return [m.w > 0 && m.w <= 144 && m.h > 0 && m.h <= 96, Math.abs(c.panel.l - k.r - 32) <= 1, Math.abs(c.ask.t - 8 - k.b) <= 1,
       !!c.ferme && Math.abs(c.W - 16 - c.ferme.r) <= 1]; })()")" "[true,true,true,true]"
 assert_eq "CN2.2 — clic au centre de la minicarte : le cadre du champ se recentre sur ce point, state.t.k inchangé" \
   "$(E "(() => { const c = j.cn2.c22; if (!c) return 'sans clic';
     return [Math.abs(c.visee[0] - c.centre[0]) < 1.5 && Math.abs(c.visee[1] - c.centre[1]) < 1.5, c.k[0] === c.k[1]]; })()")" "[true,true]"
-assert_eq "CN2.3 — tiroir Git : freeArea().w et state.t identiques (PU-G-204), hachure (trait --text-3) sur la part du cadre qu'il couvre, nom de la minicarte" \
+assert_eq "CN2.3 — tiroir Git : freeArea().w et state.t identiques (PU-G-204), hachure (--text-3) sur la part du cadre couverte, nom de la minicarte" \
   "$(E "(() => { const c = j.cn2.c23; if (!c || !c.hf || !c.ho) return 'sans mesure';
     return [c.av.ouvert === false && c.ap.ouvert === true, c.av.w === c.ap.w, JSON.stringify(c.av.t) === JSON.stringify(c.ap.t), c.hf.affiche === false,
-      c.ho.affiche, Math.abs(c.ho.part - c.attendu) < 0.04, Math.abs(c.ho.gauche) < 1.5, c.ho.trait, /sous l'historique Git$/.test(c.ho.nom),
-      !/historique Git/.test(c.hf.nom), /^Minicarte : \d+ cartes? visibles? sur \d+/.test(c.hf.nom)]; })()")" "[true,true,true,true,true,true,true,true,true,true,true]"
+      c.ho.affiche, Math.abs(c.ho.part - c.attendu) < 0.005, Math.abs(c.ho.gauche - c.debut) < 0.005, c.ho.trait, /sous l'historique Git$/.test(c.ho.nom),
+      !/historique Git/.test(c.hf.nom), /^Minicarte : \d+ cartes? visibles? sur \d+/.test(c.hf.nom)]; })()")" \
+  "[true,true,true,true,true,true,true,true,true,true,true]"
 NOMB='vf/<img/src=x/onerror=window.__xss=1>/branche-tres-longue-pour-lellipse'
-assert_eq "CN2.4 — ligne d'état : branche entière en title et en étiquette, ellipse au milieu (10 + … + 8), un seul role=status « Direct », heure HH:MM qui suit vf-who" \
+assert_eq "CN2.4 — ligne d'état : branche entière en title et étiquette, ellipse au milieu (10 + … + 8), un seul role=status, heure qui suit vf-who" \
   "$(E "(() => { const c = j.cn2.c24; if (!c || !c.base) return 'sans mesure'; const b = c.base, n = '$NOMB';
-    return [b.titre === n, b.nom.includes(n), b.vu === n.slice(0, 10) + '…' + n.slice(-8), b.status.length === 1 && /^Direct/.test(b.status[0]), b.mot === 'Direct',
-      /^Mis à jour à \d\d:\d\d$/.test(b.heure), c.h1 === 'Mis à jour à 09:05', c.h2 === 'Mis à jour à 21:47']; })()")" "[true,true,true,true,true,true,true,true]"
-assert_eq "CN2.4b — direct coupé : « Direct coupé », « Reprise en cours, mise à jour à HH:MM » ; branche hostile (T-80-10) : aucun élément créé, aucun code exécuté" \
+    return [b.titre === n, b.nom.includes(n), b.vu === n.slice(0, 10) + '…' + n.slice(-8), b.status.length === 1 && /^Direct/.test(b.status[0]),
+      b.mot === 'Direct',
+      /^Mis à jour à \d\d:\d\d$/.test(b.heure), c.h1 === 'Mis à jour à 09:05', c.h2 === 'Mis à jour à 21:47']; })()")" \
+  "[true,true,true,true,true,true,true,true]"
+assert_eq "CN2.4b — direct coupé : « Reprise en cours, mise à jour à HH:MM » ; branche hostile (T-80-10) : aucun élément créé, aucun code exécuté" \
   "$(E "(() => { const c = j.cn2.c24; if (!c || !c.coupe) return 'sans mesure';
     return [c.coupe.mot, /^Reprise en cours, mise à jour à \d\d:\d\d$/.test(c.coupe.heure), c.base.xss.join()]; })()")" '["Direct coupé",true,"true,0"]'
 assert_eq "CN2.5 — sans --terminal : aucun nœud vf-term dans #vf-coin, aucun mot « terminal », aucune commande (P71-D-02, P67-D-14)" \
   "$(E 'j.cn2.c25 ? [j.cn2.c25.term, j.cn2.c25.texte, j.cn2.c25.commandes] : "sans mesure"')" "[0,false,0]"
-assert_eq "CN2.6 — 1440 et 1024 px, panneau ouvert et fermé, tiroir Git ouvert : bloc, zoom et barre de question disjoints ; 900 px aucun bloc ; 1100 px tactile : ligne d'état seule" \
+assert_eq "CN2.6 — 1440 et 1024 px, panneau et tiroir Git ouverts ou non : bloc, zoom, barre disjoints ; 900 px aucun bloc ; 1100 px tactile : état seul" \
   "$(E "(() => { const m = j.cn2.c26; if (!m || m.length !== 6) return 'sans mesure';
     return [m.slice(0, 4).map((x) => x.coin && x.ok).join(), m[4].coin, m[5].coin && !m[5].mini && m[5].etat]; })()")" '["true,true,true,true",null,true]'
 assert_eq "CN2.9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
+
+echo "=== Mutants (copie du module dans \$WORK) ==="
+mutant() { # mutant <nom> <fichier relatif au moteur> <ancien> <nouveau> <mode> <sections> -> RM ; une mutation impossible compte comme un échec
+  local M="$WORK/mod-$1" L="$WORK/lab-$1"; mkdir -p "$M/scripts" "$M/skills"
+  cp "$SC_BASE"/*.mjs "$SC_BASE"/*.json "$M/scripts/"; cp -R "$SC_BASE/../skills/cockpit-moteur" "$M/skills/cockpit-moteur"; cp -R "$LAB" "$L"
+  if ! node "$AUX/mut.mjs" "$M/skills/cockpit-moteur/$2" "$3" "$4"; then
+    echo "  ❌ FAIL — $1 : mutation impossible"; FAIL=$((FAIL+1)); RM="{}"; return
+  fi
+  build_serve "$L" "$M/scripts" "$M/skills/cockpit-moteur"; RM="$(mesurer "$5" "$6")"; vf_hyg_stop "$SRV"; rm -rf "$L"
+}
+mutant M-FREEAREA assets/viewer.html "return { x: 16, y: top, w: Math.max(200, r.width - panelW - 32), h: Math.max(140, r.height - top - bottom) };" \
+  "const tg = document.getElementById('vf-git-tiroir'), gw = tg && !tg.hidden ? tg.offsetWidth : 0;
+  return { x: 16 + gw, y: top, w: Math.max(200, r.width - panelW - 32 - gw), h: Math.max(140, r.height - top - bottom) };" cn2 cn23
+assert_eq "M-FREEAREA — le mutant rougit CN2.3 (freeArea() déduit le tiroir Git : sa largeur change à son ouverture) (témoin : le tiroir s'est bien ouvert)" \
+  "$(E "[j.cn2.c23.av.w === j.cn2.c23.ap.w, j.cn2.c23.ap.ouvert]" "$RM")" "[false,true]"
+mutant M-COMPTE assets/ui/02-vf-reperes.js "if (d[b] >= 0) {" "if (d[b] > -c.width * k / 2 - 1) {" cn1 cn1
+assert_eq "M-COMPTE — le mutant rougit CN1.1 (une carte coupée par le bord est comptée hors champ) (témoin : le pilote a joué ses quatre états)" \
+  "$(E "[$OK1, j.cn1.etats.length]" "$RM")" "[false,4]"
+mutant M-TERMINAL assets/ui/02-vf-ligne-etat.js "s.appendChild(ls);" \
+  "s.appendChild(ls); const tm = document.createElement('span'); tm.className = 'vf-term-seg'; tm.textContent = 'Terminal'; ls.appendChild(tm);" cn2 cn25
+assert_eq "M-TERMINAL — le mutant rougit CN2.5 (un segment « Terminal » ajouté sans --terminal) (témoin : le bloc existe)" \
+  "$(E "[j.cn2.c25.term, j.cn2.c25.texte]" "$RM")" "[1,true]"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

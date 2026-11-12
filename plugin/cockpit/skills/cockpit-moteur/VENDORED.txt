@@ -26,6 +26,8 @@ AJOUT assets/ui/00-vf-surcouches.js
 AJOUT assets/ui/00-vibeflow.js
 AJOUT scripts/lib/vf-git-sortant.mjs
 AJOUT assets/ui/01-vf-responsive.js
+AJOUT assets/ui/02-vf-coin.js
+AJOUT assets/ui/02-vf-ligne-etat.js
 AJOUT assets/ui/02-vf-reperes.js
 AJOUT assets/ui/02-vf-telephone.js
 AJOUT assets/ui/03-vf-accessibilite.js

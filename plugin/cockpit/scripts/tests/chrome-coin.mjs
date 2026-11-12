@@ -2,7 +2,8 @@
 // Usage : node chrome-coin.mjs <chrome> <racine-du-serveur> <mode>   Rend UNE ligne JSON { … } ou { erreur }. Modes : cn1 · cn2 · cn3 · term.
 // Chaque section est isolée (sec) : une section qui échoue laisse ses champs vides, les autres sont mesurées. Gestes par Input.dispatch*.
 import { executer, pause, stabiliser, positionPosee } from './chrome-session.mjs';
-const [, , chrome, racine, mode] = process.argv;
+const [, , chrome, racine, mode, filtre] = process.argv; // filtre : sections à jouer (mutants), séparées par des virgules ; vide = toutes
+const SEC = new Set((filtre || '').split(',').filter(Boolean));
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!VibeFlow.state && !!VibeFlow.state.layout";
 const POSEE = "(() => { const v = document.querySelector('#viewport'); return !!v && v.style.opacity !== '0' && !v.classList.contains('anim'); })()";
 const OUTIL = `window.__cn = {
@@ -34,7 +35,7 @@ const KEYS = { Tab: 9, Enter: 13, Escape: 27 };
 await executer(chrome, async (s) => {
   const o = { erreurs: {} };
   await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
-  const sec = async (nom, f) => { try { await f(); } catch (e) { o.erreurs[nom] = String(e.message).slice(0, 160); } };
+  const sec = async (nom, f) => { if (SEC.size && !SEC.has(nom)) return; try { await f(); } catch (e) { o.erreurs[nom] = String(e.message).slice(0, 160); } };
   const lire = async (expr) => { const v = await s.ev(expr); return v === undefined ? null : JSON.parse(v); };
   const vue = (w, h, mobile) => s.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile });
   const touche = async (nom) => {
@@ -111,25 +112,29 @@ await executer(chrome, async (s) => {
     });
     await sec('cn23', async () => { // PU-G-204 : le tiroir Git ne change ni freeArea() ni state.t ; la hachure couvre la part du cadre qu'il recouvre
       const VUE = `JSON.stringify({ w: VibeFlow.freeArea().w, t: VibeFlow.state.t, ouvert: !!window.VFGitTiroir && VFGitTiroir.ouvert() })`;
-      const HACH = `JSON.stringify((() => { const h = document.querySelector('#vf-minicarte rect[fill*=hachure]'), f = document.querySelector('#vf-minicarte .vf-mf');
-        const a = h.getBoundingClientRect(), b = f.getBoundingClientRect(), l = document.querySelector('#vf-minicarte .vf-mh line'), p = document.createElement('i');
+      const HACH = `JSON.stringify((() => { const q = (x) => document.querySelector('#vf-minicarte ' + x), h = q('rect[fill*=hachure]'), f = q('.vf-mf');
+        const a = h.getBoundingClientRect(), b = f.getBoundingClientRect(), l = q('.vf-mh line'), p = document.createElement('i');
         p.style.color = 'var(--text-3)'; document.body.appendChild(p); const c = getComputedStyle(p).color; p.remove();
-        return { affiche: h.style.display !== 'none' && a.width > 0, part: a.width / b.width, gauche: a.left - b.left, trait: getComputedStyle(l).stroke === c,
+        return { affiche: h.style.display !== 'none' && a.width > 0, part: a.width / b.width, gauche: (a.left - b.left) / b.width,
+          trait: getComputedStyle(l).stroke === c,
           nom: document.querySelector('#vf-minicarte').getAttribute('aria-label') }; })())`;
       const av = await lire(VUE), hf = await lire(HACH);
       await s.ev('VFGitTiroir.ouvrir()'); await s.attendre('VFGitTiroir.ouvert()', 'tiroir Git ouvert');
       await stabiliser(() => s.ev("JSON.stringify(document.getElementById('vf-git-tiroir').getBoundingClientRect())"), { pas: 150, max: 4000 });
       await pause(300); const ap = await lire(VUE), ho = await lire(HACH);
       const tr = await R('#vf-git-tiroir'), a = await lire('JSON.stringify(VibeFlow.freeArea())');
-      o.cn2.c23 = { av, ap, hf, ho, attendu: Math.min(tr.r - a.x, a.w) / a.w };
+      const g = Math.max(tr.l, a.x); // la part du cadre sous le tiroir : de son bord gauche ou du cadre à son bord droit ou au cadre
+      o.cn2.c23 = { av, ap, hf, ho, attendu: (Math.min(tr.r, a.x + a.w) - g) / a.w, debut: (g - a.x) / a.w };
       await s.ev('VFGitTiroir.fermer()'); await pause(400);
     });
-    await sec('cn24', async () => { // la ligne d'état : branche entière, ellipse au milieu, direct, heure (horloge du pilote), branche hostile sans élément créé
+    await sec('cn24', async () => { // la ligne d'état : branche, ellipse, direct, heure (horloge du pilote), branche hostile sans élément créé
       const LIRE = `JSON.stringify((() => { const q = (x) => document.querySelector(x), t = (x) => (q(x) ? q(x).textContent : null);
         return { titre: q('#vf-coin .vf-ls-br').title, nom: q('#vf-coin .vf-ls-br').getAttribute('aria-label'), vu: t('#vf-coin .vf-ls-nom'),
         status: [...document.querySelectorAll('#vf-coin [role=status]')].map((e) => e.textContent), mot: t('#vf-coin .vf-ls-dr .vf-ls-g + span'),
-        heure: t('#vf-coin .vf-ls-hr'), xss: [window.__xss === undefined, document.querySelectorAll('#vf-coin img, #vf-coin [onerror], #vf-coin [onload]').length] }; })())`;
-      const horloge = (h, m) => s.ev(`(() => { const V = window.__vraiDate || Date; window.__vraiDate = V; const t = new V(2026, 10, 12, ${h}, ${m}, 0).getTime();
+        heure: t('#vf-coin .vf-ls-hr'),
+        xss: [window.__xss === undefined, document.querySelectorAll('#vf-coin img, #vf-coin [onerror], #vf-coin [onload]').length] }; })())`;
+      const horloge = (h, m) => s.ev(`(() => { const V = window.__vraiDate || Date; window.__vraiDate = V;
+        const t = new V(2026, 10, 12, ${h}, ${m}, 0).getTime();
         window.Date = class extends V { constructor(...a) { if (a.length) super(...a); else super(t); } static now() { return t; } };
         document.dispatchEvent(new CustomEvent('vf-who')); })()`);
       o.cn2.c24 = { base: await lire(LIRE) };
@@ -139,10 +144,11 @@ await executer(chrome, async (s) => {
       await s.ev("document.getElementById('vf-lock').classList.remove('off'); window.Date = window.__vraiDate");
     });
     await sec('cn25', async () => {
-      o.cn2.c25 = await lire(`JSON.stringify({ term: document.querySelectorAll('#vf-coin [class*=vf-term]').length, texte: /terminal/i.test(document.getElementById('vf-coin').textContent),
+      o.cn2.c25 = await lire(`JSON.stringify({ term: document.querySelectorAll('#vf-coin [class*=vf-term]').length,
+        texte: /terminal/i.test(document.getElementById('vf-coin').textContent),
         commandes: document.querySelectorAll('#vf-coin code, #vf-coin kbd').length })`);
     });
-    await sec('cn26', async () => { // aucune intersection entre le bloc, le zoom et la barre de question ; à 900 px aucun bloc ; au doigt à 1100 px la ligne d'état seule
+    await sec('cn26', async () => { // bloc, zoom et barre de question disjoints ; à 900 px aucun bloc ; au doigt à 1100 px la ligne d'état seule
       o.cn2.c26 = [];
       await s.ev('VFGitTiroir.ouvrir()'); await pause(400);
       for (const [w, ferme] of [[1440, false], [1440, true], [1024, false], [1024, true]]) {
