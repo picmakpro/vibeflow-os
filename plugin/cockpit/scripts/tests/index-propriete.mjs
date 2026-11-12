@@ -12,6 +12,7 @@ const imp = (n) => import(pathToFileURL(path.join(SC, n)).href);
 const chemins = (a, b, p = '', acc = new Set()) => { if (JSON.stringify(a) === JSON.stringify(b)) return acc; if (a && b && typeof a === 'object' && typeof b === 'object') for (const k of new Set([...Object.keys(a), ...Object.keys(b)])) chemins(a[k], b[k], p ? `${p}.${k}` : k, acc); else acc.add(p); return acc; };
 const norm = (p) => p.replace(/^voies\.\d+\./, '').replace(/\.\d+(?=\.|$)/g, '.#');
 const sans = (i) => { const c = JSON.parse(JSON.stringify(i)); delete c.genereA; return c; };
+const AR = { arbreDe: () => ({ arbre: null }) }; // preuve d'appartenance au lab fournie par l'appelant (jamais un défaut du module)
 const BLOCS = [3, 3, 17, 17, 64, 64, 64, 1000, 1000, 1048576];
 const comptes = {};
 const compte = (m) => { for (const [k, v] of m) comptes[k] = (comptes[k] || 0) + v; };
@@ -25,13 +26,13 @@ try {
       const t = tour(graine * 1000 + k), dege = GENERE !== 'normal', bloc = dege ? 1048576 : BLOCS[Math.floor(t.r() * BLOCS.length)];
       const cs = coupes(t.g, t.r, 3 + Math.floor(t.r() * 10), GENERE === 'une-coupe' ? 'aucune' : dege ? 'fins-de-ligne' : 'varie'), classes = classesDeCoupe(t.g, cs, bloc); compte(classes);
       if (MODE === 'couverture-temoin') continue;
-      const O = { maintenant: t.maintenant, bornes: { ligneMax: 4096, bloc }, memoHors: new Map() }; let idx = null; const etapes = [...cs, t.g.buf.length], cache = path.join(W, `c${graine}-${k}`, 'index.json');
+      const O = { maintenant: t.maintenant, bornes: { ligneMax: 4096, bloc }, memoHors: new Map(), ...AR }; let idx = null; const etapes = [...cs, t.g.buf.length], cache = path.join(W, `c${graine}-${k}`, 'index.json');
       etapes.forEach((c, i) => {
         ecrire(t.f, t.g.buf.subarray(0, c), i === etapes.length - 1 ? t.mt : t.mt - (etapes.length - i) * 1000);
         if (idx && i % 5 === 4) { M.cache.ecrireIndex(cache, W, idx); const l = M.cache.chargerIndex(cache, W, { maintenant: t.maintenant }); idx = l.etat === 'lu' ? l.index : null; } else if (idx) idx = JSON.parse(JSON.stringify(idx));
         idx = M.idx.mettreAJour(idx, M.idx.enumerer(t.proj), O).index;
       });
-      const ref = M.idx.construire(M.idx.enumerer(t.proj), { ...O, bornes: { ligneMax: 4096, bloc: 1048576 }, memoHors: new Map() });
+      const ref = M.idx.construire(M.idx.enumerer(t.proj), { ...O, bornes: { ligneMax: 4096, bloc: 1048576 }, memoHors: new Map(), ...AR });
       const v = idx.voies[0], p = t.g.oracle; let champs = [...chemins(sans(idx), sans(ref))].map(norm);
       if (v && v.forme === 'ok') { const inv = []; const seg = v.segments, ms = Object.values(v.curseur.etat.msParGenre).reduce((a, b) => a + b, 0);
         if (ms !== v.fin - v.debut) inv.push('invariant.somme-des-durees'); if (!seg.every((s, i) => i === 0 || (s[0] === seg[i - 1][1] && s[2] !== seg[i - 1][2]))) inv.push('invariant.segments');
@@ -42,8 +43,8 @@ try {
     sortie.couverture = { comptes, manque: manque(comptes) };
   } else if (MODE === 'reecritures') {
     for (let k = 0; k < N; k++) {
-      const t = tour(graine * 1000 + k + 500), O = { maintenant: t.maintenant, bornes: { ligneMax: 4096, bloc: BLOCS[Math.floor(t.r() * BLOCS.length)] }, memoHors: new Map() }; let base = t.g.buf, cur = Buffer.alloc(0), idx = null, mt = t.mt - 100000; const ops = [], champs = new Set();
-      const maj = () => { mt += 1000; if (fs.existsSync(t.f)) fs.utimesSync(t.f, mt / 1000, mt / 1000); idx = M.idx.mettreAJour(idx && JSON.parse(JSON.stringify(idx)), M.idx.enumerer(t.proj), O).index; const ref = M.idx.construire(M.idx.enumerer(t.proj), { ...O, memoHors: new Map(), bornes: { ...O.bornes, bloc: 1048576 } }); for (const c of chemins(sans(idx), sans(ref))) champs.add(norm(c)); };
+      const t = tour(graine * 1000 + k + 500), O = { maintenant: t.maintenant, bornes: { ligneMax: 4096, bloc: BLOCS[Math.floor(t.r() * BLOCS.length)] }, memoHors: new Map(), ...AR }; let base = t.g.buf, cur = Buffer.alloc(0), idx = null, mt = t.mt - 100000; const ops = [], champs = new Set();
+      const maj = () => { mt += 1000; if (fs.existsSync(t.f)) fs.utimesSync(t.f, mt / 1000, mt / 1000); idx = M.idx.mettreAJour(idx && JSON.parse(JSON.stringify(idx)), M.idx.enumerer(t.proj), O).index; const ref = M.idx.construire(M.idx.enumerer(t.proj), { ...O, memoHors: new Map(), ...AR, bornes: { ...O.bornes, bloc: 1048576 } }); for (const c of chemins(sans(idx), sans(ref))) champs.add(norm(c)); };
       for (let s = 0, n = 4 + Math.floor(t.r() * 4); s < n; s++) {
         const x = t.r(); let op;
         if (s === 0 || x < 0.4) { op = 'ajout'; cur = base.subarray(0, Math.min(base.length, cur.length + 1 + Math.floor(t.r() * (base.length - cur.length + 1)))); ecrire(t.f, cur, mt); }
@@ -57,7 +58,7 @@ try {
   } else if (MODE === 'cout') {
     const rs = fs.readSync; let lus = 0; fs.readSync = (...a) => { const n = rs(...a); lus += n; return n; }; sortie.octetsLus = { premiere: [], ajout: [], permis: [] };
     for (let k = 0; k < 6; k++) {
-      const t = tour(graine * 1000 + k + 900), c = t.g.lignes[Math.floor(t.g.lignes.length * 0.6)].fin, O = { maintenant: t.maintenant, memoHors: new Map(), bornes: { ligneMax: 4096 } };
+      const t = tour(graine * 1000 + k + 900), c = t.g.lignes[Math.floor(t.g.lignes.length * 0.6)].fin, O = { maintenant: t.maintenant, memoHors: new Map(), ...AR, bornes: { ligneMax: 4096 } };
       ecrire(t.f, t.g.buf.subarray(0, c), t.mt - 5000); lus = 0; let idx = M.idx.mettreAJour(null, M.idx.enumerer(t.proj), O).index; sortie.octetsLus.premiere.push(lus);
       const octets = idx.voies[0].curseur.octets; ecrire(t.f, t.g.buf, t.mt); lus = 0; idx = M.idx.mettreAJour(JSON.parse(JSON.stringify(idx)), M.idx.enumerer(t.proj), O).index;
       const permis = t.g.buf.length - octets + 1024; sortie.octetsLus.ajout.push(lus); sortie.octetsLus.permis.push(permis);
@@ -65,7 +66,7 @@ try {
     }
     fs.readSync = rs;
   } else if (MODE === 'chargement') {
-    const t = tour(graine * 1000 + 1), ref = T0 + t.g.tFin + 3600e3; ecrire(t.f, t.g.buf, t.mt); const base = M.idx.construire(M.idx.enumerer(t.proj), { maintenant: ref, memoHors: new Map() }), r = t.r;
+    const t = tour(graine * 1000 + 1), ref = T0 + t.g.tFin + 3600e3; ecrire(t.f, t.g.buf, t.mt); const base = M.idx.construire(M.idx.enumerer(t.proj), { maintenant: ref, memoHors: new Map(), ...AR }), r = t.r;
     const INTERDITES = new Set(['doing', 'mandat', 'messages', 'outils', 'fil', 'cibles', 'ecritures', 'lectures', 'cible']);
     // vérificateur d'invariants écrit à part du validateur du module
     const viole = (i) => { const v = []; const ent = (x) => Number.isInteger(x) && x >= 0, inst = (x) => Number.isFinite(x) && x >= Date.UTC(2020, 0, 1) && x <= ref + 86400e3;
@@ -94,8 +95,8 @@ try {
       const meta = { agentType: 'vf-coder', description: 'x', spawnDepth: 1, toolUseId: 'toolu_w', requestShape: 'background' }, ligneW = (ts, o) => JSON.stringify({ cwd: LAB, sessionId: t.id, isSidechain: true, agentId: wid, version: '2.1.322', timestamp: new Date(ts).toISOString(), ...o });
       ecrire(t.f, g.buf, fin); fs.writeFileSync(path.join(sd, `agent-${wid}.meta.json`), JSON.stringify(meta));
       ecrire(path.join(sd, `agent-${wid}.jsonl`), Buffer.from([ligneW(tW - 1000, { type: 'user', message: { role: 'user', content: 'x' } }), ligneW(tW, { type: 'assistant', message: { id: 'mw', model: 'claude-test-1', usage: { input_tokens: 1, output_tokens: 1 }, content: [{ type: 'text', text: 'x' }] } })].join('\n') + '\n'), tW);
-      const i0 = M.idx.construire(M.idx.enumerer(t.proj), { maintenant: fin + H, memoHors: new Map() }), d = [-2 * H, -H / 2, H / 2, 2 * H][Math.floor(r() * 4)], m2 = fin + 24 * H + d, viv = new Set([t.id, wid].filter(() => r() < 0.4));
-      const i1 = M.idx.mettreAJour(JSON.parse(JSON.stringify(i0)), M.idx.enumerer(t.proj), { maintenant: m2, memoHors: new Map(), vivantes: viv }).index, vus = new Set(i1.voies.map((v) => v.id));
+      const i0 = M.idx.construire(M.idx.enumerer(t.proj), { maintenant: fin + H, memoHors: new Map(), ...AR }), d = [-2 * H, -H / 2, H / 2, 2 * H][Math.floor(r() * 4)], m2 = fin + 24 * H + d, viv = new Set([t.id, wid].filter(() => r() < 0.4));
+      const i1 = M.idx.mettreAJour(JSON.parse(JSON.stringify(i0)), M.idx.enumerer(t.proj), { maintenant: m2, memoHors: new Map(), ...AR, vivantes: viv }).index, vus = new Set(i1.voies.map((v) => v.id));
       const keepW = tW >= m2 - 24 * H || viv.has(wid), keepS = fin >= m2 - 24 * H || viv.has(t.id) || keepW;
       const ecarts = []; if (vus.has(t.id) !== keepS) ecarts.push(vus.has(t.id) ? 'gardee-a-tort' : 'purgee-a-tort'); if (vus.has(wid) !== keepW && !(keepW === false && vus.has(wid) && keepS && false)) ecarts.push('worker-' + (vus.has(wid) ? 'garde-a-tort' : 'purge-a-tort'));
       if (ecarts.length) sortie.echecs.push({ champs: ecarts, classes: ['abandonne-en-plein-appel', ...(d > 0 ? ['hors-fenetre'] : [])], graine: graine * 1000 + k });

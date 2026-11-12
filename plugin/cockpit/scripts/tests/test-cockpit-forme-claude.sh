@@ -211,9 +211,9 @@ const pose = (o, ch, v) => { const k = ch.split('.'); let a = o; for (const x of
 const cible = { lignesDatees: (L) => L[0], assistant: (L) => L[1], appel: (L) => L[1].message.content[0], resultat: (L) => L[2].message.content[0] };
 let n = 0;
 const joue = (L) => { const d = path.join(WORK, `f17-${++n}`, 'projects', '-lab'); fs.mkdirSync(d, { recursive: true }); const f = path.join(d, 'sess-f17.jsonl'); fs.writeFileSync(f, L.map((l) => JSON.stringify(l)).join('\n') + '\n'); fs.utimesSync(f, (T0 + 3000) / 1000, (T0 + 3000) / 1000);
-  const i = idx.construire(idx.enumerer(path.join(d, '..')), { maintenant: T0 + 3600e3, CC }); return { i, v: i.voies[0] }; };
+  const i = idx.construire(idx.enumerer(path.join(d, '..')), { maintenant: T0 + 3600e3, CC, arbreDe: () => ({ arbre: null }) }); return { i, v: i.voies[0] }; };
 const { i: iOk, v: vOk } = joue(lignes()); R.conforme = vOk ? `${vOk.forme}|${vOk.jetons.entree}|${vOk.jetons.sortie}` : 'absente'; R.bilan = JSON.stringify(idx.bilan(iOk).versionsHorsContrat);
-R.bilanAutre = JSON.stringify(idx.bilan(joue(lignes()).i).versionsHorsContrat.length); { const i2 = idx.construire(idx.enumerer(path.join(WORK, 'f17-1', 'projects')), { maintenant: T0 + 3600e3, CC: { ...CC, verifieSur: '9.9.9' } }); R.horsContratEssai = JSON.stringify(idx.bilan(i2).versionsHorsContrat); }
+R.bilanAutre = JSON.stringify(idx.bilan(joue(lignes()).i).versionsHorsContrat.length); { const i2 = idx.construire(idx.enumerer(path.join(WORK, 'f17-1', 'projects')), { maintenant: T0 + 3600e3, arbreDe: () => ({ arbre: null }), CC: { ...CC, verifieSur: '9.9.9' } }); R.horsContratEssai = JSON.stringify(idx.bilan(i2).versionsHorsContrat); }
 R.amputations = {}; R.types = {};
 for (const [bloc, spec] of Object.entries(B)) for (const ch of spec.requis || []) { if (!cible[bloc]) continue; const L = lignes(); retire(cible[bloc](L), ch); const { v } = joue(L); R.amputations[`${bloc}.${ch}`] = v ? `${v.forme}|${v.jetons === null && v.compteurs === null && v.durees === null}` : 'absente'; if (B.types[ch] === 'number') { const M = lignes(); pose(cible[bloc](M), ch, 'x'); const w = joue(M).v; R.types[`${bloc}.${ch}`] = w ? w.forme : 'absente'; } }
 // test miroir : tout littéral passé à lire( est déclaré au contrat ; aucun accès direct `.message.` hors de l'accesseur

@@ -2,7 +2,7 @@
 // Exports : FENETRE_S (86 400), enumerer(projects) -> candidats { fichier, kind, session, id, meta }, mettreAJour(index, candidats, opts) -> { index, change },
 //           construire(candidats, opts) (une passe), bilan(index) -> { voies, formeInconnue, tronque, evinces, versionsHorsContrat }
 // Seuls les octets ajoutés depuis le curseur sont lus (lignes complètes seulement) ; fichier raccourci ou tête changée : voie relue depuis zéro ; transcript disparu : voie retirée.
-// opts : maintenant, arbreDe(cwd) -> { arbre } | null (preuve de l'appartenance au lab : celle de l'appelant), vivantes (Set, état officiel), memoHors (Map), bornes, CC (contrat).
+// opts : maintenant, arbreDe(cwd) -> { arbre } | null (OBLIGATOIRE : preuve de l'appartenance au lab, celle de l'appelant ; absent, l'appel lève), vivantes (Set, état officiel), memoHors (Map), bornes, CC (contrat).
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -81,7 +81,9 @@ function teteDe(fd, taille, lim) {
 
 export function mettreAJour(index, candidats, opts = {}) {
   const maintenant = opts.maintenant ?? Date.now(), bornes = { ...BORNES, ...(opts.bornes || {}) }, CC = opts.CC || CONTRAT.claudeCode, vivantes = opts.vivantes || new Set();
-  const arbreDe = opts.arbreDe || (() => ({ arbre: null })), memoHors = opts.memoHors || new Map(), seuil = CC?.metaSousAgent?.requisSiProfondeur?.parentAgentId ?? 2;
+  const arbreDe = opts.arbreDe || null; // garde:index-arbrede : jamais de lab par défaut, la preuve d'appartenance est celle de l'appelant
+  if (typeof arbreDe !== 'function') throw new TypeError('arbreDe requis : un transcript hors du lab ne s\'indexe jamais');
+  const memoHors = opts.memoHors || new Map(), seuil = CC?.metaSousAgent?.requisSiProfondeur?.parentAgentId ?? 2;
   if (!index || index.schema !== SCHEMA_INDEX) index = indexVide(CC?.verifieSur);
   const avant = JSON.stringify(index.voies), parId = new Map(index.voies.map((v) => [v.id, v])), vus = new Map();
   for (const c of candidats) { let st; try { st = fs.lstatSync(c.fichier); } catch { continue; } if (!st.isFile()) continue; const p = vus.get(c.id); if (!p || st.mtimeMs > p.st.mtimeMs) vus.set(c.id, { c, st }); }
@@ -110,7 +112,7 @@ export function mettreAJour(index, candidats, opts = {}) {
       voie.curseur.tete = tete; voie.curseur.mtimeMs = o.st.mtimeMs; voie.curseur.taille = o.st.size;
       if (neuve) {
         if (voie.debut === null && voie.forme === 'ok') { parId.delete(id); index.voies = index.voies.filter((v) => v.id !== id); continue; } // aucune ligne datée encore : rien à indexer, retenté au prochain tour
-        const r = opts.arbreDe === undefined ? { arbre: null } : arbreDe(t.cwd ?? null);
+        const r = arbreDe(t.cwd ?? null);
         if (!r || (r.arbre !== null && !/^[^/\\]{1,200}$/.test(String(r.arbre)))) { memoHors.set(c.fichier, cle); parId.delete(id); index.voies = index.voies.filter((v) => v.id !== id); continue; }
         voie.arbre = r.arbre; parId.set(id, voie); index.voies = index.voies.filter((v) => v.id !== id); index.voies.push(voie);
       }

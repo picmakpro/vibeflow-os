@@ -34,7 +34,7 @@ export function gen(seed, { lab, id, abandonne = false }) {
     else if (x < 0.80) { o.compactions++; ligne(daté('system', { subtype: 'compact_boundary' }), { type: 'system' }); }
     else if (x < 0.86) { o.tours++; fin = true; ligne(daté('system', { subtype: 'turn_duration', pendingBackgroundAgentCount: int(0, 3) }), { type: 'system' }); }
     else if (x < 0.91) ligne(r() < 0.5 ? { type: 'attachment', sessionId: id, note: 'MARQ-TEXTE' } : { type: 'custom-title', customTitle: 'MARQ-TITRE', sessionId: id }, { type: 'bruit' });
-    else if (x < 0.945) { fin = false; ligne(daté('user', { message: { role: 'user', content: 'x'.repeat(5000) } }), { type: 'user', geante: true }); }
+    else if (x < 0.97) { fin = false; ligne(daté('user', { message: { role: 'user', content: 'x'.repeat(5000) } }), { type: 'user', geante: true }); }
     else { fin = false; const refus = r() < 0.4; if (refus) o.refus++; ligne(daté('user', { message: { role: 'user', content: 'MARQ-TEXTE' }, ...(refus ? { permissionDecision: { decision: 'reject' } } : {}) }), { type: 'user', dated: true }); }
   }
   if (abandonne) { ecart(); message(true); }

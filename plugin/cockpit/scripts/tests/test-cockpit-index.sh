@@ -330,6 +330,8 @@ R.publique = pub.every((p) => Object.keys(p).every((k) => C3.includes(k)) && !('
 console.log(JSON.stringify(R));
 JS
 cc() { node "$AUX/$1.mjs" "${2:-$SCRIPTS}" "$3" "$FIX" "$SCRIPTS/tests" 2>/dev/null; }
+M="$(mutant arbrede vf-cockpit-index.mjs 'opts.arbreDe || null;' 'opts.arbreDe || (() => ({ arbre: null }));')" || M=""
+if [ -n "$M" ]; then cas arbrede "$M"; assert_eq "M-ARBREDE — I2.8e rouge, et seul I2.8e : sans la garde, un transcript hors du lab est indexé sans erreur (appel sans arbreDe)" "$(diffcles "$WORK/m-arbrede/cas.json" "$WORK/cas.json")" '["I2.8e"]'; else assert_eq "M-ARBREDE — mutant applicable" "non" "oui"; fi
 echo "=== I6 — fichier d'index hostile ==="
 mkdir -p "$WORK/h1/lab" && ( cd "$WORK" && node "$AUX/hostile.mjs" "$SCRIPTS" "$WORK/h1" "$FIX" > "$WORK/hostile.json" 2>"$WORK/hostile.err" ) ; hj() { node "$AUX/get.mjs" "$WORK/hostile.json" "j[\"$1\"]"; }
 assert_eq "I6.0 — témoin positif : l'index valide produit par le module est accepté" "$(hj I6.0)" "lu|"
