@@ -63,3 +63,14 @@ Rejeu de test-cockpit-vendor.sh : 96 PASS / 30 FAIL, les 30 sont des témoins V4
 - V4c.6b — le même historique avec une hausse citée : code 0, trois commits examinés | attendu: [0 commits=3] | obtenu:  [1 commits=3]
 - V4c.6c — création seule : code 0, un commit examiné, rien à comparer | attendu: [0 commits=1] | obtenu:  [1 commits=1]
 - V4c.6d — une hausse non commitée de la copie de travail est rouge | attendu: [1 1] | obtenu:  [1 0]
+
+### État vert (aide colonnes-cliquet.mjs posée) et mutants de l'aide
+
+Rejeu de test-cockpit-vendor.sh : 141 PASS / 0 FAIL, dont 54 témoins V4c. La baseline du vrai module n'existe pas (créée à la tâche 3) ; V4c.7 examine 0 commit.
+Mutants de l'aide (V4c.8, copies jetables, substitution par sed) : chacun a son assertion .0 (la copie change), rougit le témoin qui le vise (verdict inverse de l'attendu sain) et laisse un témoin voisin juste.
+- M-OCTETS : 150 lettres accentuées (V4c.1c) : attendu sain ok, obtenu mutant rouge HAUSSE ; voisin V4c.1b ok.
+- M-SEUIL : 161 points de code (V4c.1a) : attendu sain rouge HAUSSE, obtenu mutant ok ; voisin 160 ok.
+- M-MARQUEUR : 161 sous marqueur (V4c.3) : attendu sain rouge HAUSSE, obtenu mutant ok ; voisin 161 sans marqueur rouge HAUSSE.
+- M-CR : 160 plus CR (V4c.1d) : attendu sain ok, obtenu mutant rouge HAUSSE ; voisin 160 ok.
+- M-ORPHELINE : entrée orpheline (V4c.2b) : attendu sain rouge ORPHELINE, obtenu mutant ok ; voisin 160 ok.
+Fichiers écrits par la tâche (colonnes-cliquet.mjs 113 lignes, releve-pages-terminal.mjs) : 0 ligne longue.

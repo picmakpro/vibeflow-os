@@ -76,9 +76,13 @@ col_ligne() { node -e 'const f=require("fs");const [p,n,m]=process.argv.slice(1)
 # col_base <fichier> [ligne…] : un fichier de baseline (en-tête de commentaire puis les lignes données)
 col_base() { local f="$1"; shift; { echo '# fixture de baseline'; for l in "$@"; do printf '%s\n' "$l"; done; } > "$f"; }
 # col_juger <racine> <baseline> : « ok », « rouge <classes> » ou « erreur <code> » (jamais une sortie vide)
-col_juger() { # base : seul le plafond de 300 lignes de V4, aucune notion de colonne
-  local f big=0; for f in "$1"/scripts/*.mjs; do [ "$(nlines "$f")" -le 300 ] || big=1; done
-  [ "$big" = 0 ] && echo ok || echo "rouge LIGNES"
+col_juger() {
+  local out rc; out="$(node "$CLIQUET" verifier "$1" "$2" 2>&1)"; rc=$?
+  case "$rc" in
+    0) echo ok ;;
+    1) echo "rouge $(printf '%s\n' "$out" | awk '$1 ~ /^(HAUSSE|PERIMEE|ORPHELINE|FORME)$/ {print $1}' | sort -u | paste -sd, -)" ;;
+    *) echo "erreur $rc" ;;
+  esac
 }
 col_v() { # <nom> <n> <mode> : un fichier du module porte une ligne de n points de code, baseline vide
   local r; r="$(col_racine "$1")"; col_ligne "$r/scripts/vf-cockpit-a.mjs" "$2" "$3"; col_base "$r/b.txt"; col_juger "$r" "$r/b.txt"
@@ -187,6 +191,25 @@ if [ -n "$DEPOT_DEV" ] && [ -f "$DEPOT_DEV/plugin/cockpit/scripts/tests/test-coc
   echo "     V4c.7 — $(head -1 "$WORK/h7.out") sur l'historique réel de la baseline"
   assert_eq "V4c.7 — l'historique réel du fichier de baseline ne porte aucune hausse sans citation" "$h7_rc" "0"
 else echo "  ⏭  SKIP — V4c.7 (module posé hors du dépôt de développement : l'historique de la baseline n'est pas lisible ici, non compté)"; fi
+
+# V4c.8 : cinq mutants de l'aide (copies jetables, variable CLIQUET) ; chacun change la copie (.0), rougit le témoin qui le vise et laisse son témoin voisin vert
+col_mutant() { # <nom> <expression sed> : copie mutée de l'aide dans $WORK/mut-<nom>/ ; code 0 si la copie diffère de l'aide
+  mkdir -p "$WORK/mut-$1"; sed "$2" "$CLIQUET" > "$WORK/mut-$1/colonnes-cliquet.mjs" 2>/dev/null
+  [ -s "$WORK/mut-$1/colonnes-cliquet.mjs" ] && ! cmp -s "$CLIQUET" "$WORK/mut-$1/colonnes-cliquet.mjs"
+}
+col_orph() { local r; r="$(col_racine orphm)"; col_base "$r/b.txt" 'scripts/vf-cockpit-absent.mjs 1'; col_juger "$r" "$r/b.txt"; }
+col_mutant_temoin() { # <nom> <expression sed> <libellé> <fonction visée> <attendu sain> <fonction voisine> <attendu voisin>
+  local m="$WORK/mut-$1/colonnes-cliquet.mjs"
+  assert_eq "V4c.8 — M-$1.0 : la substitution change la copie de l'aide" "$(col_mutant "$1" "$2" && echo change || echo identique)" "change"
+  assert_eq "V4c.8 — M-$1 : $3" "$(CLIQUET="$m" $4 | sed 's/^/mutant:/')" "mutant:$5"
+  assert_eq "V4c.8 — M-$1' : le témoin voisin reste juste (le mutant ne rougit que le sien)" "$(CLIQUET="$m" $6)" "$7"
+}
+col_v160x() { col_v u160m 160 x; }; col_v161x() { col_v u161m 161 x; }; col_v150e() { col_v e150m 150 e; }; col_v160c() { col_v c160m 160 cr; }
+col_mutant_temoin OCTETS 's|\[\.\.\.sansCr(l)\]\.length|Buffer.byteLength(sansCr(l))|' "la mesure compte des octets : 150 lettres accentuées deviennent rouges (V4c.1c)" col_v150e "rouge HAUSSE" col_v160x "ok"
+col_mutant_temoin SEUIL 's/SEUIL = 160;/SEUIL = 161;/' "le plafond relâché d'une colonne : 161 passe (V4c.1a)" col_v161x "ok" col_v160x "ok"
+col_mutant_temoin MARQUEUR 's|const comptes = (texte) => |const comptes = (texte) => /vibeflow:allow-large-file/.test(texte.split("\\n").slice(0, 5).join("\\n")) ? 0 : |' "le marqueur exempte : 161 sous marqueur passe (V4c.3)" col_vmarq "ok" col_v161x "rouge HAUSSE"
+col_mutant_temoin CR "s|l\\.replace(/\\\\r\\$/, '')|l|" "le CR final est compté : 160 plus CR deviennent rouges (V4c.1d)" col_v160c "rouge HAUSSE" col_v160x "ok"
+col_mutant_temoin ORPHELINE "s|v\\.push(\\['ORPHELINE', c\\]);|;|" "les entrées orphelines sont ignorées (V4c.2b)" col_orph "ok" col_v160x "ok"
 
 echo "=== V8 — binaires ==="
 assert_eq "V8.1 — cinq .woff2 non vides (quatre polices du cockpit, JetBrains Mono 2.304 Regular)" "$(find "$MOTEUR" -name '*.woff2' -size +0 | grep -c .)" "5"
