@@ -126,4 +126,28 @@ window.__vfFrDict = Object.assign(window.__vfFrDict || {}, {
   "{} planned file": "{} fichier prévu|{} fichiers prévus",
   "{} step": "{} étape|{} étapes",
   "{} worth fixing": "{} à corriger",
+  // 79-10 : clés du traducteur sans entrée jusque-là (une clé de t, ou un texte statique de la page, a toujours son entrée ici)
+  "#": "tag ",
+  "Answer: {}": "Réponse : {}",
+  "Ask anything about {}…": "Posez une question sur ce projet…",
+  "Ask anything about this codebase…": "Posez une question sur ce projet…",
+  "Changed@pastille": "Récent",
+  "Could not load the ELK layout engine. Rebuild the map with build.mjs.":
+    "Impossible de charger le moteur de mise en page. Régénérez la carte avec build.mjs.",
+  "Looking at {}": "Examine {}",
+  'Searching the map for "{}"': "Cherche « {} » dans la carte",
+  "Sign-in": "Connexion",
+  "Theme: {}. Press for {}.": "Thème : {}. Appuyer pour {}.",
+  "To": "Vers",
+  "Tracing a dependency path": "Suit une chaîne de dépendances",
+  "and 1 more": "et 1 autre",
+  "connection": "lien",
+  "files": "fichiers",
+  "host": "hôte",
+  "pkg": "paquet",
+  "step {} of {}": "étape {} sur {}",
+  "{} card": "{} carte|{} cartes",
+  "{} file": "{} fichier|{} fichiers",
+  "{} map": "{}",
+  "{} thing": "{} point|{} points"
 });
