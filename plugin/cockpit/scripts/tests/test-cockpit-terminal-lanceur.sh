@@ -81,7 +81,7 @@ mutant() { # mutant <nom> <sed...> -> MUT_L (lanceur de la copie du module) ; MU
 
 echo "=== L0 — témoin : le lab se construit, status répond ==="
 lance "$LAUNCH" build
-assert_eq "L0 — build sort 0 et pose la sortie" "$LRC $([ -f "$OUT/serve.mjs" ] && echo serve || echo vide)" "0 serve"
+assert_eq "L0 — build sort 0 et pose la sortie" "$LRC $([ -f "$OUT/index.html" ] && echo serve || echo vide)" "0 serve"
 lance "$LAUNCH" status
 assert_eq "L0 — status dit « Cockpit arrêté. » avant tout lancement" "$(cat "$LOUT")" "Cockpit arrêté."
 
