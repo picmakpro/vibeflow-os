@@ -10,7 +10,7 @@
 #   T18 parité des 41 variables (25 Graphite + 16 d'espacement 71.5) avec viewer.html, sombre et clair, jamais sur un ensemble vide
 #   T19 parité de la palette xterm de vue.mjs avec viewer.html (J10 de la critique 71 : les 15 couleurs de l'UI-SPEC §4.2 qui ont une variable Graphite
 #       d'origine, par thème, jamais sur un ensemble vide)
-#   M-* mutants (copies de la sortie) : M-ANCETRES, M-XFO, M-EMPREINTE, M-THEME, M-PARITE (a à f), M-PALETTE (a à d)
+#   M-* mutants (copies du module par cockpit_module_muter) : M-ANCETRES, M-XFO, M-EMPREINTE, M-THEME, M-PARITE (a à f), M-PALETTE (a à d)
 # Aucun navigateur : serveur lancé directement avec --terminal, pages lues par terminal-aux.mjs. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -85,7 +85,10 @@ const ORIGINE = { background: '--surface', foreground: '--text', cursor: '--on',
 const norm = (v) => { v = String(v).trim().toLowerCase().replace(/\s+/g, ' '); const m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(v); return m ? `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}` : v; };
 const decl = (css, sel) => Object.fromEntries([...(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*{([^}]*)}').exec(css)?.[1] || '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], norm(m[2])]));
 const css = fs.readFileSync(process.argv[2], 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''); const V = { s: decl(css, ':root'), c: decl(css, ':root[data-theme="light"]') };
-globalThis.window = {}; const m = await import(pathToFileURL(process.argv[3]).href); m.vueTerminal({});
+// 79-06 : la sortie ne porte plus de code : le fichier désigné par <sortie>/vf-cockpit-….mjs est lu dans le module que COMMANDE cette sortie (table MODS_TABLE : sortie TAB module ; défaut MOD_DEPOT)
+import path from 'node:path';
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === path.dirname(process.argv[3]) && r) racine = r; } } catch {}
+globalThis.window = {}; const m = await import(pathToFileURL(path.join(racine, 'scripts', path.basename(process.argv[3]))).href); m.vueTerminal({});
 const n = { sombre: 0, clair: 0 };
 for (const theme of ['sombre', 'clair']) {
   const pal = window.vfTermVue.theme(theme === 'clair');
@@ -103,7 +106,9 @@ cat > "$AUX/pagegen.mjs" <<'JS'
 // pagegen.mjs <sortie> <moteur> <theme> <fichier> : page et CSP rendues par le module de la sortie (sans serveur) ; CSP dans <fichier>.csp
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs';
 const [, , sortie, moteur, theme, out] = process.argv;
-const m = await import(pathToFileURL(`${sortie}/vf-cockpit-terminal-page.mjs`).href);
+// 79-06 : le code n'est plus dans la sortie : le module est celui que commande cette sortie (table MODS_TABLE : sortie TAB module ; défaut MOD_DEPOT)
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === sortie && r) racine = r; } } catch {}
+const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-page.mjs`).href);
 m.preparerPage({ engineDir: moteur }); const r = m.pageTerminal({ theme, origineP: 'http://127.0.0.1:4242' });
 fs.writeFileSync(out, r.html); fs.writeFileSync(`${out}.csp`, r.csp);
 JS
@@ -119,21 +124,30 @@ mklab() {
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 }
 SRVN=0
-srv() { # srv <sortie> <0|1 terminal> [moteur] -> SRV_PORT SRV_PID SRV_O SRV_OUT
-  local o="$1" term="${2:-0}" eng="${3:-$ENG}" lab; lab="$(cd "$1/../.." && pwd)"
+# 79-06 : le code ne vit plus dans la sortie. MOD_DEPOT = racine du module du dépôt ; mod_de <sortie> = racine du module que COMMANDE cette sortie
+# (table posée par mutant() : sortie TAB module ; par défaut le module du dépôt). La table est lue par bash (awk) et par les petits scripts node.
+MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODS_TABLE="$WORK/.mods"; : > "$MODS_TABLE"; export MODS_TABLE MOD_DEPOT
+mod_de() { local m; m="$(awk -F'\t' -v s="${1:-}" '$1==s{m=$2} END{print m}' "$MODS_TABLE" 2>/dev/null)"; printf '%s\n' "${m:-$MOD_DEPOT}"; }
+srv() { # srv <sortie> <0|1 terminal> [moteur] -> SRV_PORT SRV_PID SRV_O SRV_OUT ; serveur du MODULE de la sortie visée (ou du dépôt avec un moteur factice), lancé par l'aide
+  local o="$1" term="${2:-0}" eng="${3:-}" lab; lab="$(cd "$1/../.." && pwd)"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN-$RANDOM.out"; rm -f "$o/.cache/server.json" "$o/.cache/terminal-amorce"
   local flag=(); mkdir -p "$o/.cache"
   if [ "$term" = 1 ]; then flag=(--terminal); (umask 077; amorce_neuve > "$o/.cache/terminal-amorce"); fi
-  COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" ${flag[@]+"${flag[@]}"}
+  if [ -n "$eng" ]; then COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$eng" ${flag[@]+"${flag[@]}"}   # moteur factice : le serve.mjs du dépôt, la variable de la suite gagne
+  else COCKPIT_MODULE="$(mod_de "$o")" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${flag[@]+"${flag[@]}"}; fi
   if [ "$term" = 1 ]; then attendre 5 grep -qs '"terminal"' "$o/.cache/server.json"; fi # la clé terminal manque quand le moteur refuse l'assistant : attente bornée, sans échec
   SRV_PID="$VF_PID"; SRV_PORT="${VF_PORT:-0}"; SRV_TOK="$VF_JETON"
 }
 sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
 nlignes() { printf '%s\n' "$1" | grep -c . ; }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : données) et MUT_MOD (racine de la copie du module) ; code 1 si la cible manque ou si la copie n'a pas changé
+  local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  case "$(basename "$2")" in
+    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 carte() { node "$AUX/csp.mjs" carte "$1"; }
