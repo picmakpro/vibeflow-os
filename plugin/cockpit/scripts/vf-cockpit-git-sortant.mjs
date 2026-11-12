@@ -13,6 +13,7 @@
 //      du verrou de pilotage
 //      de VibeFlow, quand il est PENDANT : un lien `DRIVER.lock` sous `vf-driver/`, de cible `DRIVER.lock.gen.<n>.<n>` absente (driver-lock.sh : génération
 //      en cours de publication) ;
+//  (1bis) le dossier réel du dépôt (dir résolu) est dans la racine réelle du lab, sauf worktree vérifié (le seul cas qui vit hors de la racine).
 //  (3) pas d'`objects/info/alternates` ; `core.worktree` (config, config.worktree, inclusions suivies) absent ou désignant ce dossier ; une inclusion de
 //      configuration (`include.path`,
 //      `includeIf.<condition>.path`) n'est permise que si son fichier, résolu physiquement, est dans le lab ou dans le dossier git, et ses propres
@@ -113,6 +114,12 @@ function sain(g, dirP, racine, libre, bud) {
   const w = coreWorktree(g, racine);
   return w !== null && (libre || w.every((x) => x === dirP));
 }
+// worktree : dossier d'administration <C>/worktrees/<x> d'un gitfile ; vérifié quand le commun est <C> et que son `gitdir` désigne ce `.git`
+const worktreeSitue = (g, estGitfile) => estGitfile && path.basename(path.dirname(g)) === 'worktrees';
+function worktreeRetour(g, c, dotgit) {
+  const haut = cheminPhysique(path.dirname(path.dirname(g))), retour = cheminPhysique(joindre(g, petit(path.join(g, 'gitdir')).trim()));
+  return c === haut && retour !== null && retour === cheminPhysique(dotgit);
+}
 export function gitSortant(dir, racineLab = dir) {
   const dotgit = path.join(dir, '.git'); let st;
   try { st = fs.lstatSync(dotgit); } catch { return false; }
@@ -136,14 +143,15 @@ export function gitSortant(dir, racineLab = dir) {
     let libre = false;
     if (!(dedans(g) && dedans(c))) {
       if (dedans(g)) return true; // le dossier git est dans le lab mais le commun n'y est pas
-      if (path.basename(path.dirname(g)) === 'worktrees' && gitfile && st.isFile()) {
-        const haut = cheminPhysique(path.dirname(path.dirname(g))), retour = cheminPhysique(joindre(g, petit(path.join(g, 'gitdir')).trim()));
-        if (c !== haut || retour === null || retour !== cheminPhysique(dotgit)) return true;
+      if (worktreeSitue(g, gitfile && st.isFile())) {
+        if (!worktreeRetour(g, c, dotgit)) return true;
         libre = true;
       } else { // sous-module : lien retour obligatoire
         const w = c === g ? coreWorktree(g, racine) : null; if (!w || !w.length || !w.every((x) => x === dirP)) return true;
       }
     }
+    // le dossier réel du dépôt est sous la racine du lab, sauf worktree vérifié (le seul cas qui vit hors de la racine)
+    if (!libre && !dedans(dirP) && !(worktreeSitue(g, gitfile && st.isFile()) && worktreeRetour(g, c, dotgit))) return true;
     const bud = { v: 0 };
     return !sain(g, dirP, racine, false, bud) || (c !== g && !sain(c, dirP, racine, libre, bud));
   } catch { return true; }
