@@ -56,8 +56,13 @@
 # message session principale, 2026-11-08 ». Ce n'est PAS un arbitrage detaille de Samuel sur la
 # regle elle-meme. LIMITE QUI DEMEURE : une citation DIRECTE fabriquee passe toujours (verification
 # de forme, jamais de veracite, voir ci-dessus) ; le radical est cherche en octets (locale C) apres
-# repli explicite de É/é/È/è et de l'accent combinant, un homoglyphe ou une orthographe qui l'evite
-# (« confiee », « deleg-u ») n'est pas detecte.
+# repli explicite de É/é/È/è et de l'accent combinant AIGU seul (U+0301 ; tout autre accent combinant,
+# grave ou circonflexe, n'est pas replie). Ne sont PAS couvertes, par choix de ne pas elargir le
+# radical (question de regle, remontee au manager) : « delegation » et « délégation » (« décision prise
+# par délégation de X (…, 2026-11-08), option recommandée » reste CONFORME), « delegate », « confiée »,
+# un homoglyphe ou une orthographe qui evite « delegu » (« deleg-u »). Quand un refus ecarte une ligne
+# de delegation, la sortie ajoute INFO-LIGNE-DELEGATION-ECARTEE (information seule, les lignes de
+# verdict sont inchangees).
 #
 # CASCADE DE RESOLUTION DE LA BASE (nommee, imprimee sur echec) : valeur de --base-ref si fournie,
 # sinon la premiere ref qui resout parmi refs/remotes/origin/main, origin/main, refs/heads/main,
@@ -195,12 +200,18 @@ function est_delegation(s,   t) {
   gsub(/é/, "e", t); gsub(/è/, "e", t)
   return index(t, "delegu") > 0
 }
-function ligne_citation_ok(s,   kw, nc, l) {
-  if (est_delegation(s)) return 0
+function ligne_forme_ok(s,   kw, nc, l) {
   l = s
   kw = (index(s, "arbitrage") > 0) || (index(s, "décision") > 0) || (index(s, "decision") > 0)
   nc = gsub(/,/, ",", l)
   return (kw && nc >= 2 && (s ~ /[0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]/)) ? 1 : 0
+}
+function ligne_citation_ok(s) {
+  if (est_delegation(s)) return 0
+  return ligne_forme_ok(s)
+}
+function ligne_ecartee(s) {
+  return (est_delegation(s) && ligne_forme_ok(s)) ? 1 : 0
 }
 '
 
@@ -218,6 +229,22 @@ extract_citation_line() {
   LC_ALL=C awk "$AWK_CITATION_LIB"'
     { if (ligne_citation_ok($0) && !found) { print $0; found = 1 } }
   '
+}
+
+delegation_ecartee() {
+  # <message complet> sur stdin -> exit 0 si une ligne a la forme d'une citation mais est ecartee
+  # parce qu'elle porte le radical de delegation (sert au seul message d'information des refus).
+  LC_ALL=C awk "$AWK_CITATION_LIB"'
+    { if (ligne_ecartee($0)) found = 1 }
+    END { exit (found ? 0 : 1) }
+  '
+}
+
+info_delegation() {
+  # <sha complet du commit impute> -> imprime INFO-LIGNE-DELEGATION-ECARTEE si son message en porte une.
+  if git log -1 --format=%B "$1" 2>/dev/null | delegation_ecartee; then
+    echo "INFO-LIGNE-DELEGATION-ECARTEE: $(git rev-parse --short "$1") — une ligne de délégation ne vaut pas citation, porter la citation directe sur sa propre ligne"
+  fi
 }
 
 baseline_exists_at() { git cat-file -e "${1}:${BASELINE_PATH}" 2>/dev/null; }
@@ -389,6 +416,7 @@ printf '%s\n' "$HAUSSES" | while IFS= read -r p; do
       curv="$(instr_at_ref "$culprit" "$p")"
       shortsha="$(git rev-parse --short "$culprit")"
       echo "HAUSSE-SANS-ARBITRAGE: ${p} instructions ${prevv} -> ${curv} (commit ${shortsha})"
+      [ -n "$culprit" ] && info_delegation "$culprit"
       echo "RC1" >> "$FACTS.rc"
     fi
   fi
@@ -422,6 +450,7 @@ printf '%s\n' "$RETRAITS" | while IFS= read -r p; do
     shortsha="indetermine"
     [ -n "$culprit" ] && shortsha="$(git rev-parse --short "$culprit")"
     echo "LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE: ${p} (commit ${shortsha})"
+    [ -n "$culprit" ] && info_delegation "$culprit"
     echo "RC1" >> "$FACTS.rc"
   elif [ "$target_exists" -eq 1 ] && [ "$retrait_citation_ok" -eq 1 ]; then
     echo "AVERTISSEMENT-LIGNE-RETIREE-ARBITREE: ${p} — citation : ${citation_line}"
@@ -469,6 +498,7 @@ printf '%s\n' "$SENTINEL_PATHS" | while IFS= read -r sp; do
       shortsha="indetermine"
       [ -n "$culprit" ] && shortsha="$(git rev-parse --short "$culprit")"
       echo "SENTINELLE-NEUTRALISEE: ${sp} (commit ${shortsha})"
+      [ -n "$culprit" ] && info_delegation "$culprit"
       echo "RC1" >> "$FACTS.rc"
     fi
   fi

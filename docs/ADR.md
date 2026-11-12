@@ -2938,8 +2938,12 @@ recopiée dans le rapport. Un seul prédicat sert les trois usages de la citatio
 des instructions, retrait d'une ligne dont la cible existe encore, neutralisation d'une sentinelle.
 
 Limite qui demeure : la garde vérifie toujours la forme, jamais la véracité. Une citation directe
-fabriquée passe ; une orthographe ou un homoglyphe qui évite le radical (« confiée ») n'est pas
-détecté. G-2 (`Gate-Touche`) et `check-ajout-retrait.sh` ne demandent pas de citation d'arbitrage :
+fabriquée passe ; une orthographe ou un homoglyphe qui évite le radical n'est pas détecté. Ne sont
+pas couvertes : « délégation » et « delegate » (« décision prise par délégation de X (…, 2026-11-08),
+option recommandée » reste conforme), « confiée ». Seul l'accent combinant aigu (U+0301) est replié.
+Élargir le radical est une question de règle, laissée ouverte. Quand un refus écarte une ligne de
+délégation, la sortie ajoute une ligne d'information `INFO-LIGNE-DELEGATION-ECARTEE`, sans modifier
+les lignes de verdict. G-2 (`Gate-Touche`) et `check-ajout-retrait.sh` ne demandent pas de citation d'arbitrage :
 leur trailer est déclaratif : ils ne sont pas concernés.
 
 ## ADR-073 : Une release publie une évolution fonctionnelle, jamais un accumulateur de doc — et la fenêtre de grâce du gate de tag
