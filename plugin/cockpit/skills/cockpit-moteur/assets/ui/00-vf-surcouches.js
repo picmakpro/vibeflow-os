@@ -30,17 +30,28 @@
     return pile.slice(pile.findIndex((e) => e.el === el) + 1).some((e) => e.fermer && e.el.isConnected && e.el !== el);
   };
   // modale : l'inert tombe sur les FRÈRES de la boîte au niveau de body (jamais un ancêtre : un inert d'ancêtre ne se lève pas dessous) ; liste tenue à part
+  const prop = new Map(); // élément inerté par la pile -> nombre de surcouches qui le demandent (il ne se lève qu'à zéro)
   const inerter = (e) => {
+    for (const o of pile) o.inertes = (o.inertes || []).filter((x) => x !== e.el); // la boîte qui s'ouvre ne reste pas inerte d'une autre
+    if (prop.has(e.el)) { prop.delete(e.el); e.el.removeAttribute('inert'); }
     e.inertes = [];
     for (const c of document.body.children) {
-      if (c === e.el || c.contains(e.el) || c.inert || c.hidden || c.matches('script, style, link, template')) continue;
-      c.inert = true; e.inertes.push(c);
+      if (c === e.el || c.contains(e.el) || c.hidden || c.matches('script, style, link, template')) continue;
+      if (prop.has(c)) { prop.set(c, prop.get(c) + 1); e.inertes.push(c); continue; }
+      if (c.inert) continue; // déjà inerte d'un autre (région du terminal fermée) : jamais le nôtre
+      c.inert = true; prop.set(c, 1); e.inertes.push(c);
     }
   };
   const lever = (e) => { // seulement ce que cette modale a posé ; un élément fermé de lui-même (région du terminal) garde son inert
-    for (const x of e.inertes) if (!x.hidden) x.removeAttribute('inert');
+    for (const x of e.inertes) {
+      const n = (prop.get(x) || 1) - 1;
+      if (n > 0) { prop.set(x, n); continue; }
+      prop.delete(x); if (!x.hidden) x.removeAttribute('inert');
+    }
     e.inertes = [];
   };
+  // le moteur rend le focus EN fermant : l'inert est levé avant ; si la surcouche reste ouverte après l'évènement, il est reposé
+  const levee = (h) => { lever(h); setTimeout(() => { if (pile.includes(h) && h.modale && !h.inertes.length) inerter(h); }, 0); };
   const rendre = (e) => {
     const a = document.activeElement;
     if (a && a !== document.body && !e.el.contains(a)) return; // le focus est déjà ailleurs : rien à rendre
@@ -69,22 +80,24 @@
     const t = ev.target, a = actives(), h = a[a.length - 1];
     if (ev.defaultPrevented || !h || vivantes().length || pile.some((e) => !e.fermer && e.el.contains(t))) return;
     if (h.modale) {
-      lever(h); // le moteur rend le focus à l'origine EN fermant : l'inert doit déjà être levé (il ne l'est qu'à l'observation, trop tard)
+      levee(h);
       if (h.el === par('palette') && t.id === 'search') return; // le champ garde son propre Échap
       consomme(ev); h.fermer(); return;
     }
     const flux = refs.moteur && refs.moteur.state && refs.moteur.state.flow; // un parcours, une bulle d'aide : ils prennent l'Échap avant le tiroir
-    if (rien(t) && !flux && !document.querySelector('.vf-git-bulle:not([hidden]), #sc-gloss.on')) { consomme(ev); h.fermer(); }
+    if (rien(t) && !flux && !document.querySelector('.vf-git-bulle:not([hidden]), #sc-gloss.on')) { consomme(ev); h.fermer(); return; }
+    const d = a.find((e) => !e.modale && e !== h && e.el.contains(t)); // focus dans un tiroir couvert par un autre : son propre Échap se tait, la pile le ferme
+    if (d) { consomme(ev); d.fermer(); }
   };
   let avant = null, courant = null; // les deux derniers éléments focalisés : l'ouvreur d'une modale ouverte par le moteur
   window.addEventListener('focusin', (ev) => { avant = courant; courant = ev.target; }, true);
   window.addEventListener('mousedown', (ev) => { // clic sur le fond ou sur la croix : même raison que pour Échap
     const h = [...pile].reverse().find((e) => e.modale && e.el.isConnected);
-    if (h && (ev.target === h.el || (ev.target.closest && ev.target.closest('#pal-x, #results')))) lever(h);
+    if (h && (ev.target === h.el || (ev.target.closest && ev.target.closest('#pal-x, #results')))) levee(h);
   }, true);
   window.addEventListener('keydown', (ev) => {
     const modale = [...pile].reverse().find((e) => e.modale && e.el.isConnected);
-    if (ev.key === 'Enter' && modale && modale.el === par('palette')) lever(modale); // choisir un résultat : le moteur rend le focus au panneau dans la foulée
+    if (ev.key === 'Enter' && modale && modale.el === par('palette')) levee(modale); // choisir un résultat : le moteur rend le focus au panneau dans la foulée
     if (ev.key === 'Tab' && modale) piege(ev, modale);
     else if (ev.key === 'Escape') echap(ev);
   }, true);
@@ -105,6 +118,12 @@
         if (x && x.classList.contains('open') && !dedans) ouvrir(x, { modale: true, ouvreur: x.contains(courant) ? avant : courant, fermer, rendu });
         else if (x && !x.classList.contains('open') && dedans) retirer(x);
       }
+      const T = par('tour'); // créée après la pile : suivie dès qu'elle existe
+      if (T && !T.vfSuivie) { T.vfSuivie = true; obs.observe(T, { attributes: true }); }
+      const dT = !!T && pile.some((e) => e.el === T), tv = !!T && (dT || !!refs.tourBtn) && visible(T); // aucune lecture de mise en page sans bouton ni entrée
+      if (tv && !dT && refs.tourBtn) { // visite ouverte par le bouton : modale ; ouverte d'elle-même : jamais (Q5)
+        ouvrir(T, { modale: true, ouvreur: refs.tourBtn, fermer: () => window.FloorplanTour.end() }); refs.tourBtn = null;
+      } else if (!tv && dT) retirer(T);
       const r = document.querySelector('.vf-term-tiroir'), on = !!r && !r.hidden, dedansT = !!r && pile.some((e) => e.el === r);
       if (on && !dedansT) ouvrir(r, { persistant: true }); else if (r && !on && dedansT) retirer(r);
       const ferme = document.body.classList.contains('no-panel'), p = par('panel'), a = document.activeElement;
@@ -115,11 +134,17 @@
       }
       sansPanneau = ferme;
     };
+    const bouton = (ev) => { // la visite ouverte par son bouton se retient 1,5 s : au-delà, une ouverture est celle de la visite d'elle-même
+      const b = ev.target.closest && ev.target.closest('#tour-btn');
+      if (b) { refs.tourBtn = b; setTimeout(() => { if (refs.tourBtn === b) refs.tourBtn = null; }, 1500); }
+    };
+    window.addEventListener('click', bouton, true);
     const obs = new MutationObserver(synchro);
     for (const id of ['modal', 'palette']) obs.observe(par(id), { attributes: true, attributeFilter: ['class'] });
-    obs.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    obs.observe(document.body, { childList: true, attributes: true, attributeFilter: ['class'] }); // une seule inscription : une seconde remplace la première
     synchro();
-    return () => { obs.disconnect(); st.remove(); for (const e of pile.slice()) if (!e.persistant) retirer(e.el); };
+    return () => {
+      obs.disconnect(); st.remove(); window.removeEventListener('click', bouton, true); for (const e of pile.slice()) if (!e.persistant) retirer(e.el); };
   };
   if (window.VF_COQUILLE && window.VF_COQUILLE.surOnglet) window.VF_COQUILLE.surOnglet(accroches, { cle: '00-vf-surcouches.js' });
   else accroches();
