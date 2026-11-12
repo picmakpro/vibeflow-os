@@ -358,3 +358,11 @@ Les treize suites rendent 0 sans saut : chaine-xss 34/0, chrome-fr 97/0, direct 
 Aucun processus laissé (`lsof +D` sur le dossier du nœud), `TMPDIR` du nœud purgé, instantanés retirés.
 
 6b fait ; reprise : vérification de fin du plan et SUMMARY (nœud x06-fin).
+
+## S3f et clôture (nœud x06-fin, 2026-11-12)
+
+Correction datée (message du manager, 2026-11-12) : git-entete H5.1b, que les lignes « Tâches 4a et 4b » et « Réserve » ci-dessus disent rouge PRÉEXISTANT, est une régression de 79-07 (c8a009df : git absent rendu comme un délai), vert sur la base da64eb8c joué seul (136/0), corrigée dans 79-07, non imputable à 79-06. L'ancienne ligne n'est pas réécrite.
+
+S3f (constat bas S3 de l'audit de fin, F2) : témoin rouge 93783aad (AM6.F2 attendu `1 0 0 0 1 1 1 0`, obtenu `1 0 0 0 0 0 0 0`), correctif 75bd3538, mutants M-F2-EGALITE (`1 0 0 0 0 1 0 0`) et M-F2-MOTEUR (`1 0 0 0 1 0 0 0`) rouges pour la bonne raison ; serveur 86/0. Effet de bord mesuré : TM.1 de terminal-serveur rouge (`terminal= journal=autre` au lieu de `terminal=false journal=refus`, 207/1) parce que `serve.mjs` refuse avant le terminal ; TM.1b affirme le refus, TM.1 et M-MOTEUR-VIBEFLOW retirent la garde de `serve.mjs` de leur copie du module : 209/0.
+
+Vérification de fin : voir le SUMMARY (rubrique « Vérification de fin »). Le premier jeu du périmètre (même jour, avant le réveil du poste, charge de 300) est NUL et n'est pas consigné ; une suite jouée sans historique git (instantané) rougit sans que le code le soit (runtime-cli-dispatch, check-machine-paths, ci-suites-perimetre, etc.) : jugées au rejeu en worktree détaché.
