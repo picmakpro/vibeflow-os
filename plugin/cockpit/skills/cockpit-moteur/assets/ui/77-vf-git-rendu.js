@@ -121,13 +121,45 @@
     o = o || {};
     const M = Math.max(1, o.couloirsMax || 6), H = o.tactile ? 44 : 40, largeur = Math.max(1, Math.min(M, ...[Math.max(...rangees.map((r) => r.largeur), 1)]));
     const tm = new Map(rangees.map((r) => [r.h, r.teinte])), lanes = [], ol = el('ol', 'vf-git-graphe', null, { role: 'listbox', 'aria-label': 'Commits' });
-    for (const r of rangees) {
-      const avant = lanes.slice(), suite = r.p.length > 0 && !r.sortants.some((s) => s.parent === r.p[0]);
-      lanes[r.col] = suite ? { sha: r.p[0], t: r.teinte } : null;
-      for (const s of r.sortants) if (!lanes[s.vers] || lanes[s.vers].sha !== s.parent) lanes[s.vers] = { sha: s.parent, t: tm.has(s.parent) ? tm.get(s.parent) : r.teinte };
-      ol.appendChild(rangee(r, { tactile: o.tactile, colonne: colonne(r, avant, { hauteur: H, largeur, suite, apres: lanes }) }));
-    }
+    let i = 0;
+    ol.ajouter = (k) => { // 80-06 : rend les k rangées suivantes (l'état des couloirs se poursuit d'une tranche à l'autre) et les rend
+      const fruit = [];
+      for (const fin = Math.min(rangees.length, i + k); i < fin; i++) {
+        const r = rangees[i], avant = lanes.slice(), suite = r.p.length > 0 && !r.sortants.some((s) => s.parent === r.p[0]);
+        lanes[r.col] = suite ? { sha: r.p[0], t: r.teinte } : null;
+        for (const s of r.sortants) if (!lanes[s.vers] || lanes[s.vers].sha !== s.parent) lanes[s.vers] = { sha: s.parent, t: tm.has(s.parent) ? tm.get(s.parent) : r.teinte };
+        const li = rangee(r, { tactile: o.tactile, colonne: colonne(r, avant, { hauteur: H, largeur, suite, apres: lanes }) });
+        ol.appendChild(li); fruit.push(li);
+      }
+      return fruit;
+    };
+    ol.ajouter(o.n == null ? rangees.length : o.n);
     return ol;
+  };
+  // P80-D-19 : au plus SEUIL rangées d'un coup, sinon PAGE ; « Afficher 100 de plus » rend la tranche suivante et met le focus sur la première rangée ajoutée.
+  // o.etat = { n } (rangées montrées, gardé par le tiroir d'une relecture à l'autre) ; o.annoncer(texte) : région polie. Rend { bloc, pied }.
+  const PAGE = 100, SEUIL = 110;
+  const pages = (rangees, o) => {
+    const total = rangees.length, et = o.etat || { n: 0 }, bloc = el('div', 'vf-git-pages'), pied = el('p', 'vf-git-note vf-git-pied');
+    et.n = Math.min(total, Math.max(et.n || 0, total <= SEUIL ? total : PAGE));
+    const ol = graphe(rangees, Object.assign({}, o, { n: et.n })), lb = el('span', 'vf-git-plus-l'), nb = el('span', 'vf-git-plus-n');
+    const b = el('button', 'vf-git-plus-b', null, { type: 'button' });
+    b.append(lb, nb); bloc.append(ol);
+    const maj = () => {
+      const reste = total - et.n;
+      if (reste <= 0) b.remove(); else { lb.textContent = reste < PAGE ? (reste > 1 ? `Afficher les ${reste} derniers` : 'Afficher le dernier') : 'Afficher 100 de plus'; nb.textContent = pl(reste, 'restant'); }
+      pied.textContent = reste > 0 ? `${et.n} commits affichés sur ${total}` : `Tous les ${total} commits sont affichés`;
+      return reste;
+    };
+    if (maj() > 0) bloc.append(b);
+    b.addEventListener('click', () => {
+      const fruit = ol.ajouter(PAGE); et.n += fruit.length;
+      for (const li of ol.children) li.setAttribute('tabindex', li === fruit[0] ? '0' : '-1');
+      const reste = maj();
+      if (fruit[0]) fruit[0].focus({ preventScroll: false });
+      if (o.annoncer) o.annoncer(`${pl(fruit.length, 'commit')} de plus ${fruit.length > 1 ? 'affichés' : 'affiché'}, ${pl(reste, 'restant')}`);
+    });
+    return { bloc, pied };
   };
 
   // ---------- sections repliables et listes ----------
@@ -198,5 +230,5 @@
     d.append(el('h3', 'vf-git-titre', 'Git est indisponible'), el('p', 'vf-git-note', raison), b, commande(cmd, annonce, 'de diagnostic'));
     return d;
   };
-  window.VFGitRendu = Object.freeze({ graphe, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande, etatChargement, etatVide, etatIndisponible, relatif, section, ico, el, aideFocus });
+  window.VFGitRendu = Object.freeze({ graphe, pages, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande, etatChargement, etatVide, etatIndisponible, relatif, section, ico, el, aideFocus });
 })();

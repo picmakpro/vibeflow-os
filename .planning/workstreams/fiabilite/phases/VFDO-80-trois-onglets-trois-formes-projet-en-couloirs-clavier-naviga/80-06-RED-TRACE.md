@@ -15,3 +15,5 @@ dans la mesure), si bien que chaque rouge porte une valeur réelle, jamais une p
 | GP1.4 clic qui épuise | `210 / focus 200 / pas body / 1 arrêt / bouton retiré / pied complet` | `210 / -1 / false / 1 / false /` |
 | GP1.5 bouton disparu sans clic | `105 / focus 104 / pas body` | `105 / -1 / false` |
 | GP1 erreurs de page | 0 | 0 (vert, témoin d'invariance) |
+
+Vert après la tâche 1 : GP1.1 à GP1.5 et l'absence d'erreur de page (8 PASS avec H0), `test-cockpit-git-tiroir.sh` 194 PASS, 0 FAIL.
