@@ -33,3 +33,19 @@ Régression : `test-cockpit-cycle-serveur.sh` 91 PASS / 0 FAIL avec le collecteu
 Deux défauts de la suite trouvés au rejeu sous charge et corrigés AVANT le commit vert : (1) C10.6a dépendait d'un délai de 1,5 s du faux git, trop proche de l'échéance globale de 2 s de la signature (retrait de 5 s si dépassée) : la première pose est maintenant vue par un rappel `surInstantane` posé avant le démarrage, sans délai ; (2) les attentes de C10.6 et C10.7 passent de 9 et 12 s à 15 et 20 s.
 
 Correction de chiffres : le message du commit des suites routes et git-env écrit « routes 57/0, git-env 136/0 » ; les bilans réels des deux suites rejouées seules sont routes 56 PASS / 0 FAIL et git-env 135 PASS / 0 FAIL (le décompte du message comptait la ligne de bilan).
+
+## Tâche 2 — témoins rouges sur le code de la tâche 1
+
+AVANT-09-T2 : 66a9af10 plus les tests (commit des aides et sections C2 à C4). Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-collecte.sh`, `TMPDIR` hors du dossier de l'utilisateur. Bilan sur le code de la tâche 1 : 40 PASS / 23 FAIL (le détail ci-dessous nomme chaque rouge ; les 40 verts sont les sections C0, C1, C10 de la tâche 1 et les verts d'emblée nommés plus bas).
+
+Verts d'emblée, voulus ou constatés : C2.1 (le pilote de la tâche 1 coalesce déjà : deux exécutions, union des motifs), C2.6b (témoin positif), C2.7 (arrêt sans fuite), C3.0 (le code de départ f763b556 est lent, la mesure sait rougir), C3.1 en entier (voir la note), C4.2 : rien de l'index n'existe encore, donc rouge, pas vert.
+- C3.0 — code de départ, GET toutes les 100 ms pendant 14 s, faux verrou à 0,4 s, fixture de 52 Mio : n 138, erreurs 0, p50 1, p99 398, max 448, pics 448 398 346 297 246 (ms). Assertion : max >= 300 ; obtenu 448.
+- C3.1 sur le code de la tâche 1 : p50 1, p99 2, max 5 (ms), VERT. Note de lecture : le fil de la tâche 1 ne porte pas encore l'index, donc le remplissage de 50 Mio n'a pas lieu ; la mesure de C3.1 rougit sur la base (C3.0) et rougira sur le mutant « en ligne » (M-EN-LIGNE, qui rejoue les étapes de la tâche 2 sur la boucle) ; le rouge propre de C3.1 sur « code présent » n'existe donc que contre la base, ce que le plan appelle « en partie ».
+- C2.2 — attendu `true partielle suspendu 1 true 2` ; obtenu `undefined … false undefined` (pas de relance : le pilote ne sait pas relancer).
+- C2.3 — attendu `true true true ok true` ; obtenu `true false false indisponible undefined` (pas de reprise).
+- C2.4 — attendu `true memoire` ; obtenu `true undefined` (cause non classée).
+- C2.5 — attendu `true 2` ; obtenu `undefined undefined` (`redemarrer` absent).
+- C2.6a — attendu `partielle 0 0` ; obtenu `ok 1 0` (un résultat à clé interdite est accepté dans « qui »).
+- C3.2 — `collecte.boucle.maxMs` : illisible (moniteur absent). C4.1 : `collecte.index` illisible. C4.2a : attendu `600 lu 64`, obtenu `absent absent 0`. C4.2b : fichier d'index absent. C4.3 : attendu `identique`, obtenu `different` (fichier absent). C4.2c : attendu `0/0`, obtenu `1/0` (le marqueur figure dans le flux : la ligne de transcript est vue par le collecteur d'équipe de la tâche 1, constaté, voir C4.2c du vert). C4.4b : `collecte.index` illisible.
+- C4.7b — attendu `true true`, obtenu `false false` (module de l'étape d'index absent). C4.8a à C4.8d : `illisible` (module absent).
+- Mutants : tous « construction du mutant » en échec sur le code de la tâche 1 (les ancres `garde:collecte-ecrivain`, `garde:collecte-sans-index`, `garde:index-arbre`, `garde:index-collision` n'existent pas encore ; M-EN-LIGNE vise `fil.w.postMessage`) ; M-GEL et M-GIT sont verts d'emblée sur leurs ancres de la tâche 1.
