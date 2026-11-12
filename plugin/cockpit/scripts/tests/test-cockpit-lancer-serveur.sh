@@ -7,7 +7,7 @@
 #   R1-R12 refus de LANC-03 et de LANC-04, chacun joué APRÈS son témoin positif (POST valide : 202, proposition +1)
 #   F1-F3  fuites : flux SSE (témoin `hello`), journal, journal du serveur, server.json
 #   U1-U2  injection du lanceur dans la page et empreinte dans la CSP · L1-L4 retour `lancee` (forme riche jusqu'à la carte) · E1-E3 états inertes et bloquants · C1-C2 chat
-#   M-*    mutants (copies de la sortie, jamais le module) : M-SANS-DRAPEAU, M-LISTE-PAGE, M-TOKEN-CODE, M-LANCEE-LIBRE
+#   M-*    mutants (copies du module, la sortie ne porte plus de code) : M-SANS-DRAPEAU, M-LISTE-PAGE, M-TOKEN-CODE, M-LANCEE-LIBRE
 # Chaque témoin négatif a son contrôle positif. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { # port libre choisi à l'exécution, gardé : ≥ 4600 et différent de 4456 (FAIL nommé et sortie sinon)
@@ -23,6 +23,10 @@ export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 . "$(dirname "$0")/socle-serveur.sh"
+# 79-06 : la sortie ne porte plus de code. mod_de <sortie> = racine du module dont le code sert cette sortie (le dépôt, sauf la copie posée par mutant() ou par la doublure de Q) ; la table est un fichier, lu aussi par harnais.mjs
+MODULE="$(cd "$SCRIPTS/.." && pwd -P)"; MODMAP="$WORK/modmap"; : > "$MODMAP"; export VF_MODMAP="$MODMAP" VF_MODULE_DEFAUT="$MODULE"; MUT_OUT=""; MUT_MOD=""
+mod_poser() { printf '%s\t%s\n' "$1" "$2" >> "$MODMAP"; }
+mod_de() { local m; m="$(awk -F'\t' -v s="$1" '$1==s{m=$2} END{print m}' "$MODMAP" 2>/dev/null)"; printf '%s\n' "${m:-$MODULE}"; }
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
@@ -59,7 +63,7 @@ const r = http.request({ host: '127.0.0.1', port: Number(port), path: `/api/vf/e
 r.on('error', () => {}); r.end(); setTimeout(() => { r.destroy(); process.exit(0); }, Number(ms));
 JS
 cat > "$AUX/stub-q.mjs" <<'JS'
-// enfant factice de Q : remplace vf-cockpit-terminal-processus.mjs dans une COPIE de la sortie. STUB_LOG, STUB_PORT, STUB_MODE (defaut|lancee|lancee-mal).
+// enfant factice de Q : remplace vf-cockpit-terminal-processus.mjs dans une COPIE du module. STUB_LOG, STUB_PORT, STUB_MODE (defaut|lancee|lancee-mal).
 // Le journal ne reçoit jamais l'environnement ni les jetons : « init » seul, les messages cibles et proposition entiers.
 import fs from 'node:fs'; import crypto from 'node:crypto';
 const { STUB_LOG, STUB_PORT, STUB_MODE = 'defaut' } = process.env;
@@ -86,10 +90,11 @@ process.on('message', (m) => {
 process.on('disconnect', () => process.exit(0));
 JS
 cat > "$AUX/harnais.mjs" <<'JS'
-// harnais.mjs <mode> <sortie> <lab> [args] : importe les modules de la COPIE de la sortie ; une ligne JSON. Modes : p1, ui, l3, l4, q, e2, e3
-import { pathToFileURL } from 'node:url'; import { Readable } from 'node:stream'; import crypto from 'node:crypto';
+// harnais.mjs <mode> <sortie> <lab> [args] : importe les modules du MODULE qui sert cette sortie (table VF_MODMAP, défaut VF_MODULE_DEFAUT) ; la sortie ne porte que des données ; une ligne JSON. Modes : p1, ui, l3, l4, q, e2, e3
+import { pathToFileURL } from 'node:url'; import { Readable } from 'node:stream'; import crypto from 'node:crypto'; import fs0 from 'node:fs';
 const [, , mode, sortie, lab, ...reste] = process.argv;
-const imp = (f) => import(pathToFileURL(`${sortie}/${f}`).href);
+const modDe = (s) => { let m = process.env.VF_MODULE_DEFAUT; try { for (const l of fs0.readFileSync(process.env.VF_MODMAP, 'utf8').split('\n')) { const [a, b] = l.split('\t'); if (a === s && b) m = b; } } catch {} return m; };
+const imp = (f) => import(pathToFileURL(`${modDe(sortie)}/scripts/${f}`).href);
 const sortir = (o) => { console.log(typeof o === 'string' ? o : JSON.stringify(o)); process.exit(0); };
 let G, U, L, C, P;
 try { G = await imp('vf-cockpit-lancer-gabarit.mjs'); U = await imp('vf-cockpit-lancer-ui.mjs'); } catch { sortir('module introuvable : gabarit ou interface'); }
@@ -198,7 +203,8 @@ srv() { # srv <sortie> <0|1 terminal> -> SRV_PORT SRV_PID SRV_O SRV_OUT ; serveu
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN-$RANDOM.out"; rm -f "$o/.cache/server.json" "$o/.cache/terminal-amorce"; mkdir -p "$o/.cache"
   local flag=(); if [ "$term" = 1 ]; then flag=(--terminal); (umask 077; node -e "process.stdout.write(require('crypto').randomBytes(24).toString('hex'))" > "$o/.cache/terminal-amorce"); fi
   local pret=port; if [ "$term" = 1 ]; then pret=terminal; fi
-  COCKPIT_PRET="$pret" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" ${flag[@]+"${flag[@]}"}
+  local mod cm=""; mod="$(mod_de "$o")"; [ "$mod" = "$MODULE" ] || cm="$mod"   # copie mutée ou doublure : l'aide vérifie que le serveur lancé la charge (code 5 sinon)
+  COCKPIT_MODULE="$cm" COCKPIT_PRET="$pret" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$mod/skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$mod/scripts" ${flag[@]+"${flag[@]}"}
   SRV_PID="$VF_PID"; SRV_PORT="${VF_PORT:-0}"
 }
 sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
@@ -208,10 +214,11 @@ srv_stub() { # srv_stub <sortie> <mode> -> comme srv, avec enfant factice (STUB_
   STUBN=$((STUBN+1)); export STUB_LOG="$WORK/stub-$STUBN.log" STUB_PORT="$(libre)" STUB_MODE="$2"; : > "$STUB_LOG"
   srv "$1" 1; rq "$SRV_PORT" GET /project.html --corps-vers "$WORK/page-$STUBN.html" > /dev/null; PTOK="$(node "$AUX/ptok.mjs" "$WORK/page-$STUBN.html")"; CTOK="$(sj j.token)"
 }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; cp "$AUX/stub-q.mjs" "$MUT_OUT/vf-cockpit-terminal-processus.mjs"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
-  cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+mutant() { # mutant <nom> <fichier-du-module> <expression-sed> -> MUT_OUT (données) + MUT_MOD (copie du module muté, enfant factice de Q posé) ; code 1 si la cible manque ou si la copie n'a pas changé
+  local d="$WORK/mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  cockpit_module_muter "$(basename "$d")" "$2" "$3" || return 1
+  MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; cp "$AUX/stub-q.mjs" "$MUT_MOD/scripts/vf-cockpit-terminal-processus.mjs"; mod_poser "$MUT_OUT" "$MUT_MOD"; return 0
 }
 nprop() { local n; n="$(grep -c '"t":"proposition"' "$STUB_LOG" 2>/dev/null)"; echo "${n:-0}"; }
 attend_n() { local i; for i in $(seq 1 30); do [ "$(nprop)" -ge "$1" ] && return 0; sleep 0.1; done; return 1; }
@@ -230,7 +237,7 @@ refuse() { # refuse <libellé> <options de rq…> : témoin positif, puis la req
 }
 
 LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"
-STUBD="$WORK/stubd"; mkdir -p "$STUBD"; cp -R "$LAB/.planning" "$STUBD/.planning"; cp -R "$LAB/.vibeflow" "$STUBD/.vibeflow"; STUBO="$STUBD/.vibeflow/cockpit"; cp "$AUX/stub-q.mjs" "$STUBO/vf-cockpit-terminal-processus.mjs"
+STUBD="$WORK/stubd"; mkdir -p "$STUBD"; cp -R "$LAB/.planning" "$STUBD/.planning"; cp -R "$LAB/.vibeflow" "$STUBD/.vibeflow"; STUBO="$STUBD/.vibeflow/cockpit"; STUBM="$(cockpit_module_copie "$WORK/stubmod")"; cp "$AUX/stub-q.mjs" "$STUBM/scripts/vf-cockpit-terminal-processus.mjs"; mod_poser "$STUBO" "$STUBM"
 CSPCH() { sed -n 2p "$1" | node "$AUX/ev.mjs" 'j["content-security-policy"]'; }
 
 echo "=== S — sans le drapeau (LANC-02, P72-D-17) ==="
@@ -355,7 +362,7 @@ E5_ATT="404:cible-inconnue: 422:verbe-refuse: 409:bloque:claude-introuvable 202:
 assert_eq "E2c — refus de POST /api/vf/lancer : cible inconnue 404 cible-inconnue ; verbe hors liste 422 verbe-refuse ; claude absent 409 bloque + claude-introuvable ; complet 202 (témoin)" "$(node "$AUX/harnais.mjs" e5 "$STUBO" "$LAB")" "$E5_ATT"
 assert_eq "E3 — claude absent du PATH du shell : bloquant claude-introuvable et POST refusé ; python3 absent : python3-absent et POST refusé ; les deux présents : 202, +1 (témoin)" "$(node "$AUX/harnais.mjs" e3 "$STUBO" "$LAB" "$ENG" "$WORK/fauxbin" "$WORK/pathsans")" '{"sansClaude":"false|claude-introuvable|409|+0","sansPython":"true|python3-absent|409|+0","complet":"true||202|+1"}'
 
-echo "=== M — mutants (copies de la sortie) ==="
+echo "=== M — mutants (copies du module) ==="
 if mutant sans-drapeau vf-cockpit-lancer.mjs 's|const servi = () => canal() !== null;|const servi = () => true;|'; then
   srv "$MUT_OUT" 0; MT="$(rq "$SRV_PORT" GET /project.html --corps-vers "$WORK/m1.html" > /dev/null; node "$AUX/ptok.mjs" "$WORK/m1.html")"; MP=$SRV_PORT
   MA="$(sig "$MP" GET /api/vf/lancer/cibles --jeton "$MT")"; MB="$(sig "$MP" GET /api/vf/inconnu --jeton "$MT")"; MC="$(sig "$MP" POST /api/vf/lancer --jeton "$MT" --entete "$JSONH" --corps "$OKB")"; MD="$(sig "$MP" POST /api/vf/inconnu --jeton "$MT" --entete "$JSONH" --corps "$OKB")"
