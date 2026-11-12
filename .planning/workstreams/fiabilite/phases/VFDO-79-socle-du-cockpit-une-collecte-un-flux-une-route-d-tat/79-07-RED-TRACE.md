@@ -140,3 +140,41 @@ Premier jet du correctif (« dossier réel sous la racine, sauf drapeau `libre` 
 Après correctif : test-cockpit-git-config-depot.sh 110 / 0 (G19.1 à G19.4 verts). Mutant M-DEDANS (la vérification retirée) : G19.1 à G19.3 rougissent (`false,false,false`), G19.4 reste vert. Copies du module identiques (`cmp`), 158 lignes.
 
 Conséquence mesurée, hors périmètre de fichier du plan (amendement daté) : le lien retour d'un worktree hors de la racine est désormais aussi exigé par gitSortant ; le mutant M-RETOUR de test-cockpit-git-details.sh (X7, retire la comparaison du lien retour dans worktreeVerifie) n'était plus visible sur X7.2 (status lancé dans le worktree forgé : 0 au lieu de 1) ; la suite neutralise donc la seconde défense pour ce mutant, comme elle le fait déjà pour M-LIEN et M-PRINCIPAL (git-details 136 / 0).
+
+## Correction ciblée après l'audit de fin de plan (2026-11-12)
+
+`AVANT-CORRECTION` = 0fb64c60 (tête de la branche avant tout écrit de ce mandat).
+
+### Constat haut T-79-705 — pilotes de nom vide (classe)
+
+Classe : un pilote (filtre, fusion, diff) dont le nom est vide, déclaré par le dépôt, n'était pas vidé par le durcissement : sa clé était soit non listée, soit listée puis écartée par l'analyse. Rouges sur le code présent (suite test-cockpit-git-config-depot.sh, section D8, 116 PASS avant les correctifs de fixture puis rejeu) :
+
+| Identifiant | Attendu | Obtenu sur le code présent |
+|---|---|---|
+| D8.0 (témoin positif) | git brut exécute les cinq pilotes de nom vide : `posé` x5 | `posé` x5 (une première fixture à contenu de taille différente n'exécutait pas le filtre : corrigée, la taille du contenu est celle du commit) |
+| D8.1 | `v,v,v,v,v,v,v` (clean, process, textconv, commande de diff, fusion, lecture non refusée, environnement vidé) | `r,r,v,v,r,r,r` : filtre clean, filtre process et pilote de fusion lancés par les trois points d'entrée ; lecture du dépôt qui les porte en échec ; environnement sans `filter..clean`, `..smudge`, `..process`, `..required`, `diff..*`, `merge..driver` |
+
+textconv et commande de diff restent fermés (`v`) par `--no-textconv` / `--no-ext-diff`, comme relevé par l'auditeur. Après correctif (motif accepté à nom vide dans le module de durcissement et l'analyse du lanceur ; liste non fiable si une clé listée n'est pas comprise) : D8.1 `v,v,v,v,v,v,v`.
+
+| Mutant (copie, une ou deux ancres) | Jetons de D8.1 attendus | Obtenus | Lecture |
+|---|---|---|---|
+| M-VIDE-GIT (motif passé à git : nom non vide exigé) | `v,v,v,v,r,v,r` | `v,v,v,v,r,v,r` | fusion lancée, environnement incomplet ; les filtres sont encore listés par l'ancien motif et compris par l'analyse neuve |
+| M-VIDE-ECARTE (analyse du filtre à nom non vide, clé non comprise ignorée : le défaut d'origine) | `r,r,v,v,v,r,r` | `r,r,v,v,v,r,r` | filtres lancés, lecture en échec, environnement incomplet ; fusion fermée |
+| M-VIDE-ANALYSE (analyse du filtre à nom non vide, refus de la clé non comprise gardé) | `v,v,v,v,v,r,r` | `v,v,v,v,v,r,r` | fermé : rien ne se lance, mais la lecture est refusée (témoin positif rouge) |
+| M-COMPRIS (motif élargi à une clé qui n'est pas un pilote, refus retiré) | D8.2 rougit | `SUJET-DEUX` au lieu de `` | sans le refus la clé non comprise est écartée en silence |
+
+Témoin vert gardé : D8.2 (motif élargi, refus en place) rend la lecture « inconnue » ; le module non élargi lit le dépôt ordinaire (`SUJET-DEUX`).
+
+### Constat bas — clause du lien retour de gitSortant (G19.5, M-RETOUR-G)
+
+Un worktree du lab, hors de la racine, dont le lien retour (`gitdir` du dossier d'administration) ne désigne plus son `.git` : G19.5 attend `true` (sortant), son voisin au lien intact `false`. Mutant M-RETOUR-G (clause retirée de la dernière condition) : `false,false` ; témoins G19.4 verts. Le cas est vert sur le code présent (la clause tient) : la preuve est le mutant.
+
+### Constat bas — R2.2c de test-cockpit-git-signature.sh (R2.2d, R2.2e)
+
+R2.2d : toute ligne d'argv de sous-commande `config` du journal est exactement `config --name-only --get-regexp <motif>`. R2.2e (témoin) : le filtre, appliqué à un journal fabriqué de cinq lignes (une forme exacte, une écriture, une option de plus, une lecture simple, un motif absent), en signale quatre.
+
+### Suites jouées seules après la correction
+
+git-config-depot 126/0, git-env 135/0, git-signature 47/0, git-details 136/0 (X6.2 rouge sous charge dans la série, verte rejouée seule), terminal-lanceur 111/0, git 118/0, who 157/0, vendor 87/0, confinement 66/0, avancement 69/0, lancer-cibles 51/0, path-enfants 37/0, signal 76/0. Liste relevée par grep des suites qui nomment le lanceur, le module de durcissement, `PILOTES_NOMMES` ou `vf-cockpit-paths.mjs` (douze) plus git-details, who, git-signature ; aucune ancre ni aucun mutant ne vise un texte déplacé (aucun texte n'a bougé : deux motifs et une fonction réécrits sur place).
+
+Rouges rapportés, non imputables à ce mandat : test-cockpit-assemblage.sh AM4.15a, AM4.16, M-PURGE-LARGE.0, M-ORDRE.0 (mêmes quatre rouges sur un instantané de la tête avant ce mandat : l'assemblage du module est en cours de refonte par un autre plan du même arbre) ; test-cockpit-securite.sh FB3.5 (délai, charge) et AM4.1 à AM4.4, M-TERM.0 (même surface d'assemblage).
