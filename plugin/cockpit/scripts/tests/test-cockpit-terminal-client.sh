@@ -331,7 +331,7 @@ await executer(chrome, async (s) => {
   r.adresse1 = '?'; r.histoireFrag = -1; r.cadre1 = null;
   await essai('amorcage', async () => {
     await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `if (window.top === window) { window.__prets = []; addEventListener('message', (e) => { if (typeof e.data === 'string') window.__prets.push(e.data); }); }` });
-    await s.naviguer(`${OP}/project.html#t=${amorce}`);
+    await s.naviguer(`${OP}/project.html#t=${amorce}`, { brut: true });
     await s.attendre(`window.__prets.includes('ready') && !location.hash`, 'cadre de Q prêt (échange fait dans le cadre)', process.env.VF_CLIENT_MS ? MS : Math.max(MS, AMORCE)); // amorçage : borné par l'échéance globale (par défaut), sauf VF_CLIENT_MS posée explicitement (mutants à 6 s)
   });
   r.cadre1 = await cadreQ().catch(() => null);
@@ -342,7 +342,7 @@ await executer(chrome, async (s) => {
     // --- S2 : échange refusé (amorçage déjà consommé) dans le cadre de Q : son adresse reste sans fragment, carte « Session expirée » (P reçoit etat:expire, la barre le dit) ---
     r.refus = { hash: '?', port: '?', carte: '' };
     await essai('refus', async () => {
-      await s.naviguer(`${OP}/project.html#t=${amorce}`);
+      await s.naviguer(`${OP}/project.html#t=${amorce}`, { brut: true });
       await att(`window.__prets.includes('etat:expire') && !location.hash`, 'etat:expire (échange refusé dans le cadre)');
     });
     const lireRefus = async () => { const c = await cadreQ(); return { hash: c.fragment, port: new URL(c.url).port, carte: await s.ev(`(document.querySelector('.vf-term-etat') || {}).textContent || ''`) }; };
