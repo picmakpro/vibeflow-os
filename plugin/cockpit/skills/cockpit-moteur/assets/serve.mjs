@@ -38,8 +38,9 @@ const depuisModule = (f) => import(pathToFileURL(path.join(scriptsDir, f)).href)
 const MOD = await depuisModule('vf-cockpit-module.mjs');
 try { MOD.moduleAdmis(root, scriptsDir, moteurDir); } catch (e) { refus(e.message); } // défense en profondeur : jamais de code pris sous la sortie ni sous .vibeflow/
 if (process.env.VF_COCKPIT_SCRIPTS_DIR === undefined) process.env.VF_COCKPIT_SCRIPTS_DIR = scriptsDir; if (process.env.VF_COCKPIT_ENGINE_DIR === undefined) process.env.VF_COCKPIT_ENGINE_DIR = moteurDir; // posées quand elles manquent (jamais un repli sur la sortie) ; une valeur passée, même vide, est respectée : l'agent est alors indisponible (fermé par défaut, Q13.3)
-// 79-06 F2 : un dossier de scripts ou de moteur passé par l'environnement, différent de ceux du module et situé DANS le lab servi, est refusé (le lab ne désigne jamais le code qui le sert) ; les autres valeurs gardent leur effet
-for (const [k, d] of [['VF_COCKPIT_SCRIPTS_DIR', scriptsDir], ['VF_COCKPIT_ENGINE_DIR', moteurDir]]) { let r = null; try { r = process.env[k] ? fs.realpathSync(process.env[k]) : null; } catch {} if (r && r !== fs.realpathSync(d) && (r === root || r.startsWith(root + path.sep))) refus(`${k} désigne un dossier du lab : refus (le code qui sert le lab vient du module).`); }
+// 79-06 F2 : un dossier de scripts passé par l'environnement, différent de celui du module et situé SOUS <lab>/.vibeflow/ (les données du lab, jamais du code), est refusé ; les autres valeurs gardent leur effet (une pose de projet vit sous <lab>/.claude/, le moteur sous .vibeflow/ est refusé plus loin par le terminal)
+{ let r = null; try { r = process.env.VF_COCKPIT_SCRIPTS_DIR ? fs.realpathSync(process.env.VF_COCKPIT_SCRIPTS_DIR) : null; } catch {} if (r && r !== fs.realpathSync(scriptsDir) && r.startsWith(path.join(root, '.vibeflow') + path.sep)) refus('VF_COCKPIT_SCRIPTS_DIR désigne un dossier de données du lab (.vibeflow) : refus (le code qui sert le lab vient du module).'); }
+
 process.env.PATH = (await depuisModule('vf-cockpit-env.mjs')).assainirPath(process.env.PATH, root); // vibeflow P25 : jamais d'outil du lab (H-1) ; ce processus seul, pas le shell
 const opt = (name, dflt) => { const i = argv.indexOf('--' + name); return i < 0 ? dflt : argv[i + 1]; };
 const has = (name) => argv.includes('--' + name);
