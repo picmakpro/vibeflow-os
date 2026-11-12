@@ -1,0 +1,106 @@
+AVANT 954618bdff0f9eb09c21ef97070789b1e9d4f83b
+
+# 79-10 — trace des rouges (plan 79-10, exécution inline)
+
+Mesures faites sur le code de production présent à l'ouverture de la tâche 1 (aucun fichier de production modifié par cette tâche). Le relevé de rendu « avant » est versé dans 79-10-RENDU-AVANT.json (36 états : Code 13, Projet 3, constats de Santé 2, chacun en français et sous `?lang=en`).
+
+## Relevés de base (une ligne par fait, forme `MOT nom valeur`)
+
+```
+LIGNES viewer.html 2579
+LONGUES viewer.html 284
+LIGNES serve.mjs 667
+LONGUES serve.mjs 76
+LIGNES 05-theme.js 75
+LONGUES 05-theme.js 5
+LIGNES 10-glossary.js 194
+LONGUES 10-glossary.js 18
+LIGNES 20-health.js 171
+LONGUES 20-health.js 16
+LIGNES 25-recent.js 91
+LONGUES 25-recent.js 7
+LIGNES 30-screens.js 141
+LONGUES 30-screens.js 12
+LIGNES 40-tour.js 271
+LONGUES 40-tour.js 49
+LIGNES 60-export.js 84
+LONGUES 60-export.js 7
+LIGNES 79-vf-fr-dict-b.js 129
+LONGUES 79-vf-fr-dict-b.js 45
+LIGNES 80-vf-fr.js 176
+LONGUES 80-vf-fr.js 38
+LIGNES build.mjs 479
+LONGUES build.mjs 25
+LIGNES vf-cockpit-fr-inventaire.mjs 192
+LONGUES vf-cockpit-fr-inventaire.mjs 11
+TLOCAUX viewer.html 25
+TLOCAUX 10-glossary.js 5
+TLOCAUX 25-recent.js 5
+TLOCAUX 40-tour.js 4
+OBSERVATEURS 80-vf-fr.js 2
+EXCLUSIONS 143 (dont mode plan: 55)
+ENTREES 78+79 463
+INVENTAIRE F1 605
+```
+
+`TLOCAUX` : relevé approché par expression régulière (`const|let|var t`, `(t)`, `t =>`) ; la porte de la tâche 2 relève ses « ombres » avec sa propre règle, la trace la rapporte à la tâche 2 (`OMBRES-OUTIL`).
+
+Écarts avec les faits écrits au plan (relevés sur 680364f1) : `LONGUES serve.mjs` 76 (plan 60), `LONGUES 80-vf-fr.js` 38 (plan 32), `LIGNES 80-vf-fr.js` 176 (plan 160) : le commit b16c57fc (restes de AUDC-H4) a ajouté `estDossier`, `dossier`, `DOSSIER`, une branche de `DONNEE` et deux exclusions de `SKIP` ; les bornes du plan sont donc les relevés ci-dessus, pas les nombres du plan.
+
+## Rouges sur le code présent (suite test-cockpit-chrome-fr.sh : 106 PASS / 24 FAIL ; avant les témoins : 97 PASS / 0 FAIL)
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-chrome-fr.sh` (sortie complète conservée hors dépôt). Seuls les identifiants F16, F17, F18.1, F19, F20.1, F20.2 et F21.3 échouent ; tout autre identifiant, y compris les 97 d'avant, reste vert.
+
+| Identifiant | Attendu | Obtenu sur le code présent |
+|---|---|---|
+| F16.0 : inventaireSites est exportée par l'inventaire | `ok` | `absent` |
+| F16.1 : clés de t relevées dans le rendu servi (au moins 200, jamais un vert à vide) (0 < 200) | `` | `` |
+| F16.2 : toute clé de t, et tout texte du balisage statique, a une entrée de table ou une exclus… | `[]` | `calcul impossible : absent` |
+| F16.3 témoin : un t('…') neuf sans entrée est nommé, lui seul | `["Chaîne neuve sans entrée"]` | `["calcul impossible"]` |
+| F17.1 : aucun littéral anglais libre, aucune clé non littérale, aucun t local qui masque le tra… | `[]` | `calcul impossible : absent` |
+| F17.2 témoin : un littéral anglais ajouté à une copie de la page est nommé, lui seul | `["Pending approval from the review board"]` | `["calcul impossible"]` |
+| F17.3 témoin : un t(variable) ajouté à une copie est nommé « clé non littérale » | `["maVariableNeuve"]` | `["calcul impossible"]` |
+| F17.4 témoin : un t local qui masque le traducteur (ombre) est nommé, lui seul | `["const t ="]` | `["calcul impossible"]` |
+| F18.1 : les blocs vibeflow:fr (78, 79, 80) précèdent le script principal et ui/00-vibeflow.js d… | `3,true,true,false` | `3,false,false,false` |
+| F19.1 : __vfFrT est une fonction | `function` | `undefined` |
+| F19.2 : clé exacte (« Hello » : « Bonjour ») | `Bonjour` | `absent` |
+| F19.3 : variables et formes (« {} call » : 1 appel, 3 appels) | `["1 appel","3 appels"]` | `absent` |
+| F19.4 : élision et contraction de « de » devant la variable (d'Anthropic, du CLI) | `["Rien de saillant. C'est un contrôle automatique rapide, pas une revue complète d'Anthropic.","Rien de sailla…` | `absent` |
+| F19.5 : @contexte (« Changed@pastille » : Récent) et repli sur la clé sans contexte (Touché) | `["Récent","Touché"]` | `absent` |
+| F19.6 : t.pl et t.mot, singulier à 1 | `["1 appel","3 appels","ligne","lignes"]` | `absent` |
+| F19.7 : t.k (« 1.3k » : « 1,3 k », espace insécable) | `1,3_k` | `absent` |
+| F19.8 : t.type (« Library » : « Bibliothèque », une donnée inconnue : null) | `["Bibliothèque",null]` | `absent` |
+| F19.9 : t.constat (forme rendue reconnue, phrase inconnue inchangée) | `["Readme et 7 autres","Une phrase que personne ne connaît"]` | `absent` |
+| F19.10 : une clé absente de la table rend la clé, variables remplies | `Un x inconnu` | `absent` |
+| F19.11 : sous ?lang=en, la clé remplie, aucune valeur de table lue, t.pl en anglais, t.mot, t.k… | `["Hello","3 call","Changed","3 calls","1 call","lines","1.3k","Readme and 7 more",null,"undefined","Un x incon…` | `absent` |
+| F19.12 : sur la vraie table (« Fit to screen », File par onglet, une donnée, un constat reconnu… | `` | `attendu: [["Ajuster à l'écran","Fichier","Élément","Ma phrase de données",null,"src.js contient util.js"]] ⏎      obtenu:  [absent] ⏎ [F3] témoin du détecteur :…` |
+| F20.1 : le code de 80-vf-fr.js (commentaires exclus) ne construit aucun observateur de mutation… | `0` | `2` |
+| F20.2 : un « Health » posé dans le panneau (hors des anciens sélecteurs listés) reste « Health … | `Health` | `Santé` |
+| F21.3 témoin : avec la ligne de garde « // garde:lang-en » neutralisée, les sondes anglaises li… | `Ajuster à l'écran (F)` | `mutation impossible : ancre absente` |
+
+Raisons : F16.0 à F16.3 et F17.1 à F17.4 rougissent parce que `inventaireSites` n'existe pas encore (le test le dit : « calcul impossible », jamais une liste vide) ; F16.1 dit 0 clé relevée sur 200 attendues ; F18.1 : les trois blocs `// vibeflow:fr` sont posés après le script principal (`3,false,false,false`) ; F19.1 à F19.12 : `window.__vfFrT` n'existe pas (« absent ») ; F20.1 : 2 constructions d'observateur dans `80-vf-fr.js` ; F20.2 : le `span` « Health » du panneau est réécrit en « Santé » par l'observateur ; F21.3 : l'ancre `// garde:lang-en` n'existe pas encore, la copie ne peut pas être mutée (le rouge vient de l'ancre absente, pas d'un comportement).
+
+Les verts de contrôle sont des témoins de non-régression, dits comme tels : F18.2 (un gabarit sans l'emplacement garde l'ancien ordre : vrai aujourd'hui, la capacité de rougir sera prouvée à la tâche 2 par la suppression du repli de `build.mjs` dans une copie), F20.3 (une copie portant un observateur générique est lue réécrite : la sonde sait voir la réécriture), F21.1 et F21.2 (sondes en français et sous `?lang=en` : vertes parce que `80-vf-fr.js` sort avant de rien poser sous `?lang=en` ; mutant F21.3 à la tâche 6), F23.1 à F23.4 (constats de Santé : l'observateur les traduit aujourd'hui).
+
+## Mutant M-RETRAIT-SEUL (A43)
+
+Commande : `VF_FR_F23_MUTANT=retrait bash plugin/cockpit/scripts/tests/test-cockpit-chrome-fr.sh` : la suite rejoue F23 sur une copie de la page de fixture où les deux constructions d'observateur du bloc 80 sont remplacées par un talon inerte ET où les deux écouteurs de rendu du moteur (`SC.on?.('panel', zones)`, `SC.on?.('render', zones)`) sont retirés.
+
+Résultat : 26 FAIL au lieu de 24 ; les deux de plus sont :
+
+- F23.1 : constat de Santé — le détail « X contains … » s'affiche « X contient … » (valeur du relevé avant) : attendu `src.js contient util.js`, obtenu `src.js contains util.js`
+- F23.3 : constat de Santé — localisations coupées à trois, « +3 autres » (valeur du relevé avant) : attendu `src/a.js:3 ⏎ src/b.js ⏎ src/c.js:9 ⏎ +3 autres`, obtenu `src/a.js:3 ⏎ src/b.js ⏎ src/c.js:9 ⏎ +3 more`
+
+MUTANT M-RETRAIT-SEUL F23.1,F23.3 sans observateur ni écouteur de rendu du moteur, le détail du constat reste « src.js contains util.js » et la localisation « +3 more » : retirer l'ancien mécanisme sans rien faire pour les constats change leur rendu (A43), c'est la raison du rouge.
+
+Amendement 2026-11-12 (exécution, fait inattendu) : le plan prévoyait qu'ôter « l'observateur seul » fasse rougir F23. Mesuré : avec les seuls observateurs remplacés par un talon inerte, F23 reste VERT, parce que les deux écouteurs de rendu du moteur (`panel` et `render`) rappellent `fix` sur le panneau et le contexte à chaque ouverture de panneau. Le mutant M-RETRAIT-SEUL retire donc les observateurs ET ces écouteurs, c'est-à-dire tout ce qui applique `fix` au DOM après le chargement ; ce que la tâche 6 retire.
+
+Amendement 2026-11-12 (exécution, hypothèse fausse du plan) : le plan et la mission placent le titre et la question du tableau « Montrer sur la carte » parmi les champs que l'observateur traduit aujourd'hui, à garder par `t.constat`. Mesuré sur le code présent : titre (`#panel .pt`) et question (`#panel .pd`) y sont des données du panneau (SKIP et DONNEE, lot 0 de l'audit, AUDC-H4) et ne sont JAMAIS réécrits : le tableau montre « Anyone could change data through util.js » et « src.js contains util.js ». A43 exige que le rendu des constats de Santé ne change pas : `t.constat` ne s'applique donc PAS aux deux champs passés à `showBoard` (F23.4 le fixe, valeurs du relevé avant). `t.constat` s'applique au titre, au détail et à la note de `issueHtml` seulement.
+
+## Panneaux que le relevé n'atteint pas
+
+Le lab de la suite ne permet pas d'atteindre : la visite guidée au-delà de sa première étape, l'écran des écrans détectés (`30-screens.js`), le travail récent (`25-recent.js`, aucune donnée de travail récent dans le lab), le glossaire sur une description riche, le tiroir de questions à l'agent, le détail d'un parcours en lecture. Ces extensions ne sont couvertes que par la porte statique (F16, F17) et par les sondes de leurs propres suites (moteur-carte, accessibilité, responsive, équipe).
+
+## Écarts de rendu admis (lignes `ECART-ADMIS <page-mode>/<état> <texte exact>`)
+
+Aucun à la tâche 1.
