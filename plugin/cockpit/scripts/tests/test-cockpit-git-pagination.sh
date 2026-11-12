@@ -275,7 +275,10 @@ out.petit = await s.ev(`(() => { const T = document.querySelector('#vf-git-tiroi
   const tx = [...v.querySelectorAll('*')].filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
   return { l: Math.round(T.getBoundingClientRect().width), h: h(v), corps: h(c), wt: document.querySelector('#vf-git-s-wt').hidden,
     police: Math.min(...tx.map((e) => parseFloat(getComputedStyle(e).fontSize))),
-    debord: v.scrollWidth > v.clientWidth || z.scrollWidth > z.clientWidth }; })()`);
+    debord: v.scrollWidth > v.clientWidth || z.scrollWidth > z.clientWidth,
+    // diagnostic (jamais une borne) : de quoi se compose la hauteur du tiroir, imprimé à chaque rejeu pour lire la CI Linux
+    mesures: { tiroir: h(T), barre: h(T.querySelector('.vf-git-barre')), aide: h(T.querySelector('.vf-git-aide')), corps: h(c), volet: h(v),
+      haut: Math.round(T.getBoundingClientRect().top), fenetre: [innerWidth, innerHeight], hh: getComputedStyle(document.body).getPropertyValue('--hh') } }; })()`);
 // GP2.6 : le détail s'ouvre, Graphe est replié, « Fermer le détail » : un focus visible (le titre du tiroir), jamais body
 await s.ev(`document.querySelector('[aria-controls=vf-git-s-graphe]').click()`);
 await s.ev(`${VOL}?.querySelector('.vf-git-fermer')?.click()`); await pause(200);
@@ -299,6 +302,7 @@ JS
     "$(jq_ "$R2" '(() => { const p = j.petit;
       return [p.l, p.h >= 192 && p.h <= 256, p.police >= 12, p.debord, p.corps >= 240, p.wt].join("|"); })()' 2>/dev/null)" \
     "352|true|true|false|true|true"
+  echo "     GP2.3 mesuré (diagnostic) : $(jq_ "$R2" 'JSON.stringify(j.petit.mesures)' 2>/dev/null)"
   assert_eq "GP2.4 — Copier le sha : « Copié » puis le libellé revient après 2 s (entre 1,5 et 3,5 s), région vive « Sha copié »" \
     "$(jq_ "$R2" '[j.copie.lib, j.copie.live, j.copie.spy === j.copie.sha, j.copie.dt >= 1500 && j.copie.dt <= 3500].join("|")' 2>/dev/null)" \
     "Copié|Sha copié|true|true"
