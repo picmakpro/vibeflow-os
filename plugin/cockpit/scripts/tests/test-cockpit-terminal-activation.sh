@@ -7,7 +7,7 @@
 #   E2E  amorçage à usage unique, aucun assistant avant le flux, commande aller-retour, ligne de commande de l'assistant, arrêt sans reste
 #   T11.4 sous Windows : aucun écouteur, état « indisponible »
 #   POSE l'engine pose `terminal/vf-cockpit-pty.py` dans les trois scopes et un serveur INSTALLÉ le lance
-#   M-*  mutants (copies de la sortie, jamais le module) : M-ACTIF, M-ECOUTE0, M-FRAMESRC, M-WIN, M-HORS-MOTEUR
+#   M-*  mutants (copies du module par cockpit_module_muter ; la sortie ne porte que des données) : M-ACTIF, M-ECOUTE0, M-FRAMESRC, M-WIN, M-HORS-MOTEUR
 # Chaque témoin négatif a son contrôle positif ; la suite rougit sur un module antérieur à la tranche. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -55,21 +55,32 @@ mklab() { # mklab <dir> : lab GSD minimal, construit ; sortie dans <dir>/.vibefl
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build-$(basename "$L").out" 2>&1 || cat "$WORK/build-$(basename "$L").out"
 }
 SRVN=0
-srv() { # srv <sortie> <0|1 terminal> [moteur] [scripts] -> SRV_PORT SRV_PID SRV_O SRV_OUT ; serveur lancé directement depuis la sortie, comme le lanceur
-  local o="$1" term="${2:-0}" eng="${3:-$ENG}" scr="${4:-$SCRIPTS}" lab; lab="$(cd "$1/../.." && pwd)"
+# 79-06 : le code ne vit plus dans la sortie. MOD_DEPOT = racine du module du dépôt ; mod_de <sortie> = racine du module que COMMANDE cette sortie
+# (table posée par mutant() : sortie TAB module ; par défaut le module du dépôt). La table est lue par bash (awk) et par les petits scripts node.
+MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODS_TABLE="$WORK/.mods"; : > "$MODS_TABLE"; export MODS_TABLE MOD_DEPOT
+mod_de() { local m; m="$(awk -F'\t' -v s="${1:-}" '$1==s{m=$2} END{print m}' "$MODS_TABLE" 2>/dev/null)"; printf '%s\n' "${m:-$MOD_DEPOT}"; }
+srv() { # srv <sortie> <0|1 terminal> [moteur] [scripts] [module] -> SRV_PORT SRV_PID SRV_O SRV_OUT ; serveur du MODULE (celui de la sortie visée, ou celui passé), lancé par l'aide
+  local o="$1" term="${2:-0}" eng="${3:-}" scr="${4:-}" mod="${5:-}" lab; lab="$(cd "$1/../.." && pwd)"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN-$RANDOM.out"; rm -f "$o/.cache/server.json" "$o/.cache/terminal-amorce"
-  local flag=(); mkdir -p "$o/.cache"
+  local flag=() ev=(); mkdir -p "$o/.cache"
   if [ "$term" = 1 ]; then flag=(--terminal); AMORCE="$(amorce_neuve)"; (umask 077; printf '%s' "$AMORCE" > "$o/.cache/terminal-amorce"); (umask 077; printf '%s' "$AMORCE" > "$WORK/amorce.copy"); fi
-  COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$scr" ${flag[@]+"${flag[@]}"}
+  [ -z "$eng" ] || ev+=(VF_COCKPIT_ENGINE_DIR="$eng"); [ -z "$scr" ] || ev+=(VF_COCKPIT_SCRIPTS_DIR="$scr")
+  if [ -n "$mod" ]; then COCKPIT_MODULE="$mod" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${ev[@]+"${ev[@]}"} ${flag[@]+"${flag[@]}"}
+  elif [ -n "$eng$scr" ]; then COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${ev[@]+"${ev[@]}"} ${flag[@]+"${flag[@]}"}   # dossiers de recherche factices : le serve.mjs du dépôt, les variables de la suite gagnent
+  else COCKPIT_MODULE="$(mod_de "$o")" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${flag[@]+"${flag[@]}"}; fi
   if [ "$term" = 1 ]; then attendre 5 grep -qs '"terminal"' "$o/.cache/server.json"; fi # la clé terminal manque quand le moteur refuse l'assistant : attente bornée, sans échec
   SRV_PID="$VF_PID"; SRV_PORT="${VF_PORT:-0}"
 }
 sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
 nlignes() { printf '%s\n' "$1" | grep -c . ; }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : données) et MUT_MOD (racine de la copie du module) ; code 1 si la cible manque ou si la copie n'a pas changé
+  local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  case "$(basename "$2")" in
+    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 # empreinte des fichiers du cockpit du VRAI ~/.claude (la suite ne doit rien y poser)
@@ -160,9 +171,12 @@ cat > "$AUX/win.mjs" <<'JS'
 import { pathToFileURL } from 'node:url';
 const msgs = []; console.error = (...a) => msgs.push(a.join(' '));
 const [, , sortie, lab] = process.argv;
-let m; try { m = await import(pathToFileURL(sortie + '/vf-cockpit-terminal.mjs').href); } catch { console.log('module introuvable'); process.exit(0); }
+// 79-06 : le code n'est plus dans la sortie : le module est celui que commande cette sortie (table MODS_TABLE : sortie TAB module ; défaut MOD_DEPOT)
+import fs from 'node:fs';
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === sortie && r) racine = r; } } catch {}
+let m; try { m = await import(pathToFileURL(racine + '/scripts/vf-cockpit-terminal.mjs').href); } catch { console.log('module introuvable'); process.exit(0); }
 const ecoutes = () => process._getActiveHandles().filter((h) => h && h.listening).length;
-const t = m.preparerTerminal({ here: sortie, root: lab, jetons: () => [], plateforme: 'win32' });
+const t = m.preparerTerminal({ here: racine + '/scripts', root: lab, jetons: () => [], plateforme: 'win32' });
 t.demarrer(0); await new Promise((r) => setTimeout(r, 300));
 let corps = ''; const res = { setHeader() {}, writeHead() {}, end(b) { corps = String(b || ''); } };
 t.routeP({ method: 'GET', url: '/api/vf/terminal', headers: {} }, res);
@@ -193,7 +207,7 @@ assert_eq "POSE.1 — l'engine pose terminal/vf-cockpit-pty.py dans les scopes p
 sonde_pose() { # sonde_pose <lab> <moteur> <scripts> : construit avec le lanceur POSÉ, lance le serveur de la sortie avec les chemins POSÉS, rend « ok » ou la raison
   local lab="$1" eng="$2" scr="$3" o="$1/.vibeflow/cockpit" sec fp res=""
   (cd "$lab" && HOME="$FH" node "$scr/vf-cockpit.mjs" build --lab "$lab" > "$WORK/build-pose.out" 2>&1) || { echo "construction impossible"; return; }
-  srv "$o" 1 "$eng" "$scr"; local q; q="$(sj '(j.terminal&&j.terminal.url)||""')"; q="${q##*:}"
+  srv "$o" 1 "$eng" "$scr" "${eng%/skills/cockpit-moteur}"; local q; q="$(sj '(j.terminal&&j.terminal.url)||""')"; q="${q##*:}"
   if [ -z "$q" ]; then unsrv; echo "pas de second écouteur (terminal arrêté)"; return; fi
   sec="$(node "$TA" amorcer "$q" "$WORK/amorce.copy" | sed -n 2p)"
   if [ -z "$sec" ]; then unsrv; echo "échange refusé"; return; fi
