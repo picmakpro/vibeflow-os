@@ -762,6 +762,22 @@ if (cas === 'C1') {
   console.log(rep.length ? 'échec : ' + rep.join(', ') : 'ok');
 }
 JS
+cat > "$GL_AUX/glmut.mjs" <<'JS'
+// glmut.mjs <fichier> <ancre> <remplacement> — remplace UNE occurrence de l'ancre ; rend « muté » ou « ancre absente » (zéro ou plusieurs occurrences).
+import fs from 'node:fs';
+const [, , fichier, de, vers] = process.argv;
+const s = fs.readFileSync(fichier, 'utf8');
+const n = s.split(de).length - 1;
+if (n !== 1) { console.log('ancre absente'); process.exit(0); }
+fs.writeFileSync(fichier, s.replace(de, () => vers));
+console.log('muté');
+JS
+cat > "$GL_AUX/retour.mjs" <<'JS'
+// module de remplacement du mutant M-RETOUR : mêmes exports, mais le retour arrière est réintroduit (regex native construite depuis la source entière)
+export const MAX_MOTIF = 1024;
+export const MAX_PAS = 4194304;
+export function automateDe(...sources) { const res = sources.map((s) => new RegExp('^' + s + '$')); return (p) => res.some((r) => r.test(p)); }
+JS
 glequiv() { node "$GL_AUX/equiv.mjs" "$GL_LIB" "$GL_AUX/ancien.mjs" "$1" "$GL_GRAINE" "$2" 2>&1; }
 glligne() { awk -v k="$1" 'index($0, k ": ") == 1 { print substr($0, length(k) + 3) }'; }
 echo "=== GLOB — coût borné de la correspondance de motifs (P79-D-32, SOCL-26) ==="
@@ -795,6 +811,58 @@ done
 GL_C2="$(node "$GL_AUX/plafonds.mjs" "$GL_LIB" C2 2> "$GL_AUX/c2.err" | head -1)"
 GL_C2L="$(awk 'END{print NR}' "$GL_AUX/c2.err")"; GL_C2M="$(awk '{ if (length($0) > m) m = length($0) } END{print m + 0}' "$GL_AUX/c2.err")"
 assert_eq "GLOB.C2 — motif géant de crochets non fermés : ne lève pas, rend faux, un avis d'une ligne de moins de 200 caractères sur stderr" "$GL_C2 / $GL_C2L ligne / $([ "$GL_C2M" -lt 200 ] && echo court || echo long)" "ok / 1 ligne / court"
+# ---------- mutants : chacun fait rougir l'identifiant qu'il vise, pour la bonne raison ----------
+# glmut <nom> <fichier de lib> <ancre> <remplacement> : copie fraîche du dossier lib, UNE occurrence remplacée ; rend « muté » ou « ancre absente »
+glmut() { rm -rf "$GL_AUX/m-$1"; cp -R "$GL_LIB" "$GL_AUX/m-$1"; node "$GL_AUX/glmut.mjs" "$GL_AUX/m-$1/$2" "$3" "$4"; }
+glm_equiv() { node "$GL_AUX/equiv.mjs" "$GL_AUX/m-$1" "$GL_AUX/ancien.mjs" "$2" "$GL_GRAINE" "${3:-$GL_N}" 2>&1 | head -1; }   # sortie d'équivalence sur la copie mutée
+# gl_juge <sortie> <zone : motif|chemin|tout> <fragment>... : identique|ok si la preuve ne rougit pas ; oui si un fragment est dans la zone ; sinon autre
+gl_juge() { local s="$1" zone="$2" z f; shift 2; if [ "$s" = identique ] || [ "$s" = ok ]; then echo "$s"; return; fi
+  case "$zone" in motif) z="${s%% chemin=*}";; chemin) z="${s#*chemin=}";; *) z="$s";; esac
+  for f in "$@"; do case "$z" in *"$f"*) echo oui; return;; esac; done; echo "autre : ${s:0:150}"; }
+echo "=== GLOB — mutants ==="
+GM_R="$(glmut POINT vf-glob.mjs 'ok = u !== 10 && u !== 13 && u !== 0x2028 && u !== 0x2029;' 'ok = true;')"
+assert_eq "GLOB.M-POINT.ancre — l'ancre de la classe du point existe une fois" "$GM_R" "muté"
+GM_S="$(glm_equiv POINT equiv)"
+assert_eq "GLOB.M-POINT — rougit E1 par un chemin à fin de ligne (le point accepte les fins de ligne)" "$(gl_juge "$GM_S" chemin '\n' '\r')" "oui"
+GM_R="$(glmut ALT vf-glob.mjs 'const bras = n.a.map((b) => bati(b, suite));' 'const bras = n.a.slice(0, 1).map((b) => bati(b, suite));')"
+assert_eq "GLOB.M-ALT.ancre — l'ancre de la lecture des bras d'une alternative existe une fois" "$GM_R" "muté"
+GM_S="$(glm_equiv ALT equiv)"
+assert_eq "GLOB.M-ALT — rougit E1 par un motif à accolades (alternative réduite à son premier bras)" "$(gl_juge "$GM_S" motif '{')" "oui"
+GM_R="$(glmut OPT vf-glob.mjs "if (n.k === 'opt') return etat(SPL, 0, bati(n.n, suite), suite);" "if (n.k === 'opt') return bati(n.n, suite);")"
+assert_eq "GLOB.M-OPT.ancre — l'ancre du quantificateur facultatif existe une fois" "$GM_R" "muté"
+GM_S="$(glm_equiv OPT equiv)"
+assert_eq "GLOB.M-OPT — rougit E1 par un motif à joker facultatif (le facultatif devient obligatoire)" "$(gl_juge "$GM_S" motif '**/')" "oui"
+GM_R="$(glmut CLASSE vf-glob.mjs 'const v = RE[idx].test(String.fromCharCode(u)) ? 1 : 2;' 'const v = RE[idx].test(String.fromCharCode(u)) ? 2 : 1;')"
+assert_eq "GLOB.M-CLASSE.ancre — l'ancre du test d'une classe existe une fois" "$GM_R" "muté"
+GM_S="$(glm_equiv CLASSE equiv)"
+assert_eq "GLOB.M-CLASSE — rougit E1 par un motif à classe (appartenance niée)" "$(gl_juge "$GM_S" motif '[')" "oui"
+GM_R="$(glmut HAUT vf-glob.mjs 'if (prof === 0 && bras.length > 1) ctx.inerte = true;' '/* garde retirée */')"
+assert_eq "GLOB.M-HAUT.ancre — l'ancre du refus de l'alternative de niveau supérieur existe une fois" "$GM_R" "muté"
+GM_S="$(node "$GL_AUX/equiv.mjs" "$GL_AUX/m-HAUT" "$GL_AUX/ancien.mjs" invalides "$GL_GRAINE" 2000 2>&1 | glligne haut | head -1)"
+assert_eq "GLOB.M-HAUT — rougit E3b (le motif à alternative de niveau supérieur correspond de nouveau à un chemin)" "$(gl_juge "$GM_S" tout 'attendu false obtenu true')" "oui"
+GM_R="$(glmut PAS vf-glob.mjs 'if (nE * (L + 1) > MAX_PAS) return false;' '/* budget retiré */')"
+assert_eq "GLOB.M-PAS.ancre — l'ancre du budget de pas existe une fois" "$GM_R" "muté"
+GM_S="$(node "$GL_AUX/plafonds.mjs" "$GL_AUX/m-PAS" C1 2> /dev/null | head -1)"
+assert_eq "GLOB.M-PAS — rougit C1 (le chemin au-delà du budget correspond de nouveau)" "$(gl_juge "$GM_S" tout 'verdict true')" "oui"
+GM_R="$(glmut MOTIF common.mjs 'if (g.length > MAX_MOTIF) {' 'if (false) {')"
+assert_eq "GLOB.M-MOTIF.ancre — l'ancre du contrôle de longueur de motif existe une fois" "$GM_R" "muté"
+GM_S="$(node "$GL_AUX/plafonds.mjs" "$GL_AUX/m-MOTIF" C2 2> /dev/null | head -1)"
+assert_eq "GLOB.M-MOTIF — rougit C2 (le motif géant est traduit : levée au lieu d'un motif inerte)" "$(gl_juge "$GM_S" tout 'levée')" "oui"
+GM_R="$(glmut SPEC common.mjs 'return { glob, specificity: premier, test: automateDe(' 'return { glob, specificity: premier + 1, test: automateDe(')"
+assert_eq "GLOB.M-SPEC.ancre — l'ancre de la valeur de specificity du cas à jokers existe une fois" "$GM_R" "muté"
+GM_S="$(glm_equiv SPEC equiv)"
+assert_eq "GLOB.M-SPEC — rougit E1 sur le champ specificity" "$(gl_juge "$GM_S" tout 'champ specificity')" "oui"
+GM_R="$(glmut COERCITION vf-glob.mjs 'const s = `${chemin}`;' 'const s = chemin;')"
+assert_eq "GLOB.M-COERCITION.ancre — l'ancre de la coercition de l'entrée existe une fois" "$GM_R" "muté"
+GM_S="$(glm_equiv COERCITION nonchaines)"
+assert_eq "GLOB.M-COERCITION — rougit E2 (une entrée non chaîne n'a plus le verdict de la copie gelée)" "$(gl_juge "$GM_S" tout 'attendu')" "oui"
+# M-RETOUR : le module est remplacé en entier par une regex native construite depuis la source (le retour arrière est réintroduit)
+rm -rf "$GL_AUX/m-RETOUR"; cp -R "$GL_LIB" "$GL_AUX/m-RETOUR"; cp "$GL_AUX/retour.mjs" "$GL_AUX/m-RETOUR/vf-glob.mjs"
+if [ "$(printf '%s\n' "$GL_BANC" | awk '{print $1, $2}')" = "lineaire=laisse-passer quadratique=vu" ]; then
+  GM_P="$(VF_GLOB_FAMILLES="F1 F5" node "$GL_AUX/perf.mjs" pilote "$GL_AUX/m-RETOUR" 2>&1)"
+else GM_P="banc invalide"; fi
+echo "  M-RETOUR : $(printf '%s\n' "$GM_P" | tr '\n' ' ' | cut -c1-260)"
+assert_eq "GLOB.M-RETOUR — le retour arrière réintroduit rougit P1.F1 et P1.F5 par le rapport (ou le délai), jamais par une exception ni un défaut de forme" "$(printf '%s\n' "$GM_P" | awk '{ r = ($2 ~ /^ratio=rouge/ || $2 ~ /^ratio=délai/) ? "rouge" : "autre"; printf "%s ", r }')" "rouge rouge "
 
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
