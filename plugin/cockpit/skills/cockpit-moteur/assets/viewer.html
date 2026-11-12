@@ -701,6 +701,8 @@ const fmt = (n) => t.k(n >= 10000 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (n 
 const dirname = (p) => p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
 const plural = (n, w) => t.pl(n, w);
+// le type fixe d'une carte (« library ») passe par t.type ; le mot « file » (onglet Projet, panneau d'un fichier) par la table, qui le dit selon l'onglet
+const kindFr = (k) => t.type(k) ?? (k === 'file' ? t('file') : k);
 function el(tag, attrs = {}, parent) {
   const e = document.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) if (v !== undefined && v !== null) e.setAttribute(k, v);
@@ -1065,7 +1067,7 @@ function cardTip(id) {
   const sv = i.n?.st || i.f?.st;
   const size = sv ? '' : !st?.files ? '' : PLAN ? (i.type === 'file' || i.type === 'module' ? 'planned' : plural(st.files, 'planned file')) : i.type === 'file' || i.type === 'module' ? t('{} lines', fmt(st.loc)) : `${plural(st.files, 'file')} · ${t('{} lines', fmt(st.loc))}`;
   const hints = [drillable(id) && state.container !== id ? `<span><span class="kbd">${t('2×click')}</span> ${t('open')}</span>` : '', `<span><span class="kbd">${t('right-click')}</span><span class="sep">:</span> ${t('more')}</span>`].join('');
-  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kind)}${size ? ` · ${size}` : ''}</div>${sv ? `<div class="td">${statePill(sv)}</div>` : ''}${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}${tipHints(hints)}`;
+  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kindFr(kind))}${size ? ` · ${size}` : ''}</div>${sv ? `<div class="td">${statePill(sv)}</div>` : ''}${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}${tipHints(hints)}`;
 }
 /** Hover lines for recent work: what changed on this card and how it serves the request, or what changed inside it. */
 function recentTip(id) {
@@ -1562,7 +1564,7 @@ function renderContext() {
     return;
   }
   const i = info(state.container);
-  const kind = state.container === 'root' ? t('Overview') : i.type === 'node' ? (t.type(Cap(i.kind)) ?? Cap(i.kind)) : i.type === 'dir' ? t('Folder') : i.type === 'file' ? t('File') : (t.type(i.type) ?? i.type);
+  const kind = state.container === 'root' ? t('Overview') : i.type === 'node' ? kindFr(Cap(i.kind)) : i.type === 'dir' ? t('Folder') : i.type === 'file' ? t('File') : kindFr(i.type);
   const badge = state.container === 'root' ? '' : `<span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span>`;
   $('#context').innerHTML = `<div class="k">${badge}${h(kind)}</div><h1>${h(i.name)}</h1>${i.desc ? `<p class="cd" id="ctx-desc">${h(i.desc)}</p>` : ''}${state.view?.hidden ? `<p class="cx" style="color:var(--text-3);font-size:12.5px;margin-top:var(--sp-8)">${t("{} more exports aren't imported by name anywhere; they're listed in the details panel.", state.view.hidden)}</p>` : ''}${i.desc ? '<button type="button" class="ctx-more" aria-controls="ctx-desc" hidden></button>' : ''}`;
   foldContext();
@@ -1651,7 +1653,7 @@ const listSec = (title, rows, count, max = 30, note = '') => rows.length ? `<div
 const pathBox = (p) => `<div class="pp"><span>${h(p).split('/').map((x) => `<span class="sg">${x}</span>`).join('/<wbr>')}</span><button data-copy="${h(p)}" title="${t('Copy')}" aria-label="${t('Copy path')}">${iconI('copy')}</button></div>`;
 function header(i) {
   const kind = i.type === 'node' ? i.kind : i.type === 'symbol' ? i.symKind : i.type === 'route' ? t('Endpoint') : i.type === 'module' ? t('file') : i.type;
-  return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(t.type(kind) ?? kind)}</span></div>
+  return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kindFr(kind))}</span></div>
     <h2 class="pt">${h(i.name)}</h2>${i.desc ? `<p class="pd">${h(i.desc)}</p>` : `<p class="pd empty">${t('No description yet.')}</p>`}`;
 }
 
@@ -1884,7 +1886,8 @@ function runSearch() {
     const ic = it.kind === 'route' ? `<span class="method" style="--m:${methodVar(ii.r.m)}">${h(ii.r.m)}</span>` : `<span class="ico" style="--c:${colorOf(ii)}">${icon(iconKey(ii))}</span>`;
     // a file shows its real file name and, on the right, its folder instead of the word "file" (PU-G-050) — on the Code tab only: on the Project tab a "file" is a card of the planning (BACKLOG entry, requirement, plan), its readable title stays; when another result has the same file name, its whole folder also sits under the name (PU-G-049)
     const file = it.kind === 'file' && G.meta?.vfTab !== 'project', dir = file ? parentDir(it.path) : '', twin = file && (sameBase.get(baseName(it.path)) || []).length > 1;
-    const right = file ? dirTag(it.path, sameBase.get(baseName(it.path))) || dir.split('/').slice(-2).join('/') || '/' : it.kind === 'route' ? ii.r.p : it.kind;
+    const right = file ? dirTag(it.path, sameBase.get(baseName(it.path))) || dir.split('/').slice(-2).join('/') || '/'
+      : it.kind === 'route' ? ii.r.p : kindFr(it.kind);
     return `<div class="r${i === 0 ? ' active' : ''}" data-i="${i}">${ic}<span class="rt"><div class="rn">${h(file ? baseName(it.path) : it.name)}</div><div class="rd">${h(twin && dir ? `${dir} · ${it.desc || ''}` : it.desc || it.path)}</div></span>${file ? `<span class="rdr rp" title="${h(dir || '/')}"><bdi dir="ltr">${h(right)}</bdi></span>` : `<span class="rk">${h(right)}</span>`}</div>`;
   }).join('') || `<div class="empty">${t('No matches')}</div>`;
   sRes.querySelectorAll('.r').forEach((r) => { r.addEventListener('mousedown', (ev) => { ev.preventDefault(); pick(+r.dataset.i); }); r.addEventListener('mousemove', () => setActive(+r.dataset.i)); });
