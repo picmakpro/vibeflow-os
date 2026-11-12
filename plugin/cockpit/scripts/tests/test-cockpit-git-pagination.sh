@@ -60,9 +60,10 @@ build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; pose
   env $ENVX "$NODE" "${2:-${GP_SCRIPTS:-$SCRIPTS}}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
   # un CLI `claude` factice, comme les autres suites du cockpit : sans CLI, serve.mjs affiche #ask-warn au-dessus de la barre de question à
-  # 1024 px, la barre passe de 40 à 115 px et le tiroir se cale 69 px plus haut (liste à 237 px). Le seul interrupteur que serve.mjs lit est
-  # l'option `--claude <chemin>` (ni FLOORPLAN_CLAUDE ni VF_COCKPIT_CLAUDE ne sont lus ; mesuré) : GP_CLAUDE la fixe, un chemin absent donne
-  # un serveur SANS CLI quel que soit le PATH du poste (GP2.3b), le défaut est le faux claude.
+  # 1024 px, la barre passe de 40 à 115 px et le tiroir se cale 69 px plus haut (liste à 237 px). Dans le serve.mjs assemblé, given('claude') lit
+  # l'option `--claude <chemin>`, sinon VF_COCKPIT_CLAUDE (FLOORPLAN_CLAUDE dans la source, renommé à l'assemblage) ; une valeur donnée, même
+  # absente, exclut tout repli. On passe --claude, plus explicite : GP_CLAUDE la fixe, un chemin absent donne un serveur SANS CLI quel que
+  # soit le PATH du poste (GP2.3b), le défaut est le faux claude.
   mkdir -p "$WORK/fauxbin"; cp "$HERE_T/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"
   env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --claude "${GP_CLAUDE:-$WORK/fauxbin/claude}" --port "$(libre)" > "$WORK/serve.out" 2>&1 &
   SRV=$!
