@@ -467,7 +467,7 @@ if mut tc vf-cockpit-terminal-processus.mjs "s/egal(req.headers\['x-vf-terminal'
   assert_eq "M-TEMPS-CONSTANT — le mutant (comparaison directe ===) rougit TC.1" "$(rouge "$(sonde_tc "$MUT_OUT")" "egal=2 directes=0 condense=oui")" "rouge"; fi
 if mut egal vf-cockpit-terminal-amorce.mjs "s/return crypto.timingSafeEqual(condense(a), condense(b));/return a === b;/"; then
   assert_eq "M-EGAL — le mutant (egal() sans timingSafeEqual) rougit TC.1" "$(rouge "$(sonde_tc "$MUT_OUT")" "egal=2 directes=0 condense=oui")" "rouge"; fi
-if mut moteurvf vf-cockpit-terminal.mjs "s/ && !realUnder(f, path.join(root, '.vibeflow'))//"; then
+if mut moteurvf vf-cockpit-terminal.mjs "s/ && !realUnder(f, path.join(root, '.vibeflow'), { siEchec: true })//"; then
   cp -R "$ENG" "$MUT_OUT/../moteur-copie"
   assert_eq "M-MOTEUR-VIBEFLOW — le mutant (plus de refus sous .vibeflow/) rougit TM.1 : le terminal devient actif" "$(rouge "$(sonde_moteur "$MUT_OUT" "$MUT_OUT/../moteur-copie")" "terminal=false journal=refus")" "rouge"; fi
 if mut moteurlien vf-cockpit-terminal.mjs "s/fs.lstatSync(f).isFile()/fs.statSync(f).isFile()/"; then
