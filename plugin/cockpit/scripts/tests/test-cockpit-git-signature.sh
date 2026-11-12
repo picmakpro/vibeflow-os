@@ -177,6 +177,8 @@ temps_sig() { # temps_sig <lab> : médiane de 7 appels de signatureGit (ms), 2 d
 
 # sous_cmds <journal> : la sous-commande de chaque ligne d'argv, options globales (--no-optional-locks, -c <v>, -C <dir>) écartées
 sous_cmds() { awk '{ i=1; while (i<=NF) { if ($i=="-c"||$i=="-C") i+=2; else if ($i ~ /^--/ && $i!="") i++; else break } print $i }' "$1"; }
+# config_hors <journal> : les lignes d'argv dont la sous-commande est `config` et qui ne sont pas exactement `config --name-only --get-regexp <motif>` (lecture seule des pilotes nommés, un seul motif)
+config_hors() { awk '{ i=1; while (i<=NF) { if ($i=="-c"||$i=="-C") i+=2; else if ($i ~ /^--/ && $i!="") i++; else break } if ($i=="config" && !($(i+1)=="--name-only" && $(i+2)=="--get-regexp" && NF==i+3)) print $0 }' "$1"; }
 echo "=== R2 — worktrees, index, argv journalisé, coût ==="
 build_serve "$DEPOT"
 fenetre 10000 "$WORK/w2a.sse" G_ -C "$WT" switch -q -c autre
@@ -194,6 +196,9 @@ fenetre 11000 "$WORK/w2e.sse" true
 assert_eq "R2.2a — témoin : le journal d'argv voit les appels de la signature (for-each-ref)" "$([ "$(sous_cmds "$WORK/git.log" | grep -c '^for-each-ref$')" -ge 1 ] && echo oui || echo non)" "oui"
 assert_eq "R2.2b — 11 s sans changement : aucune sous-commande log, status ni diff" "$(sous_cmds "$WORK/git.log" | grep -cE '^(log|status|diff)$')" "0"
 assert_eq "R2.2c — sous-commandes vues : seulement for-each-ref, worktree, show-ref, symbolic-ref, rev-list, rev-parse, plus config (lecture des pilotes nommés du dépôt, 79-07)" "$(sous_cmds "$WORK/git.log" | sort -u | grep -vxE 'for-each-ref|worktree|show-ref|symbolic-ref|rev-list|rev-parse|config' | tr '\n' ' ')" ""
+assert_eq "R2.2d — toute sous-commande config vue est une lecture : exactement « config --name-only --get-regexp <motif> », jamais une écriture ni une autre lecture" "$(config_hors "$WORK/git.log" | wc -l | tr -d ' ')" "0"
+printf '%s\n' "--no-optional-locks -c core.fsmonitor=false -C /d config --name-only --get-regexp ^(filter)$" "-C /d config --unset core.bare" "-C /d config --get-regexp ^a$ --global" "-C /d config user.name x" "-C /d config --name-only --get-regexp" > "$WORK/config-faux.log"
+assert_eq "R2.2e — témoin : le filtre de R2.2d rougit sur une écriture, une option de plus, une lecture simple et un motif absent (4 lignes), et laisse passer la forme exacte" "$(config_hors "$WORK/config-faux.log" | wc -l | tr -d ' ')" "4"
 stop_srv
 # R2 (revue serveur 2026-11-06, S3) : la mesure vise le dépôt de CETTE suite (celui qui contient le dossier du script), jamais un chemin de poste ; hors dépôt : SAUTÉ, jamais un PASS.
 # Le plafond est large (250 ms sur la médiane de 7 appels, 3 git par appel) : il garde contre un coût démesuré, pas contre la charge de la machine (48 à 55 ms mesurés sous charge contre un plafond de 50).
