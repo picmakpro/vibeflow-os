@@ -9,7 +9,7 @@
 #   T12.6 chaque branche d'arrêt (sortie du shell, SIGTERM, fin du fd 0) tue la session nohup comprise ; T12.7 relevé : vide = impossible, zombie = mort, chef réapé jamais visé
 #   T11.9 le shell n'hérite pas du descripteur 3 (canal de contrôle)     S3  entrée en attente côté serveur bornée : au-delà, 429 explicite
 #   T15  python3 du lab jamais exécuté (PATH à élément relatif ou vide), PATH du shell intact
-#   M-*  mutants (copies de la sortie ou du moteur, jamais le module) : M-INHERIT, M-ATTENTE-NON-BORNEE, M-ENVLARGE, M-CWD, M-SI-ABSENT, M-SANS-I, M-SANS-L, M-SIGINT, M-CTRLC, M-RESIZE, M-NOEOF, M-GROUPES-FIGES, M-PYTHON3-CWD, M-SORTIE-SANS-KILL, M-ARRET-SANS-KILL, M-RELEVE-VIDE, M-ZOMBIE, M-ETAT-PROC, M-CHEF-REAPE
+#   M-*  mutants (copies du module par cockpit_module_muter, ou du moteur pour l'assistant ; la sortie ne porte que des données) : M-INHERIT, M-ATTENTE-NON-BORNEE, M-ENVLARGE, M-CWD, M-SI-ABSENT, M-SANS-I, M-SANS-L, M-SIGINT, M-CTRLC, M-RESIZE, M-NOEOF, M-GROUPES-FIGES, M-PYTHON3-CWD, M-SORTIE-SANS-KILL, M-ARRET-SANS-KILL, M-RELEVE-VIDE, M-ZOMBIE, M-ETAT-PROC, M-CHEF-REAPE
 # Les attentes cherchent des sous-chaînes (le noyau double les fins de ligne, l'écho ^C précède la sortie). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -40,10 +40,11 @@ else if (cmd === 'attendre-n') { const fin = Date.now() + Number(a[3]); for (;;)
 else if (cmd === 'lignes-non-commentees') console.log(a.slice(1).reduce((s, f) => s + lire(f).split('\n').filter((l) => l.includes(a[0]) && !/^\s*\/\//.test(l)).length, 0));
 JS
 cat > "$AUX/unit.mjs" <<'JS'
-// unit.mjs <sortie> <cas> : cas de envShell et de choisirShell importés de la sortie
+// unit.mjs <sortie> <cas> : cas de envShell et de choisirShell importés du module que commande la sortie (79-06 : la sortie ne porte plus de code ; table MODS_TABLE : sortie TAB module ; défaut MOD_DEPOT)
 import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
 const [, , sortie, cas, ...a] = process.argv;
-const m = await import(pathToFileURL(sortie + '/vf-cockpit-terminal-env.mjs').href);
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === sortie && r) racine = r; } } catch {}
+const m = await import(pathToFileURL(racine + '/scripts/vf-cockpit-terminal-env.mjs').href);
 if (cas === 'filtre') {
   const S = '0123456789abcdef0123';
   const r = m.envShell({ CLAUDECODE: '1', CLAUDE_CODE_X: '1', VF_COCKPIT_Y: '1', CLAUDE_AUTRE: 'z', AUTRE: 'ok', NODE_OPTIONS: '--no-warnings', COURT: 'xcourtx', FUITE: 'a' + S + 'b' }, [S, 'court', '']);
@@ -125,6 +126,10 @@ mklab() { # mklab <dir> : lab GSD minimal, construit
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build-$(basename "$L").out" 2>&1 || cat "$WORK/build-$(basename "$L").out"
 }
 SRVN=0; ENVX=(); SRV_CWD=""; RUN="$WORK/run/x"
+# 79-06 : le code ne vit plus dans la sortie. MOD_DEPOT = racine du module du dépôt ; mod_de <sortie> = racine du module que COMMANDE cette sortie
+# (table posée par mutant() : sortie TAB module ; par défaut le module du dépôt). La table est lue par bash (awk) et par les petits scripts node.
+MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODS_TABLE="$WORK/.mods"; : > "$MODS_TABLE"; export MODS_TABLE MOD_DEPOT
+mod_de() { local m; m="$(awk -F'\t' -v s="${1:-}" '$1==s{m=$2} END{print m}' "$MODS_TABLE" 2>/dev/null)"; printf '%s\n' "${m:-$MOD_DEPOT}"; }
 srv() { # srv <sortie> [moteur] -> SRV_PORT SRV_PID SRV_O SRV_OUT ; ENVX = arguments de env, SRV_CWD = dossier courant du serveur (le lab par défaut)
   local o="$1" eng="${2:-$ENG}" lab; lab="$(cd "$1/../.." && pwd)"; [ -n "$SRV_CWD" ] && lab="$SRV_CWD"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN-$RANDOM.out"; mkdir -p "$o/.cache" "$RUN"; rm -f "$o/.cache/server.json"
@@ -132,7 +137,8 @@ srv() { # srv <sortie> [moteur] -> SRV_PORT SRV_PID SRV_O SRV_OUT ; ENVX = argum
   local _ev=() _un=() _sv=() _x _pu=0 _n # ENVX peut porter « -u NOM » (option d'env) : l'aide ne passe que des NOM=valeur, NOM est donc retiré de l'environnement le temps du lancement
   for _x in ${ENVX[@]+"${ENVX[@]}"}; do if [ "$_pu" = 1 ]; then _un+=("$_x"); _pu=0; elif [ "$_x" = -u ]; then _pu=1; else _ev+=("$_x"); fi; done
   for _n in ${_un[@]+"${_un[@]}"}; do if [ -n "${!_n+x}" ]; then _sv+=("$_n=${!_n}"); fi; unset "$_n"; done
-  COCKPIT_SORTIE="$o" COCKPIT_PRET=terminal COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${_ev[@]+"${_ev[@]}"} VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" VFT_RUN="$RUN" --terminal
+  if [ "$eng" = "$ENG" ]; then COCKPIT_MODULE="$(mod_de "$o")" COCKPIT_SORTIE="$o" COCKPIT_PRET=terminal COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${_ev[@]+"${_ev[@]}"} VFT_RUN="$RUN" --terminal
+  else COCKPIT_SORTIE="$o" COCKPIT_PRET=terminal COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${_ev[@]+"${_ev[@]}"} VF_COCKPIT_ENGINE_DIR="$eng" VFT_RUN="$RUN" --terminal; fi   # moteur copié (assistant muté) : le serve.mjs du dépôt, la variable de la suite gagne
   for _x in ${_sv[@]+"${_sv[@]}"}; do export "${_x%%=*}=${_x#*=}"; done
   SRV_PID="$VF_PID"
 }
@@ -153,9 +159,15 @@ wf() { node "$TA" attendre "$S_FL" "$1" "${2:-8000}"; }
 fin_sess() { unsrv; [ -n "$S_FPID" ] && { wait "$S_FPID" 2>/dev/null; true; }; }
 vivant() { kill -0 "$1" 2>/dev/null && echo oui || echo non; }
 attendre_fichier() { local i; for i in $(seq 1 100); do [ -s "$1" ] && return 0; sleep 0.1; done; return 1; }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> [ligne ajoutée] -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+mutant() { # mutant <nom> <fichier> <expression-sed> [ligne ajoutée] -> MUT_OUT (copie du lab : données) et MUT_MOD (racine de la copie du module) ; code 1 si la cible manque ou si la copie n'a pas changé
+  local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  case "$(basename "$2")" in
+    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+      [ -z "${4:-}" ] || printf '%s\n' "$4" >> "$(_cockpit_module_cible "$MUT_MOD" "$(basename "$2")")"
+      printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; [ -n "${4:-}" ] && printf '%s\n' "$4" >> "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 mutant_eng() { # mutant_eng <nom> <expression-sed> -> MUT_ENG : copie du moteur dont l'assistant est muté
@@ -418,7 +430,7 @@ verdict_rafale() { printf '%s\n' "$RAF" | node "$AUX/ev.mjs" '(j["429"]||0)>=1&&
 rafale t14d "$OUT"
 assert_eq "S3.1 — 60 POST de 64 Kio vers un shell qui ne lit pas : des 204 au début, puis 429 explicite ; jamais plus de 30 acceptés (≈ 1,9 Mio, borne de l'assistant 1 Mio + 256 Kio d'attente côté serveur) ; aucun autre statut" "$(verdict_rafale)" "borne"
 
-echo "=== M-* — mutants du lanceur et du filtre (copies de la sortie) ==="
+echo "=== M-* — mutants du lanceur et du filtre (copies du module) ==="
 if mutant envlarge vf-cockpit-terminal-env.mjs 's/export function envShell/function envShellOrig/' 'export const envShell = (env) => ({ PATH: env.PATH, HOME: env.HOME, SHELL: env.SHELL, VFT_RUN: env.VFT_RUN });'; then
   passe1 m1 "$MUT_OUT" "$MUT_OUT"; assert_eq "M-ENVLARGE — le mutant (liste blanche PATH, HOME, SHELL) rougit T10.2 : PATH présent, AUTRE et NODE_OPTIONS absents" "$(grep -a -c '^PATH=' "$P_ENV" 2>/dev/null) $(grep -a -c -x -e 'AUTRE=ok' -e 'NODE_OPTIONS=--no-warnings' "$P_ENV" 2>/dev/null)" "1 0"; fin_sess
 else sans_effet M-ENVLARGE; fi
