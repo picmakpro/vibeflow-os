@@ -277,3 +277,84 @@ Passe finale, tête `c40bb78a`, une suite à la fois : activation 40/0, client 7
 Règle 9 : cette tâche ne change AUCUN fichier de production (uniquement les dix suites et le plan) : aucun code ne part d'un fichier source, aucune ancre de mutant ne vise du texte déplacé ; le seul texte déplacé par la tâche 5 que ces suites ciblaient (`portDeUrl`, `adresseLocale` : M-F1-VALID) est recible. Dépendances de socle-serveur.sh : aucune modification ; la table `mod_de` est recopiée dans chaque suite (candidat à une aide commune, au rapport du manager).
 
 6a fait ; reprise : 6b (treize suites, par l'autre exécuteur), SUMMARY du plan.
+
+## S3e : tâche 6b (exécuteur x06-6b) — treize suites `lancer-*` et autres vers le module (2026-11-12)
+
+Départ : tête `bce7a105` (trace S3c). Aucun commit n'avait touché ces treize suites entre `2a5291d1` et `bce7a105` (`git log 2a5291d1..bce7a105 -- <13 suites>` : 0), donc le baseline mesuré sur un instantané de `bce7a105` vaut celui de `2a5291d1`. Suites jouées avec `TMPDIR` et `CLAUDE_CODE_TMPDIR` sous le dossier du nœud (un `mktemp` d'enveloppe pose le gabarit sous `$TMPDIR`, macOS ignorant `TMPDIR` pour `mktemp -d` nu), une à la fois par flux, disque > 30 Gio libres.
+
+### Commits `(79-06)` de cette tâche (tous par chemins exacts, mes suites seulement)
+
+| sha | suites | nature |
+|---|---|---|
+| 8f863d54 | onglet-code, robustesse, direct, chrome-fr | refactor : l'embarquement (`vf-cockpit-embed`), `ask`, `fr-inventaire` s'importent du dossier de scripts du module |
+| eb88eedc | lancer-processus, lancer-bout-en-bout | refactor : `mutant()` appelle `cockpit_module_muter`, `MUT_OUT` garde son sens de sortie, `MUT_MOD` = copie du module, `mod_de`, parent.mjs forke le module |
+| f68f4049 + d8cf501d | lancer-serveur | refactor + test (L3 : une ligne d'assertion lit `vf-cockpit-server.mjs` dans le module) |
+| c2f22517 + b6935003 | lancer-chat | refactor + test (ST et TC.4 : deux arguments d'assertion lisent le code dans le module) |
+| 670afaea + b8ed204a | lancer-mode | refactor + test (quatre lignes `$MUT_OUT/…` → `$MUT_MOD/scripts/…`) |
+| 54a9c76d | chaine-xss | refactor |
+| 5b7d4add + b1774361 | lancer-xss | refactor + test (garde `cmp` de M-ACTIVATION-RETIREE) |
+| fceca698 | git-e2e | refactor |
+| 0a54761d + 9fc41384 | transcript | refactor + test (T25.15) |
+
+Contrôle de la classe : aucun diff d'un commit `refactor(79-06)` de cette tâche ne porte de ligne contenant `assert_` (mesuré par commit avant le commit : 0). Contrôle inverse de lancer-mode (amendement M1), exécuté sur les quatre lignes : les lignes ajoutées passées par `sed 's#\$MUT_MOD/scripts/#$MUT_OUT/#g'` sont identiques aux lignes retirées (4 contre 4, `cmp` identique). Pour les autres commits `test(79-06)` le changement n'est pas `$MUT_OUT`→`$MUT_MOD` mais « la lecture du code vise le module » (R3) : voir « Amendement voulu ».
+
+### Verts, une suite jouée seule, comparaison par identifiant au baseline (libellés normalisés, nombres entre parenthèses remplacés)
+
+| suite | avant (baseline) | après | cas retirés |
+|---|---|---|---|
+| onglet-code | 10 PASS / 22 FAIL | 32 / 0 | 0 |
+| robustesse | 22 / 3 | 25 / 0 | 0 |
+| direct | 74 / 2 | 76 / 0 | 0 |
+| chrome-fr | 96 / 1 (F7) | 97 / 0 | 0 |
+| lancer-processus | 3 / 43 | 46 / 0 | 0 |
+| lancer-bout-en-bout | 52 / 2 | 54 / 0 | 0 |
+| lancer-serveur | 34 / 48 | 82 / 0 | 0 |
+| lancer-chat | 9 / 28 | 38 / 0 | 0 |
+| lancer-xss | 34 / 47 | 76 / 0 | 0 |
+| lancer-mode | 50 / 53 | 113 / 0 | 0 |
+| chaine-xss | 12 / 22 | 34 / 0 | 0 |
+| git-e2e | 32 / 3 | 35 / 0 | 0 |
+| transcript | 102 / 1 | 103 / 0 | 0 |
+
+Aucun saut (⊘) dans aucune suite. « Cas retirés : 0 » : tout identifiant du baseline figure après, SAUF les libellés qui n'existent qu'en échec (`<M-xxx> — mutant sans effet`, `doublure sans effet`, `témoin positif (N) absent : l'absence ne prouve rien`) : 7 pour lancer-processus, 2 pour bout-en-bout, 9 pour serveur, 9 pour chat, 5 pour xss, 30 pour mode, tous de cette forme (script de comparaison hors dépôt, sortie lue). Ces libellés sont des échecs du baseline (mutants non chargés), pas des cas ; les cas qu'ils masquaient (les assertions de chaque mutant) sont les « neufs » (lancer-mode : 40 identifiants de plus).
+
+Baseline : `base/` est le dernier écrivain de trois lancements concurrents (une erreur de ma part : un premier lancement avait survécu) ; il a été accepté parce que ses comptes d'échecs (chaine-xss 22, git-e2e 3, transcript 1, bout-en-bout 2, serveur 48, processus 43, chat 28, xss 47, mode 53) sont exactement ceux de la trace S3c et que chaque fichier porte autant de lignes `FAIL` que de FAIL annoncés (aucun entrelacement).
+
+### Mutants : rouges pour la bonne raison (témoin différentiel)
+
+Chaque suite migrée affirme déjà le résultat fautif exact de son mutant (ce sont ses assertions) ; elles sont vertes. Preuve que le code muté est bien celui qui est chargé, par neutralisation (instantané `ctrl/` de la tête, le seul changement : le mutant n'est plus chargé, la suite ne change pas) :
+- lancer-processus : `mod_de` renvoie le module du dépôt → 39 PASS / 7 FAIL : M-ORIGINE-LANCER, M-ID-LIBRE, M-TEXTE-LIGNE, M-RETOUR-CHARIOT, M-ANNULER-PROPRIETAIRE, Q14 et M-STATUT-ECRITURE (la doublure aussi n'est plus chargée).
+- lancer-serveur : le serveur ne charge plus la copie ni la table → 44 / 38, dont les neuf mutants (M-SANS-DRAPEAU, M-LISTE-PAGE, M-TOKEN-CODE, M-LANCEE-LIBRE, M-UUID-MAJUSCULES, M-CODE-INDISPONIBLE, M-GARDE-ACTIF, M-VERDICT-BLOQUE, M-VERDICT-VERBE) ; les autres échecs sont ceux de la doublure de Q absente.
+- lancer-bout-en-bout : 52 / 2 (M-RETOUR-CHARIOT, M-LISTE-PAGE).
+- chaine-xss : 31 / 3 (C0.2, C0.3, C4.2 : le témoin « la chaîne aboutit » ne s'établit plus sans M-CSP et M-GARDE).
+- git-e2e : 34 / 1 (M-ROUTE) ; les trois mutants de page restent verts, ce sont des données.
+- transcript : 102 / 1 (T25.15 : `ERR ECONNREFUSED` n'est plus `200`).
+- lancer-chat : 29 / 9 (les neuf mutants hors M-CHAT-NON-VALIDE-Q). M-CHAT-NON-VALIDE-Q ne peut pas rougir par construction : son assertion affirme que la proposition forgée reste ignorée (défense en profondeur : le gabarit refuse), même résultat que sans mutant ; sa preuve est la garde « mutant sans effet » (`cockpit_module_muter` rend 0 : le texte `UUID_RE.test(m.chat)` a bien changé dans la copie) et le chargement de la copie par le parent. Même état qu'avant la migration.
+- lancer-mode : `mutee` toujours faux → 76 PASS / 37 FAIL, dont 36 libellés `M-…` (le 37e échec n'a pas été relevé avant la purge de l'instantané de contrôle ; cause non établie).
+- lancer-xss : les manches lancent le module du dépôt → 52 PASS / 24 FAIL (C0l.T0/1/2, C1l à C5l : le témoin « la charge aboutit » et ses sondes ne s'établissent plus).
+
+Garde « mutant sans effet » conservée partout (`cockpit_module_muter` rend 1, ou `cmp`/empreinte avant-après) ; `cockpit_lancer` rend 5 si le serveur lancé ne publie pas l'empreinte de la copie (lancer-serveur, lancer-chat, lancer-mode, bout-en-bout, xss, chaine-xss, transcript, git-e2e lancent avec `COCKPIT_MODULE` = la copie). Les lancements du module du dépôt n'ajoutent pas `COCKPIT_MODULE` (aucun changement de comportement pour eux).
+
+### Écarts et décisions (à reporter au plan par le manager)
+
+1. **`serve.mjs` exige `--sortie=<lab>/.vibeflow/cockpit` (chemin réel, nom `cockpit` sous `.vibeflow`).** Trois suites posaient leur sortie copiée ailleurs (`$WORK/sortie-<étiquette>`, `<lab>/.vibeflow/sortie-g-<…>`, `<wt>/.vibeflow/mut-<nom>`, `<lab>/.vibeflow/mut-jeton`) : le serveur refuse, et la suite aurait pu rester verte à vide (M-ROUTE de git-e2e : « la route ne répond plus » vrai parce que le serveur était mort ; vu en cours de travail, corrigé avant le commit). Corrigé : chaine-xss une copie du lab par manche (`lab-<étiquette>`, `labg-<étiquette>`), git-e2e le mutant de page est posé dans la sortie du dépôt neuf de chaque mutant (un `mk_depot` par mutant), transcript M-JETON lance la copie du module sur la sortie du lab. Le C5 de chaine-xss pointait une sortie inexistante `sortie-livre` : il lance maintenant sur la sortie livrée du lab (défaut de l'aide). À écrire dans l'amendement : « aucune sortie copiée hors `<lab>/.vibeflow/cockpit` ».
+2. **Lignes d'assertion modifiées (R3, commits `test(79-06)`)** : lancer-serveur L3 (`cat "$STUBO/vf-cockpit-server.mjs"` → `cat "$(mod_de "$STUBO")/scripts/vf-cockpit-server.mjs"`), lancer-chat ST (présence des sept fichiers de code : dans `mod_de "$OUT"/scripts/`) et TC.4 (`VALEUR` lit le code du module), lancer-mode (`$MUT_OUT/$PROCF` et `$MUT_OUT/vf-cockpit-terminal-client.mjs` → `$MUT_MOD/scripts/…`, quatre lignes), transcript T25.15 (`grep -c 'if (false)' "$MJ/serve.mjs"` → le `serve.mjs` de la copie du module), lancer-xss (garde `cmp` de M-ACTIVATION-RETIREE). Ces changements ne sont pas tous `$MUT_OUT`→`$MUT_MOD` (le chemin gagne `/scripts/` ou `/skills/cockpit-moteur/assets/`) ; amendement voulu : « une ligne d'assertion qui lisait du code dans la sortie lit le fichier de même nom dans le module (R3), toujours dans un commit `test(79-06)` séparé ». Fenêtre rouge : le commit `refactor` précède son commit `test` de peu (lancer-serveur L3, lancer-chat ST/TC.4, lancer-mode quatre mutants, transcript T25.15) ; chaque paire est consécutive.
+3. **Course corrigée dans lancer-chat** (`manche_debut`) : `tc5` tourne dans une substitution de commande, `NM` repart donc de 1 à chaque manche et `parent-1.out` est réutilisé ; la boucle d'attente de `PRET` lisait le `PRET` périmé du parent précédent avant que le nouveau parent tronque le fichier (ports morts, `ECONNREFUSED`, M-CHAT-NON-VALIDE-Q rouge `0/0`). Latent avant la migration (même code), révélé par la charge. Corrigé par un `rm -f "$po"` avant le lancement (dans le commit refactor ; aucune assertion).
+4. **Table sortie → module** : lancer-serveur et lancer-chat (aides node comprises) utilisent un fichier de table (`VF_MODMAP`, `mod_poser`, `mod_de`) pour que `harnais.mjs`, `harnais-pur.mjs`, `harnais-fetch.mjs`, `verif-chat.mjs`, `page-vue.mjs` importent le module qui sert la sortie qu'on leur passe sans toucher aux lignes d'assertion ; lancer-processus, bout-en-bout et mode (une seule sortie mutée à la fois) utilisent `MUT_OUT`/`MUT_MOD` comparés. Dans lancer-mode, `mod_de` rend le dossier de SCRIPTS de lecture du code (la copie pour `MUT_OUT`, sinon l'argument tel quel, `$SCRIPTS` ou `$COCKPIT`), `racine_de`/`scripts_de`/`eng_de` servent les lancements.
+5. **Mutants multiples sur un même fichier** (xss, chaine-xss) : `cockpit_module_muter` copie à neuf à chaque appel (non cumulatif) ; ces suites posent plusieurs mutants dans une même manche, elles utilisent donc `cockpit_module_copie` (une copie par manche) puis la mutation sur place avec leur garde avant-après (déjà présente), plus `COCKPIT_MODULE`. M-ENTREE-AUTO (`vf-cockpit-pty.py`, du moteur) est muté dans cette copie : `cockpit_module_muter` ne sait pas viser ce fichier (`vf-cockpit-*` → scripts) ; je n'ai pas touché l'aide commune.
+6. Fichiers de production : aucun touché. Règle 9 : aucun code déplacé ni extrait par cette tâche ; chaque mutant a été posé dans un fichier qui contient encore son ancre (`cockpit_module_muter` rend 1 sinon, la suite l'écrit « mutant sans effet » en FAIL) ; aucun de ces cas n'est apparu dans les jeux finaux.
+7. Ligne `SEUIL-COCKPIT-LANCER` de la trace et contrôles `OK-SUITES-6B`/`OK-CLASSE-MODULE` : les comptes de `f="$MUT_OUT/` et `serve.mjs --export` sont à 0 dans mes treize suites (mesuré) ; le contrôle complet porte aussi sur les dix suites `terminal-*` de 6a.
+
+### Jeu final sur un instantané de la tête `9fc41384` (`git archive HEAD`, deux flux, une suite à la fois)
+
+Les treize suites rendent 0 sans saut : chaine-xss 34/0, chrome-fr 97/0, direct 76/0, git-e2e 35/0, lancer-bout-en-bout 54/0, lancer-chat 38/0, lancer-mode 113/0, lancer-processus 46/0, lancer-serveur 82/0, lancer-xss 76/0, onglet-code 32/0, robustesse 25/0, transcript 103/0. Mêmes comptes que les jeux faits dans l'arbre.
+
+### Amendement voulu (pour 79-06-PLAN.md, tâche 6b, à porter par l'exécuteur 6a ou le manager)
+
+(1) R3 précisé : une assertion qui lisait du code dans la sortie lit le fichier de même nom dans le module, dans un commit `test(79-06)` séparé, y compris quand le chemin gagne `/scripts/` ou `/skills/cockpit-moteur/assets/` (le contrôle par `sed` inverse de M1 ne vaut que pour `$MUT_OUT`→`$MUT_MOD`). (2) Aucune sortie copiée hors de `<lab>/.vibeflow/cockpit` : `serve.mjs` la refuse (une suite dont le serveur ne démarre pas peut rester verte à vide sur un négatif ; M-ROUTE de git-e2e). (3) Plusieurs mutants dans une même manche : `cockpit_module_copie` puis mutation sur place avec garde avant-après ; `cockpit_module_muter` reste le contrat pour un mutant unique. (4) Le fichier du moteur `vf-cockpit-pty.py` n'est pas ciblable par `cockpit_module_muter` ; M-ENTREE-AUTO le mute dans la copie du module. (5) Course de `parent-N.out` de lancer-chat corrigée (écart 3).
+
+### Nettoyage
+
+Aucun processus laissé (`lsof +D` sur le dossier du nœud), `TMPDIR` du nœud purgé, instantanés retirés.
+
+6b fait ; reprise : vérification de fin du plan et SUMMARY (nœud x06-fin).
