@@ -175,6 +175,28 @@
     s.append(b, c);
     return s;
   };
+  // Tags, Stash, Auteurs : même règle que le Graphe au-delà de SEUIL lignes (PAGE d'abord, « Afficher 100 de plus », focus sur la première ligne ajoutée).
+  const paginer = (items, fabrique, annoncer) => {
+    const d = el('div', 'vf-git-liste'), lb = el('span', 'vf-git-plus-l'), nb = el('span', 'vf-git-plus-n');
+    const b = el('button', 'vf-git-plus-b', null, { type: 'button' });
+    let n = 0;
+    b.append(lb, nb);
+    const ajouter = (k) => { const fruit = items.slice(n, n + k).map(fabrique); n += fruit.length; if (fruit.length) b.before(...fruit); return fruit; };
+    const maj = () => {
+      const reste = items.length - n;
+      if (reste <= 0) { b.remove(); return 0; }
+      lb.textContent = reste < PAGE ? (reste > 1 ? `Afficher les ${reste} derniers` : 'Afficher le dernier') : 'Afficher 100 de plus';
+      nb.textContent = pl(reste, 'restant');
+      return reste;
+    };
+    d.append(b); ajouter(items.length <= SEUIL ? items.length : PAGE); maj();
+    b.addEventListener('click', () => {
+      const fruit = ajouter(PAGE), reste = maj();
+      if (fruit[0]) { fruit[0].setAttribute('tabindex', '-1'); fruit[0].focus({ preventScroll: false }); }
+      if (annoncer) annoncer(`${pl(fruit.length, 'ligne')} de plus ${fruit.length > 1 ? 'affichées' : 'affichée'}, ${pl(reste, 'restant')}`);
+    });
+    return d;
+  };
   const liste = (lignes) => { const d = el('div', 'vf-git-liste'); d.append(...lignes); return d; };
   const ligne = (...enfants) => { const d = el('div', 'vf-git-ligne-d'); d.append(...enfants); return d; };
   const mono = (t, cls) => el('span', 'vf-git-mono' + (cls ? ' ' + cls : ''), t, { title: t });
@@ -193,18 +215,28 @@
     s.querySelector('.vf-git-sec-t').setAttribute('aria-label', 'Worktrees · ' + l.length); // P80-D-19 : repliée au départ, le compte fait partie du nom
     return s;
   };
-  const sectionTags = (l) => !l || !l.length ? null : section('Tags', l.length, liste(l.map((t) => ligne(mono(t.nom, 'vf-git-gras'), mono(t.h7), el('span', null, relatif(t.at))))), false, 'vf-git-s-tags');
+  const sectionTags = (l, annoncer) => !l || !l.length ? null : section('Tags', l.length,
+    paginer(l, (t) => ligne(mono(t.nom, 'vf-git-gras'), mono(t.h7), el('span', null, relatif(t.at))), annoncer), false, 'vf-git-s-tags');
   const sectionStash = (l, annonce) => {
     if (!l || !l.length) return null;
-    return section('Stash', l.length, liste(l.map((s) => { const d = el('div', 'vf-git-st'); d.append(ligne(mono(s.ref, 'vf-git-gras vf-git-entier'), el('span', 'vf-git-msg', s.message), mono(s.branche || ''), el('span', null, relatif(s.at))), commande(s.commande, annonce, 'pour voir le stash ' + s.ref)); return d; })), false, 'vf-git-s-stash');
+    const fab = (s) => {
+      const d = el('div', 'vf-git-st');
+      d.append(ligne(mono(s.ref, 'vf-git-gras vf-git-entier'), el('span', 'vf-git-msg', s.message), mono(s.branche || ''), el('span', null, relatif(s.at))),
+        commande(s.commande, annonce, 'pour voir le stash ' + s.ref));
+      return d;
+    };
+    return section('Stash', l.length, paginer(l, fab, annonce), false, 'vf-git-s-stash');
   };
-  const sectionAuteurs = (auteurs, parBranche) => {
+  const sectionAuteurs = (auteurs, parBranche, annoncer) => {
     if (!auteurs || !auteurs.length) return null;
     const max = Math.max(1, ...auteurs.map((a) => a.commits)), d = el('div', 'vf-git-liste');
-    for (const a of auteurs) {
+    const fab = (a) => {
       const b = el('div', 'vf-bar'), i = el('i'); i.style.width = Math.round((100 * a.commits) / max) + '%'; b.appendChild(i);
-      const x2 = el('div', 'vf-git-aut'); x2.append(ligne(el('span', 'vf-git-gras', a.nom), el('span', 'meta', pl(a.commits, 'commit')), el('span', null, relatif(a.dernier))), b); d.appendChild(x2);
-    }
+      const x2 = el('div', 'vf-git-aut');
+      x2.append(ligne(el('span', 'vf-git-gras', a.nom), el('span', 'meta', pl(a.commits, 'commit')), el('span', null, relatif(a.dernier))), b);
+      return x2;
+    };
+    d.appendChild(paginer(auteurs, fab, annoncer));
     if (parBranche && parBranche.length) {
       d.appendChild(el('div', 'vf-git-sous', 'Par branche — avance sur la base'));
       for (const p of parBranche) d.appendChild(ligne(mono(p.nom), avance(p.avance), el('span', null, p.dernier ? relatif(p.dernier) : '')));

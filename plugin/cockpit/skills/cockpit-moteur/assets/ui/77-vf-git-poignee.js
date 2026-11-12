@@ -16,6 +16,7 @@
   const maximum = () => Math.max(MIN, Math.round(window.innerWidth - panneau() - MARGE));
   const borner = (v) => Math.max(MIN, Math.min(maximum(), Math.round(v)));
   const defaut = () => Math.min(DEFAUT, maximum());
+  let choisie = null; // largeur voulue (non plafonnée) : elle revient quand la place revient
   const lue = () => { // valeur mémorisée ramenée dans les bornes à chaque lecture ; non numérique : le défaut (T-80-14)
     let v = NaN;
     try { v = Number(window.localStorage.getItem(cle())); } catch (e) { v = NaN; }
@@ -24,7 +25,7 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    .vf-git-poignee { position: absolute; top: 0; bottom: 0; right: 0; width: 12px; z-index: 3; cursor: ew-resize; touch-action: none;
+    .vf-git-poignee { position: absolute; top: 24px; bottom: 24px; right: 2px; width: 12px; z-index: 3; cursor: ew-resize; touch-action: none;
       display: flex; align-items: center; justify-content: center; }
     .vf-git-poignee::before { content: ''; width: 4px; height: 32px; border-radius: 2px; background: var(--text-4); }
     .vf-git-poignee:hover::before, .vf-git-poignee.vf-git-tire::before { width: 6px; background: var(--text-3); }
@@ -40,8 +41,9 @@
     p.className = 'vf-git-poignee';
     const at = { role: 'separator', 'aria-orientation': 'vertical', tabindex: '0', 'aria-label': "Largeur de l'historique Git" };
     for (const k of Object.keys(at)) p.setAttribute(k, at[k]);
-    const poser = (v, memoriser) => { // pose la largeur dans les bornes, met à jour les attributs ; la mémorise quand le geste est fini
+    const poser = (v, memoriser, garder) => { // pose la largeur dans les bornes, met à jour les attributs ; la mémorise quand le geste est fini
       const w = borner(v);
+      if (garder !== false) choisie = Math.round(v);
       tiroir.style.setProperty('--vf-git-l', w + 'px');
       p.setAttribute('aria-valuemin', String(MIN)); p.setAttribute('aria-valuemax', String(maximum()));
       p.setAttribute('aria-valuenow', String(w)); p.setAttribute('aria-valuetext', w + ' pixels');
@@ -71,7 +73,8 @@
     });
     tiroir.appendChild(p);
     poser(lue(), false);
-    for (const ev of ['resize', 'vf-git:etat']) window.addEventListener(ev, () => poser(courante(), false)); // bornes à jour, valeur mémorisée intacte
+    const relire = () => poser(choisie == null ? lue() : choisie, false, false); // bornes à jour, choix gardé : il revient avec la place
+    for (const ev of ['resize', 'vf-git:etat']) window.addEventListener(ev, relire);
   };
   window.VFGitPoignee = Object.freeze({ monter, lue, maximum });
 })();

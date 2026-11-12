@@ -540,7 +540,7 @@ const att = (e, l) => s.attendre(e, l, 6000).catch(() => null);
 const themes = [['light', 'clair'], ['dark', 'sombre']];
 await ouvrirPage(s, base); await s.ev(`window.__vfGit.reponse = window.__mk(612)`);
 await s.ev(`${LIGNE}.click()`); await att(`${RANGEES}.length === 100`, '100 rangées');
-await s.ev(`document.querySelector('.vf-git-plus-b').scrollIntoView({ block: 'end' })`); await pause(400);
+await s.ev(`document.querySelector('.vf-git-plus-b').scrollIntoView({ block: 'center' })`); await pause(400);
 for (const [t, n] of themes) {
   await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: t }] }); await pause(500);
   await cap('tiroir-git-pagination-' + n + '-v2');

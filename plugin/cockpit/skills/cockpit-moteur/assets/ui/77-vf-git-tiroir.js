@@ -39,7 +39,8 @@
     .vf-git-bulle[hidden] { display: none; }
     .vf-git-mono[tabindex]:focus-visible, .vf-git-pastille[tabindex]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
     .vf-git-aide { margin: 0; padding: 8px 16px; font-size: 12.5px; color: var(--text-3); }
-    .vf-git-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; font-family: var(--sans); overflow-x: hidden; }
+    .vf-git-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; font-family: var(--sans); overflow-x: hidden;
+      margin-right: 14px; /* la poignée de largeur occupe cette bande : la barre de défilement reste saisissable */ }
     .vf-git-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     body.vf-git-ouvert #context { opacity: 0; }
     .vf-git-sec { margin-top: 12px; }
@@ -71,7 +72,8 @@
     .vf-git-ref-cur { background: var(--on); color: var(--on-text); } .vf-git-ref-tag { background: var(--raise); }
     .vf-git-ref-distante { background: none; border: 1px solid var(--hair-2); color: var(--text-3); }
     .vf-git-plus { margin: 2px 0 0; font: 11.5px var(--mono); color: var(--text-4); }
-    .vf-git-plus-b { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 36px; margin-top: 4px; padding: 0 12px; border: 0; border-radius: var(--r-ctl); background: var(--raise); color: var(--text-2); font: 400 12.5px var(--sans); cursor: pointer; }
+    .vf-git-plus-b { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 36px; margin: 4px 0 12px;
+      padding: 0 12px; border: 0; border-radius: var(--r-ctl); background: var(--raise); color: var(--text-2); font: 400 12.5px var(--sans); cursor: pointer; }
     .vf-git-plus-b:hover { background: var(--raise-2); color: var(--text); }
     .vf-git-plus-n { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; color: var(--text-3); }
     .vf-git-pied { margin-top: 8px; font-variant-numeric: tabular-nums; }
@@ -98,6 +100,7 @@
     @media (max-width: 999px), (pointer: coarse) {
       .vf-git-tiroir, body:not(.no-panel) .vf-git-tiroir { left: 8px; right: 8px; width: auto; bottom: 8px; }
       body.vf-git-ouvert #ask { display: none; }
+      .vf-git-corps { margin-right: 0; }
       .vf-git-rangee { height: 44px; } .vf-git-fermer, .vf-git-btn { width: 44px; height: 44px; } .vf-git-barre { height: 52px; }
       .vf-git-sec-t, .vf-git-merg-b, .vf-git-tiroir .btn, .vf-git-plus-b { min-height: 44px; } .vf-git-cmd { min-height: 44px; }
     }
@@ -152,7 +155,8 @@
     g.append(R.mergees(j.mergees, annoncer));
     if (pg) g.append(pg.pied);
     if (tronque) g.append(R.el('p', 'vf-git-note', 'Historique tronqué : seuls les commits les plus récents sont lus.'));
-    corps.append(...[R.sectionWorktrees(j.worktrees, annoncer), R.section('Graphe', null, g, true, 'vf-git-s-graphe'), R.sectionTags(j.tags), R.sectionStash(j.stash, annoncer), R.sectionAuteurs(j.auteurs, j.parBranche)].filter(Boolean));
+    corps.append(...[R.sectionWorktrees(j.worktrees, annoncer), R.section('Graphe', null, g, true, 'vf-git-s-graphe'), R.sectionTags(j.tags, annoncer),
+      R.sectionStash(j.stash, annoncer), R.sectionAuteurs(j.auteurs, j.parBranche, annoncer)].filter(Boolean));
     crochet('rendu', corps, j);
   };
   const focusOrphelin = () => { // ordre de la famille : l'équivalent (le bouton), le voisin précédent (la dernière rangée, arrêt itinérant), le titre ; jamais body

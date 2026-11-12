@@ -40,3 +40,10 @@ Le mutant M-POUSSE écrit `--panel-w` au lieu d'appeler `fit`. Pas d'`estimate`/
 ## Ligne de CHANGELOG demandée à 80-18 (P80-D-24)
 Tiroir Git : rangées paginées (« Afficher 100 de plus »), worktrees repliés, détail d'un commit dans un volet bas, largeur réglable au clavier (FORM-13), entrée publique
 `VFGitTiroir.ouvrirSur(sha)` pour la Phase 74.
+
+## Correction ciblée après revue (amendement E)
+Poignée en retrait (2 px à droite, 24 px en haut et en bas) avec marge droite de 14 px du corps : la barre de défilement reste saisissable (GP3.5) ; la largeur choisie revient quand la place
+revient (GP3.6) ; `fermer(true)` donne le focus au titre du tiroir si la rangée est dans une section repliée (GP2.6) ; pagination de Tags, Stash et Auteurs au-delà de 110 lignes par `paginer`
+(GP1.6) ; marge de 12 px sous le bouton. Trace du rouge : fin de `80-06-RED-TRACE.md`. Rejeu : `test-cockpit-git-pagination.sh` 43 PASS, `test-cockpit-git-tiroir.sh` 194 PASS,
+`test-cockpit-surcouches.sh` 45 PASS, 0 FAIL partout. Captures -v2 : pagination, volet 1024, poignée, pastilles, clair et sombre.
+Laissé à la jointure (idiome A51) : écouteurs `window`, `<style>` et ouverture non idempotente des cinq fichiers `77-vf-git-*`.

@@ -53,7 +53,10 @@
     const sha = courant, T = tiroir(); seq++; courant = null; volet = null; zone = null;
     for (const d of document.querySelectorAll('#vf-git-tiroir .vf-git-detail')) d.remove();
     for (const l of lignes()) l.removeAttribute('aria-controls');
-    if (focus === true && sha) { const c = rangeDe(sha) || (T && T.querySelector('.vf-git-titre-t')); if (c) c.focus({ preventScroll: false }); }
+    if (focus === true && sha) { // la rangée si elle est visible (section repliée : non), à défaut le titre du tiroir
+      const r = rangeDe(sha), c = r && r.getClientRects().length ? r : T && T.querySelector('.vf-git-titre-t');
+      if (c) c.focus({ preventScroll: false });
+    }
   };
   // fermé, le volet quitte le DOM (`.vf-git-detail` : 0)
   const brancher = (f) => { if (typeof f === 'function') contenu = f; };
