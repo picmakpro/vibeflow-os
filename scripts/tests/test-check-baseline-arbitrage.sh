@@ -7,13 +7,17 @@
 # incapable de rougir est un defaut, au meme titre que le gate qu'elle verifie.
 #
 # Trois issues QUAL-01 (PASS / FAIL / BRUYANT) plus SILENCE et USAGE, et NEUF mutants opposables
-# (MUT-1 a MUT-9), un par comparaison du script sous test — regle de comptage (decision du manager,
+# d'origine (MUT-1 a MUT-9), un par comparaison du script sous test — regle de comptage (decision du manager,
 # 2026-09-17) : chaque mutant asserte le rc EXACT attendu sur le mutant ET sur l'original. Un mutant
 # qui « echoue » par un plantage (rc 2) ou une plage vide (rc 3) la ou le cas attendait un flip 0/1
 # n'est PAS compte comme tue. La ligne de succes d'un mutant a une forme UNIQUE, exigee par le verify
 # du plan : « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ».
 # Section DELEGATION (2026-11-12) : une ligne portant le radical « delegu » ne vaut pas citation (hausse,
-# retrait de ligne, sentinelle) ; mutant MUT-10 (exclusion retiree), tue sur le meme patron.
+# retrait de ligne, sentinelle). Cinq verifications de mutant s'y ajoutent, soit QUATORZE au total :
+# MUT-10 (exclusion retiree), MUT-10b (meme mutant, usage sentinelle), MUT-11 (radical reduit a « delegue »),
+# MUT-12 (repli de l'accent combinant retire), MUT-13 (test de forme de la ligne d'information retire).
+# MUT-10 a MUT-12 suivent le patron rc_mutant/rc_original ; MUT-13 compare la presence de la ligne
+# INFO-LIGNE-DELEGATION-ECARTEE (rc 1 des deux cotes) et a sa propre ligne de succes.
 set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-baseline-arbitrage.sh"
@@ -582,11 +586,25 @@ case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE:*) hasinfo=1 ;; *) hasinfo=0 ;; es
 [ "$hasinfo" -eq 1 ] && ok "DEL refus hausse, delegation seule -> INFO-LIGNE-DELEGATION-ECARTEE presente" \
   || ko "DEL refus hausse, delegation seule : ligne d'information" "INFO-LIGNE-DELEGATION-ECARTEE presente" "absente :: $out"
 
+# La derniere ligne de sortie d'un refus reste la ligne de verdict (l'etape CI en prend `tail -1`)
+last="$(printf '%s\n' "$out" | tail -1)"
+case "$last" in HAUSSE-SANS-ARBITRAGE:*) lastok=1 ;; *) lastok=0 ;; esac
+[ "$lastok" -eq 1 ] && ok "DEL refus hausse, delegation seule -> derniere ligne = verdict" \
+  || ko "DEL refus hausse, delegation seule : derniere ligne" "HAUSSE-SANS-ARBITRAGE: ..." "derniere ligne = $last"
+
 # --- DEL 1b : refus sans aucune ligne de delegation -> pas de ligne d'information ----------------------------
 cas_hausse del1b "feat: hausse instructions a.md sans citation"
 case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE*) hasinfo=1 ;; *) hasinfo=0 ;; esac
 if [ "$rc" -eq 1 ] && [ "$hasinfo" -eq 0 ]; then ok "DEL refus hausse sans delegation -> rc 1, pas de ligne d'information"
 else ko "DEL refus hausse sans delegation" "rc=1 sans INFO-LIGNE-DELEGATION-ECARTEE" "rc=$rc :: $out"; fi
+
+# --- DEL 1c : refus dont le message porte une ligne de delegation NON formee (sans date ni virgules) -> pas d'info
+cas_hausse del1c "feat: hausse instructions a.md
+
+décision déléguée par Samuel"
+case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE*) hasinfo=1 ;; *) hasinfo=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$hasinfo" -eq 0 ]; then ok "DEL refus, ligne de delegation non formee -> rc 1, pas de ligne d'information"
+else ko "DEL refus, ligne de delegation non formee" "rc=1 sans INFO-LIGNE-DELEGATION-ECARTEE" "rc=$rc :: $out"; fi
 
 # --- DEL 2 : citation directe seule, sur plusieurs lignes de corps -> rc 0 ----------------------------
 cas_hausse del2 "feat: hausse instructions a.md
@@ -751,6 +769,24 @@ else
   TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D" --base-ref "$B"
   if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then okmut 12 "$rc_mut" 0 "$rc_orig" 1
   else komut 12 "repli U+0301 retire" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+
+# --- MUT-13 : retire le test de forme de ligne_ecartee (toute ligne de delegation declencherait l'info) ------
+MUT13_OLD='  return (est_delegation(s) && ligne_forme_ok(s)) ? 1 : 0'
+MUT13_NEW='  return est_delegation(s) ? 1 : 0'
+MUT13_PATH="$(make_mutant mut13 "$MUT13_OLD" "$MUT13_NEW")"; MUT13_STAT=$?
+cas_hausse mut13 "chore: hausse instructions a.md, delegation non formee (MUT-13)
+
+décision déléguée par Samuel"
+if [ "$MUT13_STAT" -ne 0 ]; then komut 13 "test de forme de ligne_ecartee retire" "mutant opposable et valide" "statut mutant=$MUT13_STAT"
+else
+  TARGET="$MUT13_PATH"; safe_run out_mut rc_mut "$D" --base-ref "$B"
+  TARGET="$SCRIPT"; safe_run out_orig rc_orig "$D" --base-ref "$B"
+  case "$out_mut" in *INFO-LIGNE-DELEGATION-ECARTEE*) info_mut=1 ;; *) info_mut=0 ;; esac
+  case "$out_orig" in *INFO-LIGNE-DELEGATION-ECARTEE*) info_orig=1 ;; *) info_orig=0 ;; esac
+  if [ "$info_mut" -eq 1 ] && [ "$info_orig" -eq 0 ] && [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 1 ]; then
+    echo "  ✓ MUT-13 TUE : info_mutant=1 attendu 1, info_original=0 attendu 0 (rc 1 des deux cotes)"; PASS=$((PASS + 1))
+  else komut 13 "test de forme de ligne_ecartee retire" "info_mutant=1 info_original=0, rc 1 des deux" "info_mutant=$info_mut info_original=$info_orig rc_mutant=$rc_mut rc_original=$rc_orig"; fi
 fi
 
 TARGET="$SCRIPT"

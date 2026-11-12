@@ -242,6 +242,8 @@ delegation_ecartee() {
 
 info_delegation() {
   # <sha complet du commit impute> -> imprime INFO-LIGNE-DELEGATION-ECARTEE si son message en porte une.
+  # Appelee AVANT la ligne de verdict : la derniere ligne de sortie d'un refus reste le verdict (l'etape CI
+  # en prend `tail -1` pour son annotation).
   if git log -1 --format=%B "$1" 2>/dev/null | delegation_ecartee; then
     echo "INFO-LIGNE-DELEGATION-ECARTEE: $(git rev-parse --short "$1") — une ligne de délégation ne vaut pas citation, porter la citation directe sur sa propre ligne"
   fi
@@ -415,8 +417,8 @@ printf '%s\n' "$HAUSSES" | while IFS= read -r p; do
       prevv="$(instr_at_ref "${culprit}^" "$p")"
       curv="$(instr_at_ref "$culprit" "$p")"
       shortsha="$(git rev-parse --short "$culprit")"
-      echo "HAUSSE-SANS-ARBITRAGE: ${p} instructions ${prevv} -> ${curv} (commit ${shortsha})"
       [ -n "$culprit" ] && info_delegation "$culprit"
+      echo "HAUSSE-SANS-ARBITRAGE: ${p} instructions ${prevv} -> ${curv} (commit ${shortsha})"
       echo "RC1" >> "$FACTS.rc"
     fi
   fi
@@ -449,8 +451,8 @@ printf '%s\n' "$RETRAITS" | while IFS= read -r p; do
   if [ "$target_exists" -eq 1 ] && [ "$retrait_citation_ok" -eq 0 ]; then
     shortsha="indetermine"
     [ -n "$culprit" ] && shortsha="$(git rev-parse --short "$culprit")"
-    echo "LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE: ${p} (commit ${shortsha})"
     [ -n "$culprit" ] && info_delegation "$culprit"
+    echo "LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE: ${p} (commit ${shortsha})"
     echo "RC1" >> "$FACTS.rc"
   elif [ "$target_exists" -eq 1 ] && [ "$retrait_citation_ok" -eq 1 ]; then
     echo "AVERTISSEMENT-LIGNE-RETIREE-ARBITREE: ${p} — citation : ${citation_line}"
@@ -497,8 +499,8 @@ printf '%s\n' "$SENTINEL_PATHS" | while IFS= read -r sp; do
     if [ "$sentinel_citation_ok" -eq 0 ]; then
       shortsha="indetermine"
       [ -n "$culprit" ] && shortsha="$(git rev-parse --short "$culprit")"
-      echo "SENTINELLE-NEUTRALISEE: ${sp} (commit ${shortsha})"
       [ -n "$culprit" ] && info_delegation "$culprit"
+      echo "SENTINELLE-NEUTRALISEE: ${sp} (commit ${shortsha})"
       echo "RC1" >> "$FACTS.rc"
     fi
   fi
