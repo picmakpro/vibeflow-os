@@ -148,7 +148,7 @@ assert_eq "CC5.1 — equipe.html : des cartes (témoin), aucun tabindex (cartes,
   "$(E '[j.cc5.cartes > 0, j.cc5.tab, j.cc5.opt, j.cc5.lb, j.cc5.svgTab, j.cc5.stageTab]')" "[true,0,0,null,null,null]"
 echo "=== CC6 — anneau sur la .card, mouvement réduit ==="
 for TH in sombre clair; do
-  assert_eq "CC6.1 ($TH) — anneau de 2 px de la couleur de --ring sur la .card, pas sur le g, avec l'ombre du repos (--shadow-card) et sans l'anneau doux ni l'ombre de .sel" \
+  assert_eq "CC6.1 ($TH) — anneau de 2 px de la couleur de --ring sur la .card, pas sur le g, ombre du repos (--shadow-card), sans l'anneau doux de .sel" \
     "$(E "[j.cc6.$TH.l, j.cc6.$TH.st, j.cc6.$TH.couleur === j.cc6.$TH.ring, j.cc6.$TH.gOutline, j.cc6.$TH.ombre === j.cc6.$TH.repos]")" \
     '["2px","solid",true,"none",true]'
 done
@@ -162,13 +162,14 @@ assert_eq "CC9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object
 vf_hyg_stop "$SRV"
 # lab à deux modules qui s'importent : le niveau du premier porte un connecteur sortant (CC7)
 L2="$WORK/lab2"; mkdir -p "$L2/plugin/m1" "$L2/plugin/m2" "$L2/.planning"; printf '# Deux modules\n' > "$L2/.planning/PROJECT.md"
-printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n\n### Phase 1: Socle\n**Depends on**: Nothing (first phase)\n' > "$L2/.planning/ROADMAP.md"
+printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n\n### Phase 1: Socle\n' > "$L2/.planning/ROADMAP.md"
 for m in m1 m2; do printf '{"name":"%s","type":"skill","description":"Module."}\n' "$m" > "$L2/plugin/$m/module.json"; done
 printf "import { b } from '../m2/b.js';\nexport const a = () => b();\n" > "$L2/plugin/m1/a.js"; printf 'export const b = () => 1;\n' > "$L2/plugin/m2/b.js"
 git -C "$L2" init -q && git -C "$L2" add -A && git -C "$L2" -c user.email=t@t -c user.name=t commit -q -m init
 build_serve "$L2" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"; R7="$(mesurer cc7)"; vf_hyg_stop "$SRV"
 assert_eq "CC7.1 — niveau à connecteurs : cartes x: options nommées « Vers/Depuis <entité> », jamais l'id interne, comptées dans la liste" \
-  "$(E '[j.cc7.x.length >= 1, j.cc7.x.every((c) => c[1] === "option" && /^(Vers|Depuis) [^:]+(, reliée à \d+ cartes?|, aucune liaison)$/.test(c[2]) && !c[2].includes(c[0]))]' "$R7")" "[true,true]"
+  "$(E '[j.cc7.x.length >= 1, j.cc7.x.every((c) => c[1] === "option" && !c[2].includes(c[0])
+    && /^(Vers|Depuis) [^:]+(, reliée à \d+ cartes?|, aucune liaison)$/.test(c[2]))]' "$R7")" "[true,true]"
 
 echo "=== Mutants (copie du module dans \$WORK) ==="
 mutant() { # mutant <nom> <ancien> <nouveau> -> RM (mesure du mutant) ; une mutation impossible compte comme un échec

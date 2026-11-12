@@ -179,7 +179,8 @@ await executer(chrome, async (s) => {
         " role: document.getElementById('svg').getAttribute('role'), nomSvg: document.getElementById('svg').getAttribute('aria-label') })");
       await touche(retour); await s.attendre("VibeFlow.state.container === 'root'", 'remontée du niveau vide'); await pause(700);
       const b = await etat();
-      o.cc35[retour] = { focus: f.id, c: rv.c, stage: rv.e.stage, tag: rv.e.tag, live, vide: v.vide, ti: v.ti, role: v.role, nomSvg: v.nomSvg, retour: [b.c, b.id, b.tag] };
+      o.cc35[retour] = { focus: f.id, c: rv.c, stage: rv.e.stage, tag: rv.e.tag, live, vide: v.vide, ti: v.ti,
+        role: v.role, nomSvg: v.nomSvg, retour: [b.c, b.id, b.tag] };
     });
   }
 
@@ -187,7 +188,8 @@ await executer(chrome, async (s) => {
   o.cc6 = { sombre: {}, clair: {}, clic: {}, fleche: false };
   await sec('cc6', async () => {
     await niveau('n:unassigned'); await tab(true); await presser('ArrowRight');
-    const anneau = async (th) => { await s.ev(`document.documentElement.setAttribute('data-theme', '${th}')`); await pause(600); // les transitions de la carte sont finies
+    const anneau = async (th) => { // les transitions de la carte sont finies après 600 ms
+      await s.ev(`document.documentElement.setAttribute('data-theme', '${th}')`); await pause(600);
       return lire(`(() => { const p = document.createElement('i'); p.style.color = 'var(--ring)'; p.style.boxShadow = 'var(--shadow-card)';
       document.body.appendChild(p); const ring = getComputedStyle(p).color, repos = getComputedStyle(p).boxShadow; p.remove();
       const g = document.activeElement, k = getComputedStyle(g.querySelector('.card'));
