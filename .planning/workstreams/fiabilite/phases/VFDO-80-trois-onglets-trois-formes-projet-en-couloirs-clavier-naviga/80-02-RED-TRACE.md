@@ -26,3 +26,19 @@ Mutants : sans objet sur la base (le module n'existe pas) ; rejoués après la p
 
 Reste à faire par la mission de jointure (non fait ici) : SU6.1 et M-PERSISTANT (coquille de la 79 : la suite imprime `⏳ ATTENTE`),
 passage des mutants à `cockpit_module_copie`, idiome A51, baisse de `colonnes-baseline.txt` pour les lignes longues retirées.
+
+## Correction ciblée de la revue fraîche (témoins SU7, rejoués sur la tête `54d71a98` + suites finales)
+
+Rouge sur l'ancien module (copie `git archive` de la tête, suite et pilote neufs) :
+
+| Cas | Attendu | Obtenu sur la tête | Cause |
+|---|---|---|---|
+| SU7.1 palette, Entrée sur une recherche vide / clic dans `#results` | ouverte ET inerte | `entree.inert:""`, `clic.inert:""` | l'inert est levé avant le moteur, jamais reposé |
+| SU7.2 palette fermée + modale ouverte dans le même tour | fond inerte sous la modale | `deux.inert:"palette"` (la scène libre) | un inert à deux propriétaires levé par le premier |
+| SU7.3 « Au travail » puis Git, focus dans « Au travail », Échap | « Au travail » fermé | `{"git":true,"whop":true}` | `couverte(panneau)` vraie car Git est au-dessus : personne ne ferme |
+| SU7.9 visite ouverte par son bouton | 25 Tab dans `#tour`, inert posé | 25 × `false`, `inert:""` | visite jamais inscrite comme modale |
+
+Gardes d'`echap` (SU7.4 à SU7.7) et retour du focus (SU7.8) : verts sur la tête (garde vivante), chacun rougi par son mutant
+M-FLUX, M-BULLE, M-RIEN, M-IDPANEL, M-RENDRE ; aucune garde morte. Autres mutants neufs : M-LEVEE (SU7.1), M-PROPRIO (SU7.2),
+M-TIROIR-COUVERT (SU7.3), M-TOUR (SU7.9). Défaut trouvé en route : une seconde inscription de l'observateur sur `body` remplaçait la première
+(la création de `#tour` n'était plus vue) ; corrigé par une inscription unique.

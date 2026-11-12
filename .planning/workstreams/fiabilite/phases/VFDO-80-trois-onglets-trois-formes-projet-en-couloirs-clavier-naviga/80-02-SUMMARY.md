@@ -52,3 +52,14 @@ duration: non mesurée
 - SU6.1, M-PERSISTANT, idiome A51, `cockpit_module_copie`, baisse de `colonnes-baseline.txt` (02 : -1 ligne longue) : jointure.
 - VENDORED.txt : la ligne `AJOUT assets/ui/04-vf-clavier-canevas.js` de 80-01 (non commitée) est partie dans mon commit par pathspec.
 - Captures : surcouche-export-terminal-derriere.png, surcouche-palette-terminal-derriere.png (scratchpad de 80-02, dossier png).
+
+## Correction ciblée de la revue fraîche (2026-11-12)
+- Fermés : (1) inert levé avant la fermeture par le moteur puis reposé si la surcouche reste ouverte (`levee`) ; (2) compteur de propriétaires par élément inerté ;
+  (3) Échap avec le focus dans un tiroir couvert par un autre ferme ce tiroir ; (4) témoins SU7.4 à SU7.8 et mutants M-FLUX, M-BULLE, M-RIEN, M-IDPANEL, M-RENDRE (aucune garde morte) ;
+  (5) SU1.3 refuse un module illisible ; (6) visite ouverte par son bouton = modale dans la pile (sans toucher `40-tour.js`), d'elle-même = non modale.
+- Défaut trouvé en route : une seconde `observe` sur `body` remplace la première (la création de `#tour` n'était plus vue) ; une seule inscription désormais.
+- Suite : 15 mutants (6 d'origine + 9), SU7.1 à SU7.10. Rejeux isolés (surcouches, git-tiroir, equipe, terminal-tiroir, moteur-carte, vendor) verts.
+- Responsive : R15.5 et R15c.2 rouges dans des rejeux complets APRÈS que le worktree partagé a reçu les commits de la vague 2 (80-04, 80-05 : Projet en couloirs) ; non attribuables à la pile : le
+  groupe de six mesures qui porte R15.5 rejoué isolé, en parallèle, donne `titre true` avec le module neuf ET avec celui de `54d71a98` (deux fois chacun). À rejouer sur un instantané propre.
+- Lignes de `VENDORED.txt` d'un autre plan dans un commit : `ef0e9ec9` porte la ligne `04-vf-clavier-canevas.js` de 80-01.
+- Preuves finales : les 15 mutants rougissent (43 PASS / 2 FAIL au rejeu complet, les 2 FAIL étant SU4.5b, aléa de charge du Terminal, et SU7.9, avant la correction de l'observateur ; rejeux isolés ensuite verts). Dernier état du module (observateur unique, lecture de mise en page seulement avec un bouton ou une entrée) : suite sans mutants 30 PASS / 0 FAIL ; le rejeu des mutants sur ce dernier état n'a pas pu tourner : le disque de la machine est plein (100 %, 168 Mo libres, 1 400 dossiers `tmp.*` de toutes les sessions), à rejouer après nettoyage.
