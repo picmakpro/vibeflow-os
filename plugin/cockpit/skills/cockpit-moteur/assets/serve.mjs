@@ -277,7 +277,7 @@ function describeCommand(command) {
       return { overview: "Lit l'aperçu de la carte", find: a ? `Cherche « ${a} » dans la carte` : 'Cherche dans la carte', show: `Examine ${a.split(/\s+/).map(nameFor).join(', ')}`,
         path: `Suit un chemin ${a.split(/\s+/).map(nameFor).join(' → ')}` }[cmd] || 'Interroge la carte';
     };
-    return parts.slice(0, 2).map(one).join(' · ') + (parts.length > 2 ? ` (+${parts.length - 2} more)` : '');
+    return parts.slice(0, 2).map(one).join(' · ') + (parts.length > 2 ? ` (+${parts.length - 2} autres)` : '');
   }
   const first = cmds[0] || '';
   if (/^(rg|grep|git grep|Select-String|findstr)\b/i.test(first) && !/\s--files\b/.test(first)) {
