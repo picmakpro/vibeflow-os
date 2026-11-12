@@ -488,6 +488,25 @@ assert_eq "G18.3 — un gitfile dont le gitdir passe par un lien à maillon dive
 assert_eq "G18.4 — une inclusion à maillon divergent est refusée" "$(lk_garde "$SCRIPTS" sortant "$LK_Y/g4/lab")" "true"
 assert_eq "G18.5 — témoins : un gitfile ordinaire vers un dossier du lab et une inclusion d'un fichier inexistant situé sous le lab sont lus" "$(lk_garde "$SCRIPTS" sortant "$LK_Y/g5/lab"),$(lk_garde "$SCRIPTS" sortant "$LK_Y/g5b/lab")" "false,false"
 
+echo "=== G19 — le dossier réel du dépôt est sous la racine du lab, sauf worktree vérifié (gitSortant, constat bas de l'audit de 79-07) ==="
+# classe : un dossier (ou un lien vers un dossier) hors du lab, dont le dépôt se désigne lui-même, ne doit pas être lu comme le dépôt du lab
+LK_Z="$LK_RACINE/g19"; mkdir -p "$LK_Z/lab" "$LK_Z/hors/depot"; G "$LK_Z/lab" init -q; G "$LK_Z/hors/depot" init -q
+printf '[core]\n\tworktree = %s\n' "$LK_Z/hors/depot" >> "$LK_Z/hors/depot/.git/config"
+ln -s "$LK_Z/hors/depot" "$LK_Z/lab/lien"
+assert_eq "G19.1 — un lien du lab vers un dépôt extérieur qui désigne son propre dossier comme arbre de travail : sortant (le dossier réel est hors du lab)" "$(lk_garde "$SCRIPTS" sortant "$LK_Z/lab/lien" "$LK_Z/lab")" "true"
+assert_eq "G19.2 — le même dépôt extérieur, appelé directement avec le lab pour racine : sortant" "$(lk_garde "$SCRIPTS" sortant "$LK_Z/hors/depot" "$LK_Z/lab")" "true"
+mkdir -p "$LK_Z/hors/gf"; printf 'gitdir: %s/lab/.git\n' "$LK_Z" > "$LK_Z/hors/gf/.git"
+assert_eq "G19.3 — un dossier extérieur dont le gitfile désigne le dossier git du lab : sortant (il lirait les fichiers du dehors)" "$(lk_garde "$SCRIPTS" sortant "$LK_Z/hors/gf" "$LK_Z/lab")" "true"
+# témoins positifs (arbre à part : les fixtures rouges ci-dessus restent intactes pour le mutant) : le dépôt du lab, un dépôt imbriqué, un sous-module
+# (dossier git sous celui du lab) et un worktree vérifié situé hors de la racine du lab
+LK_Y2="$LK_RACINE/g19p"; mkdir -p "$LK_Y2/lab" "$LK_Y2/hors/depot"; G "$LK_Y2/lab" init -q; G "$LK_Y2/hors/depot" init -q
+printf 'x\n' > "$LK_Y2/lab/f"; G "$LK_Y2/lab" add f; G "$LK_Y2/lab" commit -q -m un
+G "$LK_Y2/lab" init -q "$LK_Y2/lab/imbrique"
+printf 'y\n' > "$LK_Y2/hors/depot/g"; G "$LK_Y2/hors/depot" add g; G "$LK_Y2/hors/depot" commit -q -m sub
+G "$LK_Y2/lab" -c protocol.file.allow=always submodule add -q "$LK_Y2/hors/depot" sm >/dev/null 2>&1; G "$LK_Y2/lab" commit -q -m sm
+G "$LK_Y2/lab" worktree add -q "$LK_Y2/wt-hors" -b wt >/dev/null 2>&1
+lk_g19p() { for d in "$LK_Y2/lab" "$LK_Y2/lab/imbrique" "$LK_Y2/lab/sm" "$LK_Y2/wt-hors"; do if [ -e "$d/.git" ]; then lk_garde "$1" sortant "$d" "$LK_Y2/lab"; else echo absent; fi; done | tr '\n' ','; }
+assert_eq "G19.4 — témoins positifs : le lab, un dépôt imbriqué, un sous-module et un worktree vérifié hors de la racine du lab sont lus (aucun n'est sortant)" "$(lk_g19p "$SCRIPTS")" "false,false,false,false,"
 echo "=== G16 / G17 — preuve générative de la classe « un chemin n'est jugé que par sa résolution physique » ==="
 # Générateur à graine (mulberry32) : arbres à dossier git simple (N) ou à dossier git et commun distincts (N/2), forêts de dossiers {a,b,c,d} (profondeur <= 3), 1 à 5 liens l0..l4 à cibles
 # mêlant noms de liens et segments `..` (marche aléatoire de 1 à 5 pas, traversée d'un lien déjà posé puis remontée, formes absolues, noms absents, boucles) ; 30 % des arbres reçoivent la paire
@@ -542,6 +561,11 @@ LK_MD="$WORK/mut-verrou"
 assert_eq "M-VERROU.0 — l'ancre du mutant existe" "$LK_N4" "muté"
 assert_eq "M-VERROU — rougit G18.2 : le lien DRIVER.lock de cible d'une autre forme est toléré (le dernier des cinq cas)" "$(lk_g18_2 "$LK_MD")" "true,true,true,true,false"
 assert_eq "M-VERROU — témoins positifs verts : la forme exacte du verrou reste tolérée, le dépôt ordinaire lu" "$(lk_g18_1 "$LK_MD")|$(LK_POSITIF "$LK_MD")" "false|false"
+# M-DEDANS : le dossier réel du dépôt n'est plus exigé sous la racine du lab -> G19.1 à G19.3 rougissent
+LK_N5="$(mutant_sur dedans vf-cockpit-git-sortant.mjs 'if (!libre && !dedans(dirP) && !(worktreeSitue(g, gitfile && st.isFile()) && worktreeRetour(g, c, dotgit))) return true;' '')"
+assert_eq "M-DEDANS.0 — l'ancre du mutant existe" "$LK_N5" "muté"
+assert_eq "M-DEDANS — rougit G19.1 à G19.3 : un dépôt extérieur qui se désigne lui-même est lu (false, false, false)" "$(for c in "$LK_Z/lab/lien|$LK_Z/lab" "$LK_Z/hors/depot|$LK_Z/lab" "$LK_Z/hors/gf|$LK_Z/lab"; do lk_garde "$WORK/mut-dedans" sortant "${c%%|*}" "${c##*|}"; done | tr '\n' ',')" "false,false,false,"
+assert_eq "M-DEDANS — témoins positifs verts (G19.4)" "$(lk_g19p "$WORK/mut-dedans")" "false,false,false,false,"
 
 echo "=== D6 — pilotes nommés (filter, textconv, commande de diff, pilote de fusion) vidés pour tout lancement ; liste fermée ; mémo ; enfants shell (A-04, SOCL-11) ==="
 # Dépôt piégé : un fichier f soumis à diff=tc merge=mg filter=fl, trois commits, un remisage, une branche side conflictuelle ; la configuration est posée EN DERNIER (aucun leurre ne tourne à la construction)

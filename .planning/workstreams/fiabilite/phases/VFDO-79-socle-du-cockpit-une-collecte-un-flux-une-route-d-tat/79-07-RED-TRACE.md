@@ -120,3 +120,23 @@ Suites de l'environnement durci, rejouées seules : test-cockpit-git-env.sh 135 
 Liste relevée par `rtk proxy grep -l 'vf-cockpit-paths.mjs'` sur les suites du module : assemblage 49/0, avancement 69/0, confinement 66/0, git-config-depot 103/0, git-env 135/0, git 118/0, lancer-cibles 51/0, path-enfants 37/0, securite 92/0, signal 76/0, terminal-lanceur 111/0, vendor 87/0. En plus : git-details 136/0, who 157/0, git-signature 45/0.
 
 Preuve mécanique qu'aucun mutant ni aucune ancre ne vise dans paths.mjs un texte qui n'y est plus : `grep -nE '(paths|git-sortant)(\.mjs)?'` filtré sur les lignes de mutation (mutant, mutsub, sed -i, FROM=, muter) de ces suites ne rend que (a) test-cockpit-avancement.sh l.484 (ancre de `st.isFile() && st.size <= 4096 …`, présente 1 fois dans paths.mjs), (b) des mutants de git-sortant.mjs (git-config-depot, git-details), dont le texte n'a pas été déplacé ; les mutants gitnomnu et whonomnu de test-cockpit-terminal-lanceur.sh visaient `timeout: Math.floor(reste), env, maxBuffer })` (0 occurrence dans paths.mjs, 1 dans le lanceur) : reciblés sur le lanceur, ils rougissent de nouveau (assertions « gitnomnu — le mutant (nom nu) exécute le leurre « git » du lab » et « whonomnu — … », passées sous la forme « rouge détecté »). Les assertions `.0` d'existence d'ancre de chaque suite, toutes vertes, couvrent le reste.
+
+## Tâche 6 (ajoutée par amendement, en dernier) — gitSortant et le dossier réel du dépôt
+
+Classe : un dossier du lab, ou un lien du lab, dont le dossier réel est hors de la racine du lab et dont le dépôt se désigne lui-même (arbre de travail posé sur lui-même, ou gitfile vers le dossier git du lab) était lu comme le dépôt du lab.
+
+Rouges sur le code présent (suite test-cockpit-git-config-depot.sh : 104 PASS / 3 FAIL, témoins positifs verts) :
+
+| Identifiant | Attendu | Obtenu sur le code présent |
+|---|---|---|
+| G19.1 | `true` (sortant) : lien du lab vers un dépôt extérieur qui désigne son propre dossier comme arbre de travail | `false` |
+| G19.2 | `true` : le même dépôt extérieur appelé directement avec le lab pour racine | `false` |
+| G19.3 | `true` : dossier extérieur dont le gitfile désigne le dossier git du lab | `false` |
+
+Témoin vert gardé (G19.4, arbre à part, existence de chaque `.git` vérifiée) : le lab, un dépôt imbriqué, un sous-module (dossier git sous celui du lab) et un worktree vérifié hors de la racine du lab : `false,false,false,false`.
+
+Premier jet du correctif (« dossier réel sous la racine, sauf drapeau `libre` ») : refusait à tort le worktree vérifié (G19.4 : `false,false,false,true` ; 9 échecs X dans test-cockpit-git-details.sh). Le drapeau `libre` n'est posé que si le dossier git est hors du lab, or celui d'un worktree est sous `<commun>/worktrees`. Correctif retenu : la vérification du worktree (situé sous `<commun>/worktrees`, commun égal au dossier père, `gitdir` qui revient au `.git`) est extraite en deux aides, partagées avec la branche existante ; un dossier hors de la racine n'est lu que s'il passe cette vérification. Le verdict d'un worktree vérifié ne change pas (arbitrage « Les compter comme le lab »), la signature de gitSortant non plus : la condition d'arrêt ne joue pas.
+
+Après correctif : test-cockpit-git-config-depot.sh 110 / 0 (G19.1 à G19.4 verts). Mutant M-DEDANS (la vérification retirée) : G19.1 à G19.3 rougissent (`false,false,false`), G19.4 reste vert. Copies du module identiques (`cmp`), 158 lignes.
+
+Conséquence mesurée, hors périmètre de fichier du plan (amendement daté) : le lien retour d'un worktree hors de la racine est désormais aussi exigé par gitSortant ; le mutant M-RETOUR de test-cockpit-git-details.sh (X7, retire la comparaison du lien retour dans worktreeVerifie) n'était plus visible sur X7.2 (status lancé dans le worktree forgé : 0 au lieu de 1) ; la suite neutralise donc la seconde défense pour ce mutant, comme elle le fait déjà pour M-LIEN et M-PRINCIPAL (git-details 136 / 0).
