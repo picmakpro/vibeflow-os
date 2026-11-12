@@ -325,8 +325,13 @@ rj() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "$2" 2>/dev/null; }
 rq() { node "$TA" req "$@"; }
 
 mutant() { # mutant <nom> <expression-sed> -> MUT_MOD ; code 1 si le module manque ou si la copie n'a pas changé
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; f="$d/vf-cockpit-lancer-ui.mjs"; MUT_MOD="$f"; [ -f "$MOD" ] || return 1
-  cp "$MOD" "$f"; cp "$(dirname "$MOD")/vf-cockpit-lancer-style.mjs" "$d/"; cp "$f" "$f.orig"; sed -i.bak "$2" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+  # 79-11 : le script servi est rangé en fichiers du moteur ; la copie est un module réduit (scripts/ et skills/cockpit-moteur/assets/ui/tiroir), la mutation vise le module puis, à défaut d'effet, le premier fichier rangé qu'elle modifie
+  local d="$WORK/mut-$1" f g r=1 u; rm -rf "$d"; mkdir -p "$d/scripts" "$d/skills/cockpit-moteur/assets/ui"; f="$d/scripts/vf-cockpit-lancer-ui.mjs"; MUT_MOD="$f"; [ -f "$MOD" ] || return 1
+  cp "$MOD" "$f"; cp "$(dirname "$MOD")/vf-cockpit-navigateur.mjs" "$d/scripts/"; cp -R "$(dirname "$MOD")/../skills/cockpit-moteur/assets/ui/tiroir" "$d/skills/cockpit-moteur/assets/ui/tiroir"
+  for g in "$f" "$d"/skills/cockpit-moteur/assets/ui/tiroir/*; do
+    cp "$g" "$g.orig"; sed -i.bak "$2" "$g"; if cmp -s "$g" "$g.orig"; then rm -f "$g.orig" "$g.bak"; else rm -f "$g.orig" "$g.bak"; r=0; fi
+  done
+  return $r
 }
 sans_effet() { assert_eq "$1 — mutant sans effet (module absent ou ligne marquée inchangée)" "sans effet" "effet"; }
 SRVN=0

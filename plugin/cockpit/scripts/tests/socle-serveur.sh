@@ -140,6 +140,17 @@ cockpit_module_muter() {
   if cmp -s "$cible.avant" "$cible"; then rm -f "$cible.avant"; echo "cockpit_module_muter : la copie n'a pas changé (ancre absente : $nom)" >&2; return 1; fi
   rm -f "$cible.avant"; export COCKPIT_MODULE="$copie"; return 0
 }
+cockpit_module_muter_p() { # <nom> <expression sed> (79-11) : la mutation vise du code de P rangé sous assets/ui/tiroir ; elle s'applique à CHACUN des neuf fichiers qu'elle modifie (comme dans le module d'avant), code 1 si aucun
+  local f cible copie="" ok=1
+  for f in tiroir.js tiroir-message.js tiroir-construire.js tiroir.css lancer.js lancer-extraire-chat.js lancer-observer-chat.js lancer-proposition.js lancer.css; do
+    if [ -z "$copie" ]; then
+      cockpit_module_muter "$1" "$f" "$2" 2>/dev/null && { copie="$COCKPIT_MODULE"; ok=0; }
+    else
+      cible="$copie/skills/cockpit-moteur/assets/ui/tiroir/$f"; cp "$cible" "$cible.avant" && sed "$2" "$cible.avant" > "$cible"; rm -f "$cible.avant"
+    fi
+  done
+  return $ok
+}
 cockpit_module_charge() { # <racine> : l'empreinte que le serveur a publiée = celle que calcule le module de cette racine (1 sinon : jamais un vert à vide)
   local r="${1:-}" pub att
   [ -n "$r" ] && [ -f "$r/scripts/vf-cockpit-module.mjs" ] && [ -n "${VF_SORTIE:-}" ] || return 1

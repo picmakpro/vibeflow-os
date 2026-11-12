@@ -40,6 +40,10 @@ import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
 export const modDe = (s) => { let m = process.env.VF_MODULE_DEFAUT; try { for (const l of fs.readFileSync(process.env.VF_MODMAP, 'utf8').split('\n')) { const [a, b] = l.split('\t'); if (a === s && b) m = b; } } catch {} return m; };
 export const importer = (s, f) => import(pathToFileURL(`${modDe(s)}/scripts/${f}`).href);
 // 79-11 : la vue de Q est un fichier du moteur du module qui sert la sortie, lu comme texte
+// 79-11 : le module du lancement + les trois fonctions du chat, fichiers du moteur évalués dans un même contexte (l'une est la valeur par défaut de l'autre)
+export const lancerUi = async (s) => { const m = await importer(s, 'vf-cockpit-lancer-ui.mjs'); const d = `${modDe(s)}/skills/cockpit-moteur/assets/ui/tiroir`; let f = {};
+  try { f = (await import(pathToFileURL(process.env.HERE_T + '/navigateur-charger.mjs').href)).chargerFonctions([`${d}/lancer-extraire-chat.js`, `${d}/lancer-observer-chat.js`, `${d}/lancer-proposition.js`]); } catch { f = {}; }
+  return { ...m, ...f }; };
 export const texteVue = async (s) => (await import(pathToFileURL(process.env.HERE_T + '/navigateur-charger.mjs').href)).texte(`${modDe(s)}/skills/cockpit-moteur/assets/ui/terminal/vue.js`);
 JS
 cat > "$AUX/ev.mjs" <<'JS'
@@ -47,9 +51,9 @@ import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); cons
 JS
 cat > "$AUX/harnais-pur.mjs" <<'JS'
 // harnais-pur.mjs <sortie> <cas> : TC.1, TC.3, TC.4 — imports du MODULE qui sert la sortie ; « ok », « ECHECS : … » ou « ABSENT : <nom> »
-import { importer } from './mod-de.mjs';
+import { importer, lancerUi } from './mod-de.mjs';
 const [, , dossier, cas] = process.argv;
-const m = await importer(dossier, 'vf-cockpit-lancer-ui.mjs');
+const m = await lancerUi(dossier);
 const U = '7c7d7412-0a15-4407-939b-eacb01a8e345', V = '11111111-2222-3333-4444-555555555555';
 const bloc = (ev, d) => `event: ${ev}\ndata: ${JSON.stringify(d)}\n\n`;
 const rendre = (checks) => { const x = checks.filter((c) => !c[1]).map((c) => c[0]); console.log(x.length ? 'ECHECS : ' + x.join(' ; ') : 'ok'); };
@@ -88,8 +92,8 @@ if (cas === 'tc1') {
 JS
 cat > "$AUX/harnais-fetch.mjs" <<'JS'
 // harnais-fetch.mjs <sortie> : TC.2 — l'enveloppe de window.fetch sur une fenêtre factice ; « ok », « ECHECS : … » ou « ABSENT : … »
-import { importer } from './mod-de.mjs';
-const m = await importer(process.argv[2], 'vf-cockpit-lancer-ui.mjs');
+import { importer, lancerUi } from './mod-de.mjs';
+const m = await lancerUi(process.argv[2]);
 if (typeof m.installerObservateurChat !== 'function') { console.log('ABSENT : installerObservateurChat'); process.exit(0); }
 const U = '7c7d7412-0a15-4407-939b-eacb01a8e345', att = (ms) => new Promise((ok) => setTimeout(ok, ms));
 const rejets = []; process.on('unhandledRejection', (e) => rejets.push(String(e)));
@@ -149,7 +153,7 @@ console.log(x.length ? 'ECHECS : ' + x.join(' ; ') : 'ok');
 JS
 cat > "$AUX/verif-chat.mjs" <<'JS'
 // verif-chat.mjs <sortie> <chat> : lit GET /proposition (stdin) ; compare les huit lignes à composerLigne du gabarit (72-01) ; « ok » ou la première raison de rougir
-import fs from 'node:fs'; import { importer } from './mod-de.mjs';
+import fs from 'node:fs'; import { importer, lancerUi } from './mod-de.mjs';
 const [, , sortie, chat] = process.argv; const g = await importer(sortie, 'vf-cockpit-lancer-gabarit.mjs');
 let j; try { j = JSON.parse(fs.readFileSync(0, 'utf8')); } catch { console.log('corps non JSON'); process.exit(0); }
 const verdict = () => {
@@ -233,7 +237,7 @@ mutant() {
   MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
   for e in "$@"; do x="${x:+$x
 }$e"; done
-  cockpit_module_muter "$(basename "$d")" "$rel" "$x" || return 1
+  cockpit_module_muter "$(basename "$d")" "$rel" "$x" 2>/dev/null || { [ "$rel" = vf-cockpit-lancer-ui.mjs ] && cockpit_module_muter_p "$(basename "$d")" "$x"; } || return 1
   MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; mod_poser "$MUT_OUT" "$MUT_MOD"; return 0
 }
 LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"

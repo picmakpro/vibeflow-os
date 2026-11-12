@@ -324,7 +324,7 @@ else echo "  ⊘ Q11 sauté : mesure absente du dépôt installé (non comptée 
 assert_eq "Q11.5 — argsAgent(dossier du module) : aucun jeton <module>, deux règles Bash au chemin attendu (calculé par la suite)" "$(H q115 "$SCRIPTS" "$MODDIR")" "ok"
 assert_eq "Q11.6 — un dossier admis, puis refus (exception) d'un dossier relatif, avec espace, parenthèses, virgule, signe égal, deux-points, étoile, jeton, vide, absent" "$(H q116 "$SCRIPTS" "$MODDIR" rel/dir "/tmp/a b" "/tmp/a(b)" "/tmp/a,b" "/tmp/a=b" "/tmp/a:b" "/tmp/a*b" "/tmp/<module>" "" @indefini)" "admis,refus,refus,refus,refus,refus,refus,refus,refus,refus,refus"
 MQ="$WORK/mut-q117"
-mq_copie() { rm -rf "$MQ"; mkdir -p "$MQ"; cp "$SCRIPTS/vf-cockpit-agent.mjs" "$SCRIPTS/vf-cockpit-module.mjs" "$MQ/" 2>/dev/null; }
+mq_copie() { rm -rf "$MQ"; mkdir -p "$MQ"; cp "$SCRIPTS/vf-cockpit-agent.mjs" "$SCRIPTS/vf-cockpit-module.mjs" "$SCRIPTS/vf-cockpit-navigateur.mjs" "$MQ/" 2>/dev/null; } # 79-11 : le module importe le lecteur du code navigateur
 ANC_A='.map((e) => substituerModule(e, dossierModule))'; ANC_B='() => d)'
 assert_eq "Q11.7.0 — ancres des mutants : chacune présente une fois (agent : substitution ; module : valeur de remplacement)" "$(grep -cF -- "$ANC_A" "$SCRIPTS/vf-cockpit-agent.mjs" 2>/dev/null)|$(grep -cF -- "$ANC_B" "$SCRIPTS/vf-cockpit-module.mjs" 2>/dev/null)" "1|1"
 mq_copie; assert_eq "Q11.7.1 — témoin : la copie non mutée passe Q11.5" "$(H q115 "$MQ" "$MODDIR")" "ok"

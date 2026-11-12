@@ -25,7 +25,7 @@
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; export HERE_T
 ENG="$SCRIPTS/../skills/cockpit-moteur"; TA="$HERE_T/terminal-aux.mjs"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/bin" "$WORK/run"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
@@ -65,24 +65,27 @@ cat > "$AUX/harnais-msg.mjs" <<'JS'
 import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; const SORTIE = process.argv[2];
 let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === SORTIE && r) racine = r; } } catch {}
 const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-tiroir.mjs`).href);
-if (typeof m.accepteMessage !== 'function') { console.log('ABSENT'); process.exit(0); }
+// 79-11 : le filtre de messages est un fichier du moteur (tiroir-message.js), évalué par l'aide de test dans le module qui sert la sortie
+const { chargerFonctions } = await import(pathToFileURL(process.env.HERE_T + '/navigateur-charger.mjs').href);
+let accepteMessage; try { accepteMessage = chargerFonctions([`${racine}/skills/cockpit-moteur/assets/ui/tiroir/tiroir-message.js`]).accepteMessage; } catch { accepteMessage = undefined; }
+if (typeof accepteMessage !== 'function') { console.log('ABSENT'); process.exit(0); }
 const Q = 'http://127.0.0.1:4242', P = 'http://127.0.0.1:4141', F = {}, L = m.LISTE_MESSAGES || [];
 const base = { isTrusted: true, origin: Q, source: F, data: 'toggle' };
 const cas = [['accepte', {}], ['accepte-ready', { data: 'ready' }], ['origine-de-P', { origin: P }], ['origine-voisine', { origin: Q + '/' }], ['source-autre', { source: {} }], ['source-nulle', { source: null }],
   ['valeur-inconnue', { data: 'fermer-tout' }], ['objet', { data: { toggle: 1 } }], ['tableau', { data: ['toggle'] }], ['chaine-10000', { data: 'x'.repeat(10000) }],
   ['non-fiable', { isTrusted: false }], ['confiance-absente', { isTrusted: undefined }]];
-console.log(cas.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+console.log(cas.map(([n, d]) => `${n}=${accepteMessage({ ...base, ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
 // 72-14 : la phase 71 garde ses huit valeurs (ligne 2), la phase 72 ajoute des valeurs FIXES, déclarées ici (ligne 3), avec leur table de cas (ligne 4)
 const AJOUTS_72 = ['proposition', 'annulation', 'retrait']; // annulation : AUDC-M11 (audit du cockpit, lot 0), la proposition annulée dans Q se dit au panneau de P
 console.log('liste=' + [...L].filter((v) => !AJOUTS_72.includes(v)).sort().join(','));
 console.log('ajouts72=' + AJOUTS_72.filter((v) => L.includes(v)).sort().join(','));
 const casP = [['prop', {}], ['prop-suffixe', { data: 'proposition:ouvre' }], ['prop-majuscule', { data: 'Proposition' }], ['prop-espace', { data: 'proposition ' }],
   ['prop-10000', { data: 'proposition' + 'x'.repeat(9989) }], ['prop-origine-de-P', { origin: P }], ['prop-source-autre', { source: {} }], ['prop-non-fiable', { isTrusted: false }]];
-console.log(casP.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'proposition', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+console.log(casP.map(([n, d]) => `${n}=${accepteMessage({ ...base, data: 'proposition', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
 const casA = [['ann', {}], ['ann-suffixe', { data: 'annulation:x' }], ['ann-majuscule', { data: 'Annulation' }], ['ann-origine-de-P', { origin: P }], ['ann-source-autre', { source: {} }], ['ann-non-fiable', { isTrusted: false }]];
-console.log(casA.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'annulation', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+console.log(casA.map(([n, d]) => `${n}=${accepteMessage({ ...base, data: 'annulation', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
 const casR = [['ret', {}], ['ret-suffixe', { data: 'retrait:x' }], ['ret-majuscule', { data: 'Retrait' }], ['ret-origine-de-P', { origin: P }], ['ret-source-autre', { source: {} }], ['ret-non-fiable', { isTrusted: false }]]; // AUDC-M11 : le bandeau a disparu de Q
-console.log(casR.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'retrait', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+console.log(casR.map(([n, d]) => `${n}=${accepteMessage({ ...base, data: 'retrait', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
 JS
 cat > "$AUX/harnais-liste-q.mjs" <<'JS'
 // harnais-liste-q.mjs <sortie> : la liste fermée de P égale l'ensemble des valeurs de la table MESSAGES du client de Q (72-14, contrat §8) ; une ligne JSON
@@ -839,7 +842,7 @@ mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : 
   local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
   MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
   case "$(basename "$2")" in
-    serve.mjs|graph-query.js|query-cli.mjs|vue.js|client.js|q.css|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+    serve.mjs|graph-query.js|query-cli.mjs|vue.js|client.js|q.css|tiroir.js|tiroir-message.js|tiroir-construire.js|tiroir.css|lancer.js|lancer-extraire-chat.js|lancer-observer-chat.js|lancer-proposition.js|lancer.css|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" 2>/dev/null || { case "$2" in vf-cockpit-terminal-tiroir.mjs|vf-cockpit-lancer-ui.mjs) cockpit_module_muter_p "$1" "$3" ;; *) false ;; esac; } || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
   esac
   f="$d/.vibeflow/cockpit/$2"; [ -f "$f" ] || return 1   # page de la copie du lab (donnée) : même chemin que MUT_OUT/<fichier>
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
@@ -893,7 +896,7 @@ echo "=== T23 — point de la pastille fermée : jamais une teinte d'état sur -
 cat > "$AUX/contraste-point.mjs" <<'JS'
 // contraste-point.mjs <style.mjs> <viewer.html> : rapport de contraste du point `.vf-term-point` sur --raise, thème sombre puis clair ; UNE ligne « sombre=N clair=N ».
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const { STYLE_TIROIR } = await import(pathToFileURL(process.argv[2]).href); const html = fs.readFileSync(process.argv[3], 'utf8');
+const STYLE_TIROIR = fs.readFileSync(process.argv[2], 'utf8'); const html = fs.readFileSync(process.argv[3], 'utf8');
 const bloc = (re) => { const m = re.exec(html); return m ? m[0] : ''; };
 const jetons = { sombre: bloc(/:root \{[\s\S]*?\n\}/), clair: bloc(/:root\[data-theme="light"\] \{[\s\S]*?\n\}/) };
 const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
@@ -907,10 +910,10 @@ for (const t of ['sombre', 'clair']) {
 }
 console.log(out.join(' '));
 JS
-CT="$(node "$AUX/contraste-point.mjs" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
+CT="$(node "$AUX/contraste-point.mjs" "$ENG/assets/ui/tiroir/tiroir.css" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
 assert_eq "T23.1 — le point de la pastille fermée fait au moins 3:1 sur --raise dans les deux thèmes (sombre inchangé : 8,6:1 ; clair : --recent-text 4,3:1, --recent faisait 2,9:1)" "$(echo "$CT" | awk '{ split($1,a,"="); split($2,b,"="); print (a[2]+0 >= 3 && b[2]+0 >= 3) ? "ok" : "ko" }') [$CT]" "ok [$CT]"
-MUTP="$WORK/mut-point-style.mjs"; sed 's|background: var(--recent-text); }|background: var(--recent); }|' "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" > "$MUTP"
-if cmp -s "$MUTP" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs"; then sans_effet "M-POINT-RECENT"; else
+MUTP="$WORK/mut-point-style.mjs"; sed 's|background: var(--recent-text); }|background: var(--recent); }|' "$ENG/assets/ui/tiroir/tiroir.css" > "$MUTP"
+if cmp -s "$MUTP" "$ENG/assets/ui/tiroir/tiroir.css"; then sans_effet "M-POINT-RECENT"; else
   CM="$(node "$AUX/contraste-point.mjs" "$MUTP" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
   assert_eq "M-POINT-RECENT — l'ancien point (--recent) rougit T23.1 : clair sous 3:1 (témoin : le sombre est lu)" "$(echo "$CM" | awk '{ split($1,a,"="); split($2,b,"="); print (a[2]+0 >= 3 && b[2]+0 < 3) ? "rouge" : "vert" }')" "rouge"
 fi
@@ -918,7 +921,7 @@ fi
 cat > "$AUX/contraste-etat.mjs" <<'JS'
 // contraste-etat.mjs <style.mjs> <viewer.html> : rapport de contraste de chaque point d'état de la barre (`.vf-term-etat-point`) sur --raise, par thème ; UNE ligne « sombre:defaut=N sombre:connecte=N ... clair:expire=N ». Résolution : dernière règle applicable (en clair, les règles `:root[data-theme="light"]` s'ajoutent aux règles de base).
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const { STYLE_TIROIR } = await import(pathToFileURL(process.argv[2]).href); const html = fs.readFileSync(process.argv[3], 'utf8');
+const STYLE_TIROIR = fs.readFileSync(process.argv[2], 'utf8'); const html = fs.readFileSync(process.argv[3], 'utf8');
 const bloc = (re) => { const m = re.exec(html); return m ? m[0] : ''; };
 const jetons = { sombre: bloc(/:root \{[\s\S]*?\n\}/), clair: bloc(/:root\[data-theme="light"\] \{[\s\S]*?\n\}/) };
 const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
@@ -943,15 +946,15 @@ for (const t of ['sombre', 'clair']) {
 }
 console.log(out.join(' '));
 JS
-CE="$(node "$AUX/contraste-etat.mjs" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
+CE="$(node "$AUX/contraste-etat.mjs" "$ENG/assets/ui/tiroir/tiroir.css" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
 assert_eq "T23.2 — les six points d'état de la barre (défaut, connecte, reconnexion, refuse, arrete, expire) font au moins 3:1 sur --raise dans les deux thèmes, douze mesures lues (clair : variantes -text, sombre inchangé ; DESIGN.md §9, P71.5-D-36)" "$(echo "$CE" | awk '{ n=0; bon=0; for (i=1;i<=NF;i++) { split($i,a,"="); n++; if (a[2]+0 >= 3) bon++ } print (n==12 && bon==12) ? "ok" : "ko" }') [$CE]" "ok [$CE]"
-MUTE="$WORK/mut-etat-style.mjs"; sed 's|:root\[data-theme="light"\] .vf-term-etat-point\[data-etat="connecte"\] { background: var(--recent-text); }|:root[data-theme="light"] .vf-term-etat-point[data-etat="connecte"] { background: var(--recent); }|' "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" > "$MUTE"
-if cmp -s "$MUTE" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs"; then sans_effet "M-ETAT-RECENT"; else
+MUTE="$WORK/mut-etat-style.mjs"; sed 's|:root\[data-theme="light"\] .vf-term-etat-point\[data-etat="connecte"\] { background: var(--recent-text); }|:root[data-theme="light"] .vf-term-etat-point[data-etat="connecte"] { background: var(--recent); }|' "$ENG/assets/ui/tiroir/tiroir.css" > "$MUTE"
+if cmp -s "$MUTE" "$ENG/assets/ui/tiroir/tiroir.css"; then sans_effet "M-ETAT-RECENT"; else
   CM="$(node "$AUX/contraste-etat.mjs" "$MUTE" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
   assert_eq "M-ETAT-RECENT — le point connecté en --recent sur --raise clair rougit T23.2 (clair:connecte sous 3:1, témoin : le sombre est lu)" "$(echo "$CM" | awk '{ for (i=1;i<=NF;i++) { split($i,a,"="); v[a[1]]=a[2]+0 } print (v["clair:connecte"] < 3 && v["sombre:connecte"] >= 3) ? "rouge" : "vert" }')" "rouge"
 fi
-MUTH="$WORK/mut-etat-medium.mjs"; sed 's|\(:root\[data-theme="light"\] .vf-term-etat-point\[data-etat="refuse"\] { background: \)var(--warn-text)|\1var(--sev-medium)|' "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" > "$MUTH"
-if cmp -s "$MUTH" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs"; then sans_effet "M-ETAT-MEDIUM"; else
+MUTH="$WORK/mut-etat-medium.mjs"; sed 's|\(:root\[data-theme="light"\] .vf-term-etat-point\[data-etat="refuse"\] { background: \)var(--warn-text)|\1var(--sev-medium)|' "$ENG/assets/ui/tiroir/tiroir.css" > "$MUTH"
+if cmp -s "$MUTH" "$ENG/assets/ui/tiroir/tiroir.css"; then sans_effet "M-ETAT-MEDIUM"; else
   CM="$(node "$AUX/contraste-etat.mjs" "$MUTH" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
   assert_eq "M-ETAT-MEDIUM — le point reconnexion/refus en --sev-medium sur --raise clair rougit T23.2 (clair:reconnexion sous 3:1, témoin : le sombre est lu)" "$(echo "$CM" | awk '{ for (i=1;i<=NF;i++) { split($i,a,"="); v[a[1]]=a[2]+0 } print (v["clair:reconnexion"] < 3 && v["sombre:reconnexion"] >= 3) ? "rouge" : "vert" }')" "rouge"
 fi
@@ -1055,8 +1058,8 @@ mut_geom() { # mut_geom <nom> <fichier> <expression-sed> <groupe qui doit rougir
   else sans_effet "$1"; fi
 }
 mut_geom M-PASTILLE-SUR-ZOOM vf-cockpit-terminal-tiroir.mjs 's|() => \[montre ? rect(n) : null, rect(k)\]|() => [rect(k)]|' E2f # le zoom ne monte plus au-dessus de la pastille (lot C de la recette du 2026-11-08 : la ligne « if (recouvre) z.style.bottom » est devenue la liste d'obstacles du zoom dans eviter())
-mut_geom M-AJUSTE-SANS-TIROIR vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #stage {|body.vf-term-ouvert #stage-absent {|' G1F
-mut_geom M-ASK-RESTE vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #ask { display: none; }|body.vf-term-ouvert #ask { }|' G1ask
+mut_geom M-AJUSTE-SANS-TIROIR tiroir.css 's|body.vf-term-ouvert #stage {|body.vf-term-ouvert #stage-absent {|' G1F
+mut_geom M-ASK-RESTE tiroir.css 's|body.vf-term-ouvert #ask { display: none; }|body.vf-term-ouvert #ask { }|' G1ask
 mut_geom M-VISITE-RESTE vf-cockpit-terminal-tiroir.mjs 's|window.VibeFlowTour.end();|void 0;|' G1visite
 run_pastille "$OUT" 0; PA="$PJ"
 assert_eq "T21.7 (D-06) — tiroir fermé : la pastille ne recouvre ni la barre de question, ni la feuille de détail, ni le zoom, ni la visite, de 390 à 1280 px, panneau dans son état initial, basculé, rebasculé, visite affichée, et en état tactile" "$(rj "$PA" '(j.erreur||JSON.stringify(j.erreurs))+" "+JSON.stringify(j.mauvais)')" "{} []"
@@ -1071,7 +1074,7 @@ mut_pastille() { # mut_pastille <nom> <expression-sed> : le mutant doit laisser 
 mut_pastille M-PASTILLE-SUR-ASK 's|monter(n, window.innerHeight, () => \[rect(k)\]);|monter(n, window.innerHeight, () => []);|' # la pastille ne monte plus au-dessus de la barre (lot C de la recette du 2026-11-08 : la ligne « if (sur(...kb)) n.style.bottom » est devenue la liste d'obstacles de la pastille dans eviter())
 # M-PASTILLE-SANS-RAPPEL (recette du 2026-11-08, K3) : TOUS les rappels de la pastille passent par eviterTout (resize, vf-zoom-replie, MutationObserver de data-vf-visite, MutationObserver de la classe du corps - no-panel -, ResizeObserver de la barre, transitionend de la barre) ; le mutant vide eviterTout, donc les retire d'un coup. Les appels directs (ouvrir, fermer, puce, pose initiale) restent : la pastille est placée, mais plus jamais rappelée. Les formes précédentes ne retiraient que la barre et restaient vertes sous Linux (shard 5 puis shard 3), un autre rappel replaçant la pastille.
 # Garde de recensement : sept mentions d'eviterTout (la définition et ses six branchements) et six appels directs eviter(d.*) ; un nouveau rappel qui appellerait eviter() sans passer par eviterTout échapperait au mutant : ce compte rougit alors, le mutant est à élargir avant de le changer.
-assert_eq "T21.7r — recensement des rappels de la pastille : 7 mentions d'eviterTout (définition + resize, vf-zoom-replie, 2 MutationObserver, ResizeObserver, transitionend) et 6 appels directs eviter(d.*) (eviterTout x2, puce, ouvrir, fermer, pose initiale)" "$(grep -o 'eviterTout' "$SCRIPTS/vf-cockpit-terminal-tiroir.mjs" | wc -l | tr -d ' ')/$(grep -o 'eviter(d\.[a-z]*)' "$SCRIPTS/vf-cockpit-terminal-tiroir.mjs" | wc -l | tr -d ' ')" "7/6"
+assert_eq "T21.7r — recensement des rappels de la pastille : 7 mentions d'eviterTout (définition + resize, vf-zoom-replie, 2 MutationObserver, ResizeObserver, transitionend) et 6 appels directs eviter(d.*) (eviterTout x2, puce, ouvrir, fermer, pose initiale)" "$(grep -o 'eviterTout' "$ENG/assets/ui/tiroir/tiroir.js" | wc -l | tr -d ' ')/$(grep -o 'eviter(d\.[a-z]*)' "$ENG/assets/ui/tiroir/tiroir.js" | wc -l | tr -d ' ')" "7/6"
 mut_pastille M-PASTILLE-SANS-RAPPEL "s|const eviterTout = () => { eviter(d.pastille); eviter(d.puce); };|const eviterTout = () => {};|"
 
 run_axe "$OUT" 0; AX="$XJ"

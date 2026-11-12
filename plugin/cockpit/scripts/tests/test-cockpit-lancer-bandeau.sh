@@ -318,7 +318,8 @@ const q = http.createServer(async (req, res) => {
 let injPage = '';
 if (process.env.FAUX_INJ) {
   const t = await import(pathToFileURL(`${process.env.FAUX_INJ}/vf-cockpit-terminal-tiroir.mjs`).href), l = await import(pathToFileURL(`${process.env.FAUX_INJ}/vf-cockpit-lancer-ui.mjs`).href);
-  injPage = t.injectionTiroir({}) + l.injectionLancer({});
+  const mot = fs.existsSync(`${process.env.FAUX_INJ}/moteur`) ? `${process.env.FAUX_INJ}/moteur` : undefined; // 79-11 : une copie mutée porte son moteur réduit ; sinon le moteur du module
+  injPage = t.injectionTiroir({ moteur: mot }) + l.injectionLancer({ moteur: mot });
 }
 const CIBLES = { actif: true, cibles: [{ id: 'ph-1', kind: 'phase', principal: 'planifier', verbes: ['planifier'], bloquants: [], avertissements: [], lancee: false }] };
 const pageSp1 = () => `<!doctype html><title>P factice</title><script>window.VF_COCKPIT_SERVER={token:'t'};window.__msgs=[];addEventListener('message',function(e){window.__msgs.push({o:e.origin,d:String(e.data).slice(0,60)})});window.__secs=[];window.VibeFlow={addPanelSection:function(w,f){window.__secs.push(f)}};</script><div id="panel"></div>${injPage}<script>(function t(){var f=window.__secs[0];if(!f)return void setTimeout(t,50);var r=f('n:ph-1'),z=document.getElementById('panel');z.innerHTML=r.html;r.bind(z)})()</script>`;
@@ -1418,11 +1419,14 @@ else sans_effet "M-MANIPULE-IGNORE"; fi
 if mutant expiration-silencieuse vue.js "s/const EXPIRE_PROCHE_MS = 3000;/const EXPIRE_PROCHE_MS = -1;/"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v13"]'; assert_eq "M-EXPIRATION-SILENCIEUSE — le mutant rougit LB.V13 : une disparition annoncée à 2 s de l'échéance efface le bandeau sans le dire (témoin : le compte à rebours et le message d'expiration existent)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v13 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : /^Expire dans 1 min 30 s\|timer/.test(j.v13) && /expiree\/true$/.test(j.v13) ? 'sain' : /^Expire dans 1 min 30 s\|timer/.test(j.v13) ? 'rouge' : 'plante: ' + j.v13)")" "rouge"; }
 else sans_effet "M-EXPIRATION-SILENCIEUSE"; fi
-mutant_inj() { # mutant_inj <nom> <fichier> <expression-sed> -> MUT_DIR ; copie du tiroir et de l'interface de lancement ; code 1 si la cible manque ou n'a pas changé
-  local d="$WORK/mut-$1" f x; rm -rf "$d"; mkdir -p "$d"
-  for x in terminal-tiroir terminal-tiroir-ui terminal-tiroir-style lancer-ui lancer-style; do cp "$SCRIPTS/vf-cockpit-$x.mjs" "$d/"; done
+mutant_inj() { # mutant_inj <nom> <fichier> <expression-sed> -> MUT_DIR ; copie du tiroir et de l'interface de lancement (modules et fichiers rangés) ; code 1 si la cible manque ou n'a pas changé
+  local d="$WORK/mut-$1" f g r=1; rm -rf "$d"; mkdir -p "$d/moteur/assets/ui"
+  cp "$SCRIPTS/vf-cockpit-terminal-tiroir.mjs" "$SCRIPTS/vf-cockpit-lancer-ui.mjs" "$SCRIPTS/vf-cockpit-navigateur.mjs" "$d/"; cp -R "$ENG/assets/ui/tiroir" "$d/moteur/assets/ui/tiroir"
   MUT_DIR="$d"; f="$d/$2"; [ -f "$f" ] || return 1
-  cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+  for g in "$f" "$d"/moteur/assets/ui/tiroir/*; do # 79-11 : le code de P est rangé en fichiers du moteur ; la mutation s'applique au module et à chaque fichier rangé qu'elle modifie
+    cp "$g" "$g.orig"; sed -i.bak "$3" "$g"; if cmp -s "$g" "$g.orig"; then rm -f "$g.orig" "$g.bak"; else rm -f "$g.orig" "$g.bak"; r=0; fi
+  done
+  return $r
 }
 rouge_f1() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : j.f1 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.f1 === 'abc/champP/0' ? 'sain' : 'rouge')"; }
 rouge_sp1() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : j.sp1 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.sp1 === '0/true/true/true' ? 'sain' : 'rouge')"; }

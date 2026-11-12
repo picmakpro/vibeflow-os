@@ -154,3 +154,33 @@ Vendor : 164 PASS / 14 FAIL, tous V11.P. Activation : 2 FAIL (T7.5c « vf-term- 
 - V11.P4d — douze lignes AJOUT pour les deux dossiers rangés | attendu: [12] | obtenu:  [3]
 - V11.P5 — fichiersCodeEvalue liste les douze fichiers rangés ; un octet changé dans tiroir.js d'une copie change l'empreinte | attendu: [douze=true octet=true] | obtenu:  [node:fs:2914]
 - V11.P6 — la page de Q, le tiroir, le lancement et le lecteur : aucune conversion de fonction en chaîne, aucune évaluation dynamique | attendu: [0] | obtenu:  [5]
+
+### Vert de la tâche 3 hors armement (2026-11-12 et 13)
+
+Relevé APRÈS : les neuf unités (q-* et p-*) sont égales aux neuf lignes AVANT (longueur et sha256), comparaison par cmp.
+TOTAL-APRES (mesure globale, arbre du 2026-11-12) : 1706 ; TOTAL-AVANT : 1719 ; écart -13, tout dans les fichiers déplacés (305 lignes longues avant dans les neuf modules, 292 après dans les fichiers rangés et les modules amincis) : les en-têtes de modules retirés et les préfixes « export » ôtés font passer des lignes sous 161, aucune ligne n'est repliée ni ajoutée. L'égalité du plan est donc une baisse (amendement au plan).
+
+Règle 9, rejeu de chaque suite trouvée, seule, TMPDIR du nœud, aucun mutant sans effet :
+
+| suite | code | durée | résultat |
+|---|---|---|---|
+| git-env | 0 | 13s | 135 PASS / 0 FAIL |
+| chrome-fr | 0 | 25s | 129 PASS / 0 FAIL |
+| terminal-page | 0 | 36s | 51 PASS / 0 FAIL |
+| lancer-xss | 0 | 193s | 76 PASS / 0 FAIL (0 non vérifiées sans navigateur) |
+| lancer-mode | 0 | 193s | 113 PASS, 0 FAIL (0 non jouées, dites) |
+| terminal-client | 0 | 265s | 76 PASS / 0 FAIL |
+| lancer-bandeau | 0 | 552s | 161 PASS / 0 FAIL |
+| terminal-xterm | 0 | 947s | 81 PASS / 0 FAIL |
+| questions | 0 | 15s | vert |
+| assemblage | 0 | 7s | vert |
+| collecte | 0 | 178s | vert |
+| lancer-chat | 0 | 65s | vert |
+| lancer-ui | 0 | 88s | vert |
+| cycle-serveur | 0 | 108s | vert |
+| terminal-tiroir | 0 | 1138s | 138 PASS / 0 FAIL |
+| lancer-serveur | 0 | 27s | vert |
+| terminal-activation | 0 | 31s | vert |
+| vendor | 0 | 8s | vert |
+
+Fichiers déplacés ou créés cherchés par grep dans toutes les suites et aides : navigateur-charger, vf-cockpit-navigateur, vue.js, client.js, q.css, tiroir*.js, lancer*.js, *.css rangés, et les noms retirés (terminal-tiroir-ui, terminal-tiroir-style, lancer-style) ; aides socle-serveur.sh (cockpit_module_copie copie déjà tout le module ; cockpit_module_muter : table de noms étendue ; cockpit_module_muter_p neuve) et tables mod_de / MODS_TABLE des suites (inchangées : elles visent les racines de module). Rouges rencontrés puis corrigés : lancer-chat (motif présent dans deux fichiers : mutation désormais appliquée à chaque fichier modifié), terminal-tiroir T21.7r (recensement lu dans tiroir.js), questions Q11.7 (la copie du module emporte le lecteur).
