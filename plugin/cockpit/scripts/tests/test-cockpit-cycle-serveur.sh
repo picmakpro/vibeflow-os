@@ -478,7 +478,8 @@ assert_eq "M-ESTNOTRE.0 — ancre présente : estNotre (vf-cockpit-serveur-vivan
 assert_eq "M-MODULE.0 — ancre présente : l'identité exige le serve.mjs du module (marqueur m:module)" "$(grep -cF '// m:module' "$SV" 2> /dev/null)" "1"
 assert_eq "M-PREFIXE.0 — ancre présente : l'identité exige la fin de ligne exacte --sortie=<chemin réel> (marqueur m:prefixe)" "$(grep -cF '// m:prefixe' "$SV" 2> /dev/null)" "1"
 assert_eq "M-ANCIENNE.0 — ancre présente : la forme de la version précédente est encore reconnue (marqueur m:ancienne)" "$(grep -cF '// m:ancienne' "$SV" 2> /dev/null)" "1"
-assert_eq "M-STATUS.0 — ancre présente : detecterServeur sépare détecter d'adopter (vf-cockpit-serveur-vivant.mjs)" "$(grep -cF 'export function detecterServeur' "$SV" 2> /dev/null)" "1"
+assert_eq "M-STATUS.0 — ancre présente : detecterServeur sépare détecter d'adopter (vf-cockpit-serveur-vivant.mjs)" "$(grep -cE 'export (async )?function detecterServeur' "$SV" 2> /dev/null)" "1"
+assert_eq "M-STATUS.0b — ancre présente : la ligne que le mutant édite, le retour de detecterServeur (marqueur m:detecte)" "$(grep -cF '// m:detecte' "$SV" 2> /dev/null)" "1"
 
 # ---- mutants de la tâche 4a (79-06) : copies du module (cockpit_module_muter), témoins rejoués sur la copie ----
 cockpit_module_muter mversion serve.mjs "s#^if (cli) { try { const v = execFile.*\$#if (cli) { try { version = execFileSync(cli.cmd, [...cli.args, '--version'], { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }).trim(); } catch {} }#"; MV="$COCKPIT_MODULE"; unset COCKPIT_MODULE
@@ -506,6 +507,65 @@ am420_sur() { # <racine> : module neuf ajouté puis modifié d'un octet (AM4.20)
 MLC="$WORK/mliste-copie"; cp -R "$ML" "$MLC"
 V47="$(am47_sur "$ML")"; V420="$(am420_sur "$MLC")"
 assert_eq "M-LISTE-FIGEE — liste des fichiers hachés énumérée en dur : la copie est valide, AM4.20 rougit SEUL (module neuf sans effet sur l'empreinte) et AM4.7 reste vert (un module existant change l'empreinte)" "$(node --check "$ML/scripts/vf-cockpit-module.mjs" 2> /dev/null && echo valide || echo invalide) | AM4.7=$V47 | AM4.20=$V420" "valide | AM4.7=relancé | AM4.20=réutilisé-sans-changement réutilisé-malgré-octet"
+
+# ---- mutants de l'identité et de la transition (tâche 5, 79-06) : copies du module (cockpit_module_muter), le scénario est rejoué sur la copie, lancée par SON lanceur ----
+# AM4.10b : ce que la séquence d'AM4.10 ne peut pas voir. Chaque `stop` y lit le server.json de SON lab, donc l'arrêt de « lab » n'atteint jamais « lab bis » ; la confusion
+# n'existe que si le fichier d'état de « lab » (non fiable) désigne le PID de « lab bis ». Témoin : stop de « lab » refuse (code 5) et « lab bis » reste vivant.
+am410_sur() { # <racine> : « lab » et « lab bis » servis par la copie ; le server.json de « lab » plante le PID de « lab bis », puis stop de « lab »
+  local D="$WORK/labs-am410m" LA LB SA SB PB
+  rm -rf "$D"; LA="$D/lab"; LB="$D/lab bis"; am4_lab "$LA"; am4_lab "$LB"
+  am4_ouvrir "$1" "$LA" "$(libre)" > /dev/null 2>&1; am4_ouvrir "$1" "$LB" "$(libre)" > /dev/null 2>&1
+  SA="$(pid_etat "$LA")"; SB="$(pid_etat "$LB")"
+  PB="$(node -e "try{console.log(JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')).port)}catch{console.log('')}" "$LB/.vibeflow/cockpit/.cache/server.json")"
+  printf '{"pid":%s,"port":%s,"url":"http://127.0.0.1:%s","token":"x"}\n' "$SB" "$PB" "$PB" > "$LA/.vibeflow/cockpit/.cache/server.json"
+  node "$1/scripts/vf-cockpit.mjs" stop --lab "$LA" > /dev/null 2>&1; attendre 3 am4_mort "$SB"
+  if [ -z "$SA" ] || [ -z "$SB" ]; then echo "b:sans-serveur"; else echo "b:$(am4_mort "$SB" && echo arrêté || echo vivant)"; fi # un serveur qui n'a pas démarré n'est jamais lu comme « arrêté par le mutant »
+  [ -z "$SA" ] || kill "$SA" 2> /dev/null; am4_arreter "$1" "$LB"; [ -z "$SB" ] || kill "$SB" 2> /dev/null; attendre 5 am4_mort "$SA"; attendre 5 am4_mort "$SB"
+}
+assert_eq "AM4.10b — le server.json de « lab » désigne le PID de « lab bis » (même module) : stop de « lab » refuse et « lab bis » reste vivant" "$(am410_sur "$MODROOT")" "b:vivant"
+am49_sur() { # <racine> : leurre (réponses d'un serveur du cockpit, PID d'un autre processus) : status le voit-il, stop tue-t-il l'étranger ?
+  local L="$WORK/lab-am49m" P D H ST; rm -rf "$L"; mklab "$L"; P="$(libre)"
+  node -e "setTimeout(()=>{},3e5)" "$WORK/am49m-etranger" > /dev/null 2>&1 < /dev/null & D=$!; PIDS+=("$D")
+  node "$AUX/leurre.mjs" "$P" "$D" "$L" > "$WORK/am49m-http.out" 2>&1 < /dev/null & H=$!; PIDS+=("$H")
+  attendre 5 test "$(node "$AUX/get.mjs" "$P" /api/status | grep -c "\"pid\":$D")" = 1
+  ST="$(node "$1/scripts/vf-cockpit.mjs" status --lab "$L" --port "$P" 2>&1)"; node "$1/scripts/vf-cockpit.mjs" stop --lab "$L" --port "$P" > /dev/null 2>&1
+  echo "vu=$(printf '%s' "$ST" | grep -c 'PID ') etranger=$(am4_mort "$D" && echo arrêté || echo vivant) leurre=$(am4_mort "$H" && echo arrêté || echo vivant)"
+  vf_hyg_stop "$D"; vf_hyg_stop "$H"
+}
+am411_sur() { # <racine> : ancienne forme « node <sortie>/serve.mjs » désignée par server.json : arrêtée ? un faux d'une autre sortie : arrêté ?
+  local A="$WORK/lab-am411m" B="$WORK/lab-am411mb" FA FB RA; rm -rf "$A" "$B"; mklab "$A"; mklab "$B"; mkdir -p "$A/.vibeflow/cockpit/.cache" "$B/.vibeflow/cockpit/.cache"
+  printf 'setInterval(() => {}, 1000);\n' > "$A/.vibeflow/cockpit/serve.mjs"; cp "$A/.vibeflow/cockpit/serve.mjs" "$B/.vibeflow/cockpit/serve.mjs"
+  node "$A/.vibeflow/cockpit/serve.mjs" > /dev/null 2>&1 < /dev/null & FA=$!; PIDS+=("$FA")
+  node "$B/.vibeflow/cockpit/serve.mjs" > /dev/null 2>&1 < /dev/null & FB=$!; PIDS+=("$FB")
+  attendre 5 test "$(ps -o args= -p "$FA" 2> /dev/null | grep -c serve.mjs)" = 1
+  printf '{"pid":%s,"port":1,"url":"http://127.0.0.1:1","token":"x"}\n' "$FA" > "$A/.vibeflow/cockpit/.cache/server.json"
+  node "$1/scripts/vf-cockpit.mjs" stop --lab "$A" > /dev/null 2>&1; attendre 5 am4_mort "$FA"; RA="$(am4_mort "$FA" && echo arrêté || echo vivant)"
+  printf '{"pid":%s,"port":1,"url":"http://127.0.0.1:1","token":"x"}\n' "$FB" > "$A/.vibeflow/cockpit/.cache/server.json"
+  node "$1/scripts/vf-cockpit.mjs" stop --lab "$A" > /dev/null 2>&1
+  echo "ancienne:$RA autre:$(am4_mort "$FB" && echo arrêté || echo vivant)"
+  vf_hyg_stop "$FA"; vf_hyg_stop "$FB"
+}
+am48_sur() { # <racine> : serveur vivant sans server.json : status le dit-il vivant, le fichier reste-t-il absent ?
+  local L="$WORK/lab-am48m" P S; rm -rf "$L"; am4_lab "$L"; P="$(libre)"
+  am4_ouvrir "$1" "$L" "$P" > /dev/null 2>&1; S="$(pid_etat "$L")"; rm -f "$L/.vibeflow/cockpit/.cache/server.json"
+  local ST; ST="$(node "$1/scripts/vf-cockpit.mjs" status --lab "$L" --port "$P" 2>&1)"
+  echo "vivant=$(printf '%s' "$ST" | grep -c 'PID ') fichier=$([ -e "$L/.vibeflow/cockpit/.cache/server.json" ] && echo présent || echo absent)"
+  node "$1/scripts/vf-cockpit.mjs" stop --lab "$L" --port "$P" > /dev/null 2>&1; [ -z "$S" ] || kill "$S" 2> /dev/null; attendre 5 am4_mort "$S"
+}
+am4_mutant() { # <nom> <fichier> <sed> : copie mutée du module ; imprime la racine de la copie, code 1 si la mutation n'a pas eu lieu ; valide = node --check
+  cockpit_module_muter "$1" "$2" "$3" || return 1; local r="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\n' "$r"
+}
+chk_valide() { node --check "$1/scripts/vf-cockpit-serveur-vivant.mjs" 2> /dev/null && echo valide || echo invalide; }
+ME="$(am4_mutant mestnotre vf-cockpit-serveur-vivant.mjs 's#^export function estNotre(pid, identite, lab, lireCommande) {#export function estNotre(pid, identite, lab, lireCommande) { return true;#')"
+assert_eq "M-ESTNOTRE — reconnaissance toujours vraie : la copie est valide et AM4.9 rougit (le leurre est vu par status, l'étranger est arrêté par stop)" "$(chk_valide "$ME") | $(am49_sur "$ME")" "valide | vu=1 etranger=arrêté leurre=vivant"
+MM="$(am4_mutant mmodule vf-cockpit-serveur-vivant.mjs 's#const finExacte = .*; // m:prefixe#const finExacte = true; // m:prefixe#')"
+assert_eq "M-MODULE — identité = le serve.mjs du module seul (--sortie= ignoré) : la copie est valide et AM4.10b rougit (stop de « lab » arrête « lab bis »)" "$(chk_valide "$MM") | $(am410_sur "$MM")" "valide | b:arrêté"
+MP="$(am4_mutant mprefixe vf-cockpit-serveur-vivant.mjs 's#const finExacte = .*; // m:prefixe#const finExacte = c.includes(` --sortie=${path.dirname(path.dirname(identite.sortie))}`); // m:prefixe#')"
+assert_eq "M-PREFIXE — un préfixe du chemin cherché par includes, sans fin de ligne exacte : la copie est valide et AM4.10b rougit (« /lab » est préfixe de « /lab bis »)" "$(chk_valide "$MP") | $(am410_sur "$MP")" "valide | b:arrêté"
+MA="$(am4_mutant mancienne vf-cockpit-serveur-vivant.mjs 's#const ancienne = .*; // m:ancienne#const ancienne = false; // m:ancienne#')"
+assert_eq "M-ANCIENNE — forme de la version précédente retirée : la copie est valide et AM4.11 rougit (le serveur de l'ancienne forme n'est plus arrêté), le faux d'une autre sortie reste vivant" "$(chk_valide "$MA") | $(am411_sur "$MA")" "valide | ancienne:vivant autre:vivant"
+MS="$(am4_mutant mstatus vf-cockpit-serveur-vivant.mjs 's#return trouve; // m:detecte#try { fs.mkdirSync(path.dirname(etatFile(sortie)), { recursive: true }); fs.writeFileSync(etatFile(sortie), JSON.stringify(trouve)); } catch {} return trouve; // m:detecte#')"
+assert_eq "M-STATUS — detecterServeur qui écrit server.json (adopte) : la copie est valide et AM4.8 rougit (le fichier réapparaît après status) ; l'original donne vivant=1 fichier=absent" "$(chk_valide "$MS") | $(am48_sur "$MS") | $(am48_sur "$MODROOT")" "valide | vivant=1 fichier=présent | vivant=1 fichier=absent"
 
 vf_hyg_assert
 
