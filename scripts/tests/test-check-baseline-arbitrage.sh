@@ -711,6 +711,80 @@ case "$out" in *SENTINELLE-NEUTRALISEE*) has=1 ;; *) has=0 ;; esac
 if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "DEL sentinelle videe, delegation seule -> rc 1 SENTINELLE-NEUTRALISEE"
 else ko "DEL sentinelle videe, delegation seule" "rc=1 SENTINELLE-NEUTRALISEE" "rc=$rc :: $out"; fi
 
+# ===================================================================================================
+# Radical elargi a « deleg » (precision du 2026-11-12, decision de la session principale) : « delegation »,
+# « delegate », « DÉLÉGATION » sont ecartes comme « deleguee ». Memes usages, memes temoins.
+# ===================================================================================================
+deleg2_ligne() { printf 'décision prise par %s de Samuel (message session principale, 2026-11-08), option recommandée' "$1"; }
+
+# verifie_refus <libelle> <verdict> : rc 1, verdict present, INFO presente, derniere ligne = verdict
+verifie_refus() {
+  local lib="$1" verdict="$2" l
+  case "$out" in *"${verdict}"*) has=1 ;; *) has=0 ;; esac
+  case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE:*) hasinfo=1 ;; *) hasinfo=0 ;; esac
+  l="$(printf '%s\n' "$out" | tail -1)"
+  case "$l" in "${verdict}:"*) lastok=1 ;; *) lastok=0 ;; esac
+  if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ] && [ "$hasinfo" -eq 1 ] && [ "$lastok" -eq 1 ]; then ok "$lib -> rc 1 ${verdict}, INFO presente, derniere ligne = verdict"
+  else ko "$lib" "rc=1 ${verdict}, INFO presente, derniere ligne = verdict" "rc=$rc info=$hasinfo derniere=$l :: $out"; fi
+}
+
+n=0
+for forme in "délégation" "delegation" "delegate" "DÉLÉGATION"; do
+  n=$((n + 1))
+  cas_hausse "del10-$n" "feat: hausse instructions a.md
+
+$(deleg2_ligne "$forme")"
+  verifie_refus "DEL2 hausse, forme « ${forme} » seule" HAUSSE-SANS-ARBITRAGE
+  cas_hausse "del10b-$n" "feat: hausse instructions a.md
+
+$(deleg2_ligne "$forme")
+${DIRECT}"
+  [ "$rc" -eq 0 ] && ok "DEL2 hausse, forme « ${forme} » + citation directe -> rc 0" || ko "DEL2 hausse, forme « ${forme} » + citation directe" "rc=0" "rc=$rc :: $out"
+done
+
+for forme in "délégation" "delegate"; do
+  cas_retrait "del11" "chore: retire a.md de la baseline, fichier conserve
+
+$(deleg2_ligne "$forme")"
+  verifie_refus "DEL2 retrait cible presente, forme « ${forme} » seule" LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE
+  cas_retrait "del11b" "chore: retire a.md de la baseline, fichier conserve
+
+$(deleg2_ligne "$forme")
+${DIRECT}"
+  case "$out" in *AVERTISSEMENT-LIGNE-RETIREE-ARBITREE*) hasw=1 ;; *) hasw=0 ;; esac
+  case "$out" in *"citation : ${DIRECT}"*) hascit=1 ;; *) hascit=0 ;; esac
+  case "$out" in *"option recommandée"*) hasdel=1 ;; *) hasdel=0 ;; esac
+  if [ "$rc" -eq 0 ] && [ "$hasw" -eq 1 ] && [ "$hascit" -eq 1 ] && [ "$hasdel" -eq 0 ]; then ok "DEL2 retrait, forme « ${forme} » + directe -> rc 0, ligne directe recopiee"
+  else ko "DEL2 retrait, forme « ${forme} » + directe" "rc=0 ARBITREE, citation = ligne directe, delegation absente" "rc=$rc :: $out"; fi
+
+  cas_sentinelle "del12" "chore: retire la sentinelle armed
+
+$(deleg2_ligne "$forme")"
+  verifie_refus "DEL2 sentinelle supprimee, forme « ${forme} » seule" SENTINELLE-NEUTRALISEE
+  cas_sentinelle "del12b" "chore: retire la sentinelle armed
+
+$(deleg2_ligne "$forme")
+${DIRECT}"
+  [ "$rc" -eq 0 ] && ok "DEL2 sentinelle, forme « ${forme} » + directe -> rc 0" || ko "DEL2 sentinelle, forme « ${forme} » + directe" "rc=0" "rc=$rc :: $out"
+done
+
+# --- MUT-14 : remet le radical a « delegu » (« delegation », « delegate » doivent rester ecartes) ----------
+MUT14_OLD='  return index(t, "deleg") > 0'
+MUT14_NEW='  return index(t, "delegu") > 0'
+MUT14_PATH="$(make_mutant mut14 "$MUT14_OLD" "$MUT14_NEW")"; MUT14_STAT=$?
+cas_hausse mut14 "chore: hausse instructions a.md, forme delegation (MUT-14)
+
+$(deleg2_ligne délégation)"
+if [ "$MUT14_STAT" -ne 0 ]; then komut 14 "radical remis a delegu" "mutant opposable et valide" "statut mutant=$MUT14_STAT"
+else
+  D14="$D"; B14="$B"
+  TARGET="$MUT14_PATH"; safe_run _mutout rc_mut "$D14" --base-ref "$B14"
+  TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D14" --base-ref "$B14"
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then okmut 14 "$rc_mut" 0 "$rc_orig" 1
+  else komut 14 "radical remis a delegu" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+TARGET="$SCRIPT"
+
 # --- MUT-10 : retire l'exclusion de la ligne de delegation (un seul point sert les trois usages) ----------
 MUT10_OLD='  if (est_delegation(s)) return 0'
 MUT10_NEW='  if (0) return 0'
