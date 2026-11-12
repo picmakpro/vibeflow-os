@@ -37,7 +37,7 @@ for (const f of ['vf-cockpit-env.mjs', 'vf-cockpit-module.mjs', 'vf-cockpit-serv
 const depuisModule = (f) => import(pathToFileURL(path.join(scriptsDir, f)).href);
 const MOD = await depuisModule('vf-cockpit-module.mjs');
 try { MOD.moduleAdmis(root, scriptsDir, moteurDir); } catch (e) { refus(e.message); } // défense en profondeur : jamais de code pris sous la sortie ni sous .vibeflow/
-process.env.VF_COCKPIT_SCRIPTS_DIR ||= scriptsDir; process.env.VF_COCKPIT_ENGINE_DIR ||= moteurDir; // jamais un repli sur la sortie
+if (process.env.VF_COCKPIT_SCRIPTS_DIR === undefined) process.env.VF_COCKPIT_SCRIPTS_DIR = scriptsDir; if (process.env.VF_COCKPIT_ENGINE_DIR === undefined) process.env.VF_COCKPIT_ENGINE_DIR = moteurDir; // posées quand elles manquent (jamais un repli sur la sortie) ; une valeur passée, même vide, est respectée : l'agent est alors indisponible (fermé par défaut, Q13.3)
 process.env.PATH = (await depuisModule('vf-cockpit-env.mjs')).assainirPath(process.env.PATH, root); // vibeflow P25 : jamais d'outil du lab (H-1) ; ce processus seul, pas le shell
 const opt = (name, dflt) => { const i = argv.indexOf('--' + name); return i < 0 ? dflt : argv[i + 1]; };
 const has = (name) => argv.includes('--' + name);
