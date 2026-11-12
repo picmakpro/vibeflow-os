@@ -21,5 +21,6 @@ export const DURCISSEMENT_ENV = { GIT_ALLOW_PROTOCOL: 'vf-aucun', GIT_NO_LAZY_FE
 export const SOUS_COMMANDES_AUTORISEES = ['rev-parse', 'status', 'worktree', 'for-each-ref', 'log', 'ls-files', 'rev-list', 'show-ref',
   'symbolic-ref', 'config', 'diff-tree', 'stash', 'show', 'diff'];
 // Pilotes nommés lus puis vidés (expression régulière étendue de `git config --get-regexp`, sur le nom de la clé) : filtres (toute clé),
-// textconv et commande de diff, pilote de fusion. Les valeurs vides sont posées par la configuration de portée « commande » (envGit).
-export const PILOTES_NOMMES = '^(filter\\..+|diff\\..+\\.(textconv|command)|merge\\..+\\.driver)$';
+// textconv et commande de diff, pilote de fusion, noms vides compris (`filter..clean`).
+// Les valeurs vides sont posées par la configuration de portée « commande » (envGit).
+export const PILOTES_NOMMES = '^(filter\\..*\\.[^.]+|diff\\..*\\.(textconv|command)|merge\\..*\\.driver)$';

@@ -10,6 +10,7 @@
 #   A8 à A13 un lien du lab est jugé comme sa cible (dossier git, sortie du cockpit, fichier ignoré, maillon divergent, DAG) · A14 verifierSortie et confiner · B5 worktreeVerifie
 #   G16 preuve générative (graine, témoin de couverture, témoin rouge, oracle natif + inodes) · G17 cheminPhysique (strict, plusProcheParent, bornes) · G18 verrou de pilotage, gitdir, inclusion
 #   D6 pilotes nommés vidés pour tout lancement, liste fermée, mémo de 2 s, enfants shell (les mutants M-* de ces sections suivent leur section)
+#   D8, D9 pilotes de nom vide vidés, clé listée non comprise refusée (T-79-705) · G19.5 lien retour forgé d'un worktree hors de la racine
 # Les leurres n'écrivent QUE dans le dossier temporaire de la suite. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -507,6 +508,10 @@ G "$LK_Y2/lab" -c protocol.file.allow=always submodule add -q "$LK_Y2/hors/depot
 G "$LK_Y2/lab" worktree add -q "$LK_Y2/wt-hors" -b wt >/dev/null 2>&1
 lk_g19p() { for d in "$LK_Y2/lab" "$LK_Y2/lab/imbrique" "$LK_Y2/lab/sm" "$LK_Y2/wt-hors"; do if [ -e "$d/.git" ]; then lk_garde "$1" sortant "$d" "$LK_Y2/lab"; else echo absent; fi; done | tr '\n' ','; }
 assert_eq "G19.4 — témoins positifs : le lab, un dépôt imbriqué, un sous-module et un worktree vérifié hors de la racine du lab sont lus (aucun n'est sortant)" "$(lk_g19p "$SCRIPTS")" "false,false,false,false,"
+# lien retour forgé : un worktree du lab, hors de la racine, dont le `gitdir` du dossier d'administration ne désigne plus son `.git` (le dossier d'administration et le commun sont sous le lab : seule
+# la clause du lien retour de la dernière condition de gitSortant le refuse)
+G "$LK_Y2/lab" worktree add -q "$LK_Y2/wt-forge" -b wtf >/dev/null 2>&1; printf '%s\n' "$LK_Y2/hors/ailleurs/.git" > "$LK_Y2/lab/.git/worktrees/wt-forge/gitdir"
+assert_eq "G19.5 — un worktree du lab hors de la racine dont le lien retour est forgé : sortant ; son voisin au lien intact reste lu (témoin)" "$(lk_garde "$SCRIPTS" sortant "$LK_Y2/wt-forge" "$LK_Y2/lab"),$(lk_garde "$SCRIPTS" sortant "$LK_Y2/wt-hors" "$LK_Y2/lab")" "true,false"
 echo "=== G16 / G17 — preuve générative de la classe « un chemin n'est jugé que par sa résolution physique » ==="
 # Générateur à graine (mulberry32) : arbres à dossier git simple (N) ou à dossier git et commun distincts (N/2), forêts de dossiers {a,b,c,d} (profondeur <= 3), 1 à 5 liens l0..l4 à cibles
 # mêlant noms de liens et segments `..` (marche aléatoire de 1 à 5 pas, traversée d'un lien déjà posé puis remontée, formes absolues, noms absents, boucles) ; 30 % des arbres reçoivent la paire
@@ -566,6 +571,11 @@ LK_N5="$(mutant_sur dedans vf-cockpit-git-sortant.mjs 'if (!libre && !dedans(dir
 assert_eq "M-DEDANS.0 — l'ancre du mutant existe" "$LK_N5" "muté"
 assert_eq "M-DEDANS — rougit G19.1 à G19.3 : un dépôt extérieur qui se désigne lui-même est lu (false, false, false)" "$(for c in "$LK_Z/lab/lien|$LK_Z/lab" "$LK_Z/hors/depot|$LK_Z/lab" "$LK_Z/hors/gf|$LK_Z/lab"; do lk_garde "$WORK/mut-dedans" sortant "${c%%|*}" "${c##*|}"; done | tr '\n' ',')" "false,false,false,"
 assert_eq "M-DEDANS — témoins positifs verts (G19.4)" "$(lk_g19p "$WORK/mut-dedans")" "false,false,false,false,"
+# M-RETOUR-G : la clause du lien retour de la dernière condition est retirée -> G19.5 rougit (le worktree forgé est lu), les témoins restent verts
+LK_N6="$(mutant_sur retourg vf-cockpit-git-sortant.mjs '&& worktreeRetour(g, c, dotgit))) return true;' ')) return true;')"
+assert_eq "M-RETOUR-G.0 — l'ancre du mutant existe" "$LK_N6" "muté"
+assert_eq "M-RETOUR-G — rougit G19.5 : le worktree au lien retour forgé est lu (false), son voisin intact aussi (false)" "$(lk_garde "$WORK/mut-retourg" sortant "$LK_Y2/wt-forge" "$LK_Y2/lab"),$(lk_garde "$WORK/mut-retourg" sortant "$LK_Y2/wt-hors" "$LK_Y2/lab")" "false,false"
+assert_eq "M-RETOUR-G — témoins positifs verts (G19.4)" "$(lk_g19p "$WORK/mut-retourg")" "false,false,false,false,"
 
 echo "=== D6 — pilotes nommés (filter, textconv, commande de diff, pilote de fusion) vidés pour tout lancement ; liste fermée ; mémo ; enfants shell (A-04, SOCL-11) ==="
 # Dépôt piégé : un fichier f soumis à diff=tc merge=mg filter=fl, trois commits, un remisage, une branche side conflictuelle ; la configuration est posée EN DERNIER (aucun leurre ne tourne à la construction)
@@ -652,6 +662,58 @@ assert_eq "M-MEMO.0 — l'ancre du mutant existe" "$(mutant_sur memo vf-cockpit-
 assert_eq "M-MEMO — rougit D6.5 (mémo sans expiration : le pilote déclaré après la fenêtre n'est jamais vidé)" "$(lk_d6 "$WORK/mut-memo" memo)" "v,v,v,v,r"
 assert_eq "M-OPTIONS.0 — l'ancre du mutant existe" "$(mutant_sur options vf-cockpit-git-lanceur.mjs 'ins = OPTIONS_LECTURE[sous] || [];' 'ins = [];')" "muté"
 assert_eq "M-OPTIONS — reste VERT sur D6.1 : redondance voulue, le vidage ferme seul (deux protections indépendantes : options de lecture et pilotes vidés)" "$(lk_d6 "$WORK/mut-options" options)" "v,v,v,v,v"
+echo "=== D8 — pilotes de NOM VIDE (sections filter, diff et merge sans nom) vidés comme les autres ; une clé listée mais non comprise refuse (A-04, T-79-705) ==="
+# classe : un pilote dont le nom est vide s'exécute quand le dépôt le déclare (le motif des clés exigeait un nom non vide, l'analyse l'écartait) ; un seul marqueur (VIDE), un dépôt copié par pilote
+LK_V="$(nouveau_depot "$LK_RACINE/vide-base")"
+printf 'f filter=\nf diff=\nf merge=\n' > "$LK_V/.gitattributes"; G "$LK_V" add .gitattributes; G "$LK_V" commit -q -m "SUJET-VIDE"
+printf 'cinq\n' >> "$LK_V/f"; G "$LK_V" stash -q; printf 'sept\n' > "$LK_V/f"; G "$LK_V" commit -q -am "SUJET-Z"
+# lk_vdep NOM MODE : copie du dépôt de base portant le pilote de nom vide du mode (leurre VIDE), contenu de f modifié ; rend le dossier
+lk_vdep() {
+  local d="$LK_RACINE/vide-$1" l; l="$(leurre VIDE)"; rm -rf "$d"; cp -R "$LK_V" "$d"
+  { case "$2" in
+      clean) printf '[filter ""]\n\tclean = %s\n' "$l" ;; process) printf '[filter ""]\n\tprocess = %s\n' "$l" ;; textconv) printf '[diff ""]\n\ttextconv = %s\n' "$l" ;;
+      command) printf '[diff ""]\n\tcommand = %s\n' "$l" ;; merge) printf '[merge ""]\n\tdriver = %s\n' "$l" ;;
+      tout) printf '[filter ""]\n\tclean = %s\n\tsmudge = %s\n\tprocess = %s\n[diff ""]\n\ttextconv = %s\n\tcommand = %s\n[merge ""]\n\tdriver = %s\n' "$l" "$l" "$l" "$l" "$l" "$l" ;;
+    esac; } >> "$d/.git/config"
+  printf 'wwww\n' > "$d/f"; touch "$d/f"; echo "$d" # même taille que le contenu commité : git ne lance le filtre que s'il doit comparer le contenu
+}
+LK_VT='posé'; LK_VW=""
+for LK_M in "clean|status --porcelain" "process|status --porcelain" "textconv|log -p -1" "command|diff" "merge|stash pop"; do
+  LK_D="$(lk_vdep "nu-${LK_M%%|*}" "${LK_M%%|*}")"; raz; ( cd "$LK_D" && "$GIT_REEL" ${LK_M#*|} >/dev/null 2>&1 ); LK_VW="$LK_VW,$(lk_t VIDE)"; raz
+done
+assert_eq "D8.0 — témoins positifs : git brut exécute le filtre clean, le filtre process, le textconv, la commande de diff et le pilote de fusion de nom vide (cinq lancements)" "${LK_VW#,}" "posé,posé,posé,posé,posé"
+LK_VL='[["status",["status","--porcelain"],0],["diff",["diff"],0],["ls-files",["ls-files","-m"],0],["log",["log","-p","-1"],0],["show",["show","HEAD"],0],["diff-tree",["diff-tree","-p","HEAD"],0],["stash-show",["stash","show","-p"],0],["stash-pop",["stash","pop"],0]]'
+# lk_d8 SCRIPTS NOM : sept jetons « v » (conforme) ou « r » (rouge) : aucun marqueur pour chacun des cinq pilotes (clean, process, textconv, commande, fusion) lancés par les trois points d'entrée
+# sur huit sous-commandes ; la lecture d'un dépôt qui les porte tous n'est pas refusée ; la composition de l'environnement vide les sept clés (required à false)
+lk_d8() {
+  local s="$1" n="$2" m d r t=""
+  for m in clean process textconv command merge; do
+    d="$(lk_vdep "$n-$m" "$m")"; raz; node "$AUX/sonde.mjs" "$s" "$d" pilotes "$LK_VL" >/dev/null 2>&1
+    [ "$(lk_t VIDE)" = absent ] && t="$t,v" || t="$t,r"; raz
+  done
+  d="$(lk_vdep "$n-tout" tout)"; r="$(node "$AUX/sonde.mjs" "$s" "$d" ordinaire 2>/dev/null)"; raz
+  [ "$(pg "$r" 'j.sujet+"|"+(j.statut.includes("f")?"m":"-")')" = "SUJET-Z|m" ] && t="$t,v" || t="$t,r"
+  rm -f "$AUX/fake.out"; r="$(node "$AUX/sonde.mjs" "$s" "$d" env "$AUX/fakegit.sh" "$AUX/fake.out" 2>/dev/null)"
+  [ "$(pg "$r" '["filter..clean","filter..smudge","filter..process","diff..textconv","diff..command","merge..driver"].every((k)=>j.paires[k]==="")&&j.paires["filter..required"]==="false"')" = "true" ] && t="$t,v" || t="$t,r"
+  echo "${t#,}"
+}
+assert_eq "D8.1 — pilotes de nom vide : aucun lancé par lancerGit, lancerGitAsync et shBorne (status, diff, ls-files, log -p, show, diff-tree -p, stash show -p, stash pop) ; la lecture d'un dépôt qui les porte tous n'est pas refusée ; l'environnement vide filter..clean, ..smudge, ..process, diff..textconv, diff..command, merge..driver et pose filter..required à false" "$(lk_d8 "$SCRIPTS" ref)" "v,v,v,v,v,v,v"
+# clé listée non comprise : le motif de la liste est élargi (copie) à une clé qui n'est pas un pilote ; la lecture est refusée (fail closed), jamais « le reste n'est pas vidé »
+LK_PAT="export const PILOTES_NOMMES = '^(filter\\\\..*\\\\.[^.]+|diff\\\\..*\\\\.(textconv|command)|merge\\\\..*\\\\.driver)\$';"
+LK_PAL="export const PILOTES_NOMMES = '^(filter\\\\..*\\\\.[^.]+|diff\\\\..*\\\\.(textconv|command)|merge\\\\..*\\\\.driver|core\\\\.bare)\$';"
+assert_eq "D8.2.0 — l'ancre de l'élargissement existe (le motif de PILOTES_NOMMES)" "$(mutant_sur inconnue vf-cockpit-git-durci.mjs "$LK_PAT" "$LK_PAL")" "muté"
+assert_eq "D8.2 — une clé listée par git mais que l'analyse ne comprend pas (core.bare, toujours déclarée) : aucun lancement, la lecture du dépôt ordinaire rend « inconnu » ; le module non élargi la lit (témoin)" "$(pg "$(lire "$WORK/mut-inconnue" "$ORD" ordinaire)" 'j.sujet')|$(pg "$(lire "$SCRIPTS" "$ORD" ordinaire)" 'j.sujet')" "|SUJET-DEUX"
+echo "=== D9 — mutants des pilotes de nom vide (copies du dossier des scripts ; jetons de D8 : cinq pilotes, lecture non refusée, environnement) ==="
+LK_ANCF='const motifFiltre = /^filter\.(.*)\.[^.]+$/;'
+assert_eq "M-VIDE-GIT.0 — l'ancre du mutant existe (le motif passé à git exige de nouveau un nom non vide)" "$(mutant_sur vide-git vf-cockpit-git-durci.mjs "$LK_PAT" "export const PILOTES_NOMMES = '^(filter\\\\..+|diff\\\\..+\\\\.(textconv|command)|merge\\\\..+\\\\.driver)\$';")" "muté"
+assert_eq "M-VIDE-GIT — rougit D8.1 sur le pilote de fusion (lancé) et l'environnement (diff..textconv, diff..command, merge..driver non posés) : le motif ancien liste encore les filtres de nom vide, que l'analyse comprend désormais ; textconv et commande de diff restent fermés par --no-textconv / --no-ext-diff" "$(lk_d8 "$WORK/mut-vide-git" vide-git)" "v,v,v,v,r,v,r"
+assert_eq "M-VIDE-ECARTE.0 — les deux ancres du mutant existent (analyse du filtre à nom non vide et clé non comprise ignorée : le défaut d'origine)" "$(mutant_sur vide-ecarte vf-cockpit-git-lanceur.mjs "$LK_ANCF" 'const motifFiltre = /^filter\.(.+)\.[^.]+$/;')|$(FROM='&& us.every(Boolean) };' TO='};' node "$AUX/mutsub.mjs" "$WORK/mut-vide-ecarte/vf-cockpit-git-lanceur.mjs")" "muté|muté"
+assert_eq "M-VIDE-ECARTE — rougit D8.1 : la clé de filtre de nom vide est écartée sans refus (clean et process lancés, la lecture du dépôt qui les porte échoue, environnement incomplet) ; la fusion, dont le motif est inchangé, reste fermée" "$(lk_d8 "$WORK/mut-vide-ecarte" vide-ecarte)" "r,r,v,v,v,r,r"
+assert_eq "M-VIDE-ANALYSE.0 — l'ancre du mutant existe (l'analyse du filtre exige de nouveau un nom non vide)" "$(mutant_sur vide-analyse vf-cockpit-git-lanceur.mjs "$LK_ANCF" 'const motifFiltre = /^filter\.(.+)\.[^.]+$/;')" "muté"
+assert_eq "M-VIDE-ANALYSE — rougit D8.1 sur les jetons de lecture et d'environnement seulement : la clé listée n'est pas comprise, la lecture est refusée (fermé), aucun pilote lancé" "$(lk_d8 "$WORK/mut-vide-analyse" vide-analyse)" "v,v,v,v,v,r,r"
+LK_NC="$(mutant_sur compris vf-cockpit-git-durci.mjs "$LK_PAT" "$LK_PAL")|$(FROM='&& us.every(Boolean) };' TO='};' node "$AUX/mutsub.mjs" "$WORK/mut-compris/vf-cockpit-git-lanceur.mjs")"
+assert_eq "M-COMPRIS.0 — les deux ancres du mutant existent (motif élargi, refus de la clé non comprise retiré)" "$LK_NC" "muté|muté"
+assert_eq "M-COMPRIS — rougit D8.2 : sans le refus, la clé non comprise est écartée en silence et la lecture aboutit" "$(pg "$(lire "$WORK/mut-compris" "$ORD" ordinaire)" 'j.sujet')" "SUJET-DEUX"
 echo "=== D5 — aucune trace hors du dossier temporaire ==="
 HORS="$(find "$SCRIPTS/.." -newer "$AUX/sonde.mjs" -type f \( -name 'SSH' -o -name 'UPLOAD' -o -name 'GPG' -o -name 'CLE-*' \) 2>/dev/null | head -3)"
 assert_eq "D5.1 — aucun marqueur de leurre dans l'arbre du module" "$HORS" ""

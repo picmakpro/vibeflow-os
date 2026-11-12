@@ -90,15 +90,20 @@ function lancerAsync(cmd, args, cwd, env, maxBuffer, fin) {
 // à git : au-delà de MAX_FILTRES unités, rien n'est lancé (refus : sortie vide, comptes « inconnus » chez l'appelant), jamais « le reste n'est pas vidé ».
 // Même refus quand la liste n'est pas lisible (git config en échec, tronquée, hors délai) : un pilote inconnu n'est pas un pilote absent.
 export const MAX_FILTRES = 256;
-const motifFiltre = /^filter\.(.+)\.[^.]+$/;
-const motifDiff = /^diff\..+\.(textconv|command)$/;
-const motifFusion = /^merge\..+\.driver$/;
+const motifFiltre = /^filter\.(.*)\.[^.]+$/;
+const motifDiff = /^diff\..*\.(textconv|command)$/;
+const motifFusion = /^merge\..*\.driver$/;
 const unite = (cle) => {
   const f = motifFiltre.exec(cle);
   return f ? `filter.${f[1]}` : motifDiff.test(cle) || motifFusion.test(cle) ? cle : null;
 };
-const lirePilotes = (r) => ({ unites: [...new Set(r.sortie.split('\n').map((l) => unite(l.trim())).filter(Boolean))],
-  fiable: !r.echeance && !r.tronque && !r.absent && (r.code === 0 || r.code === 1) }); // --get-regexp : 0 = trouvé, 1 = aucun ; autre code = liste inconnue
+// un nom de pilote peut être vide (clé `filter..clean`) ; une clé listée que l'analyse ne comprend pas rend la liste non fiable (refus)
+// --get-regexp : code 0 = trouvé, 1 = aucun ; autre code = liste inconnue
+const lirePilotes = (r) => {
+  const us = r.sortie.split('\n').map((l) => l.trim()).filter(Boolean).map(unite);
+  const lue = !r.echeance && !r.tronque && !r.absent && (r.code === 0 || r.code === 1);
+  return { unites: [...new Set(us.filter(Boolean))], fiable: lue && us.every(Boolean) };
+};
 const argsPilotes = (dir) => [...GIT_SUR, '-C', dir, 'config', '--name-only', '--get-regexp', PILOTES_NOMMES];
 const refus = (noms, fiable) => !fiable || noms.length > MAX_FILTRES;
 const nomsFiltres = (unites) => unites.filter((u) => u.startsWith('filter.')).map((u) => u.slice('filter.'.length));
