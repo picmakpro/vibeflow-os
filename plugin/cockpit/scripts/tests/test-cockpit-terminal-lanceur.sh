@@ -26,7 +26,7 @@ export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 export VF_COCKPIT_OUVERTURE_MS=300 # attente de l'ouverture réelle (M6) : 15 s par défaut, ramenée ici (les ouvreurs factices n'échangent jamais l'amorçage) ; L15 la règle à part
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 MODULE="$(cd "$SCRIPTS/.." && pwd)"; LAUNCH="$SCRIPTS/vf-cockpit.mjs"; TA="$HERE_T/terminal-aux.mjs"
-WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/bin" "$WORK/run" "$WORK/fauxbin"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/bin" "$WORK/run" "$WORK/fauxbin"
 cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 PIDS=(); PASS=0; FAIL=0
