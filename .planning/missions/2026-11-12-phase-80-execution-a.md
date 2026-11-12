@@ -203,6 +203,10 @@ Total : environ 6,8 M.
 
 Durée : de 22 h 16 à environ 05 h 40 le lendemain, dont 15 minutes d'arrêt pour le disque plein.
 
+Clôture (mgr80b, 2026-11-12, de 08 h 57 à 19 h 35, dont une coupure de réseau et une charge du poste montée à 300) :
+14 agents dispatchés (3 relecteurs, 1 juge de design, 6 exécuteurs, 4 lecteurs de CI). 6 reprises par message (juge, deux pour
+les témoins, visite, GP2.3, classe). Jetons de sous-agents, d'après les rapports de fin : environ 2,0 M.
+
 ## Moins cher la prochaine fois
 
 - Donner dès le premier mandat la règle d'index temporaire pour les fichiers partagés, et `TMPDIR` dans le scratchpad.
@@ -210,6 +214,10 @@ Durée : de 22 h 16 à environ 05 h 40 le lendemain, dont 15 minutes d'arrêt po
 - Relire la portée d'une ligne de spec (largeur, forme) avant d'en tirer une décision : ma décision 701-999 px a coûté
   un aller-retour.
 - Une vague parallèle dans un seul arbre fait rougir les suites temporisées : prévoir d'emblée le rejeu isolé.
+- Mettre dans le mandat de chaque exécuteur la découverte complète du module, un Chrome sans pointeur et un serveur sans
+  CLI : ces trois gestes auraient évité tous les rouges de la PR.
+- Grouper les poussées : chaque push a annulé la CI en cours (quatre runs perdus, environ 40 minutes chacun).
+- Lire le fichier assemblé, pas la source amont, avant d'écrire « sans effet, mesuré » (un aller-retour de revue).
 
 ## Preuves E6
 
@@ -227,7 +235,13 @@ Durée : de 22 h 16 à environ 05 h 40 le lendemain, dont 15 minutes d'arrêt po
 {"verdict":"responsive 378/0","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-responsive.sh","exit_code":0,"sha":"1857a51d"},
 {"verdict":"vendor 143/0","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-vendor.sh","exit_code":0,"sha":"5e994093"},
 {"verdict":"check-version-sync avec compteur 221 (compteur ensuite laissé à 213 pour la jointure, classe c)","commande":"bash scripts/check-version-sync.sh","exit_code":0,"sha":"e868ec93"},
-{"verdict":"gates ci.yml étapes 1-5, 7-20, 23","commande":"bash -e <étape extraite de .github/workflows/ci.yml>","exit_code":0,"sha":"5e994093"}
+{"verdict":"gates ci.yml étapes 1-5, 7-20, 23","commande":"bash -e <étape extraite de .github/workflows/ci.yml>","exit_code":0,"sha":"5e994093"},
+{"verdict":"CI de la PR entièrement verte (gates, 9 shards)","commande":"gh run view 43206672595","exit_code":0,"sha":"14b80257"},
+{"verdict":"CI verte sur la tête finale","commande":"gh run view 43221332650","exit_code":0,"sha":"2a6cf236"},
+{"verdict":"témoins de pointeur coin 40/0, projet-liste 49/0, couloirs 68/0","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-{coin,projet-liste,couloirs}.sh","exit_code":0,"sha":"94f90609"},
+{"verdict":"visite-retours 93/0 après correction","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-visite-retours.sh","exit_code":0,"sha":"94619edf"},
+{"verdict":"git-pagination 48/0 avec GP2.3b","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-git-pagination.sh","exit_code":0,"sha":"937e87b6"},
+{"verdict":"C5 22/0","commande":"bash scripts/tests/test-ci-shard-suites.sh","exit_code":0,"sha":"9aec7ac7"}
 ]}
 ```
 
@@ -341,3 +355,20 @@ ajouté au plan par amendement.
 - 80-04 : exception nommée à P80-D-37 (terminal-client en `{ brut: true }`).
 - 80-06 / P80-D-19 : l'arithmétique « tiroir de 684, liste ≈ 239 » supposait un tiroir sans obstacle ; le plancher de
   240 ne tient qu'avec le CLI, amendement daté avec la table.
+
+### Non-régression locale (tête 94619edf) et passage sans pointeur
+
+- Découverte complète du module cockpit, sur une copie figée : 88 suites, 81 vertes au premier passage. Les 7 rouges
+  sont verts au rejeu isolé. Cinq d'entre eux (equipe, projet-champs, signal-mod, who, retard) venaient de la copie sans
+  historique git ; git S6.1 et git-pagination GP3.1 étaient instables sous charge.
+- Suites qui exercent `39-vf-tour-placement.js` (`grep -l -E 'tour-placement|40-tour|#tour|visite|VF_TOUR'`, aucune ne
+  le nomme directement), chacune jouée seule : couloirs 68/0, git-pagination 43/0, git-tiroir 194/0, lancer-bandeau
+  161/0, onglet-code 32/0, projet-graphe 119/0, projet-visite 115/0, responsive 378/0, securite 92/0, surcouches 45/0,
+  transcript 103/0. Deux exceptions. terminal-tiroir donne 131/7 quand elle est jouée seule sous une charge du poste
+  d'environ 300 (hors de notre fait) ; elle est verte dans la découverte et en CI. visite-retours, jouée seule, a été
+  arrêtée à cause de la charge ; elle est verte en CI et dans les rejeux de l'exécuteur (93/0).
+- Le passage local sous Chrome sans pointeur n'a pas eu lieu (arrêté à cause de la charge). Il est couvert par la CI
+  Linux, dont le Chrome sans tête n'a pas de pointeur : runs 43206672595 (`14b80257`) et 43221332650 (`2a6cf236`), tous
+  deux verts.
+- Durées C5 remesurées sur le run vert 43206672595 : aucune des huit suites de la Phase 80 ne s'écarte de plus de 10 s
+  de sa durée inscrite.
