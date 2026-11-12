@@ -118,6 +118,12 @@ R['I2.7b'] = pick({ ...wk, rap: wk.evenements.map((e) => e[1]).join(',') }, ['pa
   R['I2.8c'] = JSON.stringify([par(idxFx, 'sess-aaaa0001').arbre, par(idxFx, 'sess-bbbb0001') === undefined, [...memo.keys()].map((k) => path.basename(k))]);
   R['I2.8d'] = String(JSON.stringify(idxFx).includes(LAB) || JSON.stringify(idxFx).includes(WORK));
 }
+// ---- I2.8e : sans `arbreDe` (preuve d'appartenance au lab, celle de l'appelant), jamais un transcript hors du lab indexé : l'appel est refusé
+{
+  const m = mk((id) => [base(id, 0, { type: 'user', message: { role: 'user', content: 'x' } }, path.join(WORK, 'autre')), base(id, 1000, { type: 'assistant', message: { id: 'm1', model: 'claude-test-1', stop_reason: null, usage: us(1, 1), content: [] } }, path.join(WORK, 'autre'))]); let r;
+  try { const i = M.idx.construire(M.idx.enumerer(m.projets), { maintenant: T0 + H, CC }); r = ['sans-erreur', i.voies.length]; } catch (e) { r = [e.name, 0]; }
+  R['I2.8e'] = JSON.stringify(r);
+}
 // ---- I2.9 forme inconnue
 {
   const m = mk((id) => [u(id, 0), a(id, 1000, 'm1', us(1, 1)), { ...a(id, 2000, 'm2', us(1, 1)), message: { role: 'assistant', content: [] } }, a(id, 3000, 'm3', us(9, 9))]);
@@ -211,6 +217,7 @@ c "I2.8a — arbreDe de la suite : principal, worktree prouvé, hors lab, faux w
 c "I2.8b — worktree prouvé indexé sous son nom, faux worktree hors de l'index et dans memoHors" I2.8b '[[["sess-wwww0001","wt-a"]],["sess-ffff0001.jsonl"]]'
 c "I2.8c — arbre principal null, transcript hors du lab absent et dans memoHors" I2.8c '[null,true,["sess-bbbb0001.jsonl"]]'
 c "I2.8d — aucun chemin dans l'index" I2.8d false
+c "I2.8e — sans arbreDe, un transcript hors du lab n'est jamais indexé : appel refusé, zéro voie" I2.8e '["TypeError",0]'
 c "I2.9a — ligne assistant sans message.id : forme inconnue, mesures nulles, jamais zéro, rien de plié ensuite" I2.9a '["inconnue",null,null,null,null]'
 c "I2.9b — relecture depuis zéro d'un fichier corrigé : ok" I2.9b '["ok",12]'
 c "I2.9c — une mise à jour sans changement garde ok" I2.9c ok

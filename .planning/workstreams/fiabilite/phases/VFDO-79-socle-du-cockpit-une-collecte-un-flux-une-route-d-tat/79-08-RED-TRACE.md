@@ -84,3 +84,7 @@ Déviation déclarée : la validation complète du fichier (`validerIndex`) et l
 - M-VALIDE (`garde:index-valide` : `return r;` remplacé par une acceptation inconditionnelle) : le run ne plante pas, la propriété P3.1 rougit (index accepté qui viole un invariant : clés interdites, segments, jetons, curseur) ; un premier essai a montré que le vérificateur indépendant plantait sur un index mal formé : un plantage du vérificateur compte maintenant comme une violation, jamais comme un vert.
 - M-FUITE (`garde:index-role` : le rôle lu dans `meta.description` au lieu de `meta.agentType`) : I7.1 rougit et nomme `role` (balayage de 30 transcripts générés et des fixtures).
 - Résultats au vert : `test-cockpit-index.sh` 109 PASS / 0 FAIL ; `test-cockpit-forme-claude.sh` 76 PASS / 0 FAIL ; `test-cockpit-who.sh` 157, `test-cockpit-signal.sh` 76, `test-cockpit-equipe-etats.sh` 86, `test-cockpit-transcript.sh` 103, `test-cockpit-vendor.sh` 87 PASS, 0 FAIL ; `check-file-size.sh` et `check-machine-paths.sh` rendent 0.
+
+## Correction après revue rv1 — appel sans `arbreDe`
+
+- Rouge avant correctif : `bash plugin/cockpit/scripts/tests/test-cockpit-index.sh` ; I2.8e (appel sans `arbreDe` sur un transcript dont le cwd est hors du lab) : attendu `["TypeError",0]`, obtenu `["sans-erreur",1]` (une voie créée pour un transcript hors du lab). Reste de la suite : 109 PASS.
