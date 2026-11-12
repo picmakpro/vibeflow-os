@@ -108,13 +108,58 @@ Accepté sans radical : « délégation de paiement », « delegate() ».
 - Portabilité : seul l'awk BSD du poste est mesuré ; mawk et gawk sont jugés par lecture. La CI
   Linux de la PR le tranche.
 
+## Suite : radical élargi à « deleg » (décision de la session principale, 2026-11-12)
+
+La question de règle laissée ouverte ci-dessus est tranchée par la session principale (message
+du 2026-11-12, en réponse à ce rapport) : le radical devient « deleg » après repli des accents et
+de la casse. Motif donné : « décision prise par délégation de X (…, 2026-11-08), option
+recommandée » dit la même chose que « décision déléguée » et passait encore. Ce n'est pas un
+arbitrage détaillé de Samuel. L'écart « délégation / delegate non couverts » ci-dessus est donc
+fermé.
+
+- Commits : `9cb68a98` (témoins rouges seuls), `e25e675f` (correctif + en-tête + précision datée
+  dans l'amendement d'ADR-072, sans second amendement ; les phrases devenues fausses sont
+  retirées).
+- Rouge sur `a0aad37d` : 10 cas DEL2 (hausse × « délégation », « delegation », « delegate »,
+  « DÉLÉGATION » ; retrait seul × 2 ; retrait délégation + directe × 2, la ligne recopiée étant la
+  délégation ; sentinelle × 2). Exemple : attendu rc 1 + `HAUSSE-SANS-ARBITRAGE` + INFO, obtenu
+  rc 0 `CONFORME`. Rejoué par le checker frais : même rouge.
+- Mutant MUT-14 (radical remis à « delegu ») tué dans la suite ; MUT-11 adapté (sa ligne cible
+  seule) et toujours tué. Mutants du checker tués : radical appliqué avant le repli des accents
+  (28 ko), radical sur le message entier (19 ko), repli de « É » retiré (4 ko). Libellés de cas
+  comparés par `comm` : 95 avant, 103 après, aucun retiré.
+- Faux refus assumés, nommés avec leur remède dans l'en-tête et l'ADR : « délégation de
+  paiement », « delegate() », « délégué syndical » sur la même ligne qu'une citation directe →
+  porter la citation sur sa propre ligne. Limite qui demeure : une paraphrase sans le radical
+  (« confiée ») ou une citation directe fabriquée passe toujours.
+- Suite seule sur `e25e675f` : `== bilan : 90 ok, 0 ko ==`. Rejeu du job `gates` sur `e25e675f` :
+  21 rejouées, 4 sautées, 0 en échec. Budget d'instructions : sortie identique (`cmp`), aucune
+  hausse.
+- Non-régression, version `e25e675f`, cascade CI (base = merge-base avec `origin/main`
+  `de19669b`) :
+
+  | Tête | commits non-merge | sortie | rc |
+  |---|---|---|---|
+  | `origin/release/v2.77.0` `08e3dba0` | 328 | CONFORME | 0 |
+  | `origin/integration/cockpit-audit` `ab8f3e64` | 751 | CONFORME | 0 |
+  | `origin/feat/phase-79-socle-cockpit` `244ab998` | 839 | CONFORME | 0 |
+  | `origin/feat/phase-80-trois-formes` `342a8763` | 771 | CONFORME | 0 |
+
+- Checker frais (revue5) : `passed`. Mineur hors périmètre : sous `set -e`, un mutant non
+  opposable fait quitter la suite sans bilan (patron de tous les blocs MUT, reconduit par MUT-14).
+- Environnement : le disque du poste était presque plein pendant la revue (le checker a vu « No
+  space left on device » et a rejoué avec un `TMPDIR` au scratchpad). Les journaux de rejeu de la
+  mission pèsent quelques centaines de Ko : la saturation ne vient pas d'elle.
+
 ## Budgets
 
 Relevé des blocs reçus, sans recalcul : vf-coder 212 045 (build), 235 015 (fix1), 246 443 (fix2),
 253 914 (fix3) tokens cumulés de contexte ; vf-reviewer 118 298 (revue), 103 031 (revue2),
 75 793 (revue3), 63 088 (revue4 : `passed`, mutants retrait et sentinelle tués, 72 ok / 1 ko
 chacun). `estimate`/`actuals` : `absent` (aucun PLAN.md exécuté).
-Minds dispatchés : 5 (1 vf-coder repris 3 fois, 4 vf-reviewer frais). Tours de correction : 3.
+Suite « deleg » : vf-coder 274 624 (repris), vf-reviewer 98 332 (revue5).
+Minds dispatchés : 6 (1 vf-coder repris 4 fois, 5 vf-reviewer frais). Tours de correction : 3,
+plus un mandat de règle élargie.
 
 ## Moins cher la prochaine fois
 
@@ -141,6 +186,11 @@ Minds dispatchés : 5 (1 vf-coder repris 3 fois, 4 vf-reviewer frais). Tours de 
 {"verdict":"non-régression G-1 sur release/v2.77.0, integration/cockpit-audit, phase-79, phase-80","commande":"bash scripts/check-baseline-arbitrage.sh --root <worktree détaché> (cascade CI)","exit_code":0,"sha":"e3a20973c14353a087d11a812c98cbce2c91e7bd"},
 {"verdict":"témoin rouge sur le code d'avant (revue)","commande":"suite neuve contre check-baseline-arbitrage.sh de ab8f3e64","exit_code":1,"sha":"ccdd1246725af6e6d43d5f8d37e84857b32a8c96"},
 {"verdict":"budget d'instructions inchangé","commande":"bash plugin/conductor/scripts/check-instruction-budget.sh (avant/après, cmp)","exit_code":0,"sha":"ccdd1246725af6e6d43d5f8d37e84857b32a8c96"},
+{"verdict":"suite du gate G-1 (radical deleg)","commande":"bash scripts/tests/test-check-baseline-arbitrage.sh","exit_code":0,"sha":"e25e675f2095a4a18f82f319d0e18d293e64bc48"},
+{"verdict":"témoin rouge deleg sur le code d'avant (revue5)","commande":"suite neuve contre check-baseline-arbitrage.sh de a0aad37d","exit_code":1,"sha":"e25e675f2095a4a18f82f319d0e18d293e64bc48"},
+{"verdict":"rejeu du job gates de ci.yml (radical deleg)","commande":"bash replay-ci-jobs.sh --job gates --root <wt>","exit_code":0,"sha":"e25e675f2095a4a18f82f319d0e18d293e64bc48"},
+{"verdict":"non-régression G-1 deleg sur les quatre têtes","commande":"bash scripts/check-baseline-arbitrage.sh --root <worktree détaché> (cascade CI)","exit_code":0,"sha":"e25e675f2095a4a18f82f319d0e18d293e64bc48"},
+{"verdict":"check-gate-touche (worker, deleg)","commande":"bash scripts/check-gate-touche.sh --base-ref ab8f3e64","exit_code":0,"sha":"e25e675f2095a4a18f82f319d0e18d293e64bc48"},
 {"verdict":"recette","preuve":"amont"}
 ]}
 ```
