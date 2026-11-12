@@ -14,14 +14,11 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { DATA_START, extraireGraphe } from './vf-cockpit-embed.mjs';
+import { extraireGraphe } from './vf-cockpit-embed.mjs';
 import { projectIndex, answerLocally } from './vf-cockpit-ask.mjs';
 import { findLabRoot, engineDir, outputDir, confiner } from './vf-cockpit-paths.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-// la zone de données d'une page assemblée porte le nom VibeFlow de la globale ; tant que le module n'écrit pas ce nom lui-même (79-06, tâche 4a),
-// son marqueur est celui de l'amont : on essaie le sien, puis la forme VibeFlow ramenée à lui. Après la tâche 4a le premier essai suffit.
-const lireGraphe = (html) => { try { return extraireGraphe(html); } catch { return extraireGraphe(html.replace('<script>window.VF_COCKPIT = ', DATA_START)); } };
 let G, q, I;
 try {
   const lab = findLabRoot(process.cwd());
@@ -29,7 +26,7 @@ try {
   const moteur = engineDir(here).chemin;
   if (!moteur) throw new Error('moteur du module introuvable à côté du dossier de scripts');
   const page = confiner(lab, path.join(outputDir(lab), 'project.html'));
-  G = lireGraphe(fs.readFileSync(page, 'utf8'));
+  G = extraireGraphe(fs.readFileSync(page, 'utf8'));
   // moteur de requête du graphe (graph-query.js du module), comme le serveur le charge
   const coreSrc = fs.readFileSync(path.join(moteur, 'assets', 'graph-query.js'), 'utf8');
   const { createGraphQuery } = new Function(`${coreSrc}; return { createGraphQuery };`)();

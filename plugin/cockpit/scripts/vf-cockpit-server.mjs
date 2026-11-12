@@ -145,7 +145,7 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
 
   // ---- crochets des questions (P14) : la page d'où vient la question se reconnaît à son jeton ----
   function avantQuestion({ req, body, send }) {
-    body.project = memeJeton(req.headers['x-floorplan-token'], ptoken) && !!GP; // jamais lu du corps : le navigateur ne le fixe pas
+    body.project = memeJeton(req.headers['x-vf-cockpit-token'], ptoken) && !!GP; // jamais lu du corps : le navigateur ne le fixe pas
     const r = resoudreModele({ choix: body.model, env: process.env });
     if (r.erreur) { send('failure', { code: 'modele_refuse', message: `Modèle refusé : seuls ${MODELES.join(', ')} sont admis.` }); return 'repondu'; }
     body.modeleResolu = r.modele; // écrasé à chaque question, jamais écrit sur disque ni journalisé avec la question

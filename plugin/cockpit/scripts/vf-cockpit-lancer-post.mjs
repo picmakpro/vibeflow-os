@@ -10,7 +10,7 @@
 // Aucun en-tête de partage entre origines : une requête de contrôle préalable reçoit 405. Aucun écouteur, aucune lecture de fichier, aucun accès à l'environnement.
 import { egal } from './vf-cockpit-terminal-amorce.mjs';
 
-export const ENTETE_JETON = 'x-floorplan-token'; // renommé à l'assemblage par renommerTexte (comme vf-cockpit-server.mjs) ; l'ancien nom est alors refusé
+export const ENTETE_JETON = 'x-vf-cockpit-token'; // renommé à l'assemblage par renommerTexte (comme vf-cockpit-server.mjs) ; l'ancien nom est alors refusé
 export const CORPS_MAX = 512;
 export const REFUS = Object.freeze({ hote: 403, methode: 405, origine: 403, jeton: 403, type: 415, taille: 413, corps: 400, schema: 400, interne: 500 });
 
