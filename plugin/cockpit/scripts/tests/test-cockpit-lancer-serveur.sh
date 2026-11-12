@@ -346,7 +346,7 @@ for _ in $(seq 1 30); do grep -q '"envoye"' "$STUB_LOG" && break; sleep 0.1; don
 assert_eq "L2 — cinq messages lancee mal formés (UUID, clé en trop, verbe, at absent, cible hors liste) envoyés : la carte reste false" "$(grep -c '"envoye"' "$STUB_LOG") $(lancee_de)" "1 false"
 unsrv
 assert_eq "L3 — message valide poussé à l'abonné : lancees() est une Map portant la session avec { phase, ws, verbe }" "$(node "$AUX/harnais.mjs" l3 "$STUBO" "$LAB")" '{"estMap":true,"taille":1,"entree":{"phase":"1","ws":null,"verbe":"executer"}}'
-assert_has "L3 — vf-cockpit-server.mjs de la sortie passe lancees: lancer.lancees() à pageEquipe" "$(cat "$STUBO/vf-cockpit-server.mjs")" "lancees: lancer.lancees()"
+assert_has "L3 — vf-cockpit-server.mjs de la sortie passe lancees: lancer.lancees() à pageEquipe" "$(cat "$(mod_de "$STUBO")/scripts/vf-cockpit-server.mjs")" "lancees: lancer.lancees()"
 assert_eq "L4 — les trois états du suivi atteignent la carte : attendue, vue, terminee" "$(node "$AUX/harnais.mjs" l4 "$STUBO" "$LAB")" "attendue,vue,terminee"
 
 echo "=== E — états inertes et bloquants ==="
