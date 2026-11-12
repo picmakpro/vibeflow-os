@@ -27,7 +27,8 @@
     const barre = `<div class="vp-barre"><div class="vf-bar${b.enCours ? ' st-active' : ''}" role="progressbar" aria-valuemin="0" aria-valuemax="100"`
       + ` aria-valuenow="${b.pourcent}" aria-label="Avancement du jalon" aria-valuetext="${h(texte)}"><i style="width:${b.pourcent}%"></i></div>`
       + `<span class="vp-pc" aria-hidden="true">${b.pourcent} %</span></div>`;
-    const cs = b.total ? `<div class="vp-couloirs">${M.COULOIRS.map((d) => couloir(d, b.couloirs[d[0]], o)).join('')}</div>` : '<p class="vp-vide">aucune phase</p>';
+    const lanes = M.COULOIRS.map((d) => couloir(d, b.couloirs[d[0]], o)).join('');
+    const cs = b.total ? `<div class="vp-couloirs">${lanes}</div>` : '<p class="vp-vide">aucune phase</p>';
     return `<section class="vp-jalon" aria-labelledby="${id}" data-jalon="${h(b.jalon)}"><div class="vp-jt"><div class="vp-jn"><h2 id="${id}">${h(b.nom)}</h2>`
       + `<p class="vp-syn">${h(b.synthese)}</p></div>${barre}</div>${cs}</section>`;
   };
@@ -37,7 +38,8 @@
       + `${date}${avecPastille && !r.date ? pastille(r.st, r.mot) : ''}</button>${complet(r)}</li>`;
   };
   const disclosure = (cle, titre, compte, lignes, ouverts) => `<details class="vp-details" data-cle="${h(cle)}"${ouverts && ouverts.has(cle) ? ' open' : ''}>`
-    + `<summary><span class="vp-sum-t">${h(titre)}</span><span class="vp-n">${h(compte)}</span></summary><ul class="vp-rangees">${lignes.join('')}</ul></details>`;
+    + `<summary><span class="vp-sum-t">${h(titre)}</span><span class="vp-n">${h(compte)}</span></summary>`
+    + `<ul class="vp-rangees">${lignes.join('')}</ul></details>`;
   const historique = (hist, o) => (hist ? disclosure('historique', 'Historique', hist.resume,
     hist.lignes.map((l) => rangee({ id: l.id, titre: l.nom, coupe: false, date: l.texte }, o, false)), o.ouverts) : '');
   const listes = (ls, o) => ls.map((l) => disclosure(l.cle, l.titre, l.compte, l.rows.map((r) => rangee(r, o)), o.ouverts)).join('');

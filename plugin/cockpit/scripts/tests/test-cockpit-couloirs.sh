@@ -1,8 +1,10 @@
 #!/usr/bin/env bash
 # test-cockpit-couloirs.sh — Projet en couloirs (80-04, FORM-05, FORM-07, P80-D-01..D-04, D-07, D-28..D-30, D-37, D-50, D-51), un vrai Chrome, sans réseau.
-#   CL1 couloirs par défaut, graphe à ?vue=graphe, section de panneau, adresse de naviguer · CL2 en-tête de jalon, ligne d'état, troncature, listes, XSS, mouvement réduit
+#   CL1 couloirs par défaut, graphe à ?vue=graphe, section de panneau, adresse de naviguer
+#   CL2 en-tête de jalon, ligne d'état, troncature, listes, XSS, contrastes, mouvement réduit
 #   CL3 clavier, panneau par-dessus, zone basse, visite, direct, focus orphelin, bords latéraux (pilote : chrome-couloirs-clavier.mjs)
-#   Mutants (copie du module dans $WORK, jamais le module) : M-FOOT, M-XSS, M-POUSSE, M-ORPHELIN, M-EXTREMITE. CL_SCRIPTS = dossier de scripts à bâtir (rejeu sur la base).
+#   Mutants (copie du module dans $WORK, jamais le module) : M-FOOT, M-XSS, M-POUSSE, M-ORPHELIN, M-EXTREMITE.
+#   CL_SCRIPTS = dossier de scripts à bâtir (rejeu sur la base).
 # Sans navigateur : SUITE SAUTÉE (exit 0, message explicite), jamais un vert à vide.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -12,7 +14,8 @@ for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Googl
   [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi
 done
 if [ -z "$CHROME" ]; then
-  . "$HERE_T/chrome-saut.sh"; vf_chrome_saut "  ⊘ SUITE SAUTÉE : aucun navigateur (Chrome, Chromium) — les couloirs de Projet NON vérifiés, non comptés comme réussis"; exit 0
+  . "$HERE_T/chrome-saut.sh"
+  vf_chrome_saut "  ⊘ SUITE SAUTÉE : aucun navigateur (Chrome, Chromium) — les couloirs de Projet NON vérifiés, non comptés comme réussis"; exit 0
 fi
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
@@ -59,10 +62,11 @@ assert_eq "CL2.3b — donnée absente n'est pas zéro : sans avancement ni exige
 CUT='(t) => { const a = Array.from(t); return a.slice(0, 31).join("") + "…" + a.slice(-20).join(""); }'
 T24="j.cl24.a52.plein, j.cl24.a52.lignes <= 3, j.cl24.a52.larg >= 222 && j.cl24.a52.larg <= 230, j.cl24.a52.decrit, j.cl24.a52.titre === j.cl24.A52"
 L24="Array.from(j.cl24.M53).length === 53 && Array.from(j.cl24.L70).length === 70, j.cl24.m53.titre === cut(j.cl24.M53), j.cl24.m53.decrit === j.cl24.M53"
-N24="j.cl24.l70.titre === cut(j.cl24.L70), j.cl24.l70.decrit === j.cl24.L70, j.cl24.m53.nom.startsWith('6 ' + cut(j.cl24.M53) + ','), j.cl24.l70.nom.startsWith('3 ' + cut(j.cl24.L70) + ',')"
+N24="j.cl24.l70.titre === cut(j.cl24.L70), j.cl24.l70.decrit === j.cl24.L70, j.cl24.m53.nom.startsWith('6 ' + cut(j.cl24.M53) + ','),
+  j.cl24.l70.nom.startsWith('3 ' + cut(j.cl24.L70) + ',')"
 assert_eq "CL2.4 — titre de 52 caractères entier en ≤ 3 lignes à ≈ 226 px ; 53 et 70 : 31 + « … » + 20, texte complet décrit, nom accessible" \
   "$(E2 "((cut) => [$T24, $L24, $N24])($CUT)")" '[true,true,true,null,true,true,true,true,true,true,true,true]'
-assert_eq "CL2.5 — Historique, Backlog, Graines, Releases : details repliés avec leur compte, aucune carte de canevas, jamais « DIFFÉRÉ » ; un clic sélectionne l'entrée" \
+assert_eq "CL2.5 — Historique, Backlog, Graines, Releases : details repliés et comptés, aucune carte de canevas, jamais « DIFFÉRÉ » ; clic = sélection" \
   "$(E2 '[j.cl25.liste, j.cl25.cartesFile, j.cl25.differe, j.cl25c[0].startsWith("f:.planning/BACKLOG.md#"), j.cl25c[1]]')" \
   '[[["historique",false,"1 jalon · 1 phase"],["backlog",false,"2 entrées"],["graines",false,"1 graine"],["releases",false,"0 tag"]],0,false,true,true]'
 assert_eq "CL2.6 — T-80-07 : un titre de phase « <img onerror> » du ROADMAP : 0 img, aucun code exécuté, texte rendu tel quel" \
@@ -82,16 +86,17 @@ assert_eq "CL2.9 — témoin : aucune section du pilote n'a échoué" "$(E2 'Obj
 
 echo "=== CL3 — clavier, sélection et plongée, toucher (panneau latéral, feuille de détail) ==="
 R3="$(mesurer chrome-couloirs-clavier.mjs cl3a)"; sonde "$R3"; E3() { E "$1" "$R3"; }
-assert_eq "CL3.1 — 1024 px : un seul arrêt de tabulation par bloc ; → parcourt À faire, En cours, À recetter, Fait, ← revient, Fin, Origine, ↑/↓ restent dans le couloir" \
+assert_eq "CL3.1 — 1024 px : un arrêt de tabulation par bloc ; → parcourt les quatre couloirs, ← revient, Fin, Origine, ↑/↓ restent dans le couloir" \
   "$(E3 '[j.cl31.arret1, j.cl31.arret2, j.cl31.suite.map((x) => x[1]).join()]')" \
   '[["n:ph-3",1],["summary",null],"n:ph-4,n:ph-6,n:ph-1,n:ph-6,n:ph-2,n:ph-3,n:ph-5,n:ph-5,n:ph-3"]'
-assert_eq "CL3.2 — 800 px (2 × 2) : ↓ d'À faire va à À recetter, ↓ d'En cours à Fait, ↑ symétrique ; À recetter vide : ↓ va à Fait ; En cours vide : → ne bouge pas" \
+assert_eq "CL3.2 — 800 px (2 × 2) : ↓ d'À faire va à À recetter, ↓ d'En cours à Fait, ↑ symétrique ; couloir vide sauté ; En cours vide : → ne bouge pas" \
   "$(E3 '[j.cl32.suite.map((x) => x[1]).join(), j.cl32.corps]')" '["n:ph-5,n:ph-6,n:ph-5,n:ph-1,n:ph-4,n:ph-1,n:ph-3",true]'
 assert_eq "CL3.3a — panneau latéral : Tab et flèche sélectionnent (aria-current) ; Échap désélectionne, le focus reste ; Espace resélectionne" \
   "$(E3 '[j.cl33.suit, j.cl33.esc, j.cl33.esp]')" '[["n:ph-4",["n:ph-4"]],[null,"n:ph-4"],["n:ph-4",["n:ph-4"]]]'
-assert_eq "CL3.3b — Entrée plonge ; Échap (ou Retour arrière) revient à la racine, focus sur la carte quittée ; Échap depuis le panneau : ni désélection ni remontée" \
-  "$(E3 '[j.cl33.dedans, j.cl33.retours.length >= 1 && j.cl33.retours.length <= 2, j.cl33.retours[j.cl33.retours.length - 1], j.cl33.dos, j.cl33.bs, j.cl33.panneau]')" \
-  '["n:ph-4",true,"root",["root","n:ph-4"],["root","n:ph-4"],["n:ph-4","root"]]'
+assert_eq "CL3.3b — Entrée plonge ; Échap (ou Retour arrière) revient à la racine, focus sur la carte quittée ; Échap du panneau : ni désélection ni remontée" \
+  "$(E3 '[j.cl33.dedans, j.cl33.retours.length >= 1 && j.cl33.retours.length <= 2, j.cl33.retours[j.cl33.retours.length - 1],
+    j.cl33.dos, j.cl33.bs, j.cl33.panneau, j.cl33.foc[0]]')" \
+  '["n:ph-4",true,"root",["root","n:ph-4"],["root","n:ph-4"],["n:ph-4","root"],"button"]'
 assert_eq "CL3.4 — 390 px tactile : un toucher sélectionne (feuille ouverte, bouton d'ouvrir dedans) sans plonger ; Espace sélectionne ; Entrée plonge" \
   "$(E3 '[j.cl34.touch[0], j.cl34.touch[1], j.cl34.touch[2], j.cl34.touch[3] >= 1, j.cl34.focus, j.cl34.espace, j.cl34.entree]')" \
   '["n:ph-3",true,"root",true,"n:ph-3","n:ph-4","n:ph-4"]'
@@ -99,28 +104,33 @@ assert_eq "CL3.9a — témoin : aucune section du pilote n'a échoué (clavier)"
 
 echo "=== CL3 — panneau par-dessus, visite, direct, réveil, mouvement réduit, focus orphelin, bords latéraux ==="
 R4="$(mesurer chrome-couloirs-clavier.mjs cl3b)"; sonde "$R4"; E4() { E "$1" "$R4"; }
-assert_eq "CL3.5 — 1440 px : positions et largeurs des couloirs identiques panneau ouvert et fermé ; une carte sous le panneau est ramenée hors de lui, sans animation" \
-  "$(E4 '[j.cl35.panneaux, j.cl35.ouvert.join() === j.cl35.ferme.join(), j.cl35.m.hors, j.cl35.m.defile > 0, j.cl35.m.mode, j.cl35.actives]')" '[[true,false],true,true,true,"auto",0]'
-V37="[j.cl37.clicOuvre.f, j.cl37.clicOuvre.actif, j.cl37.clicOuvre.svg, j.cl37.clicFin.f, j.cl37.clicFin.actif, j.cl37.auto.f, j.cl37.auto.actif, j.cl37.fin, j.cl37.url]"
-assert_eq "CL3.7 — la visite bascule en graphe avant de jouer (clic, ou démarrage sans clic) ; à sa fin la forme d'avant revient ; l'adresse n'est pas réécrite" \
-  "$(E4 "$V37")" '["graphe",true,"visible","couloirs",false,"graphe",true,"couloirs",""]'
-assert_eq "CL3.8 — direct : une phase focalisée change de couloir au redessin ; focus, arrêt itinérant, sélection, défilement et details restent ; une annonce" \
+assert_eq "CL3.5 — 1440 px : couloirs identiques panneau ouvert et fermé ; une carte sous le panneau est ramenée hors de lui, sans animation" \
+  "$(E4 '[j.cl35.panneaux, j.cl35.ouvert.join() === j.cl35.ferme.join(), j.cl35.m.hors, j.cl35.m.defile > 0, j.cl35.m.mode,
+    j.cl35.actives]')" '[[true,false],true,true,true,"auto",0]'
+V37="[j.cl37.clicOuvre.f, j.cl37.clicOuvre.actif, j.cl37.clicOuvre.svg, j.cl37.clicFin.f, j.cl37.clicFin.actif, j.cl37.auto.f,
+  j.cl37.auto.actif, j.cl37.fin, j.cl37.url]"
+assert_eq "CL3.7 — la visite bascule en graphe avant de jouer (clic ou démarrage sans clic) ; à sa fin la forme d'avant revient ; adresse non réécrite" \
+  "$(E4 "$V37")" '["graphe",true,"visible","couloirs",false,"graphe",true,"couloirs","?vue=couloirs"]'
+assert_eq "CL3.8 — direct : une phase focalisée change de couloir au redessin ; focus, arrêt, sélection, défilement, details restent ; une annonce" \
   "$(E4 '[j.cl38.id, j.cl38.cur, j.cl38.av[0] > 0, j.cl38.apres[0] === j.cl38.av[0], j.cl38.apres[1] === j.cl38.av[1], j.cl38.apres.slice(2)]')" \
   '["n:ph-3",["n:ph-3"],true,true,true,[true,"a-recetter","0","Phase 3 : À recetter"]]'
-assert_eq "CL3.9 — P80-C76-3 : reveal d'une phase en couloirs sélectionne la carte à la racine ; P80-C76-2 : la section overview du pilote suit le corps de la vue d'ensemble" \
+assert_eq "CL3.9 — P80-C76-3 : reveal d'une phase en couloirs sélectionne sa carte à la racine ; P80-C76-2 : la section overview suit le corps" \
   "$(E4 '[j.cl39.c, j.cl39.sel, j.cl39.cur, j.cl39.ov]')" '["root","n:ph-2",["n:ph-2"],{"dernier":true,"avant":true}]'
 assert_eq "CL3.10 — mouvement réduit : aucune animation active (hors panneau) après sélection, plongée et remontée" \
   "$(E4 '[j.cl310.charge, j.cl310.selection, j.cl310.plongee, j.cl310.remontee]')" '[0,0,0,0]'
 O3="j.cl311"
-assert_eq "CL3.11a — focus orphelin : la carte focalisée retirée rend le focus à la carte suivante du bloc (en ordre de lecture), sinon à la précédente ; jamais body" \
+assert_eq "CL3.11a — focus orphelin : la carte retirée rend le focus à la suivante du bloc (ordre de lecture), sinon à la précédente ; jamais body" \
   "$(E4 "[$O3.a.id, $O3.a.ti, $O3.b.id, $O3.b.ti]")" '["n:ph-6","0","n:ph-1","0"]'
-assert_eq "CL3.11b — une rangée de Backlog retirée : la suivante ; la dernière : l'élément sélectionné rendu, sinon le h1 « Projet » ; toutes les phases : le h1" \
-  "$(E4 "[$O3.c.suivante.id, $O3.c.suivante.ti, $O3.c.derniere.hid, $O3.cSel.id, $O3.d.hid]")" '["f:.planning/BACKLOG.md#autre-entrée","0","vf-projet-titre","n:ph-3","vf-projet-titre"]'
+assert_eq "CL3.11b — rangée de Backlog retirée : la suivante ; la dernière : l'élément sélectionné rendu, sinon le h1 « Projet » ; toutes les phases : le h1" \
+  "$(E4 "[$O3.c.suivante.id, $O3.c.suivante.ti, $O3.c.derniere.hid, $O3.cSel.id, $O3.d.hid]")" \
+  '["f:.planning/BACKLOG.md#autre-entrée","0","vf-projet-titre","n:ph-3","vf-projet-titre"]'
 assert_eq "CL3.11c — le focus d'un champ n'est jamais volé par un redessin" "$(E4 "$O3.champ.hid")" "ask-input"
 for CLE in 1440 1024; do
   X="j.cl312$CLE"
-  assert_eq "CL3.12 ($CLE) — panneau latéral : extrémité de fin, carte hors du panneau ; tiroir Git : extrémité de début, flèche vers une carte qu'il recouvrait" \
-    "$(E4 "[parseFloat($X.panneau.fin) >= $X.panneau.pw, $X.panneau.pw >= 360, $X.panneau.carte[1] <= $X.panneau.panneau[0] + 0.5, parseFloat($X.tiroir.debut) >= $X.tiroir.tiroir[1] - $X.tiroir.tiroir[0] + 16, $X.tiroir.carte[0] >= $X.tiroir.tiroir[1] - 0.5]")" '[true,true,true,true,true]'
+  assert_eq "CL3.12 ($CLE) — panneau latéral : extrémité de fin, carte hors du panneau ; tiroir Git : extrémité de début, carte ramenée hors de lui" \
+    "$(E4 "[parseFloat($X.panneau.fin) >= $X.panneau.pw, $X.panneau.pw >= 360, $X.panneau.carte[1] <= $X.panneau.panneau[0] + 0.5,
+      parseFloat($X.tiroir.debut) >= $X.tiroir.tiroir[1] - $X.tiroir.tiroir[0] + 16, $X.tiroir.carte[0] >= $X.tiroir.tiroir[1] - 0.5]")" \
+    '[true,true,true,true,true]'
 done
 for CLE in 800 390 1100t; do
   X="j.cl312$CLE"
@@ -137,8 +147,9 @@ LABT="$WORK/lab-term"; mklab "$LABT"; build_serve "$LABT" "$WORK/scripts-hote" "
 R5="$(mesurer chrome-couloirs-clavier.mjs cl3c "" "$DBL")"; sonde "$R5"; E5() { E "$1" "$R5"; }; vf_hyg_stop "$SRV"
 for CLE in 1440 1024 390 800 1100t; do
   X="j.cl36['$CLE']"
-  assert_eq "CL3.6 ($CLE) — padding-bottom = scroll-padding-block-end ≥ #ask + #vf-coin + pastille (+ feuille) ; la dernière carte n'en recouvre aucun (Git, terminal ouverts puis fermés)" \
-    "$(E5 "[Object.values($X).every((m) => m && m.pb === m.spb && m.pb >= m.somme && m.inter.length === 0), $X.base.haut, $X.base.vus.includes('pastille'), $X.terminal.vus.includes('tiroirTerm')]")" '[true,true,true,true]'
+  assert_eq "CL3.6 ($CLE) — padding-bottom = scroll-padding-block-end ≥ #ask + #vf-coin + pastille (+ feuille) ; aucun recouvrement (Git, terminal)" \
+    "$(E5 "[Object.values($X).every((m) => m && m.pb === m.spb && m.pb >= m.somme && m.inter.length === 0), $X.base.haut,
+      $X.base.vus.includes('pastille'), $X.terminal.vus.includes('tiroirTerm')]")" '[true,true,true,true]'
 done
 assert_eq "CL3.6b — témoins : la feuille de détail est mesurée à 390 px ; #ask et la pastille sont mesurés à 1440 px ; aucune section du pilote n'a échoué" \
   "$(E5 "[j.cl36['390'].feuille.vus.includes('feuille'), j.cl36['1440'].base.vus.includes('ask'), Object.keys(j.erreurs).join()]")" '[true,true,""]'
@@ -159,8 +170,9 @@ mutant M-ORPHELIN 41-vf-projet-vue.js "if (!cible && m.id) {" "if (!cible) retur
 assert_eq "M-ORPHELIN — le mutant rougit CL3.11 (règle de focus orphelin retirée : le focus tombe sur body) (témoin : CL3.8 reste vert)" \
   "$(E "[j.cl311.a.id !== 'n:ph-6', j.cl311.a.tag, j.cl38.id === 'n:ph-3']" "$RM")" '[true,"body",true]'
 mutant M-EXTREMITE 41-vf-projet-vue.js "left: 100%; width: var(--pw, 0px);" "left: 100%; width: 0px;" chrome-couloirs-clavier.mjs cl3b cl312
-assert_eq "M-EXTREMITE — le mutant rougit CL3.12 (extrémité de fin retirée, scroll-padding gardé : la carte reste sous le panneau) (témoin : scroll-padding gardé)" \
-  "$(E "[j.cl312['1440'].panneau.carte[1] > j.cl312['1440'].panneau.panneau[0] + 0.5, parseFloat(j.cl312['1440'].panneau.fin) >= j.cl312['1440'].panneau.pw]" "$RM")" "[true,true]"
+assert_eq "M-EXTREMITE — le mutant rougit CL3.12 (extrémité de fin retirée : la carte reste sous le panneau) (témoin : scroll-padding gardé)" \
+  "$(E "[j.cl3121440.panneau.carte[1] > j.cl3121440.panneau.panneau[0] + 0.5,
+    parseFloat(j.cl3121440.panneau.fin) >= j.cl3121440.panneau.pw]" "$RM")" "[true,true]"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

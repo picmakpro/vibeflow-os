@@ -1,5 +1,8 @@
-// VibeFlow (80-04) : modèle pur des couloirs de Projet (FORM-05, P80-D-03) — blocs de jalon, couloirs, ligne d'état, troncature, listes. Aucun DOM, aucune requête.
-// Lit seulement les champs du graphe : `st`, `avancement`, `exigences` (jamais `foot`, jamais le nœud `.req` ni les liens « couvre », P80-C76-6). Exposé : window.__vfProjetModele.
+// VibeFlow (80-04) : modèle pur des couloirs de Projet (FORM-05, P80-D-03) — blocs de jalon, couloirs, ligne d'état, troncature, listes. Aucun DOM,
+// aucune requête.
+// Lit seulement les champs du graphe : `st`, `avancement`, `exigences` (jamais le pied d'une phase, jamais le nœud d'exigences ni les liens de couverture,
+// P80-C76-6). Seule exception de forme : la date d'un tag de release est le pied de son entrée (rangée de Releases), pas la ligne d'état d'une phase.
+// Exposé : window.__vfProjetModele.
 (() => {
   const SEUIL = 52, DEBUT = 31, FIN = 20; // P80-D-50 f : au-delà de 52 caractères, 31 premiers + « … » + 20 derniers
   const COULOIRS = [['a-faire', 'À faire', 'todo'], ['en-cours', 'En cours', 'active'], ['a-recetter', 'À recetter', 'recette'], ['fait', 'Fait', 'done']];
@@ -43,7 +46,8 @@
     for (const n of phases) couloirs[etatDe(n)].push(carte(n));
     const faites = couloirs.fait.length, total = phases.length, recette = couloirs['a-recetter'].length;
     const pourcent = total ? Math.floor((100 * faites) / total) : 0; // strict : 100 % seulement si faites = total
-    return { jalon: 'n:' + j.id, nom: j.label, total, faites, recette, pourcent, enCours: pourcent > 0 && pourcent < 100, synthese: synthese(faites, total, recette), couloirs };
+    return { jalon: 'n:' + j.id, nom: j.label, total, faites, recette, pourcent, enCours: pourcent > 0 && pourcent < 100, synthese: synthese(faites,
+      total, recette), couloirs };
   };
   const SC = () => window.Floorplan;
 
@@ -63,16 +67,21 @@
     const m = lignes.reduce((s, l) => s + l.phases, 0);
     return clos.length ? { resume: `${pl(clos.length, 'jalon')} · ${pl(m, 'phase')}`, lignes } : null;
   };
-  const rangee = (id, titre, st, date) => { const t = tronquer(titre); return { id, titre: t.affiche, complet: t.complet, coupe: t.coupe, st, mot: MOTS[st] || MOTS.todo, date: date || '' }; };
+  const rangee = (id, titre, st, date) => { const t = tronquer(titre); return { id, titre: t.affiche, complet: t.complet, coupe: t.coupe, st,
+    mot: MOTS[st] || MOTS.todo, date: date || '' }; };
   const listes = (G) => {
     const out = [], existe = (id) => (G.nodes || []).some((n) => n.id === id);
     const fichiers = (id) => (G.files || []).filter((f) => f.n === id);
     const l = (cle, titre, unite, rows) => out.push({ cle, titre, compte: pl(rows.length, unite), rows });
     if (existe('backlog')) l('backlog', 'Backlog', 'entrée', fichiers('backlog').map((f) => rangee('f:' + f.p, f.name, f.st === 'done' ? 'done' : 'todo')));
     if (existe('seeds')) l('graines', 'Graines', 'graine', fichiers('seeds').map((f) => rangee('f:' + f.p, f.name, 'todo')));
-    if (existe('releases')) l('releases', 'Releases', 'tag', fichiers('releases').map((f) => rangee('f:' + f.p, f.name, 'done', f.foot)));
-    if (existe('missions')) l('missions', 'Missions hors phase', 'mission', (G.nodes || []).filter((n) => n.parent === 'missions').map((n) => rangee('n:' + n.id, n.label, n.st || 'todo')));
+    if (existe('releases')) {
+      l('releases', 'Releases', 'tag', fichiers('releases').map(({ p, name, foot: date }) => rangee('f:' + p, name, 'done', date)));
+    }
+    if (existe('missions')) l('missions', 'Missions hors phase', 'mission', (G.nodes
+      || []).filter((n) => n.parent === 'missions').map((n) => rangee('n:' + n.id, n.label, n.st || 'todo')));
     return out;
   };
-  window.__vfProjetModele = Object.freeze({ COULOIRS, MOTS, etatDe, ligneEtat, tronquer, etiquettePreuve, carte, blocs, historique, listes, synthese, titreDe, numeroDe });
+  window.__vfProjetModele = Object.freeze({ COULOIRS, MOTS, etatDe, ligneEtat, tronquer, etiquettePreuve, carte, blocs, historique, listes, synthese,
+    titreDe, numeroDe });
 })();

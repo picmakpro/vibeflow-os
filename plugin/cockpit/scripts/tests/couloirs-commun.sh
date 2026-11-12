@@ -45,7 +45,9 @@ MD
 | FORM-01 | Phase 1 | Complete |
 | FORM-02 | Phase 1 | Pending |
 MD
-  for n in 01 02; do printf '<objective>Plan %s</objective>\n' "$n" | wr "$B/phases/01-socle/01-$n-PLAN.md"; echo ok > "$B/phases/01-socle/01-$n-SUMMARY.md"; done
+  for n in 01 02; do
+    printf '<objective>Plan %s</objective>\n' "$n" | wr "$B/phases/01-socle/01-$n-PLAN.md"; echo ok > "$B/phases/01-socle/01-$n-SUMMARY.md"
+  done
   printf '<objective>Écran</objective>\n' | wr "$B/phases/02-ecran/02-01-PLAN.md"; echo ok > "$B/phases/02-ecran/02-01-SUMMARY.md"
   printf '<objective>Liens</objective>\n' | wr "$B/phases/03-liens/03-01-PLAN.md"
   for n in 01 02 03; do printf '<objective>Reprise</objective>\n' | wr "$B/phases/04-reprise/04-$n-PLAN.md"; done
