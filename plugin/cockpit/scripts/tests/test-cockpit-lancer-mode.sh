@@ -26,6 +26,14 @@ assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 nonjouee() { echo "  ⊘ $1 — non jouée : $2"; NONJOUE=$((NONJOUE+1)); }
 MODULE_OK=0; [ -f "$MOD" ] && MODULE_OK=1
+# 79-06 : la sortie (MUT_OUT) ne porte que des données ; le code muté vit dans une COPIE du module (MUT_MOD), posée par mutant().
+# mod_de <arg> : dossier de SCRIPTS dont une aide lit le code (la copie mutée si l'argument est MUT_OUT, sinon l'argument tel quel) ; scripts_de / eng_de / racine_de <sortie> : ce qui sert une sortie (le dépôt, sauf MUT_OUT)
+MUT_OUT=""; MUT_MOD=""
+mutee() { [ -n "$MUT_OUT" ] && [ -n "$MUT_MOD" ] && [ "$1" = "$MUT_OUT" ]; }
+mod_de() { if mutee "$1"; then printf '%s\n' "$MUT_MOD/scripts"; else printf '%s\n' "$1"; fi; }
+scripts_de() { if mutee "$1"; then printf '%s\n' "$MUT_MOD/scripts"; else printf '%s\n' "$SCRIPTS"; fi; }
+eng_de() { if mutee "$1"; then printf '%s\n' "$MUT_MOD/skills/cockpit-moteur"; else printf '%s\n' "$ENG"; fi; }
+racine_de() { if mutee "$1"; then printf '%s\n' "$MUT_MOD"; else printf '%s\n' "$COCKPIT"; fi; }
 
 # ---- aides écrites par la suite (jamais dans le dépôt) ----
 cat > "$AUX/ev.mjs" <<'JS'
@@ -37,13 +45,13 @@ import fs from 'node:fs'; const f = process.argv[2];
 try { const st = fs.lstatSync(f); console.log(JSON.stringify({ ino: st.ino, mtime: st.mtimeMs, perm: (st.mode & 0o777).toString(8), contenu: fs.readFileSync(f, 'utf8') })); } catch { console.log('absent'); }
 JS
 cat > "$AUX/parent.mjs" <<'JS'
-// parent.mjs <sortie> <lab> <moteur> <travail> : joue P. Lance le processus de Q de la sortie (IPC json), lui envoie `init`, consigne ses messages (sauf `pret`) ;
+// parent.mjs <sortie> <lab> <moteur> <travail> <dossier-de-scripts> : joue P. Lance le processus de Q du module (dossier de scripts), la sortie ne porte que des données (IPC json), lui envoie `init`, consigne ses messages (sauf `pret`) ;
 // serveur de commande 127.0.0.1 : POST /send, GET /recus, POST /stop (message `arret`). Première ligne de sortie : PRET <Q> <commande> <P>.
 import { fork } from 'node:child_process'; import http from 'node:http'; import net from 'node:net';
-const [, , sortie, lab, moteur, travail] = process.argv;
+const [, , sortie, lab, moteur, travail, scripts] = process.argv;
 const libre = () => new Promise((r) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
 const portP = await libre(); const recus = []; let portQ = null, portC = null;
-const enfant = fork(sortie + '/vf-cockpit-terminal-processus.mjs', [], { env: process.env, cwd: lab, stdio: ['inherit', 'inherit', 'inherit', 'ipc'], serialization: 'json' });
+const enfant = fork(scripts + '/vf-cockpit-terminal-processus.mjs', [], { env: process.env, cwd: lab, stdio: ['inherit', 'inherit', 'inherit', 'ipc'], serialization: 'json' });
 const pret = () => { if (portQ && portC) console.log(`PRET ${portQ} ${portC} ${portP}`); };
 enfant.on('message', (m) => { if (m && m.t === 'pret') { portQ = m.port; pret(); } else recus.push(m); });
 enfant.send({ t: 'init', engineDir: moteur, root: lab, here: sortie, jetons: [], portP, envOrigine: { ...process.env, PATH: travail + '/fauxbin:' + process.env.PATH } });
@@ -330,22 +338,24 @@ LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"; FM="$(fm_de "$LAB")
 etat_dirs() { local d; d="$(dirname "${1:-$FM}")"; mkdir -p "$STATE" "$d"; chmod 700 "$STATE" "$d"; } # dossiers du support, posés comme Q les poserait (0700)
 lab_liste() { /usr/bin/find "$1" -path "$1/.git" -prune -o -print | sort; } # tout ce qui existe sous le lab (hors .git)
 etat_liste() { /usr/bin/find "$STATE" 2>/dev/null | sort | tr '\n' ';'; }
-# mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed>... -> MUT_OUT ; code 1 si le module manque, la cible manque ou la copie n'a pas changé
+# mutant <nom> <fichier-du-module> <expression-sed>... -> MUT_OUT (sortie : données et chemin dont dérive la clé du mode retenu) + MUT_MOD (copie du module muté) ; code 1 si le module manque, la cible manque ou la copie n'a pas changé
 mutant() {
   [ "$MODULE_OK" = 1 ] || return 1 # tant que le module n'existe pas, aucun mutant ne se joue (« non jouée : module absent »)
-  local d="$WORK/mut-$1" f e; local a; a=(); local nom="$1" cible="$2"; shift 2; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$cible"; [ -f "$f" ] || return 1
-  for e in "$@"; do a+=(-e "$e"); done
-  cp "$f" "$f.orig"; sed -i.bak "${a[@]}" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+  local d="$WORK/mut-$1" e x=""; local nom="$1" cible="$2"; shift 2; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  for e in "$@"; do x="${x:+$x
+}$e"; done
+  cockpit_module_muter "$nom" "$cible" "$x" || return 1
+  MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; return 0
 }
 # sans_effet <nom> : « module absent » tant que le module n'existe pas (non jouée), sinon FAIL « mutant sans effet »
 sans_effet() { if [ "$MODULE_OK" = 0 ]; then nonjouee "$1" "module absent"; else assert_eq "$1 — mutant sans effet (ancre absente ou inchangée)" "sans effet" "effet"; fi; }
 # faits U : un module (dossier) -> JSON ; module absent : { erreur }
-facts_u() { if [ -f "$1/vf-cockpit-lancer-mode.mjs" ]; then node "$AUX/u.mjs" "$1" "$WORK/u" "${2:-tout}" 2>&1 | tail -1; else echo '{"erreur":"module absent"}'; fi; }
+facts_u() { local c; c="$(mod_de "$1")"; if [ -f "$c/vf-cockpit-lancer-mode.mjs" ]; then node "$AUX/u.mjs" "$c" "$WORK/u" "${2:-tout}" 2>&1 | tail -1; else echo '{"erreur":"module absent"}'; fi; }
 uq() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "(j.erreur ? 'plante: ' + j.erreur : ($2))" 2>/dev/null || echo "illisible"; }
-fifo_u() { if [ -f "$1/vf-cockpit-lancer-mode.mjs" ]; then "$AUX/borne.sh" 20 node "$AUX/u.mjs" "$1" "$WORK/u" fifo | tail -1; else echo '{"erreur":"module absent"}'; fi; }
+fifo_u() { local c; c="$(mod_de "$1")"; if [ -f "$c/vf-cockpit-lancer-mode.mjs" ]; then "$AUX/borne.sh" 20 node "$AUX/u.mjs" "$c" "$WORK/u" fifo | tail -1; else echo '{"erreur":"module absent"}'; fi; }
 # faits client : (dossier-du-client) -> JSON des doublures
-facts_c() { node "$AUX/cdoubles.mjs" "$1/vf-cockpit-terminal-client.mjs" 2>&1 | tail -1; }
+facts_c() { node "$AUX/cdoubles.mjs" "$(mod_de "$1")/vf-cockpit-terminal-client.mjs" 2>&1 | tail -1; }
 cq() { uq "$1" "$2"; }
 uqp() { uq "$1" "(j.perr ? 'plante: ' + j.perr : ($2))"; } # faits du support du poste (LM.U7 à LM.U12) : la cause de l'échec reste lisible
 PLANPUR='plan'
@@ -357,7 +367,7 @@ else assert_eq "LM.S1 — vf-cockpit-lancer-mode.mjs existe et exporte FICHIER_M
 # fichiers côté P : TOUS les .mjs du module cockpit (scripts et moteur, hors tests) sauf le module lui-même et son seul importeur ; liste dérivée, jamais tenue à la main
 p_refs() { # p_refs <dossier> -> « <nombre de fichiers examinés>:<nombre de références à terminal-mode ou lancer-mode hors module et importeur> »
   local n=0 r=0 f b; while IFS= read -r f; do b="$(basename "$f")"; case "$b" in vf-cockpit-lancer-mode.mjs|vf-cockpit-terminal-processus.mjs) continue ;; esac
-    n=$((n+1)); r=$((r + $(grep -c -e 'terminal-mode' -e 'lancer-mode' "$f" | tr -d ' '))); done < <(/usr/bin/find "$1" -name '*.mjs' -not -path '*/tests/*' -not -path '*/node_modules/*' | sort); echo "$n:$r"
+    n=$((n+1)); r=$((r + $(grep -c -e 'terminal-mode' -e 'lancer-mode' "$f" | tr -d ' '))); done < <(/usr/bin/find "$(racine_de "$1")" -name '*.mjs' -not -path '*/tests/*' -not -path '*/node_modules/*' | sort); echo "$n:$r"
 }
 importeurs() { local f; while IFS= read -r f; do grep -q "from './vf-cockpit-lancer-mode.mjs'" "$f" && basename "$f"; done < <(/usr/bin/find "$1" -name '*.mjs' -not -path '*/tests/*' | sort) | sort | tr '\n' ',' ; }
 if [ "$MODULE_OK" = 1 ]; then
@@ -435,7 +445,7 @@ NM=0; QP=0; CP=0; PP=0; SECRET=""; PARENT=""; FPID=""; FLUX=""; QPID=""; ARME=20
 manche_debut() { # manche_debut <sortie> [sans-flux] -> QP CP PP SECRET PARENT QPID FPID FLUX
   NM=$((NM+1)); local s="$1" am="$WORK/amorce.$NM" po="$WORK/parent-$NM.out"; FLUX="$WORK/flux-$NM.out"; : > "$FLUX"; FPID=""; rm -f "$RUN/argv" "$RUN/argv.tmp" "$RUN/recept.hex"; mkdir -p "$s/.cache"
   node -e "console.log(require('crypto').randomBytes(24).toString('hex'))" > "$am.tmp"; (umask 077; tr -d '\n' < "$am.tmp" > "$s/.cache/terminal-amorce"; tr -d '\n' < "$am.tmp" > "$am")
-  VF_COCKPIT_LANCER_ARME_MS=$ARME node "$AUX/parent.mjs" "$s" "${MLAB:-$LAB}" "$ENG" "$WORK" > "$po" 2>&1 < /dev/null & PARENT=$!; PIDS+=($PARENT)
+  VF_COCKPIT_LANCER_ARME_MS=$ARME node "$AUX/parent.mjs" "$s" "${MLAB:-$LAB}" "$(eng_de "$s")" "$WORK" "$(scripts_de "$s")" > "$po" 2>&1 < /dev/null & PARENT=$!; PIDS+=($PARENT)
   for _ in $(seq 1 100); do grep -q '^PRET ' "$po" 2>/dev/null && break; sleep 0.1; done
   read -r _ QP CP PP < <(grep '^PRET ' "$po" | head -1); QP="${QP:-0}"; CP="${CP:-0}"; PP="${PP:-0}"
   QPID="$(command pgrep -P "$PARENT" | head -1)"
@@ -596,7 +606,8 @@ psrv_debut() { # psrv_debut <sortie> -> PS_PID PS_PORT PS_QP PS_TOK PS_N (serveu
   PS_N=$((PS_N+1)); NM=$((NM+1)); local o="$1" lab am; PS_OUT="$1"; lab="$(cd "$1/../.." && pwd)"; am="$WORK/amorce.$NM"
   rm -f "$RUN/shell.pid" "$RUN/argv" "$o/.cache/server.json" "$o/.cache/terminal-amorce"; mkdir -p "$o/.cache"
   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" > "$am.tmp"; (umask 077; tr -d '\n' < "$am.tmp" > "$o/.cache/terminal-amorce"; tr -d '\n' < "$am.tmp" > "$am")
-  COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$NM.out" cockpit_lancer "$lab" VF_COCKPIT_PATH_ORIGINE="$WORK/fauxbin:$PATH" VF_COCKPIT_LANCER_ARME_MS=$ARME VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" --terminal
+  local cm=""; mutee "$o" && cm="$MUT_MOD"   # copie mutée : l'aide vérifie que le serveur lancé la charge (code 5 sinon)
+  COCKPIT_MODULE="$cm" COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$NM.out" cockpit_lancer "$lab" VF_COCKPIT_PATH_ORIGINE="$WORK/fauxbin:$PATH" VF_COCKPIT_LANCER_ARME_MS=$ARME VF_COCKPIT_ENGINE_DIR="$(eng_de "$o")" VF_COCKPIT_SCRIPTS_DIR="$(scripts_de "$o")" --terminal
   PS_PID="$VF_PID"; PS_SERVE="$WORK/serve-$NM.out"; PS_AM="$am"
   PS_PORT="${VF_PORT:-0}"
   PS_QP="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json" 2>/dev/null)"; PS_QP="${PS_QP##*:}"; PS_QP="${PS_QP:-0}"
