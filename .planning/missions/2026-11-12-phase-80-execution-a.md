@@ -364,11 +364,17 @@ ajouté au plan par amendement.
 - Suites qui exercent `39-vf-tour-placement.js` (`grep -l -E 'tour-placement|40-tour|#tour|visite|VF_TOUR'`, aucune ne
   le nomme directement), chacune jouée seule : couloirs 68/0, git-pagination 43/0, git-tiroir 194/0, lancer-bandeau
   161/0, onglet-code 32/0, projet-graphe 119/0, projet-visite 115/0, responsive 378/0, securite 92/0, surcouches 45/0,
-  transcript 103/0. Deux exceptions. terminal-tiroir donne 131/7 quand elle est jouée seule sous une charge du poste
-  d'environ 300 (hors de notre fait) ; elle est verte dans la découverte et en CI. visite-retours, jouée seule, a été
-  arrêtée à cause de la charge ; elle est verte en CI et dans les rejeux de l'exécuteur (93/0).
+  transcript 103/0 (sur 94619edf ; depuis, seuls des docs et test-cockpit-git-pagination.sh ont changé). Le poste a été
+  en veille de 13 h 52 à 19 h 29 : le verdict de terminal-tiroir, qui tournait à cheval, est nul. Rejouées seules sur la
+  tête 4df4e9f2 après la veille : terminal-tiroir 138/0 (premier passage 135/3 à une charge de 45, temporisations
+  T21.9, TP.10, TP.12 ; verte au rejeu isolé à une charge de 7), visite-retours 93/0, git-pagination 48/0.
 - Le passage local sous Chrome sans pointeur n'a pas eu lieu (arrêté à cause de la charge). Il est couvert par la CI
   Linux, dont le Chrome sans tête n'a pas de pointeur : runs 43206672595 (`14b80257`) et 43221332650 (`2a6cf236`), tous
   deux verts.
 - Durées C5 remesurées sur le run vert 43206672595 : aucune des huit suites de la Phase 80 ne s'écarte de plus de 10 s
   de sa durée inscrite.
+- check-method-budget KC2 (conductor, non touché par cette branche) : rouge sur les runs de 94619edf et de 4df4e9f2,
+  vert sur ceux de 14b80257 et de 2a6cf236 ; course entre trois passes simultanées, instable, rejouée une fois.
+- GP2.3b exige une égalité stricte sur la hauteur de la barre (115 px). La propriété voulue est « l'avertissement est
+  affiché » : une égalité au pixel rougira au premier changement de police du runner. D'accord avec la session
+  principale pour porter à la jointure la propriété à la place de l'égalité.
