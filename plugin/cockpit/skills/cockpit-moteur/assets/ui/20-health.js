@@ -57,7 +57,7 @@
   const where = () => JSON.stringify([SC.state.selected, SC.state.container]);
   function closeList() { isOpen = false; SC.closePanel(); }
   function showOnMap(issue) {
-    const items = (issue.items || []).filter((id) => SC.exists(id)).map((id) => ({ id, note: (issue.notes && issue.notes[id]) || '' }));
+    const items = (issue.items || []).filter((id) => SC.exists(id)).map((id) => ({ id, note: t.constat((issue.notes && issue.notes[id]) || '') }));
     if (!items.length) { SC.toast(t('This one isn’t on the map. Use “{} with {}” instead.', FIX, A.name)); return; }
     if (isOpen) closeList();
     SC.showBoard({ title: issue.title, question: issue.detail, items });
