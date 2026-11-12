@@ -20,3 +20,8 @@ Statut : exécuté. Commits : 42fb4ac6 (mesure de forme), 1528a2c9 (amendement d
 
 ## À documenter par 79-20
 Les quatre modules, le schéma `cockpit-index@1`, le bloc `claudeCode.index`, la version revérifiée 2.1.322, le chapitre F17, la propriété d'incrémentalité (graine, `VF_SEED`) et les mutants ; aucune édition du CHANGELOG, du README, de VERSION ni de module.json du module cockpit dans ce plan.
+
+## Correction après revue (rv1)
+- Constat majeur (axe Spec, sécurité) : sans `arbreDe`, `mettreAJour` tenait tout transcript pour un transcript du lab. Correctif : `arbreDe` obligatoire, appel refusé (`TypeError`) sans lui ; amendement daté d'une ligne au plan (écart 12). Témoin rouge I2.8e (commit de test précédent le correctif), mutant M-ARBREDE (seul I2.8e rougit). Suite d'index 111 PASS, forme 76 PASS.
+- Effet de bord corrigé : le générateur tire davantage de lignes géantes (une graine fraîche avait fait tomber la couverture de `ligne-geante` sous 8 : rouge de couverture, pas de l'index).
+- Traçabilité : les décisions citées sans canal ni date dans les messages de commit de ce plan (P79-D-03, P79-D-13, P79-D-30 et les lignes « décision déléguée par Samuel … 2026-11-08, option recommandée » de certains commits) sont des décisions du cadrage de la phase ; elles ne sont pas de Samuel. L'historique n'est pas réécrit.

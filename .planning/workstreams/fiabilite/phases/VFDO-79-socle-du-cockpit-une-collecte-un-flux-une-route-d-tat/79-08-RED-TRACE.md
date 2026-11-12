@@ -88,3 +88,4 @@ Déviation déclarée : la validation complète du fichier (`validerIndex`) et l
 ## Correction après revue rv1 — appel sans `arbreDe`
 
 - Rouge avant correctif : `bash plugin/cockpit/scripts/tests/test-cockpit-index.sh` ; I2.8e (appel sans `arbreDe` sur un transcript dont le cwd est hors du lab) : attendu `["TypeError",0]`, obtenu `["sans-erreur",1]` (une voie créée pour un transcript hors du lab). Reste de la suite : 109 PASS.
+- Vert après correctif : I2.8e vert (`TypeError`, 0 voie) ; mutant M-ARBREDE (`garde:index-arbrede` : repli sur un lab par défaut) : le run ne plante pas, seul I2.8e diffère de la sortie normale. Suite entière 111 PASS / 0 FAIL ; `test-cockpit-forme-claude.sh` 76 PASS (seules deux suites appellent `construire`).
