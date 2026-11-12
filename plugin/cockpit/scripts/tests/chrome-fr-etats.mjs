@@ -7,7 +7,7 @@
 // Les pages sont des fichiers (`file://`) : aucun serveur. Chaque état part d'une page rechargée ; il est attendu par une condition de la page, jamais par une pause fixe.
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { executer, stabiliser } from './chrome-session.mjs';
+import { executer, stabiliser, attendreValeur } from './chrome-session.mjs';
 
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout && !!document.querySelector('header .brand .mark') && !!document.getElementById('panel')";
 const VF = 'window.VibeFlow';
@@ -45,7 +45,9 @@ const ETATS = {
   ],
 };
 const lire = (s) => stabiliser(() => s.ev(LIRE), { pas: 300, max: 8000 });
-async function charger(s, f, en) { try { await s.send('Storage.clearDataForOrigin', { origin: 'file://', storageTypes: 'local_storage' }); } catch (e) {} await s.naviguer(url(f, en)); await s.attendre(PRET, 'page prête'); }
+// la page est prête quand la visite guidée de départ, qui change la vue, a fini de se poser (elle part après le premier rendu : un geste fait avant la rejoue sur une autre vue)
+async function pret(s) { await s.attendre(PRET, 'page prête'); await attendreValeur(() => s.ev("!!document.querySelector('#tour .tk')"), (v) => v, { pas: 150, max: 6000 }); }
+async function charger(s, f, en) { try { await s.send('Storage.clearDataForOrigin', { origin: 'file://', storageTypes: 'local_storage' }); } catch (e) {} await s.naviguer(url(f, en)); await pret(s); }
 async function fenetre(s) { await s.send('Emulation.setDeviceMetricsOverride', { width: 1400, height: 900, deviceScaleFactor: 1, mobile: false }); }
 
 const [, , mode, ...a] = process.argv;
@@ -65,19 +67,20 @@ const [chrome, f1, f2, f3] = a;
 await executer(chrome, async (s) => {
   await fenetre(s);
   if (mode === 'sondes') {
-    await s.naviguer(f1); await s.attendre(PRET, 'page prête');
+    await s.naviguer(f1); await pret(s);
     await s.ev(clic('search-btn')); await s.ev("(() => { const i = document.getElementById('search'); i.value = 'zzzzqq'; i.dispatchEvent(new Event('input', { bubbles: true })); })()");
     await s.attendre("document.getElementById('results').innerText.trim().length > 0", 'résultat vide');
     return stabiliser(() => s.ev("({ fit: document.getElementById('z-fit').title, vide: document.getElementById('results').innerText, export: (document.getElementById('btn-export') || {}).textContent, exportTitre: (document.getElementById('btn-export') || {}).title, sante: (document.querySelector('#btn-health .bl') || {}).textContent })"), { pas: 300, max: 8000 });
   }
   if (mode === 'donnee') {
-    await s.naviguer(f1); await s.attendre(PRET, 'page prête');
+    await s.naviguer(f1); await pret(s);
     await s.ev("(() => { const e = document.createElement('span'); e.id = 'vf-sonde-donnee'; e.textContent = 'Health'; document.getElementById('panel').appendChild(e); })()");
     return { texte: await stabiliser(() => s.ev("document.getElementById('vf-sonde-donnee').textContent"), { pas: 400, max: 5000 }) };
   }
   if (mode === 'sante') {
-    await s.naviguer(f1); await s.attendre(PRET, 'page prête');
-    await s.ev(`${VF}.setTechnical(true)`); await s.ev(clic('btn-health')); await s.attendre("!!document.querySelector('#panel .hc-issue .hc-w')", 'liste de Santé et localisations');
+    await s.naviguer(f1); await pret(s);
+    await s.ev(`${VF}.setTechnical(true)`); await stabiliser(() => s.ev("document.getElementById('panel').innerHTML.length"), { pas: 300, max: 8000 }); // le rendu qui suit ne referme pas la liste
+    await s.ev(clic('btn-health')); await s.attendre("!!document.querySelector('#panel .hc-issue .hc-w')", 'liste de Santé et localisations');
     const liste = await stabiliser(() => s.ev("[...document.querySelectorAll('#panel .hc-issue')].map((e) => ({ titre: (e.querySelector('.hc-t') || {}).textContent, detail: (e.querySelector('.hc-d') || {}).textContent || null, lieux: (e.querySelector('.hc-w') || {}).innerText || null }))"), { pas: 300, max: 8000 });
     await s.ev("document.querySelector('[data-hc-show]').click()"); await s.attendre("!!document.querySelector('#panel .pt') && !document.querySelector('#panel .hc-issue')", 'tableau sur la carte');
     const tableau = await stabiliser(() => s.ev("({ titre: document.querySelector('#panel .pt').textContent, question: (document.querySelector('#panel .pd') || {}).textContent })"), { pas: 300, max: 8000 });
@@ -85,7 +88,7 @@ await executer(chrome, async (s) => {
   }
   if (mode === 'releve') {
     const sortie = {};
-    const pages = [['code', f1, ETATS.code], ['projet', f2, ETATS.projet], ...(f3 ? [['sante', f3, [['constats', clic('btn-health'), "!!document.querySelector('#panel .hc-issue')"], ['constats-detail', `(() => { ${VF}.setTechnical(true); ${clic('btn-health')}; })()`, "!!document.querySelector('#panel .hc-w')"]]]] : [])];
+    const pages = [['code', f1, ETATS.code], ['projet', f2, ETATS.projet], ...(f3 ? [['sante', f3, [['constats', clic('btn-health'), "!!document.querySelector('#panel .hc-issue')"], ['constats-detail', `(async () => { ${VF}.setTechnical(true); await new Promise((ok) => setTimeout(ok, 1200)); ${clic('btn-health')}; })()`, "!!document.querySelector('#panel .hc-w')"]]]] : [])];
     for (const [nom, fichier, etats] of pages) for (const en of [false, true]) {
       const cle = `${nom}-${en ? 'en' : 'fr'}`; sortie[cle] = {}; let base = new Set();
       for (const [etat, geste, cond] of etats) {
