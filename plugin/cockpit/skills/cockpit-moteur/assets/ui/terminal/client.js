@@ -1,9 +1,4 @@
-// vf-cockpit-terminal-client — script client de la page de Q (amorce posée par 71-05, remplie par 71-06 ; P71-D-12, D-13, D-15, D-16, D-18 ; O4).
-// Export : clientTerminal(cfg) -> rien. cfg = { origineP, theme } : configuration non sensible, posée par pageTerminal.
-// Sérialisé par .toString() dans un <script> sans attribut : aucune référence à un identifiant du module, tout est local à la fonction.
-// Les commentaires placés DANS la fonction sont servis tels quels : ils ne citent aucun motif que la suite de test cherche. Rien d'autre ici n'est servi.
-// Flux : amorçage (dans le cadre : fragment effacé avant l'échange, secret dans le stockage du cadre, rechargement sans fragment) ou terminal (flux fetch, POST d'entrée et de taille). 72-08 : sondage de GET /proposition dès l'initialisation (avant visible()), écriture par POST /lancer { id, mode[, chat:true] } (72-13 : chat seulement si la case est cochée) sans le texte de la ligne ni octet au terminal, message fixe proposition vers P. 72-16 (P72-D-20) : le mode présélectionné est celui que Q sert dans la proposition (mode_retenu) ; le stockage du navigateur ne porte plus le mode.
-export function clientTerminal(cfg) {
+function clientTerminal(cfg) {
   const MESSAGES = Object.freeze({
     ready: 'ready', connecte: 'etat:connecte', reconnexion: 'etat:reconnexion', termine: 'etat:termine',
     refuse: 'etat:refuse', expire: 'etat:expire', arrete: 'etat:arrete', toggle: 'toggle',

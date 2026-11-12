@@ -15,6 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
+import { FICHIERS_NAVIGATEUR } from './vf-cockpit-navigateur.mjs';
 
 export const JETON = '<module>';
 const JETON_RE = /<module>/g;
@@ -49,7 +50,7 @@ export function substituerModule(texte, dossier) {
 export const OUTILS_ASSEMBLAGE = [/^vf-cockpit-build\.mjs$/, /^vf-cockpit-rename\.mjs$/, /^vf-cockpit-code.*\.mjs$/, /^vf-cockpit-fr-.*\.mjs$/];
 export const fichiersExecution = (scriptsDir) => fs.readdirSync(scriptsDir).filter((f) => /^vf-cockpit-.*\.mjs$/.test(f) && !OUTILS_ASSEMBLAGE.some((re) => re.test(f))).sort();
 
-// motifs du code évalué (constantes : 79-16 y ajoutera les ressources de page) ; dossier de scripts puis assets du moteur
+// motifs du code évalué (constantes : 79-16 y ajoutera les ressources de page) ; dossier de scripts puis assets du moteur, puis les fichiers de code navigateur
 const MOTIFS_SCRIPTS = [/^vf-cockpit-.*\.mjs$/, /^vf-cockpit-interface\.json$/];
 const MOTIFS_MOTEUR = [/^serve\.mjs$/, /^graph-query\.js$/, /^query-cli\.mjs$/];
 const dedans = (d, motifs) => fs.readdirSync(d).filter((f) => motifs.some((re) => re.test(f)));
@@ -60,6 +61,8 @@ export function fichiersCodeEvalue(dossierScripts, dossierMoteur) {
   for (const f of dedans(dossierScripts, MOTIFS_SCRIPTS)) lot.push([`scripts/${f}`, path.join(dossierScripts, f)]);
   const assets = path.join(dossierMoteur, 'assets');
   for (const f of dedans(assets, MOTIFS_MOTEUR)) lot.push([`assets/${f}`, path.join(assets, f)]);
+  // code navigateur rangé en fichiers (79-11) : une seule source, la liste close du lecteur ; un fichier illisible rend l'empreinte nulle
+  for (const [dossier, nom] of FICHIERS_NAVIGATEUR) lot.push([`assets/ui/${dossier}/${nom}`, path.join(assets, 'ui', dossier, nom)]);
   return lot.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
 }
 

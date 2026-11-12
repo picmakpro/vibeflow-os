@@ -23,6 +23,9 @@ AJOUT assets/ui/77-vf-git-vue-detail.js
 AJOUT assets/ui/78-vf-fr-dict-a.js
 AJOUT assets/ui/79-vf-fr-dict-b.js
 AJOUT assets/ui/80-vf-fr.js
+AJOUT assets/ui/terminal/client.js
+AJOUT assets/ui/terminal/q.css
+AJOUT assets/ui/terminal/vue.js
 AJOUT assets/vendor/fonts/SHA256SUMS
 AJOUT assets/vendor/fonts/jetbrains-mono-2.304-OFL.txt
 AJOUT assets/vendor/fonts/jetbrains-mono-2.304-regular.woff2

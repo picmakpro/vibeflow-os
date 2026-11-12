@@ -1,15 +1,4 @@
-// vf-cockpit-terminal-style — feuille de la page du terminal servie par Q (71-05 ; UI-SPEC §2.3, §3.3, §6.2, §6.3, §9).
-// Les 41 variables (25 Graphite + 16 d'espacement 71.5) sont recopiées de viewer.html (Q est une autre origine : elle ne peut pas hériter de P). Valeurs identiques,
-// contrôlées par la sonde T18 de test-cockpit-terminal-page.sh (sombre et clair, avec mutants) : toute dérive de viewer.html rougit.
-// Exports : VARIABLES_RECOPIEES (les 41 noms) · STYLE_Q (feuille complète). Aucune couleur ni espacement en dur hors des blocs de variables.
-export const VARIABLES_RECOPIEES = [
-  '--ink', '--surface', '--raise', '--raise-2', '--hair', '--hair-2', '--text', '--text-2', '--text-3', '--text-4', '--on', '--on-hover', '--on-text',
-  '--ring', '--recent', '--sev-medium', '--sev-high', '--warn-bg', '--warn-text', '--err-text', '--r-card', '--r-ctl', '--sans', '--mono', '--ease',
-  '--sp-2', '--sp-4', '--sp-6', '--sp-8', '--sp-12', '--sp-16', '--sp-20', '--sp-24', '--sp-32',
-  '--edge', '--inset-panel', '--gap-section', '--inset-card', '--inset-box', '--inset-row', '--inset-pill',
-];
-
-const SOMBRE = `:root {
+:root {
   color-scheme: dark;
   --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
@@ -27,9 +16,8 @@ const SOMBRE = `:root {
   --sp-2: 2px; --sp-4: 4px; --sp-6: 6px; --sp-8: 8px; --sp-12: 12px; --sp-16: 16px; --sp-20: 20px; --sp-24: 24px; --sp-32: 32px;
   --edge: var(--sp-16); --inset-panel: var(--sp-20); --gap-section: var(--sp-24); --inset-card: var(--sp-16);
   --inset-box: var(--sp-12); --inset-row: var(--sp-8) var(--sp-12); --inset-pill: var(--sp-2) var(--sp-8);
-}`;
-
-const CLAIR = `:root[data-theme="light"] {
+}
+:root[data-theme="light"] {
   color-scheme: light;
   --ink: 0, 0, 0;
   --surface: #ffffff; --raise: #ebebe8; --raise-2: #e0e0dc;
@@ -40,9 +28,7 @@ const CLAIR = `:root[data-theme="light"] {
   --sev-high: #f2384a; --sev-medium: #b88100;
   --warn-bg: rgba(var(--ink), .05); --warn-text: #986300; --err-text: #da1637;
   --ring: rgba(0, 0, 0, .85);
-}`;
-
-const MISE_EN_PAGE = `
+}
 * { box-sizing: border-box; }
 html, body { margin: 0; height: 100%; background: var(--surface); color: var(--text); font-family: var(--sans); font-size: 13.5px; overflow: hidden; -webkit-font-smoothing: antialiased; }
 button { font: inherit; color: inherit; }
@@ -115,6 +101,3 @@ body #consigne { position: static; flex: none; order: 2; z-index: auto; max-heig
 .vf-q-bouton.vf-q-secondaire:hover { box-shadow: inset 0 0 0 1px var(--hair-2); background: var(--raise-2); }
 @media (pointer: coarse) { .vf-q-bouton { height: 44px; } }
 @media (prefers-reduced-motion: reduce) { *, *::before, *::after { transition: none !important; animation: none !important; } }
-`;
-
-export const STYLE_Q = `${SOMBRE}\n${CLAIR}${MISE_EN_PAGE}`;
