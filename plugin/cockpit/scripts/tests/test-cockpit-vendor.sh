@@ -58,6 +58,136 @@ if [ -f "$CHKSIZE" ]; then
   bash "$CHKSIZE" "$WORK/serve-sans-marqueur.mjs" >/dev/null 2>&1; assert_eq "V4 — témoin : serve.mjs sans marqueur est bloqué (exit 2)" "$?" "2"
 fi
 
+echo "=== V4c — plafond de 160 colonnes en cliquet (AUDC-AM5, P79-D-19) ==="
+CLIQUET="${CLIQUET:-$SCRIPTS/tests/colonnes-cliquet.mjs}"
+RACINE_MODULE="$(cd "$SCRIPTS/.." && pwd)"
+# col_racine <nom> : racine de module jetable (un script, un code et une feuille rangés par des lignes AJOUT) ; imprime son chemin
+col_racine() {
+  local r="$WORK/col-$1"; rm -rf "$r"; mkdir -p "$r/scripts" "$r/skills/cockpit-moteur/assets/ui"
+  printf '%s\n' 'const a = 1;' > "$r/scripts/vf-cockpit-a.mjs"
+  printf '%s\n' 'const b = 2;' > "$r/skills/cockpit-moteur/assets/ui/10-b.js"
+  printf '%s\n' '.b { color: red; }' > "$r/skills/cockpit-moteur/assets/ui/b.css"
+  printf '%s\n' 'x' > "$r/skills/cockpit-moteur/assets/ui/c.css"
+  printf '%s\n' 'fixture' '' 'AJOUT assets/ui/10-b.js' 'AJOUT assets/ui/b.css' > "$r/skills/cockpit-moteur/VENDORED.txt"
+  printf '%s\n' "$r"
+}
+# col_ligne <fichier> <n> [x|e|cr] : ajoute une ligne de n points de code (x : lettres simples, e : é de 2 octets, cr : lettres simples puis un retour chariot)
+col_ligne() { node -e 'const f=require("fs");const [p,n,m]=process.argv.slice(1);f.appendFileSync(p,(m==="e"?"é":"x").repeat(Number(n))+(m==="cr"?"\r":"")+"\n")' "$1" "$2" "${3:-x}"; }
+# col_base <fichier> [ligne…] : un fichier de baseline (en-tête de commentaire puis les lignes données)
+col_base() { local f="$1"; shift; { echo '# fixture de baseline'; for l in "$@"; do printf '%s\n' "$l"; done; } > "$f"; }
+# col_juger <racine> <baseline> : « ok », « rouge <classes> » ou « erreur <code> » (jamais une sortie vide)
+col_juger() { # base : seul le plafond de 300 lignes de V4, aucune notion de colonne
+  local f big=0; for f in "$1"/scripts/*.mjs; do [ "$(nlines "$f")" -le 300 ] || big=1; done
+  [ "$big" = 0 ] && echo ok || echo "rouge LIGNES"
+}
+col_v() { # <nom> <n> <mode> : un fichier du module porte une ligne de n points de code, baseline vide
+  local r; r="$(col_racine "$1")"; col_ligne "$r/scripts/vf-cockpit-a.mjs" "$2" "$3"; col_base "$r/b.txt"; col_juger "$r" "$r/b.txt"
+}
+assert_eq "V4c.1a — une ligne de 161 points de code, baseline vide : rouge HAUSSE" "$(col_v u161 161 x)" "rouge HAUSSE"
+assert_eq "V4c.1b — la borne : 160 points de code exactement passent" "$(col_v u160 160 x)" "ok"
+assert_eq "V4c.1c — 150 lettres accentuées (300 octets) passent : la mesure compte des points de code" "$(col_v e150 150 e)" "ok"
+assert_eq "V4c.1c' — 161 lettres accentuées : rouge HAUSSE" "$(col_v e161 161 e)" "rouge HAUSSE"
+assert_eq "V4c.1d — 160 caractères suivis d'un CR : la fin de ligne CRLF n'est pas comptée" "$(col_v c160 160 cr)" "ok"
+assert_eq "V4c.1d' — 161 caractères suivis d'un CR : rouge HAUSSE" "$(col_v c161 161 cr)" "rouge HAUSSE"
+r="$(col_racine nomme)"; col_ligne "$r/scripts/vf-cockpit-a.mjs" 161; col_base "$r/b.txt"
+assert_eq "V4c.1e — le rouge nomme le fichier fautif" "$(node "$CLIQUET" verifier "$r" "$r/b.txt" 2>&1 | grep -c 'scripts/vf-cockpit-a.mjs')" "1"
+# V4c.2 : baseline en cliquet (le réel doit égaler la baseline : la descente est acceptée, la remontée non)
+col_v2() { # <nom> <lignes longues réelles> <valeur de baseline> : verdict
+  local r i; r="$(col_racine "$1")"; for i in $(seq 1 "$2"); do col_ligne "$r/scripts/vf-cockpit-a.mjs" 161; done
+  col_base "$r/b.txt" "scripts/vf-cockpit-a.mjs $3"; col_juger "$r" "$r/b.txt"
+}
+assert_eq "V4c.2a — baseline à 2, réel 2 : ok" "$(col_v2 c22 2 2)" "ok"
+assert_eq "V4c.2a' — baseline à 2, réel 3 : HAUSSE" "$(col_v2 c23 3 2)" "rouge HAUSSE"
+assert_eq "V4c.2a'' — baseline à 2, réel 1 : PERIMEE (la baseline doit suivre la baisse)" "$(col_v2 c21 1 2)" "rouge PERIMEE"
+r="$(col_racine abaisse)"; col_ligne "$r/scripts/vf-cockpit-a.mjs" 161; col_base "$r/b.txt" "scripts/vf-cockpit-a.mjs 2"
+node "$CLIQUET" abaisser "$r" "$r/b.txt" > "$WORK/ab.out" 2>&1; ab_rc=$?
+assert_eq "V4c.2a3 — abaisser réécrit la baseline au réel (code 0) puis le verdict est ok" "$ab_rc $(col_juger "$r" "$r/b.txt") $(grep -c '^scripts/vf-cockpit-a.mjs 1$' "$r/b.txt")" "0 ok 1"
+r="$(col_racine monte)"; col_ligne "$r/scripts/vf-cockpit-a.mjs" 161; col_ligne "$r/scripts/vf-cockpit-a.mjs" 161; col_ligne "$r/scripts/vf-cockpit-a.mjs" 161; col_base "$r/b.txt" "scripts/vf-cockpit-a.mjs 2"
+cp "$r/b.txt" "$r/b.avant"; node "$CLIQUET" abaisser "$r" "$r/b.txt" > "$WORK/ab2.out" 2>&1; ab_rc=$?
+assert_eq "V4c.2a4 — abaisser refuse un relèvement : code 1, baseline intacte à l'octet" "$ab_rc $(cmp -s "$r/b.avant" "$r/b.txt" && echo intacte || echo modifiee)" "1 intacte"
+col_v2b() { # <nom> <ligne de baseline> : verdict d'un fichier sans ligne longue et d'une baseline à une entrée donnée
+  local r; r="$(col_racine "$1")"; col_base "$r/b.txt" "$2"; col_juger "$r" "$r/b.txt"
+}
+assert_eq "V4c.2b — une entrée pour un fichier hors du périmètre : ORPHELINE" "$(col_v2b orph 'scripts/vf-cockpit-absent.mjs 1')" "rouge ORPHELINE"
+assert_eq "V4c.2b' — nombre non entier : FORME" "$(col_v2b f1 'scripts/vf-cockpit-a.mjs 1.5')" "rouge FORME"
+assert_eq "V4c.2b'' — zéro : FORME (le fichier ne liste que les fichiers à plus de 0)" "$(col_v2b f2 'scripts/vf-cockpit-a.mjs 0')" "rouge FORME"
+assert_eq "V4c.2b3 — chemin absolu : FORME" "$(col_v2b f3 '/scripts/vf-cockpit-a.mjs 1')" "rouge FORME"
+assert_eq "V4c.2b4 — segment .. : FORME" "$(col_v2b f4 'scripts/../scripts/vf-cockpit-a.mjs 1')" "rouge FORME"
+assert_eq "V4c.2b5 — un champ de trop : FORME" "$(col_v2b f5 'scripts/vf-cockpit-a.mjs 1 2')" "rouge FORME"
+# V4c.3 : le marqueur des gros fichiers n'exempte rien
+col_vmarq() { local r; r="$(col_racine marq)"; printf '%s\n' '// vibeflow:allow-large-file' > "$r/scripts/vf-cockpit-a.mjs"; col_ligne "$r/scripts/vf-cockpit-a.mjs" 161; col_base "$r/b.txt"; col_juger "$r" "$r/b.txt"; }
+assert_eq "V4c.3 — le marqueur vibeflow:allow-large-file dans les cinq premières lignes n'exempte pas une ligne de 161 : HAUSSE" "$(col_vmarq)" "rouge HAUSSE"
+# V4c.4 : le périmètre
+loop300() { local f; for f in "$SCRIPTS"/*.mjs; do printf 'scripts/%s\n' "$(basename "$f")"; done; while read -r k f; do [ "$k" = AJOUT ] || continue; case "$f" in *.js|*.mjs) printf 'skills/cockpit-moteur/%s\n' "$f" ;; esac; done < "$MOTEUR/VENDORED.txt"; }
+loop300 | LC_ALL=C sort > "$WORK/perim-attendu.txt"
+node "$CLIQUET" perimetre "$RACINE_MODULE" --sans-css 2>/dev/null | LC_ALL=C sort > "$WORK/perim-obtenu.txt"
+assert_ge "V4c.4 — témoin : la liste de la boucle des 300 lignes a au moins 50 fichiers" "$(nlines "$WORK/perim-attendu.txt")" 50
+assert_eq "V4c.4a — le périmètre de l'aide (sans feuilles) égale la liste de la boucle des 300 lignes (écart en lignes)" "$(comm -3 "$WORK/perim-attendu.txt" "$WORK/perim-obtenu.txt" | wc -l | tr -d ' ')" "0"
+r="$(col_racine css)"; col_ligne "$r/skills/cockpit-moteur/assets/ui/b.css" 161; col_base "$r/b.txt"
+assert_eq "V4c.4b — une ligne AJOUT .css est mesurée : HAUSSE" "$(col_juger "$r" "$r/b.txt")" "rouge HAUSSE"
+r="$(col_racine csshors)"; col_ligne "$r/skills/cockpit-moteur/assets/ui/c.css" 161; col_base "$r/b.txt"
+assert_eq "V4c.4c — un .css non inscrit n'est pas mesuré : ok" "$(col_juger "$r" "$r/b.txt")" "ok"
+r="$(col_racine sous)"; mkdir -p "$r/scripts/sous"; printf '%s\n' 'const z = 1;' > "$r/scripts/sous/z.mjs"; col_ligne "$r/scripts/sous/z.mjs" 161; col_base "$r/b.txt"
+assert_eq "V4c.4d — un fichier d'un sous-dossier de scripts/ n'est pas mesuré : ok" "$(col_juger "$r" "$r/b.txt")" "ok"
+# V4c.5 : comparaison de deux versions de la baseline (la hausse exige une citation d'arbitrage direct)
+col_comparer() { # <avant> <après> <message> : « <code> <classes> »
+  local av="$WORK/cmp-av.txt" ap="$WORK/cmp-ap.txt" out rc; printf '%s\n' "$1" > "$av"; printf '%s\n' "$2" > "$ap"
+  out="$(node "$CLIQUET" comparer "$av" "$ap" "$3" 2>&1)"; rc=$?
+  echo "$rc $(printf '%s\n' "$out" | awk '$1=="HAUSSE-SANS-ARBITRAGE"{print $1}' | sort -u | paste -sd, -)"
+}
+CITE='arbitrage Samuel, AskUserQuestion session principale, 2026-11-12'
+assert_eq "V4c.5a — une baisse est acceptée (code 0)" "$(col_comparer 'scripts/vf-cockpit-a.mjs 3' 'scripts/vf-cockpit-a.mjs 2' 'refactor : replie des lignes')" "0 "
+assert_eq "V4c.5b — une hausse sans citation : code 1 et HAUSSE-SANS-ARBITRAGE" "$(col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' 'refactor : rien à dire')" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5b' — la sortie de la hausse nomme le fichier" "$(node "$CLIQUET" comparer "$WORK/cmp-av.txt" "$WORK/cmp-ap.txt" 'rien' 2>&1 | grep -c 'scripts/vf-cockpit-a.mjs')" "1"
+assert_eq "V4c.5c — une hausse avec une citation conforme : code 0" "$(col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' "$CITE")" "0 "
+assert_eq "V4c.5d — une nouvelle entrée à plus de 0 sans citation : code 1" "$(col_comparer '' 'scripts/vf-cockpit-b.mjs 1' 'rien')" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5e — une citation sans date : code 1" "$(col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' 'arbitrage Samuel, session principale, hier')" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5e' — une citation à une seule virgule : code 1" "$(col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' 'arbitrage Samuel, 2026-11-12')" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5f — une citation conforme sans hausse : code 0" "$(col_comparer 'scripts/vf-cockpit-a.mjs 3' 'scripts/vf-cockpit-a.mjs 3' "$CITE")" "0 "
+DELEG='décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée'
+assert_eq "V4c.5g — la ligne de délégation ne vaut pas citation d'une hausse : code 1 et HAUSSE-SANS-ARBITRAGE" "$(col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' "$DELEG")" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5g' — la délégation et un arbitrage direct sur deux lignes : code 0" "$(col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' "$DELEG
+$CITE")" "0 "
+# V4c.6 : l'historique git du fichier de baseline (dépôt jetable)
+col_historique() { # <dépôt> <chemin relatif de la baseline> : « commits=N » puis une ligne par violation ; code 1 s'il y en a
+  local d="$1" p="$2" n=0 rc=0 sha out c
+  while IFS= read -r sha; do
+    n=$((n+1)); git -C "$d" cat-file -e "$sha^:$p" 2>/dev/null || continue
+    git -C "$d" show "$sha^:$p" > "$WORK/h-av.txt"; git -C "$d" show "$sha:$p" > "$WORK/h-ap.txt" 2>/dev/null || : > "$WORK/h-ap.txt"
+    out="$(node "$CLIQUET" comparer "$WORK/h-av.txt" "$WORK/h-ap.txt" "$(git -C "$d" log -1 --format=%B "$sha")" 2>&1)" || { rc=1; c="$(git -C "$d" rev-parse --short=8 "$sha")"; printf '%s\n' "$out" | sed "s/^/$c /" >> "$WORK/h-viol.txt"; }
+  done < <(git -C "$d" log --no-merges --reverse --format=%H -- "$p")
+  if git -C "$d" cat-file -e "HEAD:$p" 2>/dev/null && [ -f "$d/$p" ]; then
+    git -C "$d" show "HEAD:$p" > "$WORK/h-av.txt"
+    out="$(node "$CLIQUET" comparer "$WORK/h-av.txt" "$d/$p" '' 2>&1)" || { rc=1; printf '%s\n' "$out" | sed 's/^/copie-de-travail /' >> "$WORK/h-viol.txt"; }
+  fi
+  echo "commits=$n"; [ ! -s "$WORK/h-viol.txt" ] || cat "$WORK/h-viol.txt"; return "$rc"
+}
+col_depot() { # <nom> <message de la hausse> : dépôt jetable à trois commits (création, hausse, baisse) ; imprime le dépôt
+  local d="$WORK/dep-$1" g; rm -rf "$d"; mkdir -p "$d"; : > "$WORK/h-viol.txt"
+  g() { git -C "$d" -c user.name=essai -c user.email=essai@example.invalid -c commit.gpgsign=false "$@" > /dev/null; }
+  git -C "$d" init -q; printf '%s\n' '# base' 'scripts/vf-cockpit-a.mjs 2' > "$d/b.txt"; g add b.txt; g commit -q -m 'creation de la baseline'
+  printf '%s\n' '# base' 'scripts/vf-cockpit-a.mjs 3' > "$d/b.txt"; g commit -q -a -m "$2"
+  printf '%s\n' '# base' 'scripts/vf-cockpit-a.mjs 1' > "$d/b.txt"; g commit -q -a -m 'baisse de la baseline'
+  printf '%s\n' "$d"
+}
+d="$(col_depot sans 'hausse sans rien')"; : > "$WORK/h-viol.txt"; col_historique "$d" b.txt > "$WORK/h6.out"; h6_rc=$?
+assert_eq "V4c.6a — création, hausse sans citation, baisse : code 1 et le commit de la hausse est nommé" "$h6_rc $(grep -c "^$(git -C "$d" log --format=%h --grep='hausse sans rien' --abbrev=8) HAUSSE-SANS-ARBITRAGE" "$WORK/h6.out")" "1 1"
+d="$(col_depot cite "hausse citee : $CITE")"; : > "$WORK/h-viol.txt"; col_historique "$d" b.txt > "$WORK/h6b.out"; h6_rc=$?
+assert_eq "V4c.6b — le même historique avec une hausse citée : code 0, trois commits examinés" "$h6_rc $(head -1 "$WORK/h6b.out")" "0 commits=3"
+d="$WORK/dep-seul"; rm -rf "$d"; mkdir -p "$d"; git -C "$d" init -q; printf '%s\n' 'scripts/vf-cockpit-a.mjs 2' > "$d/b.txt"; : > "$WORK/h-viol.txt"
+git -C "$d" -c user.name=essai -c user.email=essai@example.invalid add b.txt; git -C "$d" -c user.name=essai -c user.email=essai@example.invalid -c commit.gpgsign=false commit -q -m 'creation seule'
+col_historique "$d" b.txt > "$WORK/h6c.out"; h6_rc=$?
+assert_eq "V4c.6c — création seule : code 0, un commit examiné, rien à comparer" "$h6_rc $(head -1 "$WORK/h6c.out")" "0 commits=1"
+printf '%s\n' 'scripts/vf-cockpit-a.mjs 5' > "$d/b.txt"; : > "$WORK/h-viol.txt"; col_historique "$d" b.txt > "$WORK/h6d.out"; h6_rc=$?
+assert_eq "V4c.6d — une hausse non commitée de la copie de travail est rouge" "$h6_rc $(grep -c '^copie-de-travail HAUSSE-SANS-ARBITRAGE' "$WORK/h6d.out")" "1 1"
+# V4c.7 : l'historique réel du fichier de baseline, dans le dépôt de développement seulement
+DEPOT_DEV="$(git -C "$SCRIPTS" rev-parse --show-toplevel 2>/dev/null)"
+if [ -n "$DEPOT_DEV" ] && [ -f "$DEPOT_DEV/plugin/cockpit/scripts/tests/test-cockpit-vendor.sh" ]; then
+  : > "$WORK/h-viol.txt"; col_historique "$DEPOT_DEV" plugin/cockpit/scripts/tests/colonnes-baseline.txt > "$WORK/h7.out"; h7_rc=$?
+  echo "     V4c.7 — $(head -1 "$WORK/h7.out") sur l'historique réel de la baseline"
+  assert_eq "V4c.7 — l'historique réel du fichier de baseline ne porte aucune hausse sans citation" "$h7_rc" "0"
+else echo "  ⏭  SKIP — V4c.7 (module posé hors du dépôt de développement : l'historique de la baseline n'est pas lisible ici, non compté)"; fi
+
 echo "=== V8 — binaires ==="
 assert_eq "V8.1 — cinq .woff2 non vides (quatre polices du cockpit, JetBrains Mono 2.304 Regular)" "$(find "$MOTEUR" -name '*.woff2' -size +0 | grep -c .)" "5"
 assert_eq "V8.2 — deux .png non vides" "$(find "$MOTEUR" -name '*.png' -size +0 | grep -c .)" "2"
