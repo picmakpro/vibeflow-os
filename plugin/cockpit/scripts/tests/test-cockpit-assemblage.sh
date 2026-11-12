@@ -100,6 +100,13 @@ F1OUT=$(cd "$F1L" && VF_COCKPIT_DEMARRAGE_MS=2000 node "$F1M/scripts/vf-cockpit.
 assert_eq "AM6.F1a — module sans serve.mjs : refus code 3" "$F1RC" "3"
 assert_has "AM6.F1b — message en français, dit le fichier manquant" "$F1OUT" "serve.mjs"
 assert_eq "AM6.F1c — rien n'a été lancé (ni server.json ni journal de serveur)" "$([ -e "$F1L/.vibeflow/cockpit/.cache/server.json" ] || [ -s "$F1L/.vibeflow/cockpit/.cache/serveur.log" ] && echo lancé || echo rien)" "rien"
+assert_eq "AM6.F1d — le refus précède l'assemblage (aucune page assemblée dans le lab)" "$([ -e "$F1L/.vibeflow/cockpit/index.html" ] && echo assemblé || echo rien)" "rien"
+# AM6.F1 mutant (S3b) : la copie du module sans SEULE la ligne de refus de main() (celle qui précède assemblerLab) ; le garde de demarrer() retient le lancement (code 3 conservé), donc AM6.F1a-c restent verts : seul AM6.F1d rougit, pour la bonne raison (le lab est assemblé avant le refus)
+F1MM="$(cockpit_module_copie)"; sed -i.avant '/^  if (!serveDuModule()) { console.error/d' "$F1MM/scripts/vf-cockpit.mjs"; cmp -s "$F1MM/scripts/vf-cockpit.mjs.avant" "$F1MM/scripts/vf-cockpit.mjs" && echo "ancre absente : le mutant F1 n'a rien changé" >&2; rm -f "$F1MM/scripts/vf-cockpit.mjs.avant"; rm -f "$F1MM/skills/cockpit-moteur/assets/serve.mjs"
+F1ML="$WORK/f1m-lab"; mkdir -p "$F1ML/.planning"; printf '# Projet\n' > "$F1ML/.planning/PROJECT.md"
+F1MOUT=$(cd "$F1ML" && VF_COCKPIT_DEMARRAGE_MS=2000 node "$F1MM/scripts/vf-cockpit.mjs" open --lab "$F1ML" --no-open 2>&1); F1MRC=$?
+assert_eq "AM6.F1-mutant — sans la ligne de refus de main() : la copie est valide, le code reste 3 (garde de demarrer), la page est pourtant assemblée (AM6.F1d rougirait)" "$(node --check "$F1MM/scripts/vf-cockpit.mjs" 2> /dev/null && echo valide || echo invalide) rc=$F1MRC $([ -e "$F1ML/.vibeflow/cockpit/index.html" ] && echo assemblé || echo rien)" "valide rc=3 assemblé"
+assert_eq "AM6.F1-témoin du mutant — le module réel, lui, n'assemble rien avant le refus" "$([ -e "$F1L/.vibeflow/cockpit/index.html" ] && echo assemblé || echo rien)" "rien"
 
 echo "=== A5 — liste du code d'exécution ==="
 D5="$WORK/d5"; mkdir -p "$D5"
