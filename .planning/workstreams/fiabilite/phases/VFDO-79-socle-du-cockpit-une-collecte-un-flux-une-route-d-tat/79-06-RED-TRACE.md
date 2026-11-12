@@ -95,3 +95,11 @@ Mesure : 46 appels réels (Claude Code 2.1.322, haiku), verdict CONFINABLE, comb
 État attendu des rouges à la reprise (S2) : les 18 témoins AM4 rouges de la tâche 1 le restent jusqu'aux tâches 4a et 5 ; FB3.5 est une sonde de durée préexistante, instable sous charge.
 
 Constat bas 1 de l'audit de 79-07 (`realUnder` en polarité inverse sans `siEchec: true`, `vf-cockpit-terminal.mjs`, fonction `ordinaire`) : non traité en S1 (fichier de production, tâche 4a). Analyse préalable : `lstat(f).isFile()` précède `realUnder`, qui résout le même fichier : aucun cas déterministe ne fait réussir l'un et échouer l'autre (seule une course), donc aucun témoin d'effet constructible ; l'amendement daté dira cela, posera le correctif d'une ligne et une ancre structurelle avec son mutant.
+
+## Reprise après la porte de la tâche 2
+
+Réponse de la session principale, rendue le 2026-11-12 à 01 h 58 (heure lue), par message de la session principale : « confinable : combinaison retenue écrite dans 79-MESURE-claude-p.md (limites : dossier de module avec espace non admis, refus fermé ; alphabet admis lettres, chiffres, . - _ / ~ @ + ; règle et commande au même chemin textuel ; une seule version de Claude Code, 2.1.322, sur macOS, un appel par cas) ». La mesure était autorisée d'avance par Samuel (AskUserQuestion session principale, 2026-11-11, « Oui, d'avance (Recommandé) ») ; Samuel n'a pas relu la mesure.
+
+Contrôles de la session principale avant sa réponse : le document relu en entier ; les 46 relevés bruts recomptés depuis les flux (outils tentés, refus du résultat final, mode annoncé à l'initialisation), tous concordants avec le tableau ; effets de bord revérifiés dans cinq bacs à sable (B1, B3 et B1 en V4b sans fichier créé ; B1 en V4w avec fichier créé, le banc sait voir un non-refus ; B2a avec une ligne d'appel) ; OK-MESURE rejoué vert ; les commits de S1 ne touchent aucun fichier de production.
+
+Bornes pour S2 : (1) l'alphabet de la tâche 3 suit le document de mesure ; (2) la variante « dossier avec espace admis par la forme guillemetée » n'est pas faite dans ce plan : décision de produit portée à Samuel par la session principale ; refus fermé, dit en clair à l'utilisateur.
