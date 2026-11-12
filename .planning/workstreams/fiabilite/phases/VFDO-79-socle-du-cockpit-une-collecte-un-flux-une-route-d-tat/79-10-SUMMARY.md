@@ -1,14 +1,26 @@
-# 79-10 — SUMMARY (partiel : reprise indiquée)
+# 79-10 — SUMMARY
 
-Traduction au point d'émission : code et tests commités ; preuves finales en cours.
+Traduction au point d'émission (SOCL-14, P79-D-16, P79-D-24) : `t` dans `80-vf-fr.js`, table complétée, viewer et sept extensions enveloppés, serveur en français à la source, observateur global retiré, `?lang=en` gardé. Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée.
 
-## Commits (ordre)
-test e553d3a5 (F16-F23, harnais), docs 71ba0179 (trace), build.mjs b6f4fa84, inventaire 746ad990, sources 5d8a0dd1, 80 (ajout) bf97dcaa, exclusions 36787340, table 60ed21b8, viewer 37e07a7c, ui 60/05/30/25/20/10/40 : b2ddc840 7f13aca9 6a197134 09f2d58c 29668ba7 d314ad8f e02f779f, 80 surcharge 0bebb990, serve.mjs 73f1a0a6, 80 final cb6eeb43, fr-donnees f5330b77, 20-health note 73894528, harnais visite 5eaa430b, viewer type fixe fe0ad967, relevé AVANT normalisé + écarts 3640cb99, viewer layout c870c684, serve (+N) 837cf52d.
+## Commits par fichier du moteur (règle de résolution : toute chaîne neuve des phases 73, 74, 80 s'écrit `t('texte anglais')` avec son entrée dans `79-vf-fr-dict-b.js` ; contrôle `node plugin/cockpit/scripts/vf-cockpit-fr-sources.mjs <fichier>` ; en cas de conflit garder la suppression d'`amont/` de 79-01 et rejouer la porte sur le fichier fusionné)
+build.mjs b6f4fa84 · inventaire 746ad990 7aea54c7 · sources 5d8a0dd1 · 80 (ajout) bf97dcaa, surcharge 0bebb990, final cb6eeb43 · table 60ed21b8 · viewer 37e07a7c fe0ad967 c870c684 · 60-export b2ddc840 · 05-theme 7f13aca9 · 30-screens 6a197134 · 25-recent 09f2d58c · 20-health 29668ba7 73894528 · 10-glossary d314ad8f · 40-tour e02f779f · serve.mjs 73f1a0a6 837cf52d · exclusions 36787340 2ecdbaa2 e6bfa8f6. Tests : e553d3a5 c60ee140 5eaa430b f5330b77 b396af84 0f66728c. Trace/relevé : 71ba0179 20a6e781 3640cb99 229a4f50.
+Écart au plan : la table est commitée AVANT les fichiers qui l'utilisent (parité verte à chaque commit) ; sept fichiers ont un commit de correction après le premier (oublis constatés par la parité).
 
-## Faits
-- chrome-fr : 131 PASS / 0 FAIL avec parité F22 (31 écarts admis, tous des corrections). fr-donnees, robustesse, vendor, moteur-carte, accessibilite, assemblage, marque-blanche : verts (instantané 3640cb99).
-- Mutants rouges pour la bonne raison : M-OBS (F20.1, F20.2), M-LANG (F19.11, F21.2 : plus large que le plan), M-CLE (F16.2 nomme « Answer: {} »), M-LIBRE (F17.1 nomme le littéral), M-RETRAIT-SEUL (F23, trace tâche 1).
-- A signaler : 71ba0179 porte un relevé avec fragments de chemin du poste (corrigé par 20a6e781/3640cb99) : à purger avant push (squash ou réécriture de ce commit).
+## Preuves
+- chrome-fr : 131 PASS / 0 FAIL avec parité F22 (31 écarts admis, tous des corrections : anglais laissé par l'ancien mécanisme, « 1 étapes »). fr-donnees 31/0 (témoins D7.1-D7.4, D7.7-D7.9 de b16c57fc verts), robustesse, vendor, moteur-carte, accessibilite, assemblage, marque-blanche, equipe (215/0), equipe-etats, chaine-xss, securite, serveur, projet-graphe, lancer-ui, avancement, ecrans-recent, sante (50/0), responsive (378/0), les onze terminal-* (activation, client, fin, lanceur, page, pty-plantage, pty, serveur, session, tiroir, xss, xterm : tous verts) : verts, chacune jouée seule, dans un worktree détaché.
+- git-entete : 135 / 1 FAIL (H5.1b « PATH sans git ») ; identique sur la base 954618bd : préexistant, hors périmètre.
+- Mutants rouges pour la bonne raison : M-OBS (F20.1, F20.2), M-LANG (F19.11, F21.2 ; plus large que le plan), M-CLE (F16.2 nomme « Answer: {} »), M-LIBRE (F17.1 nomme le littéral ; F2 et F3 aussi), M-ORDRE (F18.1), M-BUILD (F18.2), M-AFFICHAGE (F23.1 : détail resté anglais), M-RETRAIT-SEUL (F23.1, F23.3), mutant de R6.3 (entrée « Thinking… » retirée de la table : R6.3 obtient « Thinking… »).
+- check-version-sync, check-machine-paths : verts. Aucune suite ajoutée.
 
-## Reprise
-Restent : résultats de la voie C (responsive=1 à examiner, equipe, chaine-xss, securite, serveur, ecrans-recent, sante, projet-graphe, git-entete, lancer-ui, avancement), mutants M-ORDRE, M-BUILD, M-AFFICHAGE (sorties dans le scratchpad, dossier bat/), lignes MOTIF-R (19) et MUTANT dans 79-10-RED-TRACE.md, liste pour 79-20 (README § chrome en français, ?lang=en, outil d'inventaire/porte, ordre des blocs vibeflow:fr ; CHANGELOG ; limite : messages du serveur français sous ?lang=en), 51 entrées de table sans site d'émission (non supprimées), angles morts de la porte (lignes à appel de journal, littéraux commençant par une parenthèse).
+## Pour la jointure
+- `check-machine-paths.sh` ne voit pas un chemin découpé en chaînes séparées (le relevé versé en 71ba0179 portait des segments de dossier du poste, retirés ensuite). Limite du gate, à inscrire au registre, sans correctif dans ce segment. 71ba0179 n'est pas réécrit (décision de la session principale) ; contrôle ajouté : `79-10-CONTROLE-CHEMINS.mjs` (témoin rouge prouvé).
+- Suites hors `files_modified` modifiées par amendement daté : responsive (R6.3 réécrit sur `__vfFrT`, ancien texte cité au plan), ecrans-recent (harnais vm), sante (sonde et trois ancres de mutants).
+- Mutant qui rougit le nouveau R6.3 : entrée « Thinking… » retirée de `78-vf-fr-dict-a.js` dans une copie.
+- Angles morts de la porte : lignes qui portent un appel de journal, littéraux commençant par une parenthèse (deux sites en ont découlé, corrigés).
+- Limite A43 : les messages de `serve.mjs` restent français sous `?lang=en` (le serveur ne lit pas la langue).
+
+## Liste pour 79-20
+README du module : § chrome en français (traduction au point d'émission), `?lang=en`, outil d'inventaire et porte `vf-cockpit-fr-sources.mjs`, ordre des blocs `vibeflow:fr` (emplacement `<!--__UI_I18N__-->`) ; CHANGELOG « Non publié » ; limite des messages du serveur.
+
+## Points à signaler
+(a) texte d'aide `node …/serve.mjs` : enveloppé tel quel (viewer, `60-export.js`, une entrée de 78), à réécrire par 79-16 ; (b) 51 entrées de table sans site d'émission, listées dans la trace, non supprimées ; (c) aucun texte d'assemblage autre que les constats de Santé n'apparaît en anglais à la parité ; 19 motifs R : dispositions dans la trace.
