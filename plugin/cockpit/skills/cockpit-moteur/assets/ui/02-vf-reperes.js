@@ -9,7 +9,9 @@
   const svg = document.getElementById('svg'), stage = document.getElementById('stage'), vp = document.getElementById('viewport');
   if (!svg || !stage || !vp) return;
   const ORDRE = ['gauche', 'droite', 'haut', 'bas'], DIT = { gauche: 'à gauche', droite: 'à droite', haut: 'en haut', bas: 'en bas' };
-  const OBSTACLES = ['#vf-coin', '#zoom', '#ask', '.vf-term-pastille', '.vf-term-puce', '.vf-term-tiroir'];
+  const OBSTACLES = ['#vf-coin', '#zoom', '#ask'];
+  // pastille, puce et tiroir d'un module de bas de page : lus par leur nature (fixes, posés directement sous body), jamais par leur nom
+  const flottants = () => [...document.body.children].filter((e) => e.matches('button, div[role="status"], section[role="region"]') && getComputedStyle(e).position === 'fixed');
   const equipe = () => !!G.meta && G.meta.vfTab === 'equipe';
   const feuille = () => matchMedia('(max-width: 999px), (pointer: coarse)').matches; // feuille de détail ; sinon panneau latéral
   // la forme affichée est le canevas : #svg a une boîte et n'est pas masqué (couloirs, liste : visibility hidden)
@@ -31,8 +33,8 @@
   const els = {}; // bord -> button
   let vivant = false, fruit = null; // fruit : la carte que le geste en cours vient d'amener (focus orphelin, ordre unique de la famille)
   const C = () => window.VF_CANEVAS;
-  const rectDe = (sel) => {
-    const e = document.querySelector(sel); if (!e || e.hidden || !e.getClientRects().length) return null;
+  const rectDe = (e) => {
+    if (!e || e.hidden || !e.getClientRects().length) return null;
     const r = e.getBoundingClientRect(); return r.width && r.height ? r : null;
   };
   const boite = (id) => { // boîte écran d'une carte du niveau
@@ -96,7 +98,7 @@
     if (!vivant) return;
     const S = C(), F = !equipe() && !tour() && S && state.layout && canevas() && !(feuille() && !document.body.classList.contains('no-panel'))
       ? S.champDeLecture() : null;
-    const res = F ? analyser(F) : null, obs = F ? OBSTACLES.map(rectDe).filter(Boolean) : [], gardes = [];
+    const res = F ? analyser(F) : null, obs = F ? [...OBSTACLES.map((q) => document.querySelector(q)), ...flottants()].map(rectDe).filter(Boolean) : [], gardes = [];
     const g = document.activeElement && document.activeElement.closest ? document.activeElement.closest('g.node') : null;
     const vues = F ? [state.selected, ...[...(state.chipEls || [])].filter(([, x]) => x === g).map(([i]) => i)].map((i) => boite(i)).filter(Boolean) : [];
     for (const b of ORDRE) {

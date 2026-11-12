@@ -173,16 +173,17 @@
   // zone basse (80-UI-SPEC § 3) : la vue ne passe jamais sous #ask, #vf-coin, la pastille « Terminal » ni la feuille de détail ; le tiroir du
   // terminal relève #stage, la vue monte avec lui
   const hauteur = (e) => { const b = e && !e.hidden && e.isConnected ? e.getBoundingClientRect() : null; return b && b.width > 0 ? Math.round(b.height) : 0; };
-  const QS = ['#ask', '#vf-coin', '#panel', '.vf-term-pastille', '#vf-git-tiroir', '.vf-git-tiroir'];
+  const QS = ['#ask', '#vf-coin', '#panel', '#vf-git-tiroir', '.vf-git-tiroir'];
+  const pastille = () => [...document.body.children].find((e) => e.matches('button') && getComputedStyle(e).position === 'fixed') || null; // la pastille du bas de page : lue par sa nature (bouton fixe sous body), jamais par son nom
   const mesurerBas = () => {
     if (!vivant) return;
     // un élément né après le montage (pastille, coin) est observé dès qu'il existe
-    for (const q of QS) { const e = document.querySelector(q); if (e && ro) ro.observe(e); }
+    for (const e of [...QS.map((q) => document.querySelector(q)), pastille()]) if (e && ro) ro.observe(e);
     const panneau = document.getElementById('panel'), p = panneau && !document.body.classList.contains('no-panel') ? panneau.getBoundingClientRect() : null;
     // la feuille de détail est le panneau posé en bas, pleine largeur
     const feuille = p && p.width >= stage.getBoundingClientRect().width * 0.8 ? Math.round(p.height) : 0;
     const bas = hauteur(document.getElementById('ask')) + hauteur(document.getElementById('vf-coin'))
-      + hauteur(document.querySelector('.vf-term-pastille')) + feuille;
+      + hauteur(pastille()) + feuille;
     // dérivé : #ask + #vf-coin + feuille + pastille mesurés
     section.style.setProperty('--vf-bas', `calc(${bas}px + var(--edge) + var(--sp-8) + var(--edge) + env(safe-area-inset-bottom, 0px))`);
     const t = document.querySelector('#vf-git-tiroir, .vf-git-tiroir'), ouvert = !!t && !t.hidden && t.offsetWidth > 0
