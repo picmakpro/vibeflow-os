@@ -5,14 +5,15 @@
   const SC = window.Floorplan;
   const T = window.floorplanTheme;
   if (!SC || !T) return;
+  const t = window.__vfFrT;
 
   const ICON = {
     auto: '<circle cx="12" cy="12" r="8"/><path d="M12 4a8 8 0 0 1 0 16z" fill="currentColor"/>',
     light: '<circle cx="12" cy="12" r="4"/><path d="M12 3v2M12 19v2M3 12h2M19 12h2M5.6 5.6 7 7M17 17l1.4 1.4M5.6 18.4 7 17M17 7l1.4-1.4"/>',
     dark: '<path d="M20 14.5A8 8 0 1 1 9.5 4a6.5 6.5 0 0 0 10.5 10.5z"/>',
   };
-  const NAME = { auto: 'Auto (follows your device)', light: 'Light', dark: 'Dark' };
-  const WORD = { auto: 'Auto', light: 'Light', dark: 'Dark' };
+  const NAME = { auto: t('Auto (follows your device)'), light: t('Light'), dark: t('Dark') };
+  const WORD = { auto: t('Auto'), light: t('Light'), dark: t('Dark') };
   const NEXT = { auto: 'light', light: 'dark', dark: 'auto' };
 
   const style = document.createElement('style');
@@ -38,7 +39,7 @@
   const btn = SC.addHeaderButton({ id: 'theme-toggle', svg: ICON.auto, onClick: () => {
     const next = NEXT[T.get()];
     T.set(next);
-    status.textContent = `Theme is now ${next === 'auto' ? 'Auto, following your device' : WORD[next]}.`;
+    status.textContent = t('Theme is now {}.', next === 'auto' ? t('Auto, following your device') : WORD[next]);
   } });
 
   const word = document.createElement('span');
@@ -60,7 +61,7 @@
     btn.querySelector('svg').innerHTML = ICON[c];
     word.textContent = WORD[c]; // l'état courant en texte, à côté de l'icône, quand l'en-tête a la place (PU-G-009)
     refit();
-    const text = `Theme: ${NAME[c]}. Press for ${WORD[NEXT[c]]}.`;
+    const text = t('Theme: {}. Press for {}.', NAME[c], t.langue ? WORD[NEXT[c]].toLowerCase() : WORD[NEXT[c]]);
     btn.title = text;
     btn.setAttribute('aria-label', text);
   };
