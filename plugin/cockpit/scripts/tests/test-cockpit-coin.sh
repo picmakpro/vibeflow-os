@@ -81,6 +81,34 @@ NOM='/^\d+ cartes? hors champ (à gauche|à droite|en haut|en bas)\. Aller à la
 assert_eq "CN1.3 — Tab depuis la carte itinérante : un repère (button), nom « N cartes hors champ à <bord>. Aller à la plus proche. »" \
   "$(E "[j.cn1.tab.repere, $NOM.test(j.cn1.tab.nom || '')]")" "[true,true]"
 assert_eq "CN1.9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
+echo "=== CN2 — bloc bas-droit, minicarte, hachure du tiroir Git, ligne d'état ==="
+R="$(mesurer cn2)"; [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }; [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/cn2.json"
+assert_eq "CN2.1 — 1440 px, panneau ouvert : minicarte <= 144 x 96, bloc à 16 px de la zone libre (32 du panneau), 8 px au-dessus de #ask ; fermé : à 16 px du bord" \
+  "$(E "(() => { const c = j.cn2.c21 || {}, k = c.coin, m = c.mini; if (!k || !m) return 'bloc absent';
+    return [m.w > 0 && m.w <= 144 && m.h > 0 && m.h <= 96, Math.abs(c.panel.l - k.r - 32) <= 1, Math.abs(c.ask.t - 8 - k.b) <= 1,
+      !!c.ferme && Math.abs(c.W - 16 - c.ferme.r) <= 1]; })()")" "[true,true,true,true]"
+assert_eq "CN2.2 — clic au centre de la minicarte : le cadre du champ se recentre sur ce point, state.t.k inchangé" \
+  "$(E "(() => { const c = j.cn2.c22; if (!c) return 'sans clic';
+    return [Math.abs(c.visee[0] - c.centre[0]) < 1.5 && Math.abs(c.visee[1] - c.centre[1]) < 1.5, c.k[0] === c.k[1]]; })()")" "[true,true]"
+assert_eq "CN2.3 — tiroir Git : freeArea().w et state.t identiques (PU-G-204), hachure (trait --text-3) sur la part du cadre qu'il couvre, nom de la minicarte" \
+  "$(E "(() => { const c = j.cn2.c23; if (!c || !c.hf || !c.ho) return 'sans mesure';
+    return [c.av.ouvert === false && c.ap.ouvert === true, c.av.w === c.ap.w, JSON.stringify(c.av.t) === JSON.stringify(c.ap.t), c.hf.affiche === false,
+      c.ho.affiche, Math.abs(c.ho.part - c.attendu) < 0.04, Math.abs(c.ho.gauche) < 1.5, c.ho.trait, /sous l'historique Git$/.test(c.ho.nom),
+      !/historique Git/.test(c.hf.nom), /^Minicarte : \d+ cartes? visibles? sur \d+/.test(c.hf.nom)]; })()")" "[true,true,true,true,true,true,true,true,true,true,true]"
+NOMB='vf/<img/src=x/onerror=window.__xss=1>/branche-tres-longue-pour-lellipse'
+assert_eq "CN2.4 — ligne d'état : branche entière en title et en étiquette, ellipse au milieu (10 + … + 8), un seul role=status « Direct », heure HH:MM qui suit vf-who" \
+  "$(E "(() => { const c = j.cn2.c24; if (!c || !c.base) return 'sans mesure'; const b = c.base, n = '$NOMB';
+    return [b.titre === n, b.nom.includes(n), b.vu === n.slice(0, 10) + '…' + n.slice(-8), b.status.length === 1 && /^Direct/.test(b.status[0]), b.mot === 'Direct',
+      /^Mis à jour à \d\d:\d\d$/.test(b.heure), c.h1 === 'Mis à jour à 09:05', c.h2 === 'Mis à jour à 21:47']; })()")" "[true,true,true,true,true,true,true,true]"
+assert_eq "CN2.4b — direct coupé : « Direct coupé », « Reprise en cours, mise à jour à HH:MM » ; branche hostile (T-80-10) : aucun élément créé, aucun code exécuté" \
+  "$(E "(() => { const c = j.cn2.c24; if (!c || !c.coupe) return 'sans mesure';
+    return [c.coupe.mot, /^Reprise en cours, mise à jour à \d\d:\d\d$/.test(c.coupe.heure), c.base.xss.join()]; })()")" '["Direct coupé",true,"true,0"]'
+assert_eq "CN2.5 — sans --terminal : aucun nœud vf-term dans #vf-coin, aucun mot « terminal », aucune commande (P71-D-02, P67-D-14)" \
+  "$(E 'j.cn2.c25 ? [j.cn2.c25.term, j.cn2.c25.texte, j.cn2.c25.commandes] : "sans mesure"')" "[0,false,0]"
+assert_eq "CN2.6 — 1440 et 1024 px, panneau ouvert et fermé, tiroir Git ouvert : bloc, zoom et barre de question disjoints ; 900 px aucun bloc ; 1100 px tactile : ligne d'état seule" \
+  "$(E "(() => { const m = j.cn2.c26; if (!m || m.length !== 6) return 'sans mesure';
+    return [m.slice(0, 4).map((x) => x.coin && x.ok).join(), m[4].coin, m[5].coin && !m[5].mini && m[5].etat]; })()")" '["true,true,true,true",null,true]'
+assert_eq "CN2.9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
