@@ -13,6 +13,8 @@ import { fileURLToPath } from 'node:url';
 const TAILLE_MAX = 256 * 1024;
 export const FICHIERS_NAVIGATEUR = Object.freeze([
   ['terminal', 'client.js'], ['terminal', 'q.css'], ['terminal', 'vue.js'],
+  ['tiroir', 'lancer-extraire-chat.js'], ['tiroir', 'lancer-observer-chat.js'], ['tiroir', 'lancer-proposition.js'], ['tiroir', 'lancer.css'],
+  ['tiroir', 'lancer.js'], ['tiroir', 'tiroir-construire.js'], ['tiroir', 'tiroir-message.js'], ['tiroir', 'tiroir.css'], ['tiroir', 'tiroir.js'],
 ].map((paire) => Object.freeze(paire)));
 
 const MOTEUR_DU_MODULE = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'cockpit-moteur');

@@ -315,7 +315,7 @@ const h2 = m.empreinteModule({ dossierScripts: scripts, dossierMoteur: moteur })
 console.log(`stable=${typeof h0 === 'string' && h0.length === 12} octet=${typeof h1 === 'string' && h1 !== h0} supprime=${h2 === null}`);
 FIN
 rm -rf "$WORK/q6"; mkdir -p "$WORK/q6/scripts" "$WORK/q6/skills/cockpit-moteur/assets/ui"; cp "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs "$WORK/q6/scripts/" 2>/dev/null
-cp "$MOTEUR/assets/serve.mjs" "$WORK/q6/skills/cockpit-moteur/assets/"; cp -R "$MOTEUR/assets/ui/terminal" "$WORK/q6/skills/cockpit-moteur/assets/ui/terminal" 2>/dev/null
+cp "$MOTEUR/assets/serve.mjs" "$WORK/q6/skills/cockpit-moteur/assets/"; cp -R "$MOTEUR/assets/ui/terminal" "$WORK/q6/skills/cockpit-moteur/assets/ui/terminal" 2>/dev/null; cp -R "$MOTEUR/assets/ui/tiroir" "$WORK/q6/skills/cockpit-moteur/assets/ui/tiroir" 2>/dev/null   # la liste close porte aussi les neuf fichiers de P
 node "$WORK/q6.mjs" "$WORK/q6" > "$WORK/q6.out" 2>&1
 assert_eq "V11.Q6a — fichiersCodeEvalue liste les trois fichiers de Q" "$(sed -n 1p "$WORK/q6.out")" "liste=true"
 assert_eq "V11.Q6b — l'empreinte est calculée, change d'un octet dans client.js d'une copie, et devient nulle quand client.js manque" "$(sed -n 2p "$WORK/q6.out")" "stable=true octet=true supprime=true"
@@ -397,7 +397,7 @@ const f = path.join(moteur, 'assets/ui/tiroir/tiroir.js'); fs.appendFileSync(f, 
 const h1 = m.empreinteModule({ dossierScripts: scripts, dossierMoteur: moteur });
 console.log(`douze=${cles.length === 12} octet=${typeof h0 === 'string' && h1 !== h0}`);
 FIN
-node "$WORK/p5.mjs" "$WORK/p3" > "$WORK/p5.out" 2>&1
+mini_module "$WORK/p5"; node "$WORK/p5.mjs" "$WORK/p5" > "$WORK/p5.out" 2>&1
 assert_eq "V11.P5 — fichiersCodeEvalue liste les douze fichiers rangés ; un octet changé dans tiroir.js d'une copie change l'empreinte" "$(sed -n 1p "$WORK/p5.out")" "douze=true octet=true"
 # V11.P6 : plus aucune conversion de fonction en chaîne dans les trois modules qui servent du code ; le lecteur et les injecteurs sans évaluation dynamique
 q6=0; for f in "$SCRIPTS/vf-cockpit-terminal-page.mjs" "$SCRIPTS/vf-cockpit-terminal-tiroir.mjs" "$SCRIPTS/vf-cockpit-lancer-ui.mjs" "$NAV"; do [ -f "$f" ] || { q6=-99; break; }; q6=$((q6 + $(grep -c -E "$MOTIF_EVAL" "$f"))); done

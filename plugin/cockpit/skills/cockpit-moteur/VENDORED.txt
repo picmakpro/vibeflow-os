@@ -26,6 +26,15 @@ AJOUT assets/ui/80-vf-fr.js
 AJOUT assets/ui/terminal/client.js
 AJOUT assets/ui/terminal/q.css
 AJOUT assets/ui/terminal/vue.js
+AJOUT assets/ui/tiroir/lancer-extraire-chat.js
+AJOUT assets/ui/tiroir/lancer-observer-chat.js
+AJOUT assets/ui/tiroir/lancer-proposition.js
+AJOUT assets/ui/tiroir/lancer.css
+AJOUT assets/ui/tiroir/lancer.js
+AJOUT assets/ui/tiroir/tiroir-construire.js
+AJOUT assets/ui/tiroir/tiroir-message.js
+AJOUT assets/ui/tiroir/tiroir.css
+AJOUT assets/ui/tiroir/tiroir.js
 AJOUT assets/vendor/fonts/SHA256SUMS
 AJOUT assets/vendor/fonts/jetbrains-mono-2.304-OFL.txt
 AJOUT assets/vendor/fonts/jetbrains-mono-2.304-regular.woff2

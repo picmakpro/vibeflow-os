@@ -1,7 +1,4 @@
-// vf-cockpit-terminal-tiroir-style — feuille du tiroir du terminal (71-07 ; UI-SPEC §2, §3, §8, §9, §11).
-// Export : STYLE_TIROIR -> texte CSS posé dans un <style> de la page hôte, seulement avec --terminal. Variables Graphite existantes et classes `vf-term-*` uniquement.
-// Espacements (71.5) : jetons de viewer.html (--sp-*, --edge, --inset-*), lus tels quels (la feuille vit dans la page hôte). Posés AVANT cette feuille : un var() inconnu ferait tomber la déclaration entière.
-export const STYLE_TIROIR = `
+
 .vf-term-pastille, .vf-term-puce { position: fixed; left: var(--edge); bottom: var(--edge); z-index: 6; border-radius: 999px; background: var(--raise); border: 1px solid var(--hair-2); font: 500 13px var(--sans); }
 .vf-term-pastille { height: 32px; display: inline-flex; align-items: center; justify-content: center; gap: var(--sp-6); padding: 0 var(--sp-12); color: var(--text-2); cursor: pointer; box-shadow: var(--shadow-card); transition: background .15s, color .15s; }
 .vf-term-pastille:hover { background: var(--raise-2); color: var(--text); }
@@ -63,4 +60,3 @@ body.vf-term-ouvert #ask { display: none; }
 @media (max-width: 700px) { .vf-term-pastille, .vf-term-puce { left: var(--edge); bottom: var(--edge); } } /* correction ciblée du lot C (C-R2 : décision déléguée par Samuel (message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5), option recommandée) : le bas de la zone basse à --edge, comme la barre de question ; le tiroir reste à 8 */
 @media (prefers-reduced-motion: reduce) { .vf-term-tiroir.vf-term-entree { animation: none; } .vf-term-grip, .vf-term-pastille, .vf-term-bouton { transition: none; } }
 html.theme-switching .vf-term-tiroir, html.theme-switching .vf-term-tiroir * { animation: none !important; transition: none !important; }
-`;

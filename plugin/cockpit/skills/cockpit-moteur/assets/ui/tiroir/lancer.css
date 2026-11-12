@@ -1,0 +1,8 @@
+
+#panel [data-vf-lancer] > * + * { margin-top: var(--sp-8, 8px); }
+#panel [data-vf-lancer] details > .btn { margin: var(--sp-8, 8px) var(--sp-8, 8px) 0 0; }
+#panel [data-vf-lancer] summary { cursor: pointer; }
+#panel .sec [data-vf-lancer] { padding: var(--sp-12, 12px) 0 var(--sp-4, 4px); } /* section remontée sous le titre, dans l'en-tête du panneau : pas de seconde marge latérale */
+@media (max-width: 999px), (pointer: coarse) {
+  body.vf-term-ouvert #panel { padding-bottom: var(--vf-term-reserve, 0px); scroll-padding-bottom: var(--vf-term-reserve, 0px); }
+}

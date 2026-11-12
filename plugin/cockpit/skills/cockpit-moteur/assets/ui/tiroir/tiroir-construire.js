@@ -1,8 +1,4 @@
-// vf-cockpit-terminal-tiroir-ui — construction du DOM du tiroir du terminal (71-07 ; UI-SPEC §2, §5, §7, §12).
-// Export : construireTiroir(document, textes) -> { pastille, point, region, barre, etatPoint, etatTexte, boutonPlein, boutonFermer, boutonTerminer, poignee, emplacementCadre, charge,
-//   annonce, puce, carteInjoignable }. Sérialisée par .toString() dans le script injecté : autonome, aucune référence à un identifiant du module.
-// Tout par createElement et textContent (aucun innerHTML) ; les textes viennent de l'UI-SPEC §12 via `textes`.
-export function construireTiroir(document, textes) {
+function construireTiroir(document, textes) {
   const NS = 'http:' + '//www.w3.org/2000/svg'; // espace de noms SVG, construit par concaténation : le script servi ne porte aucune adresse web entière
   const el = (tag, cls, txt) => { const e = document.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; };
   const picto = (d) => {

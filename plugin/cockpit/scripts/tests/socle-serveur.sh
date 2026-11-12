@@ -23,7 +23,7 @@
 #   cockpit_module_copie [destination]   copie COMPLÈTE du module (scripts sans tests/, skills), jamais un lien (Node résout le lien du point d'entrée : le code
 #       muté ne serait jamais chargé) ; imprime SEUL le chemin absolu de la racine de la copie ; code 0 ou 1 ; n'exporte rien (COCKPIT_MODULE="$(cockpit_module_copie)")
 #   cockpit_module_muter <nom> <fichier-du-module> <expression sed>   copie, mutation, exporte COCKPIT_MODULE vers la copie ; code 1 si la cible manque ou si la
-#       copie n'a pas changé (le contrat des mutant() actuels). Le nom de base désigne le dossier : serve.mjs, graph-query.js, query-cli.mjs côté moteur, vf-cockpit-* côté scripts, vue.js client.js q.css (79-11) sous assets/ui/terminal.
+#       copie n'a pas changé (le contrat des mutant() actuels). Le nom de base désigne le dossier : serve.mjs, graph-query.js, query-cli.mjs côté moteur, vf-cockpit-* côté scripts, vue.js client.js q.css (79-11) sous assets/ui/terminal, les neuf fichiers du tiroir et du lancement sous assets/ui/tiroir.
 #       À appeler dans le shell courant (pas dans $(…)) pour que l'export survive.
 #   cockpit_module_charge <racine>   code 0 si l'empreinte publiée par le serveur lancé (server.json) égale celle que calcule le vf-cockpit-module.mjs DE CETTE racine
 #   cockpit_vivant                   code 0 si /api/status du serveur lancé répond 200 et publie une empreinte de 12 caractères hexadécimaux (contrôle de vie des témoins négatifs)
@@ -125,7 +125,8 @@ cockpit_module_copie() {
 _cockpit_module_cible() { # <racine> <nom de base> -> chemin du fichier dans la racine, rien si le nom n'est pas d'un fichier du module
   case "$2" in
     serve.mjs|graph-query.js|query-cli.mjs) printf '%s\n' "$1/skills/cockpit-moteur/assets/$2" ;;
-    vue.js|client.js|q.css) printf '%s\n' "$1/skills/cockpit-moteur/assets/ui/terminal/$2" ;;   # 79-11 : code navigateur de la page de Q, rangé en fichiers du moteur
+    vue.js|client.js|q.css) printf '%s\n' "$1/skills/cockpit-moteur/assets/ui/terminal/$2" ;;
+    tiroir.js|tiroir-message.js|tiroir-construire.js|tiroir.css|lancer.js|lancer-extraire-chat.js|lancer-observer-chat.js|lancer-proposition.js|lancer.css) printf '%s\n' "$1/skills/cockpit-moteur/assets/ui/tiroir/$2" ;;   # 79-11 : tiroir et lancement de la page hôte   # 79-11 : code navigateur de la page de Q, rangé en fichiers du moteur
     vf-cockpit-*) printf '%s\n' "$1/scripts/$2" ;;
   esac
 }
