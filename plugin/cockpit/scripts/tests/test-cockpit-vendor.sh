@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test-cockpit-vendor.sh — copie vendorisée de floorplan (CKPT-02, CKPT-03 volet code ; P67-D-03, D-07, D-11 ; P79-D-07).
 #   V1 sentinelles et licence · V2 licences tierces · V3 rien que check-skills ou la CI jugeraient
-#   V4 tailles et marqueurs · V8 binaires · V10 fork assumé : ni dossier amont ni journal de patchs, sentinelle du moteur lue (79-01)
+#   V4 tailles et marqueurs (V4c : plafond de 160 colonnes en cliquet) · V11 code navigateur rangé en fichiers (79-11) · V8 binaires · V10 fork assumé : ni dossier amont ni journal de patchs, sentinelle du moteur lue (79-01)
 #   V9 vendor xterm, police des traits de boîte, assistant du terminal
 # Exit 0 si tout passe, 1 sinon.
 
@@ -210,6 +210,115 @@ col_mutant_temoin SEUIL 's/SEUIL = 160;/SEUIL = 161;/' "le plafond relâché d'u
 col_mutant_temoin MARQUEUR 's|const comptes = (texte) => |const comptes = (texte) => /vibeflow:allow-large-file/.test(texte.split("\\n").slice(0, 5).join("\\n")) ? 0 : |' "le marqueur exempte : 161 sous marqueur passe (V4c.3)" col_vmarq "ok" col_v161x "rouge HAUSSE"
 col_mutant_temoin CR "s|l\\.replace(/\\\\r\\$/, '')|l|" "le CR final est compté : 160 plus CR deviennent rouges (V4c.1d)" col_v160c "rouge HAUSSE" col_v160x "ok"
 col_mutant_temoin ORPHELINE "s|v\\.push(\\['ORPHELINE', c\\]);|;|" "les entrées orphelines sont ignorées (V4c.2b)" col_orph "ok" col_v160x "ok"
+
+echo "=== V11 — code navigateur rangé en fichiers, lu comme texte (AUDC-AM5, P79-D-19) ==="
+NAV="$SCRIPTS/vf-cockpit-navigateur.mjs"
+# nav_noms <dossier> : noms de FICHIERS_NAVIGATEUR pour ce dossier, triés, séparés par un espace ; « absent » si l'export manque
+nav_noms() {
+  node --input-type=module -e "import { pathToFileURL } from 'node:url'; const m = await import(pathToFileURL(process.argv[1]).href); console.log(m.FICHIERS_NAVIGATEUR.filter((p) => p[0] === process.argv[2]).map((p) => p[1]).sort().join(' '));" "$NAV" "$1" 2>/dev/null || echo absent
+}
+dossier_noms() { ls "$MOTEUR/assets/ui/$1" 2>/dev/null | LC_ALL=C sort | paste -sd' ' -; }
+ajout_noms() { awk -v d="assets/ui/$1/" '$1=="AJOUT" && index($2, d)==1 {print substr($2, length(d)+1)}' "$MOTEUR/VENDORED.txt" | LC_ALL=C sort | paste -sd' ' -; }
+assert_eq "V11.Q1a — FICHIERS_NAVIGATEUR : les noms du dossier terminal" "$(nav_noms terminal)" "client.js q.css vue.js"
+assert_eq "V11.Q1b — les fichiers présents du dossier assets/ui/terminal" "$(dossier_noms terminal)" "client.js q.css vue.js"
+assert_eq "V11.Q1c — les lignes AJOUT de VENDORED.txt pour le dossier terminal" "$(ajout_noms terminal)" "client.js q.css vue.js"
+# q2.mjs <moteur> : la page de Q (sombre et clair) assemble, dans l'ordre, la feuille de Q puis la vue et le client, chacun dans son <script> sans attribut
+cat > "$WORK/q2.mjs" <<'FIN'
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [moteur, scripts] = process.argv.slice(2);
+const page = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-terminal-page.mjs')).href);
+page.preparerPage({ engineDir: moteur });
+const lire = (n) => fs.readFileSync(path.join(moteur, 'assets/ui/terminal', n), 'utf8');
+const css = lire('q.css'), vue = lire('vue.js').replace(/\n$/, ''), client = lire('client.js').replace(/\n$/, '');
+const o = "http://127.0.0.1:4100";
+for (const theme of ['dark', 'light']) {
+  const cfg = JSON.stringify({ origineP: o, theme }).replace(/</g, '\\u003c');
+  const { html } = page.pageTerminal({ theme, origineP: o });
+  const pieces = [`\n${css}</style>`, `<script>(${vue})(${cfg});</script>`, `<script>(${client})(${cfg});</script>`];
+  let pos = -1, ok = true;
+  for (const p of pieces) { const i = html.indexOf(p, pos + 1); if (i <= pos) ok = false; pos = i; }
+  console.log(`${theme} ${ok ? 'ordre-ok' : 'ordre-ko'} vue=${vue.length > 1000} client=${client.length > 1000}`);
+}
+FIN
+Q2="$(node "$WORK/q2.mjs" "$MOTEUR" "$SCRIPTS" 2>&1 | tr '\n' '/')"
+assert_eq "V11.Q2 — pageTerminal (sombre et clair) : feuille q.css, puis vue.js et client.js dans leurs <script> sans attribut, dans l'ordre" "$Q2" "dark ordre-ok vue=true client=true/light ordre-ok vue=true client=true/"
+# q3.mjs : une copie du dossier du moteur dont client.js porte une mutation d'un caractère : la page ET la CSP changent
+mkdir -p "$WORK/q3/assets" && cp -R "$MOTEUR/assets/vendor" "$WORK/q3/assets/vendor" && mkdir -p "$WORK/q3/assets/ui" && cp -R "$MOTEUR/assets/ui/terminal" "$WORK/q3/assets/ui/terminal" 2>/dev/null
+cat > "$WORK/q3.mjs" <<'FIN'
+import fs from 'node:fs'; import path from 'node:path'; import crypto from 'node:crypto'; import { pathToFileURL } from 'node:url';
+const [copie, scripts] = process.argv.slice(2), o = 'http://127.0.0.1:4100';
+const rendre = async (moteur, v) => { const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-terminal-page.mjs')).href + '?v=' + v); m.preparerPage({ engineDir: moteur }); return m.pageTerminal({ theme: 'dark', origineP: o }); };
+const f = path.join(copie, 'assets/ui/terminal/client.js');
+const avant = await rendre(copie, 'a'); const t = fs.readFileSync(f, 'utf8');
+fs.writeFileSync(f, t.replace('const MODES', 'const MUTE = 1; const MODES'));
+const apres = await rendre(copie, 'b');
+const empreinte = (h) => { const m = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((x) => `'sha256-${crypto.createHash('sha256').update(x[1]).digest('base64')}'`); return m[m.length - 1]; };
+console.log([avant.html !== apres.html, avant.csp !== apres.csp, apres.html.includes('const MUTE = 1;'), apres.csp.includes(empreinte(apres.html))].join(' '));
+FIN
+assert_eq "V11.Q3 — client.js muté dans une copie : la page change, la CSP change, la page porte la mutation, la CSP porte l'empreinte du script muté" "$(node "$WORK/q3.mjs" "$WORK/q3" "$SCRIPTS" 2>&1 | tail -1)" "true true true true"
+# q4.mjs : le lecteur fermé par défaut, un refus par cause
+cat > "$WORK/q4.mjs" <<'FIN'
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [dossierTmp, nav] = process.argv.slice(2);
+const m = await import(pathToFileURL(nav).href);
+const FONCTION = 'function vue(cfg) {\n  void cfg;\n}\n';
+const neuf = (nom) => { const racine = path.join(dossierTmp, nom); fs.mkdirSync(path.join(racine, 'assets/ui/terminal'), { recursive: true }); return racine; };
+const ecrire = (racine, nom, contenu) => fs.writeFileSync(path.join(racine, 'assets/ui/terminal', nom), contenu);
+const essai = (cas, fn) => { try { const r = fn(); console.log(`${cas}=lu:${r.length}`); } catch (e) { console.log(`${cas}=refus:${/vue\.js|q\.css|autre|hors|liste|terminal|client/.test(String(e.message)) ? 'nomme' : 'muet'}`); } };
+const lf = (r, d = 'terminal', n = 'vue.js') => () => m.lireFonction(d, n, { moteur: r });
+let r = neuf('intact'); ecrire(r, 'vue.js', FONCTION); essai('intact', lf(r));
+console.log(`intact-sans-fin=${(() => { try { return m.lireFonction('terminal', 'vue.js', { moteur: r }) === FONCTION.slice(0, -1); } catch { return 'erreur'; } })()}`);
+r = neuf('hors-liste'); ecrire(r, 'autre.js', FONCTION); essai('hors-liste', lf(r, 'terminal', 'autre.js'));
+r = neuf('dossier'); essai('dossier-hors-liste', lf(r, 'inconnu', 'vue.js'));
+r = neuf('lien'); fs.writeFileSync(path.join(r, 'reel.js'), FONCTION); fs.symlinkSync(path.join(r, 'reel.js'), path.join(r, 'assets/ui/terminal/vue.js')); essai('lien', lf(r));
+r = neuf('chemin'); fs.rmSync(path.join(r, 'assets/ui/terminal'), { recursive: true }); fs.mkdirSync(path.join(r, 'ailleurs')); fs.writeFileSync(path.join(r, 'ailleurs/vue.js'), FONCTION); fs.symlinkSync(path.join(r, 'ailleurs'), path.join(r, 'assets/ui/terminal')); essai('chemin-sorti', lf(r));
+r = neuf('gros'); ecrire(r, 'vue.js', FONCTION.slice(0, -2) + '/* ' + 'x'.repeat(256 * 1024) + ' */\n}\n'); essai('gros', lf(r));
+r = neuf('nul'); ecrire(r, 'vue.js', 'function vue() {\0}\n'); essai('nul', lf(r));
+r = neuf('script'); ecrire(r, 'vue.js', 'function vue() { const s = "</SCRIPT>"; }\n'); essai('fermeture-script', lf(r));
+r = neuf('absent'); essai('absent', lf(r));
+r = neuf('feuille'); ecrire(r, 'q.css', 'a { color: red } </style><script>x</script>'); essai('fermeture-feuille', () => m.lireFeuille('terminal', 'q.css', { moteur: r }));
+r = neuf('feuille-ok'); ecrire(r, 'q.css', 'a { color: red }\n'); console.log(`feuille-telle-quelle=${m.lireFeuille('terminal', 'q.css', { moteur: r }) === 'a { color: red }\n'}`);
+FIN
+mkdir -p "$WORK/q4"; node "$WORK/q4.mjs" "$WORK/q4" "$NAV" > "$WORK/q4.out" 2>&1
+q4() { grep -c -x -- "$1" "$WORK/q4.out"; }
+assert_eq "V11.Q4a — témoin positif : le fichier intact est lu" "$(q4 'intact=lu:'"$(printf 'function vue(cfg) {\n  void cfg;\n}' | wc -c | tr -d ' ')")" "1"
+assert_eq "V11.Q4b — une seule fin de ligne est retirée" "$(q4 'intact-sans-fin=true')" "1"
+assert_eq "V11.Q4c — un nom hors liste est refusé, en nommant le fichier" "$(q4 'hors-liste=refus:nomme')" "1"
+assert_eq "V11.Q4d — un dossier hors liste est refusé" "$(q4 'dossier-hors-liste=refus:nomme')" "1"
+assert_eq "V11.Q4e — un lien symbolique à la place du fichier est refusé" "$(q4 'lien=refus:nomme')" "1"
+assert_eq "V11.Q4f — un chemin dont la résolution sort du dossier est refusé" "$(q4 'chemin-sorti=refus:nomme')" "1"
+assert_eq "V11.Q4g — un fichier de 256 Kio plus un octet est refusé" "$(q4 'gros=refus:nomme')" "1"
+assert_eq "V11.Q4h — un octet nul est refusé" "$(q4 'nul=refus:nomme')" "1"
+assert_eq "V11.Q4i — une fermeture de script dans une fonction est refusée (casse ignorée)" "$(q4 'fermeture-script=refus:nomme')" "1"
+assert_eq "V11.Q4j — une fermeture de feuille dans une feuille est refusée" "$(q4 'fermeture-feuille=refus:nomme')" "1"
+assert_eq "V11.Q4k — un fichier absent est refusé" "$(q4 'absent=refus:nomme')" "1"
+assert_eq "V11.Q4l — une feuille intacte est rendue telle quelle" "$(q4 'feuille-telle-quelle=true')" "1"
+# V11.Q5 : ni conversion de fonction en chaîne ni évaluation dynamique de code dans le lecteur et la page
+MOTIF_EVAL='\.toString\(\)|new Function|[^a-zA-Z.]eval\(|node:vm'
+printf '%s\n' 'const s = f.toString();' > "$WORK/q5-t1.txt"; printf '%s\n' 'const g = new Function("x");' > "$WORK/q5-t2.txt"; printf '%s\n' 'const r = eval(code);' > "$WORK/q5-t3.txt"; printf '%s\n' "import vm from 'node:vm';" > "$WORK/q5-t4.txt"
+assert_eq "V11.Q5 — témoin positif : le motif se déclenche sur ses quatre lignes d'exemple" "$(cat "$WORK"/q5-t[1-4].txt | grep -c -E "$MOTIF_EVAL")" "4"
+q5=0; for f in "$NAV" "$SCRIPTS/vf-cockpit-terminal-page.mjs"; do [ -f "$f" ] || { q5=-99; break; }; q5=$((q5 + $(grep -c -E "$MOTIF_EVAL" "$f"))); done
+assert_eq "V11.Q5a — le lecteur et la page de Q : aucune conversion de fonction en chaîne, aucune évaluation dynamique" "$q5" "0"
+# q6.mjs : la liste du code évalué et l'empreinte du module couvrent les fichiers de Q
+cat > "$WORK/q6.mjs" <<'FIN'
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [racine] = process.argv.slice(2), scripts = path.join(racine, 'scripts'), moteur = path.join(racine, 'skills/cockpit-moteur');
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-module.mjs')).href);
+const cles = m.fichiersCodeEvalue(scripts, moteur).map((x) => x[0]);
+console.log(`liste=${['client.js', 'q.css', 'vue.js'].every((n) => cles.includes(`assets/ui/terminal/${n}`))}`);
+const h0 = m.empreinteModule({ dossierScripts: scripts, dossierMoteur: moteur });
+const f = path.join(moteur, 'assets/ui/terminal/client.js'), t = fs.readFileSync(f);
+fs.writeFileSync(f, Buffer.concat([t, Buffer.from(' ')]));
+const h1 = m.empreinteModule({ dossierScripts: scripts, dossierMoteur: moteur });
+fs.rmSync(f);
+const h2 = m.empreinteModule({ dossierScripts: scripts, dossierMoteur: moteur });
+console.log(`stable=${typeof h0 === 'string' && h0.length === 12} octet=${typeof h1 === 'string' && h1 !== h0} supprime=${h2 === null}`);
+FIN
+rm -rf "$WORK/q6"; mkdir -p "$WORK/q6/scripts" "$WORK/q6/skills/cockpit-moteur/assets/ui"; cp "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs "$WORK/q6/scripts/" 2>/dev/null
+cp "$MOTEUR/assets/serve.mjs" "$WORK/q6/skills/cockpit-moteur/assets/"; cp -R "$MOTEUR/assets/ui/terminal" "$WORK/q6/skills/cockpit-moteur/assets/ui/terminal" 2>/dev/null
+node "$WORK/q6.mjs" "$WORK/q6" > "$WORK/q6.out" 2>&1
+assert_eq "V11.Q6a — fichiersCodeEvalue liste les trois fichiers de Q" "$(sed -n 1p "$WORK/q6.out")" "liste=true"
+assert_eq "V11.Q6b — l'empreinte est calculée, change d'un octet dans client.js d'une copie, et devient nulle quand client.js manque" "$(sed -n 2p "$WORK/q6.out")" "stable=true octet=true supprime=true"
 
 echo "=== V8 — binaires ==="
 assert_eq "V8.1 — cinq .woff2 non vides (quatre polices du cockpit, JetBrains Mono 2.304 Regular)" "$(find "$MOTEUR" -name '*.woff2' -size +0 | grep -c .)" "5"

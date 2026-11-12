@@ -74,3 +74,30 @@ Mutants de l'aide (V4c.8, copies jetables, substitution par sed) : chacun a son 
 - M-CR : 160 plus CR (V4c.1d) : attendu sain ok, obtenu mutant rouge HAUSSE ; voisin 160 ok.
 - M-ORPHELINE : entrée orpheline (V4c.2b) : attendu sain rouge ORPHELINE, obtenu mutant ok ; voisin 160 ok.
 Fichiers écrits par la tâche (colonnes-cliquet.mjs 113 lignes, releve-pages-terminal.mjs) : 0 ligne longue.
+
+## Tâche 2 — page de Q rangée en fichiers
+
+### Rouges sur la base (V11.Q1 à Q6 ; fichiers et export absents)
+
+Rejeu de test-cockpit-vendor.sh : 142 PASS / 20 FAIL, tous les FAIL sont des témoins V11.Q.
+
+- V11.Q1a — FICHIERS_NAVIGATEUR : les noms du dossier terminal | attendu: [client.js q.css vue.js] | obtenu:  [absent]
+- V11.Q1b — les fichiers présents du dossier assets/ui/terminal | attendu: [client.js q.css vue.js] | obtenu:  []
+- V11.Q1c — les lignes AJOUT de VENDORED.txt pour le dossier terminal | attendu: [client.js q.css vue.js] | obtenu:  []
+- V11.Q2 — pageTerminal (sombre et clair) : feuille q.css, puis vue.js et client.js dans leurs <script> sans attribut, dans l'ordre | attendu: [dark ordre-ok vue=true client=true/light ordre-ok vue=true client=true/] | obtenu:  [node:fs:539/    return binding.readFileUtf8(path, stringToFlags(options.flag));/                   ^//E
+- V11.Q3 — client.js muté dans une copie : la page change, la CSP change, la page porte la mutation, la CSP porte l'empreinte du script muté | attendu: [true true true true] | obtenu:  [Node.js v26.5.0]
+- V11.Q4a — témoin positif : le fichier intact est lu | attendu: [1] | obtenu:  [0]
+- V11.Q4b — une seule fin de ligne est retirée | attendu: [1] | obtenu:  [0]
+- V11.Q4c — un nom hors liste est refusé, en nommant le fichier | attendu: [1] | obtenu:  [0]
+- V11.Q4d — un dossier hors liste est refusé | attendu: [1] | obtenu:  [0]
+- V11.Q4e — un lien symbolique à la place du fichier est refusé | attendu: [1] | obtenu:  [0]
+- V11.Q4f — un chemin dont la résolution sort du dossier est refusé | attendu: [1] | obtenu:  [0]
+- V11.Q4g — un fichier de 256 Kio plus un octet est refusé | attendu: [1] | obtenu:  [0]
+- V11.Q4h — un octet nul est refusé | attendu: [1] | obtenu:  [0]
+- V11.Q4i — une fermeture de script dans une fonction est refusée (casse ignorée) | attendu: [1] | obtenu:  [0]
+- V11.Q4j — une fermeture de feuille dans une feuille est refusée | attendu: [1] | obtenu:  [0]
+- V11.Q4k — un fichier absent est refusé | attendu: [1] | obtenu:  [0]
+- V11.Q4l — une feuille intacte est rendue telle quelle | attendu: [1] | obtenu:  [0]
+- V11.Q5a — le lecteur et la page de Q : aucune conversion de fonction en chaîne, aucune évaluation dynamique | attendu: [0] | obtenu:  [-99]
+- V11.Q6a — fichiersCodeEvalue liste les trois fichiers de Q | attendu: [liste=true] | obtenu:  [liste=false]
+- V11.Q6b — l'empreinte est calculée, change d'un octet dans client.js d'une copie, et devient nulle quand client.js manque | attendu: [stable=true octet=true supprime=true] | obtenu:  [node:fs:697]
