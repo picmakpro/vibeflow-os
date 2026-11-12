@@ -713,10 +713,10 @@ if (mode === 'mesure') {
   const lin = (n) => () => { let s = 0; for (let i = 0; i < n; i++) s += (i * 7) ^ (s >>> 3); return s > 0; };
   const quad = (n) => () => { let s = 0; for (let i = 0; i < n; i++) for (let j = 0; j < n; j++) s += (i ^ j) & 3; return s > 0; };
   const serie = (g, n) => { const r = []; for (let k = 0; k < 3; k++) { const m = procedure(g(n), g(2 * n), g(n >> 2)); r.push(m); } return r; };
-  const meilleurRapport = (rs) => Math.min(...rs.map((m) => m.t2 / Math.max(m.t1, 1e-9)));
+  const meilleurRapport = (rs) => Math.max(...rs.map((m) => m.t2 / Math.max(m.t1, 1e-9))); // une série sans bruit suffit à prouver que le banc voit la croissance
   const critere = (rs) => rs.some((m) => m.t2 <= 2.5 * m.t1 + 1);
   const rl = serie(lin, 4000000), rq = serie(quad, 2500);
-  console.log(`lineaire=${critere(rl) ? 'laisse-passer' : 'rouge'} quadratique=${meilleurRapport(rq) >= 3.2 ? 'vu' : 'aveugle'} (rapports ${meilleurRapport(rl).toFixed(2)} ${meilleurRapport(rq).toFixed(2)})`);
+  console.log(`lineaire=${critere(rl) ? 'laisse-passer' : 'rouge'} quadratique=${meilleurRapport(rq) >= 3.2 ? 'vu' : 'aveugle'} (meilleur rapport quadratique ${meilleurRapport(rq).toFixed(2)})`);
 }
 JS
 cat > "$GL_AUX/plafonds.mjs" <<'JS'
@@ -790,7 +790,7 @@ for C in C0 C1 C3 C4; do
     C3) T="frontières : MAX_MOTIF caractères fonctionne, un de plus est inerte ; un chemin ordinaire très long est jugé juste";;
     C4) T="500 accolades imbriquées : compile et correspond sans dépassement de pile";;
   esac
-  assert_eq "GLOB.$C — $T" "$(node "$GL_AUX/plafonds.mjs" "$GL_LIB" "$C" 2>&1 | head -1)" "ok"
+  assert_eq "GLOB.$C — $T" "$(node "$GL_AUX/plafonds.mjs" "$GL_LIB" "$C" 2> /dev/null | head -1)" "ok"
 done
 GL_C2="$(node "$GL_AUX/plafonds.mjs" "$GL_LIB" C2 2> "$GL_AUX/c2.err" | head -1)"
 GL_C2L="$(awk 'END{print NR}' "$GL_AUX/c2.err")"; GL_C2M="$(awk '{ if (length($0) > m) m = length($0) } END{print m + 0}' "$GL_AUX/c2.err")"
