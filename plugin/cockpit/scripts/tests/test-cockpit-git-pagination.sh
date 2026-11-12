@@ -59,7 +59,10 @@ mk_lab() {
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; pose OUT, PORT ; démarre le serveur (SRV)
   env $ENVX "$NODE" "${2:-${GP_SCRIPTS:-$SCRIPTS}}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
-  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
+  # un CLI `claude` factice, comme les autres suites du cockpit : sans CLI sur le PATH du runner (HOME redirigé), serve.mjs affiche #ask-warn
+  # au-dessus de la barre de question à 1024 px, la barre passe de 40 à 115 px et le tiroir se cale 69 px plus haut (GP2.3 : liste à 237 px)
+  mkdir -p "$WORK/fauxbin"; cp "$HERE_T/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"
+  env $ENVX "VF_COCKPIT_CLAUDE=$WORK/fauxbin/claude" ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
   SRV=$!
   for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
   PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
