@@ -737,11 +737,11 @@ if mutant mode-aucune "$PROCF" '/garde:mode-servi/s#.*#const lireProposition = (
 else sans_effet "M-MODE-DANS-AUCUNE"; fi
 echo "=== M-NOUVELLE-ROUTE — une route POST /mode ajoutée à routes (LM.S3) ==="
 if mutant route "$PROCF" "s#'/annuler': 'POST' };#'/annuler': 'POST', '/mode': 'POST' };#"; then
-  assert_eq "M-NOUVELLE-ROUTE — sous le mutant LM.S3 rougit : la table de routes compte une route de plus" "$(node "$AUX/stat.mjs" "$MUT_OUT/$PROCF" "$MUT_OUT/vf-cockpit-terminal-client.mjs" | evj j.routes)" "/amorce:POST,/annuler:POST,/entree:POST,/etat:GET,/flux:GET,/lancer:POST,/mode:POST,/proposition:GET,/taille:POST"
+  assert_eq "M-NOUVELLE-ROUTE — sous le mutant LM.S3 rougit : la table de routes compte une route de plus" "$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/scripts/vf-cockpit-terminal-client.mjs" | evj j.routes)" "/amorce:POST,/annuler:POST,/entree:POST,/etat:GET,/flux:GET,/lancer:POST,/mode:POST,/proposition:GET,/taille:POST"
 else sans_effet "M-NOUVELLE-ROUTE"; fi
 echo "=== M-MODE-VERS-P — le mode ajouté au message lancee (LM.S5, LM.P3) ==="
 if mutant mode-vers-p "$PROCF" 's#process.send(msg);#process.send({ ...msg, mode: demande.mode });#'; then
-  assert_eq "M-MODE-VERS-P — sous le mutant LM.S5 rougit : une ligne process.send( porte le mode" "$(node "$AUX/stat.mjs" "$MUT_OUT/$PROCF" "$MUT_OUT/vf-cockpit-terminal-client.mjs" | evj j.envoisMode)" "1"
+  assert_eq "M-MODE-VERS-P — sous le mutant LM.S5 rougit : une ligne process.send( porte le mode" "$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/scripts/vf-cockpit-terminal-client.mjs" | evj j.envoisMode)" "1"
   surp "$MUT_OUT"; pose_mode "$SENT"$'\n'; psrv_debut "$MUT_OUT"; P3R=""; p3_run
   assert_eq "M-MODE-VERS-P — sous le mutant LM.P3 rougit : P refuse le message lancee à clé de plus (forme fermée) : la cible n'est jamais marquée lancée (son témoin positif)" "$P3R" "lancee=non fuites=0"; psrv_fin; sur_out
 else sans_effet "M-MODE-VERS-P"; fi
@@ -756,7 +756,7 @@ echo "=== M-ANCIEN-FICHIER — le support revient dans le lab : l'ancien fichier
 if mutant ancien "$PROCF" "s#creerMemoireModePoste({ racine: root })#creerMemoireMode({ fichier: path.join(here, '.cache', 'terminal-mode') })#" "s#import { creerMemoireModePoste }#import { creerMemoireMode }#"; then
   assert_eq "M-ANCIEN-FICHIER — sous le mutant LM.Q10 (a) rougit : l'ancien fichier herite est servi, puis réécrit par le lancement (plan)" "$(q_vieux "$MUT_OUT")" "herite 204 plan absent"
   assert_eq "M-ANCIEN-FICHIER — sous le mutant LM.Q10 (aucun fichier sous le lab) rougit : le lancement crée le fichier sous le lab, rien au poste" "$(q_aucun "$MUT_OUT")" "204 lab-change absent"
-  assert_eq "M-ANCIEN-FICHIER — sous le mutant LM.S7 rougit : la ligne garde:mode-support nomme here, .cache et path.join" "$(grep 'garde:mode-support' "$MUT_OUT/$PROCF" | sed 's#//.*##' | grep -c -E 'here|\.cache|path\.join' | tr -d ' ')" "1"
+  assert_eq "M-ANCIEN-FICHIER — sous le mutant LM.S7 rougit : la ligne garde:mode-support nomme here, .cache et path.join" "$(grep 'garde:mode-support' "$MUT_MOD/scripts/$PROCF" | sed 's#//.*##' | grep -c -E 'here|\.cache|path\.join' | tr -d ' ')" "1"
 else sans_effet "M-ANCIEN-FICHIER"; fi
 echo "=== M-CLE-COMMUNE — la clé ne dépend plus du projet (LM.U7, LM.U8, LM.Q10) ==="
 if mutant cle-commune "$MODF" "s#update(fs.realpathSync(racine), 'utf8')#update('commun', 'utf8')#"; then
@@ -797,7 +797,7 @@ if mutant dossier-proprio "$MODF" "s#ls.uid !== os.getuid() || ##"; then
 else sans_effet "M-DOSSIER-PROPRIETAIRE"; fi
 echo "=== M-STOCKAGE-RESTE — repli sur le stockage du navigateur (LM.S4, LM.C3) ==="
 if mutant stockage-reste vf-cockpit-terminal-client.mjs "/garde:mode-lecture/s#.*#const v = p.mode_retenu !== undefined ? p.mode_retenu : localStorage.getItem('vf.terminal.mode'); // garde:mode-lecture#"; then
-  assert_eq "M-STOCKAGE-RESTE — sain/mutant/occurrences : LM.C3 sain sur le client livré, rouge sous le mutant (getItem d'une clé mode) ; LM.S4 compte 1 occurrence sous le mutant" "$(cq "$CF" "$C3EXPR")/$(cq "$(facts_c "$MUT_OUT")" "$C3EXPR")/$(node "$AUX/stat.mjs" "$MUT_OUT/$PROCF" "$MUT_OUT/vf-cockpit-terminal-client.mjs" | evj j.cliCleMode)" "0/true/1/true/1"
+  assert_eq "M-STOCKAGE-RESTE — sain/mutant/occurrences : LM.C3 sain sur le client livré, rouge sous le mutant (getItem d'une clé mode) ; LM.S4 compte 1 occurrence sous le mutant" "$(cq "$CF" "$C3EXPR")/$(cq "$(facts_c "$MUT_OUT")" "$C3EXPR")/$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/scripts/vf-cockpit-terminal-client.mjs" | evj j.cliCleMode)" "0/true/1/true/1"
 else sans_effet "M-STOCKAGE-RESTE"; fi
 echo "=== M-SERVI-NON-RELU — la valeur servie n'est pas relue contre la liste (LM.C2) ==="
 if mutant servi-non-relu vf-cockpit-terminal-client.mjs "/garde:mode-relu/s#.*#return v;#"; then
