@@ -15,7 +15,7 @@
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
-ENG="$SCRIPTS/../skills/cockpit-moteur"; TA="$HERE_T/terminal-aux.mjs"; VIEWER="$ENG/assets/viewer.html"
+export HERE_T; ENG="$SCRIPTS/../skills/cockpit-moteur"; TA="$HERE_T/terminal-aux.mjs"; VIEWER="$ENG/assets/viewer.html"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/run"
 export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
@@ -75,7 +75,7 @@ for (const theme of ['sombre', 'clair']) for (const nom of NOMS) {
 console.log(`PARITE ${n.sombre}/${n.clair}`);
 JS
 cat > "$AUX/palette.mjs" <<'JS'
-// palette.mjs <viewer.html> <vue.mjs> : la palette xterm de vue.mjs contre les variables Graphite de viewer.html, par thème. Seules les couleurs que l'UI-SPEC §4.2
+// palette.mjs <viewer.html> <vue.js> : la palette xterm de vue.js (fichier du moteur, assets/ui/terminal) contre les variables Graphite de viewer.html, par thème. Seules les couleurs que l'UI-SPEC §4.2
 // donne comme venant d'une variable (colonne « Origine ») sont comparées ; les autres (éclaircies, voiles) n'ont pas de variable d'origine.
 // 71.5 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : « Adoucir le terminal seul ») : en SOMBRE, yellow (#f0d17c, 11,8:1 sur --surface) et brightYellow (#e3df78, 12,6:1) ne sont plus liés à --sev-medium / --warn-text : une origine `=#rrggbb` est une valeur attendue littérale, comparée telle quelle ; le jeton de l'interface garde #ffe08a.
 // 71.5 : une origine `[sombre, clair]` est sensible au thème (l'ANSI clair est du TEXTE : red, green, yellow lisent les variantes --*-text, 4,5:1 ; le contrôle reste, il compare une autre variable).
@@ -85,10 +85,10 @@ const ORIGINE = { background: '--surface', foreground: '--text', cursor: '--on',
 const norm = (v) => { v = String(v).trim().toLowerCase().replace(/\s+/g, ' '); const m = /^#([0-9a-f])([0-9a-f])([0-9a-f])$/.exec(v); return m ? `#${m[1]}${m[1]}${m[2]}${m[2]}${m[3]}${m[3]}` : v; };
 const decl = (css, sel) => Object.fromEntries([...(new RegExp(sel.replace(/[.*+?^${}()|[\]\\]/g, '\\$&') + '\\s*{([^}]*)}').exec(css)?.[1] || '').matchAll(/(--[\w-]+)\s*:\s*([^;]+);/g)].map((m) => [m[1], norm(m[2])]));
 const css = fs.readFileSync(process.argv[2], 'utf8').replace(/\/\*[\s\S]*?\*\//g, ''); const V = { s: decl(css, ':root'), c: decl(css, ':root[data-theme="light"]') };
-// 79-06 : la sortie ne porte plus de code : le fichier désigné par <sortie>/vf-cockpit-….mjs est lu dans le module que COMMANDE cette sortie (table MODS_TABLE : sortie TAB module ; défaut MOD_DEPOT)
+// 79-11 : la vue est un fichier du moteur lu comme texte ; elle est évaluée ici par l'aide de test, dans ce contexte (window est le double posé ci-dessous)
 import path from 'node:path';
-let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === path.dirname(process.argv[3]) && r) racine = r; } } catch {}
-globalThis.window = {}; const m = await import(pathToFileURL(path.join(racine, 'scripts', path.basename(process.argv[3]))).href); m.vueTerminal({});
+const { chargerFonctions } = await import(pathToFileURL(path.join(process.env.HERE_T, 'navigateur-charger.mjs')).href);
+globalThis.window = {}; chargerFonctions([process.argv[3]]).vueTerminal({});
 const n = { sombre: 0, clair: 0 };
 for (const theme of ['sombre', 'clair']) {
   const pal = window.vfTermVue.theme(theme === 'clair');
@@ -145,7 +145,7 @@ mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : 
   local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
   MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
   case "$(basename "$2")" in
-    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+    serve.mjs|graph-query.js|query-cli.mjs|vue.js|client.js|q.css|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
   esac
   f="$d/.vibeflow/cockpit/$2"; [ -f "$f" ] || return 1   # page de la copie du lab (donnée) : même chemin que MUT_OUT/<fichier>
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
@@ -194,7 +194,7 @@ assert_eq "T18.0 — les 41 noms sont présents dans les deux sources, par thèm
 echo "  mesure : $(printf '%s\n' "$PAR" | grep '^PARITE ') (viewer.html contre la page servie)"
 assert_eq "T18.1 — parité sombre : aucun écart ni variable absente" "$(printf '%s\n' "$PAR" | grep -E '\(sombre\)| sombre$' || true)" ""
 assert_eq "T18.2 — parité claire (valeur effective) : aucun écart ni variable absente" "$(printf '%s\n' "$PAR" | grep -E '\(clair\)| clair$' || true)" ""
-PAL="$(node "$AUX/palette.mjs" "$VIEWER" "$OUT/vf-cockpit-terminal-vue.mjs")"
+VUEJS="$ENG/assets/ui/terminal/vue.js"; PAL="$(node "$AUX/palette.mjs" "$VIEWER" "$VUEJS")"
 assert_eq "T19.0 — les 15 couleurs de la palette qui ont une variable d'origine sont présentes dans les deux sources, par thème (anti-vide)" "$(printf '%s\n' "$PAL" | grep '^PALETTE ')" "PALETTE 15/15"
 echo "  mesure : $(printf '%s\n' "$PAL" | grep '^PALETTE ') (viewer.html contre la palette xterm de vue.mjs)"
 assert_eq "T19.1 — parité de la palette xterm, sombre et clair : aucun écart ni couleur absente" "$(printf '%s\n' "$PAL" | grep -v '^PALETTE ' || true)" ""
@@ -221,12 +221,12 @@ if mutant xfo vf-cockpit-terminal-processus.mjs "s/'Content-Security-Policy': cs
 else assert_eq "M-XFO — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-PARITE — six variantes ==="
-if mutant paritea vf-cockpit-terminal-style.mjs 's/--surface: #191919/--surface: #191918/'; then
-  node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pa.html"
+if mutant paritea q.css 's/--surface: #191919/--surface: #191918/'; then
+  node "$AUX/pagegen.mjs" "$MUT_OUT" "$MUT_MOD/skills/cockpit-moteur" dark "$WORK/m-pa.html"
   assert_has "T18.3 — (a) --surface sombre de Q changé" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pa.html")" "variable --surface (sombre) : viewer.html=#191919, Q=#191918"
 else assert_eq "T18.3 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant paritebis vf-cockpit-terminal-style.mjs 's/--ring:[^;]*;//g'; then
-  node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pb.html"
+if mutant paritebis q.css 's/--ring:[^;]*;//g'; then
+  node "$AUX/pagegen.mjs" "$MUT_OUT" "$MUT_MOD/skills/cockpit-moteur" dark "$WORK/m-pb.html"
   assert_has "T18.4 — (b) --ring retiré de Q" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pb.html")" "ABSENTE --ring Q sombre"
 else assert_eq "T18.4 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 sed 's/--text-2: #c6c6c6/--text-2: #c6c6c7/' "$VIEWER" > "$WORK/viewer-mut.html"
@@ -234,32 +234,32 @@ if ! cmp -s "$VIEWER" "$WORK/viewer-mut.html"; then
   node "$AUX/pagegen.mjs" "$OUT" "$ENG" dark "$WORK/m-pc.html"
   assert_has "T18.5 — (c) --text-2 sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/parite.mjs" "$WORK/viewer-mut.html" "$WORK/m-pc.html")" "variable --text-2 (sombre) : viewer.html=#c6c6c7, Q=#c6c6c6"
 else assert_eq "T18.5 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant pariteter vf-cockpit-terminal-style.mjs 's/--text: #161616/--text: #161617/'; then
-  node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pd.html"
+if mutant pariteter q.css 's/--text: #161616/--text: #161617/'; then
+  node "$AUX/pagegen.mjs" "$MUT_OUT" "$MUT_MOD/skills/cockpit-moteur" dark "$WORK/m-pd.html"
   assert_has "T18.6 — (d) --text clair de Q seul changé" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pd.html")" "variable --text (clair) : viewer.html=#161616, Q=#161617"
 else assert_eq "T18.6 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant paritesp vf-cockpit-terminal-style.mjs 's/--sp-8: 8px/--sp-8: 9px/'; then
-  node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pe.html"
+if mutant paritesp q.css 's/--sp-8: 8px/--sp-8: 9px/'; then
+  node "$AUX/pagegen.mjs" "$MUT_OUT" "$MUT_MOD/skills/cockpit-moteur" dark "$WORK/m-pe.html"
   assert_has "T18.7 — (e) --sp-8 de Q seul changé (espacement 71.5)" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pe.html")" "variable --sp-8 (sombre) : viewer.html=8px, Q=9px"
 else assert_eq "T18.7 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant pariteca vf-cockpit-terminal-style.mjs 's/--inset-card: var(--sp-16)/--inset-card: var(--sp-12)/'; then
-  node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-pf.html"
+if mutant pariteca q.css 's/--inset-card: var(--sp-16)/--inset-card: var(--sp-12)/'; then
+  node "$AUX/pagegen.mjs" "$MUT_OUT" "$MUT_MOD/skills/cockpit-moteur" dark "$WORK/m-pf.html"
   assert_has "T18.7 — (f) --inset-card de Q seul changé (jeton sémantique)" "$(node "$AUX/parite.mjs" "$VIEWER" "$WORK/m-pf.html")" "variable --inset-card (sombre) : viewer.html=var(--sp-16), Q=var(--sp-12)"
 else assert_eq "T18.7 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-PALETTE — quatre variantes (J10) ==="
-if mutant paletta vf-cockpit-terminal-vue.mjs "s/green: '#9ece6a'/green: '#9ece6b'/"; then
-  assert_has "T19.2 — (a) vert sombre de la palette changé" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#9ece6a, palette=#9ece6b"
+if mutant paletta vue.js "s/green: '#9ece6a'/green: '#9ece6b'/"; then
+  assert_has "T19.2 — (a) vert sombre de la palette changé" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/vue.js")" "couleur green (sombre) : viewer.html --recent=#9ece6a, palette=#9ece6b"
 else assert_eq "T19.2 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant palettb vf-cockpit-terminal-vue.mjs "s/brightRed: '#da1637',//"; then
-  assert_has "T19.3 — (b) brightRed retiré de la palette claire" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "ABSENTE brightRed palette clair"
+if mutant palettb vue.js "s/brightRed: '#da1637',//"; then
+  assert_has "T19.3 — (b) brightRed retiré de la palette claire" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/vue.js")" "ABSENTE brightRed palette clair"
 else assert_eq "T19.3 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 sed 's/--recent: #9ece6a;/--recent: #9ece69;/' "$VIEWER" > "$WORK/viewer-pal.html"
 if ! cmp -s "$VIEWER" "$WORK/viewer-pal.html"; then
-  assert_has "T19.4 — (c) --recent sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/palette.mjs" "$WORK/viewer-pal.html" "$OUT/vf-cockpit-terminal-vue.mjs")" "couleur green (sombre) : viewer.html --recent=#9ece69, palette=#9ece6a"
+  assert_has "T19.4 — (c) --recent sombre de viewer.html changé (l'amont dérive)" "$(node "$AUX/palette.mjs" "$WORK/viewer-pal.html" "$VUEJS")" "couleur green (sombre) : viewer.html --recent=#9ece69, palette=#9ece6a"
 else assert_eq "T19.4 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant palettd vf-cockpit-terminal-vue.mjs "s/cursorAccent: '#ffffff'/cursorAccent: '#fffffe'/"; then
-  assert_has "T19.5 — (d) cursorAccent clair seul changé (#fff de viewer.html contre #fffffe)" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_OUT/vf-cockpit-terminal-vue.mjs")" "couleur cursorAccent (clair) : viewer.html --on-text=#ffffff, palette=#fffffe"
+if mutant palettd vue.js "s/cursorAccent: '#ffffff'/cursorAccent: '#fffffe'/"; then
+  assert_has "T19.5 — (d) cursorAccent clair seul changé (#fff de viewer.html contre #fffffe)" "$(node "$AUX/palette.mjs" "$VIEWER" "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/vue.js")" "couleur cursorAccent (clair) : viewer.html --on-text=#ffffff, palette=#fffffe"
 else assert_eq "T19.5 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== TV — intégrité du vendor au démarrage (TERM-10) ==="

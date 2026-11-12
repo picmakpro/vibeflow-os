@@ -9,7 +9,7 @@
 # Ports libres choisis à l'exécution (jamais 4456). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; export HERE_T
 ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"; TA="$HERE_T/terminal-aux.mjs"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; RUN="$WORK/run"; mkdir -p "$AUX" "$WORK/home" "$WORK/bin" "$WORK/fauxbin" "$RUN"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"; export CHROME_SESSION="$HERE_T/chrome-session.mjs"
@@ -39,6 +39,8 @@ cat > "$AUX/mod-de.mjs" <<'JS'
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
 export const modDe = (s) => { let m = process.env.VF_MODULE_DEFAUT; try { for (const l of fs.readFileSync(process.env.VF_MODMAP, 'utf8').split('\n')) { const [a, b] = l.split('\t'); if (a === s && b) m = b; } } catch {} return m; };
 export const importer = (s, f) => import(pathToFileURL(`${modDe(s)}/scripts/${f}`).href);
+// 79-11 : la vue de Q est un fichier du moteur du module qui sert la sortie, lu comme texte
+export const texteVue = async (s) => (await import(pathToFileURL(process.env.HERE_T + '/navigateur-charger.mjs').href)).texte(`${modDe(s)}/skills/cockpit-moteur/assets/ui/terminal/vue.js`);
 JS
 cat > "$AUX/ev.mjs" <<'JS'
 import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); const v = new Function('j', 'return (' + process.argv[2] + ')')(j); console.log(typeof v === 'string' ? v : JSON.stringify(v));
@@ -239,7 +241,7 @@ UUID_CHAT='7c7d7412-0a15-4407-939b-eacb01a8e345'
 FORGES=('"x;touch M"' '"$(touch M)"' '"7c7d7412-0a15-4407-939b-eacb01a8e345a"' '""' '5' '[]' '"7c7d7412-0a15-4407-939b-eacb01a8e34;"' 'null')
 echo "=== ST — la sortie existe et porte les modules du plan ==="
 assert_eq "ST — la sortie du cockpit contient le script de P, la vue et le client de Q, le gabarit et l'état de Q" \
-  "$(for f in vf-cockpit-lancer-ui.mjs vf-cockpit-terminal-vue.mjs vf-cockpit-terminal-client.mjs vf-cockpit-lancer-gabarit.mjs vf-cockpit-lancer-q.mjs vf-cockpit-lancer.mjs vf-cockpit-terminal-processus.mjs; do [ -f "$(mod_de "$OUT")/scripts/$f" ] && echo oui || echo "non:$f"; done | sort -u | tr '\n' ' ')" "oui "
+  "$(for f in scripts/vf-cockpit-lancer-ui.mjs skills/cockpit-moteur/assets/ui/terminal/vue.js skills/cockpit-moteur/assets/ui/terminal/client.js scripts/vf-cockpit-lancer-gabarit.mjs scripts/vf-cockpit-lancer-q.mjs scripts/vf-cockpit-lancer.mjs scripts/vf-cockpit-terminal-processus.mjs; do [ -f "$(mod_de "$OUT")/$f" ] && echo oui || echo "non:$f"; done | sort -u | tr '\n' ' ')" "oui "
 
 # ---- TC.1 à TC.4 : sans navigateur ----
 pur() { node "$AUX/harnais-pur.mjs" "$1" "$2" 2>&1 | tail -1; }
@@ -253,7 +255,7 @@ echo "=== TC.4 — CHAT_LIVRE identique dans P et Q ==="
 VALEUR() { sed -nE 's/.*CHAT_LIVRE[[:space:]]*=[[:space:]]*(true|false).*/\1/p' "$1" | head -1; }
 T4="$(pur "$OUT" tc4)"
 assert_eq "TC.4 — CHAT_LIVRE : même valeur dans le script de P (importée) et dans la vue de Q (lue dans le texte de la fonction sérialisée), et la configuration servie la porte" \
-  "$(VALEUR "$(mod_de "$OUT")/scripts/vf-cockpit-lancer-ui.mjs")/$(VALEUR "$(mod_de "$OUT")/scripts/vf-cockpit-terminal-vue.mjs")/$(printf '%s' "$T4" | evj 'String(j.livre)')/$(printf '%s' "$T4" | evj 'j.cfgVrai===(j.livre===true)&&j.cfgFaux===(j.livre===false)')" \
+  "$(VALEUR "$(mod_de "$OUT")/scripts/vf-cockpit-lancer-ui.mjs")/$(VALEUR "$(mod_de "$OUT")/skills/cockpit-moteur/assets/ui/terminal/vue.js")/$(printf '%s' "$T4" | evj 'String(j.livre)')/$(printf '%s' "$T4" | evj 'j.cfgVrai===(j.livre===true)&&j.cfgFaux===(j.livre===false)')" \
   "true/true/true/true"
 assert_eq "TC.4 — valeur réelle : le corps porte chat quand CHAT_LIVRE est vraie" "$(printf '%s' "$T4" | evj 'j.corps')" "cible,verbe,chat"
 if mutant fauxlivre vf-cockpit-lancer-ui.mjs 's/CHAT_LIVRE = true/CHAT_LIVRE = false/'; then
@@ -332,12 +334,12 @@ LIGNE_TC5_OK="$([ "$(v5 verif)" = ok ] && echo oui || echo non)"
 # ---- TC.6 et TC.7 : navigateur ----
 cat > "$AUX/page-vue.mjs" <<'JS'
 // page-vue.mjs <sortie> <fichier-html> <fichier-json> : page hôte jetable (éléments terminal et etat) qui exécute vueTerminal du MODULE qui sert la sortie ; écrit la proposition de base (lignes du gabarit 72-01)
-import { importer } from './mod-de.mjs'; import fs from 'node:fs';
+import { importer, texteVue } from './mod-de.mjs'; import fs from 'node:fs';
 const [, , sortie, html, json] = process.argv;
-const { vueTerminal } = await importer(sortie, 'vf-cockpit-terminal-vue.mjs'); const g = await importer(sortie, 'vf-cockpit-lancer-gabarit.mjs');
+const vue = await texteVue(sortie); const g = await importer(sortie, 'vf-cockpit-lancer-gabarit.mjs');
 const S = '5b9c2e0a-7d41-4f3a-9c58-0e1d2f3a4b5c', C = '7c7d7412-0a15-4407-939b-eacb01a8e345';
 const jeu = (chat) => Object.fromEntries(g.MODES.map((mode) => [mode, g.composerLigne({ session: S, verbe: 'cadrer', mode, phase: '72', ws: 'fiabilite', chat }).ligne]));
-fs.writeFileSync(html, `<!doctype html><meta charset="utf-8"><body><div id="terminal"></div><div id="etat" hidden></div><script>(${vueTerminal.toString()})({});</script></body>`);
+fs.writeFileSync(html, `<!doctype html><meta charset="utf-8"><body><div id="terminal"></div><div id="etat" hidden></div><script>(${vue})({});</script></body>`);
 fs.writeFileSync(json, JSON.stringify({ id: 'a1b2c3d4e5f60718', verbe: 'cadrer', intention: 'Cadre la Phase 72 du compartiment fiabilite', phase: '72', ws: 'fiabilite', lignes: jeu(undefined), bloquants: [], avertissements: [], arme_apres_ms: 200, expire_ms: 100000, chat: true, lignesChat: jeu(C) }));
 JS
 cat > "$AUX/chrome-chat.mjs" <<'JS'
@@ -514,11 +516,11 @@ if mutant activation vf-cockpit-lancer-ui.mjs 's/const humain = actif();/const h
   assert_eq "M-ACTIVATION-RETIREE — le mutant (garde d'activation retirée) rougit TC.2 : une requête sans activation retient de nouveau l'UUID" "$(node "$AUX/harnais-fetch.mjs" "$MUT_OUT" 2>&1 | tail -1 | awk '/^ECHECS.*(activation absente|navigator|isActive|éteinte)/ {print "rouge"; next} {print "autre : " substr($0, 1, 160)}')" "rouge"
 else sans_effet "M-ACTIVATION-RETIREE"; fi
 if [ -n "$CHROME" ]; then
-  if mutant toujours vf-cockpit-terminal-vue.mjs '/garde:chat-offre/s/CHAT_LIVRE && p\.chat === true && [^;]*;/true;/'; then
+  if mutant toujours vue.js '/garde:chat-offre/s/CHAT_LIVRE && p\.chat === true && [^;]*;/true;/'; then
     run_vue "$MUT_OUT"
     assert_eq "M-CASE-TOUJOURS — le mutant (case offerte sans chat) rougit TC.6 : une case existe sans conversation" "$(rj "$VJ" '(j.erreur ? "plante" : (/^[0-9]\|[0-9]\|[0-9]\|[0-9]$/.test(j.t2 || "") && j.t2 !== "0|0|0|0") ? "rouge" : "autre : " + j.t2)')" "rouge"
   else sans_effet "M-CASE-TOUJOURS"; fi
-  if mutant force vf-cockpit-terminal-client.mjs '/garde:corps-lancer/s/avecChat === true ? { chat: true } : {}/{ chat: true }/'; then
+  if mutant force client.js '/garde:corps-lancer/s/avecChat === true ? { chat: true } : {}/{ chat: true }/'; then
     VF_CHAT_MS=20000 run_e2e "$MUT_OUT"
     assert_eq "M-CLIENT-CHAT-FORCE — le mutant (chat:true même case décochée) rougit TC.7 non cochée : la ligne de reprise part alors que la ligne standard était affichée" "$(rj "$EJ" '(j.erreur ? "plante" : (j.e2 && j.e2.cocheApres === false && typeof j.e2.capture === "string" && j.e2.capture.includes(" -r ") && j.e2.capture !== "\u0003" + j.e2.affichee) ? "rouge" : "autre : " + JSON.stringify(j.e2 || j.erreurs))')" "rouge"
   else sans_effet "M-CLIENT-CHAT-FORCE"; fi

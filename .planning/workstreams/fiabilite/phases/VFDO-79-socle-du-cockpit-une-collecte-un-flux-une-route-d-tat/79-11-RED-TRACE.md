@@ -101,3 +101,35 @@ Rejeu de test-cockpit-vendor.sh : 142 PASS / 20 FAIL, tous les FAIL sont des té
 - V11.Q5a — le lecteur et la page de Q : aucune conversion de fonction en chaîne, aucune évaluation dynamique | attendu: [0] | obtenu:  [-99]
 - V11.Q6a — fichiersCodeEvalue liste les trois fichiers de Q | attendu: [liste=true] | obtenu:  [liste=false]
 - V11.Q6b — l'empreinte est calculée, change d'un octet dans client.js d'une copie, et devient nulle quand client.js manque | attendu: [stable=true octet=true supprime=true] | obtenu:  [node:fs:697]
+
+### Vert de la tâche 2 (2026-11-12) : relevé APRÈS des quatre unités q-*, suites rejouées seules
+
+APRES q-sombre-html 766513 1cf1ea396fea9a4ae570135ad14ef506afa78f3503fa39f98f7143bcf5b73bdb
+APRES q-sombre-csp 419 66ce5b3b67d12c1065ee035b69ddfba720c9e8395807b38b7adfe9e5c9b0c2b7
+APRES q-clair-html 766534 473a821e29e153c8b60202d89a598e57d423d00a9a545dd8e1fa2b0bdd5aefe8
+APRES q-clair-csp 419 48a6f508293a4391213e679d0c487384790d550055bf32756c0d205516771d70
+
+Les quatre lignes APRES q-* sont égales aux quatre lignes AVANT q-* (longueur et sha256). Rejeu de test-cockpit-vendor.sh : 162 PASS / 0 FAIL (V11.Q1 à Q6 verts).
+
+Règle 9 (grep de toutes les suites qui nomment un fichier retiré, chacune rejouée seule, sous TMPDIR du nœud ; aucun « mutant sans effet »).
+
+Fichiers sources retirés cherchés : vf-cockpit-terminal-client, vf-cockpit-terminal-vue, vf-cockpit-terminal-style, vueTerminal, clientTerminal, STYLE_Q, VARIABLES_RECOPIEES. Suites nommant l'un d'eux : terminal-page, terminal-client, terminal-xterm, terminal-tiroir, lancer-chat, lancer-mode, lancer-xss, lancer-bandeau, chrome-fr (plus ci-shard-suites.sh et vf-cockpit-lancer-q.mjs, qui ne citent le client que dans un commentaire).
+
+| suite | code | durée | résultat |
+|---|---|---|---|
+| terminal-page | 0 | 36 s | 51 PASS / 0 FAIL |
+| chrome-fr | 0 | 26s | Résultats : 129 PASS / 0 FAIL |
+| lancer-xss | 0 | 197s | Résultats : 76 PASS / 0 FAIL (0 non vérifiées sans navigateur) |
+| lancer-chat | 0 | 62s | Résultats : 38 PASS / 0 FAIL |
+| lancer-mode | 0 | 193s | Résultats : 113 PASS, 0 FAIL (0 non jouées, dites) |
+| terminal-client | 0 | 262s | Résultats : 76 PASS / 0 FAIL |
+| lancer-bandeau | 0 | 556s | Résultats : 161 PASS / 0 FAIL |
+| terminal-xterm | 0 | 941s | Résultats : 81 PASS / 0 FAIL |
+| terminal-tiroir | 0 | 1126s | Résultats : 138 PASS / 0 FAIL |
+
+Mutants des suites visant le code déplacé : retargetés vers client.js, vue.js, q.css (copie du module par cockpit_module_muter, ou copie du moteur réduit passée à pagegen / faux dans lancer-bandeau) ; noms, expressions sed et valeurs attendues inchangés.
+
+### Mesure d'instabilité demandée par la session principale (rejeu isolé, machine chargée par d'autres exécuteurs)
+
+- test-cockpit-terminal-tiroir.sh : 1126 s en un rejeu isolé, 138 PASS (le scénario avec --terminal dépasse 600 s ; CI : 1184 s pour 493 cas).
+- test-cockpit-lancer-bandeau.sh : 556 s, 161 PASS, LB.E11 à LB.E14 verts en rejeu isolé (non reproduit ici). Où passe le temps : fixe pause(3500) de LB.E11, attendreValeur à 10 s, et un sondage client dont la décision d'annuler une proposition ancienne ne se prend qu'au PREMIER sondage de la page (client.js, gardes visite/pret : l'annulation n'est envoyée que si le terminal est déjà prêt à ce moment-là). Hypothèse de la forme [true/0/false/false] : sur un poste lent, le premier sondage précède l'état prêt, l'annulation n'est jamais émise et le scénario suivant n'est plus à l'état attendu. Non corrigé (hors plan), aucune sonde affaiblie.

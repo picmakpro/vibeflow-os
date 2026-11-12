@@ -46,8 +46,8 @@ command -v python3 >/dev/null 2>&1 || { echo "  ❌ python3 introuvable : le ter
 
 # clé de stockage de Q sondée par la charge de P (LANC-09) : relevée dans le client de Q, jamais écrite ici.
 # 72-16 a retiré la constante CLE_MODE (le mode est servi par Q et persisté dans un fichier du lab, P72-D-20) : on sonde donc une clé VIVANTE, le secret de session de Q.
-CLE_STOCK="$(sed -n "s/^.*CLE_SECRET = '\\([^']*\\)'.*\$/\\1/p" "$SCRIPTS/vf-cockpit-terminal-client.mjs" | head -1)"
-assert_eq "clé de stockage de Q sondée relevée dans vf-cockpit-terminal-client.mjs (constante CLE_SECRET, clé vivante) : clé introuvable sinon" "$CLE_STOCK" "vf.terminal.secret"
+CLE_STOCK="$(sed -n "s/^.*CLE_SECRET = '\\([^']*\\)'.*\$/\\1/p" "$SCRIPTS/../skills/cockpit-moteur/assets/ui/terminal/client.js" | head -1)"
+assert_eq "clé de stockage de Q sondée relevée dans client.js de la page de Q (constante CLE_SECRET, clé vivante) : clé introuvable sinon" "$CLE_STOCK" "vf.terminal.secret"
 
 # faux claude (témoin neuf), shell de test (PL-11.4 : echo $$ puis exec bash, invite VFP> ), PATH d'ORIGINE du shell seulement (PL-11.3)
 cp "$HERE_T/temoins/lancer-fauxbin/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"
@@ -144,10 +144,10 @@ SED
 cat > "$AUX/entree-auto.sed" <<'SED'
 s|^        vers_shell += ligne$|        vers_shell += ligne + bytes([13])|
 SED
-MUTFILES=(serve.mjs index.html project.html vf-cockpit-terminal-processus.mjs vf-cockpit-terminal-session.mjs vf-cockpit-lancer.mjs vf-cockpit-terminal-vue.mjs)
+MUTFILES=(serve.mjs index.html project.html vf-cockpit-terminal-processus.mjs vf-cockpit-terminal-session.mjs vf-cockpit-lancer.mjs vue.js)
 # 79-06 : la sortie (MUT_OUT) ne porte que des pages ; le code muté vit dans une COPIE du module (MUT_MOD), une par manche, mutée sur place
 MUT_OUT=""; MUT_MOD=""
-fichier_de() { case "$1" in index.html|project.html) printf '%s\n' "$MUT_OUT/$1" ;; serve.mjs) printf '%s\n' "$MUT_MOD/skills/cockpit-moteur/assets/serve.mjs" ;; *) printf '%s\n' "$MUT_MOD/scripts/$1" ;; esac; }
+fichier_de() { case "$1" in index.html|project.html) printf '%s\n' "$MUT_OUT/$1" ;; serve.mjs) printf '%s\n' "$MUT_MOD/skills/cockpit-moteur/assets/serve.mjs" ;; vue.js) printf '%s\n' "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/vue.js" ;; *) printf '%s\n' "$MUT_MOD/scripts/$1" ;; esac; }
 empreinte() { local f; for f in "${MUTFILES[@]}"; do cat "$(fichier_de "$f")"; done | cksum; } # chaque fichier ; une pièce d'un mutant qui touche deux fichiers se contrôle à part
 # mutant <sortie> <nom> : 0 si le texte a changé ; 1 sinon (message sur stderr) ; le code est muté dans MUT_MOD, les pages dans la sortie
 mutant() {
@@ -164,7 +164,7 @@ mutant() {
     M-ONGLET-SESSION) sed -i.bak "s#if (!actif(c) || c.onglet !== onglet) return non('absente');#if (!actif(c)) return non('absente');#" "$s" ;;
     M-ORIGINE-LANCER) sed -i.bak "s#else if (o !== origineQ())#else if (o !== origineQ() \\&\\& !(url.pathname === '/lancer' \\&\\& o === 'http://127.0.0.1:' + portP))#" "$p" ;;
     M-SANS-CONFIRM) sed -i.bak -E -f "$AUX/sans-confirm.sed" "$p" ;;
-    M-CASE-COCHEE) sed -i.bak "s#caseChat.type = 'checkbox';#caseChat.type = 'checkbox'; caseChat.checked = true;#" "$MUT_MOD/scripts/vf-cockpit-terminal-vue.mjs" ;;
+    M-CASE-COCHEE) sed -i.bak "s#caseChat.type = 'checkbox';#caseChat.type = 'checkbox'; caseChat.checked = true;#" "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/vue.js" ;;
     M-INTERPOLE)
       # trois remplacements, un seul mutant : chacun doit avoir un effet
       a2="$(cksum < "$l")"; sed -i.bak -E -f "$AUX/interp-p.sed" "$l"; [ "$a2" != "$(cksum < "$l")" ] || { echo "  ❌ mutant M-INTERPOLE (P) sans effet : ancre absente (t: 'proposition',)" >&2; return 1; }

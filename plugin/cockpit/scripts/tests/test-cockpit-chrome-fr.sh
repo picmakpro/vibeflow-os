@@ -188,7 +188,7 @@ assert_eq "DG-14.2 : la source des relances locales porte l'apostrophe (vf-cockp
 assert_eq "DG-14.3 : le chip du viewer écrit le texte reçu tel quel (h() n'ôte pas l'apostrophe) — témoin : une entrée sans apostrophe reste sans apostrophe" "$(node -e 'const u=(s)=>s.replace(/&#39;/g,String.fromCharCode(39));console.log(u("Qu&#39;est-ce qui bloque ?")+"|"+u("Qu est-ce qui bloque ?"))')" "Qu'est-ce qui bloque ?|Qu est-ce qui bloque ?"
 
 echo "[F15] recette 2026-11-08 : les phrases que la bibliothèque du terminal dit d'elle-même sont posées en français (« Terminal input », annoncé à chaque entrée dans le terminal)"
-XTERM="$SCRIPTS/../skills/cockpit-moteur/assets/vendor/xterm/xterm.js"; CLIENT="$SCRIPTS/vf-cockpit-terminal-client.mjs"
+XTERM="$SCRIPTS/../skills/cockpit-moteur/assets/vendor/xterm/xterm.js"; CLIENT="$SCRIPTS/../skills/cockpit-moteur/assets/ui/terminal/client.js"
 cat > "$AUX/biblio.mjs" <<'JS'
 import fs from 'node:fs';
 import path from 'node:path';

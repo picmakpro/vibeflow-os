@@ -14,7 +14,7 @@
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; export HERE_T
 ENG="$SCRIPTS/../skills/cockpit-moteur"; TA="$HERE_T/terminal-aux.mjs"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/bin" "$WORK/run"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
@@ -92,7 +92,7 @@ globalThis.fetch = (u, o = {}) => {
   if (String(u) === '/entree') { posts.push(o.body ? o.body.length : 0); return new Promise((ok) => setImmediate(() => ok({ status: 200 }))); }
   return new Promise(() => {}); // /flux et le reste : jamais de réponse
 };
-const m = await import(pathToFileURL(process.argv[2]).href);
+const m = (await import(pathToFileURL(process.env.HERE_T + '/navigateur-charger.mjs').href)).chargerFonctions([process.argv[2]]); // 79-11 : le client est un fichier du moteur
 m.clientTerminal({ origineP: 'http://127.0.0.1:1', theme: 'dark' });
 const att = (ms) => new Promise((ok) => setTimeout(ok, ms));
 for (let i = 0; i < 50 && !onData; i++) await att(20);
@@ -137,7 +137,7 @@ globalThis.fetch = async (u) => {
   }
   return rep(204, null);
 };
-const m = await import(pathToFileURL(process.argv[2]).href);
+const m = (await import(pathToFileURL(process.env.HERE_T + '/navigateur-charger.mjs').href)).chargerFonctions([process.argv[2]]); // 79-11 : le client est un fichier du moteur
 m.clientTerminal({ origineP: 'http://127.0.0.1:1', theme: 'dark' });
 await new Promise((ok) => setTimeout(ok, sc === 'coupure' ? 2500 : 1500));
 console.log(`cartes=${cartes.join(',')}@${premiere && premiere < 500 ? 'vite' : premiere || 'jamais'} bandeaux=${bandeaux > 0 ? 'oui' : 'non'} flux=${sc === 'coupure' ? (flux >= 2 ? '>=2' : flux) : flux} messages=${[...new Set(msgs)].join(",")}`);
@@ -494,7 +494,7 @@ mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : 
   local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
   MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
   case "$(basename "$2")" in
-    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+    serve.mjs|graph-query.js|query-cli.mjs|vue.js|client.js|q.css|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
   esac
   f="$d/.vibeflow/cockpit/$2"; [ -f "$f" ] || return 1   # page de la copie du lab (donnée) : même chemin que MUT_OUT/<fichier>
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
@@ -530,17 +530,17 @@ assert_eq "T6.5 — aucun set-cookie sur GET /, POST /amorce (refusé et admis),
 unsrv
 
 echo "=== M-ETOILE / M-ECOUTE / M-CLIP / M-SETCOOKIE — mutants statiques ==="
-mut_page() { node "$AUX/pagegen.mjs" "$MUT_OUT" "$ENG" dark "$WORK/m-$1.html"; node "$AUX/stat.mjs" "$WORK/m-$1.html"; }
-if mutant etoile vf-cockpit-terminal-client.mjs "s|MESSAGES\[cle\], cfg.origineP|MESSAGES[cle], '*'|"; then
+mut_page() { node "$AUX/pagegen.mjs" "$MUT_OUT" "$MUT_MOD/skills/cockpit-moteur" dark "$WORK/m-$1.html"; node "$AUX/stat.mjs" "$WORK/m-$1.html"; }
+if mutant etoile client.js "s|MESSAGES\[cle\], cfg.origineP|MESSAGES[cle], '*'|"; then
   assert_eq "M-ETOILE — le mutant rougit T17.Q2 : un postMessage avec l'étoile" "$(rj "$(mut_page etoile)" 'j.etoile>=1')" "true"
 else sans_effet "M-ETOILE"; fi
-if mutant ecoute vf-cockpit-terminal-client.mjs "s|const RACCOURCI|addEventListener('message', () => {}); const RACCOURCI|"; then
+if mutant ecoute client.js "s|const RACCOURCI|addEventListener('message', () => {}); const RACCOURCI|"; then
   assert_eq "M-ECOUTE — le mutant rougit T17.Q1 : un écouteur de messages entrants" "$(rj "$(mut_page ecoute)" 'j.ecoute>=1')" "true"
 else sans_effet "M-ECOUTE"; fi
-if mutant execc vf-cockpit-terminal-client.mjs "s|const RACCOURCI|document.execCommand('copy'); const RACCOURCI|"; then
+if mutant execc client.js "s|const RACCOURCI|document.execCommand('copy'); const RACCOURCI|"; then
   assert_eq "M-EXEC — un second execCommand (dans le client) rougit T14.S3 : le presse-papiers ne se touche que par la vue" "$(rj "$(mut_page execc)" '(j.presse-j.execVue)>=1')" "true"
 else sans_effet "M-EXEC"; fi
-if mutant clip vf-cockpit-terminal-client.mjs "s|const RACCOURCI|navigator.clipboard.writeText('x'); const RACCOURCI|"; then
+if mutant clip client.js "s|const RACCOURCI|navigator.clipboard.writeText('x'); const RACCOURCI|"; then
   assert_eq "M-CLIP — le mutant rougit T14.S3 : un appel au presse-papiers" "$(rj "$(mut_page clip)" '(j.presse-j.execVue)>=1')" "true"
 else sans_effet "M-CLIP"; fi
 if mutant setcookie vf-cockpit-terminal-processus.mjs "s|res.setHeader('Referrer-Policy', 'no-referrer');|res.setHeader('Referrer-Policy', 'no-referrer'); res.setHeader('Set-Cookie', 'a=b');|"; then
@@ -549,26 +549,26 @@ if mutant setcookie vf-cockpit-terminal-processus.mjs "s|res.setHeader('Referrer
 else sans_effet "M-SETCOOKIE"; fi
 
 echo "=== N11 — file d'entrée : un morceau vide est retiré sans envoi, jamais de boucle de POST vides (sans navigateur) ==="
-file_vide() { node "$AUX/queue.mjs" "$(mod_de "$1")/scripts/vf-cockpit-terminal-client.mjs"; }
+file_vide() { node "$AUX/queue.mjs" "$(mod_de "$1")/skills/cockpit-moteur/assets/ui/terminal/client.js"; }
 assert_eq "N11.1 — un morceau vide (onData vide) ne part jamais : 0 POST vide, la file est vidée (l'octet utile suivant part seul, une fois)" "$(file_vide "$OUT")" "apresVide=0 total=1 vides=0 utiles=1"
-if mutant videtout vf-cockpit-terminal-client.mjs 's|while (file.length && file\[0\].length === 0) file.shift();||;s|if (!corps.length) break;||'; then
+if mutant videtout client.js 's|while (file.length && file\[0\].length === 0) file.shift();||;s|if (!corps.length) break;||'; then
   assert_eq "M-VIDE-TOUT — le mutant (le code d'avant : ni retrait ni garde) rougit N11.1 : boucle de POST vides (plus de 100 en 300 ms)" "$(file_vide "$MUT_OUT" | awk '{ split($3, v, "="); print (v[2] > 100) ? "rouge" : "identique : " $0 }')" "rouge"
 else sans_effet "M-VIDE-TOUT"; fi
-if mutant videenvoi vf-cockpit-terminal-client.mjs 's|if (!corps.length) break;||'; then
+if mutant videenvoi client.js 's|if (!corps.length) break;||'; then
   assert_eq "M-VIDE-ENVOI — le mutant (la file vidée envoie encore un corps vide) rougit N11.1 : au moins un POST vide" "$(file_vide "$MUT_OUT" | awk '{ split($3, v, "="); print (v[2] >= 1) ? "rouge" : "identique : " $0 }')" "rouge"
 else sans_effet "M-VIDE-ENVOI"; fi
 
 echo "=== G2 / E4 — fin du flux : arrêt volontaire dit tout de suite, Python 3 absent dit en clair, vraie coupure = reconnexion (sans navigateur) ==="
-etat_fin() { node "$AUX/etat.mjs" "$(mod_de "$1")/scripts/vf-cockpit-terminal-client.mjs" "$2"; }
+etat_fin() { node "$AUX/etat.mjs" "$(mod_de "$1")/skills/cockpit-moteur/assets/ui/terminal/client.js" "$2"; }
 assert_eq "G2.1 — /etat {\"etat\":\"arret\"} à la fin du flux : la carte « Serveur arrêté » s'affiche tout de suite (moins de 500 ms, pas de « Reconnexion… »), P reçoit etat:arrete, un seul flux" "$(etat_fin "$OUT" arret)" "cartes=arrete@vite bandeaux=non flux=1 messages=ready,etat:connecte,etat:arrete"
 assert_eq "G2.2 — témoin : une vraie coupure (serveur injoignable) garde la reconnexion : aucune carte avant 30 s, le bandeau « Reconnexion… » est posé, le flux est réessayé" "$(etat_fin "$OUT" coupure)" "cartes=@jamais bandeaux=oui flux=>=2 messages=ready,etat:reconnexion"
 assert_eq "E4.1 — /etat indisponible/python3-absent : la carte « python » s'affiche tout de suite, jamais « arrete », pas d'etat:arrete vers P, pas de boucle (un seul flux)" "$(etat_fin "$OUT" python)" "cartes=python@vite bandeaux=non flux=1 messages=ready"
-assert_has "E4.2 — la carte python dit le poste et la marche à suivre (installer Python 3, relancer la commande), sans le mot « arrêté »" "$(grep -E '^ *python: ' "$SCRIPTS/vf-cockpit-terminal-vue.mjs")" "Terminal indisponible', corps: ['Python 3 est introuvable sur ce poste. Installez-le, puis relancez ', COMMANDE"
-assert_eq "E4.3 — la carte python ne contient pas « arrêté »" "$(grep -E '^ *python: ' "$SCRIPTS/vf-cockpit-terminal-vue.mjs" | grep -c 'arrêt')" "0"
-if mutant gdeux vf-cockpit-terminal-client.mjs "s|if (e \&\& e.etat === 'arret') {|if (false) {|"; then
+assert_has "E4.2 — la carte python dit le poste et la marche à suivre (installer Python 3, relancer la commande), sans le mot « arrêté »" "$(grep -E '^ *python: ' "$ENG/assets/ui/terminal/vue.js")" "Terminal indisponible', corps: ['Python 3 est introuvable sur ce poste. Installez-le, puis relancez ', COMMANDE"
+assert_eq "E4.3 — la carte python ne contient pas « arrêté »" "$(grep -E '^ *python: ' "$ENG/assets/ui/terminal/vue.js" | grep -c 'arrêt')" "0"
+if mutant gdeux client.js "s|if (e \&\& e.etat === 'arret') {|if (false) {|"; then
   assert_eq "M-G2 — le mutant (l'arrêt n'est pas lu) rougit G2.1 : aucune carte, le bandeau « Reconnexion… » est posé" "$(etat_fin "$MUT_OUT" arret | cut -d' ' -f1-2)" "cartes=@jamais bandeaux=oui"
 else sans_effet "M-G2"; fi
-if mutant mpython vf-cockpit-terminal-client.mjs "s|e.raison === 'python3-absent'|e.raison === 'x'|"; then
+if mutant mpython client.js "s|e.raison === 'python3-absent'|e.raison === 'x'|"; then
   assert_eq "M-E4 — le mutant (python3-absent non reconnu) rougit E4.1 : plus de carte, la reconnexion tourne" "$(etat_fin "$MUT_OUT" python | cut -d' ' -f1-2)" "cartes=@jamais bandeaux=oui"
 else sans_effet "M-E4"; fi
 
@@ -609,15 +609,15 @@ J="$(navig tierce "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"tierce\":
 assert_eq "T9.6 — page tierce (autre port) qui encadre Q : une violation frame-ancestors, aucun message reçu (témoin : la violation est relevée)" "$(rj "$J" '"violation="+((j.violations||[]).some(v=>/frame-ancestors/.test(v))?"oui":"non")+" messages="+(j.msgs||["?"]).length')" "violation=oui messages=0"
 
 echo "=== M-COOKIE / M-FRAGMENT / M-STOCKAGE / M-PREMIER-NIVEAU / M-SANS-AMORCE / M-ANCETRES — mutants jouées en navigateur ==="
-if mutant cookie vf-cockpit-terminal-client.mjs "s|localStorage.setItem(CLE_SECRET, secret);|localStorage.setItem(CLE_SECRET, secret); document.cookie = 'vfs=' + secret + '; path=/';|"; then
+if mutant cookie client.js "s|localStorage.setItem(CLE_SECRET, secret);|localStorage.setItem(CLE_SECRET, secret); document.cookie = 'vfs=' + secret + '; path=/';|"; then
   VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_has "M-COOKIE — le mutant rougit T6.2 : un cookie existe" "$(rj "$T6J" 'j.cookieQ')" "vfs="
 else sans_effet "M-COOKIE"; fi
-if mutant fragment vf-cockpit-terminal-client.mjs "s|history.replaceState(null, '', location.pathname + location.search);||"; then
+if mutant fragment client.js "s|history.replaceState(null, '', location.pathname + location.search);||"; then
   VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_eq "M-FRAGMENT — le mutant rougit T6.1b : l'échange refusé laisse #t= dans l'adresse de Q" "$(rj "$T6J" 'j.refus.hash.slice(0,3)')" "#t="
 else sans_effet "M-FRAGMENT"; fi
-if mutant premier vf-cockpit-terminal-client.mjs "s|^    if (!encadree) { vue.carte('horscadre'); return; }||"; then
+if mutant premier client.js "s|^    if (!encadree) { vue.carte('horscadre'); return; }||"; then
   VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_eq "M-PREMIER-NIVEAU — le mutant (SAF-1 défait : l'échange refait au premier niveau de Q) rougit T6.9 : un secret est rangé par Q ouvert seul" "$(rj "$T6J" '(j.q1||{}).secret')" "range"
 else sans_effet "M-PREMIER-NIVEAU"; fi
@@ -625,7 +625,7 @@ if mutant sansamorce vf-cockpit-terminal-tiroir.mjs "s|adresse + '#t=' + amorce|
   VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_eq "M-SANS-AMORCE — le mutant (l'amorçage n'est plus passé dans l'adresse du cadre de Q) rougit T6.3 : le cadre n'échange rien, aucun secret n'est rangé" "$(rj "$T6J" '(j.q1&&j.q1.carte&&j.q1.carte.includes("Terminal indisponible")&&j.cadre1)?(j.secretOk?"oui":"non"):"mutant non jugé (sonde non exécutée)"')" "non"
 else sans_effet "M-SANS-AMORCE"; fi
-if mutant stockage vf-cockpit-terminal-client.mjs "s|location.replace(location.pathname + location.search)|location.replace(location.pathname + '?s=' + secret)|"; then
+if mutant stockage client.js "s|location.replace(location.pathname + location.search)|location.replace(location.pathname + '?s=' + secret)|"; then
   VF_CLIENT_MS=20000 run_t6 "$MUT_OUT" # mutant : un amorçage cassé doit rougir en 20 s (VF_CLIENT_MS posée = pas de borne AMORCE)
   assert_has "M-STOCKAGE — le mutant rougit T6.1c : le secret figure dans l'adresse du cadre de Q" "$(rj "$T6J" '(j.cadre1||{}).url')" "?s="
 else sans_effet "M-STOCKAGE"; fi
@@ -681,43 +681,43 @@ assert_eq "F4.1 — un popup de Q ouvert par P (window.open, sessionStorage copi
 assert_eq "F4.2 — le shell légitime terminé, un popup de Q ouvert par P ne lance aucun shell sans frappe de l'utilisateur : zéro shell, session = terminee" "fin=$(rj "$SCJ" 'j.finShells') popup=$(rj "$SCJ" 'j.popup2>=1') shells=$(rj "$SCJ" 'j.apresFin.shells') session=$(rj "$SCJ" 'j.apresFin.session')" "fin=0 popup=true shells=0 session=terminee"
 
 echo "=== M-J2 / M-J12 / M-S5 / M-429 — mutants du client sur le serveur réel ==="
-if mutant mj2 vf-cockpit-terminal-client.mjs "s|return r.status === 401; } catch|return false; } catch|"; then
+if mutant mj2 client.js "s|return r.status === 401; } catch|return false; } catch|"; then
   MS_SC=8000 scenario "$MUT_OUT" perime "$FAUX_SEC"
   assert_eq "M-J2 — le mutant (la sonde ne reconnaît plus le secret périmé) rougit J2.1 : pas de carte « Session expirée »" "$(rj "$SCJ" '(j.carte||"").includes("Session expirée")?"expiree":"pas expiree"')" "pas expiree"
 else sans_effet "M-J2"; fi
-if mutant mj12 vf-cockpit-terminal-client.mjs "s|sessionStorage.setItem(CLE_FIN, |void (|"; then
+if mutant mj12 client.js "s|sessionStorage.setItem(CLE_FIN, |void (|"; then
   scenario "$MUT_OUT" termine
   assert_eq "M-J12 — le mutant (l'état « Terminé » n'est pas retenu) rougit J12.2 : un nouveau shell démarre au rechargement" "$(rj "$SCJ" '"bandeau="+(j.apres&&j.apres.bandeau)+" session="+(j.apres&&j.apres.session)')" "bandeau=false session=vivante"
 else sans_effet "M-J12"; fi
-if mutant msa vf-cockpit-terminal-client.mjs "s|vue.carte('sansamorce'); return;|expire(); return;|"; then
+if mutant msa client.js "s|vue.carte('sansamorce'); return;|expire(); return;|"; then
   MS_SC=8000 scenario "$MUT_OUT" sansamorce ""
   assert_eq "M-SANS-AMORCE-CARTE — le mutant (secret absent traité de nouveau comme une expiration) rougit J2.3 : « Session expirée » sans session préalable" "$(rj "$SCJ" '"expiree="+(j.carte||"").includes("Session expirée")')" "expiree=true"
 else sans_effet "M-SANS-AMORCE-CARTE"; fi
-if mutant mrep vf-cockpit-terminal-client.mjs "s|derniere = ''; taille();|derniere = term.rows + ' ' + term.cols;|"; then
+if mutant mrep client.js "s|derniere = ''; taille();|derniere = term.rows + ' ' + term.cols;|"; then
   MS_SC=8000 scenario "$MUT_OUT" reprise
   assert_eq "M-REPRISE-TAILLE — le mutant (la taille n'est plus redite à la connexion) rougit DG08.1 : le terminal garde la taille du premier cadre" "$(rj "$SCJ" '"egal="+(j.pty===j.ecran)')" "egal=false"
 else sans_effet "M-REPRISE-TAILLE"; fi
-if mutant ms5 vf-cockpit-terminal-client.mjs "s|term.onBinary(|void (|"; then
+if mutant ms5 client.js "s|term.onBinary(|void (|"; then
   MS_SC=6000 scenario "$MUT_OUT" binaire
   assert_eq "M-S5 — le mutant (onBinary non relayé) rougit S5.1 : aucun écho de rapport de souris" "$(rj "$SCJ" '"rapport="+j.rapport')" "rapport=false"
 else sans_effet "M-S5"; fi
-if mutant mhc vf-cockpit-terminal-client.mjs "s|^ *if (!encadree) { vue.carte('horscadre'); return; }||"; then
+if mutant mhc client.js "s|^ *if (!encadree) { vue.carte('horscadre'); return; }||"; then
   VF_CLIENT_MS=6000 run_t6 "$MUT_OUT"
   assert_eq "M-HORS-CADRE — le mutant (garde du cadre retirée) rougit T6.8 : Q en premier niveau ouvre un terminal et prend la session" "$(rj "$T6J" '"carte="+((j.horsCadre||{}).carte||"?")+" session="+((j.horsCadre||{}).session||"?")')" "carte=? session=?"
 else sans_effet "M-HORS-CADRE"; fi
-if mutant mpopup vf-cockpit-terminal-client.mjs "s|^ *if (!encadree) { vue.carte('horscadre'); return; }||"; then
+if mutant mpopup client.js "s|^ *if (!encadree) { vue.carte('horscadre'); return; }||"; then
   MS_SC=8000 scenario "$MUT_OUT" popup
   assert_eq "M-POPUP — le mutant (garde du cadre retirée) rougit F4.1 : le popup prend la session, P reçoit etat:reconnexion" "reconnexion=$(rj "$SCJ" 'j.apres.msgs.includes("etat:reconnexion")')" "reconnexion=true"
 else sans_effet "M-POPUP"; fi
-if mutant mtranche vf-cockpit-terminal-client.mjs "s|tranche = 65536;|tranche = 1 << 30;|"; then
+if mutant mtranche client.js "s|tranche = 65536;|tranche = 1 << 30;|"; then
   MS_SC=8000 gros "$MUT_OUT" gros
   assert_eq "M-TRANCHE — le mutant (aucune tranche) rougit M4.1 : un corps de plus de 64 Kio part et le serveur répond 413 (le découpage de repli sur 413 sauve ensuite les octets, mais la borne est franchie)" "$(rj "$GR_J" '"max>65536="+(Math.max(0,...(j.tr||[]).map((t)=>t[0]))>65536)+" n413>=1="+((j.tr||[]).filter((t)=>t[1]===413).length>=1)')" "max>65536=true n413>=1=true"
 else sans_effet "M-TRANCHE"; fi
-if mutant m413 vf-cockpit-terminal-client.mjs "s|if (r.status === 413) {|if (false) {|"; then
+if mutant m413 client.js "s|if (r.status === 413) {|if (false) {|"; then
   MS_SC=8000 gros "$MUT_OUT" limite
   assert_eq "M-413 — le mutant (413 non traité) rougit M4.2 : la saisie est perdue sans signal" "$(rj "$GR_J" '"cksum="+(j.cksum==="'"$ATT_CK"'"?"ok":"perdu")')" "cksum=perdu"
 else sans_effet "M-413"; fi
-if mutant m429 vf-cockpit-terminal-client.mjs "s|if (r.status === 429) {|if (false) {|"; then
+if mutant m429 client.js "s|if (r.status === 429) {|if (false) {|"; then
   MS_SC=6000 scenario "$MUT_OUT" pression
   assert_eq "M-429 — le mutant (429 ignoré, octets perdus) rougit S3.1 : la commande saisie ne s'exécute pas" "$(rj "$SCJ" '"sortie="+j.sortie')" "sortie=false"
 else sans_effet "M-429"; fi

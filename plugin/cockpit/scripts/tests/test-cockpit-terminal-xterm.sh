@@ -377,7 +377,7 @@ await executer(chrome, async (sp) => {
       r.g5 = { sombre: await attendreEtStabiliser(() => s.ev(CURSEUR), (v) => v !== null && v !== undefined) };
       await s.send('Input.dispatchMouseEvent', { type: 'mouseWheel', x: 300, y: 300, deltaX: 0, deltaY: -400 });
       r.g3.fin1 = await attendreValeur(() => s.ev(`${TXT}.includes('300')`), (v) => v === false);
-      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 300 }); await pause(1600); /* durée du retardateur produit conservée : l'état de départ de G3.5 (xterm natif replié) en dépend */ r.g3.apres = await attendreValeur(() => s.ev(barre), (v) => v === '0', { max: 2500 }); // minuteur produit 1 000 ms (vf-cockpit-terminal-client.mjs, montrerBarre) : déjà écoulé après la pause, borne ~2,5x
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: 900, y: 300 }); await pause(1600); /* durée du retardateur produit conservée : l'état de départ de G3.5 (xterm natif replié) en dépend */ r.g3.apres = await attendreValeur(() => s.ev(barre), (v) => v === '0', { max: 2500 }); // minuteur produit 1 000 ms (client.js de la page de Q, montrerBarre) : déjà écoulé après la pause, borne ~2,5x
       await touche({ key: 'PageUp', code: 'PageUp', windowsVirtualKeyCode: 33, modifiers: 8 }); await pause(400); r.g3.clavier = await s.ev(barre); // échantillon FIXE conservé : la barre native d'xterm se montre aussi au défilement, un sondage jusqu'à « 1 » verrait le mutant (montrerBarre retiré) lui aussi — M-BARRE-CLAVIER perdrait sa discrimination
       r.g3.repos = await attendreValeur(() => s.ev(barre), (v) => v === '0', { max: 2500 }); // ~1 000 ms de minuteur produit depuis PageUp (déjà 400 ms écoulées), borne ~2,5x : une régression du retardateur reste rouge
     });
@@ -560,7 +560,7 @@ mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : 
   local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
   MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
   case "$(basename "$2")" in
-    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+    serve.mjs|graph-query.js|query-cli.mjs|vue.js|client.js|q.css|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
   esac
   f="$d/.vibeflow/cockpit/$2"; [ -f "$f" ] || return 1   # page de la copie du lab (donnée) : même chemin que MUT_OUT/<fichier>
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
@@ -694,19 +694,19 @@ if mutant_eng ctrlc 's/^                vers_shell += donnees$/                v
   VF_XTERM_MS=6000 run_plein "$OUT" "$MUT_ENG" false
   assert_eq "M-CTRLC — le mutant retire 0x03 de l'entrée : SIGINT-RECU n'arrive jamais, T13.8 rouge" "$(rouge "sigint=$(rj "$PJ" 'j.sigint') debut_apres=$(rj "$PJ" 'j.debutApres')" "sigint=true debut_apres=false")" "rouge"
 else sans_effet "M-CTRLC"; fi
-if mutant dcs vf-cockpit-terminal-client.mjs "s|term.parser.registerDcsHandler({ intermediates: '\$', final: 'q' }, () => true);||"; then
+if mutant dcs client.js "s|term.parser.registerDcsHandler({ intermediates: '\$', final: 'q' }, () => true);||"; then
   run_hostile "$MUT_OUT"
   assert_eq "M-DCS — gestionnaire DECRQSS non enregistré : xterm répond ESC P (1b50) dans l'entrée du PTY, T14.1 rouge (mesure de A2 : le gestionnaire du client est ce qui l'empêche)" "$(rouge "dcs=$(hx "$WORK/hostile.hex" has 1b50)" "dcs=non")" "rouge"
 else sans_effet "M-DCS"; fi
-if mutant winopt vf-cockpit-terminal-client.mjs 's|windowOptions: {}|windowOptions: { getWinTitle: true, getWinSizeChars: true, getWinSizePixels: true, getCellSizePixels: true }|'; then
+if mutant winopt client.js 's|windowOptions: {}|windowOptions: { getWinTitle: true, getWinSizeChars: true, getWinSizePixels: true, getCellSizePixels: true }|'; then
   run_hostile "$MUT_OUT"
   assert_eq "M-WINOPT — windowOptions ouvertes (getWinTitle, getWinSizeChars…) : CSI 18t reçoit la réponse ESC [ 8 ; (1b5b383b) dans l'entrée du PTY, T14.1 rouge (le xterm.js livré ne répond pas à 21t même ouvert : 18t est la sonde qui discrimine)" "$(rouge "taille=$(hx "$WORK/hostile.hex" has 1b5b383b)" "taille=non")" "rouge"
 else sans_effet "M-WINOPT"; fi
-if mutant clip vf-cockpit-terminal-client.mjs "s|const fit = new FitAddon.FitAddon();|const fit = new FitAddon.FitAddon(); term.parser.registerOscHandler(52, (d) => { navigator.clipboard.writeText(d); return true; });|"; then
+if mutant clip client.js "s|const fit = new FitAddon.FitAddon();|const fit = new FitAddon.FitAddon(); term.parser.registerOscHandler(52, (d) => { navigator.clipboard.writeText(d); return true; });|"; then
   run_hostile "$MUT_OUT"
   assert_eq "M-CLIP — un gestionnaire OSC 52 écrit dans navigator.clipboard : 1 appel compté, T14.2 rouge" "$(rouge "clip=$(rj "$HJ" 'j.avant.clip')" "clip=0")" "rouge"
 else sans_effet "M-CLIP"; fi
-if mutant lien vf-cockpit-terminal-client.mjs 's|^ *linkHandler: .*$||'; then
+if mutant lien client.js 's|^ *linkHandler: .*$||'; then
   run_hostile "$MUT_OUT"
   assert_eq "M-LIEN — linkHandler retiré (comportement natif de xterm) : le clic appelle confirm, T14.4 rouge" "$(rouge "confirm=$(rj "$HJ" 'j.apres&&j.apres.confirm')" "confirm=0")" "rouge"
 else sans_effet "M-LIEN"; fi
@@ -715,86 +715,86 @@ if mutant boite vf-cockpit-terminal-page.mjs "s|const PLAGE_BOITE = 'U+2500-259F
   run_boite "$MUT_OUT" mutant
   assert_eq "M-BOITE — police des traits de boîte retirée de la page (plage sans caractère) : des trous apparaissent (T15.1 rouge) ; le mutant est mesuré aux cinq densités" "$(rouge "$(resume_boite mutant)" "d1=0 d1.25=0 d1.5=0 d2=0 d2.2=0 ")" "rouge"
 else sans_effet "M-BOITE"; fi
-if mutant proto vf-cockpit-terminal-client.mjs 's|allowNonHttpProtocols: false|allowNonHttpProtocols: true|'; then
+if mutant proto client.js 's|allowNonHttpProtocols: false|allowNonHttpProtocols: true|'; then
   run_liens "$MUT_OUT"
   assert_eq "M-PROTO — allowNonHttpProtocols ouvert : les liens javascript: et data: s'ouvrent au clic, T16.1 rouge" "$(rouge "$(rj "$LJ" 'j.ouvertures.length')" "1")" "rouge"
 else sans_effet "M-PROTO"; fi
 
-if mutant collage-sans-bandeau vf-cockpit-terminal-client.mjs 's|if (!SUR.test(t) && !vue.invisible(t)) { term.paste(t); return; }|term.paste(t); return;|'; then
+if mutant collage-sans-bandeau client.js 's|if (!SUR.test(t) && !vue.invisible(t)) { term.paste(t); return; }|term.paste(t); return;|'; then
   run_collage "$MUT_OUT"
   assert_eq "M-COLLAGE-BANDEAU — le collage multi-lignes est envoyé sans confirmation : le shell reçoit le texte et crée le marqueur, T21.2 rouge" "$(rouge "entre=[$(rj "$CJ" 'j.c.multi.entre')] marqueur=$(rj "$CJ" 'j.c.multi.marqueur')" "entre=[] marqueur=false")" "rouge"
 else sans_effet "M-COLLAGE-BANDEAU"; fi
-if mutant collage-ecoute vf-cockpit-terminal-client.mjs "s|^ *zone.addEventListener('paste'.*\$||"; then
+if mutant collage-ecoute client.js "s|^ *zone.addEventListener('paste'.*\$||"; then
   run_collage "$MUT_OUT"
   assert_eq "M-COLLAGE-ECOUTE — l'écoute du collage retirée (collage natif d'xterm) : le texte part sans bandeau, T21.2 rouge" "$(rouge "bandeau=$(rj "$CJ" 'j.c.multi.bandeau') entre=[$(rj "$CJ" 'j.c.multi.entre')]" "bandeau=true entre=[]")" "rouge"
 else sans_effet "M-COLLAGE-ECOUTE"; fi
-if mutant depot vf-cockpit-terminal-client.mjs "/addEventListener('drop'/d; /addEventListener('beforeinput'/,/^ *}, true);/d"; then
+if mutant depot client.js "/addEventListener('drop'/d; /addEventListener('beforeinput'/,/^ *}, true);/d"; then
   run_collage "$MUT_OUT"
   assert_eq "M-DEPOT — écoutes de dépôt retirées : drop et beforeinput ne sont plus annulés (le navigateur insérerait le texte dans la zone de saisie), T21.9 rouge" "$(rouge "drop_annule=$(rj "$CJ" 'j.c.depot.drop===false') beforeinput_annule=$(rj "$CJ" 'j.c.depot.avant===false')" "drop_annule=true beforeinput_annule=true")" "rouge"
 else sans_effet "M-DEPOT"; fi
-if mutant abandon-envoie vf-cockpit-terminal-client.mjs 's|const abandonner = () => { if (propose !== null) { propose = null;|const abandonner = () => { if (propose !== null) { term.paste(propose); propose = null;|'; then
+if mutant abandon-envoie client.js 's|const abandonner = () => { if (propose !== null) { propose = null;|const abandonner = () => { if (propose !== null) { term.paste(propose); propose = null;|'; then
   run_collage "$MUT_OUT"
   assert_eq "M-ABANDON-ENVOIE — abandonner() envoie l'ancien texte au lieu de l'oublier : « touch l1 » part au shell quand une ligne remplace le bandeau, T21.6 rouge (la fenêtre d'absence de 600 ms laisse le marqueur apparaître)" "$(rouge "marqueur=$(rj "$CJ" 'j.c.abandonne.marqueur')" "marqueur=false")" "rouge"
 else sans_effet "M-ABANDON-ENVOIE"; fi
 
-if mutant n9-sans-cf vf-cockpit-terminal-vue.mjs 's|const INVISIBLE = /\[\\p{Cc}\\p{Cf}\\p{Cs}\\u{E0000}-\\u{E007F}\]/u;|const INVISIBLE = /[\\p{Cc}\\p{Cs}]/u;|'; then
+if mutant n9-sans-cf vue.js 's|const INVISIBLE = /\[\\p{Cc}\\p{Cf}\\p{Cs}\\u{E0000}-\\u{E007F}\]/u;|const INVISIBLE = /[\\p{Cc}\\p{Cs}]/u;|'; then
   run_collage "$MUT_OUT"
   assert_eq "M-N9-SANS-CF — le déclencheur et le marquage perdent la classe Cf et les Tag : une ligne à U+202E passe sans bandeau et crée le marqueur, T21.16 rouge" "$(rouge "bidi=$(rj "$CJ" 'j.c.n9.bidi.bandeau')/$(rj "$CJ" 'j.c.n9.bidi.marqueur')" "bidi=true/false")" "rouge"
 else sans_effet "M-N9-SANS-CF"; fi
-if mutant n10-sans-repli vf-cockpit-terminal-vue.mjs 's|if (e - k >= 3) {|if (e - k >= 3 \&\& false) {|'; then
+if mutant n10-sans-repli vue.js 's|if (e - k >= 3) {|if (e - k >= 3 \&\& false) {|'; then
   run_collage "$MUT_OUT"
   assert_eq "M-N10-SANS-REPLI — les lignes vides ne sont plus repliées : la commande est hors de la zone, T21.18 rouge" "$(rouge "replie=$(rj "$CJ" 'j.c.n10.replie') charge=$(rj "$CJ" 'j.c.n10.charge') debord=$(rj "$CJ" 'j.c.n10.debord')" "replie=true charge=true debord=false")" "rouge"
 else sans_effet "M-N10-SANS-REPLI"; fi
-if mutant n10-sans-avertissement vf-cockpit-terminal-vue.mjs 's|const depasse = () => {|const depasse = () => { return;|'; then
+if mutant n10-sans-avertissement vue.js 's|const depasse = () => {|const depasse = () => { return;|'; then
   run_collage "$MUT_OUT"
   assert_eq "M-N10-SANS-AVERTISSEMENT — le dépassement n'est plus dit : T21.19 rouge" "$(rouge "texte=$(rj "$CJ" 'j.c.n10d.texte')" "texte=Le texte dépasse la zone : faites défiler avant de coller.")" "rouge"
 else sans_effet "M-N10-SANS-AVERTISSEMENT"; fi
 
-if mutant apercu-coupe vf-cockpit-terminal-vue.mjs 's|const LIMITE = 20000|const LIMITE = 200|'; then
+if mutant apercu-coupe vue.js 's|const LIMITE = 20000|const LIMITE = 200|'; then
   run_collage "$MUT_OUT"
   assert_eq "M-APERCU-COUPE — retour de la coupure à 200 caractères : la charge après 275 caractères n'est plus dans le DOM, T21.11 rouge" "$(rouge "visible=$(rj "$CJ" 'j.c.c12.visible')" "visible=true")" "rouge"
 else sans_effet "M-APERCU-COUPE"; fi
-if mutant neutralisation vf-cockpit-terminal-vue.mjs "s|const neutre = (t) => .*\$|const neutre = (t) => t;|"; then
+if mutant neutralisation vue.js "s|const neutre = (t) => .*\$|const neutre = (t) => t;|"; then
   run_collage "$MUT_OUT"
   assert_eq "M-NEUTRALISATION — l'aperçu affiche le texte brut : U+202E et U+200B ne sont plus des marqueurs, T21.13 rouge" "$(rouge "u202e=$(rj "$CJ" 'j.c.invis.u202e') brut=$(rj "$CJ" 'j.c.invis.brut')" "u202e=true brut=true")" "rouge"
 else sans_effet "M-NEUTRALISATION"; fi
-if mutant envoi-neutralise vf-cockpit-terminal-client.mjs 's|if (x !== null) term.paste(x);|if (x !== null) term.paste(x.replace(/[\\u202e\\u200b]/g, ""));|'; then
+if mutant envoi-neutralise client.js 's|if (x !== null) term.paste(x);|if (x !== null) term.paste(x.replace(/[\\u202e\\u200b]/g, ""));|'; then
   run_collage "$MUT_OUT"
   assert_eq "M-ENVOI-NEUTRALISE — « Coller » envoie le texte privé de ses invisibles au lieu de l'original : le sha256 diffère, T21.13 rouge" "$(rouge "sha=$(rj "$CJ" 'j.c.invis.sha')" "sha=true")" "rouge"
 else sans_effet "M-ENVOI-NEUTRALISE"; fi
-if mutant sans-marge vf-cockpit-terminal-client.mjs 's|z.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)|z.clientHeight|'; then
+if mutant sans-marge client.js 's|z.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)|z.clientHeight|'; then
   run_ecran "$MUT_OUT"
   assert_eq "M-SANS-MARGE — la hauteur utile ne déduit plus les marges (le code d'avant) : la dernière ligne déborde du cadre, E3.1 rouge" "$(rouge "$(rj "$EJ" "$E3_EXPR")" "$E3_OK")" "rouge"
 else sans_effet "M-SANS-MARGE"; fi
-if mutant barre-visible vf-cockpit-terminal-style.mjs 's|^#terminal .xterm-scrollable-element > .scrollbar { opacity: 0;.*$||'; then
+if mutant barre-visible q.css 's|^#terminal .xterm-scrollable-element > .scrollbar { opacity: 0;.*$||'; then
   run_ecran "$MUT_OUT"
   assert_eq "M-BARRE-VISIBLE — la règle qui masque la barre est retirée : elle reste visible hors survol, G3.1 rouge" "$(rouge "$(rj "$EJ" 'j.g3.dehors')" "0")" "rouge"
 else sans_effet "M-BARRE-VISIBLE"; fi
-if mutant barre-jamais vf-cockpit-terminal-style.mjs 's|^#terminal:hover .xterm-scrollable-element.*$||'; then
+if mutant barre-jamais q.css 's|^#terminal:hover .xterm-scrollable-element.*$||'; then
   run_ecran "$MUT_OUT"
   assert_eq "M-BARRE-JAMAIS — la règle qui la montre au survol est retirée : la barre ne se montre jamais, G3.2 rouge" "$(rouge "$(rj "$EJ" 'j.g3.survol')" "1")" "rouge"
 else sans_effet "M-BARRE-JAMAIS"; fi
-if mutant barre-clavier vf-cockpit-terminal-client.mjs "s|montrerBarre();|void 0;|g"; then
+if mutant barre-clavier client.js "s|montrerBarre();|void 0;|g"; then
   run_ecran "$MUT_OUT"
   assert_eq "M-BARRE-CLAVIER — la barre n'est plus montrée pendant le défilement : G3.5 rouge" "$(rouge "$(rj "$EJ" 'j.g3.clavier')" "1")" "rouge"
 else sans_effet "M-BARRE-CLAVIER"; fi
-if mutant rejeu-sans-garde vf-cockpit-terminal-client.mjs 's|if (rejeu \&\& !humain) return;||'; then
+if mutant rejeu-sans-garde client.js 's|if (rejeu \&\& !humain) return;||'; then
   run_rejeu "$MUT_OUT"
   assert_eq "M-REJEU-SANS-GARDE — la garde du rejeu est retirée (le code d'avant) : les réponses du tampon partent dans l'entrée du PTY, R1.1 rouge" "$(rougelu "[$(rjs "$RJ" 'j.rejeu.avant')]" "[]")" "rouge"
 else sans_effet "M-REJEU-SANS-GARDE"; fi
-if mutant rejeu-humain-colle vf-cockpit-terminal-client.mjs 's|if (e.target \&\& e.target.addEventListener) e.target.addEventListener(t, () => { humain = false; }, { once: true });|void 0;|'; then
+if mutant rejeu-humain-colle client.js 's|if (e.target \&\& e.target.addEventListener) e.target.addEventListener(t, () => { humain = false; }, { once: true });|void 0;|'; then
   run_rejeu "$MUT_OUT"
   assert_eq "M-REJEU-HUMAIN-COLLE — l'autorisation humaine ne se referme plus avec son événement, seul reste le minuteur (le code d'avant) : des réponses d'xterm partent pendant le rejeu, R1.3 rouge" "$(rougelu "[$(rjs "$RJ" 'j.rejeu.gros')]" "[6b]")" "rouge"
 else sans_effet "M-REJEU-HUMAIN-COLLE"; fi
-if mutant rejeu-jamais-clos vf-cockpit-terminal-client.mjs "s|term.write('', () => { rejeu = false; });|void 0;|"; then
+if mutant rejeu-jamais-clos client.js "s|term.write('', () => { rejeu = false; });|void 0;|"; then
   run_rejeu "$MUT_OUT"
   assert_eq "M-REJEU-JAMAIS-CLOS — le rejeu ne se clôt jamais : la question neuve ne reçoit plus sa réponse, R1.2 rouge (la garde ne coupe pas les réponses en général)" "$(rougelu "da1=$(rjs "$RJ" '/1b5b3f/.test(j.rejeu.apres)')" "da1=true")" "rouge"
 else sans_effet "M-REJEU-JAMAIS-CLOS"; fi
-if mutant fond-noir vf-cockpit-terminal-style.mjs 's|^#terminal .xterm .xterm-viewport.*$||'; then
+if mutant fond-noir q.css 's|^#terminal .xterm .xterm-viewport.*$||'; then
   run_ecran "$MUT_OUT"
   assert_eq "M-FOND-NOIR — la règle du fond de la zone de défilement est retirée (le code d'avant) : bande noire, R2.1 rouge" "$(rouge "$(rj "$EJ" '["dark","light"].map(t=>[160,208,280,328,570].map(h=>{const m=((j.fond||{})[t]||{})[h];return m&&m.viewport===m.terminal&&m.hors===0?"ok":"KO"}).join(" ")).join(" ")')" "ok ok ok ok ok ok ok ok ok ok")" "rouge"
 else sans_effet "M-FOND-NOIR"; fi
-if mutant curseur-pale vf-cockpit-terminal-vue.mjs 's|rgba(${ink}, .4)|rgba(${ink}, .1)|'; then
+if mutant curseur-pale vue.js 's|rgba(${ink}, .4)|rgba(${ink}, .1)|'; then
   run_ecran "$MUT_OUT"
   assert_eq "M-CURSEUR-PALE — le curseur retrouve ses 10 % : contraste insuffisant, G5.1 rouge" "$(rouge "$(rj "$EJ" '["sombre","clair"].map(t=>{const m=(j.g5||{})[t];return m&&m.contraste>=2?"ok":"KO"}).join(" ")')" "ok ok")" "rouge"
 else sans_effet "M-CURSEUR-PALE"; fi

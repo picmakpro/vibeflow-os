@@ -13,7 +13,7 @@
 # Chaque refus a son témoin positif ; aucune attente d'armement n'est une durée codée en dur (arme_apres_ms est lu). Chrome non requis. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; COCKPIT="$(cd "$SCRIPTS/.." && pwd)"
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; export HERE_T; COCKPIT="$(cd "$SCRIPTS/.." && pwd)"
 ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"; TA="$HERE_T/terminal-aux.mjs"; MOD="$SCRIPTS/vf-cockpit-lancer-mode.mjs"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; RUN="$WORK/run"; mkdir -p "$AUX" "$WORK/home" "$WORK/bin" "$WORK/fauxbin" "$RUN" "$WORK/temoins" "$WORK/u"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
@@ -277,7 +277,7 @@ const rep = (status, corps) => ({ status, ok: status >= 200 && status < 300, jso
 globalThis.fetch = (u, o = {}) => { const url = String(u); J.journal.push({ m: o.method || 'GET', u: url, b: typeof o.body === 'string' ? o.body : '' });
   if (url === '/proposition') return Promise.resolve(rep(200, JSON.parse(JSON.stringify(S.prop)))); if (url === '/lancer') return Promise.resolve(rep(S.lancer, null));
   if (url === '/flux') return new Promise(() => {}); return Promise.resolve(rep(204, null)); };
-const m = await import(pathToFileURL(chemin).href);
+const m = (await import(pathToFileURL(process.env.HERE_T + '/navigateur-charger.mjs').href)).chargerFonctions([chemin]); // 79-11 : le client est un fichier du moteur
 m.clientTerminal({ origineP: 'http://127.0.0.1:1', theme: 'dark' });
 const nData = () => J.vue.filter(Boolean).length;
 let k = 100; const afficher = async (over) => { const n = nData(); S.prop = valide(ID(++k), over); await until(() => nData() > n, 'affichage'); return J.vue.filter(Boolean).slice(-1)[0]; };
@@ -355,7 +355,7 @@ facts_u() { local c; c="$(mod_de "$1")"; if [ -f "$c/vf-cockpit-lancer-mode.mjs"
 uq() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "(j.erreur ? 'plante: ' + j.erreur : ($2))" 2>/dev/null || echo "illisible"; }
 fifo_u() { local c; c="$(mod_de "$1")"; if [ -f "$c/vf-cockpit-lancer-mode.mjs" ]; then "$AUX/borne.sh" 20 node "$AUX/u.mjs" "$c" "$WORK/u" fifo | tail -1; else echo '{"erreur":"module absent"}'; fi; }
 # faits client : (dossier-du-client) -> JSON des doublures
-facts_c() { node "$AUX/cdoubles.mjs" "$(mod_de "$1")/vf-cockpit-terminal-client.mjs" 2>&1 | tail -1; }
+facts_c() { node "$AUX/cdoubles.mjs" "$(mod_de "$1")/../skills/cockpit-moteur/assets/ui/terminal/client.js" 2>&1 | tail -1; }
 cq() { uq "$1" "$2"; }
 uqp() { uq "$1" "(j.perr ? 'plante: ' + j.perr : ($2))"; } # faits du support du poste (LM.U7 à LM.U12) : la cause de l'échec reste lisible
 PLANPUR='plan'
@@ -378,7 +378,7 @@ else nonjouee "LM.S2" "module absent (elle s'écrit avec le module)"; fi
 # LM.S7 : la ligne garde:mode-support du processus (code, sans le commentaire) ne nomme ni la sortie (here), ni .cache, ni FICHIER_MODE : le support n'est plus dans le lab
 SUPPORT_CODE="$(grep 'garde:mode-support' "$SCRIPTS/vf-cockpit-terminal-processus.mjs" | sed 's#//.*##')"
 assert_eq "LM.S7 — la ligne garde:mode-support (code, hors commentaire) construit le support du poste par la racine seule : ni here, ni .cache, ni FICHIER_MODE, ni path.join (témoin : la ligne existe et appelle creerMemoireModePoste)" "$(printf '%s' "$SUPPORT_CODE" | grep -c -E 'here|\.cache|FICHIER_MODE|path\.join' | tr -d ' ') $(printf '%s' "$SUPPORT_CODE" | grep -c 'creerMemoireModePoste' | tr -d ' ')" "0 1"
-SF="$(node "$AUX/stat.mjs" "$SCRIPTS/vf-cockpit-terminal-processus.mjs" "$SCRIPTS/vf-cockpit-terminal-client.mjs")"
+SF="$(node "$AUX/stat.mjs" "$SCRIPTS/vf-cockpit-terminal-processus.mjs" "$ENG/assets/ui/terminal/client.js")"
 ROUTES_BASE='/amorce:POST,/annuler:POST,/entree:POST,/etat:GET,/flux:GET,/lancer:POST,/proposition:GET,/taille:POST'
 if [ "$MODULE_OK" = 1 ]; then assert_eq "LM.S3 — la table fermée routes de Q : mêmes clés et méthodes que la base (huit routes, aucune de plus)" "$(uq "$SF" j.routes)" "$ROUTES_BASE"
 else nonjouee "LM.S3" "module absent"; fi
@@ -737,11 +737,11 @@ if mutant mode-aucune "$PROCF" '/garde:mode-servi/s#.*#const lireProposition = (
 else sans_effet "M-MODE-DANS-AUCUNE"; fi
 echo "=== M-NOUVELLE-ROUTE — une route POST /mode ajoutée à routes (LM.S3) ==="
 if mutant route "$PROCF" "s#'/annuler': 'POST' };#'/annuler': 'POST', '/mode': 'POST' };#"; then
-  assert_eq "M-NOUVELLE-ROUTE — sous le mutant LM.S3 rougit : la table de routes compte une route de plus" "$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/scripts/vf-cockpit-terminal-client.mjs" | evj j.routes)" "/amorce:POST,/annuler:POST,/entree:POST,/etat:GET,/flux:GET,/lancer:POST,/mode:POST,/proposition:GET,/taille:POST"
+  assert_eq "M-NOUVELLE-ROUTE — sous le mutant LM.S3 rougit : la table de routes compte une route de plus" "$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/client.js" | evj j.routes)" "/amorce:POST,/annuler:POST,/entree:POST,/etat:GET,/flux:GET,/lancer:POST,/mode:POST,/proposition:GET,/taille:POST"
 else sans_effet "M-NOUVELLE-ROUTE"; fi
 echo "=== M-MODE-VERS-P — le mode ajouté au message lancee (LM.S5, LM.P3) ==="
 if mutant mode-vers-p "$PROCF" 's#process.send(msg);#process.send({ ...msg, mode: demande.mode });#'; then
-  assert_eq "M-MODE-VERS-P — sous le mutant LM.S5 rougit : une ligne process.send( porte le mode" "$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/scripts/vf-cockpit-terminal-client.mjs" | evj j.envoisMode)" "1"
+  assert_eq "M-MODE-VERS-P — sous le mutant LM.S5 rougit : une ligne process.send( porte le mode" "$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/client.js" | evj j.envoisMode)" "1"
   surp "$MUT_OUT"; pose_mode "$SENT"$'\n'; psrv_debut "$MUT_OUT"; P3R=""; p3_run
   assert_eq "M-MODE-VERS-P — sous le mutant LM.P3 rougit : P refuse le message lancee à clé de plus (forme fermée) : la cible n'est jamais marquée lancée (son témoin positif)" "$P3R" "lancee=non fuites=0"; psrv_fin; sur_out
 else sans_effet "M-MODE-VERS-P"; fi
@@ -796,11 +796,11 @@ if mutant dossier-proprio "$MODF" "s#ls.uid !== os.getuid() || ##"; then
   assert_eq "M-DOSSIER-PROPRIETAIRE — sous le mutant LM.U14 rougit : un dossier d'un autre uid est lu (plan) et écrit (le même fichier relu donne acceptEdits)" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.p7uid')" "plan,true|acceptEdits,true"
 else sans_effet "M-DOSSIER-PROPRIETAIRE"; fi
 echo "=== M-STOCKAGE-RESTE — repli sur le stockage du navigateur (LM.S4, LM.C3) ==="
-if mutant stockage-reste vf-cockpit-terminal-client.mjs "/garde:mode-lecture/s#.*#const v = p.mode_retenu !== undefined ? p.mode_retenu : localStorage.getItem('vf.terminal.mode'); // garde:mode-lecture#"; then
-  assert_eq "M-STOCKAGE-RESTE — sain/mutant/occurrences : LM.C3 sain sur le client livré, rouge sous le mutant (getItem d'une clé mode) ; LM.S4 compte 1 occurrence sous le mutant" "$(cq "$CF" "$C3EXPR")/$(cq "$(facts_c "$MUT_OUT")" "$C3EXPR")/$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/scripts/vf-cockpit-terminal-client.mjs" | evj j.cliCleMode)" "0/true/1/true/1"
+if mutant stockage-reste client.js "/garde:mode-lecture/s#.*#const v = p.mode_retenu !== undefined ? p.mode_retenu : localStorage.getItem('vf.terminal.mode'); // garde:mode-lecture#"; then
+  assert_eq "M-STOCKAGE-RESTE — sain/mutant/occurrences : LM.C3 sain sur le client livré, rouge sous le mutant (getItem d'une clé mode) ; LM.S4 compte 1 occurrence sous le mutant" "$(cq "$CF" "$C3EXPR")/$(cq "$(facts_c "$MUT_OUT")" "$C3EXPR")/$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/client.js" | evj j.cliCleMode)" "0/true/1/true/1"
 else sans_effet "M-STOCKAGE-RESTE"; fi
 echo "=== M-SERVI-NON-RELU — la valeur servie n'est pas relue contre la liste (LM.C2) ==="
-if mutant servi-non-relu vf-cockpit-terminal-client.mjs "/garde:mode-relu/s#.*#return v;#"; then
+if mutant servi-non-relu client.js "/garde:mode-relu/s#.*#return v;#"; then
   assert_eq "M-SERVI-NON-RELU — sain/mutant : LM.C2 sain sur le client livré, rouge sous le mutant (bypassPermissions devient la présélection)" "$(cq "$CF" "$C2EXPR")/$(cq "$(facts_c "$MUT_OUT")" "$C2EXPR")" "true/false"
 else sans_effet "M-SERVI-NON-RELU"; fi
 

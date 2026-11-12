@@ -89,7 +89,7 @@ cat > "$AUX/harnais-liste-q.mjs" <<'JS'
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url'; const SORTIE = process.argv[2];
 let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === SORTIE && r) racine = r; } } catch {}
 const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-tiroir.mjs`).href);
-const src = fs.readFileSync(`${racine}/scripts/vf-cockpit-terminal-client.mjs`, 'utf8');
+const src = fs.readFileSync(`${racine}/skills/cockpit-moteur/assets/ui/terminal/client.js`, 'utf8'); // 79-11 : le client est un fichier du moteur
 const bloc = (src.match(/const MESSAGES = Object\.freeze\(\{([\s\S]*?)\}\)/) || [, ''])[1];
 const paires = [...bloc.matchAll(/([A-Za-z]+):\s*'([^']+)'/g)].map((x) => [x[1], x[2]]);
 const Qv = paires.map((x) => x[1]).sort(), Pv = [...(m.LISTE_MESSAGES || [])].sort();
@@ -839,7 +839,7 @@ mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : 
   local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
   MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
   case "$(basename "$2")" in
-    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+    serve.mjs|graph-query.js|query-cli.mjs|vue.js|client.js|q.css|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
   esac
   f="$d/.vibeflow/cockpit/$2"; [ -f "$f" ] || return 1   # page de la copie du lab (donnée) : même chemin que MUT_OUT/<fichier>
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
@@ -1137,7 +1137,7 @@ if mutant framesrc vf-cockpit-terminal.mjs "s#frameSrc: () => (portQ ? \`; frame
 else sans_effet "M-FRAMESRC"; fi
 
 echo "=== M-MSG-DONNEE — client de Q qui joint du texte du terminal à un message (T17.5) ==="
-if mutant donnee vf-cockpit-terminal-client.mjs 's|term.write(m.value);|term.write(m.value); window.parent.postMessage(new TextDecoder().decode(m.value), cfg.origineP);|'; then
+if mutant donnee client.js 's|term.write(m.value);|term.write(m.value); window.parent.postMessage(new TextDecoder().decode(m.value), cfg.origineP);|'; then
   VF_TIROIR_MS=20000 run_flag "$MUT_OUT" 1; J="$FJ"
   assert_eq "M-MSG-DONNEE — le mutant rougit T17.5 : un message hors liste ou portant le marqueur arrive à P (témoin : la commande a tourné)" "$(rj "$J" '"fichier="+j.t175.fichier+" rouge="+(j.t175.hors_liste>=1||j.t175.marqueur>=1)')" "fichier=true rouge=true"
 else sans_effet "M-MSG-DONNEE"; fi
