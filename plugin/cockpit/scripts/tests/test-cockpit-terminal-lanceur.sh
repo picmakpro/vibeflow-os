@@ -70,11 +70,13 @@ nbt() { local n; n="$(grep -c "$2" "$1" 2>/dev/null)"; echo "${n:-0}"; }
 qport() { local u; u="$(sj '(j.terminal&&j.terminal.url)||""')"; echo "${u##*:}"; }
 mode() { node "$AUX/mode.mjs" "$1"; }
 arrete() { lance "$LAUNCH" stop; }
+# 79-06 : un serveur lancé par le lanceur d'une COPIE du module (mutant) n'est reconnu que par ce lanceur (identité = serve.mjs du module + --sortie=) : l'arrêt passe par le même lanceur
+arrete_m() { lance "$MUT_L" stop; }
 attendre_mort() { local p="$1"; for _ in $(seq 1 60); do kill -0 "$p" 2>/dev/null || return 0; sleep 0.1; done; return 1; }
 fichier_ouvert() { for _ in $(seq 1 40); do [ -s "$OUVERT" ] && break; sleep 0.1; done; }
-mutant() { # mutant <nom> <sed...> -> MUT_L (lanceur de la copie) ; code 1 si la copie n'a pas changé
-  local d="$WORK/mut-$1"; shift; rm -rf "$d"; mkdir -p "$d"; cp -R "$MODULE/." "$d/"; MUT_L="$d/scripts/vf-cockpit.mjs"
-  cp "$MUT_L" "$MUT_L.orig"; sed -i.bak "$@" "$MUT_L"; local r=0; cmp -s "$MUT_L" "$MUT_L.orig" && r=1; rm -f "$MUT_L.orig" "$MUT_L.bak"; return $r
+mutant() { # mutant <nom> <sed...> -> MUT_L (lanceur de la copie du module) ; MUT_CIBLE = fichier de scripts édité (défaut : le lanceur) ; code 1 si la copie n'a pas changé
+  local d="$WORK/mut-$1" cible="${MUT_CIBLE:-vf-cockpit.mjs}"; shift; rm -rf "$d"; mkdir -p "$d"; cp -R "$MODULE/." "$d/"; MUT_L="$d/scripts/vf-cockpit.mjs"; local f="$d/scripts/$cible"
+  cp "$f" "$f.orig"; sed -i.bak "$@" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 
 echo "=== L0 — témoin : le lab se construit, status répond ==="
@@ -428,7 +430,7 @@ echo "=== L20 — E5 : un serveur qui écrit son état après 15 s (machine char
 mkdir -p "$WORK/mut-lent"; rm -rf "$WORK/mut-lent"; mkdir -p "$WORK/mut-lent"; cp -R "$MODULE/." "$WORK/mut-lent/"
 cat > "$WORK/mut-lent/skills/cockpit-moteur/assets/serve.mjs" <<'JS'
 import fs from 'node:fs'; import path from 'node:path'; import { fileURLToPath } from 'node:url';
-const sortie = path.dirname(fileURLToPath(import.meta.url)); const a = process.argv; const port = Number(a[a.indexOf('--port') + 1]);
+const a = process.argv; const sortie = (a.find((x) => x.startsWith('--sortie=')) || '').slice(9); const port = Number(a[a.indexOf('--port') + 1]); // 79-06 : la sortie arrive en --sortie=<chemin> (dernier argument), le serve.mjs est celui du module
 fs.writeFileSync(process.env.FAKE_SRV_PID, String(process.pid));
 setTimeout(() => { fs.mkdirSync(path.join(sortie, '.cache'), { recursive: true });
   fs.writeFileSync(path.join(sortie, '.cache', 'server.json'), JSON.stringify({ pid: process.pid, port, url: `http://127.0.0.1:${port}`, token: 'x', startedAt: new Date().toISOString() })); }, Number(process.env.FAKE_SRV_MS));
@@ -452,79 +454,79 @@ echo "=== M-MODE / M-SUIT-LIEN / M-IMPRIME / M-OUVRE-P — mutants du lanceur ==
 if mutant mode 's/MODE_AMORCE = 0o600/MODE_AMORCE = 0o644/'; then
   lance "$MUT_L" open --terminal --no-open; MS="$(sj j.pid)"; MM="$(mode "$AM")"
   assert_eq "M-MODE — le mutant rougit L3 (mode ≠ 600)" "$([ "$MM" != 600 ] && echo rouge || echo "identique : $MM")" "rouge"
-  arrete; [ -n "$MS" ] && attendre_mort "$MS"
+  arrete_m; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-MODE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant lien -e "s/fs.unlinkSync(f)/0/" -e "s/'wx'/'w'/" -e "s/verifierSortie(lab, sortie); return/return/"; then
-  lance "$LAUNCH" open --terminal --no-open; MS="$(sj j.pid)"
+  lance "$MUT_L" open --terminal --no-open; MS="$(sj j.pid)"
   printf 'contenu-cible\n' > "$WORK/cible"; EMP="$(cksum < "$WORK/cible")"; rm -f "$AM"; ln -s "$WORK/cible" "$AM"
   lance "$MUT_L" open --terminal --no-open
   assert_eq "M-SUIT-LIEN — le mutant (sans suppression préalable, sans création exclusive, sans garde) rougit L4 : la cible est écrasée" "$([ "$(cksum < "$WORK/cible")" != "$EMP" ] && echo rouge || echo "identique")" "rouge"
-  rm -f "$AM"; arrete; [ -n "$MS" ] && attendre_mort "$MS"
+  rm -f "$AM"; arrete_m; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-SUIT-LIEN — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant imprime 's|^function ouvrirQ(s, amorce, o, sortie) {|& console.log(amorce);|'; then
   rm -f "$AM"; lance "$MUT_L" open --terminal --no-open; MS="$(sj j.pid)"; V="$(cat "$AM" 2>/dev/null)"
   assert_eq "M-IMPRIME — le mutant rougit L5 (valeur dans la sortie du lanceur)" "$([ -n "$V" ] && [ "$(cherche "$LOUT")" != 0 ] && echo rouge || echo "identique")" "rouge"
-  arrete; [ -n "$MS" ] && attendre_mort "$MS"
+  arrete_m; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-IMPRIME — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant ouvrep 's|s\.url}/project\.html?o=\${secret}#t=|s.terminal.url}/#t=|'; then
   rm -f "$OUVERT" "$WORK/run/page-ouverte.html" "$AM"; lance "$MUT_L" open --terminal; fichier_ouvert; sleep 0.5; MS="$(sj j.pid)"; MQ="$(qport)"
   assert_eq "M-OUVRE-Q — le mutant (SAF-1 défait : le lanceur vise de nouveau Q) rougit L6 : la page de redirection mène à Q, plus à la page Projet" "$(grep -q -F "url=http://127.0.0.1:$MQ/#t=" "$WORK/run/page-ouverte.html" 2>/dev/null && echo rouge || echo "identique")" "rouge"
-  arrete; [ -n "$MS" ] && attendre_mort "$MS"
+  arrete_m; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-OUVRE-Q — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-ARGV / M-PAGE-MODE / M-PAGE-LIEN / M-F1-PID / M-F1-VALID — mutants de F1 et F6 ==="
 if mutant argv 's|^  ouvrir(page, |  ouvrir(`${s.terminal.url}/#t=${amorce}`, |'; then
   rm -f "$OUVERT" "$AM" "$SJ"; lance "$MUT_L" open --terminal; fichier_ouvert; sleep 0.5; MS="$(sj j.pid)"; V="$(cat "$AM" 2>/dev/null)"
   assert_eq "M-ARGV — le mutant (l'adresse avec l'amorçage dans l'argv) rougit L6 : la valeur est lisible dans l'argv de l'ouvreur" "$([ -n "$V" ] && grep -q -F -e "$V" "$OUVERT" && echo rouge || echo identique)" "rouge"
-  arrete; [ -n "$MS" ] && attendre_mort "$MS"
+  arrete_m; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-ARGV — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant pagemode 's/MODE_PAGE = 0o600/MODE_PAGE = 0o666/'; then
   rm -f "$OUVERT" "$AM" "$SJ" "$PAGE"; ( umask 022; lance "$MUT_L" open --terminal ); fichier_ouvert; MS="$(sj j.pid)"; MM="$(mode "$PAGE")"
   assert_eq "M-PAGE-MODE — le mutant rougit L13 : la page n'est plus en 600" "$([ "$MM" != 600 ] && echo rouge || echo "identique : $MM")" "rouge"
-  arrete; [ -n "$MS" ] && attendre_mort "$MS"; rm -f "$PAGE"
+  arrete_m; [ -n "$MS" ] && attendre_mort "$MS"; rm -f "$PAGE"
 else assert_eq "M-PAGE-MODE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant pagelien -e "/^function ecrirePageOuvrir/,/^}/{s/fs\.unlinkSync(f)/0/;s/'wx'/'w'/;}" -e "s/verifierSortie(lab, sortie); return/return/"; then
-  rm -f "$OUVERT" "$AM" "$SJ"; lance "$LAUNCH" open --terminal --no-open; MS="$(sj j.pid)"
+  rm -f "$OUVERT" "$AM" "$SJ"; lance "$MUT_L" open --terminal --no-open; MS="$(sj j.pid)"
   printf 'contenu-cible\n' > "$WORK/cible"; EMP="$(cksum < "$WORK/cible")"; rm -f "$PAGE"; ln -s "$WORK/cible" "$PAGE"
   lance "$MUT_L" open --terminal
   assert_eq "M-PAGE-LIEN — le mutant (sans suppression préalable ni création exclusive) rougit L13 : la cible est écrasée" "$([ "$(cksum < "$WORK/cible")" != "$EMP" ] && echo rouge || echo identique)" "rouge"
-  rm -f "$PAGE" "$AM"; arrete; [ -n "$MS" ] && attendre_mort "$MS"
+  rm -f "$PAGE" "$AM"; arrete_m; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-PAGE-LIEN — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant f1pid "s/&& estNotre(s\.pid, path\.join(sortie, 'serve\.mjs'))/\&\& true/"; then
   planter "$PLANT_HTTP"; rm -f "$OUVERT" "$AM"; lance "$MUT_L" open --terminal; sleep 1; MS="$(sj j.pid)"
   assert_eq "M-F1-PID — le mutant (processus non vérifié) rougit L12a : l'ouvreur reçoit une adresse tirée d'un lab dont le PID n'est pas le nôtre" "$([ -s "$OUVERT" ] && echo rouge || echo identique)" "rouge"
   rm -f "$SJ" "$AM" "$PAGE"
 else assert_eq "M-F1-PID — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
-if mutant f1valid -e 's/^const portDeUrl = .*$/const portDeUrl = (u) => (typeof u === "string" ? 1 : null);/' -e 's/terminal: { url: adresseLocale(pq) }/terminal: { url: s.terminal.url }/' -e 's/url: adresseLocale(port), \.\.\./url: s.url, .../'; then
-  rm -f "$SJ" "$AM"; lance "$LAUNCH" open --terminal --no-open; MS="$(sj j.pid)"
+if MUT_CIBLE=vf-cockpit-serveur-vivant.mjs mutant f1valid -e 's/^export const portDeUrl = .*$/export const portDeUrl = (u) => (typeof u === "string" ? 1 : null);/' -e 's/terminal: { url: adresseLocale(pq) }/terminal: { url: s.terminal.url }/' -e 's/url: adresseLocale(port), \.\.\./url: s.url, .../'; then
+  rm -f "$SJ" "$AM"; lance "$MUT_L" open --terminal --no-open; MS="$(sj j.pid)"
   node -e "const fs=require('fs');const f=process.argv[1];const j=JSON.parse(fs.readFileSync(f,'utf8'));j.terminal={url:'file:///System/Applications/Calculator.app'};j.url='file:///System/Applications/Calculator.app';fs.writeFileSync(f,JSON.stringify(j))" "$SJ"
   rm -f "$OUVERT" "$WORK/run/page-ouverte.html"; lance "$MUT_L" open --terminal; fichier_ouvert; sleep 0.5; MS2="$(sj j.pid)"
   assert_eq "M-F1-VALID — le mutant (sans validation ni reconstruction du port) rougit L12b : la page mène à file:///…" "$(grep -q 'file:' "$WORK/run/page-ouverte.html" 2>/dev/null && echo rouge || echo identique)" "rouge"
-  rm -f "$AM" "$PAGE"; arrete; { [ -n "$MS" ] && attendre_mort "$MS"; [ -n "$MS2" ] && attendre_mort "$MS2"; } 2>/dev/null; true
+  rm -f "$AM" "$PAGE"; arrete_m; { [ -n "$MS" ] && attendre_mort "$MS"; [ -n "$MS2" ] && attendre_mort "$MS2"; } 2>/dev/null; true
 else assert_eq "M-F1-VALID — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-OUVREUR-ERREUR / M-SANS-ANNONCE / M-TOUJOURS-ANNONCE / M-SANS-RATTRAPAGE — mutants de M6 et N6a ==="
 if mutant ouvreurerreur "s/    enfant.on('error', dire);//"; then
   sans_ouvreur "$MUT_L" "$WORK/ouvreurcasse:$WORK/sansouvreur"; MS="$(sj j.pid)"
   assert_eq "M-OUVREUR-ERREUR — le mutant (aucun écouteur sur l'erreur du spawn) rougit L14 : le lanceur tombe avec la trace de l'exception" "$([ "$LRC" != 0 ] && [ "$(grep -c -e 'node:internal' -e '^ *at ' "$LOUT" || true)" != 0 ] && echo rouge || echo "identique : rc=$LRC")" "rouge"
-  arrete; [ -n "$MS" ] && attendre_mort "$MS"
+  arrete_m; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-OUVREUR-ERREUR — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant sansannonce "s/^  console.error(\`le terminal ne s'est pas ouvert/  void (\`le terminal ne s'est pas ouvert/"; then
   rm -f "$OUVERT" "$AM" "$SJ"; lance "$MUT_L" open --terminal; MS="$(sj j.pid)"
   assert_eq "M-SANS-ANNONCE — le mutant (l'échec d'ouverture n'est plus dit) rougit L15 : succès muet" "$([ "$(grep -c "ne s'est pas ouvert" "$LOUT" || true)" = 0 ] && echo rouge || echo identique)" "rouge"
-  arrete; [ -n "$MS" ] && attendre_mort "$MS"
+  arrete_m; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-SANS-ANNONCE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant toujoursannonce 's/  if (!suivi.echec \&\& !fs.existsSync(amorce)) return;//'; then
   rm -f "$AM" "$SJ" "$WORK/run/conforme.log"; NL=$((NL+1)); LOUT="$WORK/lance-$NL.out"
   (cd "$LAB" && VF_COCKPIT_OUVERTURE_MS=20000 PATH="$WORK/bonbin:$PATH" node "$MUT_L" open --terminal --lab "$LAB" --port "$(libre)" > "$LOUT" 2>&1); MS="$(sj j.pid)"
   assert_eq "M-TOUJOURS-ANNONCE — le mutant (annonce même quand l'amorçage a été consommé) rougit le témoin de L15" "$([ "$(grep -c "ne s'est pas ouvert" "$LOUT" || true)" != 0 ] && echo rouge || echo identique)" "rouge"
-  arrete; [ -n "$MS" ] && attendre_mort "$MS"
+  arrete_m; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-TOUJOURS-ANNONCE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 if mutant sansrattrapage 's/^main().catch(.*$/main();/'; then
-  lance "$LAUNCH" open --terminal --no-open; MS="$(sj j.pid)"; rm -f "$AM"; ln -s "$WORK/cible" "$AM"
+  lance "$MUT_L" open --terminal --no-open; MS="$(sj j.pid)"; rm -f "$AM"; ln -s "$WORK/cible" "$AM"
   lance "$MUT_L" open --terminal --no-open
   assert_eq "M-SANS-RATTRAPAGE — le mutant (aucun rattrapage final) rougit L4 : l'exception du lien planté sort avec le code 1 et une trace" "$LRC trace=$([ "$(grep -c -e 'node:internal' -e '^ *at ' "$LOUT" || true)" != 0 ] && echo oui || echo non)" "1 trace=oui"
-  rm -f "$AM"; arrete; [ -n "$MS" ] && attendre_mort "$MS"
+  rm -f "$AM"; arrete_m; [ -n "$MS" ] && attendre_mort "$MS"
 else assert_eq "M-SANS-RATTRAPAGE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-LEURRE-TERMINAL — le garde de l'arrêt n'est plus tenu quand --terminal est donné ==="
@@ -534,7 +536,7 @@ if mutant leurreterm 's/if (vif) { if (!arreter(sortie))/if (vif) { if (o.avecQ 
   printf '{"pid":%s,"port":9,"url":"http://127.0.0.1:9","token":"x","startedAt":"2026-01-01T00:00:00.000Z"}\n' "$LEURRE_M" > "$SJ"
   lance "$MUT_L" open --terminal --no-open; RC_M="$LRC"; S_M="$(sj j.pid)"
   assert_eq "M-LEURRE-TERMINAL — le mutant (arrêt sans garde sur la voie --terminal) rougit L11b : la sortie n'est plus 5" "$([ "$RC_M" != 5 ] && echo rouge || echo "identique : $RC_M")" "rouge"
-  [ -n "$S_M" ] && [ "$S_M" != "$LEURRE_M" ] && { arrete; attendre_mort "$S_M"; }
+  [ -n "$S_M" ] && [ "$S_M" != "$LEURRE_M" ] && { arrete_m; attendre_mort "$S_M"; }
   vf_hyg_stop "$LEURRE_M"; rm -f "$SJ"
 else assert_eq "M-LEURRE-TERMINAL — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
@@ -573,7 +575,7 @@ for spec in "ouvrenomnu|vf-cockpit.mjs|s/spawn(exe, op\[1\]/spawn(op[0], op[1]/;
   [ "$mk" = "@ouvreur" ] && mk="$OUVREUR_PF"
   md="$WORK/mut-$mn"; rm -rf "$md"; mkdir -p "$md"; cp -R "$MODULE/." "$md/"; cp "$md/scripts/$mf" "$md/scripts/$mf.orig"; sed -i.bak "$msed" "$md/scripts/$mf"
   if [ "$mn" = whonomnu ]; then sed -i.bak 's/{ \.\.\.envEnfant(lab), VF_COCKPIT_ENGINE_DIR/{ ...process.env, VF_COCKPIT_ENGINE_DIR/' "$md/scripts/vf-cockpit.mjs"; rm -f "$md/scripts/vf-cockpit.mjs.bak"; fi
-  if [ "$mn" = servopen ] || [ "$mn" = whonomnu ]; then sed -i.bak 's/process\.env\.PATH = (await import(.*assainirPath(process\.env\.PATH, root);//' "$md/skills/cockpit-moteur/assets/serve.mjs"; rm -f "$md/skills/cockpit-moteur/assets/serve.mjs.bak"; fi
+  if [ "$mn" = servopen ] || [ "$mn" = whonomnu ]; then sed -i.bak 's/process\.env\.PATH = (await depuisModule(.*assainirPath(process\.env\.PATH, root);//' "$md/skills/cockpit-moteur/assets/serve.mjs"; rm -f "$md/skills/cockpit-moteur/assets/serve.mjs.bak"; fi
   if ! cmp -s "$md/scripts/$mf" "$md/scripts/$mf.orig"; then
     rm -f "$md/scripts/$mf.orig" "$md/scripts/$mf.bak"; leurres_lab
     if [ "$mp" = min ]; then pm="$WORK/minbin:$WORK/fauxbin:"; else pm=".:$PBASE"; fi
