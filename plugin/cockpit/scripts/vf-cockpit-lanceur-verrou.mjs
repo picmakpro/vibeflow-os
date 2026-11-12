@@ -1,9 +1,9 @@
 // vf-cockpit-lanceur-verrou — verrou de lanceur et reprise d'un serveur orphelin (AUDC-H3), pour vf-cockpit.mjs.
-// Aucune adresse ni PID n'est cru sans contrôle : le PID doit être le serve.mjs de la sortie du lab (estNotre, fourni par le lanceur).
+// Aucune adresse ni PID n'est cru sans contrôle : le PID doit être le serveur de CE lab (estNotre, fourni par le lanceur ; identité dans vf-cockpit-serveur-vivant.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
-import http from 'node:http';
 import { confiner } from './vf-cockpit-paths.mjs';
+import { detecterServeur } from './vf-cockpit-serveur-vivant.mjs';
 
 // AUDC-H3 : tout fichier que le lanceur écrit dans la sortie du lab (journal, état) y reste. Rien n'est modifié ni bloqué avant le contrôle : aucun composant du chemin sous le lab n'est un lien
 // symbolique (lstat de chacun), le fichier existant est régulier et à un seul lien dur (lstat), l'ouverture ne suit pas de lien et ne bloque pas (O_NOFOLLOW, O_NONBLOCK), le type est revérifié sur
@@ -23,9 +23,6 @@ export function ouvrirSur(lab, f, { ajout = false, mode = 0o600 } = {}) {
   } catch {}
   return null;
 }
-// Une valeur de server.json (fichier que le lab peut fournir) n'entre jamais dans une ligne ni dans un fichier sans forme valide.
-export const hashSur = (h) => (h === undefined || h === null ? undefined : typeof h === 'string' && /^[0-9a-f]{1,64}$/.test(h) ? h : 'illisible'); // illisible = code inconnu : le serveur est remplacé
-export const pidSur = (v) => (Number.isInteger(v) && v > 0 ? v : null);
 // Journal du serveur (serveur.log), décisions du lanceur datées avec leur motif (jamais un jeton ni un contenu). Une ligne = une ligne : aucun retour à la ligne n'y passe.
 export function noter(sortie, msg) {
   const fd = ouvrirSur(path.resolve(sortie, '..', '..'), path.join(sortie, '.cache', 'serveur.log'), { ajout: true });
@@ -57,31 +54,14 @@ export async function prendreVerrou(lab, sortie, { vivant, attendre }) {
     }
   }
 }
-// AUDC-H3 : un serveur de CE lab déjà à l'écoute alors que server.json manque (fichier perdu) est repris, jamais doublé. Le serveur se reconnaît à sa page (jeton) et à /api/status
-// (racine du lab, PID) ; le PID doit être le serve.mjs de cette sortie (estNotre). Seuls les ports du lab (préféré et repli de 20) sont sondés, sur 127.0.0.1.
-const lireHttp = (port, chemin, jeton) => new Promise((resolve) => {
-  const r = http.get({ host: '127.0.0.1', port, path: chemin, timeout: 1500, headers: { Host: `127.0.0.1:${port}`, ...(jeton ? { 'x-vf-cockpit-token': jeton } : {}) } }, (res) => {
-    let b = ''; res.on('data', (c) => { if (b.length < 3 << 20) b += c; }); res.on('end', () => resolve({ code: res.statusCode, corps: b }));
-  });
-  r.on('error', () => resolve(null)); r.on('timeout', () => { r.destroy(); resolve(null); });
-});
+// AUDC-H3 : un serveur de CE lab déjà à l'écoute alors que server.json manque (fichier perdu) est repris, jamais doublé. La DÉTECTION (page à jeton, /api/status, PID reconnu par estNotre)
+// vit dans vf-cockpit-serveur-vivant.mjs et n'écrit rien (79-06, D-M13) ; l'ADOPTION, qui écrit server.json, reste ici : c'est le geste de `open`.
 export async function serveurOrphelin(lab, sortie, port0, { estNotre, etatFile, adresseLocale, serveurVivant, noter }) {
-  let racine; try { racine = fs.realpathSync(lab); } catch { return null; }
-  for (let p = port0; p <= Math.min(65535, port0 + 20); p++) {
-    const page = await lireHttp(p, '/');
-    const jeton = page && page.code === 200 ? /VF_COCKPIT_SERVER=\{"token":"([0-9a-f]{1,128})"/.exec(page.corps)?.[1] : null;
-    if (!jeton) continue;
-    const st = await lireHttp(p, '/api/status', jeton);
-    let o = null; try { o = JSON.parse(st?.corps || ''); } catch {}
-    if (!o || !Number.isInteger(o.pid) || typeof o.root !== 'string') continue;
-    let r; try { r = fs.realpathSync(o.root); } catch { continue; }
-    if (r !== racine || !estNotre(o.pid, path.join(sortie, 'serve.mjs'), lab)) continue;
-    // adopté : server.json est réécrit (0600) pour que `status`, `stop` et les relances le retrouvent
-    const fd = ouvrirSur(lab, etatFile(sortie)); if (fd === null) return null; // jamais à travers un lien, jamais hors du lab
-    try { fs.writeSync(fd, JSON.stringify({ pid: o.pid, port: p, url: adresseLocale(p), token: jeton, hash: hashSur(o.hash), startedAt: new Date().toISOString() }, null, 2)); } catch { return null; } finally { fs.closeSync(fd); }
-    noter(sortie, `serveur déjà à l'écoute (PID ${o.pid}, port ${p}) sans server.json : repris, aucun second serveur lancé`);
-    return serveurVivant(sortie);
-  }
-  return null;
+  const o = await detecterServeur(lab, sortie, port0, { estNotre: (pid) => estNotre(pid, path.join(sortie, 'serve.mjs'), lab) });
+  if (!o) return null;
+  // adopté : server.json est réécrit (0600) pour que `status`, `stop` et les relances le retrouvent
+  const fd = ouvrirSur(lab, etatFile(sortie)); if (fd === null) return null; // jamais à travers un lien, jamais hors du lab
+  try { fs.writeSync(fd, JSON.stringify({ pid: o.pid, port: o.port, url: adresseLocale(o.port), token: o.token, hash: o.hash, startedAt: new Date().toISOString() }, null, 2)); } catch { return null; } finally { fs.closeSync(fd); }
+  noter(sortie, `serveur déjà à l'écoute (PID ${o.pid}, port ${o.port}) sans server.json : repris, aucun second serveur lancé`);
+  return serveurVivant(sortie);
 }
-
