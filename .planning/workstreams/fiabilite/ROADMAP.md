@@ -506,14 +506,14 @@ Plans:
 
 Plans:
 
-- [ ] 80-01-PLAN.md — Clavier du canevas (un arrêt de tabulation, voisin spatial, anneau sur la carte) (v1)
-- [ ] 80-02-PLAN.md — Pile de surcouches, panneau fermé hors tabulation, retrait des trois listes (v1)
-- [ ] 80-03-PLAN.md — Données de Projet (avancement, exigences, vague, recette ; DIFFÉRÉ retiré du pied) (v1)
-- [ ] 80-04-PLAN.md — Projet en couloirs, ?vue=, naviguer(), visite, contrats C76-1/2/3 (v2)
-- [ ] 80-05-PLAN.md — Coin bas-droit : minicarte, repères, ligne d'état, zone basse du téléphone (v2)
-- [ ] 80-06-PLAN.md — Tiroir Git : pagination, worktrees repliés, volet bas, poignée de largeur, ouvrirSur(sha) (v2)
-- [ ] 80-07-PLAN.md — Forme Liste, intérieur de phase, touche v, mémoire par lab (v3)
-- [ ] 80-08-PLAN.md — Pile Retour du panneau VF_PANNEAU (C76-3, C76-5) (v3)
+- [x] 80-01-PLAN.md — Clavier du canevas (un arrêt de tabulation, voisin spatial, anneau sur la carte) (v1)
+- [x] 80-02-PLAN.md — Pile de surcouches, panneau fermé hors tabulation, retrait des trois listes (v1)
+- [x] 80-03-PLAN.md — Données de Projet (avancement, exigences, vague, recette ; DIFFÉRÉ retiré du pied) (v1)
+- [x] 80-04-PLAN.md — Projet en couloirs, ?vue=, naviguer(), visite, contrats C76-1/2/3 (v2)
+- [x] 80-05-PLAN.md — Coin bas-droit : minicarte, repères, ligne d'état, zone basse du téléphone (v2)
+- [x] 80-06-PLAN.md — Tiroir Git : pagination, worktrees repliés, volet bas, poignée de largeur, ouvrirSur(sha) (v2)
+- [x] 80-07-PLAN.md — Forme Liste, intérieur de phase, touche v, mémoire par lab (v3)
+- [x] 80-08-PLAN.md — Pile Retour du panneau VF_PANNEAU (C76-3, C76-5) (v3)
 - [ ] 80-09-PLAN.md — Lot moteur A1 : cadrage unique, champ de lecture, zoom réversible, garde de saisie (v4)
 - [ ] 80-10-PLAN.md — Onglets sans rechargement, « Réessayer », VF_ONGLETS.aller (v5)
 - [ ] 80-11-PLAN.md — Lot moteur A2 : vocabulaire du panneau de Projet (v5)
