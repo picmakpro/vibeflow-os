@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test-cockpit-git-pagination.sh — tiroir Git : pagination, worktrees repliés, volet bas, poignée de largeur, ouvrirSur (80-06 ; FORM-13 ; P80-D-19, 25, 39).
-#   GP1 rangées paginées et focus · GP2 worktrees repliés, volet bas · GP3 poignée de largeur · GP4 VFGitTiroir.ouvrirSur(sha) sur un dépôt réel
-#   Mutants : M-TOUT, M-BORNE, M-POUSSE, M-EPUISE, M-PAGINE, M-MOTIF, M-VOLET-LIE, M-PASTILLE (copie du module dans $WORK, jamais le module).
+#   GP1 rangées paginées et focus · GP2 worktrees repliés, volet bas (GP2.3b : même scène sans CLI claude) · GP3 poignée de largeur · GP4 VFGitTiroir.ouvrirSur(sha) sur un dépôt réel
+#   Mutants : M-TOUT, M-BORNE, M-POUSSE, M-EPUISE, M-PAGINE, M-MOTIF, M-VOLET-LIE, M-PASTILLE, M-ASK-HAUT (copie du module dans $WORK, jamais le module).
 #   Chrome headless en CDP (SAUTÉ sans navigateur), ports éphémères. GP_CAPTURES=<dossier> écrit des captures PNG. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -59,10 +59,12 @@ mk_lab() {
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; pose OUT, PORT ; démarre le serveur (SRV)
   env $ENVX "$NODE" "${2:-${GP_SCRIPTS:-$SCRIPTS}}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
-  # un CLI `claude` factice, comme les autres suites du cockpit : sans CLI sur le PATH du runner (HOME redirigé), serve.mjs affiche #ask-warn
-  # au-dessus de la barre de question à 1024 px, la barre passe de 40 à 115 px et le tiroir se cale 69 px plus haut (GP2.3 : liste à 237 px)
+  # un CLI `claude` factice, comme les autres suites du cockpit : sans CLI, serve.mjs affiche #ask-warn au-dessus de la barre de question à
+  # 1024 px, la barre passe de 40 à 115 px et le tiroir se cale 69 px plus haut (liste à 237 px). Le seul interrupteur que serve.mjs lit est
+  # l'option `--claude <chemin>` (ni FLOORPLAN_CLAUDE ni VF_COCKPIT_CLAUDE ne sont lus ; mesuré) : GP_CLAUDE la fixe, un chemin absent donne
+  # un serveur SANS CLI quel que soit le PATH du poste (GP2.3b), le défaut est le faux claude.
   mkdir -p "$WORK/fauxbin"; cp "$HERE_T/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"
-  env $ENVX "VF_COCKPIT_CLAUDE=$WORK/fauxbin/claude" ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
+  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --claude "${GP_CLAUDE:-$WORK/fauxbin/claude}" --port "$(libre)" > "$WORK/serve.out" 2>&1 &
   SRV=$!
   for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
   PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
@@ -329,6 +331,50 @@ JS
   assert_eq "GP2.6 — Fermer le détail avec la rangée dans une section repliée : le focus va au titre du tiroir, jamais à body" \
     "$(jq_ "$R2" '[j.repli.corps, j.repli.titre, j.repli.volets].join("|")' 2>/dev/null)" "false|true|0"
   assert_eq "GP2 — aucune erreur de page" "$(jq_ "$R2" 'j.errs.length' 2>/dev/null)" "0"
+  stop_srv
+fi
+
+echo "=== GP2.3b — 1024 x 768 SANS CLI claude : le tiroir tient avec une barre de question à 115 px ==="
+# Même scène que GP2.3 mais serveur lancé avec `--claude` vers un exécutable absent (jamais le PATH : un poste qui a claude donnerait le même vert que GP2.3) :
+# #ask-warn s'affiche, #ask passe de 40 à 115 px, le zoom monte, eviter() cale le tiroir plus haut. Le produit ne garantit pas 240 px de liste ici
+# (mesuré : tiroir 511, volet au plancher 192, liste 237) : il garantit des RANGÉES ENTIÈRES, comptées dans la liste, jamais une hauteur.
+# N = 3 : rangée de 40 px, première rangée à 76 px du haut de la liste, 4 rangées entières mesurées (76 + 160 <= 237) ; on en exige une de moins, car la 4e tient à 1 px près.
+if ! veut GP2B; then :; elif [ -z "$CHROME" ]; then skip "GP2.3b" "pas de navigateur"; else
+  GP_CLAUDE="$WORK/absent/claude" build_serve "$DEPOT"; BASE="http://127.0.0.1:$PORT"
+  cat > "$AUX/gp2b.js" <<'JS'
+const [base] = ARGS, { ouvrirPage, LIGNE, RANGEES, pause, touche } = await import(process.env.GP_ENTREE);
+const { attendreEtStabiliser } = await import(process.env.VF_CS);
+const out = {}, VOL = `document.querySelector('#vf-git-tiroir .vf-git-detail')`, REG = `document.querySelector('#vf-git-tiroir .vf-git-detail [role=region]')`;
+const att = (e, l, ms = 4000) => s.attendre(e, l, ms).catch(() => null);
+await ouvrirPage(s, base);
+await s.ev(`${LIGNE}.click()`); await att(`${RANGEES}.length === 40`, '40 rangées');
+await s.ev(`${RANGEES}[2].focus()`); await touche(s, 'Enter', 'Enter', 13);
+await att(`!!${REG}`, 'volet ouvert');
+await s.send('Emulation.setDeviceMetricsOverride', { width: 1024, height: 768, deviceScaleFactor: 1, mobile: false });
+const lire = () => s.ev(`(() => { const T = document.querySelector('#vf-git-tiroir'), v = ${VOL}, c = T.querySelector('.vf-git-corps'), z = v.querySelector('.vf-git-det');
+  const h = (e) => Math.round(e.getBoundingClientRect().height), cr = c.getBoundingClientRect(), L = [...${RANGEES}];
+  const tx = [...v.querySelectorAll('*')].filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
+  const entieres = L.filter((li) => { const r = li.getBoundingClientRect(); return r.height > 0 && r.top >= cr.top - 0.5 && r.bottom <= cr.bottom + 0.5; }).length;
+  const warn = document.querySelector('#ask-warn'), ask = document.querySelector('#ask');
+  return { l: Math.round(T.getBoundingClientRect().width), tiroir: h(T), volet: h(v), corps: h(c), entieres, rang: L.length,
+    hRangee: L.length ? Math.round(L[0].getBoundingClientRect().height * 10) / 10 : 0, y0: L.length ? Math.round(L[0].getBoundingClientRect().top - cr.top) : 0, wt: document.querySelector('#vf-git-s-wt').hidden,
+    police: Math.min(...tx.map((e) => parseFloat(getComputedStyle(e).fontSize))), debord: v.scrollWidth > v.clientWidth || z.scrollWidth > z.clientWidth,
+    warn: !!warn && !warn.hidden && warn.getClientRects().length > 0, ask: ask ? h(ask) : null, bottom: T.style.bottom }; })()`);
+// mesure une fois posée : la condition (l'avertissement affiché, la barre à sa hauteur d'avertissement) PUIS deux lectures égales
+out.petit = await attendreEtStabiliser(lire, (m) => m && m.warn && m.ask > 100, { pas: 200, max: 8000 });
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  R2B="$(cdp "$AUX/gp2b.js" "$BASE")"; trace gp2b "$R2B"
+  echo "     GP2.3b mesuré (diagnostic) : $(jq_ "$R2B" 'JSON.stringify(j.petit)' 2>/dev/null)"
+  assert_eq "GP2.3b — témoin : sans CLI l'avertissement est affiché et la barre de question passe à 115 px (la configuration voulue est réellement servie)" \
+    "$(jq_ "$R2B" '[j.petit.warn, j.petit.ask].join("|")' 2>/dev/null)" "true|115"
+  assert_eq "GP2.3b — 1024 x 768 sans CLI : tiroir 352 px, volet entre 192 et 256, texte >= 12 px, sans débord, Worktrees fermé" \
+    "$(jq_ "$R2B" '(() => { const p = j.petit; return [p.l, p.volet >= 192 && p.volet <= 256, p.police >= 12, p.debord, p.wt].join("|"); })()' 2>/dev/null)" \
+    "352|true|true|false|true"
+  assert_eq "GP2.3b — 1024 x 768 sans CLI : au moins 3 rangées entières dans la liste (jamais une hauteur : 240 n'est pas garanti sans CLI)" \
+    "$(jq_ "$R2B" '(() => { const p = j.petit; return p.entieres >= 3 ? "ok" : "seulement " + p.entieres + " rangées entières (liste " + p.corps + " px, 1re rangée à " + p.y0 + " px, rangée de " + p.hRangee + " px)"; })()' 2>/dev/null)" "ok"
+  assert_eq "GP2.3b — aucune erreur de page" "$(jq_ "$R2B" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
 fi
 
@@ -633,6 +679,9 @@ if ! veut MUTANTS; then :; elif [ -z "$CHROME" ]; then skip "mutants" "pas de na
     ".vf-git-p-lecture::before { content: '◌ ' / ''; } .vf-git-p-warn { background: var(--warn-bg); }" gp5.js - pre-mock.js
   assert_eq "M-PASTILLE — le mutant rougit la mesure de D8.2 (fond teinté sur « modifiés » : false en position 2) alors que « propre » reste neutre" \
     "$(jq_ "$RM" '[j.mention, j.couleurs.mod, j.couleurs.pro, j.couleurs.tous, j.couleurs.gl].join("|")' 2>/dev/null)" "true|false|true|false|true"
+  GP_CLAUDE="$WORK/absent/claude" mutant M-ASK-HAUT 77-vf-git-tiroir.js "Math.round(H - haut + 8)" "Math.round(H - haut + 60)" gp2b.js - pre-mock.js
+  assert_eq "M-ASK-HAUT — le mutant rougit GP2.3b (eviter() cale le tiroir 52 px plus haut : moins de 3 rangées entières) alors que la config sans CLI est bien servie, le volet reste dans [192, 256] et la largeur est 352" \
+    "$(jq_ "$RM" '[j.petit.warn, j.petit.ask, j.petit.l, j.petit.volet >= 192 && j.petit.volet <= 256, j.petit.entieres >= 3, j.petit.entieres].join("|")' 2>/dev/null)" "true|115|352|true|false|2"
 fi
 
 vf_hyg_assert
