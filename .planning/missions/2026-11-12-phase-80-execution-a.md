@@ -230,3 +230,38 @@ Durée : de 22 h 16 à environ 05 h 40 le lendemain, dont 15 minutes d'arrêt po
 {"verdict":"gates ci.yml étapes 1-5, 7-20, 23","commande":"bash -e <étape extraite de .github/workflows/ci.yml>","exit_code":0,"sha":"5e994093"}
 ]}
 ```
+
+## Après l'ouverture de la PR #237 : CI Linux, fusion de la base, corrections (2026-11-12)
+
+La première CI (tête 21f174cd) était rouge, et c'est de notre fait. Aucun exécuteur n'avait joué sous Linux. Les
+suites terminal-activation, terminal-client, transcript et ailleurs n'étaient dans la liste de non-régression
+d'aucun plan.
+
+- **Fusion de la base**, demandée par la session principale le 2026-11-12 (elle remplace la consigne « pas
+  maintenant »). origin/integration/cockpit-audit (da64eb8c) fusionnée en `8abdad2e`, sans conflit. Le compteur des
+  README a été recompté à 222 par la mesure de check-version-sync (`231ebbd9`). Rejoués : vendor 143, terminal-lanceur
+  111, amorce-navigateur 52, fr-donnees 31.
+- **Pointeur fin.** Le Chrome sans tête de Linux n'annonce aucun pointeur, donc `(pointer: fine)` est faux en CI. Les
+  gardes lisent désormais `(not (pointer: coarse))` (`4397aac2`, amendement daté dans 80-04, 80-05, 80-07 et 80-08 :
+  `86e967bd`). Rouge avant sous un Chrome lancé sans pointeur : couloirs 51/6, coin 31/6, panneau-retour 22/19,
+  projet-liste 44/2. Vert après : 57, 37, 41 et 46. Le tactile est inchangé, prouvé par une sonde hors dépôt : le
+  témoin tactile n'est pas commité.
+- **T7.5.** 8 mentions « vf-term- » dans nos extensions, lues désormais par la nature des éléments (enfants fixes de
+  `body`) (`ba62bb17`). Rouge 8, puis vert. Réserve : un futur bouton fixe sous `body` serait pris pour la pastille.
+- **T27.B1.** Les liens `#r=` rechargeaient la page depuis `?vue=graphe`. Ils ne changent plus que le fragment
+  (`94c3547b`). Transcript passe de 102/1 à 103/0.
+- **C5.** Durées mesurées de nos huit suites inscrites dans `scripts/ci-shard-suites.sh` (`7dc5039b`, Gate-Touche).
+  Charge max 1301 s (shard 2) pour une borne de 1366 s : vert. Borne et ci.yml intacts. Quatre durées viennent de runs
+  rouges : à remesurer sur un run vert.
+- **test-cockpit-ailleurs (L1.2, L2.3).** Écart annulé : ma « règle unique de plans faits » (`856bf6fd`) changeait le
+  pied d'une phase cochée sans SUMMARY, que cette suite épingle, et le plan disait « foot inchangé ». Retour en
+  `4d6f6786`, amendement en `b2012346`. La divergence d'affichage (« 2 plans sur 3 » contre trois plans « Fait » sur
+  une donnée incohérente) reste visible et est signalée à la jointure.
+- **OUVERT : T6.1 (terminal-client, SAF-1).** `naviguer()` (80-04, P80-D-37) ajoute `vue=graphe` à toute adresse
+  `project.html` en promettant « aucune suite existante modifiée », alors que T6.1 compare l'adresse exacte. Le test
+  est rouge aussi sous macOS. Décision à prendre : faire naviguer ce pilote en `{ brut: true }` (amendement de 80-04),
+  ou une autre voie.
+- **OUVERT : GP2.3 (git-pagination, 1024 px).** Rouge sous Linux seulement. Localement, le corps de liste mesure
+  295 px pour un seuil de 240. La valeur Linux n'est pas journalisée : il faut une mesure Linux.
+- **Désormais, avant de déclarer un plan vert**, les exécuteurs jouent la découverte du module cockpit, y compris
+  terminal-*, transcript et ailleurs, et un passage sous Chrome sans pointeur.
