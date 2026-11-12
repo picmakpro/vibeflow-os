@@ -10,6 +10,9 @@
 #   F10 chaque gabarit du dictionnaire est servi par sa propre valeur · F11 formes rendues (corpus) sans mot anglais ni faute d'élision, de contraction, d'accord
 #   F12 rendu dans Chrome (capitalisation, statut de STATE, texte visible) ; sautée audiblement sans navigateur
 #   F9 l'inventaire voit les mots isolés, les mots courts et les pluriels construits (UIFN-07, 70-01) ; F3 et le témoin de F2 comparent aux non-traduits de base
+#   F16 toute clé passée à t() a une entrée de table ou une exclusion (la liste nomme celles qui manquent) · F17 zéro littéral anglais libre, aucune clé non littérale, aucun t qui masque · F18 les blocs vibeflow:fr précèdent le script principal
+#   F19 la mécanique de t hors navigateur (table d'essai puis vraie table) · F20 aucun observateur global, une donnée posée hors des anciens sélecteurs reste intacte · F21 sondes en français et sous ?lang=en · F22 parité avec le relevé « avant » (VF_FR_AVANT, VF_FR_ADMIS ; VF_FR_RELEVE écrit le relevé)
+#   F23 (A43) un constat de Santé de fixture s'affiche comme avant (VF_FR_F23_MUTANT=retrait|affichage rejoue la sonde sur une copie mutée)
 # L'inventaire se calcule sur le rendu SERVI (après renommage) : les clés du dictionnaire sont les phrases affichées.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -42,7 +45,7 @@ function contexte(tab) { // talons minimaux : fenêtre, document, observateur, r
   const el = () => ({ style: {}, textContent: '', appendChild: noop, setAttribute: noop, getAttribute: () => null, querySelectorAll: () => [], closest: () => null });
   const ctx = { console, URLSearchParams, location: { search: '' }, performance: { now: () => 0 }, NodeFilter: { SHOW_TEXT: 4 }, requestAnimationFrame: noop,
     MutationObserver: class { observe() {} }, document: { documentElement: {}, head: el(), body: el(), title: '', createElement: el, querySelector: () => el(), createTreeWalker: () => ({ nextNode: () => null }) } };
-  ctx.window = ctx; ctx.VibeFlow = { graph: { meta: { vfTab: tab, kindColors: {} } } };
+  ctx.window = ctx; ctx.VibeFlow = { graph: { meta: { vfTab: tab, kindColors: {} } } }; ctx.VF_COCKPIT = { meta: { vfTab: tab, kindColors: {} } }; // 79-10 : la donnée de la page, sous son nom d'assemblage (le traducteur la lit, jamais l'objet du moteur)
   vm.createContext(ctx);
   for (const b of blocs) vm.runInContext(b, ctx);
   return ctx;
@@ -57,7 +60,8 @@ const AMONT = new RegExp('floor' + 'plan', 'i');
 const IDENTIQUES = []; // termes écrits pareil dans les deux langues autorisés comme valeur du dictionnaire : aucun, ils vont en exclusion
 const nb = (s) => (s.match(/\{\}/g) || []).length;
 const ajoute = (k, v) => v.split('|').some((f) => nb(f) > nb(k)); // une valeur peut omettre des {}, jamais en ajouter
-const controler = (d) => Object.entries(d).flatMap(([k, v]) => [AMONT.test(v) && `nom amont : ${k}`, /</.test(v) && `balise : ${k}`, v === k && !IDENTIQUES.includes(k) && `valeur = clé : ${k}`, ajoute(k, v) && `{} en trop dans la valeur : ${k}`].filter(Boolean));
+const balises = (x) => (x.match(/<\/?[a-z][^>]*>/gi) || []).join(''); // 79-10 (F5 relâchée) : une valeur porte les MÊMES balises que sa clé, jamais d'autres ; ni « " », ni « < », ni « > » hors de celles-là
+const controler = (d) => Object.entries(d).flatMap(([k, v]) => [AMONT.test(v) && `nom amont : ${k}`, (balises(v) !== balises(k) || /["<>]/.test(v.replace(/<\/?[a-z][^>]*>/gi, ''))) && `balise : ${k}`, v === k && !IDENTIQUES.includes(k) && `valeur = clé : ${k}`, ajoute(k, v) && `{} en trop dans la valeur : ${k}`].filter(Boolean));
 const dico = code.__vfFrDict;
 const fautive = fautif ? controler(JSON.parse(fs.readFileSync(fautif, 'utf8'))) : [];
 // F10 (UIFN-07, P70-D-04) : chaque gabarit du dictionnaire, instancié (chaque {} -> « 2 »), doit être servi par SA valeur ; un gabarit
@@ -205,6 +209,126 @@ assert_eq "F15.4 témoin : la valeur d'origine « Terminal input » reposée à 
 assert_eq "F15.5 témoin : une autre valeur anglaise est signalée aussi" "$(node "$AUX/biblio.mjs" "$SCRIPTS" "$XTERM" "$CLIENT" autre-langue)" '["promptLabel"]'
 assert_eq "F15.6 : le libellé français du champ de saisie est posé tel quel dans le client" "$(grep -cF "Terminal.strings.promptLabel = 'Saisie du terminal'" "$CLIENT")" "1"
 
+echo "[F16 à F19] traduction au point d'émission : clés de t, sites libres, ordre de chargement, mécanique de t (79-10, SOCL-14, P79-D-16, P79-D-24)"
+cat > "$AUX/sites.mjs" <<'JS'
+import fs from 'node:fs';
+import path from 'node:path';
+import vm from 'node:vm';
+import { pathToFileURL } from 'node:url';
+const [, , pagesCsv, scriptsDir, exclFile] = process.argv;
+const inv = await import(pathToFileURL(path.join(scriptsDir, 'vf-cockpit-fr-inventaire.mjs')).href);
+if (typeof inv.inventaireSites !== 'function') { console.log(JSON.stringify({ fn: 'absent' })); process.exit(0); }
+const pages = pagesCsv.split(',').map((f) => fs.readFileSync(f, 'utf8'));
+const serveur = fs.readFileSync(path.join(scriptsDir, '..', 'skills', 'cockpit-moteur', 'assets', 'serve.mjs'), 'utf8');
+const r = inv.inventaireSites({ html: pages, serveur });
+const noop = () => {}; const el = () => ({ style: {}, textContent: '', appendChild: noop, setAttribute: noop, getAttribute: () => null, querySelectorAll: () => [], closest: () => null });
+const ctx = { console, URLSearchParams, location: { search: '' }, performance: { now: () => 0 }, NodeFilter: { SHOW_TEXT: 4 }, requestAnimationFrame: noop, MutationObserver: class { observe() {} }, document: { documentElement: {}, head: el(), body: el(), title: '', createElement: el, querySelector: () => el(), createTreeWalker: () => ({ nextNode: () => null }) } };
+ctx.window = ctx; ctx.VF_COCKPIT = { meta: { vfTab: 'code', kindColors: {} } }; vm.createContext(ctx);
+for (const b of [...pages[0].matchAll(/<script>(?:\/\* ui\/[\w.-]+ \*\/\s*)?\/\/ vibeflow:fr[\s\S]*?<\/script>/g)].map((m) => m[0].replace(/^<script>|<\/script>$/g, ''))) vm.runInContext(b, ctx);
+const dico = ctx.__vfFrDict || {}; const excl = new Set(JSON.parse(fs.readFileSync(exclFile, 'utf8')).exclusions.map((e) => e.texte));
+const sans = (x) => !Object.prototype.hasOwnProperty.call(dico, x) && !(x.includes('@') && Object.prototype.hasOwnProperty.call(dico, x.split('@')[0]) && false) && !excl.has(x.split('@')[0]) && !excl.has(x);
+console.log(JSON.stringify({ fn: 'ok', n: r.cles.length, sansEntree: [...new Set([...r.cles, ...r.squelette])].filter(sans).sort(), libres: r.libres.filter((x) => !excl.has(x)).sort(), nonLitterales: r.nonLitterales, ombres: r.ombres }));
+JS
+cat > "$AUX/ordre.mjs" <<'JS'
+import fs from 'node:fs';
+const h = fs.readFileSync(process.argv[2], 'utf8');
+const rang = (re) => { const m = re.exec(h); return m ? m.index : -1; };
+const fr = [...h.matchAll(/<script>(?:\/\* ui\/[\w.-]+ \*\/\s*)?\/\/ vibeflow:fr/g)].map((m) => m.index);
+const principal = rang(/window\.VibeFlow = Object\.freeze\(/), ui00 = rang(/<script>\/\* ui\/00-vibeflow\.js \*\//);
+console.log(JSON.stringify({ blocs: fr.length, avantPrincipal: fr.length > 0 && principal > 0 && fr.every((i) => i < principal), avant00: fr.length > 0 && ui00 > 0 && fr.every((i) => i < ui00), marqueurRestant: /__UI_I18N__/.test(h) }));
+JS
+cat > "$AUX/t19.mjs" <<'JS'
+import fs from 'node:fs';
+import vm from 'node:vm';
+const [, , page, mode] = process.argv; // mode : essai (table d'essai posée par la suite, bloc 80 seul) | reelle (les trois blocs, table de production)
+const html = fs.readFileSync(page, 'utf8');
+const blocs = [...html.matchAll(/<script>(?:\/\* ui\/[\w.-]+ \*\/\s*)?\/\/ vibeflow:fr[\s\S]*?<\/script>/g)].map((m) => m[0].replace(/^<script>|<\/script>$/g, ''));
+const moteur = blocs.find((b) => /__vfFrTraduire\s*=/.test(b));
+const ESSAI = { Hello: 'Bonjour', '{} call': '{} appel|{} appels', 'Nothing stood out. This is a quick automatic check, not a full {} review.': "Rien de saillant. C'est un contrôle automatique rapide, pas une revue complète de {}.", Changed: 'Touché', 'Changed@pastille': 'Récent', lines: 'lignes' };
+function monde(tab, anglais, essai) {
+  const noop = () => {}; const el = () => ({ style: {}, textContent: '', appendChild: noop, setAttribute: noop, getAttribute: () => null, querySelectorAll: () => [], closest: () => null });
+  const ctx = { console, URLSearchParams, location: { search: anglais ? '?lang=en' : '' }, performance: { now: () => 0 }, NodeFilter: { SHOW_TEXT: 4 }, requestAnimationFrame: noop, MutationObserver: class { observe() {} }, document: { documentElement: {}, head: el(), body: el(), title: '', createElement: el, querySelector: () => el(), createTreeWalker: () => ({ nextNode: () => null }) } };
+  ctx.window = ctx; ctx.VF_COCKPIT = { meta: { vfTab: tab, kindColors: {} } }; vm.createContext(ctx);
+  if (essai) { ctx.__vfFrDict = { ...ESSAI }; vm.runInContext(moteur, ctx); } else for (const b of blocs) vm.runInContext(b, ctx);
+  return ctx;
+}
+const sur = (f) => { try { return f(); } catch (e) { return 'erreur:' + String(e.message).slice(0, 80); } };
+const T = (c) => (typeof c.__vfFrT === 'function' ? c.__vfFrT : null);
+const out = {};
+if (mode === 'essai') {
+  const fr = monde('code', false, true), en = monde('code', true, true), t = T(fr), e = T(en);
+  const A = "Nothing stood out. This is a quick automatic check, not a full {} review.";
+  out.fonction = typeof fr.__vfFrT;
+  out.cle = t ? sur(() => t('Hello')) : 'absent';
+  out.formes = t ? sur(() => [t('{} call', 1), t('{} call', 3)]) : 'absent';
+  out.liaison = t ? sur(() => [t(A, 'Anthropic'), t(A, 'le CLI')]) : 'absent';
+  out.contexte = t ? sur(() => [t('Changed@pastille'), t('Changed@autre')]) : 'absent';
+  out.pluriels = t ? sur(() => [t.pl(1, 'call'), t.pl(3, 'call'), t.mot(1, 'lines'), t.mot(3, 'lines')]) : 'absent';
+  out.k = t ? sur(() => t.k('1.3k')) : 'absent';
+  out.type = t ? sur(() => [t.type('Library'), t.type('Ma donnée')]) : 'absent';
+  out.constat = t ? sur(() => [t.constat('Readme and 7 more'), t.constat('Une phrase que personne ne connaît'), t.constat('src.js contains util.js')]) : 'absent';
+  out.absente = t ? sur(() => t('Un {} inconnu', 'x')) : 'absent';
+  out.anglais = e ? sur(() => [e('Hello'), e('{} call', 3), e('Changed@pastille'), e.pl(3, 'call'), e.pl(1, 'call'), e.mot(1, 'lines'), e.k('1.3k'), e.constat('Readme and 7 more'), e.type('Library'), typeof e.langue, e('Un {} inconnu', 'x')]) : 'absent';
+} else {
+  const code = monde('code', false, false), proj = monde('project', false, false), t = T(code), tp = T(proj);
+  out.reelle = t ? sur(() => [t('Fit to screen'), t('File'), tp('File'), t('Ma phrase de données'), code.__vfFrTraduire('Ma phrase de données'), t.constat('src.js contains util.js')]) : 'absent';
+}
+console.log(JSON.stringify(out));
+JS
+cat > "$AUX/fixture-sante.mjs" <<'JS'
+import fs from 'node:fs';
+const [, , src, dst] = process.argv; const html = fs.readFileSync(src, 'utf8'); const D = '<script>window.VF_COCKPIT = ';
+const a = html.indexOf(D), b = html.indexOf(';</script>', a); const g = JSON.parse(html.slice(a + D.length, b));
+// un constat dont le détail est une phrase que la reconnaissance actuelle change (« X contains … »), un titre qu'elle laisse intact, six localisations (la liste en coupe trois), puis un constat de contrôle ; données jetables
+g.health = { summary: { high: 1, medium: 1, low: 0 }, services: [], issues: [
+  { id: 'fixture:1', kind: 'fixture', severity: 'high', title: 'Anyone could change data through util.js', detail: 'src.js contains util.js', items: ['f:src/util.js'], notes: {}, fix: 'Security fix: ne rien afficher.',
+    locations: [{ file: 'src/a.js', line: 3 }, { file: 'src/b.js', line: 1 }, { file: 'src/c.js', line: 9 }, { file: 'src/d.js', line: 2 }, { file: 'src/e.js', line: 5 }, { file: 'src/f.js', line: 7 }] },
+  { id: 'fixture:2', kind: 'fixture', severity: 'medium', title: 'A file in src looks unused', detail: 'Nothing in the app imports or calls this file.', items: ['f:src/open.mjs'], notes: {}, fix: 'Cleanup : ne rien afficher.', locations: [] }] };
+fs.writeFileSync(dst, html.slice(0, a + D.length) + JSON.stringify(g).replace(/</g, '\\u003c') + html.slice(b));
+JS
+sites() { node "$AUX/sites.mjs" "$1" "$SCRIPTS" "$EXCL" 2>"$WORK/sites.err" || echo '{"fn":"erreur"}'; }
+PAGES="$SORTIE/index.html,$SORTIE/project.html"
+SITES="$(sites "$PAGES")"; echo "$SITES" > "$WORK/sites.json"
+assert_eq "F16.0 : inventaireSites est exportée par l'inventaire" "$(lire "$WORK/sites.json" 'j.fn')" "ok"
+assert_ge "F16.1 : clés de t relevées dans le rendu servi (au moins 200, jamais un vert à vide)" "$(lire "$WORK/sites.json" '(j.n || 0)')" 200
+assert_eq "F16.2 : toute clé de t, et tout texte du balisage statique, a une entrée de table ou une exclusion (la liste nomme celles qui manquent)" "$(lire "$WORK/sites.json" 'j.sansEntree || "calcul impossible : " + j.fn')" "[]"
+T16="$WORK/t16"; mkdir -p "$T16"; cp "$SORTIE/index.html" "$SORTIE/project.html" "$T16/"
+node -e 'const f=process.argv[1],fs=require("fs");fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace("</body>","<script>const m = t(\"Chaîne neuve sans entrée\");</script></body>"))' "$T16/index.html"
+SITES16="$(sites "$T16/index.html,$T16/project.html")"; echo "$SITES16" > "$WORK/sites16.json"
+assert_eq "F16.3 témoin : un t('…') neuf sans entrée est nommé, lui seul" "$(node -e 'const a=JSON.parse(require("fs").readFileSync(process.argv[1])),b=JSON.parse(require("fs").readFileSync(process.argv[2]));const s=new Set(a.sansEntree||[]);console.log(JSON.stringify((b.sansEntree||["calcul impossible"]).filter((x)=>!s.has(x))))' "$WORK/sites.json" "$WORK/sites16.json")" '["Chaîne neuve sans entrée"]'
+assert_eq "F17.1 : aucun littéral anglais libre, aucune clé non littérale, aucun t local qui masque le traducteur (hors exclusions motivées)" "$(lire "$WORK/sites.json" 'j.fn === "ok" ? [...j.libres.map((x) => "libre : " + x), ...j.nonLitterales.map((x) => "clé non littérale : " + x), ...j.ombres.map((x) => "ombre : " + x)] : "calcul impossible : " + j.fn')" "[]"
+T17="$WORK/t17"; mkdir -p "$T17"; cp "$SORTIE/index.html" "$SORTIE/project.html" "$T17/"
+node -e 'const f=process.argv[1],fs=require("fs");fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace("</body>","<script>const m = \"Pending approval from the review board\"; t(maVariableNeuve);</script></body>"))' "$T17/index.html"
+SITES17="$(sites "$T17/index.html,$T17/project.html")"; echo "$SITES17" > "$WORK/sites17.json"
+nouv() { node -e 'const a=JSON.parse(require("fs").readFileSync(process.argv[1])),b=JSON.parse(require("fs").readFileSync(process.argv[2]));const k=process.argv[3];const s=new Set(a[k]||[]);console.log(JSON.stringify((b[k]||["calcul impossible"]).filter((x)=>!s.has(x))))' "$WORK/sites.json" "$1" "$2"; }
+assert_eq "F17.2 témoin : un littéral anglais ajouté à une copie de la page est nommé, lui seul" "$(nouv "$WORK/sites17.json" libres)" '["Pending approval from the review board"]'
+assert_eq "F17.3 témoin : un t(variable) ajouté à une copie est nommé « clé non littérale »" "$(nouv "$WORK/sites17.json" nonLitterales)" '["maVariableNeuve"]'
+T17b="$WORK/t17b"; mkdir -p "$T17b"; cp "$SORTIE/index.html" "$SORTIE/project.html" "$T17b/"
+node -e 'const f=process.argv[1],fs=require("fs");fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace("</body>","<script>(() => { const t = (x) => x; return t; })();</script></body>"))' "$T17b/index.html"
+sites "$T17b/index.html,$T17b/project.html" > "$WORK/sites17b.json"
+assert_eq "F17.4 témoin : un t local qui masque le traducteur (ombre) est nommé, lui seul" "$(nouv "$WORK/sites17b.json" ombres)" '["const t ="]'
+node "$AUX/ordre.mjs" "$SORTIE/index.html" > "$WORK/ordre.json"
+assert_eq "F18.1 : les blocs vibeflow:fr (78, 79, 80) précèdent le script principal et ui/00-vibeflow.js dans la page assemblée" "$(lire "$WORK/ordre.json" '[j.blocs, j.avantPrincipal, j.avant00, j.marqueurRestant].join()')" "3,true,true,false"
+# F18.2 : un gabarit sans l'emplacement garde l'ancien ordre (copie du module, jamais une édition du module) ; jouée sur une copie du module (même copie que cockpit_module_copie)
+M18="$WORK/mod-f18"; mkdir -p "$M18"; ( cd "$SCRIPTS/.." && tar -cf - --exclude='scripts/tests' scripts skills ) | ( cd "$M18" && tar -xf - ); L18="$WORK/lab18"; mkdir -p "$L18"; ( cd "$LAB" && tar -cf - --exclude=.vibeflow . ) | ( cd "$L18" && tar -xf - )
+grep -v '<!--__UI_I18N__-->' "$M18/skills/cockpit-moteur/assets/viewer.html" > "$M18/viewer.sans" && mv "$M18/viewer.sans" "$M18/skills/cockpit-moteur/assets/viewer.html"
+node "$M18/scripts/vf-cockpit-build.mjs" "$L18" --quiet >/dev/null 2>&1; node "$AUX/ordre.mjs" "$L18/.vibeflow/cockpit/index.html" > "$WORK/ordre18.json"
+assert_eq "F18.2 : sans l'emplacement dans le gabarit, la page garde l'ancien ordre (blocs après le script principal, aucun marqueur laissé)" "$(lire "$WORK/ordre18.json" '[j.blocs, j.avantPrincipal, j.avant00, j.marqueurRestant].join()')" "3,false,false,false"
+node "$AUX/t19.mjs" "$SORTIE/index.html" essai > "$WORK/t19e.json" 2>"$WORK/t19.err" || echo '{}' > "$WORK/t19e.json"
+node "$AUX/t19.mjs" "$SORTIE/index.html" reelle > "$WORK/t19r.json" 2>>"$WORK/t19.err" || echo '{}' > "$WORK/t19r.json"
+assert_eq "F19.1 : __vfFrT est une fonction" "$(lire "$WORK/t19e.json" 'j.fonction')" "function"
+assert_eq "F19.2 : clé exacte (« Hello » : « Bonjour »)" "$(lire "$WORK/t19e.json" 'j.cle')" "Bonjour"
+assert_eq "F19.3 : variables et formes (« {} call » : 1 appel, 3 appels)" "$(lire "$WORK/t19e.json" 'j.formes')" '["1 appel","3 appels"]'
+assert_eq "F19.4 : élision et contraction de « de » devant la variable (d'Anthropic, du CLI)" "$(lire "$WORK/t19e.json" 'j.liaison')" '["Rien de saillant. C'"'"'est un contrôle automatique rapide, pas une revue complète d'"'"'Anthropic.","Rien de saillant. C'"'"'est un contrôle automatique rapide, pas une revue complète du CLI."]'
+assert_eq "F19.5 : @contexte (« Changed@pastille » : Récent) et repli sur la clé sans contexte (Touché)" "$(lire "$WORK/t19e.json" 'j.contexte')" '["Récent","Touché"]'
+assert_eq "F19.6 : t.pl et t.mot, singulier à 1" "$(lire "$WORK/t19e.json" 'j.pluriels')" '["1 appel","3 appels","ligne","lignes"]'
+assert_eq "F19.7 : t.k (« 1.3k » : « 1,3 k », espace insécable)" "$(lire "$WORK/t19e.json" 'String(j.k).replace(/\u00a0/g, "_")')" "1,3_k"
+assert_eq "F19.8 : t.type (« Library » : « Bibliothèque », une donnée inconnue : null)" "$(lire "$WORK/t19e.json" 'j.type')" '["Bibliothèque",null]'
+assert_eq "F19.9 : t.constat (forme rendue reconnue, phrase inconnue inchangée)" "$(lire "$WORK/t19e.json" 'j.constat')" '["Readme et 7 autres","Une phrase que personne ne connaît"]'
+assert_eq "F19.10 : une clé absente de la table rend la clé, variables remplies" "$(lire "$WORK/t19e.json" 'j.absente')" "Un x inconnu"
+assert_eq "F19.11 : sous ?lang=en, la clé remplie, aucune valeur de table lue, t.pl en anglais, t.mot, t.k, t.type et t.constat neutres" "$(lire "$WORK/t19e.json" 'j.anglais')" '["Hello","3 call","Changed","3 calls","1 call","lines","1.3k","Readme and 7 more",null,"undefined","Un x inconnu"]'
+assert_eq "F19.12 : sur la vraie table (« Fit to screen », File par onglet, une donnée, un constat reconnu)" "$(lire "$WORK/t19r.json" 'j.reelle')" '["Ajuster à l'"'"'écran","Fichier","Élément","Ma phrase de données",null,"src.js contient util.js"]'
+
 echo "[F3] témoin du détecteur : une chaîne anglaise inventée"
 T3="$WORK/t3"; cp -R "$SORTIE" "$T3"
 node -e 'const f=process.argv[1],fs=require("fs");let h=fs.readFileSync(f,"utf8");h=h.replace("</body>","<script>const m = \"Pending approval from the review board\";</script></body>");fs.writeFileSync(f,h)' "$T3/project.html"
@@ -244,7 +368,7 @@ else
   printf '#!/usr/bin/env bash\ncase "$1" in status) echo %s ;; orphans) echo %s ;; esac\n' "'{\"locks\":[]}'" "'{\"orphans\":[]}'" > "$WORK/home/.claude/scripts/driver-lock.sh"
   # lab jetable GSD : STATE.md en statut brut « ready_to_execute », jalon dont le nom commence par une voyelle
   LAB12="$WORK/lab12"; mkdir -p "$LAB12/src" "$LAB12/.planning/phases/01-socle"
-  printf 'export const u = () => 1;\n' > "$LAB12/src/util.js"
+  printf 'export const u = () => 1;\n' > "$LAB12/src/util.js"; printf 'import { u } from "./util.js";\nexport const ouvrir = u() + 2;\n' > "$LAB12/src/open.mjs" # 79-10 : un lien (open → util) pour les états « lien » du relevé
   printf '# Roadmap\n\n## Jalon Atelier\n\n- [ ] **Phase 1: Socle** - premier jet\n' > "$LAB12/.planning/ROADMAP.md"
   printf '<objective>Faire le socle</objective>\n' > "$LAB12/.planning/phases/01-socle/01-01-PLAN.md"
   printf -- '---\ngsd_state_version: 1.0\nmilestone: Atelier\nstatus: ready_to_execute\ncurrent_phase: 1\nlast_activity: 2026-11-04\n---\n\n# State\n' > "$LAB12/.planning/STATE.md"
@@ -263,6 +387,45 @@ else
   TEMOINS12='\b(and|of|the|at|top|up|here|calls?|steps?|show|changes|endpoints|uses|resolve|still|generated|names|again|worth|fixing|minor)\b'
   assert_eq "F12.3a : témoin — le texte visible relevé n'est pas vide (Code et Projet, plus de 500 caractères chacun)" "$(lire "$WORK/rendu12.json" 'j.code.corps.length > 500 && j.projet.corps.length > 500')" "true"
   assert_eq "F12.3 : le texte visible des onglets Code et Projet ne contient aucun mot témoin anglais" "$(lire "$WORK/rendu12.json" "[j.code.corps, j.projet.corps].join(' ').match(new RegExp('$TEMOINS12', 'gi')) || []")" "[]"
+  echo "[F20 à F23] sondes de la page dans Chrome (79-10) : aucun observateur, ?lang=en gardé, parité de rendu, constats de Santé"
+  ET="$SCRIPTS/tests/chrome-fr-etats.mjs"
+  assert_eq "F20.1 : le code de 80-vf-fr.js (commentaires exclus) ne construit aucun observateur de mutations" "$(sed -E 's#^[[:space:]]*//.*##' "$UI/80-vf-fr.js" | grep -c 'new MutationObserver')" "0"
+  REAL_HOME="$REAL_HOME" node "$ET" donnee "$CHROME" "file://$O12/index.html" > "$WORK/f20.json" 2>/dev/null
+  assert_eq "F20.2 : un « Health » posé dans le panneau (hors des anciens sélecteurs listés) reste « Health »" "$(lire "$WORK/f20.json" '(j.erreur || j.texte)')" "Health"
+  T20="$WORK/t20"; mkdir -p "$T20"; cp "$O12/index.html" "$T20/index.html"
+  node -e 'const f=process.argv[1],fs=require("fs");fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace("</body>","<script>new MutationObserver((ms) => { for (const m of ms) for (const n of m.addedNodes) if (n.nodeType === 1 && n.textContent === \"Health\") n.textContent = \"Santé\"; }).observe(document.body, { subtree: true, childList: true });</script></body>"))' "$T20/index.html"
+  REAL_HOME="$REAL_HOME" node "$ET" donnee "$CHROME" "file://$T20/index.html" > "$WORK/f20c.json" 2>/dev/null
+  assert_eq "F20.3 témoin : sur une copie portant un observateur générique de réécriture, la même sonde lit « Santé » (elle sait voir la réécriture)" "$(lire "$WORK/f20c.json" '(j.erreur || j.texte)')" "Santé"
+  REAL_HOME="$REAL_HOME" node "$ET" sondes "$CHROME" "file://$O12/index.html" > "$WORK/f21f.json" 2>/dev/null
+  REAL_HOME="$REAL_HOME" node "$ET" sondes "$CHROME" "file://$O12/index.html?lang=en" > "$WORK/f21e.json" 2>/dev/null
+  assert_eq "F21.1 : sondes en français (zoom, recherche vide, export et son title, Santé)" "$(lire "$WORK/f21f.json" '(j.erreur || [j.fit, /Aucun résultat/.test(j.vide), j.export, j.exportTitre, j.sante])')" '["Ajuster à l'"'"'écran (F)",true,"Exporter","Exporter une copie de cette carte à partager","Santé"]'
+  assert_eq "F21.2 : les mêmes sondes sous ?lang=en : les libellés sources" "$(lire "$WORK/f21e.json" '(j.erreur || [j.fit, /No matches/.test(j.vide), j.export, j.exportTitre, j.sante])')" '["Fit to screen (F)",true,"Export","Export a copy of this map to share","Health"]'
+  T21="$WORK/t21"; mkdir -p "$T21"; cp "$O12/index.html" "$T21/index.html"
+  node -e 'const f=process.argv[1],fs=require("fs");const l=fs.readFileSync(f,"utf8").split("\n");const i=l.findIndex((x)=>x.includes("// garde:lang-en"));if(i<0){console.log("ancre absente");process.exit(3)}const n=l[i].replace("=== \"en\"","=== \"zz\"").replace("=== '"'"'en'"'"'","=== '"'"'zz'"'"'");if(n===l[i]){console.log("ancre sans effet");process.exit(4)}l[i]=n;fs.writeFileSync(f,l.join("\n"))' "$T21/index.html" > "$WORK/f21m.txt" 2>&1; RC21=$?
+  REAL_HOME="$REAL_HOME" node "$ET" sondes "$CHROME" "file://$T21/index.html?lang=en" > "$WORK/f21m.json" 2>/dev/null
+  assert_eq "F21.3 témoin : avec la ligne de garde « // garde:lang-en » neutralisée, les sondes anglaises lisent du français (la mutation a eu lieu : $(cat "$WORK/f21m.txt"))" "$([ "$RC21" = 0 ] && lire "$WORK/f21m.json" '(j.erreur || j.fit)' || echo "mutation impossible : $(cat "$WORK/f21m.txt")")" "Ajuster à l'écran (F)"
+  # F22 : parité de rendu avec le relevé « avant » (hors CI : variables d'environnement) ; VF_FR_RELEVE écrit le relevé et ne compare pas
+  FSANTE="$WORK/sante-fixture.html"; node "$AUX/fixture-sante.mjs" "$O12/index.html" "$FSANTE"
+  if [ -n "${VF_FR_RELEVE:-}" ] || [ -n "${VF_FR_AVANT:-}" ]; then
+    REAL_HOME="$REAL_HOME" node "$ET" releve "$CHROME" "$O12/index.html" "$O12/project.html" "$FSANTE" > "$WORK/releve.json" 2>"$WORK/releve.err"
+    assert_eq "F22.0 : le relevé des états a eu lieu (aucune erreur nommée)" "$(lire "$WORK/releve.json" 'j.erreur || "aucune"')" "aucune"
+    if [ -n "${VF_FR_RELEVE:-}" ]; then cp "$WORK/releve.json" "$VF_FR_RELEVE"; echo "  (relevé des états écrit : $(node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1]));console.log(Object.values(j).reduce((n,e)=>n+Object.keys(e).length,0)+" états")' "$WORK/releve.json" 2>/dev/null))"
+    else assert_eq "F22 : le rendu de chaque état (Code, Projet, constats de Santé ; français et ?lang=en) égale le relevé d'avant, aux écarts admis nommés près" "$(node "$ET" comparer "$VF_FR_AVANT" "$WORK/releve.json" "${VF_FR_ADMIS:-}" 2>&1 | head -c 1500)" "[]"; fi
+  fi
+  # F23 (A43) : un constat de Santé de fixture s'affiche comme avant le plan ; valeurs recopiées du relevé « avant » (jamais calculées par le code éprouvé)
+  case "${VF_FR_F23_MUTANT:-}" in
+    retrait) F23P="$WORK/t23.html"; node -e 'const f=process.argv[1],o=process.argv[2],fs=require("fs");fs.writeFileSync(o,fs.readFileSync(f,"utf8").replace(/new MutationObserver\(/g,"new (class { observe() {} })(").replace(/SC\.on\?\.\(.(?:panel|render)., zones\);?/g,""))' "$FSANTE" "$F23P" ;; # retrait = les deux observateurs ET les deux écouteurs de rendu du moteur (l'observateur seul ne suffit pas : `panel` rappelle fix sur le panneau)
+    affichage) F23P="$WORK/t23.html"; node -e 'const f=process.argv[1],o=process.argv[2],fs=require("fs");fs.writeFileSync(o,fs.readFileSync(f,"utf8").replace(/t\.constat\(/g,"((x) => x)("))' "$FSANTE" "$F23P" ;;
+    *) F23P="$FSANTE" ;;
+  esac
+  REAL_HOME="$REAL_HOME" node "$ET" sante "$CHROME" "file://$F23P" > "$WORK/f23.json" 2>/dev/null
+  assert_eq "F23.1 : constat de Santé — le détail « X contains … » s'affiche « X contient … » (valeur du relevé avant)" "$(lire "$WORK/f23.json" '(j.erreur || j.liste[0].detail)')" "src.js contient util.js"
+  assert_eq "F23.2 : constat de Santé — le titre (phrase que le moteur ne reconnaît pas) reste tel quel, et le constat de contrôle aussi" "$(lire "$WORK/f23.json" '(j.erreur || [j.liste[0].titre, j.liste[1].titre, j.liste[1].detail])')" '["Anyone could change data through util.js","A file in src looks unused","Nothing in the app imports or calls this file."]'
+  assert_eq "F23.3 : constat de Santé — localisations coupées à trois, « +3 autres » (valeur du relevé avant)" "$(lire "$WORK/f23.json" '(j.erreur || j.liste[0].lieux)')" "src/a.js:3
+src/b.js
+src/c.js:9
++3 autres"
+  assert_eq "F23.4 : tableau « Montrer sur la carte » — titre et question tels que le relevé avant les montre (donnée du panneau, jamais réécrite : A43, AUDC-H4)" "$(lire "$WORK/f23.json" '(j.erreur || [j.tableau.titre, j.tableau.question])')" '["Anyone could change data through util.js","src.js contains util.js"]'
   vf_hyg_stop "$SRV12"; vf_hyg_assert
 fi
 
