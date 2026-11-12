@@ -16,6 +16,12 @@ const OUTIL = `window.__cn = {
     const g = (c) => (c.x + c.width / 2) * k + x, par = (a, b) => (a.x - b.x), gau = cs.slice().sort(par)[0], dro = cs.slice().sort((a, b) => par(b, a))[0];
     const dx = m === 'coupeG' ? F.x - g(gau) : m === 'coupeD' ? F.x + F.w - g(dro) : F.x + F.w + 40 - Math.min(...cs.map((c) => c.x * k + x));
     VF_CANEVAS.deplacer({ x: dx, y: 0 }); },
+  procheDroite() { const S = VibeFlow.state, F = VF_CANEVAS.champDeLecture(), { k, x } = S.t; let b = null;
+    for (const c of S.layout.children) { const l = c.x * k + x; if (l >= F.x + F.w && (!b || l < b.l)) b = { id: c.id, l }; }
+    return b && b.id; },
+  dedans(id) { const S = VibeFlow.state, F = VF_CANEVAS.champDeLecture(), { k, x, y } = S.t, c = S.layout.children.find((q) => q.id === id);
+    if (!c) return false; const l = c.x * k + x, t = c.y * k + y;
+    return l >= F.x && t >= F.y && l + c.width * k <= F.x + F.w && t + c.height * k <= F.y + F.h; },
   actives() { return document.getAnimations().filter((a) => a.playState === 'running' || a.playState === 'pending').length; } }`;
 const KEYS = { Tab: 9, Enter: 13, Escape: 27 };
 
@@ -63,9 +69,11 @@ await executer(chrome, async (s) => {
         const [hors, reperes] = await rep(); o.cn1.etats.push({ m, hors, reperes });
       }
       const av = await lire('JSON.stringify({ k: VibeFlow.state.t.k, sel: VibeFlow.state.selected, hors: __cn.hors() })');
+      const proche = await s.ev('__cn.procheDroite()');
       await clicSur('button.vf-repere[data-bord=droite]');
       const [hors] = await rep();
-      const ap = await lire(`JSON.stringify({ k: VibeFlow.state.t.k, sel: VibeFlow.state.selected, hors: ${JSON.stringify(hors)} })`);
+      const ap = await lire(`JSON.stringify({ k: VibeFlow.state.t.k, sel: VibeFlow.state.selected, hors: ${JSON.stringify(hors)},
+        dedans: __cn.dedans(${JSON.stringify(proche)}) })`);
       o.cn1.clic = { avant: av, apres: ap };
       await s.ev('__cn.place("toutDroite")'); await rep();
       await s.ev("(() => { const g = VF_CANEVAS.carteItinerante(); VibeFlow.state.chipEls.get(g).focus(); })()");

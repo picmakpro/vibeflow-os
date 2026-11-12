@@ -74,9 +74,9 @@ OK1='j.cn1.etats.every((e) => ["gauche", "droite", "haut", "bas"].every((b) => (
 assert_eq "CN1.1 — niveau de 70 cartes : un repère au moins ; par bord, ajusté puis coupé puis écarté, compte = cartes ENTIÈREMENT hors champ" \
   "$(E "[j.cn1.etats.length === 4, j.cn1.etats.some((e) => e.reperes.length > 0),
     j.cn1.etats.some((e) => Object.values(e.hors).some((n) => n > 0)), $OK1]")" "[true,true,true,true]"
-assert_eq "CN1.2 — clic sur le repère droit : le compte diminue, le zoom et la sélection restent" \
+assert_eq "CN1.2 — clic sur le repère droit : la carte la plus proche est dans le champ, le compte diminue, zoom et sélection restent" \
   "$(E "(() => { const c = j.cn1.clic, a = c.avant, p = c.apres; if (!a || !p) return 'sans clic';
-    return [a.hors.droite > 0, p.hors.droite < a.hors.droite, p.k === a.k, p.sel === a.sel]; })()")" "[true,true,true,true]"
+    return [a.hors.droite > 0, p.hors.droite < a.hors.droite, p.k === a.k, p.sel === a.sel, p.dedans]; })()")" "[true,true,true,true,true]"
 NOM='/^\d+ cartes? hors champ (à gauche|à droite|en haut|en bas)\. Aller à la plus proche\.$/'
 assert_eq "CN1.3 — Tab depuis la carte itinérante : un repère (button), nom « N cartes hors champ à <bord>. Aller à la plus proche. »" \
   "$(E "[j.cn1.tab.repere, $NOM.test(j.cn1.tab.nom || '')]")" "[true,true]"
