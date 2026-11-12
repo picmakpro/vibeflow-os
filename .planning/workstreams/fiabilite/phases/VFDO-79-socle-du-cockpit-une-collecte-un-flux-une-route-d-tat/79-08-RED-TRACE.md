@@ -89,3 +89,9 @@ Déviation déclarée : la validation complète du fichier (`validerIndex`) et l
 
 - Rouge avant correctif : `bash plugin/cockpit/scripts/tests/test-cockpit-index.sh` ; I2.8e (appel sans `arbreDe` sur un transcript dont le cwd est hors du lab) : attendu `["TypeError",0]`, obtenu `["sans-erreur",1]` (une voie créée pour un transcript hors du lab). Reste de la suite : 109 PASS.
 - Vert après correctif : I2.8e vert (`TypeError`, 0 voie) ; mutant M-ARBREDE (`garde:index-arbrede` : repli sur un lab par défaut) : le run ne plante pas, seul I2.8e diffère de la sortie normale. Suite entière 111 PASS / 0 FAIL ; `test-cockpit-forme-claude.sh` 76 PASS (seules deux suites appellent `construire`).
+
+## Correction après bissection — D8.9 de test-cockpit-lecture-fil.sh
+
+- Rouge avant (depuis 209c50aa) : D8.9 attendu `cockpit-equipe@1:true,cockpit-git@1:true,cockpit-signal@1:true,cockpit-who@2:true`, obtenu la même liste avec `cockpit-index@1:true` en plus (15 réussis, 1 échoué).
+- Vert après : D8.9 réarmé à cinq schémas (17 réussis, 0 échoué). Mutant D8.9b (copie jetable du contrat où `cockpit-index@1` n'interdit plus `fil`) : le détecteur rend `cockpit-index@1:false`, donc D8.9 rougirait pour la bonne raison.
+- Règle 9 : suites qui lisent `vf-cockpit-interface.json`, rejouées seules : avancement, equipe, git-details, git-env, git, routes, signal, vie, who, assemblage, serveur, forme-claude, index, lecture-fil : 0 échec. `test-cockpit-git-config-depot.sh` rend 1 (`$3: unbound variable` ligne 725, D10.x) : fichier modifié non commité par un autre plan du même arbre, hors de mes chemins, signalé et non corrigé.
