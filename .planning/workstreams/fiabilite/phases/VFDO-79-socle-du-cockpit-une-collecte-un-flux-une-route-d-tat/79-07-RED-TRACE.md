@@ -178,3 +178,18 @@ R2.2d : toute ligne d'argv de sous-commande `config` du journal est exactement `
 git-config-depot 126/0, git-env 135/0, git-signature 47/0, git-details 136/0 (X6.2 rouge sous charge dans la série, verte rejouée seule), terminal-lanceur 111/0, git 118/0, who 157/0, vendor 87/0, confinement 66/0, avancement 69/0, lancer-cibles 51/0, path-enfants 37/0, signal 76/0. Liste relevée par grep des suites qui nomment le lanceur, le module de durcissement, `PILOTES_NOMMES` ou `vf-cockpit-paths.mjs` (douze) plus git-details, who, git-signature ; aucune ancre ni aucun mutant ne vise un texte déplacé (aucun texte n'a bougé : deux motifs et une fonction réécrits sur place).
 
 Rouges rapportés, non imputables à ce mandat : test-cockpit-assemblage.sh AM4.15a, AM4.16, M-PURGE-LARGE.0, M-ORDRE.0 (mêmes quatre rouges sur un instantané de la tête avant ce mandat : l'assemblage du module est en cours de refonte par un autre plan du même arbre) ; test-cockpit-securite.sh FB3.5 (délai, charge) et AM4.1 à AM4.4, M-TERM.0 (même surface d'assemblage).
+
+## Correction ciblée n°2 — git absent rendu « délai » (régression de la tâche 5)
+
+Classe : quand le binaire git est introuvable, la lecture des pilotes échoue par absence ; la liste est non fiable ; le refus fermé rendait `absent:false, delai:true` au lieu de `absent:true, delai:false`. Rouge sur le code présent : H5.1b de test-cockpit-git-entete.sh (attendu `false|false|false|0`, obtenu `true|true|true|0`), rejoué sur un instantané de la tête avant le correctif : FAIL ; sonde du lanceur, PATH sans git : `absent=false delai=true` pour lancerGit et lancerGitAsync (attendu `true false`).
+
+Correctif : `lirePilotes` porte `absent` (ENOENT au lancement du binaire), les deux refus le propagent (`absent: p.absent, delai: !p.fiable && !p.absent`). Le lancement du binaire reste décidé avant tout autre : après une absence rien d'autre n'est lancé.
+
+| Identifiant | Attendu | Obtenu |
+|---|---|---|
+| D10.1 (PATH sans git, CI comprise) | `true,false,true` pour les deux lanceurs | vert après correctif ; rouge avant (sonde ci-dessus) |
+| D10.2 (git présent) | `false,false,false` | vert |
+| D10.3 (clé listée non comprise : autre échec de lecture) | `false,true,true` : refus fermé « délai » | vert |
+| M-ABSENT (propagation retirée aux deux endroits) | D10.1 `false,true,true`, D10.2 inchangé | `false,true,true\|false,true,true\|false,false,false\|false,false,false` |
+
+H5.1b : vert après correctif (git-entete 136/0). H7.5b : jouée seule trois fois : tête avant correctif (instantané) PASS, tête avec correctif PASS, base da64eb8c PASS ; rouge non reproduit, il ne dépend pas de 79-07 sur ces mesures (seuil de passage sur deux rangées, sensible à la charge de la machine) ; aucun seuil n'a bougé, aucune bissection possible sans rouge à bisser. Suites jouées seules après correctif : git-config-depot 131/0, git-entete 136/0, git-signature 47/0, git-details 136/0, terminal-lanceur 111/0, git 118/0, who 157/0, confinement 111/0.

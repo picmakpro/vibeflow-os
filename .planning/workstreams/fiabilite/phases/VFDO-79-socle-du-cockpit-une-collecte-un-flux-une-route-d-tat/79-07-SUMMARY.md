@@ -61,3 +61,7 @@ Constat haut T-79-705 : la classe « pilote de nom vide » (filtre, fusion, diff
 Commits `(79-07)` : e4280349 amendement daté · f4485088 correctif, D8, D9, G19.5, M-RETOUR-G · a34b914e R2.2d, R2.2e.
 
 Suites jouées seules : git-config-depot 126/0, git-env 135/0, git-signature 47/0, git-details 136/0 (X6.2 verte rejouée seule), terminal-lanceur 111/0, git 118/0, who 157/0, vendor 87/0, confinement 66/0, avancement 69/0, lancer-cibles 51/0, path-enfants 37/0, signal 76/0. Rouges rapportés, non imputables : assemblage AM4.15a, AM4.16, M-PURGE-LARGE.0, M-ORDRE.0 (identiques sur un instantané de la tête avant le mandat) ; securite FB3.5, AM4.1 à AM4.4, M-TERM.0 (surface d'assemblage d'un autre plan).
+
+## Correction ciblée n°2 (2026-11-12) — git absent
+
+Régression de la tâche 5 : git introuvable rendait un délai au lieu d'une absence (H5.1b rouge à la tête). `absent` est propagé de la lecture des pilotes au refus, le refus fermé tient pour tout autre échec. D10.1 à D10.3 et M-ABSENT dans test-cockpit-git-config-depot.sh (le témoin tourne en CI Linux : PATH du processus de la sonde sans git). H7.5b non reproduit (PASS à la tête avant et après correctif, PASS à la base) : rien corrigé. Suites jouées seules : git-config-depot 131/0, git-entete 136/0, git-signature 47/0, git-details 136/0, terminal-lanceur 111/0, git 118/0, who 157/0, confinement 111/0. test-cockpit-git-env.sh non touchée.
