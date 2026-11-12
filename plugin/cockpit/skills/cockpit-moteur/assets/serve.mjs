@@ -38,6 +38,8 @@ const depuisModule = (f) => import(pathToFileURL(path.join(scriptsDir, f)).href)
 const MOD = await depuisModule('vf-cockpit-module.mjs');
 try { MOD.moduleAdmis(root, scriptsDir, moteurDir); } catch (e) { refus(e.message); } // défense en profondeur : jamais de code pris sous la sortie ni sous .vibeflow/
 if (process.env.VF_COCKPIT_SCRIPTS_DIR === undefined) process.env.VF_COCKPIT_SCRIPTS_DIR = scriptsDir; if (process.env.VF_COCKPIT_ENGINE_DIR === undefined) process.env.VF_COCKPIT_ENGINE_DIR = moteurDir; // posées quand elles manquent (jamais un repli sur la sortie) ; une valeur passée, même vide, est respectée : l'agent est alors indisponible (fermé par défaut, Q13.3)
+// 79-06 F2 : un dossier de scripts ou de moteur passé par l'environnement, différent de ceux du module et situé DANS le lab servi, est refusé (le lab ne désigne jamais le code qui le sert) ; les autres valeurs gardent leur effet
+for (const [k, d] of [['VF_COCKPIT_SCRIPTS_DIR', scriptsDir], ['VF_COCKPIT_ENGINE_DIR', moteurDir]]) { let r = null; try { r = process.env[k] ? fs.realpathSync(process.env[k]) : null; } catch {} if (r && r !== fs.realpathSync(d) && (r === root || r.startsWith(root + path.sep))) refus(`${k} désigne un dossier du lab : refus (le code qui sert le lab vient du module).`); }
 process.env.PATH = (await depuisModule('vf-cockpit-env.mjs')).assainirPath(process.env.PATH, root); // vibeflow P25 : jamais d'outil du lab (H-1) ; ce processus seul, pas le shell
 const opt = (name, dflt) => { const i = argv.indexOf('--' + name); return i < 0 ? dflt : argv[i + 1]; };
 const has = (name) => argv.includes('--' + name);
@@ -49,7 +51,9 @@ const readState = () => { try { return JSON.parse(fs.readFileSync(stateFile, 'ut
 if (has('stop')) {
   const s = readState();
   let stopped = false;
-  if (Number.isInteger(s?.pid) && s.pid > 1) { try { process.kill(s.pid); stopped = true; } catch {} } // vibeflow P18 : pid entier > 1 seulement (le fichier vient du lab)
+  // vibeflow P18 : pid entier > 1 seulement (le fichier vient du lab) ; 79-06 F3 : et seulement s'il est CE serveur (ce serve.mjs du module ET --sortie=<ce dossier>), comme le lanceur (estNotre)
+  const identite = (pid) => { if (pid === process.pid) return false; if (process.platform === 'win32') return true; const ps = ['/bin/ps', '/usr/bin/ps'].find((f) => fs.existsSync(f)); if (!ps) return false; try { const c = ` ${execFileSync(ps, ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trimEnd()} `; return c.includes(` ${path.join(code, 'serve.mjs')} `) && c.endsWith(` --sortie=${here} `); } catch { return false; } };
+  if (Number.isInteger(s?.pid) && s.pid > 1) { let vit = true; try { process.kill(s.pid, 0); } catch { vit = false; } if (vit && !identite(s.pid)) { console.error(`PID ${s.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté.`); process.exit(5); } if (vit) { try { process.kill(s.pid); stopped = true; } catch {} } }
   try { fs.unlinkSync(stateFile); } catch {}
   console.log(stopped ? `Stopped the map server (${s.url}).` : 'The map server was not running.');
   process.exit(0);

@@ -362,6 +362,42 @@ assert_eq "M-CONTRAT — le serveur relit le contrat dans la sortie : la copie e
 cockpit_module_muter mouvert vf-cockpit-server.mjs 's#const porteInterdit = (o) => !INTERDITS.length ||#const porteInterdit = (o) => INTERDITS.length \&\&#'; MO="$COCKPIT_MODULE"; unset COCKPIT_MODULE
 assert_eq "M-CONTRAT-OUVERT — contrat illisible -> flux ouvert : la copie est valide, AM4.6 rougit SEUL (serveur vivant, hello émis) et AM4.5 reste vert (hello=1)" "$(node --check "$MO/scripts/vf-cockpit-server.mjs" 2> /dev/null && echo valide || echo invalide) | $(am46_sur "$MO") | $(am45_sur "$MO")" "valide | vivant hello=1 | vivant hello=1"
 
+# ---- AM6.F2 / AM6.F3 (79-06, S3b, audit au06a : classes T-79-601 et T-79-603) : serve.mjs lancé directement ----
+# F2 : un dossier de scripts ou de moteur DANS le lab, passé par l'environnement, est refusé ; une valeur hors du lab garde son effet (les suites qui épinglent un dossier de test).
+# F3 : --stop ne signale le PID de server.json que s'il est CE serveur (serve.mjs du module ET --sortie= de ce dossier) ; un PID étranger n'est jamais signalé.
+f2_sur() { # <racine du module> : « rcScripts rcMoteur rcHors rcSans » de `serve.mjs --stop` sous quatre environnements
+  local L="$WORK/lab-f2"; am4_lab "$L"; local S="$L/.vibeflow/cockpit" A="$1/skills/cockpit-moteur/assets/serve.mjs" a b c d
+  mkdir -p "$L/scripts-lab" "$WORK/hors-lab-f2"
+  VF_COCKPIT_SCRIPTS_DIR="$L/scripts-lab" node "$A" --stop --sortie="$S" > "$WORK/f2a.out" 2>&1; a=$?
+  VF_COCKPIT_ENGINE_DIR="$L/scripts-lab" node "$A" --stop --sortie="$S" > "$WORK/f2b.out" 2>&1; b=$?
+  VF_COCKPIT_SCRIPTS_DIR="$WORK/hors-lab-f2" node "$A" --stop --sortie="$S" > "$WORK/f2c.out" 2>&1; c=$?
+  node "$A" --stop --sortie="$S" > "$WORK/f2d.out" 2>&1; d=$?
+  echo "$a $b $c $d"
+}
+f3_sur() { # <racine du module> : « rc vivant|tué » de `serve.mjs --stop` quand server.json désigne un processus étranger
+  local L="$WORK/lab-f3"; am4_lab "$L"; local S="$L/.vibeflow/cockpit" A="$1/skills/cockpit-moteur/assets/serve.mjs" P rc v
+  sleep 300 & P=$!
+  mkdir -p "$S/.cache"; printf '{"pid":%s,"url":"http://127.0.0.1:1/"}\n' "$P" > "$S/.cache/server.json"
+  node "$A" --stop --sortie="$S" > "$WORK/f3.out" 2>&1; rc=$?
+  kill -0 "$P" 2> /dev/null && v=vivant || v=tué
+  kill "$P" 2> /dev/null; wait "$P" 2> /dev/null
+  echo "rc=$rc $v"
+}
+F23M="$(cockpit_module_copie)"
+assert_eq "AM6.F2 — dossier de scripts du lab : refus (1) ; dossier de moteur du lab : refus (1) ; dossier hors du lab : sans effet (0) ; aucune variable : 0" "$(f2_sur "$F23M")" "1 1 0 0"
+assert_has "AM6.F2-message — le refus est en français et nomme la variable" "$(cat "$WORK/f2a.out")" "VF_COCKPIT_SCRIPTS_DIR désigne un dossier du lab"
+assert_eq "AM6.F3 — server.json désigne un processus étranger : refus (5), le processus n'est pas signalé" "$(f3_sur "$F23M")" "rc=5 vivant"
+assert_has "AM6.F3-message — le refus dit que rien n'a été arrêté" "$(cat "$WORK/f3.out")" "rien n'a été arrêté"
+L3P="$WORK/lab-f3p"; am4_lab "$L3P"; COCKPIT_MODULE="$F23M" cockpit_lancer "$L3P"; P3P="$VF_PID"
+node "$F23M/skills/cockpit-moteur/assets/serve.mjs" --stop --sortie="$L3P/.vibeflow/cockpit" > "$WORK/f3p.out" 2>&1; RC3P=$?
+attendre 5 bash -c "! kill -0 $P3P 2> /dev/null"; kill -0 "$P3P" 2> /dev/null && V3P=vivant || V3P=arrêté
+assert_eq "AM6.F3-témoin — le vrai serveur de ce dossier est reconnu et arrêté (rc 0, server.json retiré)" "rc=$RC3P $V3P $([ -e "$L3P/.vibeflow/cockpit/.cache/server.json" ] && echo état-resté || echo état-retiré)" "rc=0 arrêté état-retiré"
+cockpit_arreter
+cockpit_module_muter mf2 serve.mjs '/^for (const \[k, d\] of \[\[.VF_COCKPIT_SCRIPTS_DIR/d'; MF2="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-F2 — la ligne de refus retirée (une seule) : la copie est valide, AM6.F2 rougit (les deux dossiers du lab sont acceptés : 0 0 0 0)" "$(node --check "$MF2/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f2_sur "$MF2")" "valide 0 0 0 0"
+cockpit_module_muter mf3 serve.mjs 's#if (vit && !identite(s.pid))#if (false)#'; MF3="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-F3 — le contrôle d'identité neutralisé (une seule ligne) : la copie est valide, AM6.F3 rougit (le processus étranger est signalé : tué) et AM6.F2 reste vert" "$(node --check "$MF3/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f3_sur "$MF3") f2=$(f2_sur "$MF3")" "valide rc=0 tué f2=1 1 0 0"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
