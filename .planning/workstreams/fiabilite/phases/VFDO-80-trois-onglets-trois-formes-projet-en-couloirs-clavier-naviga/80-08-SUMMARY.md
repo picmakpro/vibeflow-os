@@ -48,3 +48,15 @@ key-files:
 - Idiome A51, `cockpit_module_copie`, `socle-serveur.sh` : non appliqués (pas dans la base). VENDORED.txt : ligne `AJOUT assets/ui/42-vf-panneau-retour.js` après `41-vf-projet-vue.js`.
 - PR2.9 : la branche cherche, dans `section.vf-projet`, un `[data-id^="n:ph-"]` qui n'est pas `.vp-carte` (sélecteur à ajuster à la liste de 80-07).
 - Ligne de CHANGELOG pour 80-18 : « cockpit : le panneau de Projet a un seul Retour, qui dit où il ramène (pile de 32 sélections, nœuds et panneaux sur mesure) ».
+
+## Correction ciblée du 2026-11-12 (revue de deux juges frais, demandée par le manager)
+- Majeur corrigé : Entrée et Espace sur le bouton le pressent sans lancer l'Entrée globale du moteur (qui plongeait dans la sélection), actif comme désactivé (PR2.15a à d, M-ENTREE).
+  Après Retour au clavier, le focus va à la carte rouverte (reveal du moteur), jamais sur body ; sur le bouton désactivé il reste sur le bouton.
+- `retour()` sur pile vide : rien ne bouge, bouton non reconstruit, focus gardé (PR2.16, M-VIDE) ; le bouton reposé reprend le focus qu'avait l'ancien.
+- PR2.2 aligné sur le plan : l'entrée défaillante est retirée, le bouton passe à la suivante SANS la rouvrir (ro=["C"], « Retour : B », taille 2). Amendement daté dans le PLAN.
+- Témoins des mutants survivants : PR2.11 (M-DEHORS), PR2.12 (M-NULL), PR2.14 (M-COUPE, titre de 43 points de code). `font-weight: 500` ajouté (80-UI-SPEC l.298).
+- PR2.7 mesure le fond rendu par les pixels de la capture du bouton : 4,62:1 en sombre (fond 24,24,24), 5,69:1 en clair (fond 254,254,254), 13 px / 500.
+- PR2.9 tourne pour de vrai (41-vf-projet-liste.js est dans l'arbre) : sélecteur `section.vf-projet .vp-ligne[data-id^="n:ph-"]`, panneau sur la phase de la rangée, cas Entrée : PASS.
+  Les pilotes chargent `project.html?vue=couloirs` (le défaut à ≤ 700 px est devenu la liste, 80-07) ; PR2.5 rouvre le panneau après `p` (l'état du panneau est mémorisé d'une page à l'autre).
+- Suite : 41 PASS / 0 FAIL, neuf mutants. Captures : retour-desactive-sombre, retour-desactive-clair, retour-1440-focus-clavier-clair (+ les trois d'avant), dossier png du scratchpad de 80-08.
+- Non-régression : accessibilite 35/0, couloirs 57/0 ; vendor rouge deux fois sur des cas différents (V6.1 puis V4), fichiers de 80-05/06/07 en cours d'écriture dans l'arbre, mes fichiers passent le gabarit.
