@@ -103,3 +103,33 @@ Réponse de la session principale, rendue le 2026-11-12 à 01 h 58 (heure lue), 
 Contrôles de la session principale avant sa réponse : le document relu en entier ; les 46 relevés bruts recomptés depuis les flux (outils tentés, refus du résultat final, mode annoncé à l'initialisation), tous concordants avec le tableau ; effets de bord revérifiés dans cinq bacs à sable (B1, B3 et B1 en V4b sans fichier créé ; B1 en V4w avec fichier créé, le banc sait voir un non-refus ; B2a avec une ligne d'appel) ; OK-MESURE rejoué vert ; les commits de S1 ne touchent aucun fichier de production.
 
 Bornes pour S2 : (1) l'alphabet de la tâche 3 suit le document de mesure ; (2) la variante « dossier avec espace admis par la forme guillemetée » n'est pas faite dans ce plan : décision de produit portée à Samuel par la session principale ; refus fermé, dit en clair à l'utilisateur.
+
+## Tâche 3 (S2) — témoins de l'agent, rouges sur la base
+
+Base : `4f9b3a6c` (branche de la phase, tâche 3 non commencée ; la suite des questions est écrite d'abord, la production n'a pas bougé). Suite jouée seule, serveur lancé comme aujourd'hui : 108 PASS / 22 FAIL. Les 22 rouges sont tous des témoins de cette tâche, plus Q11.2 (voir plus bas).
+
+Écarts de forme, dits ici : (1) la suite porte déjà un paragraphe `Q12` (« ce qui reste » sans jalon courant) : le témoin « dossier du module refusé » du plan s'appelle donc `Q13` (Q13.1 à Q13.4). (2) Q9.1 à Q9.3 sont réécrits (le script de requête du Projet est lancé par son chemin dans le module) et non retirés ; Q9.6 est ajouté (graph.json lien vers un fichier hors du lab) en plus de Q9.4 et Q9.5 du plan. (3) `demarrer` fournit désormais `VF_COCKPIT_ENGINE_DIR` et `VF_COCKPIT_SCRIPTS_DIR` au serveur (le serveur de cette tâche tourne encore depuis la sortie et lit le dossier de scripts du module dans l'environnement) ; le reste du lancement est inchangé à cette étape.
+
+| id | assertion (libellé court) | attendu | obtenu sur la base | rouge parce que |
+|---|---|---|---|---|
+| Q2.2 | l'argv du faux `claude` contient la combinaison de la mesure, `<module>` remplacé par le dossier du module calculé par la suite | `true` | `false` | la constante porte des règles relatives à la sortie |
+| Q3.2 | même contrôle, onglet Code | `true` | `false` | idem |
+| Q2.4 | tout `Bash(` de l'argv désigne l'un des deux scripts du module (forme exacte), aucune règle relative | `true` | `false` | règles `Bash(node .vibeflow/cockpit/...)` |
+| Q2.7 | la consigne Projet nomme le script de requête du module, sans jeton ni chemin relatif | `true` | `false` | la consigne donne `node .vibeflow/cockpit/vf-cockpit-query.mjs` |
+| Q3.4 | la consigne de l'onglet Code nomme `query-cli.mjs` du module, sans jeton ni chemin relatif | `true` | `false` | la consigne donne la forme amont relative |
+| Q13.1, Q13.3 | dossier de module refusé (espace) ou absent : le faux `claude` n'est pas appelé | `0` | `1` | aucun refus : l'agent est lancé |
+| Q13.2, Q13.4 | l'échec est en français et nomme le module | `oui` | (aucun événement d'échec) | aucun refus |
+| Q9.1, Q9.2 | `vf-cockpit-query.mjs` lancé par son chemin dans le module, cwd = lab : `overview`, `status done` | `0true` | `1` | le script lit `project.html` et `query.mjs` à côté de lui et plante hors de la sortie |
+| Q9.3 | commande inconnue : exit 1 ET la liste des commandes sur la sortie standard | `1 1` | `1 0` | exit 1 par plantage, pas par refus (la liste manque) |
+| Q9.4 | `query-cli.mjs` du moteur du module : `overview` (clés `project`, `counts`) et `find` | `0true 1` | `1 0` | le script n'est pas autonome (cœur concaténé, `graph.json` lu à côté de lui) |
+| Q9.5 | `graph.json` qui ressemble à du code : lu comme donnée (exit 1, clé `error`, aucun fichier PWNED) | `1 true 0` | `1  0` | plantage sans JSON d'erreur |
+| Q9.6 | `graph.json` lien vers un fichier hors du lab : refusé, contenu jamais rendu | `1 true 0` | `1  0` | idem |
+| Q11.5 | `argsAgent(dossier du module)` : aucun jeton, deux règles Bash au chemin attendu | `ok` | `regle:Bash(node .vibeflow/cockpit/query.mjs:*)\|Bash(node .vibeflow/cockpit/vf-cockpit-query.mjs:*)` | règles relatives, `dossierModule` ignoré |
+| Q11.6 | un dossier admis puis dix refus (relatif, espace, parenthèses, virgule, égal, deux-points, étoile, jeton, vide, absent) | `admis` puis 10 `refus` | 11 `admis` | aucun refus de dossier |
+| Q11.7.0 | ancres des mutants présentes une fois | `1\|1` | `0\|` | le code visé n'existe pas encore |
+| Q11.7.1 | témoin : la copie non mutée passe Q11.5 | `ok` | `regle:…` | idem Q11.5 |
+| Q11.7.2, Q11.7.3 | mutant « jeton non substitué » (verdict `jeton`), mutant « mauvais dossier » (verdict `regle:`), copie changée | `change jeton`, `change regle:` | `identique-ou-vide …` | ancre absente : rien à muter (un mutant doit pouvoir rougir pour la bonne raison, avant de prouver quoi que ce soit) |
+
+Rouge préexistant, de cause nouvelle : `Q11.2` (constante contre mesure). Depuis le commit de la mesure du confinement (79), `mesure_de` choisit `79-MESURE-claude-p.md` (plus grand numéro de phase), dont la combinaison porte le gabarit `<module>` ; la constante de la base porte encore la forme de la phase 67. Attendu `identique`, obtenu `different` : il verdit avec la constante recopiée de la mesure (tâche 3, étape 3). Q11.1, Q11.3, Q11.4 sont verts sur la base (Q11.3 : la comparaison contre la liste amputée signale bien l'écart).
+
+Témoins verts d'emblée de cette tâche (négatifs, ils ne peuvent rougir que par leurs mutants) : Q13 n'en a pas ; Q9.1 à Q9.3 sont rouges ; aucun vert à vide n'est ajouté.
