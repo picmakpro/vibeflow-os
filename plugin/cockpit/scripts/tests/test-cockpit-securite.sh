@@ -242,9 +242,12 @@ assert_eq "O1.2 — le chemin du cd (secret-dir, /x, src) ne sort dans aucune de
 # Propriété (sur chaque sortie) : le marqueur n'apparaît QUE s'il a été placé dans le programme ou le premier argument ET que ce mot entier est simple (liste blanche écrite ici indépendamment du code),
 # sans « - » initial, et pour l'argument sans « = » — la limite acceptée. Graine fixe, affichée ; en échec : commande, sortie, graine. Témoin positif : le marqueur sort bien au moins une fois.
 cat > "$AUX/gen.mjs" <<'JS'
-// gen.mjs <scripts> <lab> <home> <graine> <n> : sort {n, fuites:[{cmd,out,slot,mot}], legit, ms} ; `commandeAffichee` (la fonction même que revealDoing applique) sur les n commandes, et le chemin disque complet sur 1 commande sur 100
-import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import path from 'node:path';
-const [, , scripts, lab, home, seedS, nS] = process.argv; const N = Number(nS);
+// gen.mjs <scripts> <lab> <home> <graine> <n> [sans-disque] : sort {n, fuites:[{cmd,out,slot,mot}], legit, ms, msCmd, disque:{n, ms, lancements}} ; `commandeAffichee` (la fonction même que revealDoing applique) sur les n commandes,
+// et le chemin disque complet sur 1 commande sur 100 (absent avec « sans-disque »). FB3.5 (79-06) : `ms` ne compte PAS le chemin disque (qui lance des processus, donc dépend de la charge) ; `msCmd` est le temps de `commandeAffichee` seul ;
+// le temps et le nombre de lancements du chemin disque sont rendus à part (`disque`), sans verdict.
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import path from 'node:path'; import cp from 'node:child_process'; import { syncBuiltinESMExports } from 'node:module';
+const [, , scripts, lab, home, seedS, nS, sansDisque] = process.argv; const N = Number(nS);
+let lancements = 0; for (const f of ['spawnSync', 'execFileSync', 'execSync', 'spawn', 'execFile']) { const o = cp[f]; cp[f] = function (...a) { lancements++; return o.apply(this, a); }; } syncBuiltinESMExports(); // compte les processus lancés par le code mesuré (les importations nommées du module suivent la liaison vive)
 const { revealDoing, commandeAffichee } = await import(pathToFileURL(scripts + '/vf-cockpit-who.mjs').href);
 let a = Number(seedS) >>> 0; const rnd = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const pick = (xs) => xs[Math.floor(rnd() * xs.length)]; const MARK = 'ZqMark7391';
@@ -264,7 +267,7 @@ const OPS = [';', '&&', '|', '||', ';;', '&', '\n'];
 const home_d = path.join(home, '.claude', 'projects', '-lab'); fs.mkdirSync(home_d, { recursive: true });
 const sid = 'eeee0001-2222-3333-4444-555566667777'; const file = path.join(home_d, sid + '.jsonl');
 const line = (type, content) => JSON.stringify({ type, cwd: lab, sessionId: sid, timestamp: new Date().toISOString(), gitBranch: 'main', version: '2.1', message: { content } });
-const t0 = Date.now(); const fuites = []; let legit = 0, legitCd = 0;
+const t0 = Date.now(); const fuites = []; let legit = 0, legitCd = 0, nsCmd = 0n, msDisque = 0, nDisque = 0, lancDisque = 0;
 for (let n = 0; n < N; n++) {
   const nh = Math.floor(rnd() * 4), na = Math.floor(rnd() * 5);
   const comps = []; // {slot, texte}
@@ -285,15 +288,17 @@ for (let n = 0; n < N; n++) {
   let cmd = ''; comps.forEach((c, i) => { if (i === nh + 1 + na && nq) cmd += pick(SEP) + pick(OPS); cmd += (i ? pick(SEP) : '') + mots[i]; });
   cmd = pre + cmd;
   const slot = cdCible ? 'cd' : comps[cible].slot; const mot = cdCible ? '' : mots[cible];
-  let out = commandeAffichee(cmd);
-  if (n % 100 === 0) { // chemin complet (transcript -> revealDoing) : même sortie que la fonction directe
+  const c0 = process.hrtime.bigint(); let out = commandeAffichee(cmd); nsCmd += process.hrtime.bigint() - c0;
+  if (n % 100 === 0 && !sansDisque) {
+    const d0 = Date.now(), l0 = lancements; // chemin complet (transcript -> revealDoing) : même sortie que la fonction directe
     fs.writeFileSync(file, line('user', 'salut') + '\n' + line('assistant', [{ type: 'tool_use', name: 'Bash', input: { command: cmd } }]) + '\n');
     const disque = revealDoing(lab, sid, { home }).doing ?? ''; if (disque !== out) { out = `DIVERGENCE disque=${JSON.stringify(disque)} direct=${JSON.stringify(out)}`; fuites.push({ cmd, out, slot: 'chemin', mot: '' }); }
+    msDisque += Date.now() - d0; nDisque++; lancDisque += lancements - l0;
   }
   const permis = (!cd || cdSimple) && ((slot === 'prog' && BLANC.test(mot) && !mot.startsWith('-')) || (slot === 'arg0' && BLANC.test(mot) && !mot.startsWith('-') && !mot.includes('=')));
   if (out.includes(MARK)) { if (permis) { legit++; if (cd) legitCd++; } else fuites.push({ cmd, out, slot, mot }); }
 }
-console.log(JSON.stringify({ n: N, fuites: fuites.slice(0, 5), nFuites: fuites.length, legit, legitCd, ms: Date.now() - t0 }));
+console.log(JSON.stringify({ n: N, fuites: fuites.slice(0, 5), nFuites: fuites.length, legit, legitCd, ms: Date.now() - t0 - msDisque, msCmd: Math.round(Number(nsCmd) / 1e4) / 100, disque: { n: nDisque, ms: msDisque, lancements: lancDisque } }));
 JS
 SEED=20261103; NGEN=12000
 GEN="$(node "$AUX/gen.mjs" "$SCRIPTS" "$LAB" "$WORK/home" "$SEED" "$NGEN")"
@@ -301,7 +306,18 @@ echo "  graine=$SEED commandes=$NGEN ; sortie : $(printf '%s' "$GEN" | node "$AU
 assert_eq "FB3.3 — $NGEN commandes générées (graine $SEED) : le marqueur ne sort que placé dans le programme ou le premier argument ET simple (échec : commande, sortie, graine)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.nFuites+" fuite(s) : "+JSON.stringify(j.fuites.slice(0,2))+" graine='$SEED'"')" "0 fuite(s) : [] graine=$SEED"
 assert_eq "FB3.4 — témoin positif : le marqueur sort bien dans plus de 100 cas légitimes (programme ou premier argument simples), la mesure n'est pas à vide" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.legit > 100')" "true"
 assert_eq "FB3.6 — témoin positif du cd : le marqueur sort aussi, derrière un cd simple, dans plus de 10 cas légitimes (la branche cd du générateur n'est pas à vide)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.legitCd > 10')" "true"
-assert_eq "FB3.5 — le cas génératif tient en moins de 10 s" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.ms < 10000')" "true"
+assert_eq "FB3.5 — le cas génératif (sans le chemin disque) tient en moins de 10 s" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.ms < 10000')" "true"
+# FB3.5, amendement de 79-06 (décision de la session principale, 2026-11-12) : la propriété protégée est le temps de `commandeAffichee` seul sur le tirage complet (jamais quadratique en la longueur de la commande).
+# Mesure : 25 à 29 ms jouée seule, trois passes, charge machine 5,4 à 5,7 ; borne 1 000 ms, soit 34 fois la plus grande valeur seule (au moins 20 fois). Le chemin disque (revealDoing, 1 commande sur 100, ~4 processus chacune)
+# n'est plus chronométré dans `ms` : son temps et son nombre de lancements sont imprimés, sans verdict (sa durée suit la charge de la machine, pas le code de masque).
+echo "  commandeAffichee seule : $(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.msCmd+" ms pour "+j.n+" appels"') ; chemin disque (hors chronométrage, sans verdict) : $(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.disque.n+" appels de revealDoing, "+j.disque.lancements+" lancements de processus, "+j.disque.ms+" ms"')"
+assert_eq "FB3.7 — borne propre à la propriété protégée : commandeAffichee seule, sur le tirage complet, tient en moins de 1 000 ms (34 fois la valeur jouée seule)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.msCmd < 1000')" "true"
+assert_eq "FB3.8 — la mesure n'est pas à vide : le chemin disque a bien été joué et a lancé des processus (compteur de lancements > 0)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.disque.n > 0 && j.disque.lancements > 0')" "true"
+# mutant : `commandeAffichee` rejoue sa réduction trois fois par caractère de la commande (coût quadratique en la longueur, comportement inchangé) ; la borne FB3.7 rougit avec une marge de 3 (un rejeu par caractère ne donnait que 1,06 s, trop près de la borne)
+cockpit_module_muter fb35 vf-cockpit-who.mjs 's#^export const commandeAffichee = (cmd) => masque(resume(String(cmd).slice(0, MAX_MASQUE))).slice(0, BORNE_COMMANDE);#export const commandeAffichee = (cmd) => { const s = String(cmd).slice(0, MAX_MASQUE); let r; for (let i = 0; i < 3 * s.length; i++) r = masque(resume(s)); return r.slice(0, BORNE_COMMANDE); };#'
+GENM="$(node "$AUX/gen.mjs" "$COCKPIT_MODULE/scripts" "$LAB" "$WORK/home" "$SEED" "$NGEN" sans-disque)"; unset COCKPIT_MODULE
+echo "  mutant FB3.7 : $(printf '%s' "$GENM" | node "$AUX/ev.mjs" '"fuites="+j.nFuites+" msCmd="+j.msCmd+" ms="+j.ms')"
+assert_eq "FB3.9 — mutant (réduction rejouée trois fois par caractère) : mêmes sorties (0 fuite, témoins positifs inchangés), mais commandeAffichee dépasse 1 000 ms : la borne FB3.7 rougit pour la bonne raison" "$(printf '%s' "$GENM" | node "$AUX/ev.mjs" 'j.nFuites+" "+(j.legit === 164)+" "+(j.msCmd < 1000)')" "0 true false"
 # MB : canal task de `bornes` (description d'un sous-agent, diffusée en SSE). Un cas par motif de MASQUES : chaque valeur doit sortir masquée, et retirer un motif fait rougir son cas.
 cat > "$AUX/mask-bornes.mjs" <<'JS'
 // mask-bornes.mjs <scripts> <lab> <home> : description de sous-agent -> task bornée et masquée, une par entrée de stdin (JSON)
