@@ -26,7 +26,7 @@ mklab() { # un jalon en cours (6 phases : 2 faites, 1 en cours, 1 à recetter, 2
 ## Milestones
 
 - 🚧 **v2.0 Couloirs** - Phases 1-6 (in progress)
-- ✅ **v1.0 Socle** - Phase 7 (shipped)
+- ✅ **v1.0 <img src=x onerror=window.__z=1>** - Phase 7 (shipped)
 
 ## Phases
 
@@ -53,8 +53,9 @@ MD
   for n in 01 02 03; do printf '<objective>Reprise</objective>\n' | wr "$B/phases/04-reprise/04-$n-PLAN.md"; done
   echo ok > "$B/phases/04-reprise/04-01-SUMMARY.md"
   printf '<objective>Recette</objective>\n' | wr "$B/phases/06-recette/06-01-PLAN.md"; echo ok > "$B/phases/06-recette/06-01-SUMMARY.md"
-  printf '## Une entrée\n\ntexte\n\n## Autre entrée — DIFFÉRÉ\n\ntexte\n' | wr "$B/BACKLOG.md"
+  printf '## <img src=x onerror=window.__w=1>\n\ntexte\n\n## Autre entrée — DIFFÉRÉ\n\ntexte\n' | wr "$B/BACKLOG.md"
   printf '# Une graine\n\ntexte\n' | wr "$B/seeds/SEED-001-graine.md"
+  printf '# Graine hostile\n\ntexte\n' | wr "$B/seeds/SEED-002-\"><img src=x onerror=window.__y=1>.md"
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
 }
 # bâtir et servir : build_serve <lab> <dossier de scripts> <dossier du moteur> [--terminal] -> PORT, SRV (pas de sous-shell : PIDS doit survivre)

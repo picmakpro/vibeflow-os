@@ -39,6 +39,11 @@ assert_eq "CL1.3 — P80-C76-1 : après un clic sur la carte de la phase 3, la s
   "$(E1 '[j.cl13.dans, j.cl13.cible]')" '[true,"n:ph-3"]'
 assert_eq "CL1.4 — naviguer sans option ajoute vue=graphe avant le fragment ; une adresse qui a vue= reste telle quelle" \
   "$(E1 '[j.cl14, j.cl14b]')" '[["?vue=graphe","#s=x"],["?vue=couloirs","#s=x"]]'
+assert_eq "CL1.5 — 390 px : aucun descendant du canevas caché ne reste visible (00-vibeflow.js force visibility: visible sur certains pieds de carte)" \
+  "$(E1 'j.cl15.visibles')" "0"
+assert_eq "CL1.6 — bascule dans les deux sens : le focus va au segment équivalent du groupe visible, l'annonce vit hors de la section masquée" \
+  "$(E1 '[j.cl16.vers.id, j.cl16.vers.flottant, j.cl16.vers.texte, j.cl16.vers.dansSection, j.cl16.retour.id, j.cl16.retour.flottant, j.cl16.retour.texte]')" \
+  '["graphe",true,"Affichage en graphe",false,"couloirs",false,"Affichage en couloirs, 6 phases"]'
 assert_eq "CL1.9 — témoin : aucune section du pilote n'a échoué" "$(E1 'Object.keys(j.erreurs).join()')" ""
 
 echo "=== CL2 — en-tête de jalon, couloirs, ligne d'état, troncature, listes, sécurité du rendu ==="
@@ -68,17 +73,18 @@ assert_eq "CL2.4 — titre de 52 caractères entier en ≤ 3 lignes à ≈ 226 p
   "$(E2 "((cut) => [$T24, $L24, $N24])($CUT)")" '[true,true,true,null,true,true,true,true,true,true,true,true]'
 assert_eq "CL2.5 — Historique, Backlog, Graines, Releases : details repliés et comptés, aucune carte de canevas, jamais « DIFFÉRÉ » ; clic = sélection" \
   "$(E2 '[j.cl25.liste, j.cl25.cartesFile, j.cl25.differe, j.cl25c[0].startsWith("f:.planning/BACKLOG.md#"), j.cl25c[1]]')" \
-  '[[["historique",false,"1 jalon · 1 phase"],["backlog",false,"2 entrées"],["graines",false,"1 graine"],["releases",false,"0 tag"]],0,false,true,true]'
+  '[[["historique",false,"1 jalon · 1 phase"],["backlog",false,"2 entrées"],["graines",false,"2 graines"],["releases",false,"0 tag"]],0,false,true,true]'
 assert_eq "CL2.6 — T-80-07 : un titre de phase « <img onerror> » du ROADMAP : 0 img, aucun code exécuté, texte rendu tel quel" \
-  "$(E2 '[j.cl26.img, j.cl26.flag, j.cl26.texte]')" '[0,"undefined",true]'
+  "$(E2 '[j.cl26.img, j.cl26.flag, j.cl26.texte]')" '[0,"undefined,undefined,undefined,undefined",true]'
 UIS="$SC_BASE/../skills/cockpit-moteur/assets/ui"
 JETONS="$(node "$HERE_T/css-jetons.mjs" "$UIS"/41-vf-projet-*.js 2>&1; echo "rc=$?")"
 assert_eq "CL2.7a — css-jetons.mjs sur tous les 41-vf-projet-*.js présents : aucune valeur fautive (au moins trois fichiers)" \
-  "$(ls "$UIS"/41-vf-projet-*.js 2>/dev/null | awk 'END { print (NR >= 3) }')|${JETONS##*$'\n'}" "1|rc=0"
+  "$(ls "$UIS"/41-vf-projet-*.js 2>/dev/null | awk 'END { print (NR >= 4) }')|${JETONS##*$'\n'}" "1|rc=0"
 for TH in sombre clair; do
   C="j.cl27.$TH"
-  assert_eq "CL2.7b ($TH) — contrastes rendus : texte de carte ≥ 4,5:1, glyphes ≥ 3:1, bordure de sélection de 1,5 px ≥ 3:1" \
-    "$(E2 "[Math.min(...$C.textes) >= 4.5, $C.glyphes.length === 4 && Math.min(...$C.glyphes) >= 3, $C.bordure >= 3, $C.largeur]")" '[true,true,true,"1.5px"]'
+  assert_eq "CL2.7b ($TH) — contrastes rendus : texte de carte ≥ 4,5:1, glyphes ≥ 3:1, bordure de sélection de 1,5 px ≥ 3:1, segment actif cerné" \
+    "$(E2 "[Math.min(...$C.textes) >= 4.5, $C.glyphes.length === 4 && Math.min(...$C.glyphes) >= 3, $C.bordure >= 3, $C.largeur,
+      $C.segment !== 'rgba(0, 0, 0, 0)']")" '[true,true,true,"1.5px",true]'
 done
 assert_eq "CL2.8 — mouvement réduit : aucune animation active après chargement, après la bascule vers le graphe et au retour" \
   "$(E2 '[j.cl28.charge, j.cl28.graphe, j.cl28.retour]')" '[0,0,0]'
@@ -132,11 +138,16 @@ for CLE in 1440 1024; do
       parseFloat($X.tiroir.debut) >= $X.tiroir.tiroir[1] - $X.tiroir.tiroir[0] + 16, $X.tiroir.carte[0] >= $X.tiroir.tiroir[1] - 0.5]")" \
     '[true,true,true,true,true]'
 done
-for CLE in 800 390 1100t; do
+for CLE in 800 1100t; do
   X="j.cl312$CLE"
-  assert_eq "CL3.12 ($CLE) — feuille de détail : ni extrémité ni scroll-padding-inline ; aucun défilement horizontal (panneau et tiroir Git ouverts ou non)" \
-    "$(E4 "[$X.repos, $X.panneau, $X.tiroir, $X.ferme].every((m) => ['auto', '0px'].includes(m.debut) && ['auto', '0px'].includes(m.fin) && m.larg)")" "true"
+  assert_eq "CL3.12 ($CLE) — panneau en colonne latérale (701 à 999 px, tactile à 1 100 px) : la carte sélectionnée est amenée hors de lui" \
+    "$(E4 "[parseFloat($X.panneau.fin) >= $X.panneau.pw, $X.panneau.pw >= 360, $X.panneau.carte[1] <= $X.panneau.panneau[0] + 0.5]")" '[true,true,true]'
 done
+X="j.cl312390"
+assert_eq "CL3.12 (390) — feuille de détail : ni extrémité ni scroll-padding-inline ; aucun défilement horizontal (feuille et tiroir Git ouverts ou non)" \
+  "$(E4 "[$X.repos, $X.panneau, $X.tiroir, $X.ferme].every((m) => ['auto', '0px'].includes(m.debut) && ['auto', '0px'].includes(m.fin) && m.larg)")" "true"
+assert_eq "CL3.13 — 800 px, graphe, panneau ouvert : la bascule flottante ne chevauche pas le panneau" \
+  "$(E4 '[j.cl313.ouvert, j.cl313.fl[1] <= j.cl313.panneau[0]]')" '[true,true]'
 assert_eq "CL3.9b — témoin : aucune section du pilote n'a échoué (panneau, visite, direct, orphelin, bords)" "$(E4 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
 
@@ -166,13 +177,18 @@ assert_eq "M-XSS — le mutant rougit CL2.6 (titre inséré sans h() : un img na
 mutant M-POUSSE 41-vf-projet-vue.js "inset: 0; z-index: 1;" "inset: 0 var(--pw, 0px) 0 0; z-index: 1;" chrome-couloirs-clavier.mjs cl3b cl35
 assert_eq "M-POUSSE — le mutant rougit CL3.5 (rail rétréci panneau ouvert : les couloirs bougent) (témoin : la carte reste atteignable)" \
   "$(E "[j.cl35.ouvert.join() !== j.cl35.ferme.join(), j.cl35.panneaux[0]]" "$RM")" "[true,true]"
-mutant M-ORPHELIN 41-vf-projet-vue.js "if (!cible && m.id) {" "if (!cible) return; if (!cible && m.id) {" chrome-couloirs-clavier.mjs cl3b cl311,cl38
-assert_eq "M-ORPHELIN — le mutant rougit CL3.11 (règle de focus orphelin retirée : le focus tombe sur body) (témoin : CL3.8 reste vert)" \
-  "$(E "[j.cl311.a.id !== 'n:ph-6', j.cl311.a.tag, j.cl38.id === 'n:ph-3']" "$RM")" '[true,"body",true]'
+mutant M-ORPHELIN 41-vf-projet-vue.js "cible = suite || avant || null;" "cible = null;" chrome-couloirs-clavier.mjs cl3b cl311,cl38
+assert_eq "M-ORPHELIN — le mutant rougit CL3.11 (voisin suivant puis précédent retiré : le focus va à l'arrêt) (témoin : repli et CL3.8 verts)" \
+  "$(E "[j.cl311.a.id !== 'n:ph-6', j.cl311.a.tag, j.cl38.id === 'n:ph-3', j.cl311.d.hid]" "$RM")" '[true,"button",true,"vf-projet-titre"]'
 mutant M-EXTREMITE 41-vf-projet-vue.js "left: 100%; width: var(--pw, 0px);" "left: 100%; width: 0px;" chrome-couloirs-clavier.mjs cl3b cl312
 assert_eq "M-EXTREMITE — le mutant rougit CL3.12 (extrémité de fin retirée : la carte reste sous le panneau) (témoin : scroll-padding gardé)" \
   "$(E "[j.cl3121440.panneau.carte[1] > j.cl3121440.panneau.panneau[0] + 0.5,
     parseFloat(j.cl3121440.panneau.fin) >= j.cl3121440.panneau.pw]" "$RM")" "[true,true]"
+mutant M-XSS-ID 41-vf-projet-rendu.js 'data-id="${h(r.id)}" tabindex="-1"${decrit(r)}' 'data-id="${r.id}" tabindex="-1"${decrit(r)}' \
+  chrome-couloirs.mjs cl2 cl26
+assert_eq "M-XSS-ID — le mutant rougit CL2.6 (identifiant de rangée sans h() : un nom de graine injecte un img)" "$(E "[j.cl26.img > 0]" "$RM")" "[true]"
+mutant M-XSS-HIST 41-vf-projet-rendu.js '<span class="vp-r-t">${h(r.titre)}</span>' '<span class="vp-r-t">${r.titre}</span>' chrome-couloirs.mjs cl2 cl26
+assert_eq "M-XSS-HIST — le mutant rougit CL2.6 (nom de jalon clos ou de backlog sans h() : un img naît)" "$(E "[j.cl26.img > 0]" "$RM")" "[true]"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

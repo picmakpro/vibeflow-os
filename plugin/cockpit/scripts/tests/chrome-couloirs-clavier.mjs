@@ -11,7 +11,7 @@ const SEL = filtre ? new Set(filtre.split(',')) : null;
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!VibeFlow.state && !!VibeFlow.state.layout";
 const SANS_VISITE = "(() => { const g = Storage.prototype.getItem; Storage.prototype.getItem = function (k) {"
   + " const vue = typeof k === 'string' && (k.indexOf('floorplan:tour-seen:') === 0 || k.indexOf('vibeflow-cockpit:visite:') === 0);"
-  + " return vue ? 'true' : g.call(this, k); }; })()";
+  + " return vue ? 'true' : g.call(this, k); }; try { localStorage.removeItem('floorplan:panel'); } catch (e) { void e; } })()"; // panneau par défaut
 const KEYS = { Tab: 9, ArrowRight: 39, ArrowLeft: 37, ArrowUp: 38, ArrowDown: 40, Home: 36, End: 35, Enter: 13, Space: 32, Escape: 27, Backspace: 8 };
 const ETAT = `window.__cl = { etat() { const a = document.activeElement, S = VibeFlow.state;
   return JSON.stringify({ id: a && a.dataset ? a.dataset.id || null : null,
@@ -121,6 +121,13 @@ await executer(chrome, async (s) => {
         return { hors: c.right <= p.left + 0.5, gauche: c.left >= 0, defile: v.scrollLeft, mode: getComputedStyle(v).scrollBehavior };
           } catch (e) { return { err: e.message }; } })())`);
       o.cl35 = { ouvert, ferme, panneaux: [p0.panneau, p1.panneau], m, actives: await s.ev(ACTIVES) };
+    });
+    await sec('cl313', async () => { // 800 px, graphe, panneau ouvert : la bascule flottante ne chevauche pas le panneau
+      await charger('?vue=graphe', 800, 900);
+      if (await s.ev("document.body.classList.contains('no-panel')")) { await clic('#btn-panel'); await pause(700); }
+      o.cl313 = await lire(`JSON.stringify((() => { const f = document.getElementById('vf-projet-flottant').getBoundingClientRect(),
+        p = document.getElementById('panel').getBoundingClientRect(); return { fl: [f.left, f.right], panneau: [p.left, p.right],
+        ouvert: !document.body.classList.contains('no-panel') }; })())`);
     });
     await sec('cl37', async () => {
       await charger('?vue=couloirs');

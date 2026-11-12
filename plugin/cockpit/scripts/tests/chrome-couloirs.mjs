@@ -64,6 +64,19 @@ await executer(chrome, async (s) => {
       await s.naviguer(`${racine}/project.html?vue=couloirs#s=x`); await s.attendre(PRET, 'page prête (cl14b)');
       o.cl14b = await lire('JSON.stringify([location.search, location.hash])');
     });
+    await sec('cl15', async () => { // 390 px : rien du canevas caché ne doit rester visible (00-vibeflow.js force `visibility: visible` sur des pieds)
+      await charger('?vue=couloirs', 390, 844, true);
+      o.cl15 = await lire("JSON.stringify({ visibles: [...document.querySelectorAll('#svg *')]"
+        + ".filter((e) => getComputedStyle(e).visibility === 'visible').length })");
+    });
+    await sec('cl16', async () => { // la bascule : le focus va au segment équivalent du groupe visible, l'annonce vit hors du conteneur masqué
+      await charger();
+      const etat = `JSON.stringify({ id: document.activeElement.dataset.forme || null, flottant: !!document.activeElement.closest('#vf-projet-flottant'),
+        texte: document.querySelector('.vp-status') ? document.querySelector('.vp-status').textContent : null,
+        dansSection: !!document.querySelector('section.vf-projet .vp-status') })`;
+      await clic('.vp-bascule [data-forme=graphe]'); await pause(300); o.cl16 = { vers: await lire(etat) };
+      await clic('#vf-projet-flottant [data-forme=couloirs]'); await pause(300); o.cl16.retour = await lire(etat);
+    });
   }
 
   // rend le graphe muté puis relu par la vue : `code` modifie VibeFlow.graph, la vue se redessine sur `render`
@@ -135,7 +148,8 @@ await executer(chrome, async (s) => {
     });
     await sec('cl26', async () => {
       await charger(); await pause(500);
-      o.cl26 = await lire(`JSON.stringify({ img: document.querySelectorAll('section.vf-projet img').length, flag: typeof window.__x,
+      o.cl26 = await lire(`JSON.stringify({ img: document.querySelectorAll('section.vf-projet img').length,
+        flag: ['__x', '__y', '__z', '__w'].map((k) => typeof window[k]).join(),
         texte: [...document.querySelectorAll('.vp-titre')].some((t) => t.textContent === '<img src=x onerror=window.__x=1>') })`);
     });
     await sec('cl27', async () => {
@@ -151,6 +165,7 @@ await executer(chrome, async (s) => {
           for (const c of document.querySelectorAll('.vp-carte')) { const f = getComputedStyle(c).backgroundColor;
             out.textes.push(R(getComputedStyle(c.querySelector('.vp-titre')).color, f), R(getComputedStyle(c.querySelector('.vp-etat')).color, f)); }
           for (const g of document.querySelectorAll('.vp-gl')) out.glyphes.push(R(getComputedStyle(g, '::before').backgroundColor, bg));
+          out.segment = getComputedStyle(document.querySelector('.vp-bascule [aria-pressed=true]')).borderTopColor;
           const s = document.querySelector('.vp-carte[aria-current=true]'); out.bordure = R(getComputedStyle(s).borderTopColor, bg);
             out.largeur = ((r) => (r ? r.style.getPropertyValue('border-top-width') : null))([...document.styleSheets]
             .flatMap((sh) => { try { return [...sh.cssRules]; } catch (e) { return []; } })

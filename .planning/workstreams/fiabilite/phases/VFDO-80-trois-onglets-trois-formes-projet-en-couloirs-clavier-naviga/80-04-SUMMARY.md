@@ -41,12 +41,17 @@ M-FOOT (modele : ligne d'état lue dans `foot`) → CL2.3 · M-XSS (rendu : titr
 
 ## Écarts (amendements datés dans le PLAN)
 Pilote du clavier et socle sourcé en fichiers neufs · CL1.3 sur la phase 3 · segments de bascule à 8 px · bordure 1,5 px lue sur la règle (Chrome la calcule à 1 px) · bascule et barre de jalon à gauche (le panneau les recouvrait) ·
-de 701 à 999 px et au tactile à 1 100 px le panneau reste une colonne latérale (hauteur de feuille comptée seulement s'il est posé en bas) · à 390 px le tiroir du terminal est plein écran, non amarré · hypothèse 9 : sur le lab, faites = cases cochées (2 = 2), écart non éprouvé.
+de 701 à 999 px et au tactile à 1 100 px le panneau reste une colonne latérale : l'extrémité défilable vaut dès 701 px (correction de revue), la hauteur de feuille n'est comptée que s'il est posé en bas · à 390 px le tiroir du terminal est plein écran, non amarré · hypothèse 9 : sur le lab, faites = cases cochées (2 = 2), écart non éprouvé.
 
 ## Pour la jointure et les plans suivants
-- Idiome A51 non appliqué : `SC.on('render'|'panel')` et le `<style>` sont posés dans `init`/à l'évaluation sans clé `surOnglet` ; à passer à la jointure. `ResizeObserver`/`MutationObserver` retirés par le disposer.
+- Idiome A51, laissé à la jointure : `SC.on('render'|'panel')` posés sans retrait ; le disposer ne retire ni le `<style>`, ni les classes `body.vf-forme-couloirs`/`vf-forme-graphe`, ni `window.VF_PROJET` ; pas de clé `surOnglet`. Les observateurs et écouteurs DOM sont retirés par le disposer.
 - API : `VF_PROJET { formes, forme, basculer(nom, { url }), carteDe }` ; `FORMES` et `LIBELLES` sont des constantes de `41-vf-projet-vue.js` (236 lignes, reste 63) : 80-07 y inscrit `liste`. `__vfProjetModele` (`etiquettePreuve` rend '' : à remplacer par la 76), `__vfProjetRendu`, `__vfProjetClavier { appliquer, poser, ramener, ordre, repli, memoire, cle }`.
 - Sélecteurs : `section.vf-projet`, `.vp-jalon[data-jalon]`, `.vp-couloir[data-couloir]`, `.vp-carte[data-id]`, `.vp-rangee`, `.vp-details[data-cle]`, `.vp-status`, `#vf-projet-titre`, `#vf-projet-flottant` (bascule du graphe, haut centre ; bas au téléphone).
 - `chrome-session.mjs` : 4 lignes ajoutées avant `naviguer` (ancre distincte d'`ouvrir`). Les pilotes de couloirs lisent comme posées les clés `floorplan:tour-seen:` et `vibeflow-cockpit:visite:`.
 - Ligne de CHANGELOG pour 80-18 : « cockpit : Projet se lit en quatre couloirs par état, un bloc par jalon, le graphe reste à la demande ».
-- Captures : `…/scratchpad/phase80a/w-80-04/png/` : couloirs-1440-sombre, -1440-clair, -390-sombre, -390-clair, -1440-focus-clavier.
+- Captures : dossier `png/` du scratchpad du mandat (non versionné) : couloirs-1440-sombre, -1440-clair, -390-sombre, -390-clair, -1440-focus-clavier.
+
+## Correction de revue (2026-11-12)
+Fantôme à 390 px : le pied `.foot .meta` d'une carte du canevas caché (carte « Historique »), que `00-vibeflow.js` force en `visibility: visible` (règles `lod-mid`/`lod-low`) malgré `#svg { visibility: hidden }` ;
+vient de la couche existante, corrigé côté 41-* par `#svg *` en `visibility: hidden !important` (témoin CL1.5). Focus et annonce de la bascule (CL1.6), segment actif cerné (bordure `--hair-2`), extrémités dès 701 px (CL3.12, CL3.13),
+bascule flottante centrée dans la zone libre, M-ORPHELIN resserré, lab hostile (nom de jalon clos, entrée de Backlog, graine au nom piégé) avec M-XSS-ID et M-XSS-HIST.

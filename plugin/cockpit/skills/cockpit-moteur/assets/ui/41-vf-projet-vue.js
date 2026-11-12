@@ -27,19 +27,22 @@
       padding: calc(var(--hh) + var(--sp-16)) var(--edge) var(--vf-bas, var(--sp-32)); scroll-padding-block-end: var(--vf-bas, var(--sp-32));
         scroll-padding-block-start: calc(var(--hh) + var(--sp-16)); }
     body:not(.vf-forme-couloirs) section.vf-projet { display: none; }
-    body.vf-forme-couloirs #stage { background-image: none; } body.vf-forme-couloirs #svg { visibility: hidden; } body.vf-forme-couloirs #zoom,
+    body.vf-forme-couloirs #stage { background-image: none; } body.vf-forme-couloirs #svg,
+      body.vf-forme-couloirs #svg * { visibility: hidden !important; } /* 00-vibeflow.js force visible certains pieds */ body.vf-forme-couloirs #zoom,
       body.vf-forme-couloirs #context { display: none; }
     section.vf-projet button { font: inherit; color: inherit; text-align: left; cursor: pointer; }
     /* la bascule et la barre de jalon suivent le titre à gauche : à droite, le panneau ouvert les recouvrirait (80-UI-SPEC § 2.1 : écart assumé) */
     .vp-tete { display: flex; align-items: center; gap: var(--sp-24); margin-bottom: var(--sp-16); flex-wrap: wrap; }
     .vp-tete h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.02em; } .vp-tete h1:focus { outline: none; }
     .vp-bascule { display: inline-flex; gap: var(--sp-2); padding: var(--sp-4); border-radius: var(--r-ctl); background: var(--raise); flex: none; }
-    .vp-bascule button { min-height: 36px; padding: 0 var(--sp-12); border: 0; border-radius: 8px; background: none; font-size: 13px;
+    .vp-bascule button { min-height: 36px; padding: 0 var(--sp-12); border: 1px solid transparent; border-radius: 8px; background: none; font-size: 13px;
       font-weight: 500; color: var(--text-3); }
-    .vp-bascule button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow-card); }
+    .vp-bascule button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow-card);
+      border-color: var(--hair-2); }
     .vp-bascule button:focus-visible, .vp-carte:focus-visible, .vp-rangee:focus-visible,
       .vp-details summary:focus-visible { outline: 2px solid var(--ring); outline-offset: var(--sp-2); }
-    #vf-projet-flottant { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); top: calc(var(--hh) + var(--sp-8));
+    #vf-projet-flottant { position: absolute; z-index: 3; left: calc((100% - var(--pw, 0px)) / 2); transform: translateX(-50%);
+      top: calc(var(--hh) + var(--sp-8));
       } body.vf-forme-couloirs #vf-projet-flottant { display: none; }
     .vp-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .vp-info { padding: var(--inset-box); border-radius: var(--r-ctl); background: var(--surface); font-size: 13px; color: var(--text-2);
@@ -75,8 +78,9 @@
       padding: var(--inset-row); border: 1.5px solid transparent; background: none; font-size: 13px; color: var(--text); }
     .vp-rangees li + li { border-top: 1px solid var(--hair); } .vp-r-t { min-width: 0; overflow-wrap: anywhere; } .vp-r-d { font-family: var(--mono);
       font-size: 12px; color: var(--text-3); }
-    /* panneau latéral : le panneau se pose PAR-DESSUS ; une extrémité défilable (hors flux) permet d'amener une carte hors de lui */
-    @media (min-width: 1000px) and (pointer: fine) {
+    /* colonne latérale (dès 701 px : le moteur ne passe en feuille qu'à 700 px) : le panneau se pose PAR-DESSUS ;
+       une extrémité défilable (hors flux) permet d'amener une carte hors de lui */
+    @media (min-width: 701px) {
       section.vf-projet { scroll-padding-inline-end: var(--pw, 0px); }
       section.vf-projet::after { content: ""; position: absolute; top: 0; left: 100%; width: var(--pw, 0px); height: var(--sp-2); }
       section.vf-projet.vp-tiroir { scroll-padding-inline-start: var(--vp-debut, 0px);
@@ -176,7 +180,12 @@
   };
   const basculer = (nom, { url = true } = {}) => {
     if (!FORMES.includes(nom) || nom === forme) return false;
+    const surSegment = !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-forme]'));
     forme = nom; marquerBascule(); classes(); mesurerBas();
+    if (surSegment) { // le groupe cliqué peut être masqué : le focus va au segment équivalent du groupe visible, jamais body
+      const b = (affichee() ? section : flottant).querySelector(`[data-forme="${nom}"]`);
+      if (b) b.focus({ preventScroll: true });
+    }
     if (url) { try { const u = new URL(location.href); u.searchParams.set('vue', nom); history.replaceState(history.state, '',
       u.pathname + u.search + u.hash); } catch (e) { void e; } }
     const n = M.blocs(G).reduce((s, b) => s + b.total, 0);
@@ -190,8 +199,10 @@
     vivant = true;
     section = document.createElement('section'); section.className = 'vf-projet'; section.setAttribute('aria-labelledby', 'vf-projet-titre');
     section.innerHTML = `<div class="vp-tete"><h1 id="vf-projet-titre" tabindex="-1">Projet</h1>${outils()}</div>`
-      + '<div class="vp-status" role="status" aria-live="polite" aria-atomic="true"></div><div class="vp-corps"></div>';
-    corps = section.querySelector('.vp-corps'); statut = section.querySelector('.vp-status');
+      + '<div class="vp-corps"></div>';
+    corps = section.querySelector('.vp-corps');
+    statut = document.createElement('div'); statut.className = 'vp-status'; // hors de la section : elle est masquée en graphe, l'annonce doit rester lue
+    statut.setAttribute('role', 'status'); statut.setAttribute('aria-live', 'polite'); statut.setAttribute('aria-atomic', 'true'); document.body.append(statut);
     corps.innerHTML = R.etatVue('Chargement du projet');
     flottant = document.createElement('div'); flottant.id = 'vf-projet-flottant'; flottant.innerHTML = outils();
     stage.append(section, flottant); classes();
@@ -224,7 +235,7 @@
       mesurerBas();
     });
     mesurerBas(); surRender();
-    return () => { vivant = false; pose.splice(0).forEach((f) => f()); section.remove(); flottant.remove(); };
+    return () => { vivant = false; pose.splice(0).forEach((f) => f()); section.remove(); flottant.remove(); statut.remove(); };
   };
   window.VF_PROJET = Object.freeze({ formes: () => FORMES.slice(), forme: () => forme, basculer, carteDe });
   classes();

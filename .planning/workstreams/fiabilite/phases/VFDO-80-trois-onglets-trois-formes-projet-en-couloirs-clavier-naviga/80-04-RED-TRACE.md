@@ -40,3 +40,14 @@ dépendent pas de la vue rendent des valeurs réelles (CL3.1 : `[[null,0],["a",n
 | mutants (cinq) | `mutation impossible : motif absent` | le fichier muté n'existe pas : un mutant sans effet n'est jamais compté vert |
 
 CL1.4 est vert dans ce rejeu (les pilotes de la tête portent le `naviguer` de la tâche 1) ; il était rouge sur la base de la tâche 1 (`[["","#s=x"],…]`, voir plus haut).
+
+## Correction de revue (2026-11-12) : rouges avant le code (49 PASS / 8 FAIL sur la tête 2a1f37b9)
+
+| Cas | Obtenu | Raison |
+|---|---|---|
+| CL1.5 | `[5]` | cinq descendants du canevas caché restent `visible` à 390 px |
+| CL1.6 | `[[null,false,"Affichage en graphe",true,null,false,"Affichage en couloirs, 6 phases"]]` | focus sur `body` dans les deux sens ; l'annonce est dans la section masquée |
+| CL2.7b (clair) | segment actif sans cerne | témoin du segment (la teinte du segment sombre masquait la mesure : réécrit sur la couleur de bordure) |
+| CL3.12 (800, 1100t) | carte `[401,769]` sous le panneau `[424,784]` | extrémité absente sous 1 000 px |
+| CL3.13 | flottant `[322,478]` sur le panneau `[424,784]` | bascule centrée sur la fenêtre entière |
+| CL3.12 (1440, 1024) | `mesure absente` | état du panneau hérité d'une section voisine : pilote rendu déterministe (clé `floorplan:panel` effacée à chaque page) |
