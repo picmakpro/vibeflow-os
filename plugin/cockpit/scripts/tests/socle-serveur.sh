@@ -15,9 +15,29 @@
 #                           (000 et retour 1 si la connexion échoue) ; à appeler sans substitution de commande pour lire VF_CODE
 #   attendre <s> <commande…> rejoue la commande dans le shell courant toutes les 0,1 s ; 0 dès qu'elle réussit, 1 au délai
 #   cockpit_lancement_brut <fichier…>   imprime fichier:ligne de chaque lancement direct de serve.mjs (hors commentaire) — détecteur de classe
+#   COCKPIT_MODULE=<racine d'un module>   (79-06, facultatif) le serveur lancé est le serve.mjs de CETTE racine (skills/cockpit-moteur/assets), la sortie lui
+#       est passée par --sortie=<chemin réel> placé en DERNIER argument (jamais par l'environnement) ; l'aide pose alors VF_COCKPIT_SCRIPTS_DIR et
+#       VF_COCKPIT_ENGINE_DIR sur cette racine, sauf valeur passée par la suite en NOM=valeur (elle gagne). Posée, elle ajoute le code 5 de cockpit_lancer :
+#       le serveur lancé ne publie pas l'empreinte de la racine visée (cockpit_module_charge) — un mutant non chargé rougit au lancement, jamais vert à vide.
+#       Absente : l'ancien comportement (serve.mjs de la sortie), aucune variable ajoutée.
+#   cockpit_module_copie [destination]   copie COMPLÈTE du module (scripts sans tests/, skills), jamais un lien (Node résout le lien du point d'entrée : le code
+#       muté ne serait jamais chargé) ; imprime SEUL le chemin absolu de la racine de la copie ; code 0 ou 1 ; n'exporte rien (COCKPIT_MODULE="$(cockpit_module_copie)")
+#   cockpit_module_muter <nom> <fichier-du-module> <expression sed>   copie, mutation, exporte COCKPIT_MODULE vers la copie ; code 1 si la cible manque ou si la
+#       copie n'a pas changé (le contrat des mutant() actuels). Le nom de base désigne le dossier : serve.mjs, graph-query.js, query-cli.mjs côté moteur, vf-cockpit-* côté scripts.
+#       À appeler dans le shell courant (pas dans $(…)) pour que l'export survive.
+#   cockpit_module_charge <racine>   code 0 si l'empreinte publiée par le serveur lancé (server.json) égale celle que calcule le vf-cockpit-module.mjs DE CETTE racine
+#   cockpit_vivant                   code 0 si /api/status du serveur lancé répond 200 et publie une empreinte de 12 caractères hexadécimaux (contrôle de vie des témoins négatifs)
+#   cockpit_exporter <dossier> <fichier> [options]   le mode export de serve.mjs (celui du module si COCKPIT_MODULE est posé, sinon celui de la sortie)
 # Le lancement et le détecteur n'ont qu'une source de forme : _cockpit_commande.
 # Les lignes marquées am7:… portent chacune un effet de bord prouvé par un mutant (test-cockpit-cycle-serveur.sh, AM7.S10 à AM7.S12).
-_cockpit_commande() { _CK_SCRIPT="$1/serve.mjs"; _CK_NOOPEN="--no-open"; }
+_CK_DEPOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd -P)"   # racine du module du dépôt, dérivée de l'emplacement de l'aide (calculée au « source »)
+_CK_NOOPEN="--no-open"
+# <sortie> en $1 : en mode module le script est celui du module et la sortie voyage dans _CK_FIN (dernier argument) ; sinon l'ancienne forme
+_cockpit_commande() {
+  _CK_FIN=""
+  if [ -n "${COCKPIT_MODULE:-}" ]; then _CK_SCRIPT="$COCKPIT_MODULE/skills/cockpit-moteur/assets/serve.mjs"; _CK_FIN="--sortie=$1"
+  else _CK_SCRIPT="$1/serve.mjs"; fi
+}
 _cockpit_vivant() { local s; s="$(ps -o stat= -p "$1" 2>/dev/null)"; case "$s" in ''|Z*) return 1 ;; esac; return 0; }
 # lit server.json : « port pid jeton terminal(0|1) » ; rien si illisible (JSON à moitié écrit)
 _cockpit_etat() { "$_CK_NODE" -e 'try{const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log([j.port,j.pid,j.token,("terminal" in j)?1:0].join(" "))}catch{}' "$1" 2>/dev/null; }
@@ -34,7 +54,7 @@ EOF
 }
 _cockpit_echec() { export VF_PORT=0 VF_JETON="" VF_PID=""; return "$1"; }
 cockpit_lancer() {
-  local dossier="${1:-}" nd sortie port log fin ev=() srv=() n
+  local dossier="${1:-}" nd sortie port log fin ev=() srv=() mv=() n
   [ "$#" -gt 0 ] && shift
   if ! vf_hyg_tag_ok 2>/dev/null; then echo "cockpit_lancer : hygiène non initialisée (VF_HYG_TAG absent ou invalide) — rien n'est lancé" >&2; _cockpit_echec 2; return; fi
   nd="${NODE:-node}"; case "$nd" in */*) ;; *) nd="$(command -v "$nd")" || nd="$nd" ;; esac; _CK_NODE="$nd"
@@ -46,8 +66,9 @@ cockpit_lancer() {
     case "$1" in [A-Za-z_]*=*) n="${1%%=*}"; case "$n" in *[!A-Za-z0-9_]*) break ;; esac; ev+=("$1"); shift ;; *) break ;; esac
   done
   srv=("$@"); _cockpit_commande "$sortie"
+  mv=(); [ -z "${COCKPIT_MODULE:-}" ] || mv=(VF_COCKPIT_SCRIPTS_DIR="$COCKPIT_MODULE/scripts" VF_COCKPIT_ENGINE_DIR="$COCKPIT_MODULE/skills/cockpit-moteur")   # les NOM=valeur de la suite viennent après : elles gagnent
   log="${COCKPIT_LOG:-${WORK:-${TMPDIR:-/tmp}}/serve-$port.out}"
-  ( cd "$dossier" && exec env -u VF_PORT -u VF_JETON -u VF_PID -u VF_SORTIE -u VF_LOG ${ev[@]+"${ev[@]}"} "$nd" ${COCKPIT_NODE_ARGS:-} "$_CK_SCRIPT" "$_CK_NOOPEN" --port "$port" ${srv[@]+"${srv[@]}"} ) > "$log" 2>&1 < /dev/null &
+  ( cd "$dossier" && exec env -u VF_PORT -u VF_JETON -u VF_PID -u VF_SORTIE -u VF_LOG ${mv[@]+"${mv[@]}"} ${ev[@]+"${ev[@]}"} "$nd" ${COCKPIT_NODE_ARGS:-} "$_CK_SCRIPT" "$_CK_NOOPEN" --port "$port" ${srv[@]+"${srv[@]}"} ${_CK_FIN:+"$_CK_FIN"} ) > "$log" 2>&1 < /dev/null &
   VF_PID=$!
   PIDS+=("$VF_PID")   # am7:pids
   fin=$((SECONDS + ${COCKPIT_ATTENTE:-30} + 1))
@@ -58,6 +79,9 @@ cockpit_lancer() {
     sleep 0.1
   done
   export VF_PORT="$_CK_P" VF_JETON="$_CK_T" VF_SORTIE="$sortie" VF_LOG="$log"; export VF_PID
+  if [ -n "${COCKPIT_MODULE:-}" ] && ! cockpit_module_charge "$COCKPIT_MODULE"; then
+    vf_hyg_stop "$VF_PID"; echo "cockpit_lancer : le serveur lancé ne charge pas le module visé [COCKPIT_MODULE] (empreinte publiée différente) — arrêté (journal : $log)" >&2; _cockpit_echec 5; return
+  fi
   return 0
 }
 cockpit_arreter() {
@@ -66,6 +90,7 @@ cockpit_arreter() {
   return 0
 }
 cockpit_get() {
+  VF_CODE=000
   local f="${WORK:-${TMPDIR:-/tmp}}/.ck-code-$$-$RANDOM" rc
   "${_CK_NODE:-node}" -e 'const http=require("http"),fs=require("fs");const [port,p,jeton,f]=process.argv.slice(1);
 const r=http.get({host:"127.0.0.1",port:Number(port),path:p,headers:{Host:"127.0.0.1:"+port,"x-vf-cockpit-token":jeton}},(res)=>{res.on("data",(c)=>process.stdout.write(c));res.on("end",()=>{fs.writeFileSync(f,String(res.statusCode));process.exit(0)})});
@@ -87,4 +112,51 @@ cockpit_lancement_brut() {
     grep -n -E "serve\\.mjs\"[^|]* $_CK_NOOPEN|--import [^|]* $_CK_NOOPEN" "$f" 2>/dev/null | grep -v -E '^[0-9]+:[[:space:]]*#' | sed "s#^#$f:#"
   done
   return 0
+}
+# ---- 79-06 : le serveur lancé depuis un module (COCKPIT_MODULE), copies et mutations du module, contrôles de vie et de chargement ----
+cockpit_module_copie() {
+  local d="${1:-}" src="$_CK_DEPOT"
+  [ -n "$d" ] || d="$(mktemp -d "${WORK:-${TMPDIR:-/tmp}}/module.XXXXXX")" || return 1
+  mkdir -p "$d" || return 1
+  d="$(cd "$d" && pwd -P)" || return 1
+  ( cd "$src" && tar -cf - --exclude='scripts/tests' scripts skills ) | ( cd "$d" && tar -xf - ) || return 1
+  [ -z "$(find "$d" -type l 2>/dev/null | sed -n 1p)" ] || return 1   # jamais un lien : la copie doit être autonome
+  [ -f "$d/skills/cockpit-moteur/assets/serve.mjs" ] || return 1
+  printf '%s\n' "$d"
+}
+_cockpit_module_cible() { # <racine> <nom de base> -> chemin du fichier dans la racine, rien si le nom n'est pas d'un fichier du module
+  case "$2" in
+    serve.mjs|graph-query.js|query-cli.mjs) printf '%s\n' "$1/skills/cockpit-moteur/assets/$2" ;;
+    vf-cockpit-*) printf '%s\n' "$1/scripts/$2" ;;
+  esac
+}
+cockpit_module_muter() {
+  local nom="${1:-}" fic="${2:-}" expr="${3:-}" copie cible
+  [ "$#" -eq 3 ] && [ -n "$nom" ] && [ -n "$fic" ] && [ -n "$expr" ] || { echo "cockpit_module_muter : <nom> <fichier-du-module> <expression sed> attendus" >&2; return 1; }
+  copie="$(cockpit_module_copie "${WORK:-${TMPDIR:-/tmp}}/mod-$nom")" || return 1
+  cible="$(_cockpit_module_cible "$copie" "$(basename "$fic")")"
+  [ -n "$cible" ] && [ -f "$cible" ] || { echo "cockpit_module_muter : cible introuvable dans la copie ($fic)" >&2; return 1; }
+  cp "$cible" "$cible.avant" && sed "$expr" "$cible.avant" > "$cible" || return 1
+  if cmp -s "$cible.avant" "$cible"; then rm -f "$cible.avant"; echo "cockpit_module_muter : la copie n'a pas changé (ancre absente : $nom)" >&2; return 1; fi
+  rm -f "$cible.avant"; export COCKPIT_MODULE="$copie"; return 0
+}
+cockpit_module_charge() { # <racine> : l'empreinte que le serveur a publiée = celle que calcule le module de cette racine (1 sinon : jamais un vert à vide)
+  local r="${1:-}" pub att
+  [ -n "$r" ] && [ -f "$r/scripts/vf-cockpit-module.mjs" ] && [ -n "${VF_SORTIE:-}" ] || return 1
+  pub="$("${_CK_NODE:-node}" -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).hash||"")}catch{}' "$VF_SORTIE/.cache/server.json" 2>/dev/null)"
+  att="$("${_CK_NODE:-node}" --input-type=module -e 'const m=await import(process.argv[1]);const h=m.empreinteModule({dossierScripts:process.argv[2],dossierMoteur:process.argv[3]});console.log(h||"")' "file://$r/scripts/vf-cockpit-module.mjs" "$r/scripts" "$r/skills/cockpit-moteur" 2>/dev/null)"
+  [ -n "$pub" ] && [ "$pub" = "$att" ]
+}
+cockpit_vivant() {
+  local f="${WORK:-${TMPDIR:-/tmp}}/.ck-vivant-$$-$RANDOM" r=1
+  cockpit_get /api/status > "$f" 2> /dev/null   # sans substitution de commande : VF_CODE doit survivre
+  if [ "${VF_CODE:-000}" = 200 ]; then "${_CK_NODE:-node}" -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.exit(/^[0-9a-f]{12}$/.test(JSON.parse(s).hash)?0:1)}catch{process.exit(1)}})' < "$f" && r=0; fi
+  rm -f "$f"; return "$r"
+}
+cockpit_exporter() {
+  local dossier="${1:-}" fichier="${2:-}" sortie nd; [ "$#" -ge 2 ] || return 64; shift 2
+  nd="${NODE:-node}"; case "$nd" in */*) ;; *) nd="$(command -v "$nd")" || nd="$nd" ;; esac
+  sortie="${COCKPIT_SORTIE:-$dossier/.vibeflow/cockpit}"; sortie="$(cd "$sortie" 2>/dev/null && pwd -P || echo "$sortie")"
+  _cockpit_commande "$sortie"
+  ( cd "$dossier" && "$nd" "$_CK_SCRIPT" --export "$fichier" "$@" ${_CK_FIN:+"$_CK_FIN"} )
 }
