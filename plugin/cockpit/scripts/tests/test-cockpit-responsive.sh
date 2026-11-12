@@ -131,9 +131,9 @@ assert_eq "R5.2 — panneau d'ensemble sans bloc « Maintenant » ni « Phase �
 assert_has "R5.3 — témoin : le panneau montre bien les effectifs du lab" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[0].valeur.panneau')" "phases"
 assert_eq "R6.1 — titre de l'onglet Projet : « Projet · <nom> » (format unique, AUDC-X7)" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[0].valeur.titre')" "Projet · lab-court"
 assert_eq "R6.2 — titre de l'onglet Code : « Code · <nom> » (format unique, AUDC-X7)" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[1].valeur.titre')" "Code · lab-court"
-EXPR='(async () => { const d = document.createElement("div"); d.textContent = "Thinking…"; document.body.appendChild(d); await Promise.resolve(); await Promise.resolve(); const t = d.textContent; d.remove(); return t; })()'
+EXPR='window.__vfFrT("Thinking…")' # 79-10 : la phrase est traduite là où elle naît (aucun observateur ne réécrit un texte inséré après coup)
 XT="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$PC/project.html")"; unsrv
-assert_eq "R6.3 — « Thinking… » inséré est traduit avant toute image (deux micro-tâches)" "$(printf '%s' "$XT" | node "$AUX/ev.mjs" 'j.resultats[0].valeur')" "Réflexion…"
+assert_eq "R6.3 — « Thinking… » émis par le traducteur est montré en français, sans attendre de réécriture (79-10)" "$(printf '%s' "$XT" | node "$AUX/ev.mjs" 'j.resultats[0].valeur')" "Réflexion…"
 
 # O2 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : un fil d'Ariane profond (Vue d'ensemble / Historique / Phases) à 1 280 et 1 440 px.
 # Un segment de moins de 12 caractères n'est jamais rogné (scrollWidth <= clientWidth) ; si une troncature est nécessaire, elle porte sur un segment du MILIEU, jamais le premier ni le dernier.
