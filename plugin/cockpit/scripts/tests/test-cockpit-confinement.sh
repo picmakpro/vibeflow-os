@@ -778,6 +778,23 @@ export const MAX_MOTIF = 1024;
 export const MAX_PAS = 4194304;
 export function automateDe(...sources) { const res = sources.map((s) => new RegExp('^' + s + '$')); return (p) => res.some((r) => r.test(p)); }
 JS
+cat > "$GL_AUX/memoire.mjs" <<'JS'
+// memoire.mjs <dossier lib> — mémoire retenue par motif de classes (79-21) : N puis 2N motifs, deux formes (classes identiques, classes toutes différentes).
+// À lancer avec --expose-gc. Sortie : « ok » ou le détail ; plafond 40 Kio par motif de 1 Kio à N comme à 2N (la mémoire retenue croît donc au plus linéairement ; un rapport N/2N est trop bruité par le ramasse-miettes).
+import { pathToFileURL } from 'node:url';
+const { compileGlob } = await import(pathToFileURL(process.argv[2] + '/common.mjs').href);
+const formes = [(i) => '[ab]'.repeat(255) + (i % 10), (i) => Array.from({ length: 150 }, (_, k) => `[a${(k * 7 + i) % 90}]`).join('') + 'x'];
+const mesure = (mk, N) => {
+  global.gc(); const b = process.memoryUsage().heapUsed + process.memoryUsage().external;
+  const garde = []; for (let i = 0; i < N; i++) { const g = compileGlob(mk(i)); g.test('ab/' + 'ab'.repeat(40)); garde.push(g); }
+  global.gc(); const a = process.memoryUsage().heapUsed + process.memoryUsage().external;
+  return (a - b) / N / 1024 + garde.length * 0;
+};
+const r = [];
+for (const [k, mk] of formes.entries()) { const k1 = mesure(mk, 150), k2 = mesure(mk, 300); r.push({ k, k1, k2 }); }
+const mal = r.filter((x) => x.k1 > 40 || x.k2 > 40);
+console.log(mal.length ? 'échec : ' + r.map((x) => `forme ${x.k} : ${x.k1.toFixed(0)} puis ${x.k2.toFixed(0)} Kio par motif`).join(' ; ') : 'ok ' + r.map((x) => `${x.k1.toFixed(0)}/${x.k2.toFixed(0)}`).join(' '));
+JS
 glequiv() { node "$GL_AUX/equiv.mjs" "$GL_LIB" "$GL_AUX/ancien.mjs" "$1" "$GL_GRAINE" "$2" 2>&1; }
 glligne() { awk -v k="$1" 'index($0, k ": ") == 1 { print substr($0, length(k) + 3) }'; }
 echo "=== GLOB — coût borné de la correspondance de motifs (P79-D-32, SOCL-26) ==="
@@ -811,6 +828,8 @@ done
 GL_C2="$(node "$GL_AUX/plafonds.mjs" "$GL_LIB" C2 2> "$GL_AUX/c2.err" | head -1)"
 GL_C2L="$(awk 'END{print NR}' "$GL_AUX/c2.err")"; GL_C2M="$(awk '{ if (length($0) > m) m = length($0) } END{print m + 0}' "$GL_AUX/c2.err")"
 assert_eq "GLOB.C2 — motif géant de crochets non fermés : ne lève pas, rend faux, un avis d'une ligne de moins de 200 caractères sur stderr" "$GL_C2 / $GL_C2L ligne / $([ "$GL_C2M" -lt 200 ] && echo court || echo long)" "ok / 1 ligne / court"
+GL_MEM="$(node --expose-gc "$GL_AUX/memoire.mjs" "$GL_LIB" 2>&1 | head -1)"; echo "  mémoire : $GL_MEM"
+assert_eq "GLOB.MEM — mémoire retenue par motif de classes (150 puis 300 motifs, deux formes) : au plus 40 Kio par motif de 1 Kio, linéaire" "${GL_MEM%% *}" "ok"
 # ---------- mutants : chacun fait rougir l'identifiant qu'il vise, pour la bonne raison ----------
 # glmut <nom> <fichier de lib> <ancre> <remplacement> : copie fraîche du dossier lib, UNE occurrence remplacée ; rend « muté » ou « ancre absente »
 glmut() { rm -rf "$GL_AUX/m-$1"; cp -R "$GL_LIB" "$GL_AUX/m-$1"; node "$GL_AUX/glmut.mjs" "$GL_AUX/m-$1/$2" "$3" "$4"; }
@@ -856,6 +875,10 @@ GM_R="$(glmut COERCITION vf-glob.mjs 'const s = `${chemin}`;' 'const s = chemin;
 assert_eq "GLOB.M-COERCITION.ancre — l'ancre de la coercition de l'entrée existe une fois" "$GM_R" "muté"
 GM_S="$(glm_equiv COERCITION nonchaines)"
 assert_eq "GLOB.M-COERCITION — rougit E2 (une entrée non chaîne n'a plus le verdict de la copie gelée)" "$(gl_juge "$GM_S" tout 'attendu')" "oui"
+GM_R="$(glmut DEDUP vf-glob.mjs 'let idx = CORPS.get(n.corps);' 'let idx;')"
+assert_eq "GLOB.M-DEDUP.ancre — l'ancre du dédoublonnage des classes par leur corps existe une fois" "$GM_R" "muté"
+GM_S="$(node --expose-gc "$GL_AUX/memoire.mjs" "$GL_AUX/m-DEDUP" 2>&1 | head -1)"
+assert_eq "GLOB.M-DEDUP — rougit MEM (une RegExp et une table par occurrence de classe : plus de 40 Kio par motif)" "$(gl_juge "$GM_S" tout 'Kio par motif')" "oui"
 # M-RETOUR : le module est remplacé en entier par une regex native construite depuis la source (le retour arrière est réintroduit)
 rm -rf "$GL_AUX/m-RETOUR"; cp -R "$GL_LIB" "$GL_AUX/m-RETOUR"; cp "$GL_AUX/retour.mjs" "$GL_AUX/m-RETOUR/vf-glob.mjs"
 if [ "$(printf '%s\n' "$GL_BANC" | awk '{print $1, $2}')" = "lineaire=laisse-passer quadratique=vu" ]; then
