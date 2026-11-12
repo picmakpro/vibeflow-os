@@ -61,6 +61,21 @@ MI='{"nom":"MISSION-LIENS","etat":"running"}'
 assert_eq "PC1.4 — mission d'une phase vivante = {nom, etat}, aucune clé de verrou dans le graphe" \
   "$(nd ph-3 'JSON.stringify(n.avancement?.mission)')|$(c1 "$CLES")" "$MI|false"
 
+# ---------- PC6 — une seule règle : plans.faits compte comme le statut de l'élément de plan ----------
+L6="$WORK/pc6"; B="$L6/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+## Phases
+
+- [x] **Phase 1: Socle** - cochée, un plan sans SUMMARY
+MD
+for n in 01 02 03; do printf '<objective>Plan %s</objective>\n' "$n" | wr "$B/phases/01-socle/01-$n-PLAN.md"; done
+echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"; echo ok > "$B/phases/01-socle/01-02-SUMMARY.md"
+graph "$L6" "$WORK/c6.json"
+echo "=== PC6 — un seul compte de plans faits ==="
+FD6='JSON.stringify(j.nodes.find(x=>x.id==="ph-1").avancement.plans)+"|"+j.files.filter(f=>f.n==="ph-1"&&/-PLAN\.md$/.test(f.p)&&f.st==="done").length'
+assert_eq "PC6.1 — phase cochée, un plan sans SUMMARY : plans.faits = nombre d'éléments de plan done, le pied dit le même compte" \
+  "$(G "$WORK/c6.json" "$FD6")|$(G "$WORK/c6.json" 'j.nodes.find(x=>x.id==="ph-1").foot')" '{"faits":3,"total":3}|3|3/3 plans'
+
 # ---------- outils node de la suite ----------
 cat > "$AUX/pl.mjs" <<'JS'
 // pl.mjs <dossier de modules> <racine du lab> : ph.plans de chaque phase lue par readPlanning

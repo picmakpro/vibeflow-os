@@ -74,3 +74,20 @@ Suite rejouée sur le code AVANT correction du point 3 (`Number(wave)`) : PC2.2 
      obtenu:  [ancre-absente]
   Résultats : 18 PASS / 2 FAIL
 ```
+
+## Correction ciblée du 2026-11-12 — un seul compte de plans faits (PC6.1)
+
+Rouge sur le code d avant (plans.faits ne compte que les SUMMARY) ; PC1.5 vert :
+
+```
+  ✅ PASS — PC1.5 — ph-4 asymétrique : version 2, en-cours, plans 1 sur 3, un correctif
+=== PC6 — un seul compte de plans faits ===
+  ❌ FAIL — PC6.1 — phase cochée, un plan sans SUMMARY : plans.faits = nombre d'éléments de plan done, le pied dit le même compte
+     attendu: [{"faits":3,"total":3}|3|3/3 plans]
+     obtenu:  [{"faits":2,"total":3}|3|2/3 plans]
+  ✅ PASS — M-PLANS — le mutant rougit PC1.5 : plans { faits: total, total }
+  ✅ PASS — M-CORR — le mutant rougit PC1.5 : correctifs figé à 0
+  ✅ PASS — M-VERS — le mutant rougit PC1.5 : version null
+  ✅ PASS — M-ETAT — le mutant rougit PC1.5 : etat figé à fait
+  Résultats : 20 PASS / 1 FAIL
+```
