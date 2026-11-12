@@ -10,6 +10,10 @@
   const projet = () => D?.meta?.vfTab === 'project';
   const TBL = Object.assign({}, window.__vfFrDict || {}); // copie INTACTE de la table, clés à `{}` comprises
   const T = Object.assign({}, TBL);
+  // l'onglet Code garde des fichiers ; sur l'onglet Projet, un « fichier » est un plan, une exigence, une étape (lue aussi par les gabarits ci-dessous)
+  const SURCHARGE = projet()
+    ? { File: 'Élément', file: 'élément', Files: 'Éléments', files: 'éléments', 'Files involved': 'Éléments concernés', 'Search files, routes, modules': 'Chercher une carte, un plan, une exigence', '{} file': '{} élément|{} éléments' }
+    : { File: 'Fichier', file: 'fichier', Files: 'Fichiers', files: 'fichiers', 'Files involved': 'Fichiers concernés', 'Search files, routes, modules': 'Chercher un fichier, une route, un module', '{} file': '{} fichier|{} fichiers' };
   // clés à variables (`{}`) : une phrase de gabarit, la variable prise telle quelle puis traduite à son tour ; une valeur peut
   // porter « singulier|pluriel » (le premier `{}` est le compte, un « s » final facultatif est toléré dans la clé) et omettre
   // des `{}`, jamais en ajouter. Un gabarit au texte fixe court (< 16 caractères : « {} of {} », « {} with {} ») ne s'applique que si une variable
@@ -22,12 +26,8 @@
   const NOMS = ['Inside {}', 'You asked: {}', 'Everything behind {}', '{} contains {}'];
   const P = [];
   const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  for (const [k, v] of Object.entries(T)) if (k.includes('{}')) { delete T[k]; P.push([new RegExp('^' + k.split('{}').map(esc).join('(.*?)') + (v.includes('|') && /[a-z]$/.test(k) ? 's?' : '') + '$'), v.split('|').map((x) => x.split('{}')), k.replace(/\{\}/g, '').length, LISTES.includes(k), LIBRES.includes(k), /^\{\} \w+ ago$/.test(k), NOMS.includes(k)]); }
+  for (const [k, v] of Object.entries({ ...T, ...SURCHARGE })) if (k.includes('{}')) { delete T[k]; P.push([new RegExp('^' + k.split('{}').map(esc).join('(.*?)') + (v.includes('|') && /[a-z]$/.test(k) ? 's?' : '') + '$'), v.split('|').map((x) => x.split('{}')), k.replace(/\{\}/g, '').length, LISTES.includes(k), LIBRES.includes(k), /^\{\} \w+ ago$/.test(k), NOMS.includes(k)]); }
   P.sort((a, b) => b[2] - a[2]); // du plus précis au plus général : « {} and {} » ne capture plus une phrase longue qui contient « and »
-  // l'onglet Code garde des fichiers ; sur l'onglet Projet, un « fichier » est un plan, une exigence, une étape
-  const SURCHARGE = projet()
-    ? { File: 'Élément', file: 'élément', Files: 'Éléments', 'Files involved': 'Éléments concernés', 'Search files, routes, modules': 'Chercher une carte, un plan, une exigence', '{} file': '{} élément|{} éléments' }
-    : { File: 'Fichier', file: 'fichier', Files: 'Fichiers', 'Files involved': 'Fichiers concernés', 'Search files, routes, modules': 'Chercher un fichier, une route, un module', '{} file': '{} fichier|{} fichiers' };
   Object.assign(T, SURCHARGE);
   // sous-titre de la carte Projet (« Jalon v1 · phase 1 (Socle) · ready_to_plan. »), fabriqué par le socle avec le statut STATE brut : seul le dernier segment, un statut connu, est traduit (recette 68 R11, P68-D-35)
   const STATUTS = { ready_to_plan: 'prête à planifier', ready_to_execute: 'prête à exécuter', milestone_complete: 'jalon terminé', executing: 'en exécution', planning: 'en planification', verifying: 'en vérification', paused: 'en pause', completed: 'terminée', complete: 'terminée', closed: 'clos' };
