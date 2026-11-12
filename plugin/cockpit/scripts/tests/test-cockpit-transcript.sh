@@ -387,7 +387,7 @@ rm -rf "$WORK/mod-jeton"; MJM="$(cockpit_module_copie "$WORK/mod-jeton")"; MUT_M
 sed -i.bak "s#if (!sameOrigin || (!sameToken(given, token) \&\& !VF?.jetonValide(given)))#if (false)#" "$MJM/skills/cockpit-moteur/assets/serve.mjs"
 rafraichir
 demarrer "$MJ" "$H"; PORT="$SRV_PORT"; MUT_MOD=""
-assert_eq "T25.15 — témoin : sans contrôle de jeton, la route répond 200 sans jeton (le mutant est vu)" "appliqué:$(grep -c 'if (false)' "$MJ/serve.mjs")|sans-jeton:$(RQ GET "/api/vf/transcript?id=ag1" | sed -n 1p)" "appliqué:1|sans-jeton:200"
+assert_eq "T25.15 — témoin : sans contrôle de jeton, la route répond 200 sans jeton (le mutant est vu)" "appliqué:$(grep -c 'if (false)' "$MJM/skills/cockpit-moteur/assets/serve.mjs")|sans-jeton:$(RQ GET "/api/vf/transcript?id=ag1" | sed -n 1p)" "appliqué:1|sans-jeton:200"
 vf_hyg_stop "$SRV_PID"
 
 # --- M-PORTE : la garde d'émission (flux, hello) et son mutant ---
