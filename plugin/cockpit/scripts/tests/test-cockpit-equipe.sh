@@ -387,7 +387,7 @@ const [, , port, p, out] = process.argv;
 http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}` } }, (r) => { const c = []; r.on('data', (d) => c.push(d)); r.on('end', () => { fs.writeFileSync(out, Buffer.concat(c)); console.log(r.statusCode); }); }).on('error', (e) => console.log('ERR ' + e.code));
 JS
 cat > "$AUX/graphe.mjs" <<'JS'
-// graphe.mjs <dossier du module> <page.html> : le graphe embarqué de la page (extraireGraphe du module de ce dossier : la sortie assemblée), ou { erreur }
+// graphe.mjs <dossier du module> <page.html> : le graphe embarqué de la page (extraireGraphe du module de ce dossier), ou { erreur }
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -436,8 +436,8 @@ P23="$(node "$AUX/fetchp.mjs" "$PORT23" /project.html "$WORK/project23.html")"
 assert_eq "E23.0 — contrôle positif : serveur démarré et /project.html servi (200)" "$([ "$PORT23" -gt 0 ] && echo serveur)|$P23" "serveur|200"
 assert_eq "E23.1 — GET /equipe.html -> 200" "$S23" "200"
 assert_has "E23.2 — le titre de la page contient « VibeFlow · Équipe »" "$(grep -o '<title>[^<]*</title>' "$WORK/equipe.html" 2>/dev/null || echo 'aucun titre')" "VibeFlow · Équipe"
-# 69-07 : le lecteur du graphe est celui de la SORTIE assemblée (marqueur renommé window.VF_COCKPIT), comme le code servi — jamais celui des sources (window.FLOORPLAN)
-node "$AUX/graphe.mjs" "$OUT" "$WORK/equipe.html" > "$WORK/graphe-e23.json"
+# 79-06 : le lecteur du graphe est celui du MODULE (il écrit le marqueur window.VF_COCKPIT : la sortie ne porte plus de code), comme le code servi
+node "$AUX/graphe.mjs" "$SCRIPTS" "$WORK/equipe.html" > "$WORK/graphe-e23.json"
 assert_eq "E23.3 — le graphe embarqué porte le schéma vibeflow/cockpit-equipe@1 et meta.vfTab = equipe" "$(G "$WORK/graphe-e23.json" 'j.erreur||(j.schema+"|"+(j.meta||{}).vfTab)')" "vibeflow/cockpit-equipe@1|equipe"
 assert_eq "E23.4 — cartes : session racine, manager sous la session, worker sous son manager, terminés sous un bloc du manager, st active/done, aucun fichier" "$(G "$WORK/graphe-e23.json" 'j.erreur||(()=>{const n=(id)=>(j.nodes||[]).find((x)=>x.id===id)||{};return [n("se-'$SID'").parent??"-",n("ag-mgr1").parent,n("ag-w1").parent,n("ag-mgr1~termines").parent,n("ag-fin2h").parent,n("ag-w1").st,n("ag-fin2h").st,(j.files||[]).length].join("|")})()')" "-|se-$SID|ag-mgr1|ag-mgr1|ag-mgr1~termines|active|done|0"
 assert_eq "E23.5 — le graphe est conforme au schéma vibeflow/cockpit-equipe@1 du contrat" "$(node "$AUX/validate2.mjs" "$IFACE" vibeflow/cockpit-equipe@1 "$WORK/graphe-e23.json")" "OK"

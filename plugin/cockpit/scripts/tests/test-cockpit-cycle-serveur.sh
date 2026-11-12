@@ -94,7 +94,7 @@ const [, , port, p, jeton] = process.argv;
 http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}`, ...(jeton ? { 'x-vf-cockpit-token': jeton } : {}) } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => { process.stdout.write(b, () => process.exit(0)); }); }).on('error', () => process.exit(1));
 JS
 jeton_de() { node "$AUX/get.mjs" "$1" / | node -e "let s='';process.stdin.on('data',c=>s+=c).on('end',()=>console.log((/VF_COCKPIT_SERVER=\\{\"token\":\"([0-9a-f]+)\"/.exec(s)||[])[1]||''))"; }
-nserv() { pgrep -f -- "$1/.vibeflow/cockpit/serve.mjs" | wc -l | tr -d ' '; }
+nserv() { pgrep -f -- "--sortie=$1/.vibeflow/cockpit" | wc -l | tr -d ' '; }   # 79-06 : le serveur est celui du module, la sortie est son dernier argument
 pid_etat() { node -e "try{console.log(JSON.parse(require('fs').readFileSync('$1/.vibeflow/cockpit/.cache/server.json','utf8')).pid)}catch{console.log('')}"; }
 LAN="node $SCRIPTS/vf-cockpit.mjs"
 LH="$WORK/labh"; mklab "$LH"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LH" --quiet > "$WORK/build-h.out" 2>&1 || cat "$WORK/build-h.out"
@@ -124,7 +124,11 @@ $LAN open --lab "$LH" --no-open --port "$PH" > "$WORK/l5.out" 2>&1
 assert_eq "H3.10 — server.json perdu, serveur du lab déjà à l'écoute : aucun second serveur lancé" "$(nserv "$LH")" "1"
 assert_eq "H3.11 — le serveur repris est le même (PID de server.json = PID d'avant) et la reprise est au journal" "$(pid_etat "$LH") $(grep -c 'sans server.json : repris' "$LOG")" "$PID2 1"
 # H3.19-H3.21 empreinte du code : un serveur chargé avec un autre code que la sortie assemblée est remplacé et le journal le dit ; la relance suivante, à code identique, ne remplace pas
-echo '// empreinte changée' >> "$LH/.vibeflow/cockpit/serve.mjs"
+# 79-06 : le code est celui du module (la sortie n'en porte plus) : le lanceur d'une COPIE du module relance le serveur quand un octet de la copie change
+$LAN stop --lab "$LH" > /dev/null 2>&1; for _ in $(seq 1 30); do [ "$(nserv "$LH")" = 0 ] && break; sleep 0.2; done
+C319="$(cockpit_module_copie)"; LAN="node $C319/scripts/vf-cockpit.mjs"
+$LAN open --lab "$LH" --no-open --port "$PH" > "$WORK/l7a.out" 2>&1; PID2="$(pid_etat "$LH")"
+echo '// empreinte changée' >> "$C319/skills/cockpit-moteur/assets/serve.mjs"
 $LAN open --lab "$LH" --no-open --port "$PH" > "$WORK/l7.out" 2>&1
 PID3="$(pid_etat "$LH")"
 assert_eq "H3.19 — code de la sortie changé depuis le démarrage du serveur : le serveur est remplacé (PID différent)" "$([ -n "$PID3" ] && [ "$PID3" != "$PID2" ] && echo oui || echo non)" "oui"
@@ -162,10 +166,11 @@ assert_has "H3.16 — le motif de l'arrêt (inactivité) est daté au journal" "
 # terminal factice qui se déclare occupé : la rétention est dite au journal, le serveur reste
 LT="$WORK/labt"; mklab "$LT"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LT" --quiet > "$WORK/build-t.out" 2>&1 || cat "$WORK/build-t.out"
 OUTT="$LT/.vibeflow/cockpit"
-cat > "$OUTT/vf-cockpit-terminal.mjs" <<'JS'
+CT="$(cockpit_module_copie)"   # 79-06 : le terminal vient du module : une copie dont le terminal est factice
+cat > "$CT/scripts/vf-cockpit-terminal.mjs" <<'JS'
 export const preparerTerminal = () => ({ injection: () => '', occupe: () => true, demarrer() {}, frameSrc: () => '', routeP() {} });
 JS
-COCKPIT_LOG="$WORK/srv-t.out" cockpit_lancer "$LT" VF_COCKPIT_IDLE_TICK_MS=300 --idle-exit 0.05 --terminal || true
+COCKPIT_MODULE="$CT" COCKPIT_LOG="$WORK/srv-t.out" cockpit_lancer "$LT" VF_COCKPIT_IDLE_TICK_MS=300 --idle-exit 0.05 --terminal || true
 ST="$VF_PID"; PT="$VF_PORT"
 for _ in $(seq 1 30); do grep -q 'retenu' "$WORK/srv-t.out" && break; sleep 0.3; done
 assert_has "H3.17 — un terminal ouvert retient l'arrêt sur inactivité, et le journal le dit" "$(cat "$WORK/srv-t.out")" "arrêt sur inactivité retenu : un terminal est ouvert"
@@ -264,7 +269,7 @@ if [ "$AIDE" != oui ]; then # aide absente : des remplaçants qui échouent, pou
   attendre() { return 127; }
   cockpit_lancement_brut() { return 0; }
 fi
-nproc_sortie() { ps -eo args | S="$1/serve.mjs" awk 'index($0, ENVIRON["S"]) { n++ } END { print n + 0 }'; }  # le motif passe par l'environnement : jamais dans la ligne de commande d'awk, qui se compterait elle-même
+nproc_sortie() { ps -eo args | S="--sortie=$1" awk 'index($0, ENVIRON["S"]) { n++ } END { print n + 0 }'; }  # le motif passe par l'environnement : jamais dans la ligne de commande d'awk, qui se compterait elle-même
 LS="$WORK/labs2"; mklab "$LS"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LS" --quiet > "$WORK/build-s2.out" 2>&1 || cat "$WORK/build-s2.out"
 export VF_AM7_TEMOIN=temoin-env-ok
 cockpit_lancer "$LS" > "$WORK/s2.out" 2> "$WORK/s2.err"; RC2=$?
@@ -296,20 +301,21 @@ T0=$SECONDS; COCKPIT_SORTIE="$WORK/sortie-sans" COCKPIT_ATTENTE=20 COCKPIT_LOG="
 assert_eq "AM7.S7 — serveur mort avant d'écouter : retour 1, en moins de 15 s, VF_PID vide, VF_PORT=0, journal non vide" "$RC7 $([ "$D7" -lt 15 ] && echo oui || echo non) $([ -z "${VF_PID:-}" ] && echo oui || echo non) ${VF_PORT:-?} $([ -s "$WORK/s7-serve.out" ] && echo oui || echo non)" "1 oui oui 0 oui"
 RC8="$(env -u VF_HYG_TAG bash -c '. "$1"; cockpit_lancer "$2" > /dev/null 2>&1; echo $?' x "$SOCLE" "$LS" 2> /dev/null)"
 assert_eq "AM7.S8 — hygiène non initialisée (bash enfant) : retour 2 et aucun processus de la sortie (ps + awk)" "$RC8 $(nproc_sortie "$SORTIE_REELLE")" "2 0"
-HORS="$(mktemp -d)"; cp -R "$LS/.vibeflow/cockpit" "$HORS/sortie"
-COCKPIT_SORTIE="$HORS/sortie" cockpit_lancer "$LS" > /dev/null 2>&1; RC9=$?
-assert_eq "AM7.S9 — sortie hors de la marque de la suite : retour 3 et rien lancé (ps + awk)" "$RC9 $(nproc_sortie "$HORS/sortie")" "3 0"
+HORS="$(mktemp -d)"; HSORTIE="$HORS/lab/.vibeflow/cockpit"; mkdir -p "$HORS/lab/.vibeflow"; cp -R "$LS/.vibeflow/cockpit" "$HSORTIE"   # 79-06 : le serveur du module exige la forme <lab>/.vibeflow/cockpit : la sortie hors marque la garde
+COCKPIT_SORTIE="$HSORTIE" cockpit_lancer "$LS" > /dev/null 2>&1; RC9=$?
+assert_eq "AM7.S9 — sortie hors de la marque de la suite : retour 3 et rien lancé (ps + awk)" "$RC9 $(nproc_sortie "$HSORTIE")" "3 0"
 # sonde des effets de bord : trois clés indépendantes (inscrit / invisible / stale), jouée avec l'aide puis avec ses mutants
 sonde_aide() {
   ( . "$1"; local r_i=non r_v r_s q
     cockpit_lancer "$LS" > /dev/null 2>&1; for q in ${PIDS[@]+"${PIDS[@]}"}; do [ "$q" = "${VF_PID:-x}" ] && r_i=oui; done; cockpit_arreter
-    COCKPIT_SORTIE="$HORS/sortie" cockpit_lancer "$LS" > /dev/null 2>&1; r_v=$?
+    COCKPIT_SORTIE="$HSORTIE" cockpit_lancer "$LS" > /dev/null 2>&1; r_v=$?
     [ "$r_v" = 0 ] && { kill "$VF_PID" 2> /dev/null; wait "$VF_PID" 2> /dev/null; ps -p "$VF_PID" > /dev/null 2>&1 && r_v="$r_v(survit)"; }
     printf '{"pid":2147483000,"port":9,"token":"perime","url":"http://127.0.0.1:9"}\n' > "$LS/.vibeflow/cockpit/.cache/server.json"
     cockpit_lancer "$LS" > /dev/null 2>&1; r_s="$([ "${VF_PORT:-0}" = 9 ] && echo suivi || echo ignoré)"; cockpit_arreter
     echo "inscrit=$r_i invisible=$r_v stale=$r_s" )
 }
-mutant_de() { sed "/$1/d" "$SOCLE" > "$WORK/mut-$1.sh"; echo "$(cmp -s "$SOCLE" "$WORK/mut-$1.sh" && echo identique || echo different) $(bash -n "$WORK/mut-$1.sh" 2> /dev/null && echo valide || echo invalide) $(sonde_aide "$WORK/mut-$1.sh")"; }
+# 79-06 : la copie de l'aide vit hors de tests/ : sa racine de module par défaut (_CK_DEPOT, dérivée de son emplacement) est refixée sur celle du dépôt dans la copie de référence ET dans le mutant ; l'« identique » compare le mutant à cette référence
+mutant_de() { local dep; dep="$(cd "$SCRIPTS/.." && pwd -P)"; sed "s#^_CK_DEPOT=.*#_CK_DEPOT=\"$dep\"#" "$SOCLE" > "$WORK/ref-socle.sh"; sed "/$1/d" "$WORK/ref-socle.sh" > "$WORK/mut-$1.sh"; echo "$(cmp -s "$WORK/ref-socle.sh" "$WORK/mut-$1.sh" && echo identique || echo different) $(bash -n "$WORK/mut-$1.sh" 2> /dev/null && echo valide || echo invalide) $(sonde_aide "$WORK/mut-$1.sh")"; }
 if [ "$AIDE" = oui ]; then
   BASE_SONDE="$(sonde_aide "$SOCLE")"
   M_PIDS="$(mutant_de am7:pids)"; M_VIS="$(mutant_de am7:visible)"; M_STALE="$(mutant_de am7:stale)"
@@ -473,6 +479,33 @@ assert_eq "M-MODULE.0 — ancre présente : l'identité exige le serve.mjs du mo
 assert_eq "M-PREFIXE.0 — ancre présente : l'identité exige la fin de ligne exacte --sortie=<chemin réel> (marqueur m:prefixe)" "$(grep -cF '// m:prefixe' "$SV" 2> /dev/null)" "1"
 assert_eq "M-ANCIENNE.0 — ancre présente : la forme de la version précédente est encore reconnue (marqueur m:ancienne)" "$(grep -cF '// m:ancienne' "$SV" 2> /dev/null)" "1"
 assert_eq "M-STATUS.0 — ancre présente : detecterServeur sépare détecter d'adopter (vf-cockpit-serveur-vivant.mjs)" "$(grep -cF 'export function detecterServeur' "$SV" 2> /dev/null)" "1"
+
+# ---- mutants de la tâche 4a (79-06) : copies du module (cockpit_module_muter), témoins rejoués sur la copie ----
+cockpit_module_muter mversion serve.mjs "s#^if (cli) { try { const v = execFile.*\$#if (cli) { try { version = execFileSync(cli.cmd, [...cli.args, '--version'], { encoding: 'utf8', timeout: 15000, stdio: ['ignore', 'pipe', 'ignore'], windowsHide: true }).trim(); } catch {} }#"; MV="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+LMV="$WORK/lab-mversion"; am4_lab "$LMV"; rm -f "$LIBERE14"
+COCKPIT_MODULE="$MV" COCKPIT_ATTENTE=6 COCKPIT_LOG="$WORK/mversion.out" cockpit_lancer "$LMV" PATH="$WORK/fk14:$PATH"; RCMV=$?
+: > "$LIBERE14"; cockpit_arreter; unset COCKPIT_MODULE
+assert_eq "M-VERSION-SYNC — lecture synchrone de claude --version rétablie : la copie est valide (node --check) et AM4.14 rougit (le serveur n'est pas prêt dans la borne : lancement=4)" "$(node --check "$MV/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) lancement=$RCMV" "valide lancement=4"
+LISTE420="$( { ls "$MODROOT/scripts" | grep -E '^vf-cockpit-.*\.mjs$|^vf-cockpit-interface\.json$'; ls "$MODROOT/skills/cockpit-moteur/assets" | grep -E '^(serve\.mjs|graph-query\.js|query-cli\.mjs)$'; } | sed "s/.*/'&'/" | paste -sd, - )"
+cockpit_module_muter mliste vf-cockpit-module.mjs "s#const dedans = (d, motifs) => fs.readdirSync(d).filter((f) => motifs.some((re) => re.test(f)));#const dedans = (d) => fs.readdirSync(d).filter((f) => [$LISTE420].includes(f));#"; ML="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+am47_sur() { # <racine> : un octet changé dans un module existant (hors serve.mjs) : le second open relance-t-il ?
+  local L="$WORK/lab-am47m"; rm -rf "$L"; mklab "$L"; local P PA PB; P="$(libre)"
+  am4_ouvrir "$1" "$L" "$P" > "$WORK/am47m-1.out" 2>&1; PA="$(pid_etat "$L")"; printf '\n// octet\n' >> "$1/scripts/vf-cockpit-types.mjs"
+  am4_ouvrir "$1" "$L" "$P" > "$WORK/am47m-2.out" 2>&1; PB="$(pid_etat "$L")"; am4_arreter "$1" "$L"
+  [ -n "$PA" ] && [ -n "$PB" ] && [ "$PA" != "$PB" ] && echo relancé || echo réutilisé
+}
+am420_sur() { # <racine> : module neuf ajouté puis modifié d'un octet (AM4.20)
+  local L="$WORK/lab-am420m"; rm -rf "$L"; mklab "$L"; local P PA PB PC; P="$(libre)"
+  printf '// module neuf, que rien n importe\nexport const ESSAI = 1;\n' > "$1/scripts/vf-cockpit-essai-am420.mjs"
+  am4_ouvrir "$1" "$L" "$P" > "$WORK/am420m-1.out" 2>&1; PA="$(pid_etat "$L")"
+  am4_ouvrir "$1" "$L" "$P" > "$WORK/am420m-2.out" 2>&1; PB="$(pid_etat "$L")"
+  printf '\n// octet\n' >> "$1/scripts/vf-cockpit-essai-am420.mjs"
+  am4_ouvrir "$1" "$L" "$P" > "$WORK/am420m-3.out" 2>&1; PC="$(pid_etat "$L")"; am4_arreter "$1" "$L"
+  echo "$([ -n "$PA" ] && [ "$PA" = "$PB" ] && echo réutilisé-sans-changement || echo relancé-à-tort) $([ -n "$PC" ] && [ "$PB" != "$PC" ] && echo relancé-après-octet || echo réutilisé-malgré-octet)"
+}
+MLC="$WORK/mliste-copie"; cp -R "$ML" "$MLC"
+V47="$(am47_sur "$ML")"; V420="$(am420_sur "$MLC")"
+assert_eq "M-LISTE-FIGEE — liste des fichiers hachés énumérée en dur : la copie est valide, AM4.20 rougit SEUL (module neuf sans effet sur l'empreinte) et AM4.7 reste vert (un module existant change l'empreinte)" "$(node --check "$ML/scripts/vf-cockpit-module.mjs" 2> /dev/null && echo valide || echo invalide) | AM4.7=$V47 | AM4.20=$V420" "valide | AM4.7=relancé | AM4.20=réutilisé-sans-changement réutilisé-malgré-octet"
 
 vf_hyg_assert
 
