@@ -30,7 +30,7 @@
     body.vf-forme-couloirs #stage { background-image: none; } body.vf-forme-couloirs #svg { visibility: hidden; } body.vf-forme-couloirs #zoom,
       body.vf-forme-couloirs #context { display: none; }
     section.vf-projet button { font: inherit; color: inherit; text-align: left; cursor: pointer; }
-    /* la bascule et la barre de jalon suivent le titre à gauche : à droite, le panneau ouvert les recouvrirait (80-UI-SPEC § 2.1 les aligne à droite : écart assumé) */
+    /* la bascule et la barre de jalon suivent le titre à gauche : à droite, le panneau ouvert les recouvrirait (80-UI-SPEC § 2.1 : écart assumé) */
     .vp-tete { display: flex; align-items: center; gap: var(--sp-24); margin-bottom: var(--sp-16); flex-wrap: wrap; }
     .vp-tete h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.02em; } .vp-tete h1:focus { outline: none; }
     .vp-bascule { display: inline-flex; gap: var(--sp-2); padding: var(--sp-4); border-radius: var(--r-ctl); background: var(--raise); flex: none; }
@@ -39,7 +39,7 @@
     .vp-bascule button[aria-pressed="true"] { background: var(--surface); color: var(--text); font-weight: 600; box-shadow: var(--shadow-card); }
     .vp-bascule button:focus-visible, .vp-carte:focus-visible, .vp-rangee:focus-visible,
       .vp-details summary:focus-visible { outline: 2px solid var(--ring); outline-offset: var(--sp-2); }
-    #vf-projet-flottant { position: absolute; z-index: 3; left: var(--edge); top: calc(var(--hh, 64px) + var(--sp-8));
+    #vf-projet-flottant { position: absolute; z-index: 3; left: 50%; transform: translateX(-50%); top: calc(var(--hh) + var(--sp-8));
       } body.vf-forme-couloirs #vf-projet-flottant { display: none; }
     .vp-status { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .vp-info { padding: var(--inset-box); border-radius: var(--r-ctl); background: var(--surface); font-size: 13px; color: var(--text-2);
@@ -85,7 +85,8 @@
     @media (hover: hover) { .vp-carte, .vp-rangee { transition: background-color 150ms var(--ease), box-shadow 150ms var(--ease);
       } .vp-carte:hover:not([aria-current="true"]) { background: var(--surface-hover); box-shadow: var(--shadow-lift); } }
     @media (max-width: 999px) { .vp-couloirs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 700px) { .vp-couloirs { grid-template-columns: minmax(0, 1fr); } .vp-barre, .vp-barre .vf-bar { width: 100%;
+    @media (max-width: 700px) { #vf-projet-flottant { top: auto; bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--edge));
+      } .vp-couloirs { grid-template-columns: minmax(0, 1fr); } .vp-barre, .vp-barre .vf-bar { width: 100%;
       } .vp-barre .vf-bar { flex: 1; } }
     @media (pointer: coarse), (max-width: 700px) { .vp-bascule button { min-height: 44px; } }
     @media (prefers-reduced-motion: reduce) { .vp-carte, .vp-rangee { transition: none; } }
