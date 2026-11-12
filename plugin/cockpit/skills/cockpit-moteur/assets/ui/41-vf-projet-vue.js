@@ -2,23 +2,32 @@
 // continue de rendre dessous.
 // Modèle et rendu : 41-vf-projet-modele.js, 41-vf-projet-rendu.js ; clavier : 41-vf-projet-clavier.js. Ne parle au viewer que par window.Floorplan,
 // sans patch ni requête.
-// Exposé : window.VF_PROJET { formes(), forme(), basculer(nom), carteDe(id) } (gelé). `?vue=` : liste fermée (couloirs, graphe ici ; 80-07 y inscrit
-// « liste »), sinon la forme par défaut.
+// Exposé : window.VF_PROJET { formes(), forme(), basculer(nom, opts), carteDe(id), inscrireForme, niveau(), redessiner(), annoncer(txt) } (gelé) ;
+// forme() dit la forme AFFICHÉE (dans une phase : liste ou graphe).
+// `?vue=` : liste fermée (couloirs, liste, graphe), sinon la mémoire par lab et largeur, sinon le défaut.
+// 80-07 : formes « liste » (41-vf-projet-liste.js, -phase.js, par le registre window.__vfProjetRegistre) ; touche v et mémoire : 41-vf-projet-formes.js.
 (() => {
   const SC = window.Floorplan, M = window.__vfProjetModele, R = window.__vfProjetRendu;
   if (!SC || !M || !R || !SC.graph.meta || SC.graph.meta.vfTab !== 'project') return;
   const { graph: G, state } = SC;
   const stage = document.getElementById('stage');
   if (!stage) return;
-  const FORMES = ['couloirs', 'graphe'], LIBELLES = { couloirs: 'Couloirs', graphe: 'Graphe' };
+  const FORMES = ['couloirs', 'liste', 'graphe'], LIBELLES = { couloirs: 'Couloirs', liste: 'Liste', graphe: 'Graphe' };
+  const REG = (window.__vfProjetRegistre = window.__vfProjetRegistre || {}), MEM = window.__vfProjetMemoire, LS = () => window.__vfProjetListe;
+  const inscrireForme = (nom, def) => { if (FORMES.includes(nom) && def && typeof def.rendre === 'function') REG[nom + ':' + (def.niveau || 'racine')] = def; };
   // T-80-08 : une valeur hors de la liste vaut la forme par défaut, jamais insérée dans le DOM
   const demandee = new URLSearchParams(location.search).get('vue');
-  let forme = FORMES.includes(demandee) ? demandee : 'couloirs', vivant = false, section = null, corps = null, statut = null, flottant = null,
+  let forme = FORMES.includes(demandee) ? demandee : 'couloirs', vivant = false, section = null, corps = null,
+    statut = null, flottant = null,
     conteneur = null, avantVisite = null, ro = null, debutPose = 0, precedents = new Map();
   const ouverts = new Set(), noeuds = () => new Map((G.nodes || []).map((n) => [n.id, n]));
   const conteneurJalon = () => { const c = String(state.container); const n = c.startsWith('n:') ? noeuds().get(c.slice(2)) : null;
     return c === 'n:history' || (!!n && n.kind === 'jalon'); };
-  const affichee = () => forme === 'couloirs' && (state.container === 'root' || conteneurJalon()); // un jalon vu en couloirs est ramené à la racine (P80-C76-3)
+  const niveau = () => { const c = String(state.container); if (c === 'root' || conteneurJalon()) return 'racine';
+    const n = c.startsWith('n:') ? noeuds().get(c.slice(2)) : null; return n && n.kind === 'phase' ? 'phase' : 'autre'; };
+  // couloirs n'a pas de sens dans une phase
+  const effective = () => { const n = niveau(); return n === 'autre' || forme === 'graphe' ? 'graphe' : n === 'phase' ? 'liste' : forme; };
+  const affichee = () => effective() !== 'graphe'; // un jalon vu en couloirs ou en liste est ramené à la racine (P80-C76-3)
 
   const style = document.createElement('style');
   style.textContent = `
@@ -89,7 +98,9 @@
     @media (hover: hover) { .vp-carte, .vp-rangee { transition: background-color 150ms var(--ease), box-shadow 150ms var(--ease);
       } .vp-carte:hover:not([aria-current="true"]) { background: var(--surface-hover); box-shadow: var(--shadow-lift); } }
     @media (max-width: 999px) { .vp-couloirs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-    @media (max-width: 700px) { #vf-projet-flottant { top: auto; bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--edge));
+    @media (max-width: 700px) { .vp-tete h1 { width: 100%; } .vp-tete .vp-bascule { width: 100%; box-sizing: border-box;
+      } .vp-tete .vp-bascule button { flex: 1; text-align: center; }
+      #vf-projet-flottant { top: auto; bottom: calc(var(--vf-ask-h, var(--sp-8)) + var(--edge));
       } .vp-couloirs { grid-template-columns: minmax(0, 1fr); } .vp-barre, .vp-barre .vf-bar { width: 100%;
       } .vp-barre .vf-bar { flex: 1; } }
     @media (pointer: coarse), (max-width: 700px) { .vp-bascule button { min-height: 44px; } }
@@ -97,13 +108,19 @@
   `;
   document.head.appendChild(style);
 
-  const outils = () => `<div class="vp-bascule" role="group" aria-label="Forme de l'affichage">${FORMES.map((f) =>
-    `<button type="button" data-forme="${f}" aria-pressed="${f === forme}">${LIBELLES[f]}</button>`).join('')}</div>`;
+  const segs = () => (niveau() === 'racine' ? FORMES : ['liste', 'graphe']);
+  const boutons = () => segs().map((f) => `<button type="button" data-forme="${f}" aria-pressed="${f === effective()}">${LIBELLES[f]}</button>`).join('');
+  const outils = () => `<div class="vp-bascule" role="group" aria-label="Forme de l'affichage">${boutons()}</div>`;
   const classes = () => { document.body.classList.toggle('vf-forme-couloirs', affichee()); document.body.classList.toggle('vf-forme-graphe', !affichee()); };
-  const marquerBascule = () => document.querySelectorAll('[data-forme]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.forme === forme)));
+  // les segments suivent le niveau (trois à la racine, deux dans une phase)
+  const marquerBascule = () => document.querySelectorAll('.vp-bascule').forEach((g) => {
+    if ([...g.children].map((b) => b.dataset.forme).join() !== segs().join()) g.innerHTML = boutons();
+    g.querySelectorAll('[data-forme]').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.forme === effective()))); });
   const K = window.__vfProjetClavier || { appliquer() {}, poser() {}, ramener() {}, ordre: () => [], repli: () => null, memoire: new Map(), cle: () => '' };
   const selectionnee = () => (typeof state.selected === 'string' ? state.selected : null);
   const carteDe = (id) => (section ? section.querySelector(`.vp-carte[data-id="${CSS.escape(id)}"]`) : null);
+  const poserU = (el, o) => (el.matches('.vp-ligne') ? LS().poser(el, o) : K.poser(el, o)), repli = (o) => (effective() === 'couloirs' || !LS() ?
+    K.repli(o) : LS().repli(o));
   const annoncer = (txt) => { if (statut) { statut.textContent = ''; statut.textContent = txt; } };
   const couloirsDe = () => { const m = new Map(); for (const b of M.blocs(G)) for (const [c,
     l] of Object.entries(b.couloirs)) for (const k of l) m.set(k.id, [c, k]); return m; };
@@ -111,13 +128,17 @@
 
   const dessiner = () => {
     if (!vivant) return;
-    const a = document.activeElement, dans = !!a && corps.contains(a) && a.matches('.vp-carte, .vp-rangee, summary');
-    const memo = dans ? { id: a.dataset.id || null, resume: a.tagName === 'SUMMARY' ? a.parentNode.dataset.cle : null,
-      ordre: a.dataset.id ? K.ordre(a) : [], cle: a.dataset.id ? K.cle(a) : '' } : null;
+    const a = document.activeElement, dans = !!a && corps.contains(a) && a.matches('.vp-carte, .vp-rangee, .vp-ligne, summary, [data-tri]'), L = dans &&
+      a.matches('.vp-ligne, [data-tri]');
+    const memo = dans ? { id: a.dataset.id || null, tri: a.dataset.tri || null, resume: a.tagName === 'SUMMARY' ? a.parentNode.dataset.cle : null,
+      ordre: a.dataset.id ? (L ? LS().ordre(a) : K.ordre(a)) : [], cle: L ? LS().cle(a) : a.dataset.id ? K.cle(a) : '' } : null;
     const avant = section.scrollTop, avantG = section.scrollLeft, vus = precedents; // les couloirs du rendu précédent
     const modele = { blocs: M.blocs(G), historique: M.historique(G), listes: M.listes(G) };
-    corps.innerHTML = R.vue(modele, { sel: selectionnee(), ouverts });
-    K.appliquer(corps);
+    const n = niveau(), ph = n === 'phase' ? noeuds().get(String(state.container).slice(2)) : null, def = effective() === 'couloirs' ? null :
+      REG[effective() + ':' + n];
+    section.querySelector('#vf-projet-titre').textContent = ph ? 'Phase ' + M.numeroDe(ph) : 'Projet';
+    corps.innerHTML = def ? def.rendre(modele, { sel: selectionnee(), ouverts, phase: ph }) : R.vue(modele, { sel: selectionnee(), ouverts });
+    K.appliquer(corps); if (LS()) LS().appliquer(corps);
     section.scrollTop = avant; section.scrollLeft = avantG;
     const apres = couloirsDe(), suivi = memo && memo.id || selectionnee();
     precedents = apres;
@@ -128,18 +149,24 @@
     if (memo) restituer(memo);
   };
   const restituer = (m) => { // le focus d'un contrôle de la vue survit au redessin ; un contrôle disparu suit l'ordre unique de la famille (80-UI-SPEC § 5)
-    if (m.resume) { const s = corps.querySelector(`details[data-cle="${m.resume}"] summary`); if (s) { s.focus({ preventScroll: true }); return; } }
+    const coll = (c) => [...corps.querySelectorAll('[data-coll]')].find((x) => x.dataset.coll === c);
+    const ent = m.tri ? (coll(m.cle) || corps).querySelector(`[data-tri="${m.tri}"]`) : m.resume ?
+      corps.querySelector(`details[data-cle="${m.resume}"] summary`) : null;
+    if (ent) { // garde:orphelin-tri
+      ent.focus({ preventScroll: true }); return;
+    }
     const par = (id) => (id ? corps.querySelector(`[data-id="${CSS.escape(id)}"]`) : null);
     let cible = par(m.id);                                    // (1) l'équivalent par clé stable
     if (!cible && m.id) {                                     // (3) le voisin suivant, puis précédent, de la même collection
       const i = m.ordre.indexOf(m.id), suite = m.ordre.slice(i + 1).map(par).find(Boolean), avant = m.ordre.slice(0, i).reverse().map(par).find(Boolean);
       cible = suite || avant || null;
     }
-    if (!cible && m.cle) { // (4) l'arrêt itinérant de la collection
+    if (!cible && m.cle && coll(m.cle)) cible = coll(m.cle).querySelector('.vp-ligne[tabindex="0"]'); // (4) l'arrêt itinérant d'une table ou des plans
+    if (!cible && m.cle && !coll(m.cle)) { // (4) l'arrêt itinérant de la collection
       const q = m.cle.startsWith('liste:') ? `details[data-cle="${m.cle.slice(6)}"] .vp-rangee` : `.vp-jalon[data-jalon="${m.cle}"] .vp-carte`;
       cible = corps.querySelector(q + '[tabindex="0"]');
     }
-    if (cible) K.poser(cible, { defiler: false }); else K.repli({ defiler: false }); // (5) l'élément sélectionné, sinon le h1 : jamais body
+    if (cible) poserU(cible, { defiler: false }); else repli({ defiler: false }); // (5) l'élément sélectionné, sinon le h1 : jamais body
   };
 
   // zone basse (80-UI-SPEC § 3) : la vue ne passe jamais sous #ask, #vf-coin, la pastille « Terminal » ni la feuille de détail ; le tiroir du
@@ -170,26 +197,36 @@
   const surRender = () => {
     if (!vivant) return;
     const avant = conteneur; conteneur = state.container;
-    if (forme === 'couloirs' && state.container !== 'root' && conteneurJalon()) { SC.go('root', { select: state.selected, push: false }); return; } // P80-C76-3
+    if (affichee() && state.container !== 'root' && conteneurJalon()) { SC.go('root', { select: state.selected, push: false }); return; } // P80-C76-3
     const a = document.activeElement, venaitDeLaVue = !!a && section.contains(a), changeNiveau = avant !== null && avant !== state.container;
-    classes(); dessiner(); mesurerBas();
+    classes(); marquerBascule(); dessiner(); mesurerBas();
     if (!affichee()) { // plongée : le focus va à la première carte du niveau d'arrivée (le canevas, qu'il montre)
       const C = window.VF_CANEVAS, id = C && C.carteItinerante && C.carteItinerante();
       if (venaitDeLaVue && changeNiveau) { if (!(id && C.focaliser(id))) stage.focus({ preventScroll: true }); }
-    } else if (changeNiveau && quitteLaVue(a)) K.repli(); // retour à la racine : la carte de la phase quittée
+    // entrée dans une phase : le h1 ; retour à la racine : la carte ou la rangée de la phase quittée
+    } else if (changeNiveau && (quitteLaVue(a) || venaitDeLaVue)) repli();
   };
-  const basculer = (nom, { url = true } = {}) => {
-    if (!FORMES.includes(nom) || nom === forme) return false;
-    const surSegment = !!(document.activeElement && document.activeElement.closest && document.activeElement.closest('[data-forme]'));
-    forme = nom; marquerBascule(); classes(); mesurerBas();
+  const basculer = (nom, { url = true, memoriser = false, equivalent = false } = {}) => {
+    if (!FORMES.includes(nom) || nom === effective()) return false;
+    const act = document.activeElement, surSegment = !!(act && act.closest && act.closest('[data-forme]'));
+    const eq = equivalent && act && corps.contains(act) && act.dataset ? act.dataset.id : null; // touche v : l'élément équivalent de la nouvelle forme
+    forme = nom; if (memoriser && MEM) MEM.ecrire(nom);
+    marquerBascule(); classes(); if (affichee()) dessiner(); mesurerBas();
+    if (equivalent && !surSegment) {
+      const C = window.VF_CANEVAS, id = C && C.carteItinerante && C.carteItinerante();
+      if (affichee()) { const l = eq && [...section.querySelectorAll('[data-id]')].find((e) => e.dataset.id === eq &&
+        e.matches('.vp-carte, .vp-ligne')); if (l) poserU(l); else repli(); }
+      else if (!(id && C.focaliser(id))) stage.focus({ preventScroll: true });
+    }
     if (surSegment) { // le groupe cliqué peut être masqué : le focus va au segment équivalent du groupe visible, jamais body
       const b = (affichee() ? section : flottant).querySelector(`[data-forme="${nom}"]`);
       if (b) b.focus({ preventScroll: true });
     }
     if (url) { try { const u = new URL(location.href); u.searchParams.set('vue', nom); history.replaceState(history.state, '',
       u.pathname + u.search + u.hash); } catch (e) { void e; } }
-    const n = M.blocs(G).reduce((s, b) => s + b.total, 0);
-    annoncer(nom === 'graphe' ? 'Affichage en graphe' : `Affichage en couloirs, ${n} phase${n > 1 ? 's' : ''}`);
+    const dedans = niveau() === 'phase', n = dedans ? (G.files || []).filter((f) => f.n === String(state.container).slice(2) && /-PLAN\.md$/.test(f.p)).length
+      : M.blocs(G).reduce((s, b) => s + b.total, 0), u = dedans ? 'plan' : 'phase';
+    annoncer(nom === 'graphe' ? 'Affichage en graphe' : `Affichage en ${LIBELLES[nom].toLowerCase()}, ${n} ${u}${n > 1 ? 's' : ''}`);
     return true;
   };
 
@@ -197,6 +234,7 @@
   const ecoute = (cible, type, fn, capture) => { cible.addEventListener(type, fn, capture); pose.push(() => cible.removeEventListener(type, fn, capture)); };
   const init = () => {
     vivant = true;
+    if (!FORMES.includes(demandee) && MEM) forme = MEM.lire() || MEM.defaut(); // le nom du lab n'existe qu'une fois le graphe lu : jamais à l'évaluation
     section = document.createElement('section'); section.className = 'vf-projet'; section.setAttribute('aria-labelledby', 'vf-projet-titre');
     section.innerHTML = `<div class="vp-tete"><h1 id="vf-projet-titre" tabindex="-1">Projet</h1>${outils()}</div>`
       + '<div class="vp-corps"></div>';
@@ -206,9 +244,11 @@
     corps.innerHTML = R.etatVue('Chargement du projet');
     flottant = document.createElement('div'); flottant.id = 'vf-projet-flottant'; flottant.innerHTML = outils();
     stage.append(section, flottant); classes();
-    ecoute(document, 'click', (ev) => { const b = ev.target.closest && ev.target.closest('[data-forme]'); if (b) basculer(b.dataset.forme); });
+    ecoute(document, 'click', (ev) => { const b = ev.target.closest && ev.target.closest('[data-forme]'); if (b) basculer(b.dataset.forme,
+      { memoriser: true }); });
     ecoute(section, 'click', (ev) => { const c = ev.target.closest && ev.target.closest('[data-id]'); if (c && section.contains(c)) SC.select(c.dataset.id); });
-    ecoute(section, 'dblclick', (ev) => { const c = ev.target.closest && ev.target.closest('.vp-carte'); if (c) SC.go(c.dataset.id); });
+    ecoute(section, 'dblclick', (ev) => { const c = ev.target.closest &&
+      ev.target.closest('.vp-carte, .vp-ligne[data-id^="n:"]'); if (c) SC.go(c.dataset.id); });
     ecoute(section, 'toggle', (ev) => { const d = ev.target; if (d.dataset && d.dataset.cle) { if (d.open) ouverts.add(d.dataset.cle);
       else ouverts.delete(d.dataset.cle); } }, true);
     // visite (P80-D-09, P80-D-38) : elle se joue sur le graphe, sans patch de 40-tour.js ; la forme d'avant revient à sa fin
@@ -237,7 +277,8 @@
     mesurerBas(); surRender();
     return () => { vivant = false; pose.splice(0).forEach((f) => f()); section.remove(); flottant.remove(); statut.remove(); };
   };
-  window.VF_PROJET = Object.freeze({ formes: () => FORMES.slice(), forme: () => forme, basculer, carteDe });
+  window.VF_PROJET = Object.freeze({ formes: () => FORMES.slice(), forme: effective, basculer, carteDe, inscrireForme, niveau, redessiner: () => dessiner(),
+    annoncer });
   classes();
   const C = window.VF_COQUILLE;
   const demarrer = () => (vivant ? undefined : init());

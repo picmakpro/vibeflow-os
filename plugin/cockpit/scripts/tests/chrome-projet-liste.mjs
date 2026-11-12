@@ -2,6 +2,7 @@
 // Usage : node chrome-projet-liste.mjs <chrome> <racine-du-serveur> <mode> [sections]   Rend UNE ligne JSON { … } ou { erreur }.
 // Modes : pl1 (racine en liste) · pl2 (intérieur de phase) · pl2b (lab sans exigences, porte substituée) · pl3a (touche v, mémoire, tri, largeurs)
 //   · pl3b (focus orphelin) · pl3c (zone basse, lab lancé avec --terminal).
+import fs from 'node:fs';
 import { executer, pause, stabiliser } from './chrome-session.mjs';
 const [, , chrome, racine, mode, filtre] = process.argv;
 const SEL = filtre ? new Set(filtre.split(',')) : null;
@@ -41,7 +42,7 @@ await executer(chrome, async (s) => {
   const lire = async (expr) => { const v = await s.ev(expr); return v === undefined ? null : JSON.parse(v); };
   const touche = async (nom, mod = 0, texte) => {
     for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: nom === 'Space' ? ' ' : nom, code: nom, modifiers: mod,
-      windowsVirtualKeyCode: KEYS[nom], nativeVirtualKeyCode: KEYS[nom], ...(type === 'keyDown' && texte ? { text: texte } : {}) });
+      windowsVirtualKeyCode: KEYS[nom], nativeVirtualKeyCode: KEYS[nom], ...(type === 'keyDown' && (texte || nom === 'Enter') ? { text: texte || '\r' } : {}) });
   };
   const etat = async () => (await lire('__pl.etat()')) || {};
   const presser = async (nom, ms = 150, mod = 0, texte) => { await touche(nom, mod, texte); await pause(ms); return etat(); };
@@ -117,7 +118,7 @@ await executer(chrome, async (s) => {
       o.pl25g = await lire(`JSON.stringify({ svg: getComputedStyle(document.getElementById('svg')).visibility, noeuds: document.querySelectorAll('#viewport .node').length })`);
     });
     await sec('pl26', async () => {
-      await charger('?vue=liste'); await plonger('n:ph-2');
+      await charger('?vue=liste'); await plonger('n:ph-5');
       o.pl26 = await lire(`JSON.stringify({ texte: document.querySelector('section.vf-projet').textContent, plans: [...document.querySelectorAll('section.vf-projet h2')].map((e) => e.textContent) })`);
     });
     await sec('pl27', async () => {
@@ -210,7 +211,8 @@ await executer(chrome, async (s) => {
         return { hauteurs: [...g.querySelectorAll('button')].map((x) => x.getBoundingClientRect().height), dessous: b.top >= h.getBoundingClientRect().bottom - 1, largeur: Math.round(b.width), vue: Math.round(v.width) }; })())`);
       const defil = async () => lire(`JSON.stringify((() => { const v = document.querySelector('section.vf-projet'), c = getComputedStyle(v); return [v.scrollWidth <= v.clientWidth, ['auto', '0px'].includes(c.scrollPaddingInlineStart), ['auto', '0px'].includes(c.scrollPaddingInlineEnd)]; })())`);
       r.ferme390 = await defil(); await s.ev("VibeFlow.select('n:ph-3')"); await pause(500); r.ouvert390 = await defil();
-      await charger('?vue=liste', 800, 900); r.ferme800 = await defil(); await s.ev("VibeFlow.select('n:ph-3')"); await pause(500); r.ouvert800 = await defil();
+      await charger('?vue=liste', 600, 900); r.ferme600 = await defil(); await s.ev("VibeFlow.select('n:ph-3')"); await pause(500); r.ouvert600 = await defil();
+      await charger('?vue=liste', 800, 900); r.ferme800 = await defil();
       o.pl35 = r;
     });
     await sec('pl36', async () => {
@@ -254,6 +256,20 @@ await executer(chrome, async (s) => {
         o.pl38[cle] = r;
       });
     }
+  }
+  if (mode === 'png') { // captures de revue de design (PL_PNG = dossier) : liste, sombre et clair, 1440 et 390 px, une rangée focalisée au clavier, l'intérieur d'une phase
+    const dir = process.env.PL_PNG; fs.mkdirSync(dir, { recursive: true }); o.png = [];
+    const clip = async (nom) => { const r = await s.send('Page.captureScreenshot', { format: 'png' }); fs.writeFileSync(`${dir}/${nom}.png`, Buffer.from(r.data, 'base64')); o.png.push(nom); };
+    const theme = (t) => s.ev(`document.documentElement.setAttribute('data-theme', '${t}')`);
+    for (const [nom, w, h, tactile] of [['1440', 1440, 900, false], ['390', 390, 844, true]]) for (const t of ['sombre', 'clair']) await sec(`png${nom}${t}`, async () => {
+      await charger('?vue=liste', w, h, tactile); await theme(t === 'sombre' ? 'dark' : 'light'); await pause(300); await clip(`liste-${nom}-${t}`);
+    });
+    await sec('pngfocus', async () => {
+      await charger('?vue=liste', 1440, 900); await theme('dark'); await focus('section.vf-projet .vp-ligne[tabindex="0"]'); await presser('ArrowDown', 300); await clip('liste-1440-focus-clavier');
+    });
+    await sec('pngphase', async () => {
+      await charger('?vue=liste', 1440, 900); await theme('dark'); await plonger('n:ph-1'); await pause(300); await clip('phase-1440-sombre');
+    });
   }
   void TR;
   return o;

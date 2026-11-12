@@ -25,7 +25,7 @@ PASS=0; FAIL=0; SC_BASE="${PL_SCRIPTS:-$SCRIPTS}"
 . "$HERE_T/couloirs-commun.sh"
 mesurer() { REAL_HOME="$REAL_HOME" node "$HERE_T/$1" "$CHROME" "http://127.0.0.1:$PORT" "${2:-}" "${3:-}" 2>"$WORK/mesure.err"; }
 sonde() { [ -n "${SONDE:-}" ] && { printf '%s\n' "$1"; cat "$WORK/mesure.err"; }; return 0; }
-T52="Titre de cinquante-deux caractères pour la rangée.."; T53="${T52}."; T70="Titre de soixante-dix caractères, très long, pour tester la coupe...."
+T52="Titre de cinquante-deux caractères pour la rangée..."; T53="${T52}."; T70="Titre de soixante-dix caractères, très long, pour tester la coupe....."
 mklabl() { # mklab + titres de 52, 53 et 70 caractères ; phase 1 : trois plans (vagues 1, 2, aucune), exigences R-1 cochée et R-2 hostile non cochée
   local L="$1" B="$1/.planning"; mklab "$L"
   sed -i.bak -e "s/Phase 4: Reprise/Phase 4: $T52/" -e "s/Phase 6: Recette/Phase 6: $T53/" -e "s/Phase 3: Liens/Phase 3: $T70/" "$B/ROADMAP.md"; rm -f "$B/ROADMAP.md.bak"
@@ -86,6 +86,7 @@ assert_eq "PL2.9b — témoin : aucune section du pilote n'a échoué" "$(E2B 'O
 
 echo "=== PL3 — touche v, mémoire, tri, largeurs, focus orphelin, zone basse ==="
 build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+[ -n "${PL_PNG:-}" ] && { PNG="$(PL_PNG="$PL_PNG" mesurer chrome-projet-liste.mjs png)"; echo "  captures : $(E 'j.png.join(" ")' "$PNG")"; } # PL_PNG = dossier des captures de revue
 R3="$(mesurer chrome-projet-liste.mjs pl3a)"; sonde "$R3"; E3() { E "$1" "$R3"; }
 assert_eq "PL3.1 — v : couloirs → liste → graphe → couloirs ; focus sur l'élément équivalent (même phase), jamais body ; annonce « Affichage en liste, 6 phases »" \
   "$(E3 '[j.pl31.map((x) => x[0]).join(), j.pl31[0][1], j.pl31[0][2], j.pl31.every((x) => x[3] !== "body")]')" '["liste,graphe,couloirs","n:ph-4","Affichage en liste, 6 phases",true]'
@@ -96,16 +97,16 @@ assert_eq "PL3.3 — mémoire par lab et par classe de largeur ; défaut liste �
 assert_eq "PL3.3b — rien de neuf sous .planning/ du lab" "$(git -C "$LAB" status --porcelain -- .planning | wc -l | tr -d ' ')" "0"
 assert_eq "PL3.4 — tri par Plans : ascendant puis descendant, annonces, sans plan en dernier ; donnée absente après « aucune », texte masqué" \
   "$(E3 '[j.pl34.asc[0].join(), j.pl34.asc[1], j.pl34.asc[2], j.pl34.desc[0].join(), j.pl34.desc[1], j.pl34.desc[2], j.pl34.abs[0].slice(-1)[0], j.pl34.abs[1]]')" \
-  '["n:ph-3,n:ph-4,n:ph-1,n:ph-2,n:ph-6,n:ph-5","plans","Trié par Plans, croissant","n:ph-1,n:ph-2,n:ph-6,n:ph-4,n:ph-3,n:ph-5",1,"Trié par Plans, décroissant","n:ph-3","donnée non disponible"]'
-assert_eq "PL3.5 — 390 px : rôles posés, quatre boutons de tri ≥ 44 px, bascule à trois segments ≥ 44 px pleine largeur sous le h1 ; aucun défilement horizontal (390 et 800)" \
-  "$(E3 '[j.pl35.roles.join(), j.pl35.tri.length, Math.min(...j.pl35.tri) >= 44, j.pl35.bascule.hauteurs.length, Math.min(...j.pl35.bascule.hauteurs) >= 44, j.pl35.bascule.dessous, j.pl35.bascule.largeur >= j.pl35.bascule.vue - 40, j.pl35.ferme390.join(), j.pl35.ouvert390.join(), j.pl35.ferme800.join(), j.pl35.ouvert800.join()]')" \
-  '["true,true,true,true",4,true,3,true,true,true,"true,true,true","true,true,true","true,true,true","true,true,true"]'
+  '["n:ph-3,n:ph-4,n:ph-1,n:ph-2,n:ph-6,n:ph-5","plans","Trié par Plans, croissant","n:ph-2,n:ph-6,n:ph-1,n:ph-4,n:ph-3,n:ph-5",1,"Trié par Plans, décroissant","n:ph-3","donnée non disponible"]'
+assert_eq "PL3.5 — 390 px : rôles posés, quatre boutons de tri ≥ 44 px, bascule à trois segments ≥ 44 px pleine largeur sous le h1 ; aucun défilement horizontal (390 et 600, feuille ouverte ou non ; 800 fermé)" \
+  "$(E3 '[j.pl35.roles.join(), j.pl35.tri.length, Math.min(...j.pl35.tri) >= 44, j.pl35.bascule.hauteurs.length, Math.min(...j.pl35.bascule.hauteurs) >= 44, j.pl35.bascule.dessous, j.pl35.bascule.largeur >= j.pl35.bascule.vue - 40, j.pl35.ferme390.join(), j.pl35.ouvert390.join(), j.pl35.ferme600.join(), j.pl35.ouvert600.join(), j.pl35.ferme800.join()]')" \
+  '["true,true,true,true",4,true,3,true,true,true,"true,true,true","true,true,true","true,true,true","true,true,true","true,true,true"]'
 assert_eq "PL3.6 — mouvement réduit : aucune animation active après une bascule et un tri" "$(E3 'j.pl36.join()')" "0,0"
 assert_eq "PL3.9 — témoin : aucune section du pilote n'a échoué (v, mémoire, tri, largeurs)" "$(E3 'Object.keys(j.erreurs).join()')" ""
 R3B="$(mesurer chrome-projet-liste.mjs pl3b)"; sonde "$R3B"; E3B() { E "$1" "$R3B"; }
 assert_eq "PL3.7 — focus orphelin : en-tête de tri (clic, Entrée, direct) et summary gardent le focus sur le même contrôle, état inchangé ; jamais body" \
   "$(E3B '[j.pl37.entree.tri, j.pl37.entree.conn, j.pl37.clic.tri, j.pl37.direct.tri, j.pl37.sort.join(), j.pl37.hist.join(), j.pl37.back.join()]')" \
-  '["plans",true,"plans","etat","ascending,none,none,none","SUMMARY,historique,false","SUMMARY,backlog,true"]'
+  '["plans",true,"plans","etat","none,none,descending,none","SUMMARY,historique,false","SUMMARY,backlog,true"]'
 assert_eq "PL3.9b — témoin : aucune section du pilote n'a échoué (focus orphelin)" "$(E3B 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
 echo "=== PL3.8 — zone basse (lab lancé avec --terminal) ==="
@@ -132,8 +133,8 @@ mutant M-ORPHELIN-TRI 41-vf-projet-vue.js "if (ent) { // garde:orphelin-tri" "if
 assert_eq "M-ORPHELIN-TRI — le mutant rougit PL3.7 (restitution du focus d'en-tête et de summary retirée) (témoin : la table existe)" \
   "$(E "[j.pl37.entree.tag !== 'button' || j.pl37.direct.tri !== 'etat', j.pl37.hist[0] !== 'SUMMARY', j.pl37.sort.length > 0]" "$RM")" '[true,true,true]'
 LAB_SAUVE="$LAB"; LAB="$LABS" # PL2.9 se joue sur le lab sans exigence
-mutant M-PORTE 41-vf-projet-phase.js "const lu = window.VF_EXIGENCES.lireExigences(id); // garde:porte" \
-  "const lu = (() => { const G = window.Floorplan.graph, ex = (G.files || []).filter((f) => f.n === id + '.req').map((f) => ({ id: f.name, texte: f.d, cochee: f.st === 'done', cible: 'f:' + f.p })), c = {};
+mutant M-PORTE 41-vf-projet-phase.js "lu = window.VF_EXIGENCES.lireExigences(id); // garde:porte" \
+  "lu = (() => { const G = window.Floorplan.graph, ex = (G.files || []).filter((f) => f.n === id + '.req').map((f) => ({ id: f.name, texte: f.d, cochee: f.st === 'done', cible: 'f:' + f.p })), c = {};
     for (const l of G.links || []) { const e = ex.find((x) => l.b === x.cible); if (e && l.label === 'couvre') (c[l.a] = c[l.a] || []).push(e); } return { exigences: ex, couverture: c }; })(); // garde:porte" \
   chrome-projet-liste.mjs pl2b pl29; LAB="$LAB_SAUVE"
 assert_eq "M-PORTE — le mutant rougit PL2.9 (lecture directe du nœud) alors que le rendu avec la vraie porte reste identique (témoin : la section a joué)" \
