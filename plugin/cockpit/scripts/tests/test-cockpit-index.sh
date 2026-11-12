@@ -121,8 +121,9 @@ R['I2.7b'] = pick({ ...wk, rap: wk.evenements.map((e) => e[1]).join(',') }, ['pa
 // ---- I2.8e : sans `arbreDe` (preuve d'appartenance au lab, celle de l'appelant), jamais un transcript hors du lab indexé : l'appel est refusé
 {
   const m = mk((id) => [base(id, 0, { type: 'user', message: { role: 'user', content: 'x' } }, path.join(WORK, 'autre')), base(id, 1000, { type: 'assistant', message: { id: 'm1', model: 'claude-test-1', stop_reason: null, usage: us(1, 1), content: [] } }, path.join(WORK, 'autre'))]); let r;
-  try { const i = M.idx.construire(M.idx.enumerer(m.projets), { maintenant: T0 + H, CC }); r = ['sans-erreur', i.voies.length]; } catch (e) { r = [e.name, 0]; }
+  try { const i = M.idx.construire(M.idx.enumerer(m.projets), { maintenant: T0 + H, CC }); r = ['sans-erreur', i.voies.length]; } catch (e) { r = [e.name, e.message, 0]; }
   R['I2.8e'] = JSON.stringify(r);
+  try { M.idx.construire([], { maintenant: T0 + H, CC }); R['I2.8f'] = JSON.stringify(['sans-erreur']); } catch (e) { R['I2.8f'] = JSON.stringify([e.name, e.message]); }
 }
 // ---- I2.9 forme inconnue
 {
@@ -217,7 +218,8 @@ c "I2.8a — arbreDe de la suite : principal, worktree prouvé, hors lab, faux w
 c "I2.8b — worktree prouvé indexé sous son nom, faux worktree hors de l'index et dans memoHors" I2.8b '[[["sess-wwww0001","wt-a"]],["sess-ffff0001.jsonl"]]'
 c "I2.8c — arbre principal null, transcript hors du lab absent et dans memoHors" I2.8c '[null,true,["sess-bbbb0001.jsonl"]]'
 c "I2.8d — aucun chemin dans l'index" I2.8d false
-c "I2.8e — sans arbreDe, un transcript hors du lab n'est jamais indexé : appel refusé, zéro voie" I2.8e '["TypeError",0]'
+c "I2.8e — sans arbreDe, un transcript hors du lab n'est jamais indexé : appel refusé, zéro voie" I2.8e '["TypeError","arbreDe requis : un transcript hors du lab ne s'\''indexe jamais",0]'
+c "I2.8f — sans arbreDe et sans candidat, l'appel est refusé aussi (la garde ne dépend pas d'un premier appel)" I2.8f '["TypeError","arbreDe requis : un transcript hors du lab ne s'\''indexe jamais"]'
 c "I2.9a — ligne assistant sans message.id : forme inconnue, mesures nulles, jamais zéro, rien de plié ensuite" I2.9a '["inconnue",null,null,null,null]'
 c "I2.9b — relecture depuis zéro d'un fichier corrigé : ok" I2.9b '["ok",12]'
 c "I2.9c — une mise à jour sans changement garde ok" I2.9c ok
@@ -331,7 +333,9 @@ console.log(JSON.stringify(R));
 JS
 cc() { node "$AUX/$1.mjs" "${2:-$SCRIPTS}" "$3" "$FIX" "$SCRIPTS/tests" 2>/dev/null; }
 M="$(mutant arbrede vf-cockpit-index.mjs 'opts.arbreDe || null;' 'opts.arbreDe || (() => ({ arbre: null }));')" || M=""
-if [ -n "$M" ]; then cas arbrede "$M"; assert_eq "M-ARBREDE — I2.8e rouge, et seul I2.8e : sans la garde, un transcript hors du lab est indexé sans erreur (appel sans arbreDe)" "$(diffcles "$WORK/m-arbrede/cas.json" "$WORK/cas.json")" '["I2.8e"]'; else assert_eq "M-ARBREDE — mutant applicable" "non" "oui"; fi
+if [ -n "$M" ]; then cas arbrede "$M"; assert_eq "M-ARBREDE — I2.8e et I2.8f rougissent, et seuls eux : sans la garde, un transcript hors du lab est indexé sans erreur (appel sans arbreDe)" "$(diffcles "$WORK/m-arbrede/cas.json" "$WORK/cas.json")" '["I2.8e","I2.8f"]'; else assert_eq "M-ARBREDE — mutant applicable" "non" "oui"; fi
+M="$(mutant arbrede-requis vf-cockpit-index.mjs "typeof arbreDe !== 'function'" 'false')" || M=""
+if [ -n "$M" ]; then cas requis "$M"; assert_eq "M-ARBREDE-REQUIS — garde retirée : I2.8e (message de l'erreur) et I2.8f rougissent, et seuls eux ; l'erreur incidente « arbreDe is not a function » ne passe plus pour la garde" "$(diffcles "$WORK/m-requis/cas.json" "$WORK/cas.json")" '["I2.8e","I2.8f"]'; else assert_eq "M-ARBREDE-REQUIS — mutant applicable" "non" "oui"; fi
 echo "=== I6 — fichier d'index hostile ==="
 mkdir -p "$WORK/h1/lab" && ( cd "$WORK" && node "$AUX/hostile.mjs" "$SCRIPTS" "$WORK/h1" "$FIX" > "$WORK/hostile.json" 2>"$WORK/hostile.err" ) ; hj() { node "$AUX/get.mjs" "$WORK/hostile.json" "j[\"$1\"]"; }
 assert_eq "I6.0 — témoin positif : l'index valide produit par le module est accepté" "$(hj I6.0)" "lu|"

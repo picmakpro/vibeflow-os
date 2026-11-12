@@ -82,7 +82,7 @@ function teteDe(fd, taille, lim) {
 export function mettreAJour(index, candidats, opts = {}) {
   const maintenant = opts.maintenant ?? Date.now(), bornes = { ...BORNES, ...(opts.bornes || {}) }, CC = opts.CC || CONTRAT.claudeCode, vivantes = opts.vivantes || new Set();
   const arbreDe = opts.arbreDe || null; // garde:index-arbrede : jamais de lab par défaut, la preuve d'appartenance est celle de l'appelant
-  if (typeof arbreDe !== 'function') throw new TypeError('arbreDe requis : un transcript hors du lab ne s\'indexe jamais');
+  if (typeof arbreDe !== 'function') throw new TypeError('arbreDe requis : un transcript hors du lab ne s\'indexe jamais'); // garde:index-arbrede-requis
   const memoHors = opts.memoHors || new Map(), seuil = CC?.metaSousAgent?.requisSiProfondeur?.parentAgentId ?? 2;
   if (!index || index.schema !== SCHEMA_INDEX) index = indexVide(CC?.verifieSur);
   const avant = JSON.stringify(index.voies), parId = new Map(index.voies.map((v) => [v.id, v])), vus = new Map();
