@@ -239,7 +239,7 @@ UUID_CHAT='7c7d7412-0a15-4407-939b-eacb01a8e345'
 FORGES=('"x;touch M"' '"$(touch M)"' '"7c7d7412-0a15-4407-939b-eacb01a8e345a"' '""' '5' '[]' '"7c7d7412-0a15-4407-939b-eacb01a8e34;"' 'null')
 echo "=== ST — la sortie existe et porte les modules du plan ==="
 assert_eq "ST — la sortie du cockpit contient le script de P, la vue et le client de Q, le gabarit et l'état de Q" \
-  "$(for f in vf-cockpit-lancer-ui.mjs vf-cockpit-terminal-vue.mjs vf-cockpit-terminal-client.mjs vf-cockpit-lancer-gabarit.mjs vf-cockpit-lancer-q.mjs vf-cockpit-lancer.mjs vf-cockpit-terminal-processus.mjs; do [ -f "$OUT/$f" ] && echo oui || echo "non:$f"; done | sort -u | tr '\n' ' ')" "oui "
+  "$(for f in vf-cockpit-lancer-ui.mjs vf-cockpit-terminal-vue.mjs vf-cockpit-terminal-client.mjs vf-cockpit-lancer-gabarit.mjs vf-cockpit-lancer-q.mjs vf-cockpit-lancer.mjs vf-cockpit-terminal-processus.mjs; do [ -f "$(mod_de "$OUT")/scripts/$f" ] && echo oui || echo "non:$f"; done | sort -u | tr '\n' ' ')" "oui "
 
 # ---- TC.1 à TC.4 : sans navigateur ----
 pur() { node "$AUX/harnais-pur.mjs" "$1" "$2" 2>&1 | tail -1; }
@@ -253,7 +253,7 @@ echo "=== TC.4 — CHAT_LIVRE identique dans P et Q ==="
 VALEUR() { sed -nE 's/.*CHAT_LIVRE[[:space:]]*=[[:space:]]*(true|false).*/\1/p' "$1" | head -1; }
 T4="$(pur "$OUT" tc4)"
 assert_eq "TC.4 — CHAT_LIVRE : même valeur dans le script de P (importée) et dans la vue de Q (lue dans le texte de la fonction sérialisée), et la configuration servie la porte" \
-  "$(VALEUR "$OUT/vf-cockpit-lancer-ui.mjs")/$(VALEUR "$OUT/vf-cockpit-terminal-vue.mjs")/$(printf '%s' "$T4" | evj 'String(j.livre)')/$(printf '%s' "$T4" | evj 'j.cfgVrai===(j.livre===true)&&j.cfgFaux===(j.livre===false)')" \
+  "$(VALEUR "$(mod_de "$OUT")/scripts/vf-cockpit-lancer-ui.mjs")/$(VALEUR "$(mod_de "$OUT")/scripts/vf-cockpit-terminal-vue.mjs")/$(printf '%s' "$T4" | evj 'String(j.livre)')/$(printf '%s' "$T4" | evj 'j.cfgVrai===(j.livre===true)&&j.cfgFaux===(j.livre===false)')" \
   "true/true/true/true"
 assert_eq "TC.4 — valeur réelle : le corps porte chat quand CHAT_LIVRE est vraie" "$(printf '%s' "$T4" | evj 'j.corps')" "cible,verbe,chat"
 if mutant fauxlivre vf-cockpit-lancer-ui.mjs 's/CHAT_LIVRE = true/CHAT_LIVRE = false/'; then
