@@ -71,3 +71,9 @@ Pire cas du budget : motif de 1 024 caractères, état maximal (jokers récursif
 ## État final
 
 Suite de confinement : 108 PASS / 0 FAIL (graine 79210101) ; 19 assertions de mutants, toutes vertes. E0 à E3c, P0, P3, P1.F1 à F5, P2.F1 à F5, C0 à C4 : tous verts après la tâche 2 ; rouges voulus sur la base : E3b, P1, P2, C0 à C3.
+
+## Correction ciblée — mémoire à la compilation (audit du manager)
+
+Témoin rouge avant (code d'avant la correction, sonde GLOB.MEM sur l'état du commit de la tâche 2) : forme à classes identiques 208 puis 136 Kio par motif (N puis 2N motifs), plafond 40 : rouge. Après : 13 puis 8 Kio ; forme à classes toutes différentes 2 puis 16 Kio : vert. Sonde de l'auditeur (1 021 caractères de classes denses) : avant 208 Kio par motif, après 13 Kio, ancienne implémentation 4 Kio.
+Mutant M-DEDUP (ancre : la ligne qui cherche le corps de classe dans la table des corps déjà vus ; remplacement : indice neuf à chaque occurrence) : GLOB.MEM rougit, obtenu forme 0 : 66 puis 60 Kio par motif, forme 1 : 22 puis 38 (cause : mémoire).
+Équivalence intacte : suite GLOB (E0 à E3c, C0 à C4) verte, sonde d'équivalence de l'auditeur sur trois graines (environ 313 000 vérifications chacune, 0 écart de verdict, de constructeur ou de specificity).

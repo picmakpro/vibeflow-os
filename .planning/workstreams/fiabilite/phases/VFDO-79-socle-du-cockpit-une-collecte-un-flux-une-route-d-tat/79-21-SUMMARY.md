@@ -31,7 +31,7 @@ Constantes retenues : MAX_MOTIF = 1024, MAX_PAS = 4194304. Les tailles de famill
 ## Coût (limites nommées)
 
 - Ordinaire : médiane des rapports après/avant 6,5 (de 16 à 2 208 ns/appel ; avant 41 à 341). Pas de seuil en CI.
-- Pire cas du budget : 17,6 ms par appel (motif de 1 024 caractères, chemin au bord de MAX_PAS).
+- Pire cas du budget : 17,6 ms par appel (motif de 1 024 caractères, chemin au bord de MAX_PAS) ; mesuré par l'auditeur : 13 à 26 ms au bord du budget, 1 à 2 ms sur un chemin ordinaire avec un motif dense de 1 020 caractères. Ce coût résiduel (T-79-2106, accepté) est linéaire en le nombre de fichiers de l'assemblage.
 - Rejeu de la mesure de la Phase 75 : 830,1 ms puis 3 939,3 ms avant ; 4,9 ms puis 6,0 ms après.
 - Croissance : cinq familles, rouge sur la base (rapports 7,8 à 16,0 ; plafond dépassé), vertes après ; M-RETOUR rougit F1 et F5 (rapports 5,8 et 13,3).
 
@@ -59,3 +59,13 @@ Constantes retenues : MAX_MOTIF = 1024, MAX_PAS = 4194304. Les tailles de famill
 ## Audit de sécurité
 
 Non joué ici : le mandat le réserve au manager (audit commandé en direct sur le module de correspondance, l'entrée de compileGlob, l'équivalence, le banc et l'absence de donnée émise).
+
+## Acceptations nommées (modèle de menaces)
+
+- T-79-2105 (accepté) : l'avis d'une ligne sur stderr pour un motif trop long cite au plus 40 caractères d'une donnée du lab déjà présente dans sa configuration ; il va au journal du processus, jamais dans une page, une route ou l'export.
+- T-79-2106 (accepté) : coût résiduel d'un motif admissible de grande taille répété sur beaucoup de fichiers : borné par appel (MAX_PAS), linéaire en le nombre de fichiers (bornés ailleurs : maxLooseFiles, listes git) ; chiffres ci-dessus.
+- T-79-SC (accepté) : aucune dépendance ajoutée ni installée.
+
+## Correction ciblée après l'audit (mémoire à la compilation)
+
+Défaut moyen, classe : amplification mémoire à la compilation (208 Kio par motif de 1 Kio de classes contre 4 Kio avant ; nombre de motifs non borné). Corrigé dans lib/vf-glob.mjs : une RegExp par corps de classe, table créée à la première lecture, tables de construction non retenues, indices 16 bits, tampons créés au premier test. Mesuré : environ 13 Kio par motif, même ordre de grandeur qu'avant, donc pas de plafond de nombre de motifs. Preuves : GLOB.MEM, GLOB.M-DEDUP, équivalence intacte. Amendement daté du plan 79-21.
