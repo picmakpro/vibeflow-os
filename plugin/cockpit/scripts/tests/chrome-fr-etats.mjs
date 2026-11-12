@@ -16,8 +16,9 @@ const clic = (id) => `document.getElementById(${JSON.stringify(id)}).click()`;
 // une feuille quelconque de l'arbre des cartes (le premier identifiant sans enfant) et un dossier (le premier enfant de la racine qui en a)
 const FEUILLE = `(() => { const file = ['root']; const vus = new Set(); while (file.length) { const c = file.shift(); if (vus.has(c)) continue; vus.add(c); let ks = []; try { ks = ${VF}.children(c) || []; } catch (e) { continue; } for (const i of ks) { let k = []; try { k = ${VF}.children(i) || []; } catch (e) {} if (!k.length) return i; file.push(i); } } return null; })()`;
 const DOSSIER = `(() => { const ks = ${VF}.children('root') || []; return ks.find((i) => (${VF}.children(i) || []).length) || null; })()`;
-const LIRE = `(() => { const out = new Set(); const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); for (let n = w.nextNode(); n; n = w.nextNode()) { const p = n.parentElement; if (!p || p.closest('script,style')) continue; const t = n.nodeValue.replace(/\\s+/g, ' ').trim(); if (t) out.add(t); }
-  for (const e of document.querySelectorAll('[title],[aria-label],[placeholder],[alt]')) for (const a of ['title', 'aria-label', 'placeholder', 'alt']) { const v = e.getAttribute(a); if (v && v.trim()) out.add('@' + a + ' ' + v.trim().replace(/\\s+/g, ' ')); }
+// le relevé ne dépend pas du poste : le nom de la branche git du lab (master ou main selon la configuration) est uniformisé, un fragment de chemin (« dossier/ ») n'est pas un texte
+const LIRE = `(() => { const norme = (x) => x.replace(/\\s+/g, ' ').trim().replace(/\\b(master|main)\\b/g, 'BRANCHE'); const out = new Set(); const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT); for (let n = w.nextNode(); n; n = w.nextNode()) { const p = n.parentElement; if (!p || p.closest('script,style')) continue; const t = norme(n.nodeValue); if (t && !/^[-\\w.]+\\/$/.test(t)) out.add(t); }
+  for (const e of document.querySelectorAll('[title],[aria-label],[placeholder],[alt]')) for (const a of ['title', 'aria-label', 'placeholder', 'alt']) { const v = e.getAttribute(a); if (v && v.trim()) out.add('@' + a + ' ' + norme(v)); }
   out.add('@titre-document ' + document.title); out.add('@lang ' + document.documentElement.lang); return [...out].sort(); })()`;
 
 // états de chaque page : [nom, geste (expression), condition d'arrivée]

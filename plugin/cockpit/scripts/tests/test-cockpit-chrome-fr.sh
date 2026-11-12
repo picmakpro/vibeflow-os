@@ -150,7 +150,7 @@ assert_eq "F6.11 : O6 (recette 3, arbitrage Samuel, AskUserQuestion session prin
 
 echo "[F9] l'inventaire voit les formes d'anglais résiduel du cadrage (UIFN-07, P70-D-04)"
 assert_eq "F9.1 : mot isolé — le libellé de type « Calls » (UIFN-07)" "$(lire "$WORK/m.json" "j.liste.includes('Calls')")" "true"
-assert_eq "F9.2 : mots de sévérité de Santé — « important », « minor », « worth fixing » (UIFN-07)" "$(lire "$WORK/m.json" "['important', 'minor', 'worth fixing'].map((x) => j.liste.includes(x))")" "[true,true,true]"
+assert_eq "F9.2 : mots de sévérité de Santé — « {} important », « {} minor », « {} worth fixing » (UIFN-07 ; clés de t depuis 79-10, le compte y entre en variable)" "$(lire "$WORK/m.json" "['{} important', '{} minor', '{} worth fixing'].map((x) => j.liste.includes(x))")" "[true,true,true]"
 assert_eq "F9.3 : mot court — l'aide au clavier « ⌫ up » rend le nœud « up · » (UIFN-07)" "$(lire "$WORK/m.json" "j.liste.includes('up ·')")" "true"
 assert_eq "F9.4 : pluriel construit à l'exécution par plural(n, mot) — « {} calls », « {} steps », « {} changes » (UIFN-07)" "$(lire "$WORK/m.json" "['{} calls', '{} steps', '{} changes'].map((x) => j.liste.includes(x))")" "[true,true,true]"
 
