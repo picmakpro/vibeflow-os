@@ -407,6 +407,34 @@ assert_eq "M-F2-MOTEUR — la variable du moteur n'est plus gardée (une seule l
 cockpit_module_muter mf3 serve.mjs 's#if (vit && !identite(s.pid))#if (false)#'; MF3="$COCKPIT_MODULE"; unset COCKPIT_MODULE
 assert_eq "M-F3 — le contrôle d'identité neutralisé (une seule ligne) : la copie est valide, AM6.F3 rougit (le processus étranger est signalé : tué) et AM6.F2 reste vert" "$(node --check "$MF3/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f3_sur "$MF3") f2=$(f2_sur "$MF3")" "valide rc=0 tué f2=1 0 0 0 1 1 1 0"
 
+# AM6.F3 (revue rv-0607, majeur) : la règle d'identité de `--stop` tient en DEUX clauses, le serve.mjs du module en mot entier ET `--sortie=<ce dossier>` en toute fin de ligne ; la preuve M-F3 ne mutait que le contrôle entier.
+# Quatre processus portent une ligne de commande forgée (node -e, mots posés après le script) : le témoin (les deux clauses : reconnu, arrêté), la sortie suivie d'un autre argument (« fin »), la sortie de ce dossier
+# SUIVIE d'un mot (« lab » contre « lab bis » : « prefixe ») et le serve.mjs d'un autre module avec la bonne sortie (« autre »). Seul le témoin est arrêté ; chaque clause a son mutant d'une ligne.
+f3p_sur() { # <racine du module> : « temoin=rcN/état fin=… prefixe=… autre=… » de `serve.mjs --stop` quand server.json désigne chacun de ces processus
+  local L="$WORK/lab-f3q"; am4_lab "$L"; local S="$L/.vibeflow/cockpit" A="$1/skills/cockpit-moteur/assets/serve.mjs" SV out="" P rc v i
+  SV="$(cd "$1/skills/cockpit-moteur/assets" && pwd -P)/serve.mjs"; mkdir -p "$S/.cache"
+  f3p_un() { # <nom> <mots de la ligne de commande après le script>
+    local nom="$1"; shift
+    node -e 'setTimeout(function(){},300000)' "$@" & P=$!
+    printf '{"pid":%s,"url":"http://127.0.0.1:1/"}\n' "$P" > "$S/.cache/server.json"
+    node "$A" --stop --sortie="$S" > "$WORK/f3q-$nom.out" 2>&1; rc=$?
+    for i in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$P" 2> /dev/null || break; sleep 0.1; done
+    kill -0 "$P" 2> /dev/null && v=vivant || v=tué
+    kill "$P" 2> /dev/null; wait "$P" 2> /dev/null
+    out="$out $nom=rc$rc/$v"
+  }
+  f3p_un temoin "$SV" "--sortie=$S"
+  f3p_un fin "$SV" "--sortie=$S" --port 1
+  f3p_un prefixe "$SV" "--sortie=$S bis"
+  f3p_un autre "$WORK/ailleurs/serve.mjs" "--sortie=$S"
+  echo "${out# }"
+}
+assert_eq "AM6.F3-prefixe — les deux clauses d'identité : seul le processus qui porte le serve.mjs du module ET se termine par --sortie=<ce dossier> est arrêté ; la sortie suivie d'un autre argument, la sortie préfixe d'une autre (« lab » contre « lab bis ») et le serve.mjs d'un autre module : refus (5), jamais signalés" "$(f3p_sur "$F23M")" "temoin=rc0/tué fin=rc5/vivant prefixe=rc5/vivant autre=rc5/vivant"
+cockpit_module_muter mf3f serve.mjs 's#c.endsWith(` --sortie=${here} `)#true#'; MF3F="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-F3-FIN — la fin de ligne exacte n'est plus exigée (une seule ligne) : la copie est valide, AM6.F3-prefixe rougit sur « fin » et « prefixe » (signalés : tués), le serve.mjs d'un autre module reste refusé" "$(node --check "$MF3F/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f3p_sur "$MF3F")" "valide temoin=rc0/tué fin=rc0/tué prefixe=rc0/tué autre=rc5/vivant"
+cockpit_module_muter mf3m serve.mjs 's#c.includes(` ${path.join(code, .serve.mjs.)} `)#true#'; MF3S="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-F3-MODULE — le serve.mjs du module n'est plus exigé (une seule ligne) : la copie est valide, AM6.F3-prefixe rougit sur « autre » (signalé : tué), « fin » et « prefixe » restent refusés" "$(node --check "$MF3S/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f3p_sur "$MF3S")" "valide temoin=rc0/tué fin=rc5/vivant prefixe=rc5/vivant autre=rc0/tué"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
