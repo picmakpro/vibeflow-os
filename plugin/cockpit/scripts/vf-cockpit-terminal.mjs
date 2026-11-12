@@ -47,7 +47,7 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
   if (plateforme === 'win32') { log('Terminal indisponible sous Windows.'); return inerte(true); }
   const moteur = process.env.VF_COCKPIT_ENGINE_DIR;
   const assistant = moteur && path.isAbsolute(moteur) ? path.join(moteur, 'terminal', 'vf-cockpit-pty.py') : null;
-  const ordinaire = (f) => { try { return fs.lstatSync(f).isFile() && !realUnder(f, path.join(root, '.vibeflow')); } catch { return false; } };
+  const ordinaire = (f) => { try { return fs.lstatSync(f).isFile() && !realUnder(f, path.join(root, '.vibeflow'), { siEchec: true }); } catch { return false; } };
   if (!assistant || !ordinaire(assistant)) { log('assistant du terminal introuvable dans le moteur du cockpit : réinstaller le module cockpit.'); return inerte(false); }
   try { preparerPage({ engineDir: moteur }); } catch (e) { log(`${e.message}`); return inerte(false); }
 

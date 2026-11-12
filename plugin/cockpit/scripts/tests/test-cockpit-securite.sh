@@ -462,6 +462,11 @@ cockpit_arreter
 # ancre du mutant M-TERM (« le fork revient à la sortie ») : le fichier forké est celui du dossier du module, voisin de vf-cockpit-terminal.mjs (écrite ici, jouée avec le code ; rouge tant que le fork vise le dossier de la sortie)
 assert_eq "M-TERM.0 — ancre présente : le terminal forke vf-cockpit-terminal-processus.mjs pris à côté de son propre fichier (import.meta.url), jamais dans la sortie" "$(grep -cF "path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-terminal-processus.mjs'" "$SCRIPTS/vf-cockpit-terminal.mjs")" "1"
 
+# constat bas 1 (audit de 79-07) : realUnder est employé en polarité inverse (écarte si dedans) : un échec de résolution doit valoir « dedans » (siEchec: true). Aucun témoin d'effet n'est constructible (lstat(f).isFile() précède et résout le même fichier) : ancre structurelle et mutant
+TERM_L="$(grep -F 'const ordinaire = ' "$SCRIPTS/vf-cockpit-terminal.mjs")"
+assert_eq "REALUNDER.0 — la garde « assistant du terminal hors .vibeflow » appelle realUnder avec siEchec: true (polarité inverse : un échec de résolution écarte, fermé par défaut)" "$(printf '%s\n' "$TERM_L" | grep -cF 'realUnder(f, path.join(root, '"'"'.vibeflow'"'"'), { siEchec: true })')" "1"
+assert_eq "REALUNDER.1 — mutant (siEchec retiré) : l'ancre rougit (0 occurrence)" "$(printf '%s\n' "$TERM_L" | sed 's/, { siEchec: true }//' | grep -cF '{ siEchec: true }')" "0"
+
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
