@@ -277,7 +277,7 @@ assert_eq "R1.5b — aucun en-tête access-control-*, Cache-Control no-store mal
 assert_eq "R1.6 — lecteur asynchrone rejeté : 500 sans corps, le journal ne cite pas le message, la route propre répond ensuite (200), l'asynchrone propre 200" "$(ev "$E" '[j.r16.s,j.r16.b===""?"vide":"corps",j.r16.msg,j.r16.apres,j.r16.asynchrone].join(" ")')" "500 vide false 200 200"
 SC="$(sc_dir r17)"; E7="$(hh essai "$SC")"
 assert_eq "R1.7 — contrat vf-cockpit-interface.json retiré : la route propre rend 503 emission-refusee (fermé par défaut) ; témoin R1.1a : la sortie intacte la laisse passer" "$(ev "$E7" 'j.r11.s+" "+j.r11.b')|$(ev "$E" 'j.r11.s')" '503 {"erreur":"emission-refusee"}|200'
-assert_eq "R1.8 — la route etat (dans la table) : 200, JSON, no-store, clés mode, seq, derniereMaj, clients" "$(ev "$E" 'j.r18.s+" "+j.r18.ct+" "+j.r18.cc+" "+j.r18.cles')" "200 application/json no-store clients,derniereMaj,mode,seq"
+assert_eq "R1.8 — la route etat (dans la table) : 200, JSON, no-store, clés mode, seq, derniereMaj, clients, collecte (79-09)" "$(ev "$E" 'j.r18.s+" "+j.r18.ct+" "+j.r18.cc+" "+j.r18.cles')" "200 application/json no-store clients,collecte,derniereMaj,mode,seq"
 
 echo "=== B1 — annotateur d'essai inscrit d'une ligne, schéma migré ==="
 LABA="$WORK/an0/lab"; mkdir -p "$WORK/an0"; copielab "$LABA"
@@ -316,7 +316,7 @@ assert_eq "RK.9 — le flux : ouverts() et dernierFlux() valent 0 et 0 avant, ou
 
 echo "=== RC — caractérisation des routes antérieures (verte sur la base et après) ==="
 RC="$(hh hist)"
-assert_eq "RC.1 — etat : 200, clés mode, seq, derniereMaj, clients ; journal : clé evenements (tableau)" "$(ev "$RC" 'j.etat.s+" "+j.etat.cles+" | "+j.journal.s+" "+j.journal.cles+" "+j.journal.tableau')" "200 clients,derniereMaj,mode,seq | 200 evenements true"
+assert_eq "RC.1 — etat : 200, clés mode, seq, derniereMaj, clients, collecte (79-09) ; journal : clé evenements (tableau)" "$(ev "$RC" 'j.etat.s+" "+j.etat.cles+" | "+j.journal.s+" "+j.journal.cles+" "+j.journal.tableau')" "200 clients,collecte,derniereMaj,mode,seq | 200 evenements true"
 assert_eq "RC.2 — modeles : 200, liste non vide, défaut texte, lab de 12 caractères hexadécimaux" "$(ev "$RC" 'j.modeles.s+" "+j.modeles.liste+" "+j.modeles.defaut+" "+j.modeles.lab')" "200 true string true"
 assert_eq "RC.4 — doing : sans identifiant et identifiant invalide 400 id-invalide, identifiant valide inconnu 200 avec une clé schema" "$(ev "$RC" 'j.doing.sans+" | "+j.doing.invalide+" | "+j.doing.inconnu+" "+j.doing.ct')" '400:{"erreur":"id-invalide"} | 400:{"erreur":"id-invalide"} | 200:string application/json'
 assert_eq "RC.5 — transcript : mêmes réponses que doing" "$(ev "$RC" 'j.transcript.sans+" | "+j.transcript.invalide+" | "+j.transcript.inconnu+" "+j.transcript.ct')" '400:{"erreur":"id-invalide"} | 400:{"erreur":"id-invalide"} | 200:string application/json'

@@ -209,7 +209,7 @@ import path from 'node:path';
 const [, , racine, ...opts] = process.argv;
 const LISTE = {
   'scripts/vf-cockpit-git-lanceur.mjs': 'socle',
-  'scripts/vf-cockpit.mjs': 'sans-git', 'scripts/vf-cockpit-build.mjs': 'sans-git', 'scripts/vf-cockpit-live.mjs': 'sans-git', 'scripts/vf-cockpit-terminal.mjs': 'sans-git', 'scripts/vf-cockpit-terminal-session.mjs': 'sans-git', 'scripts/vf-cockpit-etat-officiel.mjs': 'sans-git',
+  'scripts/vf-cockpit.mjs': 'sans-git', 'scripts/vf-cockpit-build.mjs': 'sans-git', 'scripts/vf-cockpit-terminal.mjs': 'sans-git', 'scripts/vf-cockpit-terminal-session.mjs': 'sans-git', 'scripts/vf-cockpit-etat-officiel.mjs': 'sans-git',
   'skills/cockpit-moteur/assets/serve.mjs': 'sans-git', 'skills/cockpit-moteur/scripts/open.mjs': 'sans-git', 'skills/cockpit-moteur/scripts/refresh.mjs': 'sans-git',
   'skills/cockpit-moteur/scripts/lib/common.mjs': 'git-garde',
 };
@@ -275,7 +275,7 @@ JS
 PLUGIN="$(cd "$SCRIPTS/.." && pwd)"
 GARDE="$(node "$AUX/garde.mjs" "$PLUGIN" --exact)"
 assert_eq "E6.1 — aucun importeur de child_process hors liste blanche, aucun lancement de git hors vf-cockpit-git-lanceur.mjs (arbre réel de plugin/cockpit, balayage récursif)" "${GARDE:-aucun}" "aucun"
-assert_eq "E6.1a — la garde a bien ouvert des fichiers : exactement les 11 importeurs de la liste sont trouvés (pas un dossier vide)" "$(node "$AUX/garde.mjs" "$PLUGIN" --importeurs | wc -l | tr -d ' ')" "11"
+assert_eq "E6.1a — la garde a bien ouvert des fichiers : exactement les 10 importeurs de la liste sont trouvés (pas un dossier vide)" "$(node "$AUX/garde.mjs" "$PLUGIN" --importeurs | wc -l | tr -d ' ')" "10"
 # les onze fichiers plantés de l'audit (promisify, alias d'import, multiligne, autre nom de variable, chemin absolu, execSync, bash -c, témoin direct, .cjs, .js)
 PLANTES_NOMS="a-promisify.mjs b-promisify-var.mjs c-alias.mjs d-multiligne.mjs e-variable-autre-nom.mjs f-chemin-absolu.mjs g-shell.mjs h-bash-c.mjs i-temoin-direct.mjs j-cjs.cjs k-js.js"
 planter() { # planter <nom> : écrit le contenu du fichier planté sur la sortie standard
@@ -302,13 +302,13 @@ assert_eq "E6.2a — un importeur hors liste SANS le mot git rougit aussi (la r�
 # E6.3 — règle 2 : sous le nom d'un importeur DE LA LISTE, chacun des onze contenus rougit pour son « git » (alias, promisify, multiligne, variable, chemin absolu, shell, bash -c, cjs)
 R63=""
 for n in $PLANTES_NOMS; do
-  PL="$WORK/e6-li"; rm -rf "$PL"; mkdir -p "$PL/scripts"; planter "$n" > "$PL/scripts/vf-cockpit-live.mjs"
-  R63="$R63$(node "$AUX/garde.mjs" "$PL" | grep -c 'scripts/vf-cockpit-live.mjs: lancement dont un argument contient git' | tr -d ' ')"
+  PL="$WORK/e6-li"; rm -rf "$PL"; mkdir -p "$PL/scripts"; planter "$n" > "$PL/scripts/vf-cockpit-build.mjs"
+  R63="$R63$(node "$AUX/garde.mjs" "$PL" | grep -c 'scripts/vf-cockpit-build.mjs: lancement dont un argument contient git' | tr -d ' ')"
 done
 assert_eq "E6.3 — règle 2 : sous le nom d'un importeur de la liste, les 11 contenus plantés sont tous signalés (1 chacun)" "$R63" "11111111111"
 # E6.4 — négatifs : la garde ne sur-signale pas
 PL="$WORK/e6-neg"; rm -rf "$PL"; mkdir -p "$PL/scripts" "$PL/skills/cockpit-moteur/scripts/lib" "$PL/scripts/tests" "$PL/autre"
-printf "import { execFileSync } from 'node:child_process';\nemit('git', {});\nexecFileSync('ps', ['-p', '1']);\n" > "$PL/scripts/vf-cockpit-live.mjs"
+printf "import { execFileSync } from 'node:child_process';\nemit('git', {});\nexecFileSync('ps', ['-p', '1']);\n" > "$PL/scripts/vf-cockpit-build.mjs"
 printf "import cp from 'node:child_process';\ncp.execFileSync('git', ['status']);\n" > "$PL/scripts/tests/outil.mjs"
 printf "const NATIFS = new Set(['child_process', 'cluster']);\n" > "$PL/autre/set.mjs"
 printf "import { execFileSync } from 'node:child_process';\nexport function git(cwd, args) {\n  if (process.env.VF_COCKPIT_GIT_DURCI !== '1') return null;\n  return execFileSync('git', ['-C', cwd, ...args]);\n}\n" > "$PL/skills/cockpit-moteur/scripts/lib/common.mjs"
@@ -323,8 +323,8 @@ assert_eq "E6.5b — la copie de l'arbre réel passe la garde (--exact)" "$(node
 planter k-x > "$PC/skills/cockpit-moteur/assets/ui/zz-intrus.js"
 assert_eq "E6.5c — un require('child_process').execFileSync('git') planté dans skills/cockpit-moteur/assets/ui/zz-intrus.js (hors scripts/*.mjs) rougit, seul" "$(node "$AUX/garde.mjs" "$PC")" "skills/cockpit-moteur/assets/ui/zz-intrus.js: importeur de child_process hors liste blanche"
 rm -f "$PC/skills/cockpit-moteur/assets/ui/zz-intrus.js"
-printf "\nexecFileSync('git', ['status']);\n" >> "$PC/scripts/vf-cockpit-live.mjs"
-assert_eq "E6.5d — un execFileSync('git', …) ajouté à vf-cockpit-live.mjs (importeur de la liste) rougit, seul" "$(node "$AUX/garde.mjs" "$PC")" "scripts/vf-cockpit-live.mjs: lancement dont un argument contient git"
+printf "\nexecFileSync('git', ['status']);\n" >> "$PC/scripts/vf-cockpit-build.mjs"
+assert_eq "E6.5d — un execFileSync('git', …) ajouté à vf-cockpit-build.mjs (importeur de la liste) rougit, seul" "$(node "$AUX/garde.mjs" "$PC")" "scripts/vf-cockpit-build.mjs: lancement dont un argument contient git"
 
 # E6.6 — mutants de la garde : chacun rougit SA sonde, pour la bonne raison (l'ancre existe, la sonde non mutée est verte)
 cat > "$AUX/mutg.mjs" <<'JS'
@@ -335,7 +335,7 @@ if (!t.includes(process.env.FROM)) { console.log('ancre absente'); process.exit(
 fs.writeFileSync(dst, t.replace(process.env.FROM, () => process.env.TO)); console.log('muté');
 JS
 mutg() { FROM="$2" TO="$3" node "$AUX/mutg.mjs" "$AUX/garde.mjs" "$AUX/garde-$1.mjs" 2>&1; }
-r63() { local g="$1" out="" n PL; for n in $PLANTES_NOMS; do PL="$WORK/e6-li"; rm -rf "$PL"; mkdir -p "$PL/scripts"; planter "$n" > "$PL/scripts/vf-cockpit-live.mjs"; out="$out$(node "$g" "$PL" | grep -c 'scripts/vf-cockpit-live.mjs: lancement dont un argument contient git' | tr -d ' ')"; done; echo "$out"; }
+r63() { local g="$1" out="" n PL; for n in $PLANTES_NOMS; do PL="$WORK/e6-li"; rm -rf "$PL"; mkdir -p "$PL/scripts"; planter "$n" > "$PL/scripts/vf-cockpit-build.mjs"; out="$out$(node "$g" "$PL" | grep -c 'scripts/vf-cockpit-build.mjs: lancement dont un argument contient git' | tr -d ' ')"; done; echo "$out"; }
 assert_eq "M-LISTE.0 — l'ancre existe" "$(mutg liste 'if (!nature) {' 'if (false) {')" "muté"
 assert_eq "M-LISTE — rougit E6.2a : l'importeur hors liste sans git n'est plus signalé" "$(node "$AUX/garde-liste.mjs" "$PH" | grep -c 'zz/sans-git.mjs')" "0"
 assert_eq "M-RECURSIF.0 — l'ancre existe" "$(mutg recursif 'if (!IGNORES.has(e.name)) parcourir(p);' '{}')" "muté"
