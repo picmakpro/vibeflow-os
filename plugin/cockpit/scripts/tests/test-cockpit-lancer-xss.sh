@@ -408,7 +408,7 @@ if [ -n "$CHROME" ]; then
   echo "  ℹ résiduel accepté (P72-D-21, Samuel, 2026-11-06) : pendant l'activation laissée par un geste réel, une requête de la charge est retenue — mesuré : $(rj "$RACT" 'j.residuel') UUID de plus"
   rm -rf "$WORK/mod-act"; MODACT="$(cockpit_module_copie "$WORK/mod-act")"; cp "$MODACT/scripts/vf-cockpit-lancer-ui.mjs" "$WORK/ui.orig"
   sed -i.bak 's/const humain = actif();/const humain = true;/' "$MODACT/scripts/vf-cockpit-lancer-ui.mjs"
-  if cmp -s "$WORK/ui.orig" "$WORK/sortie-act/vf-cockpit-lancer-ui.mjs"; then assert_eq "M-ACTIVATION-RETIREE — mutant sans effet (ancre absente)" "sans effet" "effet"
+  if cmp -s "$WORK/ui.orig" "$MODACT/scripts/vf-cockpit-lancer-ui.mjs"; then assert_eq "M-ACTIVATION-RETIREE — mutant sans effet (ancre absente)" "sans effet" "effet"
   else
     RMUT="$(act "$MODACT/scripts")"
     assert_eq "M-ACTIVATION-RETIREE — garde d'activation retirée : la charge fait retenir l'UUID de SA conversation (ACT.1 rougit : retenu au lieu de 0/0)" "$(rj "$RMUT" 'j.erreur||(j.forge>0)+"/"+(j.forgeClic>0)')" "true/true"
