@@ -1,9 +1,41 @@
-// chrome-panneau-retour.mjs — mesures de la pile Retour du panneau de Projet (80-08, FORM-08) dans un vrai Chrome headless, de vrais clics, de vraies touches.
+// chrome-panneau-retour.mjs — mesures de la pile Retour du panneau de Projet (80-08, FORM-08) dans un vrai Chrome headless (vrais clics, vraies touches).
 // Usage : node chrome-panneau-retour.mjs <chrome> <racine-du-serveur> <mode> [filtre]   Rend UNE ligne JSON { … } ou { erreur }.
-// Modes : pr1 (PR1.x), pr2a (PR2.1 à PR2.5, PR2.7, PR2.8, PR2.9), pr2b (PR2.6), pr2c (PR2.10, lab lancé avec --terminal). Chaque section est isolée (sec).
+// Modes : pr1 (PR1.x), pr2a (PR2.1 à PR2.5, PR2.7, PR2.8, PR2.9, PR2.11 à PR2.14), pr2d (PR2.15, PR2.16 : clavier),
+// pr2b (PR2.6), pr2c (PR2.10, lab lancé avec --terminal). Chaque section est isolée (sec).
 import fs from 'node:fs';
+import zlib from 'node:zlib';
 import { executer, pause, stabiliser, attendreValeur } from './chrome-session.mjs';
 const [, , chrome, racine, mode, filtre] = process.argv;
+// couleur de fond la plus fréquente d'une capture PNG (8 bits, RGB ou RGBA) : le fond réellement rendu sous le texte, « r,g,b »
+function fondDominant(buf) {
+  let o = 8, w = 0, h = 0, ct = 0; const idat = [];
+  while (o < buf.length) {
+    const n = buf.readUInt32BE(o), ty = buf.toString('latin1', o + 4, o + 8), d = buf.subarray(o + 8, o + 8 + n);
+    if (ty === 'IHDR') { w = d.readUInt32BE(0); h = d.readUInt32BE(4); ct = d[9]; }
+    if (ty === 'IDAT') idat.push(d);
+    o += 12 + n;
+  }
+  const bpp = ct === 6 ? 4 : 3, raw = zlib.inflateSync(Buffer.concat(idat)), st = w * bpp, px = Buffer.alloc(h * st);
+  const paeth = (a, b, c) => {
+    const p = a + b - c, pa = Math.abs(p - a), pb = Math.abs(p - b), pc = Math.abs(p - c);
+    return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
+  };
+  for (let y = 0; y < h; y++) {
+    const f = raw[y * (st + 1)], l = raw.subarray(y * (st + 1) + 1, (y + 1) * (st + 1));
+    for (let x = 0; x < st; x++) {
+      const a = x >= bpp ? px[y * st + x - bpp] : 0, b = y ? px[(y - 1) * st + x] : 0, c = x >= bpp && y ? px[(y - 1) * st + x - bpp] : 0;
+      px[y * st + x] = (l[x] + (f === 0 ? 0 : f === 1 ? a : f === 2 ? b : f === 3 ? (a + b) >> 1 : paeth(a, b, c))) & 255;
+    }
+  }
+  const m = new Map();
+  for (let i = 0; i < px.length; i += bpp) { const k = px[i] + ',' + px[i + 1] + ',' + px[i + 2]; m.set(k, (m.get(k) || 0) + 1); }
+  return [...m.entries()].sort((a, b) => b[1] - a[1])[0][0];
+}
+const lum = (rgb) => {
+  const [r, g, b] = rgb.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b;
+};
+const rapport = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
 const SEL = filtre ? new Set(filtre.split(',')) : null;
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!VibeFlow.state && !!VibeFlow.state.layout";
 const SANS_VISITE = "(() => { const g = Storage.prototype.getItem; Storage.prototype.getItem = function (k) {"
@@ -27,7 +59,8 @@ await executer(chrome, async (s) => {
   const charger = async (page = 'project.html', w = 1440, h = 900, tactile = false) => {
     await s.send('Emulation.setTouchEmulationEnabled', { enabled: tactile });
     await s.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: tactile });
-    await s.naviguer(`${racine}/${page}`, { brut: true }); await s.attendre(PRET, 'page prête');
+    const qs = page === 'project.html' ? '?vue=couloirs' : ''; // la forme est explicite : le défaut est la liste à ≤ 700 px (80-07)
+    await s.naviguer(`${racine}/${page}${qs}`, { brut: true }); await s.attendre(PRET, 'page prête');
     if (page === 'project.html') await s.attendre("document.querySelectorAll('.vp-carte').length > 0", 'couloirs');
     await pause(400);
   };
@@ -81,23 +114,31 @@ await executer(chrome, async (s) => {
       await charger(); await carte(4); await deux(); await touche('Enter'); await posee((e) => e && e.cont !== 'root');
       await touche('Escape'); await posee((e) => e && e.cont === 'root'); o.pr25.racine = await taille();
       await charger(); await carte(2); await deux(); const av = await taille(); await touche('p'); await attendreValeur(taille, (t) => t === 0, { max: 3000 });
-      o.pr25.ferme = [av, await taille()];
+      o.pr25.ferme = [av, await taille()]; await touche('p'); await pause(500); // le panneau rouvert : l'état se garde d'une page à l'autre
       await charger(); await carte(2); await deux(); await s.ev("document.dispatchEvent(new CustomEvent('vf:onglet'))"); await pause(200);
       o.pr25.onglet = await taille();
     });
-    await sec('pr27', async () => {
+    await sec('pr211', async () => { await charger(); await carte(2); await lien(1); await carte(3); o.pr211 = await taille(); });
+    await sec('pr212', async () => {
+      await charger(); await carte(2); await lien(1); const av = await taille(); await s.ev('VibeFlow.select(null)'); await pause(500);
+      o.pr212 = [av, await taille()];
+    });
+    await sec('pr214', async () => {
+      await charger(); await carte(2); await empile('0123456789ab-milieu-qui-depasse-cdefghijklm'); await pause(300);
+      o.pr214 = await lire(`JSON.stringify(${BTN})`);
+    });
+    await sec('pr27', async () => { // contraste du texte désactivé sur le fond RENDU (pixels de la capture du bouton), pas sur un repli
       o.pr27 = {};
       for (const th of ['dark', 'light']) {
-        await charger(); await s.ev(`document.documentElement.setAttribute('data-theme', '${th}')`); await carte(2); await pause(300);
-        o.pr27[th] = await lire(`JSON.stringify((() => { const L = (c) => { const m = c.match(/[\\d.]+/g).map(Number); const f = (v) => { v /= 255;
-          return v <= .03928 ? v / 12.92 : ((v + .055) / 1.055) ** 2.4; }; return .2126 * f(m[0]) + .7152 * f(m[1]) + .0722 * f(m[2]); };
-          const mix = (c, f) => { const m = c.match(/[\\d.]+/g).map(Number); const a = m.length > 3 ? m[3] : 1; const g = f.match(/[\\d.]+/g).map(Number);
-            return 'rgb(' + [0, 1, 2].map((i) => Math.round(m[i] * a + g[i] * (1 - a))).join(',') + ')'; };
-          const R = (a, b) => { const x = L(a), y = L(b); return (Math.max(x, y) + .05) / (Math.min(x, y) + .05); };
-          const t = document.querySelector('#panel .vf-retour > span:last-child'), p = document.getElementById('panel');
-          let fond = getComputedStyle(p).backgroundColor, base = getComputedStyle(document.body).backgroundColor;
-          if (!/^rgb\\(/.test(base)) base = th === 'dark' ? 'rgb(18,18,18)' : 'rgb(255,255,255)'; fond = mix(fond, base);
-          const c = getComputedStyle(t).color; return { couleur: c, fond, ratio: R(c, fond), dis: t.parentNode.getAttribute('aria-disabled') }; })())`);
+        await charger(); await s.ev(`document.documentElement.setAttribute('data-theme', '${th}')`); await carte(2); await pause(400);
+        const r = await lire(`JSON.stringify((() => {
+          const b = document.querySelector('#panel .vf-retour'), q = b.getBoundingClientRect(), c = getComputedStyle(b);
+          return { x: q.x, y: q.y, w: q.width, h: q.height, c: getComputedStyle(b.lastElementChild).color, dis: b.getAttribute('aria-disabled'),
+            poids: c.fontWeight, taille: c.fontSize }; })())`);
+        const clip = { x: r.x, y: r.y, width: r.w, height: r.h, scale: 1 };
+        const png = Buffer.from((await s.send('Page.captureScreenshot', { format: 'png', clip })).data, 'base64');
+        const fond = fondDominant(png), txt = r.c.match(/\d+/g).slice(0, 3).map(Number);
+        o.pr27[th] = { couleur: r.c, fond, ratio: rapport(txt, fond.split(',').map(Number)), dis: r.dis, poids: r.poids, taille: r.taille };
       }
     });
     await sec('pr28', async () => {
@@ -110,11 +151,38 @@ await executer(chrome, async (s) => {
     await sec('pr29', async () => {
       if (!fs.existsSync(process.env.PR_LISTE || '/nonexistent')) { o.pr29 = { attente: true }; return; }
       await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
-      await s.naviguer(`${racine}/project.html?vue=liste`, { brut: true }); await s.attendre(PRET, 'liste prête'); await pause(600);
-      const ligne = 'section.vf-projet [data-id^="n:ph-"]:not(.vp-carte)';
-      await clic(ligne); await pause(600); await s.ev('VF_PANNEAU.empiler({ titre: "L", rouvrir: () => {} })');
-      await clic('#panel a.row[data-go^="n:ph-"]'); await pause(600); const avant = await taille();
-      await clic(`${ligne}:last-of-type`); await pause(600); o.pr29 = { avant, apres: await etat() };
+      await s.naviguer(`${racine}/project.html?vue=liste`, { brut: true }); await s.attendre(PRET, 'liste prête');
+      await s.attendre("document.querySelectorAll('section.vf-projet .vp-ligne').length > 1", 'rangées'); await pause(600);
+      const ligne = 'section.vf-projet .vp-ligne[data-id^="n:ph-"]'; // sélecteur annoncé par 80-07-PLAN
+      await clic(ligne); await pause(600); await s.ev('VF_PANNEAU.empiler({ titre: "L", rouvrir: () => {} })'); const avant = await taille();
+      const id = await s.ev(`document.querySelectorAll(${JSON.stringify(ligne)})[1].getAttribute('data-id')`);
+      await clic(`${ligne}[data-id="${id}"]`); await pause(600); o.pr29 = { avant, apres: await etat(), id };
+      await s.ev('VF_PANNEAU.empiler({ titre: "L", rouvrir: () => {} })'); // Entrée sur une rangée (clavier) : même vidage
+      await s.ev(`document.querySelector(${JSON.stringify(ligne)}).focus()`); await touche('Enter'); await pause(600); o.pr29.entree = await etat();
+    });
+  }
+
+  if (mode === 'pr2d') { // activation au clavier : Entrée et Espace pressent le bouton, jamais l'Entrée globale du moteur (qui plonge dans la sélection)
+    const activer = async (nom) => {
+      const sp = nom === 'Space';
+      for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: sp ? ' ' : 'Enter', code: nom,
+        windowsVirtualKeyCode: sp ? 32 : 13, nativeVirtualKeyCode: sp ? 32 : 13, ...(type === 'keyDown' ? { text: sp ? ' ' : '\r' } : {}) });
+    };
+    const lecture = async () => ({ ...(await etat()), foc: await s.ev('document.activeElement.className'),
+      meme: await s.ev('document.querySelector("#panel .vf-retour") === window.__b') });
+    const cas = async (nom, touche, actif) => {
+      await charger(); await carte(2); if (actif) await lien(1);
+      await s.ev('window.__b = document.querySelector("#panel .vf-retour"); window.__b.focus()'); await activer(touche); await pause(700);
+      const e = await lecture(); o[nom] = { sel: e.sel, cont: e.cont, taille: e.taille, foc: e.foc, meme: e.meme };
+    };
+    await sec('pr215a', async () => { await cas('pr215a', 'Enter', true); });
+    await sec('pr215b', async () => { await cas('pr215b', 'Space', true); });
+    await sec('pr215c', async () => { await cas('pr215c', 'Enter', false); });
+    await sec('pr215d', async () => { await cas('pr215d', 'Space', false); });
+    await sec('pr216', async () => { // retour() sur pile vide : le bouton n'est pas reconstruit, le focus reste dessus
+      await charger(); await carte(2);
+      await s.ev('window.__b = document.querySelector("#panel .vf-retour"); window.__b.focus(); VF_PANNEAU.retour()'); await pause(300);
+      const e = await lecture(); o.pr216 = { foc: e.foc, meme: e.meme, taille: e.taille };
     });
   }
 
