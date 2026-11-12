@@ -425,8 +425,17 @@ MOT_OK="$WORK/moteur-ok"; rm -rf "$MOT_OK"; cp -R "$ENG" "$MOT_OK"
 MOT_VF="$LAB/.vibeflow/moteur-copie"; rm -rf "$MOT_VF"; cp -R "$ENG" "$MOT_VF"
 MOT_LIEN="$WORK/moteur-lien"; rm -rf "$MOT_LIEN"; cp -R "$ENG" "$MOT_LIEN"; rm "$MOT_LIEN/terminal/vf-cockpit-pty.py"; ln -s "$ENG/terminal/vf-cockpit-pty.py" "$MOT_LIEN/terminal/vf-cockpit-pty.py"
 assert_eq "TM.0 — témoin : une copie ordinaire du moteur, hors du lab, donne un terminal actif" "$(sonde_moteur "$OUT" "$MOT_OK")" "terminal=true journal=autre"
-assert_eq "TM.1 — moteur sous <lab>/.vibeflow/ : assistant refusé, terminal inerte (journal : assistant introuvable)" "$(sonde_moteur "$OUT" "$MOT_VF")" "terminal=false journal=refus"
+# 79-06 (S3f, audit : classe T-79-601) : serve.mjs refuse lui-même un moteur désigné sous <lab>/.vibeflow/ (VF_COCKPIT_ENGINE_DIR) avant tout démarrage ;
+# la garde du terminal (celle que TM.1 et M-MOTEUR-VIBEFLOW visent) devient une défense en profondeur. TM.1b : le serveur du module refuse de démarrer ;
+# TM.1 : la même garde retirée de serve.mjs dans une copie du module (SANS_GARDE_SERVE) atteint la garde du terminal, qui refuse toujours : même attendu qu'avant.
+SANS_GARDE_SERVE='/^{ const vf = path.join(root, .\.vibeflow.); for (const nom of/d'
+assert_eq "TM.1b — moteur sous <lab>/.vibeflow/ : serve.mjs refuse de démarrer (aucun terminal, message en français)" "$(r="$(sonde_moteur "$OUT" "$MOT_VF")"; echo "$r $(grep -c 'VF_COCKPIT_ENGINE_DIR désigne un dossier de données du lab' "$(ls -t "$WORK"/serve-*.out | head -1)")")" "terminal= journal=autre 1"
 rm -rf "$MOT_VF" # copie de 3 Mo : les mutants qui suivent copient <lab>/.vibeflow
+if mutant sansgarde serve.mjs "$SANS_GARDE_SERVE"; then
+  cp -R "$ENG" "$MUT_OUT/../moteur-copie"
+  assert_eq "TM.1 — moteur sous <lab>/.vibeflow/ (garde de serve.mjs retirée dans la copie du module) : assistant refusé par le terminal, terminal inerte (journal : assistant introuvable)" "$(sonde_moteur "$MUT_OUT" "$MUT_OUT/../moteur-copie")" "terminal=false journal=refus"
+  rm -rf "$MUT_OUT/../moteur-copie"
+else assert_eq "TM.1 — copie du module sans la garde de serve.mjs : mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 assert_eq "TM.2 — assistant en lien symbolique : refusé, terminal inerte (journal : assistant introuvable)" "$(sonde_moteur "$OUT" "$MOT_LIEN")" "terminal=false journal=refus"
 
 echo "=== Mutants — chacun rougit sa sonde ==="
@@ -479,7 +488,8 @@ if mut egal vf-cockpit-terminal-amorce.mjs "s/return crypto.timingSafeEqual(cond
   assert_eq "M-EGAL — le mutant (egal() sans timingSafeEqual) rougit TC.1" "$(rouge "$(sonde_tc "$MUT_OUT")" "egal=2 directes=0 condense=oui")" "rouge"; fi
 if mut moteurvf vf-cockpit-terminal.mjs "s/ && !realUnder(f, path.join(root, '.vibeflow'), { siEchec: true })//"; then
   cp -R "$ENG" "$MUT_OUT/../moteur-copie"
-  assert_eq "M-MOTEUR-VIBEFLOW — le mutant (plus de refus sous .vibeflow/) rougit TM.1 : le terminal devient actif" "$(rouge "$(sonde_moteur "$MUT_OUT" "$MUT_OUT/../moteur-copie")" "terminal=false journal=refus")" "rouge"; fi
+  MSV="$MUT_MOD/skills/cockpit-moteur/assets/serve.mjs"; cp "$MSV" "$MSV.orig"; sed -i.bak "$SANS_GARDE_SERVE" "$MSV"; cmp -s "$MSV" "$MSV.orig" && assert_eq "M-MOTEUR-VIBEFLOW — garde de serve.mjs : mutant sans effet" "sans effet" "effet"; rm -f "$MSV.orig" "$MSV.bak"
+  assert_eq "M-MOTEUR-VIBEFLOW — le mutant (plus de refus sous .vibeflow/, la garde de serve.mjs retirée dans la même copie) rougit TM.1 : le terminal devient actif" "$(rouge "$(sonde_moteur "$MUT_OUT" "$MUT_OUT/../moteur-copie")" "terminal=false journal=refus")" "rouge"; fi
 if mut moteurlien vf-cockpit-terminal.mjs "s/fs.lstatSync(f).isFile()/fs.statSync(f).isFile()/"; then
   assert_eq "M-MOTEUR-LIEN — le mutant (lstat remplacé par stat : le lien est suivi) rougit TM.2 : le terminal devient actif" "$(rouge "$(sonde_moteur "$MUT_OUT" "$MOT_LIEN")" "terminal=false journal=refus")" "rouge"; fi
 
