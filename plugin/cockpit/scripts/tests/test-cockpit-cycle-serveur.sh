@@ -6,6 +6,8 @@
 #   AM7.*      en CI, une suite qui dépend de Chrome sort non-zéro sans lui (garde de hygiene.sh) ; hors CI le saut reste permis
 #   H3.*       journal daté avec motif d'arrêt, verrou de lanceur, relance identique / relance à option changée, activité authentifiée
 # Le test COMPTE des appels (faux verrou, lectures de fichier), il ne mesure aucun temps.
+# 79-09 : la collecte tourne dans un fil du serveur ; le harnais de H2 injecte le collecteur EN LIGNE (tests/collecte-en-ligne.mjs : mêmes étapes, même interface, dans le
+# processus du test) pour que ses espions et ses compteurs voient les lectures, et attend `live.pret` avant de remettre à zéro puis avant chaque comptage.
 # Lab neutre dans mktemp, HOME jetable, isolation git. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -37,20 +39,26 @@ const compteur = path.join(lab, '.vibeflow', 'compteur-verrou');
 let req = 0; const lire = fs.readFileSync;
 fs.readFileSync = function (f, ...r) { if (String(f).endsWith('REQUIREMENTS.md')) req++; return lire.call(this, f, ...r); };
 const { startLive } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-live.mjs')).href);
+const { creerCollecteEnLigne } = await import(pathToFileURL(path.join(scripts, 'tests', 'collecte-en-ligne.mjs')).href);
 const appels = (nom) => (fs.existsSync(compteur) ? fs.readFileSync(compteur, 'utf8').split('\n').filter((l) => l === nom).length : 0);
 const evs = [];
-const live = startLive({ root: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), onEvent: (n) => evs.push(n), log: () => {}, aClient: () => mode === 'client' });
+const live = startLive({ root: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), onEvent: (n) => evs.push(n), log: () => {}, aClient: () => mode === 'client', collecteur: (o) => creerCollecteEnLigne(o) });
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+const negatif = mode === 'sans' ? 1000 : 0; // fenêtres négatives (aucun appel de plus) : une seconde de plus avant de compter, le résultat d'une demande arrive après son départ
+// fin de la collecte de démarrage : elle ne doit pas tomber dans la fenêtre du filet
+await live.pret(4000);
 // fenêtre 1 : le filet seul (5 s de période), sans rien changer
-fs.rmSync(compteur, { force: true }); await dormir(5700);
+fs.rmSync(compteur, { force: true }); await dormir(5700); await live.pret(4000); await dormir(negatif);
 const filet = { status: appels('status'), orphans: appels('orphans') };
 // fenêtre 2 : un changement de planning ; le prochain tour du filet tombe 4 s plus tard, hors de la fenêtre
 fs.rmSync(compteur, { force: true }); req = 0; evs.length = 0;
 fs.writeFileSync(path.join(lab, '.planning', 'ROADMAP.md'), '- [x] **Phase 1: Socle** - premier jet\n- [x] **Phase 2: Suite** - deuxième jet\n');
 for (let i = 0; i < 40 && !evs.some((e) => e === 'patch' || e === 'structural'); i++) await dormir(100);
+await live.pret(4000); await dormir(negatif);
 const changement = { evenement: evs.some((e) => e === 'patch' || e === 'structural'), status: appels('status'), exigences: req };
 // fenêtre 3 : la connexion d'un onglet après un silence relit l'état une fois, et pas deux (deux onglets coup sur coup)
 fs.rmSync(compteur, { force: true }); live.reveil?.(); live.reveil?.();
+await live.pret(4000);
 const reveil = { status: appels('status') };
 live.stop();
 console.log(JSON.stringify({ filet, changement, reveil }));

@@ -1,7 +1,10 @@
-// collecte-labo — fixtures de la suite test-cockpit-collecte.sh (79-09) : lab git neutre avec planning, faux verrou, session fraîche dans un HOME jetable.
-// Exports : creerLab(dir), ecrireFauxVerrou(dir), ecrireSession(home, lab, id). CLI : node collecte-labo.mjs lab <dir> | verrou <dir> | session <home> <lab> <id>
-// Le faux verrou consigne le verbe appelé dans VF_FAUX_JOURNAL, dort VF_FAUX_DELAI secondes pour `status` seulement et rend les formes minimales de
-// `status`, `orphans` et `registry` (79-03). Rien ici n'importe le code testé : une fixture ne dépend pas de ce qu'elle sert à prouver.
+// collecte-labo — fixtures de la suite test-cockpit-collecte.sh (79-09) : lab git neutre avec planning, faux verrou, session fraîche dans un
+// HOME jetable.
+// Exports : creerLab(dir), ecrireFauxVerrou(dir), ecrireSession(home, lab, id).
+// CLI : node collecte-labo.mjs lab <dir> | verrou <dir> | session <home> <lab> <id>
+// Le faux verrou consigne le verbe appelé dans VF_FAUX_JOURNAL, dort VF_FAUX_DELAI secondes pour `status` seulement et rend les formes
+// minimales de `status`, `orphans` et `registry` (79-03). Rien ici n'importe le code testé : une fixture ne dépend pas de ce qu'elle sert
+// à prouver.
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -40,7 +43,8 @@ export function ecrireSession(home, lab, id) {
   const base = { cwd: lab, sessionId: id, gitBranch: 'main', version: '2.1.316' };
   fs.writeFileSync(path.join(d, `${id}.jsonl`), [
     { type: 'user', timestamp: '2026-11-01T10:00:00Z', message: { content: 'salut' }, ...base },
-    { type: 'assistant', timestamp: '2026-11-01T10:00:05Z', message: { content: [{ type: 'tool_use', name: 'Bash', input: { description: 'x', command: 'ls' } }] }, ...base },
+    { type: 'assistant', timestamp: '2026-11-01T10:00:05Z', ...base,
+      message: { content: [{ type: 'tool_use', name: 'Bash', input: { description: 'x', command: 'ls' } }] } },
   ].map((o) => JSON.stringify(o)).join('\n') + '\n');
 }
 

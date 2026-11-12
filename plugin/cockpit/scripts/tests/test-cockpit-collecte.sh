@@ -136,7 +136,6 @@ cat > "$WORK/fakegit/git" <<'SH'
 #!/usr/bin/env bash
 echo "$*" >> "$VF_FAUX_GIT_JOURNAL"
 case " $* " in *" for-each-ref "*)
-  [ ! -f "$VF_FAUX_GIT_DELAI" ] || sleep "$(cat "$VF_FAUX_GIT_DELAI")"
   [ ! -f "$VF_FAUX_GIT_PANNE" ] || exit 1 ;;
 esac
 exec "$VF_VRAI_GIT" "$@"
@@ -152,33 +151,33 @@ let M = null; try { M = await imp(path.join(tests, 'collecte-en-ligne.mjs')); } 
 const out = {}, evs = [], dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const jusque = async (f, ms) => { for (let t = 0; t < ms; t += 50) { if (f()) return true; await dormir(50); } return false; };
 const appels = () => (fs.existsSync(journal) ? fs.readFileSync(journal, 'utf8').split('\n').filter((l) => l.includes('for-each-ref')).length : 0);
-fs.writeFileSync(process.env.VF_FAUX_GIT_DELAI, '1.5'); // avant le démarrage : le premier calcul de la signature est lent, l'instantané naît sans git
+// la première pose est celle du graphe : le collecteur en ligne la fait au premier passage de la boucle, la signature git (plusieurs lancements asynchrones) revient après
+let premiere; const off0 = surInstantane((i) => { if (premiere === undefined) premiere = i.git; }); // posé AVANT le démarrage : la première pose est vue
 const live = startLive({ root: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), onEvent: (n, d) => evs.push([n, d]), log: () => {}, mode: 'poll', aClient: () => true, nbClients: () => 1, collecteur: M ? (o) => M.creerCollecteEnLigne(o) : undefined });
 const g = () => instantane()?.git ?? null;
-await jusque(() => instantane() !== null, 10000);
-out['C10.6a'] = instantane() !== null && g() === null; // la collecte est venue, la signature git (lente) pas encore
-fs.rmSync(process.env.VF_FAUX_GIT_DELAI, { force: true });
-await jusque(() => g() !== null, 12000); const g1 = g();
+await jusque(() => instantane() !== null, 20000); off0();
+out['C10.6a'] = instantane() !== null && premiere === null; // l'instantané existe avant toute signature git
+await jusque(() => g() !== null, 20000); const g1 = g();
 out['C10.6b'] = !!g1 && /^[0-9a-f]{16}$/.test(g1.sig) && Number.isInteger(g1.at) && g1.at > 1.7e12;
-await jusque(() => g() && g().at !== g1.at, 9000); const g2 = g();
+await jusque(() => g() && g().at !== g1.at, 15000); const g2 = g();
 out['C10.6c'] = !!g2 && g2.sig === g1.sig && g2.at > g1.at;
 execFileSync(process.env.VF_VRAI_GIT, ['-C', lab, '-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-q', '--allow-empty', '-m', 'vide'], { stdio: 'ignore' });
-await jusque(() => g() && g().sig !== g1.sig, 9000); const g3 = g();
+await jusque(() => g() && g().sig !== g1.sig, 15000); const g3 = g();
 out['C10.7a'] = !!g3 && g3.sig !== g1.sig && evs.some(([n, d]) => n === 'git' && d.sig === g3.sig);
 const n0 = appels(); let rappels = 0; const off = surInstantane(() => { rappels++; });
 for (let i = 0; i < 200; i++) instantane();
 await dormir(400); off();
 out['C10.7b'] = appels() === n0 && n0 > 0 && rappels === 0;
 fs.writeFileSync(process.env.VF_FAUX_GIT_PANNE, '1');
-const n1 = appels(); await jusque(() => appels() > n1, 9000); await dormir(600); const g4 = g();
+const n1 = appels(); await jusque(() => appels() > n1, 15000); await dormir(600); const g4 = g();
 out['C10.7c'] = appels() > n1 && !!g4 && g4.sig === g3.sig && g4.at === g3.at;
 live.stop(); console.log(JSON.stringify(out)); process.exit(0);
 JS
-export VF_FAUX_GIT_JOURNAL="$WORK/git-journal" VF_FAUX_GIT_DELAI="$WORK/git-delai" VF_FAUX_GIT_PANNE="$WORK/git-panne" VF_VRAI_GIT="$VRAI_GIT"
+export VF_FAUX_GIT_JOURNAL="$WORK/git-journal" VF_FAUX_GIT_PANNE="$WORK/git-panne" VF_VRAI_GIT="$VRAI_GIT"
 LABG="$WORK/labg"; node "$TESTS/collecte-labo.mjs" lab "$LABG"; : > "$VF_FAUX_GIT_JOURNAL"
 node "$AUX/gi.mjs" "$SCRIPTS" "$TESTS" "$LABG" "$VF_FAUX_GIT_JOURNAL" > "$WORK/gi.json" 2> "$WORK/gi.err" || cat "$WORK/gi.err"
-unset VF_FAUX_GIT_JOURNAL VF_FAUX_GIT_DELAI VF_FAUX_GIT_PANNE VF_VRAI_GIT
-assert_eq "C10.6a — tant qu'aucune signature n'est revenue, instantane().git vaut null (l'instantané existe déjà)" "$(jq_ "$WORK/gi.json" 'j["C10.6a"]')" "true"
+unset VF_FAUX_GIT_JOURNAL VF_FAUX_GIT_PANNE VF_VRAI_GIT
+assert_eq "C10.6a — la première pose de l'instantané (celle du graphe) précède toute signature git : git vaut null" "$(jq_ "$WORK/gi.json" 'j["C10.6a"]')" "true"
 assert_eq "C10.6b — puis { sig, at } : sig de 16 caractères hexadécimaux, at entier en millisecondes" "$(jq_ "$WORK/gi.json" 'j["C10.6b"]')" "true"
 assert_eq "C10.6c — deux calculs successifs sans rien changer rendent le même sig et un at qui avance" "$(jq_ "$WORK/gi.json" 'j["C10.6c"]')" "true"
 assert_eq "C10.7a — un commit vide change instantane().git.sig au calcul suivant, l'événement git porte le même sig" "$(jq_ "$WORK/gi.json" 'j["C10.7a"]')" "true"

@@ -69,13 +69,18 @@ const lireModeles = (c) => {
 function ouvrirFlux(c, req, url, res) {
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
   res.write('retry: 1000\n\n');
+  let ouvert = true, ka = null;
+  req.on('close', () => { ouvert = false; clearInterval(ka); c.clients.delete(res); c.fluxFerme(); }); // inscrite avant tout délai : un onglet fermé pendant l'attente ne reçoit rien
   c.live?.reveil?.(); // AUDC-H2 : rien n'a été collecté depuis un moment s'il n'y avait aucun onglet
-  const snap = c.live ? c.live.snapshot() : { seq: 0, lock: { available: false }, who: { workers: [], sources: {} } };
-  if (porteInterdit(snap)) { c.log('error', 'hello refusé : contenu interdit'); res.end(); return; }
-  res.write(`event: hello\ndata: ${JSON.stringify(snap)}\n\n`);
-  c.clients.add(res);
-  const ka = setInterval(() => res.write(': ka\n\n'), 15000);
-  req.on('close', () => { clearInterval(ka); c.clients.delete(res); c.fluxFerme(); });
+  // 79-09 : `hello` attend la première collecte (5 s au plus), puis part complet ; les doubles de suites n'ont pas `pret`
+  Promise.resolve(c.live?.pret?.(5000)).catch(() => {}).then(() => {
+    if (!ouvert) return;
+    const snap = c.live ? c.live.snapshot() : { seq: 0, lock: { available: false }, who: { workers: [], sources: {} } };
+    if (porteInterdit(snap)) { c.log('error', 'hello refusé : contenu interdit'); res.end(); return; }
+    res.write(`event: hello\ndata: ${JSON.stringify(snap)}\n\n`);
+    c.clients.add(res);
+    ka = setInterval(() => res.write(': ka\n\n'), 15000);
+  });
 }
 
 // la table des routes (A10) : une ligne par route, ordre alphabétique par chemin ; sans régime = gardée
@@ -123,7 +128,7 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
   };
   let live = null;
   try {
-    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); }, aClient: () => clients.size > 0 }); // AUDC-H2 : le filet ne collecte que si un onglet écoute
+    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); }, aClient: () => clients.size > 0, nbClients: () => clients.size, garde: (o) => !porteInterdit(o) }); // AUDC-H2 : le filet ne collecte que si un onglet écoute ; garde : l'instantané passe la garde d'émission avant sa pose
   } catch (e) { log('error', `direct indisponible : ${e.message}`); }
   lancer.sourceWho(() => (live ? live.snapshot().who : null)); // états attendue / vue / terminee des cartes lancées (72-07)
 
