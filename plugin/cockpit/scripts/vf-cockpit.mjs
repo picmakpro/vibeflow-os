@@ -8,6 +8,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import crypto from 'node:crypto';
+import { empreinteModule } from './vf-cockpit-module.mjs';
 import { spawn, execFileSync } from 'node:child_process';
 
 import { envEnfant } from './vf-cockpit-env.mjs';
@@ -66,7 +67,10 @@ const attendre = (ms) => new Promise((r) => setTimeout(r, ms));
 const adresses = (url) => `Cockpit : ${url}/ (Code) · ${url}/project.html (Projet)`;
 // AUDC-H3 : le journal du serveur (serveur.log) reçoit aussi les décisions du lanceur, datées, avec leur motif (jamais un jeton ni un contenu)
 // AUDC-H3 : empreinte du code que le serveur en cours a chargé (server.json.hash, écrite au démarrage) contre celle de la sortie assemblée ; différentes = le serveur tourne sur un code périmé
-const empreinteCode = (sortie) => { try { return crypto.createHash('sha1').update(fs.readFileSync(path.join(sortie, 'serve.mjs'))).digest('hex').slice(0, 12); } catch { return null; } };
+// 79-06 (SOCL-08) : l'empreinte couvre tout le code évalué du MODULE (même fonction que le serveur) ; le serveur est le serve.mjs du module, jamais un fichier de la sortie
+const empreinteDuModule = () => empreinteModule({ dossierScripts: HERE, dossierMoteur: engineDir(HERE).chemin || '' });
+const serveDuModule = () => { try { return fs.realpathSync(path.join(engineDir(HERE).chemin || '', 'assets', 'serve.mjs')); } catch { return null; } };
+const motEntier = (cmd, mot) => !!mot && (` ${cmd} `).includes(` ${mot} `);
 // 67-SECURITY M3 : le lanceur n'exécute JAMAIS un script du lab (serve.mjs de la sortie compris). Arrêt par signal, sur un PID que le fichier
 // d'état du lab (donc non fiable) désigne : entier > 1, ni le nôtre, vivant, et dont la ligne de commande est le serve.mjs de CETTE sortie.
 // Dit UNE fois par processus : estNotre est rappelée à chaque tour d'attente du terminal (100 fois) et l'absence de `ps` ne change pas entre deux appels.
@@ -82,7 +86,9 @@ function estNotre(pid, serve, lab) {
   if (!ps) { if (!psDit) { psDit = true; console.error("arrêt refusé : « ps » est introuvable dans les éléments absolus du PATH, le serveur n'est pas arrêté (un PID du lab n'est jamais signalé sans vérification)."); } return false; }
   try {
     const cmd = execFileSync(ps, ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000, env: envEnfant(lab) });
-    return cmd.includes(serve) || cmd.includes(fs.realpathSync(serve));
+    // identité : serve.mjs du module en mot entier ET --sortie=<chemin réel> exact en fin de ligne ; l'ancienne forme (<sortie>/serve.mjs, sans --sortie=) reste reconnue pendant la transition (P79-D-26, à retirer à la version suivante)
+    const c = cmd.trimEnd(), sortie = path.dirname(serve); let reelle = sortie; try { reelle = fs.realpathSync(sortie); } catch {}
+    return (motEntier(c, serveDuModule()) && c.endsWith(` --sortie=${reelle}`)) || motEntier(c, serve) || motEntier(c, path.join(reelle, 'serve.mjs'));
   } catch { return false; }
 }
 function arreter(sortie) {
@@ -190,11 +196,12 @@ async function demarrer(lab, sortie, o) {
   try { fs.unlinkSync(etatFile(sortie)); } catch {} // état d'un serveur mort : jamais pris pour un démarrage
   verifierSortie(lab, sortie);
   const logFd = fs.openSync(path.join(sortie, '.cache', 'serveur.log'), 'a');
-  const args = [path.join(sortie, 'serve.mjs'), '--idle-exit', '60'];
+  const args = [serveDuModule() || path.join(sortie, 'serve.mjs'), '--idle-exit', '60'];
   args.push('--no-open'); // N2 (P71-D-29) : le serveur ne lance jamais l'ouvreur par son nom depuis le lab ; le lanceur ouvre lui-même, par chemin absolu (ouvrir)
   if (o.terminal) args.push('--terminal');
   // port stable par lab (O4) : --port de l'utilisateur d'abord, sinon l'empreinte du lab ; le repli port+1 reste celui du serveur
   args.push('--port', String(o.port || portPrefere(lab)));
+  args.push(`--sortie=${fs.realpathSync(sortie)}`); // DERNIER argument : la sortie du lab ne porte que des données, le serveur est celui du module
   // le serveur ne se fie qu'à ces deux chemins, posés ici depuis le module (jamais lus dans un .cache/ du lab) ; le dossier de scripts est celui de CE fichier,
   // jamais une variable VF_COCKPIT_SCRIPTS_DIR héritée de l'environnement du lanceur (AUDC-B-06)
   const env = { ...envEnfant(lab), VF_COCKPIT_ENGINE_DIR: engineDir(HERE).chemin || '', VF_COCKPIT_SCRIPTS_DIR: HERE };
@@ -256,15 +263,15 @@ async function main() {
   }
   o.avecQ = o.terminal && !win;
   const libere = await prendreVerrou(lab, sortie, { vivant, attendre }); process.on('exit', libere); // AUDC-H3 : relâché avant l'attente d'ouverture, sinon à la sortie
-  const vif = serveurVivant(sortie) || (fs.existsSync(path.join(sortie, 'serve.mjs')) && !o.rebuild ? await serveurOrphelin(lab, sortie, o.port ? Number(o.port) : portPrefere(lab), { estNotre, etatFile, adresseLocale, serveurVivant, noter }) : null);
-  const perime = !!(vif && vif.hash && empreinteCode(sortie) && vif.hash !== empreinteCode(sortie));
+  const vif = serveurVivant(sortie) || (fs.existsSync(path.join(sortie, 'index.html')) && !o.rebuild ? await serveurOrphelin(lab, sortie, o.port ? Number(o.port) : portPrefere(lab), { estNotre, etatFile, adresseLocale, serveurVivant, noter }) : null);
+  const perime = !!(vif && vif.hash && empreinteDuModule() && vif.hash !== empreinteDuModule());
   if (vif && !o.rebuild && !perime) {
     // R4 (P71-D-36) : --terminal écarté (python3 absent, Windows) alors que le serveur vit déjà : le message dit « le cockpit s'ouvre sans terminal », on l'ouvre (comme au cas sans serveur) ;
     // une relance ordinaire, sans --terminal, garde son comportement : l'adresse seule.
     if (!o.avecQ) { if (demande && !o.noOpen && estNotre(vif.pid, path.join(sortie, 'serve.mjs'))) ouvrir(vif.url, `Ouvrez ${vif.url} dans un navigateur.`); console.log(adresses(vif.url)); return; }
     if (termOuvrable(vif, sortie)) { const suivi = ouvrirQ(vif, amorcer(lab, sortie), o, sortie); console.log(adresses(vif.url)); libere(); await attendreOuverture(suivi, sortie); return; } // O2 c : même serveur, nouvel amorçage
   }
-  if (vif) noter(sortie, `relance : serveur PID ${vif.pid} remplacé (${o.rebuild ? '--rebuild demandé' : perime ? `code du serveur changé, empreinte ${vif.hash} -> ${empreinteCode(sortie)}` : '--terminal demandé, aucun terminal enregistré pour le serveur en cours'})`);
+  if (vif) noter(sortie, `relance : serveur PID ${vif.pid} remplacé (${o.rebuild ? '--rebuild demandé' : perime ? `code du serveur changé, empreinte ${vif.hash} -> ${empreinteDuModule()}` : '--terminal demandé, aucun terminal enregistré pour le serveur en cours'})`);
   if (vif) { if (!arreter(sortie)) { console.error(`PID ${vif.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté.`); process.exit(5); } for (let i = 0; i < 30 && vivant(vif.pid); i++) await attendre(100); }
   if (engineDir(scriptsDir).etat !== 'trouve') { console.error('moteur du cockpit introuvable : réinstaller le module cockpit.'); process.exit(3); }
   await assemblerLab(lab, scriptsDir);
