@@ -15,7 +15,8 @@
   style.textContent = `
     .vf-retour-barre { display: flex; margin: 0 0 var(--sp-8); }
     .vf-retour { display: inline-flex; align-items: center; gap: var(--sp-4); min-height: 36px; max-width: 100%; padding: 0 var(--sp-8) 0 var(--sp-4);
-      border: 0; border-radius: var(--r-ctl); background: none; color: var(--text-2); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
+      border: 0; border-radius: var(--r-ctl); background: none; color: var(--text-2); font: inherit; font-size: 13px; font-weight: 500;
+      text-align: left; cursor: pointer; }
     .vf-retour svg.i { flex: none; width: 16px; height: 16px; }
     .vf-retour > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .vf-retour:hover { background: rgba(var(--ink), .08); color: var(--text); }
@@ -31,6 +32,7 @@
 
   const poser = () => {
     if (!vivant || !panneau.isConnected) return;
+    const a = document.activeElement, avait = !!(a && a.classList && a.classList.contains(NOM)); // le focus suit le bouton reposé
     panneau.querySelectorAll('.' + NOM + ', .' + NOM + '-barre, .' + NOM + '-desc').forEach((e) => e.remove());
     const haut = pile[pile.length - 1], b = document.createElement('button');
     b.type = 'button'; b.className = NOM;
@@ -44,10 +46,13 @@
     b.setAttribute('aria-label', haut ? 'Retour : ' + haut.titre : 'Retour, indisponible');
     b.setAttribute('aria-disabled', haut ? 'false' : 'true');
     b.addEventListener('click', (ev) => { ev.preventDefault(); retour(); });
+    // Entrée et Espace pressent ce bouton ; ils ne doivent pas aussi lancer l'Entrée globale du moteur (qui plonge dans la sélection), comme 05-theme.js
+    b.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); });
     // dans la feuille de détail, le bouton rejoint la barre de la feuille, avant la croix ; sinon une barre en tête du panneau
     const barre = panneau.querySelector(':scope > .vf-sheet-bar'), croix = barre && barre.querySelector('.vf-sheet-x');
     if (barre) { barre.insertBefore(b, croix); barre.append(d); }
     else { const w = document.createElement('div'); w.className = NOM + '-barre'; w.append(b, d); panneau.insertBefore(w, panneau.firstChild); }
+    if (avait) b.focus({ preventScroll: true });
   };
   const vider = () => { pile = []; explicite = 0; poser(); };
   const empiler = (e) => {
@@ -57,10 +62,9 @@
     explicite = Date.now() + DELAI; poser();
   };
   const retour = () => {
-    while (pile.length) {
-      const e = pile.pop(); enRetour = Date.now() + DELAI;
-      try { e.rouvrir(); poser(); return; } catch (err) { enRetour = 0; console.error('VF_PANNEAU : entrée retirée', err); }
-    }
+    if (!pile.length) return; // pile vide : rien ne bouge, le focus reste sur le bouton
+    const e = pile.pop(); enRetour = Date.now() + DELAI;
+    try { e.rouvrir(); } catch (err) { enRetour = 0; console.error('VF_PANNEAU : entrée retirée', err); } // retirée ; le bouton passe à la suivante
     poser();
   };
   // quand le panneau est rendu : empile, laisse tel quel ou vide, selon l'origine du geste ; le bouton est reposé sur le contenu neuf
