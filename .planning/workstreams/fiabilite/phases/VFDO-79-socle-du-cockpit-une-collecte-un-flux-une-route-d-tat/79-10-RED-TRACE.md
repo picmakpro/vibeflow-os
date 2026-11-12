@@ -136,3 +136,81 @@ ECART-ADMIS sante-fr/constats We looked for keys left in the code or sent to the
 ECART-ADMIS sante-fr/constats , ou ouvrir cette carte dans l'application Claude.
 ECART-ADMIS sante-fr/constats 2 points à traiter
 ECART-ADMIS sante-fr/constats Nous avons cherché les clés laissées dans le code ou envoyées au navigateur, les données et les éléments de votre application accessibles à n'importe qui sur internet, les fichiers oubliés et les fichiers trop gros pour être modifiés sans risque. C'est un contrôle rapide, pas un audit de sécurité.
+
+## Les 19 motifs R : disposition finale (tous restent en service pour t.constat et __vfFrTraduire, A43)
+
+MOTIF-R 1 sous-titre « Jalon … · phase … · statut » : sans émetteur dans le moteur (le statut est écrit en français à la source par le module projet)
+MOTIF-R 2 « {} thing(s) » : 20-health.js, t.pl(total, 'thing') ; clé « {} thing » ajoutée
+MOTIF-R 3 « Answer · {} card(s) » : viewer (en-tête de la vue), fragments « Answer » et « {} card » (t.pl) ; clé « {} card » ajoutée
+MOTIF-R 4 « Ask anything about {}… » : viewer (champ de question, trois sites) ; clés « Ask anything about {}… » et du texte statique ajoutées
+MOTIF-R 5 « {} map » : viewer, titre du document, t('{} map', nom), valeur « {} » ; clé ajoutée
+MOTIF-R 6 « Searching the map for "{}" » : viewer (progression de l'outil) par t ; serve.mjs en français à la source ; clé ajoutée
+MOTIF-R 7 « Searching code for "{}" » : serve.mjs en français à la source ; aucun émetteur dans la page
+MOTIF-R 8 « Looking at {} » : viewer par t (clé ajoutée) ; serve.mjs en français à la source
+MOTIF-R 9 « Reading {} » : serve.mjs en français à la source ; aucun émetteur dans la page
+MOTIF-R 10 « Listing {} » : serve.mjs en français à la source ; aucun émetteur dans la page
+MOTIF-R 11 « Running a command » : serve.mjs en français à la source ; aucun émetteur dans la page
+MOTIF-R 12 « Tracing a dependency path » : viewer par t ; clé ajoutée
+MOTIF-R 13 « … and N more » : viewer et 40-tour.js, « and {} more » et « and 1 more » ; clé « and 1 more » ajoutée
+MOTIF-R 14 date d'en-tête d'export : viewer, toLocaleDateString(t.langue) dans t('Exported {}', date)
+MOTIF-R 15 « (+{} more) » : serve.mjs (lignes de progression), écrit « (+N autres) » à la source ; aucun émetteur dans la page
+MOTIF-R 16 « +{} more » : viewer, 20-health.js, t('+{} more', n)
+MOTIF-R 17 « {} card(s) » et « {} file(s) » : viewer par plural (alias de t.pl) ; clés « {} card » et « {} file » (surcharge par onglet)
+MOTIF-R 18 « {} file(s) » par onglet : surcharge Fichier/Élément lue aussi par les gabarits (« {} file », « files »)
+MOTIF-R 19 « Theme: {}. Press for {}. » : 05-theme.js, t('Theme: {}. Press for {}.', …) ; clé ajoutée
+
+## Entrées de table sans site d'émission (51, non supprimées)
+SANS-SITE Less
+SANS-SITE More
+SANS-SITE Theme
+SANS-SITE , because {}
+SANS-SITE , matched from call sites to route definitions
+SANS-SITE , opened in your project folder.
+SANS-SITE , planned from {}
+SANS-SITE A change is still being made.
+SANS-SITE Backspace
+SANS-SITE Enter
+SANS-SITE Escape
+SANS-SITE Everything behind
+SANS-SITE The screen itself
+SANS-SITE Failed to fetch
+SANS-SITE Nothing stood out. This is a quick automatic check, not a full {} review.
+SANS-SITE Nothing to undo.
+SANS-SITE Pick one and choose
+SANS-SITE Searching code
+SANS-SITE The map’s server couldn’t export it. The details are in its output.
+SANS-SITE This map is too old to export. Ask Claude or Codex to update the vf-cockpit first.
+SANS-SITE This map’s server can’t find the VibeFlow scripts. Ask Claude Code or Codex to update the vf-cockpit once, then try again.
+SANS-SITE Tracing a path {}
+SANS-SITE Who may use it
+SANS-SITE across {}
+SANS-SITE at the top.{}
+SANS-SITE for {}{}
+SANS-SITE this part
+SANS-SITE to start on it.
+SANS-SITE worth fixing
+SANS-SITE {} · step {} of {}
+SANS-SITE {}Press Play to follow it through the code, one step at a time.
+SANS-SITE {}Walk through {} steps
+SANS-SITE {}{} with {}
+SANS-SITE it explains the choice and updates the plan once you decide
+SANS-SITE from
+SANS-SITE {} of {}
+SANS-SITE {} problems
+SANS-SITE {} steps
+SANS-SITE {} steps{}
+SANS-SITE Unassigned
+SANS-SITE Files no node claims. Add globs in architecture.json to place them.
+SANS-SITE API client
+SANS-SITE API key
+SANS-SITE API keys
+SANS-SITE HTTP methods
+SANS-SITE MCP server
+SANS-SITE ORM model
+SANS-SITE ORM models
+SANS-SITE Claude Code and GSD
+SANS-SITE important
+SANS-SITE minor
+## Relevé sans chemin du poste (amendement)
+
+Prise : `chrome-fr-etats.mjs` écarte les textes réduits à un fragment « dossier/ » et remplace master/main par BRANCHE avant l'écriture. Contrôle : `node 79-10-CONTROLE-CHEMINS.mjs 79-10-RENDU-AVANT.json` OK ; témoin rouge : relevé + « Users/ » donne ROUGE (code 1).
