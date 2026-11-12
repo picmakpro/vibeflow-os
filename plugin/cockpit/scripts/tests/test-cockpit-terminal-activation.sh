@@ -100,7 +100,7 @@ for pg in index projet; do
   assert_eq "T7.2 — $nom : CSP = formule de v2.75.0 appliquée aux scripts de la page servie" "$CSPS" "$(node "$TA" csp-v275 "$WORK/page-$pg.html")"
   assert_not "T7.2 — $nom : aucune sous-chaîne frame-src" "$CSPS" "frame-src"
 done
-assert_eq "T7.2b — la ligne « const csp = » de la sortie serve.mjs est la copie figée de v2.75.0" "$(node "$TA" ligne-csp "$OUT/serve.mjs")" "$(node "$TA" ligne-csp-v275)"
+assert_eq "T7.2b — la ligne « const csp = » de la sortie serve.mjs est la copie figée de v2.75.0" "$(node "$TA" ligne-csp "$ENG/assets/serve.mjs")" "$(node "$TA" ligne-csp-v275)"
 ECO0="$(node "$TA" ecoutes "$PID0")"
 assert_eq "T7.3 — témoin : la mesure des écouteurs voit le port de P" "$ECO0" "127.0.0.1:$P0"
 assert_eq "T7.3 — sans le drapeau, un seul écouteur pour le PID du serveur" "$(nlignes "$ECO0")" "1"
