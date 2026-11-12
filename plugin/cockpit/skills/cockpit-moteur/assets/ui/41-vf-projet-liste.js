@@ -61,7 +61,7 @@
   const memoire = new Map();
   let programme = false;
   const racine = () => document.querySelector('section.vf-projet');
-  const lateral = () => matchMedia('(min-width: 1000px) and (pointer: fine)').matches;
+  const lateral = () => matchMedia('(min-width: 1000px) and (not (pointer: coarse))').matches;
   const cle = (el) => { const c = el.closest('[data-coll]'); return c ? c.dataset.coll : ''; };
   const membres = (el) => [...el.closest('[data-coll]').querySelectorAll('.vp-ligne')];
   const ordre = (el) => membres(el).map((e) => e.dataset.id);

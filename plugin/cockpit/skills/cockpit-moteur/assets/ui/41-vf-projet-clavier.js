@@ -8,7 +8,7 @@
   const SC = window.Floorplan;
   if (!SC || !SC.graph.meta || SC.graph.meta.vfTab !== 'project') return;
   const { state } = SC;
-  const lateral = () => matchMedia('(min-width: 1000px) and (pointer: fine)').matches; // panneau latéral ; sinon feuille de détail (80-UI-SPEC § 0, point 6)
+  const lateral = () => matchMedia('(min-width: 1000px) and (not (pointer: coarse))').matches; // panneau latéral ; sinon feuille de détail (80-UI-SPEC § 0, point 6)
   const section = () => document.querySelector('section.vf-projet');
   const memoire = new Map(); // collection (jalon ou liste) -> identifiant de l'arrêt itinérant
   let programme = false; // restitution programmée du focus : ne change jamais la sélection

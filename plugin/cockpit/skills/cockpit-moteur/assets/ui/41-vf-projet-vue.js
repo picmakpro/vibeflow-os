@@ -90,7 +90,7 @@
       font-size: 12px; color: var(--text-3); }
     /* panneau latéral (dès 1000 px, pointeur fin : P80-D-50 b) : le panneau se pose PAR-DESSUS ; une extrémité défilable (hors flux)
        permet d'amener une carte hors de lui ; en dessous, feuille de détail et aucun défilement horizontal */
-    @media (min-width: 1000px) and (pointer: fine) {
+    @media (min-width: 1000px) and (not (pointer: coarse)) {
       section.vf-projet { scroll-padding-inline-end: var(--pw, 0px); }
       section.vf-projet::after { content: ""; position: absolute; top: 0; left: 100%; width: var(--pw, 0px); height: var(--sp-2); }
       section.vf-projet.vp-tiroir { scroll-padding-inline-start: var(--vp-debut, 0px);
@@ -186,7 +186,7 @@
     // dérivé : #ask + #vf-coin + feuille + pastille mesurés
     section.style.setProperty('--vf-bas', `calc(${bas}px + var(--edge) + var(--sp-8) + var(--edge) + env(safe-area-inset-bottom, 0px))`);
     const t = document.querySelector('#vf-git-tiroir, .vf-git-tiroir'), ouvert = !!t && !t.hidden && t.offsetWidth > 0
-      && matchMedia('(min-width: 1000px) and (pointer: fine)').matches;
+      && matchMedia('(min-width: 1000px) and (not (pointer: coarse))').matches;
     const d = ouvert ? t.offsetLeft + t.offsetWidth + 16 : 0, avant = debutPose; // en mise en page, jamais en position animée
     if (d !== debutPose) { // le tiroir Git recouvre le bord gauche : une extrémité de début, la vue ne bouge pas
       debutPose = d; section.style.setProperty('--vp-debut', d + 'px'); section.style.setProperty('--vp-larg',

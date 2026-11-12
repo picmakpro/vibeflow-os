@@ -87,7 +87,7 @@
   const bloc = () => { // place, présence de la minicarte, mode compact ; la hauteur de #ask est relue à chaque changement
     const ask = document.getElementById('ask'), h = ask && ask.offsetHeight ? ask.offsetHeight : 0;
     coin.style.setProperty('--vf-coin-bas', h ? `calc(${h}px + var(--edge) + var(--sp-8))` : 'var(--edge)');
-    const utile = stage.clientHeight - (h ? h + 24 : 16), souris = matchMedia('(min-width: 1000px) and (pointer: fine)').matches;
+    const utile = stage.clientHeight - (h ? h + 24 : 16), souris = matchMedia('(min-width: 1000px) and (not (pointer: coarse))').matches;
     mini.toggleAttribute('hidden', !(!equipe() && canevas() && state.layout && state.layout.children.length && souris && utile >= 360));
     coin.toggleAttribute('data-compact', utile < 480);
     coin.hidden = mini.hasAttribute('hidden') && (etat.hidden || !etat.childElementCount);
