@@ -41,14 +41,16 @@ function libresDe(brut, texte) {
   if (/<[a-z!/][^>]*>/i.test(brut)) return textesHtml(brut).map(norm).filter((x) => x && estAnglais(x, true));
   const x = norm(brut); return x && estAnglais(x, texte) ? [x] : [];
 }
-const MARQUES = new RegExp('^\\s*(?:/\\* ui/[\\w.-]+ \\*/\\s*)?// (?:vibeflow:fr|vibeflow:allow-large-file|VibeFlow \\()|^\\s*// [\\w-]+ graph queries, shared by the viewer');
+const ENTETE = '^\\s*(?:/\\* ui/[\\w.-]+ \\*/\\s*)?// (?:vibeflow:fr|vibeflow:allow-large-file|VibeFlow \\()';
+const MARQUES = new RegExp(ENTETE + '|^\\s*// [\\w-]+ graph queries, shared by the viewer');
 // mêmes lignes, jamais un journal
 const sansJournal = (src) => src.split('\n').map((l) => (/console\.(log|error|warn|info)\(/.test(l) ? '' : l)).join('\n');
 const LIGNE_MESSAGE = /\b(message|error|text|title|label)\s*:|new Error\(|\bplain\b/;
 
 // les constats d'un script : décalage = position du script dans son fichier (une page .html en porte plusieurs)
 function constatsScript(src, { decalage = 0, tout, table, exclus, hors }) {
-  const L = litteraux(src), r = [], at = (pos) => ligneDe(tout, decalage + pos);
+  // les lignes du script, décalées de celles qui le précèdent dans le fichier
+  const L = litteraux(src), r = [], debut = ligneDe(tout, decalage) - 1, at = (pos) => debut + ligneDe(src, pos);
   L.forEach((v, k) => {
     if (L.cle[k]) {
       const c = L.cle[k];
@@ -62,7 +64,8 @@ function constatsScript(src, { decalage = 0, tout, table, exclus, hors }) {
 }
 
 export function constatsDe(source, { table = {}, exclusions = [], fichier = '' } = {}) {
-  const src = renommerTexte(source); // le rendu servi est renommé à l'assemblage : les textes, les clés et les exclusions se jugent sous leur forme servie (mêmes lignes)
+  // le rendu servi est renommé à l'assemblage : textes, clés et exclusions se jugent sous leur forme servie (mêmes lignes)
+  const src = renommerTexte(source);
   const exclus = new Set(exclusions.map((e) => (typeof e === 'string' ? e : e.texte)));
   const r = [], o = { table, exclus, tout: src };
   if (/\.html?$/i.test(fichier)) {

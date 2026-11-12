@@ -49,7 +49,8 @@ function sonde(out, src, k) { // au niveau du code : un appel du traducteur dont
   const ap = src.slice(k, k + 90), m = /^(t\.pl|t\.mot|plural|t)\(\s*(?=\S)/.exec(ap);
   if (m) {
     const bout = ap.slice(m[0].length), ok = m[1] === 't' ? /^['"`]/.test(bout) : /^[^'"`\n]*?,\s*['"`]/.test(bout);
-    if (!ok) out.appels.push({ pos: k, texte: bout.split(')')[0].slice(0, 60) });
+    const alias = /const plural = \(n, w\) => $/.test(src.slice(Math.max(0, k - 30), k)); // l'alias du viewer est le seul t.pl à mot non littéral
+    if (!ok && !alias) out.appels.push({ pos: k, texte: bout.split(')')[0].slice(0, 60) });
     return;
   }
   if (!/^t(?![\w$])/.test(ap) || /^t\s*:/.test(ap)) return;
