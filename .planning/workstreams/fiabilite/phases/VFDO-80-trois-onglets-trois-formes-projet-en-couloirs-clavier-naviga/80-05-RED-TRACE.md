@@ -59,3 +59,17 @@ Rejeu final de la suite de la tête : 33 PASS / 0 FAIL (cinq mutants rougissent 
 La capture claire à 1440 px montrait le cadre du champ de la minicarte plein et sombre : la règle `.vf-mini .vf-mc rect { fill: var(--text-4) }` (cartes) l'emportait sur
 `.vf-mini .vf-mf { fill: none }` (même groupe, spécificité supérieure). CN2.3 n'en disait rien (géométrie seule). Mesure ajoutée (`getComputedStyle(cadre).fill === 'none'`, tiroir Git
 fermé et ouvert), jouée avant la correction : `vide: false` aux deux états (`CN_SOLO=cn2:cn23`), puis `vide: true` après la règle `rect:not(.vf-mf)`.
+
+## Correction ciblée après revue fraîche (gardes de forme, repères disjoints, focus)
+
+Témoins ajoutés à la suite, joués sur une copie de la tête avant correction (`git archive`, pilote et suite de la tête, module d'avant) : 35 PASS / 2 FAIL sur 37, plus la mesure brute de CN3.6.
+
+| Cas | Attendu | Obtenu avant correction | Cause |
+|---|---|---|---|
+| CN4 Projet en couloirs (`?vue=couloirs`, 1440 px puis 390 px tactile, après « + » x 8 et `deplacer`) | `[true x 9]` : canevas masqué, ni minicarte ni repère, ligne d'état gardée à 1440 | `[false, true, false, false, true, false, true, true, false]` (brut : 1440 `mini: true, reperes: 1` ; 390 `reperes: 1`) | `bloc()` et `maj()` ne testaient que `getClientRects().length`, qui reste vrai quand `#svg` est en `visibility: hidden` |
+| CN3.4d nouveau bord, focus sur « droite » | focus gardé sur le repère droit | `[true, "body", null, true]` | `creer()` posait le nouveau repère juste après `#svg` : la boucle d'ordre déplaçait le repère focalisé |
+| CN3.6 repères à 1000 et 1024 px, panneau et tiroir Git ouverts, état « milieu » | gauche et droite disjoints | première version du témoin verte (le panneau se refermait à l'ouverture du tiroir) ; après avoir rouvert le panneau, mesure brute `gauche [368,334,502,362]`, `droite [450,334,584,362]` à 1000 px, `[392,334,526,362]` et `[474,334,608,362]` à 1024 px : recouvrement de 52 px | `placer()` n'évitait que les surcouches, jamais les repères déjà posés |
+| M-COMPTE (témoins ajoutés) | repères non vides, somme des `n` supérieure à celle des cartes hors champ | `[false, true, 4, true]` rejoué sur le mutant ; sur un module mort : `etats[].reperes` vides | le mutant et un module absent donnaient le même `[false, 4]` |
+
+Corrections : `canevas()` (boîte de `#svg` ET `visibility` calculée non masquée, sans nom de forme) dans `02-vf-coin.js` et `02-vf-reperes.js` ; chaque repère posé devient un obstacle pour les suivants ; `creer()` insère le nouveau repère avant son premier suivant, sans déplacer les autres.
+Remarque de méthode : sans `?vue=couloirs`, la visite guidée du premier passage laisse Projet en forme graphe (`vue=graphe`) : le témoin CN4 force la forme.

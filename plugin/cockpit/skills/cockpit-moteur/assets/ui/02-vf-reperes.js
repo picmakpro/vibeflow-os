@@ -12,6 +12,8 @@
   const OBSTACLES = ['#vf-coin', '#zoom', '#ask', '.vf-term-pastille', '.vf-term-puce', '.vf-term-tiroir'];
   const equipe = () => !!G.meta && G.meta.vfTab === 'equipe';
   const feuille = () => matchMedia('(max-width: 999px), (pointer: coarse)').matches; // feuille de détail ; sinon panneau latéral
+  // la forme affichée est le canevas : #svg a une boîte et n'est pas masqué (couloirs, liste : visibility hidden)
+  const canevas = () => svg.getClientRects().length > 0 && getComputedStyle(svg).visibility !== 'hidden';
   const tour = () => !!(window.FloorplanTour && window.FloorplanTour.active && window.FloorplanTour.active());
   const style = document.createElement('style');
   style.textContent = `
@@ -75,7 +77,12 @@
     const NS = 'http://www.w3.org/2000/svg', ic = document.createElementNS(NS, 'svg'), tr = document.createElementNS(NS, 'path');
     ic.setAttribute('class', 'i'); ic.setAttribute('viewBox', '0 0 24 24'); ic.setAttribute('aria-hidden', 'true'); tr.setAttribute('d', 'M9 6l6 6-6 6');
     ic.appendChild(tr); el.appendChild(ic); el.appendChild(document.createElement('span'));
-    el.addEventListener('click', () => activer(bord)); els[bord] = el; svg.after(el); return el; // posé tout de suite : sa taille se mesure attachée
+    el.addEventListener('click', () => activer(bord)); els[bord] = el;
+    // posé tout de suite (sa taille se mesure attachée), avant son premier suivant : aucun repère déjà posé, focalisé ou non, ne bouge
+    const suivant = ORDRE.slice(ORDRE.indexOf(bord) + 1).map((b) => els[b]).find(Boolean);
+    const avant = ORDRE.slice(0, ORDRE.indexOf(bord)).reverse().map((b) => els[b]).find(Boolean);
+    if (suivant) suivant.before(el); else (avant || svg).after(el);
+    return el;
   };
   const rendreLeFocus = (bord, gardes) => { // ordre unique : fruit du geste, voisin suivant puis précédent, carte itinérante, #stage ; jamais body
     const S = C(), i = ORDRE.indexOf(bord);
@@ -87,7 +94,7 @@
   };
   const maj = () => {
     if (!vivant) return;
-    const S = C(), F = !equipe() && !tour() && S && state.layout && svg.getClientRects().length && !(feuille() && !document.body.classList.contains('no-panel'))
+    const S = C(), F = !equipe() && !tour() && S && state.layout && canevas() && !(feuille() && !document.body.classList.contains('no-panel'))
       ? S.champDeLecture() : null;
     const res = F ? analyser(F) : null, obs = F ? OBSTACLES.map(rectDe).filter(Boolean) : [], gardes = [];
     const g = document.activeElement && document.activeElement.closest ? document.activeElement.closest('g.node') : null;
@@ -99,6 +106,7 @@
       el.setAttribute('aria-label', `${n} carte${n > 1 ? 's' : ''} hors champ ${DIT[b]}. Aller à la plus proche.`);
       const p = placer(b, F, el.offsetWidth, el.offsetHeight, obs, vues); if (!p) continue;
       el.style.left = `${Math.round(p.x)}px`; el.style.top = `${Math.round(p.y)}px`; el.dataset.cible = r.id; gardes.push(b);
+      obs.push({ left: p.x, top: p.y, right: p.x + p.w, bottom: p.y + p.h }); // un repère posé est un obstacle pour les suivants
     }
     const perdus = ORDRE.filter((b) => els[b] && !gardes.includes(b)), perdu = perdus.find((b) => els[b] === document.activeElement);
     if (perdu) rendreLeFocus(perdu, gardes);

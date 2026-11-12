@@ -10,6 +10,8 @@
   const svg = document.getElementById('svg'), stage = document.getElementById('stage'), vp = document.getElementById('viewport');
   if (!svg || !stage || !vp) return;
   const equipe = () => !!G.meta && G.meta.vfTab === 'equipe';
+  // le canevas est la forme affichée : #svg a une boîte ET n'est pas masqué (couloirs, liste : visibility hidden, sans nom de forme)
+  const canevas = () => svg.getClientRects().length > 0 && getComputedStyle(svg).visibility !== 'hidden';
   const style = document.createElement('style');
   style.textContent = `
     #vf-coin { position: absolute; z-index: 3; right: calc(var(--pw) + var(--edge)); bottom: var(--vf-coin-bas, var(--edge)); width: 176px;
@@ -86,7 +88,7 @@
     const ask = document.getElementById('ask'), h = ask && ask.offsetHeight ? ask.offsetHeight : 0;
     coin.style.setProperty('--vf-coin-bas', h ? `calc(${h}px + var(--edge) + var(--sp-8))` : 'var(--edge)');
     const utile = stage.clientHeight - (h ? h + 24 : 16), souris = matchMedia('(min-width: 1000px) and (pointer: fine)').matches;
-    mini.toggleAttribute('hidden', !(!equipe() && svg.getClientRects().length && state.layout && state.layout.children.length && souris && utile >= 360));
+    mini.toggleAttribute('hidden', !(!equipe() && canevas() && state.layout && state.layout.children.length && souris && utile >= 360));
     coin.toggleAttribute('data-compact', utile < 480);
     coin.hidden = mini.hasAttribute('hidden') && (etat.hidden || !etat.childElementCount);
     dessiner();

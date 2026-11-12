@@ -15,7 +15,9 @@ const OUTIL = `window.__cn = {
     texte: b.textContent, nom: b.getAttribute('aria-label') })); },
   place(m) { const S = VibeFlow.state, F = VF_CANEVAS.champDeLecture(), { k, x } = S.t, cs = S.layout.children;
     const g = (c) => (c.x + c.width / 2) * k + x, par = (a, b) => (a.x - b.x), gau = cs.slice().sort(par)[0], dro = cs.slice().sort((a, b) => par(b, a))[0];
-    const dx = m === 'coupeG' ? F.x - g(gau) : m === 'coupeD' ? F.x + F.w - g(dro) : F.x + F.w + 40 - Math.min(...cs.map((c) => c.x * k + x));
+    const med = cs.slice().sort(par)[Math.floor(cs.length / 2)];
+    const dx = m === 'coupeG' ? F.x - g(gau) : m === 'coupeD' ? F.x + F.w - g(dro) : m === 'milieu' ? F.x + F.w / 2 - g(med)
+      : F.x + F.w + 40 - Math.min(...cs.map((c) => c.x * k + x));
     VF_CANEVAS.deplacer({ x: dx, y: 0 }); },
   procheDroite() { const S = VibeFlow.state, F = VF_CANEVAS.champDeLecture(), { k, x } = S.t; let b = null;
     for (const c of S.layout.children) { const l = c.x * k + x; if (l >= F.x + F.w && (!b || l < b.l)) b = { id: c.id, l }; }
@@ -44,32 +46,26 @@ const OUTIL = `window.__cn = {
 const KEYS = { Tab: 9, Enter: 13, Escape: 27 };
 
 await executer(chrome, async (s) => {
-  const o = { erreurs: {} };
+  const o = { erreurs: {}, cn4: {} };
   await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
   const sec = async (nom, f) => { if (SEC.size && !SEC.has(nom)) return; try { await f(); } catch (e) { o.erreurs[nom] = String(e.message).slice(0, 160); } };
   const lire = async (expr) => { const v = await s.ev(expr); return v === undefined ? null : JSON.parse(v); };
   const vue = (w, h, mobile) => s.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile });
-  const touche = async (nom) => {
-    for (const type of ['keyDown', 'keyUp']) {
-      const texte = nom === 'Enter' && type === 'keyDown' ? '\r' : undefined;
-      await s.send('Input.dispatchKeyEvent', { type, key: nom, code: nom, text: texte, windowsVirtualKeyCode: KEYS[nom], nativeVirtualKeyCode: KEYS[nom] });
-    }
-  };
+  const touche = async (nom) => { for (const type of ['keyDown', 'keyUp']) { const text = nom === 'Enter' && type === 'keyDown' ? '\r' : undefined;
+    await s.send('Input.dispatchKeyEvent', { type, key: nom, code: nom, text, windowsVirtualKeyCode: KEYS[nom], nativeVirtualKeyCode: KEYS[nom] }); } };
   const souris = (type, x, y) => s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseMoved' ? 'none' : 'left', clickCount: 1 });
   const clic = async (x, y) => { await souris('mouseMoved', x, y); await souris('mousePressed', x, y); await souris('mouseReleased', x, y); };
-  const clicSur = async (sel) => {
-    const p = await positionPosee(s.ev, `document.querySelector(${JSON.stringify(sel)})`);
-    if (!p) throw new Error(`élément absent : ${sel}`);
-    await clic(p.cx, p.cy);
-  };
+  const clicSur = async (sel) => { const p = await positionPosee(s.ev, `document.querySelector(${JSON.stringify(sel)})`);
+    if (!p) throw new Error(`élément absent : ${sel}`); await clic(p.cx, p.cy); };
   const lireVue = () => s.ev('JSON.stringify([VibeFlow.state.container, document.querySelectorAll("#viewport .node").length])');
+  const url = (p) => `${racine}/${p}${p.includes('?') ? '&' : '?'}lang=en`;
   const charger = async (page, w = 1440, h = 900, mobile = false) => {
-    await vue(w, h, mobile); await s.naviguer(`${racine}/${page}?lang=en`);
+    await vue(w, h, mobile); await s.naviguer(url(page));
     if (mode === 'term') { // le tiroir du terminal se rouvre de lui-même d'une page à l'autre (stockage) : chaque page part tiroir fermé
-      await s.ev("localStorage.removeItem('vf.terminal.open'); localStorage.removeItem('vf.terminal.h')"); await s.naviguer(`${racine}/${page}?lang=en`);
+      await s.ev("localStorage.removeItem('vf.terminal.open'); localStorage.removeItem('vf.terminal.h')"); await s.naviguer(url(page));
     }
-    await s.attendre(PRET, `page ${page}`);
-    await s.attendre("!!document.querySelector('#viewport .node')", `cartes ${page}`); await s.attendre(POSEE, `vue posée ${page}`);
+    await s.attendre(PRET, `page ${page}`); await s.attendre("!!document.querySelector('#viewport .node')", `cartes ${page}`);
+    await s.attendre(POSEE, `vue posée ${page}`);
     await stabiliser(lireVue, { pas: 120, max: 5000 });
     await pause(1200); // la visite guidée du premier passage démarre après le chargement : Échap jusqu'à sa fermeture
     for (let i = 0; i < 5 && await s.ev('!!(window.VibeFlowTour && VibeFlowTour.active())'); i++) { await touche('Escape'); await pause(400); }
@@ -83,6 +79,20 @@ await executer(chrome, async (s) => {
   };
   const rep = () => stabiliser(() => s.ev('JSON.stringify([__cn.hors(), __cn.reperes()])'), { pas: 120, max: 3000 }).then((v) => JSON.parse(v));
 
+  const tactile = (on) => s.send('Emulation.setTouchEmulationEnabled', { enabled: on });
+  if (mode === 'cn4') { // Projet en couloirs : le canevas n'est pas la forme affichée, ni minicarte ni repère, seule la ligne d'état reste
+    for (const [cle, w, h, doigt] of [['1440', 1440, 900, false], ['390', 390, 844, true]]) {
+      await sec('cn4', async () => {
+        await tactile(doigt); await charger('project.html?vue=couloirs', w, h, doigt);
+        await s.attendre("document.body.classList.contains('vf-forme-couloirs')", 'forme couloirs'); // la visite rend la forme en fermant
+        for (let i = 0; i < 8; i++) await s.ev("document.getElementById('z-in').click()");
+        await s.ev('VF_CANEVAS.deplacer({ x: -200, y: 0 })'); await pause(500);
+        o.cn4[cle] = await lire(`JSON.stringify({ cache: getComputedStyle(document.getElementById('svg')).visibility === 'hidden',
+          cartes: VibeFlow.state.layout.children.length, mini: !!__cn.r('#vf-minicarte'), reperes: __cn.repsel().length, etat: !!__cn.r('#vf-coin .vf-ls') })`);
+      });
+    }
+    await tactile(false); return o;
+  }
   if (mode === 'cn1') {
     await charger('index.html'); o.cn1 = { etats: [], clic: {}, tab: {} };
     await sec('cn1', async () => {
@@ -93,8 +103,7 @@ await executer(chrome, async (s) => {
       }
       const av = await lire('JSON.stringify({ k: VibeFlow.state.t.k, sel: VibeFlow.state.selected, hors: __cn.hors() })');
       const proche = await s.ev('__cn.procheDroite()');
-      await clicSur('button.vf-repere[data-bord=droite]');
-      const [hors] = await rep();
+      await clicSur('button.vf-repere[data-bord=droite]'); const [hors] = await rep();
       const ap = await lire(`JSON.stringify({ k: VibeFlow.state.t.k, sel: VibeFlow.state.selected, hors: ${JSON.stringify(hors)},
         dedans: __cn.dedans(${JSON.stringify(proche)}) })`);
       o.cn1.clic = { avant: av, apres: ap };
@@ -181,7 +190,6 @@ await executer(chrome, async (s) => {
     });
     return o;
   }
-  const tactile = (on) => s.send('Emulation.setTouchEmulationEnabled', { enabled: on });
   const feuilleFermee = async () => {
     if (!await s.ev("document.body.classList.contains('no-panel')")) await s.ev("document.getElementById('btn-panel').click()");
     await s.attendre("document.body.classList.contains('no-panel')", 'feuille fermée');
@@ -194,7 +202,7 @@ await executer(chrome, async (s) => {
     return { n: R.length, appui: R.every((e) => __cn.appui(e)), zones: zs.map((z) => [Math.round(z.w), Math.round(z.h)]), libre,
       vue: !!c && c.right > 0 && c.left < innerWidth && c.bottom > 0 && c.top < innerHeight, couvre: tous.filter(coupe).length, zoom: Z.length }; })())`;
   if (mode === 'cn3') {
-    o.cn3 = { f: {}, tabs: {}, orphelin: {}, ro: {} };
+    o.cn3 = { f: {}, tabs: {}, orphelin: {}, ro: {}, paires: [] };
     for (const [cle, w, h, doigt] of [['tactile', 390, 844, true], ['moyen', 800, 900, false]]) {
       await sec('cn31', async () => {
         await tactile(doigt); await charger('index.html', w, h, doigt); await gros();
@@ -217,7 +225,7 @@ await executer(chrome, async (s) => {
     await sec('cn34', async () => { // focus orphelin : fruit du geste, voisin, carte itinérante ; jamais body
       await charger('index.html'); await gros();
       const F = (b) => `(() => { const e = document.querySelector('button.vf-repere[data-bord=${b}]'); if (e) e.focus(); return !!e; })()`;
-      const o4 = o.cn3.orphelin = { a: {}, b: {}, c: {} }; await rep(); o4.a.focus = await s.ev(F('droite'));
+      const o4 = o.cn3.orphelin = { a: {}, b: {}, c: {}, d: {} }; await rep(); o4.a.focus = await s.ev(F('droite'));
       let proche = null, n = 0;
       const DR = "!!document.querySelector('button.vf-repere[data-bord=droite]')";
       for (; n < 12 && await s.ev(DR); n++) { proche = await s.ev('__cn.procheDroite()'); await touche('Enter'); await pause(200); }
@@ -232,7 +240,21 @@ await executer(chrome, async (s) => {
         const y0 = m('min')(...cs.map((c) => c.y * k + y)), y1 = m('max')(...cs.map((c) => (c.y + c.height) * k + y));
         VF_CANEVAS.deplacer({ x: F.x + F.w / 2 - (x0 + x1) / 2, y: F.y + F.h / 2 - (y0 + y1) / 2 }); })()`);
       await rep(); o4.c = { ...o4.c, restants: (await lire('JSON.stringify(__cn.reperes())')).length, apres: await lire('JSON.stringify(__cn.actif())') };
+      await s.ev("document.getElementById('z-fit').click()"); await rep(); // un nouveau bord ne déplace pas le repère focalisé
+      o4.d = { focus: await s.ev(F('droite')) };
+      await s.ev('VF_CANEVAS.deplacer({ x: 0, y: -300 })'); await rep();
+      o4.d = { ...o4.d, apres: await lire('JSON.stringify(__cn.actif())'), bords: (await lire('JSON.stringify(__cn.reperes())')).map((r) => r.bord) };
     });
+    for (const w of [1000, 1024]) {
+      await sec('cn36', async () => { // panneau et tiroir Git ouverts : les repères gauche et droite ne se recouvrent pas (champ étroit)
+        await charger('index.html', w, 800); await gros(); await s.ev('VFGitTiroir.ouvrir()'); await s.attendre('VFGitTiroir.ouvert()', 'tiroir Git ouvert');
+        await pause(500); if (await s.ev("document.body.classList.contains('no-panel')")) await s.ev("document.getElementById('btn-panel').click()");
+        await pause(600); await s.ev('__cn.place("milieu")'); await rep();
+        const L = "__cn.repsel().map((e) => 'button.vf-repere[data-bord=' + e.dataset.bord + ']')";
+        o.cn3.paires.push(await lire(`JSON.stringify({ w: ${w}, bords: __cn.repsel().map((e) => e.dataset.bord), ok: __cn.disjoints(${L}),
+          deux: !document.body.classList.contains('no-panel') && VFGitTiroir.ouvert() })`));
+      });
+    }
     await sec('cn35', async () => { // mouvement réduit : aucune animation active après un repère, un clic de minicarte, l'ouverture du tiroir Git
       await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] });
       await charger('index.html'); await gros(); await s.ev('__cn.place("toutDroite")'); await rep(); o.cn3.ro = {};
@@ -272,18 +294,6 @@ await executer(chrome, async (s) => {
     }
     await tactile(false);
     return o;
-  }
-  if (mode === 'shots') { // captures pour la critique de design (hors suite) : coin à 1440 px, zone basse à 390 px, deux thèmes ; CN_SHOTS = dossier
-    const fs = await import('node:fs'); fs.mkdirSync(process.env.CN_SHOTS, { recursive: true });
-    for (const [cle, w, h, doigt] of [['1440', 1440, 900, false], ['390', 390, 844, true]]) for (const th of ['dark', 'light']) {
-      await tactile(doigt); await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-color-scheme', value: th }] });
-      await charger('index.html', w, h, doigt); await s.ev(`document.documentElement.setAttribute('data-theme', '${th}')`); await gros();
-      if (doigt) { await feuilleFermee(); await s.ev('VF_CANEVAS.amenerDansLeChamp(VibeFlow.state.selected)'); }
-      else if (th === 'dark') { await s.ev('VFGitTiroir.ouvrir()'); await pause(500); }
-      await rep(); await pause(500); const r = await s.send('Page.captureScreenshot', { format: 'png' });
-      fs.writeFileSync(`${process.env.CN_SHOTS}/coin-${cle}-${th}.png`, Buffer.from(r.data, 'base64'));
-    }
-    await tactile(false); return o;
   }
   return o;
 });

@@ -61,13 +61,13 @@ build_serve() {
   for _ in $(seq 1 300); do grep -q '"port"' "$O/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
   PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$O/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
 }
-mesurer() { REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-coin.mjs" "$CHROME" "http://127.0.0.1:$PORT" "$1" 2>"$WORK/mesure.err"; }
+mesurer() { REAL_HOME="$REAL_HOME" node "${CN_PILOTE:-$HERE_T/chrome-coin.mjs}" "$CHROME" "http://127.0.0.1:$PORT" "$1" 2>"$WORK/mesure.err"; }
 E() { printf '%s' "${2:-$R}" | node "$AUX/ev.mjs" "$1"; }
 LAB="$WORK/lab"; mklab "$LAB"
 SC_BASE="${CN_SCRIPTS:-$SCRIPTS}"; ln -s "$SC_BASE" "$WORK/scripts-hote"
 build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
 assert_eq "CN0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
-if [ -n "${CN_SOLO:-}" ]; then # une seule mesure brute, hors suite : CN_SOLO=<mode>[:<sections>] ; CN_SOLO=shots avec CN_SHOTS=<dossier> : les captures
+if [ -n "${CN_SOLO:-}" ]; then # une seule mesure brute, hors suite : CN_SOLO=<mode>[:<sections>] (CN_PILOTE : un autre pilote)
   SOLO_S=""; case "$CN_SOLO" in *:*) SOLO_S="${CN_SOLO#*:}";; esac
   mesurer "${CN_SOLO%%:*}" "$SOLO_S"; vf_hyg_stop "$SRV"; vf_hyg_assert; exit 0
 fi
@@ -97,7 +97,8 @@ assert_eq "CN2.2 — clic au centre de la minicarte : le cadre du champ se recen
 assert_eq "CN2.3 — tiroir Git : freeArea().w et state.t identiques (PU-G-204), hachure (--text-3) sur la part couverte, cadre sans fond, nom" \
   "$(E "(() => { const c = j.cn2.c23; if (!c || !c.hf || !c.ho) return 'sans mesure';
     return [c.av.ouvert === false && c.ap.ouvert === true, c.av.w === c.ap.w, JSON.stringify(c.av.t) === JSON.stringify(c.ap.t), c.hf.affiche === false,
-      c.ho.affiche, Math.abs(c.ho.part - c.attendu) < 0.005, Math.abs(c.ho.gauche - c.debut) < 0.005, c.ho.trait, c.ho.vide && c.hf.vide, /sous l'historique Git$/.test(c.ho.nom),
+      c.ho.affiche, Math.abs(c.ho.part - c.attendu) < 0.005, Math.abs(c.ho.gauche - c.debut) < 0.005, c.ho.trait, c.ho.vide && c.hf.vide,
+      /sous l'historique Git$/.test(c.ho.nom),
       !/historique Git/.test(c.hf.nom), /^Minicarte : \d+ cartes? visibles? sur \d+/.test(c.hf.nom)]; })()")" \
   "[true,true,true,true,true,true,true,true,true,true,true,true]"
 NOMB='vf/<img/src=x/onerror=window.__xss=1>/branche-tres-longue-pour-lellipse'
@@ -141,9 +142,21 @@ assert_eq "CN3.4b — le repère bas tombe à 0 sans geste sur lui, focus dessus
 assert_eq "CN3.4c — plus aucun repère : le focus va à la carte itinérante du canevas, jamais body" \
   "$(E "(() => { const c = $O4.c; if (!c || !c.apres) return 'sans mesure';
     return [c.focus, c.restants, c.apres.tag, c.apres.id !== null && c.apres.id === c.apres.itin]; })()")" '[true,0,"g",true]'
+assert_eq "CN3.4d — un nouveau bord (haut) apparaît : le repère focalisé (droite) ne bouge pas, le focus y reste (jamais body)" \
+  "$(E "(() => { const d = $O4.d; if (!d || !d.apres) return 'sans mesure'; return [d.focus, d.apres.tag, d.apres.bord, d.bords.includes('haut')]; })()")" \
+  '[true,"button","droite",true]'
+assert_eq "CN3.6 — 1000 et 1024 px, panneau et tiroir Git ouverts : repères gauche et droite présents et disjoints" \
+  "$(E "(() => { const p = j.cn3.paires; if (!p || p.length !== 2) return 'sans mesure';
+    return p.map((x) => [x.bords.includes('gauche') && x.bords.includes('droite') && x.deux, x.ok].join()); })()")" '["true,true","true,true"]'
 assert_eq "CN3.5 — mouvement réduit : aucune animation active après un repère, un clic de minicarte et l'ouverture du tiroir Git" \
   "$(E "j.cn3.ro.media ? [j.cn3.ro.repere, j.cn3.ro.mini, j.cn3.ro.tiroir] : 'sans mesure'")" "[0,0,0]"
 assert_eq "CN3.9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
+R="$(mesurer cn4)"; [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }; [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/cn4.json"
+assert_eq "CN4 — Projet en couloirs (1440 et 390 px, après « + » x 8 et un déplacement) : canevas masqué, ni minicarte ni repère, ligne d'état gardée" \
+  "$(E "(() => { const c = j.cn4 && j.cn4['1440'], d = j.cn4 && j.cn4['390']; if (!c || !d) return 'sans mesure';
+    return [c.cache, c.cartes > 0, !c.mini, c.reperes === 0, c.etat, d.cache, d.cartes > 0, !d.mini, d.reperes === 0]; })()")" \
+  "[true,true,true,true,true,true,true,true,true]"
+assert_eq "CN4.9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
 # le même lab lancé avec --terminal : la pastille « Terminal » et le tiroir du terminal (CN3.3)
 LABT="$WORK/lab-term"; cp -R "$LAB" "$LABT"; build_serve "$LABT" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur" --terminal
@@ -181,8 +194,11 @@ mutant M-FREEAREA assets/viewer.html "return { x: 16, y: top, w: Math.max(200, r
 assert_eq "M-FREEAREA — le mutant rougit CN2.3 (freeArea() déduit le tiroir Git : sa largeur change à son ouverture) (témoin : le tiroir s'est bien ouvert)" \
   "$(E "[j.cn2.c23.av.w === j.cn2.c23.ap.w, j.cn2.c23.ap.ouvert]" "$RM")" "[false,true]"
 mutant M-COMPTE assets/ui/02-vf-reperes.js "if (d[b] >= 0) {" "if (d[b] > -c.width * k / 2 - 1) {" cn1 cn1
-assert_eq "M-COMPTE — le mutant rougit CN1.1 (une carte coupée par le bord est comptée hors champ) (témoin : le pilote a joué ses quatre états)" \
-  "$(E "[$OK1, j.cn1.etats.length]" "$RM")" "[false,4]"
+assert_eq "M-COMPTE — le mutant rougit CN1.1 (carte coupée comptée hors champ) (témoins : des repères, quatre états, plus comptées que hors champ)" \
+  "$(E "[$OK1, j.cn1.etats.some((e) => e.reperes.length > 0), j.cn1.etats.length,
+    j.cn1.etats.flatMap((e) => e.reperes).reduce((a, r) => a + r.n, 0)
+      > j.cn1.etats.flatMap((e) => Object.values(e.hors)).reduce((a, n) => a + n, 0)]" "$RM")" \
+  "[false,true,4,true]"
 mutant M-TERMINAL assets/ui/02-vf-ligne-etat.js "s.appendChild(ls);" \
   "s.appendChild(ls); const tm = document.createElement('span'); tm.className = 'vf-term-seg'; tm.textContent = 'Terminal'; ls.appendChild(tm);" cn2 cn25
 assert_eq "M-TERMINAL — le mutant rougit CN2.5 (un segment « Terminal » ajouté sans --terminal) (témoin : le bloc existe)" \
