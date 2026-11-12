@@ -278,7 +278,18 @@ out.petit = await s.ev(`(() => { const T = document.querySelector('#vf-git-tiroi
     debord: v.scrollWidth > v.clientWidth || z.scrollWidth > z.clientWidth,
     // diagnostic (jamais une borne) : de quoi se compose la hauteur du tiroir, imprimé à chaque rejeu pour lire la CI Linux
     mesures: { tiroir: h(T), barre: h(T.querySelector('.vf-git-barre')), aide: h(T.querySelector('.vf-git-aide')), corps: h(c), volet: h(v),
-      haut: Math.round(T.getBoundingClientRect().top), fenetre: [innerWidth, innerHeight], hh: getComputedStyle(document.body).getPropertyValue('--hh') } }; })()`);
+      haut: Math.round(T.getBoundingClientRect().top), fenetre: [innerWidth, innerHeight], hh: getComputedStyle(document.body).getPropertyValue('--hh'),
+      // diagnostic encore : la barre de question, la boîte du zoom, et l'élément que eviter() retient (même filtre que 77-vf-git-tiroir.js), lus au même instant
+      ...(() => { const bx = (e) => { if (!e) return null; const r = e.getBoundingClientRect(); return [Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; };
+        const bot = T.style.bottom; T.style.bottom = ''; const a = T.getBoundingClientRect(), H = innerHeight, ask = document.querySelector('#ask'), sc = document.querySelector('#stage'); let ret = null; const bas = []; // le tiroir est relu sans son « bottom » : eviter() le pose depuis ce rectangle-là
+        for (const n of document.querySelectorAll('#stage > *, body > *')) { if (n === T || n.hidden || !n.getClientRects().length) continue;
+          const p = getComputedStyle(n).position, b = n.getBoundingClientRect();
+          if ((p !== 'fixed' && p !== 'absolute') || b.height > 64 || b.top < H / 2) continue;
+          if (!(a.left < b.right && a.right > b.left)) continue; bas.push((n.id || n.className || n.tagName) + '@' + Math.round(b.top) + (a.top < b.bottom && a.bottom > b.top ? '' : '!'));
+          if (a.left < b.right && a.right > b.left && a.top < b.bottom && a.bottom > b.top && (!ret || b.top < ret.top)) ret = { id: n.id || n.className || n.tagName, top: Math.round(b.top), box: bx(n) }; }
+        T.style.bottom = bot;
+        return { ask: { h: ask ? Math.round(ask.getBoundingClientRect().height) : null, box: bx(ask), bas: getComputedStyle(document.documentElement).getPropertyValue('--vf-ask-bas') },
+          zoom: bx(document.querySelector('#zoom')), scene: sc ? Math.round(sc.getBoundingClientRect().bottom) : null, retenu: ret, bas, bottom: T.style.bottom, police: getComputedStyle(document.body).fontFamily.slice(0, 40) }; })() } }; })()`);
 // GP2.6 : le détail s'ouvre, Graphe est replié, « Fermer le détail » : un focus visible (le titre du tiroir), jamais body
 await s.ev(`document.querySelector('[aria-controls=vf-git-s-graphe]').click()`);
 await s.ev(`${VOL}?.querySelector('.vf-git-fermer')?.click()`); await pause(200);
