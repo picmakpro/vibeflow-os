@@ -3,7 +3,7 @@
 // Filet de la traduction : à rejouer après toute édition du moteur ou de ses pages servies.
 // Entrées : le HTML des pages servies (index.html, project.html) et le source de serve.mjs du moteur du module.
 // Sortie : liste triée et dédoublonnée (ordre des points de code), `${…}` d'un gabarit écrit `{}`.
-// Exports : inventaire({ html: [...], serveur }), litteraux(src), textesHtml(html), estAnglais(chaine), chainesBibliotheque(xterm), bibliothequeNonTraitee(xterm, client).
+// Exports : inventaire({ html: [...], serveur }), inventaireSites({ html, serveur }), litteraux(src), textesHtml(html), estAnglais(chaine), chainesBibliotheque(xterm), bibliothequeNonTraitee(xterm, client).
 // CLI : node vf-cockpit-fr-inventaire.mjs <sortie> [--json]   Code 0 ; 2 sortie sans index.html.
 //
 // Ce qui entre : littéraux (apostrophes, guillemets, gabarits) des blocs <script> en ligne, texte et attributs
@@ -28,12 +28,44 @@ const CLES_UI = /\b(?:word|label|group|title|hint|kicker|note|text)\s*:\s*$/;
 // --- littéraux d'un source JavaScript ---------------------------------------------------------------
 // Parcours récursif : commentaires et expressions régulières sautés, gabarits lus avec leurs `${…}` (les littéraux
 // imbriqués sont lus à leur tour, le gabarit hôte les écrit `{}`).
+// 79-10 : le traducteur `t`. Rôle d'un littéral : sa clé s'il est TOUT le premier argument de t( — ou le mot de t.pl(, t.mot(, plural( — sinon null.
+const CLE_T = /(?<![\w$.])t\(\s*$/, CLE_PL = /(?<![\w$.])(t\.pl|t\.mot|plural)\(([^'"`\n]*?),\s*$/;
+const equilibre = (x) => { let d = 0; for (const c of x) { d += c === '(' ? 1 : c === ')' ? -1 : 0; if (d < 0) return false; } return d === 0; };
+function cleDe(out, src, st, fin, v, expr) {
+  const av = src.slice(Math.max(0, st - 80), st), pl = CLE_PL.exec(av), role = CLE_T.test(av) ? 't' : pl && equilibre(pl[2]) ? pl[1] : null;
+  if (!role) return null;
+  // clé coupée (« 'a' + x ») ou à expression : un site fautif
+  if (expr || !/^\s*[,)]/.test(src.slice(fin, fin + 40))) { out.appels.push({ pos: st, texte: src.slice(st, fin).slice(0, 60) }); return null; }
+  return role === 't.pl' || role === 'plural' ? `{} ${v}` : v;
+}
+function parametres(src, k) { // la liste de paramètres qui contient k est-elle celle d'une fonction (suivie de =>, précédée de function ou catch) ?
+  let d = 0, j = k; for (; j > 0 && j > k - 400; j--) { const c = src[j - 1]; if (c === ')') d++; else if (c === '(') { if (d === 0) break; d--; } }
+  if (src[j - 1] !== '(') return false;
+  let f = j; d = 1; while (f < src.length && d) { const c = src[f++]; d += c === '(' ? 1 : c === ')' ? -1 : 0; }
+  return /^\s*=>/.test(src.slice(f, f + 10)) || /(function\s*\w*|catch)\s*$/.test(src.slice(Math.max(0, j - 40), j - 1));
+}
+function sonde(out, src, k) { // au niveau du code : un appel du traducteur dont la clé n'est pas un littéral, une déclaration de `t` autre que l'alias
+  if (/[\w$.]/.test(src[k - 1] || '')) return;
+  const ap = src.slice(k, k + 90), m = /^(t\.pl|t\.mot|plural|t)\(\s*(?=\S)/.exec(ap);
+  if (m) {
+    const bout = ap.slice(m[0].length), ok = m[1] === 't' ? /^['"`]/.test(bout) : /^[^'"`\n]*?,\s*['"`]/.test(bout);
+    if (!ok) out.appels.push({ pos: k, texte: bout.split(')')[0].slice(0, 60) });
+    return;
+  }
+  if (!/^t(?![\w$])/.test(ap) || /^t\s*:/.test(ap)) return;
+  const av = src.slice(Math.max(0, k - 200), k), decl = /\b(const|let|var)\s+$/.exec(av);
+  const lie = decl || /\b(?:const|let|var)\s*[{[][^=;()]*[,{[]\s*$/.test(av) || /^t\s*=>/.test(ap) || (/[(,]\s*$/.test(av) && parametres(src, k));
+  if (lie && !(decl && /^t\s*=\s*window\.__vfFrT\s*;/.test(ap))) out.ombres.push({ pos: k, texte: decl ? `${decl[1]} t` : 'paramètre t' });
+}
 export function litteraux(src) {
   const out = [];
   out.cles = new Set(); // valeurs lues sous une clé d'interface (CLES_UI)
+  // 79-10 : par littéral, son début, sa fin, sa clé de t (ou null) ; puis les sites fautifs du traducteur (clé non littérale, t qui masque)
+  out.pos = []; out.fin = []; out.cle = []; out.appels = []; out.ombres = [];
   let i = 0;
   const n = src.length;
   const motPrecedent = (k) => { let j = k; while (j > 0 && ID.test(src[j - 1])) j--; return src.slice(j, k); };
+  const empile = (st, v, expr) => { out.push(v); out.pos.push(st); out.fin.push(i); out.cle.push(cleDe(out, src, st, i, v, expr)); };
   function chaine(q) { // i sur la quote ouvrante ; rend la valeur, i après la quote fermante
     let v = ''; i++;
     while (i < n && src[i] !== q) {
@@ -43,13 +75,13 @@ export function litteraux(src) {
     i++; return v;
   }
   function gabarit() { // i sur le backtick ouvrant
-    let v = ''; i++;
+    let v = '', expr = false; const st = i; i++;
     while (i < n && src[i] !== '`') {
       if (src[i] === '\\') { v += src[i + 1] === 'n' ? '\n' : src[i + 1]; i += 2; continue; }
-      if (src[i] === '$' && src[i + 1] === '{') { i += 2; code(1); v += '{}'; continue; }
+      if (src[i] === '$' && src[i + 1] === '{') { i += 2; code(1); v += '{}'; expr = true; continue; }
       v += src[i++];
     }
-    i++; out.push(v); return v;
+    i++; empile(st, v, expr); return v;
   }
   function code(profondeur) { // lit jusqu'à l'accolade fermante qui ramène la profondeur à 0 (0 = fichier entier)
     let dernier = '';
@@ -57,7 +89,7 @@ export function litteraux(src) {
       const c = src[i];
       if (c === '/' && src[i + 1] === '/') { while (i < n && src[i] !== '\n') i++; continue; }
       if (c === '/' && src[i + 1] === '*') { const e = src.indexOf('*/', i + 2); i = e < 0 ? n : e + 2; continue; }
-      if (c === '"' || c === "'") { const avant = src.slice(Math.max(0, i - 24), i); const v = chaine(c); out.push(v); if (CLES_UI.test(avant)) out.cles.add(v); dernier = 'x'; continue; }
+      if (c === '"' || c === "'") { const avant = src.slice(Math.max(0, i - 24), i), st = i; const v = chaine(c); empile(st, v, false); if (CLES_UI.test(avant)) out.cles.add(v); dernier = 'x'; continue; }
       if (c === '`') { gabarit(); dernier = 'x'; continue; }
       if (c === '/') {
         const regex = dernier === '' || '(,=:[!&|?{};+-*%<>~^'.includes(dernier) || AVANT_REGEX.has(motPrecedent(i - (src.slice(0, i).match(/\s*$/)[0].length)));
@@ -65,11 +97,13 @@ export function litteraux(src) {
       }
       if (c === '{' && profondeur > 0) { profondeur++; }
       if (c === '}' && profondeur > 0) { profondeur--; if (profondeur === 0) { i++; return; } }
+      if (c === 't' || c === 'p') sonde(out, src, i);
       if (!/\s/.test(c)) dernier = c;
       i++;
     }
   }
   code(0);
+  out.alias = /\bconst t\s*=\s*window\.__vfFrT\s*;/.test(src); // seul un script qui déclare l'alias peut voir son traducteur masqué
   return out;
 }
 
@@ -113,7 +147,7 @@ function ajouter(set, brut, texte = false) {
 }
 
 // pluriels construits à l'exécution : `plural(n, 'mot')` rend « 1 mot » ou « n mots » ; l'inventaire en note les deux formes
-const PLURIEL = /\bplural\([^'"`\n]*?,\s*'([^']+)'\s*\)/g;
+const PLURIEL = /\b(?:plural|t\.pl)\([^'"`\n]*?,\s*'([^']+)'\s*\)/g;
 function plurielsConstruits(src) { const r = []; for (const m of src.matchAll(PLURIEL)) r.push(`{} ${m[1]}`, `{} ${m[1]}s`); return r; }
 
 // --- pages servies --------------------------------------------------------------------------------------
@@ -145,6 +179,24 @@ function litterauxServeur(src) {
     if (dansDescribe || LIGNE_MESSAGE.test(l)) out.push(...litteraux(l));
   }
   return out;
+}
+
+// 79-10 : les SITES d'émission du rendu servi — clés de t, littéraux libres, texte statique (squelette), appels fautifs ;
+// la porte de fichier (vf-cockpit-fr-sources.mjs) nomme fichier et ligne
+export function inventaireSites({ html = [], serveur = '' } = {}) {
+  const r = { cles: new Set(), libres: new Set(), squelette: new Set(), nonLitterales: [], ombres: [] };
+  for (const page of html) {
+    const { scripts, reste } = blocs(page);
+    for (const s of scripts) {
+      const src = sansJournal(s), L = litteraux(src);
+      L.forEach((v, k) => { if (L.cle[k]) r.cles.add(L.cle[k]); else ajouter(r.libres, v, L.cles.has(v)); });
+      r.nonLitterales.push(...L.appels.map((a) => a.texte)); if (L.alias) r.ombres.push(...L.ombres.map((a) => a.texte));
+    }
+    for (const t of textesHtml(reste)) ajouter(r.squelette, t, true);
+  }
+  for (const l of litterauxServeur(serveur)) ajouter(r.libres, l);
+  const tri = (e) => [...e].sort((a, b) => (a < b ? -1 : a > b ? 1 : 0));
+  return { cles: tri(r.cles), libres: tri(r.libres), squelette: tri(r.squelette), nonLitterales: r.nonLitterales, ombres: r.ombres };
 }
 
 export function inventaire({ html = [], serveur = '' } = {}) {
