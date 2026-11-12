@@ -56,3 +56,57 @@ AVANT-02 1f4197ced9bd5c4dbe49747c3f53bd9a7363974f
   - obtenu : [43]
 
 Note : AM7.S5 rougit sur la base parce que son témoin d'existence du serveur (avant=vivant) manque ; H3.16 à H3.18 (suite existante, durées d'inactivité) sont des rouges de charge observés à la base, rejouables seuls : hors plan, signalés.
+
+## Zones relevées sur AVANT-02 (plages de lignes d'AVANT-02 : en-tête, blocs de lancement)
+
+ZONES plugin/cockpit/scripts/tests/test-cockpit-assemblage.sh 1-14 73-77
+ZONES plugin/cockpit/scripts/tests/test-cockpit-direct-coupe.sh 1-20 33-40
+ZONES plugin/cockpit/scripts/tests/test-cockpit-flux-unique.sh 1-19 32-39
+ZONES plugin/cockpit/scripts/tests/test-cockpit-fr-donnees.sh 1-20 33-40
+ZONES plugin/cockpit/scripts/tests/test-cockpit-reconnexion.sh 1-15 29-37
+ZONES plugin/cockpit/scripts/tests/test-cockpit-accessibilite.sh 1-20 60-65
+ZONES plugin/cockpit/scripts/tests/test-cockpit-moteur-carte.sh 1-29 74-79
+ZONES plugin/cockpit/scripts/tests/test-cockpit-responsive.sh 1-24 78-84 471-475 784-787
+ZONES plugin/cockpit/scripts/tests/test-cockpit-robustesse.sh 1-14 40-43
+ZONES plugin/cockpit/scripts/tests/test-cockpit-securite.sh 1-15 92-98 386-386
+ZONES plugin/cockpit/scripts/tests/test-cockpit-who.sh 1-13 348-353
+ZONES plugin/cockpit/scripts/tests/test-cockpit-marque-blanche.sh 1-17 73-77
+ZONES plugin/cockpit/scripts/tests/test-cockpit-direct.sh 1-18 94-101
+ZONES plugin/cockpit/scripts/tests/test-cockpit-git.sh 1-19 25-25 182-185
+ZONES plugin/cockpit/scripts/tests/test-cockpit-git-details.sh 1-22 26-26 123-126
+ZONES plugin/cockpit/scripts/tests/test-cockpit-serveur.sh 1-20 86-89 316-319
+ZONES plugin/cockpit/scripts/tests/test-cockpit-chrome-fr.sh 240-241 252-256
+ZONES plugin/cockpit/scripts/tests/test-cockpit-lancer-bout-en-bout.sh 1-27 126-135
+ZONES plugin/cockpit/scripts/tests/test-cockpit-lancer-chat.sh 1-19 428-437
+ZONES plugin/cockpit/scripts/tests/test-cockpit-lancer-mode.sh 1-23 595-605 609-618@79-05 738-744@79-05
+ZONES plugin/cockpit/scripts/tests/test-cockpit-lancer-serveur.sh 1-24 195-204
+ZONES plugin/cockpit/scripts/tests/test-cockpit-lancer-xss.sh 1-31 254-259 433-438
+ZONES plugin/cockpit/scripts/tests/test-cockpit-terminal-activation.sh 1-21 58-67
+ZONES plugin/cockpit/scripts/tests/test-cockpit-terminal-client.sh 1-23 476-483
+ZONES plugin/cockpit/scripts/tests/test-cockpit-terminal-fin.sh 1-19 56-62
+ZONES plugin/cockpit/scripts/tests/test-cockpit-terminal-page.sh 1-23 122-131
+ZONES plugin/cockpit/scripts/tests/test-cockpit-terminal-pty.sh 1-21 128-134
+ZONES plugin/cockpit/scripts/tests/test-cockpit-terminal-serveur.sh 1-22 76-85
+ZONES plugin/cockpit/scripts/tests/test-cockpit-terminal-session.sh 1-23 76-82
+ZONES plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh 1-34 819-827
+ZONES plugin/cockpit/scripts/tests/test-cockpit-terminal-xss.sh 1-24 131-136
+ZONES plugin/cockpit/scripts/tests/test-cockpit-terminal-xterm.sh 1-28 543-550
+ZONES plugin/cockpit/scripts/tests/test-cockpit-chaine-xss.sh 1-33 132-135 229-232 294-297
+ZONES plugin/cockpit/scripts/tests/test-cockpit-demander-bornes.sh 1-16 80-83
+ZONES plugin/cockpit/scripts/tests/test-cockpit-equipe.sh 1-25 325-328 431-434 885-888
+ZONES plugin/cockpit/scripts/tests/test-cockpit-git-e2e.sh 1-29 132-135
+ZONES plugin/cockpit/scripts/tests/test-cockpit-git-entete.sh 1-20 72-75 569-572 580-583
+ZONES plugin/cockpit/scripts/tests/test-cockpit-git-signature.sh 1-21 116-118
+ZONES plugin/cockpit/scripts/tests/test-cockpit-git-tiroir.sh 1-24 83-86 425-428
+ZONES plugin/cockpit/scripts/tests/test-cockpit-path-enfants.sh 1-22 159-162
+ZONES plugin/cockpit/scripts/tests/test-cockpit-reseau.sh 1-17 115-118
+ZONES plugin/cockpit/scripts/tests/test-cockpit-transcript.sh 1-21 338-341
+
+## Trace verte (instantané de HEAD 730416dc)
+
+- test-cockpit-cycle-serveur.sh en entier : 62 PASS / 0 FAIL ; AM7.S1 à S12, K1, K2 verts ; AM7.K3 obtenu 0 (la classe est fermée).
+- décroissance de K3 : 43 (base) -> 42 (tâche 1) -> 26 (+ lot A) -> 11 (+ lot B partiel) -> 0 ; le détecteur voit encore 1 ligne dans test-cockpit-questions.sh (exception, 79-01/79-06).
+- suites qui appellent cockpit_lancer : 43 ; lancements directs hors questions : 0 (base : 57).
+- périmètre des commits (test, feat, refactor) du plan : 45 chemins ; assertions modifiées dans les suites migrées : 0.
+- zones : hunks AVANT-02..HEAD hors zones = 0 pour les commits de 79-02 ; les 4 hunks hors zone vus sur la plage (fr-donnees, git-details, git-signature) viennent des commits d'autres plans b16c57fc, 730416dc, c8a009df ; git-tiroir : aucune ligne D2.1, D7, D8.1, D9.1 touchée.
+- rouges de charge constatés (base comme migré, rejoués seuls verts ou identiques) : securite FB3.5, git S6.1, git-details X6.2, who W24.3/W24.4, responsive (cas variable), terminal-tiroir TH.9/TH.14/T21.13, H3.16-H3.18 de cycle-serveur.
