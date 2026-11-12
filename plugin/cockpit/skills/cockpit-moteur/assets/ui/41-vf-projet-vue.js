@@ -30,7 +30,8 @@
     body.vf-forme-couloirs #stage { background-image: none; } body.vf-forme-couloirs #svg { visibility: hidden; } body.vf-forme-couloirs #zoom,
       body.vf-forme-couloirs #context { display: none; }
     section.vf-projet button { font: inherit; color: inherit; text-align: left; cursor: pointer; }
-    .vp-tete { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-16); margin-bottom: var(--sp-16); flex-wrap: wrap; }
+    /* la bascule et la barre de jalon suivent le titre à gauche : à droite, le panneau ouvert les recouvrirait (80-UI-SPEC § 2.1 les aligne à droite : écart assumé) */
+    .vp-tete { display: flex; align-items: center; gap: var(--sp-24); margin-bottom: var(--sp-16); flex-wrap: wrap; }
     .vp-tete h1 { margin: 0; font-size: 22px; font-weight: 600; letter-spacing: -.02em; } .vp-tete h1:focus { outline: none; }
     .vp-bascule { display: inline-flex; gap: var(--sp-2); padding: var(--sp-4); border-radius: var(--r-ctl); background: var(--raise); flex: none; }
     .vp-bascule button { min-height: 36px; padding: 0 var(--sp-12); border: 0; border-radius: 8px; background: none; font-size: 13px;
@@ -45,7 +46,7 @@
       margin-bottom: var(--gap-section); }
     .vp-info p { margin: 0; } .vp-info p + p { margin-top: var(--sp-4); }
     .vp-jalon { margin-bottom: var(--gap-section); }
-    .vp-jt { display: flex; align-items: flex-end; justify-content: space-between; gap: var(--sp-16); flex-wrap: wrap; margin-bottom: var(--sp-16); }
+    .vp-jt { display: flex; align-items: flex-end; gap: var(--sp-24); flex-wrap: wrap; margin-bottom: var(--sp-16); }
     .vp-jn h2 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: -.015em; } .vp-syn { margin: var(--sp-2) 0 0; font-size: 13px;
       color: var(--text-2); }
     .vp-barre { display: flex; align-items: center; gap: var(--sp-12); } .vp-barre .vf-bar { width: 180px; margin-top: 0; }
