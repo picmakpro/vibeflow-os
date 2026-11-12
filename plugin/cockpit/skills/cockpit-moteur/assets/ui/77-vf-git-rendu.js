@@ -181,7 +181,7 @@
   const AIDE_DETACHE = "HEAD détaché : ce dossier n'est sur aucune branche, il est posé sur un commit précis.";
   const sectionWorktrees = (l, annonce) => {
     if (!l || !l.length) return null;
-    return section('Worktrees', l.length, liste(l.map((w) => {
+    const s = section('Worktrees', l.length, liste(l.map((w) => {
       const d = el('div', 'vf-git-wt-l'), t = ligne(mono(w.nom, 'vf-git-gras'));
       if (w.ici) t.appendChild(el('span', 'vf-git-ici', 'ici'));
       const br = mono(w.detache ? 'HEAD détaché' : w.branche || '—');
@@ -189,7 +189,9 @@
       d.append(t, ligne(br));
       if (!w.ici) d.appendChild(commande(w.commande, annonce, 'cd vers ' + w.nom));
       return d;
-    })), true, 'vf-git-s-wt', "Worktrees : copies de travail du dépôt, chacune dans son propre dossier et sur sa propre branche. " + AIDE_DETACHE);
+    })), false, 'vf-git-s-wt', "Worktrees : copies de travail du dépôt, chacune dans son propre dossier et sur sa propre branche. " + AIDE_DETACHE);
+    s.querySelector('.vf-git-sec-t').setAttribute('aria-label', 'Worktrees · ' + l.length); // P80-D-19 : repliée au départ, le compte fait partie du nom
+    return s;
   };
   const sectionTags = (l) => !l || !l.length ? null : section('Tags', l.length, liste(l.map((t) => ligne(mono(t.nom, 'vf-git-gras'), mono(t.h7), el('span', null, relatif(t.at))))), false, 'vf-git-s-tags');
   const sectionStash = (l, annonce) => {
@@ -230,5 +232,9 @@
     d.append(el('h3', 'vf-git-titre', 'Git est indisponible'), el('p', 'vf-git-note', raison), b, commande(cmd, annonce, 'de diagnostic'));
     return d;
   };
-  window.VFGitRendu = Object.freeze({ graphe, pages, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande, etatChargement, etatVide, etatIndisponible, relatif, section, ico, el, aideFocus });
+  window.VFGitRendu = Object.freeze({
+    graphe, pages, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande,
+    etatChargement, etatVide, etatIndisponible, relatif, section, ico, el, aideFocus,
+    motifSha: /^[0-9a-f]{40}$/, // définition unique du motif du sha (40 hexadécimaux minuscules), lue par le tiroir et le volet
+  });
 })();

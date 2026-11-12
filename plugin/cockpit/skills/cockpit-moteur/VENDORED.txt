@@ -44,8 +44,10 @@ AJOUT assets/ui/72-vf-equipe.js
 AJOUT assets/ui/73-vf-tiroir-travail.js
 AJOUT assets/ui/75-vf-modele.js
 AJOUT assets/ui/76-vf-git-entete.js
+AJOUT assets/ui/77-vf-git-poignee.js
 AJOUT assets/ui/77-vf-git-rendu.js
 AJOUT assets/ui/77-vf-git-tiroir.js
+AJOUT assets/ui/77-vf-git-volet.js
 AJOUT assets/ui/77-vf-git-vue-detail.js
 AJOUT assets/ui/78-vf-fr-dict-a.js
 AJOUT assets/ui/79-vf-fr-dict-b.js

@@ -20,8 +20,10 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    .vf-git-tiroir { position: fixed; left: 16px; top: calc(var(--hh, 64px) + 4px); bottom: 16px; width: 360px; z-index: 7; display: flex; flex-direction: column; border-radius: var(--r-panel); overflow: hidden; }
-    body:not(.no-panel) .vf-git-tiroir { width: max(240px, min(360px, calc(100vw - var(--panel-w, 360px) - 312px))); }
+    .vf-git-tiroir { position: fixed; left: 16px; top: calc(var(--hh, 64px) + 4px); bottom: 16px; width: var(--vf-git-l, 360px); z-index: 7;
+      display: flex; flex-direction: column; border-radius: var(--r-panel); overflow: hidden; }
+    body:not(.no-panel) .vf-git-tiroir { /* 80-06 : largeur réglable par la poignée, bornée par le panneau ouvert */
+      width: min(var(--vf-git-l, 360px), max(280px, calc(100vw - var(--panel-w, 360px) - 312px))); }
     .vf-git-tiroir[hidden] { display: none; }
     .vf-git-tiroir.vf-git-entree { animation: vf-git-entree 250ms var(--ease) both; }
     @keyframes vf-git-entree { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
@@ -112,6 +114,7 @@
   tiroir.append(barre, R.el('p', 'vf-git-aide', 'Lecture seule. Chaque action est une commande à copier.'), corps, live);
   tiroir.hidden = true;
   document.body.appendChild(tiroir);
+  if (window.VFGitPoignee) window.VFGitPoignee.monter(tiroir); // 77-vf-git-poignee.js (chargée avant) : largeur réglable, 80-06
 
   let ouvert = false, donnees = null, seq = 0, avant = null;
   const etatPages = { n: 0 }; // rangées montrées (80-06) : gardé d'une relecture à l'autre
@@ -191,6 +194,21 @@
     if (cible && sansFocus !== true) cible.focus({ preventScroll: true });
     emettre('vf-git:etat', { ouvert: false }); crochet('etat', false);
   };
+  // Entrée publique pour les autres phases (74) : ouvre le tiroir et son volet sur un commit. Valide le sha avant tout effet ; ne pagine ni ne relit la liste ;
+  // ne déplace pas le focus au-delà de ce que fait ouvrir() ; rend true quand le détail est affiché, false sinon ; jamais d'exception ni de rejet.
+  // comparaison de dataset.h, jamais un sélecteur construit avec le sha
+  const rangeDe = (sha) => [...tiroir.querySelectorAll('li[role=option]')].find((l) => l.dataset.h === sha) || null;
+  const ouvrirSur = (sha) => {
+    try {
+      const V = window.VFGitVolet, D = window.VFGitDetail;
+      if (typeof sha !== 'string' || !R.motifSha.test(sha) || !V) return Promise.resolve(false);
+      ouvrir(); V.fermer();
+      const li = rangeDe(sha);
+      const p = V.ouvrir(sha, li);
+      if (li && D) { D.selectionner(sha); li.scrollIntoView({ block: 'nearest' }); }
+      return Promise.resolve(p).then((ok) => ok === true, () => false);
+    } catch (e) { return Promise.resolve(false); }
+  };
   const basculer = () => (ouvert ? fermer() : ouvrir());
   tiroir.addEventListener('animationend', () => tiroir.classList.remove('vf-git-entree'));
   fermerB.addEventListener('click', fermer);
@@ -212,5 +230,5 @@
   const reevaluer = () => { eviter(); if (donnees && donnees.etat === 'ok') montrer(donnees); };
   MOBILE.addEventListener('change', reevaluer);
   new MutationObserver(eviter).observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] }); // le Terminal s'ouvre ou se ferme : la réserve basse change
-  window.VFGitTiroir = Object.freeze({ ouvrir, fermer, ouvert: () => ouvert, recharger, donnees: () => donnees });
+  window.VFGitTiroir = Object.freeze({ ouvrir, fermer, ouvert: () => ouvert, recharger, donnees: () => donnees, ouvrirSur });
 })();
