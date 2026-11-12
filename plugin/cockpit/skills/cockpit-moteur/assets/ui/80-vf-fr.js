@@ -3,7 +3,8 @@
 // traduit au point d'émission : la clé est le texte anglais source, la valeur vient de la table (fichiers 78 et 79 → window.__vfFrDict).
 // Ce fichier est posé AVANT le script principal (emplacement UI_I18N de la page) : la table existe quand un fichier appelle `t` au chargement.
 // Sous ?lang=en (ligne `garde:lang-en`), `t` rend la clé et rien d'autre n'est posé. Fonction pure : window.__vfFrTraduire(texte) → phrase ou null.
-// Reste de l'ancien mécanisme (retiré à la tâche 6 du plan 79-10) : le moteur de reconnaissance d'une forme rendue (noyau, motifs R, gabarits P).
+// Le moteur de reconnaissance d'une forme rendue (noyau, motifs R, gabarits P) ne sert plus qu'à t.constat et à __vfFrTraduire : les constats de Santé
+// produits à l'assemblage gardent leur rendu (A43). Aucun observateur, aucune réécriture après coup : une donnée du lab n'est jamais traduite.
 (() => {
   const EN = new URLSearchParams(location.search).get('lang') === 'en'; // garde:lang-en
   const D = window.FLOORPLAN; // la donnée de la page, posée avant ce script : l'onglet se lit là, jamais dans l'objet du moteur (absent à ce moment)
@@ -88,7 +89,7 @@
   const TYPES = { ui: 'interface', service: 'module', worker: 'tâche de fond', library: 'bibliothèque', feature: 'fonctionnalité', data: 'données', config: 'configuration', test: 'test', script: 'script',
     infra: 'infrastructure', external: 'service externe', misc: 'divers', endpoint: "point d'accès", function: 'fonction', class: 'classe', route: 'route', dir: 'dossier', module: 'module' };
   const type = (s) => { const t = typeof s === 'string' ? s.trim() : '', k = Object.prototype.hasOwnProperty.call(TYPES, t.toLowerCase()) ? TYPES[t.toLowerCase()] : null; return k == null ? null : s.replace(t, () => (/^[A-Z]/.test(t) ? k[0].toUpperCase() + k.slice(1) : k)); };
-  window.__vfFrType = type;
+  window.__vfFrType = (s) => (EN ? null : type(s));
   // le traducteur (79-10, P79-D-24) : t(clé, ...variables). `{}` rempli dans l'ordre, forme « singulier|pluriel » choisie sur la PREMIÈRE variable,
   // « de » + variable lié (lier). `@contexte` en fin de clé : la clé complète puis la clé sans contexte. Clé sans valeur : la clé remplie.
   // Sous ?lang=en : la clé remplie, aucune valeur de table lue.
@@ -107,19 +108,6 @@
   trad.constat = (x) => (EN ? x : (tr(x) ?? x));
   trad.langue = EN ? undefined : 'fr';
   window.__vfFrT = trad;
-  const typeDuTexte = (n) => {
-    const p = n.parentElement, t = n.nodeValue; if (!p) return null;
-    if (p.matches('.kindlabel, #results .rk, #context .k')) return type(t);
-    if (p.matches('#tooltip .td')) { const i = t.indexOf(' · '), k = type(i < 0 ? t : t.slice(0, i)); return k == null ? null : k + (i < 0 ? '' : t.slice(i)); }
-    if (p.matches('.stats b') && /^\d+(\.\d)?k$/.test(t.trim())) return kfr(t); // chiffre abrégé d'un panneau
-    if (p.matches('.stats span') && p.previousElementSibling?.matches('b') && p.previousElementSibling.textContent.trim() === '1') { const f = tr(t); return f != null && SING[f.trim()] ? SING[f.trim()] : null; } // « 1 ligne », « 1 fichier »
-    if (p.matches('.rw') && t.trim() === 'Changed') return 'Récent'; // pastille d'une carte touchée par une phase récente (« modifié » reste l'état Git)
-    if (p.matches('.tag')) { // « Détecté via » : l'origine de chaque correspondance, dite en toutes lettres (PU-G-070)
-      const h3 = p.closest('.sec')?.querySelector('h3')?.textContent.trim();
-      if (h3 === 'Matched by' || h3 === 'Détecté via') { const m = /^(pkg|host|#) ?(.+)$/.exec(t.trim()); if (m) return ({ pkg: 'paquet', host: 'hôte', '#': 'tag' })[m[1]] + ' ' + m[2]; }
-    }
-    return null;
-  };
   if (EN) return;
 
   // squelette : le texte et les attributs du balisage statique de la page, en UNE passe, avant tout rendu de donnée (clé exacte seulement)
@@ -130,11 +118,10 @@
   for (const el of document.body.querySelectorAll('[placeholder],[title],[aria-label]')) {
     for (const at of ATTRS) { const x = (el.getAttribute(at) || '').trim(); if (x && a(x)) el.setAttribute(at, trad(x)); }
   }
+  document.documentElement.lang = 'fr';
 
-  // l'ancien glue (observateurs, écouteurs de rendu, couleurs, styles, lang) : tout de suite si l'objet du moteur existe, sinon au chargement de la page
-  const glue = (SC) => { const G = SC.graph;
-  // couleurs des types : sombre par défaut, clair sous data-theme="light" (même règle que le viewer)
-  const C = G.meta.kindColors || {};
+  // couleurs des types de l'onglet Projet : sombre par défaut, clair sous data-theme="light" (même règle que le viewer) ; lues dans la donnée de la page
+  const C = D?.meta?.kindColors || {};
   if (Object.keys(C).length) {
     const st = document.createElement('style');
     st.textContent = `:root { ${Object.entries(C).map(([k, [, d]]) => `--n-${k}: ${d};`).join(' ')} }
@@ -148,61 +135,4 @@
   // infobulle d'une carte : le viewer capitalise chaque mot (« 115 Fichiers · 48k Lignes ») ; en français, seule la première lettre l'est (PU-G-066, PU-G-161)
   sp.textContent += ' #tooltip .td[style*="capitalize"] { text-transform: none !important; } #tooltip .td[style*="capitalize"]::first-letter { text-transform: uppercase; }';
   document.head.appendChild(sp);
-
-  // la mise en page de l'en-tête (libellés français plus longs) est le travail de 01-vf-responsive.js
-
-  const probe = (window.__vfFr = { nodes: 0, attrs: 0, passes: 0, ms: 0 });
-  // AUDC-H4 : le titre et la description d'une carte sont des DONNÉES du lab (« tokens.ts » ne devient pas « Jetons ») ; « No description yet » (.desc.empty) est du chrome et reste traduit
-  // même propriété ailleurs où le viewer reprend ces données : titre et description du panneau de détail (.pt, .pd), nom et description d'une ligne de liste ou d'un résultat de recherche (.rn, .rd), nom d'une carte dans l'infobulle (.tt), fil d'Ariane
-  const SKIP = 'script,style,code,pre,textarea,.mono,.rp,.pp,.card .title,.card .desc:not(.empty),#panel .pt,.row .rn,.row:not(.vf-rep) .rd,#results .rn,#results .rd';
-  // deux emplacements mêlent donnée et chrome : l'infobulle d'une carte (le nom) et celle d'un lien (« A contains B », gabarit) ; le fil d'Ariane (« Overview », « Réponse : titre » sont du chrome, un nom de dossier est une donnée)
-  // (« #panel .pd » : la description d'une carte ou d'un lien est une donnée ; le texte de repli que le viewer calcule pour un lien sans description (« 1 connection. », « 3 connections across 2 endpoints. ») n'en est pas une et reste traduit ; les rangées d'une réponse (.row.vf-rep) gardent leur NOM de carte intact, leur note reste traduite)
-  const REPLI_LIEN = /^\d+ connections?( across \d+ endpoints?)?(, matched from call sites to route definitions)?\.$/;
-  // le glossaire enveloppe un mot de la description (« endpoints ») dans un <span class="sc-term"> : c'est l'ANCÊTRE .pd, pas le parent du nœud, qui dit que le texte est une donnée (AUDC-H4, restes) ; le texte de repli se juge sur la description entière
-  const DONNEE = (n) => { const p = n.parentElement, t = n.nodeValue, pd = p.closest('#panel .pd:not(.empty)'); return pd ? !REPLI_LIEN.test(pd.textContent.trim()) : p.matches('#tooltip .tt') ? !/ contains /.test(t) : p.matches('#crumbs button') ? t.trim() !== 'Overview' && !t.includes(': ') : false; };
-  // « 42 files in plugin/cockpit/signal/ » : la description que le MOTEUR fabrique pour une carte dossier (viewer.html, `${plural(n, 'file')} in ${chemin}/`) ; le gabarit est du chrome, le chemin une donnée jamais traduite.
-  // Forme stricte et entière : une description du lab qui ne la reproduit pas à l'identique n'est jamais touchée (AUDC-H4, restes ; la traduction au point d'émission relève de la Phase 79)
-  const DOSSIER = /^(\d+) files? in (\S.*\/)$/;
-  // l'IDENTITÉ de l'item, jamais la forme du texte : une description de carte FICHIER égale au gabarit est une donnée. Panneau : l'item sélectionné est un dossier (id « d: ») ; ligne de liste : son `data-go` est un dossier ; résultat de recherche : son type affiché est « dir » (ou « dossier » une fois traduit) — branche DÉFENSIVE : l'index de recherche du produit n'a pas de dossier, elle ne se déclenche pas aujourd'hui
-  const estDossier = (p) => {
-    if (p.matches('.row:not(.vf-rep) .rd')) return String(p.closest('.row').getAttribute('data-go') || '').startsWith('d:');
-    if (p.matches('#results .rd')) return /^(dir|dossier)$/.test((p.closest('.r')?.querySelector('.rk')?.textContent || '').trim());
-    if (!p.matches('#panel .pd:not(.empty)')) return false;
-    // même cible que renderPanel() : `selected` s'il est une chaîne (connecteur « x:in:|x:out: » retiré, « m: » ramené à « f: »), sinon le CONTENEUR ouvert (dossier ouvert par go(), sans sélection) ; un objet (lien) n'est pas un dossier
-    const st = window.VibeFlow?.state, sel = st?.selected;
-    if (sel && typeof sel === 'object') return false;
-    return (sel ? String(sel).replace(/^x:(?:in|out):/, '').replace(/^m:/, 'f:') : String(st?.container ?? '')).startsWith('d:');
-  };
-  const dossier = (n) => { const p = n.parentElement, t = n.nodeValue.trim(), m = DOSSIER.exec(t); if (!m || !p || !estDossier(p)) return null; const nom = projet() ? 'élément' : 'fichier'; return n.nodeValue.replace(t, () => `${m[1]} ${nom}${m[1] === '1' ? '' : 's'} dans ${m[2]}`); };
-  const fix = (root) => {
-    const t0 = performance.now();
-    const w = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
-    for (let n = w.nextNode(); n; n = w.nextNode()) {
-      const d = n.parentElement ? dossier(n) : null; if (d != null) { if (d !== n.nodeValue) { n.nodeValue = d; probe.nodes++; } continue; }
-      if (n.parentElement?.closest(SKIP) || (n.parentElement && DONNEE(n))) continue;
-      const k = typeDuTexte(n); if (k != null && k !== n.nodeValue) { n.nodeValue = k; probe.nodes++; continue; }
-      const v = tr(n.nodeValue); if (v != null) { n.nodeValue = v; probe.nodes++; }
-    }
-    const els = root.nodeType === 1 ? [root, ...root.querySelectorAll('[placeholder],[title],[aria-label]')] : [];
-    for (const el of els) for (const a of ATTRS) { if (a === 'title' && el.matches?.('.row.vf-rep')) continue; if (a === 'aria-label' && el.matches?.('#viewport .node')) continue; /* AUDC-H4 : le nom accessible d'une carte (posé par le viewer à l'atterrissage au clavier) est son nom de donnée */ /* AUDC-H4 : le `title` d'une rangée de réponse reprend le nom de la carte (et sa note) : donnée du lab */ const x = el.getAttribute?.(a); const v = x ? tr(x) : null; if (v != null) { el.setAttribute(a, v); probe.attrs++; } }
-    probe.passes++; probe.ms += performance.now() - t0;
-  };
-  document.documentElement.lang = 'fr';
-  // le viewer réécrit le titre après coup (« <nom> map ») : on le suit
-  new MutationObserver(() => { const v = tr(document.title); if (v != null) document.title = v; }).observe(document.querySelector('title'), { childList: true });
-  // regroupe les mutations d'un même lot (un rendu du viewer en produit des centaines) et les traduit avant la peinture : le callback d'un
-  // MutationObserver part en fin de tâche, avant l'image suivante ; passer par requestAnimationFrame laissait « Thinking… » une image en anglais
-  new MutationObserver((ms) => {
-    const q = new Set();
-    for (const m of ms) q.add(m.type === 'characterData' ? m.target.parentElement : m.target);
-    for (const el of q) if (el?.isConnected) fix(el);
-  }).observe(document.body, { subtree: true, childList: true, characterData: true, attributes: true, attributeFilter: ATTRS });
-  fix(document.body);
-  // le glossaire découpe les nœuds de texte du panneau et du contexte dans une microtâche : traduire avant (écouteurs synchrones)
-  const zones = () => { for (const id of ['panel', 'context']) { const z = document.getElementById(id); if (z) fix(z); } };
-  SC.on?.('panel', zones); SC.on?.('render', zones);
-  const v = tr(document.title); if (v != null) document.title = v;
-  };
-  const lancer = () => { if (window.Floorplan) glue(window.Floorplan); };
-  if (window.Floorplan || document.readyState !== 'loading') lancer(); else document.addEventListener('DOMContentLoaded', lancer, { once: true });
 })();
