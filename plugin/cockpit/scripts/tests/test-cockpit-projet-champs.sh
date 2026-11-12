@@ -61,7 +61,7 @@ MI='{"nom":"MISSION-LIENS","etat":"running"}'
 assert_eq "PC1.4 — mission d'une phase vivante = {nom, etat}, aucune clé de verrou dans le graphe" \
   "$(nd ph-3 'JSON.stringify(n.avancement?.mission)')|$(c1 "$CLES")" "$MI|false"
 
-# ---------- PC6 — une seule règle : plans.faits compte comme le statut de l'élément de plan ----------
+# ---------- PC6 — plans.faits et le pied comptent les SUMMARY, même sur une phase cochée (contrat de test-cockpit-ailleurs.sh) ----------
 L6="$WORK/pc6"; B="$L6/.planning"
 wr "$B/ROADMAP.md" <<'MD'
 ## Phases
@@ -71,10 +71,10 @@ MD
 for n in 01 02 03; do printf '<objective>Plan %s</objective>\n' "$n" | wr "$B/phases/01-socle/01-$n-PLAN.md"; done
 echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"; echo ok > "$B/phases/01-socle/01-02-SUMMARY.md"
 graph "$L6" "$WORK/c6.json"
-echo "=== PC6 — un seul compte de plans faits ==="
-FD6='JSON.stringify(j.nodes.find(x=>x.id==="ph-1").avancement.plans)+"|"+j.files.filter(f=>f.n==="ph-1"&&/-PLAN\.md$/.test(f.p)&&f.st==="done").length'
-assert_eq "PC6.1 — phase cochée, un plan sans SUMMARY : plans.faits = nombre d'éléments de plan done, le pied dit le même compte" \
-  "$(G "$WORK/c6.json" "$FD6")|$(G "$WORK/c6.json" 'j.nodes.find(x=>x.id==="ph-1").foot')" '{"faits":3,"total":3}|3|3/3 plans'
+echo "=== PC6 — plans faits = SUMMARY ==="
+FD6='JSON.stringify(j.nodes.find(x=>x.id==="ph-1").avancement.plans)'
+assert_eq "PC6.1 — phase cochée, un plan sans SUMMARY : plans.faits et le pied comptent les SUMMARY (2 sur 3), foot inchangé" \
+  "$(G "$WORK/c6.json" "$FD6")|$(G "$WORK/c6.json" 'j.nodes.find(x=>x.id==="ph-1").foot')" '{"faits":2,"total":3}|2/3 plans'
 
 # ---------- outils node de la suite ----------
 cat > "$AUX/pl.mjs" <<'JS'
@@ -239,7 +239,7 @@ mutchamp() { # nom ancre remplacement id expression attendu
 }
 A5='2|en-cours|{"faits":1,"total":3}|1'
 assert_eq "M-PLANS — le mutant rougit PC1.5 : plans { faits: total, total }" \
-  "$(mutchamp plans 'faits: plansFaits, total' 'faits: av.plans.total, total' ph-4 "$AV5" "$A5")" rougit
+  "$(mutchamp plans 'plans: { ...av.plans }' 'plans: { faits: av.plans.total, total: av.plans.total }' ph-4 "$AV5" "$A5")" rougit
 assert_eq "M-CORR — le mutant rougit PC1.5 : correctifs figé à 0" "$(mutchamp corr 'correctifs: av.correctifs,' 'correctifs: 0,' ph-4 "$AV5" "$A5")" rougit
 assert_eq "M-VERS — le mutant rougit PC1.5 : version null" "$(mutchamp vers 'version: av.version' 'version: null' ph-4 "$AV5" "$A5")" rougit
 assert_eq "M-ETAT — le mutant rougit PC1.5 : etat figé à fait" "$(mutchamp etat 'etat: av.etat, plans' 'etat: "fait", plans' ph-4 "$AV5" "$A5")" rougit
