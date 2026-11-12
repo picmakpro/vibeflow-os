@@ -1,12 +1,11 @@
-# 79-05 — SUMMARY (SOCL-06 ; A10, A11, A27) — statut : reprise attendue
+# 79-05 — SUMMARY (SOCL-06 ; A10, A11, A27) — statut : terminé
 
 Commits (ordre) : `ebe5bbde` test (suite neuve, témoins rouges) · `f397986e` routes + serveur · `db86078b` annotateurs · `ef15873f` compteur de suites (214) · `1d706eb4` lancer-mode (deux paragraphes). Le présent fichier et `79-05-RED-TRACE.md` sont commités en dernier.
 
-## Reprise : tâche 4, passe finale (c)
+## Passe finale (tâche 4, étape 4c) — point de reprise fermé
 
-Faits : la suite `test-cockpit-routes.sh` entière (56 PASS / 0 FAIL, mutants compris), `check-version-sync.sh` (214 deux fois), `check-machine-paths.sh`, `check-file-size.sh` sur les trois modules, `test-cockpit-vendor.sh` : verts. Suites existantes de la vérification des tâches 1 à 3, jouées sur l'export de HEAD `1d706eb4` : `git-e2e` (35 réussis, M-ROUTE jouée), `transcript`, `serveur`, `demander-bornes`, `lancer-serveur`, `direct`, `flux-unique`, `assemblage`, `marque-blanche`, `confinement`, `onglet-code`, `chrome-fr` : exit 0 ; `equipe` : exit 0 joué dans l'arbre (rouge sur l'export : ses témoins « code d'avant » lisent l'historique git, absent d'un `git archive`) ; `lancer-mode` : 113 PASS sur un export portant mes deux hunks.
-Reste : `OK-PERIMETRE` (périmètre de la branche, `scripts/ci-suites-perimetre.sh --liste origin/integration/cockpit-audit HEAD`, toutes les suites du cockpit listées, une par une) et un dernier `check-version-sync.sh`, à jouer sur l'export de HEAD une fois les SUMMARY de 79-01 (déjà versionné) et de **79-02** commités (précondition de 05-M2 : `socle-serveur.sh` fait passer le périmètre à « tout » ; `cycle-serveur` reste rouge jusqu'à la tâche 4 de 79-02). Reprise : tâche 4, étape 4(c) ; l'état de ce plan est vert, aucune modification de code n'est attendue.
-Deux rouges préexistants, identiques sur la base `80d64b04` (rejeu isolé de la suite, même identifiant) : `test-cockpit-securite.sh` FB3.5 (« le cas génératif tient en moins de 10 s ») et `test-cockpit-git.sh` S6.1 (« les deux lectures aboutissent », obtenu `ok|absent`). Hors périmètre (ADR-031) : signalés, non corrigés.
+Export de HEAD épinglé à `91af2123` (SUMMARY de 79-01 et 79-02 commités, base fusionnée). Périmètre = « tout » (216 suites, `ci-suites-perimetre.sh --liste origin/integration/cockpit-audit 91af2123`) : les 81 suites du module cockpit hors `equipe`, jouées une par une sur l'export en trois files : 81 exit 0. `equipe` jouée dans l'arbre (l'export n'a pas d'historique git, dont ses témoins « code d'avant » ont besoin) : exit 0. Sauts : `projet-visite` O6.17d et O6.19 (polices DejaVu absentes du poste, dits par la suite, non comptés réussis). `check-version-sync.sh` : 216 deux fois ; `check-machine-paths.sh` vert (dans l'arbre).
+Les deux rouges préexistants de la première passe (`securite` FB3.5, `git` S6.1) sont verts sur cet export.
 
 ## Signatures posées
 
