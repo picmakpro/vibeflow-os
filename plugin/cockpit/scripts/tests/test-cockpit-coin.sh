@@ -209,6 +209,22 @@ assert_eq "M-ORPHELIN — le mutant rougit CN3.4a (le focus orphelin ne va plus 
 mutant M-ONGLETS assets/ui/02-vf-coin.js "inset: -4px 0;" "inset: 0;" cn3 cn32
 assert_eq "M-ONGLETS — le mutant rougit CN3.2 (la zone d'appui des onglets retombe à 36 px) (témoin : l'onglet visuel reste à 36)" \
   "$(E "[j.cn3.tabs.onglets.every((o) => o.haut && o.bas), j.cn3.tabs.onglets.every((o) => Math.abs(o.h - 36) <= 1)]" "$RM")" "[false,true]"
+echo "=== CN5 — témoins de pointeur (P80-D-50 b : le Chrome sans tête de la CI Linux n'annonce aucun pointeur) ==="
+printf '#!/bin/bash\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$AUX/chrome-sans-pointeur"; chmod +x "$AUX/chrome-sans-pointeur"
+CHROME_REEL="$CHROME"; build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+export CN_PILOTE="$HERE_T/chrome-pointeur-forme.mjs" # mesurer ne passe que le mode : « mode:sonde » en un seul argument
+CHROME="$AUX/chrome-sans-pointeur"; RCN="$(mesurer none:coin)"; CHROME="$CHROME_REEL"; RCC="$(mesurer coarse:coin)"; vf_hyg_stop "$SRV"
+CN51='[j.pointeur.fine, j.pointeur.coarse, j.mini.cartes > 0, j.mini.existe, j.mini.pose]'
+assert_eq "CN5.1 — sans aucun pointeur (Chrome de la CI Linux) : ni fine ni coarse ; la minicarte est posée à 1440 px (souris)" \
+  "$(E "$CN51" "$RCN")" '[false,false,true,true,true]'
+assert_eq "CN5.2 — pointeur grossier (toucher émulé) : coarse vrai ; la minicarte est masquée (la ligne d'état seule)" \
+  "$(E '[j.pointeur.coarse, j.mini.cartes > 0, j.mini.existe, j.mini.cache, j.mini.pose]' "$RCC")" '[true,true,true,true,false]'
+CHROME="$AUX/chrome-sans-pointeur"
+mutant M-POINTEUR-COIN assets/ui/02-vf-coin.js "(min-width: 1000px) and (not (pointer: coarse))" "(min-width: 1000px) and (pointer: fine)" none:coin ""
+CHROME="$CHROME_REEL"; unset CN_PILOTE
+echo "     trace M-POINTEUR-COIN — sonde CN5.1 [fine, coarse, cartes, minicarte existe, minicarte posée] : attendu [false,false,true,true,true], obtenu $(E "$CN51" "$RM")"
+assert_eq "M-POINTEUR-COIN — le mutant (ancienne requête (pointer: fine)) rougit CN5.1 : sans pointeur la minicarte n'est plus posée (témoin : Chrome sans pointeur, des cartes, la minicarte existe)" \
+  "$(E '[j.pointeur.fine, j.pointeur.coarse, j.mini.cartes > 0, j.mini.existe, j.mini.pose]' "$RM")" '[false,false,true,true,false]'
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

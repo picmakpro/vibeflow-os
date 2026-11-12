@@ -130,6 +130,23 @@ for CLE in 1440 1024 390; do
 done
 assert_eq "PL3.8z — témoin : aucune section du pilote n'a échoué (zone basse)" "$(E5 'Object.keys(j.erreurs).join()')" ""
 
+echo "=== PL4 — témoins de pointeur (P80-D-50 b : le Chrome sans tête de la CI Linux n'annonce aucun pointeur) ==="
+printf '#!/bin/bash\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$AUX/chrome-sans-pointeur"; chmod +x "$AUX/chrome-sans-pointeur"
+CHROME_REEL="$CHROME"; build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+CHROME="$AUX/chrome-sans-pointeur"; RLN="$(mesurer chrome-pointeur-forme.mjs none liste)"; CHROME="$CHROME_REEL"
+RLC="$(mesurer chrome-pointeur-forme.mjs coarse liste)"; vf_hyg_stop "$SRV"
+PL41='[j.pointeur.fine, j.pointeur.coarse, j.focus.n > 0, j.focus.actif, j.focus.sel === j.focus.id]'
+assert_eq "PL4.1 — sans aucun pointeur (Chrome de la CI Linux) : ni fine ni coarse ; le focus d'une rangée la sélectionne (panneau latéral, la sélection suit le focus)" \
+  "$(E "$PL41" "$RLN")" '[false,false,true,true,true]'
+assert_eq "PL4.2 — pointeur grossier (toucher émulé) : coarse vrai ; le focus d'une rangée ne la sélectionne pas (feuille de détail)" \
+  "$(E '[j.pointeur.coarse, j.focus.n > 0, j.focus.actif, j.focus.sel]' "$RLC")" '[true,true,true,null]'
+CHROME="$AUX/chrome-sans-pointeur"
+mutant M-POINTEUR-LISTE 41-vf-projet-liste.js "(min-width: 1000px) and (not (pointer: coarse))" "(min-width: 1000px) and (pointer: fine)" chrome-pointeur-forme.mjs none liste
+CHROME="$CHROME_REEL"
+echo "     trace M-POINTEUR-LISTE — sonde PL4.1 [fine, coarse, rangées, focus posé, sélection = rangée] : attendu [false,false,true,true,true], obtenu $(E "$PL41" "$RM")"
+assert_eq "M-POINTEUR-LISTE — le mutant (ancienne requête (pointer: fine)) rougit PL4.1 : sans pointeur la sélection ne suit plus le focus (témoin : Chrome sans pointeur, rangée focalisée)" \
+  "$(E '[j.pointeur.fine, j.pointeur.coarse, j.focus.n > 0, j.focus.actif, j.focus.sel === j.focus.id]' "$RM")" '[false,false,true,true,false]'
+
 echo "=== Mutants (copie du module dans \$WORK) ==="
 mutant M-CLE 41-vf-projet-formes.js "'vf-projet-forme:' + nom + ':' + classe()" "'vf-projet-forme:' + classe()" chrome-projet-liste.mjs pl3a pl33
 assert_eq "M-CLE — le mutant rougit PL3.3 (clé sans le nom du lab) (témoin : la mémoire fonctionne encore)" \

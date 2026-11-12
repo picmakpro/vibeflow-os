@@ -168,20 +168,50 @@ printf '#!/bin/bash\nexec "%s" --blink-settings=primaryPointerType=1,availablePo
 build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
 RPN="$(node "$HERE_T/chrome-pointeur.mjs" "$AUX/chrome-sans-pointeur" "http://127.0.0.1:$PORT" none 2>/dev/null)"
 RPC="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" coarse 2>/dev/null)"
-RPE="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" etranger 2>/dev/null)"; vf_hyg_stop "$SRV"
+RPE="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" etranger 2>/dev/null)"
+RPD="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" div 2>/dev/null)"
+RPF="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" nonfixe 2>/dev/null)"
+RKN="$(node "$HERE_T/chrome-pointeur-forme.mjs" "$AUX/chrome-sans-pointeur" "http://127.0.0.1:$PORT" none clavier 2>/dev/null)"
+RKC="$(node "$HERE_T/chrome-pointeur-forme.mjs" "$CHROME" "http://127.0.0.1:$PORT" coarse clavier 2>/dev/null)"; vf_hyg_stop "$SRV"
 assert_eq "CL4.1 — sans aucun pointeur (Chrome de la CI Linux) : ni fine ni coarse, et le panneau latéral s'applique (scroll-padding de fin posé, pas auto)" \
   "$(E '[j.pointeur.fine, j.pointeur.coarse, j.spie !== "auto" && j.spie !== ""]' "$RPN")" '[false,false,true]'
 assert_eq "CL4.2 — pointeur grossier (toucher émulé) : coarse vrai, la feuille de détail s'applique, aucun scroll-padding de fin (auto)" \
   "$(E '[j.pointeur.coarse, j.spie]' "$RPC")" '[true,"auto"]'
+# CL4.3 fige en POSITIF une limite connue : à la jointure, quand le terminal posera son attribut neutre (contrat Phase 79), il devra être INVERSÉ
+# (un bouton fixe étranger laissera la zone basse inchangée) ; CL4.3b/c (négatifs voisins) resteront valables tels quels.
 # limite connue, dite : la pastille « Terminal » est lue par sa nature (bouton fixe sous body), pas par un attribut neutre posé par le terminal
 # (contrat porté à la jointure avec la Phase 79). Un bouton fixe étranger EST donc pris pour elle : #ask + #vf-coin + pastille croissent.
 assert_eq "CL4.3 — limite connue : un bouton fixe étranger sous body est pris pour la pastille (la zone basse de la vue grandit : $(E 'j.avant + " -> " + j.apres' "$RPE"))" \
   "$(E '[j.avant !== j.apres]' "$RPE")" '[true]'
+assert_eq "CL4.3b — négatif : un DIV fixe étranger sous body (pas un bouton) n'est pas pris pour la pastille : la zone basse reste inchangée ($(E 'j.avant + " -> " + j.apres' "$RPD"))" \
+  "$(E '[j.avant !== "", j.avant === j.apres]' "$RPD")" '[true,true]'
+assert_eq "CL4.3c — négatif : un BOUTON étranger non fixe sous body n'est pas pris pour la pastille : la zone basse reste inchangée ($(E 'j.avant + " -> " + j.apres' "$RPF"))" \
+  "$(E '[j.avant !== "", j.avant === j.apres]' "$RPF")" '[true,true]'
 CHROME_REEL="$CHROME"; CHROME="$AUX/chrome-sans-pointeur"
 mutant M-POINTEUR 41-vf-projet-vue.js "@media (min-width: 1000px) and (not (pointer: coarse)) {" "@media (min-width: 1000px) and (pointer: fine) {" chrome-pointeur.mjs none ""
 CHROME="$CHROME_REEL"
 assert_eq "M-POINTEUR — le mutant (ancienne requête (pointer: fine)) rougit CL4.1 : sans pointeur le panneau latéral ne s'applique plus (témoin : le Chrome est bien sans pointeur)" \
   "$(E '[j.pointeur.fine, j.pointeur.coarse, j.spie === "auto" || j.spie === ""]' "$RM")" '[false,false,true]'
+CL44='[j.pointeur.fine, j.pointeur.coarse, j.focus.n > 0, j.focus.actif, j.focus.sel === j.focus.id]'
+assert_eq "CL4.4 — 41-vf-projet-clavier.js, sans aucun pointeur (Chrome de la CI Linux) : ni fine ni coarse ; le focus d'une carte la sélectionne (panneau latéral, la sélection suit le focus)" \
+  "$(E "$CL44" "$RKN")" '[false,false,true,true,true]'
+assert_eq "CL4.5 — 41-vf-projet-clavier.js, pointeur grossier (toucher émulé) : coarse vrai ; le focus d'une carte ne la sélectionne pas (feuille de détail)" \
+  "$(E '[j.pointeur.coarse, j.focus.n > 0, j.focus.actif, j.focus.sel]' "$RKC")" '[true,true,true,null]'
+CHROME_REEL="$CHROME"; CHROME="$AUX/chrome-sans-pointeur"
+mutant M-POINTEUR-CLAVIER 41-vf-projet-clavier.js "(min-width: 1000px) and (not (pointer: coarse))" "(min-width: 1000px) and (pointer: fine)" chrome-pointeur-forme.mjs none clavier
+CHROME="$CHROME_REEL"
+echo "     trace M-POINTEUR-CLAVIER — sonde CL4.4 [fine, coarse, cartes, focus posé, sélection = carte] : attendu [false,false,true,true,true], obtenu $(E "$CL44" "$RM")"
+assert_eq "M-POINTEUR-CLAVIER — le mutant (ancienne requête (pointer: fine)) rougit CL4.4 : sans pointeur la sélection ne suit plus le focus de la carte (témoin : Chrome sans pointeur, carte focalisée)" \
+  "$(E '[j.pointeur.fine, j.pointeur.coarse, j.focus.n > 0, j.focus.actif, j.focus.sel === j.focus.id]' "$RM")" '[false,false,true,true,false]'
+CHROME="$CHROME_REEL"
+mutant M-PASTILLE-DIV 41-vf-projet-vue.js "find((e) => e.matches('button') && getComputedStyle(e).position === 'fixed')" "filter((e) => getComputedStyle(e).position === 'fixed').pop()" chrome-pointeur.mjs div ""
+echo "     trace M-PASTILLE-DIV — sonde CL4.3b [avant, après] : attendu égaux, obtenu $(E 'j.avant + " -> " + j.apres' "$RM")"
+assert_eq "M-PASTILLE-DIV — le mutant (reconnaissance élargie : le dernier élément fixe, bouton ou non) rougit CL4.3b : le div fixe fait grandir la zone basse (témoin : mesure avant lue)" \
+  "$(E '[j.avant !== "", j.avant === j.apres]' "$RM")" '[true,false]'
+mutant M-PASTILLE-NONFIXE 41-vf-projet-vue.js "find((e) => e.matches('button') && getComputedStyle(e).position === 'fixed')" "find((e) => e.matches('button'))" chrome-pointeur.mjs nonfixe ""
+echo "     trace M-PASTILLE-NONFIXE — sonde CL4.3c [avant, après] : attendu égaux, obtenu $(E 'j.avant + " -> " + j.apres' "$RM")"
+assert_eq "M-PASTILLE-NONFIXE — le mutant (reconnaissance élargie : tout bouton) rougit CL4.3c : le bouton non fixe fait grandir la zone basse (témoin : mesure avant lue)" \
+  "$(E '[j.avant !== "", j.avant === j.apres]' "$RM")" '[true,false]'
 
 echo "=== Mutants (copie du module dans \$WORK) ==="
 mutant M-FOOT 41-vf-projet-modele.js "const av = n && n.avancement, ex = n && n.exigences, seg = [];" \
