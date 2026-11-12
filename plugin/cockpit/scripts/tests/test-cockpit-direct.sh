@@ -72,11 +72,12 @@ const v = new Function('j', 'return (' + process.argv[3] + ')')(j);
 console.log(typeof v === 'string' ? v : JSON.stringify(v));
 JS
 cat > "$AUX/pg.mjs" <<'JS'
-// pg.mjs <dossier-sortie> <page.html> <expression sur g> : le graphe de la page (module d'embarquement de la sortie)
+// pg.mjs <dossier-sortie> <page.html> <expression sur g> : le graphe de la page (module d'embarquement du MODULE, dossier de scripts dans VF_PG_SCRIPTS ; la sortie ne porte que des données)
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const [, , out, file, expr] = process.argv; const m = await import(pathToFileURL(out + '/vf-cockpit-embed.mjs').href);
+const [, , out, file, expr] = process.argv; const m = await import(pathToFileURL(process.env.VF_PG_SCRIPTS + '/vf-cockpit-embed.mjs').href);
 console.log(String(new Function('g', 'return (' + expr + ')')(m.extraireGraphe(fs.readFileSync(file, 'utf8')))));
 JS
+export VF_PG_SCRIPTS="$SCRIPTS"   # 79-06 : pg.mjs importe l'embarquement du module, plus de la sortie
 cat > "$AUX/now.mjs" <<'JS'
 console.log(Date.now());
 JS

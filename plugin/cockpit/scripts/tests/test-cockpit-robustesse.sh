@@ -60,12 +60,12 @@ git -C "$L1" init -q && git -C "$L1" add -A && git -C "$L1" -c user.email=t@t -c
 assert_eq "S1.0 — assemblage du lab à un seul jalon" "$(build "$L1" "$WORK/b1.out")" "0"
 cat > "$AUX/ask.mjs" <<'JS'
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const [, , out] = process.argv; const A = await import(pathToFileURL(out + '/vf-cockpit-ask.mjs').href); const E = await import(pathToFileURL(out + '/vf-cockpit-embed.mjs').href);
+const [, , out, scripts] = process.argv; const A = await import(pathToFileURL(scripts + '/vf-cockpit-ask.mjs').href); const E = await import(pathToFileURL(scripts + '/vf-cockpit-embed.mjs').href);
 const G = E.extraireGraphe(fs.readFileSync(out + '/project.html', 'utf8')); const r = {};
 for (const q of ["Qu'est-ce qui reste ?", 'prochaine étape', 'next', 'Où en est-on ?']) { try { const a = A.answerLocally(G, q); r[q] = a ? (/undefined/.test(JSON.stringify(a)) ? 'undefined-dans-la-réponse' : 'réponse') : 'agent'; } catch (e) { r[q] = 'EXCEPTION ' + e.message.slice(0, 60); } }
 console.log(JSON.stringify(r));
 JS
-R1="$(node "$AUX/ask.mjs" "$L1/.vibeflow/cockpit")"
+R1="$(node "$AUX/ask.mjs" "$L1/.vibeflow/cockpit" "$SCRIPTS")"
 assert_eq "S1.1 — « reste », « prochaine étape », « next » : jamais d'exception ; « où en est-on » : une réponse sans « undefined »" "$(printf '%s' "$R1" | node "$AUX/ev.mjs" 'Object.values(j).filter(v=>/EXCEPTION|undefined/.test(v)).length')" "0"
 assert_eq "S1.2 — « Où en est-on ? » répond localement" "$(printf '%s' "$R1" | node "$AUX/ev.mjs" 'j["Où en est-on ?"]')" "réponse"
 assert_eq "S1.2b — CKPT-07 : « reste », « prochaine étape », « next » répondent localement (jalon unique, STATE non reconnu)" "$(printf '%s' "$R1" | node "$AUX/ev.mjs" 'Object.values(j).slice(0,3).join(",")')" "réponse,réponse,réponse"

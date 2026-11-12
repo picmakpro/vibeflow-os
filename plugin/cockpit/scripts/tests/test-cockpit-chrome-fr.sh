@@ -95,9 +95,10 @@ cat > "$AUX/blueprint.mjs" <<'JS'
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-const { extraireGraphe } = await import(pathToFileURL(path.join(process.argv[2], 'vf-cockpit-embed.mjs')).href);
+const { extraireGraphe } = await import(pathToFileURL(path.join(process.env.VF_BP_SCRIPTS, 'vf-cockpit-embed.mjs')).href);
 for (const f of ['index.html', 'project.html']) console.log(f, Object.prototype.hasOwnProperty.call(extraireGraphe(fs.readFileSync(path.join(process.argv[2], f), 'utf8')).meta, 'blueprint') ? 'blueprint' : 'sans');
 JS
+export VF_BP_SCRIPTS="$SCRIPTS"   # 79-06 : blueprint.mjs importe l'embarquement du module, la sortie ne porte que des données (index.html, project.html)
 lire() { node "$AUX/lire.mjs" "$1" "$2"; }
 # nouveaux <mesure.json> : les non-traduits de la copie témoin qui n'étaient pas déjà ceux du rendu de base ($WORK/m.json) ;
 # F3 et le témoin de F2 prouvent le DÉTECTEUR, ils ne doivent pas rougir quand F2 rougit sur autre chose (70-01)
