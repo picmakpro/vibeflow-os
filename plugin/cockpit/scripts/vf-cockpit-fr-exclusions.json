@@ -167,6 +167,12 @@
   {"texte": "API keys", "raison": "alias de recherche du glossaire : motif de repérage dans un texte, jamais affiché seul"},
   {"texte": "HTTP method", "raison": "alias de recherche du glossaire : motif de repérage dans un texte, jamais affiché seul"},
   {"texte": "HTTP methods", "raison": "alias de recherche du glossaire : motif de repérage dans un texte, jamais affiché seul"},
-  {"texte": "MCP server", "raison": "alias de recherche du glossaire : motif de repérage dans un texte, jamais affiché seul"}
+  {"texte": "MCP server", "raison": "alias de recherche du glossaire : motif de repérage dans un texte, jamais affiché seul"},
+  {"texte": "Parcours", "raison": "français écrit à la source : le serveur n'a pas la table, ses messages sont en français (79-10) ; le mot sans accent est pris pour de l'anglais par l'inventaire"},
+  {"texte": "Examine {}", "raison": "français écrit à la source : le serveur n'a pas la table, ses messages sont en français (79-10) ; le mot sans accent est pris pour de l'anglais par l'inventaire"},
+  {"texte": "Lit {}", "raison": "français écrit à la source : le serveur n'a pas la table, ses messages sont en français (79-10) ; le mot sans accent est pris pour de l'anglais par l'inventaire"},
+  {"texte": "Liste {}", "raison": "français écrit à la source : le serveur n'a pas la table, ses messages sont en français (79-10) ; le mot sans accent est pris pour de l'anglais par l'inventaire"},
+  {"texte": "{} introuvable.", "raison": "français écrit à la source : le serveur n'a pas la table, ses messages sont en français (79-10) ; le mot sans accent est pris pour de l'anglais par l'inventaire"},
+  {"texte": "{} problems", "raison": "mode plan (blueprint) inatteignable : l'assemblage ne pose jamais meta.blueprint, le test F7 le vérifie (message de correction du plan)"}
  ]
 }
