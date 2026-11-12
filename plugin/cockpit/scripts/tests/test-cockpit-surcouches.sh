@@ -85,10 +85,10 @@ O="$LAB/.vibeflow/cockpit"; serve "$LAB" "$O"; PORT="$SERVED"
 assert_eq "A0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
 TL="$WORK/lab-term"; mklab "$TL"; OT="$TL/.vibeflow/cockpit"; serve "$TL" "$OT" --terminal; PORT_T="$SERVED"
 pilote() { # pilote <port> <module> <racine-terminal> <sections>
-  REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-surcouches.mjs" "$CHROME" "http://127.0.0.1:$1" "$2" "${3:-}" "${4:-su1,su2,su3,su4}" 2>"$WORK/mesure.err"
+  REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-surcouches.mjs" "$CHROME" "http://127.0.0.1:$1" "$2" "${3:-}" "${4:-su1,su2,su3,su4,su7}" 2>"$WORK/mesure.err"
 }
 # SU_SECTIONS : mise au point (sections jouées) ; SU_SANS_MUTANTS=1 saute les mutants
-R="$(pilote "$PORT" "$PILE" "http://127.0.0.1:$PORT_T" "${SU_SECTIONS:-su1,su2,su3,su4}")"
+R="$(pilote "$PORT" "$PILE" "http://127.0.0.1:$PORT_T" "${SU_SECTIONS:-su1,su2,su3,su4,su7}")"
 [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/mesure.json"
 [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }
 E() { printf '%s' "$R" | node "$AUX/ev.mjs" "$1"; }
@@ -133,6 +133,22 @@ ok "SU4.6 — un seul écouteur Échap de la pile, posé avant tout écouteur d'
   'j.su4.ordre.pile === 1 && j.su4.ordre.avantTout && j.su4.ordre.dernier > 0 && j.su4.consomme_index.ferme'
 echo "  ℹ cas interdit : constat documenté — un écouteur en capture sur window posé AVANT la pile reçoit l'appui" \
   "avec defaultPrevented = $(E 'j.su4.consomme_index.interdit.slice(-1).join()') (ni PASS ni FAIL de la pile)"
+echo "=== SU7 — corrections de la revue : inert, tiroirs couverts, gardes d'Échap, visite modale ==="
+ok "SU7.1 — palette : Entrée sur une recherche vide et clic dans #results hors d'une ligne la laissent ouverte ET inerte ; Échap lève tout" \
+  "j.su7.entree.ouverte && j.su7.entree.inert.length > 0 && j.su7.clic.ouverte && j.su7.clic.inert.length > 0 && !j.su7.fin.ouverte && j.su7.fin.inert === ''"
+ok "SU7.2 — palette fermée et modale ouverte dans le même tour : le fond reste inerte sous la modale, levé à sa fermeture" \
+  "j.su7.deux.modale && j.su7.deux.inert.split(',').includes('stage') && !j.su7.deux.inert.split(',').includes('modal') && j.su7.deuxFin === ''"
+ok "SU7.3 — « Au travail » puis Git ouverts, focus dans « Au travail » : Échap ferme « Au travail » (régression de la base), Git reste" \
+  "j.su7.tiroirs === '{\"git\":true,\"whop\":false}'"
+ok "SU7.4 — un parcours en cours : Échap ne ferme pas le tiroir Git (garde flux)" 'j.su7.flux'
+ok "SU7.5 — une bulle d'aide visible : Échap ne ferme pas le tiroir Git (garde bulle)" 'j.su7.bulle'
+ok "SU7.6 — focus sur un bouton hors du tiroir : Échap ne ferme pas le tiroir Git (garde rien)" 'j.su7.rien'
+ok "SU7.7 — la feuille de détail (role=dialog visible, 600 px) n'est pas une surcouche : ouverte() faux" \
+  "j.su7.feuille === '{\"role\":\"dialog:true\",\"ouverte\":false}'"
+ok "SU7.8 — modale inscrite par l'API : fermer() rend le focus à son ouvreur" 'j.su7.rendre'
+ok "SU7.9 — visite ouverte par son bouton : modale (25 Tab dans #tour, inert posé, levé à la fermeture)" \
+  "j.su7.tour.actif && j.su7.tour.arrets.every(Boolean) && j.su7.tour.inert.length > 0 && !j.su7.tour.fin.actif && j.su7.tour.fin.inert === ''"
+ok "SU7.10 — visite ouverte d'elle-même : non modale (aucun inert)" 'j.auto.actif && j.auto.inert === 0'
 echo "=== SU5 — les listes recopiées ont disparu (retrait 4) ==="
 assert_eq "SU5.1 — « #palette.open, #flowmenu.open » absent de 02, 73 et 77 (baseline : 1 dans chacun)" \
   "$(cd "$UI" && grep -lF '#palette.open, #flowmenu.open' 02-vf-telephone.js 73-vf-tiroir-travail.js 77-vf-git-tiroir.js | tr '\n' ',')" ""
@@ -161,6 +177,16 @@ mutant M-ECHAP-VIDE su4i 's#{ // vf-echap$#{ ev.preventDefault(); ev.stopPropaga
 mutant M-SANS-PREVENT su4i 's#const consomme = (ev) => { ev.preventDefault();#const consomme = (ev) => {#' \
   'j.su4.consomme_index.temoin[0] === true'
 mutant M-UNICITE su1 's#if (window.VF_SURCOUCHES) return;##' 'j.su1.identite && j.su1.nouveaux === 0'
+mutant M-LEVEE su7 's|if (pile.includes(h) \&\& h.modale \&\& !h.inertes.length) inerter(h);|void 0;|' \
+  "j.su7.entree.inert.length > 0 && j.su7.clic.inert.length > 0"
+mutant M-PROPRIO su7 's|if (n > 0) { prop.set(x, n); continue; }||' "j.su7.deux.inert.split(',').includes('stage')"
+mutant M-TIROIR-COUVERT su7 's|if (d) { consomme(ev); d.fermer(); }||' "j.su7.tiroirs === '{\"git\":true,\"whop\":false}'"
+mutant M-FLUX su7 's|if (rien(t) \&\& !flux|if (rien(t)|' 'j.su7.flux'
+mutant M-BULLE su7 's#\.vf-git-bulle:not(\[hidden\]), \#sc-gloss\.on#.zz-vide#' 'j.su7.bulle'
+mutant M-RIEN su7 's|if (rien(t) \&\& !flux|if (!flux|' 'j.su7.rien'
+mutant M-IDPANEL su7 "s|d.id !== 'panel' \&\& ||" 'j.su7.feuille === '"'"'{"role":"dialog:true","ouverte":false}'"'"
+mutant M-RENDRE su7 's|if (e.rendu) rendre(e);|void 0;|' 'j.su7.rendre'
+mutant M-TOUR su7 's|if (tv \&\& !dT \&\& refs.tourBtn)|if (false)|' 'j.su7.tour.arrets.every(Boolean)'
 echo "  ⏳ ATTENTE — M-PERSISTANT (marqueur vf-coquille: persistant retiré : exécutable après la 79, exigé rouge par la jointure)"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

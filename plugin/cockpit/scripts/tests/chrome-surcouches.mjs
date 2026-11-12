@@ -4,7 +4,7 @@
 // Rend une ligne JSON { su1, su2, su3, su4 } ; chaque section est lisible seule. SU6 n'est pas mesuré ici (coquille de la 79).
 import fs from 'node:fs';
 import { executer, pause } from './chrome-session.mjs';
-const [, , chrome, racine, source, racineTerm, quoi = 'su1,su2,su3,su4'] = process.argv;
+const [, , chrome, racine, source, racineTerm, quoi = 'su1,su2,su3,su4,su7'] = process.argv;
 const veut = (k) => quoi.split(',').includes(k);
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
 const SEL = "a[href], button, input, select, textarea, summary, [tabindex]";
@@ -43,12 +43,24 @@ await executer(chrome, async (s) => {
     await s.naviguer(`${base}/${page}?lang=en`); await s.attendre(PRET, `page prête (${page})`);
     await s.attendre("!!document.querySelector('#viewport .node')", `cartes (${page})`);
     await pause(1300); // la visite guidée démarre seule 700 ms après `ready` au premier passage : on la laisse venir, puis Échap la ferme
+    if (!o.auto) {
+      o.auto = JSON.parse(await s.ev(`JSON.stringify({ actif: !!(window.VibeFlowTour && window.VibeFlowTour.active()),
+        inert: document.querySelectorAll('[inert]').length })`));
+    }
     if (await s.ev('!!(window.VibeFlowTour && window.VibeFlowTour.active())')) await echap();
     await s.attendre("!(window.VibeFlowTour && window.VibeFlowTour.active())", `visite fermée (${page})`); await pause(300);
     await s.ev('document.activeElement && document.activeElement.blur()');
   };
   const palette = "document.getElementById('palette').classList.contains('open')";
   const dansBoite = (b) => `(() => { const a = document.activeElement; return !!a && !!a.closest(${JSON.stringify(b)}); })()`;
+  const entree = cle('Enter', 'Enter', 13, { text: '\r' });
+  const inerts = "[...document.querySelectorAll('[inert]')].map((e) => e.id || e.tagName).join(',')";
+  const clic = async (sel) => {
+    const lire = `(() => { const b = document.querySelector(${JSON.stringify(sel)}).getBoundingClientRect();
+      return JSON.stringify([b.x + b.width / 2, b.y + b.height / 2]); })()`;
+    const [x, y] = JSON.parse(await s.ev(lire));
+    for (const type of ['mousePressed', 'mouseReleased']) await s.send('Input.dispatchMouseEvent', { type, x, y, button: 'left', clickCount: 1 });
+  };
   const poser = () => s.ev(`(() => { window.__temoin = []; window.__vue = 0; if (window.__poses) return; window.__poses = true;
     window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.__temoin.push(e.defaultPrevented); }, true);
     document.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.__vue++; }); })()`);
@@ -65,7 +77,8 @@ await executer(chrome, async (s) => {
     await pause(100); await echap(); await pause(300); r.champ = !(await s.ev(palette));
     r.api = await s.ev('typeof window.VF_SURCOUCHES');
     await s.ev('window.__id = window.VF_SURCOUCHES'); const avant = await s.ev('window.__ec.length');
-    await s.ev(lire(source).replace(/Floorplan/g, 'VibeFlow') || 'void 0');
+    const src = lire(source); if (!src.trim()) throw new Error(`module des surcouches illisible ou vide (${source}) : SU1.3 ne prouverait rien`);
+    await s.ev(src.replace(/Floorplan/g, 'VibeFlow'));
     r.identite = await s.ev('!!window.VF_SURCOUCHES && window.VF_SURCOUCHES === window.__id');
     r.nouveaux = await s.ev(`window.__ec.slice(${avant}).filter((x) => x.t === 'keydown' && x.cap && x.cible === 'window').length`);
     await s.ev("document.getElementById('btn-export').focus()"); await barre(); await s.attendre(palette, 'palette (après la réévaluation)');
@@ -161,6 +174,55 @@ await executer(chrome, async (s) => {
       } catch (e) { r.terminal = { sautee: String(e.message) }; }
     }
     o.su4 = r;
+  }
+  if (veut('su7')) { // corrections de la revue : inert qui reste, deux propriétaires, tiroirs couverts, gardes d'Échap, visite modale
+    const r = {}; const tiroirOuvert = "!document.getElementById('vf-git-tiroir').hidden";
+    await charger('index.html'); await s.ev("document.getElementById('btn-export').focus()"); await barre(); await s.attendre(palette, 'palette (su7)');
+    await pause(150); await s.send('Input.insertText', { text: 'zzzzqq' }); await pause(150); await entree(); await pause(300);
+    r.entree = { ouverte: await s.ev(palette), inert: await s.ev(inerts) };
+    await clic('#results'); await pause(300); r.clic = { ouverte: await s.ev(palette), inert: await s.ev(inerts) };
+    await echap(); await pause(300); r.fin = { ouverte: await s.ev(palette), inert: await s.ev(inerts) };
+    await barre(); await s.attendre(palette, 'palette (su7 b)'); await pause(150);
+    await s.ev(`(() => { document.getElementById('pal-x').click();
+      window.VibeFlow.modal({ title: 'T', html: '<p>x</p><button id="zz">b</button>' }); })()`); await pause(400);
+    r.deux = { inert: await s.ev(inerts), modale: await s.ev("document.getElementById('modal').classList.contains('open')") };
+    await echap(); await pause(400); r.deuxFin = await s.ev(inerts);
+    // deux tiroirs : « Au travail » puis Git, focus dans « Au travail », Échap
+    await charger('index.html'); await s.ev("document.getElementById('vf-lock').click()"); await pause(600);
+    await s.ev('document.activeElement && document.activeElement.blur()'); await g(); await pause(500);
+    await s.ev("(() => { const h = document.querySelector('#panel > .vf-whop h3'); h.tabIndex = -1; h.focus(); })()"); await pause(100);
+    await echap(); await pause(400);
+    r.tiroirs = await s.ev(`JSON.stringify({ git: ${tiroirOuvert},
+      whop: !!document.querySelector('#panel > .vf-whop') && !document.body.classList.contains('no-panel') })`);
+    // gardes d'Échap : tiroir Git ouvert, focus sur body, un parcours / une bulle ; focus sur un bouton ; le tiroir doit rester
+    await charger('index.html'); await s.ev('document.activeElement && document.activeElement.blur()'); await g(); await pause(500);
+    const garde = async (prepare, defait) => {
+      await s.ev('document.activeElement && document.activeElement.blur()'); await s.ev(prepare); await echap(); await pause(300);
+      const ouvert = await s.ev(tiroirOuvert); await s.ev(defait); return ouvert;
+    };
+    r.flux = await garde('window.VibeFlow.state.flow = { faux: true }', 'window.VibeFlow.state.flow = null');
+    r.bulle = await garde("(() => { const b = document.createElement('div'); b.id = 'zz-bulle'; b.className = 'vf-git-bulle';"
+      + " document.body.appendChild(b); })()",
+      "document.getElementById('zz-bulle').remove()");
+    r.rien = await garde("document.getElementById('btn-export').focus()", 'void 0');
+    // un dialogue non modal visible (la feuille du téléphone) n'est pas une surcouche
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 600, height: 900, deviceScaleFactor: 1, mobile: false });
+    await charger('index.html'); await s.ev("VibeFlow.reveal('f:src/util.js')"); await pause(900);
+    r.feuille = await s.ev(`JSON.stringify({ role: document.getElementById('panel').getAttribute('role') + ':'
+      + !!document.getElementById('panel').getClientRects().length,
+      ouverte: !!window.VF_SURCOUCHES && window.VF_SURCOUCHES.ouverte() })`);
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+    // retour du focus à l'ouvreur d'une modale inscrite par l'API
+    await charger('index.html');
+    r.rendre = await s.ev(`(() => { const o = document.createElement('button'), d = document.createElement('div'), i = document.createElement('button');
+      o.id = 'zz-o'; document.body.appendChild(o); d.appendChild(i); document.body.appendChild(d); o.focus();
+      window.VF_SURCOUCHES.ouvrir(d, { modale: true, ouvreur: o }); i.focus(); window.VF_SURCOUCHES.fermer(d); return document.activeElement === o; })()`);
+    // visite ouverte par son bouton : modale ; d'elle-même : non modale
+    await charger('index.html'); await s.ev("document.getElementById('tour-btn').click()"); await pause(900);
+    r.tour = { actif: await s.ev('!!(window.VibeFlowTour && window.VibeFlowTour.active())'), inert: await s.ev(inerts), arrets: [] };
+    for (let i = 0; i < 25; i++) { await tab(); r.tour.arrets.push(await s.ev("!!document.activeElement.closest('#tour')")); }
+    await echap(); await pause(500); r.tour.fin = { actif: await s.ev('!!(window.VibeFlowTour && window.VibeFlowTour.active())'), inert: await s.ev(inerts) };
+    o.su7 = r;
   }
   return o;
 });
