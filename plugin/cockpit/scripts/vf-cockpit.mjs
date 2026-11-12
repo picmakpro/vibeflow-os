@@ -196,7 +196,8 @@ async function demarrer(lab, sortie, o) {
   try { fs.unlinkSync(etatFile(sortie)); } catch {} // état d'un serveur mort : jamais pris pour un démarrage
   verifierSortie(lab, sortie);
   const logFd = fs.openSync(path.join(sortie, '.cache', 'serveur.log'), 'a');
-  const args = [serveDuModule() || path.join(sortie, 'serve.mjs'), '--idle-exit', '60'];
+  const serve = serveDuModule(); if (!serve) throw Object.assign(new Error('serveur du cockpit introuvable (serve.mjs absent du module)'), { code: 3 }); // jamais de repli sur la sortie du lab
+  const args = [serve, '--idle-exit', '60'];
   args.push('--no-open'); // N2 (P71-D-29) : le serveur ne lance jamais l'ouvreur par son nom depuis le lab ; le lanceur ouvre lui-même, par chemin absolu (ouvrir)
   if (o.terminal) args.push('--terminal');
   // port stable par lab (O4) : --port de l'utilisateur d'abord, sinon l'empreinte du lab ; le repli port+1 reste celui du serveur
@@ -274,6 +275,7 @@ async function main() {
   if (vif) noter(sortie, `relance : serveur PID ${vif.pid} remplacé (${o.rebuild ? '--rebuild demandé' : perime ? `code du serveur changé, empreinte ${vif.hash} -> ${empreinteDuModule()}` : '--terminal demandé, aucun terminal enregistré pour le serveur en cours'})`);
   if (vif) { if (!arreter(sortie)) { console.error(`PID ${vif.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté.`); process.exit(5); } for (let i = 0; i < 30 && vivant(vif.pid); i++) await attendre(100); }
   if (engineDir(scriptsDir).etat !== 'trouve') { console.error('moteur du cockpit introuvable : réinstaller le module cockpit.'); process.exit(3); }
+  if (!serveDuModule()) { console.error('serveur du cockpit introuvable (serve.mjs absent du module) : réinstaller le module cockpit.'); process.exit(3); } // 79-06 F1 : jamais de repli sur un serve.mjs de la sortie du lab
   await assemblerLab(lab, scriptsDir);
   const amorce = o.avecQ ? amorcer(lab, sortie) : null; // avant le démarrage : le serveur ne reçoit jamais la valeur
   let s = await demarrer(lab, sortie, o), suivi = null;

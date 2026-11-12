@@ -93,6 +93,14 @@ FAKE="$WORK/fake"; mkdir -p "$FAKE"; printf '#!/bin/sh\ntouch "%s/CLAUDE-APPELE"
 PATH="$FAKE:$PATH" node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet >/dev/null 2>&1
 assert_eq "A4.5 — le faux claude n'est jamais appelé" "$([ -e "$WORK/CLAUDE-APPELE" ] && echo oui || echo non)" "non"
 
+# AM6.F1 (79-06, S3, audit au06a) : un module sans son serve.mjs n'est pas lancé, et le lanceur ne retombe JAMAIS sur <sortie>/serve.mjs (un fichier du lab)
+F1M="$(cockpit_module_copie)"; rm -f "$F1M/skills/cockpit-moteur/assets/serve.mjs"
+F1L="$WORK/f1-lab"; mkdir -p "$F1L/.planning"; printf '# Projet\n' > "$F1L/.planning/PROJECT.md"
+F1OUT=$(cd "$F1L" && VF_COCKPIT_DEMARRAGE_MS=2000 node "$F1M/scripts/vf-cockpit.mjs" open --lab "$F1L" --no-open 2>&1); F1RC=$?
+assert_eq "AM6.F1a — module sans serve.mjs : refus code 3" "$F1RC" "3"
+assert_has "AM6.F1b — message en français, dit le fichier manquant" "$F1OUT" "serve.mjs"
+assert_eq "AM6.F1c — rien n'a été lancé (ni server.json ni journal de serveur)" "$([ -e "$F1L/.vibeflow/cockpit/.cache/server.json" ] || [ -s "$F1L/.vibeflow/cockpit/.cache/serveur.log" ] && echo lancé || echo rien)" "rien"
+
 echo "=== A5 — liste du code d'exécution ==="
 D5="$WORK/d5"; mkdir -p "$D5"
 for f in vf-cockpit-build vf-cockpit-rename vf-cockpit-code-vf vf-cockpit-fr-inventaire vf-cockpit-who; do echo "export {};" > "$D5/$f.mjs"; done
