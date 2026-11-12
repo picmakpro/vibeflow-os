@@ -88,4 +88,10 @@ Contrôles de l'aide (`OK-AIDE`) : marqueurs `am7:` présents (5), aucun `trap`,
 
 ## Point d'arrêt S1 (tâche 2)
 
-Voir la rubrique ajoutée à la fermeture de la session (sha des commits, verdict de la mesure).
+Commits `(79-06)` de la session : 81168f4f (aide), 10604d3f (témoins et trace), e1a1238c (mesure). Aucun fichier de production touché ; fichiers touchés : l'aide, cinq suites, cette trace, `79-MESURE-claude-p.md` (tous dans `files_modified`).
+
+Mesure : 46 appels réels (Claude Code 2.1.322, haiku), verdict CONFINABLE, combinaison retenue de 13 éléments avec le gabarit `<module>` dans les deux règles Bash. Chemin nominal et lien tiennent (règle et commande doivent porter le même chemin textuel) ; dossier avec espace non admis par `argsAgent` (la forme guillemetée tient : décision de produit, non prise) ; alphabet admis : lettres, chiffres, `.` `-` `_` `/` `~` `@` `+` ; `(` et `)` échouent. Sortie brute conservée hors dépôt (dossier du banc du nœud x06, fichiers `RESULTATS.md`, `RESULTATS-2.md`, `sortie-brute/`).
+
+État attendu des rouges à la reprise (S2) : les 18 témoins AM4 rouges de la tâche 1 le restent jusqu'aux tâches 4a et 5 ; FB3.5 est une sonde de durée préexistante, instable sous charge.
+
+Constat bas 1 de l'audit de 79-07 (`realUnder` en polarité inverse sans `siEchec: true`, `vf-cockpit-terminal.mjs`, fonction `ordinaire`) : non traité en S1 (fichier de production, tâche 4a). Analyse préalable : `lstat(f).isFile()` précède `realUnder`, qui résout le même fichier : aucun cas déterministe ne fait réussir l'un et échouer l'autre (seule une course), donc aucun témoin d'effet constructible ; l'amendement daté dira cela, posera le correctif d'une ligne et une ancre structurelle avec son mutant.
