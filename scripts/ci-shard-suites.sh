@@ -253,13 +253,13 @@ durees() {
 658 plugin/cockpit/scripts/tests/test-cockpit-projet-visite.sh
 515 plugin/cockpit/scripts/tests/test-cockpit-projet-croissance.sh
 48 plugin/cockpit/scripts/tests/test-cockpit-sondes-stables.sh
-307 plugin/cockpit/scripts/tests/test-cockpit-panneau-retour.sh
-257 plugin/cockpit/scripts/tests/test-cockpit-surcouches.sh
-239 plugin/cockpit/scripts/tests/test-cockpit-clavier-canevas.sh
-142 plugin/cockpit/scripts/tests/test-cockpit-coin.sh
-137 plugin/cockpit/scripts/tests/test-cockpit-couloirs.sh
-106 plugin/cockpit/scripts/tests/test-cockpit-git-pagination.sh
-105 plugin/cockpit/scripts/tests/test-cockpit-projet-liste.sh
+82 plugin/cockpit/scripts/tests/test-cockpit-panneau-retour.sh
+263 plugin/cockpit/scripts/tests/test-cockpit-surcouches.sh
+232 plugin/cockpit/scripts/tests/test-cockpit-clavier-canevas.sh
+139 plugin/cockpit/scripts/tests/test-cockpit-coin.sh
+154 plugin/cockpit/scripts/tests/test-cockpit-couloirs.sh
+102 plugin/cockpit/scripts/tests/test-cockpit-git-pagination.sh
+109 plugin/cockpit/scripts/tests/test-cockpit-projet-liste.sh
 2 plugin/cockpit/scripts/tests/test-cockpit-projet-champs.sh
 540 plugin/cockpit/scripts/tests/test-cockpit-projet-*.sh
 DUREES
