@@ -69,7 +69,10 @@ const DATA_START = '<script>window.VF_COCKPIT = ';
 function exportMap(include, extraFlows = []) {
   const html = fs.readFileSync(path.join(here, 'index.html'), 'utf8');
   const a = html.indexOf(DATA_START), b = html.indexOf(';</script>', a);
-  if (a < 0 || b < 0) throw Object.assign(new Error('This map is too old to export. Ask Claude or Codex to update the vf-cockpit first.'), { plain: true });
+  if (a < 0 || b < 0) {
+    const dit = "Cette carte est trop ancienne pour être exportée. Demandez d'abord à Claude ou à Codex de mettre le cockpit à jour.";
+    throw Object.assign(new Error(dit), { plain: true });
+  }
   const g = JSON.parse(html.slice(a + DATA_START.length, b));
   const on = EXPORT_PARTS.filter((p) => include.includes(p));
   const out = {
@@ -90,7 +93,7 @@ function exportMap(include, extraFlows = []) {
 const cleanFlows = (list) => (Array.isArray(list) ? list : []).slice(0, 50)
   .filter((f) => f && typeof f.id === 'string' && Array.isArray(f.steps))
   .map((f) => ({
-    id: f.id.slice(0, 100), title: String(f.title || 'Flow').slice(0, 200), description: String(f.description || '').slice(0, 1000), custom: true,
+    id: f.id.slice(0, 100), title: String(f.title || 'Parcours').slice(0, 200), description: String(f.description || '').slice(0, 1000), custom: true,
     steps: f.steps.slice(0, 60).filter((s) => s && typeof s.ref === 'string').map((s) => ({ ref: s.ref.slice(0, 300), note: String(s.note || '').slice(0, 2000) })),
   }))
   .filter((f) => f.steps.length >= 2);
@@ -271,28 +274,29 @@ function describeCommand(command) {
   if (parts.length) {
     const one = ([, cmd, rest]) => {
       const a = rest.replace(/--\w+\s+\S+/g, '').replace(/["']/g, '').trim();
-      return { overview: 'Reading the map overview', find: a ? `Searching the map for "${a}"` : 'Searching the map', show: `Looking at ${a.split(/\s+/).map(nameFor).join(', ')}`, path: `Tracing a path ${a.split(/\s+/).map(nameFor).join(' → ')}` }[cmd] || 'Querying the map';
+      return { overview: "Lit l'aperçu de la carte", find: a ? `Cherche « ${a} » dans la carte` : 'Cherche dans la carte', show: `Examine ${a.split(/\s+/).map(nameFor).join(', ')}`,
+        path: `Suit un chemin ${a.split(/\s+/).map(nameFor).join(' → ')}` }[cmd] || 'Interroge la carte';
     };
     return parts.slice(0, 2).map(one).join(' · ') + (parts.length > 2 ? ` (+${parts.length - 2} more)` : '');
   }
   const first = cmds[0] || '';
   if (/^(rg|grep|git grep|Select-String|findstr)\b/i.test(first) && !/\s--files\b/.test(first)) {
     const pat = /\s(["'])(.+?)\1/.exec(first)?.[2] || /\s(?:-Pattern\s+)?([^\s-][^\s]*)/i.exec(first.replace(/^\S+(\s+-\S+)*/, ''))?.[1];
-    return pat ? `Searching code for "${pat}"` : 'Searching code';
+    return pat ? `Cherche « ${pat} » dans le code` : 'Cherche dans le code';
   }
-  if (/^(rg\s.*--files|ls|dir|Get-ChildItem|gci|find|tree)\b/i.test(first)) return 'Listing files';
+  if (/^(rg\s.*--files|ls|dir|Get-ChildItem|gci|find|tree)\b/i.test(first)) return 'Liste des fichiers';
   if (/^(cat|type|Get-Content|gc|sed|head|tail|nl|more|less)\b/i.test(first)) {
     const file = [...first.matchAll(/[\w@.\\/-]+\.\w{1,6}\b/g)].map((m) => m[0]).pop();
-    return file ? `Reading ${rel(file)}` : 'Reading a file';
+    return file ? `Lit ${rel(file)}` : 'Lit un fichier';
   }
-  return 'Running a command';
+  return 'Lance une commande';
 }
 function describeTool(name, input = {}) {
   if (name === 'Bash') return describeCommand(input.command);
   // a long result the CLI saved to read back in parts lives outside the project
-  if (name === 'Read') return /[\\/]tool-results[\\/]/.test(input.file_path || '') ? 'Reading the rest of a long file' : `Reading ${rel(input.file_path)}`;
-  if (name === 'Grep') return `Searching code for "${input.pattern}"`;
-  if (name === 'Glob') return `Listing ${input.pattern}`;
+  if (name === 'Read') return /[\\/]tool-results[\\/]/.test(input.file_path || '') ? "Lit la suite d'un long fichier" : `Lit ${rel(input.file_path)}`;
+  if (name === 'Grep') return `Cherche « ${input.pattern} » dans le code`;
+  if (name === 'Glob') return `Liste ${input.pattern}`;
   return name;
 }
 function parseAnswer(ev) {
@@ -300,7 +304,7 @@ function parseAnswer(ev) {
   const t = String(ev.result || '');
   const fence = /```(?:json)?\s*([\s\S]*?)```/.exec(t);
   for (const cand of [t, fence?.[1], t.slice(t.indexOf('{'), t.lastIndexOf('}') + 1)]) { try { const v = JSON.parse(cand); if (v && typeof v === 'object') return v; } catch {} }
-  return { title: 'Answer', answer: t, items: [] };
+  return { title: 'Réponse', answer: t, items: [] };
 }
 const failCode = (msg) => /not logged in|logged out|\/login|log ?in again|sign in|authenticat|unauthori[sz]ed|\b401\b/i.test(msg) ? 'not_logged_in'
   : /usage limit|rate limit|too many requests|\b429\b/i.test(msg) ? 'rate_limited' : 'cli_error';
@@ -403,7 +407,7 @@ function ask(req, res, body) {
   let ouvert = false; // vibeflow AUDC-B-02 : le flux s'ouvre à la première émission, pour qu'un refus puisse encore être un 429
   const send = (event, data) => { if (!ouvert) { ouvert = true; res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' }); } if (!res.writableEnded) res.write(`event: ${event}\ndata: ${JSON.stringify(data)}\n\n`); };
   if (VF && VF.avantQuestion({ req, body, send }) === 'repondu') return res.end(); // vibeflow P14 : réponse locale ou refus de modèle
-  if (!cli) { send('failure', { code: 'cli_missing', message: `${ENGINES[want].name} not found.` }); return res.end(); }
+  if (!cli) { send('failure', { code: 'cli_missing', message: `${ENGINES[want].name} introuvable.` }); return res.end(); }
   if (running.size >= MAX_ASK) { res.writeHead(429, { 'Content-Type': 'application/json', 'Retry-After': '5' }); return res.end(JSON.stringify({ error: 'Deux questions sont déjà en cours : attendez la fin de l’une d’elles.' })); } // vibeflow AUDC-B-02
   if (body.mode === 'change') return changePlan(res, send, body);
   if (engine === 'claude' && typeof body.session === 'string' && body.session && !issued.has(body.session)) { send('failure', { code: 'session_inconnue', message: 'Cette conversation n’a pas été ouverte par ce serveur : rechargez la page pour en commencer une nouvelle.' }); return res.end(); } // vibeflow AUDC-A-01
@@ -436,7 +440,7 @@ function restore(dir) {
 const engineDirFromLauncher = () => { const d = process.env.VF_COCKPIT_ENGINE_DIR; return d && path.isAbsolute(d) ? d : null; };
 function skillScript(name, ...args) {
   const dir = engineDirFromLauncher();
-  if (!['plan.mjs', 'build.mjs'].includes(name) || !dir || !fs.existsSync(path.join(dir, 'scripts', name))) throw new Error('This map’s server can’t find the VibeFlow scripts. Ask Claude Code or Codex to update the vf-cockpit once, then try again.');
+  if (!['plan.mjs', 'build.mjs'].includes(name) || !dir || !fs.existsSync(path.join(dir, 'scripts', name))) throw new Error('Le serveur du cockpit ne trouve pas les scripts VibeFlow. Demandez à Claude Code ou à Codex de mettre le cockpit à jour une fois, puis réessayez.');
   try { return execFileSync(process.execPath, [path.join(dir, 'scripts', name), root, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'], windowsHide: true, timeout: 120000 }); }
   catch (e) { throw Object.assign(new Error(String(e.stdout || '') + String(e.stderr || '') || e.message), { checks: true }); }
 }
@@ -510,7 +514,7 @@ async function changePlan(res, send, body) {
 /** Puts back the files a change replaced (the newest first), and redraws. */
 function undoChange() {
   const all = fs.existsSync(historyDir) ? fs.readdirSync(historyDir).sort() : [];
-  if (!all.length) return { ok: false, error: 'Nothing to undo.' };
+  if (!all.length) return { ok: false, error: 'Rien à annuler.' };
   const dir = path.join(historyDir, all[all.length - 1]);
   restore(dir);
   try { skillScript('plan.mjs'); skillScript('build.mjs', '--no-claude-md'); } catch (e) {
@@ -589,7 +593,7 @@ function route(req, res) {
       }
     }
     if (req.method === 'POST' && url.pathname === '/api/plan/undo') {
-      const r = changing ? { ok: false, error: 'A change is still being made.' } : undoChange();
+      const r = changing ? { ok: false, error: 'Une modification est encore en cours.' } : undoChange();
       res.writeHead(200, { 'Content-Type': 'application/json' }); return res.end(JSON.stringify(r));
     }
     if (req.method === 'POST' && url.pathname === '/api/cancel') { for (const c of [...running.values(), ...lingering.values()]) c.kill(); res.writeHead(204); return res.end(); }
@@ -605,7 +609,7 @@ function route(req, res) {
         } catch (e) {
           console.error(`✗ Couldn't export the map: ${e.message}`);
           res.writeHead(500, { 'Content-Type': 'application/json' });
-          res.end(JSON.stringify({ error: e.plain ? e.message : 'The map’s server couldn’t export it. The details are in its output.' }));
+          res.end(JSON.stringify({ error: e.plain ? e.message : "Le serveur du cockpit n'a pas pu l'exporter. Le détail est dans sa sortie." }));
         }
       });
       return;
