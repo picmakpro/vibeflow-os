@@ -99,10 +99,11 @@ const unite = (cle) => {
 };
 // un nom de pilote peut être vide (clé `filter..clean`) ; une clé listée que l'analyse ne comprend pas rend la liste non fiable (refus)
 // --get-regexp : code 0 = trouvé, 1 = aucun ; autre code = liste inconnue
+// git absent (ENOENT à la lecture) : `absent` est propagé, le refus ne se dit pas « délai » (enteteGit : « absent », pas « indisponible »)
 const lirePilotes = (r) => {
   const us = r.sortie.split('\n').map((l) => l.trim()).filter(Boolean).map(unite);
   const lue = !r.echeance && !r.tronque && !r.absent && (r.code === 0 || r.code === 1);
-  return { unites: [...new Set(us.filter(Boolean))], fiable: lue && us.every(Boolean) };
+  return { unites: [...new Set(us.filter(Boolean))], fiable: lue && us.every(Boolean), absent: r.absent };
 };
 const argsPilotes = (dir) => [...GIT_SUR, '-C', dir, 'config', '--name-only', '--get-regexp', PILOTES_NOMMES];
 const refus = (noms, fiable) => !fiable || noms.length > MAX_FILTRES;
@@ -175,7 +176,7 @@ export function lancerGit(dir, args, { lab = dir, maxBuffer = 4 << 20, binaire =
   if (!autorisee(sous)) return { ...REFUS_GIT }; // A-04 : liste fermée
   if (gitSortant(dir, lab)) return { ...REFUS_GIT }; // AUDC-A-02 : voir shBorne
   const p = pilotes(dir, lab);
-  if (refus(p.unites, p.fiable)) return { ...REFUS_GIT, delai: !p.fiable }; // A1 : jamais lancé
+  if (refus(p.unites, p.fiable)) return { ...REFUS_GIT, absent: p.absent, delai: !p.fiable && !p.absent }; // A1 : jamais lancé
   const r = lancer(binaire, argv, dir, envGit(lab, { config: configFiltres(p.unites) }), maxBuffer);
   return { ok: r.code === 0 && !r.tronque && !r.echeance, sortie: r.sortie, code: r.code, tronque: r.tronque, absent: r.absent, delai: r.delai };
 }
@@ -187,7 +188,7 @@ export async function lancerGitAsync(dir, args, { lab = dir, maxBuffer = 4 << 20
   if (!autorisee(sous)) return { ...REFUS_GIT };
   if (gitSortant(dir, lab)) return { ...REFUS_GIT }; // AUDC-A-02 : voir shBorne
   const p = await pilotesAsync(dir, lab, fin);
-  if (refus(p.unites, p.fiable)) return { ...REFUS_GIT, delai: !p.fiable };
+  if (refus(p.unites, p.fiable)) return { ...REFUS_GIT, absent: p.absent, delai: !p.fiable && !p.absent };
   const r = await lancerAsync(binaire, argv, dir, envGit(lab, { config: configFiltres(p.unites) }), maxBuffer, fin);
   return { ok: r.code === 0 && !r.tronque && !r.echeance, sortie: r.sortie, code: r.code, tronque: r.tronque, absent: r.absent, delai: r.delai };
 }

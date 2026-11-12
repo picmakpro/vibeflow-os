@@ -80,6 +80,10 @@ if (mode === 'lecture') {
     sortie.refus.push({ n, a: !!a.refuse, b: !!b.refuse, c: c.length === 0 });
   }
   const d = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git-durci.mjs')).href); sortie.liste = d.SOUS_COMMANDES_AUTORISEES ?? null;
+} else if (mode === 'absent') { // D10 : git introuvable (ENOENT à la lecture des pilotes) ; sans argument, le PATH est celui du poste
+  if (process.argv[5] === 'sans-git') process.env.PATH = '/nonexistent';
+  const a = m.lancerGit(depot, ['status', '--porcelain']), b = await m.lancerGitAsync(depot, ['status', '--porcelain']);
+  sortie.s = [a.absent, a.delai, a.refuse === true].join(','); sortie.a = [b.absent, b.delai, b.refuse === true].join(',');
 } else if (mode === 'memo') { // D6.5 : une seule lecture des pilotes dans la fenêtre du mémo, limite de la fenêtre
   const [fake, out, journal, wrap, reel] = process.argv.slice(5); process.env.VF_FAKE_OUT = out; process.env.PATH = wrap + path.delimiter + process.env.PATH;
   const lectures = () => (fs.existsSync(journal) ? fs.readFileSync(journal, 'utf8').split('\n').filter((l) => l.includes('--get-regexp')).length : 0);
@@ -707,13 +711,21 @@ echo "=== D9 — mutants des pilotes de nom vide (copies du dossier des scripts 
 LK_ANCF='const motifFiltre = /^filter\.(.*)\.[^.]+$/;'
 assert_eq "M-VIDE-GIT.0 — l'ancre du mutant existe (le motif passé à git exige de nouveau un nom non vide)" "$(mutant_sur vide-git vf-cockpit-git-durci.mjs "$LK_PAT" "export const PILOTES_NOMMES = '^(filter\\\\..+|diff\\\\..+\\\\.(textconv|command)|merge\\\\..+\\\\.driver)\$';")" "muté"
 assert_eq "M-VIDE-GIT — rougit D8.1 sur le pilote de fusion (lancé) et l'environnement (diff..textconv, diff..command, merge..driver non posés) : le motif ancien liste encore les filtres de nom vide, que l'analyse comprend désormais ; textconv et commande de diff restent fermés par --no-textconv / --no-ext-diff" "$(lk_d8 "$WORK/mut-vide-git" vide-git)" "v,v,v,v,r,v,r"
-assert_eq "M-VIDE-ECARTE.0 — les deux ancres du mutant existent (analyse du filtre à nom non vide et clé non comprise ignorée : le défaut d'origine)" "$(mutant_sur vide-ecarte vf-cockpit-git-lanceur.mjs "$LK_ANCF" 'const motifFiltre = /^filter\.(.+)\.[^.]+$/;')|$(FROM='&& us.every(Boolean) };' TO='};' node "$AUX/mutsub.mjs" "$WORK/mut-vide-ecarte/vf-cockpit-git-lanceur.mjs")" "muté|muté"
+assert_eq "M-VIDE-ECARTE.0 — les deux ancres du mutant existent (analyse du filtre à nom non vide et clé non comprise ignorée : le défaut d'origine)" "$(mutant_sur vide-ecarte vf-cockpit-git-lanceur.mjs "$LK_ANCF" 'const motifFiltre = /^filter\.(.+)\.[^.]+$/;')|$(FROM='lue && us.every(Boolean)' TO='lue' node "$AUX/mutsub.mjs" "$WORK/mut-vide-ecarte/vf-cockpit-git-lanceur.mjs")" "muté|muté"
 assert_eq "M-VIDE-ECARTE — rougit D8.1 : la clé de filtre de nom vide est écartée sans refus (clean et process lancés, la lecture du dépôt qui les porte échoue, environnement incomplet) ; la fusion, dont le motif est inchangé, reste fermée" "$(lk_d8 "$WORK/mut-vide-ecarte" vide-ecarte)" "r,r,v,v,v,r,r"
 assert_eq "M-VIDE-ANALYSE.0 — l'ancre du mutant existe (l'analyse du filtre exige de nouveau un nom non vide)" "$(mutant_sur vide-analyse vf-cockpit-git-lanceur.mjs "$LK_ANCF" 'const motifFiltre = /^filter\.(.+)\.[^.]+$/;')" "muté"
 assert_eq "M-VIDE-ANALYSE — rougit D8.1 sur les jetons de lecture et d'environnement seulement : la clé listée n'est pas comprise, la lecture est refusée (fermé), aucun pilote lancé" "$(lk_d8 "$WORK/mut-vide-analyse" vide-analyse)" "v,v,v,v,v,r,r"
-LK_NC="$(mutant_sur compris vf-cockpit-git-durci.mjs "$LK_PAT" "$LK_PAL")|$(FROM='&& us.every(Boolean) };' TO='};' node "$AUX/mutsub.mjs" "$WORK/mut-compris/vf-cockpit-git-lanceur.mjs")"
+LK_NC="$(mutant_sur compris vf-cockpit-git-durci.mjs "$LK_PAT" "$LK_PAL")|$(FROM='lue && us.every(Boolean)' TO='lue' node "$AUX/mutsub.mjs" "$WORK/mut-compris/vf-cockpit-git-lanceur.mjs")"
 assert_eq "M-COMPRIS.0 — les deux ancres du mutant existent (motif élargi, refus de la clé non comprise retiré)" "$LK_NC" "muté|muté"
 assert_eq "M-COMPRIS — rougit D8.2 : sans le refus, la clé non comprise est écartée en silence et la lecture aboutit" "$(pg "$(lire "$WORK/mut-compris" "$ORD" ordinaire)" 'j.sujet')" "SUJET-DEUX"
+echo "=== D10 — git introuvable : la lecture des pilotes échoue par absence, le refus dit « absent » et jamais « délai » ==="
+lk_d10() { pg "$(node "$AUX/sonde.mjs" "$1" "$ORD" absent "$2" 2>/dev/null)" 'j.s+"|"+j.a'; }
+assert_eq "D10.1 — git introuvable : lancerGit et lancerGitAsync refusent avec absent=true, delai=false (refus fermé)" "$(lk_d10 "$SCRIPTS" sans-git)" "true,false,true|true,false,true"
+assert_eq "D10.2 — témoin positif : git présent, aucun refus (absent=false, delai=false)" "$(lk_d10 "$SCRIPTS" avec-git)" "false,false,false|false,false,false"
+assert_eq "D10.3 — témoin : un autre échec de lecture (clé listée non comprise) reste un refus fermé « délai » (absent=false, delai=true)" "$(lk_d10 "$WORK/mut-inconnue" avec-git)" "false,true,true|false,true,true"
+LK_NA="$(mutant_sur absent vf-cockpit-git-lanceur.mjs 'return { ...REFUS_GIT, absent: p.absent, delai: !p.fiable && !p.absent };' 'return { ...REFUS_GIT, delai: !p.fiable };')|$(FROM='return { ...REFUS_GIT, absent: p.absent, delai: !p.fiable && !p.absent };' TO='return { ...REFUS_GIT, delai: !p.fiable };' node "$AUX/mutsub.mjs" "$WORK/mut-absent/vf-cockpit-git-lanceur.mjs")"
+assert_eq "M-ABSENT.0 — les deux ancres existent (lancerGit, lancerGitAsync)" "$LK_NA" "muté|muté"
+assert_eq "M-ABSENT — rougit D10.1 : git introuvable redevient « délai » (absent=false, delai=true), le refus reste fermé ; D10.2 reste vert" "$(lk_d10 "$WORK/mut-absent" sans-git)|$(lk_d10 "$WORK/mut-absent" avec-git)" "false,true,true|false,true,true|false,false,false|false,false,false"
 echo "=== D5 — aucune trace hors du dossier temporaire ==="
 HORS="$(find "$SCRIPTS/.." -newer "$AUX/sonde.mjs" -type f \( -name 'SSH' -o -name 'UPLOAD' -o -name 'GPG' -o -name 'CLE-*' \) 2>/dev/null | head -3)"
 assert_eq "D5.1 — aucun marqueur de leurre dans l'arbre du module" "$HORS" ""
