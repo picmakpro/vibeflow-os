@@ -231,37 +231,113 @@ Durée : de 22 h 16 à environ 05 h 40 le lendemain, dont 15 minutes d'arrêt po
 ]}
 ```
 
-## Après l'ouverture de la PR #237 : CI Linux, fusion de la base, corrections (2026-11-12)
+## Après l'ouverture de la PR #237 : CI Linux, fusion de la base, corrections, clôture (2026-11-12)
 
-La première CI (tête 21f174cd) était rouge, et c'est de notre fait. Aucun exécuteur n'avait joué sous Linux. Les
-suites terminal-activation, terminal-client, transcript et ailleurs n'étaient dans la liste de non-régression
-d'aucun plan.
+La première CI (tête 21f174cd) était rouge, de notre fait. Fusion de la base demandée par la session principale le
+2026-11-12 : origin/integration/cockpit-audit (da64eb8c) fusionnée en `8abdad2e`, sans conflit, compteur des README
+recompté à 222 (`231ebbd9`). Clôture reprise par un second manager (mgr80b) après l'arrêt du premier, sur ce qui était
+écrit. Les commits 9411891e, b36fdd01 et e9b69b1a ont été faits et poussés par l'exécuteur de la correction de CI à la
+demande de la session principale, après la relâche du verrou par le premier manager ; les décisions qu'ils citent
+(« prise par la session principale le 2026-11-12 ») sont les siennes, par messages à cet exécuteur le 2026-11-12. Ce
+n'est pas un écart de l'exécuteur.
 
-- **Fusion de la base**, demandée par la session principale le 2026-11-12 (elle remplace la consigne « pas
-  maintenant »). origin/integration/cockpit-audit (da64eb8c) fusionnée en `8abdad2e`, sans conflit. Le compteur des
-  README a été recompté à 222 par la mesure de check-version-sync (`231ebbd9`). Rejoués : vendor 143, terminal-lanceur
-  111, amorce-navigateur 52, fr-donnees 31.
-- **Pointeur fin.** Le Chrome sans tête de Linux n'annonce aucun pointeur, donc `(pointer: fine)` est faux en CI. Les
-  gardes lisent désormais `(not (pointer: coarse))` (`4397aac2`, amendement daté dans 80-04, 80-05, 80-07 et 80-08 :
-  `86e967bd`). Rouge avant sous un Chrome lancé sans pointeur : couloirs 51/6, coin 31/6, panneau-retour 22/19,
-  projet-liste 44/2. Vert après : 57, 37, 41 et 46. Le tactile est inchangé, prouvé par une sonde hors dépôt : le
-  témoin tactile n'est pas commité.
-- **T7.5.** 8 mentions « vf-term- » dans nos extensions, lues désormais par la nature des éléments (enfants fixes de
-  `body`) (`ba62bb17`). Rouge 8, puis vert. Réserve : un futur bouton fixe sous `body` serait pris pour la pastille.
-- **T27.B1.** Les liens `#r=` rechargeaient la page depuis `?vue=graphe`. Ils ne changent plus que le fragment
-  (`94c3547b`). Transcript passe de 102/1 à 103/0.
-- **C5.** Durées mesurées de nos huit suites inscrites dans `scripts/ci-shard-suites.sh` (`7dc5039b`, Gate-Touche).
-  Charge max 1301 s (shard 2) pour une borne de 1366 s : vert. Borne et ci.yml intacts. Quatre durées viennent de runs
-  rouges : à remesurer sur un run vert.
-- **test-cockpit-ailleurs (L1.2, L2.3).** Écart annulé : ma « règle unique de plans faits » (`856bf6fd`) changeait le
-  pied d'une phase cochée sans SUMMARY, que cette suite épingle, et le plan disait « foot inchangé ». Retour en
-  `4d6f6786`, amendement en `b2012346`. La divergence d'affichage (« 2 plans sur 3 » contre trois plans « Fait » sur
-  une donnée incohérente) reste visible et est signalée à la jointure.
-- **OUVERT : T6.1 (terminal-client, SAF-1).** `naviguer()` (80-04, P80-D-37) ajoute `vue=graphe` à toute adresse
-  `project.html` en promettant « aucune suite existante modifiée », alors que T6.1 compare l'adresse exacte. Le test
-  est rouge aussi sous macOS. Décision à prendre : faire naviguer ce pilote en `{ brut: true }` (amendement de 80-04),
-  ou une autre voie.
-- **OUVERT : GP2.3 (git-pagination, 1024 px).** Rouge sous Linux seulement. Localement, le corps de liste mesure
-  295 px pour un seuil de 240. La valeur Linux n'est pas journalisée : il faut une mesure Linux.
-- **Désormais, avant de déclarer un plan vert**, les exécuteurs jouent la découverte du module cockpit, y compris
-  terminal-*, transcript et ailleurs, et un passage sous Chrome sans pointeur.
+### Rouges de CI, cause et correction
+
+| Rouge | Cause établie | Correction | Sous Linux seulement ? |
+|---|---|---|---|
+| gates : check-version-sync | compteur des README à 213 (base à 214, 222 réels après fusion) | fusion `8abdad2e`, recompte `231ebbd9` | non |
+| T7.5 terminal-activation | 8 littéraux « vf-term- » dans nos extensions | lecture par structure (`ba62bb17`) | non (suite non jouée) |
+| couloirs CL3.x, coin CN2.x, panneau-retour PR1-2, projet-liste PL2.3/3.4 | le Chrome sans tête de Linux n'annonce aucun pointeur : `(pointer: fine)` faux | gardes en `(not (pointer: coarse))` (`4397aac2`, amendements `86e967bd`) ; témoins CL4 (`e9b69b1a`), CN5, PL4, CL4.4-5 (`94f90609`) | oui |
+| T6.1 terminal-client | `naviguer()` (P80-D-37) ajoute `vue=graphe`, T6.1 compare l'adresse exacte | pilote en `{ brut: true }`, exception nommée à P80-D-37 (`9411891e`) | non |
+| T27.B1 transcript | les liens `#r=` rechargeaient depuis `?vue=graphe` | le lien de la même page ne change que le fragment (`94c3547b`) | non |
+| ailleurs L1.2/L2.3 | règle unique de plans faits (`856bf6fd`) | annulée (`4d6f6786`, amendement `b2012346`) | non |
+| visite-retours T3.2 | visite ouverte par le bouton rendue modale (`c6aca1f9`, contrat P80-D-11/Q5) : le bouton devient inerte | T3.2 réécrite sur le contrat, T3.3 ajoutée (retour du focus, mutant) (`f2d45fba`) | non |
+| visite-retours T9S ×2, T10 | `visibility: hidden` du panneau fermé (`ef0e9ec9`) le sortait des obstacles de la carte de visite | `obstacles()` compte le panneau fermé à 701 px et plus (`480c8494`, garde du null `94619edf`) | non |
+| GP2.3 git-pagination | runner sans CLI `claude` : `#ask-warn` affiché à 1024 px, barre 40 → 115 px, zoom et tiroir remontent, liste 237 < 240 | faux claude donné au serveur (`c00858f5`, puis `--claude` explicite `937e87b6`), cas GP2.3b sans CLI, amendement de P80-D-19 (`00219daa`, texte corrigé `14b80257`) | oui |
+| C5 test-ci-shard-suites | suites neuves absentes de la table des durées | durées inscrites (`7dc5039b`), remesurées sur runs verts (`9aec7ac7`) | — |
+| lancer-bandeau LB.E12-14 | instable sous charge CI (vert dans deux autres runs, aucun fichier en cause modifié) | aucune ; pas de la branche | oui, instable |
+| check-method-budget KC2 | course de trois passes simultanées (conductor, non touché) | aucune ; vert au run suivant | instable |
+
+CI de la PR lue jusqu'au bout et verte : run 43206672595 sur `14b80257`, quatre jobs de gates et neuf shards verts.
+Quatre runs intermédiaires ont été annulés par le push suivant (cancel-in-progress).
+
+### Pourquoi seulement en CI, et ce que les exécuteurs jouent désormais
+
+Deux causes propres à Linux : Chrome sans tête sans pointeur, et aucun CLI `claude` sur le runner (les postes de dev
+en ont un). Les autres rouges n'étaient pas propres à Linux : les suites terminal-*, transcript, ailleurs et
+visite-retours n'étaient dans la liste de non-régression d'aucun plan. Désormais, avant de déclarer un plan vert : la
+découverte complète des suites du module cockpit, un passage sous Chrome sans pointeur, et, pour toute sonde qui dépend
+de la barre de question, un serveur sans CLI (`--claude` vers un chemin absent).
+
+### Revues et jugement de la clôture
+
+- Revue fraîche des commits de correction (231ebbd9 … e9b69b1a, 4d6f6786, 1857a51d) : passed, aucun majeur. Mineurs :
+  les exclusions de `94c3547b` (modificateurs, autre chemin, autre origine) n'ont pas de témoin et toute requête
+  différente, pas seulement `vue=`, est avalée (aucun lien du produit n'en porte) ; quatre sites `matchMedia` sans
+  mutant (fermé par `94f90609`) ; durées C5 sous-estimées (fermé par `9aec7ac7`).
+- **Limite de `ba62bb17` (CL4.3) : acceptable jusqu'à la jointure**, selon la revue. Sur Projet, seul le module terminal
+  pose un bouton fixe sous `body` ; un bouton fixe étranger ne ferait que relever la zone basse (+120 px au témoin),
+  sans perte de donnée ni blocage. Témoins négatifs ajoutés (CL4.3b div fixe, CL4.3c bouton non fixe, mutants
+  M-PASTILLE-DIV et M-PASTILLE-NONFIXE). CL4.3 devra être inversé à la jointure.
+- Seconde revue (`94f90609` … `94619edf`) : passed ; troisième (`00219daa`, `937e87b6`) : un majeur de texte (la raison
+  écrite « VF_COCKPIT_CLAUDE sans effet » était fausse : le serveur assemblé lit `--claude`, sinon `VF_COCKPIT_CLAUDE`),
+  corrigé en `14b80257` ; le témoin GP2.3b exige `ask === 115` en égalité stricte (laissé, consigné).
+- Juge de design sur le rendu tactile et sans pointeur : passed, 88/100. Tactile 390 px identique avant/après (0 px) ;
+  sans pointeur = pointeur fin (le reste est du bruit de texte de la barre haute).
+
+### Décisions de la clôture
+
+Toutes « décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée » :
+- visite-retours T9S/T10 : la régression vient de la Phase 80, fermée dans ce segment, `39-vf-tour-placement.js` ajouté
+  à 80-02 par amendement daté (aucun plan de la Phase 79 ne le liste, vérifié) ;
+- T3.2 réécrite sur le contrat de 80-02 ; acceptée par la session principale après lecture du diff ;
+- GP2.3 : mesure de la classe puis amendement et GP2.3b, « prise par la session principale le 2026-11-12 ». Les deux
+  correctifs produit proposés (masquer l'avertissement quand le tiroir est ouvert, le sortir de `--vf-ask-bas`) ont été
+  refusés par la session principale (dire vrai ; ordre zoom/pastille/barre de PU-G-021, arbitrage Samuel,
+  AskUserQuestion session principale, 2026-11-08).
+
+Mesure de la classe (1024 × 768, panneau et volet ouverts) :
+
+| CLI | terminal | tiroir | volet | liste | barre de question | bas du tiroir |
+|---|---|---|---|---|---|---|
+| présent | non | 580 | 203 | 295 | 40 | 120 |
+| présent | oui | 546 | 192 | 272 | 40 | 154 |
+| absent | non | 511 | 192 | 237 | 115 | 189 |
+| absent | oui | 471 | 192 | 197 | 115 | 229 |
+
+### Commits qui portent des lignes d'un autre plan
+
+`ef0e9ec9` (80-02) porte la ligne VENDORED de `04-vf-clavier-canevas.js` (80-01) ; `1d47a9dc` et `9e60d903` (80-05)
+portent les lignes `41-vf-projet-{modele,rendu,vue}` (80-04). `480c8494` (80-02) touche `39-vf-tour-placement.js`,
+ajouté au plan par amendement.
+
+### Pour la jointure
+
+- CL4.3 à inverser quand le terminal posera un attribut neutre (contrat avec la Phase 79).
+- Registre, mineur : sans CLI, la liste du tiroir Git tombe à 237 px (197 avec le terminal) sous le plancher de 240.
+  Destination proposée : un plan responsive de la 80 (80-17 ou 80-20, propriétaires de `01-vf-responsive.js`). Question :
+  l'avertissement doit-il être compact de 701 à 1 279 px ?
+- Constat produit : `eviter()` (77-vf-git-tiroir.js) ne se rejoue pas à l'arrivée de la pastille du terminal (ajoutée à
+  `body`, sans changement de classe ni de style) ; un tiroir ouvert avant elle la chevauche jusqu'au prochain
+  redimensionnement.
+- Tactile à 1 000 px et plus : le panneau recouvre la 3ᵉ colonne sans défilement possible (conforme à P80-D-50 b, la
+  géométrie de la feuille à ce seuil n'est pas spécifiée) ; à trancher.
+- Durées C5 : deux suites hors Phase 80 dépassent largement leur durée inscrite sur le run vert (terminal-tiroir 1 184 s
+  pour 493, lancer-bandeau 608 pour 311) ; la charge réelle de quatre shards dépasse la borne calculée. Cause non établie.
+- `39-vf-tour-placement.js` : la limite 701 px du correctif est couplée au `@media (min-width: 701px)` de
+  `00-vf-surcouches.js`.
+
+### Pour la Phase 79
+
+- `39-vf-tour-placement.js` est désormais touché par la 80 (`480c8494`, `94619edf`) : `obstacles()` compte `#panel` même
+  en `visibility: hidden` à 701 px et plus.
+- La pastille et le tiroir du terminal sont reconnus par leur structure (`ba62bb17`) en attendant un attribut neutre.
+- `eviter()` du tiroir Git devrait se rejouer à l'arrivée d'un enfant de `body` (pastille du terminal).
+
+### Écarts
+
+- La « règle unique de plans faits » est annulée (cassait ailleurs L1.2/L2.3).
+- 80-02 : un fichier ajouté (`39-vf-tour-placement.js`) et l'assertion T3.2 réécrite, par amendement daté.
+- 80-04 : exception nommée à P80-D-37 (terminal-client en `{ brut: true }`).
+- 80-06 / P80-D-19 : l'arithmétique « tiroir de 684, liste ≈ 239 » supposait un tiroir sans obstacle ; le plancher de
+  240 ne tient qu'avec le CLI, amendement daté avec la table.
