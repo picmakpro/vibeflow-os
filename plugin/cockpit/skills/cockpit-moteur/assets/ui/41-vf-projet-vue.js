@@ -250,6 +250,15 @@
     ecoute(document, 'click', (ev) => { const b = ev.target.closest && ev.target.closest('[data-forme]'); if (b) basculer(b.dataset.forme,
       { memoriser: true }); });
     ecoute(section, 'click', (ev) => { const c = ev.target.closest && ev.target.closest('[data-id]'); if (c && section.contains(c)) SC.select(c.dataset.id); });
+    // un lien de nœud de la même page (`project.html#r=…`, tiroir « Au travail », panneaux) ne change que le fragment : la requête de l'adresse
+    // (?vue=, posée par la bascule) reste celle de l'utilisateur, la page ne se recharge pas (00-vibeflow.js, `arriver`)
+    ecoute(document, 'click', (ev) => {
+      const l = ev.target.closest && ev.target.closest('a[href]');
+      if (!l || ev.defaultPrevented || ev.button || ev.metaKey || ev.ctrlKey || ev.shiftKey || ev.altKey || (l.target && l.target !== '_self')) return;
+      let u; try { u = new URL(l.href, location.href); } catch (e) { return; }
+      if (u.origin !== location.origin || u.pathname !== location.pathname || u.search === location.search || !u.hash.startsWith('#r=')) return;
+      ev.preventDefault(); location.hash = u.hash;
+    });
     ecoute(section, 'dblclick', (ev) => { const c = ev.target.closest &&
       ev.target.closest('.vp-carte, .vp-ligne[data-id^="n:"]'); if (c) SC.go(c.dataset.id); });
     ecoute(section, 'toggle', (ev) => { const d = ev.target; if (d.dataset && d.dataset.cle) { if (d.open) ouverts.add(d.dataset.cle);
