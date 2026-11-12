@@ -114,7 +114,7 @@ mk_lab() { # $1 = dossier : lab GSD minimal
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; pose OUT, PORT, TOK ; démarre le serveur (SRV), git emballé
   "$NODE" "${2:-$SCRIPTS}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"; rm -f "$OUT/.cache/server.json"
-  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" PATH="$WORK/bin:$PATH" || true
+  COCKPIT_MODULE="$(cd "${2:-$SCRIPTS}/.." && pwd -P)" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" PATH="$WORK/bin:$PATH" || true   # 79-06 : le serveur est celui du module qui a assemblé (un mutant est une copie du module)
   SRV="$VF_PID"
   PORT=0; TOK=""
   for _ in $(seq 1 50); do # le fichier peut être lu à moitié écrit : on relit jusqu'à un port valide et un jeton
