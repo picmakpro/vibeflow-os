@@ -33,6 +33,10 @@ export CHROME_SESSION="$HERE_T/chrome-session.mjs"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 . "$(dirname "$0")/socle-serveur.sh"
+# 79-06 : le code ne vit plus dans la sortie. MOD_DEPOT = racine du module du dépôt ; mod_de <sortie> = racine du module que COMMANDE cette sortie
+# (table posée par mutant() : sortie TAB module ; par défaut le module du dépôt). La table est lue par bash (awk) et par les petits scripts node.
+MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODS_TABLE="$WORK/.mods"; : > "$MODS_TABLE"; export MODS_TABLE MOD_DEPOT
+mod_de() { local m; m="$(awk -F'\t' -v s="${1:-}" '$1==s{m=$2} END{print m}' "$MODS_TABLE" 2>/dev/null)"; printf '%s\n' "${m:-$MOD_DEPOT}"; }
 PASS=0; FAIL=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$#" -ne 3 ]; then echo "  ❌ FAIL — $1 (assert_eq a reçu $# arguments au lieu de 3 : expansion d'accolades de bash 3.2 ?)"; FAIL=$((FAIL+1)); elif [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
@@ -58,8 +62,9 @@ import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); cons
 JS
 cat > "$AUX/harnais-msg.mjs" <<'JS'
 // harnais-msg.mjs <sortie> : table de accepteMessage (T17.4) ; une ligne « nom=oui|non » par cas, « ABSENT » si la fonction n'existe pas
-import { pathToFileURL } from 'node:url';
-const m = await import(pathToFileURL(`${process.argv[2]}/vf-cockpit-terminal-tiroir.mjs`).href);
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; const SORTIE = process.argv[2];
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === SORTIE && r) racine = r; } } catch {}
+const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-tiroir.mjs`).href);
 if (typeof m.accepteMessage !== 'function') { console.log('ABSENT'); process.exit(0); }
 const Q = 'http://127.0.0.1:4242', P = 'http://127.0.0.1:4141', F = {}, L = m.LISTE_MESSAGES || [];
 const base = { isTrusted: true, origin: Q, source: F, data: 'toggle' };
@@ -81,9 +86,10 @@ console.log(casR.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'retr
 JS
 cat > "$AUX/harnais-liste-q.mjs" <<'JS'
 // harnais-liste-q.mjs <sortie> : la liste fermée de P égale l'ensemble des valeurs de la table MESSAGES du client de Q (72-14, contrat §8) ; une ligne JSON
-import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const m = await import(pathToFileURL(`${process.argv[2]}/vf-cockpit-terminal-tiroir.mjs`).href);
-const src = fs.readFileSync(`${process.argv[2]}/vf-cockpit-terminal-client.mjs`, 'utf8');
+import fs from 'node:fs'; import { pathToFileURL } from 'node:url'; const SORTIE = process.argv[2];
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === SORTIE && r) racine = r; } } catch {}
+const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-tiroir.mjs`).href);
+const src = fs.readFileSync(`${racine}/scripts/vf-cockpit-terminal-client.mjs`, 'utf8');
 const bloc = (src.match(/const MESSAGES = Object\.freeze\(\{([\s\S]*?)\}\)/) || [, ''])[1];
 const paires = [...bloc.matchAll(/([A-Za-z]+):\s*'([^']+)'/g)].map((x) => [x[1], x[2]]);
 const Qv = paires.map((x) => x[1]).sort(), Pv = [...(m.LISTE_MESSAGES || [])].sort();
@@ -93,8 +99,9 @@ console.log(JSON.stringify({ q: Qv.length, p: Pv.length, egal: Qv.join(',') === 
 JS
 cat > "$AUX/scriptgen.mjs" <<'JS'
 // scriptgen.mjs <sortie> <indisponible 0|1> : faits statiques du script injecté (contenu du <script>) ; une ligne JSON
-import { pathToFileURL } from 'node:url';
-const m = await import(pathToFileURL(`${process.argv[2]}/vf-cockpit-terminal-tiroir.mjs`).href);
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; const SORTIE = process.argv[2];
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === SORTIE && r) racine = r; } } catch {}
+const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-tiroir.mjs`).href);
 const h = m.injectionTiroir({ indisponible: process.argv[3] === '1' }) || '';
 const s = (h.match(/<script>([\s\S]*?)<\/script>/) || [, ''])[1];
 const adr = /https?:\/\//g;
@@ -108,9 +115,10 @@ console.log(JSON.stringify({
 JS
 cat > "$AUX/page-tiroir.mjs" <<'JS'
 // page-tiroir.mjs <sortie> <port> <indisponible 0|1> : serveur jetable qui sert une page portant injectionTiroir() sous n'importe quel chemin
-import http from 'node:http'; import { pathToFileURL } from 'node:url';
-const [, , sortie, port, indispo] = process.argv;
-const m = await import(pathToFileURL(`${sortie}/vf-cockpit-terminal-tiroir.mjs`).href);
+import http from 'node:http'; import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
+const [, , sortie, port, indispo] = process.argv; const SORTIE = sortie;
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === SORTIE && r) racine = r; } } catch {}
+const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-tiroir.mjs`).href);
 const page = `<!doctype html><html><head><meta charset="utf-8"><script>window.VF_COCKPIT_SERVER={token:"t"};</script>${m.injectionTiroir({ indisponible: indispo === '1' }) || ''}</head><body><p id="x">page</p></body></html>`;
 http.createServer((q, r) => {
   if (q.url.startsWith('/api/')) { r.writeHead(200, { 'Content-Type': 'application/json' }); return r.end('{"etat":"arrete"}'); }
@@ -817,19 +825,23 @@ mklab() {
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 }
 SRVN=0
-srv() { # srv <sortie> <0|1 terminal> -> SRV_PORT SRV_PID SRV_O SRV_OUT QP AMORCE ; serveur lancé directement depuis la sortie, comme le lanceur
+srv() { # srv <sortie> <0|1 terminal> -> SRV_PORT SRV_PID SRV_O SRV_OUT QP AMORCE ; serveur du MODULE de la sortie visée, lancé par l'aide
   local o="$1" term="${2:-1}" lab flag=(); lab="$(cd "$1/../.." && pwd)"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN.out"; rm -f "$o/.cache/server.json" "$o/.cache/terminal-amorce"; mkdir -p "$o/.cache"
   if [ "$term" = 1 ]; then flag=(--terminal); AMORCE="$(amorce_neuve)"; (umask 077; printf '%s' "$AMORCE" > "$o/.cache/terminal-amorce"); fi
   local pret=port; if [ "$term" = 1 ]; then pret=terminal; fi
-  COCKPIT_PRET="$pret" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" ${flag[@]+"${flag[@]}"}
+  COCKPIT_MODULE="$(mod_de "$o")" COCKPIT_PRET="$pret" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${flag[@]+"${flag[@]}"}
   SRV_PID="$VF_PID"; SRV_PORT="${VF_PORT:-0}"; QP="$(sj '(j.terminal&&j.terminal.url)||"http://127.0.0.1:0"')"; QP="${QP##*:}"
 }
 sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : données) et MUT_MOD (racine de la copie du module) ; code 1 si la cible manque ou si la copie n'a pas changé
+  local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  case "$(basename "$2")" in
+    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; }
