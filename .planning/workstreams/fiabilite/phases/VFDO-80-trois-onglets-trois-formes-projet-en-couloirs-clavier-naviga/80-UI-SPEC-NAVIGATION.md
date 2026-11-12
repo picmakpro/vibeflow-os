@@ -285,11 +285,13 @@ Chevron de section : composant du § 6 (F1).
 
 **Volet bas de détail.** Un commit s'ouvre par `Entrée` ou clic sur sa rangée : la liste garde sa place, un volet apparaît au bas du tiroir (jamais dans le panneau ni inséré sous la rangée).
 - Hauteur : `clamp(192px, 35%, 256px)` du tiroir (≈ 239 à 1 024 × 768 : tiroir de 684) ; défilement interne ; filet haut 1 px `--hair-2` ; même fond que le tiroir.
+  > Amendement du 2026-11-12 : voir § « Amendement du 2026-11-12 » en fin de fichier (tiroir mesuré 580 avec CLI, 511 sans ; volet 203 ou 192).
 - Contenu : ligne 1 sha court mono 12 / 500 `--text` + bouton « Copier le sha » (28 ; au clic le libellé devient « Copié » pendant 2 s puis revient, annonce polie « Sha copié » ; échec : « Copie impossible », le sha est sélectionné et l'annonce dit « Copie impossible. Copiez le sha sélectionné à la main. ») + bouton « Fermer le détail » (icône croix 28, 44 tactile) ; message complet 13 / 400 `--text-2`, 3 lignes visibles puis défilement ;
   « Auteur · date » 12 / 400 `--text-3` (date absolue en `title`) ; « N fichiers modifiés » 12 / 500 `--text-2` puis liste : nom du fichier mono 12 / 500 `--text`, dossier mono 11 `--text-3` (c'est le dossier qui reçoit l'ellipse,
   jamais le nom), à droite `+12 −3` tabulaire, statut en lettre avec mot (« Ajouté », « Modifié », « Supprimé ») jamais en couleur seule.
 - Rôle : `role="region" aria-label="Détail du commit <sha>"`. Le focus reste sur la rangée à l'ouverture (les flèches continuent) ; Tab depuis la liste entre dans le volet. Échap ferme le volet (cran 4 de § 2) et rend le focus à la rangée.
 - Lisible à 1 024 × 768 : tiroir de 352 de large (corps de 320), texte du volet ≥ 12 px, `scrollWidth` ≤ `clientWidth` du volet, liste restante ≥ 240 px de haut (6 rangées de 40), Worktrees fermé.
+  > Amendement du 2026-11-12 : le plancher de 240 px ne vaut qu'avec le CLI `claude` présent (295 ou 272) ; sans CLI : au moins 3 rangées entières (§ en fin de fichier).
 - Sous 1 000 px : volet `clamp(160px, 45%, 320px)`.
 
 **Poignée de largeur.** Bord droit du tiroir, à l'intérieur (2 px de retrait) ; `role="separator" aria-orientation="vertical" tabindex="0"`, `aria-label="Largeur de l'historique Git"`, `aria-valuemin/max/now`,
@@ -401,3 +403,22 @@ Aucun tiret cadratin dans ces textes. Les libellés d'actions n'emploient pas «
 5. **DESIGN.md § 4 (hauteurs de contrôle 24, 28, 32, 36, 44) contre les rangées de 40 px du tiroir Git** (existantes) : elles sont gardées ; la spec propose d'ajouter « rangée de liste dense : 40, 44 tactile » aux exceptions écrites de § 4 (lot jetons). La palette, nouvelle, reste à 36.
 6. **Ouvreur Git** : dessiné à 36 px, zone d'appui de 44 px (P80-D-56), aligné sur `--hdr-btn`.
 7. **Touche « Cadrer la sélection »** : `C` est choisie par cette spec (D-17 ne donne pas de touche ; `Maj+F` écarté : `F` majuscule appelle déjà « Ajuster » dans l'écouteur global) ; décision déléguée à consigner.
+
+## Amendement du 2026-11-12 — P80-D-19 : hauteur du volet bas et plancher de 240 px de la liste
+
+Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; prise par la session principale le 2026-11-12. Elle amende, sans les réécrire, la ligne « Hauteur : clamp(192px, 35%, 256px) du tiroir (≈ 239 à 1 024 × 768 : tiroir de 684) » et la ligne « liste restante ≥ 240 px de haut (6 rangées de 40) ». L'arithmétique d'origine était fausse : elle comptait un tiroir de 684 px (scène 768, haut 68, bas 16, aucun obstacle). Le tiroir se cale au-dessus des petits éléments du coin bas-gauche (zoom, pastille du terminal, avertissement), donc il est plus court.
+
+Mesure du 2026-11-12, 1 024 × 768, panneau ouvert, volet de détail ouvert, tiroir de 352 px de large, deux lectures stables par configuration (hauteurs en px, tiroir = barre 36 + aide 46 + volet + liste) :
+
+| CLI `claude` | `--terminal` | tiroir | volet | liste | barre de question | bas du tiroir |
+|---|---|---|---|---|---|---|
+| présent | non | 580 | 203 | 295 | 40 | 120 (obstacle retenu : l'infobulle à 656) |
+| présent | oui | 546 | 192 | 272 | 40 | 154 (zoom à 622, au-dessus de la pastille à 672) |
+| absent | non | 511 | 192 | 237 | 115 | 189 (zoom à 587, au-dessus de la barre à 115) |
+| absent | oui | 471 | 192 | 197 | 115 | 229 (zoom à 547, au-dessus de la pastille à 597) |
+
+Arithmétique corrigée : tiroir = 768 − 68 − bas ; volet = clamp(192, 35 % du tiroir, 256) ; liste = tiroir − 36 − 46 − volet. Le volet vaut 203 avec un tiroir de 580 et reste au plancher de 192 dans les trois autres cas.
+
+Domaine de validité du plancher de 240 px : il tient avec le CLI présent, avec ou sans terminal (295 et 272). Il ne tient pas sans CLI : sans CLI le serveur affiche l'avertissement au-dessus de la barre de question à plus de 700 px (comportement amont voulu), la barre passe de 40 à 115 px, le zoom remonte et le tiroir perd 69 px (liste à 237, puis 197 avec la pastille du terminal). Le produit ne s'en défend pas (l'ordre zoom, pastille, barre vient de PU-G-021, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08). Sans CLI, la garantie s'exprime en rangées entières de 40 px, la première rangée commençant à 76 px du haut de la liste : au moins 3 rangées entières à 1 024 × 768 sans terminal (4 mesurées). Le cas GP2.3b de `test-cockpit-git-pagination.sh` la porte ; il n'affirme jamais 240.
+
+Interrupteur du CLI dans la suite : dans le `serve.mjs` assemblé (le build renomme `FLOORPLAN_` en `VF_COCKPIT_`), `given('claude')` lit l'option `--claude <chemin>`, sinon la variable `VF_COCKPIT_CLAUDE` ; une valeur donnée, même absente, exclut tout repli ; ensuite `which claude`, puis `$HOME/.local/bin/claude`. `FLOORPLAN_CLAUDE` est le nom de la source, sans effet sur le fichier assemblé. La suite passe `--claude`, retenu pour son caractère explicite ; le faux claude de c00858f5 (`VF_COCKPIT_CLAUDE`) était efficace. Correction du 2026-11-12 d'une affirmation erronée du commit 937e87b6.

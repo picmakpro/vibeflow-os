@@ -23,7 +23,8 @@
       // la pastille du terminal (seulement avec --terminal ; absente ou masquée = ignorée par vis) est un obstacle comme le zoom, sans marge fixe
       return ['zoom', 'panel', 'context', 'ask'].map((id) => document.getElementById(id))
         .concat(document.querySelector('header'), [...document.querySelectorAll('.tour-target')], document.querySelector('.vf-' + 'term-pastille'), ask ? [...ask.children] : [])
-        .filter(vis)
+        // 80-02 (ef0e9ec9) : le panneau fermé est en `visibility: hidden` dès 701 px (hors tabulation) ; sa boîte reste posée (translateX(24px), opacité 0) et la carte l'évitait avant : il compte encore, lui seul
+        .filter((e) => vis(e) || (!!e && e.id === 'panel' && innerWidth >= 701 && e.getClientRects().length > 0 && getComputedStyle(e).display !== 'none'))
         .map((e) => {
           const r = e.getBoundingClientRect();
           return { n: name(e), left: r.left, top: r.top, right: r.right, bottom: r.bottom };

@@ -20,8 +20,10 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    .vf-git-tiroir { position: fixed; left: 16px; top: calc(var(--hh, 64px) + 4px); bottom: 16px; width: 360px; z-index: 7; display: flex; flex-direction: column; border-radius: var(--r-panel); overflow: hidden; }
-    body:not(.no-panel) .vf-git-tiroir { width: max(240px, min(360px, calc(100vw - var(--panel-w, 360px) - 312px))); }
+    .vf-git-tiroir { position: fixed; left: 16px; top: calc(var(--hh, 64px) + 4px); bottom: 16px; width: var(--vf-git-l, 360px); z-index: 7;
+      display: flex; flex-direction: column; border-radius: var(--r-panel); overflow: hidden; }
+    body:not(.no-panel) .vf-git-tiroir { /* 80-06 : largeur réglable par la poignée, bornée par le panneau ouvert */
+      width: min(var(--vf-git-l, 360px), max(280px, calc(100vw - var(--panel-w, 360px) - 312px))); }
     .vf-git-tiroir[hidden] { display: none; }
     .vf-git-tiroir.vf-git-entree { animation: vf-git-entree 250ms var(--ease) both; }
     @keyframes vf-git-entree { from { opacity: 0; transform: translateX(-16px); } to { opacity: 1; transform: none; } }
@@ -37,7 +39,8 @@
     .vf-git-bulle[hidden] { display: none; }
     .vf-git-mono[tabindex]:focus-visible, .vf-git-pastille[tabindex]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 4px; }
     .vf-git-aide { margin: 0; padding: 8px 16px; font-size: 12.5px; color: var(--text-3); }
-    .vf-git-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; font-family: var(--sans); overflow-x: hidden; }
+    .vf-git-corps { flex: 1; min-height: 0; overflow-y: auto; padding: 0 16px 16px; font-family: var(--sans); overflow-x: hidden;
+      margin-right: 14px; /* la poignée de largeur occupe cette bande : la barre de défilement reste saisissable */ }
     .vf-git-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
     body.vf-git-ouvert #context { opacity: 0; }
     .vf-git-sec { margin-top: 12px; }
@@ -69,6 +72,11 @@
     .vf-git-ref-cur { background: var(--on); color: var(--on-text); } .vf-git-ref-tag { background: var(--raise); }
     .vf-git-ref-distante { background: none; border: 1px solid var(--hair-2); color: var(--text-3); }
     .vf-git-plus { margin: 2px 0 0; font: 11.5px var(--mono); color: var(--text-4); }
+    .vf-git-plus-b { display: flex; align-items: center; justify-content: space-between; gap: 8px; width: 100%; height: 36px; margin: 4px 0 12px;
+      padding: 0 12px; border: 0; border-radius: var(--r-ctl); background: var(--raise); color: var(--text-2); font: 400 12.5px var(--sans); cursor: pointer; }
+    .vf-git-plus-b:hover { background: var(--raise-2); color: var(--text); }
+    .vf-git-plus-n { font: 11.5px var(--mono); font-variant-numeric: tabular-nums; color: var(--text-3); }
+    .vf-git-pied { margin-top: 8px; font-variant-numeric: tabular-nums; }
     .vf-git-liste { display: flex; flex-direction: column; gap: 4px; }
     .vf-git-wt-l, .vf-git-st, .vf-git-aut { display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-radius: var(--r-ctl); background: var(--raise); }
     .vf-git-ligne-d { white-space: nowrap; display: flex; align-items: center; gap: 8px; min-width: 0; padding: 6px 12px; border-radius: var(--r-ctl); font-size: 12.5px; color: var(--text-3); }
@@ -92,8 +100,9 @@
     @media (max-width: 999px), (pointer: coarse) {
       .vf-git-tiroir, body:not(.no-panel) .vf-git-tiroir { left: 8px; right: 8px; width: auto; bottom: 8px; }
       body.vf-git-ouvert #ask { display: none; }
+      .vf-git-corps { margin-right: 0; }
       .vf-git-rangee { height: 44px; } .vf-git-fermer, .vf-git-btn { width: 44px; height: 44px; } .vf-git-barre { height: 52px; }
-      .vf-git-sec-t, .vf-git-merg-b, .vf-git-tiroir .btn { min-height: 44px; } .vf-git-cmd { min-height: 44px; }
+      .vf-git-sec-t, .vf-git-merg-b, .vf-git-tiroir .btn, .vf-git-plus-b { min-height: 44px; } .vf-git-cmd { min-height: 44px; }
     }
     @media (max-width: 700px) { .vf-git-tiroir { top: calc(var(--hh, 56px) + 4px); } }
     @media (prefers-reduced-motion: reduce) { .vf-git-tiroir.vf-git-entree { animation: none; } .vf-git-sec-t svg { transition: none; } }
@@ -108,8 +117,10 @@
   tiroir.append(barre, R.el('p', 'vf-git-aide', 'Lecture seule. Chaque action est une commande à copier.'), corps, live);
   tiroir.hidden = true;
   document.body.appendChild(tiroir);
+  if (window.VFGitPoignee) window.VFGitPoignee.monter(tiroir); // 77-vf-git-poignee.js (chargée avant) : largeur réglable, 80-06
 
   let ouvert = false, donnees = null, seq = 0, avant = null;
+  const etatPages = { n: 0 }; // rangées montrées (80-06) : gardé d'une relecture à l'autre
   const annoncer = (t) => { live.textContent = t; };
   const visible = (e) => !!e && !e.hidden && e.getClientRects().length > 0;
   const ligne = () => document.querySelector('#vf-git-ligne'), ouvreur = () => document.querySelector('#vf-git-ouvreur'), plus = () => document.querySelector('#vf-plus'); // plus : « Plus d'actions » du téléphone, qui porte l'ouvreur sous 700 px
@@ -137,12 +148,21 @@
     if (j && j.entete && typeof j.entete === 'object') emettre('vf-git:entete', j.entete); // l'en-tête suit la lecture, même indisponible
     if (!j || (j.etat !== 'ok' && j.etat !== 'vide')) { corps.append(R.etatIndisponible(j && j.commandes ? j.commandes.diagnostic : 'git status', recharger, annoncer, !!j && j.etat === 'indisponible')); return; }
     if (j.etat === 'vide') { corps.append(R.etatVide(j.commandes.vide, annoncer)); return; }
-    const g = R.el('div'), pied = j.bornes && j.bornes.tronque ? 'Historique tronqué : seuls les commits les plus récents sont lus.' : `${j.rangees.length} commits affichés.`;
-    g.append(j.rangees.length ? R.graphe(j.rangees, { couloirsMax: j.couloirsMax, replies: j.replies, tactile: MOBILE.matches }) : R.el('p', 'vf-git-note', 'Aucun commit à afficher.'));
+    const g = R.el('div'), tronque = j.bornes && j.bornes.tronque;
+    const pg = j.rangees.length ? R.pages(j.rangees, { couloirsMax: j.couloirsMax, replies: j.replies, tactile: MOBILE.matches, etat: etatPages, annoncer }) : null;
+    g.append(pg ? pg.bloc : R.el('p', 'vf-git-note', 'Aucun commit à afficher.'));
     if (j.replies > 0) g.append(R.el('p', 'vf-git-plus', '+' + j.replies, { title: `${j.replies} rangées au-delà de ${j.couloirsMax} couloirs, repliées sur le dernier` }));
-    g.append(R.mergees(j.mergees, annoncer), R.el('p', 'vf-git-note', pied));
-    corps.append(...[R.sectionWorktrees(j.worktrees, annoncer), R.section('Graphe', null, g, true, 'vf-git-s-graphe'), R.sectionTags(j.tags), R.sectionStash(j.stash, annoncer), R.sectionAuteurs(j.auteurs, j.parBranche)].filter(Boolean));
+    g.append(R.mergees(j.mergees, annoncer));
+    if (pg) g.append(pg.pied);
+    if (tronque) g.append(R.el('p', 'vf-git-note', 'Historique tronqué : seuls les commits les plus récents sont lus.'));
+    corps.append(...[R.sectionWorktrees(j.worktrees, annoncer), R.section('Graphe', null, g, true, 'vf-git-s-graphe'), R.sectionTags(j.tags, annoncer),
+      R.sectionStash(j.stash, annoncer), R.sectionAuteurs(j.auteurs, j.parBranche, annoncer)].filter(Boolean));
     crochet('rendu', corps, j);
+  };
+  const focusOrphelin = () => { // ordre de la famille : l'équivalent (le bouton), le voisin précédent (la dernière rangée, arrêt itinérant), le titre ; jamais body
+    const L = [...corps.querySelectorAll('li[role=option]')], b = corps.querySelector('.vf-git-plus-b'), cible = b || L[L.length - 1] || titre;
+    if (!b && L.length) for (const l of L) l.setAttribute('tabindex', l === cible ? '0' : '-1');
+    cible.focus({ preventScroll: true });
   };
   function recharger(relance) { // GET de même origine ; au-delà de 150 ms, rangées fantômes ; une réponse périmée est ignorée ; une réponse « indisponible » ou nulle est relancée UNE fois (191), jamais en boucle
     const moi = ++seq, SRV = window.FLOORPLAN_SERVER || {};
@@ -154,7 +174,9 @@
         if (relance !== true && (!j || j.etat === 'indisponible' || !valide(j))) return recharger(true); // la relance prend la main : son propre ++seq périme celle-ci
         corps.removeAttribute('aria-busy');
         const bon = valide(j) && (j.etat === 'ok' || j.etat === 'vide'), change = !(bon && donnees && JSON.stringify(j) === JSON.stringify(donnees));
-        montrer(valide(j) ? j : null); eviter(); return { ok: bon, change };
+        const surBouton = !!document.activeElement && document.activeElement.classList.contains('vf-git-plus-b'); // P80-D-50 d : le bouton va disparaître sans clic
+        montrer(valide(j) ? j : null); eviter(); if (surBouton) focusOrphelin();
+        return { ok: bon, change };
       });
   }
 
@@ -164,23 +186,39 @@
     tiroir.hidden = false; tiroir.classList.add('vf-git-entree'); document.body.classList.add('vf-git-ouvert');
     if (!donnees) recharger();
     eviter(); titre.focus({ preventScroll: true });
+    // 80-02 : le tiroir s'inscrit dans la pile (ordre d'Échap), sans piège ni prise de focus
+    window.VF_SURCOUCHES.ouvrir(tiroir, { modale: false, ouvreur: avant, fermer: () => fermer() });
     emettre('vf-git:etat', { ouvert: true }); crochet('etat', true);
   };
   const fermer = (sansFocus) => { // sansFocus === true : un autre tiroir latéral s'ouvre (73-vf-tiroir-travail.js) et prend le focus
     if (!ouvert) return;
     ouvert = false; seq++; corps.removeAttribute('aria-busy');
-    tiroir.hidden = true; tiroir.classList.remove('vf-git-entree'); document.body.classList.remove('vf-git-ouvert');
+    tiroir.hidden = true; tiroir.classList.remove('vf-git-entree'); document.body.classList.remove('vf-git-ouvert'); window.VF_SURCOUCHES.fermer(tiroir);
     const cible = [ligne(), ouvreur(), plus()].find(visible) || (avant && document.contains(avant) && visible(avant) ? avant : null);
     if (cible && sansFocus !== true) cible.focus({ preventScroll: true });
     emettre('vf-git:etat', { ouvert: false }); crochet('etat', false);
+  };
+  // Entrée publique pour les autres phases (74) : ouvre le tiroir et son volet sur un commit. Valide le sha avant tout effet ; ne pagine ni ne relit la liste ;
+  // ne déplace pas le focus au-delà de ce que fait ouvrir() ; rend true quand le détail est affiché, false sinon ; jamais d'exception ni de rejet.
+  // comparaison de dataset.h, jamais un sélecteur construit avec le sha
+  const rangeDe = (sha) => [...tiroir.querySelectorAll('li[role=option]')].find((l) => l.dataset.h === sha) || null;
+  const ouvrirSur = (sha) => {
+    try {
+      const V = window.VFGitVolet, D = window.VFGitDetail;
+      if (typeof sha !== 'string' || !R.motifSha.test(sha) || !V) return Promise.resolve(false);
+      ouvrir(); V.fermer();
+      const li = rangeDe(sha);
+      const p = V.ouvrir(sha, li);
+      if (li && D) { D.selectionner(sha); li.scrollIntoView({ block: 'nearest' }); }
+      return Promise.resolve(p).then((ok) => ok === true, () => false);
+    } catch (e) { return Promise.resolve(false); }
   };
   const basculer = () => (ouvert ? fermer() : ouvrir());
   tiroir.addEventListener('animationend', () => tiroir.classList.remove('vf-git-entree'));
   fermerB.addEventListener('click', fermer);
   window.addEventListener('vf-git:basculer', basculer);
 
-  const surcouche = () => !!document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden])') || [...document.querySelectorAll('[role="dialog"]:not([hidden]), [aria-modal="true"]')].some((d) => getComputedStyle(d).visibility !== 'hidden'); // 201 : le panneau fermé d'un téléphone reste un role=dialog (visibility: hidden), il ne couvre rien
-  const echap = (e) => { if (ouvert && e.key === 'Escape' && !e.defaultPrevented && !surcouche()) { e.stopPropagation(); e.preventDefault(); fermer(); } };
+  const echap = (e) => { if (ouvert && e.key === 'Escape' && !e.defaultPrevented && !window.VF_SURCOUCHES.couverte(tiroir)) { e.stopPropagation(); e.preventDefault(); fermer(); } };
   tiroir.addEventListener('keydown', echap);
   document.addEventListener('keydown', (e) => { const l = ligne(), o = ouvreur(), p = plus(); if ((l && l === e.target) || (o && o === e.target) || (p && p === e.target)) echap(e); }, true);
   window.addEventListener('keydown', (e) => { // touche g : ni dans un champ, ni palette ouverte, ni avec Ctrl, Alt ou Meta, ni sans ouvreur
@@ -196,5 +234,5 @@
   const reevaluer = () => { eviter(); if (donnees && donnees.etat === 'ok') montrer(donnees); };
   MOBILE.addEventListener('change', reevaluer);
   new MutationObserver(eviter).observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] }); // le Terminal s'ouvre ou se ferme : la réserve basse change
-  window.VFGitTiroir = Object.freeze({ ouvrir, fermer, ouvert: () => ouvert, recharger, donnees: () => donnees });
+  window.VFGitTiroir = Object.freeze({ ouvrir, fermer, ouvert: () => ouvert, recharger, donnees: () => donnees, ouvrirSur });
 })();

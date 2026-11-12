@@ -50,6 +50,9 @@ DEFAUT=7
 # projet ») : leurs durées et celle de test-cockpit-sondes-stables.sh sont MESURÉES sur le run CI 42435171473 de la PR #220 ;
 # le glob projet-* (540 s) reste en repli pour une suite de cette famille qui n'aurait pas sa ligne.
 # L'entrée exacte précède le glob : tant que la suite entière existe, sa mesure prime.
+# Phase 80 (segment a) : huit suites neuves, mesurées sur le run CI 43155820890 de la PR #237 (horodatage `##[group]` jusqu'à
+# `PASS`/`FAIL`). Quatre d'entre elles (panneau-retour, coin, couloirs, projet-liste) étaient ROUGES à cette mesure : leur durée est
+# à remesurer sur le premier run vert de `main`. projet-liste et projet-champs quittent le repli glob (540 s chacune).
 durees() {
   cat <<'DUREES'
 1 plugin/_internal/runtime-adapter/tests/test-agent-to-codex.sh
@@ -250,6 +253,14 @@ durees() {
 658 plugin/cockpit/scripts/tests/test-cockpit-projet-visite.sh
 515 plugin/cockpit/scripts/tests/test-cockpit-projet-croissance.sh
 48 plugin/cockpit/scripts/tests/test-cockpit-sondes-stables.sh
+82 plugin/cockpit/scripts/tests/test-cockpit-panneau-retour.sh
+263 plugin/cockpit/scripts/tests/test-cockpit-surcouches.sh
+232 plugin/cockpit/scripts/tests/test-cockpit-clavier-canevas.sh
+139 plugin/cockpit/scripts/tests/test-cockpit-coin.sh
+154 plugin/cockpit/scripts/tests/test-cockpit-couloirs.sh
+102 plugin/cockpit/scripts/tests/test-cockpit-git-pagination.sh
+109 plugin/cockpit/scripts/tests/test-cockpit-projet-liste.sh
+2 plugin/cockpit/scripts/tests/test-cockpit-projet-champs.sh
 540 plugin/cockpit/scripts/tests/test-cockpit-projet-*.sh
 DUREES
 }

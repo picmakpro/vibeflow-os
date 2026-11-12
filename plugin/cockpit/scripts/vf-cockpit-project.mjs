@@ -45,11 +45,13 @@ function scinder(t, max) {
 
 // pied d'une carte de phase, part des exigences (PU-G-097, Q9 option A : mot en texte neutre, aucun glyphe ajouté — le pied n'a pas d'emplacement de pastille) :
 // une phase faite dont des exigences ne sont pas cochées dit « N exigence(s) non cochée(s) » (la pastille voisine dit « Fait ») au lieu de « 3/14 exigences », qui se lisait comme un travail à moitié fait
+// P80-C76-4 : le compte des exigences d'une phase, calculé UNE fois ici (pied de carte et champ `exigences`)
+const compteExigences = (reqs) => ({ faits: reqs.filter((r) => r.done).length, total: reqs.length });
 function piedExigences(etat, reqs) {
-  if (!reqs.length) return '';
-  const ouvertes = reqs.filter((r) => !r.done).length;
+  const { faits, total } = compteExigences(reqs); const ouvertes = total - faits;
+  if (!total) return '';
   if (etat === 'fait' && ouvertes) return `${ouvertes} exigence${ouvertes > 1 ? 's' : ''} non cochée${ouvertes > 1 ? 's' : ''}`;
-  return `${reqs.length - ouvertes}/${reqs.length} exigences`;
+  return `${faits}/${total} exigences`;
 }
 
 // PU-G-093 : l'état d'une phase est celui de sa carte (fichiers du dossier, P69-D-08) ; STATE.md ne dit que s'il s'accorde avec elle. Statuts de STATE compatibles avec chaque état de carte ;
@@ -117,18 +119,24 @@ function construireGraphe(root, { layout } = {}) {
     const planFiles = ls(dir).filter((f) => /-PLAN\.md$/.test(f)).sort();
     const sums = new Set(ls(dir).filter((f) => /-SUMMARY\.md$/.test(f)).map((f) => f.replace('-SUMMARY.md', '')));
     const av = ph.avancement;
+    const vagues = new Map((ph.plans || []).map((x) => [x.fichier, x.vague])); // P80-D-44 : posée par readPlanning
     const enCours = P.dags.filter((d) => d.phaseKey === ph.key && d.etat === 'running').flatMap((d) => d.nodes.filter((x) => x?.status === 'running')); // un plan non fait est actif si un nœud running d'une mission rattachée le désigne (P69-PL-04) ; seule une mission vivante désigne un plan actif (VFSG-06)
     const phReqs = ownReqs(ph); const id = phId(ph);
     const but = propre(ph.goal), ligne = propre(ph.line), { resume, reste: suite } = but ? scinder(but, 400) : { resume: sentence(ligne || ph.name, 200), reste: '' };
     node({ id, parent: msId, label: `Phase ${ph.n} · ${ph.name}`, kind: 'phase', num: ph.n, ws: ph.ws, summary: resume,
       details: [suite, av.reste.length ? `Reste : ${av.reste.map((c) => LIBELLES_RESTE[c]).join(', ')}.` : '', av.ailleurs ? `Avancement lu dans le worktree ${av.ailleurs.arbre}${av.ailleurs.branche ? ` (branche ${av.ailleurs.branche})` : ''} : plus avancé que celui de l'arbre courant.` : '', av.mission ? `Mission : ${av.mission.nom} (${LIBELLES_MISSION[av.mission.etat] || av.mission.etat}).` : '', ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ligne ? `Ligne de ROADMAP : ${ligne}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
-      st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', piedExigences(av.etat, phReqs), av.ailleurs ? `dans worktree ${av.ailleurs.arbre}` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [] });
+      st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', piedExigences(av.etat, phReqs), av.ailleurs ? `dans worktree ${av.ailleurs.arbre}` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [],
+      // P80-D-06 : les comptes en champs ; la mission se réduit à { nom, etat } (A25 : aucune clé de verrou dans cockpit-project@1)
+      avancement: { version: av.version, etat: av.etat, plans: { ...av.plans }, correctifs: av.correctifs, reste: av.reste,
+        mission: av.mission ? { nom: av.mission.nom, etat: av.mission.etat } : null },
+      exigences: compteExigences(phReqs) });
     for (const pf of planFiles) {
       const txt = texte(read(path.join(dir, pf))); const meta = fm(txt); const pid = pf.replace('-PLAN.md', '');
       const obj = objectif(txt) || /^#\s+(.*)$/m.exec(txt)?.[1] || '';
       const touched = list(meta.files_modified); const p = rel(path.join(dir, pf));
       file({ p, n: id, name: `${pid} — ${clip(obj.split('\n').find((l) => l.trim()) || '', 70)}`, d: sentence(obj, 220), st: sums.has(pid) || ph.done ? 'done' : enCours.some((x) => x.id === pid || (Array.isArray(x.scope) && x.scope.includes(p))) ? 'active' : 'todo',
-        foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, touched });
+        foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, touched,
+        vague: vagues.get(pf) ?? null });
       for (const dep of list(meta.depends_on)) { const dp = planFiles.find((x) => x.startsWith(dep.length <= 3 ? `${pf.split('-')[0]}-${dep.padStart(2, '0')}` : dep)); if (dp) link('f:' + rel(path.join(dir, dp)), 'f:' + p, 'import', 'puis'); }
       for (const r of list(meta.requirements)) { const rq = reqOf(r, ph.ws); if (rq) link('f:' + p, 'f:' + reqPath(rq), 'data', 'couvre'); }
     }
@@ -158,7 +166,7 @@ function construireGraphe(root, { layout } = {}) {
   const bl = node({ id: 'backlog', parent: null, label: 'Backlog', kind: 'backlog', summary: 'Ce qui est consigné, différé ou investigué, hors des jalons.' });
   for (const m of P.backlog.matchAll(/^## ([^\n]*)\n([\s\S]*?)(?=^## |(?![\s\S]))/gm)) {
     const [title, status] = m[1].split(/(?<!\s)\s+—\s+(?=[A-ZÉ]{4,}|consigné|mesuré)/);
-    file({ p: `.planning/BACKLOG.md#${title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 60)}`, n: bl, name: clip(title, 80), d: sentence(m[2].replace(/^>.*$/gm, ''), 220), st: /INVESTIGUÉ|mesuré/i.test(status || '') ? 'done' : 'todo', foot: clip(status || '', 40) });
+    file({ p: `.planning/BACKLOG.md#${title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 60)}`, n: bl, name: clip(title, 80), d: sentence(m[2].replace(/^>.*$/gm, ''), 220), st: /INVESTIGUÉ|mesuré/i.test(status || '') ? 'done' : 'todo', foot: '' }); // P80-D-07 : le statut n'est plus répété au pied, la pastille le dit
   }
   const sd = node({ id: 'seeds', parent: null, label: 'Graines', kind: 'graine', summary: 'Idées de jalons futurs, avec leurs déclencheurs.' });
   for (const s of P.seeds) file({ p: s.file, n: sd, name: clip(/^#\s+(.*)$/m.exec(s.text)?.[1] || path.basename(s.file), 80), d: sentence(s.text.replace(/^---[\s\S]*?---/, '').replace(/^#.*$/gm, ''), 220), st: 'todo' });

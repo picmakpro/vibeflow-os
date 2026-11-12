@@ -59,7 +59,10 @@ export async function ouvrir(chrome, { csp = false } = {}) {
     const ev = async (expression) => (await send('Runtime.evaluate', { expression, returnByValue: true, awaitPromise: true }))?.result?.value;
     // naviguer : passe par about:blank (un changement de hash seul recharge ainsi quand même), rend la main à l'évènement load de la page
     let premier = true; // le premier chargement d'une session paie l'amorçage de la page (Chrome à froid) : borné par max(ECHEANCE, AMORCE)
-    const naviguer = async (url) => {
+    // P80-D-37 : toute adresse `…/project.html` sans `vue=` reçoit `vue=graphe` (requête, avant le fragment) : les suites écrites pour le canevas de Projet y restent ; { brut: true } charge l'adresse telle quelle
+    const sansVue = (u) => { const [base, ...fr] = u.split('#'); return /\/project\.html(\?|$)/.test(base) && !/[?&]vue=/.test(base) ? [base + (base.includes('?') ? '&' : '?') + 'vue=graphe', ...fr].join('#') : u; };
+    const naviguer = async (url, { brut = false } = {}) => {
+      if (!brut) url = sansVue(url);
       violations.length = 0; const ms = premier ? Math.max(ECHEANCE, AMORCE) : ECHEANCE; premier = false;
       await send('Page.navigate', { url: 'about:blank' }, ms);
       const charge = new Promise((ok) => ecoutes.push({ m: 'Page.loadEventFired', f: ok }));

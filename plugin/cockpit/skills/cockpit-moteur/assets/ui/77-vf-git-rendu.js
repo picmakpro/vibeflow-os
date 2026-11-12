@@ -121,13 +121,45 @@
     o = o || {};
     const M = Math.max(1, o.couloirsMax || 6), H = o.tactile ? 44 : 40, largeur = Math.max(1, Math.min(M, ...[Math.max(...rangees.map((r) => r.largeur), 1)]));
     const tm = new Map(rangees.map((r) => [r.h, r.teinte])), lanes = [], ol = el('ol', 'vf-git-graphe', null, { role: 'listbox', 'aria-label': 'Commits' });
-    for (const r of rangees) {
-      const avant = lanes.slice(), suite = r.p.length > 0 && !r.sortants.some((s) => s.parent === r.p[0]);
-      lanes[r.col] = suite ? { sha: r.p[0], t: r.teinte } : null;
-      for (const s of r.sortants) if (!lanes[s.vers] || lanes[s.vers].sha !== s.parent) lanes[s.vers] = { sha: s.parent, t: tm.has(s.parent) ? tm.get(s.parent) : r.teinte };
-      ol.appendChild(rangee(r, { tactile: o.tactile, colonne: colonne(r, avant, { hauteur: H, largeur, suite, apres: lanes }) }));
-    }
+    let i = 0;
+    ol.ajouter = (k) => { // 80-06 : rend les k rangées suivantes (l'état des couloirs se poursuit d'une tranche à l'autre) et les rend
+      const fruit = [];
+      for (const fin = Math.min(rangees.length, i + k); i < fin; i++) {
+        const r = rangees[i], avant = lanes.slice(), suite = r.p.length > 0 && !r.sortants.some((s) => s.parent === r.p[0]);
+        lanes[r.col] = suite ? { sha: r.p[0], t: r.teinte } : null;
+        for (const s of r.sortants) if (!lanes[s.vers] || lanes[s.vers].sha !== s.parent) lanes[s.vers] = { sha: s.parent, t: tm.has(s.parent) ? tm.get(s.parent) : r.teinte };
+        const li = rangee(r, { tactile: o.tactile, colonne: colonne(r, avant, { hauteur: H, largeur, suite, apres: lanes }) });
+        ol.appendChild(li); fruit.push(li);
+      }
+      return fruit;
+    };
+    ol.ajouter(o.n == null ? rangees.length : o.n);
     return ol;
+  };
+  // P80-D-19 : au plus SEUIL rangées d'un coup, sinon PAGE ; « Afficher 100 de plus » rend la tranche suivante et met le focus sur la première rangée ajoutée.
+  // o.etat = { n } (rangées montrées, gardé par le tiroir d'une relecture à l'autre) ; o.annoncer(texte) : région polie. Rend { bloc, pied }.
+  const PAGE = 100, SEUIL = 110;
+  const pages = (rangees, o) => {
+    const total = rangees.length, et = o.etat || { n: 0 }, bloc = el('div', 'vf-git-pages'), pied = el('p', 'vf-git-note vf-git-pied');
+    et.n = Math.min(total, Math.max(et.n || 0, total <= SEUIL ? total : PAGE));
+    const ol = graphe(rangees, Object.assign({}, o, { n: et.n })), lb = el('span', 'vf-git-plus-l'), nb = el('span', 'vf-git-plus-n');
+    const b = el('button', 'vf-git-plus-b', null, { type: 'button' });
+    b.append(lb, nb); bloc.append(ol);
+    const maj = () => {
+      const reste = total - et.n;
+      if (reste <= 0) b.remove(); else { lb.textContent = reste < PAGE ? (reste > 1 ? `Afficher les ${reste} derniers` : 'Afficher le dernier') : 'Afficher 100 de plus'; nb.textContent = pl(reste, 'restant'); }
+      pied.textContent = reste > 0 ? `${et.n} commits affichés sur ${total}` : `Tous les ${total} commits sont affichés`;
+      return reste;
+    };
+    if (maj() > 0) bloc.append(b);
+    b.addEventListener('click', () => {
+      const fruit = ol.ajouter(PAGE); et.n += fruit.length;
+      for (const li of ol.children) li.setAttribute('tabindex', li === fruit[0] ? '0' : '-1');
+      const reste = maj();
+      if (fruit[0]) fruit[0].focus({ preventScroll: false });
+      if (o.annoncer) o.annoncer(`${pl(fruit.length, 'commit')} de plus ${fruit.length > 1 ? 'affichés' : 'affiché'}, ${pl(reste, 'restant')}`);
+    });
+    return { bloc, pied };
   };
 
   // ---------- sections repliables et listes ----------
@@ -143,13 +175,35 @@
     s.append(b, c);
     return s;
   };
+  // Tags, Stash, Auteurs : même règle que le Graphe au-delà de SEUIL lignes (PAGE d'abord, « Afficher 100 de plus », focus sur la première ligne ajoutée).
+  const paginer = (items, fabrique, annoncer) => {
+    const d = el('div', 'vf-git-liste'), lb = el('span', 'vf-git-plus-l'), nb = el('span', 'vf-git-plus-n');
+    const b = el('button', 'vf-git-plus-b', null, { type: 'button' });
+    let n = 0;
+    b.append(lb, nb);
+    const ajouter = (k) => { const fruit = items.slice(n, n + k).map(fabrique); n += fruit.length; if (fruit.length) b.before(...fruit); return fruit; };
+    const maj = () => {
+      const reste = items.length - n;
+      if (reste <= 0) { b.remove(); return 0; }
+      lb.textContent = reste < PAGE ? (reste > 1 ? `Afficher les ${reste} derniers` : 'Afficher le dernier') : 'Afficher 100 de plus';
+      nb.textContent = pl(reste, 'restant');
+      return reste;
+    };
+    d.append(b); ajouter(items.length <= SEUIL ? items.length : PAGE); maj();
+    b.addEventListener('click', () => {
+      const fruit = ajouter(PAGE), reste = maj();
+      if (fruit[0]) { fruit[0].setAttribute('tabindex', '-1'); fruit[0].focus({ preventScroll: false }); }
+      if (annoncer) annoncer(`${pl(fruit.length, 'ligne')} de plus ${fruit.length > 1 ? 'affichées' : 'affichée'}, ${pl(reste, 'restant')}`);
+    });
+    return d;
+  };
   const liste = (lignes) => { const d = el('div', 'vf-git-liste'); d.append(...lignes); return d; };
   const ligne = (...enfants) => { const d = el('div', 'vf-git-ligne-d'); d.append(...enfants); return d; };
   const mono = (t, cls) => el('span', 'vf-git-mono' + (cls ? ' ' + cls : ''), t, { title: t });
   const AIDE_DETACHE = "HEAD détaché : ce dossier n'est sur aucune branche, il est posé sur un commit précis.";
   const sectionWorktrees = (l, annonce) => {
     if (!l || !l.length) return null;
-    return section('Worktrees', l.length, liste(l.map((w) => {
+    const s = section('Worktrees', l.length, liste(l.map((w) => {
       const d = el('div', 'vf-git-wt-l'), t = ligne(mono(w.nom, 'vf-git-gras'));
       if (w.ici) t.appendChild(el('span', 'vf-git-ici', 'ici'));
       const br = mono(w.detache ? 'HEAD détaché' : w.branche || '—');
@@ -157,20 +211,32 @@
       d.append(t, ligne(br));
       if (!w.ici) d.appendChild(commande(w.commande, annonce, 'cd vers ' + w.nom));
       return d;
-    })), true, 'vf-git-s-wt', "Worktrees : copies de travail du dépôt, chacune dans son propre dossier et sur sa propre branche. " + AIDE_DETACHE);
+    })), false, 'vf-git-s-wt', "Worktrees : copies de travail du dépôt, chacune dans son propre dossier et sur sa propre branche. " + AIDE_DETACHE);
+    s.querySelector('.vf-git-sec-t').setAttribute('aria-label', 'Worktrees · ' + l.length); // P80-D-19 : repliée au départ, le compte fait partie du nom
+    return s;
   };
-  const sectionTags = (l) => !l || !l.length ? null : section('Tags', l.length, liste(l.map((t) => ligne(mono(t.nom, 'vf-git-gras'), mono(t.h7), el('span', null, relatif(t.at))))), false, 'vf-git-s-tags');
+  const sectionTags = (l, annoncer) => !l || !l.length ? null : section('Tags', l.length,
+    paginer(l, (t) => ligne(mono(t.nom, 'vf-git-gras'), mono(t.h7), el('span', null, relatif(t.at))), annoncer), false, 'vf-git-s-tags');
   const sectionStash = (l, annonce) => {
     if (!l || !l.length) return null;
-    return section('Stash', l.length, liste(l.map((s) => { const d = el('div', 'vf-git-st'); d.append(ligne(mono(s.ref, 'vf-git-gras vf-git-entier'), el('span', 'vf-git-msg', s.message), mono(s.branche || ''), el('span', null, relatif(s.at))), commande(s.commande, annonce, 'pour voir le stash ' + s.ref)); return d; })), false, 'vf-git-s-stash');
+    const fab = (s) => {
+      const d = el('div', 'vf-git-st');
+      d.append(ligne(mono(s.ref, 'vf-git-gras vf-git-entier'), el('span', 'vf-git-msg', s.message), mono(s.branche || ''), el('span', null, relatif(s.at))),
+        commande(s.commande, annonce, 'pour voir le stash ' + s.ref));
+      return d;
+    };
+    return section('Stash', l.length, paginer(l, fab, annonce), false, 'vf-git-s-stash');
   };
-  const sectionAuteurs = (auteurs, parBranche) => {
+  const sectionAuteurs = (auteurs, parBranche, annoncer) => {
     if (!auteurs || !auteurs.length) return null;
     const max = Math.max(1, ...auteurs.map((a) => a.commits)), d = el('div', 'vf-git-liste');
-    for (const a of auteurs) {
+    const fab = (a) => {
       const b = el('div', 'vf-bar'), i = el('i'); i.style.width = Math.round((100 * a.commits) / max) + '%'; b.appendChild(i);
-      const x2 = el('div', 'vf-git-aut'); x2.append(ligne(el('span', 'vf-git-gras', a.nom), el('span', 'meta', pl(a.commits, 'commit')), el('span', null, relatif(a.dernier))), b); d.appendChild(x2);
-    }
+      const x2 = el('div', 'vf-git-aut');
+      x2.append(ligne(el('span', 'vf-git-gras', a.nom), el('span', 'meta', pl(a.commits, 'commit')), el('span', null, relatif(a.dernier))), b);
+      return x2;
+    };
+    d.appendChild(paginer(auteurs, fab, annoncer));
     if (parBranche && parBranche.length) {
       d.appendChild(el('div', 'vf-git-sous', 'Par branche — avance sur la base'));
       for (const p of parBranche) d.appendChild(ligne(mono(p.nom), avance(p.avance), el('span', null, p.dernier ? relatif(p.dernier) : '')));
@@ -198,5 +264,9 @@
     d.append(el('h3', 'vf-git-titre', 'Git est indisponible'), el('p', 'vf-git-note', raison), b, commande(cmd, annonce, 'de diagnostic'));
     return d;
   };
-  window.VFGitRendu = Object.freeze({ graphe, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande, etatChargement, etatVide, etatIndisponible, relatif, section, ico, el, aideFocus });
+  window.VFGitRendu = Object.freeze({
+    graphe, pages, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande,
+    etatChargement, etatVide, etatIndisponible, relatif, section, ico, el, aideFocus,
+    motifSha: /^[0-9a-f]{40}$/, // définition unique du motif du sha (40 hexadécimaux minuscules), lue par le tiroir et le volet
+  });
 })();
