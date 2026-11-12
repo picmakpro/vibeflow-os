@@ -27,7 +27,7 @@ function analyser(src, ctx) {
         let j = i + 1;
         while (j < src.length && src[j] !== ']') j += src[j] === '\\' ? 2 : 1;
         const corps = src.slice(i + 1, j); i = j + 1;
-        n = corps === '^/' ? { k: 'nsl' } : { k: 'cls', re: new RegExp('[' + corps + ']') };
+        n = corps === '^/' ? { k: 'nsl' } : { k: 'cls', corps };
       }
       else if (c === '\\' && i + 1 < src.length) { n = { k: 'car', v: src.charCodeAt(i + 1) }; i += 2; }
       else if (c === '.') { n = { k: 'any' }; i++; }
@@ -40,18 +40,19 @@ function analyser(src, ctx) {
   return alternative(0);
 }
 
-export function automateDe(...sources) {
-  for (const src of sources) new RegExp('^' + src + '$'); // validation d'abord : même SyntaxError qu'avant, au même moment (à la compilation)
-  const ctx = { inerte: false };
-  const arbres = sources.map((src) => analyser(src, ctx));
-  if (ctx.inerte) return () => false;
-  const T = [], A = [], X = [], Y = [], RE = [];
+// Construit les tables de l'automate ; les listes de travail ne survivent pas à l'appel (la mémoire par motif reste celle des tables).
+function construire(arbres) {
+  const T = [], A = [], X = [], Y = [], RE = [], CORPS = new Map(); // une seule RegExp par corps de classe (mémoire bornée par motif)
   const etat = (t, a, x, y) => { T.push(t); A.push(a); X.push(x); Y.push(y); return T.length - 1; };
   const bati = (n, suite) => {
     if (n.k === 'car') return etat(CAR, n.v, suite, -1);
     if (n.k === 'any') return etat(ANY, 0, suite, -1);
     if (n.k === 'nsl') return etat(NSL, 0, suite, -1);
-    if (n.k === 'cls') return etat(CLS, RE.push(n.re) - 1, suite, -1);
+    if (n.k === 'cls') {
+      let idx = CORPS.get(n.corps);
+      if (idx === undefined) { idx = RE.push(new RegExp('[' + n.corps + ']')) - 1; CORPS.set(n.corps, idx); }
+      return etat(CLS, idx, suite, -1);
+    }
     if (n.k === 'seq') { let e = suite; for (let k = n.a.length - 1; k >= 0; k--) e = bati(n.a[k], e); return e; }
     if (n.k === 'alt') {
       const bras = n.a.map((b) => bati(b, suite));
@@ -65,14 +66,24 @@ export function automateDe(...sources) {
   const final = etat(FIN, 0, -1, -1);
   let debut = bati(arbres[arbres.length - 1], final);
   for (let k = arbres.length - 2; k >= 0; k--) debut = etat(SPL, 0, bati(arbres[k], final), debut);
-  const nE = T.length, tt = Uint8Array.from(T), aa = Int32Array.from(A), xx = Int32Array.from(X), yy = Int32Array.from(Y);
-  const memo = new Int8Array(Math.max(1, RE.length) * 256), marque = new Int32Array(nE), pile = new Int32Array(nE + 1);
-  let cur = new Int32Array(nE), nxt = new Int32Array(nE), gen = 0;
+  const nE = T.length, IA = nE < 32000 ? Int16Array : Int32Array; // largeur des indices d'états : moitié moins de mémoire par motif
+  const tt = Uint8Array.from(T), aa = Uint16Array.from(A), xx = IA.from(X), yy = IA.from(Y);
+  return { nE, IA, tt, aa, xx, yy, debut, RE };
+}
+
+export function automateDe(...sources) {
+  for (const src of sources) new RegExp('^' + src + '$'); // validation d'abord : même SyntaxError qu'avant, au même moment (à la compilation)
+  const ctx = { inerte: false };
+  const arbres = sources.map((src) => analyser(src, ctx));
+  if (ctx.inerte) return () => false;
+  const { nE, IA, tt, aa, xx, yy, debut, RE } = construire(arbres), memo = [];
+  let marque, pile, cur, nxt, gen = 0; // tampons de simulation, créés au premier appel de test seulement
   const enClasse = (idx, u) => {
-    const m = u < 256 ? memo[idx * 256 + u] : 0;
+    const t = u < 256 ? (memo[idx] ||= new Int8Array(256)) : null; // table de la classe, créée à la première lecture
+    const m = t ? t[u] : 0;
     if (m) return m === 1;
     const v = RE[idx].test(String.fromCharCode(u)) ? 1 : 2;
-    if (u < 256) memo[idx * 256 + u] = v;
+    if (t) t[u] = v;
     return v === 1;
   };
   const ajouter = (liste, n, s) => { // ajoute s et tout ce qu'on atteint sans lire d'unité (chaque état au plus une fois par génération)
@@ -92,6 +103,7 @@ export function automateDe(...sources) {
     const s = `${chemin}`;
     const L = s.length;
     if (nE * (L + 1) > MAX_PAS) return false; // budget de pas : au-delà, ne correspond à rien
+    if (!marque) { marque = new Int32Array(nE); pile = new IA(nE + 1); cur = new IA(nE); nxt = new IA(nE); }
     if (gen > 2000000000 - L) { marque.fill(0); gen = 0; }
     gen++;
     let n = ajouter(cur, 0, debut);
