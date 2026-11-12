@@ -16,7 +16,8 @@ export HOME="$WORK/home"; export VF_COCKPIT_MODE_DIR="$WORK/etat"; unset XDG_CAC
 LABSRV="$WORK/srv/lab"
 fin() { [ -d "$LABSRV/.vibeflow" ] && node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$LABSRV" >/dev/null 2>&1; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }
 trap fin EXIT
-. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init 
+. "$(dirname "$0")/socle-serveur.sh"   # 79-06 : seulement cockpit_module_copie (copies du module pour les mutants) ; le lancement reste celui du lanceur réel
 PASS=0; FAIL=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$#" -ne 3 ]; then echo "  ❌ FAIL — $1 (assert_eq a reçu $# arguments au lieu de 3)"; FAIL=$((FAIL+1)); elif [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
@@ -140,9 +141,9 @@ cat > "$AUX/sondes.mjs" <<'JS'
 import http from 'node:http';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-const [, , sortie, port, TC, TP] = process.argv;
-const { ROUTES } = await import(pathToFileURL(path.join(sortie, 'vf-cockpit-server.mjs')).href);
-const { ENTETE_JETON: ENT } = await import(pathToFileURL(path.join(sortie, 'vf-cockpit-lancer-post.mjs')).href);
+const [, , sortie, port, TC, TP, scripts] = process.argv; // 79-06 : le code est celui du module (scripts), la sortie ne porte que des données
+const { ROUTES } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-server.mjs')).href);
+const { ENTETE_JETON: ENT } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-lancer-post.mjs')).href);
 setTimeout(() => process.exit(2), 40000).unref();
 const req = (p, { host, origin, token, method = 'GET' } = {}) => new Promise((resolve) => {
   const headers = { Host: host ?? `127.0.0.1:${port}` }; if (origin) headers.Origin = origin; if (token) headers[ENT] = token;
@@ -212,7 +213,7 @@ const M = await import(pathToFileURL(path.join(dir, 'vf-cockpit-build.mjs')).hre
 const sortie = path.join(lab, '.vibeflow', 'cockpit'), VOL = new Set(['generatedAt', 'scanAt', 'builtAt', 'updatedAt']);
 const tri = (o) => (Array.isArray(o) ? o.map(tri) : o && typeof o === 'object' ? Object.fromEntries(Object.keys(o).filter((k) => !VOL.has(k)).sort().map((k) => [k, tri(o[k])])) : o);
 const canon = (j) => JSON.stringify(tri(j)).split(lab).join('<LAB>').split(fs.realpathSync(lab)).join('<LAB>');
-const graphe = () => JSON.parse(fs.readFileSync(path.join(sortie, 'graph.json'), 'utf8')), page = async () => (await import(pathToFileURL(path.join(sortie, 'vf-cockpit-embed.mjs')).href)).extraireGraphe(fs.readFileSync(path.join(sortie, 'index.html'), 'utf8')); // le lecteur de la sortie (marque blanche)
+const graphe = () => JSON.parse(fs.readFileSync(path.join(sortie, 'graph.json'), 'utf8')), page = async () => (await import(pathToFileURL(path.join(scripts, 'vf-cockpit-embed.mjs')).href)).extraireGraphe(fs.readFileSync(path.join(sortie, 'index.html'), 'utf8')); // le lecteur de la sortie (marque blanche)
 const asm = (annotateurs) => M.assembler({ lab, quiet: true, scriptsDir: scripts, ...(annotateurs ? { annotateurs } : {}) });
 const essai = (g) => { g.meta.vfEssai = 'ok'; };
 const tente = (t) => { try { asm(t); return { code: 0 }; } catch (e) { return { code: e.code, message: String(e.message) }; } };
@@ -249,8 +250,8 @@ copielab() { mkdir -p "$(dirname "$1")"; cp -R "$PRISTINE" "$1"; }
 ev() { printf '%s' "$1" | node "$AUX/ev.mjs" "$2"; }
 LABH="$WORK/h/lab"; mkdir -p "$WORK/h"; mklab "$LABH"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LABH" --quiet > "$WORK/build-h.out" 2>&1 || cat "$WORK/build-h.out"
 OUTH="$LABH/.vibeflow/cockpit"
-hh() { node "$AUX/h.mjs" "$1" "${2:-$OUTH}" "$LABH" "$OUTH" "${@:3}" 2>"$WORK/h.err" | tail -1; }
-copie() { local d="$WORK/mut-$1"; rm -rf "$d"; cp -R "$OUTH" "$d"; echo "$d"; }
+hh() { node "$AUX/h.mjs" "$1" "${2:-$SCRIPTS}" "$LABH" "$OUTH" "${@:3}" 2>"$WORK/h.err" | tail -1; }
+copie() { local d="$WORK/mut-$1"; rm -rf "$d"; cockpit_module_copie "$d" > /dev/null || return 1; echo "$d/scripts"; }   # 79-06 : une copie du MODULE ; elle rend son dossier de scripts (le code testé)
 sc_dir() { local d; d="$(copie "sc-$1")"; rm -f "$d/vf-cockpit-interface.json"; echo "$d"; }
 
 echo "=== R0 — exports ==="
@@ -259,8 +260,8 @@ import path from 'node:path'; import { pathToFileURL } from 'node:url';
 const [, , dir, f, noms] = process.argv; let m; try { m = await import(pathToFileURL(path.join(dir, f)).href); } catch { console.log('absent'); process.exit(0); }
 console.log(noms.split(',').map((n) => (n in m ? typeof m[n] === 'function' || Array.isArray(m[n]) || typeof m[n] === 'string' ? 'ok' : 'type' : 'undefined')).join(','));
 JS
-assert_eq "R0.1 — vf-cockpit-routes.mjs exporte HISTORIQUE, FLUX, reponse, estReponse, controlerAcces, creerRepartiteur" "$(node "$AUX/exp.mjs" "$OUTH" vf-cockpit-routes.mjs HISTORIQUE,FLUX,reponse,estReponse,controlerAcces,creerRepartiteur)" "ok,ok,ok,ok,ok,ok"
-assert_eq "R0.2 — le serveur de la sortie exporte ROUTES (tableau), repondreGardee (fonction) et attach" "$(node "$AUX/exp.mjs" "$OUTH" vf-cockpit-server.mjs ROUTES,repondreGardee,attach)" "ok,ok,ok"
+assert_eq "R0.1 — vf-cockpit-routes.mjs exporte HISTORIQUE, FLUX, reponse, estReponse, controlerAcces, creerRepartiteur" "$(node "$AUX/exp.mjs" "$SCRIPTS" vf-cockpit-routes.mjs HISTORIQUE,FLUX,reponse,estReponse,controlerAcces,creerRepartiteur)" "ok,ok,ok,ok,ok,ok"
+assert_eq "R0.2 — le serveur du module exporte ROUTES (tableau), repondreGardee (fonction) et attach" "$(node "$AUX/exp.mjs" "$SCRIPTS" vf-cockpit-server.mjs ROUTES,repondreGardee,attach)" "ok,ok,ok"
 assert_eq "B0.1 — vf-cockpit-build.mjs exporte ANNOTATEURS (tableau) et appliquerAnnotateurs" "$(node "$AUX/exp.mjs" "$SCRIPTS" vf-cockpit-build.mjs ANNOTATEURS,appliquerAnnotateurs)" "ok,ok"
 
 echo "=== R1 — route d'essai gardée, de la ligne de table à la réponse HTTP ==="
@@ -285,7 +286,7 @@ assert_eq "B1.1 — annotateur ajouté d'une ligne : meta.vfEssai atteint graph.
 assert_eq "B1.2 — l'annotateur schema migré : graph.json porte vf-cockpit/graph@1" "$(ev "$B" 'j.schema')" "vf-cockpit/graph@1"
 
 echo "=== RK — table des routes (A10) ==="
-STR="$(node "$AUX/struct.mjs" "$OUTH" "$LABH" "$OUTH")"
+STR="$(node "$AUX/struct.mjs" "$SCRIPTS" "$LABH" "$OUTH")"
 va() { printf '%s' "$1" | tr ' ' '\n' | grep "^$2=" | cut -d= -f2; }
 assert_eq "RK.1 — les chemins de ROUTES égalent la liste écrite à la main (doing, etat, events, journal, modeles, transcript) ; une ligne par route ajoutée, à sa place alphabétique" "$(va "$STR" RK.1)" "ok"
 assert_eq "RK.2 — chemins uniques, triés par unités de code, chaque entrée [chaîne, fonction, régime?]" "$(va "$STR" RK.2)" "ok"
@@ -307,8 +308,8 @@ http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127
 JS
 TOKC="$(node "$AUX/jeton.mjs" "$PORT" /)"; TOKP="$(node "$AUX/jeton.mjs" "$PORT" /project.html)"
 assert_eq "RK.0 — témoin : le serveur est lancé par le lanceur, les deux jetons sont lus dans les deux pages" "$([ "$PORT" -gt 0 ] && [ "${#TOKC}" -ge 16 ] && [ "${#TOKP}" -ge 16 ] && [ "$TOKC" != "$TOKP" ] && echo oui || echo non)" "oui"
-SO="$(node "$AUX/sondes.mjs" "$OUTS" "$PORT" "$TOKC" "$TOKP" 2>"$WORK/sondes.err" | tail -1)"; [ -n "$SO" ] || SO='{}'
-assert_eq "RK.7 — pour chaque route de ROUTES (dérivée de l'export) : sans jeton 403, hôte et origine étrangers 403, POST 405, ?token= 403 sauf events, accès valides ni 403/404/405, JSON no-store sans CORS ; témoin de couverture : toutes les routes sondées" "$(ev "$SO" 'j.ko.join(",")||"aucun-echec"')|$(ev "$SO" 'j.sondees')|$(node "$AUX/exp.mjs" "$OUTS" vf-cockpit-server.mjs ROUTES >/dev/null; node --input-type=module -e "import('file://$OUTS/vf-cockpit-server.mjs').then(m=>console.log(m.ROUTES.length))")" "aucun-echec|6|6"
+SO="$(node "$AUX/sondes.mjs" "$OUTS" "$PORT" "$TOKC" "$TOKP" "$SCRIPTS" 2>"$WORK/sondes.err" | tail -1)"; [ -n "$SO" ] || SO='{}'
+assert_eq "RK.7 — pour chaque route de ROUTES (dérivée de l'export) : sans jeton 403, hôte et origine étrangers 403, POST 405, ?token= 403 sauf events, accès valides ni 403/404/405, JSON no-store sans CORS ; témoin de couverture : toutes les routes sondées" "$(ev "$SO" 'j.ko.join(",")||"aucun-echec"')|$(ev "$SO" 'j.sondees')|$(node "$AUX/exp.mjs" "$SCRIPTS" vf-cockpit-server.mjs ROUTES >/dev/null; node --input-type=module -e "import('file://$SCRIPTS/vf-cockpit-server.mjs').then(m=>console.log(m.ROUTES.length))")" "aucun-echec|6|6"
 assert_eq "RK.8 — le portail précède la résolution : /api/vf/inconnu 403 sans jeton et 404 avec ; /api/vf/git ni 403, 404 ni 405 ; /api/vf/git/inconnu 404 (délégués conservés)" "$(ev "$SO" 'j.rk8.join(" ")')" "403 404 true 404"
 FL="$(hh flux)"
 assert_eq "RK.9 — le flux : ouverts() et dernierFlux() valent 0 et 0 avant, ouverts() vaut 1 pendant, 0 après et dernierFlux() > 0" "$(ev "$FL" 'JSON.stringify(j.avant)+" "+j.ouvert+" "+JSON.stringify(j.apres)')" "[0,0] 1 [0,true]"
@@ -365,7 +366,7 @@ assert_eq "M-ANNOT-DEP — la ligne garde:annot-schema conditionnée à vfTab : 
 echo "=== AX — classe d'accès à trois voix : portail, vérificateur intérieur, oracle ==="
 UN="$(hh unit)"
 assert_eq "AX.U — le vérificateur : ok, POST 405, hôte étranger 403, origine étrangère 403, jeton faux 403, jeton absent du paramètre 403, port non entier 403, sans hôte 403" "$(ev "$UN" 'j.join(" ")')" "ok 405 403 403 403 403 403 403"
-CL="$(hh classe "$OUTH" "$PORT" "$TOKC" "$TOKP")"; [ -n "$CL" ] || { echo "     (classe sans sortie) $(head -c 400 "$WORK/h.err")"; CL='{}'; }
+CL="$(hh classe "$SCRIPTS" "$PORT" "$TOKC" "$TOKP")"; [ -n "$CL" ] || { echo "     (classe sans sortie) $(head -c 400 "$WORK/h.err")"; CL='{}'; }
 assert_eq "AX.0 — couverture : 245 sondes (7 hôtes x 5 origines x 7 jetons), 12 passantes, 233 refus, 64 refus isolés (une seule dimension fautive)" "$(ev "$CL" 'j.n+" "+j.pass+" "+j.refus+" "+j.isoles')" "245 12 233 64"
 assert_eq "AX.1 — le verdict du portail du serveur lancé égale l'oracle pour les 245 sondes (0 désaccord)" "$(ev "$CL" 'j.portail.n')" "0"
 assert_eq "AX.2 — le verdict du vérificateur intérieur (route d'essai gardée) égale l'oracle (0 désaccord)" "$(ev "$CL" 'j.verif.n')" "0"

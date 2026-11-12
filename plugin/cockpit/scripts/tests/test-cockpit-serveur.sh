@@ -152,11 +152,11 @@ SH
 SCAN=$(bash "$AUX/scan.sh" "$OUT" "$MARK" | tr '\n' ' ')
 assert_eq "S7.1 — .vibeflow/cockpit : 0 fichier à clé doing, 0 au marqueur" "$SCAN" "0 0 "
 mkdir -p "$WORK/temoin"; printf '{"doing":"x"}\n' > "$WORK/temoin/a.json"; printf '%s\n' "$MARK" > "$WORK/temoin/b.txt"
-assert_eq "S7.3 — l'exemption est exacte : le contrat de la sortie est celui du module, octet pour octet" "$(cmp -s "$OUT/vf-cockpit-interface.json" "$SCRIPTS/vf-cockpit-interface.json" && echo identique || echo different)" "identique"
+assert_eq "S7.3 — l'exemption est exacte : le contrat n'est plus dans la sortie (il n'y a que celui du module ; AM4.16 le couvre aussi)" "$([ -e "$OUT/vf-cockpit-interface.json" ] && echo présent || echo absent)|$([ -f "$SCRIPTS/vf-cockpit-interface.json" ] && echo module || echo manque)" "absent|module"
 assert_eq "S7.2 — témoin : le même balayage détecte une clé et un marqueur injectés" "$(bash "$AUX/scan.sh" "$WORK/temoin" "$MARK" | tr '\n' ' ')" "1 1 "
 
 echo "=== S8 — l'export ne la porte pas ==="
-node "$OUT/serve.mjs" --export "$WORK/export.html" > "$WORK/export.out" 2>&1; assert_eq "S8.1 — l'export rend 0" "$?" "0"
+cockpit_exporter "$LAB" "$WORK/export.html" > "$WORK/export.out" 2>&1; assert_eq "S8.1 — l'export rend 0" "$?" "0"
 assert_eq "S8.2 — témoin de données : l'export contient un fichier du lab" "$([ "$(grep -c 'util.js' "$WORK/export.html")" -ge 1 ] && echo oui || echo non)" "oui"
 assert_eq "S8.3 — ni clé doing ni marqueur dans l'export" "$(grep -cE '"doing"[[:space:]]*:' "$WORK/export.html")$(grep -c "$MARK" "$WORK/export.html")" "00"
 
@@ -302,7 +302,7 @@ globalThis.__vfSnap = { seq: 2, lock: { available: false }, who: { workers: [{ k
 const p = a.pageEquipe(); sortie.interdit = page(); sortie.fuite = typeof p === 'string' && p.includes('commande-secrete');
 console.log(JSON.stringify(sortie)); a.stop(); process.exit(0);
 JS
-mkdir -p "$WORK/lab-eq"; printf '%s' '<html><head><title>t</title></head><body><script>window.FLOORPLAN = {"meta":{"rootName":"x"},"nodes":[],"files":[],"links":[]};</script></body></html>' > "$WORK/lab-eq/project.html"
+mkdir -p "$WORK/lab-eq"; printf '%s' '<html><head><title>t</title></head><body><script>window.VF_COCKPIT = {"meta":{"rootName":"x"},"nodes":[],"files":[],"links":[]};</script></body></html>' > "$WORK/lab-eq/project.html"
 EQ="$(VF_DOUBLE_LIVE="file://$AUX/live-double.mjs" node --import "$AUX/reg-double.mjs" "$AUX/equipe-garde.mjs" "$SCRIPTS" "$WORK/lab-eq" 2>"$WORK/eq.err")"
 eqev() { printf '%s' "$EQ" | node "$AUX/json-stdin.mjs" "$1"; }
 assert_eq "EQ.1 — témoin positif : un who propre donne la page Équipe" "$(eqev 'j.propre')" "page"
@@ -310,12 +310,12 @@ assert_eq "EQ.2 — un who portant une clé interdite (profondeur 2) : aucune pa
 
 # F4 (69-07, P69-D-23) : la liste des clés interdites vient du contrat. Une copie de la sortie dont vf-cockpit-interface.json est retirée ne peut plus
 # la lire : le serveur de la copie doit tout refuser d'émettre (fermé par défaut). Témoin : le serveur d'origine a émis son hello (S4.2, S5.1).
-F4="$LAB/.vibeflow/mut-contrat"; rm -rf "$F4"; cp -R "$OUT" "$F4"; rm -rf "$F4/.cache"; rm -f "$F4/vf-cockpit-interface.json"
-COCKPIT_SORTIE="$F4" cockpit_lancer "$LAB"; F4PID="${VF_PID:-}"
+F4="$(cockpit_module_copie)"; rm -f "$F4/scripts/vf-cockpit-interface.json"   # 79-06 : le contrat est celui du module ; une copie du module sans contrat
+COCKPIT_MODULE="$F4" cockpit_lancer "$LAB"; F4PID="${VF_PID:-}"
 F4PORT="${VF_PORT:-0}"
 F4TOK=$(node "$AUX/token.mjs" "$F4PORT" /)
 : > "$WORK/f4.jsonl"; node "$AUX/sse.mjs" "$F4PORT" "$F4TOK" 2000 hello "$WORK/f4.jsonl"
-assert_eq "F4.0 — témoin : la copie est sans contrat, son serveur répond (jeton lu, flux ouvert en 200)" "contrat:$([ -e "$F4/vf-cockpit-interface.json" ] && echo present || echo absent)|jeton:$([ "${#F4TOK}" -ge 16 ] && echo oui || echo non)|flux:$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E[0].status')" "contrat:absent|jeton:oui|flux:200"
+assert_eq "F4.0 — témoin : la copie est sans contrat, son serveur répond (jeton lu, flux ouvert en 200)" "contrat:$([ -e "$F4/scripts/vf-cockpit-interface.json" ] && echo present || echo absent)|jeton:$([ "${#F4TOK}" -ge 16 ] && echo oui || echo non)|flux:$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E[0].status')" "contrat:absent|jeton:oui|flux:200"
 assert_eq "F4 — contrat illisible : aucun événement hello n'est émis" "$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E.filter(e=>e.event).length')" "0"
 assert_eq "EQ.3 — contrat illisible : /equipe.html n'émet aucune donnée d'équipe (ni 200 avec la page)" "$(node "$AUX/statut.mjs" "$F4PORT" /equipe.html | grep -c '^200|page')" "0"
 vf_hyg_stop "$F4PID"
@@ -344,6 +344,23 @@ cockpit_arreter
 assert_eq "M-CONTRAT-OUVERT.0 — ancre présente : porteInterdit ferme le flux quand la liste de clés interdites est vide (vf-cockpit-server.mjs du module)" "$(grep -cF 'const porteInterdit = (o) => !INTERDITS.length ||' "$SCRIPTS/vf-cockpit-server.mjs")" "1"
 # ancre du mutant M-CONTRAT (« le serveur relit le contrat dans la sortie ») : le contrat est lu à côté du fichier du serveur (import.meta.url), jamais depuis here ; ancre verte aussi
 assert_eq "M-CONTRAT.0 — ancre présente : le contrat est lu à côté de vf-cockpit-server.mjs (import.meta.url), jamais depuis la sortie" "$(grep -cF "fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json')" "$SCRIPTS/vf-cockpit-server.mjs")" "1"
+
+# ---- mutants de la tâche 4a (79-06) : copies du module (cockpit_module_muter : ancre présente, copie changée), témoin rejoué sur la copie ----
+am45_sur() { # <racine du module muté> : verdict d'AM4.5 (contrat de la sortie vidé) rejoué sur ce module
+  local L="$WORK/lab-am45m-$RANDOM"; am4_lab "$L"
+  node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));for(const k of Object.keys(j.schemas||{}))if(j.schemas[k]&&Array.isArray(j.schemas[k].interdits))j.schemas[k].interdits=[];fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$SCRIPTS/vf-cockpit-interface.json" "$L/.vibeflow/cockpit/vf-cockpit-interface.json"
+  COCKPIT_MODULE="$1" cockpit_lancer "$L"; local v; v="$(cockpit_vivant && echo vivant || echo mort)"
+  am4_flux "$L" "$WORK/am45m.jsonl"; echo "$v hello=$(node "$AUX/ev.mjs" "$WORK/am45m.jsonl" 'E.filter(e=>e.event==="hello").length')"; cockpit_arreter
+}
+am46_sur() { # <racine du module muté, sans contrat> : verdict d'AM4.6 rejoué sur ce module
+  local L="$WORK/lab-am46m-$RANDOM"; am4_lab "$L"; rm -f "$1/scripts/vf-cockpit-interface.json"
+  COCKPIT_MODULE="$1" cockpit_lancer "$L"; local v; v="$(cockpit_vivant && echo vivant || echo mort)"
+  am4_flux "$L" "$WORK/am46m.jsonl"; echo "$v hello=$(node "$AUX/ev.mjs" "$WORK/am46m.jsonl" 'E.filter(e=>e.event==="hello").length')"; cockpit_arreter
+}
+cockpit_module_muter mcontrat vf-cockpit-server.mjs "s#path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json')#path.join(process.cwd(), '.vibeflow', 'cockpit', 'vf-cockpit-interface.json')#"; MC="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-CONTRAT — le serveur relit le contrat dans la sortie : la copie est valide (node --check), AM4.5 rougit (le contrat vidé ferme tout : hello=0)" "$(node --check "$MC/scripts/vf-cockpit-server.mjs" 2> /dev/null && echo valide || echo invalide) $(am45_sur "$MC")" "valide vivant hello=0"
+cockpit_module_muter mouvert vf-cockpit-server.mjs 's#const porteInterdit = (o) => !INTERDITS.length ||#const porteInterdit = (o) => INTERDITS.length \&\&#'; MO="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-CONTRAT-OUVERT — contrat illisible -> flux ouvert : la copie est valide, AM4.6 rougit SEUL (serveur vivant, hello émis) et AM4.5 reste vert (hello=1)" "$(node --check "$MO/scripts/vf-cockpit-server.mjs" 2> /dev/null && echo valide || echo invalide) | $(am46_sur "$MO") | $(am45_sur "$MO")" "valide | vivant hello=1 | vivant hello=1"
 
 vf_hyg_assert
 echo ""

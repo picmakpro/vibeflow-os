@@ -180,9 +180,9 @@ printf '%s' "$(H call "$FK" 1 'c.stdin')" > "$WORK/stdin-vu.txt"
 assert_eq "Q5.3 — l'entrée standard porte la question octet pour octet" "$(cmp -s "$WORK/stdin-vu.txt" "$WORK/piege-exact.txt" && echo identique || echo different)" "identique"
 
 echo "=== Q6 — le modèle ne laisse aucune trace ==="
-demarrer "$WORK/fk2" "$WORK/fk2:$PATH"; node "$OUT/serve.mjs" --export "$WORK/export-avant.html" > /dev/null 2>&1
+demarrer "$WORK/fk2" "$WORK/fk2:$PATH"; cockpit_exporter "${OUT%/.vibeflow/cockpit}" "$WORK/export-avant.html" > /dev/null 2>&1
 poser "$PTOK" "Pourquoi ?" '{"model":"opus"}'
-node "$OUT/serve.mjs" --export "$WORK/export-apres.html" > /dev/null 2>&1
+cockpit_exporter "${OUT%/.vibeflow/cockpit}" "$WORK/export-apres.html" > /dev/null 2>&1
 TRACES=$(grep -rl '"model"[[:space:]]*:[[:space:]]*"opus"' "$OUT" 2>/dev/null | grep -c .); OPUS=$(grep -l 'opus' "$OUT/graph.json" "$OUT"/.cache/*.json 2>/dev/null | grep -c .)
 assert_eq "Q6.1 — aucun fichier de la sortie ne garde le choix (clé model, graph.json, .cache)" "$TRACES$OPUS" "00"
 sed 's/"at":"[^"]*"//g' "$WORK/export-avant.html" > "$WORK/ea.html"; sed 's/"at":"[^"]*"//g' "$WORK/export-apres.html" > "$WORK/eb.html" # seul l'horodatage de l'export diffère

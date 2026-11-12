@@ -122,8 +122,8 @@ console.log(sc.length >= 6 && sc.every((s) => csp.includes(s)) ? 'tous' : `manqu
 JS
 assert_eq "H5 — chaque script en ligne de la page a son empreinte dans la CSP" "$(node "$AUX/empreintes.mjs" "$PAGE" "$CSP")" "tous"
 # mutant : les trois en-têtes neutralisés -> les assertions H1 doivent rougir
-cp -R "$OUT" "$WORK/sortie-mut"; sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-M1'#g; s#res.setHeader('X-Content-Type-Options'#res.setHeader('X-M2'#; s#res.setHeader('X-Frame-Options'#res.setHeader('X-M3'#" "$WORK/sortie-mut/serve.mjs"
-srv "$WORK/sortie-mut"; HM="$(hdr "$SRV_PORT" / "$(tok "$SRV_PORT" /)")"; unsrv
+cockpit_module_muter h6 serve.mjs "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-M1'#g; s#res.setHeader('X-Content-Type-Options'#res.setHeader('X-M2'#; s#res.setHeader('X-Frame-Options'#res.setHeader('X-M3'#"   # 79-06 : le serveur est celui du module, le mutant est une copie du module
+COCKPIT_MODULE="$COCKPIT_MODULE" srv "$OUT"; HM="$(hdr "$SRV_PORT" / "$(tok "$SRV_PORT" /)")"; unsrv; unset COCKPIT_MODULE
 assert_eq "H6 — témoin rouge : sans les setHeader, la page ne porte aucun des trois en-têtes" "$(printf '%s' "$HM" | node "$AUX/ev.mjs" '!!j["content-security-policy"]||!!j["x-frame-options"]||!!j["x-content-type-options"]')" "false"
 
 echo "=== B — corps JSON non objet : 400, le serveur survit ==="
@@ -370,18 +370,18 @@ assert_eq "Y6 — témoin : /graph.json est servi" "$(sta "$SRV_PORT" GET /graph
 echo "=== E — « < » du graphe : aucun <!-- ni <script dans les données ==="
 cat > "$AUX/emb.mjs" <<'JS'
 import { pathToFileURL } from 'node:url'; const m = await import(pathToFileURL(process.argv[2] + '/vf-cockpit-embed.mjs').href);
-const html = '<head></head><script>window.FLOORPLAN = null;</script><script>autre()</script>', txt = 'a <!-- b <script> c </script> d';
+const html = '<head></head><script>window.VF_COCKPIT = null;</script><script>autre()</script>', txt = 'a <!-- b <script> c </script> d';
 const out = m.insererGraphe(html, { details: txt, n: 'x' });
 console.log(JSON.stringify({ brut: /</.test(m.decouper(out).donnees), allerRetour: m.extraireGraphe(out).details === txt, scripts: (out.match(/<script/g) || []).length }));
 JS
 assert_eq "E1 — aucun « < » dans la zone de données, aller-retour exact, 2 balises script" "$(node "$AUX/emb.mjs" "$SCRIPTS" | node "$AUX/ev.mjs" 'j.brut+","+j.allerRetour+","+j.scripts')" "false,true,2"
 assert_eq "E2 — le moteur (build.mjs) échappe aussi chaque < en \\u003c" "$(grep -c "replace(/</g, '\\\\\\\\u003c')" "$ENG/scripts/build.mjs")" "1"
 assert_eq "E3 — l'export (serve.mjs) échappe de même" "$(grep -cF "JSON.stringify(out).replace(/</g, '\\\\u003c')" "$ENG/assets/serve.mjs")" "1"
-assert_eq "E3b — l'objet injecté dans les pages (version, modèle) échappe aussi chaque < (AUDC-B-06 1)" "$(grep -F 'window.FLOORPLAN_SERVER=' "$ENG/assets/serve.mjs" | grep -cF "replace(/</g, '\\\\u003c')")" "1"
+assert_eq "E3b — l'objet injecté dans les pages (version, modèle) échappe aussi chaque < (AUDC-B-06 1)" "$(grep -F 'window.VF_COCKPIT_SERVER=' "$ENG/assets/serve.mjs" | grep -cF "replace(/</g, '\\\\u003c')")" "1"
 
 echo "=== C — sans vf-cockpit-server.mjs : échec franc ==="
-cp -R "$OUT" "$WORK/sortie-sans"; rm -f "$WORK/sortie-sans/vf-cockpit-server.mjs"
-COCKPIT_SORTIE="$WORK/sortie-sans" COCKPIT_LOG="$WORK/c.out" cockpit_lancer "$LAB" 2>/dev/null; CRC=$?
+CSANS="$(cockpit_module_copie)"; rm -f "$CSANS/scripts/vf-cockpit-server.mjs"   # 79-06 : une copie du module sans le serveur du cockpit
+COCKPIT_MODULE="$CSANS" COCKPIT_LOG="$WORK/c.out" cockpit_lancer "$LAB" 2>/dev/null; CRC=$?
 if [ "$CRC" = 1 ]; then echo mort > "$WORK/c.etat"; else echo vivant > "$WORK/c.etat"; cockpit_arreter; fi
 assert_eq "C1 — le serveur refuse de démarrer (jamais de repli sur l'agent amont)" "$(cat "$WORK/c.etat")" "mort"
 assert_has "C2 — message en français" "$(cat "$WORK/c.out")" "est absent"
@@ -415,7 +415,7 @@ assert_eq "R2 — témoin : un chemin ordinaire est toujours reconnu" "$(printf 
 
 echo "=== X — aucun champ du graphe n'est interprété (navigateur) ==="
 if [ -z "$CHROME" ]; then echo "  ⊘ X sauté : aucun navigateur (non compté comme réussi)"; else
-LX="$WORK/labX"; mklab "$LX"; node "$AUX/marquer.mjs" "$LX/.vibeflow/cockpit/project.html" "$WORK/urls.txt" "$LX/.vibeflow/cockpit"
+LX="$WORK/labX"; mklab "$LX"; node "$AUX/marquer.mjs" "$LX/.vibeflow/cockpit/project.html" "$WORK/urls.txt" "$SCRIPTS"
 srv "$LX/.vibeflow/cockpit"; XP=$SRV_PORT; URLS=(); while read -r u; do URLS+=("http://127.0.0.1:$XP/$u"); done < "$WORK/urls.txt"
 EXPR='[...document.querySelectorAll("[onerror]")].map((e)=>e.getAttribute("data-f")||"?")'
 XR="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "${URLS[@]}")"; unsrv
@@ -466,6 +466,12 @@ assert_eq "M-TERM.0 — ancre présente : le terminal forke vf-cockpit-terminal-
 TERM_L="$(grep -F 'const ordinaire = ' "$SCRIPTS/vf-cockpit-terminal.mjs")"
 assert_eq "REALUNDER.0 — la garde « assistant du terminal hors .vibeflow » appelle realUnder avec siEchec: true (polarité inverse : un échec de résolution écarte, fermé par défaut)" "$(printf '%s\n' "$TERM_L" | grep -cF 'realUnder(f, path.join(root, '"'"'.vibeflow'"'"'), { siEchec: true })')" "1"
 assert_eq "REALUNDER.1 — mutant (siEchec retiré) : l'ancre rougit (0 occurrence)" "$(printf '%s\n' "$TERM_L" | sed 's/, { siEchec: true }//' | grep -cF '{ siEchec: true }')" "0"
+
+# mutant M-TERM (79-06) : le fork revient à la sortie (le fichier du processus est cherché à côté de `here`) ; AM4.3 rougit : le marqueur planté dans la sortie s'exécute
+cockpit_module_muter mterm vf-cockpit-terminal.mjs "s#path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-terminal-processus.mjs')#path.join(here || '.', 'vf-cockpit-terminal-processus.mjs')#"; MT="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+LMT="$WORK/lab-mterm"; mklab "$LMT"; MMT="$WORK/marq-mterm"; mk_marqueur "$LMT/.vibeflow/cockpit/vf-cockpit-terminal-processus.mjs" "$MMT" "$SCRIPTS/vf-cockpit-terminal-processus.mjs"
+COCKPIT_MODULE="$MT" COCKPIT_LOG="$WORK/mterm.out" am4_lancer "$LMT" --terminal > /dev/null 2>&1; RMT="$(am4_temoin "$MMT")"; cockpit_arreter; unset COCKPIT_MODULE
+assert_eq "M-TERM — le fork revient à la sortie : la copie est valide (node --check) et AM4.3 rougit (le marqueur s'exécute : $RMT)" "$(node --check "$MT/scripts/vf-cockpit-terminal.mjs" 2> /dev/null && echo valide || echo invalide) $RMT" "valide présent vivant"
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

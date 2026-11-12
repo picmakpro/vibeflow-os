@@ -53,8 +53,7 @@ OUT="$LAB/.vibeflow/cockpit"
 
 echo "=== A1 — assemblage et contenu de la sortie ==="
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" > "$WORK/build.out" 2>&1; assert_eq "A1.1 — l'assemblage rend 0" "$?" "0"
-for f in index.html project.html serve.mjs query.mjs graph.json architecture.json LICENSE LICENCES-TIERCES.txt .cache/vf-cockpit.json \
-  vf-cockpit-paths.mjs vf-cockpit-who.mjs vf-cockpit-planning.mjs vf-cockpit-project.mjs vf-cockpit-types.mjs vf-cockpit-embed.mjs vf-cockpit-interface.json; do
+for f in index.html project.html graph.json architecture.json LICENSE LICENCES-TIERCES.txt .cache/vf-cockpit.json; do   # 79-06 : la sortie ne porte que des données (aucun code : AM4.16)
   assert_eq "A1 — $f présent" "$([ -s "$OUT/$f" ] && echo oui || echo non)" "oui"
 done
 assert_eq "A1.2 — .cache/vf-cockpit.json porte scriptsDir" "$(node "$AUX/json.mjs" "$OUT/.cache/vf-cockpit.json" 'typeof j.scriptsDir')" "string"
@@ -65,8 +64,8 @@ assert_eq "A1.6 — aucun outil d'assemblage recopié" "$(ls "$OUT" | grep -cE '
 assert_eq "A1.7 — l'état git du lab est inchangé (sortie ignorée)" "$(git -C "$LAB" status --porcelain | grep -c .)" "0"
 
 echo "=== A2 — données des deux pages ==="
-assert_eq "A2.1 — index.html : onglet code" "$(node "$AUX/donnees.mjs" "$OUT" "$OUT/index.html" 'j.meta.vfTab')" "code"
-assert_eq "A2.2 — project.html : schéma Projet" "$(node "$AUX/donnees.mjs" "$OUT" "$OUT/project.html" 'j.schema')" "vibeflow/cockpit-project@1"
+assert_eq "A2.1 — index.html : onglet code" "$(node "$AUX/donnees.mjs" "$SCRIPTS" "$OUT/index.html" 'j.meta.vfTab')" "code"
+assert_eq "A2.2 — project.html : schéma Projet" "$(node "$AUX/donnees.mjs" "$SCRIPTS" "$OUT/project.html" 'j.schema')" "vibeflow/cockpit-project@1"
 assert_eq "A2.3 — architecture brute : un nœud par dossier de code" "$(node "$AUX/json.mjs" "$OUT/architecture.json" 'j.nodes.map(n=>n.label).join(",")')" "src"
 
 echo "=== A3 — serveur local et contrôle du Host ==="
@@ -105,7 +104,7 @@ console.log(m.fichiersExecution(process.argv[3]).join(','));
 JS
 assert_eq "A5.1 — seul vf-cockpit-who.mjs est du code d'exécution" "$(node "$AUX/liste.mjs" "$SCRIPTS" "$D5")" "vf-cockpit-who.mjs"
 MUT="$WORK/mut"; mkdir -p "$MUT"; cp "$SCRIPTS"/vf-cockpit-*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$MUT/"
-sed 's#, /^vf-cockpit-fr-.\*\\.mjs$/##' "$MUT/vf-cockpit-build.mjs" > "$MUT/b.tmp" && mv "$MUT/b.tmp" "$MUT/vf-cockpit-build.mjs"
+sed 's#, /^vf-cockpit-fr-.\*\\.mjs$/##' "$MUT/vf-cockpit-module.mjs" > "$MUT/b.tmp" && mv "$MUT/b.tmp" "$MUT/vf-cockpit-module.mjs"   # 79-06 : fichiersExecution vit dans vf-cockpit-module.mjs
 assert_eq "A5.2 — témoin rouge : sans le motif fr-, le leurre fr-inventaire est recopié" "$(node "$AUX/liste.mjs" "$MUT" "$D5")" "vf-cockpit-fr-inventaire.mjs,vf-cockpit-who.mjs"
 
 echo "=== A6 — diagnostic des lignes non comprises (premier assemblage et --rebuild) ; .planning jamais écrit ==="
@@ -127,7 +126,7 @@ node "$SCRIPTS/vf-cockpit.mjs" build --lab "$LAB6" > "$WORK/a6a.out" 2>&1; asser
 assert_has "A6.2 — premier assemblage : « 2 ligne(s) non comprise(s) » nommées fichier:ligne (CLI)" "$(cat "$WORK/a6a.out")" "2 ligne(s) non comprise(s) du planning : .planning/ROADMAP.md:2 .planning/ROADMAP.md:8"
 node "$SCRIPTS/vf-cockpit.mjs" build --rebuild --lab "$LAB6" > "$WORK/a6b.out" 2>&1; assert_eq "A6.3 — build --rebuild : rend 0" "$?" "0"
 assert_has "A6.4 — build --rebuild : le même diagnostic" "$(cat "$WORK/a6b.out")" "2 ligne(s) non comprise(s) du planning : .planning/ROADMAP.md:2 .planning/ROADMAP.md:8"
-assert_eq "A6.5 — le diagnostic est aussi dans les données de la page Projet (interface)" "$(node "$AUX/donnees.mjs" "$LAB6/.vibeflow/cockpit" "$LAB6/.vibeflow/cockpit/project.html" 'j.meta.vf.drift.nonComprises.map(x=>x.fichier+":"+x.ligne).join(",")')" ".planning/ROADMAP.md:2,.planning/ROADMAP.md:8"
+assert_eq "A6.5 — le diagnostic est aussi dans les données de la page Projet (interface)" "$(node "$AUX/donnees.mjs" "$SCRIPTS" "$LAB6/.vibeflow/cockpit/project.html" 'j.meta.vf.drift.nonComprises.map(x=>x.fichier+":"+x.ligne).join(",")')" ".planning/ROADMAP.md:2,.planning/ROADMAP.md:8"
 assert_eq "A6.6 — .planning intact après deux assemblages (liste et cksum avant/après)" "$(find "$LAB6/.planning" | sort | while read -r f; do [ -f "$f" ] && cksum "$f" || echo "$f"; done | cmp -s - <(printf '%s\n' "$AV6") && echo identique)" "identique"
 assert_eq "A6.7 — témoin : le lab canonique de A1 ne dit rien de non compris" "$(grep -c 'non comprise' "$WORK/build.out")" "0"
 MUT6="$WORK/mut6"; mkdir -p "$MUT6"; cp "$SCRIPTS"/vf-cockpit-*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$MUT6/"
@@ -152,6 +151,18 @@ assert_eq "AM4.16 — une sortie fraîchement assemblée ne contient aucun *.mjs
 # ancres des mutants de la tâche 4a (écrites ici, jouées avec le code) ; elles rougissent tant que le code visé n'existe pas
 assert_eq "M-PURGE-LARGE.0 — ancre présente : la purge de l'assemblage vise une liste de motifs de code (CODE_ANCIEN dans vf-cockpit-build.mjs)" "$(grep -cF 'const CODE_ANCIEN =' "$SCRIPTS/vf-cockpit-build.mjs")" "1"
 assert_eq "M-ORDRE.0 — ancre présente : la page du moteur est renommée par renommerPageMoteur avant l'insertion des données (vf-cockpit-rename.mjs)" "$(grep -cF 'export function renommerPageMoteur' "$SCRIPTS/vf-cockpit-rename.mjs")" "1"
+
+# ---- mutants de la tâche 4a (79-06) : l'assemblage est rejoué par une COPIE du module mutée (cockpit_module_muter) ----
+am4_asm() { # <racine du module muté> <lab> : assemble le lab avec le lanceur d'assemblage de cette copie ; rend le code de sortie
+  node "$1/scripts/vf-cockpit-build.mjs" "$2" --quiet > "$WORK/am4m-$(basename "$2").out" 2>&1; echo $?
+}
+cockpit_module_muter mpurge vf-cockpit-build.mjs 's#^const CODE_ANCIEN = .*#const CODE_ANCIEN = [/./];#'; MP="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+LMP="$WORK/lab-mpurge"; cp -R "$LAB" "$LMP"; rm -rf "$LMP/.vibeflow"; OMP="$LMP/.vibeflow/cockpit"; am4_asm "$MP" "$LMP" > /dev/null
+printf '{"flows":[{"id":"gardé"}]}\n' > "$OMP/custom-flows.json"; AVMP="$(cksum < "$OMP/custom-flows.json")"; RCMP="$(am4_asm "$MP" "$LMP")"
+assert_eq "M-PURGE-LARGE — purge de tout le dossier : la copie est valide (node --check), AM4.15b rougit (données perdues : custom-flows.json)" "$(node --check "$MP/scripts/vf-cockpit-build.mjs" 2> /dev/null && echo valide || echo invalide) $([ "$(cksum < "$OMP/custom-flows.json" 2> /dev/null)" = "$AVMP" ] && echo identique || echo perdu)" "valide perdu"
+cockpit_module_muter mordre vf-cockpit-build.mjs "s#const html = renommerPageMoteur(read(path.join(sortie, 'index.html')));#const html = read(path.join(sortie, 'index.html'));#"; MR="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+LMR="$WORK/lab-mordre"; cp -R "$LAB" "$LMR"; rm -rf "$LMR/.vibeflow"; RCMR="$(am4_asm "$MR" "$LMR")"
+assert_eq "M-ORDRE — insertion des données avant le renommage de la page du moteur : la copie est valide, l'assemblage échoue (code non nul) et la page n'a pas de données lisibles (A2.1 rougit)" "$(node --check "$MR/scripts/vf-cockpit-build.mjs" 2> /dev/null && echo valide || echo invalide) rc=$([ "$RCMR" != 0 ] && echo non-nul || echo nul) A2.1=$([ "$(node "$AUX/donnees.mjs" "$SCRIPTS" "$LMR/.vibeflow/cockpit/index.html" 'j.meta.vfTab' 2> /dev/null | tail -1)" = code ] && echo vert || echo rouge)" "valide rc=non-nul A2.1=rouge"
 
 vf_hyg_assert
 echo ""

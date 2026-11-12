@@ -6,7 +6,7 @@
 # Isolation git, aucun serveur ni navigateur. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; SERVE_MODULE="$SCRIPTS/../skills/cockpit-moteur/assets/serve.mjs"   # 79-06 : l'export est celui du module, la sortie est son dernier argument
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"
 cleanup() { if [ -n "${KEEP:-}" ]; then echo "WORK=$WORK"; else rm -rf "$WORK"; fi; }; trap cleanup EXIT
 PASS=0; FAIL=0
@@ -63,7 +63,7 @@ G "$LAB" init -q && G "$LAB" add -A && G "$LAB" commit -q -m init
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 OUT="$LAB/.vibeflow/cockpit"
 EXP="$WORK/export.html"
-node "$OUT/serve.mjs" --export "$EXP" --include flows,notes,recent,health > "$WORK/export.out" 2>&1 || cat "$WORK/export.out"
+node "$SERVE_MODULE" --export "$EXP" --include flows,notes,recent,health --sortie="$OUT" > "$WORK/export.out" 2>&1 || cat "$WORK/export.out"
 
 compte() { cat "${@:2}" 2>/dev/null | grep -o "$1" | wc -l | tr -d ' '; }
 echo "=== A — liens symboliques sortants ==="
@@ -242,7 +242,7 @@ console.log(JSON.stringify({ sortant: gitSortant(lab), git: JSON.stringify(await
 JS
 mesurer() { # mesurer <nom> <lab> : « sortant|nombre de marqueurs » (pages, graph.json, export, /api/vf/git)
   local L="$2" O="$2/.vibeflow/cockpit" R
-  node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$GEN/b-$1.out" 2>&1; node "$O/serve.mjs" --export "$GEN/x-$1.html" --include flows,notes,recent,health > "$GEN/e-$1.out" 2>&1
+  node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$GEN/b-$1.out" 2>&1; node "$SERVE_MODULE" --export "$GEN/x-$1.html" --include flows,notes,recent,health --sortie="$O" > "$GEN/e-$1.out" 2>&1
   R="$(node "$WORK/lire.mjs" "$SCRIPTS" "$L")"
   echo "$(printf '%s' "$R" | grep -o '"sortant":[a-z]*' | cut -d: -f2)|$(( $(printf '%s' "$R" | grep -o 'MARQUEUR-F1' | wc -l) + $(compte 'MARQUEUR-F1' "$O/project.html" "$O/index.html" "$O/graph.json" "$O/architecture.json" "$GEN/x-$1.html") ))"
 }
