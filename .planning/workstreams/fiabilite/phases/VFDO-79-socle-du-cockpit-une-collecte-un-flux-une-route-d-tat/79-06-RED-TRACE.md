@@ -198,3 +198,14 @@ Fichiers sources d'où du code est parti ou a été changé par S2 (16 fichiers 
 ### (e) Identité à l'octet avec `ab8f3e64`
 
 Zone `AUDC-B-03 bis` de `vf-cockpit.mjs` (de la ligne de commentaire `// AUDC-B-03 bis : secret d'ouverture` à la fin de `ouvrirQ`, 31 lignes) : `git show ab8f3e64:plugin/cockpit/scripts/vf-cockpit.mjs` contre le fichier de la tête, `cmp` sortie 0, 1 814 octets des deux côtés. Ligne `ouvertureLanceur` de `vf-cockpit-terminal.mjs` : `cmp` sortie 0, 200 octets des deux côtés. Écart au mandat : le total attendu de 1 905 octets n'est pas retrouvé (1 814 pour la zone, 2 014 avec la ligne) et aucun intervalle de lignes contigu de la zone ne donne 1 905 ; le chiffre vise peut-être une autre zone que celle que je retiens. L'identité à l'octet de celle-ci est établie, pas le nombre.
+
+## Reprise après la porte 4c (2026-11-12, 07 h 41, heure lue dans le message de la session principale)
+
+Reprise autorisée par la session principale, décision déléguée par Samuel (AskUserQuestion session principale, 2026-11-11, « Claude, sur preuves (Recommandé) »). Réponse rendue le 2026-11-12 à 07 h 41 : « reprendre S3 ». S3 (tâches 5, 6a, 6b) est confiée par le manager à un exécuteur neuf.
+
+Contrôles cités par la session principale, recopiés tels qu'elle les rapporte :
+- rubrique « Point d'arrêt S2 » lue ; 22 commits (79-06) depuis la base du segment ; fichiers hors files_modified : `79-06-PLAN.md`, `test-cockpit-equipe.sh` et `test-cockpit-git-signature.sh` (déclarés par l'amendement `4c48d523`) ;
+- règle AUDC-B-03 et exception `ouvertureLanceur` de `serve.mjs` identiques à celles de `ab8f3e64` (même empreinte) ;
+- rejeu indépendant sur un export de `24271323`, retiré depuis : securite 100 PASS / 0 FAIL, questions 133 / 0 ; AM4.1 à AM4.4 verts ;
+- constat F1 lu à la source (`vf-cockpit.mjs`, repli sur le `serve.mjs` de la sortie) ;
+- audit intermédiaire : aucun constat haut (relayé par le manager, non relu par la session principale dans le transcript de l'auditeur).
