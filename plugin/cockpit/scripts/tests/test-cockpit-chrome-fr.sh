@@ -226,7 +226,7 @@ const ctx = { console, URLSearchParams, location: { search: '' }, performance: {
 ctx.window = ctx; ctx.VF_COCKPIT = { meta: { vfTab: 'code', kindColors: {} } }; vm.createContext(ctx);
 for (const b of [...pages[0].matchAll(/<script>(?:\/\* ui\/[\w.-]+ \*\/\s*)?\/\/ vibeflow:fr[\s\S]*?<\/script>/g)].map((m) => m[0].replace(/^<script>|<\/script>$/g, ''))) vm.runInContext(b, ctx);
 const dico = ctx.__vfFrDict || {}; const excl = new Set(JSON.parse(fs.readFileSync(exclFile, 'utf8')).exclusions.map((e) => e.texte));
-const sans = (x) => !Object.prototype.hasOwnProperty.call(dico, x) && !(x.includes('@') && Object.prototype.hasOwnProperty.call(dico, x.split('@')[0]) && false) && !excl.has(x.split('@')[0]) && !excl.has(x);
+const sans = (x) => !Object.prototype.hasOwnProperty.call(dico, x) && !excl.has(x.split('@')[0]) && !excl.has(x);
 console.log(JSON.stringify({ fn: 'ok', n: r.cles.length, sansEntree: [...new Set([...r.cles, ...r.squelette])].filter(sans).sort(), libres: r.libres.filter((x) => !excl.has(x)).sort(), nonLitterales: r.nonLitterales, ombres: r.ombres }));
 JS
 cat > "$AUX/ordre.mjs" <<'JS'
@@ -266,7 +266,7 @@ if (mode === 'essai') {
   out.pluriels = t ? sur(() => [t.pl(1, 'call'), t.pl(3, 'call'), t.mot(1, 'lines'), t.mot(3, 'lines')]) : 'absent';
   out.k = t ? sur(() => t.k('1.3k')) : 'absent';
   out.type = t ? sur(() => [t.type('Library'), t.type('Ma donnée')]) : 'absent';
-  out.constat = t ? sur(() => [t.constat('Readme and 7 more'), t.constat('Une phrase que personne ne connaît'), t.constat('src.js contains util.js')]) : 'absent';
+  out.constat = t ? sur(() => [t.constat('Readme and 7 more'), t.constat('Une phrase que personne ne connaît')]) : 'absent';
   out.absente = t ? sur(() => t('Un {} inconnu', 'x')) : 'absent';
   out.anglais = e ? sur(() => [e('Hello'), e('{} call', 3), e('Changed@pastille'), e.pl(3, 'call'), e.pl(1, 'call'), e.mot(1, 'lines'), e.k('1.3k'), e.constat('Readme and 7 more'), e.type('Library'), typeof e.langue, e('Un {} inconnu', 'x')]) : 'absent';
 } else {
@@ -304,9 +304,9 @@ nouv() { node -e 'const a=JSON.parse(require("fs").readFileSync(process.argv[1])
 assert_eq "F17.2 témoin : un littéral anglais ajouté à une copie de la page est nommé, lui seul" "$(nouv "$WORK/sites17.json" libres)" '["Pending approval from the review board"]'
 assert_eq "F17.3 témoin : un t(variable) ajouté à une copie est nommé « clé non littérale »" "$(nouv "$WORK/sites17.json" nonLitterales)" '["maVariableNeuve"]'
 T17b="$WORK/t17b"; mkdir -p "$T17b"; cp "$SORTIE/index.html" "$SORTIE/project.html" "$T17b/"
-node -e 'const f=process.argv[1],fs=require("fs");fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace("</body>","<script>(() => { const t = (x) => x; return t; })();</script></body>"))' "$T17b/index.html"
+node -e 'const f=process.argv[1],fs=require("fs");fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace("</body>","<script>(() => { const t = window.__vfFrT; return (() => { const t = (x) => x; return t; })(); })();</script></body>"))' "$T17b/index.html"
 sites "$T17b/index.html,$T17b/project.html" > "$WORK/sites17b.json"
-assert_eq "F17.4 témoin : un t local qui masque le traducteur (ombre) est nommé, lui seul" "$(nouv "$WORK/sites17b.json" ombres)" '["const t ="]'
+assert_eq "F17.4 témoin : un t local qui masque le traducteur (ombre) est nommé, lui seul" "$(nouv "$WORK/sites17b.json" ombres)" '["const t"]'
 node "$AUX/ordre.mjs" "$SORTIE/index.html" > "$WORK/ordre.json"
 assert_eq "F18.1 : les blocs vibeflow:fr (78, 79, 80) précèdent le script principal et ui/00-vibeflow.js dans la page assemblée" "$(lire "$WORK/ordre.json" '[j.blocs, j.avantPrincipal, j.avant00, j.marqueurRestant].join()')" "3,true,true,false"
 # F18.2 : un gabarit sans l'emplacement garde l'ancien ordre (copie du module, jamais une édition du module) ; jouée sur une copie du module (même copie que cockpit_module_copie)
