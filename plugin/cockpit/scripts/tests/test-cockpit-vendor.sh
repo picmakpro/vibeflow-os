@@ -320,6 +320,89 @@ node "$WORK/q6.mjs" "$WORK/q6" > "$WORK/q6.out" 2>&1
 assert_eq "V11.Q6a — fichiersCodeEvalue liste les trois fichiers de Q" "$(sed -n 1p "$WORK/q6.out")" "liste=true"
 assert_eq "V11.Q6b — l'empreinte est calculée, change d'un octet dans client.js d'une copie, et devient nulle quand client.js manque" "$(sed -n 2p "$WORK/q6.out")" "stable=true octet=true supprime=true"
 
+# --- V11.P : tiroir et lancement de la page hôte P (assets/ui/tiroir, lus à l'injection sous --terminal seulement) ---
+NOMS_P="lancer-extraire-chat.js lancer-observer-chat.js lancer-proposition.js lancer.css lancer.js tiroir-construire.js tiroir-message.js tiroir.css tiroir.js"
+assert_eq "V11.P1a — FICHIERS_NAVIGATEUR : les neuf noms du dossier tiroir" "$(nav_noms tiroir)" "$NOMS_P"
+assert_eq "V11.P1b — les fichiers présents du dossier assets/ui/tiroir" "$(dossier_noms tiroir)" "$NOMS_P"
+assert_eq "V11.P1c — les lignes AJOUT de VENDORED.txt pour le dossier tiroir" "$(ajout_noms tiroir)" "$NOMS_P"
+retires=""; for m in terminal-client terminal-vue terminal-style terminal-tiroir-ui terminal-tiroir-style lancer-style; do [ -e "$SCRIPTS/vf-cockpit-$m.mjs" ] && retires="$retires $m"; done
+assert_eq "V11.P1d — les six modules du plan n'existent plus (client, vue, feuille de Q, interface du tiroir, deux feuilles)" "${retires:-aucun}" "aucun"
+# p2.mjs <racine d'un module> : les deux injections sont faites des fichiers rangés, dans l'ordre
+cat > "$WORK/p2.mjs" <<'FIN'
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [racine] = process.argv.slice(2), moteur = path.join(racine, 'skills/cockpit-moteur/assets/ui/tiroir');
+const charger = (n) => import(pathToFileURL(path.join(racine, 'scripts', n)).href + '?v=' + Math.random());
+const t = await charger('vf-cockpit-terminal-tiroir.mjs'), l = await charger('vf-cockpit-lancer-ui.mjs');
+const lire = (n, css) => { const x = fs.readFileSync(path.join(moteur, n), 'utf8'); return css || !x.endsWith('\n') ? x : x.slice(0, -1); };
+const dans = (h, pieces) => { let pos = -1; for (const p of pieces) { const i = h.indexOf(p, pos + 1); if (i <= pos) return false; pos = i; } return true; };
+const it = t.injectionTiroir();
+const a = it.indexOf(`(${lire('tiroir.js')})(`), b = it.indexOf(`, ${lire('tiroir-message.js')}, ${lire('tiroir-construire.js')});\n`);
+let cfgT = false; try { cfgT = JSON.parse(it.slice(a + lire('tiroir.js').length + 3, b)).indisponible === false; } catch {}
+console.log(`tiroir=${dans(it, [`<style>${lire('tiroir.css', true)}</style><script>`, `(${lire('tiroir.js')})(`]) && a > 0 && b > a && cfgT}`);
+const il = l.injectionLancer();
+const c = il.indexOf(`(${lire('lancer.js')})(`), d = il.indexOf(`, ${lire('lancer-extraire-chat.js')}, ${lire('lancer-observer-chat.js')}, ${lire('lancer-proposition.js')});\n`);
+let cfgL = false; try { cfgL = JSON.parse(il.slice(c + lire('lancer.js').length + 3, d)).css === lire('lancer.css', true); } catch {}
+console.log(`lancer=${c > 0 && d > c && il.startsWith('<script>') && cfgL}`);
+console.log(`indispo=${JSON.stringify(l.injectionLancer({ indisponible: true }))}`);
+FIN
+node "$WORK/p2.mjs" "$RACINE_MODULE" > "$WORK/p2.out" 2>&1
+assert_eq "V11.P2a — injectionTiroir : la feuille tiroir.css dans son <style>, puis (tiroir.js)(configuration JSON, tiroir-message.js, tiroir-construire.js)" "$(sed -n 1p "$WORK/p2.out")" "tiroir=true"
+assert_eq "V11.P2b — injectionLancer : (lancer.js)(configuration portant lancer.css, extraire, observer, proposition)" "$(sed -n 2p "$WORK/p2.out")" "lancer=true"
+assert_eq "V11.P2c — injectionLancer({ indisponible }) rend la chaîne vide" "$(sed -n 3p "$WORK/p2.out")" 'indispo=""'
+# p3 : une copie jetable du module (scripts utiles et moteur réduit) : un fichier muté change l'injection ; un fichier illisible la rend vide avec une ligne d'erreur
+mini_module() { # <dossier> : copie réduite du module (le lecteur, le module, les deux injecteurs et le dossier rangé)
+  rm -rf "$1"; mkdir -p "$1/scripts" "$1/skills/cockpit-moteur/assets/ui"
+  cp "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs "$SCRIPTS"/vf-cockpit-terminal-tiroir.mjs "$SCRIPTS"/vf-cockpit-lancer-ui.mjs "$1/scripts/" 2>/dev/null
+  cp "$MOTEUR/assets/serve.mjs" "$1/skills/cockpit-moteur/assets/" 2>/dev/null; cp -R "$MOTEUR/assets/ui/terminal" "$MOTEUR/assets/ui/tiroir" "$1/skills/cockpit-moteur/assets/ui/" 2>/dev/null
+}
+cat > "$WORK/p3.mjs" <<'FIN'
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [racine] = process.argv.slice(2), f = path.join(racine, 'skills/cockpit-moteur/assets/ui/tiroir/tiroir.js');
+const charger = async (v) => import(pathToFileURL(path.join(racine, 'scripts/vf-cockpit-terminal-tiroir.mjs')).href + '?v=' + v);
+const avant = (await charger('a')).injectionTiroir();
+fs.writeFileSync(f, fs.readFileSync(f, 'utf8').replace('const T = cfg.textes', 'const MUTE_P = 1; const T = cfg.textes'));
+const apres = (await charger('b')).injectionTiroir();
+console.log(`${avant !== apres} ${apres.includes('const MUTE_P = 1;')}`);
+fs.rmSync(f);
+const vide = (await charger('c')).injectionTiroir();
+console.log(`vide=${JSON.stringify(vide)}`);
+FIN
+mini_module "$WORK/p3"; node "$WORK/p3.mjs" "$WORK/p3" > "$WORK/p3.out" 2> "$WORK/p3.err"
+assert_eq "V11.P3a — tiroir.js muté dans une copie : l'injection change et porte la mutation" "$(sed -n 1p "$WORK/p3.out")" "true true"
+assert_eq "V11.P3b — tiroir.js illisible dans une copie : l'injection rend la chaîne vide, le serveur ne plante pas" "$(sed -n 2p "$WORK/p3.out")" 'vide=""'
+assert_eq "V11.P3c — une ligne d'erreur nomme le fichier illisible" "$(grep -c 'tiroir/tiroir.js' "$WORK/p3.err")" "1"
+# p4 : la liste close a douze entrées ; chacune a son AJOUT, son fichier et une lecture réussie ; un nom de P hors liste est refusé
+cat > "$WORK/p4.mjs" <<'FIN'
+import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [nav, moteur] = process.argv.slice(2); const m = await import(pathToFileURL(nav).href);
+let lus = 0; for (const [d, n] of m.FICHIERS_NAVIGATEUR) { try { (n.endsWith('.css') ? m.lireFeuille : m.lireFonction)(d, n, { moteur }); lus++; } catch (e) { console.log(`echec ${d}/${n} : ${e.message}`); } }
+console.log(`entrees=${m.FICHIERS_NAVIGATEUR.length} lus=${lus}`);
+try { m.lireFonction('tiroir', 'autre.js', { moteur }); console.log('hors-liste=lu'); } catch { console.log('hors-liste=refus'); }
+try { m.lireFonction('tiroir', 'tiroir.css', { moteur }); console.log('css-en-fonction=lu'); } catch { console.log('css-en-fonction=refus'); }
+FIN
+node "$WORK/p4.mjs" "$NAV" "$MOTEUR" > "$WORK/p4.out" 2>&1
+assert_eq "V11.P4a — douze entrées dans FICHIERS_NAVIGATEUR, douze lectures réussies" "$(grep '^entrees=' "$WORK/p4.out")" "entrees=12 lus=12"
+assert_eq "V11.P4b — un nom de P hors liste est refusé" "$(grep -c '^hors-liste=refus$' "$WORK/p4.out")" "1"
+assert_eq "V11.P4c — une feuille lue comme une fonction est refusée (elle ne commence pas à « function »)" "$(grep -c '^css-en-fonction=refus$' "$WORK/p4.out")" "1"
+n_ajout=$(grep -c -E '^AJOUT assets/ui/(terminal|tiroir)/' "$MOTEUR/VENDORED.txt")
+assert_eq "V11.P4d — douze lignes AJOUT pour les deux dossiers rangés" "$n_ajout" "12"
+# p5 : la liste du code évalué et l'empreinte couvrent les douze
+cat > "$WORK/p5.mjs" <<'FIN'
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [racine] = process.argv.slice(2), scripts = path.join(racine, 'scripts'), moteur = path.join(racine, 'skills/cockpit-moteur');
+const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-module.mjs')).href);
+const cles = m.fichiersCodeEvalue(scripts, moteur).map((x) => x[0]).filter((c) => c.startsWith('assets/ui/'));
+const h0 = m.empreinteModule({ dossierScripts: scripts, dossierMoteur: moteur });
+const f = path.join(moteur, 'assets/ui/tiroir/tiroir.js'); fs.appendFileSync(f, ' ');
+const h1 = m.empreinteModule({ dossierScripts: scripts, dossierMoteur: moteur });
+console.log(`douze=${cles.length === 12} octet=${typeof h0 === 'string' && h1 !== h0}`);
+FIN
+node "$WORK/p5.mjs" "$WORK/p3" > "$WORK/p5.out" 2>&1
+assert_eq "V11.P5 — fichiersCodeEvalue liste les douze fichiers rangés ; un octet changé dans tiroir.js d'une copie change l'empreinte" "$(sed -n 1p "$WORK/p5.out")" "douze=true octet=true"
+# V11.P6 : plus aucune conversion de fonction en chaîne dans les trois modules qui servent du code ; le lecteur et les injecteurs sans évaluation dynamique
+q6=0; for f in "$SCRIPTS/vf-cockpit-terminal-page.mjs" "$SCRIPTS/vf-cockpit-terminal-tiroir.mjs" "$SCRIPTS/vf-cockpit-lancer-ui.mjs" "$NAV"; do [ -f "$f" ] || { q6=-99; break; }; q6=$((q6 + $(grep -c -E "$MOTIF_EVAL" "$f"))); done
+assert_eq "V11.P6 — la page de Q, le tiroir, le lancement et le lecteur : aucune conversion de fonction en chaîne, aucune évaluation dynamique" "$q6" "0"
+
 echo "=== V8 — binaires ==="
 assert_eq "V8.1 — cinq .woff2 non vides (quatre polices du cockpit, JetBrains Mono 2.304 Regular)" "$(find "$MOTEUR" -name '*.woff2' -size +0 | grep -c .)" "5"
 assert_eq "V8.2 — deux .png non vides" "$(find "$MOTEUR" -name '*.png' -size +0 | grep -c .)" "2"

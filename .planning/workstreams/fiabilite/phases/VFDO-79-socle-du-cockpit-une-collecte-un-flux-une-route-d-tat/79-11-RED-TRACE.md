@@ -133,3 +133,24 @@ Mutants des suites visant le code déplacé : retargetés vers client.js, vue.js
 
 - test-cockpit-terminal-tiroir.sh : 1126 s en un rejeu isolé, 138 PASS (le scénario avec --terminal dépasse 600 s ; CI : 1184 s pour 493 cas).
 - test-cockpit-lancer-bandeau.sh : 556 s, 161 PASS, LB.E11 à LB.E14 verts en rejeu isolé (non reproduit ici). Où passe le temps : fixe pause(3500) de LB.E11, attendreValeur à 10 s, et un sondage client dont la décision d'annuler une proposition ancienne ne se prend qu'au PREMIER sondage de la page (client.js, gardes visite/pret : l'annulation n'est envoyée que si le terminal est déjà prêt à ce moment-là). Hypothèse de la forme [true/0/false/false] : sur un poste lent, le premier sondage précède l'état prêt, l'annulation n'est jamais émise et le scénario suivant n'est plus à l'état attendu. Non corrigé (hors plan), aucune sonde affaiblie.
+
+## Tâche 3 — tiroir et lancement rangés en fichiers
+
+### Rouges sur la base (V11.P1 à P6, T7.5c)
+
+Vendor : 164 PASS / 14 FAIL, tous V11.P. Activation : 2 FAIL (T7.5c « vf-term- » et « data-vf-lancer » : les fichiers rangés n'existent pas encore ; le plan les disait verts dès l'écriture, ils ne peuvent l'être qu'une fois les fichiers posés). T7.5, T7.5b, T7.5c (vfTermVue, VibeFlow (71-, VibeFlow (72-) et T8.2b sont verts sur la base : ils gardent l'invariant pendant le déplacement.
+
+- V11.P1a — FICHIERS_NAVIGATEUR : les neuf noms du dossier tiroir | attendu: [lancer-extraire-chat.js lancer-observer-chat.js lancer-proposition.js lancer.css lancer.js tiroir-construire.js tiroir-message.js tiroir.css tiroir.js] | obtenu:  []
+- V11.P1b — les fichiers présents du dossier assets/ui/tiroir | attendu: [lancer-extraire-chat.js lancer-observer-chat.js lancer-proposition.js lancer.css lancer.js tiroir-construire.js tiroir-message.js tiroir.css tiroir.js] | obtenu:  []
+- V11.P1c — les lignes AJOUT de VENDORED.txt pour le dossier tiroir | attendu: [lancer-extraire-chat.js lancer-observer-chat.js lancer-proposition.js lancer.css lancer.js tiroir-construire.js tiroir-message.js tiroir.css tiroir.js] | obtenu:  []
+- V11.P1d — les six modules du plan n'existent plus (client, vue, feuille de Q, interface du tiroir, deux feuilles) | attendu: [aucun] | obtenu:  [ terminal-tiroir-ui terminal-tiroir-style lancer-style]
+- V11.P2a — injectionTiroir : la feuille tiroir.css dans son <style>, puis (tiroir.js)(configuration JSON, tiroir-message.js, tiroir-construire.js) | attendu: [tiroir=true] | obtenu:  [node:fs:539]
+- V11.P2b — injectionLancer : (lancer.js)(configuration portant lancer.css, extraire, observer, proposition) | attendu: [lancer=true] | obtenu:  [    return binding.readFileUtf8(path, stringToFlags(options.flag));]
+- V11.P2c — injectionLancer({ indisponible }) rend la chaîne vide | attendu: [indispo=""] | obtenu:  [                   ^]
+- V11.P3a — tiroir.js muté dans une copie : l'injection change et porte la mutation | attendu: [true true] | obtenu:  []
+- V11.P3b — tiroir.js illisible dans une copie : l'injection rend la chaîne vide, le serveur ne plante pas | attendu: [vide=""] | obtenu:  []
+- V11.P3c — une ligne d'erreur nomme le fichier illisible | attendu: [1] | obtenu:  [0]
+- V11.P4a — douze entrées dans FICHIERS_NAVIGATEUR, douze lectures réussies | attendu: [entrees=12 lus=12] | obtenu:  [entrees=3 lus=3]
+- V11.P4d — douze lignes AJOUT pour les deux dossiers rangés | attendu: [12] | obtenu:  [3]
+- V11.P5 — fichiersCodeEvalue liste les douze fichiers rangés ; un octet changé dans tiroir.js d'une copie change l'empreinte | attendu: [douze=true octet=true] | obtenu:  [node:fs:2914]
+- V11.P6 — la page de Q, le tiroir, le lancement et le lecteur : aucune conversion de fonction en chaîne, aucune évaluation dynamique | attendu: [0] | obtenu:  [5]

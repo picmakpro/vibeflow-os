@@ -25,6 +25,7 @@ pgrep() { if [ "$1" = "-P" ] && [ $# -eq 2 ]; then local c; for c in $(command p
 ecoutes_srv() { local c; { node "$TA" ecoutes "$1"; for c in $(command pgrep -P "$1"); do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && node "$TA" ecoutes "$c"; done; } | sed '/^$/d'; }
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
+assert_ge() { if [ "$2" -ge "$3" ] 2>/dev/null; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 ($2 < $3)"; FAIL=$((FAIL+1)); fi; }
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; } # une valeur longue montre son début ET sa fin
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
 assert_not() { if [[ "$2" != *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     sous-chaîne interdite: [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
@@ -108,6 +109,13 @@ assert_eq "T7.4 — témoin : server.json porte la clé port" "$(sj 'typeof j.po
 assert_eq "T7.4 — sans le drapeau, server.json n'a pas de clé terminal" "$(sj '"terminal" in j')" "false"
 assert_eq "T7.5 — témoin : les deux pages servies sont lues en entier" "$([ "$(wc -c < "$WORK/page-index.html")" -gt 100000 ] && [ "$(wc -c < "$WORK/page-projet.html")" -gt 100000 ] && echo oui || echo non)" "oui"
 assert_eq "T7.5 — pages servies sans « VibeFlow (71- » ni « vf-term- »" "$(cat "$WORK/page-index.html" "$WORK/page-projet.html" | grep -c -e 'VibeFlow (71-' -e 'vf-term-')" "0"
+assert_eq "T7.5b — pages servies sans « VibeFlow (72- », « data-vf-lancer » ni « vfTermVue » (79-11 : le code est rangé en fichiers, il ne vient que sous --terminal)" "$(cat "$WORK/page-index.html" "$WORK/page-projet.html" | grep -c -e 'VibeFlow (72-' -e 'data-vf-lancer' -e 'vfTermVue')" "0"
+# T7.5c (témoin) : la recherche voit quelque chose : les marques existent dans les fichiers rangés (vf-term-, data-vf-lancer, vfTermVue) et dans la SORTIE des injections (VibeFlow (71-, VibeFlow (72-)
+RANGES="$ENG/assets/ui"
+marque_fichiers() { cat "$RANGES"/tiroir/* "$RANGES"/terminal/* 2>/dev/null | grep -c -e "$1"; }
+marque_injection() { node --input-type=module -e "import { pathToFileURL } from 'node:url'; const t = await import(pathToFileURL(process.argv[1] + '/vf-cockpit-terminal-tiroir.mjs').href); const l = await import(pathToFileURL(process.argv[1] + '/vf-cockpit-lancer-ui.mjs').href); const s = t.injectionTiroir() + l.injectionLancer(); console.log(s.split(process.argv[2]).length - 1);" "$SCRIPTS" "$1" 2>/dev/null || echo 0; }
+for m in 'vf-term-' 'data-vf-lancer' 'vfTermVue'; do assert_ge "T7.5c — la marque « $m » existe dans les fichiers rangés (témoin de T7.5 et T7.5b)" "$(marque_fichiers "$m")" 1; done
+for m in 'VibeFlow (71-' 'VibeFlow (72-'; do assert_ge "T7.5c — la marque « $m » existe dans la sortie des injections (témoin de T7.5)" "$(marque_injection "$m")" 1; done
 unsrv
 
 echo "=== M-ACTIF — import du terminal sans le test du drapeau ==="
@@ -124,6 +132,7 @@ ECO1="$(ecoutes_srv "$PID1")"
 assert_eq "T7.8 — exactement deux écouteurs, tous deux 127.0.0.1 (P et Q)" "$(printf '%s\n' "$ECO1" | sort | tr '\n' ' ')" "$(printf '127.0.0.1:%s\n127.0.0.1:%s\n' "$P1" "$QPORT" | sort | tr '\n' ' ')"
 rq "$P1" GET / --corps-vers "$WORK/page-index-t.html" > "$WORK/r-index-t.out"
 assert_eq "T8.1 — CSP de / avec le drapeau = formule de v2.75.0 + « ; frame-src http://127.0.0.1:<Q> » exact" "$(sed -n 2p "$WORK/r-index-t.out" | node "$AUX/ev.mjs" 'j["content-security-policy"]')" "$(node "$TA" csp-v275 "$WORK/page-index-t.html"); frame-src http://127.0.0.1:$QPORT"
+assert_eq "T8.2b — avec le drapeau, la page / porte « VibeFlow (71- », « vf-term- » et « VibeFlow (72-06) » (79-11 : le tiroir et le lancement rangés sont injectés)" "$(for m in 'VibeFlow (71-' 'vf-term-' 'VibeFlow (72-06)'; do grep -c -F -e "$m" "$WORK/page-index-t.html" | awk '$1>0{print "oui"}'; done | tr '\n' ' ')" "oui oui oui "
 assert_eq "P5.1 — GET /api/vf/terminal sous jeton : {\"etat\":\"actif\",\"port\":<Q>}" "$(rq "$P1" GET /api/vf/terminal --jeton "$TOK1" | sed '1,2d')" "{\"etat\":\"actif\",\"port\":$QPORT}"
 assert_eq "P5.1 — sans jeton : 403" "$(sta "$P1" GET /api/vf/terminal)" "403"
 
