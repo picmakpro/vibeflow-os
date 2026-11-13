@@ -17,7 +17,7 @@
 #   C7   A20 : motif de fin d'une session (finMotif) et agents sortis pour silence (sortisSilence), mutants
 #   C8   A17 : la signature du who (tout champ ajouté, liste nommée des champs volatils), mutant
 #   C11  le cache du scan (AB1) : un lab inchangé ne relance pas le scan ; édition à taille égale, ajout, retrait, git, code du moteur ; mutant
-# Les sections C9 s'ajoutent à la tâche suivante du plan.
+#   C9   A15 : projection des verrous en liste blanche (propriété générative, flux réel, signal construit dans le serveur, contrat), mutants
 # Lab neutre dans mktemp, HOME jetable, isolation git, faux verrou (VF_FAUX_JOURNAL, VF_FAUX_DELAI). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -610,6 +610,104 @@ if mutant M-CACHE vf-cockpit-code-cache.mjs scan-cache-fichiers '!e.isDirectory(
   CM="$(c11_serie mut)"
   assert_eq "M-CACHE — la ligne garde:scan-cache-fichiers signe les dossiers seuls : C11.3 rougit (l'édition de contenu sans changement de dossier ne relance pas : 1 au lieu de 2), le premier assemblage reste à 1" "$(echo "$CM" | cut -d' ' -f1,3)" "1 1"
 else assert_eq "M-CACHE — construction du mutant" "échec" "ok"; fi
+
+# ======================= tâche 4 : verrous projetés en liste blanche (A15), signal construit dans le serveur =======================
+echo "=== C9.1 / C9.3 — la projection des verrous en liste blanche : propriété générative (graine imprimée), formes, sansSession ==="
+node "$TESTS/collecte-propriete.mjs" "$SCRIPTS" verrous ${VF_SEED:+--graine="$VF_SEED"} > "$WORK/c91.out" 2> "$WORK/c91.err" || cat "$WORK/c91.err"
+head -1 "$WORK/c91.out" | sed 's/^/  (verrous : /; s/$/)/'; tail -1 "$WORK/c91.out" > "$WORK/c91.json"
+assert_eq "C9.1 — verrousDe puis projeterVerrous, et projeterVerrous seul sur des entrées hostiles : aucune clé hors des quatorze, aucun marqueur planté, chaînes bornées, dag borné et revalidé (aucune classe n'a fui)" "$(jq_ "$WORK/c91.json" 'j.erreur||JSON.stringify(j.resultats.ecarts)')" "{}"
+assert_eq "C9.couverture — chacune des seize classes (quinze hostiles et la clé en trop) est exercée au moins 20 fois, témoin positif : chaque marqueur planté est dans l'entrée avant projection" "$(jq_ "$WORK/c91.json" 'j.erreur||(Object.keys(j.couverture).length===16 && Object.values(j.couverture).every(v=>v>=20))+" "+(j.resultats.temoin.plante>0 && j.resultats.temoin.plante===j.resultats.temoin.vu)')" "true true"
+assert_eq "C9.1b — formes de la sortie du script : absent -> absente, erreur -> erreur, aucun verrou -> lue et plat et vide, forme inconnue ou nulle -> erreur, entrées non tenues écartées" "$(jq_ "$WORK/c91.json" 'j.erreur||j.resultats.formes')" "absente,erreur,luetrue0,erreur,erreur,1"
+assert_eq "C9.3 — sansSession : vrai si session_ids est non vide et ne nomme aucune session de la collecte ; faux pour une session présente, pour une liste vide, pour un mélange ; absent sans l'ensemble des sessions" "$(jq_ "$WORK/c91.json" 'j.erreur||j.resultats.c93.sansSession')" "true,false,false,false,false"
+assert_eq "C9.3b — leaseS rend la date de prise, childrenRunning et step suivent le verrou, et la projection les garde" "$(jq_ "$WORK/c91.json" 'j.erreur||[j.resultats.c93.lease,j.resultats.c93.enfants,j.resultats.c93.step,j.resultats.c93.proj].join(" ")')" "3000 4 etape true,3000,4,etape"
+
+echo "=== C9.2 / C9.4 / C9.6 — le flux réel : liste blanche seule, même collecte que le signal, un seul appel au verrou ==="
+FA="$WORK/faux-a15"; mkdir -p "$FA"
+cat > "$FA/driver-lock.sh" <<'SH'
+#!/usr/bin/env bash
+# faux verrou de forme réelle (status --all d'un lab partitionné) ; `age_seconds` suit le nombre d'appels : l'événement lock change à chaque tour
+[ -z "${VF_FAUX_JOURNAL:-}" ] || echo "$1" >> "$VF_FAUX_JOURNAL"
+case "$1" in
+  status) sed "s/__N__/$(wc -l < "$VF_FAUX_JOURNAL" | tr -d ' ')/" "$VF_FAUX_STATUS" ;;
+  orphans) echo '{"orphans":[]}' ;;
+  registry) echo '{"present": false, "count": 0, "agents": []}' ;;
+  *) echo '{}' ;;
+esac
+SH
+chmod +x "$FA/driver-lock.sh"
+cat > "$WORK/a15-status.json" <<'JSON'
+{"present": true, "scope": "lab", "location": "/Users/MQLOCATION9/lab/.git/vf-driver", "legacy_lock": false, "children_running": 2, "locks": [
+ {"present": true, "owner": "mgr-p79", "step": "exec", "age_seconds": __N__, "ttl": 1800, "stale": false, "generation": "g1", "session_ids": ["MQSESSIONID9a", "MQSESSIONID9b"], "lease_seconds": 3000, "guard_effective": true, "progress_epoch": 1, "progress_age_seconds": 5, "children_running": 2, "scope": "compartiment", "ws": "fiabilite", "phase": "79", "location": "git-common-dir", "lock": "/Users/MQCHEMIN9/lab/.git/vf-driver/ws/fiabilite/DRIVER.lock", "dag": {"ws": "fiabilite", "phase": "79", "at": 1700000000, "nodes": [{"id": "n1", "deps": [], "status": "running"}, {"id": "n2", "deps": ["n1"], "status": "blocked"}]}},
+ {"present": false, "lock": "/Users/MQCHEMIN9/lab/.git/vf-driver/DRIVER.lock", "children_running": 0, "scope": "depot"}]}
+JSON
+LAB9="$WORK/lab9"; mklab "$LAB9"; J9="$WORK/journal-9"; : > "$J9"
+cockpit_lancer "$LAB9" VF_COCKPIT_SCRIPTS_DIR="$FA" VF_FAUX_JOURNAL="$J9" VF_FAUX_STATUS="$WORK/a15-status.json"
+lancer_sse "$VF_PORT" "$VF_JETON" 40000 "$WORK/e9.jsonl"
+attendre_hello "$WORK/e9.jsonl"
+for _ in $(seq 1 160); do grep -q '"event":"lock"' "$WORK/e9.jsonl" 2>/dev/null && break; sleep 0.1; done
+cockpit_get /api/vf/etat > "$WORK/etat9.json"
+assert_ge "C9.2.0 — témoin positif : le faux verrou est appelé et l'événement lock arrive (au moins un status au journal, un lock dans le flux)" "$(( $(grep -c '^status$' "$J9") + $(grep -c '"event":"lock"' "$WORK/e9.jsonl") ))" 2
+assert_eq "C9.2a — aucun marqueur (chemin du verrou, emplacement, identifiants de session) dans le flux ni dans la route d'état (témoin : le verrou est bien dans hello, avec son propriétaire)" "$(cat "$WORK/e9.jsonl" "$WORK/etat9.json" | grep -cE 'MQCHEMIN9|MQLOCATION9|MQSESSIONID9')/$(jq_ "$WORK/e9.jsonl" 'E.filter(e=>e&&e.event==="hello").map(e=>e.data.lock.verrous.liste.map(x=>x.owner).join()).join()')" "0/mgr-p79"
+assert_eq "C9.2b — l'événement lock a exactement les clés seq, at, verrous ; hello.lock aussi ; aucune clé present ni locks dans l'un ni l'autre" "$(jq_ "$WORK/e9.jsonl" '[E.find(e=>e&&e.event==="lock").data, E.find(e=>e&&e.event==="hello").data.lock].map(o=>Object.keys(o).sort().join()).join("|")+"|"+/"present"|"locks"/.test(JSON.stringify([E.find(e=>e&&e.event==="lock").data, E.find(e=>e&&e.event==="hello").data.lock]))')" "at,seq,verrous|at,seq,verrous|false"
+assert_eq "C9.2c — chaque entrée de verrous.liste a exactement les quatorze clés de la liste blanche, dag compris ; sansSession vaut vrai (aucune session de la collecte ne porte MQSESSIONID9a)" "$(jq_ "$WORK/e9.jsonl" 'E.filter(e=>e&&e.event==="hello").map(e=>{const x=e.data.lock.verrous.liste[0];return Object.keys(x).sort().join()+" "+x.sansSession+" "+x.leaseS+" "+x.childrenRunning+" "+x.step+" "+x.dag.nodes.length}).join()')" "ageS,childrenRunning,dag,leaseS,owner,phase,progressAgeS,sansSession,scope,stale,step,tenu,ttl,ws true 3000 2 exec 2"
+: > "$J9"; sleep 5.7
+assert_eq "C9.4a — un tour du filet (signal construit dans le serveur, équipe et verrous partagés) fait un seul appel status au verrou et au plus un registry" "$(grep -c '^status$' "$J9")/$([ "$(grep -c '^registry$' "$J9")" -le 1 ] && echo oui || echo non)" "1/oui"
+vf_hyg_stop "$SSE_PID"; cockpit_arreter "$VF_PID"
+cat > "$AUX/c94.mjs" <<'JS'
+// c94.mjs <scripts> <lab> : startLive avec le vrai pilote (fil) ; une fois l'instantané posé avec son signal : mêmes entrées de verrou, mêmes identifiants de travailleurs que le flux, champs schema
+import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv, imp = (f) => import(pathToFileURL(path.join(scripts, f)).href), out = {};
+const { startLive } = await imp('vf-cockpit-live.mjs'), { instantane } = await imp('vf-cockpit-instantane.mjs');
+const live = startLive({ root: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), onEvent: () => {}, log: () => {}, mode: 'poll', aClient: () => true, nbClients: () => 1 });
+const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+for (let t = 0; t < 40000 && !instantane()?.signal; t += 100) await dormir(100);
+await live.pret(20000);
+const i = instantane(), s = live.snapshot();
+try {
+  out.verrous = i?.signal ? JSON.stringify(i.signal.verrous.liste) === JSON.stringify(s.lock.verrous.liste) && i.signal.verrous.liste.length === 1 : 'signal absent';
+  const ids = (w) => w.map((x) => x.id).sort().join();
+  out.equipe = i?.signal ? ids(i.signal.equipe.workers) === ids(s.who.workers) && s.who.workers.length > 0 : 'signal absent';
+  out.schemas = [i?.signal?.schema, i?.projet?.schema].join();
+  out.gele = !!i?.signal && Object.isFrozen(i.signal) && Object.isFrozen(i.signal.verrous);
+} catch (e) { out.erreur = String(e.message).slice(0, 160); }
+live.stop(); console.log(JSON.stringify(out)); process.exit(0);
+JS
+VF_COCKPIT_SCRIPTS_DIR="$FA" VF_FAUX_JOURNAL="$WORK/journal-94" VF_FAUX_STATUS="$WORK/a15-status.json" node "$AUX/c94.mjs" "$SCRIPTS" "$LAB9" > "$WORK/c94.json" 2> "$WORK/c94.err" || cat "$WORK/c94.err"
+assert_eq "C9.4b — instantane().signal.verrous.liste porte les mêmes entrées que le flux (une seule collecte)" "$(jq_ "$WORK/c94.json" 'j.erreur||j.verrous')" "true"
+assert_eq "C9.4c — instantane().signal.equipe a les mêmes identifiants de travailleurs que le who du flux (au moins un)" "$(jq_ "$WORK/c94.json" 'j.erreur||j.equipe')" "true"
+assert_eq "C9.4d — signal et projet portent leur champ schema, et le signal posé est gelé" "$(jq_ "$WORK/c94.json" 'j.erreur||j.schemas+" "+j.gele')" "vibeflow/cockpit-signal@1,vibeflow/cockpit-project@1 true"
+cat > "$AUX/c96.mjs" <<'JS'
+// c96.mjs <scripts> <lab> : le signal@1 de l'émetteur CLI (sans injection) sur le faux verrou : entrées de verrou dans les clés du contrat ; le contrat déclare les cinq facultatifs et le bloc dag
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv, out = {};
+try {
+  const S = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-signal.mjs')).href), j = JSON.parse(fs.readFileSync(path.join(scripts, 'vf-cockpit-interface.json'), 'utf8'));
+  const v = j.schemas['vibeflow/cockpit-signal@1'].verrou, cles = Object.keys(v), sig = S.collectSignal(lab, { scriptsDir: process.env.VF_COCKPIT_SCRIPTS_DIR });
+  const permis = new Set([...v.requis, ...v.optionnels]);
+  out.entrees = sig.verrous.liste.length + ' ' + sig.verrous.liste.every((e) => Object.keys(e).every((k) => permis.has(k)) && v.requis.every((k) => k in e));
+  out.contrat = ['step', 'childrenRunning', 'dag', 'leaseS', 'sansSession'].every((k) => v.optionnels.includes(k)) + ' ' + !!v.dag + ' ' + (cles.indexOf('dag') === cles.indexOf('requis') + 1);
+  out.cli = Object.keys(sig.verrous.liste[0] || {}).includes('sansSession') ? 'sansSession' : 'sans';
+} catch (e) { out.erreur = String(e.message).slice(0, 160); }
+console.log(JSON.stringify(out));
+JS
+VF_COCKPIT_SCRIPTS_DIR="$FA" VF_FAUX_JOURNAL="$WORK/journal-96" VF_FAUX_STATUS="$WORK/a15-status.json" node "$AUX/c96.mjs" "$SCRIPTS" "$LAB9" > "$WORK/c96.json" 2> "$WORK/c96.err" || cat "$WORK/c96.err"
+assert_eq "C9.6a — signal@1 de l'émetteur CLI : une entrée de verrou, dont toutes les clés sont dans requis et optionnels de cockpit-signal@1.verrou et dont les requis sont tous là ; sansSession absent (l'émetteur ne compare pas aux sessions)" "$(jq_ "$WORK/c96.json" 'j.erreur||j.entrees+" "+j.cli')" "1 true sans"
+assert_eq "C9.6b — le contrat déclare step, childrenRunning, dag, leaseS, sansSession en facultatifs de cockpit-signal@1.verrou, décrit le bloc dag, juste après requis" "$(jq_ "$WORK/c96.json" 'j.erreur||j.contrat')" "true true true"
+# mutants : la liste blanche recopie l'entrée (M-LISTE), le dag n'est pas revalidé à la projection (M-VERROU-DAG), sansSession ne regarde plus les sessions (M-SANS)
+GR="$(head -1 "$WORK/c91.out" | sed 's/graine=//')"
+if mutant M-LISTE vf-cockpit-signal.mjs verrou-liste-blanche '({ ws:' '({ ...l, ws:'; then
+  node "$TESTS/collecte-propriete.mjs" "$MUT_SCRIPTS" verrous --graine="$GR" 2> /dev/null | tail -1 > "$WORK/c91-ml.json"
+  echo "  (M-LISTE : classes qui ont fui : $(jq_ "$WORK/c91-ml.json" 'Object.keys(j.resultats.ecarts||{}).join()'))"
+  assert_eq "M-LISTE — la ligne garde:verrou-liste-blanche recopie l'entrée par propagation d'objet : C9.1 rougit et nomme au moins les classes chemin et session-ids" "$(jq_ "$WORK/c91-ml.json" '["chemin","session-ids"].every(c=>c in (j.resultats.ecarts||{}))')" "true"
+else assert_eq "M-LISTE — construction du mutant" "échec" "ok"; fi
+if mutant M-VERROU-DAG vf-cockpit-signal.mjs verrou-dag 'dagP(l.dag)' '{ dag: l.dag }'; then
+  node "$TESTS/collecte-propriete.mjs" "$MUT_SCRIPTS" verrous --graine="$GR" 2> /dev/null | tail -1 > "$WORK/c91-md.json"
+  assert_eq "M-VERROU-DAG — la ligne garde:verrou-dag recopie le dag sans le revalider : C9.1 rougit sur les classes dag-id, dag-statut, dag-noeuds, dag-deps, dag-ws-phase et dag-forme" "$(jq_ "$WORK/c91-md.json" '["dag-id","dag-statut","dag-noeuds","dag-deps","dag-ws-phase","dag-forme"].every(c=>c in (j.resultats.ecarts||{}))')" "true"
+else assert_eq "M-VERROU-DAG — construction du mutant" "échec" "ok"; fi
+if mutant M-SANS vf-cockpit-vie.mjs verrou-sanssession '!ids.some((i) => sessions.has(i))' 'true'; then
+  node "$TESTS/collecte-propriete.mjs" "$MUT_SCRIPTS" verrous --graine="$GR" 2> /dev/null | tail -1 > "$WORK/c91-ms.json"
+  assert_eq "M-SANS — la ligne garde:verrou-sanssession ne regarde plus les sessions de la collecte : C9.3 rougit (une session présente donne vrai)" "$(jq_ "$WORK/c91-ms.json" 'j.resultats.c93.sansSession')" "true,true,false,true,false"
+else assert_eq "M-SANS — construction du mutant" "échec" "ok"; fi
 
 vf_hyg_assert
 echo "== Résultats : $PASS PASS / $FAIL FAIL =="

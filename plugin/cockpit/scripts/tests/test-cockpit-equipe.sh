@@ -1051,7 +1051,7 @@ assert_eq "EA1.6 — carte : aucune description vide (groupe « Terminés », ag
 
 echo "=== EA2 — tiroir « Au travail » : orphelins, verrous, libellés (PU-G-177, 178, 179, 180, 182, 184, 186, 187) ==="
 cat > "$AUX/vm70s.mjs" <<'JS'
-// vm70s.mjs <70-vf-live.js> <71-vf-equipe-rendu.js> <scénario.json> : le tiroir hors navigateur (vm) ; le scénario porte `who` (workers, sources) et, facultatif, `lock` (flux lock brut). Sortie : le HTML du tiroir, ou { erreur }.
+// vm70s.mjs <70-vf-live.js> <71-vf-equipe-rendu.js> <scénario.json> : le tiroir hors navigateur (vm) ; le scénario porte `who` (workers, sources) et, facultatif, `verrous` (la projection en liste blanche que porte l'événement lock : { etat, plat, liste }, A15). Sortie : le HTML du tiroir, ou { erreur }.
 import fs from 'node:fs';
 import vm from 'node:vm';
 const [, , f70, f71, scen] = process.argv;
@@ -1068,7 +1068,7 @@ try {
   const S = JSON.parse(fs.readFileSync(scen, 'utf8'));
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
-  if (S.lock) ES.last.l.lock({ data: JSON.stringify({ seq: 1, lock: S.lock }) });
+  if (S.verrous) ES.last.l.lock({ data: JSON.stringify({ seq: 1, at: Date.now(), verrous: S.verrous }) });
   ES.last.l.who({ data: JSON.stringify({ seq: 2, who: S.who }) });
   bouton.onClick();
   console.log(JSON.stringify({ html: panneau }));
@@ -1084,14 +1084,14 @@ cat > "$AUX/ea2-orph.json" <<'JSON'
 JSON
 sed 's/"ageS":2400/"ageS":600/' "$AUX/ea2-orph.json" > "$AUX/ea2-orph-court.json"
 cat > "$AUX/ea2-verrou.json" <<JSON
-{"lock":{"present":true,"locks":[{"present":true,"owner":"$UUID_OWNER","step":"exec","scope":"depot","age_seconds":1,"lease_seconds":3000,"session_ids":["sess-presente"]}]},
+{"verrous":{"etat":"lue","plat":false,"liste":[{"ws":"","scope":"depot","phase":null,"tenu":true,"stale":false,"ageS":1,"ttl":1800,"progressAgeS":null,"owner":"$UUID_OWNER","step":"exec","leaseS":3000,"sansSession":false}]},
  "who":{"sources":{"sessions":{"etat":"lue"},"locks":{"etat":"lue"},"dags":{"etat":"lue"}},"workers":[
  {"kind":"lock","id":"$UUID_OWNER","task":"exec","tree":"depot","ageS":1,"stale":false},
  {"kind":"session","id":"sess-presente","etat":"actif","ageS":2,"tree":".","branch":"main"}]}}
 JSON
-sed 's/"sess-presente"\]/"sess-absente"]/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-absent.json"
-sed 's/"sess-presente"\]/]/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-vide.json"
-sed 's/"lease_seconds":3000,//' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-sanslease.json"
+sed 's/"sansSession":false/"sansSession":true/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-absent.json" # le serveur dit : aucune session de la collecte ne tient ce verrou
+sed 's/,"sansSession":false//' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-vide.json" # aucun verdict : le serveur n'a pas pu comparer (liste d'identifiants vide, collecte pas lue)
+sed 's/"leaseS":3000,//' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-sanslease.json"
 sed 's/"locks":{"etat":"lue"}/"locks":{"etat":"erreur"}/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-illisible.json"
 cat > "$AUX/ea2-vide.json" <<'JSON'
 {"who":{"sources":{"sessions":{"etat":"lue"},"locks":{"etat":"lue"},"dags":{"etat":"lue"}},"workers":[]}}
@@ -1100,10 +1100,10 @@ T70() { node "$AUX/vm70s.mjs" "${3:-$UI/70-vf-live.js}" "${4:-$RENDU}" "$AUX/$1"
 assert_eq "EA2.1 — orphelin du registre (PU-G-182) : l'agent consigné sans verrou tenu est montré, « orphelin ? » ; le nœud de DAG périmé reste écarté (P71.5-D-14, apparié)" "$(T70 ea2-orph.json '[j.html.includes("TACHE-ORPH"), j.html.includes("orphelin ?"), j.html.includes("NOEUD-PERIME")].join()')" "true,true,false"
 assert_eq "EA2.2 — enfant actif d'une session muette depuis 40 min : « orphelin ? » sur sa ligne (PU-G-182)" "$(T70 ea2-orph.json '/class="r-task">TACHE-ENFANT <span class="sr">\(([^)]*)\)/.exec(j.html)[1].includes("orphelin ?")')" "true"
 assert_eq "EA2.2b — apparié : la même session muette depuis 10 min ne marque pas l'enfant, et l'orphelin du registre reste dit une seule fois" "$(T70 ea2-orph-court.json '[/class="r-task">TACHE-ENFANT <span class="sr">\(([^)]*)\)/.exec(j.html)[1].includes("orphelin ?"), j.html.split("orphelin ?").length-1].join()')" "false,1"
-assert_eq "EA2.3 — « tenu depuis » lit la date de prise (lease_seconds 3000 s = 50 min), jamais le battement (age_seconds 1 s) : ligne du verrou ET ligne du driver (PU-G-179)" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length+"|"+j.html.includes("tenu depuis 1 s")')" "2|false"
-assert_eq "EA2.4 — lease_seconds absent : « tenu » sans durée, jamais un battement présenté comme une prise (PU-G-179)" "$(T70 ea2-verrou-sanslease.json '[j.html.includes("tenu depuis"), (j.html.match(/>tenu</g)||[]).length].join()')" "false,2"
-assert_eq "EA2.5 — verrou dont session_ids ne nomme aucune session de la collecte : « aucune session active », jamais « orphelin » ni « introuvable » (PU-G-179)" "$(T70 ea2-verrou-absent.json '[j.html.includes("aucune session active"), /orphelin|introuvable/.test(j.html.replace(/<[^>]*>/g, " "))].join()')" "true,false"
-assert_eq "EA2.6 — apparié : session présente ou session_ids vide : aucun verdict" "$(T70 ea2-verrou.json 'j.html.includes("aucune session active")')|$(T70 ea2-verrou-vide.json 'j.html.includes("aucune session active")')" "false|false"
+assert_eq "EA2.3 — « tenu depuis » lit la date de prise (leaseS 3000 s = 50 min), jamais le battement (ageS 1 s) : ligne du verrou ET ligne du driver (PU-G-179)" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length+"|"+j.html.includes("tenu depuis 1 s")')" "2|false"
+assert_eq "EA2.4 — leaseS absent : « tenu » sans durée, jamais un battement présenté comme une prise (PU-G-179)" "$(T70 ea2-verrou-sanslease.json '[j.html.includes("tenu depuis"), (j.html.match(/>tenu</g)||[]).length].join()')" "false,2"
+assert_eq "EA2.5 — verrou que le serveur dit sans session de la collecte (sansSession vrai) : « aucune session active », jamais « orphelin » ni « introuvable » (PU-G-179)" "$(T70 ea2-verrou-absent.json '[j.html.includes("aucune session active"), /orphelin|introuvable/.test(j.html.replace(/<[^>]*>/g, " "))].join()')" "true,false"
+assert_eq "EA2.6 — apparié : sansSession faux ou absent : aucun verdict" "$(T70 ea2-verrou.json 'j.html.includes("aucune session active")')|$(T70 ea2-verrou-vide.json 'j.html.includes("aucune session active")')" "false|false"
 assert_eq "EA2.7 — le driver se dit en clair : « Session qui pilote : », jamais l'identifiant brut du propriétaire, ni dans le driver ni dans la liste (PU-G-177)" "$(T70 ea2-verrou.json '[j.html.includes("Session qui pilote : "), j.html.includes("88f83d8b")].join()')" "true,false"
 assert_eq "EA2.8 — « Qui a la main » remplace « Verrous tenus », avec « rien à faire de votre côté » (PU-G-178)" "$(T70 ea2-verrou.json '[j.html.includes("Qui a la main"), j.html.includes("Verrous tenus"), j.html.includes("rien à faire de votre côté")].join()')" "true,false,true"
 assert_eq "EA2.9 — tout est lu : aucun pied de sources ; une source illisible : le pied la nomme, elle seule (PU-G-180)" "$(T70 ea2-verrou.json '[j.html.includes("Sessions et sous-agents"), j.html.includes("class=\"src\"")].join()')|$(T70 ea2-verrou-illisible.json '(/class="src">([^<]*)</.exec(j.html)||[])[1]')" "false,false|Source illisible : Verrous du dépôt"
@@ -1112,8 +1112,8 @@ assert_eq "EA2.10 — personne : « Personne ne travaille en ce moment », sans 
 mkdir -p "$MUT/avant"
 for f in 70-vf-live.js 71-vf-equipe-rendu.js; do git -C "$SCRIPTS" show "c7d96740:plugin/cockpit/skills/cockpit-moteur/assets/ui/$f" > "$MUT/avant/$f" 2>/dev/null; done
 assert_eq "EA2.11 — témoin rouge : le code d'avant (c7d96740) ne montre pas l'orphelin du registre, ne marque pas l'enfant et lit le battement" "$(T70 ea2-orph.json '[j.html.includes("TACHE-ORPH"), j.html.includes("orphelin ?")].join()' "$MUT/avant/70-vf-live.js" "$MUT/avant/71-vf-equipe-rendu.js")|$(T70 ea2-verrou.json 'j.html.includes("tenu depuis 50 min")' "$MUT/avant/70-vf-live.js" "$MUT/avant/71-vf-equipe-rendu.js")" "false,false|false"
-sed 's#lease_seconds#age_seconds#g' "$UI/70-vf-live.js" > "$MUT/70-lease.js"
-assert_eq "EA2.12 — mutant (lease_seconds lu comme age_seconds) : la durée de prise disparaît, détecté" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length' "$MUT/70-lease.js")" "0"
+sed 's#leaseS#ageS#g' "$UI/70-vf-live.js" > "$MUT/70-lease.js"
+assert_eq "EA2.12 — mutant (leaseS lu comme ageS) : la durée de prise disparaît, détecté" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length' "$MUT/70-lease.js")" "0"
 M "$UI/70-vf-live.js" "$MUT/70-orph.js" "orph = reste.filter((w) => w.orphan)" "orph = []"
 assert_eq "EA2.13 — mutant (orphelins du registre non listés) : détecté" "$(T70 ea2-orph.json 'j.html.includes("TACHE-ORPH")' "$MUT/70-orph.js")" "false"
 cat > "$AUX/ea2-rendu.mjs" <<'JS'

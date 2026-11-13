@@ -111,9 +111,11 @@ echo "=== U — lockText de la page, lab plat ==="
 cat > "$AUX/locktext.mjs" <<'JS'
 import fs from 'node:fs'; const src = fs.readFileSync(process.argv[2], 'utf8');
 const a = src.indexOf('const lockText = '), b = src.indexOf('const KIND = '); const lockText = new Function(src.slice(a, b) + '; return lockText;')();
-const plat = lockText({ present: true, owner: 'rev', step: 'x', age_seconds: 3 });
-console.log(JSON.stringify({ plat: plat.cls, partitionne: lockText({ locks: [{ present: true, owner: 'm', step: 's' }] }).cls, libre: lockText({ present: false }).cls,
-  titrePlat: plat.title, titrePart: lockText({ locks: [{ present: true, scope: 'repo', ws: 'fiabilite', owner: 'm', step: 's' }] }).title, titreScope: lockText({ locks: [{ present: true, scope: 'repo', owner: 'm', step: 's' }] }).title }));
+// la page lit la projection en liste blanche de l'événement lock (A15) : { verrous: { etat, plat, liste: [{ ws, scope, owner, step, ageS, … }] } }
+const V = (liste, plat = false) => ({ verrous: { etat: 'lue', plat, liste } });
+const plat = lockText(V([{ ws: '', scope: null, owner: 'rev', step: 'x', ageS: 3 }], true));
+console.log(JSON.stringify({ plat: plat.cls, partitionne: lockText(V([{ ws: '', scope: null, owner: 'm', step: 's' }])).cls, libre: lockText(V([], true)).cls,
+  titrePlat: plat.title, titrePart: lockText(V([{ scope: 'repo', ws: 'fiabilite', owner: 'm', step: 's' }])).title, titreScope: lockText(V([{ scope: 'repo', ws: '', owner: 'm', step: 's' }])).title }));
 JS
 assert_eq "U1 — verrou plat : classe held ; partitionné : held ; absent : vide" "$(node "$AUX/locktext.mjs" "$ENG/assets/ui/70-vf-live.js" | node "$AUX/ev.mjs" 'j.plat+","+j.partitionne+","+j.libre')" "held,held,"
 assert_eq "U2 — infobulle du badge en lab plat : jamais « undefined », propriétaire et étape seuls" "$(node "$AUX/locktext.mjs" "$ENG/assets/ui/70-vf-live.js" | node "$AUX/ev.mjs" 'j.titrePlat')" "rev (x)"
