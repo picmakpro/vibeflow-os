@@ -130,22 +130,23 @@ done
 H r "$PORT" GET /api/vf/etat "{\"x-vf-cockpit-token\":\"$TOK\",\"Sec-Fetch-Site\":\"same-origin\"}" "$WORK/d3.txt"
 assert_eq "D3.2 — témoin : une route d'API avec son jeton répond toujours" "$(H statut "$WORK/d3.txt")" "200"
 cat > "$AUX/memo.mjs" <<'JS'
-// memo.mjs <sortie> <lab> <scripts> : (le module du cockpit : le code ne vient plus de la sortie, 79-06) le serveur du cockpit reconstruit-il la page Équipe à chaque appel ? (l'espion : inject est concaténé à chaque construction)
-import path from 'node:path'; import { pathToFileURL } from 'node:url';
+// memo.mjs <sortie> <lab> <scripts> : (le module du cockpit : le code ne vient plus de la sortie, 79-06) 79-16 : le serveur ne construit plus aucune page ; douze lectures de la route Équipe ne relisent
+// rien du gabarit (le compte de lectures de project.html, posé par un espion sur fs.readFileSync, ne bouge pas) ; un nouvel assemblage de la carte (load) le relit une fois.
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
 const [, , sortie, lab, scripts] = process.argv;
+let lectures = 0; const lire = fs.readFileSync; fs.readFileSync = function (p, ...a) { if (String(p).endsWith('project.html')) lectures++; return lire.call(this, p, ...a); };
 const { attach } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-server.mjs')).href);
-let n = 0; const inject = { replace: () => '<!--p-->', [Symbol.toPrimitive]: () => { n++; return '<!--i-->'; } };
-const VF = attach({ here: sortie, root: lab, token: 'ab'.repeat(16), inject, log: () => {} });
-// 79-15 : la page Équipe est une page en parties ; `inject` n'est concaténé qu'à la construction du DÉBUT, une fois par gabarit et par variante : la variante Projet passe par
-// inject.replace (sans compte), la variante Équipe par la concaténation (un compte). Valeurs recalculées à la main : premier appel = un chargement du gabarit = 1 ; second appel =
-// mêmes tampons, toujours 1 ; load() reconstruit le début et la fin = 2.
-let a = null; for (let i = 0; i < 100 && !(a = VF.pageEquipe()); i++) await new Promise((r) => setTimeout(r, 100));
-const b = VF.pageEquipe(); const apres2 = n;
-VF.load(); const c = VF.pageEquipe();
-console.log(JSON.stringify({ page: !!a && a.longueur > 1000, identique: a === b && a.avant === b.avant && a.donnees === b.donnees && a.apres === b.apres, constructions: apres2, apresLoad: n, debutNeuf: c.avant !== a.avant }));
+const VF = attach({ here: sortie, root: lab, token: 'ab'.repeat(16), log: () => {} });
+let reponses = 0; const requete = async () => { let fini = false; const res = { writeHead(c) { if (c === 200 || c === 503) reponses++; }, end() { fini = true; } };
+  VF.route({ method: 'GET', headers: { 'x-vf-cockpit-token': 'ab'.repeat(16), host: '127.0.0.1:5000' }, socket: { localPort: 5000 } }, res, new URL('http://127.0.0.1:5000/api/vf/graphe?onglet=equipe'));
+  for (let i = 0; i < 50 && !fini; i++) await new Promise((r) => setTimeout(r, 40)); };
+await requete(); const apres1 = lectures;
+for (let i = 0; i < 12; i++) await requete();
+const apres12 = lectures; VF.load();
+console.log(JSON.stringify({ pages: typeof VF.pageEquipe + typeof VF.pageProjet, repondu: reponses === 13, apres1, apres12, apresLoad: lectures }));
 VF.stop(); process.exit(0);
 JS
-assert_eq "D3.3 — deux appels sans rien de changé : la page Équipe n'est construite qu'une fois (mêmes tampons) ; un nouvel assemblage de la carte (load) reconstruit le début et la fin" "$(node "$AUX/memo.mjs" "$OUT" "$LAB" "$SCRIPTS" 2>&1 | tail -1)" '{"page":true,"identique":true,"constructions":1,"apresLoad":2,"debutNeuf":true}'
+assert_eq "D3.3 — douze lectures de la route Équipe ne construisent rien et ne relisent rien du gabarit (compte de lectures inchangé) ; un nouvel assemblage de la carte (load) le relit une fois" "$(node "$AUX/memo.mjs" "$OUT" "$LAB" "$SCRIPTS" 2>&1 | tail -1)" '{"pages":"undefinedundefined","repondu":true,"apres1":1,"apres12":1,"apresLoad":2}'
 
 echo "=== D4 — injection de version : « < » échappé (AUDC-B-06 1) ==="
 demarrer VF_FAKE_VERSION='</script><b id=zz>2.1.316'

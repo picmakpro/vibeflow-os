@@ -111,16 +111,19 @@ done
 assert_eq "H2 — un 403 (sans jeton) porte aussi les en-têtes" "$(hdr "$PORT" /api/vf/etat | node "$AUX/ev.mjs" '!!j["content-security-policy"]&&j["x-frame-options"]==="DENY"')" "true"
 PAGE="$WORK/page.html"; node "$AUX/req.mjs" "$PORT" GET /project.html | sed '1,2d' > "$PAGE"; CSP="$(hdr "$PORT" /project.html | node "$AUX/ev.mjs" 'j["content-security-policy"]')"
 for d in "connect-src 'self'" "frame-ancestors 'none'" "form-action 'none'" "img-src 'self' data:" "base-uri 'none'"; do assert_has "H3 — la CSP de la page contient « $d »" "$CSP" "$d"; done
-assert_eq "H4 — script-src sans 'unsafe-inline' ni 'unsafe-eval' ni origine" "$(printf '%s' "$CSP" | tr ';' '\n' | grep -E '^ *script-src' | grep -cE "unsafe-|http|\*|'self'")" "0"
+# 79-16 (A40) : script-src n'a plus « aucune origine » : sans 'unsafe-', sans *, sans 'self', et EXACTEMENT une source de chemin http://<hôte>/_vf/ (comptée)
+src_ok() { printf '%s' "$1" | tr ';' '\n' | grep -E '^ *script-src' | tr ' ' '\n' | awk -v p="http://127.0.0.1:$PORT/_vf/" -v q="'" 'index($0,"unsafe-")||index($0,"*")||index($0,q "self" q){bad++} /^http/{h++; if ($0==p) ok++} END{print (bad+0)"|"(h+0)"|"(ok+0)}'; }
+assert_eq "H4 — script-src sans 'unsafe-', sans *, sans 'self', et exactement une source de chemin http://<hôte>/_vf/" "$(src_ok "$CSP")" "0|1|1"
 CSPE="$(hdr "$PORT" /equipe.html | node "$AUX/ev.mjs" 'j["content-security-policy"]')"
-assert_eq "H4bis — la CSP de /equipe.html : script-src présent, sans 'unsafe-inline' ni 'unsafe-eval' ni origine" "$(printf '%s' "$CSPE" | tr ';' '\n' | grep -E '^ *script-src' | grep -cE "unsafe-|http|\*|'self'")|$(printf '%s' "$CSPE" | tr ';' '\n' | grep -cE '^ *script-src')" "0|1"
+assert_eq "H4bis — la CSP de /equipe.html : script-src présent, sans 'unsafe-', sans *, sans 'self', exactement une source de chemin http://<hôte>/_vf/" "$(src_ok "$CSPE")|$(printf '%s' "$CSPE" | tr ';' '\n' | grep -cE '^ *script-src')" "0|1|1|1"
 cat > "$AUX/empreintes.mjs" <<'JS'
 import fs from 'node:fs'; import crypto from 'node:crypto';
 const h = fs.readFileSync(process.argv[2], 'utf8'), csp = process.argv[3];
 const sc = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`);
-console.log(sc.length >= 6 && sc.every((s) => csp.includes(s)) ? 'tous' : `manque ${sc.filter((s) => !csp.includes(s)).length}/${sc.length}`);
+const ext = [...h.matchAll(/<script[^>]*\ssrc="([^"]*)"/g)].map((m) => m[1]); // 79-16 : le plancher est le compte réel des scripts en ligne (théme, classe, jeton : 3) ; aucun script à src hors du préfixe
+console.log(sc.length >= 2 && sc.every((s) => csp.includes(s)) && ext.every((u) => u.startsWith('/_vf/')) ? 'tous' : `manque ${sc.filter((s) => !csp.includes(s)).length}/${sc.length} hors-prefixe ${ext.filter((u) => !u.startsWith('/_vf/')).length}`);
 JS
-assert_eq "H5 — chaque script en ligne de la page a son empreinte dans la CSP" "$(node "$AUX/empreintes.mjs" "$PAGE" "$CSP")" "tous"
+assert_eq "H5 — chaque script en ligne du document a son empreinte dans la CSP, aucun script à src hors du préfixe /_vf/" "$(node "$AUX/empreintes.mjs" "$PAGE" "$CSP")" "tous"
 # mutant : les trois en-têtes neutralisés -> les assertions H1 doivent rougir
 cockpit_module_muter h6 serve.mjs "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-M1'#g; s#res.setHeader('X-Content-Type-Options'#res.setHeader('X-M2'#; s#res.setHeader('X-Frame-Options'#res.setHeader('X-M3'#"   # 79-06 : le serveur est celui du module, le mutant est une copie du module
 COCKPIT_MODULE="$COCKPIT_MODULE" srv "$OUT"; HM="$(hdr "$SRV_PORT" / "$(tok "$SRV_PORT" /)")"; unsrv; unset COCKPIT_MODULE
@@ -380,8 +383,8 @@ node "$SCRIPTS/vf-cockpit-build.mjs" "$LZ" > "$WORK/z.out" 2>&1; assert_eq "Y3 �
 ln -s "$WORK/dehors.txt" "$OUT/creds.txt"; cp "$OUT/graph.json" "$OUT/copie.json"; ln -s "$OUT/copie.json" "$OUT/lien-interne.json"
 srv "$OUT"
 assert_eq "Y4 — le serveur ne sert pas un lien vers un fichier extérieur" "$(sta "$SRV_PORT" GET /creds.txt)" "404"
-assert_eq "Y5 — témoin : un lien qui reste dans le dossier est servi" "$(sta "$SRV_PORT" GET /lien-interne.json)" "200"
-assert_eq "Y6 — témoin : /graph.json est servi" "$(sta "$SRV_PORT" GET /graph.json)" "200"; unsrv
+assert_eq "Y5 — un lien qui reste dans le dossier n'est pas servi non plus (404) ; témoin positif : /_vf/moteur.js répond 200 dans le même serveur (A41 : aucun fichier de la sortie n'est servi)" "$(sta "$SRV_PORT" GET /lien-interne.json)|$(sta "$SRV_PORT" GET /_vf/moteur.js)" "404|200"
+assert_eq "Y6 — /graph.json n'est pas servi (404) alors qu'il existe sur disque (le constat de 79-15 : remote et chemin du lab)" "$(sta "$SRV_PORT" GET /graph.json)|$([ -s "$OUT/graph.json" ] && echo existe)" "404|existe"; unsrv
 
 echo "=== E — « < » du graphe : aucun <!-- ni <script dans les données ==="
 cat > "$AUX/emb.mjs" <<'JS'
@@ -435,15 +438,18 @@ LX="$WORK/labX"; mklab "$LX"; node "$AUX/marquer.mjs" "$LX/.vibeflow/cockpit/pro
 # 79-15 (A42) : la page Projet est servie depuis l'instantané ; le réglage d'essai garde au serveur la source du gabarit (les marqueurs posés dans la page assemblée), sans fichier réécrit
 SRV_ENV="VF_COCKPIT_DONNEES_GABARIT=1"
 srv "$LX/.vibeflow/cockpit"; XP=$SRV_PORT; URLS=(); while read -r u; do URLS+=("http://127.0.0.1:$XP/$u"); done < "$WORK/urls.txt"
-assert_eq "X0 — témoin de présence : la page Projet servie porte au moins 10 marqueurs data-f= distincts (le réglage d'essai opère)" "$([ "$(node "$AUX/req.mjs" "$XP" GET /project.html | grep -o 'data-f=[A-Za-z.]*' | sort -u | awk 'END{print NR}')" -ge 10 ] && echo oui || echo non)" "oui"
+# 79-16 : la page ne porte plus de donnée ; le témoin lit la donnée là où le moteur la lit, la route de l'onglet Projet
+assert_eq "X0 — témoin de présence : la donnée de l'onglet Projet (route) porte au moins 10 marqueurs data-f= distincts (le réglage d'essai opère)" "$([ "$(node "$AUX/req.mjs" "$XP" GET "/api/vf/graphe?onglet=projet" "$(tok "$XP" /project.html)" | grep -o 'data-f=[A-Za-z.]*' | sort -u | awk 'END{print NR}')" -ge 10 ] && echo oui || echo non)" "oui"
 EXPR='[...document.querySelectorAll("[onerror]")].map((e)=>e.getAttribute("data-f")||"?")'
 XR="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "${URLS[@]}")"; unsrv
 assert_eq "X1 — témoin : les ${#URLS[@]} adresses (accueil, conteneurs, éléments) ont été chargées" "$(printf '%s' "$XR" | node "$AUX/ev.mjs" 'j.resultats?j.resultats.length:"mesure indisponible : "+j.erreur')" "${#URLS[@]}"
 assert_eq "X2 — aucun marqueur n'est devenu un élément, dans AUCUN champ" "$(printf '%s' "$XR" | node "$AUX/ev.mjs" 'j.resultats?[...new Set(j.resultats.flatMap(r=>r.valeur||[]))]:"mesure indisponible : "+j.erreur')" "[]"
-LM="$WORK/labXm"; mkdir -p "$LM/.planning"; cp -R "$LX/.vibeflow" "$LM/.vibeflow"; sed -i.bak 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' "$LM/.vibeflow/cockpit/project.html"
+LM="$WORK/labXm"; mkdir -p "$LM/.planning"; cp -R "$LX/.vibeflow" "$LM/.vibeflow"
+# 79-16 : le mutant est une COPIE DU MODULE dont les sources de page perdent h() sur le pied de carte (la page vient du module, plus de la sortie)
+MXM="$(cockpit_module_copie "$WORK/mod-x3")"; cockpit_page_muter_dans "$MXM" 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' 2>/dev/null
 # lecture POSITIVE (le pied de carte « foot » doit être détecté) : le PRET par défaut (logo de l'en-tête) accepte deux relevés vides identiques ; on attend donc que les cartes de la vue soient dessinées
 PRET_CARTES="document.readyState === 'complete' && !!document.querySelector('header .brand .mark') && document.querySelector('header .brand .mark').naturalWidth > 0 && document.querySelectorAll('.card').length >= 1"
-srv "$LM/.vibeflow/cockpit"; XM="$(CDP_PRET="$PRET_CARTES" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-1" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-2")"; unsrv
+COCKPIT_MODULE="$MXM" srv "$LM/.vibeflow/cockpit"; XM="$(CDP_PRET="$PRET_CARTES" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-1" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-2")"; unsrv
 assert_has "X3 — témoin rouge : sans h() sur le pied de carte, le champ « foot » est détecté" "$(printf '%s' "$XM" | node "$AUX/ev.mjs" 'j.resultats?[...new Set(j.resultats.flatMap(r=>r.valeur||[]))]:"mesure indisponible : "+j.erreur')" "foot"
 SRV_ENV=""
 fi

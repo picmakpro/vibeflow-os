@@ -139,8 +139,9 @@ assert_lt "D2.4 — latence du patch en ms" "$LAT" 5000
 # S2 (79-15) : un patch ne réécrit plus project.html ; la donnée vit en mémoire et la route la porte
 node "$AUX/route.mjs" "$PORT" "$PTOK" projet > "$WORK/route-projet.json"
 assert_eq "D2.5 — project.html SUR DISQUE est INCHANGÉ (phase 2 toujours à faire) et la route porte la phase 2 faite" "$(node "$AUX/pg.mjs" "$OUT" "$OUT/project.html" 'g.nodes.find(n=>n.id==="ph-2").st!=="done"')|$(node "$AUX/json.mjs" "$WORK/route-projet.json" 'j.nodes.find(n=>n.id==="ph-2").st')" "true|done"
-node "$AUX/get.mjs" "$PORT" /project.html | sed '1,2d' > "$WORK/servi.html"
-assert_eq "D2.6 — GET /project.html sert la phase 2 faite (le serveur a rechargé la page)" "$(node "$AUX/pg.mjs" "$OUT" "$WORK/servi.html" 'g.nodes.find(n=>n.id==="ph-2").st')" "done"
+# 79-16 : le document servi ne porte plus de donnée ; l'énoncé passe à la route, là où le moteur lit
+node "$AUX/route.mjs" "$PORT" "$PTOK" projet > "$WORK/route-projet2.json"
+assert_eq "D2.6 — GET /api/vf/graphe?onglet=projet sert la phase 2 faite (le serveur a rechargé la donnée)" "$(node "$AUX/json.mjs" "$WORK/route-projet2.json" 'j.nodes.find(n=>n.id==="ph-2").st')" "done"
 
 echo "=== D3 — PLAN ajouté -> structural, page réécrite et servie ==="
 assert_eq "D3.0 — témoin : le nouveau plan est absent de la page avant" "$(grep -c '02-01-PLAN.md' "$OUT/project.html")" "0"
@@ -152,7 +153,7 @@ assert_eq "D3.1 — un événement structural est reçu" "$(node "$AUX/ev.mjs" "
 assert_lt "D3.2 — latence du structural en ms" "$(( $(node "$AUX/ev.mjs" "$WORK/e3.jsonl" 'E.filter(e=>e.event==="structural")[0]?.abs||0') - T0 ))" 5000
 node "$AUX/route.mjs" "$PORT" "$PTOK" projet > "$WORK/route-projet3.json"
 assert_eq "D3.3 — project.html sur disque ne contient pas le nouveau plan, la route le contient" "$(grep -c '02-01-PLAN.md' "$OUT/project.html")|$([ "$(grep -c '02-01-PLAN.md' "$WORK/route-projet3.json")" -ge 1 ] && echo oui || echo non)" "0|oui"
-assert_eq "D3.4 — GET /project.html sert le nouveau plan" "$([ "$(node "$AUX/get.mjs" "$PORT" /project.html | grep -c '02-01-PLAN.md')" -ge 1 ] && echo oui || echo non)" "oui"
+assert_eq "D3.4 — GET /api/vf/graphe?onglet=projet sert le nouveau plan" "$([ "$(node "$AUX/route.mjs" "$PORT" "$PTOK" projet | grep -c '02-01-PLAN.md')" -ge 1 ] && echo oui || echo non)" "oui"
 assert_eq "D3.5 — le gabarit est conservé (titre de l'onglet et jeton du serveur)" "$(node "$AUX/get.mjs" "$PORT" /project.html | grep -c '<title>VibeFlow · Projet</title>')$(node "$AUX/token.mjs" "$PORT" /project.html | grep -c "$PTOK")" "11"
 assert_eq "D3.6 — l'écriture a été atomique : aucun .tmp résiduel (project.html.tmp, projet.json.tmp) et projet.json est là" "$(ls "$OUT" | grep -c -E 'project.html.tmp|projet.json.tmp')|$([ -f "$OUT/projet.json" ] && echo present || echo absent)" "0|present"
 

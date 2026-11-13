@@ -69,6 +69,18 @@ demarrer() { # demarrer <lab> [VAR=val …] -> PORT, TOK (jeton Code), PTOK (jet
   PORT="${VF_PORT:-0}"; TOK="$(node "$AUX/jeton.mjs" "$PORT" /index.html)"; PTOK="$(node "$AUX/jeton.mjs" "$PORT" /project.html)"
 }
 route() { gc get "$PORT" "$1" "${2-$PTOK}" "${3:-}"; } # route <chemin> [jeton] [hôte]
+# 79-16 : le document ne porte plus de donnée ; « ce que le moteur voit » se lit dans le navigateur, nœud par nœud (identifiant et statut), et se compare à la route
+CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
+REAL_HOME="$(node -e 'console.log(require("os").userInfo().homedir)')"
+vumoteur() { # vumoteur <adresse> -> « id|statut;… » des nœuds du graphe que le moteur a reçu (relevé relancé tant que la page se recharge : un changement de planning récent fait recharger la page Projet)
+  [ -n "$CHROME" ] || { . "$TESTS/chrome-saut.sh"; vf_chrome_saut "  ⊘ navigateur absent : ce que le moteur voit n'est pas relevé" >&2; echo sans-navigateur; return; }
+  local i o; for i in 1 2 3 4; do
+    o="$(REAL_HOME="$REAL_HOME" node "$TESTS/coquille-chrome.mjs" charger "$CHROME" "http://127.0.0.1:$PORT$1" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let j;try{j=JSON.parse(s)}catch{console.log("erreur:illisible");return}console.log(j.res?j.res[0].vus.join(";"):"erreur:"+j.erreur)})')"
+    case "$o" in ''|erreur:*) sleep 1 ;; *) printf '%s\n' "$o"; return ;; esac
+  done
+  printf '%s\n' "$o"
+}
+rv() { cj 'JSON.parse(j.corps).nodes.map((n)=>n.id+"|"+(n.st||"")).join(";")'; } # la même liste, lue dans le corps d'une route
 ROADMAP_2='- [x] **Phase 1: Socle** - premier jet\n- [x] **Phase 2: Suite** - deuxième jet\n- [ ] **Phase 3: Fin** - dernier jet\n'
 ROADMAP_3='- [x] **Phase 1: Socle** - premier jet\n- [x] **Phase 2: Suite** - deuxième jet\n- [x] **Phase 3: Fin** - dernier jet\n'
 ph2_fait() { route "/api/vf/graphe?onglet=projet" > "$WORK/r-ph2.json"; [ "$(cj 'JSON.parse(j.corps).nodes.find(n=>n.id==="ph-2").st' < "$WORK/r-ph2.json")" = done ]; }
@@ -123,8 +135,9 @@ assert_eq "G1.6b — pendant 3 s sans changement : aucun événement graphe (une
 
 node "$AUX/page.mjs" "$PORT" /project.html "$WORK/servi.html" > "$WORK/servi.meta"
 printf '%s' "$(route "/api/vf/graphe?onglet=projet" | cj 'j.corps')" > "$WORK/corps7.json"
-assert_eq "G1.7 — non-régression : GET /project.html sert la phase 3 faite, le titre « VibeFlow · Projet » et le jeton de la page" "$(node "$AUX/donnees.mjs" "$WORK/servi.html" 'g.nodes.find(n=>n.id==="ph-3").st')|$(grep -c '<title>VibeFlow · Projet</title>' "$WORK/servi.html")|$(grep -c "$PTOK" "$WORK/servi.html" | awk '{print ($1>=1)?"jeton":"sans"}')" "done|1|jeton"
-assert_eq "G1.7b — les données de la page servie égalent le corps de la route (hors dates de construction)" "$([ -s "$WORK/corps7.json" ] && node "$AUX/egal.mjs" "$WORK/servi.html" "$WORK/corps7.json" || echo route-vide)" "egal"
+# 79-16 : la phase 3 faite se lit dans ce que le moteur reçoit de la route ; le titre et le jeton restent ceux du document de l'adresse
+assert_eq "G1.7 — non-régression : le moteur voit la phase 3 faite ; le document de /project.html porte le titre « VibeFlow · Projet » et le jeton de la page" "$(vumoteur /project.html | tr ';' '\n' | grep '^ph-3|')|$(grep -c '<title>VibeFlow · Projet</title>' "$WORK/servi.html")|$(grep -c "$PTOK" "$WORK/servi.html" | awk '{print ($1>=1)?"jeton":"sans"}')" "ph-3|done|1|jeton"
+assert_eq "G1.7b — les nœuds (identifiants et statuts) que le moteur reçoit égalent ceux du corps de la route ; le document, lui, ne porte aucune donnée (hors dates de construction)" "$([ -s "$WORK/corps7.json" ] && [ "$(vumoteur /project.html)" = "$(route "/api/vf/graphe?onglet=projet" | rv)" ] && echo egal || echo diff)|$(grep -c 'ph-3' "$WORK/servi.html")" "egal|0"
 
 # G1.8 : l'outil de requête lit projet.json, jamais project.html
 LABQ="$WORK/labq"; mklab "$LABQ"; OUTQ="$LABQ/.vibeflow/cockpit"
@@ -209,15 +222,18 @@ assert_eq "G3.1 — Équipe : 200, schéma vibeflow/cockpit-equipe@1, ETag de 18
 route "/api/vf/graphe?onglet=code" "$TOK" > "$WORK/r-code.json"
 printf '%s' "$(cj 'j.corps' < "$WORK/r-code.json")" > "$WORK/corps-code.json"
 node "$AUX/page.mjs" "$PORT" /index.html "$WORK/index-servi.html" > /dev/null; node "$AUX/page.mjs" "$PORT" /project.html "$WORK/projet-servi.html" > /dev/null; node "$AUX/page.mjs" "$PORT" /equipe.html "$WORK/equipe-servi.html" > /dev/null
-assert_eq "G3.2a — Code : 200, schéma vf-cockpit/graph@1, corps égal en profondeur au graphe embarqué dans /index.html (même repos vidé)" "$(cj '[j.statut,JSON.parse(j.corps).schema].join("|")' < "$WORK/r-code.json")|$(node "$AUX/egal.mjs" "$WORK/corps-code.json" "$WORK/index-servi.html")" "200|vf-cockpit/graph@1|egal"
+assert_eq "G3.2a — Code : 200, schéma vf-cockpit/graph@1, les nœuds que le moteur reçoit sur /index.html égalent ceux du corps de la route" "$(cj '[j.statut,JSON.parse(j.corps).schema].join("|")' < "$WORK/r-code.json")|$([ "$(vumoteur /index.html)" = "$(rv < "$WORK/r-code.json")" ] && echo egal || echo diff)" "200|vf-cockpit/graph@1|egal"
 FUITE_REMOTE=""; for f in "$WORK/corps-code.json" "$WORK/index-servi.html" "$WORK/projet-servi.html" "$WORK/equipe-servi.html"; do FUITE_REMOTE="$FUITE_REMOTE $(grep -c -F "$MQ_REMOTE" "$f")"; done
 assert_eq "G3.2b — le marqueur du remote git est absent du corps Code, de /index.html, /project.html, /equipe.html ; témoin de présence : il est dans graph.json" "$(echo $FUITE_REMOTE)|$([ "$(grep -c -F "$MQ_REMOTE" "$OUT2/graph.json")" -ge 1 ] && echo present || echo absent)" "0 0 0 0|present"
 printf '%s' "$(route "/api/vf/graphe?onglet=projet" | cj 'j.corps')" > "$WORK/corps-p.json"; printf '%s' "$(route "/api/vf/graphe?onglet=equipe" | cj 'j.corps')" > "$WORK/corps-e.json"
 node "$AUX/page.mjs" "$PORT" /project.html "$WORK/projet-servi.html" > /dev/null; node "$AUX/page.mjs" "$PORT" /equipe.html "$WORK/equipe-servi.html" > /dev/null
-assert_eq "G3.3a — égalité route et page pour Projet et pour Équipe (zone de données extraite de la page servie)" "$(node "$AUX/egal.mjs" "$WORK/corps-p.json" "$WORK/projet-servi.html")|$(node "$AUX/egal.mjs" "$WORK/corps-e.json" "$WORK/equipe-servi.html")" "egal|egal"
+assert_eq "G3.3a — égalité route et graphe reçu par le moteur pour Projet et pour Équipe (comparaison dans le navigateur)" "$([ "$(vumoteur /project.html)" = "$(route "/api/vf/graphe?onglet=projet" | rv)" ] && echo egal || echo diff)|$([ "$(vumoteur /equipe.html)" = "$(route "/api/vf/graphe?onglet=equipe" "$TOK" | rv)" ] && echo egal || echo diff)" "egal|egal"
 bascule done
 printf '%s' "$(route "/api/vf/graphe?onglet=projet" | cj 'j.corps')" > "$WORK/corps-p.json"; node "$AUX/page.mjs" "$PORT" /project.html "$WORK/projet-servi.html" > /dev/null
-assert_eq "G3.3b — après un changement de planning, la page Projet servie égale toujours la route (et porte le changement)" "$(node "$AUX/egal.mjs" "$WORK/corps-p.json" "$WORK/projet-servi.html")|$(node "$AUX/donnees.mjs" "$WORK/projet-servi.html" 'g.nodes.find(n=>n.id==="ph-3").st')" "egal|done"
+# un changement de planning fait recharger la page Projet (structural) : le relevé est repris jusqu'à ce que la page posée porte la donnée de la route
+g33b() { VU33="$(vumoteur /project.html)"; [ "$VU33" = "$(route "/api/vf/graphe?onglet=projet" | rv)" ] && printf '%s' "$VU33" | grep -q 'ph-3|done'; }
+attendre 25 g33b
+assert_eq "G3.3b — après un changement de planning, ce que le moteur reçoit égale toujours la route (et porte le changement)" "$([ "$VU33" = "$(route "/api/vf/graphe?onglet=projet" | rv)" ] && echo egal || echo diff)|$(printf '%s' "$VU33" | tr ';' '\n' | grep '^ph-3|')" "egal|ph-3|done"
 
 cp "$OUT2/graph.json" "$WORK/graph.sauve"
 code_st() { route "/api/vf/graphe?onglet=code" "$TOK" | cj '[j.statut,(JSON.parse(j.corps||"{}").erreur||"")].join("/")'; }
@@ -240,19 +256,20 @@ assert_eq "G3.6c — témoin : le graph.json rétabli répond de nouveau 200" "$
 
 echo "=== G4 — pages en parties : CSP égale à l'oracle indépendant, longueur exacte, texte de planning qui ferme le script ==="
 cat > "$AUX/oracle.mjs" <<'JS'
-// oracle.mjs <corps.html> <script-src publié> : oracle INDÉPENDANT du module (regex sur le CORPS servi, sha256 base64 de chaque script en ligne, dédoublonné, ordre du document, zone de données comprise)
+// oracle.mjs <corps.html> <script-src publié> <source du préfixe> : oracle INDÉPENDANT du module (regex sur le CORPS servi, sha256 base64 de chaque script en ligne, dédoublonné, ordre du document, zone de données comprise)
 import fs from 'node:fs'; import crypto from 'node:crypto';
 const corps = fs.readFileSync(process.argv[2], 'utf8');
 const attendu = [...new Set([...corps.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`))].join(' ');
-console.log(attendu === process.argv[3] && attendu.length > 20 ? 'egal' : 'diff');
+const complet = `${attendu} ${process.argv[4]}`; // 79-16 (A40) : les empreintes des scripts en ligne puis, seule, la source du préfixe de /_vf/
+console.log(complet === process.argv[3] && attendu.length > 20 ? 'egal' : 'diff');
 JS
-csp_page() { local meta; meta="$(node "$AUX/page.mjs" "$PORT" "$1" "$WORK/csp-$2.html")"; node "$AUX/oracle.mjs" "$WORK/csp-$2.html" "${meta##*|}"; }
+csp_page() { local meta; meta="$(node "$AUX/page.mjs" "$PORT" "$1" "$WORK/csp-$2.html")"; node "$AUX/oracle.mjs" "$WORK/csp-$2.html" "${meta##*|}" "http://127.0.0.1:$PORT/_vf/"; }
 assert_eq "G4.1a — CSP de /project.html et de /equipe.html : la liste ordonnée des empreintes de script-src égale celle de l'oracle indépendant" "$(csp_page /project.html p)|$(csp_page /equipe.html e)" "egal|egal"
 printf -- '- [x] **Phase 1: Socle** - premier jet\n- [x] **Phase 2: Suite** - deuxième jet\n- [x] **Phase 3: Fin** - dernier jet\n- [ ] **Phase 4: </script><b id=zz>x** - piege\n' > "$LAB2/.planning/ROADMAP.md"
 hostile_vu() { route "/api/vf/graphe?onglet=projet" | grep -q 'zz'; }
 attendre 8 hostile_vu
 node "$AUX/page.mjs" "$PORT" /project.html "$WORK/csp-h.html" > "$WORK/csp-h.meta"
-assert_eq "G4.1b — un nom de phase « </script><b id=zz>x » : la page ne porte pas la balise brute, le texte est dans les données, la CSP reste égale à l'oracle" "$(grep -c '<b id=zz>' "$WORK/csp-h.html")|$([ "$(grep -c 'zz' "$WORK/csp-h.html")" -ge 1 ] && echo present || echo absent)|$(node "$AUX/oracle.mjs" "$WORK/csp-h.html" "$(cat "$WORK/csp-h.meta" | sed 's/.*|//')")" "0|present|egal"
+assert_eq "G4.1b — un nom de phase « </script><b id=zz>x » : le document ne porte ni la balise brute ni le texte (aucune donnée), le texte est dans le corps de la route, la CSP reste égale à l'oracle" "$(grep -c '<b id=zz>' "$WORK/csp-h.html")|$(grep -c 'id=zz' "$WORK/csp-h.html")|$([ "$(route "/api/vf/graphe?onglet=projet" | grep -c 'zz')" -ge 1 ] && echo route-presente || echo route-absente)|$(node "$AUX/oracle.mjs" "$WORK/csp-h.html" "$(cat "$WORK/csp-h.meta" | sed 's/.*|//')" "http://127.0.0.1:$PORT/_vf/")" "0|0|route-presente|egal"
 G42=""; for p in /project.html /equipe.html /index.html; do G42="$G42 $(node "$AUX/page.mjs" "$PORT" "$p" "$WORK/cl.html" | awk -F'|' '{print ($2==$3)?"egal":"diff:"$2"/"$3}')"; done
 assert_eq "G4.2 — Content-Length égal au nombre d'octets du corps pour /project.html, /equipe.html, /index.html" "$(echo $G42)" "egal egal egal"
 printf -- "$ROADMAP_3" > "$LAB2/.planning/ROADMAP.md"
