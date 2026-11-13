@@ -520,6 +520,15 @@ export default async function (h) {
     await tab('Régie');
     await h.attendre("!document.querySelector('.vf-fiche')", 'fiche fermée par la bascule');
     h.egal('P19.b', 'clic sur la vue déjà choisie (témoin) : la vue d\'origine revient, aucune inert', await vues(), [['regie', false, false], ['frise', true, false]]);
+    // le FOND de la bascule (le conteneur, hors d'un onglet) ne change aucune vue : la fiche reste ouverte ; une fois fermée, exactement une vue visible
+    await h.ouvrir('wk-2');
+    await h.ev(() => document.querySelector('#vf-equipe [role=tablist]').click());
+    await h.pause(300);
+    const ouverte = await h.ev(() => !!document.querySelector('.vf-fiche'));
+    await h.fermer();
+    const c = await vues();
+    h.egal('P19.c', 'clic sur le fond de la bascule, fiche ouverte : elle reste ouverte ; une fois fermée, UNE seule vue visible, aucune inert',
+      [ouverte, c.filter((v) => !v[1]).length, c.some((v) => v[2])], [true, 1, false]);
   });
 }
 JS

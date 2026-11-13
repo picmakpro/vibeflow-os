@@ -261,7 +261,7 @@
       if (e.defaultPrevented || e.key !== 'Escape' || !ouv) return;
       e.preventDefault(); e.stopPropagation(); fermer(true);
     });
-    ecouter(D, 'click', (e) => { if (ouv && e.target.closest && e.target.closest('#vf-equipe [role=tablist]')) fermer(false, false); });
+    ecouter(D, 'click', (e) => { if (ouv && e.target.closest && e.target.closest('#vf-equipe [role=tablist] [role=tab]')) fermer(false, false); });
     const surMq = () => { if (ouv) ouv.det.open = !mq.matches; };
     mq.addEventListener('change', surMq); retraits.push(() => mq.removeEventListener('change', surMq));
     monte = { ouvrir, fermer: () => fermer(true), ouverte: () => ouv !== null };
