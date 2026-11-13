@@ -18,7 +18,9 @@ import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { enteteGit } from './vf-cockpit-git-entete.mjs';
 import { ecrireArchitecture } from './vf-cockpit-code.mjs';
 import { insererGraphe } from './vf-cockpit-embed.mjs';
+import { ecrireProjet } from './vf-cockpit-graphe-fichier.mjs';
 import { renommerPageMoteur, MARQUEUR_LICENCE } from './vf-cockpit-rename.mjs';
+import * as prevues from './vf-cockpit-activite-prevues.mjs'; // 75-06 : cartes « prévues » (annotateur)
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export { OUTILS_ASSEMBLAGE, fichiersExecution }; // déplacés dans vf-cockpit-module.mjs (79-06) : ré-exportés pour leurs importeurs
@@ -95,6 +97,7 @@ export const ANNOTATEURS = [
   ['git', annoterGit],
   ['logos', annoterLogos],
   ['onglet', annoterOnglet],
+  ['prevues', prevues.annoterPrevues],
   ['schema', annoterSchema],
   ['touche', annoterTouche],
 ];
@@ -172,6 +175,8 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd, annotate
   fs.writeFileSync(path.join(sortie, 'index.html'), insererGraphe(html, { ...g, meta: { ...g.meta, repos: [] } }).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Code</title>'));
   project.meta.root = g.meta.root; project.meta.vfLogos = g.meta.vfLogos; project.meta.vfGit = g.meta.vfGit;
   fs.writeFileSync(path.join(sortie, 'project.html'), insererGraphe(html, project).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Projet</title>'));
+  // A29 : l'outil de requête de l'agent « Demander » le lit sans serveur
+  if (!ecrireProjet(lab, sortie, project)) throw fin(4, 'projet.json non écrit : la sortie du cockpit le refuse.');
 
   // bannière de licence (marque blanche : déjà faite sur la page du moteur, jamais sur les données du lab)
   for (const f of ['index.html', 'project.html']) {

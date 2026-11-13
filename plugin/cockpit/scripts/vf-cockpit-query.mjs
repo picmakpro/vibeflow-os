@@ -1,8 +1,9 @@
-// vf-cockpit-query (67-05, promu du spike 005 ; 79-06, SOCL-09, P79-D-09) : interroger le graphe Projet (project.html), comme query-cli.mjs
+// vf-cockpit-query (67-05, promu du spike 005 ; 79-06, SOCL-09, P79-D-09 ; 79-15, A29) : interroger le graphe Projet (projet.json), comme query-cli.mjs
 // le fait pour le graphe de code. L'agent de l'onglet Projet l'appelle PAR SON CHEMIN DANS LE MODULE (c'est l'un des deux seuls Bash que son
 // confinement autorise) ; les résultats portent st et foot. Le cœur de requête est lu dans graph-query.js du moteur du module (jamais dans
-// la sortie du lab, inscriptible par tout processus du lab) ; le lab est trouvé depuis le dossier courant et project.html est lu dans sa
-// sortie, après contrôle que le chemin reste sous le lab.
+// la sortie du lab, inscriptible par tout processus du lab) ; le lab est trouvé depuis le dossier courant et projet.json est lu dans sa
+// sortie (fichier ordinaire, schéma vérifié : absent ou invalide, l'outil refuse, jamais un repli sur project.html), après contrôle que le chemin
+// reste sous le lab.
 //
 // usage: node <module>/scripts/vf-cockpit-query.mjs overview
 //        node <module>/scripts/vf-cockpit-query.mjs find "<mots>" [--limit 15]
@@ -14,7 +15,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { extraireGraphe } from './vf-cockpit-embed.mjs';
+import { lireProjet } from './vf-cockpit-graphe-fichier.mjs';
 import { projectIndex, answerLocally } from './vf-cockpit-ask.mjs';
 import { findLabRoot, engineDir, outputDir, confiner } from './vf-cockpit-paths.mjs';
 
@@ -25,8 +26,9 @@ try {
   if (!lab) throw new Error('aucun lab (dossier .planning) trouvé depuis le dossier courant');
   const moteur = engineDir(here).chemin;
   if (!moteur) throw new Error('moteur du module introuvable à côté du dossier de scripts');
-  const page = confiner(lab, path.join(outputDir(lab), 'project.html'));
-  G = extraireGraphe(fs.readFileSync(page, 'utf8'));
+  const sortie = outputDir(lab);
+  confiner(lab, path.join(sortie, 'projet.json'));
+  G = lireProjet(sortie);
   // moteur de requête du graphe (graph-query.js du module), comme le serveur le charge
   const coreSrc = fs.readFileSync(path.join(moteur, 'assets', 'graph-query.js'), 'utf8');
   const { createGraphQuery } = new Function(`${coreSrc}; return { createGraphQuery };`)();

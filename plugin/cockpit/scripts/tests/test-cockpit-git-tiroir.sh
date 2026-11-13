@@ -81,7 +81,9 @@ mk_lab() {
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module, ou TIROIR_SCRIPTS pour jouer la suite contre une copie) ; pose OUT, PORT ; démarre le serveur (SRV)
   env $ENVX "$NODE" "${2:-${TIROIR_SCRIPTS:-$SCRIPTS}}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
-  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true
+  # 79-16 : la page vient du module que sert le serveur (/_vf/) : une copie mutée doit être CELLE QUE LANCE cockpit_lancer, pas seulement celle qui assemble
+  local mod=""; [ -n "${2:-${TIROIR_SCRIPTS:-}}" ] && mod="$(cd "${2:-$TIROIR_SCRIPTS}/.." && pwd -P)"
+  COCKPIT_MODULE="$mod" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true
   SRV="$VF_PID"
   PORT="$VF_PORT"
 }

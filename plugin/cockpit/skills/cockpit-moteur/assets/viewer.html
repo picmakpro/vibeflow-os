@@ -1134,6 +1134,7 @@ function roundedPath(pts, r = 10) {
 }
 
 let renderToken = 0;
+const apresDurables = []; // 79-16 : le rappel `after` d'un rendu supplanté ({ durable: true }) passe au rendu qui gagne : `ready` n'est jamais perdu
 async function render(opts = {}) {
   const token = ++renderToken;
   hideTip(); // the cards are about to be redrawn
@@ -1150,7 +1151,7 @@ async function render(opts = {}) {
   }
   clearTimeout(loading);
   indicateur.classList.remove('on', 'now');
-  if (token !== renderToken) return;
+  if (token !== renderToken) { if (opts.durable && opts.after) apresDurables.push(opts.after); return; }
   state.view = view; state.layout = res;
   queueMicrotask(() => emit('render', { container: state.container, view }));
   draw(view, res);
@@ -1160,6 +1161,7 @@ async function render(opts = {}) {
   if (opts.keepTransform) applyTransform(); else fit(false);
   applySelection();
   if (opts.after) opts.after();
+  for (const f of apresDurables.splice(0)) f();
 }
 
 function draw(view, res) {
@@ -2597,8 +2599,8 @@ state.container = init.v; state.selected = init.s;
 if (init.s && isPhone()) { document.body.classList.remove('no-panel'); $('#btn-panel').setAttribute('aria-expanded', 'true'); } // a shared link to a box opens its details
 const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();
 // vibeflow K5 : le premier rendu et `ready` attendent aussi que les scripts d'extension (ui/*.js, posés APRÈS ce script par la page) aient été exécutés (DOMContentLoaded) : polices déjà prêtes (Linux), `fontsReady` est résolue à la fin de ce script et le rendu partait avant eux (titre du panneau, définitions au focus posés sur un rendu déjà fait, écouteurs de `ready` posés trop tard)
-const extensionsPosees = document.readyState === 'loading' ? new Promise((ok) => document.addEventListener('DOMContentLoaded', ok, { once: true })) : Promise.resolve();
-Promise.all([fontsReady, extensionsPosees]).then(() => render({ nav: true, after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
+const extensionsPosees = window.VF_COQUILLE?.porteMoteur ? window.VF_COQUILLE.porteMoteur() : document.readyState === 'loading' ? /* vibeflow 79-16 : la coquille lève la porte du premier rendu une fois les extensions posées */ new Promise((ok) => document.addEventListener('DOMContentLoaded', ok, { once: true })) : Promise.resolve();
+Promise.all([fontsReady, extensionsPosees]).then(() => render({ nav: true, durable: true, after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
 })();
 </script>
 <!--__UI_EXTENSIONS__-->

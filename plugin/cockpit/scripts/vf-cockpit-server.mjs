@@ -1,7 +1,7 @@
 // vf-cockpit-server — le crochet VibeFlow du serveur unique (67-04, P67-D-13, P67-D-14). Le serveur patché
 // (serve.mjs, patch P13) l'importe à côté de lui et lui délègue tout /api/vf/* APRÈS son contrôle du Host et du
 // jeton : même port que la page, aucun en-tête CORS. Le direct vient de vf-cockpit-live.mjs.
-// Export : attach({ here, root, token, inject, log, routes = ROUTES, scriptsDir = trustedScriptsDir() }) -> { ptoken, load, pageProjet, pageEquipe, jetonValide,
+// Export : attach({ here, root, token, log, routes = ROUTES, scriptsDir = trustedScriptsDir() }) -> { ptoken, load, jetonValide,
 //   route, stop, avantQuestion, modes, argsAgent, substituerConsigne } (les quatre derniers : crochets P14 des questions, 67-05 ; 79-06 : le dossier du module,
 //   parent du dossier de scripts, remplace le jeton `<module>` des consignes et des règles de l'agent ; refusé ou introuvable, l'agent est indisponible), ROUTES, repondreGardee.
 // Routes GET /api/vf/* : la table ROUTES (une ligne par route : chemin, lecteur, régime). Ajouter une route = un lecteur et UNE ligne à sa place
@@ -9,6 +9,12 @@
 //   JSON simple, comportement antérieur) et FLUX (le lecteur écrit le flux). Mécanisme : vf-cockpit-routes.mjs. Le sous-routeur Git (/api/vf/git…)
 //   et celui du lanceur (/api/vf/lancer/cibles · POST /api/vf/lancer, SEULEMENT sous `--terminal`) restent des délégués placés après la table.
 // GET /api/vf/state (79-12, SOCL-16) : l'état du cockpit en une enveloppe, lu en mémoire (vf-cockpit-state.mjs) ; jamais une collecte à la demande.
+// GET /api/vf/frise (79-13, SOCL-17) : les voies des 24 dernières heures (heures, durées, jetons, segments, état officiel, nœud, cibles
+// réduites au lab), lues en mémoire (vf-cockpit-frise.mjs) ; jamais une collecte, jamais un fichier du lab.
+// GET /api/vf/graphe?onglet=code|projet|equipe (79-15, SOCL-19) : la donnée de la page de l'onglet, ETag et 304 ; événement `graphe` { seq, at,
+// onglet, sig } après chaque instantané,
+// au seul changement de signature. project.html n'est plus réécrit ni servi (79-16 : le document de la coquille, vf-cockpit-coquille.mjs, ne porte aucune
+// donnée) ; son gabarit n'est plus lu que pour la méta de base et le repli avant le premier instantané ; `projet.json` (A29) pour l'outil de requête.
 // La dernière commande et le transcript ne figurent jamais dans le flux ni dans un fichier : la garde d'émission refuse tout
 // objet qui porte une clé de la liste `interdits` du contrat (vf-cockpit-interface.json, à côté), à n'importe quelle profondeur.
 // Contrat illisible ou liste vide : rien n'est émis (fermé par défaut).
@@ -18,11 +24,13 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { startLive } from './vf-cockpit-live.mjs';
 import { revealDoing, revealTranscript } from './vf-cockpit-who.mjs';
-import { resolveScriptsDir, trustedScriptsDir, finDans } from './vf-cockpit-paths.mjs';
+import { resolveScriptsDir, trustedScriptsDir } from './vf-cockpit-paths.mjs';
 import { dossierModule, substituerModule } from './vf-cockpit-module.mjs';
 import { ID_RE } from './vf-cockpit-lecture.mjs';
-import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
-import { buildEquipeGraph, missionsEnCours } from './vf-cockpit-equipe-carte.mjs';
+import { creerGraphes } from './vf-cockpit-graphe.mjs';
+import { creerRouteGraphe } from './vf-cockpit-graphe-route.mjs';
+import { ecrireProjet, lireProjet, lireGrapheCode } from './vf-cockpit-graphe-fichier.mjs';
+import { instantane, surInstantane } from './vf-cockpit-instantane.mjs';
 import { answerLocally, instructions } from './vf-cockpit-ask.mjs';
 import { MODELES, resoudreModele, argsAgent as argsConfines } from './vf-cockpit-agent.mjs';
 import { routeGit } from './vf-cockpit-git.mjs';
@@ -30,10 +38,11 @@ import { creerLancer } from './vf-cockpit-lancer.mjs';
 import { HISTORIQUE, FLUX, reponse, controlerAcces, creerRepartiteur } from './vf-cockpit-routes.mjs';
 import { lireState, LECTEURS } from './vf-cockpit-state.mjs';
 import { brancherFluxEtat, VIE_MS } from './vf-cockpit-flux-etat.mjs';
-import os from 'node:os';
-import { ailleurs, demander, REPIT_MS } from './vf-cockpit-etat-officiel.mjs';
-import { arbresGitAsync } from './vf-cockpit-arbres.mjs';
+import { lireFrise } from './vf-cockpit-frise.mjs';
+import { brancherFluxFrise } from './vf-cockpit-frise-direct.mjs';
+import { routeActivite } from './vf-cockpit-activite.mjs';
 import { lireTracabilite } from './vf-cockpit-trace.mjs';
+import { lireAilleurs } from './vf-cockpit-route-ailleurs.mjs';
 
 let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
 try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
@@ -43,18 +52,18 @@ const porteInterdit = (o) => !INTERDITS.length || (!!o && typeof o === 'object' 
 const memeJeton = (a, b) => { if (typeof a !== 'string' || typeof b !== 'string') return false; const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 
 // réponse gardée (A11, C0) : accès contrôlé (`acces` obligatoire), puis garde d'émission, puis en-têtes, puis écriture ; jamais de CORS
-export function repondreGardee(req, res, corps, { code = 200, entetes = {}, acces, log = () => {} } = {}) {
+export function repondreGardee(req, res, corps, { code = 200, entetes = {}, acces, log = () => {}, controle, brut } = {}) {
   if (typeof acces !== 'function') throw new Error('repondreGardee : contrôle d\'accès absent');
   const a = acces(req);
   if (!a || a.ok !== true) { res.writeHead(Number(a && a.code) || 403); res.end(); return; }
   const base = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }; // garde:reponse-nostore
-  if (corps !== undefined && porteInterdit(corps)) {
+  if (corps !== undefined && porteInterdit(controle !== undefined ? controle : corps)) {
     log('error', 'réponse refusée : contenu interdit ou contrat illisible');
     res.writeHead(503, base); res.end('{"erreur":"emission-refusee"}'); return; // garde:reponse-503
   }
   const extra = {};
   for (const [k, v] of Object.entries(entetes || {})) if (!/^(access-control-|content-type$|cache-control$)/i.test(k)) extra[k] = v;
-  res.writeHead(code, { ...extra, ...base }); res.end(corps === undefined ? undefined : JSON.stringify(corps));
+  res.writeHead(code, { ...extra, ...base }); res.end(corps === undefined ? undefined : typeof brut === 'string' ? brut : JSON.stringify(corps));
 }
 
 // lecteurs : `lecteur(ctx, req, url)` rend un corps JSON, une reponse(…) ou une promesse de l'un ou de l'autre ; ctx est gelé (root, here, log, dep, clients, journal, live, fluxFerme)
@@ -72,32 +81,6 @@ const lireTranscript = (c, req, url) => { // à la demande seulement, jamais jou
 const lireModeles = (c) => {
   let reel = c.root; try { reel = fs.realpathSync(c.root); } catch {} // le lab peut disparaître en cours de route : jamais une exception
   return { modeles: MODELES, defaut: c.dep.modele, lab: crypto.createHash('sha256').update(reel).digest('hex').slice(0, 12) };
-};
-// GET /api/vf/ailleurs (73-02, P73-D-16, P73-D-35) : sessions d'AUTRES labs qui vous attendent, par NOM de lab seulement ; dérive de
-// la dernière lecture officielle gardée en mémoire de CE processus (la collecte lit la sienne dans son fil : invisible ici ;
-// `demander` relance la lecture au plus une fois par REPIT_MS, jamais une par requête). Les arbres du lab sont relus au plus une
-// fois par REPIT_MS ; jamais de git dans un autre dépôt ; la route attend (BORNE_AILLEURS_MS) les lectures en vol, null si aucune lecture fraîche n'aboutit.
-// Garde d'émission propre à ailleurs@1 (audit 73-02) : la liste d'interdits de who@2 (porteInterdit) ne dit rien de ce contrat ;
-// chaque entrée a EXACTEMENT les clés { lab, n }, sinon elle ne sort pas.
-const exacte = (e) => !!e && typeof e === 'object' && Object.keys(e).sort().join() === 'lab,n';
-const racinesLab = new Map(); // racine du lab -> { at, liste }
-const BORNE_AILLEURS_MS = 3000; // revue 73 : la route attend les lectures en vol, au plus ce temps (la boucle reste libre : attente asynchrone)
-const lireAilleurs = async (c) => {
-  const now = Date.now();
-  const officiel = demander({ home: os.homedir(), cwd: c.root });
-  let m = racinesLab.get(c.root);
-  if (!m) { m = { at: 0, liste: null, enCours: false, vol: null }; racinesLab.set(c.root, m); }
-  if (!m.enCours && now - m.at >= REPIT_MS) { // lecture ASYNCHRONE (P78-D-41) ; la route attend sa fin, bornée
-    m.enCours = true; m.at = now;
-    m.vol = arbresGitAsync(c.root, { fin: finDans(5000) }).then((a) => { m.liste = a.map((t) => t.chemin); }, () => { m.liste = null; })
-      .finally(() => { m.enCours = false; });
-  }
-  let minuteur; // lectures en vol (état officiel, arbres du lab) attendues ensemble ;
-  // au-delà de la borne : ce que la mémoire porte déjà (null si rien de frais)
-  await Promise.race([Promise.all([officiel, m.enCours ? m.vol : null]), new Promise((fin) => { minuteur = setTimeout(fin, BORNE_AILLEURS_MS); })]);
-  clearTimeout(minuteur);
-  const l = ailleurs(os.homedir(), { racines: m.liste });
-  return { schema: 'vibeflow/cockpit-ailleurs@1', ailleurs: Array.isArray(l) ? l.filter(exacte) : l };
 };
 function ouvrirFlux(c, req, url, res) {
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
@@ -118,10 +101,13 @@ function ouvrirFlux(c, req, url, res) {
 
 // la table des routes (A10) : une ligne par route, ordre alphabétique par chemin ; sans régime = gardée
 export const ROUTES = [
+  ['/api/vf/activite', routeActivite],
   ['/api/vf/ailleurs', lireAilleurs],
   ['/api/vf/doing', lireDoing, HISTORIQUE],
   ['/api/vf/etat', lireEtat, HISTORIQUE],
   ['/api/vf/events', ouvrirFlux, FLUX],
+  ['/api/vf/frise', lireFrise],
+  ['/api/vf/graphe', (c, req, url) => c.routeGraphe(c, req, url)],
   ['/api/vf/journal', lireJournal, HISTORIQUE],
   ['/api/vf/modeles', lireModeles, HISTORIQUE],
   ['/api/vf/state', lireState],
@@ -129,18 +115,29 @@ export const ROUTES = [
   ['/api/vf/transcript', lireTranscript, HISTORIQUE],
 ];
 
-export function attach({ here, root, token, inject, log = () => {}, routes = ROUTES, scriptsDir = trustedScriptsDir(), vieMs = VIE_MS }) {
+export function attach({ here, root, token, log = () => {}, routes = ROUTES, scriptsDir = trustedScriptsDir(), vieMs = VIE_MS }) {
   const dossier = dossierModule(scriptsDir); // racine réelle du module (null si introuvable : jamais une exception ici, l'agent est refusé à la question)
   const ptoken = crypto.randomBytes(16).toString('hex'); // onglet Projet : dit de quel onglet vient une requête
-  let pageP = null, GP = null, gabarit = null, genP = 0, memoE = null; // genP : génération du gabarit ; memoE : la page Équipe déjà construite (AUDC-B-03)
-  const load = () => { // relue après chaque réécriture de project.html par le direct
-    genP++;
-    try {
-      const html = fs.readFileSync(path.join(here, 'project.html'), 'utf8');
-      GP = extraireGraphe(html); gabarit = html; pageP = html.replace('</head>', inject.replace(token, ptoken) + '</head>');
-    } catch { pageP = null; GP = null; gabarit = null; }
+  let charge = false;
+  const memoCode = {};
+  const graphes = creerGraphes({
+    forcerGabarit: process.env.VF_COCKPIT_DONNEES_GABARIT === '1', // réglage d'essai (A42)
+    code: () => lireGrapheCode(here, memoCode),
+    nomDe: (p) => String(p?.project?.name || '').replace(/ — Projet$/, '') || p?.meta?.rootName || path.basename(root),
+    gardeWho: (w) => !!INTERDITS.length && !(w && porteInterdit(w)),
+  });
+
+  // lecture en mémoire (A31), jamais une collecte
+  const majGraphes = () => graphes.maj({ projet: instantane()?.projet, who: live ? live.snapshot()?.who : null, lancees: lancer.lancees() });
+  // à l'attache (au premier besoin) et à chaque nouvel assemblage de la carte : le gabarit n'est plus relu à chaque événement du direct
+  const load = () => {
+    charge = true;
+    try { graphes.recharger(fs.readFileSync(path.join(here, 'project.html'), 'utf8')); } catch { graphes.recharger(''); }
+    majGraphes();
+    // projet.json absent ou invalide : réécrit (A29)
+    try { lireProjet(here); } catch { const c = graphes.courant('projet'); if (c) ecrireProjet(root, here, c.g); }
   };
-  load();
+  const frais = () => { if (!charge) load(); majGraphes(); return graphes; };
   const lancer = creerLancer({ root, here, ptoken, log });
   if (!INTERDITS.length) log('error', 'contrat illisible : la liste des clés interdites est vide, rien ne sera émis');
   const dep = resoudreModele({ env: process.env });
@@ -165,15 +162,28 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
   const aClient = () => clients.size > 0 || LECTEURS.actif(); // garde:lecteur-arme
   let live = null;
   try {
-    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); }, aClient, nbClients: () => clients.size, garde: (o) => !porteInterdit(o) }); // AUDC-H2 : le filet ne collecte que si un onglet écoute ; garde : l'instantané passe la garde d'émission avant sa pose
+    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => diffuser(nom, data), aClient, nbClients: () => clients.size, garde: (o) => !porteInterdit(o) }); // AUDC-H2 : le filet ne collecte que si un onglet écoute ; garde : l'instantané passe la garde d'émission avant sa pose
   } catch (e) { log('error', `direct indisponible : ${e.message}`); }
   const fluxEtat = brancherFluxEtat({ diffuser, seq: () => (live ? live.etat().seq : 0), nbClients: () => clients.size, vieMs }); // 79-12 : `vie` et `etat`
+  const fluxFrise = brancherFluxFrise({ diffuser, seq: () => (live ? live.etat().seq : 0) }); // 79-13 : `frise` à la fin d'un tour de collecte
   lancer.sourceWho(() => (live ? live.snapshot().who : null)); // états attendue / vue / terminee des cartes lancées (72-07)
+  // A5 : projet.json AVANT l'événement, un `graphe` par onglet dont la signature a changé, jamais au démarrage
+  const retirerInstantane = surInstantane((inst) => {
+    try {
+      const dues = frais().dues();
+      if (dues.includes('projet')) ecrireProjet(root, here, graphes.courant('projet').g);
+      for (const o of dues) {
+        const sig = graphes.courant(o).sig;
+        diffuser('graphe', { seq: inst.seq, at: Date.now(), onglet: o, sig }); graphes.emises(o, sig);
+      }
+    } catch (e) { log('error', `événement graphe : ${e.message}`); }
+  });
 
   const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
 
   const acces = (req) => controlerAcces(req, { jetonValide: (j) => memeJeton(j, token) || memeJeton(j, ptoken) }); // le jeton de la page Code ou celui de la page Projet
-  const contexte = Object.freeze({ root, here, log, dep, clients, journal, get live() { return live; }, fluxFerme: () => { dernierFlux = Date.now(); } });
+  const routeGraphe = creerRouteGraphe({ graphes: { courant: (o) => frais().courant(o) } });
+  const contexte = Object.freeze({ root, here, log, dep, clients, journal, routeGraphe, get live() { return live; }, fluxFerme: () => { dernierFlux = Date.now(); } });
   const repondre = (req, res, corps, o) => repondreGardee(req, res, corps, { ...o, acces, log });
   const repartiteur = creerRepartiteur({ table: routes, contexte, repondre, json, acces, log });
 
@@ -188,6 +198,7 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
 
   // ---- crochets des questions (P14) : la page d'où vient la question se reconnaît à son jeton ----
   function avantQuestion({ req, body, send }) {
+    const GP = frais().courant('projet')?.g; // le graphe Projet de la mémoire, jamais relu d'une page
     body.project = memeJeton(req.headers['x-vf-cockpit-token'], ptoken) && !!GP; // jamais lu du corps : le navigateur ne le fixe pas
     const r = resoudreModele({ choix: body.model, env: process.env });
     if (r.erreur) { send('failure', { code: 'modele_refuse', message: `Modèle refusé : seuls ${MODELES.join(', ')} sont admis.` }); return 'repondu'; }
@@ -202,35 +213,19 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
   }
   const substituerConsigne = (texte) => substituerModule(texte, dossier); // lève (français) si le dossier du module est refusé : appelée à la question, jamais au chargement
   const modes = (MODES, body) => { // flow et change gardent leur schéma ; chaque consigne reçoit le chemin du module à la place du jeton
-    const base = body.project && GP ? { ...MODES, ask: { ...MODES.ask, instructions: instructions(GP) } } : MODES;
+    const GP = frais().courant('projet')?.g, base = body.project && GP ? { ...MODES, ask: { ...MODES.ask, instructions: instructions(GP) } } : MODES;
     return Object.fromEntries(Object.entries(base).map(([nom, m]) => [nom, { ...m, instructions: substituerConsigne(m.instructions) }]));
   };
   const argsAgent = (args, body) => argsConfines(args, { modele: body.modeleResolu || resoudreModele({ env: process.env }).modele, dossierModule: dossier });
 
   return {
     ptoken, load, route, avantQuestion, modes, argsAgent, substituerConsigne,
-    pageProjet: () => pageP,
-    // onglet Équipe (69-05, P69-D-17) : construite en mémoire depuis le gabarit de project.html, jamais écrite ; jeton de la page Code (inject tel quel)
-    // AUDC-B-03 : mémorisée tant que rien n'a changé (même gabarit, même instantané du direct, mêmes cartes lancées) : une requête de plus ne reconstruit pas 2,5 Mo
-    pageEquipe: () => {
-      if (!gabarit) return null;
-      live?.reveil?.();
-      const who = live ? live.snapshot().who : null;
-      if (!INTERDITS.length || (who && porteInterdit(who))) { log('error', 'page Équipe refusée : contrat illisible ou contenu interdit'); return null; } // même garde que le flux, fermée par défaut
-      // `nom` : celui que la page Projet affiche (P69-D-33), jamais le nom du dossier
-      const cles = JSON.stringify([...lancer.lancees()]);
-      if (memoE && memoE.gen === genP && memoE.who === who && memoE.cles === cles) return memoE.html;
-      const g = buildEquipeGraph(who, { nom: String(GP?.project?.name || '').replace(/ — Projet$/, '') || GP?.meta?.rootName || path.basename(root), racine: GP?.meta?.root, logos: GP?.meta?.vfLogos, git: GP?.meta?.vfGit, missions: missionsEnCours(GP), lancees: lancer.lancees() }); // 78-04 : en-tête Git et bloc de vue
-      const html = insererGraphe(gabarit, g).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Équipe</title>').replace('</head>', () => inject + '</head>');
-      memoE = { gen: genP, who, cles, html };
-      return html;
-    },
     dernierFlux: () => dernierFlux,
     ouverts: () => clients.size, // AUDC-H3 : des flux de page ouverts retiennent l'arrêt sur inactivité
     jetonValide: (j) => memeJeton(j, ptoken),
     // AUDC-H1 : une page n'ouvre qu'UN flux (celui-ci). Le rechargement de la carte y passe (sans séquence ni journal : la page se recharge) et chaque flux ouvert compte comme une page ouverte.
     diffuserCarte: (nom, data) => { if (nom !== 'reload') return; const s = `event: reload\ndata: ${JSON.stringify(data || {})}\n\n`; for (const c of clients) c.write(s); },
     nbPages: () => clients.size,
-    stop() { fluxEtat.stop(); live?.stop(); for (const c of clients) c.end(); },
+    stop() { retirerInstantane(); fluxEtat.stop(); fluxFrise.stop(); live?.stop(); for (const c of clients) c.end(); },
   };
 }

@@ -10,6 +10,7 @@ import { pathToFileURL } from 'node:url';
 import { planningLayout } from './vf-cockpit-paths.mjs';
 import { readPlanning, lireConfine, lister, read, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
 import { texte } from './vf-cockpit-formats.mjs';
+import { listeImbriquee } from './vf-cockpit-frontmatter.mjs';
 import { trouverPhase, LIBELLES_RESTE, LIBELLES_MISSION, LIBELLES_ETAT } from './vf-cockpit-avancement.mjs';
 import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
 import { detectDrift, commandeCorrectif } from './vf-cockpit-drift.mjs';
@@ -29,6 +30,14 @@ function piedJalon(ks) {
 
 // contenu de la première balise <objective> (indexOf : une balise sans fermeture ne fait pas rebalayer le texte pour chaque ouverture)
 const objectif = (t) => { const a = t.indexOf('<objective>'); if (a < 0) return undefined; const b = t.indexOf('</objective>', a + 11); return b < 0 ? undefined : t.slice(a + 11, b).replace(/^\s+/, ''); };
+
+// P75-D-24 : `files_modified` d'un plan (ligne ou bloc), borné à 200 chemins de 4 096 octets ;
+// l'excédent est compté dans `touchedIgnores`, jamais tronqué en silence
+const fichiersPlan = (txt) => {
+  const tous = listeImbriquee(txt, ['files_modified'], { max: 1 << 20 });
+  const gardes = tous.filter((c) => Buffer.byteLength(c) <= 4096).slice(0, 200);
+  return { touched: gardes, touchedIgnores: tous.length - gardes.length };
+};
 
 // PU-G-102 : le texte d'un jalon ou d'une phase vient du ROADMAP en markdown : commentaires d'archive (`<!-- vf-archive … -->`, fermés ou non), gras, accents graves et liens sont retirés à la SOURCE,
 // le panneau n'affiche jamais de balisage brut. Un commentaire jamais fermé court jusqu'à la fin du texte (un seul passage : coût linéaire).
@@ -134,9 +143,9 @@ function construireGraphe(root, { layout } = {}) {
     for (const pf of planFiles) {
       const txt = texte(read(path.join(dir, pf))); const meta = fm(txt); const pid = pf.replace('-PLAN.md', '');
       const obj = objectif(txt) || /^#\s+(.*)$/m.exec(txt)?.[1] || '';
-      const touched = list(meta.files_modified); const p = rel(path.join(dir, pf));
+      const { touched, touchedIgnores } = fichiersPlan(txt); const p = rel(path.join(dir, pf));
       file({ p, n: id, name: `${pid} — ${clip(obj.split('\n').find((l) => l.trim()) || '', 70)}`, d: sentence(obj, 220), st: sums.has(pid) || ph.done ? 'done' : enCours.some((x) => x.id === pid || (Array.isArray(x.scope) && x.scope.includes(p))) ? 'active' : 'todo',
-        foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, touched,
+        foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, ...(touched.length ? { touched } : {}), ...(touchedIgnores ? { touchedIgnores } : {}),
         vague: vagues.get(pf) ?? null });
       for (const dep of list(meta.depends_on)) { const dp = planFiles.find((x) => x.startsWith(dep.length <= 3 ? `${pf.split('-')[0]}-${dep.padStart(2, '0')}` : dep)); if (dp) link('f:' + rel(path.join(dir, dp)), 'f:' + p, 'import', 'puis'); }
       for (const r of list(meta.requirements)) { const rq = reqOf(r, ph.ws); if (rq) link('f:' + p, 'f:' + reqPath(rq), 'data', 'couvre'); }

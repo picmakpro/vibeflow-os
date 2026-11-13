@@ -7,14 +7,16 @@
 //           etapeTour({ racine, sortie, scriptsDir, home, memo, maintenant, sansIndex })
 //           (verrou lu une fois ; équipe avec l'état officiel et CE MÊME verrou ; verrous projetés avec les sessions de la collecte ; signal construit sur
 //           cette équipe et ces verrous ; puis l'index des transcripts, sauf sansIndex) -> { verrous, equipe, signal, erreurs, dureeMs, index }
-//           (index : rapport en comptes ; les voies restent dans memo.index ; memo.sessions : sessions de la dernière équipe lue).
-// `erreurs` : noms d'étapes d'une liste fermée (`verrous`, `equipe`, `signal`, `index`, et `tour` posté par le fil quand le tour entier lève) ;
+//           (index : rapport en comptes ; les voies restent dans memo.index ; memo.sessions : sessions de la dernière équipe lue ;
+//           `frise` : { messages, reste } de l'étape de frise, 79-13, jamais posté dans le message `tour`).
+// `erreurs` : noms d'étapes d'une liste fermée (`verrous`, `equipe`, `signal`, `index`, `frise`, et `tour` posté par le fil quand le tour entier lève) ;
 // un échec laisse un résultat neutre, comme la collecte d'avant : le tour dégrade, il ne lève jamais.
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { collectWho } from './vf-cockpit-who.mjs';
 import { lireRegie } from './vf-cockpit-regie-lecture.mjs';
 import { driverLockScript, shBorne } from './vf-cockpit-paths.mjs';
 import { etapeIndex } from './vf-cockpit-collecte-index.mjs';
+import { etapeFrise } from './vf-cockpit-collecte-frise.mjs';
 import { verrousDe } from './vf-cockpit-vie.mjs';
 import { collectSignal, projeterVerrous } from './vf-cockpit-signal.mjs';
 
@@ -65,5 +67,7 @@ export function etapeTour({ racine, sortie, scriptsDir, home, memo = creerMemoir
   let index;
   const VIDE = { etat: 'erreur', tronque: false, voies: 0, formeInconnue: 0, evinces: 0 };
   try { index = etapeIndex({ racine, sortie, home, memo, who: equipe.workers, maintenant, sansIndex }); } catch { erreurs.push('index'); index = VIDE; }
-  return { verrous, equipe, signal, erreurs, dureeMs: Math.max(1, Date.now() - t0), index };
+  let frise = null; // 79-13 : la frise lit les voies gardées dans memo.index ; index suspendu ou en erreur, aucune frise
+  if (!sansIndex && index.etat !== 'erreur') { try { frise = etapeFrise({ racine, home, memo, equipe, maintenant }); } catch { erreurs.push('frise'); } }
+  return { verrous, equipe, signal, erreurs, dureeMs: Math.max(1, Date.now() - t0), index, frise };
 }

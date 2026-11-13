@@ -85,6 +85,40 @@
     "vibeflow/cockpit-doing@1": {
       "requis": { "schema": "string", "id": "string", "doing": "any" }
     },
+    "vibeflow/cockpit-frise@1": {
+      "description": "frise des voies des dernières 24 h, lue en mémoire (79-13, GET /api/vf/frise) ; cibles jamais persistées",
+      "requis": { "schema": "string", "at": "string", "depuis": "number", "jusqua": "number", "fenetreS": "number", "source": "object",
+        "voiesOmises": "number", "tronque": "boolean", "voies": "array" },
+      "voie": ["id", "kind", "session", "parent", "depth", "role", "arbre", "background", "debut", "fin", "dispatchA", "fini", "arrete", "etatOfficiel",
+        "modeles", "compteurs", "jetons", "durees", "segments", "evenements", "enCours", "rattachement", "cibles"],
+      "source": { "requis": ["etat", "ccVerifie", "versionsVues"], "etats": ["ok", "en-construction", "partielle", "forme-inconnue", "indisponible"] },
+      "segments": ["travail", "attend-agents", "attend-humain", "repos", "silence"],
+      "evenements": ["compaction", "erreur", "humain", "rapport", "dispatch"],
+      "champs": ["cibles"],
+      "outils": { "lectures": ["Read"], "ecritures": ["Write", "Edit", "MultiEdit", "NotebookEdit"] },
+      "bornes": { "fenetreS": 86400, "segments": 500, "evenements": 500, "cibles": 200, "ciblesTotal": 20000, "voiesInstantane": 2000,
+        "voiesReponse": 500, "cibleUnites": 120 },
+      "cible": ["arbre", "cible", "n", "dernierMs"],
+      "cibles": { "requis": ["etat", "tronque", "ecritures", "lectures"], "etats": ["ok", "en-construction"] },
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"]
+    },
+    "vibeflow/cockpit-activite@1": {
+      "description": "activité sur le code, lue en mémoire (75-05, GET /api/vf/activite) : points chauds, couplage, gardes, empreinte des agents, radar de collisions ; tableaux de tuples, jamais un chemin, une branche, un rôle ou un titre comme clé d'objet ; jamais dans l'export autonome (A25)",
+      "requis": { "schema": "string", "at": "string", "etat": "string", "calcul": "string", "git": "object", "branches": "object", "gardes": "object", "empreinte": "object", "collisions": "array", "radar": "object" },
+      "etats": ["ok", "en-calcul", "indisponible"],
+      "calcul": ["pret", "en-cours"],
+      "git": { "etats": ["ok", "vide", "indisponible", "absent", "en-lecture"], "tuples": { "chauds": ["chemin", "commits", "loc", "rang", "palier"], "couplage": ["a", "b", "communes", "degre"] } },
+      "branches": { "etats": ["ok", "indisponible", "absent", "en-lecture"] },
+      "gardes": { "etats": ["ok", "non-lues", "indisponible", "en-lecture", "tronque"], "tuples": { "gardes": ["chemin", "suites", "estGarde"] } },
+      "empreinte": { "etats": ["ok", "en-construction", "tronque", "indisponible"], "degres": ["en-cours", "modifie", "lu", "fini"], "tuples": { "marques": ["chemin", "degre", "noms"] } },
+      "collisions": { "sources": ["agents", "arbres", "branches", "plans"], "tuple": ["chemin", "source", "noms", "vague"], "plafond": 500 },
+      "bornes": { "octets": 8388608, "noms": 10, "chemin": 300, "vague": 40, "chauds": 1000, "couplage": 2000, "gardes": 3000, "marques": 2000, "reprise": 60 },
+      "radar": { "raisons": ["en-construction", "tronque", "cibles-coupees", "agents-indisponible", "plans-indisponible", "branches-indisponible", "plans-tronques", "collisions-tronquees", "chemins-ecartes", "reponse-trop-grosse"] },
+      "cles": ["schema", "at", "etat", "calcul", "git", "branches", "gardes", "empreinte", "collisions", "radar", "fenetre", "jours", "commits", "plafond", "plafondAtteint", "partiel",
+        "chauds", "couplage", "paliers", "tetes", "estGarde", "prevusIgnores", "incomplet", "limite", "marques", "horsCarte", "horsLab", "coupees", "rejetes", "ignorees",
+        "voiesTronquees", "voiesCiblesTronquees", "raisons", "total", "tronque", "sansVague", "plansTronques", "limites", "nomsTronques", "cheminsEcartes", "marquesTronquees"],
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"]
+    },
     "vibeflow/cockpit-git@1": {
       "description": "topologie Git du lab pour le tiroir (78-05, GET /api/vf/git) : requis vaut pour etat ok ; les autres etats ne portent que schema, etat, entete (sauf absent : schema, etat, entete) et commandes. auteurs : agrégés sur la fenêtre de commits lue (500 de la base et des branches non mergées), pas sur tout l'historique : l'écran ne doit pas dire « tous les auteurs ». refsIgnorees : nombre de refs sans date (tag vers un blob ou un arbre) écartées, le reste du graphe est lu",
       "requis": { "schema": "string", "etat": "string", "entete": "object", "base": "object", "worktrees": "array", "rangees": "array", "couloirsMax": "number", "replies": "number", "refsIgnorees": "number", "horsFenetre": "array", "mergees": "array", "tags": "array", "stash": "array", "auteurs": "array", "parBranche": "array", "bornes": "object", "commandes": "object" },
@@ -163,6 +197,11 @@
       "motifs": { "failed": "echec", "stopped": "arret" },
       "motifsDit": "cause d'une session finie, jamais d'un état vivant : `failed` donne `echec`, `stopped` donne `arret`, `done` aucune ; elle sort en `finMotif` du travailleur (l'état reste `termine`)",
       "statuts": { "busy": "actif", "waiting": "attend", "idle": "au-repos" }
+    },
+    "cibles": {
+      "description": "champs du transcript lus par le lecteur de cibles de la frise (79-13) : chemins pointés, jamais un texte ni une sortie d'outil",
+      "chemins": ["type", "timestamp", "message.content", "name", "input.file_path", "input.notebook_path"],
+      "jamaisPersiste": true
     },
     "transcriptTitre": {
       "type": "custom-title",

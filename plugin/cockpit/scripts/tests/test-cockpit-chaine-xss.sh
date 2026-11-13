@@ -109,17 +109,18 @@ plante() { # $1 = sortie
 # mutant <sortie> <M-ESC|M-CSP|M-GARDE> : applique le mutant ; échoue si rien n'a changé (jamais un mutant sans effet)
 # 79-06 : la sortie (o) ne porte que des pages ; serve.mjs muté vit dans une COPIE du module (MUT_MOD, une par manche, mutée sur place)
 MUT_OUT=""; MUT_MOD=""
+pages_mod() { local a="$MUT_MOD/skills/cockpit-moteur/assets"; cat "$a/viewer.html" "$a"/ui/*.js; } # 79-16 : les sources de page sont celles de la copie du module (la sortie ne porte que des données)
 mutant() {
   local o="$1" m="$2" sv="$MUT_MOD/skills/cockpit-moteur/assets/serve.mjs" before after
-  before="$(cat "$sv" "$o/index.html" "$o/project.html" | cksum)"
+  before="$({ cat "$sv"; pages_mod; } | cksum)"
   case "$m" in
-    M-ESC) for f in index.html project.html; do sed -i.bak 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' "$o/$f"; done ;;
+    M-ESC) cockpit_page_muter_dans "$MUT_MOD" 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' 2>/dev/null ;;
     M-CSP) sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-Mutant-Csp'#g" "$sv" ;;
-    M-GIT-TEXTE) for f in index.html project.html; do sed -i.bak "s#if (txt != null) e.textContent = String(txt);#if (txt != null) e.innerHTML = String(txt);#; s#corpsMsg.textContent = m.length#corpsMsg.innerHTML = m.length#" "$o/$f"; done
-      for f in index.html project.html; do [ "$(grep -c 'e.innerHTML = String(txt);' "$o/$f")" = 1 ] && [ "$(grep -c 'corpsMsg.innerHTML = m.length' "$o/$f")" = 1 ] || { echo "  ❌ mutant M-GIT-TEXTE incomplet dans $f" >&2; return 1; }; done ;;
+    M-GIT-TEXTE) cockpit_page_muter_dans "$MUT_MOD" "s#if (txt != null) e.textContent = String(txt);#if (txt != null) e.innerHTML = String(txt);#; s#corpsMsg.textContent = m.length#corpsMsg.innerHTML = m.length#" 2>/dev/null
+      [ "$(pages_mod | grep -c 'e.innerHTML = String(txt);')" = 1 ] && [ "$(pages_mod | grep -c 'corpsMsg.innerHTML = m.length')" = 1 ] || { echo "  ❌ mutant M-GIT-TEXTE incomplet dans les sources de page du module" >&2; return 1; } ;;
     M-GARDE) sed -i.bak "s#const dir = engineDirFromLauncher();#let dir; try { dir = JSON.parse(fs.readFileSync(path.join(here, '.cache', 'skill.json'), 'utf8')).dir; } catch {}#; s#^try { fs.rmSync(path.join(here, '.cache', 'skill.json')#if (false) try { fs.rmSync(path.join(here, '.cache', 'skill.json')#" "$sv" ;;
   esac
-  after="$(cat "$sv" "$o/index.html" "$o/project.html" | cksum)"
+  after="$({ cat "$sv"; pages_mod; } | cksum)"
   [ "$before" != "$after" ] || { echo "  ❌ mutant $m sans effet (motif absent du module ou de la sortie)" >&2; return 1; }
 }
 
