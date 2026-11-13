@@ -6,6 +6,7 @@ Commits (ordre) : `ebe5bbde` test (suite neuve, témoins rouges) · `f397986e` r
 
 Export de HEAD épinglé à `91af2123` (SUMMARY de 79-01 et 79-02 commités, base fusionnée). Périmètre = « tout » (216 suites, `ci-suites-perimetre.sh --liste origin/integration/cockpit-audit 91af2123`) : les 81 suites du module cockpit hors `equipe`, jouées une par une sur l'export en trois files : 81 exit 0. `equipe` jouée dans l'arbre (l'export n'a pas d'historique git, dont ses témoins « code d'avant » ont besoin) : exit 0. Sauts : `projet-visite` O6.17d et O6.19 (polices DejaVu absentes du poste, dits par la suite, non comptés réussis). `check-version-sync.sh` : 216 deux fois ; `check-machine-paths.sh` vert (dans l'arbre).
 Les deux rouges préexistants de la première passe (`securite` FB3.5, `git` S6.1) sont verts sur cet export.
+Correction datée 2026-11-13 : rouge de charge, vert seul sur la base da64eb8c (arbre détaché) ; pas un préexistant (journaux hors dépôt).
 
 ## Signatures posées
 

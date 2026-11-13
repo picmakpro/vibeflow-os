@@ -38,6 +38,7 @@ Observations d'exécution (aucun amendement) :
 
 Les rouges de la tâche 1 sont inchangés après l'extraction (mêmes 20 identifiants, aucun nouveau). `vf-cockpit-paths.mjs` descend de 296 à 157 lignes (166 après la tâche 3), `vf-cockpit-git-lanceur.mjs` en compte 152, `child_process` n'est plus importé par paths.mjs, `execFile(cmd` n'apparaît qu'une fois, dans le module neuf. Suites jouées seules après l'extraction : test-cockpit-git-env.sh, -vendor.sh, -confinement.sh, -signal.sh, -path-enfants.sh, -avancement.sh, -assemblage.sh vertes.
 Mesure de contrôle : test-cockpit-securite.sh (FB3.5, délai de 10 s du cas génératif) et test-cockpit-git-details.sh (X6.2, ordre de service sous charge) rougissent aussi sur un instantané du commit des témoins (avant toute modification de production), sous une charge machine de 25 à 40 : rouges de charge, rejoués seuls, non imputables au plan (X6.2 est revenue verte aux rejeux suivants).
+Correction datée 2026-11-13 : rouge de charge, vert seul sur la base da64eb8c (arbre détaché) ; pas un préexistant (journaux hors dépôt).
 
 ## Tâche 3 — état vert et mutants
 
@@ -63,6 +64,7 @@ Amendement daté (voir le plan, commit séparé) : les ancres de mutation de `wo
 
 Suites vertes, jouées seules : test-cockpit-git-env.sh, -vendor.sh, -confinement.sh, -git-details.sh, -avancement.sh, -terminal-serveur.sh, -signal.sh, -path-enfants.sh, -assemblage.sh. Contrôles de la tâche 3 : OK-REGLE-PHYSIQUE (aucun échec hors A8, A9, A10, A12, D6.1 à D6.5 ; 19 identifiants de la règle verts ; 17 assertions de mutants vertes ; copies du module identiques ; aucun appel du realpath JS ni de la résolution lexicale dans le module partagé ; module de 150 lignes), OK-GRAINE-REJOUABLE (graine 424242), OK-NON-REGRESSION-SOCLE.
 Rouge de charge, hors plan : test-cockpit-securite.sh FB3.5 (délai de 10 s du cas génératif), rouge aussi sur un instantané antérieur au plan.
+Correction datée 2026-11-13 : rouge de charge, vert seul sur la base da64eb8c (arbre détaché) ; pas un préexistant (journaux hors dépôt).
 
 Ensemble exact des rouges attendus dans test-cockpit-git-config-depot.sh : A8, A9, A10, A12 (tâche 4, scan.mjs) et D6.1, D6.2, D6.3, D6.4, D6.5 (tâche 5, pilotes nommés) ; tout le reste est vert.
 Mutants M-LEXICAL, M-JS, M-REPLI et M-VERROU : causes, attendus, obtenus et graine (4217) dans la section « Tâche 3 » ci-dessus.

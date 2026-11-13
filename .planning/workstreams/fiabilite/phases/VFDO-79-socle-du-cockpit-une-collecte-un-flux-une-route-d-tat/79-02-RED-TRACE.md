@@ -56,6 +56,7 @@ AVANT-02 1f4197ced9bd5c4dbe49747c3f53bd9a7363974f
   - obtenu : [43]
 
 Note : AM7.S5 rougit sur la base parce que son témoin d'existence du serveur (avant=vivant) manque ; H3.16 à H3.18 (suite existante, durées d'inactivité) sont des rouges de charge observés à la base, rejouables seuls : hors plan, signalés.
+Correction datée 2026-11-13 : rouge de charge, vert seul sur la base da64eb8c (arbre détaché) ; pas un préexistant (journaux hors dépôt).
 
 ## Zones relevées sur AVANT-02 (plages de lignes d'AVANT-02 : en-tête, blocs de lancement)
 
@@ -110,3 +111,4 @@ ZONES plugin/cockpit/scripts/tests/test-cockpit-transcript.sh 1-21 338-341
 - périmètre des commits (test, feat, refactor) du plan : 45 chemins ; assertions modifiées dans les suites migrées : 0.
 - zones : hunks AVANT-02..HEAD hors zones = 0 pour les commits de 79-02 ; les 4 hunks hors zone vus sur la plage (fr-donnees, git-details, git-signature) viennent des commits d'autres plans b16c57fc, 730416dc, c8a009df ; git-tiroir : aucune ligne D2.1, D7, D8.1, D9.1 touchée.
 - rouges de charge constatés (base comme migré, rejoués seuls verts ou identiques) : securite FB3.5, git S6.1, git-details X6.2, who W24.3/W24.4, responsive (cas variable), terminal-tiroir TH.9/TH.14/T21.13, H3.16-H3.18 de cycle-serveur.
+Correction datée 2026-11-13 : rouge de charge, vert seul sur la base da64eb8c (arbre détaché) ; pas un préexistant (journaux hors dépôt).

@@ -53,6 +53,7 @@ Intermédiaire (vf-auditer, avant la reprise) : passed, aucun constat haut ; con
 depot 110/0, git-env 135/0, git-details 136/0 (X6.2 rouge sous charge de 30 à 45, verte rejouée seule), confinement 66/0, git 118/0, vendor 87/0, who 157/0, signal 76/0, path-enfants 37/0, avancement 69/0, assemblage 49/0, git-signature 45/0 (R2.3a et M-SIG-LENTE rouges sous charge, vertes rejouées seules), terminal-lanceur 111/0, lancer-cibles 51/0, terminal-serveur 208/0.
 
 Rouges rapportés, non imputables à 79-07 : test-cockpit-securite.sh FB3.5 (délai de 10 s, rouge de charge, déjà noté avant le plan) ; au dernier rejeu AM4.1 à AM4.4 et M-TERM.0 (le serveur lancé depuis une copie du module : « vf-cockpit-env.mjs est absent », terminal forké depuis la sortie) : surface de 79-06 (assemblage du module, en cours dans le même arbre), verte à 92/0 au rejeu précédent de ce plan ; à rejouer après 79-06.
+Correction datée 2026-11-13 : rouge de charge, vert seul sur la base da64eb8c (arbre détaché) ; pas un préexistant (journaux hors dépôt).
 
 ## Correction ciblée après l'audit de fin de plan (2026-11-12)
 
