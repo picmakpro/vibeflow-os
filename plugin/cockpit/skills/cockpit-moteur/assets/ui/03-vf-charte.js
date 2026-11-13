@@ -7,8 +7,9 @@
 //      est décalé de -2. Les sections d'Équipe (.vf-termines) ont déjà leur chevron (71-vf-equipe-rendu.js) : elles ne sont pas reprises ici.
 //      Sélecteur #vf-modele : apparence retirée, 28 px (36 au toucher), fond --raise, contour 1 px --hair-2, chevron bas, color-scheme du thème ;
 //      désactivé en --text-4, sans opacité. Les règles se posent derrière `body` (ou un identifiant) pour passer devant celles de 00, 41 et 75.
-//   F3 --hdr-btn : une seule hauteur de bouton d'en-tête (36 px en panneau latéral, 44 px en feuille de détail ou au pointeur grossier) ; l'ouvreur Git
-//      (#vf-git-ouvreur) n'est pas repris : sa cible est celle de P78-D-34 (80-20 porte l'amendement P80-D-56). Le bouton de thème la lit aussi (05-theme.js).
+//   F3 --hdr-btn : une seule hauteur de bouton d'en-tête (36 px en panneau latéral, 44 px en feuille de détail ou au pointeur grossier), l'ouvreur Git
+//      (#vf-git-ouvreur) compris depuis 80-20 (P80-D-56) : son dessin la lit, sa zone d'appui reste de 44 × 44 (76-vf-git-entete.js).
+//      Le bouton de thème la lit aussi (05-theme.js).
 //   F4 chiffres des phrases : #vf-lock et les compteurs d'Équipe passent en police de texte, chiffres tabulaires, graisse 500 (70 et 71 restent intacts).
 // Valeurs en dur seulement là où aucun jeton n'existe (boîte du chevron, hauteurs de contrôle) ; la page du terminal reprend celles du sélecteur dans sa
 // propre feuille (assets/ui/terminal/q.css, autre origine).
@@ -47,7 +48,7 @@
     /* F3 : une seule hauteur de bouton d'en-tête */
     :root { --hdr-btn: 36px; }
     @media (max-width: 999px), (pointer: coarse) { :root { --hdr-btn: 44px; } }
-    header .hr .btn:not(#vf-git-ouvreur), header #hdr-ext > button:not(#vf-git-ouvreur) { height: var(--hdr-btn); }
+    header .hr .btn, header #hdr-ext > button { height: var(--hdr-btn); }
     header #theme-toggle { min-width: var(--hdr-btn); }
     @media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) {
       header #theme-toggle { width: var(--hdr-btn); padding: 0; justify-content: center; } /* le mot du thème ne tient pas ici : l'icône seule, carrée */

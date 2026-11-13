@@ -111,10 +111,15 @@
     .vf-git-ligne[hidden], #vf-git-ouvreur[hidden] { display: none !important; }
     #vf-git-ouvreur { display: none; }
     #vf-git-ouvreur:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-    /* P78-D-34 (avis du juge de design) : la seconde ligne est illisible sous 1280 px ; l'ouvreur icône de 44 px la remplace de 701 à 1279 px */
+    /* P78-D-34 (avis du juge de design) : la seconde ligne est illisible sous 1280 px ; l'ouvreur icône la remplace de 701 à 1279 px.
+       P80-D-56 (80-20 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, « 36 visibles, 44 d'appui (Recommandé) ») : il est dessiné à la
+       taille de ses voisins (--hdr-btn : 36 px au pointeur fin dès 1 000 px, 44 en dessous et au toucher) et garde une zone d'appui de 44 × 44 au moins,
+       par un pseudo-élément centré. */
     @media (max-width: 1279px) {
       .vf-git-ligne { display: none; }
-      #vf-git-ouvreur { display: inline-flex; width: 44px; height: 44px; }
+      #vf-git-ouvreur { display: inline-flex; position: relative; width: var(--hdr-btn, 44px); height: var(--hdr-btn, 44px); }
+      #vf-git-ouvreur::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+        width: max(100%, 44px); height: max(100%, 44px); }
     }
     /* même requête que viewer.html (« phones and tablets ») : le nom et sa seconde ligne partent ensemble */
     @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) { .vf-nom { display: none; } }
