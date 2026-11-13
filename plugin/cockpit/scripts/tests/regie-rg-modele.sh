@@ -145,6 +145,7 @@ rg_RG6_modele() {
   assert_eq "RG6.1 — owner et étape de 120 caractères : bornés à 80" "$(g "$o" 'j[1].owner.length+"|"+j[1].step.length')" "80|80"
   assert_eq "RG6.1 — owner à forme de chemin absolu (ou de partage) : vide" "$(g "$o" 'JSON.stringify([j[2].owner,j[2].step])')" '["",""]'
   assert_eq "RG6.1 — caractères de contrôle et U+202E (classe Cf) retirés" "$(g "$o" 'j[3].owner+"|"+j[3].step')" "abcde|et"
+  rgm_forme_cas
   if [ -f "$UI/72-vf-regie-modele.js" ]; then
     rg_mutant "VERROU-ENTREE-BRUTE" "l'entrée recopiée entière" "$UI" "72-vf-regie-modele.js" 'const o = { ws: libre(e.ws),' 'const o = { ...e, ws: libre(e.ws),' rgm_sonde_verrou "false|80|\"\"|abcde"
     rg_mutant "VERROU-SESSION-IDS" "la liste d'identifiants de session admise" "$UI" "72-vf-regie-modele.js" "sansSession: typeof e.sansSession === 'boolean' ? e.sansSession : null };" "sansSession: typeof e.sansSession === 'boolean' ? e.sansSession : null, session_ids: e.session_ids };" rgm_sonde_verrou "false|80|\"\"|abcde"
@@ -162,6 +163,33 @@ rg_RG6_modele() {
   assert_eq "RG6.2 — owner hors des sessions : forme courte" "$(g "$o2" "j[2]$m")" "verrou : aaaaaaaa · exec · tenu depuis 14 min · dernier signe il y a 3 min"
   assert_eq "RG6.2 — verrou de dépôt : ligne d'en-tête seulement, aucune ligne de mission" "$(g "$o2" 'j[3].entete.verrouDepot.texte+"|"+j[3].sections[1].lignes.filter(l=>l.kind==="mission").length+"|"+(j[0].entete.verrouDepot===null)')" "Verrou du dépôt : Atelier alpha · exec · tenu depuis 14 min · dernier signe il y a 3 min|0|true"
 }
+# Forme admise (T-73-16, audit 73-04) : owner et étape n'ont pas de séparateur ; ws, phase, scope, dag suivent une grammaire stricte.
+# rgm_forme_sc <sortie> : un appel verrouBlanc par valeur, sur les cinq champs.
+RGM_OWNERS='a/Users/quidam/lab|lab/locks/x|file:///Users/quidam/x|../../etc/passwd|~quidam|a b|..|release-bump|exec-73|vf-dev-manager-p73|3f9a0c1e7b'
+rgm_forme_un() { local e; e="[{\"present\":true,$1}]"; printf '%s' "$(rgm_appel verrouBlanc "$e")"; }   # bash 3.2 : jamais de \" dans un $( ) entre guillemets
+rgm_forme_sc() {
+  local IFS='|' a=() v w
+  for v in $RGM_OWNERS; do w="\"owner\":\"$v\",\"step\":\"$v\""; a+=("$(rgm_forme_un "$w")"); done
+  for v in 'Fiab' 'fia/x' 'fia_bis' '../fia' fiabilite ws-2; do w="\"ws\":\"$v\""; a+=("$(rgm_forme_un "$w")"); done
+  for v in 73 73.1 7x '../73' '73.' '.5'; do w="\"phase\":\"$v\""; a+=("$(rgm_forme_un "$w")"); done
+  for v in depot mission compartiment /etc autre; do w="\"scope\":\"$v\""; a+=("$(rgm_forme_un "$w")"); done
+  for v in dag-73.json '../dag.json' '/abs/dag.json' '..' 'a/b.json'; do w="\"dag\":\"$v\""; a+=("$(rgm_forme_un "$w")"); done
+  unset IFS; rgm_json "${a[@]}" > "$1"
+}
+rgm_forme_cas() {
+  local sc="$WORK/s63.json" o="$WORK/o63.json" L
+  rgm_forme_sc "$sc"; rgm_play "$UI" "$sc" "$o"
+  assert_eq "RG6.3 — owner et étape : chemin au milieu, relatif, file:, ../, ~, espace, « .. » refusés ; valeurs réelles gardées" \
+    "$(g "$o" 'j.slice(0,11).map(x=>x.owner===x.step?x.owner:"!").join(",")')" ",,,,,,,release-bump,exec-73,vf-dev-manager-p73,3f9a0c1e7b"
+  assert_eq "RG6.3 — ws : minuscules, chiffres, tiret" "$(g "$o" 'j.slice(11,17).map(x=>x.ws).join(",")')" ",,,,fiabilite,ws-2"
+  assert_eq "RG6.3 — phase : entier, décimale éventuelle" "$(g "$o" 'j.slice(17,23).map(x=>x.phase).join(",")')" "73,73.1,,,,"
+  assert_eq "RG6.3 — scope : liste fermée" "$(g "$o" 'j.slice(23,28).map(x=>x.scope).join(",")')" "depot,mission,compartiment,,"
+  assert_eq "RG6.3 — dag : forme de nom de fichier, aucune séparation" "$(g "$o" 'j.slice(28,33).map(x=>x.dag===undefined?"-":x.dag).join(",")')" "dag-73.json,-,-,-,-"
+  L="$(rgm_lock 'a/Users/quidam/lab' depot '' 840 false null)"
+  rgm_json "$(rgm_modele "$(rgm_sess)" "$L")" > "$WORK/s64.json"; rgm_play "$UI" "$WORK/s64.json" "$WORK/o64.json"
+  assert_eq "RG6.3 — owner refusé : « détenteur inconnu », la valeur ne s'affiche pas" "$(g "$WORK/o64.json" 'j[0].entete.verrouDepot.texte')" "Verrou du dépôt : détenteur inconnu · exec · tenu depuis 14 min · dernier signe il y a 3 min"
+}
+rgm_sonde_forme() { rgm_forme_sc "$WORK/s63m.json"; rgm_play "$1" "$WORK/s63m.json" "$WORK/o63.mut"; g "$WORK/o63.mut" 'j.map(x=>[x.owner,x.step,x.ws,x.phase,x.scope,x.dag].join("~")).join("#")'; }
 rgm_sonde_verrou() { rgm_play "$1" "$WORK/s61.json" "$WORK/o61.mut"; g "$WORK/o61.mut" '/SENT|quidam|session_ids/.test(JSON.stringify(j[0]))+"|"+j[1].owner.length+"|"+JSON.stringify(j[2].owner)+"|"+j[3].owner'; }
 
 rg_RG7_modele() {
