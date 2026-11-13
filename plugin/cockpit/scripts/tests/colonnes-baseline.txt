@@ -49,7 +49,7 @@ scripts/vf-cockpit-planning.mjs 25
 scripts/vf-cockpit-port.mjs 3
 scripts/vf-cockpit-project.mjs 68
 scripts/vf-cockpit-query.mjs 3
-scripts/vf-cockpit-server.mjs 19
+scripts/vf-cockpit-server.mjs 17
 scripts/vf-cockpit-serveur-vivant.mjs 3
 scripts/vf-cockpit-signal.mjs 14
 scripts/vf-cockpit-terminal-amorce.mjs 7

@@ -58,3 +58,9 @@ H1 à H8 confirmées (voir la trace). H3 : `rattacherVoies` rend une `Map` id ->
 ## Suites jouées (une fois, sur la tête commitée)
 Voir la trace pour les verdicts et durées. Rouge « base » : `test-cockpit-vendor.sh` V4 (`check-file-size`, fichier du module à 300 lignes qui n'est pas à moi, signalé par le manager).
 Non joué par ce nœud (renvoyé à la CI) : `direct`, `cycle-serveur`, `lancer-serveur`, `robustesse`, `git-signature`, `reseau`, `etat`, `securite` après T4, `signal`, `confinement`.
+
+## Correction d'audit AU13-01 / AU13-02
+- AU13-01 (moyen) : `lire` de `vf-cockpit-cibles-suivi.mjs` garde la ligne en cours en morceaux d'une tranche à l'autre, teste le budget à chaque bloc (au moins un bloc par visite), ne concatène qu'à la fin de ligne
+  (coût linéaire) et saute sans l'accumuler une ligne plus longue que LIGNE_MAX ; nouvelle méthode `enAttente(id)`. Témoin F4.4b (durée sous 600 ms, mémoire en attente bornée), mutant M-LIGNE-MAX.
+- AU13-02 (bas) : `fin` passe par `nettoie` (déjà utilisé pour les noms d'arbre : contrôles C0/C1, Cf, masque) ; témoin F4.14, mutant M-NETTOIE.
+- Écart de suite : F0.2 ne vérifie plus le voisin suivant de la ligne `frise` (79-15 ajoute une route) ; F4.5 gagne une coupe déterministe.

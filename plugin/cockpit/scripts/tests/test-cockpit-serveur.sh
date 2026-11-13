@@ -294,12 +294,14 @@ const [, , scripts, lab] = process.argv;
 const { attach } = await import(pathToFileURL(scripts + '/vf-cockpit-server.mjs').href);
 const a = attach({ here: lab, root: lab, token: 'tk', inject: '', log: () => {} });
 a.load();
-const page = () => { const p = a.pageEquipe(); return p === null ? 'null' : typeof p === 'string' && p.includes('VibeFlow · Équipe') ? 'page' : 'autre'; };
+// 79-15 : la « page » est une page en parties { avant, donnees, apres } (tampons) dont le début porte le titre Équipe ; les verdicts attendus restent `page`, puis `null|false`
+const texte = (p) => (p === null ? '' : p.avant.toString('utf8') + p.donnees.toString('utf8') + p.apres.toString('utf8'));
+const page = () => { const p = a.pageEquipe(); return p === null ? 'null' : p.avant instanceof Buffer && p.avant.toString('utf8').includes('VibeFlow · Équipe') ? 'page' : 'autre'; };
 const sortie = {};
 globalThis.__vfSnap = { seq: 1, lock: { available: false }, who: { workers: [{ kind: 'session', id: 'w1', tree: 't', source: 's' }], sources: {} } };
 sortie.propre = page();
 globalThis.__vfSnap = { seq: 2, lock: { available: false }, who: { workers: [{ kind: 'session', id: 'w1', tree: 't', source: 's', sub: { doing: 'commande-secrete' } }], sources: {} } };
-const p = a.pageEquipe(); sortie.interdit = page(); sortie.fuite = typeof p === 'string' && p.includes('commande-secrete');
+const p = a.pageEquipe(); sortie.interdit = page(); sortie.fuite = texte(p).includes('commande-secrete');
 console.log(JSON.stringify(sortie)); a.stop(); process.exit(0);
 JS
 mkdir -p "$WORK/lab-eq"; printf '%s' '<html><head><title>t</title></head><body><script>window.VF_COCKPIT = {"meta":{"rootName":"x"},"nodes":[],"files":[],"links":[]};</script></body></html>' > "$WORK/lab-eq/project.html"

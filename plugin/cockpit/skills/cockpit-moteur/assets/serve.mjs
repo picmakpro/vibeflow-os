@@ -539,15 +539,18 @@ const bad = (res) => { res.writeHead(400, { 'Content-Type': 'application/json' }
 // ne se laisse pas encadrer, n'envoie aucun formulaire. Les polices et logos sont des data: ; les styles en ligne sont admis (36 attributs style).
 const BASE_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 const cspMemo = new Map(); // les pages pèsent ~2 Mo : une empreinte par contenu, pas par requête
+const cspDe = (empreintes) => `default-src 'none'; script-src ${empreintes.join(' ')}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`; // vibeflow 79-15 : une seule fonction bâtit la chaîne, de la liste d'empreintes
 const pageCsp = (html) => {
   if (cspMemo.has(html)) return cspMemo.get(html);
   const hashes = [...String(html).matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`);
-  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;
+  const csp = cspDe([...new Set(hashes)]);
   if (cspMemo.size >= 4) cspMemo.clear();
   cspMemo.set(html, csp);
   return csp;
 };
-const sendPage = (res, html) => { res.setHeader('Content-Security-Policy', pageCsp(html) + (TERM ? TERM.frameSrc() : '')); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store' }); return res.end(html); }; // vibeflow P26 : frame-src de la CSP de page s'ajoute hors de pageCsp (v2.75.0 intacte)
+const sendPage = (res, html) => { res.setHeader('Content-Security-Policy', pageCsp(html) + (TERM ? TERM.frameSrc() : '')); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store', 'Content-Length': Buffer.byteLength(html) }); return res.end(html); }; // vibeflow P26, 79-15 : longueur exacte : frame-src de la CSP de page s'ajoute hors de pageCsp (v2.75.0 intacte)
+// vibeflow 79-15 : une page en trois parties (début, données, fin) de vf-cockpit-pages.mjs : jamais une chaîne d'une page entière, CSP de la liste d'empreintes de la page, longueur exacte
+const sendParties = (res, p) => { res.setHeader('Content-Security-Policy', cspDe(p.haches) + (TERM ? TERM.frameSrc() : '')); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store', 'Content-Length': p.longueur }); res.write(p.avant); res.write(p.donnees); return res.end(p.apres); };
 const server = http.createServer((req, res) => {
   res.setHeader('Content-Security-Policy', BASE_CSP); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
   try { route(req, res); } catch (e) { console.error(`vf-cockpit : requête en échec : ${e?.message || e}`); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch {} }
@@ -627,8 +630,8 @@ function route(req, res) {
     }
     res.writeHead(404); return res.end();
   }
-  if (url.pathname === '/equipe.html') { const pe = VF?.pageEquipe?.(); if (pe) return sendPage(res, pe); } // vibeflow P24
-  if (url.pathname === '/project.html' && VF?.pageProjet()) return sendPage(res, VF.pageProjet()); // vibeflow P13, P17
+  if (url.pathname === '/equipe.html') { const pe = VF?.pageEquipe?.(); if (pe) return sendParties(res, pe); } // vibeflow P24
+  if (url.pathname === '/project.html') { const pp = VF?.pageProjet(); if (pp) return sendParties(res, pp); } // vibeflow P13, P17
   if (url.pathname === '/' || url.pathname === '/index.html') return sendPage(res, page);
   let file;
   try { file = path.join(here, decodeURIComponent(url.pathname)); } catch { res.writeHead(400); return res.end('bad address'); }

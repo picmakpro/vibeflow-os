@@ -108,6 +108,7 @@ if (cas === 'cible') { // F4.1, F4.2 : réduction d'un chemin égale à l'oracle
   const oneShot = () => { fs.writeFileSync(f, tout); const s = S.creerSuivi(); s.avancer({ voies: [voie], fichiers: new Map([['i1', f]]), arbres: table, maintenant: T }); return JSON.stringify(s.cibles('i1')); };
   const attendu = oneShot(), coupes = new Set();
   const nl = [...tout.keys()].filter((j) => tout[j] === 10);
+  for (let i = 0; i < 8; i++) coupes.add(nl[i * 4] + 5); // coupes fixes au milieu d'une ligne, espacées de plusieurs lignes : le mutant du curseur ne peut pas être rattrapé par une reprise
   for (let i = 0; i < 100; i++) { const k = i % 4;
     if (k === 0) { coupes.add(1 + Math.floor(r() * (tout.length - 2))); comptes.milieu++; } else if (k === 1) { coupes.add(nl[Math.floor(r() * nl.length)] + 1); comptes.entreLignes++; }
     else if (k === 2) { coupes.add(tout.length); comptes.fin++; } else { coupes.add(0); comptes.vide++; } }
@@ -117,7 +118,12 @@ if (cas === 'cible') { // F4.1, F4.2 : réduction d'un chemin égale à l'oracle
   const gradue = JSON.stringify(s.cibles('i1'));
   let somme = 0; for (const l of tout.toString().split('\n')) { try { const d = JSON.parse(l); for (const b of d.message.content) if (b.type === 'tool_use' && ['Read', 'Write', 'Edit', 'MultiEdit'].includes(b.name)) somme++; } catch { /* ligne hostile */ } }
   const parVoie = JSON.parse(gradue), n = [...parVoie.ecritures, ...parVoie.lectures].reduce((x, e) => x + e.n, 0);
-  const res = { egal: gradue === attendu, somme: n === somme, couverture: manque(comptes, 20), graine: opts.graine || null };
+  const t3 = Buffer.from(['a', 'b', 'c'].map((n, i) => ecriture(path.join(R, n + '.js'), T - 2000e3 + i * 1000).split('\n')[0]).join('\n') + '\n'), nl3 = t3.indexOf(10) + 6;
+  const g3 = path.join(R, 'm.jsonl'), s3 = S.creerSuivi(), v3 = [{ id: 'm3', fin: T, arbre: null }], f3 = new Map([['m3', g3]]);
+  fs.writeFileSync(g3, t3.subarray(0, nl3)); s3.avancer({ voies: v3, fichiers: f3, arbres: table, maintenant: T });
+  fs.writeFileSync(g3, t3); s3.avancer({ voies: v3, fichiers: f3, arbres: table, maintenant: T });
+  const milieu = s3.cibles('m3').ecritures.length === 3; // une coupe au milieu d'une ligne, reprise plus tard : la ligne est lue une fois, entière
+  const res = { milieu, egal: gradue === attendu, somme: n === somme, couverture: manque(comptes, 20), graine: opts.graine || null };
   if (cas === 'reprise') {
     const s2 = S.creerSuivi(); fs.writeFileSync(f, tout); s2.avancer({ voies: [voie], fichiers: new Map([['i1', f]]), arbres: table, maintenant: T });
     const avant = JSON.parse(JSON.stringify(s2.cibles('i1')));
@@ -200,6 +206,22 @@ if (cas === 'cible') { // F4.1, F4.2 : réduction d'un chemin égale à l'oracle
   const i = path.join(R, 'i', 'lab'); depot(i); wt(i, path.join(R, 'i', 'x', 'lab'), 'i1'); wt(i, path.join(R, 'i', 'unique'), 'i2');
   res.i = sonde(i, [i + '/app/f.js', R + '/i/x/lab/app/g.js', R + '/i/unique/app/g.js']); res.iVoie = sonde(i, ['app/g.js'], 'lab');
   out({ ...res, H });
+} else if (cas === 'ligne-longue') { // AU13-01 : la tranche tient son budget quelle que soit la longueur de ligne ; une ligne > LIGNE_MAX est sautée sans être accumulée
+  const S = await imp('vf-cockpit-cibles-suivi.mjs'), R = fs.realpathSync(fs.mkdtempSync(path.join(aux, 'long-')));
+  const table = [{ nom: null, racine: R, base: R }], bonne = ecriture(path.join(R, 'ok.js'));
+  const essai = (nom, contenu) => {
+    const f = path.join(R, nom + '.jsonl'), fd = fs.openSync(f, 'w'); fs.writeSync(fd, bonne);
+    const bloc = Buffer.alloc(1 << 20, 97); for (let i = 0; i < 40; i++) fs.writeSync(fd, bloc); // 40 Mio sur une seule ligne
+    fs.writeSync(fd, contenu); fs.closeSync(fd);
+    const s = S.creerSuivi(), v = [{ id: nom, fin: T, arbre: null }], fi = new Map([[nom, f]]); let max = 0, tours = 0, tenu = 0;
+    for (;;) { const t0 = Date.now(), r = s.avancer({ voies: v, fichiers: fi, arbres: table, maintenant: T }); max = Math.max(max, Date.now() - t0); tours++; tenu = Math.max(tenu, s.enAttente ? s.enAttente(nom) : -1); if (!r.reste || tours > 200) break; }
+    const c = s.cibles(nom); return { max, tours, tenu, cibles: c.ecritures.map((e) => [e.cible, e.n]), etat: c.etat };
+  };
+  out({ sansSaut: essai('ls', ''), termine: essai('lt', '\n' + bonne) });
+} else if (cas === 'controle') { // AU13-02 : aucune cible ne porte de caractère de contrôle ni de format
+  const C = await imp('vf-cockpit-cible.mjs'), motif = /[\u0000-\u001f\u007f-\u009f\p{Cf}]/u;
+  const entrees = ['a\u202Eb.js', 'x\u001b[31my.js', 'z\u200Bw.js', 'c1\u0085d.js', 'del\u007fe.js'];
+  out({ positif: entrees.every((e) => motif.test(e)), propres: entrees.every((e) => !motif.test(C.fin(e))), exemples: entrees.map((e) => C.fin(e)) });
 } else if (cas === 'fin') { // F4.13 : borne d'affichage contre l'oracle
   const C = await imp('vf-cockpit-cible.mjs'), r = rng(opts.graine || graineDe()), comptes = {}, ko = [];
   const L = (n, c = 'a') => c.repeat(n), PAIRE = '\u{1F600}';

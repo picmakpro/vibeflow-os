@@ -58,7 +58,7 @@ for m in $MODULES; do
 done
 POSER="$(node --input-type=module -e "try{const m=await import('file://$SCRIPTS/vf-cockpit-instantane.mjs');console.log(typeof m.poserFrise)}catch(e){console.log('absent')}")"
 assert_eq "F0.1 — les sept modules neufs exportent les noms de « artifacts », vf-cockpit-instantane.mjs exporte poserFrise" "$(echo $F01) $POSER" "ok ok ok ok ok ok ok function"
-F02="$(node --input-type=module -e "const m=await import('file://$SCRIPTS/vf-cockpit-server.mjs');const c=m.ROUTES.map((l)=>l[0]);const i=c.indexOf('/api/vf/frise');console.log([i>0&&c[i-1]==='/api/vf/events'&&c[i+1]==='/api/vf/journal',new Set(c).size===c.length,JSON.stringify(c)===JSON.stringify([...c].sort()),i>=0&&m.ROUTES[i].length===2].join(','))")"
+F02="$(node --input-type=module -e "const m=await import('file://$SCRIPTS/vf-cockpit-server.mjs');const c=m.ROUTES.map((l)=>l[0]);const i=c.indexOf('/api/vf/frise');console.log([i>0&&c[i-1]==='/api/vf/events',new Set(c).size===c.length,JSON.stringify(c)===JSON.stringify([...c].sort()),i>=0&&m.ROUTES[i].length===2].join(','))")"
 assert_eq "F0.2 — ROUTES porte /api/vf/frise entre events et journal, chemins uniques et triés, la ligne n'a aucun régime" "$F02" "true,true,true,true"
 F03="$(node -e "
 const j=JSON.parse(require('fs').readFileSync('$SCRIPTS/vf-cockpit-interface.json','utf8')).schemas;const s=j['vibeflow/cockpit-frise@1'],g=j['vibeflow/cockpit-signal@1'];
@@ -205,7 +205,7 @@ chk3() { # <id> <copie> -> ok | ko
     F4.1) f="$(ck "$d" cible "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.nko+"|"+(j.n>=400)')" = '0|true' ] ;;
     F4.3) f="$(ck "$d" outils)"; [ "$(jf "$f" 'j.ok')" = true ] ;;
     F4.4) f="$(ck "$d" hostiles)"; [ "$(jf "$f" 'JSON.stringify([j.leve,j.premier,j.second,j.lien.etat+j.lien.ecritures.length,j.tube.etat+j.tube.ecritures.length,j.long])')" = '[false,[["ok.js",1]],[["ok.js",2]],"en-construction0","en-construction0",1]' ] ;;
-    F4.5) f="$(ck "$d" incremental "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.egal+"|"+j.somme+"|"+j.couverture')" = 'true|true|ok' ] ;;
+    F4.5) f="$(ck "$d" incremental "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.egal+"|"+j.somme+"|"+j.couverture+"|"+j.milieu')" = 'true|true|ok|true' ] ;;
     F4.6) f="$(ck "$d" reprise "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.egal+"|"+j.avant+"|"+j.court[1]+"|"+j.apres[1].join(",")')" = 'true|true|0|d.js' ] ;;
     F4.7) f="$(ck "$d" limites)"; [ "$(jf "$f" 'JSON.stringify([j.mille,j.top,j.exact,j.plus,j.mixte,j.deux,j.plafondTotal,j.plafondTronque])')" = '[[200,0,true],"e999.js",[200,0,false],[200,0,true],[150,200,true],[150,150,false],50,[false,false,true,true,true]]' ] ;;
     F4.8) f="$(ck "$d" limites)"; [ "$(jf "$f" 'j.avant+"|"+j.apres+"|"+j.vieux')" = '1|0|0' ] ;;
@@ -217,14 +217,18 @@ chk3() { # <id> <copie> -> ok | ko
     F4.11f) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify(j.f)')" = "[\"null|$H4\",\"null|$H4\",\"ok|app/g.js\"]" ] ;;
     F4.11h) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify([j.h,j.hVoie])')" = "[[\"null|$H4\",\"null|$H4\",\"autre|app/g.js\"],[\"null|$H4\"]]" ] ;;
     F4.11i) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify([j.i,j.iVoie])')" = "[[\"null|app/f.js\",\"null|$H4\",\"unique|app/g.js\"],[\"null|$H4\"]]" ] ;;
+    F4.4b) f="$(ck "$d" ligne-longue)"; [ "$(jf "$f" '[j.sansSaut,j.termine].map((x)=>[x.max<600,x.tours<200,x.tenu>=0&&x.tenu<=33554432,JSON.stringify(x.cibles),x.etat].join("/")).join("|")')" = 'true/true/true/[["ok.js",1]]/ok|true/true/true/[["ok.js",2]]/ok' ] ;;
+    F4.14) f="$(ck "$d" controle)"; [ "$(jf "$f" 'j.positif+"|"+j.propres')" = 'true|true' ] ;;
     F4.13) f="$(ck "$d" fin "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.nko+"|"+j.couverture')" = '0|ok' ] ;;
   esac && echo ok || echo ko
 }
-for id in F4.1 F4.3 F4.4 F4.5 F4.6 F4.7 F4.8 F4.9 F4.10 F4.11a F4.11c F4.11d F4.11f F4.11h F4.11i F4.13; do
+for id in F4.1 F4.3 F4.4 F4.4b F4.14 F4.5 F4.6 F4.7 F4.8 F4.9 F4.10 F4.11a F4.11c F4.11d F4.11f F4.11h F4.11i F4.13; do
   case "$id" in
     F4.1) t="propriété (graine $GRAINE, 400 valeurs de vingt classes de chemins) : reduireCible égale à l'oracle de résolution physique écrit à la main" ;;
     F4.3) t="outils comptés : Read en lecture ; Write, Edit, MultiEdit, NotebookEdit (notebook_path) en écriture ; Grep, Glob, Bash et noms de prototype : aucune cible ; valeur non chaîne ignorée" ;;
     F4.4) t="lignes hostiles : aucune exception, état intact, lignes valides comptées, dernière ligne incomplète non consommée, lien et tube jamais ouverts, ligne géante sautée" ;;
+    F4.4b) t="AU13-01 : une tranche tient son budget sur une ligne de 40 Mio sans saut de ligne puis sur une ligne géante terminée (durée par avance sous 600 ms, mémoire en attente au plus LIGNE_MAX, ligne sautée, lignes valides comptées)" ;;
+    F4.14) t="AU13-02 : aucune cible ne porte de caractère de contrôle ni de format (inversion bidi, séquence d'échappement, espace de largeur nulle, C1, DEL) ; témoin positif : les entrées en portent" ;;
     F4.5) t="incrémentalité (graine $GRAINE) : avances sur préfixes croissants égales à une passe unique, somme des n égale au nombre d'appels comptés, couverture des coupes" ;;
     F4.6) t="reprise : fichier raccourci ou tête changée : état repris depuis zéro, anciennes cibles disparues" ;;
     F4.7) t="bornes A48-45 : 200 par sens, plus récentes gardées, tronque vrai dès qu'un sens coupe (faux à exactement 200), plafond total d'essai jamais dépassé, tronque pour chaque voie touchée" ;;
@@ -253,13 +257,15 @@ mut3 M-ECHEC-OUVERT vf-cockpit-cible.mjs 's|if (phys === null) return HORS_R; //
 mut3 M-PARENT vf-cockpit-cible.mjs 's|const OPTION = { plusProcheParent: true }; // garde:cible-parent|const OPTION = { plusProcheParent: false }; // garde:cible-parent|' F4.1 "plus proche parent retiré"
 mut3 M-PREFIXE vf-cockpit-cible.mjs '/garde:cible-dedans/s/p.startsWith(r.endsWith(path.sep) ? r : r + path.sep)/p.startsWith(r)/' F4.1 "préfixe sans frontière de séparateur"
 mut3 M-OUTILS vf-cockpit-cibles.mjs "s|Write: T('ecritures', 'file_path'), Edit: T('ecritures', 'file_path'), // garde:cibles-outils|Write: T('ecritures', 'file_path'), Grep: T('lectures', 'file_path'), Edit: T('ecritures', 'file_path'), // garde:cibles-outils|" F4.3 "Grep compté en lecture"
-mut3 M-CURSEUR vf-cockpit-cibles-suivi.mjs 's|st.curseur = fin; // garde:cibles-curseur|st.curseur = pos; // garde:cibles-curseur|' F4.5 "le curseur avance jusqu'à la taille du fichier au lieu de la dernière ligne complète"
+mut3 M-CURSEUR vf-cockpit-cibles-suivi.mjs 's|st.curseur = pos - st.attenteLen; // garde:cibles-curseur|st.curseur = pos; // garde:cibles-curseur|' F4.5 "le curseur avance jusqu'à la taille du fichier au lieu de la dernière ligne complète"
 mut3 M-TRANCHE vf-cockpit-cibles-suivi.mjs 's|ctx.budget = () => ctx.lus >= octets \|\| horloge() - t0 >= ms; // garde:cibles-tranche|ctx.budget = () => false; // garde:cibles-tranche|' F4.9 "le budget de la tranche est retiré"
 mut3 M-PERSISTE vf-cockpit-cibles-suivi.mjs "s|cibles(id) {|cibles(id) { if (etats.has(id) \&\& process.getBuiltinModule('node:fs')) process.getBuiltinModule('node:fs').appendFileSync(process.getBuiltinModule('node:os').tmpdir() + '/frise-persiste.txt', 'x'); // garde:cibles-memoire|" F4.10 "les listes sont écrites dans un fichier"
 mut3 M-ARBRE vf-cockpit-cible.mjs 's|^.*garde:cible-arbre.*$|  return arbre ? { nom: arbre, racine: table[0].racine, base: table[0].racine + path.sep + arbre } : table[0]; // garde:cible-arbre|' F4.11d "le nom est pris pour un chemin sous l'arbre principal"
 mut3 M-VERIF vf-cockpit-arbres.mjs 's|worktreeVerifie(commun, t)|true|' F4.11f "la preuve du lien retour d'un worktree est neutralisée"
 mut3 M-COLLISION vf-cockpit-cible.mjs '/garde:cible-collision/s/occupants.get(nom(a)) > 1/occupants.get(nom(a)) > 2/' F4.11h "deux worktrees de même nom sont admis"
 mut3 M-PRINCIPAL vf-cockpit-cible.mjs 's|^.*garde:cible-principal.*$||' F4.11i "le nom du dossier de l'arbre principal n'occupe plus un nom"
+mut3 M-LIGNE-MAX vf-cockpit-cibles-suivi.mjs 's|garde:cibles-ligne-max|garde:cibles-ligne-max|;/garde:cibles-ligne-max/s/> LIGNE_MAX/> 1e12/' F4.4b "la ligne trop longue est accumulée au lieu d'être sautée"
+mut3 M-NETTOIE vf-cockpit-cible.mjs '/garde:cible-nettoie/s/nettoie(/masque(/' F4.14 "le nettoyage d'affichage est retiré de fin"
 mut3 M-ELLIPSE vf-cockpit-cible.mjs "s|return t.slice(0, n) + '…'; // garde:cible-fin|return t.slice(0, 120); // garde:cible-fin|" F4.13 "coupe à 120 sans marque"
 mut3 M-TRONQUE-CIBLES vf-cockpit-cibles-suivi.mjs 's|if (perdu) st.cibles.tronque = true; // garde:cibles-tronque|if (perdu) st.ver += 0; // garde:cibles-tronque|' F4.7 "la ligne ne pose plus l'indicateur"
 
