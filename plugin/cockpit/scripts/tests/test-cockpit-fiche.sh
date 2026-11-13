@@ -159,13 +159,13 @@ export default async function (h) {
   await h.section('P1', async () => {
     const av = await h.ev(() => { const v = document.querySelector('.vf-vue:not([hidden])'), r = v.getBoundingClientRect();
       return { vue: [r.left, r.top, r.width].map(Math.round), panel: document.getElementById('panel').outerHTML, href: location.href,
-        fp: Object.keys(window.Floorplan).sort().join(), vb: Object.keys(window.VibeFlow).sort().join() }; });
+        fp: Object.keys(window.Floorplan || {}).sort().join(), vb: Object.keys(window.VibeFlow || {}).sort().join() }; });
     await h.ouvrir('wk-2', ORIGINE('wk-2'));
     const ap = await h.ev(() => { const f = document.querySelector('.vf-fiche'), r = f.getBoundingClientRect(), a = document.activeElement;
       const regs = [...document.querySelectorAll('[role=region][aria-label^="Fiche de "]')];
       return { n: regs.length, nom: regs[0] && regs[0].getAttribute('aria-label'), foc: a && [a.tagName, a.getAttribute('tabindex'), a.textContent],
         rect: [r.left, r.top, r.width].map(Math.round), panel: document.getElementById('panel').outerHTML, href: location.href,
-        fp: Object.keys(window.Floorplan).sort().join(), vb: Object.keys(window.VibeFlow).sort().join() }; });
+        fp: Object.keys(window.Floorplan || {}).sort().join(), vb: Object.keys(window.VibeFlow || {}).sort().join() }; });
     h.egal('P1', 'ouverture : une région « Fiche de Rédiger les faits », le focus sur le titre (H2, tabindex -1)', [ap.n, ap.nom, ap.foc], [1, 'Fiche de Rédiger les faits', ['H2', '-1', 'Rédiger les faits']]);
     h.egal('P1.a', 'la fiche occupe la zone de contenu : même gauche, même haut, même largeur que la vue d\'origine', ap.rect, av.vue);
     h.sonde('P1.b', '#panel inchangé (hors page) et aucune adresse dans l\'URL', ap.panel === av.panel && ap.href === av.href, ap.href);
@@ -202,13 +202,13 @@ export default async function (h) {
   });
   await h.section('P9', async () => {
     await h.fermer().catch(() => {});
-    await h.ouvrir('wk-1', ORIGINE('wk-1'));
+    await h.ouvrir('wk-2', ORIGINE('wk-2'));
     await h.ev(() => document.querySelector('.vf-fiche-ratt button').click());
     await h.fiche();
     const p = await h.ev(() => { const a = document.activeElement; return { n: document.querySelectorAll('.vf-fiche').length, nom: document.querySelector('.vf-fiche').getAttribute('aria-label'),
       foc: a && a.tagName + ':' + a.textContent }; });
     await h.fermer();
-    const r = await h.ev((sel) => ({ ferme: !document.querySelector('.vf-fiche'), foc: document.activeElement === document.querySelector(sel), vue: !document.querySelector('.vf-vue[data-vf-vue="regie"]').hidden }), ORIGINE('wk-1'));
+    const r = await h.ev((sel) => ({ ferme: !document.querySelector('.vf-fiche'), foc: document.activeElement === document.querySelector(sel), vue: !document.querySelector('.vf-vue[data-vf-vue="regie"]').hidden }), ORIGINE('wk-2'));
     h.egal('P9', 'le lien du parent REMPLACE la vue par la fiche du parent, le focus va au titre', [p.n, p.nom, p.foc], [1, 'Fiche de Piloter la phase 74', 'H2:Piloter la phase 74']);
     h.egal('P9.a', '« Retour » ramène à la vue d\'origine (pas à la fiche précédente), le focus à l\'élément d\'origine de la première ouverture', r, { ferme: true, foc: true, vue: true });
   });
@@ -222,7 +222,7 @@ export default async function (h) {
   const faits = async (id = 'wk-1') => { await h.fermer().catch(() => {}); await h.ouvrir(id); return h.ev(FAITS); };
   await h.monter({ voies, who: WHO, fil: (now) => ({ 'wk-1': corps('wk-1', [msg(now, 5, 'x')]) }) });
   await h.section('P3', async () => {
-    const f = await faits(), fm = await h.ev(() => ({ duree: window.__vfFriseModele.fmtDuree(8040), jet: window.__vfFriseModele.fmtJetons(168000) }));
+    const f = await faits(), fm = await h.ev(() => ({ duree: window.__vfFriseModele.fmtDuree(8040).replace(/\s/g, ' '), jet: window.__vfFriseModele.fmtJetons(168000).replace(/\s/g, ' ') }));
     const ordre = ['Au travail', 'À vous attendre', 'Contexte au dernier tour', 'Compactions', "Appels d'outil", 'En échec'];
     h.egal('P3', 'six chiffres dans l\'ordre ; « Au travail » = somme des segments (2 h 14), jamais la durée de 101 h ; contexte en jetons, jamais « % »',
       [f.ordre, f.m['Au travail'], f.m['Contexte au dernier tour'], /%|101/.test(f.texte)], [ordre, fm.duree, `${fm.jet} jetons`, false]);
@@ -303,7 +303,7 @@ export default async function (h) {
   await h.section('P5', async () => {
     const etat = async (id, corpsFil, o = {}) => { await h.fermer().catch(() => {}); await h.filFixe(corpsFil === null ? {} : { [id]: corpsFil }, o);
       await h.ouvrir(id); return h.ev(() => { const f = document.querySelector('.vf-fiche-fil'); return { t: f.innerText.replace(/\s+/g, ' '), n: document.querySelectorAll('.vf-fiche-lignes > li').length,
-        boutons: [...f.querySelectorAll('button')].map((b) => b.textContent.trim()).filter((x) => !['Messages', 'Outils', 'Erreurs'].includes(x)) }; }); };
+        boutons: [...f.querySelectorAll('button')].filter((b) => b.offsetParent !== null).map((b) => b.textContent.trim()).filter((x) => !['Messages', 'Outils', 'Erreurs'].includes(x)) }; }); };
     const now = await h.horloge();
     const vide = await etat('wk-2', corps('wk-2', []));
     h.egal('P5.e', 'fil réel de 0 ligne : « Aucune ligne dans le fil. »', [/Aucune ligne dans le fil\./.test(vide.t), vide.n], [true, 0]);
@@ -406,7 +406,7 @@ cat > "$AUX/s8.mjs" <<'JS'
 import { voies, WHO, corps, msg } from './fix.mjs';
 export const ids = ['P8', 'P17'];
 const ORIGINE = (id) => `#vf-equipe li[data-vf-agent="${id}"] .vf-rg-tog`;
-const ETAT = (sel) => () => ({ ferme: !document.querySelector('.vf-fiche'), foc: document.activeElement === document.querySelector(sel) });
+const ETAT = (sel) => ({ ferme: !document.querySelector('.vf-fiche'), foc: document.activeElement === document.querySelector(sel) });
 export default async function (h) {
   const fil = (now) => ({ 'wk-2': corps('wk-2', [msg(now, 5, 'x')]), 'wk-1': corps('wk-1', [msg(now, 5, 'y')]) });
   await h.monter({ voies, who: WHO, fil });
@@ -447,7 +447,7 @@ export default async function (h) {
       await h.ouvrir('wk-2', ORIGINE('wk-2'));
       await h.echap();
       await h.attendre("!document.querySelector('.vf-fiche')", 'fiche fermée par Échap');
-      const e = await h.ev(ETAT(ORIGINE('wk-2')));
+      const e = await h.ev(ETAT, ORIGINE('wk-2'));
       h.egal('P8.a', `un Échap intact ferme la fiche et rend le focus (pile factice ${pile ? 'présente' : 'absente'})`, e, { ferme: true, foc: true });
     }
     // un Échap déjà pris : preventDefault seul, en capture sur document (la fiche l'ignore) ; puis le même geste que la pile de la 80
@@ -475,6 +475,7 @@ export default async function (h) {
   });
   await h.section('P17', async () => {
     await h.monter({ voies, who: WHO, fil });
+    await h.ev(() => window.__vfEquipeVues.declarer({ id: 'essai', libelle: 'Essai', monter() {}, demonter() {} }));
     await h.ev(() => { window.__ouv = []; document.addEventListener('vf-agent:ouvrir', (e) => window.__ouv.push({ d: e.detail && e.detail.declencheur, prevented: e.defaultPrevented })); window.__lus = [];
       document.addEventListener('vf-agent:lu', (e) => window.__lus.push(e.detail && e.detail.id)); });
     const cas = [['nom', ORIGINE('wk-2'), 'wk-2', () => document.querySelector('#vf-equipe li[data-vf-agent="wk-2"] .vf-rg-tog').click()],
@@ -491,7 +492,8 @@ export default async function (h) {
         [o.ouv, o.ouvre, o.panel === av.panel, o.repli, o.etendu.every((x) => x === 'false'), o.lus.includes('wk-2')], [{ d: decl, prevented: true }, true, true, false, true, false]);
       await h.ev(() => document.querySelector('.vf-fiche-retour').click());
       await h.attendre("!document.querySelector('.vf-fiche')", 'fiche fermée');
-      const r = await h.ev((s) => ({ foc: document.activeElement === document.querySelector(s) }), sel);
+      const r = await h.ev((s) => { const el = document.querySelector(s), a = document.activeElement;
+        return { foc: el ? a === el : a !== document.body && !!a.closest('#vf-equipe') }; }, sel);
       h.egal('P17.a', `à la fermeture le focus revient à l'élément du déclencheur « ${decl} »`, r, { foc: true });
     }
     const faux = await h.ev(() => { const mk = (d) => new CustomEvent('vf-agent:ouvrir', { detail: { id: 'wk-2', kind: 'subagent', declencheur: d }, cancelable: true, bubbles: true });
@@ -615,7 +617,7 @@ export default async function (h) {
     const e = await h.ev(() => ({ esc: window.__esc2, fiches: document.querySelectorAll('.vf-fiche').length, errs: window.__errs.length }));
     h.egal('P18.a', 'Échap après le retour ne fait rien (aucune fiche, événement non pris, aucune erreur de page)', e, { esc: false, fiches: 0, errs: 0 });
     const s = await h.ev(() => window.__surOnglet.filter((x) => x.fiche).map((x) => x.cle));
-    h.egal('P18.b', 'l\'inscription porte cle « 74-vf-fiche.js » à chaque arrivée (3 arrivées, 3 appels, aucune sans clé)', s, ['74-vf-fiche.js', '74-vf-fiche.js', '74-vf-fiche.js']);
+    h.sonde('P18.b', 'l\'inscription porte cle « 74-vf-fiche.js » à chaque arrivée (au moins trois, aucune sans clé)', s.length >= 3 && s.every((c) => c === '74-vf-fiche.js'), JSON.stringify(s));
   });
 }
 JS

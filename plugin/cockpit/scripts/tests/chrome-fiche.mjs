@@ -103,7 +103,7 @@ await executer(chrome, async (s) => {
   // monter : la page Équipe (régie), fixtures posées, who émis si demandé
   h.monter = async (o = {}) => {
     const { largeur = 1280, hauteur = 800, coarse = false, media = [] } = o;
-    await s.ev("(() => { try { sessionStorage.clear(); } catch {} })()");
+    await s.ev("(() => { try { sessionStorage.clear(); localStorage.clear(); } catch {} })()");
     await s.send('Emulation.setDeviceMetricsOverride', { width: largeur, height: hauteur, deviceScaleFactor: 1, mobile: coarse && largeur <= 700 });
     await s.send('Emulation.setTouchEmulationEnabled', { enabled: coarse, maxTouchPoints: coarse ? 1 : 0 });
     await s.send('Emulation.setEmulatedMedia', { features: media });
