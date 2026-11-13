@@ -8,7 +8,7 @@
 set -uo pipefail
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 REPO="$(cd "$SCRIPTS/../../.." && pwd)"
-WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"
 AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
 export HOME="$WORK/home"
 trap 'vf_hyg_fin; [ -n "${KEEP:-}" ] || { chmod -R u+rwx "$WORK" 2>/dev/null; rm -rf "$WORK"; }' EXIT
@@ -64,8 +64,7 @@ async function sortie() {
 try { console.log(JSON.stringify(await sortie())); } catch (e) { console.log(JSON.stringify({ erreur: 'echec ' + String(e && e.message).slice(0, 120) })); }
 JS
 # V <lab> <vue> [cle] -> chemin du fichier JSON produit (un fichier par appel)
-NV=0
-V() { NV=$((NV+1)); node "$AUX/trace.mjs" "$SCRIPTS" "$@" > "$WORK/v$NV.json" 2>/dev/null; echo "$WORK/v$NV.json"; }
+V() { local f; f="$WORK/v-$(basename "$1")-$2-$(printf '%s' "${3:-}" | tr -c 'A-Za-z0-9' _).json"; node "$AUX/trace.mjs" "$SCRIPTS" "$@" > "$f" 2>/dev/null; echo "$f"; }
 # M <fichier> <id> <maillon> -> « état/niveau » (niveau « - » si le maillon n'est pas lu)
 M() { J "$1" "(l=>l.maillons.$3.etat+'/'+(l.maillons.$3.niveau??'-'))(j.exigences.find(l=>l.id==='$2'))"; }
 # MOT <fichier> <id> -> « maillon/état » du mot de ligne, « aucun » si la chaîne est complète
@@ -211,7 +210,7 @@ printf '# Validation\n\nREQ-20\n' > "$D/06-VALIDATION.md"
 D="$(phdir "$L2" 07-contra)"
 mkplan "$D/07-01-PLAN.md" '[REQ-05]'
 mkplan "$D/07-02-PLAN.md" '[REQ-07]'; mksum "$D/07-02-SUMMARY.md" 'requirements: [REQ-07]'
-mkplan "$D/07-03-PLAN.md" '[REQ-08]'; mksum "$D/07-03-SUMMARY.md" 'requirements: [REQ-08]'
+mkplan "$D/07-03-PLAN.md" '[REQ-08]' # pas de SUMMARY : REQ-08 ne porte que la mention sans-ligne-tracabilite
 # phase 8 : chaîne complète, un identifiant cité partout, l'autre au niveau phase
 D="$(phdir "$L2" 08-full)"; mkplan "$D/08-01-PLAN.md" '[REQ-22, REQ-23]'; mksum "$D/08-01-SUMMARY.md" 'requirements: [REQ-22, REQ-23]'
 printf -- '---\nstatus: passed\n---\n# Vérification\n\n| REQ-22 | test | OK |\n' > "$D/08-VERIFICATION.md"

@@ -1,5 +1,5 @@
 // vf-cockpit-trace-ledger — lecture du registre des exigences (REQUIREMENTS.md) pour la traçabilité du cockpit (TRAC-01, TRAC-11 ; P76-D-12, P76-D-13, P76-D-38).
-// Exports : traceDuLedger, statutFait.
+// Exports : traceDuLedger, statutFait, citationsLigne.
 // Module pur : reçoit le texte du ledger, ne lit aucun fichier. Cases et lignes de traçabilité par les motifs de vf-cockpit-formats.mjs (reExigences, reTraceabilite) :
 // aucun motif neuf pour la forme « Phase N », aucune RegExp construite depuis une valeur lue dans le lab.
 import { normNum, texte, reExigences, idExigence, reTraceabilite } from './vf-cockpit-formats.mjs';
@@ -28,3 +28,12 @@ export function traceDuLedger({ txt, ws }) {
   }
   return { statuts, lignes, lignesSansExigence: sans };
 }
+
+// P76-D-38 : citations lues sur la LIGNE COMPLÈTE d'une exigence au ledger (jamais sur un libellé coupé, jamais devinées ni déduites d'un autre fichier).
+// Préfixée (reliable, ADR-075) : `P<n>-D-<nn>` ; ADR : `ADR-<nnn>` ; nue : `D-<nn>` non précédée d'un préfixe, listée mais jamais reliée. Listes dédoublonnées, ordre de lecture.
+// Motifs fixes : aucune RegExp construite depuis une valeur du lab.
+const CITE_DECISION = /(?<![A-Za-z0-9.-])P[0-9]+(?:\.[0-9]+)*-D-[0-9]{2,}(?![0-9A-Za-z])/g;
+const CITE_ADR = /(?<![A-Za-z0-9-])ADR-[0-9]{3}(?![0-9A-Za-z])/g;
+const CITE_NUE = /(?<![A-Za-z0-9.-])D-[0-9]{2,}(?![0-9A-Za-z])/g;
+const uniques = (ligne, re) => [...new Set([...String(ligne || '').matchAll(re)].map((m) => m[0]))];
+export function citationsLigne(ligne) { return { decisions: uniques(ligne, CITE_DECISION), adrs: uniques(ligne, CITE_ADR), nues: uniques(ligne, CITE_NUE) }; }
