@@ -139,14 +139,13 @@ function motifsDe(texte) {
 }
 
 // --- contexte : lu une fois par calcul (suites, gates, fichiers suivis, motifs) ---
-// `git ls-files -z` : refusé, hors délai, tronqué, git absent, hors dépôt → null (jamais une liste devinée) ; `binaire` : l'option d'essai de la route
-async function suivisDe(lab, fin, binaire) {
-  const opts = { fin, maxBuffer: 64 << 20, ...(binaire ? { binaire } : {}) };
-  const r = await lancerGitAsync(lab, ['ls-files', '-z'], opts);
+// `git ls-files -z` : refusé, hors délai, tronqué, git absent, hors dépôt → null (jamais une liste devinée)
+async function suivisDe(lab, fin) {
+  const r = await lancerGitAsync(lab, ['ls-files', '-z'], { fin, maxBuffer: 64 << 20 });
   return r.ok ? r.sortie.split('\0').filter(Boolean) : null;
 }
-export async function contexteGardes(lab, { fin, binaire } = {}) {
-  const liste = await suivisDe(lab, fin ?? finDans(20000), binaire);
+export async function contexteGardes(lab, { fin } = {}) {
+  const liste = await suivisDe(lab, fin ?? finDans(20000));
   if (!liste) return { etat: 'indisponible', motif: 'git ls-files' };
   try {
     return lireConfine(lab, () => {

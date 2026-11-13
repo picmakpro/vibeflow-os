@@ -1,6 +1,6 @@
 // vf-cockpit-activite-branches — collisions COMMITTÉES entre branches, par paire de HEAD distincts de worktrees vérifiés (Phase 75, plan 75-01 ;
 //   ACTV-10 ; P75-D-10, P75-D-11, P78-D-38). LECTURE SEULE.
-// Exports : PLAFOND_TETES, collisionsBranches(lab, { worktrees, plafond, fin, binaire, cache }) -> { etat, tetes, plafond, plafondAtteint,
+// Exports : PLAFOND_TETES, collisionsBranches(lab, { worktrees, plafond, fin, cache }) -> { etat, tetes, plafond, plafondAtteint,
 //   collisions: [[chemin, [branche, ...]]] } | { etat: 'indisponible' | 'absent' }.
 // Par paire de HEAD (A, B) : base = meilleur ancêtre commun, puis `diff-tree -r --no-renames --name-only -z <base> <tête>` de chaque côté,
 //   intersection. La base unique `main` est écartée
@@ -72,8 +72,8 @@ async function paire(lire, a, b) {
   return fa.filter((p) => sb.has(p));
 }
 
-export async function collisionsBranches(lab, { worktrees, plafond = PLAFOND_TETES, fin = finDans(ECHEANCE_MS), binaire, cache = CACHE } = {}) {
-  const lire = (args) => lancerGitAsync(lab, args, { fin, binaire, maxBuffer: 16 << 20 });
+export async function collisionsBranches(lab, { worktrees, plafond = PLAFOND_TETES, fin = finDans(ECHEANCE_MS), cache = CACHE } = {}) {
+  const lire = (args) => lancerGitAsync(lab, args, { fin, maxBuffer: 16 << 20 });
   const cm = await lire(['rev-parse', '--path-format=absolute', '--git-common-dir']);
   if (!cm.ok) return { etat: raison(cm) };
   const pf = await lire(['rev-parse', '--show-prefix']);

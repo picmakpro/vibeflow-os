@@ -125,9 +125,11 @@ const GE = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/
 for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_NAMESPACE', 'GIT_CEILING_DIRECTORIES']) delete GE[k];
 const git = (d, ...a) => execFileSync('git', ['-C', d, '-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { stdio: 'ignore', env: GE });
 const R = fs.mkdtempSync(path.join(work, 'cas-')), lab = path.join(R, 'lab'), wt = path.join(R, 'wt'), here = path.join(lab, '.vibeflow', 'cockpit');
-const LOG = path.join(R, 'espion.log'), DORS = path.join(R, 'espion.dors'), FAILF = path.join(R, 'espion.echec'), SPY = path.join(R, 'espion.sh');
+const LOG = path.join(R, 'espion.log'), DORS = path.join(R, 'espion.dors'), FAILF = path.join(R, 'espion.echec'), BIN = path.join(R, 'bin'), SPY = path.join(BIN, 'git');
 const reel = execFileSync('which', ['git'], { encoding: 'utf8' }).trim();
+fs.mkdirSync(BIN); // le faux git s'injecte par le PATH (forme maison, hors du lab : l'assainissement du PATH le garde) ; le module ne choisit jamais le programme git
 fs.writeFileSync(SPY, `#!/bin/bash\nprintf '%s\\n' "$*" >> "${LOG}"\nif [ -f "${DORS}" ]; then for a in "$@"; do [ "$a" = log ] && sleep 2; done; fi\nif [ -f "${FAILF}" ]; then for a in "$@"; do [ "$a" = for-each-ref ] && exit 1; done; fi\nexec "${reel}" "$@"\n`, { mode: 0o755 });
+process.env.PATH = `${BIN}${path.delimiter}${process.env.PATH}`;
 const sousDe = (l) => { const t = l.split(' '); let i = 0; while (i < t.length && t[i].startsWith('-')) i += (t[i] === '-C' || t[i] === '-c') ? 2 : 1; return t[i]; };
 const journal = () => (fs.existsSync(LOG) ? fs.readFileSync(LOG, 'utf8').split('\n').filter(Boolean) : []);
 const FICHIERS = [['fil', 5], ['src/a.js', 20], ['src/b.js', 30], ['src/c.js', 10]];
@@ -157,7 +159,7 @@ const frise = (voies, o = {}) => ({ at: NOW, sig: 'f1', source: { etat: 'ok', cc
 const instOf = (o = {}) => ({ seq: 1, at: NOW, git: { sig: 'aaaa000000000001', at: NOW }, projet: { files: [] }, frise: frise([]), ...o });
 const plan = (p, name, touched, o = {}) => ({ p, n: 'ph-1', name, st: 'todo', vague: 1, touched, ...o });
 const { creerActivite, creerRouteActivite } = await imp('vf-cockpit-activite.mjs');
-const mk = (H, o = {}) => creerActivite({ binaire: SPY, lireInstantane: () => H.v, ...o });
+const mk = (H, o = {}) => creerActivite({ lireInstantane: () => H.v, ...o });
 const pret = async (act, ctx, ms = 25000) => { const t0 = Date.now(); for (;;) { const r = act(ctx); if (r.calcul === 'pret' || Date.now() - t0 > ms) return r; await dormir(25); } };
 const stable = async () => { let n = journal().length; const t0 = Date.now(); for (;;) { await dormir(250); const m = journal().length; if (m === n || Date.now() - t0 > 8000) return m; n = m; } };
 const out = {}; fabriquer(); const ctx = { root: lab, here };
@@ -206,7 +208,7 @@ if (cas === 'assemblage') {
   const fin = await pret(act, ctx); fs.rmSync(DORS);
   const neufs = journal().slice(n2);
   out.lsfiles = neufs.some((l) => sousDe(l) === 'ls-files'); out.logs2 = neufs.filter((l) => sousDe(l) === 'log').length; out.commits = fin.git.fenetre.commits - prec.git.fenetre.commits;
-  out.autres = [...new Set(neufs.map(sousDe))].filter((s) => !['for-each-ref', 'worktree', 'rev-parse', 'log', 'rev-list', 'diff-tree', 'ls-files'].includes(s)).join(',');
+  out.autres = [...new Set(neufs.map(sousDe))].filter((s) => !['for-each-ref', 'worktree', 'rev-parse', 'log', 'rev-list', 'diff-tree', 'ls-files', 'config'].includes(s)).join(','); // config : la lecture des filtres du dépôt que fait le lanceur avant chaque git
   out.interdits2 = journal().map(sousDe).filter((s) => ['status', 'diff', 'fetch', 'pull', 'ls-remote'].includes(s));
   out.intact2 = condensat(lab) === c2;
 } else if (cas === 'lecture') {
@@ -309,7 +311,7 @@ node "$AUX/valide.mjs" "$SCRIPTS/vf-cockpit-interface.json" "$WORK/r5.json" > "$
 ok R13 "la source arbres (même cible dans deux arbres vérifiés) est fusionnée dans collisions : sources agents, arbres, branches, plans" "$(cj "$C" 'o.sources')" "agents,arbres,branches,plans"
 ok R14 "un worktree VÉRIFIÉ du même dépôt, hors du dossier du lab, n'est jamais compté hors lab (sa cible est une marque) ; seul un arbre non prouvé l'est" "$(cj "$C" 'o.horsLab')" "1,true,false"
 K="$(cas cache)"
-ok R6 "signature git inchangée : ZÉRO invocation du binaire (toutes sous-commandes) sur six appels ; signature changée : UN seul log incrémental, un commit de plus, les autres sous-commandes nommées (ls-files comprise : toute invocation passe par l'option binaire) ; le graphe seul qui change ne lance aucun git" \
+ok R6 "signature git inchangée : ZÉRO invocation du binaire (toutes sous-commandes) sur six appels ; signature changée : UN seul log incrémental, un commit de plus, les autres sous-commandes nommées (ls-files comprise : toute invocation passe par le git espion du PATH) ; le graphe seul qui change ne lance aucun git" \
   "$(cj "$K" '[o.zero,o.logs2,o.commits,o.autres,o.graphe0,o.lsfiles].join(",")')" "0,1,1,,0,true"
 ok R7 "calcul lent (2 s) : réponse immédiate avec calcul en-cours ; premier calcul etat en-calcul ; trois requêtes concurrentes = UN seul log ; l'objet précédent est servi pendant le recalcul" \
   "$(cj "$K" '[o.premier,o.rapide,o.unLog,o.precedent].join("|")')" "en-calcul,en-cours,en-lecture,en-lecture|true|1|en-cours,ok,ok,true"
@@ -374,7 +376,7 @@ const G = 'vf-cockpit-activite-gardes.mjs';
 const nul = (o) => !o;
 const TOUS = {
   tache2: [
-    { nom: 'signature-relue-par-requete', f: A, p: [[LANCE, `lancerGitAsync(ctx.root, ['rev-parse', 'HEAD'], { binaire: o.binaire }); ${LANCE}`]], cas: 'cache', rouge: (o) => o.zero !== 0 },
+    { nom: 'signature-relue-par-requete', f: A, p: [[LANCE, `lancerGitAsync(ctx.root, ['rev-parse', 'HEAD']); ${LANCE}`]], cas: 'cache', rouge: (o) => o.zero !== 0 },
     { nom: 'cache-par-cle-retire', f: A, p: [['if (!b || b.cle !== cle || forcer)', 'if (true)'], ['const manque = cle !== null && (cle !== e.cle || gsig !== e.gsig || reprise);', 'const manque = cle !== null;']], cas: 'cache', rouge: (o) => o.zero !== 0 },
     { nom: 'mono-vol-retire', f: A, p: [['manque && !e.enVol', 'manque'], ['monoVol(cleVol(ctx.root), () => rafraichir(ctx.root, e, o, cle, carte, gsig, forcer))', 'rafraichir(ctx.root, e, o, cle, carte, gsig, forcer)']], cas: 'cache', rouge: (o) => o.unLog !== 1 },
     { nom: 'calcul-synchrone-dans-la-requete', f: A, p: [[LANCE, 'if (manque && !e.enVol) { demarrer(ctx, e, o, cle, carte, gsig); Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500); }']], cas: 'cache', rouge: (o) => !o.rapide || o.ecartMax > 250 },
@@ -396,7 +398,7 @@ const TOUS = {
     { nom: 'reprise-retiree', f: A, p: [['const reprise = e.echecA != null && o.horloge() - e.echecA >= o.retryMs;', 'const reprise = false;']], cas: 'reprise', rouge: (o) => o.reprise !== 'ok,ok,pret' },
     { nom: 'reprise-sans-delai', f: A, p: [['o.horloge() - e.echecA >= o.retryMs;', 'o.horloge() - e.echecA >= 0;']], cas: 'reprise', rouge: (o) => o.calme !== 0 || !o.unSeul },
     { nom: 'contexte-des-gardes-relu-a-chaque-graphe', f: A, p: [['b.gctx ??= await', 'b.gctx = await']], cas: 'cache', rouge: (o) => o.graphe0 !== 0 },
-    { nom: 'ls-files-hors-de-l-option-binaire', f: G, p: [['...(binaire ? { binaire } : {})', '']], cas: 'cache', rouge: (o) => o.lsfiles !== true },
+    { nom: 'ls-files-hors-du-path-espionne', f: G, p: [["await lancerGitAsync(lab, ['ls-files', '-z'], { fin, maxBuffer: 64 << 20 })", "await lancerGitAsync(lab, ['ls-files', '-z'], { fin, maxBuffer: 64 << 20, binaire: '/usr/bin/git' })"]], cas: 'cache', rouge: (o) => o.lsfiles !== true },
     { nom: 'borne-de-la-reponse-retiree', f: A, p: [['const liste = t.slice(0, o.max);', 'const liste = t.slice(0);']], cas: 'bornes', rouge: (o) => !o.bornes.startsWith('500,') },
   ],
 };

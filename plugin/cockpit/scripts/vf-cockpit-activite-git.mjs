@@ -121,10 +121,10 @@ async function commitsDeLaFenetre(lire, tete, memo, { plafond, jours, debut }) {
   return lireCommits(lire, [...ARGS_LOG, since, '-n', String(plafond), tete, '--']);
 }
 
-export async function calculerGit(lab, { loc, etatPrecedent = null, binaire, fin = finDans(ECHEANCE_MS),
+export async function calculerGit(lab, { loc, etatPrecedent = null, fin = finDans(ECHEANCE_MS),
   plafond = FENETRE.plafond, jours = FENETRE.jours, options,
   paliersMin = PALIERS_MIN_FICHIERS, maxBuffer = 32 << 20, maintenant = Date.now() } = {}) {
-  const lire = (args) => lancerGitAsync(lab, args, { fin, maxBuffer, binaire });
+  const lire = (args) => lancerGitAsync(lab, args, { fin, maxBuffer });
   const debut = Math.floor(maintenant / 1000) - jours * 86400;
   // clé de cache : condensat des refs et des worktrees (HEAD de chacun compris), RELUE à chaque appel (deux lectures, aucun `log`)
   const refs = await lire(['for-each-ref', '--format=%(refname)%00%(objectname)']);

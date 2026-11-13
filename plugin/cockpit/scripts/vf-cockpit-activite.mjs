@@ -7,7 +7,7 @@
 //   change : la requête répond tout de suite avec l'objet précédent et `calcul: "en-cours"` (premier calcul : `etat: "en-calcul"`).
 //   La part agents et plans est recalculée par instantané.
 // Un chemin, une branche, un rôle ne sont jamais des clés d'objet : des tableaux de tuples. Un chemin rendu n'est jamais ouvert, décodé ni résolu ici.
-// Une exception d'un module rend `indisponible` sur la lentille seule. Options d'essai : `binaire` (le programme git), `horloge`, `lireInstantane`.
+// Une exception d'un module rend `indisponible` sur la lentille seule. Options d'essai : `horloge`, `lireInstantane` ; le programme git n'est JAMAIS choisi ici (les essais placent un faux git en tête du PATH).
 import path from 'node:path';
 import { instantane } from './vf-cockpit-instantane.mjs';
 import { lancerGitAsync } from './vf-cockpit-git-lanceur.mjs';
@@ -64,11 +64,11 @@ async function arbresDe(lire) {
 
 // lecture git sur une clé neuve : journal incrémental, arbres vérifiés, collisions committées ; chaque lentille tombe seule en `indisponible`
 async function lireBase(lab, cle, prec, loc, o) {
-  const git = await essaiA(() => calculerGit(lab, { loc, etatPrecedent: prec && prec.git, binaire: o.binaire, maintenant: o.horloge() }), INDISPO);
+  const git = await essaiA(() => calculerGit(lab, { loc, etatPrecedent: prec && prec.git, maintenant: o.horloge() }), INDISPO);
   if (git.etat === 'absent') return { cle, git, branches: { etat: 'absent' }, arbres: SANS_ARBRES };
-  const lire = (args) => lancerGitAsync(lab, args, { fin: Date.now() + ECHEANCE_MS, binaire: o.binaire, maxBuffer: 16 << 20 });
+  const lire = (args) => lancerGitAsync(lab, args, { fin: Date.now() + ECHEANCE_MS, maxBuffer: 16 << 20 });
   const arbres = await essaiA(() => arbresDe(lire), SANS_ARBRES);
-  const branches = await essaiA(() => collisionsBranches(lab, { worktrees: arbres.liste, binaire: o.binaire }), INDISPO);
+  const branches = await essaiA(() => collisionsBranches(lab, { worktrees: arbres.liste }), INDISPO);
   return { cle, git, branches, arbres };
 }
 
@@ -86,7 +86,7 @@ async function sectionGardes(lab, b, carte, o) {
   if (!g || !g.meta || g.meta.vfCodeExtractor !== 'vibeflow') return gardesVides('non-lues'); // lab non VibeFlow : jamais « tout sans témoin »
   const prevus = Number.isInteger(g.meta.prevusIgnores) && g.meta.prevusIgnores > 0 ? g.meta.prevusIgnores : 0;
   if (b.git.etat === 'absent') return gardesVides('indisponible', prevus);
-  b.gctx ??= await essaiA(() => contexteGardes(lab, { binaire: o.binaire }), INDISPO);
+  b.gctx ??= await essaiA(() => contexteGardes(lab), INDISPO);
   if (b.gctx.etat !== 'ok') return gardesVides('indisponible', prevus);
   const r = await essaiA(() => calculerGardes(lab, g, { ctx: b.gctx.ctx }), INDISPO);
   const gd = plafonner(r.gardes || [], GARDES_MAX), eg = (r.estGarde || []).filter((x) => x.length <= CHEMIN_MAX);
@@ -177,9 +177,9 @@ function servir(ctx, e, o, inst, graceMs) {
   return obj;
 }
 
-export function creerActivite({ binaire, horloge = Date.now, lireInstantane = instantane, graceMs = GRACE_MS, collisionsMax = COLLISIONS_MAX,
+export function creerActivite({ horloge = Date.now, lireInstantane = instantane, graceMs = GRACE_MS, collisionsMax = COLLISIONS_MAX,
   retryMs = RETRY_MS } = {}) {
-  const o = { binaire, horloge, max: collisionsMax, retryMs }, labs = new Map();
+  const o = { horloge, max: collisionsMax, retryMs }, labs = new Map();
   return function activite(ctx) {
     try {
       let e = labs.get(ctx.root);

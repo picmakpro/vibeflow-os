@@ -173,6 +173,17 @@ const script = (nom, corps) => { const f = path.join(WORK, nom); fs.writeFileSyn
 const ESPION = script('espion-git', `printf '%s\\t' "$@" >> '${JOURNAL}'\nprintf '\\n' >> '${JOURNAL}'\nexec '${GITREEL}' "$@"`);
 const ECHEC_LOG = script('echec-log-git', `for a in "$@"; do [ "$a" = log ] && exit 3; done\nexec '${GITREEL}' "$@"`);
 const ORDURE_LOG = script('ordure-log-git', `for a in "$@"; do [ "$a" = log ] && { printf 'abc'; exit 0; }; done\nexec '${GITREEL}' "$@"`);
+// le faux git s'injecte par le PATH (forme maison) : un dossier hors du lab, en tête, qui porte un exécutable nommé git ; jamais un paramètre passé au lanceur
+let NVIA = 0;
+const via = async (script, f) => {
+  const d = path.join(WORK, `via-${++NVIA}`); fs.mkdirSync(d); fs.copyFileSync(script, path.join(d, 'git')); fs.chmodSync(path.join(d, 'git'), 0o755);
+  const avant = process.env.PATH; process.env.PATH = `${d}${path.delimiter}${avant}`;
+  try { return await f(); } finally { process.env.PATH = avant; }
+};
+const sansGit = async (f) => { // git introuvable : un PATH qui ne porte aucun git
+  const d = path.join(WORK, `sansgit-${++NVIA}`); fs.mkdirSync(d); const avant = process.env.PATH; process.env.PATH = d;
+  try { return await f(); } finally { process.env.PATH = avant; }
+};
 const argvs = () => fs.readFileSync(JOURNAL, 'utf8').split('\n').filter(Boolean).map((l) => l.split('\t').filter((x, i, t) => i < t.length - 1 || x !== ''));
 const HIST = [];
 const vider = () => { HIST.push(...argvs()); fs.writeFileSync(JOURNAL, ''); };
@@ -186,17 +197,17 @@ for (let i = 0; i < 6; i++) lot(`i${i}`, 'a.txt', 'b.txt');
 lot('seul', 'c.txt');
 const locI = new Map([['a.txt', 3], ['b.txt', 2], ['c.txt', 1], ['a2.txt', 3], ['d.txt', 1]]);
 vider();
-const s1 = await A.calculerGit(ri, { loc: locI, binaire: ESPION });
+const s1 = await via(ESPION, () => A.calculerGit(ri, { loc: locI }));
 eq('G7', 'G7.1 premier calcul : exactement un `log`, et une clé sha256 recalculée à partir de `for-each-ref` et de `worktree list`', [appels('log').length, /^[0-9a-f]{64}$/.test(s1.cle), appels('for-each-ref').length, appels('worktree').length], [1, true, 1, 1]);
 eq('G7', 'G7.2 le couplage de la fixture est non vide (le témoin d\'égalité ci-dessous ne compare pas du vide)', [s1.etat, s1.couplage.length, s1.chauds.length], ['ok', 1, 3]);
 vider();
-const s2 = await A.calculerGit(ri, { loc: locI, binaire: ESPION, etatPrecedent: s1 });
+const s2 = await via(ESPION, () => A.calculerGit(ri, { loc: locI, etatPrecedent: s1 }));
 eq('G7', 'G7.3 HEAD et refs inchangés : zéro `log` relancé, résultat identique, la clé est pourtant relue (un `for-each-ref` et un `worktree list`)', [appels('log').length, appels('for-each-ref').length, appels('worktree').length, aire(s2) === aire(s1)], [0, 1, 1, true]);
-const s2b = await A.calculerGit(ri, { loc: new Map([['a.txt', 30], ['b.txt', 2]]), binaire: ESPION, etatPrecedent: s1 });
+const s2b = await via(ESPION, () => A.calculerGit(ri, { loc: new Map([['a.txt', 30], ['b.txt', 2]]), etatPrecedent: s1 }));
 eq('G7', 'G7.4 clé inchangée mais `loc` du scan différent : les points chauds suivent, sans nouveau `log`', [appels('log').length, s2b.chauds[0].slice(0, 3)], [0, ['a.txt', 6, 30]]);
 G(ri, 'branch', 'autre');
 vider();
-const s3 = await A.calculerGit(ri, { loc: locI, binaire: ESPION, etatPrecedent: s2 });
+const s3 = await via(ESPION, () => A.calculerGit(ri, { loc: locI, etatPrecedent: s2 }));
 eq('G7', 'G7.5 une ref de plus (HEAD inchangé) : la clé change, le résultat reste identique, toujours aucun `log` (rien de neuf à lire)', [s3.cle !== s2.cle, appels('log').length, aire(s3) === aire(s2)], [true, 0, true]);
 
 // G8 : incrémental quand l'ancien HEAD est un ancêtre, relecture complète sinon
@@ -204,7 +215,7 @@ const ancienHead = G(ri, 'rev-parse', 'HEAD').trim();
 lot('apres1', 'a.txt', 'b.txt'); C(ri, 'renomme', (ti -= 2), { mv: [['a.txt', 'a2.txt']] }); lot('apres2', 'a2.txt', 'b.txt', 'd.txt');
 const nouvelHead = G(ri, 'rev-parse', 'HEAD').trim();
 vider();
-const s4 = await A.calculerGit(ri, { loc: locI, binaire: ESPION, etatPrecedent: s3 });
+const s4 = await via(ESPION, () => A.calculerGit(ri, { loc: locI, etatPrecedent: s3 }));
 const logs4 = appels('log');
 eq('G8', 'G8.1 ancien HEAD ancêtre : un seul `log`, limité à ancien..HEAD', [logs4.length, logs4[0]?.includes(`${ancienHead}..${nouvelHead}`)], [1, true]);
 const complet4 = await A.calculerGit(ri, { loc: locI });
@@ -212,7 +223,7 @@ eq('G8', 'G8.2 les agrégats de l\'incrémental sont identiques à ceux d\'une r
 eq('G8', 'G8.3 le témoin d\'égalité n\'est pas vide : l\'alias du renommage agit sur les anciens commits', [s4.chauds.find((t) => t[0] === 'a2.txt')?.[1], s4.chauds.some((t) => t[0] === 'a.txt'), s4.couplage.length > 0], [9, false, true]);
 G(ri, 'reset', '-q', '--hard', 'HEAD~2'); lot('divergent', 'd.txt');
 vider();
-const s5 = await A.calculerGit(ri, { loc: locI, binaire: ESPION, etatPrecedent: s4 });
+const s5 = await via(ESPION, () => A.calculerGit(ri, { loc: locI, etatPrecedent: s4 }));
 const logs5 = appels('log');
 eq('G8', 'G8.4 ancien HEAD non ancêtre (réécriture) : relecture complète, aucun `..` dans le `log`', [logs5.length, logs5[0]?.some((x) => x.includes('..'))], [1, false]);
 eq('G8', 'G8.5 la relecture complète rend les agrégats d\'un calcul neuf', aire(s5) === aire(await A.calculerGit(ri, { loc: locI })), true);
@@ -221,12 +232,12 @@ eq('G8', 'G8.5 la relecture complète rend les agrégats d\'un calcul neuf', air
 const tous = [...HIST, ...argvs()];
 const interdit = (x) => ['status', 'diff', 'fetch', 'pull', 'push', '--follow'].includes(x);
 eq('G9', 'G9.1 aucun argv journalisé ne contient status, diff, fetch ni --follow (journal non vide)', [tous.length > 8, tous.filter((a) => a.some(interdit)).length], [true, 0]);
-eq('G9', 'G9.2 erreur de `log` (sortie 3) : indisponible, sans champ partiel', await A.calculerGit(ri, { loc: locI, binaire: ECHEC_LOG }), { etat: 'indisponible' });
-eq('G9', 'G9.3 sortie de `log` désalignée : indisponible, sans champ partiel', await A.calculerGit(ri, { loc: locI, binaire: ORDURE_LOG }), { etat: 'indisponible' });
+eq('G9', 'G9.2 erreur de `log` (sortie 3) : indisponible, sans champ partiel', await via(ECHEC_LOG, () => A.calculerGit(ri, { loc: locI })), { etat: 'indisponible' });
+eq('G9', 'G9.3 sortie de `log` désalignée : indisponible, sans champ partiel', await via(ORDURE_LOG, () => A.calculerGit(ri, { loc: locI })), { etat: 'indisponible' });
 eq('G9', 'G9.4 échéance dépassée : indisponible, sans champ partiel', await A.calculerGit(ri, { loc: locI, fin: Date.now() - 1 }), { etat: 'indisponible' });
 eq('G9', 'G9.5 sortie tronquée (maxBuffer de 600 octets sur un journal plus long) : indisponible, sans champ partiel', await A.calculerGit(r1, { loc: loc1, maxBuffer: 600 }), { etat: 'indisponible' });
 const horsDepot = path.join(WORK, 'horsdepot'); fs.mkdirSync(horsDepot);
-eq('G9', 'G9.6 hors dépôt, dossier absent, git introuvable : absent', [(await A.calculerGit(horsDepot, { loc: locI })).etat, (await A.calculerGit(path.join(WORK, 'inexistant'), { loc: locI })).etat, (await A.calculerGit(ri, { loc: locI, binaire: path.join(WORK, 'pas-de-git') })).etat], ['absent', 'absent', 'absent']);
+eq('G9', 'G9.6 hors dépôt, dossier absent, git introuvable : absent', [(await A.calculerGit(horsDepot, { loc: locI })).etat, (await A.calculerGit(path.join(WORK, 'inexistant'), { loc: locI })).etat, (await sansGit(() => A.calculerGit(ri, { loc: locI }))).etat], ['absent', 'absent', 'absent']);
 const vide = init('rvide');
 eq('G9', 'G9.7 dépôt sans commit : vide, aucune ligne rendue', await A.calculerGit(vide, { loc: locI }).then((o) => [o.etat, o.chauds, o.couplage]), ['vide', [], []]);
 
@@ -258,13 +269,13 @@ eq('B2', 'B2.2 une seule branche modifie le fichier : aucune collision', (await 
 // B3 : deux worktrees au même HEAD comptent pour un
 const wa2 = path.join(WORK, 'wt-rb2-wa2'); G(rb2, 'worktree', 'add', '-q', '--detach', wa2, 'wa');
 vider();
-const r3 = await coll(rb2, { binaire: ESPION });
+const r3 = await via(ESPION, () => coll(rb2, {}));
 eq('B3', 'B3.1 un worktree détaché au HEAD de wa : quatre HEAD distincts, une seule étiquette pour wa, six paires seulement (douze `diff-tree`, pas vingt)', [vue(r3), appels('diff-tree').length], [['ok', 4, false, [['commun.txt', ['wa', 'wb']]]], 12]);
 
 // B4 : plafond de HEAD
 const wd = mkWt(rb2, 'wd'); ecrire(wd, 'd', 17, 'd.txt');
 vider();
-const r4 = await coll(rb2, { plafond: 3, binaire: ESPION });
+const r4 = await via(ESPION, () => coll(rb2, { plafond: 3 }));
 eq('B4', 'B4.1 cinq HEAD distincts, plafond injecté à 3 : plafondAtteint true, trois paires seulement (six `diff-tree`)', [r4.etat, r4.tetes, r4.plafondAtteint, appels('diff-tree').length], ['ok', 5, true, 6]);
 eq('B4', 'B4.2 plafond par défaut (12) : non atteint avec cinq HEAD', (await coll(rb2)).plafondAtteint, false);
 
@@ -295,7 +306,7 @@ eq('B7', 'B7.2 aucune clé dynamique : les clés de l\'objet rendu sont fixes, `
 const memoPaires = new Map();
 await coll(rb2, { cache: memoPaires });
 vider();
-const r8 = await coll(rb2, { cache: memoPaires, binaire: ESPION });
+const r8 = await via(ESPION, () => coll(rb2, { cache: memoPaires }));
 eq('B8', 'B8.1 cache par paire de sha : une seconde demande identique ne relance ni `rev-list` ni `diff-tree`, même résultat', [appels('rev-list').length, appels('diff-tree').length, r8.collisions], [0, 0, [['commun.txt', ['wa', 'wb']]]]);
 const argvB = [...HIST, ...argvs()];
 eq('B8', 'B8.2 aucun argv de la tâche ne contient status, diff, fetch ni --follow (`diff-tree` seul est permis)', argvB.filter((a) => a.some(interdit)).length, 0);

@@ -64,3 +64,9 @@ chaque garde porte un témoin rouge puis vert ET un mutant vu rouge (vingt mutan
 - F5 (bas) : R2b et ses quatre mutants jugent la propriété (importe-t-on une lecture de fichier, un contrôle d'accès, un en-tête ?), les grep d'origine restent.
 - Schéma : `gardes.etat` gagne `tronque` ; champs `git.tronque`, `gardes.tronque`, `empreinte.marquesTronquees`, `radar.nomsTronques`, `radar.cheminsEcartes` ; raisons `chemins-ecartes`, `reponse-trop-grosse`. Fichier amont touché : `vf-cockpit-activite-gardes.mjs` (commit `fix(75-02)`).
 - Suites : route 35 PASS / 35 mutants rouges (214 s), gardes 25 PASS (9 s), routes 56 PASS (19 s) ; cliquet de colonnes sans écart sur mes fichiers.
+
+## Correctif D10.7 (le cockpit ne choisit jamais l'exécutable git)
+
+- Le paramètre `binaire` est retiré de `vf-cockpit-activite.mjs`, `-git.mjs` (`calculerGit`), `-branches.mjs` (`collisionsBranches`) et `-gardes.mjs` (`contexteGardes`) : aucun chemin de production ne le porte, sous aucune forme (raccourci, variable renommée).
+- Les essais injectent un faux `git` en tête du PATH, dans un dossier hors du lab (l'assainissement du PATH par `envGit` ne retire que les dossiers du lab : le faux git s'exécute) ; `test-cockpit-activite-git.sh` (helpers `via` et `sansGit`) et `test-cockpit-activite-route.sh` suivent. Le mutant de F4 devient `ls-files-hors-du-path-espionne` (un `ls-files` lancé par un chemin absolu échappe à l'espion : rouge). L'espion voit désormais aussi les `config` du lanceur (lecture des filtres) : ils comptent dans « zéro invocation ».
+- Rejoué : `test-cockpit-git-config-depot.sh` 138 PASS (D10.7 = 0, M-BINAIRE = 1|0), route 35 PASS / 35 mutants rouges (218 s), git 82 PASS, gardes 25 PASS.
