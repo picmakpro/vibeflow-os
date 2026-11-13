@@ -6,6 +6,7 @@
 (() => {
   const SC = window.Floorplan;
   if (!SC || !SC.graph.meta || SC.graph.meta.vfTab !== 'project') return;
+  const t = window.__vfFrT;
   const BORNE = 32, DELAI = 3000, COUPE = 24, NOM = 'vf-retour';
   const panneau = document.getElementById('panel');
   if (!panneau) return;
@@ -27,7 +28,7 @@
     .vf-retour-desc { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }`;
 
   // titre coupé au milieu à l'affichage (points de code, jamais au milieu d'un caractère), complet dans le nom accessible
-  const coupe = (t) => { const a = Array.from(t); return a.length <= COUPE ? t : a.slice(0, 12).join('') + '…' + a.slice(-11).join(''); };
+  const coupe = (s) => { const a = Array.from(s); return a.length <= COUPE ? s : a.slice(0, 12).join('') + '…' + a.slice(-11).join(''); };
   const nomDe = (id) => { try { const i = SC.info(id); return String((i && i.name) || id); } catch { return String(id); } };
 
   const poser = () => {
@@ -39,11 +40,11 @@
     const icone = document.createElement('span'); icone.setAttribute('aria-hidden', 'true'); icone.style.display = 'inline-flex';
     icone.innerHTML = SC.iconI('left'); // constante du moteur, aucune donnée de la page
     const texte = document.createElement('span');
-    texte.textContent = haut ? 'Retour : ' + coupe(haut.titre) : 'Retour';
+    texte.textContent = haut ? t('Back: {}', coupe(haut.titre)) : t('Back');
     b.append(icone, texte);
     const d = document.createElement('span'); d.className = NOM + '-desc'; d.id = NOM + '-desc'; d.textContent = 'Revenir à la sélection précédente';
     b.setAttribute('aria-describedby', d.id);
-    b.setAttribute('aria-label', haut ? 'Retour : ' + haut.titre : 'Retour, indisponible');
+    b.setAttribute('aria-label', haut ? t('Back: {}', haut.titre) : t('Back, unavailable'));
     b.setAttribute('aria-disabled', haut ? 'false' : 'true');
     b.addEventListener('click', (ev) => { ev.preventDefault(); retour(); });
     // Entrée et Espace pressent ce bouton ; ils ne doivent pas aussi lancer l'Entrée globale du moteur (qui plonge dans la sélection), comme 05-theme.js

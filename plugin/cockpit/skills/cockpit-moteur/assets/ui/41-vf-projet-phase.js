@@ -7,6 +7,7 @@
   if (!SC || !SC.graph.meta || SC.graph.meta.vfTab !== 'project') return;
   const { state } = SC, h = SC.h, sain = (id) => String(id).replace(/[^\w-]/g, '_');
   const registre = (window.__vfProjetRegistre = window.__vfProjetRegistre || {});
+  const t = window.__vfFrT;
 
   // porte-exigences:début
   function lireExigences(phaseId) {
@@ -31,23 +32,23 @@
   const M = () => window.__vfProjetModele;
   const couvertes = (idPhase, idPlan) => { // segment omis à 0 ; « 1 exigence couverte » au singulier
     const n = ((window.VF_EXIGENCES.lireExigences(idPhase).couverture || {})[idPlan] || []).length;
-    return n ? `<span class="vp-cov">${n} exigence${n > 1 ? 's' : ''} couverte${n > 1 ? 's' : ''}</span>` : '';
+    return n ? `<span class="vp-cov">${n > 1 ? t('{} requirements covered', n) : t('{} requirement covered', n)}</span>` : '';
   };
   const plan = (f, idPhase, o) => {
-    const [pid, ...reste] = String(f.name).split(' — '), t = M().tronquer(reste.join(' — ')), id = 'f:' + f.p, st = f.st || 'todo', mot = M().MOTS[st] ||
+    const [pid, ...reste] = String(f.name).split(' — '), tr = M().tronquer(reste.join(' — ')), id = 'f:' + f.p, st = f.st || 'todo', mot = M().MOTS[st] ||
       M().MOTS.todo;
-    const cache = t.coupe ? ` aria-describedby="vp-d-${sain(id)}"` : '', cur = o.sel === id ? ' aria-current="true"' : '';
-    const nom = `${pid} ${t.affiche}, plan, ${mot}`;
+    const cache = tr.coupe ? ` aria-describedby="vp-d-${sain(id)}"` : '', cur = o.sel === id ? ' aria-current="true"' : '';
+    const nom = `${pid} ${tr.affiche}, ${t('plan')}, ${mot}`;
     return `<li class="vp-pl"><button type="button" class="vp-ligne vp-plan" data-id="${h(id)}" tabindex="-1" aria-label="${h(nom)}"${cache}${cur}>`
-      + `<span class="vp-pid">${h(pid)}</span><span class="vp-titre">${h(t.affiche)}</span><span class="vst vst-${h(st)}">${h(mot)}</span>`
+      + `<span class="vp-pid">${h(pid)}</span><span class="vp-titre">${h(tr.affiche)}</span><span class="vst vst-${h(st)}">${h(mot)}</span>`
       + `${couvertes(idPhase, id)}</button>`
-      + (t.coupe ? `<span id="vp-d-${sain(id)}" hidden>${h(t.complet)}</span>` : '') + '</li>';
+      + (tr.coupe ? `<span id="vp-d-${sain(id)}" hidden>${h(tr.complet)}</span>` : '') + '</li>';
   };
   const vagues = (idPhase, o) => {
     const fichiers = (SC.graph.files || []).filter((f) => f.n === idPhase && /-PLAN\.md$/.test(f.p)), groupes = new Map();
     for (const f of fichiers) { const v = Number.isInteger(f.vague) ? f.vague : null; if (!groupes.has(v)) groupes.set(v, []); groupes.get(v).push(f); }
     const cles = [...groupes.keys()].sort((a, b) => (a === null) - (b === null) || a - b);
-    return cles.map((v) => `<h3 class="vp-h3">${v === null ? 'Sans vague' : 'Vague ' + v}</h3><ul class="vp-pls">`
+    return cles.map((v) => `<h3 class="vp-h3">${v === null ? t('No wave') : t('Wave {}', v)}</h3><ul class="vp-pls">`
       + groupes.get(v).sort((a, b) => String(a.name).localeCompare(String(b.name), 'fr', { numeric: true })).map((f) => plan(f, idPhase,
         o)).join('') + '</ul>').join('');
   };
@@ -57,8 +58,8 @@
     const n = o.phase, id = n.id, lu = window.VF_EXIGENCES.lireExigences(id); // garde:porte
     const plans = vagues(id, o), ligne = M().ligneEtat(n);
     return `<div class="vp-phase"><p class="vp-pt">${h(M().titreDe(n))}</p>${ligne ? `<p class="vp-etat-l">${h(ligne)}</p>` : ''}`
-      + (plans ? `<h2 class="vp-h2">Plans</h2><div data-coll="plans">${plans}</div>` : '<p class="vp-vide">pas de plan</p>')
-      + (lu.exigences.length ? `<h2 class="vp-h2">Exigences</h2><ul class="vp-exig">${lu.exigences.map(exigence).join('')}</ul>` : '') + '</div>';
+      + (plans ? `<h2 class="vp-h2">${t('Plans')}</h2><div data-coll="plans">${plans}</div>` : `<p class="vp-vide">${t('no plan')}</p>`)
+      + (lu.exigences.length ? `<h2 class="vp-h2">${t('Requirements')}</h2><ul class="vp-exig">${lu.exigences.map(exigence).join('')}</ul>` : '') + '</div>';
   };
 
   const style = `

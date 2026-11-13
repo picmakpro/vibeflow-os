@@ -6,12 +6,15 @@
   const SC = window.Floorplan;
   if (!SC) return;
   const { graph: G, state } = SC;
+  const t = window.__vfFrT;
   const svg = document.getElementById('svg'), stage = document.getElementById('stage'), vp = document.getElementById('viewport');
   if (!svg || !stage || !vp) return;
-  const ORDRE = ['gauche', 'droite', 'haut', 'bas'], DIT = { gauche: 'à gauche', droite: 'à droite', haut: 'en haut', bas: 'en bas' };
+  const ORDRE = ['gauche', 'droite', 'haut', 'bas'];
+  const DIT = { gauche: t('on the left'), droite: t('on the right'), haut: t('at the top'), bas: t('at the bottom') };
   const OBSTACLES = ['#vf-coin', '#zoom', '#ask'];
   // pastille, puce et tiroir d'un module de bas de page : lus par leur nature (fixes, posés directement sous body), jamais par leur nom
-  const flottants = () => [...document.body.children].filter((e) => e.matches('button, div[role="status"], section[role="region"]') && getComputedStyle(e).position === 'fixed');
+  const flottants = () => [...document.body.children]
+    .filter((e) => e.matches('button, div[role="status"], section[role="region"]') && getComputedStyle(e).position === 'fixed');
   const equipe = () => !!G.meta && G.meta.vfTab === 'equipe';
   const feuille = () => matchMedia('(max-width: 999px), (pointer: coarse)').matches; // feuille de détail ; sinon panneau latéral
   // la forme affichée est le canevas : #svg a une boîte et n'est pas masqué (couloirs, liste : visibility hidden)
@@ -39,15 +42,15 @@
   };
   const boite = (id) => { // boîte écran d'une carte du niveau
     const c = (state.layout ? state.layout.children : []).find((x) => x.id === id); if (!c) return null;
-    const { k, x, y } = state.t, l = c.x * k + x, t = c.y * k + y;
-    return { left: l, top: t, right: l + c.width * k, bottom: t + c.height * k };
+    const { k, x, y } = state.t, l = c.x * k + x, ty = c.y * k + y;
+    return { left: l, top: ty, right: l + c.width * k, bottom: ty + c.height * k };
   };
   const analyser = (F) => { // par bord : combien de cartes entièrement au-delà, et la plus proche
     const { k, x, y } = state.t, res = {};
     for (const b of ORDRE) res[b] = { n: 0, d: Infinity, id: null };
     for (const c of state.layout.children) {
-      const l = c.x * k + x, t = c.y * k + y;
-      const d = { gauche: F.x - (l + c.width * k), droite: l - (F.x + F.w), haut: F.y - (t + c.height * k), bas: t - (F.y + F.h) };
+      const l = c.x * k + x, ty = c.y * k + y;
+      const d = { gauche: F.x - (l + c.width * k), droite: l - (F.x + F.w), haut: F.y - (ty + c.height * k), bas: ty - (F.y + F.h) };
       for (const b of ORDRE) {
         if (d[b] >= 0) { res[b].n++; if (d[b] < res[b].d) { res[b].d = d[b]; res[b].id = c.id; } }
       }
@@ -98,7 +101,8 @@
     if (!vivant) return;
     const S = C(), F = !equipe() && !tour() && S && state.layout && canevas() && !(feuille() && !document.body.classList.contains('no-panel'))
       ? S.champDeLecture() : null;
-    const res = F ? analyser(F) : null, obs = F ? [...OBSTACLES.map((q) => document.querySelector(q)), ...flottants()].map(rectDe).filter(Boolean) : [], gardes = [];
+    const res = F ? analyser(F) : null, gardes = [];
+    const obs = F ? [...OBSTACLES.map((q) => document.querySelector(q)), ...flottants()].map(rectDe).filter(Boolean) : [];
     const g = document.activeElement && document.activeElement.closest ? document.activeElement.closest('g.node') : null;
     const vues = F ? [state.selected, ...[...(state.chipEls || [])].filter(([, x]) => x === g).map(([i]) => i)].map((i) => boite(i)).filter(Boolean) : [];
     for (const b of ORDRE) {

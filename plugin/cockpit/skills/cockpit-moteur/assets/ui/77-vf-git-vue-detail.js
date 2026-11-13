@@ -6,6 +6,7 @@
 (() => {
   const R = window.VFGitRendu, T = window.VFGitTiroir;
   if (!R || !T) return; // sans dépôt, le tiroir n'existe pas
+  const t = window.__vfFrT;
   const el = R.el, V = window.VFGitVolet, LIM = 30, RAFALE = 300;
   if (!V) return;
   const WT_REPLI = 'approximatif : filtres du dépôt non exécutés';
@@ -40,10 +41,10 @@
   const lire = (url) => fetch(url, { method: 'GET', headers: { 'x-floorplan-token': (window.FLOORPLAN_SERVER || {}).token || '' }, cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const lignes = () => [...document.querySelectorAll('#vf-git-tiroir li[role=option]')];
   const corps = () => document.querySelector('#vf-git-tiroir .vf-git-corps');
-  const annoncer = (t) => { // l'unique région vive du tiroir (celle de 77-vf-git-tiroir.js) : une annonce, une région
+  const annoncer = (txt) => { // l'unique région vive du tiroir (celle de 77-vf-git-tiroir.js) : une annonce, une région
     const tiroir = document.querySelector('#vf-git-tiroir');
     let l = tiroir && tiroir.querySelector('.vf-git-live');
-    if (l) l.textContent = t;
+    if (l) l.textContent = txt;
   };
   const pl = (n, mot, plur) => `${n} ${n > 1 ? plur || mot + 's' : mot}`;
   const dateLongue = (iso) => { // « 5 nov. 2026, 14 h 32 »
@@ -69,7 +70,7 @@
   const indisponible = (zone, sha, vivant) => {
     const b = el('button', 'btn soft', 'Réessayer', { type: 'button' });
     b.addEventListener('click', () => { cache.delete(sha); charger(zone, sha, vivant); });
-    zone.replaceChildren(el('p', 'vf-git-d-fichiers-t', 'Indisponible'), el('p', 'vf-git-note', "Le détail de ce commit n'a pas pu être lu."), b);
+    zone.replaceChildren(el('p', 'vf-git-d-fichiers-t', t('Unavailable')), el('p', 'vf-git-note', "Le détail de ce commit n'a pas pu être lu."), b);
   };
   // « Copier le sha » : « Copié » 2 s puis le libellé revient ; presse-papiers refusé : « Copie impossible » et le sha est sélectionné
   const copieur = (code, sha) => {
@@ -79,7 +80,7 @@
     const refus = () => {
       const r = document.createRange(); r.selectNodeContents(code);
       const s = window.getSelection(); s.removeAllRanges(); s.addRange(r);
-      dire('Copie impossible', 'Copie impossible, sha sélectionné');
+      dire(t('Copy failed'), t('Copy failed, sha selected'));
     };
     b.addEventListener('click', () => { try { navigator.clipboard.writeText(sha).then(() => dire('Copié', 'Sha copié'), refus); } catch (e) { refus(); } });
     return b;
@@ -99,7 +100,7 @@
       fl.appendChild(li);
     }
     if (autres > 0) fl.appendChild(el('li', 'vf-git-d-reste', `et ${autres} ${autres > 1 ? 'autres' : 'autre'}`));
-    zone.replaceChildren(msg, el('div', 'vf-git-d-meta', `${j.auteur} · ${dateLongue(j.date)}`), sha, el('p', 'vf-git-d-fichiers-t', `Fichiers (${total})`), fl, cmds('Pour lire ce commit', j.commandes.show, '', 'pour lire le commit ' + j.h.slice(0, 7)), cmds('Change votre copie de travail', j.commandes.detacher, ' vf-git-d-change', 'pour détacher HEAD sur le commit ' + j.h.slice(0, 7)));
+    zone.replaceChildren(msg, el('div', 'vf-git-d-meta', `${j.auteur} · ${dateLongue(j.date)}`), sha, el('p', 'vf-git-d-fichiers-t', t('Files ({})', total)), fl, cmds('Pour lire ce commit', j.commandes.show, '', 'pour lire le commit ' + j.h.slice(0, 7)), cmds('Change votre copie de travail', j.commandes.detacher, ' vf-git-d-change', 'pour détacher HEAD sur le commit ' + j.h.slice(0, 7)));
   };
   function charger(zone, sha, vivant) { // promesse de booléen (le volet la rend) : true = détail affiché ; vivant() : le volet n'a pas été remplacé ni fermé
     if (!R.motifSha.test(sha)) { indisponible(zone, sha, vivant); return Promise.resolve(false); } // jamais de requête sur un sha que la page refuse
@@ -127,11 +128,11 @@
   const dAvance = (n, base) => `${pl(n, 'commit')} d'avance sur ${base || 'la base'}`; // le nom de la base ne va que dans un title, jamais dans une commande
   const pastilles = (p, base) => {
     const l = [];
-    if (p.propre === null || p.modifies == null) return [['lecture impossible', '', "git status n'a pas abouti pour ce worktree : la prochaine lecture réessaiera"]]; // échec réel, distinct de « lecture… » (en cours)
+    if (p.propre === null || p.modifies == null) return [[t('unreadable'), '', t('git status did not complete for this worktree: the next read will retry')]]; // échec réel, distinct de « lecture… » (en cours)
     if (p.propre) l.push(['propre', 'vf-git-p-ok']);
     if (p.modifies > 0) l.push([pl(p.modifies, 'modifié'), 'vf-git-p-warn']);
-    if (p.nonSuivis > 0) l.push([(p.plus ? p.nonSuivis + '+ ' : p.nonSuivis + ' ') + (p.nonSuivis > 1 || p.plus ? 'non suivis' : 'non suivi'), 'vf-git-p-nonsuivi']);
-    if (p.avance > 0 || p.retard > 0) l.push([`↑${nb(p.avance)} ↓${nb(p.retard)}`, 'vf-git-p-mono', p.avance == null || p.retard == null ? 'avance inconnue' : `${dAvance(p.avance, base)}, ${pl(p.retard, 'commit')} de retard`]);
+    if (p.nonSuivis > 0) l.push([(p.plus ? p.nonSuivis + '+ ' : p.nonSuivis + ' ') + (p.nonSuivis > 1 || p.plus ? t('untracked@many') : t('untracked')), 'vf-git-p-nonsuivi']);
+    if (p.avance > 0 || p.retard > 0) l.push([`↑${nb(p.avance)} ↓${nb(p.retard)}`, 'vf-git-p-mono', p.avance == null || p.retard == null ? t('ahead count unknown') : t('{}, {} behind', dAvance(p.avance, base), pl(p.retard, 'commit'))]);
     return l;
   };
   const appliquerWt = () => {
@@ -191,7 +192,7 @@
   // ---------- crochets du tiroir ----------
   const rangee = (li, r) => {
     const br = (r.refs || []).find((x) => x.type === 'locale') || (r.refs || []).find((x) => x.type === 'distante');
-    li.setAttribute('aria-label', `${r.h7}, ${r.s}${br ? ', branche ' + br.nom : ''}, ${R.relatif(r.at)}`);
+    li.setAttribute('aria-label', `${r.h7}, ${r.s}${br ? ', ' + t('branch {}', br.nom) : ''}, ${R.relatif(r.at)}`);
     li.addEventListener('click', () => { selectionner(r.h); basculerDetail(r.h, li); });
     li.addEventListener('keydown', (e) => {
       if (e.ctrlKey || e.altKey || e.metaKey) return;

@@ -4,6 +4,7 @@
   const SC = window.Floorplan;
   if (!SC) return;
   const { graph: G, state } = SC;
+  const t = window.__vfFrT;
   const svg = document.getElementById('svg'), stage = document.getElementById('stage'), vp = document.getElementById('viewport');
   if (!svg || !stage || !vp) return;
   const equipe = () => !!G.meta && G.meta.vfTab === 'equipe'; // Équipe : ses vues décident seules de leur clavier (EK18, jamais de rôle ni de tabindex ici)
@@ -62,7 +63,7 @@
     let titre = ''; try { titre = SC.shownName(id); } catch (e) { void e; }
     if (id.startsWith('x:')) { // carte connecteur : nom affiché de l'entité liée et direction, jamais l'identifiant interne
       const c = ((state.view && state.view.connectors) || []).find((x) => x.id === id);
-      titre = `${c && c.side === 'in' ? 'Depuis' : 'Vers'} ${txt('.lbl')}`;
+      titre = `${c && c.side === 'in' ? t('From@connector') : t('To')} ${txt('.lbl')}`;
     }
     const mot = txt('.vst') || ((carte.className.match(/\bst-([\w-]+)/) || [])[1] || ''); // mot d'état : la pastille de la carte rendue, à défaut son statut
     const n = liens(id);
@@ -73,7 +74,7 @@
   const poser = (liste, cible) => {
     const tous = liste.map((id) => state.chipEls.get(id));
     svg.setAttribute('role', 'listbox');
-    svg.setAttribute('aria-label', `Carte : ${niveau()}, ${liste.length} carte${liste.length > 1 ? 's' : ''}`);
+    svg.setAttribute('aria-label', t('Map: {}, {}', niveau(), t('{} card', liste.length)));
     liste.forEach((id, i) => {
       const g = state.chipEls.get(id);
       ids.set(g, id);
@@ -105,9 +106,9 @@
 
   // champ de lecture : la zone libre moins le tiroir Git ouvert et le bord de carte ; la carte focalisée y est ramenée sans changer le zoom
   const champDeLecture = () => {
-    const a = SC.freeArea(), t = document.getElementById('vf-git-tiroir'), coin = document.getElementById('vf-coin');
+    const a = SC.freeArea(), tir = document.getElementById('vf-git-tiroir'), coin = document.getElementById('vf-coin');
     let { x, y, w, h } = a;
-    if (t && !t.hidden && t.offsetWidth) { const d = t.getBoundingClientRect().right + 16; w = Math.max(120, x + w - d); x = Math.max(x, d); }
+    if (tir && !tir.hidden && tir.offsetWidth) { const d = tir.getBoundingClientRect().right + 16; w = Math.max(120, x + w - d); x = Math.max(x, d); }
     if (coin && !coin.hidden && coin.offsetWidth) {
       const r = coin.getBoundingClientRect();
       if (r.top > y + h / 2) h = Math.max(120, r.top - 16 - y); else if (r.left > x + w / 2) w = Math.max(120, r.left - 16 - x);
@@ -123,12 +124,12 @@
   };
   const amenerDansLeChamp = (id) => {
     const c = rect(id); if (!c) return;
-    const a = champDeLecture(), { k, x, y } = state.t, l = c.x * k + x, t = c.y * k + y, w = c.width * k, h = c.height * k;
+    const a = champDeLecture(), { k, x, y } = state.t, l = c.x * k + x, ty = c.y * k + y, w = c.width * k, h = c.height * k;
     let dx = 0, dy = 0;
     if (l + w > a.x + a.w) dx = a.x + a.w - (l + w);
     if (l + dx < a.x) dx = a.x - l;
-    if (t + h > a.y + a.h) dy = a.y + a.h - (t + h);
-    if (t + dy < a.y) dy = a.y - t;
+    if (ty + h > a.y + a.h) dy = a.y + a.h - (ty + h);
+    if (ty + dy < a.y) dy = a.y - ty;
     deplacer({ x: dx, y: dy });
   };
   const focaliser = (id) => {

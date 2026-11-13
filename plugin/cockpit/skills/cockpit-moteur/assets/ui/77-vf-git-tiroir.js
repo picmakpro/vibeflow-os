@@ -5,6 +5,7 @@
 (() => {
   const SC = window.Floorplan, R = window.VFGitRendu;
   if (!SC || !R) return;
+  const t = window.__vfFrT;
   const V = SC.graph.meta && SC.graph.meta.vfGit;
   if (!V || V.etat === 'absent' || !V.depot) return; // sans dépôt : aucun tiroir, aucune touche g
   const MOBILE = window.matchMedia('(max-width: 999px), (pointer: coarse)');
@@ -109,8 +110,8 @@
   `;
   document.head.appendChild(style);
 
-  const tiroir = R.el('aside', 'vf-git-tiroir glass', null, { id: 'vf-git-tiroir', role: 'complementary', 'aria-label': 'Historique Git' }), barre = R.el('div', 'vf-git-barre');
-  const titre = R.el('h2', 'vf-git-titre-t', 'Historique Git', { tabindex: '-1' }), fermerB = R.el('button', 'vf-git-fermer', null, { type: 'button', 'aria-label': "Fermer l'historique Git" });
+  const tiroir = R.el('aside', 'vf-git-tiroir glass', null, { id: 'vf-git-tiroir', role: 'complementary', 'aria-label': t('Git history') }), barre = R.el('div', 'vf-git-barre');
+  const titre = R.el('h2', 'vf-git-titre-t', t('Git history'), { tabindex: '-1' }), fermerB = R.el('button', 'vf-git-fermer', null, { type: 'button', 'aria-label': t('Close the Git history') });
   const corps = R.el('div', 'vf-git-corps'), live = R.el('div', 'vf-git-live', null, { 'aria-live': 'polite' });
   fermerB.appendChild(R.ico('M6 6l12 12M18 6L6 18'));
   barre.append(titre, fermerB);
@@ -121,7 +122,7 @@
 
   let ouvert = false, donnees = null, seq = 0, avant = null;
   const etatPages = { n: 0 }; // rangées montrées (80-06) : gardé d'une relecture à l'autre
-  const annoncer = (t) => { live.textContent = t; };
+  const annoncer = (txt) => { live.textContent = txt; };
   const visible = (e) => !!e && !e.hidden && e.getClientRects().length > 0;
   const ligne = () => document.querySelector('#vf-git-ligne'), ouvreur = () => document.querySelector('#vf-git-ouvreur'), plus = () => document.querySelector('#vf-plus'); // plus : « Plus d'actions » du téléphone, qui porte l'ouvreur sous 700 px
   const emettre = (nom, detail) => window.dispatchEvent(new CustomEvent(nom, { detail }));
@@ -155,7 +156,7 @@
     g.append(R.mergees(j.mergees, annoncer));
     if (pg) g.append(pg.pied);
     if (tronque) g.append(R.el('p', 'vf-git-note', 'Historique tronqué : seuls les commits les plus récents sont lus.'));
-    corps.append(...[R.sectionWorktrees(j.worktrees, annoncer), R.section('Graphe', null, g, true, 'vf-git-s-graphe'), R.sectionTags(j.tags, annoncer),
+    corps.append(...[R.sectionWorktrees(j.worktrees, annoncer), R.section(t('Graph'), null, g, true, 'vf-git-s-graphe'), R.sectionTags(j.tags, annoncer),
       R.sectionStash(j.stash, annoncer), R.sectionAuteurs(j.auteurs, j.parBranche, annoncer)].filter(Boolean));
     crochet('rendu', corps, j);
   };
@@ -223,8 +224,8 @@
   document.addEventListener('keydown', (e) => { const l = ligne(), o = ouvreur(), p = plus(); if ((l && l === e.target) || (o && o === e.target) || (p && p === e.target)) echap(e); }, true);
   window.addEventListener('keydown', (e) => { // touche g : ni dans un champ, ni palette ouverte, ni avec Ctrl, Alt ou Meta, ni sans ouvreur
     if ((e.key !== 'g' && e.key !== 'G') || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing) return;
-    const t = e.target;
-    if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(t.tagName) >= 0)) return;
+    const tg = e.target;
+    if (tg && (tg.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(tg.tagName) >= 0)) return;
     if (document.querySelector('#palette.open')) return;
     const l = ligne(), o = ouvreur();
     if (!(l && !l.hidden) && !(o && !o.hidden)) return;

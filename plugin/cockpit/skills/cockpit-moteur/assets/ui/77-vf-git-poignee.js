@@ -4,6 +4,7 @@
 (() => {
   const SC = window.Floorplan;
   if (!SC) return;
+  const t = window.__vfFrT;
   const MIN = 280, DEFAUT = 360, PAS = 16, GRAND = 64, MARGE = 312;
   const MOBILE = window.matchMedia('(max-width: 999px), (pointer: coarse)');
   const lab = () => (SC.graph.project && SC.graph.project.name) || (SC.graph.meta && SC.graph.meta.rootName) || 'lab';
@@ -39,7 +40,7 @@
     if (!tiroir || tiroir.querySelector('.vf-git-poignee')) return;
     const p = document.createElement('div');
     p.className = 'vf-git-poignee';
-    const at = { role: 'separator', 'aria-orientation': 'vertical', tabindex: '0', 'aria-label': "Largeur de l'historique Git" };
+    const at = { role: 'separator', 'aria-orientation': 'vertical', tabindex: '0', 'aria-label': t('Git history width') };
     for (const k of Object.keys(at)) p.setAttribute(k, at[k]);
     const poser = (v, memoriser, garder) => { // pose la largeur dans les bornes, met à jour les attributs ; la mémorise quand le geste est fini
       const w = borner(v);

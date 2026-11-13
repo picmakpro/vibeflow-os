@@ -5,6 +5,7 @@
 (() => {
   const SC = window.Floorplan;
   if (!SC) return;
+  const t = window.__vfFrT;
   const style = document.createElement('style');
   style.textContent = `
     .vf-ls { display: flex; flex-direction: column; font-size: 11px; line-height: 16px; }
@@ -25,13 +26,13 @@
   document.head.appendChild(style);
 
   const NS = 'http://www.w3.org/2000/svg';
-  const div = (c, t) => { const d = document.createElement('div'); d.className = c; if (t !== undefined) d.textContent = t; return d; };
+  const div = (c, txt) => { const d = document.createElement('div'); d.className = c; if (txt !== undefined) d.textContent = txt; return d; };
   const span = () => document.createElement('span');
   const br = div('vf-ls-br'), nom = span(), dr = div('vf-ls-dr'), mot = span(), hc = span();
   const hr = div('vf-ls-hr'), glyphe = span(), sr = span(), ls = div('vf-ls');
-  { const ic = document.createElementNS(NS, 'svg'), t = document.createElementNS(NS, 'path'); // glyphe branche, comme l'ouvreur Git
+  { const ic = document.createElementNS(NS, 'svg'), tr = document.createElementNS(NS, 'path'); // glyphe branche, comme l'ouvreur Git
     ic.setAttribute('class', 'i'); ic.setAttribute('viewBox', '0 0 24 24'); ic.setAttribute('aria-hidden', 'true');
-    t.setAttribute('d', 'M6 5v14M18 8c0 5-12 3-12 9'); ic.appendChild(t); br.appendChild(ic); }
+    tr.setAttribute('d', 'M6 5v14M18 8c0 5-12 3-12 9'); ic.appendChild(tr); br.appendChild(ic); }
   nom.className = 'vf-ls-nom'; br.appendChild(nom); br.setAttribute('role', 'img');
   glyphe.className = 'vf-ls-g'; glyphe.setAttribute('aria-hidden', 'true'); hc.className = 'vf-ls-hc'; hc.setAttribute('aria-hidden', 'true');
   sr.className = 'vf-ls-sr'; dr.setAttribute('role', 'status'); dr.append(glyphe, mot, sr, hc); ls.append(br, dr, hr);
@@ -59,11 +60,11 @@
     const b = lireBranche(), d = lireDirect(), h = heure(majA), cle = [b, d, h, nom.clientWidth].join('|');
     if (cle === rendu) return;
     rendu = cle; br.hidden = !b; dr.hidden = hr.hidden = !d;
-    if (b !== branche || !nom.textContent) { branche = b; coupe(b); br.title = b; br.setAttribute('aria-label', `Branche ${b}`); } else coupe(b);
+    if (b !== branche || !nom.textContent) { branche = b; coupe(b); br.title = b; br.setAttribute('aria-label', t('Branch {}', b)); } else coupe(b);
     if (d) {
       const off = d === 'off';
-      mot.textContent = off ? 'Direct coupé' : 'Direct'; glyphe.classList.toggle('coupe', off);
-      dr.title = off ? `Direct coupé. ${SUITE_COUPE}` : 'Direct'; sr.textContent = off ? `. ${SUITE_COUPE}` : '';
+      mot.textContent = off ? t('Live off') : t('Live'); glyphe.classList.toggle('coupe', off);
+      dr.title = off ? `${t('Live off')}. ${SUITE_COUPE}` : t('Live'); sr.textContent = off ? `. ${SUITE_COUPE}` : '';
       hc.textContent = ` · ${h}`; hr.classList.toggle('coupe', off);
       hr.textContent = off ? `Reprise en cours, mise à jour à ${h}` : `Mis à jour à ${h}`;
     }

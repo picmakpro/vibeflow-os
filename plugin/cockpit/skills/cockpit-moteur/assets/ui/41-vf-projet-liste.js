@@ -7,7 +7,8 @@
   if (!SC || !SC.graph.meta || SC.graph.meta.vfTab !== 'project') return;
   const { state } = SC, h = SC.h, sain = (id) => String(id).replace(/[^\w-]/g, '_');
   const registre = (window.__vfProjetRegistre = window.__vfProjetRegistre || {});
-  const COLS = [['phase', 'Phase'], ['etat', 'État'], ['plans', 'Plans'], ['exigences', 'Exigences']];
+  const t = window.__vfFrT;
+  const COLS = [['phase', t('Phase')], ['etat', t('Status')], ['plans', t('Plans')], ['exigences', t('Requirements')]];
   const RANG_ETAT = { 'en-cours': 0, 'a-recetter': 1, 'a-faire': 2, fait: 3 };
   let tri = { col: 'etat', sens: 1 }; // État croissant, puis numéro (non mémorisé)
   const P = () => window.VF_PROJET, M = () => window.__vfProjetModele, R = () => window.__vfProjetRendu;
@@ -28,7 +29,7 @@
   const nombres = (c, unite) => (!c ? `<span class="vp-sr">donnée non disponible</span>` : c.total > 0
     ? `<span class="vp-nb">${c.faits}</span><span class="vp-u"> ${c.faits > 1 ? unite : unite.replace(/s$/, '')}</span>`
       + ` sur <span class="vp-nb">${c.total}</span>` : unite === 'plans' ?
-      'pas de plan' : 'aucune<span class="vp-u"> exigence</span>');
+      t('no plan') : `${t('no@requirements')}<span class="vp-u"> ${t('requirement')}</span>`);
   const cellule = (d, st, mot) => {
     const c = d.c, cache = c.coupe ? ` aria-describedby="vp-d-${sain(c.id)}"` : '', cur = state.selected === c.id ? ' aria-current="true"' : '';
     return `<tr role="row"><td role="cell"><button type="button" class="vp-ligne" data-id="${h(c.id)}" tabindex="-1" aria-label="${h(c.nom)}"${cache}${cur}>`
@@ -52,8 +53,8 @@
   };
   const rendre = (m, o) => {
     if (!m.blocs.length) return R().vue(m, o);
-    const blocs = m.blocs.map((b) => { const t = R().blocJalon(b, o), i = t.indexOf('<div class="vp-couloirs">');
-      return i < 0 ? t : t.slice(0, i) + table(b) + '</section>'; }).join('');
+    const blocs = m.blocs.map((b) => { const bloc = R().blocJalon(b, o), i = bloc.indexOf('<div class="vp-couloirs">');
+      return i < 0 ? bloc : bloc.slice(0, i) + table(b) + '</section>'; }).join('');
     return blocs + `<div class="vp-listes">${R().historique(m.historique, o)}${R().listes(m.listes, o)}</div>`;
   };
 

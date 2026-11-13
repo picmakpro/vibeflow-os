@@ -5,6 +5,7 @@
   const SC = window.Floorplan, M = window.__vfProjetModele;
   if (!SC || !M) return;
   const h = SC.h, sain = (id) => String(id).replace(/[^\w-]/g, '_');
+  const t = window.__vfFrT;
   const pastille = (st, mot) => `<span class="vst vst-${h(st)}">${h(mot)}</span>`;
   const decrit = (x) => (x.coupe ? ` aria-describedby="vp-d-${sain(x.id)}"` : '');
   const complet = (x) => (x.coupe ? `<span id="vp-d-${sain(x.id)}" hidden>${h(x.complet)}</span>` : '');
@@ -17,7 +18,8 @@
       + `<span class="vp-etat"${c.ligne ? '' : ' aria-hidden="true"'}>${etat}</span></button>${complet(c)}</li>`;
   };
   const couloir = (def, cartes, o) => {
-    const [cle, mot, st] = def, n = cartes.length, nom = `${mot}, ${n} phase${n > 1 ? 's' : ''}`;
+    // 0 : « 0 phase » en français (le pluriel commence à 2)
+    const [cle, mot, st] = def, n = cartes.length, nom = `${mot}, ${n ? t.pl(n, 'phase') : t('0 phases')}`;
     const corps = n ? `<ul class="vp-cartes">${cartes.map((c) => carte(c, o)).join('')}</ul>` : '<p class="vp-vide">aucune phase</p>';
     return `<div class="vp-couloir" role="group" aria-label="${h(nom)}" data-couloir="${h(cle)}"><h3 class="vp-ch">`
       + `<span class="vst vst-${h(st)} vp-gl" aria-hidden="true"></span><span class="vp-mot">${h(mot)}</span><span class="vp-n">${n}</span></h3>${corps}</div>`;
@@ -40,7 +42,7 @@
   const disclosure = (cle, titre, compte, lignes, ouverts) => `<details class="vp-details" data-cle="${h(cle)}"${ouverts && ouverts.has(cle) ? ' open' : ''}>`
     + `<summary><span class="vp-sum-t">${h(titre)}</span><span class="vp-n">${h(compte)}</span></summary>`
     + `<ul class="vp-rangees">${lignes.join('')}</ul></details>`;
-  const historique = (hist, o) => (hist ? disclosure('historique', 'Historique', hist.resume,
+  const historique = (hist, o) => (hist ? disclosure('historique', t('History'), hist.resume,
     hist.lignes.map((l) => rangee({ id: l.id, titre: l.nom, coupe: false, date: l.texte }, o, false)), o.ouverts) : '');
   const listes = (ls, o) => ls.map((l) => disclosure(l.cle, l.titre, l.compte, l.rows.map((r) => rangee(r, o)), o.ouverts)).join('');
   const etatVue = (texte, detail) => `<div class="vp-info"><p>${h(texte)}</p>${detail ? `<p>${h(detail)}</p>` : ''}</div>`;

@@ -10,9 +10,10 @@
   const SC = window.Floorplan, M = window.__vfProjetModele, R = window.__vfProjetRendu;
   if (!SC || !M || !R || !SC.graph.meta || SC.graph.meta.vfTab !== 'project') return;
   const { graph: G, state } = SC;
+  const t = window.__vfFrT;
   const stage = document.getElementById('stage');
   if (!stage) return;
-  const FORMES = ['couloirs', 'liste', 'graphe'], LIBELLES = { couloirs: 'Couloirs', liste: 'Liste', graphe: 'Graphe' };
+  const FORMES = ['couloirs', 'liste', 'graphe'], LIBELLES = { couloirs: t('Lanes'), liste: t('List'), graphe: t('Graph') };
   const REG = (window.__vfProjetRegistre = window.__vfProjetRegistre || {}), MEM = window.__vfProjetMemoire, LS = () => window.__vfProjetListe;
   const inscrireForme = (nom, def) => { if (FORMES.includes(nom) && def && typeof def.rendre === 'function') REG[nom + ':' + (def.niveau || 'racine')] = def; };
   // T-80-08 : une valeur hors de la liste vaut la forme par défaut, jamais insérée dans le DOM
@@ -111,7 +112,7 @@
 
   const segs = () => (niveau() === 'racine' ? FORMES : ['liste', 'graphe']);
   const boutons = () => segs().map((f) => `<button type="button" data-forme="${f}" aria-pressed="${f === effective()}">${LIBELLES[f]}</button>`).join('');
-  const outils = () => `<div class="vp-bascule" role="group" aria-label="Forme de l'affichage">${boutons()}</div>`;
+  const outils = () => `<div class="vp-bascule" role="group" aria-label="${t('Display layout')}">${boutons()}</div>`;
   const classes = () => { document.body.classList.toggle('vf-forme-couloirs', affichee()); document.body.classList.toggle('vf-forme-graphe', !affichee()); };
   // les segments suivent le niveau (trois à la racine, deux dans une phase)
   const marquerBascule = () => document.querySelectorAll('.vp-bascule').forEach((g) => {
@@ -137,7 +138,7 @@
     const modele = { blocs: M.blocs(G), historique: M.historique(G), listes: M.listes(G) };
     const n = niveau(), ph = n === 'phase' ? noeuds().get(String(state.container).slice(2)) : null, def = effective() === 'couloirs' ? null :
       REG[effective() + ':' + n];
-    section.querySelector('#vf-projet-titre').textContent = ph ? 'Phase ' + M.numeroDe(ph) : 'Projet';
+    section.querySelector('#vf-projet-titre').textContent = ph ? t('Phase {}', M.numeroDe(ph)) : t('Project');
     corps.innerHTML = def ? def.rendre(modele, { sel: selectionnee(), ouverts, phase: ph }) : R.vue(modele, { sel: selectionnee(), ouverts });
     K.appliquer(corps); if (LS()) LS().appliquer(corps);
     section.scrollTop = avant; section.scrollLeft = avantG;
@@ -145,7 +146,7 @@
     precedents = apres;
     if (suivi && vus.has(suivi) && apres.has(suivi) && vus.get(suivi)[0] !== apres.get(suivi)[0]) { // une seule annonce : la phase suivie qui change de couloir
       const mot = M.COULOIRS.find((c) => c[0] === apres.get(suivi)[0])[1];
-      annoncer(`Phase ${apres.get(suivi)[1].num} : ${mot}`);
+      annoncer(t('Phase {}: {}', apres.get(suivi)[1].num, mot));
     }
     if (memo) restituer(memo);
   };
@@ -174,7 +175,9 @@
   // terminal relève #stage, la vue monte avec lui
   const hauteur = (e) => { const b = e && !e.hidden && e.isConnected ? e.getBoundingClientRect() : null; return b && b.width > 0 ? Math.round(b.height) : 0; };
   const QS = ['#ask', '#vf-coin', '#panel', '#vf-git-tiroir', '.vf-git-tiroir'];
-  const pastille = () => [...document.body.children].find((e) => e.matches('button') && getComputedStyle(e).position === 'fixed') || null; // la pastille du bas de page : lue par sa nature (bouton fixe sous body), jamais par son nom
+  // la pastille du bas de page : lue par sa nature (bouton fixe sous body), jamais par son nom
+  const pastille = () => [...document.body.children]
+    .find((e) => e.matches('button') && getComputedStyle(e).position === 'fixed') || null;
   const mesurerBas = () => {
     if (!vivant) return;
     // un élément né après le montage (pastille, coin) est observé dès qu'il existe
@@ -186,9 +189,9 @@
       + hauteur(pastille()) + feuille;
     // dérivé : #ask + #vf-coin + feuille + pastille mesurés
     section.style.setProperty('--vf-bas', `calc(${bas}px + var(--edge) + var(--sp-8) + var(--edge) + env(safe-area-inset-bottom, 0px))`);
-    const t = document.querySelector('#vf-git-tiroir, .vf-git-tiroir'), ouvert = !!t && !t.hidden && t.offsetWidth > 0
+    const tir = document.querySelector('#vf-git-tiroir, .vf-git-tiroir'), ouvert = !!tir && !tir.hidden && tir.offsetWidth > 0
       && matchMedia('(min-width: 1000px) and (not (pointer: coarse))').matches;
-    const d = ouvert ? t.offsetLeft + t.offsetWidth + 16 : 0, avant = debutPose; // en mise en page, jamais en position animée
+    const d = ouvert ? tir.offsetLeft + tir.offsetWidth + 16 : 0, avant = debutPose; // en mise en page, jamais en position animée
     if (d !== debutPose) { // le tiroir Git recouvre le bord gauche : une extrémité de début, la vue ne bouge pas
       debutPose = d; section.style.setProperty('--vp-debut', d + 'px'); section.style.setProperty('--vp-larg',
         ouvert ? section.clientWidth - 2 * 16 + 'px' : 'auto');
@@ -228,8 +231,10 @@
     if (url) { try { const u = new URL(location.href); u.searchParams.set('vue', nom); history.replaceState(history.state, '',
       u.pathname + u.search + u.hash); } catch (e) { void e; } }
     const dedans = niveau() === 'phase', n = dedans ? (G.files || []).filter((f) => f.n === String(state.container).slice(2) && /-PLAN\.md$/.test(f.p)).length
-      : M.blocs(G).reduce((s, b) => s + b.total, 0), u = dedans ? 'plan' : 'phase';
-    annoncer(nom === 'graphe' ? 'Affichage en graphe' : `Affichage en ${LIBELLES[nom].toLowerCase()}, ${n} ${u}${n > 1 ? 's' : ''}`);
+      : M.blocs(G).reduce((s, b) => s + b.total, 0);
+    // 0 : singulier en français (le pluriel commence à 2)
+    const total = !n ? (dedans ? t('0 plans') : t('0 phases')) : dedans ? t.pl(n, 'plan') : t.pl(n, 'phase');
+    annoncer(nom === 'graphe' ? t('Showing as a graph') : t('Showing as {}, {}', LIBELLES[nom].toLowerCase(), total));
     return true;
   };
 
@@ -239,7 +244,7 @@
     vivant = true;
     if (!FORMES.includes(demandee) && MEM) forme = MEM.lire() || MEM.defaut(); // le nom du lab n'existe qu'une fois le graphe lu : jamais à l'évaluation
     section = document.createElement('section'); section.className = 'vf-projet'; section.setAttribute('aria-labelledby', 'vf-projet-titre');
-    section.innerHTML = `<div class="vp-tete"><h1 id="vf-projet-titre" tabindex="-1">Projet</h1>${outils()}</div>`
+    section.innerHTML = `<div class="vp-tete"><h1 id="vf-projet-titre" tabindex="-1">${t('Project')}</h1>${outils()}</div>`
       + '<div class="vp-corps"></div>';
     corps = section.querySelector('.vp-corps');
     statut = document.createElement('div'); statut.className = 'vp-status'; // hors de la section : elle est masquée en graphe, l'annonce doit rester lue
