@@ -25,7 +25,7 @@
   const sortirDesCommandes = (C, id) => {
     const g = state.chipEls.get(id), carte = g && g.querySelector('.card'), o = document.getElementById('svg').getBoundingClientRect();
     if (!carte || !feuille()) return;
-    for (const q of ['#zoom', '.vf-term-pastille']) {
+    for (const q of ['#zoom', '[data-vf-flottant="bouton"]']) {
       const e = document.querySelector(q), c = carte.getBoundingClientRect(), r = e && e.getClientRects().length ? e.getBoundingClientRect() : null;
       if (!r || c.right <= r.left || r.right <= c.left || c.bottom <= r.top || r.bottom <= c.top) continue;
       const dans = (d) => C.champsDeCadrage().some((a) => c.left + (d.x || 0) >= o.left + a.x - 1 && c.right + (d.x || 0) <= o.left + a.x + a.w + 1

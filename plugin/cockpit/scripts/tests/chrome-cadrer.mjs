@@ -94,11 +94,11 @@ await executer(chrome, async (s) => {
             .every((c) => c && ch.some((a) => __ca.dedans(c, a))); })()`);
           const dedans = await q(`(() => { const c = __ca.carte(${JSON.stringify(SEL)}); return __ca.champs().some((a) => __ca.dedans(c, a)); })()`);
           const sel = await q(`(() => { const c = __ca.carte(${JSON.stringify(SEL)});
-            return ['#zoom', '.vf-term-pastille'].map((x) => [x, __ca.rect(x)]).filter((p) => p[1] && __ca.coupe(c, p[1])).map((p) => p[0]); })()`);
-          r[ouverte ? 'ouverte' : 'fermee'] = { pastille: !!(await q("__ca.rect('.vf-term-pastille')")),
+            return ['#zoom', '[data-vf-flottant="bouton"]'].map((x) => [x, __ca.rect(x)]).filter((p) => p[1] && __ca.coupe(c, p[1])).map((p) => p[0]); })()`);
+          r[ouverte ? 'ouverte' : 'fermee'] = { pastille: !!(await q(`__ca.rect('[data-vf-flottant="bouton"]')`)),
             groupeLibre: !tient || touchent.length === 0, selLibre: sel.length === 0 && dedans,
             rects: await q(`({ sel: __ca.carte(${JSON.stringify(SEL)}), champs: __ca.champs(), t: VibeFlow.state.t,
-              zones: ['#ask', '#panel', '#zoom', '.vf-term-pastille'].map((x) => [x, __ca.rect(x)]) })`),
+              zones: ['#ask', '#panel', '#zoom', '[data-vf-flottant="bouton"]'].map((x) => [x, __ca.rect(x)]) })`),
             k: Math.abs(m.t.k - m.ref.k) <= 1e-6, touche: [touchent, sel], sansRelayout: m.layout };
         }
       });
