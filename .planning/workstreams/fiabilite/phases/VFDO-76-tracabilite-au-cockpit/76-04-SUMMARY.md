@@ -61,3 +61,9 @@ requirements-completed: [TRAC-10, TRAC-01, TRAC-03, TRAC-04, TRAC-05]
 Fichiers partagés : `vf-cockpit-planning.mjs` (80 : `avancement`, `exigences`, `vague` ; 75 ; ici l'import, `ledgers`, le bloc `trace`, le champ rendu), `vf-cockpit-project.mjs` (80, 75 ; la 77 retire
 `lastDesc` du même `return` de `construireGraphe`, devenu `const graphe = { … }` suivi de `return projeterTrace(…)` : à reprendre dans cette forme), `vf-cockpit-interface.json` (73, 74, 75, 77, 79 :
 clés ajoutées sous `cockpit-project@1`, rien réécrit). Poids du graphe Projet : voir Mesures (le plan estimait 0,4 Mo).
+
+- Correctif revue M1 : `438a2ef6` (témoins rouges `8993f733`) — l'exigence d'archive (ledger `ws: '*'`) ne se rattache plus par le numéro de phase seul :
+  elle suit le compartiment du plan qui la cite et n'est jamais comptée là où le ledger vivant du même compartiment porte le même identifiant.
+  Champ ajouté `cleNoeud` sur les seules exigences d'archive rattachées (aucun champ existant ne change). La clé ouvrable de la vivante reste
+  résoluble. Témoins T9.12 à T9.12e ; chaine 66/0, collecte 36/0, route 73/0.
+- rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
