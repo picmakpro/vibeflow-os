@@ -162,6 +162,7 @@ durees() {
 49 plugin/cockpit/scripts/tests/test-cockpit-sondes-stables.sh
 263 plugin/cockpit/scripts/tests/test-cockpit-surcouches.sh
 60 plugin/cockpit/scripts/tests/test-cockpit-synthese-blocs.sh
+75 plugin/cockpit/scripts/tests/test-cockpit-synthese-cout.sh
 40 plugin/cockpit/scripts/tests/test-cockpit-synthese-page.sh
 140 plugin/cockpit/scripts/tests/test-cockpit-synthese-visite.sh
 10 plugin/cockpit/scripts/tests/test-cockpit-synthese.sh
