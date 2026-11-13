@@ -147,10 +147,16 @@ rg_RG6_modele() {
   assert_eq "RG6.1 — caractères de contrôle et U+202E (classe Cf) retirés" "$(g "$o" 'j[3].owner+"|"+j[3].step')" "abcde|et"
   rgm_forme_cas
   if [ -f "$UI/72-vf-regie-modele.js" ]; then
-    rg_mutant "VERROU-ENTREE-BRUTE" "l'entrée recopiée entière" "$UI" "72-vf-regie-modele.js" 'const o = { ws: libre(e.ws),' 'const o = { ...e, ws: libre(e.ws),' rgm_sonde_verrou "false|80|\"\"|abcde"
+    local sain; sain="$(rgm_sonde_forme "$UI")"
+    rg_mutant "VERROU-ENTREE-BRUTE" "l'entrée recopiée entière" "$UI" "72-vf-regie-modele.js" 'const o = { ws: wsOk(e.ws),' 'const o = { ...e, ws: wsOk(e.ws),' rgm_sonde_verrou "false|80|\"\"|abcde"
     rg_mutant "VERROU-SESSION-IDS" "la liste d'identifiants de session admise" "$UI" "72-vf-regie-modele.js" "sansSession: typeof e.sansSession === 'boolean' ? e.sansSession : null };" "sansSession: typeof e.sansSession === 'boolean' ? e.sansSession : null, session_ids: e.session_ids };" rgm_sonde_verrou "false|80|\"\"|abcde"
-    rg_mutant "VERROU-CHEMIN" "refus du chemin absolu retiré" "$UI" "72-vf-regie-modele.js" '/^(\/|\\|[A-Za-z]:[\\/]|~[\\/])/.test(s)' 'false' rgm_sonde_verrou "false|80|\"\"|abcde"
-    rg_mutant "VERROU-OWNER-SANS-BORNE" "borne de 80 retirée" "$UI" "72-vf-regie-modele.js" ': s.slice(0, n)' ': s' rgm_sonde_verrou "false|80|\"\"|abcde"
+    rg_mutant "VERROU-OWNER-SANS-BORNE" "borne de 80 retirée" "$UI" "72-vf-regie-modele.js" 'sans(v).slice(0, n);' 'sans(v);' rgm_sonde_verrou "false|80|\"\"|abcde"
+    # une garde de forme = un mutant : l'ancienne règle (refus par préfixe, ou aucune forme) rétablie
+    rg_mutant "VERROU-FORME-LIBRE" "owner et étape : refus par préfixe rétabli" "$UI" "72-vf-regie-modele.js" 'const libre = (v) => admis(v, /^[A-Za-z0-9][A-Za-z0-9_-]*$/, 80);' 'const libre = (v) => { const s = sans(v); return /^(\/|\\|[A-Za-z]:[\\/]|~[\\/])/.test(s) ? "" : s.slice(0, 80); };' rgm_sonde_forme "$sain"
+    rg_mutant "VERROU-FORME-WS" "ws : grammaire retirée" "$UI" "72-vf-regie-modele.js" 'admis(v, /^[a-z0-9-]+$/, 80)' 'admis(v, /^.*$/, 80)' rgm_sonde_forme "$sain"
+    rg_mutant "VERROU-FORME-PHASE" "phase : grammaire retirée" "$UI" "72-vf-regie-modele.js" 'admis(v, /^[0-9]+(\.[0-9]+)?$/, 12)' 'admis(v, /^.*$/, 12)' rgm_sonde_forme "$sain"
+    rg_mutant "VERROU-FORME-SCOPE" "scope : liste fermée retirée" "$UI" "72-vf-regie-modele.js" 'admis(v, /^(depot|compartiment|phase|mission|lab)$/, 12)' 'admis(v, /^.*$/, 12)' rgm_sonde_forme "$sain"
+    rg_mutant "VERROU-FORME-DAG" "dag : forme de nom retirée" "$UI" "72-vf-regie-modele.js" 'admis(v, /^[A-Za-z0-9][A-Za-z0-9._-]*$/, 200)' 'admis(v, /^.*$/, 200)' rgm_sonde_forme "$sain"
   else assert_eq "M-VERROU-* — modèle présent pour muter" "absent" "présent"; fi
   local sc2="$WORK/sc62.json" o2="$WORK/o62.json" L1 L0 LD LF
   L1="$(rgm_lock sess-1 mission fiabilite 840 false null)"; L0="$(rgm_lock sess-1 mission fiabilite null false null)"

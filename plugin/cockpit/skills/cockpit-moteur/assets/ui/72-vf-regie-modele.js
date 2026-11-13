@@ -6,18 +6,22 @@
   const nbf = (v) => typeof v === 'number' && Number.isFinite(v) && v >= 0;
   const num = (v) => (nbf(v) ? v : null), nombre = (a, b) => (nbf(a) ? a : num(b));
   const sans = (v) => (typeof v === 'string' ? v.replace(/[\p{Cc}\p{Cf}]/gu, '').trim() : '');
-  // champ libre d'un verrou : sans contrôle ni classe Cf (U+202E compris), refusé s'il ressemble à un chemin absolu, borné
-  const libre = (v, n = 80) => { const s = sans(v); return /^(\/|\\|[A-Za-z]:[\\/]|~[\\/])/.test(s) ? '' : s.slice(0, n); };
+  // champ d'un verrou : une FORME ADMISE (jeu de caractères et longueur bornés), jamais un refus par préfixe : une valeur hors forme (chemin au milieu,
+  // relatif, file:, ../, ~) devient vide et ne s'affiche pas. Sans contrôle ni classe Cf (U+202E compris) ; la borne coupe avant l'épreuve de forme.
+  const admis = (v, forme, n) => { const s = sans(v).slice(0, n); return forme.test(s) ? s : ''; };
+  const libre = (v) => admis(v, /^[A-Za-z0-9][A-Za-z0-9_-]*$/, 80); // owner, étape : aucun séparateur (release-bump, exec-73, vf-dev-manager-p73, identifiants hexadécimaux)
+  const wsOk = (v) => admis(v, /^[a-z0-9-]+$/, 80), phaseOk = (v) => admis(v, /^[0-9]+(\.[0-9]+)?$/, 12);
+  const scopeOk = (v) => admis(v, /^(depot|compartiment|phase|mission|lab)$/, 12), dagOk = (v) => admis(v, /^[A-Za-z0-9][A-Za-z0-9._-]*$/, 200);
 
   // ---------- le verrou : liste blanche champ par champ (la forme brute de driver-lock.sh et la forme projetée donnent le même objet) ----------
   const verrouBlanc = (e) => {
     e = e && typeof e === 'object' ? e : {};
-    const o = { ws: libre(e.ws), scope: libre(e.scope), phase: libre(e.phase), step: libre(e.step), // garde:verrou-liste-blanche
+    const o = { ws: wsOk(e.ws), scope: scopeOk(e.scope), phase: phaseOk(e.phase), step: libre(e.step), // garde:verrou-liste-blanche
       tenu: e.tenu === true || e.present === true, stale: e.stale === true, ageS: nombre(e.ageS, e.age_seconds), ttl: num(e.ttl),
       progressAgeS: nombre(e.progressAgeS, e.progress_age_seconds), owner: libre(e.owner),
       childrenRunning: nombre(e.childrenRunning, e.children_running), leaseS: nombre(e.leaseS, e.lease_seconds),
       sansSession: typeof e.sansSession === 'boolean' ? e.sansSession : null };
-    const dag = libre(e.dag, 200); if (dag) o.dag = dag;
+    const dag = dagOk(e.dag); if (dag) o.dag = dag;
     return o;
   };
   const entrees = (l) => (Array.isArray(l) ? l : l && typeof l === 'object'
