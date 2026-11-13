@@ -116,6 +116,64 @@ assert_eq "T5.6 — ADR -> décisions : arête lue dans la ligne de définition,
 Q57='JSON.stringify(j.definitions.filter((d) => d.id === "P90-D-07").map((d) => [d.titre.length <= 80, d.titre.length > 20, /\*\*|`/.test(d.titre)]))'
 assert_eq "T5.7 — titre de 150 caractères et plus coupé à 80 au plus, sans gras ni accent grave" "$(J "$WORK/o52.json" "$Q57")" "[[true,true,false]]"
 
+echo "=== T6 — passage git borné et durci ==="
+# argv.mjs <journal> : appels git journalisés par l'emballage -> JSON { log: [argv], revparse: [argv], tous: [argv...] }
+cat > "$AUX/argv.mjs" <<'JS'
+import fs from 'node:fs';
+const blocs = fs.readFileSync(process.argv[2], 'utf8').split('--8<--\n').map((b) => b.split('\n').filter((l) => l !== '')).filter((b) => b.length);
+const pas = (b, nom) => b.includes(nom);
+console.log(JSON.stringify({ log: blocs.filter((b) => pas(b, 'log')), revparse: blocs.filter((b) => pas(b, 'rev-parse') && pas(b, 'HEAD')), tous: blocs.flat() }));
+JS
+: > "$WORK/argv.log"
+D "$L2" > "$WORK/o61.json"
+node "$AUX/argv.mjs" "$WORK/argv.log" > "$WORK/a61.json"
+Q61='(() => { const l = j.log[0] || []; const i = l.indexOf("--end-of-options"); return [j.log.length, i > 0 && /^[0-9a-f]{40}$/.test(l[i + 1]) && l[i + 2] === "--" && l.length === i + 3, l.includes("--max-count=2000"), j.tous.includes("--all"), j.revparse.length > 0 && j.revparse.every((r) => r.includes("--verify") && r.includes("--end-of-options"))].join("|"); })()'
+assert_eq "T6.1 — argv : --end-of-options, sha de 40 caractères, --, --max-count=2000, jamais --all, rev-parse --verify --end-of-options" "$(J "$WORK/a61.json" "$Q61")" "1|true|true|false|true"
+
+# trois commits de plus que la borne de la sonde : cinq commits citants
+L3="$WORK/lab3"; mkdir -p "$L3"; G_ init -q -b main "$L3"
+for i in 1 2 3 4 5; do G_ -C "$L3" commit -q --allow-empty -m "feat: suit ADR-001 ($i)"; done
+G_ -C "$L3" commit -q --allow-empty -m "chore: sans citation"
+D "$L3" 3 > "$WORK/o62a.json"; D "$L3" 10 > "$WORK/o62b.json"
+Q62='[j.cit.commits.length, j.cit.tronque].join("|")'
+assert_eq "T6.2 — borne max=3 sur cinq commits citants : 3 commits, tronque" "$(J "$WORK/o62a.json" "$Q62")" "3|true"
+assert_eq "T6.2 — témoin positif : max=10 rend les 5 commits, tronque faux" "$(J "$WORK/o62b.json" "$Q62")" "5|false"
+
+# git qui dort 30 s sur `log` : l'échéance coupe, la sonde rend tronque sans attendre
+touch "$WORK/lent"
+D "$L3" 10 1500 > "$WORK/o63.json"
+rm -f "$WORK/lent"
+Q63='[j.tete.sha !== null, j.cit.tronque, j.ms < 5000].join("|")'
+assert_eq "T6.3 — délai : tronque vrai, retour en moins de 5 s malgré un git qui dort 30 s" "$(J "$WORK/o63.json" "$Q63")" "true|true|true"
+
+# corps de 300 Kio : lu pour les citations, jamais servi
+L4="$WORK/lab4"; mkdir -p "$L4"; G_ init -q -b main "$L4"
+{ printf 'feat: suit ADR-001\n\n'; i=0; while [ "$i" -lt 4000 ]; do printf 'ligne de corps numero %05d xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n' "$i"; i=$((i+1)); done; echo 'GROS-CORPS-76 fin'; } > "$WORK/corps.txt"
+G_ -C "$L4" commit -q --allow-empty -F "$WORK/corps.txt"
+D "$L4" > "$WORK/o64.json"
+Q64='[j.rel.parAdr["ADR-001"].commits.length, JSON.stringify(j).includes("GROS-CORPS-76"), JSON.stringify(j).includes("ligne de corps"), j.cit.tronque].join("|")'
+assert_eq "T6.4 — corps de 300 Kio : commit relié, aucune chaîne du corps dans la sortie, non tronqué" "$(J "$WORK/o64.json" "$Q64")" "1|false|false|false"
+assert_eq "T6.4 — témoin positif : le marqueur est dans git log --format=%B" "$(G_ -C "$L4" log -1 --format=%B | grep -c 'GROS-CORPS-76')" "1"
+assert_eq "T6.4 — témoin de taille : le corps dépasse 250 Kio" "$([ "$(G_ -C "$L4" log -1 --format=%B | wc -c)" -gt 256000 ] && echo oui)" "oui"
+
+# sujet hostile : séquence de contrôle et faux secret d'une forme de MASQUES (jeton GitHub assemblé à l'exécution)
+L5="$WORK/lab5"; mkdir -p "$L5"; G_ init -q -b main "$L5"
+FAUX="$(printf 'gh%s_%s' p aaaaaaaaaaaaaaaaaaaaaaaaaaaa)"
+printf 'feat: suit ADR-001 \033[31mrouge\007 %s fin\n' "$FAUX" > "$WORK/hostile.txt"
+G_ -C "$L5" commit -q --allow-empty -F "$WORK/hostile.txt"
+D "$L5" > "$WORK/o65.json"
+Q65='(() => { const s = j.cit.commits[0].sujet; return [/[\u0000-\u001f\u007f-\u009f]/.test(s), s.includes("[masqué]"), s.includes("ghp_")].join("|"); })()'
+assert_eq "T6.5 — sujet hostile : contrôles retirés, secret remplacé par [masqué]" "$(J "$WORK/o65.json" "$Q65")" "false|true|false"
+assert_eq "T6.5 — témoin positif : le sujet brut de git porte la séquence d'échappement et le faux secret" "$(G_ -C "$L5" log -1 --format=%s | grep -c "$(printf '\033').*ghp_")" "1"
+
+# lab sans git : aucun log lancé, aucune exception
+NG="$WORK/nogit"; mkdir -p "$NG"
+: > "$WORK/argv.log"
+D "$NG" > "$WORK/o66.json"
+Q66='JSON.stringify([j.tete, j.cit.commits.length, j.erreur === undefined])'
+assert_eq "T6.6 — lab sans git : teteSha rend { sha: null, absent: true }, aucun commit, aucune exception" "$(J "$WORK/o66.json" "$Q66")" '[{"sha":null,"absent":true},0,true]'
+assert_eq "T6.6 — aucun appel log lancé" "$(grep -c '^log$' "$WORK/argv.log")" "0"
+
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
 echo "=================================="

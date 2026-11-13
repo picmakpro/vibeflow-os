@@ -36,3 +36,20 @@ Même commande. T5.1 à T5.3 et les témoins positifs verts ; rouges par l'asser
      obtenu:  [[]]
   Résultats : 5 PASS / 5 FAIL
 ```
+
+## Tâche 3 — T6.1 à T6.6 (rouge vu contre une copie sans le durcissement)
+
+Écart : l'argv durci, la borne, le tampon et le corps jeté étaient déjà dans `vf-cockpit-trace-git.mjs` livré à la tâche 1 ; contre la tête, la suite est verte d'emblée (21 PASS / 0 FAIL). Le rouge est donc pris sur une copie jetable des modules et de la suite où `trace-git` est ramené à sa forme naïve (`rev-parse HEAD`, ni `--end-of-options` ni `--max-count`, `--all`, tampon de 1 Kio), hors dépôt :
+
+```
+  ❌ FAIL — T6.1 — argv : --end-of-options, sha de 40 caractères, --, --max-count=2000, jamais --all, rev-parse --verify --end-of-options
+     attendu: [1|true|true|false|true]
+     obtenu:  [1|false|false|true|false]
+  ❌ FAIL — T6.2 — borne max=3 sur cinq commits citants : 3 commits, tronque
+     attendu: [3|true]
+     obtenu:  [5|true]
+  ❌ FAIL — T6.4 — corps de 300 Kio : commit relié, aucune chaîne du corps dans la sortie, non tronqué
+     attendu: [1|false|false|false]
+     obtenu:  [1|false|false|true]
+  Résultats : 18 PASS / 3 FAIL
+```
