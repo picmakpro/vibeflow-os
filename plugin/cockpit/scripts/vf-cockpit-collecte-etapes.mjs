@@ -26,7 +26,11 @@ export const creerMemoire = () => ({});
 export function etapePlanning({ racine, memo }) {
   const graphe = buildProjectGraph(racine);
   if (memo) {
-    try { memo.gouvernance = lireGouvernance(racine, graphe); } catch { /* lecture illisible : la gouvernance précédente est gardée */ }
+    // lecture illisible : la gouvernance précédente est gardée ; trace bornée (3 au plus par fil)
+    try { memo.gouvernance = lireGouvernance(racine, graphe); } catch (e) {
+      memo.echecsGouvernance = (memo.echecsGouvernance || 0) + 1;
+      if (memo.echecsGouvernance <= 3) console.error(`collecte : gouvernance illisible (${String(e && e.message).slice(0, 160)})`);
+    }
     memo.lecturesPlanning = (memo.lecturesPlanning || 0) + 1;
   }
   return graphe;

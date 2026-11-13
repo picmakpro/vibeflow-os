@@ -38,3 +38,9 @@ rituel levé : régime allégé (consigne de Samuel, message session principale,
 - Constat 1 (`ws` sans grammaire) : le champ `ws` de `phasesHumaines` vient d'un nom de dossier de compartiment, borné par le masque seulement (U+202E et BEL survivaient). Correctif : `phasesHumainesSortie` applique la grammaire de `detention()` (`wsValide`, `phaseValide`, exportées de `vf-cockpit-gouvernance.mjs`) : entrée rejetée si `ws` ou `phase` est hors forme ; `ref` retirée si elle n'a pas la forme `n:<identifiant>`. Témoin : RG16.15, vu rouge sur la tête d'avant ; mutant GRAMMAIRE-WS vu rouge puis retiré. Commit c3ffb7d8.
 
 rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
+
+## Correctifs de revue
+
+- Majeur 1 (revue du point de fusion 1) : `memo.gouvernance` n etait posee que par `etapePlanning` ; un fil relance (surMort, refaire, armerReprise, armerIndex) repartait avec un memo vide et un tour sans planning rendait `phasesHumaines` = null jusqu au prochain changement de `.planning`. Correctif : au premier tour d un fil dont le memo n a pas de gouvernance, le fil appelle `etapePlanning` avec le meme memo (une fois par fil, jamais par tour) ; le `catch` de `etapePlanning` laisse une trace bornee (3 lignes au plus par fil). Temoin : RG4.14 (fil relance puis tour sans planning), vu rouge sur la tete d avant (`[["7"],null]`), vert apres. Pas de mutant (ni garde ni filtre).
+
+rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)

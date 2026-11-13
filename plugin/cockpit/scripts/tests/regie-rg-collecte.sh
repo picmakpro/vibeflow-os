@@ -76,6 +76,17 @@ const collecte = async (d, o = {}) => (await imp('vf-cockpit-who.mjs')).collectW
 const session = (w, id) => w.workers.find((x) => x.kind === 'session' && x.id === id);
 const SC = {
   rg4: async () => { const d = lab('rg4', { verif: a1 === '1' }); const w = await collecte(d, { gouvernance: await gov(d) }); return 'phasesHumaines' in w ? JSON.stringify(w.phasesHumaines.map((p) => p.phase)) : 'absent'; },
+  // revue 1, majeur 1 : le fil relancé repart avec un memo vide ; un tour SANS planning doit rendre les phases à vérification humaine comme avant
+  memo: async () => {
+    const d = lab('rg4m', { verif: true }), sortie = path.join(d, '.vibeflow', 'cockpit'); fs.mkdirSync(sortie, { recursive: true });
+    const { creerCollecte } = await imp('vf-cockpit-collecte.mjs');
+    const c = creerCollecte({ racine: d, sortie, scriptsDir: path.join(work, 'noscripts'), home, log: () => {} });
+    let dernier = null; c.surResultat((m) => { if (m.type === 'tour') dernier = m; });
+    const ph = () => (dernier?.equipe?.phasesHumaines ?? null) && dernier.equipe.phasesHumaines.map((p) => p.phase);
+    c.demander({ planning: true, tour: true }); await c.pret(10000); const avant = ph();
+    dernier = null; await c.redemarrer({ sansIndex: true }); c.demander({ tour: true }); await c.pret(10000); const apres = ph();
+    c.arreter(); return JSON.stringify([avant, apres]);
+  },
   fabrique5: async () => { lab('lab', { ws: true, verif: true, dag: a1 === '1', sessions: [{ id: SID, ageS: 3600 }] }); return 'ok'; },
   collecte5: async () => {
     const d = path.join(work, 'lab'); const w = await collecte(d, { scriptsDir: a1, gouvernance: await gov(d) });
@@ -154,6 +165,7 @@ rgc_prepare5() { [ -f "$WORK/rg5-a/who.json" ] && return 0; rgc_verrou rg5-a 1; 
 rg_RG4_collecte() {
   assert_eq "RG4.10 — phase 7 non cochée et phase 8 cochée, VERIFICATION human_needed dans les deux : who.phasesHumaines ne liste que la phase « 7 » (A1)" "$(rgc rg4 "$WORK/rg4-a" 1)" '["7"]'
   assert_eq "RG4.11 — aucune VERIFICATION concernée : la clé phasesHumaines est absente" "$(rgc rg4 "$WORK/rg4-b" 0)" 'absent'
+  assert_eq "RG4.14 — revue 1, majeur 1 : fil relancé (redemarrer, memo vide) puis un tour SANS planning : phasesHumaines reste [\"7\"], elle ne retombe pas à null" "$(rgc memo "$WORK/rg4-m")" '[["7"],["7"]]'
 }
 
 # ---------- RG4_direct — planning de gouvernance lu une fois par reconstruction (REGI-04) ----------

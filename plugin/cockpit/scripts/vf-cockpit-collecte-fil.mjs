@@ -21,6 +21,12 @@ parentPort.on('message', (m) => {
     parentPort.postMessage({ type: 'verrous', id, verrous });
   }
   if (m.tour) {
+    // revue 73-03 : un fil relancé repart avec un memo vide ; sans gouvernance, le tour la lit une fois
+    // (même lecture que `planning`), jamais par tour de 5 s
+    if (memo.gouvernance === undefined && !memo.gouvernanceTentee) {
+      memo.gouvernanceTentee = true;
+      try { etapePlanning({ ...base, memo }); } catch { /* le tour dégrade */ }
+    }
     let r; // un tour qui lève ne tue pas le fil : un tour neuf et neutre, `tour` dans les erreurs (la collecte devient `partielle`)
     try { r = etapeTour({ ...base, memo, sansIndex: !!sansIndex }); } catch { // garde:fil-tour
       r = { verrous: { etat: 'erreur', plat: false, liste: [] }, equipe: { workers: [], sources: {} }, signal: null, erreurs: ['tour'], dureeMs: 1,
