@@ -141,3 +141,31 @@ Mutants (copie du module, la copie diffère par `cmp` et charge, rouge sur la bo
 - M-REENTRANT (`garde:collecte-reentrant`, retrait de `if (!redemarrage) `) : plus de deux lancements, et des battements d'un fil orphelin après l'arrêt.
 - M-CHIEN (`garde:collecte-chien`, le minuteur ne fait plus rien) : `pret=false relances=0`.
 - M-MOTIFS (`garde:collecte-motifs`, retrait du plafond) : `20000,40000`. M-DEDOUBLON (même ligne, retrait du `Set`) : `64` au lieu de `2`.
+
+### Correction ciblée 2 après la revue rv2 (section C13) — état rouge puis vert
+
+AVANT-09-C13 : 906e3efe (HEAD avant la correction). Les rouges sont joués sur un instantané `git archive` de ce sha (jamais l'arbre partagé), avec les harnais mêmes de la suite, extraits de `test-cockpit-collecte.sh` ; aucune suite entière rejouée sur l'instantané. Dossier temporaire et `TMPDIR` hors de celui de l'utilisateur.
+
+Rouges, avant tout code :
+- C13.1b — `etapeTour` quand la projection des verrous lève | attendu : `verrous=erreur/0 erreurVerrous=true dureeMs=number` | obtenu : `leve:essai` (le tour lève). C13.1a (mémoire ordinaire) : vert avant et après.
+- C13.2 — le vrai fil dont `etapeTour` lève (greffe posée sur une copie de l'ancien fil) | attendu : `true true tour 0 partielle 0 true true` | obtenu : `pret=true tour=false erreurs=null etat=indisponible relances=1 vivant=false mort=erreur` (le fil meurt, relancé une fois, mort à nouveau dans la fenêtre).
+- C13.3a — signature du lab | attendu : `true true true true` | obtenu : `stable=true config=false exclude=false stable2=true`. C13.3b (arbre de travail) | attendu : `true true` | obtenu : `false false`.
+- C13.4b — sortie en lien vers un dossier hors du lab | attendu : `dehors=0` | obtenu : `dehors=1` (un dossier `.cache` naît hors du lab : le mkdir précède le confinement). C13.4c — temporaire en lien vers un fichier hors du lab | attendu : `intact` | obtenu : `{"signature":"abc"}` (le fichier visé est écrasé). C13.4a (écriture ordinaire, 0600, aucun reste) : vert avant et après.
+- C13.5 — motif `confirm` derrière 70 motifs distincts | attendu : `n=64 confirm=true | n=64 confirm=true | n=1 confirm=true` | obtenu : `n=64 confirm=false | n=64 confirm=true | n=1 confirm=true` (évincé par le plafond ; devant la rafale ou seul il passait).
+- C2.8 — `startLive` sans garde fournie | attendu : `true 0 0 partielle` | obtenu : `false 1 0 ok` (instantané posé, un travailleur dans « qui »).
+- Verts d'emblée, voulus : C2.6a dans sa nouvelle forme (le refus gardait déjà l'instantané du tour accepté : le test l'exerce maintenant, la preuve qu'il peut rougir est M-GARDE-TOUR), C2.1 et C2.7 (leurs preuves sont les mutants ci-dessous).
+
+Vert après le code : `test-cockpit-collecte.sh` 149 PASS / 0 FAIL. Un premier rejeu complet donnait 146 / 3, trois défauts de la suite et aucun du code : C13.2 comparait `null` joint (`mort` nul se lit vide) ; M-COALESCENCE comptait les exécutions trop tôt (le premier `fini` libère `pret`, le pilote muté n'avait exécuté que deux demandes sur cinq : C2.1 attend maintenant 1,8 s avant de compter, 5 exécutions de 300 ms au plus) ; M-ARRET-FERME visait un marqueur dont un autre marqueur était le préfixe (`collecte-arret` et `collecte-arret-fil`, deux lignes : renommés `collecte-ferme` et `collecte-terminer`).
+
+Mutants (copie du module, la copie diffère par `cmp` et charge, rouge sur la bonne mesure ; le point d'entrée du fil ne se charge que dans un fil, `MUT_NOLOAD=1` saute le chargement pour M-FIL-TOUR, dont la preuve est l'exécution dans un vrai fil) :
+- M-GREFFE-TOUR (`garde:etape-tour`, `etapeTour` lève dès l'entrée) : greffe du témoin C13.2, pas un mutant.
+- M-FIL-TOUR (`garde:fil-tour`, le `catch` relève ; greffe en plus) : obtenu `false true` (aucun tour posté, mort comptée). M-PROJETER (`garde:etape-projeter`, le `catch` relève) : `verrous=lue/1 erreurVerrous=false | leve:essai`.
+- M-CACHE-CONFIG (`garde:scan-cache-config`, `config` remplacé par `''`) : `false true`. M-CACHE-EXCLUDE (`info/exclude` remplacé par `''`) : `true false`.
+- M-CACHE-ORDRE (`garde:code-cache-confiner`, le mkdir repasse avant le confinement) : `dehors=1`. M-CACHE-TMP (le même confinement sans le temporaire, plus l'ouverture `'w'` à l'ancienne) : fichier visé écrasé (`{"signature":"abc"}`). Les deux contrôles du temporaire, confinement et création exclusive sans lien, se couvrent : aucun mutant ne tue l'un sans l'autre (limite écrite).
+- M-CONFIRM (`garde:collecte-motifs`, `reserve(t)` devient `t.slice(0, MAX_MOTIFS)`) : `n=64 confirm=false | n=64 confirm=true | n=1 confirm=true`. M-MOTIFS et M-DEDOUBLON (même ligne) : toujours tués.
+- M-COALESCENCE (`garde:collecte-demander`, `if (enVol || !fil)` devient `if (!fil)`) : 5 exécutions au lieu de 2. M-UNION (`garde:collecte-fusion`, `unir(a.motifs, b.motifs)` devient `b.motifs`) : motifs de la dernière exécution vides au lieu de `a,b,c`.
+- M-ARRET-FERME (`garde:collecte-ferme`, `ferme = true;` retiré) : une demande après `arreter()` est acceptée (C2.7). M-ARRET-FIL (`garde:collecte-terminer`, `terminate` retiré) : le fil bat encore après l'arrêt.
+- M-GARDE-TOUR (`garde:live-garde-tour`, `if (!garde(…))` devient `if (false)`) : l'instantané du tour accepté n'est pas conservé (`conserve=false`). M-GARDE-DEFAUT (`garde:live-garde-defaut`, `garde = () => false` devient `() => true`) : `false 1` (instantané posé, « qui » rempli).
+- Mutants des sections précédentes qui visaient une ligne déplacée : M-CACHE-OUVERTURE et M-CACHE-BORNE, réancrés sur `garde:code-cache-ouverture` (la lecture tient maintenant sur plusieurs lignes) ; leurs rouges sont inchangés (`git-tube` et `head-tube` bloquent ; `git-lien-zero` et `head-lien-zero` bloquent).
+
+Colonnes (points de code, plus de 160) : `vf-cockpit-code-cache.mjs` 3 → 0, `vf-cockpit-collecte.mjs` 1 → 0, `vf-cockpit-git-lanceur.mjs` 21 → 20 ; `colonnes-baseline.txt` non modifiée (le nœud final l'abaisse).
