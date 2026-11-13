@@ -647,7 +647,7 @@ assert_eq "W23.11 — le titre le plus récent l'emporte, même vide ou blanc (l
 assert_eq "W23.12 — le mémo est invalidé par la taille (même date) ET par la date (même taille)" "$(g23 "$WORK/w23a" 'j.t11.join("|")')" "AAAAAA|BBBBBBB|CCCCCCC"
 assert_eq "W23.13 — un fichier illisible n'est pas mémorisé comme « pas de titre » : chmod 000 puis 644 relit" "$(g23 "$WORK/w23a" 'j.t12.join("|")')" "|ZZ"
 assert_eq "W23.14 — toute clé d'un travailleur est déclarée au contrat vf-cockpit-interface.json (requis ∪ optionnels), titre compris" "$(g23 "$WORK/w23a" 'j.t13.join(",")')" ""
-assert_eq "W23.15 — un /rename seul change la signature whoSig : deux collectes qui ne diffèrent que par `titre` donnent deux signatures, une collecte identique en donne une seule" "$(g23 "$WORK/w23a" 'j.t14.join(",")')" "true,true"
+assert_eq "W23.15 — un /rename seul change la signature whoSig : deux collectes qui ne diffèrent que par « titre » donnent deux signatures, une collecte identique en donne une seule" "$(g23 "$WORK/w23a" 'j.t14.join(",")')" "true,true"
 assert_eq "W23.16 — LIBRES.titre vaut 80 dans who.mjs (garde statique : le titre est déjà borné à 80 en amont, aucune sortie ne le distingue)" "$(grep -c "LIBRES = { titre: 80," "$SCRIPTS/vf-cockpit-who.mjs")" "1"
 mut23() { mut17 "w23-$1" "$2" "$3" "$4" >/dev/null; mkdir -p "$WORK/w23-$1-b"; w23 "$WORK/mut17-w23-$1" "$WORK/w23-$1-b"; }
 L23="vf-cockpit-lecture.mjs"
@@ -679,7 +679,7 @@ assert_eq "M-W23-BRANCHE — mutant (branche brute dans le libellé) : W23.10 ro
 mut23 branchedet vf-cockpit-equipe-carte.mjs "const branche = retireAffichage(w.branch);" "const branche = w.branch || '';"
 assert_eq "M-W23-BRANCHE-DETAIL — mutant (branche brute dans le détail et le résumé) : W23.10 rougit sur le détail" "$(g23 "$WORK/w23-branchedet-b" 'j.t8[1]')" "false"
 mut23 iface vf-cockpit-interface.json '"task", "titre",' '"task",'
-assert_eq "M-W23-IFACE — mutant (contrat sans `titre`) : W23.14 rougit" "$(g23 "$WORK/w23-iface-b" 'j.t13.join(",")')" "titre"
+assert_eq "M-W23-IFACE — mutant (contrat sans « titre ») : W23.14 rougit" "$(g23 "$WORK/w23-iface-b" 'j.t13.join(",")')" "titre"
 mut23 sig vf-cockpit-who-signature.mjs "'lastAt']" "'lastAt', 'titre']"
 assert_eq "M-W23-SIG — mutant du juge (titre ajouté à la liste des champs volatils de la ligne garde:who-volatils, un grep resterait vert) : W23.15 rougit" "$(g23 "$WORK/w23-sig-b" 'j.t14.join(",")')" "false,true"
 mut17 w23-lib vf-cockpit-who.mjs "LIBRES = { titre: 80," "LIBRES = {" >/dev/null

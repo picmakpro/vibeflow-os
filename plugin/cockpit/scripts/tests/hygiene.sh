@@ -23,6 +23,9 @@
 #   vf_hyg_assert    arrête les inscrits puis assert_eq : plus rien ne survit — un survivant est une fuite (nommé : pid et commande)
 #   vf_hyg_fin       filet du trap EXIT : tue tout ce qui porte la marque (TERM puis KILL), jamais autre chose
 VF_HYG_MAX=20
+# Dossier de cette bibliothèque, en chemin ABSOLU, résolu au CHARGEMENT (ici, à la source du fichier) : le filet AM7 charge chrome-saut.sh depuis le trap EXIT, où une suite lancée par un chemin
+# RELATIF et qui a changé de dossier ne retrouverait plus « $(dirname "${BASH_SOURCE[0]}") » (chargement en échec, vf_chrome_ci_exige « command not found », filet désarmé sans bruit).
+VF_HYG_DIR="$(CDPATH='' cd "$(dirname "${BASH_SOURCE[0]}")" && pwd -P)"
 vf_hyg_tag_ok() {
   local LC_ALL=C t="${VF_HYG_TAG:-}"
   [ "${#t}" -ge 10 ] || return 1
@@ -122,7 +125,7 @@ vf_hyg_assert() {
 # Hors CI (CI vide) le saut local reste permis. Échappatoires explicites : VF_CHROME_OPTIONNEL=1, et CHAINE_SANS_NAVIGATEUR (simulation voulue de la suite chaîne-xss).
 # Même condition que vf_chrome_saut (chrome-saut.sh, le mécanisme du point de saut). Appelée par vf_hyg_fin, donc depuis le trap EXIT de chaque suite : le dossier de travail est supprimé ici (sauf KEEP) avant le « exit 1 », qui coupe le reste du trap.
 vf_hyg_chrome_ci() {
-  . "$(dirname "${BASH_SOURCE[0]}")/chrome-saut.sh"
+  . "$VF_HYG_DIR/chrome-saut.sh"
   vf_chrome_ci_exige || return 0
   local v
   for v in CHROME EKCHROME; do
