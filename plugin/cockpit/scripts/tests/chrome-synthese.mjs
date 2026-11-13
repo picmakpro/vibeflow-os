@@ -55,8 +55,8 @@ export async function stockageAvant(s, cle, valeur) {
 }
 export async function intercepter(s, motif, reponse) {
   let actif = true, n = 0; await s.send('Fetch.enable', { patterns: [{ urlPattern: `*${motif}*` }] });
-  s.ecouter('Fetch.requestPaused', (p) => {
-    if (!actif) return void s.send('Fetch.continueRequest', { requestId: p.requestId }).catch(() => {});
+  s.ecouter('Fetch.requestPaused', (p) => { // l'écoute est permanente : chaque interception ne répond qu'à SES requêtes, et plus rien une fois arrêtée
+    if (!actif || !p.request.url.includes(motif)) return;
     n++; s.send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: reponse.statut, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
       body: Buffer.from(reponse.corps || '{}').toString('base64') }).catch(() => {});
   });

@@ -35,7 +35,9 @@ const STYLE = `(() => {
     if (!neutre(c.backgroundColor) || (num(c.backgroundColor).a > 0 && !fonds.has(c.backgroundColor))) mal.fond.push(id + ' ' + c.backgroundColor);
     if (c.boxShadow !== 'none' || c.filter !== 'none') mal.ombre.push(id);
     for (const p of ['border-left-color', 'border-top-color', 'outline-color']) if (!neutre(c.getPropertyValue(p))) mal.liseres.push(id + ' ' + p);
+    const sr = c.position === 'absolute' && parseFloat(c.width) <= 1; // la zone vive masquée : ses décalages sont ceux de sa place, pas un espacement
     for (const p of ['padding-top', 'padding-right', 'padding-bottom', 'padding-left', 'margin-top', 'margin-right', 'margin-bottom', 'margin-left', 'row-gap', 'column-gap', 'top', 'left', 'right', 'bottom']) {
+      if (sr && /^(top|left|right|bottom)$/.test(p)) continue;
       const v = c.getPropertyValue(p); if (/^-?[0-9.]+px$/.test(v) && !GRILLE.has(Math.abs(parseFloat(v)))) mal.espace.push(id + ' ' + p + '=' + v);
     }
     if (!TAILLES.has(parseFloat(c.fontSize))) mal.taille.push(id + ' ' + c.fontSize);
@@ -62,6 +64,8 @@ async function charger(s, base, valeur) {
 }
 const ouvrir = async (s) => { if (!(await s.ev(OUVERTE))) { await s.ev(`${BTN}.click()`); await s.attendre(OUVERTE, 'Synthèse ouverte'); } await pause(250); };
 const fermer = async (s) => { if (await s.ev(OUVERTE)) { await s.ev(`${BTN}.click()`); await attendreValeur(() => s.ev(`!${OUVERTE}`), (v) => v === true, { max: 3000 }); } };
+// la ligne-résumé (Synthèse fermée) une fois les données arrivées : jamais la première lecture vide qui se « stabilise » avant l'arrivée
+const resumeLu = async (s) => { await attendreValeur(() => s.ev(RESUME), (v) => !!v, { max: 10000 }); return stabiliser(() => s.ev(RESUME), { max: 6000 }); };
 async function fiche(s) { await attendreValeur(() => s.ev(RESUME), (v) => !!v, { max: 10000 }); await ouvrir(s); return stabiliser(() => s.ev(FICHE), { max: 6000 }); }
 const stylePose = async (s, theme) => { await s.ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(theme)})`); await pause(300); return stabiliser(() => s.ev(STYLE), { max: 5000 }); };
 
@@ -78,11 +82,11 @@ export async function jouer(chrome, port, mode) {
     await s.naviguer(base + '/project.html'); await s.attendre(`!!${BTN}`, 'bouton Synthèse posé');
     r.faits = await s.ev(FAITS); s.cle = r.faits.cle; const f = r.faits;
     r.cles0 = Object.keys(await stockageLu(s, null)).filter((k) => k !== 'vf-cockpit:panel'); r.session0 = await s.ev(`JSON.stringify(Object.entries(sessionStorage))`);
-    r.v1 = { resume: await stabiliser(() => s.ev(RESUME), { max: 8000 }), fiche: await fiche(s) };
+    r.v1 = { resume: await resumeLu(s), fiche: await fiche(s) };
     if (mode === 'complet') await sondes(s, base, r, f);
     const v2 = val(null, inst(maintenant() - 7200, avant(f)));
     // ---- V2 : repère d'il y a deux heures (la valeur tourne au chargement) ----
-    await charger(s, base, v2); r.v2 = { resume: await stabiliser(() => s.ev(RESUME), { max: 8000 }), fiche: await fiche(s), titre: await s.ev(`${BTN}.getAttribute('aria-label')`), garde: await stockageLu(s, s.cle) };
+    await charger(s, base, v2); r.v2 = { resume: await resumeLu(s), fiche: await fiche(s), titre: await s.ev(`${BTN}.getAttribute('aria-label')`), garde: await stockageLu(s, s.cle) };
     r.w12 = await s.ev(`({ prose: document.documentElement.innerText.includes('MARQUEUR-PROSE-77') || document.getElementById('panel').innerHTML.includes('MARQUEUR-PROSE-77'),
       cle: Object.prototype.hasOwnProperty.call(window.VibeFlow.graph.meta.vf, 'lastDesc') })`);
     r.w15 = await s.ev(`({ xss: typeof window.__xss, on: document.querySelectorAll('#panel .vf-sy [onerror], #panel .vf-sy [onclick], #btn-synthese[onclick]').length,
@@ -100,17 +104,17 @@ export async function jouer(chrome, port, mode) {
     const e0 = erreurs.length; await charger(s, base, 'ceci {n est pas du json'); r.v6 = { fiche: await fiche(s), erreurs: erreurs.length - e0 };
     // ---- V5 : identifiant de lab non reçu ----
     const i5 = await intercepter(s, '/api/vf/modeles', { statut: 500, corps: '{}' }); await charger(s, base, null);
-    r.v5 = { fiche: await fiche(s), resume: await s.ev(RESUME), vues: i5.vues() }; await s.naviguer(base + '/'); r.v5.cles = Object.keys(await stockageLu(s, null)).filter((k) => /derniere-visite/.test(k)); await i5.arreter();
+    r.v5 = { resume: await resumeLu(s), fiche: await fiche(s), vues: i5.vues() }; await s.naviguer(base + '/'); r.v5.cles = Object.keys(await stockageLu(s, null)).filter((k) => /derniere-visite/.test(k)); await i5.arreter();
     // ---- V9 : git en panne ----
     const i9 = await intercepter(s, '/api/vf/git', { statut: 500, corps: '{}' }); await charger(s, base, v2); r.v9 = { fiche: await fiche(s), vues: i9.vues() }; await i9.arreter();
     // ---- V7, V10, OB1 : sur l'état V2 ----
     await charger(s, base, v2); await fiche(s); r.ob1 = await s.ev(ORDRE); await fermer(s);
     r.ecout0 = await s.ev('window.__nbEcout()');
     for (const o of ['code', 'projet', 'code', 'projet']) await s.ev(`window.VF_COQUILLE.chargerOnglet(${JSON.stringify(o)})`);
-    await s.attendre(`!!${BTN}`, 'bouton après deux cycles'); await stabiliser(() => s.ev(RESUME), { max: 6000 }); const ecout1 = await s.ev('window.__nbEcout()'); await ouvrir(s);
+    await s.attendre(`!!${BTN}`, 'bouton après deux cycles'); await stabiliser(() => s.ev(RESUME), { max: 6000 }); const ecout1 = await s.ev('window.__nbEcout()'), lignes1 = await s.ev(`document.querySelectorAll('[data-vf-sy-resume]').length`); await ouvrir(s);
     const ecr0 = await s.ev('window.__ecr');
     await s.ev(`(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); delete document.visibilityState; })()`); await pause(300);
-    r.v10 = { ecout: ecout1, blocs: await s.ev(`document.querySelectorAll('[data-vf-sy-bloc="visite"]').length`), lignes: await s.ev(`document.querySelectorAll('[data-vf-sy-resume]').length`),
+    r.v10 = { ecout: ecout1, blocs: await s.ev(`document.querySelectorAll('[data-vf-sy-bloc="visite"]').length`), lignes: lignes1,
       ecritures: (await s.ev('window.__ecr')) - ecr0, memeDocument: true };
     await s.naviguer(base + '/'); const garde = JSON.parse((await stockageLu(s, s.cle)) || 'null');
     r.v7 = { v: garde && garde.v, ageS: garde && garde.courante ? maintenant() - garde.courante.vu : null, cles: garde ? Object.keys(garde) : null };
@@ -146,9 +150,10 @@ async function tout(s, base, r) {
   // une écriture qui n'avance que l'heure de la courante : le rendu ne change pas, le focus non plus
   await t2.ev(`(() => { const k = ${JSON.stringify(s.cle)}, o = JSON.parse(localStorage.getItem(k)); o.courante.vu += 1; localStorage.setItem(k, JSON.stringify(o)); })()`); await pause(600);
   r.w13v.focusApresDonnees = await s.ev(FOCUS);
-  await s.ev(`document.querySelector('${'#panel [data-vf-sy-bloc="visite"] [data-vf-sy-toutvu]'}').click()`); await pause(500);
-  r.v8 = { fiche: await stabiliser(() => s.ev(FICHE), { max: 5000 }), resume: await s.ev(RESUME), titre: await s.ev(`${BTN}.getAttribute('aria-label')`), focus: await s.ev(FOCUS),
+  r.avantClic = maintenant(); await s.ev(`document.querySelector('${'#panel [data-vf-sy-bloc="visite"] [data-vf-sy-toutvu]'}').click()`); await pause(500);
+  r.v8 = { fiche: await stabiliser(() => s.ev(FICHE), { max: 5000 }), titre: await s.ev(`${BTN}.getAttribute('aria-label')`), focus: await s.ev(FOCUS),
     sr: await s.ev(`document.querySelector('#panel .vf-sy .sr').textContent`), garde: JSON.parse(await stockageLu(s, s.cle)) };
+  await fermer(s); r.v8.resume = await resumeLu(s); // la ligne-résumé n'est dans l'aperçu que Synthèse fermée
   await attendreValeur(() => t2.ev(`(document.querySelector('[data-vf-sy-resume] .rn') || {}).textContent || ''`), (v) => /^Rien de nouveau/.test(v), { max: 10000 });
   r.w13v.resume2 = await t2.ev(`(document.querySelector('[data-vf-sy-resume] .rn') || {}).textContent`); r.w13v.titre2Apres = await t2.ev(`${BTN}.title`);
   r.w13v.apres2 = await t2.ev(`document.activeElement.tagName + '#' + document.activeElement.id`); r.w13v.sr2 = await t2.ev(`(document.querySelector('#panel .vf-sy .sr') || { textContent: '' }).textContent`);

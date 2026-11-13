@@ -71,6 +71,7 @@ Sans `--terminal`, rien ne change : aucun bouton, aucune route `POST`, aucun scr
   « à recetter » (tous les plans faits, phase pas encore cochée au ROADMAP) ou « fait ». Les plans de correction sont comptés
   à part du total. Les missions sont rattachées à leur phase. Preuve : `test-cockpit-avancement.sh` (A1 à A12, A18).
   Le bloc « Santé » n'est pas affiché sur cet onglet : il ne lit que le code, pas la planification (DG-15).
+  **Synthèse** (Phase 77) : le bouton « Synthèse » de l'en-tête, quand le cockpit est servi, ouvre un panneau à blocs ordonnés ; le premier, « Depuis votre dernière visite », dit les phases avancées, les commits arrivés, les sessions finies et les blocages nouveaux ou levés depuis la dernière visite faite dans ce navigateur, avec un bouton « Tout vu » ; une ligne-résumé en tête de l'aperçu donne le même texte. Preuve : `test-cockpit-synthese-visite.sh`.
   **Phases menées dans un worktree** (même dépôt git) : la carte affiche l'avancement du worktree (état, décompte de plans, reste) avec la mention
   « dans worktree <nom> ». Règle de priorité : l'état le plus avancé gagne (à faire < en cours < à recetter) ; un état clos
   sur l'arbre courant reste clos, jamais rouvert par un worktree ; une clôture lue seulement dans un worktree vaut « à recetter »
@@ -206,6 +207,8 @@ l'agent qui répond aux questions. Le lab observé n'est jamais une source de co
 « modifier le plan » n'exécute que le moteur du module), aucun lien symbolique de la sortie n'est suivi, et la page porte une
 Content-Security-Policy (scripts en ligne par empreintes, `connect-src 'self'`). Hypothèse assumée : une machine à un seul utilisateur
 (le jeton est servi à tout processus local, `.cache/server.json` est en 0600). Conséquence : un autre processus du même poste peut lire ce jeton par `GET /project.html`, interroger l'agent par `POST /api/ask` et, avec `--terminal`, déposer une proposition dans le tiroir par `POST /api/vf/lancer` ; rien ne part au shell sans le geste humain dans le terminal (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06).
+
+**Mémoire de la dernière visite** (Phase 77, SYNT-06). Le bloc « Depuis votre dernière visite » garde son repère dans le stockage local du navigateur (`localStorage`), sous la seule clé `vibeflow-cockpit:derniere-visite:<identifiant du lab>` : un objet de 8 Ko au plus, sur une liste fermée de champs (états de phase, sha du sommet de la base de git, condensats des blocages, instant de la visite) ; jamais un titre, un sujet de commit, une commande ni un chemin. Aucun fichier n'est écrit dans le lab, aucune route n'écrit. « Tout vu » remet la synthèse à zéro (le repère avance à maintenant, les autres onglets du navigateur suivent) ; l'oubli complet passe par l'effacement des données du site, dans les réglages du navigateur. La donnée reste dans le navigateur après la désinstallation du cockpit : désinstaller ne l'efface pas.
 
 **Avec `--terminal`**, ce qui circule et ce qui ne circule pas :
 
@@ -353,6 +356,7 @@ chaque patch, ajout et retrait dans `VENDORED.txt`. Vérifier : `bash plugin/coc
 
 ## Limites connues
 
+- **Dernière visite (Phase 77)** : le repère est gardé par navigateur et par origine, pour un poste mono-utilisateur : si le port du lab ou le navigateur change, le repère est perdu et le bloc dit « Première visite sur ce poste ». `localhost` et `127.0.0.1` sont deux origines distinctes : un repère posé depuis l'une n'est pas vu depuis l'autre. La borne de 8 Ko vaut en lecture comme en écriture : au-delà, la clé est retirée et le bloc repart de « Première visite sur ce poste ». Les commits arrivés ne se comptent que si le lab a une branche `main` (la base du cockpit).
 - **Transcript** (risque accepté, P69-D-27 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : le masque des
   secrets est fait au mieux sur la prose des mandats et des messages ; un secret écrit en clair dans une phrase peut donc
   s'afficher dans le transcript lu. Le jeton qui autorise la lecture est lisible par tout processus local (hypothèse d'une

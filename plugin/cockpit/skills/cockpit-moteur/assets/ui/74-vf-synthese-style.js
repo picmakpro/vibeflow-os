@@ -11,6 +11,7 @@
     .vf-sy .vst { --c-st: var(--text-2); }
     .vf-sy .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap; }
     .vf-sy .pd { font-size: 13.5px; }
+    .vf-sy .btn { font-size: 12.5px; }
     .vf-sy .vf-sy-note { margin: var(--sp-2) 0 0; font-size: 12.5px; line-height: 1.45; color: var(--text-3); }
     .vf-sy .vf-sy-fort { margin: 0; font-size: 12.5px; font-weight: 500; line-height: 1.4; color: var(--text); }
     .vf-sy .vf-sy-tete { margin: 0; font-size: 12.5px; font-weight: 500; line-height: 1.4; color: var(--text); font-variant-numeric: tabular-nums; }
