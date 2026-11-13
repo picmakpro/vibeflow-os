@@ -9,6 +9,9 @@
 //   jetons <fichier-document>      l'objet de l'unique script de jeton : { token, jetons, nbScripts } (nbScripts = scripts en ligne qui portent un jeton)
 //   assets <port> <fichier-document>   chaque fichier du manifeste sous /_vf/ : 200, JavaScript, étiquette = 16 hexadécimaux du sha256 des octets reçus, no-cache ; « ok N » ou « ko <nom> <raison> »
 //   inm <port> <nom>               If-None-Match sur /_vf/<nom> : 304 (égale, faible, liste, *) et 200 (autre) ; « ok » ou « ko <forme> <statut> »
+//   memes <doc1> <doc2>…           « oui » si les documents sont identiques octet pour octet une fois retirés le <title> et le script de jeton
+//   titre <fichier-document>       le <title> du document
+//   contient <port> <doc> <texte>…  noms (document et fichiers du manifeste sous /_vf/) qui contiennent l'un des textes ; vide si aucun
 //   marque <fichier> <texte>       « oui » si le texte figure dans le fichier, « non » sinon (octets)
 import fs from 'node:fs';
 import crypto from 'node:crypto';
@@ -32,9 +35,24 @@ if (mode === 'csp') {
 } else if (mode === 'jetons') {
   const h = doc(), s = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => m[1]).filter((t) => /VF_COCKPIT_SERVER\s*=/.test(t));
   let o = null; try { o = JSON.parse(/VF_COCKPIT_SERVER=(\{[\s\S]*\});?\s*$/.exec(s[0] || '')?.[1] || ''); } catch { o = null; }
-  console.log(JSON.stringify({ nbScripts: s.length, token: o?.token || '', jetons: o?.jetons || null, premiere: /VF_COCKPIT_SERVER=\{"token":"/.test(s[0] || '') }));
+  const sans = s.reduce((t, x) => t.replace(`<script>${x}</script>`, ''), h), tous = Object.values(o?.jetons || {}).filter(Boolean);
+  console.log(JSON.stringify({ nbScripts: s.length, token: o?.token || '', jetons: o?.jetons || null, premiere: /VF_COCKPIT_SERVER=\{"token":"/.test(s[0] || ''), dehors: tous.filter((t) => sans.includes(t)).length }));
+} else if (mode === 'memes') {
+  const norm = (f) => fs.readFileSync(f, 'utf8').replace(/<title>[^<]*<\/title>/, '').replace(/<script>[^<]*VF_COCKPIT_SERVER[\s\S]*?<\/script>/, '');
+  const [x, ...autres] = [a, b, c, ...process.argv.slice(6)].filter(Boolean).map(norm);
+  console.log(autres.every((t) => crypto.createHash('sha256').update(t).digest('hex') === crypto.createHash('sha256').update(x).digest('hex')) ? 'oui' : 'non');
+} else if (mode === 'titre') {
+  console.log(/<title>([^<]*)<\/title>/.exec(doc())?.[1] ?? '');
 } else if (mode === 'marque') {
   console.log(fs.readFileSync(a).includes(Buffer.from(b)) ? 'oui' : 'non');
+} else if (mode === 'contient') {
+  const cherches = process.argv.slice(5), trouves = [];
+  const get1 = (chemin) => new Promise((ok) => http.get({ host: '127.0.0.1', port: Number(a), path: chemin, headers: { Host: `127.0.0.1:${a}` } }, (r) => { const m = []; r.on('data', (x) => m.push(x)); r.on('end', () => ok(Buffer.concat(m))); }).on('error', () => ok(Buffer.alloc(0))));
+  const d = fs.readFileSync(b);
+  if (cherches.concat(c).some((t) => t && d.includes(Buffer.from(t)))) trouves.push('document');
+  const mm = /<script type="application\/json" id="vf-coquille-manifeste">([\s\S]*?)<\/script>/.exec(d.toString('utf8'));
+  if (mm) for (const f of JSON.parse(mm[1]).fichiers) { const buf = await get1('/_vf/' + f.nom); if ([c, ...cherches].some((t) => t && buf.includes(Buffer.from(t)))) trouves.push(f.nom); }
+  console.log(trouves.join(','));
 } else if (mode === 'assets' || mode === 'inm') {
   const get = (chemin, entetes = {}) => new Promise((ok) => http.get({ host: '127.0.0.1', port: Number(a), path: chemin, headers: { Host: `127.0.0.1:${a}`, ...entetes } }, (r) => { const m = []; r.on('data', (x) => m.push(x)); r.on('end', () => ok({ r, corps: Buffer.concat(m) })); }).on('error', () => ok(null)));
   const sha16 = (buf) => crypto.createHash('sha256').update(buf).digest('hex').slice(0, 16);
