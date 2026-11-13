@@ -24,7 +24,8 @@ await executer(chrome, async (s) => {
   if (['etranger', 'marque', 'div', 'nonfixe'].includes(mode)) {
     o.avant = await bas();
     const [balise, pos] = mode === 'div' ? ['div', 'fixed'] : mode === 'nonfixe' ? ['button', 'absolute'] : ['button', 'fixed'];
-    await s.ev(`(() => { const b = document.createElement('${balise}'); b.id = 'etranger'; b.textContent = 'étranger';${mode === 'marque' ? " b.setAttribute('data-vf-flottant', 'bouton');" : ''}
+    await s.ev(`(() => { const b = document.createElement('${balise}'); b.id = 'etranger'; b.textContent = 'étranger';
+      ${mode === 'marque' ? "b.setAttribute('data-vf-flottant', 'bouton');" : ''}
       b.style.cssText = 'position: ${pos}; left: 16px; bottom: 16px; height: 120px; width: 120px; z-index: 5'; document.body.appendChild(b); window.dispatchEvent(new Event('resize')); })()`);
     await pause(500);
     o.apres = await bas();

@@ -6,6 +6,7 @@
 //   pile-marque    : la même région porte data-vf-flottant="tiroir" : la pile la laisse à son Échap (palette encore ouverte)
 //   reperes        : cartes hors champ, un bouton fixe étranger couvre la fenêtre : les repères restent-ils posés ?
 //   reperes-marque : le même bouton porte data-vf-flottant="bouton" : c'est un obstacle, aucun repère ne trouve de place
+//   reperes-sans   : témoin de méthode, le même geste sans aucun élément posé : les repères restent
 import { executer, pause, stabiliser } from './chrome-session.mjs';
 const [, , chrome, racine, mode] = process.argv;
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!VibeFlow.state && !!VibeFlow.state.layout";
@@ -50,18 +51,20 @@ await executer(chrome, async (s) => {
     await s.ev(`(() => { const b = document.createElement('section'); b.id = 'region-etrangere'; b.setAttribute('role', 'region');
       b.setAttribute('aria-label', 'étranger'); ${marque}
       b.style.cssText = 'position: fixed; left: 400px; bottom: 100px; width: 200px; height: 40px; z-index: 5';
-      const f = document.createElement('button'); f.id = 'region-fils'; f.textContent = 'x'; b.appendChild(f); document.body.appendChild(b); return true; })()`);
+      const f = document.createElement('button'); f.id = 'region-fils'; f.textContent = 'x';
+      b.appendChild(f); document.body.appendChild(b); return true; })()`);
     await pause(400); // la pile observe les enfants de body : elle a statué
     o.pris = JSON.parse(await s.ev(`JSON.stringify((() => { const e = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
       document.getElementById('region-fils').dispatchEvent(e); return e.defaultPrevented; })())`));
     await pause(300); o.palette = JSON.parse(await s.ev(`JSON.stringify(${PALETTE})`));
-  } else if (mode === 'reperes' || mode === 'reperes-marque') {
+  } else if (mode === 'reperes' || mode === 'reperes-marque' || mode === 'reperes-sans') {
     await s.ev('VF_CANEVAS.deplacer({ x: 3000, y: 0 })'); await pause(300);
     const n = () => s.ev("document.querySelectorAll('button.vf-repere').length");
     o.avant = await stabiliser(n, { pas: 150, max: 4000 });
     const marque = mode === 'reperes-marque' ? "b.setAttribute('data-vf-flottant', 'bouton');" : '';
-    await s.ev(POSER('button', 'position: fixed; inset: 0; width: 100vw; height: 100vh; opacity: 0; pointer-events: none; z-index: 5', marque));
-    await s.ev("window.dispatchEvent(new Event('resize')); VF_CANEVAS.deplacer({ x: -20, y: 0 })"); await pause(300);
+    const plein = 'position: fixed; inset: 0; width: 100vw; height: 100vh; opacity: 0; pointer-events: none; z-index: 5';
+    if (mode !== 'reperes-sans') await s.ev(POSER('button', plein, marque));
+    await s.ev("document.body.classList.add('sonde-neutre')"); await pause(300); // 02 réévalue à tout changement de classe du corps
     o.apres = await stabiliser(n, { pas: 150, max: 4000 });
   }
   return o;

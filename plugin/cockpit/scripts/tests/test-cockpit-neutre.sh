@@ -32,19 +32,21 @@ assert_eq "NE0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui ||
 echo "=== NE1 — les lecteurs lisent l'attribut, jamais une forme ==="
 RP="$(mesurer chrome-neutre.mjs pile)"; RPM="$(mesurer chrome-neutre.mjs pile-marque)"
 RR="$(mesurer chrome-neutre.mjs reperes)"; RRM="$(mesurer chrome-neutre.mjs reperes-marque)"
-RT="$(mesurer chrome-neutre.mjs tiroir)"; vf_hyg_stop "$SRV"
-[ -z "${SONDE:-}" ] || { printf '%s\n' "$RP" "$RPM" "$RR" "$RRM" "$RT"; cat "$WORK/mesure.err"; }
+RS="$(mesurer chrome-neutre.mjs reperes-sans)"; RT="$(mesurer chrome-neutre.mjs tiroir)"; vf_hyg_stop "$SRV"
+[ -z "${SONDE:-}" ] || { printf '%s\n' "$RP" "$RPM" "$RR" "$RRM" "$RS" "$RT"; cat "$WORK/mesure.err"; }
 assert_eq "NE1.1 — 00 : Échap tapé dans une région fixe ÉTRANGÈRE sous body ferme la palette (la pile ne la prend pas pour le tiroir du terminal)" \
   "$(E '[j.pris, j.palette]' "$RP")" '[true,false]'
 assert_eq "NE1.2 — 00 (témoin positif) : la même région marquée data-vf-flottant=\"tiroir\" garde son Échap : la palette reste ouverte" \
   "$(E '[j.pris, j.palette]' "$RPM")" '[false,true]'
-assert_eq "NE1.3 — 02 : un bouton fixe étranger couvrant la fenêtre n'est pas un obstacle : les repères restent posés ($(E 'j.avant + " -> " + j.apres' "$RR"))" \
+assert_eq "NE1.3 — 02 : un bouton fixe étranger couvrant la fenêtre n'est pas un obstacle : repères posés ($(E 'j.avant + " -> " + j.apres' "$RR"))" \
   "$(E '[j.avant > 0, j.apres > 0]' "$RR")" '[true,true]'
-assert_eq "NE1.4 — 02 (témoin positif) : le même bouton marqué data-vf-flottant=\"bouton\" est un obstacle : aucun repère n'a de place ($(E 'j.avant + " -> " + j.apres' "$RRM"))" \
+assert_eq "NE1.4 — 02 (témoin positif) : le même bouton marqué data-vf-flottant=\"bouton\" est un obstacle ($(E 'j.avant + " -> " + j.apres' "$RRM"))" \
   "$(E '[j.avant > 0, j.apres]' "$RRM")" '[true,0]'
+assert_eq "NE1.5 — 02 (témoin de méthode) : sans élément posé, le même geste laisse les repères ($(E 'j.avant + " -> " + j.apres' "$RS"))" \
+  "$(E '[j.avant > 0, j.apres > 0]' "$RS")" '[true,true]'
 
 echo "=== NE2 — le tiroir Git se rejoue à l'arrivée d'un élément flottant ==="
-assert_eq "NE2.1 — tiroir Git ouvert, PUIS un bouton fixe en bas à gauche : aucun chevauchement sans redimensionnement ; témoin : le redimensionnement n'en lève aucun" \
+assert_eq "NE2.1 — tiroir Git ouvert, PUIS un bouton fixe en bas à gauche : aucun chevauchement sans redimensionnement (témoin : aucun avec)" \
   "$(E '[j.apres, j.temoin]' "$RT")" '[false,false]'
 
 echo "=== Mutants (copie du module dans \$WORK) ==="
@@ -52,18 +54,19 @@ SEL_PILE="document.querySelector('[data-vf-flottant=\"tiroir\"]')"
 FORME_PILE="[...document.body.children].find((e) => e.matches('section[role=\"region\"]') && getComputedStyle(e).position === 'fixed')"
 mutant M-FORME-PILE 00-vf-surcouches.js "$SEL_PILE" "$FORME_PILE" chrome-neutre.mjs pile ""
 echo "     trace M-FORME-PILE — sonde NE1.1 [prise, palette] : attendu [true,false], obtenu $(E '[j.pris, j.palette]' "$RM")"
-assert_eq "M-FORME-PILE — le mutant (lecture revenue à la forme) rougit NE1.1 : la région étrangère reprend l'Échap de la palette (témoin : palette ouverte)" \
+assert_eq "M-FORME-PILE — le mutant (lecture revenue à la forme) rougit NE1.1 : la région étrangère reprend l'Échap (témoin : palette ouverte)" \
   "$(E '[typeof j.pris, j.pris, j.palette]' "$RM")" '["boolean",false,true]'
 SEL_REP="[...document.querySelectorAll('[data-vf-flottant]')]"
-FORME_REP="[...document.body.children].filter((e) => e.matches('button, div[role=\"status\"], section[role=\"region\"]') && getComputedStyle(e).position === 'fixed')"
+FORME_REP="[...document.body.children].filter((e) => e.matches('button, div[role=\"status\"], section[role=\"region\"]')"
+FORME_REP="$FORME_REP && getComputedStyle(e).position === 'fixed')"
 mutant M-FORME-REPERES 02-vf-reperes.js "$SEL_REP" "$FORME_REP" chrome-neutre.mjs reperes ""
 echo "     trace M-FORME-REPERES — sonde NE1.3 [avant, après] : attendu repères posés des deux côtés, obtenu $(E 'j.avant + " -> " + j.apres' "$RM")"
-assert_eq "M-FORME-REPERES — le mutant (lecture revenue à la forme) rougit NE1.3 : le bouton étranger fait disparaître les repères (témoin : ils existaient avant)" \
+assert_eq "M-FORME-REPERES — le mutant (lecture revenue à la forme) rougit NE1.3 : le bouton étranger efface les repères (témoin : ils existaient)" \
   "$(E '[j.avant > 0, j.apres]' "$RM")" '[true,0]'
 OBS_ANCIEN="{ childList: true, attributes: true, attributeFilter: ['class', 'style'] }"
 mutant M-EVITER-REJEU 77-vf-git-tiroir.js "$OBS_ANCIEN" "{ attributes: true, attributeFilter: ['class', 'style'] }" chrome-neutre.mjs tiroir ""
 echo "     trace M-EVITER-REJEU — sonde NE2.1 [chevauche, témoin] : attendu [false,false], obtenu $(E '[j.apres, j.temoin]' "$RM")"
-assert_eq "M-EVITER-REJEU — le mutant (rejeu d'eviter retiré à l'arrivée d'un enfant de body) rougit NE2.1 : la pastille chevauche le tiroir ouvert avant elle (témoin : le redimensionnement la dégage)" \
+assert_eq "M-EVITER-REJEU — le mutant (rejeu d'eviter retiré à l'arrivée d'un enfant de body) rougit NE2.1 : chevauchement (témoin : redimensionnement)" \
   "$(E '[typeof j.apres, j.apres, j.temoin]' "$RM")" '["boolean",true,false]'
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
