@@ -28,6 +28,7 @@ AJOUT assets/ui/70-vf-live.js
 AJOUT assets/ui/71-vf-equipe-rendu.js
 AJOUT assets/ui/72-vf-equipe.js
 AJOUT assets/ui/73-vf-tiroir-travail.js
+AJOUT assets/ui/74-vf-synthese-calcul.js
 AJOUT assets/ui/75-vf-modele.js
 AJOUT assets/ui/76-vf-git-entete.js
 AJOUT assets/ui/77-vf-git-poignee.js
