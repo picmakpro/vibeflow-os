@@ -23,6 +23,12 @@
       "etatsVerrous": ["lue", "absente", "erreur"],
       "interdits": ["doing", "mandat", "messages", "outils", "fil"]
     },
+    "vibeflow/cockpit-state@1": {
+      "description": "GET /api/vf/state (79-12, C2) : l'enveloppe de l'état du cockpit. `signal` est le `signal` de vibeflow/cockpit-signal@1, de forme inchangée, nul seulement avant la première collecte (collecte.etat vaut alors en-cours). `collecte` : liste blanche de cinq champs ; les diagnostics du direct restent sur /api/vf/etat.",
+      "requis": { "schema": "string", "at": "string", "seq": "number", "collecte": "object", "signal": "any" },
+      "collecte": { "requis": ["etat", "derniereA", "dureeMs", "mode", "clients"], "optionnels": [], "etats": ["ok", "en-cours", "partielle", "indisponible"], "modes": ["watch", "poll", "absent"] },
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"]
+    },
     "vibeflow/cockpit-who@2": {
       "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "fenetre": "number", "busy": "boolean", "workers": "array", "sources": "object" },
       "optionnels": ["sortisSilence"],

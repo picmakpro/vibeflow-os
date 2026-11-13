@@ -9,7 +9,7 @@ export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 unset GIT_DIR GIT_WORK_TREE GIT_INDEX_FILE GIT_COMMON_DIR GIT_OBJECT_DIRECTORY GIT_NAMESPACE GIT_CEILING_DIRECTORIES
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 TESTS="$SCRIPTS/tests"
-WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
 export HOME="$WORK/home"
 trap 'vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
@@ -103,7 +103,7 @@ import fs from 'node:fs';
 const { collectSignal } = await import('file://$SCRIPTS/vf-cockpit-signal.mjs');
 const loc = collectSignal('$LAB', { scriptsDir: '$FAUX' }); fs.writeFileSync('$WORK/signal-local.json', JSON.stringify(loc));
 " 2>/dev/null
-VOL='["at","ageS","dureeS","lastAt","progressAgeS","fetchAgeS"]'
+VOL='["at","ageS","dureeS","lastAt","progressAgeS","fetchAgeS","sansSession"]' # sansSession : verdict tiré de l'équipe, que la collecte locale (sans équipe injectée) ne porte pas
 SANS='const v='"$VOL"';const f=(o)=>Array.isArray(o)?o.map(f):o&&typeof o==="object"?Object.fromEntries(Object.entries(o).filter(([k])=>!v.includes(k)&&k!=="equipe").sort(([a],[b])=>a<b?-1:1).map(([k,x])=>[k,f(x)])):o;'
 EGAL="$(node -e "const fs=require('fs');$SANS const a=JSON.parse(fs.readFileSync('$WORK/signal-servi.json','utf8')),b=JSON.parse(fs.readFileSync('$WORK/signal-local.json','utf8'));console.log(JSON.stringify(f(a))===JSON.stringify(f(b)))" 2>/dev/null)"
 IDS="$(node -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync('$WORK/signal-servi.json','utf8')),b=JSON.parse(fs.readFileSync('$WORK/signal-local.json','utf8'));const i=(x)=>((x.equipe||{}).workers||[]).map((w)=>w.id).sort().join(',');console.log(i(a)===i(b))" 2>/dev/null)"
