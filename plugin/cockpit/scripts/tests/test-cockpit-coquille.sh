@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test-cockpit-coquille.sh — la coquille statique du cockpit (79-16, SOCL-20 ; C5, A1 à A3, A30, A37, A40, A41, A48, A51, A53, A55).
 #   K0 témoins · K1 document aux quatre adresses · K2 fichiers de /_vf/ (table fermée, ETag, 304, lien) · K3 CSP · K4 E9 (fichier planté) · K5 service retiré
-#   K6 module servi = module lancé · A37 gardes de chemin · C1 à C8 navigateur (onglet rendu, adresses, chargerOnglet, surOnglet, persistants, classe, terminal, échec)
+#   K6 module servi = module lancé · A37 gardes de chemin · C1 à C9 navigateur (onglet rendu, adresses, chargerOnglet, surOnglet, persistants, classe, terminal, échec de lecture, échec de démarrage)
 #   P aide de mutation de page · M-* mutants (copies du module par cockpit_module_muter, jamais le module du dépôt)
 # Lab neutre dans mktemp, HOME jetable, isolation git. Le code testé est celui du dossier de cette suite. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
@@ -542,6 +542,72 @@ if [ -n "$CHROME" ]; then
   done
 fi
 fi
+
+echo "=== C9 — un démarrage d'onglet en échec laisse la coquille pilotable : l'écouteur du routeur est reposé, un clic ne recharge pas le document ==="
+# défaut de 79-16, relevé par la revue de la Phase 80 : le démarrage en échec défaisait les rappels de surOnglet (nettoyage avant le démontage) sans jamais les rappeler
+cat > "$AUX/c9-routeur.js" <<'JS'
+// vf-coquille: persistant
+(() => {
+  window.__fixR = { poses: 0, clics: 0, actifs: 0, doc: Math.random() }; // doc : identité du document (une portée défait les propriétés de window posées après l'élection, pas celles d'un persistant)
+  VF_COQUILLE.surOnglet(() => {
+    const clic = (ev) => { const a = ev.target && ev.target.closest ? ev.target.closest('a[data-fixr]') : null; if (!a) return; ev.preventDefault(); window.__fixR.clics += 1; VF_COQUILLE.chargerOnglet(a.dataset.fixr).catch(() => {}); };
+    document.addEventListener('click', clic, true); window.__fixR.poses += 1; window.__fixR.actifs += 1;
+    return () => { document.removeEventListener('click', clic, true); window.__fixR.actifs -= 1; };
+  }, { cle: '00-vf-zz-fixture-routeur.js' });
+})();
+JS
+cat > "$AUX/c9mesure.js" <<'JS'
+const CLIC = (nom) => `(() => { const a = document.createElement('a'); a.href = '/${nom}.html'; a.dataset.fixr = '${nom}'; a.textContent = 'x'; document.body.appendChild(a); a.click(); return 1; })()`;
+const LIRE = `({ doc: window.__fixR ? window.__fixR.doc : null, ...(window.__fixR || {}), etat: window.VF_COQUILLE ? VF_COQUILLE.etat() : null })`;
+const ECHEC = "!window.__fixR || window.__fixR.doc !== DOC || VF_COQUILLE.etat().phase === 'echec'", PRET = "!!window.VF_COQUILLE && VF_COQUILLE.etat().phase === 'pret'";
+// attente bornée (10 s) qui ne lève jamais : un clic qui recharge le document perd la marque de window, la mesure le dit au lieu d'attendre l'échéance globale
+const attends = async (expr) => { for (let i = 0; i < 40; i++) { let v = false; try { v = await s.ev(expr); } catch {} if (v) return true; await pause(250); } return false; };
+let DOC = null; // identité du document d'origine, lue par chaque scénario avant son premier clic
+const apresClic = async (nom, attendu) => { await s.ev(CLIC(nom)); await pause(500); const m = await s.ev(LIRE); await attends(attendu); return { meme: m.doc === DOC, clics: m.clics, apres: await s.ev(LIRE) }; };
+JS
+cat > "$AUX/c9a.js" <<'JS'
+// echec: true
+// amorce: sessionStorage.setItem('fixPasReady', '1'); window.VF_COQUILLE_REGLAGES = { delaiMs: 2000 };
+const e0 = await s.ev(LIRE); DOC = e0.doc;
+const c1 = await apresClic('equipe', ECHEC);
+const c2 = await apresClic('projet', ECHEC);
+await s.ev(`sessionStorage.removeItem('fixPasReady')`);
+const c3 = await apresClic('code', PRET);
+return { e0, c1, c2, c3 };
+JS
+cat > "$AUX/c9b.js" <<'JS'
+// amorce: sessionStorage.removeItem('fixPasReady'); window.VF_COQUILLE_REGLAGES = { delaiMs: 2000 };
+await s.attendre(PRET, 'premier onglet prêt');
+DOC = (await s.ev(LIRE)).doc; await s.ev(`sessionStorage.setItem('fixPasReady', '1')`);
+const rej = await s.ev(`VF_COQUILLE.chargerOnglet('equipe').then(() => 'resolu', () => 'rejete')`); const e0 = await s.ev(LIRE);
+const c1 = await apresClic('projet', ECHEC);
+const c2 = await apresClic('equipe', ECHEC);
+await s.ev(`sessionStorage.removeItem('fixPasReady')`);
+const c3 = await apresClic('projet', PRET);
+return { rej, e0, c1, c2, c3 };
+JS
+c9_jouer() { # <module> <dossier de sortie> : joue a (2 lignes d'en-tête) et b (1) sur un serveur lancé sur ce module
+  mkdir -p "$2"; COCKPIT_MODULE="$1" demarrer "$LAB"
+  local x n; for x in a b; do n=1; [ "$x" = a ] && n=2
+    { head -n "$n" "$AUX/c9$x.js"; cat "$AUX/c9mesure.js"; tail -n +"$((n+1))" "$AUX/c9$x.js"; } > "$2/c9$x.js"; chrome avec "http://127.0.0.1:$PORT/project.html" "$2/c9$x.js" > "$2/c9$x.json"; done
+  cockpit_arreter; unset COCKPIT_MODULE
+}
+c9_verdict() { # <dossier> : « a b », chacun = [écouteur posé après l'échec, clic 1 sans rechargement, clic 2 sans rechargement, écouteur reposé après le second échec, retour à pret sans rechargement]
+  local x r=""; for x in a b; do r="$r$(oj "[j.e0?.actifs===1, j.c1?.meme===true&&j.c1?.clics===1, j.c2?.meme===true&&j.c2?.clics===2, j.c2?.apres?.actifs===1, j.c3?.meme===true&&j.c3?.apres?.etat?.phase==='pret']" < "$1/c9$x.json") "; done; printf '%s' "$r"
+}
+cockpit_arreter
+if cockpit_module_muter pret9 viewer.html "s|emit('ready', {});|if (!sessionStorage.getItem('fixPasReady')) emit('ready', {});|" && [ -n "$CHROME" ]; then
+  CP9="$COCKPIT_MODULE"; unset COCKPIT_MODULE; cp "$AUX/c9-routeur.js" "$CP9/skills/cockpit-moteur/assets/ui/00-vf-zz-fixture-routeur.js"
+  c9_jouer "$CP9" "$WORK/c9base"
+  assert_eq "C9.1 / C9.2 — après un démarrage en échec (premier chargement, puis changement d'onglet), l'écouteur du routeur est posé : chaque clic passe par chargerOnglet (compteur de la fixture) sans recharger le document (identité du document posée par un persistant), et un clic vers un onglet sain rend l'état pret" "$(c9_verdict "$WORK/c9base")" "[true,true,true,true,true] [true,true,true,true,true] "
+  cp "$CP9/skills/cockpit-moteur/assets/vf-coquille.js" "$WORK/vf-coquille-c9.avant"
+  sed -i.bak "s|lot(\[...inscriptions\]); // garde:coquille-relance|;|" "$CP9/skills/cockpit-moteur/assets/vf-coquille.js"
+  if ! cmp -s "$WORK/vf-coquille-c9.avant" "$CP9/skills/cockpit-moteur/assets/vf-coquille.js"; then
+    c9_jouer "$CP9" "$WORK/c9mut"
+    assert_eq "M-RELANCE — la relance retirée : C9.1 et C9.2 rougissent (le clic recharge le document, l'écouteur n'est pas reposé), le retour à pret ne vient plus de la coquille (aucune marque)" "$(c9_verdict "$WORK/c9mut")" "[false,false,false,false,false] [false,false,false,false,false] "
+  else assert_eq "M-RELANCE — mutant sans effet (ancre garde:coquille-relance absente)" "sans effet" "effet"; fi
+else assert_eq "C9 — mutant du moteur sans effet ou Chrome absent" "sans effet" "effet"; fi
+unset COCKPIT_MODULE
 
 echo "=== A37 — les gardes de chemin jugent la résolution physique, jamais la forme écrite ==="
 node "$TESTS/coquille-propriete.mjs" gardes "$SCRIPTS" "$WORK/a37" > "$WORK/a37.json" 2>"$WORK/a37.err"
