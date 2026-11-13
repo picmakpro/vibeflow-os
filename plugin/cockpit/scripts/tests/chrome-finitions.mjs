@@ -44,8 +44,13 @@ const AIDES = `window.__j = (() => {
 const BOUTONS = "JSON.stringify([...document.querySelectorAll('header .hr .btn, header #hdr-ext > button')]"
   + ".filter((e) => e.id !== 'vf-git-ouvreur' && e.getBoundingClientRect().height > 0)"
   + ".map((e) => [e.id, Math.round(e.getBoundingClientRect().height), Math.round(e.getBoundingClientRect().width)]))";
+// [largeur, hauteur de la boîte dessinée, zone d'appui de 44 × 44 au moins] : l'appui = les quatre points à 1 px à l'intérieur
+// d'un carré de 44 centré tombent sur lui
 const OUVREUR = "JSON.stringify((() => { const e = document.getElementById('vf-git-ouvreur'); if (!e) return null;"
-  + " const r = e.getBoundingClientRect(); return [Math.round(r.width), Math.round(r.height)]; })())";
+  + " const r = e.getBoundingClientRect(), cx = r.left + r.width / 2, cy = r.top + r.height / 2;"
+  + " const sur = (a, b) => { const x = document.elementFromPoint(cx + a, cy + b); return !!x && (x === e || e.contains(x)); };"
+  + " const appui = [[-21, 0], [21, 0], [0, -21], [0, 21]].every(([a, b]) => sur(a, b));"
+  + " return [Math.round(r.width), Math.round(r.height), appui]; })())";
 // la feuille de l'Équipe n'est posée par 70-vf-live.js qu'au premier dessin du tiroir « Au travail » : la sonde la pose comme lui (poserCss)
 const EQUIPE = `JSON.stringify((() => { const b = getComputedStyle(document.body), box = document.createElement('div'); box.id = 'sonde-equipe';
   const st = document.createElement('style'); st.textContent = window.__vfEquipeRendu.css; document.head.appendChild(st);

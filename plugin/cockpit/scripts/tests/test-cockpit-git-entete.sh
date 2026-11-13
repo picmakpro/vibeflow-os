@@ -238,7 +238,7 @@ for (const w of [375, 700, 768, 999, 1000, 1100, 1279, 1280, 1440]) {
   res[w] = await s.stable(`(() => { const l = document.querySelector('.vf-git-ligne'), o = document.querySelector('#vf-git-ouvreur'), h = document.querySelector('header');
     const r = o ? o.getBoundingClientRect() : { width: 0, height: 0 };
     return { ligneVisible: getComputedStyle(l).display !== 'none' && l.getBoundingClientRect().width > 0, ouvreurVisible: !!o && getComputedStyle(o).display !== 'none' && r.width > 0,
-      w: Math.round(r.width), h: Math.round(r.height), debord: h.scrollWidth > h.clientWidth + 1, premier: o ? o.parentElement.firstElementChild === o && o.parentElement.classList.contains('hr') : false,
+      w: Math.round(r.width), h: Math.round(r.height), appui: !!o && [[-21, 0], [21, 0], [0, -21], [0, 21]].every(([a, b]) => { const x = document.elementFromPoint(r.left + r.width / 2 + a, r.top + r.height / 2 + b); return !!x && (x === o || o.contains(x)); }), debord: h.scrollWidth > h.clientWidth + 1, premier: o ? o.parentElement.firstElementChild === o && o.parentElement.classList.contains('hr') : false,
       rangees: h.getBoundingClientRect().height > 80 ? 2 : 1,
       hors: [...document.querySelectorAll('header .hr > *')].filter((e) => e.getClientRects().length).filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).length,
       chevauche: (() => { const k = [...document.querySelectorAll('header .hr > *')].filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect()); let n = 0;
@@ -255,7 +255,8 @@ return res;
 JS
   R="$(cdp "$AUX/h4.js" "$BASE" 2>&1 | tail -1)"
   for w in 768 999 1000 1100 1279; do
-    assert_eq "H4.1 — ${w} px : ligne masquée, ouvreur 44 × 44 en tête de .hr (P78-D-34, icône de 701 à 1279 px)" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible, j['$w'].w, j['$w'].h, j['$w'].premier].join('|')" 2>/dev/null)" "false|true|44|44|true"
+    T=36; [ "$w" -lt 1000 ] && T=44
+    assert_eq "H4.1 — ${w} px : ligne masquée, ouvreur dessiné à ${T} × ${T} (--hdr-btn, comme ses voisins), zone d'appui de 44 × 44 au moins, en tête de .hr (P78-D-34, icône de 701 à 1279 px ; P80-D-56)" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible, j['$w'].w, j['$w'].h, j['$w'].premier, j['$w'].appui].join('|')" 2>/dev/null)" "false|true|${T}|${T}|true|true"
   done
   for w in 375 700; do
     assert_eq "H4.1 — ${w} px (téléphone) : ligne masquée, ouvreur absent de la rangée" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible].join('|')" 2>/dev/null)" "false|false"

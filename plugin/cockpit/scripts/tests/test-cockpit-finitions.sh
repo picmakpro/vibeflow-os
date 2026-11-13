@@ -2,7 +2,7 @@
 # test-cockpit-finitions.sh — finitions de la charte (80-17, FORM-14, P80-D-20 : AUDC-F1, F3, F4, F5), un vrai Chrome, sans réseau.
 #   FI1 disclosures et sélecteurs à la charte : summary sans marqueur natif, chevron de 16 px tourné de 90° ouvert, zone ≥ 32 px (44 au toucher) ;
 #       #vf-modele et #proposition-mode (page de Q) aux mêmes valeurs ; mouvement réduit ; 03-vf-charte.js servi, chargé, sans doublon
-#   FI2 une taille de bouton d'en-tête (36 en panneau latéral, 44 en feuille de détail ou au toucher), l'ouvreur Git laissé à 44 × 44
+#   FI2 une taille de bouton d'en-tête (36 en panneau latéral, 44 en feuille de détail ou au toucher), l'ouvreur Git dessiné comme eux, appui de 44 × 44 (80-20)
 #   FI3 chiffres tabulaires en police de texte, pastilles du menu « ⋯ » aux teintes du bureau, zone basse (non-régression)
 #   FI4 plafonds de lignes et de colonnes, grille des jetons, inventaire
 #   Régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale) : pas de mutant.
@@ -59,7 +59,7 @@ assert_eq "FI1.5 — 03-vf-charte.js servi sous /_vf/ui/ (200), chargé par la p
   "$CODE15|$(E '[j.charge[0] >= 1, j.charge[1], j.apres1[1], j.apres2[1], j.apres1[2] === j.apres2[2], j.chevron.length > 0 && j.chevron.every((c) => c === "\"\"")]' "$R15")" \
   '200|[true,1,1,1,true,true]'
 
-echo "=== FI2 — une taille de bouton d'en-tête, l'ouvreur Git laissé à 44 px ==="
+echo "=== FI2 — une taille de bouton d'en-tête, l'ouvreur Git dessiné comme eux, appui de 44 px ==="
 R2="$(mesurer fi2)"; sonde "$R2"; R2T="$(mesurer fi2t)"; sonde "$R2T"
 for w in 1440 1100; do
   assert_eq "FI2.1 — à $w px au pointeur fin : tous les boutons d'en-tête (hors ouvreur Git) ont 36 px de haut, le bouton de thème compris" \
@@ -68,8 +68,8 @@ done
 assert_eq "FI2.2 — à 900 px (souris) puis à 1100 px au toucher : les boutons d'en-tête ont 44 px d'appui" \
   "$(E "(() => { const b = j.b900.boutons; return [b.length >= 2, b.every((e) => e[1] >= 44)]; })()" "$R2")|$(E "(() => { const b = j.b1100.boutons;
     return [b.length >= 5, b.every((e) => e[1] === 44)]; })()" "$R2T")" '[true,true]|[true,true]'
-assert_eq "FI2.3 — de 701 à 1279 px, l'ouvreur Git reste à 44 × 44 (P78-D-34 ; P80-D-56 est porté par 80-20)" \
-  "$(E '[j.b800.ouvreur, j.b1100.ouvreur]' "$R2")" '[[44,44],[44,44]]'
+assert_eq "FI2.3 — de 701 à 1279 px, l'ouvreur Git est dessiné à --hdr-btn (36 px au pointeur fin dès 1 000 px, 44 en dessous et au toucher) et sa zone d'appui mesure 44 × 44 au moins (P80-D-56, 80-20)" \
+  "$(E '[j.b800.ouvreur, j.b1100.ouvreur]' "$R2")|$(E 'j.b1100.ouvreur' "$R2T")" '[[44,44,true],[36,36,true]]|[44,44,true]'
 
 echo "=== FI3 — chiffres tabulaires, pastilles du menu « ⋯ », zone basse ==="
 R3="$(mesurer fi3)"; sonde "$R3"
