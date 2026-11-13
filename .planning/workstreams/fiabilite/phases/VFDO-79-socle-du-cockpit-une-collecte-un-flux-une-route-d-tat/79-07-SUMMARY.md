@@ -69,3 +69,7 @@ Régression de la tâche 5 : git introuvable rendait un délai au lieu d'une abs
 ## Correction ciblée n°3 (2026-11-12)
 
 D10.4 à D10.6 (faux git à code 128, à délai dépassé, échéance passée : jamais « absent »), M-ABSENT-LARGE (le mutant de l'audit rougit D10.4 et D10.6), D10.7 et M-BINAIRE (aucun appelant de production ne passe `binaire` : limite lecture/lancement gardée), dossier de travail de la suite sous TMPDIR. Aucun code produit touché. test-cockpit-git-config-depot.sh 138/0.
+
+## Correction ciblée n°4 (2026-11-13)
+
+Rouge de CI Linux (git 2.56) sur M-VIDE-ECARTE : son 6e jeton dépend de la version de git (un filtre process en échec fait sortir la lecture en 128 sous git 2.50 ; sous 2.56, hypothèse non vérifiée, elle aboutit). Le mutant est tué par les jetons stables, le 6e est masqué et sa raison écrite dans la suite ; D8.1 inchangé. Accents graves du libellé de D6.1 remplacés. test-cockpit-git-config-depot.sh 138/0 sur le poste. Aucun code produit touché.
