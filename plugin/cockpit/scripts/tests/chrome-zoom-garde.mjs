@@ -74,7 +74,8 @@ await executer(chrome, async (s) => {
           await s.attendre(`document.body.classList.contains('no-panel') === ${!ouverte}`, 'feuille'); await pause(600);
           await s.ev('VibeFlow.select(__zg.premiere())'); await s.ev('VF_CANEVAS.amenerDansLeChamp(VibeFlow.state.selected)'); await posee();
           const id = await s.ev('VibeFlow.state.selected'), q = (x) => lire(`JSON.stringify(${x})`);
-          const L = ['#ask', '#zoom', '.vf-term-pastille', ouverte ? '#panel' : null].filter(Boolean);
+          // au téléphone #zoom est une colonne à gauche DANS la zone libre (freeArea ne la déduit pas) : hors du contrat de ce plan
+          const L = ['#ask', doigt ? null : '#zoom', '.vf-term-pastille', ouverte ? '#panel' : null].filter(Boolean);
           const dis = () => q(`(() => { const L = ${JSON.stringify(L)};
             const c = __zg.rect(VibeFlow.state.chipEls.get(${JSON.stringify(id)}).querySelector('.card'));
             return L.map((x) => [x, __zg.rect(x)]).filter((p) => p[1] && __zg.coupe(c, p[1])).map((p) => p[0]); })()`);
@@ -85,7 +86,7 @@ await executer(chrome, async (s) => {
           await s.ev('VibeFlow.select(null)'); const ch = await q('__zg.champ()'), m0 = await q(`__zg.monde(${ch.x + ch.w / 2}, ${ch.y + ch.h / 2})`);
           await touche('+'); const m1 = await q(`__zg.monde(${ch.x + ch.w / 2}, ${ch.y + ch.h / 2})`); await touche('-');
           r[ouverte ? 'ouverte' : 'fermee'] = { pastille: !!(await q("__zg.rect('.vf-term-pastille')")), fixe: proche(c0, c1, 0.5) && proche(c2, c0, 0.5),
-            libre: d0.length === 0 && d2.length === 0, touche: [d0, d2], centre: proche(m0, m1, 0.5), retour: (await T()).k === t0.k };
+            libre: d0.length === 0 && d2.length === 0, touche: [d0, d2], centre: proche(m0, m1, 0.5), retour: Math.abs((await T()).k - t0.k) <= 1e-6 };
         }
       });
     }
@@ -98,8 +99,11 @@ await executer(chrome, async (s) => {
       c: typeof VibeFlow.cadrage === 'function' ? VibeFlow.cadrage() : null })`);
     o.zg1.a = { fn: c.fn, egal: !!c.c && proche([c.t.k, c.t.x, c.t.y], [c.c.k, c.c.x, c.c.y], 1e-6), plancher: c.t.k >= 11 / 13 - 1e-9 };
     o.zg1.coin = await lire(`JSON.stringify((() => { const k = __zg.rect('#vf-coin'); if (!k) return { coin: false };
-      const W = innerWidth, H = innerHeight, v = [...document.querySelectorAll('#viewport g.node .card')].map(__zg.rect)
-        .filter((r) => r && r.l >= 0 && r.t >= 0 && r.r <= W && r.b <= H);
+      const o = document.getElementById('svg').getBoundingClientRect(); // une carte ENTIÈRE dans le champ de lecture (un candidat) ne passe jamais sous le coin
+      const champs = (window.VF_CANEVAS && VF_CANEVAS.champsDeCadrage ? [].concat(VF_CANEVAS.champsDeCadrage()) : [VibeFlow.freeArea()])
+        .map((a) => ({ l: o.left + a.x, t: o.top + a.y, r: o.left + a.x + a.w, b: o.top + a.y + a.h }));
+      const v = [...document.querySelectorAll('#viewport g.node .card')].map(__zg.rect)
+        .filter((r) => r && champs.some((a) => r.l >= a.l && r.t >= a.t && r.r <= a.r && r.b <= a.b));
       return { coin: true, entieres: v.length, touchent: v.filter((r) => __zg.coupe(r, k)).length }; })())`);
     const av = await lire('JSON.stringify({ t: VibeFlow.state.t, w: VibeFlow.freeArea().w })');
     await s.ev('VFGitTiroir.ouvrir()'); await s.attendre('VFGitTiroir.ouvert()', 'tiroir Git'); await pause(500);

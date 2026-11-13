@@ -86,6 +86,7 @@
   --recent-text: #007f3d;
   --on: #161616; --on-hover: #000; --on-text: #fff; --on-sev-text: #161616;
   --ok: var(--recent); --sev-high: #f2384a; --sev-medium: #b88100; --sev-low: #666666;
+  --st-active: #a37100; /* 80-16 (P80-D-31, AUDC-X5 a) : glyphe « En cours » clair, 3,84:1 sur --bg et 4,27:1 sur --surface (--sev-medium en donnait 3,06 et 3,40) ; --st-recette le suit */
   --warn-bg: rgba(var(--ink), .05); --warn-text: #986300; --warn-sheet: var(--menu-solid);
   --ok-bg: var(--note-bg); --ok-text: var(--recent-text); --err-text: #da1637;
   --dir-bg: rgba(255, 255, 255, .7); --menu-solid: rgba(255, 255, 255, .96); --well: rgba(0, 0, 0, .06);
@@ -240,7 +241,9 @@ svg.lod-low .meta, svg.lod-low .anote { visibility: hidden; }
 svg.lod-low .desc { display: none; }
 svg.lod-low .title { font-size: 22px; white-space: normal; }
 svg.dim .node:not(.hl) .card { box-shadow: none; }
-svg.dim .node:not(.hl) .card > * { opacity: .55; transition: opacity .3s var(--ease); }
+/* 80-16 (AUDC-X5 c) : texte estompé à .72 avec --text-3 et --text-4 ramenés à --text-2 (≥ 4,5:1 composé) ; la pastille d'état (.vst, .rw) reste pleine */
+svg.dim .node:not(.hl) .card { --text-3: var(--text-2); --text-4: var(--text-2); }
+svg.dim .node:not(.hl) .card > :not(.foot), svg.dim .node:not(.hl) .card .foot > :not(.vst):not(.rw) { opacity: .72; transition: opacity .3s var(--ease); }
 
 /* ---------- edges ---------- */
 .edges { animation: fadeIn .7s var(--ease) .12s both; }
@@ -522,8 +525,8 @@ header .btn:focus-visible, #zoom button:focus-visible { outline: 2px solid var(-
 html.wk .node foreignObject { overflow: hidden; }
 html.wk .card, html.wk .card * { position: static !important; transform: none !important; animation: none !important; transition: none !important; will-change: auto !important; }
 html.wk .card { overflow: visible; }
-html.wk svg.dim .node:not(.hl) .card > * { opacity: 1; }
-html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+html.wk svg.dim .node:not(.hl) .card > *, html.wk svg.dim .node:not(.hl) .card .foot > * { opacity: 1; }
+html.wk svg.dim .node:not(.hl) foreignObject { opacity: .72; }
 /* ---------- phones and tablets: windows under 1000 px and touch screens under 1280 px (a mouse at 1000 px and wider is untouched) ---------- */
 @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) {
   #btn-up, .brand { flex: none; }
@@ -1377,22 +1380,73 @@ function freeArea() {
   const bottom = open && sheet ? $('#panel').offsetHeight + 24 : $('#ask').offsetHeight + 36;
   return { x: 16, y: top, w: Math.max(200, r.width - panelW - 32), h: Math.max(140, r.height - top - bottom) };
 }
-function fit(animate) {
-  const b = state.bounds; if (!b) return;
-  const a = freeArea();
-  // floor, Code tab only: card names stay at 11 px or more (13 px connector labels are the smallest names), even if that means not showing everything.
-  // The Project tab keeps its own zoom steps (ui/00-vibeflow.js) and the responsive suite wants its cards inside the free area.
-  const kFit = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1), k = /\/(index\.html)?$/.test(location.pathname) ? Math.max(kFit, 11 / 13) : kFit;
-  // what does not fit is cropped on the right and at the bottom: the top-left corner (where a view starts) stays in sight
-  const x = b.w * k + 40 * k > a.w ? a.x - (b.x - 20) * k : a.x + (a.w - b.w * k) / 2 - b.x * k;
-  const y = b.h * k + 20 * k > a.h ? a.y - (b.y - 10) * k : a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k;
-  setT({ k, x, y }, animate);
+// The tab whose graph is loaded, never read from the address (the shell serves the three tabs under any of them, 80-09): the shell's own answer
+// while it loads, then `onglet()`, else the graph's `meta.vfTab` (project | equipe; absent or any other value = code). Returns code | projet | equipe.
+function loadedTab() {
+  const C = window.VF_COQUILLE;
+  if (C && typeof C.onglet === 'function') {
+    const e = typeof C.etat === 'function' ? C.etat() : null, o = e && e.phase === 'chargement' && e.onglet ? e.onglet : C.onglet();
+    if (o) return o;
+  }
+  const v = G.meta && G.meta.vfTab;
+  return v === 'project' ? 'projet' : v === 'equipe' ? 'equipe' : 'code';
+}
+let readingProvider = null; // the VF layer's reading field: () => one rectangle or an array of candidate rectangles (NAVIGATION 4.6)
+/** The reading field's candidates {x, y, w, h}: the provider's (bounded like freeArea, a throwing provider is ignored), else the free area. */
+function readingAreas() {
+  if (readingProvider) {
+    try {
+      const r = [].concat(readingProvider()).filter((c) => c && [c.x, c.y, c.w, c.h].every(Number.isFinite) && c.w >= 200 && c.h >= 140);
+      if (r.length) return r;
+    } catch (e) { console.error('floorplan reading area', e); }
+  }
+  return [freeArea()];
+}
+/** The one framing formula (80-09). Pure: { k, x, y } that shows the cards `ids` of the level (else all of it) in the best reading-field candidate.
+ *  `plancher` (default: only on the Code tab) keeps card names at 11 px or more, even if that means not showing everything. */
+function cadrage({ plancher, zone, ids } = {}) {
+  const list = ids && ids.length && state.layout ? state.layout.children.filter((c) => ids.includes(c.id)) : [];
+  const b = list.length
+    ? { x: Math.min(...list.map((c) => c.x)), y: Math.min(...list.map((c) => c.y)), w: 0, h: 0 }
+    : state.bounds;
+  if (!b) return null;
+  if (list.length) { b.w = Math.max(...list.map((c) => c.x + c.width)) - b.x; b.h = Math.max(...list.map((c) => c.y + c.height)) - b.y; }
+  const floor = plancher === undefined ? loadedTab() === 'code' : plancher;
+  const put = (a) => {
+    const kFit = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1), k = floor ? Math.max(kFit, 11 / 13) : kFit;
+    // what does not fit is cropped on the right and at the bottom: the top-left corner (where a view starts) stays in sight
+    return { kFit, k, x: b.w * k + 40 * k > a.w ? a.x - (b.x - 20) * k : a.x + (a.w - b.w * k) / 2 - b.x * k,
+      y: b.h * k + 20 * k > a.h ? a.y - (b.y - 10) * k : a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k };
+  };
+  const { k, x, y } = (zone ? [zone] : readingAreas()).map(put).reduce((p, q) => (q.kFit > p.kFit ? q : p));
+  return { k, x, y };
+}
+function fit(animate) { const m = cadrage(); if (m) setT(m, animate); }
+/** Where a keyboard or button zoom is centred: the selected card if its centre is in the reading field, else the middle of the largest candidate. */
+function zoomCentre() {
+  const areas = readingAreas(), { k, x, y } = state.t;
+  const c = typeof state.selected === 'string' && state.layout && state.layout.children.find((n) => n.id === state.selected);
+  if (c) {
+    const px = (c.x + c.width / 2) * k + x, py = (c.y + c.height / 2) * k + y;
+    if (areas.some((a) => px >= a.x && px <= a.x + a.w && py >= a.y && py <= a.y + a.h)) return [px, py];
+  }
+  const a = areas.reduce((p, q) => (q.w * q.h > p.w * p.h ? q : p));
+  return [a.x + a.w / 2, a.y + a.h / 2];
 }
 function zoomBy(f, cx, cy) {
-  const r = stageRect();
-  cx ??= r.width / 2; cy ??= r.height / 2;
+  if (cx === undefined || cy === undefined) [cx, cy] = zoomCentre();
   const k = clamp(state.t.k * f, 0.08, 2.5);
   setT({ k, x: cx - (cx - state.t.x) * (k / state.t.k), y: cy - (cy - state.t.y) * (k / state.t.k) }, false);
+}
+/** A transformation applied through the engine's own path (levels of detail, columns): never animated; non-finite values are refused (80-09). */
+function transformer(m) {
+  if (!m || ![m.k, m.x, m.y].every(Number.isFinite)) return false;
+  setT({ k: clamp(m.k, 0.08, 2.5), x: m.x, y: m.y }, false); return true;
+}
+/** The one input guard: no shortcut from an INPUT, TEXTAREA, SELECT or contenteditable element (80-09). */
+function enSaisie(ev) {
+  const e = ev && ev.target;
+  return !!e && (/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName) || e.isContentEditable === true);
 }
 // Ctrl + wheel (and the trackpad pinch, which sends ctrlKey) zooms around the cursor; a plain wheel or two-finger scroll pans
 svg.addEventListener('wheel', (ev) => {
@@ -2472,7 +2526,7 @@ phoneQuery.addEventListener('change', placeZoom); placeZoom();
 $('#btn-panel').onclick = () => setPanel(document.body.classList.contains('no-panel'));
 Object.assign(state.kinds, store.get('kinds', {}));
 window.addEventListener('keydown', (ev) => {
-  if (pal.classList.contains('open') || ev.target.tagName === 'INPUT') return;
+  if (pal.classList.contains('open') || enSaisie(ev)) return;
   if (ev.key === '/' || (ev.key === 'k' && (ev.metaKey || ev.ctrlKey))) { ev.preventDefault(); openPalette(); }
   else if (ev.key === 'Backspace') { ev.preventDefault(); up(); }
   else if (ev.key === 'Escape') {
@@ -2483,13 +2537,14 @@ window.addEventListener('keydown', (ev) => {
     else if (ev.target === document.body || ev.target === document.documentElement || svg.contains(ev.target)) { if (state.selected) select(null); else up(); }
   }
   else if (G.meta?.vfTab === 'equipe' && /^[fFpP=+-]$/.test(ev.key)) { /* Équipe : ni cadrage, ni tiroir, ni zoom par la frappe (PU-G-137, Q8) */ }
+  else if ((ev.metaKey || ev.ctrlKey || ev.altKey) && /^[fFpP=+-]$/.test(ev.key)) { /* une lettre seule : jamais avec ⌘, Ctrl ou Alt */ }
   else if (ev.key === 'f' || ev.key === 'F') fit(true);
   else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
   else if (ev.key === 'Enter' && typeof state.selected === 'string') open(state.selected);
   else if (state.flow && ev.key === 'ArrowRight') $('#fl-next')?.click();
   else if (state.flow && ev.key === 'ArrowLeft') $('#fl-prev')?.click();
-  else if (ev.key === '=' || ev.key === '+') zoomBy(1.2);
-  else if (ev.key === '-') zoomBy(0.83);
+  else if (ev.key === '=' || ev.key === '+') zoomBy(1.25);
+  else if (ev.key === '-') zoomBy(0.8);
 });
 // ======================= extension API =======================
 // Features in assets/ui/*.js are inlined after this script and talk to the viewer only through
@@ -2555,6 +2610,8 @@ window.Floorplan = Object.freeze({
   go, reveal, select, open, up, fit, render: (o) => render({ keepTransform: true, ...o }), refreshPanel: () => renderPanel(),
   showBoard, playFlow, startFlow, stopFlow: () => { if (state.flow) stopFlow(); },
   freeArea: () => freeArea(),
+  // 80-09 : cadrage unique, champ de lecture, garde de saisie, transformation par le chemin du moteur
+  cadrage, enSaisie, transformer, setReadingArea(fn) { readingProvider = typeof fn === 'function' ? fn : null; },
   closeMenus: () => { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); },
   // asking
   addAskContext, ask: (text) => { closeSheet(); askInput.value = text; submitAsk(); }, askEngine: () => askState.engine,

@@ -76,7 +76,12 @@
   };
   // Le rendu du viewer cadre la vue (fit) avec le bloc NATIF, puis émet « render » en microtâche : ecrireVue raccourcit alors le bloc, et le haut de la zone libre (freeArea) bouge sous une vue cadrée pour l'ancien.
   // Une vue qui était exactement le cadrage de l'ancienne zone est recadrée sur la nouvelle ; toute autre vue (déplacée, zoomée par la personne) reste où elle est.
-  const cadrage = () => { const b = SC.state && SC.state.bounds, T = SC.state && SC.state.t; if (!b || !T) return null; const a = SC.freeArea(), k = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1); return { y: a.y, cadree: Math.abs(T.k - k) <= k * 0.005 && Math.abs(T.x - (a.x + (a.w - b.w * k) / 2 - b.x * k)) <= 1 && Math.abs(T.y - (a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k)) <= 1 }; };
+  // la formule de cadrage est celle du moteur (SC.cadrage, 80-09) : « cadrée » = state.t en est égal à un pixel près
+  const cadrage = () => {
+    const T = SC.state && SC.state.t, m = T && SC.cadrage();
+    if (!m) return null;
+    return { y: m.y, cadree: Math.abs(T.k - m.k) <= m.k * 0.005 && Math.abs(T.x - m.x) <= 1 && Math.abs(T.y - m.y) <= 1 };
+  };
   const ecrireEtRecadrer = () => { const avant = cadrage(); ecrireVue(); const apres = avant && avant.cadree ? cadrage() : null; if (apres && apres.y !== avant.y) SC.fit(false); };
   const styleVue = document.createElement('style');
   styleVue.textContent = '.vf-ctx-titre { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }\n.vf-ctx-seg { display: inline-block; max-width: 100%; vertical-align: top; overflow-wrap: anywhere; }';

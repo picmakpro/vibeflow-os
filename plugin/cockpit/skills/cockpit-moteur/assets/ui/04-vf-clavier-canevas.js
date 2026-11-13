@@ -115,6 +115,15 @@
     }
     return { x, y, w, h };
   };
+  // champ de cadrage (80-09, NAVIGATION 4.6) : la zone libre, ou ses deux découpes autour du coin (au-dessus, à gauche) ; le tiroir Git n'en retire rien (PU-G-204)
+  const champsDeCadrage = () => {
+    const a = SC.freeArea(), coin = document.getElementById('vf-coin');
+    if (!coin || coin.hidden || !coin.offsetWidth) return [a];
+    const r = coin.getBoundingClientRect(), s = svg.getBoundingClientRect(), cx = r.left - s.left, cy = r.top - s.top, c = [];
+    if (cy > a.y + a.h / 2) c.push({ x: a.x, y: a.y, w: a.w, h: cy - 16 - a.y });
+    if (cx > a.x + a.w / 2) c.push({ x: a.x, y: a.y, w: cx - 16 - a.x, h: a.h });
+    return c.length ? c : [a];
+  };
   const deplacer = ({ x = 0, y = 0 }) => { // seule écriture de translation de la couche VF : le zoom (state.t.k) ne bouge jamais
     if (!x && !y) return;
     const bulle = document.getElementById('tooltip'); if (bulle && !bulle.hidden) bulle.hidden = true; // comme applyTransform : la carte bouge sous la bulle
@@ -190,12 +199,17 @@
     }, true);
     SC.on('render', surRender); SC.on('panel', () => { if (vivant && !equipe()) surPanel(); });
     surRender();
+    // le coin ne se pose qu'après le premier rendu : une vue qui était exactement le cadrage de la zone libre est recadrée dans le champ de lecture (80-09)
+    const egal = (p, q) => !!p && !!q && Math.abs(p.k - q.k) <= p.k * 0.005 && Math.abs(p.x - q.x) <= 1 && Math.abs(p.y - q.y) <= 1;
+    if (egal(state.t, SC.cadrage({ zone: SC.freeArea() })) && !egal(state.t, SC.cadrage())) SC.fit(false);
     return () => { vivant = false; pose.splice(0).forEach((f) => f()); };
   };
-  window.VF_CANEVAS = Object.freeze({ nomDeCarte, carteItinerante, focaliser, champDeLecture, amenerDansLeChamp, deplacer, voisin });
+  window.VF_CANEVAS = Object.freeze({ nomDeCarte, carteItinerante, focaliser, champDeLecture, champsDeCadrage, amenerDansLeChamp, deplacer, voisin });
+  if (typeof SC.setReadingArea === 'function') SC.setReadingArea(champsDeCadrage); // accroche au moteur : avant le premier rendu (80-09)
   const C = window.VF_COQUILLE;
   // `ready` peut être passé avant l'exécution de ce fichier (seconde page d'une session) : le moteur a alors déjà rendu
   const demarrer = () => (vivant ? undefined : init());
-  if (C && typeof C.surOnglet === 'function') C.surOnglet(init); // P80-D-42 : la coquille, sinon `ready` (ou le premier rendu, s'il l'a devancé)
+  // P80-D-42, A51 : la coquille (clé = nom du fichier), sinon `ready` (ou le premier rendu, s'il l'a devancé)
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(init);
   else if (state.layout) demarrer(); else { SC.on('ready', demarrer); SC.on('render', demarrer); }
 })();
