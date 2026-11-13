@@ -1,5 +1,6 @@
-// vf-cockpit-registres — décisions et ADR lues dans du texte (76-02 ; TRAC-05 ; P76-D-16, D-17, D-18). Module PUR : aucune lecture, aucun git,
-// seul import vf-cockpit-formats.mjs. La Phase 73 l'importe pour ses définitions de registres (P76-D-18) : signature et exports sont un contrat.
+// vf-cockpit-registres — décisions et ADR lues dans du texte (76-02 ; TRAC-05 ; P76-D-16, D-17, D-18).
+// Module PUR : aucune lecture, aucun git, seul import vf-cockpit-formats.mjs.
+// La Phase 73 l'importe pour ses définitions de registres (P76-D-18) : signature et exports sont un contrat.
 // Exports : sectionsAdr(txt), definitionsRegistre(txt, { phase, ws, fichier, couper }), citations(message), relier({ adrs, definitions, commits }).
 //   cle d'une décision = `<ID>:<phase>`, phase = identifiant de nœud (`ph-<N>` ou `ph-<N>@<ws>`) reçu de l'appelant, jamais calculé ici.
 // Une arête est lue dans un texte, jamais inférée ; une citation nue (`D-04`) n'est jamais retenue ni reliée à un commit (ADR-075).
@@ -9,7 +10,8 @@ import { ESP, COLON } from './vf-cockpit-formats.mjs';
 export const PREFIXE = '[A-Z][A-Z0-9.]*';
 const ID_DEC = `(?:${PREFIXE}-)*D-\\d+[a-z]?(?:bis)?`;
 const ID_PREFIXE = `(?:${PREFIXE}-)+D-\\d+[a-z]?(?:bis)?`;
-const SECTION_ADR = new RegExp(`^##${ESP}+(ADR-\\d{3})(?:${COLON}|${ESP}*[—–-]|${ESP}*$)${ESP}*(.*)$`);
+const FIN_TITRE = `(?:${COLON}|${ESP}*[—–-]|${ESP}*$)`;
+const SECTION_ADR = new RegExp(`^##${ESP}+(ADR-\\d{3})${FIN_TITRE}${ESP}*(.*)$`);
 const DEF = new RegExp(`^[-*+] \\*\\*(${ID_DEC})`);
 const CIT_ADR = /(?<![A-Za-z0-9-])ADR-\d{3}(?![A-Za-z0-9])/g;
 const CIT_DEC = new RegExp(`(?<![A-Za-z0-9.-])${ID_PREFIXE}(?![A-Za-z0-9])`, 'g');
@@ -21,7 +23,11 @@ const uniques = (a) => [...new Set(a)];
 // lignes hors blocs de code : [{ l, n }] (n = numéro de ligne 1-based)
 function lignesHorsCode(txt) {
   const out = []; let dedans = false;
-  String(txt ?? '').replace(/\r\n?/g, '\n').split('\n').forEach((l, i) => { if (FENCE.test(l)) { dedans = !dedans; return; } if (!dedans) out.push({ l, n: i + 1 }); });
+  const lignes = String(txt ?? '').replace(/\r\n?/g, '\n').split('\n');
+  lignes.forEach((l, i) => {
+    if (FENCE.test(l)) { dedans = !dedans; return; }
+    if (!dedans) out.push({ l, n: i + 1 });
+  });
   return out;
 }
 
@@ -36,8 +42,9 @@ export function citations(message) {
   return { adr: uniques(s.match(CIT_ADR) || []), decisions: uniques(s.match(CIT_DEC) || []) };
 }
 
-// Lignes de définition `- **<ID>` d'un registre (hors blocs de code et hors titres `###`), quel que soit le préfixe. Première définition gardée, suivantes comptées en `amendee`.
-// `phase` (identifiant de nœud) et `couper` (coupe au mot) viennent de l'appelant ; `ws` et `fichier` lui restent, ils ne servent pas la clé.
+// Lignes de définition `- **<ID>` d'un registre (hors blocs de code et hors titres `###`), quel que soit le préfixe.
+// Première définition gardée, suivantes comptées en `amendee`. `phase` (identifiant de nœud) et `couper` (coupe au mot)
+// viennent de l'appelant ; `ws` et `fichier` lui restent, ils ne servent pas la clé.
 export function definitionsRegistre(txt, { phase, couper } = {}) {
   const coupe = typeof couper === 'function' ? couper : (s, n) => s.slice(0, n);
   const vues = new Map(), out = [];
@@ -52,7 +59,8 @@ export function definitionsRegistre(txt, { phase, couper } = {}) {
   return out;
 }
 
-// { adrs, definitions, commits } -> { parAdr: Map(id -> { decisions: [cle], commits: [h7] }), parDecision: Map(cle -> { adr: [ids], commits: [h7] }), adrSansSection: [ids] }
+// { adrs, definitions, commits } -> { parAdr: Map(id -> { decisions: [cle], commits: [h7] }),
+//   parDecision: Map(cle -> { adr: [ids], commits: [h7] }), adrSansSection: [ids] }
 export function relier({ adrs = [], definitions = [], commits = [] } = {}) {
   const parAdr = new Map(), parDecision = new Map(), adrSansSection = [];
   for (const a of adrs) parAdr.set(a.id, { decisions: [], commits: [] });
@@ -66,7 +74,8 @@ export function relier({ adrs = [], definitions = [], commits = [] } = {}) {
   }
   for (const c of commits) {
     for (const id of c.adr || []) ajoute(fiche(id).commits, c.h7);
-    for (const id of c.decisions || []) for (const cle of parId.get(id) || []) ajoute(parDecision.get(cle).commits, c.h7); // une nue n'a jamais de commit (ADR-075)
+    // une nue n'a jamais de commit (ADR-075) : parId ne contient que des identifiants préfixés
+    for (const id of c.decisions || []) for (const cle of parId.get(id) || []) ajoute(parDecision.get(cle).commits, c.h7);
   }
   return { parAdr, parDecision, adrSansSection };
 }
