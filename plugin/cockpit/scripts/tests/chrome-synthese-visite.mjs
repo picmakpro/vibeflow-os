@@ -111,6 +111,8 @@ export async function jouer(chrome, port, mode) {
     const i11 = await intercepter(s, '/api/vf/git', { statut: 200, corps: JSON.stringify({ etat: 'ok', base: { nom: null, h: null }, rangees: [] }) });
     await charger(s, base, val(null, inst(maintenant() - 7200, identique(f)))); r.v11 = { fiche: await fiche(s), resume: null, vues: i11.vues() };
     await fermer(s); r.v11.resume = await resumeLu(s); await i11.arreter();
+    // ---- V12 : visite précédente sans sommet (tete nul), git de nouveau lisible avec des commits arrivés : « non lus », jamais « rien de nouveau » ----
+    await charger(s, base, val(null, inst(maintenant() - 7200, { ...identique(f), tete: null }))); r.v12 = { fiche: await fiche(s) };
     // ---- V7, V10, OB1 : sur l'état V2 ----
     await charger(s, base, v2); await fiche(s); r.ob1 = await s.ev(ORDRE); await fermer(s);
     r.ecout0 = await s.ev('window.__nbEcout()'); const origine = await s.ev('performance.timeOrigin');

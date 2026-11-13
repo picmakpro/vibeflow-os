@@ -83,6 +83,7 @@ assert_eq "V8 — « Tout vu » : « Rien de nouveau depuis aujourd'hui, HH h MM
 assert_eq "V9 — git en panne : « Commits : non lus, le dépôt git est indisponible. », jamais « 0 commit », les autres lignes intactes" "$(JV '[j.v9.fiche.texte.includes("Commits : non lus, le dépôt git est indisponible."), /0 commit/.test(j.v9.fiche.texte), j.v9.fiche.texte.includes("nouveau blocage"), /phases? (a|ont) avancé/.test(j.v9.fiche.texte), j.v9.vues >= 1].join()')" "true,false,true,true,true"
 assert_eq "V10 — après deux changements d'onglet : un seul bloc, une seule ligne-résumé, écouteurs de document et de window égaux à ceux d'un chargement à froid (A51), une seule écriture de courante par masquage, sans recharger la page (même performance.timeOrigin)" "$(JV '[j.v10.blocs, j.v10.lignes, JSON.stringify(j.v10.ecout) === JSON.stringify(j.ecout0), j.v10.ecritures, j.v10.memeDocument].join()')" "1,1,true,1,true"
 assert_eq "V11 — base de git inconnue (dépôt lisible, base.h nul) : le bloc dit « Commits : non lus », jamais « Rien de nouveau », et la ligne-résumé non plus" "$(JV '[j.v11.vues >= 1, j.v11.fiche.etat, j.v11.fiche.texte.includes("Commits : non lus, le dépôt git est indisponible."), j.v11.fiche.texte.includes("Rien de nouveau"), /Rien de nouveau/.test(j.v11.resume), /commits non lus/.test(j.v11.resume)].join()')" "true,neuf,true,false,false,true"
+assert_eq "V12 — visite précédente sans sommet (tete nul) et git lisible : « Commits : non lus », jamais « Rien de nouveau »" "$(JV '[j.v12.fiche.etat, j.v12.fiche.texte.includes("Commits : non lus, le dépôt git est indisponible."), j.v12.fiche.texte.includes("Rien de nouveau")].join()')" "neuf,true,false"
 OB_ATT="visite"; [ -f "$UI/74-vf-synthese-burnup.js" ] && OB_ATT="$OB_ATT-burnup"; [ -f "$UI/74-vf-synthese-jauges.js" ] && OB_ATT="$OB_ATT-methode"; [ -f "$UI/74-vf-synthese-cout.js" ] && OB_ATT="$OB_ATT-cout"
 assert_eq "OB1 — ordre final des blocs dans le DOM : visite d'abord, jamais trié (blocs de 77-06 présents au dépôt : $OB_ATT)" "$(JV 'j.ob1.join("-")')" "$OB_ATT"
 
@@ -108,6 +109,13 @@ if cockpit_module_muter_page minner 's/n\.appendChild(document\.createTextNode(c
   RM="$(mesurer "$PM" xss)"; cockpit_arreter
   assert_eq "M-INNER — sur le mutant, la balise piégée s'exécute (window.__xss posé ou image rendue) : W15 rougit, la sonde est donc capable d'échouer" "$(JM '(j.w15.xss !== "undefined") || (j.w15.img > 0)')" "true"
 else assert_eq "M-INNER.0 — la mutation s'applique (ancre présente dans le fichier du bloc)" "refusée" "appliquée"; fi
+echo "=== M-TETE — la clause « visite précédente sans sommet » : retirée, V12 rougit ==="
+if cockpit_module_muter_page mtete 's/gitLu: S\.gitLu && !!pre\.tete/gitLu: S.gitLu/'; then
+  cockpit_lancer "$LAB"; RLT=$?; PT="${VF_PORT:-0}"
+  assert_eq "M-TETE.0 — le serveur du mutant est prêt et charge la copie mutée (charge prouvée)" "$RLT|$([ "$PT" -gt 0 ] && echo prêt)|$(cockpit_module_charge "$COCKPIT_MODULE" && echo charge)" "0|prêt|charge"
+  RM="$(mesurer "$PT" complet)"; cockpit_arreter
+  assert_eq "M-TETE — sur le mutant V12 rougit (« Rien de nouveau » au lieu de « Commits : non lus »), la sonde est donc capable d'échouer" "$(JM '[j.v12.fiche.etat, j.v12.fiche.texte.includes("Commits : non lus")].join()')" "rien,false"
+else assert_eq "M-TETE.0 — la mutation s'applique (ancre présente dans le fichier du bloc)" "refusée" "appliquée"; fi
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ "$FAIL" -eq 0 ]
