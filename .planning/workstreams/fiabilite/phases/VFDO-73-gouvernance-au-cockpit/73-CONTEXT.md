@@ -460,7 +460,7 @@ reprennent les propositions de la Phase 74, relayées par la session principale 
 Une question tranchée ou appliquée garde son entrée ; seule sa ligne « État » change, et la décision qui en découle est
 au registre. P73-Q-01 est tranchée le 2026-11-11 (option b) hors de cette phase : le correctif du tiroir Git est porté
 par l'exécution de la Phase 80, la régie se bornant à rendre ses propres pastilles neutres (P73-D-10) ; aucune décision
-`P73-D-NN` ne la porte, la décision qui en découle vit hors de ce registre (tranchée hors phase).
+`P73-D-NN` ne la porte, la décision qui en découle vit hors de ce registre (tranchée hors phase). Sans objet depuis le 2026-11-13 : les pastilles sont neutres depuis P78-D-33, aucun correctif du tiroir n'est porté par la Phase 80.
 Anciens libellés : S-1 → P73-Q-01, S-2 → P73-Q-02, S-3 → P73-Q-03, S-4 → P73-Q-04.
 
 - **P73-Q-01 — Pastilles du tiroir Git sur fond d'avertissement.** Le tiroir Git de la Phase 78 pose « modifiés » sur un
@@ -468,7 +468,7 @@ Anciens libellés : S-1 → P73-Q-01, S-2 → P73-Q-02, S-3 → P73-Q-03, S-4 �
   Options : (a) laisser le tiroir tel quel ; (b) neutraliser ces pastilles dans un correctif du tiroir Git, hors de la Phase 73.
   Recommandation : (b) — une seule règle de couleur sur tout le cockpit, sans élargir la Phase 73.
   Bloque : rien
-  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Les neutraliser (Recommandé) »
+  État : tranchée — arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 — option (b) — « Les neutraliser (Recommandé) » ; sans objet (2026-11-13, jointure J1) : les pastilles sont neutres depuis P78-D-33 (la question reposait sur une erreur de relais de la session principale ; preuve : Phase 80, segment a, amendement A de 80-06, mutant M-PASTILLE, juge de design)
 - **P73-Q-02 — Question de l'assistant restée sans réponse, lue au transcript.** Une session bloquée sur une question
   de l'assistant passe pour « au travail » quand l'état officiel est absent ; la lire au transcript rouvrirait la décision
   D2 du lot 0 (« vous attend » vient seulement de l'état officiel).
