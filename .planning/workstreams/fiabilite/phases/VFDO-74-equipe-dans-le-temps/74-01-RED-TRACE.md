@@ -26,3 +26,9 @@ Résultat : exit 1, `=== 1 PASS, 21 FAIL ===`. Le seul PASS est le contrôle pos
 | FMT | FAIL | exception : `fmtJetons` introuvable |
 
 Aucun mutant (régime allégé : plan non marqué audit). Rituel levé : voir `74-01-SUMMARY.md`.
+
+## Suite des commits
+
+- Tâche 2 : F1, F3, F3b, F4, F5, F6, F6b, F7, F8, F11, F13 passent au vert (F0 aussi) ; F2, F9, F10 (a), F12, F14, F15 (exports) et FMT restent rouges, faute des fonctions de la tâche 3.
+- Tâche 3 : toutes les sections vertes, `141 PASS, 0 FAIL`, un `⊘` annoncé (F10 b, bloc `cockpit-frise@1` du contrat).
+- Mutants M-* : non joués (régime allégé, plan non marqué audit) ; chaque section a toutefois été vue rouge pour la bonne raison (tableau ci-dessus).
