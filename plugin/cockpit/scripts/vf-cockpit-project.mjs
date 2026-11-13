@@ -203,7 +203,16 @@ function construireGraphe(root, { layout } = {}) {
     schema: 'vibeflow/cockpit-project@1',
     meta: { generatedAt: new Date().toISOString(), rootName: path.basename(root), root, audience: 'everyone', agent: 'claude', repos: [], counts: { files: files.length, loc: 0 }, vfTab: 'project',
       kindIcons: KIND_ICONS, kindColors: KIND_COLORS,
-      kindLabels: { import: 'Dépend de', event: 'Enchaînement', data: 'Couvre', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient' },
+      kindLabels: { import: 'Dépend de', event: 'Enchaînement', data: 'Couvre', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient',
+      // 80-11 (P80-D-35, FORM-08) : le vocabulaire du planning dans le panneau, lu par le moteur sur l'onglet Projet
+      // (clés à préfixe, jamais un genre de lien)
+      'feuille:phase': 'Plan', 'feuille:exigences': 'Exigence', 'feuille:backlog': 'Entrée du backlog', 'feuille:graine': 'Graine',
+      'feuille:release': 'Release', 'feuille:mission': 'Étape', 'parent:phase': 'Dans la phase', 'parent:exigences': 'Exigences de la phase',
+      'parent:mission': 'Dans la mission', 'parent:backlog': 'Dans le backlog', 'parent:graine': 'Dans les graines', 'parent:release': 'Dans les releases',
+      'liste:phase': 'Plans', 'liste:exigences': 'Exigences', 'liste:backlog': 'Entrées', 'liste:graine': 'Graines', 'liste:release': 'Releases',
+      'liste:mission': 'Étapes', 'entrant:import': 'Dépend de', 'sortant:import': 'Attendu par', 'entrant:data': 'Couverte par',
+      'sortant:data': '', // '' : liste non rendue, la couche VF dit la couverture
+      'ouvrir:phase': 'Ouvrir la phase', 'champ:statut': 'Statut', 'champ:vague': 'Vague', 'valeur:sans-vague': 'Sans vague' },
       vf: { milestone: state.milestone, phase: curPhase, phaseEtat, stateStale: perime, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, lastDesc: state.last_activity_desc, progress: state.progress,
         milestones: msList.filter((m) => !m.horsJalon).map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),
         next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}`, etat: p.avancement.etat })) : [],
