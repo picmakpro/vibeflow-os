@@ -83,7 +83,7 @@ export async function ouvrir(chrome, { csp = false } = {}) {
       throw new Error(`« ${nom} » ne s'est pas stabilisé (${ms} ms)`);
     };
     await send('Page.enable', {}, AMORCE); if (csp) await send('Log.enable', {}, AMORCE);
-    return { send, ev, naviguer, attendre, stable, fermer, violations };
+    return { send, ev, naviguer, attendre, stable, fermer, violations, port };
   } catch (e) { await fermer(); throw e; }
 }
 

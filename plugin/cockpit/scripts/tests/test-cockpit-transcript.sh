@@ -287,7 +287,7 @@ node "$AUX/red.mjs" "$SCRIPTS" "$AUX/fx/agent-rep.jsonl" "$LAB0" > "$WORK/red-re
 FMT='(j.r.outils||[]).map((o)=>[o.outil,o.verbe,o.cible,o.n===undefined?"":o.n].join("|")).join(",")'
 assert_eq "T24.17 — PU-G-170 : trois Bash consécutifs ne font qu'une entrée « × 3 », un Bash seul n'a pas de n, deux Read de même cible se regroupent, une autre cible reste à part, l'ordre est gardé" "$(G "$WORK/red-rep.json" "j.absent||($FMT)")" "Bash|lance une commande||3,Read|lit|src/a.js|,Bash|lance une commande||,Read|lit|src/a.js|2,Read|lit|src/b.js|"
 assert_eq "T24.18 — le regroupement ne fait sortir aucune valeur d'entrée (apparié à T24.17 : les 4 commandes sont dans la fixture, aucune dans la sortie)" "$(grep -c 'CMD-SECRET-170' "$AUX/fx/agent-rep.jsonl")|$(G "$WORK/red-rep.json" 'j.absent||JSON.stringify(j.r).includes("CMD-SECRET-170")')" "4|false"
-mkdir -p "$WORK/mut-scripts"; cp "$SCRIPTS/vf-cockpit-transcript.mjs" "$SCRIPTS/vf-cockpit-lecture.mjs" "$WORK/mut-scripts/"
+mkdir -p "$WORK/mut-scripts"; cp "$SCRIPTS"/vf-cockpit-*.mjs "$WORK/mut-scripts/" # la règle de chemin unique ajoute des imports au module : la copie les emporte tous
 sed 's#fil: regrouper(#fil: ((x) => x)(#' "$SCRIPTS/vf-cockpit-transcript.mjs" > "$WORK/mut-scripts/vf-cockpit-transcript.mjs"
 cmp -s "$SCRIPTS/vf-cockpit-transcript.mjs" "$WORK/mut-scripts/vf-cockpit-transcript.mjs" && echo "MUTANT VIDE : regrouper"
 node "$AUX/red.mjs" "$WORK/mut-scripts" "$AUX/fx/agent-rep.jsonl" "$LAB0" > "$WORK/red-rep-mut.json"
@@ -619,7 +619,7 @@ assert_eq "T24F3.1 — reduireTranscript : le secret d'un message de l'assistant
 MUTD="$AUX/mutsrc"; mkdir -p "$MUTD"; cp "$SCRIPTS"/vf-cockpit-*.mjs "$MUTD/"
 mutant() { cp "$SCRIPTS/vf-cockpit-transcript.mjs" "$MUTD/vf-cockpit-transcript.mjs"; sed -i.bak "s#$1#$2#" "$MUTD/vf-cockpit-transcript.mjs"; if cmp -s "$SCRIPTS/vf-cockpit-transcript.mjs" "$MUTD/vf-cockpit-transcript.mjs"; then echo "MUTANT VIDE"; else f3 "$MUTD"; fi; }
 assert_eq "T24F3.2 — mutant : message de l'assistant non masqué -> détecté" "$(mutant 'const r = masqueCoupe(t, n);' 'const r = t.slice(0, n);')" "fuite : message "
-assert_eq "T24F3.3 — mutant : cible d'outil non masquée -> détecté" "$(mutant 'return { outil, verbe, cible: fin(cible) };' 'return { outil, verbe, cible };')" "fuite : cible "
+assert_eq "T24F3.3 — mutant : cible d'outil non masquée -> détecté" "$(mutant 'return { outil, verbe, cible: fin(cible) + suffixe };' 'return { outil, verbe, cible: cible + suffixe };')" "fuite : cible "
 assert_eq "T24F3.4 — mutant : nom d'outil non masqué -> détecté" "$(mutant "const outil = fin(name) || '?';" "const outil = chaine(name) || '?';")" "fuite : nom d outil"
 
 echo "=== T24G — revue fraîche : masque borné au texte brut, première ligne trop longue, tube, cache, borne d'étiquette (points 1, 4, 5, 6, 8, 9, 10) ==="
@@ -639,16 +639,19 @@ assert_eq "T24G1.0 — contrôle positif : les fixtures portent le jeton (ghp_) 
 assert_eq "T24G1.1 (point 1) — un blob masqué raccourcit la tranche : aucun caractère de la zone d'extension (ghp) dans le mandat ni le message" "$(G "$WORK/f1b-blob.json" 'j.absent||(()=>{const m=String(j.r.mandat),g=j.r.messages.join("");return m.includes("[masqué]")&&g.includes("[masqué]")?(/ghp/.test(m+g)?"fuite de la zone d extension":"ok"):"blob non masqué"})()')" "ok"
 assert_eq "T24G1.2 (point 6) — identifiants d'URL (portée 385) commençant avant la borne : aucun fragment (U, P) au mandat ni au message, sorties non vides" "$(G "$WORK/f1b-url.json" 'j.absent||(()=>{const m=String(j.r.mandat),g=j.r.messages.join("");return m.length>100&&g.length>100?(/UUUU|PPPP/.test(m+g)?"fragment d identifiants":"ok"):"sortie vide"})()')" "ok"
 cat > "$AUX/cnt.mjs" <<'JS'
-// cnt.mjs <scripts> <fichier> <racine> : nombre d'appels à fs.realpathSync pendant reduireTranscript (la borne de l'étiquette, sans horloge)
+// cnt.mjs <scripts> <fichier> <racine> : nombre d'appels RÉELS à la résolution du noyau (fs.realpathSync.native, celle de cheminPhysique) pendant
+// reduireTranscript (la borne de l'étiquette, sans horloge) ; l'espion est posé avant l'import du module
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
-const [, , scripts, fichier, root] = process.argv; const orig = fs.realpathSync; let n = 0;
-fs.realpathSync = (...a) => { n++; return orig(...a); };
+const [, , scripts, fichier, root] = process.argv; const orig = fs.realpathSync.native; let n = 0;
+fs.realpathSync.native = (...a) => { n++; return orig(...a); };
 const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-transcript.mjs')).href);
 const r = m.reduireTranscript(fichier, { root }); console.log(JSON.stringify({ n, outils: r.fil.filter((e) => e.genre === 'outil').length })); // AUDC-D8 : le fil porte messages et outils
 JS
-assert_eq "T24G2 (point 9) — 8,5 Mio de tool_use Read : au plus 2 appels à realpath par outil gardé (200 outils, 410 appels), donc pas d'étiquette sur les outils écartés" "$(node "$AUX/cnt.mjs" "$SCRIPTS" "$AUX/fx/f4-outils.jsonl" "$AUX/f4/lab" | node "$AUX/jq.mjs" 'j.outils===200&&j.n>0&&j.n<=410?"ok":"n="+j.n+" outils="+j.outils')" "ok"
+G2UN="$AUX/fx/g2-un.jsonl"; grep -m1 tool_use "$AUX/fx/f4-outils.jsonl" > "$G2UN"
+G2MAX="$(node "$AUX/cnt.mjs" "$SCRIPTS" "$G2UN" "$AUX/f4/lab" | node "$AUX/jq.mjs" 'j.n')"
+assert_eq "T24G2 (point 9, réécrite 79-13) — 8,5 Mio de tool_use Read : le nombre d'appels réels au noyau est strictement positif (témoin : l'espion voit la résolution), au plus le maximum relevé pour un outil seul (${G2MAX}) multiplié par 200, plus 10, et très inférieur au nombre d'outils de la fixture : aucune étiquette sur un outil écarté" "$(node "$AUX/cnt.mjs" "$SCRIPTS" "$AUX/fx/f4-outils.jsonl" "$AUX/f4/lab" | node "$AUX/jq.mjs" "j.outils===200&&j.n>0&&j.n<=$G2MAX*200+10&&j.n<$(grep -c tool_use "$AUX/fx/f4-outils.jsonl")?\"ok\":\"n=\"+j.n+\" outils=\"+j.outils")" "ok"
 cat > "$AUX/mk-long.mjs" <<'JS'
 // mk-long.mjs <fichier> : première ligne user de 300 Kio (au-delà de la fenêtre de tête de 256 Kio), puis un message
 import fs from 'node:fs';
@@ -712,6 +715,45 @@ vf_hyg_assert
 
 echo ""
 echo "=================================="
+# =====================================================================================================================
+echo "=== T24H — une seule règle de chemin pour la frise et la route de transcript (79-13, A23, A45, A48-44) ==="
+cat > "$AUX/hfix.mjs" <<'JS'
+// hfix.mjs <scripts> <dossier> : lab git (src/a.js), lien du lab vers le dedans et vers le dehors, worktree prouvé et non prouvé ; écrit <dossier>/h.jsonl
+// et imprime { cibles: [...], table: [...] } : la cible de chaque appel d'outil rendue par reduireTranscript et par reduireCible sur la même liste d'arbres.
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, dir] = process.argv, imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
+const R = fs.realpathSync(dir), L = path.join(R, 'lab'), O = path.join(R, 'out'), W = path.join(R, 'wtx'), F = path.join(R, 'faux');
+const g = (...a) => execFileSync('git', ['-C', L, '-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { stdio: 'ignore' });
+fs.mkdirSync(path.join(L, 'src'), { recursive: true }); fs.mkdirSync(O, { recursive: true }); fs.writeFileSync(path.join(L, 'src', 'a.js'), 'x'); fs.writeFileSync(path.join(O, 'o.txt'), 'x');
+g('init', '-q', '-b', 'main'); g('add', '-A'); g('commit', '-q', '-m', 'i'); g('worktree', 'add', '-q', W, '-b', 'bx');
+fs.symlinkSync(path.join(L, 'src'), path.join(L, 'lin')); fs.symlinkSync(O, path.join(L, 'lout'));
+fs.mkdirSync(F, { recursive: true }); fs.writeFileSync(path.join(F, '.git'), `gitdir: ${path.join(L, '.git', 'worktrees', 'inconnu')}\n`);
+const LONG = ['d' + 'a'.repeat(100), 'e' + 'b'.repeat(100), 'f' + 'c'.repeat(80), 'x.js'].join('/');
+const appels = [['Read', path.join(L, 'lin', 'a.js')], ['Read', path.join(L, 'lout', 'o.txt')], ['Write', path.join(L, 'lout', 'gone.txt')], ['Write', path.join(W, 'src', 'b.js')],
+  ['Write', path.join(F, 'z.js')], ['Write', path.join(W, LONG)], ['Read', path.join(L, LONG)], ['Read', 'src/a.js']];
+const ligne = (n, v, i) => JSON.stringify({ type: 'assistant', timestamp: new Date(Date.now() - 1000 + i).toISOString(), message: { role: 'assistant', content: [{ type: 'tool_use', id: `t${i}`, name: n, input: { file_path: v } }] } });
+const outils = [...appels, ['X'.repeat(200), 'src/a.js']];
+fs.writeFileSync(path.join(R, 'h.jsonl'), outils.map(([n, v], i) => ligne(n, v, i)).join('\n') + '\n');
+const T = await imp('vf-cockpit-transcript.mjs'), C = await imp('vf-cockpit-cible.mjs'), A = await imp('vf-cockpit-arbres.mjs');
+const fil = T.reduireTranscript(path.join(R, 'h.jsonl'), { root: L, kind: 'session' }).fil.filter((e) => e.genre === 'outil');
+const table = C.racinesDeComparaison(L, A.arbresGit(L));
+const ref = (v) => { const r = C.reduireCible(v, table, C.arbreDeNom(table, null)); return r ? r.cible + (r.arbre === null ? '' : ` (worktree ${r.arbre})`) : ''; };
+console.log(JSON.stringify({ cibles: fil.map((e) => e.cible), outils: fil.map((e) => e.outil), ref: appels.map(([, v]) => ref(v)) }));
+JS
+node "$AUX/hfix.mjs" "$SCRIPTS" "$(mkdir -p "$WORK/hfx" && echo "$WORK/hfx")" > "$WORK/h.json" 2>"$WORK/h.err"
+HORSL='un fichier hors du lab'
+assert_eq "T24H1 — un lien du lab vers le dedans se rend sous son chemin résolu" "$(G "$WORK/h.json" 'j.cibles[0]')" "src/a.js"
+assert_eq "T24H2 — un lien du lab vers le dehors se rend « un fichier hors du lab »" "$(G "$WORK/h.json" 'j.cibles[1]')" "$HORSL"
+assert_eq "T24H3 — un fichier supprimé sous un lien qui sort du lab se rend « un fichier hors du lab » (la forme écrite ne suffit plus)" "$(G "$WORK/h.json" 'j.cibles[2]')" "$HORSL"
+assert_eq "T24H4 — le résultat de etiquette pour ces cas égale celui de reduireCible pour la même liste d'arbres" "$(G "$WORK/h.json" '[0,1,2,3,4].every((i)=>j.cibles[i]===j.ref[i])&&j.cibles[7]===j.ref[7]')" "true"
+assert_eq "T24H5 — un fichier d'un worktree prouvé, hors de l'arbre principal, se rend « <chemin relatif> (worktree <nom>) »" "$(G "$WORK/h.json" 'j.cibles[3]')" "src/b.js (worktree wtx)"
+assert_eq "T24H6 — un dossier qui se dit worktree sans lien retour prouvé se rend « un fichier hors du lab » sans suffixe" "$(G "$WORK/h.json" 'j.cibles[4]')" "$HORSL"
+assert_eq "T24H7 — A48-44 : un fichier de worktree de 300 caractères se rend « <chemin coupé> (worktree <nom>) » : 120 unités finissant par …, suffixe entier" "$(G "$WORK/h.json" '(()=>{const c=j.cibles[5],i=c.indexOf(" (worktree");return [i,c.slice(i),c[i-1]].join("|")})()')" "120| (worktree wtx)|…"
+assert_eq "T24H8 — A48-44 : une cible ordinaire et un nom d'outil de plus de 120 unités finissent par … (120 unités)" "$(G "$WORK/h.json" '[j.cibles[6].length,j.cibles[6].endsWith("…"),j.outils[8].length,j.outils[8].endsWith("…")].join("|")')" "120|true|120|true"
+
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
 echo "=================================="
 TOTAL=$((PASS+FAIL))
