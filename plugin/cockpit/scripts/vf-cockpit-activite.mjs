@@ -7,7 +7,8 @@
 //   change : la requête répond tout de suite avec l'objet précédent et `calcul: "en-cours"` (premier calcul : `etat: "en-calcul"`).
 //   La part agents et plans est recalculée par instantané.
 // Un chemin, une branche, un rôle ne sont jamais des clés d'objet : des tableaux de tuples. Un chemin rendu n'est jamais ouvert, décodé ni résolu ici.
-// Une exception d'un module rend `indisponible` sur la lentille seule. Options d'essai : `horloge`, `lireInstantane` ; le programme git n'est JAMAIS choisi ici (les essais placent un faux git en tête du PATH).
+// Une exception d'un module rend `indisponible` sur la lentille seule. Options d'essai : `horloge`, `lireInstantane`.
+//   Le programme git n'est JAMAIS choisi ici (les essais placent un faux git en tête du PATH).
 import path from 'node:path';
 import { instantane } from './vf-cockpit-instantane.mjs';
 import { lancerGitAsync } from './vf-cockpit-git-lanceur.mjs';
