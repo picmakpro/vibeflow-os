@@ -25,6 +25,7 @@ rgm_json() { local s="[" sep="" x; for x in "$@"; do s="$s$sep$x"; sep=","; done
 rgm_play() { node "$TESTS_DIR/vm-regie.mjs" "$1" "$2" ${4:+"$4"} > "$3" 2>&1; return 0; }   # rgm_play <dossier ui> <scénario> <sortie> [brut]
 # rgm_lock <owner> <scope> <ws> <leaseS|null> <stale> <progressAgeS|null> [phase] [ageS] : un verrou projeté (A15) enveloppé comme le flux `lock`
 rgm_lock() { printf '{"seq":1,"at":"t","verrous":{"etat":"lue","plat":false,"liste":[{"ws":"%s","scope":"%s","phase":"%s","step":"exec","tenu":true,"stale":%s,"ageS":%s,"ttl":1800,"progressAgeS":%s,"owner":"%s","leaseS":%s}]}}' "$3" "$2" "${7:-73}" "$5" "${8:-180}" "$6" "$1" "$4"; }
+rgm_ev() { rgm_appel etatVivant "[{\"kind\":\"$1\",\"etat\":\"$2\",$3},$4]"; }   # rgm_ev <kind> <etat> <champs JSON> <ctx> (bash 3.2 : jamais de \" dans un $( ) entre guillemets)
 rgm_sess() { printf '{"workers":[{"kind":"session","id":"sess-1","etat":"actif","titre":"Atelier alpha","tree":".","ageS":30}]}'; }
 
 rg_RG0_ordre_modele() {
@@ -67,7 +68,7 @@ rg_RG1_modele() {
   assert_eq "RG1.1 — sous-titre : agents distincts en vie, attentes, à relire" "$(g "$o" 'j[0].entete.sousTitre')" "5 agents · 2 vous attendent · 1 à relire"
   assert_eq "RG1.1 — singuliers, un agent seul, zéro agent" "$(g "$o" 'j[1].entete.sousTitre+"|"+j[2].entete.sousTitre+"|"+j[3].entete.sousTitre')" "1 agent · 1 vous attend|1 agent|Aucun agent en vie"
   assert_eq "RG1.2 — un agent qui attend : deux lignes, clés section:identifiant" "$(g "$o" '[0,1].map(i=>j[0].sections[i].lignes.find(l=>l.id==="s-attend").cle).join("|")')" "a-vous:s-attend|au-travail:s-attend"
-  assert_eq "RG1.2 — clés toutes distinctes ; la ligne de l'arbre ne répète pas l'impact" "$(g "$o" 'const c=j[0].sections.flatMap(s=>s.lignes.map(l=>l.cle)); (new Set(c).size===c.length)+"|"+j[0].sections[1].lignes.find(l=>l.id==="s-attend").detail+"|"')" "true||"
+  assert_eq "RG1.2 — clés toutes distinctes ; la ligne de l'arbre ne répète pas l'impact" "$(g "$o" '(()=>{const c=j[0].sections.flatMap(s=>s.lignes.map(l=>l.cle)); return (new Set(c).size===c.length)+"|"+j[0].sections[1].lignes.find(l=>l.id==="s-attend").detail+"|"})()')" "true||"
   assert_eq "RG1.3 — sections vides : leurs textes" "$(g "$o" 'j[3].sections.map(s=>s.vide).join("|")')" "Rien ne vous attend.|Personne ne travaille en ce moment.|Aucun rapport à relire.|Aucune session au repos."
   assert_eq "RG1.3 — aucun agent : l'état de la page le dit ; avec des agents, il se tait" "$(g "$o" 'j[3].etatPage+"|"+j[0].etatPage+"|"')" "Aucun agent dans les dernières 24 h.||"
   if [ -f "$UI/72-vf-regie-modele.js" ]; then
@@ -80,8 +81,8 @@ rg_RG2_modele() {
   local sc="$WORK/sc2.json" o="$WORK/o2.json"
   local brut='{"ws":"fiabilite","scope":"mission","phase":"73","step":"exec","present":true,"stale":false,"age_seconds":180,"ttl":1800,"progress_age_seconds":600,"children_running":2,"owner":"sess-1","lease_seconds":840,"session_ids":["x"]}'
   local proj='{"ws":"fiabilite","scope":"mission","phase":"73","step":"exec","tenu":true,"stale":false,"ageS":180,"ttl":1800,"progressAgeS":600,"childrenRunning":2,"owner":"sess-1","leaseS":840}'
-  rgm_json "$(rgm_appel verrouBlanc "[$brut]")" "$(rgm_appel verrouBlanc "[$proj]")" "$(rgm_appel verrous "[[$brut]]")" \
-    "$(rgm_appel verrous "[{\"seq\":1,\"at\":\"t\",\"verrous\":{\"etat\":\"lue\",\"plat\":false,\"liste\":[$proj]}}]")" > "$sc"
+  local env="{\"seq\":1,\"at\":\"t\",\"verrous\":{\"etat\":\"lue\",\"plat\":false,\"liste\":[$proj]}}"
+  rgm_json "$(rgm_appel verrouBlanc "[$brut]")" "$(rgm_appel verrouBlanc "[$proj]")" "$(rgm_appel verrous "[[$brut]]")" "$(rgm_appel verrous "[$env]")" > "$sc"
   rgm_play "$UI" "$sc" "$o"
   assert_eq "RG2.0 — la forme brute et la forme projetée donnent le même objet" "$(g "$o" 'j[0].leaseS===840 && JSON.stringify(j[0])===JSON.stringify(j[1])')" "true"
   assert_eq "RG2.0 — verrous() : mêmes listes pour les deux formes, un verrou tenu" "$(g "$o" '(JSON.stringify(j[2])===JSON.stringify(j[3]))+"|"+j[2].length+"|"+j[0].leaseS+"|"+j[0].progressAgeS')" "true|1|840|600"
@@ -101,7 +102,7 @@ rg_RG4_modele() {
   rgm_json "$(rgm_modele "$w")" "$(rgm_appel aVous "[$w]")" > "$sc"
   rgm_play "$UI" "$sc" "$o"
   assert_eq "RG4.4 — À vous : la session qui attend et la ligne de phase, ni orphelin, ni suspect, ni repos, ni terminé" "$(g "$o" 'j[0].sections[0].lignes.map(l=>l.cle).join("|")')" "a-vous:s-att|a-vous:phase:fiabilite:7"
-  assert_eq "RG4.4 — la ligne de phase : nom, lien vers la carte, genre, aucune action" "$(g "$o" 'const l=j[0].sections[0].lignes[1]; [l.nom,l.lien,l.kind,l.action,l.mot].map(String).join("|")')" "Phase 7 : vérification humaine demandée|project.html#r=n%3Aph-7|phase|null|vous attend"
+  assert_eq "RG4.4 — la ligne de phase : nom, lien vers la carte, genre, aucune action" "$(g "$o" '(()=>{const l=j[0].sections[0].lignes[1]; return [l.nom,l.lien,l.kind,l.action,l.mot].map(String).join("|")})()')" "Phase 7 : vérification humaine demandée|project.html#r=n%3Aph-7|phase|null|vous attend"
   assert_eq "RG4.4 — aVous() compte les mêmes lignes" "$(g "$o" 'j[1]')" "2"
 }
 
@@ -135,8 +136,8 @@ rg_RG6_modele() {
   local CH LONG sc="$WORK/s61.json" o="$WORK/o61.json" e
   CH="$(printf '%s' '/Us' 'ers/quidam/lab/locks/x')"; LONG="$(printf 'o%.0s' $(seq 1 120))"
   e="{\"ws\":\"fiabilite\",\"scope\":\"mission\",\"phase\":\"73\",\"step\":\"exec\",\"present\":true,\"age_seconds\":10,\"lease_seconds\":840,\"owner\":\"sess-1\",\"session_ids\":[\"SENT-SID-1\",\"SENT-SID-2\"],\"dir\":\"$CH\",\"emplacement\":\"$CH/fichier\",\"inconnu\":\"SENT-INCONNU\"}"
-  rgm_json "$(rgm_appel verrouBlanc "[$e]")" "$(rgm_appel verrouBlanc "[{\"present\":true,\"owner\":\"$LONG\",\"step\":\"$LONG\"}]")" \
-    "$(rgm_appel verrouBlanc "[{\"present\":true,\"owner\":\"$CH\",\"step\":\"C:\\\\partage\"}]")" \
+  local e2="{\"present\":true,\"owner\":\"$LONG\",\"step\":\"$LONG\"}" e3="{\"present\":true,\"owner\":\"$CH\",\"step\":\"C:\\\\partage\"}"
+  rgm_json "$(rgm_appel verrouBlanc "[$e]")" "$(rgm_appel verrouBlanc "[$e2]")" "$(rgm_appel verrouBlanc "[$e3]")" \
     "$(rgm_appel verrouBlanc '[{"present":true,"owner":"ab\u0007c‮d​e","step":"e\u0000t"}]')" > "$sc"
   rgm_play "$UI" "$sc" "$o"
   assert_eq "RG6.1 — entrée à sentinelles : aucune ne sort (identifiants de session, chemins, emplacement, clé brute, clé inconnue)" "$(g "$o" 'j[0].ws==="fiabilite" && !/SENT|quidam|session_ids|lease_seconds|emplacement|"dir"/.test(JSON.stringify(j[0]))')" "true"
@@ -214,15 +215,15 @@ rg_RG9_modele() {
   assert_eq "RG9.2 — 22 min : « commande longue : 22 min »" "$(g "$o" 'j[4].mot+"|"+j[4].poids')" "commande longue : 22 min|600"
   assert_eq "RG9.2 — fenêtre 600 : 12 min restent « commande en cours » (le seuil de commande longue n'est pas la fenêtre) ; 22 min restent « longue »" "$(g "$o" 'j[5].detail+"|"+j[6].mot')" "commande en cours depuis 12 min|commande longue : 22 min"
   assert_eq "RG9.3 — fenêtre inconnue : jamais « suspect », la décroissance s'arrête à « silencieux »" "$(g "$o" 'j[7].mot')" "silencieux depuis 18 min"
-  assert_eq "RG9.4 — orphelin sous la ligne grisée de son parent terminé : mot, niveau, aucune action" "$(g "$o" 'const L=j[8].sections[1].lignes.filter(l=>l.kind!=="mission"); L.map(l=>[l.id,l.grise,l.mot,l.niveau,l.parent,l.action].join(":")).join("|")')" "p:true:terminé:0:null:null|o:false:orphelin:1:p:null"
+  assert_eq "RG9.4 — orphelin sous la ligne grisée de son parent terminé : mot, niveau, aucune action" "$(g "$o" '(()=>{const L=j[8].sections[1].lignes.filter(l=>l.kind!=="mission"); return L.map(l=>[l.id,l.grise,l.mot,l.niveau,l.parent,l.action].map(String).join(":")).join("|")})()')" "p:true:terminé:0:null:null|o:false:orphelin:1:p:null"
   assert_eq "RG9.6 — l'âge avance avec le temps écoulé depuis la réception : 60 s reçus il y a 200 s" "$(g "$o" 'j[10].mot')" "silencieux depuis 4 min"
   assert_eq "RG9.6 — contre-épreuve : 60 s reçus à l'instant restent « au travail »" "$(g "$o" 'j[9].mot')" "au travail"
-  assert_eq "RG9.7 — chaque attrs.etat est une valeur de GLYPHE_ETAT ou surveiller, orphelin, attente" "$(g "$o" 'const ok=new Set([...j[12].glyphes,"surveiller","orphelin","attente"]); const l=[...j[8].sections,...j[11].sections].flatMap(s=>s.lignes.concat(s.relus||[])).filter(x=>x.kind!=="mission"); (l.length>0 && l.every(x=>ok.has(x.attrs.etat)))')" "true"
+  assert_eq "RG9.7 — chaque attrs.etat est une valeur de GLYPHE_ETAT ou surveiller, orphelin, attente" "$(g "$o" '(()=>{const ok=new Set([...j[12].glyphes,"surveiller","orphelin","attente"]); const l=[...j[8].sections,...j[11].sections].flatMap(s=>s.lignes.concat(s.relus||[])).filter(x=>x.kind!=="mission"); return (l.length>0 && l.every(x=>ok.has(x.attrs.etat)))})()')" "true"
   assert_eq "RG9.7 — le modèle ne porte aucune forme de glyphe et pose les six exports du modèle" "$(g "$o" 'j[12].glypheCopie+"|"+j[12].sansDocument+"|"+j[12].modele.slice().sort().join(",")')" "false|true|aVous,etatVivant,modele,trierAVous,verrouBlanc,verrous"
   local d="$WORK/o9b.json"; rgm_play "$UI" "$WORK/sc9.json" "$d" brut
   assert_eq "RG9.8 — espaces insécables avant « : » et entre nombre et unité" "$(g "$d" 'j[2].mot===`suspect : aucun signe de vie depuis 18 min`')" "true"
   if [ -f "$UI/72-vf-regie-modele.js" ]; then
-    rg_mutant "CALME" "seuil de silence lu à 300" "$UI" "72-vf-regie-modele.js" 'age >= r.CALME_S' 'age >= 300' rgm_sonde_calme "silencieux depuis 4 min"
+    rg_mutant "CALME" "seuil de silence lu à 300" "$UI" "72-vf-regie-modele.js" '!cmd && age != null && age >= r.CALME_S' '!cmd && age != null && age >= 300' rgm_sonde_calme "silencieux depuis 4 min"
     rg_mutant "LONGUE-EGALE-STALL" "seuil de commande longue lu dans la fenêtre" "$UI" "72-vf-regie-modele.js" 'age >= r.LONGUE_S' 'age >= (fen == null ? r.LONGUE_S : fen)' rgm_sonde_longue "commande en cours depuis 12 min"
     rg_mutant "ORPHELIN-ACTION" "l'orphelin reçoit l'action lire-rapport" "$UI" "72-vf-regie-modele.js" "action: lire ? 'lire-rapport' : null," "action: lire || e.etat === 'orphelin' ? 'lire-rapport' : null," rgm_sonde_orphelin "null"
     rg_mutant "GLYPHE-COPIE" "table de glyphes locale à la place de celle de 71" "$UI" "72-vf-regie-modele.js" 'G = r.GLYPHE_ETAT' "G = { actif: 'a', 'en-attente': 'b', 'au-repos': 'c', attend: 'd', termine: 'e', bloque: 'f' }" rgm_sonde_glyphes "true"
@@ -231,13 +232,12 @@ rg_RG9_modele() {
 rgm_sonde_calme() { rgm_play "$1" "$WORK/sc9.json" "$WORK/o9.mut"; g "$WORK/o9.mut" 'j[1].mot'; }
 rgm_sonde_longue() { rgm_play "$1" "$WORK/sc9.json" "$WORK/o9.mut"; g "$WORK/o9.mut" 'j[5].detail'; }
 rgm_sonde_orphelin() { rgm_play "$1" "$WORK/sc9.json" "$WORK/o9.mut"; g "$WORK/o9.mut" 'j[8].sections[1].lignes.find(l=>l.id==="o").action'; }
-rgm_sonde_glyphes() { rgm_play "$1" "$WORK/sc9.json" "$WORK/o9.mut"; g "$WORK/o9.mut" 'const ok=new Set([...j[12].glyphes,"surveiller","orphelin","attente"]); const l=[...j[8].sections,...j[11].sections].flatMap(s=>s.lignes.concat(s.relus||[])).filter(x=>x.kind!=="mission"); (l.length>0 && l.every(x=>ok.has(x.attrs.etat)))'; }
+rgm_sonde_glyphes() { rgm_play "$1" "$WORK/sc9.json" "$WORK/o9.mut"; g "$WORK/o9.mut" '(()=>{const ok=new Set([...j[12].glyphes,"surveiller","orphelin","attente"]); const l=[...j[8].sections,...j[11].sections].flatMap(s=>s.lignes.concat(s.relus||[])).filter(x=>x.kind!=="mission"); return (l.length>0 && l.every(x=>ok.has(x.attrs.etat)))})()'; }
 
 rg_RG10_modele() {
   local sc="$WORK/sc10.json" o="$WORK/o10.json" cx='{"now":1000000000000,"recuA":1000000000000,"fenetre":900}'
-  rgm_json "$(rgm_appel etatVivant "[{\"kind\":\"session\",\"etat\":\"en-attente\",\"attendAgents\":3,\"ageS\":400},$cx]")" \
-    "$(rgm_appel etatVivant "[{\"kind\":\"subagent\",\"etat\":\"en-attente\",\"attendAgents\":3,\"ageS\":400},$cx]")" \
-    "$(rgm_appel etatVivant "[{\"kind\":\"session\",\"etat\":\"actif\",\"attendAgents\":3,\"ageS\":30},$cx]")" > "$sc"
+  rgm_json "$(rgm_ev session en-attente '"attendAgents":3,"ageS":400' "$cx")" "$(rgm_ev subagent en-attente '"attendAgents":3,"ageS":400' "$cx")" \
+    "$(rgm_ev session actif '"attendAgents":3,"ageS":30' "$cx")" > "$sc"
   rgm_play "$UI" "$sc" "$o"
   assert_eq "RG10.6 — session non active avec attendAgents 3 : « attend ses agents (3) »" "$(g "$o" 'j[0].mot+"|"+j[0].etat')" "attend ses agents (3)|attente"
   assert_eq "RG10.6 — sous-agent : champ ignoré ; session active : champ ignoré" "$(g "$o" 'j[1].mot+"|"+j[2].mot')" "en attente|au travail"
@@ -250,14 +250,13 @@ rg_RG11_modele() {
   w="$w]}"
   local lus='{"now":1000000000000,"recuA":1000000000000,"fenetre":900,"lus":{"t1":1},"nonCommite":{},"missions":[]}'
   rgm_json "$(rgm_modele "$w" null "$lus")" "$(rgm_modele "$w")" \
-    "$(rgm_appel etatVivant "[{\"kind\":\"subagent\",\"etat\":\"termine\",\"finMotif\":\"echec\",\"ageS\":180,\"dureeS\":1740},$cx]")" \
-    "$(rgm_appel etatVivant "[{\"kind\":\"subagent\",\"etat\":\"termine\",\"finMotif\":\"arret\",\"ageS\":180,\"dureeS\":1740},$cx]")" \
-    "$(rgm_appel etatVivant "[{\"kind\":\"subagent\",\"etat\":\"termine\",\"ageS\":180,\"dureeS\":1740},$cx]")" > "$sc"
+    "$(rgm_ev subagent termine '"finMotif":"echec","ageS":180,"dureeS":1740' "$cx")" "$(rgm_ev subagent termine '"finMotif":"arret","ageS":180,"dureeS":1740' "$cx")" \
+    "$(rgm_ev subagent termine '"ageS":180,"dureeS":1740' "$cx")" > "$sc"
   rgm_play "$UI" "$sc" "$o"
-  assert_eq "RG11.1 — hors « lus », du plus récent au plus ancien : huit lignes puis « Un autre » ; compte = 9" "$(g "$o" 'const s=j[0].sections[2]; s.compte+"|"+s.lignes.map(l=>l.id).join(",")+"|"+s.autres+"|"+s.autresTexte')" "9|t2,t3,t4,t5,t6,t7,t8,t9|1|Un autre"
-  assert_eq "RG11.1 — « lus » absent : tout est à relire (repli sans stockage) ; « Les 2 autres »" "$(g "$o" 'const s=j[1].sections[2]; s.compte+"|"+s.lignes.length+"|"+s.autresTexte')" "10|8|Les 2 autres"
-  assert_eq "RG11.1 — l'agent lu et la session close vont dans les relus, sans bouton" "$(g "$o" 'const s=j[0].sections[2]; s.relus.map(l=>l.id+":"+l.action).join(",")')" "t1:null,s-close:null"
-  assert_eq "RG11.1 — une ligne à relire : coche, « il y a », « a duré », bouton « lire-rapport »" "$(g "$o" 'const l=j[0].sections[2].lignes[0]; [l.etat,l.detail,l.duree.prefixe,l.duree.valeur,l.action,l.cle].join("|")')" "termine|il y a 2 min|a duré|3 min|lire-rapport|a-relire:t2"
+  assert_eq "RG11.1 — hors « lus », du plus récent au plus ancien : huit lignes puis « Un autre » ; compte = 9" "$(g "$o" '(()=>{const s=j[0].sections[2]; return s.compte+"|"+s.lignes.map(l=>l.id).join(",")+"|"+s.autres+"|"+s.autresTexte})()')" "9|t2,t3,t4,t5,t6,t7,t8,t9|1|Un autre"
+  assert_eq "RG11.1 — « lus » absent : tout est à relire (repli sans stockage) ; « Les 2 autres »" "$(g "$o" '(()=>{const s=j[1].sections[2]; return s.compte+"|"+s.lignes.length+"|"+s.autresTexte})()')" "10|8|Les 2 autres"
+  assert_eq "RG11.1 — l'agent lu et la session close vont dans les relus, sans bouton" "$(g "$o" 'j[0].sections[2].relus.map(l=>l.id+":"+l.action).join(",")')" "t1:null,s-close:null"
+  assert_eq "RG11.1 — une ligne à relire : coche, « il y a », « a duré », bouton « lire-rapport »" "$(g "$o" '(()=>{const l=j[0].sections[2].lignes[0]; return [l.etat,l.detail,l.duree.prefixe,l.duree.valeur,l.action,l.cle].join("|")})()')" "termine|il y a 2 min|a duré|3 min|lire-rapport|a-relire:t2"
   assert_eq "RG11.5 — finMotif : « échec », « arrêté », absent : « rapport rendu »" "$(g "$o" 'j[2].mot+"|"+j[3].mot+"|"+j[4].mot')" "échec|arrêté|rapport rendu"
 }
 

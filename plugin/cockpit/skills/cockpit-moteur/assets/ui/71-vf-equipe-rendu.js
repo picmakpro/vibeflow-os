@@ -76,6 +76,9 @@
   };
   let noms = new Map();
   const SILENCE_PARENT_S = 1800; // PU-G-182 : une session parente en attente ou muette depuis plus de 30 min (le TTL de driver-lock.sh)
+  // PU-G-182, P73-D-13 : le garde d'orphelin, nommé pour que la régie (72-vf-regie-modele.js) l'appelle au lieu de le recopier
+  const estOrphelin = (w, parent) => !!w.orphan
+    || (w.kind === 'subagent' && w.etat === 'actif' && !!parent && parent.kind === 'session' && parent.etat !== 'termine' && parent.ageS > SILENCE_PARENT_S);
   const aVivant = (w, enfants) => w.etat !== 'termine' || (enfants.get(w.id) || []).some((k) => aVivant(k, enfants));
 
   // la durée dit de quoi elle parle : tenue d'un sous-agent en cours, ancienneté de la dernière écriture d'une session, durée d'un terminé
@@ -88,7 +91,7 @@
   const ligne = (w, parent, enfants, tous, h) => {
     const sess = w.kind === 'session', fini = w.etat === 'termine', ks = (tous.get(w.id) || []).filter((k) => aVivant(k, tous)).sort((a, b) => (b.dureeS || 0) - (a.dureeS || 0));
     // PU-G-182 : « orphelin ? » (le registre dit « jamais fermé », pas « processus mort ») ; un enfant actif dont la session parente se tait depuis plus de 30 min l'est aussi
-    const orphe = !!w.orphan || (w.kind === 'subagent' && w.etat === 'actif' && !!parent && parent.kind === 'session' && parent.etat !== 'termine' && parent.ageS > SILENCE_PARENT_S);
+    const orphe = estOrphelin(w, parent);
     const nom = orphe ? 'orphelin' : GLYPHE_ETAT[w.etat] || 'actif';
     const tache = sess ? noms.get(w.id) || titreDe(w) : w.task || (fini ? `${w.role || 'Agent'} · ${String(w.id).slice(0, 8)}` : ''); // PU-G-184 : un agent terminé sans titre se nomme par son rôle et son identifiant court
     const raison = w.rattachement && w.rattachement.raison;
@@ -227,5 +230,5 @@
     .aw-foot { margin: var(--sp-12) 0 0; color: var(--text-3); font-size: 12px; line-height: 20px; }
   `;
 
-  window.__vfEquipeRendu = { glyphe, nomDeSession: (workers, id) => nommer(workers).get(id) || null, arbre, agentsDuNoeud, transcript, pied, piedCarte, st, etat, duree, versNoeud, actif, surveiller, titreEquipe, ligneAgents, css: CSS };
+  window.__vfEquipeRendu = { GLYPHE_ETAT, MOT, estOrphelin, CALME_S, LONGUE_S, nommer, glyphe, nomDeSession: (workers, id) => nommer(workers).get(id) || null, arbre, agentsDuNoeud, transcript, pied, piedCarte, st, etat, duree, versNoeud, actif, surveiller, titreEquipe, ligneAgents, css: CSS };
 })();
