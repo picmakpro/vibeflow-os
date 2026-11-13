@@ -70,7 +70,9 @@ mk_lab() { # $1 = dossier : lab GSD minimal, un commit
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; $ENVX = préfixe d'environnement ; pose OUT, PORT ; démarre le serveur (SRV)
   env $ENVX "$NODE" "${2:-$SCRIPTS}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
-  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true
+  # 79-16 : la page vient des sources du MODULE servi ; un mutant (copie passée en $2) n'agit que s'il est le module LANCÉ
+  if [ -n "${2:-}" ]; then COCKPIT_MODULE="${2%/scripts}" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true
+  else COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true; fi
   SRV="$VF_PID"
   PORT="$VF_PORT"
 }
@@ -121,8 +123,7 @@ PRET="document.readyState === 'complete' && !!document.querySelector('#proj-name
 
 # --- copies privées du module pour les mutants et le témoin (VENDORED non nécessaire : le build lit assets/ui/*.js) ---
 mkmod() { # $1 = nom ; rend le dossier des scripts de la copie (frère : skills/cockpit-moteur)
-  local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"
-  cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"
+  local d; d="$(cockpit_module_copie "$WORK/mod-$1")" || return 1   # 79-16 : la copie complète du module (le serveur lancé est celui de la copie, voir build_serve)
   echo "$d/scripts"
 }
 cat > "$AUX/mut.mjs" <<'JS'
@@ -153,7 +154,8 @@ JS
     case "$pg" in /project.html) assert_eq "H2.2 — titre de l'onglet du navigateur : « Projet · » puis le nom que l'en-tête affiche (AUDC-X7, forme unique)" "$(jq_ "$R" 'j.titre === "Projet · " + j.attendu ? "inchangé" : j.titre' 2>/dev/null)" "inchangé";; esac
   done
   # H2.3 : un changement de planning garde le nom du dépôt (79-15 : la page est servie depuis la mémoire, project.html du disque ne bouge plus)
-  servi() { node "$SCRIPTS/tests/graphe-client.mjs" get "$PORT" /project.html | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).corps||"")}catch{}})'; }
+  # 79-16 : le document de la coquille ne porte plus aucune donnée ; ce que la page servie porte (plans, meta.vfGit) se lit sur la route du graphe de l'onglet Projet
+  servi() { local tok; tok="$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).token)}catch{}' "$OUT/.cache/server.json")"; node "$SCRIPTS/tests/graphe-client.mjs" get "$PORT" "/api/vf/graphe?onglet=projet" "$tok" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).corps||"")}catch{}})'; }
   printf '<objective>Second plan ajouté par le test H2.3</objective>\n' > "$WT/.planning/phases/01-x/01-02-PLAN.md" # un plan neuf change la structure : la page servie le porte, project.html du disque reste celui de l'assemblage
   for _ in $(seq 1 150); do servi | grep -q 'Second plan ajouté par le test H2.3' && break; sleep 0.2; done
   assert_eq "H2.3a — témoin : la page servie porte le second plan, project.html du disque est resté celui de l'assemblage" "$(servi | grep -c 'Second plan ajouté par le test H2.3')|$(grep -c 'Second plan ajouté par le test H2.3' "$OUT/project.html")" "1|0"
@@ -514,7 +516,7 @@ JS
   cat > "$AUX/h9.js" <<'JS'
 const [base, mode] = ARGS;
 const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
-if (mode === 'premiere') await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `window.__vfFetch.reponse = { schema: 'vibeflow/cockpit-git-entete@1', etat: 'indisponible', depot: 'depot', branche: null, worktree: null, detache: false, sha7: null }` }); // la lecture du chargement dit « indisponible » aussi : jamais de valeur connue
+if (mode === 'premiere') await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `window.__vfFetch.reponse = { schema: 'vibeflow/cockpit-git-entete@1', etat: 'indisponible', depot: 'depot', branche: null, worktree: null, detache: false, sha7: null }; { const f1 = window.fetch.bind(window); window.fetch = (u, i) => { const r = f1(u, i); return /\\/api\\/vf\\/graphe/.test(typeof u === 'string' ? u : u.url) ? r.then((x) => x.text().then((t) => new Response(t.split('"vfGit":{"etat":"ok"').join('"vfGit":{"etat":"indisponible"'), { status: x.status, headers: x.headers }))) : r; }; }` }); // la lecture du chargement dit « indisponible » aussi : jamais de valeur connue ; 79-16 : la page tient meta.vfGit de la route du graphe (plus du document), réécrite ici à l'arrivée
 await s.naviguer(base + '/');
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
@@ -563,23 +565,15 @@ JS
   assert_eq "H9.1e — après « absent » puis « indisponible » : aucune ancienne branche ne réapparaît comme non confirmée (« Branche indisponible », sans mot)" "$(jq_ "$R9" '[j.apresAbsent.branche, j.apresAbsent.etat].join("|")' 2>/dev/null)" "Branche indisponible|"
   assert_eq "H9.1d — aucune erreur de page" "$(jq_ "$R9" 'j.errs.length' 2>/dev/null)" "0"
   assert_eq "H9.1f — F6a (3e tour) : le titre de la vue est un arrêt de Tab (tabindex 0) tant qu'il porte sa définition (branche connue, témoin) ; dépôt « indisponible », il n'en porte plus et n'est plus un arrêt, même après un changement de classe du corps qui relance l'observateur de tabindex (aucun tabindex, ni title ni aria-description)" "$(jq_ "$R9" '[j.titreConnu, j.titreIndispo].join("|")' 2>/dev/null)" "0/true|aucun/false"
-  # première lecture SANS valeur connue : la page servie dit déjà « indisponible » (le HTML posé est réécrit pour le test) -> « Branche indisponible », jamais masquée
-  env $ENVX "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$WT" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
-  OUT="$WT/.vibeflow/cockpit"
-  node "$AUX/mut.mjs" "$OUT/index.html" '"vfGit":{"etat":"ok"' '"vfGit":{"etat":"indisponible"' > "$WORK/h92.out" 2>&1 || cat "$WORK/h92.out"
-  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$WT" $ENVX ${ENVS:-} || true
-  SRV="$VF_PID"
-  PORT="$VF_PORT"; BASE="http://127.0.0.1:$PORT"
+  # première lecture SANS valeur connue : le graphe reçu par la page dit déjà « indisponible » (réponse de la route réécrite dans le navigateur par h9.js, mode premiere) -> « Branche indisponible », jamais masquée
+  build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
   R92="$(cdp "$AUX/h9.js" "$BASE" premiere 2>&1 | tail -1)"; stop_srv
   assert_eq "H9.2 — première lecture sans valeur connue : « Branche indisponible », sans mot ajouté, ligne et ouvreur présents ; la lecture réussie suivante donne la branche" "$(jq_ "$R92" '[j.premiere.branche, j.premiere.etat, j.premiere.cachee, j.premiere.ouvreurCache, j.muet.branche, j.muet.ligneCachee, j.ok.branche].join("|")' 2>/dev/null)" "Branche indisponible||false|false|Branche indisponible|false|revenue"
 
   # F6a (3e tour) : mutant de la garde de tabindex (elle ne regarde plus la définition COURANTE mais le fait d'en avoir déjà porté une) -> le titre d'un dépôt « indisponible » redevient un arrêt de Tab muet (H9.1f rougit)
-  env $ENVX "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$WT" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
-  OUT="$WT/.vibeflow/cockpit"
-  node "$AUX/mut.mjs" "$OUT/index.html" "if (!h1 || !h1.dataset.vfAide) return; if (document.body.classList.contains('vf-git-ouvert'))" "if (!h1 || !h1.dataset.vfAideLie) return; if (document.body.classList.contains('vf-git-ouvert'))" > "$WORK/h91f.out" 2>&1 || { cat "$WORK/h91f.out"; echo "  ❌ FAIL — M-TABINDEX-DEFINITION : mutation impossible" >&2; }
-  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$WT" $ENVX ${ENVS:-} || true
-  SRV="$VF_PID"
-  PORT="$VF_PORT"; BASE="http://127.0.0.1:$PORT"
+  MTI="$(mkmod mtabindex)"  # 79-16 : la garde est dans la source de page du module (ui/76), plus dans un document posé : le mutant est une copie du module, LANCÉE
+  mutate "$MTI/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "if (!h1 || !h1.dataset.vfAide) return; if (document.body.classList.contains('vf-git-ouvert'))" "if (!h1 || !h1.dataset.vfAideLie) return; if (document.body.classList.contains('vf-git-ouvert'))" || echo "  ❌ FAIL — M-TABINDEX-DEFINITION : mutation impossible" >&2
+  build_serve "$WT" "$MTI"; BASE="http://127.0.0.1:$PORT"
   RTI="$(cdp "$AUX/h9.js" "$BASE" connue 2>&1 | tail -1)"; stop_srv
   assert_eq "M-TABINDEX-DEFINITION — le mutant (le titre redevient un arrêt de Tab dès qu'il a porté une définition) rougit H9.1f : « 0/true|0/false » au lieu de « 0/true|aucun/false » (témoin : le témoin positif reste « 0/true »)" "$(jq_ "$RTI" '[j.titreConnu, j.titreIndispo].join("|")' 2>/dev/null)" "0/true|0/false"
 
@@ -644,9 +638,9 @@ JS
   mutate "$MK/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "if (d.etat === 'absent') { connue = null; ligne.hidden = true;" "if (d.etat === 'absent' || d.etat === 'indisponible') { connue = null; ligne.hidden = true;" || echo "  ❌ FAIL — M-MASQUE : mutation impossible" >&2
   build_serve "$WT" "$MK"; RMK="$(cdp "$AUX/h9.js" "http://127.0.0.1:$PORT" connue 2>&1 | tail -1)"; stop_srv
   assert_eq "M-MASQUE — rougit H9.1 (la ligne et l'ouvreur disparaissent sur une lecture non confirmée)" "$(jq_ "$RMK" '[j.muet.ligneCachee, j.muet.ouvreurCache].join("|")' 2>/dev/null)" "true|true"
-  # M-REPOS : l'index garde la liste des dépôts (retrait annulé dans une copie du build) -> H6.5 rougit
+  # M-REPOS : le graphe servi garde la liste des dépôts (retrait annulé dans une copie du module lancée ; 79-15 : il est servi depuis la mémoire, plus lu dans index.html) -> H6.5 rougit
   MR="$(mkmod mrepos)"
-  mutate "$MR/vf-cockpit-build.mjs" "insererGraphe(html, { ...g, meta: { ...g.meta, repos: [] } })" "insererGraphe(html, g)" || echo "  ❌ FAIL — M-REPOS : mutation impossible" >&2
+  mutate "$MR/vf-cockpit-graphe-fichier.mjs" "const g = { ...g0, meta: { ...g0.meta, repos: [] } };" "const g = g0;" || echo "  ❌ FAIL — M-REPOS : mutation impossible" >&2
   REPOS="$WORK/depot-repos"; mk_lab "$REPOS"; $GIT -C "$REPOS" init -q -b main && $GIT -C "$REPOS" add -A && $GIT -C "$REPOS" commit -q -m init
   build_serve "$REPOS" "$MR"; RMR="$(cdp "$AUX/h6.js" "http://127.0.0.1:$PORT" / 2>&1 | tail -1)"; stop_srv
   assert_eq "M-REPOS — rougit H6.5 (la liste « Dépôts » ou ses lignes réapparaissent)" "$(jq_ "$RMR" '(j.sections.filter((t) => /^(Repositories|Dépôts)/.test(t)).length + j.depots) > 0 ? "rouge" : "vert"' 2>/dev/null)" "rouge"
