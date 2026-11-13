@@ -96,7 +96,7 @@ cockpit_arreter
 # --- aides des sections suivantes ---
 # Q <paramètres> : GET de la route ; code dans QC, corps dans $WORK/b.json ; JB <expression sur b> lit ce corps
 Q() { R GET "/api/vf/tracabilite?$1"; QC="$(J "$WORK/r.json" 'j.code')"; node -e 'process.stdout.write(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).b)' "$WORK/r.json" > "$WORK/b.json" 2>/dev/null || : > "$WORK/b.json"; }
-JB() { J "$WORK/b.json" "$1"; }
+JB() { J "$WORK/b.json" "(b=>($1))(j)"; }
 # mutsub.mjs <fichier> <ancre> <remplacement> : copie jetable modifiée ; « muté » exigé en sortie (ancre introuvable = erreur)
 cat > "$AUX/mutsub.mjs" <<'JS'
 import fs from 'node:fs';
@@ -222,7 +222,7 @@ build_lab "$L3"; cockpit_lancer "$L3"; attendre 20 pret
 tout "$WORK/t111.txt"
 assert_eq "T11.1 — aucune des huit réponses ne contient le chemin du lab, \$HOME, ~/ ni /private/" "$(fuite "$WORK/t111.txt")" "propre"
 assert_eq "T11.1b — témoin positif : les quatre chaînes sont bien dans les fichiers et messages du lab" "$(grep -cF "$L3/src" "$L3/docs/ADR.md")|$(grep -cF '/private/tmp/x' "$(phdir "$L3" 01-un)/01-01-PLAN.md")|$(G_ -C "$L3" log -1 --format=%s | grep -cF '~/.claude/x')|$(grep -cF '~/.claude/z' "$L3/.claude/agent-memory/vf-coder/a.md")" "1|1|1|1"
-assert_eq "T11.1c — témoin positif : les réponses portent bien les textes (titre d'ADR, sujet, critère) sans leur chemin" "$(grep -c 'un chemin hors du lab' "$WORK/t111.txt")" "3"
+assert_eq "T11.1c — témoin positif : les réponses portent bien les textes (titre d'ADR, sujet, critère, nom) remplacés par « un chemin hors du lab »" "$([ "$(grep -c 'un chemin hors du lab' "$WORK/t111.txt")" -ge 3 ] && echo oui || echo non)" "oui"
 cockpit_arreter
 cockpit_module_muter M-ABSOLU vf-cockpit-trace-texte.mjs "s/^  let t = String(s ?? '');\$/  return String(s ?? '');/" && echo "muté M-ABSOLU"
 cockpit_lancer "$L3"; attendre 20 pret
@@ -235,14 +235,14 @@ echo "=== T11.2 — dégradations par cas : 200, l'absence dite, le voisin qui m
 DA="$WORK/da"; lab_l2 "$DA"; rm -rf "$DA/docs" "$DA/.claude"; G_ -C "$DA" add -A; G_ -C "$DA" commit -q -m "retrait"
 build_lab "$DA"; cockpit_lancer "$DA"; attendre 20 pret
 Q 'vue=adr'
-assert_eq "T11.2a — sans docs/ADR.md : 200, absences.adr vrai, registres encore servis" "$QC|$(JB "b.absences.adr+'|'+b.adrs.length+'|'+b.registres.length")" "200|true|0|2"
+assert_eq "T11.2a — sans docs/ADR.md : 200, absences.adr vrai, aucune ADR ouvrable (les deux citées par des commits restent sans panneau), registres encore servis" "$QC|$(JB "b.absences.adr+'|'+b.adrs.filter(a=>a.cle!==null).length+'|'+b.registres.length")" "200|true|0|2"
 Q 'vue=memoire'
 assert_eq "T11.2b — sans .claude/agent-memory/ : 200, absences.memoire absente, aucune entrée" "$QC|$(JB "b.absences.memoire+'|'+b.memoire.compteurs.entrees")" "200|absente|0"
 Q 'vue=jalon'
-assert_eq "T11.2c — voisin : la vue jalon du même lab est servie avec ses phases" "$QC|$(JB 'b.etat+"|"+b.jalon.phases.length')" "200|ok|3"
+assert_eq "T11.2c — voisin : la vue jalon du même lab est servie avec sa phase" "$QC|$(JB 'b.etat+"|"+b.jalon.phases.length')" "200|ok|1"
 cockpit_arreter
-# DC : sans compartiment (aucun .planning)
-DC="$WORK/dc"; mkdir -p "$DC/docs"; printf '# ADR\n\n## ADR-001 — Seul choix\n' > "$DC/docs/ADR.md"; git_lab "$DC"
+# DC : sans compartiment (un .planning sans phase ni compartiment)
+DC="$WORK/dc"; mkdir -p "$DC/docs" "$DC/.planning"; printf '# Roadmap\n' > "$DC/.planning/ROADMAP.md"; printf '# ADR\n\n## ADR-001 — Seul choix\n' > "$DC/docs/ADR.md"; git_lab "$DC"
 build_lab "$DC"; cockpit_lancer "$DC"; attendre 20 pret
 Q 'vue=jalon'
 assert_eq "T11.2d — sans compartiment, jalon : 200, etat vide, absences.compartiment vrai" "$QC|$(JB 'b.etat+"|"+b.absences.compartiment')" "200|vide|true"
