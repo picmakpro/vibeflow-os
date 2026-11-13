@@ -9,18 +9,15 @@
 (() => {
   const SC = window.Floorplan, M = window.__vfProjetModele, R = window.__vfProjetRendu;
   if (!SC || !M || !R || !SC.graph.meta || SC.graph.meta.vfTab !== 'project') return;
-  const { graph: G, state } = SC;
-  const t = window.__vfFrT;
-  const stage = document.getElementById('stage');
-  if (!stage) return;
+  const { graph: G, state } = SC, t = window.__vfFrT;
+  const stage = document.getElementById('stage'); if (!stage) return;
   const FORMES = ['couloirs', 'liste', 'graphe'], LIBELLES = { couloirs: t('Lanes'), liste: t('List'), graphe: t('Graph') };
   const REG = (window.__vfProjetRegistre = window.__vfProjetRegistre || {}), MEM = window.__vfProjetMemoire, LS = () => window.__vfProjetListe;
   const inscrireForme = (nom, def) => { if (FORMES.includes(nom) && def && typeof def.rendre === 'function') REG[nom + ':' + (def.niveau || 'racine')] = def; };
   // T-80-08 : une valeur hors de la liste vaut la forme par défaut, jamais insérée dans le DOM
   const demandee = new URLSearchParams(location.search).get('vue');
   let forme = FORMES.includes(demandee) ? demandee : 'couloirs', formePhase = null, vivant = false, section = null, corps = null,
-    statut = null, flottant = null,
-    conteneur = null, avantVisite = null, ro = null, debutPose = 0, precedents = new Map();
+    statut = null, flottant = null, conteneur = null, avantVisite = null, ro = null, debutPose = 0, precedents = new Map();
   const ouverts = new Set(), noeuds = () => new Map((G.nodes || []).map((n) => [n.id, n]));
   const conteneurJalon = () => { const c = String(state.container); const n = c.startsWith('n:') ? noeuds().get(c.slice(2)) : null;
     return c === 'n:history' || (!!n && n.kind === 'jalon'); };
@@ -176,8 +173,7 @@
   const hauteur = (e) => { const b = e && !e.hidden && e.isConnected ? e.getBoundingClientRect() : null; return b && b.width > 0 ? Math.round(b.height) : 0; };
   const QS = ['#ask', '#vf-coin', '#panel', '#vf-git-tiroir', '.vf-git-tiroir'];
   // la pastille du bas de page : lue par sa nature (bouton fixe sous body), jamais par son nom
-  const pastille = () => [...document.body.children]
-    .find((e) => e.matches('button') && getComputedStyle(e).position === 'fixed') || null;
+  const pastille = () => [...document.body.children].find((e) => e.matches('button') && getComputedStyle(e).position === 'fixed') || null;
   const mesurerBas = () => {
     if (!vivant) return;
     // un élément né après le montage (pastille, coin) est observé dès qu'il existe
@@ -232,7 +228,6 @@
       u.pathname + u.search + u.hash); } catch (e) { void e; } }
     const dedans = niveau() === 'phase', n = dedans ? (G.files || []).filter((f) => f.n === String(state.container).slice(2) && /-PLAN\.md$/.test(f.p)).length
       : M.blocs(G).reduce((s, b) => s + b.total, 0);
-    // 0 : singulier en français (le pluriel commence à 2)
     const total = !n ? (dedans ? t('0 plans') : t('0 phases')) : dedans ? t.pl(n, 'plan') : t.pl(n, 'phase');
     annoncer(nom === 'graphe' ? t('Showing as a graph') : t('Showing as {}, {}', LIBELLES[nom].toLowerCase(), total));
     return true;
