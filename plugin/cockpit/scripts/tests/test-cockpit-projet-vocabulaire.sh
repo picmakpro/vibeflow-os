@@ -81,7 +81,7 @@ echo "=== PV3 — phase, jalon, mots ==="
 build_serve "$LAB"
 R3="$(mesurer chrome-projet-vocabulaire.mjs pv3)"; sonde "$R3"; E3() { E "$1" "$R3"; }
 assert_eq "PV3.1 — phase 1 : sa ligne d'état une fois ; jalon : « N phases faites sur M » et une barre role=progressbar" \
-  "$(E3 '[j.pv31.txt.split(" plans sur ").length - 1, /exigence sur 2/.test(j.pv31.txt), /phases? faites? sur 6/.test(j.pv31j.txt), j.pv31j.progress]')" '[1,true,true,1]'
+  "$(E3 '[(j.pv31.txt.match(/\d+ plans? sur \d+/g) || []).length, /exigence sur 2/.test(j.pv31.txt), /phases? faites? sur 6/.test(j.pv31j.txt), j.pv31j.progress]')" '[1,true,true,1]'
 assert_eq "PV3.3 — sur tout nœud et tout élément de Projet : aucun des mots « Élément », « module », « Mention »" \
   "$(E3 '[j.pv33.n > 10, j.pv33.mots]')" '[true,[]]'
 assert_eq "PV3.9 — témoin : aucune section du pilote n'a échoué" "$(E3 'Object.keys(j.erreurs).join()')" ""

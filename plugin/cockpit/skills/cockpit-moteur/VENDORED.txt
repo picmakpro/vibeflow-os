@@ -23,6 +23,7 @@ AJOUT assets/ui/41-vf-projet-clavier.js
 AJOUT assets/ui/41-vf-projet-formes.js
 AJOUT assets/ui/41-vf-projet-liste.js
 AJOUT assets/ui/41-vf-projet-modele.js
+AJOUT assets/ui/41-vf-projet-panneau.js
 AJOUT assets/ui/41-vf-projet-phase.js
 AJOUT assets/ui/41-vf-projet-rendu.js
 AJOUT assets/ui/41-vf-projet-vue.js
