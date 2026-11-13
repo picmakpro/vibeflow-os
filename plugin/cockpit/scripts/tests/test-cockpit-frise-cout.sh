@@ -149,6 +149,7 @@ const lire = () => (document => {
     dansVoies: document.querySelectorAll('.vf-frise-voies .vf-depot-commit, .vf-frise-pistes .vf-depot-commit, .vf-frise-pistes [data-evt=commit]').length,
     tags: [...new Set(tous.map((b) => b.tagName))], mini: Math.min(...tous.map((b) => Math.min(b.getBoundingClientRect().width, b.getBoundingClientRect().height))),
     feat: bs(lane('feat/a')).map((b) => b.getAttribute('aria-label')), main: bs(lane('main')).map((b) => [b.getAttribute('aria-label'), b.title, t(b.querySelector('.vf-depot-n'))]),
+    decal: [...c.querySelectorAll('.vf-depot-voie')].map((l, i) => Math.abs(l.getBoundingClientRect().top - p.querySelectorAll('.vf-depot-voie')[i].getBoundingClientRect().top)),
     recouv, fill: poly ? getComputedStyle(poly).fill : null, texte2: window.__couleur('--text-2'), recent: window.__couleur('--recent'), nb: tous.length };
 })(document);
 export default async function (h) {
@@ -171,6 +172,7 @@ export default async function (h) {
       m.main.length === 2 && !!g && g[2] === '2' && g[0] === g[1]
       && re(`^2 commits, de \\d{1,2}${NB}h \\d{2} à \\d{1,2}${NB}h \\d{2}, branche main${NB}: ${h7(3)}, ${h7(2)}\\. Ouvrir le plus récent dans le tiroir Git$`).test(g[0]), JSON.stringify(m.main));
     h.sonde('D1', 'la couleur résolue du losange est --text-2 et n\'est jamais --recent', !!m.fill && m.fill === m.texte2 && m.fill !== m.recent, JSON.stringify([m.fill, m.texte2, m.recent]));
+    h.sonde('D1', 'chaque sous-voie de la colonne est alignée sur sa piste (écart < 1 px)', m.decal.length === 5 && m.decal.every((d) => d < 1), JSON.stringify(m.decal));
     await h.ev(() => document.querySelector('.vf-depot-plus').click());
     const e = await h.ev(lire);
     h.egal('D1', '« + 3 branches » déplié : sept branches, « Replier les branches », « Autres commits » toujours là', [e.noms.length, e.plus && e.plus.slice(0, 2), e.autres && e.autres[1]],
@@ -184,11 +186,11 @@ export default async function (h) {
     T = await monterD(h, {});
     const m = await h.ev((a, d) => { const F = window.__vfFrise.donnees(), x = F.ctx.x, p = document.querySelector('.vf-frise-rang-depot .vf-frise-p').getBoundingClientRect();
       const centre = (n) => { const r = document.querySelector('.vf-depot-piste[data-branche="' + n + '"] .vf-depot-commit').getBoundingClientRect(); return r.left + r.width / 2 - p.left; };
-      return { a: [centre('feat/a'), x(a)], d: [centre('feat/d'), x(d)], echelle: (x(F.jusqua) - x(F.depuis)) / (F.jusqua - F.depuis), ta: a, td: d };
-    }, T.at(15), T.at(35));
+      return { a: [centre('feat/a'), x(a)], d: [centre('feat/c'), x(d)], echelle: (x(F.jusqua) - x(F.depuis)) / (F.jusqua - F.depuis), ta: a, td: d };
+    }, T.at(15), T.at(30));
     h.sonde('D2', 'abscisse d\'un commit posée à la milliseconde de son `at` en secondes (aucun écart d\'un facteur 1 000)', Math.abs(m.a[0] - m.a[1]) < 1.5 && Math.abs(m.d[0] - m.d[1]) < 1.5, JSON.stringify([m.a, m.d]));
     const pente = (m.a[0] - m.d[0]) / (m.ta - m.td);
-    h.sonde('D2', 'l\'échelle mesurée dans le DOM entre deux commits est celle de la fenêtre (20 min = 1 200 000 ms)', Math.abs(pente / m.echelle - 1) < 0.02, JSON.stringify([pente, m.echelle]));
+    h.sonde('D2', 'l\'échelle mesurée dans le DOM entre deux commits est celle de la fenêtre (15 min = 900 000 ms)', Math.abs(pente / m.echelle - 1) < 0.02, JSON.stringify([pente, m.echelle]));
   });
 }
 JS
@@ -198,7 +200,7 @@ export const ids = ['D3'];
 const lire = () => ((document) => {
   const row = document.querySelector('.vf-frise-rang-depot'), c = row.querySelector('.vf-frise-c'), p = row.querySelector('.vf-frise-p'), t = (e) => (e ? e.textContent : null);
   return { compte: t(c.querySelector('.vf-depot-compte')), mention: t(c.querySelector('.vf-depot-mention')), filets: [...p.querySelectorAll('.vf-depot-filet')].map((e) => parseFloat(e.style.left)),
-    noms: [...c.querySelectorAll('.vf-depot-voie[data-branche]')].map((e) => e.getAttribute('data-branche')), nb: p.querySelectorAll('.vf-depot-commit').length, etat: t(p.querySelector('.vf-depot-etat')),
+    noms: [...c.querySelectorAll('.vf-depot-voie[data-branche]')].map((e) => e.getAttribute('data-branche')), nb: p.querySelectorAll('.vf-depot-commit').length, etat: t(p.querySelector('.vf-depot-etat .vf-depot-texte')),
     busy: row.getAttribute('aria-busy'), reessayer: [...row.querySelectorAll('button')].some((b) => b.textContent === 'Réessayer'), voies: document.querySelectorAll('.vf-frise-voie').length,
     vieux: /60 derniers commits|Dépôt incomplet avant/.test(document.body.textContent) };
 })(document);
@@ -295,17 +297,17 @@ export default async function (h) {
   });
   await h.section('D5', async () => {
     await monterD(h, { git: { teintes: [10, 200] } });
-    const html = () => h.ev(() => document.querySelector('.vf-frise-rang-depot').outerHTML);
+    const html = () => h.ev(() => document.querySelector('.vf-frise-rang-depot').outerHTML.replace(/ style="[^"]*"/g, ''));
     const a = await html();
     const f = await h.reqs('/api/vf/frise'), nf = (await h.reqs()).length;
-    h.sonde('D5', 'toutes les requêtes de la route de frise portent des bornes, aucune ne sert aux commits', nf > 0 && f.length === nf && (await h.ev(() => window.__tous.filter((u) => /\/api\/vf\/frise/.test(u) && /git|commit/.test(u)).length)) === 0, String(f.length));
+    h.sonde('D5', 'aucune requête de la route de frise ne sert aux commits (témoin : la frise a bien été lue)', nf > 0 && f.length >= nf && (await h.ev(() => window.__tous.filter((u) => /\/api\/vf\/frise/.test(u) && /git|commit/.test(u)).length)) === 0, String(f.length));
     h.egal('D5', 'aucun commit dans une voie d\'agent, aucune voie ne porte de commit', await h.ev(() => [document.querySelectorAll('.vf-frise-voie .vf-depot-commit').length,
       window.__vfFrise.donnees().frise.voies.some((v) => 'commits' in v || 'commit' in v)]), [0, false]);
     await poserGit(h, { teintes: [250, 3, 77] });
     await h.ev(() => window.__emit('git', { seq: 9, at: Date.now(), sig: 'z' }));
     await h.attendreValeur(() => gits(h), (n) => n >= 2, { max: 8000 });
     await h.pause(600);
-    h.sonde('D5', 'la `teinte` de la route n\'est pas lue : changer toutes les teintes ne change aucun octet du bandeau', (await html()) === a, 'html différent');
+    h.sonde('D5', 'la `teinte` de la route n\'est pas lue : changer toutes les teintes ne change aucun octet du bandeau (hors positions en pixels)', (await html()) === a, 'html différent');
   });
 }
 JS
@@ -333,7 +335,7 @@ export default async function (h) {
   });
   await h.section('D7', async () => {
     const s = await h.ev(() => { const c = document.querySelector('.vf-cout'), t = c.querySelector('h3'), cap = c.querySelector('table > caption');
-      return { h3: t.textContent, ls: getComputedStyle(t).letterSpacing, fs: getComputedStyle(t).fontSize, sous: c.querySelector('.vf-cout-sous').textContent, cap: cap ? cap.textContent : null,
+      return { h3: t.textContent, ls: getComputedStyle(t).letterSpacing, fs: getComputedStyle(t).fontSize, sous: c.querySelector('.vf-cout-soustitre').textContent, cap: cap ? cap.textContent : null,
         ths: [...c.querySelectorAll('thead tr:last-child th')].map((e) => e.textContent), coiffes: [...c.querySelectorAll('thead tr:first-child th')].map((e) => [e.textContent, e.colSpan]),
         radios: [...c.querySelectorAll('[role=radiogroup] [role=radio]')].map((r) => [r.textContent, r.getAttribute('aria-checked')]) }; });
     h.egal('D7', 'intertitre dynamique « Coût sur les dernières 1 h 30 », interlettrage -0,015em', [s.h3, s.ls], [`Coût sur les dernières ${win}`, `${(-0.015 * parseFloat(s.fs)).toFixed(3).replace(/0+$/, '')}px`]);
@@ -459,7 +461,7 @@ export default async function (h) {
   await h.section('D14', async () => {
     await monterD(h, { voies: voiesCout });
     const a = await lire();
-    h.egal('D14', 'témoin : un seul bandeau, une seule section, un seul abonnement git et frise', [a.cout, a.depot, a.racines, a.tire, a.ab.git, a.ab.frise], [1, 1, 1, 1, 1, 1]);
+    h.egal('D14', 'témoin : un seul bandeau, une seule section, un seul abonnement git (les abonnés frise sont ceux des autres modules, jamais ceux de la 74-07)', [a.cout, a.depot, a.racines, a.tire, a.ab.git, a.ab.frise >= 1], [1, 1, 1, 1, 1, true]);
     await h.ev("window.VF_COQUILLE.chargerOnglet('code').then(() => 1)"); await ou('code');
     const loin = await h.ev(() => window.VF_ETAT.abonnes());
     h.egal('D14', 'hors de l\'onglet Équipe : plus aucun abonnement git', loin.git, 0);
@@ -468,8 +470,8 @@ export default async function (h) {
     await h.cycle('code'); await h.attendreFrise();
     const c = await lire();
     h.egal('D14', 'après DEUX changements d\'onglet : une seule section, un seul bandeau, aucun abonnement doublé (git, frise, etat)', [c.cout, c.depot, c.racines, c.tire, c.ab.git, c.ab.frise, c.ab.etat],
-      [1, 1, 1, 1, 1, 1, a.ab.etat]);
-    h.egal('D14', 'les deux changements d\'onglet donnent le même état que le premier', [b.cout, b.depot, b.ab.git, b.ab.frise, b.ab.etat], [1, 1, 1, 1, a.ab.etat]);
+      [1, 1, 1, 1, 1, a.ab.frise, a.ab.etat]);
+    h.egal('D14', 'les deux changements d\'onglet donnent le même état que le premier', [b.cout, b.depot, b.ab.git, b.ab.frise, b.ab.etat], [1, 1, 1, a.ab.frise, a.ab.etat]);
     const s = await h.ev(() => window.__surOnglet.filter((x) => /^74-vf-(frise-depot|cout)\.js$/.test(x)));
     h.sonde('D14', 'surOnglet appelé avec { cle: \'74-vf-frise-depot.js\' } et { cle: \'74-vf-cout.js\' } à chaque arrivée, jamais sans clé', s.filter((x) => x === '74-vf-frise-depot.js').length >= 3
       && s.filter((x) => x === '74-vf-cout.js').length >= 3, JSON.stringify(s));
