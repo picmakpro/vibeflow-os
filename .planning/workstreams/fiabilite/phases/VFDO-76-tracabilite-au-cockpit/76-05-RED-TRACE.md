@@ -74,7 +74,7 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-tracabilite-route.sh`
      obtenu:  [200|absent]
   ❌ FAIL — T11.1b — témoin positif : les quatre chaînes sont bien dans les fichiers et messages du lab
      attendu: [1|1|1|1]
-     obtenu:  [1|/private/tmp/claude-501/-Users-samuel-Documents-dev-vibeflow-os/a219f2f3-5094-402a-a8ad-667ce3f18b1a/scratchpad/exec-76/tmp/76-05/tmp.Iwvj6joD05/l3/.planning/workstreams/x/phases/01-un/01-01-PLAN.md:1|1|1]
+     obtenu:  [1|$WORK/l3/.planning/workstreams/x/phases/01-un/01-01-PLAN.md:1|1|1]
   ❌ FAIL — T11.1c — témoin positif : les réponses portent bien les textes (titre d'ADR, sujet, critère) sans leur chemin
      attendu: [3]
      obtenu:  [0]
