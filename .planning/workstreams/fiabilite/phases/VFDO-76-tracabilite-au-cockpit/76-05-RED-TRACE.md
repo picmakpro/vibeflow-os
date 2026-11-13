@@ -15,3 +15,15 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-tracabilite-route.sh`
 ```
 
 T10.2a et T10.2b passent dès la base (témoins du chemin des contrôles communs, attendu par le plan) ; T10.1 est le rouge.
+
+### RK.1 constaté rouge (ligne de table posée, chemin pas encore dans la liste de RK.1)
+
+```
+  ❌ FAIL — RK.1 — les chemins de ROUTES égalent la liste écrite à la main (doing, etat, events, journal, modeles, state, transcript) ; ...
+     attendu: [ok]
+     obtenu:  [ko]      (chemin /api/vf/tracabilite présent dans ROUTES, absent de la liste)
+  ❌ FAIL — RK.7 — ... témoin de couverture : toutes les routes sondées
+     attendu: [aucun-echec|7|7]
+     obtenu:  [aucun-echec|8|8]
+```
+(RK.7 : le compte de routes sondées passe de 7 à 8, aucun échec de sonde.) Les mutants M-LITTERAL, M-HISTORIQUE-NEUF, M-ORDRE rougissaient aussi pour la même raison (RK.1 hors liste).
