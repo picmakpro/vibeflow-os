@@ -40,3 +40,19 @@ Correctifs : `vfPrevuAt` ajouté aux clés volatiles du canon d'`an.mjs` (liste 
 ## Après le code (tâche 1)
 
 `test-cockpit-activite-prevues.sh` : 12 PASS, 0 FAIL (`BILAN : 12 PASS, 0 FAIL`). `test-cockpit-routes.sh` : 56 PASS, 0 FAIL. `test-cockpit-onglet-code.sh` : 32 PASS, 0 FAIL. `test-cockpit-assemblage.sh` : 55 PASS. `test-cockpit-moteur-carte.sh` : 73 PASS.
+
+## Tâche 2 — rouge avant le retrait de l'export
+
+Code de la tâche 1 seul, suite complète (V1 à V10, V-N2N) rejouée sans arrêt au premier échec : 26 PASS, 1 FAIL. V5 à V8, V10 et V-N2N sont verts dès la tâche 1 (bornes, comptes, gabarits et fraîcheur sont dans le module de la tâche 1) : le plan les rangeait en tâche 2, la suite les a seulement posés après.
+
+| témoin | attendu | obtenu | bonne raison |
+| --- | --- | --- | --- |
+| V9 | `0\|[]` (aucune carte prévue, ni `vfPrevuAt` ni `prevusIgnores` dans les données de l'export) | `3\|["vfPrevuAt","prevusIgnores"]` | `exportMap` est en liste de refus (`...g`, seuls `vfTouch` et `vfGit` retirés) : les trois cartes (`ZMARQ-prevu`, `nouveau`, `apres`) et les deux champs sortent |
+
+Témoin positif de V9 (V9b, vert avant et après) : le fichier réel `src/ZMARQ-reel.mjs` et le graphe entier sont dans l'export ; V9c : `graph.json` de la sortie porte bien la carte et les deux champs. Sans V9b, V9 serait un vert à vide.
+
+V-N2N : vert (non-régression après 79-21) ; le code d'avant 79-21 mesurait 855,0 ms puis 3 444,6 ms (consigne du plan, non rejouée ici : mutants levés).
+
+## Après le code (tâche 2)
+
+`test-cockpit-activite-prevues.sh` : 27 PASS, 0 FAIL. `test-cockpit-activite-route.sh` (X1 à X3, export de 75-05, ancre `(({ vfTouch, vfGit, ...m }) => m)(g.meta)` intacte) : 30 PASS, 0 FAIL.
