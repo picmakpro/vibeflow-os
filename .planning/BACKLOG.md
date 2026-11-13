@@ -755,3 +755,16 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - 75-01 (revue, m5) : le tri de la base commune multiple (`baseCommune`, historiques en croix) n'a pas de témoin ; les quatre autres mutants de m5 ont leur témoin (G11).
 
 **Déclencheur de reprise :** la prochaine passe sur l'activité du cockpit (75-07 ou la phase suivante qui la lit).
+
+## Cockpit : mineurs des plans 74-01 à 74-05 et 74-07 (Phase 74, l'équipe dans le temps) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** exécution des plans 74-01 à 74-05 et 74-07, régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale) ; audit de 74-03 et deux passes de revue.
+- 74-03 (audit) : le critère de linéarité de X9 (`test-cockpit-fiche-texte.sh`) admet un ratio de 4 pour un doublement de N ; un tokenizer quadratique à petite constante resterait vert.
+- 74-04 : budget de nœuds SVG non tenu sur la fixture adversariale (40 voies de 500 segments à 24 h : 40 092 nœuds pour 26 240, un `title` par segment) ; rendu mesuré 79 ms, sous la limite de 150 ms.
+- 74-04 : S6 (survol) et S16 (`scrollLeft` de la piste) de `test-cockpit-frise-vue.sh` ont rougi chacune une fois sous forte charge du poste, vertes au passage suivant.
+- 74-04 et 74-07 : la première inscription `VF_ETAT.abonner('frise')` lit `/api/vf/frise` sans bornes.
+- 74-05 : un Échap déjà consommé par la régie (détail déplié dans la régie masquée) ne ferme pas la fiche ; il faut un second appui.
+- 74-07 (revue) : « + N branches » précède les commits dans l'ordre de tabulation du bandeau Dépôt (UI-SPEC § 2 et § 9 le veulent après).
+- 74-07 (revue) : les chiffres de la synthèse de coût ne sont pas en `--text` 500 (UI-SPEC § 5).
+
+**Déclencheur de reprise :** la prochaine passe sur la frise ou la fiche d'agent (74-06, 74-08 à 74-10, ou la recette de la Phase 74).
