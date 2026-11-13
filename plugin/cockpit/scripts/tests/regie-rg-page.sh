@@ -89,6 +89,17 @@ rg_RG9_page() {
   pg_ok "RG9.21 — 30 s sans poussée, texte identique : aucune écriture du DOM" "$o" 'j.out.e.ecritures + "|" + (j.out.e.minuteries >= 1)' "0|true"
 }
 
+# RG9.22 : un rendu qui suit un événement du magasin (who, lock, connexion) ou la minuterie ne touche ni la sélection du moteur ni le focus : aucun appel au moteur
+# (rerender, showPanel, closePanel…), la sélection posée avant reste posée. Sans horloge : l'événement est rejoué puis le rendu attendu par un cycle de promesses.
+rg_RG9_selection() {
+  local src o ev='{"poser":{"who":'"$PG_WHO"',"lock":'"$PG_LOCK"'}}'
+  for src in etat live; do
+    o="$(pg_sc '"source":"'"$src"'"' '[{"selectionner":"n:ag-'"$PG_A"'"},{"focus":"'"$PG_BTN_A"'"},{"nom":"av","obs":{"mode":"focus"}},'"$ev"','"$ev"',{"conn":"perdu"},{"conn":"ouvert"},{"avancer":30000},{"nom":"ap","obs":{"mode":"focus"}},{"nom":"e","obs":{}}]')"
+    pg_ok "RG9.22 — source $src : événements du magasin et minuterie, puis rendu : aucun appel au moteur, sélection et focus intacts" "$o" \
+      'j.out.e.sc.length + "|" + j.out.e.selection + "|" + (j.out.ap.cle === j.out.av.cle && j.out.ap.tag === "BUTTON")' "0|n:ag-$PG_A|true"
+  done
+}
+
 rg_RG11_page() {
   local o="$WORK/_" a b c
   a="$(pg_sc '' '[{"clic":"'"$PG_BTN_RAPPORT"'"},{"nom":"e","obs":{}}]')"
