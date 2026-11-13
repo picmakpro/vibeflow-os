@@ -268,10 +268,112 @@ SHA_B="$(find "$L2" -type f -print0 | sort -z | xargs -0 shasum -a 256)"
 assert_eq "T2.6 lecture seule : empreintes sha256 du lab identiques avant et après toutes les lectures" "$SHA_B" "$SHA_A"
 assert_eq "T2.6 témoin positif : l'empreinte porte bien les fichiers du lab (au moins 30)" "$([ "$(printf '%s\n' "$SHA_A" | wc -l | tr -d ' ')" -ge 30 ] && echo oui || echo non)" "oui"
 
+echo "=== T3 — preuves, critères, bilans exclusifs, vue de jalon, forme « Étape N » ==="
+# aux : lecteur de frontmatter imbriqué (valeurImbriquee, listeImbriquee) et son coût sur un frontmatter de 10 000 lignes
+cat > "$AUX/fmtest.mjs" <<'JS'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+let m; try { m = await import(pathToFileURL(path.join(process.argv[2], 'vf-cockpit-frontmatter.mjs')).href); } catch { console.log(JSON.stringify({ erreur: 'module-absent' })); process.exit(0); }
+const txt = '---\nname: x\nmetadata:\n  type: "project"\n  autre: y\nmust_haves:\n  truths:\n    - "a"\n    - b\n---\ncorps\n';
+const gros = '---\n' + 'a: 1\n'.repeat(10000) + 'metadata:\n  type: project\n---\n';
+const t0 = Date.now(); const g = m.valeurImbriquee(gros, ['metadata', 'type']); const ms = Date.now() - t0;
+console.log(JSON.stringify({ valeur: m.valeurImbriquee(txt, ['metadata', 'type']), liste: m.listeImbriquee(txt, ['must_haves', 'truths']), absent: m.valeurImbriquee(txt, ['metadata', 'nope']), g, ms }));
+JS
+# T3.1 / T3.2 : preuves attachées et critères
+L3A="$WORK/l3a"; lab_base "$L3A" 2
+wr "$(ledger "$L3A")" <<'MD'
+# Exigences
+
+- [ ] **REQ-01**: une exigence
+
+| REQ-01 | Phase 1 | Pending |
+MD
+LONG=""; for _ in $(seq 1 63); do LONG="${LONG}mot "; done
+TRUTHS="$(printf 'must_haves:\n  truths:\n    - "premier critère"\n    - deuxième critère sans guillemets\n    - "troisième critère"\n    - "%s"\n  artifacts: []' "$LONG")"
+MANY="must_haves:"$'\n'"  truths:"; for i in $(seq 1 40); do MANY="${MANY}"$'\n'"    - \"critère numéro $i\""; done
+D="$(phdir "$L3A" 01-un)"; P1=".planning/workstreams/x/phases/01-un"
+mkplan "$D/01-01-PLAN.md" '[REQ-01]' "$TRUTHS"; mkplan "$D/01-02-PLAN.md" '-' "$MANY"
+printf -- '---\nstatus: passed\n---\n# Vérification\n\nMARQUEUR-CORPS-7f3a\n' > "$D/01-VERIFICATION.md"
+printf '# Recette humaine\n\n**Statut : FAITE — close le 2026-11-05.**\n\nMARQUEUR-CORPS-7f3a\n' > "$D/01-RECETTE-HUMAINE.md"
+printf '# Trace rouge\n' > "$D/01-01-RED-TRACE.md"; printf '# Sécurité\n' > "$D/01-SECURITY.md"; printf '# Validation\n' > "$D/01-VALIDATION.md"
+mkplan "$(phdir "$L3A" 02-deux)/02-01-PLAN.md" '-'
+TR="$(V "$L3A" trace)"
+assert_eq "T3.1 cinq preuves en chemins relatifs au lab, sorte exacte, statut lu, plan de la trace rouge" "$(J "$TR" "JSON.stringify(j.phases.find(p=>p.num==='1').trace.preuves.map(x=>[x.sorte,x.fichier,x.plan,x.statut].join('|')))")" "[\"verification|$P1/01-VERIFICATION.md||passed\",\"recette|$P1/01-RECETTE-HUMAINE.md||FAITE — close le 2026-11-05.\",\"trace-rouge|$P1/01-01-RED-TRACE.md|01-01|\",\"securite|$P1/01-SECURITY.md||\",\"validation|$P1/01-VALIDATION.md||\"]"
+assert_eq "T3.1 un fichier absent ne produit aucune preuve (phase 2 : aucun fichier de preuve)" "$(J "$TR" "j.phases.find(p=>p.num==='2').trace.preuves.length")" "0"
+assert_eq "T3.1 aucun corps de fichier dans la sortie (la chaîne marqueur du corps est absente)" "$(grep -c 'MARQUEUR-CORPS' "$TR")" "0"
+assert_eq "T3.1 témoin positif : la même chaîne est dans la VERIFICATION et la recette du lab" "$(cat "$D/01-VERIFICATION.md" "$D/01-RECETTE-HUMAINE.md" | grep -c 'MARQUEUR-CORPS-7f3a')" "2"
+assert_eq "T3.1 aucune clé corps, description ou texte dans les objets produits" "$(grep -c '"corps"\|"description"\|"texte"' "$TR")" "0"
+assert_eq "T3.2 critères : 4 comptés, guillemets retirés, le plus long coupé au mot à 200 au plus" "$(J "$TR" "(c=>c.n+'|'+c.liste[0]+'|'+c.liste[1]+'|'+(c.liste[3].length<=200)+'|'+c.liste[3].endsWith('…'))(j.phases.find(p=>p.num==='1').trace.plans.find(p=>p.id==='01-01').criteres)")" "4|premier critère|deuxième critère sans guillemets|true|true"
+assert_eq "T3.2 critères : au plus 30 listés, le nombre est compté" "$(J "$TR" "(c=>c.n+'/'+c.liste.length)(j.phases.find(p=>p.num==='1').trace.plans.find(p=>p.id==='01-02').criteres)")" "40/30"
+assert_eq "T3.2 PLAN sans must_haves : criteres null" "$(J "$TR" "j.phases.find(p=>p.num==='2').trace.plans[0].criteres")" "null"
+assert_eq "T3.2 valeurImbriquee et listeImbriquee ; frontmatter de 10 000 lignes rendu en moins d'une seconde sans exception" "$(node "$AUX/fmtest.mjs" "$SCRIPTS" > "$WORK/fmtest.json" 2>/dev/null; J "$WORK/fmtest.json" "j.valeur+'|'+j.liste.join(',')+'|'+j.absent+'|'+j.g+'|'+(j.ms<1000)")" "project|a,b|null|null|true"
+# T3.3 / T3.4 : bilans et jalon (jalon v1 = phases 1 à 3, jalon v2 = phase 4)
+L3="$WORK/l3"; lab_base "$L3" 3 4
+wr "$(ledger "$L3")" <<'MD'
+# Exigences
+
+- [ ] **REQ-44**: complète, VERIFICATION et recette lues au niveau phase
+- [ ] **REQ-43**: SUMMARY non lisible
+- [ ] **REQ-42**: SUMMARY manque
+- [x] **REQ-41**: cochée sans SUMMARY
+- [ ] **REQ-45**: phase 2
+- [ ] **REQ-47**: phase 2
+- [ ] **REQ-46**: phase 4, hors du jalon actif
+
+| REQ-44 | Phase 1 | Pending |
+| REQ-43 | Phase 1 | Pending |
+| REQ-42 | Phase 1 | Pending |
+| REQ-41 | Phase 1 | Pending |
+| REQ-45 | Phase 2 | Pending |
+| REQ-47 | Phase 2 | Pending |
+| GHOST-02 | Phase 3 | Pending |
+| GHOST-03 | Phase 3 | Pending |
+| REQ-46 | Phase 4 | Pending |
+MD
+D="$(phdir "$L3" 01-un)"
+mkplan "$D/01-01-PLAN.md" '[REQ-41]'; mkplan "$D/01-02-PLAN.md" '[REQ-42]'
+mkplan "$D/01-03-PLAN.md" '[REQ-43]'; mksum "$D/01-03-SUMMARY.md" NOFM
+mkplan "$D/01-04-PLAN.md" '[REQ-44]'; mksum "$D/01-04-SUMMARY.md" 'requirements: [REQ-44]'
+printf -- '---\nstatus: passed\n---\n# Vérification\n' > "$D/01-VERIFICATION.md"; printf '# Recette humaine\n\n**Statut : FAITE — close le 2026-11-05.**\n' > "$D/01-RECETTE-HUMAINE.md"
+D="$(phdir "$L3" 02-deux)"; mkplan "$D/02-01-PLAN.md" '[REQ-45, REQ-47]'; mksum "$D/02-01-SUMMARY.md" 'requirements: [REQ-45]'
+mkdir -p "$(phdir "$L3" 03-trois)"; printf '# Contexte\n' > "$(phdir "$L3" 03-trois)/03-CONTEXT.md"
+mkplan "$(phdir "$L3" 04-quatre)/04-01-PLAN.md" '[REQ-46]'
+F="$(V "$L3" phase 'x|1')"
+assert_eq "T3.3 bilan exclusif : une exigence par catégorie, dans l'ordre contradiction, manque, non lisible, complète" "$(J "$F" "JSON.stringify(j.bilan)")" '{"total":4,"contradiction":1,"manque":1,"nonLisible":1,"complete":1}'
+assert_eq "T3.3 la somme des catégories égale le total" "$(J "$F" "(b=>b.contradiction+b.manque+b.nonLisible+b.complete===b.total)(j.bilan)")" "true"
+assert_eq "T3.3 exigences triées : contradiction, manque, non lisible, complète (le ledger les liste à l'envers)" "$(J "$F" "j.exigences.map(l=>l.id).join()")" "REQ-41,REQ-42,REQ-43,REQ-44"
+assert_eq "T3.3 la complète : VERIFICATION et recette lues au niveau phase" "$(M "$F" REQ-44 verification) $(M "$F" REQ-44 recette)" "lu/phase lu/phase"
+F="$(V "$L3" jalon)"
+assert_eq "T3.4 jalon v1 : trois phases (id et cle), la phase du jalon v2 n'y est pas" "$(J "$F" "j.phases.map(p=>p.id+'/'+p.cle).join()")" "ph-1/x|1,ph-2/x|2,ph-3/x|3"
+assert_eq "T3.4 bilan de jalon exclusif par phase (pire exigence) plus sansExigence, somme = 3" "$(J "$F" "JSON.stringify(j.bilan)")" '{"total":3,"contradiction":1,"manque":1,"nonLisible":0,"sansExigence":1,"complete":0}'
+assert_eq "T3.4 maillonsEnDefaut phase 1 : un maillon en contradiction n'est pas compté manque" "$(J "$F" "JSON.stringify(j.phases[0].maillonsEnDefaut)")" '{"plan":0,"summary":3,"verification":0,"recette":0,"manquants":1,"nonLisibles":1,"contradictions":1}'
+assert_eq "T3.4 maillonsEnDefaut phase 2 : comptes par maillon avec chevauchement" "$(J "$F" "JSON.stringify(j.phases[1].maillonsEnDefaut)")" '{"plan":0,"summary":1,"verification":2,"recette":2,"manquants":5,"nonLisibles":0,"contradictions":0}'
+assert_eq "T3.4 exigencesEnContradiction compte des exigences ; lignesSansExigence vient de la phase" "$(J "$F" "j.phases.map(p=>p.exigencesEnContradiction).join()+'/'+j.phases.map(p=>p.lignesSansExigence).join()")" "1,0,0/0,0,2"
+# T3.5 dépôt réel (témoin positif, lecture seule)
+F="$(V "$REPO" jalon)"
+assert_eq "T3.5 dépôt réel : vue de jalon non vide, la somme du bilan égale le nombre de phases" "$(J "$F" "(b=>j.phases.length>0&&b.contradiction+b.manque+b.nonLisible+b.sansExigence+b.complete===j.phases.length&&b.total===j.phases.length)(j.bilan)")" "true"
+# T3.6 forme « Étape N » (gabarit planning-core)
+L36="$WORK/l36"; lab_base "$L36" 2
+wr "$(ledger "$L36")" <<'MD'
+# Exigences
+
+- [ ] **REQ-01**: à faire, étape 1
+- [x] **REQ-02**: faite, étape 7 sans dossier
+
+| REQ-01 | Étape 1 | À faire |
+| REQ-02 | Étape 7 | Fait |
+MD
+mkplan "$(phdir "$L36" 01-un)/01-01-PLAN.md" '[REQ-01]'
+TR="$(V "$L36" trace)"
+assert_eq "T3.6 « Étape 1 » désigne un dossier existant : rattachement etape, phase 1" "$(J "$TR" "(e=>e.rattachement+'/'+e.phase+'/'+e.fait)(j.exigences.find(x=>x.id==='REQ-01'))")" "etape/1/false"
+assert_eq "T3.6 « Étape 7 » sans dossier : ni phase ni rattachement, statut Fait lu" "$(J "$TR" "(e=>e.rattachement+'/'+e.phase+'/'+e.fait)(j.exigences.find(x=>x.id==='REQ-02'))")" "null/null/true"
+assert_eq "T3.6 lignes Étape lues et sans dossier comptées" "$(J "$TR" "JSON.stringify(j.etapes)")" '{"lues":2,"sansDossier":1}'
+assert_eq "T3.6 témoin voisin : un ledger sans ligne Étape donne etapes null" "$(J "$(V "$L1" trace)" "j.etapes")" "null"
+
 # --- FIN-SECTIONS ---
 echo
 echo "Résultats : $PASS passés, $FAIL échoués"
 # garde anti-vert-à-vide : le nombre d'assertions jouées doit atteindre l'attendu
-ATTENDU=5
+ATTENDU=66
 [ $((PASS + FAIL)) -ge "$ATTENDU" ] || { echo "  ❌ FAIL — anti-vert-à-vide : $((PASS + FAIL)) assertions jouées, $ATTENDU attendues"; FAIL=$((FAIL+1)); }
 [ "$FAIL" -eq 0 ]

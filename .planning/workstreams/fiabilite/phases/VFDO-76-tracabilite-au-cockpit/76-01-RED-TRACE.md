@@ -47,3 +47,27 @@ non-régression, vertes avant et après par construction.
   ❌ FAIL — T2.8 décision non définie : reste une citation lue ; D-04 n'est jamais dans decisions — attendu: [["P95-D-09"] false] obtenu: [[] false]
 Résultats : 24 passés, 19 échoués
 ```
+
+## Tâche 3 — preuves, critères, bilans, jalon, « Étape N » (T3.1 à T3.6)
+
+État après la tâche 2. Échecs d assertion (attendu / obtenu) ; les sondes négatives (aucun corps, aucune clé interdite) sont vertes à vide tant que rien n est produit, leurs témoins positifs sont dans la même section.
+
+```
+  ❌ FAIL — T3.1 cinq preuves en chemins relatifs au lab, sorte exacte, statut lu, plan de la trace rouge — attendu: [["verification|.planning/workstreams/x/phases/01-un/01-VERIFICATION.md||passed","recette|.planning/workstreams/x/phases/01-un/01-RECETTE-HUMAINE.md||FAITE — close le 2026-11-05.","trace-rouge|.planning/workstreams/x/phases/01-un/01-01-RED-TRACE.md|01-01|","securite|.planning/workstr
+  ❌ FAIL — T3.2 critères : 4 comptés, guillemets retirés, le plus long coupé au mot à 200 au plus — attendu: [4|premier critère|deuxième critère sans guillemets|true|true] obtenu: [absent]
+  ❌ FAIL — T3.2 critères : au plus 30 listés, le nombre est compté — attendu: [40/30] obtenu: [absent]
+  ❌ FAIL — T3.2 valeurImbriquee et listeImbriquee ; frontmatter de 10 000 lignes rendu en moins d'une seconde sans exception — attendu: [project|a,b|null|null|true] obtenu: [absent]
+  ❌ FAIL — T3.3 bilan exclusif : une exigence par catégorie, dans l'ordre contradiction, manque, non lisible, complète — attendu: [{"total":4,"contradiction":1,"manque":1,"nonLisible":1,"complete":1}] obtenu: [null]
+  ❌ FAIL — T3.3 la somme des catégories égale le total — attendu: [true] obtenu: [absent]
+  ❌ FAIL — T3.3 exigences triées : contradiction, manque, non lisible, complète (le ledger les liste à l'envers) — attendu: [REQ-41,REQ-42,REQ-43,REQ-44] obtenu: [REQ-44,REQ-43,REQ-42,REQ-41]
+  ❌ FAIL — T3.4 jalon v1 : trois phases (id et cle), la phase du jalon v2 n'y est pas — attendu: [ph-1/x|1,ph-2/x|2,ph-3/x|3] obtenu: [absent]
+  ❌ FAIL — T3.4 bilan de jalon exclusif par phase (pire exigence) plus sansExigence, somme = 3 — attendu: [{"total":3,"contradiction":1,"manque":1,"nonLisible":0,"sansExigence":1,"complete":0}] obtenu: [absent]
+  ❌ FAIL — T3.4 maillonsEnDefaut phase 1 : un maillon en contradiction n'est pas compté manque — attendu: [{"plan":0,"summary":3,"verification":0,"recette":0,"manquants":1,"nonLisibles":1,"contradictions":1}] obtenu: [absent]
+  ❌ FAIL — T3.4 maillonsEnDefaut phase 2 : comptes par maillon avec chevauchement — attendu: [{"plan":0,"summary":1,"verification":2,"recette":2,"manquants":5,"nonLisibles":0,"contradictions":0}] obtenu: [absent]
+  ❌ FAIL — T3.4 exigencesEnContradiction compte des exigences ; lignesSansExigence vient de la phase — attendu: [1,0,0/0,0,2] obtenu: [absent]
+  ❌ FAIL — T3.5 dépôt réel : vue de jalon non vide, la somme du bilan égale le nombre de phases — attendu: [true] obtenu: [absent]
+  ❌ FAIL — T3.6 « Étape 1 » désigne un dossier existant : rattachement etape, phase 1 — attendu: [etape/1/false] obtenu: [plan/1/false]
+  ❌ FAIL — T3.6 « Étape 7 » sans dossier : ni phase ni rattachement, statut Fait lu — attendu: [null/null/true] obtenu: [null/null/false]
+  ❌ FAIL — T3.6 lignes Étape lues et sans dossier comptées — attendu: [{"lues":2,"sansDossier":1}] obtenu: [null]
+Résultats : 50 passés, 16 échoués
+```
