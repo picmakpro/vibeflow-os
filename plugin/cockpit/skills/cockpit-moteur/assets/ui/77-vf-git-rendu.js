@@ -122,7 +122,8 @@
   const graphe = (rangees, o) => {
     o = o || {};
     const M = Math.max(1, o.couloirsMax || 6), H = o.tactile ? 44 : 40, largeur = Math.max(1, Math.min(M, ...[Math.max(...rangees.map((r) => r.largeur), 1)]));
-    const tm = new Map(rangees.map((r) => [r.h, r.teinte])), lanes = [], ol = el('ol', 'vf-git-graphe', null, { role: 'listbox', 'aria-label': t('Commits') });
+    const tm = new Map(rangees.map((r) => [r.h, r.teinte])), lanes = [];
+    const ol = el('ol', 'vf-git-graphe', null, { role: 'listbox', 'aria-label': t('Commits@git') });
     let i = 0;
     ol.ajouter = (k) => { // 80-06 : rend les k rangées suivantes (l'état des couloirs se poursuit d'une tranche à l'autre) et les rend
       const fruit = [];
@@ -211,7 +212,7 @@
   const AIDE_DETACHE = "HEAD détaché : ce dossier n'est sur aucune branche, il est posé sur un commit précis.";
   const sectionWorktrees = (l, annonce) => {
     if (!l || !l.length) return null;
-    const s = section(t('Worktrees'), l.length, liste(l.map((w) => {
+    const s = section(t('Worktrees@git'), l.length, liste(l.map((w) => {
       const d = el('div', 'vf-git-wt-l'), tl = ligne(mono(w.nom, 'vf-git-gras'));
       if (w.ici) tl.appendChild(el('span', 'vf-git-ici', 'ici'));
       const br = mono(w.detache ? 'HEAD détaché' : w.branche || '—');
@@ -221,10 +222,10 @@
       return d;
     })), false, 'vf-git-s-wt', "Worktrees : copies de travail du dépôt, chacune dans son propre dossier et sur sa propre branche. " + AIDE_DETACHE);
     // P80-D-19 : repliée au départ, le compte fait partie du nom
-    s.querySelector('.vf-git-sec-t').setAttribute('aria-label', `${t('Worktrees')} · ${l.length}`);
+    s.querySelector('.vf-git-sec-t').setAttribute('aria-label', `${t('Worktrees@git')} · ${l.length}`);
     return s;
   };
-  const sectionTags = (l, annoncer) => !l || !l.length ? null : section(t('Tags'), l.length,
+  const sectionTags = (l, annoncer) => !l || !l.length ? null : section(t('Tags@git'), l.length,
     paginer(l, (tg) => ligne(mono(tg.nom, 'vf-git-gras'), mono(tg.h7), el('span', null, relatif(tg.at))), annoncer), false, 'vf-git-s-tags');
   const sectionStash = (l, annonce) => {
     if (!l || !l.length) return null;
@@ -234,7 +235,7 @@
         commande(s.commande, annonce, t('to see the stash {}', s.ref)));
       return d;
     };
-    return section(t('Stash'), l.length, paginer(l, fab, annonce), false, 'vf-git-s-stash');
+    return section(t('Stash@git'), l.length, paginer(l, fab, annonce), false, 'vf-git-s-stash');
   };
   const sectionAuteurs = (auteurs, parBranche, annoncer) => {
     if (!auteurs || !auteurs.length) return null;

@@ -38,7 +38,7 @@
     const [pid, ...reste] = String(f.name).split(' — '), tr = M().tronquer(reste.join(' — ')), id = 'f:' + f.p, st = f.st || 'todo', mot = M().MOTS[st] ||
       M().MOTS.todo;
     const cache = tr.coupe ? ` aria-describedby="vp-d-${sain(id)}"` : '', cur = o.sel === id ? ' aria-current="true"' : '';
-    const nom = `${pid} ${tr.affiche}, ${t('plan')}, ${mot}`;
+    const nom = `${pid} ${tr.affiche}, ${t('plan@project')}, ${mot}`;
     return `<li class="vp-pl"><button type="button" class="vp-ligne vp-plan" data-id="${h(id)}" tabindex="-1" aria-label="${h(nom)}"${cache}${cur}>`
       + `<span class="vp-pid">${h(pid)}</span><span class="vp-titre">${h(tr.affiche)}</span><span class="vst vst-${h(st)}">${h(mot)}</span>`
       + `${couvertes(idPhase, id)}</button>`
@@ -58,7 +58,7 @@
     const n = o.phase, id = n.id, lu = window.VF_EXIGENCES.lireExigences(id); // garde:porte
     const plans = vagues(id, o), ligne = M().ligneEtat(n);
     return `<div class="vp-phase"><p class="vp-pt">${h(M().titreDe(n))}</p>${ligne ? `<p class="vp-etat-l">${h(ligne)}</p>` : ''}`
-      + (plans ? `<h2 class="vp-h2">${t('Plans')}</h2><div data-coll="plans">${plans}</div>` : `<p class="vp-vide">${t('no plan')}</p>`)
+      + (plans ? `<h2 class="vp-h2">${t('Plans@project')}</h2><div data-coll="plans">${plans}</div>` : `<p class="vp-vide">${t('no plan')}</p>`)
       + (lu.exigences.length ? `<h2 class="vp-h2">${t('Requirements')}</h2><ul class="vp-exig">${lu.exigences.map(exigence).join('')}</ul>` : '') + '</div>';
   };
 

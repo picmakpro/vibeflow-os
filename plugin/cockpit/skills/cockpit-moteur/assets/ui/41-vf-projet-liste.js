@@ -8,7 +8,7 @@
   const { state } = SC, h = SC.h, sain = (id) => String(id).replace(/[^\w-]/g, '_');
   const registre = (window.__vfProjetRegistre = window.__vfProjetRegistre || {});
   const t = window.__vfFrT;
-  const COLS = [['phase', t('Phase')], ['etat', t('Status')], ['plans', t('Plans')], ['exigences', t('Requirements')]];
+  const COLS = [['phase', t('Phase@project')], ['etat', t('Status')], ['plans', t('Plans@project')], ['exigences', t('Requirements')]];
   const RANG_ETAT = { 'en-cours': 0, 'a-recetter': 1, 'a-faire': 2, fait: 3 };
   let tri = { col: 'etat', sens: 1 }; // État croissant, puis numéro (non mémorisé)
   const P = () => window.VF_PROJET, M = () => window.__vfProjetModele, R = () => window.__vfProjetRendu;

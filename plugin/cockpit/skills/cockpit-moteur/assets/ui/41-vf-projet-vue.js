@@ -138,7 +138,7 @@
     const modele = { blocs: M.blocs(G), historique: M.historique(G), listes: M.listes(G) };
     const n = niveau(), ph = n === 'phase' ? noeuds().get(String(state.container).slice(2)) : null, def = effective() === 'couloirs' ? null :
       REG[effective() + ':' + n];
-    section.querySelector('#vf-projet-titre').textContent = ph ? t('Phase {}', M.numeroDe(ph)) : t('Project');
+    section.querySelector('#vf-projet-titre').textContent = ph ? `${t('Phase@project')} ${M.numeroDe(ph)}` : t('Project');
     corps.innerHTML = def ? def.rendre(modele, { sel: selectionnee(), ouverts, phase: ph }) : R.vue(modele, { sel: selectionnee(), ouverts });
     K.appliquer(corps); if (LS()) LS().appliquer(corps);
     section.scrollTop = avant; section.scrollLeft = avantG;

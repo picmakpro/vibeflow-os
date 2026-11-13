@@ -74,10 +74,13 @@
     const out = [], existe = (id) => (G.nodes || []).some((n) => n.id === id);
     const fichiers = (id) => (G.files || []).filter((f) => f.n === id);
     const l = (cle, titre, unite, rows) => out.push({ cle, titre, compte: pl(rows.length, unite), rows });
-    if (existe('backlog')) l('backlog', t('Backlog'), 'entrée', fichiers('backlog').map((f) => rangee('f:' + f.p, f.name, f.st === 'done' ? 'done' : 'todo')));
+    if (existe('backlog')) {
+      l('backlog', t('Backlog@project'), 'entrée', fichiers('backlog').map((f) => rangee('f:' + f.p, f.name, f.st === 'done' ? 'done' : 'todo')));
+    }
     if (existe('seeds')) l('graines', t('Seeds'), 'graine', fichiers('seeds').map((f) => rangee('f:' + f.p, f.name, 'todo')));
     if (existe('releases')) {
-      l('releases', t('Releases'), 'tag', fichiers('releases').map(({ p, name, foot: date }) => rangee('f:' + p, name, 'done', date)));
+      const tags = fichiers('releases').map(({ p, name, foot: date }) => rangee('f:' + p, name, 'done', date));
+      l('releases', t('Releases@project'), 'tag', tags);
     }
     if (existe('missions')) l('missions', t('Missions outside a phase'), 'mission', (G.nodes
       || []).filter((n) => n.parent === 'missions').map((n) => rangee('n:' + n.id, n.label, n.st || 'todo')));
