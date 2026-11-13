@@ -21,6 +21,7 @@
 import { Worker } from 'node:worker_threads';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 import { recevoirFrise, finDeTour } from './vf-cockpit-frise-direct.mjs';
+import { poserLecteurAgents } from './vf-cockpit-agents-table.mjs';
 
 export const LIMITES = Object.freeze({ maxOldGenerationSizeMb: 768, maxYoungGenerationSizeMb: 64, stackSizeMb: 4 });
 export const DELAIS = Object.freeze({ fenetreMortMs: 30000, reprisePauseMs: 60000, indexSuspenduMs: 600000, demandeMs: 120000 });
@@ -44,6 +45,14 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
   let fil = null, enVol = null, attente = null, chien = null, redemarrage = null;
   let id = 0, ferme = false, ok = false, indispo = false, derniereA = null, dureeMs = null;
   let index = INDEX_ATTENTE, erreurs = [], relances = 0, derniereMort = null, mortT = 0;
+  const lectures = new Map(); // 79-22 : lectures d'agent en vol (id de demande -> résolution) ; le fil seul lit les fichiers
+  const viderLectures = () => { for (const r of [...lectures.values()]) r(null); lectures.clear(); };
+  const lireAgent = (quoi, cle, signal) => new Promise((res) => {
+    if (!fil || ferme) return res(null);
+    const rid = ++id; lectures.set(rid, res);
+    signal?.addEventListener('abort', () => { lectures.delete(rid); res(null); }, { once: true });
+    try { fil.w.postMessage({ id: rid, lecture: { quoi, id: cle } }); } catch { lectures.delete(rid); res(null); }
+  });
   const moniteur = monitorEventLoopDelay({ resolution: RESOLUTION_MS }); moniteur.enable();
 
   const reveiller = () => { for (const f of [...attendants]) f(true); attendants.clear(); };
@@ -90,6 +99,7 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
     cur.w.unref();
     cur.w.on('message', (m) => {
       if (fil !== cur) return; // un message d'un fil qu'on a quitté n'entre jamais dans la collecte
+      if (m && m.type === 'lecture') { const r = lectures.get(m.id); if (r) { lectures.delete(m.id); r(m.corps); } return; } // 79-22
       if (m && m.type === 'frise') { // 79-13 : la frise va à l'instantané, pas aux consommateurs de résultats
         try { recevoirFrise(m); } catch (e) { log('error', `frise : ${String(e.message).slice(0, 160)}`); }
         return;
@@ -126,7 +136,7 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
     if (ferme) return;
     const t = Date.now(), recente = derniereMort !== null && t - mortT <= D.fenetreMortMs;
     derniereMort = { cause: CAUSES.includes(cause) ? cause : 'erreur', at: new Date(t).toISOString() }; mortT = t;
-    attente = fusion(enVol, attente); enVol = null; fil = null; annulerMinuteurs(); // la demande en vol est rejouée par le fil suivant
+    attente = fusion(enVol, attente); enVol = null; fil = null; annulerMinuteurs(); viderLectures(); // la demande en vol est rejouée par le fil suivant
     log('error', `collecte : fil mort (${derniereMort.cause}) ${detail || ''}`.trim());
     if (recente) { indispo = true; reveiller(); armerReprise(); log('error', 'collecte indisponible : seconde mort rapprochée'); return; }
     relances++; index = INDEX_SUSPENDU;
@@ -142,7 +152,7 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
   async function refaire({ sansIndex = false } = {}) {
     if (ferme) return;
     const ancien = fil; fil = null; annulerMinuteurs();
-    attente = fusion(enVol, attente); enVol = null;
+    attente = fusion(enVol, attente); enVol = null; viderLectures();
     if (ancien) { ancien.voulu = true; ancien.w.terminate().catch(() => {}); await ancien.sorti; } // garde:collecte-ecrivain
     if (ferme) return;
     indispo = false; relances++; index = sansIndex ? INDEX_SUSPENDU : INDEX_ATTENTE;
@@ -151,7 +161,7 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
     envoyerAttente();
   }
 
-  lancer(false);
+  lancer(false); poserLecteurAgents(lireAgent);
 
   return {
     demander({ planning = false, verrous = false, tour = false, motifs = [] } = {}) {
@@ -182,6 +192,7 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
     arreter() {
       if (ferme) return;
       ferme = true; attente = null; enVol = null; annulerMinuteurs(); moniteur.disable(); reveiller(); // garde:collecte-ferme
+      viderLectures(); poserLecteurAgents(null, lireAgent);
       const f = fil; fil = null;
       if (f) { f.voulu = true; f.w.terminate().catch(() => {}); } // garde:collecte-terminer
     },
