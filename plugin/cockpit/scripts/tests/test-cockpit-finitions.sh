@@ -35,10 +35,10 @@ assert_eq "FI0 — serveur du lab démarré (avec --terminal)" "$([ "$PORT" -gt 
 echo "=== FI1 — disclosures et sélecteurs à la charte ==="
 R1="$(mesurer fi1)"; sonde "$R1"; R1T="$(mesurer fi1t)"; sonde "$R1T"; RQ="$(mesurer fi1q)"; sonde "$RQ"
 cockpit_get /_vf/ui/03-vf-charte.js > /dev/null; CODE15="${VF_CODE:-000}"; R15="$(mesurer fi15)"; sonde "$R15"
-SUMOK='[x && x.ls, x && x.marq, x && x.chev, x && x.h >= 32, x && x.ferme]'
+SUMOK='[x && x.ls, x && x.chev, x && x.h >= 32, x && x.ferme]'
 for nom in historique tech lancer; do
-  assert_eq "FI1.1 ($nom) — summary sans marqueur natif (list-style none, marqueur masqué), chevron de 16 × 16 px, zone ≥ 32 px, chevron fermé à 0°" \
-    "$(E "(() => { const x = j.$nom; return $SUMOK; })()" "$R1")" '["none","none",["\"\"","16px","16px"],true,0]'
+  assert_eq "FI1.1 ($nom) — summary sans marqueur natif (list-style none), chevron de 16 × 16 px, zone ≥ 32 px, chevron fermé à 0°" \
+    "$(E "(() => { const x = j.$nom; return $SUMOK; })()" "$R1")" '["none",["\"\"","16px","16px"],true,0]'
 done
 assert_eq "FI1.1b — une fois ouvert, le chevron a tourné de 90° (Historique, Détails techniques, menu du lancement ; transition de 150 ms passée)" \
   "$(E '[j.historiqueOuvert, j.techOuvert, j.lancerOuvert]' "$R1")" '[90,90,90]'

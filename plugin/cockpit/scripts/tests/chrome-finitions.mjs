@@ -58,15 +58,19 @@ const LOCK = `JSON.stringify((() => { const e = document.getElementById('vf-lock
   return [c.fontFamily === b.fontFamily, /tabular-nums/.test(c.fontVariantNumeric), c.fontWeight]; })())`;
 // deux sources de pastilles, comme les posent 20-health.js et 25-recent.js (le bouton, puis la pastille, puis les variables de teinte, dans le même tour)
 const POSER = `(() => { const SC = window.VibeFlow;
-  const bouton = (id) => document.getElementById(id) || SC.addHeaderButton({ id, svg: '<circle cx="12" cy="12" r="4"/>', title: id + ' de test', onClick() {} });
+  const bouton = (id) => document.getElementById(id)
+    || SC.addHeaderButton({ id, svg: '<circle cx="12" cy="12" r="4"/>', title: id + ' de test', onClick() {} });
   const sante = bouton('btn-health'), recent = bouton('btn-recent');
   for (const [b, texte] of [[sante, '3'], [recent, '2']]) { b.hidden = false; b.querySelector('.badge')?.remove();
     const p = document.createElement('span'); p.className = 'badge'; p.textContent = texte; b.appendChild(p); }
+  // la teinte de Récent vient de la feuille de 25-recent.js (#btn-recent .badge), absente ici sans donnée : posée comme elle la pose
+  recent.querySelector('.badge').style.cssText = 'background: var(--recent); color: var(--on-recent-text)';
   sante.style.setProperty('--hc-badge', 'var(--sev-medium)'); sante.style.setProperty('--hc-badge-text', 'var(--on-sev-text)'); return true; })()`;
 const PASTILLES = `JSON.stringify((() => { const J = window.__j, ouvreur = document.getElementById('vf-plus');
   const point = () => { const e = document.querySelector('#vf-plus .badge'); return e ? J.rgb(getComputedStyle(e).backgroundColor) : null; };
   const avant = point(); ouvreur.click();
-  const nom = (id) => { const b = document.getElementById(id); return (b.querySelector('.bl')?.textContent || b.getAttribute('aria-label') || b.title || '').trim(); };
+  const nom = (id) => { const b = document.getElementById(id);
+    return (b.querySelector('.bl')?.textContent || b.getAttribute('aria-label') || b.title || '').trim(); };
   const lire = (id) => { const it = [...document.querySelectorAll('.vf-pl-i')].find((x) => x.querySelector('.vf-pl-t')?.textContent === nom(id));
     const e = it && it.querySelector('.badge'); if (!e) return null;
     const c = getComputedStyle(e);
