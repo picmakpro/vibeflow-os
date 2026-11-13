@@ -91,7 +91,7 @@ MD
 }
 srv() { # srv <sortie> [PATH-extra] -> SRV_PORT SRV_PID ; serveur depuis la sortie, avec les deux chemins du module (comme le lanceur)
   local o="$1" lab; lab="$(cd "$1/../.." && pwd)"
-  COCKPIT_SORTIE="$o" cockpit_lancer "$lab" PATH="${2:+$2:}$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS"
+  COCKPIT_SORTIE="$o" cockpit_lancer "$lab" PATH="${2:+$2:}$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" ${SRV_ENV:+"$SRV_ENV"}
   SRV_PID="${VF_PID:-}"; SRV_PORT="${VF_PORT:-0}"
 }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
@@ -432,7 +432,10 @@ assert_eq "R2 — témoin : un chemin ordinaire est toujours reconnu" "$(printf 
 echo "=== X — aucun champ du graphe n'est interprété (navigateur) ==="
 if [ -z "$CHROME" ]; then echo "  ⊘ X sauté : aucun navigateur (non compté comme réussi)"; else
 LX="$WORK/labX"; mklab "$LX"; node "$AUX/marquer.mjs" "$LX/.vibeflow/cockpit/project.html" "$WORK/urls.txt" "$SCRIPTS"
+# 79-15 (A42) : la page Projet est servie depuis l'instantané ; le réglage d'essai garde au serveur la source du gabarit (les marqueurs posés dans la page assemblée), sans fichier réécrit
+SRV_ENV="VF_COCKPIT_DONNEES_GABARIT=1"
 srv "$LX/.vibeflow/cockpit"; XP=$SRV_PORT; URLS=(); while read -r u; do URLS+=("http://127.0.0.1:$XP/$u"); done < "$WORK/urls.txt"
+assert_eq "X0 — témoin de présence : la page Projet servie porte au moins 10 marqueurs data-f= distincts (le réglage d'essai opère)" "$([ "$(node "$AUX/req.mjs" "$XP" GET /project.html | grep -o 'data-f=[A-Za-z.]*' | sort -u | awk 'END{print NR}')" -ge 10 ] && echo oui || echo non)" "oui"
 EXPR='[...document.querySelectorAll("[onerror]")].map((e)=>e.getAttribute("data-f")||"?")'
 XR="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "${URLS[@]}")"; unsrv
 assert_eq "X1 — témoin : les ${#URLS[@]} adresses (accueil, conteneurs, éléments) ont été chargées" "$(printf '%s' "$XR" | node "$AUX/ev.mjs" 'j.resultats?j.resultats.length:"mesure indisponible : "+j.erreur')" "${#URLS[@]}"
@@ -442,6 +445,7 @@ LM="$WORK/labXm"; mkdir -p "$LM/.planning"; cp -R "$LX/.vibeflow" "$LM/.vibeflow
 PRET_CARTES="document.readyState === 'complete' && !!document.querySelector('header .brand .mark') && document.querySelector('header .brand .mark').naturalWidth > 0 && document.querySelectorAll('.card').length >= 1"
 srv "$LM/.vibeflow/cockpit"; XM="$(CDP_PRET="$PRET_CARTES" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-1" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-2")"; unsrv
 assert_has "X3 — témoin rouge : sans h() sur le pied de carte, le champ « foot » est détecté" "$(printf '%s' "$XM" | node "$AUX/ev.mjs" 'j.resultats?[...new Set(j.resultats.flatMap(r=>r.valeur||[]))]:"mesure indisponible : "+j.erreur')" "foot"
+SRV_ENV=""
 fi
 
 

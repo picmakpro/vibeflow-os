@@ -53,9 +53,10 @@ OUT="$LAB/.vibeflow/cockpit"
 
 echo "=== A1 — assemblage et contenu de la sortie ==="
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" > "$WORK/build.out" 2>&1; assert_eq "A1.1 — l'assemblage rend 0" "$?" "0"
-for f in index.html project.html graph.json architecture.json LICENSE LICENCES-TIERCES.txt .cache/vf-cockpit.json; do   # 79-06 : la sortie ne porte que des données (aucun code : AM4.16)
+for f in index.html project.html projet.json graph.json architecture.json LICENSE LICENCES-TIERCES.txt .cache/vf-cockpit.json; do   # 79-06 : la sortie ne porte que des données (aucun code : AM4.16)
   assert_eq "A1 — $f présent" "$([ -s "$OUT/$f" ] && echo oui || echo non)" "oui"
 done
+assert_eq "A1.2a — projet.json (79-15) : schéma exact, mode 600, nœuds et fichiers du graphe Projet" "$(node -e 'const fs=require("fs");try{const s=fs.statSync(process.argv[1]);const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));console.log((s.mode&0o777).toString(8)+"|"+j.schema+"|"+Array.isArray(j.nodes)+"|"+Array.isArray(j.files))}catch{console.log("absent")}' "$OUT/projet.json")" "600|vibeflow/cockpit-project@1|true|true"
 assert_eq "A1.2 — .cache/vf-cockpit.json porte scriptsDir" "$(node "$AUX/json.mjs" "$OUT/.cache/vf-cockpit.json" 'typeof j.scriptsDir')" "string"
 assert_eq "A1.3 — .gitignore à deux lignes dont la seconde est *" "$(awk 'END{print NR}' "$OUT/.gitignore")$(sed -n 2p "$OUT/.gitignore")" "2*"
 assert_eq "A1.4 — aucun dossier floorplan dans le lab" "$([ -e "$LAB/floorplan" ] && echo oui || echo non)" "non"
