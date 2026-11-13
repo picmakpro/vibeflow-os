@@ -90,6 +90,7 @@ SC_BASE="${CC_SCRIPTS:-$SCRIPTS}"; RACINE_BASE="$(cd "$SC_BASE/.." && pwd -P)"
 build_serve "$LAB"
 assert_eq "CC0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
 R="$(mesurer)"; [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }; [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/mesure.json"
+RF="$(mesurer fr)" # le défaut (français), sans ?lang=en : même niveau, lu dans le DOM
 E() { printf '%s' "${2:-$R}" | node "$AUX/ev.mjs" "$1"; }
 UN='[1,1,1,1]'; tt() { echo "j.cc1.mouv.$1.t0"; }
 
@@ -101,12 +102,14 @@ assert_eq "CC1.2 — → : la carte de droite ; ← : retour ; ↓ : la carte de
   "$(E "[$M.droite.vers !== $M.droite.de && $M.droite.pvers.x > $M.droite.pde.x, $M.gauche.vers === $M.droite.de,
     $M.bas.pvers.y > $M.bas.pde.y && $M.bas.pvers.x === $M.bas.pde.x, $M.haut.vers === $M.bas.de,
     ['droite', 'gauche', 'bas', 'haut'].every((k) => $M[k].t0 === 1)]")" "[true,true,true,true,true]"
-assert_eq "CC1.3 — #svg est une listbox nommée « Carte : <niveau>, N cartes »" \
-  "$(E '[j.cc1.listbox.role, /^Carte : .+, \d+ cartes$/.test(j.cc1.listbox.nom)]')" '["listbox",true]'
+assert_eq "CC1.3 — sous ?lang=en, #svg est une listbox nommée « Map: <niveau>, N card(s) » (la clé de t, sans pluriel anglais)" \
+  "$(E '[j.cc1.listbox.role, /^Map: .+, \d+ cards?$/.test(j.cc1.listbox.nom)]')" '["listbox",true]'
+assert_eq "CC1.3f — sous le défaut (français), #svg est nommée « Carte : <niveau>, N cartes », et chaque carte garde « reliée à N carte(s) » ou « aucune liaison »" \
+  "$(E '[/^Carte : .+, \d+ cartes$/.test(j.fr.listbox), j.fr.noms.length >= 18, j.fr.noms.every((n) => /(, reliée à \d+ cartes?|, aucune liaison)$/.test(n))]' "$RF")" "[true,true,true]"
 echo "=== CC2 — noms accessibles (arbre d'accessibilité réel), Origine et Fin ==="
 N='j.cc2.options.length'
 assert_eq "CC2.1a — chaque carte est une option, N = nombre de cartes, la listbox est nommée avec N, ses enfants sont des options" \
-  "$(E "[$N === j.cc2.titres.length, $N >= 18, j.cc2.listbox.endsWith(', ' + $N + ' cartes'),
+  "$(E "[$N === j.cc2.titres.length, $N >= 18, j.cc2.listbox.startsWith('Map: ') && new RegExp(', ' + $N + ' cards?\$').test(j.cc2.listbox),
     j.cc2.enfants.length === $N && j.cc2.enfants.every((r) => r === 'option')]")" "[true,true,true,true]"
 POS='j.cc2.dom.map((d) => d[1]).sort((a, b) => a - b).join() === Array.from({ length: '$N' }, (_, i) => i + 1).join()'
 LIEN='/(, reliée à \d+ cartes?|, aucune liaison)$/.test(o.nom)'
@@ -167,9 +170,9 @@ for m in m1 m2; do printf '{"name":"%s","type":"skill","description":"Module."}\
 printf "import { b } from '../m2/b.js';\nexport const a = () => b();\n" > "$L2/plugin/m1/a.js"; printf 'export const b = () => 1;\n' > "$L2/plugin/m2/b.js"
 git -C "$L2" init -q && git -C "$L2" add -A && git -C "$L2" -c user.email=t@t -c user.name=t commit -q -m init
 build_serve "$L2"; R7="$(mesurer cc7)"; vf_hyg_stop "$SRV"
-assert_eq "CC7.1 — niveau à connecteurs : cartes x: options nommées « Vers/Depuis <entité> », jamais l'id interne, comptées dans la liste" \
+assert_eq "CC7.1 — niveau à connecteurs : cartes x: options nommées « To/From <entité> » sous ?lang=en, jamais l'id interne, comptées dans la liste" \
   "$(E '[j.cc7.x.length >= 1, j.cc7.x.every((c) => c[1] === "option" && !c[2].includes(c[0])
-    && /^(Vers|Depuis) [^:]+(, reliée à \d+ cartes?|, aucune liaison)$/.test(c[2]))]' "$R7")" "[true,true]"
+    && /^(To|From) [^:]+(, reliée à \d+ cartes?|, aucune liaison)$/.test(c[2]))]' "$R7")" "[true,true]"
 
 echo "=== Mutants (copie du module, page rebâtie, serveur sur la copie) ==="
 mutant() { # mutant <nom> <ancien> <nouveau> -> RM (mesure du mutant) ; une mutation impossible compte comme un échec

@@ -1,8 +1,9 @@
 // chrome-clavier-canevas.mjs — mesures du clavier du canevas (80-01, FORM-01) dans un vrai Chrome headless, de vraies touches (Input.dispatchKeyEvent).
-// Usage : node chrome-clavier-canevas.mjs <chrome> <racine-du-serveur>   Rend UNE ligne JSON { cc1 … cc62 } ou { erreur }. ?lang=en : libellés du moteur.
+// Usage : node chrome-clavier-canevas.mjs <chrome> <racine-du-serveur>   Rend UNE ligne JSON { cc1 … cc62 } ou { erreur }. ?lang=en : libellés du moteur ; mode « fr » : le défaut français.
 // Chaque section est isolée (sec) : une section qui échoue (module absent ou muté) laisse ses champs vides, les autres sont mesurées.
 import { executer, pause, stabiliser } from './chrome-session.mjs';
 const [, , chrome, racine, mode] = process.argv; // mode « cc7 » : seul le niveau à connecteurs, sur le lab à deux modules qui s'importent
+const LANG = mode === 'fr' ? '' : '?lang=en'; // mode « fr » : le défaut (français), sans ?lang=en ; tous les autres modes : ?lang=en
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!VibeFlow.state && !!VibeFlow.state.layout";
 const POSEE = "(() => { const v = document.querySelector('#viewport'); return !!v && v.style.opacity !== '0' && !v.classList.contains('anim'); })()";
 const OUTIL = `window.__cc = {
@@ -40,7 +41,7 @@ await executer(chrome, async (s) => {
     await stabiliser(lireVue, { pas: 120, max: 5000 });
   };
   const charger = async (page, w = 1440, h = 900, mobile = false) => {
-    await vue(w, h, mobile); await s.naviguer(`${racine}/${page}?lang=en`); await s.attendre(PRET, `page ${page}`);
+    await vue(w, h, mobile); await s.naviguer(`${racine}/${page}${LANG}`); await s.attendre(PRET, `page ${page}`);
     await s.attendre("!!document.querySelector('#viewport .node')", `cartes ${page}`); await s.attendre(POSEE, `vue posée ${page}`);
     await stabiliser(lireVue, { pas: 120, max: 5000 });
     await pause(1200); // la visite guidée du premier passage démarre après le chargement : Échap jusqu'à sa fermeture
@@ -83,6 +84,12 @@ await executer(chrome, async (s) => {
     });
     return o;
   }
+  if (mode === 'fr') { // le défaut français : le nom de la listbox et ceux des cartes, lus dans le DOM (le texte du dictionnaire, pas la clé anglaise)
+    await charger('index.html'); await niveau('n:unassigned');
+    o.fr = await lire(`JSON.stringify({ listbox: document.getElementById('svg').getAttribute('aria-label'),
+      noms: ${NOTE('g.node')}.map((g) => g.getAttribute('aria-label')) })`);
+    return o;
+  }
   // ---------- CC1, CC2 : Code, 1440 px, niveau « non classé » : 19 cartes, des liens, plusieurs couches ----------
   await charger('index.html'); await niveau('n:unassigned');
   o.cc1 = { arretsCanevas: 0, carte: false, arrets: 0, listbox: {}, mouv: {} }; o.cc2 = {}; o.cc22 = {};
@@ -101,7 +108,7 @@ await executer(chrome, async (s) => {
   await sec('cc2', async () => { // CC2.1 : l'arbre d'accessibilité réel (Accessibility.getFullAXTree)
     await s.send('Accessibility.enable'); const ax = (await s.send('Accessibility.getFullAXTree')).nodes.filter((n) => !n.ignored);
     const nom = (n) => (n.name && n.name.value) || '', parNoeud = (i) => ax.find((n) => n.nodeId === i);
-    const lb = ax.find((n) => n.role.value === 'listbox' && /^Carte/.test(nom(n))), enf = lb ? lb.childIds.map(parNoeud).filter(Boolean) : [];
+    const lb = ax.find((n) => n.role.value === 'listbox' && /^(Carte|Map)/.test(nom(n))), enf = lb ? lb.childIds.map(parNoeud).filter(Boolean) : [];
     o.cc2 = { listbox: lb ? nom(lb) : null, enfants: enf.map((n) => n.role.value),
       options: enf.filter((n) => n.role.value === 'option').map((n) => ({ nom: nom(n) })),
       ordre: await s.ev('__cc.lecture()'), decor: await s.ev(`${NOTE('#svg .edges, #svg .cols')}.map((e) => e.getAttribute('aria-hidden')).join()`),
