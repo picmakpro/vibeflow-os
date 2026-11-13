@@ -65,7 +65,7 @@ scripts/vf-cockpit-who.mjs 43
 scripts/vf-cockpit.mjs 36
 skills/cockpit-moteur/assets/ui/00-vibeflow.js 91
 skills/cockpit-moteur/assets/ui/01-vf-responsive.js 63
-skills/cockpit-moteur/assets/ui/02-vf-telephone.js 56
+skills/cockpit-moteur/assets/ui/02-vf-telephone.js 54
 skills/cockpit-moteur/assets/ui/03-vf-accessibilite.js 6
 skills/cockpit-moteur/assets/ui/39-vf-tour-placement.js 26
 skills/cockpit-moteur/assets/ui/70-vf-live.js 60
@@ -74,9 +74,9 @@ skills/cockpit-moteur/assets/ui/72-vf-equipe.js 29
 skills/cockpit-moteur/assets/ui/73-vf-tiroir-travail.js 12
 skills/cockpit-moteur/assets/ui/75-vf-modele.js 6
 skills/cockpit-moteur/assets/ui/76-vf-git-entete.js 38
-skills/cockpit-moteur/assets/ui/77-vf-git-rendu.js 29
-skills/cockpit-moteur/assets/ui/77-vf-git-tiroir.js 39
-skills/cockpit-moteur/assets/ui/77-vf-git-vue-detail.js 26
+skills/cockpit-moteur/assets/ui/77-vf-git-rendu.js 25
+skills/cockpit-moteur/assets/ui/77-vf-git-tiroir.js 38
+skills/cockpit-moteur/assets/ui/77-vf-git-vue-detail.js 22
 skills/cockpit-moteur/assets/ui/78-vf-fr-dict-a.js 43
 skills/cockpit-moteur/assets/ui/79-vf-fr-dict-b.js 45
 skills/cockpit-moteur/assets/ui/80-vf-fr.js 19
