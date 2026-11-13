@@ -27,3 +27,10 @@ Verts d'emblée (garde-fous, chacun avec son témoin positif) : F7.3 (le marqueu
 
 ## Écart de fixture
 Le marqueur d'erreur `MARQ-ERREUR-79-22` ne vit pas dans le nom du fichier mais dans le message de l'erreur injectée (déclencheur : le fichier `agent-err1.jsonl`) : l'identifiant de l'agent est renvoyé par la route dans le corps, un nom marqué ferait « fuir » le marqueur par l'identifiant. En processus (F7.9) le nom forgé porte bien l'octet nul puis le marqueur.
+
+## Après la tâche 2 (code posé) : verts et mutants
+- `seul-f7` (sections F7 seules) : 30 PASS / 0 FAIL ; suite de frise complète sur la tête commitée : 170 PASS / 0 FAIL.
+- Latence mesurée (sonde de 79-09, 100 ms, 8 s, 30 lectures de 9 Mio par groupes de 6) : table (fil) p99 4 ms, max 4 ms, 78 réponses, 0 erreur ; ancien chemin (M-RELANCE) p99 458 ms, max 458 ms. Lecture sur la boucle de la fixture : 158 ms.
+- Mutants, chacun rejoué sur une copie (ancre exactement une fois, `cmp`, `node --check`) : M-RELANCE (F7.1 : au moins 50 lignes `requete` de plus), M-EN-LIGNE-LECTURE (F7.5 : max 458 ms), M-REMPLACE (F7.2 : l'agent sorti reste lisible), M-BORNE-TABLE (F7.2b : 1999,2000,2001,2500 retenus), M-FILE (F7.6 : `tot40` = 0), M-CHEMIN (F7.3 : le marqueur de chemin sort par transcript), M-ERREUR-LECTURE (F7.9 : marqueur d'erreur dans le corps ; F7.10 : le marqueur sort par transcript).
+- Premier vert refusé pour la bonne raison : un `egal` rejoué sur la même fixture lisait un fichier déjà supprimé par le premier passage (le scénario rend maintenant la fixture telle quelle) ; le témoin positif de F7.9 perdait le marqueur (Node tronque la valeur citée d'un chemin long) : nom forgé court.
+- Premier rouge de serveur : `{}` pour `/api/vf/doing` (le répartiteur HISTORIQUE n'attendait pas la promesse) : `vf-cockpit-routes.mjs`, branche HISTORIQUE (voir l'écart 1 du SUMMARY).
