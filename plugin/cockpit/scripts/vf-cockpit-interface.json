@@ -163,6 +163,11 @@
       "motifsDit": "cause d'une session finie, jamais d'un état vivant : `failed` donne `echec`, `stopped` donne `arret`, `done` aucune ; elle sort en `finMotif` du travailleur (l'état reste `termine`)",
       "statuts": { "busy": "actif", "waiting": "attend", "idle": "au-repos" }
     },
+    "cibles": {
+      "description": "champs du transcript lus par le lecteur de cibles de la frise (79-13) : chemins pointés, jamais un texte ni une sortie d'outil",
+      "chemins": ["type", "timestamp", "message.content", "name", "input.file_path", "input.notebook_path"],
+      "jamaisPersiste": true
+    },
     "transcriptTitre": {
       "type": "custom-title",
       "champ": "customTitle",

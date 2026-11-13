@@ -190,6 +190,110 @@ mut M-BORNE-REPONSE vf-cockpit-frise.mjs '/garde:frise-reponse-borne/s/slice(0, 
 mut M-OMISES vf-cockpit-frise.mjs '/garde:frise-omises/s/dans.length - gardees.length/gardees.length/' F2.15 "l'entier est calculé sur les voies gardées"
 
 
+echo "=== F4 — cibles : règle de chemin unique, outils, incrémentalité, bornes, passe découpée, arbres, borne d'affichage ==="
+AUX3="$WORK/aux3"; mkdir -p "$AUX3"
+ck() { local f="$WORK/k-$(basename "$1")-$2.json"; [ -s "$f" ] || node "$TESTS/frise-cibles.mjs" "$2" "$1" "$AUX3" "${3:-}" 2> "$WORK/k-$2.err" | tail -1 > "$f"; echo "$f"; }
+H4='un fichier hors du lab'
+F0_4="$(node -e "
+const j=JSON.parse(require('fs').readFileSync('$SCRIPTS/vf-cockpit-interface.json','utf8')).claudeCode,ck=Object.keys(j);
+const c=j.cibles||{};import('file://$SCRIPTS/vf-cockpit-cibles.mjs').then((m)=>{const a=[...m.CHAMPS_LUS].sort().join(','),b=(c.chemins||[]).slice().sort().join(',');
+const idx=JSON.stringify(j.index||{});console.log([a===b,ck.indexOf('cibles')===ck.indexOf('vueAgents')+1,!/input\.file_path|notebook_path/.test(idx)].join(','))}).catch(()=>console.log('absent'))")"
+assert_eq "F0.4 — le bloc claudeCode.cibles (juste après vueAgents) liste exactement les chemins de CHAMPS_LUS ; l'index de 79-08 n'en déclare aucun chemin d'entrée d'outil" "$F0_4" "true,true,true"
+chk3() { # <id> <copie> -> ok | ko
+  local d="$2" f
+  case "$1" in
+    F4.1) f="$(ck "$d" cible "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.nko+"|"+(j.n>=400)')" = '0|true' ] ;;
+    F4.3) f="$(ck "$d" outils)"; [ "$(jf "$f" 'j.ok')" = true ] ;;
+    F4.4) f="$(ck "$d" hostiles)"; [ "$(jf "$f" 'JSON.stringify([j.leve,j.premier,j.second,j.lien.etat+j.lien.ecritures.length,j.tube.etat+j.tube.ecritures.length,j.long])')" = '[false,[["ok.js",1]],[["ok.js",2]],"en-construction0","en-construction0",1]' ] ;;
+    F4.5) f="$(ck "$d" incremental "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.egal+"|"+j.somme+"|"+j.couverture')" = 'true|true|ok' ] ;;
+    F4.6) f="$(ck "$d" reprise "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.egal+"|"+j.avant+"|"+j.court[1]+"|"+j.apres[1].join(",")')" = 'true|true|0|d.js' ] ;;
+    F4.7) f="$(ck "$d" limites)"; [ "$(jf "$f" 'JSON.stringify([j.mille,j.top,j.exact,j.plus,j.mixte,j.deux,j.plafondTotal,j.plafondTronque])')" = '[[200,0,true],"e999.js",[200,0,false],[200,0,true],[150,200,true],[150,150,false],50,[false,false,true,true,true]]' ] ;;
+    F4.8) f="$(ck "$d" limites)"; [ "$(jf "$f" 'j.avant+"|"+j.apres+"|"+j.vieux')" = '1|0|0' ] ;;
+    F4.9) f="$(ck "$d" passe)"; [ "$(jf "$f" 'JSON.stringify([j.resteInitial,j.etat0Enc,j.fini,j.tous,j.egal,j.espaces,j.dernierMsg])')" = '[true,true,true,true,true,true,true]' ] ;;
+    F4.10) f="$(ck "$d" memoire)"; [ "$(jf "$f" 'j.ecritures+"|"+j.vu+"|"+j.temoin')" = '0|true|true' ] ;;
+    F4.11a) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify([j.a,j.aRel])')" = '[["null|app/f.js","wt-in|app/g.js","sib|app/g.js","null|app/f.js"],["wt-in|app/g.js","null|x"]]' ] ;;
+    F4.11c) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify([j.c,j.cRel])')" = "[[\"null|f.js\",\"null|$H4\",\"wt|g.js\",\"null|$H4\",\"null|f.js\"],[\"wt|g.js\"]]" ] ;;
+    F4.11d) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify([j.aInconnu,j.aTraversee])')" = "[[\"null|$H4\",\"sib|app/g.js\"],[\"null|$H4\"]]" ] ;;
+    F4.11f) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify(j.f)')" = "[\"null|$H4\",\"null|$H4\",\"ok|app/g.js\"]" ] ;;
+    F4.11h) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify([j.h,j.hVoie])')" = "[[\"null|$H4\",\"null|$H4\",\"autre|app/g.js\"],[\"null|$H4\"]]" ] ;;
+    F4.11i) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify([j.i,j.iVoie])')" = "[[\"null|app/f.js\",\"null|$H4\",\"unique|app/g.js\"],[\"null|$H4\"]]" ] ;;
+    F4.13) f="$(ck "$d" fin "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.nko+"|"+j.couverture')" = '0|ok' ] ;;
+  esac && echo ok || echo ko
+}
+for id in F4.1 F4.3 F4.4 F4.5 F4.6 F4.7 F4.8 F4.9 F4.10 F4.11a F4.11c F4.11d F4.11f F4.11h F4.11i F4.13; do
+  case "$id" in
+    F4.1) t="propriété (graine $GRAINE, 400 valeurs de vingt classes de chemins) : reduireCible égale à l'oracle de résolution physique écrit à la main" ;;
+    F4.3) t="outils comptés : Read en lecture ; Write, Edit, MultiEdit, NotebookEdit (notebook_path) en écriture ; Grep, Glob, Bash et noms de prototype : aucune cible ; valeur non chaîne ignorée" ;;
+    F4.4) t="lignes hostiles : aucune exception, état intact, lignes valides comptées, dernière ligne incomplète non consommée, lien et tube jamais ouverts, ligne géante sautée" ;;
+    F4.5) t="incrémentalité (graine $GRAINE) : avances sur préfixes croissants égales à une passe unique, somme des n égale au nombre d'appels comptés, couverture des coupes" ;;
+    F4.6) t="reprise : fichier raccourci ou tête changée : état repris depuis zéro, anciennes cibles disparues" ;;
+    F4.7) t="bornes A48-45 : 200 par sens, plus récentes gardées, tronque vrai dès qu'un sens coupe (faux à exactement 200), plafond total d'essai jamais dépassé, tronque pour chaque voie touchée" ;;
+    F4.8) t="fenêtre : ligne de plus de 24 h ignorée ; entrée sortie de la fenêtre purgée à l'avance suivante" ;;
+    F4.9) t="passe découpée (budgets abaissés, horloge injectée) : reste vrai puis converge vers ok, messages espacés d'au moins FLUSH_MS, état final égal à une passe unique" ;;
+    F4.10) t="mémoire seule : zéro écriture de fichier pendant une passe complète (témoin positif : l'espion compte l'écriture du harnais), la cible est dans les messages" ;;
+    F4.11a) t="arbres (a) : cible d'un worktree prouvé sous le lab et d'un frère, relative à sa racine, arbre égal à son nom ; arbre principal nul ; relatif d'une voie de worktree" ;;
+    F4.11c) t="arbres (c) : lab en sous-dossier du dépôt : base = racine du worktree plus le sous-dossier ; hors du sous-dossier : hors du lab" ;;
+    F4.11d) t="arbres (d) : valeur d'arbre inconnue ou en forme de chemin : arbre nul et relatives hors du lab (absolue jugée sans le nom)" ;;
+    F4.11f) t="arbres (f) : worktree au lien retour falsifié et dossier qui se dit worktree sans être enregistré : hors du lab ; un worktree prouvé reste admis" ;;
+    F4.11h) t="arbres (h) A46 : deux worktrees prouvés de même nom : hors du lab (troisième de nom unique admis), voies de ce nom sans arbre" ;;
+    F4.11i) t="arbres (i) A46 : worktree prouvé de même nom que le dossier de l'arbre principal : hors du lab ; l'arbre principal garde ses cibles" ;;
+    F4.13) t="A48-44 (graine $GRAINE) : fin égale à l'oracle (119 unités plus …, 118 devant une paire de substitution, 120 ou moins intact, masque avant la coupe)" ;;
+  esac
+  assert_eq "$id — $t" "$(chk3 "$id" "$COPIE")" "ok"
+done
+assert_eq "F4.2 — couverture : chaque classe de chemin et chaque classe de texte tirée au moins 15 fois ; la fonction appliquée à une liste dégénérée répond « dégénéré »" "$(jf "$(ck "$COPIE" cible "{\"graine\":$GRAINE}")" 'j.couverture+"|"+j.degenere')|$(jf "$(ck "$COPIE" fin "{\"graine\":$GRAINE}")" 'j.couverture+"|"+j.degenere')" "ok|dégénéré|ok|dégénéré"
+F410S=0; for m in vf-cockpit-cible vf-cockpit-cibles vf-cockpit-cibles-suivi vf-cockpit-frise-voie vf-cockpit-collecte-frise vf-cockpit-frise-direct vf-cockpit-frise; do F410S=$((F410S + $(grep -c 'writeFile\|appendFile\|createWriteStream\|renameSync\|child_process\|node:http\|node:net\|process\.env\|realpathSync' "$SCRIPTS/$m.mjs"))); done
+assert_eq "F4.10b — statiquement aucun module neuf n'écrit de fichier, ne lance de processus, n'ouvre de réseau, ne lit l'environnement ni ne résout un chemin hors de cheminPhysique" "$F410S" "0"
+mut3() { # <nom> <fichier> <sed> <id rouge> <raison>
+  local d; d="$(mutcopie "$1" "$2" "$3")"; assert_eq "$1.0 — la copie existe, diffère et charge" "$([ -n "$d" ] && echo oui || echo non)" "oui"
+  [ -n "$d" ] && assert_eq "$1 — $5 : $4 rougit" "$(chk3 "$4" "$d")" "ko"
+}
+mut3 M-LEXICAL vf-cockpit-cible.mjs 's|const phys = cheminPhysique(abs, OPTION); // garde:cible-physique|const phys = path.resolve(abs); // garde:cible-physique|' F4.1 "résolution lexicale à la place de la résolution physique"
+mut3 M-ECHEC-OUVERT vf-cockpit-cible.mjs 's|if (phys === null) return HORS_R; // garde:cible-echec|if (phys === null) return { arbre: null, cible: path.relative(arbres[0].base, path.resolve(abs)) }; // garde:cible-echec|' F4.1 "un échec de résolution ne ferme plus"
+mut3 M-PARENT vf-cockpit-cible.mjs 's|const OPTION = { plusProcheParent: true }; // garde:cible-parent|const OPTION = { plusProcheParent: false }; // garde:cible-parent|' F4.1 "plus proche parent retiré"
+mut3 M-PREFIXE vf-cockpit-cible.mjs '/garde:cible-dedans/s/p.startsWith(r.endsWith(path.sep) ? r : r + path.sep)/p.startsWith(r)/' F4.1 "préfixe sans frontière de séparateur"
+mut3 M-OUTILS vf-cockpit-cibles.mjs "s|Write: T('ecritures', 'file_path'), Edit: T('ecritures', 'file_path'), // garde:cibles-outils|Write: T('ecritures', 'file_path'), Grep: T('lectures', 'file_path'), Edit: T('ecritures', 'file_path'), // garde:cibles-outils|" F4.3 "Grep compté en lecture"
+mut3 M-CURSEUR vf-cockpit-cibles-suivi.mjs 's|st.curseur = fin; // garde:cibles-curseur|st.curseur = pos; // garde:cibles-curseur|' F4.5 "le curseur avance jusqu'à la taille du fichier au lieu de la dernière ligne complète"
+mut3 M-TRANCHE vf-cockpit-cibles-suivi.mjs 's|ctx.budget = () => ctx.lus >= octets \|\| horloge() - t0 >= ms; // garde:cibles-tranche|ctx.budget = () => false; // garde:cibles-tranche|' F4.9 "le budget de la tranche est retiré"
+mut3 M-PERSISTE vf-cockpit-cibles-suivi.mjs "s|cibles(id) {|cibles(id) { if (etats.has(id) \&\& process.getBuiltinModule('node:fs')) process.getBuiltinModule('node:fs').appendFileSync(process.getBuiltinModule('node:os').tmpdir() + '/frise-persiste.txt', 'x'); // garde:cibles-memoire|" F4.10 "les listes sont écrites dans un fichier"
+mut3 M-ARBRE vf-cockpit-cible.mjs 's|^.*garde:cible-arbre.*$|  return arbre ? { nom: arbre, racine: table[0].racine, base: table[0].racine + path.sep + arbre } : table[0]; // garde:cible-arbre|' F4.11d "le nom est pris pour un chemin sous l'arbre principal"
+mut3 M-VERIF vf-cockpit-arbres.mjs 's|worktreeVerifie(commun, t)|true|' F4.11f "la preuve du lien retour d'un worktree est neutralisée"
+mut3 M-COLLISION vf-cockpit-cible.mjs '/garde:cible-collision/s/occupants.get(nom(a)) > 1/occupants.get(nom(a)) > 2/' F4.11h "deux worktrees de même nom sont admis"
+mut3 M-PRINCIPAL vf-cockpit-cible.mjs 's|^.*garde:cible-principal.*$||' F4.11i "le nom du dossier de l'arbre principal n'occupe plus un nom"
+mut3 M-ELLIPSE vf-cockpit-cible.mjs "s|return t.slice(0, n) + '…'; // garde:cible-fin|return t.slice(0, 120); // garde:cible-fin|" F4.13 "coupe à 120 sans marque"
+mut3 M-TRONQUE-CIBLES vf-cockpit-cibles-suivi.mjs 's|if (perdu) st.cibles.tronque = true; // garde:cibles-tronque|if (perdu) st.ver += 0; // garde:cibles-tronque|' F4.7 "la ligne ne pose plus l'indicateur"
+
+echo "=== serveur A : borne d'affichage et arbres sur un serveur réel (F4.13b, F6.6) ==="
+ALAB="$WORK/alab"; AHOME="$WORK/home-a"; mkdir -p "$AHOME"
+node "$TESTS/frise-labo.mjs" lab "$ALAB"
+git -C "$ALAB" worktree add -q "$ALAB/wt-in" -b b1 > /dev/null 2>&1
+LONGD="d$(printf 'a%.0s' $(seq 1 100))/e$(printf 'b%.0s' $(seq 1 100))/f$(printf 'c%.0s' $(seq 1 80))"
+cat > "$WORK/spec-a.json" <<JSON
+{ "sessions": [ { "id": "sess-a-0001", "lignes": [
+  { "age": 600, "outils": [ { "name": "Write", "input": { "file_path": "@LAB@/src/a.js", "note": "MARQ-ENTREE-79-13" } }, { "name": "Write", "input": { "file_path": "@LAB@/wt-in/src/b.js" } },
+    { "name": "Bash", "input": { "command": "echo MARQ-COMMANDE" } },
+    { "name": "Write", "input": { "file_path": "@LAB@/src/MARQ-CIBLE-79-13.js" } }, { "name": "Write", "input": { "file_path": "@LAB@/$LONGD/x.js" } },
+    { "name": "Read", "input": { "file_path": "@LAB@/src/b.js" } }, { "name": "Grep", "input": { "path": "@LAB@/src", "pattern": "MARQ-MOTIF" } } ] } ] } ] }
+JSON
+node "$TESTS/frise-labo.mjs" transcripts "$AHOME" "$ALAB" "$WORK/spec-a.json"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$ALAB" --quiet > "$WORK/build-a.out" 2>&1
+node "$TESTS/frise-labo.mjs" claude-faux "$BIN" '[{"sessionId":"sess-a-0001","status":"busy"}]'
+cockpit_lancer "$ALAB" VF_COCKPIT_SCRIPTS_DIR="$FAUX" PATH="$BIN:$PATH" HOME="$AHOME"; RA=$?
+assert_eq "FA.0 — le serveur A (lab à worktree, session qui écrit dans l'arbre principal et dans le worktree) est lancé" "$RA" "0"
+if [ "$RA" = 0 ]; then
+  prete_a() { get '/api/vf/frise?champs=cibles' > "$WORK/frise-a.json" 2>/dev/null; [ "$VF_CODE" = 200 ] && [ "$(jf "$WORK/frise-a.json" 'j.voies.length===1&&j.voies[0].cibles.etat==="ok"&&j.voies[0].cibles.ecritures.length>=4' 2>/dev/null)" = true ]; }
+  attendre 60 prete_a
+  get '/api/vf/frise?champs=cibles' > "$WORK/frise-a.json"; get /api/vf/git/worktrees > "$WORK/wts-a.json"
+fi
+F413B="$(jf "$WORK/frise-a.json" '(()=>{const e=(j.voies[0]||{cibles:{ecritures:[]}}).cibles.ecritures.filter((x)=>x.cible.length>=100);return [e.length,e[0]&&e[0].cible.length,e[0]&&e[0].cible.endsWith("…")].join("|")})()')"
+assert_eq "F4.13b — serveur réel : une écriture sur un chemin relatif de 290 caractères rend une cible de 120 unités qui finit par … (témoin positif : le transcript porte le chemin entier)" "$F413B|$(grep -c -F "$LONGD" "$AHOME/.claude/projects/-lab/sess-a-0001.jsonl")" "1|120|true|1"
+F66="$(jf "$WORK/frise-a.json" '(()=>{const c=j.voies[0].cibles;return JSON.stringify([c.ecritures.filter((x)=>x.cible.length<100).map((x)=>[x.arbre,x.cible]).sort(),c.lectures.map((x)=>[x.arbre,x.cible]),j.voies[0].arbre])})()')"
+NOMS_WT="$(jf "$WORK/wts-a.json" 'j.worktrees.filter((w)=>w.verifie).map((w)=>w.nom).sort()')"
+assert_eq "F6.6 — arbres sur le serveur réel : écriture de l'arbre principal (arbre nul) et du worktree prouvé (arbre = son nom, rendu par /api/vf/git/worktrees), cibles relatives ; la lecture est comptée ; Grep ne produit aucune cible ; aucun chemin absolu" "$F66|$NOMS_WT|$(grep -c -F "$ALAB" "$WORK/frise-a.json")" '[[[null,"src/MARQ-CIBLE-79-13.js"],[null,"src/a.js"],["wt-in","src/b.js"]],[[null,"src/b.js"]],null]|["'"$(basename "$ALAB")"'","wt-in"]|0'
+
+
+cockpit_arreter
+
 # @@SUITE@@
 vf_hyg_assert
 echo

@@ -38,7 +38,7 @@ export function plierLigneCibles(etat, d, arbres, defaut, maintenant, cache = {}
   for (const b of c) {
     if (!b || typeof b !== 'object' || b.type !== 'tool_use' || typeof b.name !== 'string' || !Object.hasOwn(OUTILS_CIBLES, b.name)) continue;
     const o = OUTILS_CIBLES[b.name], v = b.input && typeof b.input === 'object' ? b.input[o.champ] : undefined;
-    if (typeof v !== 'string' || v.length > L.valeurMax) continue;
+    if (typeof v !== 'string' || v.length > L.valeurMax || v.includes('\0')) continue; // un chemin ne porte jamais d'octet nul
     const cle = `${defaut ? defaut.nom ?? '' : '\u0001'}\0${v}`;
     let r = cache.reduits ? cache.reduits.get(cle) : undefined;
     if (r === undefined) { r = reduireCible(v, arbres, defaut); if (cache.reduits && cache.reduits.size < 20000) cache.reduits.set(cle, r); }

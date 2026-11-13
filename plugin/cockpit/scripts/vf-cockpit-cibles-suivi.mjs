@@ -60,7 +60,8 @@ export function creerSuivi({ limites } = {}) {
         lignes++;
         if (!l.includes('"tool_use"') || l.length > LIGNE_MAX) continue;
         let d; try { d = JSON.parse(l); } catch { continue; }
-        const [vus] = plierLigneCibles(st.cibles, d, arbres, defaut, maintenant, cache);
+        const [vus, perdu] = plierLigneCibles(st.cibles, d, arbres, defaut, maintenant, cache);
+        if (perdu) st.cibles.tronque = true; // garde:cibles-tronque
         if (vus) change = true;
       }
       if (pend.length > LIGNE_MAX) { pend = Buffer.alloc(0); saut = true; }
@@ -102,7 +103,7 @@ export function creerSuivi({ limites } = {}) {
       resteVrai = reste;
       return { reste };
     },
-    cibles(id) {
+    cibles(id) { // garde:cibles-memoire
       const st = etats.get(id);
       return st ? { etat: st.etat, tronque: st.cibles.tronque, ...listesDeCibles(st.cibles) } : null;
     },

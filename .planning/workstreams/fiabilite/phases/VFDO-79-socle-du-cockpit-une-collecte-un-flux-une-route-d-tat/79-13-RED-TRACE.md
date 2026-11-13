@@ -35,3 +35,28 @@ Commande : `bash <arbre exporté>/plugin/cockpit/scripts/tests/test-cockpit-fris
 M-LISTE-BLANCHE -> F3.1 ; M-BORNES -> F2.2 ; M-FENETRE -> F2.4 ; M-REVEIL -> F2.7 ; M-GARDE -> F2.6 ; M-ATTEND -> F2.13 ; M-OFFICIEL -> F3.2 ;
 M-RATTACHEMENT -> F3.3 ; M-BORNE-INSTANTANE -> F3.5 ; M-BORNE-REPONSE -> F2.15 ; M-OMISES -> F2.15. Les onze rougissent pour la raison nommée.
 Suites rejouées : routes 56/0, serveur 98/0, securite 103/0.
+
+## Tâche 3 — rouges sur le code de la tâche 2 (suite jouée sur l'arbre du commit de la tâche 2 exporté, témoins de la tâche 3 seuls)
+`bash <arbre exporté>/…/test-cockpit-frise.sh` : 83 PASS / 17 FAIL (23 s). Rouges :
+- F0.4 : bloc `claudeCode.cibles` absent du contrat.
+- F4.4 : un chemin à octet nul comptait comme une cible (« un fichier hors du lab ») : l'état était altéré par la ligne hostile (obtenu : deux entrées, attendu : `ok.js` seul).
+- F4.7 : `cibles.tronque` jamais posé (obtenu faux là où 200 par sens sont dépassés).
+- F4.11a, F4.11c, F4.11d, F4.11f, F4.11h, F4.11i : seul l'arbre principal était admis (worktree prouvé rendu « un fichier hors du lab », nom d'arbre jamais cherché).
+- F4.13 : `fin` coupait à 120 sans marque ; F4.13b (serveur réel) : cible de 120 unités sans `…` (obtenu `…` faux).
+- F6.6 : worktree prouvé rendu `{ arbre: null, cible: wt-in/src/b.js }` au lieu de `{ arbre: wt-in, cible: src/b.js }`.
+- Mutants dont l'ancre n'existait pas : M-ARBRE, M-COLLISION, M-PRINCIPAL, M-ELLIPSE, M-TRONQUE-CIBLES.
+- Verts d'emblée (modules de la tâche 1 déjà tenus, chacun prouvé ensuite par son mutant) : F4.1, F4.2, F4.3, F4.5, F4.6, F4.8, F4.9 (la passe découpée par budget converge), F4.10.
+- Corrections de harnais avant le code : l'oracle de F4.1 résolvait `..` lexicalement (realpath non natif) : passé à `realpath.native` ; couverture de F4.5 rendue déterministe.
+- `test-cockpit-transcript.sh` sur le code présent : T24H1 à T24H3, T24H5, T24H7, T24H8 rouges (forme écrite, pas de worktree, coupe sans marque) ; T24G2 réécrite : le témoin positif de l'ancienne mesure (espion sur `fs.realpathSync`) était aveugle après 79-07 ; nouvelle mesure sur `fs.realpathSync.native`.
+
+## Tâche 3 — vert et mutants
+`test-cockpit-frise.sh` : 105 PASS / 0 FAIL (25 s), graine jouée imprimée (propriétés F4.1, F4.2, F4.5, F4.6, F4.13).
+Mutants de la tâche (ancre, substitution, `cmp` par `.0`, identifiant rouge) : M-LEXICAL, M-ECHEC-OUVERT, M-PARENT, M-PREFIXE -> F4.1 ; M-OUTILS -> F4.3 ; M-CURSEUR -> F4.5 ;
+M-TRANCHE -> F4.9 (reste faux dès la première tranche) ; M-PERSISTE -> F4.10 ; M-ARBRE -> F4.11d ; M-VERIF (copie de `vf-cockpit-arbres.mjs`, `worktreeVerifie` neutralisé) -> F4.11f ;
+M-COLLISION -> F4.11h ; M-PRINCIPAL -> F4.11i ; M-ELLIPSE -> F4.13 ; M-TRONQUE-CIBLES -> F4.7. Les quatorze rougissent pour la raison nommée (vingt-cinq au total avec la tâche 2).
+`test-cockpit-transcript.sh` : 111 PASS / 0 FAIL. T24G2 : un outil seul = 6 appels réels au noyau (table des arbres comprise) ; 200 outils gardés : 404 appels, borne 6 x 200 + 10 = 1210.
+Avant la reprise (79-07) la mesure comptait au plus 410 appels de `fs.realpathSync` ; l'ancienne mesure serait restée à 0 après la reprise (aveugle).
+Suites existantes adaptées : `test-cockpit-transcript.sh` (copie complète des modules dans le mutant de regroupement ; ancre de T24F3.3 sur la ligne de retour d'`etiquette`).
+Régression de la tâche 3 : who 157/0, equipe 215/0, equipe-etats 86/0, lecture-fil 17/0, git-config-depot 138/0, git-env 135/0, collecte 149/0 (323 s), vendor : V4 « check-file-size » rouge au moment du
+rejeu (base : fichier du module à 300 lignes qui n'est pas à moi, signalé par le manager) ; V4c.9a (cliquet de colonnes) rouge sur ma HAUSSE de 13 à 15 lignes longues de `vf-cockpit-transcript.mjs`,
+corrigée dans le commit (retour à 13, `colonnes-cliquet.mjs verifier` : OK, baseline inchangée).

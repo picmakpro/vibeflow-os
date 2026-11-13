@@ -3,8 +3,9 @@
 //           citationsDuMandat(texte) -> [identifiant], reduireTranscript(fichier, { root, roles, kind }) -> { mandat, fil, tronque } (fil : [{ t, genre: 'message', texte } | { t, genre: 'outil', outil, verbe, cible, n? }])
 // Lecture seule, aucun réseau ; liste blanche ; aucune valeur d'entrée d'outil ne sort hors de la cible réduite (chemin du lab, hôte, type d'agent, nom de skill ou de serveur).
 import fs from 'node:fs';
-import path from 'node:path';
-import { cherche, masque, masqueCoupe, MARGE_MASQUE } from './vf-cockpit-lecture.mjs';
+import { cherche, masqueCoupe, MARGE_MASQUE } from './vf-cockpit-lecture.mjs';
+import { fin, reduireCible, racinesDeComparaison, arbreDeNom, HORS } from './vf-cockpit-cible.mjs';
+import { arbresGit } from './vf-cockpit-arbres.mjs';
 
 // libellés provisoires (P69-PL-19) : à valider avant la publication
 export const VERBES = Object.freeze(Object.assign(Object.create(null), {
@@ -12,42 +13,41 @@ export const VERBES = Object.freeze(Object.assign(Object.create(null), {
   Bash: 'lance une commande', bash: 'lance une commande', Agent: 'lance un agent', Task: 'lance un agent', SendMessage: 'écrit à',
   WebFetch: 'consulte une page', WebSearch: 'cherche sur le web', Skill: 'utilise le skill',
 }));
-const VERBE_MCP = 'utilise', VERBE_AUTRE = 'utilise un outil', HORS = 'un fichier hors du lab';
-const BORNE_CIBLE = 120, BORNE_MANDAT = 8000, MAX_MESSAGES = 50, BORNE_MESSAGE = 2000, MAX_OUTILS = 200, TETE = 256 << 10, QUEUE = 8 << 20;
+const VERBE_MCP = 'utilise', VERBE_AUTRE = 'utilise un outil';
+const BORNE_MANDAT = 8000, MAX_MESSAGES = 50, BORNE_MESSAGE = 2000, MAX_OUTILS = 200, TETE = 256 << 10, QUEUE = 8 << 20;
 
 // un texte coupé à la borne le dit : la mention vient APRÈS la coupe (masqueCoupe reste la seule voie de coupe, le masque passe avant), avec la borne réelle, jamais écrite en dur
 const milliers = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 const coupe = (t, n) => { const r = masqueCoupe(t, n); return t.length > n ? `${r} … (tronqué, ${milliers(n)} caractères)` : r; };
 const chaine = (v) => (typeof v === 'string' ? v : '');
-const fin = (s) => masque(chaine(s).replace(/\s+/g, ' ').trim()).slice(0, BORNE_CIBLE);
-const real = (p) => { try { return fs.realpathSync(p); } catch { return null; } };
-const dedans = (p, dir) => p === dir || p.startsWith(dir.endsWith(path.sep) ? dir : dir + path.sep);
 
-// chemin relatif au lab (contrôle sur le chemin résolu, puis sur le chemin réel s'il existe), sinon « un fichier hors du lab »
-function cheminDuLab(valeur, root) {
-  const v = chaine(valeur); if (!v || !root) return v ? HORS : '';
-  const r = path.resolve(root, v), base = path.resolve(root);
-  if (!dedans(r, base)) return HORS;
-  const rr = real(r); if (rr !== null) { const rb = real(base); if (rb === null || !dedans(rr, rb)) return HORS; }
-  return path.relative(base, r).split(path.sep).join('/') || '.';
+// chemin relatif au lab par la règle UNIQUE de vf-cockpit-cible.mjs (résolution physique, échec = hors du lab, A23) ; la cible d'un worktree
+// prouvé du dépôt s'écrit `<chemin relatif> (worktree <nom>)` : le suffixe s'ajoute APRÈS la borne d'affichage et n'est pas compté dedans (A48-44)
+function ciblePrincipale(valeur, root, arbres) {
+  const v = chaine(valeur);
+  if (!v || !root) return { cible: v ? HORS : '', suffixe: '' };
+  const table = arbres || racinesDeComparaison(root), r = reduireCible(v, table, arbreDeNom(table, null));
+  return r === null ? { cible: '', suffixe: '' } : { cible: r.cible, suffixe: r.arbre === null ? '' : ` (worktree ${r.arbre})` };
 }
 
 // roles : Map identifiant d'agent -> rôle, tirée de la COLLECTE (registre, meta.json) et jamais du texte de l'entrée ; sans elle (ou destinataire inconnu) la cible d'un message est « un agent »
-export function etiquette(name, input, root, roles) {
+export function etiquette(name, input, root, roles, arbres) {
   const outil = fin(name) || '?'; const i = input && typeof input === 'object' ? input : {};
   const n = chaine(name);
-  let verbe, cible = '';
+  let verbe, cible = '', suffixe = '';
   if (n.startsWith('mcp__')) { verbe = VERBE_MCP; cible = n.split('__')[1] || ''; }
   else if (n in VERBES) {
     verbe = VERBES[n];
-    if (['Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit'].includes(n)) cible = cheminDuLab(i.file_path ?? i.notebook_path ?? i.path, root);
-    else if (n === 'Grep' || n === 'Glob') cible = cheminDuLab(i.path ?? i.file_path, root);
+    if (['Read', 'Write', 'Edit', 'MultiEdit', 'NotebookEdit'].includes(n)) {
+      ({ cible, suffixe } = ciblePrincipale(i.file_path ?? i.notebook_path ?? i.path, root, arbres));
+    }
+    else if (n === 'Grep' || n === 'Glob') ({ cible, suffixe } = ciblePrincipale(i.path ?? i.file_path, root, arbres));
     else if (n === 'Agent' || n === 'Task') cible = chaine(i.subagent_type);
     else if (n === 'SendMessage') cible = roles instanceof Map && roles.has(chaine(i.to)) ? chaine(roles.get(chaine(i.to))) : 'un agent'; // jamais l'identifiant brut (Q2a)
     else if (n === 'Skill') cible = chaine(i.skill);
     else if (n === 'WebFetch') { try { cible = new URL(chaine(i.url)).hostname; } catch { cible = ''; } }
   } else verbe = VERBE_AUTRE;
-  return { outil, verbe, cible: fin(cible) };
+  return { outil, verbe, cible: fin(cible) + suffixe };
 }
 
 // dernière action : le dernier bloc tool_use d'une ligne assistant, en remontant le transcript
@@ -98,7 +98,10 @@ function reduire(fichier, root, roles, kind) {
   const q = fenetre(fichier, QUEUE, true);
   if (!q) return { mandat, fil: [], tronque };
   const lignes = q.texte.split('\n'); if (q.coupe) { lignes.shift(); tronque = true; } // la première ligne de la fenêtre est coupée
-  let msgs = [], outs = [], seq = 0; // `seq` : l'ordre d'apparition, partagé par les messages et les outils pour les remettre en UN fil
+  let msgs = [], outs = [], seq = 0, table; // table : les arbres prouvés du dépôt, calculés UNE fois par appel et seulement si un outil est gardé
+  const arbres = () => (table ??= (() => { // les arbres prouvés du dépôt ; échec : l'arbre principal seul
+    try { return racinesDeComparaison(root, arbresGit(root)); } catch { return root ? racinesDeComparaison(root) : undefined; }
+  })());
   for (const l of lignes) {
     if (!l.trim() || !l.includes('"assistant"')) continue; // écarte sans analyser les lignes d'une autre sorte
     const d = json(l); if (!d || d.type !== 'assistant') continue;
@@ -115,6 +118,6 @@ function reduire(fichier, root, roles, kind) {
   if (outs.length > MAX_OUTILS) { outs = outs.slice(-MAX_OUTILS); tronque = true; }
   if (msgs.some((m) => m.x.length > BORNE_MESSAGE)) tronque = true;
   const fil = [...msgs.map((m) => ({ s: m.s, e: { t: m.t, genre: 'message', texte: coupe(m.x, BORNE_MESSAGE) } })),
-    ...outs.map((o) => ({ s: o.s, e: { t: o.t, genre: 'outil', ...etiquette(o.n, o.i, root, roles) } }))].sort((a, b) => a.s - b.s).map((x) => x.e);
+    ...outs.map((o) => ({ s: o.s, e: { t: o.t, genre: 'outil', ...etiquette(o.n, o.i, root, roles, arbres()) } }))].sort((a, b) => a.s - b.s).map((x) => x.e);
   return { mandat, fil: regrouper(fil), tronque };
 }
