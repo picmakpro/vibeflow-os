@@ -84,13 +84,15 @@
     [b.sansExigence, 'sans exigence', 'sans exigence'], [b.complete, 'complète', 'complètes']]));
   VT.resume = (b) => {
     const inc = b.total - b.complete, tete = VT.N(b.total) + ' ' + VT.P(b.total, 'exigence', 'exigences') + ', ';
-    return VT.T(tete + (inc ? VT.N(inc) + ' ' + VT.P(inc, 'incomplète', 'incomplètes') + ' dont ' + VT.N(b.contradiction) + ' en contradiction' : 'toutes complètes'));
+    return VT.T(tete + (inc ? VT.N(inc) + ' ' + VT.P(inc, 'incomplète', 'incomplètes') + ' dont ' + VT.N(b.contradiction) + ' en contradiction'
+      : 'toutes complètes'));
   };
   // légende des glyphes : visible en permanence, quatre paires neutres (jamais de corail), colonnes nommées
   VT.legende = () => {
     const l = el('p', 'vf-trace-legende vf-trace-neutre');
     l.append(document.createTextNode(VT.T('Légende : ')));
-    for (const [e, m] of [['lu', 'lu'], ['manque', 'manque'], ['non-lisible', 'non lisible'], ['contradiction', 'contradiction']]) l.append(VT.paire(e, m), esp());
+    for (const [e, m] of [['lu', 'lu'], ['manque', 'manque'], ['non-lisible', 'non lisible'], ['contradiction', 'contradiction']]) l.append(VT.paire(e, m),
+      esp());
     l.append(document.createTextNode(VT.T('Colonnes : plan, SUMMARY, VERIFICATION, recette.')));
     return l;
   };
@@ -104,6 +106,8 @@
 
   // une preuve : portée et libellé, statut lu, chemin relatif copiable (le contenu du fichier n'est jamais rendu)
   const LIB = { verification: 'VERIFICATION', recette: 'Recette', 'trace-rouge': 'Trace rouge', securite: 'Sécurité', validation: 'Validation' };
+  // la phase d'abord, puis chaque plan (à égalité, l'ordre de la route)
+  VT.preuvesTriees = (ps) => ps.map((p, i) => [p.plan ? 1 : 0, i, p]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
   VT.libelleProuve = (p) => (p.plan || 'Phase') + ' · ' + (LIB[p.sorte] || p.sorte);
   VT.chemin = (chemin) => {
     const b = el('button', 'vf-copie vf-ref', null, { type: 'button', 'data-vf-copie': chemin, title: chemin, 'aria-label': 'Copier le chemin : ' + chemin });
@@ -118,31 +122,39 @@
   // ligne d'une phase du Jalon : gabarit fermé de quatre lignes au plus (§ 4.1)
   const ETAT = { 'a-faire': ['todo', 'À faire'], 'en-cours': ['active', 'En cours'], 'a-recetter': ['recette', 'À recetter'], fait: ['done', 'Fait'] };
   VT.ligneJalon = (p, { surOuvrir } = {}) => {
-    const b = el('button', 'vf-trace-ligne', null, { type: 'button', 'data-trace': 'phase:' + p.cle }), l1 = el('span', 'vf-trace-jalon-l1'), e = ETAT[p.etat] || ETAT['a-faire'];
-    l1.append(el('span', 'vf-trace-nom1', 'Phase ' + p.n), esp(), el('span', 'vf-trace-tt', p.nom, { title: p.nom }), esp(), el('span', 'vst vst-' + e[0], e[1]));
+    const b = el('button', 'vf-trace-ligne', null, { type: 'button', 'data-trace': 'phase:' + p.cle }), l1 = el('span', 'vf-trace-jalon-l1'),
+      e = ETAT[p.etat] || ETAT['a-faire'];
+    l1.append(el('span', 'vf-trace-nom1', 'Phase ' + p.n), esp(), el('span', 'vf-trace-tt', p.nom, { title: p.nom }), esp(), el('span', 'vst vst-' + e[0],
+      e[1]));
     b.append(l1);
     const x = p.bilan, m = p.maillonsEnDefaut;
-    b.append(el('span', 'vf-trace-cl2', x.total ? VT.T('Maillons non lus : plan ' + VT.N(m.plan) + ' · SUMMARY ' + VT.N(m.summary) + ' · VERIFICATION ' + VT.N(m.verification)
+    b.append(el('span', 'vf-trace-cl2', x.total ? VT.T('Maillons non lus : plan ' + VT.N(m.plan) + ' · SUMMARY ' + VT.N(m.summary) + ' · VERIFICATION '
+      + VT.N(m.verification)
       + ' · recette ' + VT.N(m.recette)) : 'aucune exigence rattachée'));
-    const tr = [[x.contradiction, 'en contradiction', 'en contradiction'], [x.manque, 'avec un manque', 'avec un manque'], [x.nonLisible, 'non lisible', 'non lisibles']].filter((c) => c[0] > 0);
+    const tr = [[x.contradiction, 'en contradiction', 'en contradiction'], [x.manque, 'avec un manque', 'avec un manque'], [x.nonLisible, 'non lisible',
+      'non lisibles']].filter((c) => c[0] > 0);
     if (x.total && !tr.length) b.append(el('span', 'vf-trace-l3', 'toutes complètes'));
     else if (tr.length) {
       const l3 = el('span', 'vf-trace-l3');
       if (x.contradiction) l3.append(VT.glyphe('contradiction'), esp());
       l3.append(document.createTextNode(VT.T(tranches(tr)))); b.append(l3);
     }
-    if (p.lignesSansExigence > 0) b.append(el('span', 'vf-trace-l3', VT.T(VT.N(p.lignesSansExigence) + ' ' + VT.P(p.lignesSansExigence, 'ligne', 'lignes') + ' de traçabilité sans exigence')));
+    if (p.lignesSansExigence > 0) b.append(el('span', 'vf-trace-l3', VT.T(VT.N(p.lignesSansExigence) + ' ' + VT.P(p.lignesSansExigence, 'ligne', 'lignes')
+      + ' de traçabilité sans exigence')));
     if (surOuvrir) b.addEventListener('click', (ev) => surOuvrir(p, ev.detail === 0, b));
     return b;
   };
 
   // états de § 9 : tous neutres, chacun dit ce qui l'a produit puis ce qui le lèverait
   const PHRASES = {
-    'vide-phase': "Aucune exigence rattachée à cette phase. Une ligne du tableau de traçabilité du registre des exigences, ou le champ « requirements » d'un plan, la rattache.",
+    'vide-phase': "Aucune exigence rattachée à cette phase. Une ligne du tableau de traçabilité du registre des exigences, "
+      + "ou le champ « requirements » d'un plan, la rattache.",
     'jalon-vide': 'Aucune phase dans le jalon en cours. Une phase inscrite à la feuille de route sous ce jalon apparaît ici.',
-    'aucune-preuve': "Aucune preuve attachée. Un fichier VERIFICATION, de recette, de trace rouge, de sécurité ou de validation dans le dossier de la phase l'attacherait.",
+    'aucune-preuve': "Aucune preuve attachée. Un fichier VERIFICATION, de recette, de trace rouge, de sécurité ou de validation "
+      + "dans le dossier de la phase l'attacherait.",
     collecte: "La collecte du dépôt est en cours. La traçabilité apparaît dès qu'elle est faite.",
-    compartiment: "Aucun compartiment de planification lu : la traçabilité n'est pas disponible. Un compartiment avec son registre des exigences la rend lisible.",
+    compartiment: "Aucun compartiment de planification lu : la traçabilité n'est pas disponible. "
+      + "Un compartiment avec son registre des exigences la rend lisible.",
     disparu: "Cet objet n'existe plus dans le dépôt. Le bouton Retour de l'en-tête rouvre la vue précédente.",
     'aucune-preuve-exigence': 'Aucune preuve lue pour cette exigence. VERIFICATION, recette ou trace rouge dans le dossier de la phase la relierait.',
   };
@@ -156,11 +168,13 @@
     if (cas === 'erreur') {
       const b = el('div', 'vf-trace-boite', null, { role: 'status' }), r = el('button', 'btn soft', 'Réessayer', { type: 'button' });
       r.addEventListener('click', () => d.surReessayer());
-      b.append(el('strong', null, 'La traçabilité est indisponible'), esp(), el('span', null, 'La lecture du dépôt a échoué ou dépassé le délai.'), esp(), r); return b;
+      b.append(el('strong', null, 'La traçabilité est indisponible'), esp(), el('span', null, 'La lecture du dépôt a échoué ou dépassé le délai.'), esp(),
+        r); return b;
     }
     if (cas === 'etapes') { // P76-D-12 : le registre est rangé par Étape N
       const tout = d.lues === d.sansDossier;
-      return phrase('La traçabilité de ce registre est rangée par Étape N' + (tout ? ', aucune ne désigne un dossier de phase. Un dossier de phase par étape la rend lisible.'
+      return phrase('La traçabilité de ce registre est rangée par Étape N' + (tout
+        ? ', aucune ne désigne un dossier de phase. Un dossier de phase par étape la rend lisible.'
         : ' : ' + d.lues + ' étapes lues comme des phases, ' + d.sansDossier + ' sans dossier de phase. Un dossier de phase par étape les rend lisibles.'));
     }
     return phrase(PHRASES[cas] || '');

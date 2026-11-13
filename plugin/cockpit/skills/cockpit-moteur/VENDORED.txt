@@ -32,6 +32,8 @@ AJOUT assets/ui/72-vf-equipe.js
 AJOUT assets/ui/72-vf-regie-modele.js
 AJOUT assets/ui/72-vf-regie-style.js
 AJOUT assets/ui/73-vf-tiroir-travail.js
+AJOUT assets/ui/74-vf-trace-exigence.js
+AJOUT assets/ui/74-vf-trace-liste.js
 AJOUT assets/ui/74-vf-trace-rendu.js
 AJOUT assets/ui/74-vf-trace-sections.js
 AJOUT assets/ui/74-vf-trace-style.js

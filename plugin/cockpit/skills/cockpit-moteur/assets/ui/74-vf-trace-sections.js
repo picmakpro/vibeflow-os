@@ -1,4 +1,5 @@
-// VibeFlow (76-06) : les sections de la traçabilité posées dans le panneau du moteur (UI-SPEC § 2, § 3, § 4.1) : addPanelSection seulement (la fonction qui remplace la vue d'ensemble n'est jamais appelée),
+// VibeFlow (76-06) : les sections de la traçabilité posées dans le panneau du moteur (UI-SPEC § 2, § 3, § 4.1) : addPanelSection seulement (la fonction qui
+// remplace la vue d'ensemble n'est jamais appelée),
 // Le rappel rend un gabarit statique (aucune donnée du lab dans le HTML) ; `bind` remplit en place par le DOM (textContent).
 (() => {
   const VT = (window.VFTrace = window.VFTrace || {});
@@ -9,14 +10,14 @@
 
   // repli « Preuves attachées » : fermé par défaut, plafonné ouvert à 6 lignes (4 sous 700 px), la phase d'abord puis chaque plan
   const preuves = (ph) => {
-    const el = VT.el, ps = ph.preuves.map((p, i) => [p.plan ? 1 : 0, i, p]).sort((a, b) => a[0] - b[0] || a[1] - b[1]).map((x) => x[2]);
+    const el = VT.el, ps = VT.preuvesTriees(ph.preuves);
     const max = etroit() ? 4 : 6, d = el('details', 'vf-trace-repli'), s = el('summary', 'vf-trace-sec-t', 'Preuves attachées');
     s.append(document.createTextNode(' '), el('span', 'c', VT.T(VT.N(ps.length) + ' ' + VT.P(ps.length, 'fichier', 'fichiers'))));
     d.append(s);
     if (!ps.length) d.append(VT.etat('aucune-preuve'));
     else {
       for (const p of ps.slice(0, max)) d.append(VT.ligneProuve(p));
-      const ouvrir = (clavier) => VT.ouvrirListePreuves && VT.ouvrirListePreuves(ph, null, clavier);
+      const ouvrir = (clavier) => VT.ouvrirListePreuves(ph, null, clavier);
       if (ps.length > max) d.append(VT.plus(['fichier de preuve', 'fichiers de preuve'], ps.length - max, ouvrir));
     }
     d.open = ouvert.preuves; d.addEventListener('toggle', () => { ouvert.preuves = d.open; });
@@ -33,11 +34,11 @@
         compte.textContent = VT.T(VT.N(ex.length) + ' ' + VT.P(ex.length, 'exigence', 'exigences'));
         if (!ex.length) kids.push(VT.etat('vide-phase'));
         else {
-          const surOuvrir = (ligne, clavier, b) => VT.ouvrirExigence && VT.ouvrirExigence(ligne, clavier, b);
+          const surOuvrir = (ligne, clavier, b) => VT.ouvrirExigence(ligne, clavier, b);
           const lignes = VT.el('div', 'vf-trace-lignes');
           lignes.append(...ex.slice(0, max).map((l) => VT.ligneExigence(l, { surOuvrir })));
           kids.push(VT.el('p', 'vf-trace-bilan', VT.T(VT.bilanPhase(ph.bilan))), VT.legende(), lignes);
-          const ouvrir = (clavier) => VT.ouvrirListeExigences && VT.ouvrirListeExigences(ph, clavier);
+          const ouvrir = (clavier) => VT.ouvrirListeExigences(ph, clavier);
           if (ex.length > max) kids.push(VT.plus(['exigence', 'exigences'], ex.length - max, ouvrir));
         }
         if (ex.length || ph.preuves.length) kids.push(preuves(ph));
@@ -98,7 +99,8 @@
     });
     SC.addPanelSection('overview', () => {
       if (!vivant()) return '';
-      return { html: '<div class="sec vf-trace"><details class="vf-trace-repli" data-vf-trace-jalon><summary class="vf-trace-sec-t">Jalon <span class="c"></span></summary>'
+      return { html: '<div class="sec vf-trace"><details class="vf-trace-repli" data-vf-trace-jalon>'
+        + '<summary class="vf-trace-sec-t">Jalon <span class="c"></span></summary>'
         + '<div data-vf-trace-corps></div></details></div>', bind: (racine) => VT.jalonSection(racine) };
     });
   };

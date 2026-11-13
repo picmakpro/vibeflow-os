@@ -13,7 +13,7 @@ const AIDES = `window.__tr = { sec: () => document.getElementById('vf-trace-phas
   nb: (x) => String(x == null ? '' : x).replace(/\\u00a0/g, ' ').replace(/\\s+/g, ' ').trim() };`;
 const BTN = `(() => { const b = document.querySelector('#panel .vf-retour'); return b ? { label: __tr.nb(b.getAttribute('aria-label')), dis: b.getAttribute('aria-disabled') } : null; })()`;
 const PAN = `(() => { const p = document.querySelector('#panel [data-vf-trace-panneau]'); if (!p) return null; const t = p.querySelector('.pt');
-  return { titre: t && __tr.nb(t.textContent), id: t && t.id, sections: [...p.querySelectorAll('h3')].map((h) => __tr.nb(h.firstChild.textContent)), texte: __tr.nb(p.textContent) }; })()`;
+  return { titre: t && __tr.nb(t.textContent), id: t && t.id, sections: [...p.querySelectorAll('h3')].map((h) => __tr.nb(h.firstChild.textContent)), texte: __tr.nb(p.textContent), corps: __tr.nb(p.querySelector('[data-vf-trace-corps]').textContent) }; })()`;
 const L = (id) => `#vf-trace-phase .vf-trace-ligne[data-trace="exigence:${id}"]`;
 
 await executer(chrome, async (s) => {
@@ -43,7 +43,12 @@ await executer(chrome, async (s) => {
     ...(key === 'Enter' && type === 'keyDown' ? { text: '\r' } : {}) }); };
   const focus = (sel) => s.ev(`document.querySelector(${JSON.stringify(sel)}).focus()`);
   const titre = (t) => vrai(`(() => { const e = document.querySelector('#panel [data-vf-trace-panneau] .pt'); return !!e && e.textContent === ${JSON.stringify(t)}; })()`);
-  const ouvrir = async (id) => { await clic(L(id)); return titre(id); };
+  const sections = () => vrai("document.querySelectorAll('#panel [data-vf-trace-panneau] .sec').length >= 4"); // le corps du panneau est lu de façon asynchrone
+  const ouvrir = async (id) => { await clic(L(id)); const ok = await titre(id); return ok && (await sections()); };
+  const ouvrirDirect = async (id, ph) => { // une exigence hors des cinq lignes de la section : le panneau est ouvert par l'ouvreur de la page
+    await s.ev(`VFTrace.lire('phase', '${ph}').then((p) => VFTrace.ouvrirExigence(p.phase.exigences.find((l) => l.id === '${id}'), false, null))`);
+    return (await titre(id)) && (await sections());
+  };
   const retour = async () => { await clic('#panel .vf-retour'); await pause(500); await stabiliser(() => lire(BTN), { pas: 150, max: 3000 }); };
 
   await sec('e1', async () => { // C2.1 : panneau d'exigence et état de la pile commune (le bouton Retour de l'en-tête nomme la vue quittée)
@@ -103,7 +108,7 @@ await executer(chrome, async (s) => {
   });
   await sec('e9', async () => { // C2.9 : l'exigence ouvre sa décision et sa preuve (P76-D-38)
     await charger(); await phase(1); await s.ev("window.VFTrace.ouvrir = (sorte, cle) => { window.__ouvert = [sorte, cle]; }");
-    await ouvrir('REQ-11'); await vrai("document.querySelectorAll('#panel [data-vf-trace-panneau] .sec').length >= 4");
+    await ouvrirDirect('REQ-11', 'ph-1');
     o.e9 = await lire(`({ pan: ${PAN}, lignes: [...document.querySelectorAll('#panel [data-vf-trace-panneau] .vf-trace-ligne')].map((b) => ({ id: __tr.nb((b.querySelector('.vf-trace-id') || {}).textContent), txt: __tr.nb(b.textContent) })),
       inertes: [...document.querySelectorAll('#panel [data-vf-trace-panneau] .vf-trace-inerte')].map((e) => __tr.nb(e.textContent)), glyphes: document.querySelectorAll('#panel [data-vf-trace-panneau] .vf-trace-decisions .vf-trace-g').length,
       nue: (await VF_ETAT.lireJson('/api/vf/tracabilite?vue=exigence&cle=REQ-11')).exigence.decisionsNues })`);
@@ -116,16 +121,17 @@ await executer(chrome, async (s) => {
     await charger(); await phase(3); await ouvrir('REQ-02'); o.e9sans = await lire(`${PAN}`);
     await charger(); await phase(2); await ouvrir('REQ-01'); o.e9aucune = await lire(`${PAN}`);
   });
-  await sec('e5', async () => { // C2.5 : section Jalon ouverte : un SUMMARY modifié dans le lab remplace le contenu, section ouverte ; fermée : aucune requête
+  await sec('e5', async () => { // C2.5 : section Jalon ouverte : une ligne ajoutée au tableau dans le lab remplace le contenu, section ouverte ; fermée : aucune requête
     await charger(1440, 500); await s.ev("VibeFlow.go('root')"); await pause(400); await clic('#panel details[data-vf-trace-jalon] > summary');
     await vrai("!!document.querySelector('#panel details[data-vf-trace-jalon] .vf-trace-ligne')");
-    const ph2 = "[...document.querySelectorAll('#panel details[data-vf-trace-jalon] .vf-trace-ligne')].map((b) => __tr.nb(b.textContent)).find((t) => t.startsWith('Phase 2'))";
+    const ph2 = "[...document.querySelectorAll('#panel details[data-vf-trace-jalon] .vf-trace-ligne')].map((b) => __tr.nb(b.textContent)).find((t) => t.startsWith('Phase 1'))";
     o.e5avant = await lire(ph2); await s.ev("document.getElementById('panel').scrollTop = 40"); const haut = await lire("document.getElementById('panel').scrollTop");
-    fs.writeFileSync(`${lab}/.planning/workstreams/x/phases/02-deux/02-01-SUMMARY.md`, '---\nrequirements-completed: REQ-77\n---\n# Summary\n');
+    const reg = `${lab}/.planning/workstreams/x/REQUIREMENTS.md`, original = fs.readFileSync(reg, 'utf8'); // une exigence retirée du registre : la ligne de la phase 1 le dit (l'événement planning suit un changement de structure du graphe)
+    fs.writeFileSync(reg, original.split('\n').filter((l) => !l.includes('REQ-12')).join('\n'));
     o.e5change = await attendreValeur(() => lire(`${ph2}`), (v) => v && v !== o.e5avant, { max: 25000 }) !== o.e5avant;
     o.e5apres = await lire(`({ ouvert: document.querySelector('#panel details[data-vf-trace-jalon]').open, haut: document.getElementById('panel').scrollTop === ${haut || 0} })`);
     await clic('#panel details[data-vf-trace-jalon] > summary'); await pause(300); reqs.length = 0;
-    fs.writeFileSync(`${lab}/.planning/workstreams/x/phases/02-deux/02-01-SUMMARY.md`, '---\nrequirements-completed: REQ-01\n---\n# Summary\n'); await pause(8000);
+    fs.writeFileSync(reg, original); await pause(8000);
     o.e5ferme = reqs.filter((x) => x.includes('vue=jalon')).length;
   });
   await sec('e7', async () => { // C2.7 : l'exigence retirée du registre des exigences puis relue : l'objet a disparu
