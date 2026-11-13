@@ -210,7 +210,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 const [, , dir, scripts, cas, lab, arg] = process.argv;
 const M = await import(pathToFileURL(path.join(dir, 'vf-cockpit-build.mjs')).href);
-const sortie = path.join(lab, '.vibeflow', 'cockpit'), VOL = new Set(['generatedAt', 'scanAt', 'builtAt', 'updatedAt']);
+const sortie = path.join(lab, '.vibeflow', 'cockpit'), VOL = new Set(['generatedAt', 'scanAt', 'builtAt', 'updatedAt', 'vfPrevuAt']);
 const tri = (o) => (Array.isArray(o) ? o.map(tri) : o && typeof o === 'object' ? Object.fromEntries(Object.keys(o).filter((k) => !VOL.has(k)).sort().map((k) => [k, tri(o[k])])) : o);
 const canon = (j) => JSON.stringify(tri(j)).split(lab).join('<LAB>').split(fs.realpathSync(lab)).join('<LAB>');
 const graphe = () => JSON.parse(fs.readFileSync(path.join(sortie, 'graph.json'), 'utf8')), page = async () => (await import(pathToFileURL(path.join(scripts, 'vf-cockpit-embed.mjs')).href)).extraireGraphe(fs.readFileSync(path.join(sortie, 'index.html'), 'utf8')); // le lecteur de la sortie (marque blanche)
@@ -336,7 +336,7 @@ export MUT_F=$'  [\'/api/vf/modeles\', lireModeles, HISTORIQUE],\n' MUT_R=""
 assert_eq "M-TABLE — la ligne modeles retirée : RK.1 et RC.3 rougissent (RC.3 obtient 404)" "$(mutstruct table)" "2|RK.1,RC.3,"
 
 echo "=== AN — table des annotateurs (A27) ==="
-assert_eq "AN.1 — ANNOTATEURS porte exactement descriptions, git, logos, onglet, schema, touche (liste à la main ; une ligne par annotateur ajouté, à sa place alphabétique), uniques et triés" "$(ev "$B" 'j.noms.join(",")')" "descriptions,git,logos,onglet,schema,touche"
+assert_eq "AN.1 — ANNOTATEURS porte exactement descriptions, git, logos, onglet, prevues, schema, touche (liste à la main ; une ligne par annotateur ajouté, à sa place alphabétique), uniques et triés" "$(ev "$B" 'j.noms.join(",")')" "descriptions,git,logos,onglet,prevues,schema,touche"
 LABV="$WORK/an1/lab"; mkdir -p "$WORK/an1"; copielab "$LABV"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LABV" --quiet >/dev/null 2>&1
 AV="$(node "$AUX/an.mjs" "$SCRIPTS" "$SCRIPTS" valeurs "$LABV" 2>/dev/null | tail -1)"; BR="$(git -C "$LABV" branch --show-current)"
 assert_eq "AN.2 — valeurs du lab neutre : onglet code, logos clair et sombre en data:image/svg+xml, entête Git (branche du lab), vfTouch de src/app.js, extracteur, description du script, schéma" "$(ev "$AV" '[j.tab,j.logos,j.git,j.touche,j.extracteur,j.d,j.auto,j.schema].join("|")')" "code|true,true|$BR|true|true|Lance la démonstration du socle : une phrase accentuée en tête.|false|vf-cockpit/graph@1"
