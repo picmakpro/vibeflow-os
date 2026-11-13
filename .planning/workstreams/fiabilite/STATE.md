@@ -40,6 +40,7 @@ Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 10
 - Non publié, sur `release/v2.77.0` (PR #226 ouverte, non mergée) : panel, recette du 2026-11-08 et correctifs, audit du cockpit.
 - Gel des publications : décision de Samuel du 2026-11-08 (`.planning/missions/2026-11-08-recette-correctifs.md`) ; levée du gel, merge, bump, tag et release restent ses gestes.
 - Exécution : segments b et c de 79 et 80, puis 73, 74, 75, 76, 77 ; 81 reportée (`AUDC-Q3` « plus tard », 2026-11-11).
+- Phase 76 : 76-01 à 76-05 faits (2026-11-13).
 - Dettes nommées : UIFN-10 et LANC-12 (voir Pending) ; étapes 4 et 5 de la recette de la 68 reportées (P68-D-35).
 
 ## Accumulated Context

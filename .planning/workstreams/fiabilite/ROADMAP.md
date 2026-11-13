@@ -140,7 +140,7 @@
 | 73. Gouvernance au cockpit — arbitrages en attente, worktrees et verrous | vibeflow-v2.0 | 0/11 | Planned | - |
 | 74. L'équipe dans le temps — swim-lanes, coût, replay | vibeflow-v2.0 | 0/10 | Planned | - |
 | 75. L'activité posée sur le code — hotspots, couplage, gardes, empreinte | vibeflow-v2.0 | 0/12 | Planned | - |
-| 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 0/9 | Planned | - |
+| 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 5/9 | In Progress | - |
 | 77. Santé de la méthode et synthèse — jauges, dernière visite, burn-up | vibeflow-v2.0 | 0/8 | Planned | - |
 | 78. Git dans le cockpit | vibeflow-v2.0 | 11/11 | Complete — PR #216, release `v2.76.0` | 2026-11-06 |
 | 79. Socle du cockpit — une collecte, un flux, une route d'état | vibeflow-v2.0 | 13/22 | In progress — segment a fusionné (PR #238) | - |
@@ -399,11 +399,11 @@ Plans:
 
 Plans:
 
-- [ ] 76-01-PLAN.md — Chaîne d'exigences : maillons, contradictions, preuves, bilans, Jalon (fonctions pures) (v1)
-- [ ] 76-02-PLAN.md — Décisions : extracteur `vf-cockpit-registres.mjs` et passage git des commits citants (v1)
-- [ ] 76-03-PLAN.md — Mémoire des agents : entrées, liens, états (v2)
-- [ ] 76-04-PLAN.md — Branchement dans la collecte (champs facultatifs de `cockpit-project@1`) (v2)
-- [ ] 76-05-PLAN.md — Route `GET /api/vf/tracabilite` (v3)
+- [x] 76-01-PLAN.md — Chaîne d'exigences : maillons, contradictions, preuves, bilans, Jalon (fonctions pures) (v1)
+- [x] 76-02-PLAN.md — Décisions : extracteur `vf-cockpit-registres.mjs` et passage git des commits citants (v1)
+- [x] 76-03-PLAN.md — Mémoire des agents : entrées, liens, états (v2)
+- [x] 76-04-PLAN.md — Branchement dans la collecte (champs facultatifs de `cockpit-project@1`) (v2)
+- [x] 76-05-PLAN.md — Route `GET /api/vf/tracabilite` (v3)
 - [ ] 76-06-PLAN.md — Page : section de phase, preuves, Jalon, panneau d'exigence (v4)
 - [ ] 76-07-PLAN.md — Page : Décisions, Mémoire, panneaux d'ADR, de décision, d'entrée, commits (v5)
 - [ ] 76-08-PLAN.md — Retrait du nœud `.req`, puis clôture (v6)
