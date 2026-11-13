@@ -42,23 +42,23 @@ export function raisonRejet(chemin) {
 // A37 : aucune validation de chemin textuel n'est exportée par 79-06 ni 79-07 (seule la résolution physique l'est) : la garde est limitée à la forme
 export const gardeFilesModified = (chemin) => raisonRejet(chemin) === null;
 
-const comptes = new WeakMap(); // contexte -> Map nom d'arbre -> nombre de porteurs
+const comptes = new WeakMap(); // contexte -> Map nom d'arbre -> nombre de worktrees VÉRIFIÉS qui le portent
 function porteurs(c) {
   let m = comptes.get(c);
   if (m) return m;
   m = new Map();
   for (const x of Array.isArray(c.worktreesVerifies) ? c.worktreesVerifies : []) m.set(x, (m.get(x) || 0) + 1);
-  if (typeof c.nomPrincipal === 'string') m.set(c.nomPrincipal, (m.get(c.nomPrincipal) || 0) + 1); // le nom de base de l'arbre principal compte (A46)
   comptes.set(c, m);
   return m;
 }
 
-// l'arbre principal (nul) est toujours admis ; un worktree l'est s'il est vérifié ET si son nom n'est porté que par lui (A46, fermé par défaut)
+// l'arbre principal (nul) est toujours admis ; un worktree l'est s'il est vérifié, s'il est seul à porter son nom ET si ce nom n'est pas celui de
+// l'arbre principal (A46, fermé par défaut : un nom absent de la liste des vérifiés n'est jamais admis, même s'il égale le nom de base du principal)
 function admis(arbre, c) {
   if (arbre === null || arbre === undefined) return true;
   if (typeof arbre !== 'string' || !Array.isArray(c.worktreesVerifies)) return false;
   const n = porteurs(c).get(arbre) || 0;
-  return n === 1; // garde:chemins-arbre-unique
+  return n === 1 && arbre !== c.nomPrincipal; // garde:chemins-arbre-unique
 }
 
 export function normaliser(entree, contexte = {}) {

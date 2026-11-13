@@ -73,7 +73,7 @@ await cas('C1', () => {
 await cas('C2', () => {
   const c = ctx(), hostiles = [['..', '..'], ['../x', '../x'], ['a/../../b', 'a/../../b'], ['absolu', '/etc/passwd'], ['NUL', 'a\0b'], ['retour ligne', 'a\nb'], ['U+2028', 'a\u2028b'],
     ['U+2029', 'a\u2029b'], ['tabulation', 'a\tb'], ['contrôle', 'a\u0007b'], ['DEL', 'a\u007fb'], ['4 097 octets', 'x'.repeat(4097)], ['4 098 octets (é)', '\u00e9'.repeat(2049)],
-    ['lecteur', 'C:\\x'], ['UNC', '\\\\srv\\x'], ['vide', ''], ['non texte', 42]];
+    ['C1 U+0080', 'a\u0080b'], ['NEL U+0085', 'a\u0085b'], ['C1 U+009F', 'a\u009fb'], ['lecteur', 'C:\\x'], ['UNC', '\\\\srv\\x'], ['vide', ''], ['non texte', 42]];
   for (const [nom, cible] of hostiles) {
     eq('C2', `${nom} : rejeté`, CH.normaliser({ arbre: null, cible }, c), { etat: 'rejete', chemin: null });
     eq('C2', `${nom} : gardeFilesModified refuse`, CH.gardeFilesModified(cible), false);
@@ -152,6 +152,7 @@ await cas('C7', () => {
   const col = CO.collisionsAgents([e('dup'), voie({ id: 'x2', arbre: 'dup', role: 'vf-reviewer', e: [ent('dup', 'src/a.mjs', 5)] })], dup);
   eq('C7', 'deux arbres homonymes ne fusionnent jamais : aucune collision, deux écritures comptées hors du lab', [col.collisions, col.horsLab], [[], 2]);
   eq('C7', 'le nom de base de l\'arbre principal compte : un worktree de ce nom n\'est pas admis', CH.normaliser({ arbre: 'depot', cible: 'src/a.mjs' }, ctx({ worktreesVerifies: ['depot'] })).etat, 'hors-lab');
+  for (const liste of [['wt-a'], []]) eq('C7', `un arbre égal au nom de base du principal et absent des vérifiés (${J(liste)}) n'est jamais joint`, CH.normaliser({ arbre: 'depot', cible: 'src/a.mjs' }, ctx({ worktreesVerifies: liste })).etat, 'hors-lab');
   eq('C7', 'un nom unique reste admis', CH.normaliser({ arbre: 'wt-a', cible: 'src/a.mjs' }, ctx()).etat, 'carte');
   eq('C7', 'fermé par défaut : aucune liste d\'arbres vérifiés, un worktree n\'est pas admis', CH.normaliser({ arbre: 'wt-a', cible: 'src/a.mjs' }, { cartes: new Set(['src/a.mjs']) }).etat, 'hors-lab');
 });
@@ -183,7 +184,9 @@ mutant 'comparaison-apres-nettoie' C2 $CH "const cible = entree && entree.cible;
 mutant 'rejet-du-NUL-retire' C2 $CH '/[\u0000-\u001f' '/[\u0001-\u001f'
 mutant 'arbre-ignore-dans-la-jointure' C5 $CH 'const cle = e.arbre ?? null;' 'const cle = null;'
 mutant 'cible-coupee-jointe-par-prefixe' C6 $CH "if (cible.endsWith(COUPEE)) return { etat: 'coupee', chemin: null };" "if (cible.endsWith(COUPEE)) { const pre = cible.slice(0, -1); const x = contexte.cartes ? [...contexte.cartes].find((y) => y.startsWith(pre)) : undefined; return x ? { etat: 'carte', chemin: x } : { etat: 'hors-carte', chemin: pre }; }"
-mutant 'nom-de-worktree-ambigu-admis' C7 $CH 'return n === 1;' 'return n >= 1;'
+mutant 'nom-de-worktree-ambigu-admis' C7 $CH 'return n === 1 && arbre !== c.nomPrincipal;' 'return n >= 1 && arbre !== c.nomPrincipal;'
+mutant 'nom-principal-compte-sans-verification' C7 $CH 'return n === 1 && arbre !== c.nomPrincipal;' 'return (n + (c.nomPrincipal === arbre ? 1 : 0)) === 1;'
+mutant 'plage-C1-retiree' C2 $CH '\u007f-\u009f' '\u007f'
 mutant 'cibles-d-une-voie-tronquee-jamais-jointes' C6 $EMP 'if (v.cibles.tronque === true) r.cibleTronquee = true;' 'if (v.cibles.tronque === true) { r.cibleTronquee = true; continue; }'
 mutant 'garde-remonte-retiree' C2 $CH "if (parcourir(chemin)) return 'remonte';" ''
 mutant 'garde-absolu-retiree' C2 $CH "if (ABSOLU.test(chemin)) return 'absolu';" ''

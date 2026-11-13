@@ -27,3 +27,11 @@ Rituel levé : régime allégé (consigne de Samuel, message session principale,
 - `test-cockpit-activite-empreinte.sh` : vert, exit 0 (≈ 2 s).
 - `scripts/check-machine-paths.sh` : vert.
 - Cliquet de colonnes : aucun de mes fichiers en écart.
+
+## Correctifs d'audit (mandat de correction ciblée du manager)
+
+- A46 : un arbre égal à `nomPrincipal` et absent de `worktreesVerifies` n'est plus admis (C7, mutant `nom-principal-compte-sans-verification`) ; rouge mesuré sur le code d'avant, vert après.
+- `collisionsAgents` linéaire : fonction `enConflit` (liens comptés une fois par paire, au plus 50 ancêtres par voie) ; K8 : N = 500 puis 1 000, à plat et en chaîne de parent, résultat égal à la double boucle de référence ; mutant `double-boucle-quadratique-remise`. Sur l'ancien code, à plat : 78 ms puis 256 ms, rouge.
+- `PROFONDEUR_MAX` : témoin de filiation bornée (K2) et de cycle de `parent` (K9), mutants `profondeur-max-portee-a-1e9` et `cycle-de-parent-sans-borne` (coupé par l'alarme de 12 s).
+- Plage C1 de `CTRL` (C2), `propre()` (M10), `PLANS_MAX` / `plansTronques` (K4) : un témoin et un mutant chacun ; noms de plans assainis par `propre` (K4).
+- Suites rejouées sur la tête commitée : chemins 90 PASS / 17 mutants rouges, empreinte 51 PASS / 20 mutants rouges ; cliquet de colonnes : aucun de mes fichiers en écart.

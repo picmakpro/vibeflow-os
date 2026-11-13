@@ -18,7 +18,7 @@ export const FENETRE_MS = 86400000;
 export const LIMITE = 'ecritures-par-commande-non-vues';
 const RANG = { 'en-cours': 3, modifie: 2, lu: 1, fini: 0 };
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-const propre = (t) => String(t).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').slice(0, 120);
+export const propre = (t) => String(t).replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, ' ').slice(0, 120);
 
 export const vivante = (v) => !!v && typeof v.etatOfficiel === 'string' && v.etatOfficiel !== 'termine';
 

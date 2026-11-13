@@ -14,18 +14,25 @@
 // `incomplet` : cibles en construction, historique tronqué ou cible coupée / voie dont la liste est coupée — jamais « aucune collision » dans ces
 //   cas.
 import { rassembler, gardeFilesModified } from './vf-cockpit-activite-chemins.mjs';
-import { preparer, raisons } from './vf-cockpit-activite-empreinte.mjs';
+import { preparer, raisons, propre } from './vf-cockpit-activite-empreinte.mjs';
 
 const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 const PROFONDEUR_MAX = 50;
 
-// parent ou enfant (directement ou par ancêtres) : bornée, sans récursion
-function liees(a, b, parId) {
-  for (const [x, y] of [[a, b], [b, a]]) {
-    let id = parId.get(x.id), n = 0;
-    while (typeof id === 'string' && n++ < PROFONDEUR_MAX) { if (id === y.id) return true; id = parId.get(id); }
+// les voies de `ks` (vivantes, même chemin, même arbre) en conflit : celles qui ont au moins un partenaire ni ancêtre ni descendant. Linéaire : chaque voie
+// remonte au plus PROFONDEUR_MAX ancêtres (un cycle de `parent` est coupé par la borne) et chaque lien trouvé compte une fois pour ses deux bouts.
+function enConflit(ks, retenues, parId) {
+  const pos = new Map(), liens = new Set(), lies = new Map(ks.map((k) => [k, 0]));
+  for (const k of ks) if (typeof retenues[k].v.id === 'string') pos.set(retenues[k].v.id, k);
+  for (const k of ks) {
+    let id = parId.get(retenues[k].v.id), n = 0;
+    while (typeof id === 'string' && n++ < PROFONDEUR_MAX) { // garde:collisions-profondeur
+      const a = pos.get(id), cle = a < k ? a + ',' + k : k + ',' + a;
+      if (a !== undefined && a !== k && !liens.has(cle)) { liens.add(cle); lies.set(k, lies.get(k) + 1); lies.set(a, lies.get(a) + 1); }
+      id = parId.get(id);
+    }
   }
-  return false;
+  return ks.filter((k) => ks.length - 1 > lies.get(k));
 }
 
 export function collisionsAgents(voies, contexte = {}) {
@@ -46,14 +53,12 @@ export function collisionsAgents(voies, contexte = {}) {
   for (const [chemin, arbres] of [...parChemin].sort((a, b) => cmp(a[0], b[0]))) {
     const nomsDe = (ks) => [...ks].map((k) => p.noms[k]).sort(cmp);
     if (arbres.size >= 2) tuples.push([chemin, 'arbres', nomsDe([...arbres.values()].flatMap((s) => [...s])), null]); // garde:collisions-arbres
-    const enConflit = new Set();
+    const conflit = [];
     for (const ks of arbres.values()) {
       const vifs = [...ks].filter((k) => p.retenues[k].etat === 'vivante'); // garde:collisions-vivantes
-      for (const a of vifs) for (const b of vifs) {
-        if (a < b && !liees(p.retenues[a].v, p.retenues[b].v, parId)) { enConflit.add(a); enConflit.add(b); } // garde:collisions-parent-enfant
-      }
+      conflit.push(...enConflit(vifs, p.retenues, parId)); // garde:collisions-parent-enfant
     }
-    if (enConflit.size >= 2) tuples.push([chemin, 'agents', nomsDe(enConflit), null]);
+    if (conflit.length >= 2) tuples.push([chemin, 'agents', nomsDe(conflit), null]);
   }
   const rs = raisons(p, r.compte);
   return { collisions: tuples, incomplet: rs.length > 0, raisons: rs, horsCarte: r.compte.horsCarte, horsLab: r.compte.horsLab, coupees: r.compte.coupees,
@@ -71,7 +76,7 @@ export function collisionsPlans(plans) {
   for (const x of bornes) {
     if (!x || typeof x !== 'object' || x.st === 'done' || !Array.isArray(x.touched)) continue; // un plan fait est exclu
     if (!Number.isFinite(x.vague) && typeof x.vague !== 'string') { r.sansVague++; continue; } // jamais « vague ? » devinée
-    const phase = x.phase ?? x.n ?? null, nom = typeof x.name === 'string' ? x.name : String(x.p ?? '').split('/').pop();
+    const phase = x.phase ?? x.n ?? null, nom = propre(typeof x.name === 'string' ? x.name : String(x.p ?? '').split('/').pop());
     let parVague = groupes.get(phase); if (!parVague) { parVague = new Map(); groupes.set(phase, parVague); }
     let parChemin = parVague.get(x.vague); if (!parChemin) { parChemin = new Map(); parVague.set(x.vague, parChemin); } // garde:collisions-vague
     for (const f of new Set(x.touched)) {
