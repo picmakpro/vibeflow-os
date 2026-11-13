@@ -149,6 +149,8 @@ du journal du manager et des commits cités ; « non consignée » dit que ni le
 | tête a2ef07c8 (shard 5) | T28-F, responsive R15c.2 | T28-F : externe au segment (gsd-core 1.21.0 publié le 2026-11-13 à 04:13:53 UTC, index versionné en 1.15.0), correctif repris par cherry-pick `-x` de `c64f9e2b` (PR #239, brouillon, non fusionnée) pour que la tête finale soit verte ; R15c.2 : défaut de la sonde, intermittent en CI (4 runs sur 15), corrigé f7214e6b et a821e66b (origine aa071452) |
 | 43402693393 (tête 7ef2594c) | aucune | VERT de bout en bout |
 
+Correction du 2026-11-13 (jointure J1) : R15c.2 a rougi dans TROIS runs (43197982172, 43300355064, 43384769046), non dans « 4 runs sur 15 » comme l'écrit la ligne de la tête a2ef07c8 ci-dessus ; l'erreur venait d'un premier message de la session principale, rectifié ensuite. La ligne d'origine est laissée telle quelle.
+
 Causes élucidées depuis la première version de ce tableau :
 - D8.9 cockpit-state@1 : 99299905 ; la lecture-fil de 79-08 (D8.9, `cockpit-index@1`) : 3ad2f28f.
 - M-VIDE-ECARTE : 721b8f40 (git 2.56 du runner contre 2.50 du poste).

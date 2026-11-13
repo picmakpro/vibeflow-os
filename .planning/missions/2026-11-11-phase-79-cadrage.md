@@ -201,6 +201,10 @@ Format C76-Q1 (contrat de la Phase 76), tel que posé dans `79-CONTEXT.md` § «
 - **P79-Q-04 (S-4) — Réduire AUDC-I18 ?** En attente, modification de périmètre. La sonde, première tâche de 79-19,
   dit si `claude agents --json` voit déjà une attente de permission. Recommandation : (b) retirer I18 sur sonde
   verte, garder la forme minimale sinon.
+  *Ligne datée du 2026-11-13 (jointure J1) : P79-Q-04 n'est plus en attente. Tranchée : retrait d'AUDC-I18, « retirée,
+  sonde verte ; à rouvrir si une version de Claude Code cesse de publier `waiting` / `blocked` » (décision déléguée par
+  Samuel (message session principale, 2026-11-11 : « tranche pour chacun de ces points »), prise par la session
+  principale). L'historique de ce rapport n'est pas réécrit ; voir le registre de l'audit, § 5.3.*
 
 Limites qui appellent son avis :
 

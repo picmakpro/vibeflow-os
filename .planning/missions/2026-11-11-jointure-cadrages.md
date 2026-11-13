@@ -105,6 +105,9 @@ rapport et le STATE (jointure). AUDC-M11 et AUDC-B-05 sont livrées par le lot 0
 ## À Samuel
 
 - P75-Q-06 (amendements de `DESIGN.md`, bloque 75-10) et P79-Q-04 (S-4, réduction d'I18) restent en attente.
+  *Ligne datée du 2026-11-13 (jointure J1) : P79-Q-04 est tranchée (retrait d'AUDC-I18, décision déléguée par Samuel
+  (message session principale, 2026-11-11 : « tranche pour chacun de ces points »), prise par la session principale ;
+  registre de l'audit, § 5.3). P75-Q-06 reste en attente.*
 - Le nœud `docs` de la 71.5 : fournir la preuve, ou trancher qu'il est couvert par l'alignement du planning du
   2026-11-11.
 - Le BACKLOG est à 45 sujets ouverts pour un budget de 20 (39 avant la jointure) : un tri reste à décider.
