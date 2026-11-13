@@ -468,7 +468,7 @@ const SC = {
   hostile: async () => {
     const T = () => ({ toString() { throw new Error('piege'); } });
     const H = [V('72; x', 'alpha', 'planifier'), V('72', 'alpha', 'rm -rf'), V(T(), 'alpha', 'planifier'), V('72', T(), 'planifier'), V('72', 'alpha', T()), V('72', 'a$(id)', 'planifier'), null, 'x', 42];
-    const ids = H.map((_, i) => U(i + 1)), ok = U(9);
+    const ids = H.map((_, i) => U(i + 1)), ok = U('a');
     const d = lab('h', { sessions: [...ids.map((id) => ({ id, ageS: 60 })), { id: ok, ageS: 60 }] });
     const map = new Map(ids.map((id, i) => [id, H[i]])); map.set(ok, V('72', 'alpha', 'verifier'));
     let w; try { w = await collect(d, { lancees: map }); } catch (e) { return 'exc:1 ' + e.message; }
@@ -495,7 +495,7 @@ console.log(await SC[sc]());
 process.exit(0);
 JS
 mkdir -p "$WORK/fakebin"; printf '#!/bin/sh\nexit 1\n' > "$WORK/fakebin/claude"; chmod +x "$WORK/fakebin/claude" # faux claude : aucun vrai appel de la collecte (LR.6)
-LRH() { local sc="$1"; PATH="$WORK/fakebin:$PATH" node "$AUX/lr.mjs" "$SCRIPTS" "$sc" "$WORK/lr-$sc" 2>&1; }
+LRH() { local sc="$1"; HOME="$WORK/lr-$sc/home" PATH="$WORK/fakebin:$PATH" node "$AUX/lr.mjs" "$SCRIPTS" "$sc" "$WORK/lr-$sc" 2>&1; } # HOME jetable : le fil de collecte lit les sessions de la fixture, jamais celles du poste
 # valeur saine de LR.1 : capturée sur le code d'AVANT 73-03 (commit de base et commande dans 73-03-RED-TRACE.md), figée ici ; sept labs, un sha256 chacun
 SAIN_LR1="b4b3cd3802ee2be2b817b81c87f1d7f863ce263a76f5fe003fdc9a409c683545,b7f9cff75d7e6ed44e866b3dcc88a3e1fef3389ff9450d7f2f84269ec04b57a6,0c427f45db0037900967dd5d8a965da74556e2ade8f45ef0d180d8e0976e099c,fdb2203e921beead8f3cef7a8683bfc3f7042606f180662d920b1d8b64e3834d,213202c267bb388346f711fec10ef1164d9668f999a9526ed2690a788fbf51c6,5618478371c026523073379b88611170819b21bc745f38764735ef97814f4adc,3fe8cdb6715034a6ff1957ea19bd206cc12b19e376fdf9eff0c41c7f3030146f" # capture : code de base c4053a32, voir 73-03-RED-TRACE.md
 SAIN_LR2='{"phase":"72","ws":"alpha","verbe":"planifier"}'
@@ -520,6 +520,19 @@ mut_ls M-TERMINEE-PERDUE "/garde:termine/s#w.etat === 'termine'#false#" ls33 "$S
 mut_le M-LANCEES-HORS-SESSION "/garde:lancees/s# && w\\.kind === 'session'##" hors-session "$SAIN_LE5" LE.5
 mut_le M-LIGNE-SANS-VALIDATION '/garde:ligne-valide/s#l && entreeLanceeValide(l)#l#' hostile "$SAIN_LE4" LE.4
 mut_le M-LIGNE-VIDE-TOUJOURS "/garde:ligne-insert/s#.*#      lignes.push(t || ''); // garde:ligne-insert#" identique "$SAIN_LE1" LE.1
+
+# mutants de la ligne de lancement portée par who@2 (P73-D-21) : copie de tous les modules du module dans $WORK/mut-<nom>/, sed sur la ligne marquée ; sonde = scénario LR rejoué sur la copie
+mut_lr() { # mut_lr <nom> <expression-sed> <scénario> <valeur saine> <sonde>
+  local d="$WORK/mut-$1" got v=vert; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$d/"
+  cp "$d/vf-cockpit-who.mjs" "$d/who.orig"; sed -i.bak "$2" "$d/vf-cockpit-who.mjs"
+  if cmp -s "$d/vf-cockpit-who.mjs" "$d/who.orig"; then sans_effet "$1"; return 0; fi
+  rm -f "$d/who.orig" "$d/vf-cockpit-who.mjs.bak"
+  got="$(HOME="$WORK/lrm-$1/home" node "$AUX/lr.mjs" "$d" "$3" "$WORK/lrm-$1" 2>&1 | tail -1)"
+  if [ -n "$got" ] && [ "$got" != "$4" ]; then v=rouge; fi
+  assert_eq "$1 — le mutant rougit $5 : le relevé [${got:0:60}] n'est plus la valeur saine (témoin : le scénario s'exécute)" "$v" "rouge"
+}
+mut_lr M-LANCEE-HORS-SESSION "/garde:lancee-session/s#w\.kind === 'session' ? lancees\.get(w\.id) : undefined#lancees.get(w.id)#" hors-session "$SAIN_LR5" LR.5
+mut_lr M-LANCEE-SANS-VALIDATION '/garde:lancee-valide/s#e \&\& entreeLanceeValide(e)#e#' hostile "$SAIN_LR4" LR.4
 
 vf_hyg_assert
 

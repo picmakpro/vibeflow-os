@@ -22,6 +22,7 @@ const work = fs.realpathSync(work0), home = process.env.HOME;
 const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
 const sleep = (ms) => new Promise((k) => setTimeout(k, ms));
 const U = (n) => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`;
+const slug = (nom) => '-' + path.basename(work) + '-' + nom; // un dossier de transcripts par lab ET par dossier de travail
 const SID = '3f2c9a10-5b7e-4c1d-9a2e-0d4f6b8c1e77';
 const git = (d, ...a) => execFileSync('git', ['-C', d, ...a], { stdio: 'ignore' });
 const L = (d, id, o) => JSON.stringify({ cwd: d, sessionId: id, gitBranch: 'main', version: '2.1.316', ...o });
@@ -36,7 +37,7 @@ function transcript(f, d, id, ageS, { tail = [], titre } = {}) {
 }
 const turn = (id, n) => JSON.stringify({ type: 'system', subtype: 'turn_duration', durationMs: 1000, pendingBackgroundAgentCount: n, timestamp: '2026-11-01T11:59:09Z', sessionId: id });
 function sub(nom, sid, aid, o = {}) {
-  const sd = path.join(home, '.claude', 'projects', '-' + nom, sid, 'subagents'), a = path.join(sd, `agent-${aid}`), d = path.join(work, nom);
+  const sd = path.join(home, '.claude', 'projects', slug(nom), sid, 'subagents'), a = path.join(sd, `agent-${aid}`), d = path.join(work, nom);
   fs.mkdirSync(sd, { recursive: true });
   fs.writeFileSync(a + '.meta.json', JSON.stringify({ agentType: 'vf-coder', description: 'tâche', spawnDepth: 1, toolUseId: 'toolu_x', requestShape: 'background' }));
   transcript(a + '.jsonl', d, sid, 30, o);
@@ -60,7 +61,7 @@ function lab(nom, { ws = false, verif = false, dag = false, branche = 'main', se
     fs.writeFileSync(path.join(d, '.planning', 'missions', 'MISSION-7.dag.json'), JSON.stringify({ name: 'MISSION-7', ws: ws ? 'alpha' : undefined, phase: '7',
       nodes: [N('n1', [], 'done'), N('n2', ['n1'], 'done'), N('n3', ['n2'], 'ready'), N('n4', ['n3'], 'ready'), N('n5', ['n4'], 'blocked'), N('n6', [], 'ready')] }));
   }
-  for (const s of sessions) transcript(path.join(home, '.claude', 'projects', '-' + nom, s.id + '.jsonl'), d, s.id, s.ageS, s);
+  for (const s of sessions) transcript(path.join(home, '.claude', 'projects', slug(nom), s.id + '.jsonl'), d, s.id, s.ageS, s);
   return d;
 }
 // gouvernance de test : les phases lues par readPlanning et phasesHumaines() du module, sans passer par le code livré du fil de collecte
@@ -78,7 +79,7 @@ const SC = {
   fabrique5: async () => { lab('lab', { ws: true, verif: true, dag: a1 === '1', sessions: [{ id: SID, ageS: 3600 }] }); return 'ok'; },
   collecte5: async () => {
     const d = path.join(work, 'lab'); const w = await collecte(d, { scriptsDir: a1, gouvernance: await gov(d) });
-    fs.writeFileSync(path.join(work, 'who.json'), JSON.stringify(w)); const s = session(w, SID);
+    fs.writeFileSync(a2 || path.join(work, 'who.json'), JSON.stringify(w)); const s = session(w, SID);
     return JSON.stringify({ detient: s?.detient, retient: s?.retient });
   },
   fenetre: async () => {
@@ -175,14 +176,20 @@ rgc_fuites() {
   done
   echo "$n"
 }
-rgc6_sonde() { RGC_SCRIPTS="$1" rgc collecte5 "$WORK/mut6" "$(rgc_conducteur)" > /dev/null; rgc_fuites "$WORK/mut6/who.json"; }
+rgc6_sonde() { RGC_SCRIPTS="$1" rgc collecte5 "$WORK/rg5-a" "$(rgc_conducteur)" "$WORK/who-mut6.json" > /dev/null; rgc_fuites "$WORK/who-mut6.json"; }
 rg_RG6_collecte() {
   rgc_prepare5
   assert_eq "RG6.0 — témoin positif : la session porte detient (RG5.10 vert d'abord)" "$(G "$WORK/rg5-a/who.json" 'j.workers.some(w => w.kind === "session" && w.detient)')" 'true'
   assert_eq "RG6.10 — who@2 ne contient ni la liste d'identifiants du verrou, ni le chemin de son dossier, ni l'emplacement, ni la durée de bail" "$(rgc_fuites "$WORK/rg5-a/who.json")" '0'
-  rm -rf "$WORK/mut6"; cp -R "$WORK/rg5-a" "$WORK/mut6"; rm -f "$WORK/mut6/who.json"
-  rg_mutant DETENTION-BRUTE "l'entrée de verrou entière posée sur la session" "$SCRIPTS" vf-cockpit-gouvernance-lecture.mjs 'w.detient = { ws: det.ws, phase: det.phase }; // garde:detient' \
-    'w.detient = { ...(brut.locks || []).find((l) => l && l.present && (l.session_ids || []).includes(w.id)) }; // garde:detient' rgc6_sonde '0'
+  # M-DETENTION-BRUTE : les DEUX gardes de la paire { ws, phase } retirées (detention() rend le verrou entier ET collectWho ne borne plus `detient`) :
+  # l'entrée brute du verrou atteint who@2, RG6.10 doit rougir. Une seule garde retirée ne fuit pas (défense en profondeur) : le mutant les retire ensemble.
+  local msg got
+  msg="$(rg_mut DETENTION-BRUTE "$SCRIPTS" vf-cockpit-gouvernance.mjs 'return { ws, phase };' 'return l;')" \
+    && msg="$(FROM="if (w.detient) w.detient = sous(w.detient, { ws: 40, phase: 20 }); // garde:detient" TO="// garde:detient" node "$AUX/mutsub.mjs" "$WORK/mut-DETENTION-BRUTE/vf-cockpit-who.mjs")" \
+    || { assert_eq "M-DETENTION-BRUTE — le verrou entier posé sur la session (ancre)" "$msg" "muté"; return 0; }
+  got="$(rgc6_sonde "$WORK/mut-DETENTION-BRUTE")"
+  if [ "$got" != "0" ]; then echo "  ✅ PASS — M-DETENTION-BRUTE — le verrou entier posé sur la session (mutant tué : $got fuite(s), saine 0)"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — M-DETENTION-BRUTE — le verrou entier posé sur la session (mutant survivant)"; echo "     attendu: [différent de 0]"; echo "     obtenu:  [$got]"; FAIL=$((FAIL+1)); fi
 }
 
 # ---------- RG7 — fenêtre de stall à source unique (REGI-07) ----------
@@ -212,7 +219,7 @@ rg_RG16_collecte() {
   assert_eq "RG16.12 — le contrat déclare vibeflow/cockpit-ailleurs@1 : entrée [lab, n], cwd interdit, requis schema et ailleurs" "$(rgc contrat "$WORK/rg16c" 12)" '{"entree":["lab","n"],"cwd":true,"requis":["schema","ailleurs"]}'
   rgc_prepare5
   assert_eq "RG16.14 — toute clé émise par who@2 (premier niveau et travailleurs, collecte riche : détention, impact, phases humaines, fenêtre) est déclarée au contrat" "$(rgc contrat "$WORK/rg16c" 14 "$WORK/rg5-a/who.json")" '[]'
-  rg_mutant NETTOIE-EMISSION "branche et titre repassés au seul masque" "$SCRIPTS" vf-cockpit-who.mjs 'w[k] = nettoie(w[k], n); // garde:nettoie' 'w[k] = bornes(w[k], n); // garde:nettoie' rgc16_sonde 'branch:propre|titre:propre'
+  rg_mutant NETTOIE-EMISSION "branche et titre repassés au seul masque" "$SCRIPTS" vf-cockpit-who.mjs 'w[k] = nettoie(w[k], LIBRES[k]); // garde:nettoie' 'w[k] = bornes(w[k], LIBRES[k]); // garde:nettoie' rgc16_sonde 'branch:propre|titre:propre'
 }
 rg_RG16_direct() {
   assert_eq "RG16.13 — whoSig diffère quand seul un champ ajouté (attendAgents, lancee, detient, retient, orphan, phasesHumaines, fenetreStallS) diffère, et ne diffère pas quand seuls ageS et at diffèrent" "$(rgc sigs "$WORK/rg16s")" 'champs:true,true,true,true,true,true,true|age:egal'
