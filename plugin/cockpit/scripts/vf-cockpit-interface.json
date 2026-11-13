@@ -31,10 +31,10 @@
     },
     "vibeflow/cockpit-who@2": {
       "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "fenetre": "number", "busy": "boolean", "workers": "array", "sources": "object" },
-      "optionnels": ["sortisSilence"],
+      "optionnels": ["sortisSilence", "phasesHumaines", "fenetreStallS"],
       "travailleur": {
         "requis": ["kind", "id", "tree", "source"],
-        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "finMotif", "action", "rattachement", "enCours"],
+        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "finMotif", "action", "rattachement", "enCours", "attendAgents", "lancee", "detient", "retient"],
         "motifsFin": ["echec", "arret"],
         "etats": ["actif", "en-attente", "au-repos", "attend", "termine"]
       },
@@ -110,6 +110,12 @@
       "requis": { "schema": "string", "etat": "string", "depot": "string" },
       "optionnels": ["branche", "worktree", "detache", "sha7"],
       "etats": ["ok", "indisponible", "absent"]
+    },
+    "vibeflow/cockpit-ailleurs@1": {
+      "description": "P73-D-16, REGI-13 : les sessions « vous attend » HORS des arbres du lab, comptées par NOM de lab. Aucun chemin, identifiant de session, titre ni nom de session n'en sort.",
+      "requis": { "schema": "string", "ailleurs": "any" },
+      "entree": { "requis": ["lab", "n"] },
+      "interdits": ["cwd", "sessionId", "id", "name", "titre", "chemin"]
     }
   },
   "claudeCode": {
