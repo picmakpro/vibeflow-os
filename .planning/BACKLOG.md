@@ -748,5 +748,10 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - 75-04 : un bloc de frontmatter de plus de 400 lignes est lu comme absent, sans compteur.
 - 75-05 : la partie synchrone de `contexteGardes` (parcours des suites) ne cède pas la main.
 - 75-06 : une carte prévue est créée pour tout chemin absent du lab, documents compris (pas de filtre par catégorie).
+- 75-06 (revue, m2) : `vf-cockpit-activite-prevues.mjs` crée une carte prévue pour des fichiers non code et des sous-dossiers ignorés ; filtrer par `classify()` et `arch.include`/`ignore`.
+- 75-0x (revue, m3) : le nœud `unassigned` vide ajouté par l'annotateur reste dans l'export autonome (`serve.mjs`).
+- 75-01 (revue, m4) : `vf-cockpit-activite-branches.mjs`, échéance globale de 15 s pour 66 paires ; plusieurs reprises de 60 s avant convergence sous charge, ce que dit `radar` (`branches-indisponible`).
+- 75-04 (revue, m6) : la lecture des listes en bloc peuple `vfTouch`, soit +885 Ko dans `graph.json` et dans l'`index.html` Code ; effet voulu, non mesuré.
+- 75-01 (revue, m5) : le tri de la base commune multiple (`baseCommune`, historiques en croix) n'a pas de témoin ; les quatre autres mutants de m5 ont leur témoin (G11).
 
 **Déclencheur de reprise :** la prochaine passe sur l'activité du cockpit (75-07 ou la phase suivante qui la lit).
