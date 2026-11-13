@@ -73,6 +73,19 @@ rg_RG2_page() {
     "$([ "$s1" = "$s2" ] && echo egal || echo different)|$([ "${#s1}" -gt 500 ] && echo plein || echo vide)|$([[ "$s1" == *"verrou"* ]] && echo mission || echo sans-mission)" "egal|plein|mission"
 }
 
+# RG2.2 (correction 73-09, H6.2) : les missions du titre viennent de meta.vf.missions de l'enveloppe de l'onglet, jamais d'un tableau vide écrit en dur dans la source
+rg_RG2_missions() {
+  local rel o m fx="$WORK/pg-missions-$$.js" defaut='71-vf-equipe-rendu.js 72-vf-regie-modele.js 72-vf-regie-pied.js 72-vf-regie-rendu.js 72-vf-regie-source.js' liste="" f
+  rel="$(node -e 'console.log(require("path").relative(process.argv[1], process.argv[2]))' "$UI" "$fx")"
+  for m in '[]' '["x"]' '["x","y"]'; do
+    printf 'window.Floorplan.graph.meta.vf.missions = %s;\n' "$m" > "$fx"
+    liste="\"$rel\""; for f in $defaut; do liste="$liste,\"$f\""; done
+    o="$(pg_sc '"who":{"workers":[]},"fichiers":['"$liste"']' '[{"nom":"h","obs":{"mode":"textes","sel":"#vf-equipe-entete h1"}}]')"
+    pg_ok "RG2.2 — meta.vf.missions = $m : le titre de la régie dit les missions de l'enveloppe" "$o" 'j.out.h.join("|")' \
+      "$([ "$m" = '[]' ] && echo 'Aucune mission en cours' || { [ "$m" = '["x"]' ] && echo 'Mission : x' || echo '2 missions en cours'; })"
+  done
+}
+
 rg_RG9_page() {
   local x='x0000000-0000-0000-0000-000000000009' w1 w2 w3 o
   w1='{"workers":[{"kind":"session","id":"'"$x"'","etat":"actif","titre":"Atelier X","tree":".","ageS":10,"dureeS":40}]}'
