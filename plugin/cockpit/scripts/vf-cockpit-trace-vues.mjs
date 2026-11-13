@@ -29,9 +29,10 @@ export const definitionsDe = (projet) => registres(projet).flatMap((r) => r.deci
 
 // la clé ouvrable d'une exigence : son identifiant, qualifié `@<compartiment>` quand l'identifiant existe dans plusieurs ledgers ; null si non représentable
 const cleExigence = (projet) => {
-  const ex = (projet.meta.vf.trace && projet.meta.vf.trace.exigences) || [], n = new Map();
-  for (const e of ex) n.set(e.id, (n.get(e.id) || 0) + 1);
-  return (l) => (n.get(l.id) > 1 ? (l.ws && l.ws !== '*' ? `${l.id}@${l.ws}` : null) : l.id);
+  const ex = (projet.meta.vf.trace && projet.meta.vf.trace.exigences) || [], n = new Map(), vivants = new Map();
+  for (const e of ex) { n.set(e.id, (n.get(e.id) || 0) + 1); if (e.ws !== '*') vivants.set(e.id, (vivants.get(e.id) || 0) + 1); }
+  // une archive jumelle d'une exigence vivante ne retire pas sa clé à la vivante : seuls les ledgers vivants comptent pour elle
+  return (l) => (l.ws === '*' ? (n.get(l.id) > 1 ? null : l.id) : vivants.get(l.id) > 1 ? (l.ws ? `${l.id}@${l.ws}` : null) : l.id);
 };
 
 function corpsDe(v, cle, projet, modele, c) {
@@ -60,7 +61,8 @@ function vueDePlanning(v, cle, projet) {
     return c('ok', { phase: { ...p.phase, cle: n.id, bilan: p.bilan, exigences, plans: p.plans, preuves: p.preuves } });
   }
   const [id, ws] = cle.split('@');
-  const cand = ((vf.trace && vf.trace.exigences) || []).filter((e) => e.id === id && (ws === undefined || e.ws === ws));
+  let cand = ((vf.trace && vf.trace.exigences) || []).filter((e) => e.id === id && (ws === undefined || e.ws === ws));
+  if (ws === undefined && cand.some((e) => e.ws !== '*')) cand = cand.filter((e) => e.ws !== '*'); // la ligne vivante fait foi sur sa jumelle d'archive
   if (cand.length === 0) return c('absent', {});
   if (cand.length > 1) return refus('cle-ambigue');
   const e = cand[0], { exigence: x, noeud, ...ligne } = vueExigence(projet, `${e.ws || ''}|${e.id}`);
