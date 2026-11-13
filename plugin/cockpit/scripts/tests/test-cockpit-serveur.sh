@@ -435,6 +435,97 @@ assert_eq "M-F3-FIN — la fin de ligne exacte n'est plus exigée (une seule lig
 cockpit_module_muter mf3m serve.mjs 's#c.includes(` ${path.join(code, .serve.mjs.)} `)#true#'; MF3S="$COCKPIT_MODULE"; unset COCKPIT_MODULE
 assert_eq "M-F3-MODULE — le serve.mjs du module n'est plus exigé (une seule ligne) : la copie est valide, AM6.F3-prefixe rougit sur « autre » (signalé : tué), « fin » et « prefixe » restent refusés" "$(node --check "$MF3S/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f3p_sur "$MF3S")" "valide temoin=rc0/tué fin=rc5/vivant prefixe=rc5/vivant autre=rc0/tué"
 
+# ---- AM6.F4 (79-06, fix2-x06, audit au12 objet C : classes de server.json) : le fichier d'état porte le jeton et vit dans un dossier que le lab contrôle ----
+# C1 : l'écriture de démarrage de serve.mjs ne suit jamais un lien posé à la place de server.json (cible intacte, mode compris, et le lien est remplacé par un fichier ordinaire).
+# C2 : server.json n'est jamais vu vide ni à moitié écrit pendant le démarrage ; `--stop` ne supprime pas un fichier illisible et ne dit ni « arrêté » ni « pas lancé » sur une lecture vide.
+# C3 : aucun `server.json.*.tmp` (il porte le jeton) ne survit au démarrage, à l'arrêt par signal ni à `--stop`.
+cat > "$AUX/planter.mjs" <<'JS'
+// préchargé AVANT serve.mjs (--import) : pose, comme le ferait le lab, un lien à la place de server.json (C1)
+import fs from 'node:fs'; import path from 'node:path';
+const sortie = process.argv[process.argv.length - 1].slice('--sortie='.length);
+fs.mkdirSync(path.join(sortie, '.cache'), { recursive: true });
+fs.symlinkSync(process.env.PLANT_VICTIME, path.join(sortie, '.cache', 'server.json'));
+JS
+cat > "$AUX/ralentir-etat.mjs" <<'JS'
+// préchargé AVANT serve.mjs : la publication de server.json est ralentie à 400 ms ; si elle vise server.json lui-même, le fichier est d'abord créé vide (la troncature d'une écriture sur place) — la fenêtre est certaine
+import fs from 'node:fs'; import path from 'node:path';
+const ecrire = fs.writeFileSync;
+fs.writeFileSync = function (p, d, ...r) {
+  if (String(p).includes('server.json') && String(d).includes('"token"')) {
+    if (path.basename(String(p)) === 'server.json') fs.closeSync(fs.openSync(p, 'w'));
+    fs.appendFileSync(process.env.RALENTI_MARQUE, 'x');
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 400);
+  }
+  return ecrire.call(this, p, d, ...r);
+};
+JS
+cat > "$AUX/sonde-etat.mjs" <<'JS'
+// sonde-etat.mjs <fichier> <ms> : compte les lectures où le fichier EXISTE mais n'est pas un JSON (vide, tronqué)
+import fs from 'node:fs';
+const [f, ms] = process.argv.slice(2); const fin = Date.now() + Number(ms); let ill = 0, ok = 0;
+while (Date.now() < fin) {
+  let t = null; try { t = fs.readFileSync(f, 'utf8'); } catch {}
+  if (t !== null) { try { JSON.parse(t); ok++; } catch { ill++; } }
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+}
+console.log(`illisibles=${ill} lus=${ok > 0 ? 'oui' : 'non'}`);
+JS
+mode_de() { node -e 'console.log((require("fs").statSync(process.argv[1]).mode & 0o777).toString(8))' "$1"; }
+c1s_sur() { # <racine du module> : « lancé contenu mode état jeton » quand server.json est un lien vers un fichier précieux au démarrage de serve.mjs
+  local L="$WORK/lab-c1s" V="$WORK/victime-c1s" S rc; am4_lab "$L"; S="$L/.vibeflow/cockpit"; printf 'PRECIEUX\n' > "$V"; chmod 644 "$V"
+  COCKPIT_NODE_ARGS="--import=file://$AUX/planter.mjs" COCKPIT_MODULE="$1" cockpit_lancer "$L" PLANT_VICTIME="$V"; rc=$?
+  echo "rc=$rc victime=$(tr -d '\n' < "$V") mode=$(mode_de "$V") etat=$([ -L "$S/.cache/server.json" ] && echo lien || { [ -f "$S/.cache/server.json" ] && echo fichier || echo absent; }) jeton=$(grep -c '"token"' "$S/.cache/server.json" 2> /dev/null)"
+  cockpit_arreter
+}
+c2d_sur() { # <racine du module> : « illisibles=N lus=… ralenti=… » pendant le démarrage de serve.mjs dont la publication est ralentie
+  local L="$WORK/lab-c2d" S SP; am4_lab "$L"; S="$L/.vibeflow/cockpit"; mkdir -p "$S/.cache"; : > "$WORK/ralenti-c2.marque"
+  node "$AUX/sonde-etat.mjs" "$S/.cache/server.json" 4000 > "$WORK/sonde-c2.out" & SP=$!
+  RALENTI_MARQUE="$WORK/ralenti-c2.marque" COCKPIT_NODE_ARGS="--import=file://$AUX/ralentir-etat.mjs" COCKPIT_MODULE="$1" cockpit_lancer "$L" > /dev/null 2>&1
+  wait "$SP"; echo "$(cat "$WORK/sonde-c2.out") ralenti=$([ "$(wc -c < "$WORK/ralenti-c2.marque" | tr -d ' ')" -ge 1 ] && echo oui || echo non)"
+  cockpit_arreter
+}
+c2s_sur() { # <racine du module> : « illisible: rc= message= fichier= serveur= | lisible: rc= serveur= fichier= » de `serve.mjs --stop` sur un server.json vide puis rétabli
+  local L="$WORK/lab-c2s" S A="$1/skills/cockpit-moteur/assets/serve.mjs" P rc1 rc2 v1 v2 m1 f1 f2 sauve; am4_lab "$L"; S="$L/.vibeflow/cockpit"
+  COCKPIT_MODULE="$1" cockpit_lancer "$L" || { echo "serveur non lancé"; return; }; P="$VF_PID"; sauve="$(cat "$S/.cache/server.json")"
+  : > "$S/.cache/server.json"
+  node "$A" --stop --sortie="$S" > "$WORK/c2s.out" 2>&1; rc1=$?
+  kill -0 "$P" 2> /dev/null && v1=vivant || v1=arrêté; [ -e "$S/.cache/server.json" ] && f1=resté || f1=supprimé
+  m1="$(tr 'A-Z' 'a-z' < "$WORK/c2s.out")"; case "$m1" in *"illisible"*) m1=illisible ;; *"stopped"*|*"arrêté"*) m1=dit-arrêté ;; *"not running"*) m1=dit-pas-lancé ;; *) m1=autre ;; esac
+  printf '%s' "$sauve" > "$S/.cache/server.json"
+  node "$A" --stop --sortie="$S" > "$WORK/c2s2.out" 2>&1; rc2=$?
+  attendre 5 bash -c "! kill -0 $P 2> /dev/null"; kill -0 "$P" 2> /dev/null && v2=vivant || v2=arrêté; [ -e "$S/.cache/server.json" ] && f2=resté || f2=supprimé
+  echo "illisible: rc=$rc1 message=$m1 fichier=$f1 serveur=$v1 | lisible: rc=$rc2 serveur=$v2 fichier=$f2"
+  cockpit_arreter
+}
+c3_sur() { # <racine du module> : « démarrage=N sortie=N arrêt=N leurres=M » : N = temporaires server.json.*.tmp restants, M = leurres (autre nom) conservés
+  local L="$WORK/lab-c3" S A="$1/skills/cockpit-moteur/assets/serve.mjs" d s a l P; am4_lab "$L"; S="$L/.vibeflow/cockpit"; mkdir -p "$S/.cache"
+  semer() { printf '{"token":"SECRET"}' > "$S/.cache/server.json.111.tmp"; printf '{"token":"SECRET"}' > "$S/.cache/server.json.222.aaaa.tmp"; printf 'x' > "$S/.cache/server.json.garde"; printf 'x' > "$S/.cache/autre.tmp"; }
+  restants() { find "$S/.cache" -maxdepth 1 -name 'server.json.*.tmp' | wc -l | tr -d ' '; }
+  semer; COCKPIT_MODULE="$1" cockpit_lancer "$L" > /dev/null 2>&1 || { echo "serveur non lancé"; return; }; P="$VF_PID"; d="$(restants)"
+  semer; kill "$P" 2> /dev/null; attendre 5 bash -c "! kill -0 $P 2> /dev/null"; s="$(restants)"
+  semer; rm -f "$S/.cache/server.json"; node "$A" --stop --sortie="$S" > /dev/null 2>&1; a="$(restants)"
+  l=0; [ -f "$S/.cache/server.json.garde" ] && l=$((l+1)); [ -f "$S/.cache/autre.tmp" ] && l=$((l+1))
+  echo "démarrage=$d sortie=$s arrêt=$a leurres=$l"
+  cockpit_arreter
+}
+F4M="$(cockpit_module_copie)"
+assert_eq "AM6.F4-C1 — server.json est un lien vers un fichier précieux au démarrage : la cible garde son contenu et son mode (644), le lien est remplacé par un fichier ordinaire qui porte le jeton" "$(c1s_sur "$F4M")" "rc=0 victime=PRECIEUX mode=644 etat=fichier jeton=1"
+assert_eq "AM6.F4-C2 — pendant un démarrage dont la publication est ralentie à 400 ms, server.json n'est jamais lu vide ni tronqué, et finit lisible" "$(c2d_sur "$F4M")" "illisibles=0 lus=oui ralenti=oui"
+assert_eq "AM6.F4-C2-stop — server.json vide : \`--stop\` refuse (6), le dit (illisible), ne supprime rien et le serveur reste vivant ; rétabli, le même \`--stop\` arrête le serveur (rc 0) et retire le fichier" "$(c2s_sur "$F4M")" "illisible: rc=6 message=illisible fichier=resté serveur=vivant | lisible: rc=0 serveur=arrêté fichier=supprimé"
+assert_eq "AM6.F4-C3 — les server.json.*.tmp laissés par un arrêt brutal sont retirés au démarrage, à l'arrêt par signal et par \`--stop\` ; un autre nom (server.json.garde, autre.tmp) n'est pas touché" "$(c3_sur "$F4M")" "démarrage=0 sortie=0 arrêt=0 leurres=2"
+# Un mutant d'une ligne par classe (la copie est valide : node --check ; le témoin de la classe rougit SEUL ; les autres restent verts)
+valide() { node --check "$1/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide; }
+cockpit_module_muter mf4plc serve.mjs 's#ecrireEtat(stateFile, #fs.writeFileSync(stateFile, #'; MF4A="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-ETAT-SUR-PLACE — l'état écrit sur place au démarrage (une seule ligne) : la copie est valide, AM6.F4-C1 (cible écrasée) et AM6.F4-C2 (fichier vu vide) rougissent" "$(valide "$MF4A") c1=$([ "$(c1s_sur "$MF4A")" = "rc=0 victime=PRECIEUX mode=644 etat=fichier jeton=1" ] && echo vert || echo rouge) c2=$([ "$(c2d_sur "$MF4A")" = "illisibles=0 lus=oui ralenti=oui" ] && echo vert || echo rouge)" "valide c1=rouge c2=rouge"
+cockpit_module_muter mf4stop serve.mjs "s#if (!s || typeof s !== 'object') { console.error#if (false) { console.error#"; MF4B="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-STOP-ILLISIBLE — la garde du fichier illisible neutralisée (une seule ligne) : la copie est valide, AM6.F4-C2-stop rougit (fichier supprimé, « pas lancé »), AM6.F4-C1 reste vert" "$(valide "$MF4B") $(c2s_sur "$MF4B" | cut -d'|' -f1) c1=$([ "$(c1s_sur "$MF4B")" = "rc=0 victime=PRECIEUX mode=644 etat=fichier jeton=1" ] && echo vert || echo rouge)" "valide illisible: rc=0 message=dit-pas-lancé fichier=supprimé serveur=vivant  c1=vert"
+cockpit_module_muter mf4dem serve.mjs '/^    retirerTemporairesEtat(stateFile); \/\/ un SIGKILL/d'; MF4C="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-TMP-DEMARRAGE — le balayage au démarrage retiré (une seule ligne) : la copie est valide, AM6.F4-C3 rougit sur le démarrage seul" "$(valide "$MF4C") $(c3_sur "$MF4C")" "valide démarrage=2 sortie=0 arrêt=0 leurres=2"
+cockpit_module_muter mf4sor serve.mjs 's# retirerTemporairesEtat(stateFile); };# };#'; MF4D="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-TMP-SORTIE — le balayage à la sortie du serveur retiré (une seule ligne) : la copie est valide, AM6.F4-C3 rougit sur la sortie seule" "$(valide "$MF4D") $(c3_sur "$MF4D")" "valide démarrage=0 sortie=2 arrêt=0 leurres=2"
+cockpit_module_muter mf4arr serve.mjs '/^  retirerTemporairesEtat(stateFile);$/d'; MF4E="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-TMP-ARRET — le balayage de \`--stop\` retiré (une seule ligne) : la copie est valide, AM6.F4-C3 rougit sur \`--stop\` seul" "$(valide "$MF4E") $(c3_sur "$MF4E")" "valide démarrage=0 sortie=0 arrêt=2 leurres=2"
+
 vf_hyg_assert
 echo ""
 echo "=================================="

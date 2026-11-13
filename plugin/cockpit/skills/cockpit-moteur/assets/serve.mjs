@@ -33,7 +33,7 @@ let here;
 try { here = fs.realpathSync(sortieArg); } catch { refus('la sortie désignée par --sortie= est introuvable : refus.'); }
 if (here !== sortieArg || path.basename(here) !== 'cockpit' || path.basename(path.dirname(here)) !== '.vibeflow') refus('--sortie= doit être le chemin réel de <lab>/.vibeflow/cockpit : refus.');
 const root = path.resolve(here, '..', '..'); // vibeflow P10 : la sortie est sous <lab>/.vibeflow/cockpit
-for (const f of ['vf-cockpit-env.mjs', 'vf-cockpit-module.mjs', 'vf-cockpit-server.mjs']) if (!fs.existsSync(path.join(scriptsDir, f))) refus(`${f} est absent du module : refus de servir (réinstaller le module cockpit).`);
+for (const f of ['vf-cockpit-env.mjs', 'vf-cockpit-module.mjs', 'vf-cockpit-server.mjs', 'vf-cockpit-etat-ecrire.mjs']) if (!fs.existsSync(path.join(scriptsDir, f))) refus(`${f} est absent du module : refus de servir (réinstaller le module cockpit).`);
 const depuisModule = (f) => import(pathToFileURL(path.join(scriptsDir, f)).href);
 const MOD = await depuisModule('vf-cockpit-module.mjs');
 try { MOD.moduleAdmis(root, scriptsDir, moteurDir); } catch (e) { refus(e.message); } // défense en profondeur : jamais de code pris sous la sortie ni sous .vibeflow/
@@ -49,13 +49,18 @@ const stateFile = path.join(here, '.cache', 'server.json');
 const journal = (m) => console.log(`${new Date().toISOString()} ${m}`);
 let motifArret = 'fin du processus';
 const readState = () => { try { return JSON.parse(fs.readFileSync(stateFile, 'utf8')); } catch { return null; } };
+// 79-06 fix2-x06 : server.json porte le jeton et vit dans un dossier que le lab contrôle : écrit à côté (création exclusive, nom aléatoire) puis renommé, jamais à travers un lien, jamais vu à moitié écrit ; les temporaires d'un arrêt brutal sont balayés
+const { ecrireEtat, retirerTemporairesEtat } = await depuisModule('vf-cockpit-etat-ecrire.mjs');
 if (has('stop')) {
-  const s = readState();
+  // 79-06 fix2-x06 : un server.json PRÉSENT mais illisible (vide, à moitié écrit, pas un objet) n'est jamais lu comme « pas de serveur » : rien n'est arrêté, rien n'est supprimé, le serveur peut tourner
+  let brut = null; try { brut = fs.readFileSync(stateFile, 'utf8'); } catch (e) { if (e.code !== 'ENOENT') brut = ''; }
+  let s = null; if (brut !== null) { try { s = JSON.parse(brut); } catch {} if (!s || typeof s !== 'object') { console.error("server.json est illisible (vide ou à moitié écrit) : rien n'a été arrêté ni supprimé. Relancez la commande dans un instant."); process.exit(6); } }
   let stopped = false;
   // vibeflow P18 : pid entier > 1 seulement (le fichier vient du lab) ; 79-06 F3 : et seulement s'il est CE serveur (ce serve.mjs du module ET --sortie=<ce dossier>), comme le lanceur (estNotre)
   const identite = (pid) => { if (pid === process.pid) return false; if (process.platform === 'win32') return true; const ps = ['/bin/ps', '/usr/bin/ps'].find((f) => fs.existsSync(f)); if (!ps) return false; try { const c = ` ${execFileSync(ps, ['-o', 'command=', '-p', String(pid)], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 5000 }).trimEnd()} `; return c.includes(` ${path.join(code, 'serve.mjs')} `) && c.endsWith(` --sortie=${here} `); } catch { return false; } };
   if (Number.isInteger(s?.pid) && s.pid > 1) { let vit = true; try { process.kill(s.pid, 0); } catch { vit = false; } if (vit && !identite(s.pid)) { console.error(`PID ${s.pid} non reconnu comme le serveur de ce cockpit : rien n'a été arrêté.`); process.exit(5); } if (vit) { try { process.kill(s.pid); stopped = true; } catch {} } }
   try { fs.unlinkSync(stateFile); } catch {}
+  retirerTemporairesEtat(stateFile);
   console.log(stopped ? `Stopped the map server (${s.url}).` : 'The map server was not running.');
   process.exit(0);
 }
@@ -651,11 +656,11 @@ server.on('listening', () => {
   const u = `http://127.0.0.1:${port}`;
   try {
     fs.mkdirSync(path.dirname(stateFile), { recursive: true });
-    fs.writeFileSync(stateFile, JSON.stringify({ pid: process.pid, port, url: u, token, hash: selfHash, startedAt: new Date().toISOString() }, null, 2), { mode: 0o600 });
-    fs.chmodSync(stateFile, 0o600); // vibeflow P18 : le jeton n'est lisible que du propriétaire (le fichier peut préexister en 0644)
+    retirerTemporairesEtat(stateFile); // un SIGKILL d'un lancement précédent a pu laisser un temporaire avec le jeton
+    ecrireEtat(stateFile, JSON.stringify({ pid: process.pid, port, url: u, token, hash: selfHash, startedAt: new Date().toISOString() }, null, 2)); // vibeflow P18 : fichier neuf en 0600 (le jeton n'est lisible que du propriétaire), renommé
   } catch {}
   TERM?.demarrer(port); // vibeflow P26 : second écouteur du terminal, une fois server.json écrit
-  const forget = () => { try { if (readState()?.pid === process.pid) fs.unlinkSync(stateFile); } catch {} };
+  const forget = () => { try { if (readState()?.pid === process.pid) fs.unlinkSync(stateFile); } catch {} retirerTemporairesEtat(stateFile); };
   process.on('exit', forget);
   process.on('exit', () => journal(`arrêt : ${motifArret} (PID ${process.pid})`)); // vibeflow AUDC-H3
   for (const sig of ['SIGINT', 'SIGTERM', 'SIGHUP']) process.on(sig, () => { motifArret = `signal ${sig}`; process.exit(0); });

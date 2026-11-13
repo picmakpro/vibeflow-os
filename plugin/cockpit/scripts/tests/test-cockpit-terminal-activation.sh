@@ -175,7 +175,8 @@ import fs from 'node:fs';
 const ecrire = fs.writeFileSync;
 fs.writeFileSync = function (p, d, ...r) {
   if (String(p).includes('server.json') && String(d).includes('"terminal"')) {
-    fs.closeSync(fs.openSync(p, 'w')); fs.appendFileSync(process.env.RALENTI_MARQUE, 'x');
+    if (String(p).endsWith('/server.json')) fs.closeSync(fs.openSync(p, 'w')); // l'écriture sur place : le fichier d'état est d'abord créé vide (une écriture à côté ne le touche pas)
+    fs.appendFileSync(process.env.RALENTI_MARQUE, 'x');
     Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 400);
   }
   return ecrire.call(this, p, d, ...r);
@@ -183,18 +184,18 @@ fs.writeFileSync = function (p, d, ...r) {
 JS
 cat > "$AUX/sonde-json.mjs" <<'JS'
 import fs from 'node:fs';
-const [f, ms] = process.argv.slice(2); const fin = Date.now() + Number(ms);
+const [f, ms] = process.argv.slice(2); const fin = Date.now() + Number(ms); let finTerm = Infinity; // plafond de sécurité ; la sonde s'arrête 300 ms après avoir vu terminal (condition observable)
 let vu = false, ill = 0, term = 0, n = 0;
-while (Date.now() < fin) {
+while (Date.now() < Math.min(fin, finTerm)) {
   let j = null; try { j = JSON.parse(fs.readFileSync(f, 'utf8')); } catch {}
-  n++; if (j && typeof j.hash === 'string' && j.hash) { vu = true; if (j.terminal) term = 1; } else if (vu) ill++;
+  n++; if (j && typeof j.hash === 'string' && j.hash) { vu = true; if (j.terminal) { term = 1; if (finTerm === Infinity) finTerm = Date.now() + 300; } } else if (vu) ill++;
   Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
 }
 console.log(`illisibles=${ill} terminal=${term}`);
 JS
 t711() { # t711 <sortie> -> T711_PORT T711_SONDE T711_MARQUE ; la sonde tourne AVANT le lancement : la fenêtre ralentie est couverte en entier
   local o="$1" sp; : > "$WORK/ralenti.marque"
-  node "$AUX/sonde-json.mjs" "$o/.cache/server.json" 4000 > "$WORK/sonde.out" & sp=$!
+  node "$AUX/sonde-json.mjs" "$o/.cache/server.json" 20000 > "$WORK/sonde.out" & sp=$!
   SRV_REFUS_ATTENDU=1 RALENTI_MARQUE="$WORK/ralenti.marque" COCKPIT_NODE_ARGS="--import=file://$AUX/ralentir.mjs" srv "$o" 1
   wait "$sp"; T711_PORT="$SRV_PORT"; T711_SONDE="$(cat "$WORK/sonde.out")"; T711_MARQUE="$(wc -c < "$WORK/ralenti.marque" | tr -d ' ')"
 }
@@ -203,11 +204,41 @@ assert_ge "T7.11 — témoin : la publication de terminal.url a été ralentie (
 assert_eq "T7.11 — le serveur à publication lente est accepté par le socle (empreinte lue, jamais refusé à tort)" "$([ "$T711_PORT" -gt 0 ] && echo oui || echo non)" "oui"
 assert_eq "T7.11 — server.json n'est jamais illisible ni sans empreinte après sa première lecture, et finit par porter terminal" "$T711_SONDE" "illisibles=0 terminal=1"
 [ -z "$SRV_PID" ] || unsrv
-if mutant srvjson vf-cockpit-terminal.mjs 's#const tmp = `${f}\.${process\.pid}\.tmp`;#const tmp = f;#'; then
+if mutant srvjson vf-cockpit-terminal.mjs 's#ecrireEtat(f, #fs.writeFileSync(f, #'; then
   t711 "$MUT_OUT"
   assert_eq "M-SRVJSON — le mutant rougit T7.11 : server.json réécrit sur place est vu tronqué (ou le serveur refusé)" "$([ "$T711_PORT" -gt 0 ] && [ "$T711_SONDE" = "illisibles=0 terminal=1" ] && echo vert || echo rouge)" "rouge"
   [ -z "$SRV_PID" ] || unsrv
 else assert_eq "M-SRVJSON — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+echo "=== T7.12 — la publication de terminal.url ne suit jamais un lien posé à la place de son temporaire (fix2-x06, 2026-11-13) ==="
+# Le lab peut poser un lien à la place du temporaire de la réécriture de server.json : la cible (un fichier précieux) ne doit jamais être écrasée par le JSON du jeton. Le préchargement fixe les noms
+# aléatoires de 12 octets (1er appel : « a », 2e : « b ») pour que le lab « devine » le nom du temporaire de la publication, et pose aussi un lien sous l'ancien nom `server.json.<pid>.tmp`,
+# une fois server.json écrit (le balayage du démarrage a déjà eu lieu).
+cat > "$AUX/planter-tmp.mjs" <<'JS'
+import fs from 'node:fs'; import path from 'node:path'; import crypto from 'node:crypto';
+const sortie = process.argv[process.argv.length - 1].slice('--sortie='.length); const cache = path.join(sortie, '.cache');
+let n = 0; const vrai = crypto.randomBytes; crypto.randomBytes = function (k, ...r) { return k === 12 ? Buffer.alloc(k, ++n === 1 ? 0x61 : 0x62) : vrai.call(this, k, ...r); };
+// les liens sont posés dès que server.json existe : APRÈS le balayage des temporaires du démarrage, AVANT la publication de terminal.url (le processus de Q met plus d'une milliseconde à répondre)
+const t = setInterval(() => {
+  if (!fs.existsSync(path.join(cache, 'server.json'))) return;
+  clearInterval(t);
+  fs.symlinkSync(process.env.PLANT_V1, path.join(cache, `server.json.${process.pid}.tmp`));
+  fs.symlinkSync(process.env.PLANT_V2, path.join(cache, `server.json.${process.pid}.${'62'.repeat(12)}.tmp`));
+}, 1);
+JS
+t712() { # t712 <sortie> -> T712 : contenu des deux cibles précieuses après la publication
+  local o="$1"; printf 'PRECIEUX1\n' > "$WORK/precieux1"; printf 'PRECIEUX2\n' > "$WORK/precieux2"
+  PLANT_V1="$WORK/precieux1" PLANT_V2="$WORK/precieux2" COCKPIT_NODE_ARGS="--import=file://$AUX/planter-tmp.mjs" srv "$o" 1
+  T712="v1=$(tr -d '\n' < "$WORK/precieux1") v2=$(tr -d '\n' < "$WORK/precieux2") etat=$([ -f "$o/.cache/server.json" ] && [ ! -L "$o/.cache/server.json" ] && echo fichier || echo autre)"
+}
+t712 "$OUT"
+assert_eq "T7.12 — liens posés sous le nom ancien et sous le nom du temporaire : les deux cibles gardent leur contenu, server.json reste un fichier ordinaire" "$T712" "v1=PRECIEUX1 v2=PRECIEUX2 etat=fichier"
+[ -z "$SRV_PID" ] || unsrv
+if mutant srvjsonlien vf-cockpit-etat-ecrire.mjs 's#fs\.constants\.O_CREAT | fs\.constants\.O_EXCL | (fs\.constants\.O_NOFOLLOW || 0)#fs.constants.O_CREAT#'; then
+  t712 "$MUT_OUT"
+  assert_eq "M-SRVJSON-LIEN — création exclusive retirée (une ligne) : le mutant rougit T7.12 (la cible du lien sous le nom du temporaire est écrasée)" "$([ "$T712" = "v1=PRECIEUX1 v2=PRECIEUX2 etat=fichier" ] && echo vert || echo rouge)" "rouge"
+  [ -z "$SRV_PID" ] || unsrv
+else assert_eq "M-SRVJSON-LIEN — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-ECOUTE0 / M-FRAMESRC — mutants du serveur Q ==="
 if mutant ecoute0 vf-cockpit-terminal-processus.mjs "s/\.listen(0, '127\.0\.0\.1'/.listen(0, '0.0.0.0'/"; then

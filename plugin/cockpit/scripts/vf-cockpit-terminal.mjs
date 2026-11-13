@@ -11,6 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { fork } from 'node:child_process';
 import { realUnder, resoudreBinaire } from './vf-cockpit-paths.mjs';
+import { ecrireEtat } from './vf-cockpit-etat-ecrire.mjs';
 import { envEnfant } from './vf-cockpit-env.mjs';
 import { envShell } from './vf-cockpit-terminal-env.mjs';
 import { preparerPage } from './vf-cockpit-terminal-page.mjs';
@@ -74,12 +75,13 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
         else if (m.t === 'echec') { etat = 'arrete'; occupe = false; }
         else if (m.t === 'pret' && Number.isInteger(m.port)) {
           portQ = m.port; etat = 'actif';
-          const f = path.join(here, '.cache', 'server.json'); const tmp = `${f}.${process.pid}.tmp`;
-          try { // server.json gagne la clé terminal { url } : jamais un secret ; écrit à côté puis renommé, jamais vu tronqué (ecoute0, 2026-11-13)
+          const f = path.join(here, '.cache', 'server.json');
+          // server.json gagne la clé terminal { url } : jamais un secret ; écrit à côté puis renommé
+          // (ecoute0 : jamais vu tronqué ; fix2-x06 : jamais à travers un lien)
+          try {
             const j = JSON.parse(fs.readFileSync(f, 'utf8'));
-            fs.writeFileSync(tmp, JSON.stringify({ ...j, terminal: { url: origineQ() } }, null, 2), { mode: 0o600 });
-            fs.renameSync(tmp, f); fs.chmodSync(f, 0o600);
-          } catch { try { fs.unlinkSync(tmp); } catch {} log('server.json illisible : l\'adresse du terminal n\'a pas pu être publiée.'); }
+            ecrireEtat(f, JSON.stringify({ ...j, terminal: { url: origineQ() } }, null, 2));
+          } catch { log('server.json illisible : l\'adresse du terminal n\'a pas pu être publiée.'); }
         }
       });
       enfant.on('error', () => { etat = 'arrete'; occupe = false; });
