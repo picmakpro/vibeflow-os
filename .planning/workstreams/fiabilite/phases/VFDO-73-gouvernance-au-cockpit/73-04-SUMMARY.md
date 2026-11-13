@@ -58,4 +58,13 @@ M-VERROU-SESSION-IDS, M-VERROU-CHEMIN, M-VERROU-OWNER-SANS-BORNE, M-CLE-ID-SEUL,
 - `check-version-sync.sh` : seul écart, la ligne « suites » (226 annoncées, 227 réelles : attendu).
 - Inventaire FR (78-, 79-, 80-vf-fr*) : non joué, aucune chaîne anglaise ajoutée, libellés écrits en français dans les fichiers neufs ; F2 de `test-cockpit-chrome-fr.sh` vert.
 
+
+## Correctifs d'audit (audit de sécurité 73-04, régime allégé)
+
+- **T-73-16, moyen** (`libre`, `verrouBlanc`, `texteV`) : le refus d'un owner ou d'une étape à forme de chemin ne bornait que le début de la chaîne ; un chemin au milieu, relatif, une forme `file:`, un `../` ou un `~` atteignaient `verrouDepot.texte` et le nom des lignes de mission. Correctif (la classe, pas les instances) : une forme admise, `[A-Za-z0-9][A-Za-z0-9_-]*` sur 80 caractères au plus ; hors forme la valeur devient vide et s'affiche sous « détenteur inconnu » (mot neutre existant). Témoin RG6.3 vu rouge sur la tête d'avant (6 cas sur 6), sha `742a82a3` ; correctif `626c8652`, plus `b51323d3` (commentaire scindé sous la baseline de 160 colonnes).
+- **Bas** (même fichier) : `ws` (`[a-z0-9-]`), `phase` (entier, décimale éventuelle), `scope` (liste fermée `depot|compartiment|phase|mission|lab`) et `dag` (nom de fichier sans séparateur) passent par la même fonction de forme, au lieu de `libre()` sans contrôle.
+- Mutants, un par garde, vus rouges (ancienne règle rétablie) puis laissés dans la suite : `M-VERROU-FORME-LIBRE` (refus par préfixe), `-WS`, `-PHASE`, `-SCOPE`, `-DAG` ; les ancres de `M-VERROU-ENTREE-BRUTE` et `M-VERROU-OWNER-SANS-BORNE` reportées sur les nouvelles gardes, `M-VERROU-CHEMIN` remplacé par `M-VERROU-FORME-LIBRE`.
+- Écart : la grammaire de `ws` demandée (`[a-z0-9-]`) est plus étroite que `WS_RE` de `vf-cockpit-vie.mjs` (majuscules, `.`, `_` admis côté serveur) : un ws hors forme est vidé côté page, jamais affiché.
+- Suites (tête commitée, une fois) : `test-cockpit-regie.sh` 156 PASS / 0 FAIL ; `test-cockpit-equipe.sh` 215 PASS / 0 FAIL ; `test-cockpit-vendor.sh` 250 PASS / 2 FAIL au premier jeu (V4 : rouge connu, `chrome-coin.mjs` ; V4c.9a : ligne de 176 colonnes de mon fichier, corrigée par `b51323d3`, `colonnes-cliquet.mjs verifier` OK ensuite).
+
 rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
