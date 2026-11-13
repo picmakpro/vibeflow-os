@@ -20,6 +20,7 @@ import { ecrireArchitecture } from './vf-cockpit-code.mjs';
 import { insererGraphe } from './vf-cockpit-embed.mjs';
 import { ecrireProjet } from './vf-cockpit-graphe-fichier.mjs';
 import { renommerPageMoteur, MARQUEUR_LICENCE } from './vf-cockpit-rename.mjs';
+import * as prevues from './vf-cockpit-activite-prevues.mjs'; // 75-06 : cartes « prévues » (annotateur)
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 export { OUTILS_ASSEMBLAGE, fichiersExecution }; // déplacés dans vf-cockpit-module.mjs (79-06) : ré-exportés pour leurs importeurs
@@ -96,6 +97,7 @@ export const ANNOTATEURS = [
   ['git', annoterGit],
   ['logos', annoterLogos],
   ['onglet', annoterOnglet],
+  ['prevues', prevues.annoterPrevues],
   ['schema', annoterSchema],
   ['touche', annoterTouche],
 ];

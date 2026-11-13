@@ -94,6 +94,7 @@ TAILLE assets/serve.mjs
 TAILLE assets/vendor/elk.bundled.js
 TAILLE assets/viewer.html .html, hors gate
 TAILLE scripts/build.mjs
+TAILLE scripts/lib/common.mjs
 TAILLE scripts/lib/extract.mjs
 TAILLE scripts/lib/health.mjs
 TAILLE scripts/lib/screens.mjs

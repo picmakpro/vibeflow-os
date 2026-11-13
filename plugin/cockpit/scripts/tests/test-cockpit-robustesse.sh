@@ -166,12 +166,14 @@ cat > "$AUX/resync.mjs" <<'JS'
 import http from 'node:http'; import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
 const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, sport, plan, serverJson] = process.argv; const live = new Set(); let blocked = false;
+let rport = 0; // 79-16 : la CSP de la coquille nomme l'hôte vu par le serveur (Host réécrit = le port du serveur) ; le relais la réécrit au port du relais, sinon le navigateur refuse les scripts de /_vf/
+const csp = (h) => { const c = h['content-security-policy']; return c ? { ...h, 'content-security-policy': c.split(`127.0.0.1:${sport}`).join(`127.0.0.1:${rport}`) } : h; };
 const relais = http.createServer((q, r) => {
   if (blocked && q.url.startsWith('/api/vf/events')) { q.socket.destroy(); return; } // une erreur réseau (pas un 503 : EventSource abandonne alors pour de bon)
-  const up = http.request({ host: '127.0.0.1', port: Number(sport), path: q.url, method: q.method, headers: { ...q.headers, host: `127.0.0.1:${sport}` } }, (ur) => { r.writeHead(ur.statusCode, ur.headers); ur.pipe(r); });
+  const up = http.request({ host: '127.0.0.1', port: Number(sport), path: q.url, method: q.method, headers: { ...q.headers, host: `127.0.0.1:${sport}` } }, (ur) => { r.writeHead(ur.statusCode, csp(ur.headers)); ur.pipe(r); });
   live.add(up); live.add(r); q.pipe(up); up.on('error', () => r.destroy()); r.on('close', () => { live.delete(up); live.delete(r); up.destroy(); });
 });
-await new Promise((ok) => relais.listen(0, '127.0.0.1', ok)); const rport = relais.address().port;
+await new Promise((ok) => relais.listen(0, '127.0.0.1', ok)); rport = relais.address().port;
 const token = JSON.parse(fs.readFileSync(serverJson, 'utf8')).token;
 const seqServeur = async () => { const r = await fetch(`http://127.0.0.1:${sport}/api/vf/etat`, { headers: { host: `127.0.0.1:${sport}`, 'x-vf-cockpit-token': token } }); return (await r.json()).seq; };
 await executer(chrome, async (s) => {

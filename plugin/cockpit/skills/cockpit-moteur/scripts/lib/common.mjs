@@ -1,4 +1,5 @@
 // Shared helpers: paths, globs, file classification, git, and codebase discovery.
+// vibeflow:allow-large-file (code vendorisé, VENDORED.txt ; 75-06 : la règle de rattachement d'un fichier à un nœud, extraite de build.mjs)
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
@@ -65,6 +66,32 @@ export function compileGlob(glob) {
   }
   // A glob that names directories (src/components/{a,b}) also matches everything beneath them.
   return { glob, specificity: premier, test: automateDe(globSource(g), globSource(g + '/**')) };
+}
+
+// ---------- rattachement d'un fichier à un nœud (vibeflow 75-06) : la règle de build.mjs, UNE fois, appelée par le moteur ET par l'annotateur des cartes prévues ----------
+const strs = (v) => Array.isArray(v) && v.every((x) => typeof x === 'string');
+/** Les motifs de chaque nœud, avec sa profondeur (chaîne de `parent`) ; le `exclude` d'un nœud vaut aussi pour ses descendants. */
+export function regleDeNoeuds(nodes) {
+  const byId = new Map(nodes.filter((n) => n && typeof n.id === 'string' && n.id).map((n) => [n.id, n]));
+  const chaine = (n, seen = new Set()) => (!n || seen.has(n.id) ? [] : (seen.add(n.id), [n, ...chaine(byId.get(n.parent), seen)])); // le nœud et ses ancêtres, sans boucle
+  return nodes.filter((n) => n?.id && strs(n.paths ?? [])).map((n, order) => {
+    const ch = chaine(n);
+    return { id: n.id, order, depth: ch.length - 1, paths: (n.paths || []).map(compileGlob), exclude: ch.flatMap((x) => (strs(x.exclude) ? x.exclude : [])).map(compileGlob),
+      hits: new Array((n.paths || []).length).fill(0) };
+  });
+}
+/** Le nœud d'un chemin : profondeur d'abord, puis spécificité. { id ('unassigned' sans nœud), tie (id d'un nœud à égalité parfaite, ou null) }. */
+export function rattacher(matchers, chemin) {
+  let best = null, bk = null, tie = null;
+  for (const m of matchers) {
+    if (m.exclude.some((g) => g.test(chemin))) continue;
+    let spec = -1;
+    m.paths.forEach((g, i) => { if (g.test(chemin)) { m.hits[i]++; spec = Math.max(spec, g.specificity); } });
+    if (spec < 0) continue;
+    if (!best || m.depth > bk[0] || (m.depth === bk[0] && spec > bk[1])) { best = m; bk = [m.depth, spec]; tie = null; }
+    else if (m.depth === bk[0] && spec === bk[1]) tie = m.id;
+  }
+  return { id: best ? best.id : 'unassigned', tie };
 }
 
 // ---------- file classification ----------
