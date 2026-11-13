@@ -1,0 +1,39 @@
+---
+phase: 79
+plan: "16"
+requirements: [SOCL-20]
+---
+
+# 79-16 — la coquille statique : un document du module, des fichiers sous /_vf/, un onglet qui change sans rechargement (SOCL-20)
+
+rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale) — pas de preuve générative (A37 et C6 en dispositions fixes, avec témoin de couverture et mutants), pas de rejeu des trente suites du plan (celles que le plan nomme et celles modifiées, une fois ; le reste est la CI). Trace : `79-16-RED-TRACE.md`.
+
+## Livré
+- `vf-cockpit-coquille.mjs`, `vf-cockpit-coquille-assets.mjs` : le document est composé UNE fois du module (gabarit `viewer.html` dont chaque marqueur est exigé une fois, polices et logo en ligne, script de thème, classe `wk`), servi aux quatre adresses (GET, HEAD ; 405 sinon ; titre et jeton propres à l'adresse). `/_vf/` est une table fermée construite au démarrage (étiquette forte à 16 hexadécimaux, `no-cache`, 304 par `correspond` de 79-15, recherche sur le chemin BRUT, chemin physique de chaque fichier sous les assets sinon refus de démarrer). La CSP est `script-src` = empreintes des scripts en ligne + `http://<hôte>/_vf/` (ligne `const csp =` de `serve.mjs` = copie figée de v2.75.0 plus la source).
+- Retraits : lecture de `index.html`, `pageCsp`, `cspMemo`, `sendPage`, `sendParties`, le service statique de la sortie (A41 : `graph.json`, `projet.json`, liens… répondent 404 avec et sans jeton), `preparerGabarit`, `assemblerPage`, `creerAssembleur`, `pageProjet`, `pageEquipe`, le paramètre `inject` d'`attach`.
+- `vf-coquille.js` (139 l.) et `vf-coquille-portee.js` (95 l.) : `VF_COQUILLE.{version, chargerOnglet, surOnglet, onglet, etat, natif, porteMoteur}` ; démontage par portée, `surOnglet(rappel, { cle })` (A51), classes de scripts (bibliothèque, persistant, i18n, moteur, onglet), échec de chargement (A55 : état, événement `vf:coquille-echec` annulable, texte fixe et « Réessayer »).
+- A37 : `moduleAdmis`, la revérification de `--sortie=` et `identiteServeur` jugent par `cheminPhysique` de 79-07 (échec = refus). L'empreinte du module couvre désormais `viewer.html`, le client de la coquille et les `ui/*.js`.
+- Suite `test-cockpit-coquille.sh` (104 assertions, ~100 s), aides `coquille-oracle.mjs`, `coquille-chrome.mjs`, `coquille-sonde.mjs`, `coquille-propriete.mjs` ; `socle-serveur.sh` : `cockpit_module_muter_page`, `cockpit_page_muter_dans`, `cockpit_page_muter_litteral` ; `chrome-session.mjs` : `naviguer` attend `data-vf-pret` (option `{ echec: true }`), `ecouter` ; neuf suites alignées sur le contrat de page, huit migrées (mutants de page = copies du module).
+
+## Écarts (au plan et aux plans voisins)
+1. `classerScripts` rend aussi `i18n` : les trois fichiers `// vibeflow:fr` (79-10) lisent la donnée de l'onglet à l'évaluation et se posent avant le moteur, à chaque onglet ; le manifeste porte la classe `i18n` (entre `persistant` et `moteur`). Le plan ne connaissait que 25 fichiers de `ui/` (41 réels : 2 persistants, 3 i18n, 36 par onglet).
+2. R6 : la portée reste ouverte pendant TOUTE la vie de l'onglet, plus seulement jusqu'à la résolution : le relevé C6 montrait des écouteurs, observateurs et propriétés posés après le premier rendu (douze écouteurs et douze observateurs de plus par onglet). Les persistants posent leurs écouteurs, minuteries et flux tardifs par `VF_COQUILLE.natif`, étendu à `setTimeout`, `setInterval`, `clear*` et `EventSource`.
+3. Les rappels de `surOnglet` inscrits PENDANT LE DÉMARRAGE d'un onglet (par ses scripts) sont défaits avec lui : douze fichiers de la Phase 80 s'inscrivent par `surOnglet(init)` sans `cle` et sont ré-exécutés par onglet (écart 79-16-a). Un rappel inscrit après le premier rendu reste ; un persistant inscrit à son évaluation (avant toute portée) reste (`00-vf-surcouches.js`, avec `cle`).
+4. `ui/69-vf-flux.js` : en plus du marqueur et des primitives natives, le rejeu de l'état mémorisé attend le premier rendu (rappel `surOnglet`) : sinon l'indicateur de verrou restait à « … » après un changement d'onglet. Seul fichier de `ui/` modifié.
+5. A37 et C6 en dispositions fixes (régime allégé) : neuf dispositions de liens avec oracle du noyau, deux mutants (M-LEXICAL, M-ECHEC-OUVERT) ; sept suites de changement d'onglet. Les gardes de 79-06 résolvaient déjà par `realpathSync` natif : A37 n'est pas rouge sur la base (la migration vers `cheminPhysique` est un changement de source de règle, prouvée par les deux mutants et par l'appel).
+6. Titre : le moteur pose lui-même le titre final (« <nom> map », « Projet · <nom> ») ; C2.3 relève le titre que la coquille pose AVANT le moteur ; le document servi porte le titre de l'onglet de son adresse.
+7. `naviguer` (chrome-session.mjs) : la course sur l'évènement `load` d'`about:blank` — antérieure, révélée par une page qui se construit après `load` — est fermée.
+8. Neuf suites migrées (securite X3 en plus des huit du plan), plus `responsive` en trois sites que le plan ne relevait pas (R4, `mut39`), et `reconnexion` N4 ; `colonnes-baseline.txt` abaissée par le cliquet (module 4 → 3, serveur 17 → 16).
+9. EK15.6 : l'élément actif d'un tiroir fermé sans retour de focus est le bouton `btn-panel` du moteur (plus un `BUTTON` anonyme) ; l'assertion juge « le focus ne revient plus sur #vf-lock ».
+
+## Suites jouées (tête, une fois, séquentiel)
+coquille 104/0 (106 s) ; responsive 379/0 (564 s) ; git-tiroir 194/0 (211 s) ; git-pagination 49/0 ; securite 104, lancer-serveur 82, terminal-activation 54, transcript 111, graphe 48, direct 76, serveur 98, demander-bornes 36, equipe 215 ; chaine-xss 34, lancer-xss 76, terminal-xss 17, reconnexion 20, git-e2e 35 (tous 0 échec). `terminal-tiroir` 137/1 : T21.7 (`1024x768/visite:zoom`) — recouvrement de la pastille et du zoom pendant la visite, reproduit seul, ABSENT de la base 2fb2d9d6 (39 relevés avec visite visible contre 27-28 en tête) : cause non établie, écart OUVERT, remonté au manager.
+
+## Corrections de rejeu (demande du manager)
+`git-pagination` rouge en tête (GP2.3, GP2.3b, GP3.1, GP4.1, M-ASK-*) : la suite posait la taille de la fenêtre APRÈS la navigation ; le moteur ouvre le panneau d'après `innerWidth >= 1000` à son démarrage et la coquille attend ce démarrage, donc la page démarrait à la taille par défaut, panneau fermé (barre de question à 700 px au lieu de 600, tiroir 360 au lieu de 352). Taille posée AVANT la navigation, aucune assertion changée. `git-tiroir` : `build_serve` lançait le module du dépôt au lieu de la copie mutée (27 rouges) ; corrigé.
+
+## Contrats pour les autres phases (tenus exactement ; aucun nom changé)
+`VF_COQUILLE.surOnglet(rappel, { cle })`, `chargerOnglet(nom)`, `onglet()`, `etat()`, `natif`, `porteMoteur()`, `version` ; liste fermée de `/_vf/` calculée au démarrage ; `cockpit_module_muter_page <nom> <expression sed>` dans `tests/socle-serveur.sh` ; `creerCoquille({ dossierMoteur, injection })` (l'injection est une fonction de l'adresse), `prefixeScripts(hote)`, `lireAssets(dossierMoteur, { moteur })`, `classerScripts`, `servirAsset`.
+
+## Limites
+L'export lit encore `index.html` de la sortie (79-16-c). Le tiroir du terminal et le lanceur restent liés à l'adresse de chargement et à des nœuds du moteur posés une fois (`#ask`). Les écouteurs d'une liste de requêtes média ne sont pas défaits. Polices en ligne : document d'environ 320 Ko, non mis en cache. Durée de la suite de la coquille : ~100 s (entrée dans `scripts/ci-shard-suites.sh` à faire après la première mesure en CI). Pas de preuve générative (A37, C6).
