@@ -58,7 +58,8 @@ export function collectSignal(root, { home, now = Date.now(), scriptsDir, echean
 
 function construire(root, tous, { home, now, scriptsDir, equipe, verrous: injectes }) {
   const layout = planningLayout(root);
-  const verrous = injectes ?? lireVerrous(root, { scriptsDir, home }); // verrous de la racine : ceux de la sortie, et ceux de tous les arbres d'un lab partitionné (F-05)
+  // verrous de la racine : ceux de la sortie, et ceux de tous les arbres d'un lab partitionné (F-05) ; injectés : lus une fois par la collecte du serveur
+  const verrous = injectes ?? lireVerrous(root, { scriptsDir, home });
   const P = readPlanning(root, layout, { verrous });
   const base = brancheBase(root), common = gitCommonDir(root);
   const lus = tous.map((a) => {
