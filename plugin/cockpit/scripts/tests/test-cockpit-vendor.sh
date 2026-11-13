@@ -168,8 +168,39 @@ col_cmp3() { col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs
 DELEG_FORME='décision prise par délégation de Samuel (message session principale, 2026-11-08), option recommandée'
 assert_eq "V4c.5h — « par délégation de Samuel » (la forme relevée par la revue rv-11, avec le mot « décision ») ne vaut pas citation d'une hausse : code 1" "$(col_cmp3 "$DELEG_FORME")" "1 HAUSSE-SANS-ARBITRAGE"
 assert_eq "V4c.5h' — « DÉLÉGUÉE » en capitales : code 1" "$(col_cmp3 'décision DÉLÉGUÉE par Samuel (message session principale, 2026-11-08), option recommandée')" "1 HAUSSE-SANS-ARBITRAGE"
-assert_eq "V4c.5h'' — « delegation » sans accents : code 1" "$(col_cmp3 'decision par delegation de Samuel (message session principale, 2026-11-08)')" "1 HAUSSE-SANS-ARBITRAGE"
-assert_eq "V4c.5h3 — « a délégué » : code 1" "$(col_cmp3 'arbitrage : Samuel a délégué le choix (session principale, 2026-11-08)')" "1 HAUSSE-SANS-ARBITRAGE"
+# chaque message de délégation ci-dessous passe TOUTES les autres conditions (mot-clé, deux virgules, date) : seul le filtre de délégation peut le refuser
+col_nondirecte() { node "$CLIQUET" citation "$1" > /dev/null 2>&1; echo $?; }
+DELEG_SANS_ACCENT='decision par delegation de Samuel, message session principale, 2026-11-08'
+DELEG_A_DELEGUE='arbitrage : Samuel a délégué le choix, session principale, 2026-11-08'
+DELEG_GRAVE='arbitrage Samuel, session principale, 2026-11-08 : Samuel délègue le choix'
+DELEG_NFD="$(printf 'arbitrage Samuel, session principale, 2026-11-08 : de\xcc\x81le\xcc\x81gue\xcc\x81')"
+DELEG_ZW="$(printf 'arbitrage Samuel, session principale, 2026-11-08 : de\xcc\x81\xe2\x80\x8bl\xc3\xa9gation')"
+assert_eq "V4c.5h0 — témoin : chacun des messages de délégation ci-dessous est conforme sans le filtre (aucune autre condition ne le refuse)" "$(col_nondirecte "$DELEG_FORME") $(col_nondirecte "$DELEG_SANS_ACCENT") $(col_nondirecte "$DELEG_A_DELEGUE") $(col_nondirecte "$DELEG_GRAVE") $(col_nondirecte "$DELEG_NFD") $(col_nondirecte "$DELEG_ZW")" "0 0 0 0 0 0"
+assert_eq "V4c.5h'' — « delegation » sans accents : code 1, refusé par le seul filtre" "$(col_cmp3 "$DELEG_SANS_ACCENT")" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5h3 — « a délégué » : code 1, refusé par le seul filtre" "$(col_cmp3 "$DELEG_A_DELEGUE")" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5h5 — « délègue » (accent grave) : code 1" "$(col_cmp3 "$DELEG_GRAVE")" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5h6 — « délégué » en NFD (accent combinant) : code 1" "$(col_cmp3 "$DELEG_NFD")" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5h7 — « délégation » coupée par un caractère de largeur nulle : code 1" "$(col_cmp3 "$DELEG_ZW")" "1 HAUSSE-SANS-ARBITRAGE"
+# V4c.5i : la CLASSE, par un générateur de variantes (radicaux, casse, NFC/NFD, un caractère invisible à chaque position) : toutes refusées ; les citations légitimes restent acceptées
+cat > "$WORK/gen-deleg.mjs" <<'FIN'
+import { spawnSync } from 'node:child_process';
+const [cliquet] = process.argv.slice(2);
+const radicaux = ['délégation', 'déléguée', 'délégué', 'délègue', 'délèguent', 'delegation', 'delegue', 'DÉLÉGATION', 'Délègue', 'DELEGUE'];
+const invisibles = ['\u200b', '\u200c', '\u200d', '\u2060', '\ufeff', '\u00ad'];
+const variantes = new Set();
+for (const r of radicaux) for (const f of ['NFC', 'NFD']) {
+  const base = r.normalize(f); variantes.add(base);
+  for (let i = 1; i < base.length; i++) for (const z of invisibles) variantes.add(base.slice(0, i) + z + base.slice(i));
+}
+const verdict = (m) => spawnSync('node', [cliquet, 'citation', m, '--directe']).status;
+let rejetes = 0;
+for (const v of variantes) if (verdict(`arbitrage Samuel, session principale, 2026-11-08 : ${v}`) === 1) rejetes++;
+const legit = ['arbitrage Samuel, AskUserQuestion session principale, 2026-11-12', 'décision de Samuel, message session principale, 2026-11-08', 'arbitrage Samuel, canal WhatsApp, 2026-11-12 : option B'];
+const acceptes = legit.filter((m) => verdict(m) === 0).length;
+console.log(`rejetes=${rejetes}/${variantes.size} legitimes=${acceptes}/${legit.length}`);
+FIN
+col_generatif() { node "$WORK/gen-deleg.mjs" "$CLIQUET" | sed -E 's|rejetes=([0-9]+)/([0-9]+)|\1 sur \2|; s|legitimes=([0-9]+)/([0-9]+)|\1 sur \2|' | awk '{ print ($1==$3 ? "tous-rejetes" : "fuite") " " ($4==$6 ? "legitimes-ok" : "legitime-refusee") }'; }
+assert_eq "V4c.5i — le générateur de variantes (accents, casse, NFC/NFD, un invisible à chaque position, conjugaisons) : toutes refusées, et les citations légitimes toutes acceptées" "$(col_generatif)" "tous-rejetes legitimes-ok"
 assert_eq "V4c.5h4 — la délégation et la citation directe sur deux lignes : code 0 (la ligne directe suffit)" "$(col_cmp3 "$DELEG_FORME
 $CITE")" "0 "
 # V4c.6 : l'historique git du fichier de baseline (dépôt jetable)
@@ -251,7 +282,10 @@ col_mutant_temoin MARQUEUR 's|const comptes = (texte) => |const comptes = (texte
 col_mutant_temoin CR "s|l\\.replace(/\\\\r\\$/, '')|l|" "le CR final est compté : 160 plus CR deviennent rouges (V4c.1d)" col_v160c "rouge HAUSSE" col_v160x "ok"
 col_mutant_temoin ORPHELINE "s|v\\.push(\\['ORPHELINE', c\\]);|;|" "les entrées orphelines sont ignorées (V4c.2b)" col_orph "ok" col_v160x "ok"
 col_deleg_forme() { col_cmp3 "$DELEG_FORME"; }; col_cite_ok() { col_cmp3 "$CITE"; }; col_dbl() { col_vdbl dblm 'scripts/vf-cockpit-a.mjs 1' 'scripts/vf-cockpit-a.mjs 1'; }
-col_mutant_temoin DELEGATION 's|d\[ée\]l\[ée\]g/i|d[ée]l[ée]gu/i|' "le filtre ne voit que « déléguée » : « par délégation de Samuel » vaut citation (V4c.5h)" col_deleg_forme "0 " col_cite_ok "0 "
+col_deleg_sans_accent() { col_cmp3 "$DELEG_SANS_ACCENT"; }
+col_mutant_temoin DELEGATION 's|/deleg/i|/dél[ée]gu/i|' "le filtre ne voit que « déléguée » accentué : « delegation » et « par délégation » valent citation (V4c.5h'')" col_deleg_sans_accent "0 " col_cite_ok "0 "
+col_mutant_temoin DELEGATION2 's|/deleg/i|/dél[ée]g/i|' "le filtre sans normalisation d'accents : « delegation » sans accent vaut citation (V4c.5h'')" col_deleg_sans_accent "0 " col_cite_ok "0 "
+col_mutant_temoin NORMALISATION "s|l\.normalize[(]'NFKD'[)]\.replace[(]INVISIBLES, ''[)]|l|" "le filtre lit le texte brut : NFD et largeur nulle valent citation (V4c.5i)" col_generatif "fuite legitimes-ok" col_cite_ok "0 "
 col_mutant_temoin DOUBLON 's/ || entrees\.has(c\[0\])//' "un fichier nommé deux fois est accepté : la seconde entrée écrase la première (V4c.2b6)" col_dbl "ok" col_v160x "ok"
 col_mutant_temoin INITIALISER 's|^  if (fs\.existsSync(b)) fin(1,.*$||' "initialiser réécrit une baseline qui existe (V4c.2c)" col_init_existe "0 modifiee" col_init_neuf "0 ok"
 

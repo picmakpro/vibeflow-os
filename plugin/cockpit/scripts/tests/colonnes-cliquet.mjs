@@ -66,10 +66,14 @@ function verdicts(racine, texteBaseline) {
   for (const [c, n] of reel) if (n > 0 && !entrees.has(c)) v.push(['HAUSSE', `${c} réel=${n} baseline=0`]);
   return { v, reel };
 }
-// citation d'arbitrage : la forme de citation_ok de la garde G-1 (mot-clé, au moins deux virgules, date ISO) ; « directe » écarte toute forme de délégation (délég…)
+// délégation : lue après normalisation (NFKD, marques combinantes et caractères invisibles retirés), sur le radical « deleg » sans égard à la casse :
+// délégation, déléguée, délègue, accent combinant, lettre pleine chasse, largeur nulle y tombent ; filtre lexical, un tour de phrase sans le mot n'y tombe pas
+const INVISIBLES = /[\u0300-\u036f\u00ad\u200b-\u200d\u2060\ufeff]/g;
+const delegation = (l) => /deleg/i.test(l.normalize('NFKD').replace(INVISIBLES, ''));
+// citation d'arbitrage : la forme de citation_ok de la garde G-1 (mot-clé, au moins deux virgules, date ISO) ; « directe » écarte toute ligne de délégation
 function citationConforme(message, directe) {
   const conforme = (l) => /arbitrage|décision|decision/.test(l) && (l.match(/,/g) || []).length >= 2 && /[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(l);
-  return String(message).split('\n').some((l) => conforme(l) && !(directe && /d[ée]l[ée]g/i.test(l)));
+  return String(message).split('\n').some((l) => conforme(l) && !(directe && delegation(l)));
 }
 function ecrire(racine, baseline, reel) {
   const lignes = [...reel].filter(([, n]) => n > 0).sort((a, b) => octets(a[0], b[0])).map(([c, n]) => `${c} ${n}`);
