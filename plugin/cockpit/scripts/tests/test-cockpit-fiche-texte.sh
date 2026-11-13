@@ -7,10 +7,10 @@
 #   X1  balisage hostile en texte        X2  lien jamais actif                 X3  aucun accès innerHTML et consorts
 #   X4  sous-ensemble fermé              X5  filtres cumulables et compteur    X6  liste blanche, lignes sans texte
 #   X7  lireFil : schéma, erreur, inconnu X8  cible et nom d'outil hostiles    X9  temps borné et plafond
-#   X10 fusionnerEvenements (a à h)   X12 corpus hostile : jeu fermé, aucun attribut, classes fixes   X13 genre hors du jeu fermé
+#   X10 fusionnerEvenements (a à h)   X12 corpus hostile : jeu fermé, aucun attribut, classes fixes   X13 genre hors du jeu fermé   X14 lien non fermé
 #   X11 mutants (copies des modules sous $WORK/mut-<nom>/) : a M-INNERHTML (X3), b M-LIEN (X2), c M-RENDU-TOUT (X6), d M-FILTRE-ET (X5),
 #       e M-BACKTRACK (X9), f M-FUSION-SANS-BORNE (X10), g M-FUSION-EN-CONSTRUCTION (X10), h M-INCONNU-VIDE (X7), i M-PLAFOND (X9),
-#       j M-AUTOLIEN (X12), k M-STYLE (X12), l M-GENRE-CLASSE (X13) ;
+#       j M-AUTOLIEN (X12), k M-STYLE (X12), l M-GENRE-CLASSE (X13), m M-LIEN-OUVERT (X14) ;
 #       chaque mutant imprime « MUTANT-ROUGE <nom> <sonde> » quand sa sonde rougit, « MUTANT-VERT <nom> <sonde> » (plus un FAIL) sinon.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -75,7 +75,7 @@ const ctx = vm.createContext({ Intl, Date, window: {} });
 const absent = FICHIERS.filter((f) => !fs.existsSync(path.join(dir, f)));
 if (!absent.length) for (const f of FICHIERS) vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
 out.push('absent ' + (absent.length ? 1 : 0));
-const KEYS = ['X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'X8', 'X9', 'X12', 'X13', 'X10', 'X10a', 'X10b', 'X10c', 'X10d', 'X10e', 'X10f', 'X10g', 'X10h'];
+const KEYS = ['X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'X8', 'X9', 'X12', 'X13', 'X14', 'X10', 'X10a', 'X10b', 'X10c', 'X10d', 'X10e', 'X10f', 'X10g', 'X10h'];
 if (absent.length) { KEYS.forEach((k) => ligne(k, 'absent')); console.log(out.join('\n')); process.exit(0); }
 
 const Md = ctx.window.__vfFicheMd, F = ctx.window.__vfFicheTexte;
@@ -197,6 +197,15 @@ sonde('X13', () => {
   const clas = String(li.className);
   return (!clas.includes('zz') && !clas.includes('onclick') && !LOG.classes.join(' ').includes('zz') && li.children.length === 0 && texteDe(li) === '') || { clas, n: li.children.length };
 });
+// X14 : lien à parenthèse non fermée (aucun « ) » plus loin) : rendu terminé sous délai dur, texte intact (la garde `dernier[')']` évite la boucle infinie)
+sonde('X14', () => {
+  const cas = ['[a](b', 'voir [doc](https://x.y sans fermer', 'a [b](c [d](e', '[x]( et ](y'];
+  const r = cas.map((m) => {
+    try { ctx.__m = m; ctx.__d = mkDoc(); reset(); vm.runInContext('__r = window.__vfFicheMd.markdown(__m, __d)', ctx, { timeout: 1500 }); return texteDe(ctx.__r) === m; }
+    catch (e) { return 'délai : ' + m; }
+  });
+  return r.every((x) => x === true) || r;
+});
 // X10 : fusionnerEvenements
 {
   const fil = [msgL(T, 'a'), outL(T + 10000), msgL(T + 20000, 'b')];
@@ -274,6 +283,7 @@ sonde_ok "X8 — cible et nom d'outil hostiles rendus en texte, la cible dans un
 sonde_ok "X9 — tokenizer linéaire (N / 2N), moins de 300 ms sur emphase pathologique, plafond de 100 000 caractères avec mention" X9
 sonde_ok "X12 — corpus hostile (adresses nues, javascript:, data:, mailto:, chevrons, format d'attribut) : balises du jeu fermé, aucun attribut, classes d'une liste fixe" X12
 sonde_ok "X13 — un genre hors du jeu fermé ne produit ni classe dérivée ni contenu (liste blanche au rendu)" X13
+sonde_ok "X14 — lien à parenthèse non fermée : rendu terminé sous délai dur, texte intact (pas de boucle infinie)" X14
 sonde_ok "X10 — fusionnerEvenements : genres, valeurs non finies, borne, en-construction, plafond de 200, tri, pureté, fil sans date" X10
 for k in a b c d e f g h; do sonde_ok "X10$k — sous-cas $k de la fusion des événements" "X10$k"; done
 
@@ -303,6 +313,7 @@ mutant i M-PLAFOND X9 X9 "$MD" 'const tronque = t.length > PLAFOND;' 'const tron
 mutant j M-AUTOLIEN X12 X12 "$MD" 'tampon += c;' "if (texte.startsWith('http', i)) { let j = i; while (j < n && !blanc(texte[j])) j++; vider(); const a = doc.createElement('a'); a.setAttribute('href', texte.slice(i, j)); a.textContent = texte.slice(i, j); parent.appendChild(a); i = j; continue; } tampon += c;"
 mutant k M-STYLE X12 X12 "$MD" 'e.textContent = contenu;' "e.textContent = contenu; e.setAttribute('style', contenu);"
 mutant l M-GENRE-CLASSE X13 X13 "$TX" 'if (!GENRES.includes(ligne && ligne.genre)) return li;' ''
+mutant m M-LIEN-OUVERT X14 X14 "$MD" " && dernier[')'] >= fermante + 2" ''
 
 vf_hyg_assert
 
