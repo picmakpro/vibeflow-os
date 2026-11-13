@@ -1349,7 +1349,7 @@ function edgeMenu(e) {
 }
 function canvasMenu() {
   return [
-    { label: t('Fit to screen'), icon: 'fit', hint: 'F', run: () => fit(true) },
+    { label: t('Fit to screen'), icon: 'fit', hint: 'F', run: () => cadrer() },
     state.container !== 'root' ? { label: t('Up one level'), icon: 'left', hint: '⌫', run: up } : null,
     state.container !== 'root' ? { label: t('Back to overview'), icon: 'home', run: () => go('root') } : null,
     '-',
@@ -1442,6 +1442,7 @@ function zoomBy(f, cx, cy) {
   if (cx === undefined || cy === undefined) [cx, cy] = zoomCentre();
   const k = clamp(state.t.k * f, 0.08, 2.5);
   setT({ k, x: cx - (cx - state.t.x) * (k / state.t.k), y: cy - (cy - state.t.y) * (k / state.t.k) }, false);
+  programmerZ();
 }
 /** A transformation applied through the engine's own path (levels of detail, columns): never animated; non-finite values are refused (80-09). */
 function transformer(m) {
@@ -1458,7 +1459,7 @@ svg.addEventListener('wheel', (ev) => {
   ev.preventDefault();
   const r = stageRect();
   if (ev.ctrlKey) zoomBy(Math.exp(-ev.deltaY * 0.01), ev.clientX - r.left, ev.clientY - r.top);
-  else { const u = ev.deltaMode === 1 ? 16 : 1; setT({ ...state.t, x: state.t.x - ev.deltaX * u, y: state.t.y - ev.deltaY * u }, false); }
+  else { const u = ev.deltaMode === 1 ? 16 : 1; setT({ ...state.t, x: state.t.x - ev.deltaX * u, y: state.t.y - ev.deltaY * u }, false); programmerZ(); }
 }, { passive: false });
 let drag = null;
 const fingers = new Map(); let pinch = null; // touch only: the fingers on the map, and the pinch they make
@@ -1483,6 +1484,7 @@ window.addEventListener('pointermove', (ev) => {
 const endDrag = (ev) => {
   if (!drag || ev.pointerId !== drag.id) return;
   if (drag.moved) { if (ev.pointerType === 'touch') swallowClick = true; else svg.addEventListener('click', (e) => e.stopPropagation(), { capture: true, once: true }); }
+  if (drag.moved) programmerZ();
   drag = null; svg.classList.remove('panning');
 };
 window.addEventListener('pointerup', endDrag);
@@ -1501,7 +1503,7 @@ window.addEventListener('pointermove', (ev) => {
 });
 const liftFinger = (ev) => {
   if (!fingers.delete(ev.pointerId)) return;
-  if (pinch?.moved) swallowClick = true; // lifting a finger after a pinch isn't a tap
+  if (pinch?.moved) { swallowClick = true; programmerZ(); } // lifting a finger after a pinch isn't a tap
   if (fingers.size < 2) pinch = null;
 };
 window.addEventListener('pointerup', liftFinger);
@@ -1515,25 +1517,60 @@ window.addEventListener('resize', () => {
 });
 $('#z-in').onclick = () => zoomBy(1.25);
 $('#z-out').onclick = () => zoomBy(0.8);
-$('#z-fit').onclick = () => fit(true);
+const cadrer = () => { fit(true); programmerZ(); }; // the user's own framing (button, key F, palette): the address follows
+$('#z-fit').onclick = cadrer;
 
 // ======================= navigation =======================
-function setHash(container, sel) {
+// 80-13 (FORM-15) : the fragment carries the view (v), the selection (s), the zoom (z = k,x,y) and the extension keys of a closed list (git = 1)
+const EXT_CLES = ['git'];
+function ecrireFragment(p, remplacer) { // the query (?vue=) is kept; the comma of z stays readable
+  const s = p.toString().replace(/%2C/g, ',');
+  const url = s ? '#' + s : location.pathname + location.search;
+  try { if (location.hash.slice(1) !== s) history[remplacer ? 'replaceState' : 'pushState'](null, '', url); } catch {}
+}
+function setHash(container, sel, autreNiveau) {
   if (container.startsWith('q:')) return; // answer views are transient
-  const p = new URLSearchParams();
+  const cur = new URLSearchParams(location.hash.slice(1)), p = new URLSearchParams();
   if (container !== 'root') p.set('v', container);
   if (sel && typeof sel === 'string') p.set('s', sel);
-  const s = p.toString();
-  try { if (location.hash.slice(1) !== s) history.pushState(null, '', s ? '#' + s : location.pathname + location.search); } catch {}
+  for (const k of EXT_CLES) if (cur.has(k)) p.set(k, cur.get(k));
+  if (!autreNiveau && cur.has('z')) p.set('z', cur.get('z')); // another level has its own framing: z only follows a selection on the same level
+  ecrireFragment(p, false);
+}
+/** z = k,x,y : finite decimals only, k within the zoom bounds, x and y bounded; anything else is ignored. */
+function lireZ(texte) {
+  const a = String(texte || '').split(',');
+  if (a.length !== 3 || !a.every((x) => /^-?\d{1,9}(\.\d{1,6})?$/.test(x))) return null;
+  const [k, x, y] = a.map(Number);
+  return k >= 0.08 && k <= 2.5 && Math.abs(x) <= 1e5 && Math.abs(y) <= 1e5 ? { k, x, y } : null;
 }
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   let v = p.get('v') || 'root', s = p.get('s');
-  if (v !== 'root' && !parentOf.has(v)) v = 'root';
+  const inconnue = v !== 'root' && !parentOf.has(v);
+  if (inconnue) v = 'root';
   if (s && !parentOf.has(s) && !s.startsWith('x:') && !s.startsWith('m:')) s = null;
-  return { v, s };
+  return { v, s, z: inconnue ? null : lireZ(p.get('z')) }; // a link to a level this graph does not have carries no framing for it
 }
-window.addEventListener('popstate', () => { const { v, s } = readHash(); go(v, { select: s, push: false }); });
+const arrondi = (n) => Math.round(n * 1000) / 1000;
+let zMinuterie = 0;
+function ecrireZ() { // the end of a user gesture: the framing goes into the address, without a history entry per gesture
+  const m = state.t;
+  if (state.container.startsWith('q:') || ![m.k, m.x, m.y].every(Number.isFinite)) return;
+  const p = new URLSearchParams(location.hash.slice(1)); p.set('z', [m.k, m.x, m.y].map(arrondi).join(','));
+  ecrireFragment(p, true);
+}
+function programmerZ() { clearTimeout(zMinuterie); zMinuterie = setTimeout(ecrireZ, 250); }
+/** An extension key of the fragment (git = 1): read, written or removed (null); a key outside the closed list or a value other than 1 is refused. */
+function paramVue(cle, valeur) {
+  if (!EXT_CLES.includes(cle) || (valeur !== null && valeur !== '1')) return false;
+  const p = new URLSearchParams(location.hash.slice(1));
+  if (valeur === null) p.delete(cle); else p.set(cle, valeur);
+  ecrireFragment(p, true); return true;
+}
+function lireParamVue(cle) { return EXT_CLES.includes(cle) && new URLSearchParams(location.hash.slice(1)).get(cle) === '1' ? '1' : null; }
+const surZ = (z) => () => { if (z) transformer(z); };
+window.addEventListener('popstate', () => { const { v, s, z } = readHash(); go(v, { select: s, push: false, after: surZ(z) }); });
 
 async function go(container, { select: sel = null, push = true, zoomFrom = null, after, force = false } = {}) {
   if (container === 'q:answer' && !state.answer?.items) return; // no answer on a board to show (the last one had no cards): nothing to open, no error (PU-G-144)
@@ -1543,7 +1580,7 @@ async function go(container, { select: sel = null, push = true, zoomFrom = null,
   const changed = container !== state.container;
   if (changed && container !== 'q:answer' && !keepSheet) $('#ask-sheet').hidden = true; // going to another map puts the answer bubble away: it covered the canvas (PU-G-149)
   state.container = container; state.selected = sel;
-  if (push) setHash(container, sel);
+  if (push) setHash(container, sel, changed);
   if (!changed && state.layout && !force) { applySelection(); renderPanel(); if (after) after(); return; }
   const c = zoomFrom && state.layout?.children.find((x) => x.id === zoomFrom);
   if (c) {
@@ -2573,7 +2610,7 @@ window.addEventListener('keydown', (ev) => {
   }
   else if (G.meta?.vfTab === 'equipe' && /^[fFpP=+-]$/.test(ev.key)) { /* Équipe : ni cadrage, ni tiroir, ni zoom par la frappe (PU-G-137, Q8) */ }
   else if ((ev.metaKey || ev.ctrlKey || ev.altKey) && /^[fFpP=+-]$/.test(ev.key)) { /* une lettre seule : jamais avec ⌘, Ctrl ou Alt */ }
-  else if (ev.key === 'f' || ev.key === 'F') fit(true);
+  else if (ev.key === 'f' || ev.key === 'F') cadrer();
   else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
   else if (ev.key === 'Enter' && typeof state.selected === 'string') open(state.selected);
   else if (state.flow && ev.key === 'ArrowRight') $('#fl-next')?.click();
@@ -2645,8 +2682,8 @@ window.Floorplan = Object.freeze({
   go, reveal, select, open, up, fit, render: (o) => render({ keepTransform: true, ...o }), refreshPanel: () => renderPanel(),
   showBoard, playFlow, startFlow, stopFlow: () => { if (state.flow) stopFlow(); },
   freeArea: () => freeArea(),
-  // 80-09 : cadrage unique, champ de lecture, garde de saisie, transformation par le chemin du moteur
-  cadrage, enSaisie, transformer, setReadingArea(fn) { readingProvider = typeof fn === 'function' ? fn : null; },
+  // 80-09 : cadrage unique, champ de lecture, garde de saisie, transformation par le chemin du moteur ; 80-13 : paramètres du lien de vue
+  cadrage, enSaisie, transformer, paramVue, lireParamVue, setReadingArea(fn) { readingProvider = typeof fn === 'function' ? fn : null; },
   closeMenus: () => { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); },
   // asking
   addAskContext, ask: (text) => { closeSheet(); askInput.value = text; submitAsk(); }, askEngine: () => askState.engine,
@@ -2690,7 +2727,7 @@ if (init.s && isPhone()) { document.body.classList.remove('no-panel'); $('#btn-p
 const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();
 // vibeflow K5 : le premier rendu et `ready` attendent aussi que les scripts d'extension (ui/*.js, posés APRÈS ce script par la page) aient été exécutés (DOMContentLoaded) : polices déjà prêtes (Linux), `fontsReady` est résolue à la fin de ce script et le rendu partait avant eux (titre du panneau, définitions au focus posés sur un rendu déjà fait, écouteurs de `ready` posés trop tard)
 const extensionsPosees = window.VF_COQUILLE?.porteMoteur ? window.VF_COQUILLE.porteMoteur() : document.readyState === 'loading' ? /* vibeflow 79-16 : la coquille lève la porte du premier rendu une fois les extensions posées */ new Promise((ok) => document.addEventListener('DOMContentLoaded', ok, { once: true })) : Promise.resolve();
-Promise.all([fontsReady, extensionsPosees]).then(() => render({ nav: true, after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
+Promise.all([fontsReady, extensionsPosees]).then(() => render({ nav: true, after: () => { renderPanel(); surZ(init.z)(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
 })();
 </script>
 <!--__UI_EXTENSIONS__-->
