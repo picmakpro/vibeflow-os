@@ -48,11 +48,12 @@ export async function ouvrir(chrome, { csp = false } = {}) {
       ch.once('exit', (c) => { clearTimeout(t); ko(new Error(`Chrome s'est arrêté avant d'être prêt (code ${c})`)); });
     });
     const cible = await (await fetch(`http://127.0.0.1:${port}/json/new?about:blank`, { method: 'PUT', signal: AbortSignal.timeout(AMORCE) })).json();
-    const ws = new WebSocket(cible.webSocketDebuggerUrl); let id = 0; const pend = new Map(); const ecoutes = []; const violations = [];
+    const ws = new WebSocket(cible.webSocketDebuggerUrl); let id = 0; const pend = new Map(); const ecoutes = []; const permanentes = []; const violations = [];
     ws.onmessage = (e) => { const j = JSON.parse(e.data);
       if (j.id && pend.has(j.id)) { const p = pend.get(j.id); pend.delete(j.id); clearTimeout(p.t); p.ok(j.result); return; }
       if (j.method === 'Log.entryAdded' && /Content Security Policy|Refused to/i.test(j.params.entry.text)) violations.push(j.params.entry.text.slice(0, 160));
-      for (const l of ecoutes) if (l.m === j.method) l.f(j.params); };
+      for (const l of ecoutes) if (l.m === j.method) l.f(j.params);
+      for (const l of permanentes) if (l.m === j.method) l.f(j.params); };
     ws.onclose = () => { for (const p of pend.values()) { clearTimeout(p.t); p.ko(new Error('connexion au navigateur perdue')); } pend.clear(); };
     await new Promise((ok, ko) => { ws.onopen = ok; ws.onerror = () => ko(new Error('connexion au navigateur impossible')); setTimeout(() => ko(new Error(`connexion au navigateur : échéance (${AMORCE} ms)`)), AMORCE); });
     const send = (method, params = {}, ms = ECHEANCE) => new Promise((ok, ko) => { const i = ++id; const t = setTimeout(() => { pend.delete(i); ko(new Error(`${method} : pas de réponse en ${ms} ms`)); }, ms); pend.set(i, { ok, ko, t }); ws.send(JSON.stringify({ id: i, method, params })); });
@@ -61,7 +62,7 @@ export async function ouvrir(chrome, { csp = false } = {}) {
     let premier = true; // le premier chargement d'une session paie l'amorçage de la page (Chrome à froid) : borné par max(ECHEANCE, AMORCE)
     // P80-D-37 : toute adresse `…/project.html` sans `vue=` reçoit `vue=graphe` (requête, avant le fragment) : les suites écrites pour le canevas de Projet y restent ; { brut: true } charge l'adresse telle quelle
     const sansVue = (u) => { const [base, ...fr] = u.split('#'); return /\/project\.html(\?|$)/.test(base) && !/[?&]vue=/.test(base) ? [base + (base.includes('?') ? '&' : '?') + 'vue=graphe', ...fr].join('#') : u; };
-    const naviguer = async (url, { brut = false } = {}) => {
+    const naviguer = async (url, { brut = false, echec = false } = {}) => {
       if (!brut) url = sansVue(url);
       violations.length = 0; const ms = premier ? Math.max(ECHEANCE, AMORCE) : ECHEANCE; premier = false;
       await send('Page.navigate', { url: 'about:blank' }, ms);
@@ -69,6 +70,8 @@ export async function ouvrir(chrome, { csp = false } = {}) {
       await send('Page.navigate', { url }, ms);
       await Promise.race([charge, pause(ms).then(() => { throw new Error(`chargement de ${url} : événement load absent en ${ms} ms`); })]);
       ecoutes.length = 0;
+      // 79-16 R9 : une page de la coquille se dit prête par `data-vf-pret = oui` (ou, avec { echec: true }, par un premier chargement en échec) ; une page sans coquille n'attend rien
+      if (await ev('!!window.VF_COQUILLE')) await attendre(echec ? `window.VF_COQUILLE.etat().phase === 'echec'` : `document.documentElement.dataset.vfPret === 'oui'`, echec ? 'coquille en échec' : 'coquille prête', ms);
     };
     // attendre : sonde l'expression (booléenne) toutes les 100 ms jusqu'à ce qu'elle soit vraie ; échec nommé sinon
     const attendre = async (expr, nom, ms = ECHEANCE) => {
@@ -83,7 +86,8 @@ export async function ouvrir(chrome, { csp = false } = {}) {
       throw new Error(`« ${nom} » ne s'est pas stabilisé (${ms} ms)`);
     };
     await send('Page.enable', {}, AMORCE); if (csp) await send('Log.enable', {}, AMORCE);
-    return { send, ev, naviguer, attendre, stable, fermer, violations, port };
+    const ecouter = (m, f) => { permanentes.push({ m, f }); }; // écoute permanente d'un évènement du protocole (relevé réseau, 79-16)
+    return { send, ev, naviguer, attendre, stable, fermer, violations, port, ecouter };
   } catch (e) { await fermer(); throw e; }
 }
 
