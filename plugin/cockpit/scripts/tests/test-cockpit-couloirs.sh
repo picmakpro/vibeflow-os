@@ -213,6 +213,16 @@ echo "     trace M-PASTILLE-NONFIXE — sonde CL4.3c [avant, après] : attendu �
 assert_eq "M-PASTILLE-NONFIXE — le mutant (reconnaissance élargie : tout bouton) rougit CL4.3c : le bouton non fixe fait grandir la zone basse (témoin : mesure avant lue)" \
   "$(E '[j.avant !== "", j.avant === j.apres]' "$RM")" '[true,false]'
 
+echo "=== CL5 — idiome A51 : deux allers-retours Projet / Code, extensions réévaluées (80-a51) ==="
+. "$HERE_T/a51-commun.sh"
+build_serve "$LAB"
+a51_mesurer "$WORK/a51-cl.json" "http://127.0.0.1:$PORT/project.html?vue=couloirs" projet code \
+  "41-vf-projet-vue.js,41-vf-projet-clavier.js,41-vf-projet-formes.js" "section.vf-projet" "section.vf-projet,.vp-status,#vf-projet-flottant"
+vf_hyg_stop "$SRV"
+assert_eq "CL5.1 — deux allers-retours Projet / Code : écouteurs, observateurs, classes du corps, feuille et nœuds de la vue comme à la première arrivée ; rien de la vue sur Code" \
+  "$(a51_verdict "$WORK/a51-cl.json" retours --absent-ailleurs)" "ok"
+assert_eq "CL5.2 — les trois extensions réévaluées deux fois (même cle) : un seul branchement actif, une seule feuille, une seule section, aucune classe orpheline" \
+  "$(a51_verdict "$WORK/a51-cl.json" rejeu)" "ok"
 echo "=== Mutants (copie du module dans \$WORK) ==="
 mutant M-FOOT 41-vf-projet-modele.js "const av = n && n.avancement, ex = n && n.exigences, seg = [];" \
   "if (n && n.foot !== undefined) return n.foot; const av = n && n.avancement, ex = n && n.exigences, seg = [];" chrome-couloirs.mjs cl2 cl23

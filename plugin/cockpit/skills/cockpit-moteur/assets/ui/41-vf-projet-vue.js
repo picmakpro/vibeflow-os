@@ -287,13 +287,13 @@
       mesurerBas();
     });
     mesurerBas(); surRender();
-    return () => { vivant = false; pose.splice(0).forEach((f) => f()); section.remove(); flottant.remove(); statut.remove(); };
+    return () => { // A51 : repris aussi hors de la portée (réévaluation du fichier)
+      vivant = false; pose.splice(0).forEach((f) => f()); [section, flottant, statut, style].forEach((n) => n.remove());
+      document.body.classList.remove('vf-forme-couloirs', 'vf-forme-graphe'); if (window.VF_PROJET === API) delete window.VF_PROJET; };
   };
-  window.VF_PROJET = Object.freeze({ formes: () => FORMES.slice(), forme: effective, basculer, carteDe, inscrireForme, niveau, redessiner: () => dessiner(),
-    annoncer });
-  classes();
-  const C = window.VF_COQUILLE;
-  const demarrer = () => (vivant ? undefined : init());
-  if (C && typeof C.surOnglet === 'function') C.surOnglet(init); // P80-D-42 : la coquille, sinon `ready` (ou le premier rendu, s'il l'a devancé)
+  const API = Object.freeze({ formes: () => FORMES.slice(), forme: effective, basculer, carteDe, inscrireForme, niveau, redessiner: () => dessiner(),
+    annoncer }); window.VF_PROJET = API; classes();
+  const C = window.VF_COQUILLE, demarrer = () => (vivant ? undefined : init());
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(init, { cle: '41-vf-projet-vue.js' }); // la coquille (A51), sinon `ready`
   else if (state.layout) demarrer(); else { SC.on('ready', demarrer); SC.on('render', demarrer); }
 })();
