@@ -47,12 +47,13 @@
       "etatsSource": ["lue", "absente", "erreur", "forme-inconnue"]
     },
     "vibeflow/cockpit-project@1": {
+      "description": "Champs facultatifs de traçabilité (76-04, P76-D-31, A32 de la 79) : `trace` d'un nœud de phase (plans, correctifs, verification, recette, preuves), `meta.vf.trace` (exigences dont `cites`, étapes, registresSansPhase, ou { erreur: true } si la lecture a échoué), `meta.vf.registres` (définitions des registres par phase), `meta.vf.jalonActif`. Tout texte y est nettoyé, masqué et sans chemin du poste. La version du schéma ne monte pas.",
       "requis": { "schema": "string", "meta": "object", "project": "object", "nodes": "array", "files": "array", "links": "array", "flows": "array" },
       "noeud": { "requis": ["id", "label", "kind"] },
       "element": { "requis": ["p", "n", "name"] },
       "lien": { "requis": ["a", "b", "k"] },
       "statuts": ["done", "active", "recette", "todo", "blocked"],
-      "optionnels": { "noeud": ["avancement", "exigences"], "element": ["vague"] },
+      "optionnels": { "noeud": ["avancement", "exigences", "trace"], "element": ["vague"], "metaVf": ["trace", "registres", "jalonActif"] },
       "meta": { "requis": ["vfTab", "vf", "kindLabels"] }
     },
     "vibeflow/cockpit-transcript@2": {
@@ -116,6 +117,17 @@
       "requis": { "schema": "string", "ailleurs": "any" },
       "entree": { "requis": ["lab", "n"] },
       "interdits": ["cwd", "sessionId", "id", "name", "titre", "chemin"]
+    },
+    "vibeflow/cockpit-trace@1": {
+      "description": "traçabilité du cockpit (76-05, GET /api/vf/tracabilite?vue=jalon|phase|exigence|decision|adr|memoire|entree[&cle=…]) : une vue par requête, lue dans l'instantané de la collecte (jalon, phase, exigence, registres) ou par les lectures propres de la route (docs/ADR.md, commits citants, mémoire des agents). Des codes d'état et des clés ouvrables, jamais de copy. etat : ok, vide (rien à montrer, ou collecte: en-cours), absent (objet inconnu, 200), indisponible (lecture en échec). bornes.tronque : vrai dès qu'une lecture a atteint sa borne ou son échéance, une réponse bornée ne se donne jamais pour complète. absences : adr, compartiment, memoire (absente | ignoree | null), nonSuivis, git, etapes. memoire.compteurs : contrat fourni à la Phase 77 (entrees, agents, horsIndex, liensCasses, sansEntrant, cheminsAbsents, resolusParNom, entreesCitantAbsent). Aucune clé description, corps ni texte : la route ne sert jamais le contenu d'un fichier de mémoire.",
+      "requis": { "schema": "string", "etat": "string", "vue": "string", "bornes": "object" },
+      "optionnels": { "cle": "string", "collecte": "string", "absences": "object", "jalon": "object", "phase": "object", "exigence": "object", "adrs": "array", "adr": "object", "registres": "array", "decision": "object", "commits": "array", "memoire": "object", "agent": "object", "entree": "object", "erreur": "string" },
+      "etats": ["ok", "vide", "absent", "indisponible"],
+      "ligneExigence": { "requis": ["id", "ws", "cle", "libelle", "coche", "maillons", "mot", "contradictions", "mentions", "niveauPhase"] },
+      "maillon": { "requis": ["etat", "niveau", "sources"] },
+      "commit": { "requis": ["h7", "jour", "sujet"] },
+      "entreeMemoire": { "requis": ["cle", "chemin", "agent", "name", "type", "jour", "sortants", "entrants", "nbSortants", "nbEntrants", "horsIndex", "sansEntrant", "cheminsAbsents"] },
+      "interdits": ["doing", "mandat", "messages", "outils", "fil", "description", "corps", "texte"]
     }
   },
   "claudeCode": {

@@ -33,6 +33,7 @@ import { brancherFluxEtat, VIE_MS } from './vf-cockpit-flux-etat.mjs';
 import os from 'node:os';
 import { ailleurs, demander, REPIT_MS } from './vf-cockpit-etat-officiel.mjs';
 import { arbresGitAsync } from './vf-cockpit-arbres.mjs';
+import { lireTracabilite } from './vf-cockpit-trace.mjs';
 
 let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
 try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
@@ -124,6 +125,7 @@ export const ROUTES = [
   ['/api/vf/journal', lireJournal, HISTORIQUE],
   ['/api/vf/modeles', lireModeles, HISTORIQUE],
   ['/api/vf/state', lireState],
+  ['/api/vf/tracabilite', lireTracabilite],
   ['/api/vf/transcript', lireTranscript, HISTORIQUE],
 ];
 

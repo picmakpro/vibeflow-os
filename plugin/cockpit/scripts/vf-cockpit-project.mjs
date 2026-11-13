@@ -14,6 +14,7 @@ import { trouverPhase, LIBELLES_RESTE, LIBELLES_MISSION, LIBELLES_ETAT } from '.
 import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
 import { detectDrift, commandeCorrectif } from './vf-cockpit-drift.mjs';
 import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
+import { projeterTrace } from './vf-cockpit-trace-collecte.mjs';
 
 const ls = lister; // AUDC-A-02 : listage confiné au lab (un dossier lié hors du lab n'est pas listé)
 const DST = { done: 'done', running: 'active', ready: 'todo', blocked: 'todo', failed: 'blocked' }; // dag.sh : blocked = en attente des deps
@@ -65,7 +66,7 @@ export function buildProjectGraph(root, opts = {}) { root = path.resolve(root); 
 function construireGraphe(root, { layout } = {}) {
   layout = layout || planningLayout(root);
   // dérive de format mesurée AVANT la lecture : le panneau propose le correctif au lieu d'une carte vide sans explication
-  const P = readPlanning(root, layout); const { rel, state, reqs } = P; // AUDC-H2 : lu UNE fois, le contrôle de format reçoit cette lecture
+  const P = readPlanning(root, layout, { trace: true }); const { rel, state, reqs } = P; // AUDC-H2 : lu UNE fois, le contrôle de format reçoit cette lecture
   let drift; try { drift = detectDrift(root, layout, P); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}`, erreur: true }; }
   P.phases = fusionner(P.phases, lireAilleurs(root)); // N5 : une phase menée dans un worktree du même dépôt prend l'avancement du worktree si elle y est plus avancée
   const { phases } = P;
@@ -199,7 +200,7 @@ function construireGraphe(root, { layout } = {}) {
   }
   tour.push({ ref: 'root', cible: '#vf-lock', kicker: 'Au travail', title: 'Qui est au travail', note: "Ce point en haut de la page s'anime quand quelqu'un travaille sur le projet, et reste éteint sinon ; un clic ouvre la liste. L'onglet Équipe en montre le détail." });
   const ids = new Set(nodes.map((n) => 'n:' + n.id)), fids = new Set(files.map((f) => 'f:' + f.p));
-  return {
+  const graphe = {
     schema: 'vibeflow/cockpit-project@1',
     meta: { generatedAt: new Date().toISOString(), rootName: path.basename(root), root, audience: 'everyone', agent: 'claude', repos: [], counts: { files: files.length, loc: 0 }, vfTab: 'project',
       kindIcons: KIND_ICONS, kindColors: KIND_COLORS,
@@ -228,6 +229,8 @@ function construireGraphe(root, { layout } = {}) {
     project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files, phaseEtat) },
     nodes, files, routes: [], links: links.filter((l) => [l.a, l.b].every((x) => (x.startsWith('n:') ? ids.has(x) : fids.has(x)))), flows, tour: tour.length >= 2 ? tour : [],
   };
+  // 76-04 (P76-D-31) : champs facultatifs de traçabilité posés sur le graphe ; le jalon mis en avant est celui de `active`, jamais recalculé ailleurs
+  return projeterTrace(graphe, P.trace, { jalonActif: active ? 'n:' + active.id : null, couper: clip, racine: root });
 }
 
 // libellés français des valeurs de `status:` que gsd-core écrit dans STATE.md ; table unique, reprise à l'identique par le navigateur (STATUT de 00-vibeflow.js, parité vérifiée par Q17)
