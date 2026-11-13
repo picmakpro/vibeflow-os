@@ -103,7 +103,8 @@ export function avancement({ ph, fichiers, missions, lire } = {}) {
   return { version: 2, etat, plans: { faits, total }, correctifs, mission: choisir(ms), reste: reste({ ph, fichiers, lire, vivante: lance }) };
 }
 
-// Statut d'une recette (P76-D-14 : la règle de reste() est réutilisée par la traçabilité, jamais réécrite) : la ligne qui commence par `**Statut :`, '' sinon ;
+// Statut d'une recette (P76-D-14 : la règle de reste() est réutilisée par la traçabilité, jamais réécrite) :
+// la ligne qui commence par `**Statut :`, '' sinon ;
 // la recette est faite quand le mot FAITE y figure en mot entier (découpe sur tout ce qui n'est ni lettre ni chiffre).
 export function ligneStatutRecette(txt) { return String(txt || '').split('\n').find((l) => l.startsWith('**Statut :')) || ''; }
 export function recetteFaite(ligne) { return String(ligne || '').split(/[^\p{L}\p{N}]+/u).includes('FAITE'); }
