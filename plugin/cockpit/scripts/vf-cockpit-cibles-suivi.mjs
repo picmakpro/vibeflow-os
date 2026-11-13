@@ -30,10 +30,12 @@ function ouvrir(f) {
 export function creerSuivi({ limites } = {}) {
   const L = { ...LIMITES_CIBLES, ...(limites || {}) }, etats = new Map(), somme = { n: 0 };
   let purgeA = 0, resteVrai = false;
-  const neuf = () => ({ taille: -1, mtimeMs: -1, tete: null, curseur: 0, saut: false, complet: false, etat: 'en-construction', cibles: cibleVide(), ver: 0 });
+  const neuf = () => ({ taille: -1, mtimeMs: -1, tete: null, curseur: 0, attente: [], attenteLen: 0, saut: false, complet: false, etat: 'en-construction',
+    cibles: cibleVide(), ver: 0 });
   const compte = (c) => c.ecritures.size + c.lectures.size;
   const reinit = (st) => {
-    somme.n -= compte(st.cibles); st.cibles = cibleVide(); st.curseur = 0; st.saut = false; st.complet = false; st.etat = 'en-construction'; st.ver++;
+    somme.n -= compte(st.cibles); st.cibles = cibleVide(); st.curseur = 0; st.attente = []; st.attenteLen = 0; st.saut = false;
+    st.complet = false; st.etat = 'en-construction'; st.ver++;
   };
 
   function purger(limite) {
@@ -44,31 +46,40 @@ export function creerSuivi({ limites } = {}) {
     }
   }
 
-  // lit les octets ajoutés d'une voie jusqu'à épuisement de la tranche (au moins une ligne complète par visite, pour toujours avancer)
+  // lit les octets ajoutés d'une voie jusqu'à épuisement de la tranche (budget testé à chaque bloc, au moins un bloc par visite pour toujours avancer).
+  // La ligne en cours reste en attente d'une tranche à l'autre (morceaux, jamais recopiés avant la fin de ligne) : coût linéaire, quelle que soit la
+  // longueur de ligne ; une ligne plus longue que LIGNE_MAX est sautée sans être accumulée. Curseur = fin de la dernière ligne complète.
   function lire(st, fd, taille, ctx) {
     const { budget, octets, arbres, defaut, maintenant, cache } = ctx;
-    let pos = st.curseur, pend = Buffer.alloc(0), saut = st.saut, lignes = 0, change = false;
-    while (pos < taille && !(budget() && lignes > 0)) {
+    let pos = st.curseur + st.attenteLen, change = false;
+    const ligne = (buf) => {
+      const l = buf.toString('utf8');
+      if (!l.includes('"tool_use"')) return;
+      let d; try { d = JSON.parse(l); } catch { return; }
+      const [vus, perdu] = plierLigneCibles(st.cibles, d, arbres, defaut, maintenant, cache);
+      if (perdu) st.cibles.tronque = true; // garde:cibles-tronque
+      if (vus) change = true;
+    };
+    for (let premier = true; pos < taille && (premier || !budget()); premier = false) {
       const n = Math.min(BLOC, taille - pos, Math.max(65536, octets - ctx.lus)), b = Buffer.alloc(n), k = fs.readSync(fd, b, 0, n, pos);
       if (!k) break;
       pos += k; ctx.lus += k;
       let chunk = b.subarray(0, k);
-      if (saut) { const i = chunk.indexOf(10); if (i < 0) continue; chunk = chunk.subarray(i + 1); saut = false; }
-      const tout = Buffer.concat([pend, chunk]), dernier = tout.lastIndexOf(10);
-      pend = dernier < 0 ? tout : tout.subarray(dernier + 1);
-      if (dernier >= 0) for (const l of tout.subarray(0, dernier).toString('utf8').split('\n')) {
-        lignes++;
-        if (!l.includes('"tool_use"') || l.length > LIGNE_MAX) continue;
-        let d; try { d = JSON.parse(l); } catch { continue; }
-        const [vus, perdu] = plierLigneCibles(st.cibles, d, arbres, defaut, maintenant, cache);
-        if (perdu) st.cibles.tronque = true; // garde:cibles-tronque
-        if (vus) change = true;
+      if (st.saut) { const i = chunk.indexOf(10); if (i < 0) { st.curseur = pos; continue; } chunk = chunk.subarray(i + 1); st.saut = false; }
+      const premierNl = chunk.indexOf(10);
+      if (premierNl < 0) {
+        st.attente.push(chunk); st.attenteLen += chunk.length;
+        if (st.attenteLen > LIGNE_MAX) { st.attente = []; st.attenteLen = 0; st.saut = true; st.curseur = pos; } // garde:cibles-ligne-max
+        continue;
       }
-      if (pend.length > LIGNE_MAX) { pend = Buffer.alloc(0); saut = true; }
+      if (st.attenteLen + premierNl <= LIGNE_MAX) ligne(Buffer.concat([...st.attente, chunk.subarray(0, premierNl)]));
+      st.attente = []; st.attenteLen = 0;
+      const dernierNl = chunk.lastIndexOf(10);
+      if (dernierNl > premierNl) for (const l of chunk.subarray(premierNl + 1, dernierNl).toString('utf8').split('\n')) ligne(Buffer.from(l));
+      const reste = chunk.subarray(dernierNl + 1);
+      if (reste.length) { st.attente.push(reste); st.attenteLen = reste.length; }
+      st.curseur = pos - st.attenteLen; // garde:cibles-curseur
     }
-    const fin = saut ? pos : pos - pend.length;
-    st.curseur = fin; // garde:cibles-curseur
-    st.saut = saut;
     return { complet: pos >= taille, change };
   }
 
@@ -91,7 +102,7 @@ export function creerSuivi({ limites } = {}) {
         if (!o) continue;
         try {
           const tete = teteDe(o.fd, o.st.size);
-          if (st.taille >= 0 && (o.st.size < st.curseur || (st.tete !== null && tete !== st.tete))) reinit(st);
+          if (st.taille >= 0 && (o.st.size < st.curseur + st.attenteLen || (st.tete !== null && tete !== st.tete))) reinit(st);
           ctx.defaut = arbreDeNom(arbres, v.arbre);
           const r = lire(st, o.fd, o.st.size, ctx);
           st.tete = tete; st.taille = o.st.size; st.mtimeMs = ls.mtimeMs; st.complet = r.complet;
@@ -109,6 +120,7 @@ export function creerSuivi({ limites } = {}) {
     },
     version: (id) => (etats.has(id) ? etats.get(id).ver : 0),
     reste: () => resteVrai,
+    enAttente: (id) => (etats.has(id) ? etats.get(id).attenteLen : 0), // octets de la ligne en cours, jamais plus de LIGNE_MAX
     total: () => somme.n,
     oublier(gardes) { for (const [id, st] of etats) if (!gardes.has(id)) { somme.n -= compte(st.cibles); etats.delete(id); } },
   };
