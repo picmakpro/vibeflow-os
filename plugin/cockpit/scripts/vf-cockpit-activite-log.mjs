@@ -43,7 +43,7 @@ export function fusionner(nouveaux, anciens, plafond) {
   const vus = new Set(), tous = [];
   for (const c of [...nouveaux, ...anciens]) if (!vus.has(c.h)) { vus.add(c.h); tous.push(c); }
   tous.sort((a, b) => b.at - a.at);
-  return { commits: tous.slice(0, plafond), coupe: tous.length > plafond };
+  return tous.slice(0, plafond);
 }
 
 // ce qui sort de la fenêtre (même règle que `--since` : un commit exactement à la borne reste)

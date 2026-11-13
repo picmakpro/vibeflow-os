@@ -144,7 +144,93 @@ eq('G5', 'G5.2 limite superficielle plus récente que le début de la fenêtre (
 eq('G5', 'G5.3 limite plus ancienne que le début de la fenêtre (95 j) : pas partiel', await part(sup5), false);
 eq('G5', 'G5.4 dépôt complet : pas partiel', await part(rl), false);
 
-// FIN_G1_G5
+// ---- G6 : couplage aux bornes (unitaire, commits synthétiques) ----
+const co = (...chemins) => ({ h: H40, at: 1, chemins });
+const rep = (n, ...chemins) => Array.from({ length: n }, () => co(...chemins));
+const seul = (n, p) => rep(n, p);
+const paire = (a, b, communes, soloA, soloB) => [...rep(communes, a, b), ...seul(soloA, a), ...seul(soloB, b)];
+const cp = (commits, options) => A.couplage(commits, options);
+eq('G6', 'G6.1 défauts exportés : 5 communes, 5 révisions, degré 30, 30 fichiers, 5 voisins', A.SEUILS_COUPLAGE, { minCommunes: 5, minRevs: 5, minDegre: 30, maxFichiers: 30, voisins: 5 });
+eq('G6', 'G6.2 quatre révisions communes : exclu ; cinq : gardé', [cp(paire('a', 'b', 4, 0, 0)), cp(paire('a', 'b', 5, 0, 0))], [[], [['a', 'b', 5, 100]]]);
+eq('G6', 'G6.3 degré 29 % : exclu ; 30 % : gardé (communes et révisions identiques par ailleurs)', [cp(paire('a', 'b', 29, 71, 71)), cp(paire('a', 'b', 30, 70, 70))], [[], [['a', 'b', 30, 30]]]);
+const bloc = (n, nb) => Array.from({ length: nb }, () => co(...Array.from({ length: n }, (_, i) => `g${String(i).padStart(2, '0')}`)));
+eq('G6', 'G6.4 commit de 30 fichiers : compté ; de 31 fichiers : écarté', [cp(bloc(30, 5)).length > 0, cp(bloc(31, 5))], [true, []]);
+eq('G6', 'G6.5 un fichier de la liste de bruit ne forme aucune paire ; le même schéma sur un fichier ordinaire en forme une', [cp(paire('a.js', 'CHANGELOG.md', 5, 0, 0)), cp(paire('a.js', 'sous/dossier/package-lock.json', 5, 0, 0)), cp(paire('a.js', 'b.js', 5, 0, 0)).length], [[], [], 1]);
+const hub = cp(Array.from({ length: 5 }, () => co('h', 'x1', 'x2', 'x3', 'x4', 'x5', 'x6', 'x7', 'x8')));
+const occ = new Map(); for (const t of hub) for (const p of t.slice(0, 2)) occ.set(p, (occ.get(p) || 0) + 1);
+eq('G6', 'G6.6 au plus 5 voisins par fichier (neuf fichiers co-modifiés, 36 paires possibles) ; le centre en garde exactement 5', [Math.max(...occ.values()), occ.get('h')], [5, 5]);
+eq('G6', 'G6.7 tri par degré décroissant puis par chemin', cp([...paire('r', 's', 6, 4, 4), ...paire('t', 'u', 5, 7, 7), ...paire('p', 'q', 5, 0, 0)]), [['p', 'q', 5, 100], ['r', 's', 6, 60], ['t', 'u', 5, 42]]);
+eq('G6', 'G6.8 liste de bruit exportée : dix noms, dont CHANGELOG.md, VERSION et un fichier de verrou', [A.BRUIT.length, ['CHANGELOG.md', 'VERSION', 'package-lock.json'].every((n) => A.BRUIT.includes(n))], [10, true]);
+const deux = paire('a', 'b', 4, 1, 1); // 4 communes, 5 révisions chacun
+eq('G6b', 'G6b.1 les deux contrôles sont indépendants : minRevs 6 exclut (communes 4 >= 3, révisions 5 < 6)', cp(deux, { minRevs: 6, minCommunes: 3 }), []);
+eq('G6b', 'G6b.2 minRevs 5 et minCommunes 3 : gardé ; défauts : exclu par les communes seules', [cp(deux, { minRevs: 5, minCommunes: 3 }), cp(deux)], [[['a', 'b', 4, 80]], []]);
+
+// ---- G7 à G9 : espion d'argv (`binaire`), cache par clé, incrémental, dégradations ----
+const GITREEL = execFileSync('/bin/sh', ['-c', 'command -v git'], { encoding: 'utf8' }).trim();
+const JOURNAL = path.join(WORK, 'espion.log');
+fs.writeFileSync(JOURNAL, '');
+const script = (nom, corps) => { const f = path.join(WORK, nom); fs.writeFileSync(f, `#!/bin/sh\n${corps}\n`, { mode: 0o755 }); return f; };
+const ESPION = script('espion-git', `printf '%s\\t' "$@" >> '${JOURNAL}'\nprintf '\\n' >> '${JOURNAL}'\nexec '${GITREEL}' "$@"`);
+const ECHEC_LOG = script('echec-log-git', `for a in "$@"; do [ "$a" = log ] && exit 3; done\nexec '${GITREEL}' "$@"`);
+const ORDURE_LOG = script('ordure-log-git', `for a in "$@"; do [ "$a" = log ] && { printf 'abc'; exit 0; }; done\nexec '${GITREEL}' "$@"`);
+const argvs = () => fs.readFileSync(JOURNAL, 'utf8').split('\n').filter(Boolean).map((l) => l.split('\t').filter((x, i, t) => i < t.length - 1 || x !== ''));
+const HIST = [];
+const vider = () => { HIST.push(...argvs()); fs.writeFileSync(JOURNAL, ''); };
+const appels = (sous) => argvs().filter((a) => a.includes(sous));
+const aire = (o) => JSON.stringify({ f: o.fenetre, c: o.chauds, k: o.couplage, p: o.paliers });
+
+const ri = init('rinc');
+let ti = 60;
+const lot = (msg, ...chemins) => touch(ri, msg, (ti -= 2), ...chemins);
+for (let i = 0; i < 6; i++) lot(`i${i}`, 'a.txt', 'b.txt');
+lot('seul', 'c.txt');
+const locI = new Map([['a.txt', 3], ['b.txt', 2], ['c.txt', 1], ['a2.txt', 3], ['d.txt', 1]]);
+vider();
+const s1 = await A.calculerGit(ri, { loc: locI, binaire: ESPION });
+eq('G7', 'G7.1 premier calcul : exactement un `log`, et une clé sha256 recalculée à partir de `for-each-ref` et de `worktree list`', [appels('log').length, /^[0-9a-f]{64}$/.test(s1.cle), appels('for-each-ref').length, appels('worktree').length], [1, true, 1, 1]);
+eq('G7', 'G7.2 le couplage de la fixture est non vide (le témoin d\'égalité ci-dessous ne compare pas du vide)', [s1.etat, s1.couplage.length, s1.chauds.length], ['ok', 1, 3]);
+vider();
+const s2 = await A.calculerGit(ri, { loc: locI, binaire: ESPION, etatPrecedent: s1 });
+eq('G7', 'G7.3 HEAD et refs inchangés : zéro `log` relancé, résultat identique, la clé est pourtant relue (un `for-each-ref` et un `worktree list`)', [appels('log').length, appels('for-each-ref').length, appels('worktree').length, aire(s2) === aire(s1)], [0, 1, 1, true]);
+const s2b = await A.calculerGit(ri, { loc: new Map([['a.txt', 30], ['b.txt', 2]]), binaire: ESPION, etatPrecedent: s1 });
+eq('G7', 'G7.4 clé inchangée mais `loc` du scan différent : les points chauds suivent, sans nouveau `log`', [appels('log').length, s2b.chauds[0].slice(0, 3)], [0, ['a.txt', 6, 30]]);
+G(ri, 'branch', 'autre');
+vider();
+const s3 = await A.calculerGit(ri, { loc: locI, binaire: ESPION, etatPrecedent: s2 });
+eq('G7', 'G7.5 une ref de plus (HEAD inchangé) : la clé change, le résultat reste identique, toujours aucun `log` (rien de neuf à lire)', [s3.cle !== s2.cle, appels('log').length, aire(s3) === aire(s2)], [true, 0, true]);
+
+// G8 : incrémental quand l'ancien HEAD est un ancêtre, relecture complète sinon
+const ancienHead = G(ri, 'rev-parse', 'HEAD').trim();
+lot('apres1', 'a.txt', 'b.txt'); C(ri, 'renomme', (ti -= 2), { mv: [['a.txt', 'a2.txt']] }); lot('apres2', 'a2.txt', 'b.txt', 'd.txt');
+const nouvelHead = G(ri, 'rev-parse', 'HEAD').trim();
+vider();
+const s4 = await A.calculerGit(ri, { loc: locI, binaire: ESPION, etatPrecedent: s3 });
+const logs4 = appels('log');
+eq('G8', 'G8.1 ancien HEAD ancêtre : un seul `log`, limité à ancien..HEAD', [logs4.length, logs4[0]?.includes(`${ancienHead}..${nouvelHead}`)], [1, true]);
+const complet4 = await A.calculerGit(ri, { loc: locI });
+eq('G8', 'G8.2 les agrégats de l\'incrémental sont identiques à ceux d\'une relecture complète (renommage compris)', aire(s4) === aire(complet4), true);
+eq('G8', 'G8.3 le témoin d\'égalité n\'est pas vide : l\'alias du renommage agit sur les anciens commits', [s4.chauds.find((t) => t[0] === 'a2.txt')?.[1], s4.chauds.some((t) => t[0] === 'a.txt'), s4.couplage.length > 0], [9, false, true]);
+G(ri, 'reset', '-q', '--hard', 'HEAD~2'); lot('divergent', 'd.txt');
+vider();
+const s5 = await A.calculerGit(ri, { loc: locI, binaire: ESPION, etatPrecedent: s4 });
+const logs5 = appels('log');
+eq('G8', 'G8.4 ancien HEAD non ancêtre (réécriture) : relecture complète, aucun `..` dans le `log`', [logs5.length, logs5[0]?.some((x) => x.includes('..'))], [1, false]);
+eq('G8', 'G8.5 la relecture complète rend les agrégats d\'un calcul neuf', aire(s5) === aire(await A.calculerGit(ri, { loc: locI })), true);
+
+// G9 : aucun argv interdit, dégradations sans champ partiel
+const tous = [...HIST, ...argvs()];
+const interdit = (x) => ['status', 'diff', 'fetch', 'pull', 'push', '--follow'].includes(x);
+eq('G9', 'G9.1 aucun argv journalisé ne contient status, diff, fetch ni --follow (journal non vide)', [tous.length > 8, tous.filter((a) => a.some(interdit)).length], [true, 0]);
+eq('G9', 'G9.2 erreur de `log` (sortie 3) : indisponible, sans champ partiel', await A.calculerGit(ri, { loc: locI, binaire: ECHEC_LOG }), { etat: 'indisponible' });
+eq('G9', 'G9.3 sortie de `log` désalignée : indisponible, sans champ partiel', await A.calculerGit(ri, { loc: locI, binaire: ORDURE_LOG }), { etat: 'indisponible' });
+eq('G9', 'G9.4 échéance dépassée : indisponible, sans champ partiel', await A.calculerGit(ri, { loc: locI, fin: Date.now() - 1 }), { etat: 'indisponible' });
+eq('G9', 'G9.5 sortie tronquée (maxBuffer de 600 octets sur un journal plus long) : indisponible, sans champ partiel', await A.calculerGit(r1, { loc: loc1, maxBuffer: 600 }), { etat: 'indisponible' });
+const horsDepot = path.join(WORK, 'horsdepot'); fs.mkdirSync(horsDepot);
+eq('G9', 'G9.6 hors dépôt, dossier absent, git introuvable : absent', [(await A.calculerGit(horsDepot, { loc: locI })).etat, (await A.calculerGit(path.join(WORK, 'inexistant'), { loc: locI })).etat, (await A.calculerGit(ri, { loc: locI, binaire: path.join(WORK, 'pas-de-git') })).etat], ['absent', 'absent', 'absent']);
+const vide = init('rvide');
+eq('G9', 'G9.7 dépôt sans commit : vide, aucune ligne rendue', await A.calculerGit(vide, { loc: locI }).then((o) => [o.etat, o.chauds, o.couplage]), ['vide', [], []]);
+
+// FIN_G6_G9
 bilan();
 FIN_SONDE
 
