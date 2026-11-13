@@ -36,15 +36,37 @@ export function citations(message) {
   return { adr: uniques(s.match(CIT_ADR) || []), decisions: uniques(s.match(CIT_DEC) || []) };
 }
 
-// 76-02 tâche 2 : écrite après son témoin rouge
-export function definitionsRegistre(txt, { phase, ws, fichier, couper } = {}) { void phase; void ws; void fichier; void couper; void txt; void DEF; return []; }
+// Lignes de définition `- **<ID>` d'un registre (hors blocs de code et hors titres `###`), quel que soit le préfixe. Première définition gardée, suivantes comptées en `amendee`.
+// `phase` (identifiant de nœud) et `couper` (coupe au mot) viennent de l'appelant ; `ws` et `fichier` lui restent, ils ne servent pas la clé.
+export function definitionsRegistre(txt, { phase, couper } = {}) {
+  const coupe = typeof couper === 'function' ? couper : (s, n) => s.slice(0, n);
+  const vues = new Map(), out = [];
+  for (const { l, n } of lignesHorsCode(txt)) {
+    const m = DEF.exec(l); if (!m) continue;
+    const id = m[1], deja = vues.get(id);
+    if (deja) { deja.amendee = true; continue; }
+    const reste = l.slice(m[0].length);
+    const d = { id, cle: `${id}:${phase}`, nue: id.startsWith('D-'), titre: coupe(nettoyer(reste), 80), adr: citations(l).adr, amendee: false, ligne: n };
+    vues.set(id, d); out.push(d);
+  }
+  return out;
+}
 
 // { adrs, definitions, commits } -> { parAdr: Map(id -> { decisions: [cle], commits: [h7] }), parDecision: Map(cle -> { adr: [ids], commits: [h7] }), adrSansSection: [ids] }
 export function relier({ adrs = [], definitions = [], commits = [] } = {}) {
-  const parAdr = new Map(), parDecision = new Map();
+  const parAdr = new Map(), parDecision = new Map(), adrSansSection = [];
   for (const a of adrs) parAdr.set(a.id, { decisions: [], commits: [] });
-  const adrSansSection = [];
   const fiche = (id) => { if (!parAdr.has(id)) { parAdr.set(id, { decisions: [], commits: [] }); adrSansSection.push(id); } return parAdr.get(id); };
-  for (const c of commits) for (const id of c.adr || []) { const e = fiche(id); if (!e.commits.includes(c.h7)) e.commits.push(c.h7); }
+  const ajoute = (liste, v) => { if (!liste.includes(v)) liste.push(v); };
+  const parId = new Map(); // identifiant préfixé -> clés des définitions qui le portent
+  for (const d of definitions) {
+    parDecision.set(d.cle, { adr: [...d.adr], commits: [] });
+    for (const id of d.adr) ajoute(fiche(id).decisions, d.cle); // arête lue dans la ligne de définition
+    if (!d.nue) parId.set(d.id, [...(parId.get(d.id) || []), d.cle]);
+  }
+  for (const c of commits) {
+    for (const id of c.adr || []) ajoute(fiche(id).commits, c.h7);
+    for (const id of c.decisions || []) for (const cle of parId.get(id) || []) ajoute(parDecision.get(cle).commits, c.h7); // une nue n'a jamais de commit (ADR-075)
+  }
   return { parAdr, parDecision, adrSansSection };
 }
