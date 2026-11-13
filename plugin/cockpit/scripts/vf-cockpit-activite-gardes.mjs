@@ -14,6 +14,8 @@ import path from 'node:path';
 import { lireConfine, read, lister } from './vf-cockpit-planning.mjs';
 import { lancerGitAsync, finDans } from './vf-cockpit-paths.mjs';
 
+const BUDGET_MS = 8; // tranche de calcul avant de rendre la main à la boucle d'événements du serveur (calculerGardes cède entre deux fichiers)
+const PLAFOND_TRAVAIL = 30e6; // motifs x fichiers ; au-delà : `tronque`, jamais une liste partielle présentée comme complète
 const MAX_ENTREES = 20000; // entrées parcourues sous plugin/ et scripts/ ; au-delà : indisponible, jamais une liste partielle
 const IGNORES = new Set(['.git', 'node_modules']);
 const comparer = (a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)); // LC_ALL=C : l'ordre des octets UTF-8 = celui des points de code
@@ -137,12 +139,14 @@ function motifsDe(texte) {
 }
 
 // --- contexte : lu une fois par calcul (suites, gates, fichiers suivis, motifs) ---
-async function suivisDe(lab, fin) { // `git ls-files -z` : refusé, hors délai, tronqué, git absent, hors dépôt → null (jamais une liste devinée)
-  const r = await lancerGitAsync(lab, ['ls-files', '-z'], { fin, maxBuffer: 64 << 20 });
+// `git ls-files -z` : refusé, hors délai, tronqué, git absent, hors dépôt → null (jamais une liste devinée) ; `binaire` : l'option d'essai de la route
+async function suivisDe(lab, fin, binaire) {
+  const opts = { fin, maxBuffer: 64 << 20, ...(binaire ? { binaire } : {}) };
+  const r = await lancerGitAsync(lab, ['ls-files', '-z'], opts);
   return r.ok ? r.sortie.split('\0').filter(Boolean) : null;
 }
-export async function contexteGardes(lab, { fin } = {}) {
-  const liste = await suivisDe(lab, fin ?? finDans(20000));
+export async function contexteGardes(lab, { fin, binaire } = {}) {
+  const liste = await suivisDe(lab, fin ?? finDans(20000), binaire);
   if (!liste) return { etat: 'indisponible', motif: 'git ls-files' };
   try {
     return lireConfine(lab, () => {
@@ -182,15 +186,21 @@ export function suitesQuiNomment(f, ctx) {
 }
 
 // carteCode : le graph.json du cockpit (`meta.vfCodeExtractor`, `files[].p` chemin, `l` langage ou « docs », `st` « prevu » pour une carte prévue).
-// → { etat: 'ok' | 'non-lues' | 'indisponible', gardes: [[chemin, nbSuites, estGarde 1|0]] (code seulement : ni doc, ni suite, ni fixture, ni prévu),
+// Le calcul est COOPÉRATIF : il cède la main toutes les `budgetMs` (8 ms) et, au-delà de `plafond` (motifs x fichiers), rend `tronque` sans rien calculer.
+// → { etat: 'ok' | 'non-lues' | 'indisponible' | 'tronque',
+//     gardes: [[chemin, nbSuites, estGarde 1|0]] (code seulement : ni doc, ni suite, ni fixture, ni prévu),
 //     estGarde: [chemin] (fichiers de la carte appartenant aux six classes) }. Lab non VibeFlow : « non-lues », jamais « tout sans témoin » (P75-D-17).
 export async function calculerGardes(lab, carteCode, opts = {}) {
   const vide = (etat) => ({ etat, gardes: [], estGarde: [] });
   if (!carteCode || !carteCode.meta || carteCode.meta.vfCodeExtractor !== 'vibeflow') return vide('non-lues');
   const r = opts.ctx ? { etat: 'ok', ctx: opts.ctx } : await contexteGardes(lab, opts);
   if (r.etat !== 'ok') return vide(r.etat);
-  const gardes = [], garde = [];
-  for (const f of carteCode.files || []) {
+  const fichiers = Array.isArray(carteCode.files) ? carteCode.files : [];
+  if (r.ctx.globs.size * fichiers.length > (opts.plafond ?? PLAFOND_TRAVAIL)) return vide('tronque'); // garde:gardes-plafond
+  const budget = opts.budgetMs ?? BUDGET_MS, gardes = [], garde = [];
+  let debut = Date.now();
+  for (const f of fichiers) {
+    if (Date.now() - debut >= budget) { await new Promise((ok) => setImmediate(ok)); debut = Date.now(); } // garde:gardes-cession
     if (!f || typeof f.p !== 'string' || f.st === 'prevu') continue;
     const g = estGarde(f.p);
     if (g) garde.push(f.p);
