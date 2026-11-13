@@ -74,3 +74,33 @@ Suite : `bash plugin/cockpit/scripts/tests/test-cockpit-tracabilite-page.sh` (10
 ```
 
 Verts dès la tâche 1 (comportement déjà livré) : C1.0 à C1.2, C1.6a, C1.6b, C1.10a. Mutants M-PLAFOND, M-RECOMPTE, M-CORAIL, M-EXCLUSION : levés (régime allégé, consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale).
+
+## Tâche 3 — C2.1 à C2.10 (code de la tâche 2 seul : ni panneau d'exigence, ni liste, ni pile, ni Échap)
+
+Suite : 34 PASS, 20 FAIL (C1.x tous verts). Rouges par l'assertion (attendu, obtenu), extraits :
+
+```
+  ❌ FAIL — C2.1a — clic sur REQ-16 : panneau d'exigence, titre REQ-16, Chaîne sans section « Contradictions », SUMMARY en contradiction dite sur sa ligne
+     attendu: [true|REQ-16|Chaîne,Décisions citées,Preuves,Rattachement|true]
+     obtenu:  [absent : Cannot read properties of null (reading 'titre')]
+  ❌ FAIL — C2.2a — « + 26 autres exigences » ouvre « Exigences de la Phase 5 » : 30 lignes, « 1 à 30 sur 31 exigences », Précédentes désactivé ; Suivantes : 1 ligne, focus sur le titre
+     attendu: [30|1 à 30 sur 31 exigences|true|1|31 à 31 sur 31 exigences|true]
+     obtenu:  [absent : Cannot read properties of undefined (reading 'n')]
+  ❌ FAIL — C2.3a — Entrée sur une ligne : focus sur le titre du panneau ; un clic souris laisse le focus où il est
+     attendu: [true|vf-trace-exigence-REQ-16|true]
+     obtenu:  [false||true]
+  ❌ FAIL — C2.9a — REQ-11 : sections dans l'ordre, une ligne par décision définie et par ADR avec son titre, « D-04 » absent (la route le rend en decisionsNues, la ligne du registre le contient), aucun glyphe
+     attendu: [Chaîne,Décisions citées,Preuves,Rattachement|P90-D-01,ADR-001|true|true|false|1|true|0]
+     obtenu:  [absent : Cannot read properties of undefined (reading 'pan')]
+  ❌ FAIL — C2.9d — un clic sur une preuve ouvre « Preuves de la Phase 1 » positionné sur elle (aria-current, chemin relatif copiable) ; le contenu du fichier n'est ni dans le DOM ni dans les réponses (témoin : il est dans le fichier du lab)
+     attendu: [[".planning/workstreams/x/phases/01-socle/01-VERIFICATION.md"]|false|false|true]
+     obtenu:  [absent : Cannot read properties of undefined (reading 'cur')]
+  ❌ FAIL — C2.5 — section Jalon ouverte : un SUMMARY modifié dans le lab remplace le contenu, la section reste ouverte, le défilement est gardé ; refermée : aucune requête vue=jalon
+     attendu: [true|true|true|0]
+     obtenu:  [false|true|true|0]
+  ❌ FAIL — C2.7 — exigence retirée du registre puis relue : « Cet objet n'existe plus dans le dépôt. Le bouton Retour de l'en-tête rouvre la vue précédente. »
+     attendu: [true]
+     obtenu:  [false]
+```
+
+Obtenu typique : `clic : « #vf-trace-phase .vf-trace-ligne[data-trace="exigence:REQ-11"] » absent` / panneau absent (`pan: null`), Retour « indisponible » (aucun panneau empilé). Mutants M-INNERHTML, M-PREUVE-CORPS, M-NUE-EXIG, M-EMPILER, M-EMPILER-NOEUD, M-EXPORT, M-REF-GARDEE, M-CLE-CRUE : levés (régime allégé, consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale).

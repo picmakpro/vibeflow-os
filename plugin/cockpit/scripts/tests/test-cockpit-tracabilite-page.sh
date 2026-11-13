@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # test-cockpit-tracabilite-page.sh — la traçabilité au cockpit, côté page : section de phase, preuves attachées, section « Jalon », panneau d'une exigence (76-06)
 #   C1.0-C1.2 le fichier neuf est servi, la ligne d'une exigence dans le vrai panneau (serveur réel, Chrome sans tête)
+#   C2.1-C2.10 panneau d'une exigence, liste paginée, pile Retour, clavier, onglets, confidentialité, décisions et preuves (chrome-tracabilite-exigence.mjs)
 #   C1.3-C1.12 glyphes, bilan, seuils, nom accessible, entrée haute, preuves attachées, section Jalon, états, typographie, hauteurs
 # Lab fabriqué dans mktemp (aucun chemin du poste dans les fichiers écrits), HOME jetable, isolation git. Sans navigateur : suite SAUTÉE (jamais un vert à vide).
 # Exit 0 si tout passe, 1 sinon.
@@ -38,7 +39,8 @@ mklab() {
   { printf '# Roadmap\n\n## Milestones\n\n- 🚧 **v1** - Phases 1-3 (in progress)\n\n## Phases\n\n'
     for i in 1 2 3; do printf -- '- [ ] **Phase %s: P%s** - p\n' "$i" "$i"; done; printf '\n'
     for i in 1 2 3; do printf '### Phase %s: P%s\n**Goal**: but %s\n**Depends on**: Nothing\n\n' "$i" "$i" "$i"; done
-    printf -- '- [ ] **Phase 90: P90** - p\n\n### Phase 90: P90\n**Goal**: but 90\n**Depends on**: Nothing\n'; } > "$B/ROADMAP.md"
+    printf -- '- [ ] **Phase 90: P90** - p\n\n### Phase 90: P90\n**Goal**: but 90\n**Depends on**: Nothing\n'
+    printf -- '- [ ] **Phase 5: P5** - p\n\n### Phase 5: P5\n**Goal**: but 5\n**Depends on**: Nothing\n'; } > "$B/ROADMAP.md"
   printf -- '---\nmilestone: v1\nstatus: executing\ncurrent_phase: 1\n---\n' > "$B/STATE.md"
   wr "$B/REQUIREMENTS.md" <<'MD'
 # Exigences
@@ -63,6 +65,7 @@ mklab() {
 | REQ-17 | Phase 1 | Complete |
 | REQ-99 | Phase 1 | Pending |
 MD
+  { printf -- '- [ ] **REQ-501**: <img src=x onerror="window.__xss=1">\n'; for i in $(seq 502 531); do printf -- '- [ ] **REQ-%s**: Exigence %s de la phase cinq\n' "$i" "$i"; done; } >> "$B/REQUIREMENTS.md"
   P="$B/phases/01-socle"; mkplan "$P/01-01-PLAN.md" '[REQ-11, REQ-13, REQ-14, REQ-15, REQ-16]'; mksum "$P/01-01-SUMMARY.md" 'requirements-completed: REQ-11'
   mkplan "$P/01-02-PLAN.md" '[REQ-12]'; mksum "$P/01-02-SUMMARY.md" 'note: sans champ d exigence'
   printf -- '---\nstatus: passed\n---\n# Vérification\n\n| Exigence | Preuve |\n|----------|--------|\n| REQ-11 | ok |\n\nPREUVE-MARQUEUR-76\n' > "$P/01-VERIFICATION.md"
@@ -73,6 +76,7 @@ MD
   mksum "$P/03-01-SUMMARY.md" 'requirements-completed: REQ-02'
   printf -- '---\nstatus: passed\n---\n# Vérification\n\n| REQ-02 | ok |\n' > "$P/03-VERIFICATION.md"; printf '# Recette\n\n**Statut : faite**\n\nREQ-02.\n' > "$P/03-RECETTE-HUMAINE.md"
   printf -- '---\nstatus: secured\n---\n# Sécurité\n' > "$P/03-SECURITY.md"; printf -- '---\nstatus: ok\n---\n# Validation\n' > "$P/03-VALIDATION.md"
+  P="$B/phases/05-cinq"; mkplan "$P/05-01-PLAN.md" "[$(seq -s, -f 'REQ-%g' 501 531)]" 'critère <b>XSS-CRIT-76</b> du plan cinq'; printf '# Trace rouge\n' > "$P/05-01-RED-TRACE.md"
   wr "$B/phases/90-registre/90-CONTEXT.md" <<'MD'
 # Contexte
 
@@ -132,6 +136,37 @@ assert_eq "C1.12a — bureau : section ≤ 888 px (repli fermé) et ≤ 1 306 px
 assert_eq "C1.12b — feuille de 390 px : section ≤ 614 px (repli fermé) et ≤ 968 px (ouvert), bornes de l'UI-SPEC § 2.3, aucun défilement horizontal" "$(E1 '(j.c112f.ferme<=614)+"|"+(j.c112f.ouvert<=968)+"|"+j.c112f.defilement')" "true|true|true"
 assert_eq "C1.x — aucune section n'a échoué par erreur de harnais" "$(E1 'JSON.stringify(j.erreurs)')" "{}"
 
+
+# --- panneau d'une exigence, liste paginée, pile, clavier, onglets, confidentialité (second harnais, sur le même lab : e5 et e7 modifient ses fichiers, en dernier) ---
+H2="$WORK/h2.json"; node "$HERE_T/chrome-tracabilite-exigence.mjs" "$CHROME" "http://127.0.0.1:$VF_PORT" "$LAB" ${SECTIONS2:-} > "$H2" 2> "$WORK/h2.err"
+E2() { node "$AUX/ev.mjs" "$1" < "$H2"; }
+[ -n "${SONDE:-}" ] && { cat "$H2"; cat "$WORK/h2.err"; }
+echo "=== C2.1 à C2.10 — le panneau d'une exigence et ce qui s'y relie ==="
+assert_eq "C2.1a — clic sur REQ-16 : panneau d'exigence, titre REQ-16, Chaîne sans section « Contradictions », SUMMARY en contradiction dite sur sa ligne" "$(E2 'j.e1pose+"|"+j.e1a.pan.titre+"|"+j.e1a.pan.sections.join()+"|"+j.e1a.chaine.filter(m=>m.startsWith("SUMMARY")).join().includes("contradiction : case cochée au registre des exigences, aucun SUMMARY lu")')" "true|REQ-16|Chaîne,Décisions citées,Preuves,Rattachement|true"
+assert_eq "C2.1b — le Retour de l'en-tête nomme la phase quittée (empilée une fois) ; la puce de plan « 01-01 » ouvre le plan et le Retour nomme REQ-16" "$(E2 '(j.e1a.back.label.startsWith("Retour")&&j.e1a.back.label.endsWith(j.e1nom))+"|"+j.e1b.sel.startsWith("f:")+"|"+j.e1b.back.label.endsWith("REQ-16")')" "true|true|true"
+assert_eq "C2.1c — Retour : REQ-16 rouvert sans réempiler, le Retour nomme la phase ; Retour : la phase, pile vide (Retour désactivé), aucune vue répétée" "$(E2 'j.e1c.pan.titre+"|"+j.e1c.back.label.endsWith(j.e1nom)+"|"+j.e1d.sel+"|"+j.e1d.sec+"|"+j.e1d.back.dis')" "REQ-16|true|n:ph-1|true|true"
+assert_eq "C2.1d — « Mentions » et « Rattachement » (REQ-14, sans ligne de traçabilité) : phrase neutre, ordre des cinq sections" "$(E2 'j.e1mentions.sections.join()+"|"+j.e1mentions.texte.includes("Aucune ligne du tableau de traçabilité ne la nomme.")')" "Chaîne,Décisions citées,Preuves,Mentions,Rattachement|true"
+assert_eq "C2.2a — « + 26 autres exigences » ouvre « Exigences de la Phase 5 » : 30 lignes, « 1 à 30 sur 31 exigences », Précédentes désactivé ; Suivantes : 1 ligne, focus sur le titre" "$(E2 'j.e2p1.n+"|"+j.e2p1.compte+"|"+j.e2p1.prec+"|"+j.e2p2.n+"|"+j.e2p2.compte+"|"+j.e2foc')" "30|1 à 30 sur 31 exigences|true|1|31 à 31 sur 31 exigences|true"
+assert_eq "C2.2b — « + 1 autre fichier de preuve » ouvre « Preuves de la Phase 3 » avec les critères du plan en texte" "$(E2 '["Preuves de la Phase 3","Critères du plan","3 critères","critère un du plan 01"].map(x=>j.e2pr.includes(x)).join()')" "true,true,true,true"
+assert_eq "C2.3a — Entrée sur une ligne : focus sur le titre du panneau ; un clic souris laisse le focus où il est" "$(E2 'j.e3titre+"|"+j.e3foc+"|"+j.e3souris')" "true|vf-trace-exigence-REQ-16|true"
+assert_eq "C2.3b — Échap : pile non vide, Retour commun (la phase revient) ; surcouche ouverte, rien ; pile vide, panneau d'objet fermé et focus rendu à la ligne d'origine" "$(E2 'JSON.stringify(j.e3retour)+"|"+j.e3surcouche+"|"+JSON.stringify(j.e3ferme)')" '{"sel":"n:ph-1","sec":true,"pan":false}|true|{"pan":false,"sec":true,"foc":"exigence:REQ-16"}'
+assert_eq "C2.4 — Projet, Code, Projet : l'abonnement à planning est rendu sur Code puis repris une fois, une seule section et une seule entrée, un seul Jalon, plus d'installation de la 76 sur Code" "$(E2 '(j.e4code.abo===j.e4abo1-1)+"|"+(j.e4abo3===j.e4abo1)+"|"+j.e4code.vt+"|"+j.e4code.sec+"|"+j.e4un.sec+"|"+j.e4un.entree+"|"+j.e4jalon')" "true|true|true|false|1|1|1"
+assert_eq "C2.10a — après l'aller-retour, les panneaux reliés s'empilent et reviennent comme à la première arrivée (VF_PANNEAU lu à l'appel)" "$(E2 'j.e4pile.label.startsWith("Retour")+"|"+j.e4pile.dis+"|"+j.e4retour')" "true|false|n:ph-2"
+assert_eq "C2.10c — clés bien formées : REQ-01, ph-1@deux et REQ-01@deux passent la grammaire de lireJson (aucun refus à statut 0) et la requête porte « %40 »" "$(E2 'j.e4cles.join()+"|"+(j.e4req>=2)')" "ok,absent,absent|true"
+assert_eq "C2.6a — le texte d'une exigence à balise s'affiche littéralement dans la liste et dans le panneau : aucun script exécuté, aucune image posée" "$(E2 'j.e6.marque+"|"+j.e6.xss+"|"+j.e6.img+"|"+j.e6pan.marque+"|"+j.e6pan.xss+"|"+j.e6pan.img')" "true|undefined|0|true|undefined|0"
+assert_eq "C2.8 — témoin positif d'abord (éléments .vf-trace posés et visibles, moteur présent), puis aucun canevas ni svg dans .vf-trace" "$(E2 '(j.e8.posee>0)+"|"+j.e8.visible+"|"+(j.e8.moteur>0)+"|"+j.e8.dedans')" "true|true|true|0"
+assert_eq "C2.9a — REQ-11 : sections dans l'ordre, une ligne par décision définie et par ADR avec son titre, « D-04 » absent (la route le rend en decisionsNues, la ligne du registre le contient), aucun glyphe" "$(E2 'j.e9.pan.sections.join()+"|"+j.e9.lignes.map(l=>l.id).filter(Boolean).join()+"|"+j.e9.lignes.some(l=>l.txt.includes("première définition"))+"|"+j.e9.lignes.some(l=>l.txt.includes("Premier choix"))+"|"+j.e9.pan.texte.includes("D-04")+"|"+j.e9.nue+"|"+j.e9ledger+"|"+j.e9.glyphes')" "Chaîne,Décisions citées,Preuves,Rattachement|P90-D-01,ADR-001|true|true|false|1|true|0"
+assert_eq "C2.9b — P95-D-09 sans définition : texte non interactif « sans définition lue » ; compteurs « 3 décisions » et « 2 fichiers »" "$(E2 'JSON.stringify(j.e9.inertes)+"|"+j.e9.pan.texte.includes("3 décisions")+"|"+j.e9.pan.texte.includes("2 fichiers")')" '["P95-D-09 sans définition lue"]|true|true'
+assert_eq "C2.9c — un clic sur la ligne P90-D-01 appelle window.VFTrace.ouvrir('decision', clé)" "$(E2 'JSON.stringify(j.e9appel)')" '["decision","P90-D-01:ph-90"]'
+assert_eq "C2.9d — un clic sur une preuve ouvre « Preuves de la Phase 1 » positionné sur elle (aria-current, chemin relatif copiable) ; le contenu du fichier n'est ni dans le DOM ni dans les réponses (témoin : il est dans le fichier du lab)" "$(E2 'JSON.stringify(j.e9preuve.cur)+"|"+j.e9preuve.corps+"|"+j.e9preuve.reseau+"|"+j.e9fichier')" '[".planning/workstreams/x/phases/01-socle/01-VERIFICATION.md"]|false|false|true'
+assert_eq "C2.9e — REQ-02 sans citation : « aucune décision citée » et ce qui la lèverait ; REQ-01 sans preuve : « Aucune preuve lue pour cette exigence… »" "$(E2 'j.e9sans.texte.includes("aucune décision citée")+"|"+j.e9sans.texte.includes("Un identifiant Pnn-D-nn ou ADR-nnn dans la ligne de l\u0027exigence au registre des exigences la relierait.")+"|"+j.e9aucune.texte.includes("Aucune preuve lue pour cette exigence. VERIFICATION, recette ou trace rouge dans le dossier de la phase la relierait.")')" "true|true|true"
+assert_eq "C2.5 — section Jalon ouverte : un SUMMARY modifié dans le lab remplace le contenu, la section reste ouverte, le défilement est gardé ; refermée : aucune requête vue=jalon" "$(E2 'j.e5change+"|"+j.e5apres.ouvert+"|"+j.e5apres.haut+"|"+j.e5ferme')" "true|true|true|0"
+assert_eq "C2.7 — exigence retirée du registre puis relue : « Cet objet n'existe plus dans le dépôt. Le bouton Retour de l'en-tête rouvre la vue précédente. »" "$(E2 '(j.e7||"").includes("Cet objet n\u0027existe plus dans le dépôt. Le bouton Retour de l\u0027en-tête rouvre la vue précédente.")')" "true"
+assert_eq "C2.x — aucune section du second harnais n'a échoué par erreur de harnais" "$(E2 'JSON.stringify(j.erreurs)')" "{}"
+# export : ni le texte d'une exigence, ni celui d'un critère, ni la ligne d'une exigence ; témoin positif : ils sont dans les fichiers du lab et dans le panneau (C2.6a)
+cockpit_exporter "$LAB" "$WORK/export.html" > "$WORK/export.out" 2>&1
+assert_eq "C2.6b — l'export existe et ne porte ni le texte d'une exigence (REQ-501, REQ-14) ni celui d'un critère (XSS-CRIT-76) ni aucune section de traçabilité" "$([ -s "$WORK/export.html" ] && echo "$(grep -c 'onerror=' "$WORK/export.html")|$(grep -c 'XSS-CRIT-76' "$WORK/export.html")|$(grep -c 'vf-trace' "$WORK/export.html")" || echo vide)" "0|0|0"
+assert_eq "C2.6c — témoin positif : les marqueurs sont dans les fichiers du lab" "$(grep -c 'onerror=' "$LAB/.planning/workstreams/x/REQUIREMENTS.md")|$(grep -c 'XSS-CRIT-76' "$LAB/.planning/workstreams/x/phases/05-cinq/05-01-PLAN.md")" "1|1"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
