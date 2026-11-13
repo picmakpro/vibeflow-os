@@ -14,7 +14,7 @@ set -uo pipefail
 
 ROOT="$(cd "$(dirname "$0")/../.." && pwd)"
 SCRIPT="$ROOT/scripts/ci-shard-suites.sh"
-N=9   # la valeur de SHARDS visée par la CI ; la propriété est testée aussi sur d'autres n
+N=14  # la valeur de SHARDS visée par la CI ; la propriété est testée aussi sur d'autres n
 XTERM=plugin/cockpit/scripts/tests/test-cockpit-terminal-xterm.sh
 PROJET=plugin/cockpit/scripts/tests/test-cockpit-projet-visite.sh
 
@@ -63,7 +63,7 @@ else
 fi
 
 # --- C2 : union = découverte, sans doublon, pour plusieurs n ----------------------------------------------------
-for n in 3 7 "$N"; do
+for n in 6 7 "$N"; do
   union "$SCRIPT" "$n" | LC_ALL=C sort > "$WORK/u.txt"
   dups="$(uniq -d "$WORK/u.txt" | awk 'END { print NR }')"
   if cmp -s "$WORK/u.txt" "$ALL" && [ "$dups" -eq 0 ]; then
@@ -145,22 +145,23 @@ if [ -z "$(union "$SCRIPT" "$N" "$WORK/vide.txt")" ] && part "$SCRIPT" 0 "$N" "$
 
 # --- C8 : le glob projet-* est estimé à 540 s (arbre factice, la découverte y est relative) ----------------------------
 FAKE="$WORK/fake"; mkdir -p "$FAKE/plugin/cockpit/scripts/tests"
-for f in test-cockpit-projet-a.sh test-cockpit-projet-b.sh test-cockpit-lancer-bandeau.sh; do : > "$FAKE/plugin/cockpit/scripts/tests/$f"; done
+for f in test-cockpit-projet-a.sh test-cockpit-projet-b.sh test-cockpit-collecte.sh; do : > "$FAKE/plugin/cockpit/scripts/tests/$f"; done
 mkdir -p "$FAKE/scripts"
 fake_part() { (cd "$FAKE" && bash "$1" "$2" 2 2>/dev/null); } # n=2
-# 540 s chacune, bandeau 311 s : LPT → projet-a → 0, projet-b → 1, bandeau → 0 (charges égales, indice le plus bas).
-# À 7 s (défaut) le bandeau passerait en tête : shard 0 = {bandeau}. À > 600 s, deux lourdes + un reste sur 2 shards : rc 64.
+# 540 s chacune, collecte entre 7 et 540 s dans la table (379 s à la mesure du 2026-11-13 ; bandeau, 632 s, est devenue lourde
+# donc réservée, d'où ce choix) : LPT → projet-a → 0, projet-b → 1, collecte → 0 (charges égales, indice le plus bas).
+# À 7 s (défaut) la collecte passerait en tête : shard 0 = {collecte}. À > 600 s, deux lourdes + un reste sur 2 shards : rc 64.
 P0="$(fake_part "$SCRIPT" 0 | tr '\n' ' ')"; P1="$(fake_part "$SCRIPT" 1 | tr '\n' ' ')"
-if [ "$P0" = "plugin/cockpit/scripts/tests/test-cockpit-lancer-bandeau.sh plugin/cockpit/scripts/tests/test-cockpit-projet-a.sh " ] \
+if [ "$P0" = "plugin/cockpit/scripts/tests/test-cockpit-collecte.sh plugin/cockpit/scripts/tests/test-cockpit-projet-a.sh " ] \
    && [ "$P1" = "plugin/cockpit/scripts/tests/test-cockpit-projet-b.sh " ]; then
-  ok "C8 projet-a, projet-b (inexistantes, glob) sont estimées à 540 s : < 600 s (non réservées), > 311 s (placées avant le bandeau)"
+  ok "C8 projet-a, projet-b (inexistantes, glob) sont estimées à 540 s : < 600 s (non réservées), > 311 s (placées avant la collecte)"
 else
-  ko "C8 glob projet-*" "shard0={bandeau,projet-a} shard1={projet-b}" "shard0=[$P0] shard1=[$P1]"
+  ko "C8 glob projet-*" "shard0={collecte,projet-a} shard1={projet-b}" "shard0=[$P0] shard1=[$P1]"
 fi
 if grep -qE '^540 plugin/cockpit/scripts/tests/test-cockpit-projet-\*\.sh$' "$SCRIPT"; then ok "C8b la table porte la ligne « 540 …/test-cockpit-projet-*.sh »"; else ko "C8b" "ligne 540 projet-*" "absente"; fi
 
 # --- C9 : trop de suites lourdes → rc 64 ---------------------------------------------------------------------------------
-printf '%s\n' "$XTERM" "$PROJET" "plugin/cockpit/scripts/tests/test-cockpit-lancer-bandeau.sh" > "$WORK/lourdes.txt"
+printf '%s\n' "$XTERM" "$PROJET" "plugin/cockpit/scripts/tests/test-cockpit-collecte.sh" > "$WORK/lourdes.txt"
 (cd "$ROOT" && bash "$SCRIPT" 0 2 --liste "$WORK/lourdes.txt") >/dev/null 2>&1; rc=$?
 if [ "$rc" -eq 64 ]; then ok "C9 deux suites lourdes + un reste sur 2 shards → rc 64"; else ko "C9" "rc 64" "rc=$rc"; fi
 
@@ -223,7 +224,7 @@ M="$(mutant 6 's/for (g = 1; g <= ng; g++) if/for (g = 1; g <= 0; g++) if/')"
 if [ -z "$M" ]; then komut 6 "sed sans effet"
 else
   m0="$(fake_part "$M" 0 | tr '\n' ' ')"
-  if [ "$m0" = "plugin/cockpit/scripts/tests/test-cockpit-lancer-bandeau.sh " ] && [ "$P0" != "$m0" ]; then okmut 6 "glob sans effet : shard0=[$m0] au lieu de [$P0]"; else komut 6 "shard0 du mutant = [$m0]"; fi
+  if [ "$m0" = "plugin/cockpit/scripts/tests/test-cockpit-collecte.sh " ] && [ "$P0" != "$m0" ]; then okmut 6 "glob sans effet : shard0=[$m0] au lieu de [$P0]"; else komut 6 "shard0 du mutant = [$m0]"; fi
 fi
 
 echo

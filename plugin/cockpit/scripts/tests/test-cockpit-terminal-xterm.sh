@@ -104,7 +104,7 @@ const PHASES = [0, 0.25, 0.5, 0.75];
 const trous = (arr) => arr.reduce((n, v) => n + (v ? 0 : 1), 0);
 const { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, AMORCE } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, mode, brut] = process.argv;
-const { P, Q, amorce, plein, hostile, sortieHex, recepteurHex, avecRecepteur, densite, dossier, journal, recepteurPy } = JSON.parse(brut);
+const { P, Q, amorce, plein, hostile, sortieHex, recepteurHex, avecRecepteur, densite, dossier, journal, recepteurPy, attMax } = JSON.parse(brut);
 const OQ = `http://127.0.0.1:${Q}`, MS = Number(process.env.VF_XTERM_MS) || 20000;
 const erreurs = {};
 const essai = async (nom, f) => { try { return await f(); } catch (e) { erreurs[nom] = String(e.message).slice(0, 140); return undefined; } };
@@ -201,9 +201,12 @@ await executer(chrome, async (sp) => {
     const bouton = (nom) => s.ev(`[...document.querySelectorAll('#collage button')].find((b) => b.textContent === ${JSON.stringify(nom)}).click()`);
     const existe = async (n) => (await import('node:fs')).existsSync(M(n));
     // on mesure une fois posé : l'attente est POSITIVE (bandeau, octet reçu, marqueur créé) ; les durées fixes qui suivent ne servent qu'à prouver une absence
-    const attBandeau = () => attendreValeur(bandeau, (v) => v === true);
-    const attEnt = (sous) => attendreValeur(ent, (v) => typeof v === 'string' && v.includes(sous));
-    const attExiste = (n) => attendreValeur(() => existe(n), (v) => v === true);
+    // Échéance des attentes POSITIVES : 10 s sur le code sain ; sous un mutant dont le bandeau n'apparaît jamais, chaque attente irait au bout (15 x 10 s),
+    // alors que l'absence est déjà le résultat attendu : run_collage passe alors `attMax` (2 s), le verdict du mutant se lit sur les mêmes champs.
+    const ATT = { max: Number(attMax) || 10000 };
+    const attBandeau = () => attendreValeur(bandeau, (v) => v === true, ATT);
+    const attEnt = (sous) => attendreValeur(ent, (v) => typeof v === 'string' && v.includes(sous), ATT);
+    const attExiste = (n) => attendreValeur(() => existe(n), (v) => v === true, ATT);
     await s.ev(`(() => { window.__ent = []; const f0 = window.fetch; window.fetch = function (u, o) { if (String(u) === '/entree' && o && o.body) window.__ent.push(new TextDecoder().decode(o.body)); return f0.apply(this, arguments); }; })()`);
     // une ligne collée sans Entrée reste dans la ligne de commande du shell : Ctrl+U la vide avant chaque cas qui crée un marqueur
     const vide = async () => { await touche({ key: 'u', code: 'KeyU', windowsVirtualKeyCode: 85, modifiers: 2 }); await attEnt('\u0015'); await s.ev(`window.__ent.length = 0`); };
@@ -221,7 +224,7 @@ await executer(chrome, async (sp) => {
       r.c.echap = { avant, bandeau: await bandeau(), entre: await ent(), marqueur: await existe('m2') };
     });
     await essai('remplace', async () => {
-      await vide(); await coller(`touch ${M('rA')}\n`); await coller(`touch ${M('rB')}\n`); await attendreValeur(nb, (v) => v === 1); const n = await nb();
+      await vide(); await coller(`touch ${M('rA')}\n`); await coller(`touch ${M('rB')}\n`); await attendreValeur(nb, (v) => v === 1, ATT); const n = await nb();
       await bouton('Coller'); await attExiste('rB'); await pause(2000);
       r.c.remplace = { bandeaux: n, A: await existe('rA'), B: await existe('rB') };
     });
@@ -252,7 +255,7 @@ await executer(chrome, async (sp) => {
     await essai('long', async () => { // borne d'affichage dite, et levée par « Tout afficher »
       await coller('z'.repeat(30000) + '\n'); await attBandeau();
       const note = await s.ev(`(document.querySelector('#collage .vf-q-reste .vf-q-texte') || {}).textContent`); const avant = await s.ev(`document.getElementById('collage-apercu').textContent.length`);
-      await bouton('Tout afficher'); const apres = await attendreValeur(() => s.ev(`document.getElementById('collage-apercu').textContent.length`), (v) => v >= 30000);
+      await bouton('Tout afficher'); const apres = await attendreValeur(() => s.ev(`document.getElementById('collage-apercu').textContent.length`), (v) => v >= 30000, ATT);
       r.c.long = { note, avant, apres, reste: await s.ev(`!!document.querySelector('#collage .vf-q-reste')`) }; await bouton('Annuler');
     });
     // N9 (P71-D-30) : UNE ligne portant un invisible ou un caractère de contrôle d'affichage demande confirmation ; « Coller » reste le seul chemin vers le shell
@@ -597,9 +600,9 @@ run_liens() { # run_liens <sortie> -> LJ
   srv "$1"
   LJ="$(navig liens "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\"}")"; unsrv
 }
-run_collage() { # run_collage <sortie> -> CJ ; un serveur neuf, un amorçage neuf, un Chrome neuf ; les marqueurs de « shell exécuté » sont créés dans $WORK/collage
+run_collage() { # run_collage <sortie> [attMax ms : échéance des attentes, 10 000 par défaut ; 2 000 sous mutant] -> CJ ; un serveur neuf, un amorçage neuf, un Chrome neuf ; les marqueurs de « shell exécuté » sont créés dans $WORK/collage
   rm -rf "$WORK/collage"; mkdir -p "$WORK/collage"; srv "$1"
-  CJ="$(navig collage "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"dossier\":\"$WORK/collage\"}")"; unsrv
+  CJ="$(navig collage "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"dossier\":\"$WORK/collage\",\"attMax\":${2:-0}}")"; unsrv
 }
 run_rejeu() { # run_rejeu <sortie> -> RJ ; le journal des octets reçus par le PTY est dans $WORK/rejeu.log
   rm -f "$WORK/rejeu.log"; srv "$1"
@@ -721,45 +724,45 @@ if mutant proto client.js 's|allowNonHttpProtocols: false|allowNonHttpProtocols:
 else sans_effet "M-PROTO"; fi
 
 if mutant collage-sans-bandeau client.js 's|if (!SUR.test(t) && !vue.invisible(t)) { term.paste(t); return; }|term.paste(t); return;|'; then
-  run_collage "$MUT_OUT"
+  run_collage "$MUT_OUT" 2000
   assert_eq "M-COLLAGE-BANDEAU — le collage multi-lignes est envoyé sans confirmation : le shell reçoit le texte et crée le marqueur, T21.2 rouge" "$(rouge "entre=[$(rj "$CJ" 'j.c.multi.entre')] marqueur=$(rj "$CJ" 'j.c.multi.marqueur')" "entre=[] marqueur=false")" "rouge"
 else sans_effet "M-COLLAGE-BANDEAU"; fi
 if mutant collage-ecoute client.js "s|^ *zone.addEventListener('paste'.*\$||"; then
-  run_collage "$MUT_OUT"
+  run_collage "$MUT_OUT" 2000
   assert_eq "M-COLLAGE-ECOUTE — l'écoute du collage retirée (collage natif d'xterm) : le texte part sans bandeau, T21.2 rouge" "$(rouge "bandeau=$(rj "$CJ" 'j.c.multi.bandeau') entre=[$(rj "$CJ" 'j.c.multi.entre')]" "bandeau=true entre=[]")" "rouge"
 else sans_effet "M-COLLAGE-ECOUTE"; fi
 if mutant depot client.js "/addEventListener('drop'/d; /addEventListener('beforeinput'/,/^ *}, true);/d"; then
-  run_collage "$MUT_OUT"
+  run_collage "$MUT_OUT" 2000
   assert_eq "M-DEPOT — écoutes de dépôt retirées : drop et beforeinput ne sont plus annulés (le navigateur insérerait le texte dans la zone de saisie), T21.9 rouge" "$(rouge "drop_annule=$(rj "$CJ" 'j.c.depot.drop===false') beforeinput_annule=$(rj "$CJ" 'j.c.depot.avant===false')" "drop_annule=true beforeinput_annule=true")" "rouge"
 else sans_effet "M-DEPOT"; fi
 if mutant abandon-envoie client.js 's|const abandonner = () => { if (propose !== null) { propose = null;|const abandonner = () => { if (propose !== null) { term.paste(propose); propose = null;|'; then
-  run_collage "$MUT_OUT"
+  run_collage "$MUT_OUT" 2000
   assert_eq "M-ABANDON-ENVOIE — abandonner() envoie l'ancien texte au lieu de l'oublier : « touch l1 » part au shell quand une ligne remplace le bandeau, T21.6 rouge (la fenêtre d'absence de 600 ms laisse le marqueur apparaître)" "$(rouge "marqueur=$(rj "$CJ" 'j.c.abandonne.marqueur')" "marqueur=false")" "rouge"
 else sans_effet "M-ABANDON-ENVOIE"; fi
 
 if mutant n9-sans-cf vue.js 's|const INVISIBLE = /\[\\p{Cc}\\p{Cf}\\p{Cs}\\u{E0000}-\\u{E007F}\]/u;|const INVISIBLE = /[\\p{Cc}\\p{Cs}]/u;|'; then
-  run_collage "$MUT_OUT"
+  run_collage "$MUT_OUT" 2000
   assert_eq "M-N9-SANS-CF — le déclencheur et le marquage perdent la classe Cf et les Tag : une ligne à U+202E passe sans bandeau et crée le marqueur, T21.16 rouge" "$(rouge "bidi=$(rj "$CJ" 'j.c.n9.bidi.bandeau')/$(rj "$CJ" 'j.c.n9.bidi.marqueur')" "bidi=true/false")" "rouge"
 else sans_effet "M-N9-SANS-CF"; fi
 if mutant n10-sans-repli vue.js 's|if (e - k >= 3) {|if (e - k >= 3 \&\& false) {|'; then
-  run_collage "$MUT_OUT"
+  run_collage "$MUT_OUT" 2000
   assert_eq "M-N10-SANS-REPLI — les lignes vides ne sont plus repliées : la commande est hors de la zone, T21.18 rouge" "$(rouge "replie=$(rj "$CJ" 'j.c.n10.replie') charge=$(rj "$CJ" 'j.c.n10.charge') debord=$(rj "$CJ" 'j.c.n10.debord')" "replie=true charge=true debord=false")" "rouge"
 else sans_effet "M-N10-SANS-REPLI"; fi
 if mutant n10-sans-avertissement vue.js 's|const depasse = () => {|const depasse = () => { return;|'; then
-  run_collage "$MUT_OUT"
+  run_collage "$MUT_OUT" 2000
   assert_eq "M-N10-SANS-AVERTISSEMENT — le dépassement n'est plus dit : T21.19 rouge" "$(rouge "texte=$(rj "$CJ" 'j.c.n10d.texte')" "texte=Le texte dépasse la zone : faites défiler avant de coller.")" "rouge"
 else sans_effet "M-N10-SANS-AVERTISSEMENT"; fi
 
 if mutant apercu-coupe vue.js 's|const LIMITE = 20000|const LIMITE = 200|'; then
-  run_collage "$MUT_OUT"
+  run_collage "$MUT_OUT" 2000
   assert_eq "M-APERCU-COUPE — retour de la coupure à 200 caractères : la charge après 275 caractères n'est plus dans le DOM, T21.11 rouge" "$(rouge "visible=$(rj "$CJ" 'j.c.c12.visible')" "visible=true")" "rouge"
 else sans_effet "M-APERCU-COUPE"; fi
 if mutant neutralisation vue.js "s|const neutre = (t) => .*\$|const neutre = (t) => t;|"; then
-  run_collage "$MUT_OUT"
+  run_collage "$MUT_OUT" 2000
   assert_eq "M-NEUTRALISATION — l'aperçu affiche le texte brut : U+202E et U+200B ne sont plus des marqueurs, T21.13 rouge" "$(rouge "u202e=$(rj "$CJ" 'j.c.invis.u202e') brut=$(rj "$CJ" 'j.c.invis.brut')" "u202e=true brut=true")" "rouge"
 else sans_effet "M-NEUTRALISATION"; fi
 if mutant envoi-neutralise client.js 's|if (x !== null) term.paste(x);|if (x !== null) term.paste(x.replace(/[\\u202e\\u200b]/g, ""));|'; then
-  run_collage "$MUT_OUT"
+  run_collage "$MUT_OUT" 2000
   assert_eq "M-ENVOI-NEUTRALISE — « Coller » envoie le texte privé de ses invisibles au lieu de l'original : le sha256 diffère, T21.13 rouge" "$(rouge "sha=$(rj "$CJ" 'j.c.invis.sha')" "sha=true")" "rouge"
 else sans_effet "M-ENVOI-NEUTRALISE"; fi
 if mutant sans-marge client.js 's|z.clientHeight - parseFloat(cs.paddingTop) - parseFloat(cs.paddingBottom)|z.clientHeight|'; then
