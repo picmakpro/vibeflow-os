@@ -1,7 +1,9 @@
 #!/usr/bin/env node
-// coquille-propriete.mjs — jugements de chemin de la coquille (79-16, SOCL-20 ; A37). Régime allégé : dispositions FIXES (une par classe de liens), pas de
-// générateur ; l'oracle est le noyau (fs.realpathSync natif) et n'importe jamais le code testé.
+// coquille-propriete.mjs — jugements de chemin de la coquille (79-16, SOCL-20 ; A37) et détecteur des mutations de page. Régime allégé : dispositions FIXES
+// (une par classe de liens), pas de générateur ; l'oracle est le noyau (fs.realpathSync natif) et n'importe jamais le code testé.
 //   gardes <dossier-des-scripts> <dossier-de-travail>   rend { cas: { nom: { verdict, oracle, ok } }, identites } sur une ligne JSON
+//   detecteur-pages <dossier-des-suites> <fichier-d-exceptions>   les écritures (sed -i, cp, redirection, writeFileSync) qui visent index.html, project.html ou equipe.html
+//        d'une sortie, hors exceptions (une par ligne : « fichier|fragment de la ligne|motif ») ; première ligne « touches=N exceptions=M », puis une ligne par écriture non excusée
 // Classes : chaîne vers l'intérieur de .vibeflow/ (refus), vers l'extérieur (accord), pendante (refus), en boucle (refus), saine (accord), deux orthographes
 // d'un même lab (même identité), un lab préfixe d'un autre (deux identités).
 import fs from 'node:fs';
@@ -9,7 +11,24 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 const [, , mode, scripts, travail] = process.argv;
-if (mode !== 'gardes' || !scripts || !travail) { console.error('usage : coquille-propriete.mjs gardes <scripts> <travail>'); process.exit(2); }
+if (mode === 'detecteur-pages') {
+  const exceptions = fs.existsSync(travail) ? fs.readFileSync(travail, 'utf8').split('\n').filter((l) => l.trim() && !l.startsWith('#')).map((l) => l.split('|')) : [];
+  const P = '(?:index|project|equipe)\\.html'; // une écriture qui vise une page : sed -i ou writeFileSync avec une page sur la ligne, cp dont la DESTINATION est une page, redirection vers une page
+  const FORMES = [/sed -i/, /writeFileSync/, new RegExp(`\\bcp\\s[^;|&]*[\\s/"]${P}"?\\s*(?:;|&&|\\|\\||$)`), new RegExp(`>\\s*"?[^\\s";|&]*${P}`)];
+  const CIBLE = new RegExp(`\\b${P}`), ECRIT = { test: (l) => FORMES.some((f) => f.test(l)) };
+  let touches = 0, excuses = 0; const reste = [];
+  for (const nom of fs.readdirSync(scripts).sort()) {
+    if (!/^(test-cockpit-.*\.sh|.*\.mjs)$/.test(nom) || nom === 'coquille-propriete.mjs') continue;
+    fs.readFileSync(path.join(scripts, nom), 'utf8').split('\n').forEach((l, i) => {
+      const t = l.trim(); if (t.startsWith('#') || t.startsWith('//') || !CIBLE.test(l) || !ECRIT.test(l)) return;
+      if (/\bcockpit_page_muter_dans\b|\bcockpit_module_muter_page\b/.test(l)) return; // la forme neuve
+      touches++;
+      if (exceptions.some(([f, frag]) => f === nom && l.includes(frag))) excuses++; else reste.push(`${nom}:${i + 1}:${t.slice(0, 90)}`);
+    });
+  }
+  console.log(`touches=${touches} exceptions=${excuses}`); for (const r of reste) console.log(r); process.exit(0);
+}
+if (mode !== 'gardes' || !scripts || !travail) { console.error('usage : coquille-propriete.mjs gardes <scripts> <travail> | detecteur-pages <suites> <exceptions>'); process.exit(2); }
 const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
 const { moduleAdmis } = await imp('vf-cockpit-module.mjs');
 const { identiteServeur } = await imp('vf-cockpit-serveur-vivant.mjs');

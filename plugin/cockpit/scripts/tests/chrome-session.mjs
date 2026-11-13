@@ -71,6 +71,7 @@ export async function ouvrir(chrome, { csp = false } = {}) {
       await Promise.race([charge, pause(ms).then(() => { throw new Error(`chargement de ${url} : événement load absent en ${ms} ms`); })]);
       ecoutes.length = 0;
       // 79-16 R9 : une page de la coquille se dit prête par `data-vf-pret = oui` (ou, avec { echec: true }, par un premier chargement en échec) ; une page sans coquille n'attend rien
+      await attendre(`location.href !== 'about:blank' && document.readyState === 'complete'`, 'page chargée (hors about:blank)', ms); // l'évènement load d'about:blank peut arriver après l'enregistrement de l'écoute
       if (await ev('!!window.VF_COQUILLE')) await attendre(echec ? `window.VF_COQUILLE.etat().phase === 'echec'` : `document.documentElement.dataset.vfPret === 'oui'`, echec ? 'coquille en échec' : 'coquille prête', ms);
     };
     // attendre : sonde l'expression (booléenne) toutes les 100 ms jusqu'à ce qu'elle soit vraie ; échec nommé sinon

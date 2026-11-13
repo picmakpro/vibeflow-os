@@ -8,6 +8,9 @@
 //   journal    suite ordonnée de marques : 'ready:<onglet>' (un « ready » du moteur), posée par le crochet de window.VibeFlow
 //   prof       profondeur d'enveloppement de fetch au dernier appel (cadres venus de /_vf/ui/) ; sonder(fetch) la déclenche
 //   req        adresses de /api/vf/graphe demandées (fetch)
+//   empreinte()  l'état du document, par classes : corps (identifiants, balises), tete, classesBody, attrsHtml, props, ecouteurs, vivants
+//   profondeurFetch()  appelle fetch et rend la profondeur d'enveloppement vue (cadres de /_vf/ui/ dans la pile)
+//   depart     { href, longueur } de l'historique au premier script ; ins[].titre : document.title à l'insertion
 export const SONDE = `(() => {
   const S = window.__s = { ins: [], journal: [], prof: -1, req: [] }; let rang = 0;
   const cible = (t) => (t === window ? 'window' : t === document ? 'document' : t === document.documentElement ? 'html' : t === document.body ? 'body' : null);
@@ -25,8 +28,18 @@ export const SONDE = `(() => {
     window[nom] = class extends O { constructor(...a) { super(...a); obs.add(this); } disconnect() { obs.delete(this); return super.disconnect(); } }; }
   { const E = window.EventSource; window.EventSource = class extends E { constructor(...a) { super(...a); flux.add(this); } close() { flux.delete(this); return super.close(); } }; }
   S.vivants = () => ({ intervalles: inter.size, observateurs: obs.size, flux: [...flux].filter((e) => e.readyState !== 2).length });
-  S.props = () => Object.getOwnPropertyNames(window).sort();
-  for (const m of ['appendChild', 'insertBefore']) { const o = Node.prototype[m]; Node.prototype[m] = function (n, ...r) { if (n && n.tagName === 'SCRIPT' && n.src) S.ins.push({ src: new URL(n.src).pathname, rang: rang++ }); return o.call(this, n, ...r); }; }
+  S.props = () => Object.getOwnPropertyNames(window).filter((n) => n !== 'goog').sort(); // goog : posée par le navigateur lui-même, jamais par la page
+  for (const m of ['appendChild', 'insertBefore']) { const o = Node.prototype[m]; Node.prototype[m] = function (n, ...r) { if (n && n.tagName === 'SCRIPT' && n.src) S.ins.push({ src: new URL(n.src).pathname, rang: rang++, titre: document.title }); return o.call(this, n, ...r); }; }
   { const f0 = window.fetch; window.fetch = function (u, ...r) { if (/\\/api\\/vf\\/graphe/.test(String(u))) S.req.push(String(u)); S.prof = (new Error().stack.match(/\\/_vf\\/ui\\//g) || []).length; return f0.call(this, u, ...r); }; }
+  S.depart = { href: location.href, longueur: history.length };
+  S.empreinte = () => {
+    const sansId = (e) => e.tagName + (e.id ? '#' + e.id : '') + (e.src ? '@' + new URL(e.src).pathname : '');
+    const balises = {}; for (const e of document.body.querySelectorAll('*')) balises[e.tagName] = (balises[e.tagName] || 0) + 1;
+    const garde = ['data-theme', 'lang', 'data-vf-pret'];
+    return { corps: { ids: [...document.body.querySelectorAll('[id]')].map((e) => e.id).sort(), balises }, tete: [...document.head.children].map(sansId).sort(),
+      classesBody: [...document.body.classList].sort(), attrsHtml: Object.fromEntries([...document.documentElement.attributes].filter((a) => !garde.includes(a.name)).map((a) => [a.name, a.name === 'style' ? a.value.split(';').map((x) => x.trim()).filter(Boolean).sort().join(';') : a.value])),
+      props: S.props(), ecouteurs: S.ecout(), vivants: S.vivants() };
+  };
+  S.profondeurFetch = async () => { try { await fetch('/api/status'); } catch { /* sans importance : on lit la pile */ } return S.prof; };
   let vf; Object.defineProperty(window, 'VibeFlow', { configurable: true, get: () => vf, set: (v) => { vf = v; try { v.on('ready', () => S.journal.push('ready:' + (v.graph?.meta?.vfTab || '?'))); } catch {} } });
 })();`;
