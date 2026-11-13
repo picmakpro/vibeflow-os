@@ -1523,8 +1523,7 @@ $('#z-fit').onclick = cadrer;
 // ======================= navigation =======================
 // 80-13 (FORM-15) : the fragment carries the view (v), the selection (s), the zoom (z = k,x,y) and the extension keys of a closed list (git = 1)
 const EXT_CLES = ['git'];
-function ecrireFragment(p, remplacer) { // the query (?vue=) is kept; the comma of z stays readable
-  const s = p.toString().replace(/%2C/g, ',');
+function ecrireFragment(s, remplacer) { // the query (?vue=) is kept
   const url = s ? '#' + s : location.pathname + location.search;
   try { if (location.hash.slice(1) !== s) history[remplacer ? 'replaceState' : 'pushState'](null, '', url); } catch {}
 }
@@ -1535,7 +1534,13 @@ function setHash(container, sel, autreNiveau) {
   if (sel && typeof sel === 'string') p.set('s', sel);
   for (const k of EXT_CLES) if (cur.has(k)) p.set(k, cur.get(k));
   if (!autreNiveau && cur.has('z')) p.set('z', cur.get('z')); // another level has its own framing: z only follows a selection on the same level
-  ecrireFragment(p, false);
+  ecrireFragment(p.toString().replace(/%2C/g, ','), false); // the comma of z stays readable
+}
+/** Replaces (or removes, null) the `cle=…` token of the fragment; every other token (#t, #vf-x, #r=…) is left as it is. */
+function majFragment(cle, valeur) {
+  const jetons = location.hash.slice(1).split('&').filter((x) => x && x.split('=')[0] !== cle);
+  if (valeur !== null) jetons.push(cle + '=' + valeur);
+  ecrireFragment(jetons.join('&'), true);
 }
 /** z = k,x,y : finite decimals only, k within the zoom bounds, x and y bounded; anything else is ignored. */
 function lireZ(texte) {
@@ -1557,16 +1562,13 @@ let zMinuterie = 0;
 function ecrireZ() { // the end of a user gesture: the framing goes into the address, without a history entry per gesture
   const m = state.t;
   if (state.container.startsWith('q:') || ![m.k, m.x, m.y].every(Number.isFinite)) return;
-  const p = new URLSearchParams(location.hash.slice(1)); p.set('z', [m.k, m.x, m.y].map(arrondi).join(','));
-  ecrireFragment(p, true);
+  majFragment('z', [m.k, m.x, m.y].map(arrondi).join(','));
 }
 function programmerZ() { clearTimeout(zMinuterie); zMinuterie = setTimeout(ecrireZ, 250); }
 /** An extension key of the fragment (git = 1): read, written or removed (null); a key outside the closed list or a value other than 1 is refused. */
 function paramVue(cle, valeur) {
   if (!EXT_CLES.includes(cle) || (valeur !== null && valeur !== '1')) return false;
-  const p = new URLSearchParams(location.hash.slice(1));
-  if (valeur === null) p.delete(cle); else p.set(cle, valeur);
-  ecrireFragment(p, true); return true;
+  majFragment(cle, valeur); return true;
 }
 function lireParamVue(cle) { return EXT_CLES.includes(cle) && new URLSearchParams(location.hash.slice(1)).get(cle) === '1' ? '1' : null; }
 const surZ = (z) => () => { if (z) transformer(z); };

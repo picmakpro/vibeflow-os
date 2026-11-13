@@ -25,25 +25,36 @@ await executer(chrome, async (s) => {
   const taille = (width) => s.send('Emulation.setDeviceMetricsOverride', { width, height: 900, deviceScaleFactor: 1, mobile: false });
   await taille(1440);
   await s.send('Page.addScriptToEvaluateOnNewDocument', { source: SANS_VISITE });
-  const sec = async (nom, f) => { if (SEL && !SEL.has(nom)) return; try { await f(); } catch (e) { o.erreurs[nom] = String(e.message).slice(0, 200); } };
+  const sec = async (nom, f) => {
+    if (SEL && !SEL.has(nom)) return;
+    try { await f(); } catch (e) { o.erreurs[nom] = String(e.message).slice(0, 200); }
+  };
   const lire = async (expr) => { const v = await s.ev(`JSON.stringify(${expr})`); return v === undefined ? null : JSON.parse(v); };
   const etat = () => lire(ETAT);
-  const essayer = (expr, ms = 4000) => s.attendre(expr, expr.slice(0, 40), ms).then(() => true, () => false); // un absent se mesure vite, sans épuiser l'échéance
-  const charger = async (chemin) => { await s.naviguer(`${racine}${chemin}`, { brut: true }); await s.attendre('!!window.VibeFlow && !!VibeFlow.state', 'moteur');
-    return stabiliser(etat, { pas: 250, max: 6000 }); };
+  // un absent se mesure vite, sans épuiser l'échéance
+  const essayer = (expr, ms = 4000) => s.attendre(expr, expr.slice(0, 40), ms).then(() => true, () => false);
+  const charger = async (chemin) => {
+    await s.naviguer(`${racine}${chemin}`, { brut: true, garderTiroirs: true });
+    await s.attendre('!!window.VibeFlow && !!VibeFlow.state', 'moteur');
+    return stabiliser(etat, { pas: 250, max: 6000 });
+  };
   const clic = async (sel) => {
-    const r = await lire(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({ block: 'nearest' });
+    const r = await lire(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null;
+      e.scrollIntoView({ block: 'nearest' });
       const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
     if (!r) throw new Error(`clic : « ${sel} » absent`);
     await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x, y: r.y });
-    for (const type of ['mousePressed', 'mouseReleased']) await s.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
+    for (const type of ['mousePressed', 'mouseReleased']) {
+      await s.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
+    }
   };
   const choix = () => lire(`(() => { const k = (i) => VibeFlow.children(i).filter((j) => !j.startsWith('x:'));
     const c = k('root').find((i) => k(i).length >= 2); return c ? [c, ...k(c)] : null; })()`);
   const cle = async () => 'vf-tiroirs:' + (await lire(NOM));
   const memoire = async (v) => s.ev(`sessionStorage.setItem(${JSON.stringify(await cle())}, ${JSON.stringify(JSON.stringify(v))})`);
   const git = () => lire(GIT);
-  const ouvrirGit = async () => { await clic('#vf-git-ligne'); await essayer("!!document.getElementById('vf-git-tiroir') && !document.getElementById('vf-git-tiroir').hidden"); };
+  const GIT_OUVERT = "!!document.getElementById('vf-git-tiroir') && !document.getElementById('vf-git-tiroir').hidden";
+  const ouvrirGit = async () => { await clic('#vf-git-ligne'); await essayer(GIT_OUVERT); };
   const ouvrirTravail = async () => { await s.attendre("!!document.getElementById('vf-lock')", 'badge Au travail'); await clic('#vf-lock');
     await essayer("!!document.querySelector('#panel > .vf-whop')"); };
   const neuf = async () => { await charger('/'); await s.ev('sessionStorage.clear()'); return charger('/index.html'); }; // aucune mémoire de session
@@ -75,7 +86,7 @@ await executer(chrome, async (s) => {
     await sec('lv21', async () => {
       await neuf(); await ouvrirGit(); await pause(300); const ouvert = { h: (await etat()).h, g: await git() };
       await clic('.vf-git-fermer'); await pause(300); const ferme = { h: (await etat()).h, g: await git() };
-      await charger('/index.html#git=1'); await essayer("!!document.getElementById('vf-git-tiroir') && !document.getElementById('vf-git-tiroir').hidden");
+      await charger('/index.html#git=1'); await essayer(GIT_OUVERT);
       await pause(500); o.lv21 = { ouvert, ferme, lien: await git() };
     });
     await sec('lv22', async () => {
@@ -85,15 +96,16 @@ await executer(chrome, async (s) => {
       o.lv22 = { git: await git(), cles, cle: await cle(), onglet: await lire('VibeFlow.graph.meta.vfTab') };
       await taille(1200); await neuf(); await ouvrirTravail(); await charger('/project.html');
       await essayer("!!document.querySelector('#panel > .vf-whop')"); await pause(500);
-      o.lv22.travail = await lire(TRAV); o.lv22.cleT = (await lire("Object.keys(sessionStorage).filter((k) => k.indexOf('vf-tiroirs:') === 0)"))[0] === await cle();
+      o.lv22.travail = await lire(TRAV);
+      o.lv22.cleT = (await lire("Object.keys(sessionStorage).filter((k) => k.indexOf('vf-tiroirs:') === 0)"))[0] === await cle();
       await taille(1440);
     });
     await sec('lv23', async () => {
       await charger('/'); const k = await cle(), pose = async (v, chemin) => { await memoire(v); await charger(chemin);
         await pause(500); return (await git()).ouvert; };
-      o.lv23 = { memo: await pose({ git: true }, '/index.html'), lien: await (async () => { await memoire({ git: false }); return pose({ git: false }, '/index.html#git=1'); })(),
+      o.lv23 = { memo: await pose({ git: true }, '/index.html'), lien: await pose({ git: false }, '/index.html#git=1'),
         aucun: await pose({ git: false }, '/index.html'), k };
-      o.lv23.focus = await (async () => { await memoire({ git: true }); await charger('/index.html'); await pause(500); return (await git()).focus; })();
+      await memoire({ git: true }); await charger('/index.html'); await pause(500); o.lv23.focus = (await git()).focus;
     });
     await sec('lv24', async () => {
       await neuf(); await ouvrirGit(); const e0 = await etat(); const r1 = await aller('projet'); await pause(500);
@@ -118,7 +130,8 @@ await executer(chrome, async (s) => {
         o.lv31.push({ f, ok: e.c === 'root' && Math.abs(e.t.k - e.cad.k) <= 1e-3 && !(await git()).ouvert
           && !(await lire('window.__g')) && !(await lire("!!document.querySelector('img[src=\"x\"]')")) });
       }
-      await charger('/#z=1.5,10.5,20.25'); await pause(500); o.lv31t = (await stabiliser(etat, { pas: 250, max: 4000 })).t; // témoin : un z valide s'applique
+      await charger('/#z=1.5,10.5,20.25'); await pause(500); // témoin : un z valide s'applique
+      o.lv31t = (await stabiliser(etat, { pas: 250, max: 4000 })).t;
     });
     await sec('lv32', async () => {
       await charger('/'); const [, a, b] = await choix();
