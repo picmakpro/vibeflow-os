@@ -163,6 +163,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
 
 export function collectWho(root, opts = {}) {
   const g = gather(root, opts);
+  try { opts.surAgents?.(g.workers, rolesDe(g.workers)); } catch {} // 79-22 : alimente la table du fil, avant le retrait de `_tr`
   // tout champ libre vient d'un fichier que d'autres écrivent : chaîne masquée et bornée, sinon absent (F2) ; les nombres sont finis ou absents ; un identifiant hors forme exclut le travailleur
   const bornes = (v, n) => masque(v).slice(0, n);
   const LIBRES = { titre: 80, task: 160, cwd: 200, role: 80, branch: 200, tree: 200, lastAt: 40, parent: 128, dag: 200, treeBy: 20 }, NOMBRES = ['ageS', 'depth', 'dureeS', 'children', 'attendAgents'];
@@ -247,7 +248,9 @@ const lastDoing = (f) => cherche(f, (d) => (d.type === 'assistant' ? lastCommand
 // identifiant au format strict ET présent dans une collecte fraîche : aucun chemin construit depuis l'entrée (T-67-07)
 export function revealDoing(root, id, opts = {}) {
   if (typeof id !== 'string' || !ID_RE.test(id)) return { schema: 'vibeflow/cockpit-doing@1', id: String(id), doing: null, erreur: 'id-invalide' };
-  const w = gather(root, opts).workers.find((x) => (x.kind === 'session' || x.kind === 'subagent') && x.id === id && x._tr);
+  const t = opts.table ? opts.table(id) : null; // 79-22 : `table` (id -> { genre, fichier, roles } ou nul) remplace la collecte par requête
+  const w = opts.table ? t && { _tr: t.fichier }
+    : gather(root, opts).workers.find((x) => (x.kind === 'session' || x.kind === 'subagent') && x.id === id && x._tr);
   if (!w) return { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'inconnu' };
   const doing = lastDoing(w._tr);
   return doing ? { schema: 'vibeflow/cockpit-doing@1', id, doing } : { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'sans-action' };
@@ -257,9 +260,16 @@ export function revealDoing(root, id, opts = {}) {
 export function revealTranscript(root, id, opts = {}) {
   const S = 'vibeflow/cockpit-transcript@2';
   if (typeof id !== 'string' || !ID_RE.test(id)) return { schema: S, id: String(id).slice(0, 128), erreur: 'id-invalide' };
-  try { return reveler(root, id, opts, S); } catch { return { schema: S, id, erreur: 'inconnu' }; } // aucune exception ne remonte à l'appelant (F3)
+  try { return reveler(root, id, opts, S); } catch (e) { // F3 : aucune exception ne remonte ; avec `table`, le `try` est celui du fil (79-22)
+    if (opts.table) throw e;
+    return { schema: S, id, erreur: 'inconnu' };
+  }
 }
 function reveler(root, id, opts, S) {
+  if (opts.table) {
+    const t = opts.table(id), r = t && reduireTranscript(t.fichier, { root: path.resolve(root), roles: t.roles, kind: t.genre });
+    return t ? { schema: S, id, ...r } : { schema: S, id, erreur: 'inconnu' };
+  }
   const connus = new Map(agentsConnus(root, opts).filter((x) => (x.kind === 'session' || x.kind === 'subagent') && x._tr).map((x) => [x.id, x]));
   const w = connus.get(id);
   return w ? { schema: S, id, ...reduireTranscript(w._tr, { root: path.resolve(root), roles: rolesDe([...connus.values()]), kind: w.kind }) } : { schema: S, id, erreur: 'inconnu' };

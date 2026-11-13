@@ -110,7 +110,7 @@
   };
   const parCarte = () => new Map(equipe(window.__vfLive?.who).map((w) => [idCarte(w), w]));
 
-  // transcript lu : gardé en mémoire de la page seulement (jamais dans le graphe, le stockage ni l'export), reposé par un observateur chaque fois que le panneau est redessiné
+  // transcript lu : gardé en mémoire de la page seulement (jamais dans le graphe, le stockage ni l'export), reposé par l'événement `panel` du moteur chaque fois que le panneau est redessiné
   // (à chaque `who`, par le viewer, par l'arrivée sur une carte) ; il disparaît quand le panneau montre un autre agent. Seul l'identifiant de l'agent est gardé dans
   // sessionStorage, pour redemander le transcript après un rechargement de la page (structure de l'équipe changée, « Map updated »).
   const CLE_OUVERT = 'vf-equipe-ouvert';
@@ -129,7 +129,7 @@
     if (!b) { lu = null; marque(null); return; } // un autre agent : le transcript lu disparaît
     const z = zoneDe(b); if (!z.firstChild) z.replaceChildren(...lu.noeuds);
   };
-  new MutationObserver(remettre).observe(document.getElementById('panel') || document.documentElement, { childList: true, subtree: true }); // le panneau seulement
+  SC.on('panel', remettre); // 79-17 : l'événement panel du moteur, synchrone après chaque dessin du panneau
   // AUDC-D2 : l'état écrit à l'assemblage dans le panneau (« État : actif » des détails, dernier mot du repli de la description) suit chaque poussée : un seul état affiché pour une session, celui de la carte
   const dirEtat = (x, w) => {
     const mot = R().etat(w);

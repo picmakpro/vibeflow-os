@@ -3,11 +3,13 @@
 // résultats ; il ne diffuse rien et n'importe que les étapes.
 // Demande { id, planning, verrous, tour, motifs } -> messages { id, type: 'planning' (graphe | erreur, motifs) | 'verrous' (projection en liste
 // blanche, A15) | 'tour' (verrous projetés, equipe, signal, erreurs, dureeMs) | 'index' (rapport en comptes, jamais les voies) |
-// 'frise' (paquet de voies, 79-13) | 'fini' }. workerData.sansIndex : relance sans l'index.
+// 'frise' (paquet de voies, 79-13) | 'fini' }. Demande { id, lecture: { quoi, id } } -> message { id, type: 'lecture', corps } SEUL (79-22).
+// workerData.sansIndex : relance sans l'index.
 // 73-03 : 'planning' et 'tour' portent aussi `lecturesPlanning` (compteur du fil).
 import { parentPort, workerData } from 'node:worker_threads';
 import { creerMemoire, etapePlanning, etapeVerrous, etapeTour } from './vf-cockpit-collecte-etapes.mjs';
 import { tranche } from './vf-cockpit-collecte-frise.mjs';
+import { creerTable, lireDansLeFil } from './vf-cockpit-agents-table.mjs';
 
 const { racine, sortie, scriptsDir, home, sansIndex } = workerData, base = { racine, sortie, scriptsDir, home }, memo = creerMemoire();
 const compte = () => ({ lecturesPlanning: memo.lecturesPlanning }); // 73-03
@@ -22,6 +24,12 @@ const enchainer = () => { chaine = true; setImmediate(() => {
 
 parentPort.on('message', (m) => {
   const { id, motifs = [] } = m;
+  if (m.lecture) { // 79-22 : lecture d'un agent dans la table du fil, sans `fini` (le pilote ne la compte pas comme une demande) ; toute exception : corps nul
+    let corps = null;
+    try { corps = lireDansLeFil({ quoi: m.lecture.quoi, id: m.lecture.id, table: memo.table || creerTable(), racine }); } catch { corps = null; }
+    parentPort.postMessage({ type: 'lecture', id, corps });
+    return;
+  }
   if (m.planning) {
     try { const graphe = etapePlanning({ ...base, memo }); parentPort.postMessage({ type: 'planning', id, motifs, graphe, ...compte() }); }
     catch (e) { parentPort.postMessage({ type: 'planning', id, motifs, erreur: String(e.message).slice(0, 200), ...compte() }); }
