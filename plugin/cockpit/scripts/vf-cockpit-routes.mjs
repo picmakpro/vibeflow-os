@@ -1,7 +1,7 @@
 // vf-cockpit-routes — mécanisme des routes GET /api/vf/* du serveur unique (79-05, SOCL-06 ; A10, A11, C0).
 // Rôle : un répartiteur à table validée, un vérificateur d'accès intérieur et les régimes de route. La table elle-même (ROUTES) vit dans
 // vf-cockpit-server.mjs : ajouter une route = importer un lecteur et ajouter UNE ligne `[chemin, lecteur, régime?]` à sa place alphabétique.
-// Exports : HISTORIQUE, FLUX (régimes), reponse(code, corps, entetes), estReponse(o), controlerAcces(req, { entete, jetonValide, port }),
+// Exports : HISTORIQUE, FLUX (régimes), reponse(code, corps, entetes, options), estReponse(o), controlerAcces(req, { entete, jetonValide, port }),
 //   creerRepartiteur({ table, contexte, repondre, json, acces, log }) -> { servir(req, res, url) }.
 // Régimes : sans marqueur = gardé (accès contrôlé, garde d'émission, no-store, 503) ; HISTORIQUE = réponse JSON simple, comportement antérieur
 //   conservé (le portail de serve.mjs a déjà contrôlé l'accès) ; FLUX = le lecteur écrit lui-même (flux SSE).
@@ -12,7 +12,11 @@ export const HISTORIQUE = 'historique';
 export const FLUX = 'flux';
 
 const MARQUE = Symbol('vf-cockpit-reponse');
-export const reponse = (code, corps, entetes) => Object.freeze({ [MARQUE]: true, code, corps, entetes: { ...(entetes || {}) } });
+// options (79-15) : `controle` = valeur soumise à la garde d'émission à la place du corps, `brut` = le corps déjà sérialisé (une route de graphe ne
+// le reconstruit pas par requête)
+export const reponse = (code, corps, entetes, options) => Object.freeze({
+  [MARQUE]: true, code, corps, entetes: { ...(entetes || {}) }, options: { ...(options || {}) },
+});
 export const estReponse = (o) => !!o && typeof o === 'object' && o[MARQUE] === true;
 
 // C0 « Accès » : hôte, origine, jeton, méthode, dans cet ordre ; fermé par défaut (paramètre manquant ou invalide : 403)
@@ -55,7 +59,7 @@ export function creerRepartiteur({ table, contexte, repondre, json, acces, log =
     let r;
     try { r = lecteur(contexte, req, url); } catch { echec(res); return; }
     Promise.resolve(r).then((v) => {
-      if (estReponse(v)) repondre(req, res, v.corps, { code: v.code, entetes: v.entetes }); else repondre(req, res, v, {});
+      if (estReponse(v)) repondre(req, res, v.corps, { code: v.code, entetes: v.entetes, ...v.options }); else repondre(req, res, v, {});
     }).catch(() => echec(res));
   };
   return {
@@ -64,7 +68,11 @@ export function creerRepartiteur({ table, contexte, repondre, json, acces, log =
       if (!e) return false;
       const [lecteur, regime] = e;
       if (regime === FLUX) lecteur(contexte, req, url, res);
-      else if (regime === HISTORIQUE) { const v = lecteur(contexte, req, url); if (estReponse(v)) json(res, v.code, v.corps); else json(res, 200, v); }
+      else if (regime === HISTORIQUE) {
+        const sortir = (v) => (estReponse(v) ? json(res, v.code, v.corps) : json(res, 200, v));
+        const r = lecteur(contexte, req, url); // 79-22 : un lecteur peut rendre une promesse (lecture d'un agent dans le fil), sinon `{}`
+        if (r && typeof r.then === 'function') r.then(sortir).catch(() => echec(res)); else sortir(r);
+      }
       else gardee(lecteur, req, res, url);
       return true;
     },

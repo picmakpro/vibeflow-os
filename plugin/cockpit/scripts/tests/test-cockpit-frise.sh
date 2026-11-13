@@ -58,7 +58,7 @@ for m in $MODULES; do
 done
 POSER="$(node --input-type=module -e "try{const m=await import('file://$SCRIPTS/vf-cockpit-instantane.mjs');console.log(typeof m.poserFrise)}catch(e){console.log('absent')}")"
 assert_eq "F0.1 — les sept modules neufs exportent les noms de « artifacts », vf-cockpit-instantane.mjs exporte poserFrise" "$(echo $F01) $POSER" "ok ok ok ok ok ok ok function"
-F02="$(node --input-type=module -e "const m=await import('file://$SCRIPTS/vf-cockpit-server.mjs');const c=m.ROUTES.map((l)=>l[0]);const i=c.indexOf('/api/vf/frise');console.log([i>0&&c[i-1]==='/api/vf/events'&&c[i+1]==='/api/vf/journal',new Set(c).size===c.length,JSON.stringify(c)===JSON.stringify([...c].sort()),i>=0&&m.ROUTES[i].length===2].join(','))")"
+F02="$(node --input-type=module -e "const m=await import('file://$SCRIPTS/vf-cockpit-server.mjs');const c=m.ROUTES.map((l)=>l[0]);const i=c.indexOf('/api/vf/frise');console.log([i>0&&c[i-1]==='/api/vf/events',new Set(c).size===c.length,JSON.stringify(c)===JSON.stringify([...c].sort()),i>=0&&m.ROUTES[i].length===2].join(','))")"
 assert_eq "F0.2 — ROUTES porte /api/vf/frise entre events et journal, chemins uniques et triés, la ligne n'a aucun régime" "$F02" "true,true,true,true"
 F03="$(node -e "
 const j=JSON.parse(require('fs').readFileSync('$SCRIPTS/vf-cockpit-interface.json','utf8')).schemas;const s=j['vibeflow/cockpit-frise@1'],g=j['vibeflow/cockpit-signal@1'];
@@ -205,7 +205,7 @@ chk3() { # <id> <copie> -> ok | ko
     F4.1) f="$(ck "$d" cible "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.nko+"|"+(j.n>=400)')" = '0|true' ] ;;
     F4.3) f="$(ck "$d" outils)"; [ "$(jf "$f" 'j.ok')" = true ] ;;
     F4.4) f="$(ck "$d" hostiles)"; [ "$(jf "$f" 'JSON.stringify([j.leve,j.premier,j.second,j.lien.etat+j.lien.ecritures.length,j.tube.etat+j.tube.ecritures.length,j.long])')" = '[false,[["ok.js",1]],[["ok.js",2]],"en-construction0","en-construction0",1]' ] ;;
-    F4.5) f="$(ck "$d" incremental "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.egal+"|"+j.somme+"|"+j.couverture')" = 'true|true|ok' ] ;;
+    F4.5) f="$(ck "$d" incremental "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.egal+"|"+j.somme+"|"+j.couverture+"|"+j.milieu')" = 'true|true|ok|true' ] ;;
     F4.6) f="$(ck "$d" reprise "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.egal+"|"+j.avant+"|"+j.court[1]+"|"+j.apres[1].join(",")')" = 'true|true|0|d.js' ] ;;
     F4.7) f="$(ck "$d" limites)"; [ "$(jf "$f" 'JSON.stringify([j.mille,j.top,j.exact,j.plus,j.mixte,j.deux,j.plafondTotal,j.plafondTronque])')" = '[[200,0,true],"e999.js",[200,0,false],[200,0,true],[150,200,true],[150,150,false],50,[false,false,true,true,true]]' ] ;;
     F4.8) f="$(ck "$d" limites)"; [ "$(jf "$f" 'j.avant+"|"+j.apres+"|"+j.vieux')" = '1|0|0' ] ;;
@@ -217,14 +217,18 @@ chk3() { # <id> <copie> -> ok | ko
     F4.11f) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify(j.f)')" = "[\"null|$H4\",\"null|$H4\",\"ok|app/g.js\"]" ] ;;
     F4.11h) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify([j.h,j.hVoie])')" = "[[\"null|$H4\",\"null|$H4\",\"autre|app/g.js\"],[\"null|$H4\"]]" ] ;;
     F4.11i) f="$(ck "$d" arbres)"; [ "$(jf "$f" 'JSON.stringify([j.i,j.iVoie])')" = "[[\"null|app/f.js\",\"null|$H4\",\"unique|app/g.js\"],[\"null|$H4\"]]" ] ;;
+    F4.4b) f="$(ck "$d" ligne-longue)"; [ "$(jf "$f" '[j.sansSaut,j.termine].map((x)=>[x.max<600,x.tours<200,x.tenu>=0&&x.tenu<=33554432,JSON.stringify(x.cibles),x.etat].join("/")).join("|")')" = 'true/true/true/[["ok.js",1]]/ok|true/true/true/[["ok.js",2]]/ok' ] ;;
+    F4.14) f="$(ck "$d" controle)"; [ "$(jf "$f" 'j.positif+"|"+j.propres')" = 'true|true' ] ;;
     F4.13) f="$(ck "$d" fin "{\"graine\":$GRAINE}")"; [ "$(jf "$f" 'j.nko+"|"+j.couverture')" = '0|ok' ] ;;
   esac && echo ok || echo ko
 }
-for id in F4.1 F4.3 F4.4 F4.5 F4.6 F4.7 F4.8 F4.9 F4.10 F4.11a F4.11c F4.11d F4.11f F4.11h F4.11i F4.13; do
+for id in F4.1 F4.3 F4.4 F4.4b F4.14 F4.5 F4.6 F4.7 F4.8 F4.9 F4.10 F4.11a F4.11c F4.11d F4.11f F4.11h F4.11i F4.13; do
   case "$id" in
     F4.1) t="propriété (graine $GRAINE, 400 valeurs de vingt classes de chemins) : reduireCible égale à l'oracle de résolution physique écrit à la main" ;;
     F4.3) t="outils comptés : Read en lecture ; Write, Edit, MultiEdit, NotebookEdit (notebook_path) en écriture ; Grep, Glob, Bash et noms de prototype : aucune cible ; valeur non chaîne ignorée" ;;
     F4.4) t="lignes hostiles : aucune exception, état intact, lignes valides comptées, dernière ligne incomplète non consommée, lien et tube jamais ouverts, ligne géante sautée" ;;
+    F4.4b) t="AU13-01 : une tranche tient son budget sur une ligne de 40 Mio sans saut de ligne puis sur une ligne géante terminée (durée par avance sous 600 ms, mémoire en attente au plus LIGNE_MAX, ligne sautée, lignes valides comptées)" ;;
+    F4.14) t="AU13-02 : aucune cible ne porte de caractère de contrôle ni de format (inversion bidi, séquence d'échappement, espace de largeur nulle, C1, DEL) ; témoin positif : les entrées en portent" ;;
     F4.5) t="incrémentalité (graine $GRAINE) : avances sur préfixes croissants égales à une passe unique, somme des n égale au nombre d'appels comptés, couverture des coupes" ;;
     F4.6) t="reprise : fichier raccourci ou tête changée : état repris depuis zéro, anciennes cibles disparues" ;;
     F4.7) t="bornes A48-45 : 200 par sens, plus récentes gardées, tronque vrai dès qu'un sens coupe (faux à exactement 200), plafond total d'essai jamais dépassé, tronque pour chaque voie touchée" ;;
@@ -253,13 +257,15 @@ mut3 M-ECHEC-OUVERT vf-cockpit-cible.mjs 's|if (phys === null) return HORS_R; //
 mut3 M-PARENT vf-cockpit-cible.mjs 's|const OPTION = { plusProcheParent: true }; // garde:cible-parent|const OPTION = { plusProcheParent: false }; // garde:cible-parent|' F4.1 "plus proche parent retiré"
 mut3 M-PREFIXE vf-cockpit-cible.mjs '/garde:cible-dedans/s/p.startsWith(r.endsWith(path.sep) ? r : r + path.sep)/p.startsWith(r)/' F4.1 "préfixe sans frontière de séparateur"
 mut3 M-OUTILS vf-cockpit-cibles.mjs "s|Write: T('ecritures', 'file_path'), Edit: T('ecritures', 'file_path'), // garde:cibles-outils|Write: T('ecritures', 'file_path'), Grep: T('lectures', 'file_path'), Edit: T('ecritures', 'file_path'), // garde:cibles-outils|" F4.3 "Grep compté en lecture"
-mut3 M-CURSEUR vf-cockpit-cibles-suivi.mjs 's|st.curseur = fin; // garde:cibles-curseur|st.curseur = pos; // garde:cibles-curseur|' F4.5 "le curseur avance jusqu'à la taille du fichier au lieu de la dernière ligne complète"
+mut3 M-CURSEUR vf-cockpit-cibles-suivi.mjs 's|st.curseur = pos - st.attenteLen; // garde:cibles-curseur|st.curseur = pos; // garde:cibles-curseur|' F4.5 "le curseur avance jusqu'à la taille du fichier au lieu de la dernière ligne complète"
 mut3 M-TRANCHE vf-cockpit-cibles-suivi.mjs 's|ctx.budget = () => ctx.lus >= octets \|\| horloge() - t0 >= ms; // garde:cibles-tranche|ctx.budget = () => false; // garde:cibles-tranche|' F4.9 "le budget de la tranche est retiré"
 mut3 M-PERSISTE vf-cockpit-cibles-suivi.mjs "s|cibles(id) {|cibles(id) { if (etats.has(id) \&\& process.getBuiltinModule('node:fs')) process.getBuiltinModule('node:fs').appendFileSync(process.getBuiltinModule('node:os').tmpdir() + '/frise-persiste.txt', 'x'); // garde:cibles-memoire|" F4.10 "les listes sont écrites dans un fichier"
 mut3 M-ARBRE vf-cockpit-cible.mjs 's|^.*garde:cible-arbre.*$|  return arbre ? { nom: arbre, racine: table[0].racine, base: table[0].racine + path.sep + arbre } : table[0]; // garde:cible-arbre|' F4.11d "le nom est pris pour un chemin sous l'arbre principal"
 mut3 M-VERIF vf-cockpit-arbres.mjs 's|worktreeVerifie(commun, t)|true|' F4.11f "la preuve du lien retour d'un worktree est neutralisée"
 mut3 M-COLLISION vf-cockpit-cible.mjs '/garde:cible-collision/s/occupants.get(nom(a)) > 1/occupants.get(nom(a)) > 2/' F4.11h "deux worktrees de même nom sont admis"
 mut3 M-PRINCIPAL vf-cockpit-cible.mjs 's|^.*garde:cible-principal.*$||' F4.11i "le nom du dossier de l'arbre principal n'occupe plus un nom"
+mut3 M-LIGNE-MAX vf-cockpit-cibles-suivi.mjs 's|garde:cibles-ligne-max|garde:cibles-ligne-max|;/garde:cibles-ligne-max/s/> LIGNE_MAX/> 1e12/' F4.4b "la ligne trop longue est accumulée au lieu d'être sautée"
+mut3 M-NETTOIE vf-cockpit-cible.mjs '/garde:cible-nettoie/s/nettoie(/masque(/' F4.14 "le nettoyage d'affichage est retiré de fin"
 mut3 M-ELLIPSE vf-cockpit-cible.mjs "s|return t.slice(0, n) + '…'; // garde:cible-fin|return t.slice(0, 120); // garde:cible-fin|" F4.13 "coupe à 120 sans marque"
 mut3 M-TRONQUE-CIBLES vf-cockpit-cibles-suivi.mjs 's|if (perdu) st.cibles.tronque = true; // garde:cibles-tronque|if (perdu) st.ver += 0; // garde:cibles-tronque|' F4.7 "la ligne ne pose plus l'indicateur"
 
@@ -422,6 +428,162 @@ const eg=ev.slice(1).map((x,i)=>x-ev[i]);console.log([ev.length>=1,ev.length<=t.
   assert_eq "F6.4 — la sonde sait rougir : sur le collecteur en ligne (étapes sur la boucle), la même sonde mesure un maximum d'au moins 100 ms, sans erreur de connexion (M-EN-LIGNE-FRISE : le rouge est celui de la sonde)" "$(jf "$WORK/sonde-el.json" 'j.n>=20&&j.erreurs===0&&j.max>=100')" "true"
 fi
 
+
+echo "=== F7 — routes d'agent lues dans la table de la collecte, fichier lu dans le fil, chemin d'erreur fermé (79-22, SOCL-27 ; A48-47, A50) ==="
+AG="$TESTS/frise-agents.mjs"; MQ_D="MARQ-DOING-79-22"; MQ_M="MARQ-MANDAT-79-22"; MQ_C="MARQ-CHEMIN-79-22"; MQ_E="MARQ-ERREUR-79-22"
+AGLAB="$WORK/aglab"; AGHOME="$WORK/aghome"; COUNT="$WORK/compteur-ag.txt"; mkdir -p "$AGHOME"
+node "$TESTS/frise-labo.mjs" lab "$AGLAB"
+node "$AG" fixture "$AGHOME" "$AGLAB" "${VF_AGENTS_MIO:-9}"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$AGLAB" --quiet > "$WORK/build-ag.out" 2>&1
+ag_node() { PATH="$BIN:$PATH" HOME="$AGHOME" node "$AG" "$@" 2> "$WORK/ag-$1.err" | tail -1; }
+# « rougit » : la valeur mesurée sur le mutant n'est ni illisible (un plantage n'est pas un rouge) ni égale à l'attendu sain
+rougit() { if [ "$1" = illisible ] || [ -z "$1" ]; then echo "plante"; elif [ "$1" = "$2" ]; then echo "vert"; else echo "ko"; fi; }
+# serveur de la fixture sur une copie instrumentée du module, mutée si <sed> est donné : 0 quand le marqueur de `doing` est lu
+ag_demarrer() { # <nom> [<fichier-du-module> <sed>]
+  if [ -n "${2:-}" ]; then cockpit_module_muter "$1" "$2" "$3" || return 90; node --check "$COCKPIT_MODULE/scripts/$2" || return 91
+  else COCKPIT_MODULE="$(cockpit_module_copie "$WORK/mod-$1")" || return 92; export COCKPIT_MODULE; fi
+  : > "$COUNT"; node "$AG" instrumenter "$COCKPIT_MODULE" "$COUNT" || return 93
+  cockpit_lancer "$AGLAB" VF_COCKPIT_SCRIPTS_DIR="$FAUX" PATH="$BIN:$PATH" HOME="$AGHOME" || return 94
+  doing_vu() { get "/api/vf/doing?id=sess-ag-0001" > "$WORK/ag-doing.json" 2>/dev/null; grep -q "$MQ_D" "$WORK/ag-doing.json"; }
+  attendre 40 doing_vu
+}
+ag_arreter() { cockpit_arreter; unset COCKPIT_MODULE; }
+nreq() { grep -c '^requete$' "$COUNT" 2>/dev/null; }
+# cinquante requêtes (25 transcript, 25 doing) : imprime « <réponses 200 à marqueur>|<lignes requete de plus> »
+ag_cinquante() {
+  local n0 ok=0 i; n0="$(nreq)"
+  for i in $(seq 1 25); do
+    get "/api/vf/transcript?id=role1" > "$WORK/ag-t.json"; [ "$VF_CODE" = 200 ] && grep -q "$MQ_M" "$WORK/ag-t.json" && ok=$((ok+1))
+    get "/api/vf/doing?id=sess-ag-0001" > "$WORK/ag-d.json"; [ "$VF_CODE" = 200 ] && grep -q "$MQ_D" "$WORK/ag-d.json" && ok=$((ok+1))
+  done
+  echo "$ok|$(( $(nreq) - n0 ))"
+}
+# sonde de latence pendant trente lectures de 9 Mio (6 par groupe) : écrit sonde et rafale, imprime « p99|max|erreurs|n|200 »
+ag_sonde() {
+  node "$TESTS/collecte-sonde.mjs" "$VF_PORT" 100 8000 > "$WORK/ag-sonde.json" & local sp=$!; PIDS+=("$sp")
+  node "$AG" rafale "$VF_PORT" "$VF_JETON" big1 30 6 1200 > "$WORK/ag-rafale.json"
+  wait "$sp" 2>/dev/null
+  echo "$(jf "$WORK/ag-sonde.json" 'j.p99+"|"+j.max+"|"+j.erreurs+"|"+j.n')|$(jf "$WORK/ag-rafale.json" 'j.codes.filter((c)=>c===200).length')"
+}
+
+# F7.0 — le module neuf, les deux options facultatives de who
+F70="$(node --input-type=module -e "
+const T=await import('file://$SCRIPTS/vf-cockpit-agents-table.mjs').catch(()=>null);
+if(!T){console.log('absent');process.exit(0)}
+const W=await import('file://$SCRIPTS/vf-cockpit-who.mjs');
+let vu=null;
+W.collectWho('$AGLAB',{home:'$AGHOME',scriptsDir:'$FAUX',surAgents:(w,r)=>{vu=[Array.isArray(w),w.some((x)=>typeof x._tr==='string'),r instanceof Map]}});
+const f='$AGHOME/.claude/projects/-lab/sess-ag-0001.jsonl',tb=(i)=>i==='sess-ag-0001'?{genre:'session',fichier:f,roles:new Map()}:null,o={home:'/inexistant-79-22',table:tb};
+const d=W.revealDoing('$AGLAB','sess-ag-0001',o),t=W.revealTranscript('$AGLAB','sess-ag-0001',o),u=W.revealDoing('$AGLAB','autre-id',{home:'/inexistant-79-22',table:()=>null});
+console.log([Object.keys(T).sort().join(','),JSON.stringify(vu),String(d.doing).includes('$MQ_D'),t.schema+'/'+Array.isArray(t.fil),u.erreur].join('|'))")"
+assert_eq "F7.0 — agents-table exporte ses cinq noms ; collectWho appelle surAgents (travailleurs avec _tr, rôles en Map) ; revealDoing et revealTranscript avec table lisent sans collecter (home vide) et rendent inconnu pour un agent absent" "$F70" "TABLE_MAX,creerTable,lireAgent,lireDansLeFil,poserLecteurAgents|[true,true,true]|true|vibeflow/cockpit-transcript@2/true|inconnu"
+
+# mesures de l'ancien chemin : une lecture du transcript volumineux sur la boucle
+DUREE_LECTURE="$(ag_node duree "$SCRIPTS" "$AGLAB" "$AGHOME" big1)"
+echo "  (durée d'une lecture de $(du -k "$AGHOME/.claude/projects/-lab/sess-ag-0001/subagents/agent-big1.jsonl" | cut -f1) Kio sur la boucle, ancien chemin : ${DUREE_LECTURE} ms)"
+assert_ge "F7.4a — la fixture volumineuse est assez lourde : une lecture sur la boucle dure au moins 100 ms (la fixture se règle sur la mesure, jamais le seuil : VF_AGENTS_MIO)" "${DUREE_LECTURE:-0}" 100
+
+# F7.2b — la borne de la table (en processus), puis son mutant
+B_SAIN="$(ag_node borne "$COPIE")"; echo "$B_SAIN" > "$WORK/ag-borne.json"
+assert_eq "F7.2b — table : 1 999, 2 000, 2 001 puis 2 500 travailleurs rendent 1 999, 2 000, 2 000 puis 2 000 entrées retenues (la borne est atteinte deux fois), le 2 001e et le 2 500e sont inconnus" "$(jf "$WORK/ag-borne.json" 'j.retenus.join()+"|"+j.max+"|"+j.inconnus[2001].join()+"|"+j.inconnus[2500].join()')" "1999,2000,2000,2000|2000|true,true|true,true"
+d="$(mutcopie M-BORNE-TABLE vf-cockpit-agents-table.mjs '/garde:agents-borne/s/neuf.size >= max/false/')"; assert_eq "M-BORNE-TABLE.0 — la copie existe, diffère et charge" "$([ -n "$d" ] && echo oui || echo non)" "oui"
+[ -n "$d" ] && { ag_node borne "$d" > "$WORK/ag-borne-m.json"; assert_eq "M-BORNE-TABLE — la ligne garde:agents-borne ne borne plus : F7.2b rougit pour la raison tracée (2 500 entrées retenues au lieu de 2 000)" "$(jf "$WORK/ag-borne-m.json" 'j.retenus.join()')" "1999,2000,2001,2500"; }
+
+# F7.2 — corps égal à l'ancien chemin, pilote réel sur le fil réel, puis son mutant
+ag_node egal "$COPIE" "$AGLAB" "$AGHOME" "$FAUX" > "$WORK/ag-egal.json"
+EGAL_ATT="true|true|true|inconnu|inconnu|true|true|inconnu"
+EGAL_EXPR='[Object.values(j.avant).every(Boolean),j.tour1,Object.values(j.egal).every((v)=>v[0]&&v[1]),j.egal.gone1[2],j.egal.gone1[3],String(j.mandat).includes("MARQ-MANDAT-79-22"),j.presentAvant,j.sorti].join("|")'
+assert_eq "F7.2 — avant le premier tour : inconnu sans collecte ; après un tour : corps de transcript et de doing égaux (JSON) à ceux de l'ancien chemin pour la session, le sous-agent de rôle connu, le fichier supprimé (inconnu des deux côtés) et l'identifiant inconnu ; un agent sorti de la fenêtre au tour suivant est inconnu" "$(jf "$WORK/ag-egal.json" "$EGAL_EXPR")" "$EGAL_ATT"
+d="$(mutcopie M-REMPLACE vf-cockpit-agents-table.mjs '/garde:agents-remplace/s/m = neuf;/m = new Map([...m, ...neuf]);/')"; assert_eq "M-REMPLACE.0 — la copie existe, diffère et charge" "$([ -n "$d" ] && echo oui || echo non)" "oui"
+[ -n "$d" ] && { ag_node egal "$d" "$AGLAB" "$AGHOME" "$FAUX" > "$WORK/ag-egal-m.json"; assert_eq "M-REMPLACE — la ligne garde:agents-remplace fusionne au lieu de remplacer : l'agent sorti de la fenêtre reste lisible, F7.2 rougit" "$(rougit "$(jf "$WORK/ag-egal-m.json" "$EGAL_EXPR")" "$EGAL_ATT")|$(jf "$WORK/ag-egal-m.json" 'j.sorti===undefined')" "ko|true"; }
+
+# F7.6 — file, délai, relance (fil d'essai : le harnais), puis son mutant
+mkdir -p "$WORK/ag-fil"; ag_node file "$COPIE" "$AGLAB" "$WORK/ag-fil" > "$WORK/ag-file.json"
+FILE_EXPR='[j.tot40,j.tot40Inconnus,j.tot40Apres,j.bons,j.muetsAvant,j.muetsApres,j.muetsInconnus,j.nouveaux,j.nouveauxInconnus,j.morts,j.mortsInconnus,j.apresRelance].join("|")'
+FILE_ATT="24|true|40|16|0|3|true|16|1|2|true|true"
+assert_eq "F7.6 — 40 lectures simultanées pendant que le fil retient : 16 en vol, 24 inconnues sans attendre ; réponses libérées : les 16 reçoivent leur corps ; fil muet : inconnu au délai (horloge injectée) puis aucune fuite (16 nouvelles lectures répondues, la 17e inconnue) ; fil mort : lectures en vol inconnues, lecture suivante répondue après un tour du nouveau fil" "$(jf "$WORK/ag-file.json" "$FILE_EXPR")" "$FILE_ATT"
+d="$(mutcopie M-FILE vf-cockpit-agents-table.mjs '/garde:agents-file/s/enVol >= EN_VOL_MAX/false/')"; assert_eq "M-FILE.0 — la copie existe, diffère et charge" "$([ -n "$d" ] && echo oui || echo non)" "oui"
+[ -n "$d" ] && { mkdir -p "$WORK/ag-fil-m"; ag_node file "$d" "$AGLAB" "$WORK/ag-fil-m" > "$WORK/ag-file-m.json"; assert_eq "M-FILE — la ligne garde:agents-file retire le plafond de 16 : les 40 lectures partent, aucune n'est refusée, F7.6 rougit" "$(rougit "$(jf "$WORK/ag-file-m.json" "$FILE_EXPR")" "$FILE_ATT")|$(jf "$WORK/ag-file-m.json" 'j.tot40')" "ko|0"; }
+
+# F7.9 — chemin d'erreur en processus (fichier au nom forgé), puis son mutant
+ag_node erreur "$COPIE" "$AGLAB" > "$WORK/ag-erreur.json"
+ERR_EXPR='j.transcript.join()+"|"+j.doing.join()+"|"+j.leve'
+ERR_ATT="true,false,false,erreur,id,schema|true,false,false,doing,erreur,id,schema|oui"
+assert_eq "F7.9 — un fichier au nom forgé (octet nul) : lireDansLeFil rend, pour transcript et doing, le corps d'un agent absent (mêmes clés, sans message), sans le marqueur ni la racine du lab ; témoin positif : fs.statSync sur ce chemin lève et son message porte le marqueur" "$(jf "$WORK/ag-erreur.json" "$ERR_EXPR")" "$ERR_ATT"
+d="$(mutcopie M-ERREUR-LECTURE vf-cockpit-agents-table.mjs '/garde:agents-erreur/s/catch { return inconnu(q, id); }/catch (e) { return { ...inconnu(q, id), erreur: String(e.message) }; }/')"; assert_eq "M-ERREUR-LECTURE.0 — la copie existe, diffère et charge" "$([ -n "$d" ] && echo oui || echo non)" "oui"
+[ -n "$d" ] && { ag_node erreur "$d" "$AGLAB" > "$WORK/ag-erreur-m.json"; assert_eq "M-ERREUR-LECTURE — la ligne garde:agents-erreur rend le texte de l'exception : F7.9 rougit pour la raison tracée (le marqueur est dans le corps)" "$(rougit "$(jf "$WORK/ag-erreur-m.json" "$ERR_EXPR")" "$ERR_ATT")|$(jf "$WORK/ag-erreur-m.json" 'j.transcript[1]')" "ko|true"; }
+
+# F7.7 — une seule collecte par tour (garde-fou : vert avant et après), en processus sur une copie instrumentée
+IN7="$(cockpit_module_copie "$WORK/mod-tours")"; : > "$COUNT"; node "$AG" instrumenter "$IN7" "$COUNT"
+ag_node tours "$IN7/scripts" "$AGLAB" "$AGHOME" "$FAUX" 3 > /dev/null
+assert_eq "F7.7 — trois tours de la collecte sur la copie instrumentée : exactement trois lignes tour (jamais une seconde collecte pour la table), aucune ligne requete" "$(grep -c '^tour$' "$COUNT")|$(nreq)" "3|0"
+
+# serveur réel A : copie instrumentée saine
+ag_demarrer ag-sain; RA=$?
+assert_eq "F7.0a — le serveur de la fixture F7 (copie instrumentée) est lancé et la dernière commande de la session est lue" "$RA" "0"
+if [ "$RA" = 0 ]; then
+  FLOG7="$WORK/flux-ag.json"; node "$TESTS/etat-clients.mjs" sse "$VF_PORT" "$VF_JETON" 150000 "$FLOG7" > /dev/null 2>&1 &
+  SSE7=$!; PIDS+=("$SSE7")
+  # F7.1 — cinquante requêtes, zéro collecte
+  R1="$(ag_cinquante)"; TOURS7="$(grep -c '^tour$' "$COUNT")"
+  assert_eq "F7.1 — 25 requêtes /api/vf/transcript et 25 /api/vf/doing : toutes 200 avec leur marqueur, zéro ligne requete de plus dans le compteur de collecte" "$R1" "50|0"
+  assert_ge "F7.1b — témoin positif : le compteur compte (au moins une ligne tour depuis le démarrage)" "$TOURS7" 1
+  # F7.3 — la table et ses chemins ne sortent jamais
+  ag_balayage() { # <marqueur> : nombre de corps (et du flux, du journal du processus, de la sortie du lab) qui portent le marqueur
+    local n=0 u f; for u in /api/vf/etat /api/vf/state /api/vf/frise '/api/vf/frise?champs=cibles' '/api/vf/doing?id=sess-ag-0001' '/api/vf/doing?id=sess-ch-0001' '/api/vf/transcript?id=role1' '/api/vf/transcript?id=chem1' '/api/vf/transcript?id=err1' '/api/vf/doing?id=chem1' /api/vf/journal; do
+      get "$u" > "$WORK/ag-b.json" 2>/dev/null; grep -q -F "$1" "$WORK/ag-b.json" && n=$((n+1)); done
+    for f in "$FLOG7.log" "$VF_LOG"; do grep -q -F "$1" "$f" 2>/dev/null && n=$((n+1)); done
+    [ "$(grep -rlF "$1" "$AGLAB" --exclude-dir=.git 2>/dev/null | wc -l | tr -d ' ')" = 0 ] || n=$((n+1))
+    echo "$n"
+  }
+  sleep 4
+  B7="$(ag_balayage "$MQ_C")"
+  mkdir -p "$AGLAB/.vibeflow/cockpit"; echo "$MQ_C" > "$AGLAB/.vibeflow/cockpit/plante.txt"; POS7="$(grep -rlF "$MQ_C" "$AGLAB" --exclude-dir=.git 2>/dev/null | wc -l | tr -d ' ')"; rm -f "$AGLAB/.vibeflow/cockpit/plante.txt"
+  DISQUE7="$(find "$AGHOME" -name "*$MQ_C*" -type d | wc -l | tr -d ' ')"
+  assert_eq "F7.3 — le marqueur de chemin n'est dans aucun corps (etat, state, frise avec et sans champs, doing, transcript, journal), ni dans le flux, ni dans la sortie du processus, ni dans un fichier du lab ; témoins positifs : le marqueur est dans un dossier de transcript sur disque et le balayage trouve un marqueur planté" "$B7|$POS7|$DISQUE7" "0|1|1"
+  get "/api/vf/transcript?id=chem1" > "$WORK/ag-chem1.json"
+  assert_eq "F7.3b — l'agent du dossier marqué est bien lu (200, fil non vide) : le balayage ne passe pas à côté d'une lecture qui n'a pas eu lieu" "$VF_CODE|$(jf "$WORK/ag-chem1.json" 'j.erreur===undefined&&j.fil.length>0')" "200|true"
+  # F7.4 — la boucle ne sent pas les lectures
+  S4="$(ag_sonde)"; echo "  (sonde, table : p99|max|erreurs|n|200 = $S4 ; durée d'une lecture de la fixture sur la boucle : ${DUREE_LECTURE} ms)"
+  assert_eq "F7.4 — 30 lectures du transcript volumineux pendant la sonde : toutes 200, aucune erreur de connexion, au moins 60 réponses de sonde, p99 inférieur à 50 ms et maximum inférieur à 100 ms" "$(echo "$S4" | awk -F'|' '{print ($1<50)"|"($2<100)"|"$3"|"($4>=60)"|"$5}')" "1|1|0|1|30"
+  # F7.10 — chemin d'erreur sur le serveur réel
+  get "/api/vf/transcript?id=err1" > "$WORK/ag-err1.json"; C_ERR="$VF_CODE"
+  get "/api/vf/doing?id=err1" > "$WORK/ag-err1d.json"
+  LEVEE="$(grep -c '^levee$' "$COUNT")"; sleep 3; FUITE10="$(( $(ag_balayage "$MQ_E") + $(ag_balayage "$MQ_C") ))"
+  get "/api/vf/transcript?id=role1" > "$WORK/ag-apres.json"
+  assert_eq "F7.10 — la lecture qui lève (agent err1) : 200 et corps inconnu ; l'exception a bien été levée (témoin positif : ligne levee) ; ni le marqueur d'erreur ni celui de chemin dans un corps, le journal, le flux, la sortie du processus ou le lab ; la lecture suivante d'un agent sain rend son corps (le fil n'est pas mort)" "$C_ERR|$(jf "$WORK/ag-err1.json" 'j.erreur+"/"+Object.keys(j).sort().join()')|$([ "$LEVEE" -ge 1 ] && echo levee)|$FUITE10|$(grep -c "$MQ_M" "$WORK/ag-apres.json")" "200|inconnu/erreur,id,schema|levee|0|1"
+  vf_hyg_stop "$SSE7"
+fi
+ag_arreter
+
+# M-RELANCE : la ligne garde:agents-table appelle l'ancien chemin sur la boucle ; F7.1 rougit (collectes d'origine requête), la sonde de F7.5 rougit
+ag_demarrer M-RELANCE vf-cockpit-agents-table.mjs '/garde:agents-table/s/lecteur(quoi, id, ctl.signal)/Promise.resolve((quoi === "doing" ? revealDoing : revealTranscript)(process.cwd(), id, {}))/'; RM=$?
+assert_eq "M-RELANCE.0 — la copie existe, diffère, charge, et le serveur muté est lancé" "$RM" "0"
+if [ "$RM" = 0 ]; then
+  RM1="$(ag_cinquante)"
+  assert_eq "M-RELANCE — F7.1 rougit : chaque requête relance une collecte (au moins 50 lignes requete de plus)" "$([ "${RM1#*|}" -ge 50 ] && echo ko || echo "vert:$RM1")" "ko"
+  S5="$(ag_sonde)"; echo "  (sonde, ancien chemin sur la boucle : p99|max|erreurs|n|200 = $S5)"
+  assert_eq "M-EN-LIGNE-LECTURE — F7.5 : la sonde sait rougir, la même scène avec l'ancien chemin sur la boucle mesure un maximum d'au moins 100 ms, sans erreur de connexion" "$(echo "$S5" | awk -F'|' '{print ($2>=100)"|"$3}')" "1|0"
+fi
+ag_arreter
+
+# M-CHEMIN : la ligne garde:agents-sortie ajoute le fichier au corps ; F7.3 rougit
+ag_demarrer M-CHEMIN vf-cockpit-agents-table.mjs '/garde:agents-sortie/s/return corps;/return { ...corps, fichier: e.fichier };/'; RC=$?
+assert_eq "M-CHEMIN.0 — la copie existe, diffère, charge, et le serveur muté est lancé" "$RC" "0"
+if [ "$RC" = 0 ]; then
+  get "/api/vf/transcript?id=chem1" > "$WORK/ag-chem-m.json"
+  assert_eq "M-CHEMIN — la ligne garde:agents-sortie ajoute le fichier au corps : le marqueur de chemin sort par transcript, F7.3 rougit" "$(grep -c -F "$MQ_C" "$WORK/ag-chem-m.json")" "1"
+fi
+ag_arreter
+
+# M-ERREUR-LECTURE sur le serveur réel : F7.10 rougit
+ag_demarrer M-ERREUR-LECTURE vf-cockpit-agents-table.mjs '/garde:agents-erreur/s/catch { return inconnu(q, id); }/catch (e) { return { ...inconnu(q, id), erreur: String(e.message) }; }/'; RE=$?
+assert_eq "M-ERREUR-LECTURE.1 — la copie existe, diffère, charge, et le serveur muté est lancé" "$RE" "0"
+if [ "$RE" = 0 ]; then
+  get "/api/vf/transcript?id=err1" > "$WORK/ag-err-m.json"
+  assert_eq "M-ERREUR-LECTURE — la ligne garde:agents-erreur rend le texte de l'exception : le marqueur d'erreur sort par transcript, F7.10 rougit" "$(grep -c -F "$MQ_E" "$WORK/ag-err-m.json")" "1"
+fi
+ag_arreter
 
 # @@SUITE@@
 vf_hyg_assert

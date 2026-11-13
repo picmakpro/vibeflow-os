@@ -63,9 +63,12 @@ assert_has "N2.2 — un message dit que le cockpit ne répond plus" "$(printf '%
 assert_has "N2.3 — le message porte le bouton « Réessayer »" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.banniere')" "Réessayer"
 assert_eq "N3.1 — « Réessayer » relance le sondage" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.apresClic>=2')" "true"
 echo "=== N4 — témoin rouge : le module d'avant (la page ne ferme pas son flux : le navigateur réessaie seul, chaque seconde) ==="
-LABM="$WORK/lab-mutant"; cp -R "$LAB" "$LABM"; MP="$LABM/.vibeflow/cockpit/project.html"
-assert_eq "N4.0 — le mutant retire bien la fermeture du flux coupé et son inscription au sondage (motif présent avant, absent après)" "$(before=$(grep -c "es.onerror = () => { es.close(); perdu('direct', connecter); };" "$MP"); sed -i.bak "s#es.onerror = () => { es.close(); perdu('direct', connecter); };#es.onerror = () => {}; /* mutant N4 */#" "$MP"; echo "$before,$(grep -c "es.onerror = () => { es.close(); perdu('direct', connecter); };" "$MP")")" "1,0"
-RM="$(reco "$LABM" project.html)"
+# 79-16 : le module d'avant est une COPIE DU MODULE dont la source de page (ui/*.js) perd la fermeture du flux coupé ; la sortie du lab ne porte que des données
+MOTIF="es.onerror = () => { es.close(); perdu('direct', connecter); };"
+n4_pages() { local a="$1/skills/cockpit-moteur/assets"; cat "$a/viewer.html" "$a"/ui/*.js | grep -cF "$MOTIF" || true; }
+cockpit_module_muter_page n4 "s#es.onerror = () => { es.close(); perdu('direct', connecter); };#es.onerror = () => {}; /* mutant N4 */#"; MN4="${COCKPIT_MODULE:-}"
+assert_eq "N4.0 — le mutant retire bien la fermeture du flux coupé et son inscription au sondage (motif présent avant, absent après)" "$(n4_pages "$(cd "$SCRIPTS/.." && pwd)"),$([ -n "$MN4" ] && n4_pages "$MN4" || echo ?)" "1,0"
+RM="$(COCKPIT_MODULE="$MN4" reco "$LAB" project.html)"; unset COCKPIT_MODULE
 assert_eq "N4.1 — témoin rouge : sans le recul, des requêtes continuent entre 5 s et 9 s (N2.1 rougirait)" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" '!j.erreur && j.tard>0')" "true"
 
 echo "=== N5 — deux onglets du même lab, le serveur s'arrête : le suiveur est informé par l'élu ==="

@@ -43,13 +43,13 @@ scripts/vf-cockpit-lancer.mjs 11
 scripts/vf-cockpit-lanceur-verrou.mjs 4
 scripts/vf-cockpit-lecture.mjs 23
 scripts/vf-cockpit-live.mjs 7
-scripts/vf-cockpit-module.mjs 4
+scripts/vf-cockpit-module.mjs 3
 scripts/vf-cockpit-paths.mjs 8
 scripts/vf-cockpit-planning.mjs 25
 scripts/vf-cockpit-port.mjs 3
 scripts/vf-cockpit-project.mjs 68
 scripts/vf-cockpit-query.mjs 3
-scripts/vf-cockpit-server.mjs 19
+scripts/vf-cockpit-server.mjs 16
 scripts/vf-cockpit-serveur-vivant.mjs 3
 scripts/vf-cockpit-signal.mjs 14
 scripts/vf-cockpit-terminal-amorce.mjs 7
@@ -68,9 +68,9 @@ skills/cockpit-moteur/assets/ui/01-vf-responsive.js 63
 skills/cockpit-moteur/assets/ui/02-vf-telephone.js 54
 skills/cockpit-moteur/assets/ui/03-vf-accessibilite.js 6
 skills/cockpit-moteur/assets/ui/39-vf-tour-placement.js 26
-skills/cockpit-moteur/assets/ui/70-vf-live.js 60
+skills/cockpit-moteur/assets/ui/70-vf-live.js 59
 skills/cockpit-moteur/assets/ui/71-vf-equipe-rendu.js 59
-skills/cockpit-moteur/assets/ui/72-vf-equipe.js 29
+skills/cockpit-moteur/assets/ui/72-vf-equipe.js 28
 skills/cockpit-moteur/assets/ui/73-vf-tiroir-travail.js 12
 skills/cockpit-moteur/assets/ui/75-vf-modele.js 6
 skills/cockpit-moteur/assets/ui/76-vf-git-entete.js 38

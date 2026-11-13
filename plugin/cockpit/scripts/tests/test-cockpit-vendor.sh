@@ -475,7 +475,20 @@ fs.rmSync(f);
 const h2 = m.empreinteModule({ dossierScripts: scripts, dossierMoteur: moteur });
 console.log(`stable=${typeof h0 === 'string' && h0.length === 12} octet=${typeof h1 === 'string' && h1 !== h0} supprime=${h2 === null}`);
 FIN
-rm -rf "$WORK/q6"; mkdir -p "$WORK/q6/scripts" "$WORK/q6/skills/cockpit-moteur/assets/ui"; cp "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs "$WORK/q6/scripts/" 2>/dev/null
+# copie jetable : les fichiers demandes ET leur fermeture transitive des imports relatifs (`from './x.mjs'`) ; un import neuf est suivi sans toucher la suite
+copier_avec_imports() { # <dossier-cible> <fichier>... (chemins absolus)
+  local dest="$1" file dep vus=""; shift
+  local file_list=("$@")
+  while [ ${#file_list[@]} -gt 0 ]; do
+    file="${file_list[0]}"; file_list=("${file_list[@]:1}")
+    case " $vus " in *" $file "*) continue;; esac
+    vus="$vus $file"; cp "$file" "$dest/" 2>/dev/null || continue
+    for dep in $(sed -nE "s/^[[:space:]]*(import|export)[^'\"]*from[[:space:]]+'\.\/([^']+)'.*/\2/p" "$file"); do
+      file_list=("${file_list[@]}" "$(dirname "$file")/$dep")
+    done
+  done
+}
+rm -rf "$WORK/q6"; mkdir -p "$WORK/q6/scripts" "$WORK/q6/skills/cockpit-moteur/assets/ui"; copier_avec_imports "$WORK/q6/scripts" "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs
 cp "$MOTEUR/assets/serve.mjs" "$WORK/q6/skills/cockpit-moteur/assets/"; cp -R "$MOTEUR/assets/ui/terminal" "$WORK/q6/skills/cockpit-moteur/assets/ui/terminal" 2>/dev/null; cp -R "$MOTEUR/assets/ui/tiroir" "$WORK/q6/skills/cockpit-moteur/assets/ui/tiroir" 2>/dev/null   # la liste close porte aussi les neuf fichiers de P
 node "$WORK/q6.mjs" "$WORK/q6" > "$WORK/q6.out" 2>&1
 assert_eq "V11.Q6a — fichiersCodeEvalue liste les trois fichiers de Q" "$(sed -n 1p "$WORK/q6.out")" "liste=true"
@@ -513,7 +526,7 @@ assert_eq "V11.P2c — injectionLancer({ indisponible }) rend la chaîne vide" "
 # p3 : une copie jetable du module (scripts utiles et moteur réduit) : un fichier muté change l'injection ; un fichier illisible la rend vide avec une ligne d'erreur
 mini_module() { # <dossier> : copie réduite du module (le lecteur, le module, les deux injecteurs et le dossier rangé)
   rm -rf "$1"; mkdir -p "$1/scripts" "$1/skills/cockpit-moteur/assets/ui"
-  cp "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs "$SCRIPTS"/vf-cockpit-terminal-tiroir.mjs "$SCRIPTS"/vf-cockpit-lancer-ui.mjs "$1/scripts/" 2>/dev/null
+  copier_avec_imports "$1/scripts" "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs "$SCRIPTS"/vf-cockpit-terminal-tiroir.mjs "$SCRIPTS"/vf-cockpit-lancer-ui.mjs
   cp "$MOTEUR/assets/serve.mjs" "$1/skills/cockpit-moteur/assets/" 2>/dev/null; cp -R "$MOTEUR/assets/ui/terminal" "$MOTEUR/assets/ui/tiroir" "$1/skills/cockpit-moteur/assets/ui/" 2>/dev/null
 }
 cat > "$WORK/p3.mjs" <<'FIN'

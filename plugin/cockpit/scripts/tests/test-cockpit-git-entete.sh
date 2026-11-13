@@ -152,13 +152,14 @@ JS
     assert_eq "H2.2 — $pg : la seconde ligne dit la branche" "$(jq_ "$R" '/feat\/x/.test(j.ligne||"") ? "oui" : "non"' 2>/dev/null)" "oui"
     case "$pg" in /project.html) assert_eq "H2.2 — titre de l'onglet du navigateur : « Projet · » puis le nom que l'en-tête affiche (AUDC-X7, forme unique)" "$(jq_ "$R" 'j.titre === "Projet · " + j.attendu ? "inchangé" : j.titre' 2>/dev/null)" "inchangé";; esac
   done
-  # H2.3 : une réécriture de project.html par le direct garde le nom du dépôt
-  printf '<objective>Second plan ajouté par le test H2.3</objective>\n' > "$WT/.planning/phases/01-x/01-02-PLAN.md" # un plan neuf change la structure : le direct réécrit project.html
-  for _ in $(seq 1 150); do grep -q 'Second plan ajouté par le test H2.3' "$OUT/project.html" 2>/dev/null && break; sleep 0.2; done
-  assert_eq "H2.3a — témoin : project.html a bien été réécrit par le direct" "$(grep -c 'Second plan ajouté par le test H2.3' "$OUT/project.html")" "1"
-  assert_eq "H2.3b — la page réécrite porte toujours meta.vfGit" "$(grep -c '"vfGit":{"etat":"ok"' "$OUT/project.html")" "1"
+  # H2.3 : un changement de planning garde le nom du dépôt (79-15 : la page est servie depuis la mémoire, project.html du disque ne bouge plus)
+  servi() { node "$SCRIPTS/tests/graphe-client.mjs" get "$PORT" /project.html | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).corps||"")}catch{}})'; }
+  printf '<objective>Second plan ajouté par le test H2.3</objective>\n' > "$WT/.planning/phases/01-x/01-02-PLAN.md" # un plan neuf change la structure : la page servie le porte, project.html du disque reste celui de l'assemblage
+  for _ in $(seq 1 150); do servi | grep -q 'Second plan ajouté par le test H2.3' && break; sleep 0.2; done
+  assert_eq "H2.3a — témoin : la page servie porte le second plan, project.html du disque est resté celui de l'assemblage" "$(servi | grep -c 'Second plan ajouté par le test H2.3')|$(grep -c 'Second plan ajouté par le test H2.3' "$OUT/project.html")" "1|0"
+  assert_eq "H2.3b — la page servie après le changement porte toujours meta.vfGit" "$(servi | grep -c '"vfGit":{"etat":"ok"')" "1"
   R="$(cdp "$AUX/h2.js" "$BASE" /project.html 2>&1 | tail -1)"
-  assert_eq "H2.3c — après réécriture, #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
+  assert_eq "H2.3c — après le changement, #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
 
   echo "=== H3 — seconde ligne, événements, ouvreur ==="
   cat > "$AUX/h3.js" <<'JS'
@@ -538,7 +539,7 @@ if (mode === 'connue') {
   out.avant = await lecture({ etat: 'ok', branche: 'feat/memoire', worktree: 'wt-m' });
   // F6a (3e tour de la recette du 2026-11-08) : le titre de la vue n'est un arrêt de Tab que s'il porte une définition. Branche connue : titre atteignable (témoin) ; dépôt « indisponible » : plus de définition, donc plus d'arrêt, MÊME après un changement de classe du corps (ouverture/fermeture du tiroir Git) qui relance l'observateur de tabindex
   const titre = () => s.ev(`(() => { const h = document.querySelector('#context h1'); return h ? [h.hasAttribute('tabindex') ? h.getAttribute('tabindex') : 'aucun', h.hasAttribute('title') || h.hasAttribute('aria-description')].join('/') : 'absent'; })()`);
-  const classeDuCorps = async () => { await s.ev(`document.body.classList.add('vf-git-ouvert')`); await s.ev(`document.body.classList.remove('vf-git-ouvert')`); await s.ev(`new Promise((r) => setTimeout(r, 50))`); };
+  const classeDuCorps = async () => { await s.ev(`document.body.classList.add('vf-git-ouvert')`); await s.ev(`document.body.classList.remove('vf-git-ouvert')`); await s.ev(`window.dispatchEvent(new CustomEvent('vf-git:etat', { detail: { ouvert: false } }))`); await s.ev(`new Promise((r) => setTimeout(r, 50))`); }; // 79-17 : le tiroir pose ou retire la classe PUIS émet vf-git:etat, qui relance l'arrêt de tabulation (plus d'observateur de la classe)
   await attendreValeur(titre, (v) => v === '0/true', { max: 6000 }); out.titreConnu = await titre();
   out.muet = await lecture({ etat: 'indisponible' });
   await classeDuCorps(); out.titreIndispo = await attendreEtStabiliser(titre, (v) => v !== 'absent', { max: 6000 });

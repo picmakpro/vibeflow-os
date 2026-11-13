@@ -75,3 +75,11 @@ Taille : 2 400 entrées de cible, 178 273 octets de réponse, durées de `GET /a
 Serveur A : fenêtre calme de 12 s sans événement ; une ligne ajoutée : un événement ; `etat` actif -> attend : un événement ; segment de queue `attend-humain` commençant à `fin` puis retiré au retour à actif.
 Suites existantes rejouées sur la tête (T4) : routes 56/0, serveur 98/0, securite 103/0, etat 127/0 (494 s), direct 76/0, cycle-serveur rc 0, lancer-serveur 82/0, robustesse 25/0,
 git-signature 47/0, reseau 15/0, signal 76/0 ; vendor : un seul rouge, V4 `check-file-size` (base : fichier du module à 300 lignes qui n'est pas à moi) ; le cliquet de colonnes (V4c.9a) est vert.
+
+## Correction d'audit AU13-01 / AU13-02 (sur 238aed8b)
+Rouges sur 238aed8b (arbre exporté, témoins neufs) : F4.4b : ligne de 40 Mio sans saut de ligne, durée de la plus longue avance 3 577 ms (sans saut) et 3 444 ms (ligne géante terminée),
+attendu sous 600 ms ; F4.14 : `fin` laissait passer bidi (U+202E), échappement (U+001B), espace de largeur nulle (U+200B), C1 (U+0085), DEL.
+Le témoin F4.4 d'origine (« ligne géante sautée », 70 Kio sans `tool_use`) n'atteignait jamais LIGNE_MAX : remplacé par F4.4b (durée mesurée, ligne en attente bornée à LIGNE_MAX, ligne valide suivante comptée).
+Vert : plus longue avance 3 ms et 20 ms, 6 avances, ligne en attente au plus 33 553 621 octets (< LIGNE_MAX), cibles `ok.js` comptées. Mutants : M-LIGNE-MAX -> F4.4b ; M-NETTOIE -> F4.14 ;
+M-CURSEUR réancré sur la nouvelle ligne (`st.curseur = pos - st.attenteLen`) et F4.5 durci par une coupe déterministe au milieu d'une ligne (sinon la reprise sur raccourcissement rattrapait le mutant selon la graine).
+F0.2 relâchée : seul le voisin précédent (`events`) est exigé (le nœud 79-15 insère une route après `frise`).
