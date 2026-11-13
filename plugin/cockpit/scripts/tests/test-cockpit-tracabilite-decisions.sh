@@ -87,6 +87,35 @@ Q51='(() => { const c = j.cit.commits.find((x) => x.sujet.includes("suit ADR-001
 assert_eq "T5.1 — le commit qui cite ADR-001 est relié à la section (h7, jour, sujet) et son corps n'est pas servi" "$(J "$WORK/o51.json" "$Q51")" "true|7|true|false"
 assert_eq "T5.2 — témoin positif : le corps du commit contient bien le marqueur dans git" "$(G_ -C "$LAB" log -1 --format=%B | grep -c 'CORPS-SECRET-76')" "1"
 
+# --- second laboratoire : sections ADR, registres de phase (entière et décimale), commits citants ---
+L2="$WORK/lab2"; mkdir -p "$L2/docs" "$L2/.planning/phases/90-demo" "$L2/.planning/phases/90.5-pointe"
+G_ init -q -b main "$L2"
+{ printf '%s\n' '# ADR' '' '## ADR-001 : Premier choix' '' 'texte' '' '## ADR-002 — Second choix' '' '```' '## ADR-099 : faux' '```'; } > "$L2/docs/ADR.md"
+LONG="mot0 mot1 mot2 mot3 mot4 mot5 mot6 mot7 mot8 mot9 mot10 mot11 mot12 mot13 mot14 mot15 mot16 mot17 mot18 mot19 mot20 mot21 mot22 mot23 mot24 mot25 mot26"
+{ printf '%s\n' '- **P90-D-01 (choix) :** choix retenu, suit ADR-001' '- **P90-D-01 (amendé) :** reprise du choix' '- **D-04 :** décision nue' '### Arbitrage D-05' '```' '- **P90-D-09 :** dans un bloc de code' '```'; echo "- **P90-D-07 :** **gras** et \`code\` $LONG"; } > "$L2/.planning/phases/90-demo/90-CONTEXT.md"
+printf '%s\n' '- **P90.5-D-01 (pointé) :** décision de la phase décimale' '- **P90.5-D-02 :** seconde décision' > "$L2/.planning/phases/90.5-pointe/90.5-CONTEXT.md"
+G_ -C "$L2" add -A; G_ -C "$L2" commit -q -m "docs: pose les registres"
+G_ -C "$L2" commit -q --allow-empty -m "feat: ajoute ADR-007"
+G_ -C "$L2" commit -q --allow-empty -m "feat: met en oeuvre P90-D-01"
+G_ -C "$L2" commit -q --allow-empty -m "applique D-04, suit ADR-001"
+G_ -C "$L2" commit -q --allow-empty -m "fix: suit P90.5-D-01"
+H_() { G_ -C "$L2" log --format=%h -1 --grep="$1"; }
+D "$L2" > "$WORK/o52.json"
+Q53='JSON.stringify([j.adrs.map((a) => a.id), j.adrs.map((a) => a.titre), j.rel.adrSansSection.includes("ADR-007"), j.rel.parAdr["ADR-099"] === undefined])'
+assert_eq "T5.3 — deux sections lues (tiret cadratin toléré), ADR-099 en bloc de code ignorée, ADR-007 citée sans section" "$(J "$WORK/o52.json" "$Q53")" '[["ADR-001","ADR-002"],["Premier choix","Second choix"],true,true]'
+Q54='JSON.stringify(["P90-D-01","D-04","D-05","P90-D-09"].map((i) => j.definitions.filter((d) => d.id === i).length).concat(j.definitions.filter((d) => d.id === "P90-D-01").map((d) => [d.amendee, d.adr, d.nue, d.cle, d.ligne]), j.definitions.filter((d) => d.id === "D-04").map((d) => [d.nue, d.cle]), j.definitions.filter((d) => /^P90\.5-/.test(d.id)).map((d) => [d.id, d.nue, d.cle])))'
+assert_eq "T5.4 — définitions : doublon en une entrée amendée, nue qualifiée par sa phase, titre ### et bloc de code ignorés, phase décimale lue" "$(J "$WORK/o52.json" "$Q54")" '[1,1,0,0,[true,["ADR-001"],false,"P90-D-01:ph-90",1],[true,"D-04:ph-90"],["P90.5-D-01",false,"P90.5-D-01:ph-90.5"],["P90.5-D-02",false,"P90.5-D-02:ph-90.5"]]'
+assert_eq "T5.4 — témoin positif : le registre 90.5 du lab porte deux lignes de définition" "$(grep -c '^- \*\*P90.5-D-' "$L2/.planning/phases/90.5-pointe/90.5-CONTEXT.md")" "2"
+Q54B="JSON.stringify(j.rel.parDecision['P90.5-D-01:ph-90.5'].commits)"
+assert_eq "T5.4 — un commit qui cite P90.5-D-01 est relié à la définition de la phase décimale" "$(J "$WORK/o52.json" "$Q54B")" "[\"$(H_ 'suit P90.5-D-01')\"]"
+Q55='JSON.stringify([j.rel.parDecision["P90-D-01:ph-90"].commits, j.rel.parDecision["D-04:ph-90"].commits, j.rel.parAdr["ADR-001"].commits])'
+assert_eq "T5.5 — décision préfixée reliée à son commit, nue sans commit, le commit « D-04 » remonté par son ADR" "$(J "$WORK/o52.json" "$Q55")" "[[\"$(H_ 'met en oeuvre P90-D-01')\"],[],[\"$(H_ 'applique D-04')\"]]"
+assert_eq "T5.5 — témoin positif : le commit contient bien « D-04 » dans git" "$(G_ -C "$L2" log --format=%h --grep='D-04' | grep -c .)" "1"
+Q56='JSON.stringify([j.rel.parAdr["ADR-001"].decisions, Object.keys(j).concat(Object.keys(j.rel)).some((k) => /exigence/i.test(k))])'
+assert_eq "T5.6 — ADR -> décisions : arête lue dans la ligne de définition, aucune arête exigence -> décision" "$(J "$WORK/o52.json" "$Q56")" '[["P90-D-01:ph-90"],false]'
+Q57='JSON.stringify(j.definitions.filter((d) => d.id === "P90-D-07").map((d) => [d.titre.length <= 80, d.titre.length > 20, /\*\*|`/.test(d.titre)]))'
+assert_eq "T5.7 — titre de 150 caractères et plus coupé à 80 au plus, sans gras ni accent grave" "$(J "$WORK/o52.json" "$Q57")" "[[true,true,false]]"
+
 echo "=================================="
 echo "  Résultats : $PASS PASS / $FAIL FAIL"
 echo "=================================="
