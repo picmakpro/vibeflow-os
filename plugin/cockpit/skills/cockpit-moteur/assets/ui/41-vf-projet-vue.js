@@ -172,8 +172,8 @@
   // terminal relève #stage, la vue monte avec lui
   const hauteur = (e) => { const b = e && !e.hidden && e.isConnected ? e.getBoundingClientRect() : null; return b && b.width > 0 ? Math.round(b.height) : 0; };
   const QS = ['#ask', '#vf-coin', '#panel', '#vf-git-tiroir', '.vf-git-tiroir'];
-  // la pastille du bas de page : lue par sa nature (bouton fixe sous body), jamais par son nom
-  const pastille = () => [...document.body.children].find((e) => e.matches('button') && getComputedStyle(e).position === 'fixed') || null;
+  // la pastille du bas de page : désignée par l'attribut neutre data-vf-flottant="bouton" que son module pose (jamais un nom, jamais une forme)
+  const pastille = () => document.querySelector('[data-vf-flottant="bouton"]');
   const mesurerBas = () => {
     if (!vivant) return;
     // un élément né après le montage (pastille, coin) est observé dès qu'il existe

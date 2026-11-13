@@ -9,11 +9,12 @@ function construireTiroir(document, textes) {
 
   const pastille = el('button', 'vf-term-pastille'); pastille.type = 'button';
   pastille.setAttribute('aria-label', textes.ouvrir); pastille.title = textes.ouvrir;
+  pastille.setAttribute('data-vf-flottant', 'bouton'); // attribut neutre : les extensions de la page lisent celui-ci, jamais la classe ni la forme
   pastille.appendChild(picto('M3 4l4 4-4 4 M9 12h4'));
   pastille.appendChild(el('span', 'vf-term-libelle', textes.pastille));
   const point = el('span', 'vf-term-point'); point.hidden = true; pastille.appendChild(point);
 
-  const region = el('section', 'vf-term-tiroir'); region.setAttribute('role', 'region'); region.setAttribute('aria-label', textes.titre); region.hidden = true; region.inert = true;
+  const region = el('section', 'vf-term-tiroir'); region.setAttribute('role', 'region'); region.setAttribute('aria-label', textes.titre); region.hidden = true; region.inert = true; region.setAttribute('data-vf-flottant', 'tiroir');
   const poignee = el('div', 'vf-term-poignee'); poignee.setAttribute('role', 'separator'); poignee.setAttribute('aria-orientation', 'horizontal');
   poignee.setAttribute('aria-label', textes.poignee); poignee.setAttribute('aria-valuemin', '160'); poignee.tabIndex = 0; poignee.appendChild(el('span', 'vf-term-grip'));
   const corps = el('div', 'vf-term-corps');
@@ -32,7 +33,7 @@ function construireTiroir(document, textes) {
   region.appendChild(poignee); region.appendChild(corps);
 
   const annonce = el('div', 'vf-term-annonce'); annonce.setAttribute('role', 'status'); annonce.setAttribute('aria-live', 'polite');
-  const puce = el('div', 'vf-term-puce'); puce.setAttribute('role', 'status');
+  const puce = el('div', 'vf-term-puce'); puce.setAttribute('role', 'status'); puce.setAttribute('data-vf-flottant', 'etat');
   const carteInjoignable = el('div', 'vf-term-carte'); carteInjoignable.setAttribute('role', 'alert'); carteInjoignable.tabIndex = -1;
   carteInjoignable.appendChild(document.createTextNode(textes.injoignable));
   const colle = el('span', 'vf-term-insecable'); colle.appendChild(el('code', '', textes.commande)); colle.appendChild(document.createTextNode('.')); carteInjoignable.appendChild(colle); // commande et point final ne se coupent jamais

@@ -236,7 +236,7 @@
     if (window.ResizeObserver && scene) obs(ResizeObserver, scene, undefined, () => eviter());
     sur(window, 'vf-git:basculer', basculer); sur(document, 'keydown', surOuvreur, true); sur(window, 'keydown', surTouche);
     sur(window, 'resize', eviter); sur(MOBILE, 'change', reevaluer);
-    obs(MutationObserver, document.body, { attributes: true, attributeFilter: ['class', 'style'] }, eviter); // le Terminal s'ouvre ou se ferme : la réserve basse change
+    obs(MutationObserver, document.body, { childList: true, attributes: true, attributeFilter: ['class', 'style'] }, eviter); // le Terminal s'ouvre ou se ferme, sa pastille arrive : la réserve basse change
     return () => {
       pose.splice(0).forEach((f) => f()); if (ouvert) fermer(true);
       if (demonter) demonter();

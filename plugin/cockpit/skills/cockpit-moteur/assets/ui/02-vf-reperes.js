@@ -12,9 +12,8 @@
   const ORDRE = ['gauche', 'droite', 'haut', 'bas'];
   const DIT = { gauche: t('on the left'), droite: t('on the right'), haut: t('at the top'), bas: t('at the bottom') };
   const OBSTACLES = ['#vf-coin', '#zoom', '#ask'];
-  // pastille, puce et tiroir d'un module de bas de page : lus par leur nature (fixes, posés directement sous body), jamais par leur nom
-  const flottants = () => [...document.body.children]
-    .filter((e) => e.matches('button, div[role="status"], section[role="region"]') && getComputedStyle(e).position === 'fixed');
+  // éléments flottants d'un module de bas de page : l'attribut neutre data-vf-flottant qu'il pose (jamais un nom de classe, jamais une forme)
+  const flottants = () => [...document.querySelectorAll('[data-vf-flottant]')];
   const equipe = () => !!G.meta && G.meta.vfTab === 'equipe';
   const feuille = () => matchMedia('(max-width: 999px), (pointer: coarse)').matches; // feuille de détail ; sinon panneau latéral
   // la forme affichée est le canevas : #svg a une boîte et n'est pas masqué (couloirs, liste : visibility hidden)
