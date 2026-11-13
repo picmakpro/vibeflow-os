@@ -1,5 +1,5 @@
 // collecte-pilote — harnais du pilote de la collecte avec le fil d'essai (79-09, tâche 2 ; sections C2.x de test-cockpit-collecte.sh).
-// Usage : node collecte-pilote.mjs <dossier-scripts> <dossier-tests> <dossier-essai> <cas>   (cas : c21 … c27)
+// Usage : node collecte-pilote.mjs <dossier-scripts> <dossier-tests> <dossier-essai> <cas>   (cas : c21 … c28)
 //   <dossier-scripts> : le code joué (livré, ou copie mutée) ; <dossier-essai> : porte `scenario` et `journal` du fil d'essai (workerData.sortie).
 //   Écrit UNE ligne JSON sur la sortie standard ; un cas qui plante rend { erreur } (le module ou une méthode absents rougissent, jamais un blanc).
 import fs from 'node:fs';
@@ -23,7 +23,7 @@ const CAS = {
     scen('lent'); const c = mk(), recus = []; c.surResultat((m) => recus.push(m));
     c.demander({ tour: true }); await dormir(60);
     c.demander({ planning: true, motifs: ['a'] }); c.demander({ verrous: true, motifs: ['b'] }); c.demander({ motifs: ['c'] }); c.demander({ planning: true });
-    await c.pret(8000); await dormir(100);
+    await c.pret(8000); await dormir(1800); // 5 exécutions de 300 ms au plus : un pilote sans file les aurait toutes envoyées au fil
     const L = lignes().filter((l) => /^exec-(debut|fin) /.test(l)).map((l) => l.split(' ')[0]);
     const dernier = recus.filter((m) => m.type === 'planning').at(-1);
     c.arreter();
@@ -59,17 +59,30 @@ const CAS = {
     const ordre = !!premier && !!second && L.indexOf(f.find((l) => fil(l) === premier)) < L.indexOf(second);
     return { debuts: d.length, ordre, fins: f.length };
   },
-  async c26() { // la garde injectée : un résultat portant une clé interdite à profondeur 3 n'est ni posé ni émis ; le même résultat sans la clé passe
+  async c26() { // la garde injectée, à partir d'un tour ACCEPTÉ : un résultat portant une clé interdite à profondeur 3 n'est ni posé ni émis, l'état et l'instantané du tour précédent restent ; le même résultat sans la clé passe
     const { startLive } = await imp(path.join(scripts, 'vf-cockpit-live.mjs')), { instantane } = await imp(path.join(scripts, 'vf-cockpit-instantane.mjs'));
-    scen('interdit'); const evs = [];
+    scen('ok'); const evs = []; let col = null;
     const live = startLive({ root: process.argv[6], sortie: dossier, onEvent: (n) => evs.push(n), log: () => {}, mode: 'poll', aClient: () => true, nbClients: () => 1,
-      garde: (o) => !interdit(o), collecteur: (o) => creerCollecte({ ...o, entree }) });
-    await jusque(() => instantane() !== null, 8000); await live.pret(5000); await dormir(300);
-    const seq0 = instantane()?.seq, refus = { etat: live.etat().collecte.etat, qui: live.snapshot().who.workers.length, evenements: evs.filter((n) => n === 'who' || n === 'lock').length };
-    scen('ok');
-    const accepte = await jusque(() => live.snapshot().who.workers.length === 1, 14000);
-    const apres = { accepte, etat: live.etat().collecte.etat, seq: instantane()?.seq, seq0 }; live.stop();
+      garde: (o) => !interdit(o), collecteur: (o) => { col = creerCollecte({ ...o, entree }); return col; } });
+    const premier = await jusque(() => live.snapshot().who.workers.length === 1, 14000); await col.pret(5000); await dormir(200);
+    const avant = instantane(), evAvant = evs.filter((n) => n === 'who' || n === 'lock').length;
+    scen('interdit'); col.demander({ tour: true }); await col.pret(8000); await dormir(300);
+    const apresRefus = instantane(), w = live.snapshot().who.workers;
+    const refus = { premier, etat: live.etat().collecte.etat, qui: w.length, evenements: evs.filter((n) => n === 'who' || n === 'lock').length - evAvant,
+      conserve: avant !== null && apresRefus === avant && w[0] && w[0].a === undefined };
+    scen('ok'); col.demander({ tour: true });
+    const accepte = await jusque(() => live.etat().collecte.etat === 'ok' && instantane()?.at > avant.at, 14000);
+    const apres = { accepte, etat: live.etat().collecte.etat, avance: instantane()?.at > avant.at }; live.stop();
     return { refus, apres };
+  },
+  async c28() { // sans garde fournie, la garde est FERMÉE : rien de la collecte n'est posé ni émis (le serveur, lui, fournit la sienne)
+    const { startLive } = await imp(path.join(scripts, 'vf-cockpit-live.mjs')), { instantane } = await imp(path.join(scripts, 'vf-cockpit-instantane.mjs'));
+    scen('ok'); const evs = []; let col = null;
+    const live = startLive({ root: process.argv[6], sortie: dossier, onEvent: (n) => evs.push(n), log: () => {}, mode: 'poll', aClient: () => true, nbClients: () => 1,
+      collecteur: (o) => { col = creerCollecte({ ...o, entree }); return col; } });
+    await col.pret(8000); await dormir(500);
+    const r = { instantane: instantane() === null, qui: live.snapshot().who.workers.length, evenements: evs.filter((n) => n === 'who' || n === 'lock').length, etat: live.etat().collecte.etat };
+    live.stop(); return r;
   },
   async c27() { // arreter : fil terminé, pret résout, rien ne repart, le processus sort de lui-même
     scen('ok'); const c = mk(); c.demander({ tour: true }); await c.pret(5000);

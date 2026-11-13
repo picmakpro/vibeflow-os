@@ -18,6 +18,6 @@ const srv = http.createServer((req, res) => {
 });
 srv.listen(Number(port), '127.0.0.1', () => {
   fs.writeFileSync(fichier, JSON.stringify({ pret: true, at: Date.now() }));
-  live = startLive({ root: lab, sortie, onEvent: () => {}, log: () => {}, mode: 'poll', aClient: () => true, nbClients: () => 1 });
+  live = startLive({ root: lab, sortie, onEvent: () => {}, log: () => {}, mode: 'poll', aClient: () => true, nbClients: () => 1, garde: () => true });
 });
 process.on('SIGTERM', () => { try { live?.stop(); } catch {} process.exit(0); });

@@ -8,7 +8,8 @@
 //           (verrou lu une fois ; équipe avec l'état officiel et CE MÊME verrou ; verrous projetés avec les sessions de la collecte ; signal construit sur
 //           cette équipe et ces verrous ; puis l'index des transcripts, sauf sansIndex) -> { verrous, equipe, signal, erreurs, dureeMs, index }
 //           (index : rapport en comptes ; les voies restent dans memo.index ; memo.sessions : sessions de la dernière équipe lue).
-// `erreurs` : noms d'étapes d'une liste fermée (`verrous`, `equipe`, `signal`, `index`) ; un échec laisse un résultat neutre, comme la collecte d'avant.
+// `erreurs` : noms d'étapes d'une liste fermée (`verrous`, `equipe`, `signal`, `index`, et `tour` posté par le fil quand le tour entier lève) ;
+// un échec laisse un résultat neutre, comme la collecte d'avant : le tour dégrade, il ne lève jamais.
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { collectWho } from './vf-cockpit-who.mjs';
 import { driverLockScript, shBorne } from './vf-cockpit-paths.mjs';
@@ -32,7 +33,7 @@ function lireBrut({ racine, scriptsDir, home }) {
 const projeter = (brut, memo) => projeterVerrous(verrousDe(brut, { sessions: memo.sessions }));
 export function etapeVerrous({ racine, scriptsDir, home, memo = creerMemoire() }) { return projeter(lireBrut({ racine, scriptsDir, home }), memo); }
 
-export function etapeTour({ racine, sortie, scriptsDir, home, memo = creerMemoire(), maintenant = Date.now(), sansIndex = false }) {
+export function etapeTour({ racine, sortie, scriptsDir, home, memo = creerMemoire(), maintenant = Date.now(), sansIndex = false }) { // garde:etape-tour
   const t0 = Date.now(), erreurs = [];
   let brut = { available: false };
   try { brut = lireBrut({ racine, scriptsDir, home }); } catch { erreurs.push('verrous'); }
@@ -42,7 +43,8 @@ export function etapeTour({ racine, sortie, scriptsDir, home, memo = creerMemoir
   }
   // sansSession se décide sur les sessions de CETTE équipe ; équipe illisible : aucun verdict (l'ensemble reste celui du tour précédent, ou absent)
   if (!equipe.error) memo.sessions = new Set(equipe.workers.filter((w) => w.kind === 'session').map((w) => w.id));
-  const verrous = projeter(brut, memo);
+  let verrous = { etat: 'erreur', plat: false, liste: [] };
+  try { verrous = projeter(brut, memo); } catch { erreurs.push('verrous'); } // garde:etape-projeter
   let signal = null;
   try { signal = collectSignal(racine, { home, scriptsDir, equipe, verrous }); } catch { erreurs.push('signal'); }
   let index;

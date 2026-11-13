@@ -20,7 +20,12 @@ parentPort.on('message', (m) => {
     parentPort.postMessage({ type: 'verrous', id, verrous });
   }
   if (m.tour) {
-    const { index, ...tour } = etapeTour({ ...base, memo, sansIndex: !!sansIndex });
+    let r; // un tour qui lève ne tue pas le fil : un tour neuf et neutre, `tour` dans les erreurs (la collecte devient `partielle`)
+    try { r = etapeTour({ ...base, memo, sansIndex: !!sansIndex }); } catch { // garde:fil-tour
+      r = { verrous: { etat: 'erreur', plat: false, liste: [] }, equipe: { workers: [], sources: {} }, signal: null, erreurs: ['tour'], dureeMs: 1,
+        index: { etat: 'erreur', tronque: false, voies: 0, formeInconnue: 0, evinces: 0 } };
+    }
+    const { index, ...tour } = r;
     parentPort.postMessage({ type: 'tour', id, ...tour }); parentPort.postMessage({ type: 'index', id, index });
   }
   parentPort.postMessage({ type: 'fini', id });

@@ -2,10 +2,12 @@
 // Exports : signatureDuLab({ lab, moteur, etatGit }) -> chaîne hexadécimale | null (plus de MAX_ENTREES entrées : pas de cache),
 //           lireSignature(sortie) -> chaîne | null, ecrireSignature(lab, sortie, signature) (temporaire puis renommage, 0600, confiné au lab).
 // La signature couvre : le chemin, la taille et la date de CHAQUE entrée du lab hors `.git`, `.vibeflow` et `node_modules` (à toute profondeur,
-// aucun lien suivi), l'index git, HEAD et sa référence, l'état de l'environnement git du moteur (`etatGit`, posé par l'assembleur), la taille et
-// la date du scan et de ses bibliothèques, la version majeure de node. Par fichiers et non par dossiers seuls : la date d'un dossier ne bouge
+// aucun lien suivi), l'index git, HEAD et sa référence, `config` et `info/exclude` du dépôt (le moteur en lit l'adresse distante et la liste des
+// fichiers non ignorés), l'état de l'environnement git du moteur (`etatGit`, posé par l'assembleur), la taille et la date du scan et de ses
+// bibliothèques, la version majeure de node. Par fichiers et non par dossiers seuls : la date d'un dossier ne bouge
 // pas à l'édition d'un fichier.
-// Lectures de `.git` (gitfile, HEAD, références) : 512 octets au plus, sans suivre de lien ni attendre un tube nommé, fichier régulier exigé (texte vide sinon).
+// Lectures de `.git` (gitfile, HEAD, références) : 512 octets au plus, sans suivre de lien ni attendre un tube nommé,
+// fichier régulier exigé (texte vide sinon).
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -15,11 +17,17 @@ export const MAX_ENTREES = 200000;
 const IGNORES = new Set(['.git', '.vibeflow', 'node_modules']);
 const FICHIER = 'scan-signature.json';
 const stat = (f) => { try { const s = fs.lstatSync(f); return `${s.size}:${s.mtimeMs}`; } catch { return 'absent'; } };
-// lecture bornée à 512 octets : ni lien suivi, ni tube nommé attendu (O_NOFOLLOW, O_NONBLOCK), type revérifié sur le descripteur ouvert ; tout autre cas rend ''
+// lecture bornée à 512 octets : ni lien suivi, ni tube nommé attendu (O_NOFOLLOW, O_NONBLOCK),
+// type revérifié sur le descripteur ouvert ; tout autre cas rend ''
 const BAS = (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0);
 function texte(f) {
   let fd = -1;
-  try { fd = fs.openSync(f, fs.constants.O_RDONLY | BAS); if (!fs.fstatSync(fd).isFile()) return ''; const b = Buffer.alloc(512), n = fs.readSync(fd, b, 0, 512, 0); return b.toString('utf8', 0, n).trim(); } catch { return ''; } finally { if (fd >= 0) try { fs.closeSync(fd); } catch {} } // garde:code-cache-lecture
+  try {
+    fd = fs.openSync(f, fs.constants.O_RDONLY | BAS); // garde:code-cache-ouverture
+    if (!fs.fstatSync(fd).isFile()) return '';
+    const b = Buffer.alloc(512), n = fs.readSync(fd, b, 0, 512, 0);
+    return b.toString('utf8', 0, n).trim();
+  } catch { return ''; } finally { if (fd >= 0) try { fs.closeSync(fd); } catch {} }
 }
 
 // le dossier git du lab (`.git` dossier ou fichier `gitdir:`), en remontant : un lab peut être un sous-dossier du dépôt
@@ -55,6 +63,8 @@ export function signatureDuLab({ lab, moteur, etatGit = '' }) {
     const head = texte(path.join(g, 'HEAD')), ref = /^ref:\s*(\S+)/.exec(head)?.[1], commun = texte(path.join(g, 'commondir'));
     const base = commun ? path.resolve(g, commun) : g, cible = ref ? texte(path.join(base, ref)) : '';
     mise(`git\0${stat(path.join(g, 'index'))}\0${head}\0${cible}\0${stat(path.join(base, 'packed-refs'))}`);
+    // ce que le scan lit en plus : l'adresse distante (config) et les exclusions du dépôt (info/exclude)
+    mise(`cfg\0${stat(path.join(base, 'config'))}\0${stat(path.join(base, 'info', 'exclude'))}`); // garde:scan-cache-config
   }
   mise(`env\0${etatGit}\0node${process.versions.node.split('.')[0]}`);
   const sc = path.join(moteur, 'scripts');
@@ -73,8 +83,13 @@ export function lireSignature(sortie) {
 
 export function ecrireSignature(lab, sortie, signature) {
   const dir = path.join(sortie, '.cache'), f = path.join(dir, FICHIER), tmp = `${f}.${process.pid}.tmp`;
+  let fd = -1;
+  try { confiner(lab, f); confiner(lab, tmp); } catch { return; } // garde:code-cache-confiner — d'abord : aucun dossier créé ni fichier ouvert hors du lab
   try {
-    fs.mkdirSync(dir, { recursive: true }); confiner(lab, f);
-    fs.writeFileSync(tmp, JSON.stringify({ signature }), { mode: 0o600 }); fs.renameSync(tmp, f);
-  } catch { try { fs.rmSync(tmp, { force: true }); } catch {} }
+    fs.mkdirSync(dir, { recursive: true });
+    const drapeaux = fs.constants.O_WRONLY | fs.constants.O_CREAT | fs.constants.O_EXCL | (fs.constants.O_NOFOLLOW || 0);
+    fd = fs.openSync(tmp, drapeaux, 0o600); // garde:code-cache-ecriture
+    fs.writeSync(fd, JSON.stringify({ signature })); fs.closeSync(fd); fd = -1;
+    fs.renameSync(tmp, f);
+  } catch { if (fd >= 0) try { fs.closeSync(fd); } catch {} try { fs.rmSync(tmp, { force: true }); } catch {} }
 }

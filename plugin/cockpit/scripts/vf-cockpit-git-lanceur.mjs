@@ -157,7 +157,9 @@ const autorisee = (sous) => SOUS_COMMANDES_AUTORISEES.includes(sous);
 // options de lecture insérées, tous les pilotes du dépôt vidés.
 // Pour tout autre enfant (bash driver-lock.sh, qui appelle git) : envGit(lab) aussi, donc aucun GIT_* hérité (SOCL-11, T-79-706).
 export function shBorne(cmd, args, cwd, lab = cwd) {
-  if (cmd !== 'git' && gitSortant(lab || cwd || process.cwd(), lab || cwd || process.cwd())) return ''; // garde:lanceur-enfant-sortant — AUDC-A-02 : l'enfant (bash driver-lock.sh) lance son propre git ; un lab dont le .git désigne un dépôt hors du lab ne le voit jamais (sortie vide, comme un git refusé)
+  // AUDC-A-02 : l'enfant (bash driver-lock.sh) lance son propre git ; un lab dont le .git désigne un dépôt hors du lab ne le voit jamais
+  // (sortie vide, comme un git refusé)
+  if (cmd !== 'git' && gitSortant(lab || cwd || process.cwd(), lab || cwd || process.cwd())) return ''; // garde:lanceur-enfant-sortant
   if (cmd !== 'git') return lancer(cmd, args, cwd, envGit(lab), 1 << 20).sortie;
   const { argv, sous, dir } = argsGit(args), cour = cwd || process.cwd();
   // -C jugé tel quel par gitSortant, sans normalisation lexicale

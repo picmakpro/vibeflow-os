@@ -42,7 +42,7 @@ const { startLive } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-
 const { creerCollecteEnLigne } = await import(pathToFileURL(path.join(scripts, 'tests', 'collecte-en-ligne.mjs')).href);
 const appels = (nom) => (fs.existsSync(compteur) ? fs.readFileSync(compteur, 'utf8').split('\n').filter((l) => l === nom).length : 0);
 const evs = [];
-const live = startLive({ root: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), onEvent: (n) => evs.push(n), log: () => {}, aClient: () => mode === 'client', collecteur: (o) => creerCollecteEnLigne(o) });
+const live = startLive({ root: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), onEvent: (n) => evs.push(n), log: () => {}, aClient: () => mode === 'client', garde: () => true, collecteur: (o) => creerCollecteEnLigne(o) });
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const negatif = mode === 'sans' ? 1000 : 0; // fenêtres négatives (aucun appel de plus) : une seconde de plus avant de compter, le résultat d'une demande arrive après son départ
 // fin de la collecte de démarrage : elle ne doit pas tomber dans la fenêtre du filet

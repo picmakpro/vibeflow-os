@@ -9,6 +9,7 @@
 //   etat() -> { etat: 'en-cours' | 'ok' | 'partielle' | 'indisponible', derniereA, dureeMs, index, boucle, erreurs, relances, derniereMort, vivant }.
 //   redemarrer({ sansIndex }) : termine le fil, ATTEND sa sortie, puis construit le suivant ; la demande en vol y est rejouée. Réentrant : un redémarrage
 //     en cours est partagé (la promesse rendue est la même), les options du premier appel valent pour tous.
+//   Motif `confirm` (seconde lecture d'un retrait, lue par vf-cockpit-live.mjs) : jamais évincé par le plafond, il passe en tête de la fusion.
 //   Chien de garde : une demande sans `fini` après `delais.demandeMs` (120 s) est celle d'un fil bloqué sans mourir ; il est terminé et la politique de mort
 //     s'applique. `motifs` est dédoublonné et plafonné à MAX_MOTIFS (64) : l'attente ne grossit pas avec le nombre de demandes.
 // Politique : un fil qui meurt (mémoire, erreur, sortie) est relancé UNE fois SANS index (`partielle`, index `suspendu`) ; une seconde mort dans
@@ -27,16 +28,20 @@ const CAUSES = ['memoire', 'erreur', 'sortie'], RESOLUTION_MS = 10;
 const INDEX_ATTENTE = Object.freeze({ etat: 'attente', tronque: false, voies: 0, formeInconnue: 0, evinces: 0 });
 const INDEX_SUSPENDU = Object.freeze({ etat: 'suspendu', tronque: false, voies: 0, formeInconnue: 0, evinces: 0 });
 
-// motifs : dédoublonnés et plafonnés à MAX_MOTIFS (la fusion reste en temps constant, l'attente ne grossit pas avec le nombre de demandes)
-const unir = (a, b) => [...new Set([...a, ...b])].slice(0, MAX_MOTIFS); // garde:collecte-motifs
+// motifs : dédoublonnés et plafonnés à MAX_MOTIFS (la fusion reste en temps constant, l'attente ne grossit pas avec le nombre de demandes) ;
+// `confirm` est RÉSERVÉ : une rafale de motifs distincts ne l'évince jamais (le plafond ne garde que MAX_MOTIFS - 1 autres motifs)
+const RESERVE = 'confirm';
+const reserve = (t) => [RESERVE, ...t.filter((m) => m !== RESERVE).slice(0, MAX_MOTIFS - 1)];
+const unir = (a, b) => { const t = [...new Set([...a, ...b])]; return t.includes(RESERVE) ? reserve(t) : t.slice(0, MAX_MOTIFS); }; // garde:collecte-motifs
 const fusion = (a, b) => (a && b
-  ? { planning: a.planning || b.planning, verrous: a.verrous || b.verrous, tour: a.tour || b.tour, motifs: unir(a.motifs, b.motifs) }
+  ? { planning: a.planning || b.planning, verrous: a.verrous || b.verrous, tour: a.tour || b.tour, motifs: unir(a.motifs, b.motifs) } // garde:collecte-fusion
   : a || b);
 
 export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limites = LIMITES, delais, log = () => {} }) {
   const D = { ...DELAIS, ...(delais || {}) };
   const ecouteurs = new Set(), attendants = new Set(), minuteurs = new Set();
-  let fil = null, enVol = null, attente = null, chien = null, redemarrage = null, id = 0, ferme = false, ok = false, indispo = false, derniereA = null, dureeMs = null;
+  let fil = null, enVol = null, attente = null, chien = null, redemarrage = null;
+  let id = 0, ferme = false, ok = false, indispo = false, derniereA = null, dureeMs = null;
   let index = INDEX_ATTENTE, erreurs = [], relances = 0, derniereMort = null, mortT = 0;
   const moniteur = monitorEventLoopDelay({ resolution: RESOLUTION_MS }); moniteur.enable();
 
@@ -142,7 +147,7 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
     demander({ planning = false, verrous = false, tour = false, motifs = [] } = {}) {
       if (ferme) return false;
       const r = { planning: !!planning, verrous: !!verrous, tour: !!tour, motifs: unir([], motifs) };
-      if (enVol || !fil) attente = fusion(attente, r); else envoyer(r);
+      if (enVol || !fil) attente = fusion(attente, r); else envoyer(r); // garde:collecte-demander
       return true;
     },
     surResultat(f) { ecouteurs.add(f); return () => ecouteurs.delete(f); },
@@ -166,9 +171,9 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
     redemarrer,
     arreter() {
       if (ferme) return;
-      ferme = true; attente = null; enVol = null; annulerMinuteurs(); moniteur.disable(); reveiller();
+      ferme = true; attente = null; enVol = null; annulerMinuteurs(); moniteur.disable(); reveiller(); // garde:collecte-ferme
       const f = fil; fil = null;
-      if (f) { f.voulu = true; f.w.terminate().catch(() => {}); }
+      if (f) { f.voulu = true; f.w.terminate().catch(() => {}); } // garde:collecte-terminer
     },
   };
 }

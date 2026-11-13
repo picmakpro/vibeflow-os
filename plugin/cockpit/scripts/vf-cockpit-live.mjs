@@ -4,7 +4,9 @@
 // l'instantané gelé (vf-cockpit-instantane.mjs) et réécrit <sortie>/project.html par fichier temporaire puis rename quand la structure change.
 // Lecture seule sur le dépôt observé.
 // Export : startLive({ root, sortie, onEvent, log, mode, aClient, nbClients, garde, collecteur }) -> { etat(), snapshot(), reveil(), pret(ms), stop() }.
-//   garde(objet) : garde d'émission injectée par le serveur (vrai = permis), appliquée avant la pose de l'instantané ;
+//   garde(objet) : garde d'émission injectée par le serveur (vrai = permis), appliquée aux résultats de collecte (verrous, équipe, signal) avant leur
+//     pose et leur émission, et à la pose de l'instantané ; FERMÉE par défaut (79-09, correction ciblée) : un appelant qui n'en fournit pas ne pose
+//     ni n'émet rien de la collecte, il ne contourne pas le filtre par oubli ;
 //   collecteur : fabrique du pilote (défaut creerCollecte, seam de test).
 //   mode : 'auto' (fs.watch récursif, repli par scrutation des mtimes si l'appel lève ou si le watcher échoue),
 //          'poll' (scrutation d'emblée) ; défaut = VF_COCKPIT_WATCH. etat().mode vaut 'watch' ou 'poll'.
@@ -58,7 +60,7 @@ export { whoSig };
 // aClient : y a-t-il un onglet connecté au flux ? (AUDC-H2) Sans onglet, le filet ne collecte rien ; `reveil()` rattrape à la connexion. Défaut : toujours vrai (comportement d'avant).
 export function startLive({
   root, sortie, onEvent = () => {}, log = () => {}, mode = process.env.VF_COCKPIT_WATCH || 'auto',
-  aClient = () => true, nbClients = () => 0, garde = () => true, collecteur = creerCollecte,
+  aClient = () => true, nbClients = () => 0, garde = () => false, collecteur = creerCollecte, // garde:live-garde-defaut
 }) {
   root = path.resolve(root);
   const common = gitCommonDir(root);
@@ -133,7 +135,7 @@ export function startLive({
     verrous = n; lockSeq = ++state.seq; lockAt = Date.now(); emit('lock', { seq: lockSeq, at: lockAt, verrous });
   };
   const surTour = ({ verrous: n, equipe: nw, signal: sg }) => {
-    if (!garde({ verrous: n, equipe: nw, signal: sg })) { // avant toute pose et toute émission
+    if (!garde({ verrous: n, equipe: nw, signal: sg })) { // garde:live-garde-tour — avant toute pose et toute émission
       refusee = true; log('error', 'tour refusé : contenu interdit, état précédent gardé'); return;
     }
     refusee = false;

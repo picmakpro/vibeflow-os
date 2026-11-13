@@ -20,6 +20,9 @@
 #   C9   A15 : projection des verrous en liste blanche (propriété générative, flux réel, signal construit dans le serveur, contrat), mutants
 #   C12  durcissements après l'audit de sécurité de 79-09 : verrou et registre d'un lab à gitfile sortant jamais lus, signature du lab en lecture bornée,
 #        redémarrage réentrant, chien de garde d'une demande en vol, motifs bornés et dédoublonnés (mutants M-LANCEUR-ENFANT à M-DEDOUBLON)
+#   C13  correction ciblée après la revue rv2 : un tour qui lève dégrade (étape et fil), signature du cache couvrant config et exclusions, écriture
+#        de la signature confinée d'abord et sans lien suivi, motif « confirm » réservé, garde de startLive fermée par défaut, mutants de coalescence,
+#        d'arrêt et de garde (C2.1, C2.6a, C2.7, C2.8)
 # Lab neutre dans mktemp, HOME jetable, isolation git, faux verrou (VF_FAUX_JOURNAL, VF_FAUX_DELAI). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -168,7 +171,7 @@ const jusque = async (f, ms) => { for (let t = 0; t < ms / K; t += 50) { if (f()
 const appels = () => (fs.existsSync(journal) ? fs.readFileSync(journal, 'utf8').split('\n').filter((l) => l.includes('for-each-ref')).length : 0);
 // la première pose est celle du graphe : le collecteur en ligne la fait au premier passage de la boucle, la signature git (plusieurs lancements asynchrones) revient après
 let premiere; const off0 = surInstantane((i) => { if (premiere === undefined) premiere = i.git; }); // posé AVANT le démarrage : la première pose est vue
-const live = startLive({ root: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), onEvent: (n, d) => evs.push([n, d]), log: () => {}, mode: 'poll', aClient: () => true, nbClients: () => 1, collecteur: M ? (o) => M.creerCollecteEnLigne(o) : undefined });
+const live = startLive({ root: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), onEvent: (n, d) => evs.push([n, d]), log: () => {}, mode: 'poll', aClient: () => true, nbClients: () => 1, garde: () => true, collecteur: M ? (o) => M.creerCollecteEnLigne(o) : undefined });
 const g = () => instantane()?.git ?? null;
 await jusque(() => instantane() !== null, 20000); off0();
 out['C10.6a'] = instantane() !== null && premiere === null; // l'instantané existe avant toute signature git
@@ -218,7 +221,8 @@ mutant() {
   cible="$d/scripts/$fic"; cp "$cible" "$WORK/mut-$nom.avant"
   node "$AUX/muter.mjs" "$cible" "$ancre" "$de" "$vers" ${pre:+"$pre"} 2> "$WORK/mut-$nom.err" || { echo "mutant $nom : $(cat "$WORK/mut-$nom.err")"; return 1; }
   cmp -s "$WORK/mut-$nom.avant" "$cible" && { echo "mutant $nom : la copie n'a pas changé"; return 1; }
-  node --input-type=module -e "await import('file://$cible')" > /dev/null 2>&1 || { echo "mutant $nom : la copie ne charge pas"; return 1; }
+  # le point d'entrée du fil ne se charge que dans un fil (parentPort nul sur le fil principal) : MUT_NOLOAD=1 saute le chargement, la preuve est l'exécution dans un vrai fil
+  [ -n "${MUT_NOLOAD:-}" ] || node --input-type=module -e "await import('file://$cible')" > /dev/null 2>&1 || { echo "mutant $nom : la copie ne charge pas"; return 1; }
   MUT_SCRIPTS="$d/scripts"; return 0
 }
 libre_port() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -238,8 +242,9 @@ pilote "$SCRIPTS" c23 > "$WORK/c23.json"; assert_eq "C2.3 — le fil meurt toujo
 pilote "$SCRIPTS" c24 > "$WORK/c24.json"; assert_eq "C2.4 — mémoire de 24 Mio imposée : le fil meurt par la limite, la cause est « memoire », le test continue" "$(jq_ "$WORK/c24.json" 'j.vu+" "+j.cause')" "true memoire"
 pilote "$SCRIPTS" c25 > "$WORK/c25.json"; assert_eq "C2.5 — un seul écrivain : pendant une tenue d'écriture de l'ancien fil, redemarrer() n'écrit qu'après la fin de l'écriture de l'ancien (ordre du journal)" "$(jq_ "$WORK/c25.json" 'j.ordre+" "+j.debuts')" "true 2"
 mkdir -p "$WORK/lab26"; node "$TESTS/collecte-labo.mjs" lab "$WORK/lab26"; pilote "$SCRIPTS" c26 "$WORK/lab26" > "$WORK/c26.json"
-assert_eq "C2.6a — résultat portant une clé interdite à profondeur 3 : instantané précédent gardé (non nul), aucun événement, « qui » vide, collecte.etat partielle" "$(jq_ "$WORK/c26.json" 'j.refus.etat+" "+j.refus.qui+" "+j.refus.evenements')" "partielle 0 0"
-assert_eq "C2.6b — témoin positif : le même résultat sans la clé est accepté (« qui » porte w1) et l'état redevient ok" "$(jq_ "$WORK/c26.json" 'j.apres.accepte+" "+j.apres.etat')" "true ok"
+assert_eq "C2.6a — après un tour ACCEPTÉ (« qui » porte w1), un résultat portant une clé interdite à profondeur 3 : l'instantané du tour précédent est gardé (même objet), « qui » reste celui du tour accepté (sans la clé), aucun événement, collecte.etat partielle" "$(jq_ "$WORK/c26.json" 'j.refus.premier+" "+j.refus.etat+" "+j.refus.qui+" "+j.refus.evenements+" "+j.refus.conserve')" "true partielle 1 0 true"
+assert_eq "C2.6b — témoin positif : le même résultat sans la clé est accepté (l'instantané avance) et l'état redevient ok" "$(jq_ "$WORK/c26.json" 'j.apres.accepte+" "+j.apres.etat')" "true ok"
+pilote "$SCRIPTS" c28 "$WORK/lab26" > "$WORK/c28.json"; assert_eq "C2.8 — startLive sans garde fournie : garde fermée par défaut, aucun instantané posé, « qui » vide, aucun événement de la collecte, collecte.etat partielle (le serveur fournit la sienne)" "$(jq_ "$WORK/c28.json" 'j.erreur||j.instantane+" "+j.qui+" "+j.evenements+" "+j.etat')" "true 0 0 partielle"
 pilote "$SCRIPTS" c27 > "$WORK/c27.json"; assert_eq "C2.7 — arreter() : pret résout, une demande ultérieure ne fait rien, le processus sort de lui-même (aucun descripteur ne fuit)" "$(jq_ "$WORK/c27.json" 'j.pret+" "+j.apres+" "+j.fuite')" "true false false"
 
 echo "=== C3 / C4 — la sonde de latence : base, code livré, mutant en ligne, vrai serveur ; index dans le fil ==="
@@ -660,7 +665,7 @@ cat > "$AUX/c94.mjs" <<'JS'
 import path from 'node:path'; import { pathToFileURL } from 'node:url';
 const [, , scripts, lab] = process.argv, imp = (f) => import(pathToFileURL(path.join(scripts, f)).href), out = {};
 const { startLive } = await imp('vf-cockpit-live.mjs'), { instantane } = await imp('vf-cockpit-instantane.mjs');
-const live = startLive({ root: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), onEvent: () => {}, log: () => {}, mode: 'poll', aClient: () => true, nbClients: () => 1 });
+const live = startLive({ root: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), onEvent: () => {}, log: () => {}, mode: 'poll', aClient: () => true, nbClients: () => 1, garde: () => true });
 const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 for (let t = 0; t < 40000 && !instantane()?.signal; t += 100) await dormir(100);
 await live.pret(20000);
@@ -796,7 +801,7 @@ const sc = fs.readFileSync(path.join(workerData.sortie, 'scenario'), 'utf8').tri
 parentPort.on('message', (m) => {
   n++;
   if (!workerData.sansIndex && n === 1) { if (sc === 'bloque') for (;;) {} Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500); }
-  parentPort.postMessage({ type: 'recu', id: m.id, n: m.motifs.length, motifs: m.motifs.slice(0, 4) });
+  parentPort.postMessage({ type: 'recu', id: m.id, n: m.motifs.length, motifs: m.motifs.slice(0, 4), confirm: m.motifs.includes('confirm') });
   parentPort.postMessage({ type: 'fini', id: m.id });
 });
 JS
@@ -820,6 +825,14 @@ const mesure = async (N, motif) => { // N demandes pendant que la première dure
   const ms = Number(process.hrtime.bigint() - t0) / 1e6; await c.pret(6000); c.arreter();
   return { ms, n: recus.length > 1 ? recus[1].n : -1 };
 };
+{ // `confirm` réservé : jamais évincé par le plafond, qu'il arrive après une rafale, avant elle, ou seul
+  const cas = async (avant, apres) => { const { c, recus } = nouvelle('lent', {}); c.demander({ tour: true }); await dort(100);
+    for (let i = 0; i < avant; i++) c.demander({ tour: true, motifs: ['motif-' + i] });
+    c.demander({ tour: true, motifs: ['confirm'] });
+    for (let i = 0; i < apres; i++) c.demander({ tour: true, motifs: ['suite-' + i] });
+    await c.pret(6000); c.arreter(); const r = recus[1]; return r ? `n=${r.n} confirm=${r.confirm}` : 'aucun'; };
+  out.confirm = [await cas(70, 0), await cas(0, 70), await cas(0, 0)].join(' | ');
+}
 const a = await mesure(20000, (i) => 'motif-' + i), b = await mesure(40000, (i) => 'motif-' + i), d = await mesure(2000, (i) => 'm' + (i % 2));
 out.bornes = `${a.n},${b.n}`; out.lineaire = `${b.ms < 3 * a.ms + 80 && b.ms < 1500} (${Math.round(a.ms)}ms puis ${Math.round(b.ms)}ms)`; out.dedoublon = d.n;
 console.log(JSON.stringify(out)); process.exit(0);
@@ -837,17 +850,18 @@ c12run c124 "$SCRIPTS"
 assert_eq "C12.4a — un fil bloqué sans mourir est relancé après demandeMs : la demande est rejouée, la collecte redevient prête, la mort est comptée" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.chien')" "pret=true relances=1 mort=true recu=1 motifs=m1 ms<4000=true"
 assert_eq "C12.4b — motifs plafonnés à 64 pour N puis 2N demandes distinctes, et la fusion reste linéaire (le double de demandes ne coûte pas le quadruple)" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.bornes+" "+j.lineaire.split(" ")[0]')" "64,64 true"
 assert_eq "C12.4c — deux motifs répétés 2 000 fois n'en font que deux" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.dedoublon')" "2"
+assert_eq "C13.5 — le motif « confirm » n'est jamais évincé par le plafond de 64 : après 70 motifs distincts, avant 70 autres, ou seul, la demande rejouée le porte (64 motifs au plus)" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.confirm')" "n=64 confirm=true | n=64 confirm=true | n=1 confirm=true"
 # mutants : lanceur sans garde d'enfant (M-LANCEUR-ENFANT), lecture du cache sans O_NONBLOCK (M-CACHE-OUVERTURE) ou à l'ancienne, non bornée (M-CACHE-BORNE), redémarrage non partagé (M-REENTRANT),
 # chien de garde inerte (M-CHIEN), motifs sans plafond (M-MOTIFS), motifs sans dédoublonnage (M-DEDOUBLON)
 if mutant M-LANCEUR-ENFANT vf-cockpit-git-lanceur.mjs lanceur-enfant-sortant '&& gitSortant(' '&& false && gitSortant('; then
   c12run c121 "$MUT_SCRIPTS"
   assert_eq "M-LANCEUR-ENFANT — sans la garde, le script de verrou d'un lab à gitfile sortant est lancé et son contenu publié : C12.1c rougit" "$(jq_ "$WORK/c12/c121.json" 'j.erreur||j.etranger')" "appels=2 verrous=lue/1 registre=lue/1 fuite=true"
 else assert_eq "M-LANCEUR-ENFANT — construction du mutant" "échec" "ok"; fi
-if mutant M-CACHE-OUVERTURE vf-cockpit-code-cache.mjs code-cache-lecture 'fs.constants.O_RDONLY | BAS' 'fs.constants.O_RDONLY'; then
+if mutant M-CACHE-OUVERTURE vf-cockpit-code-cache.mjs code-cache-ouverture 'fs.constants.O_RDONLY | BAS' 'fs.constants.O_RDONLY'; then
   c12run c122 "$MUT_SCRIPTS"
   assert_eq "M-CACHE-OUVERTURE — sans O_NONBLOCK, l'ouverture d'un tube nommé bloque : C12.2 rougit sur git-tube et head-tube" "$(jq_ "$WORK/c12/c122.json" 'j.erreur||(j["git-tube"].startsWith("bloque")&&j["head-tube"].startsWith("bloque"))')" "true"
 else assert_eq "M-CACHE-OUVERTURE — construction du mutant" "échec" "ok"; fi
-if mutant M-CACHE-BORNE vf-cockpit-code-cache.mjs code-cache-lecture "fs.constants.O_RDONLY | BAS); if (!fs.fstatSync(fd).isFile()) return ''; const b = Buffer.alloc(512), n = fs.readSync(fd, b, 0, 512, 0); return b.toString('utf8', 0, n).trim();" "fs.constants.O_RDONLY | fs.constants.O_NONBLOCK); return fs.readFileSync(fd, 'utf8').slice(0, 512).trim();"; then
+if mutant M-CACHE-BORNE vf-cockpit-code-cache.mjs code-cache-ouverture "fs.constants.O_RDONLY | BAS);" "fs.constants.O_RDONLY | fs.constants.O_NONBLOCK); return fs.readFileSync(fd, 'utf8').slice(0, 512).trim();"; then
   c12run c122 "$MUT_SCRIPTS"
   assert_eq "M-CACHE-BORNE — l'ancienne lecture (lien suivi, aucun contrôle de type, lecture entière) sature sur un lien vers un périphérique sans fin : C12.2 rougit sur git-lien-zero et head-lien-zero" "$(jq_ "$WORK/c12/c122.json" 'j.erreur||(j["git-lien-zero"].startsWith("bloque")&&j["head-lien-zero"].startsWith("bloque"))')" "true"
 else assert_eq "M-CACHE-BORNE — construction du mutant" "échec" "ok"; fi
@@ -867,6 +881,158 @@ if mutant M-DEDOUBLON vf-cockpit-collecte.mjs collecte-motifs '[...new Set([...a
   c12run c124 "$MUT_SCRIPTS"
   assert_eq "M-DEDOUBLON — sans dédoublonnage, les répétitions comptent (le plafond les garde à 64) : C12.4c rougit" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.dedoublon')" "64"
 else assert_eq "M-DEDOUBLON — construction du mutant" "échec" "ok"; fi
+
+# --- C13 : correction ciblée après la revue rv2 de 79-09 (tour qui dégrade, signature du cache : config et exclusions, écriture confinée, preuves de coalescence et d'arrêt)
+mkdir -p "$WORK/c13"
+cat > "$AUX/c131.mjs" <<'JS'
+// c131.mjs <scripts> <travail> : etapeTour ne lève jamais, même si la projection des verrous lève (sessions de la collecte hostiles : `has` lève) ; témoin : mémoire ordinaire
+import fs from 'node:fs'; import path from 'node:path'; import { spawnSync } from 'node:child_process'; import { pathToFileURL } from 'node:url';
+const [, , scripts, w] = process.argv, out = {};
+const bin = path.join(w, 'fakebin'); fs.mkdirSync(bin, { recursive: true }); fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\nexit 1\n', { mode: 0o755 });
+process.env.PATH = bin + path.delimiter + process.env.PATH;
+try {
+  const { etapeTour, creerMemoire } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-collecte-etapes.mjs')).href);
+  const faux = path.join(w, 'faux'); fs.mkdirSync(faux, { recursive: true });
+  fs.writeFileSync(path.join(faux, 'driver-lock.sh'), `#!/usr/bin/env bash\ncase "$1" in\n status) echo '{"present":true,"scope":"lab","locks":[{"present":true,"owner":"o","step":"s","ws":"w","scope":"phase","phase":"79","age_seconds":1,"ttl":1800,"stale":false,"session_ids":["x1"]}]}' ;;\n *) echo '{}' ;;\nesac\n`, { mode: 0o755 });
+  const lab = path.join(w, 'lab'); fs.mkdirSync(lab, { recursive: true }); spawnSync('git', ['init', '-q', lab]);
+  const base = { racine: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), scriptsDir: faux, home: path.join(w, 'home'), sansIndex: true };
+  const r0 = etapeTour({ ...base, memo: creerMemoire() });
+  out.temoin = `verrous=${r0.verrous.etat}/${r0.verrous.liste.length} erreurVerrous=${r0.erreurs.includes('verrous')}`;
+  const memo = creerMemoire(); Object.defineProperty(memo, 'sessions', { get: () => ({ has() { throw new Error('essai'); } }), set() {}, configurable: true });
+  let r1 = null, levee = null; try { r1 = etapeTour({ ...base, memo }); } catch (e) { levee = String(e && e.message).slice(0, 40); }
+  out.hostile = levee ? `leve:${levee}` : `verrous=${r1.verrous.etat}/${r1.verrous.liste.length} erreurVerrous=${r1.erreurs.includes('verrous')} dureeMs=${typeof r1.dureeMs}`;
+} catch (e) { out.erreur = String(e && e.stack || e).slice(0, 300); }
+console.log(JSON.stringify(out));
+JS
+cat > "$AUX/c132.mjs" <<'JS'
+// c132.mjs <scripts> <travail> : le VRAI fil de cette copie du module, dont etapeTour lève (greffe posée par la suite) : la collecte n'en meurt pas, un tour neuf et neutre porte `tour` dans ses erreurs
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, w] = process.argv, dort = (ms) => new Promise((r) => setTimeout(r, ms));
+const { creerCollecte } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-collecte.mjs')).href);
+const lab = path.join(w, 'lab'); fs.mkdirSync(lab, { recursive: true });
+const c = creerCollecte({ racine: lab, sortie: path.join(lab, '.vibeflow', 'cockpit'), scriptsDir: scripts, home: w, log: () => {} }), recus = []; c.surResultat((m) => recus.push(m));
+const tenir = setInterval(() => {}, 200); // la boucle reste vivante même si le fil meurt (fil et minuteurs du pilote sont détachés)
+c.demander({ tour: true }); const pret = await c.pret(15000); await dort(300); clearInterval(tenir);
+const t = recus.find((m) => m.type === 'tour'), e = c.etat(); c.arreter();
+console.log(JSON.stringify({ pret, tour: !!t, erreurs: t ? t.erreurs.join('+') : null, equipe: t ? t.equipe.workers.length : null, etat: e.etat, relances: e.relances, vivant: e.vivant, mort: e.derniereMort }));
+process.exit(0);
+JS
+cat > "$AUX/c133.mjs" <<'JS'
+// c133.mjs <scripts> <travail> : la signature du lab couvre `.git/config` (adresse distante) et `.git/info/exclude` (exclusions), de l'arbre principal comme du dépôt commun d'un arbre de travail
+import fs from 'node:fs'; import path from 'node:path'; import { spawnSync } from 'node:child_process'; import { pathToFileURL } from 'node:url';
+const [, , scripts, w] = process.argv, out = {};
+try {
+  const { signatureDuLab } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-code-cache.mjs')).href), moteur = path.join(scripts, '..', 'skills', 'cockpit-moteur');
+  const git = (...a) => spawnSync('git', ['-c', 'user.email=a@b.c', '-c', 'user.name=t', ...a], { encoding: 'utf8' });
+  const sig = (lab) => signatureDuLab({ lab, moteur, etatGit: '[]' });
+  const lab = path.join(w, 'lab'); fs.mkdirSync(lab, { recursive: true }); git('init', '-q', lab);
+  const s0 = sig(lab); out.stable = s0 === sig(lab);
+  fs.appendFileSync(path.join(lab, '.git', 'config'), '[remote "origin"]\n\turl = https://exemple.invalid/a.git\n'); const s1 = sig(lab); out.config = s1 !== s0;
+  fs.mkdirSync(path.join(lab, '.git', 'info'), { recursive: true }); fs.appendFileSync(path.join(lab, '.git', 'info', 'exclude'), 'secret.txt\n'); const s2 = sig(lab); out.exclude = s2 !== s1;
+  out.stable2 = s2 === sig(lab);
+  const hote = path.join(w, 'hote'); fs.mkdirSync(hote); git('init', '-q', hote); git('-C', hote, 'commit', '--allow-empty', '-q', '-m', 'x');
+  const wt = path.join(w, 'arbre'); git('-C', hote, 'worktree', 'add', '-q', '-b', 'wt', wt);
+  const t0 = sig(wt); fs.appendFileSync(path.join(hote, '.git', 'config'), '[remote "origin"]\n\turl = https://exemple.invalid/b.git\n'); const t1 = sig(wt);
+  fs.appendFileSync(path.join(hote, '.git', 'info', 'exclude'), 'autre.txt\n'); const t2 = sig(wt);
+  out.arbre = `${t1 !== t0} ${t2 !== t1}`;
+} catch (e) { out.erreur = String(e && e.stack || e).slice(0, 300); }
+console.log(JSON.stringify(out));
+JS
+cat > "$AUX/c134.mjs" <<'JS'
+// c134.mjs <scripts> <travail> : ecrireSignature confine AVANT de créer quoi que ce soit, et ne suit aucun lien pour son temporaire
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, w] = process.argv, out = {};
+try {
+  const { ecrireSignature, lireSignature } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-code-cache.mjs')).href);
+  const mk = (n) => { const d = path.join(w, n); fs.mkdirSync(d, { recursive: true }); return d; };
+  // témoin : écriture ordinaire, 0600, aucun temporaire laissé
+  const lab = mk('lab'), sortie = path.join(lab, '.vibeflow', 'cockpit'); fs.mkdirSync(sortie, { recursive: true });
+  ecrireSignature(lab, sortie, 'abc');
+  const f = path.join(sortie, '.cache', 'scan-signature.json');
+  out.temoin = `${lireSignature(sortie)} ${(fs.statSync(f).mode & 0o777).toString(8)} restes=${fs.readdirSync(path.join(sortie, '.cache')).filter((x) => x.endsWith('.tmp')).length}`;
+  // la sortie est un lien vers un dossier hors du lab : aucun dossier `.cache` n'y est créé
+  const lab2 = mk('lab2'), dehors = mk('dehors2'); fs.mkdirSync(path.join(lab2, '.vibeflow')); fs.symlinkSync(dehors, path.join(lab2, '.vibeflow', 'cockpit'));
+  ecrireSignature(lab2, path.join(lab2, '.vibeflow', 'cockpit'), 'abc'); out.lien = `dehors=${fs.readdirSync(dehors).length}`;
+  // le temporaire attendu est un lien vers un fichier hors du lab : le fichier visé n'est jamais écrit
+  const lab3 = mk('lab3'), dehors3 = mk('dehors3'), sortie3 = path.join(lab3, '.vibeflow', 'cockpit'); fs.mkdirSync(path.join(sortie3, '.cache'), { recursive: true });
+  const victime = path.join(dehors3, 'victime.txt'); fs.writeFileSync(victime, 'intact');
+  fs.symlinkSync(victime, path.join(sortie3, '.cache', `scan-signature.json.${process.pid}.tmp`));
+  ecrireSignature(lab3, sortie3, 'abc'); out.tmp = fs.readFileSync(victime, 'utf8');
+} catch (e) { out.erreur = String(e && e.stack || e).slice(0, 300); }
+console.log(JSON.stringify(out));
+JS
+c13run() { local n="$1" scripts="$2"; rm -rf "$WORK/c13/$n"; mkdir -p "$WORK/c13/$n"; node "$AUX/$n.mjs" "$scripts" "$WORK/c13/$n" 2> "$WORK/c13/$n.err" | tail -1 > "$WORK/c13/$n.json"; }
+# greffe d'essai : etapeTour lève dès son entrée (sur la copie, jamais sur le module livré) ; sert au témoin C13.2 et à son mutant
+GREFFE_DE='sansIndex = false }) {'; GREFFE_VERS="sansIndex = false }) { throw new Error('essai');"
+c13run c131 "$SCRIPTS"
+assert_eq "C13.1a — témoin : une mémoire ordinaire, un verrou tenu : projection lue, aucune erreur de verrous" "$(jq_ "$WORK/c13/c131.json" 'j.erreur||j.temoin')" "verrous=lue/1 erreurVerrous=false"
+assert_eq "C13.1b — la projection des verrous lève : etapeTour ne lève pas, la projection vaut erreur (liste vide), « verrous » est dans les erreurs du tour" "$(jq_ "$WORK/c13/c131.json" 'j.erreur||j.hostile')" "verrous=erreur/0 erreurVerrous=true dureeMs=number"
+if mutant M-GREFFE-TOUR vf-cockpit-collecte-etapes.mjs etape-tour "$GREFFE_DE" "$GREFFE_VERS"; then
+  c13run c132 "$MUT_SCRIPTS"
+  assert_eq "C13.2 — le fil dont etapeTour lève ne meurt pas : un tour neuf (équipe vide, erreurs « tour ») est posté, la collecte est partielle, aucune relance, le fil vit" "$(jq_ "$WORK/c13/c132.json" 'j.erreur||[j.pret,j.tour,j.erreurs,j.equipe,j.etat,j.relances,j.vivant,j.mort===null].join(" ")')" "true true tour 0 partielle 0 true true"
+else assert_eq "C13.2 — construction de la greffe" "échec" "ok"; fi
+c13run c133 "$SCRIPTS"
+assert_eq "C13.3a — la signature est stable, puis change quand .git/config change (adresse distante) puis quand .git/info/exclude change, et reste stable ensuite" "$(jq_ "$WORK/c13/c133.json" 'j.erreur||[j.stable,j.config,j.exclude,j.stable2].join(" ")')" "true true true true"
+assert_eq "C13.3b — même chose pour un arbre de travail : la config et les exclusions du dépôt commun changent sa signature" "$(jq_ "$WORK/c13/c133.json" 'j.erreur||j.arbre')" "true true"
+c13run c134 "$SCRIPTS"
+assert_eq "C13.4a — témoin : l'écriture ordinaire se relit, en 0600, sans temporaire laissé" "$(jq_ "$WORK/c13/c134.json" 'j.erreur||j.temoin')" "abc 600 restes=0"
+assert_eq "C13.4b — la sortie est un lien vers un dossier hors du lab : rien n'est créé dehors (le confinement précède le mkdir)" "$(jq_ "$WORK/c13/c134.json" 'j.erreur||j.lien')" "dehors=0"
+assert_eq "C13.4c — le temporaire attendu est un lien vers un fichier hors du lab : le fichier visé reste intact" "$(jq_ "$WORK/c13/c134.json" 'j.erreur||j.tmp')" "intact"
+# mutants
+if MUT_NOLOAD=1 mutant M-FIL-TOUR vf-cockpit-collecte-fil.mjs fil-tour ' catch {' ' catch (e) { throw e; } if (false) {'; then
+  node "$AUX/muter.mjs" "$MUT_SCRIPTS/vf-cockpit-collecte-etapes.mjs" etape-tour "$GREFFE_DE" "$GREFFE_VERS" && c13run c132 "$MUT_SCRIPTS"
+  assert_eq "M-FIL-TOUR — sans le try du fil, un tour qui lève tue le fil : aucun tour posté, mort comptée, C13.2 rougit" "$(jq_ "$WORK/c13/c132.json" 'j.erreur||[j.tour,(j.relances>0||j.mort!==null)].join(" ")')" "false true"
+else assert_eq "M-FIL-TOUR — construction du mutant" "échec" "ok"; fi
+if mutant M-PROJETER vf-cockpit-collecte-etapes.mjs etape-projeter "catch { erreurs.push('verrous'); }" "catch (e) { throw e; }"; then
+  c13run c131 "$MUT_SCRIPTS"
+  assert_eq "M-PROJETER — sans le try autour de la projection, le tour lève : C13.1b rougit (le témoin C13.1a reste vert)" "$(jq_ "$WORK/c13/c131.json" 'j.erreur||j.temoin+" | "+j.hostile')" "verrous=lue/1 erreurVerrous=false | leve:essai"
+else assert_eq "M-PROJETER — construction du mutant" "échec" "ok"; fi
+if mutant M-CACHE-CONFIG vf-cockpit-code-cache.mjs scan-cache-config "stat(path.join(base, 'config'))" "''"; then
+  c13run c133 "$MUT_SCRIPTS"
+  assert_eq "M-CACHE-CONFIG — la signature ignore .git/config : C13.3a rougit sur config (les exclusions restent vues)" "$(jq_ "$WORK/c13/c133.json" 'j.erreur||[j.config,j.exclude].join(" ")')" "false true"
+else assert_eq "M-CACHE-CONFIG — construction du mutant" "échec" "ok"; fi
+if mutant M-CACHE-EXCLUDE vf-cockpit-code-cache.mjs scan-cache-config "stat(path.join(base, 'info', 'exclude'))" "''"; then
+  c13run c133 "$MUT_SCRIPTS"
+  assert_eq "M-CACHE-EXCLUDE — la signature ignore .git/info/exclude : C13.3a rougit sur exclude (la config reste vue)" "$(jq_ "$WORK/c13/c133.json" 'j.erreur||[j.config,j.exclude].join(" ")')" "true false"
+else assert_eq "M-CACHE-EXCLUDE — construction du mutant" "échec" "ok"; fi
+if mutant M-CACHE-ORDRE vf-cockpit-code-cache.mjs code-cache-confiner 'try { confiner(lab, f); confiner(lab, tmp); } catch { return; }' "fs.mkdirSync(dir, { recursive: true }); try { confiner(lab, f); } catch { return; }"; then
+  c13run c134 "$MUT_SCRIPTS"
+  assert_eq "M-CACHE-ORDRE — le dossier est créé avant le confinement (ordre d'avant) : C13.4b rougit (un dossier .cache naît hors du lab)" "$(jq_ "$WORK/c13/c134.json" 'j.erreur||j.lien')" "dehors=1"
+else assert_eq "M-CACHE-ORDRE — construction du mutant" "échec" "ok"; fi
+if mutant M-CACHE-TMP vf-cockpit-code-cache.mjs code-cache-confiner 'confiner(lab, f); confiner(lab, tmp);' 'confiner(lab, f);' \
+   && node "$AUX/muter.mjs" "$MUT_SCRIPTS/vf-cockpit-code-cache.mjs" code-cache-ecriture 'fs.openSync(tmp, drapeaux, 0o600)' "fs.openSync(tmp, 'w', 0o600)"; then
+  c13run c134 "$MUT_SCRIPTS"
+  assert_eq "M-CACHE-TMP — temporaire ni confiné ni créé en exclusif sans suivre les liens (écriture d'avant) : C13.4c rougit (le fichier visé par le lien est écrasé)" "$(jq_ "$WORK/c13/c134.json" 'j.erreur||j.tmp')" "{\"signature\":\"abc\"}"
+else assert_eq "M-CACHE-TMP — construction du mutant" "échec" "ok"; fi
+if mutant M-CONFIRM vf-cockpit-collecte.mjs collecte-motifs 'reserve(t)' 't.slice(0, MAX_MOTIFS)'; then
+  c12run c124 "$MUT_SCRIPTS"
+  assert_eq "M-CONFIRM — sans la réserve, le plafond évince « confirm » derrière une rafale de 70 motifs : C13.5 rougit (confirm=false), le cas seul reste vrai" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.confirm')" "n=64 confirm=false | n=64 confirm=true | n=1 confirm=true"
+else assert_eq "M-CONFIRM — construction du mutant" "échec" "ok"; fi
+# preuves de coalescence (C2.1), d'arrêt (C2.7) et de garde (C2.6a, C2.8) : chacune rougit sur son mutant
+if mutant M-COALESCENCE vf-cockpit-collecte.mjs collecte-demander 'if (enVol || !fil)' 'if (!fil)'; then
+  pilote "$MUT_SCRIPTS" c21 > "$WORK/c21-m.json"
+  assert_eq "M-COALESCENCE — sans file d'attente, les cinq demandes partent aussitôt : C2.1 rougit (cinq exécutions au lieu de deux)" "$(jq_ "$WORK/c21-m.json" 'j.erreur||j.execs')" "5"
+else assert_eq "M-COALESCENCE — construction du mutant" "échec" "ok"; fi
+if mutant M-UNION vf-cockpit-collecte.mjs collecte-fusion 'unir(a.motifs, b.motifs)' 'b.motifs'; then
+  pilote "$MUT_SCRIPTS" c21 > "$WORK/c21-m2.json"
+  assert_eq "M-UNION — la fusion de l'attente perd les motifs déjà en attente : C2.1 rougit (la dernière exécution ne porte plus a,b,c)" "$(jq_ "$WORK/c21-m2.json" 'j.erreur||(j.motifs===null?"aucun":j.motifs)')" ""
+else assert_eq "M-UNION — construction du mutant" "échec" "ok"; fi
+if mutant M-ARRET-FERME vf-cockpit-collecte.mjs collecte-ferme 'ferme = true;' ''; then
+  pilote "$MUT_SCRIPTS" c27 > "$WORK/c27-m.json"
+  assert_eq "M-ARRET-FERME — arreter() ne ferme plus le pilote : une demande ultérieure est acceptée, C2.7 rougit" "$(jq_ "$WORK/c27-m.json" 'j.erreur||j.apres')" "true"
+else assert_eq "M-ARRET-FERME — construction du mutant" "échec" "ok"; fi
+if mutant M-ARRET-FIL vf-cockpit-collecte.mjs collecte-terminer 'f.w.terminate().catch(() => {});' ';'; then
+  c12run c123 "$MUT_SCRIPTS"
+  assert_eq "M-ARRET-FIL — arreter() ne termine pas le fil : il bat encore après l'arrêt (C12.3 rougit sur batApresArret)" "$(jq_ "$WORK/c12/c123.json" 'j.erreur||j.batApresArret>0')" "true"
+else assert_eq "M-ARRET-FIL — construction du mutant" "échec" "ok"; fi
+if mutant M-GARDE-TOUR vf-cockpit-live.mjs live-garde-tour 'if (!garde({ verrous: n, equipe: nw, signal: sg }))' 'if (false)'; then
+  pilote "$MUT_SCRIPTS" c26 "$WORK/lab26" > "$WORK/c26-m.json"
+  assert_eq "M-GARDE-TOUR — la garde ne refuse plus le tour : le tour interdit est posé, l'instantané du tour accepté n'est pas conservé, C2.6a rougit" "$(jq_ "$WORK/c26-m.json" 'j.erreur||j.refus.conserve')" "false"
+else assert_eq "M-GARDE-TOUR — construction du mutant" "échec" "ok"; fi
+if mutant M-GARDE-DEFAUT vf-cockpit-live.mjs live-garde-defaut 'garde = () => false' 'garde = () => true'; then
+  pilote "$MUT_SCRIPTS" c28 "$WORK/lab26" > "$WORK/c28-m.json"
+  assert_eq "M-GARDE-DEFAUT — la garde par défaut redevient ouverte : l'instantané est posé et « qui » rempli sans garde fournie, C2.8 rougit" "$(jq_ "$WORK/c28-m.json" 'j.erreur||j.instantane+" "+j.qui')" "false 1"
+else assert_eq "M-GARDE-DEFAUT — construction du mutant" "échec" "ok"; fi
 
 vf_hyg_assert
 echo "== Résultats : $PASS PASS / $FAIL FAIL =="
