@@ -31,9 +31,11 @@ function piedJalon(ks) {
 // contenu de la première balise <objective> (indexOf : une balise sans fermeture ne fait pas rebalayer le texte pour chaque ouverture)
 const objectif = (t) => { const a = t.indexOf('<objective>'); if (a < 0) return undefined; const b = t.indexOf('</objective>', a + 11); return b < 0 ? undefined : t.slice(a + 11, b).replace(/^\s+/, ''); };
 
-// P75-D-24 : `files_modified` d'un plan (liste en ligne ou en bloc), borné à 200 chemins de 4 096 octets ; l'excédent est compté dans `touchedIgnores`, jamais tronqué en silence
+// P75-D-24 : `files_modified` d'un plan (ligne ou bloc), borné à 200 chemins de 4 096 octets ;
+// l'excédent est compté dans `touchedIgnores`, jamais tronqué en silence
 const fichiersPlan = (txt) => {
-  const tous = listeImbriquee(txt, ['files_modified'], { max: 1 << 20 }), gardes = tous.filter((c) => Buffer.byteLength(c) <= 4096).slice(0, 200);
+  const tous = listeImbriquee(txt, ['files_modified'], { max: 1 << 20 });
+  const gardes = tous.filter((c) => Buffer.byteLength(c) <= 4096).slice(0, 200);
   return { touched: gardes, touchedIgnores: tous.length - gardes.length };
 };
 
