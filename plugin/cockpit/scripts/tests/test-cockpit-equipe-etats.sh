@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # test-cockpit-equipe-etats.sh — état des sessions et des agents de l'onglet Équipe, lot 0 de l'audit du cockpit (AUDC-D1 à D4, M3).
-# Chaque ligne du registre a sa section ; toutes traversent le COLLECTEUR RÉEL (collectWho, puis buildEquipeGraph), jamais une donnée écrite à la main
-# pour le rendu seul. Un HOME jetable porte les transcripts ; le lab est un dépôt git jetable.
+# Chaque ligne du registre a sa section ; toutes traversent le COLLECTEUR RÉEL (collectWho, puis la régie de la page Équipe jouée hors navigateur par vm-regie-page.mjs ; buildEquipeGraph
+# ne sert plus qu'à meta.vf.compte, D-03), jamais une donnée écrite à la main pour le rendu seul. Un HOME jetable porte les transcripts ; le lab est un dépôt git jetable.
 #   D1  un sous-agent non fini et muet reste listé (« outil en cours »), sa session aussi
-#   D2  une session écrite depuis moins de 24 h reste listée avec un état lu (occupée, au repos, vous attend, close) ; le panneau d'une carte dit le même état que la carte à chaque poussée (D2c)
+#   D2  une session écrite depuis moins de 24 h reste listée avec un état lu (occupée, au repos, vous attend, close) ; la ligne de la régie dit le même état que sa section à chaque poussée (D2c)
 #   D3  « À surveiller » et « commande en cours depuis 15 min » atteignables de bout en bout ; l'âge avance dans la page
 #   D4  un worker vivant sous un manager terminé est dit orphelin, jamais rangé dans « Terminés »
 #   M3  le titre de la vue Équipe dit le nombre d'agents actifs ; la santé d'Équipe ne contredit plus celle de Code
@@ -13,6 +13,7 @@ set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 UI="$(cd "$SCRIPTS/../skills/cockpit-moteur/assets/ui" && pwd)"
+TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 WORK="$(mktemp -d)"
 trap 'rm -rf "$WORK"' EXIT
 WORK="$(cd "$WORK" && pwd -P)"
@@ -25,7 +26,9 @@ import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
 import { pathToFileURL } from 'node:url';
+import { execFileSync } from 'node:child_process';
 const [, , scripts, ui, lab, work, ...sections] = process.argv;
+const TESTS = process.env.VF_TESTS_DIR; // dossier de vm-regie-page.mjs
 const who = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-who.mjs')).href);
 const carte = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-equipe-carte.mjs')).href);
 let pass = 0, fail = 0;
@@ -73,6 +76,17 @@ function rendu() {
   return sandbox.window.__vfEquipeRendu;
 }
 const h = (t) => String(t).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+// 73-09 (P73-D-04) : la page Équipe (régie) hors navigateur, jouée sur le who@2 du collecteur réel (vm-regie-page.mjs) ; rend { out, final } (étapes : voir l'en-tête du harnais)
+const regie = (wh, etapes) => {
+  const f = path.join(work, `sc-regie-${++n}.json`);
+  fs.writeFileSync(f, JSON.stringify({ onglet: 'equipe', source: 'live', who: wh, lock: null, etapes }));
+  const r = JSON.parse(execFileSync('node', [path.join(TESTS, 'vm-regie-page.mjs'), ui, f], { encoding: 'utf8' }));
+  if (r.erreur) throw new Error('vm-regie-page : ' + r.erreur);
+  return r;
+};
+const li = (id, sec = '') => `${sec ? `section[data-vf-section="${sec}"] ` : ''}li[data-vf-agent="${id}"]`;
+const sp = (t) => String(t).replace(/\s/g, ' ');
+const SECTIONS = ['a-vous', 'au-travail', 'a-relire', 'au-repos'];
 const texte = (html) => html.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ');
 
 const S = {
@@ -115,8 +129,10 @@ const S = {
     const att = collecte(monter({ session: { ageS: 600 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 600, outil: 'Agent' }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 20 }] }));
     eq('D2.5 — une session dont un agent écrit encore reste « en-attente »', sess(att)?.etat, 'en-attente');
     eq('D2.6 — une session seulement au repos ne rend pas la collecte « busy »', collecte(monter({ session: { ageS: 300 } })).busy, false);
-    const g = carte.buildEquipeGraph(r, {}), nd = g.nodes.find((x) => x.id === 'se-' + SID);
-    ok('D2.7 — la carte de la session au repos dit « au repos » et n\'a pas la pastille « En cours »', !!nd && /État : au repos/.test(nd.details) && nd.st === undefined, nd);
+    const g = carte.buildEquipeGraph(r, {});
+    const rg7 = regie(r, [{ nom: 'mot', obs: { mode: 'textes', sel: li(SID, 'au-repos') + ' .vf-rg-mot' } }, { nom: 'etat', obs: { mode: 'attr', sel: li(SID, 'au-repos'), attr: 'data-vf-etat' } },
+      { nom: 'travail', obs: { mode: 'compte', sel: li(SID, 'au-travail') } }]).out;
+    ok('D2.7 — la ligne de régie de la session au repos, dans « Au repos », dit « au repos » et n\'a pas le glyphe « au travail » (plan 73-09 : lu sur la ligne, plus sur la carte)', JSON.stringify([rg7.mot, rg7.etat, rg7.travail]) === '[["au repos"],["repos"],0]', rg7);
     eq('D2.8 — le compte de la carte sépare les sessions au repos', [g.meta.vf.compte.actif, g.meta.vf.compte.auRepos], [0, 1]);
     const rd = rendu();
     ok('D2.9 — le tiroir écrit « au repos » (mot) pour la session', /au repos/.test(texte(rd.arbre(r.workers, h))), texte(rd.arbre(r.workers, h)));
@@ -153,9 +169,10 @@ const S = {
     ok('D4.2 — le manager terminé n\'est pas orphelin', sous(o, 'mgr')?.orphan !== true);
     const ft = collecte(monter({ session: { ageS: 600 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 600, fini: true }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 700, fini: true }] }));
     ok('D4.3 — un worker terminé sous un manager terminé n\'est pas orphelin', sous(ft, 'wrk')?.orphan !== true && !!sous(ft, 'wrk'));
-    const g = carte.buildEquipeGraph(o, {}), nd = g.nodes.find((x) => x.id === 'ag-wrk');
-    ok('D4.4 — sur la carte, le worker orphelin n\'est pas rangé sous « Terminés » : son parent est la session', !!nd && nd.parent === 'se-' + SID, nd?.parent);
-    ok('D4.5 — la carte le nomme « orphelin » (détail et résumé)', !!nd && /Orphelin/.test(nd.details) && /^Orphelin/.test(nd.summary), nd);
+    const rgo = regie(o, [{ nom: 'ordre', obs: { mode: 'attr', sel: 'section[data-vf-section="au-travail"] li', attr: 'data-vf-agent' } }, { nom: 'relire', obs: { mode: 'compte', sel: li('wrk', 'a-relire') } },
+      { nom: 'mot', obs: { mode: 'textes', sel: li('wrk', 'au-travail') + ' .vf-rg-mot' } }, { nom: 'det', obs: { mode: 'textes', sel: li('wrk', 'au-travail') + ' .vf-rg-det' } }]).out;
+    ok('D4.4 — sur la régie, le worker orphelin est dans l\'arbre « Au travail » juste sous la ligne de son parent, jamais dans « Terminé, à relire »', rgo.ordre.includes('wrk') && rgo.ordre.indexOf('wrk') === rgo.ordre.indexOf('mgr') + 1 && rgo.relire === 0, rgo);
+    ok('D4.5 — la ligne de régie le nomme « orphelin » (mot et détail)', JSON.stringify(rgo.mot) === '["orphelin"]' && /son parent est terminé/.test(sp((rgo.det || []).join(' '))), rgo);
     const t = texte(rendu().arbre(o.workers, h));
     ok('D4.6 — le tiroir le nomme « orphelin ? »', /orphelin \?/.test(t) && !/Terminés depuis/.test(t), t);
   },
@@ -247,51 +264,37 @@ const S = {
     ok('D2b.9 — l\'enfant est lancé avec un PATH assaini : le programme posé dans le lab n\'est jamais exécuté', !fs.existsSync(piegeMarque));
     fs.rmSync(piege, { force: true }); process.env.PATH = PATH0;
   },
-  // ---- D3b : l'âge avance dans les pieds de carte et le panneau de l'onglet Équipe sans nouveau who ----
+  // ---- D3b : l'âge avance dans les lignes de la régie sans nouveau who (minuterie de 30 s de la régie, plan 73-09) ----
   async D3b() {
-    console.log('=== D3b — minuterie de l\'onglet Équipe ===');
-    const minuteries = []; let rerendus = 0, sections = null;
-    const G = { meta: { vfTab: 'equipe', vf: {} }, project: { name: 'P' }, nodes: [{ id: 'ag-a', foot: '' }] };
-    const SC = { graph: G, h, exists: () => false, on() {}, setOverview() {}, addPanelSection(_, f) { sections = f; }, rerender: async () => { rerendus++; }, fit() {}, reveal() {}, plafond() {} };
-    const sb = { window: { Floorplan: SC, FLOORPLAN_SERVER: {}, __vfLive: {} }, document: { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], addEventListener() {}, hidden: false, documentElement: {} }, location: { hash: '' }, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
-      MutationObserver: class { observe() {} }, setInterval: (f, ms) => { minuteries.push([f, ms]); return 1; }, setTimeout, fetch: async () => ({ ok: false }), console };
-    vm.createContext(sb);
-    vm.runInContext(fs.readFileSync(path.join(ui, '71-vf-equipe-rendu.js'), 'utf8'), sb);
-    vm.runInContext(fs.readFileSync(path.join(ui, '72-vf-equipe.js'), 'utf8'), sb);
-    ok('D3b.1 — l\'onglet Équipe arme une minuterie de recalcul', minuteries.length >= 1, minuteries.length);
+    console.log('=== D3b — minuterie de la régie ===');
     const w = { kind: 'subagent', id: 'a', etat: 'actif', tree: '.', role: 'vf-coder', task: 'x', ageS: 60, dureeS: 100 };
-    sb.window.__vfLive = { who: { workers: [w] }, whoAt: Date.now() - 600000 };
-    for (const [f] of minuteries) await f();
-    ok('D3b.2 — le pied de la carte a avancé sans nouveau who (10 min de plus)', /dernière activité il y a 11 min|au travail depuis 12 min/.test(G.nodes[0].foot), G.nodes[0].foot);
-    ok('D3b.3 — la vue est redessinée', rerendus >= 1, rerendus);
-    const panneau = sections ? sections('n:ag-a') : '';
-    ok('D3b.4 — la ligne « Activité » du panneau porte le même âge avancé', /au travail depuis 12 min/.test(texte(panneau)), texte(panneau));
+    const dur = (nom) => ({ nom, obs: { mode: 'textes', sel: li('a') + ' .vf-rg-dur' } });
+    const f = { kind: 'subagent', id: 'b', etat: 'termine', tree: '.', role: 'vf-reviewer', task: 'y', ageS: 600, dureeS: 90 };
+    const R = regie({ workers: [w, f] }, [dur('avant'), { nom: 'm', obs: {} }, { avancer: 600000 }, dur('apres')]);
+    const fin = regie({ workers: [f] }, [{ raz: true }, { avancer: 30000 }, { nom: 'fin', obs: {} }]).out.fin;
+    const frais = regie({ workers: [{ ...w, ageS: 660, dureeS: 700 }, f] }, [dur('neuf')]).out.neuf;
+    ok('D3b.1 — la régie arme une minuterie de recalcul', R.out.m.minuteries >= 1, R.out.m.minuteries);
+    ok('D3b.2 — la durée de la ligne a avancé sans nouveau who (10 min de plus : « écrit il y a 11 min »)', /11 min/.test(sp(R.out.apres.join(' '))) && R.out.avant.join() !== R.out.apres.join(), [R.out.avant, R.out.apres]);
+    ok('D3b.3 — la ligne est redessinée à l\'avance du temps ; 30 s plus tard, texte identique (agent terminé) : aucune écriture du DOM', R.out.avant.join() !== R.out.apres.join() && fin.ecritures === 0, [R.out.avant, R.out.apres, fin.ecritures]);
+    ok('D3b.4 — la durée avancée par la minuterie est celle d\'une poussée neuve de même âge (une seule vérité du temps)', sp(R.out.apres.join(' ')) === sp(frais.join(' ')), [R.out.apres, frais]);
   },
-  // ---- D2c (AUDC-D2) : un seul état affiché pour une session ; le panneau suit chaque poussée (avant : « État : actif » au panneau, « vous attend » sur la carte) ----
+  // ---- D2c (AUDC-D2) : un seul état affiché pour une session ; la ligne de la régie suit chaque poussée et dit le même état que la section où elle se trouve (plan 73-09) ----
   async D2c() {
-    console.log('=== D2c — le panneau suit l\'état à chaque poussée ===');
-    const ecoutes = {}; let rerendus = 0;
-    const G = { meta: { vfTab: 'equipe', vf: {} }, project: { name: 'P' }, nodes: [
-      { id: 'se-s1', kind: 'session', foot: '', details: 'Rôle : vf-dev-manager\n\nÉtat : actif\n\nIdentifiant : s1s1s1s1', summary: 'Session sans tâche annoncée · actif' },
-      { id: 'ag-a', kind: 'agent', foot: '', details: 'État : actif\n\nOrphelin : son parent est terminé, cet agent travaille encore.', summary: 'Orphelin · tâche du worker' }] };
-    const SC = { graph: G, h, exists: () => false, on() {}, setOverview() {}, addPanelSection() {}, rerender: async () => { rerendus++; }, fit() {}, reveal() {}, plafond() {} };
-    const sb = { window: { Floorplan: SC, FLOORPLAN_SERVER: {}, __vfLive: {} }, document: { getElementById: () => null, querySelector: () => null, querySelectorAll: () => [], addEventListener(n, f) { ecoutes[n] = f; }, hidden: false, documentElement: {} }, location: { hash: '' }, sessionStorage: { getItem: () => null, setItem() {}, removeItem() {} },
-      MutationObserver: class { observe() {} }, URLSearchParams, setInterval: () => 1, setTimeout, fetch: async () => ({ ok: false }), console };
-    vm.createContext(sb);
-    vm.runInContext(fs.readFileSync(path.join(ui, '71-vf-equipe-rendu.js'), 'utf8'), sb);
-    vm.runInContext(fs.readFileSync(path.join(ui, '72-vf-equipe.js'), 'utf8'), sb);
-    ok('D2c.0 — témoin : la page écoute le flux « who »', typeof ecoutes['vf-who'] === 'function');
-    const pousse = async (etatSession, etatAgent) => { sb.window.__vfLive = { who: { workers: [{ kind: 'session', id: 's1', etat: etatSession, tree: '.', ageS: 5 }, { kind: 'subagent', id: 'a', etat: etatAgent, tree: '.', role: 'vf-coder', task: 'x', ageS: 5, orphan: true }] }, whoAt: Date.now() }; await ecoutes['vf-who'](); };
-    const ligneEtat = (n) => (/État : ([^\n]*)/.exec(n.details) || [])[1];
-    await pousse('attend', 'actif');
-    eq('D2c.1 — la session qui « vous attend » : le panneau le dit aussi (une seule vérité avec la carte)', ligneEtat(G.nodes[0]), 'vous attend');
-    ok('D2c.2 — le repli de la description dit le même état', /· vous attend$/.test(G.nodes[0].summary), G.nodes[0].summary);
-    eq('D2c.3 — témoin : l\'agent encore actif garde « actif »', ligneEtat(G.nodes[1]), 'actif');
-    await pousse('au-repos', 'en-attente');
-    eq('D2c.4 — poussée suivante : « au repos » au panneau', ligneEtat(G.nodes[0]), 'au repos');
-    eq('D2c.5 — poussée suivante : l\'agent en attente est dit « en attente »', ligneEtat(G.nodes[1]), 'en attente');
-    ok('D2c.6 — les autres lignes du panneau sont intactes', /Rôle : vf-dev-manager/.test(G.nodes[0].details) && /Identifiant : s1s1s1s1/.test(G.nodes[0].details) && /Orphelin : son parent/.test(G.nodes[1].details), G.nodes[0].details);
-    ok('D2c.7 — la description d\'un agent qui porte une tâche n\'est pas réécrite', G.nodes[1].summary === 'Orphelin · tâche du worker', G.nodes[1].summary);
+    console.log('=== D2c — la régie suit l\'état à chaque poussée ===');
+    const WS = (a, b) => ({ workers: [{ kind: 'session', id: 's1', etat: a, tree: '.', ageS: 5, titre: 'Atelier', role: 'vf-dev-manager' }, { kind: 'subagent', id: 'a', parent: 's1', etat: b, tree: '.', role: 'vf-coder', task: 'x', ageS: 5 }] });
+    const lire = (k) => [{ nom: 'mot-' + k, obs: { mode: 'textes', sel: li('s1') + ' .vf-rg-mot' } }, { nom: 'etat-' + k, obs: { mode: 'attr', sel: li('s1'), attr: 'data-vf-etat' } },
+      ...SECTIONS.map((x) => ({ nom: `${x}-${k}`, obs: { mode: 'compte', sel: li('s1', x) } })), { nom: 'ag-' + k, obs: { mode: 'textes', sel: li('a') + ' .vf-rg-mot' } }, { nom: 'agnom-' + k, obs: { mode: 'textes', sel: li('a') + ' .vf-rg-nom' } },
+      { nom: 'role-' + k, obs: { mode: 'textes', sel: li('a') + ' .vf-rg-role' } }];
+    const R = regie(WS('actif', 'actif'), [...lire(0), { poser: { who: WS('attend', 'actif') } }, ...lire(1), { poser: { who: WS('au-repos', 'en-attente') } }, ...lire(2)]).out;
+    const secs = (k) => SECTIONS.filter((x) => R[`${x}-${k}`] > 0).join('+');
+    ok('D2c.0 — témoin : la page écoute le flux « who » (la ligne change à la poussée)', R['mot-0'].join() !== R['mot-1'].join() && R['mot-1'].join() !== R['mot-2'].join(), [R['mot-0'], R['mot-1'], R['mot-2']]);
+    eq('D2c.1 — la session qui « vous attend » : toutes ses lignes le disent, et elle est dans « À vous » (une seule vérité entre la ligne et la section)', [R['mot-1'], secs(1)], [['vous attend', 'vous attend'], 'a-vous+au-travail']);
+    ok('D2c.2 — le glyphe de la ligne (data-vf-etat) dit le même état à chaque poussée : attend puis au repos, jamais « actif »', R['etat-1'].every((e) => e === R['etat-1'][0]) && R['etat-1'][0] !== R['etat-0'][0] && R['etat-2'][0] !== R['etat-1'][0] && R['etat-2'].every((e) => e !== 'actif'), [R['etat-0'], R['etat-1'], R['etat-2']]);
+    eq('D2c.3 — témoin : l\'agent encore actif garde « au travail »', [R['ag-0'], R['ag-1']], [['au travail'], ['au travail']]);
+    eq('D2c.4 — poussée suivante : « au repos », dans « Au repos » seulement', [R['mot-2'], secs(2)], [['au repos'], 'au-repos']);
+    eq('D2c.5 — poussée suivante : l\'agent en attente est dit « en attente »', R['ag-2'], ['en attente']);
+    ok('D2c.6 — les autres champs de la ligne sont intacts : identifiant de session et rôle de l\'agent', R['role-0'].join() === 'vf-coder' && R['role-2'].join() === 'vf-coder' && R['mot-0'].length > 0, R['role-2']);
+    ok('D2c.7 — le nom d\'un agent qui porte une tâche n\'est pas réécrit par les poussées', [0, 1, 2].every((k) => R['agnom-' + k].join() === 'x'), [R['agnom-0'], R['agnom-1'], R['agnom-2']]);
   },
 };
 
@@ -302,7 +305,7 @@ JS
 
 PASS=0; FAIL=0
 run() { # sections...
-  local out; out="$(node "$AUX/etats.mjs" "$SCRIPTS" "$UI" "$LAB" "$WORK" "$@" 2>&1)"; local rc=$?
+  local out; out="$(VF_TESTS_DIR="$TESTS_DIR" node "$AUX/etats.mjs" "$SCRIPTS" "$UI" "$LAB" "$WORK" "$@" 2>&1)"; local rc=$?
   printf '%s\n' "$out" | grep -v '^__TOTAL__'
   local t; t="$(printf '%s\n' "$out" | grep '^__TOTAL__' | tail -1)"
   if [ -z "$t" ]; then echo "  ❌ FAIL — la section $* n'a pas rendu de total (rc=$rc)"; FAIL=$((FAIL+1)); return; fi
