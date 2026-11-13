@@ -104,7 +104,7 @@ assert_eq "CL3.3b — Entrée plonge ; Échap (ou Retour arrière) revient à la
     j.cl33.dos, j.cl33.bs, j.cl33.panneau, j.cl33.foc[0]]')" \
   '["n:ph-4",true,"root",["root","n:ph-4"],["root","n:ph-4"],["n:ph-4","root"],"button"]'
 assert_eq "CL3.4 — 390 px tactile : un toucher sélectionne (feuille ouverte, bouton d'ouvrir dedans) sans plonger ; Espace sélectionne ; Entrée plonge" \
-  "$(E3 '[j.cl3arr.touch[0], j.cl3arr.touch[1], j.cl3arr.touch[2], j.cl3arr.touch[3] >= 1, j.cl3arr.focus, j.cl3arr.espace, j.cl3arr.entree]')" \
+  "$(E3 '[j.cl34.touch[0], j.cl34.touch[1], j.cl34.touch[2], j.cl34.touch[3] >= 1, j.cl34.focus, j.cl34.espace, j.cl34.entree]')" \
   '["n:ph-3",true,"root",true,"n:ph-3","n:ph-4","n:ph-4"]'
 assert_eq "CL3.3c — arrivée sur Projet par VF_ONGLETS.aller sans sélection : aucune erreur du clavier des couloirs, focus sur le h1 « Projet »" \
   "$(E3 '[j.cl3arr.err.filter((m) => /clavier|querySelectorAll|null/.test(m)), j.cl3arr.foc, j.cl3arr.sel]')" '[[],"vf-projet-titre",null]'
