@@ -4,7 +4,7 @@
 # la page, le serveur, le flux (enveloppe AMORCE_FLUX), la régie de la 73 et le tiroir Git de la 80 sont les vrais.
 #   D1 bandeau (branches, « Autres commits », losanges, boutons)  D2 heure des commits  D3 couverture et états (chargement, échec, vide)  D4 clic vers le tiroir Git
 #   D5 jamais attribué à une voie  D5b lecture Git au montage puis sur l'événement git  D6 synthèse de l'en-tête  D7 section « Coût »  D8 trois regroupements
-#   D9 aucune devise ni estimation  D10 un seul calcul de jetons  D11 formats  D12 forme du code (statique) et téléphone  D13 incomplet  D14 aller-retour d'onglet
+#   D9 aucune devise ni estimation  D10 un seul calcul de jetons  D11 formats  D12 forme du code (statique) et téléphone  D13 incomplet  D14 aller-retour d'onglet  D15 focus conservé à la relecture  D16 aucune donnée de frise : coût vide  D17 aucun texte non fiable dans un sélecteur
 # Plan 74-07 non marqué audit : le régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale) ne demande aucun mutant ;
 # les douze mutants du plan ne sont pas joués ici.
 # Chrome headless en CDP (SAUTÉ, jamais compté réussi, sans navigateur). Exit 0 si tout passe, 1 sinon.
@@ -481,6 +481,58 @@ export default async function (h) {
 }
 JS
 
+cat > "$AUX/d15.mjs" <<'JS'
+import { monterD, poserGit, voiesCout, NB } from './commun.mjs';
+export const ids = ['D15', 'D16', 'D17'];
+const actif = (h) => h.ev(() => { const a = document.activeElement; return a && a !== document.body ? [a.tagName, a.getAttribute('data-foc'), a.textContent.slice(0, 30)] : null; });
+const frise = async (h, n) => { const f0 = (await h.reqs()).length; await h.emettre(n); await h.attendreValeur(async () => (await h.reqs()).length, (k) => k > f0, { max: 8000 }); await h.pause(800); };
+const focaliser = (h, motif, texte) => h.ev((m, t) => { const l = [...document.querySelectorAll(m)].find((x) => !t || x.textContent === t); if (l) l.focus(); return !!l && document.activeElement === l; }, motif, texte);
+export default async function (h) {
+  await h.section('D15', async () => {
+    await monterD(h, { voies: voiesCout });
+    const cas = [['bascule « Regrouper par »', '.vf-cout [role=radio][aria-checked=true]', null], ['bouton de dépli d\'une mission', '.vf-cout button[aria-expanded]', null],
+      ['commit du Dépôt', '.vf-depot-commit', null], ['« + N branches »', '.vf-depot-plus', null]];
+    let n = 0;
+    for (const [nom, m, t] of cas) {
+      const ok = await focaliser(h, m, t), av = await actif(h);
+      await frise(h, ++n);
+      const ap = await actif(h);
+      h.sonde('D15', `${nom} : après un événement frise, le même contrôle garde le focus`, ok && !!av && JSON.stringify(av) === JSON.stringify(ap), JSON.stringify([av, ap]));
+    }
+    await monterD(h, { voies: voiesCout, git: { statut: 500 } });
+    const ok = await focaliser(h, '.vf-frise-rang-depot button', 'Réessayer'), av = await actif(h);
+    await frise(h, 9);
+    const ap = await actif(h);
+    h.sonde('D15', '« Réessayer » : après un événement frise, le même contrôle garde le focus', ok && !!av && JSON.stringify(av) === JSON.stringify(ap), JSON.stringify([av, ap]));
+  });
+  await h.section('D16', async () => {
+    const lire = () => h.ev(() => ({ cout: document.querySelectorAll('.vf-cout').length, lien: document.querySelectorAll('.vf-frise-lignes a').length, td: document.querySelectorAll('.vf-cout td').length,
+      carte: !!document.querySelector('.vf-frise-carte, .vf-frise-vide') }));
+    await monterD(h, { voies: voiesCout });
+    const a = await lire();
+    await h.ev('window.__vfF.statut = 503');
+    await h.changer(() => h.radio('6 h')).catch(() => 0); await h.pause(1500);
+    const b = await lire();
+    h.sonde('D16', 'route de frise en erreur après un premier rendu : ni tableau du coût ni « Détail du coût » de la lecture précédente', a.td > 0 && a.lien === 1 && b.carte && b.cout === 0 && b.lien === 0, JSON.stringify([a, b]));
+    await monterD(h, { voies: voiesCout });
+    await h.ev("window.__vfF.statut = 200; window.__vfF.reponse = Object.assign({}, window.__vfF.reponse, { voies: [] })");
+    await h.changer(() => h.radio('6 h')).catch(() => 0); await h.pause(1500);
+    const c = await lire();
+    h.sonde('D16', 'fenêtre sans agent : ni tableau du coût ni « Détail du coût » de la lecture précédente', c.carte && c.cout === 0 && c.lien === 0, JSON.stringify(c));
+  });
+  await h.section('D17', async () => {
+    await monterD(h, { voies: (now, F) => voiesCout(now, F).map((v) => (v.rattachement && v.rattachement.dag === 'm1.md' ? { ...v, rattachement: { ...v.rattachement, dag: 'x"y.md' } } : v)) });
+    await h.ev("window.__vfS.signal.missions[0].fichier = 'x\"y.md'; window.__emit('etat', { seq: 2 })");
+    await h.pause(1500); await h.ev('window.__errs.length = 0');
+    const ok = await h.ev(() => { const b = document.querySelector('.vf-cout-depli'); if (b) b.click(); return !!b; });
+    await h.pause(500);
+    const e = await h.ev(() => ({ errs: window.__errs.slice(), exp: document.querySelector('.vf-cout-depli') ? document.querySelector('.vf-cout-depli').getAttribute('aria-expanded') : null,
+      foc: document.activeElement === document.querySelector('.vf-cout-depli'), phases: document.querySelectorAll('.vf-cout-phase').length }));
+    h.sonde('D17', 'dépli d\'une mission dont le fichier contient un guillemet : aucune erreur, phases dépliées, focus rendu au bouton', ok && e.errs.length === 0 && e.exp === 'true' && e.foc && e.phases > 0, JSON.stringify(e));
+  });
+}
+JS
+
 # ---------- lancement ----------
 LAB="$WORK/lab"; mkdir -p "$LAB/src" "$LAB/.planning/phases/01-x"
 printf 'export const util = () => 1;\n' > "$LAB/src/util.js"
@@ -551,6 +603,7 @@ else
   echo "=== D12 — téléphone 390 px ==="; joue d12 "$PORT" D12
   echo "=== D13 — incomplet ==="; joue d13 "$PORT" D13
   echo "=== D14 — aller-retour d'onglet ==="; joue d14 "$PORT" D14
+  echo "=== D15 à D17 — focus à la relecture, aucune donnée de frise, texte non fiable ==="; joue d15 "$PORT" D15 D16 D17
   cockpit_arreter "$SRV"; SRV=""
 fi
 
