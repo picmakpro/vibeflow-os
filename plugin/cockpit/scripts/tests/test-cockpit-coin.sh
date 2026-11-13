@@ -2,8 +2,9 @@
 # test-cockpit-coin.sh — coin bas-droit, ligne d'état, repères de bord (80-05, FORM-10, FORM-12, P80-D-16/18/25/32/50), un vrai Chrome, sans réseau.
 #   CN1 repères « N cartes par là » : compte, geste, ordre de Tab · CN2 bloc bas-droit, minicarte, hachure du tiroir Git, ligne d'état, sans terminal
 #   CN3 feuille de détail (390 et 800 px), tactile, terminal ouvert, focus orphelin, mouvement réduit
-#   Mutants (copie du module dans $WORK, jamais le module) : M-FREEAREA, M-COMPTE, M-TERMINAL.
-#   CN_SCRIPTS = dossier de scripts à bâtir (rejeu sur la base). Sans navigateur : SUITE SAUTÉE (exit 0), jamais un vert à vide.
+#   Mutants (copie COMPLÈTE du module par cockpit_module_copie, page rebâtie depuis la copie, serveur lancé par socle-serveur.sh sur COCKPIT_MODULE ;
+#   jamais le module du dépôt) : M-FREEAREA, M-COMPTE, M-TERMINAL, M-ORPHELIN, M-ONGLETS, M-POINTEUR-COIN.
+#   CN_SCRIPTS = dossier de scripts à bâtir (rejeu sur la base) : sa racine de module est servie comme COCKPIT_MODULE. Sans navigateur : SUITE SAUTÉE (exit 0), jamais un vert à vide.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -20,6 +21,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 PASS=0; FAIL=0
 assert_eq() {
   if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1))
@@ -48,24 +50,22 @@ mklab() { # 70 notes dans un dossier (un niveau qui déborde), un module, une ph
   echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
   git -C "$L" init -q -b "$BRANCHE" && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
 }
-# build_serve <lab> <dossier de scripts> <dossier du moteur> [--terminal] -> PORT, SRV
+# build_serve <lab> [--terminal] -> PORT, SRV, LANCE_RC. Le module est COCKPIT_MODULE s'il est posé (une copie mutée), sinon la racine de CN_SCRIPTS si elle est posée, sinon celui du dépôt.
 build_serve() {
-  local L="$1" O="$1/.vibeflow/cockpit" flag=(); [ "${4:-}" = "--terminal" ] && flag=(--terminal)
-  node "$2/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
-  rm -f "$O/.cache/server.json" "$O/.cache/terminal-amorce"; mkdir -p "$WORK/fauxbin" "$O/.cache"
+  local L="$1" O="$1/.vibeflow/cockpit" mod="${COCKPIT_MODULE:-${CN_SCRIPTS:+$RACINE_BASE}}" flag=() pret=port; [ "${2:-}" = "--terminal" ] && { flag=(--terminal); pret=terminal; }
+  local env=(PATH="$WORK/fauxbin:$PATH") opt=(); [ -z "${SANS_CLI:-}" ] || { mkdir -p "$WORK/vide"; env=(PATH="$WORK/vide:/usr/bin:/bin"); opt=(--claude "$WORK/absent"); } # SANS_CLI=1 : serveur sans CLI (barre de question absente), passage de la jointure J1
+  node "${mod:-$SCRIPTS/..}/scripts/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
+  mkdir -p "$WORK/fauxbin" "$O/.cache"; rm -f "$O/.cache/terminal-amorce"
   cp "$SCRIPTS/tests/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"
   [ -n "${flag[*]:-}" ] && (umask 077; node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" > "$O/.cache/terminal-amorce")
-  ( cd "$L" && PATH="$WORK/fauxbin:$PATH" VF_COCKPIT_ENGINE_DIR="$3" VF_COCKPIT_SCRIPTS_DIR="$2" \
-      exec node "$O/serve.mjs" --no-open ${flag[@]+"${flag[@]}"} --port "$(libre)" > "$WORK/serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV=$!; PIDS+=($SRV)
-  for _ in $(seq 1 300); do grep -q '"port"' "$O/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$O/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  COCKPIT_MODULE="$mod" COCKPIT_PRET="$pret" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$L" "${env[@]}" ${flag[@]+"${flag[@]}"} ${opt[@]+"${opt[@]}"}; LANCE_RC=$?
+  SRV="$VF_PID"; PORT="$VF_PORT"
 }
 mesurer() { REAL_HOME="$REAL_HOME" node "${CN_PILOTE:-$HERE_T/chrome-coin.mjs}" "$CHROME" "http://127.0.0.1:$PORT" "$1" 2>"$WORK/mesure.err"; }
 E() { printf '%s' "${2:-$R}" | node "$AUX/ev.mjs" "$1"; }
 LAB="$WORK/lab"; mklab "$LAB"
-SC_BASE="${CN_SCRIPTS:-$SCRIPTS}"; ln -s "$SC_BASE" "$WORK/scripts-hote"
-build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+SC_BASE="${CN_SCRIPTS:-$SCRIPTS}"; RACINE_BASE="$(cd "$SC_BASE/.." && pwd -P)"
+build_serve "$LAB"
 assert_eq "CN0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
 if [ -n "${CN_SOLO:-}" ]; then # une seule mesure brute, hors suite : CN_SOLO=<mode>[:<sections>] (CN_PILOTE : un autre pilote)
   SOLO_S=""; case "$CN_SOLO" in *:*) SOLO_S="${CN_SOLO#*:}";; esac
@@ -159,7 +159,7 @@ assert_eq "CN4 — Projet en couloirs (1440 et 390 px, après « + » x 8 et un 
 assert_eq "CN4.9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
 # le même lab lancé avec --terminal : la pastille « Terminal » et le tiroir du terminal (CN3.3)
-LABT="$WORK/lab-term"; cp -R "$LAB" "$LABT"; build_serve "$LABT" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur" --terminal
+LABT="$WORK/lab-term"; cp -R "$LAB" "$LABT"; build_serve "$LABT" --terminal
 assert_eq "CN3.0 — serveur du lab lancé avec --terminal démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
 R="$(mesurer term)"; [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }; [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/term.json"
 assert_eq "CN3.3a — 1440 px, tiroir du terminal ouvert : bloc et repères au-dessus du tiroir (rectangles disjoints)" \
@@ -179,14 +179,18 @@ done
 assert_eq "CN3.3z — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
 
-echo "=== Mutants (copie du module dans \$WORK) ==="
+echo "=== Mutants (copie du module, page rebâtie, serveur sur la copie) ==="
 mutant() { # mutant <nom> <fichier relatif au moteur> <ancien> <nouveau> <mode> <sections> -> RM ; une mutation impossible compte comme un échec
-  local M="$WORK/mod-$1" L="$WORK/lab-$1"; mkdir -p "$M/scripts" "$M/skills"
-  cp "$SC_BASE"/*.mjs "$SC_BASE"/*.json "$M/scripts/"; cp -R "$SC_BASE/../skills/cockpit-moteur" "$M/skills/cockpit-moteur"; cp -R "$LAB" "$L"
+  local M L="$WORK/lab-$1"
+  rm -rf "$WORK/mod-$1" "$L"; M="$(cockpit_module_copie "$WORK/mod-$1")" || { echo "  ❌ FAIL — $1 : copie du module impossible"; FAIL=$((FAIL+1)); RM="{}"; return; }
+  cp -R "$LAB" "$L"
   if ! node "$AUX/mut.mjs" "$M/skills/cockpit-moteur/$2" "$3" "$4"; then
     echo "  ❌ FAIL — $1 : mutation impossible"; FAIL=$((FAIL+1)); RM="{}"; return
   fi
-  build_serve "$L" "$M/scripts" "$M/skills/cockpit-moteur"; RM="$(mesurer "$5" "$6")"; vf_hyg_stop "$SRV"; rm -rf "$L"
+  COCKPIT_MODULE="$M" build_serve "$L"
+  [ "$LANCE_RC" = 0 ] || { echo "  ❌ FAIL — $1 : serveur non lancé sur la copie (code $LANCE_RC ; 5 = la copie n'est pas celle qui est chargée)"; FAIL=$((FAIL+1)); RM="{}"; return; }
+  echo "     trace $1 — copie chargée : empreinte publiée = celle de la copie ; $(cmp -s "$M/skills/cockpit-moteur/$2" "$SC_BASE/../skills/cockpit-moteur/$2" && echo 'ATTENTION copie identique au dépôt' || echo 'copie différente du dépôt')"
+  RM="$(mesurer "$5" "$6")"; vf_hyg_stop "$SRV"; rm -rf "$L"
 }
 mutant M-FREEAREA assets/viewer.html "return { x: 16, y: top, w: Math.max(200, r.width - panelW - 32), h: Math.max(140, r.height - top - bottom) };" \
   "const tg = document.getElementById('vf-git-tiroir'), gw = tg && !tg.hidden ? tg.offsetWidth : 0;
@@ -211,7 +215,7 @@ assert_eq "M-ONGLETS — le mutant rougit CN3.2 (la zone d'appui des onglets ret
   "$(E "[j.cn3.tabs.onglets.every((o) => o.haut && o.bas), j.cn3.tabs.onglets.every((o) => Math.abs(o.h - 36) <= 1)]" "$RM")" "[false,true]"
 echo "=== CN5 — témoins de pointeur (P80-D-50 b : le Chrome sans tête de la CI Linux n'annonce aucun pointeur) ==="
 printf '#!/bin/bash\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$AUX/chrome-sans-pointeur"; chmod +x "$AUX/chrome-sans-pointeur"
-CHROME_REEL="$CHROME"; build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+CHROME_REEL="$CHROME"; build_serve "$LAB"
 export CN_PILOTE="$HERE_T/chrome-pointeur-forme.mjs" # mesurer ne passe que le mode : « mode:sonde » en un seul argument
 CHROME="$AUX/chrome-sans-pointeur"; RCN="$(mesurer none:coin)"; CHROME="$CHROME_REEL"; RCC="$(mesurer coarse:coin)"; vf_hyg_stop "$SRV"
 CN51='[j.pointeur.fine, j.pointeur.coarse, j.mini.cartes > 0, j.mini.existe, j.mini.pose]'
