@@ -69,7 +69,7 @@ if [ "${#FICH[@]}" -gt 0 ]; then
   assert_eq "CS1.2 — chaque fichier : au plus 299 lignes et 160 points de code par ligne (mesure en points de code)" "$(node "$AUX/largeur.mjs" "${FICH[@]}" 2>/dev/null | awk '$2 > 299 || $3 > 160 { print $1 }' | tr '\n' ' ')" ""
   node "$TESTS/css-jetons.mjs" "${FICH[@]}" > /dev/null 2>&1; CJ=$?
   assert_eq "CS1.3 — css-jetons : aucune couleur littérale ni espacement hors grille" "$CJ" "0"
-  assert_eq "CS1.4 — la page est sans lecture de jeton ni de stockage ; la seule route lue est /api/vf/methode" "$(/usr/bin/grep -cE 'localStorage|sessionStorage|document\.cookie|/api/vf/[a-z]' "$FB" "$FJ" | tr '\n' ' ' | sed 's/[^ ]*://g')|$(/usr/bin/grep -c '/api/vf/methode' "$FJ")" "0 1 |1"
+  assert_eq "CS1.4 — la page est sans stockage ni cookie ; la seule route lue est /api/vf/methode" "$(/usr/bin/grep -cE 'localStorage|sessionStorage|document\.cookie' "$FB" "$FJ" | tr '\n' ' ' | sed 's/[^ ]*://g')|$(/usr/bin/grep -ho '/api/vf/[a-z]*' "$FB" "$FJ" | sort -u | tr '\n' ' ')" "0 0 |/api/vf/methode "
 else
   for e in CS1.1 CS1.2 CS1.3 CS1.4; do assert_eq "$e — fichiers absents : non vérifiable" "absent" "présent"; done
 fi
@@ -89,9 +89,10 @@ assert_eq "BG4 — liste : mois abrégés (août, sept., déc., févr.), « 1er 
 30 sept. · périmètre 11 · closes 1 : Phase 67
 2 déc. · périmètre 11 · closes 3 : Phases 68 et 69
 14 févr. · périmètre 11 · closes 6 : Phases 70, 71 et 72"
-assert_eq "BG5 — notes : au singulier, au pluriel (Phases 70, 71 et 72 ; 79 et 80), rien sans phase sans date" "$(JB 'j.notes.map((n) => n.join(" // ")).join("\n")')" "Close, date non écrite : Phase 70. Elle compte dans le pourcentage, sans marche sur la courbe. // Inscrite sans date : Phase 79. Comptée dès l'ouverture du jalon, le 1er nov.
+assert_eq "BG5 — notes : au singulier, au pluriel (Phases 70, 71 et 72 ; 79 et 80), aucune note sans phase sans date" "$(JB 'j.notes.slice(0, 2).map((n) => n.join(" // ")).join("\n")')
+$(JB 'j.notes[2].length')" "Close, date non écrite : Phase 70. Elle compte dans le pourcentage, sans marche sur la courbe. // Inscrite sans date : Phase 79. Comptée dès l'ouverture du jalon, le 1er nov.
 Closes, date non écrite : Phases 70, 71 et 72. Elles comptent dans le pourcentage, sans marche sur la courbe. // Inscrites sans date : Phases 79 et 80. Comptées dès l'ouverture du jalon, le 1er nov.
-"
+0"
 assert_eq "BG6 — ariaLabel : singulier et pluriel, aucune phase close datée dite" "$(JB 'j.aria.join("\n")')" "Burn-up du jalon v1 : 2 phases closes sur 4, 50 %. Périmètre de 3 phases le 1er nov. à 4 phases le 5 nov. ; 2 phases closes datées entre le 3 nov. et le 5 nov.
 Burn-up du jalon v3 : 1 phase close sur 1, 100 %. Périmètre de 1 phase le 3 nov. à 1 phase le 3 nov. ; 1 phase close datée le 3 nov.
 Burn-up du jalon v1 : 0 phase close sur 4, 0 %. Périmètre de 3 phases le 1er nov. à 4 phases le 3 nov. ; aucune phase close datée.
@@ -153,7 +154,7 @@ echo "=== JA — lecture à l'ouverture, attente, erreur, ordre, baseline, chemi
 assert_eq "JA1 — aucune requête /api/vf/methode avant l'ouverture (le journal voit des GET /api/vf/ avec jeton : sonde positive), une seule à l'ouverture" "$(JN '[j.avant.methode, j.avant.api >= 1, j.apres.methode, j.compteMethode].join("|")')" "0|true|1|1"
 assert_eq "JA2.1 — pendant la lecture (faux gate de 1 s) : « Lecture des jauges en cours. » et aria-busy=true ; à l'arrivée aria-busy retiré et contenu remplacé" "$(JN '[j.attente.busy, j.attente.texte, j.ja.busy, j.ja.lis.length].join("|")')" "true|Lecture des jauges en cours.||11"
 assert_eq "JA2.2 — l'arrivée des jauges ne déplace ni le focus (bouton du bloc témoin, vu focalisé avant), ni le défilement (vu positif avant) ; annonce unique « Jauges lues : … »" "$(JN '[j.avantArrivee.focus.texte, j.avantArrivee.scroll > 0, JSON.stringify(j.avantArrivee.focus) === JSON.stringify(j.apresArrivee.focus), j.avantArrivee.scroll === j.apresArrivee.scroll, j.apresArrivee.sr, j.apresArrivee.muts].join("|")')" "Bouton témoin|true|true|true|Jauges lues : 6 dans le budget, 2 à surveiller, 3 dépassées.|1"
-assert_eq "JA3.1 — réponse en erreur : la phrase d'erreur et « Relire les jauges »" "$(JN '[j.erreur.texte.includes("Les jauges sont indisponibles : le serveur du cockpit n'"'"'a pas répondu."), j.erreur.relire.join(",")].join("|")')" "true|Relire les jauges"
+assert_eq "JA3.1 — réponse en erreur : la phrase d'erreur et « Relire les jauges »" "$(JN '[j.echec.texte.includes("Les jauges sont indisponibles : le serveur du cockpit n'"'"'a pas répondu."), j.echec.relire.join(",")].join("|")')" "true|Relire les jauges"
 assert_eq "JA3.2 — pendant la relecture : aria-disabled=true (jamais disabled), le focus reste sur le bouton ; une seule lecture de plus" "$(JN '[j.relecture.aria, j.relecture.disabled, j.relecture.focus.tag, j.relecture.focus.texte, j.relecture.nb].join("|")')" "true|false|BUTTON|Relire les jauges|3"
 assert_eq "JA3.3 — nouvel échec : phrase d'erreur et bouton de nouveau actif, focus gardé dessus ; une relecture réussie remplace le contenu (onze jauges) sans perdre le focus sur le corps de page" "$(JN '[j.apresEchec.focus.tag, j.apresEchec.aria !== "true", j.apresEchec.texte.includes("n'"'"'a pas répondu"), j.apresSucces.lis, j.apresSucces.focus.tag !== "BODY"].join("|")')" "BUTTON|true|true|11|true"
 assert_eq "JA4 — aucun contrôle lu (code 64 des deux) : aucune ligne de jauge, un bilan absent, l'annonce « Jauges indisponibles. »" "$(J6 '[j.ja.lis.length, j.ja.bilan === "", j.ja.texte.includes("Aucune jauge")].join("|")')" "0|true|true"

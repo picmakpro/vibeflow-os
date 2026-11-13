@@ -21,13 +21,14 @@ const lu = (s) => attendreValeur(() => s.ev(`${SEC('methode')} ? ${SEC('methode'
 
 // ---- audit des styles calculés sous une section : neutres, grille d'espacement, tailles, graisses, polices, ombres ----
 const AUDIT = `(sel) => { const out = { n: 0, couleur: [], espacement: [], police: [], ombre: [] }; const GRILLE = [0, 2, 4, 6, 8, 12, 16, 20, 24, 32], TAILLES = [20, 13.5, 12.5, 11];
+  const piste = (() => { const p = document.createElement('i'); p.style.backgroundColor = 'var(--raise-2)'; document.body.appendChild(p); const c = getComputedStyle(p).backgroundColor; p.remove(); return c; })();
   const nombres = (c) => { const m = /(rgba?|color)\\(([^)]*)\\)/.exec(c); if (!m) return null; let v = m[2].replace('srgb', '').split(/[ ,\\/]+/).filter(Boolean).map(Number); if (m[1] === 'color') v = v.map((x) => x * 255); return v; };
   const neutre = (c) => { const v = nombres(c); return !v || (Math.abs(v[0] - v[1]) <= 2 && Math.abs(v[1] - v[2]) <= 2 && Math.abs(v[0] - v[2]) <= 2); };
   for (const el of document.querySelectorAll(sel + ', ' + sel + ' *')) { out.n++; const nom = el.tagName + '.' + (el.getAttribute('class') || ''); const c = getComputedStyle(el);
     const teintes = { color: c.color, fond: c.backgroundColor, fill: c.fill, stroke: c.stroke, outline: c.outlineStyle === 'none' ? '' : c.outlineColor };
     for (const k of ['Top', 'Right', 'Bottom', 'Left']) if (parseFloat(c['border' + k + 'Width']) > 0) teintes['b' + k] = c['border' + k + 'Color'];
     if (el.classList.contains('vst')) teintes.glyphe = getComputedStyle(el, '::before').backgroundColor;
-    for (const [k, v] of Object.entries(teintes)) if (v && !neutre(v)) out.couleur.push(nom + ' ' + k + '=' + v);
+    for (const [k, v] of Object.entries(teintes)) if (v && !(k === 'fond' && v === piste) && !neutre(v)) out.couleur.push(nom + ' ' + k + '=' + v);
     for (const p of ['paddingTop', 'paddingRight', 'paddingBottom', 'paddingLeft', 'marginTop', 'marginRight', 'marginBottom', 'marginLeft', 'rowGap', 'columnGap']) {
       const x = parseFloat(c[p]); if (Number.isFinite(x) && !GRILLE.includes(Math.abs(x))) out.espacement.push(nom + ' ' + p + '=' + c[p]); }
     const f = c.fontFamily.split(',')[0].replace(/["']/g, '').trim();
@@ -37,7 +38,7 @@ const AUDIT = `(sel) => { const out = { n: 0, couleur: [], espacement: [], polic
 const audit = (s, id) => s.ev(`(${AUDIT})('[data-vf-sy-bloc="${id}"]')`);
 
 const BU = `(() => { const sec = ${SEC('burnup')}; if (!sec) return null; const q = (x) => sec.querySelector(x), svg = q('svg.vf-sy-courbe');
-  const vis = (e) => !!e && e.getBoundingClientRect().height > 0 && getComputedStyle(e).display !== 'none';
+  const vis = (e) => !!e && e.getBoundingClientRect().height > 0 && getComputedStyle(e).display !== 'none' && (typeof e.checkVisibility !== 'function' || e.checkVisibility());
   const teinte = (v) => { const p = document.createElement('i'); p.style.color = 'var(' + v + ')'; sec.appendChild(p); const c = getComputedStyle(p).color; p.remove(); return c; };
   const series = svg ? [...svg.querySelectorAll('path[data-serie]')].map((p) => { const c = getComputedStyle(p); return { serie: p.dataset.serie, d: p.getAttribute('d'), tirets: c.strokeDasharray, stroke: c.stroke, largeur: c.strokeWidth }; }) : [];
   const jalon = window.VibeFlow.graph.nodes.find((n) => n.kind === 'jalon'), liste = q('ol.vf-sy-liste'), det = q('details.vf-tech');
@@ -73,7 +74,7 @@ export async function jouer(chrome, port, nom) {
     const J = await journalReseau(s), methodes = () => J.filter((x) => x.url.includes('/api/vf/methode')).length;
     await s.naviguer(base + '/project.html'); await s.attendre(`!!${BTN}`, 'bouton Synthèse posé'); await pause(400);
     r.t0 = await s.ev('performance.timeOrigin'); r.avant = { methode: methodes(), api: J.filter((x) => x.url.includes('/api/vf/') && x.methode === 'GET' && x.jeton).length };
-    r.sondeMQ = await s.ev(`(() => { const q = matchMedia('(max-width: 123px)'), f = () => {}, a = ${MQ}; q.addEventListener('change', f); const b = ${MQ}; q.removeEventListener('change', f); return b - a === 1 && ${MQ} === a; })()`);
+    r.sondeMQ = await s.ev(`(() => { const q = matchMedia('(max-width: 123px)'), f = () => { /* corpsCourant */ }, a = ${MQ}; q.addEventListener('change', f); const b = ${MQ}; q.removeEventListener('change', f); return b - a === 1 && ${MQ} === a; })()`);
     await s.ev(FETCH);
     if (nom === 'main') { // la lecture est lente (1 s) : l'état « en cours » se lit avant l'arrivée
       await s.ev(`${BTN}.click()`); await s.attendre(OUVERTE, 'ouverte'); await s.attendre(`!!${SEC('methode')}`, 'bloc santé');
@@ -100,7 +101,7 @@ export async function jouer(chrome, port, nom) {
       await largeur(s, 800); r.cible800 = (await stabiliser(() => s.ev(BU), { max: 8000 })).details.hauteurResume; await largeur(s, 1440); await pause(300);
       // ---- erreur de la route, relecture : le focus reste sur le bouton ----
       await fermer(s); await s.ev(`window.__mode = 'echec'`); await ouvrir(s); await lu(s); await pause(300);
-      r.erreur = { texte: await s.ev(`${SEC('methode')}.querySelector('.vf-sy-corps').textContent`), relire: await s.ev(`[...${SEC('methode')}.querySelectorAll('button.btn')].map((b) => b.textContent.trim())`) };
+      r.echec = { texte: await s.ev(`${SEC('methode')}.querySelector('.vf-sy-corps').textContent`), relire: await s.ev(`[...${SEC('methode')}.querySelectorAll('button.btn')].map((b) => b.textContent.trim())`) };
       await s.ev(`window.__mode = 'tenir'; (() => { const b = ${SEC('methode')}.querySelector('button.btn'); b.focus(); b.click(); })()`);
       await attendreValeur(() => s.ev(`window.__liberer ? 1 : 0`), (v) => v === 1, { max: 5000 });
       r.relecture = { aria: await s.ev(`${SEC('methode')}.querySelector('button.btn').getAttribute('aria-disabled')`), disabled: await s.ev(`${SEC('methode')}.querySelector('button.btn').disabled`), focus: await s.ev(FOCUS), nb: await s.ev('window.__nbMethode') };

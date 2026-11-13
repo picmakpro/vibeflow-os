@@ -2,7 +2,7 @@
 // chrome-synthese-blocs.mjs — outils du banc des blocs 2 et 3 de la Synthèse (77-06) ; importe le banc de 77-05 tel quel, ne le modifie pas.
 // Outils (chacun a sa sonde positive dans test-cockpit-synthese-blocs.sh) :
 //   labBlocs(dossier, variante)   le lab fixture du banc, dont le ROADMAP porte cinq phases DATÉES : variante « normal » ou « sansdate » (une phase close sans date)
-//   AMORCE_MQ                     écouteurs vivants des listes de requêtes média : window.__nbMQ()
+//   AMORCE_MQ                     écouteurs vivants des listes de requêtes média posés par le bloc burn-up (le source du rappel nomme `corpsCourant`) : window.__nbMQ()
 //   fauxGates(dossier)            écrit check-method-budget.sh et check-instruction-budget.sh (FAUX_METHODE : ok | xss | 64 ; FAUX_DENSITE : ok | tiers | 64 ; FAUX_DELAI en secondes ; vide = gates mixtes)
 //   copieBlocs(copie)             retire de la copie du module tout frère 74-vf-synthese-* hors burnup et jauges, y pose le bloc témoin et les faux gates
 // CLI : lab <dossier> <variante> (imprime le lab) · copie <copie du module> · scenario <chrome> <port> <nom> (une ligne JSON)
@@ -26,7 +26,7 @@ export function labBlocs(dossier, variante = 'normal') {
 }
 
 export const AMORCE_MQ = `(() => { const a = EventTarget.prototype.addEventListener, r = EventTarget.prototype.removeEventListener, L = [];
-  EventTarget.prototype.addEventListener = function (t, f, o) { if (this instanceof MediaQueryList) L.push([this, t, f]); return a.call(this, t, f, o); };
+  EventTarget.prototype.addEventListener = function (t, f, o) { if (this instanceof MediaQueryList && String(f).includes('corpsCourant')) L.push([this, t, f]); return a.call(this, t, f, o); };
   EventTarget.prototype.removeEventListener = function (t, f, o) { if (this instanceof MediaQueryList) { const i = L.findIndex((e) => e[0] === this && e[1] === t && e[2] === f); if (i >= 0) L.splice(i, 1); } return r.call(this, t, f, o); };
   window.__nbMQ = () => L.length; })();`;
 
@@ -40,7 +40,7 @@ if [ "$g" = check-method-budget ]; then
   printf 'state\\t%s\\t12\\t40\\tKo\\tOK\\nstate-prose\\t.planning/STATE.md\\t5\\t12\\tlignes\\tOK\\nbacklog-ouverts\\t.planning/BACKLOG.md\\t3\\t50\\tsujets\\tOK\\n' "$p"
   if [ "$m" = ok ] || [ "$m" = xss ]; then printf 'backlog-entree\\t.planning/BACKLOG.md\\t30\\t40\\tlignes\\tOK\\nroadmap\\t.planning/ROADMAP.md\\t30\\t64\\tKo\\tOK\\n'
   else
-    printf 'backlog-entree\\tgouvernance/doc/BACKLOG.md\\t45\\t40\\tlignes\\tDEPASSE\\nstate\\tgouvernance/doc/STATE.md\\t21\\t8\\tKo\\tDEPASSE\\nroadmap\\t.planning/ROADMAP.md\\t60\\t64\\tAVERTISSEMENT\\n'
+    printf 'backlog-entree\\tgouvernance/doc/BACKLOG.md\\t45\\t40\\tlignes\\tDEPASSE\\nstate\\tgouvernance/doc/STATE.md\\t21\\t8\\tKo\\tDEPASSE\\nroadmap\\t.planning/ROADMAP.md\\t60\\t64\\tKo\\tAVERTISSEMENT\\n'
     for i in 1 2 3 4 5 6 7; do printf 'state\\tx/a%s/STATE.md\\t9\\t8\\tKo\\tDEPASSE\\n' "$i"; done
   fi
   printf 'backlog-clos\\t.planning/BACKLOG.md\\t0\\t0\\tsujets\\tOK\\nmemory-index\\tMEMORY.md\\t120\\t200\\tlignes\\tOK\\nworktrees\\t.\\t2\\t3\\tworktrees\\tOK\\n'

@@ -32,7 +32,9 @@ AJOUT assets/ui/72-vf-equipe.js
 AJOUT assets/ui/72-vf-regie-modele.js
 AJOUT assets/ui/72-vf-regie-style.js
 AJOUT assets/ui/73-vf-tiroir-travail.js
+AJOUT assets/ui/74-vf-synthese-burnup.js
 AJOUT assets/ui/74-vf-synthese-calcul.js
+AJOUT assets/ui/74-vf-synthese-jauges.js
 AJOUT assets/ui/74-vf-synthese-memoire.js
 AJOUT assets/ui/74-vf-synthese-style.js
 AJOUT assets/ui/74-vf-synthese-visite.js
