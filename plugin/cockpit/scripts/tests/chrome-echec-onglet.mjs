@@ -55,8 +55,10 @@ await executer(chrome, async (s) => {
     await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x, y: r.y });
     for (const type of ['mousePressed', 'mouseReleased']) await s.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
   };
-  const touche = async (key, code, vk) => {
-    for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk });
+  const touche = async (key, code, vk) => { // Entrée porte son texte : sans lui, le bouton ne reçoit pas l'évènement d'activation
+    for (const type of ['keyDown', 'keyUp']) {
+      await s.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, ...(type === 'keyDown' ? { text: '\r' } : {}) });
+    }
   };
   const charger = async (chemin, opts) => {
     await s.naviguer(`${racine}${chemin}`, { brut: true, ...opts }); await s.attendre('!!window.VF_ONGLETS', 'VF_ONGLETS'); await pause(300);
@@ -78,16 +80,18 @@ await executer(chrome, async (s) => {
   if (mode === 'ec1') {
     await sec('ec1', async () => {
       await poser(0); await charger('/'); await s.attendre("document.documentElement.dataset.vfPret === 'oui'", 'Code prêt');
+      await s.ev('document.querySelector(\'nav.vf-tabs a[href="project.html"]\').focus()'); // le clic ne déplace alors pas le focus de lui-même
       const e0 = await etat(); await s.ev('__e.echec = 1'); const nf = e0.fetchs;
       await clic('nav.vf-tabs a[href="project.html"]'); await s.attendre(`__e.fetchs.length > ${nf}`, 'lecture tentée');
       const e1 = await rien(700); o.ec11 = { e0, e1 };
       o.ec12 = { vide: await palette(''), saisie: await palette('réess'), action: await palette('>réess'),
         reg: await lire("VF_RACCOURCIS.entrees('code').map((e) => e.libelle).filter((l) => /essayer/i.test(l))") }; await fermer();
       o.ec31 = { rangee: await lire(`(() => { const r = document.querySelector('#vf-coin .vf-ech'); const b = r && r.querySelector('button');
-        const t = b ? b.getBoundingClientRect() : null; return r ? { texte: r.textContent, nb: document.querySelectorAll('#vf-coin .vf-ech').length,
-        h: t && t.height, l: t && t.width, vis: r.getClientRects().length > 0 } : null; })()`) };
+        const t = b ? getComputedStyle(b, '::after') : null;
+        return r ? { texte: r.textContent, nb: document.querySelectorAll('#vf-coin .vf-ech').length,
+        h: t && parseFloat(t.height), l: t && parseFloat(t.width), vis: r.getClientRects().length > 0 } : null; })()`) };
       await s.ev("document.querySelector('#vf-coin .vf-ech button').focus()");
-      await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Enter', code: 'Enter', windowsVirtualKeyCode: 13 }); // coup sur coup : encore en panne
+      await touche('Enter', 'Enter', 13); // la lecture est encore en panne
       const e2 = await rien(700); o.ec31.encore = { echec: e2.evs, ech: e2.ech, p: e2.p };
       await s.ev('__e.echec = 0'); await s.ev("document.querySelector('#vf-coin .vf-ech button').focus()");
       const n0 = (await etat()).fetchs, p0 = (await etat()).posts;

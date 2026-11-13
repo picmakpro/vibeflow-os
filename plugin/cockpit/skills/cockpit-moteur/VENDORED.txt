@@ -6,6 +6,7 @@ Ce fichier est aussi la sentinelle de détection du moteur (engineDir, vf-cockpi
 
 AJOUT LICENCES-TIERCES.txt
 AJOUT VENDORED.txt
+AJOUT assets/ui/00-vf-onglets-echec.js
 AJOUT assets/ui/00-vf-onglets.js
 AJOUT assets/ui/00-vf-surcouches.js
 AJOUT assets/ui/00-vibeflow.js
@@ -20,6 +21,7 @@ AJOUT assets/ui/03-vf-charte.js
 AJOUT assets/ui/04-vf-canevas-champ.js
 AJOUT assets/ui/04-vf-clavier-canevas.js
 AJOUT assets/ui/07-vf-raccourcis.js
+AJOUT assets/ui/07-vf-reessayer.js
 AJOUT assets/ui/39-vf-tour-placement.js
 AJOUT assets/ui/41-vf-projet-clavier.js
 AJOUT assets/ui/41-vf-projet-formes.js

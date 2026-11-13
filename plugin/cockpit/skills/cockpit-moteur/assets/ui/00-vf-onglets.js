@@ -3,7 +3,7 @@
 // Un clic d'onglet, Précédent et Suivant, VF_ONGLETS.aller(nom) passent par une même fonction : VF_COQUILLE.chargerOnglet(nom) d'abord, puis, après sa
 // résolution SEULEMENT, history.pushState du chemin (jamais depuis popstate : le navigateur a déjà changé l'adresse), puis la vue mémorisée, le titre,
 // vf:onglet, le focus et l'annonce. Un chargement rejeté ne change ni l'adresse, ni l'onglet affiché, ni le focus (après un popstate rejeté, l'adresse
-// est ramenée par replaceState) ; dire l'échec à l'écran n'est pas ici (80-21). Évaluation : l'objet, l'écouteur popstate et UNE inscription surOnglet ;
+// est ramenée par replaceState) ; dire l'échec à l'écran est 00-vf-onglets-echec.js (80-21). Évaluation : l'objet, l'écouteur popstate et UNE inscription surOnglet ;
 // tout ce qui dépend du document de l'onglet vit dans le rappel de surOnglet. Seule donnée gardée : la mémoire de vue par onglet (données simples).
 (() => {
   if (window.VF_ONGLETS) return;
@@ -32,10 +32,17 @@
     const SC = moteur(), p = SC && SC.graph && SC.graph.project, n = String((p && p.name) || '').replace(/ — (Projet|Équipe)$/, '');
     if (!document.title.startsWith(LIBELLE[nom] + ' · ')) document.title = LIBELLE[nom] + ' · ' + n;
   };
-  const annoncer = (nom) => { // la zone status de Projet quand elle existe, sinon celle de la barre de question (aucune lecture ici)
+  const dire = (texte) => { // la zone status de Projet quand elle existe, sinon celle de la barre de question (aucune lecture ici)
     const F = window.VF_PROJET, z = document.getElementById('ask-live');
-    if (F && typeof F.annoncer === 'function') F.annoncer(LIBELLE[nom]); else if (z) z.textContent = LIBELLE[nom];
+    if (F && typeof F.annoncer === 'function') F.annoncer(texte); else if (z) z.textContent = texte;
   };
+  const annoncer = (nom) => dire(LIBELLE[nom]);
+  // 80-21 : l'échec d'un chargement est lu dans la coquille à chaque appel (rien n'est gardé ici) ; `affiche` : l'onglet resté affiché, ou null
+  const echec = () => {
+    const e = C.etat();
+    return e.phase === 'echec' && NOMS.includes(e.onglet) ? Object.freeze({ onglet: e.onglet, affiche: C.onglet() }) : null;
+  };
+  const reessayer = () => { const e = echec(); return e ? aller(e.onglet) : Promise.reject(new Error('Aucun échec à relancer.')); };
   // le tiroir Git se ferme avec l'onglet qu'il quitte (son nettoyage précède le nôtre) : l'état est lu au départ, avant tout chargement, et rendu à l'arrivée
   const gitOuvert = () => {
     const G = window.VFGitTiroir;
@@ -100,7 +107,9 @@
     }
     return C.chargerOnglet(nom).then(() => {
       if (!pop && avant) history.replaceState(null, '', location.pathname + location.search + avant); // l'entrée quittée garde son fragment
-      if (!pop) history.pushState(null, '', CHEMIN[nom] + (fragment !== null ? fragment : hashes.get(nom) || ''));
+      const chemin = CHEMIN[nom] + (fragment !== null ? fragment : hashes.get(nom) || '');
+      if (!pop && !(precedent === null && PAR_CHEMIN[location.pathname] === nom)) history.pushState(null, '', chemin);
+      else if (!pop && fragment !== null) history.replaceState(null, '', chemin); // relance d'un premier chargement en échec : l'entrée existe déjà
       return arriver(nom, precedent, !pop && fragment === null, git);
     }, (e) => {
       const a = C.onglet();
@@ -136,5 +145,5 @@
     return () => { document.removeEventListener('click', clic, true); memoriser(onglet); };
   }, { cle: '00-vf-onglets.js' });
 
-  window.VF_ONGLETS = Object.freeze({ aller, courant: () => C.onglet() });
+  window.VF_ONGLETS = Object.freeze({ aller, courant: () => C.onglet(), echec, reessayer, annoncer: dire });
 })();

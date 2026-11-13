@@ -47,7 +47,7 @@ assert_eq "EC1.2b — Entrée sur la rangée relance : Projet affiché, même pa
 assert_eq "EC3.1 — ligne d'état : « Lecture impossible · Réessayer », une rangée, zone d'appui de 44 au moins, retirée après la relance réussie" \
   "$(E1 '[j.ec31.rangee.texte, j.ec31.rangee.nb, j.ec31.rangee.h >= 44, j.ec31.rangee.vis, j.ec31.apres]')" '["Lecture impossible · Réessayer",1,true,true,0]'
 assert_eq "EC3.1b — Entrée sur « Réessayer » de la ligne, lecture encore en échec : un second échec, même état, Code toujours affiché" \
-  "$(E1 '[j.ec31.encore.echec.join(), j.ec31.encore.ech && j.ec31.encore.ech.onglet, j.ec31.encore.p]')" '["projet:false,projet:false","projet","/"]'
+  "$(E1 '[j.ec31.encore.echec, j.ec31.encore.ech && j.ec31.encore.ech.onglet, j.ec31.encore.p]')" '[2,"projet","/"]'
 assert_eq "EC1.3 — échec, deux changements d'onglet réussis, nouvel échec : l'entrée de palette une fois, zéro entre les deux, une rangée d'état" \
   "$(E1 '[j.ec13.un, j.ec13.entre, j.ec13.deux, j.ec13.rangees]')" '[1,0,1,1]'
 assert_eq "EC1.4 — le script d'échec réévalué après coup : echec() lit toujours l'échec, l'entrée est offerte, aucune annonce de plus" \
@@ -68,7 +68,7 @@ for n in projet code equipe; do
     '[true,"BUTTON","pret",false,null,true]'
 done
 echo "=== Sans erreur de pilote ==="
-ERR=""; for r in "$R1" "$R2"; do ERR="$ERR$(E 'Object.keys(j.erreurs).join()' "$r")"; done
+ERR=""; for r in "$R1" "$R2"; do ERR="$ERR$(E 'Object.entries(j.erreurs).map((x) => x[0] + "=" + x[1]).join()' "$r")"; done
 assert_eq "EC9 — aucune section du pilote n'a échoué" "$ERR" ""
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
