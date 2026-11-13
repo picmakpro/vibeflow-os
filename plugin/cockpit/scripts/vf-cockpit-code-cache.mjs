@@ -5,6 +5,7 @@
 // aucun lien suivi), l'index git, HEAD et sa référence, l'état de l'environnement git du moteur (`etatGit`, posé par l'assembleur), la taille et
 // la date du scan et de ses bibliothèques, la version majeure de node. Par fichiers et non par dossiers seuls : la date d'un dossier ne bouge
 // pas à l'édition d'un fichier.
+// Lectures de `.git` (gitfile, HEAD, références) : 512 octets au plus, sans suivre de lien ni attendre un tube nommé, fichier régulier exigé (texte vide sinon).
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
@@ -14,7 +15,12 @@ export const MAX_ENTREES = 200000;
 const IGNORES = new Set(['.git', '.vibeflow', 'node_modules']);
 const FICHIER = 'scan-signature.json';
 const stat = (f) => { try { const s = fs.lstatSync(f); return `${s.size}:${s.mtimeMs}`; } catch { return 'absent'; } };
-const texte = (f) => { try { return fs.readFileSync(f, 'utf8').slice(0, 512).trim(); } catch { return ''; } };
+// lecture bornée à 512 octets : ni lien suivi, ni tube nommé attendu (O_NOFOLLOW, O_NONBLOCK), type revérifié sur le descripteur ouvert ; tout autre cas rend ''
+const BAS = (fs.constants.O_NOFOLLOW || 0) | (fs.constants.O_NONBLOCK || 0);
+function texte(f) {
+  let fd = -1;
+  try { fd = fs.openSync(f, fs.constants.O_RDONLY | BAS); if (!fs.fstatSync(fd).isFile()) return ''; const b = Buffer.alloc(512), n = fs.readSync(fd, b, 0, 512, 0); return b.toString('utf8', 0, n).trim(); } catch { return ''; } finally { if (fd >= 0) try { fs.closeSync(fd); } catch {} } // garde:code-cache-lecture
+}
 
 // le dossier git du lab (`.git` dossier ou fichier `gitdir:`), en remontant : un lab peut être un sous-dossier du dépôt
 function dossierGit(lab) {

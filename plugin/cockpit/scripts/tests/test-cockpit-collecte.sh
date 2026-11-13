@@ -18,6 +18,8 @@
 #   C8   A17 : la signature du who (tout champ ajouté, liste nommée des champs volatils), mutant
 #   C11  le cache du scan (AB1) : un lab inchangé ne relance pas le scan ; édition à taille égale, ajout, retrait, git, code du moteur ; mutant
 #   C9   A15 : projection des verrous en liste blanche (propriété générative, flux réel, signal construit dans le serveur, contrat), mutants
+#   C12  durcissements après l'audit de sécurité de 79-09 : verrou et registre d'un lab à gitfile sortant jamais lus, signature du lab en lecture bornée,
+#        redémarrage réentrant, chien de garde d'une demande en vol, motifs bornés et dédoublonnés (mutants M-LANCEUR-ENFANT à M-DEDOUBLON)
 # Lab neutre dans mktemp, HOME jetable, isolation git, faux verrou (VF_FAUX_JOURNAL, VF_FAUX_DELAI). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -708,6 +710,163 @@ if mutant M-SANS vf-cockpit-vie.mjs verrou-sanssession '!ids.some((i) => session
   node "$TESTS/collecte-propriete.mjs" "$MUT_SCRIPTS" verrous --graine="$GR" 2> /dev/null | tail -1 > "$WORK/c91-ms.json"
   assert_eq "M-SANS — la ligne garde:verrou-sanssession ne regarde plus les sessions de la collecte : C9.3 rougit (une session présente donne vrai)" "$(jq_ "$WORK/c91-ms.json" 'j.resultats.c93.sansSession')" "true,true,false,true,false"
 else assert_eq "M-SANS — construction du mutant" "échec" "ok"; fi
+
+# --- C12 : durcissements après l'audit de sécurité de 79-09 (verrou hors du lab, cache du scan, redémarrage réentrant, chien de garde, motifs bornés)
+mkdir -p "$WORK/c12"
+cat > "$AUX/c121.mjs" <<'JS'
+// c121.mjs <scripts> <travail> : le verrou et le registre d'un lab dont .git désigne un dépôt hors du lab ne sont jamais lus (AUDC-A-02, 79-09 correctif)
+import fs from 'node:fs'; import path from 'node:path'; import { spawnSync } from 'node:child_process'; import { pathToFileURL } from 'node:url';
+const [, , scripts, w] = process.argv, out = {};
+const U = (f) => import(pathToFileURL(path.join(scripts, f)).href);
+try {
+  const { etapeVerrous } = await U('vf-cockpit-collecte-etapes.mjs'), { lireRegistre } = await U('vf-cockpit-registre.mjs'), { lireVerrous } = await U('vf-cockpit-vie.mjs').catch(() => ({}));
+  const faux = path.join(w, 'faux'), journal = path.join(w, 'journal'); fs.mkdirSync(faux, { recursive: true });
+  fs.writeFileSync(path.join(faux, 'driver-lock.sh'), `#!/usr/bin/env bash\necho "$1 $2" >> "${journal}"\ncase "$1" in\n status) echo '{"present":true,"scope":"lab","locks":[{"present":true,"owner":"OWNER-ETRANGER","step":"STEP-ETRANGER","ws":"WS-ETRANGER","scope":"phase","phase":"79","age_seconds":1,"ttl":1800,"stale":false}]}' ;;\n registry) echo '{"registries":[{"ws":"w","phase":"79","agents":[{"agent_id":"ag1","status":"done","node":"n1","role":"r","epoch":1}]}]}' ;;\n *) echo '{}' ;;\nesac\n`, { mode: 0o755 });
+  const git = (...a) => spawnSync('git', ['-c', 'user.email=a@b.c', '-c', 'user.name=t', ...a], { encoding: 'utf8' });
+  const mk = (n) => { const d = path.join(w, n); fs.mkdirSync(d, { recursive: true }); return d; };
+  const ord = mk('ordinaire'); git('init', '-q', ord);
+  const hote = mk('hote'); git('init', '-q', hote); git('-C', hote, 'commit', '--allow-empty', '-q', '-m', 'x');
+  const etr = mk('etranger'); fs.writeFileSync(path.join(etr, '.git'), `gitdir: ${path.join(hote, '.git')}\n`);
+  const wt = path.join(w, 'arbre'); git('-C', hote, 'worktree', 'add', '-q', '-b', 'wt', wt);
+  const lit = () => { try { return fs.readFileSync(journal, 'utf8').trim().split('\n').filter(Boolean).length; } catch { return 0; } };
+  const cas = (nom, lab) => {
+    fs.rmSync(journal, { force: true });
+    const v = etapeVerrous({ racine: lab, scriptsDir: faux, home: path.join(w, 'home') });
+    const r = lireRegistre({ chemin: path.join(faux, 'driver-lock.sh'), racine: lab });
+    const dump = JSON.stringify(v) + JSON.stringify([...r.agents]);
+    out[nom] = `appels=${lit()} verrous=${v.etat}/${v.liste.length} registre=${r.etat}/${r.agents.size} fuite=${/ETRANGER|ag1/.test(dump)}`;
+  };
+  cas('ordinaire', ord); cas('worktree', wt); cas('etranger', etr);
+} catch (e) { out.erreur = String(e && e.stack || e).slice(0, 300); }
+console.log(JSON.stringify(out));
+JS
+cat > "$AUX/c122.mjs" <<'JS'
+// c122.mjs <scripts> <travail> : signatureDuLab sur un `.git` ou un `.git/HEAD` qui est un tube nommé, un lien vers un périphérique sans fin ou un gros fichier : rend vite, mémoire bornée (79-09 correctif)
+import fs from 'node:fs'; import path from 'node:path'; import { spawnSync } from 'node:child_process'; import { pathToFileURL } from 'node:url';
+const [, , scripts, w, enfant] = process.argv, U = (f) => pathToFileURL(path.join(scripts, f)).href;
+if (enfant) { // processus enfant : UNE signature, rend la durée et la mémoire
+  const { signatureDuLab } = await import(U('vf-cockpit-code-cache.mjs')), t0 = Date.now();
+  const s = signatureDuLab({ lab: enfant, moteur: path.join(scripts, '..', 'skills', 'cockpit-moteur'), etatGit: '[]' });
+  console.log(JSON.stringify({ ok: typeof s === 'string' && s.length === 64, ms: Date.now() - t0, rss: Math.round(process.memoryUsage().rss / 1e6) })); process.exit(0);
+}
+const git = (...a) => spawnSync('git', a, { encoding: 'utf8' }), out = {};
+const cas = {
+  temoin: (l) => { git('init', '-q', l); },
+  'git-tube': (l) => { spawnSync('mkfifo', [path.join(l, '.git')]); },
+  'head-tube': (l) => { git('init', '-q', l); fs.rmSync(path.join(l, '.git', 'HEAD')); spawnSync('mkfifo', [path.join(l, '.git', 'HEAD')]); },
+  'git-lien-zero': (l) => { fs.symlinkSync('/dev/zero', path.join(l, '.git')); },
+  'head-lien-zero': (l) => { git('init', '-q', l); fs.rmSync(path.join(l, '.git', 'HEAD')); fs.symlinkSync('/dev/zero', path.join(l, '.git', 'HEAD')); },
+  'head-gros': (l) => { git('init', '-q', l); fs.writeFileSync(path.join(l, '.git', 'HEAD'), 'ref: refs/heads/' + 'x'.repeat(64 << 20)); },
+};
+for (const [n, f] of Object.entries(cas)) {
+  const l = fs.mkdtempSync(path.join(w, 'c.')); f(l); const t0 = Date.now();
+  const r = spawnSync(process.execPath, [process.argv[1], scripts, w, l], { timeout: 6000, encoding: 'utf8', killSignal: 'SIGKILL' });
+  let j = {}; try { j = JSON.parse(r.stdout.trim().split('\n').pop()); } catch {}
+  out[n] = r.signal ? 'bloque:' + r.signal : j.ok === true && j.ms < 3000 && j.rss < 400 ? 'ok' : 'echec:' + JSON.stringify(j);
+}
+console.log(JSON.stringify(out));
+JS
+cat > "$AUX/c123-fil.mjs" <<'JS'
+// fil d'essai de C12.3 : bat (une ligne au journal toutes les 40 ms) tant qu'il vit ; répond à chaque demande
+import { parentPort, workerData, threadId } from 'node:worker_threads'; import fs from 'node:fs'; import path from 'node:path';
+const J = path.join(workerData.sortie, 'journal'); fs.appendFileSync(J, `lancement ${threadId}\n`);
+setInterval(() => fs.appendFileSync(J, `bat ${threadId}\n`), 40);
+parentPort.on('message', (m) => parentPort.postMessage({ type: 'fini', id: m.id }));
+JS
+cat > "$AUX/c123.mjs" <<'JS'
+// c123.mjs <scripts> <travail> : deux redémarrages simultanés ne laissent aucun fil orphelin (un seul fil neuf, rien ne bat après arreter())
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, w] = process.argv, J = path.join(w, 'journal'); fs.writeFileSync(J, '');
+const { creerCollecte } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-collecte.mjs')).href);
+const lire = () => fs.readFileSync(J, 'utf8').split('\n').filter(Boolean), dort = (ms) => new Promise((r) => setTimeout(r, ms));
+const c = creerCollecte({ racine: w, sortie: w, scriptsDir: scripts, home: w, entree: path.join(path.dirname(process.argv[1]), 'c123-fil.mjs') });
+await dort(300);
+await Promise.all([c.redemarrer({ sansIndex: true }), c.redemarrer({ sansIndex: true }), c.redemarrer()]);
+await dort(300);
+const lancements = lire().filter((l) => l.startsWith('lancement')).length;
+c.arreter(); await dort(400);
+const n0 = lire().length; await dort(400);
+console.log(JSON.stringify({ lancements, batApresArret: lire().length - n0 })); process.exit(0);
+JS
+cat > "$AUX/c124-fil.mjs" <<'JS'
+// fil d'essai de C12.4 (scénario lu dans le dossier de sortie) : `bloque` (boucle sans fin à la 1re demande du fil AVEC index, le fil relancé répond),
+// `lent` (la 1re demande du premier fil dure 1,5 s, ce qui laisse les demandes suivantes s'accumuler) ; toute demande rejouée rend `recu` (nombre de motifs, motifs) puis `fini`
+import { parentPort, workerData } from 'node:worker_threads'; import fs from 'node:fs'; import path from 'node:path';
+const sc = fs.readFileSync(path.join(workerData.sortie, 'scenario'), 'utf8').trim(); let n = 0;
+parentPort.on('message', (m) => {
+  n++;
+  if (!workerData.sansIndex && n === 1) { if (sc === 'bloque') for (;;) {} Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 1500); }
+  parentPort.postMessage({ type: 'recu', id: m.id, n: m.motifs.length, motifs: m.motifs.slice(0, 4) });
+  parentPort.postMessage({ type: 'fini', id: m.id });
+});
+JS
+cat > "$AUX/c124.mjs" <<'JS'
+// c124.mjs <scripts> <travail> : chien de garde d'une demande en vol (un fil bloqué est relancé) et motifs bornés et dédoublonnés (fusion linéaire : N puis 2N)
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, w] = process.argv, out = {}, dort = (ms) => new Promise((r) => setTimeout(r, ms));
+const { creerCollecte } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-collecte.mjs')).href);
+const entree = path.join(path.dirname(process.argv[1]), 'c124-fil.mjs');
+const nouvelle = (scenario, delais) => { const d = fs.mkdtempSync(path.join(w, 'k.')); fs.writeFileSync(path.join(d, 'scenario'), scenario);
+  const recus = []; const c = creerCollecte({ racine: d, sortie: d, scriptsDir: scripts, home: d, entree, delais }); c.surResultat((m) => { if (m.type === 'recu') recus.push(m); }); return { c, recus }; };
+{ // chien de garde
+  const { c, recus } = nouvelle('bloque', { demandeMs: 500, fenetreMortMs: 30000 });
+  c.demander({ tour: true, motifs: ['m1'] });
+  const t0 = Date.now(); const pret = await c.pret(4000), e = c.etat();
+  out.chien = `pret=${pret} relances=${e.relances} mort=${!!e.derniereMort} recu=${recus.length} motifs=${(recus[0] || {}).motifs} ms<4000=${Date.now() - t0 < 4000}`; c.arreter();
+}
+const mesure = async (N, motif) => { // N demandes pendant que la première dure 1,5 s : la fusion de l'attente
+  const { c, recus } = nouvelle('lent', {}); c.demander({ tour: true }); await dort(100);
+  const t0 = process.hrtime.bigint(); for (let i = 0; i < N; i++) c.demander({ tour: true, motifs: [motif(i)] });
+  const ms = Number(process.hrtime.bigint() - t0) / 1e6; await c.pret(6000); c.arreter();
+  return { ms, n: recus.length > 1 ? recus[1].n : -1 };
+};
+const a = await mesure(20000, (i) => 'motif-' + i), b = await mesure(40000, (i) => 'motif-' + i), d = await mesure(2000, (i) => 'm' + (i % 2));
+out.bornes = `${a.n},${b.n}`; out.lineaire = `${b.ms < 3 * a.ms + 80 && b.ms < 1500} (${Math.round(a.ms)}ms puis ${Math.round(b.ms)}ms)`; out.dedoublon = d.n;
+console.log(JSON.stringify(out)); process.exit(0);
+JS
+c12run() { local n="$1" scripts="$2"; rm -rf "$WORK/c12/$n"; mkdir -p "$WORK/c12/$n"; node "$AUX/$n.mjs" "$scripts" "$WORK/c12/$n" 2> "$WORK/c12/$n.err" | tail -1 > "$WORK/c12/$n.json"; }
+c12run c121 "$SCRIPTS"
+assert_eq "C12.1a — lab ordinaire : le verrou et le registre sont lus (témoin positif)" "$(jq_ "$WORK/c12/c121.json" 'j.erreur||j.ordinaire')" "appels=2 verrous=lue/1 registre=lue/1 fuite=true"
+assert_eq "C12.1b — arbre de travail dont le gitfile est vérifié (dépôt commun hors du lab) : lu comme avant (témoin positif)" "$(jq_ "$WORK/c12/c121.json" 'j.erreur||j.worktree')" "appels=2 verrous=lue/1 registre=lue/1 fuite=true"
+assert_eq "C12.1c — lab dont le .git désigne un dépôt hors du lab : driver-lock.sh n'est jamais lancé, ni verrou ni registre publiés (AUDC-A-02)" "$(jq_ "$WORK/c12/c121.json" 'j.erreur||j.etranger')" "appels=0 verrous=erreur/0 registre=absente/0 fuite=false"
+c12run c122 "$SCRIPTS"
+assert_eq "C12.2 — signatureDuLab rend vite et sans saturer la mémoire sur un .git ou un .git/HEAD en tube nommé, en lien vers un périphérique sans fin, ou énorme (le témoin ordinaire reste vert)" "$(jq_ "$WORK/c12/c122.json" 'j.erreur||Object.entries(j).map(([k,v])=>k+"="+v).join(" ")')" "temoin=ok git-tube=ok head-tube=ok git-lien-zero=ok head-lien-zero=ok head-gros=ok"
+c12run c123 "$SCRIPTS"
+assert_eq "C12.3 — trois redémarrages simultanés : un seul fil neuf (deux lancements en tout) et rien ne bat après arreter()" "$(jq_ "$WORK/c12/c123.json" 'j.erreur||j.lancements+" "+j.batApresArret')" "2 0"
+c12run c124 "$SCRIPTS"
+assert_eq "C12.4a — un fil bloqué sans mourir est relancé après demandeMs : la demande est rejouée, la collecte redevient prête, la mort est comptée" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.chien')" "pret=true relances=1 mort=true recu=1 motifs=m1 ms<4000=true"
+assert_eq "C12.4b — motifs plafonnés à 64 pour N puis 2N demandes distinctes, et la fusion reste linéaire (le double de demandes ne coûte pas le quadruple)" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.bornes+" "+j.lineaire.split(" ")[0]')" "64,64 true"
+assert_eq "C12.4c — deux motifs répétés 2 000 fois n'en font que deux" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.dedoublon')" "2"
+# mutants : lanceur sans garde d'enfant (M-LANCEUR-ENFANT), lecture du cache sans O_NONBLOCK (M-CACHE-OUVERTURE) ou à l'ancienne, non bornée (M-CACHE-BORNE), redémarrage non partagé (M-REENTRANT),
+# chien de garde inerte (M-CHIEN), motifs sans plafond (M-MOTIFS), motifs sans dédoublonnage (M-DEDOUBLON)
+if mutant M-LANCEUR-ENFANT vf-cockpit-git-lanceur.mjs lanceur-enfant-sortant '&& gitSortant(' '&& false && gitSortant('; then
+  c12run c121 "$MUT_SCRIPTS"
+  assert_eq "M-LANCEUR-ENFANT — sans la garde, le script de verrou d'un lab à gitfile sortant est lancé et son contenu publié : C12.1c rougit" "$(jq_ "$WORK/c12/c121.json" 'j.erreur||j.etranger')" "appels=2 verrous=lue/1 registre=lue/1 fuite=true"
+else assert_eq "M-LANCEUR-ENFANT — construction du mutant" "échec" "ok"; fi
+if mutant M-CACHE-OUVERTURE vf-cockpit-code-cache.mjs code-cache-lecture 'fs.constants.O_RDONLY | BAS' 'fs.constants.O_RDONLY'; then
+  c12run c122 "$MUT_SCRIPTS"
+  assert_eq "M-CACHE-OUVERTURE — sans O_NONBLOCK, l'ouverture d'un tube nommé bloque : C12.2 rougit sur git-tube et head-tube" "$(jq_ "$WORK/c12/c122.json" 'j.erreur||(j["git-tube"].startsWith("bloque")&&j["head-tube"].startsWith("bloque"))')" "true"
+else assert_eq "M-CACHE-OUVERTURE — construction du mutant" "échec" "ok"; fi
+if mutant M-CACHE-BORNE vf-cockpit-code-cache.mjs code-cache-lecture "fs.constants.O_RDONLY | BAS); if (!fs.fstatSync(fd).isFile()) return ''; const b = Buffer.alloc(512), n = fs.readSync(fd, b, 0, 512, 0); return b.toString('utf8', 0, n).trim();" "fs.constants.O_RDONLY | fs.constants.O_NONBLOCK); return fs.readFileSync(fd, 'utf8').slice(0, 512).trim();"; then
+  c12run c122 "$MUT_SCRIPTS"
+  assert_eq "M-CACHE-BORNE — l'ancienne lecture (lien suivi, aucun contrôle de type, lecture entière) sature sur un lien vers un périphérique sans fin : C12.2 rougit sur git-lien-zero et head-lien-zero" "$(jq_ "$WORK/c12/c122.json" 'j.erreur||(j["git-lien-zero"].startsWith("bloque")&&j["head-lien-zero"].startsWith("bloque"))')" "true"
+else assert_eq "M-CACHE-BORNE — construction du mutant" "échec" "ok"; fi
+if mutant M-REENTRANT vf-cockpit-collecte.mjs collecte-reentrant 'if (!redemarrage) ' ''; then
+  c12run c123 "$MUT_SCRIPTS"
+  assert_eq "M-REENTRANT — sans le partage, trois appels simultanés construisent trois fils : C12.3 rougit (lancements > 2, fils orphelins)" "$(jq_ "$WORK/c12/c123.json" 'j.erreur||(j.lancements>2&&j.batApresArret>0)')" "true"
+else assert_eq "M-REENTRANT — construction du mutant" "échec" "ok"; fi
+if mutant M-CHIEN vf-cockpit-collecte.mjs collecte-chien 'setTimeout(() => {' 'setTimeout(() => { return;'; then
+  c12run c124 "$MUT_SCRIPTS"
+  assert_eq "M-CHIEN — chien de garde inerte : le fil bloqué n'est jamais relancé, la collecte reste en cours : C12.4a rougit" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.chien.startsWith("pret=false relances=0")')" "true"
+else assert_eq "M-CHIEN — construction du mutant" "échec" "ok"; fi
+if mutant M-MOTIFS vf-cockpit-collecte.mjs collecte-motifs '.slice(0, MAX_MOTIFS)' ''; then
+  c12run c124 "$MUT_SCRIPTS"
+  assert_eq "M-MOTIFS — sans plafond, l'attente garde tous les motifs distincts (20 000 puis 40 000) : C12.4b rougit" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.bornes')" "20000,40000"
+else assert_eq "M-MOTIFS — construction du mutant" "échec" "ok"; fi
+if mutant M-DEDOUBLON vf-cockpit-collecte.mjs collecte-motifs '[...new Set([...a, ...b])]' '[...a, ...b]'; then
+  c12run c124 "$MUT_SCRIPTS"
+  assert_eq "M-DEDOUBLON — sans dédoublonnage, les répétitions comptent (le plafond les garde à 64) : C12.4c rougit" "$(jq_ "$WORK/c12/c124.json" 'j.erreur||j.dedoublon')" "64"
+else assert_eq "M-DEDOUBLON — construction du mutant" "échec" "ok"; fi
 
 vf_hyg_assert
 echo "== Résultats : $PASS PASS / $FAIL FAIL =="

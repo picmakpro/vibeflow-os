@@ -7,7 +7,10 @@
 //   surResultat(rappel) -> désinscription : rappel(message) pour chaque message du fil (voir l'en-tête de vf-cockpit-collecte-fil.mjs).
 //   pret(ms) -> promesse : vrai quand aucune demande n'est en vol, faux après `ms`.
 //   etat() -> { etat: 'en-cours' | 'ok' | 'partielle' | 'indisponible', derniereA, dureeMs, index, boucle, erreurs, relances, derniereMort, vivant }.
-//   redemarrer({ sansIndex }) : termine le fil, ATTEND sa sortie, puis construit le suivant ; la demande en vol y est rejouée.
+//   redemarrer({ sansIndex }) : termine le fil, ATTEND sa sortie, puis construit le suivant ; la demande en vol y est rejouée. Réentrant : un redémarrage
+//     en cours est partagé (la promesse rendue est la même), les options du premier appel valent pour tous.
+//   Chien de garde : une demande sans `fini` après `delais.demandeMs` (120 s) est celle d'un fil bloqué sans mourir ; il est terminé et la politique de mort
+//     s'applique. `motifs` est dédoublonné et plafonné à MAX_MOTIFS (64) : l'attente ne grossit pas avec le nombre de demandes.
 // Politique : un fil qui meurt (mémoire, erreur, sortie) est relancé UNE fois SANS index (`partielle`, index `suspendu`) ; une seconde mort dans
 // `fenetreMortMs` rend `indisponible`, avec une nouvelle tentative après `reprisePauseMs` ; l'index suspendu est repris après `indexSuspenduMs`.
 // UN seul écrivain de l'index : le fil suivant n'est jamais construit avant la sortie du précédent.
@@ -18,19 +21,22 @@ import { Worker } from 'node:worker_threads';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
 
 export const LIMITES = Object.freeze({ maxOldGenerationSizeMb: 768, maxYoungGenerationSizeMb: 64, stackSizeMb: 4 });
-export const DELAIS = Object.freeze({ fenetreMortMs: 30000, reprisePauseMs: 60000, indexSuspenduMs: 600000 });
+export const DELAIS = Object.freeze({ fenetreMortMs: 30000, reprisePauseMs: 60000, indexSuspenduMs: 600000, demandeMs: 120000 });
+export const MAX_MOTIFS = 64;
 const CAUSES = ['memoire', 'erreur', 'sortie'], RESOLUTION_MS = 10;
 const INDEX_ATTENTE = Object.freeze({ etat: 'attente', tronque: false, voies: 0, formeInconnue: 0, evinces: 0 });
 const INDEX_SUSPENDU = Object.freeze({ etat: 'suspendu', tronque: false, voies: 0, formeInconnue: 0, evinces: 0 });
 
+// motifs : dédoublonnés et plafonnés à MAX_MOTIFS (la fusion reste en temps constant, l'attente ne grossit pas avec le nombre de demandes)
+const unir = (a, b) => [...new Set([...a, ...b])].slice(0, MAX_MOTIFS); // garde:collecte-motifs
 const fusion = (a, b) => (a && b
-  ? { planning: a.planning || b.planning, verrous: a.verrous || b.verrous, tour: a.tour || b.tour, motifs: [...a.motifs, ...b.motifs] }
+  ? { planning: a.planning || b.planning, verrous: a.verrous || b.verrous, tour: a.tour || b.tour, motifs: unir(a.motifs, b.motifs) }
   : a || b);
 
 export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limites = LIMITES, delais, log = () => {} }) {
   const D = { ...DELAIS, ...(delais || {}) };
   const ecouteurs = new Set(), attendants = new Set(), minuteurs = new Set();
-  let fil = null, enVol = null, attente = null, id = 0, ferme = false, ok = false, indispo = false, derniereA = null, dureeMs = null;
+  let fil = null, enVol = null, attente = null, chien = null, redemarrage = null, id = 0, ferme = false, ok = false, indispo = false, derniereA = null, dureeMs = null;
   let index = INDEX_ATTENTE, erreurs = [], relances = 0, derniereMort = null, mortT = 0;
   const moniteur = monitorEventLoopDelay({ resolution: RESOLUTION_MS }); moniteur.enable();
 
@@ -41,14 +47,28 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
   const minuter = (ms, f) => {
     const t = setTimeout(() => { minuteurs.delete(t); if (!ferme) f(); }, ms); t.unref?.(); minuteurs.add(t);
   };
-  const annulerMinuteurs = () => { for (const t of minuteurs) clearTimeout(t); minuteurs.clear(); };
+  const desarmerChien = () => { if (chien) { clearTimeout(chien); chien = null; } };
+  const annulerMinuteurs = () => { for (const t of minuteurs) clearTimeout(t); minuteurs.clear(); desarmerChien(); };
 
   const envoyer = (r) => {
     enVol = { ...r, id: ++id };
     fil.w.postMessage(enVol); // garde:collecte-fil
+    armerChien(fil, enVol.id);
+  };
+  // chien de garde : une demande sans `fini` après `demandeMs` est celle d'un fil bloqué sans mourir ; il est terminé (ce n'est pas une mort qu'on lui compte
+  // deux fois), sa sortie attendue, puis la politique de mort s'applique (relance sans index, ou indisponible si la mort précédente est proche)
+  const armerChien = (cur, idDemande) => {
+    desarmerChien();
+    chien = setTimeout(() => { // garde:collecte-chien
+      chien = null;
+      if (ferme || fil !== cur || !enVol || enVol.id !== idDemande) return;
+      cur.voulu = true; cur.w.terminate().catch(() => {});
+      cur.sorti.then(() => { if (!ferme && fil === cur) surMort('erreur', `demande ${idDemande} sans réponse après ${D.demandeMs} ms`); });
+    }, D.demandeMs);
+    chien.unref?.();
   };
   const suivante = () => {
-    enVol = null;
+    desarmerChien(); enVol = null;
     if (attente && !ferme && fil) { const s = attente; attente = null; envoyer(s); } else reveiller();
   };
   const envoyerAttente = () => { if (attente && fil && !enVol) { const s = attente; attente = null; envoyer(s); } };
@@ -99,7 +119,12 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
     armerIndex(); envoyerAttente();
   }
 
-  async function redemarrer({ sansIndex = false } = {}) {
+  // réentrant : un redémarrage en cours est partagé par tous les appelants (deux appels simultanés ne construisent jamais deux fils)
+  function redemarrer(o) {
+    if (!redemarrage) redemarrage = refaire(o).finally(() => { redemarrage = null; }); // garde:collecte-reentrant
+    return redemarrage;
+  }
+  async function refaire({ sansIndex = false } = {}) {
     if (ferme) return;
     const ancien = fil; fil = null; annulerMinuteurs();
     attente = fusion(enVol, attente); enVol = null;
@@ -116,7 +141,7 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
   return {
     demander({ planning = false, verrous = false, tour = false, motifs = [] } = {}) {
       if (ferme) return false;
-      const r = { planning: !!planning, verrous: !!verrous, tour: !!tour, motifs: [...motifs] };
+      const r = { planning: !!planning, verrous: !!verrous, tour: !!tour, motifs: unir([], motifs) };
       if (enVol || !fil) attente = fusion(attente, r); else envoyer(r);
       return true;
     },
