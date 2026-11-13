@@ -57,6 +57,8 @@ DEFAUT=7
 # vertes, 12765 s ; toute suite mesurée prend cette valeur. Huit suites découvertes depuis n'y figurent pas (clavier-canevas, coin,
 # couloirs, git-pagination, panneau-retour, projet-champs, projet-liste, surcouches) : les cinq qui avaient une ligne la gardent
 # (mesure du run 43155820890), les trois autres retombent sur DEFAUT, à mesurer sur le premier run complet qui les joue.
+# Deux suites raccourcies (terminal-tiroir : mutants TH rejoués par cas ; terminal-xterm : attentes de 2 s sous mutant) sont remesurées sur
+# le run 43459074372 de la PR #241 : 955 s et 667 s.
 durees() {
   cat <<'DUREES'
 1 plugin/_internal/runtime-adapter/tests/test-agent-to-codex.sh
@@ -165,9 +167,9 @@ durees() {
 148 plugin/cockpit/scripts/tests/test-cockpit-terminal-pty.sh
 82 plugin/cockpit/scripts/tests/test-cockpit-terminal-serveur.sh
 110 plugin/cockpit/scripts/tests/test-cockpit-terminal-session.sh
-1201 plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh
+955 plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh
 27 plugin/cockpit/scripts/tests/test-cockpit-terminal-xss.sh
-988 plugin/cockpit/scripts/tests/test-cockpit-terminal-xterm.sh
+667 plugin/cockpit/scripts/tests/test-cockpit-terminal-xterm.sh
 28 plugin/cockpit/scripts/tests/test-cockpit-transcript.sh
 80 plugin/cockpit/scripts/tests/test-cockpit-vendor.sh
 10 plugin/cockpit/scripts/tests/test-cockpit-vie.sh
