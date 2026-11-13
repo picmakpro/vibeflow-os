@@ -31,7 +31,6 @@
     .vf-repere[data-bord=bas] svg { transform: rotate(90deg); }
     @media (pointer: coarse) { .vf-repere { height: 32px; } .vf-repere::after { inset: -6px; } } /* 32 + 2 x 6 = 44 */
   `;
-  document.head.appendChild(style);
 
   const els = {}; // bord -> button
   let vivant = false, fruit = null; // fruit : la carte que le geste en cours vient d'amener (focus orphelin, ordre unique de la famille)
@@ -127,7 +126,7 @@
 
   const pose = [];
   const init = () => {
-    vivant = true;
+    vivant = true; document.head.appendChild(style);
     const observer = (O, cible, opts, fn) => { const o = new O(fn); o.observe(cible, opts); pose.push(() => o.disconnect()); };
     observer(MutationObserver, vp, { attributes: true, attributeFilter: ['style'] }, maj); // la transformation : aucun événement du moteur
     observer(MutationObserver, document.body, { attributes: true, attributeFilter: ['class'] }, maj);
@@ -141,10 +140,10 @@
     }
     SC.on('render', maj); SC.on('panel', maj);
     maj();
-    return () => { vivant = false; pose.splice(0).forEach((f) => f()); for (const b of ORDRE) if (els[b]) { els[b].remove(); delete els[b]; } };
+    return () => { vivant = false; pose.splice(0).forEach((f) => f()); for (const b of ORDRE) if (els[b]) { els[b].remove(); delete els[b]; } style.remove(); };
   };
   const C0 = window.VF_COQUILLE;
   const demarrer = () => (vivant ? undefined : init());
-  if (C0 && typeof C0.surOnglet === 'function') C0.surOnglet(init); // P80-D-42 : la coquille, sinon `ready` (ou le premier rendu, s'il l'a devancé)
+  if (C0 && typeof C0.surOnglet === 'function') C0.surOnglet(init, { cle: '02-vf-reperes.js' }); // la coquille (A51), sinon `ready`
   else if (state.layout) demarrer(); else { SC.on('ready', demarrer); SC.on('render', demarrer); }
 })();
