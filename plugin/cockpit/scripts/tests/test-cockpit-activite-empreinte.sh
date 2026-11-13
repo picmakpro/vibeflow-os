@@ -154,15 +154,23 @@ await cas('K2', () => {
   eq('K2', 'à 10 générations, la filiation tient : aucune collision', CO.collisionsAgents(chaine([90, 100]), ctx()).collisions, []);
 });
 
+// compte les lectures de Map pendant f ; lève au-delà du budget (une boucle sans fin devient un échec franc, jamais un silence)
+function ops(f, budget) {
+  const get = Map.prototype.get; let n = 0;
+  Map.prototype.get = function (k) { if (++n > budget) throw new Error('budget de lectures dépassé'); return get.call(this, k); };
+  try { f(); } finally { Map.prototype.get = get; }
+  return n;
+}
+
 await cas('K8', () => {
   const cartes = new Set(Array.from({ length: 10 }, (_, j) => 'src/p' + j + '.mjs'));
   const jeu = (n, chaine) => Array.from({ length: n }, (_, i) => voie({ id: 'v' + i, role: 'vf-r', rat: { dag: 'd', noeud: 'N' + i, source: 'registre' }, parent: chaine && i > 0 ? 'v' + (i - 1) : null,
     e: Array.from({ length: 10 }, (_, j) => ent(null, 'src/p' + j + '.mjs', i)) }));
-  const med = (f) => { f(); const t = []; for (let i = 0; i < 3; i++) { const s = performance.now(); f(); t.push(performance.now() - s); } t.sort((a, b) => a - b); return t[1]; };
+  // le coût se COMPTE (lectures de Map pendant l'appel), il ne se chronomètre pas : le verdict ne dépend pas de la vitesse de la machine
   for (const [nom, chaine] of [['à plat', false], ['en chaîne de parent', true]]) {
-    const a = jeu(500, chaine), b = jeu(1000, chaine), t1 = med(() => CO.collisionsAgents(a, ctx({ cartes }))), t2 = med(() => CO.collisionsAgents(b, ctx({ cartes })));
-    console.log(`  mesure ${nom} N = 500 : ${t1.toFixed(1)} ms ; 2N = 1000 : ${t2.toFixed(1)} ms ; seuil ${(2.8 * t1 + 10).toFixed(1)} ms`);
-    vrai('K8', `coût linéaire en nombre de voies par (chemin, arbre), ${nom} : t(2N) <= 2,8 x t(N) + 10 ms`, t2 <= 2.8 * t1 + 10, `t1=${t1.toFixed(1)} t2=${t2.toFixed(1)}`);
+    const a = jeu(100, chaine), b = jeu(200, chaine), o1 = ops(() => CO.collisionsAgents(a, ctx({ cartes })), 5e7), o2 = ops(() => CO.collisionsAgents(b, ctx({ cartes })), 5e7);
+    console.log(`  comptage ${nom} N = 100 : ${o1} lectures ; 2N = 200 : ${o2} lectures ; plafond ${(2.8 * o1).toFixed(0)}`);
+    vrai('K8', `coût linéaire en nombre de voies par (chemin, arbre), ${nom} : ops(2N) <= 2,8 x ops(N)`, o2 <= 2.8 * o1, `o1=${o1} o2=${o2}`);
   }
   // le résultat est celui de la double boucle de référence (forêt de parents pseudo-aléatoire, 60 voies sur 3 chemins)
   let s = 7; const alea = (n) => { s = (s * 1103515245 + 12345) % 2147483648; return s % n; };
@@ -184,10 +192,11 @@ await cas('K3', () => {
   eq('K3', 'deux lectures : aucune collision', CO.collisionsAgents([B, C], ctx()).collisions, []);
 });
 
-// un parent en cycle : sans la borne, ce témoin ne se termine pas (le mutant est alors coupé par l'alarme) ; placé en dernier pour que les autres sortent avant
+// un parent en cycle : sans la borne, ce témoin ne se termine pas (le budget de lectures le coupe : échec franc) ; placé en dernier pour que les autres sortent avant
 await cas('K9', () => {
   const ecr = (id, plus = {}) => voie({ id, role: 'vf-' + id, e: [ent(null, 'src/a.mjs', 1)], ...plus });
-  const cyc = CO.collisionsAgents([ecr('a', { parent: 'b' }), ecr('b', { parent: 'a' }), ecr('c', { parent: 'c' })], ctx());
+  let cyc; const n = ops(() => { cyc = CO.collisionsAgents([ecr('a', { parent: 'b' }), ecr('b', { parent: 'a' }), ecr('c', { parent: 'c' })], ctx()); }, 2e5);
+  vrai('K9', 'le cycle est coupé par la borne : moins de 2 000 lectures', n < 2000, 'lectures=' + n);
   eq('K9', 'un parent en cycle (a-b, b-a, c-c) : le calcul s\'arrête, a et b liées, c en conflit avec les deux', cyc.collisions.map((x) => [x[1], x[2].length]), [['agents', 3]]);
 });
 
@@ -253,8 +262,9 @@ mutant() { # mutant <nom> <témoin attendu rouge> <fichier> <de> <vers> [<de> <v
   local d="$WORK/m-$MU"; MU=$((MU+1)); mkdir -p "$d"
   cp "$SCRIPTS"/vf-cockpit-activite-chemins.mjs "$SCRIPTS"/vf-cockpit-activite-empreinte.mjs "$SCRIPTS"/vf-cockpit-activite-collisions.mjs "$d/"
   if ! node "$WORK/mut.mjs" "$d" "$f" "$@" 2> "$d/err"; then echo "❌ FAIL — MUT : $nom : retouche impossible ($(cat "$d/err"))"; echo "BILAN : $NB PASS, 1 FAIL"; exit 1; fi
-  ( perl -e 'alarm 12; exec @ARGV' node "$WORK/h.mjs" "$d" "$SCRIPTS" > "$d/out" 2>&1 ) 2>/dev/null; rc=$?
-  if [ "$id" = HANG ] && [ "$rc" -eq 142 ]; then echo "MUTANT-ROUGE — $nom (boucle sans fin, coupée à 12 s)"
+  ( perl -e 'alarm($ENV{ALARME_MUTANT} || 120); exec @ARGV' node "$WORK/h.mjs" "$d" "$SCRIPTS" > "$d/out" 2>&1 ) 2>/dev/null; rc=$?
+  # un harnais coupé ou muet n'est jamais un témoin vert : échec franc, distinct
+  if [ "$rc" -ge 128 ] || ! grep -q '^PASS — \|^❌ FAIL — ' "$d/out"; then echo "❌ FAIL — MUT : $nom : harnais coupé ou muet (code $rc), aucun verdict"; echo "BILAN : $NB PASS, 1 FAIL"; exit 1
   elif grep -q "^❌ FAIL — $id " "$d/out"; then echo "MUTANT-ROUGE — $nom ($id rouge)"; else echo "❌ FAIL — MUT : $nom : le témoin $id reste vert"; echo "BILAN : $NB PASS, 1 FAIL"; exit 1; fi
 }
 CH=vf-cockpit-activite-chemins.mjs; EMP=vf-cockpit-activite-empreinte.mjs; COL=vf-cockpit-activite-collisions.mjs
@@ -271,7 +281,7 @@ mutant 'worktree-supprime-ignore' K1 $CH 'return n === 1 && arbre !== c.nomPrinc
 mutant 'exclusion-parent-enfant-retiree' K2 $COL 'return ks.filter((k) => ks.length - 1 > lies.get(k));' 'return ks;'
 mutant 'double-boucle-quadratique-remise' K8 $COL 'conflit.push(...enConflit(vifs, p.retenues, parId));' "const up = (x, y) => { let id = parId.get(p.retenues[x].v.id), n = 0; while (typeof id === 'string' && n++ < 50) { if (id === p.retenues[y].v.id) return true; id = parId.get(id); } return false; }; const s = new Set(); for (const a of vifs) for (const b of vifs) if (a < b && !up(a, b) && !up(b, a)) { s.add(a); s.add(b); } conflit.push(...s);"
 mutant 'profondeur-max-portee-a-1e9' K2 $COL 'const PROFONDEUR_MAX = 50;' 'const PROFONDEUR_MAX = 1e9;'
-mutant 'cycle-de-parent-sans-borne' HANG $COL 'const PROFONDEUR_MAX = 50;' 'const PROFONDEUR_MAX = 1e12;'
+mutant 'cycle-de-parent-sans-borne' K9 $COL 'const PROFONDEUR_MAX = 50;' 'const PROFONDEUR_MAX = 1e12;'
 mutant 'plage-C1-de-propre-retiree' M10 $EMP '\u007f-\u009f' '\u007f'
 mutant 'borne-120-de-propre-retiree' M10 $EMP '.slice(0, 120);' ';'
 mutant 'propre-des-noms-de-plans-retire' K4 $COL 'nom = propre(' 'nom = ((t) => t)('

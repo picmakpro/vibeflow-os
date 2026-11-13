@@ -35,3 +35,4 @@ Rituel levé : régime allégé (consigne de Samuel, message session principale,
 - `PROFONDEUR_MAX` : témoin de filiation bornée (K2) et de cycle de `parent` (K9), mutants `profondeur-max-portee-a-1e9` et `cycle-de-parent-sans-borne` (coupé par l'alarme de 12 s).
 - Plage C1 de `CTRL` (C2), `propre()` (M10), `PLANS_MAX` / `plansTronques` (K4) : un témoin et un mutant chacun ; noms de plans assainis par `propre` (K4).
 - Suites rejouées sur la tête commitée : chemins 90 PASS / 17 mutants rouges, empreinte 51 PASS / 20 mutants rouges ; cliquet de colonnes : aucun de mes fichiers en écart.
+- Mutants indépendants de la vitesse de la machine (rouge CI Linux, lot 12) : K8 compte les lectures de Map (N puis 2N) au lieu de chronométrer, K9 coupe le cycle par un budget de lectures ; un harnais coupé ou muet est un échec franc (« aucun verdict »), jamais un témoin vert. Rejoué sous 24 boucles CPU avec alarme de 3 s, puis alarme de 1 s : 52 PASS, 22 mutants rouges.
