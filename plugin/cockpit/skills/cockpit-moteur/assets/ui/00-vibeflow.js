@@ -77,7 +77,10 @@
     .foot .meta { white-space: normal; min-width: 0; border-radius: 12px; }
     .foot .vst { flex: none; }
     /* 71.5 (P71.5-D-18, D-28, N2) : ni anneau ni halo, une seule élévation ; l'état se lit dans le pied (glyphe + mot) et la graisse du titre. « En cours » : palier neutre plus marqué (--raise allégé), car --surface-hover ne se voit pas en clair */
-    .card.st-active, .card.st-recette, .node:hover .card.st-active, .node:hover .card.st-recette { background: color-mix(in srgb, var(--raise) 70%, var(--surface)); }
+    /* 80-16 (P80-D-31, AUDC-X5 b) : le palier neutre n'est posé qu'en sombre ; en clair la carte active reste sur --surface (jamais grisée) :
+       l'état se lit au glyphe, au mot et au titre */
+    :root:not([data-theme="light"]) .card.st-active, :root:not([data-theme="light"]) .card.st-recette, :root:not([data-theme="light"]) .node:hover .card.st-active,
+    :root:not([data-theme="light"]) .node:hover .card.st-recette { background: color-mix(in srgb, var(--raise) 70%, var(--surface)); }
     .card.st-active, .card.st-recette, .card.st-blocked { box-shadow: var(--shadow-card); }
     .card.st-active .title, .card.st-recette .title, .card.st-blocked .title { font-weight: 600; color: var(--text); }
     .card.st-done .title, .card.st-todo .title { font-weight: 500; color: var(--text-2); }
