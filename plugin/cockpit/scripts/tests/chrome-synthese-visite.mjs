@@ -109,13 +109,13 @@ export async function jouer(chrome, port, mode) {
     const i9 = await intercepter(s, '/api/vf/git', { statut: 500, corps: '{}' }); await charger(s, base, v2); r.v9 = { fiche: await fiche(s), vues: i9.vues() }; await i9.arreter();
     // ---- V7, V10, OB1 : sur l'état V2 ----
     await charger(s, base, v2); await fiche(s); r.ob1 = await s.ev(ORDRE); await fermer(s);
-    r.ecout0 = await s.ev('window.__nbEcout()');
+    r.ecout0 = await s.ev('window.__nbEcout()'); const origine = await s.ev('performance.timeOrigin');
     for (const o of ['code', 'projet', 'code', 'projet']) await s.ev(`window.VF_COQUILLE.chargerOnglet(${JSON.stringify(o)})`);
-    await s.attendre(`!!${BTN}`, 'bouton après deux cycles'); await stabiliser(() => s.ev(RESUME), { max: 6000 }); const ecout1 = await s.ev('window.__nbEcout()'), lignes1 = await s.ev(`document.querySelectorAll('[data-vf-sy-resume]').length`); await ouvrir(s);
+    await s.attendre(`!!${BTN}`, 'bouton après deux cycles'); await resumeLu(s); const ecout1 = await s.ev('window.__nbEcout()'), lignes1 = await s.ev(`document.querySelectorAll('[data-vf-sy-resume]').length`); await ouvrir(s);
     const ecr0 = await s.ev('window.__ecr');
     await s.ev(`(() => { Object.defineProperty(document, 'visibilityState', { configurable: true, get: () => 'hidden' }); document.dispatchEvent(new Event('visibilitychange')); delete document.visibilityState; })()`); await pause(300);
     r.v10 = { ecout: ecout1, blocs: await s.ev(`document.querySelectorAll('[data-vf-sy-bloc="visite"]').length`), lignes: lignes1,
-      ecritures: (await s.ev('window.__ecr')) - ecr0, memeDocument: true };
+      ecritures: (await s.ev('window.__ecr')) - ecr0, memeDocument: (await s.ev('performance.timeOrigin')) === origine };
     await s.naviguer(base + '/'); const garde = JSON.parse((await stockageLu(s, s.cle)) || 'null');
     r.v7 = { v: garde && garde.v, ageS: garde && garde.courante ? maintenant() - garde.courante.vu : null, cles: garde ? Object.keys(garde) : null };
     // ---- V8, W13v : « Tout vu », puis un second onglet ----
