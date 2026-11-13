@@ -109,7 +109,7 @@ console.log(JSON.stringify({ lignes: GR.map(([l, g]) => ligne(l, tete(g))), etag
 JS
 CO="$(node "$AUX/co.mjs" "$COUT" "$CALC" "$MODELE" "$FIX" 2>&1)"; JC() { printf '%s' "$CO" | node "$AUX/ev.mjs" "$1"; }
 MON() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(/[€$£]|\b(euros?|dollars?|USD|EUR)\b|coût estimé/i.test(s)?1:0))'; }
-NC() { node -e 'const fs=require("fs");console.log((fs.readFileSync(process.argv[1],"utf8").match(new RegExp(process.argv[2],process.argv[3]||"g"))||[]).length)' "$1" "$2" "$3"; }
+NC() { node -e 'const fs=require("fs");console.log((fs.readFileSync(process.argv[1],"utf8").match(new RegExp(process.argv[2],process.argv[3]||"g"))||[]).length)' "$1" "$2" "${3:-}"; }
 
 echo "=== S — le fichier neuf, statiquement ==="
 assert_eq "S0 — témoin : le fichier et ses deux dépendances de test existent (jamais un vert à vide)" "$([ -f "$COUT" ] && [ -f "$CALC" ] && [ -f "$MODELE" ] && echo oui || echo non)" "oui"
@@ -117,9 +117,9 @@ assert_eq "S1 — aucun en-tête de jeton, eval, new Function, blob:, attribut o
 assert_eq "S2 — première ligne « // VibeFlow ( », au plus 299 lignes, 160 points de code par ligne (mesure en points de code)" "$([ -f "$COUT" ] && head -n 1 "$COUT" | /usr/bin/grep -q '^// VibeFlow (' && node "$AUX/largeur.mjs" "$COUT" | awk '$2 > 299 || $3 > 160 { print $1 }' || echo faux)" ""
 assert_eq "S3 — ligne AJOUT de VENDORED.txt : une, et les lignes AJOUT restent triées" "$(/usr/bin/grep -c -E '^AJOUT assets/ui/74-vf-synthese-cout\.js$' "$ENG/VENDORED.txt")|$(/usr/bin/grep '^AJOUT ' "$ENG/VENDORED.txt" | LC_ALL=C sort -c 2>&1 | wc -l | tr -d ' ')" "1|0"
 assert_eq "CO9 — aucun champ de voie hors kind, role, jetons, durees, rattachement : ni verbe en cours, cibles, événements, segments, ni transcript ou doing" "$(NC "$COUT" 'enCours|cibles|evenements|segments|dispatchA|etatOfficiel|compteurs|transcript|doing|modeles|\.parent\b|\.arbre\b|\.session\b')" "0"
-assert_eq "S4 — aucun symbole ni mot de monnaie dans le fichier" "$(MON < "$COUT")" "0"
+assert_eq "S4 — aucun symbole ni mot de monnaie dans le fichier" "$(sed 's/\${//g' "$COUT" | MON)" "0"
 assert_eq "S4b — sonde positive de la regex de monnaie : elle voit « 12 € et 3 dollars » et rien dans « Jetons, hors cache 3 k »" "$(printf '12 € et 3 dollars' | MON)|$(printf 'Jetons, hors cache 3 k, Cache lu et créé' | MON)" "1|0"
-assert_eq "S7 — l'ancre de M-INNER est unique dans les fichiers ui/ (le mutant ne peut viser que ce bloc)" "$(cat "$UI"/*.js | NC /dev/stdin 'e\.textContent = String\(texte\)')" "1"
+assert_eq "S7 — l'ancre de M-INNER est unique dans les fichiers ui/ (le mutant ne peut viser que ce bloc)" "$(cat "$UI"/*.js | NC /dev/stdin "e\.textContent = '' \+ texte")" "1"
 assert_eq "S5 — « Aucune activité » écrit une seule fois (l'état ok sans voie, le seul qui le dit)" "$(NC "$COUT" 'Aucune activité')" "1"
 cat > "$AUX/sonde.css" <<'CSS'
 .x { padding: 10px; color: #123456; }
@@ -182,7 +182,7 @@ assert_eq "W17.1 — route présente : le bloc suit le bloc 3 (ordre visite, bur
 assert_eq "W17.2 — un tableau nommé par le h3 (aria-labelledby), quatre en-têtes th scope=col : Phase, Jetons hors cache, Cache lu et créé, Durée" "$(JV "j.cas.complet.tables + '|' + j.cas.complet.labelled + '|' + j.cas.complet.labelledOk + '|' + j.cas.complet.ths.join(',')")" "1|vf-sy-t-cout|true|Phase|col,Jetons, hors cache|col,Cache lu et créé|col,Durée|col"
 assert_eq "W17.3 — lignes : phases du jalon dans l'ordre (77, 78), puis « Hors jalon », puis « Non rattaché » en dernier ; jetons (entrée + sortie), cache lu et créé, durée" "$(JV 'j.cas.complet.lignes')" "$(JA 'j.lignes')"
 assert_eq "W17.4 — chaque ligne se déplie (details) en une ligne par étage, dans l'ordre fixe : entrée, sortie, cache lu, cache créé" "$(JV 'j.cas.complet.etages')|$(JV 'j.cas.complet.details')" "$(JA 'j.etages')|[1,1,1,1]"
-assert_eq "W17.5 — ligne de total sans « au moins » quand tout est complet ; aucune phrase de minorant" "$(JV 'j.cas.complet.total')|$(JV 'j.cas.complet.notes.filter((n) => n.includes(\"Total partiel\")).length')" "$(JA 'j.total')|0"
+assert_eq "W17.5 — ligne de total sans « au moins » quand tout est complet ; aucune phrase de minorant" "$(JV 'j.cas.complet.total')|$(JV 'j.cas.complet.notes.filter((n) => /Total partiel/.test(n)).length')" "$(JA 'j.total')|0"
 assert_eq "W17.6 — aucun symbole ni mot de monnaie dans le texte du bloc (cas complet, tronqué, partiel)" "$(for c in complet tronque3 partielle inconnu; do JV "j.cas.$c.texte" | MON; done | tr '\n' ',')" "0,0,0,0,"
 assert_eq "W17.7 — la voie sans rattachement tombe sur « Non rattaché » (comptée au total), jamais dans une phase : la ligne porte ses jetons" "$(JV "j.cas.complet.lignes[3][0]")|$(JV "j.cas.complet.lignes[0][0] + '/' + j.cas.complet.lignes[1][0]")" "Non rattaché|Phase 77 · Santé de la méthode/Phase 78 · Équipe en direct"
 assert_eq "W17.8 — l'aide dit « Jamais de montant » et que les jetons couvrent la vie de chaque agent dans l'index des 24 h, sans coupe à la seconde" "$(JV "j.cas.complet.notes[0]")" "Jetons et durée de travail. Jamais de montant. Les jetons couvrent la vie de chaque agent dans l'index des dernières 24 h, sans coupe à la seconde."
@@ -201,7 +201,7 @@ assert_eq "W11 — aucun POST, aucune requête vers transcript ou doing, chaque 
 assert_eq "E0 — aucune exception de page" "$(JV 'j.erreursPage.length')" "0"
 
 echo "=== M-INNER — la garde d'échappement : un nom de phase injecté sans échappement rougit W15c ==="
-if cockpit_module_muter_page minner 's/e\.textContent = String(texte)/e.innerHTML = String(texte)/'; then
+if cockpit_module_muter_page minner "s/e\.textContent = '' + texte/e.innerHTML = '' + texte/"; then
   cockpit_lancer "$LAB"; RLM=$?; PM="${VF_PORT:-0}"
   assert_eq "M-INNER.0 — le serveur du mutant est prêt et charge la copie mutée (charge prouvée)" "$RLM|$([ "$PM" -gt 0 ] && echo prêt)|$(cockpit_module_charge "$COCKPIT_MODULE" && echo charge)" "0|prêt|charge"
   RM="$(REAL_HOME="$REAL_HOME" node "$BANC" cout "$CHROME" "$PM")"; cockpit_arreter
