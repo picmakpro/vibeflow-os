@@ -136,13 +136,16 @@ const [, , sortie, lab, scripts] = process.argv;
 const { attach } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-server.mjs')).href);
 let n = 0; const inject = { replace: () => '<!--p-->', [Symbol.toPrimitive]: () => { n++; return '<!--i-->'; } };
 const VF = attach({ here: sortie, root: lab, token: 'ab'.repeat(16), inject, log: () => {} });
-let a = null; for (let i = 0; i < 100 && !(a = VF.pageEquipe()); i++) await new Promise((r) => setTimeout(r, 100)); // le direct écrit la page Projet (avec ses données) peu après le démarrage
+// 79-15 : la page Équipe est une page en parties ; `inject` n'est concaténé qu'à la construction du DÉBUT, une fois par gabarit et par variante : la variante Projet passe par
+// inject.replace (sans compte), la variante Équipe par la concaténation (un compte). Valeurs recalculées à la main : premier appel = un chargement du gabarit = 1 ; second appel =
+// mêmes tampons, toujours 1 ; load() reconstruit le début et la fin = 2.
+let a = null; for (let i = 0; i < 100 && !(a = VF.pageEquipe()); i++) await new Promise((r) => setTimeout(r, 100));
 const b = VF.pageEquipe(); const apres2 = n;
-VF.load(); VF.pageEquipe();
-console.log(JSON.stringify({ page: typeof a === 'string' && a.length > 1000, identique: a === b, constructions: apres2, apresLoad: n }));
+VF.load(); const c = VF.pageEquipe();
+console.log(JSON.stringify({ page: !!a && a.longueur > 1000, identique: a === b && a.avant === b.avant && a.donnees === b.donnees && a.apres === b.apres, constructions: apres2, apresLoad: n, debutNeuf: c.avant !== a.avant }));
 VF.stop(); process.exit(0);
 JS
-assert_eq "D3.3 — deux appels sans rien de changé : la page Équipe n'est construite qu'une fois ; une réécriture de la page Projet la fait reconstruire" "$(node "$AUX/memo.mjs" "$OUT" "$LAB" "$SCRIPTS" 2>&1 | tail -1)" '{"page":true,"identique":true,"constructions":1,"apresLoad":2}'
+assert_eq "D3.3 — deux appels sans rien de changé : la page Équipe n'est construite qu'une fois (mêmes tampons) ; un nouvel assemblage de la carte (load) reconstruit le début et la fin" "$(node "$AUX/memo.mjs" "$OUT" "$LAB" "$SCRIPTS" 2>&1 | tail -1)" '{"page":true,"identique":true,"constructions":1,"apresLoad":2,"debutNeuf":true}'
 
 echo "=== D4 — injection de version : « < » échappé (AUDC-B-06 1) ==="
 demarrer VF_FAKE_VERSION='</script><b id=zz>2.1.316'
