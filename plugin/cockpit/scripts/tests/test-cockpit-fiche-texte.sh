@@ -10,7 +10,7 @@
 #   X10 fusionnerEvenements (a à h)   X12 corpus hostile : jeu fermé, aucun attribut, classes fixes   X13 genre hors du jeu fermé   X14 lien non fermé
 #   X11 mutants (copies des modules sous $WORK/mut-<nom>/) : a M-INNERHTML (X3), b M-LIEN (X2), c M-RENDU-TOUT (X6), d M-FILTRE-ET (X5),
 #       e M-BACKTRACK (X9), f M-FUSION-SANS-BORNE (X10), g M-FUSION-EN-CONSTRUCTION (X10), h M-INCONNU-VIDE (X7), i M-PLAFOND (X9),
-#       j M-AUTOLIEN (X12), k M-STYLE (X12), l M-GENRE-CLASSE (X13), m M-LIEN-OUVERT (X14) ;
+#       j M-AUTOLIEN (X12), k M-STYLE (X12), l M-GENRE-CLASSE (X13), m M-LIEN-OUVERT (X14), n M-LIEN-FAIBLE (X14) ;
 #       chaque mutant imprime « MUTANT-ROUGE <nom> <sonde> » quand sa sonde rougit, « MUTANT-VERT <nom> <sonde> » (plus un FAIL) sinon.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -197,9 +197,9 @@ sonde('X13', () => {
   const clas = String(li.className);
   return (!clas.includes('zz') && !clas.includes('onclick') && !LOG.classes.join(' ').includes('zz') && li.children.length === 0 && texteDe(li) === '') || { clas, n: li.children.length };
 });
-// X14 : lien à parenthèse non fermée (aucun « ) » plus loin) : rendu terminé sous délai dur, texte intact (la garde `dernier[')']` évite la boucle infinie)
+// X14 : lien à parenthèse non fermée (aucun « ) » plus loin) : rendu terminé sous délai dur, texte intact (la garde `dernier[')'] >= fermante + 2` évite la boucle infinie ; les deux derniers cas portent une `)` AVANT le lien, qu'une garde affaiblie en `>= 0` laisserait passer)
 sonde('X14', () => {
-  const cas = ['[a](b', 'voir [doc](https://x.y sans fermer', 'a [b](c [d](e', '[x]( et ](y'];
+  const cas = ['[a](b', 'voir [doc](https://x.y sans fermer', 'a [b](c [d](e', '[x]( et ](y', '(a) [b](c', 'f(x) puis [y](z'];
   const r = cas.map((m) => {
     try { ctx.__m = m; ctx.__d = mkDoc(); reset(); vm.runInContext('__r = window.__vfFicheMd.markdown(__m, __d)', ctx, { timeout: 1500 }); return texteDe(ctx.__r) === m; }
     catch (e) { return 'délai : ' + m; }
@@ -314,6 +314,7 @@ mutant j M-AUTOLIEN X12 X12 "$MD" 'tampon += c;' "if (texte.startsWith('http', i
 mutant k M-STYLE X12 X12 "$MD" 'e.textContent = contenu;' "e.textContent = contenu; e.setAttribute('style', contenu);"
 mutant l M-GENRE-CLASSE X13 X13 "$TX" 'if (!GENRES.includes(ligne && ligne.genre)) return li;' ''
 mutant m M-LIEN-OUVERT X14 X14 "$MD" " && dernier[')'] >= fermante + 2" ''
+mutant n M-LIEN-FAIBLE X14 X14 "$MD" " && dernier[')'] >= fermante + 2" " && dernier[')'] >= 0"
 
 vf_hyg_assert
 
