@@ -58,11 +58,15 @@ if (mode === 'tracer') {
       for (const [m, sansWorker] of [['ligne', true], ['worker', false]]) {
         niveaux[nom][m] = await sous(s, { sansWorker }, `${racine}/${page}?lang=en`, async () => {
           if (aller) { await s.ev(aller); await s.attendre("VibeFlow.state.container !== 'root'", 'niveau atteint'); await attendrePose(s); }
-          return { ...JSON.parse(await s.ev(`JSON.stringify(${POSITIONS})`)), construits: (await resume(s)).construits };
+          const p = JSON.parse(await s.ev(`JSON.stringify(${POSITIONS})`));
+          return { ...p, construits: (await resume(s)).construits };
         });
       }
     }
-    return { niveaux };
+    // la sortie d'un processus qui se termine par process.exit est tronquée à 64 Kio sur un tube : seuls des condensés sortent
+    const egal = (v, k) => JSON.stringify(v.ligne[k]) === JSON.stringify(v.worker[k]);
+    return { niveaux: Object.fromEntries(Object.entries(niveaux).map(([k, v]) => [k, { cartes: v.ligne.cartes.length, egalCartes: egal(v, 'cartes'), egalAretes: egal(v, 'aretes'),
+      nbAretes: v.ligne.aretes.length, construitsWorker: v.worker.construits, construitsLigne: v.ligne.construits }])) };
   }, { csp: true });
 } else if (mode === 'repli') {
   await executer(chrome, async (s) => sous(s, { sansWorker: arg === 'sans' }, `${racine}/index.html?lang=en`, async () => ({

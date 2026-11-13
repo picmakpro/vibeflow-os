@@ -75,16 +75,16 @@ node "$OR" csp "$WORK/doc-p.html" "$K1CSP" "http://127.0.0.1:$PORT/_vf/" > "$WOR
 assert_eq "K3.1 — empreintes de script-src = celles des scripts en ligne du corps servi ; une seule autre source, http://127.0.0.1:<port>/_vf/ ; valeur servie = valeur reconstruite" "$(oj '[j.egales,JSON.stringify(j.autres),j.servi===j.attendu].join("|")' < "$WORK/csp.json")" "true|[\"http://127.0.0.1:$PORT/_vf/\"]|true"
 assert_eq "K3.1 — script-src sans 'self', sans 'unsafe-', sans *" "$(oj '/\x27self\x27|unsafe-|\*/.test(j.servi)?"interdit":"propre"' < "$WORK/csp.json")" "propre"
 cat > "$AUX/ligne.mjs" <<'JS'
-// ligne.mjs <serve.mjs> : la ligne « const csp = » du serveur égale la copie figée de v2.75.0 avec la seule insertion de la source du préfixe
+// ligne.mjs <serve.mjs> : la ligne « const csp = » du serveur égale la copie figée de v2.75.0 avec les deux seules insertions (source du préfixe, directive de worker)
 import fs from 'node:fs'; import { execFileSync } from 'node:child_process';
 const [, , serve, aux] = process.argv;
 const ancien = "  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;";
 const ligne = fs.readFileSync(serve, 'utf8').split('\n').find((x) => x.startsWith('  const csp = ')) || '';
-const attendu = ancien.replace(".join(' ')}; style-src", ".join(' ')} ${source}; style-src");
+const attendu = ancien.replace(".join(' ')}; style-src", ".join(' ')} ${source}; ${worker}; style-src"); // les DEUX insertions de la phase : la source du préfixe (79-16) et le worker (79-18)
 const figee = execFileSync('node', [aux, 'ligne-csp-v275'], { encoding: 'utf8' }).trimEnd();
 console.log([ligne === attendu ? 'serveur' : 'serveur-different', figee === attendu ? 'figee' : 'figee-differente'].join(' '));
 JS
-assert_eq "K3.3 — la ligne « const csp = » de serve.mjs ne diffère de la copie de v2.75.0 que par la source du préfixe, et terminal-aux en porte la copie figée neuve" "$(node "$AUX/ligne.mjs" "$ENG/assets/serve.mjs" "$TA")" "serveur figee"
+assert_eq "K3.3 — la ligne « const csp = » de serve.mjs ne diffère de la copie de v2.75.0 que par la source du préfixe et la directive de worker (deux insertions exactes), et terminal-aux en porte la copie figée neuve" "$(node "$AUX/ligne.mjs" "$ENG/assets/serve.mjs" "$TA")" "serveur figee"
 
 echo "=== K1 (suite) — les quatre adresses, les méthodes, les jetons ==="
 rq GET / "$WORK/doc-r.html"; rq GET /index.html "$WORK/doc-i.html"; rq GET /equipe.html "$WORK/doc-e.html"; rq GET /project.html "$WORK/doc-p.html"

@@ -11,9 +11,10 @@ import { pause, stabiliser } from './chrome-session.mjs';
 export const INTERDITES = ['doing', 'mandat', 'messages', 'outils', 'fil'];
 export const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
 export const VUE_POSEE = "(() => { const v = document.querySelector('#viewport'); return !!v && v.style.opacity !== '0' && !v.classList.contains('anim'); })()";
-// l'état lu pour juger qu'une page est posée : onglet, conteneur, positions des cartes
+// l'état lu pour juger qu'une page est posée : onglet, conteneur, nombre de cartes et somme de leurs positions (stable = mise en page posée)
 export const LIRE = "JSON.stringify([window.VF_COQUILLE && window.VF_COQUILLE.onglet(), window.VibeFlow && window.VibeFlow.state && window.VibeFlow.state.container, "
-  + "document.documentElement.dataset.vfPret, ((window.VibeFlow && window.VibeFlow.state.layout && window.VibeFlow.state.layout.children) || []).length])";
+  + "document.documentElement.dataset.vfPret, ((window.VibeFlow && window.VibeFlow.state.layout && window.VibeFlow.state.layout.children) || []).length, "
+  + "((window.VibeFlow && window.VibeFlow.state.layout && window.VibeFlow.state.layout.children) || []).reduce((a, n) => a + n.x * 3 + n.y, 0)])";
 
 export const sonde = ({ sansWorker = false, secrets = [], longueur = 260 } = {}) => `(() => {
   const INT = ${JSON.stringify(INTERDITES)}, SEC = ${JSON.stringify(secrets)}, now = () => performance.now();

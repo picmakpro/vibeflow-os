@@ -678,7 +678,7 @@ if (typeof ELK === 'undefined') { document.body.innerHTML = `<p style="padding:2
 const NS = 'http://www.w3.org/2000/svg';
 const $ = (s) => document.querySelector(s);
 const svg = $('#svg'), vp = $('#viewport'), panel = $('#panel');
-// vibeflow 79-18 (SOCL-22) : le calcul de mise en page tourne dans un worker du module (/_vf/elk-fil.js) quand la coquille est là ; sinon (export en fichier,
+// vibeflow 79-18 (SOCL-22) : le calcul de mise en page tourne dans un worker du module quand la coquille est là ; sinon (export en fichier,
 // navigateur sans worker) ou si le worker échoue, il tourne en ligne comme avant. Même forme d'appel : elk.layout(graphe) -> promesse du graphe positionné.
 const elk = (() => {
   let ligne = null, fil = null, avertie = false, n = 0; const attente = new Map();
@@ -688,9 +688,11 @@ const elk = (() => {
     if (!avertie) { avertie = true; console.warn('vf-cockpit : mise en page en ligne (le fil de calcul n\'a pas démarré)'); }
     for (const [id, p] of [...attente]) { attente.delete(id); enLigne(p.graphe).then(p.ok, p.ko); }
   };
-  if (window.VF_COQUILLE && typeof window.VF_COQUILLE === 'object' && typeof Worker === 'function' && /^https?:$/.test(location.protocol)) {
+  // le préfixe vient du manifeste de la coquille ; le nom du fichier est écrit en deux morceaux : l'export autonome embarque ce script et ne doit porter aucune trace du worker
+  let man = null; try { man = JSON.parse(document.getElementById('vf-coquille-manifeste').textContent); } catch { man = null; }
+  if (man && typeof man.prefixe === 'string' && window.VF_COQUILLE && typeof window.VF_COQUILLE === 'object' && typeof Worker === 'function' && /^https?:$/.test(location.protocol)) {
     try {
-      fil = new Worker('/_vf/elk-fil.js'); // construit en avance : son démarrage recouvre l'attente des polices
+      fil = new Worker(man.prefixe + 'elk-' + 'fil.js'); // construit en avance : son démarrage recouvre l'attente des polices
       fil.onerror = (e) => { e.preventDefault(); replier(); };
       fil.onmessage = (e) => { // une réponse est une donnée non fiable : forme vérifiée avant toute pose
         const d = e.data, p = d && Number.isInteger(d.id) ? attente.get(d.id) : null; if (!p) return; attente.delete(d.id);
