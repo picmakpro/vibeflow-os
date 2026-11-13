@@ -94,5 +94,17 @@ await executer(chrome, async (s) => {
   o.x6.reduit.attente = JSON.parse(await s.ev("JSON.stringify((() => { const e = document.createElement('span'); e.className = 'spin'; e.style.display = 'inline-flex'; document.body.appendChild(e); const k = getComputedStyle(e); const r = { anim: k.animationName, actives: e.getAnimations().length, largeur: e.getBoundingClientRect().width, quartColore: k.borderTopColor !== k.borderRightColor }; e.remove(); return r; })())"));
   await s.ev("(() => { const e = document.createElement('div'); e.id = 'vf-essai-entree'; e.className = 'vf-git-entree'; e.addEventListener('animationend', () => e.classList.remove('vf-git-entree')); document.body.appendChild(e); })()");
   o.x6.reduit.entree = await s.attendre("!document.getElementById('vf-essai-entree').classList.contains('vf-git-entree')", 'classe d\'entrée retirée', 3000).then(() => true, () => false);
+  // ---------- S : un premier rendu supplanté par un second émet quand même « ready » (garde de disponibilité ; accessibilite, régression de 79-16) ----------
+  // La sonde demande un second rendu dès que le premier lance son calcul de mise en page (ELK en ligne, ou message au fil de calcul) : le premier est supplanté, déterministe.
+  const sup = await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => { window.__sup = 0;
+    const poser = () => { if (window.__sup++ === 0) queueMicrotask(() => window.VibeFlow.render()); };
+    let E; Object.defineProperty(window, 'ELK', { configurable: true, get() { return E; }, set(v) { E = v; if (!v || !v.prototype || v.prototype.__vfSup) return; v.prototype.__vfSup = true; const orig = v.prototype.layout;
+      v.prototype.layout = function (...a) { poser(); return orig.apply(this, a); }; } });
+    const pm = Worker.prototype.postMessage; Worker.prototype.postMessage = function (...a) { poser(); return pm.apply(this, a); };
+  })()` });
+  o.sup = { pret: true };
+  try { await s.naviguer(`${racine}/index.html?lang=en`); } catch (e) { o.sup.pret = false; o.sup.erreur = String(e.message).slice(0, 160); }
+  o.sup.calculs = await s.ev('window.__sup').catch(() => -1);
+  await s.send('Page.removeScriptToEvaluateOnNewDocument', { identifier: sup.identifier });
   return o;
 });
