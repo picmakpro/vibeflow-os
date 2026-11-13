@@ -17,6 +17,7 @@ import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE, premiereLigne 
 import { FENETRE, collecteAgents, indexDesNoeuds, rattacher } from './vf-cockpit-equipe.mjs';
 import { lireDags, lireConfine } from './vf-cockpit-planning.mjs';
 import { arbresGit } from './vf-cockpit-arbres.mjs';
+import { lireRegistre, fusionnerRegistre } from './vf-cockpit-registre.mjs';
 import { demander, lire } from './vf-cockpit-etat-officiel.mjs';
 import { reduireTranscript } from './vf-cockpit-transcript.mjs';
 
@@ -123,6 +124,8 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
       const held = (st.locks || []).some((l) => l.present && !l.stale && (l.ws || '') === ws && String(l.phase || '') === ph);
       for (const a of Array.isArray(o.orphans) ? o.orphans : []) { if (typeof a?.agent_id !== 'string' || !ID_RE.test(a.agent_id)) continue; reg++; if (presents.has(a.agent_id)) { registre.set(a.agent_id, { noeud: a.node || '', role: a.role, ws }); continue; } workers.push({ kind: 'registered', id: a.agent_id, role: a.role, task: a.node || '', parent: a.parent || '', depth: a.depth ?? null, tree: ws ? `compartiment ${ws}${ph ? ` phase ${ph}` : ''}` : 'dépôt', ageS: a.age_seconds, stale: !held, orphan: !held, source: 'registre' }); }
     }
+    // D5 : un agent clos, verrou relâché, reste rattaché à son nœud (registre courant et archive de 24 h)
+    if (presents.size) fusionnerRegistre(registre, presents, lireRegistre({ chemin: DL, racine: root }));
     sources.locks ||= { etat: 'lue', held: (st.locks || []).filter((x) => x.present).length, registered: reg };
   }
 
@@ -151,7 +154,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     for (const n of nodes.filter((x) => x.status === 'running')) { running++; if (stale) staleNodes++; workers.push({ kind: 'dag-node', id: n.id, role: n.stage || '', task: String(n.step || ''), tree: path.relative(root, d) || d, dag: f, ageS: age, stale, source: 'dag' }); }
   }
   sources.dags = { etat: 'lue', files: nDags, running, stale: staleNodes };
-  return { at: new Date(now).toISOString(), root, trees: trees.map(label), fresh, fenetre: FENETRE, workers, sources, _registre: registre };
+  return { at: new Date(now).toISOString(), root, trees: trees.map(label), fresh, fenetre: FENETRE, workers, sources, sortisSilence: eq.sortisSilence, _registre: registre };
 }
 
 export function collectWho(root, opts = {}) {
@@ -171,7 +174,7 @@ export function collectWho(root, opts = {}) {
   });
   const sources = { ...g.sources };
   if (typeof sources.sessions?.path === 'string') sources.sessions = { ...sources.sessions, path: sources.sessions.path.replace(opts.home || os.homedir(), '~') };
-  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees.map((t) => bornes(t, 200)), fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine' && w.etat !== 'au-repos' && w.etat !== 'attend'), workers, sources };
+  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees.map((t) => bornes(t, 200)), fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine' && w.etat !== 'au-repos' && w.etat !== 'attend'), workers, sources, sortisSilence: Number.isInteger(g.sortisSilence) ? g.sortisSilence : 0 };
 }
 
 // P67-D-14 : la dernière commande ne sort que par cette révélation ponctuelle (T-67-05), réduite au programme et à son premier argument (décision de Samuel, AskUserQuestion session principale, 2026-11-02).

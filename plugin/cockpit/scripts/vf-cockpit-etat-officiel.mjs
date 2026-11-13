@@ -28,7 +28,9 @@ export function formeEtats(json, CC = contrat()) {
     const etat = st === 'termine' || st === 'attend' ? st : su || st;
     const avant = out.get(e[CC.cleSession]);
     if (avant && avant.etat !== 'termine' && etat === 'termine') continue; // AUDC-D2 : un état vivant listé pour cet identifiant n'est jamais écrasé par « termine », quel que soit l'ordre
-    out.set(e[CC.cleSession], { etat: etat || null }); // une session listée d'état inconnu est VIVANTE : présente, sans état
+    // A20 : seul `termine` porte un motif (`failed`, `stopped`), lu du contrat (`motifs`)
+    const motif = etat === 'termine' && typeof e.state === 'string' && Object.hasOwn(CC.motifs || {}, e.state) && typeof CC.motifs[e.state] === 'string' ? CC.motifs[e.state] : null;
+    out.set(e[CC.cleSession], { etat: etat || null, ...(motif ? { motif } : {}) }); // une session listée d'état inconnu est VIVANTE : présente, sans état
   }
   return out;
 }

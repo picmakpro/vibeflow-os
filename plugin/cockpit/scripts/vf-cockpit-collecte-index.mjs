@@ -19,6 +19,7 @@ import { GIT_SUR, shBorne } from './vf-cockpit-paths.mjs';
 import { cheminPhysique } from './vf-cockpit-git-sortant.mjs';
 import { worktreeVerifie } from './vf-cockpit-git-details.mjs';
 import { nettoie } from './vf-cockpit-arbres.mjs';
+import { rattacherVoies } from './vf-cockpit-voies-rattachement.mjs';
 
 const git = (racine, ...a) => shBorne('git', [...GIT_SUR, '-C', racine, ...a], racine, racine);
 
@@ -52,10 +53,10 @@ export function creerArbreDe(racine) {
 }
 
 const rapportDe = (etat, b = {}) => ({
-  etat, tronque: etat === 'tronque', voies: b.voies ?? 0, formeInconnue: b.formeInconnue ?? 0, evinces: b.evinces ?? 0,
+  etat, tronque: etat === 'tronque', voies: b.voies ?? 0, formeInconnue: b.formeInconnue ?? 0, evinces: b.evinces ?? 0, rattachees: b.rattachees ?? 0,
 });
 
-export function etapeIndex({ racine, sortie, home, memo, maintenant = Date.now(), sansIndex = false }) {
+export function etapeIndex({ racine, sortie, home, memo, who = [], maintenant = Date.now(), sansIndex = false }) {
   if (sansIndex) return rapportDe('suspendu');
   try {
     const fichier = path.join(sortie, '.cache', FICHIER_INDEX);
@@ -72,6 +73,7 @@ export function etapeIndex({ racine, sortie, home, memo, maintenant = Date.now()
     memo.index = r.index;
     if (r.change || ecrire) ecrireIndex(fichier, racine, memo.index);
     const b = bilan(memo.index);
-    return rapportDe(b.tronque ? 'tronque' : 'ok', b);
+    memo.rattachements = rattacherVoies(memo.index.voies, who); // A8, A14 : jointure à chaque tour, jamais persistée dans le fichier d'index
+    return rapportDe(b.tronque ? 'tronque' : 'ok', { ...b, rattachees: [...memo.rattachements.values()].filter(Boolean).length });
   } catch { return rapportDe('erreur'); }
 }

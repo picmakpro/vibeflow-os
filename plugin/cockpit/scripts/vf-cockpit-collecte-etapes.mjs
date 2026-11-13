@@ -34,6 +34,6 @@ export function etapeTour({ racine, sortie, scriptsDir, home, memo = creerMemoir
   }
   let index;
   const VIDE = { etat: 'erreur', tronque: false, voies: 0, formeInconnue: 0, evinces: 0 };
-  try { index = etapeIndex({ racine, sortie, home, memo, maintenant, sansIndex }); } catch { erreurs.push('index'); index = VIDE; }
+  try { index = etapeIndex({ racine, sortie, home, memo, who: equipe.workers, maintenant, sansIndex }); } catch { erreurs.push('index'); index = VIDE; }
   return { verrous, equipe, erreurs, dureeMs: Math.max(1, Date.now() - t0), index };
 }

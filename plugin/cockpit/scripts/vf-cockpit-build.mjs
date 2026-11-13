@@ -12,6 +12,7 @@ import { read as lireGarde, lireConfine, clipMot } from './vf-cockpit-planning.m
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { findLabRoot, engineDir, envGit, configFiltres, filtresEtat, MAX_FILTRES, outputDir, verifierSortie } from './vf-cockpit-paths.mjs';
+import { signatureDuLab, lireSignature, ecrireSignature } from './vf-cockpit-code-cache.mjs';
 import { OUTILS_ASSEMBLAGE, fichiersExecution } from './vf-cockpit-module.mjs';
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { enteteGit } from './vf-cockpit-git-entete.mjs';
@@ -137,7 +138,14 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd, annotate
   purgerCodeAncien(sortie); // avant toute écriture : la sortie n'est jamais source de code (P79-D-26)
 
   const ferme = etatMoteur(lab).ferme; // R6 : dit dans le résumé quand git du moteur reste fermé
-  run(eng.chemin, 'scan.mjs', lab); // le moteur refuse un dossier de sortie non vide qui n'est pas encore une carte : .gitignore après
+  // AB1 : un lab inchangé (fichiers, index git, environnement git et code du moteur) ne relance pas le scan ;
+  // la signature est posée APRÈS un scan réussi, effacée avant
+  const sigLab = signatureDuLab({ lab, moteur: eng.chemin, etatGit: JSON.stringify([ferme, filtresEtat(lab, lab).noms]) });
+  if (!(sigLab && sigLab === lireSignature(sortie) && fs.existsSync(path.join(sortie, '.cache', 'scan.json')))) {
+    fs.rmSync(path.join(sortie, '.cache', 'scan-signature.json'), { force: true });
+    run(eng.chemin, 'scan.mjs', lab); // le moteur refuse un dossier de sortie non vide qui n'est pas encore une carte : .gitignore après
+    if (sigLab) ecrireSignature(lab, sortie, sigLab);
+  }
   const arch = ecrireArchitecture({ lab, sortie });
   const project = buildProjectGraph(lab);
   // travail récent : les deux dernières phases exécutées du jalon en cours (plans à SUMMARY)

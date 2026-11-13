@@ -533,7 +533,7 @@ const L = await imp(path.join(tests, 'collecte-labo.mjs')), W = await imp(path.j
 const bin = path.join(work, 'bin7'); fs.mkdirSync(bin, { recursive: true });
 fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\ncat "$(dirname "$0")/sortie.json"\n', { mode: 0o755 });
 process.env.PATH = bin + path.delimiter + process.env.PATH;
-const out = {}, lab = path.join(work, 'lab7-' + mode), home = path.join(work, 'home7-' + mode); L.creerLab(lab);
+const out = {}, racine = fs.mkdtempSync(path.join(work, 'l7-')), lab = path.join(racine, 'lab'), home = path.join(racine, 'home'); L.creerLab(lab); // un dossier neuf par passage (les mutants rejouent la même fixture)
 if (mode === 'motif') {
   const ids = { fail: 'fm-fail', stop: 'fm-stop', done: 'fm-done', live: 'fm-live' };
   for (const id of Object.values(ids)) L.ecrireSession(home, lab, id);

@@ -17,6 +17,7 @@ import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
 import { signatureGit } from './vf-cockpit-git-signature.mjs';
 import { creerCollecte } from './vf-cockpit-collecte.mjs';
 import { poser } from './vf-cockpit-instantane.mjs';
+import { whoSig } from './vf-cockpit-who-signature.mjs';
 
 const IGNORE = /(^|\/)\.git(\/|$)|\.tmp$|~$|\.swp$/;
 const POLL_MS = 2000, DEBOUNCE_MS = 300, HOLD_MS = 600, NET_MS = 5000;
@@ -48,8 +49,9 @@ const empreinte = (dir) => {
 };
 const changes = (a, b) => [...new Set([...a.keys(), ...b.keys()])].filter((k) => a.get(k) !== b.get(k));
 
-// signature de la liste « qui » (PU-G-162 : testable seule, déplacée hors de startLive sans changer son corps) : poussée seulement quand la liste change, pas à chaque seconde d'âge qui passe
-export const whoSig = (w) => JSON.stringify((w.workers || []).map((x) => [x.kind, x.id, x.tree, x.branch || '', !!x.stale, x.titre || '', x.task || '', x.parent || '', x.etat || '', x.action ? `${x.action.verbe} ${x.action.cible}` : '', x.rattachement ? [x.rattachement.etat, x.rattachement.dag, x.rattachement.noeud, x.rattachement.raison].join('|') : '']));
+// signature de la liste « qui » (PU-G-162, A17) : poussée seulement quand la liste change, pas à chaque seconde d'âge qui passe ;
+// le calcul vit dans vf-cockpit-who-signature.mjs, ré-exporté ici pour ses importeurs
+export { whoSig };
 
 // aClient : y a-t-il un onglet connecté au flux ? (AUDC-H2) Sans onglet, le filet ne collecte rien ; `reveil()` rattrape à la connexion. Défaut : toujours vrai (comportement d'avant).
 export function startLive({

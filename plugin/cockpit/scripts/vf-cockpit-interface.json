@@ -25,9 +25,11 @@
     },
     "vibeflow/cockpit-who@2": {
       "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "fenetre": "number", "busy": "boolean", "workers": "array", "sources": "object" },
+      "optionnels": ["sortisSilence"],
       "travailleur": {
         "requis": ["kind", "id", "tree", "source"],
-        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "action", "rattachement", "enCours"],
+        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "finMotif", "action", "rattachement", "enCours"],
+        "motifsFin": ["echec", "arret"],
         "etats": ["actif", "en-attente", "au-repos", "attend", "termine"]
       },
       "rattachement": {
@@ -133,6 +135,8 @@
       "description": "sortie de `claude agents --json` (AUDC-V8) : source de référence de l'état des sessions, lue derrière ce contrat de forme (AUDC-Q4) ; les transcripts en sont le repli quand la commande est absente, en échec, trop lente ou de forme inattendue",
       "cleSession": "sessionId",
       "etats": { "working": "actif", "blocked": "attend", "done": "termine", "failed": "termine", "stopped": "termine" },
+      "motifs": { "failed": "echec", "stopped": "arret" },
+      "motifsDit": "cause d'une session finie, jamais d'un état vivant : `failed` donne `echec`, `stopped` donne `arret`, `done` aucune ; elle sort en `finMotif` du travailleur (l'état reste `termine`)",
       "statuts": { "busy": "actif", "waiting": "attend", "idle": "au-repos" }
     },
     "transcriptTitre": {
