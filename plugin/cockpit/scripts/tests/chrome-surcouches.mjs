@@ -11,7 +11,7 @@ const SEL = "a[href], button, input, select, textarea, summary, [tabindex]";
 
 // posé avant tout script de la page : journal des écouteurs (type, capture, cible, fichier de l'extension qui l'a posé) + écouteur du « cas interdit »
 function espion() {
-  window.__ec = []; window.__interdit = []; window.__su6 = null; // __su6 : posée AVANT toute portée d'onglet, donc jamais défaite par la coquille
+  window.__ec = []; window.__interdit = []; window.__su6 = null; window.__su6t = null; // __su6 : posée AVANT toute portée d'onglet, donc jamais défaite par la coquille
   const nom = () => {
     const c = document.currentScript; if (!c) return '';
     if (c.src) return c.src.split('/').pop();
@@ -178,7 +178,7 @@ await executer(chrome, async (s) => {
   if (veut('su6')) { // coquille de la 79 : la pile est un persistant ; deux allers-retours Code / Projet ne la recréent pas, ne doublent pas son écouteur
     const r = {}; const tiroir = "document.getElementById('vf-git-tiroir')";
     await charger('index.html', racineTerm || racine);
-    await s.ev('window.__su6 = window.VF_SURCOUCHES; window.VFGitTiroir.ouvrir(); 1');
+    await s.ev("window.__su6 = window.VF_SURCOUCHES; window.VFGitTiroir.ouvrir(); window.__su6t = document.getElementById('vf-git-tiroir'); 1");
     await s.attendre(`!!${tiroir} && !${tiroir}.hidden`, 'tiroir Git ouvert avant le départ');
     r.avant = await s.ev(`!!window.VF_SURCOUCHES && window.VF_SURCOUCHES.dessus() === ${tiroir}`);
     for (const nom of ['projet', 'code', 'projet', 'code']) { await s.ev(`VF_COQUILLE.chargerOnglet('${nom}').then(() => 1)`); await pause(300); }
@@ -187,7 +187,9 @@ await executer(chrome, async (s) => {
     r.pile = ec.filter((x) => x[N] === '00-vf-surcouches.js' && x.t === 'keydown' && x.cap && x.cible === 'window').length;
     r.identite = await s.ev('!!window.__su6 && window.VF_SURCOUCHES === window.__su6');
     r.onglet = await s.ev('window.VF_COQUILLE.onglet()');
-    r.retire = await s.ev(`${tiroir}.hidden === true && !window.VF_SURCOUCHES.ouverte() && window.VF_SURCOUCHES.dessus() === null`);
+    // contrat de 80-10 et 80-13 : le tiroir ouvert au départ est rouvert à l'arrivée ; l'ancien nœud est parti, il n'y en a qu'un, une seule entrée vivante dans la pile
+    r.retire = await s.ev(`!!window.__su6t && !window.__su6t.isConnected && document.querySelectorAll('#vf-git-tiroir').length === 1 && window.__su6t !== ${tiroir}
+      && ${tiroir}.hidden === false && window.VF_SURCOUCHES.dessus() === ${tiroir}`);
     if (racineTerm) { // le Terminal, posé une fois : ouvert (ou resté ouvert), un Échap dans sa région passe intact à la vue
       try {
         if (!(await s.ev("document.body.classList.contains('vf-term-ouvert')"))) {

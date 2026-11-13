@@ -156,7 +156,7 @@ echo "=== SU5 — les listes recopiées ont disparu (retrait 4) ==="
 assert_eq "SU5.1 — « #palette.open, #flowmenu.open » absent de 02, 73 et 77 (baseline : 1 dans chacun)" \
   "$(cd "$UI" && grep -lF '#palette.open, #flowmenu.open' 02-vf-telephone.js 73-vf-tiroir-travail.js 77-vf-git-tiroir.js | tr '\n' ',')" ""
 echo "=== SU6 — coquille de la 79 ==="
-ok "SU6.1 — deux allers-retours Code / Projet, tiroir Git ouvert avant le départ : VF_SURCOUCHES est le même objet, UN seul écouteur Échap en capture posé par la pile, le tiroir est retiré de la pile avec l'onglet" \
+ok "SU6.1 — deux allers-retours Code / Projet, tiroir Git ouvert avant le départ : VF_SURCOUCHES est le même objet, UN seul écouteur Échap en capture posé par la pile, le tiroir ouvert au départ est rouvert à l'arrivée en UN seul nœud neuf (l'ancien est parti), une seule entrée dans la pile" \
   "j.su6.avant && j.su6.identite && j.su6.pile === 1 && j.su6.onglet === 'code' && j.su6.retire"
 if [ "$(E 'j.su6.terminal && j.su6.terminal.sautee ? 1 : 0')" = "1" ]; then
   echo "  ⊘ SU6.1b SAUTÉ — Terminal non lancé : $(E 'j.su6.terminal.sautee') (non compté comme réussi)"
