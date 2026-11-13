@@ -95,6 +95,81 @@ assert_eq "T7.1 lien entrant de b" "$(E "$O1" vf-coder/b.md 'e.entrants')" '["vf
 assert_eq "T7.2 témoin positif : description et corps sont dans le fichier du lab" "$(cat "$L1/.claude/agent-memory/vf-coder/a.md" | grep -c 'DESC-MARQUEUR-76\|CORPS-MARQUEUR-76')" "2"
 assert_eq "T7.2 ni description ni corps dans la sortie (sortie non vide)" "$(SANS "$O1" DESC-MARQUEUR-76 CORPS-MARQUEUR-76)" "ok"
 
+echo "T7.9 — chemin du fichier de mémoire, relatif au dépôt"
+assert_eq "T7.9 témoin positif : git ls-files du lab liste ce chemin exact" "$(git -C "$L1" ls-files | grep -cx '.claude/agent-memory/vf-coder/a.md')" "1"
+assert_eq "T7.9 chemin = chemin relatif au dépôt" "$(E "$O1" vf-coder/a.md 'e.chemin')" ".claude/agent-memory/vf-coder/a.md"
+assert_eq "T7.9 aucun chemin absolu ni en ~/" "$(J "$O1" "j.entrees.every(e=>/^\\.claude\\/agent-memory\\/[^/]+\\/[^/]+\\.md\$/.test(e.chemin))")" "true"
+
+echo "T7.3 — mémoire locale exclue"
+L2="$WORK/l2"; lab_init "$L2"
+idx "$L2" vf-coder '- [A](a.md) — première'
+mem "$L2" vf-coder a.md entree-a project 'rien'
+mkdir -p "$L2/.claude/agent-memory-local/vf-coder"
+printf -- '---\nname: local\nmetadata:\n  type: project\n---\n\nLOCAL-MARQUEUR-76 [[entree-a]]\n' > "$L2/.claude/agent-memory-local/vf-coder/x.md"
+gc "$L2" 2026-01-10 'mémoire et locale'
+O2="$(V "$L2")"
+assert_eq "T7.3 témoin positif : git suit le fichier local" "$(git -C "$L2" ls-files | grep -c 'agent-memory-local/vf-coder/x.md')" "1"
+assert_eq "T7.3 aucune entrée sous agent-memory-local" "$(J "$O2" "j.entrees.filter(e=>e.chemin.includes('agent-memory-local')).length")" "0"
+assert_eq "T7.3 marqueur local absent de la sortie" "$(SANS "$O2" LOCAL-MARQUEUR-76 agent-memory-local)" "ok"
+assert_eq "T7.3 la mémoire locale n'ajoute aucun lien entrant" "$(E "$O2" vf-coder/a.md 'e.entrants')" "[]"
+
+echo "T7.4 — lien symbolique suivi qui sort du lab"
+L3="$WORK/l3"; lab_init "$L3"; mkdir -p "$WORK/hors" "$L3/dedans"
+printf -- '---\nname: HORS-MARQUEUR-76\nmetadata:\n  type: project\n---\n\n[[HORS-MARQUEUR-76]]\n' > "$WORK/hors/hors.md"
+printf -- '---\nname: DANS-LE-LAB-76\nmetadata:\n  type: project\n---\n\ncorps\n' > "$L3/dedans/dans.md"
+idx "$L3" vf-coder '- [A](a.md) — première'
+mem "$L3" vf-coder a.md entree-a project 'rien'
+ln -s "$WORK/hors/hors.md" "$L3/.claude/agent-memory/vf-coder/lien.md"
+ln -s "$L3/dedans/dans.md" "$L3/.claude/agent-memory/vf-coder/voisin.md"
+gc "$L3" 2026-01-10 'liens symboliques'
+O3="$(V "$L3")"
+assert_eq "T7.4 témoin positif : le lien rend le marqueur dans le shell" "$(cat "$L3/.claude/agent-memory/vf-coder/lien.md" | grep -c HORS-MARQUEUR-76)" "2"
+assert_eq "T7.4 marqueur du fichier hors du lab absent de la sortie entière" "$(SANS "$O3" HORS-MARQUEUR-76)" "ok"
+assert_eq "T7.4 l'entrée du lien, si listée, n'a ni name ni lien" "$(E "$O3" vf-coder/lien.md '[e.name,e.sortants.length]')" "[null,0]"
+assert_eq "T7.4 témoin positif : un lien vers un fichier du lab est lu" "$(E "$O3" vf-coder/voisin.md 'e.name')" "DANS-LE-LAB-76"
+
+echo "T7.5 — jamais de chemin du poste"
+L4="$WORK/l4"; lab_init "$L4"
+idx "$L4" vf-coder '- [A](a.md) — première'
+mem "$L4" vf-coder a.md entree-a project "lab $L4/docs/z.md, ~/.claude/x.md et $HOME/.claude/y.md"
+gc "$L4" 2026-01-10 'chemins du poste'
+O4="$(V "$L4")"
+assert_eq "T7.5 témoin positif : les trois chemins sont dans le fichier" "$(grep -c -e "$L4/docs/z.md" -e '~/.claude/x.md' -e "$HOME/.claude/y.md" "$L4/.claude/agent-memory/vf-coder/a.md")" "1"
+assert_eq "T7.5 aucun des trois dans la sortie" "$(SANS "$O4" "$L4" '~/.claude/x.md' "$HOME" "$WORK")" "ok"
+
+echo "T7.6 — .claude/ ignoré : compté, jamais nommé"
+L5="$WORK/l5"; lab_init "$L5"; printf '.claude/\n' > "$L5/.gitignore"; printf 'x\n' > "$L5/readme.txt"
+mkdir -p "$L5/.claude/agent-memory/vf-coder"; for n in UN DEUX TROIS; do printf -- '---\nname: n\n---\n' > "$L5/.claude/agent-memory/vf-coder/NONSUIVI-$n.md"; done
+gc "$L5" 2026-01-10 'ignoré'
+O5="$(V "$L5")"
+assert_eq "T7.6 témoin positif : le dossier contient trois noms" "$(ls "$L5/.claude/agent-memory/vf-coder" | grep -c NONSUIVI)" "3"
+assert_eq "T7.6 aucun fichier suivi : aucune entrée" "$(J "$O5" "j.entrees.length")" "0"
+assert_eq "T7.6 trois fichiers non suivis comptés" "$(J "$O5" "j.nonSuivis.n")" "3"
+assert_eq "T7.6 aucun des trois noms dans la sortie" "$(SANS "$O5" NONSUIVI-UN NONSUIVI-DEUX NONSUIVI-TROIS)" "ok"
+
+echo "T7.7 — jour du dernier commit, nombres de liens"
+L6="$WORK/l6"; lab_init "$L6"
+idx "$L6" vf-coder '- [A](a.md) [B](b.md) [C](c.md)'
+mem "$L6" vf-coder a.md entree-a project 'voir [[entree-b]] et [[entree-c]] et encore [[entree-b]]'
+mem "$L6" vf-coder b.md entree-b project 'rien'
+mem "$L6" vf-coder c.md entree-c project 'rien'
+gc "$L6" 2026-01-01 'premier'
+mem "$L6" vf-coder a.md entree-a project 'voir [[entree-b]] et [[entree-c]] et encore [[entree-b]] (modifié)'
+gc "$L6" 2026-03-05 'second'
+O6="$(V "$L6")"
+assert_eq "T7.7 entrée modifiée : jour du second commit" "$(E "$O6" vf-coder/a.md 'e.jour')" "2026-03-05"
+assert_eq "T7.7 entrée intacte : jour du premier commit" "$(E "$O6" vf-coder/b.md 'e.jour')" "2026-01-01"
+assert_eq "T7.7 nombre de liens sortants (une cible citée deux fois compte une fois)" "$(E "$O6" vf-coder/a.md 'e.nbSortants')" "2"
+assert_eq "T7.7 nombre de liens entrants" "$(E "$O6" vf-coder/b.md 'e.nbEntrants')" "1"
+
+echo "T7.8 — borne"
+L7="$WORK/l7"; lab_init "$L7"
+idx "$L7" vf-coder '- [A](a.md)'
+for n in a b c d; do mem "$L7" vf-coder "$n.md" "entree-$n" project 'rien'; done
+gc "$L7" 2026-01-10 'quatre'
+assert_eq "T7.8 sans borne : quatre entrées, non tronqué" "$(J "$(V "$L7")" "[j.entrees.length,j.tronque]")" "[4,false]"
+assert_eq "T7.8 max 2 : deux entrées lues, tronqué" "$(J "$(V "$L7" 2)" "[j.entrees.length,j.tronque]")" "[2,true]"
+
 echo
 echo "=== Bilan : $PASS passés, $FAIL échoués ==="
 [ "$FAIL" -eq 0 ]

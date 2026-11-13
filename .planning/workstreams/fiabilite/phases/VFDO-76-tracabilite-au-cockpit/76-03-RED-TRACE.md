@@ -16,3 +16,15 @@ Le harnais attrape l'échec d'import des modules absents et imprime `{"erreur":"
   ❌ FAIL — T7.2 ni description ni corps dans la sortie (sortie non vide) — attendu: [ok] obtenu: [vide]
 === Bilan : 1 passés, 7 échoués ===
 ```
+
+## Tâche 2 — T7.3 à T7.9 (code de la tâche 1 en place)
+
+Seuls les nombres de liens (T7.7) manquaient au code de la tâche 1 : le module git a été écrit complet dès la tâche 1 (filtre de profondeur, comptes des non suivis, borne, chemin
+relatif), et le harnais lit sous `lireConfine`, de sorte que T7.3 à T7.6, T7.8 et T7.9 sont verts d'emblée. Pas de mutant (régime allégé, plan non marqué pour audit de sécurité) :
+les témoins positifs de chaque « jamais » (fichier local suivi par git, lien rendant le marqueur au shell, trois noms listés par `ls`) sont dans la suite.
+
+```
+  ❌ FAIL — T7.7 nombre de liens sortants (une cible citée deux fois compte une fois) — attendu: [2] obtenu: [absent]
+  ❌ FAIL — T7.7 nombre de liens entrants — attendu: [1] obtenu: [absent]
+=== Bilan : 29 passés, 2 échoués ===
+```
