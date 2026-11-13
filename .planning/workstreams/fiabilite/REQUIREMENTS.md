@@ -1104,22 +1104,22 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | SYNT-08 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
 | SYNT-09 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; plans écrits, non exécutés) |
 | SYNT-10 | Phase 77 | Pending — 2026-11-11 (cadrage et planification ; dépend de la Phase 79 (C3) et de l'agrégat de la Phase 74) |
-| SOCL-01 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-02 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-03 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-04 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-05 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-06 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-07 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-08 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-09 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-10 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-11 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-12 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-13 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-14 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-15 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-16 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
+| SOCL-01 | Phase 79 | Complete — 2026-11-13, plan 79-01 (segment a) |
+| SOCL-02 | Phase 79 | Complete — 2026-11-13, plan 79-02 (segment a) |
+| SOCL-03 | Phase 79 | Complete — 2026-11-13, plan 79-03 (segment a) |
+| SOCL-04 | Phase 79 | Complete — 2026-11-13, plan 79-03 (segment a) |
+| SOCL-05 | Phase 79 | Complete — 2026-11-13, plan 79-04 (segment a) |
+| SOCL-06 | Phase 79 | Complete — 2026-11-13, plan 79-05 (segment a) |
+| SOCL-07 | Phase 79 | Complete — 2026-11-13, plan 79-06 (segment a) |
+| SOCL-08 | Phase 79 | Complete — 2026-11-13, plan 79-06 (segment a) |
+| SOCL-09 | Phase 79 | Complete — 2026-11-13, plan 79-06 (segment a) |
+| SOCL-10 | Phase 79 | Complete — 2026-11-13, plan 79-07 (segment a) |
+| SOCL-11 | Phase 79 | Complete — 2026-11-13, plan 79-07 (segment a) |
+| SOCL-12 | Phase 79 | Complete — 2026-11-13, plan 79-08 (segment a) |
+| SOCL-13 | Phase 79 | Complete — 2026-11-13, plan 79-09 (segment a) |
+| SOCL-14 | Phase 79 | Complete — 2026-11-13, plan 79-10 (segment a) |
+| SOCL-15 | Phase 79 | Complete — 2026-11-13, plan 79-11 (segment a) |
+| SOCL-16 | Phase 79 | Complete — 2026-11-13, plan 79-12 (segment a) |
 | SOCL-17 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | SOCL-18 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | SOCL-19 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
@@ -1129,7 +1129,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | SOCL-23 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | SOCL-24 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | SOCL-25 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-26 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
+| SOCL-26 | Phase 79 | Complete — 2026-11-13, plan 79-21 (segment a) |
 | SOCL-27 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
 | FORM-01 | Phase 80 | Pending |
 | FORM-02 | Phase 80 | Pending |
@@ -1863,22 +1863,22 @@ la Phase 80.
 ### Socle du cockpit (Phase 79 — posées au cadrage, 2026-11-11)
 > Dérivent de `79-CONTEXT.md` (contrats C0 à C6, amendements A1 à A55, décisions P79-D-01 à P79-D-33 (P79-D-33 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; les autres : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée) ; arbitrages en vigueur AUDC-Q2, Q4, Q5 du 2026-11-11). Famille `SOCL`, réservée au ROADMAP pour la Phase 79. Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin, rouge sur le code de la base `integration/cockpit-audit` avant le code.
 
-- [ ] **SOCL-01**: Fork assumé : `plugin/cockpit/amont/` retiré avec ses contrôles ; `VENDORED.txt` réduit à l'origine, à la sentinelle du moteur et à l'inventaire du plafond ; le contrôle de confinement de l'agent ne saute plus en silence hors de `amont/` (Q11.0) (AUDC-H5, P79-D-07).
-- [ ] **SOCL-02**: Une aide commune `socle-serveur.sh` lance, attend, interroge et arrête le serveur dans les suites ; toutes les suites qui lançaient `<sortie>/serve.mjs` passent par elle et chaque serveur lancé reste vu par l'hygiène des suites (AUDC-AM7, A6, P79-D-23).
-- [ ] **SOCL-03**: Le registre des agents d'un verrou survit au relâchement (archive 24 h, plafond de lignes) et un verbe en lecture seule rend le dernier état de chaque agent avec son nœud ; `orphans` et `status` inchangés (AUDC-D5, P79-D-17).
-- [ ] **SOCL-04**: Le manager qui tient un verrou publie le résumé de son plan de mission (identifiants, dépendances, statuts, compartiment, phase ; jamais de texte libre) à côté du verrou, rendu par `status --all` (A16).
-- [ ] **SOCL-05**: La doctrine fait écrire le nœud dans chaque mandat sous la forme que lit le cockpit et publier le plan de mission ; aucun corps d'agent n'est modifié (AUDC-I37, P79-D-18).
-- [ ] **SOCL-06**: Une route GET `/api/vf/*` neuve s'ajoute par une ligne de table et une réponse gardée commune (contrôles C0, garde des clés interdites, `no-store`, 503) ; un annotateur du graphe Code s'inscrit d'une ligne (A10, A11, A27).
-- [ ] **SOCL-07**: Le serveur est lancé depuis le module avec la sortie en argument ; aucun code ni contrat n'est lu ou évalué depuis la sortie ; un code planté dans la sortie ne s'exécute jamais ; deux labs servis par le même module ne se confondent pas (AUDC-AM4, A-03, P79-D-08, P79-D-09).
-- [ ] **SOCL-08**: L'empreinte de relance couvre tout le code évalué du module ; `status` et `stop` voient un serveur orphelin sans `server.json` ; la version de Claude Code est lue sans bloquer le démarrage (AUDC-H3, D-M13, AB1, P79-D-10).
-- [ ] **SOCL-09**: Le confinement de l'agent « Demander » est remesuré avec les chemins du module (`79-MESURE-claude-p.md`) avant tout changement de sa liste ; un verdict non confinable remonte à Samuel (P79-D-09).
-- [ ] **SOCL-10**: Un chemin n'est jamais jugé autrement que par sa résolution physique complète (échec = dehors), par une fonction unique partagée par le socle et le moteur ; preuve générative avec témoin de couverture ; un lien vers une cible interne protégée est masqué comme sa cible (AUDC-A-02, D-M15, P79-D-11).
-- [ ] **SOCL-11**: Tout lancement de git par le socle vide tous les pilotes nommés déclarés, quelle que soit la sous-commande ; tout enfant shell qui lance git reçoit l'environnement git unique (AUDC-A-04, P79-D-11).
-- [ ] **SOCL-12**: Index incrémental des transcripts `cockpit-index@1` (C1) : lecture des seuls octets ajoutés, jetons dédoublonnés par message, segments typés, 24 h, sans cible ni texte, non fiable à la lecture ; contrat de forme étendu et revérifié (AUDC-I20, D9, P79-D-13).
-- [ ] **SOCL-13**: La collecte tourne hors de la boucle du serveur (p99 d'une requête < 50 ms pendant un tour et un remplissage d'index) ; registre du verrou lu pour le rattachement ; cache du scan ; verrous projetés en liste blanche dans le flux ; `sortisSilence` et `finMotif` (AUDC-H2, A15, A17, A20, P79-D-12).
-- [ ] **SOCL-14**: Les chaînes du moteur sont traduites au point d'émission ; plus aucun observateur global ne réécrit une donnée du lab ; `?lang=en` rend les libellés sources (AUDC-H4, P79-D-16, P79-D-24).
-- [ ] **SOCL-15**: Plafond de 160 colonnes en cliquet par fichier ; le code navigateur sérialisé côté serveur est rangé en fichiers, injection toujours conditionnée par `--terminal` (AUDC-AM5, P79-D-19).
-- [ ] **SOCL-16**: `GET /api/vf/state` (C2) sert l'instantané d'une collecte unique ; `vf-signal` le lit quand un serveur du lab vit et garde son émetteur sinon ; battement `vie` nommé (AUDC-I19, AM1, D-M2).
+- [x] **SOCL-01**: Fork assumé : `plugin/cockpit/amont/` retiré avec ses contrôles ; `VENDORED.txt` réduit à l'origine, à la sentinelle du moteur et à l'inventaire du plafond ; le contrôle de confinement de l'agent ne saute plus en silence hors de `amont/` (Q11.0) (AUDC-H5, P79-D-07).
+- [x] **SOCL-02**: Une aide commune `socle-serveur.sh` lance, attend, interroge et arrête le serveur dans les suites ; toutes les suites qui lançaient `<sortie>/serve.mjs` passent par elle et chaque serveur lancé reste vu par l'hygiène des suites (AUDC-AM7, A6, P79-D-23).
+- [x] **SOCL-03**: Le registre des agents d'un verrou survit au relâchement (archive 24 h, plafond de lignes) et un verbe en lecture seule rend le dernier état de chaque agent avec son nœud ; `orphans` et `status` inchangés (AUDC-D5, P79-D-17).
+- [x] **SOCL-04**: Le manager qui tient un verrou publie le résumé de son plan de mission (identifiants, dépendances, statuts, compartiment, phase ; jamais de texte libre) à côté du verrou, rendu par `status --all` (A16).
+- [x] **SOCL-05**: La doctrine fait écrire le nœud dans chaque mandat sous la forme que lit le cockpit et publier le plan de mission ; aucun corps d'agent n'est modifié (AUDC-I37, P79-D-18).
+- [x] **SOCL-06**: Une route GET `/api/vf/*` neuve s'ajoute par une ligne de table et une réponse gardée commune (contrôles C0, garde des clés interdites, `no-store`, 503) ; un annotateur du graphe Code s'inscrit d'une ligne (A10, A11, A27).
+- [x] **SOCL-07**: Le serveur est lancé depuis le module avec la sortie en argument ; aucun code ni contrat n'est lu ou évalué depuis la sortie ; un code planté dans la sortie ne s'exécute jamais ; deux labs servis par le même module ne se confondent pas (AUDC-AM4, A-03, P79-D-08, P79-D-09).
+- [x] **SOCL-08**: L'empreinte de relance couvre tout le code évalué du module ; `status` et `stop` voient un serveur orphelin sans `server.json` ; la version de Claude Code est lue sans bloquer le démarrage (AUDC-H3, D-M13, AB1, P79-D-10).
+- [x] **SOCL-09**: Le confinement de l'agent « Demander » est remesuré avec les chemins du module (`79-MESURE-claude-p.md`) avant tout changement de sa liste ; un verdict non confinable remonte à Samuel (P79-D-09).
+- [x] **SOCL-10**: Un chemin n'est jamais jugé autrement que par sa résolution physique complète (échec = dehors), par une fonction unique partagée par le socle et le moteur ; preuve générative avec témoin de couverture ; un lien vers une cible interne protégée est masqué comme sa cible (AUDC-A-02, D-M15, P79-D-11).
+- [x] **SOCL-11**: Tout lancement de git par le socle vide tous les pilotes nommés déclarés, quelle que soit la sous-commande ; tout enfant shell qui lance git reçoit l'environnement git unique (AUDC-A-04, P79-D-11).
+- [x] **SOCL-12**: Index incrémental des transcripts `cockpit-index@1` (C1) : lecture des seuls octets ajoutés, jetons dédoublonnés par message, segments typés, 24 h, sans cible ni texte, non fiable à la lecture ; contrat de forme étendu et revérifié (AUDC-I20, D9, P79-D-13).
+- [x] **SOCL-13**: La collecte tourne hors de la boucle du serveur (p99 d'une requête < 50 ms pendant un tour et un remplissage d'index) ; registre du verrou lu pour le rattachement ; cache du scan ; verrous projetés en liste blanche dans le flux ; `sortisSilence` et `finMotif` (AUDC-H2, A15, A17, A20, P79-D-12).
+- [x] **SOCL-14**: Les chaînes du moteur sont traduites au point d'émission ; plus aucun observateur global ne réécrit une donnée du lab ; `?lang=en` rend les libellés sources (AUDC-H4, P79-D-16, P79-D-24).
+- [x] **SOCL-15**: Plafond de 160 colonnes en cliquet par fichier ; le code navigateur sérialisé côté serveur est rangé en fichiers, injection toujours conditionnée par `--terminal` (AUDC-AM5, P79-D-19).
+- [x] **SOCL-16**: `GET /api/vf/state` (C2) sert l'instantané d'une collecte unique ; `vf-signal` le lit quand un serveur du lab vit et garde son émetteur sinon ; battement `vie` nommé (AUDC-I19, AM1, D-M2).
 - [ ] **SOCL-17**: `GET /api/vf/frise` (C3) et l'événement `frise` ; `cibles` en mémoire, réduites, sur le chemin réel ; fenêtre de 24 h (AUDC-I20, A21-A24, A28).
 - [ ] **SOCL-18**: Un seul flux d'événements par navigateur et par lab, partagé entre les onglets, reprise sans rechargement à la fermeture de l'onglet élu ; veille de silence de 45 s (AUDC-H1, I22, D-M2, P79-D-14).
 - [ ] **SOCL-19**: `GET /api/vf/graphe` (C5) et l'événement `graphe` ; le serveur ne réécrit plus `project.html` ; la page Équipe n'est plus reconstruite par requête (AUDC-AM1, I31, A5, A29).
@@ -1888,7 +1888,7 @@ la Phase 80.
 - [ ] **SOCL-23**: Ni l'index, ni l'état, ni la frise, ni les cibles, ni les verrous, ni le plan de mission publié n'entrent dans l'export autonome ; témoin à marqueur avec témoin positif (A25).
 - [ ] **SOCL-24**: Journal des attentes par hook `command` (I18 réduit, P79-D-22), précédé d'une sonde qui peut le rendre inutile ; jamais de commande, de texte ni de chemin dans le fichier.
 - [ ] **SOCL-25**: Documentation du module : README (code jamais lu depuis la sortie, limite de la pose projet, CSP, `vf-signal`), CHANGELOG, version mineure ; un ajout, un retrait nommés (P79-D-27).
-- [ ] **SOCL-26**: La correspondance de motifs du moteur a un coût borné, au point unique, quelle que soit l'entrée fournie par le lab (motif à plusieurs `**`, chemin très long) ; preuve générative de croissance au plus linéaire (constat de la Phase 75, P79-D-32).
+- [x] **SOCL-26**: La correspondance de motifs du moteur a un coût borné, au point unique, quelle que soit l'entrée fournie par le lab (motif à plusieurs `**`, chemin très long) ; preuve générative de croissance au plus linéaire (constat de la Phase 75, P79-D-32).
 - [ ] **SOCL-27**: `/api/vf/transcript` et `/api/vf/doing` retrouvent l'agent dans la table en mémoire de la collecte et lisent le fichier sans bloquer la boucle : N requêtes ne déclenchent aucune collecte ; aucun chemin ne sort, y compris sur le chemin d'erreur (AUDC-H2, A48, A50).
 
 ### Trois onglets, trois formes (Phase 80 — posées au cadrage, 2026-11-11)
