@@ -12,7 +12,11 @@ await executer(chrome, async (s) => {
   const vue = (w, h) => s.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false });
   const lireVue = () => s.ev("JSON.stringify({ c: VibeFlow.state.container, n: document.querySelectorAll('#viewport .node').length })");
   const charger = async (page, nom) => {
-    await s.naviguer(`${racine}/${page}?lang=en`); await s.attendre(PRET, `page prête (${nom})`);
+    // 79-16 : si la coquille ne se dit jamais prête, l'échec porte l'état de la page (diagnostic d'une panne vue seulement en CI, aucune assertion touchée)
+    try { await s.naviguer(`${racine}/${page}?lang=en`); } catch (e) {
+      let d = 'état illisible'; try { d = await s.ev("JSON.stringify({ href: location.href, rs: document.readyState, pret: document.documentElement.dataset.vfPret, etat: window.VF_COQUILLE && VF_COQUILLE.etat(), moteur: !!window.VibeFlow, erreurs: window.__err, scripts: document.scripts.length, t: Math.round(performance.now()) })"); } catch {}
+      throw new Error(`${e.message} — ${d}`); }
+    await s.attendre(PRET, `page prête (${nom})`);
     await s.attendre("!!document.querySelector('#viewport .node')", `cartes (${nom})`); await s.attendre(VUE_POSEE, `vue posée (${nom})`); await stabiliser(lireVue, { pas: 120, max: 5000 });
     // la visite guidée s'ouvre au premier passage (profil jetable) : Échap la ferme, pour ne mesurer que la page
     await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
@@ -24,6 +28,7 @@ await executer(chrome, async (s) => {
   // Le calcul (ELK) tourne sur le fil principal : tant qu'il dure, plus rien ne se peint. La sonde s'installe avant les scripts de la page,
   // enveloppe ELK.prototype.layout et relève, À L'INSTANT où le calcul démarre, l'état de #loading et le nombre d'images produites depuis qu'il est allumé.
   await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    window.__err = []; addEventListener('error', (e) => window.__err.push(String(e.message) + ' ' + (e.filename || (e.target && e.target.src) || '')), true); addEventListener('unhandledrejection', (e) => window.__err.push('rejet ' + String(e.reason && e.reason.message || e.reason)));
     window.__img = 0; const tic = () => { window.__img++; requestAnimationFrame(tic); }; requestAnimationFrame(tic);
     new MutationObserver((ms) => { for (const m of ms) { const e = m.target; if (e.id === 'loading' && e.classList.contains('on') && window.__m7 && window.__m7.allume === undefined) window.__m7.allume = window.__img; } })
       .observe(document, { attributes: true, attributeFilter: ['class'], subtree: true });
