@@ -27,3 +27,13 @@ Verts sur la base, notés comme témoins : SF2.0, SF2.1 (14 genres déclenchés)
 
 S2.5 reste verte à vide sur la base (le détail anglais ne porte pas la phrase française) : elle garde sa force après la traduction (la phrase d alarme ne doit pas apparaître dans le détail de test).
 
+## Mutants (serveur lancé sur une copie du module faite par cockpit_module_copie ; 5 = copie non chargée = échec)
+- ✅ PASS — M.RESTE-ANGLAIS — le serveur charge la copie mutée (cockpit_lancer rend 0, jamais 5)
+- ✅ PASS — M-RESTE-ANGLAIS — le mutant rougit : SF2.1c voit le gabarit rendu à l'anglais
+- ✅ PASS — M.NOM-PROPRE-TRADUIT — le serveur charge la copie mutée (cockpit_lancer rend 0, jamais 5)
+- ✅ PASS — M-NOM-PROPRE-TRADUIT — le mutant rougit : SF2.2c voit « Stripe » traduit
+- ✅ PASS — M.ECHAPPE — le serveur charge la copie mutée (cockpit_lancer rend 0, jamais 5)
+- ✅ PASS — M-ECHAPPE — le mutant rougit : SF2.3 voit un élément img et window.__p posé
+
+SF3.4 : empreintes cksum de health.mjs et 20-health.js égales avant et après la suite (dépôt jamais muté).
+Après le code : test-cockpit-sante-fr.sh 24/0, test-cockpit-sante.sh 50/0.

@@ -18,7 +18,10 @@ trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$TESTS/hygiene.sh"; vf_hyg_init
 . "$TESTS/socle-serveur.sh"
 PASS=0; FAIL=0
-assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
+assert_eq() {
+  if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi
+}
 assert_ne() { if [ "$2" != "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 (valeur interdite: [$3])"; FAIL=$((FAIL+1)); fi; }
 HOSTILE='<img src=x onerror=window.__p=1>.js'
 AWS="AKIA""QWERTY7890ZXCVBN"   # 20 caractères, format réel, entropie suffisante : aucune clé réelle
@@ -35,18 +38,22 @@ w('.planning/ROADMAP.md', '# Roadmap\n\n## Jalon A\n\n- [ ] **Phase 1: Socle** -
 app('tests/aws.test.js', `const k = "${aws}";\n`);
 app('src/aws.js', `const k = "${aws}";\nexport default k;\n`);
 app(`src/${hostile}`, `const k = "${aws}";\nexport default k;\n`);
-app('src/App.jsx', "import { createClient } from '@supabase/supabase-js';\nexport const c = createClient;\nexport const appel = () => fetch('http://localhost:3000/api');\n");
+app('src/App.jsx', "import { createClient } from '@supabase/supabase-js';\nexport const c = createClient;\n"
+  + "export const appel = () => fetch('http://localhost:3000/api');\n");
 app('src/main.jsx', "import App from './App.jsx';\nexport default App;\n");
 app('package.json', JSON.stringify({ name: 'demo', dependencies: { react: '18.0.0', 'react-dom': '18.0.0', vite: '5.0.0' } }));
 app('.env', `AWS_ACCESS_KEY_ID=${aws}\n`);
 app('.env.local', 'VITE_STRIPE_SECRET_KEY=zq81xk29vm44ab7782qq\n');
 app('supabase/migrations/001_init.sql', 'create table public.notes (id int primary key);\ncreate table public.posts (id int primary key, user_id uuid);\n'
   + 'alter table public.posts enable row level security;\ncreate policy "tout" on public.posts for all to anon using (true) with check (true);\n');
-app('firestore.rules', "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}\n");
+app('firestore.rules', "rules_version = '2';\nservice cloud.firestore {\n  match /databases/{database}/documents {\n"
+  + "    match /{document=**} {\n      allow read, write: if true;\n    }\n  }\n}\n");
 app('api/stripe.js', "const express = require('express');\nconst cors = require('cors');\nconst stripe = require('stripe')('x');\nconst app = express();\n"
-  + "app.post('/webhook/stripe', (req, res) => {\n  const event = req.body;\n  if (event.type === 'checkout.session.completed') { res.json({ ok: true }); }\n});\napp.use(cors());\nmodule.exports = app;\n");
+  + "app.post('/webhook/stripe', (req, res) => {\n  const event = req.body;\n"
+  + "  if (event.type === 'checkout.session.completed') { res.json({ ok: true }); }\n});\napp.use(cors());\nmodule.exports = app;\n");
 app('server/routes.py', "from flask import Flask\napp = Flask(__name__)\n@jwt_required\n@app.route('/users', methods=['POST'])\ndef users():\n    return 'x'\n"
-  + "@app.route('/orders', methods=['POST'])\n@jwt_required\ndef orders():\n    return 'ok'\n@app.route('/items', methods=['POST'])\ndef items():\n    return 'y'\n");
+  + "@app.route('/orders', methods=['POST'])\n@jwt_required\ndef orders():\n    return 'ok'\n"
+  + "@app.route('/items', methods=['POST'])\ndef items():\n    return 'y'\n");
 w('backend/api.py', "from flask import Flask\napp = Flask(__name__)\n@app.route('/things', methods=['POST'])\ndef things():\n    return 'y'\n");
 app('src/orphan.js', 'export const orphan = 1;\n');
 app('src/big.js', lignes(1200));
@@ -81,11 +88,13 @@ PRE='const strip=(s)=>String(s||"").replace(/`[^`]*`/g,"").replace(/"[^"]*"/g,""
 PRE="$PRE"'const TEM=/\b(the|your|anyone|probably|fake|files?|keys?|every|these|this|with|without)\b/i;const ang=(s)=>TEM.test(strip(s));'
 # les noms propres (service, fichier, variable) cités tels quels : liste des contrôles en échec
 NOMS="$PRE"'const par=(p)=>j.find((i)=>i.id.startsWith(p))||{};const la=(i,c,m)=>String(par(i)[c]||"").includes(m);const r=[];'
-NOMS="$NOMS"'if(!la("stripe-webhook:","title","Stripe"))r.push("Stripe");if(!la("firebase-rules:","title","Firebase"))r.push("Firebase");'
+NOMS="$NOMS"'if(!la("stripe-webhook:","detail","événements Stripe"))r.push("Stripe");if(!la("firebase-rules:","title","Firebase"))r.push("Firebase");'
 NOMS="$NOMS"'if(!la("rls:","detail","Supabase"))r.push("Supabase");if(!la("public-env","title","VITE_STRIPE_SECRET_KEY"))r.push("variable");'
 NOMS="$NOMS"'if(!la("secret:app/src/aws.js","title","aws.js"))r.push("fichier");'
 NOMS_FIX='if(!la("env-file:","fix",".gitignore")||!la("env-file:","fix",".env.example")||!la("env-file:","fix","git rm --cached"))r.push("env");'
-ATTENDU_GENRES="$(node -e 'const s=require("fs").readFileSync(process.argv[1],"utf8");console.log(JSON.stringify([...new Set([...s.matchAll(/\bid: .([a-z-]+)[:\x27]/g)].map((m)=>m[1]))].sort()))' "$SANTE")"
+GENRES_JS='const s=require("fs").readFileSync(process.argv[1],"utf8");'
+GENRES_JS="$GENRES_JS"'console.log(JSON.stringify([...new Set([...s.matchAll(/\bid: .([a-z-]+)[:\x27]/g)].map((m)=>m[1]))].sort()))'
+ATTENDU_GENRES="$(node -e "$GENRES_JS" "$SANTE")"
 FP_AVANT="$(cksum "$SANTE" "$UI")"
 
 LAB="$WORK/lab"; mkdir -p "$LAB"; node "$AUX/lab.mjs" "$LAB" "$AWS" "$HOSTILE"
@@ -102,39 +111,87 @@ assert_eq "SF2.1b — aucun mot témoin anglais dans title, detail, notes et fix
 assert_eq "SF2.2 — noms propres gardés tels quels : Stripe, Firebase, Supabase, variable, fichier" "$(lire "$WORK/genres.json" "$NOMS"'return r')" "[]"
 assert_eq "SF2.2b — le constat du fichier .env cite .gitignore, .env.example et git rm --cached" "$(lire "$WORK/genres.json" "$NOMS$NOMS_FIX"'return r')" "[]"
 
-CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do
+CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable \
+  chromium chromium-browser; do
   [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi
 done
 if [ -z "$CHROME" ]; then
   . "$TESTS/chrome-saut.sh"; vf_chrome_saut "  ⊘ SF1, SF2.3, SF3 SAUTÉS : aucun navigateur — le panneau servi n'est PAS vérifié, non compté comme réussi"
 else
   mkdir -p "$WORK/home/.claude/scripts"
-  printf '#!/usr/bin/env bash\ncase "$1" in status) echo %s ;; orphans) echo %s ;; esac\n' "'{\"locks\":[]}'" "'{\"orphans\":[]}'" > "$WORK/home/.claude/scripts/driver-lock.sh"
+  printf '#!/usr/bin/env bash\ncase "$1" in status) echo %s ;; orphans) echo %s ;; esac\n' "'{\"locks\":[]}'" "'{\"orphans\":[]}'" \
+    > "$WORK/home/.claude/scripts/driver-lock.sh"
   # lire_page <lab> <fichier de sortie> : lance le serveur (celui du module visé par COCKPIT_MODULE, sinon du dépôt), lit le panneau, arrête le serveur
   lire_page() {
     cockpit_lancer "$1" HOME="$WORK/home"; local rc=$? srv="${VF_PID:-}" port="${VF_PORT:-0}"
-    if [ "$rc" -eq 0 ]; then node "$TESTS/chrome-sante-fr.mjs" "$CHROME" "http://127.0.0.1:$port/index.html" > "$2" 2> "$2.err"; else echo '{"erreur":"serveur"}' > "$2"; fi
+    if [ "$rc" -eq 0 ]; then
+      node "$TESTS/chrome-sante-fr.mjs" "$CHROME" "http://127.0.0.1:$port/index.html" > "$2" 2> "$2.err"
+    else echo '{"erreur":"serveur"}' > "$2"; fi
     cockpit_arreter "$srv"; return "$rc"
   }
   echo "=== SF1 — un constat de clé en fichier de test, dans la page servie ==="
-  lire_page "$LAB" "$WORK/page.json"; [ -z "${KEEP_PAGE:-}" ] || cp "$WORK/page.json" "$KEEP_PAGE"; assert_eq "SF1.0 — le serveur du lab a démarré et le pilote a lu la page (aucune erreur nommée)" "$(lire "$WORK/page.json" 'j.erreur || "aucune"')" "aucune"
+  lire_page "$LAB" "$WORK/page.json"; [ -z "${KEEP_PAGE:-}" ] || cp "$WORK/page.json" "$KEEP_PAGE"
+  assert_eq "SF1.0 — le serveur du lab a démarré et le pilote a lu la page (aucune erreur nommée)" \
+    "$(lire "$WORK/page.json" 'j.erreur || "aucune"')" "aucune"
   CLE='j.donnees.find((i) => i.id === "secret:app/tests/aws.test.js")'
-  assert_eq "SF1.1 — le titre affiché est celui du collecteur, en français, et nomme aws.test.js" \
-    "$(lire "$WORK/page.json" "$PRE"'const d='"$CLE"';return [j.affiches.some((a) => a.titre === d.title), /aws\.test\.js/.test(d.title), !ang(d.title)]')" "[true,true,true]"
+  E11="${PRE}const d=$CLE;return [j.affiches.some((a) => a.titre === d.title), /aws\.test\.js/.test(d.title), !ang(d.title)]"
+  assert_eq "SF1.1 — le titre affiché est celui du collecteur, en français, et nomme aws.test.js" "$(lire "$WORK/page.json" "$E11")" "[true,true,true]"
   assert_eq "SF1.1b — le titre est exactement la forme attendue" "$(lire "$WORK/page.json" "$CLE"'.title')" "Une clé dans aws.test.js est probablement factice"
+  E12="${PRE}const d=$CLE;return [j.affiches.some((a) => a.detail === d.detail), j.invite === d.fix, !ang(d.detail), !ang(j.invite)]"
   assert_eq "SF1.2 — le détail affiché et l'invite (<pre>) sont ceux du collecteur et ne portent aucun mot témoin anglais" \
-    "$(lire "$WORK/page.json" "$PRE"'const d='"$CLE"';return [j.affiches.some((a) => a.detail === d.detail), j.invite === d.fix, !ang(d.detail), !ang(j.invite)]')" "[true,true,true,true]"
+    "$(lire "$WORK/page.json" "$E12")" "[true,true,true,true]"
   echo "=== SF2.3 — un nom de fichier hostile reste du texte ==="
   assert_eq "SF2.3 — le titre porte le nom en texte, aucun img dans le panneau, window.__p indéfini" \
     "$(lire "$WORK/page.json" '[String(j.hostile.titre).includes("'"$HOSTILE"'"), j.hostile.imgs, j.hostile.p]')" '[true,0,"undefined"]'
   echo "=== SF3 — affichage et introduction ==="
+  E31='const t=(l)=>JSON.stringify(l.sort());return [j.donnees.length > 10, t(j.affiches.map((a) => a.titre)) === t(j.donnees.map((d) => d.title)), '
+  E31="$E31"'t(j.affiches.map((a) => a.detail)) === t(j.donnees.map((d) => d.detail))]'
   assert_eq "SF3.1 — chaque constat français du collecteur traverse t.constat sans changement (titres et détails égaux, jamais vide)" \
-    "$(lire "$WORK/page.json" 'const t=(l)=>JSON.stringify(l.sort());return [j.donnees.length > 10, t(j.affiches.map((a) => a.titre)) === t(j.donnees.map((d) => d.title)), t(j.affiches.map((a) => a.detail)) === t(j.donnees.map((d) => d.detail))]')" "[true,true,true]"
-  INTRO="Nous avons cherché les clés laissées dans le code ou envoyées au navigateur, les données et les éléments de votre application accessibles à n'importe qui"
-  INTRO="$INTRO sur internet, les fichiers oubliés et les fichiers trop gros pour être modifiés sans risque. C'est un contrôle rapide, pas un audit de sécurité."
+    "$(lire "$WORK/page.json" "$E31")" "[true,true,true]"
+  INTRO="Nous avons cherché les clés laissées dans le code ou envoyées au navigateur, les données et les éléments de votre application"
+  INTRO="$INTRO accessibles à n'importe qui"
+  INTRO="$INTRO sur internet, les fichiers oubliés et les fichiers trop gros pour être modifiés sans risque."
+  INTRO="$INTRO C'est un contrôle rapide, pas un audit de sécurité."
   INTRO="$INTRO || Contrôles propres à ce que ce projet utilise : Supabase, Firebase, Stripe."
   assert_eq "SF3.2 — l'introduction du panneau, trois services, est le texte de la base (non retouchée)" "$(lire "$WORK/page.json" 'j.intro')" "$INTRO"
+
+  assert_eq "SF2.1c — la page servie : aucun mot témoin anglais dans title, detail et fix des constats lus" \
+    "$(lire "$WORK/page.json" "$PRE"'return j.donnees.filter((d) => ang(d.title) || ang(d.detail) || ang(d.fix)).map((d) => d.id)')" "[]"
+  assert_eq "SF2.2c — la page servie : noms propres gardés" "$(lire "$WORK/page.json" 'j=j.donnees;'"$NOMS"'return r')" "[]"
+  echo "=== M — mutants sur une COPIE du module (le serveur est lancé sur la copie ; 5 = copie non chargée = échec) ==="
+  cat > "$AUX/muter.mjs" <<'JS'
+// muter.mjs <fichier> <ancre> <remplacement> : remplace TOUTES les occurrences de l'ancre ; imprime « ok » ou « ancre-introuvable »
+import fs from 'node:fs';
+const [, , f, a, b] = process.argv; const s = fs.readFileSync(f, 'utf8');
+if (!s.includes(a)) { console.log('ancre-introuvable'); process.exit(0); }
+fs.writeFileSync(f, s.split(a).join(b)); console.log('ok');
+JS
+  # mutant <nom> <fichier relatif au module> <ancre> <remplacement> : lit la page servie par la copie mutée dans $WORK/m-<nom>.json
+  mutant() {
+    local nom="$1" copie labm ok rc
+    copie="$(cockpit_module_copie)" || { assert_eq "M.$nom — copie du module faite" "échec" "ok"; echo '{"erreur":"copie"}' > "$WORK/m-$nom.json"; return; }
+    ok="$(node "$AUX/muter.mjs" "$copie/$2" "$3" "$4")"
+    assert_eq "M.$nom — l'ancre existe dans la copie" "$ok" "ok"
+    labm="$WORK/lab-$nom"; cp -R "$LAB" "$labm"
+    node "$copie/scripts/vf-cockpit-build.mjs" "$labm" --quiet >/dev/null 2>&1
+    export COCKPIT_MODULE="$copie"; lire_page "$labm" "$WORK/m-$nom.json"; rc=$?; unset COCKPIT_MODULE
+    assert_eq "M.$nom — le serveur charge la copie mutée (cockpit_lancer rend 0, jamais 5)" "$rc" "0"
+  }
+  H="skills/cockpit-moteur/scripts/lib/health.mjs"
+  mutant RESTE-ANGLAIS "$H" "N’importe qui pourrait simuler un paiement Stripe dans " "Anyone could fake a Stripe payment in "
+  assert_ne "M-RESTE-ANGLAIS — le mutant rougit : SF2.1c voit le gabarit rendu à l'anglais" \
+    "$(lire "$WORK/m-RESTE-ANGLAIS.json" "$PRE"'return j.donnees.filter((d) => ang(d.title) || ang(d.detail) || ang(d.fix)).map((d) => d.id)')" "[]"
+  mutant NOM-PROPRE-TRADUIT "$H" "des événements Stripe (comme" "des événements Rayure (comme"
+  assert_ne "M-NOM-PROPRE-TRADUIT — le mutant rougit : SF2.2c voit « Stripe » traduit" \
+    "$(lire "$WORK/m-NOM-PROPRE-TRADUIT.json" 'j=j.donnees;'"$NOMS"'return r')" "[]"
+  mutant ECHAPPE "skills/cockpit-moteur/assets/ui/20-health.js" '${h(t.constat(issue.title))}' '${t.constat(issue.title)}'
+  assert_ne "M-ECHAPPE — le mutant rougit : SF2.3 voit un élément img et window.__p posé" \
+    "$(lire "$WORK/m-ECHAPPE.json" '[String(j.hostile.titre).includes("'"$HOSTILE"'"), j.hostile.imgs, j.hostile.p]')" '[true,0,"undefined"]'
 fi
+
+echo "=== SF3.4 — le dépôt n'est jamais muté ==="
+assert_eq "SF3.4 — empreintes de health.mjs et de 20-health.js égales avant et après la suite (aucun mutant n'écrit dans le dépôt)" \
+  "$(cksum "$SANTE" "$UI")" "$FP_AVANT"
 
 echo
 echo "=== Bilan : $PASS passés, $FAIL en échec ==="
