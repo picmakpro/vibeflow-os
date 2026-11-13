@@ -96,3 +96,34 @@ donc il figure à la fois dans une collision de branches de `/api/vf/activite` e
 Le correctif d'une fuite irait dans le module d'export de la 79 (hors plan) : aucune fuite constatée, rien à remonter. Vert : `30 PASS / 0 FAIL`, 95 s, `20` mutants rouges cumulés (4 + 13 + 2 de source + 1).
 Écart au plan : le plan voulait « une cible d'empreinte » dans les données ; une cible d'empreinte a toujours une carte (le radar ne rend que des chemins à carte), donc son nom est aussi dans `graph.json` et
 dans l'export légitime : elle ne peut pas servir de marqueur de fuite. Le nom de branche, lui, n'est pas une donnée exportée (retirée avec `vfGit`).
+
+## Correctifs d'audit (mandat de correction ciblée du manager) : F1 à F5
+
+Base du rouge : `d3ffa525`. Suite rejouée en `TOUT=1` sur une copie dont le module, le module des gardes et le contrat sont ceux de cette base : `29 PASS / 6 FAIL` (les
+quatre témoins neufs R19 à R22 et R6 rouges ; R21 par plantage : `creerRouteActivite` n'existe pas ; les mutants dont l'ancre n'existe pas sont « invalides », jamais des rouges).
+
+| Témoin | Attendu | Obtenu sur la base | Raison |
+|---|---|---|---|
+| R19 (F1) | `true\|ok,3000,true` (boucle libre, liste bornée) | `false\|ok,8000,` | le calcul des gardes gèle la boucle (écart de ticks > 250 ms) et sert 8 000 gardes sans borne |
+| R20 (F1) | `true\|tronque,0,true` | la lentille calcule tout | pas de plafond de travail |
+| R21 (F2) | réponse < 1 Mo, 10 noms, sérialisée une fois | cas levé (`creerRouteActivite` absente) | la sérialisation n'existe pas ; noms non bornés |
+| R22 (F3) | `indisponible,pret\|0\|true\|ok,ok,pret` | `indisponible,pret\|0\|false\|indisponible,ok,pret` | aucune reprise après l'échec |
+| R6 (F4) | `0,1,1,,0,true` | `0,1,1,,0,false` | `git ls-files` ne passe pas par l'option `binaire` : l'espion ne le voit pas |
+| R2b (F5) | `aucune` | vert (propriété déjà vraie) | le témoin par la propriété est neuf ; ses mutants (`import 'fs'`, `import('node:fs/promises')`, import d'un contrôle d'accès, lecture d'un en-tête) rougissent là où les grep d'origine ne les voient pas |
+
+Vert après correctif : `35 PASS / 0 FAIL`, 214 s, `35` mutants rouges (20 + 11 de cas + 4 de propriété). Mutants neufs, chacun rouge par la propriété :
+
+| Mutant | Propriété | Témoin |
+|---|---|---|
+| `gardes-sans-cession` | boucle libre pendant un calcul volumineux | R19 (écart de ticks mesuré 3 846 ms contre 26 ms) |
+| `gardes-sans-plafond` | plafond de travail : `tronque`, jamais une liste partielle | R20 |
+| `noms-par-tuple-non-bornes` | au plus 10 noms par tuple | R21 |
+| `serialisation-a-chaque-requete` | aucun `stringify` par requête une fois la dérivation faite | R21 |
+| `controle-vide`, `controle-integral` | squelette de contrôle = mêmes clés que la réponse et < 5 Ko | R21 |
+| `plafond-d-octets-retire` | un plafond d'octets mordu réduit et le dit | R21 |
+| `reprise-retiree`, `reprise-sans-delai` | reprise après le délai, jamais de tempête | R22 |
+| `contexte-des-gardes-relu-a-chaque-graphe` | le graphe seul qui change ne lance aucun git (survivait sur la base : l'espion ne voyait pas `ls-files`) | R6 |
+| `ls-files-hors-de-l-option-binaire` | toute invocation git passe par `binaire` | R6 |
+| `import-fs-sans-prefixe`, `import-dynamique-de-fs-promises`, `import-d-un-controle-d-acces`, `lecture-d-un-en-tete` | aucune lecture de fichier, aucun contrôle recopié, quelle que soit la forme | R2b |
+
+Deux erreurs de ma suite relevées et corrigées en route (prédicat de rouge inversé sur `gardes-sans-cession`, seuil de comptage de `stringify` trop haut) : les mutants avaient survécu, c'est ce qui les a montrées.

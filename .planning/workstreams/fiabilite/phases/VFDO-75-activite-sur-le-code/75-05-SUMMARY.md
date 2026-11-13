@@ -55,3 +55,12 @@ chaque garde porte un témoin rouge puis vert ET un mutant vu rouge (vingt mutan
 - `test-cockpit-lecture-fil.sh` : vert, 17 PASS, 1 s.
 - `test-cockpit-lancer-mode.sh` (balaie chaque route de `ROUTES` pour une sentinelle de secret) : vert, 113 PASS, 197 s.
 - `scripts/check-machine-paths.sh` : vert. `colonnes-cliquet.mjs verifier` : aucun de mes fichiers en écart. Temps total dans les suites : environ 310 s.
+
+## Correctifs d'audit
+
+- F1 (haut) : `calculerGardes` cède la main toutes les 8 ms et rend `tronque` au-delà de 30 millions de couples motif x fichier ; R19 (écart de ticks 26 ms, 3 846 ms sans cession) et R20.
+- F2 (moyen) : réponse bornée (10 noms par tuple, chemins de 300 caractères, listes plafonnées, 8 Mio au plus, chaque coupe dite : `tronque`, `marquesTronquees`, `radar.nomsTronques`, `cheminsEcartes`) ; sérialisée une fois par objet servi (`brut`) avec squelette de clés (`controle`) ; R21.
+- F3 (bas) : reprise après 60 s d'un échec git ou des gardes, une tentative par délai ; R22. F4 (bas) : `ls-files` passe par l'option `binaire` ; le graphe seul qui change ne lance aucun git (R6).
+- F5 (bas) : R2b et ses quatre mutants jugent la propriété (importe-t-on une lecture de fichier, un contrôle d'accès, un en-tête ?), les grep d'origine restent.
+- Schéma : `gardes.etat` gagne `tronque` ; champs `git.tronque`, `gardes.tronque`, `empreinte.marquesTronquees`, `radar.nomsTronques`, `radar.cheminsEcartes` ; raisons `chemins-ecartes`, `reponse-trop-grosse`. Fichier amont touché : `vf-cockpit-activite-gardes.mjs` (commit `fix(75-02)`).
+- Suites : route 35 PASS / 35 mutants rouges (214 s), gardes 25 PASS (9 s), routes 56 PASS (19 s) ; cliquet de colonnes sans écart sur mes fichiers.
