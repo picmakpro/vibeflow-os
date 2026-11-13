@@ -32,11 +32,13 @@ export async function jouer(chrome, port, mode, fichierExport) {
   await executer(chrome, async (s) => {
     const base = `http://127.0.0.1:${port}`, r = { mode }, erreurs = [];
     await s.send('Runtime.enable'); s.ecouter('Runtime.exceptionThrown', (p) => erreurs.push(String(p.exceptionDetails?.exception?.description || p.exceptionDetails?.text).slice(0, 160)));
+    await largeur(s, 1440); // poste de bureau : sous 1000 px le bouton d'en-tête vit dans le menu « ⋯ » et un panneau fermé s'ouvre en poussant la carte
     await s.send('Page.addScriptToEvaluateOnNewDocument', { source: AMORCE_ECOUTEURS + AMORCE_VISITE });
     const J = await journalReseau(s);
     await pages(s, base, r); if (fichierExport) await exportee(s, fichierExport, r);
     await s.naviguer(base + '/project.html'); await s.attendre(`!!${BTN}`, 'bouton Synthèse posé');
-    const stocks = `JSON.stringify([Object.keys(localStorage).sort(), Object.keys(sessionStorage).sort(), Object.entries(sessionStorage)])`, stock0 = await s.ev(stocks);
+    // la clé du viewer lui-même (vf-cockpit:panel, état ouvert/fermé du panneau, écrite à l'ouverture de TOUT panneau) est hors du périmètre de la Synthèse
+    const stocks = `JSON.stringify([Object.keys(localStorage).filter((k) => k !== 'vf-cockpit:panel').sort(), Object.keys(sessionStorage).sort(), Object.entries(sessionStorage)])`, stock0 = await s.ev(stocks);
     r.pre = await s.ev(`({ surOnglet: typeof window.VF_COQUILLE.surOnglet, lireJson: typeof window.VF_ETAT.lireJson, jeton: typeof window.VF_ETAT.jeton })`);
     r.bouton = await s.ev(FICHE_BTN); r.ligneAvant = await s.ev(`document.querySelectorAll('[data-vf-sy-resume]').length`);
     const vp = `(() => { const v = document.getElementById('viewport'); const b = v.getBoundingClientRect(); return JSON.stringify([b.x, b.y, b.width, b.height, v.getAttribute('transform')]); })()`;
@@ -54,7 +56,7 @@ export async function jouer(chrome, port, mode, fichierExport) {
     await attendreValeur(() => s.ev(`!${OUVERTE}`), (v) => v === true, { max: 3000 }); r.echapBouton = await s.ev(`({ ouverte: ${OUVERTE}, focus: ${FOCUS}.id })`);
     await s.ev(`${BTN}.click()`); await s.attendre(OUVERTE, 'ouverte'); await s.ev(`${BTN}.click()`); await attendreValeur(() => s.ev(`!${OUVERTE}`), (v) => v === true, { max: 3000 });
     r.basculeFerme = await s.ev(`({ ouverte: ${OUVERTE}, expanded: ${BTN}.getAttribute('aria-expanded') })`);
-    r.stockApres = (await s.ev(stocks)) === stock0; r.csp = s.violations.length;
+    const stock1 = await s.ev(stocks); r.stockApres = stock1 === stock0; r.stockDiag = [stock0, stock1]; r.csp = s.violations.length;
     r.fichier = await s.ev(`(async () => { const e = performance.getEntriesByType('resource').find((x) => /\\/74-vf-synthese\\.js(\\?|$)/.test(x.name)); if (!e) return null;
       const f = await fetch(e.name); return { statut: f.status, etag: !!f.headers.get('ETag') }; })()`);
     if (mode === 'temoin') await (await import('./chrome-synthese-temoin.mjs')).mesures(s, base, r, J);

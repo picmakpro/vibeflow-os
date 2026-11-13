@@ -52,7 +52,7 @@ export async function mesures(s, base, r, J) {
   await s.ev(`(() => { const n = ${SC}.graph.nodes.find((x) => x.kind === 'phase') || ${SC}.graph.nodes[0]; ${SC}.select(n.id); })()`);
   await attendreValeur(() => s.ev(`!${OUVERTE}`), (v) => v === true, { max: 3000 });
   r.selection = { synth: await s.ev(OUVERTE), largeurDetail: await s.ev(largeurPanneau), expanded: await s.ev(`${BTN}.getAttribute('aria-expanded')`), tiroirApres: await s.ev(git) };
-  await s.ev(`${SC}.closePanel()`); await pause(200);
+  await s.ev(`${SC}.select(null)`); await s.ev(`${SC}.closePanel()`); await pause(200); r.selection.deselect = await s.ev(`${SC}.state.selected === null`); // retour à l'aperçu
   // ---- W14 : mouvement réduit ----
   await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'reduce' }] }); await ouvrir(s);
   r.mouvement = await s.ev(`(() => { const l = [${BTN}, ...document.querySelectorAll('.vf-sy, .vf-sy *')].filter(Boolean).map((e) => { const c = getComputedStyle(e);
@@ -60,8 +60,8 @@ export async function mesures(s, base, r, J) {
   await s.send('Emulation.setEmulatedMedia', { features: [{ name: 'prefers-reduced-motion', value: 'no-preference' }] });
   // ---- W16 : cibles de 44 px (≤ 999 px), pas de débordement horizontal ----
   await fermer(s); await largeur(s, 800);
-  await s.ev(`(() => { const st = document.createElement('style'); st.id = 'sonde-visible-77'; st.textContent = '#hdr-ext > #btn-synthese { display: inline-flex !important }'; document.head.appendChild(st); })()`);
-  r.cibles = { bouton: await s.ev(`${BTN}.getBoundingClientRect().height`), ligne: (await ligneStable(s)).hauteur };
+  await s.ev(`(() => { const st = document.createElement('style'); st.id = 'sonde-visible-77'; st.textContent = '#hdr-ext > button#btn-synthese:not(#vf-lock) { display: inline-flex !important }'; document.head.appendChild(st); })()`);
+  r.ligne800 = await ligneStable(s); r.cibles = { bouton: await s.ev(`${BTN}.getBoundingClientRect().height`), ligne: r.ligne800.hauteur };
   await ouvrir(s); r.cibles.fermer = await s.ev(`document.querySelector('#panel .vf-sy .btn').getBoundingClientRect().height`);
   r.debordPanneau = [await s.ev(`(() => { const p = document.getElementById('panel'); return p.scrollWidth <= p.clientWidth; })()`)];
   await s.ev(`document.getElementById('sonde-visible-77').remove()`); await fermer(s);
@@ -74,7 +74,7 @@ export async function mesures(s, base, r, J) {
   }
   await largeur(s, 600); await s.ev(`document.getElementById('vf-plus').click()`); await s.attendre(`!!document.getElementById('vf-plus-menu')`, 'menu Plus d\'actions');
   r.menu = await s.ev(`[...document.querySelectorAll('#vf-plus-menu button')].filter((b) => /^Synthèse/.test(b.textContent.trim())).length`);
-  await s.ev(`document.getElementById('vf-plus').click()`); await s.send('Emulation.clearDeviceMetricsOverride'); await pause(300);
+  await s.ev(`document.getElementById('vf-plus').click()`); await largeur(s, 1440); await pause(300);
   // ---- deux thèmes : le titre se lit sur le fond du panneau ----
   r.themes = [];
   for (const th of ['light', 'dark']) { await s.ev(`document.documentElement.setAttribute('data-theme', ${JSON.stringify(th)})`); await ouvrir(s);

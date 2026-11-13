@@ -34,6 +34,7 @@ AJOUT assets/ui/72-vf-regie-style.js
 AJOUT assets/ui/73-vf-tiroir-travail.js
 AJOUT assets/ui/74-vf-synthese-calcul.js
 AJOUT assets/ui/74-vf-synthese-memoire.js
+AJOUT assets/ui/74-vf-synthese.js
 AJOUT assets/ui/75-vf-modele.js
 AJOUT assets/ui/76-vf-git-entete.js
 AJOUT assets/ui/77-vf-git-poignee.js
