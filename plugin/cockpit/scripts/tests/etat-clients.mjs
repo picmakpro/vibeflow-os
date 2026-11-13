@@ -48,7 +48,8 @@ if (mode === 'sse') {
   const [cas, copie, root, here, opts] = [a1, a2, a3, a4, JSON.parse(a5 || '{}')];
   const imp = (f) => import(pathToFileURL(path.join(copie, f)).href);
   setTimeout(() => process.exit(2), 60000).unref();
-  const D = (globalThis.__ETAT_DOUBLE ||= {});
+  await imp('vf-cockpit-live.mjs'); // le direct factice pose son état global avant tout
+  const D = globalThis.__ETAT_DOUBLE;
   const logs = [];
   const req = (port, p, { host, origin, token, method = 'GET' } = {}) => new Promise((resolve) => {
     const headers = { Host: host ?? `127.0.0.1:${port}` };

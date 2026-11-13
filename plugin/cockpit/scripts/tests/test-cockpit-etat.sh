@@ -109,6 +109,70 @@ EGAL="$(node -e "const fs=require('fs');$SANS const a=JSON.parse(fs.readFileSync
 IDS="$(node -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync('$WORK/signal-servi.json','utf8')),b=JSON.parse(fs.readFileSync('$WORK/signal-local.json','utf8'));const i=(x)=>((x.equipe||{}).workers||[]).map((w)=>w.id).sort().join(',');console.log(i(a)===i(b))" 2>/dev/null)"
 assert_eq "E1.3 — le signal servi est conforme au contrat (validateur indépendant) et égal, hors equipe et hors clés volatiles, à la collecte locale du même lab ; mêmes identifiants d'équipe" "$V13|$EGAL|$IDS" "OK|true|true"
 
+# ---- copies du module en processus (harnais) et mutants ----
+COPIE="$WORK/copie"
+copie_de() { # <destination> : les scripts et le contrat du dossier testé, le direct remplacé par le direct factice
+  rm -rf "$1"; mkdir -p "$1"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/vf-cockpit-interface.json "$1"/ || return 1; cp "$TESTS/etat-live-double.mjs" "$1/vf-cockpit-live.mjs"
+}
+mutcopie() { # <nom> <fichier> <expression sed> : copie de COPIE mutée ; imprime le dossier ; code 1 si la copie n'a pas changé, ou ne charge plus (jamais un rouge par plantage)
+  local d="$WORK/mut-$1"; rm -rf "$d"; cp -R "$COPIE" "$d" || return 1
+  cp "$d/$2" "$d/$2.avant" && sed "$3" "$d/$2.avant" > "$d/$2" || return 1
+  if cmp -s "$d/$2.avant" "$d/$2"; then echo "ancre absente : $1" >&2; return 1; fi
+  rm -f "$d/$2.avant"; node --check "$d/$2" 2>/dev/null || return 1
+  printf '%s\n' "$d"
+}
+copie_de "$COPIE"
+sig_h() { printf '{"signal":"%s"}' "$WORK/signal-servi.json"; }
+hn() { node "$TESTS/etat-clients.mjs" harnais "$1" "$2" "$LAB" "$LAB/.vibeflow/cockpit" "${3:-}" 2> "$WORK/h-$1.err" | tail -1; } # <cas> <copie> [options]
+# lance les scénarios de E2 sur une copie ; les sorties se rangent sous $WORK/e2-<préfixe>-<cas>.json
+lance_e2() { # <préfixe> <copie>
+  local p="$1" c="$2" v="$WORK/e2-$1-vide"; rm -rf "$v"; cp -R "$c" "$v"; echo '{"schemas":{}}' > "$v/vf-cockpit-interface.json"
+  for cas in acces nul pose interdit aucune-collecte sans-direct; do hn "$cas" "$c" "$(sig_h)" > "$WORK/e2-$p-$cas.json"; done
+  hn contrat "$v" "$(sig_h)" > "$WORK/e2-$p-contratvide.json"; hn contrat "$c" "$(sig_h)" > "$WORK/e2-$p-contratok.json"
+}
+rouges_e2() { # <préfixe> : identifiants de E2 qui rougissent, séparés par des espaces
+  local p="$1" f="$WORK/e2-$1" r=""
+  [ "$(jf "$f-acces.json" 'JSON.stringify(j)')" = '{"sans":403,"faux":403,"hote":403,"origine":403,"post":405,"projet":200,"code":200}' ] || r="$r E2.1"
+  [ "$(jf "$f-nul.json" 'j.status+"|"+j.signal+"|"+j.etat+"|"+j.cc')" = "200|null|en-cours|no-store" ] || r="$r E2.2"
+  [ "$(jf "$f-pose.json" 'j.s1+"|"+j.seq+"|"+j.s2+"|"+j.identiques+"|"+j.cles')" = "true|7|true|true|at,collecte,schema,seq,signal" ] || r="$r E2.3"
+  [ "$(jf "$f-contratvide.json" 'j.status+"|"+j.corps')|$(jf "$f-contratok.json" 'j.status')" = '503|{"erreur":"emission-refusee"}|200' ] || r="$r E2.4"
+  [ "$(jf "$f-interdit.json" 'j.status+"|"+j.corps+"|"+j.fuite+"|"+j.positif')" = '503|{"erreur":"emission-refusee"}|false|200' ] || r="$r E2.5"
+  [ "$(jf "$f-aucune-collecte.json" 'j.ko+"|"+j.reveil+"|"+j.pret+"|"+(j.etat>=1)+"|"+j.meme')" = "0|0|0|true|true" ] || r="$r E2.6"
+  [ "$(jf "$f-sans-direct.json" 'j.status+"|"+j.collecte.etat+"|"+j.collecte.mode+"|"+j.collecte.clients+"|"+j.signal')" = "200|indisponible|absent|1|null" ] || r="$r E2.7"
+  echo "${r# }"
+}
+echo "=== E2 — enveloppe : accès, garde, instantané nul, lecture mémoire seule ==="
+lance_e2 base "$COPIE"; R2="$(rouges_e2 base)"
+has_rouge() { case " $1 " in *" $2 "*) echo ko ;; *) echo ok ;; esac; }
+assert_eq "E2.1 — sans jeton 403, jeton faux 403, hôte étranger 403, origine étrangère 403, POST 405, jeton de la page Projet 200" "$(has_rouge "$R2" E2.1)" "ok"
+assert_eq "E2.2 — instantané nul et direct qui dit ok : 200, signal nul, collecte.etat en-cours (cohérence imposée), no-store" "$(has_rouge "$R2" E2.2)" "ok"
+assert_eq "E2.3 — un signal posé est servi tel quel avec le seq du direct ; un second poser est vu à la requête suivante ; deux requêtes sans pose : corps identique hors at" "$(has_rouge "$R2" E2.3)" "ok"
+assert_eq "E2.4 — contrat illisible : 503 emission-refusee (corps exact) ; témoin positif : le contrat intact rend 200" "$(has_rouge "$R2" E2.4)" "ok"
+assert_eq "E2.5 — clé fil à trois niveaux : 503 emission-refusee, marqueur absent de la réponse et du journal ; témoin positif : sans la clé, 200" "$(has_rouge "$R2" E2.5)" "ok"
+assert_eq "E2.6 — cinquante requêtes : zéro tour de collecte à la demande, zéro attente de première collecte, instantané inchangé ; témoin positif : etat() lu" "$(has_rouge "$R2" E2.6)" "ok"
+assert_eq "E2.7 — direct absent : 200, collecte indisponible, mode absent, clients = flux ouverts, signal nul" "$(has_rouge "$R2" E2.7)" "ok"
+
+echo "=== E3 — collecte en liste blanche (générative) ==="
+node "$TESTS/etat-propriete.mjs" collecte "$COPIE" > "$WORK/e3.json" 2>&1
+echo "  (graine=$(jf "$WORK/e3.json" 'j.graine'))"
+assert_eq "E3.1 — entrées hostiles de huit classes : cinq clés exactement, types et domaines, cohérence, aucun marqueur planté (témoin positif : planté dans au moins quatre classes)" "$(jf "$WORK/e3.json" 'JSON.stringify(j.ko)+"|"+j.positif')" "{}|true"
+assert_eq "E3.2 — couverture : chaque classe est tirée au moins 20 fois ; la fonction de couverture répond « dégénéré » sur une liste à une seule classe" "$(jf "$WORK/e3.json" 'j.couverture+"|"+j.degenere+"|"+j.n')" "ok|degenere|240"
+
+echo "=== mutants de E2 et E3 (copie du module, ancre exactement une fois) ==="
+mutant_e2() { # <nom> <fichier> <sed> <attendu E2> <attendu E3 : vide|ko|ko-couv>
+  local nom="$1" d x r3 r
+  d="$(mutcopie "$nom" "$2" "$3")"; local rc=$?
+  assert_eq "M-$nom.0 — l'ancre existe une fois, la copie diffère et charge (node --check)" "$rc" "0"
+  [ "$rc" = 0 ] || return
+  lance_e2 "m-$nom" "$d"; r="$(rouges_e2 "m-$nom")"
+  node "$TESTS/etat-propriete.mjs" collecte "$d" > "$WORK/e3-$nom.json" 2>&1; r3="$(jf "$WORK/e3-$nom.json" '(Object.keys(j.ko).length?"E3.1":"")+(j.couverture!=="ok"?" E3.2":"")')"
+  assert_eq "M-$nom — rouges de la copie : « $4${5:+ $5} » seuls" "$(echo "$r $r3" | xargs)" "$(echo "$4 ${5:-}" | xargs)"
+}
+mutant_e2 GARDE vf-cockpit-server.mjs 's/^const porteInterdit = .*/const porteInterdit = () => false;/' "E2.4 E2.5"
+mutant_e2 REVEIL vf-cockpit-state.mjs 's/ctx.live ? ctx.live.etat()/ctx.live ? (ctx.live.reveil(), ctx.live.etat())/' "E2.6"
+mutant_e2 COHERENCE vf-cockpit-state.mjs '/garde:state-coherence/d' "E2.2" "E3.1"
+mutant_e2 COLLECTE-RECOPIE vf-cockpit-state.mjs '/garde:state-liste-blanche/s/({ etat:/({ ...b, etat:/' "" "E3.1"
+
 cockpit_arreter
 vf_hyg_assert
 echo "Résultats : $PASS PASS / $FAIL FAIL"

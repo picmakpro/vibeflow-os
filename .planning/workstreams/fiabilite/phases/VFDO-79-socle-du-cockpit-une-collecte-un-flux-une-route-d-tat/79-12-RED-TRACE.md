@@ -40,3 +40,19 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-etat.sh` — sortie :
 - `test-cockpit-serveur.sh` : 89 PASS / 0 FAIL.
 - Compteur de suites : N = 217 relu avant l'ajout, 218 posé dans `README.md` et `README.fr.md` ; `scripts/check-version-sync.sh` vert.
 - Lignes : `vf-cockpit-server.mjs` 202 / 19 lignes de plus de 160 points de code ; `vf-cockpit-state.mjs` sous 150 lignes, 0 ligne de plus de 160.
+
+## Tâche 2 — l'enveloppe tenue
+
+Les témoins E2.1 à E2.7 et E3.1 à E3.2 sont écrits avant tout correctif ; joués sur l'état de la tâche 1, ils sont verts d'emblée : le lecteur de la tâche 1 est complet (cohérence, repli sans direct, liste blanche, aucune collecte à la demande). Leur capacité à rougir est établie par les quatre mutants ci-dessous (plan : « le lecteur de la tâche 1 est complet : ne rougissent alors que les assertions écrites avant lui » — aucune ne l'était).
+
+- `test-cockpit-etat.sh` : 25 PASS / 0 FAIL en 10 s. Propriété E3 : graine 1389251393 (rejouable par `VF_ETAT_GRAINE`), 240 tirages, huit classes hostiles à 30 tirages chacune (seuil 20), 4 classes au moins portent le marqueur planté (témoin positif) ; la fonction de couverture rend « degenere » sur une liste à une classe.
+- Suites rejouées : `routes` 0, `serveur` 0, `securite` 0, aucun saut.
+
+| Mutant | Ancre (une occurrence) | Substitution | `cmp` | Rouges obtenus | Raison |
+|---|---|---|---|---|---|
+| M-GARDE | `const porteInterdit = …` (serveur) | `const porteInterdit = () => false;` | copie différente | E2.4, E2.5 | un contrat vide et une clé `fil` sortent en 200 |
+| M-REVEIL | `ctx.live ? ctx.live.etat()` (lecteur) | appel de `reveil()` avant `etat()` | copie différente | E2.6 | le double compte un tour à la demande |
+| M-COHERENCE | ligne `garde:state-coherence` | ligne retirée | copie différente | E2.2, E3.1 | un instantané nul dit `ok` |
+| M-COLLECTE-RECOPIE | ligne `garde:state-liste-blanche` | `({ ...b, etat: …` | copie différente | E3.1 (E3.2 vert) | des clés d'entrée sortent de `collecte` |
+
+Chaque mutant : suffixe `.0` vert (ancre trouvée, copie différente, `node --check` vert) avant que le rouge soit mesuré ; rouges exactement ceux de la colonne, aucun autre.
