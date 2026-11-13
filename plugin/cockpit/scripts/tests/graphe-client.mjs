@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // graphe-client.mjs — aide de test-cockpit-graphe.sh (79-15) : un GET brut ou un flux d'événements, sans dépendance. Rien n'est évalué.
-//   get <port> <chemin> [jeton] [hôte] [Nom=valeur…]  écrit une ligne JSON { statut, entetes, corps } ; en-têtes supplémentaires en arguments
+//   get <port> <chemin> [jeton] [hôte] [Nom=valeur…]  écrit une ligne JSON { statut, entetes, corps } ; en-têtes supplémentaires en arguments ;
+//       GRAPHE_METHODE (méthode) et GRAPHE_CORPS (corps) en environnement
 //   sse <port> <jeton> <maxMs> <arret> <fichier>      une ligne JSON par événement ({ abs, event, data }) ; s'arrête sur l'événement <arret> ou après maxMs
 import http from 'node:http';
 import fs from 'node:fs';
@@ -15,6 +16,7 @@ if (mode === 'get') {
     res.on('end', () => { console.log(JSON.stringify({ statut: res.statusCode, entetes: res.headers, corps: Buffer.concat(morceaux).toString('utf8') })); });
   });
   req.on('error', (e) => { console.log(JSON.stringify({ statut: 0, erreur: e.message })); });
+  if (process.env.GRAPHE_CORPS) req.write(process.env.GRAPHE_CORPS); // corps d'une requête POST (GRAPHE_METHODE)
   req.end();
 } else if (mode === 'sse') {
   const [jeton, maxMs, arret, sortie] = [a1, a2, a3, reste[0]];

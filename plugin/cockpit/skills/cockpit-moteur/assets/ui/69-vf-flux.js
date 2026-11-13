@@ -14,6 +14,7 @@
   const EVENEMENTS = [ // garde:flux-evenements
     'etat',
     'frise',
+    'graphe',
     'git',
     'hello',
     'lock',

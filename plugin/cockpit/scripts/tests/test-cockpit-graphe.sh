@@ -280,6 +280,68 @@ G37=""; for o in code projet equipe; do G37="$G37 $(route "/api/vf/graphe?onglet
 assert_eq "G3.7 — contrat illisible (copie du module sans vf-cockpit-interface.json, serveur vivant : RL=$RL) : code, projet, equipe en 503 emission-refusee" "$RL|$(echo $G37)" "0|503/emission-refusee 503/emission-refusee 503/emission-refusee"
 cockpit_arreter
 
+
+echo "=== X — l'export autonome reste fermé à l'index, à l'état, à la frise, aux cibles, aux verrous et au plan publié (A25, SOCL-23) ==="
+MQ_IDX="MQ-A25-IDX"; MQ_CIB="MQ-A25-CIB"; MQ_VRR="MQ-A25-VRR"; MQ_PLN="MQ-A25-PLN"
+XLAB="$WORK/xlab"; node "$TESTS/frise-labo.mjs" lab "$XLAB"; XOUT="$XLAB/.vibeflow/cockpit"
+cat > "$AUX/xfab.mjs" <<'JS'
+// xfab.mjs <fixture> <home> <lab> <marqueur> : copie la session de la fixture d'index (79-08) avec ses sous-agents, jalon @LAB@ substitué, horodatages ramenés à « maintenant » (fenêtre de 24 h), rôle d'un sous-agent = marqueur
+import fs from 'node:fs'; import path from 'node:path';
+const [, , src, home, lab, marqueur] = process.argv;
+const base = path.join(src, 'projects', '-lab'), dst = path.join(home, '.claude', 'projects', '-lab');
+const lire = (d) => fs.readdirSync(d, { withFileTypes: true }).flatMap((e) => (e.isDirectory() ? lire(path.join(d, e.name)) : [path.join(d, e.name)]));
+const fichiers = lire(base).filter((f) => /sess-aaaa0001/.test(f));
+const ts = []; for (const f of fichiers) for (const m of fs.readFileSync(f, 'utf8').matchAll(/"timestamp":"([^"]+)"/g)) ts.push(Date.parse(m[1]));
+const delta = Date.now() - 120000 - Math.max(...ts);
+for (const f of fichiers) {
+  const out = path.join(dst, path.relative(base, f)); fs.mkdirSync(path.dirname(out), { recursive: true });
+  let t = fs.readFileSync(f, 'utf8').split('@LAB@').join(lab).replace(/"timestamp":"([^"]+)"/g, (_, s) => `"timestamp":"${new Date(Date.parse(s) + delta).toISOString()}"`);
+  if (f.endsWith('agent-mgr00001.meta.json')) t = t.replace('"agentType":"vf-dev-manager"', `"agentType":"${marqueur}"`);
+  fs.writeFileSync(out, t);
+}
+JS
+node "$AUX/xfab.mjs" "$TESTS/fixtures/test-cockpit-index" "$HOME" "$XLAB" "$MQ_IDX"
+printf '{ "lignes": [ { "age": 90, "outils": [ { "name": "Write", "input": { "file_path": "@LAB@/src/%s.js", "content": "x" } } ] } ] }\n' "$MQ_CIB" > "$WORK/spec-x.json"
+node "$TESTS/frise-labo.mjs" ajouter "$HOME" "$XLAB" sess-aaaa0001 "$WORK/spec-x.json"
+DLR="$SCRIPTS/../../conductor/scripts/driver-lock.sh"
+( cd "$XLAB" && bash "$DLR" acquire --owner="$MQ_VRR" --step=s > "$WORK/x-acq.json" 2>&1 )
+printf '{"nodes":[{"id":"%s","step":"x","deps":[],"status":"running"}]}\n' "$MQ_PLN" > "$WORK/x-plan.dag.json"
+( cd "$XLAB" && bash "$DLR" publish-plan --owner="$MQ_VRR" --file="$WORK/x-plan.dag.json" > "$WORK/x-pub.json" 2>&1 )
+node "$SCRIPTS/vf-cockpit-build.mjs" "$XLAB" --quiet > "$WORK/build-x.out" 2>&1 || { echo "assemblage du lab X KO"; cat "$WORK/build-x.out"; }
+demarrer "$XLAB"
+voies_vues() { cockpit_get /api/vf/etat > "$WORK/x-etat.json" 2>/dev/null; [ "$(jf "$WORK/x-etat.json" 'j.collecte&&j.collecte.index&&j.collecte.index.voies>=1')" = true ]; }
+attendre 40 voies_vues
+FIC_INDEX="$XOUT/.cache/index-transcripts.json"
+index_ecrit() { [ -f "$FIC_INDEX" ] && grep -q -F "$MQ_IDX" "$FIC_INDEX"; }
+attendre 40 index_ecrit
+cible_vue() { cockpit_get "/api/vf/frise?champs=cibles" > "$WORK/x-cibles.json" 2>/dev/null; grep -q -F "$MQ_CIB" "$WORK/x-cibles.json"; }
+attendre 40 cible_vue
+cockpit_get /api/vf/frise > "$WORK/x-frise.json"; cockpit_get /api/vf/state > "$WORK/x-state.json"
+( cd "$XLAB" && bash "$DLR" status --all > "$WORK/x-status.json" 2>&1 )
+nb() { grep -c -F "$1" "$2" 2>/dev/null || true; }
+assert_eq "X0.1 — témoin de présence : le fichier d'index de la sortie contient le marqueur de l'index (rôle d'un sous-agent)" "$([ "$(nb $MQ_IDX "$FIC_INDEX")" -ge 1 ] && echo present || echo absent)" "present"
+assert_eq "X0.2 — témoin de présence : /api/vf/frise contient le marqueur de l'index, ?champs=cibles contient celui de la cible" "$([ "$(nb $MQ_IDX "$WORK/x-frise.json")" -ge 1 ] && echo idx || echo sans-idx)|$([ "$(nb $MQ_CIB "$WORK/x-cibles.json")" -ge 1 ] && echo cib || echo sans-cib)" "idx|cib"
+get_state_pln() { cockpit_get /api/vf/state > "$WORK/x-state.json" 2>/dev/null; [ "$(nb $MQ_VRR "$WORK/x-state.json")" -ge 1 ] && [ "$(nb $MQ_PLN "$WORK/x-state.json")" -ge 1 ]; }
+attendre 30 get_state_pln
+assert_eq "X0.3 — témoin de présence : /api/vf/state contient le propriétaire du verrou et l'identifiant du plan publié" "$([ "$(nb $MQ_VRR "$WORK/x-state.json")" -ge 1 ] && echo vrr || echo sans-vrr)|$([ "$(nb $MQ_PLN "$WORK/x-state.json")" -ge 1 ] && echo pln || echo sans-pln)" "vrr|pln"
+assert_eq "X0.4 — témoin de présence : driver-lock.sh status --all contient les deux" "$([ "$(nb $MQ_VRR "$WORK/x-status.json")" -ge 1 ] && echo vrr || echo sans-vrr)|$([ "$(nb $MQ_PLN "$WORK/x-status.json")" -ge 1 ] && echo pln || echo sans-pln)" "vrr|pln"
+X05=""; for m in $MQ_IDX $MQ_CIB $MQ_VRR $MQ_PLN; do for f in graph.json index.html project.html projet.json; do X05="$X05 $(nb $m "$XOUT/$f")"; done; done
+assert_eq "X0.5 — aucun des quatre marqueurs n'est dans graph.json, index.html, project.html ni projet.json" "$(echo $X05 | tr ' ' '\n' | sort -u | paste -sd, -)" "0"
+
+exporter_cli() { rm -f "$WORK/$1"; cockpit_exporter "$XLAB" "$WORK/$1" --include flows,notes,recent,health > "$WORK/$1.log" 2>&1; }
+exporter_route() { rm -f "$WORK/$1"; GRAPHE_METHODE=POST GRAPHE_CORPS='{"include":["flows","notes","recent","health"]}' gc get "$PORT" /api/export "$TOK" "" "Content-Type=application/json" > "$WORK/$1.rep"; cj 'j.corps' < "$WORK/$1.rep" > "$WORK/$1"; }
+nombres() { local f="$1" r=""; for m in $MQ_IDX $MQ_CIB $MQ_VRR $MQ_PLN; do r="$r $m=$(nb $m "$f")"; done; echo $r; }
+exporter_cli x1.html; exporter_route x2.html
+assert_eq "X1 — export en ligne de commande (flux, notes, travail récent, bilan de santé) : 0 occurrence de chacun des quatre marqueurs ; témoin : l'export existe et porte le graphe" "$([ "$(nb VF_COCKPIT "$WORK/x1.html")" -ge 1 ] && echo graphe || echo vide)|$(nombres "$WORK/x1.html")" "graphe|MQ-A25-IDX=0 MQ-A25-CIB=0 MQ-A25-VRR=0 MQ-A25-PLN=0"
+assert_eq "X2 — export par la route /api/export (corps include complet, jeton de la page Code) : idem" "$([ "$(nb VF_COCKPIT "$WORK/x2.html")" -ge 1 ] && echo graphe || echo vide)|$(nombres "$WORK/x2.html")" "graphe|MQ-A25-IDX=0 MQ-A25-CIB=0 MQ-A25-VRR=0 MQ-A25-PLN=0"
+printf '// %s : témoin positif\nexport const t = 1;\n' "$MQ_CIB" > "$XLAB/src/$MQ_CIB.js"
+git -C "$XLAB" add -A && git -C "$XLAB" -c user.email=t@t -c user.name=t commit -q -m temoin
+node "$SCRIPTS/vf-cockpit-build.mjs" "$XLAB" --quiet > "$WORK/build-x2.out" 2>&1 || { echo "réassemblage du lab X KO"; cat "$WORK/build-x2.out"; }
+exporter_cli x3a.html; exporter_route x3b.html
+assert_eq "X3 — témoin positif : le même marqueur de cible, présent cette fois dans une donnée exportée légitime (un fichier du lab décrit par la page Code), apparaît dans les deux exports" "$([ "$(nb $MQ_CIB "$WORK/x3a.html")" -ge 1 ] && echo cli || echo sans-cli)|$([ "$(nb $MQ_CIB "$WORK/x3b.html")" -ge 1 ] && echo route || echo sans-route)" "cli|route"
+assert_eq "X5 — ui/69-vf-flux.js énumère « graphe » parmi les événements relayés (relais de bout en bout entre onglets : limite dite, prouvé statiquement)" "$([ "$(grep -c "'graphe'" "$SCRIPTS/../skills/cockpit-moteur/assets/ui/69-vf-flux.js")" -ge 1 ] && echo oui || echo non)" "oui"
+cockpit_arreter
+
 # --- FIN-SECTIONS ---
 vf_hyg_assert
 echo ""
