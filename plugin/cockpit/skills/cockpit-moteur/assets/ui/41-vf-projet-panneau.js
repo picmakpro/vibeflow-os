@@ -27,7 +27,8 @@
     const lu = window.VF_EXIGENCES.lireExigences(f.n); // garde:porte
     const liste = (lu.couverture || {})[cible] || [];
     if (!liste.length) return null;
-    return { html: `<div class="sec"><h3>Exigences couvertes <span class="c">${liste.length}</span></h3><div class="list">${liste.map(rangee).join('')}</div></div>`,
+    return { html: `<div class="sec"><h3>Exigences couvertes <span class="c">${liste.length}</span></h3>`
+      + `<div class="list">${liste.map(rangee).join('')}</div></div>`,
       bind: placer };
   };
   const noeud = (cible) => (SC.graph.nodes || []).find((n) => n.id === cible.slice(2));
@@ -41,8 +42,10 @@
     const b = M().blocs(SC.graph).find((x) => x.jalon === cible);
     if (!b) return null;
     const texte = M().synthese(b.faites, b.total, 0);
-    return { html: `<div class="sec"><p class="pd">${h(b.synthese)}</p><div class="vf-bar${b.enCours ? ' st-active' : ''}" role="progressbar" aria-valuemin="0"`
-      + ` aria-valuemax="100" aria-valuenow="${b.pourcent}" aria-label="Avancement du jalon" aria-valuetext="${h(texte)}"><i style="width:${b.pourcent}%"></i></div></div>`,
+    return { html: `<div class="sec"><p class="pd">${h(b.synthese)}</p><div class="vf-bar${b.enCours ? ' st-active' : ''}"`
+      + ` role="progressbar" aria-valuemin="0"`
+      + ` aria-valuemax="100" aria-valuenow="${b.pourcent}" aria-label="Avancement du jalon"`
+      + ` aria-valuetext="${h(texte)}"><i style="width:${b.pourcent}%"></i></div></div>`,
     top: true };
   };
 
