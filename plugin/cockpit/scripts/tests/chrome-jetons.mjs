@@ -11,11 +11,13 @@ const SANS_VISITE = "(() => { const g = Storage.prototype.getItem; Storage.proto
 // outils de mesure posés dans la page : couleur normalisée par un canevas, luminance relative, rapport de contraste, opacité cumulée
 const AIDES = `window.__j = (() => {
   const cv = document.createElement('canvas').getContext('2d', { willReadFrequently: true });
-  const norm = (c) => { cv.clearRect(0, 0, 1, 1); cv.fillStyle = '#000'; cv.fillStyle = c; cv.fillRect(0, 0, 1, 1); const d = cv.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
+  const norm = (c) => { cv.clearRect(0, 0, 1, 1); cv.fillStyle = '#000'; cv.fillStyle = c; cv.fillRect(0, 0, 1, 1);
+    const d = cv.getImageData(0, 0, 1, 1).data; return [d[0], d[1], d[2], d[3] / 255]; };
   const lin = (v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; };
   const lum = (c) => 0.2126 * lin(c[0]) + 0.7152 * lin(c[1]) + 0.0722 * lin(c[2]);
   const ratio = (a, b) => { const x = lum(a), y = lum(b); return Math.round(((Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05)) * 100) / 100; };
-  const sonde = (css) => { const p = document.createElement('i'); p.style.cssText = css; document.body.appendChild(p); const s = getComputedStyle(p); const r = { c: s.color, f: s.backgroundColor, o: s.boxShadow }; p.remove(); return r; };
+  const sonde = (css) => { const p = document.createElement('i'); p.style.cssText = css; document.body.appendChild(p);
+    const s = getComputedStyle(p); const r = { c: s.color, f: s.backgroundColor, o: s.boxShadow }; p.remove(); return r; };
   const jeton = (t) => norm(sonde('color: var(' + t + ')').c);
   const sur = (fg, a, bg) => [0, 1, 2].map((i) => Math.round(fg[i] * a + bg[i] * (1 - a)));
   const alpha = (el, jusque) => { let a = 1; for (let e = el; e && e !== jusque; e = e.parentElement) a *= parseFloat(getComputedStyle(e).opacity); return a; };
@@ -69,7 +71,8 @@ await executer(chrome, async (s) => {
         o[th] = await lire(`JSON.stringify((() => { const J = window.__j, r = {};
           const probe = J.sonde('background: color-mix(in srgb, var(--raise) 70%, var(--surface)); box-shadow: var(--shadow-card)');
           const sd = (sel) => { const e = document.querySelector(sel); if (!e) return null; const s = getComputedStyle(e);
-            return { fond: J.norm(s.backgroundColor).join(), surface: J.jeton('--surface').join(), melange: J.norm(probe.f).join(), ombre: s.boxShadow === probe.o,
+            return { fond: J.norm(s.backgroundColor).join(), surface: J.jeton('--surface').join(),
+              melange: J.norm(probe.f).join(), ombre: s.boxShadow === probe.o,
               bord: s.borderTopWidth + '|' + s.outlineStyle }; };
           r.actif = sd('#viewport .card.st-active'); r.recette = sd('#viewport .card.st-recette'); return r; })())`);
         await s.ev("document.getElementById('svg').classList.add('dim')"); await pause(600);
@@ -102,7 +105,8 @@ await executer(chrome, async (s) => {
           const R = (a, b) => J.ratio(j(a), j(b));
           r.texte = { 'text/surface': R('--text', '--surface'), 'text-2/surface': R('--text-2', '--surface'), 'text-3/surface': R('--text-3', '--surface'),
             'text-3/hover': R('--text-3', '--surface-hover'), 'text-3/bg': R('--text-3', '--bg') };
-          r.nonTexte = { 'done/bg': R('--st-done', '--bg'), 'select/bg': R('--text-3', '--bg'), 'warn/raise-2': R('--warn-text', '--raise-2'), 'ring/bg': R('--ring', '--bg') };
+          r.nonTexte = { 'done/bg': R('--st-done', '--bg'), 'select/bg': R('--text-3', '--bg'),
+            'warn/raise-2': R('--warn-text', '--raise-2'), 'ring/bg': R('--ring', '--bg') };
           r.actif = { bg: R('--st-active', '--bg'), surface: R('--st-active', '--surface') };
           return r; })())`);
       }
@@ -113,7 +117,8 @@ await executer(chrome, async (s) => {
     // JT1.5 : l'extension est une extension de page, chargée une fois par arrivée sur l'onglet (entrées de ressources), jamais persistante
     await sec('jt15', async () => {
       await charger('');
-      const n = () => lire("JSON.stringify(['/ui/01-vf-ensemble.js', '/ui/00-vibeflow.js'].map((f) => performance.getEntriesByType('resource').filter((e) => e.name.endsWith('/_vf' + f)).length))");
+      const n = () => lire("JSON.stringify(['/ui/01-vf-ensemble.js', '/ui/00-vibeflow.js'].map((f) => "
+        + "performance.getEntriesByType('resource').filter((e) => e.name.endsWith('/_vf' + f)).length))");
       const aller = async (nom) => { await s.ev(`VF_COQUILLE.chargerOnglet(${JSON.stringify(nom)}).then(() => 1)`); await pause(300); };
       o.jt15 = { charge: await n() };
       await aller('equipe'); await aller('projet'); o.jt15.apres1 = await n();
