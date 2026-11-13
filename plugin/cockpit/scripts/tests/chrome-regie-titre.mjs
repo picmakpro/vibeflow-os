@@ -21,7 +21,7 @@ const fini = (id, i) => ({ kind: 'subagent', id, etat: 'termine', parent: SID, r
 const attendent = (n) => Array.from({ length: n }, (_, i) => sess(`s${i}000000-aaaa-bbbb-cccc-11111111111${i}`, 'attend'));
 const finis = (n, pre) => Array.from({ length: n }, (_, i) => fini(`${pre}${String(i).padStart(11, '0')}`, i));
 const RAPPORT = `li[data-vf-cle="a-relire:${F0}"] .vf-rg-act button`;
-const LIGNES = "document.querySelectorAll('[data-vf-section=\"a-relire\"] .vf-rg-corps li').length";
+const LIGNES = "document.querySelectorAll('[data-vf-section=\"a-relire\"] > .vf-rg-corps li').length";
 const PUSH = (w) => `window.__es.find((x) => x.url.includes('/api/vf/events')).__emit('who', { who: { workers: ${JSON.stringify(w)} } })`;
 const PREFIXE_LAB = 'vf-regie-lus:';
 const LUS = `Object.entries(localStorage).filter(([k]) => k.startsWith('${PREFIXE_LAB}')).map(([k, v]) => ({ k, v }))`;
@@ -90,7 +90,7 @@ await executer(chrome, async (s) => {
     await attendreValeur(() => s.ev(LIGNES), (n) => n === 0, { max: 6000 });
     const v = clic && clic[0] ? JSON.parse(clic[0].v) : {};
     return { avant, survol, cle: clic && clic[0] ? clic[0].k : '', ids: Object.keys(v), heureOk: Number.isFinite(v[F0]) && v[F0] <= Date.now(), apres: await s.ev(LIGNES),
-      relus: await s.ev("(document.querySelector('.vf-rg-relus summary') || {}).textContent || ''"), nonGet: nonGet() };
+      relus: await s.ev("(document.querySelector('[data-vf-section=\"a-relire\"] .vf-rg-relus summary') || {}).textContent || ''"), nonGet: nonGet() };
   }
   if (scenario === 'tout-lu') {
     const bouton = () => s.ev("(() => { const b = document.querySelector('[data-vf-tout]'); return b ? { classe: b.className, texte: b.textContent } : null; })()");
