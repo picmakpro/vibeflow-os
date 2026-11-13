@@ -212,6 +212,7 @@ function construireGraphe(root, { layout } = {}) {
       'liste:phase': 'Plans', 'liste:exigences': 'Exigences', 'liste:backlog': 'Entrées', 'liste:graine': 'Graines', 'liste:release': 'Releases',
       'liste:mission': 'Étapes', 'entrant:import': 'Dépend de', 'sortant:import': 'Attendu par', 'entrant:data': 'Couverte par',
       'sortant:data': '', // '' : liste non rendue, la couche VF dit la couverture
+      'statut:exigences:done': 'Cochée', 'statut:exigences:todo': 'Non cochée', // le mot d'état d'une exigence (80-UI-SPEC § 4.2)
       'ouvrir:phase': 'Ouvrir la phase', 'champ:statut': 'Statut', 'champ:vague': 'Vague', 'valeur:sans-vague': 'Sans vague' },
       vf: { milestone: state.milestone, phase: curPhase, phaseEtat, stateStale: perime, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, lastDesc: state.last_activity_desc, progress: state.progress,
         milestones: msList.filter((m) => !m.horsJalon).map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),

@@ -385,6 +385,8 @@ body.no-panel #panel-resize { opacity: 0; pointer-events: none; }
 .stats div { background: none; padding: 0; }
 .stats b { display: block; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .stats span { font-size: 12px; color: var(--text-3); }
+.vf-champs { display: flex; flex-wrap: wrap; gap: var(--sp-8) var(--sp-24); margin-bottom: var(--sp-12); } .vf-champs div { background: none; padding: 0; }
+.vf-champs span { display: block; font-size: 12px; color: var(--text-3); } .vf-champs b { display: block; font-size: 13px; font-weight: 500; }
 .bar { display: flex; height: 6px; border-radius: 999px; overflow: hidden; margin: var(--sp-12) 0 var(--sp-8); gap: var(--sp-4); }
 .bar span { border-radius: 999px; }
 .legend-row { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-12); font-size: 12px; color: var(--text-2); }
@@ -688,6 +690,9 @@ const KIND_TECH = { contains: t('Contains'), import: t('Imports'), http: 'HTTP',
 const KIND_PLAIN = { contains: t('Contains'), import: t('Uses'), http: t('Web requests'), call: t('Calls'), rpc: t('Calls'), event: t('Events'),
   queue: t('Background jobs'), data: t('Reads & writes data'), config: t('Settings') };
 if (G.meta.kindLabels) { Object.assign(KIND_PLAIN, G.meta.kindLabels); Object.assign(KIND_TECH, G.meta.kindLabels); } // vibeflow P1
+// 80-11 (P80-D-08, P80-D-35) : sur l'onglet Projet les libellés de type, de section et de champ viennent de meta.kindLabels (clés à préfixe) ;
+// une clé absente = repli actuel
+const PROJ = G.meta?.vfTab === 'project', KL = (k) => (PROJ ? G.meta.kindLabels?.[k] : undefined);
 // 79-10 : le titre du panneau d'un lien, par genre de lien (une entrée de table par combinaison) ;
 // un genre dont le graphe fournit le libellé (onglet Projet) garde « libellé + connection »
 const KIND_CONN_TECH = { import: t('Imports connection'), http: t('HTTP connection'), call: t('Calls connection'), rpc: t('RPC connection'),
@@ -1708,9 +1713,25 @@ const routeRow = (ri, extra = '') => {
 };
 const listSec = (title, rows, count, max = 30, note = '') => rows.length ? `<div class="sec"><h3>${h(title)} <span class="c">${count ?? rows.length}</span></h3>${note ? `<p class="pd">${h(note)}</p>` : ''}<div class="list">${rows.slice(0, max).join('')}${rows.length > max ? `<div class="more">${t('+{} more', rows.length - max)}</div>` : ''}</div></div>` : '';
 const pathBox = (p) => `<div class="pp"><span>${h(p).split('/').map((x) => `<span class="sg">${x}</span>`).join('/<wbr>')}</span><button data-copy="${h(p)}" title="${t('Copy')}" aria-label="${t('Copy path')}">${iconI('copy')}</button></div>`;
+const kindLab = (i, kind) => (i.f && KL('feuille:' + nodes.get(i.f.n)?.kind)) || kindFr(kind); // 80-11 : « Plan », « Exigence »… sur Projet
+const ouvrirLab = (i) => (i.type === 'node' && KL('ouvrir:' + i.kind)) || t('Open');
+const rowsFiles = (fl) => fl.map((f) => rowFor('f:' + f.p, f.st ? statePill(f.st) : PLAN ? '' : fmt(f.loc)));
+// la liste des éléments d'un nœud : sur Projet, ceux du nœud puis ceux de ses sous-nœuds, chaque liste titrée par kindLabels['liste:<type>']
+// et sans compte (80-UI-SPEC § 4.2) ; un nœud sans titre de liste n'en rend aucune (le jalon : ses phases suffisent)
+const filesSec = (n, fl) => {
+  if (!PROJ) return listSec(PLAN ? 'Planned files' : t('Files'), rowsFiles(fl), fl.length, 25);
+  if (!KL('liste:' + n?.kind)) return '';
+  const sous = [...nodes.values()].filter((c) => c.parent === n.id);
+  const liste = (o) => {
+    const ti = KL('liste:' + o.kind);
+    return ti ? listSec(ti, rowsFiles(fl.filter((f) => f.n === o.id)), '', 25) : '';
+  };
+  return [n, ...sous].map(liste).join('');
+};
+const parentLab = (owner) => (PROJ ? KL('parent:' + owner.kind) || '' : 'module');
 function header(i) {
   const kind = i.type === 'node' ? i.kind : i.type === 'symbol' ? i.symKind : i.type === 'route' ? t('Endpoint') : i.type === 'module' ? t('file') : i.type;
-  return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kindFr(kind))}</span></div>
+  return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kindLab(i, kind))}</span></div>
     <h2 class="pt">${h(i.name)}</h2>${i.desc ? `<p class="pd">${h(i.desc)}</p>` : `<p class="pd empty">${t('No description yet.')}</p>`}`;
 }
 
@@ -1817,11 +1838,24 @@ function connections(item) {
   return { out: rows(out), inn: rows(inn) };
 }
 
+// 80-11 : statut (glyphe + mot) et vague d'un élément du planning ; la vague seulement pour ce qui en porte une (champ présent, nul = sans vague)
+const champs = (f, owner) => {
+  const w = KL('statut:' + owner?.kind + ':' + f.st) || STATE_WORD[f.st] || f.st, nb = Number.isInteger(f.vague);
+  const v = nb ? KL('champ:vague') + ' ' + f.vague : KL('valeur:sans-vague'), cls = h(f.st).replace(/[^\w-]/g, '');
+  const st = f.st ? `<span class="vst vst-${cls}">${h(w)}</span>` : '';
+  return `<div class="vf-champs"><div><span>${h(KL('champ:statut') || '')}</span><b>${st}</b></div>`
+    + ('vague' in f && v ? `<div><span>${h(KL('champ:vague') || '')}</span><b>${h(v)}</b></div>` : '') + '</div>';
+};
+// 80-11 : sur Projet, les liens d'une feuille par sens puis par genre, titrés par kindLabels['entrant:<genre>'] / ['sortant:<genre>'] ;
+// une étiquette vide n'est pas rendue
+const parSens = (ls, sens, autre) => { const m = new Map(); for (const l of ls) m.set(l.k, [...(m.get(l.k) || []), l]);
+  return [...m].map(([k, g]) => { const ti = KL(sens + ':' + k); return ti === '' ? '' : listSec(ti ?? t(sens === 'entrant' ? 'Depends on' : 'Used by'),
+    g.map((l) => rowFor(autre(l), '', `var(--k-${l.k})`))); }).join(''); };
 function itemPanel(item, viaConnector) {
   const i = info(item);
   let html = `<div class="sec">${header(i)}`;
   const actions = [];
-  if (drillable(item) && state.container !== item) actions.push(`<button class="btn soft" data-open="${h(item)}">${iconI('drill')}${t('Open')}</button>`);
+  if (drillable(item) && state.container !== item) actions.push(`<button class="btn soft" data-open="${h(item)}">${iconI('drill')}${ouvrirLab(i)}</button>`);
   if (viaConnector || (parentOf.get(item) !== state.container && state.container !== item)) actions.push(`<button class="btn soft" data-go="${h(item)}">${t('Show on map')}</button>`);
   if (i.type === 'node' || i.type === 'dir') {
     const n = i.n, s = statsOf(item);
@@ -1829,7 +1863,7 @@ function itemPanel(item, viaConnector) {
     if (n?.paths?.length || i.d) html += pathBox(i.d ? i.d.path + '/' : n.paths.join('  '));
     if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
     html += '</div>';
-    if (s?.files) {
+    if (s?.files && !PROJ) {
       const langs = Object.entries(n?.stats.langs || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
       const tot = langs.reduce((a, [, v]) => a + v, 0) || 1;
       const palette = ['#a78bfa', '#38bdf8', '#34d399', '#fbbf24', '#f472b6'];
@@ -1844,7 +1878,7 @@ function itemPanel(item, viaConnector) {
     const depFirst = G.meta?.vfTab === 'project';
     html += listSec(depFirst ? t('Depends on') : t('Used by'), c.inn) + listSec(depFirst ? t('Used by') : t('Depends on'), c.out);
     const fl = (i.d ? i.d.files : G.files.filter((f) => chain('f:' + f.p).includes(item))).slice().sort((a, b) => b.loc - a.loc);
-    html += listSec(PLAN ? 'Planned files' : t('Files'), fl.map((f) => rowFor('f:' + f.p, f.st ? statePill(f.st) : PLAN ? '' : fmt(f.loc))), fl.length, 25);
+    html += filesSec(n, fl);
   } else if (i.type === 'file' || i.type === 'module') {
     const f = i.f, fid = 'f:' + f.p, url = editorUrl(f.p);
     if (f.note) html += `<div class="callout">${h(f.note)}</div>`;
@@ -1853,15 +1887,16 @@ function itemPanel(item, viaConnector) {
     if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}${t('Open in editor')}</a>`);
     if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
     const owner = nodes.get(f.n);
-    html += `</div><div class="sec"><div class="stats">${PLAN ? `<div><b>${fmt(G.links.filter((l) => l.a === fid).length)}</b><span>${t('uses')}</span></div>` : `<div><b>${fmt(f.loc)}</b><span>${t.mot(f.loc, 'lines')}</span></div>`}<div><b>${(routesByFile.get(f.p) || []).length}</b><span>${t.mot((routesByFile.get(f.p) || []).length, 'endpoints')}</span></div><div><b>${fmt(G.links.filter((l) => l.b === 'f:' + f.p).length)}</b><span>${t('used by')}</span></div></div>
-      ${owner ? `<div class="list" style="margin-top:var(--sp-12)">${rowFor('n:' + owner.id, 'module')}</div>` : ''}</div>`;
+    html += `</div><div class="sec">${PROJ ? champs(f, owner) : `<div class="stats">${PLAN ? `<div><b>${fmt(G.links.filter((l) => l.a === fid).length)}</b><span>${t('uses')}</span></div>` : `<div><b>${fmt(f.loc)}</b><span>${t.mot(f.loc, 'lines')}</span></div>`}<div><b>${(routesByFile.get(f.p) || []).length}</b><span>${t.mot((routesByFile.get(f.p) || []).length, 'endpoints')}</span></div><div><b>${fmt(G.links.filter((l) => l.b === 'f:' + f.p).length)}</b><span>${t('used by')}</span></div></div>`}
+      ${owner ? `<div class="list" style="margin-top:var(--sp-12)">${rowFor('n:' + owner.id, parentLab(owner))}</div>` : ''}</div>`;
     html += listSec(t('Endpoints'), (routesByFile.get(f.p) || []).map((ri) => routeRow(ri)), undefined, 60);
     const inL = G.links.filter((l) => l.b === fid), outL = G.links.filter((l) => l.a === fid);
     // the same words in both modes (PU-G-058): the technical switch adds the Exports list below, it never renames what is already there
-    const doc = /\.(md|mdx|markdown|rst|txt)$/i.test(f.p) && !/(^|\/)SKILL\.md$|(^|\/)agents\//.test(f.p); // a document mentions files, it doesn't call or depend on them; an agent or a skill really dispatches (PU-G-072)
+    const doc = !PROJ && /\.(md|mdx|markdown|rst|txt)$/i.test(f.p) && !/(^|\/)SKILL\.md$|(^|\/)agents\//.test(f.p); // a document mentions files, it doesn't call or depend on them; an agent or a skill really dispatches (PU-G-072)
     const rowL = (l, other) => rowFor(other, doc ? (l.calls?.length ? plural(l.calls.length, 'mention') : t('Mention')) : l.calls?.length ? plural(l.calls.length, 'call') : KIND_PLAIN[l.k] || l.k, `var(--k-${l.k})`);
-    html += listSec(t('Used by'), inL.map((l) => rowL(l, l.a)));
-    html += doc ? listSec(t('Mentions'), outL.map((l) => rowL(l, l.b)), undefined, 30, t('The files, folders and pages this document names or links to.')) : listSec(t('Depends on'), outL.map((l) => rowL(l, l.b)));
+    if (PROJ) html += parSens(inL, 'entrant', (l) => l.a) + parSens(outL, 'sortant', (l) => l.b);
+    else html += listSec(t('Used by'), inL.map((l) => rowL(l, l.a)));
+    if (!PROJ) html += doc ? listSec(t('Mentions'), outL.map((l) => rowL(l, l.b)), undefined, 30, t('The files, folders and pages this document names or links to.')) : listSec(t('Depends on'), outL.map((l) => rowL(l, l.b)));
     const handlers = new Set((routesByFile.get(f.p) || []).map((ri) => routes[ri].h));
     if (technical()) html += listSec('Exports', (f.s || []).map((s, k) => [s, k]).filter(([s]) => !handlers.has(s[0])).map(([s, k]) => `<a class="row" ${parentOf.has(`s:${f.p}#${k}`) ? `data-go="s:${h(f.p)}#${k}"` : ''}><span class="dot" style="background:var(--n-symbol)"></span><span class="rt"><div class="rn" style="font-family:var(--mono);font-size:12px">${h(s[0])}</div>${s[4] ? `<div class="rd">${h(s[4])}</div>` : ''}</span><span class="rc">${h(s[1])} · L${s[2]}</span></a>`), undefined, 60);
   } else if (i.type === 'route') {
