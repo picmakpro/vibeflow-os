@@ -30,4 +30,15 @@ Rouge d'une garde : M-LANCEE-VIDE-TOUJOURS (champ `lancee` posé sur tout travai
 
 ## Tâche 2 — largeur, visite, en-tête, accessibilité
 
-(voir plus bas)
+| identifiant | ancien support | rouge observé | nouveau support |
+|---|---|---|---|
+| R14.1 (boucle `equipe`) | zoom du canevas dans l'en-tête, Équipe | rouge mesuré par 73-05 (`false\|false` pour `false\|true`) | la boucle sort `equipe` (raison écrite) ; R14.7 neuf : aucun zoom visible sur Équipe ; R14.2, R14.3 gardés sur Code et Projet |
+| R17.0, R17.1, R17.1b | cartes et zoom du canevas (`nCartes`, `zoomCartes`) | rouge mesuré par 73-05 ; par construction à la réduction (aucune carte) | ligne de régie mesurée par chrome-cdp ; témoin négatif « aucun zoom de canevas », positif gardé sur Projet (R17.2) |
+| R19.1, R19.2 | `#context h1` contre la première carte | rouge mesuré par 73-05 | `#vf-equipe-entete` contre la première section, avant et après dépliage de la première ligne |
+| O6.14a | `VibeFlow.graph.nodes.length >= 2` | rouge par construction (enveloppe sans nœuds) | au moins deux `li.vf-rg-lig` ; O6.14 et O6.14b inchangés |
+| H6.2 | `#context` (surtitre, h1, ligne « Agents : … ») | rouge par construction | `#vf-equipe-entete h1` et `.vf-rg-sous` ; deux cas restent ROUGES, voir le SUMMARY |
+| X4.5, X7.3 | compte des `<main>` ; titre exact | — | régions `main, [role=main]` visibles ; préfixe « (N) vous attendent » toléré, N égal aux lignes de « À vous » (X7.3b) ; M-X45-DEUX-MAIN neuf |
+| chargement de chrome-accessibilite.mjs | attend `#viewport .node` sur Équipe | rouge par construction après 73-08 | attend la régie montée et ses lignes |
+
+Verts joués une fois : accessibilité 37 PASS / 0 FAIL (35 à la base) ; responsive 375 PASS / 0 FAIL ; projet-visite 114 PASS / 1 FAIL (R3.18, hors périmètre) ;
+git-entete 117 PASS / 19 FAIL (les 17 de la 79 et deux cas de H6.2). Nombre de lignes `assert_` : responsive 125 → 126, accessibilité 29 → 31, projet-visite 68 → 68, git-entete 105 → 105.
