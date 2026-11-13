@@ -8,6 +8,7 @@
 // Toute chaîne de la sortie, quel que soit le champ, traverse `nettoie` (contrôles retirés, secrets masqués) et une borne : bornes serrées par champ connu, puis une passe finale
 // (`assainir`) sur l'objet entier, filet de tout champ ajouté plus tard (F-02, ADR-035 : une chaîne issue du disque ou d'un fichier du lab n'est jamais de confiance).
 // CLI : node vf-cockpit-signal.mjs <root>   (JSON sur une ligne ; exit 2 sur usage invalide ; aucune option, P68-D-28)
+// 79-12 : la CLI lit l'état d'un serveur du lab reconnu (vf-cockpit-signal-serveur.mjs), sinon elle collecte.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
@@ -102,5 +103,13 @@ if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process
   if (args.length !== 1 || args[0].startsWith('-')) usage(args.length ? 'argument invalide' : 'racine manquante');
   let ok = false; try { ok = fs.statSync(args[0]).isDirectory(); } catch {}
   if (!ok) usage(`racine introuvable : ${args[0].slice(0, 120)}`);
-  console.log(JSON.stringify(collectSignal(args[0])));
+  // 79-12 (SOCL-16, P68-D-41) : un serveur du lab vivant et reconnu sert l'état (une réponse tenue pour non fiable, vf-cockpit-signal-serveur.mjs) ;
+  // sinon, ou au moindre doute, la collecte locale d'avant, avec l'échéance qui reste
+  const debut = Date.now(); let lu = null;
+  try {
+    const ici = path.dirname(fileURLToPath(import.meta.url)), { signalDuServeur } = await import('./vf-cockpit-signal-serveur.mjs');
+    const contrat = JSON.parse(fs.readFileSync(path.join(ici, 'vf-cockpit-interface.json'), 'utf8'));
+    lu = await signalDuServeur(path.resolve(args[0]), { schema: SCHEMA, dossierScripts: ici, contrat });
+  } catch { lu = null; }
+  console.log(JSON.stringify(lu ? assainir(lu.signal) : collectSignal(args[0], { echeanceMs: Math.max(1000, ECHEANCE_MS - (Date.now() - debut)) })));
 }
