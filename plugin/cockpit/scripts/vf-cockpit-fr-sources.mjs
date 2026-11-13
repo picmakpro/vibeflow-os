@@ -45,7 +45,7 @@ const ENTETE = '^\\s*(?:/\\* ui/[\\w.-]+ \\*/\\s*)?// (?:vibeflow:fr|vibeflow:al
 const MARQUES = new RegExp(ENTETE + '|^\\s*// [\\w-]+ graph queries, shared by the viewer');
 // mêmes lignes, jamais un journal
 const sansJournal = (src) => src.split('\n').map((l) => (/console\.(log|error|warn|info)\(/.test(l) ? '' : l)).join('\n');
-const LIGNE_MESSAGE = /\b(message|error|text|title|label)\s*:|new Error\(|\bplain\b/;
+const LIGNE_MESSAGE = /\b(message|error|text|title|label)\s*:|new Error\(|\bplain\b|\b(?:fail|reject)\s*\(/; // fail( : le message d'échec de l'agent, relayé tel quel à la page (revue rv-1021)
 
 // les constats d'un script : décalage = position du script dans son fichier (une page .html en porte plusieurs)
 function constatsScript(src, { decalage = 0, tout, table, exclus, hors }) {

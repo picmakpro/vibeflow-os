@@ -169,7 +169,7 @@ function blocs(html) { // { scripts: [source], reste: html sans données ni scri
 }
 
 // lignes de serve.mjs dont les littéraux atteignent la page ; jamais une ligne de journal console
-const LIGNE_MESSAGE = /\b(message|error|text|title|label)\s*:|new Error\(|\bplain\b/;
+const LIGNE_MESSAGE = /\b(message|error|text|title|label)\s*:|new Error\(|\bplain\b|\b(?:fail|reject)\s*\(/; // fail( : le message d'échec de l'agent, relayé tel quel à la page (revue rv-1021)
 function litterauxServeur(src) {
   const out = [];
   let dansDescribe = false;
@@ -234,7 +234,12 @@ export function bibliothequeNonTraitee(xterm, client) {
 
 export function inventaireDeSortie(sortie) {
   const lire = (f) => { try { return fs.readFileSync(path.join(sortie, f), 'utf8'); } catch { return ''; } };
-  return inventaire({ html: [lire('index.html'), lire('project.html')].filter(Boolean), serveur: (() => { try { return fs.readFileSync(path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'cockpit-moteur', 'assets', 'serve.mjs'), 'utf8'); } catch { return ''; } })() }); // serve.mjs est dans le moteur du module, plus dans la sortie
+  // serve.mjs est dans le moteur du module, plus dans la sortie
+  const serveur = (() => {
+    const f = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'skills', 'cockpit-moteur', 'assets', 'serve.mjs');
+    try { return fs.readFileSync(f, 'utf8'); } catch { return ''; }
+  })();
+  return inventaire({ html: [lire('index.html'), lire('project.html')].filter(Boolean), serveur });
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {

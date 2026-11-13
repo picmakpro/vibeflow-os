@@ -322,7 +322,7 @@ function claudeRun(body, mode) {
     onEvent(ev, out) {
       if (ev.type === 'assistant') for (const c of ev.message?.content || []) if (c.type === 'tool_use') out.progress(describeTool(c.name, c.input));
       if (ev.type !== 'result') return;
-      if (ev.is_error) out.fail(String(ev.result || ev.subtype || 'Claude Code reported an error'));
+      if (ev.is_error) out.fail(String(ev.result || ev.subtype || 'Claude Code a signalé une erreur'));
       else { noteSession(ev.session_id); out.answer({ ...parseAnswer(ev), session: ev.session_id }); }
     },
   };
@@ -346,7 +346,7 @@ function codexRun(body, mode) {
       if (ev.type === 'item.started' && ev.item?.type === 'command_execution') out.progress(describeCommand(ev.item.command));
       if (ev.type === 'item.completed' && ev.item?.type === 'agent_message') last = String(ev.item.text || '');
       if (ev.type === 'error') error = String(ev.message || error);
-      if (ev.type === 'turn.failed') out.fail(String(ev.error?.message || error || 'Codex reported an error'));
+      if (ev.type === 'turn.failed') out.fail(String(ev.error?.message || error || 'Codex a signalé une erreur'));
       if (ev.type === 'turn.completed') {
         const a = parseAnswer({ result: last });
         convos.set(session, [...turns, { q: question.slice(0, 500), a: String(a.answer || '').slice(0, 1500) }].slice(-4));
@@ -396,7 +396,7 @@ function runAgent(res, send, body) {
     child.on('error', (e) => out.fail(e.message));
     child.on('close', (code) => {
       running.delete(id); lingering.delete(id); clearTimeout(limit);
-      out.fail(run.lastError?.() || stderr.trim() || `${engine} exited with code ${code}`);
+      out.fail(run.lastError?.() || stderr.trim() || `${engine} s’est arrêté avec le code ${code}`);
     });
     // the browser went away (closed tab, Stop): don't leave the CLI working. Note req 'close' fires as soon as
     // the body is read, so watch the response instead.

@@ -307,6 +307,28 @@ T17b="$WORK/t17b"; mkdir -p "$T17b"; cp "$SORTIE/index.html" "$SORTIE/project.ht
 node -e 'const f=process.argv[1],fs=require("fs");fs.writeFileSync(f,fs.readFileSync(f,"utf8").replace("</body>","<script>(() => { const t = window.__vfFrT; return (() => { const t = (x) => x; return t; })(); })();</script></body>"))' "$T17b/index.html"
 sites "$T17b/index.html,$T17b/project.html" > "$WORK/sites17b.json"
 assert_eq "F17.4 témoin : un t local qui masque le traducteur (ombre) est nommé, lui seul" "$(nouv "$WORK/sites17b.json" ombres)" '["const t"]'
+# F17.5 : un message d'échec de l'agent (appel `fail(`) atteint la page : l'inventaire ET la porte de fichier le voient (revue rv-1021 : la porte était aveugle à tout ce qui n'est pas une clé `message:`)
+cat > "$AUX/serveur-fail.mjs" <<'JS'
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scriptsDir, forme] = process.argv;
+const inv = await import(pathToFileURL(path.join(scriptsDir, 'vf-cockpit-fr-inventaire.mjs')).href);
+const src = await import(pathToFileURL(path.join(scriptsDir, 'vf-cockpit-fr-sources.mjs')).href);
+const base = fs.readFileSync(path.join(scriptsDir, '..', 'skills', 'cockpit-moteur', 'assets', 'serve.mjs'), 'utf8');
+const FORMES = { fail: "  out.fail('Brand new failure text');", gabarit: '  out.fail(`Second failure ${engine} text`);', fail_nu: "  fail('Third failure text');", reject: "  reject(new Error('Fourth failure text'));", aucune: '' };
+const copie = base + '\n' + (FORMES[forme] ?? '') + '\n';
+const libresInv = inv.inventaireSites({ serveur: copie }).libres;
+const libresSrc = src.constatsDe(copie, { fichier: 'serve.mjs', table: src.chargerTable() }).filter((c) => c.genre === 'libre').map((c) => c.texte).filter((x) => /failure/i.test(x));
+console.log(JSON.stringify({ inventaire: libresInv.filter((x) => /failure/i.test(x)), sources: libresSrc }));
+JS
+for forme in fail gabarit fail_nu reject; do node "$AUX/serveur-fail.mjs" "$SCRIPTS" "$forme" > "$WORK/fail-$forme.json" 2>"$WORK/fail-$forme.err" || echo '{}' > "$WORK/fail-$forme.json"; done
+node "$AUX/serveur-fail.mjs" "$SCRIPTS" aucune > "$WORK/fail-aucune.json" 2>/dev/null || echo '{}' > "$WORK/fail-aucune.json"
+assert_eq "F17.5 témoin : un appel out.fail('…') neuf dans une copie de serve.mjs est nommé par l'inventaire et par la porte de fichier" "$(lire "$WORK/fail-fail.json" 'JSON.stringify([j.inventaire, j.sources])')" '[["Brand new failure text"],["Brand new failure text"]]'
+assert_eq "F17.6 témoin : un gabarit passé à out.fail(…) est nommé des deux côtés" "$(lire "$WORK/fail-gabarit.json" 'JSON.stringify([j.inventaire, j.sources])')" '[["Second failure {} text"],["Second failure {} text"]]'
+assert_eq "F17.7 témoin : fail('…') sans préfixe est nommé des deux côtés" "$(lire "$WORK/fail-fail_nu.json" 'JSON.stringify([j.inventaire, j.sources])')" '[["Third failure text"],["Third failure text"]]'
+assert_eq "F17.8 témoin : reject(new Error('…')) est nommé des deux côtés" "$(lire "$WORK/fail-reject.json" 'JSON.stringify([j.inventaire, j.sources])')" '[["Fourth failure text"],["Fourth failure text"]]'
+assert_eq "F17.9 : la copie sans ajout ne nomme rien (le témoin ne rougit pas à vide)" "$(lire "$WORK/fail-aucune.json" 'JSON.stringify([j.inventaire, j.sources])')" '[[],[]]'
 node "$AUX/ordre.mjs" "$SORTIE/index.html" > "$WORK/ordre.json"
 assert_eq "F18.1 : les blocs vibeflow:fr (78, 79, 80) précèdent le script principal et ui/00-vibeflow.js dans la page assemblée" "$(lire "$WORK/ordre.json" '[j.blocs, j.avantPrincipal, j.avant00, j.marqueurRestant].join()')" "3,true,true,false"
 # F18.2 : un gabarit sans l'emplacement garde l'ancien ordre (copie du module, jamais une édition du module) ; jouée sur une copie du module (même copie que cockpit_module_copie)
