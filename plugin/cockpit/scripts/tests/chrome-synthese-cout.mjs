@@ -28,13 +28,20 @@ const READ = `(() => { const sec = document.querySelector('[data-vf-sy-bloc="cou
   const base = { blocs: [...document.querySelectorAll('#panel > section.vf-sy[data-vf-sy-bloc]')].map((e) => e.dataset.vfSyBloc), tops, xss: window.__xss === undefined ? 'undefined' : String(window.__xss),
     nbCout: document.querySelectorAll('[data-vf-sy-bloc="cout"]').length };
   if (!sec) return { ...base, present: false };
-  const tb = sec.querySelector('table'), rows = tb ? [...tb.tBodies[0].rows] : [], cells = (tr) => [...tr.cells].map((c) => T(c.querySelector('summary') || c));
+  const tb = sec.querySelector('table'), rows = tb ? [...tb.querySelectorAll('tr.vf-sy-l')] : [];
+  const cells = (tr) => [...tr.cells].map((c) => (c.querySelector('button') ? T(c.querySelector('button')) : [...c.childNodes].map(T).join('|')));
   return { ...base, present: true, hidden: sec.hidden, titre: T(sec.querySelector('h3')), texte: sec.textContent, tables: sec.querySelectorAll('table').length,
     ths: tb ? [...tb.tHead.rows[0].cells].map((c) => c.textContent + '|' + c.getAttribute('scope')) : [], labelled: tb ? tb.getAttribute('aria-labelledby') : null,
     labelledOk: tb ? !!document.getElementById(tb.getAttribute('aria-labelledby')) : false, lignes: rows.map(cells),
-    etages: rows.map((tr) => [...tr.querySelectorAll('details li')].map((li) => li.textContent)), details: rows.map((tr) => tr.querySelectorAll('details').length),
+    etages: rows.map((tr) => [...tr.nextElementSibling.querySelectorAll('li')].map((li) => li.textContent)), details: rows.map((tr) => tr.querySelectorAll('button[aria-expanded]').length),
     total: tb && tb.tFoot ? cells(tb.tFoot.rows[0]) : null, notes: [...sec.querySelectorAll('.vf-sy-corps > p')].map((p) => p.textContent),
     imgs: sec.querySelectorAll('img, script').length, on: sec.querySelectorAll('[onerror], [onclick]').length, nodes: sec.querySelectorAll('*').length }; })()`;
+// géométrie de la lecture « à la largeur du panneau » : panneau de 360 px, première ligne dépliée
+const GEO = `(() => { const tb = document.querySelector('[data-vf-sy-bloc="cout"] table'); if (!tb) return null; const b = tb.querySelector('button.vf-sy-plie'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click();
+  const tw = tb.getBoundingClientRect().width, det = tb.querySelector('tr.vf-sy-e:not([hidden]) td'), lh = (e) => parseFloat(getComputedStyle(e).lineHeight) || 16;
+  const caches = [...tb.querySelectorAll('.vf-sy-cache')]; return { panneau: Math.round(document.getElementById('panel').getBoundingClientRect().width), table: Math.round(tw), nCaches: caches.length,
+    lignesCache: Math.max(0, ...caches.map((e) => Math.round(e.getBoundingClientRect().height / lh(e)))), detail: det ? Math.round(det.getBoundingClientRect().width) : 0,
+    debordement: tb.scrollWidth > tb.clientWidth + 1, ouvert: b ? b.getAttribute('aria-expanded') : null }; })()`;
 const largeur = async (s, w) => { await s.send('Emulation.setDeviceMetricsOverride', { width: w, height: 900, deviceScaleFactor: 1, mobile: false }); await pause(200); };
 const ouvrir = async (s) => {
   if (!(await s.ev(OUVERTE))) await s.ev(`${BTN}.click()`);
@@ -68,6 +75,7 @@ export async function jouer(chrome, port) {
     const jouerCas = async (nom, fr, et) => {
       table[FR] = fr; table[ET] = et || ok(etatCorps()); const avant = vues[FR];
       await charger(); await ouvrir(s); r.cas[nom] = await lire(s); r.cas[nom].reqFrise = vues[FR] - avant;
+      if (nom === 'complet') { await s.ev(GEO); await pause(300); r.cas[nom].geo = await stabiliser(() => s.ev(GEO), { max: 5000 }); }
     };
     for (const [nom, fr] of CAS) await jouerCas(nom, fr);
     await jouerCas('xss', ok(frise()), ok(etatCorps({ nom78: '<img src=x onerror="window.__xss=1">PIEGE' })));

@@ -164,29 +164,38 @@
       .vf-sy table.vf-sy-cout td { padding: var(--sp-4) var(--sp-6); text-align: right; vertical-align: top; border-bottom: 1px solid var(--hair-2); }
       .vf-sy table.vf-sy-cout th:first-child, .vf-sy table.vf-sy-cout td:first-child { text-align: left; }
       .vf-sy table.vf-sy-cout tfoot td { font-weight: 600; color: var(--text); }
-      .vf-sy table.vf-sy-cout summary { cursor: pointer; font-weight: 500; color: var(--text); }
-      .vf-sy table.vf-sy-cout ul { list-style: none; margin: var(--sp-4) 0 0; padding: 0; font-size: 11px; color: var(--text-3); }
-      @media (pointer: coarse), (max-width: 999px) { .vf-sy table.vf-sy-cout summary { min-height: 44px; display: flex; align-items: center; } }`;
+      .vf-sy table.vf-sy-cout .vf-sy-plie { all: unset; box-sizing: border-box; cursor: pointer; font-weight: 500; color: var(--text); text-align: left; }
+      .vf-sy table.vf-sy-cout .vf-sy-plie:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 8px; }
+      .vf-sy table.vf-sy-cout .vf-sy-cache { display: block; white-space: nowrap; font-size: 11px; font-weight: 400; color: var(--text-3); }
+      .vf-sy table.vf-sy-cout tr.vf-sy-e td { text-align: left; }
+      .vf-sy table.vf-sy-cout ul { list-style: none; margin: 0; padding: 0; font-size: 11px; color: var(--text-3); }
+      @media (pointer: coarse), (max-width: 999px) { .vf-sy table.vf-sy-cout .vf-sy-plie { min-height: 44px; display: flex; align-items: center; } }`;
     document.head.appendChild(st);
   };
   const J = (n) => (n == null ? 'inconnu' : FJ(n) ?? 'inconnu'), D = (n) => (n == null ? 'inconnu' : FD(n) ?? 'inconnu');
   const cache = (r) => `lu ${J(r.cacheLu)} · créé ${J(r.cacheCree)}`;
-  const ligneTable = (r) => {
-    const tr = el('tr'), td = el('td'), d = el('details'), ul = el('ul');
+  // jetons hors cache en chiffre principal, cache lu et créé en seconde ligne de la même cellule (une ligne, jamais coupée)
+  const cellule = (j, c) => { const td = el('td', {}, j); td.append(el('span', { class: 'vf-sy-cache' }, c)); return td; };
+  const ligneTable = (r) => { // une ligne de phase et, dessous, ses étages sur toute la largeur du tableau (repliés)
+    const tb = el('tbody'), tr = el('tr', { class: 'vf-sy-l' }), td = el('td'), ul = el('ul'), det = el('tr', { class: 'vf-sy-e' });
+    const b = el('button', { type: 'button', class: 'vf-sy-plie', 'aria-expanded': 'false' }, r.libelle), dd = el('td', { colspan: '3' });
     for (const x of r.etages) {
       ul.append(el('li', {}, `${x.etage} : entrée ${J(x.entree)}, sortie ${J(x.sortie)}, cache lu ${J(x.cacheLu)}, cache créé ${J(x.cacheCree)}`));
     }
-    d.append(el('summary', {}, r.libelle), ul); td.append(d);
-    tr.append(td, el('td', {}, J(r.jetons)), el('td', {}, cache(r)), el('td', {}, D(r.travailS)));
-    return tr;
+    det.hidden = true; dd.append(ul); det.append(dd); td.append(b);
+    b.addEventListener('click', () => { det.hidden = !det.hidden; b.setAttribute('aria-expanded', String(!det.hidden)); });
+    tr.append(td, cellule(J(r.jetons), cache(r)), el('td', {}, D(r.travailS)));
+    tb.append(tr, det);
+    return tb;
   };
   const tableau = (a) => {
     const t = el('table', { class: 'vf-sy-cout', 'aria-labelledby': 'vf-sy-t-cout' }), h = el('tr'), pre = a.incomplet ? 'au moins ' : '';
-    for (const c of ['Phase', 'Jetons, hors cache', 'Cache lu et créé', 'Durée']) h.append(el('th', { scope: 'col' }, c));
-    const corps = el('tbody'), pied = el('tfoot'), tf = el('tr');
-    for (const r of [...a.lignes, a.horsJalon, a.nonRattache]) if (r) corps.append(ligneTable(r));
-    for (const c of ['Total', `${pre}${J(a.total.jetons)}`, `${pre}${cache(a.total)}`, `${pre}${D(a.total.travailS)}`]) tf.append(el('td', {}, c));
-    pied.append(tf); t.append(el('thead', {}, null), corps, pied); t.tHead.append(h);
+    for (const c of ['Phase', 'Jetons, hors cache', 'Durée']) h.append(el('th', { scope: 'col' }, c));
+    const pied = el('tfoot'), tf = el('tr'), th = el('thead');
+    th.append(h); t.append(th);
+    for (const r of [...a.lignes, a.horsJalon, a.nonRattache]) if (r) t.append(ligneTable(r));
+    tf.append(el('td', {}, 'Total'), cellule(`${pre}${J(a.total.jetons)}`, `${pre}${cache(a.total)}`), el('td', {}, `${pre}${D(a.total.travailS)}`));
+    pied.append(tf); t.append(pied);
     return t;
   };
 

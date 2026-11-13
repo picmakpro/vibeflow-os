@@ -100,12 +100,12 @@ const E = { 'sess-1': 'Tête de session', 'mg-77': 'Manager', 'wk-77a': 'Codeur'
 const ORDRE = ['Manager', 'Codeur', 'Revue', 'Audit', 'Vérification', 'Tête de session', 'Autres'];
 const S = (vs, k) => vs.reduce((s, v) => s + (k === 'travailS' ? v.durees.travailS : v.jetons[k]), 0), J = (n) => K.fmtJetons(n), D = (n) => K.fmtDuree(n);
 const cache = (vs) => `lu ${J(S(vs, 'cacheLu'))} · créé ${J(S(vs, 'cacheCree'))}`, tete = (g) => brut.filter((v) => G[v.id] === g);
-const ligne = (lib, vs) => [lib, J(S(vs, 'entree') + S(vs, 'sortie')), cache(vs), D(S(vs, 'travailS'))];
+const ligne = (lib, vs) => [lib, J(S(vs, 'entree') + S(vs, 'sortie')) + '|' + cache(vs), D(S(vs, 'travailS'))];
 const etages = (vs) => ORDRE.filter((n) => vs.some((v) => E[v.id] === n)).map((n) => { const g = vs.filter((v) => E[v.id] === n);
   return `${n} : entrée ${J(S(g, 'entree'))}, sortie ${J(S(g, 'sortie'))}, cache lu ${J(S(g, 'cacheLu'))}, cache créé ${J(S(g, 'cacheCree'))}`; });
 const GR = [['Phase 77 · Santé de la méthode', '77'], ['Phase 78 · Équipe en direct', '78'], ['Hors jalon', 'hors'], ['Non rattaché', 'non']];
 console.log(JSON.stringify({ lignes: GR.map(([l, g]) => ligne(l, tete(g))), etages: GR.map(([, g]) => etages(tete(g))),
-  total: ['Total', pre + J(S(brut, 'entree') + S(brut, 'sortie')), pre + cache(brut), pre + D(S(brut, 'travailS'))], jetons: J(S(brut, 'entree') + S(brut, 'sortie')), duree: D(S(brut, 'travailS')) }));
+  total: ['Total', pre + J(S(brut, 'entree') + S(brut, 'sortie')) + '|' + pre + cache(brut), pre + D(S(brut, 'travailS'))], jetons: J(S(brut, 'entree') + S(brut, 'sortie')), duree: D(S(brut, 'travailS')) }));
 JS
 CO="$(node "$AUX/co.mjs" "$COUT" "$CALC" "$MODELE" "$FIX" 2>&1)"; JC() { printf '%s' "$CO" | node "$AUX/ev.mjs" "$1"; }
 MON() { node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>console.log(/[€$£]|\b(euros?|dollars?|USD|EUR)\b|coût estimé/i.test(s)?1:0))'; }
@@ -179,7 +179,7 @@ assert_eq "CO12 (partielle) — le tableau ET « Lecture partielle : certaines s
 
 echo "=== W17 — le bloc, le tableau, les phases, le minorant ==="
 assert_eq "W17.1 — route présente : le bloc suit le bloc 3 (ordre visite, burnup, methode, cout), titre exact, un seul bloc" "$(JV "j.cas.complet.blocs.join('-') + '|' + j.cas.complet.titre + '|' + j.cas.complet.nbCout")" "visite-burnup-methode-cout|Coût par phase et par étage · dernières 24 h|1"
-assert_eq "W17.2 — un tableau nommé par le h3 (aria-labelledby), quatre en-têtes th scope=col : Phase, Jetons hors cache, Cache lu et créé, Durée" "$(JV "j.cas.complet.tables + '|' + j.cas.complet.labelled + '|' + j.cas.complet.labelledOk + '|' + j.cas.complet.ths.join(',')")" "1|vf-sy-t-cout|true|Phase|col,Jetons, hors cache|col,Cache lu et créé|col,Durée|col"
+assert_eq "W17.2 — un tableau nommé par le h3 (aria-labelledby), trois en-têtes th scope=col : Phase, Jetons hors cache, Durée (le cache est la seconde ligne de la cellule des jetons)" "$(JV "j.cas.complet.tables + '|' + j.cas.complet.labelled + '|' + j.cas.complet.labelledOk + '|' + j.cas.complet.ths.join(',')")" "1|vf-sy-t-cout|true|Phase|col,Jetons, hors cache|col,Durée|col"
 assert_eq "W17.3 — lignes : phases du jalon dans l'ordre (77, 78), puis « Hors jalon », puis « Non rattaché » en dernier ; jetons (entrée + sortie), cache lu et créé, durée" "$(JV 'j.cas.complet.lignes')" "$(JA 'j.lignes')"
 assert_eq "W17.4 — chaque ligne se déplie (details) en une ligne par étage, dans l'ordre fixe : entrée, sortie, cache lu, cache créé" "$(JV 'j.cas.complet.etages')|$(JV 'j.cas.complet.details')" "$(JA 'j.etages')|[1,1,1,1]"
 assert_eq "W17.5 — ligne de total sans « au moins » quand tout est complet ; aucune phrase de minorant" "$(JV 'j.cas.complet.total')|$(JV 'j.cas.complet.notes.filter((n) => /Total partiel/.test(n)).length')" "$(JA 'j.total')|0"
@@ -191,9 +191,10 @@ for c in tronque3 tronque1 tronque0; do
   assert_eq "W17.9 ($c) — le total est un minorant (« au moins » devant chaque total) et la phrase le dit : « …, $ph »" "$(JV "j.cas.$c.total")|$(JV "j.cas.$c.notes.filter((n) => n.startsWith('Total partiel')).join('/')")" "$(JT 'j.total')|Total partiel : au moins $(JT 'j.jetons') jetons hors cache et $(JT 'j.duree'), $ph"
 done
 assert_eq "W17.10 — frise tronquée à 0 voie omise : jamais « 0 voie omise » ; complète : aucun « au moins »" "$(JV "j.cas.tronque0.texte.includes(' 0 voie')")|$(JV "j.cas.complet.texte.includes('au moins')")" "false|false"
-assert_eq "W17.11 — champ de jetons absent : « inconnu » sur la ligne, total sans lui avec « 1 voie sans mesure, non comptée. »" "$(JV "j.cas.inconnu.lignes[1][1]")|$(JV "j.cas.inconnu.notes.includes('1 voie sans mesure, non comptée.')")" "inconnu|true"
+assert_eq "W17.11 — champ de jetons absent : « inconnu » sur la ligne, total sans lui avec « 1 voie sans mesure, non comptée. »" "$(JV "j.cas.inconnu.lignes[1][1].split('|')[0]")|$(JV "j.cas.inconnu.notes.includes('1 voie sans mesure, non comptée.')")" "inconnu|true"
 assert_eq "W17.12 — état d'index indisponible pour les missions (GET /api/vf/state en 500) : tout est « Non rattaché », jamais une phase devinée" "$(JV "j.cas.sansEtat.lignes.map((l) => l[0]).join('/')")" "Non rattaché"
 assert_eq "W17.13 — les ordonnées des blocs 1 à 3 ne bougent pas que le bloc existe ou non (même page : 404 puis route présente après un cycle d'onglets)" "$(JV 'JSON.stringify(j.retour.avant.tops) === JSON.stringify(j.retour.apres.tops)')|$(JV 'j.retour.avant.present + "," + j.retour.apres.present')" "true|false,true"
+assert_eq "W17.14 — lisible à la largeur du panneau (360 px) : cache sur une seule ligne dans chaque cellule, détail des étages (ligne dépliée) à la largeur du tableau, aucun débordement" "$(JV '[j.cas.complet.geo.panneau, j.cas.complet.geo.nCaches >= 5, j.cas.complet.geo.lignesCache, j.cas.complet.geo.detail === j.cas.complet.geo.table, j.cas.complet.geo.debordement, j.cas.complet.geo.ouvert].join()')" "360,true,1,true,false,true"
 echo "=== CO14 / W15c / E0 ==="
 assert_eq "CO14 — après deux cycles d'onglets : un seul bloc, un seul abonnement à frise (égal au chargement à froid), même document, écouteurs égaux, au plus une requête de frise à l'ouverture" "$(JV '[j.onglets.nbCout, j.onglets.abonnes === j.retour.abonnes0, j.onglets.memeDocument, JSON.stringify(j.onglets.ecoutAvant) === JSON.stringify(j.onglets.ecoutApres), j.onglets.reqOuverture <= 1, j.retour.abonnes1 === j.retour.abonnes0].join()')" "1,true,true,true,true,true"
 assert_eq "W15c — la balise piégée posée dans un nom de phase est affichée en texte : window.__xss indéfini, aucune image ni script, aucun on*, aucune violation de CSP" "$(JV '[j.cas.xss.xss, j.cas.xss.imgs, j.cas.xss.on, j.cas.xss.texte.includes("PIEGE"), j.csp].join()')" "undefined,0,0,true,0"

@@ -36,3 +36,9 @@ M-HORS-JALON, M-PRINCIPAL, M-OMISES-ZERO, M-AGREGAT, M-NETTOIE-ABONNEMENT non jo
 - `test-cockpit-synthese-page.sh` 38/0 (30 s), `-visite.sh` 45/0 (36 s), `-blocs.sh` 59/0 (27 s), `test-cockpit-chrome-fr.sh` 141/0 (37 s), `test-cockpit-vendor.sh` 252/0 (172 s),
   `css-jetons.mjs` : 0, `scripts/check-version-sync.sh` : vert (246 suites).
 - Rouges connus non rencontrés : aucune des suites concernées (routes F.1, robustesse, git-entete, R3.18, T24F4.1) n'a été jouée.
+
+## Correction ciblée de design (majeur du juge, passe de fin de phase)
+
+- Écart : la structure du tableau s'écarte du plan. Trois colonnes (Phase, Jetons hors cache, Durée) ; le cache lu et créé est la seconde ligne, sur une seule ligne (`nowrap`, 11 px), de la cellule des jetons.
+  Chaque phase est un `tbody` : la ligne de phase, un bouton `aria-expanded` à la place du `details`, et sous elle une ligne `colspan` de pleine largeur portant les étages. À 360 px de panneau, le cache ne casse plus
+  et le détail occupe toute la largeur du tableau (W17.14, rouge sur la tête précédente, verte ensuite). W17.2 à W17.5, W17.7, W17.9 et W17.11 suivent la nouvelle structure ; `test-cockpit-synthese-cout.sh` : 66 PASS / 0 FAIL (65 s).
