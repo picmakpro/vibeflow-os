@@ -67,3 +67,4 @@ clés ajoutées sous `cockpit-project@1`, rien réécrit). Poids du graphe Proje
   Champ ajouté `cleNoeud` sur les seules exigences d'archive rattachées (aucun champ existant ne change). La clé ouvrable de la vivante reste
   résoluble. Témoins T9.12 à T9.12e ; chaine 66/0, collecte 36/0, route 73/0.
 - rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
+- Correctif CI PC3.2 : `79f452ef` — l'attendu de PC3.2 (test-cockpit-projet-champs.sh) complété des champs voulus : nœud `trace`, `metaVf` [trace, registres, jalonActif] ; `cleNoeud` n'entre pas dans cockpit-project@1. Contrat déjà déclaré dans vf-cockpit-interface.json. Suites lisant cockpit-project@1 rejouées : verdicts au rapport du correctif.
