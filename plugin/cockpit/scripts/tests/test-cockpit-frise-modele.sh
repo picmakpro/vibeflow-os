@@ -6,7 +6,7 @@
 #   F1  lire (schéma avant tout champ, genres inconnus, cibles/arbre nuls, tronque, voiesOmises)   F2  unités (secondes -> millisecondes)
 #   F3  arbre (ordre, enfants, session sans segment) · F3b cycle et plafond   F4  fenêtres et voies tronquées   F5  repli des workers
 #   F6  projection Horloge / Événements · F6b graduations au passage à l'heure d'hiver (TZ=Europe/Paris)   F7  etatA   F8  noeudsPortes
-#   F9  agreger   F10 TEMP-10 (a : texte des modules ; b : contrat — NON vérifiée tant que 79-13 n'a pas posé le bloc)   F11 courbe
+#   F9  agreger   F10 TEMP-10 (a : texte des modules ; b : contre le bloc cockpit-frise@1 du contrat et la liste blanche de la route)   F11 courbe
 #   F12 dépôt (commitsParBranche, couverture)   F13 δ et voiesAutour   F14 fichiersA   F15 forme du code (A44)   FMT formats français
 # Pas de mutants (régime allégé, consigne de la session principale, 2026-11-13) ; aucun serveur lancé, donc pas d'hygiène de processus.
 # Exit 0 si tout passe, 1 sinon. Les `⊘` sont annoncés en fin de sortie, jamais comptés comme réussis.
@@ -31,7 +31,7 @@ import path from 'node:path';
 import vm from 'node:vm';
 import { pathToFileURL } from 'node:url';
 
-const [, , DIR, FAB] = process.argv;
+const [, , DIR, FAB, SCRIPTS] = process.argv;
 const F = await import(pathToFileURL(FAB).href);
 const { NOW, MIN, voie, entree, fabrique, quiMissions, quiPhases, element, rangee, tete, git } = F;
 const FICHIERS = ['74-vf-frise-calculs.js', '74-vf-frise-modele.js'];
@@ -66,6 +66,7 @@ const section = (id, f) => SECTIONS.push([id, f]);
 
 section('F1', () => {
   const r = M.lire(fabrique({}));
+  eq(r.frise.at, NOW, 'at (chaîne ISO de la route) lu en millisecondes');
   ok(r.ok === true && r.frise.voies.length === 6, 'schéma @1 lu, six voies', j(r).slice(0, 200));
   let lu = false;
   const hostile = { schema: 'vibeflow/cockpit-frise@2', get voies() { lu = true; throw new Error('voies lu'); } };
@@ -193,6 +194,8 @@ section('F7', () => {
   eq([M.etatA(p, B + 30 * MIN - 1), M.etatA(p, B + 30 * MIN), M.etatA(p, B + 40 * MIN)], ['travail', 'attend-humain', 'attend-humain'],
     'queue attend-humain (A43) : jamais travail ni repos, à fin exact attend-humain');
   eq(p.segments.map((s) => s.genre), ['travail', 'attend-humain'], 'le dernier segment persisté n\'est pas retypé');
+  const fu = vs([voie({ id: 'fu', debut: B, fin: B + 30 * MIN, segments: [[B, B + 20 * MIN, 'travail'], [B + 20 * MIN, NOW, 'attend-humain']] })])[0];
+  eq([M.etatA(fu, B + 20 * MIN - 1), M.etatA(fu, B + 30 * MIN), M.etatA(fu, B + 40 * MIN)], ['travail', 'attend-humain', 'attend-humain'], 'queue fusionnée au dernier segment (forme de la route) : même état');
 });
 
 section('F8', () => {
@@ -266,7 +269,22 @@ section('F10', () => {
     if (t !== null) for (const [re, nom] of INTERDITS) ok(!re.test(t), `a) ${n} : aucune occurrence de ${nom}`);
   }
   ok(Array.isArray(M.CHAMPS_LUS) && ['id', 'segments', 'cibles.tronque', 'jetons.entree', 'rattachement.source', 'durees.travailS'].every((c) => M.CHAMPS_LUS.includes(c)), 'CHAMPS_LUS : chemins de champs lus');
-  neutre('b) CHAMPS_LUS ⊆ champs déclarés par le bloc vibeflow/cockpit-frise@1 de vf-cockpit-interface.json : bloc posé par 79-13, comparaison à écrire à la reprise');
+  // b) contre le bloc réellement posé par 79-13 (jamais un repli : fichier ou bloc absent = rouge) et contre la liste blanche de la route
+  const bloc = JSON.parse(fs.readFileSync(path.join(SCRIPTS, 'vf-cockpit-interface.json'), 'utf8')).schemas['vibeflow/cockpit-frise@1'];
+  ok(!!bloc && Array.isArray(bloc.voie), 'b) bloc vibeflow/cockpit-frise@1 présent dans vf-cockpit-interface.json');
+  const top = new Set([...Object.keys(bloc.requis), ...bloc.voie]);
+  const liste = (nom) => { const m = new RegExp(`const ${nom} = \\[([^\\]]*)\\]`).exec(fs.readFileSync(path.join(SCRIPTS, 'vf-cockpit-frise-voie.mjs'), 'utf8')); return m ? [...m[1].matchAll(/'([^']+)'/g)].map((x) => x[1]) : null; };
+  const sous = { compteurs: liste('COMPTEURS'), jetons: liste('JETONS'), durees: liste('DUREES'), rattachement: ['dag', 'noeud', 'source'] };
+  const hors = M.CHAMPS_LUS.filter((c) => {
+    const [a, k] = c.split('.');
+    if (a === 'source') return !bloc.source.requis.includes(k);
+    if (a === 'cibles' && k) return !bloc.cibles.requis.includes(k);
+    if (k !== undefined && sous[a]) return !top.has(a) || !sous[a].includes(k);
+    return !top.has(a);
+  });
+  eq(hors, [], 'b) CHAMPS_LUS ⊆ champs déclarés par le bloc cockpit-frise@1 (sous-champs : liste blanche de la route)');
+  const segs = bloc.segments.map((g, i) => [NOW - 1000 * (i + 2), NOW - 1000 * (i + 1), g]), evs = bloc.evenements.map((g, i) => [NOW - i, g]);
+  eq(lire1([voie({ id: 'gen', segments: segs, evenements: evs })]).ignores, 0, 'b) tous les genres déclarés par le bloc sont lus (aucun écarté)');
 });
 
 section('F11', () => {
@@ -384,7 +402,7 @@ JS
 SECTIONS="F1 F2 F3 F3b F4 F5 F6 F6b F7 F8 F9 F10 F11 F12 F13 F14 F15 FMT"
 
 # --- F0 : contrôle positif, dossier VIDE : chaque section doit rougir (sinon une sonde reste verte sans module) ---
-TZ=Europe/Paris node "$AUX/sondes.mjs" "$VIDE" "$HERE_T/frise-fabrique.mjs" > "$WORK/vide.out" 2>&1
+TZ=Europe/Paris node "$AUX/sondes.mjs" "$VIDE" "$HERE_T/frise-fabrique.mjs" "$SCRIPTS" > "$WORK/vide.out" 2>&1
 VERTES=""
 for s in $SECTIONS; do
   f=$(grep -cF "❌ FAIL — $s :" "$WORK/vide.out"); p=$(grep -cF "✅ PASS — $s :" "$WORK/vide.out")
@@ -393,7 +411,7 @@ done
 assert_eq "F0 : sans module, chaque section F1 à F15 et FMT rougit (une sonde reste verte sans module :${VERTES:- aucune})" "$VERTES" ""
 
 # --- sections sur les modules du dépôt ---
-TZ=Europe/Paris node "$AUX/sondes.mjs" "$UI" "$HERE_T/frise-fabrique.mjs" > "$WORK/reel.out" 2>&1
+TZ=Europe/Paris node "$AUX/sondes.mjs" "$UI" "$HERE_T/frise-fabrique.mjs" "$SCRIPTS" > "$WORK/reel.out" 2>&1
 grep -v '^SONDES ' "$WORK/reel.out"
 PASS=$((PASS + $(grep -c '✅ PASS' "$WORK/reel.out")))
 FAIL=$((FAIL + $(grep -c '❌ FAIL' "$WORK/reel.out")))
@@ -402,5 +420,5 @@ NEUTRES=$(grep -c '⊘ NON vérifiée' "$WORK/reel.out")
 
 echo
 echo "=== $PASS PASS, $FAIL FAIL ==="
-[ "$NEUTRES" -gt 0 ] && echo "⊘ $NEUTRES sonde(s) NON vérifiée(s), non comptée(s) comme réussie(s) : F10 b) (bloc cockpit-frise@1 du contrat, 79-13)"
+[ "$NEUTRES" -gt 0 ] && echo "⊘ $NEUTRES sonde(s) NON vérifiée(s), non comptée(s) comme réussie(s)"
 [ "$FAIL" -eq 0 ]
