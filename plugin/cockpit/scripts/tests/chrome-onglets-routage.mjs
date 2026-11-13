@@ -8,7 +8,8 @@ import vm from 'node:vm';
 import { executer, pause, stabiliser } from './chrome-session.mjs';
 const [, , chrome, racine, mode, fichier, filtre] = process.argv;
 const SEL = filtre ? new Set(filtre.split(',')) : null;
-const AMORCE = `(() => { const A = window.__o = { pop: 0, push: 0, repl: 0, fetchs: [], directs: 0, evs: [], rej: 0, echec: 0 };
+const AMORCE = `(() => { const A = window.__o = { pop: 0, push: 0, repl: 0, fetchs: [], directs: 0, evs: [], rej: 0, echec: 0, cerr: [] };
+  const ce = console.error; console.error = function (...a) { A.cerr.push(String(a[0]).slice(0, 120)); return ce.apply(this, a); };
   const ael = EventTarget.prototype.addEventListener;
   EventTarget.prototype.addEventListener = function (t, ...r) {
     if (t === 'popstate' && /00-vf-onglets/.test(new Error().stack)) A.pop++; return ael.call(this, t, ...r); };
@@ -152,6 +153,12 @@ await executer(chrome, async (s) => {
     await sec('og212', async () => {
       const av = await etat(); const r0 = av.repl; const e = await retour('history.back()', (await lire('__o.evs.length')) + 1);
       o.og212 = { p: e.p, h: e.h, repl: e.repl - r0 };
+    });
+    await sec('og213', async () => { // une modale ouverte (invite du panneau Santé) : aller charge Projet, la surcouche est défaite avec l'onglet
+      await charger('/'); await s.ev(`VibeFlow.modal({ title: 'T', html: '<p>x</p>', actions: [] })`); await pause(400);
+      const r = JSON.parse(await s.ev(`(async () => JSON.stringify(await VF_ONGLETS.aller('projet').then(() => ['ok'], (e) => ['rejet', e.message])))()`));
+      const e = await arrivee(1, 'projet'); o.og213 = { r, p: e.p, t: e.t, ae: e.ae, cerr: await lire('__o.cerr'),
+        modale: await lire(`!!document.querySelector('#modal.open')`) };
     });
   }
 

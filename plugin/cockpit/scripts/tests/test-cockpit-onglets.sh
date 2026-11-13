@@ -78,6 +78,9 @@ assert_eq "OG2.11 — aller('equipe', { fragment }) : #vf-x à la résolution, u
   "$(E2 '[j.og211.r.h, j.og211.r.p, j.og211.r.n - j.og211.e0.n, j.og211.r.push - j.og211.e0.push, j.og211.bad.join(),
     j.og211.apres.n === j.og211.r.n, j.og211.apres.fetchs - j.og211.e0.fetchs]')" \
   '["#vf-x","/equipe.html",1,1,"rejet,rejet,rejet,rejet,rejet",true,1]'
+assert_eq "OG2.13 — modale ouverte puis aller('projet') : promesse résolue, Projet chargé, focus posé, aucune erreur consignée (hors écart 41-clavier), modale défaite" \
+  "$(E2 '[j.og213.r[0], j.og213.p, /^Projet · /.test(j.og213.t), j.og213.ae !== "body",
+    j.og213.cerr.filter((x) => !/querySelectorAll/.test(x)).join(), j.og213.modale]')" '["ok","/project.html",true,true,"",false]'
 assert_eq "OG2.12 — history.back() : l'adresse de l'entrée (chemin et fragment) à l'identique, aucun replaceState du routeur" \
   "$(E2 '[j.og212.p, j.og212.h, j.og212.repl]')" '["/","#s=zz",0]'
 
