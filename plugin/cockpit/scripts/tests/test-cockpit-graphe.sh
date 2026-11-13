@@ -68,7 +68,7 @@ demarrer() { # demarrer <lab> [VAR=val …] -> PORT, TOK (jeton Code), PTOK (jet
   cockpit_lancer "$L" "$@"; RL=$?
   PORT="${VF_PORT:-0}"; TOK="$(node "$AUX/jeton.mjs" "$PORT" /index.html)"; PTOK="$(node "$AUX/jeton.mjs" "$PORT" /project.html)"
 }
-route() { gc get "$PORT" "$1" "${2:-$PTOK}" "${3:-}"; } # route <chemin> [jeton] [hôte]
+route() { gc get "$PORT" "$1" "${2-$PTOK}" "${3:-}"; } # route <chemin> [jeton] [hôte]
 ROADMAP_2='- [x] **Phase 1: Socle** - premier jet\n- [x] **Phase 2: Suite** - deuxième jet\n- [ ] **Phase 3: Fin** - dernier jet\n'
 ROADMAP_3='- [x] **Phase 1: Socle** - premier jet\n- [x] **Phase 2: Suite** - deuxième jet\n- [x] **Phase 3: Fin** - dernier jet\n'
 ph2_fait() { route "/api/vf/graphe?onglet=projet" > "$WORK/r-ph2.json"; [ "$(cj 'JSON.parse(j.corps).nodes.find(n=>n.id==="ph-2").st' < "$WORK/r-ph2.json")" = done ]; }
@@ -131,7 +131,7 @@ LABQ="$WORK/labq"; mklab "$LABQ"; OUTQ="$LABQ/.vibeflow/cockpit"
 node -e 'const fs=require("fs");const f=process.argv[1];const g=JSON.parse(fs.readFileSync(f,"utf8"));g.nodes.find(n=>n.id==="ph-2").st="done";fs.writeFileSync(f,JSON.stringify(g))' "$OUTQ/projet.json" 2>/dev/null
 requete() { ( cd "$LABQ" && node "$SCRIPTS/vf-cockpit-query.mjs" status done 2>&1; echo "rc=$?" ); }
 Q1="$(requete)"
-assert_eq "G1.8a — l'outil de requête suit projet.json (phase 2 faite dans projet.json, à faire dans project.html) : ph-2 listée, code 0" "$(printf '%s' "$Q1" | grep -c '"ph-2"' | awk '{print ($1>=1)?"ph-2":"absent"}')|$(printf '%s' "$Q1" | tail -1)" "ph-2|rc=0"
+assert_eq "G1.8a — l'outil de requête suit projet.json (phase 2 faite dans projet.json, à faire dans project.html) : ph-2 listée, code 0" "$(printf '%s' "$Q1" | grep -c 'ph-2' | awk '{print ($1>=1)?"ph-2":"absent"}')|$(printf '%s' "$Q1" | tail -1)" "ph-2|rc=0"
 cp "$OUTQ/projet.json" "$WORK/projet.sauve"
 rm -f "$OUTQ/projet.json"; Q2="$(requete)"
 printf '{"schema":"vibeflow/cockpit-project@1","nodes":[' > "$OUTQ/projet.json"; Q3="$(requete)"
@@ -154,6 +154,130 @@ cockpit_arreter; rm -f "$OUT/projet.json"
 demarrer "$LAB"
 attendre 6 recree
 assert_eq "G1.10b — au prochain démarrage, projet.json manquant est réécrit (l'attache le crée), en 0600" "$(node -e 'const fs=require("fs");try{console.log((fs.statSync(process.argv[1]).mode&0o777).toString(8))}catch{console.log("absent")}' "$OUT/projet.json")" "600"
+cockpit_arreter
+
+
+# ===== lab de la seconde partie : un dépôt avec un remote marqué, un plan qui cite un fichier nommé `outils` =====
+LAB2="$WORK/lab2"; mklab "$LAB2"; OUT2="$LAB2/.vibeflow/cockpit"
+MQ_REMOTE="MQ-REMOTE-79-15"
+git -C "$LAB2" remote add origin "https://example.invalid/$MQ_REMOTE.git"
+printf -- '---\nphase: 1\nplan: 1\nfiles_modified: [outils, src/util.js]\n---\n<objective>Faire le socle</objective>\n' > "$LAB2/.planning/phases/01-x/01-01-PLAN.md"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB2" --quiet > "$WORK/build2.out" 2>&1 || { echo "assemblage du lab 2 KO"; cat "$WORK/build2.out"; }
+demarrer "$LAB2"
+attendre 30 collecte_ok
+bascule() { # inverse la phase 3 de LAB2 et attend que la route le dise ; $1 = done|todo attendu
+  local voulu="$1"
+  if [ "$1" = done ]; then printf -- "$ROADMAP_3" > "$LAB2/.planning/ROADMAP.md"; else printf -- "$ROADMAP_2" > "$LAB2/.planning/ROADMAP.md"; fi
+  vu() { route "/api/vf/graphe?onglet=projet" | cj 'JSON.parse(j.corps).nodes.find(n=>n.id==="ph-3").st' | grep -q "^$voulu$"; }
+  attendre 8 vu
+}
+
+echo "=== G2 — contrôles d'accès de C0, méthodes, CORS, ensemble fermé des onglets ==="
+URL_P="/api/vf/graphe?onglet=projet"
+G21="$(route "$URL_P" "" | cj 'j.statut')|$(route "$URL_P" "0000000000000000000000000000000f" | cj 'j.statut')|$(route "$URL_P" "$PTOK" "evil.example:$PORT" | cj 'j.statut')|$(gc get "$PORT" "$URL_P" "$PTOK" "" "Origin=http://evil.example" | cj 'j.statut')|$(route "$URL_P" "$TOK" | cj 'j.statut')|$(route "$URL_P" "$PTOK" | cj 'j.statut')"
+assert_eq "G2.1 — sans jeton, jeton faux, hôte inconnu, origine étrangère : 403 chacun ; jeton Code et jeton Projet : 200" "$G21" "403|403|403|403|200|200"
+G22=""; for m in POST PUT DELETE; do G22="$G22 $(GRAPHE_METHODE=$m gc get "$PORT" "$URL_P" "$PTOK" | cj 'j.statut')"; done
+assert_eq "G2.2 — POST, PUT, DELETE sur la route : 405" "$(echo $G22)" "405 405 405"
+cat > "$AUX/cors-temoin.mjs" <<'JS'
+// témoin positif : un serveur jetable qui pose l'en-tête CORS, interrogé par le MÊME client que la suite
+import http from 'node:http'; import { execFile } from 'node:child_process';
+const s = http.createServer((q, r) => { r.writeHead(200, { 'Access-Control-Allow-Origin': '*' }); r.end('x'); }).listen(0, '127.0.0.1', () => {
+  const port = s.address().port;
+  execFile(process.execPath, [process.argv[2], 'get', String(port), '/', 'jeton'], { encoding: 'utf8' }, (e, out) => { console.log(JSON.parse(out).entetes['access-control-allow-origin'] || 'absent'); s.close(); }); // asynchrone : un enfant synchrone figerait le serveur qu'il interroge
+});
+JS
+G23=0
+ETAG_P2="$(route "$URL_P" | cj 'j.entetes.etag')"
+for c in "$URL_P|$PTOK||" "/api/vf/graphe?onglet=zzz|$PTOK||" "$URL_P||" "$URL_P|$PTOK||If-None-Match=$ETAG_P2"; do
+  IFS='|' read -r ch jt _ ent <<EOF
+$c
+EOF
+  if [ -n "$ent" ]; then R="$(gc get "$PORT" "$ch" "$jt" "" "$ent")"; else R="$(gc get "$PORT" "$ch" "$jt")"; fi
+  [ "$(printf '%s' "$R" | cj 'Object.keys(j.entetes).some(k=>/^access-control-/i.test(k))')" = true ] && G23=$((G23+1))
+done
+assert_eq "G2.3 — aucune réponse de la route (200, 400, 403, 304) ne porte access-control-* ; témoin : un serveur qui pose l'en-tête est détecté par le même client" "$G23|$(node "$AUX/cors-temoin.mjs" "$TESTS/graphe-client.mjs")" "0|*"
+G24=""
+for v in "" "onglet=" "onglet=Code" "onglet=PROJET" "onglet=code%20" "onglet=__proto__" "onglet=constructor" "onglet=toString" "onglet=code&onglet=projet" "onglet=$(head -c 4096 /dev/zero | tr '\0' a)" "onglet=projet.json" "onglet=%00"; do
+  R="$(route "/api/vf/graphe?$v")"; G24="$G24 $(printf '%s' "$R" | cj '[j.statut,JSON.parse(j.corps||"{}").erreur].join("/")')"
+done
+assert_eq "G2.4 — onglet absent, vide, hors de l'ensemble fermé (casse, espace, noms de propriété d'objet), répété, de 4 Kio, nul : 400 onglet-invalide chacun" "$(echo $G24)" "$(printf '400/onglet-invalide %.0s' 1 2 3 4 5 6 7 8 9 10 11 12 | sed 's/ $//')"
+assert_eq "G2.4b — /api/vf/graphe/ : 404 ; témoin positif : les trois noms valides répondent 200" "$(route "/api/vf/graphe/" | cj 'j.statut')|$(for o in code projet equipe; do route "/api/vf/graphe?onglet=$o" | cj 'j.statut'; done | paste -sd, -)" "404|200,200,200"
+
+echo "=== G3 — Équipe et Code : mêmes données que les pages, remote absent, graphe absent ou hostile, garde ==="
+route "/api/vf/graphe?onglet=equipe" > "$WORK/r-eq.json"; ETAG_EQ="$(cj 'j.entetes.etag' < "$WORK/r-eq.json")"
+assert_eq "G3.1 — Équipe : 200, schéma vibeflow/cockpit-equipe@1, ETag de 18 caractères, 304 sur l'étiquette" "$(cj '[j.statut,JSON.parse(j.corps).schema,/^"[0-9a-f]{16}"$/.test(j.entetes.etag)].join("|")' < "$WORK/r-eq.json")|$(gc get "$PORT" "/api/vf/graphe?onglet=equipe" "$PTOK" "" "If-None-Match=$ETAG_EQ" | cj 'j.statut')" "200|vibeflow/cockpit-equipe@1|true|304"
+route "/api/vf/graphe?onglet=code" "$TOK" > "$WORK/r-code.json"
+printf '%s' "$(cj 'j.corps' < "$WORK/r-code.json")" > "$WORK/corps-code.json"
+node "$AUX/page.mjs" "$PORT" /index.html "$WORK/index-servi.html" > /dev/null; node "$AUX/page.mjs" "$PORT" /project.html "$WORK/projet-servi.html" > /dev/null; node "$AUX/page.mjs" "$PORT" /equipe.html "$WORK/equipe-servi.html" > /dev/null
+assert_eq "G3.2a — Code : 200, schéma vf-cockpit/graph@1, corps égal en profondeur au graphe embarqué dans /index.html (même repos vidé)" "$(cj '[j.statut,JSON.parse(j.corps).schema].join("|")' < "$WORK/r-code.json")|$(node "$AUX/egal.mjs" "$WORK/corps-code.json" "$WORK/index-servi.html")" "200|vf-cockpit/graph@1|egal"
+FUITE_REMOTE=""; for f in "$WORK/corps-code.json" "$WORK/index-servi.html" "$WORK/projet-servi.html" "$WORK/equipe-servi.html"; do FUITE_REMOTE="$FUITE_REMOTE $(grep -c -F "$MQ_REMOTE" "$f")"; done
+assert_eq "G3.2b — le marqueur du remote git est absent du corps Code, de /index.html, /project.html, /equipe.html ; témoin de présence : il est dans graph.json" "$(echo $FUITE_REMOTE)|$([ "$(grep -c -F "$MQ_REMOTE" "$OUT2/graph.json")" -ge 1 ] && echo present || echo absent)" "0 0 0 0|present"
+printf '%s' "$(route "/api/vf/graphe?onglet=projet" | cj 'j.corps')" > "$WORK/corps-p.json"; printf '%s' "$(route "/api/vf/graphe?onglet=equipe" | cj 'j.corps')" > "$WORK/corps-e.json"
+node "$AUX/page.mjs" "$PORT" /project.html "$WORK/projet-servi.html" > /dev/null; node "$AUX/page.mjs" "$PORT" /equipe.html "$WORK/equipe-servi.html" > /dev/null
+assert_eq "G3.3a — égalité route et page pour Projet et pour Équipe (zone de données extraite de la page servie)" "$(node "$AUX/egal.mjs" "$WORK/corps-p.json" "$WORK/projet-servi.html")|$(node "$AUX/egal.mjs" "$WORK/corps-e.json" "$WORK/equipe-servi.html")" "egal|egal"
+bascule done
+printf '%s' "$(route "/api/vf/graphe?onglet=projet" | cj 'j.corps')" > "$WORK/corps-p.json"; node "$AUX/page.mjs" "$PORT" /project.html "$WORK/projet-servi.html" > /dev/null
+assert_eq "G3.3b — après un changement de planning, la page Projet servie égale toujours la route (et porte le changement)" "$(node "$AUX/egal.mjs" "$WORK/corps-p.json" "$WORK/projet-servi.html")|$(node "$AUX/donnees.mjs" "$WORK/projet-servi.html" 'g.nodes.find(n=>n.id==="ph-3").st')" "egal|done"
+
+cp "$OUT2/graph.json" "$WORK/graph.sauve"
+code_st() { route "/api/vf/graphe?onglet=code" "$TOK" | cj '[j.statut,(JSON.parse(j.corps||"{}").erreur||"")].join("/")'; }
+rm -f "$OUT2/graph.json"; G34a="$(code_st)|$(route "/api/vf/graphe?onglet=projet" | cj 'j.statut')"
+cp "$WORK/graph.sauve" "$OUT2/graph.json"; G34b="$(code_st)"
+head -c 200 "$WORK/graph.sauve" > "$OUT2/graph.json"; G34c="$(code_st)"
+head -c 34603008 /dev/zero > "$OUT2/graph.json"; G34d="$(code_st)"
+rm -f "$OUT2/graph.json"; ln -s "$LAB2/src/util.js" "$OUT2/graph.json"; G34e="$(code_st)"
+rm -f "$OUT2/graph.json"; cp "$WORK/graph.sauve" "$OUT2/graph.json"
+assert_eq "G3.4 — graph.json absent : 503 graphe-indisponible pour Code, Projet 200 ; rétabli : 200 ; tronqué, de 33 Mio ou lien symbolique : 503 graphe-indisponible" "$G34a $G34b $G34c $G34d $G34e" "503/graphe-indisponible|200 200/ 503/graphe-indisponible 503/graphe-indisponible 503/graphe-indisponible"
+
+# G3.6 : la garde d'émission et son exemption précise (les CLÉS de meta.vfTouch sont des chemins du lab ; leurs valeurs sont comparées)
+route "/api/vf/graphe?onglet=code" "$TOK" > "$WORK/r-code2.json"
+assert_eq "G3.6a — un plan qui cite un fichier nommé « outils » : la route Code répond 200 et la clé outils est dans meta.vfTouch (exemption des clés)" "$(cj '[j.statut,"outils" in (JSON.parse(j.corps).meta.vfTouch||{})].join("|")' < "$WORK/r-code2.json")" "200|true"
+modif_graphe() { node -e 'const fs=require("fs");const f=process.argv[1];const g=JSON.parse(fs.readFileSync(f,"utf8"));new Function("g",process.argv[2])(g);fs.writeFileSync(f,JSON.stringify(g))' "$OUT2/graph.json" "$1"; }
+modif_graphe 'g.files[0].messages = 1'; G36b="$(code_st)"; cp "$WORK/graph.sauve" "$OUT2/graph.json"
+modif_graphe 'g.meta.vfTouch = { x: [{ fil: 1 }] }'; G36c="$(code_st)"; cp "$WORK/graph.sauve" "$OUT2/graph.json"
+assert_eq "G3.6b — une clé interdite (messages) sur un nœud de graph.json : 503 emission-refusee ; une clé interdite (fil) dans une VALEUR de meta.vfTouch : 503 emission-refusee" "$G36b $G36c" "503/emission-refusee 503/emission-refusee"
+assert_eq "G3.6c — témoin : le graph.json rétabli répond de nouveau 200" "$(code_st)" "200/"
+
+echo "=== G4 — pages en parties : CSP égale à l'oracle indépendant, longueur exacte, texte de planning qui ferme le script ==="
+cat > "$AUX/oracle.mjs" <<'JS'
+// oracle.mjs <corps.html> <script-src publié> : oracle INDÉPENDANT du module (regex sur le CORPS servi, sha256 base64 de chaque script en ligne, dédoublonné, ordre du document, zone de données comprise)
+import fs from 'node:fs'; import crypto from 'node:crypto';
+const corps = fs.readFileSync(process.argv[2], 'utf8');
+const attendu = [...new Set([...corps.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`))].join(' ');
+console.log(attendu === process.argv[3] && attendu.length > 20 ? 'egal' : 'diff');
+JS
+csp_page() { local meta; meta="$(node "$AUX/page.mjs" "$PORT" "$1" "$WORK/csp-$2.html")"; node "$AUX/oracle.mjs" "$WORK/csp-$2.html" "${meta##*|}"; }
+assert_eq "G4.1a — CSP de /project.html et de /equipe.html : la liste ordonnée des empreintes de script-src égale celle de l'oracle indépendant" "$(csp_page /project.html p)|$(csp_page /equipe.html e)" "egal|egal"
+printf -- '- [x] **Phase 1: Socle** - premier jet\n- [x] **Phase 2: Suite** - deuxième jet\n- [x] **Phase 3: Fin** - dernier jet\n- [ ] **Phase 4: </script><b id=zz>x** - piege\n' > "$LAB2/.planning/ROADMAP.md"
+hostile_vu() { route "/api/vf/graphe?onglet=projet" | grep -q 'zz'; }
+attendre 8 hostile_vu
+node "$AUX/page.mjs" "$PORT" /project.html "$WORK/csp-h.html" > "$WORK/csp-h.meta"
+assert_eq "G4.1b — un nom de phase « </script><b id=zz>x » : la page ne porte pas la balise brute, le texte est dans les données, la CSP reste égale à l'oracle" "$(grep -c '<b id=zz>' "$WORK/csp-h.html")|$([ "$(grep -c 'zz' "$WORK/csp-h.html")" -ge 1 ] && echo present || echo absent)|$(node "$AUX/oracle.mjs" "$WORK/csp-h.html" "$(cat "$WORK/csp-h.meta" | sed 's/.*|//')")" "0|present|egal"
+G42=""; for p in /project.html /equipe.html /index.html; do G42="$G42 $(node "$AUX/page.mjs" "$PORT" "$p" "$WORK/cl.html" | awk -F'|' '{print ($2==$3)?"egal":"diff:"$2"/"$3}')"; done
+assert_eq "G4.2 — Content-Length égal au nombre d'octets du corps pour /project.html, /equipe.html, /index.html" "$(echo $G42)" "egal egal egal"
+printf -- "$ROADMAP_3" > "$LAB2/.planning/ROADMAP.md"
+
+echo "=== G5 — fichier de données hostile : aucun lien suivi, aucun fichier hors du lab touché ==="
+mkdir -p "$WORK/hors"; HORS="$WORK/hors/cible.txt"; echo "contenu-hors-du-lab" > "$HORS"; HORS_AVANT="$(node "$AUX/mtime.mjs" "$HORS")|$(cat "$HORS")"
+egal_pj() { printf '%s' "$(route "/api/vf/graphe?onglet=projet" | cj 'j.corps')" > "$WORK/corps-pj.json"; [ "$(node "$AUX/egal.mjs" "$OUT2/projet.json" "$WORK/corps-pj.json" 2>/dev/null)" = egal ]; }
+ln -s "$HORS" "$OUT2/projet.json.tmp"; bascule todo; attendre 6 egal_pj
+G51a="$([ -L "$OUT2/projet.json" ] && echo lien || echo ordinaire)|$([ "$HORS_AVANT" = "$(node "$AUX/mtime.mjs" "$HORS")|$(cat "$HORS")" ] && echo intact || echo touche)|$(route "$URL_P" | cj 'j.statut')"
+rm -f "$OUT2/projet.json.tmp"
+rm -f "$OUT2/projet.json"; ln -s "$HORS" "$OUT2/projet.json"; bascule done; attendre 6 egal_pj
+G51b="$([ -L "$OUT2/projet.json" ] && echo lien || echo ordinaire)|$([ "$HORS_AVANT" = "$(node "$AUX/mtime.mjs" "$HORS")|$(cat "$HORS")" ] && echo intact || echo touche)"
+LIEN_LAB="$LAB2/src/util.js"; LAB_AVANT="$(cksum < "$LIEN_LAB")|$(node "$AUX/mtime.mjs" "$LIEN_LAB")"
+ln "$LIEN_LAB" "$OUT2/projet.json.tmp"; bascule todo; attendre 6 egal_pj
+G51c="$([ "$LAB_AVANT" = "$(cksum < "$LIEN_LAB")|$(node "$AUX/mtime.mjs" "$LIEN_LAB")" ] && echo intact || echo touche)"
+rm -f "$OUT2/projet.json.tmp"; bascule done; attendre 6 egal_pj
+G51d="$(egal_pj && echo ecrit || echo absent)|$([ -L "$OUT2/projet.json" ] && echo lien || echo ordinaire)"
+assert_eq "G5.1 — projet.json.tmp en lien symbolique, projet.json en lien symbolique, projet.json.tmp en lien dur d'un fichier du lab : aucun fichier hors du lab ni du lab touché, projet.json ordinaire, serveur vivant ; témoin positif : sans lien l'écriture réussit" "$G51a $G51b $G51c $G51d" "ordinaire|intact|200 ordinaire|intact intact ecrit|ordinaire"
+
+echo "=== G3.7 — contrat du module vidé : les trois onglets répondent 503 emission-refusee ==="
+cockpit_arreter
+F37="$(cockpit_module_copie)"; rm -f "$F37/scripts/vf-cockpit-interface.json"
+COCKPIT_MODULE="$F37" demarrer "$LAB2"
+G37=""; for o in code projet equipe; do G37="$G37 $(route "/api/vf/graphe?onglet=$o" "$PTOK" | cj '[j.statut,JSON.parse(j.corps||"{}").erreur].join("/")')"; done
+assert_eq "G3.7 — contrat illisible (copie du module sans vf-cockpit-interface.json, serveur vivant : RL=$RL) : code, projet, equipe en 503 emission-refusee" "$RL|$(echo $G37)" "0|503/emission-refusee 503/emission-refusee 503/emission-refusee"
 cockpit_arreter
 
 # --- FIN-SECTIONS ---
