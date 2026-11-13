@@ -144,17 +144,17 @@ SED
 cat > "$AUX/entree-auto.sed" <<'SED'
 s|^        vers_shell += ligne$|        vers_shell += ligne + bytes([13])|
 SED
-MUTFILES=(serve.mjs index.html project.html vf-cockpit-terminal-processus.mjs vf-cockpit-terminal-session.mjs vf-cockpit-lancer.mjs vue.js)
+MUTFILES=(serve.mjs viewer.html vf-cockpit-terminal-processus.mjs vf-cockpit-terminal-session.mjs vf-cockpit-lancer.mjs vue.js)
 # 79-06 : la sortie (MUT_OUT) ne porte que des pages ; le code muté vit dans une COPIE du module (MUT_MOD), une par manche, mutée sur place
 MUT_OUT=""; MUT_MOD=""
-fichier_de() { case "$1" in index.html|project.html) printf '%s\n' "$MUT_OUT/$1" ;; serve.mjs) printf '%s\n' "$MUT_MOD/skills/cockpit-moteur/assets/serve.mjs" ;; vue.js) printf '%s\n' "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/vue.js" ;; *) printf '%s\n' "$MUT_MOD/scripts/$1" ;; esac; }
-empreinte() { local f; for f in "${MUTFILES[@]}"; do cat "$(fichier_de "$f")"; done | cksum; } # chaque fichier ; une pièce d'un mutant qui touche deux fichiers se contrôle à part
+fichier_de() { case "$1" in viewer.html) printf '%s\n' "$MUT_MOD/skills/cockpit-moteur/assets/viewer.html" ;; serve.mjs) printf '%s\n' "$MUT_MOD/skills/cockpit-moteur/assets/serve.mjs" ;; vue.js) printf '%s\n' "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/vue.js" ;; *) printf '%s\n' "$MUT_MOD/scripts/$1" ;; esac; }
+empreinte() { local f; { for f in "${MUTFILES[@]}"; do cat "$(fichier_de "$f")"; done; cat "$MUT_MOD"/skills/cockpit-moteur/assets/ui/*.js; } | cksum; } # 79-16 : les sources de page sont celles de la copie du module (viewer.html et ui/*.js) # chaque fichier ; une pièce d'un mutant qui touche deux fichiers se contrôle à part
 # mutant <sortie> <nom> : 0 si le texte a changé ; 1 sinon (message sur stderr) ; le code est muté dans MUT_MOD, les pages dans la sortie
 mutant() {
   local o="$1" m="$2" p="$MUT_MOD/scripts/vf-cockpit-terminal-processus.mjs" s="$MUT_MOD/scripts/vf-cockpit-terminal-session.mjs" l="$MUT_MOD/scripts/vf-cockpit-lancer.mjs" sv="$MUT_MOD/skills/cockpit-moteur/assets/serve.mjs" avant apres a2 b2
   avant="$(empreinte "$o")"
   case "$m" in
-    M-ESC) for f in index.html project.html; do sed -i.bak 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' "$o/$f"; done ;;
+    M-ESC) cockpit_page_muter_dans "$MUT_MOD" 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' 2>/dev/null ;;
     M-CSP) sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-Mutant-Csp'#g" "$sv" ;;
     M-ORIGINE-TERM) sed -i.bak "s/if (!page \&\& !navigateur) return /if (false) return /; s/else if (o !== origineQ())/else if (false)/" "$p" ;;
     M-SECRET-TERM) sed -i.bak "s/if (!egal(req.headers\['x-vf-terminal'\], secret)) return refus(res, 401, 'secret');//" "$p" ;;
