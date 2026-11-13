@@ -1,0 +1,36 @@
+# 74-05 : SUMMARY, la fiche d'agent plein cadre
+
+## Livré
+- `ui/74-vf-fiche-faits.js` (112 lignes) : `window.__vfFicheFaits` = faits, rattachement, nomDe, dom (colonne des faits en nœuds de texte). « inconnu » pour toute valeur absente, arbre nul = « arbre principal », fichiers comptés par couple (arbre, cible), « 200 ou plus » au plafond ou sur `cibles.tronque`.
+- `ui/74-vf-fiche-style.js` (82 lignes) : feuille à jetons, une seule règle de police mono, fondu de 200 ms coupé sous `prefers-reduced-motion`.
+- `ui/74-vf-fiche.js` (278 lignes) : `window.__vfFiche = { ouvrir(id, origine), fermer(), ouverte() }` ; inscription `VF_COQUILLE.surOnglet(rappel, { cle: '74-vf-fiche.js' })`, non persistant ; Échap sur `document` en remontée, ignoré si `defaultPrevented` ; `vf-agent:ouvrir` annulé pour nom, ancre, rapport ; `vf-agent:lu { id }` à l'ouverture d'un agent terminé ; frise lue sur 24 h et fil par `VF_ETAT.lireJson`, relus sur `frise` (une fois par seconde au plus).
+- `tests/test-cockpit-fiche.sh` (P1 à P18) et `tests/chrome-fiche.mjs` ; trace du rouge : `74-05-RED-TRACE.md`.
+
+## Témoins de la 73 rougis (P74-D-54)
+Aucun. Le lanceur `test-cockpit-regie.sh` joué sur la tête (après la fusion de 73-05 final) : 234 PASS, 0 FAIL, aucun saut. `74-05-ROUGES-73.txt` est donc vide (la commande « seuls les rouges attendus » du plan compare deux ensembles vides ; son test `-s` est caduc). Aucune suite de la 73 modifiée. Rappel : ne pas pousser avant 74-10.
+
+## Relevé des contrats
+- 73 (tête 97029657) : `vf-agent:ouvrir { id, kind, declencheur }` annulable ; nom = `.vf-rg-tog` de la ligne `li[data-vf-agent]`, rapport = bouton « Lire le rapport » de `.vf-rg-act`, ancre = la ligne (tabindex -1 posé au besoin) ; bascule = `[role=tablist]` « Vue de l'équipe » (n'existe qu'avec au moins deux vues) ; conteneur `section#vf-equipe`, vues `.vf-vue[data-vf-vue]`.
+- 80 : geste d'Échap simulé par la suite (preventDefault puis stopPropagation en capture sur window) ; non relevé sur la branche de la 80.
+- Signature : `ouvrir(id, element|null)`.
+
+## Écarts
+- Écart : précondition P74-D-56 non jouée, remplacée par les prérequis réels (régime allégé).
+- Écart : le modèle de la frise n'a pas de compte de fichiers par voie (`fichiersA` est celui du curseur) : le compte par couple est fait dans `74-vf-fiche-faits.js`.
+- Écart : le lien « carte de mission » (`n:dag-<nom>`) est porté par « rattaché par ses agents » d'un manager ; pour un worker, les trois liens sont parent, nœud (`f:<dag>#<noeud>`), phase.
+- Écart : glyphes du fil pris dans la table unique de la régie (message : attente, humain : actif, compaction : orphelin, outil : repli, échec : bloque) ; aucun tracé neuf, donc formes proches de la spec seulement.
+- Écart : un clic sur la bascule ferme la fiche (non prévu au plan). La fiche d'un agent terminé marque l'agent lu : son bouton « Lire le rapport » disparaît, le focus retombe alors sur la ligne, la voie ou la bascule.
+- Écart : un Échap déjà pris par la régie (détail déplié dans la vue masquée) ne ferme pas la fiche, il faut un second appui.
+- Écart : l'inscription `surOnglet` de la fiche est appelée plus de trois fois sur deux allers-retours (les scripts de l'onglet sont rejoués plus d'une fois par arrivée) ; la clé la remplace, aucun écouteur doublé : P18.b exige au moins trois appels, tous avec la clé.
+- Écart : `surOnglet` espionné, `h.monter` vide aussi `localStorage` (l'état « lu » de la régie y persiste d'une section à l'autre).
+
+## Rituels levés
+- rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Pas de mutants (plan non marqué audit), pas de relecteur.
+
+## Suites jouées (tête commitée)
+| Suite | Verdict | Secondes |
+|---|---|---|
+| `test-cockpit-fiche.sh` | exit 0, 74 PASS, 0 FAIL, aucun SAUTÉ | 32 |
+| `test-cockpit-regie.sh` (73) | exit 0, 234 PASS, 0 FAIL | 144 |
+| `test-cockpit-fiche-texte.sh` | 34 PASS, 0 FAIL | 20 |
+| `css-jetons.mjs`, `check-file-size.sh` | 0 écart ; 74-vf-fiche.js à 278 lignes (avertissement ≥ 250) | < 1 |
