@@ -46,7 +46,18 @@ addEventListener('unhandledrejection', (e) => window.__errs.push('rejet ' + Stri
 window.__couleur = (x) => { const p = document.createElement('i'); p.style.color = x.startsWith('--') ? 'var(' + x + ')' : x; document.body.appendChild(p); const c = getComputedStyle(p).color; p.remove(); return c; };
 window.__px = (v) => { const p = document.createElement('i'); p.style.cssText = 'position:absolute;width:var(' + v + ')'; document.body.appendChild(p); const w = parseFloat(getComputedStyle(p).width); p.remove(); return w; };
 window.__vfF = { reponse: null, statut: 503, delai: 0, reqs: [] };
-window.__fiche = []; window.__vfFiche = { ouvrir: (id, el) => { window.__fiche.push({ id, tag: el && el.tagName, data: el && el.getAttribute && el.getAttribute('data-id') }); } };
+// l'espion d'ouverture de la fiche survit au chargement du vrai module (74-vf-fiche.js) : la lecture rend toujours l'espion, l'écriture est ignorée
+window.__fiche = [];
+{ const espion = { ouvrir: (id, el) => { window.__fiche.push({ id, tag: el && el.tagName, data: el && el.getAttribute && el.getAttribute('data-id') }); } };
+  Object.defineProperty(window, '__vfFiche', { configurable: true, get: () => espion, set: () => {} }); }
+// les abonnements `frise` sont attribués à leur ORIGINE par la pile d'appel : ceux de la frise (74-vf-frise*.js) comptent, ceux de la fiche ou d'autres non
+window.__aboF = [];
+window.__aboFrise = () => window.__aboF.length;
+{ let e; Object.defineProperty(window, 'VF_ETAT', { configurable: true, get: () => e,
+  set: (x) => { e = x && typeof x.abonner === 'function' ? Object.freeze(Object.assign({}, x, { abonner: (cle, f) => {
+    const un = x.abonner(cle, f), reg = cle === 'frise' && /74-vf-frise/.test(String(new Error().stack)) ? {} : null;
+    if (reg) window.__aboF.push(reg);
+    return () => { un(); if (reg) window.__aboF = window.__aboF.filter((r) => r !== reg); }; } })) : x; } }); }
 window.__declarer = []; window.__surOnglet = [];
 { let v; Object.defineProperty(window, '__vfEquipeVues', { configurable: true, get: () => v,
   set: (x) => { v = x && typeof x.declarer === 'function' ? Object.assign({}, x, { declarer: (o) => { window.__declarer.push(o && o.id); return x.declarer(o); } }) : x; } }); }
@@ -465,7 +476,7 @@ JS
 cat > "$AUX/s17.mjs" <<'JS'
 export const ids = ['S17'];
 export default async function (h) {
-  const lire = () => h.ev(() => ({ abo: window.VF_ETAT.abonnes().frise, racines: document.querySelectorAll('.vf-frise').length, kd: window.__nkd(), tablists: document.querySelectorAll('#vf-equipe [role=tablist]').length, voies: document.querySelectorAll('.vf-frise-voies > .vf-frise-voie').length }));
+  const lire = () => h.ev(() => ({ abo: window.__aboFrise(), racines: document.querySelectorAll('.vf-frise').length, kd: window.__nkd(), tablists: document.querySelectorAll('#vf-equipe [role=tablist]').length, voies: document.querySelectorAll('.vf-frise-voies > .vf-frise-voie').length }));
   const un = async (nom, seq) => { await h.calme(); const n0 = (await h.reqs()).length; await h.emettre(seq);
     await h.attendreValeur(async () => (await h.reqs()).length, (n) => n > n0, { max: 8000 }); await h.pause(1500);
     h.egal('S17', `${nom} : une relecture par événement`, (await h.reqs()).length - n0, 1); };
@@ -503,7 +514,7 @@ JS
 cat > "$AUX/s19.mjs" <<'JS'
 export const ids = ['S19'];
 export default async function (h) {
-  const lire = () => h.ev(() => ({ abo: window.VF_ETAT.abonnes().frise, racines: document.querySelectorAll('.vf-frise').length, kd: window.__nkd(),
+  const lire = () => h.ev(() => ({ abo: window.__aboFrise(), racines: document.querySelectorAll('.vf-frise').length, kd: window.__nkd(),
     checks: [...document.querySelectorAll('.vf-frise-outils [role=radio][aria-checked=true]')].map((r) => r.textContent), curseur: window.__vfFrise.donnees().curseurMs ?? null,
     cles: Object.keys(sessionStorage).sort(), ouvertures: window.__fiche.length, reglages: sessionStorage.getItem('vibeflow-cockpit:frise-reglages') }));
   await h.section('S19', async () => {
