@@ -7,6 +7,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import http from 'node:http';
 import { engineDir } from './vf-cockpit-paths.mjs';
+import { cheminPhysique } from './vf-cockpit-git-sortant.mjs';
 
 export const etatFile = (sortie) => path.join(sortie, '.cache', 'server.json');
 export const lireEtat = (sortie) => { try { return JSON.parse(fs.readFileSync(etatFile(sortie), 'utf8')); } catch { return null; } };
@@ -35,12 +36,15 @@ export const serveurVivant = (sortie) => {
 };
 
 // Identité d'un serveur : le chemin réel du serve.mjs du MODULE (celui du moteur voisin du dossier de scripts) et le chemin réel de la sortie.
-// Résolution native, FERMÉE PAR DÉFAUT (A37) : si l'un des deux ne se résout pas, il n'y a pas d'identité (estNotre est faux, aucun signal n'est envoyé),
-// jamais un repli sur la forme écrite du chemin. `sortieEcrite` ne sert qu'à l'ancienne forme (transition P79-D-26).
+// Résolution PHYSIQUE (`cheminPhysique` de 79-07, A37), FERMÉE PAR DÉFAUT : si l'un des deux ne se résout pas, il n'y a pas d'identité
+// (estNotre est faux, aucun signal n'est envoyé), jamais un repli sur la forme écrite du chemin.
+// `sortieEcrite` ne sert qu'à l'ancienne forme (transition P79-D-26).
 export function identiteServeur(dossierScripts, sortie) {
   try {
     const moteur = engineDir(dossierScripts).chemin; if (!moteur) return null;
-    return { serve: fs.realpathSync(path.join(moteur, 'assets', 'serve.mjs')), sortie: fs.realpathSync(sortie), sortieEcrite: path.resolve(sortie) };
+    const serve = cheminPhysique(path.join(moteur, 'assets', 'serve.mjs')), reelle = cheminPhysique(sortie);
+    if (serve === null || reelle === null) return null;
+    return { serve, sortie: reelle, sortieEcrite: path.resolve(sortie) };
   } catch { return null; }
 }
 // Messages du lanceur (dits à l'écran ou au journal), écrits ici pour tenir sa taille de base (79-06).

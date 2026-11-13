@@ -24,6 +24,7 @@ AJOUT assets/ui/41-vf-projet-phase.js
 AJOUT assets/ui/41-vf-projet-rendu.js
 AJOUT assets/ui/41-vf-projet-vue.js
 AJOUT assets/ui/42-vf-panneau-retour.js
+AJOUT assets/ui/69-vf-flux.js
 AJOUT assets/ui/70-vf-live.js
 AJOUT assets/ui/71-vf-equipe-rendu.js
 AJOUT assets/ui/72-vf-equipe.js
@@ -61,6 +62,8 @@ AJOUT assets/vendor/xterm/SHA256SUMS
 AJOUT assets/vendor/xterm/addon-fit.js
 AJOUT assets/vendor/xterm/xterm.css
 AJOUT assets/vendor/xterm/xterm.js
+AJOUT assets/vf-coquille-portee.js
+AJOUT assets/vf-coquille.js
 AJOUT assets/vibeflow-logo-clair.svg
 AJOUT assets/vibeflow-logo-sombre.svg
 AJOUT scripts/lib/vf-git-sortant.mjs

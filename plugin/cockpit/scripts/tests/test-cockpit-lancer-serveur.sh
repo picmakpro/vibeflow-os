@@ -49,9 +49,11 @@ try { h = JSON.parse(t.slice(i + 1, k)); } catch {} delete h.date;
 console.log(t.slice(0, i) + '|' + JSON.stringify(Object.fromEntries(Object.entries(h).sort())) + '|' + t.slice(k + 1));
 JS
 cat > "$AUX/strip.mjs" <<'JS'
-// strip.mjs <page servie> <fichier du disque> : « <nombre de scripts de jeton>:identique|different » une fois le seul script de jeton retiré
-import fs from 'node:fs'; const [, , a, b] = process.argv; const s = fs.readFileSync(a, 'utf8'), d = fs.readFileSync(b, 'utf8'); const re = /<script>window\.VF_COCKPIT_SERVER=[^<]*<\/script>/;
-console.log(`${s.split(new RegExp(re.source, 'g')).length - 1}:${s.replace(re, '') === d ? 'identique' : 'different'}`);
+// strip.mjs <page servie> <autre page servie> <chemin du lab> : « <nombre de scripts de jeton>:identique|different:donnee|sans-donnee » (79-16 : deux adresses rendent le même document
+// au <title> et au script de jeton près ; le document ne porte aucune donnée du lab, jamais son chemin)
+import fs from 'node:fs'; const [, , a, b, lab] = process.argv; const s = fs.readFileSync(a, 'utf8'), d = fs.readFileSync(b, 'utf8'); const re = /<script>window\.VF_COCKPIT_SERVER=[^<]*<\/script>/;
+const nu = (t) => t.replace(re, '').replace(/<title>[^<]*<\/title>/, '');
+console.log(`${s.split(new RegExp(re.source, 'g')).length - 1}:${nu(s) === nu(d) ? 'identique' : 'different'}:${s.includes(lab) ? 'donnee' : 'sans-donnee'}`);
 JS
 cat > "$AUX/ptok.mjs" <<'JS'
 import fs from 'node:fs'; const m = /VF_COCKPIT_SERVER=\{"token":"([0-9a-f]+)"/.exec(fs.readFileSync(process.argv[2], 'utf8')); console.log(m ? m[1] : '');
@@ -250,11 +252,11 @@ S2A="$(sig "$P0" POST /api/vf/lancer --jeton "$PTOK0" --entete "$JSONH" --corps 
 assert_eq "S2 — témoin : POST /api/vf/inconnu rend un statut d'erreur (≥ 400)" "$([ "${S2B%%|*}" -ge 400 ] 2>/dev/null && echo oui || echo "non : ${S2B%%|*}")" "oui"
 assert_eq "S2 — sans drapeau, POST /api/vf/lancer (en-têtes complets et valides) rend ce que rend une route inconnue de même méthode" "$S2A" "$S2B"
 rq "$P0" GET / --corps-vers "$WORK/s-index.html" > "$WORK/s-index.out"; rq "$P0" GET /index.html --corps-vers "$WORK/s-index2.html" > "$WORK/s-index2.out"
-assert_eq "S3 — /project.html : le fichier du disque plus un seul script de jeton, rien d'autre" "$(node "$AUX/strip.mjs" "$WORK/s-projet.html" "$OUT/project.html")" "1:identique"
-assert_eq "S3 — / : le fichier du disque plus un seul script de jeton" "$(node "$AUX/strip.mjs" "$WORK/s-index.html" "$OUT/index.html")" "1:identique"
-assert_eq "S3 — /index.html : le fichier du disque plus un seul script de jeton" "$(node "$AUX/strip.mjs" "$WORK/s-index2.html" "$OUT/index.html")" "1:identique"
+assert_eq "S3 — /project.html : le même document que / au <title> et au script de jeton près, un seul script de jeton, aucune donnée du lab" "$(node "$AUX/strip.mjs" "$WORK/s-projet.html" "$WORK/s-index.html" "$LAB")" "1:identique:sans-donnee"
+assert_eq "S3 — / : un seul script de jeton, aucune donnée du lab, même document que /project.html" "$(node "$AUX/strip.mjs" "$WORK/s-index.html" "$WORK/s-projet.html" "$LAB")" "1:identique:sans-donnee"
+assert_eq "S3 — /index.html : un seul script de jeton, aucune donnée du lab, même document que / " "$(node "$AUX/strip.mjs" "$WORK/s-index2.html" "$WORK/s-index.html" "$LAB")" "1:identique:sans-donnee"
 CSPS="$(CSPCH "$WORK/s-projet.out")"
-assert_eq "S3 — CSP de /project.html = formule de v2.75.0 appliquée à la page servie" "$CSPS" "$(node "$TA" csp-v275 "$WORK/s-projet.html")"
+assert_eq "S3 — CSP de /project.html = formule de v2.75.0 (plus la source du préfixe, A40) appliquée au document servi" "$CSPS" "$(node "$TA" csp-v275 "$WORK/s-projet.html" "http://127.0.0.1:$P0/_vf/")"
 assert_not "S3 — aucune sous-chaîne frame-src" "$CSPS" "frame-src"
 unsrv
 
@@ -329,7 +331,7 @@ echo "=== U — injection du lanceur et CSP ==="
 rq "$P1" GET /project.html --corps-vers "$WORK/u-page.html" > "$WORK/u-page.out"; CSPCH "$WORK/u-page.out" > "$WORK/u-csp.txt"
 UI="$(node "$AUX/harnais.mjs" ui "$STUBO" "$LAB" "$WORK/u-page.html" "$WORK/u-csp.txt")"
 assert_eq "U1 — la page /project.html servie avec le drapeau contient le texte de injectionLancer({ indisponible: false })" "${UI%% *}" "balise=oui"
-EXACT=non; [ "$(cat "$WORK/u-csp.txt")" = "$(node "$TA" csp-v275 "$WORK/u-page.html"); frame-src http://127.0.0.1:$QPORT" ] && EXACT=oui
+EXACT=non; [ "$(cat "$WORK/u-csp.txt")" = "$(node "$TA" csp-v275 "$WORK/u-page.html" "http://127.0.0.1:$P1/_vf/"); frame-src http://127.0.0.1:$QPORT" ] && EXACT=oui
 assert_eq "U2 — CSP = formule de v2.75.0 de la page servie + « ; frame-src http://127.0.0.1:<Q> » exact, et le script du lanceur y est empreinté" "exact=$EXACT ${UI#* }" "exact=oui empreinte=oui"
 unsrv
 
