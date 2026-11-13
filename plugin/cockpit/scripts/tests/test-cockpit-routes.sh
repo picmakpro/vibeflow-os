@@ -178,7 +178,7 @@ import { pathToFileURL } from 'node:url';
 const [, , dir, lab, sortie, extra] = process.argv;
 const imp = (f) => import(pathToFileURL(path.join(dir, f)).href);
 setTimeout(() => process.exit(2), 40000).unref();
-const ATTENDU = ['/api/vf/doing', '/api/vf/etat', '/api/vf/events', '/api/vf/journal', '/api/vf/modeles', '/api/vf/state', '/api/vf/transcript', ...JSON.parse(extra || '[]')].sort();
+const ATTENDU = ['/api/vf/doing', '/api/vf/etat', '/api/vf/events', '/api/vf/journal', '/api/vf/methode', '/api/vf/modeles', '/api/vf/state', '/api/vf/transcript', ...JSON.parse(extra || '[]')].sort();
 const REGIMES = { '/api/vf/doing': 'historique', '/api/vf/etat': 'historique', '/api/vf/journal': 'historique', '/api/vf/modeles': 'historique', '/api/vf/transcript': 'historique', '/api/vf/events': 'flux' };
 const v = {}; let S = null, R = null;
 try { S = await imp('vf-cockpit-server.mjs'); R = await imp('vf-cockpit-routes.mjs'); } catch {}
@@ -288,7 +288,7 @@ assert_eq "B1.2 — l'annotateur schema migré : graph.json porte vf-cockpit/gra
 echo "=== RK — table des routes (A10) ==="
 STR="$(node "$AUX/struct.mjs" "$SCRIPTS" "$LABH" "$OUTH")"
 va() { printf '%s' "$1" | tr ' ' '\n' | grep "^$2=" | cut -d= -f2; }
-assert_eq "RK.1 — les chemins de ROUTES égalent la liste écrite à la main (doing, etat, events, journal, modeles, state, transcript) ; une ligne par route ajoutée, à sa place alphabétique" "$(va "$STR" RK.1)" "ok"
+assert_eq "RK.1 — les chemins de ROUTES égalent la liste écrite à la main (doing, etat, events, journal, methode, modeles, state, transcript) ; une ligne par route ajoutée, à sa place alphabétique" "$(va "$STR" RK.1)" "ok"
 assert_eq "RK.2 — chemins uniques, triés par unités de code, chaque entrée [chaîne, fonction, régime?]" "$(va "$STR" RK.2)" "ok"
 assert_eq "RK.3 — une ligne de source par route (lignes « deux espaces, crochet, chemin /api/vf/ » = longueur de ROUTES)" "$(va "$STR" RK.3)" "ok"
 assert_eq "RK.4 — aucune comparaison littérale de url.pathname avec un chemin /api/vf/ dans le serveur" "$(va "$STR" RK.4)" "ok"
@@ -309,7 +309,7 @@ JS
 TOKC="$(node "$AUX/jeton.mjs" "$PORT" /)"; TOKP="$(node "$AUX/jeton.mjs" "$PORT" /project.html)"
 assert_eq "RK.0 — témoin : le serveur est lancé par le lanceur, les deux jetons sont lus dans les deux pages" "$([ "$PORT" -gt 0 ] && [ "${#TOKC}" -ge 16 ] && [ "${#TOKP}" -ge 16 ] && [ "$TOKC" != "$TOKP" ] && echo oui || echo non)" "oui"
 SO="$(node "$AUX/sondes.mjs" "$OUTS" "$PORT" "$TOKC" "$TOKP" "$SCRIPTS" 2>"$WORK/sondes.err" | tail -1)"; [ -n "$SO" ] || SO='{}'
-assert_eq "RK.7 — pour chaque route de ROUTES (dérivée de l'export) : sans jeton 403, hôte et origine étrangers 403, POST 405, ?token= 403 sauf events, accès valides ni 403/404/405, JSON no-store sans CORS ; témoin de couverture : toutes les routes sondées" "$(ev "$SO" 'j.ko.join(",")||"aucun-echec"')|$(ev "$SO" 'j.sondees')|$(node "$AUX/exp.mjs" "$SCRIPTS" vf-cockpit-server.mjs ROUTES >/dev/null; node --input-type=module -e "import('file://$SCRIPTS/vf-cockpit-server.mjs').then(m=>console.log(m.ROUTES.length))")" "aucun-echec|7|7"
+assert_eq "RK.7 — pour chaque route de ROUTES (dérivée de l'export) : sans jeton 403, hôte et origine étrangers 403, POST 405, ?token= 403 sauf events, accès valides ni 403/404/405, JSON no-store sans CORS ; témoin de couverture : toutes les routes sondées" "$(ev "$SO" 'j.ko.join(",")||"aucun-echec"')|$(ev "$SO" 'j.sondees')|$(node "$AUX/exp.mjs" "$SCRIPTS" vf-cockpit-server.mjs ROUTES >/dev/null; node --input-type=module -e "import('file://$SCRIPTS/vf-cockpit-server.mjs').then(m=>console.log(m.ROUTES.length))")" "aucun-echec|8|8"
 assert_eq "RK.8 — le portail précède la résolution : /api/vf/inconnu 403 sans jeton et 404 avec ; /api/vf/git ni 403, 404 ni 405 ; /api/vf/git/inconnu 404 (délégués conservés)" "$(ev "$SO" 'j.rk8.join(" ")')" "403 404 true 404"
 FL="$(hh flux)"
 assert_eq "RK.9 — le flux : ouverts() et dernierFlux() valent 0 et 0 avant, ouverts() vaut 1 pendant, 0 après et dernierFlux() > 0" "$(ev "$FL" 'JSON.stringify(j.avant)+" "+j.ouvert+" "+JSON.stringify(j.apres)')" "[0,0] 1 [0,true]"

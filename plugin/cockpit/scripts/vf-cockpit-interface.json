@@ -106,6 +106,15 @@
       "etats": ["ok", "indisponible"],
       "interdits": ["email", "diff", "patch"]
     },
+    "vibeflow/cockpit-jauges@1": {
+      "description": "les onze jauges de la Santé de la méthode, à la demande (77-03, GET /api/vf/methode ; jamais dans la collecte) : traduction du TSV `#vf-budget@1` des gates check-method-budget et check-instruction-budget, sans recalcul ; verdict d'une jauge = celui de sa mesure la plus grave ; `indispo` (avec sa cause) quand la source n'a pas répondu, `na` quand le lab n'a pas ce corpus ; une valeur absente vaut null, jamais 0 ; un chemin du poste n'est jamais servi (null) ; mesures bornées à 200 par jauge (`tronque`) ; `baseline` seulement pour `socle`",
+      "requis": { "schema": "string", "at": "string", "sources": "object", "jauges": "array" },
+      "jauge": { "requis": ["type", "groupe", "unite", "verdict", "cause", "mesures", "tronque", "baseline"] },
+      "verdicts": ["ok", "surveiller", "depasse", "na", "indispo", "format"],
+      "causes": ["absent", "ancien", "delai", "format", "echec"],
+      "types": ["state", "state-prose", "backlog-ouverts", "backlog-entree", "backlog-clos", "roadmap", "memory-index", "worktrees", "agent", "skill", "socle"],
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"]
+    },
     "vibeflow/cockpit-git-entete@1": {
       "requis": { "schema": "string", "etat": "string", "depot": "string" },
       "optionnels": ["branche", "worktree", "detache", "sha7"],

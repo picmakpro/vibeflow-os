@@ -9,6 +9,7 @@
 //   JSON simple, comportement antérieur) et FLUX (le lecteur écrit le flux). Mécanisme : vf-cockpit-routes.mjs. Le sous-routeur Git (/api/vf/git…)
 //   et celui du lanceur (/api/vf/lancer/cibles · POST /api/vf/lancer, SEULEMENT sous `--terminal`) restent des délégués placés après la table.
 // GET /api/vf/state (79-12, SOCL-16) : l'état du cockpit en une enveloppe, lu en mémoire (vf-cockpit-state.mjs) ; jamais une collecte à la demande.
+// GET /api/vf/methode  jauges de la méthode à la demande (vibeflow/cockpit-jauges@1, P77-D-04)
 // La dernière commande et le transcript ne figurent jamais dans le flux ni dans un fichier : la garde d'émission refuse tout
 // objet qui porte une clé de la liste `interdits` du contrat (vf-cockpit-interface.json, à côté), à n'importe quelle profondeur.
 // Contrat illisible ou liste vide : rien n'est émis (fermé par défaut).
@@ -30,6 +31,7 @@ import { creerLancer } from './vf-cockpit-lancer.mjs';
 import { HISTORIQUE, FLUX, reponse, controlerAcces, creerRepartiteur } from './vf-cockpit-routes.mjs';
 import { lireState, LECTEURS } from './vf-cockpit-state.mjs';
 import { brancherFluxEtat, VIE_MS } from './vf-cockpit-flux-etat.mjs';
+import { lireMethode } from './vf-cockpit-methode.mjs';
 
 let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
 try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
@@ -92,6 +94,7 @@ export const ROUTES = [
   ['/api/vf/etat', lireEtat, HISTORIQUE],
   ['/api/vf/events', ouvrirFlux, FLUX],
   ['/api/vf/journal', lireJournal, HISTORIQUE],
+  ['/api/vf/methode', lireMethode],
   ['/api/vf/modeles', lireModeles, HISTORIQUE],
   ['/api/vf/state', lireState],
   ['/api/vf/transcript', lireTranscript, HISTORIQUE],
