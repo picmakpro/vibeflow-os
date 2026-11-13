@@ -75,3 +75,13 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-etat.sh` — 30 PASS 
 | E7.4 | forme : nul pour un non-objet, 16 hexadécimaux sinon | `ko` |
 
 Verts d'emblée, gardes tenues par leur mutant : E4.2 (aucun `vie`, donc aucun au journal), E7.1 et E7.3 (une signature constante est stable et indifférente à l'ordre).
+
+### Tâche 3 — état vert
+
+- Code : `vf-cockpit-state.mjs` (signature, volatils, lecteurs), `vf-cockpit-flux-etat.mjs` (signaleur, minuterie `vie`, abonnement à `surInstantane`), `vf-cockpit-server.mjs` (option `vieMs`, `vie` hors journal, `aClient` étendu aux lecteurs, branchement et arrêt du flux d'état, minuterie par réponse retirée).
+- Scénario du serveur réel A : fenêtre calme de 17 s avec un faux verrou dont les âges croissent : 0 `etat` (la liste des volatils est complète pour ce signal : `at`, `ageS`, `dureeS`, `lastAt`, `progressAgeS`, `fetchAgeS`, aucune clé de plus n'a été nécessaire) ; 1 `vie` ; 0 commentaire de battement ; un `PLAN.md` ajouté : 1 `etat`, l'état servi passe de 1 à 2 plans. Chronologie : environ 45 s par scénario.
+- Écart au plan, déclaré : « un `hello` ouvert ensuite rend le `seq` de cet `etat` » ne peut pas être une égalité sur un serveur réel dont le verrou vieillit : un événement `lock` avance `seq` à chaque tour du filet. Le serveur réel prouve `hello.seq >= etat.seq` ; l'égalité est prouvée en processus (E5.2, direct factice).
+- Écart au plan, déclaré : sur les mutants M-SERIE et M-FENETRE, E6.1 (cas listés) rougit en plus de E6.2 ; les deux témoins rougissent, l'attendu de la suite est « E6.1 E6.2 ».
+- Écart au plan, déclaré : M-ETAT-SEQ ne rougit que E5.2 : E5.1 ne contrôle pas le `seq` (plan : « E5.2 rougit »).
+- Lignes : `vf-cockpit-server.mjs` 204 lignes, 19 lignes de plus de 160 points de code (19 avant : inchangé) ; `vf-cockpit-state.mjs` 59 / 0 ; `vf-cockpit-flux-etat.mjs` 33 / 0.
+- Suites existantes rejouées une par une, TMPDIR du scratchpad : `serveur` 89 PASS, `direct` 76, `cycle-serveur` 91, `transcript` 103, `lancer-serveur` 82, `robustesse` 25, `git-signature` 47 (« 0 SAUTÉ » dans le bilan : le motif de saut du plan reconnaît ce libellé à tort, aucune section sautée), `reseau` 15, `routes` 56, `collecte` 126 PASS / 0 FAIL. Un premier lancement de `collecte` dans l'enchaînement a été terminé de l'extérieur (code 143, 237 s) pendant que des fichiers de la collecte étaient modifiés dans l'arbre par un autre exécuteur ; rejoué seul : vert. Aucune suite adaptée, aucune assertion affaiblie.

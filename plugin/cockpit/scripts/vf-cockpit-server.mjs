@@ -28,7 +28,8 @@ import { MODELES, resoudreModele, argsAgent as argsConfines } from './vf-cockpit
 import { routeGit } from './vf-cockpit-git.mjs';
 import { creerLancer } from './vf-cockpit-lancer.mjs';
 import { HISTORIQUE, FLUX, reponse, controlerAcces, creerRepartiteur } from './vf-cockpit-routes.mjs';
-import { lireState } from './vf-cockpit-state.mjs';
+import { lireState, LECTEURS } from './vf-cockpit-state.mjs';
+import { brancherFluxEtat, VIE_MS } from './vf-cockpit-flux-etat.mjs';
 
 let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
 try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
@@ -71,8 +72,8 @@ const lireModeles = (c) => {
 function ouvrirFlux(c, req, url, res) {
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
   res.write('retry: 1000\n\n');
-  let ouvert = true, ka = null;
-  req.on('close', () => { ouvert = false; clearInterval(ka); c.clients.delete(res); c.fluxFerme(); }); // inscrite avant tout délai : un onglet fermé pendant l'attente ne reçoit rien
+  let ouvert = true;
+  req.on('close', () => { ouvert = false; c.clients.delete(res); c.fluxFerme(); }); // inscrite avant tout délai : un onglet fermé pendant l'attente ne reçoit rien
   c.live?.reveil?.(); // AUDC-H2 : rien n'a été collecté depuis un moment s'il n'y avait aucun onglet
   // 79-09 : `hello` attend la première collecte (5 s au plus), puis part complet ; les doubles de suites n'ont pas `pret`
   Promise.resolve(c.live?.pret?.(5000)).catch(() => {}).then(() => {
@@ -82,7 +83,6 @@ function ouvrirFlux(c, req, url, res) {
     if (porteInterdit(snap)) { c.log('error', 'hello refusé : contenu interdit'); res.end(); return; }
     res.write(`event: hello\ndata: ${JSON.stringify(snap)}\n\n`);
     c.clients.add(res);
-    ka = setInterval(() => res.write(': ka\n\n'), 15000);
   });
 }
 
@@ -97,7 +97,7 @@ export const ROUTES = [
   ['/api/vf/transcript', lireTranscript, HISTORIQUE],
 ];
 
-export function attach({ here, root, token, inject, log = () => {}, routes = ROUTES, scriptsDir = trustedScriptsDir() }) {
+export function attach({ here, root, token, inject, log = () => {}, routes = ROUTES, scriptsDir = trustedScriptsDir(), vieMs = VIE_MS }) {
   const dossier = dossierModule(scriptsDir); // racine réelle du module (null si introuvable : jamais une exception ici, l'agent est refusé à la question)
   const ptoken = crypto.randomBytes(16).toString('hex'); // onglet Projet : dit de quel onglet vient une requête
   let pageP = null, GP = null, gabarit = null, genP = 0, memoE = null; // genP : génération du gabarit ; memoE : la page Équipe déjà construite (AUDC-B-03)
@@ -126,14 +126,16 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
   };
   const diffuser = (nom, data) => {
     if (porteInterdit(data)) { log('error', `événement ${nom} refusé : contenu interdit`); return; }
-    noter(nom, data);
+    if (nom !== 'vie') noter(nom, data); // garde:vie-journal
     const s = `event: ${nom}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const c of clients) c.write(s);
   };
+  const aClient = () => clients.size > 0 || LECTEURS.actif(); // garde:lecteur-arme
   let live = null;
   try {
-    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); }, aClient: () => clients.size > 0, nbClients: () => clients.size, garde: (o) => !porteInterdit(o) }); // AUDC-H2 : le filet ne collecte que si un onglet écoute ; garde : l'instantané passe la garde d'émission avant sa pose
+    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); }, aClient, nbClients: () => clients.size, garde: (o) => !porteInterdit(o) }); // AUDC-H2 : le filet ne collecte que si un onglet écoute ; garde : l'instantané passe la garde d'émission avant sa pose
   } catch (e) { log('error', `direct indisponible : ${e.message}`); }
+  const fluxEtat = brancherFluxEtat({ diffuser, seq: () => (live ? live.etat().seq : 0), nbClients: () => clients.size, vieMs }); // 79-12 : `vie` et `etat`
   lancer.sourceWho(() => (live ? live.snapshot().who : null)); // états attendue / vue / terminee des cartes lancées (72-07)
 
   const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
@@ -197,6 +199,6 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
     // AUDC-H1 : une page n'ouvre qu'UN flux (celui-ci). Le rechargement de la carte y passe (sans séquence ni journal : la page se recharge) et chaque flux ouvert compte comme une page ouverte.
     diffuserCarte: (nom, data) => { if (nom !== 'reload') return; const s = `event: reload\ndata: ${JSON.stringify(data || {})}\n\n`; for (const c of clients) c.write(s); },
     nbPages: () => clients.size,
-    stop() { live?.stop(); for (const c of clients) c.end(); },
+    stop() { fluxEtat.stop(); live?.stop(); for (const c of clients) c.end(); },
   };
 }

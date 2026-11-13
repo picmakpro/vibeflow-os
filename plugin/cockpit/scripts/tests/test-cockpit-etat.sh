@@ -298,8 +298,8 @@ mutant_t3 VIE-JOURNAL vf-cockpit-server.mjs "/garde:vie-journal/s/if (nom !== 'v
 mutant_t3 ETAT-SEQ vf-cockpit-flux-etat.mjs '/garde:etat-seq/s/seq: seq()/seq: seq() + 1/' "E5.2" e45
 mutant_t3 VOLATILS-TROP vf-cockpit-state.mjs "/garde:state-volatils/s/'fetchAgeS'\]/'fetchAgeS', 'owner']/" "E7.2" e7
 mutant_t3 ORDRE vf-cockpit-state.mjs '/garde:state-canonique/s/\.sort()//' "E7.3" e7
-mutant_t3 SERIE vf-cockpit-state.mjs '/garde:lecteurs-serie/s/serie >= 2/serie >= 1/' "E6.2" e6
-mutant_t3 FENETRE vf-cockpit-state.mjs '/garde:lecteurs-fenetre/s/now - dernier < fenetreMs/true/' "E6.2" e6
+mutant_t3 SERIE vf-cockpit-state.mjs '/garde:lecteurs-serie/s/serie >= 2/serie >= 1/' "E6.1 E6.2" e6
+mutant_t3 FENETRE vf-cockpit-state.mjs '/garde:lecteurs-fenetre/s/now - dernier < fenetreMs/true/' "E6.1 E6.2" e6
 # mutants du serveur réel : la copie du module est lancée par le lanceur (COCKPIT_MODULE), la mesure est celle du scénario
 cockpit_module_muter VIE vf-cockpit-flux-etat.mjs '/garde:vie-battement/s/nbClients() > 0/false/'; assert_eq "M-VIE.0 — l'ancre existe une fois et la copie du module diffère" "$?" "0"
 scenario_a m-VIE; unset COCKPIT_MODULE

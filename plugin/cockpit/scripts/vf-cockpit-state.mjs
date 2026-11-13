@@ -4,7 +4,9 @@
 // (index, boucle, erreurs, relances, derniereMort) restent sur la route privée /api/vf/etat.
 // Exports : SCHEMA_STATE, VOLATILS_ETAT, FENETRE_LECTEUR_MS, collecteDe(brut, { signalNul }), corpsState({ instantane, collecte, seq, now }),
 //   sigState(signal), creerLecteurs({ fenetreMs }), LECTEURS, lireState(ctx, req, url) (le lecteur de la ligne de table).
+import crypto from 'node:crypto';
 import { instantane } from './vf-cockpit-instantane.mjs';
+import { CHAMPS_VOLATILS } from './vf-cockpit-who-signature.mjs';
 
 export const SCHEMA_STATE = 'vibeflow/cockpit-state@1';
 const ETATS = ['ok', 'en-cours', 'partielle', 'indisponible'], MODES = ['watch', 'poll', 'absent'];
@@ -27,15 +29,30 @@ export const corpsState = ({ instantane: inst, collecte, seq, now = Date.now() }
   return { schema: SCHEMA_STATE, at: new Date(now).toISOString(), seq: ent(seq, Number.MAX_SAFE_INTEGER), collecte: c, signal };
 };
 
-// signature, volatils et lecteurs : posés par la tâche 3 du plan
-export const VOLATILS_ETAT = new Set();
-export const sigState = () => null;
+// Signature (événement `etat`, C4) : 16 caractères hexadécimaux d'un sha256 du `signal` ramené à une forme canonique (clés triées à tout niveau, clés
+// volatiles retirées à tout niveau, ordre des tableaux gardé). La liste nommée est la seule chose à tenir à jour : une clé qui varie avec le seul temps
+// s'y inscrit, jamais une énumération de champs.
+export const VOLATILS_ETAT = new Set([...CHAMPS_VOLATILS, 'progressAgeS', 'fetchAgeS']); // garde:state-volatils
+const cles = (o) => Object.keys(o).sort().filter((k) => !VOLATILS_ETAT.has(k)); // garde:state-canonique
+const canon = (v) => (Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(cles(v).map((k) => [k, canon(v[k])])) : v);
+export const sigState = (signal) => (signal && typeof signal === 'object'
+  ? crypto.createHash('sha256').update(JSON.stringify(canon(signal))).digest('hex').slice(0, 16) : null);
+
+// Lecteurs d'état sans onglet (A31) : deux lectures à moins de la fenêtre l'une de l'autre arment le filet de collecte tant que la dernière est à moins
+// de la fenêtre de `now` ; une lecture isolée (pane fermée, une émission par minute) ne l'arme pas. L'horloge est injectée (`now`).
 export const FENETRE_LECTEUR_MS = 30000;
-export const creerLecteurs = () => ({ vu() {}, actif: () => false });
+export function creerLecteurs({ fenetreMs = FENETRE_LECTEUR_MS } = {}) {
+  let serie = 0, dernier = null;
+  return {
+    vu(now = Date.now()) { serie = dernier !== null && now >= dernier && now - dernier < fenetreMs ? serie + 1 : 1; dernier = now; }, // garde:lecteurs-fenetre
+    actif(now = Date.now()) { return serie >= 2 && dernier !== null && now - dernier < fenetreMs; }, // garde:lecteurs-serie
+  };
+}
 export const LECTEURS = creerLecteurs();
 
 // le lecteur de la ligne de table : lit `etat()` du direct et `instantane()`, rien d'autre
 export function lireState(ctx) {
+  LECTEURS.vu(Date.now()); // appelé après le contrôle d'accès (le répartiteur) : un refus ne marque jamais un lecteur
   const e = ctx.live ? ctx.live.etat() : null; // garde:state-lecture
   const collecte = e ? e.collecte : { etat: 'indisponible', mode: 'absent', clients: ctx.clients.size };
   return corpsState({ instantane: instantane(), collecte, seq: e ? e.seq : 0, now: Date.now() });
