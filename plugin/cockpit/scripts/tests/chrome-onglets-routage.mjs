@@ -172,6 +172,28 @@ await executer(chrome, async (s) => {
     });
   }
 
+  if (mode === 'og215') { // demandes coup sur coup : la file, la dernière demande l'emporte
+    const deux = (a, b) => s.ev(`(async () => { const p = [VF_ONGLETS.aller(${a}), VF_ONGLETS.aller(${b})];
+      await Promise.all(p.map((x) => x.catch(() => 0))); return 1; })()`);
+    await sec('og215', async () => { // un z mémorisé sur Projet ne passe pas sur Équipe ; precedent juste
+      await charger('/project.html?vue=couloirs'); await s.attendre("document.querySelectorAll('.vp-carte').length > 0", 'couloirs');
+      await s.ev(`history.replaceState(null, '', '/project.html#z=0.5,100,100')`); await onglet('code', 1); const n0 = (await etat()).n;
+      await deux("'projet'", "'equipe'"); const e = await arrivee(3, 'equipe'); await pause(500);
+      o.og215 = { evs: await lire('__o.evs.slice(-2)'), p: e.p, tk: (await etat()).tk, dn: e.n - n0 };
+    });
+    await sec('og216', async () => { // aller('code') puis aller('projet') : la seconde, vers l'onglet encore affiché, gagne
+      await charger('/project.html?vue=couloirs'); await s.attendre("document.querySelectorAll('.vp-carte').length > 0", 'couloirs');
+      await deux("'code'", "'projet'"); await s.attendre('__o.evs.length >= 2', 'deux arrivées'); await pause(500);
+      o.og216 = { ...(await etat()), evs: await lire('__o.evs.slice(-2)'), onglet: await lire('VF_COQUILLE.onglet()') };
+    });
+    await sec('og217', async () => { // Précédent pendant un chargement en vol : l'adresse et l'onglet affiché concordent, Précédent l'emporte
+      await charger('/'); await onglet('projet', 1); await onglet('code', 2);
+      await s.ev(`(() => { VF_ONGLETS.aller('equipe').catch(() => 0); history.back(); })()`);
+      await s.attendre('__o.evs.length >= 4', 'deux arrivées'); await pause(800);
+      o.og217 = { ...(await etat()), onglet: await lire('VF_COQUILLE.onglet()') };
+    });
+  }
+
   if (mode === 'og3') {
     await sec('og3', async () => {
       await charger('/'); const id = await premier(); await s.ev(`VibeFlow.select(${JSON.stringify(id)})`); await pause(300);

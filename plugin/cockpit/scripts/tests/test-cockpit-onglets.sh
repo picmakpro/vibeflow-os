@@ -89,6 +89,13 @@ assert_eq "OG2.14 — z posé sur Code : le premier rendu de Projet ne l'appliqu
   "$(E '[j.og214.p, j.og214.h, j.og214.tk.k === 1.5 && j.og214.tk.x === 10.5 && j.og214.tk.y === 20.25]' "$R5")" '["/project.html","",false]'
 assert_eq "OG2.14b — chargement rejeté : le fragment (z) de l'adresse et l'historique reviennent à l'identique" \
   "$(E '[j.og214r.r, j.og214r.apres.h === j.og214r.avant.h, j.og214r.apres.n === j.og214r.avant.n, j.og214r.apres.p]' "$R5")" '["rejet",true,true,"/"]'
+R6="$(mesurer og215)"; sonde "$R6"
+assert_eq "OG2.15 — aller('projet') puis aller('equipe') coup sur coup : precedent juste, le z de Projet ne passe pas sur Équipe" \
+  "$(E '[j.og215.evs, j.og215.p, j.og215.tk.k === 0.5 && j.og215.tk.x === 100, j.og215.dn]' "$R6")" '[["projet<code","equipe<projet"],"/equipe.html",false,2]'
+assert_eq "OG2.16 — aller('code') puis aller('projet') : la dernière demande, vers l'onglet encore affiché, l'emporte, adresse et onglet concordent" \
+  "$(E '[j.og216.evs, j.og216.p, j.og216.onglet]' "$R6")" '[["code<projet","projet<code"],"/project.html","projet"]'
+assert_eq "OG2.17 — Précédent pendant un chargement en vol : la dernière demande l'emporte, adresse et onglet concordent" \
+  "$(E '[j.og217.p, j.og217.onglet]' "$R6")" '["/project.html","projet"]'
 echo "=== OG3 — chargement rejeté sans effet visible ==="
 R3="$(mesurer og3)"; sonde "$R3"; E3() { E "$1" "$R3"; }
 assert_eq "OG3.1 — lecture en échec, clic sur Projet : adresse, historique, titre, sélection, focus inchangés, aucun vf:onglet, aucun rejet non capté" \
@@ -112,7 +119,7 @@ R4="$(mesurer og2t)"; sonde "$R4"
 assert_eq "OG2.2 — le cadre du terminal est le même nœud, jamais rechargé, après un aller-retour d'onglet (tampon gardé)" \
   "$(E 'j.og22' "$R4")" '{"meme":true,"connecte":true,"charges":0}'
 echo "=== Sans erreur de pilote ==="
-ERR=""; for r in "$R1" "$R2" "$R3" "$R4" "$R5"; do ERR="$ERR$(E 'Object.keys(j.erreurs).join()' "$r")"; done
+ERR=""; for r in "$R1" "$R2" "$R3" "$R4" "$R5" "$R6"; do ERR="$ERR$(E 'Object.keys(j.erreurs).join()' "$r")"; done
 assert_eq "OG9 — aucune section du pilote n'a échoué" "$ERR" ""
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

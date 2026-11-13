@@ -75,8 +75,21 @@
     }
   };
 
-  // la seule fonction de chargement : clic, popstate et aller. `pop` : le navigateur a déjà posé l'adresse ; `fragment` : posé tel quel (aller)
-  const charger = (nom, { pop = false, fragment = null } = {}) => {
+  // la seule fonction de chargement : clic, popstate et aller. `pop` : le navigateur a déjà posé l'adresse (`adresse`, lue à l'évènement) ;
+  // `fragment` : posé tel quel (aller).
+  // Les demandes passent en FILE : toute la comptabilité de départ (onglet quitté, fragment, tiroir Git, adresse) se fait quand le chargement démarre
+  // vraiment, et la dernière demande l'emporte, y compris vers l'onglet encore affiché.
+  let file = Promise.resolve(), enCours = 0;
+  const charger = (nom, options) => {
+    enCours++;
+    const p = file.then(() => chargerMaintenant(nom, options || {}));
+    file = p.then(() => { enCours--; }, () => { enCours--; });
+    return p;
+  };
+  const chargerMaintenant = (nom, { pop = false, fragment = null, adresse = '' }) => {
+    const ici = location.pathname + location.search + location.hash;
+    if (pop && ici !== adresse) history.replaceState(null, '', adresse); // la dernière demande de l'humain gagne
+    if (nom === C.onglet()) return Promise.resolve(); // une demande vers l'onglet affiché, devenue la dernière : rien à charger (un fragment n'y a pas d'effet)
     const precedent = C.onglet(), git = gitOuvert(), avant = location.hash;
     // le moteur d'arrivée lit l'adresse au premier rendu : le fragment de l'onglet quitté (v, s, z, git) ne doit pas s'y appliquer. Il est mémorisé, retiré
     // pendant le chargement (replaceState, aucune entrée d'historique) et remis à l'identique, chargement rejeté ou non (l'entrée quittée le garde).
@@ -100,15 +113,14 @@
     if (typeof nom !== 'string' || !NOMS.includes(nom)) return Promise.reject(new Error('Onglet inconnu.'));
     const avec = options !== null && typeof options === 'object' && options.fragment !== undefined;
     if (avec && !fragmentValide(options.fragment)) return Promise.reject(new Error('Fragment refusé.'));
-    if (nom === C.onglet()) return Promise.resolve();
     return charger(nom, { fragment: avec ? options.fragment : null });
   };
 
   window.addEventListener('popstate', (ev) => {
     const nom = PAR_CHEMIN[location.pathname];
-    if (!nom || nom === C.onglet()) return;
+    if (!nom || (nom === C.onglet() && !enCours)) return;
     ev.stopImmediatePropagation(); // le moteur de l'onglet affiché ne lit pas l'adresse d'un autre onglet
-    charger(nom, { pop: true }).catch(() => {});
+    charger(nom, { pop: true, adresse: location.pathname + location.search + location.hash }).catch(() => {});
   });
 
   C.surOnglet(({ onglet }) => {
@@ -118,7 +130,7 @@
       const u = new URL(a.getAttribute('href'), document.baseURI), nom = u.origin === location.origin ? PAR_CHEMIN[u.pathname] : null;
       if (!nom) return;
       ev.preventDefault();
-      if (nom !== C.onglet()) charger(nom).catch(() => {});
+      charger(nom).catch(() => {});
     };
     document.addEventListener('click', clic, true);
     return () => { document.removeEventListener('click', clic, true); memoriser(onglet); };
