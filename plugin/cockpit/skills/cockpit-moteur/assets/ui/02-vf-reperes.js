@@ -128,7 +128,7 @@
     vivant = true; document.head.appendChild(style);
     const observer = (O, cible, opts, fn) => { const o = new O(fn); o.observe(cible, opts); pose.push(() => o.disconnect()); };
     observer(MutationObserver, vp, { attributes: true, attributeFilter: ['style'] }, maj); // la transformation : aucun événement du moteur
-    observer(MutationObserver, document.body, { attributes: true, attributeFilter: ['class'] }, maj);
+    observer(MutationObserver, document.body, { childList: true, attributes: true, attributeFilter: ['class'] }, maj); // + l'arrivée d'un flottant
     if (window.ResizeObserver) {
       for (const q of ['#ask', '#vf-coin']) { const e = document.querySelector(q); if (e) observer(ResizeObserver, e, undefined, maj); }
     }
