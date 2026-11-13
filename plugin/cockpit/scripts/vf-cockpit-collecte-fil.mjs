@@ -3,7 +3,8 @@
 // résultats ; il ne diffuse rien et n'importe que les étapes.
 // Demande { id, planning, verrous, tour, motifs } -> messages { id, type: 'planning' (graphe | erreur, motifs) | 'verrous' (projection en liste
 // blanche, A15) | 'tour' (verrous projetés, equipe, signal, erreurs, dureeMs) | 'index' (rapport en comptes, jamais les voies) |
-// 'frise' (paquet de voies, 79-13) | 'fini' }. workerData.sansIndex : relance sans l'index. 73-03 : 'planning' et 'tour' portent aussi `lecturesPlanning` (compteur du fil).
+// 'frise' (paquet de voies, 79-13) | 'fini' }. workerData.sansIndex : relance sans l'index.
+// 73-03 : 'planning' et 'tour' portent aussi `lecturesPlanning` (compteur du fil).
 import { parentPort, workerData } from 'node:worker_threads';
 import { creerMemoire, etapePlanning, etapeVerrous, etapeTour } from './vf-cockpit-collecte-etapes.mjs';
 import { tranche } from './vf-cockpit-collecte-frise.mjs';
