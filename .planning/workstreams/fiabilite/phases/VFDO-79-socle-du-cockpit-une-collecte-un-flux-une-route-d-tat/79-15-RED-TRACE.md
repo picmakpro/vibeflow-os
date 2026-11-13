@@ -34,3 +34,25 @@ Suites de l'ancien contrat réécrites (libellé et rôle gardés) :
 | `test-cockpit-securite.sh` | marqueurs hostiles avec `VF_COCKPIT_DONNEES_GABARIT=1`, témoin de présence X0 | non rejouée sur la base (Chrome) ; X0 vert sur la base (la page est le fichier), le réglage n'y fait rien : sans effet, jamais un vert à vide une fois la page servie de l'instantané |
 
 Rouges de base : aucun hors de ce plan.
+
+## Tâches 2 et 4 — rouges, régime allégé
+
+Le code des tâches 1 et 2 a été écrit d'un bloc (commit 32a669cd) : les sections G2 à G5 n'ont donc pas été jouées sur un code sans elles. Les rouges vus pendant l'écriture,
+corrigés dans le code ou dans la suite (jamais affaiblis) :
+
+| Assertion | Obtenu | Cause |
+|---|---|---|
+| EQ.1, EQ.2 (serveur) | sortie vide | `load()` appelait `live.snapshot().who` sur un double sans instantané : lecture tolérante `?.who` |
+| RK.1, RK.7 (routes) | 8 attendu, 9 obtenu | la route `graphe` est la neuvième : liste et compte réécrits |
+| G3.2b | marqueur absent de graph.json | le moteur retire l'identité d'une URL de remote : marqueur déplacé dans le chemin de l'URL |
+| G3.6a | clé absente de vfTouch | `files_modified` se lit en liste en ligne : plan réécrit |
+| G4.2 | /index.html sans Content-Length | `sendPage` ne posait pas la longueur : posée |
+| G5.1 (projet.json en lien) | non remplacé | `confiner` refusait le lien : retiré lui-même avant le renommage |
+| flux-unique FV1.2, FV8.3 | 10 / liste sans `graphe` | la liste relayée compte onze noms : assertions réécrites |
+
+Sections X0 à X3 : X0 vertes (témoins de présence des quatre marqueurs dans leur source), X1 et X2 vertes dès l'écriture (preuve d'une absence qui tient déjà ; elles savent rougir grâce
+aux témoins X0 et au témoin positif X3, vert). X4 (mutant) non écrit : régime allégé. X5 ne prouve que la présence statique de `'graphe'` dans la liste, pas la réception par un second onglet.
+
+## État vert (tête commitée)
+
+Voir 79-15-SUMMARY.md pour les verdicts et durées. Coût de la signature : non mesuré (régime allégé) ; le graphe Projet du lab de test est de quelques dizaines de Ko.
