@@ -171,5 +171,101 @@ assert_eq "T7.8 sans borne : quatre entrées, non tronqué" "$(J "$(V "$L7")" "[
 assert_eq "T7.8 max 2 : deux entrées lues, tronqué" "$(J "$(V "$L7" 2)" "[j.entrees.length,j.tronque]")" "[2,true]"
 
 echo
+echo "=== T8 — liens et états ==="
+echo "T8.1 — extraction des liens"
+L8="$WORK/l8"; lab_init "$L8"
+idx "$L8" vf-coder '- [A](a.md) [B](b.md)'
+wr "$L8/.claude/agent-memory/vf-coder/a.md" <<'MD'
+---
+name: entree-a
+metadata:
+  type: project
+---
+
+voir [[entree-b]] hors code, et une classe [[:alpha:]] dans un test.
+
+```
+[[dans-bloc]]
+```
+
+et `[[entre-accents]]` en ligne.
+MD
+mem "$L8" vf-coder b.md entree-b project 'rien'
+gc "$L8" 2026-01-10 'extraction'
+O8="$(V "$L8")"
+assert_eq "T8.1 témoin positif : les trois formes ignorées sont dans le fichier" "$(grep -c -e 'dans-bloc' -e 'entre-accents' -e ':alpha:' "$L8/.claude/agent-memory/vf-coder/a.md")" "3"
+assert_eq "T8.1 seul le lien hors code est retenu" "$(E "$O8" vf-coder/a.md 'e.sortants.map(s=>s.cible)')" '["entree-b"]'
+
+echo "T8.2 — résolution en deux temps"
+L9="$WORK/l9"; lab_init "$L9"
+idx "$L9" vf-coder '- [A](a.md) [B](b.md) [C](c.md)'
+idx "$L9" vf-reviewer '- [X](x.md)'
+mem "$L9" vf-coder a.md entree-a project 'liens [[entree-b]] [[c]] [[inconnu]] [[partage]]'
+mem "$L9" vf-coder b.md entree-b project 'rien'
+mem "$L9" vf-coder c.md autre-nom-c project 'rien'
+mem "$L9" vf-reviewer x.md partage project 'rien'
+gc "$L9" 2026-01-10 'résolution'
+O9="$(V "$L9")"
+assert_eq "T8.2 états dans l'ordre de citation" "$(E "$O9" vf-coder/a.md 'e.sortants.map(s=>s.etat)')" '["resolu","resolu-par-nom","casse","resolu"]'
+assert_eq "T8.2 cible par nom de fichier" "$(E "$O9" vf-coder/a.md 'e.sortants[1].vers')" "vf-coder/c.md"
+assert_eq "T8.2 name unique d'un autre agent du lab" "$(E "$O9" vf-coder/a.md 'e.sortants[3].vers')" "vf-reviewer/x.md"
+assert_eq "T8.2 compteurs resolusParNom et liensCasses du lab" "$(J "$O9" "[j.compteurs.resolusParNom,j.compteurs.liensCasses]")" "[1,1]"
+assert_eq "T8.2 compteurs de l'agent" "$(J "$O9" "(a=>[a.resolusParNom,a.liensCasses,a.entrees])(j.agents.find(x=>x.agent==='vf-coder'))")" "[1,1,3]"
+
+echo "T8.3 — hors index, égalité exacte du nom de fichier"
+L10="$WORK/l10"; lab_init "$L10"
+idx "$L10" vf-coder '- [AA](aa.md) — cité
+- [B](./b.md) — cité avec ./'
+for n in a aa b; do mem "$L10" vf-coder "$n.md" "entree-$n" project 'rien'; done
+gc "$L10" 2026-01-10 'index'
+O10="$(V "$L10")"
+assert_eq "T8.3 a.md hors index (aa.md ne l'indexe pas)" "$(E "$O10" vf-coder/a.md 'e.horsIndex')" "true"
+assert_eq "T8.3 aa.md indexé" "$(E "$O10" vf-coder/aa.md 'e.horsIndex')" "false"
+assert_eq "T8.3 b.md indexé malgré le ./ initial" "$(E "$O10" vf-coder/b.md 'e.horsIndex')" "false"
+assert_eq "T8.3 compteur horsIndex" "$(J "$O10" "j.compteurs.horsIndex")" "1"
+
+echo "T8.4 — sans lien entrant"
+L11="$WORK/l11"; lab_init "$L11"
+idx "$L11" vf-coder '- [X](x.md) [Y](y.md) [Z](z.md)'
+mem "$L11" vf-coder x.md entree-x project 'se cite [[entree-x]]'
+mem "$L11" vf-coder y.md entree-y project 'rien'
+mem "$L11" vf-coder z.md entree-z project 'cite [[entree-y]]'
+gc "$L11" 2026-01-10 'entrants'
+O11="$(V "$L11")"
+assert_eq "T8.4 citée par l'index et par elle-même : sans lien entrant" "$(E "$O11" vf-coder/x.md 'e.sansEntrant')" "true"
+assert_eq "T8.4 citée par une autre entrée : avec lien entrant" "$(E "$O11" vf-coder/y.md 'e.sansEntrant')" "false"
+assert_eq "T8.4 compteur sansEntrant (x et z)" "$(J "$O11" "j.compteurs.sansEntrant")" "2"
+
+echo "T8.5 — chemin cité absent de HEAD, présent dans l'historique"
+L12="$WORK/l12"; lab_init "$L12"
+mkdir -p "$L12/docs"; printf 'v\n' > "$L12/docs/vieux.md"; printf 'a\n' > "$L12/docs/ancien.md"
+idx "$L12" vf-coder '- [A](a.md)'
+mem "$L12" vf-coder a.md entree-a project 'cite docs/vieux.md, `docs/ancien.md`, docs/jamais.md et docs/nouveau.md.'
+gc "$L12" 2026-01-01 'début'
+git -C "$L12" rm -q docs/vieux.md; gc "$L12" 2026-01-02 'suppression'
+git -C "$L12" mv docs/ancien.md docs/nouveau.md; gc "$L12" 2026-01-03 'déplacement'
+O12="$(V "$L12")"
+assert_eq "T8.5 témoin positif : jamais.md n'est ni dans HEAD ni dans l'historique" "$(git -C "$L12" log --all --name-only --format= | grep -c 'docs/jamais.md')" "0"
+assert_eq "T8.5 supprimé et déplacé listés, relatifs, triés" "$(E "$O12" vf-coder/a.md 'e.cheminsAbsents')" '["docs/ancien.md","docs/vieux.md"]'
+assert_eq "T8.5 compteur : deux chemins distincts" "$(J "$O12" "j.compteurs.cheminsAbsents")" "2"
+
+echo "T8.6 — aucune péremption"
+L13="$WORK/l13"; lab_init "$L13"
+idx "$L13" vf-coder '- [A](a.md) [B](b.md)'
+mem "$L13" vf-coder a.md entree-a project 'rien'; gc "$L13" 2025-01-01 'vieille'
+mem "$L13" vf-coder b.md entree-b project 'rien'; gc "$L13" 2026-11-01 'récente'
+O13="$(V "$L13")"
+assert_eq "T8.6 témoin positif : deux jours distincts lus" "$(J "$O13" "[j.entrees[0].jour,j.entrees[1].jour]")" '["2025-01-01","2026-11-01"]'
+assert_eq "T8.6 aucune clé perim* à aucune profondeur" "$(J "$O13" "(function f(o){return !!o&&typeof o==='object'&&Object.keys(o).some(k=>/^perim/i.test(k)||f(o[k]))})(j)")" "false"
+assert_eq "T8.6 l'entrée d'un an n'a aucun état de plus que la récente" "$(J "$O13" "Object.keys(j.entrees[0]).join()===Object.keys(j.entrees[1]).join()")" "true"
+
+echo "T8.7 — dépôt réel (lecture seule)"
+OR="$(V "$REPO" reel)"
+assert_eq "T8.7 témoin positif : le dépôt porte des descriptions dans ses fichiers de mémoire" "$(git -C "$REPO" ls-files '.claude/agent-memory/' | head -400 | xargs grep -l '^description:' 2>/dev/null | head -1 | wc -c | tr -d ' ' | awk '{print ($1>0)?"oui":"non"}')" "oui"
+assert_eq "T8.7 au moins une entrée et un lien" "$(J "$OR" "[j.entrees.length>0,j.entrees.some(e=>e.nbSortants>0)]")" "[true,true]"
+assert_eq "T8.7 aucune clé description, corps ni texte" "$(J "$OR" "(function f(o){return !!o&&typeof o==='object'&&Object.keys(o).some(k=>/^(description|corps|texte)\$/i.test(k)||f(o[k]))})(j)")" "false"
+assert_eq "T8.7 aucune occurrence du chemin absolu de la racine" "$(SANS "$OR" "$REPO")" "ok"
+
+echo
 echo "=== Bilan : $PASS passés, $FAIL échoués ==="
 [ "$FAIL" -eq 0 ]

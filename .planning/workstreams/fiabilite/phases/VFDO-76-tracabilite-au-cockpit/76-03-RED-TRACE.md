@@ -28,3 +28,23 @@ les témoins positifs de chaque « jamais » (fichier local suivi par git, lien 
   ❌ FAIL — T7.7 nombre de liens entrants — attendu: [1] obtenu: [absent]
 === Bilan : 29 passés, 2 échoués ===
 ```
+
+## Tâche 3 — T8.1 à T8.7 (code de la tâche 2 en place ; 14 rouges, T8.6 et T8.7 verts d emblée : le module ne produit ni péremption ni description)
+
+```
+  ❌ FAIL — T8.1 seul le lien hors code est retenu — attendu: [["entree-b"]] obtenu: [["entree-b",":alpha:","dans-bloc","entre-accents"]]
+  ❌ FAIL — T8.2 états dans l'ordre de citation — attendu: [["resolu","resolu-par-nom","casse","resolu"]] obtenu: [["resolu","resolu","resolu","resolu"]]
+  ❌ FAIL — T8.2 cible par nom de fichier — attendu: [vf-coder/c.md] obtenu: [absent]
+  ❌ FAIL — T8.2 compteurs resolusParNom et liensCasses du lab — attendu: [[1,1]] obtenu: [[null,null]]
+  ❌ FAIL — T8.2 compteurs de l'agent — attendu: [[1,1,3]] obtenu: [absent]
+  ❌ FAIL — T8.3 a.md hors index (aa.md ne l'indexe pas) — attendu: [true] obtenu: [absent]
+  ❌ FAIL — T8.3 aa.md indexé — attendu: [false] obtenu: [absent]
+  ❌ FAIL — T8.3 b.md indexé malgré le ./ initial — attendu: [false] obtenu: [absent]
+  ❌ FAIL — T8.3 compteur horsIndex — attendu: [1] obtenu: [absent]
+  ❌ FAIL — T8.4 citée par l'index et par elle-même : sans lien entrant — attendu: [true] obtenu: [absent]
+  ❌ FAIL — T8.4 citée par une autre entrée : avec lien entrant — attendu: [false] obtenu: [absent]
+  ❌ FAIL — T8.4 compteur sansEntrant (x et z) — attendu: [2] obtenu: [absent]
+  ❌ FAIL — T8.5 supprimé et déplacé listés, relatifs, triés — attendu: [["docs/ancien.md","docs/vieux.md"]] obtenu: [absent]
+  ❌ FAIL — T8.5 compteur : deux chemins distincts — attendu: [2] obtenu: [absent]
+=== Bilan : 41 passés, 14 échoués ===
+```
