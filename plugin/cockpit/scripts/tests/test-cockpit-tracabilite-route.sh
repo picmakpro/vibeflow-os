@@ -407,7 +407,7 @@ c.fige = inst().seq === inst().seq && inst().git.sig === inst().git.sig && inst(
 const get = async (q) => T.lireTracabilite({ root: lab }, null, new URL(`http://x/api/vf/tracabilite?${q}`), { instantane: inst });
 const n = () => (fs.existsSync(journal) ? fs.readFileSync(journal, 'utf8').split('\n').filter(Boolean).length : 0);
 const toucher = (f, texte, dec) => { if (texte !== null) fs.writeFileSync(f, texte); const t = new Date(Date.now() + dec * 1000); fs.utimesSync(f, t, t); };
-const adr = path.join(lab, 'docs', 'ADR.md'), titre = (r) => (r.adrs || []).map((a) => a.titre).join('|');
+const adr = path.join(lab, 'docs', 'ADR.md'), titre = (r) => (r.adrs || []).map((a) => a.titre).filter(Boolean).join('|'); // les ADR citées sans section n'ont pas de titre
 await get('vue=adr'); // chauffe : premier calcul, caches de configuration remplis
 let n0 = n(); toucher(adr, '# ADR\n\n## ADR-001 — Titre B\n', 10); const rB = await get('vue=adr'); c.k = n() - n0; c.k_ge1 = c.k >= 1;
 n0 = n(); toucher(adr, '# ADR\n\n## ADR-001 — Titre C\n', 20); const deux = await Promise.all([get('vue=adr'), get('vue=adr')]);
@@ -419,6 +419,7 @@ projet.meta.vf.trace.exigences.push({ id: 'REQ-77', ws: 'x', coche: false, phase
   libelle: 'ajoutée', fichier: 'x', cites: { decisions: [], adrs: [], nues: [] } });
 seq = 8; n0 = n(); const ph = await get('vue=phase&cle=ph-1');
 c.phase = ph.phase.exigences.map((e) => e.id).join() === 'REQ-01,REQ-77' && n() - n0 === 0;
+await get('vue=adr'); // absorbe le changement de seq : l'étape suivante ne change que git.sig
 sig = 'bbbbbbbbbbbbbbbb'; n0 = n(); await get('vue=adr'); c.sig = n() - n0 === c.k;
 n0 = n(); toucher(adr, '# ADR\n\n## ADR-001 — Titre D\n', 30); const rD = await get('vue=adr'); c.titre = titre(rD) === 'Titre D' && n() - n0 === c.k;
 const mem = path.join(lab, '.claude', 'agent-memory', 'vf-coder'), avant = (await get('vue=memoire')).memoire.compteurs.entrees;
