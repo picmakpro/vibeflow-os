@@ -20,3 +20,4 @@ Mutants gardés : M-CHEMIN, M-AUTO, M-TSV-RANGEMENT, M-ENV-GIT (chacun rougit sa
 
 Suites (sur la tête commitée) : test-cockpit-jauges 60 PASS / 0 FAIL (36 s) ; test-cockpit-routes 56/0 (18 s) ; securite vert (76 s) ; serveur vert (59 s) ;
 git-env vert (16 s), git-config-depot vert (81 s), git-details vert (56 s) ; vendor 251/1 (78 s, V4 = base, hors plan).
+- Correction ciblée (PR #242, shard 5) : D8.9 et D8.9b de test-cockpit-lecture-fil.sh enregistrent cockpit-jauges@1 (sept schémas), rouge vu puis vert (17/0, 1 s).
