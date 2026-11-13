@@ -37,7 +37,7 @@ await executer(chrome, async (s) => {
     await charger();
     o.c10 = await lire(`(async () => { const e = performance.getEntriesByType('resource').map((x) => x.name).find((n) => /\\/74-vf-trace\\.js$/.test(n));
       if (!e) return 'non demandé'; const r = await fetch(e, { headers: { 'x-vf-cockpit-token': VF_ETAT.jeton() } });
-      return r.status + '|' + (await r.text()).split('\\n')[0].slice(0, 14); })()`);
+      return r.status + '|' + (await r.text()).split("\\n")[0].slice(0, 13); })()`);
     o.c10intrus = await lire(`(async () => { const e = performance.getEntriesByType('resource').map((x) => x.name).find((n) => /\\/74-vf-trace\\.js$/.test(n));
       if (!e) return 'non demandé'; const r = await fetch(e.replace('74-vf-trace.js', '74-vf-trace-intrus.js'), { headers: { 'x-vf-cockpit-token': VF_ETAT.jeton() } }); return r.status; })()`);
   });
