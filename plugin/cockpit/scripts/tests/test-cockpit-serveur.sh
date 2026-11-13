@@ -88,9 +88,10 @@ PORT="${VF_PORT:-0}"
 TOK=$(node "$AUX/token.mjs" "$PORT" /); PTOK=$(node "$AUX/token.mjs" "$PORT" /project.html)
 assert_eq "S0 — serveur démarré, jetons lus dans les deux pages" "$([ "$PORT" -gt 0 ] && [ "${#TOK}" -ge 16 ] && [ "${#PTOK}" -ge 16 ] && echo oui || echo non)" "oui"
 cat > "$AUX/statut.mjs" <<'JS'
+// statut.mjs <port> <chemin> [jeton] : « statut|page|sans-page » ; avec un jeton, « page » = le corps porte le schéma Équipe (79-16 : le document ne porte plus de donnée, la route si)
 import http from 'node:http';
-const [, , port, p] = process.argv;
-http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}` } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => console.log(r.statusCode + '|' + (b.includes('VibeFlow · Équipe') ? 'page' : 'sans-page'))); }).on('error', (e) => console.log('ERR ' + e.message));
+const [, , port, p, jeton] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}`, ...(jeton ? { 'x-vf-cockpit-token': jeton } : {}) } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => console.log(r.statusCode + '|' + (b.includes(jeton ? 'vibeflow/cockpit-equipe@1' : 'VibeFlow · Équipe') ? 'page' : 'sans-page'))); }).on('error', () => console.log('ERR'));
 JS
 assert_eq "EQ.0 — témoin : le serveur d'origine sert /equipe.html (200, page Équipe)" "$(node "$AUX/statut.mjs" "$PORT" /equipe.html)" "200|page"
 
@@ -110,7 +111,7 @@ echo "=== S3 — fichiers cachés et traversée ==="
 assert_eq "S3.1 — /.cache/server.json : 404 (il porte le jeton)" "$(status "$PORT" /.cache/server.json)" "404"
 assert_eq "S3.2 — /.gitignore : 404" "$(status "$PORT" /.gitignore)" "404"
 assert_eq "S3.3 — témoin : le fichier server.json existe bien et porte le jeton" "$(grep -c "$TOK" "$OUT/.cache/server.json")" "1"
-assert_eq "S3.4 — /graph.json (fichier public) : 200" "$(status "$PORT" /graph.json)" "200"
+assert_eq "S3.4 — /graph.json n'est plus servi (404, A41 : aucun fichier de la sortie) alors qu'il existe sur disque" "$(status "$PORT" /graph.json)|$([ -s "$OUT/graph.json" ] && echo existe || echo absent)" "404|existe"
 for p in "/%2e%2e/%2e%2e/etc/passwd" "/..%2f..%2fREADME.md" "/%2e%2e%2f%2e%2e%2f.planning/ROADMAP.md"; do
   assert_eq "S3 — $p : jamais 200" "$([ "$(status "$PORT" "$p")" = "200" ] && echo 200 || echo refuse)" "refuse"
 done
@@ -292,21 +293,29 @@ cat > "$AUX/equipe-garde.mjs" <<'JS'
 import { pathToFileURL } from 'node:url';
 const [, , scripts, lab] = process.argv;
 const { attach } = await import(pathToFileURL(scripts + '/vf-cockpit-server.mjs').href);
-const a = attach({ here: lab, root: lab, token: 'tk', inject: '', log: () => {} });
+const a = attach({ here: lab, root: lab, token: 'tk', log: () => {} });
 a.load();
-const page = () => { const p = a.pageEquipe(); return p === null ? 'null' : typeof p === 'string' && p.includes('VibeFlow · Équipe') ? 'page' : 'autre'; };
+// 79-16 : la page Équipe n'existe plus (le document ne porte aucune donnée) ; le graphe Équipe se lit sur la route, en processus (double de la requête) ; verdicts inchangés : `page`, puis `null|false`
+const lire = async () => {
+  const r = { code: 0, corps: '' }; let fini = false;
+  const res = { writeHead(c) { r.code = c; }, end(b) { r.corps = String(b ?? ''); fini = true; } };
+  a.route({ method: 'GET', headers: { 'x-vf-cockpit-token': 'tk', host: '127.0.0.1:5000' }, socket: { localPort: 5000 } }, res, new URL('http://127.0.0.1:5000/api/vf/graphe?onglet=equipe'));
+  for (let i = 0; i < 50 && !fini; i++) await new Promise((ok) => setTimeout(ok, 40));
+  return r;
+};
+const page = async () => { const r = await lire(); return r.code === 200 && r.corps.includes('vibeflow/cockpit-equipe@1') ? 'page' : r.code === 503 && r.corps.includes('emission-refusee') ? 'null' : `autre:${r.code}`; };
 const sortie = {};
 globalThis.__vfSnap = { seq: 1, lock: { available: false }, who: { workers: [{ kind: 'session', id: 'w1', tree: 't', source: 's' }], sources: {} } };
-sortie.propre = page();
+sortie.propre = await page();
 globalThis.__vfSnap = { seq: 2, lock: { available: false }, who: { workers: [{ kind: 'session', id: 'w1', tree: 't', source: 's', sub: { doing: 'commande-secrete' } }], sources: {} } };
-const p = a.pageEquipe(); sortie.interdit = page(); sortie.fuite = typeof p === 'string' && p.includes('commande-secrete');
+const r = await lire(); sortie.interdit = r.code === 503 && r.corps.includes('emission-refusee') ? 'null' : `autre:${r.code}`; sortie.fuite = r.corps.includes('commande-secrete');
 console.log(JSON.stringify(sortie)); a.stop(); process.exit(0);
 JS
 mkdir -p "$WORK/lab-eq"; printf '%s' '<html><head><title>t</title></head><body><script>window.VF_COCKPIT = {"meta":{"rootName":"x"},"nodes":[],"files":[],"links":[]};</script></body></html>' > "$WORK/lab-eq/project.html"
 EQ="$(VF_DOUBLE_LIVE="file://$AUX/live-double.mjs" node --import "$AUX/reg-double.mjs" "$AUX/equipe-garde.mjs" "$SCRIPTS" "$WORK/lab-eq" 2>"$WORK/eq.err")"
 eqev() { printf '%s' "$EQ" | node "$AUX/json-stdin.mjs" "$1"; }
-assert_eq "EQ.1 — témoin positif : un who propre donne la page Équipe" "$(eqev 'j.propre')" "page"
-assert_eq "EQ.2 — un who portant une clé interdite (profondeur 2) : aucune page d'équipe, rien ne sort" "$(eqev 'j.interdit+"|"+j.fuite')" "null|false"
+assert_eq "EQ.1 — témoin positif : un who propre donne le graphe Équipe (route, en processus)" "$(eqev 'j.propre')" "page"
+assert_eq "EQ.2 — un who portant une clé interdite (profondeur 2) : le graphe Équipe est refusé (503 emission-refusee), rien ne sort" "$(eqev 'j.interdit+"|"+j.fuite')" "null|false"
 
 # F4 (69-07, P69-D-23) : la liste des clés interdites vient du contrat. Une copie de la sortie dont vf-cockpit-interface.json est retirée ne peut plus
 # la lire : le serveur de la copie doit tout refuser d'émettre (fermé par défaut). Témoin : le serveur d'origine a émis son hello (S4.2, S5.1).
@@ -317,7 +326,7 @@ F4TOK=$(node "$AUX/token.mjs" "$F4PORT" /)
 : > "$WORK/f4.jsonl"; node "$AUX/sse.mjs" "$F4PORT" "$F4TOK" 2000 hello "$WORK/f4.jsonl"
 assert_eq "F4.0 — témoin : la copie est sans contrat, son serveur répond (jeton lu, flux ouvert en 200)" "contrat:$([ -e "$F4/scripts/vf-cockpit-interface.json" ] && echo present || echo absent)|jeton:$([ "${#F4TOK}" -ge 16 ] && echo oui || echo non)|flux:$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E[0].status')" "contrat:absent|jeton:oui|flux:200"
 assert_eq "F4 — contrat illisible : aucun événement hello n'est émis" "$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E.filter(e=>e.event).length')" "0"
-assert_eq "EQ.3 — contrat illisible : /equipe.html n'émet aucune donnée d'équipe (ni 200 avec la page)" "$(node "$AUX/statut.mjs" "$F4PORT" /equipe.html | grep -c '^200|page')" "0"
+assert_eq "EQ.3 — contrat illisible : la route Équipe n'émet aucune donnée d'équipe (ni 200 avec le graphe) ; le document, lui, ne porte aucune donnée" "$(node "$AUX/statut.mjs" "$F4PORT" "/api/vf/graphe?onglet=equipe" "$F4TOK" | grep -c '^200|page')" "0"
 vf_hyg_stop "$F4PID"
 
 
@@ -338,7 +347,7 @@ cockpit_arreter
 L46="$WORK/lab-am46"; am4_lab "$L46"; C46="$(cockpit_module_copie)"; rm -f "$C46/scripts/vf-cockpit-interface.json"
 COCKPIT_MODULE="$C46" cockpit_lancer "$L46"; V46="$(cockpit_vivant && echo vivant || echo mort)"
 am4_flux "$L46" "$WORK/am46.jsonl"
-assert_eq "AM4.6 — copie du module sans son contrat : serveur vivant, aucun hello émis et /equipe.html sans donnée d'équipe (contrat illisible ferme tout)" "$V46 hello=$(node "$AUX/ev.mjs" "$WORK/am46.jsonl" 'E.filter(e=>e.event==="hello").length') equipe=$(node "$AUX/statut.mjs" "${VF_PORT:-0}" /equipe.html | grep -c '^200|page')" "vivant hello=0 equipe=0"
+assert_eq "AM4.6 — copie du module sans son contrat : serveur vivant, aucun hello émis et la route Équipe sans donnée d'équipe (contrat illisible ferme tout)" "$V46 hello=$(node "$AUX/ev.mjs" "$WORK/am46.jsonl" 'E.filter(e=>e.event==="hello").length') equipe=$(node "$AUX/statut.mjs" "${VF_PORT:-0}" "/api/vf/graphe?onglet=equipe" "$(node "$AUX/token.mjs" "${VF_PORT:-0}" /)" | grep -c '^200|page')" "vivant hello=0 equipe=0"
 cockpit_arreter
 # ancre du mutant M-CONTRAT-OUVERT (« contrat illisible -> flux ouvert ») : la constante porteInterdit ferme sur une liste vide ; elle existe déjà : ancre VERTE dès cette tâche (l'assertion d'effet vient avec le serveur du module)
 assert_eq "M-CONTRAT-OUVERT.0 — ancre présente : porteInterdit ferme le flux quand la liste de clés interdites est vide (vf-cockpit-server.mjs du module)" "$(grep -cF 'const porteInterdit = (o) => !INTERDITS.length ||' "$SCRIPTS/vf-cockpit-server.mjs")" "1"

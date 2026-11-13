@@ -107,17 +107,18 @@ MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODM="$MOD_DEPOT"   # MODM = racine d
 
 # mutant <sortie> <M-ESC|M-CSP|M-ORIGINE-TERM|M-SECRET-TERM|M-ONGLET-TERM> : échoue si rien n'a changé (jamais un mutant sans effet). M-ESC édite les PAGES de la copie de la sortie (des données) ;
 # les autres éditent la copie du module de la manche ($MODM, posée par manche()) : le code ne vit plus dans la sortie.
+pages_modm() { local a="$MODM/skills/cockpit-moteur/assets"; cat "$a/viewer.html" "$a"/ui/*.js; } # 79-16 : les sources de page sont celles de la copie du module (la sortie ne porte que des données)
 mutant() {
   local o="$1" m="$2" before after sv="$MODM/skills/cockpit-moteur/assets/serve.mjs" pr="$MODM/scripts/vf-cockpit-terminal-processus.mjs" se="$MODM/scripts/vf-cockpit-terminal-session.mjs"
-  before="$(cat "$sv" "$o/index.html" "$o/project.html" "$pr" "$se" | cksum)"
+  before="$({ cat "$sv" "$pr" "$se"; pages_modm; } | cksum)"
   case "$m" in
-    M-ESC) for f in index.html project.html; do sed -i.bak 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' "$o/$f"; done ;;
+    M-ESC) cockpit_page_muter_dans "$MODM" 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' 2>/dev/null ;;
     M-CSP) sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-Mutant-Csp'#g" "$sv" ;;
     M-ORIGINE-TERM) sed -i.bak "s/if (!page \&\& !navigateur) return /if (false) return /; s/else if (o !== origineQ())/else if (false)/" "$pr" ;;
     M-SECRET-TERM) sed -i.bak "s/if (!egal(req.headers\['x-vf-terminal'\], secret)) return refus(res, 401, 'secret');//" "$pr" ;;
     M-ONGLET-TERM) sed -i.bak "s/if (s.onglet !== onglet) return 409;//g" "$se" ;;
   esac
-  after="$(cat "$sv" "$o/index.html" "$o/project.html" "$pr" "$se" | cksum)"
+  after="$({ cat "$sv" "$pr" "$se"; pages_modm; } | cksum)"
   [ "$before" != "$after" ] || { echo "  ❌ mutant $m sans effet (motif absent de la sortie ou du module)" >&2; return 1; }
 }
 nassistants() { ps -eo pid=,ppid=,args= | awk -v p="$1" '$2 == p && /vf-cockpit-pty\.py/ { n++ } END { print n + 0 }'; } # assistants du serveur (ancien étage)

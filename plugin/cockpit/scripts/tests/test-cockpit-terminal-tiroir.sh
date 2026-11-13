@@ -846,8 +846,12 @@ mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : 
   case "$(basename "$2")" in
     serve.mjs|graph-query.js|query-cli.mjs|vue.js|client.js|q.css|tiroir.js|tiroir-message.js|tiroir-construire.js|tiroir.css|lancer.js|lancer-extraire-chat.js|lancer-observer-chat.js|lancer-proposition.js|lancer.css|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" 2>/dev/null || { case "$2" in vf-cockpit-terminal-tiroir.mjs|vf-cockpit-lancer-ui.mjs) cockpit_module_muter_p "$1" "$3" ;; *) false ;; esac; } || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
   esac
-  f="$d/.vibeflow/cockpit/$2"; [ -f "$f" ] || return 1   # page de la copie du lab (donnée) : même chemin que MUT_OUT/<fichier>
-  cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+  # 79-16 : une page (index.html, project.html, equipe.html) vient du MODULE, plus de la sortie : le mutant est une copie du module dont les sources de page (viewer.html, ui/*.js) portent la substitution ;
+  # les motifs sont écrits contre la page assemblée (renommée) : l'aide renomme d'abord. La copie du lab (données) reste la sortie de la manche.
+  case "$(basename "$2")" in
+    index.html|project.html|equipe.html) MUT_MOD="$(cockpit_module_copie "$WORK/mod-$1")" || return 1; cockpit_page_muter_dans "$MUT_MOD" "$3" 2>/dev/null || return 1; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  return 1
 }
 sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; }
 navig() { node "$AUX/chrome-tiroir.mjs" "$CHROME" "$@"; } # navig <mode> <json>

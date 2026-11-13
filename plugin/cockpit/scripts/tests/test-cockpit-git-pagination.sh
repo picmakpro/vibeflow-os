@@ -137,8 +137,10 @@ export async function touche(s, key, code, vk, mods = 0) { // vraie touche au cl
   await s.send('Input.dispatchKeyEvent', Object.assign({ type: 'keyUp' }, base));
 }
 export async function ouvrirPage(s, base, l = 1440, h = 900) {
-  await s.naviguer(base + '/');
+  // la taille de la fenêtre AVANT la navigation : le moteur décide de l'ouverture du panneau d'après innerWidth à son démarrage (>= 1000), et la coquille
+  // attend maintenant ce démarrage avant de rendre la main — poser la taille après ferait démarrer la page à la taille par défaut, panneau fermé
   await s.send('Emulation.setDeviceMetricsOverride', { width: l, height: h, deviceScaleFactor: 1, mobile: false });
+  await s.naviguer(base + '/');
   await s.attendre(`document.readyState === 'complete' && !!${LIGNE} && getComputedStyle(${LIGNE}).display !== 'none'`, 'seconde ligne');
 }
 JS

@@ -260,15 +260,15 @@
   let lastSeq = null;
   const vu = (d) => { if (typeof d?.seq === 'number') lastSeq = d.seq; return d; };
   const connecter = () => {
-    const es = new EventSource('/api/vf/events?token=' + encodeURIComponent(SRV.token));
+    const es = window.VF_FLUX.ouvrir(SRV.token); // 79-14 : flux partagé entre les onglets (ui/69-vf-flux.js)
     es.addEventListener('hello', (e) => {
       probe.connected = true; const d = JSON.parse(e.data);
       if (TAB === 'project' && lastSeq !== null && typeof d.seq === 'number' && d.seq !== lastSeq) { probe.resync = (probe.resync || 0) + 1; location.reload(); return; }
-      vu(d); setWho(d.who); showLock(d.lock);
+      vu(d); // 79-17 : who et lock du hello sont posés par le magasin d'état (VF_ETAT), qui lit le même flux
     });
     es.addEventListener('reload', () => { if (window.FLOORPLAN_RELOAD) window.FLOORPLAN_RELOAD(); else location.reload(); }); // AUDC-H1 : la carte reconstruite recharge la page par ce flux (le viewer n'en ouvre plus un second)
-    es.addEventListener('who', (e) => setWho(vu(JSON.parse(e.data)).who));
-    es.addEventListener('lock', (e) => showLock(vu(JSON.parse(e.data))));
+    es.addEventListener('who', (e) => vu(JSON.parse(e.data))); // le magasin d'état pose le who ; ici seule la séquence est retenue (resynchronisation)
+    es.addEventListener('lock', (e) => vu(JSON.parse(e.data))); // idem : seule la séquence est retenue ici
     es.addEventListener('git', (e) => { const d = vu(JSON.parse(e.data)); document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: d.sig } })); }); // 78-09 : signal sans contenu, l'en-tête et le tiroir relisent leurs routes
     es.addEventListener('patch', (e) => {
       const d = vu(JSON.parse(e.data));
@@ -284,5 +284,17 @@
     es.addEventListener('structural', (e) => { vu(JSON.parse(e.data)); probe.structural++; if (TAB === 'project') { SC.toast('Projet modifié : rechargement'); setTimeout(() => location.reload(), 400); } });
     es.onerror = () => { es.close(); perdu('direct', connecter); };
   };
+  // 79-17 (SOCL-21) : who, lock et connexion se lisent dans le magasin d'état, puis on s'y abonne ; perdu : « Direct coupé », ouvert : l'état courant.
+  // Sous la coquille, une fois l'onglet rendu (le rendu du tiroir vit dans 71, chargé après ce fichier) : la pastille d'un onglet neuf dit l'état
+  // courant sans attendre un événement, et la désinscription est rendue à `surOnglet` (les inscriptions meurent avec leur onglet, 79-16)
+  const E = window.VF_ETAT, CQ = window.VF_COQUILLE;
+  const surConnexion = (c) => { if (c === 'perdu') showLock(null, true); else if (c === 'ouvert') showLock(); };
+  const brancher = () => {
+    if (E.lire('who')) setWho(E.lire('who'));
+    if (E.lire('lock')) showLock(E.lire('lock'));
+    const off = [E.abonner('who', setWho), E.abonner('lock', (l) => showLock(l)), E.abonner('connexion', surConnexion)];
+    return () => { for (const f of off) f(); };
+  };
+  if (CQ && typeof CQ.surOnglet === 'function') CQ.surOnglet(brancher); else brancher();
   connecter();
 })();
