@@ -107,8 +107,8 @@
 - [ ] Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire (inscrite 2026-11-03, jalon vibeflow-v2.0 ; cadrée et planifiée 2026-11-11, 9 plans)
 - [ ] Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up (inscrite 2026-11-03, jalon vibeflow-v2.0) — planifiée 2026-11-11 (8 plans)
 - [x] Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git (inscrite 2026-11-05, jalon vibeflow-v2.0) — complete 2026-11-06 : 11/11 plans, GITC-01..14 cochées, publiée en `v2.76.0`
-- [ ] Phase 79: Socle du cockpit — une collecte, un flux, une route d'état (inscrite 2026-11-11, jalon vibeflow-v2.0) — planifiée 2026-11-11, 22 plans en 11 vagues
-- [ ] Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation (inscrite 2026-11-11, jalon vibeflow-v2.0) — cadrée et planifiée le 2026-11-11 (21 plans, 11 vagues ; FORM-01..18)
+- [ ] Phase 79: Socle du cockpit — une collecte, un flux, une route d'état (inscrite 2026-11-11, jalon vibeflow-v2.0) — 13/22 plans faits (segment a fusionné 2026-11-13) ; restent 79-13 à 79-20, 79-22
+- [ ] Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation (inscrite 2026-11-11, jalon vibeflow-v2.0) — 8/21 plans faits (segment a fusionné 2026-11-13) ; restent 80-09 à 80-21 (FORM-01..18)
 - [ ] Phase 81: Agir sur une session depuis le cockpit (inscrite 2026-11-11, jalon vibeflow-v2.0, reportée : `AUDC-Q3` tranchée « plus tard » le 2026-11-11)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
@@ -143,8 +143,8 @@
 | 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 0/9 | Planned | - |
 | 77. Santé de la méthode et synthèse — jauges, dernière visite, burn-up | vibeflow-v2.0 | 0/8 | Planned | - |
 | 78. Git dans le cockpit | vibeflow-v2.0 | 11/11 | Complete — PR #216, release `v2.76.0` | 2026-11-06 |
-| 79. Socle du cockpit — une collecte, un flux, une route d'état | vibeflow-v2.0 | 0/22 | Planned | - |
-| 80. Trois onglets, trois formes — Projet en couloirs, clavier, navigation | vibeflow-v2.0 | 0/21 | Planned | - |
+| 79. Socle du cockpit — une collecte, un flux, une route d'état | vibeflow-v2.0 | 13/22 | In progress — segment a fusionné (PR #238) | - |
+| 80. Trois onglets, trois formes — Projet en couloirs, clavier, navigation | vibeflow-v2.0 | 8/21 | In progress — segment a fusionné (PR #237) | - |
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15 -->
 
@@ -236,7 +236,7 @@ et qu'on applique les choses qui ont été vues »). Il ajoute une source de cad
 les Phases 79 (socle), 80 (formes) et 81 (actions sur une session, reportée). Ses corrections immédiates forment
 le lot 0, mission hors phase (`2026-11-10-audit-cockpit/LOT-0-MANDAT.md`) ; le suivi ligne à ligne se tient dans
 `2026-11-10-audit-cockpit/REGISTRE.md`. **Ordre recommandé pour la suite du jalon** (décision déléguée par Samuel, message session
-principale, 2026-11-08, option recommandée) : lot 0 → 79 et 80 en parallèle, 73 dès le lot 0 livré → 74 après la 79 → 75 → 76 → 77 ;
+principale, 2026-11-08, option recommandée) : lot 0 → 79 et 80 en parallèle → 73 (ses plans consomment des contrats des 79 et 80 : A10-A11, A30-A32, `VF_SURCOUCHES`, `VF_ONGLETS`) → 74 → 75 → 76 → 77 ;
 81 seulement si Samuel le décide (`AUDC-Q3`). **Décisions de fond tranchées le 2026-11-11** (registre § 5.1, Samuel retenant l'avis de
 la session principale) : fork du moteur assumé, index des sessions sur disque avec fenêtre de 24 h, `claude agents` en source de
 référence, Phase 81 reportée.
@@ -275,7 +275,7 @@ référence, Phase 81 reportée.
 
 **Goal:** Le cockpit montre ce qui attend une décision humaine (arbitrages en attente, reliés à leur phase et à ce qu'ils bloquent), qui tient le verrou de driver, quels worktrees et branches existent avec leur travail non commité, et l'alerte du watchdog posée sur le nœud de mission concerné. Forme ajoutée par l'audit du 2026-11-10 : l'onglet Équipe devient une régie — « À vous », « Au travail », « Terminé, à relire », « Au repos » — à la place de son canevas.
 **Requirements**: REGI-01, REGI-02, REGI-03, REGI-04, REGI-05, REGI-06, REGI-07, REGI-08, REGI-09, REGI-10, REGI-11, REGI-12, REGI-13, REGI-14, REGI-15, REGI-16, REGI-17
-**Depends on:** Phase 69 (objet `avancement`, collecteur `who`) ; lot 0 de l'audit (états lus des sessions, livré). Ne dépend pas de la Phase 79 : la régie se bâtit sur le flux actuel et lit le magasin de page de la 79 s'il existe (P73-D-02). Réutilise les routes de la Phase 78 pour les worktrees (P78-D-08). Pose les points d'accroche de la Phase 74 (P73-D-20).
+**Depends on:** Phase 69 (objet `avancement`, collecteur `who`) ; lot 0 de l'audit (états lus des sessions, livré). Pas de blocage dur sur la Phase 79 (la régie lit le magasin de page de la 79 s'il existe, P73-D-02), mais ses plans consomment les contrats des Phases 79 et 80 : exécution après elles (jointure J1, 2026-11-13). Réutilise les routes de la Phase 78 pour les worktrees (P78-D-08). Pose les points d'accroche de la Phase 74 (P73-D-20).
 **Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 9, 13, 4) ; audit du 2026-11-10 : `.planning/research/2026-11-10-audit-cockpit-etude.md` § 8.2, `REGISTRE.md` (AUDC-I01, I02, I03, I09, I10, I21, I34, I38, reste de D4 et M3, F2), `DESIGNS.md` § 3 ; `73-UI-SPEC.md`.
 **Retraits:** le canevas de l'onglet Équipe ; le nom écrit trois fois ; la carte et le pli « Terminés depuis moins de 24 h » ; le panneau d'item d'Équipe et ses styles de bouton ; la section Santé injectée sur Équipe ; P70-D-20 / UIFN-14.
 
