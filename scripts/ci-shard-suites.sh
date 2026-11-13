@@ -103,10 +103,13 @@ durees() {
 250 plugin/cockpit/scripts/tests/test-cockpit-equipe.sh
 490 plugin/cockpit/scripts/tests/test-cockpit-etat.sh
 19 plugin/cockpit/scripts/tests/test-cockpit-fiche-texte.sh
+32 plugin/cockpit/scripts/tests/test-cockpit-fiche.sh
 43 plugin/cockpit/scripts/tests/test-cockpit-flux-unique.sh
 4 plugin/cockpit/scripts/tests/test-cockpit-forme-claude.sh
 12 plugin/cockpit/scripts/tests/test-cockpit-fr-donnees.sh
+40 plugin/cockpit/scripts/tests/test-cockpit-frise-cout.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-frise-modele.sh
+150 plugin/cockpit/scripts/tests/test-cockpit-frise-vue.sh
 69 plugin/cockpit/scripts/tests/test-cockpit-git-commandes.sh
 38 plugin/cockpit/scripts/tests/test-cockpit-git-config-depot.sh
 28 plugin/cockpit/scripts/tests/test-cockpit-git-details.sh
