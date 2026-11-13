@@ -3,17 +3,18 @@
 // résultats ; il ne diffuse rien et n'importe que les étapes.
 // Demande { id, planning, verrous, tour, motifs } -> messages { id, type: 'planning' (graphe | erreur, motifs) | 'verrous' (projection en liste
 // blanche, A15) | 'tour' (verrous projetés, equipe, signal, erreurs, dureeMs) | 'index' (rapport en comptes, jamais les voies) |
-// 'fini' }. workerData.sansIndex : relance sans l'index.
+// 'fini' }. workerData.sansIndex : relance sans l'index. 73-03 : 'planning' et 'tour' portent aussi `lecturesPlanning` (compteur du fil).
 import { parentPort, workerData } from 'node:worker_threads';
 import { creerMemoire, etapePlanning, etapeVerrous, etapeTour } from './vf-cockpit-collecte-etapes.mjs';
 
 const { racine, sortie, scriptsDir, home, sansIndex } = workerData, base = { racine, sortie, scriptsDir, home }, memo = creerMemoire();
+const compte = () => ({ lecturesPlanning: memo.lecturesPlanning }); // 73-03
 
 parentPort.on('message', (m) => {
   const { id, motifs = [] } = m;
   if (m.planning) {
-    try { parentPort.postMessage({ type: 'planning', id, motifs, graphe: etapePlanning(base) }); }
-    catch (e) { parentPort.postMessage({ type: 'planning', id, motifs, erreur: String(e.message).slice(0, 200) }); }
+    try { const graphe = etapePlanning({ ...base, memo }); parentPort.postMessage({ type: 'planning', id, motifs, graphe, ...compte() }); }
+    catch (e) { parentPort.postMessage({ type: 'planning', id, motifs, erreur: String(e.message).slice(0, 200), ...compte() }); }
   }
   if (m.verrous && !m.tour) {
     let verrous; try { verrous = etapeVerrous({ ...base, memo }); } catch { verrous = { etat: 'erreur', plat: false, liste: [] }; }
@@ -26,7 +27,7 @@ parentPort.on('message', (m) => {
         index: { etat: 'erreur', tronque: false, voies: 0, formeInconnue: 0, evinces: 0 } };
     }
     const { index, ...tour } = r;
-    parentPort.postMessage({ type: 'tour', id, ...tour }); parentPort.postMessage({ type: 'index', id, index });
+    parentPort.postMessage({ type: 'tour', id, ...tour, ...compte() }); parentPort.postMessage({ type: 'index', id, index });
   }
   parentPort.postMessage({ type: 'fini', id });
 });
