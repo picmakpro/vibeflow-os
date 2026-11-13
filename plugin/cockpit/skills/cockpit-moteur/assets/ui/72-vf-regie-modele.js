@@ -9,7 +9,8 @@
   // champ d'un verrou : une FORME ADMISE (jeu de caractères et longueur bornés), jamais un refus par préfixe : une valeur hors forme (chemin au milieu,
   // relatif, file:, ../, ~) devient vide et ne s'affiche pas. Sans contrôle ni classe Cf (U+202E compris) ; la borne coupe avant l'épreuve de forme.
   const admis = (v, forme, n) => { const s = sans(v).slice(0, n); return forme.test(s) ? s : ''; };
-  const libre = (v) => admis(v, /^[A-Za-z0-9][A-Za-z0-9_-]*$/, 80); // owner, étape : aucun séparateur (release-bump, exec-73, vf-dev-manager-p73, identifiants hexadécimaux)
+  // owner, étape : aucun séparateur (release-bump, exec-73, vf-dev-manager-p73, identifiants hexadécimaux)
+  const libre = (v) => admis(v, /^[A-Za-z0-9][A-Za-z0-9_-]*$/, 80);
   const wsOk = (v) => admis(v, /^[a-z0-9-]+$/, 80), phaseOk = (v) => admis(v, /^[0-9]+(\.[0-9]+)?$/, 12);
   const scopeOk = (v) => admis(v, /^(depot|compartiment|phase|mission|lab)$/, 12), dagOk = (v) => admis(v, /^[A-Za-z0-9][A-Za-z0-9._-]*$/, 200);
 
