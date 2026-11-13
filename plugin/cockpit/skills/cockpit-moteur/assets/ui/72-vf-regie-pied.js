@@ -1,6 +1,7 @@
 // VibeFlow (73-05) : états de page de la régie (UI-SPEC § 4.5) et pied. Chaque message dit son état et, en une demi-phrase, ce qui le résout (P73-D-32).
-// monter(racine) pose la zone des états et le pied, rend le nettoyage ; maj(info) dessine l'état ; ajouter(bloc) branche un bloc au pied (73-07 : les arbres de travail
-// et « ailleurs sur ce poste »). nonCommite() rend à la source la jointure branche → fichiers modifiés (ligne 2 d'un agent). Texte seul (textContent). Pose window.__vfRegiePied.
+// monter(racine) pose la zone des états et le pied, rend le nettoyage ; maj(info) dessine l'état ; ajouter(bloc) branche un bloc au pied
+// (73-07 : les arbres de travail et « ailleurs sur ce poste »). nonCommite() rend à la source la jointure branche → fichiers modifiés
+// (ligne 2 d'un agent). Texte seul (textContent). Pose window.__vfRegiePied.
 (() => {
   const D = document, DP = ' :';
   const h = (tag, cls, txt) => { const e = D.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
@@ -20,7 +21,8 @@
     const E = W.VF_ETAT;
     if (E && typeof E.lireJson === 'function') return E.lireJson(chemin);
     const S = W.FLOORPLAN_SERVER || {};
-    return W.fetch(chemin, { headers: { 'x-floorplan-token': S.token || '' }, cache: 'no-store' }).then((r) => (r.ok ? r.json() : Promise.reject(new Error('statut'))));
+    const options = { headers: { 'x-floorplan-token': S.token || '' }, cache: 'no-store' };
+    return W.fetch(chemin, options).then((r) => (r.ok ? r.json() : Promise.reject(new Error('statut'))));
   };
   const abonner = (cle, evenement, f) => {
     const E = W.VF_ETAT;
@@ -42,7 +44,8 @@
   };
 
   function arbres() {
-    const bloc = h('details', 'vf-rg-sec vf-rg-arbres'), corps = h('div', 'vf-rg-corps vf-rg-arbres-corps'), titre = h('summary', 'vf-rg-tete', 'Arbres de travail');
+    const bloc = h('details', 'vf-rg-sec vf-rg-arbres'), corps = h('div', 'vf-rg-corps vf-rg-arbres-corps');
+    const titre = h('summary', 'vf-rg-tete', 'Arbres de travail');
     let vivant = true, signature = '';
     bloc.append(titre, corps);
     const bouton = (txt, f) => { const b = h('button', 'btn', txt); b.setAttribute('type', 'button'); b.addEventListener('click', f); return b; };
@@ -51,7 +54,10 @@
       const s = JSON.stringify(Object.entries(carte).sort());
       nonCommite = carte; if (s !== signature) { signature = s; D.dispatchEvent(new CustomEvent('vf-regie:redessiner')); }
     };
-    const echec = () => { if (!vivant) return; bloc.hidden = false; dire('Git est indisponible : le dépôt ne répond pas.', bouton('Réessayer', () => lecture())); rendre(Object.create(null)); };
+    const echec = () => {
+      if (!vivant) return;
+      bloc.hidden = false; dire('Git est indisponible : le dépôt ne répond pas.', bouton('Réessayer', () => lecture())); rendre(Object.create(null));
+    };
     const pastilles = (d) => {
       if (!d || !d.verifie || (d.modifies == null && d.nonSuivis == null && d.propre == null)) return ['non vérifié'];
       const p = [], plus = d.plus ? '+' : '';
@@ -69,9 +75,13 @@
       const lus = new Map(w.worktrees.map((x) => [x.chemin, x])), L = g.worktrees;
       const noms = new Map(), branches = new Map(), carte = Object.create(null);
       for (const t of L) { noms.set(t.nom, (noms.get(t.nom) || 0) + 1); if (t.branche) branches.set(t.branche, (branches.get(t.branche) || 0) + 1); }
-      for (const t of L) { const d = lus.get(t.chemin); if (t.branche && branches.get(t.branche) === 1 && d && d.verifie && d.modifies > 0) carte[t.branche] = d.modifies; }
+      for (const t of L) {
+        const d = lus.get(t.chemin);
+        if (t.branche && branches.get(t.branche) === 1 && d && d.verifie && d.modifies > 0) carte[t.branche] = d.modifies;
+      }
       ecrire(titre, `Arbres de travail (${L.length})`);
-      const histo = D.getElementById('vf-git-ouvreur') ? bouton("Ouvrir l'historique Git (g)", () => { const o = D.getElementById('vf-git-ouvreur'); if (o) o.click(); }) : null;
+      const ouvrirGit = () => { const o = D.getElementById('vf-git-ouvreur'); if (o) o.click(); };
+      const histo = D.getElementById('vf-git-ouvreur') ? bouton("Ouvrir l'historique Git (g)", ouvrirGit) : null;
       if (L.length <= 1) dire('Un seul arbre de travail.', ...(histo ? [histo] : []));
       else {
         const ul = h('ul', 'vf-rg-arbres-liste');
@@ -106,7 +116,8 @@
     const ligne = h('p', 'vf-rg-ailleurs');
     let donneesAilleurs = null, vivant = true, dessin = '';
     ligne.hidden = true;
-    const dessiner = () => { // « Ailleurs sur ce poste : 1 session vous attend, dans « atelier ». » ; le nom d'un lab ne se pose qu'en textContent d'un élément exclu de la traduction
+    // « Ailleurs sur ce poste : 1 session vous attend, dans « atelier ». » ; le nom d'un lab ne se pose qu'en textContent d'un élément exclu de la traduction
+    const dessiner = () => {
       const liste = (donneesAilleurs || []).filter((e) => e && typeof e.lab === 'string' && e.lab && Number.isInteger(e.n) && e.n > 0).slice(0, 50);
       const total = liste.reduce((s, e) => s + e.n, 0), noms = liste.slice(0, 3), reste = liste.length - noms.length, nodes = [];
       const sig = liste.length ? JSON.stringify(liste) : '';
@@ -162,5 +173,8 @@
     const retrait = A.demarrer(); B.lecture();
     return () => { courant = null; retrait(); A.fin(); B.fin(); etats.remove(); zone.remove(); direct.remove(); };
   }
-  window.__vfRegiePied = { monter, maj: (i) => { if (courant) courant.maj(i); }, ajouter: (b) => { if (courant) courant.ajouter(b); }, surWho: () => { if (courant && courant.surWho) courant.surWho(); }, nonCommite: () => nonCommite };
+  window.__vfRegiePied = {
+    monter, maj: (i) => { if (courant) courant.maj(i); }, ajouter: (b) => { if (courant) courant.ajouter(b); },
+    surWho: () => { if (courant && courant.surWho) courant.surWho(); }, nonCommite: () => nonCommite,
+  };
 })();
