@@ -64,7 +64,7 @@ await executer(chrome, async (s) => {
   };
   const choisir = async () => { await s.ev('VibeFlow.fit(false)'); await s.ev(`VibeFlow.select(${JSON.stringify(SEL)})`); await posee(); };
   const onglet = async (nom) => {
-    await s.ev(`VF_COQUILLE.chargerOnglet(${JSON.stringify(nom)})`); await s.attendre(PRET, `onglet ${nom}`);
+    await s.ev(`VF_ONGLETS.aller(${JSON.stringify(nom)})`); await s.attendre(PRET, `onglet ${nom}`);
     await s.attendre(POSEE, `onglet ${nom} posé`); await stabiliser(lireVue, { pas: 120, max: 5000 }); await s.ev(OUTIL);
   };
   const apres = async (mod, key = 'c') => { // la mesure d'un geste : t, mise en page, groupe attendu, cadrage de référence
