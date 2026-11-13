@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // vf-cockpit-arbres — arbres git du lab, branche de base, retard sans réseau, phase active (socle du cockpit, VFSG-05 ; P68-D-04). Lecture seule.
-// Exports : GIT_SUR (préfixe d'arguments de chaque appel git), arbresGit(root, { sh }) -> [{ chemin, branche, principal }],
+// Exports : GIT_SUR (préfixe d'arguments de chaque appel git), arbresGit(root, { sh }) -> [{ chemin, branche, principal }], arbresGitAsync(root, { fin }) -> Promise de la même liste,
 //           brancheBase(root, { sh }) -> nom | null, brancheBaseAsync(root, { fin }) -> Promise<nom | null>, retard({ chemin, base, commonDir, now, sh, lab }) -> { base, main, origin, fetchAgeS },
 //           phaseActive({ phases, branche }) -> { key, n, nom, etat } | null, nettoie(s, n) -> chaîne sans caractère de contrôle, masquée, bornée
 // Aucune sous-commande réseau (ni fetch, pull, ls-remote, remote) ; git sans fsmonitor ; sous-commandes qui ne lisent ni l'index ni l'arbre de travail ;
@@ -32,6 +32,23 @@ export function arbresGit(root, { sh = shDefaut } = {}) {
     const t = /^worktree (.*)$/m.exec(b)?.[1];
     if (!t || !fs.existsSync(t)) continue;
     if (arbres.length > 0 && !(dossierCommun() && worktreeVerifie(commun, t))) continue;
+    const branche = /^branch refs\/heads\/(.*)$/m.exec(b)?.[1] || (b.includes('detached') ? '(détachée)' : '');
+    arbres.push({ chemin: fs.realpathSync(t), branche, principal: arbres.length === 0 });
+  }
+  return arbres.length ? arbres : [{ chemin: root, branche: '', principal: true }];
+}
+
+// Variante ASYNCHRONE d'arbresGit (constat d'audit 73-02, même raison que P78-D-41) : mêmes lectures, mêmes contrôles de lien retour, par `lancerGitAsync` ;
+// la boucle du serveur reste libre pendant que git travaille. Git muet ou en échec : la liste se réduit à l'arbre principal [root], jamais une liste inventée.
+export async function arbresGitAsync(root, { fin } = {}) {
+  root = path.resolve(root);
+  const arbres = [];
+  let commun; // lu à la première entrée non principale seulement
+  const dossierCommun = async () => { if (commun === undefined) { commun = null; try { const c = (await lancerGitAsync(root, ['rev-parse', '--path-format=absolute', '--git-common-dir'], { fin })).sortie.trim(); commun = c ? fs.realpathSync(c) : null; } catch {} } return commun; };
+  for (const b of (await lancerGitAsync(root, ['worktree', 'list', '--porcelain'], { fin })).sortie.split('\n\n')) {
+    const t = /^worktree (.*)$/m.exec(b)?.[1];
+    if (!t || !fs.existsSync(t)) continue;
+    if (arbres.length > 0 && !(await dossierCommun() && worktreeVerifie(commun, t))) continue;
     const branche = /^branch refs\/heads\/(.*)$/m.exec(b)?.[1] || (b.includes('detached') ? '(détachée)' : '');
     arbres.push({ chemin: fs.realpathSync(t), branche, principal: arbres.length === 0 });
   }

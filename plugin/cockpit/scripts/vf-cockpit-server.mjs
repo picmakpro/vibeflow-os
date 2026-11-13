@@ -18,7 +18,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { startLive } from './vf-cockpit-live.mjs';
 import { revealDoing, revealTranscript } from './vf-cockpit-who.mjs';
-import { resolveScriptsDir, trustedScriptsDir } from './vf-cockpit-paths.mjs';
+import { resolveScriptsDir, trustedScriptsDir, finDans } from './vf-cockpit-paths.mjs';
 import { dossierModule, substituerModule } from './vf-cockpit-module.mjs';
 import { ID_RE } from './vf-cockpit-lecture.mjs';
 import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
@@ -32,7 +32,7 @@ import { lireState, LECTEURS } from './vf-cockpit-state.mjs';
 import { brancherFluxEtat, VIE_MS } from './vf-cockpit-flux-etat.mjs';
 import os from 'node:os';
 import { ailleurs, demander, REPIT_MS } from './vf-cockpit-etat-officiel.mjs';
-import { arbresGit } from './vf-cockpit-arbres.mjs';
+import { arbresGitAsync } from './vf-cockpit-arbres.mjs';
 
 let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
 try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
@@ -83,10 +83,10 @@ const lireAilleurs = (c) => {
   const now = Date.now();
   demander({ home: os.homedir(), cwd: c.root });
   let m = racinesLab.get(c.root);
-  if (!m || now - m.at >= REPIT_MS) {
-    m = { at: now, liste: null };
-    try { m.liste = arbresGit(c.root).map((t) => t.chemin); } catch {}
-    racinesLab.set(c.root, m);
+  if (!m) { m = { at: 0, liste: null, enCours: false }; racinesLab.set(c.root, m); }
+  if (!m.enCours && now - m.at >= REPIT_MS) { // audit 73-02, constat 3 : lecture ASYNCHRONE (lancerGitAsync, comme P78-D-41) ; la boucle reste libre, la liste arrive pour une requête suivante
+    m.enCours = true; m.at = now;
+    arbresGitAsync(c.root, { fin: finDans(5000) }).then((a) => { m.liste = a.map((t) => t.chemin); }, () => { m.liste = null; }).finally(() => { m.enCours = false; });
   }
   const l = ailleurs(os.homedir(), { racines: m.liste });
   return { schema: 'vibeflow/cockpit-ailleurs@1', ailleurs: Array.isArray(l) ? l.filter(exacte) : l };

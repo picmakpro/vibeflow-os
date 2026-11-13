@@ -194,5 +194,12 @@ rg_RG13_route() {
   if rg13_inj EXTRA-GARDE "$RG13_INJ" 's@l\.filter(exacte)@l@'; then RG13_VIDE=1 rg13_run "$x"; got="$(rg13_ch "$x" liste)"; else got="ancre absente"; fi; unset COCKPIT_MODULE
   if [ -n "$got" ] && [ "$got" != '[]' ] && [ "$got" != "ancre absente" ]; then echo "  ✅ PASS — M-EXTRA-GARDE — la garde d'émission retirée (mutant tué : liste=$got, saine [])"; PASS=$((PASS+1))
   else echo "  ❌ FAIL — M-EXTRA-GARDE — la garde d'émission retirée (mutant survivant, serveur muet ou ancre absente)"; echo "     attendu: [différent de []]"; echo "     obtenu:  [$got]"; FAIL=$((FAIL+1)); fi
+  # constat d'audit 3 : la lecture des arbres ne gèle pas la boucle du serveur (git qui dort 3 s, seconde requête servie pendant ce temps)
+  x="$WORK/rg13-lent.res"; rg13_run_lent "$x"
+  assert_eq "RG13.16 — git lent (3 s) : la première requête de la route déclenche la lecture des arbres, une requête d'état partie 300 ms après est servie en moins de 1,5 s ; la route garde son contrat (200, schéma ailleurs@1)" "$(rg13_etat_libre "$x")" '[200,true,200,"vibeflow/cockpit-ailleurs@1"]'
+  x="$WORK/rg13-lent-mut.res"
+  if cockpit_module_muter RG13-LENT-SYNC vf-cockpit-arbres.mjs 's@export async function arbresGitAsync(root, { fin } = {}) {@export async function arbresGitAsync(root, { fin } = {}) { return arbresGit(root);@'; then rg13_run_lent "$x"; got="$(rg13_etat_libre "$x")"; else got="ancre absente"; fi; unset COCKPIT_MODULE
+  if [ -n "$got" ] && [ "$got" != '[200,true,200,"vibeflow/cockpit-ailleurs@1"]' ] && [ "$got" != "ancre absente" ]; then echo "  ✅ PASS — M-LENT-SYNC — la lecture des arbres redevenue synchrone (mutant tué : $got)"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — M-LENT-SYNC — la lecture des arbres redevenue synchrone (mutant survivant, serveur muet ou ancre absente)"; echo "     attendu: [différent du sain]"; echo "     obtenu:  [$got]"; FAIL=$((FAIL+1)); fi
   vf_hyg_assert
 }
