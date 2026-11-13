@@ -7,7 +7,8 @@
   const GABARIT = '<div class="vf-trace" data-vf-trace-panneau><div class="ph"><span class="kindlabel">Liste</span></div>'
     + '<h2 class="pt" tabindex="-1"></h2><div data-vf-trace-corps></div></div>';
 
-  // ouvrirListe({ titre, sorte: [singulier, pluriel], elements, rendreLigne(element) -> Node, visee(element) -> bool, apres(corps), clavier, depuis })
+  // ouvrirListe({ titre, sorte: [singulier, pluriel], elements, rendreLigne(element) -> Node, visee(element) -> bool, avant() -> Node[], apres() -> Node[],
+//   clavier, depuis })
   VT.ouvrirListe = (o) => {
     const etat = { page: 0 }, total = o.elements.length;
     if (o.visee) { const i = o.elements.findIndex(o.visee); if (i >= 0) etat.page = Math.floor(i / PAGE); }
@@ -28,7 +29,7 @@
           nav.append(VT.el('p', 'vf-trace-compte', VT.T((debut + 1) + ' à ' + fin + ' sur ' + VT.N(total) + ' ' + o.sorte[1]), { 'aria-live': 'polite' }), b);
           kids.push(nav);
         }
-        sec.replaceChildren(h, ...kids);
+        sec.replaceChildren(h, ...(o.avant ? o.avant() : []), ...kids);
         if (o.apres) sec.append(...o.apres());
         if (focusTitre) t.focus();
         const vise = sec.querySelector('[aria-current="true"]');

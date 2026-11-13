@@ -86,6 +86,7 @@
   // un nœud (phase, plan) s'ouvre par select : le panneau sur mesure quitté est empilé ici, le nœud quitté par la pile commune
   VT.allerNoeud = (id) => { if (courant) { empiler(courant); courant = null; } SC.select(id); };
   VT.ouvreurs = {}; // sorte (decision, adr, entree, commit, …) -> (cle, { clavier, depuis }) ; posés par 76-07
+  for (const k of ['poseDecisions', 'poseMemoire']) if (typeof VT[k] === 'function') VT[k](VT.ouvreurs); // 74-vf-trace-decisions.js, -memoire.js
   VT.ouvrir = (sorte, cle, opts) => { const f = VT.ouvreurs[sorte]; if (f) f(cle, opts || {}); };
   // Échap (UI-SPEC § 8) : surcouche ouverte, rien ; pile commune non vide, Retour commun ; sinon fermeture du panneau d'objet et focus rendu à sa ligne
   // d'origine
@@ -108,6 +109,7 @@
     VT.installe = true; let vivant = true;
     if (VT.style) VT.style();
     VT.sections(SC, () => vivant);
+    for (const k of ['sectionDecisions', 'sectionMemoire']) if (typeof VT[k] === 'function') VT[k](SC, () => vivant); // ordre : Jalon, Décisions, Mémoire
     // Entrée sur un bouton de la traçabilité ne doit pas lancer aussi l'Entrée globale du moteur, qui plonge dans la sélection et redessine le panneau
     const entree = (ev) => { if (ev.key === 'Enter' && ev.target.closest
       && ev.target.closest('#panel .vf-trace button, #panel .vf-trace summary')) ev.stopPropagation(); };
