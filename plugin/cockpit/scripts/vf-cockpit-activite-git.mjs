@@ -7,6 +7,7 @@
 //   vidés). Jamais `status`, `diff` contre l'arbre de travail,
 // `fetch` ni `--follow` ; aucun réseau, rien d'écrit. Sans état global : l'état gardé (`memo`, <= 5 000 commits) vit chez l'appelant (75-05), qui le
 //   rend dans `etatPrecedent`.
+// `--relative` : chemins du journal relatifs au LAB (comme `graph.json`), fichiers hors du lab ignorés (lab en sous-dossier du dépôt).
 // A-04 : `merge-base` n'est pas dans la liste fermée des sous-commandes : « l'ancien HEAD est un ancêtre » se lit par `rev-list --count HEAD..ancien`
 //   (0 = ancêtre).
 // P75-D-11, P78-D-22 : erreur, délai, sortie tronquée ou désalignée = { etat: 'indisponible' } SANS champ partiel ; git absent, refusé ou hors dépôt
@@ -82,7 +83,7 @@ export function couplage(commits, options = {}) {
 
 // absent : pas de git, refusé, hors dépôt ; tout le reste (délai, tronqué, erreur) : indisponible
 const raison = (r) => (r.delai || r.tronque ? 'indisponible' : r.absent || r.refuse || r.code === 128 || r.code === null ? 'absent' : 'indisponible');
-const ARGS_LOG = ['log', '--no-merges', '-M', '-l400', '--name-status', '-z', '--format=%x00%H%x00%ct'];
+const ARGS_LOG = ['log', '--no-merges', '-M', '-l400', '--name-status', '-z', '--relative', '--format=%x00%H%x00%ct'];
 const lireCommits = async (lire, args) => {
   const r = await lire(args), lu = r.ok && !r.tronque ? lireLog(r.sortie) : { ok: false };
   return lu.ok ? lu.commits : null;

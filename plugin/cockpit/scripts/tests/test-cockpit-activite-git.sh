@@ -301,6 +301,28 @@ const argvB = [...HIST, ...argvs()];
 eq('B8', 'B8.2 aucun argv de la tâche ne contient status, diff, fetch ni --follow (`diff-tree` seul est permis)', argvB.filter((a) => a.some(interdit)).length, 0);
 eq('B9', 'B9.1 hors dépôt : absent ; échéance dépassée : indisponible sur la source seule', [(await B.collisionsBranches(horsDepot, { fin: FIN() })).etat, (await B.collisionsBranches(rb2, { fin: Date.now() - 1, cache: new Map() })).etat], ['absent', 'indisponible']);
 
+// ---- G10 : lab en sous-dossier du dépôt ; G11 : témoins de la revue (clé, copie, borne, purge) ----
+const rsub = init('rsub');
+for (let i = 0; i < 5; i++) touch(rsub, `s${i}`, 40 - i, 'sous/a.txt', 'sous/b.txt', 'top.js');
+const gs = await A.calculerGit(path.join(rsub, 'sous'), { loc: new Map([['a.txt', 1], ['b.txt', 1], ['top.js', 1]]) });
+eq('G10', 'G10.1 lab = sous-dossier : chemins relatifs au lab, aucun chemin hors du lab (top.js) ni dans les chauds ni dans le couplage', [gs.etat, gs.chauds.map((t) => [t[0], t[1]]), gs.couplage], ['ok', [['a.txt', 5], ['b.txt', 5]], [['a.txt', 'b.txt', 5, 100]]]);
+const rwd = init('rwd'); touch(rwd, 'w0', 20, 'f.txt');
+const wdd = path.join(WORK, 'wt-rwd-d'); G(rwd, 'worktree', 'add', '-q', '--detach', wdd);
+const locW = new Map([['f.txt', 1], ['g.txt', 1]]);
+const k1 = await A.calculerGit(rwd, { loc: locW });
+touch(wdd, 'w1', 10, 'g.txt');
+const k2 = await A.calculerGit(rwd, { loc: locW, etatPrecedent: k1 });
+eq('G11', 'G11.1 la clé couvre la liste des worktrees : un HEAD détaché qui bouge (aucune ref ne bouge) change la clé', k2.cle !== k1.cle, true);
+const copie = L.resoudre([{ h: H40, at: 2, entrees: [{ st: 'C', chemins: ['src', 'dst'] }] }, { h: H40, at: 1, entrees: [{ st: 'M', chemins: ['src'] }] }]);
+eq('G11', 'G11.2 une copie (C) ne crée aucun alias : le chemin source reste lui-même', copie.map((c) => c.chemins), [['dst'], ['src']]);
+eq('G11', 'G11.3 purger garde un commit exactement à la borne, écarte celui d\'avant', L.purger([{ at: 100 }, { at: 99 }], 100).map((c) => c.at), [100]);
+const loin = Date.now() + 400 * 86400000;
+const k3 = await A.calculerGit(rwd, { loc: locW, etatPrecedent: k2, maintenant: loin });
+eq('G11', 'G11.4 clé identique : la fenêtre glisse, le commit sorti de la fenêtre est purgé', [k3.cle === k2.cle, k3.fenetre.commits, k3.etat], [true, 0, 'vide']);
+G(rwd, 'branch', 'x');
+const k4 = await A.calculerGit(rwd, { loc: locW, etatPrecedent: k2, maintenant: loin });
+eq('G11', 'G11.5 clé changée, HEAD inchangé : même purge de la fenêtre', [k4.cle !== k2.cle, k4.fenetre.commits, k4.etat], [true, 0, 'vide']);
+
 // FIN_B
 bilan();
 FIN_SONDE

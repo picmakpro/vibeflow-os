@@ -33,3 +33,9 @@ Sur ce dépôt, 90 jours, 4 152 commits hors merges : 395 paires sans retrait du
 ## À consigner ailleurs
 
 CHANGELOG (« Non publié ») : écrit par 75-10 seul. Aucune route ni page branchée ici (75-05).
+
+## Correctif de revue
+
+- Majeur corrigé : `--relative` ajouté au journal des points chauds, tout chemin servi est relatif au lab ; témoin G10 vu rouge (`top.js` servi, chemins `sous/…`) puis vert. L'écart « sans --relative » ci-dessus est périmé.
+- m5 : témoins G11 pour clé et worktrees, copie `C`, borne de `purger`, purge à HEAD inchangé (deux chemins) ; le tri de la base commune multiple va au BACKLOG. Suite : 82 PASS, cliquet OK.
+- Le BACKLOG du compartiment n'existe pas : les lignes sont dans `.planning/BACKLOG.md`, à la suite des lignes 75.
