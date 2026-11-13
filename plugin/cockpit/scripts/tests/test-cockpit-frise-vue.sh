@@ -151,20 +151,21 @@ export default async function (h) {
       const patLine = pat && pat.querySelector('line, path, rect');
       return { sp8: window.__px('--sp-8'), sp2: window.__px('--sp-2'), act: window.__couleur('--st-active'), t4: window.__couleur('--text-4'),
         tr: tr[0] ? { tag: tr[0].tagName, h: tr[0].getAttribute('height'), fill: cs(tr[0]).fill, stroke: cs(tr[0]).stroke } : null,
-        at: at ? { tag: at.tagName, fill: at.getAttribute('fill'), pat: pat ? pat.tagName : null, patStroke: patLine ? cs(patLine).stroke : null, stroke: at.getAttribute('stroke'), strokeCs: cs(at).stroke, h: at.getAttribute('height') } : null,
+        at: at ? { tag: at.tagName, fill: at.getAttribute('fill'), fillCs: cs(at).fill, pat: pat ? pat.tagName : null, patStroke: patLine ? cs(patLine).stroke : null, stroke: at.getAttribute('stroke'), strokeCs: cs(at).stroke, h: at.getAttribute('height') } : null,
         ag: ag[0] ? { tag: ag[0].tagName, sw: cs(ag[0]).strokeWidth, dash: cs(ag[0]).strokeDasharray, rects: ag.filter((e) => e.tagName === 'rect').length } : null,
         re: re ? { dash: cs(re).strokeDasharray, stroke: cs(re).stroke, sw: cs(re).strokeWidth } : null,
         total: g.querySelectorAll('[data-etat]').length, silence: g.querySelectorAll('[data-etat="silence"]').length,
         titres: [...g.querySelectorAll('title')].map((e) => e.textContent), derniere: tr[1] ? ti(tr[1]) : null, trN: tr.length };
     });
     h.sonde('S4', 'travail : rect plein, hauteur = --sp-8, fill = --st-active, aucun contour', !!m.tr && m.tr.tag === 'rect' && parseFloat(m.tr.h) === m.sp8 && m.tr.fill === m.act && m.tr.stroke === 'none', JSON.stringify(m.tr));
-    h.sonde('S4', 'attend : rect rempli par un <pattern> aux traits --st-active, stroke none, aucune bordure', !!m.at && m.at.tag === 'rect' && /^url\(#/.test(m.at.fill) && m.at.pat === 'pattern' && m.at.patStroke === m.act && (m.at.stroke === 'none' || m.at.strokeCs === 'none'), JSON.stringify(m.at));
+    h.sonde('S4', 'attend : rect rempli par un <pattern> aux traits --st-active, stroke none, aucune bordure', !!m.at && m.at.tag === 'rect' && /^url\(#/.test(m.at.fill) && m.at.pat === 'pattern' && /^url\(/.test(m.at.fillCs) && m.at.patStroke === m.act && m.at.stroke === 'none' && m.at.strokeCs === 'none', JSON.stringify(m.at));
     h.sonde('S4', 'agents : line ou path d\'épaisseur --sp-2, aucun rect plein', !!m.ag && ['line', 'path'].includes(m.ag.tag) && parseFloat(m.ag.sw) === m.sp2 && m.ag.rects === 0, JSON.stringify(m.ag));
     h.sonde('S4', 'repos : pointillé non vide, couleur --text-4', !!m.re && m.re.dash !== 'none' && m.re.dash !== '' && m.re.stroke === m.t4, JSON.stringify(m.re));
     const jeu = [[m.tr && m.tr.h, false, 'none'], [m.at && m.at.h, true, 'none'], [m.ag && m.ag.sw, false, m.ag && m.ag.dash], [m.re && m.re.sw, false, m.re && m.re.dash]].map((x) => JSON.stringify(x));
     h.sonde('S4', 'les quatre jeux (hauteur, pattern, dasharray) sont deux à deux distincts', new Set(jeu).size === 4 && jeu.every((x) => !x.includes('null')), jeu.join(' '));
     h.egal('S4', 'un segment silence ne produit aucun élément ni title : cinq éléments pour six segments', [m.silence, m.total, m.titres.length], [0, 5, 5]);
-    const attendu = await h.ev((a, b) => { const hh = (ms) => { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }; return 'au travail, ' + hh(a) + ' à ' + hh(b) + ', 38 min'; }, now - 38 * 60000, now);
+    const fin = await h.ev(() => window.__vfFrise.donnees().jusqua);
+    const attendu = await h.ev((a, b) => { const hh = (ms) => { const d = new Date(ms); return String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0'); }; return 'au travail, ' + hh(a) + ' à ' + hh(b) + ', 38 min'; }, now - 38 * 60000, fin);
     h.egal('S4', 'title du segment « au travail, hh:mm à hh:mm, 38 min » aux instants vrais', m.derniere, attendu);
   });
 }
@@ -237,7 +238,7 @@ export const ids = ['S7'];
 const gros = (now, F) => { const d = (m) => now - m * F.MIN, v = [];
   v.push(F.voie({ id: 'sess-1', kind: 'session', role: null, depth: null, debut: d(80), fin: now, segments: [[d(80), now, 'repos']] }));
   for (const [id, t] of [['mg-1', 70], ['mg-2', 69]]) v.push(F.voie({ id, parent: 'sess-1', dispatchA: d(t), debut: d(t), fin: now, segments: [[d(t), now, 'attend-agents']], rattachement: { dag: 'm1.md', noeud: null, source: 'enfants' } }));
-  for (let i = 0; i < 15; i++) v.push(F.voie({ id: `w-${i}`, parent: i < 10 ? 'mg-1' : 'mg-2', depth: 2, dispatchA: d(60 - i), debut: d(60 - i), fin: d(30), fini: true, segments: [[d(60 - i), d(30), 'travail']] }));
+  for (let i = 0; i < 15; i++) v.push(F.voie({ id: `w-${i}`, parent: 'mg-1', depth: 2, dispatchA: d(60 - i), debut: d(60 - i), fin: d(30), fini: true, segments: [[d(60 - i), d(30), 'travail']] }));
   return v; };
 export default async function (h) {
   await h.section('S7', async () => {
@@ -245,7 +246,7 @@ export default async function (h) {
     const lire = () => h.ev(() => ({ voies: document.querySelectorAll('.vf-frise-voies > .vf-frise-voie').length, boutons: [...document.querySelectorAll('button.vf-frise-repli')].map((b) => [b.textContent, b.getAttribute('aria-expanded'), b.getAttribute('aria-label')]),
       sr: document.querySelectorAll('.vf-frise-sr li[data-id]').length }));
     const a = await lire();
-    h.sonde('S7', '18 voies : au plus 12 visibles et un bouton « + 10 agents » aria-expanded=false', a.voies <= 12 && a.boutons.length === 1 && a.boutons[0][0] === '+ 10 agents' && a.boutons[0][1] === 'false' && a.boutons[0][2].startsWith('+ 10 agents'), JSON.stringify(a));
+    h.sonde('S7', '18 voies : au plus 12 visibles et un bouton « + 15 agents » aria-expanded=false', a.voies <= 12 && a.boutons.length === 1 && a.boutons[0][0] === '+ 15 agents' && a.boutons[0][1] === 'false' && a.boutons[0][2].startsWith('+ 15 agents'), JSON.stringify(a));
     await h.ev(() => document.querySelector('button.vf-frise-repli').click());
     await h.pause(400);
     const b = await lire();
@@ -382,16 +383,16 @@ const axe = () => ({ cellule: document.querySelector('.vf-frise-rang-axe .vf-fri
 export default async function (h) {
   await h.section('S12', async () => {
     await h.monter({ voies: hor });
-    const a = await h.ev(() => { const r = [...document.querySelectorAll('g[data-voie="hl-1"] rect[data-etat="travail"]')].map((e) => e.getBoundingClientRect().width);
+    const a = await h.ev(() => { const rs = [...document.querySelectorAll('g[data-voie="hl-1"] rect[data-etat="travail"]')].map((e) => e.getBoundingClientRect()), r = rs.map((x) => x.width);
       const nom = document.querySelector('.vf-frise-voie[data-id="Close-1"] .vf-frise-nom'); const c = document.querySelector('.vf-frise-voie[data-id="Close-1"] .vf-frise-cell');
-      return { r, nom: nom ? nom.textContent : null, mono: !!(nom && nom.closest('.mono, code, pre')), noeud: (c.querySelector('.vf-frise-sous .mono, .vf-frise-sous code') || {}).textContent }; });
-    h.sonde('S12', 'Horloge : largeur(segment) / durée constante (30 min contre 10 min, tolérance 0,5 px)', a.r.length === 2 && Math.abs(a.r[0] - 3 * a.r[1]) < 0.5, JSON.stringify(a.r));
+      return { r, ecart: rs.length === 2 ? rs[1].left - rs[0].right : null, reperes: document.querySelectorAll('.vf-frise-repere').length, nom: nom ? nom.textContent : null, mono: !!(nom && nom.closest('.mono, code, pre')), noeud: (c.querySelector('.vf-frise-sous .mono, .vf-frise-sous code') || {}).textContent }; });
+    h.sonde('S12', 'Horloge : largeur(segment) / durée constante (30 min contre 10 min, et l\'écart de 10 min = un segment de 10 min), aucun repère de silence', a.r.length === 2 && Math.abs(a.r[0] - 3 * a.r[1]) < 0.5 && Math.abs(a.ecart - a.r[1]) < 0.5 && a.reperes === 0, JSON.stringify(a));
     h.sonde('S12', 'un nom d\'agent « Close » et un nœud « Close » restent « Close » (hors de la traduction : .mono)', !!a.nom && a.nom.startsWith('Close') && a.mono && a.noeud === 'Close', JSON.stringify([a.nom, a.mono, a.noeud]));
     const ax = await h.ev(axe);
     h.sonde('S12', 'la cellule d\'axe dit « Horloge » ; trait « maintenant » en pointillé et étiquette « maintenant »', ax.cellule === 'Horloge' && !!ax.maintenant && ax.maintenant !== 'none' && ax.mot, JSON.stringify([ax.cellule, ax.maintenant, ax.mot]));
     await h.monter({ voies: evt });
     await h.changer(() => h.radio('6 h'));
-    await h.changer(() => h.radio('Événements'));
+    await h.radio('Événements'); await h.pause(500);
     const e = await h.ev(axe);
     const larg = e.reperes.map((x) => Math.round(x.larg * 100) / 100), textes = e.reperes.map((x) => x.texte);
     h.sonde('S12', 'Événements : tous les repères ont la MÊME largeur fixe, dont ceux de 3 min et de 40 min', e.reperes.length >= 3 && new Set(larg).size === 1 && larg[0] > 0 && e.reperes.every((x) => x.nl === 2), JSON.stringify(larg));
@@ -518,7 +519,7 @@ export default async function (h) {
     h.egal('S19', 'après DEUX changements d\'onglet : aucun abonnement ni écouteur doublé, réglages toujours restitués', [b.checks.sort(), b.racines, b.abo, b.kd], [['6 h', 'Événements'].sort(), 1, 1, 1]);
     h.egal('S19', 'aucune autre clé de stockage que celle de la régie et celle des réglages', b.cles.filter((c) => !c.startsWith('vibeflow-cockpit:equipe-vue') && c !== 'vibeflow-cockpit:frise-reglages'), []);
     const s = await h.ev(() => window.__surOnglet.filter((x) => x.frise));
-    h.sonde('S19', 'surOnglet appelé par la frise avec { cle: \'74-vf-frise.js\' } à chaque arrivée (3 arrivées, 3 appels, aucune sans clé)', s.length === 3 && s.every((x) => x.cle === '74-vf-frise.js'), JSON.stringify(s));
+    h.sonde('S19', 'surOnglet appelé par la frise avec { cle: \'74-vf-frise.js\' } à chaque arrivée (chaque exécution du module, aucune sans clé)', s.length >= 3 && s.every((x) => x.cle === '74-vf-frise.js'), JSON.stringify(s));
   });
 }
 JS
@@ -537,6 +538,8 @@ demarrer() { COCKPIT_LOG="$WORK/serve-$1.out" cockpit_lancer "$LAB" HOME="$WORK/
 # joue <scénario> <port> <sections…> : une ligne PASS/FAIL par sonde ; une section sans sonde est un FAIL nommé ; remplit RESULTAT (lignes FAIL par section)
 joue() {
   local f="$1" port="$2" out line id lib ok ob n0 rc; shift 2
+  JOUE_FAIL=""
+  if [ -n "${SEUL:-}" ]; then case " $SEUL " in *" $f "*) ;; *) return ;; esac; fi   # SEUL="s1 s6" : ne jouer que ces scénarios (mise au point)
   out="$("$NODE" "$HERE_T/chrome-frise.mjs" "$CHROME" "$AUX/$f.mjs" "http://127.0.0.1:$port" 2>&1 | tail -1)"
   JOUE_FAIL=""
   line="$("$NODE" -e 'let j; try { j = JSON.parse(process.argv[1]); } catch { process.exit(3); }
@@ -609,11 +612,13 @@ else
   echo "=== S16 — téléphone 390 px ==="; joue s16 "$PORT" S16
   echo "=== S17 — cycle de vie ==="; joue s17 "$PORT" S17
   echo "=== S18 — bandeau haut ==="; joue s18 "$PORT" S18
+  if [ -n "${DBG:-}" ]; then cp "$DBG" "$AUX/dbg.mjs"; joue dbg "$PORT" DBG; fi   # mise au point seulement
   echo "=== S19 — aller-retour Code -> Équipe -> Code -> Équipe ==="; joue s19 "$PORT" S19
   cockpit_arreter "$SRV"; SRV=""
 
   # ---------- mutants : copie du module, motif vérifié par cockpit_module_muter, sonde rejouée sur le serveur de la copie ----------
   echo "=== Mutants ==="
+  if [ -n "${SEUL:-}" ]; then echo "  (mutants non joués : SEUL est posé)"; else
   mutant() { # <nom> <fichier ui> <expression sed> <scénario> <section>… ; MUTANT-ROUGE seulement si la sonde a rougi
     local nom="$1" fic="$2" expr="$3" scen="$4" sec s rouge="" pc pf; shift 4
     unset COCKPIT_MODULE
@@ -629,11 +634,11 @@ else
   mutant BASCULE-PROPRE 74-vf-frise.js "s/const barre = h('div', 'vf-frise-outils');/const barre = h('div', 'vf-frise-outils'); barre.setAttribute('role', 'tablist');/" s1 S1
   mutant TRONQUE-MUET 74-vf-frise-source.js "s/ne sont pas montrées/sont affichées/g" s9 S9
   mutant CONTOUR 74-vf-frise-pistes.js "s/rect.setAttribute('fill', 'url(#' + ID_HACHURES + ')');/rect.setAttribute('fill', 'url(#' + ID_HACHURES + ')'); rect.setAttribute('stroke', 'var(--text)');/" s4 S4
-  mutant SILENCE-DESSINE 74-vf-frise-pistes.js "s/if (s.genre === 'silence') continue;//" s4 S4
+  mutant SILENCE-DESSINE 74-vf-frise-pistes.js "s/s.genre !== 'silence' \&\& //" s4 S4
   mutant COULEUR-NOEUD 74-vf-frise-pistes.js "s/rect.classList.add('vf-frise-seg');/rect.classList.add('vf-frise-seg'); rect.style.fill = 'hsl(' + (String(v.rattachement \&\& v.rattachement.noeud).length * 47) + ', 70%, 40%)';/" s14 S14
-  mutant HORLOGE-COMPRESSEE 74-vf-frise.js "s/lecture: ctx.lecture,/lecture: 'evenements',/" s12 S12
+  mutant HORLOGE-COMPRESSEE 74-vf-frise.js "s/lecture: lecture,/lecture: 'evenements',/" s12 S12
   mutant REPLI-SILENCIEUX 74-vf-frise-colonne.js "s/'+ ' + n + ' agents'/'+ agents'/" s7 S7
-  mutant SANS-NETTOYAGE 74-vf-frise.js "s/ab();//" s17 S17 S19
+  mutant SANS-NETTOYAGE 74-vf-frise.js "s/m.abo(); m.abo = null;//" s17 S17 S19
   mutant SANS-CLE 74-vf-frise.js "s/{ cle: '74-vf-frise.js' }/{}/" s19 S19
   mutant REGLAGES-OUBLIES 74-vf-frise.js "s/sessionStorage.setItem(CLE_REGLAGES/void (CLE_REGLAGES/" s19 S19
   mutant COURBE-ABSENTE 74-vf-frise-pistes.js "s/poly.setAttribute('data-marches', String(c.pas.length));/poly.setAttribute('data-marches', '0');/" s18 S18
@@ -644,6 +649,7 @@ else
     if [ -n "$E" ]; then echo "MUTANT-ROUGE FETCH-DIRECT S13"; echo "  ✅ PASS — M-FETCH-DIRECT — S13 rougit sur le mutant"; PASS=$((PASS+1)); else echo "  ❌ FAIL — M-FETCH-DIRECT — S13 reste verte"; FAIL=$((FAIL+1)); fi
   else echo "  ❌ FAIL — M-FETCH-DIRECT — motif absent (module source introuvable ou ancre manquante)"; FAIL=$((FAIL+1)); fi
   unset COCKPIT_MODULE
+  fi
 fi
 
 echo

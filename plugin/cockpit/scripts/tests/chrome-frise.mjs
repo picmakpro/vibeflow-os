@@ -40,7 +40,10 @@ await executer(chrome, async (s) => {
   // la réponse de la route de frise : fixture de la fabrique, à l'heure de la page (jamais l'horloge du scénario)
   h.poser = async (o = {}) => {
     const now = await s.ev('Date.now()');
-    const voies = typeof o.voies === 'function' ? o.voies(now, FAB) : o.voies;
+    let voies = typeof o.voies === 'function' ? o.voies(now, FAB) : o.voies;
+    // la fabrique pose la queue « attend-humain » jusqu'à son NOW constant : ramenée à l'heure de la page (la route la pose jusqu'à `jusqua`)
+    if (voies === undefined && !o.brut) voies = FAB.voiesParDefaut(now);
+    for (const v of voies || []) { if (v.fin === FAB.NOW) v.fin = now; for (const s of v.segments) if (s[1] === FAB.NOW) s[1] = now; }
     const rep = o.brut ?? FAB.fabrique({ now, voies, tronque: o.tronque, voiesOmises: o.voiesOmises, sourceEtat: o.sourceEtat });
     if (o.sansOmises) delete rep.voiesOmises;
     await s.ev(`window.__vfF.reponse = ${JSON.stringify(rep)}; window.__vfF.statut = ${o.statut ?? 200}; window.__vfF.delai = ${o.delai ?? 0}`);
