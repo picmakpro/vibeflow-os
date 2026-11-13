@@ -17,7 +17,7 @@
       "jalon": { "requis": ["key", "icone", "texte", "ws", "phases"], "optionnels": [] },
       "mission": { "requis": ["nom", "fichier", "phaseKey", "ws", "etat", "libelle", "vie"], "optionnels": ["noeuds"], "vieNulle": ["inconnu", "done", "ready", "failed"], "vieNulleDit": "vie vaut null seulement pour ces etats : inconnu = source des verrous illisible ; done, ready, failed = aucun noeud running, verrous non lus. running et abandonnee portent toujours une vie. Lire vie: null sur etat, jamais seul." },
       "noeud": { "requis": ["id", "status", "step", "stage", "deps"], "optionnels": [] },
-      "verrou": { "requis": ["ws", "scope", "phase", "tenu", "stale", "ageS", "ttl", "progressAgeS", "owner"], "optionnels": [] },
+      "verrou": { "requis": ["ws", "scope", "phase", "tenu", "stale", "ageS", "ttl", "progressAgeS", "owner"], "dag": { "cles": ["ws", "phase", "at", "nodes"], "noeud": ["id", "deps", "status"], "statuts": ["blocked", "ready", "running", "done", "failed"], "bornes": { "noeuds": 200, "dependances": 32, "identifiant": 64 } }, "optionnels": ["step", "childrenRunning", "dag", "leaseS", "sansSession"] },
       "arbre": { "requis": ["label", "branche", "principal", "courant", "phaseActive", "retard"], "optionnels": [] },
       "retard": { "requis": ["base", "main", "origin", "fetchAgeS"], "optionnels": [] },
       "etatsVerrous": ["lue", "absente", "erreur"],

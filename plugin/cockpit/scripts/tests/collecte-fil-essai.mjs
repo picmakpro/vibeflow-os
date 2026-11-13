@@ -29,7 +29,7 @@ parentPort.on('message', (m) => {
   if (m.planning) parentPort.postMessage({ type: 'planning', id, motifs, graphe: { nodes: [], files: [], meta: {} } });
   if (m.tour || m.verrous) {
     const equipe = { workers: sc === 'interdit' ? [{ id: 'w1', kind: 'worker', a: { b: { cleInterdite: 'x' } } }] : [{ id: 'w1', kind: 'worker' }], sources: {} };
-    parentPort.postMessage({ type: 'tour', id, verrous: { available: false }, equipe, erreurs: [], dureeMs: 1 });
+    parentPort.postMessage({ type: 'tour', id, verrous: { etat: 'absente', plat: false, liste: [] }, equipe, erreurs: [], dureeMs: 1 });
     parentPort.postMessage({ type: 'index', id, index: sansIndex ? { etat: 'suspendu', voies: 0, formeInconnue: 0, evinces: 0 } : { etat: 'ok', voies: 0, formeInconnue: 0, evinces: 0 } });
   }
   parentPort.postMessage({ type: 'fini', id });

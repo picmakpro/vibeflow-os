@@ -8,7 +8,9 @@
 //   collecteur : fabrique du pilote (défaut creerCollecte, seam de test).
 //   mode : 'auto' (fs.watch récursif, repli par scrutation des mtimes si l'appel lève ou si le watcher échoue),
 //          'poll' (scrutation d'emblée) ; défaut = VF_COCKPIT_WATCH. etat().mode vaut 'watch' ou 'poll'.
-// Événements : patch { seq, at, patch, vf? } · structural { seq, at } · who { seq, at, who } · lock { seq, at, lock } · git { seq, at, sig } (78-09 : signal sans contenu, la page relit ses routes).
+// Événements : patch { seq, at, patch, vf? } · structural { seq, at } · who { seq, at, who } · lock { seq, at, verrous } · git { seq, at, sig }
+//   (78-09 : signal sans contenu, la page relit ses routes). `verrous` : { etat, plat, liste } en liste blanche, construite dans le fil de la collecte (A15) ;
+//   `snapshot().lock` = { seq, at, verrous } ; le signal@1 de la dernière collecte est posé dans l'instantané.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -69,16 +71,18 @@ export function startLive({
   // première collecte : graine posée sans événement (comme la lecture de démarrage d'avant) ; tant qu'elle n'est pas revenue,
   // `snapshot()` rend un « qui » vide de la forme du repli du serveur
   let refusee = false; // la garde d'émission a refusé le dernier résultat : collecte.etat vaut « partielle »
-  let graph = null, idx = new Map(), lock = { available: false }, who = { workers: [], sources: {} }, semeeTour = false;
+  let graph = null, idx = new Map(), who = { workers: [], sources: {} }, semeeTour = false;
+  // A15 : projection des verrous, rang et date de leur dernière pose, signal du dernier tour
+  let verrous = { etat: 'absente', plat: false, liste: [] }, lockSeq = 0, lockAt = Date.now(), signalTour = null;
   let gitSig = null, gitSemee = false, gitInfo = null, projetGarde = null; // 78-09 ; gitInfo : { sig, at } posé dans l'instantané (A47)
   const collecte = collecteur({ racine: root, sortie, scriptsDir, home: os.homedir(), log });
-  const snapshot = () => ({ seq: state.seq, lock, who });
+  const snapshot = () => ({ seq: state.seq, lock: { seq: lockSeq, at: lockAt, verrous }, who });
   const emit = (nom, data) => { try { onEvent(nom, data); } catch (e) { log('error', `onEvent(${nom}) : ${e.message}`); } };
 
   // instantané (A31) : refusé par la garde d'émission, le précédent est gardé ; un graphe déjà approuvé n'est pas reparcouru à chaque pose
   const poserInstantane = () => {
     if (stopped || !graph) return;
-    const inst = { seq: state.seq, at: Date.now(), git: gitInfo, projet: graph };
+    const inst = { seq: state.seq, at: Date.now(), git: gitInfo, signal: signalTour, projet: graph };
     if (!garde(projetGarde === graph ? { ...inst, projet: null } : inst)) {
       log('error', 'instantané refusé : contenu interdit, instantané précédent gardé'); refusee = true; return;
     }
@@ -124,22 +128,30 @@ export function startLive({
     else if (patch.length || vfChanged) emit('patch', { seq: state.seq, at, patch, ...(vfChanged ? { vf: g.meta.vf } : {}) });
     poserInstantane();
   };
-  const surVerrous = (n) => { if (JSON.stringify(n) !== JSON.stringify(lock)) { lock = n; emit('lock', { seq: ++state.seq, at: Date.now(), lock }); } };
-  const surTour = ({ verrous: n, equipe: nw }) => {
-    if (!garde({ verrous: n, equipe: nw })) { refusee = true; log('error', 'tour refusé : contenu interdit, état précédent gardé'); return; } // avant toute pose et toute émission
+  const surVerrous = (n) => {
+    if (JSON.stringify(n) === JSON.stringify(verrous)) return;
+    verrous = n; lockSeq = ++state.seq; lockAt = Date.now(); emit('lock', { seq: lockSeq, at: lockAt, verrous });
+  };
+  const surTour = ({ verrous: n, equipe: nw, signal: sg }) => {
+    if (!garde({ verrous: n, equipe: nw, signal: sg })) { // avant toute pose et toute émission
+      refusee = true; log('error', 'tour refusé : contenu interdit, état précédent gardé'); return;
+    }
     refusee = false;
-    if (!semeeTour) { semeeTour = true; who = nw; lock = n; return; }
-    const avant = state.seq;
+    if (sg) signalTour = sg; // le signal de ce tour (toujours posé : son `at` avance même quand rien ne change)
+    if (!semeeTour) { semeeTour = true; who = nw; verrous = n; lockAt = Date.now(); poserInstantane(); return; }
     if (whoSig(nw) !== whoSig(who)) { who = nw; emit('who', { seq: ++state.seq, at: Date.now(), who }); }
     surVerrous(n);
-    if (state.seq !== avant) poserInstantane();
+    poserInstantane();
   };
   collecte.surResultat((m) => {
     if (stopped || !m) return;
     try {
       if (m.type === 'planning') {
         if (m.erreur) log('error', `graphe illisible, état précédent gardé : ${String(m.erreur).slice(0, 200)}`); else refreshSur(m.graphe, m.motifs || []);
-      } else if (m.type === 'verrous') surVerrous(m.verrous);
+      } else if (m.type === 'verrous') {
+        if (garde({ verrous: m.verrous })) surVerrous(m.verrous);
+        else { refusee = true; log('error', 'verrous refusés : contenu interdit, état précédent gardé'); }
+      }
       else if (m.type === 'tour') surTour(m);
     } catch (e) { log('error', `résultat ${m.type} : ${e.message}`); }
   });

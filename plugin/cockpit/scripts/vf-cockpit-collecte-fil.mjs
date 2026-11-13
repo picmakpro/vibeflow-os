@@ -1,8 +1,9 @@
 // vf-cockpit-collecte-fil — point d'entrée du fil de la collecte (79-09, P79-D-12). Les chaînes de `workerData` sont calculées par le serveur
 // (jamais lues d'une variable d'environnement ni d'un fichier du lab). Traite les demandes UNE à UNE dans l'ordre de réception et poste leurs
 // résultats ; il ne diffuse rien et n'importe que les étapes.
-// Demande { id, planning, verrous, tour, motifs } -> messages { id, type: 'planning' (graphe | erreur, motifs) | 'verrous' | 'tour' (verrous,
-// equipe, erreurs, dureeMs) | 'index' (rapport en comptes, jamais les voies) | 'fini' }. workerData.sansIndex : relance sans l'index.
+// Demande { id, planning, verrous, tour, motifs } -> messages { id, type: 'planning' (graphe | erreur, motifs) | 'verrous' (projection en liste
+// blanche, A15) | 'tour' (verrous projetés, equipe, signal, erreurs, dureeMs) | 'index' (rapport en comptes, jamais les voies) |
+// 'fini' }. workerData.sansIndex : relance sans l'index.
 import { parentPort, workerData } from 'node:worker_threads';
 import { creerMemoire, etapePlanning, etapeVerrous, etapeTour } from './vf-cockpit-collecte-etapes.mjs';
 
@@ -15,7 +16,7 @@ parentPort.on('message', (m) => {
     catch (e) { parentPort.postMessage({ type: 'planning', id, motifs, erreur: String(e.message).slice(0, 200) }); }
   }
   if (m.verrous && !m.tour) {
-    let verrous; try { verrous = etapeVerrous(base); } catch { verrous = { error: 'lecture impossible' }; }
+    let verrous; try { verrous = etapeVerrous({ ...base, memo }); } catch { verrous = { etat: 'erreur', plat: false, liste: [] }; }
     parentPort.postMessage({ type: 'verrous', id, verrous });
   }
   if (m.tour) {

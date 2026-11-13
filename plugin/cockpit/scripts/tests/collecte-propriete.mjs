@@ -111,7 +111,7 @@ const ID_DAG = /^[A-Za-z0-9._:-]{1,64}$/, ST_DAG = new Set(['blocked', 'ready', 
 const NOMS = { A: { age: 'age_seconds', lease: 'lease_seconds', enfants: 'children_running', sids: 'session_ids' }, B: { age: 'ageS', lease: 'leaseS', enfants: 'childrenRunning', sids: 'session_ids' } };
 const noeuds = (n) => Array.from({ length: n }, (_, i) => ({ id: `n${i}`, deps: i ? [`n${i - 1}`] : [], status: 'running' }));
 const CLASSES_V = {
-  'chemin': (e, m) => { e.lock = `/Users/${m}/lab/.git/vf-driver/repo/DRIVER.lock`; e.location = `/Users/${m}/emplacement`; e.chemin = `/Users/${m}/x`; },
+  'chemin': (e, m) => { e.lock = `/srv/${m}/lab/.git/vf-driver/repo/DRIVER.lock`; e.location = `/srv/${m}/emplacement`; e.chemin = `/srv/${m}/x`; },
   'session-ids': (e, m, N) => { e[N.sids] = [`${m}a`, `${m}b`]; e.present = true; },
   'prototype': (e, m) => { Object.defineProperty(e, '__proto__', { value: { x: m }, enumerable: true, configurable: true, writable: true }); e.constructor = { prototype: m }; e.toString = m; },
   'objet-imbrique': (e, m) => { e.step = { a: { b: m } }; e.owner = [m, { c: m }]; },
@@ -120,11 +120,11 @@ const CLASSES_V = {
   'controle': (e) => { e.step = 'a\u0000b\u0007c\u001bd\u007fe'; e.owner = 'o\u0000\u0001'; },
   'secret': (e, m) => { e.owner = `jeton ghp_${m}${'A1b2C3d4E5f6G7h8I9j0K1l2'}`; e.step = `ghp_${m}z${'A1b2C3d4E5f6G7h8I9j0K1l2'}`; },
   'nombre-hostile': (e, m, N) => { e[N.age] = m; e[N.lease] = [m]; e[N.enfants] = { v: m }; e.ttl = Infinity; e.stale = m; },
-  'dag-id': (e, m) => { e.dag.nodes = [{ id: `../${m}a`, deps: [], status: 'running' }, { id: 'a b', deps: [], status: 'ready' }, { id: 'x'.repeat(70) + m, deps: [`../${m}d`, 'y y'], status: 'done' }, ...noeuds(2)]; },
-  'dag-statut': (e, m) => { e.dag.nodes = [{ id: 'ok1', deps: [], status: m }, { id: 'ok2', deps: [], status: 7 }, ...noeuds(2)]; },
-  'dag-noeuds': (e) => { e.dag.nodes = noeuds(300); },
-  'dag-deps': (e) => { e.dag.nodes = [{ id: 'gros', deps: Array.from({ length: 60 }, (_, i) => `d${i}`), status: 'ready' }]; },
-  'dag-ws-phase': (e, m) => { e.dag.ws = `${m}/../x`; e.dag.phase = `${m}.x`; e.dag.at = m; },
+  'dag-id': (e, m) => { (e.dag = dagOk()).nodes = [{ id: `../${m}a`, deps: [], status: 'running' }, { id: 'a b', deps: [], status: 'ready' }, { id: 'x'.repeat(70) + m, deps: [`../${m}d`, 'y y'], status: 'done' }, ...noeuds(2)]; },
+  'dag-statut': (e, m) => { (e.dag = dagOk()).nodes = [{ id: 'ok1', deps: [], status: m }, { id: 'ok2', deps: [], status: 7 }, ...noeuds(2)]; },
+  'dag-noeuds': (e) => { (e.dag = dagOk()).nodes = noeuds(300); },
+  'dag-deps': (e) => { (e.dag = dagOk()).nodes = [{ id: 'gros', deps: Array.from({ length: 60 }, (_, i) => `d${i}`), status: 'ready' }]; },
+  'dag-ws-phase': (e, m) => { Object.assign(e.dag = dagOk(), { ws: `${m}/../x`, phase: `${m}.x`, at: m }); },
   'dag-forme': (e, m) => { e.dag = r.pick([m, [m], { nodes: { a: m } }, { nodes: m }, 42]); },
 };
 const NOMS_CLASSES = Object.keys(CLASSES_V), SANS_MARQUEUR = new Set(['controle', 'dag-noeuds', 'dag-deps']); // ces classes se prouvent par une borne, non par un marqueur
@@ -169,8 +169,8 @@ async function verrous() {
     const entrees = [], plantes = new Map();
     for (let k = 0; k < 1 + r.n(3); k++) {
       const e = entreeBrute(k, B), classes = forcees.length && k === 0 ? forcees : r.bool(0.6) ? [r.pick(NOMS_CLASSES), ...(r.bool(0.4) ? [r.pick(NOMS_CLASSES)] : [])] : [];
-      for (const c of classes) { const m = `MQ${c.replace(/-/g, '')}${r.chaine(6)}`; CLASSES_V[c](e, m, N); if (!SANS_MARQUEUR.has(c)) plantes.set(m, c); couverture[c]++; }
-      if (B && r.bool(0.5)) { const m = `MQextracle${r.chaine(6)}`; Object.assign(e, { lock: `/Users/${m}/x`, present: true, location: m, session_ids: [m] }); plantes.set(m, 'extra-cle'); couverture['extra-cle']++; }
+      for (const c of classes) { const m = `MQ${c.replace(/-/g, '')}${r.chaine(6)}`; CLASSES_V[c](e, m, N); if (SANS_MARQUEUR.has(c)) couverture[c]++; else plantes.set(m, c); }
+      if (B && r.bool(0.5)) { const m = `MQextracle${r.chaine(6)}`; Object.assign(e, { lock: `/srv/${m}/x`, present: true, location: m, session_ids: [m] }); plantes.set(m, 'extra-cle'); }
       entrees.push(e);
     }
     const sessions = new Set(['sess-a']);
@@ -178,14 +178,19 @@ async function verrous() {
     try {
       if (B) proj = S.projeterVerrous({ etat: 'lue', plat: false, liste: entrees });
       else {
-        const brut = entrees.length === 1 && r.bool(0.4) ? entrees[0] : { present: true, scope: 'lab', location: `/Users/MQlocation${i}/x`, legacy_lock: false, children_running: 1, locks: [...entrees, { present: false, lock: '/x' }] };
+        const brut = entrees.length === 1 && r.bool(0.4) ? entrees[0] : { present: true, scope: 'lab', location: `/srv/MQlocation${i}/x`, legacy_lock: false, children_running: 1, locks: [...entrees, { present: false, lock: '/x' }] };
         plantes.set(`MQlocation${i}`, 'chemin');
         proj = S.projeterVerrous(V.verrousDe(brut, { sessions: sessions }));
       }
     } catch (e) { proj = null; plantes.set('LEVE', 'leve'); }
     // témoin positif : chaque marqueur planté est bien dans l'entrée avant projection (la projection ne peut pas le « perdre » pour de bon sans qu'on sache que l'entrée le portait)
     const brutTxt = JSON.stringify(entrees);
-    for (const m of plantes.keys()) if (!m.startsWith('MQlocation') && m !== 'LEVE') { temoin.plante++; if (brutTxt.includes(m)) temoin.vu++; }
+    // un marqueur qu'une classe suivante a écrasé dans la même entrée n'est pas planté : il ne compte ni pour la couverture ni pour la preuve
+    for (const [m, c] of [...plantes]) {
+      if (m.startsWith('MQlocation') || m === 'LEVE') continue;
+      temoin.plante++;
+      if (brutTxt.includes(m)) { temoin.vu++; couverture[c]++; } else plantes.delete(m);
+    }
     const v = proj ? violations(proj, plantes) : new Set(['leve']);
     for (const c of v) { ecarts[c] = (ecarts[c] || 0) + 1; exemple ||= { classe: c, graine, tour: i, pass: B ? 'B' : 'A' }; }
   }

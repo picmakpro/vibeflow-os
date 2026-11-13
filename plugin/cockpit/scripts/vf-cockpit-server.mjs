@@ -75,7 +75,8 @@ function ouvrirFlux(c, req, url, res) {
   // 79-09 : `hello` attend la première collecte (5 s au plus), puis part complet ; les doubles de suites n'ont pas `pret`
   Promise.resolve(c.live?.pret?.(5000)).catch(() => {}).then(() => {
     if (!ouvert) return;
-    const snap = c.live ? c.live.snapshot() : { seq: 0, lock: { available: false }, who: { workers: [], sources: {} } };
+    const vide = { seq: 0, at: Date.now(), verrous: { etat: 'absente', plat: false, liste: [] } }; // A15 : la forme de hello.lock avant toute collecte
+    const snap = c.live ? c.live.snapshot() : { seq: 0, lock: vide, who: { workers: [], sources: {} } };
     if (porteInterdit(snap)) { c.log('error', 'hello refusé : contenu interdit'); res.end(); return; }
     res.write(`event: hello\ndata: ${JSON.stringify(snap)}\n\n`);
     c.clients.add(res);

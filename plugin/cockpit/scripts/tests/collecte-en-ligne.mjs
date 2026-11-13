@@ -18,7 +18,7 @@ export function creerCollecteEnLigne({ racine, sortie, scriptsDir, home }) {
       try { dire({ type: 'planning', id: n, motifs: r.motifs, graphe: etapePlanning(base) }); }
       catch (e) { dire({ type: 'planning', id: n, motifs: r.motifs, erreur: String(e.message).slice(0, 200) }); }
     }
-    if (r.verrous && !r.tour) dire({ type: 'verrous', id: n, verrous: etapeVerrous(base) });
+    if (r.verrous && !r.tour) dire({ type: 'verrous', id: n, verrous: etapeVerrous({ ...base, memo }) });
     if (r.tour) { const t = etapeTour({ ...base, memo }); derniereA = new Date().toISOString(); dureeMs = t.dureeMs; dire({ type: 'tour', id: n, ...t }); }
     fini = true; dire({ type: 'fini', id: n });
   };
