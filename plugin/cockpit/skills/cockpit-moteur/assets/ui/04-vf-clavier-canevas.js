@@ -115,7 +115,7 @@
     }
     return { x, y, w, h };
   };
-  // champ de cadrage (80-09, NAVIGATION 4.6) : la zone libre, ou ses deux découpes autour du coin (au-dessus, à gauche) ; le tiroir Git n'en retire rien (PU-G-204)
+  // champ de cadrage (80-09, NAVIGATION 4.6) : la zone libre, ou ses deux découpes autour du coin ; le tiroir Git n'en retire rien (PU-G-204)
   const champsDeCadrage = () => {
     const a = SC.freeArea(), coin = document.getElementById('vf-coin');
     if (!coin || coin.hidden || !coin.offsetWidth) return [a];
