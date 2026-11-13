@@ -48,6 +48,7 @@
 # production (CI, hook, humain) les laisse absentes :
 #   VF_BUDGET_PLANNING_DIR   — redirige le dossier .planning (sentinelle + baseline)
 #   VF_BUDGET_BASELINE_FILE  — redirige le chemin du fichier de baselines
+#   VF_BUDGET_RESOLVER       — redirige le resolveur de dependances (jamais pris sous --path)
 #
 # SKILL.md (Phase 43, FABR-09, D-Q4). Seconde decouverte, INDEPENDANTE de celle des agents (D-03
 # inchangee) : recursive sous chaque module de plugin/*/, sauf un module ENTIEREMENT exclu quand
@@ -564,7 +565,10 @@ BOOTSTRAP_VERDICT="NON-APPLICABLE"
 
 if [ -f "$ROOT/plugin/conductor/module.json" ]; then
   BOOTSTRAP_APPLICABLE=1
-  RESOLVER="$ROOT/plugin/_internal/resolve-deps.sh"
+  # Jamais un programme pris sous --path (le lab observe, il ne fournit que des donnees) : le resolveur se
+  # resout depuis le dossier de CE gate. Absent a cote du gate (gate installe a plat) : socle NON-VERIFIABLE,
+  # dit, jamais execute depuis le lab. VF_BUDGET_RESOLVER : surcharge pour les fixtures de test uniquement.
+  RESOLVER="${VF_BUDGET_RESOLVER:-$(cd "$(dirname "$0")" && pwd)/../../_internal/resolve-deps.sh}"
   if [ ! -f "$RESOLVER" ]; then
     BOOTSTRAP_NONVERIF=1
     echo "[check-instruction-budget] BOOTSTRAP : non verifiable — resolveur absent : $RESOLVER" >&2

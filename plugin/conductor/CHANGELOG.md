@@ -8,6 +8,7 @@
 - **Lecture seule** : le gate de méthode en mode TSV n'écrit rien, ne lance aucun `gh` (`--no-remote` implicite) ni passe de rangement, et refuse `--auto`, `--archive` et `--dry-run` (64, sortie standard vide) ; tout autre `--format=` rend 64 sur les deux gates. Sans l'option, la sortie texte et le code de retour sont identiques octet pour octet (preuve A/B contre une copie figée de chaque gate).
 - **Lab sans corpus d'agents distribué** (P77-D-05) : `check-instruction-budget.sh --format=tsv` rend trois lignes `NON-APPLICABLE` (`agent`, `skill`, `socle`) sans valeur et garde le code 2, au lieu d'une sortie vide.
 - **Preuves** : sections `TF1`..`TF13` et mutants `MF1`..`MF8` de `test-check-method-budget.sh`, `TI1`..`TI9` et mutants `MI1`..`MI6` de `test-check-instruction-budget.sh` ; aucune suite ajoutée. Deux copies figées sous `tests/fixtures/` (`check-method-budget-pre-4a246c4c.sh`, `check-instruction-budget-pre-394c7956.sh`).
+- **Sécurité** : `check-instruction-budget.sh` ne lance plus jamais un `resolve-deps.sh` pris sous `--path` (résolu depuis le dossier du gate ; absent, socle `NON-VERIFIABLE`).
 - **Retiré : rien** (option additive ; aucune règle, aucun libellé ni aucune ligne mesurée n'a changé).
 
 ## [v1.54.1] — 2026-11-12 (nœud dans le mandat, plan de mission publié ; Phase 79, SOCL-05) — non publiée

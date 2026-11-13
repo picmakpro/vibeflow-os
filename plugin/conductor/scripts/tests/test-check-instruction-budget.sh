@@ -42,6 +42,9 @@ TARGET="$SCRIPT"
 # Racine du depot reel (43-04, BOOT-1..5) — pour copier plugin/_internal/resolve-deps.sh dans les
 # fixtures synthetiques du bootstrap : le resolveur canonique, jamais un second parseur de requires.
 REPO_ROOT="$(cd "$(dirname "$0")/../../../.." && pwd)"
+# Le gate ne lance JAMAIS un resolveur pris sous --path (correction de securite, Phase 77) : il le resout depuis son
+# propre dossier. Les mutants et les copies jouees hors de leur arbre le trouvent par cette surcharge (fixtures seulement).
+export VF_BUDGET_RESOLVER="$REPO_ROOT/plugin/_internal/resolve-deps.sh"
 
 # Constantes locales de la suite (Phase 40.1) — TOUTES les tailles de fixture de bord se dérivent
 # de ces deux valeurs, jamais d'un littéral de l'ancien plafond (constat B1 du checker, révision
@@ -936,7 +939,8 @@ w_bootstrap_fixture "$D"
 rm -f "$D/plugin/_internal/resolve-deps.sh"
 w_armed "$D"
 printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t100\n' | w_baseline "$D"
-out="$(run "$D")"; rc=$?
+# Le resolveur ne se prend plus sous --path : « absent » se pose par la surcharge de test, vers un chemin qui n'existe pas.
+out="$(VF_BUDGET_RESOLVER="$D/plugin/_internal/resolve-deps.sh" run "$D")"; rc=$?
 has=0; case "$out" in *"BOOTSTRAP"*"non verifiable"*"resolveur absent"*) has=1 ;; esac
 if [ "$rc" -eq 2 ] && [ "$has" -eq 1 ]; then ok "BOOT-4 — resolveur (resolve-deps.sh) absent, socle present → rc 2, NON-VERIFIABLE avec la cause"; else ko "BOOT-4 — resolveur absent" "rc=2, cause resolveur absent nommee" "rc=$rc out=[$out]"; fi
 
@@ -1118,6 +1122,9 @@ ti_obs_ab() { # <cible> : nombre de fixtures dont le rapport texte ou le rc diff
   for r in "$TMP"/*/; do
     r="${r%/}"
     [ -d "$r/plugin" ] || continue
+    # Difference VOULUE (securite) : un lab dont le socle n'a pas de resolveur sous lui n'est plus « resolveur absent » pour
+    # le gate livre, qui resout depuis son propre dossier ; le cas est couvert par BOOT-4 et TS3.
+    [ -f "$r/plugin/conductor/module.json" ] && [ ! -f "$r/plugin/_internal/resolve-deps.sh" ] && continue
     n=$((n + 1))
     ti_ab_one "$TI_PRE/check-instruction-budget.sh" "$r" > "$TMP/tiab.a"
     ti_ab_one "$t" "$r" > "$TMP/tiab.b"
@@ -1130,6 +1137,32 @@ case "$TI8_OBS" in diff=0/*) [ "$TI8_N" -ge 12 ] && TI8=ok || TI8="moins de douz
 if [ "$TI8" = ok ]; then ok "TI8 — A/B : rapport texte et rc identiques a la copie figee (cmp) sur $TI8_N fixtures de la suite"; else ko "TI8 — A/B texte" "diff=0 sur au moins douze fixtures" "$TI8"; fi
 TI9_OUT="$(bash "$TARGET" --path "$TI_D" --format=json 2>"$TMP/ti9.err")"; TI9_RC=$?
 if [ "$TI9_RC" -eq 64 ] && [ -z "$TI9_OUT" ] && grep -q 'format inconnu' "$TMP/ti9.err"; then ok "TI9 — --format=json : rc 64, sortie standard vide, message nomme"; else ko "TI9 — format inconnu" "rc 64, stdout vide, « format inconnu »" "rc=$TI9_RC stdout=[$TI9_OUT]"; fi
+
+# --- TS — le gate n'execute jamais un programme pris sous --path (lab piege, audit de securite Phase 77) ---------
+echo ""
+echo "== TS — resolveur jamais pris sous --path =="
+TS_MARK="$TMP/ts-marqueur"
+ts_trap_fix() { # <nom> : socle valide dont resolve-deps.sh (sous le lab) ecrit un marqueur
+  local d; d="$(mk_root "$1")"; w_bootstrap_fixture "$d"
+  printf '%s\n' '#!/usr/bin/env bash' "touch \"$TS_MARK\"" 'echo conductor' > "$d/plugin/_internal/resolve-deps.sh"
+  printf '%s' "$d"
+}
+ts_obs() { # <cible> : marqueur ecrit par le lab piege ? et ligne BOOTSTRAP rendue (resolveur de test retire de l'environnement)
+  local t="$1" d out; d="$(ts_trap_fix ts-piege)"; rm -f "$TS_MARK"
+  out="$(env -u VF_BUDGET_RESOLVER bash "$t" --path "$d" 2>/dev/null | grep '^BOOTSTRAP :')"
+  if [ -e "$TS_MARK" ]; then echo "marqueur=ecrit"; else echo "marqueur=absent"; fi
+  rm -rf "$d"
+}
+TS_OBS="$(ts_obs "$SCRIPT")"
+if [ "$TS_OBS" = "marqueur=absent" ]; then ok "TS1 — lab piege : le resolve-deps.sh du lab n'est jamais execute (marqueur absent)"; else ko "TS1 — lab piege" "marqueur=absent" "$TS_OBS"; fi
+TS2D="$(mk_root ts-temoin)"; w_bootstrap_fixture "$TS2D"
+TS2_OUT="$(env -u VF_BUDGET_RESOLVER bash "$SCRIPT" --path "$TS2D" 2>/dev/null | grep '^BOOTSTRAP :')"
+case "$TS2_OUT" in *"$(( $(boot_expected_total) / 4 )) tokens"*"sur socle (4 fichiers)"*) ok "TS2 — temoin positif : gate dans son arbre, la resolution des dependances a bien lieu (socle de 4 fichiers mesure)" ;; *) ko "TS2 — temoin positif" "socle (4 fichiers) mesure" "$TS2_OUT" ;; esac
+TS3G="$TMP/ts-plat"; mkdir -p "$TS3G"; cp "$SCRIPT" "$TS3G/check-instruction-budget.sh"
+TS3_ERR="$(env -u VF_BUDGET_RESOLVER bash "$TS3G/check-instruction-budget.sh" --path "$TS2D" 2>&1 >/dev/null)"
+env -u VF_BUDGET_RESOLVER bash "$TS3G/check-instruction-budget.sh" --path "$TS2D" >/dev/null 2>&1; TS3_RC=$?
+case "$TS3_ERR" in *"BOOTSTRAP : non verifiable — resolveur absent"*) TS3_MSG=ok ;; *) TS3_MSG=absent ;; esac
+if [ "$TS3_MSG" = ok ] && [ "$TS3_RC" -eq 2 ]; then ok "TS3 — gate sans resolveur a cote de lui : socle NON-VERIFIABLE dit, rc 2, jamais le resolveur du lab"; else ko "TS3 — degradation" "message resolveur absent, rc 2" "msg=$TS3_MSG rc=$TS3_RC"; fi
 
 # ===================================================================================================
 # Tâche 2 — quatre mutants vérifiés par cmp
@@ -1531,6 +1564,10 @@ if [ "$RM" -eq 0 ]; then mi_kill "MI5 ligne du rapport texte changee : TI8 rougi
 MI6_OLD="    printf 'socle\\t.\\t%s\\t%s\\tjetons\\t%s\\n' \"\$BOOTSTRAP_TOKENS\" \"\$VF_BOOTSTRAP_TOKEN_CAP\" \"\$tsv_socle\""
 MI6="$(mi_make mi6 "$MI6_OLD" "    printf 'socle\\t%s\\t%s\\t%s\\tjetons\\t%s\\n' \"\$ROOT\" \"\$BOOTSTRAP_TOKENS\" \"\$VF_BOOTSTRAP_TOKEN_CAP\" \"\$tsv_socle\"")"; RM=$?
 if [ "$RM" -eq 0 ]; then mi_kill "MI6 chemin absolu emis dans la sortie de densite : TI6 rougit" "$(ti_obs_abs "$MI6")" "absolus=0"; else ko "MI6 opposable" "mutant opposable (rc 0)" "rc=$RM"; fi
+
+MS1_OLD='  RESOLVER="${VF_BUDGET_RESOLVER:-$(cd "$(dirname "$0")" && pwd)/../../_internal/resolve-deps.sh}"'
+MS1="$(mi_make ms1 "$MS1_OLD" '  RESOLVER="$ROOT/plugin/_internal/resolve-deps.sh"')"; RM=$?
+if [ "$RM" -eq 0 ]; then mi_kill "MS1 resolveur de nouveau pris sous --path : TS1 rougit (le lab piege ecrit son marqueur)" "$(ts_obs "$MS1")" "marqueur=absent"; else ko "MS1 opposable" "mutant opposable (rc 0)" "rc=$RM"; fi
 
 # --- Garde finale : le script vivant reste syntaxiquement intact apres le bloc de mutations -------
 if bash -n "$SCRIPT" 2>/dev/null; then
