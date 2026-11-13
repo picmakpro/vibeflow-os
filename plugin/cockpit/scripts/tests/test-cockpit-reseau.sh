@@ -117,7 +117,7 @@ lancer() { # lancer <serve.mjs> -> PORT, TOK, PTOK ; le serveur tourne sous la s
   PORT="$VF_PORT"
   TOK=$(node "$AUX/token.mjs" "$PORT" /); PTOK=$(node "$AUX/token.mjs" "$PORT" /project.html)
 }
-charger() { node "$AUX/get.mjs" "$PORT" / > "$WORK/page-code.html"; node "$AUX/get.mjs" "$PORT" /project.html > "$WORK/page-projet.html"; node "$AUX/get.mjs" "$PORT" /equipe.html > "$WORK/page-equipe.html"; node "$AUX/get.mjs" "$PORT" "/api/vf/transcript?id=inconnu-69" "$TOK" > "$WORK/transcript.json"; node "$AUX/sse.mjs" "$PORT" "$PTOK" 3000; node "$AUX/get.mjs" "$PORT" /api/vf/etat "$TOK" > "$WORK/etat.json"; }
+charger() { node "$AUX/get.mjs" "$PORT" / > "$WORK/page-code.html"; node "$AUX/get.mjs" "$PORT" /_vf/ui/69-vf-flux.js > "$WORK/flux-code.js"; node "$AUX/get.mjs" "$PORT" /project.html > "$WORK/page-projet.html"; node "$AUX/get.mjs" "$PORT" /equipe.html > "$WORK/page-equipe.html"; node "$AUX/get.mjs" "$PORT" "/api/vf/transcript?id=inconnu-69" "$TOK" > "$WORK/transcript.json"; node "$AUX/sse.mjs" "$PORT" "$PTOK" 3000; node "$AUX/get.mjs" "$PORT" /api/vf/etat "$TOK" > "$WORK/etat.json"; }
 lancer "$OUT/serve.mjs"; charger
 PORTS=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'Object.keys(j).filter(k=>/port/i.test(k)).join(",")')
 assert_eq "R1.3 — la sonde était chargée dans le serveur" "$([ -s "$SONDE_OUT.charge" ] && echo oui || echo non)" "oui"
@@ -138,7 +138,8 @@ echo "=== R3 — un seul port, plus de paramètre live ==="
 assert_eq "R3.1 — aucune page ne mentionne le second port du spike" "$(cat "$WORK/page-code.html" "$WORK/page-projet.html" | grep -c '4379')" "0"
 assert_eq "R3.2 — aucune page ne lit un paramètre live" "$(cat "$WORK/page-code.html" "$WORK/page-projet.html" | grep -cE "get\('live'\)|[?&]live=")" "0"
 assert_eq "R3.3 — .cache/server.json (lu pendant l'exécution) ne déclare qu'un port" "$PORTS" "port"
-assert_eq "R3.4 — témoin : la page ouvre le flux par un chemin relatif" "$([ "$(grep -c "EventSource('/api/vf/events" "$WORK/page-code.html")" -ge 1 ] && echo oui || echo non)" "oui"
+# 79-14, 79-16 : la page est la coquille, le flux s'ouvre dans ui/69-vf-flux.js (listé par son manifeste, servi sous /_vf/) : la propriété reste « un seul flux, par un chemin relatif »
+assert_eq "R3.4 — témoin : la page ouvre le flux par un chemin relatif (le script du flux est dans son manifeste et ouvre '/api/vf/events', jamais une adresse complète)" "$([ "$(grep -c '69-vf-flux.js' "$WORK/page-code.html")" -ge 1 ] && [ "$(grep -c "('/api/vf/events?token=" "$WORK/flux-code.js")" = 1 ] && [ "$(grep -cE "https?://[^ ]*/api/vf/events" "$WORK/flux-code.js")" = 0 ] && echo oui || echo non)" "oui"
 
 vf_hyg_assert
 echo ""
