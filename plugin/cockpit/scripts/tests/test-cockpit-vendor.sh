@@ -270,6 +270,20 @@ if [ -n "$DEPOT_DEV" ] && [ -f "$DEPOT_DEV/plugin/cockpit/scripts/tests/test-coc
   assert_eq "V4c.7 — l'historique réel du fichier de baseline ne porte aucune hausse sans citation" "$h7_rc" "0"
 else echo "  ⏭  SKIP — V4c.7 (module posé hors du dépôt de développement : l'historique de la baseline n'est pas lisible ici, non compté)"; fi
 
+# V4c.7b : deux messages RÉELS de l'historique de la branche (dépôt de développement seulement) : l'un sans citation directe (la hausse est refusée, la baisse acceptée), l'autre avec (la hausse passe)
+if [ -n "$DEPOT_DEV" ] && [ -f "$DEPOT_DEV/plugin/cockpit/scripts/tests/test-cockpit-vendor.sh" ]; then
+  reel_sans=""; reel_avec=""
+  while IFS= read -r sha; do
+    m="$(git -C "$DEPOT_DEV" log -1 --format=%B "$sha")"
+    if node "$CLIQUET" citation "$m" --directe > /dev/null 2>&1; then [ -n "$reel_avec" ] || reel_avec="$m"; else [ -n "$reel_sans" ] || reel_sans="$m"; fi
+    [ -n "$reel_avec" ] && [ -n "$reel_sans" ] && break
+  done < <(git -C "$DEPOT_DEV" log --no-merges -n 400 --format=%H)
+  assert_eq "V4c.7b.0 — témoin : l'historique porte un message réel sans citation directe et un message réel avec" "$([ -n "$reel_sans" ] && echo sans) $([ -n "$reel_avec" ] && echo avec)" "sans avec"
+  assert_eq "V4c.7b.1 — un message réel sans citation directe : une hausse est refusée (code 1)" "$(col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' "$reel_sans")" "1 HAUSSE-SANS-ARBITRAGE"
+  assert_eq "V4c.7b.2 — le même message réel : une baisse est acceptée (code 0)" "$(col_comparer 'scripts/vf-cockpit-a.mjs 3' 'scripts/vf-cockpit-a.mjs 2' "$reel_sans")" "0 "
+  assert_eq "V4c.7b.3 — un message réel avec citation directe : une hausse passe (code 0), une citation légitime passe toujours" "$(col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' "$reel_avec")" "0 "
+else echo "  ⏭  SKIP — V4c.7b (module posé hors du dépôt de développement : pas d'historique réel, non compté)"; fi
+
 # V4c.8 : cinq mutants de l'aide (copies jetables, variable CLIQUET) ; chacun change la copie (.0), rougit le témoin qui le vise et laisse son témoin voisin vert
 col_mutant() { # <nom> <expression sed> : copie mutée de l'aide dans $WORK/mut-<nom>/ ; code 0 si la copie diffère de l'aide
   mkdir -p "$WORK/mut-$1"; sed "$2" "$CLIQUET" > "$WORK/mut-$1/colonnes-cliquet.mjs" 2>/dev/null
