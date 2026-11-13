@@ -34,6 +34,7 @@
   sur `#panel`.
 - Écart : la sonde d'écouteurs de média (BO1) ne compte que les écouteurs dont le rappel nomme `corpsCourant` (ceux du bloc burn-up) : d'autres scripts de page laissent leurs écouteurs de média après un
   changement d'onglet (+16 par cycle, avant ce plan : limite écrite de `vf-coquille-portee.js`), hors périmètre. Les mesures de style se font dans le thème par défaut du poste.
+- Écart : correction ciblée du juge de design (2026-11-14). Décompte sans aucune date au ROADMAP : le contrat ne traitait pas ce cas ; la tête reste et le bloc dit « Courbe indisponible : aucune date écrite au ROADMAP. » (plus « Burn-up indisponible », réservé à l'absence du champ) ; « Inscrites sans date » ne liste plus les phases closes. Témoin W8.11, rouge vu sur la tête précédente (obtenu : « Burn-up indisponible » et « Phases 1, 2 et 3 »), vert ensuite (60 PASS / 0 FAIL, 22 s). Mineurs sans témoin : espace insécable entre nombre et nom dans le bilan, marge de 8 px au-dessus de « Relire les jauges ».
 - Contrat consommé par une autre phase : aucun changé. `window.__vfSyntheseBlocs` et `ctx` utilisés tels que 77-05 les a précisés.
 
 rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale) : mutants M-COULEUR, M-LEGENDE, M-ESTIME, M-RECALCUL, M-ZERO, M-TRI, M-CHARGE,

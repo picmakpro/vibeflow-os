@@ -39,7 +39,9 @@
   const liste = (b) => b.serie.map((p) => ({ d: p.d, date: date(p.d),
     texte: `${date(p.d)} · périmètre ${p.perimetre} · closes ${p.clos}${p.closes.length ? ` : ${phases(p.closes)}` : ''}` }));
   function notes(b) {
-    const c = b.closesSansDate || [], i = b.inscritesSansDate || [], n = [], pl = (l) => l.length > 1;
+    const c = b.closesSansDate || [], n = [], pl = (l) => l.length > 1;
+    const closes = new Set([...c.map(num), ...b.serie.flatMap((p) => p.closes.map(num))]); // une phase close n'est pas « inscrite sans date »
+    const i = (b.inscritesSansDate || []).filter((p) => !closes.has(num(p)));
     if (c.length) n.push(pl(c) ? `Closes, date non écrite : ${phases(c)}. Elles comptent dans le pourcentage, sans marche sur la courbe.`
       : `Close, date non écrite : ${phases(c)}. Elle compte dans le pourcentage, sans marche sur la courbe.`);
     if (i.length) {
@@ -87,6 +89,7 @@
   };
 
   let corpsCourant = null, ctxCourant = null, signe = '', phone = null;
+  const SANS_COURBE = 'Courbe indisponible : aucune date écrite au ROADMAP.';
   const SANS_DATES = 'Burn-up indisponible : le cockpit n\'a pas reçu les dates du ROADMAP.';
   const mot = (texte) => el('p', { class: 'pd vf-sy-note' }, texte);
   function ol(L) {
@@ -120,7 +123,7 @@
     if (bu.ouverture && bu.serie.length) {
       if (phone) corps.append(ol(liste(bu)));
       else { const d = el('details', { class: 'vf-tech' }); d.append(el('summary', {}, 'Liste datée'), ol(liste(bu))); corps.append(dessiner(bu), d); }
-    } else corps.append(mot(SANS_DATES));
+    } else corps.append(mot(SANS_COURBE)); // le décompte existe : seule la courbe manque de dates
     for (const n of notes(bu)) corps.append(el('p', { class: 'pd vf-sy-note', 'data-vf-sy-note': '' }, n));
   }
   function installer() {

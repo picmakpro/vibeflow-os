@@ -117,6 +117,11 @@ export async function jouer(chrome, port, nom) {
       await ouvrir(s); await lu(s); r.cycles = { blocs: await s.ev(BLOCS), burnup: await s.ev(`document.querySelectorAll('[data-vf-sy-bloc="burnup"]').length`), methode: await s.ev(`document.querySelectorAll('[data-vf-sy-bloc="methode"]').length`),
         memeDocument: (await s.ev('performance.timeOrigin')) === r.t0, mq3: await s.ev(MQ) };
     }
+    if (nom === 'main') { // ROADMAP sans aucune date : le décompte existe, la courbe n'a rien à tracer (rendu relu de meta.vf à la réouverture)
+      await fermer(s); await s.ev(`window.VibeFlow.graph.meta.vf.burnup = { jalon: 'x', clos: 1, total: 3, pct: 33, ouverture: null, serie: [], closesSansDate: [{ n: '1', nom: 'a' }],
+        inscritesSansDate: [{ n: '1', nom: 'a' }, { n: '2', nom: 'b' }, { n: '3', nom: 'c' }] }`);
+      await ouvrir(s); r.sansDates = await s.ev(BU);
+    }
     r.csp = s.violations.length; r.erreursPage = erreurs; r.reseau = { posts: J.filter((x) => x.methode === 'POST').length, interdites: J.filter((x) => /\/api\/vf\/(doing|transcript)/.test(x.url)).length,
       lecturesSansJeton: J.filter((x) => x.url.includes('/api/vf/') && (x.type === 'Fetch' || x.type === 'XHR') && !x.jeton).length };
     return r;

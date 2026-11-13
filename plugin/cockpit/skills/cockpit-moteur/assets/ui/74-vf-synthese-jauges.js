@@ -33,12 +33,13 @@
     if (!m || typeof m !== 'object' || !Number.isFinite(m.valeur) || !Number.isFinite(m.budget) || ['na', 'indispo', 'format'].includes(m.verdict)) return null;
     return m.budget === 0 ? `${nb(m.valeur)}, budget 0` : `${nb(m.valeur)} sur ${nb(m.budget)} ${unite === 'worktrees' ? 'worktrees actifs' : unite}`;
   }
-  const CATEGORIES = [['ok', (n) => `${n} dans le budget`], ['surveiller', (n) => `${n} à surveiller`], ['depasse', (n) => `${n} dépassée${n > 1 ? 's' : ''}`],
-    ['na', (n) => `${n} non applicable${n > 1 ? 's' : ''}`], ['indispo', (n) => `${n} indisponible${n > 1 ? 's' : ''}`],
-    ['format', (n) => `${n} format non reconnu`]];
+  const CATEGORIES = [['ok', (n) => `${n}${NB}dans le budget`], ['surveiller', (n) => `${n}${NB}à surveiller`],
+    ['depasse', (n) => `${n}${NB}dépassée${n > 1 ? 's' : ''}`],
+    ['na', (n) => `${n}${NB}non applicable${n > 1 ? 's' : ''}`], ['indispo', (n) => `${n}${NB}indisponible${n > 1 ? 's' : ''}`],
+    ['format', (n) => `${n}${NB}format non reconnu`]];
   function bilan(jauges) {
     const c = {}; for (const j of jauges) { const v = verdictDe(j); c[v] = (c[v] || 0) + 1; }
-    return [`${jauges.length} jauge${jauges.length > 1 ? 's' : ''}`, ...CATEGORIES.filter(([v]) => c[v]).map(([v, f]) => f(c[v]))].join(' · ');
+    return [`${jauges.length}${NB}jauge${jauges.length > 1 ? 's' : ''}`, ...CATEGORIES.filter(([v]) => c[v]).map(([v, f]) => f(c[v]))].join(' · ');
   }
   window.__vfSyntheseJauges = Object.freeze({ NOMS, GROUPES, MOTS, RAISONS, valeurTexte, bilan });
 
@@ -58,6 +59,7 @@
     const st = document.createElement('style'); st.id = 'vf-sy-jauges';
     st.textContent = `.vf-sy .vst { --c-st: var(--text-2); }
       .vf-sy p.vf-sy-mnote, .vf-sy p.vf-sy-bilan { margin: var(--sp-6) 0 0; font-size: 12.5px; line-height: 1.45; color: var(--text-3); }
+      .vf-sy-corps > .btn { margin-top: var(--sp-8); }
       .vf-sy p.vf-sy-bilan { color: var(--text-2); font-weight: 500; }
       .vf-sy p.vf-sy-pied { margin: var(--sp-12) 0 0; font-size: 11px; font-weight: 500; line-height: 1.45; color: var(--text-3); }
       .vf-sy .vf-sy-corps h4 { margin: var(--sp-16) 0 var(--sp-4); font-size: 11px; font-weight: 500; line-height: 16px; color: var(--text-3); }
