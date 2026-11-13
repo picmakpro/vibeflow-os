@@ -88,6 +88,9 @@ function exportMap(include, extraFlows = []) {
     tour: on.includes('flows') ? g.tour : [],
     files: on.includes('notes') ? g.files : g.files.map(({ note, ...f }) => f),
   };
+  // vibeflow 75-06 : les cartes « prévues » sont de la donnée de planning (P67-D-14) : ni elles, ni leur date, ni leur compte ne sortent de la machine
+  out.files = out.files.filter((f) => f.st !== 'prevu');
+  out.meta = Object.fromEntries(Object.entries(out.meta).filter(([k]) => k !== 'vfPrevuAt' && k !== 'prevusIgnores'));
   if (!on.includes('recent')) delete out.recent;
   if (!on.includes('health')) delete out.health;
   const json = JSON.stringify(out).replace(/</g, '\\u003c').replace(/\u2028/g, '\\u2028').replace(/\u2029/g, '\\u2029');

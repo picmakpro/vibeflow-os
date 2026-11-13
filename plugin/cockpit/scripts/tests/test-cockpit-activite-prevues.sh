@@ -78,7 +78,7 @@ import path from 'node:path'; import { pathToFileURL } from 'node:url';
 const { compileGlob } = await import(pathToFileURL(path.join(process.argv[2], 'scripts', 'lib', 'common.mjs')).href);
 const med = (n) => { const t = []; for (let i = 0; i < 5; i++) { const g = compileGlob('**/a/**/b/**/*.js'), s = 'a/'.repeat(n) + 'x', a = process.hrtime.bigint(); g.test(s); t.push(Number(process.hrtime.bigint() - a) / 1e6); } return t.sort((x, y) => x - y)[2]; };
 const C = await import(pathToFileURL(path.join(process.argv[2], 'scripts', 'lib', 'common.mjs')).href);
-console.log(JSON.stringify({ t1: med(20000), t2: med(40000), regle: typeof C.matchersDe === 'function' && C.matchersDe.toString().includes('compileGlob') }));
+console.log(JSON.stringify({ t1: med(20000), t2: med(40000), regle: typeof C.regleDeNoeuds === 'function' && C.regleDeNoeuds.toString().includes('compileGlob') }));
 JS
 j() { node -e "const j=JSON.parse(require('fs').readFileSync(0,'utf8'));const v=new Function('j','return ('+process.argv[1]+')')(j);console.log(typeof v==='string'?v:JSON.stringify(v))" "$1"; }
 jf() { node -e "const j=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8'));const v=new Function('j','return ('+process.argv[2]+')')(j);console.log(typeof v==='string'?v:JSON.stringify(v))" "$1" "$2" 2>/dev/null || echo illisible; }
@@ -144,6 +144,72 @@ L4="$WORK/lab4"; mklab "$L4"; node "$AUX/an.mjs" "$SCRIPTS" sans "$L4" > /dev/nu
 node "$AUX/an.mjs" "$SCRIPTS" noms "$L4" > /dev/null 2>&1; asm "$L4"; S4B="$(jf "$L4/.vibeflow/cockpit/graph.json" 'JSON.stringify(j.nodes.map(n=>[n.id,n.stats]))')"
 ok V4 "stats de nœud identiques avec et sans la table complète (Santé ne compte aucune prévue « inutilisée ») ; témoin : le graphe complet porte bien ses cartes prévues" "$([ "$S4A" = "$S4B" ] && echo identiques || echo differentes)|$(jf "$L4/.vibeflow/cockpit/graph.json" 'j.files.filter(f=>f.st==="prevu").length')" "identiques|2"
 ok V4b ".cache/scan.json ne contient aucun chemin prévu ; témoin : il contient un fichier réel du lab" "$(jf "$L4/.vibeflow/cockpit/.cache/scan.json" '[j.files.some(f=>f.path==="src/nouveau.mjs"||f.path==="src/ZMARQ-prevu.mjs"),j.files.some(f=>f.path==="src/ZMARQ-reel.mjs")].join()')" "false,true"
+
+echo "=== V5 — chemins hostiles, comptés, jamais dessinés ; plafond de 500 cartes ==="
+L5="$WORK/lab5"; HORS5="$WORK/hors5"; mkdir -p "$L5/src" "$HORS5"; ln -s "$HORS5" "$L5/lien"
+node "$AUX/gen.mjs" hostiles "$L5" "$HORS5" "$WORK/s5.json"; P5="$(prev "$WORK/s5.json")"
+ok V5 "absolu, .., NUL, retour ligne, U+2028, > 4 096 octets, sous .planning/, lien hors du lab : une seule carte (src/ok.mjs) et prevusIgnores = 8" "$(printf '%s' "$P5" | j 'j.absent?"absent":JSON.stringify([j.prevus.map(f=>f.p),j.meta.prevusIgnores])')" '[["src/ok.mjs"],8]'
+node "$AUX/gen.mjs" ignores "$L5" "$HORS5" "$WORK/s5b.json"; P5B="$(prev "$WORK/s5b.json")"
+ok V5b "les chemins que 75-04 a déjà écartés (touchedIgnores) s'ajoutent au compte : 1 carte, prevusIgnores = 3" "$(printf '%s' "$P5B" | j 'j.absent?"absent":JSON.stringify([j.prevus.length,j.meta.prevusIgnores])')" "[1,3]"
+node "$AUX/gen.mjs" plafond "$L5" "$HORS5" "$WORK/s5c.json"; P5C="$(prev "$WORK/s5c.json")"
+ok V5c "501 plans, 501 chemins valides : 500 cartes, l'excédent (1) compté" "$(printf '%s' "$P5C" | j 'j.absent?"absent":JSON.stringify([j.prevus.length,j.meta.prevusIgnores])')" "[500,1]"
+
+echo "=== V6 — lab sous-dossier d'un dépôt : lu relatif au lab, préfixe non redoublé ==="
+R6="$WORK/rep6"; mkdir -p "$R6/sub/src"; printf 'export const e = 1;\n' > "$R6/sub/src/existe.mjs"; git -C "$R6" init -q && commit "$R6"
+cat > "$WORK/s6.json" <<JSON
+{ "lab": "$R6/sub", "arch": { "nodes": [ { "id": "d-src", "label": "src", "kind": "library", "paths": ["src/**"] } ] }, "nodes": [],
+  "plans": [ { "p": ".planning/phases/1-x/1-01-PLAN.md", "st": "todo", "touched": ["src/neuf.mjs", "src/existe.mjs"] } ] }
+JSON
+P6="$(prev "$WORK/s6.json")"
+ok V6 "src/neuf.mjs est une carte « src/neuf.mjs » (jamais « sub/src/… ») ; src/existe.mjs, présent sous le lab, n'en est pas une" "$(printf '%s' "$P6" | j 'j.absent?"absent":j.prevus.map(f=>f.p).join()')" "src/neuf.mjs"
+
+echo "=== V7 — plusieurs plans visent le même fichier : une carte, identifiants triés, gabarits au pluriel ==="
+cat > "$WORK/s7.json" <<JSON
+{ "lab": "$WORK/lab7", "arch": { "nodes": [ { "id": "d-src", "label": "src", "kind": "library", "paths": ["src/**"] } ] }, "nodes": [], "plans": [
+  { "p": ".planning/phases/75-x/75-07-PLAN.md", "st": "todo", "touched": ["src/trois.mjs", "src/un.mjs"] },
+  { "p": ".planning/phases/75-x/75-02-PLAN.md", "st": "active", "touched": ["src/trois.mjs", "src/deux.mjs", "src/un.mjs"] },
+  { "p": ".planning/phases/75-x/75-04-PLAN.md", "st": "todo", "touched": ["src/trois.mjs", "src/deux.mjs"] },
+  { "p": ".planning/phases/75-x/75-01-PLAN.md", "st": "done", "touched": ["src/trois.mjs", "src/fait.mjs"] } ] }
+JSON
+mkdir -p "$WORK/lab7"; P7="$(prev "$WORK/s7.json")"
+ok V7 "trois plans non faits : prevuPar trié, « Créé par les plans 75-02, 75-04 et 75-07 » ; deux plans : « … 75-02 et 75-04 » ; un plan : « … le plan 75-07 » ; le plan fait n'y compte pas" \
+  "$(printf '%s' "$P7" | j 'j.absent?"absent":j.prevus.map(f=>f.p+"|"+f.prevuPar.join("+")+"|"+f.d).join(" ; ")')" \
+  "src/deux.mjs|75-02+75-04|Créé par les plans 75-02 et 75-04 ; src/trois.mjs|75-02+75-04+75-07|Créé par les plans 75-02, 75-04 et 75-07 ; src/un.mjs|75-02+75-07|Créé par les plans 75-02 et 75-07"
+cat > "$WORK/s7b.json" <<JSON
+{ "lab": "$WORK/lab7", "arch": { "nodes": [ { "id": "d-src", "label": "src", "kind": "library", "paths": ["src/**"] } ] }, "nodes": [], "plans": [
+  { "p": ".planning/phases/75-x/75-07-PLAN.md", "st": "todo", "touched": ["src/seul.mjs"] } ] }
+JSON
+ok V7b "un seul plan : « Créé par le plan 75-07 »" "$(prev "$WORK/s7b.json" | j 'j.absent?"absent":j.prevus[0].d')" "Créé par le plan 75-07"
+
+echo "=== V8 — fraîcheur dite : la carte suit l'assemblage, jamais un changement de .planning/ seul ==="
+H1="$(shasum "$G1" | cut -d' ' -f1)"; M1="$(jf "$G1" 'j.meta.vfPrevuAt')"
+printf -- '---\nphase: 1\nplan: "03"\nwave: 2\nfiles_modified:\n  - src/apres.mjs\n---\n<objective>Un plan de plus</objective>\n' > "$L1/.planning/phases/01-socle/01-03-PLAN.md"
+H2="$(shasum "$G1" | cut -d' ' -f1)"
+ok V8 "un plan ajouté sous .planning/ sans assemblage : graph.json identique (condensat), aucune carte « src/apres.mjs »" "$([ "$H1" = "$H2" ] && echo identique || echo change)|$(jf "$G1" 'j.files.some(f=>f.p==="src/apres.mjs")')" "identique|false"
+sleep 0.05; asm "$L1"
+ok V8b "après l'assemblage : la carte « src/apres.mjs » naît et vfPrevuAt avance" "$(jf "$G1" 'j.files.some(f=>f.p==="src/apres.mjs"&&f.st==="prevu")')|$([ "$(jf "$G1" 'j.meta.vfPrevuAt')" \> "$M1" ] && echo avance || echo fige)" "true|avance"
+
+echo "=== V9 — export : aucune carte prévue ni vfPrevuAt, témoin positif d'un fichier réel de même marqueur ==="
+exporter() { rm -f "$WORK/$1"; cockpit_exporter "$L1" "$WORK/$1" --include flows,notes,recent,health > "$WORK/$1.log" 2>&1; }
+exporter x9.html
+X9="$(node "$AUX/exp.mjs" "$WORK/x9.html" 2>/dev/null | tail -1)"
+ok V9 "l'export autonome (données lues comme serve.mjs les écrit) ne contient aucune carte prévue (st:'prevu', src/ZMARQ-prevu.mjs, src/apres.mjs), ni meta.vfPrevuAt, ni meta.prevusIgnores" \
+  "$(printf '%s' "$X9" | j 'j.illisible?"illisible":j.prevus+"|"+JSON.stringify(j.cles)')" "0|[]"
+ok V9b "témoin positif : le fichier réel src/ZMARQ-reel.mjs (même marqueur) est dans l'export, qui porte le graphe entier" "$(printf '%s' "$X9" | j 'j.illisible?"illisible":j.reel+"|"+(j.fichiers>=3)')" "true|true"
+ok V9c "témoin : graph.json de la sortie (hors export) porte bien la carte prévue et vfPrevuAt, donc l'export retire ce que le graphe porte" "$(jf "$G1" '[j.files.some(f=>f.p==="src/ZMARQ-prevu.mjs"&&f.st==="prevu"),typeof j.meta.vfPrevuAt,"prevusIgnores" in j.meta].join()')" "true,string,true"
+
+echo "=== V10 — l'annotateur est inscrit sous le nom « prevues », à sa place alphabétique, et s'exerce seul ==="
+NOMS="$(node "$AUX/an.mjs" "$SCRIPTS" noms "$L1" 2>/dev/null | tail -1)"
+ok V10 "la table ANNOTATEURS contient « prevues » et ses noms sont triés par unités de code" "$(printf '%s' "$NOMS" | j '[j.includes("prevues"),JSON.stringify(j)===JSON.stringify([...j].sort())].join()')" "true,true"
+L10="$WORK/lab10"; mklab "$L10"; node "$AUX/an.mjs" "$SCRIPTS" seul "$L10" > /dev/null 2>&1
+ok V10b "assembler(…, [prevues]) — la liste injectée, sans les autres annotateurs — pose les cartes prévues et meta.vfPrevuAt, sans meta.vfTab" "$(jf "$L10/.vibeflow/cockpit/graph.json" '[j.files.filter(f=>f.st==="prevu").length,typeof j.meta.vfPrevuAt,j.meta.vfTab===undefined].join()')" "2,string,true"
+
+echo "=== V-N2N — le rattachement passe par compileGlob corrigé (79-21), linéaire ==="
+NN="$(node "$AUX/n2n.mjs" "$MOTEUR" 2>/dev/null | tail -1)"
+ok V-N2N "compileGlob('**/a/**/b/**/*.js') sur 'a/'×N : t(40 000) <= 2,5 × t(20 000) + 2 ms (médiane de cinq ; le code d'avant 79-21 : 855 puis 3 445 ms)" \
+  "$(printf '%s' "$NN" | j '(j.t2<=2.5*j.t1+2)?"lineaire":"quadratique "+j.t1+" "+j.t2')" "lineaire"
+ok V-N2Nb "la règle extraite construit ses motifs par compileGlob (celui de common.mjs) ; le module des cartes prévues ne construit aucune RegExp et n'importe pas vf-glob.mjs" \
+  "$(printf '%s' "$NN" | j 'j.regle')|$(grep -c 'new RegExp\|vf-glob' "$SCRIPTS/vf-cockpit-activite-prevues.mjs" 2>/dev/null || true)" "true|0"
 
 vf_hyg_assert
 echo "BILAN : $NB PASS, $NF FAIL"
