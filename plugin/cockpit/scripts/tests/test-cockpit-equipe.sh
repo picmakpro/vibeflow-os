@@ -431,6 +431,9 @@ rm -f "$OUT/.cache/server.json"
 COCKPIT_LOG="$WORK/serve23.out" cockpit_lancer "$LABS" HOME="$H23" || true
 SRV23="$VF_PID"
 PORT23="$VF_PORT"
+# 79-09 : la collecte tourne dans un fil et la page Équipe se construit sur l'instantané du moment : la première collecte est attendue (borne de 20 s) avant de demander la page
+collecte_prete_e23() { cockpit_get /api/vf/etat 2> /dev/null | node -e 'try{process.exit(JSON.parse(require("fs").readFileSync(0,"utf8")).collecte.etat==="ok"?0:1)}catch{process.exit(1)}'; }
+attendre 20 collecte_prete_e23 || true
 S23="$(node "$AUX/fetchp.mjs" "$PORT23" /equipe.html "$WORK/equipe.html")"
 P23="$(node "$AUX/fetchp.mjs" "$PORT23" /project.html "$WORK/project23.html")"
 assert_eq "E23.0 — contrôle positif : serveur démarré et /project.html servi (200)" "$([ "$PORT23" -gt 0 ] && echo serveur)|$P23" "serveur|200"
