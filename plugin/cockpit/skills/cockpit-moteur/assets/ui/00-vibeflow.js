@@ -283,7 +283,7 @@
     const r = new URLSearchParams(location.hash.slice(1)).get('r');
     if (!r) return;
     const id = /^[nf]:/.test(r) ? r : 'f:' + r;
-    if (SC.exists(id)) SC.reveal(id); else SC.toast(`Pas sur cette carte : ${r}`);
+    if (TAB === 'equipe' && window.__vfRegie?.arriver(r)) return; if (SC.exists(id)) SC.reveal(id); else SC.toast(`Pas sur cette carte : ${r}`);
   };
   // recette 68 R5 : la carte d'une mission abandonnée porte `st: todo` (le viewer n'a pas d'état « abandonnée ») et sa pastille disait « À faire ». Le socle écrit « abandonnée » dans le pied de la carte
   // (LIBELLES_MISSION) : la pastille de CETTE carte est réécrite en « Abandonnée », avant lecture par un lecteur d'écran. Idempotent : une pastille réécrite n'est plus `vst-todo`.
