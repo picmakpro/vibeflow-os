@@ -111,5 +111,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process
     const contrat = JSON.parse(fs.readFileSync(path.join(ici, 'vf-cockpit-interface.json'), 'utf8'));
     lu = await signalDuServeur(path.resolve(args[0]), { schema: SCHEMA, dossierScripts: ici, contrat });
   } catch { lu = null; }
-  console.log(JSON.stringify(lu ? assainir(lu.signal) : collectSignal(args[0], { echeanceMs: Math.max(1000, ECHEANCE_MS - (Date.now() - debut)) })));
+  let sortie = null; // un état forgé qui fait lever l'assainissement vaut repli, jamais une sortie absente
+  if (lu) { try { sortie = JSON.stringify(assainir(lu.signal)); } catch { sortie = null; } } // garde:signal-assainir
+  console.log(sortie ?? JSON.stringify(collectSignal(args[0], { echeanceMs: Math.max(1000, ECHEANCE_MS - (Date.now() - debut)) })));
 }

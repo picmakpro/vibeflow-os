@@ -325,7 +325,7 @@ const conns = lire(connF).split('\n').filter(Boolean).map((l) => JSON.parse(l));
 const appels = lire(jF).split('\n').filter((l) => l.endsWith(' ' + em.pid)).length;
 console.log(JSON.stringify({ code: em.code, ms: em.ms, tue: em.tue, pid: em.pid, marq: String(em.sortie || '').includes(marq), sortieLue: (() => { try { return JSON.parse(em.sortie).schema; } catch { return null; } })(),
   visites: vis.length, jeton: vis[0] && vis[0].jeton, origine: vis[0] && vis[0].origine, hote: vis[0] && vis[0].hote, hoteAttendu: lp ? `127.0.0.1:${lp}` : null,
-  appels, conns: conns.length, refuses: conns.filter((c) => c.refuse).length, vers: conns.filter((c) => !c.refuse).map((c) => `${c.hote}:${c.port}`) }));
+  appels, cle: String(em.sortie || '').includes('CLE_EN_TROP'), conns: conns.length, refuses: conns.filter((c) => c.refuse).length, vers: conns.filter((c) => !c.refuse).map((c) => `${c.hote}:${c.port}`) }));
 JS
 cat > "$AUX/chemins.mjs" <<'JS'
 // chemins.mjs <état.json> : « chemin JSON » de chaque chaîne qui est un chemin absolu (indices de tableau remplacés par [])
@@ -358,7 +358,8 @@ echo "=== E9 — leurres : chaque propriété retirée a son leurre, le même le
 MARQ=MARQUEUR-LEURRE-79-12
 pose_json() { node -e "require('fs').writeFileSync(process.argv[1], JSON.stringify({ pid: Number(process.argv[2]), port: Number(process.argv[3]), url: 'http://127.0.0.1:' + process.argv[3], token: '0123456789abcdef0123456789abcdef', hash: 'abcdef012345' }))" "$SJ" "$1" "$2"; }
 restaurer() { rm -f "$SJ"; cp "$WORK/server-b.json" "$SJ"; }
-node -e "setTimeout(()=>{},900000)" "$WORK/etranger" & PETR=$!; PIDS+=("$PETR") # un processus vivant étranger au serveur (la marque de la suite est dans sa ligne de commande)
+node -e "setTimeout(()=>{},900000)" "$WORK/etranger" & PETR=$!; PIDS+=("$PETR")
+node -e "setTimeout(()=>{},900000)" "$LB/.vibeflow/cockpit/serve.mjs" & PNOM=$!; PIDS+=("$PNOM") # un processus qui ne fait que NOMMER <sortie>/serve.mjs (forme ancienne de estNotre) # un processus vivant étranger au serveur (la marque de la suite est dans sa ligne de commande)
 head -c 20480 /dev/zero | tr '\0' ' ' > "$WORK/blancs"
 leurre_cas() { # <mode> <scripts> <préfixe> [pid] [modèle de server.json : json|tube|lien|gros]
   local m="$1" sc="$2" p="$3" pid="${4:-$PB}" forme="${5:-json}" lpid lp="" f="$WORK/lc-$3-$1-${5:-json}"
@@ -376,17 +377,22 @@ leurre_cas() { # <mode> <scripts> <préfixe> [pid] [modèle de server.json : jso
   vf_hyg_stop "$lpid"; restaurer
   resume "$WORK/em-$p-$m.json" "$WORK/lv.log" "$JB" "$MARQ" "$WORK/conn.log" "$lp" > "$f.json"
 }
-MODES_E9="pid-etranger autre-racine perime schema incomplet interdit gros muet refus texte indispo encours nul tube lien-fichier gros-fichier"
+MODES_E9="pid-etranger pid-nomme autre-racine perime schema incomplet interdit gros profond abime cles-en-trop muet refus texte indispo encours nul tube lien-fichier gros-fichier"
 cas_e9() { # <scripts> <préfixe>
   local m
   for m in $MODES_E9; do
-    case "$m" in pid-etranger) leurre_cas valide "$1" "$2" "$PETR" json; mv "$WORK/lc-$2-valide-json.json" "$WORK/lc-$2-pid-etranger.json" ;; *) leurre_cas "$m" "$1" "$2" "$PB" "x"; mv "$WORK/lc-$2-$m-x.json" "$WORK/lc-$2-$m.json" ;; esac
+    case "$m" in pid-etranger) leurre_cas valide "$1" "$2" "$PETR" json; mv "$WORK/lc-$2-valide-json.json" "$WORK/lc-$2-pid-etranger.json" ;;
+      pid-nomme) leurre_cas valide "$1" "$2" "$PNOM" json; mv "$WORK/lc-$2-valide-json.json" "$WORK/lc-$2-pid-nomme.json" ;; *) leurre_cas "$m" "$1" "$2" "$PB" "x"; mv "$WORK/lc-$2-$m-x.json" "$WORK/lc-$2-$m.json" ;; esac
   done
 }
 rouges_e9() { # <préfixe> : identifiants de E9 qui rougissent
   local f="$WORK/lc-$1" r="" m
   rej() { [ "$(jf "$f-$1.json" '!j.marq&&j.code===0&&j.sortieLue==="vibeflow/cockpit-signal@1"&&j.tue===false')" = true ]; }
   rej pid-etranger && [ "$(jf "$f-pid-etranger.json" 'j.visites')" = 0 ] || r="$r E9.1"
+  rej pid-nomme && [ "$(jf "$f-pid-nomme.json" 'j.visites')" = 0 ] || r="$r E9.13"
+  rej profond && [ "$(jf "$f-profond.json" 'j.visites')" = 1 ] || r="$r E9.14"
+  [ "$(jf "$f-cles-en-trop.json" 'j.marq&&!j.cle&&j.code===0&&j.tue===false')" = true ] || r="$r E9.15"
+  rej abime && [ "$(jf "$f-abime.json" 'j.visites')" = 1 ] || r="$r E9.16"
   rej autre-racine && [ "$(jf "$f-autre-racine.json" 'j.visites')" = 1 ] || r="$r E9.2"
   rej perime && [ "$(jf "$f-perime.json" 'j.visites')" = 1 ] || r="$r E9.3"
   rej schema && [ "$(jf "$f-schema.json" 'j.visites')" = 1 ] || r="$r E9.4"
@@ -415,6 +421,10 @@ assert_eq "E9.9 — refus 403, corps non JSON, collecte indisponible, collecte e
 assert_eq "E9.10 — server.json remplacé par un lien vers un tube nommé, un lien vers un fichier, un fichier de plus de 16 Kio : repli en moins de 8 s, sans être tué" "$(has_rouge "$R9" E9.10)" "ok"
 node "$TESTS/etat-propriete.mjs" conforme "$SCRIPTS" "$WORK/signal-servi.json" > "$WORK/e9c.json" 2>&1
 echo "  (graine=$(jf "$WORK/e9c.json" 'j.graine'))"
+assert_eq "E9.13 — un processus qui ne fait que nommer <sortie>/serve.mjs (forme ancienne de estNotre) ne reçoit pas le jeton : zéro visite, repli" "$(has_rouge "$R9" E9.13)" "ok"
+assert_eq "E9.14 — réponse imbriquée à cent niveaux (au-delà de la borne de profondeur) : repli" "$(has_rouge "$R9" E9.14)" "ok"
+assert_eq "E9.15 — clés en plus (premier niveau, élément de liste) : l'état est lu, la sortie ne porte que les clés du contrat" "$(has_rouge "$R9" E9.15)" "ok"
+assert_eq "E9.16 — réponse imbriquée à 3 500 niveaux : repli avec une sortie valide, jamais une sortie absente" "$(has_rouge "$R9" E9.16)" "ok"
 assert_eq "E9.11 — conforme sur des états valides dont une clé requise est retirée ou change de type (tirages et exhaustif) : faux si et seulement si la clé est requise ; une clé en plus reste tolérée (témoin positif)" "$(jf "$WORK/e9c.json" 'JSON.stringify(j.ko)+"|"+j.temoin')" "[]|true"
 assert_eq "E9.12 — couverture : chaque clé requise (premier niveau et chaque sous-schéma) est retirée au moins une fois" "$(jf "$WORK/e9c.json" 'JSON.stringify(j.nonTirees)+"|"+(j.nbCles>=40)')" "[]|true"
 
@@ -439,10 +449,11 @@ copie_em() { # <nom> : copie du module dont le moteur est LIÉ (l'identité du s
   ln -s "$(dirname "$SCRIPTS")/skills" "$d/skills" || return 1
   printf '%s\n' "$d/scripts"
 }
-mutant_em() { # <nom> <fichier> <sed> <attendu>
+mutant_em() { # <nom> <fichier> <sed> <attendu> [<second fichier> <second sed>]
   local nom="$1" d rc c r
   d="$(copie_em "$nom")"; cp "$d/$2" "$d/$2.avant"; sed "$3" "$d/$2.avant" > "$d/$2"; rm -f "$d/$2.avant"
   c=0; cmp -s "$SCRIPTS/$2" "$d/$2" && c=1; node --check "$d/$2" 2>/dev/null || c=2
+  if [ -n "${5:-}" ]; then cp "$d/$5" "$d/$5.avant"; sed "$6" "$d/$5.avant" > "$d/$5"; rm -f "$d/$5.avant"; cmp -s "$SCRIPTS/$5" "$d/$5" && c=1; node --check "$d/$5" 2>/dev/null || c=2; fi
   assert_eq "M-$nom.0 — l'ancre existe une fois, la copie diffère de l'original et charge (node --check)" "$c" "0"
   [ "$c" = 0 ] || return
   cas_e9 "$d" "m-$nom"; r="$(rouges_e9 "m-$nom")"
@@ -450,7 +461,10 @@ mutant_em() { # <nom> <fichier> <sed> <attendu>
 }
 D0="$(copie_em neutre)"; cas_e9 "$D0" m-neutre >/dev/null 2>&1; leurre_cas valide "$D0" neutre "$PB" valide
 assert_eq "E9.0m — la copie du module NON mutée, lancée comme l'émetteur, atteint la requête : le leurre valide est lu (une visite, une connexion locale), zéro appel au verrou à son PID" "$(jf "$WORK/lc-neutre-valide-valide.json" 'j.marq+"|"+j.visites+"|"+j.conns+"|"+j.refuses+"|"+j.appels')|$(rouges_e9 m-neutre)" "true|1|1|0|0|"
-mutant_em ESTNOTRE vf-cockpit-signal-serveur.mjs '/garde:signal-estnotre/s/if (!estNotre([^;]*)) return null;//' "E9.1"
+mutant_em ESTNOTRE vf-cockpit-signal-serveur.mjs '/garde:signal-estnotre/s/if (!reconnu) return null;//' "E9.1 E9.13"
+mutant_em STRICT vf-cockpit-signal-serveur.mjs 's/ && strict(lireCommande(s.pid, racine), ident)//' "E9.13"
+mutant_em BORNE vf-cockpit-signal-serveur.mjs '/garde:signal-borne/s/if (!borne(o)) return null;//' "E9.14"
+mutant_em PROJECTION vf-cockpit-signal-serveur.mjs '/garde:signal-projection/s/projeter(sg, contrat)/sg/' "E9.15"
 mutant_em RACINE vf-cockpit-signal-serveur.mjs '/garde:signal-racine/s/a !== b/false/' "E9.2"
 mutant_em FRAICHEUR vf-cockpit-signal-serveur.mjs '/garde:signal-fraicheur/s/age < FRAICHEUR_MAX_MS/true/' "E9.3"
 mutant_em SCHEMA vf-cockpit-signal-serveur.mjs '/garde:signal-schema/s/o.schema !== SCHEMA_ETAT/false/' "E9.4"

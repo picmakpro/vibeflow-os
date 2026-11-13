@@ -147,6 +147,10 @@ if (mode === 'sse') {
     if (m === 'incomplet') delete o.signal.equipe;
     if (m === 'interdit') o.signal.extra = { a: { b: { fil: 'x' } } };
     if (m === 'gros') o.signal.rembourrage = 'x'.repeat(3 << 20);
+    const creux = (n) => { let x = 'FOND'; for (let i = 0; i < n; i++) x = { a: x }; return x; };
+    if (m === 'profond') o.signal.layout.imbrique = creux(100); // franchit la borne de profondeur de l'émetteur, reste lisible par l'assainissement
+    if (m === 'abime') o.signal.layout.imbrique = creux(3500); // fait lever l'assainissement s'il est atteint
+    if (m === 'cles-en-trop') { o.signal.CLE_EN_TROP = 'x'.repeat(1 << 20); if (o.signal.phases[0]) o.signal.phases[0].CLE_EN_TROP = 1; }
     if (m === 'indispo') o.collecte.etat = 'indisponible';
     if (m === 'encours') o.collecte.etat = 'en-cours';
     if (m === 'nul') o.signal = null;

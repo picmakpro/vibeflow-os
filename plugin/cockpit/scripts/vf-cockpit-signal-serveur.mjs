@@ -12,7 +12,7 @@ import { shBorne, avecEcheance, resoudreBinaire, pathAssaini } from './vf-cockpi
 import { ENTETE_JETON } from './vf-cockpit-lancer-post.mjs';
 
 export const FRAICHEUR_MAX_MS = 20000, DELAI_HTTP_MS = 1500, MAX_OCTETS = 2 << 20;
-const ETAT_MAX = 16384, SCHEMA_ETAT = 'vibeflow/cockpit-state@1';
+const PROFONDEUR_MAX = 20, NOEUDS_MAX = 200000, ETAT_MAX = 16384, SCHEMA_ETAT = 'vibeflow/cockpit-state@1';
 const TYPES = { string: (v) => typeof v === 'string', number: (v) => typeof v === 'number' && Number.isFinite(v), boolean: (v) => typeof v === 'boolean',
   object: (v) => !!v && typeof v === 'object' && !Array.isArray(v), array: Array.isArray, any: () => true };
 const porte = (o, ks) => !!o && typeof o === 'object' && Object.entries(o).some(([k, v]) => ks.includes(k) || porte(v, ks));
@@ -30,6 +30,34 @@ export function conforme(signal, contrat) {
   return ok(tab(signal.phases), 'phase') && ok(tab(signal.jalons), 'jalon') && ok(missions, 'mission') && ok(tab(signal.verrous.liste), 'verrou')
     && ok(missions.flatMap((m) => tab(m.noeuds)), 'noeud') && ok(arbres, 'arbre') && ok(arbres.map((x) => x.retard).filter(Boolean), 'retard');
 }
+
+// borne de la réponse (itérative : jamais une récursion sur une forme forgée) : profondeur et nombre de noeuds
+const borne = (racine) => {
+  let n = 0; const pile = [[racine, 1]];
+  while (pile.length) {
+    const [v, d] = pile.pop();
+    if (d > PROFONDEUR_MAX || ++n > NOEUDS_MAX) return false;
+    if (v && typeof v === 'object') for (const x of Object.values(v)) pile.push([x, d + 1]);
+  }
+  return true;
+};
+// projection par liste blanche : seules les clés du contrat sortent, au premier niveau et dans chaque élément des listes
+const garder = (o, noms) => Object.fromEntries(noms.filter((k) => k in o).map((k) => [k, o[k]]));
+export function projeter(sg, contrat) {
+  const spec = contrat.schemas['vibeflow/cockpit-signal@1'], noms = (n) => [...(spec[n].requis || []), ...(spec[n].optionnels || [])];
+  const liste = (l, n) => l.map((o) => garder(o, noms(n)));
+  const p = garder(sg, Object.keys(spec.requis));
+  p.phases = liste(sg.phases, 'phase'); p.jalons = liste(sg.jalons, 'jalon');
+  p.missions = sg.missions.map((m) => ({ ...garder(m, noms('mission')), ...(Array.isArray(m.noeuds) ? { noeuds: liste(m.noeuds, 'noeud') } : {}) }));
+  p.verrous = { ...garder(sg.verrous, ['etat', 'plat']), liste: liste(sg.verrous.liste || [], 'verrou') };
+  p.arbres = sg.arbres.map((a) => ({ ...garder(a, noms('arbre')), retard: a.retard ? garder(a.retard, noms('retard')) : a.retard }));
+  return p;
+}
+// identité STRICTE (jamais la forme de la version précédente de estNotre) : serve.mjs du module en mot entier ET `--sortie=<chemin réel>` en fin de ligne
+const strict = (cmd, id) => {
+  const c = typeof cmd === 'string' ? cmd.trimEnd() : '';
+  return !!id && c.includes(` ${id.serve} `) && c.endsWith(` --sortie=${id.sortie}`);
+};
 
 // une requête locale vers 127.0.0.1 seulement, hôte explicite, aucune en-tête d'origine, aucune réutilisation de connexion, échéance TOTALE
 export function lireEtatHttp({ port, jeton, delaiMs = DELAI_HTTP_MS, maxOctets = MAX_OCTETS }) {
@@ -62,11 +90,13 @@ export async function signalDuServeur(racine, { schema, dossierScripts, contrat,
     const s = serveurVivant(sortie);
     if (!s || !/^[0-9a-f]{8,128}$/.test(String(s.token))) return null;
     const ident = identiteServeur(dossierScripts, sortie);
-    if (!estNotre(s.pid, ident, racine, lireCommande)) return null; // garde:signal-estnotre
+    const reconnu = estNotre(s.pid, ident, racine, lireCommande) && strict(lireCommande(s.pid, racine), ident);
+    if (!reconnu) return null; // garde:signal-estnotre
     const r = await lireEtatHttp({ port: s.port, jeton: s.token });
     if (!r || r.code !== 200) return null;
     const o = JSON.parse(r.corps);
     if (!o || o.schema !== SCHEMA_ETAT) return null; // garde:signal-schema
+    if (!borne(o)) return null; // garde:signal-borne
     const sg = o.signal;
     if (!(sg && sg.schema === schema && conforme(sg, contrat))) return null; // garde:signal-conforme
     let a = null, b = null;
@@ -75,6 +105,6 @@ export async function signalDuServeur(racine, { schema, dossierScripts, contrat,
     if (!['ok', 'partielle'].includes(o.collecte && o.collecte.etat)) return null;
     const now = typeof maintenant === 'function' ? maintenant() : (maintenant ?? Date.now()), age = now - Date.parse(sg.at);
     if (!(age > -1000 && age < FRAICHEUR_MAX_MS)) return null; // garde:signal-fraicheur
-    return { signal: sg };
+    return { signal: projeter(sg, contrat) }; // garde:signal-projection
   } catch { return null; }
 }

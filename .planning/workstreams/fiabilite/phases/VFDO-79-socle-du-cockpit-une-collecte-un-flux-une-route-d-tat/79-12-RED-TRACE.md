@@ -106,3 +106,9 @@ Gardes vertes d'emblée, rendues rouges par leur mutant : E8.2 à E8.4, E9.1, E9
 ### Sonde de connexions : défaut trouvé à l'écriture
 
 Première version de `etat-sonde.mjs` : Node passe à `Socket.prototype.connect` des arguments déjà normalisés (`[options, rappel]`) ; la sonde lisait le premier argument comme des options, voyait « localhost » sans port et refusait tout, y compris le leurre valide (E9.0 rouge pour une mauvaise raison). Corrigé (lecture du premier élément du tableau), vérifié par deux connexions d'essai (127.0.0.1 laissée passer, 203.0.113.9 refusée).
+
+### Correction ciblée après l'audit (A1, A2)
+
+Rouges sur le code précédent (instantané de 99299905, témoins nouveaux) : E9.13 (un processus qui ne fait que nommer `<sortie>/serve.mjs` reçoit une visite avec le jeton), E9.14 (imbrication à cent niveaux acceptée), E9.15 (clés en plus sorties) — 80 PASS / 3 FAIL. E9.16 (3 500 niveaux) est vert avant comme après : `conforme` déborde la pile avant `assainir`. Après : `test-cockpit-etat.sh` 107 PASS / 0 FAIL ; mutants M-STRICT (E9.13), M-BORNE (E9.14), M-PROJECTION (E9.15) rouges pour leur seule raison ; M-ESTNOTRE rougit E9.1 et E9.13. Un mutant du `try` d'assainissement a été tenté puis retiré : aucune profondeur ne sépare le débordement de `conforme` de celui d'`assainir` (seuils instables, dépendants du JIT).
+Suites rejouées seules après la correction : `signal` 76, `signal-mod` 40, `who` 157, `ailleurs`, `path-enfants` 37, `git-env` 135, `vendor` 178, `lecture-fil`, `collecte` 126 : toutes vertes.
+Périmètre de la branche (84 suites, une par une) : toutes à rc 0 ; seul saut : `projet-visite` (O6.17d et O6.19, polices DejaVu absentes du poste).
