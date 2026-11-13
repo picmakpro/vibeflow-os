@@ -680,8 +680,8 @@ mut23 branchedet vf-cockpit-equipe-carte.mjs "const branche = retireAffichage(w.
 assert_eq "M-W23-BRANCHE-DETAIL — mutant (branche brute dans le détail et le résumé) : W23.10 rougit sur le détail" "$(g23 "$WORK/w23-branchedet-b" 'j.t8[1]')" "false"
 mut23 iface vf-cockpit-interface.json '"task", "titre",' '"task",'
 assert_eq "M-W23-IFACE — mutant (contrat sans `titre`) : W23.14 rougit" "$(g23 "$WORK/w23-iface-b" 'j.t13.join(",")')" "titre"
-mut23 sig vf-cockpit-live.mjs "x.titre || ''" "0 && x.titre || ''"
-assert_eq "M-W23-SIG — mutant du juge (titre neutralisé dans whoSig par « 0 && x.titre || '' », un grep resterait vert) : W23.15 rougit" "$(g23 "$WORK/w23-sig-b" 'j.t14.join(",")')" "false,true"
+mut23 sig vf-cockpit-who-signature.mjs "'lastAt']" "'lastAt', 'titre']"
+assert_eq "M-W23-SIG — mutant du juge (titre ajouté à la liste des champs volatils de la ligne garde:who-volatils, un grep resterait vert) : W23.15 rougit" "$(g23 "$WORK/w23-sig-b" 'j.t14.join(",")')" "false,true"
 mut17 w23-lib vf-cockpit-who.mjs "LIBRES = { titre: 80," "LIBRES = {" >/dev/null
 assert_eq "M-W23-LIBRES — mutant (titre retiré de LIBRES) : W23.16 rougit" "$(grep -c "LIBRES = { titre: 80," "$WORK/mut17-w23-lib/vf-cockpit-who.mjs")" "0"
 

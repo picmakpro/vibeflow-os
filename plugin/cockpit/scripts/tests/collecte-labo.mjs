@@ -1,9 +1,13 @@
 // collecte-labo — fixtures de la suite test-cockpit-collecte.sh (79-09) : lab git neutre avec planning, faux verrou, session fraîche dans un
 // HOME jetable.
 // Exports : creerLab(dir), ecrireFauxVerrou(dir), ecrireSession(home, lab, id), ecrireLourd(home, lab, opts), ecrireGeant(home, lab, id, octets),
-//           ecrireAncienne(home, lab, id), ecrireVoie(home, cwd, id, seed).
+//           ecrireAncienne(home, lab, id), ecrireVoie(home, cwd, id, seed), ecrireSousAgent(home, lab, sid, aid, meta, opts), ecrireRegistre(home, lab, sid, driver),
+//           ecrireSilence(home, lab, sid).
 // CLI : node collecte-labo.mjs lab <dir> | verrou <dir> | session <home> <lab> <id> | lourd <home> <lab> | geant <home> <lab> <id> [octets]
-//       | ancienne <home> <lab> <id>
+//       | ancienne <home> <lab> <id> | registre <home> <lab> <id-session> <driver-lock.sh> | silence <home> <lab> <id-session>
+// Modes de la tâche 3 : `registre` (DAG du lab portant le nœud n-revue, session, manager mgr01 et travailleur fini wk01 de profondeur 2 ; avec un script de
+// verrou donné : acquire, register, close, release du VRAI script, donc un agent clos dont le verrou est relâché), `silence` (cinq sous-agents de silences
+// connus : 2 000 s, 1 700 s, 90 s non finis, 5 000 s fini, 90 000 s non fini hors de la fenêtre de 24 h).
 // Modes de la tâche 2 : `lourd` (16 sessions de 3 sous-agents, environ 50 Mio, dates récentes), `geant` (une session dont une ligne dépasse la
 // borne de lecture de l'index ; écrite au test, jamais commitée), `ancienne` (session datée de 25 h, appel d'outil non résolu, fichier récent).
 // Les transcripts viennent du générateur à graine de 79-08 (importé, jamais dupliqué) dont les dates sont décalées vers le présent.
@@ -99,6 +103,34 @@ export function ecrireAncienne(home, lab, id) {
   fs.writeFileSync(path.join(d, `${id}.jsonl`), texte(31, lab, id, Date.now() - 25 * 3600e3, { abandonne: true })); // mtime = maintenant, lignes de 25 h, dernier appel ouvert
 }
 
+// un sous-agent de profondeur 1 ou 2 : meta.json et transcript (premier et dernier tour), dates de modification reculées de `age` secondes
+export function ecrireSousAgent(home, lab, sid, aid, meta, { age = 60, mandat = 'tache' } = {}) {
+  const sub = path.join(projets(home), sid, 'subagents'); fs.mkdirSync(sub, { recursive: true });
+  const base = { isSidechain: true, agentId: aid, cwd: lab, sessionId: sid, version: '2.1.316' }, t = new Date(Date.now() - age * 1000).toISOString();
+  const tr = path.join(sub, `agent-${aid}.jsonl`), mj = path.join(sub, `agent-${aid}.meta.json`);
+  fs.writeFileSync(tr, [{ type: 'user', timestamp: t, message: { role: 'user', content: mandat }, ...base }, { type: 'assistant', timestamp: t, message: { role: 'assistant', content: [{ type: 'text', text: 'ok' }] }, ...base }].map((o) => JSON.stringify(o)).join('\n') + '\n');
+  fs.writeFileSync(mj, JSON.stringify({ agentType: 'vf-coder', description: 'tache', spawnDepth: 1, toolUseId: `toolu_${aid}`, requestShape: 'foreground', ...meta }));
+  const d = new Date(Date.now() - age * 1000); fs.utimesSync(tr, d, d); fs.utimesSync(mj, d, d);
+}
+
+export function ecrireRegistre(home, lab, sid, driver, { mandat = 'revue' } = {}) {
+  fs.mkdirSync(path.join(lab, '.planning', 'missions'), { recursive: true });
+  fs.writeFileSync(path.join(lab, '.planning', 'missions', 'm-revue.dag.json'), JSON.stringify({ nodes: [{ id: 'n-revue', step: 'revue', stage: 'exec', deps: [], scope: [], status: 'done' }] }));
+  ecrireSession(home, lab, sid);
+  ecrireSousAgent(home, lab, sid, 'mgr01', { agentType: 'vf-dev-manager', spawnDepth: 1 }, { age: 400 });
+  ecrireSousAgent(home, lab, sid, 'wk01', { spawnDepth: 2, parentAgentId: 'mgr01', finished: true }, { age: 300, mandat });
+  if (!driver) return;
+  const dl = (...a) => execFileSync('bash', [driver, ...a], { cwd: lab, stdio: 'ignore', env: { ...process.env, HOME: home } });
+  dl('acquire', '--owner=mgr01', '--step=exec'); dl('register', '--agent=wk01', '--role=vf-coder', '--node=n-revue', '--parent=mgr01', '--depth=2');
+  dl('close', '--agent=wk01', '--status=done'); dl('release', '--owner=mgr01');
+}
+
+export function ecrireSilence(home, lab, sid) {
+  ecrireSession(home, lab, sid);
+  const A = [['sil-a', 2000, {}], ['sil-b', 1700, {}], ['sil-c', 90, {}], ['sil-d', 5000, { finished: true }], ['sil-e', 90000, {}]];
+  for (const [aid, age, meta] of A) ecrireSousAgent(home, lab, sid, aid, meta, { age });
+}
+
 if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import.meta.url)) {
   const [, , verbe, a, b, c] = process.argv;
   if (verbe === 'lab') creerLab(a);
@@ -107,5 +139,7 @@ if (process.argv[1] && fs.realpathSync(process.argv[1]) === fileURLToPath(import
   else if (verbe === 'lourd') ecrireLourd(a, b);
   else if (verbe === 'geant') ecrireGeant(a, b, c, process.argv[6] ? Number(process.argv[6]) : undefined);
   else if (verbe === 'ancienne') ecrireAncienne(a, b, c);
-  else { console.error('collecte-labo : lab <dir> | verrou <dir> | session <home> <lab> <id> | lourd <home> <lab> | geant <home> <lab> <id> [octets] | ancienne <home> <lab> <id>'); process.exit(64); }
+  else if (verbe === 'registre') ecrireRegistre(a, b, c, process.argv[6] || undefined, { mandat: process.argv[7] });
+  else if (verbe === 'silence') ecrireSilence(a, b, c);
+  else { console.error('collecte-labo : lab <dir> | verrou <dir> | session <home> <lab> <id> | lourd <home> <lab> | geant <home> <lab> <id> [octets] | ancienne <home> <lab> <id> | registre <home> <lab> <id> [verrou] | silence <home> <lab> <id>'); process.exit(64); }
 }

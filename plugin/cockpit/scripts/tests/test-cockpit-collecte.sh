@@ -12,13 +12,18 @@
 #   C4   l'index dans le fil : 64 voies, fichier 0600 sans marqueur, pas de réécriture sans changement, ligne géante, empreinte du code évalué,
 #        rétention par l'état officiel, voie rattachée à un arbre PROUVÉ (leurres, collision de noms)
 #   M-*  mutants sur copie du module : la copie diffère (cmp), charge, et le rouge porte sur la bonne mesure
-# Les sections C5 à C11 s'ajoutent à la tâche suivante du plan.
+#   C5   le registre clos lu pour le rattachement (D5) : de bout en bout par le serveur, script sans le verbe, sorties hostiles et bornes, fusion
+#   C6   la jointure du rattachement aux voies (A8, A14) : propriété générative (graine imprimée, VF_SEED), lien au signal, mutant
+#   C7   A20 : motif de fin d'une session (finMotif) et agents sortis pour silence (sortisSilence), mutants
+#   C8   A17 : la signature du who (tout champ ajouté, liste nommée des champs volatils), mutant
+#   C11  le cache du scan (AB1) : un lab inchangé ne relance pas le scan ; édition à taille égale, ajout, retrait, git, code du moteur ; mutant
+# Les sections C9 s'ajoutent à la tâche suivante du plan.
 # Lab neutre dans mktemp, HOME jetable, isolation git, faux verrou (VF_FAUX_JOURNAL, VF_FAUX_DELAI). Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 TESTS="$SCRIPTS/tests"
-WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home" "$WORK/faux"
+mkdir -p "${TMPDIR:-/tmp}"; WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home" "$WORK/faux"
 export HOME="$WORK/home"
 trap 'vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$TESTS/hygiene.sh"; vf_hyg_init
@@ -420,6 +425,191 @@ if mutant M-COLLISION vf-cockpit-collecte-index.mjs index-collision 'compte.get(
   mkdir -p "$WORK/c48m2"; node "$AUX/c48.mjs" "$MUT_SCRIPTS" "$TESTS" "$WORK/c48m2" > "$WORK/c48-m2.json" 2> /dev/null
   assert_eq "M-COLLISION — la ligne garde:index-collision n'écarte plus un nom porté par deux arbres : le cas (c) rougit (d1 obtient une voie), le cas (a) reste vert" "$(jq_ "$WORK/c48-m2.json" '(j.C.d1!=="ABSENT")+" "+j.A.wt+" "+j.A.l1')" "true alpha ABSENT"
 else assert_eq "M-COLLISION — construction du mutant" "échec" "ok"; fi
+
+# ======================= tâche 3 : registre clos, jointure du rattachement, A20, A17, cache du scan =======================
+echo "=== C5 — le registre clos reste lu pour le rattachement (D5, P79-D-17) : de bout en bout, dégradation, sortie hostile ==="
+DLREEL="$(cd "$SCRIPTS/../../conductor/scripts" && pwd)/driver-lock.sh"
+mkdir -p "$WORK/fakebin"; printf '#!/bin/sh\nexit 1\n' > "$WORK/fakebin/claude"; chmod +x "$WORK/fakebin/claude" # jamais le vrai `claude` du poste
+SID5="bbbb1111-2222-3333-4444-555566667777"; LAB5="$WORK/lab5"; HOME5="$WORK/home5"
+node "$TESTS/collecte-labo.mjs" lab "$LAB5"; node "$TESTS/collecte-labo.mjs" registre "$HOME5" "$LAB5" "$SID5" "$DLREEL"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB5" --quiet > "$WORK/build5.out" 2>&1 || cat "$WORK/build5.out"
+assert_eq "C5.0 — témoin : le vrai script a archivé wk01 clos (verrou relâché : status ne tient rien) et registry --all le rend en « done »" "$(cd "$LAB5" && bash "$DLREEL" status | grep -c '"present": *false') $(cd "$LAB5" && bash "$DLREEL" registry --all | node -e 'const j=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(j.agents.map(a=>a.agent_id+":"+a.status+":"+a.node).join())')" "1 wk01:done:n-revue"
+cockpit_lancer "$LAB5" HOME="$HOME5" PATH="$WORK/fakebin:$PATH"
+lancer_sse "$VF_PORT" "$VF_JETON" 40000 "$WORK/e5.jsonl"
+attendre_hello "$WORK/e5.jsonl"
+assert_eq "C5.1 — agent consigné puis clos, verrou relâché : hello.who.workers donne à wk01 { rattache, registre, n-revue } et dag égal au fichier du DAG du lab" "$(jq_ "$WORK/e5.jsonl" 'E.filter(e=>e&&e.event==="hello").map(e=>{const w=e.data.who.workers.find(x=>x.id==="wk01");return w&&w.rattachement?[w.rattachement.etat,w.rattachement.source,w.rattachement.noeud,w.rattachement.dag].join("|"):"absent"})[0]')" "rattache|registre|n-revue|.planning/missions/m-revue.dag.json"
+vf_hyg_stop "$SSE_PID"; cockpit_arreter "$VF_PID"
+mkdir -p "$WORK/faux-sr"; printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"locks\\":[]}" ;; orphans) echo "{\\"orphans\\":[]}" ;; esac\n' > "$WORK/faux-sr/driver-lock.sh"; chmod +x "$WORK/faux-sr/driver-lock.sh"
+cat > "$AUX/c5.mjs" <<'JS'
+// c5.mjs <scripts> <tests> <work> <mode> : `absente` (script sans le verbe registry), `hostile` (sorties hostiles, bornes, doublons), `fusion`
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, tests, work, mode] = process.argv, imp = (f) => import(pathToFileURL(f).href), S = (f) => imp(path.join(scripts, f));
+const out = {}, sortir = () => { console.log(JSON.stringify(out)); process.exit(0); };
+let R = null; try { R = await S('vf-cockpit-registre.mjs'); } catch (e) { out.moduleAbsent = String(e.message).slice(0, 120); }
+const L = await imp(path.join(tests, 'collecte-labo.mjs'));
+const bin = path.join(work, 'fakebin'); process.env.PATH = bin + path.delimiter + process.env.PATH;
+if (mode === 'absente') {
+  const lab = path.join(work, 'lab52'), home = path.join(work, 'home52'), sr = path.join(work, 'faux-sr');
+  L.creerLab(lab); L.ecrireRegistre(home, lab, 'cccc1111-2222-3333-4444-555566667777', null, { mandat: 'reprendre le nœud `n-revue` de la mission' });
+  const { collectWho } = await S('vf-cockpit-who.mjs');
+  const w = collectWho(lab, { home, scriptsDir: sr }).workers.find((x) => x.id === 'wk01');
+  out.collecte = w ? [w.rattachement.etat, w.rattachement.source, w.rattachement.noeud].join('|') : 'absent';
+  out.lecture = R ? (await R.lireRegistre({ chemin: path.join(sr, 'driver-lock.sh'), racine: lab })).etat : 'module-absent';
+  sortir();
+}
+if (!R) sortir();
+const SEC = 'ghp_' + 'A1b2C3d4E5f6G7h8I9j0K1l2M3n4';
+const lab = path.join(work, 'lab53'); L.creerLab(lab);
+let n = 0;
+const lire = async (contenu) => { // un script de verrou qui rend `contenu` (déjà sérialisé) pour le verbe registry
+  const d = path.join(work, 'hostile-' + (++n)); fs.mkdirSync(d, { recursive: true });
+  fs.writeFileSync(path.join(d, 'sortie.json'), contenu); fs.writeFileSync(path.join(d, 'driver-lock.sh'), `#!/usr/bin/env bash\ncase "$1" in registry) cat "${path.join(d, 'sortie.json')}" ;; *) echo '{}' ;; esac\n`, { mode: 0o755 });
+  try { return await R.lireRegistre({ chemin: path.join(d, 'driver-lock.sh'), racine: lab }); } catch (e) { return { etat: 'LEVE', agents: new Map(), message: String(e.message).slice(0, 80) }; }
+};
+const ag = (id, o = {}) => ({ agent_id: id, parent: 'p', role: 'vf-coder', node: 'n1', owner: 'm', generation: 'g', dispatched_at: 't', epoch: 5, depth: 2, status: 'done', ...o });
+const ids = (r) => [...r.agents.keys()].sort().join();
+let r = await lire(JSON.stringify({ present: true, agents: [ag('ok1'), ag('../x'), ag('a b'), ag(7), ag(''), ag('x'.repeat(200)), ag('ok2', { status: 'bizarre' })] }));
+out.ids = [r.etat, ids(r)].join('|');
+r = await lire(JSON.stringify({ present: true, agents: [ag('ok1', { node: SEC })] })); const nd = r.agents.get('ok1')?.noeud || '';
+out.secret = [nd.includes('[masqué]'), !nd.includes('A1b2C3d4')].join();
+r = await lire(JSON.stringify({ present: true, agents: Array.from({ length: 6000 }, (_, i) => ({ agent_id: 'a' + i, node: 'n', status: 'done', epoch: i })) }));
+out.plafond = [r.etat, r.agents.size].join('|');
+r = await lire(JSON.stringify({ present: true, registries: [{ agents: [ag('d1', { status: 'running', epoch: 1, node: 'A' }), ag('d2', { epoch: 5, node: 'B' })] }, { agents: [ag('d1', { epoch: 9, node: 'C' }), ag('d2', { epoch: 7, node: 'D' })] }] }));
+out.doublon = [r.agents.get('d1')?.noeud, r.agents.get('d2')?.noeud].join();
+const mauvais = []; for (const c of ['[1,2]', 'null', '"x"', '{pas du json', '']) { const x = await lire(c); mauvais.push(x.etat + ':' + x.agents.size); }
+out.mauvais = mauvais.join();
+r = await lire(JSON.stringify({ present: true, agents: [ag('long1', { node: 'n'.repeat(300), role: 'r'.repeat(300), parent: 'p'.repeat(300) })] })); const g = r.agents.get('long1') || {};
+out.bornes = [g.noeud?.length, g.role?.length, g.parent?.length].join();
+const carte = new Map([['p1', { noeud: 'orphelin', role: 'x', ws: '' }]]);
+R.fusionnerRegistre(carte, new Set(['p1', 'p2', 'p3', 'p4']), { etat: 'lue', agents: new Map([['p1', { noeud: 'ecrase', role: 'r', ws: '', status: 'done', epoch: 1 }], ['p2', { noeud: 'n2', role: 'r', ws: '', status: 'done', epoch: 1 }], ['p3', { noeud: 'n3', role: 'r', ws: '', status: 'running', epoch: 1 }], ['p4', { noeud: '', role: 'r', ws: '', status: 'done', epoch: 1 }], ['p5', { noeud: 'n5', role: 'r', ws: '', status: 'done', epoch: 1 }]]) });
+out.fusion = [...carte].map(([k, v]) => k + ':' + v.noeud).sort().join();
+sortir();
+JS
+node "$AUX/c5.mjs" "$SCRIPTS" "$TESTS" "$WORK" absente > "$WORK/c52.json" 2> "$WORK/c52.err" || cat "$WORK/c52.err"
+assert_eq "C5.2a — script sans le verbe registry (stdout vide) : la collecte réussit et l'agent dont le mandat cite son nœud reste rattaché par mandat" "$(jq_ "$WORK/c52.json" 'j.collecte')" "rattache|mandat|n-revue"
+assert_eq "C5.2b — lireRegistre rend « absente » pour ce script, sans lever" "$(jq_ "$WORK/c52.json" 'j.lecture')" "absente"
+node "$AUX/c5.mjs" "$SCRIPTS" "$TESTS" "$WORK" hostile > "$WORK/c53.json" 2> "$WORK/c53.err" || cat "$WORK/c53.err"
+assert_eq "C5.3a — identifiants hors ID_RE écartés, statut hors liste écarté : seul ok1 est lu" "$(jq_ "$WORK/c53.json" 'j.ids')" "lue|ok1"
+assert_eq "C5.3b — un nœud portant un jeton de forme secrète est masqué" "$(jq_ "$WORK/c53.json" 'j.secret')" "true,true"
+assert_eq "C5.3c — 6 000 agents : 5 000 lus" "$(jq_ "$WORK/c53.json" 'j.plafond')" "lue|5000"
+assert_eq "C5.3d — un même agent dans deux registres : l'entrée running gagne (A), sinon l'epoch le plus grand (D)" "$(jq_ "$WORK/c53.json" 'j.doublon')" "A,D"
+assert_eq "C5.3e — sortie non objet, JSON illisible ou vide : erreur (vide : absente), aucune exception, aucun agent" "$(jq_ "$WORK/c53.json" 'j.mauvais')" "erreur:0,erreur:0,erreur:0,erreur:0,absente:0"
+assert_eq "C5.3f — chaque valeur bornée : nœud 128, rôle 80, parent 128" "$(jq_ "$WORK/c53.json" 'j.bornes')" "128,80,128"
+assert_eq "C5.3g — fusion : un clos présent avec nœud est ajouté, jamais d'écrasement d'une entrée de orphans, ni running, ni sans nœud, ni absent" "$(jq_ "$WORK/c53.json" 'j.fusion')" "p1:orphelin,p2:n2"
+
+echo "=== C6 — la jointure du rattachement aux voies (A8, A14) : propriété générative et mutant ==="
+node "$TESTS/collecte-propriete.mjs" "$SCRIPTS" rattachement ${VF_SEED:+--graine="$VF_SEED"} > "$WORK/c61.out" 2> "$WORK/c61.err" || cat "$WORK/c61.err"
+head -1 "$WORK/c61.out" | sed 's/^/  (rattachement : /; s/$/)/'; tail -1 "$WORK/c61.out" > "$WORK/c61.json"
+assert_eq "C6.1 — rattacherVoies égale l'oracle de la suite sur toutes les forêts aléatoires (aucun écart, quelle que soit la classe)" "$(jq_ "$WORK/c61.json" 'Object.values(j.resultats.ecarts).join()')" "0,0,0,0,0,0"
+assert_eq "C6.couverture — chaque classe est exercée au moins une fois : propre, enfants-uniques, enfants-mixtes, aucun-enfant-rattache, enfants-partiellement-rattaches, session" "$(jq_ "$WORK/c61.json" 'Object.keys(j.couverture||{}).length===6 && Object.values(j.couverture).every(v=>v>0)')" "true"
+cat > "$AUX/c62.mjs" <<'JS'
+// c62.mjs <scripts> <work> : sur le lab du C5.1, une étape de tour dans le fil courant puis le signal@1 du même lab
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, work] = process.argv, imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
+process.env.PATH = path.join(work, 'fakebin') + path.delimiter + process.env.PATH;
+const lab = path.join(work, 'lab5'), home = path.join(work, 'home5'), out = {};
+try {
+  const E = await imp('vf-cockpit-collecte-etapes.mjs'), S = await imp('vf-cockpit-signal.mjs'), memo = E.creerMemoire();
+  E.etapeTour({ racine: lab, sortie: path.join(lab, '.vibeflow', 'cockpit', 'c62'), scriptsDir: scripts, home, memo, maintenant: Date.now() });
+  const rt = memo.rattachements instanceof Map ? memo.rattachements.get('wk01') : undefined, sig = S.collectSignal(lab, { home, scriptsDir: scripts });
+  out.voie = !!memo.index?.voies.some((v) => v.id === 'wk01'); out.rt = rt ? [rt.source, rt.noeud].join('|') : 'absent';
+  out.egal = !!rt && sig.missions.length === 1 && rt.dag === sig.missions[0].fichier; out.fichier = sig.missions[0]?.fichier;
+} catch (e) { out.erreur = String(e.message).slice(0, 160); }
+console.log(JSON.stringify(out));
+JS
+node "$AUX/c62.mjs" "$SCRIPTS" "$WORK" > "$WORK/c62.json" 2> "$WORK/c62.err" || cat "$WORK/c62.err"
+assert_eq "C6.2 — sur le lab du C5.1 : la voie de wk01 existe, rattachement { registre, n-revue }, et son dag vaut exactement signal.missions[].fichier du même lab (même réduction à 200)" "$(jq_ "$WORK/c62.json" '[j.voie,j.rt,j.egal].join(" ")')" "true registre|n-revue true"
+if mutant M-ENFANTS vf-cockpit-voies-rattachement.mjs rattachement-enfants 'plans.size === 1' 'plans.size >= 1'; then
+  node "$TESTS/collecte-propriete.mjs" "$MUT_SCRIPTS" rattachement --graine="$(head -1 "$WORK/c61.out" | sed 's/graine=//')" 2> /dev/null | tail -1 > "$WORK/c61-m.json"
+  assert_eq "M-ENFANTS — la ligne garde:rattachement-enfants prend le premier plan sans exiger l'unanimité : C6.1 rougit sur la classe enfants-mixtes seule" "$(jq_ "$WORK/c61-m.json" 'Object.entries(j.resultats.ecarts).filter(([k,v])=>v>0).map(([k])=>k).join()')" "enfants-mixtes"
+else assert_eq "M-ENFANTS — construction du mutant" "échec" "ok"; fi
+
+echo "=== C7 — A20 : motif de fin d'une session (finMotif) et agents sortis pour silence (sortisSilence) ==="
+cat > "$AUX/c7.mjs" <<'JS'
+// c7.mjs <scripts> <tests> <work> <mode> : `motif` (fausse commande `claude agents --json`), `silence` (cinq sous-agents de silences connus)
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, tests, work, mode] = process.argv, imp = (f) => import(pathToFileURL(f).href), faux = path.join(work, 'faux');
+const L = await imp(path.join(tests, 'collecte-labo.mjs')), W = await imp(path.join(scripts, 'vf-cockpit-who.mjs')), O = await imp(path.join(scripts, 'vf-cockpit-etat-officiel.mjs'));
+const bin = path.join(work, 'bin7'); fs.mkdirSync(bin, { recursive: true });
+fs.writeFileSync(path.join(bin, 'claude'), '#!/bin/sh\ncat "$(dirname "$0")/sortie.json"\n', { mode: 0o755 });
+process.env.PATH = bin + path.delimiter + process.env.PATH;
+const out = {}, lab = path.join(work, 'lab7-' + mode), home = path.join(work, 'home7-' + mode); L.creerLab(lab);
+if (mode === 'motif') {
+  const ids = { fail: 'fm-fail', stop: 'fm-stop', done: 'fm-done', live: 'fm-live' };
+  for (const id of Object.values(ids)) L.ecrireSession(home, lab, id);
+  fs.writeFileSync(path.join(bin, 'sortie.json'), JSON.stringify([{ sessionId: ids.fail, state: 'failed' }, { sessionId: ids.stop, state: 'stopped' }, { sessionId: ids.done, state: 'done' }, { sessionId: ids.live, state: 'working' }]));
+  await O.rafraichir({ home, cwd: lab });
+  const ws = W.collectWho(lab, { home, scriptsDir: faux, officiel: true }).workers.filter((w) => w.kind === 'session');
+  out.sessions = Object.values(ids).map((id) => { const w = ws.find((x) => x.id === id); return w ? `${id}:${w.etat}:${w.finMotif ?? ''}` : id + ':absent'; }).join(' ');
+} else {
+  L.ecrireSilence(home, lab, 'dddd1111-2222-3333-4444-555566667777');
+  const who = W.collectWho(lab, { home, scriptsDir: faux });
+  out.sortis = who.sortisSilence; out.ids = who.workers.filter((w) => w.kind === 'subagent').map((w) => w.id).sort().join();
+}
+console.log(JSON.stringify(out));
+JS
+node "$AUX/c7.mjs" "$SCRIPTS" "$TESTS" "$WORK" motif > "$WORK/c71.json" 2> "$WORK/c71.err" || cat "$WORK/c71.err"
+assert_eq "C7.1 — failed, stopped, done, working : finMotif echec, arret, aucun, aucun ; l'état reste termine (la session vivante n'en porte pas)" "$(jq_ "$WORK/c71.json" 'j.sessions')" "fm-fail:termine:echec fm-stop:termine:arret fm-done:termine: fm-live:actif:"
+node "$AUX/c7.mjs" "$SCRIPTS" "$TESTS" "$WORK" silence > "$WORK/c72.json" 2> "$WORK/c72.err" || cat "$WORK/c72.err"
+assert_eq "C7.2 — sortisSilence vaut 1 (seul le muet de 2 000 s compte : 1 700 s, 90 s, le fini muet et l'agent hors de la fenêtre de 24 h ne comptent pas) ; les trois agents retenus restent dans who" "$(jq_ "$WORK/c72.json" 'j.sortis+" "+j.ids')" "1 sil-b,sil-c,sil-d"
+if mutant M-SILENCE vf-cockpit-equipe.mjs equipe-silence 'c.sAge >= SILENCE_MAX_S' 'c.sAge >= 0'; then
+  node "$AUX/c7.mjs" "$MUT_SCRIPTS" "$TESTS" "$WORK" silence > "$WORK/c72-m1.json" 2> /dev/null
+  assert_eq "M-SILENCE — la ligne garde:equipe-silence compte aussi les récents : C7.2 rougit (obtenu 2 sortis)" "$(jq_ "$WORK/c72-m1.json" 'j.sortis')" "2"
+else assert_eq "M-SILENCE — construction du mutant" "échec" "ok"; fi
+if mutant M-SILENCE-FENETRE vf-cockpit-equipe.mjs equipe-fenetre 'sAge >= fenetre' 'false'; then
+  node "$AUX/c7.mjs" "$MUT_SCRIPTS" "$TESTS" "$WORK" silence > "$WORK/c72-m2.json" 2> /dev/null
+  assert_eq "M-SILENCE-FENETRE — la ligne garde:equipe-fenetre ne retient plus la fenêtre : C7.2 rougit pour la seule raison de l'agent hors fenêtre (obtenu 2 sortis, mêmes agents retenus)" "$(jq_ "$WORK/c72-m2.json" 'j.sortis+" "+j.ids')" "2 sil-b,sil-c,sil-d"
+else assert_eq "M-SILENCE-FENETRE — construction du mutant" "échec" "ok"; fi
+assert_eq "C7.3 — le contrat déclare sortisSilence (facultatif de cockpit-who@2), finMotif (facultatif de travailleur), motifsFin et vueAgents.motifs" "$(node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));const w=j.schemas["vibeflow/cockpit-who@2"];console.log([(w.optionnels||[]).includes("sortisSilence"),w.travailleur.optionnels.includes("finMotif"),JSON.stringify(w.travailleur.motifsFin),JSON.stringify(j.claudeCode.vueAgents.motifs)].join(" "))' "$SCRIPTS/vf-cockpit-interface.json")" 'true true ["echec","arret"] {"failed":"echec","stopped":"arret"}'
+
+echo "=== C8 — A17 : la signature du who couvre tout champ ajouté, moins la liste nommée des champs volatils ==="
+node "$TESTS/collecte-propriete.mjs" "$SCRIPTS" signature > "$WORK/c8.out" 2> "$WORK/c8.err" || cat "$WORK/c8.err"
+head -1 "$WORK/c8.out" | sed 's/^/  (signature : /; s/$/)/'; tail -1 "$WORK/c8.out" > "$WORK/c8.json"
+assert_eq "C8.1 — la liste des champs volatils est exactement at, ageS, dureeS, lastAt" "$(jq_ "$WORK/c8.json" 'j.resultats.liste')" "true"
+assert_eq "C8.2 — chaque clé hors liste (premier niveau et travailleur de plus de vingt clés) change la signature, chaque clé de la liste non" "$(jq_ "$WORK/c8.json" '[j.resultats.hors.length,j.resultats.dedans.length,j.resultats.nTrav>=20].join()')" "0,0,true"
+assert_eq "C8.3 — l'ordre des clés est sans effet ; un champ inconnu ajouté à un travailleur change la signature sans retouche ; un champ volatil à toute profondeur n'a pas d'effet" "$(jq_ "$WORK/c8.json" '[j.resultats.ordre,j.resultats.ajoute,j.resultats.profondeur].join()')" "true,true,true"
+if mutant M-VOLATILS vf-cockpit-who-signature.mjs who-volatils "'lastAt']" "'lastAt', 'titre']"; then
+  node "$TESTS/collecte-propriete.mjs" "$MUT_SCRIPTS" signature 2> /dev/null | tail -1 > "$WORK/c8-m.json"
+  assert_eq "M-VOLATILS — la ligne garde:who-volatils ajoute titre à la liste : C8.1 et C8.2 rougissent (le renommage d'un travailleur ne change plus la signature)" "$(jq_ "$WORK/c8-m.json" '[j.resultats.liste,j.resultats.hors.join("+")].join(" ")')" "false workers[0].titre"
+else assert_eq "M-VOLATILS — construction du mutant" "échec" "ok"; fi
+
+echo "=== C11 — le cache du scan (AB1, P79-D-21) : un lab inchangé ne relance pas le scan ==="
+cat > "$AUX/journaliser-scan.mjs" <<'JS'
+// journaliser-scan.mjs <scan.mjs de la copie> <journal> : le scan de CETTE copie consigne chaque lancement (une ligne) ; le journal est un chemin posé à l'écriture
+import fs from 'node:fs';
+const [, , f, journal] = process.argv, L = fs.readFileSync(f, 'utf8').split('\n'), i = L[0].startsWith('#!') ? 1 : 0;
+L.splice(i, 0, `import __fs from 'node:fs'; __fs.appendFileSync(${JSON.stringify(journal)}, 'scan\\n');`);
+fs.writeFileSync(f, L.join('\n'));
+JS
+c11_prepare() { C11_MODULE="$1"; C11_JOURNAL="$2"; : > "$C11_JOURNAL"; node "$AUX/journaliser-scan.mjs" "$C11_MODULE/skills/cockpit-moteur/scripts/scan.mjs" "$C11_JOURNAL"; }
+c11_assemble() { node "$C11_MODULE/scripts/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/c11-build.out" 2>&1 || { echo "assemblage KO"; cat "$WORK/c11-build.out"; }; }
+c11_lancements() { wc -l < "$C11_JOURNAL" | tr -d ' '; }
+c11_serie() { # c11_serie <nom> -> « C11.1 C11.2 C11.3 C11.4a C11.4b C11.5a C11.5b » (journal après chaque geste)
+  local lab="$WORK/lab11-$1" r=""
+  node "$TESTS/collecte-labo.mjs" lab "$lab"; c11_assemble "$lab"; r="$(c11_lancements)"
+  c11_assemble "$lab"; r="$r $(c11_lancements)"
+  node -e 'const fs=require("fs");const f=process.argv[1];const t=fs.readFileSync(f,"utf8");fs.writeFileSync(f,t.replace("REQ-01","REQ-0Z"));const d=new Date(Date.now()+5000);fs.utimesSync(f,d,d)' "$lab/.planning/REQUIREMENTS.md"
+  c11_assemble "$lab"; r="$r $(c11_lancements)"
+  echo "ajout" > "$lab/ajout.txt"; c11_assemble "$lab"; r="$r $(c11_lancements)"
+  rm -f "$lab/ajout.txt"; c11_assemble "$lab"; r="$r $(c11_lancements)"
+  for i in $(seq 1 257); do printf '[filter "f%s"]\n\tclean = cat\n' "$i"; done >> "$lab/.git/config"; c11_assemble "$lab"; r="$r $(c11_lancements)"
+  echo "// un octet de plus" >> "$C11_MODULE/skills/cockpit-moteur/scripts/scan.mjs"; c11_assemble "$lab"; r="$r $(c11_lancements)"
+  echo "$r"
+}
+c11_prepare "$(cockpit_module_copie "$WORK/c11-module")" "$WORK/scan-journal"
+C11="$(c11_serie ok)"
+assert_eq "C11.1 — le premier assemblage lance le scan (journal à 1)" "$(echo "$C11" | cut -d' ' -f1)" "1"
+assert_eq "C11.2 — un second assemblage sans rien changer ne relance pas le scan (journal toujours à 1)" "$(echo "$C11" | cut -d' ' -f2)" "1"
+assert_eq "C11.3 — l'édition d'un fichier du lab à taille égale (contenu et date changés) relance le scan (2)" "$(echo "$C11" | cut -d' ' -f3)" "2"
+assert_eq "C11.4 — un fichier ajouté, puis retiré : le scan est relancé chaque fois (3 puis 4)" "$(echo "$C11" | cut -d' ' -f4-5)" "3 4"
+assert_eq "C11.5 — l'état de l'environnement git (plus de filtres que la borne) puis le code du moteur (un octet) relancent le scan (5 puis 6)" "$(echo "$C11" | cut -d' ' -f6-7)" "5 6"
+if mutant M-CACHE vf-cockpit-code-cache.mjs scan-cache-fichiers '!e.isDirectory()' 'e.isDirectory()'; then
+  c11_prepare "$(cockpit_module_copie "$WORK/c11-module-m")" "$WORK/scan-journal-m"
+  # le mutant signe les dossiers seuls : le module copié est le module muté (le scan de CETTE copie journalise)
+  cp "$MUT_SCRIPTS/vf-cockpit-code-cache.mjs" "$C11_MODULE/scripts/vf-cockpit-code-cache.mjs"
+  CM="$(c11_serie mut)"
+  assert_eq "M-CACHE — la ligne garde:scan-cache-fichiers signe les dossiers seuls : C11.3 rougit (l'édition de contenu sans changement de dossier ne relance pas : 1 au lieu de 2), le premier assemblage reste à 1" "$(echo "$CM" | cut -d' ' -f1,3)" "1 1"
+else assert_eq "M-CACHE — construction du mutant" "échec" "ok"; fi
 
 vf_hyg_assert
 echo "== Résultats : $PASS PASS / $FAIL FAIL =="
