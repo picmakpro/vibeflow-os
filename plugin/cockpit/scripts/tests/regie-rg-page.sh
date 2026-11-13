@@ -6,7 +6,7 @@
 # Fixtures : noms et identifiants inventés. Les formes simulées de VF_ETAT, VF_COQUILLE et VF_SURCOUCHES sont dans vm-regie-page.mjs (à aligner sur le code livré).
 # Contrat du DOM attendu de la régie (écrit ici AVANT le code) : section#vf-equipe[role=main] > #vf-equipe-entete (h1, .vf-rg-sous, bascule role=tablist) puis .vf-vue[data-vf-vue] ;
 #   section.vf-rg-sec[data-vf-section] > h2 (tabindex -1) ; li.vf-rg-lig[data-vf-cle][data-vf-agent][data-vf-noeud][data-vf-etat] ; .vf-rg-nom (le nom, une fois) ; button[aria-expanded] (le nom, déplie) ;
-#   .vf-rg-det (détail en flux) ; .vf-rg-dur ; .vf-rg-act button.btn (actions) ; .vf-rg-note (messages) ; recherche : input#search du moteur.
+#   .vf-rg-plus (détail en flux) ; .vf-rg-dur ; .vf-rg-act button.btn (actions) ; .vf-rg-note (messages) ; recherche : input#search du moteur.
 
 PG_SID='s0000000-aaaa-bbbb-cccc-111111111111'; PG_A='a1b2c3d4e5f6'; PG_F='f0f0f0f0f0f0'; PG_B='b9b9b9b9b9b9'
 PG_WHO='{"workers":[
@@ -74,7 +74,7 @@ rg_RG2_page() {
 
 rg_RG9_page() {
   local x='x0000000-0000-0000-0000-000000000009' w1 w2 w3 o
-  w1='{"workers":[{"kind":"session","id":"'"$x"'","etat":"actif","titre":"Atelier X","tree":".","ageS":10,"dureeS":100}]}'
+  w1='{"workers":[{"kind":"session","id":"'"$x"'","etat":"actif","titre":"Atelier X","tree":".","ageS":10,"dureeS":40}]}'
   w2='{"workers":[{"kind":"session","id":"'"$x"'","etat":"attend","titre":"Atelier X","tree":".","ageS":20,"dureeS":100,"retient":{"n":2,"portee":"noeuds"}}]}'
   w3='{"workers":[{"kind":"session","id":"'"$x"'","etat":"au-repos","titre":"Atelier X","tree":".","ageS":30,"dureeS":100}]}'
   local btn='li[data-vf-cle=\"au-travail:'"$x"'\"] button[aria-expanded]'
@@ -118,14 +118,14 @@ rg_RG15_page() {
   pg_ok "RG15.1 — avec la seule vue regie : aucune bascule" "$(pg_sc '' "$a")" 'j.out.ts' "0"
   o="$(pg_sc '' '['"$v"',{"nom":"ts","obs":{"mode":"compte","sel":"#vf-equipe-entete [role=\"tablist\"]"}},{"nom":"lib","obs":{"mode":"attr","sel":"#vf-equipe-entete [role=\"tablist\"]","attr":"aria-label"}},{"nom":"tabs","obs":{"mode":"textes","sel":"[role=\"tab\"]"}},{"clic":"[role=\"tab\"]","indice":1},{"nom":"v1","obs":{"mode":"compte","sel":".vf-vue[data-vf-vue=\"frise\"]"}},{"nom":"e1","obs":{}},{"clic":"[role=\"tab\"]","indice":0},{"nom":"e2","obs":{}},{"appel":"sessionStorage.getItem","args":["vibeflow-cockpit:equipe-vue"],"nom":"cle"}]')"
   pg_ok "RG15.1 et RG15.8 — dès deux vues : tablist « Vue de l'équipe » à deux onglets (Régie, Frise) ; monter une fois au choix, demonter au retour ; position gardée par l'id de la vue" "$o" \
-    'j.out.ts + "|" + j.out.lib.join() + "|" + j.out.tabs.join() + "|" + j.out.v1 + "|" + j.out.e1.vues.join() + "|" + j.out.e2.vues.join() + "|" + j.out.cle' "1|Vue de l'équipe|Régie,Frise|1|monter:frise|monter:frise,demonter:frise|frise"
+    'j.out.ts + "|" + j.out.lib.join() + "|" + j.out.tabs.join() + "|" + j.out.v1 + "|" + j.out.e1.vues.join() + "|" + j.out.e2.vues.join() + "|" + j.out.cle' "1|Vue de l'équipe|Régie,Frise|1|monter:frise|monter:frise,demonter:frise|regie"
   o="$(pg_sc "$cle" '['"$v"',{"nom":"sel","obs":{"mode":"attr","sel":"[role=\"tab\"]","attr":"aria-selected"}}]')"
   pg_ok "RG15.8 — la clé sessionStorage restaure la vue (Frise sélectionnée)" "$o" 'j.out.sel.join()' "false,true"
   o="$(pg_sc '"sessionStorage":{"vibeflow-cockpit:equipe-vue":"zzz"}' '['"$v"',{"nom":"sel","obs":{"mode":"attr","sel":"[role=\"tab\"]","attr":"aria-selected"}}]')"
   pg_ok "RG15.8 — valeur inconnue ou absente : « Régie »" "$o" 'j.out.sel.join()' "true,false"
   o="$(pg_sc '' '[{"nom":"ag","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-agent"}},{"nom":"no","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-noeud"}},{"nom":"et","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-etat"}},{"nom":"vn","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-noeud"}},{"nom":"ve","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-etat"}},{"nom":"va","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-agent"}}]')"
   pg_ok "RG15.2 — data-vf-agent, data-vf-noeud et data-vf-etat sur chaque ligne ; valeurs d'une ligne rattachée" "$o" 'j.out.ag + "|" + j.out.no + "|" + j.out.et + "|" + j.out.va + "|" + j.out.vn + "|" + j.out.ve' "0|0|0|$PG_A|N2|actif"
-  o="$(pg_sc '' '[{"annuler":[]},{"clic":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]"},{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]","attr":"aria-expanded"}},{"nom":"det","obs":{"mode":"textes","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-det"}},{"nom":"lien","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-det a","attr":"href"}},{"touche":"Escape","sur":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]","nom":"esc"},{"nom":"ex2","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]","attr":"aria-expanded"}},{"nom":"f","obs":{"mode":"focus"}}]')"
+  o="$(pg_sc '' '[{"annuler":[]},{"clic":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]"},{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]","attr":"aria-expanded"}},{"nom":"det","obs":{"mode":"textes","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-plus"}},{"nom":"lien","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-plus a","attr":"href"}},{"touche":"Escape","sur":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]","nom":"esc"},{"nom":"ex2","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]","attr":"aria-expanded"}},{"nom":"f","obs":{"mode":"focus"}}]')"
   pg_ok "RG15.3 — le nom, non annulé : vf-agent:ouvrir (nom) puis détail en flux (identifiant court, branche, arbre, lien Nœud) avec aria-expanded ; Échap replie et rend le focus au bouton" "$o" \
     'j.out.e.evts[0].declencheur + "|" + j.out.ex.join() + "|" + ["s0000000","feat/x","main","Nœud"].map((s) => j.out.det.join(" ").includes(s)).join() + "|" + j.out.lien.join().includes("project.html#r=") + "|" + j.out.ex2.join() + "|" + j.out.f.tag + ":" + j.out.f.cle' \
     "nom|true|true,true,true,true|true|false|BUTTON:au-travail:$PG_SID"
@@ -142,12 +142,13 @@ rg_RG15_page() {
 }
 
 rg15_annule() {
+  local av='li[data-vf-cle=\"a-vous:'"$PG_SID"'\"] button[aria-expanded]'
   local o ouv='li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]' ar='{"appel":"__vfRegie.arriver","args":["n:se-'"$PG_SID"'"]}'
-  o="$(pg_sc '' '[{"annuler":["nom","ancre","rapport"]},{"focus":"#search"},{"clic":"'"$ouv"'"},{"clic":"'"$PG_BTN_RAPPORT"'"},'"$ar"',{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"'"$ouv"'","attr":"aria-expanded"}},{"nom":"det","obs":{"mode":"compte","sel":".vf-rg-det"}},{"nom":"f","obs":{"mode":"focus"}}]')"
+  o="$(pg_sc '' '[{"annuler":["nom","ancre","rapport"]},{"focus":"#search"},{"clic":"'"$ouv"'"},{"clic":"'"$PG_BTN_RAPPORT"'"},'"$ar"',{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"'"$ouv"'","attr":"aria-expanded"}},{"nom":"det","obs":{"mode":"compte","sel":".vf-rg-plus"}},{"nom":"f","obs":{"mode":"focus"}}]')"
   pg_ok "RG15.6 — vf-agent:ouvrir annulé (nom, rapport, ancre) : détail dans son état (replié), aucun lecteur, aucune requête, aucun vf-agent:lu, aucun défilement" "$o" \
     'j.out.e.evts.map((x) => x.type + ":" + x.declencheur).join() + "|" + j.out.ex.join() + "|" + j.out.det + "|" + j.out.e.fetchs.length + "|" + j.out.e.panneau.length + "|" + j.out.e.defilements.length' \
     "vf-agent:ouvrir:nom,vf-agent:ouvrir:rapport,vf-agent:ouvrir:ancre|false|0|0|0|0"
-  o="$(pg_sc '' '[{"annuler":[]},'"$ar"',{"nom":"ex","obs":{"mode":"attr","sel":"'"$ouv"'","attr":"aria-expanded"}},{"nom":"e","obs":{}}]')"
+  o="$(pg_sc '' '[{"annuler":[]},'"$ar"',{"nom":"ex","obs":{"mode":"attr","sel":"'"$av"'","attr":"aria-expanded"}},{"nom":"e","obs":{}}]')"
   pg_ok "RG15.6 — non annulés : « ancre » déplie la ligne (défile et prend le focus)" "$o" 'j.out.ex.join() + "|" + j.out.e.evts.map((x) => x.declencheur).join()' "true|ancre"
 }
 
@@ -193,7 +194,7 @@ rg15_echap() {
 
 rg_RG16_page() {
   local o rows='li[data-vf-cle] .vf-rg-nom'
-  o="$(pg_sc '' '[{"nom":"tous","obs":{"mode":"visibles","sel":"'"$rows"'"}},{"saisie":"#search","valeur":"mana"},{"nom":"m","obs":{"mode":"visibles","sel":"'"$rows"'"}},{"nom":"sm","obs":{"mode":"visiblesAttr","sel":"section.vf-rg-sec","attr":"data-vf-section"}},{"touche":"Enter","sur":"#search"},{"nom":"f","obs":{"mode":"focus"}},{"saisie":"#search","valeur":"zzzz"},{"nom":"z","obs":{"mode":"visibles","sel":"'"$rows"'"}},{"nom":"nt","obs":{"mode":"textes","sel":".vf-rg-note"}},{"saisie":"#search","valeur":""},{"nom":"v","obs":{"mode":"visibles","sel":"'"$rows"'"}},{"nom":"sv","obs":{"mode":"visiblesAttr","sel":"section.vf-rg-sec","attr":"data-vf-section"}}]')"
+  o="$(pg_sc '' '[{"nom":"tous","obs":{"mode":"visibles","sel":"'"$rows"'"}},{"saisie":"#search","valeur":"mana"},{"nom":"m","obs":{"mode":"visibles","sel":"'"$rows"'"}},{"nom":"sm","obs":{"mode":"visiblesAttr","sel":"section.vf-rg-sec","attr":"data-vf-section"}},{"touche":"Enter","sur":"#search"},{"nom":"f","obs":{"mode":"focus"}},{"saisie":"#search","valeur":"zzzz"},{"nom":"z","obs":{"mode":"visibles","sel":"'"$rows"'"}},{"nom":"nt","obs":{"mode":"visibles","sel":".vf-rg-note"}},{"saisie":"#search","valeur":""},{"nom":"v","obs":{"mode":"visibles","sel":"'"$rows"'"}},{"nom":"sv","obs":{"mode":"visiblesAttr","sel":"section.vf-rg-sec","attr":"data-vf-section"}}]')"
   pg_ok "RG16.1 — « mana » : seules les lignes dont le nom ou le rôle visible contient « mana » restent (la ligne du vf-dev-manager, pas les autres) ; sections sans ligne masquées" "$o" \
     'j.out.m.includes("vf-dev-manager") + "|" + j.out.m.includes("Écrire le rendu") + "|" + j.out.m.includes("Relire le plan") + "|" + j.out.sm.includes("au-travail") + "|" + j.out.sm.includes("a-relire") + "|" + j.out.sm.includes("au-repos")' "true|false|false|true|false|false"
   pg_ok "RG16.1 — Entrée dans la recherche : le focus va à la première ligne retenue" "$o" 'j.out.f.cle' "au-travail:$PG_A"

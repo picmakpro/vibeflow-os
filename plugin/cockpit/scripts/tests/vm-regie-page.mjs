@@ -16,7 +16,7 @@ for (const f of FICHIERS) if (!fs.existsSync(path.join(ui, f))) dire({ erreur: '
 const JETON = 'tok-vm', horloge = { now: 1_700_000_000_000 };
 const dom = creerDom(horloge), { window: W, document: D, Evt } = dom;
 W.window = W; W.self = W;
-const etat = { who: null, lock: null }, abos = new Map(), journal = { fetchs: [], evts: [], surcouches: [], vues: [], toasts: [], stockage: [], reveals: [] };
+const etat = { who: null, lock: null, connexion: 'ouvert' }, abos = new Map(), journal = { fetchs: [], evts: [], surcouches: [], vues: [], toasts: [], stockage: [], reveals: [] };
 const compteurs = { ouverteLue: 0, panneauLu: 0 };
 const el = (tag, id, parent = D.body) => { const e = D.createElement(tag); if (id) e.id = id; parent.appendChild(e); return e; };
 const stage = el('div', 'stage'), zoom = el('div', 'zoom'), resultats = el('div', 'results'), panneau = el('div', 'panel'); el('div', 'hdr-ext'); const recherche = el('input', 'search');
@@ -35,11 +35,12 @@ const tick = () => new Promise((r) => setImmediate(r));
 const fetchF = async (url, opts = {}) => { journal.fetchs.push({ url: String(url), entetes: Object.values((opts && opts.headers) || {}) }); return { ok: true, status: 200, json: async () => S.transcript || { fil: [{ genre: 'message', texte: 'texte du transcript factice' }] } }; };
 Object.assign(W, { Floorplan: SC, FLOORPLAN_SERVER: S.serveur === false ? undefined : { token: JETON }, location: loc, sessionStorage: session, localStorage: local, fetch: fetchF,
   EventSource: class { addEventListener() {} close() {} } });
-// VF_ETAT simulé (C4, A13) : clés who, etat (verrous projetés), connexion, git ; abonner rend le désabonnement ; jeton ; lireJson
+// VF_ETAT simulé d'après ui/70-vf-etat.js (79-17) : lire(cle) (who = l'objet, lock = { seq, verrous: { liste } }, connexion = 'ouvert'|'perdu'|'reprise'), abonner(cle, rappel) rend
+// le désabonnement, abonnes(), jeton(), lireJson(chemin) (GET avec l'en-tête x-vf-cockpit-token)
 const notifier = (cle) => { for (const f of [...(abos.get(cle) || [])]) f(); };
-if (S.source === 'etat') W.VF_ETAT = { lire: (k) => (k === 'who' ? etat.who : k === 'etat' ? { verrous: { liste: etat.lock || [] } } : k === 'connexion' ? { connecte: true } : null),
-  abonner: (k, f) => { if (!abos.has(k)) abos.set(k, new Set()); abos.get(k).add(f); return () => abos.get(k).delete(f); }, jeton: () => JETON,
-  lireJson: async (url) => { const r = await fetchF(url, { headers: { 'x-floorplan-token': JETON } }); return r.json(); } };
+if (S.source === 'etat') W.VF_ETAT = { lire: (k) => (k === 'who' ? etat.who : k === 'lock' ? { seq: 1, verrous: { etat: 'lue', plat: false, liste: etat.lock || [] } } : k === 'connexion' ? etat.connexion : null),
+  abonner: (k, f) => { if (!abos.has(k)) abos.set(k, new Set()); abos.get(k).add(f); return () => abos.get(k).delete(f); }, jeton: () => JETON, abonnes: () => ({}),
+  lireJson: async (url) => { const r = await fetchF(url, { headers: { 'x-vf-cockpit-token': JETON } }); return r.json(); } };
 etat.who = S.who || null; etat.lock = S.lock || null;
 if (S.source !== 'etat') W.__vfLive = { who: etat.who, whoAt: horloge.now, lock: etat.lock, connected: true };
 if (S.onglets) W.VF_ONGLETS = { aller() {} };
@@ -85,9 +86,9 @@ const obs = (o) => {
     case 'trouve': return { textes: n.reduce((c, x) => c + x.querySelectorAll('*').concat([x]).filter((y) => y.childNodes.some((k) => k.nodeType === 3 && k.data.includes(o.contient))).length, 0),
       attrs: n.reduce((c, x) => c + x.querySelectorAll('*').concat([x]).reduce((d, y) => d + y.attributs.filter(([, v]) => v.includes(o.contient)).length, 0), 0) };
     case 'classes': return n.map((x) => x.className); case 'sansAttr': return n.filter((x) => !x.hasAttribute(o.attr)).length;
-    default: return { ...journal, ...compteurs, ecouteurs: dom.ecouteurs(), types: dom.types(), minuteries: dom.minuteries(), violations: dom.violations, defilements: dom.defilements.map((d) => (d.el.closest('li[data-vf-cle]') || { dataset: {} }).dataset.vfCle || d.el.localName),
+    default: return JSON.parse(JSON.stringify({ ...journal, ...compteurs, ecouteurs: dom.ecouteurs(), types: dom.types(), minuteries: dom.minuteries(), violations: dom.violations, defilements: dom.defilements.map((d) => (d.el.closest('li[data-vf-cle]') || { dataset: {} }).dataset.vfCle || d.el.localName),
       appels: dom.appels, ecritures: dom.ecritures(), corps: D.body.className, abonnes: Object.fromEntries([...abos].map(([k, v]) => [k, v.size])), panneau: panneau.textContent, recherche: recherche.value,
-      monte: W.__vfRegie && W.__vfRegie.monte ? W.__vfRegie.monte() : null, fiche: ficheFocus() };
+      monte: W.__vfRegie && W.__vfRegie.monte ? W.__vfRegie.monte() : null, fiche: ficheFocus() }));
   }
 };
 const sortie = {};
@@ -97,16 +98,17 @@ try {
     let r;
     try {
       if (e.poser) { etat.who = e.poser.who; if (e.poser.lock !== undefined) etat.lock = e.poser.lock;
-        if (S.source === 'etat') { notifier('who'); notifier('etat'); } else { W.__vfLive.who = etat.who; W.__vfLive.whoAt = horloge.now; W.__vfLive.lock = etat.lock; D.dispatchEvent(new Evt('vf-who')); } }
+        if (S.source === 'etat') { notifier('who'); notifier('lock'); } else { W.__vfLive.who = etat.who; W.__vfLive.whoAt = horloge.now; W.__vfLive.lock = etat.lock; D.dispatchEvent(new Evt('vf-who')); } }
+      else if (e.conn) { if (S.source === 'etat') { etat.connexion = e.conn; notifier('connexion'); } else { W.__vfLive.connected = e.conn === 'ouvert'; D.dispatchEvent(new Evt('vf-who')); } }
       else if (e.avancer !== undefined) dom.avancer(e.avancer);
       else if (e.clic) q(e.clic, e.indice || 0).click();
       else if (e.focus) q(e.focus, e.indice || 0).focus();
       else if (e.touche) { const cible = e.sur ? q(e.sur) : D.activeElement; const ev = new Evt('keydown', { bubbles: true, cancelable: true, key: e.touche }); if (e.prevenu) ev.preventDefault(); if (e.sur && !e.prevenu) cible.focus(); cible.dispatchEvent(ev); r = { prevenu: ev.defaultPrevented }; }
       else if (e.saisie) { const c = q(e.saisie); c.value = e.valeur; c.dispatchEvent(new Evt('input', { bubbles: true })); }
       else if (e.evenement) { const ev = new Evt(e.evenement, { bubbles: true, cancelable: !!e.annulable, detail: e.detail }); (e.sur === 'window' ? W : D).dispatchEvent(ev); r = { prevenu: ev.defaultPrevented }; }
+      else if (e.vfOnglet) { if (e.hash !== undefined) loc.hash = e.hash; D.dispatchEvent(new Evt('vf:onglet', { detail: { onglet: e.vfOnglet } })); }
       else if (e.hash !== undefined) { loc.hash = e.hash; W.dispatchEvent(new Evt('hashchange')); }
       else if (e.onglet) { affiche = e.onglet; SC.graph.meta.vfTab = e.onglet; D.body.className = D.body.className.replace(/vf-tab-\w+/, 'vf-tab-' + e.onglet); for (const i of ins.slice()) nettoyer(i); for (const i of ins.slice()) appeler(i); }
-      else if (e.vfOnglet) { if (e.hash !== undefined) loc.hash = e.hash; D.dispatchEvent(new Evt('vf:onglet', { detail: { onglet: e.vfOnglet } })); }
       else if (e.declarerVue) { const v = e.declarerVue; W.__vfEquipeVues.declarer({ id: v.id, libelle: v.libelle, monter(c) { journal.vues.push('monter:' + v.id); c.textContent = 'vue ' + v.id; }, demonter() { journal.vues.push('demonter:' + v.id); } }); }
       else if (e.annuler) annulees = new Set(e.annuler);
       else if (e.marquer) for (const x of D.querySelectorAll(e.marquer)) x._m = true;
