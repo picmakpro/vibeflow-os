@@ -42,6 +42,7 @@ Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 10
 - Exécution : segments b et c de 79 et 80, puis 73, 74, 75, 76, 77 ; 81 reportée (`AUDC-Q3` « plus tard », 2026-11-11).
 - Phase 73 : 73-01 à 73-04 exécutés (branche `feat/phase-73-gouvernance-regie`) ; 73-05 à 73-11 attendent 79-16, 79-17 et 79-22.
 - Phase 76 : 76-01 à 76-05 faits (2026-11-13).
+- Phase 75 : 75-01 à 75-06 exécutés (2026-11-13), 75-07 à 75-10 restent.
 - Dettes nommées : UIFN-10 et LANC-12 (voir Pending) ; étapes 4 et 5 de la recette de la 68 reportées (P68-D-35).
 
 ## Accumulated Context
