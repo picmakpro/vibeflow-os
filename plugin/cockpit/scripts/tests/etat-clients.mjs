@@ -142,7 +142,7 @@ if (mode === 'sse') {
   const corps = () => {
     const o = JSON.parse(JSON.stringify(M)); const now = Date.now();
     o.at = new Date(now).toISOString(); o.signal = o.signal || {}; o.signal.at = new Date(m === 'perime' ? now - 600000 : now).toISOString(); o.signal.projet = MARQUEUR;
-    if (m === 'autre-racine') o.signal.root = path.join(String(o.signal.root), 'autre-lab');
+    if (m === 'autre-racine') o.signal.root = path.dirname(String(o.signal.root)); // un dossier qui existe : seule la différence de racine est la cause du rejet
     if (m === 'schema') o.schema = 'vibeflow/cockpit-state@0';
     if (m === 'incomplet') delete o.signal.equipe;
     if (m === 'interdit') o.signal.extra = { a: { b: { fil: 'x' } } };

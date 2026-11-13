@@ -38,7 +38,8 @@ esac
 } else if (mode === 'emetteur') {
   const [scripts, lab, faux, coupe] = [a1, a2, a3, Number(a4) || 0];
   const t0 = Date.now();
-  const enf = spawn(process.execPath, [path.join(scripts, 'vf-cockpit-signal.mjs'), lab], {
+  const sonde = process.env.ETAT_SONDE; // préchargement facultatif (etat-sonde.mjs) : la suite compte les connexions de l'émetteur
+  const enf = spawn(process.execPath, [...(sonde ? ['--import', sonde] : []), path.join(scripts, 'vf-cockpit-signal.mjs'), lab], {
     stdio: ['ignore', 'pipe', 'ignore'], env: { ...process.env, VF_COCKPIT_SCRIPTS_DIR: faux },
   });
   let sortie = '', tue = false;

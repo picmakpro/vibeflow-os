@@ -85,3 +85,24 @@ Verts d'emblée, gardes tenues par leur mutant : E4.2 (aucun `vie`, donc aucun a
 - Écart au plan, déclaré : M-ETAT-SEQ ne rougit que E5.2 : E5.1 ne contrôle pas le `seq` (plan : « E5.2 rougit »).
 - Lignes : `vf-cockpit-server.mjs` 204 lignes, 19 lignes de plus de 160 points de code (19 avant : inchangé) ; `vf-cockpit-state.mjs` 59 / 0 ; `vf-cockpit-flux-etat.mjs` 33 / 0.
 - Suites existantes rejouées une par une, TMPDIR du scratchpad : `serveur` 89 PASS, `direct` 76, `cycle-serveur` 91, `transcript` 103, `lancer-serveur` 82, `robustesse` 25, `git-signature` 47 (« 0 SAUTÉ » dans le bilan : le motif de saut du plan reconnaît ce libellé à tort, aucune section sautée), `reseau` 15, `routes` 56, `collecte` 126 PASS / 0 FAIL. Un premier lancement de `collecte` dans l'enchaînement a été terminé de l'extérieur (code 143, 237 s) pendant que des fichiers de la collecte étaient modifiés dans l'arbre par un autre exécuteur ; rejoué seul : vert. Aucune suite adaptée, aucune assertion affaiblie.
+
+## Tâche 4 — `vf-signal` par la route
+
+### Rouges sur le code de la tâche 3 (instantané `git archive` du commit e4185ff1 : module de délégation absent, CLI non câblée)
+
+Commande : la suite complète des témoins (sections E2 à E10, sans les mutants de l'émetteur) lancée depuis l'instantané — 69 PASS / 10 FAIL.
+
+| Libellé | Attendu | Obtenu |
+|---|---|---|
+| E8.1 | zéro ligne du journal du faux verrou au PID de l'émetteur | 3 lignes (l'émetteur collecte lui-même) |
+| E9.0 | marqueur du leurre dans la sortie, 1 visite avec jeton, sans origine, hôte exact | `false|0|undefined|undefined|false` (aucune visite : l'émetteur ne lit pas la route) |
+| E9.2 | visite reçue, repli, marqueur absent | aucune visite |
+| E9.3, E9.4, E9.5, E9.7 | une visite puis repli | aucune visite (même cause) |
+| E9.11, E9.12 | propriété sur `conforme` | module absent |
+| E10.1 | une connexion vers 127.0.0.1:<port de server.json> | 0 connexion, 3 appels au verrou |
+
+Gardes vertes d'emblée, rendues rouges par leur mutant : E8.2 à E8.4, E9.1, E9.8 à E9.10, E10.2, E10.3.
+
+### Sonde de connexions : défaut trouvé à l'écriture
+
+Première version de `etat-sonde.mjs` : Node passe à `Socket.prototype.connect` des arguments déjà normalisés (`[options, rappel]`) ; la sonde lisait le premier argument comme des options, voyait « localhost » sans port et refusait tout, y compris le leurre valide (E9.0 rouge pour une mauvaise raison). Corrigé (lecture du premier élément du tableau), vérifié par deux connexions d'essai (127.0.0.1 laissée passer, 203.0.113.9 refusée).

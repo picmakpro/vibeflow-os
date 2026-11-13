@@ -313,6 +313,161 @@ cockpit_module_muter LECTEUR-AUCUN vf-cockpit-server.mjs '/garde:lecteur-arme/s/
 scenario_b m-LECTEUR-AUCUN; unset COCKPIT_MODULE
 assert_eq "M-LECTEUR-AUCUN — le serveur n'étend plus aClient : E6.4 rougit, seul" "$(rouges_b m-LECTEUR-AUCUN)" "E6.4"
 
+# ---- E8 à E10 : l'émetteur de vf-signal par la route, leurres, connexions ----
+cat > "$AUX/resume.mjs" <<'JS'
+// resume.mjs <em.json> <visites.log> <journal-verrou> <marqueur> <connexions.log> <port-leurre> : un résumé d'un lancement de l'émetteur
+import fs from 'node:fs';
+const [, , emF, visF, jF, marq, connF, lp] = process.argv;
+const lire = (f) => { try { return fs.readFileSync(f, 'utf8'); } catch { return ''; } };
+let em = {}; try { em = JSON.parse(lire(emF)); } catch {}
+const vis = lire(visF).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+const conns = lire(connF).split('\n').filter(Boolean).map((l) => JSON.parse(l));
+const appels = lire(jF).split('\n').filter((l) => l.endsWith(' ' + em.pid)).length;
+console.log(JSON.stringify({ code: em.code, ms: em.ms, tue: em.tue, pid: em.pid, marq: String(em.sortie || '').includes(marq), sortieLue: (() => { try { return JSON.parse(em.sortie).schema; } catch { return null; } })(),
+  visites: vis.length, jeton: vis[0] && vis[0].jeton, origine: vis[0] && vis[0].origine, hote: vis[0] && vis[0].hote, hoteAttendu: lp ? `127.0.0.1:${lp}` : null,
+  appels, conns: conns.length, refuses: conns.filter((c) => c.refuse).length, vers: conns.filter((c) => !c.refuse).map((c) => `${c.hote}:${c.port}`) }));
+JS
+cat > "$AUX/chemins.mjs" <<'JS'
+// chemins.mjs <état.json> : « chemin JSON » de chaque chaîne qui est un chemin absolu (indices de tableau remplacés par [])
+import fs from 'node:fs';
+const o = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')); const out = [];
+const marche = (v, p) => { if (typeof v === 'string') { if (/^\/[^\s]+|^[A-Za-z]:\\/.test(v)) out.push(p); } else if (Array.isArray(v)) v.forEach((x) => marche(x, p + '[]')); else if (v && typeof v === 'object') for (const [k, x] of Object.entries(v)) marche(x, p ? p + '.' + k : k); };
+marche(o, ''); console.log(JSON.stringify([...new Set(out)].sort()));
+JS
+resume() { node "$AUX/resume.mjs" "$@"; }
+
+nouveau_lab eb; LB="$WORK/lab-eb"; FB="$WORK/faux-eb"; JB="$LB/.vibeflow/journal-verrou"
+cockpit_lancer "$LB" VF_COCKPIT_SCRIPTS_DIR="$FB"; RLB=$?
+PB="${VF_PID:-0}"; PORTB="${VF_PORT:-0}"; SJ="$LB/.vibeflow/cockpit/.cache/server.json"
+frais() { get /api/vf/state > "$WORK/etat-b.json" 2>/dev/null; [ "$VF_CODE" = 200 ] && [ "$(jf "$WORK/etat-b.json" 'j.signal!==null&&(Date.now()-Date.parse(j.signal.at))<5000')" = true ]; }
+armer() { get /api/vf/state > /dev/null 2>&1; sleep 1; attendre 25 frais; }
+emet() { node "$TESTS/etat-labo.mjs" emetteur "$1" "$LB" "$FB" "${2:-0}" > "${3:-$WORK/em.json}" 2>/dev/null; }
+
+echo "=== E8 — l'émetteur lit la route d'un serveur reconnu ==="
+armer; cp "$WORK/etat-b.json" "$WORK/modele.json"; cp "$SJ" "$WORK/server-b.json"
+assert_eq "E8.0 — serveur B (lancé par le lanceur, filet armé par deux lectures) : l'état est frais, signal.at de moins de 5 s" "$RLB|$(jf "$WORK/etat-b.json" '(Date.now()-Date.parse(j.signal.at))<5000')" "0|true"
+emet "$SCRIPTS" 9000; E81="$(resume "$WORK/em.json" /dev/null "$JB" X /dev/null)"
+assert_eq "E8.1 — l'émetteur lancé alors n'appelle pas le verrou : zéro ligne du journal du faux verrou portant son PID" "$(ev "$E81" 'j.appels')" "0"
+jf "$WORK/em.json" 'JSON.parse(j.sortie)' > "$WORK/em-sortie.json" 2>/dev/null
+RACINE_B="$(cd "$LB" && pwd -P)"
+ROOT_OK="$(node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('$WORK/em-sortie.json','utf8'));console.log(fs.realpathSync(j.root)===fs.realpathSync('$LB'))" 2>/dev/null)"
+IDS_OK="$(node -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync('$WORK/em-sortie.json','utf8')),b=JSON.parse(fs.readFileSync('$WORK/etat-b.json','utf8')).signal;const i=(x)=>x.equipe.workers.map((w)=>w.id).sort().join(',');console.log(i(a)===i(b))" 2>/dev/null)"
+assert_eq "E8.2 — sa sortie est un cockpit-signal@1 conforme (même validateur indépendant que E1.3), code 0, root = la racine du lab, mêmes identifiants d'équipe que l'état servi" "$(valide vibeflow/cockpit-signal@1 "$WORK/em-sortie.json")|$(jf "$WORK/em.json" 'j.code')|$ROOT_OK|$IDS_OK" "OK|0|true|true"
+
+echo "=== E9 — leurres : chaque propriété retirée a son leurre, le même leurre rendu valide est lu ==="
+MARQ=MARQUEUR-LEURRE-79-12
+pose_json() { node -e "require('fs').writeFileSync(process.argv[1], JSON.stringify({ pid: Number(process.argv[2]), port: Number(process.argv[3]), url: 'http://127.0.0.1:' + process.argv[3], token: '0123456789abcdef0123456789abcdef', hash: 'abcdef012345' }))" "$SJ" "$1" "$2"; }
+restaurer() { rm -f "$SJ"; cp "$WORK/server-b.json" "$SJ"; }
+node -e "setTimeout(()=>{},900000)" "$WORK/etranger" & PETR=$!; PIDS+=("$PETR") # un processus vivant étranger au serveur (la marque de la suite est dans sa ligne de commande)
+head -c 20480 /dev/zero | tr '\0' ' ' > "$WORK/blancs"
+leurre_cas() { # <mode> <scripts> <préfixe> [pid] [modèle de server.json : json|tube|lien|gros]
+  local m="$1" sc="$2" p="$3" pid="${4:-$PB}" forme="${5:-json}" lpid lp="" f="$WORK/lc-$3-$1-${5:-json}"
+  rm -f "$WORK/lp.port" "$WORK/lv.log" "$WORK/conn.log"; : > "$WORK/lv.log"
+  case "$m" in tube|lien-fichier|gros-fichier) m_leurre=valide ;; *) m_leurre="$m" ;; esac
+  node "$TESTS/etat-clients.mjs" leurre "$m_leurre" "$WORK/modele.json" "$WORK/lp.port" "$WORK/lv.log" & lpid=$!; PIDS+=("$lpid")
+  attendre 10 test -s "$WORK/lp.port"; lp="$(cat "$WORK/lp.port" 2>/dev/null)"
+  case "$m" in
+    tube) rm -f "$WORK/tube"; mkfifo "$WORK/tube"; rm -f "$SJ"; ln -s "$WORK/tube" "$SJ" ;;
+    lien-fichier) pose_json "$pid" "$lp"; cp "$SJ" "$WORK/lien-cible.json"; rm -f "$SJ"; ln -s "$WORK/lien-cible.json" "$SJ" ;;
+    gros-fichier) pose_json "$pid" "$lp"; cat "$WORK/blancs" >> "$SJ" ;;
+    *) pose_json "$pid" "$lp" ;;
+  esac
+  ETAT_SONDE="$TESTS/etat-sonde.mjs" ETAT_SONDE_SORTIE="$WORK/conn.log" emet "$sc" 9000 "$WORK/em-$p-$m.json"
+  vf_hyg_stop "$lpid"; restaurer
+  resume "$WORK/em-$p-$m.json" "$WORK/lv.log" "$JB" "$MARQ" "$WORK/conn.log" "$lp" > "$f.json"
+}
+MODES_E9="pid-etranger autre-racine perime schema incomplet interdit gros muet refus texte indispo encours nul tube lien-fichier gros-fichier"
+cas_e9() { # <scripts> <préfixe>
+  local m
+  for m in $MODES_E9; do
+    case "$m" in pid-etranger) leurre_cas valide "$1" "$2" "$PETR" json; mv "$WORK/lc-$2-valide-json.json" "$WORK/lc-$2-pid-etranger.json" ;; *) leurre_cas "$m" "$1" "$2" "$PB" "x"; mv "$WORK/lc-$2-$m-x.json" "$WORK/lc-$2-$m.json" ;; esac
+  done
+}
+rouges_e9() { # <préfixe> : identifiants de E9 qui rougissent
+  local f="$WORK/lc-$1" r="" m
+  rej() { [ "$(jf "$f-$1.json" '!j.marq&&j.code===0&&j.sortieLue==="vibeflow/cockpit-signal@1"&&j.tue===false')" = true ]; }
+  rej pid-etranger && [ "$(jf "$f-pid-etranger.json" 'j.visites')" = 0 ] || r="$r E9.1"
+  rej autre-racine && [ "$(jf "$f-autre-racine.json" 'j.visites')" = 1 ] || r="$r E9.2"
+  rej perime && [ "$(jf "$f-perime.json" 'j.visites')" = 1 ] || r="$r E9.3"
+  rej schema && [ "$(jf "$f-schema.json" 'j.visites')" = 1 ] || r="$r E9.4"
+  rej incomplet && [ "$(jf "$f-incomplet.json" 'j.visites')" = 1 ] || r="$r E9.5"
+  rej interdit && [ "$(jf "$f-interdit.json" 'j.visites')" = 1 ] || r="$r E9.6"
+  rej gros && [ "$(jf "$f-gros.json" 'j.visites')" = 1 ] || r="$r E9.7"
+  rej muet && [ "$(jf "$f-muet.json" 'j.ms<8000')" = true ] || r="$r E9.8"
+  for m in refus texte indispo encours nul; do rej "$m" || { r="$r E9.9"; break; }; done
+  for m in tube lien-fichier gros-fichier; do rej "$m" && [ "$(jf "$f-$m.json" 'j.ms<8000')" = true ] || { r="$r E9.10"; break; }; done
+  echo "${r# }"
+}
+leurre_cas valide "$SCRIPTS" base "$PB" valide
+LV="$(cat "$WORK/lc-base-valide-valide.json")"
+assert_eq "E9.0 — témoin positif : le leurre valide, derrière un server.json au PID reconnu, est lu (marqueur dans la sortie) ; il reçoit une visite avec l'en-tête de jeton, sans en-tête d'origine, à l'hôte exact" "$(ev "$LV" 'j.marq+"|"+j.visites+"|"+j.jeton+"|"+j.origine+"|"+(j.hote===j.hoteAttendu)')" "true|1|true|false|true"
+cas_e9 "$SCRIPTS" base; R9="$(rouges_e9 base)"
+echo "  (E9 : rouges = « $R9 »)"
+assert_eq "E9.1 — server.json au PID d'un processus étranger vivant : repli, zéro visite au leurre, marqueur absent" "$(has_rouge "$R9" E9.1)" "ok"
+assert_eq "E9.2 — PID reconnu, état d'un autre lab (signal.root différent) : visite reçue, repli, marqueur absent" "$(has_rouge "$R9" E9.2)" "ok"
+assert_eq "E9.3 — état périmé de dix minutes, tout le reste valide : repli" "$(has_rouge "$R9" E9.3)" "ok"
+assert_eq "E9.4 — mauvais schema d'enveloppe, tout le reste valide : repli" "$(has_rouge "$R9" E9.4)" "ok"
+assert_eq "E9.5 — signal sans equipe : repli" "$(has_rouge "$R9" E9.5)" "ok"
+assert_eq "E9.6 — clé interdite à trois niveaux dans le signal : repli" "$(has_rouge "$R9" E9.6)" "ok"
+assert_eq "E9.7 — réponse valide de plus de 2 Mio : repli" "$(has_rouge "$R9" E9.7)" "ok"
+assert_eq "E9.8 — leurre muet (accepte la connexion, n'écrit rien) : l'émetteur se termine en moins de 8 s avec la sortie du repli, sans être tué" "$(has_rouge "$R9" E9.8)" "ok"
+assert_eq "E9.9 — refus 403, corps non JSON, collecte indisponible, collecte en cours, signal nul : repli dans chaque cas" "$(has_rouge "$R9" E9.9)" "ok"
+assert_eq "E9.10 — server.json remplacé par un lien vers un tube nommé, un lien vers un fichier, un fichier de plus de 16 Kio : repli en moins de 8 s, sans être tué" "$(has_rouge "$R9" E9.10)" "ok"
+node "$TESTS/etat-propriete.mjs" conforme "$SCRIPTS" "$WORK/signal-servi.json" > "$WORK/e9c.json" 2>&1
+echo "  (graine=$(jf "$WORK/e9c.json" 'j.graine'))"
+assert_eq "E9.11 — conforme sur des états valides dont une clé requise est retirée ou change de type (tirages et exhaustif) : faux si et seulement si la clé est requise ; une clé en plus reste tolérée (témoin positif)" "$(jf "$WORK/e9c.json" 'JSON.stringify(j.ko)+"|"+j.temoin')" "[]|true"
+assert_eq "E9.12 — couverture : chaque clé requise (premier niveau et chaque sous-schéma) est retirée au moins une fois" "$(jf "$WORK/e9c.json" 'JSON.stringify(j.nonTirees)+"|"+(j.nbCles>=40)')" "[]|true"
+
+echo "=== E10 — connexions, durée, chemins ==="
+sonde() { # <nom> : lance l'émetteur sous la sonde, résume
+  : > "$WORK/conn.log"; ETAT_SONDE="$TESTS/etat-sonde.mjs" ETAT_SONDE_SORTIE="$WORK/conn.log" emet "$SCRIPTS" 13000 "$WORK/em-$1.json"; resume "$WORK/em-$1.json" /dev/null "$JB" X "$WORK/conn.log" > "$WORK/s-$1.json"
+}
+armer; sonde vivant
+node -e "const fs=require('fs');const j=JSON.parse(fs.readFileSync('$SJ','utf8'));j.url='http://203.0.113.9:'+j.port;fs.writeFileSync('$SJ',JSON.stringify(j))"; armer; sonde urlnonlocale; restaurer
+assert_eq "E10.1 — avec le serveur vivant : exactement une connexion, vers 127.0.0.1 et le port de server.json ; avec une url non locale dans server.json (seul le port est lu) : aucune connexion non locale" "$(jf "$WORK/s-vivant.json" 'j.conns+"|"+j.refuses+"|"+j.vers.join(",")+"|"+j.appels')|$(jf "$WORK/s-urlnonlocale.json" 'j.conns+"|"+j.refuses+"|"+j.vers.join(",")')" "1|0|127.0.0.1:$PORTB|0|1|0|127.0.0.1:$PORTB"
+assert_eq "E10.2 — l'émetteur ne se termine jamais après 13 s (budget du mod : 15 s) sur les scénarios de connexion, ni après 8 s sur les leurres" "$(jf "$WORK/s-vivant.json" 'j.ms<13000&&j.tue===false')|$(jf "$WORK/s-urlnonlocale.json" 'j.ms<13000&&j.tue===false')|$(jf "$WORK/lc-base-muet.json" 'j.ms<8000&&j.tue===false')" "true|true|true"
+armer; node "$AUX/chemins.mjs" "$WORK/etat-b.json" > "$WORK/chemins.json"
+assert_eq "E10.3 — l'état servi ne porte de chemin absolu que dans la liste fermée des champs des formes inchangées ; aucun dans l'enveloppe, collecte comprise ; témoin positif : signal.root est présent" "$(jf "$WORK/chemins.json" 'j.every((p)=>["signal.root","signal.equipe.root","signal.equipe.workers[].cwd"].includes(p))+"|"+j.includes("signal.root")')" "true|true"
+rm -f "$WORK/conn.log"
+# repli : aucune connexion
+rm -f "$SJ"; : > "$WORK/conn.log"; ETAT_SONDE="$TESTS/etat-sonde.mjs" ETAT_SONDE_SORTIE="$WORK/conn.log" emet "$SCRIPTS" 13000 "$WORK/em-repli.json"; resume "$WORK/em-repli.json" /dev/null "$JB" X "$WORK/conn.log" > "$WORK/s-repli.json"; restaurer
+assert_eq "E10.1b — en repli (aucun server.json) : zéro connexion, des appels au verrou par l'émetteur" "$(jf "$WORK/s-repli.json" 'j.conns+"|"+(j.appels>=1)')" "0|true"
+
+echo "=== mutants de l'émetteur (copie du module, moteur lié) ==="
+copie_em() { # <nom> : copie du module dont le moteur est LIÉ (l'identité du serveur lancé du dépôt survit à la copie) ; imprime le dossier des scripts
+  local d="$WORK/mem-$1"; rm -rf "$d"; mkdir -p "$d/scripts"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/" || return 1
+  ln -s "$(dirname "$SCRIPTS")/skills" "$d/skills" || return 1
+  printf '%s\n' "$d/scripts"
+}
+mutant_em() { # <nom> <fichier> <sed> <attendu>
+  local nom="$1" d rc c r
+  d="$(copie_em "$nom")"; cp "$d/$2" "$d/$2.avant"; sed "$3" "$d/$2.avant" > "$d/$2"; rm -f "$d/$2.avant"
+  c=0; cmp -s "$SCRIPTS/$2" "$d/$2" && c=1; node --check "$d/$2" 2>/dev/null || c=2
+  assert_eq "M-$nom.0 — l'ancre existe une fois, la copie diffère de l'original et charge (node --check)" "$c" "0"
+  [ "$c" = 0 ] || return
+  cas_e9 "$d" "m-$nom"; r="$(rouges_e9 "m-$nom")"
+  assert_eq "M-$nom — rouges de la copie : « $4 » seuls" "$r" "$4"
+}
+D0="$(copie_em neutre)"; cas_e9 "$D0" m-neutre >/dev/null 2>&1; leurre_cas valide "$D0" neutre "$PB" valide
+assert_eq "E9.0m — la copie du module NON mutée, lancée comme l'émetteur, atteint la requête : le leurre valide est lu (une visite, une connexion locale), zéro appel au verrou à son PID" "$(jf "$WORK/lc-neutre-valide-valide.json" 'j.marq+"|"+j.visites+"|"+j.conns+"|"+j.refuses+"|"+j.appels')|$(rouges_e9 m-neutre)" "true|1|1|0|0|"
+mutant_em ESTNOTRE vf-cockpit-signal-serveur.mjs '/garde:signal-estnotre/s/if (!estNotre([^;]*)) return null;//' "E9.1"
+mutant_em RACINE vf-cockpit-signal-serveur.mjs '/garde:signal-racine/s/a !== b/false/' "E9.2"
+mutant_em FRAICHEUR vf-cockpit-signal-serveur.mjs '/garde:signal-fraicheur/s/age < FRAICHEUR_MAX_MS/true/' "E9.3"
+mutant_em SCHEMA vf-cockpit-signal-serveur.mjs '/garde:signal-schema/s/o.schema !== SCHEMA_ETAT/false/' "E9.4"
+mutant_em CONFORME vf-cockpit-signal-serveur.mjs '/garde:signal-conforme/s/if (!(.*)) return null;//' "E9.5 E9.6"
+mutant_em PLAFOND vf-cockpit-signal-serveur.mjs '/garde:signal-plafond/s/n > maxOctets/false/' "E9.7"
+mutant_em DELAI vf-cockpit-signal-serveur.mjs '/garde:signal-delai/s/r.destroy(); fin(null);//' "E9.8"
+mutant_em LIEN vf-cockpit-signal-serveur.mjs '/garde:signal-lien/s/if (!st.isFile() || st.size > ETAT_MAX) return null;//' "E9.10"
+MLX="$(copie_em laxe)"; cp "$MLX/vf-cockpit-signal-serveur.mjs" "$MLX/x.avant"; sed '/garde:signal-sous-schemas/s/TYPES.object(o) \&\&/true ||/' "$MLX/x.avant" > "$MLX/vf-cockpit-signal-serveur.mjs"; rm -f "$MLX/x.avant"
+node "$TESTS/etat-propriete.mjs" conforme "$MLX" "$WORK/signal-servi.json" > "$WORK/e9c-laxe.json" 2>&1
+assert_eq "M-CONFORME-LAXE — le contrôle des éléments neutralisé (marqueur garde:signal-sous-schemas) : E9.11 rougit en nommant les clés non détectées" "$(cmp -s "$SCRIPTS/vf-cockpit-signal-serveur.mjs" "$MLX/vf-cockpit-signal-serveur.mjs" && echo identique || echo diffère)|$(jf "$WORK/e9c-laxe.json" 'j.ko.length>0&&j.ko.every((k)=>k.endsWith(":retrait"))')" "diffère|true"
+echo "=== repli sans serveur (E8.3, E8.4) ==="
+cockpit_arreter "$PB"
+emet "$SCRIPTS" 9000; E83="$(resume "$WORK/em.json" /dev/null "$JB" X /dev/null)"; jf "$WORK/em.json" 'JSON.parse(j.sortie)' > "$WORK/em83.json" 2>/dev/null
+assert_eq "E8.3 — serveur arrêté : l'émetteur se replie : au moins une ligne du journal à son PID, sortie conforme, code 0" "$(ev "$E83" '(j.appels>=1)+"|"+j.code')|$(valide vibeflow/cockpit-signal@1 "$WORK/em83.json")" "true|0|OK"
+rm -f "$SJ"; emet "$SCRIPTS" 9000; E84="$(resume "$WORK/em.json" /dev/null "$JB" X /dev/null)"; jf "$WORK/em.json" 'JSON.parse(j.sortie)' > "$WORK/em84.json" 2>/dev/null
+assert_eq "E8.4 — aucun server.json : repli identique (appels au verrou, sortie conforme, code 0)" "$(ev "$E84" '(j.appels>=1)+"|"+j.code')|$(valide vibeflow/cockpit-signal@1 "$WORK/em84.json")" "true|0|OK"
+
 cockpit_arreter
 vf_hyg_assert
 echo "Résultats : $PASS PASS / $FAIL FAIL"

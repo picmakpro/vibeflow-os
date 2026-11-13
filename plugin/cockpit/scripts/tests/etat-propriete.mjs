@@ -4,6 +4,7 @@
 //   collecte <dossier-des-scripts>      collecteDe et corpsState contre des entrées hostiles (E3.1, E3.2)
 //   signature <dossier> <signal.json>   sigState : stabilité, sensibilité, ordre, couverture (E7.1 à E7.4)
 //   lecteurs <dossier>                  fenêtre des lecteurs d'état contre un oracle écrit à la main (E6.1 à E6.3)
+//   conforme <dossier> <signal.json>    `conforme` de l'émetteur : faux si et seulement si une clé requise du contrat manque ou change de type (E9.11, E9.12)
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -130,4 +131,32 @@ if (mode === 'lecteurs') {
     if (l.actif(now) !== att) ko.push([lec.join(','), now, att]);
   }
   console.log(JSON.stringify({ graine, unit, n, armes, non, ko: ko.slice(0, 4), nko: ko.length }));
+}
+
+if (mode === 'conforme') {
+  const { conforme } = await imp('vf-cockpit-signal-serveur.mjs');
+  const contrat = JSON.parse(fs.readFileSync(path.join(dir, 'vf-cockpit-interface.json'), 'utf8')), spec = contrat.schemas['vibeflow/cockpit-signal@1'];
+  const T = JSON.parse(fs.readFileSync(extra, 'utf8')), clone = (o) => JSON.parse(JSON.stringify(o));
+  const synth = (nom) => Object.fromEntries((spec[nom].requis).map((k) => [k, null])); // un élément qui porte exactement les clés requises du sous-schéma
+  // gabarit : le signal réel, chaque liste garnie d'au moins un élément synthétique (valide par construction)
+  const G = clone(T); G.jalons = [...(G.jalons || []), synth('jalon')]; G.phases = [...(G.phases || []), synth('phase')];
+  G.missions = [...(G.missions || []), { ...synth('mission'), noeuds: [synth('noeud')] }];
+  G.verrous = { ...(G.verrous || {}), liste: [...((G.verrous || {}).liste || []), synth('verrou')] };
+  G.arbres = [...(G.arbres || []), { ...synth('arbre'), retard: synth('retard') }];
+  const sites = { 'premier-niveau': { liste: Object.keys(spec.requis), elem: (g) => [g], types: true }, phase: { liste: spec.phase.requis, elem: (g) => g.phases },
+    jalon: { liste: spec.jalon.requis, elem: (g) => g.jalons }, mission: { liste: spec.mission.requis, elem: (g) => g.missions }, noeud: { liste: spec.noeud.requis, elem: (g) => g.missions.flatMap((m) => m.noeuds || []) },
+    verrou: { liste: spec.verrou.requis, elem: (g) => g.verrous.liste }, arbre: { liste: spec.arbre.requis, elem: (g) => g.arbres }, retard: { liste: spec.retard.requis, elem: (g) => g.arbres.map((a) => a.retard).filter(Boolean) } };
+  const faux = { string: 5, number: 'x', boolean: 'x', object: [], array: {}, any: undefined };
+  const ko = [], vus = new Set(); let n = 0;
+  const temoin = conforme(G, contrat) === true && conforme({ ...clone(G), supplement: { a: 1 } }, contrat) === true;
+  const essaie = (site, cle, type) => {
+    const g = clone(G), cible = sites[site].elem(g); if (!cible.length) { ko.push(`${site}.${cle}:aucun-element`); return; }
+    const e = choix(cible); n++; vus.add(`${site}.${cle}`);
+    if (!type) delete e[cle]; else if (site === 'premier-niveau' && spec.requis[cle] !== 'any') e[cle] = faux[spec.requis[cle]]; else return;
+    if (conforme(g, contrat) !== false) ko.push(`${site}.${cle}${type ? ':type' : ':retrait'}`); // retirée, ou de mauvais type sur le premier niveau : faux
+  };
+  for (const [site, d] of Object.entries(sites)) for (const cle of d.liste) { essaie(site, cle, false); if (d.types) essaie(site, cle, true); }
+  for (let i = 0; i < 150; i++) { const site = choix(Object.keys(sites)); essaie(site, choix(sites[site].liste), sites[site].types && R() < 0.4); }
+  const toutes = Object.entries(sites).flatMap(([s, d]) => d.liste.map((k) => `${s}.${k}`));
+  console.log(JSON.stringify({ graine, n, ko: [...new Set(ko)].slice(0, 12), temoin, nonTirees: toutes.filter((k) => !vus.has(k)), nbCles: toutes.length }));
 }
