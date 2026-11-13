@@ -15,6 +15,7 @@ import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
 import { detectDrift, commandeCorrectif } from './vf-cockpit-drift.mjs';
 import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
 import { projeterTrace } from './vf-cockpit-trace-collecte.mjs';
+import { burnup } from './vf-cockpit-burnup.mjs';
 
 const ls = lister; // AUDC-A-02 : listage confiné au lab (un dossier lié hors du lab n'est pas listé)
 const DST = { done: 'done', running: 'active', ready: 'todo', blocked: 'todo', failed: 'blocked' }; // dag.sh : blocked = en attente des deps
@@ -229,6 +230,9 @@ function construireGraphe(root, { layout } = {}) {
     project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files, phaseEtat) },
     nodes, files, routes: [], links: links.filter((l) => [l.a, l.b].every((x) => (x.startsWith('n:') ? ids.has(x) : fids.has(x)))), flows, tour: tour.length >= 2 ? tour : [],
   };
+  // 77-02 (P77-D-13, P77-D-14) : burn-up du jalon mis en avant ; le pourcentage est celui du pied de jalon (la fonction `pct` du fichier, jamais une seconde)
+  const bu = active ? burnup({ jalon: active.key, phases: active.ks.map((p) => ({ n: p.n, nom: p.name, line: p.line, etat: p.avancement.etat })), pct }) : null;
+  if (bu) graphe.meta.vf.burnup = bu;
   // 76-04 (P76-D-31) : champs facultatifs de traçabilité posés sur le graphe ; le jalon mis en avant est celui de `active`, jamais recalculé ailleurs
   return projeterTrace(graphe, P.trace, { jalonActif: active ? 'n:' + active.id : null, couper: clip, racine: root });
 }
