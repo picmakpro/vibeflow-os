@@ -109,3 +109,36 @@ CIBLE   if [ "$lines" -gt "$VF_SKILL_LINE_CAP" ]; then
 CIBLE   if [ "$verdict" != "DEPASSEMENT-ADR029" ] && [ "$lines" -ge "$VF_BUDGET_LINE_WARN_FROM" ] && [ "$lines" -le "$VF_BUDGET_LINE_CAP" ]; then
 CIBLE   if [ -f "${d}module.json" ] && grep -Eq '"type"[[:space:]]*:[[:space:]]*"doc-only"' "${d}module.json" 2>/dev/null; then
 CIBLE [ -f "$SENTINEL" ] && ARMED=1
+
+## Mutants rouges obtenus (sur le code livré)
+
+Chaque mutant change le script (vérifié par `cmp`), passe `bash -n`, et rougit l'assertion qu'il vise ; un mutant sans effet est un échec de la suite.
+
+Gate de méthode (suite : `594 PASS / 0 FAIL`) :
+
+- **MF1** `AUTO=1` forcé en mode TSV : TF9 rougit — obtenu `arbre=modifie`
+- **MF2** passe de rangement rétablie en mode TSV : TF11 rougit — obtenu `verbes=[[for-each-ref][ls-files][stash]]`
+- **MF3** type `state` renommé `etat` : TF2 rougit — obtenu `ecarts=3 lignes=21`
+- **MF4** chemin absolu émis : TF4 rougit — obtenu `absolus=3`
+- **MF5** `--no-remote` implicite ET passe de rangement retirés : TF10 rougit — obtenu `gh=appele`
+- **MF6** valeur la plus haute retirée (STATE et BACKLOG) : TF7 rougit — obtenu `prose=0/OK entree=0/OK`
+- **MF7** libellé d'un `say` changé : TF12 rougit — obtenu `diff=3/34`
+- **MF8** budget en dur en mode TSV : TF6 rougit — obtenu `budget1=non(3/0)`
+
+Gate de densité (suite : `86 ok, 0 ko`) : **MI1** bord d'avertissement décalé (TI2), **MI2** valeur `0` en lab tiers (TI5, `mauvais=1`), **MI3** `NON-VERIFIABLE` au lieu de `NON-APPLICABLE` (TI5, `mauvais=1`), **MI4** relation de baseline inversée (TI4), **MI5** ligne du rapport texte changée (TI8, `diff=73/75`), **MI6** chemin absolu émis (TI6, `absolus=1`). Tous tués.
+
+## La mesure de non-modification des cibles tient une cible qui commence par « - » (consigne de la session principale)
+
+La mesure du plan lit les lignes RETIRÉES d'un `git diff -U0`. Une ligne retirée dont le texte commence par `-` y apparaît en `--…`, et l'en-tête de fichier est `--- a/…` : la forme `sed -n 's/^-\([^-].*\)$/\1/p'` écarte les deux (second caractère `-`) et laisserait passer, sans bruit, le retrait d'une cible qui commence par `-`.
+La mesure retenue lit le diff par hunk (awk : une ligne `diff --git` ouvre l'en-tête, la première `@@` le ferme ; hors en-tête, toute ligne commençant par `-` est du contenu retiré, rendu sans son premier caractère), puis `grep -qxFf` contre les `CIBLE` :
+
+`( AVANT=$(awk '$1=="AVANT"{print $2; exit}' <trace>) && [ -n "$AVANT" ] && git rev-parse --verify -q "$AVANT^{commit}" > /dev/null && T=$(mktemp) && trap 'rm -f "$T"' EXIT && sed -n 's/^CIBLE //p' <trace> > "$T" && [ -s "$T" ] && X=$(git diff -U0 "$AVANT" HEAD -- <gates> .github/workflows/ci.yml) && ! { printf '%s\n' "$X" | awk '/^diff --git/ { h = 1; next } /^@@/ { h = 0; next } !h && /^-/ { print substr($0, 2) }' | grep -qxFf "$T"; } )`
+
+Sonde, dépôt jetable, une cible `-h) usage ;;` (commence par `-`) et une cible `  cible normale`, sous bash ET sous zsh (mêmes codes) :
+
+- cibles intactes : 0
+- cible commençant par `-` retirée, forme awk : **1** ; la forme `sed` du plan, sur le même cas : **0** (cible ratée : c'est la raison du changement de forme)
+- cible ordinaire retirée : 1
+- ligne de contenu `--- a/fake` ajoutée puis retirée (pas une cible) : 0, elle n'est pas prise pour un en-tête
+- trace sans ligne `CIBLE` : 1 ; `AVANT` vide : 1 ; `AVANT` invalide : 1
+Sur ce plan : les 58 cibles relevées sont intactes depuis `AVANT` (code 0), `.planning/instruction-budget-baselines.tsv`, `plugin/conductor/VERSION`, `VERSION` et `.github/workflows/ci.yml` ne figurent dans aucun diff de la plage.

@@ -1,5 +1,15 @@
 # Changelog — conductor
 
+## [Non publié] — 2026-11-13 (sortie machine `--format=tsv` des deux gates de méthode ; Phase 77, SYNT-02, SYNT-04)
+
+**Minor** (capacité nouvelle ; aucune release racine : elle sera groupée ; aucun bump de `VERSION`). Le cockpit lira les mesures des gates sans jamais les recalculer.
+
+- **`check-method-budget.sh --format=tsv` et `check-instruction-budget.sh --format=tsv` (contrat `#vf-budget@1`, P77-D-03, P77-D-05, P77-D-06, P77-D-23)** : sur la sortie standard, l'en-tête `#vf-budget@1<TAB><gate>` puis une ligne par mesure déjà calculée, six champs (type, chemin relatif à la racine, valeur, budget effectif, unité, verdict ; `-` si non vérifiable ou non applicable). Gate de méthode : `state`, `state-prose`, `backlog-ouverts`, `backlog-entree`, `backlog-clos`, `roadmap`, `memory-index`, `worktrees`, la prose de STATE et l'entrée de BACKLOG portant la valeur la plus haute vue sous le plafond comme au-delà. Gate de densité : `agent`, `skill`, `socle`, `socle-baseline` (relation de la baseline à la mesure : `EGALE`, `AU-DESSUS`, `EN-DESSOUS`).
+- **Lecture seule** : le gate de méthode en mode TSV n'écrit rien, ne lance aucun `gh` (`--no-remote` implicite) ni passe de rangement, et refuse `--auto`, `--archive` et `--dry-run` (64, sortie standard vide) ; tout autre `--format=` rend 64 sur les deux gates. Sans l'option, la sortie texte et le code de retour sont identiques octet pour octet (preuve A/B contre une copie figée de chaque gate).
+- **Lab sans corpus d'agents distribué** (P77-D-05) : `check-instruction-budget.sh --format=tsv` rend trois lignes `NON-APPLICABLE` (`agent`, `skill`, `socle`) sans valeur et garde le code 2, au lieu d'une sortie vide.
+- **Preuves** : sections `TF1`..`TF13` et mutants `MF1`..`MF8` de `test-check-method-budget.sh`, `TI1`..`TI9` et mutants `MI1`..`MI6` de `test-check-instruction-budget.sh` ; aucune suite ajoutée. Deux copies figées sous `tests/fixtures/` (`check-method-budget-pre-4a246c4c.sh`, `check-instruction-budget-pre-394c7956.sh`).
+- **Retiré : rien** (option additive ; aucune règle, aucun libellé ni aucune ligne mesurée n'a changé).
+
 ## [v1.54.1] — 2026-11-12 (nœud dans le mandat, plan de mission publié ; Phase 79, SOCL-05) — non publiée
 
 **Patch** (la capacité est portée par la minor v1.54.0 du plan 79-03 : verbes `registry` et `publish-plan` ; aucune release racine, gel des publications, ADR-073 ; aucun bump de la `VERSION` racine). Doctrine du kernel seule, aucun script.
