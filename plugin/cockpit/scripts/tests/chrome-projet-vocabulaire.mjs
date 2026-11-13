@@ -15,7 +15,8 @@ const PANNEAU = `(() => { const n = ${NORM}, p = document.getElementById('panel'
   return JSON.stringify({ kind: n((p.querySelector('.ph .kindlabel, .ph .kind') || {}).textContent), titre: n((p.querySelector('h2.pt') || {}).textContent),
     txt: n(p.textContent), actions: [...p.querySelectorAll('.actions .btn')].map((b) => n(b.textContent)),
     stats: p.querySelectorAll('.stats').length, progress: p.querySelectorAll('[role=progressbar]').length,
-    secs: [...p.querySelectorAll('.sec')].map((s) => ({ h: n(s.querySelector('h3') && s.querySelector('h3').firstChild ? s.querySelector('h3').firstChild.textContent : ''),
+    secs: [...p.querySelectorAll('.sec')].map((s) => ({
+      h: n(s.querySelector('h3') && s.querySelector('h3').firstChild ? s.querySelector('h3').firstChild.textContent : ''),
       rows: [...s.querySelectorAll('.row')].map((r) => n(r.textContent)) })).filter((s) => s.h || s.rows.length) }); })()`;
 
 await executer(chrome, async (s) => {
@@ -42,7 +43,7 @@ await executer(chrome, async (s) => {
     });
     await sec('pv13', async () => {
       await charger('index.html');
-      const id = await lire("JSON.stringify((VibeFlow.graph.files.find((f) => /a\\.js$/.test(f.p)) || {}).p ? 'f:' + VibeFlow.graph.files.find((f) => /a\\.js$/.test(f.p)).p : null)");
+      const id = await lire("JSON.stringify(((f) => (f ? 'f:' + f.p : null))(VibeFlow.graph.files.find((f) => /a\\.js$/.test(f.p))))");
       o.pv13 = await choisir(id);
     });
   }
@@ -70,7 +71,8 @@ await executer(chrome, async (s) => {
       await stabiliser(() => s.ev("document.querySelectorAll('#viewport .node').length"), { pas: 150, max: 5000 });
       o.pv27.vraie = await choisir(await idDe('01-02'));
       await s.ev(`(async () => { const e = [{ id: 'FX-1', texte: 'a', cochee: true, cible: null }, { id: 'FX-2', texte: 'b', cochee: false, cible: null }];
-        VF_EXIGENCES.lireExigences = () => { const c = {}; for (const f of VibeFlow.graph.files) if (/-PLAN\\.md$/.test(f.p)) c['f:' + f.p] = e; return { exigences: e, couverture: c }; };
+        VF_EXIGENCES.lireExigences = () => { const c = {}; for (const f of VibeFlow.graph.files) if (/-PLAN\\.md$/.test(f.p)) c['f:' + f.p] = e;
+          return { exigences: e, couverture: c }; };
         await VibeFlow.rerender(); })()`); await pause(500);
       o.pv27.fausse = await lire(PANNEAU);
     });
@@ -79,9 +81,11 @@ await executer(chrome, async (s) => {
   if (mode === 'pv2b') {
     await sec('pv25', async () => {
       await charger('project.html', '?vue=graphe'); const r = {};
-      r.graphe = await lire("JSON.stringify([VibeFlow.graph.nodes.filter((n) => n.kind === 'exigences').length, VibeFlow.graph.files.filter((f) => /R-\\d/.test(f.name)).length])");
+      r.graphe = await lire("JSON.stringify([VibeFlow.graph.nodes.filter((n) => n.kind === 'exigences').length,"
+        + " VibeFlow.graph.files.filter((f) => /R-\\d/.test(f.name)).length])");
       r.vraie = await choisir(await idDe('01-02'));
-      await s.ev(`(async () => { window.__vraie = VF_EXIGENCES.lireExigences; const e = [{ id: 'FX-1', texte: 'Premier texte factice', cochee: true, cible: null },
+      await s.ev(`(async () => { window.__vraie = VF_EXIGENCES.lireExigences;
+        const e = [{ id: 'FX-1', texte: 'Premier texte factice', cochee: true, cible: null },
         { id: 'FX-2', texte: 'Second texte factice', cochee: false, cible: null }]; VF_EXIGENCES.lireExigences = () => {
           const c = {}; for (const f of VibeFlow.graph.files) if (/-PLAN\\.md$/.test(f.p)) c['f:' + f.p] = e; return { exigences: e, couverture: c }; };
         await VibeFlow.rerender(); })()`); await pause(500);
@@ -102,7 +106,10 @@ await executer(chrome, async (s) => {
       await charger('project.html', '?vue=graphe');
       const ids = await lire("JSON.stringify([...VibeFlow.graph.nodes.map((n) => 'n:' + n.id), ...VibeFlow.graph.files.map((f) => 'f:' + f.p)])");
       const mots = [];
-      for (const id of ids) { const p = await choisir(id); const m = /.{0,24}([Éé]lément|module|Mention).{0,24}/.exec(p.kind + ' | ' + p.txt); if (m) mots.push([id, m[0]]); }
+      for (const id of ids) {
+        const p = await choisir(id), m = /.{0,24}([Éé]lément|module|Mention).{0,24}/.exec(p.kind + ' | ' + p.txt);
+        if (m) mots.push([id, m[0]]);
+      }
       o.pv33 = { n: ids.length, mots };
     });
   }
