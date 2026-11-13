@@ -24,3 +24,13 @@ README du module : § chrome en français (traduction au point d'émission), `?l
 
 ## Points à signaler
 (a) texte d'aide `node …/serve.mjs` : enveloppé tel quel (viewer, `60-export.js`, une entrée de 78), à réécrire par 79-16 ; (b) 51 entrées de table sans site d'émission, listées dans la trace, non supprimées ; (c) aucun texte d'assemblage autre que les constats de Santé n'apparaît en anglais à la parité ; 19 motifs R : dispositions dans la trace.
+
+## Correction ciblée après la revue rv-1021 (2026-11-13)
+Décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; prise par la session principale le 2026-11-13. Amendement daté dans le plan.
+- Majeur : les trois replis d'erreur de l'agent de `serve.mjs` en français à la source, la porte voit `fail(` et `reject(` (213cda8e ; F17.5 à F17.9). Reliquat d'un autre exécuteur repris tel quel dans ce commit : mise en forme de la fonction qui lit `serve.mjs` dans `vf-cockpit-fr-inventaire.mjs`, sans effet de comportement.
+- Parité F22 d'un seul côté, trace migrée (a0ad4ca8 ; F22.1 à F22.5). Ombre de `t` : classe fermée (098658fa ; F17.10, F17.11). R6.3 sur le chemin d'émission réel, mutant intégré (a2eaa458).
+- Un commit par fichier : écart déclaré au plan (viewer 3, 20-health 2, serve 3, 80-vf-fr 3).
+- Rejeux seuls : chrome-fr 143 passés / 0 échec (F22 jouée avec le relevé d'avant), responsive 379 / 0, fr-donnees, robustesse, assemblage, serveur, securite verts.
+- Suites qui nomment l'inventaire ou la porte : assemblage (vert), equipe (E23.4 rouge deux fois dans l'arbre partagé et une fois sur un instantané de HEAD, vert sur l'instantané de a50de579 et sur un second instantané de HEAD : sonde sous charge ou travail non commité de 79-09 sur `vf-cockpit-equipe.mjs`, hors périmètre ; EA2.11, EA2.16, EA3.5, EA3.9 rouges sur instantané seulement, faute de dépôt git).
+- Rouge d'un autre plan : `test-cockpit-vendor.sh` V4 (2 échecs) : `vf-cockpit.mjs` (305 lignes) est modifié non commité par un autre exécuteur ; la suite est verte sinon (176 passés).
+
