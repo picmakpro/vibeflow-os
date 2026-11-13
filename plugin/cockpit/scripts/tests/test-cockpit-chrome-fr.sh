@@ -329,6 +329,31 @@ assert_eq "F17.6 témoin : un gabarit passé à out.fail(…) est nommé des deu
 assert_eq "F17.7 témoin : fail('…') sans préfixe est nommé des deux côtés" "$(lire "$WORK/fail-fail_nu.json" 'JSON.stringify([j.inventaire, j.sources])')" '[["Third failure text"],["Third failure text"]]'
 assert_eq "F17.8 témoin : reject(new Error('…')) est nommé des deux côtés" "$(lire "$WORK/fail-reject.json" 'JSON.stringify([j.inventaire, j.sources])')" '[["Fourth failure text"],["Fourth failure text"]]'
 assert_eq "F17.9 : la copie sans ajout ne nomme rien (le témoin ne rougit pas à vide)" "$(lire "$WORK/fail-aucune.json" 'JSON.stringify([j.inventaire, j.sources])')" '[[],[]]'
+# F17.10, F17.11 : toute forme qui masque t est nommée (const { t }, const [t], { a: t }, paramètre destructuré, méthode m(t) { }), aucune forme licite ne l'est (revue rv-1021, classe de l'ombre)
+cat > "$AUX/ombres.mjs" <<'JS'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scriptsDir] = process.argv;
+const inv = await import(pathToFileURL(path.join(scriptsDir, 'vf-cockpit-fr-inventaire.mjs')).href);
+const ALIAS = 'const t = window.__vfFrT;\n';
+// formes qui masquent le traducteur : chacune doit être nommée (une fois) ; contrôles : formes licites, jamais nommées
+const MASQUE = {
+  const_destructure: 'const { t } = o;', const_tableau: 'const [t] = a;', const_renomme: 'const { a: t } = o;', const_deuxieme: 'const { a, t } = o;',
+  const_ligne: 'const t = (x) => x;', parametre_fleche: 'const f = (t) => t;', parametre_destructure: 'const f = ({ t }) => t;',
+  fonction_destructure: 'function f(a, { t }) { return t; }', methode_objet: 'const o = { m(t) { return t; } };', methode_classe: 'class C { m(t) { return t; } }',
+  methode_asynchrone: 'const o = { async m(t) { return t; } };',
+};
+const LICITE = {
+  utilisation: 'const x = t("Hello");', cle_objet: 'const o = { t: 1 };', objet_appel: 'call({ a: t });', condition: 'if (t) { run(); }', boucle: 'while (t) { run(); }',
+  commutateur: 'switch (t) { default: }', appel_fleche: 'xs.map((v) => t(v));', alias_seul: '',
+};
+const out = {};
+for (const [k, v] of Object.entries({ ...MASQUE, ...LICITE })) { const L = inv.litteraux(ALIAS + v); out[k] = L.alias ? L.ombres.length : 'sans alias'; }
+console.log(JSON.stringify(out));
+JS
+node "$AUX/ombres.mjs" "$SCRIPTS" > "$WORK/ombres.json" 2>"$WORK/ombres.err" || echo '{}' > "$WORK/ombres.json"
+assert_eq "F17.10 témoin : chacune des onze formes qui masquent t est nommée une fois (const, const { }, const [ ], renommage, flèche, paramètre destructuré, function, méthodes)" "$(lire "$WORK/ombres.json" 'JSON.stringify(Object.entries(j).filter(([k]) => /^(const_|parametre_|fonction_|methode_)/.test(k)).map(([k, v]) => k + "=" + v))')" '["const_destructure=1","const_tableau=1","const_renomme=1","const_deuxieme=1","const_ligne=1","parametre_fleche=1","parametre_destructure=1","fonction_destructure=1","methode_objet=1","methode_classe=1","methode_asynchrone=1"]'
+assert_eq "F17.11 : les formes licites (usage, clé d'objet, objet en argument, if, while, switch, flèche appelante, alias seul) ne sont jamais nommées" "$(lire "$WORK/ombres.json" 'JSON.stringify(Object.entries(j).filter(([k]) => !/^(const_|parametre_|fonction_|methode_)/.test(k)).map(([k, v]) => k + "=" + v))')" '["utilisation=0","cle_objet=0","objet_appel=0","condition=0","boucle=0","commutateur=0","appel_fleche=0","alias_seul=0"]'
 # F22.1 à F22.5 (sans navigateur) : un écart admis a un CÔTÉ ; un texte admis « avant seulement » ne passe pas s'il revient « après seulement » (retour à l'anglais), revue rv-1021
 ET22="$SCRIPTS/tests/chrome-fr-etats.mjs"; D22="$WORK/f22"; mkdir -p "$D22"
 printf '%s' '{"c-fr":{"s":["Hello EN"]}}' > "$D22/avant.json"; printf '%s' '{"c-fr":{"s":["Bonjour"]}}' > "$D22/apres.json"

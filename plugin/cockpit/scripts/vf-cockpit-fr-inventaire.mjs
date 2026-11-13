@@ -42,7 +42,10 @@ function parametres(src, k) { // la liste de paramètres qui contient k est-elle
   let d = 0, j = k; for (; j > 0 && j > k - 400; j--) { const c = src[j - 1]; if (c === ')') d++; else if (c === '(') { if (d === 0) break; d--; } }
   if (src[j - 1] !== '(') return false;
   let f = j; d = 1; while (f < src.length && d) { const c = src[f++]; d += c === '(' ? 1 : c === ')' ? -1 : 0; }
-  return /^\s*=>/.test(src.slice(f, f + 10)) || /(function\s*\w*|catch)\s*$/.test(src.slice(Math.max(0, j - 40), j - 1));
+  const avant = src.slice(Math.max(0, j - 40), j - 1);
+  // fonction fléchée, function, catch, ou méthode (`m(t) {` : un nom qui n'est pas un mot-clé de bloc, puis le corps)
+  return /^\s*=>/.test(src.slice(f, f + 10)) || /(function\s*\w*|catch)\s*$/.test(avant)
+    || (/^\s*\{/.test(src.slice(f, f + 10)) && /\b(?!(?:if|for|while|switch|with|return|typeof|await|yield|new|else|do|in|of)\b)[\w$]+\s*$/.test(avant));
 }
 function sonde(out, src, k) { // au niveau du code : un appel du traducteur dont la clé n'est pas un littéral, une déclaration de `t` autre que l'alias
   if (/[\w$.]/.test(src[k - 1] || '')) return;
@@ -55,7 +58,9 @@ function sonde(out, src, k) { // au niveau du code : un appel du traducteur dont
   }
   if (!/^t(?![\w$])/.test(ap) || /^t\s*:/.test(ap)) return;
   const av = src.slice(Math.max(0, k - 200), k), decl = /\b(const|let|var)\s+$/.exec(av);
-  const lie = decl || /\b(?:const|let|var)\s*[{[][^=;()]*[,{[]\s*$/.test(av) || /^t\s*=>/.test(ap) || (/[(,]\s*$/.test(av) && parametres(src, k));
+  // lie : `const t`, `const { t }`, `const [a, t]`, `const { a: t }`, `t =>`, un paramètre simple ou destructuré (`({ t }) =>`, `f(a, { t })`), une méthode `m(t) {`
+  const lie = decl || /\b(?:const|let|var)\s*[{[](?:[^=;()]*[,:{[])?\s*$/.test(av) || /^t\s*=>/.test(ap)
+    || ((/[(,]\s*$/.test(av) || /[(,]\s*[{[]\s*(?:[^()=;{}[\]]*[,:]\s*)?$/.test(av)) && parametres(src, k));
   if (lie && !(decl && /^t\s*=\s*window\.__vfFrT\s*;/.test(ap))) out.ombres.push({ pos: k, texte: decl ? `${decl[1]} t` : 'paramètre t' });
 }
 export function litteraux(src) {
