@@ -117,7 +117,17 @@
   tiroir.append(barre, R.el('p', 'vf-git-aide', 'Lecture seule. Chaque action est une commande à copier.'), corps, live);
   tiroir.hidden = true;
 
-  let ouvert = false, donnees = null, seq = 0, avant = null;
+  let ouvert = false, donnees = null, seq = 0, avant = null, demontage = false;
+  // 80-13 : l'état « ouvert » voyage dans le lien (git=1) et dans la mémoire de session (au nom du lab), jamais dans le stockage durable
+  const cleMemo = () => 'vf-tiroirs:' + String(((SC.graph || {}).project || {}).name || '').replace(/ — (Projet|Équipe)$/, '');
+  const lireMemo = () => { try { const j = JSON.parse(sessionStorage.getItem(cleMemo())); return !!j && j.git === true; } catch { return false; } };
+  const ecrireMemo = (v) => {
+    try {
+      const k = cleMemo(), j = JSON.parse(sessionStorage.getItem(k));
+      sessionStorage.setItem(k, JSON.stringify({ ...(j && typeof j === 'object' ? j : {}), git: v }));
+    } catch { /* stockage refusé */ }
+  };
+  const ecrireLien = (v) => { if (typeof SC.paramVue === 'function') SC.paramVue('git', v); };
   const etatPages = { n: 0 }; // rangées montrées (80-06) : gardé d'une relecture à l'autre
   const annoncer = (txt) => { live.textContent = txt; };
   const visible = (e) => !!e && !e.hidden && e.getClientRects().length > 0;
@@ -177,12 +187,13 @@
       });
   }
 
-  const ouvrir = () => {
+  const ouvrir = (sansFocus) => { // sansFocus === true : rouvert par un lien ou par la mémoire (un événement, pas l'humain) : le focus reste où il est
     if (ouvert) return;
     ouvert = true; avant = document.activeElement;
     tiroir.hidden = false; tiroir.classList.add('vf-git-entree'); document.body.classList.add('vf-git-ouvert');
     if (!donnees) recharger();
-    eviter(); titre.focus({ preventScroll: true });
+    eviter(); if (sansFocus !== true) titre.focus({ preventScroll: true });
+    ecrireLien('1'); ecrireMemo(true);
     // 80-02 : le tiroir s'inscrit dans la pile (ordre d'Échap), sans piège ni prise de focus
     window.VF_SURCOUCHES.ouvrir(tiroir, { modale: false, ouvreur: avant, fermer: () => fermer() });
     emettre('vf-git:etat', { ouvert: true }); crochet('etat', true);
@@ -193,6 +204,7 @@
     tiroir.hidden = true; tiroir.classList.remove('vf-git-entree'); document.body.classList.remove('vf-git-ouvert'); window.VF_SURCOUCHES.fermer(tiroir);
     const cible = [ligne(), ouvreur(), plus()].find(visible) || (avant && document.contains(avant) && visible(avant) ? avant : null);
     if (cible && sansFocus !== true) cible.focus({ preventScroll: true });
+    if (!demontage) { ecrireLien(null); ecrireMemo(false); } // le démontage d'un onglet ne dit pas que l'humain a fermé le tiroir
     emettre('vf-git:etat', { ouvert: false }); crochet('etat', false);
   };
   // Entrée publique pour les autres phases (74) : ouvre le tiroir et son volet sur un commit. Valide le sha avant tout effet ; ne pagine ni ne relit la liste ;
@@ -236,9 +248,12 @@
     if (window.ResizeObserver && scene) obs(ResizeObserver, scene, undefined, () => eviter());
     sur(window, 'vf-git:basculer', basculer); sur(document, 'keydown', surOuvreur, true); sur(window, 'keydown', surTouche);
     sur(window, 'resize', eviter); sur(MOBILE, 'change', reevaluer);
+    // 80-10 pose l'adresse de l'onglet d'arrivée après le chargement : le lien redit le tiroir
+    sur(document, 'vf:onglet', () => { if (ouvert) ecrireLien('1'); });
     obs(MutationObserver, document.body, { childList: true, attributes: true, attributeFilter: ['class', 'style'] }, eviter); // le Terminal s'ouvre ou se ferme, sa pastille arrive : la réserve basse change
+    if (SC.lireParamVue && (SC.lireParamVue('git') === '1' || lireMemo())) ouvrir(true); // lien d'abord, puis mémoire de session ; sans focus
     return () => {
-      pose.splice(0).forEach((f) => f()); if (ouvert) fermer(true);
+      pose.splice(0).forEach((f) => f()); demontage = true; if (ouvert) fermer(true); demontage = false;
       if (demonter) demonter();
       tiroir.remove(); style.remove();
     };
