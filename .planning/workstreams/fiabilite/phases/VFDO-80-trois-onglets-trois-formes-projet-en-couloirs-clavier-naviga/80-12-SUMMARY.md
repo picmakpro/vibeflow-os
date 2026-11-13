@@ -32,3 +32,6 @@ rituel levé : régime allégé (consigne de Samuel, message session principale,
 
 ## CHANGELOG demandé (80-18)
 Cockpit : la touche C cadre d'un geste la carte sélectionnée et ses voisins du niveau, sans nouvelle mise en page et sans descendre sous la taille de lecture ; elle ne prend jamais la copie (⌘C), la saisie ni l'onglet Équipe.
+
+## Rejeu CA2.5 par `VF_ONGLETS.aller` (après 80-10)
+CA2.5 passe désormais par `VF_ONGLETS.aller` (aide `onglet` de `chrome-cadrer.mjs`) : cadrer 17/0. Rouge : sans objet, avant 80-10 `aller` n'existait pas (0 occurrence dans `00-vf-onglets.js` à `2736fe67^`).

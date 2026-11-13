@@ -9,7 +9,10 @@ status: executed-partiel
 
 rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
 
-SF3.5 : à ajouter après 80-10 (VF_ONGLETS) — non écrit ici, `VF_ONGLETS.aller` n'existe pas encore dans la branche.
+SF3.5 : ajouté après 80-10 (`test-cockpit-sante-fr.sh`, 25/0) : Code, Projet, Code par `VF_ONGLETS.aller`, promesses tenues, `performance.timeOrigin` inchangé ; titre, détail et invite du constat de SF1.1 égaux à ceux du collecteur.
+- Écart : absence de rechargement prouvée par `performance.timeOrigin`, non par un marqueur sur `window` (la portée d'onglet de la 79 retire les propriétés posées après le premier rendu).
+- Rouge vu : sans objet par trace ; sur la tête d'avant 80-10 (`2736fe67^`), `00-vf-onglets.js` ne contient pas `aller` (0 occurrence, 4 après), le cas ne pouvait que rougir.
+- Observation : avec la modale d'invite ouverte, `aller('projet')` est rejetée (« Cannot read properties of null (reading 'querySelectorAll') ») ; le cas ferme la modale avant. Cause non cherchée dans `00-vf-onglets.js` (non touché).
 
 ## Livré
 
