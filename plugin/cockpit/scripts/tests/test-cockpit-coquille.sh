@@ -612,6 +612,49 @@ if cockpit_module_muter service serve.mjs "s|res.writeHead(404); return res.end(
 else assert_eq "M-SERVICE — mutant sans effet (ancre garde:coquille-404 absente ou inchangée)" "sans effet" "effet"; fi
 unset COCKPIT_MODULE
 
+echo "=== P — l'aide de mutation de page et le détecteur des mutations de page (79-16, tâche 5) ==="
+src_pages() { local a="$1/skills/cockpit-moteur/assets" f; for f in "$a/viewer.html" "$a/graph-query.js" "$a"/ui/*.js; do printf '%s\n' "$f"; done; }
+somme_depot() { src_pages "$MOD" | xargs cat | cksum; }
+SD0="$(somme_depot)"
+cockpit_module_muter_page p1abs 's|ANCRE-QUI-N-EXISTE-PAS-79-16|x|' 2>/dev/null; P11=$?
+assert_eq "P1.1 — une ancre absente de toutes les sources de page : code 1, aucune copie utilisable laissée" "$P11|$([ -d "$WORK/mod-p1abs" ] && echo copie-laissee || echo aucune-copie)|${COCKPIT_MODULE:-aucun}" "1|aucune-copie|aucun"
+ANC='<span class="meta">${h(size)}</span>'
+unset COCKPIT_MODULE; cockpit_module_muter_page p12 "s#$ANC#<span class=\"meta\">\${size}</span>#"; P12=$?; CP12="${COCKPIT_MODULE:-}"; unset COCKPIT_MODULE
+ATTENDUS="$(for f in $(src_pages "$MOD"); do grep -qF "$ANC" "$f" && printf '%s\n' "${f#$MOD/}"; done | LC_ALL=C sort | tr '\n' ' ')"
+DIFF="$(for f in $(src_pages "$MOD"); do g="$CP12/${f#$MOD/}"; cmp -s "$f" "$g" || printf '%s\n' "${f#$MOD/}"; done | LC_ALL=C sort | tr '\n' ' ')"
+assert_eq "P1.2 — sinon code 0, exactement les fichiers qui portent l'ancre diffèrent (cmp), le module du dépôt est identique avant et après (sommes)" "$P12|$([ -n "$ATTENDUS" ] && [ "$DIFF" = "$ATTENDUS" ] && echo egal || echo "attendus[$ATTENDUS] diffèrent[$DIFF]")|$([ "$SD0" = "$(somme_depot)" ] && echo depot-intact)" "0|egal|depot-intact"
+AN3='window.VibeFlow = Object.freeze('
+cockpit_module_muter_page p13 "s|$AN3|$AN3/*MQ16-ASSEMBLEE*/|" 2>/dev/null; P13=$?; CP13="${COCKPIT_MODULE:-}"; unset COCKPIT_MODULE
+assert_eq "P1.3 — une ancre écrite contre la page ASSEMBLÉE (nom VibeFlow, que la source porte sous son nom d'origine) est trouvée : l'aide renomme d'abord" "$P13|$(grep -rlF 'MQ16-ASSEMBLEE' "$CP13/skills/cockpit-moteur/assets" 2>/dev/null | wc -l | tr -d ' ')" "0|1"
+base_srv; unset COCKPIT_MODULE; cockpit_arreter
+if [ "$P13" = 0 ]; then
+  COCKPIT_MODULE="$CP13" demarrer "$LAB"; P14L=$RL; rq GET /_vf/moteur.js "$WORK/p14.js"
+  assert_eq "P1.4 — le serveur lancé par cockpit_lancer sur la copie publie son empreinte (cockpit_module_charge, code 0) ET /_vf/moteur.js porte le fragment muté (témoin d'effet : le mutant est chargé)" "$P14L|$(node "$OR" marque "$WORK/p14.js" MQ16-ASSEMBLEE)" "0|oui"
+  cockpit_arreter; unset COCKPIT_MODULE
+else assert_eq "P1.4 — sans copie (P1.3 rouge)" "sans copie" "copie"; fi
+# P1.5 mutant M-AIDE-SANS-RENOMMAGE : l'aide applique la substitution au texte NON renommé -> l'ancre de P1.3 n'existe plus
+( _cockpit_page_renommer() { cp "$2" "$3"; }; cockpit_module_muter_page p15 "s|$AN3|$AN3/*MQ16-ASSEMBLEE*/|" 2>/dev/null; echo "rc=$?" ) > "$WORK/p15.out"
+assert_eq "M-AIDE-SANS-RENOMMAGE — l'aide sans le renommage ne trouve plus l'ancre écrite contre la page assemblée : P1.3 rougit (code 1)" "$(cat "$WORK/p15.out")" "rc=1"
+cat > "$AUX/exceptions.txt" <<'EXC'
+# fichier|fragment de la ligne|motif : la page assemblée reste ÉCRITE (instantané ouvrable en fichier, base de l'export) ; ces lignes ne mutent rien de ce que le serveur sert
+test-cockpit-chrome-fr.sh|const f=process.argv[1],fs=require("fs")|copie de la page assemblée, lue en fichier (file://) par l'inventaire des chaînes : jamais servie
+test-cockpit-chrome-fr.sh|cp "$O12/index.html"|copie de la page assemblée, lue en fichier (file://) par l'inventaire des chaînes : jamais servie
+test-cockpit-coquille.sh|window.__plante16 = 1</script></body>|plantation voulue par la suite de la coquille (E9) : le fichier planté n'est jamais servi
+test-cockpit-coquille.sh|mkdir -p "$WORK/faux-tests"|texte synthétique du témoin positif du détecteur (P2.2) : écrit dans le dossier de travail, jamais servi
+test-cockpit-reseau.sh|charger() { node "$AUX/get.mjs"|lecture de pages servies vers le dossier de travail : aucune écriture dans la sortie
+test-cockpit-securite.sh|const urls = ['project.html#'|liste d'adresses de navigation, aucune écriture
+test-cockpit-serveur.sh|mkdir -p "$WORK/lab-eq"|gabarit de DONNÉES d'un lab factice pour un serveur en processus : jamais servi
+test-cockpit-terminal-lanceur.sh|L6 — SAF-1|texte d'un libellé d'assertion, aucune écriture
+test-cockpit-terminal-lanceur.sh|L12b|texte d'un libellé d'assertion, aucune écriture
+test-cockpit-terminal-lanceur.sh|L12c|texte d'un libellé d'assertion, aucune écriture
+EXC
+node "$TESTS/coquille-propriete.mjs" detecteur-pages "$TESTS" "$AUX/exceptions.txt" > "$WORK/p21.out"
+assert_eq "P2.1 — aucune écriture de page de sortie hors de la liste d'exceptions FERMÉE (chacune porte son motif) : le détecteur ne nomme aucune suite" "$(sed -n '2,$p' "$WORK/p21.out" | head -3 | tr '\n' ' ')|$(sed -n 1p "$WORK/p21.out" | sed 's/touches=\([0-9]*\) exceptions=\([0-9]*\)/\1 \2/' | awk '{print ($1==$2 && $1>0)?"toutes-excusees":"reste"}')" "|toutes-excusees"
+mkdir -p "$WORK/faux-tests"; printf '%s\n' 'mutant() { sed -i.bak "s#a#b#" "$o/project.html"; }' > "$WORK/faux-tests/test-cockpit-faux.sh"
+assert_eq "P2.2 — témoin positif : un texte de suite synthétique qui écrit dans la page d'une sortie est détecté" "$(node "$TESTS/coquille-propriete.mjs" detecteur-pages "$WORK/faux-tests" "$AUX/exceptions.txt" | sed -n 2p | cut -d: -f1)" "test-cockpit-faux.sh"
+: > "$AUX/exceptions-vide.txt"
+assert_eq "P2.3 — mutant : liste d'exceptions vidée : P2.1 rougit et nomme les suites exceptées (chrome-fr, coquille, reseau, securite, serveur, terminal-lanceur)" "$(node "$TESTS/coquille-propriete.mjs" detecteur-pages "$TESTS" "$AUX/exceptions-vide.txt" | sed '1d' | cut -d: -f1 | LC_ALL=C sort -u | tr '\n' ' ')" "test-cockpit-chrome-fr.sh test-cockpit-coquille.sh test-cockpit-reseau.sh test-cockpit-securite.sh test-cockpit-serveur.sh test-cockpit-terminal-lanceur.sh "
+
 # FIN
 cockpit_arreter
 vf_hyg_assert

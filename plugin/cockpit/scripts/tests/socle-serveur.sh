@@ -25,6 +25,8 @@
 #   cockpit_module_muter <nom> <fichier-du-module> <expression sed>   copie, mutation, exporte COCKPIT_MODULE vers la copie ; code 1 si la cible manque ou si la
 #       copie n'a pas changé (le contrat des mutant() actuels). Le nom de base désigne le dossier : serve.mjs, graph-query.js, query-cli.mjs côté moteur, vf-cockpit-* côté scripts, vue.js client.js q.css (79-11) sous assets/ui/terminal, les neuf fichiers du tiroir et du lancement sous assets/ui/tiroir ; viewer.html, vf-coquille.js, vf-coquille-portee.js et les `NN-*.js` de ui/ (79-16).
 #       À appeler dans le shell courant (pas dans $(…)) pour que l'export survive.
+#   cockpit_module_muter_page <nom> <expression sed>   (79-16) copie du module avec son moteur, substitution sur chaque source de page (viewer.html, graph-query.js, ui/*.js) renommée ; exporte COCKPIT_MODULE ; code 1 si aucun fichier n'a changé
+#   cockpit_page_muter_dans <copie> <expression sed>   (79-16) la même substitution sur une copie déjà faite (suites à copie par manche)
 #   cockpit_module_charge <racine>   code 0 si l'empreinte publiée par le serveur lancé (server.json) égale celle que calcule le vf-cockpit-module.mjs DE CETTE racine
 #   cockpit_vivant                   code 0 si /api/status du serveur lancé répond 200 et publie une empreinte de 12 caractères hexadécimaux (contrôle de vie des témoins négatifs)
 #   cockpit_exporter <dossier> <fichier> [options]   le mode export de serve.mjs (celui du module si COCKPIT_MODULE est posé, sinon celui de la sortie)
@@ -152,6 +154,52 @@ cockpit_module_muter_p() { # <nom> <expression sed> (79-11) : la mutation vise d
     fi
   done
   return $ok
+}
+# 79-16 : les sources de la page (viewer.html, graph-query.js, chaque ui/*.js de premier niveau) vivent dans le MODULE, plus dans la sortie : un mutant de page est une copie du module.
+# Les motifs des mutants sont écrits contre la page ASSEMBLÉE (renommée : VibeFlow, VF_COCKPIT…) ; l'aide renomme donc d'abord chaque source (le renommage du module, idempotent : la
+# coquille renomme de nouveau au démarrage), rend leurs quatre emplacements de gabarit à leur nom d'origine, puis applique la substitution.
+#   cockpit_page_muter_dans <racine d'une copie du module> <expression sed>   substitution sur chaque source de page de la copie ; code 0 si au moins un fichier a changé (par rapport à sa forme renommée), 1 sinon (la copie n'est alors pas modifiée)
+#   cockpit_module_muter_page <nom> <expression sed>   copie du module AVEC son moteur, substitution appliquée par cockpit_page_muter_dans ; exporte COCKPIT_MODULE ; code 1 si aucun fichier n'a changé
+_cockpit_page_renommer() { # <copie> <fichier> <sortie> : le fichier renommé comme la page assemblée, ses quatre emplacements de gabarit rendus à leur nom d'origine
+  "${_CK_NODE:-node}" --input-type=module -e 'import fs from "node:fs"; const { renommerTexte } = await import(process.argv[1]); const [, , src, out] = process.argv;
+    let t = renommerTexte(fs.readFileSync(src, "utf8")); for (const k of ["DATA", "TITLE", "LOGO", "FAVICON"]) t = t.split("__VF_COCKPIT_" + k + "__").join("__FLOORPLAN_" + k + "__"); fs.writeFileSync(out, t);' "file://$1/scripts/vf-cockpit-rename.mjs" "$2" "$3"
+}
+_cockpit_page_sources() { local a="$1/skills/cockpit-moteur/assets" f; for f in "$a/viewer.html" "$a/graph-query.js" "$a"/ui/*.js; do [ -f "$f" ] && printf '%s\n' "$f"; done; }
+cockpit_page_muter_dans() {
+  local copie="${1:-}" expr="${2:-}" f n=0 ren mut
+  [ -n "$copie" ] && [ -n "$expr" ] && [ -f "$copie/scripts/vf-cockpit-rename.mjs" ] || { echo "cockpit_page_muter_dans : <copie du module> <expression sed> attendus" >&2; return 1; }
+  while IFS= read -r f; do
+    ren="$f.ren"; mut="$f.mut"
+    _cockpit_page_renommer "$copie" "$f" "$ren" || { rm -f "$ren"; return 1; }
+    sed "$expr" "$ren" > "$mut" || { rm -f "$ren" "$mut"; return 1; }
+    if cmp -s "$ren" "$mut"; then rm -f "$mut"; else mv "$mut" "$f"; n=$((n+1)); fi
+    rm -f "$ren"
+  done < <(_cockpit_page_sources "$copie")
+  [ "$n" -gt 0 ] || { echo "cockpit_page_muter_dans : aucune source de page n'a changé (ancre absente)" >&2; return 1; }
+  return 0
+}
+#   cockpit_page_muter_litteral <copie> <ancien> <nouveau> [unique]   la même chose pour un texte LITTÉRAL (aucune expression régulière) : chaque occurrence, dans chaque source qui la porte ;
+#       code 1 si le motif est absent de toutes les sources, 2 avec `unique` si le total des occurrences n'est pas exactement 1 (un mutant ambigu pourrait viser le mauvais fichier)
+cockpit_page_muter_litteral() {
+  local copie="${1:-}"
+  [ -n "$copie" ] && [ -n "${2:-}" ] && [ -f "$copie/scripts/vf-cockpit-rename.mjs" ] || { echo "cockpit_page_muter_litteral : <copie du module> <ancien> <nouveau> attendus" >&2; return 1; }
+  "${_CK_NODE:-node}" --input-type=module -e 'import fs from "node:fs"; import path from "node:path";
+    const [, copie, ancien, nouveau, unique] = process.argv; const { renommerTexte } = await import(`file://${copie}/scripts/vf-cockpit-rename.mjs`);
+    const a = path.join(copie, "skills", "cockpit-moteur", "assets"); const fich = [path.join(a, "viewer.html"), path.join(a, "graph-query.js")];
+    for (const n of fs.readdirSync(path.join(a, "ui"))) if (n.endsWith(".js")) fich.push(path.join(a, "ui", n));
+    const fixe = (t) => { for (const k of ["DATA", "TITLE", "LOGO", "FAVICON"]) t = t.split("__VF_COCKPIT_" + k + "__").join("__FLOORPLAN_" + k + "__"); return t; };
+    const lots = fich.filter((f) => fs.existsSync(f)).map((f) => ({ f, t: fixe(renommerTexte(fs.readFileSync(f, "utf8"))) })).filter((x) => x.t.includes(ancien));
+    const total = lots.reduce((n, x) => n + x.t.split(ancien).length - 1, 0);
+    if (total === 0) { console.error("cockpit_page_muter_litteral : motif introuvable dans les sources de page"); process.exit(1); }
+    if (unique === "unique" && total !== 1) { console.error("cockpit_page_muter_litteral : motif ambigu (" + total + " occurrences)"); process.exit(2); }
+    for (const x of lots) fs.writeFileSync(x.f, x.t.split(ancien).join(nouveau));' "$copie" "$2" "${3:-}" "${4:-}"
+}
+cockpit_module_muter_page() {
+  local nom="${1:-}" expr="${2:-}" copie
+  [ "$#" -eq 2 ] && [ -n "$nom" ] && [ -n "$expr" ] || { echo "cockpit_module_muter_page : <nom> <expression sed> attendus" >&2; return 1; }
+  copie="$(cockpit_module_copie "${WORK:-${TMPDIR:-/tmp}}/mod-$nom")" || return 1
+  cockpit_page_muter_dans "$copie" "$expr" || { rm -rf "$copie"; return 1; } # une copie sans effet n'est jamais laissée utilisable
+  export COCKPIT_MODULE="$copie"; return 0
 }
 cockpit_module_charge() { # <racine> : l'empreinte que le serveur a publiée = celle que calcule le module de cette racine (1 sinon : jamais un vert à vide)
   local r="${1:-}" pub att
