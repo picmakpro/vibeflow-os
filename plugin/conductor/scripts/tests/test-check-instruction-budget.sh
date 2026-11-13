@@ -30,6 +30,9 @@
 # grande légitime) qui doivent rester OK/exit 0 — un « 2 » de complaisance serait aussi faux qu'un
 # « 0 » de complaisance.
 #
+# Phase 77 (contrat #vf-budget@1) : section TI (TI1-TI9, sortie machine --format=tsv, NON-APPLICABLE en lab tiers, texte identique à
+# la copie figée du gate) et mutants MI1-MI6, un par cas visé.
+#
 # Comparaison de fixtures : cmp, comm, cksum uniquement — jamais diff (proxifié menteur sur ce
 # poste, cf. test-check-divergence.sh:4-6).
 set -uo pipefail
@@ -1022,6 +1025,113 @@ else
 fi
 
 # ===================================================================================================
+# TI — sortie machine --format=tsv, contrat #vf-budget@1 (Phase 77, P77-D-03, P77-D-05)
+# ===================================================================================================
+echo ""
+echo "== TI — sortie machine --format=tsv (contrat #vf-budget@1) =="
+TAB="$(printf '\t')"
+trun() { # <root> [args...] : sortie standard seule du gate (le texte d'erreur est ecarte)
+  local path="$1"; shift
+  bash "$TARGET" --path "$path" "$@" 2>/dev/null
+}
+ti_row() { printf '%s\t%s\t%s\t%s\t%s\t%s' "$1" "$2" "$3" "$4" "$5" "$6"; }
+TI_D="$(mk_root ti-densite)"
+gen_lines "$TI_D/plugin/demo/agents/l250.md" 250
+gen_lines "$TI_D/plugin/demo/agents/l251.md" 251
+gen_lines "$TI_D/plugin/demo/agents/l301.md" 301
+mkdir -p "$TI_D/plugin/demo/s500" "$TI_D/plugin/demo/s501"
+gen_lines "$TI_D/plugin/demo/s500/SKILL.md" 500
+gen_lines "$TI_D/plugin/demo/s501/SKILL.md" 501
+ti_obs_agents() { # <cible> : lignes agent de la fixture de densite (trois tailles de bord)
+  local t="$1" out; local save="$TARGET"; TARGET="$t"; out="$(trun "$TI_D" --format=tsv)"; TARGET="$save"
+  printf '%s\n' "$out" | awk -F'\t' '$1 == "agent" && $2 ~ /l25[01]|l301/ { printf "%s=%s/%s/%s/%s;", $2, $3, $4, $5, $6 }'
+}
+ti_obs_skills() { # <cible> : lignes skill de la fixture de densite
+  local t="$1" out; local save="$TARGET"; TARGET="$t"; out="$(trun "$TI_D" --format=tsv)"; TARGET="$save"
+  printf '%s\n' "$out" | awk -F'\t' '$1 == "skill" { printf "%s=%s/%s/%s/%s;", $2, $3, $4, $5, $6 }'
+}
+TI1_OUT="$(trun "$TI_D" --format=tsv)"
+trun "$TI_D" --format=tsv > /dev/null; TI1_RC=$?
+run "$TI_D" > /dev/null; TI1_RCT=$?
+if [ "$TI1_RC" -eq "$TI1_RCT" ] && [ "$(printf '%s\n' "$TI1_OUT" | sed -n 1p)" = "#vf-budget@1${TAB}check-instruction-budget" ]; then
+  ok "TI1 — --format=tsv : meme code de retour que le mode texte ($TI1_RC) et en-tete #vf-budget@1 + tabulation + check-instruction-budget"
+else
+  ko "TI1 — en-tete et code de retour" "rc=$TI1_RCT et en-tete #vf-budget@1<TAB>check-instruction-budget" "rc=$TI1_RC en-tete=[$(printf '%s\n' "$TI1_OUT" | sed -n 1p)]"
+fi
+TI2_OBS="$(ti_obs_agents "$SCRIPT")"
+TI2_EXP="plugin/demo/agents/l250.md=250/300/lignes/OK;plugin/demo/agents/l251.md=251/300/lignes/AVERTISSEMENT;plugin/demo/agents/l301.md=301/300/lignes/DEPASSE;"
+if [ "$TI2_OBS" = "$TI2_EXP" ]; then ok "TI2 — agents : 250 lignes OK, 251 AVERTISSEMENT, 301 DEPASSE, budget 300, unite lignes"; else ko "TI2 — agents" "$TI2_EXP" "$TI2_OBS"; fi
+TI3_OBS="$(ti_obs_skills "$SCRIPT")"
+TI3_EXP="plugin/demo/s500/SKILL.md=500/500/lignes/OK;plugin/demo/s501/SKILL.md=501/500/lignes/DEPASSE;"
+if [ "$TI3_OBS" = "$TI3_EXP" ]; then ok "TI3 — skills : 500 lignes OK, 501 DEPASSE, budget 500"; else ko "TI3 — skills" "$TI3_EXP" "$TI3_OBS"; fi
+ti_obs_socle() { # <cible> <racine> : lignes socle et socle-baseline
+  local t="$1" r="$2" out; local save="$TARGET"; TARGET="$t"; out="$(trun "$r" --format=tsv)"; TARGET="$save"
+  printf '%s\n' "$out" | awk -F'\t' '$1 == "socle" || $1 == "socle-baseline" { printf "%s|%s|%s|%s|%s|%s;", $1, $2, $3, $4, $5, $6 }'
+}
+TI4_TOK=$(( $(boot_expected_total) / 4 ))
+ti4_fix() { # <nom> <valeur de la ligne @bootstrap:socle, ou - pour aucune>
+  local d; d="$(mk_root "$1")"; w_bootstrap_fixture "$d"
+  [ "$2" = "-" ] || printf 'plugin/demo/agents/a.md\t4\t1\n@bootstrap:socle\t0\t%s\n' "$2" | w_baseline "$d"
+  printf '%s' "$d"
+}
+TI4_EG="$(ti4_fix ti4-egale "$TI4_TOK")"; TI4_HA="$(ti4_fix ti4-haut "$((TI4_TOK - 1))")"; TI4_BA="$(ti4_fix ti4-bas "$((TI4_TOK + 5))")"; TI4_NO="$(ti4_fix ti4-sans -)"
+TI4_S="socle|.|$TI4_TOK|2000|jetons|OK;"
+[ "$(ti_obs_socle "$SCRIPT" "$TI4_EG")" = "${TI4_S}socle-baseline|-|$TI4_TOK|-|jetons|EGALE;" ] && TI4A=ok || TI4A="$(ti_obs_socle "$SCRIPT" "$TI4_EG")"
+[ "$(ti_obs_socle "$SCRIPT" "$TI4_HA")" = "socle|.|$TI4_TOK|2000|jetons|DEPASSE;socle-baseline|-|$((TI4_TOK - 1))|-|jetons|AU-DESSUS;" ] && TI4B=ok || TI4B="$(ti_obs_socle "$SCRIPT" "$TI4_HA")"
+[ "$(ti_obs_socle "$SCRIPT" "$TI4_BA")" = "${TI4_S}socle-baseline|-|$((TI4_TOK + 5))|-|jetons|EN-DESSOUS;" ] && TI4C=ok || TI4C="$(ti_obs_socle "$SCRIPT" "$TI4_BA")"
+[ "$(ti_obs_socle "$SCRIPT" "$TI4_NO")" = "$TI4_S" ] && TI4D=ok || TI4D="$(ti_obs_socle "$SCRIPT" "$TI4_NO")"
+if [ "$TI4A$TI4B$TI4C$TI4D" = "okokokok" ]; then ok "TI4 — socle et socle-baseline : EGALE, AU-DESSUS, EN-DESSOUS selon la ligne @bootstrap:socle ; sans ligne, pas de socle-baseline"; else ko "TI4 — socle" "okokokok" "egale=[$TI4A] haut=[$TI4B] bas=[$TI4C] sans=[$TI4D]"; fi
+TI_TIERS="$TMP/ti-tiers"; mkdir -p "$TI_TIERS"
+TI5_TXT_OUT="$(bash "$TARGET" --path "$TI_TIERS" 2>"$TMP/ti5.err")"; TI5_TXT_RC=$?
+if [ -z "$TI5_TXT_OUT" ] && [ "$TI5_TXT_RC" -eq 2 ] && [ -s "$TMP/ti5.err" ]; then ok "TI5 — sonde positive : lab tiers en mode texte, sortie standard vide, message sur la sortie d'erreur, rc 2"; else ko "TI5 — sonde positive" "stdout vide, stderr non vide, rc 2" "stdout=[$TI5_TXT_OUT] rc=$TI5_TXT_RC"; fi
+TI5_OUT="$(trun "$TI_TIERS" --format=tsv)"; trun "$TI_TIERS" --format=tsv > /dev/null; TI5_RC=$?
+TI5_NA="$(printf '%s\n' "$TI5_OUT" | awk -F'\t' 'NR > 1 && $6 == "NON-APPLICABLE" && $3 == "-" { n++ } END { print n + 0 }')"
+TI5_TYPES="$(printf '%s\n' "$TI5_OUT" | awk -F'\t' 'NR > 1 { printf "%s ", $1 }')"
+TI5_BAD="$(printf '%s\n' "$TI5_OUT" | awk -F'\t' 'NR > 1 && ($6 == "NON-VERIFIABLE" || $3 == "0") { n++ } END { print n + 0 }')"
+if [ "$TI5_RC" -eq 2 ] && [ "$TI5_NA" -eq 3 ] && [ "$TI5_TYPES" = "agent skill socle " ] && [ "$TI5_BAD" -eq 0 ] && [ "$(printf '%s\n' "$TI5_OUT" | sed -n 1p)" = "#vf-budget@1${TAB}check-instruction-budget" ]; then
+  ok "TI5 — lab tiers en TSV : en-tete et trois lignes agent, skill, socle en NON-APPLICABLE sans valeur, rc 2, jamais NON-VERIFIABLE ni une valeur 0"
+else
+  ko "TI5 — lab tiers en TSV" "rc 2, 3 lignes NON-APPLICABLE sans valeur (agent skill socle), aucun NON-VERIFIABLE ni 0" "rc=$TI5_RC na=$TI5_NA types=[$TI5_TYPES] mauvais=$TI5_BAD sortie=[$TI5_OUT]"
+fi
+ti_obs_abs() { # <cible> : champs commencant par / ou ~ sur la fixture du socle (au moins une ligne de mesure)
+  local t="$1" out n bad; local save="$TARGET"; TARGET="$t"; out="$(trun "$TI4_EG" --format=tsv)"; TARGET="$save"
+  n="$(printf '%s\n' "$out" | awk 'NR > 1' | grep -c .)"
+  bad="$(printf '%s\n' "$out" | awk -F'\t' '{ for (i = 1; i <= NF; i++) if ($i ~ /^[\/~]/) b++ } END { print b + 0 }')"
+  if [ "$n" -gt 0 ]; then echo "absolus=$bad"; else echo "absolus=vide"; fi
+}
+TI6_TXT="$(run "$TI4_EG")"
+case "$TI6_TXT" in *"sentinelle : $TI4_EG/"*) TI6P=ok ;; *) TI6P=absent ;; esac
+if [ "$TI6P" = ok ]; then ok "TI6 — sonde positive : la ligne « sentinelle : » du mode texte porte la racine absolue de la fixture"; else ko "TI6 — sonde positive" "sentinelle : <racine absolue>" "$TI6_TXT"; fi
+if [ "$(ti_obs_abs "$SCRIPT")" = "absolus=0" ]; then ok "TI6 — aucun champ ne commence par / ni par ~ (lignes de mesure non nulles)"; else ko "TI6 — champs absolus" "absolus=0" "$(ti_obs_abs "$SCRIPT")"; fi
+TI7_BAD="$(printf '%s\n' "$TI1_OUT" | awk 'index($0, "BILAN") == 1 || index($0, "FICHIER |") == 1 || index($0, "BOOTSTRAP :") == 1 || index($0, "SKILL |") == 1 { n++ } END { print n + 0 }')"
+TI7_N="$(printf '%s\n' "$TI1_OUT" | awk 'NR > 1' | grep -c .)"
+if [ "$TI7_BAD" -eq 0 ] && [ "$TI7_N" -gt 0 ]; then ok "TI7 — en mode TSV, aucune ligne du rapport texte (BILAN, FICHIER |, SKILL |, BOOTSTRAP :) sur la sortie standard ($TI7_N lignes de mesure)"; else ko "TI7 — rapport texte absent" "0 ligne de rapport, au moins une mesure" "rapport=$TI7_BAD mesures=$TI7_N"; fi
+TI_PRE="$TMP/pre"; mkdir -p "$TI_PRE"
+TI_PRESRC="$(cd "$(dirname "$0")" && pwd)/fixtures/check-instruction-budget-pre-394c7956.sh"
+if [ -f "$TI_PRESRC" ]; then cp "$TI_PRESRC" "$TI_PRE/check-instruction-budget.sh"; else git -C "$REPO_ROOT" show 394c7956:plugin/conductor/scripts/check-instruction-budget.sh > "$TI_PRE/check-instruction-budget.sh" 2>/dev/null; fi
+ti_ab_one() { # <script> <racine> : sortie texte (racine remplacee par un jeton) puis le code de retour
+  bash "$1" --path "$2" 2>&1 | sed "s|$2|<R>|g"
+  echo "rc=${PIPESTATUS[0]}"
+}
+ti_obs_ab() { # <cible> : nombre de fixtures dont le rapport texte ou le rc differe de la copie figee
+  local t="$1" n=0 d=0 r
+  for r in "$TMP"/*/; do
+    r="${r%/}"
+    [ -d "$r/plugin" ] || continue
+    n=$((n + 1))
+    ti_ab_one "$TI_PRE/check-instruction-budget.sh" "$r" > "$TMP/tiab.a"
+    ti_ab_one "$t" "$r" > "$TMP/tiab.b"
+    cmp -s "$TMP/tiab.a" "$TMP/tiab.b" || d=$((d + 1))
+  done
+  echo "diff=$d/$n"
+}
+TI8_OBS="$(ti_obs_ab "$SCRIPT")"; TI8_N="${TI8_OBS#diff=0/}"
+case "$TI8_OBS" in diff=0/*) [ "$TI8_N" -ge 12 ] && TI8=ok || TI8="moins de douze fixtures ($TI8_N)" ;; *) TI8="$TI8_OBS" ;; esac
+if [ "$TI8" = ok ]; then ok "TI8 — A/B : rapport texte et rc identiques a la copie figee (cmp) sur $TI8_N fixtures de la suite"; else ko "TI8 — A/B texte" "diff=0 sur au moins douze fixtures" "$TI8"; fi
+TI9_OUT="$(bash "$TARGET" --path "$TI_D" --format=json 2>"$TMP/ti9.err")"; TI9_RC=$?
+if [ "$TI9_RC" -eq 64 ] && [ -z "$TI9_OUT" ] && grep -q 'format inconnu' "$TMP/ti9.err"; then ok "TI9 — --format=json : rc 64, sortie standard vide, message nomme"; else ko "TI9 — format inconnu" "rc 64, stdout vide, « format inconnu »" "rc=$TI9_RC stdout=[$TI9_OUT]"; fi
+
+# ===================================================================================================
 # Tâche 2 — quatre mutants vérifiés par cmp
 # ===================================================================================================
 echo ""
@@ -1386,6 +1496,41 @@ else
 fi
 
 TARGET="$SCRIPT"
+
+# --- MI1..MI6 : mutants de la sortie TSV (P77-D-18). Chacun doit changer le script, passer bash -n, et rougir le cas TI qui le vise.
+mi_make() { # <nom> <ligne exacte> <remplacement> : chemin du mutant ; 0 opposable, 1 identique, 2 syntaxe
+  local out="$MUTD/$1.sh"
+  MUT_OLD_ENV="$2" MUT_NEW_ENV="$3" awk '{ if ($0 == ENVIRON["MUT_OLD_ENV"]) print ENVIRON["MUT_NEW_ENV"]; else print }' "$SCRIPT" > "$out"
+  cmp -s "$out" "$SCRIPT" && { echo "$out"; return 1; }
+  bash -n "$out" 2>/dev/null || { echo "$out"; return 2; }
+  echo "$out"
+}
+mi_kill() { # <nom> <observation sous mutant> <valeur que le cas TI attend> : tue si l'observation differe de ce que le cas attend
+  if [ "$2" != "$3" ]; then ok "$1 — mutant tue, l'observation differe de l'attendu du cas : [$2]"; else ko "$1 — mutant SURVIVANT" "observation differente de [$3]" "$2"; fi
+}
+MI1_OLD='  if [ "$verdict" != "DEPASSEMENT-ADR029" ] && [ "$lines" -ge "$VF_BUDGET_LINE_WARN_FROM" ] && [ "$lines" -le "$VF_BUDGET_LINE_CAP" ]; then'
+MI1="$(mi_make mi1 "$MI1_OLD" "${MI1_OLD/-ge/-gt}")"; RM=$?
+if [ "$RM" -eq 0 ]; then mi_kill "MI1 bord d'avertissement decale (-ge vers -gt) : TI2 rougit (251 lignes n'est plus AVERTISSEMENT)" "$(ti_obs_agents "$MI1")" "$TI2_EXP"; else ko "MI1 opposable" "mutant opposable (rc 0)" "rc=$RM"; fi
+MI2_OLD="    printf 'agent\\t-\\t-\\t%s\\tlignes\\tNON-APPLICABLE\\n' \"\$VF_BUDGET_LINE_CAP\""
+MI2="$(mi_make mi2 "$MI2_OLD" "    printf 'agent\\t-\\t0\\t%s\\tlignes\\tNON-APPLICABLE\\n' \"\$VF_BUDGET_LINE_CAP\"")"; RM=$?
+if [ "$RM" -eq 0 ]; then
+  MI2_BAD="$(TARGET="$MI2" trun "$TI_TIERS" --format=tsv | awk -F'\t' 'NR > 1 && ($6 == "NON-VERIFIABLE" || $3 == "0") { n++ } END { print n + 0 }')"
+  mi_kill "MI2 valeur 0 emise en lab tiers : TI5 rougit (la valeur doit rester « - »)" "mauvais=$MI2_BAD" "mauvais=0"
+else ko "MI2 opposable" "mutant opposable (rc 0)" "rc=$RM"; fi
+MI3="$(mi_make mi3 "$MI2_OLD" "    printf 'agent\\t-\\t-\\t%s\\tlignes\\tNON-VERIFIABLE\\n' \"\$VF_BUDGET_LINE_CAP\"")"; RM=$?
+if [ "$RM" -eq 0 ]; then
+  MI3_BAD="$(TARGET="$MI3" trun "$TI_TIERS" --format=tsv | awk -F'\t' 'NR > 1 && ($6 == "NON-VERIFIABLE" || $3 == "0") { n++ } END { print n + 0 }')"
+  mi_kill "MI3 NON-VERIFIABLE au lieu de NON-APPLICABLE en lab tiers : TI5 rougit" "mauvais=$MI3_BAD" "mauvais=0"
+else ko "MI3 opposable" "mutant opposable (rc 0)" "rc=$RM"; fi
+MI4_OLD='      if [ "$BOOTSTRAP_TOKENS" -gt "$BOOTSTRAP_BASELINE_VALUE" ]; then tsv_rel=AU-DESSUS'
+MI4="$(mi_make mi4 "$MI4_OLD" "${MI4_OLD/-gt/-lt}")"; RM=$?
+if [ "$RM" -eq 0 ]; then mi_kill "MI4 relation de baseline inversee : TI4 rougit (AU-DESSUS devient EGALE)" "$(ti_obs_socle "$MI4" "$TI4_HA")" "socle|.|$TI4_TOK|2000|jetons|DEPASSE;socle-baseline|-|$((TI4_TOK - 1))|-|jetons|AU-DESSUS;"; else ko "MI4 opposable" "mutant opposable (rc 0)" "rc=$RM"; fi
+MI5_OLD="printf 'FICHIER | LIGNES | BL-LIGNES | INSTR | BL-INSTR | VERDICT\\n'"
+MI5="$(mi_make mi5 "$MI5_OLD" "printf 'FICHIER | LIGNES | BL-LIGNES | INSTR | BL-INSTR | VERDICTS\\n'")"; RM=$?
+if [ "$RM" -eq 0 ]; then mi_kill "MI5 ligne du rapport texte changee : TI8 rougit (le texte differe de la copie figee)" "$(ti_obs_ab "$MI5")" "diff=0/$TI8_N"; else ko "MI5 opposable" "mutant opposable (rc 0)" "rc=$RM"; fi
+MI6_OLD="    printf 'socle\\t.\\t%s\\t%s\\tjetons\\t%s\\n' \"\$BOOTSTRAP_TOKENS\" \"\$VF_BOOTSTRAP_TOKEN_CAP\" \"\$tsv_socle\""
+MI6="$(mi_make mi6 "$MI6_OLD" "    printf 'socle\\t%s\\t%s\\t%s\\tjetons\\t%s\\n' \"\$ROOT\" \"\$BOOTSTRAP_TOKENS\" \"\$VF_BOOTSTRAP_TOKEN_CAP\" \"\$tsv_socle\"")"; RM=$?
+if [ "$RM" -eq 0 ]; then mi_kill "MI6 chemin absolu emis dans la sortie de densite : TI6 rougit" "$(ti_obs_abs "$MI6")" "absolus=0"; else ko "MI6 opposable" "mutant opposable (rc 0)" "rc=$RM"; fi
 
 # --- Garde finale : le script vivant reste syntaxiquement intact apres le bloc de mutations -------
 if bash -n "$SCRIPT" 2>/dev/null; then
