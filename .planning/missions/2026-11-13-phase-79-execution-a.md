@@ -4,14 +4,19 @@
 > plans, du journal des décisions du manager et du relevé de CI. Compartiment `fiabilite`, jalon `vibeflow-v2.0`,
 > branche `feat/phase-79-socle-cockpit`. Demande : session principale Claude Code, 2026-11-11 (« Exécuter 79 et 80 en
 > parallèle avec un manager de jointure »). Le segment ne clôt pas la phase : 79-13 à 79-20 et 79-22 restent.
-> Ce que ce rapport ne peut pas établir lui-même (verdicts de rv2, rv-11, cas sautés rejoués sur la tête finale,
-> correctif en cours de fix2-x06) porte la mention « à compléter par le manager ».
+> Complété le 2026-11-13 par le nœud `docs2` (verdicts de rv2, rv-11 et des quatre relectures du cliquet, cas sautés
+> rejoués sur la tête 7ef2594c, correctifs de fix2-x06, run de CI de la tête finale).
 
 ## Résultat
 
 - Verdict global : partiel. Les 13 plans du segment (79-01 à 79-12, 79-21) sont faits, chacun avec son SUMMARY commité ;
   ils sont cochés au ROADMAP et au ledger (17 exigences SOCL-01 à 16 et SOCL-26) par 906e3efe. La phase reste ouverte.
 - Base de départ du segment : `680364f1`. La branche compte 273 commits au-dessus de cette base à la rédaction.
+- Dernière tête poussée : `7ef2594c` (cherry-pick `c64f9e2b`, sonde R15c.2 `f7214e6b` et `a821e66b`, cliquet `303a47ad` et
+  `f751fc87`, baseline `e1fcc116`). Son run de CI, 43402693393, est VERT de bout en bout. Les commits de la quatrième
+  passe du filtre (`e3468b1f`, `3c733f15`, `8ced5084`, `ef5a6020`) et ce rapport partent dans une dernière poussée, non
+  encore faite à la rédaction. Ces commits touchent le filtre du cliquet de colonnes : le run vert de `7ef2594c` ne les
+  couvre pas, celui de la dernière poussée devra le faire.
 - Fusion de la base d'intégration `ab8f3e64` dans la branche en `9c18079c` (via 796b8343). Conflits résolus :
   `plugin/cockpit/amont/` : suppression de 79-01 gardée ; `VENDORED.txt` : forme de 79-01 (une ligne `AJOUT` par
   fichier, tri C) ; compteurs des README recomptés.
@@ -39,8 +44,10 @@
 | 79-21 | Coût borné de la correspondance de motifs du moteur | ad29ec96, 1f1d2eeb, b2361ef7 | 79-21-SUMMARY.md |
 
 Corrections ciblées de sortie (hors cycle de plan, une par constat) : 79-07 en quatre passes (T-79-705 f4485088 ;
-git absent 9d8fb831 ; témoins D10 ; M-VIDE-ECARTE 721b8f40) ; 79-09 759fd4bf et 57d3137d ; 79-08 arbreDe ; 79-10
-213cda8e ; 79-06 a50de579, e3dbbe8a, f07c8801 puis 2fba54d4 ; 79-12 4b2b6d08.
+git absent 9d8fb831 ; témoins D10 ; M-VIDE-ECARTE 721b8f40) ; 79-09 759fd4bf et 57d3137d, puis ded7daa3 et 9bc16549 ;
+79-08 arbreDe ; 79-10 213cda8e, puis la sonde R15c.2 (f7214e6b, a821e66b) ; 79-06 a50de579, e3dbbe8a, f07c8801, puis
+2fba54d4 (M-ECOUTE0) et 547cbc45 (`server.json`) ; 79-12 4b2b6d08 puis a2ef07c8 ; 79-11 en quatre passes du filtre du
+cliquet (voir Revues).
 
 ## Amendements de plan
 
@@ -89,9 +96,10 @@ Amendements d'exécution, datés dans les plans (liste complète dans les SUMMAR
 | 79-07 | fin de plan (au07a) | gaps_found | HAUT T-79-705 (pilotes de nom vide) fermé par f4485088 (témoins D8, mutants M-VIDE-*) ; deux bas fermés |
 | 79-07 | frais (au07b, b8ed6c55) | passed | haut et deux bas fermés ; notes basses héritées (mémo 2 s, enfant non git sous envGit) |
 | 79-07 | frais (au07c, edbba389) | passed | « absent » ne rouvre pas T-79-705 ; deux témoins D10 et mktemp à gabarit (fait) ; écarts d'étiquette = no-op documentés (voir Limites) |
-| 79-09 | au09 (8ba5260e) | gaps_found | MOYEN : le script de verrou lisait hors du lab, fermé au point central `shBorne` (759fd4bf) ; trois bas fermés ; infos au SUMMARY (limites) |
-| 79-12 | au12 (99299905) | gaps_found, 4 bas | A1 et A2 (assainir hors try, identité stricte de l'émetteur) fermés 4b2b6d08 ; C1 à C3 (`server.json` : liens, troncature, `.tmp` orphelin) confiés à fix2-x06 : à compléter par le manager (chantier en cours dans l'arbre à la rédaction) ; partie B (759fd4bf) passed |
-| 79-12 | correctif 2fba54d4 (M-ECOUTE0) | revue fraîche et audit demandés par la session principale | à compléter par le manager |
+| 79-09 | au09 (8ba5260e) | gaps_found | MOYEN : le script de verrou lisait hors du lab, fermé au point central `shBorne` (759fd4bf) ; trois bas fermés (code-cache tube/zéro, `redemarrer` non réentrant, chien de garde de la demande : 759fd4bf et 57d3137d) ; infos au SUMMARY (limites) |
+| 79-09 | au09, correctif 759fd4bf (partie B de l'audit de 79-12) | passed | la garde `gitSortant` de `shBorne` tient ; rien d'ouvert |
+| 79-12 | au12 (99299905) | gaps_found, 4 bas | A1 et A2 (assainir hors try, identité stricte de l'émetteur) fermés a2ef07c8 et 4b2b6d08 ; C1, C2 et C3 (`server.json` : liens, troncature par `--stop`, `.tmp` orphelin) fermés par 547cbc45 (module neuf `vf-cockpit-etat-ecrire.mjs`, aucune ligne longue) ; partie B (759fd4bf) passed ; l'objet B de l'audit a passé |
+| 79-12 | correctif 2fba54d4 (M-ECOUTE0) | revue fraîche (rv2) | voir Revues : rv2 a porté sur 79-09, 79-12 et ce correctif ; ses constats sur le correctif sont fermés par 547cbc45 |
 | 79-21 | au21 | gaps_found | MOYEN : mémoire du motif, bornée par MAX_MOTIF et MAX_PAS (ad29ec96, b2361ef7) ; bas : stderr de `build.mjs` jeté (hors fichiers de 79-21, signalé pour le registre) ; bas SUMMARY du coût corrigé ; GLOB.E3b no-op ; T-79-2105, T-79-2106 et SC à inscrire au journal des risques (pas de SECURITY.md de phase) |
 
 ## Revues
@@ -101,8 +109,20 @@ Amendements d'exécution, datés dans les plans (liste complète dans les SUMMAR
 | rv1 | 79-01 à 05, 08 | gaps_found | majeur 79-08 (`arbreDe` à défaut ouvert) corrigé (I2.8e, M-ARBREDE) ; mineurs 79-01 (Q11.0a), 79-02 (exception git-env, AM7.K1) à traiter après 79-06 ; AM7.S12 no-op noté ; décisions citées sans canal : notées aux SUMMARY |
 | rv-0607 | 79-06, 79-07 | gaps_found | majeur F3 (identité par préfixe) corrigé a50de579 ; 38 lignes de plus de 160 colonnes : 26 coupées, 10 laissées et déclarées ; mineurs au rapport : `mod_de` recopiée dans 13 suites, `mktemp` nu dans 30 suites, `serve.mjs:42` clause morte, paramètre inutile de serveur-vivant, identité avec espace |
 | rv-1021 | 79-10, 79-21 | gaps_found | majeur 79-10 (replis d'erreur de l'agent en anglais dans `serve.mjs`, porte aveugle à `fail(`) corrigé 213cda8e ; mineurs R6.3, F22, ombre de `t`, un commit par fichier non tenu (déclaré) ; 79-08 I2.8e ; 79-21 : 38 lignes longues dans `confinement.sh`, avis stderr non dédupliqué, contrôle anti-chemins limité au homedir local |
-| rv2 (79-09, 79-12, 2fba54d4) | lancée | à compléter par le manager | |
-| rv-11 (79-11) | lancée | à compléter par le manager | |
+| rv2 (79-09, 79-12, 2fba54d4) | 79-09, 79-12 et le correctif de `server.json` | gaps_found | 79-12 : M1 (`leaseS` non volatil) et M2 (mode strict : deux clauses, un seul mutant) plus mineurs, fermés par fix-x12 (a2ef07c8, passed) ; 79-09 : mineurs (cinq lignes de plus de 160 colonnes de 759fd4bf, `try` d'`etapeTour`, mutants C2.1, C2.7 et C2.6a, garde ouverte de `startLive`, signature du cache dans `.git/config`, `ecrireSignature`, `confirm` évincé, chien de garde de 120 s), fermés par fix2-x09 (ded7daa3, 9bc16549 ; `startLive` garde fermée par défaut, donc 79-13 et 79-15 devront passer la leur) ; 2fba54d4 : T7.11 à attente fixe de 4 s et ancre de M-SRVJSON, fermés par fix2-x06 (547cbc45) |
+| rv-11 (79-11) | cliquet de colonnes, baseline armée | passed | mineurs : (1) le filtre `/d[ée]l[ée]gu/` laisse passer « par délégation » ; (2) `col_historique` ne compare pas une recréation après suppression ; (3) gardes du cliquet (l. 53 et 110) sans témoin ; (4) gardes de `navigateur.mjs` sans témoin ; (8) SUMMARY inexact (« préfixes export ôtés »). Sort : corrigés par cliquet-fin (6ad6fbe1, cd7289b7, e1fcc116 : toute forme de délégation écartée, baseline abaissée de 13, SUMMARY corrigé), puis (1) repris par les passes ci-dessous ; LB.E11 : l'hypothèse du client contredite (`client.js:71` réessaie), restent « prêt jamais vrai » ou `enVol` bloqué sans délai, hors plan |
+| rv-cliquet | filtre de délégation du cliquet (cliquet-fin) | gaps_found | filtre contourné (« délègue » accentué, NFD, espace de largeur nulle) ; témoins V4c.5h'' et 5h3 tautologiques. Sort : cliquet-fin2 (normalisation NFKD, radical, témoin génératif), 24fdf46f, 466a5437. À l'issue de cliquet-fin : verifier OK, 114 fichiers, 1 674 lignes ; vendor 222/0 |
+| rv-cliquet2 | cliquet-fin2 | gaps_found | séparateurs (« dé-léguée », espace insécable), caractères de classes Cf et Cc hors jeu, marques hors 0300-036F. Sort : cliquet-fin3 (classes Unicode `\p{Cf}`, `\p{Cc}`, `\p{M}` et séparateurs), 303a47ad, f751fc87 ; 253 des 375 citations légitimes acceptées, à conserver |
+| rv-cliquet3 | cliquet-fin3 | gaps_found | ponctuation visible à l'intérieur d'un mot, U+2800, zone d'usage privé. Sort : cliquet-fin4, ensemble POSITIF (seules les lettres `\p{L}` après NFKD comptent), e3468b1f, 3c733f15, 8ced5084, ef5a6020 (non poussés à la rédaction) ; balayage complet 0 fuite ; 304 citations identiques ; témoins « citation légitime » et deux messages réels de l'historique de la branche (hausse refusée, baisse acceptée) |
+
+Quatrième passe du filtre : c'est la DERNIÈRE, par décision déléguée (message de la session principale, 2026-11-08,
+option recommandée, prise par la session principale le 2026-11-13), motif ADR-072 : le filtre est une garde
+déclarative, il rend visible et ne verrouille rien, et un filtre lexical n'a pas d'ensemble fini de contournements
+à fermer. Aucune cinquième passe n'est prévue ; ce qui reste est écrit en limites. Limites du filtre : homoglyphes
+(un caractère d'un autre alphabet qui ressemble à une lettre), synonymes (« mandat » pour « délégation »), coupure du
+mot par un retour à la ligne, faux positifs de compaction (« mode léger » lu comme une délégation : le filtre
+refuse alors par prudence, il ne laisse pas passer), `col_historique` aveugle au renommage d'un fichier et à
+`--no-merges`.
 
 ## Tableau des rouges de CI
 
@@ -122,7 +142,22 @@ du journal du manager et des commits cités ; « non consignée » dit que ni le
 | 43300355064 | equipe 1, lecture-fil 1, responsive 1, git-config-depot 1 | lecture-fil l. 5338 : même cas D8.9 ; git-config-depot : M-VIDE-ECARTE |
 | 43336702553 | equipe 1, git-config-depot 1 | M-VIDE-ECARTE : le 6e jeton dépend de git 2.56 du runner contre 2.50 du poste, masqué par 721b8f40 (raison écrite dans la suite) |
 | 43342613636 | equipe 1, who 1, retard 1 (collecte 27 dans un shard annulé) | equipe, who, retard : non consignées (sondes sous charge, jugées vertes au rejeu seul : à vérifier) ; collecte : run annulé |
-| 43345371712 | git-config-depot 1 (shard 8) | M-VIDE-ECARTE ; à compléter par le manager pour le run de la tête finale |
+| 43345371712 | git-config-depot 1 (shard 8) | M-VIDE-ECARTE, corrigé 721b8f40 |
+| tête 0a25743 | M-VIDE-ECARTE seul | connu, corrigé 721b8f40 |
+| tête e4185ff1 (shard 6) | lecture-fil D8.9 et D8.9b | `cockpit-state@1` (79-12, 4cfa3c5d) absent de la liste fermée ; corrigé 99299905 (voir Leçons, n° 2) |
+| tête f07c8801 (shard 4) | terminal-activation M-ECOUTE0 | intermittent : course sur `server.json` réécrit après « prêt » (empreinte publiée différente, `pgrep` à PID vide) ; corrigé 2fba54d4 et 547cbc45, sans lien avec e3dbbe8a |
+| tête a2ef07c8 (shard 5) | T28-F, responsive R15c.2 | T28-F : externe au segment (gsd-core 1.21.0 publié le 2026-11-13 à 04:13:53 UTC, index versionné en 1.15.0), correctif repris par cherry-pick `-x` de `c64f9e2b` (PR #239, brouillon, non fusionnée) pour que la tête finale soit verte ; R15c.2 : défaut de la sonde, intermittent en CI (4 runs sur 15), corrigé f7214e6b et a821e66b (origine aa071452) |
+| 43402693393 (tête 7ef2594c) | aucune | VERT de bout en bout |
+
+Causes élucidées depuis la première version de ce tableau :
+- D8.9 cockpit-state@1 : 99299905 ; la lecture-fil de 79-08 (D8.9, `cockpit-index@1`) : 3ad2f28f.
+- M-VIDE-ECARTE : 721b8f40 (git 2.56 du runner contre 2.50 du poste).
+- M-ECOUTE0 : intermittent, course de `server.json` réécrit après « prêt » (2fba54d4), sans lien avec e3dbbe8a.
+- R15c.2 : défaut de la sonde (`chrome-panneau-etroit.mjs` lisait `textContent`, « PhasesPhases », et tapait avant que le
+  focus soit posé, `setTimeout(0)` du viewer), corrigé f7214e6b et a821e66b ; origine aa071452 (recette du lot B). Note
+  produit pour le registre : une frappe envoyée juste après « / » est perdue (`setTimeout(0)`).
+- T28-F : externe au segment, voir la ligne de la tête a2ef07c8. Limite connue : le poste porte gsd-core 1.20.1, donc T28-F
+  rougit en local et passe en CI.
 
 Sautés et instables connus de CI hors liste : KC2 de `test-check-method-budget.sh` (Ubuntu 26, `mkdir` non exclusif), LB.E11 à
 LB.E14 de lancer-bandeau, délai de terminal-tiroir (600 s en scénario `--terminal`, 1 184 s en CI).
@@ -147,19 +182,23 @@ journaux hors dépôt (dossier du nœud de rejeu). Résultat : aucun rouge sur l
 
 Autres écarts constatés à la tête pendant l'exécution de 79-11 : Q11.7.1 à Q11.7.3 (copie mutante sans le module
 navigateur), terminal-tiroir TP.3 et M-MSG-DONNEE : signalés et corrigés par le plan. H7.5b : jouée seule trois fois
-(tête avant correctif, tête après, base) : verte ; non reproduite. Condition connue du rouge : lancement sous charge ;
-à rejouer au calme sur la tête finale, à compléter par le manager.
+(tête avant correctif, tête après, base) : verte ; non reproduite. Condition connue du rouge : lancement sous charge.
+Rejouée au calme sur la tête 7ef2594c (charge de l'ordre de 4) : git-entete 136/0, H7.5b PASS.
 
 ## Cas SAUTÉS en CI Linux et verdict sur le poste
 
 | Suite | Cas | Raison du saut | Verdict joué seul sur le poste | Preuve ailleurs |
 |---|---|---|---|---|
 | projet-visite | O6.17d, O6.19 | polices DejaVu absentes (`saut=2`) | SAUTÉ aussi sur le poste : les polices manquent et `VF_DEJAVU_DIR` n'est pas posé ; aucun verdict positif | aucune preuve retrouvée dans ce segment : le cas est compté sauté, pas réussi ; à lever en posant les polices |
-| git-commandes | C1.2 | zsh | à compléter par le manager (tête finale) | |
-| git-entete | H5.1b | git non masquable sur le runner | git-entete 136/0 (79-07, correction n°2 ; 79-09, tête 8ba5260e) | témoin unitaire D10.1 à D10.3 et M-ABSENT dans git-config-depot, qui tourne en CI Linux (PATH sans git) |
-| serveur | PS.11 | casse du système de fichiers Linux | à compléter par le manager (tête finale) | |
+| git-commandes | C1.2 | zsh | PASS sous zsh (git-commandes 57/0, tête 7ef2594c) | |
+| git-entete | H5.1b | git non masquable sur le runner | PASS : git-entete 136/0 sur la tête 7ef2594c (et 79-07, correction n°2 ; 79-09, tête 8ba5260e) | témoin unitaire D10.1 à D10.3 et M-ABSENT dans git-config-depot, qui tourne en CI Linux (PATH sans git) |
+| serveur | PS.11 | casse du système de fichiers Linux | PASS : serveur 98/0 (tête 7ef2594c) | |
 
-Verdicts joués seuls sur la TÊTE FINALE : à compléter par le manager.
+Verdicts joués seuls sur la TÊTE 7ef2594c (nœud final-verif, charge de l'ordre de 4, journaux hors dépôt) : git-entete
+136/0 (H5.1b et H7.5b PASS) ; git-commandes 57/0 (C1.2 PASS sous zsh) ; serveur 98/0 (PS.11 PASS) ; projet-visite 115/0
+avec O6.17d et O6.19[dejavu] sautés aussi sur le poste (polices DejaVu absentes, aucune autre preuve : ces deux cas ne
+sont pas des verts) ; dev-orchestrator 489 réussis, 1 échoué, 0 sauté, l'échec étant T28-F seul (le poste porte
+gsd-core 1.20.1, publié 1.21.0) ; les 21 étapes de `gates` jouées rc 0.
 
 ## Contrats fournis aux autres phases
 
@@ -272,6 +311,21 @@ Limites connues, écrites et non fermées :
    sur le poste ; préférer un témoin qui tourne aussi en CI (D10 pour H5.1b).
 9. **Régression d'un déplacement de code** (79-07, 2026-11-12) : la liste des suites écrite dans un plan ne remplace
    pas le `grep -l`, rejoué suite par suite avant de dire une extraction verte.
+10. **Nœuds suspendus sur une forme de commande.** Deux nœuds (suspendus 30 et 63 minutes) attendaient une autorisation
+   que personne ne pouvait donner, sur des formes de commande à autorisation (message de commit en ligne, `cd` en tête,
+   commandes chaînées). La session principale les a arrêtés le 2026-11-13 : un manager ne peut pas arrêter une tâche qui
+   n'est pas la sienne, limite du harnais, à inscrire au registre. Règle (point 13 du mandat) : message de commit dans un
+   fichier et `git -C <arbre> commit -F <fichier> -- <chemins>`, jamais de `cd` en tête, un rejeu contre une variante de
+   suite sur une copie hors du worktree, une commande simple par appel. Repris par r15c2-fin et cliquet-fin.
+11. **Un filtre sans ensemble positif se contourne par passes.** Le filtre de délégation du cliquet a demandé quatre
+   passes (normalisation, classes Unicode, séparateurs, puis ensemble positif des seules lettres après NFKD) parce que
+   chaque version listait ce qu'elle refusait au lieu de ce qu'elle acceptait ; chaque relecture fraîche a trouvé une
+   forme neuve. La quatrième est la dernière : garde déclarative (ADR-072), limites écrites. Règle : décrire d'emblée
+   l'ensemble qu'on accepte, et fixer à l'avance le nombre de passes.
+12. **Le fil-piège D8.9 est passé deux fois sous la règle 9** (cockpit-index@1 par 209c50aa, cockpit-state@1 par 4cfa3c5d) :
+   voir le n° 2 ; la règle n'a de valeur que si le grep nomme l'identifiant de schéma.
+13. **Une constante qui dépend de la version de l'outil** (git 2.56 du runner contre 2.50 du poste, M-VIDE-ECARTE) rougit
+   en CI seulement ; le rejeu local ne la voit pas. Idem T28-F (gsd-core 1.21.0 contre 1.20.1 du poste).
 
 ## Budgets
 
@@ -289,6 +343,10 @@ Calibration (recopiée, jamais recalculée ; jetons non mesurés au token près 
 Lecture du manager à confirmer : les trois dépassements viennent surtout des constats d'audit et de revue acceptés comme
 amendements (corrections ciblées, rejeux de la règle 9) et de suites lourdes rejouées sous charge pour obtenir un verdict propre.
 
+Coûts de la sortie de segment (jetons non mesurés, nombres de passes mesurés) : le filtre de délégation du cliquet a pris
+quatre passes de correction et quatre relectures fraîches (cliquet-fin à cliquet-fin4) ; 79-06 a eu trois correctifs
+après audit (a50de579 et suivants, 2fba54d4, 547cbc45) ; 79-09 deux (759fd4bf, ded7daa3) ; 79-12 une (fix-x12, a2ef07c8). Deux nœuds suspendus sur des formes de commande ont perdu 30 et 63 minutes.
+
 ## Moins cher la prochaine fois
 
 - Rejouer SEUL, sur la base détachée, avant d'écrire le moindre « préexistant » : un rejeu isolé évite deux régressions attribuées à tort et des traces fausses.
@@ -299,6 +357,13 @@ amendements (corrections ciblées, rejeux de la règle 9) et de suites lourdes r
 - Un seul écrivain par arbre au moment du rejeu final ; jamais de chantier non commité pendant un rejeu.
 - Retirer les cas à constante dépendante de la version de l'outil (git 2.56 contre 2.50) avant le premier push.
 - Poser les polices DejaVu sur le poste pour jouer O6.17d et O6.19 au lieu de les laisser sautés.
+- Écrire les gestes de nœud sous des formes de commande qui n'appellent aucune autorisation (point 13 du mandat) : un nœud
+  suspendu coûte une heure et une intervention de la session principale.
+- Écrire dès la première version d'un filtre l'ensemble POSITIF accepté (lettres après NFKD), plus un nombre de passes
+  fixé d'avance : quatre passes et quatre relectures auraient été une.
+- Grep de la règle 9 sur l'identifiant de schéma d'interface avant d'ajouter un schéma : le fil-piège D8.9 est passé deux
+  fois.
+- Rejouer les cas à constante dépendante d'une version d'outil contre la version du runner, ou les retirer.
 
 ## Preuves E6
 
@@ -306,6 +371,12 @@ Verdicts relayés des retours typés cités dans le journal du manager et dans l
 canonique de la suite concernée, code de sortie 0, sha du commit de sortie du plan ; les audits et revues, verdicts
 sans commande rejouable, sont marqués `amont` et leurs sha cités au tableau des audits. Un verdict `gaps_found` n'est
 pas un vert : il est écrit ici avec son sort.
+
+Preuves du nœud final-verif (tête 7ef2594c, journaux hors dépôt) : six entrées, une par suite ou lot jouée seule, et le
+run de CI 43402693393 de la même tête. L'entrée dev-orchestrator porte `exit_code` 1, vrai code de sortie : 489
+réussis, 1 échoué, l'échec étant T28-F seul (gsd-core 1.20.1 sur le poste, 1.21.0 publié), qui passe en CI. Les
+entrées projet-visite (`exit_code` 0, 115/0) comptent deux cas sautés faute de polices DejaVu (O6.17d, O6.19) : sauté
+n'est pas réussi.
 
 ```json
 {"preuves":[
@@ -328,6 +399,13 @@ pas un vert : il est écrit ici avec son sort.
 {"verdict":"gate:check-version-sync","commande":"bash scripts/check-version-sync.sh","exit_code":0,"sha":"906e3efe"},
 {"verdict":"gate:check-method-budget","commande":"bash plugin/conductor/scripts/check-method-budget.sh","exit_code":0,"sha":"906e3efe"},
 {"verdict":"gate:check-divergence","commande":"bash plugin/conductor/scripts/check-divergence.sh --path .","exit_code":0,"sha":"906e3efe"},
-{"verdict":"gate:check-state-integrity","commande":"bash plugin/conductor/scripts/check-state-integrity.sh --path . --file .planning/workstreams/fiabilite/STATE.md","exit_code":0,"sha":"906e3efe"}
+{"verdict":"gate:check-state-integrity","commande":"bash plugin/conductor/scripts/check-state-integrity.sh --path . --file .planning/workstreams/fiabilite/STATE.md","exit_code":0,"sha":"906e3efe"},
+{"verdict":"final-verif:git-entete","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-git-entete.sh","exit_code":0,"sha":"7ef2594c"},
+{"verdict":"final-verif:git-commandes","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-git-commandes.sh","exit_code":0,"sha":"7ef2594c"},
+{"verdict":"final-verif:serveur","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-serveur.sh","exit_code":0,"sha":"7ef2594c"},
+{"verdict":"final-verif:projet-visite","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-projet-visite.sh","exit_code":0,"sha":"7ef2594c"},
+{"verdict":"final-verif:dev-orchestrator","commande":"bash plugin/dev-orchestrator/scripts/tests/test-dev-orchestrator.sh","exit_code":1,"sha":"7ef2594c"},
+{"verdict":"final-verif:gates","commande":"gates du workflow de CI, 21 étapes jouées","exit_code":0,"sha":"7ef2594c"},
+{"verdict":"ci-verte","commande":"gh run view 43402693393","exit_code":0,"sha":"7ef2594c"}
 ]}
 ```
