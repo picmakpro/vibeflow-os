@@ -84,6 +84,23 @@
     "vibeflow/cockpit-doing@1": {
       "requis": { "schema": "string", "id": "string", "doing": "any" }
     },
+    "vibeflow/cockpit-frise@1": {
+      "description": "frise des voies des dernières 24 h, lue en mémoire (79-13, GET /api/vf/frise) ; cibles jamais persistées",
+      "requis": { "schema": "string", "at": "string", "depuis": "number", "jusqua": "number", "fenetreS": "number", "source": "object",
+        "voiesOmises": "number", "tronque": "boolean", "voies": "array" },
+      "voie": ["id", "kind", "session", "parent", "depth", "role", "arbre", "background", "debut", "fin", "dispatchA", "fini", "arrete", "etatOfficiel",
+        "modeles", "compteurs", "jetons", "durees", "segments", "evenements", "enCours", "rattachement", "cibles"],
+      "source": { "requis": ["etat", "ccVerifie", "versionsVues"], "etats": ["ok", "en-construction", "partielle", "forme-inconnue", "indisponible"] },
+      "segments": ["travail", "attend-agents", "attend-humain", "repos", "silence"],
+      "evenements": ["compaction", "erreur", "humain", "rapport", "dispatch"],
+      "champs": ["cibles"],
+      "outils": { "lectures": ["Read"], "ecritures": ["Write", "Edit", "MultiEdit", "NotebookEdit"] },
+      "bornes": { "fenetreS": 86400, "segments": 500, "evenements": 500, "cibles": 200, "ciblesTotal": 20000, "voiesInstantane": 2000,
+        "voiesReponse": 500, "cibleUnites": 120 },
+      "cible": ["arbre", "cible", "n", "dernierMs"],
+      "cibles": { "requis": ["etat", "tronque", "ecritures", "lectures"], "etats": ["ok", "en-construction"] },
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"]
+    },
     "vibeflow/cockpit-git@1": {
       "description": "topologie Git du lab pour le tiroir (78-05, GET /api/vf/git) : requis vaut pour etat ok ; les autres etats ne portent que schema, etat, entete (sauf absent : schema, etat, entete) et commandes. auteurs : agrégés sur la fenêtre de commits lue (500 de la base et des branches non mergées), pas sur tout l'historique : l'écran ne doit pas dire « tous les auteurs ». refsIgnorees : nombre de refs sans date (tag vers un blob ou un arbre) écartées, le reste du graphe est lu",
       "requis": { "schema": "string", "etat": "string", "entete": "object", "base": "object", "worktrees": "array", "rangees": "array", "couloirsMax": "number", "replies": "number", "refsIgnorees": "number", "horsFenetre": "array", "mergees": "array", "tags": "array", "stash": "array", "auteurs": "array", "parBranche": "array", "bornes": "object", "commandes": "object" },

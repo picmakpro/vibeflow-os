@@ -3,7 +3,7 @@
 // résultats ; il ne diffuse rien et n'importe que les étapes.
 // Demande { id, planning, verrous, tour, motifs } -> messages { id, type: 'planning' (graphe | erreur, motifs) | 'verrous' (projection en liste
 // blanche, A15) | 'tour' (verrous projetés, equipe, signal, erreurs, dureeMs) | 'index' (rapport en comptes, jamais les voies) |
-// 'fini' }. workerData.sansIndex : relance sans l'index.
+// 'frise' (paquet de voies, 79-13) | 'fini' }. workerData.sansIndex : relance sans l'index.
 import { parentPort, workerData } from 'node:worker_threads';
 import { creerMemoire, etapePlanning, etapeVerrous, etapeTour } from './vf-cockpit-collecte-etapes.mjs';
 
@@ -25,8 +25,9 @@ parentPort.on('message', (m) => {
       r = { verrous: { etat: 'erreur', plat: false, liste: [] }, equipe: { workers: [], sources: {} }, signal: null, erreurs: ['tour'], dureeMs: 1,
         index: { etat: 'erreur', tronque: false, voies: 0, formeInconnue: 0, evinces: 0 } };
     }
-    const { index, ...tour } = r;
+    const { index, frise, ...tour } = r;
     parentPort.postMessage({ type: 'tour', id, ...tour }); parentPort.postMessage({ type: 'index', id, index });
+    for (const f of (frise && frise.messages) || []) parentPort.postMessage({ type: 'frise', id, ...f }); // 79-13 : voies par paquets, avant `fini`
   }
   parentPort.postMessage({ type: 'fini', id });
 });
