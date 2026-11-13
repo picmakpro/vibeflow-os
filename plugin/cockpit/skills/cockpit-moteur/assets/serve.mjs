@@ -29,8 +29,9 @@ const refus = (m) => { console.error(`vf-cockpit : ${m}`); process.exit(1); };
 // la sortie : --sortie=<chemin réel> en DERNIER argument, de la forme <lab>/.vibeflow/cockpit, sans lien (résolution native : un échec vaut refus, A37)
 const sortieArg = argv[argv.length - 1]?.startsWith('--sortie=') ? argv[argv.length - 1].slice('--sortie='.length) : '';
 if (!sortieArg) refus('--sortie=<dossier> est absent (dernier argument) : refus de servir sans connaître la sortie du lab.');
-let here;
-try { here = fs.realpathSync(sortieArg); } catch { refus('la sortie désignée par --sortie= est introuvable : refus.'); }
+let here = null; // résolution PHYSIQUE de 79-07 (A37, R8) : un échec vaut refus, jamais un jugement sur la forme écrite
+try { here = (await import(pathToFileURL(path.join(scriptsDir, 'vf-cockpit-git-sortant.mjs')).href)).cheminPhysique(sortieArg); } catch { here = null; }
+if (!here) refus('la sortie désignée par --sortie= est introuvable : refus.');
 if (here !== sortieArg || path.basename(here) !== 'cockpit' || path.basename(path.dirname(here)) !== '.vibeflow') refus('--sortie= doit être le chemin réel de <lab>/.vibeflow/cockpit : refus.');
 const root = path.resolve(here, '..', '..'); // vibeflow P10 : la sortie est sous <lab>/.vibeflow/cockpit
 for (const f of ['vf-cockpit-env.mjs', 'vf-cockpit-module.mjs', 'vf-cockpit-server.mjs', 'vf-cockpit-etat-ecrire.mjs']) if (!fs.existsSync(path.join(scriptsDir, f))) refus(`${f} est absent du module : refus de servir (réinstaller le module cockpit).`);
@@ -124,7 +125,7 @@ const idleExit = Number(opt('idle-exit', 0)) * 60000; // stop this long after th
 const selfHash = MOD.empreinteModule({ dossierScripts: scriptsDir, dossierMoteur: moteurDir }); // même fonction que le lanceur (SOCL-08) : l'empreinte de TOUT le code évalué du module
 const model = opt('model', process.env.VF_COCKPIT_MODEL || '');
 const token = crypto.randomBytes(16).toString('hex');
-const TYPES = { '.html': 'text/html; charset=utf-8', '.json': 'application/json', '.js': 'text/javascript', '.mjs': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml' };
+const TYPES = { '.html': 'text/html; charset=utf-8' }; // 79-16 : le seul type servi par ce fichier ; les scripts de /_vf/ ont le leur (vf-cockpit-coquille-assets.mjs)
 
 // ---------- find the CLI that answers: Claude Code or Codex ----------
 function which(cmd) {
@@ -207,19 +208,21 @@ if (cli) { try { const v = execFile(cli.cmd, [...cli.args, '--version'], { encod
 // code). Loaded at start and again whenever the map is rebuilt.
 let TERM = null; // vibeflow P26 : terminal intégré, chargé seulement avec --terminal (second écouteur 127.0.0.1, aucun effet sans le drapeau)
 if (has('terminal')) { try { TERM = (await depuisModule('vf-cockpit-terminal.mjs')).preparerTerminal({ here, root, jetons: () => [token, VF?.ptoken] }); } catch (e) { console.error(`vf-cockpit : terminal indisponible : ${e.message}. Relancer « vf-cockpit build ».`); } } // vibeflow P26
-const inject = `<script>window.VF_COCKPIT_SERVER=${JSON.stringify({ token, cli: !!cli, engine, want, model: model || null, change: canChange, unFlux: true }).replace(/</g, '\\u003c')};</script>` + (TERM ? TERM.injection() : ''); // vibeflow P26
-let page, G, core, MODES;
+let G, core, MODES;
 // vibeflow P13 : serveur unique. Le direct, « au travail » et la page Projet vivent dans vf-cockpit-server.mjs, posé à côté de
 // vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
 // vibeflow P18 : jamais de repli sur l'agent amont non confiné (vf-cockpit-server.mjs absent du module : refus plus haut)
-const VF = (await depuisModule('vf-cockpit-server.mjs')).attach({ here, root, token, inject, log: (cat, msg) => { if (cat === 'error' || cat === 'warn') console.error(`vf-cockpit : ${msg}`); } }); // vibeflow P13
+const VF = (await depuisModule('vf-cockpit-server.mjs')).attach({ here, root, token, log: (cat, msg) => { if (cat === 'error' || cat === 'warn') console.error(`vf-cockpit : ${msg}`); } }); // vibeflow P13
+// vibeflow 79-16 : le document de la coquille est composé UNE fois, du module (jamais de la sortie), puis servi tel quel aux adresses de page ; l'injection (jeton de l'onglet, tiroir) est propre à l'adresse
+const jetons = { code: token, projet: VF.ptoken, equipe: token };
+const injection = (adresse) => `<script>window.VF_COCKPIT_SERVER=${JSON.stringify({ token: adresse === '/project.html' ? VF.ptoken : token, cli: !!cli, engine, want, model: model || null, change: canChange, unFlux: true, jetons }).replace(/</g, '\\u003c')};</script>` + (TERM ? TERM.injection() : '');
+let coquille; try { coquille = (await depuisModule('vf-cockpit-coquille.mjs')).creerCoquille({ dossierMoteur: moteurDir, injection }); } catch (e) { refus(e.message); }
+const { servirAsset } = await depuisModule('vf-cockpit-coquille-assets.mjs');
 function load() {
-  const html = fs.readFileSync(path.join(here, 'index.html'), 'utf8');
   const g = JSON.parse(fs.readFileSync(path.join(here, 'graph.json'), 'utf8'));
   const coreSrc = fs.readFileSync(path.join(code, 'graph-query.js'), 'utf8'); // le cœur de requête vient du module, jamais de la sortie (AM4.2)
   const c = new Function(`${coreSrc.replace(/^import .*$/gm, '')}; return { VF_COCKPIT_ANSWER_SCHEMA, VF_COCKPIT_FLOW_SCHEMA, VF_COCKPIT_CHANGE_SCHEMA, vfCockpitAskInstructions, vfCockpitFlowInstructions, vfCockpitChangeInstructions, createGraphQuery };`)();
   c.q = c.createGraphQuery(g);
-  page = html.replace('</head>', inject + '</head>');
   G = g; core = c;
   // kinds of request: a question (answer + board), a new guided flow, and for a blueprint, a change to the
   // plan. Codex reads its schema from a file.
@@ -541,19 +544,18 @@ const bad = (res) => { res.writeHead(400, { 'Content-Type': 'application/json' }
 // vibeflow P17 : en-têtes de toutes les réponses. La page ne charge que ses scripts en ligne (empreintes), aucune origine tierce,
 // ne se laisse pas encadrer, n'envoie aucun formulaire. Les polices et logos sont des data: ; les styles en ligne sont admis (36 attributs style).
 const BASE_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
-const cspMemo = new Map(); // les pages pèsent ~2 Mo : une empreinte par contenu, pas par requête
-const cspDe = (empreintes) => `default-src 'none'; script-src ${empreintes.join(' ')}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`; // vibeflow 79-15 : une seule fonction bâtit la chaîne, de la liste d'empreintes
-const pageCsp = (html) => {
-  if (cspMemo.has(html)) return cspMemo.get(html);
-  const hashes = [...String(html).matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`);
-  const csp = cspDe([...new Set(hashes)]);
-  if (cspMemo.size >= 4) cspMemo.clear();
-  cspMemo.set(html, csp);
+const cspDe = (hashes, source) => { // vibeflow 79-15 : une seule fonction bâtit la chaîne, de la liste d'empreintes ; 79-16 : et de la source du préfixe de /_vf/ (A40), jamais 'self'
+  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')} ${source}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;
   return csp;
 };
-const sendPage = (res, html) => { res.setHeader('Content-Security-Policy', pageCsp(html) + (TERM ? TERM.frameSrc() : '')); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store', 'Content-Length': Buffer.byteLength(html) }); return res.end(html); }; // vibeflow P26, 79-15 : longueur exacte : frame-src de la CSP de page s'ajoute hors de pageCsp (v2.75.0 intacte)
-// vibeflow 79-15 : une page en trois parties (début, données, fin) de vf-cockpit-pages.mjs : jamais une chaîne d'une page entière, CSP de la liste d'empreintes de la page, longueur exacte
-const sendParties = (res, p) => { res.setHeader('Content-Security-Policy', cspDe(p.haches) + (TERM ? TERM.frameSrc() : '')); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store', 'Content-Length': p.longueur }); res.write(p.avant); res.write(p.donnees); return res.end(p.apres); };
+const hoteDe = (res) => res.req.headers.host.toLowerCase(); // l'hôte a déjà passé le contrôle exact de route() : 127.0.0.1:<port> ou localhost:<port>
+// vibeflow 79-16 : le document de la coquille d'une adresse (GET et HEAD), CSP = empreintes de SES scripts en ligne + la source du préfixe
+const sendDoc = (req, res, adresse) => {
+  const d = coquille.document(adresse);
+  res.setHeader('Content-Security-Policy', cspDe(d.haches, coquille.prefixeScripts(hoteDe(res))) + (TERM ? TERM.frameSrc() : ''));
+  res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store', 'Content-Length': d.longueur });
+  res.end(req.method === 'HEAD' ? undefined : d.octets);
+};
 const server = http.createServer((req, res) => {
   res.setHeader('Content-Security-Policy', BASE_CSP); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
   try { route(req, res); } catch (e) { console.error(`vf-cockpit : requête en échec : ${e?.message || e}`); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch {} }
@@ -633,19 +635,12 @@ function route(req, res) {
     }
     res.writeHead(404); return res.end();
   }
-  if (url.pathname === '/equipe.html') { const pe = VF?.pageEquipe?.(); if (pe) return sendParties(res, pe); } // vibeflow P24
-  if (url.pathname === '/project.html') { const pp = VF?.pageProjet(); if (pp) return sendParties(res, pp); } // vibeflow P13, P17
-  if (url.pathname === '/' || url.pathname === '/index.html') return sendPage(res, page);
-  let file;
-  try { file = path.join(here, decodeURIComponent(url.pathname)); } catch { res.writeHead(400); return res.end('bad address'); }
-  // vibeflow P13 : jamais un segment caché (.cache/server.json porte le jeton, .gitignore) ni un segment qui sort du dossier
-  if (path.relative(here, file).split(path.sep).some((seg) => seg.startsWith('.'))) { res.writeHead(404); return res.end('not found'); } // vibeflow P13
-  // inside this folder only: a neighbour like ../vf-cockpit-old/ also starts with this folder's path
-  if (!file.startsWith(here + path.sep) || !fs.existsSync(file) || !fs.statSync(file).isFile()) { res.writeHead(404); return res.end('not found'); }
-  // vibeflow P19 : un lien symbolique n'est servi que s'il reste dans ce dossier (realpath), jamais vers un fichier du lab ou d'ailleurs
-  try { if (!fs.realpathSync(file).startsWith(fs.realpathSync(here) + path.sep)) { res.writeHead(404); return res.end('not found'); } } catch { res.writeHead(404); return res.end('not found'); }
-  res.writeHead(200, { 'Content-Type': TYPES[path.extname(file)] || 'application/octet-stream', 'Cache-Control': 'no-store' }); // vibeflow P5
-  fs.createReadStream(file).pipe(res);
+  if (servirAsset(req, res, coquille.table)) return; // vibeflow 79-16 : les scripts de la coquille, table fermée (aucun fichier de la sortie n'est servi)
+  if (coquille.document(url.pathname)) { // vibeflow 79-16 : le même document aux quatre adresses de page, GET et HEAD seulement
+    if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }); return res.end(); }
+    return sendDoc(req, res, url.pathname);
+  }
+  res.writeHead(404); return res.end(); // garde:coquille-404
 }
 // vibeflow P18 : une exception perdue se journalise, le serveur (détaché, personne ne le relance) ne meurt pas
 process.on('uncaughtException', (e) => { console.error(`vf-cockpit : exception non rattrapée : ${e?.stack || e}`); });

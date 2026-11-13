@@ -14,7 +14,7 @@
 //   etat <portQ> <secret>                      GET /etat : statut puis corps
 //   attendre <fichier> <sous-chaine> <ms>      lecture latin1 toutes les 50 ms : TROUVE (0) ou ABSENT (1)
 //   ecoutes <pid>                              adresses en écoute du PID (lsof, sinon ss), sinon INDISPONIBLE
-//   csp-v275 <fichier-html>                    CSP que la formule de v2.75.0 donne aux <script> sans attribut du fichier
+//   csp-v275 <fichier-html> <source>           CSP que la formule de v2.75.0 donne aux <script> sans attribut du fichier, plus la source du préfixe (79-16)
 //   ligne-csp <serve.mjs>                      ligne qui commence par « const csp = » (deux espaces)
 //   ligne-csp-v275                             la même ligne, copie figée de v2.75.0
 import http from 'node:http';
@@ -24,11 +24,11 @@ import { execFileSync } from 'node:child_process';
 
 const [, , cmd, ...args] = process.argv;
 
-// copie figée de v2.75.0 : formule de pageCsp (serve.mjs) et ligne qui la porte ; ne se met JAMAIS à jour avec le moteur
-const LIGNE_CSP_V275 = "  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;";
-const cspV275 = (html) => {
+// copie figée de v2.75.0 (formule de pageCsp, serve.mjs) AVEC la seule source de script du préfixe de /_vf/ (79-16, A40 : `${source}` insérée après les empreintes) ; ne se met JAMAIS à jour avec le moteur
+const LIGNE_CSP_V275 = "  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')} ${source}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;";
+const cspV275 = (html, source) => {
   const hashes = [...String(html).matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`);
-  return `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;
+  return `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')} ${source}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;
 };
 
 const interpreter = (t) => String(t).replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\n/g, '\n').replace(/\\r/g, '\r');
@@ -128,7 +128,7 @@ async function main() {
       console.log(ss.split('\n').filter((l) => new RegExp(`pid=${pid},`).test(l)).map((l) => l.trim().split(/\s+/)[3]).filter(Boolean).sort().join('\n'));
     } catch { console.log('INDISPONIBLE'); }
   } else if (cmd === 'csp-v275') {
-    console.log(cspV275(fs.readFileSync(args[0], 'utf8')));
+    console.log(cspV275(fs.readFileSync(args[0], 'utf8'), args[1] || ''));
   } else if (cmd === 'ligne-csp') {
     const l = fs.readFileSync(args[0], 'utf8').split('\n').find((x) => x.startsWith('  const csp = '));
     console.log(l ?? 'ABSENTE');
