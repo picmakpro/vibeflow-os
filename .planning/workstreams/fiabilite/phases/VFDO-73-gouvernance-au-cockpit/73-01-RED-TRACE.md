@@ -26,4 +26,21 @@ Bilan sur la base : `Résultats : 1 PASS / 29 FAIL`. Le seul vert est RG7.0 (fix
 | RG10.4 | 0, -2, 1.5, 5000 | `[0,0,0,999]` | vide |
 | RG10.5 | champ absent, fichier absent | `[0,0]` | vide |
 
-Mutants (tâche 2) : voir la section ci-dessous une fois le module écrit.
+
+
+## Mutants (tâche 2) — vus rouges, sur copie jetable, ancre vérifiée
+
+Suite complète sur le module écrit : `Résultats : 35 PASS / 0 FAIL`. Un mutant est tué quand la sonde rejouée sur la copie mutée diffère de la valeur saine.
+
+| Mutant | Sonde | Valeur saine | Obtenu muté |
+|---|---|---|---|
+| M-STALL-DUR | variante au défaut 600 | `600` | `900` |
+| M-STALL-ENV | env 600, script à 900 | `600` | `900` |
+| M-STALL-ANCRE | variante commentée ou indentée | `null` | `900` |
+| M-STALL-LIGNE | variante au défaut 600 (copie du script) | `600` (pas 900) | suit la ligne |
+| M-STALL-ABSENT | variante sans la ligne | `null` | jamais 900 |
+| M-IMPACT-TERMINES | aval(a) du DAG a→b→c, a→d | `[2,0,0]` | `[3,0,0]` |
+| M-IMPACT-DEVINE | retientDe sans détention | `[{"n":4,…},null,null,{"n":2,…}]` | 3e élément `{"n":4,"portee":"mission"}` au lieu de null |
+| M-HUMAN-NEEDED-COCHEE | phase cochée | `[]` | `[{"phase":"73","ws":"w","cle":"w|73"}]` |
+| M-ENTETE-CORPS | en-tête sans statut, corps human_needed | `[0,0,0,1,0]` | `[0,1,0,1,0]` |
+| M-ATTEND-REMONTE | turn_duration 3 puis ligne assistant | `0` | `3` |
