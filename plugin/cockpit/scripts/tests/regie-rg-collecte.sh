@@ -121,11 +121,11 @@ const SC = {
     const age = () => live.snapshot().who.workers.find((x) => x.kind === 'session' && x.id === SID)?.ageS;
     for (let i = 0; i < 200 && age() === undefined; i++) await sleep(100);
     await live.pret(10000);
-    const c0 = live.etat().lecturesPlanning, age1 = age();
+    const c0 = live.lecturesPlanning(), age1 = age();
     await sleep(11500); // deux tours du filet (5 s) sans aucun changement de .planning/
-    const c1 = live.etat().lecturesPlanning, age2 = age(), ph = live.snapshot().who.phasesHumaines;
+    const c1 = live.lecturesPlanning(), age2 = age(), ph = live.snapshot().who.phasesHumaines;
     fs.writeFileSync(path.join(d, '.planning', 'phases', '7-alpha', '7-NOTE.md'), 'note\n');
-    let c2 = c1; for (let i = 0; i < 100 && !(c2 > c1); i++) { await sleep(100); c2 = live.etat().lecturesPlanning; }
+    let c2 = c1; for (let i = 0; i < 100 && !(c2 > c1); i++) { await sleep(100); c2 = live.lecturesPlanning(); }
     live.stop(); return JSON.stringify({ c0, c1, c2, age1, age2, ph });
   },
 };
@@ -155,7 +155,7 @@ rgc_faux_claude() { mkdir -p "$WORK/fakebin"; printf '#!/bin/sh\nexit 1\n' > "$W
 rgc_direct() { [ -f "$WORK/direct.json" ] && return 0; rgc_faux_claude; PATH="$WORK/fakebin:$PATH" rgc direct "$WORK/rgd" > "$WORK/direct.json"; }
 rg_RG4_direct() {
   rgc_direct
-  assert_eq "RG4.12 — etat() expose un compteur de lectures du planning : 1 après la construction initiale et deux tours de 5 s, 2 après une écriture dans .planning/" "$(G "$WORK/direct.json" '[j.c1, j.c2]' 2> /dev/null)" '[1,2]'
+  assert_eq "RG4.12 — live.lecturesPlanning() expose un compteur de lectures du planning : 1 après la construction initiale et deux tours de 5 s, 2 après une écriture dans .planning/" "$(G "$WORK/direct.json" '[j.c1, j.c2]' 2> /dev/null)" '[1,2]'
   assert_eq "RG4.13 — snapshot().who.phasesHumaines : une seule entrée, phase « 7 », ref « n:ph-7 »" "$(G "$WORK/direct.json" 'j.ph.map(p => p.phase + "/" + p.ref)' 2> /dev/null)" '["7/n:ph-7"]'
 }
 
@@ -219,7 +219,7 @@ rg_RG16_collecte() {
   assert_eq "RG16.12 — le contrat déclare vibeflow/cockpit-ailleurs@1 : entrée [lab, n], cwd interdit, requis schema et ailleurs" "$(rgc contrat "$WORK/rg16c" 12)" '{"entree":["lab","n"],"cwd":true,"requis":["schema","ailleurs"]}'
   rgc_prepare5
   assert_eq "RG16.14 — toute clé émise par who@2 (premier niveau et travailleurs, collecte riche : détention, impact, phases humaines, fenêtre) est déclarée au contrat" "$(rgc contrat "$WORK/rg16c" 14 "$WORK/rg5-a/who.json")" '[]'
-  rg_mutant NETTOIE-EMISSION "branche et titre repassés au seul masque" "$SCRIPTS" vf-cockpit-who.mjs 'w[k] = nettoie(w[k], LIBRES[k]); // garde:nettoie' 'w[k] = bornes(w[k], LIBRES[k]); // garde:nettoie' rgc16_sonde 'branch:propre|titre:propre'
+  rg_mutant NETTOIE-EMISSION "branche et titre repassés au seul masque" "$SCRIPTS" vf-cockpit-who.mjs 'w.branch = nettoie(w.branch, LIBRES.branch); // garde:nettoie' 'w.branch = bornes(w.branch, LIBRES.branch); // garde:nettoie' rgc16_sonde 'branch:propre|titre:propre'
 }
 rg_RG16_direct() {
   assert_eq "RG16.13 — whoSig diffère quand seul un champ ajouté (attendAgents, lancee, detient, retient, orphan, phasesHumaines, fenetreStallS) diffère, et ne diffère pas quand seuls ageS et at diffèrent" "$(rgc sigs "$WORK/rg16s")" 'champs:true,true,true,true,true,true,true|age:egal'

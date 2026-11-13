@@ -227,9 +227,10 @@ export function startLive({
 
   return {
     etat: () => ({
-      mode: state.mode, seq: state.seq, derniereMaj: state.derniereMaj, lecturesPlanning, collecte: { ...(({ etat, ...c }) => ({ ...c, etat: refusee && etat === 'ok' ? 'partielle' : etat }))(collecte.etat()), mode: state.mode, clients: nbClients() },
+      mode: state.mode, seq: state.seq, derniereMaj: state.derniereMaj, collecte: { ...(({ etat, ...c }) => ({ ...c, etat: refusee && etat === 'ok' ? 'partielle' : etat }))(collecte.etat()), mode: state.mode, clients: nbClients() },
     }),
     snapshot,
+    lecturesPlanning: () => lecturesPlanning, // 73-03 : diagnostic seul, hors de etat() (donc de /api/vf/etat)
     // à la connexion d'un onglet : l'instantané n'a pas bougé depuis un moment (aucune collecte sans onglet), un tour le remet à jour avant d'être servi ; au plus un tour par période du filet
     reveil() { if (!stopped && Date.now() - dernierTour >= NET_MS) { try { tour(); } catch (e) { log('error', `réveil : ${e.message}`); } } },
     pret: (ms = 5000) => collecte.pret(ms), // vrai quand aucune demande n'est en vol, faux après `ms` : le serveur retient `hello` jusque-là

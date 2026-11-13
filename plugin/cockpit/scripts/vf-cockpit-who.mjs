@@ -171,8 +171,8 @@ export function collectWho(root, opts = {}) {
     w.id = bornes(w.id, 128);
     for (const [k, n] of Object.entries(LIBRES)) if (k in w) { if (typeof w[k] === 'string') w[k] = bornes(w[k], k === 'task' && w.kind === 'dag-node' ? 100 : n); else delete w[k]; }
     for (const k of NOMBRES) if (k in w && !(Number.isFinite(w[k]) || (k === 'depth' && w[k] === null))) delete w[k];
-    // P73-D-22 : contrôles, sens d'écriture et largeur nulle retirés de la branche et du titre à l'émission
-    for (const k of ['branch', 'titre']) if (typeof w[k] === 'string') w[k] = nettoie(w[k], LIBRES[k]); // garde:nettoie
+    // P73-D-22 : contrôles, sens d'écriture et largeur nulle retirés de la branche à l'émission (le titre l'est déjà en amont, nettoieTitre)
+    if (typeof w.branch === 'string') w.branch = nettoie(w.branch, LIBRES.branch); // garde:nettoie
     const sous = (o, bornesDe) => { const r = {}; for (const [k, n] of Object.entries(bornesDe)) if (typeof o?.[k] === 'string') r[k] = bornes(o[k], n); return r; }; // objets imbriqués : mêmes règles
     if (w.detient) w.detient = sous(w.detient, { ws: 40, phase: 20 }); // garde:detient — seule la paire { ws, phase } sort (P73-D-08)
     const r = w.retient; // { n, portee } : un entier et une portée de liste fermée, sinon absent
