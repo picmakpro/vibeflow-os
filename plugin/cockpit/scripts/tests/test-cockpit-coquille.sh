@@ -43,7 +43,7 @@ mklab() { # lab neutre : phases 1 (faite) et 2 (marqueur), un plan, une mission,
 demarrer() { cockpit_lancer "$@"; RL=$?; PORT="${VF_PORT:-0}"; }
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
 REAL_HOME="$HOME"; REAL_HOME="$(node -e 'console.log(require("os").userInfo().homedir)')"
-chrome() { REAL_HOME="$REAL_HOME" node "$CH" "$CHROME" "$@"; } # chrome <mode> <args…>
+chrome() { local m="$1"; shift; REAL_HOME="$REAL_HOME" node "$CH" "$m" "$CHROME" "$@"; } # chrome <mode> <args…>
 
 echo "=== K0 — témoins : serveur, sortie assemblée, marqueurs du lab ==="
 LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"

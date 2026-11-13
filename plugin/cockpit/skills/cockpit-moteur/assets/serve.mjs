@@ -210,6 +210,11 @@ let page, G, core, MODES;
 // vibeflow P13 : ce fichier ; absent, le serveur reste celui de l'amont. Même port que la page, aucun en-tête CORS.
 // vibeflow P18 : jamais de repli sur l'agent amont non confiné (vf-cockpit-server.mjs absent du module : refus plus haut)
 const VF = (await depuisModule('vf-cockpit-server.mjs')).attach({ here, root, token, inject, log: (cat, msg) => { if (cat === 'error' || cat === 'warn') console.error(`vf-cockpit : ${msg}`); } }); // vibeflow P13
+// vibeflow 79-16 : le document de la coquille est composé UNE fois, du module (jamais de la sortie), puis servi tel quel aux adresses de page ; l'injection (jeton de l'onglet, tiroir) est propre à l'adresse
+const jetons = { code: token, projet: VF.ptoken, equipe: token };
+const injection = (adresse) => `<script>window.VF_COCKPIT_SERVER=${JSON.stringify({ token: adresse === '/project.html' ? VF.ptoken : token, cli: !!cli, engine, want, model: model || null, change: canChange, unFlux: true, jetons }).replace(/</g, '\\u003c')};</script>` + (TERM ? TERM.injection() : '');
+let coquille; try { coquille = (await depuisModule('vf-cockpit-coquille.mjs')).creerCoquille({ dossierMoteur: moteurDir, injection }); } catch (e) { refus(e.message); }
+const { servirAsset } = await depuisModule('vf-cockpit-coquille-assets.mjs');
 function load() {
   const html = fs.readFileSync(path.join(here, 'index.html'), 'utf8');
   const g = JSON.parse(fs.readFileSync(path.join(here, 'graph.json'), 'utf8'));
@@ -539,18 +544,29 @@ const bad = (res) => { res.writeHead(400, { 'Content-Type': 'application/json' }
 // ne se laisse pas encadrer, n'envoie aucun formulaire. Les polices et logos sont des data: ; les styles en ligne sont admis (36 attributs style).
 const BASE_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
 const cspMemo = new Map(); // les pages pèsent ~2 Mo : une empreinte par contenu, pas par requête
-const cspDe = (empreintes) => `default-src 'none'; script-src ${empreintes.join(' ')}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`; // vibeflow 79-15 : une seule fonction bâtit la chaîne, de la liste d'empreintes
-const pageCsp = (html) => {
+const cspDe = (hashes, source) => { // vibeflow 79-15 : une seule fonction bâtit la chaîne, de la liste d'empreintes ; 79-16 : et de la source du préfixe de /_vf/ (A40), jamais 'self'
+  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')} ${source}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;
+  return csp;
+};
+const pageCsp = (html, hote) => {
   if (cspMemo.has(html)) return cspMemo.get(html);
   const hashes = [...String(html).matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`);
-  const csp = cspDe([...new Set(hashes)]);
+  const csp = cspDe(hashes, `http://${hote}/_vf/`);
   if (cspMemo.size >= 4) cspMemo.clear();
   cspMemo.set(html, csp);
   return csp;
 };
-const sendPage = (res, html) => { res.setHeader('Content-Security-Policy', pageCsp(html) + (TERM ? TERM.frameSrc() : '')); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store', 'Content-Length': Buffer.byteLength(html) }); return res.end(html); }; // vibeflow P26, 79-15 : longueur exacte : frame-src de la CSP de page s'ajoute hors de pageCsp (v2.75.0 intacte)
+const hoteDe = (res) => res.req.headers.host.toLowerCase(); // l'hôte a déjà passé le contrôle exact de route() : 127.0.0.1:<port> ou localhost:<port>
+// vibeflow 79-16 : le document de la coquille d'une adresse (GET et HEAD), CSP = empreintes de SES scripts en ligne + la source du préfixe
+const sendDoc = (req, res, adresse) => {
+  const d = coquille.document(adresse);
+  res.setHeader('Content-Security-Policy', cspDe(d.haches, coquille.prefixeScripts(hoteDe(res))) + (TERM ? TERM.frameSrc() : ''));
+  res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store', 'Content-Length': d.longueur });
+  res.end(req.method === 'HEAD' ? undefined : d.octets);
+};
+const sendPage = (res, html) => { res.setHeader('Content-Security-Policy', pageCsp(html, hoteDe(res)) + (TERM ? TERM.frameSrc() : '')); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store', 'Content-Length': Buffer.byteLength(html) }); return res.end(html); }; // vibeflow P26, 79-15 : longueur exacte : frame-src de la CSP de page s'ajoute hors de pageCsp (v2.75.0 intacte)
 // vibeflow 79-15 : une page en trois parties (début, données, fin) de vf-cockpit-pages.mjs : jamais une chaîne d'une page entière, CSP de la liste d'empreintes de la page, longueur exacte
-const sendParties = (res, p) => { res.setHeader('Content-Security-Policy', cspDe(p.haches) + (TERM ? TERM.frameSrc() : '')); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store', 'Content-Length': p.longueur }); res.write(p.avant); res.write(p.donnees); return res.end(p.apres); };
+const sendParties = (res, p) => { res.setHeader('Content-Security-Policy', cspDe(p.haches, `http://${hoteDe(res)}/_vf/`) + (TERM ? TERM.frameSrc() : '')); res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store', 'Content-Length': p.longueur }); res.write(p.avant); res.write(p.donnees); return res.end(p.apres); };
 const server = http.createServer((req, res) => {
   res.setHeader('Content-Security-Policy', BASE_CSP); res.setHeader('X-Content-Type-Options', 'nosniff'); res.setHeader('X-Frame-Options', 'DENY');
   try { route(req, res); } catch (e) { console.error(`vf-cockpit : requête en échec : ${e?.message || e}`); try { if (!res.headersSent) res.writeHead(500); res.end(); } catch {} }
@@ -631,7 +647,8 @@ function route(req, res) {
     res.writeHead(404); return res.end();
   }
   if (url.pathname === '/equipe.html') { const pe = VF?.pageEquipe?.(); if (pe) return sendParties(res, pe); } // vibeflow P24
-  if (url.pathname === '/project.html') { const pp = VF?.pageProjet(); if (pp) return sendParties(res, pp); } // vibeflow P13, P17
+  if (servirAsset(req, res, coquille.table)) return; // vibeflow 79-16 : les scripts de la coquille, table fermée
+  if (url.pathname === '/project.html') return sendDoc(req, res, '/project.html');
   if (url.pathname === '/' || url.pathname === '/index.html') return sendPage(res, page);
   let file;
   try { file = path.join(here, decodeURIComponent(url.pathname)); } catch { res.writeHead(400); return res.end('bad address'); }
