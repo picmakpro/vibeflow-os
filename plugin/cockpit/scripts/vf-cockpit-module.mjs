@@ -16,6 +16,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { FICHIERS_NAVIGATEUR } from './vf-cockpit-navigateur.mjs';
+import { cheminPhysique } from './vf-cockpit-git-sortant.mjs';
 
 export const JETON = '<module>';
 const JETON_RE = /<module>/g;
@@ -50,9 +51,11 @@ export function substituerModule(texte, dossier) {
 export const OUTILS_ASSEMBLAGE = [/^vf-cockpit-build\.mjs$/, /^vf-cockpit-rename\.mjs$/, /^vf-cockpit-code.*\.mjs$/, /^vf-cockpit-fr-.*\.mjs$/];
 export const fichiersExecution = (scriptsDir) => fs.readdirSync(scriptsDir).filter((f) => /^vf-cockpit-.*\.mjs$/.test(f) && !OUTILS_ASSEMBLAGE.some((re) => re.test(f))).sort();
 
-// motifs du code évalué (constantes : 79-16 y ajoutera les ressources de page) ; dossier de scripts puis assets du moteur, puis les fichiers de code navigateur
+// motifs du code évalué (constantes ; 79-16 : les ressources de page y sont) ; dossier de scripts puis assets du moteur, puis les fichiers de code navigateur
 const MOTIFS_SCRIPTS = [/^vf-cockpit-.*\.mjs$/, /^vf-cockpit-interface\.json$/];
-const MOTIFS_MOTEUR = [/^serve\.mjs$/, /^graph-query\.js$/, /^query-cli\.mjs$/];
+// 79-16 : le gabarit et le client de la coquille ; les extensions de page de premier niveau (servies sous /_vf/ui/), jamais les sous-dossiers
+const MOTIFS_MOTEUR = [/^serve\.mjs$/, /^graph-query\.js$/, /^query-cli\.mjs$/, /^viewer\.html$/, /^vf-coquille(-portee)?\.js$/];
+const MOTIFS_UI = [/\.js$/];
 const dedans = (d, motifs) => fs.readdirSync(d).filter((f) => motifs.some((re) => re.test(f)));
 
 // [clé, chemin] triés par clé ; lève si un dossier est illisible
@@ -61,6 +64,8 @@ export function fichiersCodeEvalue(dossierScripts, dossierMoteur) {
   for (const f of dedans(dossierScripts, MOTIFS_SCRIPTS)) lot.push([`scripts/${f}`, path.join(dossierScripts, f)]);
   const assets = path.join(dossierMoteur, 'assets');
   for (const f of dedans(assets, MOTIFS_MOTEUR)) lot.push([`assets/${f}`, path.join(assets, f)]);
+  const ui = path.join(assets, 'ui');
+  for (const f of dedans(ui, MOTIFS_UI).filter((n) => fs.statSync(path.join(ui, n)).isFile())) lot.push([`assets/ui/${f}`, path.join(ui, f)]);
   // code navigateur rangé en fichiers (79-11) : une seule source, la liste close du lecteur ; un fichier illisible rend l'empreinte nulle
   for (const [dossier, nom] of FICHIERS_NAVIGATEUR) lot.push([`assets/ui/${dossier}/${nom}`, path.join(assets, 'ui', dossier, nom)]);
   return lot.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));
@@ -75,15 +80,18 @@ export function empreinteModule({ dossierScripts, dossierMoteur } = {}) {
   } catch { return null; }
 }
 
-// refuse (erreur de code 3) un module dont le chemin réel est sous la sortie du lab ou sous son `.vibeflow/`. Résolution native, fermée par
-// défaut : un échec de résolution vaut refus (A37 ; son passage à la résolution physique de 79-07 est porté par 79-16).
+// refuse (erreur de code 3) un module dont le chemin réel est sous la sortie du lab ou sous son `.vibeflow/`. Résolution PHYSIQUE de 79-07
+// (`cheminPhysique`, A37), fermée par défaut : un échec de résolution vaut refus, jamais un jugement sur la forme écrite du chemin.
 export function moduleAdmis(lab, dossierScripts, dossierMoteur) {
   const refus = (m) => Object.assign(new Error(m), { code: 3 });
-  let vibeflow;
-  try { vibeflow = path.join(fs.realpathSync(lab), '.vibeflow'); } catch { throw refus('lab introuvable : module refusé.'); }
+  const labReel = cheminPhysique(lab);
+  if (labReel === null) throw refus('lab introuvable : module refusé.');
+  const vibeflow = path.join(labReel, '.vibeflow');
   for (const d of [dossierScripts, dossierMoteur]) {
-    let r;
-    try { r = fs.realpathSync(d); } catch { throw refus('dossier du module introuvable : refus.'); }
-    if (r === vibeflow || r.startsWith(vibeflow + path.sep)) throw refus('le module du cockpit se trouve sous le dossier .vibeflow du lab (la sortie ne peut pas être source de code) : refus.');
+    const r = cheminPhysique(d); // garde:coquille-chemin
+    if (r === null) throw refus('dossier du module introuvable : refus.'); // garde:coquille-echec
+    if (r === vibeflow || r.startsWith(vibeflow + path.sep)) {
+      throw refus('le module du cockpit se trouve sous le dossier .vibeflow du lab (la sortie ne peut pas être source de code) : refus.');
+    }
   }
 }

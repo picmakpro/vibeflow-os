@@ -43,13 +43,13 @@ scripts/vf-cockpit-lancer.mjs 11
 scripts/vf-cockpit-lanceur-verrou.mjs 4
 scripts/vf-cockpit-lecture.mjs 23
 scripts/vf-cockpit-live.mjs 7
-scripts/vf-cockpit-module.mjs 4
+scripts/vf-cockpit-module.mjs 3
 scripts/vf-cockpit-paths.mjs 8
 scripts/vf-cockpit-planning.mjs 25
 scripts/vf-cockpit-port.mjs 3
 scripts/vf-cockpit-project.mjs 68
 scripts/vf-cockpit-query.mjs 3
-scripts/vf-cockpit-server.mjs 17
+scripts/vf-cockpit-server.mjs 16
 scripts/vf-cockpit-serveur-vivant.mjs 3
 scripts/vf-cockpit-signal.mjs 14
 scripts/vf-cockpit-terminal-amorce.mjs 7

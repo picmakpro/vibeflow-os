@@ -1,7 +1,7 @@
 // vf-cockpit-server — le crochet VibeFlow du serveur unique (67-04, P67-D-13, P67-D-14). Le serveur patché
 // (serve.mjs, patch P13) l'importe à côté de lui et lui délègue tout /api/vf/* APRÈS son contrôle du Host et du
 // jeton : même port que la page, aucun en-tête CORS. Le direct vient de vf-cockpit-live.mjs.
-// Export : attach({ here, root, token, inject, log, routes = ROUTES, scriptsDir = trustedScriptsDir() }) -> { ptoken, load, pageProjet, pageEquipe, jetonValide,
+// Export : attach({ here, root, token, log, routes = ROUTES, scriptsDir = trustedScriptsDir() }) -> { ptoken, load, jetonValide,
 //   route, stop, avantQuestion, modes, argsAgent, substituerConsigne } (les quatre derniers : crochets P14 des questions, 67-05 ; 79-06 : le dossier du module,
 //   parent du dossier de scripts, remplace le jeton `<module>` des consignes et des règles de l'agent ; refusé ou introuvable, l'agent est indisponible), ROUTES, repondreGardee.
 // Routes GET /api/vf/* : la table ROUTES (une ligne par route : chemin, lecteur, régime). Ajouter une route = un lecteur et UNE ligne à sa place
@@ -13,8 +13,8 @@
 // réduites au lab), lues en mémoire (vf-cockpit-frise.mjs) ; jamais une collecte, jamais un fichier du lab.
 // GET /api/vf/graphe?onglet=code|projet|equipe (79-15, SOCL-19) : la donnée de la page de l'onglet, ETag et 304 ; événement `graphe` { seq, at,
 // onglet, sig } après chaque instantané,
-// au seul changement de signature. project.html n'est plus réécrit : pages Projet et Équipe en trois parties depuis la mémoire, `projet.json` (A29)
-// pour l'outil de requête.
+// au seul changement de signature. project.html n'est plus réécrit ni servi (79-16 : le document de la coquille, vf-cockpit-coquille.mjs, ne porte aucune
+// donnée) ; son gabarit n'est plus lu que pour la méta de base et le repli avant le premier instantané ; `projet.json` (A29) pour l'outil de requête.
 // La dernière commande et le transcript ne figurent jamais dans le flux ni dans un fichier : la garde d'émission refuse tout
 // objet qui porte une clé de la liste `interdits` du contrat (vf-cockpit-interface.json, à côté), à n'importe quelle profondeur.
 // Contrat illisible ou liste vide : rien n'est émis (fermé par défaut).
@@ -30,7 +30,6 @@ import { ID_RE } from './vf-cockpit-lecture.mjs';
 import { creerGraphes } from './vf-cockpit-graphe.mjs';
 import { creerRouteGraphe } from './vf-cockpit-graphe-route.mjs';
 import { ecrireProjet, lireProjet, lireGrapheCode } from './vf-cockpit-graphe-fichier.mjs';
-import { preparerGabarit, creerAssembleur } from './vf-cockpit-pages.mjs';
 import { instantane, surInstantane } from './vf-cockpit-instantane.mjs';
 import { answerLocally, instructions } from './vf-cockpit-ask.mjs';
 import { MODELES, resoudreModele, argsAgent as argsConfines } from './vf-cockpit-agent.mjs';
@@ -110,11 +109,10 @@ export const ROUTES = [
   ['/api/vf/transcript', lireTranscript, HISTORIQUE],
 ];
 
-export function attach({ here, root, token, inject, log = () => {}, routes = ROUTES, scriptsDir = trustedScriptsDir(), vieMs = VIE_MS }) {
+export function attach({ here, root, token, log = () => {}, routes = ROUTES, scriptsDir = trustedScriptsDir(), vieMs = VIE_MS }) {
   const dossier = dossierModule(scriptsDir); // racine réelle du module (null si introuvable : jamais une exception ici, l'agent est refusé à la question)
   const ptoken = crypto.randomBytes(16).toString('hex'); // onglet Projet : dit de quel onglet vient une requête
-  // gabarits de page (début et fin construits une fois), pages assemblées mémoïsées
-  let gabP = null, gabE = null, charge = false; const pages = creerAssembleur();
+  let charge = false;
   const memoCode = {};
   const graphes = creerGraphes({
     forcerGabarit: process.env.VF_COCKPIT_DONNEES_GABARIT === '1', // réglage d'essai (A42)
@@ -127,13 +125,8 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
   const majGraphes = () => graphes.maj({ projet: instantane()?.projet, who: live ? live.snapshot()?.who : null, lancees: lancer.lancees() });
   // à l'attache (au premier besoin) et à chaque nouvel assemblage de la carte : le gabarit n'est plus relu à chaque événement du direct
   const load = () => {
-    charge = true; pages.vider();
-    try {
-      const html = fs.readFileSync(path.join(here, 'project.html'), 'utf8');
-      gabP = preparerGabarit(html, { inject: inject.replace(token, ptoken) });
-      gabE = preparerGabarit(html, { inject, titre: 'VibeFlow · Équipe' });
-      graphes.recharger(html);
-    } catch { gabP = null; gabE = null; graphes.recharger(''); }
+    charge = true;
+    try { graphes.recharger(fs.readFileSync(path.join(here, 'project.html'), 'utf8')); } catch { graphes.recharger(''); }
     majGraphes();
     // projet.json absent ou invalide : réécrit (A29)
     try { lireProjet(here); } catch { const c = graphes.courant('projet'); if (c) ecrireProjet(root, here, c.g); }
@@ -221,15 +214,6 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
 
   return {
     ptoken, load, route, avantQuestion, modes, argsAgent, substituerConsigne,
-    // 79-15 : pages en trois parties, jamais reconstruites par requête ; la page Équipe porte le jeton de la page Code (inject tel quel)
-    pageProjet: () => pages.page('projet', gabP, frais().courant('projet')),
-    // AUDC-B-03 : mémorisée par gabarit et signature ; fermée par la même garde que le flux (contrat illisible ou clé interdite : null)
-    pageEquipe: () => {
-      live?.reveil?.();
-      const g = frais(), c = g.courant('equipe');
-      if (!INTERDITS.length || (c && c.interdit)) { log('error', 'page Équipe refusée : contrat illisible ou contenu interdit'); return null; }
-      return pages.page('equipe', gabE, c);
-    },
     dernierFlux: () => dernierFlux,
     ouverts: () => clients.size, // AUDC-H3 : des flux de page ouverts retiennent l'arrêt sur inactivité
     jetonValide: (j) => memeJeton(j, ptoken),

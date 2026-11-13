@@ -74,7 +74,7 @@ export function lireAssets(dossierMoteur, { moteur } = {}) {
 
 const ENTETES = { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' };
 export function servirAsset(req, res, table) {
-  let p; try { p = new URL(req.url, 'http://x').pathname; } catch { return false; }
+  const p = String(req.url || '').split('?')[0]; // le chemin BRUT : jamais normalisé (`..`, `%2e%2e` ne désignent rien), jamais décodé
   if (!p.startsWith(PREFIXE)) return false;
   if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }); res.end(); return true; }
   const f = table.get(p); // garde:coquille-404

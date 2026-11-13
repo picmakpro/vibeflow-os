@@ -163,8 +163,8 @@ mut_a37() { # <nom> <sed> : le modèle de jugement muté, rejoué sur les mêmes
   cockpit_module_muter "$1" vf-cockpit-module.mjs "$2" || return 1
   rm -rf "$WORK/a37m"; node "$TESTS/coquille-propriete.mjs" gardes "$COCKPIT_MODULE/scripts" "$WORK/a37m" 2>/dev/null | oj 'Object.entries(j.cas).filter(([,c])=>!c.ok).map(([n])=>n).join(",")||"tous"'
 }
-assert_eq "M-LEXICAL — moduleAdmis jugeant des chemins normalisés : rougit A37.1 sur les liens vers l'intérieur et vers l'extérieur (jamais sur les cas sains)" "$(mut_a37 lexical 's|const r = cheminPhysique(d); // garde:coquille-chemin|const r = path.resolve(d);|')" "lien-vers-interieur,chaine-de-deux,lien-vers-exterieur"
-assert_eq "M-ECHEC-OUVERT — un échec de résolution vaut accord : rougit A37.1 sur le lien pendant et la boucle" "$(mut_a37 ouvert 's|if (r === null) throw refus(.dossier du module introuvable : refus.); // garde:coquille-echec|if (r === null) continue;|')" "pendant,boucle"
+assert_eq "M-LEXICAL — moduleAdmis jugeant des chemins normalisés : rougit A37.1 sur les liens (vers l'intérieur, chaîne, vers l'extérieur, pendant, boucle), jamais sur les cas sains" "$(mut_a37 lexical 's|const r = cheminPhysique(d); // garde:coquille-chemin|const r = path.resolve(d);|')" "lien-vers-interieur,chaine-de-deux,lien-vers-exterieur,pendant,boucle"
+assert_eq "M-ECHEC-OUVERT — un échec de résolution vaut accord : rougit A37.1 sur le lien pendant et la boucle" "$(mut_a37 ouvert 's|if (r === null) throw refus(.dossier du module introuvable : refus..); // garde:coquille-echec|if (r === null) continue;|')" "pendant,boucle"
 
 echo "=== K6 — le module servi est celui que cockpit_lancer démarre (A48, point 41) ==="
 rq GET /_vf/ui/25-recent.js "$WORK/k6-base.js"; E0="$(hv etag)"
