@@ -9,6 +9,8 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { ID_RE } from './vf-cockpit-lecture.mjs';
 import { envEnfant } from './vf-cockpit-env.mjs';
+import os from 'node:os';
+import { nettoie } from './vf-cockpit-arbres.mjs';
 
 export const REPIT_MS = 10000; // au plus une commande toutes les 10 s
 export const VALIDITE_MS = 60000; // une lecture plus vieille que 60 s n'est plus rendue : retour à la lecture des transcripts
@@ -51,7 +53,7 @@ export function rafraichir({ home, cwd, commande = 'claude' } = {}) {
       execFile(commande, ['agents', '--json'], { cwd, env: { ...envEnfant(cwd), HOME: home } /* PATH assaini : jamais un `claude` posé dans le lab (audit H-1) */, timeout: DELAI_MS, maxBuffer: MAX_OCTETS, windowsHide: true }, (err, out) => {
         if (err) return clos(null);
         let j = null; try { j = JSON.parse(String(out)); } catch {}
-        clos(formeEtats(j));
+        const carte = formeEtats(j); c.attendent = carte ? dossiersEnAttente(j, carte) : null; clos(carte); // 73-02
       });
     } catch { clos(null); }
   });
@@ -62,4 +64,56 @@ export function demander({ home, cwd, now = Date.now() } = {}) {
   const c = cache(home);
   if (c.enCours || now - c.dernier < REPIT_MS) return;
   rafraichir({ home, cwd }).catch(() => {});
+}
+
+// ---- 73-02 : « ailleurs sur ce poste » (REGI-13, P73-D-16) ----
+// ailleurs(home, { racines, now, homeDir }) -> [{ lab, n }] | null : combien de sessions à l'état « vous attend » ont leur dossier
+//   HORS des arbres du lab (racines), groupées par NOM de lab. Ni chemin, ni identifiant, ni titre ne sort : les dossiers vivent dans
+//   la mémoire privée de la dernière lecture (c.attendent), jamais exportée. Aucune commande, aucun git, aucun fichier lu ici.
+//   null (jamais 0) : pas de lecture officielle fraîche (60 s), liste illisible, racines inconnues. Nom du lab : dernier segment,
+//   suffixe /.claude/worktrees/<n> retiré, nettoyé, borné à 40 ; dossier personnel, un de ses ancêtres ou chemin de moins de
+//   deux segments : « un autre dossier » (hypothèse A7).
+const AUTRE = 'un autre dossier', SUFFIXE_ARBRE = /[\\/]\.claude[\\/]worktrees[\\/][^\\/]+(?:[\\/].*)?$/;
+const dessous = (racine, p) => {
+  const r = path.relative(racine, p);
+  return r === '' || (r !== '..' && !r.startsWith('..' + path.sep) && !path.isAbsolute(r));
+};
+// chemin réel quand il se résout ; sinon l'ancêtre existant le plus proche résolu, suivi du reste (un dossier supprimé reste comparable)
+function reelOuResolu(p) {
+  const abs = path.resolve(p);
+  try { return fs.realpathSync(abs); } catch { const haut = path.dirname(abs); return haut === abs ? abs : path.join(reelOuResolu(haut), path.basename(abs)); }
+}
+function nomDuLab(d, hd) {
+  const base = d.replace(SUFFIXE_ARBRE, '');
+  if (dessous(base, hd)) return AUTRE;
+  const segs = base.split(/[\\/]/).filter(Boolean);
+  if (segs.length < 2) return AUTRE;
+  return nettoie(segs[segs.length - 1], 40) || AUTRE;
+}
+// les dossiers des sessions qui attendent (une fois par identifiant) ; une session en attente sans dossier lisible rend le compte inconnu (null)
+function dossiersEnAttente(json, carte) {
+  const CC = contrat(), vus = new Set(), out = [];
+  for (const e of json) {
+    const id = e[CC.cleSession];
+    if (vus.has(id) || !carte.get(id) || carte.get(id).etat !== 'attend') continue;
+    vus.add(id);
+    if (typeof e.cwd !== 'string' || !e.cwd) return null;
+    out.push(e.cwd);
+  }
+  return out;
+}
+export function ailleurs(home, { racines, now = Date.now(), homeDir = os.homedir() } = {}) {
+  const c = caches.get(home);
+  if (!c || !c.carte || now - c.at >= VALIDITE_MS || !Array.isArray(c.attendent) || !Array.isArray(racines)) return null;
+  const rs = racines.filter((r) => typeof r === 'string' && r).map(reelOuResolu);
+  if (!rs.length) return null;
+  const hd = reelOuResolu(homeDir), lignes = new Map();
+  for (const cwd of c.attendent) {
+    const d = reelOuResolu(cwd);
+    if (path.isAbsolute(cwd) && rs.some((r) => dessous(r, d))) continue;
+    const lab = nomDuLab(d, hd);
+    const l = lignes.get(lab) || { lab, n: 0 };
+    l.n++; lignes.set(lab, l);
+  }
+  return [...lignes.values()].sort((x, y) => y.n - x.n || (x.lab < y.lab ? -1 : x.lab > y.lab ? 1 : 0));
 }

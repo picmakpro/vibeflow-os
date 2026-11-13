@@ -30,6 +30,9 @@ import { creerLancer } from './vf-cockpit-lancer.mjs';
 import { HISTORIQUE, FLUX, reponse, controlerAcces, creerRepartiteur } from './vf-cockpit-routes.mjs';
 import { lireState, LECTEURS } from './vf-cockpit-state.mjs';
 import { brancherFluxEtat, VIE_MS } from './vf-cockpit-flux-etat.mjs';
+import os from 'node:os';
+import { ailleurs, demander, REPIT_MS } from './vf-cockpit-etat-officiel.mjs';
+import { arbresGit } from './vf-cockpit-arbres.mjs';
 
 let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
 try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
@@ -69,6 +72,22 @@ const lireModeles = (c) => {
   let reel = c.root; try { reel = fs.realpathSync(c.root); } catch {} // le lab peut disparaître en cours de route : jamais une exception
   return { modeles: MODELES, defaut: c.dep.modele, lab: crypto.createHash('sha256').update(reel).digest('hex').slice(0, 12) };
 };
+// GET /api/vf/ailleurs (73-02, P73-D-16, P73-D-35) : sessions d'AUTRES labs qui vous attendent, par NOM de lab seulement ; dérive de
+// la dernière lecture officielle gardée en mémoire de CE processus (la collecte lit la sienne dans son fil : invisible ici ;
+// `demander` relance la lecture au plus une fois par REPIT_MS, jamais une par requête). Les arbres du lab sont relus au plus une
+// fois par REPIT_MS ; jamais de git dans un autre dépôt ; avant la première lecture : null.
+const racinesLab = new Map(); // racine du lab -> { at, liste }
+const lireAilleurs = (c) => {
+  const now = Date.now();
+  demander({ home: os.homedir(), cwd: c.root });
+  let m = racinesLab.get(c.root);
+  if (!m || now - m.at >= REPIT_MS) {
+    m = { at: now, liste: null };
+    try { m.liste = arbresGit(c.root).map((t) => t.chemin); } catch {}
+    racinesLab.set(c.root, m);
+  }
+  return { schema: 'vibeflow/cockpit-ailleurs@1', ailleurs: ailleurs(os.homedir(), { racines: m.liste }) };
+};
 function ouvrirFlux(c, req, url, res) {
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
   res.write('retry: 1000\n\n');
@@ -88,6 +107,7 @@ function ouvrirFlux(c, req, url, res) {
 
 // la table des routes (A10) : une ligne par route, ordre alphabétique par chemin ; sans régime = gardée
 export const ROUTES = [
+  ['/api/vf/ailleurs', lireAilleurs],
   ['/api/vf/doing', lireDoing, HISTORIQUE],
   ['/api/vf/etat', lireEtat, HISTORIQUE],
   ['/api/vf/events', ouvrirFlux, FLUX],

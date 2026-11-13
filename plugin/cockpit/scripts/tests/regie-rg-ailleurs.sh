@@ -46,7 +46,7 @@ rg13_cas_attend() { og "$1" "$OGP"' await lire([S(P + "/atelier", BL)]); return 
 rg13_cas_etats() { og "$1" "$OGP"' await lire([S(P + "/atelier", WA)]); const a1 = al(); await lire([S(P + "/atelier", { state: "working" }), S(P + "/atelier", { status: "idle" }), S(P + "/atelier", { state: "done" }), S(P + "/atelier", { status: "busy" })]); return [a1, al()];'; }
 rg13_cas_lab() { og "$1" "$OGP"' await lire([S(X.lab, BL), S(X.lab + "/src", BL), S(X.lab + "/.claude/worktrees/w1", WA)]); const dedans = al(); await lire([S(X.w + "/lab-bis", BL)]); return [dedans, al()];'; }
 rg13_cas_noms() { og "$1" "$OGP"' await lire([S(P + "/menuiserie", BL), S(P + "/forge", WA), S(P + "/atelier/.claude/worktrees/w1", BL), S(P + "/atelier", BL)]); return al();'; }
-rg13_cas_sortie() { og "$1" "$OGP"' const t = "TITRE-SECRET-ZED"; await lire([S(P + "/atelier", BL, { name: t, title: t, summary: t })]); const r = al(), j = JSON.stringify(r); return [r.map((x) => Object.keys(x).join(",")), j.includes(P), j.includes(ID(0)), j.includes(t)];'; }
+rg13_cas_sortie() { og "$1" "$OGP"' const t = "TITRE-SECRET-ZED"; await lire([S(P + "/atelier", BL, { name: t, title: t, summary: t })]); const r = al(), j = JSON.stringify(r); return [r.map((x) => Object.keys(x).join(",")), j.includes(P), j.includes(ID(0)), j.includes(t), r.map((x) => x.lab)];'; }
 rg13_cas_nettoie() { og "$1" "$OGP"' await lire([S(P + "/at‮el\u0007ier", BL)]); const r1 = al(); await lire([S(P + "/" + "q".repeat(90), BL)]); return [r1, al()[0].lab.length];'; }
 rg13_cas_perso() { og "$1" "$OGP"' await lire([S(X.home, BL), S(path.dirname(X.home), BL), S("/seul", BL)]); return al();'; }
 rg13_cas_nul() { og "$1" "$OGP"' const r = []; const lisible = [S(P + "/atelier", BL)];
@@ -59,12 +59,12 @@ rg_RG13_officiel() {
   assert_eq "RG13.1 — status « waiting » compte ; « working », « idle », « done », « busy » ne comptent pas" "$(rg13_cas_etats "$SCRIPTS")" '[[{"lab":"atelier","n":1}],[]]'
   assert_eq "RG13.2 — dans le lab, son sous-dossier et son worktree (lien vérifié) : rien ; un lab dont le nom commence par celui du lab : compté (segment entier)" "$(rg13_cas_lab "$SCRIPTS")" '[[],[{"lab":"lab-bis","n":1}]]'
   assert_eq "RG13.3 — worktree d'un autre lab = ce lab ; deux sessions du même lab : n = 2 ; trois labs triés par n décroissant puis nom" "$(rg13_cas_noms "$SCRIPTS")" '[{"lab":"atelier","n":2},{"lab":"forge","n":1},{"lab":"menuiserie","n":1}]'
-  assert_eq "RG13.4 — la sortie n'a que lab et n : ni dossier, ni identifiant de session, ni titre" "$(rg13_cas_sortie "$SCRIPTS")" '[["lab,n"],false,false,false]'
+  assert_eq "RG13.4 — la sortie n'a que lab et n : ni dossier, ni identifiant de session, ni titre" "$(rg13_cas_sortie "$SCRIPTS")" '[["lab,n"],false,false,false,["atelier"]]'
   assert_eq "RG13.4b — caractères de contrôle et de sens d'écriture retirés du nom ; nom de 90 caractères borné à 40" "$(rg13_cas_nettoie "$SCRIPTS")" '[[{"lab":"atelier","n":1}],40]'
   assert_eq "RG13.5 — dossier personnel, un de ses ancêtres, chemin d'un seul segment : « un autre dossier »" "$(rg13_cas_perso "$SCRIPTS")" '[{"lab":"un autre dossier","n":3}]'
   assert_eq "RG13.6 — commande en échec, JSON illisible, entrée en attente sans cwd, lecture de plus de 60 s, racines absentes, aucune lecture : null (jamais 0)" "$(rg13_cas_nul "$SCRIPTS")" '[null,null,null,null,null,null]'
-  rg_mutant AILLEURS-CWD "la sortie garde le dossier" "$SCRIPTS" vf-cockpit-etat-officiel.mjs 'const l = lignes.get(lab) || { lab, n: 0 };' 'const l = lignes.get(lab) || { lab, n: 0, cwd };' rg13_cas_sortie '[["lab,n"],false,false,false]'
-  rg_mutant AILLEURS-TITRE "le nom du lab porte l'identifiant de session" "$SCRIPTS" vf-cockpit-etat-officiel.mjs 'out.push(e.cwd);' 'out.push(e.cwd + "#" + e.sessionId);' rg13_cas_sortie '[["lab,n"],false,false,false]'
+  rg_mutant AILLEURS-CWD "la sortie garde le dossier" "$SCRIPTS" vf-cockpit-etat-officiel.mjs 'const l = lignes.get(lab) || { lab, n: 0 };' 'const l = lignes.get(lab) || { lab, n: 0, cwd };' rg13_cas_sortie '[["lab,n"],false,false,false,["atelier"]]'
+  rg_mutant AILLEURS-TITRE "le nom du lab porte l'identifiant de session" "$SCRIPTS" vf-cockpit-etat-officiel.mjs 'out.push(e.cwd);' 'out.push(e.cwd + "#" + e.sessionId);' rg13_cas_sortie '[["lab,n"],false,false,false,["atelier"]]'
   rg_mutant AILLEURS-SOUS-ARBRE "égalité stricte au lieu de « sous la racine »" "$SCRIPTS" vf-cockpit-etat-officiel.mjs 'rs.some((r) => dessous(r, d))' 'rs.some((r) => r === d)' rg13_cas_lab '[[],[{"lab":"lab-bis","n":1}]]'
   rg_mutant AILLEURS-HOME "repli du dossier personnel retiré" "$SCRIPTS" vf-cockpit-etat-officiel.mjs 'if (dessous(base, hd)) return AUTRE;' 'if (false) return AUTRE;' rg13_cas_perso '[{"lab":"un autre dossier","n":3}]'
 }
@@ -101,10 +101,10 @@ rg13_run() {
   echo 0 > "$RG13_RC"; : > "$RG13_MARK"; : > "$RG13_GITLOG"
   COCKPIT_SORTIE="$RG13_LAB/.vibeflow/cockpit" cockpit_lancer "$RG13_LAB" PATH="$RG13_BIN:$PATH"
   if [ "${VF_PORT:-0}" = 0 ]; then echo "lancement=ko" > "$res"; return 0; fi
-  attendre 15 test -s "$RG13_MARK" || true   # la lecture officielle du serveur a eu lieu (le faux claude a été appelé)
+  # la première requête déclenche la lecture officielle du serveur (null tant qu'elle n'a pas fini) ; les suivantes lisent la mémoire
   attendre 8 rg13_liste && liste="oui"
   rg13_get
-  { echo "lancement=ok"; echo "code=$RG13_CODE"
+  { echo "lancement=ok"; echo "code=$RG13_CODE"; echo "appels=$(rg13_n "$RG13_MARK")"
     echo "schema=$(G "$WORK/rg13-body" 'j.schema' 2>/dev/null)"; echo "liste=$(G "$WORK/rg13-body" 'j.ailleurs' 2>/dev/null)"; echo "rendue=$liste"; } > "$res"
   node "$AUX/rg13req.mjs" "$VF_PORT" POST /api/vf/ailleurs "$VF_JETON" | sed -n 1p | sed 's/^/post=/' >> "$res"
   node "$AUX/rg13req.mjs" "$VF_PORT" GET /api/vf/ailleurs | sed -n 1p | sed 's/^/sanstoken=/' >> "$res"
@@ -138,6 +138,7 @@ rg_RG13_route() {
   local r d
   rg13_serveur_init
   r="$WORK/rg13-sain.res"; rg13_run "$r"
+  [ -z "${RG13_DBG:-}" ] || { cat "$r"; cat "$RG13_MARK" "$RG13_GITLOG" | head -20; tail -5 "$VF_LOG" 2>/dev/null; }
   assert_eq "RG13.10 — GET avec jeton : 200, schéma vibeflow/cockpit-ailleurs@1, ailleurs = [{ atelier, 1 }] après la lecture officielle du serveur" "$(rg13_ch "$r" code)|$(rg13_ch "$r" schema)|$(rg13_ch "$r" liste)" '200|vibeflow/cockpit-ailleurs@1|[{"lab":"atelier","n":1}]'
   assert_eq "RG13.11 — POST avec jeton : 405 (lecture seule)" "$(rg13_ch "$r" post)" "405"
   assert_eq "RG13.12 — GET sans jeton : 403" "$(rg13_ch "$r" sanstoken)" "403"

@@ -32,4 +32,16 @@ M-AILLEURS-GIT et M-ROUTE-PAR-REQUETE aussi. Ils sont rejoués et vus rouges par
 
 ## RK.1 (table des routes, A54)
 
-Voir la section ci-dessous, ajoutée à la tâche 2.
+`ROUTES` du serveur reçoit d'abord la ligne `/api/vf/ailleurs` ; `bash plugin/cockpit/scripts/tests/test-cockpit-routes.sh` rend alors :
+
+- `RK.1` rouge : attendu `ok`, obtenu `ko` (la route de `ROUTES` n'est pas dans la liste écrite à la main) ;
+- `RK.7` rouge : attendu `aucun-echec|7|7`, obtenu `aucun-echec|8|8` (le compteur de couverture est écrit en dur : 7 routes) ;
+- trois mutants de la suite (M-LITTERAL, M-HISTORIQUE-NEUF, M-ORDRE) rougissent aussi, `RK.1` s'ajoutant à leur verdict attendu (leur liste dérive de `ATTENDU`).
+
+Puis, à sa place alphabétique : `/api/vf/ailleurs` ajouté à `ATTENDU`, au libellé de `RK.1` et le compteur de `RK.7` porté à 8 : PASS RK.1, PASS RK.7, suite 56 PASS / 0 FAIL.
+
+## Écart constaté en cours de tâche 2 (pas un rouge de témoin)
+
+La collecte du cockpit lit `claude agents --json` dans un fil (worker) : la mémoire de `vf-cockpit-etat-officiel.mjs` du processus serveur reste vide, `ailleurs()` y rendait `null`
+(obtenu `liste=null` malgré deux appels du faux claude). La route déclenche donc la lecture officielle du serveur par `demander` (au plus une par REPIT_MS, jamais une par requête) ;
+RG13.13 et M-ROUTE-PAR-REQUETE (lecture relancée à chaque requête, `dclaude=10`) gardent cette borne.
