@@ -123,7 +123,7 @@ if (mode === 'sse') {
     out({ noms }, z);
   } else if (cas === 'etat') {
     const z = await serveur(); D.seq = 5; const evs = []; const f = lireFlux(z.port, { duree: 0, onBloc: (e) => { if (e.nom === 'etat') evs.push(e); } }); await dormir(300);
-    const S1 = sig(); const volat = (o) => { if (Array.isArray(o)) return o.map(volat); if (!o || typeof o !== 'object') return o; return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ['at', 'ageS', 'dureeS', 'lastAt', 'progressAgeS', 'fetchAgeS'].includes(k) ? (typeof v === 'number' ? v + 1 : typeof v === 'string' ? '2030-01-01T00:00:00.000Z' : v) : volat(v)])); };
+    const S1 = sig(); const volat = (o) => { if (Array.isArray(o)) return o.map(volat); if (!o || typeof o !== 'object') return o; return Object.fromEntries(Object.entries(o).map(([k, v]) => [k, ['at', 'ageS', 'dureeS', 'lastAt', 'progressAgeS', 'fetchAgeS', 'leaseS'].includes(k) ? (typeof v === 'number' ? v + 1 : typeof v === 'string' ? '2030-01-01T00:00:00.000Z' : v) : volat(v)])); };
     const n = () => evs.length; const r = {};
     poserSig(S1, 1); await dormir(300); r.premier = n();
     poserSig(volat(S1), 2); await dormir(300); r.volatils = n();
@@ -141,7 +141,7 @@ if (mode === 'sse') {
   const MARQUEUR = 'MARQUEUR-LEURRE-79-12';
   const corps = () => {
     const o = JSON.parse(JSON.stringify(M)); const now = Date.now();
-    o.at = new Date(now).toISOString(); o.signal = o.signal || {}; o.signal.at = new Date(m === 'perime' ? now - 600000 : now).toISOString(); o.signal.projet = MARQUEUR;
+    o.at = new Date(now).toISOString(); o.signal = o.signal || {}; o.signal.at = new Date(m === 'perime' ? now - 600000 : m === 'futur' ? now + 600000 : now).toISOString(); o.signal.projet = MARQUEUR;
     if (m === 'autre-racine') o.signal.root = path.dirname(String(o.signal.root)); // un dossier qui existe : seule la différence de racine est la cause du rejet
     if (m === 'schema') o.schema = 'vibeflow/cockpit-state@0';
     if (m === 'incomplet') delete o.signal.equipe;
@@ -163,7 +163,7 @@ if (mode === 'sse') {
     if (m === 'texte') { s.writeHead(200, { 'Content-Type': 'text/plain' }); s.end('pas du json'); return; }
     const c = corps();
     if (m === 'lent') { s.writeHead(200, { 'Content-Type': 'application/json' }); let i = 0; const t = setInterval(() => { if (i >= c.length) { clearInterval(t); s.end(); } else s.write(c[i++]); }, 300); s.on('close', () => clearInterval(t)); return; }
-    s.writeHead(200, { 'Content-Type': 'application/json' }); s.end(c);
+    s.writeHead(m === 'code-non-200' ? 202 : 200, { 'Content-Type': 'application/json' }); s.end(c); // 202 : seul le code diffère, le corps est celui du leurre valide
   });
   srv.listen(0, '127.0.0.1', () => fs.writeFileSync(fPort, String(srv.address().port)));
 }

@@ -2,6 +2,7 @@
 // etat-labo.mjs — aide de test-cockpit-etat.sh (79-12) : lab de démonstration, faux verrou à journal, lancement de l'émetteur de vf-signal.
 //   lab <dossier>                                  dépôt git, planning à deux phases, un plan et son bilan, un commit
 //   verrou <dossier> <lab>                         faux driver-lock.sh dans <dossier> ; chaque appel écrit « verbe PPID » dans <lab>/.vibeflow/journal-verrou ;
+//                                                  `age_seconds`, `progress_age_seconds` et `lease_seconds` croissent avec le temps (forme réelle) ;
 //                                                  l'instant de départ des âges est lu d'un fichier posé à côté du script (jamais d'une variable d'environnement)
 //   emetteur <scripts> <lab> <faux> [coupe-ms]     lance l'émetteur du dossier <scripts> ; une ligne JSON { code, sortie, pid, ms, tue }
 import fs from 'node:fs';
@@ -29,7 +30,7 @@ if (mode === 'lab') {
 D="$(cd "$(dirname "$0")" && pwd)"; T0="$(cat "$D/debut")"; N=$(( $(date +%s) - T0 ))
 mkdir -p "${L}/.vibeflow"; echo "$1 $PPID" >> "${L}/.vibeflow/journal-verrou"
 case "$1" in
-  status) printf '{"locks":[{"present":true,"scope":"depot","ws":"","phase":"","stale":false,"age_seconds":%s,"ttl":1800,"progress_age_seconds":%s,"owner":"essai"}]}\\n' "$N" "$N" ;;
+  status) printf '{"locks":[{"present":true,"scope":"depot","ws":"","phase":"","stale":false,"age_seconds":%s,"ttl":1800,"progress_age_seconds":%s,"lease_seconds":%s,"owner":"essai"}]}\\n' "$N" "$N" "$N" ;;
   orphans) echo '{"orphans":[]}' ;;
   registry) echo '{"present": false, "count": 0, "agents": []}' ;;
   *) echo '{}' ;;

@@ -103,7 +103,7 @@ import fs from 'node:fs';
 const { collectSignal } = await import('file://$SCRIPTS/vf-cockpit-signal.mjs');
 const loc = collectSignal('$LAB', { scriptsDir: '$FAUX' }); fs.writeFileSync('$WORK/signal-local.json', JSON.stringify(loc));
 " 2>/dev/null
-VOL='["at","ageS","dureeS","lastAt","progressAgeS","fetchAgeS","sansSession"]' # sansSession : verdict tiré de l'équipe, que la collecte locale (sans équipe injectée) ne porte pas
+VOL='["at","ageS","dureeS","lastAt","progressAgeS","fetchAgeS","leaseS","sansSession"]' # sansSession : verdict tiré de l'équipe, que la collecte locale (sans équipe injectée) ne porte pas
 SANS='const v='"$VOL"';const f=(o)=>Array.isArray(o)?o.map(f):o&&typeof o==="object"?Object.fromEntries(Object.entries(o).filter(([k])=>!v.includes(k)&&k!=="equipe").sort(([a],[b])=>a<b?-1:1).map(([k,x])=>[k,f(x)])):o;'
 EGAL="$(node -e "const fs=require('fs');$SANS const a=JSON.parse(fs.readFileSync('$WORK/signal-servi.json','utf8')),b=JSON.parse(fs.readFileSync('$WORK/signal-local.json','utf8'));console.log(JSON.stringify(f(a))===JSON.stringify(f(b)))" 2>/dev/null)"
 IDS="$(node -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync('$WORK/signal-servi.json','utf8')),b=JSON.parse(fs.readFileSync('$WORK/signal-local.json','utf8'));const i=(x)=>((x.equipe||{}).workers||[]).map((w)=>w.id).sort().join(',');console.log(i(a)===i(b))" 2>/dev/null)"
@@ -296,7 +296,7 @@ mutant_t3() { # <nom> <fichier> <sed> <attendu> <fonction de verdict : e45 | e6 
 }
 mutant_t3 VIE-JOURNAL vf-cockpit-server.mjs "/garde:vie-journal/s/if (nom !== 'vie') //" "E4.2" e45
 mutant_t3 ETAT-SEQ vf-cockpit-flux-etat.mjs '/garde:etat-seq/s/seq: seq()/seq: seq() + 1/' "E5.2" e45
-mutant_t3 VOLATILS-TROP vf-cockpit-state.mjs "/garde:state-volatils/s/'fetchAgeS'\]/'fetchAgeS', 'owner']/" "E7.2" e7
+mutant_t3 VOLATILS-TROP vf-cockpit-state.mjs "/garde:state-volatils/s/'leaseS'\]/'leaseS', 'owner']/" "E7.2" e7
 mutant_t3 ORDRE vf-cockpit-state.mjs '/garde:state-canonique/s/\.sort()//' "E7.3" e7
 mutant_t3 SERIE vf-cockpit-state.mjs '/garde:lecteurs-serie/s/serie >= 2/serie >= 1/' "E6.1 E6.2" e6
 mutant_t3 FENETRE vf-cockpit-state.mjs '/garde:lecteurs-fenetre/s/now - dernier < fenetreMs/true/' "E6.1 E6.2" e6
@@ -309,6 +309,12 @@ cockpit_module_muter VOLATILS-VIDE vf-cockpit-state.mjs "/garde:state-volatils/s
 scenario_a m-VOLATILS-VIDE; unset COCKPIT_MODULE
 MVV="$(mutcopie VOLATILS-VIDE vf-cockpit-state.mjs "/garde:state-volatils/s/new Set(\[[^]]*\])/new Set()/")"; node "$TESTS/etat-propriete.mjs" signature "${MVV:-$COPIE-absent}" "$WORK/signal-servi.json" > "$WORK/m-vv.json" 2>&1
 assert_eq "M-VOLATILS-VIDE — la liste nommée est vide : E7.1 (propriété) et E5.3 (serveur réel) rougissent, seuls" "$(echo "$(rouges_e7 "$WORK/m-vv.json") $(rouges_a m-VOLATILS-VIDE)" | xargs)" "E7.1 E5.3"
+# M-VOLATILS-LEASE : `leaseS` retiré de la liste, tout le reste intact. Le faux verrou émet un lease_seconds croissant (forme réelle) : le serveur réel envoie un etat par tour
+cockpit_module_muter VOLATILS-LEASE vf-cockpit-state.mjs "/garde:state-volatils/s/, 'leaseS'\\]/]/"; assert_eq "M-VOLATILS-LEASE.0 — l'ancre existe une fois et la copie du module diffère" "$?" "0"
+scenario_a m-VOLATILS-LEASE; unset COCKPIT_MODULE
+MVL="$(mutcopie VOLATILS-LEASE vf-cockpit-state.mjs "/garde:state-volatils/s/, 'leaseS'\\]/]/")"; node "$TESTS/etat-propriete.mjs" signature "${MVL:-$COPIE-absent}" "$WORK/signal-servi.json" > "$WORK/m-vl.json" 2>&1
+assert_eq "M-VOLATILS-LEASE — leaseS retiré des volatils : E7.1 (oracle écrit à la main) et E5.3 (un etat par tour du filet pendant la fenêtre calme) rougissent, seuls" "$(echo "$(rouges_e7 "$WORK/m-vl.json") $(rouges_a m-VOLATILS-LEASE)" | xargs)" "E7.1 E5.3"
+assert_eq "M-VOLATILS-LEASE — raison : le serveur réel a bien émis des etat pendant la fenêtre calme (calme > 0), pas un autre défaut" "$(jf "$WORK/sa-m-VOLATILS-LEASE.json" 'j.calme>0')" "true"
 cockpit_module_muter LECTEUR-AUCUN vf-cockpit-server.mjs '/garde:lecteur-arme/s/ || LECTEURS.actif()//'; assert_eq "M-LECTEUR-AUCUN.0 — l'ancre existe une fois et la copie du module diffère" "$?" "0"
 scenario_b m-LECTEUR-AUCUN; unset COCKPIT_MODULE
 assert_eq "M-LECTEUR-AUCUN — le serveur n'étend plus aClient : E6.4 rougit, seul" "$(rouges_b m-LECTEUR-AUCUN)" "E6.4"
@@ -360,11 +366,17 @@ pose_json() { node -e "require('fs').writeFileSync(process.argv[1], JSON.stringi
 restaurer() { rm -f "$SJ"; cp "$WORK/server-b.json" "$SJ"; }
 node -e "setTimeout(()=>{},900000)" "$WORK/etranger" & PETR=$!; PIDS+=("$PETR")
 node -e "setTimeout(()=>{},900000)" "$LB/.vibeflow/cockpit/serve.mjs" & PNOM=$!; PIDS+=("$PNOM") # un processus qui ne fait que NOMMER <sortie>/serve.mjs (forme ancienne de estNotre) # un processus vivant étranger au serveur (la marque de la suite est dans sa ligne de commande)
+# deux leurres qui ne satisfont chacun qu'UNE clause de l'identité stricte, tous deux reconnus par l'ancienne forme de estNotre (ils nomment <sortie>/serve.mjs) :
+# SERVE-SEUL porte le serve.mjs du module en mot entier mais ne finit pas par --sortie= ; SORTIE-SEULE finit par --sortie=<sortie> sans porter ce serve.mjs
+IDENT="$(node --input-type=module -e "const { identiteServeur } = await import('file://$SCRIPTS/vf-cockpit-serveur-vivant.mjs'); const i = identiteServeur('$SCRIPTS', '$LB/.vibeflow/cockpit'); console.log(i ? i.serve + '\n' + i.sortie : '')")"
+ID_SERVE="$(echo "$IDENT" | sed -n 1p)"; ID_SORTIE="$(echo "$IDENT" | sed -n 2p)"
+node -e "setTimeout(()=>{},900000)" -- "$LB/.vibeflow/cockpit/serve.mjs" "$ID_SERVE" fin & PSRV=$!; PIDS+=("$PSRV")
+node -e "setTimeout(()=>{},900000)" -- "$LB/.vibeflow/cockpit/serve.mjs" "--sortie=$ID_SORTIE" & PSOR=$!; PIDS+=("$PSOR")
 head -c 20480 /dev/zero | tr '\0' ' ' > "$WORK/blancs"
 leurre_cas() { # <mode> <scripts> <préfixe> [pid] [modèle de server.json : json|tube|lien|gros]
   local m="$1" sc="$2" p="$3" pid="${4:-$PB}" forme="${5:-json}" lpid lp="" f="$WORK/lc-$3-$1-${5:-json}"
   rm -f "$WORK/lp.port" "$WORK/lv.log" "$WORK/conn.log"; : > "$WORK/lv.log"
-  case "$m" in tube|lien-fichier|gros-fichier) m_leurre=valide ;; *) m_leurre="$m" ;; esac
+  case "$m" in tube|lien-fichier|gros-fichier|assainir) m_leurre=valide ;; *) m_leurre="$m" ;; esac
   node "$TESTS/etat-clients.mjs" leurre "$m_leurre" "$WORK/modele.json" "$WORK/lp.port" "$WORK/lv.log" & lpid=$!; PIDS+=("$lpid")
   attendre 10 test -s "$WORK/lp.port"; lp="$(cat "$WORK/lp.port" 2>/dev/null)"
   case "$m" in
@@ -373,16 +385,19 @@ leurre_cas() { # <mode> <scripts> <préfixe> [pid] [modèle de server.json : jso
     gros-fichier) pose_json "$pid" "$lp"; cat "$WORK/blancs" >> "$SJ" ;;
     *) pose_json "$pid" "$lp" ;;
   esac
-  ETAT_SONDE="$TESTS/etat-sonde.mjs" ETAT_SONDE_SORTIE="$WORK/conn.log" emet "$sc" 9000 "$WORK/em-$p-$m.json"
+  local pre="$TESTS/etat-sonde.mjs"; [ "$m" = assainir ] && pre="$TESTS/etat-leve.mjs" # E9.19 : Object.fromEntries lève sous assainir
+  ETAT_SONDE="$pre" ETAT_SONDE_SORTIE="$WORK/conn.log" emet "$sc" 9000 "$WORK/em-$p-$m.json"
   vf_hyg_stop "$lpid"; restaurer
   resume "$WORK/em-$p-$m.json" "$WORK/lv.log" "$JB" "$MARQ" "$WORK/conn.log" "$lp" > "$f.json"
 }
-MODES_E9="pid-etranger pid-nomme autre-racine perime schema incomplet interdit gros profond abime cles-en-trop muet refus texte indispo encours nul tube lien-fichier gros-fichier"
+MODES_E9="pid-etranger pid-nomme pid-serve-seul pid-sortie-seule autre-racine perime futur schema incomplet interdit gros profond abime cles-en-trop muet refus texte indispo encours nul code-non-200 assainir tube lien-fichier gros-fichier"
 cas_e9() { # <scripts> <préfixe>
   local m
   for m in $MODES_E9; do
     case "$m" in pid-etranger) leurre_cas valide "$1" "$2" "$PETR" json; mv "$WORK/lc-$2-valide-json.json" "$WORK/lc-$2-pid-etranger.json" ;;
-      pid-nomme) leurre_cas valide "$1" "$2" "$PNOM" json; mv "$WORK/lc-$2-valide-json.json" "$WORK/lc-$2-pid-nomme.json" ;; *) leurre_cas "$m" "$1" "$2" "$PB" "x"; mv "$WORK/lc-$2-$m-x.json" "$WORK/lc-$2-$m.json" ;; esac
+      pid-nomme) leurre_cas valide "$1" "$2" "$PNOM" json; mv "$WORK/lc-$2-valide-json.json" "$WORK/lc-$2-pid-nomme.json" ;;
+      pid-serve-seul) leurre_cas valide "$1" "$2" "$PSRV" json; mv "$WORK/lc-$2-valide-json.json" "$WORK/lc-$2-pid-serve-seul.json" ;;
+      pid-sortie-seule) leurre_cas valide "$1" "$2" "$PSOR" json; mv "$WORK/lc-$2-valide-json.json" "$WORK/lc-$2-pid-sortie-seule.json" ;; *) leurre_cas "$m" "$1" "$2" "$PB" "x"; mv "$WORK/lc-$2-$m-x.json" "$WORK/lc-$2-$m.json" ;; esac
   done
 }
 rouges_e9() { # <préfixe> : identifiants de E9 qui rougissent
@@ -390,6 +405,11 @@ rouges_e9() { # <préfixe> : identifiants de E9 qui rougissent
   rej() { [ "$(jf "$f-$1.json" '!j.marq&&j.code===0&&j.sortieLue==="vibeflow/cockpit-signal@1"&&j.tue===false')" = true ]; }
   rej pid-etranger && [ "$(jf "$f-pid-etranger.json" 'j.visites')" = 0 ] || r="$r E9.1"
   rej pid-nomme && [ "$(jf "$f-pid-nomme.json" 'j.visites')" = 0 ] || r="$r E9.13"
+  rej pid-serve-seul && [ "$(jf "$f-pid-serve-seul.json" 'j.visites')" = 0 ] || r="$r E9.17"
+  rej pid-sortie-seule && [ "$(jf "$f-pid-sortie-seule.json" 'j.visites')" = 0 ] || r="$r E9.18"
+  rej assainir && [ "$(jf "$f-assainir.json" 'j.visites')" = 1 ] || r="$r E9.19"
+  rej futur && [ "$(jf "$f-futur.json" 'j.visites')" = 1 ] || r="$r E9.20"
+  rej code-non-200 && [ "$(jf "$f-code-non-200.json" 'j.visites')" = 1 ] || r="$r E9.21"
   rej profond && [ "$(jf "$f-profond.json" 'j.visites')" = 1 ] || r="$r E9.14"
   [ "$(jf "$f-cles-en-trop.json" 'j.marq&&!j.cle&&j.code===0&&j.tue===false')" = true ] || r="$r E9.15"
   rej abime && [ "$(jf "$f-abime.json" 'j.visites')" = 1 ] || r="$r E9.16"
@@ -424,6 +444,11 @@ echo "  (graine=$(jf "$WORK/e9c.json" 'j.graine'))"
 assert_eq "E9.13 — un processus qui ne fait que nommer <sortie>/serve.mjs (forme ancienne de estNotre) ne reçoit pas le jeton : zéro visite, repli" "$(has_rouge "$R9" E9.13)" "ok"
 assert_eq "E9.14 — réponse imbriquée à cent niveaux (au-delà de la borne de profondeur) : repli" "$(has_rouge "$R9" E9.14)" "ok"
 assert_eq "E9.15 — clés en plus (premier niveau, élément de liste) : l'état est lu, la sortie ne porte que les clés du contrat" "$(has_rouge "$R9" E9.15)" "ok"
+assert_eq "E9.17 — processus qui porte le serve.mjs du module en mot entier mais ne finit pas par --sortie= (première clause seule, reconnu par l'ancienne forme) : zéro visite, repli" "$(has_rouge "$R9" E9.17)" "ok"
+assert_eq "E9.18 — processus qui finit par --sortie=<sortie> sans porter le serve.mjs du module (seconde clause seule, reconnu par l'ancienne forme) : zéro visite, repli" "$(has_rouge "$R9" E9.18)" "ok"
+assert_eq "E9.19 — état valide dont la valeur fait lever assainir (préchargement qui fait lever Object.fromEntries sous assainir seulement) : une visite, repli avec une sortie valide, code 0, jamais une sortie absente" "$(has_rouge "$R9" E9.19)" "ok"
+assert_eq "E9.20 — signal.at dans le futur de dix minutes, tout le reste valide (la borne basse de la fraîcheur est la seule cause) : repli" "$(has_rouge "$R9" E9.20)" "ok"
+assert_eq "E9.21 — réponse de code 202 au corps du leurre valide (le code est la seule cause) : repli" "$(has_rouge "$R9" E9.21)" "ok"
 assert_eq "E9.16 — réponse imbriquée à 3 500 niveaux : repli avec une sortie valide, jamais une sortie absente" "$(has_rouge "$R9" E9.16)" "ok"
 assert_eq "E9.11 — conforme sur des états valides dont une clé requise est retirée ou change de type (tirages et exhaustif) : faux si et seulement si la clé est requise ; une clé en plus reste tolérée (témoin positif)" "$(jf "$WORK/e9c.json" 'JSON.stringify(j.ko)+"|"+j.temoin')" "[]|true"
 assert_eq "E9.12 — couverture : chaque clé requise (premier niveau et chaque sous-schéma) est retirée au moins une fois" "$(jf "$WORK/e9c.json" 'JSON.stringify(j.nonTirees)+"|"+(j.nbCles>=40)')" "[]|true"
@@ -461,10 +486,16 @@ mutant_em() { # <nom> <fichier> <sed> <attendu> [<second fichier> <second sed>]
 }
 D0="$(copie_em neutre)"; cas_e9 "$D0" m-neutre >/dev/null 2>&1; leurre_cas valide "$D0" neutre "$PB" valide
 assert_eq "E9.0m — la copie du module NON mutée, lancée comme l'émetteur, atteint la requête : le leurre valide est lu (une visite, une connexion locale), zéro appel au verrou à son PID" "$(jf "$WORK/lc-neutre-valide-valide.json" 'j.marq+"|"+j.visites+"|"+j.conns+"|"+j.refuses+"|"+j.appels')|$(rouges_e9 m-neutre)" "true|1|1|0|0|"
-mutant_em ESTNOTRE vf-cockpit-signal-serveur.mjs '/garde:signal-estnotre/s/if (!reconnu) return null;//' "E9.1 E9.13"
-mutant_em STRICT vf-cockpit-signal-serveur.mjs 's/ && strict(lireCommande(s.pid, racine), ident)//' "E9.13"
+mutant_em ESTNOTRE vf-cockpit-signal-serveur.mjs '/garde:signal-estnotre/s/if (!reconnu) return null;//' "E9.1 E9.13 E9.17 E9.18"
+mutant_em STRICT vf-cockpit-signal-serveur.mjs 's/ && strict(cmd, ident)//' "E9.13 E9.17 E9.18"
+mutant_em STRICT-SORTIE vf-cockpit-signal-serveur.mjs 's/ && c\.endsWith([^)]*)//' "E9.17"
+mutant_em STRICT-SERVE vf-cockpit-signal-serveur.mjs 's/ && c\.includes([^)]*)//' "E9.18"
 mutant_em BORNE vf-cockpit-signal-serveur.mjs '/garde:signal-borne/s/if (!borne(o)) return null;//' "E9.14"
 mutant_em PROJECTION vf-cockpit-signal-serveur.mjs '/garde:signal-projection/s/projeter(sg, contrat)/sg/' "E9.15"
+mutant_em ASSAINIR-TRY vf-cockpit-signal.mjs '/garde:signal-assainir/s/try { sortie = JSON.stringify(assainir(lu.signal)); } catch { sortie = null; }/sortie = JSON.stringify(assainir(lu.signal));/' "E9.19"
+mutant_em BASSE vf-cockpit-signal-serveur.mjs '/garde:signal-fraicheur/s/age > -1000 && //' "E9.20"
+mutant_em CODE vf-cockpit-signal-serveur.mjs '/garde:signal-code/s/ || r.code !== 200//' "E9.21"
+mutant_em COLLECTE-ETAT vf-cockpit-signal-serveur.mjs '/garde:signal-collecte/s/if (!\[.*\]\.includes(o.collecte && o.collecte.etat)) return null;//' "E9.9"
 mutant_em RACINE vf-cockpit-signal-serveur.mjs '/garde:signal-racine/s/a !== b/false/' "E9.2"
 mutant_em FRAICHEUR vf-cockpit-signal-serveur.mjs '/garde:signal-fraicheur/s/age < FRAICHEUR_MAX_MS/true/' "E9.3"
 mutant_em SCHEMA vf-cockpit-signal-serveur.mjs '/garde:signal-schema/s/o.schema !== SCHEMA_ETAT/false/' "E9.4"

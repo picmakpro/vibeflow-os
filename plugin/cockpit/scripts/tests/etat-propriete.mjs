@@ -68,7 +68,7 @@ if (mode === 'collecte') {
 if (mode === 'signature') {
   const { sigState, VOLATILS_ETAT } = await imp('vf-cockpit-state.mjs');
   const T = JSON.parse(fs.readFileSync(extra, 'utf8'));
-  const VOL = ['at', 'ageS', 'dureeS', 'lastAt', 'progressAgeS', 'fetchAgeS']; // oracle écrit à la main : les clés qui varient avec le seul temps
+  const VOL = ['at', 'ageS', 'dureeS', 'lastAt', 'progressAgeS', 'fetchAgeS', 'leaseS']; // oracle écrit à la main : les clés qui varient avec le seul temps
   const clone = (o) => JSON.parse(JSON.stringify(o));
   const feuilles = (o, chemin = [], out = []) => {
     if (Array.isArray(o)) { if (!o.length) out.push({ chemin, vide: 'tab' }); o.forEach((v, i) => feuilles(v, [...chemin, i], out)); }

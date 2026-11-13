@@ -112,3 +112,77 @@ Première version de `etat-sonde.mjs` : Node passe à `Socket.prototype.connect`
 Rouges sur le code précédent (instantané de 99299905, témoins nouveaux) : E9.13 (un processus qui ne fait que nommer `<sortie>/serve.mjs` reçoit une visite avec le jeton), E9.14 (imbrication à cent niveaux acceptée), E9.15 (clés en plus sorties) — 80 PASS / 3 FAIL. E9.16 (3 500 niveaux) est vert avant comme après : `conforme` déborde la pile avant `assainir`. Après : `test-cockpit-etat.sh` 107 PASS / 0 FAIL ; mutants M-STRICT (E9.13), M-BORNE (E9.14), M-PROJECTION (E9.15) rouges pour leur seule raison ; M-ESTNOTRE rougit E9.1 et E9.13. Un mutant du `try` d'assainissement a été tenté puis retiré : aucune profondeur ne sépare le débordement de `conforme` de celui d'`assainir` (seuils instables, dépendants du JIT).
 Suites rejouées seules après la correction : `signal` 76, `signal-mod` 40, `who` 157, `ailleurs`, `path-enfants` 37, `git-env` 135, `vendor` 178, `lecture-fil`, `collecte` 126 : toutes vertes.
 Périmètre de la branche (84 suites, une par une) : toutes à rc 0 ; seul saut : `projet-visite` (O6.17d et O6.19, polices DejaVu absentes du poste).
+
+## Correction ciblée après la revue rv2 (nœud fix-x12, 2026-11-13)
+
+Décisions invoquées : mandat du manager (`vf-dev-manager`, nœud `fix-x12`, correction ciblée de la revue rv2) ; aucune décision d'arbitrage neuve.
+
+### Rouges avant correction, par construction
+
+Chaque défaut relevé par la revue est reproduit par un mutant qui remet l'état d'avant, ou par un témoin qui n'existait pas :
+
+| Constat | Témoin neuf | Rouge sur l'état d'avant |
+|---|---|---|
+| M1 `leaseS` hors des volatils | faux verrou à `lease_seconds` croissant ; M-VOLATILS-LEASE | E5.3 (`calme > 0` : un `etat` par tour du filet pendant la fenêtre calme) et E7.1 (oracle écrit à la main) |
+| M2 clause serve de l'identité stricte | E9.18 ; M-STRICT-SERVE | E9.18 seul |
+| M2 clause `--sortie=` de l'identité stricte | E9.17 ; M-STRICT-SORTIE | E9.17 seul |
+| `try` d'assainissement sans témoin | E9.19 ; préchargement `etat-leve.mjs` ; M-ASSAINIR-TRY | E9.19 seul (l'émetteur meurt sur la levée, code non nul) |
+| borne basse `age > -1000` | E9.20 (`signal.at` à +10 min) ; M-BASSE | E9.20 seul |
+| `r.code !== 200` | E9.21 (202 au corps valide) ; M-CODE | E9.21 seul |
+| `collecte.etat` hors `ok`, `partielle` | E9.9 (modes `indispo` et `encours`) ; M-COLLECTE-ETAT | E9.9 seul |
+
+Chaque mutant : suffixe `.0` vert (ancre trouvée, copie différente, `node --check` vert) avant que le rouge soit mesuré.
+Les deux leurres de M2 sont reconnus par l'ancienne forme de `estNotre` (ils nomment `<sortie>/serve.mjs`) : seule la clause de l'identité stricte qui leur manque les rejette ; M-STRICT (les deux clauses) rougit E9.13 E9.17 E9.18, M-ESTNOTRE (tout) E9.1 E9.13 E9.17 E9.18.
+
+### Tableau complet des mutants de la suite (passe finale)
+
+Tous les mutants de `test-cockpit-etat.sh`, un par ligne ; « Rouges obtenus » est lu dans la sortie de la passe finale, qui les compare à l'attendu de la suite (127 PASS / 0 FAIL).
+
+| Mutant | Fichier | Ancre et substitution (sed) | Rouges obtenus | Verdict |
+|---|---|---|---|---|
+| M-GARDE | `vf-cockpit-server.mjs` | `s/^const porteInterdit = .*/const porteInterdit = () => false;/` | E2.4 E2.5 | conforme |
+| M-REVEIL | `vf-cockpit-state.mjs` | `s/ctx.live ? ctx.live.etat()/ctx.live ? (ctx.live.reveil(), ctx.live.etat())/` | E2.6 | conforme |
+| M-COHERENCE | `vf-cockpit-state.mjs` | `/garde:state-coherence/d` | E2.2 E3.1 | conforme |
+| M-COLLECTE-RECOPIE | `vf-cockpit-state.mjs` | `/garde:state-liste-blanche/s/({ etat:/({ ...b, etat:/` |  E3.1 | conforme |
+| M-VIE-JOURNAL | `vf-cockpit-server.mjs` | `/garde:vie-journal/s/if (nom !== 'vie') //` | E4.2 | conforme |
+| M-ETAT-SEQ | `vf-cockpit-flux-etat.mjs` | `/garde:etat-seq/s/seq: seq()/seq: seq() + 1/` | E5.2 | conforme |
+| M-VOLATILS-TROP | `vf-cockpit-state.mjs` | `/garde:state-volatils/s/'leaseS'\]/'leaseS', 'owner']/` | E7.2 | conforme |
+| M-ORDRE | `vf-cockpit-state.mjs` | `/garde:state-canonique/s/\.sort()//` | E7.3 | conforme |
+| M-SERIE | `vf-cockpit-state.mjs` | `/garde:lecteurs-serie/s/serie >= 2/serie >= 1/` | E6.1 E6.2 | conforme |
+| M-FENETRE | `vf-cockpit-state.mjs` | `/garde:lecteurs-fenetre/s/now - dernier < fenetreMs/true/` | E6.1 E6.2 | conforme |
+| M-ESTNOTRE | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-estnotre/s/if (!reconnu) return null;//` | E9.1 E9.13 E9.17 E9.18 | conforme |
+| M-STRICT | `vf-cockpit-signal-serveur.mjs` | `s/ && strict(cmd, ident)//` | E9.13 E9.17 E9.18 | conforme |
+| M-STRICT-SORTIE | `vf-cockpit-signal-serveur.mjs` | `s/ && c\.endsWith([^)]*)//` | E9.17 | conforme |
+| M-STRICT-SERVE | `vf-cockpit-signal-serveur.mjs` | `s/ && c\.includes([^)]*)//` | E9.18 | conforme |
+| M-BORNE | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-borne/s/if (!borne(o)) return null;//` | E9.14 | conforme |
+| M-PROJECTION | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-projection/s/projeter(sg, contrat)/sg/` | E9.15 | conforme |
+| M-ASSAINIR-TRY | `vf-cockpit-signal.mjs` | `/garde:signal-assainir/s/try { sortie = JSON.stringify(assainir(lu.signal)); } catch { sortie = null; }/sortie = JSON.stringify(assainir(lu.signal));/` | E9.19 | conforme |
+| M-BASSE | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-fraicheur/s/age > -1000 && //` | E9.20 | conforme |
+| M-CODE | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-code/s/ \|\| r.code !== 200//` | E9.21 | conforme |
+| M-COLLECTE-ETAT | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-collecte/s/if (!\[.*\]\.includes(o.collecte && o.collecte.etat)) return null;//` | E9.9 | conforme |
+| M-RACINE | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-racine/s/a !== b/false/` | E9.2 | conforme |
+| M-FRAICHEUR | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-fraicheur/s/age < FRAICHEUR_MAX_MS/true/` | E9.3 | conforme |
+| M-SCHEMA | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-schema/s/o.schema !== SCHEMA_ETAT/false/` | E9.4 | conforme |
+| M-CONFORME | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-conforme/s/if (!(.*)) return null;//` | E9.5 E9.6 | conforme |
+| M-PLAFOND | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-plafond/s/n > maxOctets/false/` | E9.7 | conforme |
+| M-DELAI | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-delai/s/r.destroy(); fin(null);//` | E9.8 | conforme |
+| M-LIEN | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-lien/s/if (!st.isFile() \|\| st.size > ETAT_MAX) return null;//` | E9.10 | conforme |
+| M-VIE | `vf-cockpit-flux-etat.mjs` | `/garde:vie-battement/s/nbClients() > 0/false/` | E4.1 E4.3 | conforme |
+| M-VOLATILS-VIDE | `vf-cockpit-state.mjs` | `/garde:state-volatils/s/new Set(\[[^]]*\])/new Set()/` | E7.1 E5.3 | conforme |
+| M-VOLATILS-LEASE | `vf-cockpit-state.mjs` | `/garde:state-volatils/s/, 'leaseS'\]/]/` | E7.1 E5.3 (`calme > 0`) | conforme |
+| M-LECTEUR-AUCUN | `vf-cockpit-server.mjs` | `/garde:lecteur-arme/s/ \|\| LECTEURS.actif()//` | E6.4 | conforme |
+| M-CONFORME-LAXE | `vf-cockpit-signal-serveur.mjs` | `/garde:signal-sous-schemas/s/TYPES.object(o) \&\&/true \|\|/` | E9.11 (clés `:retrait` nommées) | conforme |
+
+### Graines
+
+La suite imprime une graine par propriété (rejouable par `VF_ETAT_GRAINE`) ; passe finale : E3 1404452602, E6 1404492019, E7 1404519923, E9.11 1404664829, toutes vertes. Rejeu des quatre propriétés avec trois graines fixes, sur un signal de la collecte locale du lab de démonstration :
+
+| Graine | E3 collecte (n, ko) | E6 lecteurs (n, armées, non armées, ko) | E7 signature (n71, n72, n73, ko) | E9.11 conforme (n, ko, témoin, clés non tirées) |
+|---|---|---|---|---|
+| 11 | 240, 0 | 800, 173, 627, 0 | 300, 275, 60, 0 | 215, 0, vrai, 0 |
+| 4242 | 240, 0 | 800, 163, 637, 0 | 300, 275, 60, 0 | 215, 0, vrai, 0 |
+| 987654321 | 240, 0 | 800, 148, 652, 0 | 300, 275, 60, 0 | 215, 0, vrai, 0 |
+
+### Mesures de colonnes (cliquet armé, `colonnes-baseline.txt` non modifiée)
+
+`vf-cockpit-state.mjs` 0 (0 avant), `vf-cockpit-signal-serveur.mjs` 0 (0 avant), `vf-cockpit-signal.mjs` 14 (14 avant) : aucune ligne neuve de plus de 160 points de code, aucun compte en baisse.

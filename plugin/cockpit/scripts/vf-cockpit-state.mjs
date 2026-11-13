@@ -30,9 +30,10 @@ export const corpsState = ({ instantane: inst, collecte, seq, now = Date.now() }
 };
 
 // Signature (événement `etat`, C4) : 16 caractères hexadécimaux d'un sha256 du `signal` ramené à une forme canonique (clés triées à tout niveau, clés
-// volatiles retirées à tout niveau, ordre des tableaux gardé). La liste nommée est la seule chose à tenir à jour : une clé qui varie avec le seul temps
+// volatiles retirées à tout niveau, ordre des tableaux gardé). `leaseS` (`lease_seconds` du verrou) vaut l'âge du bail et croît à chaque tour : sans lui, un
+// verrou tenu enverrait `etat` toutes les 5 s. La liste nommée est la seule chose à tenir à jour : une clé qui varie avec le seul temps
 // s'y inscrit, jamais une énumération de champs.
-export const VOLATILS_ETAT = new Set([...CHAMPS_VOLATILS, 'progressAgeS', 'fetchAgeS']); // garde:state-volatils
+export const VOLATILS_ETAT = new Set([...CHAMPS_VOLATILS, 'progressAgeS', 'fetchAgeS', 'leaseS']); // garde:state-volatils
 const cles = (o) => Object.keys(o).sort().filter((k) => !VOLATILS_ETAT.has(k)); // garde:state-canonique
 const canon = (v) => (Array.isArray(v) ? v.map(canon) : v && typeof v === 'object' ? Object.fromEntries(cles(v).map((k) => [k, canon(v[k])])) : v);
 export const sigState = (signal) => (signal && typeof signal === 'object'

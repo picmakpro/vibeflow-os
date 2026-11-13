@@ -90,10 +90,11 @@ export async function signalDuServeur(racine, { schema, dossierScripts, contrat,
     const s = serveurVivant(sortie);
     if (!s || !/^[0-9a-f]{8,128}$/.test(String(s.token))) return null;
     const ident = identiteServeur(dossierScripts, sortie);
-    const reconnu = estNotre(s.pid, ident, racine, lireCommande) && strict(lireCommande(s.pid, racine), ident);
+    const cmd = lireCommande(s.pid, racine); // un seul `ps` : lu pour `estNotre` et pour l'identité stricte
+    const reconnu = estNotre(s.pid, ident, racine, () => cmd) && strict(cmd, ident);
     if (!reconnu) return null; // garde:signal-estnotre
     const r = await lireEtatHttp({ port: s.port, jeton: s.token });
-    if (!r || r.code !== 200) return null;
+    if (!r || r.code !== 200) return null; // garde:signal-code
     const o = JSON.parse(r.corps);
     if (!o || o.schema !== SCHEMA_ETAT) return null; // garde:signal-schema
     if (!borne(o)) return null; // garde:signal-borne
@@ -102,7 +103,7 @@ export async function signalDuServeur(racine, { schema, dossierScripts, contrat,
     let a = null, b = null;
     try { a = fs.realpathSync(sg.root); b = fs.realpathSync(racine); } catch { return null; } // fermé par défaut : une racine qui ne se résout pas vaut refus
     if (a !== b) return null; // garde:signal-racine
-    if (!['ok', 'partielle'].includes(o.collecte && o.collecte.etat)) return null;
+    if (!['ok', 'partielle'].includes(o.collecte && o.collecte.etat)) return null; // garde:signal-collecte
     const now = typeof maintenant === 'function' ? maintenant() : (maintenant ?? Date.now()), age = now - Date.parse(sg.at);
     if (!(age > -1000 && age < FRAICHEUR_MAX_MS)) return null; // garde:signal-fraicheur
     return { signal: projeter(sg, contrat) }; // garde:signal-projection
