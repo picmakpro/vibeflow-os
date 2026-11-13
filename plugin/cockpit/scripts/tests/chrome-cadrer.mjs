@@ -88,11 +88,17 @@ await executer(chrome, async (s) => {
           await choisir();
           const m = await apres(0);
           const q = (x) => lire(`JSON.stringify(${x})`);
-          const touchent = await q(`__ca.touchent(${JSON.stringify(SEL)}, ['#ask', ${ouverte} ? '#panel' : '#ask'])`);
+          const vers = ['#ask', ouverte ? '#panel' : '#ask'], touchent = await q(`__ca.touchent(${JSON.stringify(SEL)}, ${JSON.stringify(vers)})`);
+          // le plancher 11/13 rogne un groupe plus large que le champ (écart de 80-09, ZG1.2) : alors seule la carte sélectionnée est tenue
+          const tient = await q(`(() => { const ch = __ca.champs(); return __ca.groupe(${JSON.stringify(SEL)}).map(__ca.carte)
+            .every((c) => c && ch.some((a) => __ca.dedans(c, a))); })()`);
+          const dedans = await q(`(() => { const c = __ca.carte(${JSON.stringify(SEL)}); return __ca.champs().some((a) => __ca.dedans(c, a)); })()`);
           const sel = await q(`(() => { const c = __ca.carte(${JSON.stringify(SEL)});
             return ['#zoom', '.vf-term-pastille'].map((x) => [x, __ca.rect(x)]).filter((p) => p[1] && __ca.coupe(c, p[1])).map((p) => p[0]); })()`);
           r[ouverte ? 'ouverte' : 'fermee'] = { pastille: !!(await q("__ca.rect('.vf-term-pastille')")),
-            groupeLibre: touchent.length === 0, selLibre: sel.length === 0,
+            groupeLibre: !tient || touchent.length === 0, selLibre: sel.length === 0 && dedans,
+            rects: await q(`({ sel: __ca.carte(${JSON.stringify(SEL)}), champs: __ca.champs(), t: VibeFlow.state.t,
+              zones: ['#ask', '#panel', '#zoom', '.vf-term-pastille'].map((x) => [x, __ca.rect(x)]) })`),
             k: Math.abs(m.t.k - m.ref.k) <= 1e-6, touche: [touchent, sel], sansRelayout: m.layout };
         }
       });

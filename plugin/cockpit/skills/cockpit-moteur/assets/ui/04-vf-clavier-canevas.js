@@ -152,6 +152,14 @@
     return g ? ids.get(g) || null : null;
   };
 
+  // cadrer la sélection et ses voisins (80-12, P80-D-17) : le calcul vit dans 04-vf-canevas-champ.js, lu à l'exécution
+  const cadrerVoisins = () => { const X = window.VF_CANEVAS_CHAMP; return !equipe() && !!X && X.cadrerVoisins(); };
+  const surC = (ev) => { // P80-D-45 : « c » ou « C », jamais avec ⌘, Ctrl ou Alt, ni dans un champ de saisie, ni sur Équipe, ni palette ouverte
+    const pal = document.getElementById('palette');
+    if (!vivant || equipe() || ev.altKey || ev.ctrlKey || ev.metaKey || String(ev.key).toLowerCase() !== 'c' || SC.enSaisie(ev) || tour()) return;
+    if (!(pal && pal.classList.contains('open'))) cadrerVoisins();
+  };
+
   const TOUCHES = { ArrowLeft: 'gauche', ArrowRight: 'droite', ArrowUp: 'haut', ArrowDown: 'bas', Home: 'debut', End: 'fin' };
   const surTouche = (ev) => {
     if (!vivant || equipe() || ev.altKey || ev.ctrlKey || ev.metaKey) return;
@@ -187,6 +195,7 @@
     if (!stage.hasAttribute('tabindex')) stage.setAttribute('tabindex', '-1'); // cible de repli du focus (80-UI-SPEC § 5) ; absent du moteur
     svg.setAttribute('tabindex', '-1'); // Chrome fait du canevas un arrêt de Tab à lui seul : l'arrêt unique est la carte itinérante
     ecoute(svg, 'keydown', surTouche); ecoute(stage, 'keydown', surEchap);
+    ecoute(window, 'keydown', surC); // touche C (80-12) : posée et retirée avec le rappel de l'onglet (A51)
     ecoute(svg, 'focusin', (ev) => { // le focus vient de nous poser, ou d'un clic : la carte focalisée devient l'arrêt unique
       focusDans = true; const g = ev.target.closest && ev.target.closest('g.node'), id = g && ids.get(g);
       if (id && state.chipEls) { itinerante(g, [...state.chipEls.values()]); memo = id; }
@@ -204,7 +213,8 @@
     if (egal(state.t, SC.cadrage({ zone: SC.freeArea() })) && !egal(state.t, SC.cadrage())) SC.fit(false);
     return () => { vivant = false; pose.splice(0).forEach((f) => f()); };
   };
-  window.VF_CANEVAS = Object.freeze({ nomDeCarte, carteItinerante, focaliser, champDeLecture, champsDeCadrage, amenerDansLeChamp, deplacer, voisin });
+  window.VF_CANEVAS = Object.freeze({ nomDeCarte, carteItinerante, focaliser, champDeLecture, champsDeCadrage, amenerDansLeChamp, deplacer, voisin,
+    cadrerVoisins });
   if (typeof SC.setReadingArea === 'function') SC.setReadingArea(champsDeCadrage); // accroche au moteur : avant le premier rendu (80-09)
   const C = window.VF_COQUILLE;
   // `ready` peut être passé avant l'exécution de ce fichier (seconde page d'une session) : le moteur a alors déjà rendu
