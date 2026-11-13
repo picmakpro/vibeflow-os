@@ -38,3 +38,34 @@ E4 attend `test-s4.sh` seul alors que `test-s4x.sh` cite `twin.mjs` ; E7 et E10 
 
 Après le module : `BILAN : 15 PASS, 0 FAIL` (E0 découverte ×2 ajoutés pendant la tâche), exit 0, 3 s.
 `new RegExp` : aucune occurrence dans le module.
+
+## Tâche 2 — témoins P1 à P5
+
+Le module livré à la tâche 1 portait déjà `CLASSES_GARDE`, `estGarde`, `globLineaire` et `calculerGardes` (écrits d'un trait avec la
+découverte). Le rouge de la tâche 2 est donc mesuré sur l'état intermédiaire « module de la tâche 1 sans ces quatre exports » : copie du
+dossier des scripts, `export` retiré sur les quatre noms, suite lancée avec `VF_GARDES_MODULES=<copie>` (variable lue par la suite pour
+choisir le dossier du module ; sans elle, le module du dépôt). Base : `e3aa9329` (commit de la tâche 1).
+
+`bash plugin/cockpit/scripts/tests/test-cockpit-activite-gardes.sh` sur la copie → `BILAN : 16 PASS, 9 FAIL`, exit 1 (les 15 témoins de la
+tâche 1 restent verts, `suitesQuiNomment` étant intact). Les neuf rouges, tous pour la bonne raison (`m.estGarde is not a function`,
+`m.calculerGardes is not a function`, `m.globLineaire is not a function`) :
+
+| Témoin | Attendu | Obtenu |
+|---|---|---|
+| P1 parité des six classes (26 chemins) | `chemins_surface` de `scripts/check-gate-touche.sh`, un commit fixture par chemin (1 pour `…/check-a.sh`, `…/test-a.sh`, `ci.yml`, `scripts/hooks/…`, `…/fixtures/…` ; 0 pour les frontières `check-.sh`, `sub/check-x.sh`, `test-.sh`, `hookx`, `plugin/cockpit/…`) | `TypeError: m.estGarde is not a function` |
+| P2 tuples | `{"etat":"ok","gardes":[[full.mjs,1,0],[none.mjs,0,0],[check-demo.sh,0,1]],"estGarde":[check-demo.sh,test-q.sh]}` | `TypeError: m.calculerGardes is not a function` |
+| P3 (4 cas : brut, sans meta, VibeFlow sans suite, `ls-files` refusé) | `non-lues` ×2, `ok` avec fichier à 0, `indisponible` | `TypeError: m.calculerGardes is not a function` |
+| P4 justesse (28 couples contre le `case` de bash) | `1101010100111101101111111110` | `TypeError: m.globLineaire is not a function` |
+| P4 croissance | quatre entrées, t(2N) ≤ 2,5 t(N) + 20 ms | `TypeError: m.globLineaire is not a function` |
+| P5 coût | `ok`, moins de 10 s | `TypeError: m.calculerGardes is not a function` |
+
+Garde contre le vide-contre-vide : P1 vérifie en plus que le script a rendu au moins un 1 ET un 0.
+
+Après (module du dépôt) : `BILAN : 25 PASS, 0 FAIL`, exit 0, 9 s.
+
+Mesures consignées (poste chargé par d'autres missions) :
+- P4, version linéaire, médiane de cinq, `t(N)` puis `t(2N)` en ms pour N = 20 000 et 40 000 : A (`'*'×N + 'a'` contre `'a'×N`) 0,49 puis 0,64 ;
+  B (`'*a'×50 + 'b'` contre `'a'×N`) 0,40 puis 0,72 ; C (`'*'×N + 'x'` contre `'../'×N`) 0,60 puis 1,17 ; D (`*` contre U+2028 × N) 0,09 puis 0,15.
+  Marge de bruit passée de +2 ms (planification) à +20 ms : le poste partage ses cœurs. Mutants (RegExp naïve, glob quadratique) : levés par le régime allégé,
+  donc aucune durée de mutant à consigner.
+- P5 : `calculerGardes` sur ce dépôt, 687 fichiers de code listés par `git ls-files`, 444 tuples, 1 145 ms (assertion large : moins de 10 s).

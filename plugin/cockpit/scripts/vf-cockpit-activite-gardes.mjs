@@ -63,7 +63,8 @@ export function decouvrirSuites(lab) {
   return { suites: trier(suites), tronque };
 }
 
-// Gates : jetons `[\w./-]*check-[\w.-]+\.sh` de ci.yml (lus à la main : une RegExp à étoile en tête est quadratique), « ./ » retiré, gardés s'ils sont suivis.
+// Gates : jetons `[\w./-]*check-[\w.-]+\.sh` de ci.yml (lus à la main : une RegExp à étoile en tête est quadratique),
+// « ./ » retiré, gardés s'ils sont suivis.
 export function gatesDeCi(lab, suivis) {
   const out = new Set();
   for (const run of read(path.join(lab, '.github/workflows/ci.yml')).split(/[^\w./-]+/)) {
@@ -107,7 +108,8 @@ export function globLineaire(p, s) {
 
 // --- motifs de chemin écrits dans un texte (glob.awk du script) ---
 const lettre = (c) => c !== undefined && ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z') || c === '_');
-function finVariablePlugin(t) { // fin de la dernière occurrence de `${?[A-Za-z_]*PLUGIN[A-Za-z_]*}?/` (jamais de RegExp : sans borne, retour arrière quadratique)
+// fin de la dernière occurrence de `${?[A-Za-z_]*PLUGIN[A-Za-z_]*}?/` (jamais de RegExp : sans borne, retour arrière quadratique)
+function finVariablePlugin(t) {
   let fin = -1;
   for (let i = t.indexOf('$'); i >= 0; i = t.indexOf('$', i + 1)) {
     let k = i + 1; if (t[k] === '{') k++;
@@ -162,8 +164,8 @@ const citeNom = (ctx, nom) => {
   if (!r) { r = ctx.corpus.filter((s) => ctx.textes.get(s).includes(nom)); ctx.cache.set(nom, r); }
   return r;
 };
-// Les suites (et gates) qui nomment le fichier `f` : la règle 1 à 4, sans la part « module ». Tout est dans citeNom(nom) : le chemin, le dossier et le module
-// n'ajoutent rien hors des suites qui citent déjà le nom (le nom est une sous-chaîne du chemin).
+// Les suites (et gates) qui nomment le fichier `f` : la règle 1 à 4, sans la part « module ». Tout est dans citeNom(nom) :
+// le chemin, le dossier et le module n'ajoutent rien hors des suites qui citent déjà le nom (le nom est une sous-chaîne du chemin).
 export function suitesQuiNomment(f, ctx) {
   const nom = f.slice(f.lastIndexOf('/') + 1), dir = f.includes('/') ? f.slice(0, f.lastIndexOf('/')) : f;
   let res = citeNom(ctx, nom);
