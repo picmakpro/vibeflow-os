@@ -75,7 +75,7 @@
       if (perdu && fige === null && tCoupe === null) tCoupe = setTimeout(() => { tCoupe = null; rendre(); }, DELAI_COUPE - (now - coupeT0));
       const recuA = A.whoAt() || recu, lus = W.__vfRegieLu && typeof W.__vfRegieLu.lus === 'function' ? W.__vfRegieLu.lus() : null;
       if (!who && !sansDirect) { P.maj({ lecture: true, muet: now - lectureT0 < 150 }); return; }
-      const m = M.modele(who || { workers: [] }, A.lock(), { now: fige !== null ? fige : now, recuA, lus, missions: [] });
+      const m = M.modele(who || { workers: [] }, A.lock(), { now: fige !== null ? fige : now, recuA, lus, missions: [], nonCommite: P.nonCommite() });
       ui.rendre(m, { sections: !sansDirect });
       if (recherche) ui.filtrer(recherche.value);
       P.maj({ direct: !sansDirect, aucun: !!m.etatPage, sources: who && who.sources, coupe: fige !== null ? (fige - recuA) / 1000 : null });
@@ -154,7 +154,7 @@
     ecouter(D, 'vf-regie:aller', (e) => aller(e.detail && e.detail.section));
     ecouter(D, 'vf-regie:redessiner', () => rendre());
     ecouter(D, 'vf:onglet', (e) => { if (e.detail && e.detail.onglet === 'equipe' && String(W.location.hash || '') !== luHash) fragment(); });
-    for (const d of A.ecouter((cle) => { if (cle === 'who') recu = Date.now(); rendre(); })) retraits.push(d);
+    for (const d of A.ecouter((cle) => { if (cle === 'who') { recu = Date.now(); P.surWho(); } rendre(); })) retraits.push(d);
     minuteries.push(setInterval(rendre, 30000));
 
     monte = { declaree: () => declaree(), ancre };

@@ -100,7 +100,7 @@ pi_sentinelles() {
 # pi_fuite <fichier> : le témoin de non-fuite sur un serveur frais (module muté si COCKPIT_MODULE est posé) ; sortie JSON dans <fichier>
 pi_fuite() {
   [ -d "$WORK/lab-fuite" ] || rg_lab "$WORK/lab-fuite"
-  pi_sentinelles; pi_fx fuite "$PI_FUITE_JSON" 0
+  pi_sentinelles; pi_fx fx-fuite "$PI_FUITE_JSON" 0
   pi_page fuite "$WORK/lab-fuite" "$1" "$PI_SENT" PATH="$PI_BIN:$PATH"
 }
 PI_SONDE_FUITE='(function(){ const f = Object.keys(j.trouve).filter((k) => j.trouve[k].length); return (f.length ? f.join(",") : "aucune"); })()'
@@ -151,7 +151,7 @@ JS
   if cockpit_module_muter_page "pi-stock" 's@donneesAilleurs = Array.isArray(j.ailleurs) ? j.ailleurs : null;@donneesAilleurs = Array.isArray(j.ailleurs) ? (sessionStorage.setItem("vf-m", JSON.stringify(j.ailleurs)), j.ailleurs) : null;@' > /dev/null 2>&1
   then pi_mutant_fuite AILLEURS-PAGE-STOCKAGE "le pied garde la réponse dans sessionStorage"
   else unset COCKPIT_MODULE; assert_eq "M-AILLEURS-PAGE-STOCKAGE — le pied garde la réponse dans sessionStorage (ancre)" "ancre absente" "muté"; fi
-  if cockpit_module_muter "pi-flux" vf-cockpit-server.mjs 's@JSON.stringify(snap)}@JSON.stringify({ ...snap, ailleurs: ailleurs(os.homedir(), { racines: [] }) })}@' > /dev/null 2>&1
+  if cockpit_module_muter "pi-flux" vf-cockpit-server.mjs 's@JSON.stringify(snap)}@JSON.stringify({ ...snap, ailleurs: ailleurs(os.homedir(), { racines: [\"/nulle-part-un\"] }) })}@' > /dev/null 2>&1
   then pi_mutant_fuite AILLEURS-FLUX "le direct ajoute la liste au hello"
   else unset COCKPIT_MODULE; assert_eq "M-AILLEURS-FLUX — le direct ajoute la liste au hello (ancre)" "ancre absente" "muté"; fi
 }
@@ -166,6 +166,6 @@ rg_RG14_fr() {
 rg_RG16_export() {
   rg_chrome || return 0
   [ -s "$WORK/pi-fuite.json" ] || { [ -d "$WORK/lab-fuite" ] || rg_lab "$WORK/lab-fuite"; pi_fuite "$WORK/pi-fuite.json"; }
-  pi_ok "RG16.20 — précondition (la ligne « ailleurs » est affichée, des lignes d'agents aussi) puis l'export demandé depuis la page Équipe ne contient ni « vf-equipe », ni « data-vf-cle », ni aucun identifiant d'agent de la fixture" "$WORK/pi-fuite.json" \
-    '(j.positif ? 1 : 0) + "|" + (j.lignes >= 1) + "|" + j.export.statut + "|" + j.export.vfEquipe + "|" + j.export.cle + "|" + j.export.agents.length' "1|true|200|false|false|0"
+  pi_ok "RG16.20 — précondition (la ligne « ailleurs » est affichée, des lignes d'agents aussi, les motifs trouvent le DOM vivant) puis l'export demandé depuis la page Équipe ne contient ni balisage de la régie (id vf-equipe, classes vf-rg-, data-vf-cle) ni aucun identifiant d'agent de la fixture" "$WORK/pi-fuite.json" \
+    '(j.positif ? 1 : 0) + "|" + (j.lignes >= 1) + "|" + j.export.statut + "|" + j.export.temoin + "|" + j.export.vfEquipe + "|" + j.export.cle + "|" + j.export.agents.length' "1|true|200|true|false|false|0"
 }

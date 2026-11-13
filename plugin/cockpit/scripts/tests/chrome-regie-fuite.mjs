@@ -14,6 +14,7 @@ const INJ = `(() => { const R = window.EventSource; window.__es = []; window.Eve
   __emit(n, d) { for (const f of this.__l[n] || []) f({ data: JSON.stringify(d) }); } }; })();`;
 const CALME = "try { sessionStorage.setItem('vf-equipe-rechargement', String(Date.now() + 800000000)); } catch {}";
 const PRET = "document.readyState === 'complete' && !!document.getElementById('vf-equipe') && document.body.classList.contains('vf-regie-montee') && !!window.__es && window.__es.some((e) => e.url.includes('/api/vf/events'))";
+const MARQUE_ID = /id=["']vf-equipe["']|class=["'][^"']*vf-rg-/, MARQUE_CLE = /data-vf-cle=["']/;
 const SENTINELLES = () => [X.id, X.titre, X.chemin, X.parent, X.lab].filter(Boolean);
 const dans = (t) => SENTINELLES().filter((v) => String(t).includes(v));
 const parcourir = (d, t0, sortie) => {
@@ -63,7 +64,8 @@ await executer(chrome, async (s) => {
   return { positif: positif || null, lignes, nomDansPage: pages.section.includes(X.lab) || String(positif).includes(X.lab), trouve: {
     export: dans(exporte.texte), fichiers: [...new Set(fichiers.flatMap((f) => f.trouve))], trames: dans(trames.join('\n')), who: dans(pages.who), etat: dans(etat.texte), journal: dans(journal.texte),
     local: dans(pages.local), session: dans(pages.session), titre: dans(pages.titre) },
-  export: { statut: exporte.statut, vfEquipe: /vf-equipe/.test(exporte.texte), cle: /data-vf-cle/.test(exporte.texte), agents: (X.agents || []).filter((a) => exporte.texte.includes(a)) },
+  // l'export est la page de la sortie, scripts compris (ils NOMMENT vf-equipe) : ce qui ne doit pas y être, c'est le balisage de la régie ; le témoin positif : les mêmes motifs trouvent le DOM vivant
+  export: { statut: exporte.statut, vfEquipe: MARQUE_ID.test(exporte.texte), cle: MARQUE_CLE.test(exporte.texte), temoin: MARQUE_ID.test(pages.html) && MARQUE_CLE.test(pages.html), agents: (X.agents || []).filter((a) => exporte.texte.includes(a)) },
   fichiers: { n: fichiers.length, serveur: fichiers.some((f) => f.nom.endsWith('server.json')) }, hellos: ts,
   transcript: { statut: transcript.statut, aTranscript: /"(lignes|events|messages|turns)"/.test(transcript.texte) },
   contrat: { statut: ailleurs.statut, cles, schema: corps && corps.schema } };

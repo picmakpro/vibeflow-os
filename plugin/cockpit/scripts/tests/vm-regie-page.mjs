@@ -33,7 +33,7 @@ const SC = { selected: null, graph: { meta: { vfTab: ong0, vf: {} }, nodes: noeu
   showPanel(html, bind) { journal.sc.push('showPanel'); journal.panneauHtml = html; panneau.replaceChildren(); if (bind) bind(panneau); } };
 const tick = () => new Promise((r) => setImmediate(r));
 // fetch factice : enregistre l'URL et les en-têtes, rend le transcript du scénario
-const fetchF = async (url, opts = {}) => { journal.fetchs.push({ url: String(url), entetes: Object.values((opts && opts.headers) || {}) }); return { ok: true, status: 200, json: async () => S.transcript || { fil: [{ genre: 'message', texte: 'texte du transcript factice' }] } }; };
+const fetchF = async (url, opts = {}) => { if (!/\/api\/vf\/(ailleurs|git)/.test(String(url))) journal.fetchs.push({ url: String(url), entetes: Object.values((opts && opts.headers) || {}) }); return { ok: true, status: 200, json: async () => S.transcript || { fil: [{ genre: 'message', texte: 'texte du transcript factice' }] } }; };
 Object.assign(W, { Floorplan: SC, FLOORPLAN_SERVER: S.serveur === false ? undefined : { token: JETON }, location: loc, sessionStorage: session, localStorage: local, fetch: fetchF,
   EventSource: class { addEventListener() {} close() {} } });
 // VF_ETAT simulé d'après ui/70-vf-etat.js (79-17) : lire(cle) (who = l'objet, lock = { seq, verrous: { liste } }, connexion = 'ouvert'|'perdu'|'reprise'), abonner(cle, rappel) rend
