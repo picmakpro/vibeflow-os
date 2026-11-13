@@ -211,6 +211,17 @@ col_mutant_temoin MARQUEUR 's|const comptes = (texte) => |const comptes = (texte
 col_mutant_temoin CR "s|l\\.replace(/\\\\r\\$/, '')|l|" "le CR final est compté : 160 plus CR deviennent rouges (V4c.1d)" col_v160c "rouge HAUSSE" col_v160x "ok"
 col_mutant_temoin ORPHELINE "s|v\\.push(\\['ORPHELINE', c\\]);|;|" "les entrées orphelines sont ignorées (V4c.2b)" col_orph "ok" col_v160x "ok"
 
+# V4c.9 : le réel (armé par 79-11, état trouvé après rangement) : le vrai module contre la vraie baseline, et deux mutations de copie
+BASE_REELLE="$SCRIPTS/tests/colonnes-baseline.txt"
+assert_ge "V4c.9 — témoin : la vraie baseline liste au moins 50 fichiers" "$(grep -c -v -E '^#|^$' "$BASE_REELLE" 2>/dev/null || echo 0)" 50
+assert_eq "V4c.9a — le vrai module égale la vraie baseline (aucune hausse, aucune baisse non suivie)" "$(col_juger "$RACINE_MODULE" "$BASE_REELLE")" "ok"
+PREMIERE="$(grep -v -E '^#|^$' "$BASE_REELLE" | sed -n 1p)"; FICHIER_1="${PREMIERE% *}"
+grep -v -x -F "$PREMIERE" "$BASE_REELLE" > "$WORK/base-privee.txt"
+assert_eq "V4c.9b — une copie de la baseline privée de sa première ligne : HAUSSE, le fichier est nommé" "$(col_juger "$RACINE_MODULE" "$WORK/base-privee.txt") $(node "$CLIQUET" verifier "$RACINE_MODULE" "$WORK/base-privee.txt" 2>&1 | grep -c -F "$FICHIER_1")" "rouge HAUSSE 1"
+awk -v f="$FICHIER_1" '$1==f && !fait {print $1, $2+1; fait=1; next} {print}' "$BASE_REELLE" > "$WORK/base-relevee.txt"
+assert_eq "V4c.9c — la baseline relevée de 1, sans citation : comparer contre la version en place rougit (code 1)" "$(node "$CLIQUET" comparer "$BASE_REELLE" "$WORK/base-relevee.txt" 'rien' >/dev/null 2>&1; echo $?)" "1"
+assert_eq "V4c.9d — la même hausse avec une citation d'arbitrage direct : code 0" "$(node "$CLIQUET" comparer "$BASE_REELLE" "$WORK/base-relevee.txt" 'arbitrage Samuel, AskUserQuestion session principale, 2026-11-13' >/dev/null 2>&1; echo $?)" "0"
+
 echo "=== V11 — code navigateur rangé en fichiers, lu comme texte (AUDC-AM5, P79-D-19) ==="
 NAV="$SCRIPTS/vf-cockpit-navigateur.mjs"
 # nav_noms <dossier> : noms de FICHIERS_NAVIGATEUR pour ce dossier, triés, séparés par un espace ; « absent » si l'export manque
