@@ -43,7 +43,9 @@ export function ligneExigence(exigence, tracePhase) {
     niveauPhase: MAILLONS.filter((m) => maillons[m].etat === 'lu' && maillons[m].niveau === 'phase') };
 }
 
-const duPhase = (ex, noeud) => ex.phase === noeud.num && (ex.ws === '*' || (ex.ws || null) === (noeud.ws || null));
+// une exigence d'archive (ws '*') se rattache au nœud que la collecte a désigné (`cleNoeud`, compartiment compris), jamais par le numéro seul
+const duPhase = (ex, noeud) => (ex.ws === '*' ? ex.cleNoeud === `${noeud.ws || ''}|${noeud.num}`
+  : ex.phase === noeud.num && (ex.ws || null) === (noeud.ws || null));
 // toutes les exigences rattachées à une phase, dans l'ordre du ledger
 export function lignesDePhase(projet, noeudPhase) {
   const ex = projet.meta?.vf?.trace?.exigences || [];

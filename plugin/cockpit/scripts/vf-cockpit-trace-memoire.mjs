@@ -19,12 +19,13 @@ const RACINE = '.claude/agent-memory/';
 export const MOTIF_CHEMIN = /(?<![\w./~@-])(?:[\w@.-]+\/)+[\w@-][\w@.-]*\.[A-Za-z0-9]{1,8}(?![\w/])/g;
 
 // cibles `[[…]]` : après retrait des blocs ```, des passages entre accents graves et des classes POSIX `[[:…:]]` ;
-// cible bornée à 128 caractères, sans saut de ligne
+// cible bornée à 128 caractères, sans saut de ligne ; toute classe POSIX est bornée de même, pour un coût linéaire du texte
+// (un quantificateur ouvert, relancé à chaque début de motif, est de coût quadratique sur une ligne longue)
 export function liensDe(txt) {
   const nu = String(txt ?? '')
     .replace(/```[\s\S]*?(?:```|$)/g, ' ')
     .replace(/`[^`\n]*`/g, ' ')
-    .replace(/\[\[:[^\]\n]*:\]\]/g, ' ');
+    .replace(/\[\[:[^\]\n]{0,128}:\]\]/g, ' ');
   const out = [];
   for (const m of nu.matchAll(/\[\[([^[\]\n]{1,128})\]\]/g)) {
     const cible = m[1].split(/[|#]/)[0].trim();
@@ -34,8 +35,8 @@ export function liensDe(txt) {
 }
 
 // noms de fichier cités par les liens `](fichier.md)` d'un index, `./` initial retiré : le jugement « indexé » est une
-// ÉGALITÉ sur cet ensemble (jamais une sous-chaîne)
-const nomsIndexes = (txt) => new Set([...String(txt ?? '').matchAll(/\]\(([^)\s#]+)\)/g)]
+// ÉGALITÉ sur cet ensemble (jamais une sous-chaîne) ; nom borné à la longueur maximale d'un nom de fichier (coût linéaire)
+const nomsIndexes = (txt) => new Set([...String(txt ?? '').matchAll(/\]\(([^)\s#]{1,255})\)/g)]
   .map((m) => m[1].replace(/^(?:\.\/)+/, '')));
 const decoupe = (chemin) => {
   const m = /^\.claude\/agent-memory\/([^/]+)\/([^/]+)$/.exec(chemin);
