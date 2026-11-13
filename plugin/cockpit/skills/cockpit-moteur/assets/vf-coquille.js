@@ -102,6 +102,13 @@
     try { await Promise.race([pret, limite]); } finally { clearTimeout(minuterie); }
   }
 
+  // un démarrage en échec laisse la coquille pilotable : le nettoyage d'avant le démontage a défait les rappels (l'écouteur du routeur compris) ;
+  // ceux des scripts de l'onglet raté s'en vont avec lui, les autres (persistants) sont rappelés : sinon plus aucun clic d'onglet ne passe par la coquille
+  function reprendre() {
+    for (const ins of inscriptions.splice(0)) if (ins.demarrage) ins.actif = false; else inscriptions.push(ins);
+    lot([...inscriptions]); // garde:coquille-relance
+  }
+
   async function sequence(nom, initial) {
     etat = { onglet: nom, phase: 'chargement', motif: null };
     let graphe;
@@ -113,7 +120,9 @@
     for (const ins of inscriptions.splice(0)) if (ins.demarrage) ins.actif = false; else inscriptions.push(ins);
     P.demonter();
     P.ouvrir(squelette); enDemarrage = true;
-    try { await demarrerOnglet(nom, graphe, initial); } catch (e) { enDemarrage = false; etat = { onglet: nom, phase: 'echec', motif: null }; throw e; }
+    try { await demarrerOnglet(nom, graphe, initial); } catch (e) {
+      enDemarrage = false; etat = { onglet: nom, phase: 'echec', motif: null }; reprendre(); throw e;
+    }
     enDemarrage = false;
     affiche = nom; etat = { onglet: nom, phase: 'pret', motif: null };
     H.dataset.vfPret = 'oui';
