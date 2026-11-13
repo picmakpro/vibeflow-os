@@ -122,6 +122,153 @@ assert_eq "T1.1d REQ-01 : VERIFICATION et recette manquent" "$(M "$F" REQ-01 ver
 F="$(V "$L1" phase 'x|2')"
 assert_eq "T1.2 REQ-02 : VERIFICATION citée dans la table, lue au niveau exigence (témoin positif voisin)" "$(M "$F" REQ-02 verification)" "lu/exigence"
 
+echo "=== T2 — maillons complets, contradictions, mentions, citations ==="
+L2="$WORK/l2"; lab_base "$L2" 8
+FILL=""; for _ in $(seq 1 60); do FILL="${FILL}mot "; done
+wr "$(ledger "$L2")" <<MD
+# Exigences
+
+- [ ] **REQ-03**: SUMMARY lu par requirements
+- [ ] **REQ-04**: SUMMARY lu par requirements-completed scalaire
+- [ ] **REQ-10**: SUMMARY apparié sans frontmatter
+- [ ] **REQ-11**: SUMMARY sans champ d'exigence
+- [ ] **REQ-12**: SUMMARY dont le champ ne cite pas l'identifiant
+- [ ] **REQ-13**: VERIFICATION, première cellule
+- [ ] **REQ-14**: VERIFICATION, troisième cellule
+- [ ] **REQ-15**: VERIFICATION, paragraphe seulement
+- [ ] **REQ-16**: VERIFICATION sans frontmatter
+- [ ] **REQ-17**: recette qui cite l'identifiant
+- [ ] **REQ-18**: recette qui ne le cite pas
+- [ ] **REQ-19**: recette sans ligne de statut
+- [ ] **REQ-20**: dossier qui n'a qu'une VALIDATION
+- [x] **REQ-05**: cochée, plan citant, aucun SUMMARY
+- [ ] **REQ-06**: statut Complete, aucun plan
+- [ ] **REQ-07**: non cochée, SUMMARY lu
+- [ ] **REQ-08**: rattachée par un plan seulement
+- [ ] **REQ-09**: non cochée, ni plan ni SUMMARY
+- [x] **REQ-21**: cochée, ni plan ni SUMMARY
+- [ ] **REQ-22**: chaîne complète, citée partout
+- [ ] **REQ-23**: chaîne complète, niveau phase
+- [ ] **REQ-30**: ${FILL}(P90-D-01, ADR-001, D-04)
+- [ ] **REQ-31**: aucune citation
+- [ ] **REQ-32**: citation d'une décision définie nulle part (P95-D-09)
+
+| REQ-03 | Phase 1 | Pending |
+| REQ-04 | Phase 1 | Pending |
+| REQ-10 | Phase 1 | Pending |
+| REQ-11 | Phase 1 | Pending |
+| REQ-12 | Phase 1 | Pending |
+| REQ-13 | Phase 2 | Pending |
+| REQ-14 | Phase 2 | Pending |
+| REQ-15 | Phase 2 | Pending |
+| REQ-16 | Phase 3 | Pending |
+| REQ-17 | Phase 4 | Pending |
+| REQ-18 | Phase 4 | Pending |
+| REQ-19 | Phase 5 | Pending |
+| REQ-20 | Phase 6 | Pending |
+| REQ-05 | Phase 7 | Complete |
+| REQ-06 | Phase 7 | Complete—2026-11-05(PR#203…) |
+| REQ-07 | Phase 7 | Pending |
+| REQ-09 | Phase 7 | Planned |
+| REQ-21 | Phase 7 | Planned |
+| GHOST-01 | Phase 7 | Pending |
+| REQ-22 | Phase 8 | Complete |
+| REQ-23 | Phase 8 | Complete |
+MD
+# phase 1 : variantes de SUMMARY
+D="$(phdir "$L2" 01-sum)"
+mkplan "$D/01-01-PLAN.md" '[REQ-03]';  mksum "$D/01-01-SUMMARY.md" 'requirements: [REQ-03]'
+mkplan "$D/01-02-PLAN.md" '[REQ-04]';  mksum "$D/01-02-SUMMARY.md" 'requirements-completed: REQ-04'
+mkplan "$D/01-03-PLAN.md" '[REQ-10]';  mksum "$D/01-03-SUMMARY.md" NOFM
+mkplan "$D/01-04-PLAN.md" '[REQ-11]';  mksum "$D/01-04-SUMMARY.md" 'phase: 1'
+mkplan "$D/01-05-PLAN.md" '[REQ-12]';  mksum "$D/01-05-SUMMARY.md" 'requirements: [REQ-99]'
+# phase 2 : VERIFICATION (cellule 1, cellule 3, paragraphe) · phase 3 : VERIFICATION sans frontmatter
+D="$(phdir "$L2" 02-ver)"; mkplan "$D/02-01-PLAN.md" '[REQ-13, REQ-14, REQ-15]'; mksum "$D/02-01-SUMMARY.md" 'requirements-completed: [REQ-13, REQ-14, REQ-15]'
+wr "$D/02-VERIFICATION.md" <<'MD'
+---
+status: passed
+---
+# Vérification
+
+| Exigence | Preuve | Statut |
+|----------|--------|--------|
+| REQ-13 | test | VERIFIED |
+| Critère | preuve | REQ-14 |
+
+La phase couvre aussi REQ-15 en prose, hors de toute table.
+MD
+D="$(phdir "$L2" 03-ver2)"; mkplan "$D/03-01-PLAN.md" '[REQ-16]'; mksum "$D/03-01-SUMMARY.md" 'requirements: [REQ-16]'
+printf '# Vérification\n\n| REQ-16 | test | OK |\n' > "$D/03-VERIFICATION.md"
+# phases 4 à 6 : recettes
+D="$(phdir "$L2" 04-rec)"; mkplan "$D/04-01-PLAN.md" '[REQ-17, REQ-18]'; mksum "$D/04-01-SUMMARY.md" 'requirements: [REQ-17, REQ-18]'
+printf -- '---\nstatus: passed\n---\n# Vérification\n' > "$D/04-VERIFICATION.md"
+printf '# Recette humaine\n\n**Statut : FAITE — close le 2026-11-05.**\n\nCouvre REQ-17.\n' > "$D/04-RECETTE-HUMAINE.md"
+D="$(phdir "$L2" 05-rec2)"; mkplan "$D/05-01-PLAN.md" '[REQ-19]'; mksum "$D/05-01-SUMMARY.md" 'requirements: [REQ-19]'
+printf '# Recette des juges\n\nrien de daté ici\n' > "$D/05-RECETTE-JUGES.md"
+D="$(phdir "$L2" 06-val)"; mkplan "$D/06-01-PLAN.md" '[REQ-20]'; mksum "$D/06-01-SUMMARY.md" 'requirements: [REQ-20]'
+printf '# Validation\n\nREQ-20\n' > "$D/06-VALIDATION.md"
+# phase 7 : contradictions et mentions
+D="$(phdir "$L2" 07-contra)"
+mkplan "$D/07-01-PLAN.md" '[REQ-05]'
+mkplan "$D/07-02-PLAN.md" '[REQ-07]'; mksum "$D/07-02-SUMMARY.md" 'requirements: [REQ-07]'
+mkplan "$D/07-03-PLAN.md" '[REQ-08]'; mksum "$D/07-03-SUMMARY.md" 'requirements: [REQ-08]'
+# phase 8 : chaîne complète, un identifiant cité partout, l'autre au niveau phase
+D="$(phdir "$L2" 08-full)"; mkplan "$D/08-01-PLAN.md" '[REQ-22, REQ-23]'; mksum "$D/08-01-SUMMARY.md" 'requirements: [REQ-22, REQ-23]'
+printf -- '---\nstatus: passed\n---\n# Vérification\n\n| REQ-22 | test | OK |\n' > "$D/08-VERIFICATION.md"
+printf '# Recette humaine\n\n**Statut : FAITE — close le 2026-11-05.**\n\nREQ-22 recetté.\n' > "$D/08-RECETTE-HUMAINE.md"
+
+SHA_A="$(find "$L2" -type f -print0 | sort -z | xargs -0 shasum -a 256)"
+F="$(V "$L2" phase 'x|1')"
+assert_eq "T2.1 REQ-03 : SUMMARY lu par requirements: (liste)" "$(M "$F" REQ-03 summary)" "lu/exigence"
+assert_eq "T2.1 REQ-04 : SUMMARY lu par requirements-completed: scalaire sans crochets (témoin voisin)" "$(M "$F" REQ-04 summary)" "lu/exigence"
+assert_eq "T2.1 REQ-10 : SUMMARY apparié sans frontmatter = non lisible, jamais manque" "$(M "$F" REQ-10 summary)" "non-lisible/-"
+assert_eq "T2.1 REQ-11 : frontmatter sans champ d'exigence = non lisible" "$(M "$F" REQ-11 summary)" "non-lisible/-"
+assert_eq "T2.1 REQ-12 : champ présent sans l'identifiant = manque" "$(M "$F" REQ-12 summary)" "manque/-"
+F="$(V "$L2" phase 'x|2')"
+assert_eq "T2.2 REQ-13 : identifiant en première cellule de table = lu, niveau exigence" "$(M "$F" REQ-13 verification)" "lu/exigence"
+assert_eq "T2.2 REQ-14 : identifiant en troisième cellule = lu, niveau exigence" "$(M "$F" REQ-14 verification)" "lu/exigence"
+assert_eq "T2.2 REQ-15 : identifiant seulement dans un paragraphe = lu, niveau phase" "$(M "$F" REQ-15 verification)" "lu/phase"
+F="$(V "$L2" phase 'x|3')"
+assert_eq "T2.2 REQ-16 : VERIFICATION sans frontmatter = non lisible" "$(M "$F" REQ-16 verification)" "non-lisible/-"
+F="$(V "$L2" phase 'x|4')"; TR="$(V "$L2" trace)"
+assert_eq "T2.3 REQ-17 : recette qui cite l'identifiant = lu, niveau exigence" "$(M "$F" REQ-17 recette)" "lu/exigence"
+assert_eq "T2.3 REQ-18 : recette qui ne le cite pas = lu, niveau phase (témoin voisin)" "$(M "$F" REQ-18 recette)" "lu/phase"
+assert_eq "T2.3 recette de la phase 4 : faite, statut lu" "$(J "$TR" "(r=>r.faite+'/'+r.statut.includes('FAITE'))(j.phases.find(p=>p.num==='4').trace.recette)")" "true/true"
+F="$(V "$L2" phase 'x|5')"
+assert_eq "T2.3 REQ-19 : 05-RECETTE-JUGES.md sans ligne **Statut : = non lisible" "$(M "$F" REQ-19 recette)" "non-lisible/-"
+F="$(V "$L2" phase 'x|6')"
+assert_eq "T2.3 REQ-20 : un 06-VALIDATION.md n'est jamais une recette = manque" "$(M "$F" REQ-20 recette)" "manque/-"
+# T2.4 reste() : mêmes verdicts qu'avant l'extraction des deux fonctions (tableaux capturés dans 76-01-RED-TRACE.md)
+assert_eq "T2.4 reste() forme 1 (**Statut : FAITE)" "$(node "$AUX/trace.mjs" "$SCRIPTS" - reste 1)" '["verification","cloture"]'
+assert_eq "T2.4 reste() forme 2 (**Statut :** CLOSE)" "$(node "$AUX/trace.mjs" "$SCRIPTS" - reste 2)" '["recette","verification","cloture"]'
+assert_eq "T2.4 reste() forme 3 (« Statut : recette jouée », sans gras)" "$(node "$AUX/trace.mjs" "$SCRIPTS" - reste 3)" '["recette","verification","cloture"]'
+assert_eq "T2.4 reste() forme 4 (aucune ligne)" "$(node "$AUX/trace.mjs" "$SCRIPTS" - reste 4)" '["recette","verification","cloture"]'
+assert_eq "T2.4 ligneStatutRecette et recetteFaite exportées par avancement" "$(grep -c 'export function ligneStatutRecette\|export function recetteFaite' "$SCRIPTS/vf-cockpit-avancement.mjs")" "2"
+F="$(V "$L2" phase 'x|7')"; TR="$(V "$L2" trace)"
+assert_eq "T2.5 REQ-05 : cochée, plan citant, aucun SUMMARY = maillon SUMMARY en contradiction" "$(M "$F" REQ-05 summary) $(MOT "$F" REQ-05)" "contradiction/- summary/contradiction"
+assert_eq "T2.5 REQ-05 : le mot porte le code cochee-sans-summary" "$(J "$F" "j.exigences.find(l=>l.id==='REQ-05').mot.code")" "cochee-sans-summary"
+assert_eq "T2.5 REQ-06 : Complete sans plan = maillon plan en contradiction, code complete-sans-plan" "$(M "$F" REQ-06 plan) $(J "$F" "j.exigences.find(l=>l.id==='REQ-06').mot.code")" "contradiction/- complete-sans-plan"
+assert_eq "T2.5 REQ-07 : non cochée avec SUMMARY lu = mention neutre" "$(J "$F" "j.exigences.find(l=>l.id==='REQ-07').mentions")" '["non-cochee-summary-lu"]'
+assert_eq "T2.5 REQ-08 : rattachée par un PLAN seulement = mention sans-ligne-tracabilite" "$(J "$F" "j.exigences.find(l=>l.id==='REQ-08').mentions") $(J "$TR" "j.exigences.find(e=>e.id==='REQ-08').rattachement")" '["sans-ligne-tracabilite"] plan'
+assert_eq "T2.5 GHOST-01 : ligne de traçabilité sans exigence comptée par phase, jamais posée sur une exigence" "$(J "$TR" "j.phases.find(p=>p.num==='7').trace.lignesSansExigence+'/'+j.exigences.some(e=>e.id==='GHOST-01')+'/'+j.phases.find(p=>p.num==='1').trace.lignesSansExigence")" "1/false/0"
+assert_eq "T2.5 REQ-09 : absence simple voisine = manque, jamais contradiction" "$(M "$F" REQ-09 summary) $(M "$F" REQ-09 plan)" "manque/- manque/-"
+assert_eq "T2.5 statut Planned = fait faux ; Complete—… = fait vrai" "$(J "$TR" "j.exigences.find(e=>e.id==='REQ-09').fait+'/'+j.exigences.find(e=>e.id==='REQ-06').fait")" "false/true"
+assert_eq "T2.7 REQ-21 : premier maillon non lu = plan (manque) ; la contradiction du SUMMARY passe en contradictions" "$(MOT "$F" REQ-21) $(J "$F" "j.exigences.find(l=>l.id==='REQ-21').contradictions")" 'plan/manque ["cochee-sans-summary"]'
+assert_eq "T2.7 REQ-05 : la contradiction qui EST le mot n'est pas répétée en contradictions" "$(J "$F" "j.exigences.find(l=>l.id==='REQ-05').contradictions")" "[]"
+F="$(V "$L2" phase 'x|8')"
+assert_eq "T2.7 REQ-22 : quatre maillons lus = chaîne complète (mot null)" "$(MOT "$F" REQ-22)" "aucun"
+assert_eq "T2.7 REQ-23 : chaîne complète, niveauPhase liste VERIFICATION et recette" "$(MOT "$F" REQ-23) $(J "$F" "j.exigences.find(l=>l.id==='REQ-23').niveauPhase")" 'aucun ["verification","recette"]'
+# T2.8 citations lues sur la ligne COMPLÈTE de l'exigence au ledger (au-delà des 220 caractères du libellé)
+LG="$(ledger "$L2")"
+assert_eq "T2.8 témoin positif : les trois lignes du ledger contiennent bien les chaînes citées" "$(grep -c 'P90-D-01, ADR-001, D-04)$' "$LG") $(grep -c '(P95-D-09)$' "$LG")" "1 1"
+assert_eq "T2.8 REQ-30 : cites = préfixée, ADR, nue" "$(J "$TR" "j.exigences.find(e=>e.id==='REQ-30').cites")" '{"decisions":["P90-D-01"],"adrs":["ADR-001"],"nues":["D-04"]}'
+assert_eq "T2.8 la citation est au-delà du libellé coupé (jamais lue dans libelle)" "$(J "$TR" "j.exigences.find(e=>e.id==='REQ-30').libelle.includes('P90-D-01')")" "false"
+assert_eq "T2.8 REQ sans citation : trois listes vides" "$(J "$TR" "j.exigences.find(e=>e.id==='REQ-31').cites")" '{"decisions":[],"adrs":[],"nues":[]}'
+assert_eq "T2.8 décision non définie : reste une citation lue ; D-04 n'est jamais dans decisions" "$(J "$TR" "j.exigences.find(e=>e.id==='REQ-32').cites.decisions") $(J "$TR" "j.exigences.find(e=>e.id==='REQ-30').cites.decisions.includes('D-04')")" '["P95-D-09"] false'
+SHA_B="$(find "$L2" -type f -print0 | sort -z | xargs -0 shasum -a 256)"
+assert_eq "T2.6 lecture seule : empreintes sha256 du lab identiques avant et après toutes les lectures" "$SHA_B" "$SHA_A"
+assert_eq "T2.6 témoin positif : l'empreinte porte bien les fichiers du lab (au moins 30)" "$([ "$(printf '%s\n' "$SHA_A" | wc -l | tr -d ' ')" -ge 30 ] && echo oui || echo non)" "oui"
+
 # --- FIN-SECTIONS ---
 echo
 echo "Résultats : $PASS passés, $FAIL échoués"
