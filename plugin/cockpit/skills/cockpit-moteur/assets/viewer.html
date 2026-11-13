@@ -1849,7 +1849,7 @@ const champs = (f, owner) => {
 // 80-11 : sur Projet, les liens d'une feuille par sens puis par genre, titrés par kindLabels['entrant:<genre>'] / ['sortant:<genre>'] ;
 // une étiquette vide n'est pas rendue
 const parSens = (ls, sens, autre) => { const m = new Map(); for (const l of ls) m.set(l.k, [...(m.get(l.k) || []), l]);
-  return [...m].map(([k, g]) => { const ti = KL(sens + ':' + k); return ti === '' ? '' : listSec(ti ?? t(sens === 'entrant' ? 'Depends on' : 'Used by'),
+  return [...m].map(([k, g]) => { const ti = KL(sens + ':' + k); return ti === '' ? '' : listSec(ti ?? (sens === 'entrant' ? t('Depends on') : t('Used by')),
     g.map((l) => rowFor(autre(l), '', `var(--k-${l.k})`))); }).join(''); };
 function itemPanel(item, viaConnector) {
   const i = info(item);
