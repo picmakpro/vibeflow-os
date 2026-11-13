@@ -126,7 +126,8 @@ header > * { pointer-events: auto; }
 .brand { display: flex; align-items: center; gap: var(--sp-8); font-weight: 600; letter-spacing: -.01em; white-space: nowrap; padding-right: var(--sp-6); }
 .mark { height: 22px; width: auto; display: block; flex: none; }
 #crumbs { display: flex; align-items: center; min-width: 0; overflow: hidden; }
-#crumbs .sep { color: var(--text-4); padding: 0; }
+#crumbs .sep { color: var(--text-4); padding: 0; display: inline-flex; align-items: center; }
+#crumbs .sep svg.i { margin-inline: -4px; } /* 80-20 : chevron de 16 dont le tracé en couvre 4 ; l'écart reste celui du « / » */
 #crumbs button { background: none; border: 0; padding: var(--sp-6) var(--sp-8); border-radius: 999px; cursor: pointer; color: var(--text-3); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; transition: background .2s var(--ease), color .2s var(--ease); }
 #crumbs button:hover { background: rgba(var(--ink), .06); color: var(--text); }
 #crumbs button.cur { color: var(--text); }
@@ -617,7 +618,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .72; }
   </div>
   <div class="hr">
     <div id="hdr-ext" class="hr-ext"></div>
-    <div class="rel"><button class="btn" id="flows-btn" aria-label="Flows"><svg class="i" viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg><span class="bl">Flows</span></button><div id="flowmenu" class="menu glass"></div></div>
+    <div class="rel"><button class="btn" id="flows-btn" aria-label="Flows"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg><span class="bl">Flows</span></button><div id="flowmenu" class="menu glass"></div></div>
     <div class="rel"><button class="btn icon" id="filters-btn" title="Connection types" aria-label="Connection types"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg></button><div id="legend" class="menu glass"></div></div>
     <button class="btn icon" id="btn-panel" title="Toggle details (P)" aria-label="Toggle details" aria-expanded="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
   </div>
@@ -1699,7 +1700,7 @@ function renderCrumbs() {
   const c = $('#crumbs'); c.innerHTML = '';
   const path = chain(state.container).slice().reverse();
   path.forEach((item, idx) => {
-    if (idx) { const s = document.createElement('span'); s.className = 'sep'; s.textContent = '/'; c.appendChild(s); }
+    if (idx) { const s = document.createElement('span'); s.className = 'sep'; s.setAttribute('aria-hidden', 'true'); s.innerHTML = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>'; c.appendChild(s); }
     const b = document.createElement('button');
     b.textContent = item === 'root' ? t('Overview')
       : item === 'q:answer' ? (state.answer.kind ? (state.answer.kind === state.answer.title ? state.answer.title : `${state.answer.kind}: ${state.answer.title}`) : t('Answer: {}', state.answer.title)) : info(item).name;
