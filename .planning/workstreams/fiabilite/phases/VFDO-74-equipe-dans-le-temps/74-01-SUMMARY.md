@@ -13,7 +13,8 @@
 
 ## Écarts
 - Écart : précondition « P74-D-56 / OK-PRECONDITION-79 » non jouée, remplacée par les prérequis réels plan par plan (consigne du mandat) ; le calcul tourne sur fixtures.
-- Écart : F10 (b) (`CHAMPS_LUS` ⊆ champs déclarés par le bloc `vibeflow/cockpit-frise@1` de `vf-cockpit-interface.json`) n'est PAS écrite : annoncée `⊘ NON vérifiée, non comptée comme réussie`. Reste à faire à la reprise après 79-13 : (1) écrire la comparaison à la forme réelle du bloc, bloquante au plan 74-09 ; (2) confronter les fixtures F1/F7 (`frise-fabrique.mjs`) à la forme réellement écrite par la route : noms `durees.travailS`, `jetons.contexteDernier`, `rattachement.source`, `cibles.tronque`, `voiesOmises`, queue `attend-humain`, `arbre: null`, `cibles: null`, segments `[debutMs, finMs, genre]` et événements `[tMs, genre]`.
+- Écart levé à la reprise (après 79-13) : F10 (b) est écrite et verte (CHAMPS_LUS contre le bloc `vibeflow/cockpit-frise@1` de `vf-cockpit-interface.json` et la liste blanche de `vf-cockpit-frise-voie.mjs`) ; plus aucun `⊘`. À rendre bloquante au plan 74-09 : elle l'est déjà (rouge si le bloc manque).
+- Écart : confrontation à la route livrée. `at` est une chaîne ISO (fixture et `lire` corrigés : `frise.at` en millisecondes) ; la route fusionne la queue `attend-humain` au dernier segment quand il l'est déjà (sonde F7 ajoutée, `etatA` inchangé) et ne la pose que pour un agent `attend`. Les autres champs concordent (durees, jetons, rattachement, cibles.tronque, voiesOmises, `arbre`/`cibles` nuls, segments et évènements en tableaux). Dépend encore de 79-22 : rien (le modèle ne lit jamais le fil).
 - Écart : la suite ne lance aucun serveur, donc pas d'hygiène de processus (`hygiene.sh`) ; elle tourne sous `TZ=Europe/Paris` (F6b) et se rejoue sur un dossier vide (F0, contrôle positif).
 - Écart : les commandes `<automated>` des tâches n'ont pas été rejouées sous bash et zsh sur sorties factices (régime allégé) ; remplacées par le contrôle positif F0 de la suite.
 - Écart : forme de la voie normalisée par `lire` : `segments[] = { debut, fin, genre }`, `evenements[] = { t, genre }` (la route écrit des tableaux).
@@ -24,10 +25,10 @@
 ## Rituels levés
 - rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale) — pas de mutants M-* (plan non marqué audit), pas de relecteur, pas de triple passe.
 
-## Suites jouées (tête commitée c1a1ffb4)
+## Suites jouées (tête commitée de la reprise, après 79-13)
 | Suite | Verdict | Secondes |
 |---|---|---|
-| `test-cockpit-frise-modele.sh` | exit 0, 141 PASS, 0 FAIL, 1 `⊘` (F10 b) | < 1 |
+| `test-cockpit-frise-modele.sh` | exit 0, 146 PASS, 0 FAIL, aucun `⊘` | < 1 |
 | `check-file-size.sh` (deux modules et la fabrique) | exit 0, aucun avertissement | < 1 |
 
 Tailles : aucun fichier au-delà de 299 lignes, aucune ligne au-delà de 160 colonnes ; aucun symbole monétaire, aucun accès réseau, aucune lecture de la consommation brute (F10 a).
