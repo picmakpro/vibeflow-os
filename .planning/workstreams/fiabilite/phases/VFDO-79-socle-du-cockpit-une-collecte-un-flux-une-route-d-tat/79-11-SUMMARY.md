@@ -8,6 +8,8 @@ Plan 79-11 (SOCL-15, AUDC-AM5, P79-D-19) : exécuté, baseline armée. Commits :
 - Après rangement, sur la tête du plan seule : 1706 (écart -13, en-têtes retirés et préfixes « export » ôtés, aucun repli).
 - À l'armement (instantané de HEAD 4b2b6d08, aucun fichier non suivi ni modification non commitée) : 93 fichiers à plus de 0, total 1679 lignes longues, dont 2 de code tiers (assets/vendor/xterm : xterm.js 1, addon-fit.js 1). Le total a bougé depuis le rangement parce que d'autres plans (79-06, 79-09, 79-10, 79-12) ont écrit dans le périmètre ; la baseline est l'état trouvé, pas une hausse.
 
+> Correction 2026-11-13 (revue rv-11) : l'explication « préfixes export ôtés » de l'écart -13 ci-dessus est fausse. Le -13 est de 16 lignes d'en-tête de module retirées (elles dépassaient 160 colonnes) moins 3 lignes longues ajoutées ; aucun préfixe `export` n'est en cause. La même explication dans 79-11-RED-TRACE.md (ligne « TOTAL-APRES ») et dans l'amendement du 2026-11-12 du plan se lit de la même façon.
+
 ## Dette de colonnes : vingt fichiers du lab les plus chargés (hors vendeurs tiers)
 
 - skills/cockpit-moteur/assets/ui/00-vibeflow.js 91
