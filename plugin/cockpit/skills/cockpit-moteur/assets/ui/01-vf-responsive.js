@@ -229,7 +229,8 @@
     if (!colDroite) return;
     if (!mq1280.matches) { deranger(); return; }
     origine = origine || [];
-    for (const e of unites()) if (!origine.some((x) => x[0] === e)) origine.push([e, e.parentElement === extHdr ? extHdr : colDroite]); // un bouton posé plus tard suit les autres
+    // un bouton posé plus tard suit les autres
+    for (const e of unites()) if (!origine.some((x) => x[0] === e)) origine.push([e, e.parentElement === extHdr ? extHdr : colDroite]);
     const cibles = [];
     for (const [cle, lib] of GROUPES) {
       let g = colDroite.querySelector(`:scope > [data-vf-groupe="${cle}"]`);
