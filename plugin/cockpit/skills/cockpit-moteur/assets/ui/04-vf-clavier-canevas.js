@@ -210,6 +210,6 @@
   // `ready` peut être passé avant l'exécution de ce fichier (seconde page d'une session) : le moteur a alors déjà rendu
   const demarrer = () => (vivant ? undefined : init());
   // P80-D-42, A51 : la coquille (clé = nom du fichier), sinon `ready` (ou le premier rendu, s'il l'a devancé)
-  if (C && typeof C.surOnglet === 'function') C.surOnglet(init);
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(init, { cle: '04-vf-clavier-canevas.js' });
   else if (state.layout) demarrer(); else { SC.on('ready', demarrer); SC.on('render', demarrer); }
 })();
