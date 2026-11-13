@@ -116,7 +116,7 @@ UIF=42-vf-panneau-retour.js
 mutant M-REEMPILE $UIF "const e = pile.pop(); enRetour = Date.now() + DELAI;" "const e = pile.pop(); enRetour = 0;" chrome-panneau-retour.mjs pr1 pr13
 assert_eq "M-REEMPILE — le mutant rougit PR1.3 (Retour réempile : la pile n'est pas à 0) (témoin : la phase 2 est rouverte)" \
   "$(E "[j.pr13.taille !== 0, j.pr13.sel]" "$RM")" '[true,"n:ph-2"]'
-mutant M-HTML $UIF "texte.textContent = haut ? 'Retour : ' + coupe(haut.titre) : 'Retour';" "texte.innerHTML = haut ? 'Retour : ' + haut.titre : 'Retour';" \
+mutant M-HTML $UIF "texte.textContent = haut ? t('Back: {}', coupe(haut.titre)) : t('Back');" "texte.innerHTML = haut ? t('Back: {}', haut.titre) : t('Back');" \
   chrome-panneau-retour.mjs pr2a pr24
 assert_eq "M-HTML — le mutant rougit PR2.4 (titre par innerHTML : un img naît) (témoin : le bouton existe)" \
   "$(E "[j.pr24.img > 0, !!j.pr24.b]" "$RM")" '[true,true]'
@@ -134,7 +134,7 @@ mutant M-NULL $UIF "if (sel == null || typeof sel !== 'string' || maintenant >= 
   chrome-panneau-retour.mjs pr2a pr212
 assert_eq "M-NULL — le mutant rougit PR2.12 (clause « sélection absente ou non nœud » retirée : la désélection empile) (témoin : 1 avant)" \
   "$(E "[j.pr212[1] !== 0, j.pr212[0]]" "$RM")" '[true,1]'
-mutant M-COUPE $UIF "a.length <= COUPE ? t :" "a.length <= 1e9 ? t :" chrome-panneau-retour.mjs pr2a pr214
+mutant M-COUPE $UIF "a.length <= COUPE ? s :" "a.length <= 1e9 ? s :" chrome-panneau-retour.mjs pr2a pr214
 assert_eq "M-COUPE — le mutant rougit PR2.14 (titre jamais coupé) (témoin : nom accessible complet)" \
   "$(E "[j.pr214.texte !== 'Retour : 0123456789ab…cdefghijklm', j.pr214.nom.length]" "$RM")" '[true,52]'
 mutant M-ENTREE $UIF "b.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') ev.stopPropagation(); });" "" \

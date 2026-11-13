@@ -170,7 +170,7 @@ assert_eq "M-PORTE — le mutant rougit PL2.9 (lecture directe du nœud) alors q
 mutant M-XSS-LISTE 41-vf-projet-liste.js '<span class="vp-titre">${h(c.titre)}</span>' '<span class="vp-titre">${c.titre}</span>' chrome-projet-liste.mjs pl1 pl11,pl14
 assert_eq "M-XSS-LISTE — le mutant rougit PL1.4 (titre de phase sans h() : un img naît à la racine) (témoin : la table existe)" \
   "$(E "[j.pl14.img > 0, j.pl11.tables >= 1]" "$RM")" "[true,true]"
-mutant M-XSS-PLAN 41-vf-projet-phase.js '<span class="vp-titre">${h(t.affiche)}</span>' '<span class="vp-titre">${t.affiche}</span>' chrome-projet-liste.mjs pl2 pl21,pl22
+mutant M-XSS-PLAN 41-vf-projet-phase.js '<span class="vp-titre">${h(tr.affiche)}</span>' '<span class="vp-titre">${tr.affiche}</span>' chrome-projet-liste.mjs pl2 pl21,pl22
 assert_eq "M-XSS-PLAN — le mutant rougit PL2.2b (titre de plan sans h() : un img naît dans la phase) (témoin : les plans existent)" \
   "$(E "[j.pl22.img > 0, j.pl21.plans.length === 3]" "$RM")" "[true,true]"
 mutant M-PHASE 41-vf-projet-vue.js "if (niveau() === 'racine') { forme = nom; if (memoriser && MEM) MEM.ecrire(nom); } else formePhase = nom;" \
