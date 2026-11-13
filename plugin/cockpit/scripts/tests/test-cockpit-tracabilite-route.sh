@@ -213,7 +213,7 @@ wr "$L3/docs/ADR.md" <<MD
 
 texte
 MD
-printf -- '---\nname: nom ~/.claude/z\nmetadata:\n  type: project\n---\ncorps\n' > "$L3/.claude/agent-memory/vf-coder/a.md" 2>/dev/null || { mkdir -p "$L3/.claude/agent-memory/vf-coder"; printf -- '---\nname: nom ~/.claude/z\nmetadata:\n  type: project\n---\ncorps\n' > "$L3/.claude/agent-memory/vf-coder/a.md"; }
+mkdir -p "$L3/.claude/agent-memory/vf-coder"; printf -- '---\nname: nom ~/.claude/z\nmetadata:\n  type: project\n---\ncorps\n' > "$L3/.claude/agent-memory/vf-coder/a.md"
 printf -- '- [A](a.md) — a\n' > "$L3/.claude/agent-memory/vf-coder/MEMORY.md"
 git_lab "$L3"; cm "$L3" "feat: ADR-001 voir ~/.claude/x et $HOME/y"
 tout() { : > "$1"; local qs; for qs in "vue=jalon" "vue=phase&cle=ph-1" "vue=exigence&cle=REQ-01" "vue=adr" "vue=adr&cle=ADR-001" "vue=memoire" "vue=memoire&cle=vf-coder" "vue=entree&cle=vf-coder/a.md"; do Q "$qs"; cat "$WORK/b.json" >> "$1"; echo >> "$1"; done; }
@@ -291,6 +291,207 @@ U "$L2" 'vue=memoire'
 assert_eq "T11.3b — memoire : servie (200) avec collecte en-cours, aucune lecture ni git" "$(J "$WORK/u.json" "j.code+'|'+j.corps.collecte+'|'+j.corps.etat")" "200|en-cours|vide"
 U "$L2" 'vue=jalon&cle=x'
 assert_eq "T11.3c — témoin : la validation précède l'attente de collecte (cle sur jalon : 400)" "$(J "$WORK/u.json" 'j.code')" "400"
+
+echo "=== T10.5 à T10.7, T10.11 — contrôles de C0, contrat, garde d'émission, exigence → décisions (lab L2, serveur réel) ==="
+# assert_rouge <nom> <attendu nominal> <obtenu sous mutant> : la sonde du mutant doit s'écarter du nominal ; la trace du rouge est imprimée
+assert_rouge() { if [ "$#" -ne 3 ]; then echo "  ❌ FAIL — $1 (assert_rouge : $# arguments au lieu de 3)"; FAIL=$((FAIL+1)); elif [ "$2" != "$3" ]; then echo "  ✅ PASS — $1 (sonde rouge : attendu [$2], obtenu [$3])"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 — le mutant ne rougit pas (obtenu = nominal [$3])"; FAIL=$((FAIL+1)); fi; }
+# validate.mjs <interface.json> <sortie.json> : requis typés, optionnels déclarés et typés, états, sous-formes, aucun interdit à toute profondeur
+cat > "$AUX/validate.mjs" <<'JS'
+import fs from 'node:fs';
+const [, , ifaceF, outF] = process.argv;
+let spec; try { spec = JSON.parse(fs.readFileSync(ifaceF, 'utf8')).schemas['vibeflow/cockpit-trace@1']; } catch { spec = null; }
+if (!spec) { console.log('KO schéma absent'); process.exit(1); }
+const out = JSON.parse(fs.readFileSync(outF, 'utf8')), errs = [];
+const type = (v) => (Array.isArray(v) ? 'array' : v === null ? 'null' : typeof v);
+for (const [k, t] of Object.entries(spec.requis)) { if (!(k in out)) errs.push(`requis absent : ${k}`); else if (type(out[k]) !== t) errs.push(`type de ${k}`); }
+for (const k of Object.keys(out)) {
+  if (k in spec.requis) continue;
+  if (!(k in spec.optionnels)) errs.push(`clé non déclarée : ${k}`); else if (type(out[k]) !== spec.optionnels[k]) errs.push(`type de ${k}`);
+}
+if (out.schema !== 'vibeflow/cockpit-trace@1') errs.push('schema');
+if (!spec.etats.includes(out.etat)) errs.push(`état ${out.etat}`);
+const sous = (o, forme) => { for (const k of spec[forme].requis) if (!(k in o)) errs.push(`${forme} : ${k} absent`); };
+const ligne = (l) => { sous(l, 'ligneExigence'); for (const m of Object.values(l.maillons || {})) sous(m, 'maillon'); };
+const entree = (e) => sous(e, 'entreeMemoire');
+for (const l of (out.phase && out.phase.exigences) || []) ligne(l);
+if (out.exigence) ligne(out.exigence);
+for (const c of out.commits || []) sous(c, 'commit');
+for (const e of (out.agent && out.agent.entrees) || []) entree(e);
+if (out.entree) entree(out.entree);
+const deep = (o, f) => { if (o && typeof o === 'object') for (const [k, v] of Object.entries(o)) { f(k); deep(v, f); } };
+deep(out, (k) => { if (spec.interdits.includes(k)) errs.push(`interdit présent : ${k}`); });
+console.log(errs.length ? 'KO ' + errs.join(' | ') : 'OK');
+JS
+build_lab "$L2"; cockpit_lancer "$L2"; attendre 20 pret; TOK2="$VF_JETON"
+# sonde_cle : trois clés hors motif sur la vue phase -> codes
+sonde_cle() { local o="" c; for c in '..%2Fx' 'ph-1%3Bls' "ph-$(printf '9%.0s' $(seq 1 297))"; do Q "vue=phase&cle=$c"; o="$o$QC|"; done; echo "${o%|}"; }
+R GET '/api/vf/tracabilite?vue=jalon' "{\"Host\":\"evil.test\",\"x-vf-cockpit-token\":\"$TOK2\"}"
+assert_eq "T10.5a — Host faux : 403" "$(J "$WORK/r.json" 'j.code')" "403"
+R GET '/api/vf/tracabilite?vue=jalon' "{\"Host\":\"127.0.0.1:$VF_PORT\",\"Origin\":\"http://evil.test\",\"x-vf-cockpit-token\":\"$TOK2\"}"
+assert_eq "T10.5b — Origin étrangère : 403" "$(J "$WORK/r.json" 'j.code')" "403"
+Q 'vue=zzz'; C1="$QC"; Q 'vue=jalon&cle=x'; C2="$QC"; Q 'vue=phase'; C3="$QC"; Q 'vue=jalon&vue=phase'; C4="$QC"; Q 'vue=jalon&autre=1'; C5="$QC"
+assert_eq "T10.5c — vue inconnue, cle sur jalon, cle absente, vue double, paramètre inconnu : cinq 400" "$C1|$C2|$C3|$C4|$C5" "400|400|400|400|400"
+assert_eq "T10.5d — cle hors motif (../x, ph-1;ls, 300 caractères) : 400, 400, 400" "$(sonde_cle)" "400|400|400"
+Q 'vue=phase&cle=ph-1'; OK1="$QC"; R GET '/api/vf/tracabilite?vue=phase&cle=ph-1'; H200="$(J "$WORK/r.json" "j.h['cache-control']+'|'+j.h['content-type']")"
+R GET '/api/vf/tracabilite?vue=zzz'; H400="$(J "$WORK/r.json" "j.h['cache-control']+'|'+j.h['content-type']")"
+assert_eq "T10.5e — témoin positif : une clé valide rend 200 ; 200 et 400 portent no-store et application/json" "$OK1|$H200|$H400" "200|no-store|application/json|no-store|application/json"
+for q in 'vue=jalon' 'vue=phase&cle=ph-1' 'vue=exigence&cle=REQ-01' 'vue=adr' 'vue=adr&cle=ADR-001' 'vue=decision&cle=P90-D-01:ph-90' 'vue=memoire' 'vue=memoire&cle=vf-coder' 'vue=entree&cle=vf-coder/a.md'; do
+  Q "$q"; V="$(node "$AUX/validate.mjs" "$SCRIPTS/vf-cockpit-interface.json" "$WORK/b.json" 2>&1)"; [ "$V" = OK ] || break
+done
+assert_eq "T10.6 — chaque réponse des sept vues (neuf requêtes) passe le contrat cockpit-trace@1 (requis, optionnels, états, sous-formes, interdits)" "$V ($q)" "OK ($q)"
+Q 'vue=exigence&cle=REQ-01'
+assert_eq "T10.11a — REQ-01 : décisions citées (ouvrable, définition absente sans clé), ADR citée, une nue comptée jamais reliée" "$(JB "JSON.stringify([b.exigence.decisions,b.exigence.adrs,b.exigence.decisionsNues,b.exigence.aucuneDecisionCitee])")" '[[{"id":"P90-D-01","cle":"P90-D-01:ph-90","phase":"ph-90"},{"id":"P95-D-09","cle":null}],[{"id":"ADR-001","cle":"ADR-001"}],1,false]'
+Q 'vue=exigence&cle=REQ-02'
+assert_eq "T10.11b — REQ-02 sans citation : aucuneDecisionCitee vrai, aucune décision ni ADR" "$(JB "[b.exigence.aucuneDecisionCitee,b.exigence.decisions.length,b.exigence.adrs.length].join()")" "true,0,0"
+assert_eq "T10.11c — témoin positif : la ligne du ledger porte les quatre citations et 90-CONTEXT.md définit P90-D-01 et D-04" "$(grep -c 'P90-D-01, ADR-001, D-04, P95-D-09' "$(ledger "$L2")")|$(grep -c 'P90-D-01\|\*\*D-04' "$(phdir "$L2" 90-x)/90-CONTEXT.md")" "1|2"
+Q 'vue=decision&cle=P90-D-01:ph-90'; A="$QC"; Q 'vue=adr&cle=ADR-001'
+assert_eq "T10.11d — chaque clé rendue est ouvrable par decision et adr du même lab (200)" "$A|$QC" "200|200"
+sonde_exig() { Q 'vue=exigence&cle=REQ-01'; JB "b.exigence.decisions.map(d=>d.id).join()"; }
+sonde_piege() { Q 'vue=entree&cle=vf-coder/a.md'; echo "$QC"; }
+# piège : la vue entree ajoute une clé « corps » (copie jetable) ; la garde locale doit refuser
+cockpit_arreter
+cockpit_module_muter PIEGE-CORPS vf-cockpit-trace-vues.mjs 's/{ entree: e }/{ entree: e, corps: "x" }/' && echo "muté PIEGE-CORPS"
+cockpit_lancer "$L2"; attendre 20 pret
+Q 'vue=entree&cle=vf-coder/a.md'; P1="$QC|$(JB 'b.erreur')"; Q 'vue=memoire'; P2="$QC"
+assert_eq "T10.7a — vue piégée (clé corps ajoutée) : 503 emission-refusee ; témoin positif : la vue normale rend 200" "$P1|$P2" "503|emission-refusee|200"
+cockpit_arreter; unset COCKPIT_MODULE
+COPIE="$(cockpit_module_copie)"; rm -f "$COPIE/scripts/vf-cockpit-interface.json"
+U_ILL="$(node "$AUX/unit.mjs" "$COPIE/scripts" "$L2" 'vue=jalon' 2>/dev/null | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const j=JSON.parse(s);console.log(j.code+"|"+(j.corps&&j.corps.erreur))})')"
+assert_eq "T10.7b — contrat illisible (copie sans vf-cockpit-interface.json) : 503 emission-refusee, jamais une réponse" "$U_ILL" "503|emission-refusee"
+U "$L2" 'vue=jalon'
+assert_eq "T10.7c — témoin positif : avec le contrat, la même requête n'est pas refusée" "$(J "$WORK/u.json" 'j.code')" "200"
+# mutants M-GARDE (garde locale neutralisée sur la copie piégée), M-CLE, M-NUE-RELIEE-EXIG : un serveur par mutant
+cockpit_module_muter M-GARDE vf-cockpit-trace-vues.mjs 's/{ entree: e }/{ entree: e, corps: "x" }/' >/dev/null
+echo "muté M-GARDE (piège)"; AN='if (gardeLocale(corps, INTERDITS))'
+grep -nF "$AN" "$COCKPIT_MODULE/scripts/vf-cockpit-trace.mjs" > /dev/null && node "$AUX/mutsub.mjs" "$COCKPIT_MODULE/scripts/vf-cockpit-trace.mjs" "$AN" 'if (false)'
+cockpit_lancer "$L2"; attendre 20 pret
+Q 'vue=entree&cle=vf-coder/a.md'
+assert_rouge "M-GARDE — garde locale neutralisée : la vue piégée sort en 200 avec la clé corps (T10.7a)" "503" "$QC"
+cockpit_arreter; unset COCKPIT_MODULE
+cockpit_module_muter M-CLE vf-cockpit-trace-vues.mjs 's/^  phase: new RegExp.*$/  phase: \/.*\/,/' && echo "muté M-CLE"
+cockpit_lancer "$L2"; attendre 20 pret
+assert_rouge "M-CLE — motif de cle assoupli en .* : T10.5d rougit" "400|400|400" "$(sonde_cle)"
+cockpit_arreter; unset COCKPIT_MODULE
+cockpit_module_muter M-NUE-RELIEE-EXIG vf-cockpit-trace-vues.mjs 's/const decisions = x.cites.decisions.flatMap(/const decisions = [...x.cites.decisions, ...x.cites.nues].flatMap(/' && echo "muté M-NUE-RELIEE-EXIG"
+cockpit_lancer "$L2"; attendre 20 pret
+assert_rouge "M-NUE-RELIEE-EXIG — la décision nue de la ligne d'exigence reliée : T10.11a rougit" "P90-D-01,P95-D-09" "$(sonde_exig)"
+cockpit_arreter; unset COCKPIT_MODULE
+
+echo "=== T10.8 — cache par empreinte, calcul unique en vol, aucun parcours du planning (harnais en processus, git factice compteur) ==="
+L8="$WORK/l8"; lab_l2 "$L8"
+mkdir -p "$WORK/wrap"; GIT_REEL="$(command -v git)"
+cat > "$WORK/wrap/git" <<EOS
+#!/bin/sh
+echo "\$*" >> "\$VF_GIT_JOURNAL"
+GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null exec "$GIT_REEL" "\$@"
+EOS
+chmod +x "$WORK/wrap/git"
+# cache.mjs <scripts> <lab> : scénario complet, un objet { checks, k, ... } sur la sortie ; `instantane` injecté et figé, fs espionné AVANT l'import des modules
+cat > "$AUX/cache.mjs" <<'JS'
+import fs from 'node:fs';
+import path from 'node:path';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, lab] = process.argv, journal = process.env.VF_GIT_JOURNAL, reel = process.env.GIT_REEL;
+const acces = []; // chemins du planning touchés par la route
+for (const nom of ['lstatSync', 'statSync', 'readdirSync', 'readFileSync', 'opendirSync', 'realpathSync']) {
+  const f = fs[nom], w = function (p, ...a) { if (typeof p === 'string' && /[\\/]\.planning([\\/]|$)/.test(p)) acces.push(nom); return f.call(this, p, ...a); };
+  fs[nom] = Object.assign(w, f); // les propriétés (realpathSync.native) suivent
+}
+const imp = (n) => import(pathToFileURL(path.join(scripts, n)).href);
+const T = await imp('vf-cockpit-trace.mjs'), { buildProjectGraph } = await imp('vf-cockpit-project.mjs');
+const graphe = buildProjectGraph(lab), c = {};
+let seq = 7, sig = 'aaaaaaaaaaaaaaaa', projet = graphe;
+const inst = () => Object.freeze({ seq, git: Object.freeze({ sig }), projet });
+c.fige = inst().seq === inst().seq && inst().git.sig === inst().git.sig && inst().seq === 7;
+const get = async (q) => T.lireTracabilite({ root: lab }, null, new URL(`http://x/api/vf/tracabilite?${q}`), { instantane: inst });
+const n = () => (fs.existsSync(journal) ? fs.readFileSync(journal, 'utf8').split('\n').filter(Boolean).length : 0);
+const toucher = (f, texte, dec) => { if (texte !== null) fs.writeFileSync(f, texte); const t = new Date(Date.now() + dec * 1000); fs.utimesSync(f, t, t); };
+const adr = path.join(lab, 'docs', 'ADR.md'), titre = (r) => (r.adrs || []).map((a) => a.titre).join('|');
+await get('vue=adr'); // chauffe : premier calcul, caches de configuration remplis
+let n0 = n(); toucher(adr, '# ADR\n\n## ADR-001 — Titre B\n', 10); const rB = await get('vue=adr'); c.k = n() - n0; c.k_ge1 = c.k >= 1;
+n0 = n(); toucher(adr, '# ADR\n\n## ADR-001 — Titre C\n', 20); const deux = await Promise.all([get('vue=adr'), get('vue=adr')]);
+c.vol = n() - n0 === c.k && titre(deux[0]) === 'Titre C' && titre(deux[1]) === 'Titre C';
+n0 = n(); await get('vue=adr'); c.stable = n() - n0 === 0;
+acces.length = 0; // à partir d'ici : aucune lecture du planning par la route
+projet = structuredClone(graphe);
+projet.meta.vf.trace.exigences.push({ id: 'REQ-77', ws: 'x', coche: false, phase: '1', phasesParPlan: [], statut: null, fait: false, rattachement: 'table',
+  libelle: 'ajoutée', fichier: 'x', cites: { decisions: [], adrs: [], nues: [] } });
+seq = 8; n0 = n(); const ph = await get('vue=phase&cle=ph-1');
+c.phase = ph.phase.exigences.map((e) => e.id).join() === 'REQ-01,REQ-77' && n() - n0 === 0;
+sig = 'bbbbbbbbbbbbbbbb'; n0 = n(); await get('vue=adr'); c.sig = n() - n0 === c.k;
+n0 = n(); toucher(adr, '# ADR\n\n## ADR-001 — Titre D\n', 30); const rD = await get('vue=adr'); c.titre = titre(rD) === 'Titre D' && n() - n0 === c.k;
+const mem = path.join(lab, '.claude', 'agent-memory', 'vf-coder'), avant = (await get('vue=memoire')).memoire.compteurs.entrees;
+fs.writeFileSync(path.join(mem, 'c.md'), '---\nname: c-nom\n---\nx\n'); execFileSync(reel, ['-C', lab, 'add', '.claude/agent-memory/vf-coder/c.md']);
+const t = new Date(Date.now() + 40000); fs.utimesSync(mem, t, t);
+n0 = n(); const apres = (await get('vue=memoire')).memoire.compteurs.entrees; c.memoire = apres === avant + 1 && n() - n0 === c.k;
+const plan = path.join(lab, '.planning', 'workstreams', 'x', 'phases', '01-un', 'extra.txt');
+fs.writeFileSync(plan, 'x'); const t2 = new Date(Date.now() + 50000); fs.utimesSync(path.dirname(plan), t2, t2);
+n0 = n(); await get('vue=memoire'); c.planning = n() - n0 === 0; c.planningAcces = acces.length === 0;
+console.log(JSON.stringify({ checks: c }));
+JS
+CACHE() { : > "$WORK/git.journal"; local d="$WORK/l8-$1"; rm -rf "$d"; cp -R "$L8" "$d"; VF_GIT_JOURNAL="$WORK/git.journal" GIT_REEL="$GIT_REEL" PATH="$WORK/wrap:$PATH" node "$AUX/cache.mjs" "${2:-$SCRIPTS}" "$d" > "$WORK/cache-$1.json" 2>"$WORK/cache-$1.err" || echo '{"checks":{}}' > "$WORK/cache-$1.json"; }
+CK() { J "$WORK/cache-$1.json" "j.checks.$2"; }
+VERD() { J "$WORK/cache-$1.json" "['fige','k_ge1','vol','stable','phase','sig','titre','memoire','planning','planningAcces'].map(k=>j.checks[k]).join()"; }
+CACHE nominal
+assert_eq "T10.8.0 — précondition : instantané figé (deux appels, même seq et même git.sig) et K >= 1 appels git par calcul, mesurés" "$(CK nominal fige)|$(CK nominal k_ge1)" "true|true"
+assert_eq "T10.8a — deux requêtes simultanées après une modification de docs/ADR.md : un seul calcul (+K, jamais +2K), les deux servent le nouveau titre" "$(CK nominal vol)" "true"
+assert_eq "T10.8b — une troisième requête identique : aucun appel git (aucun rev-parse par requête)" "$(CK nominal stable)" "true"
+assert_eq "T10.8c — seq 7 -> 8 avec une exigence ajoutée : la vue phase la reflète, aucun appel git" "$(CK nominal phase)" "true"
+assert_eq "T10.8d — git.sig aaaa -> bbbb : la requête suivante recalcule (+K)" "$(CK nominal sig)" "true"
+assert_eq "T10.8e — titre d'ADR modifié sans commit : nouveau titre servi (date de docs/ADR.md), +K" "$(CK nominal titre)" "true"
+assert_eq "T10.8f — entrée de mémoire ajoutée sans commit : comptée à la requête suivante (date du dossier d'agent), +K" "$(CK nominal memoire)" "true"
+assert_eq "T10.8g — fichier ajouté sous .planning/ sans changement de seq : aucun recalcul" "$(CK nominal planning)" "true"
+assert_eq "T10.8h — aucun lstat, stat, ni lecture de répertoire ou de fichier sous .planning/ pendant les requêtes (témoin : le harnais écoute fs avant l'import)" "$(CK nominal planningAcces)" "true"
+NOM_V="$(VERD nominal)"
+mut_cache() { # <NOM> <fichier> <ancre> <remplacement>
+  cockpit_module_copie "$WORK/mod-$1" > /dev/null && node "$AUX/mutsub.mjs" "$WORK/mod-$1/scripts/$2" "$3" "$4" | sed "s/^muté$/muté $1/"; CACHE "$1" "$WORK/mod-$1/scripts"
+}
+mut_cache M-VOL vf-cockpit-trace.mjs 'if (enVol && enVol.emp === emp) return enVol.p;' ''
+assert_rouge "M-VOL — partage du calcul retiré : T10.8a rougit" "$NOM_V" "$(VERD M-VOL)"
+mut_cache M-EMPREINTE vf-cockpit-trace.mjs 'const parties = [' 'const parties = [snap.seq]; const _ignore = ['
+assert_rouge "M-EMPREINTE — empreinte réduite à seq (sans les dates) : T10.8 rougit" "$NOM_V" "$(VERD M-EMPREINTE)"
+mut_cache M-SIG vf-cockpit-trace.mjs 'snap.git && snap.git.sig, ' ''
+assert_rouge "M-SIG — git.sig retirée de l'empreinte : T10.8d rougit" "$NOM_V" "$(VERD M-SIG)"
+mut_cache M-EMPREINTE-PLANNING vf-cockpit-trace.mjs 'const parties = [' 'const parties = [fs.lstatSync(path.join(root, ".planning")).mtimeMs, '
+assert_rouge "M-EMPREINTE-PLANNING — parcours des dates de .planning/ ajouté à l'empreinte : la dernière assertion de T10.8 rougit" "$NOM_V" "$(VERD M-EMPREINTE-PLANNING)"
+
+echo "=== T10.9 — borne des commits citants (lab L9, cinq commits citants) ==="
+L9="$WORK/l9"; lab_l1 "$L9"; mkdir -p "$L9/docs"; printf '# ADR\n\n## ADR-001 — Choix\n' > "$L9/docs/ADR.md"
+git_lab "$L9"; for i in 1 2 3 4 5; do cm "$L9" "feat: suit ADR-001 ($i)"; done
+build_lab "$L9"
+cockpit_lancer "$L9" VF_COCKPIT_TRACE_MAX_COMMITS=2; attendre 20 pret
+Q 'vue=adr&cle=ADR-001'; B2="$(JB 'b.bornes.tronque+"|"+b.commits.length')"
+cockpit_arreter
+cockpit_lancer "$L9"; attendre 20 pret
+Q 'vue=adr&cle=ADR-001'; B1="$(JB 'b.bornes.tronque+"|"+b.commits.length')"
+assert_eq "T10.9 — borne abaissée à 2 : bornes.tronque vrai (deux commits servis) ; borne normale : faux (cinq commits)" "$B2 $B1" "true|2 false|5"
+cockpit_arreter
+cockpit_module_muter M-TRONQUE vf-cockpit-trace-vues.mjs 's/Boolean(modele.bornes.tronque)/false/' && echo "muté M-TRONQUE"
+cockpit_lancer "$L9" VF_COCKPIT_TRACE_MAX_COMMITS=2; attendre 20 pret
+Q 'vue=adr&cle=ADR-001'
+assert_rouge "M-TRONQUE — tronque forcé à faux : T10.9 rougit (réponse bornée donnée pour complète)" "true" "$(JB 'b.bornes.tronque')"
+cockpit_arreter; unset COCKPIT_MODULE
+
+echo "=== T10.10 — confinement de la route : lien symbolique suivi par git vers un fichier hors du lab ==="
+L10="$WORK/l10"; lab_l1 "$L10"; mkdir -p "$L10/.claude/agent-memory/vf-coder"
+printf -- '---\nname: HORS-MARQUEUR-76\n---\nvoir [[HORS-MARQUEUR-76]]\n' > "$WORK/hors.md"
+printf -- '---\nname: DANS-LE-LAB-76\n---\ncorps\n' > "$L10/.claude/dedans.md"
+ln -s "$WORK/hors.md" "$L10/.claude/agent-memory/vf-coder/lien.md"; ln -s ../../dedans.md "$L10/.claude/agent-memory/vf-coder/voisin.md"
+printf -- '- [L](lien.md)\n- [V](voisin.md)\n' > "$L10/.claude/agent-memory/vf-coder/MEMORY.md"
+git_lab "$L10"; build_lab "$L10"
+sonde_conf() { local f="$WORK/t1010.txt" q; : > "$f"; for q in 'vue=memoire' 'vue=memoire&cle=vf-coder' 'vue=entree&cle=vf-coder/lien.md'; do Q "$q"; cat "$WORK/b.json" >> "$f"; echo >> "$f"; done; grep -c 'HORS-MARQUEUR-76' "$f"; }
+cockpit_lancer "$L10"; attendre 20 pret
+assert_eq "T10.10a — aucune des trois réponses ne contient le marqueur d'un fichier hors du lab" "$(sonde_conf)" "0"
+Q 'vue=entree&cle=vf-coder/lien.md'; E1="$(JB "b.entree.name+'|'+b.entree.nbSortants")"
+Q 'vue=entree&cle=vf-coder/voisin.md'; E2="$(JB "b.entree.name")"
+assert_eq "T10.10b — l'entrée hors du lab est listée sans name lu ni lien ; témoin positif : le lien voisin vers un fichier du lab est lu (DANS-LE-LAB-76)" "$E1|$E2" "null|0|DANS-LE-LAB-76"
+assert_eq "T10.10c — témoin positif : cat du lien dans le shell rend le marqueur" "$(grep -c 'HORS-MARQUEUR-76' "$L10/.claude/agent-memory/vf-coder/lien.md")" "2"
+cockpit_arreter
+cockpit_module_muter M-CONFINE vf-cockpit-trace.mjs 's/lireConfine(root, () => ({ adr:/((_r, f) => f())(root, () => ({ adr:/' && echo "muté M-CONFINE"
+cockpit_lancer "$L10"; attendre 20 pret
+assert_rouge "M-CONFINE — lecture hors de lireConfine : le marqueur du fichier hors du lab est servi (T10.10a rougit)" "0" "$(sonde_conf)"
+cockpit_arreter; unset COCKPIT_MODULE
 
 # --- FIN-DES-SECTIONS ---
 echo

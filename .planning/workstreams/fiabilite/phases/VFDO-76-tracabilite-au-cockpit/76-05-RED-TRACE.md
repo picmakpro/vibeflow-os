@@ -84,3 +84,41 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-tracabilite-route.sh`
 ```
 
 Le reste des FAIL (T10.3h à T10.3j, T10.4a à T10.4e, T11.2a à T11.2k, T11.1c, M-ABSOLU) suit la même forme : obtenu `absent` (vue servie `indisponible`, sans clé de vue). T11.1b : le harnais comptait avec `grep -rcF` (corrigé en `grep -cF` avant le vert). T11.2d à T11.2f : code 0, le lab sans `.planning` ne démarre pas encore (à traiter côté lab, voir SUMMARY si écart).
+
+## Tâche 3 — témoins rouges du contrat, de la garde, du cache et du calcul unique (contre le code de la tâche 2 : ni schéma déclaré, ni garde locale, ni cache, ni borne de test)
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-tracabilite-route.sh` ; 61 PASS, 12 FAIL. Assertion, attendu, obtenu :
+
+```
+  ❌ FAIL — T10.6 — chaque réponse des sept vues (neuf requêtes) passe le contrat cockpit-trace@1 (requis, optionnels, états, sous-formes, interdits)
+     attendu: [OK (vue=jalon)]
+     obtenu:  [KO schéma absent (vue=jalon)]
+  ❌ FAIL — T10.7a — vue piégée (clé corps ajoutée) : 503 emission-refusee ; témoin positif : la vue normale rend 200
+     attendu: [503|emission-refusee|200]
+     obtenu:  [200|absent|200]
+  ❌ FAIL — T10.7b — contrat illisible (copie sans vf-cockpit-interface.json) : 503 emission-refusee, jamais une réponse
+     attendu: [503|emission-refusee]
+     obtenu:  [200|undefined]
+  ❌ FAIL — T10.8a — deux requêtes simultanées après une modification de docs/ADR.md : un seul calcul (+K, jamais +2K), les deux servent le nouveau titre
+     attendu: [true]
+     obtenu:  [false]
+  ❌ FAIL — T10.8b — une troisième requête identique : aucun appel git (aucun rev-parse par requête)
+     attendu: [true]
+     obtenu:  [false]
+  ❌ FAIL — T10.8e — titre d'ADR modifié sans commit : nouveau titre servi (date de docs/ADR.md), +K
+     attendu: [true]
+     obtenu:  [false]
+  ❌ FAIL — T10.8g — fichier ajouté sous .planning/ sans changement de seq : aucun recalcul
+     attendu: [true]
+     obtenu:  [false]
+  ❌ FAIL — M-VOL — partage du calcul retiré : T10.8a rougit — le mutant ne rougit pas (obtenu = nominal [true,true,false,false,true,true,false,true,false,true])
+  ❌ FAIL — M-EMPREINTE — empreinte réduite à seq (sans les dates) : T10.8 rougit — le mutant ne rougit pas (obtenu = nominal [true,true,false,false,true,true,false,true,false,true])
+  ❌ FAIL — M-SIG — git.sig retirée de l'empreinte : T10.8d rougit — le mutant ne rougit pas (obtenu = nominal [true,true,false,false,true,true,false,true,false,true])
+  ❌ FAIL — M-EMPREINTE-PLANNING — parcours des dates de .planning/ ajouté à l'empreinte : la dernière assertion de T10.8 rougit — le mutant ne rougit pas (obtenu = nominal [true,true,false,false,true,true,false,true,false,true])
+=== T10.9 — borne des commits citants (lab L9, cinq commits citants) ===
+  ❌ FAIL — T10.9 — borne abaissée à 2 : bornes.tronque vrai (deux commits servis) ; borne normale : faux (cinq commits)
+     attendu: [true|2 false|5]
+     obtenu:  [false|5 false|5]
+```
+
+Les quatre mutants de cache (M-VOL, M-EMPREINTE, M-SIG, M-EMPREINTE-PLANNING) ne rougissent pas encore : leur ancre (`enVol`, `const parties = [`) n'existe pas dans le code de la tâche 2 (« ancre introuvable »). Le harnais mesure K = 8 appels git par calcul sur le code naïf (aucun cache) ; T10.8a, T10.8b, T10.8g rouges (chaque requête relance git). M-GARDE, M-CLE, M-NUE-RELIEE-EXIG, M-CONFINE : leur sonde nominale est atteinte, le mutant a un effet une fois la garde posée (voir le vert).
