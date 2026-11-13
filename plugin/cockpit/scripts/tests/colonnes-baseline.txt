@@ -8,10 +8,8 @@ scripts/vf-cockpit-arbres.mjs 8
 scripts/vf-cockpit-ask.mjs 37
 scripts/vf-cockpit-avancement.mjs 7
 scripts/vf-cockpit-build.mjs 16
-scripts/vf-cockpit-code-cache.mjs 3
 scripts/vf-cockpit-code-vf.mjs 13
 scripts/vf-cockpit-code.mjs 5
-scripts/vf-cockpit-collecte.mjs 1
 scripts/vf-cockpit-drift.mjs 13
 scripts/vf-cockpit-embed.mjs 1
 scripts/vf-cockpit-equipe-carte.mjs 17
@@ -26,7 +24,7 @@ scripts/vf-cockpit-git-details.mjs 24
 scripts/vf-cockpit-git-durci.mjs 8
 scripts/vf-cockpit-git-entete.mjs 3
 scripts/vf-cockpit-git-graphe.mjs 1
-scripts/vf-cockpit-git-lanceur.mjs 21
+scripts/vf-cockpit-git-lanceur.mjs 20
 scripts/vf-cockpit-git-signature.mjs 4
 scripts/vf-cockpit-git-sortant.mjs 3
 scripts/vf-cockpit-git.mjs 40
