@@ -57,3 +57,10 @@ Gate-Touche : aucun chemin des six classes touché. `colonnes-baseline.txt` inch
 - Écart : l'ancre du mutant ROUTE-PAR-REQUETE suit la ligne déplacée du serveur.
 
 rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
+
+## Correctifs de revue
+
+- Majeur 2 (revue du point de fusion 1) : la route lancait `demander()` en tache de fond puis lisait tout de suite le cache de la lecture precedente (valide 60 s) : premiere requete = null, et toute requete arrivee plus de 60 s apres la precedente = null. Correctif : `lireAilleurs` devient asynchrone et attend, au plus `BORNE_AILLEURS_MS` (3 s), l etat officiel en vol (`demander` rend desormais la promesse de la lecture en vol) et la lecture des arbres (`arbresGitAsync`) avant de repondre ; la boucle reste libre (attente de promesses), le plafond d une lecture par `REPIT_MS` et la non-fuite `{ lab, n }` sont intacts, `null` reste la reponse quand rien de frais n aboutit dans la borne. Temoin : RG13.17 (gestionnaire reel de la route, horloge avancee de 61 s puis 122 s entre trois requetes), vu rouge sur la tete d avant (`[null,null,null]`), vert apres ; RG13.13, ROUTE-PAR-REQUETE, RG13.15 et RG13.16 restent verts. Pas de mutant (aucune garde nouvelle).
+- Ecart : le harnais `og` du fragment importe aussi le serveur (variable `RG13_SRV`) pour jouer le gestionnaire reel.
+
+rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)

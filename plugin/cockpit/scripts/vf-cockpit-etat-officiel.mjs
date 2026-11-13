@@ -62,8 +62,9 @@ export function rafraichir({ home, cwd, commande = 'claude' } = {}) {
 
 export function demander({ home, cwd, now = Date.now() } = {}) {
   const c = cache(home);
-  if (c.enCours || now - c.dernier < REPIT_MS) return;
-  rafraichir({ home, cwd }).catch(() => {});
+  if (c.enCours) return c.enCours.catch(() => null); // la lecture en vol : l'appelant peut l'attendre (route ailleurs, revue 73)
+  if (now - c.dernier < REPIT_MS) return null;
+  return rafraichir({ home, cwd }).catch(() => null);
 }
 
 // ---- 73-02 : « ailleurs sur ce poste » (REGI-13, P73-D-16) ----

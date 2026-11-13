@@ -34,7 +34,7 @@ rg13_fixtures() {
 # (X = fixtures, fs, path), imprime le résultat en JSON ; un échec du corps (ex. export absent) s'imprime « ERR … » : le témoin rougit
 og() {
   local d="$1" body="$2"
-  node --input-type=module -e 'import { pathToFileURL as U } from "node:url"; import fs from "node:fs"; import path from "node:path"; const X = JSON.parse(process.env.RG13_FX); process.env.PATH = X.bin + path.delimiter + process.env.PATH; process.env.HOME = X.home; const F = Object.getPrototypeOf(async () => {}).constructor; let r; try { const m = await import(U(path.join(process.argv[1], "vf-cockpit-etat-officiel.mjs")).href); const a = await import(U(path.join(process.argv[1], "vf-cockpit-arbres.mjs")).href); r = await new F("m", "a", "X", "fs", "path", process.argv[2])(m, a, X, fs, path); } catch (e) { r = "ERR " + e.message; } console.log(typeof r === "string" ? r : JSON.stringify(r)); process.exit(0);' "$d" "$body" 2>/dev/null
+  node --input-type=module -e 'import { pathToFileURL as U } from "node:url"; import fs from "node:fs"; import path from "node:path"; const X = JSON.parse(process.env.RG13_FX); process.env.PATH = X.bin + path.delimiter + process.env.PATH; process.env.HOME = X.home; const F = Object.getPrototypeOf(async () => {}).constructor; let r; try { const m = await import(U(path.join(process.argv[1], "vf-cockpit-etat-officiel.mjs")).href); const a = await import(U(path.join(process.argv[1], "vf-cockpit-arbres.mjs")).href); const s = process.env.RG13_SRV ? await import(U(path.join(process.argv[1], "vf-cockpit-server.mjs")).href) : null; r = await new F("m", "a", "X", "fs", "path", "s", process.argv[2])(m, a, X, fs, path, s); } catch (e) { r = "ERR " + e.message; } console.log(typeof r === "string" ? r : JSON.stringify(r)); process.exit(0);' "$d" "$body" 2>/dev/null
 }
 
 # préambule des corps : S(cwd, état) = une entrée de `claude agents --json` ; lire(liste, rc, brut) = lecture officielle sur le faux claude ; al(opts) = ailleurs() avec les racines du lab
@@ -54,6 +54,11 @@ rg13_cas_nul() { og "$1" "$OGP"' const r = []; const lisible = [S(P + "/atelier"
   await lire(lisible, 1); r.push(al()); await lire(lisible, 0, "{pas du json"); r.push(al()); await lire([S(42, BL)]); r.push(al());
   await lire(lisible); r.push(al({ now: Date.now() + 61000 })); r.push(al({ racines: undefined })); r.push(m.ailleurs("home-jamais-lu", { racines: [X.lab] })); return r;'; }
 
+# revue 1, majeur 2 : le gestionnaire réel de la route (s.ROUTES), l'horloge avancée de 61 s entre deux requêtes ; le faux claude répond tout de suite
+rg13_cas_espace() { RG13_SRV=1 og "$1" "$OGP"' fs.writeFileSync(X.fichier, JSON.stringify([S(P + "/atelier", BL)])); fs.writeFileSync(X.rc, "0");
+  const h = s.ROUTES.find((l) => l[0] === "/api/vf/ailleurs")[1], t = Date.now, r = [];
+  r.push((await h({ root: X.lab })).ailleurs); Date.now = () => t() + 61000; r.push((await h({ root: X.lab })).ailleurs); Date.now = () => t() + 122000; r.push((await h({ root: X.lab })).ailleurs); Date.now = t; return r;'; }
+
 rg_RG13_officiel() {
   rg13_fixtures
   assert_eq "RG13.0 — témoin positif : une session « blocked » d'un lab voisin « atelier » donne [{ lab: atelier, n: 1 }]" "$(rg13_cas_attend "$SCRIPTS")" '[{"lab":"atelier","n":1}]'
@@ -64,6 +69,7 @@ rg_RG13_officiel() {
   assert_eq "RG13.4b — caractères de contrôle et de sens d'écriture retirés du nom ; nom de 90 caractères borné à 40" "$(rg13_cas_nettoie "$SCRIPTS")" '[[{"lab":"atelier","n":1}],40]'
   assert_eq "RG13.5 — dossier personnel, un de ses ancêtres, chemin d'un seul segment : « un autre dossier »" "$(rg13_cas_perso "$SCRIPTS")" '[{"lab":"un autre dossier","n":3}]'
   assert_eq "RG13.6 — commande en échec, JSON illisible, entrée en attente sans cwd, lecture de plus de 60 s, racines absentes, aucune lecture : null (jamais 0)" "$(rg13_cas_nul "$SCRIPTS")" '[null,null,null,null,null,null]'
+  assert_eq "RG13.17 — revue 1, majeur 2 : gestionnaire réel de la route, trois requêtes espacées de plus de 60 s : la première (aucune lecture avant) et les suivantes rendent la liste, jamais null" "$(rg13_cas_espace "$SCRIPTS")" '[[{"lab":"atelier","n":1}],[{"lab":"atelier","n":1}],[{"lab":"atelier","n":1}]]'
   rg_mutant AILLEURS-CWD "la sortie garde le dossier" "$SCRIPTS" vf-cockpit-etat-officiel.mjs 'const l = lignes.get(lab) || { lab, n: 0 };' 'const l = lignes.get(lab) || { lab, n: 0, cwd };' rg13_cas_sortie '[["lab,n"],false,false,false,["atelier"]]'
   rg_mutant AILLEURS-TITRE "le nom du lab porte l'identifiant de session" "$SCRIPTS" vf-cockpit-etat-officiel.mjs 'out.push(e.cwd);' 'out.push(e.cwd + "#" + e.sessionId);' rg13_cas_sortie '[["lab,n"],false,false,false,["atelier"]]'
   rg_mutant AILLEURS-SOUS-ARBRE "égalité stricte au lieu de « sous la racine »" "$SCRIPTS" vf-cockpit-etat-officiel.mjs 'rs.some((r) => dessous(r, d))' 'rs.some((r) => r === d)' rg13_cas_lab '[[],[{"lab":"lab-bis","n":1}]]'
