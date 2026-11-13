@@ -40,7 +40,7 @@
     g.setAttribute('role', 'radiogroup'); g.setAttribute('aria-label', 'Regrouper par');
     const radios = PAR.map(([val, texte]) => {
       const b = h('button', 'vf-frise-radio', texte), on = st.par === val;
-      b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('data-val', val);
+      b.type = 'button'; b.setAttribute('role', 'radio'); b.setAttribute('data-val', val); b.setAttribute('data-foc', `r:${val}`);
       b.setAttribute('aria-checked', on ? 'true' : 'false'); b.tabIndex = on ? 0 : -1;
       return b;
     });
@@ -55,9 +55,19 @@
     return [lib, g];
   }
 
-  function dessiner(st, focus) {
-    const ctx = st.ctx, sec = ctx && ctx.emplacement, T = W.__vfCoutTableau;
-    if (!sec || !sec.isConnected || !T || !ctx.frise || !ctx.frise.voies.length) return;
+  const garderFocus = (zone, refaire) => {
+    const a = D.activeElement, k = a && a !== D.body && zone.contains(a) ? a.getAttribute('data-foc') : null;
+    refaire();
+    const n = k === null ? null : [...zone.querySelectorAll('[data-foc]')].find((x) => x.getAttribute('data-foc') === k);
+    if (n) n.focus({ preventScroll: true });
+  };
+  function dessiner(st) {
+    const sec = st.ctx && st.ctx.emplacement;
+    if (sec && sec.isConnected) garderFocus(sec, () => tracer(st, sec));
+  }
+  function tracer(st, sec) {
+    const ctx = st.ctx, T = W.__vfCoutTableau;
+    if (!T || !ctx.frise || !ctx.frise.voies.length) { sec.replaceChildren(); return; }
     const M = ctx.modele, voies = ctx.frise.voies, sg = signal(), lib = ctx.libFenetre, titre = `Coût sur les dernières ${lib}`;
     const agg = M.agreger(voies, st.par, { missions: sg.missions, phases: sg.phases, fenetreLibelle: lib, tronque: ctx.incomplet });
     const racine = h('section', 'vf-cout'), h3 = h('h3', 'vf-cout-titre', titre), note = agg.inconnus ? h('p', 'vf-cout-note',
@@ -66,13 +76,12 @@
     const sous = h('p', 'vf-cout-soustitre', `Durées lues sur la fenêtre, jetons sur les dernières 24${NB}h (horizon de l'index). Rien n'est estimé.`);
     const tab = T.construire(M, agg, voies, { par: st.par, titre, lib, ouvertes: st.ouvertes, surBascule: (cle) => {
       if (st.ouvertes.has(cle)) st.ouvertes.delete(cle); else st.ouvertes.add(cle);
-      dessiner(st, `button[data-cle="${cle}"]`);
+      dessiner(st);
     } });
-    racine.append(h3, sous, ...groupe(st, () => dessiner(st, '[role=radio][aria-checked=true]')), tab);
+    racine.append(h3, sous, ...groupe(st, () => dessiner(st)), tab);
     if (note) racine.append(note);
     sec.replaceChildren(racine);
     synthese(ctx, agg, voies, M, sec);
-    if (focus) { const f = sec.querySelector(focus); if (f) f.focus(); }
   }
 
   // l'état du plan (missions, phases) arrive du magasin : relire le tableau quand il change

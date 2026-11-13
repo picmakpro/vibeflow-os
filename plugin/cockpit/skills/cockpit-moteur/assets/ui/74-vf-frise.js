@@ -96,7 +96,7 @@
     else if (!voies) { nodes.etat.append(S.vide(lib, m.fenetre)); nodes.lignes.append(h('p', 'vf-frise-synthese',
       `Sur les dernières ${lib}${NB}: aucun agent vu.`)); }
     else nodes.etat.hidden = true;
-    if (!voies) { m.ctx = null; nodes.voies.replaceChildren(); nodes.voiesP.replaceChildren(); return; }
+    if (!voies) { m.ctx = null; nodes.emplacements.cout.replaceChildren(); nodes.voies.replaceChildren(); nodes.voiesP.replaceChildren(); return; }
 
     const jusqua = f.jusqua != null ? f.jusqua : Date.now(), depuis = f.depuis != null ? f.depuis : jusqua - fen[2], lecture = m.lecture;
     const who = W.VF_ETAT ? W.VF_ETAT.lire('who') : null, workers = who && Array.isArray(who.workers) ? who.workers : [];

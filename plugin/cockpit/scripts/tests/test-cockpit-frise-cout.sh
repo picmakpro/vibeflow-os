@@ -524,7 +524,7 @@ export default async function (h) {
     await monterD(h, { voies: (now, F) => voiesCout(now, F).map((v) => (v.rattachement && v.rattachement.dag === 'm1.md' ? { ...v, rattachement: { ...v.rattachement, dag: 'x"y.md' } } : v)) });
     await h.ev("window.__vfS.signal.missions[0].fichier = 'x\"y.md'; window.__emit('etat', { seq: 2 })");
     await h.pause(1500); await h.ev('window.__errs.length = 0');
-    const ok = await h.ev(() => { const b = document.querySelector('.vf-cout-depli'); if (b) b.click(); return !!b; });
+    const ok = await h.ev(() => { const b = document.querySelector('.vf-cout-depli'); if (b) { b.focus(); b.click(); } return !!b; });
     await h.pause(500);
     const e = await h.ev(() => ({ errs: window.__errs.slice(), exp: document.querySelector('.vf-cout-depli') ? document.querySelector('.vf-cout-depli').getAttribute('aria-expanded') : null,
       foc: document.activeElement === document.querySelector('.vf-cout-depli'), phases: document.querySelectorAll('.vf-cout-phase').length }));

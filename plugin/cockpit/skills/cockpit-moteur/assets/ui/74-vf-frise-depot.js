@@ -55,7 +55,8 @@
   function commit(g, branche, M, ouvrable) {
     const b = h(ouvrable ? 'button' : 'span', 'vf-depot-commit'), texte = V().etiquette(M, g, branche, ouvrable);
     if (ouvrable) b.type = 'button'; else b.setAttribute('role', 'img');
-    b.setAttribute('aria-label', texte); b.title = texte; b.style.left = `${g.x}px`; b.setAttribute('data-h', g.items[0].h);
+    b.setAttribute('aria-label', texte); b.title = texte; b.style.left = `${g.x}px`;
+    b.setAttribute('data-h', g.items[0].h); b.setAttribute('data-foc', `c:${g.items[0].h}`);
     const svg = D.createElementNS('http://www.w3.org/2000/svg', 'svg'), poly = D.createElementNS('http://www.w3.org/2000/svg', 'polygon');
     svg.setAttribute('viewBox', '0 0 12 12'); svg.setAttribute('aria-hidden', 'true'); svg.setAttribute('focusable', 'false');
     poly.setAttribute('points', '6,0 12,6 6,12 0,6'); poly.setAttribute('class', 'vf-frise-losange'); svg.append(poly); b.append(svg);
@@ -64,9 +65,19 @@
     return b;
   }
 
+  // le focus survit à la relecture : la clé `data-foc` du contrôle actif est retrouvée par comparaison d'attribut (jamais dans un sélecteur)
+  const garderFocus = (zone, refaire) => {
+    const a = D.activeElement, k = a && a !== D.body && zone.contains(a) ? a.getAttribute('data-foc') : null;
+    refaire();
+    const n = k === null ? null : [...zone.querySelectorAll('[data-foc]')].find((x) => x.getAttribute('data-foc') === k);
+    if (n) n.focus({ preventScroll: true });
+  };
   function dessiner(st) {
-    const ctx = st.ctx, e = ctx && ctx.emplacement;
-    if (!e || !e.isConnected) return;
+    const e = st.ctx && st.ctx.emplacement;
+    if (e && e.isConnected) garderFocus(e, () => tracer(st));
+  }
+  function tracer(st) {
+    const ctx = st.ctx, e = ctx.emplacement;
     const C = V(), M = ctx.modele, c = e.querySelector('.vf-frise-c'), p = e.querySelector('.vf-frise-p');
     c.replaceChildren(); p.replaceChildren(); p.classList.add('vf-depot-p');
     const tete = h('div', 'vf-depot-tete'); tete.append(h('div', 'vf-depot-titre', 'Dépôt')); c.append(tete);
@@ -74,7 +85,7 @@
     const etat = (texte, bouton) => {
       const z = h('div', 'vf-depot-etat'); z.append(h('span', 'vf-depot-texte', texte));
       if (bouton) {
-        const b = h('button', 'vf-frise-reessayer', 'Réessayer'); b.type = 'button';
+        const b = h('button', 'vf-frise-reessayer', 'Réessayer'); b.type = 'button'; b.setAttribute('data-foc', 'reessayer');
         b.addEventListener('click', () => { st.git = null; lire(st); }); z.append(b);
       }
       p.append(z); listeSr(ctx, `Dépôt${NB}: ${texte}`);
@@ -115,10 +126,10 @@
     if (vues.voies.length > LIMITE) {
       const n = vues.voies.length - LIMITE, plus = C.pluriel(n, 'branche', 'branches');
       const b = h('button', 'vf-frise-repli vf-depot-plus', st.deplie ? 'Replier les branches' : `+ ${plus}`);
-      b.type = 'button'; b.setAttribute('aria-expanded', st.deplie ? 'true' : 'false');
+      b.type = 'button'; b.setAttribute('aria-expanded', st.deplie ? 'true' : 'false'); b.setAttribute('data-foc', 'plus');
       b.setAttribute('aria-label', st.deplie ? `Replier les branches${NB}: revenir à ${LIMITE} branches`
         : `+ ${plus}${NB}: afficher les autres branches du dépôt`);
-      b.addEventListener('click', () => { st.deplie = !st.deplie; dessiner(st); const nb = e.querySelector('.vf-depot-plus'); if (nb) nb.focus(); });
+      b.addEventListener('click', () => { st.deplie = !st.deplie; dessiner(st); });
       c.append(b);
     }
     listeSr(ctx, `Dépôt${NB}: ${C.pluriel(vues.total, 'commit', 'commits')} sur ${ctx.libFenetre}${mention ? `, ${mention.toLowerCase()}` : ''}`);

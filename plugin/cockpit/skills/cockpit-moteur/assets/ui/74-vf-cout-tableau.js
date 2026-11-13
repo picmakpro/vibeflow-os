@@ -38,7 +38,7 @@
       c.setAttribute('scope', 'row');
       if (opt.exp != null) {
         const b = h('button', 'vf-cout-depli'); b.type = 'button';
-        b.setAttribute('aria-expanded', opt.exp ? 'true' : 'false'); b.setAttribute('data-cle', opt.cle);
+        b.setAttribute('aria-expanded', opt.exp ? 'true' : 'false'); b.setAttribute('data-cle', opt.cle); b.setAttribute('data-foc', `d:${opt.cle}`);
         n.className = 'vf-cout-nom'; b.append(n); b.addEventListener('click', () => surBascule(opt.cle)); c.append(b);
       } else c.append(n);
       if (opt.sous) c.append(h('span', 'vf-cout-sous', opt.sous));
