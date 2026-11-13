@@ -56,3 +56,22 @@ Les témoins E2.1 à E2.7 et E3.1 à E3.2 sont écrits avant tout correctif ; jo
 | M-COLLECTE-RECOPIE | ligne `garde:state-liste-blanche` | `({ ...b, etat: …` | copie différente | E3.1 (E3.2 vert) | des clés d'entrée sortent de `collecte` |
 
 Chaque mutant : suffixe `.0` vert (ancre trouvée, copie différente, `node --check` vert) avant que le rouge soit mesuré ; rouges exactement ceux de la colonne, aucun autre.
+
+## Tâche 3 — rouges sur le code de la tâche 2 (signature, volatils et lecteurs encore des stubs, aucune minuterie de battement dans le serveur, aucun événement `etat`)
+
+Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-etat.sh` — 30 PASS / 21 FAIL (4 min : trois scénarios de serveur réel, dont deux hors sujet puisque les mutants n'ont pas d'ancre).
+
+| Libellé | Attendu | Obtenu |
+|---|---|---|
+| E4.1 | au moins trois `vie` à `{ seq, at }`, `seq` = 9 | `ko` (aucun `vie` : l'option `vieMs` est ignorée) |
+| E4.3 (serveur réel, flux tenu 17 s) | au moins un `vie`, aucun commentaire de battement | `vies` 0, `commentaire` 3 (un commentaire toutes les 15 s sur la session) |
+| E5.1 | un `etat` au premier signal non nul, aucun aux seuls volatils | `ko` (aucun `etat`) |
+| E5.2 | `seq` de chaque événement = celui du direct | `ko` (aucun événement) |
+| E5.3 | zéro en fenêtre calme, un après le changement de planning | `change` 0 (aucun `etat`), plan avant 1, après 2 (le changement est vu par la route, pas par un événement) |
+| E6.1 | `[false,true,false,false,false]` | `[false,false,false,false,false]` |
+| E6.2 | 0 écart sur 800 chronologies | 703 écarts |
+| E6.4 (serveur réel B) | zéro appel en 7 s ; au moins deux de plus sous lecture | base 2, après 7 s : 2, après lectures : 2 (la lecture n'arme pas le filet) |
+| E7.2 | toute feuille non volatile change la signature | `ko` (signature nulle pour tout signal) |
+| E7.4 | forme : nul pour un non-objet, 16 hexadécimaux sinon | `ko` |
+
+Verts d'emblée, gardes tenues par leur mutant : E4.2 (aucun `vie`, donc aucun au journal), E7.1 et E7.3 (une signature constante est stable et indifférente à l'ordre).

@@ -14,7 +14,7 @@ const dormir = (ms) => new Promise((r) => setTimeout(r, ms));
 const TC = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
 
 // lecture d'un flux d'événements : blocs séparés par une ligne vide, `event:` et `data:` ; les commentaires (lignes en « : ») sont gardés dans le brut seulement
-function lireFlux(port, { jeton, duree, onBloc } = {}) {
+function lireFlux(port, { jeton, duree, onBloc, onBrut } = {}) {
   let fermer = () => {};
   const fin = new Promise((resolve) => {
     const evenements = []; let brut = '', tampon = '';
@@ -22,7 +22,7 @@ function lireFlux(port, { jeton, duree, onBloc } = {}) {
     const r = http.get({ host: '127.0.0.1', port, path: '/api/vf/events', headers, agent: false }, (res) => {
       res.setEncoding('utf8');
       res.on('data', (c) => {
-        brut += c; tampon += c;
+        brut += c; tampon += c; if (onBrut) onBrut(c);
         let i; while ((i = tampon.indexOf('\n\n')) >= 0) {
           const bloc = tampon.slice(0, i); tampon = tampon.slice(i + 2);
           const nom = /^event: (.*)$/m.exec(bloc)?.[1]; const d = /^data: (.*)$/m.exec(bloc)?.[1];
@@ -41,7 +41,10 @@ function lireFlux(port, { jeton, duree, onBloc } = {}) {
 }
 
 if (mode === 'sse') {
-  const r = await lireFlux(Number(a1), { jeton: a2, duree: Number(a3) }).fin;
+  const journal = a4 + '.log'; // une ligne par événement, au fil de l'eau : la suite l'attend sans attendre la fin du client
+  const onBloc = (e) => fs.appendFileSync(journal, JSON.stringify({ nom: e.nom, t: e.t, seq: e.data && e.data.seq, sig: e.data && e.data.sig }) + '\n');
+  fs.writeFileSync(journal, '');
+  const r = await lireFlux(Number(a1), { jeton: a2, duree: Number(a3), onBloc, onBrut: (c) => { if (/(^|\n): /.test(c)) fs.appendFileSync(journal, JSON.stringify({ nom: ':commentaire', t: Date.now() }) + '\n'); } }).fin;
   fs.writeFileSync(a4, JSON.stringify(r));
   process.exit(0);
 } else if (mode === 'harnais') {
@@ -109,7 +112,7 @@ if (mode === 'sse') {
     const x = await etatDe(z); f.fermer();
     out({ status: x.status, collecte: x.j && x.j.collecte, signal: x.j && x.j.signal }, z);
   } else if (cas === 'vie') {
-    const z = await serveur(); const r = await lireFlux(z.port, { duree: 1300 }).fin;
+    D.seq = 9; const z = await serveur(); const r = await lireFlux(z.port, { duree: 1300 }).fin;
     const vies = r.evenements.filter((e) => e.nom === 'vie');
     out({ n: vies.length, cles: [...new Set(vies.map((e) => Object.keys(e.data || {}).sort().join(',')))], entiers: vies.every((e) => Number.isInteger(e.data && e.data.at)),
       seqs: [...new Set(vies.map((e) => e.data && e.data.seq))], seqDouble: D.seq, commentaire: /^: /m.test(r.brut) }, z);

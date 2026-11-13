@@ -108,6 +108,7 @@ SANS='const v='"$VOL"';const f=(o)=>Array.isArray(o)?o.map(f):o&&typeof o==="obj
 EGAL="$(node -e "const fs=require('fs');$SANS const a=JSON.parse(fs.readFileSync('$WORK/signal-servi.json','utf8')),b=JSON.parse(fs.readFileSync('$WORK/signal-local.json','utf8'));console.log(JSON.stringify(f(a))===JSON.stringify(f(b)))" 2>/dev/null)"
 IDS="$(node -e "const fs=require('fs');const a=JSON.parse(fs.readFileSync('$WORK/signal-servi.json','utf8')),b=JSON.parse(fs.readFileSync('$WORK/signal-local.json','utf8'));const i=(x)=>((x.equipe||{}).workers||[]).map((w)=>w.id).sort().join(',');console.log(i(a)===i(b))" 2>/dev/null)"
 assert_eq "E1.3 — le signal servi est conforme au contrat (validateur indépendant) et égal, hors equipe et hors clés volatiles, à la collecte locale du même lab ; mêmes identifiants d'équipe" "$V13|$EGAL|$IDS" "OK|true|true"
+cockpit_arreter
 
 # ---- copies du module en processus (harnais) et mutants ----
 COPIE="$WORK/copie"
@@ -172,6 +173,145 @@ mutant_e2 GARDE vf-cockpit-server.mjs 's/^const porteInterdit = .*/const porteIn
 mutant_e2 REVEIL vf-cockpit-state.mjs 's/ctx.live ? ctx.live.etat()/ctx.live ? (ctx.live.reveil(), ctx.live.etat())/' "E2.6"
 mutant_e2 COHERENCE vf-cockpit-state.mjs '/garde:state-coherence/d' "E2.2" "E3.1"
 mutant_e2 COLLECTE-RECOPIE vf-cockpit-state.mjs '/garde:state-liste-blanche/s/({ etat:/({ ...b, etat:/' "" "E3.1"
+
+# ---- E4 à E7 : battement, événement d'état, lecteurs, signature ----
+cat > "$AUX/lj.mjs" <<'JS'
+// lj.mjs <journal> <expression sur L (lignes) et a (arguments)> [a…] : lit le journal d'un client du flux (une ligne JSON par événement)
+import fs from 'node:fs';
+let L = []; try { L = fs.readFileSync(process.argv[2], 'utf8').split('\n').filter(Boolean).map((l) => JSON.parse(l)); } catch {}
+const a = process.argv.slice(4);
+let v; try { v = new Function('L', 'a', 'return (' + process.argv[3] + ')')(L, a); } catch (e) { v = 'erreur: ' + e.message; }
+console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+lj() { node "$AUX/lj.mjs" "$@"; }
+fenetre() { local fin=$((SECONDS + $1)); while [ "$SECONDS" -lt "$fin" ]; do sleep 0.3; done; } # une fenêtre d'observation (durée voulue, pas une attente d'état)
+maintenant() { node -e 'console.log(Date.now())'; }
+nouveau_lab() { # <nom> : lab, faux verrou, sortie assemblée
+  node "$TESTS/etat-labo.mjs" lab "$WORK/lab-$1"; node "$TESTS/etat-labo.mjs" verrou "$WORK/faux-$1" "$WORK/lab-$1"
+  node "$SCRIPTS/vf-cockpit-build.mjs" "$WORK/lab-$1" --quiet > "$WORK/build-$1.out" 2>&1
+}
+# scénario A : un flux tenu, une fenêtre calme, un changement de planning (E4.3, E5.3) ; COCKPIT_MODULE s'il est posé
+scenario_a() { # <nom>
+  local p="$1" L="$WORK/lab-$1" out="$WORK/sse-$1.json" rc cl t0 t1 tch av ap
+  nouveau_lab "$p"; cockpit_lancer "$L" VF_COCKPIT_SCRIPTS_DIR="$WORK/faux-$p"; rc=$?
+  if [ "$rc" != 0 ]; then echo "{\"lance\":$rc}" > "$WORK/sa-$p.json"; return; fi
+  node "$TESTS/etat-clients.mjs" sse "$VF_PORT" "$VF_JETON" 60000 "$out" & cl=$!; PIDS+=("$cl")
+  attendre 25 grep -q '"nom":"hello"' "$out.log"
+  get /api/vf/state > "$WORK/sa-$p-av.json"; av="$(jf "$WORK/sa-$p-av.json" 'j.signal.phases[0].avancement.plans.total')"
+  t0="$(maintenant)"; fenetre 17; t1="$(maintenant)"
+  tch="$(node -e "const fs=require('fs');fs.writeFileSync('$L/.planning/phases/01-x/01-02-PLAN.md','<objective>deuxieme</objective>\n');console.log(Date.now())")"
+  apres_change() { [ "$(lj "$out.log" 'L.filter((e)=>e.nom==="etat"&&e.t>=Number(a[0])).length' "$tch")" -ge 1 ] 2>/dev/null; }
+  attendre 20 apres_change; fenetre 6
+  attente_etat() { get /api/vf/state > "$WORK/sa-$p-ap.json"; [ "$(jf "$WORK/sa-$p-ap.json" 'j.signal.phases[0].avancement.plans.total')" != "$av" ]; }
+  attendre 12 attente_etat; ap="$(jf "$WORK/sa-$p-ap.json" 'j.signal.phases[0].avancement.plans.total')"
+  node "$TESTS/etat-clients.mjs" sse "$VF_PORT" "$VF_JETON" 1500 "$WORK/sse-$p-h.json"
+  lj "$out.log" '({lance:0,vies:L.filter((e)=>e.nom==="vie"&&e.t>=Number(a[0])&&e.t<=Number(a[1])).length,commentaire:L.filter((e)=>e.nom===":commentaire").length,calme:L.filter((e)=>e.nom==="etat"&&e.t>=Number(a[0])&&e.t<Number(a[2])).length,change:L.filter((e)=>e.nom==="etat"&&e.t>=Number(a[2])).length,etatSeq:(L.filter((e)=>e.nom==="etat"&&e.t>=Number(a[2])).slice(-1)[0]||{}).seq,avant:Number(a[3]),apres:Number(a[4])})' "$t0" "$t1" "$tch" "${av:-0}" "${ap:-0}" > "$WORK/sa-$p.json"
+  HS="$(jf "$WORK/sse-$p-h.json" 'j.evenements.filter((e)=>e.nom==="hello")[0].data.seq')"
+  node -e "const fs=require('fs');const o=JSON.parse(fs.readFileSync('$WORK/sa-$p.json','utf8'));o.helloSeq=Number('${HS:-0}');fs.writeFileSync('$WORK/sa-$p.json',JSON.stringify(o))"
+  vf_hyg_stop "$cl"; cockpit_arreter
+}
+rouges_a() { # <nom> : E4.3 et E5.3 d'après le scénario A
+  local f="$WORK/sa-$1.json" r=""
+  [ "$(jf "$f" 'j.vies>=1&&j.commentaire===0')" = true ] || r="$r E4.3"
+  [ "$(jf "$f" 'j.calme===0&&j.change===1&&j.apres===j.avant+1&&j.helloSeq>=j.etatSeq')" = true ] || r="$r E5.3"
+  echo "${r# }"
+}
+# scénario B : sans client ni lecteur, puis des lectures de l'état (E6.4) ; appels au verrou attribués au PID du serveur
+scenario_b() { # <nom>
+  local p="$1" L="$WORK/lab-$1" J pidb prev n stable i base apres7 fin
+  nouveau_lab "$p"; cockpit_lancer "$L" VF_COCKPIT_SCRIPTS_DIR="$WORK/faux-$p"; local rc=$?
+  if [ "$rc" != 0 ]; then echo "{\"lance\":$rc}" > "$WORK/sb-$p.json"; return; fi
+  J="$L/.vibeflow/journal-verrou"; pidb="$VF_PID"
+  appels() { grep -c " $pidb\$" "$J" 2>/dev/null || true; }
+  prev=-1; stable=0; fin=$((SECONDS + 40))
+  while [ "$SECONDS" -lt "$fin" ]; do n="$(appels)"; if [ "$n" = "$prev" ] && [ "$n" -gt 0 ]; then stable=$((stable + 1)); [ "$stable" -ge 5 ] && break; else stable=0; fi; prev="$n"; sleep 0.5; done
+  base="$(appels)"; fenetre 7; apres7="$(appels)"
+  for i in 1 2 3 4 5; do get /api/vf/state > /dev/null; [ "$i" -lt 5 ] && fenetre 4; done
+  fenetre 1; apres="$(appels)"
+  echo "{\"lance\":0,\"base\":$base,\"apres7\":$apres7,\"apres\":$apres}" > "$WORK/sb-$p.json"; cockpit_arreter
+}
+rouges_b() { [ "$(jf "$WORK/sb-$1.json" 'j.apres7===j.base&&j.base>0&&j.apres-j.apres7>=2')" = true ] && echo "" || echo "E6.4"; }
+
+echo "=== E4 — battement vie ==="
+rouges_e45() { # <copie> : E4.1, E4.2, E5.1, E5.2 sur une copie en processus
+  local c="$1" r="" k="$WORK/e45-$(basename "$1")"
+  hn vie "$c" '{"vieMs":150}' > "$k-vie.json"; hn journal "$c" '{"vieMs":100}' > "$k-journal.json"; hn etat "$c" "$(sig_h)" > "$k-etat.json"
+  [ "$(jf "$k-vie.json" 'j.n>=3&&JSON.stringify(j.cles)==="[\"at,seq\"]"&&j.entiers&&JSON.stringify(j.seqs)==="[9]"&&j.seqDouble===9&&!j.commentaire')" = true ] || r="$r E4.1"
+  [ "$(jf "$k-journal.json" 'j.noms.includes("structural")&&!j.noms.includes("vie")')" = true ] || r="$r E4.2"
+  [ "$(jf "$k-etat.json" 'j.premier===1&&j.volatils===1&&j.phase===2&&j.repete===2&&j.premierEv&&j.premierEv.cles==="at,seq,sig"&&j.premierEv.sig&&j.premierEv.at')" = true ] || r="$r E5.1"
+  [ "$(jf "$k-etat.json" 'j.seqs.length>=2&&j.seqs.every((s)=>s===j.seqDouble)&&j.helloSeq===j.seqDouble')" = true ] || r="$r E5.2"
+  echo "${r# }"
+}
+R45="$(rouges_e45 "$COPIE")"
+assert_eq "E4.1 — direct factice, battement de 150 ms, un client : au moins trois vie à exactement les clés seq et at, at entier en millisecondes, seq constant égal à celui du direct, aucun commentaire de battement" "$(has_rouge "$R45" E4.1)" "ok"
+assert_eq "E4.2 — après plusieurs battements le journal ne porte aucun vie ; témoin positif : un événement structural émis par le direct y figure" "$(has_rouge "$R45" E4.2)" "ok"
+scenario_a base; RA="$(rouges_a base)"
+echo "  (scénario A : $(cat "$WORK/sa-base.json"))"
+assert_eq "E4.3 — serveur réel, flux tenu 17 s : au moins un event vie, aucun commentaire de battement" "$(has_rouge "$RA" E4.3)" "ok"
+
+echo "=== E5 — événement etat, seq non avancé ==="
+assert_eq "E5.1 — premier signal non nul : un etat { seq, at, sig } (sig de 16 hexadécimaux) ; seuls des volatils changés : aucun ; une phase ajoutée : un ; le même signal deux fois : aucun" "$(has_rouge "$R45" E5.1)" "ok"
+assert_eq "E5.2 — etat n'avance pas seq : le seq de chaque événement égale celui du direct et le hello d'une seconde connexion rend ce même seq" "$(has_rouge "$R45" E5.2)" "ok"
+assert_eq "E5.3 — serveur réel, faux verrou à âges croissants, un flux tenu : zéro etat pendant la fenêtre calme, puis exactement un après un PLAN.md ajouté, l'état servi montre le changement, un hello ouvert ensuite rend un seq au moins égal" "$(has_rouge "$RA" E5.3)" "ok"
+
+echo "=== E6 — lecteurs d'état ==="
+node "$TESTS/etat-propriete.mjs" lecteurs "$COPIE" > "$WORK/e6.json" 2>&1
+echo "  (graine=$(jf "$WORK/e6.json" 'j.graine'))"
+assert_eq "E6.1 — fenêtre (horloge injectée) : une lecture seule non armé ; deux à 10 s armé ; 31 s après non armé ; lecture isolée après expiration non armé ; deux à 31 s non armé" "$(jf "$WORK/e6.json" 'JSON.stringify(j.unit)')" "[false,true,false,false,false]"
+assert_eq "E6.2 — chronologies et instants tirés au hasard (frontières 29 999, 30 000, 30 001 comprises) : actif égale l'oracle écrit à la main, sans écart" "$(jf "$WORK/e6.json" 'j.nko+"|"+j.n')" "0|800"
+assert_eq "E6.3 — couverture : au moins 20 réponses armées et 20 non armées" "$(jf "$WORK/e6.json" '(j.armes>=20&&j.non>=20)')" "true"
+scenario_b base; RB="$(rouges_b base)"
+echo "  (scénario B : $(cat "$WORK/sb-base.json"))"
+assert_eq "E6.4 — serveur réel sans client ni lecteur : aucun appel de plus au verrou en 7 s ; puis des lectures toutes les 4 s : au moins deux appels de plus" "$(has_rouge "$RB" E6.4)" "ok"
+
+echo "=== E7 — signature (générative) ==="
+node "$TESTS/etat-propriete.mjs" signature "$COPIE" "$WORK/signal-servi.json" > "$WORK/e7.json" 2>&1
+echo "  (graine=$(jf "$WORK/e7.json" 'j.graine'))"
+rouges_e7() { # <fichier>
+  local f="$1" r=""
+  [ "$(jf "$f" 'j.e71.ko===0&&j.e71.n>=300')" = true ] || r="$r E7.1"
+  [ "$(jf "$f" 'j.e72.ko.length===0&&j.e72.n>=100')" = true ] || r="$r E7.2"
+  [ "$(jf "$f" 'j.e73.ko===0&&j.e73.n>=50')" = true ] || r="$r E7.3"
+  [ "$(jf "$f" 'j.nonTirees.volatils.length===0&&j.nonTirees.hautes.length===0&&j.forme==="true,true,true,true,true"')" = true ] || r="$r E7.4"
+  echo "${r# }"
+}
+R7="$(rouges_e7 "$WORK/e7.json")"
+assert_eq "E7.1 — stabilité : une variation aléatoire des seules clés volatiles, à des profondeurs variées, laisse la signature inchangée" "$(has_rouge "$R7" E7.1)" "ok"
+assert_eq "E7.2 — sensibilité : le changement de n'importe quelle feuille non volatile (toutes les feuilles, puis des tirages) change la signature" "$(has_rouge "$R7" E7.2)" "ok"
+assert_eq "E7.3 — ordre : un ordre de clés mélangé à tout niveau laisse la signature inchangée" "$(has_rouge "$R7" E7.3)" "ok"
+assert_eq "E7.4 — couverture : chaque clé volatile et chaque clé de premier niveau du signal est tirée ; forme : nul pour un non-objet, 16 hexadécimaux sinon" "$(has_rouge "$R7" E7.4)" "ok"
+
+echo "=== mutants de E4 à E7 ==="
+mutant_t3() { # <nom> <fichier> <sed> <attendu> <fonction de verdict : e45 | e6 | e7>
+  local nom="$1" d rc r
+  d="$(mutcopie "$nom" "$2" "$3")"; rc=$?
+  assert_eq "M-$nom.0 — l'ancre existe une fois, la copie diffère et charge (node --check)" "$rc" "0"
+  [ "$rc" = 0 ] || return
+  case "$5" in
+    e45) r="$(rouges_e45 "$d")" ;;
+    e6) node "$TESTS/etat-propriete.mjs" lecteurs "$d" > "$WORK/m-$nom.json" 2>&1; r="$([ "$(jf "$WORK/m-$nom.json" 'JSON.stringify(j.unit)')" = "[false,true,false,false,false]" ] || echo E6.1) $([ "$(jf "$WORK/m-$nom.json" 'j.nko+"|"+j.n')" = "0|800" ] || echo E6.2)" ;;
+    e7) node "$TESTS/etat-propriete.mjs" signature "$d" "$WORK/signal-servi.json" > "$WORK/m-$nom.json" 2>&1; r="$(rouges_e7 "$WORK/m-$nom.json")" ;;
+  esac
+  assert_eq "M-$nom — rouges de la copie : « $4 » seuls" "$(echo "$r" | xargs)" "$4"
+}
+mutant_t3 VIE-JOURNAL vf-cockpit-server.mjs "/garde:vie-journal/s/if (nom !== 'vie') //" "E4.2" e45
+mutant_t3 ETAT-SEQ vf-cockpit-flux-etat.mjs '/garde:etat-seq/s/seq: seq()/seq: seq() + 1/' "E5.2" e45
+mutant_t3 VOLATILS-TROP vf-cockpit-state.mjs "/garde:state-volatils/s/'fetchAgeS'\]/'fetchAgeS', 'owner']/" "E7.2" e7
+mutant_t3 ORDRE vf-cockpit-state.mjs '/garde:state-canonique/s/\.sort()//' "E7.3" e7
+mutant_t3 SERIE vf-cockpit-state.mjs '/garde:lecteurs-serie/s/serie >= 2/serie >= 1/' "E6.2" e6
+mutant_t3 FENETRE vf-cockpit-state.mjs '/garde:lecteurs-fenetre/s/now - dernier < fenetreMs/true/' "E6.2" e6
+# mutants du serveur réel : la copie du module est lancée par le lanceur (COCKPIT_MODULE), la mesure est celle du scénario
+cockpit_module_muter VIE vf-cockpit-flux-etat.mjs '/garde:vie-battement/s/nbClients() > 0/false/'; assert_eq "M-VIE.0 — l'ancre existe une fois et la copie du module diffère" "$?" "0"
+scenario_a m-VIE; unset COCKPIT_MODULE
+MV1="$(mutcopie VIE vf-cockpit-flux-etat.mjs '/garde:vie-battement/s/nbClients() > 0/false/')"; MV1="$(rouges_e45 "${MV1:-$COPIE-absent}")"
+assert_eq "M-VIE — la minuterie ne tire jamais : E4.1 (copie en processus) et E4.3 (serveur réel) rougissent, seuls" "$(echo "$MV1 $(rouges_a m-VIE)" | xargs)" "E4.1 E4.3"
+cockpit_module_muter VOLATILS-VIDE vf-cockpit-state.mjs "/garde:state-volatils/s/new Set(\[[^]]*\])/new Set()/"; assert_eq "M-VOLATILS-VIDE.0 — l'ancre existe une fois et la copie du module diffère" "$?" "0"
+scenario_a m-VOLATILS-VIDE; unset COCKPIT_MODULE
+MVV="$(mutcopie VOLATILS-VIDE vf-cockpit-state.mjs "/garde:state-volatils/s/new Set(\[[^]]*\])/new Set()/")"; node "$TESTS/etat-propriete.mjs" signature "${MVV:-$COPIE-absent}" "$WORK/signal-servi.json" > "$WORK/m-vv.json" 2>&1
+assert_eq "M-VOLATILS-VIDE — la liste nommée est vide : E7.1 (propriété) et E5.3 (serveur réel) rougissent, seuls" "$(echo "$(rouges_e7 "$WORK/m-vv.json") $(rouges_a m-VOLATILS-VIDE)" | xargs)" "E7.1 E5.3"
+cockpit_module_muter LECTEUR-AUCUN vf-cockpit-server.mjs '/garde:lecteur-arme/s/ || LECTEURS.actif()//'; assert_eq "M-LECTEUR-AUCUN.0 — l'ancre existe une fois et la copie du module diffère" "$?" "0"
+scenario_b m-LECTEUR-AUCUN; unset COCKPIT_MODULE
+assert_eq "M-LECTEUR-AUCUN — le serveur n'étend plus aClient : E6.4 rougit, seul" "$(rouges_b m-LECTEUR-AUCUN)" "E6.4"
 
 cockpit_arreter
 vf_hyg_assert
