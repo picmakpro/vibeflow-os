@@ -33,6 +33,7 @@ AJOUT assets/ui/41-vf-projet-phase.js
 AJOUT assets/ui/41-vf-projet-rendu.js
 AJOUT assets/ui/41-vf-projet-vue.js
 AJOUT assets/ui/42-vf-panneau-retour.js
+AJOUT assets/ui/60-vf-aide.js
 AJOUT assets/ui/69-vf-flux.js
 AJOUT assets/ui/70-vf-etat.js
 AJOUT assets/ui/70-vf-live.js
