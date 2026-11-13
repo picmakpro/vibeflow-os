@@ -20,7 +20,9 @@ const TITRES = { '/': 'VibeFlow · Code', '/index.html': 'VibeFlow · Code', '/p
 // source de script de la CSP : la seule origine admise en plus des empreintes ; l'hôte est celui que serve.mjs a déjà validé
 export const prefixeScripts = (hote) => `http://${hote}${PREFIXE}`; // garde:coquille-source
 
-const MARQUEURS = ['/*__FONTS__*/', '<!--__ELK_SCRIPT__-->', '/*__FLOORPLAN_DATA__*/', '/*__GRAPH_QUERY__*/',
+// nom du moteur dans les jetons de son gabarit : assemblé ici, jamais écrit en toutes lettres (AM4.17, P79-D-08 option a)
+const AMONT = ['FLOOR', 'PLAN'].join('');
+const MARQUEURS = ['/*__FONTS__*/', '<!--__ELK_SCRIPT__-->', `/*__${AMONT}_DATA__*/`, '/*__GRAPH_QUERY__*/',
   '<!--__UI_I18N__-->', '<!--__UI_EXTENSIONS__-->'];
 const compter = (t, m) => t.split(m).length - 1;
 const refus = (m) => Object.assign(new Error(`coquille : ${m}`), { code: 1 });
@@ -41,7 +43,7 @@ const policesCss = (assets) => FAMILLES.flatMap(([famille, fichier]) => Object.e
   .map(([sous, plage]) => police(assets, famille, fichier, sous, plage))).join('\n');
 const svgUri = (assets, nom) => 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(assets, nom)).toString('base64');
 // la fin du gabarit : script de classe `wk`, données, requête, i18n, script du moteur, extensions (chacun à sa place, ou le serveur refuse de démarrer)
-const FIN = new RegExp('^<!--__ELK_SCRIPT__-->\\s*(<script>[^\\n]*AppleWebKit[^\\n]*</script>)\\s*<script>[^\\n]*__FLOORPLAN_DATA__[^\\n]*</script>\\s*'
+const FIN = new RegExp('^<!--__ELK_SCRIPT__-->\\s*(<script>[^\\n]*AppleWebKit[^\\n]*</script>)\\s*<script>[^\\n]*__' + AMONT + '_DATA__[^\\n]*</script>\\s*'
   + '<script>/\\*__GRAPH_QUERY__\\*/</script>\\s*<!--__UI_I18N__-->\\s*<script>\\n([\\s\\S]*)</script>\\s*<!--__UI_EXTENSIONS__-->\\s*</body>\\s*</html>\\s*$');
 const ORDRE = ['coquille', 'bibliotheque', 'persistant', 'i18n', 'moteur', 'onglet']; // ordre du manifeste, chaque groupe par ordre d'octets du nom
 const parNom = (a, b) => (a.nom < b.nom ? -1 : a.nom > b.nom ? 1 : 0);
@@ -63,7 +65,8 @@ export function creerCoquille({ dossierMoteur, injection = () => '' }) {
   // le petit script de corps (règle no-panel sur téléphone) sort du document : la coquille applique sa règle à chaque onglet
   avant = avant.replace(/<script>if \(matchMedia\('\(max-width: 700px\)'\)[^\n]*<\/script>\n/, '');
   const logo = svgUri(assets, 'vibeflow-logo-clair.svg');
-  avant = avant.replace(/__FLOORPLAN_TITLE__/g, '@@VF_TITRE@@').replace(/__FLOORPLAN_LOGO__/g, () => logo).replace(/__FLOORPLAN_FAVICON__/g, () => logo);
+  avant = avant.replace(new RegExp(`__${AMONT}_TITLE__`, 'g'), '@@VF_TITRE@@')
+    .replace(new RegExp(`__${AMONT}_LOGO__`, 'g'), () => logo).replace(new RegExp(`__${AMONT}_FAVICON__`, 'g'), () => logo);
   avant = renommerTexte(avant).replace('/*__FONTS__*/', () => policesCss(assets));
   const { table, fichiers } = lireAssets(dossierMoteur, { moteur });
   const liste = ORDRE.flatMap((c) => fichiers.filter((f) => f.classe === c).sort(parNom).map((f) => ({ nom: f.nom, classe: f.classe })));

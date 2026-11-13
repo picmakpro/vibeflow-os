@@ -139,7 +139,7 @@
 | 72. Lancer du travail depuis les cartes du cockpit | vibeflow-v2.0 | 16/16 | Complete — PR #214, LANC-12 décochée, release `v2.76.0` | 2026-11-06 |
 | 73. Gouvernance au cockpit — arbitrages en attente, worktrees et verrous | vibeflow-v2.0 | 4/11 | In progress | - |
 | 74. L'équipe dans le temps — swim-lanes, coût, replay | vibeflow-v2.0 | 0/10 | Planned | - |
-| 75. L'activité posée sur le code — hotspots, couplage, gardes, empreinte | vibeflow-v2.0 | 0/12 | Planned | - |
+| 75. L'activité posée sur le code — hotspots, couplage, gardes, empreinte | vibeflow-v2.0 | 6/12 | In Progress | - |
 | 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 7/9 | In Progress | - |
 | 77. Santé de la méthode et synthèse — jauges, dernière visite, burn-up | vibeflow-v2.0 | 0/8 | Planned | - |
 | 78. Git dans le cockpit | vibeflow-v2.0 | 11/11 | Complete — PR #216, release `v2.76.0` | 2026-11-06 |
@@ -366,12 +366,12 @@ Plans:
 
 Plans:
 
-- [ ] 75-01-PLAN.md — Calcul git : points chauds, couplage, collisions entre branches (v1)
-- [ ] 75-02-PLAN.md — Gardes : règle de citation de la CI lue dans le socle, suite d'équivalence (v1)
-- [ ] 75-03-PLAN.md — Chemins, empreinte et collisions d'agents et de plans, preuve générative (v1)
-- [ ] 75-04-PLAN.md — `files_modified` borné jusqu'à l'instantané, avec la vague de la Phase 80 (v1)
-- [ ] 75-05-PLAN.md — Route `/api/vf/activite`, schéma `cockpit-activite@1`, témoin d'export (v2)
-- [ ] 75-06-PLAN.md — Cartes « prévues » : annotateur, règle de rattachement extraite, export sans les prévues (v3)
+- [x] 75-01-PLAN.md — Calcul git : points chauds, couplage, collisions entre branches (v1)
+- [x] 75-02-PLAN.md — Gardes : règle de citation de la CI lue dans le socle, suite d'équivalence (v1)
+- [x] 75-03-PLAN.md — Chemins, empreinte et collisions d'agents et de plans, preuve générative (v1)
+- [x] 75-04-PLAN.md — `files_modified` borné jusqu'à l'instantané, avec la vague de la Phase 80 (v1)
+- [x] 75-05-PLAN.md — Route `/api/vf/activite`, schéma `cockpit-activite@1`, témoin d'export (v2)
+- [x] 75-06-PLAN.md — Cartes « prévues » : annotateur, règle de rattachement extraite, export sans les prévues (v3)
 - [ ] 75-07-PLAN.md — Canal de marquage, pied réservé, glyphes, nom accessible, rendu des prévues (v4)
 - [ ] 75-08-PLAN.md — Sélecteur de lentilles, menu, panneau, compte du radar (v5)
 - [ ] 75-09a-PLAN.md — Retrait côté assemblage et moteur : `recent-work.json`, `recent.mjs`, étape de `refresh.mjs`, sonde Y reportée (v6)
