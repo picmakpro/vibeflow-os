@@ -75,7 +75,7 @@ skills/cockpit-moteur/assets/ui/73-vf-tiroir-travail.js 12
 skills/cockpit-moteur/assets/ui/75-vf-modele.js 6
 skills/cockpit-moteur/assets/ui/76-vf-git-entete.js 38
 skills/cockpit-moteur/assets/ui/77-vf-git-rendu.js 25
-skills/cockpit-moteur/assets/ui/77-vf-git-tiroir.js 38
+skills/cockpit-moteur/assets/ui/77-vf-git-tiroir.js 37
 skills/cockpit-moteur/assets/ui/77-vf-git-vue-detail.js 22
 skills/cockpit-moteur/assets/ui/78-vf-fr-dict-a.js 43
 skills/cockpit-moteur/assets/ui/79-vf-fr-dict-b.js 45
