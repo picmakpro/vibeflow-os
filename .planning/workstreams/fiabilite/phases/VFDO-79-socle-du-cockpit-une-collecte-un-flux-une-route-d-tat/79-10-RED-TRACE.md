@@ -101,41 +101,41 @@ Amendement 2026-11-12 (exécution, hypothèse fausse du plan) : le plan et la mi
 
 Le lab de la suite ne permet pas d'atteindre : la visite guidée au-delà de sa première étape, l'écran des écrans détectés (`30-screens.js`), le travail récent (`25-recent.js`, aucune donnée de travail récent dans le lab), le glossaire sur une description riche, le tiroir de questions à l'agent, le détail d'un parcours en lecture. Ces extensions ne sont couvertes que par la porte statique (F16, F17) et par les sondes de leurs propres suites (moteur-carte, accessibilité, responsive, équipe).
 
-## Écarts de rendu admis (lignes `ECART-ADMIS <page-mode>/<état> <texte exact>`)
+## Écarts de rendu admis (lignes `ECART-ADMIS AVANT|APRES <page-mode>/<état> <texte exact>` ; le côté est AVANT quand le texte disparaît, APRES quand il apparaît, et un côté n'admet jamais l'autre)
 
 Parité mesurée sur 36 états (Code 13, Projet 3, constats de Santé 2 ; français et `?lang=en`) entre le code d'avant (e553d3a5, relevé versé) et le code après le plan. Les 31 écarts ci-dessous sont les seuls, tous des corrections, aucune régression : de l'anglais que l'ancien mécanisme laissait à l'écran parce qu'il le jugeait donnée du lab (description du panneau, ligne de liste, texte de repli) est maintenant traduit là où il naît (« Contrôle automatique rapide des… », « Aucun problème trouvé », « 2 points à traiter », « , ou ouvrir cette carte dans l'application Claude. », « 1 mineur », « Rien d'urgent », le paragraphe d'introduction de la Santé), et le pluriel « 1 étapes » / « 1 steps » devient « 1 étape » / « 1 step » (`t.pl` : un pluriel construit à la main dans le viewer, `${n} steps`, disparaît). Aucun écart sur un constat de Santé produit à l'assemblage (titre, détail, localisations : F23).
 
-ECART-ADMIS code-fr/accueil , or open this map in the Claude app.
-ECART-ADMIS code-fr/accueil 1 minor
-ECART-ADMIS code-fr/accueil Nothing urgent
-ECART-ADMIS code-fr/accueil , ou ouvrir cette carte dans l'application Claude.
-ECART-ADMIS code-fr/accueil 1 mineur
-ECART-ADMIS code-fr/accueil Rien d'urgent
-ECART-ADMIS code-fr/sante 1 mineur
-ECART-ADMIS code-fr/sante We looked for keys left in the code or sent to the browser, data and parts of your app anyone on the internet can reach, leftover files and files too big to edit safely. It’s a quick check, not a security audit.
-ECART-ADMIS code-fr/sante Nous avons cherché les clés laissées dans le code ou envoyées au navigateur, les données et les éléments de votre application accessibles à n'importe qui sur internet, les fichiers oubliés et les fichiers trop gros pour être modifiés sans risque. C'est un contrôle rapide, pas un audit de sécurité.
-ECART-ADMIS projet-fr/accueil , open
-ECART-ADMIS projet-fr/accueil , or open this map in the Claude app.
-ECART-ADMIS projet-fr/accueil 1 étapes · Les phases du jalon en cours, dans l'ordre.
-ECART-ADMIS projet-fr/accueil No problems found
-ECART-ADMIS projet-fr/accueil Quick automatic check of
-ECART-ADMIS projet-fr/accueil and leftover files
-ECART-ADMIS projet-fr/accueil endpoints
-ECART-ADMIS projet-fr/accueil , des points d'accès ouverts et des fichiers oubliés
-ECART-ADMIS projet-fr/accueil , ou ouvrir cette carte dans l'application Claude.
-ECART-ADMIS projet-fr/accueil 1 étape · Les phases du jalon en cours, dans l'ordre.
-ECART-ADMIS projet-fr/accueil Aucun problème trouvé
-ECART-ADMIS projet-fr/accueil Contrôle automatique rapide des
-ECART-ADMIS projet-fr/sante We looked for keys left in the code or sent to the browser, data and parts of your app anyone on the internet can reach, leftover files and files too big to edit safely. It’s a quick check, not a security audit.
-ECART-ADMIS projet-fr/sante Nous avons cherché les clés laissées dans le code ou envoyées au navigateur, les données et les éléments de votre application accessibles à n'importe qui sur internet, les fichiers oubliés et les fichiers trop gros pour être modifiés sans risque. C'est un contrôle rapide, pas un audit de sécurité.
-ECART-ADMIS projet-en/accueil 1 steps · Les phases du jalon en cours, dans l'ordre.
-ECART-ADMIS projet-en/accueil 1 step · Les phases du jalon en cours, dans l'ordre.
-ECART-ADMIS sante-fr/constats , or open this map in the Claude app.
-ECART-ADMIS sante-fr/constats 2 things need attention
-ECART-ADMIS sante-fr/constats We looked for keys left in the code or sent to the browser, data and parts of your app anyone on the internet can reach, leftover files and files too big to edit safely. It’s a quick check, not a security audit.
-ECART-ADMIS sante-fr/constats , ou ouvrir cette carte dans l'application Claude.
-ECART-ADMIS sante-fr/constats 2 points à traiter
-ECART-ADMIS sante-fr/constats Nous avons cherché les clés laissées dans le code ou envoyées au navigateur, les données et les éléments de votre application accessibles à n'importe qui sur internet, les fichiers oubliés et les fichiers trop gros pour être modifiés sans risque. C'est un contrôle rapide, pas un audit de sécurité.
+ECART-ADMIS AVANT code-fr/accueil , or open this map in the Claude app.
+ECART-ADMIS AVANT code-fr/accueil 1 minor
+ECART-ADMIS AVANT code-fr/accueil Nothing urgent
+ECART-ADMIS APRES code-fr/accueil , ou ouvrir cette carte dans l'application Claude.
+ECART-ADMIS APRES code-fr/accueil 1 mineur
+ECART-ADMIS APRES code-fr/accueil Rien d'urgent
+ECART-ADMIS AVANT code-fr/sante 1 mineur
+ECART-ADMIS AVANT code-fr/sante We looked for keys left in the code or sent to the browser, data and parts of your app anyone on the internet can reach, leftover files and files too big to edit safely. It’s a quick check, not a security audit.
+ECART-ADMIS APRES code-fr/sante Nous avons cherché les clés laissées dans le code ou envoyées au navigateur, les données et les éléments de votre application accessibles à n'importe qui sur internet, les fichiers oubliés et les fichiers trop gros pour être modifiés sans risque. C'est un contrôle rapide, pas un audit de sécurité.
+ECART-ADMIS AVANT projet-fr/accueil , open
+ECART-ADMIS AVANT projet-fr/accueil , or open this map in the Claude app.
+ECART-ADMIS AVANT projet-fr/accueil 1 étapes · Les phases du jalon en cours, dans l'ordre.
+ECART-ADMIS AVANT projet-fr/accueil No problems found
+ECART-ADMIS AVANT projet-fr/accueil Quick automatic check of
+ECART-ADMIS AVANT projet-fr/accueil and leftover files
+ECART-ADMIS AVANT projet-fr/accueil endpoints
+ECART-ADMIS APRES projet-fr/accueil , des points d'accès ouverts et des fichiers oubliés
+ECART-ADMIS APRES projet-fr/accueil , ou ouvrir cette carte dans l'application Claude.
+ECART-ADMIS APRES projet-fr/accueil 1 étape · Les phases du jalon en cours, dans l'ordre.
+ECART-ADMIS APRES projet-fr/accueil Aucun problème trouvé
+ECART-ADMIS APRES projet-fr/accueil Contrôle automatique rapide des
+ECART-ADMIS AVANT projet-fr/sante We looked for keys left in the code or sent to the browser, data and parts of your app anyone on the internet can reach, leftover files and files too big to edit safely. It’s a quick check, not a security audit.
+ECART-ADMIS APRES projet-fr/sante Nous avons cherché les clés laissées dans le code ou envoyées au navigateur, les données et les éléments de votre application accessibles à n'importe qui sur internet, les fichiers oubliés et les fichiers trop gros pour être modifiés sans risque. C'est un contrôle rapide, pas un audit de sécurité.
+ECART-ADMIS AVANT projet-en/accueil 1 steps · Les phases du jalon en cours, dans l'ordre.
+ECART-ADMIS APRES projet-en/accueil 1 step · Les phases du jalon en cours, dans l'ordre.
+ECART-ADMIS AVANT sante-fr/constats , or open this map in the Claude app.
+ECART-ADMIS AVANT sante-fr/constats 2 things need attention
+ECART-ADMIS AVANT sante-fr/constats We looked for keys left in the code or sent to the browser, data and parts of your app anyone on the internet can reach, leftover files and files too big to edit safely. It’s a quick check, not a security audit.
+ECART-ADMIS APRES sante-fr/constats , ou ouvrir cette carte dans l'application Claude.
+ECART-ADMIS APRES sante-fr/constats 2 points à traiter
+ECART-ADMIS APRES sante-fr/constats Nous avons cherché les clés laissées dans le code ou envoyées au navigateur, les données et les éléments de votre application accessibles à n'importe qui sur internet, les fichiers oubliés et les fichiers trop gros pour être modifiés sans risque. C'est un contrôle rapide, pas un audit de sécurité.
 
 ## Les 19 motifs R : disposition finale (tous restent en service pour t.constat et __vfFrTraduire, A43)
 

@@ -3,7 +3,7 @@
 //         node chrome-fr-etats.mjs donnee  <chrome> <url>                     F20.2 : un « Health » posé dans le panneau est-il réécrit ?
 //         node chrome-fr-etats.mjs sante   <chrome> <url>                     F23 : un constat de Santé de fixture, tel qu'il s'affiche
 //         node chrome-fr-etats.mjs releve  <chrome> <index> <projet> [<sante>] relevé des textes et attributs, par page, mode et état (JSON)
-//         node chrome-fr-etats.mjs comparer <avant.json> <apres.json> [<trace>] écarts ; ceux d'une ligne `ECART-ADMIS <page-mode>/<état> <texte>` de la trace sont admis
+//         node chrome-fr-etats.mjs comparer <avant.json> <apres.json> [<trace>] écarts ; ceux d'une ligne `ECART-ADMIS AVANT|APRES <page-mode>/<état> <texte>` de la trace sont admis, du seul côté nommé
 // Les pages sont des fichiers (`file://`) : aucun serveur. Chaque état part d'une page rechargée ; il est attendu par une condition de la page, jamais par une pause fixe.
 import fs from 'node:fs';
 import { pathToFileURL } from 'node:url';
@@ -53,12 +53,17 @@ async function fenetre(s) { await s.send('Emulation.setDeviceMetricsOverride', {
 const [, , mode, ...a] = process.argv;
 if (mode === 'comparer') {
   const [avant, apres, trace] = a; const A = JSON.parse(fs.readFileSync(avant, 'utf8')), B = JSON.parse(fs.readFileSync(apres, 'utf8'));
-  const admis = new Set(trace ? fs.readFileSync(trace, 'utf8').split('\n').filter((l) => l.startsWith('ECART-ADMIS ')).map((l) => l.slice(12)) : []);
-  const ecarts = [];
+  // un écart admis a un CÔTÉ : « ECART-ADMIS AVANT <état> <texte> » (le texte disparaît) ou « ECART-ADMIS APRES <état> <texte> » (il apparaît). Un texte admis d'un côté ne l'est pas de l'autre :
+  // sinon l'anglais retiré (admis « avant seulement ») pourrait revenir (« après seulement ») sans bruit. Une ligne sans côté est elle-même un écart (jamais ignorée en silence).
+  const admis = new Set(), ecarts = [];
+  for (const l of trace ? fs.readFileSync(trace, 'utf8').split('\n').filter((x) => x.startsWith('ECART-ADMIS ')) : []) {
+    const m = /^ECART-ADMIS (AVANT|APRES) (\S.*)$/.exec(l);
+    if (m) admis.add(`${m[1]} ${m[2]}`); else ecarts.push(`ligne ECART-ADMIS sans côté (AVANT ou APRES) : ${l.slice(12, 90)}`);
+  }
   for (const [cle, etats] of Object.entries(A)) for (const [nom, av] of Object.entries(etats)) {
     const ap = new Set((B[cle] || {})[nom] || []), as = new Set(av);
-    for (const t of av) if (!ap.has(t) && !admis.has(`${cle}/${nom} ${t}`)) ecarts.push(`${cle}/${nom} AVANT seulement : ${t}`);
-    for (const t of ap) if (!as.has(t) && !admis.has(`${cle}/${nom} ${t}`)) ecarts.push(`${cle}/${nom} APRÈS seulement : ${t}`);
+    for (const t of av) if (!ap.has(t) && !admis.has(`AVANT ${cle}/${nom} ${t}`)) ecarts.push(`${cle}/${nom} AVANT seulement : ${t}`);
+    for (const t of ap) if (!as.has(t) && !admis.has(`APRES ${cle}/${nom} ${t}`)) ecarts.push(`${cle}/${nom} APRÈS seulement : ${t}`);
   }
   for (const cle of Object.keys(B)) if (!A[cle]) ecarts.push(`${cle} absent du relevé AVANT`);
   console.log(JSON.stringify(ecarts)); process.exit(0);

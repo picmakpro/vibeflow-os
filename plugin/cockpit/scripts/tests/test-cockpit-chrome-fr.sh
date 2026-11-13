@@ -329,6 +329,19 @@ assert_eq "F17.6 témoin : un gabarit passé à out.fail(…) est nommé des deu
 assert_eq "F17.7 témoin : fail('…') sans préfixe est nommé des deux côtés" "$(lire "$WORK/fail-fail_nu.json" 'JSON.stringify([j.inventaire, j.sources])')" '[["Third failure text"],["Third failure text"]]'
 assert_eq "F17.8 témoin : reject(new Error('…')) est nommé des deux côtés" "$(lire "$WORK/fail-reject.json" 'JSON.stringify([j.inventaire, j.sources])')" '[["Fourth failure text"],["Fourth failure text"]]'
 assert_eq "F17.9 : la copie sans ajout ne nomme rien (le témoin ne rougit pas à vide)" "$(lire "$WORK/fail-aucune.json" 'JSON.stringify([j.inventaire, j.sources])')" '[[],[]]'
+# F22.1 à F22.5 (sans navigateur) : un écart admis a un CÔTÉ ; un texte admis « avant seulement » ne passe pas s'il revient « après seulement » (retour à l'anglais), revue rv-1021
+ET22="$SCRIPTS/tests/chrome-fr-etats.mjs"; D22="$WORK/f22"; mkdir -p "$D22"
+printf '%s' '{"c-fr":{"s":["Hello EN"]}}' > "$D22/avant.json"; printf '%s' '{"c-fr":{"s":["Bonjour"]}}' > "$D22/apres.json"
+printf '%s' '{"c-fr":{"s":[]}}' > "$D22/avant2.json"; printf '%s' '{"c-fr":{"s":["Hello EN"]}}' > "$D22/apres2.json"
+printf 'ECART-ADMIS AVANT c-fr/s Hello EN\nECART-ADMIS APRES c-fr/s Bonjour\n' > "$D22/trace-ok.md"
+printf 'ECART-ADMIS AVANT c-fr/s Hello EN\n' > "$D22/trace-avant.md"
+printf 'ECART-ADMIS c-fr/s Hello EN\nECART-ADMIS c-fr/s Bonjour\n' > "$D22/trace-sans-cote.md"
+assert_eq "F22.1 : chaque écart admis du bon côté (le texte anglais disparaît, le français apparaît) : aucun écart" "$(node "$ET22" comparer "$D22/avant.json" "$D22/apres.json" "$D22/trace-ok.md")" '[]'
+assert_eq "F22.2 témoin : un texte admis « avant seulement » qui REVIENT « après seulement » (retour à l'anglais) est nommé" "$(node "$ET22" comparer "$D22/avant2.json" "$D22/apres2.json" "$D22/trace-avant.md")" '["c-fr/s APRÈS seulement : Hello EN"]'
+assert_eq "F22.3 témoin : avec la seule admission AVANT, l'apparition du français (côté APRES) reste nommée : un côté n'admet que lui-même" "$(node "$ET22" comparer "$D22/avant.json" "$D22/apres.json" "$D22/trace-avant.md")" '["c-fr/s APRÈS seulement : Bonjour"]'
+assert_eq "F22.4 : une ligne ECART-ADMIS sans côté est elle-même un écart (jamais ignorée en silence)" "$(node "$ET22" comparer "$D22/avant.json" "$D22/apres.json" "$D22/trace-sans-cote.md" | node -e 'const a=JSON.parse(require("fs").readFileSync(0,"utf8"));console.log(JSON.stringify(a.filter((x)=>/sans côté/.test(x)).length))')" '2'
+M22="$WORK/mut22"; mkdir -p "$M22"; cp "$SCRIPTS/tests/chrome-session.mjs" "$M22/"; sed 's/admis.has(`APRES \${cle}/admis.has(`AVANT ${cle}/' "$ET22" > "$M22/chrome-fr-etats.mjs"
+assert_eq "F22.5 mutant : la vérification du côté APRÈS rabattue sur AVANT laisse passer le retour à l'anglais de F22.2 (la suite sait le voir, F22.2 rougit)" "$([ "$(cmp -s "$ET22" "$M22/chrome-fr-etats.mjs" && echo identique)" = identique ] && echo "mutation sans effet" || node "$M22/chrome-fr-etats.mjs" comparer "$D22/avant2.json" "$D22/apres2.json" "$D22/trace-avant.md")" '[]'
 node "$AUX/ordre.mjs" "$SORTIE/index.html" > "$WORK/ordre.json"
 assert_eq "F18.1 : les blocs vibeflow:fr (78, 79, 80) précèdent le script principal et ui/00-vibeflow.js dans la page assemblée" "$(lire "$WORK/ordre.json" '[j.blocs, j.avantPrincipal, j.avant00, j.marqueurRestant].join()')" "3,true,true,false"
 # F18.2 : un gabarit sans l'emplacement garde l'ancien ordre (copie du module, jamais une édition du module) ; jouée sur une copie du module (même copie que cockpit_module_copie)
