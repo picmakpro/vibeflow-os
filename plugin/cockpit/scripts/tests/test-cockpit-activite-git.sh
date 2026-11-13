@@ -230,7 +230,78 @@ eq('G9', 'G9.6 hors dépôt, dossier absent, git introuvable : absent', [(await 
 const vide = init('rvide');
 eq('G9', 'G9.7 dépôt sans commit : vide, aucune ligne rendue', await A.calculerGit(vide, { loc: locI }).then((o) => [o.etat, o.chauds, o.couplage]), ['vide', [], []]);
 
-// FIN_G6_G9
+// ---- B1 à B7 : collisions committées par PAIRE de HEAD distincts de worktrees vérifiés ----
+const B = await charger('vf-cockpit-activite-branches.mjs');
+const FIN = () => Date.now() + 120000; // la suite tourne sous charge : l'échéance par défaut (15 s) n'est pas ce qu'elle mesure
+const mkWt = (repo, nom, base = 'HEAD') => { const d = path.join(WORK, `wt-${path.basename(repo)}-${nom}`); G(repo, 'worktree', 'add', '-q', '-b', nom, d, base); return d; };
+const coll = (repo, o = {}) => B.collisionsBranches(repo, { fin: FIN(), cache: new Map(), ...o });
+const vue = (r) => [r.etat, r.tetes, r.plafondAtteint, r.collisions];
+const ecrire = (d, nom, jours, ...chemins) => touch(d, nom, jours, ...chemins);
+
+// B1 : neuf worktrees partis de la même branche d'intégration, fichiers distincts ; l'intégration avance ensuite
+const rb = init('rb'); ecrire(rb, 'base', 30, 'base.txt');
+for (let i = 1; i <= 8; i++) ecrire(mkWt(rb, `w${i}`), `w${i}`, 29 - i, `f${i}.txt`);
+for (const n of ['a1', 'a2', 'a3']) ecrire(rb, n, 10, `ahead-${n}.txt`);
+const faux = G(rb, 'diff', '--name-only', 'main', 'w1').split('\n').filter(Boolean).filter((p) => G(rb, 'diff', '--name-only', 'main', 'w2').split('\n').includes(p));
+eq('B1', 'B1.1 contrôle : une base unique `main` donnerait des fausses collisions entre w1 et w2 (les fichiers dont l\'intégration a avancé)', faux.sort(), ['ahead-a1.txt', 'ahead-a2.txt', 'ahead-a3.txt']);
+eq('B1', 'B1.2 neuf worktrees (huit branches et l\'intégration), fichiers distincts : aucune collision', vue(await coll(rb)), ['ok', 9, false, []]);
+
+// B2 : deux branches qui modifient le même fichier, et le cas d'une seule
+const rb2 = init('rb2'); ecrire(rb2, 'base', 30, 'base.txt');
+const wa = mkWt(rb2, 'wa'), wb = mkWt(rb2, 'wb'), wc = mkWt(rb2, 'wc');
+ecrire(wa, 'a', 20, 'commun.txt'); ecrire(wb, 'b', 19, 'commun.txt'); ecrire(wc, 'c', 18, 'autre.txt');
+eq('B2', 'B2.1 deux branches modifient le même fichier : une collision [chemin, [branche, branche]] ; la troisième branche n\'y est pas', vue(await coll(rb2)), ['ok', 4, false, [['commun.txt', ['wa', 'wb']]]]);
+const rb2b = init('rb2b'); ecrire(rb2b, 'base', 30, 'base.txt');
+ecrire(mkWt(rb2b, 'wa'), 'a', 20, 'commun.txt'); ecrire(mkWt(rb2b, 'wb'), 'b', 19, 'autre.txt');
+eq('B2', 'B2.2 une seule branche modifie le fichier : aucune collision', (await coll(rb2b)).collisions, []);
+
+// B3 : deux worktrees au même HEAD comptent pour un
+const wa2 = path.join(WORK, 'wt-rb2-wa2'); G(rb2, 'worktree', 'add', '-q', '--detach', wa2, 'wa');
+vider();
+const r3 = await coll(rb2, { binaire: ESPION });
+eq('B3', 'B3.1 un worktree détaché au HEAD de wa : quatre HEAD distincts, une seule étiquette pour wa, six paires seulement (douze `diff-tree`, pas vingt)', [vue(r3), appels('diff-tree').length], [['ok', 4, false, [['commun.txt', ['wa', 'wb']]]], 12]);
+
+// B4 : plafond de HEAD
+const wd = mkWt(rb2, 'wd'); ecrire(wd, 'd', 17, 'd.txt');
+vider();
+const r4 = await coll(rb2, { plafond: 3, binaire: ESPION });
+eq('B4', 'B4.1 cinq HEAD distincts, plafond injecté à 3 : plafondAtteint true, trois paires seulement (six `diff-tree`)', [r4.etat, r4.tetes, r4.plafondAtteint, appels('diff-tree').length], ['ok', 5, true, 6]);
+eq('B4', 'B4.2 plafond par défaut (12) : non atteint avec cinq HEAD', (await coll(rb2)).plafondAtteint, false);
+
+// B5 : un worktree dont le lien retour n'est pas vérifié n'entre dans aucune paire
+const rb5 = init('rb5'); ecrire(rb5, 'base', 30, 'base.txt');
+const w5a = mkWt(rb5, 'wa'), w5b = mkWt(rb5, 'wb'), w5z = mkWt(rb5, 'wz');
+ecrire(w5a, 'a', 20, 'commun.txt'); ecrire(w5b, 'b', 19, 'commun.txt'); ecrire(w5z, 'z', 18, 'commun.txt');
+eq('B5', 'B5.1 contrôle positif : trois branches modifient le même fichier', vue(await coll(rb5)), ['ok', 4, false, [['commun.txt', ['wa', 'wb', 'wz']]]]);
+fs.writeFileSync(path.join(rb5, '.git', 'worktrees', path.basename(w5z), 'gitdir'), `${path.join(WORK, 'ailleurs', '.git')}\n`);
+eq('B5', 'B5.2 lien retour de wz falsifié : wz n\'entre dans aucune paire (ni collision, ni HEAD compté)', vue(await coll(rb5)), ['ok', 3, false, [['commun.txt', ['wa', 'wb']]]]);
+
+// B6 : lab sous-dossier du dépôt
+const rs = init('rs'); ecrire(rs, 'base', 30, 'sous/a.txt', 'hors.txt');
+const s6a = mkWt(rs, 'wa'), s6b = mkWt(rs, 'wb');
+ecrire(s6a, 'a', 20, 'sous/a.txt', 'hors.txt'); ecrire(s6b, 'b', 19, 'sous/a.txt', 'hors.txt');
+eq('B6', 'B6.1 lab = sous-dossier : chemins relatifs au lab (préfixe retiré), fichier hors du sous-dossier ignoré', (await coll(path.join(rs, 'sous'))).collisions, [['a.txt', ['wa', 'wb']]]);
+eq('B6', 'B6.2 contrôle : depuis la racine du dépôt les deux fichiers sont rendus, préfixe compris', (await coll(rs)).collisions, [['hors.txt', ['wa', 'wb']], ['sous/a.txt', ['wa', 'wb']]]);
+
+// B7 : noms de branche et de fichier qui seraient des clés dangereuses
+const rp = init('rp'); ecrire(rp, 'base', 30, 'base.txt');
+for (const n of ['messages', 'fil', '__proto__']) ecrire(mkWt(rp, n), n, 20, 'fil');
+const r7 = await coll(rp);
+const j7 = JSON.parse(JSON.stringify(r7));
+eq('B7', 'B7.1 noms `messages`, `fil`, `__proto__` et fichier `fil` : portés comme VALEURS de tuples', r7.collisions, [['fil', ['__proto__', 'fil', 'messages']]]);
+eq('B7', 'B7.2 aucune clé dynamique : les clés de l\'objet rendu sont fixes, `collisions` est un tableau de tuples', [Object.keys(j7).sort(), Array.isArray(j7.collisions), j7.collisions.every((t) => Array.isArray(t) && typeof t[0] === 'string' && Array.isArray(t[1]))], [['collisions', 'etat', 'plafond', 'plafondAtteint', 'tetes'], true, true]);
+
+// cache par paire de sha : une seconde demande identique ne relance ni `rev-list` ni `diff-tree`
+const memoPaires = new Map();
+await coll(rb2, { cache: memoPaires });
+vider();
+const r8 = await coll(rb2, { cache: memoPaires, binaire: ESPION });
+eq('B8', 'B8.1 cache par paire de sha : une seconde demande identique ne relance ni `rev-list` ni `diff-tree`, même résultat', [appels('rev-list').length, appels('diff-tree').length, r8.collisions], [0, 0, [['commun.txt', ['wa', 'wb']]]]);
+const argvB = [...HIST, ...argvs()];
+eq('B8', 'B8.2 aucun argv de la tâche ne contient status, diff, fetch ni --follow (`diff-tree` seul est permis)', argvB.filter((a) => a.some(interdit)).length, 0);
+eq('B9', 'B9.1 hors dépôt : absent ; échéance dépassée : indisponible sur la source seule', [(await B.collisionsBranches(horsDepot, { fin: FIN() })).etat, (await B.collisionsBranches(rb2, { fin: Date.now() - 1, cache: new Map() })).etat], ['absent', 'indisponible']);
+
+// FIN_B
 bilan();
 FIN_SONDE
 

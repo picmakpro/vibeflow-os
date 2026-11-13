@@ -36,3 +36,11 @@ Mesure (90 jours, 4 152 commits hors merges, historique complet, plafond non att
 - sans bruit retiré : 395 paires (5 voisins au plus par fichier) ;
 - avec la liste figée : 325 paires ;
 - 80 des 395 paires impliquent un nom de la liste (par exemple `VERSION` avec `module.json` à 100 % sur 8 à 17 révisions communes) : sans la liste, les fichiers de version dominent le couplage. La liste est donc figée telle quelle.
+
+## Tâche 3 — témoin B1 à B9 sur la base des tâches 1 et 2
+
+Base du rouge : le commit de la tâche 2 (aucun module `vf-cockpit-activite-branches.mjs`).
+
+- Assertion : import de `vf-cockpit-activite-branches.mjs` — attendu : module chargé ; obtenu : `ERR_MODULE_NOT_FOUND`, `BILAN : 60 PASS, 1 FAIL` (G0 à G9 verts : le rouge ne vient que de l'absence du module de la tâche 3).
+- Vert après code : `BILAN : 76 PASS, 0 FAIL`, exit 0, aucun processus laissé (`pgrep -f test-cockpit-activite-git` vide).
+- Raison des assertions de comportement : B1.1 établit que la fixture discrimine (une base unique `main` rendrait 3 fausses collisions entre `w1` et `w2`) ; B5.1 est le témoin positif de B5.2 ; B6.2 celui de B6.1 ; B8.1 compte les `rev-list` et `diff-tree` de l'espion (0 et 0 sur la seconde demande).
