@@ -206,7 +206,7 @@ function construireGraphe(root, { layout } = {}) {
     meta: { generatedAt: new Date().toISOString(), rootName: path.basename(root), root, audience: 'everyone', agent: 'claude', repos: [], counts: { files: files.length, loc: 0 }, vfTab: 'project',
       kindIcons: KIND_ICONS, kindColors: KIND_COLORS,
       kindLabels: { import: 'Dépend de', event: 'Enchaînement', data: 'Couvre', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient' },
-      vf: { milestone: state.milestone, phase: curPhase, phaseEtat, stateStale: perime, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, lastDesc: state.last_activity_desc, progress: state.progress,
+      vf: { milestone: state.milestone, phase: curPhase, phaseEtat, stateStale: perime, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, progress: state.progress,
         milestones: msList.filter((m) => !m.horsJalon).map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),
         next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}`, etat: p.avancement.etat })) : [],
         drift: { resume: drift.resume, erreur: !!drift.erreur,
