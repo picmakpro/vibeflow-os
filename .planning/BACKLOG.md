@@ -699,6 +699,9 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - **Socle de test (79-b) :** dossiers temporaires et restes de Chrome laissés par les suites, alerte sonore du poste, erreurs de shell silencieuses, causes de rouges non consignées, durées de CI, cas sautés en CI dont O6.17d et O6.19, jamais prouvés (J1-17 à J1-23, J1-33, J1-34).
 - **Sécurité basse (lancement de 79-b), par classe :** cinq restes mineurs du lot 0 bis (J1-07 à J1-11).
 - **Méthode :** un attendu de mutant ne repose pas sur l'échec d'une commande externe, la CI se lit par ses jobs rouges, un écrivain par arbre pour les preuves, formes de commande qui suspendent un nœud, Docker démarré sans demande, limite du harnais (J1-35 à J1-37, J1-40 à J1-43).
+- **Reporté de J1 (consigne d'allègement, demande de Samuel, message session principale, 2026-11-13) :** étape 2 point 8, contrat « attribut neutre posé par le terminal », inversion de CL4.3 et `eviter()` rejoué à l'arrivée de la pastille (J1-49).
+- **Ouverts de J1 :** SU6.1 et M-PERSISTANT attendent `VF_COQUILLE` de 79-16 (J1-50) ; angle mort de la porte des chaînes, littéraux français accentués non vus (J1-51) ; ligne `AJOUT` manquante non vue par la suite vendor (J1-52).
+- **Design, nœud `docs` de la 71.5 (J1-53) :** jetons d'espacement absents des six fichiers Git et garde `css-jetons.mjs` à étendre ; P71.5-D-10 (gouttière du téléphone, 20 px contre 24) ; pulsation par l'opacité dans `70-vf-live.js` ; valeurs hors grille de `06-blueprint.js`.
 
 **Déclencheur de reprise :** le cadrage du segment b de la Phase 79 ou de la Phase 80, ou la prochaine passe sur le socle de test du cockpit.
 
