@@ -2,7 +2,8 @@
 // Usage : node chrome-coin.mjs <chrome> <racine-du-serveur> <mode>   Rend UNE ligne JSON { … } ou { erreur }. Modes : cn1 · cn2 · cn3 · term.
 // Chaque section est isolée (sec) : une section qui échoue laisse ses champs vides, les autres sont mesurées. Gestes par Input.dispatch*.
 import { executer, pause, stabiliser, positionPosee } from './chrome-session.mjs';
-const [, , chrome, racine, mode, filtre] = process.argv; // filtre : sections à jouer (mutants), séparées par des virgules ; vide = toutes
+const [, , chrome, racine, modeArg, filtre] = process.argv;
+const FR = /fr$/.test(modeArg || ''), mode = FR ? modeArg.slice(0, -2) : modeArg; // « cn1fr », « cn2fr » : le même mode sous le défaut (français), sans ?lang=en; // filtre : sections à jouer (mutants), séparées par des virgules ; vide = toutes
 const SEC = new Set((filtre || '').split(',').filter(Boolean));
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!VibeFlow.state && !!VibeFlow.state.layout";
 const POSEE = "(() => { const v = document.querySelector('#viewport'); return !!v && v.style.opacity !== '0' && !v.classList.contains('anim'); })()";
@@ -58,7 +59,7 @@ await executer(chrome, async (s) => {
   const clicSur = async (sel) => { const p = await positionPosee(s.ev, `document.querySelector(${JSON.stringify(sel)})`);
     if (!p) throw new Error(`élément absent : ${sel}`); await clic(p.cx, p.cy); };
   const lireVue = () => s.ev('JSON.stringify([VibeFlow.state.container, document.querySelectorAll("#viewport .node").length])');
-  const url = (p) => `${racine}/${p}${p.includes('?') ? '&' : '?'}lang=en`;
+  const url = (p) => (FR ? `${racine}/${p}` : `${racine}/${p}${p.includes('?') ? '&' : '?'}lang=en`);
   const charger = async (page, w = 1440, h = 900, mobile = false) => {
     await vue(w, h, mobile); await s.naviguer(url(page));
     if (mode === 'term') { // le tiroir du terminal se rouvre de lui-même d'une page à l'autre (stockage) : chaque page part tiroir fermé

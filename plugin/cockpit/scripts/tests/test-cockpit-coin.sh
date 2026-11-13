@@ -81,9 +81,13 @@ assert_eq "CN1.1 — niveau de 70 cartes : un repère au moins ; par bord, ajust
 assert_eq "CN1.2 — clic sur le repère droit : la carte la plus proche est dans le champ, le compte diminue, zoom et sélection restent" \
   "$(E "(() => { const c = j.cn1.clic, a = c.avant, p = c.apres; if (!a || !p) return 'sans clic';
     return [a.hors.droite > 0, p.hors.droite < a.hors.droite, p.k === a.k, p.sel === a.sel, p.dedans]; })()")" "[true,true,true,true,true]"
-NOM='/^\d+ cartes? hors champ (à gauche|à droite|en haut|en bas)\. Aller à la plus proche\.$/'
-assert_eq "CN1.3 — Tab depuis la carte itinérante : un repère (button), nom « N cartes hors champ à <bord>. Aller à la plus proche. »" \
+NOM='/^\d+ cartes? hors champ (on the left|on the right|at the top|at the bottom)\. Aller à la plus proche\.$/'
+assert_eq "CN1.3 — sous ?lang=en, Tab depuis la carte itinérante : un repère (button), nom « N cartes hors champ <bord en anglais, clé de t>. Aller à la plus proche. »" \
   "$(E "[j.cn1.tab.repere, $NOM.test(j.cn1.tab.nom || '')]")" "[true,true]"
+NOMF='/^\d+ cartes? hors champ (à gauche|à droite|en haut|en bas)\. Aller à la plus proche\.$/'
+RF1="$(mesurer cn1fr)"
+assert_eq "CN1.3f — sous le défaut (français), le même repère porte le bord du dictionnaire : « N cartes hors champ à gauche|à droite|en haut|en bas. Aller à la plus proche. »" \
+  "$(E "[j.cn1.tab.repere, $NOMF.test(j.cn1.tab.nom || '')]" "$RF1")" "[true,true]"
 assert_eq "CN1.9 — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
 echo "=== CN2 — bloc bas-droit, minicarte, hachure du tiroir Git, ligne d'état ==="
 R="$(mesurer cn2)"; [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }; [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/cn2.json"
@@ -102,15 +106,19 @@ assert_eq "CN2.3 — tiroir Git : freeArea().w et state.t identiques (PU-G-204),
       !/historique Git/.test(c.hf.nom), /^Minicarte : \d+ cartes? visibles? sur \d+/.test(c.hf.nom)]; })()")" \
   "[true,true,true,true,true,true,true,true,true,true,true,true]"
 NOMB='vf/<img/src=x/onerror=window.__xss=1>/branche-tres-longue-pour-lellipse'
-assert_eq "CN2.4 — ligne d'état : branche entière en title et étiquette, ellipse au milieu (10 + … + 8), un seul role=status, heure qui suit vf-who" \
+assert_eq "CN2.4 — sous ?lang=en, ligne d'état : branche entière en title et étiquette, ellipse au milieu (10 + … + 8), un seul role=status, heure qui suit vf-who" \
   "$(E "(() => { const c = j.cn2.c24; if (!c || !c.base) return 'sans mesure'; const b = c.base, n = '$NOMB';
-    return [b.titre === n, b.nom.includes(n), b.vu === n.slice(0, 10) + '…' + n.slice(-8), b.status.length === 1 && /^Direct/.test(b.status[0]),
-      b.mot === 'Direct',
+    return [b.titre === n, b.nom.includes(n), b.vu === n.slice(0, 10) + '…' + n.slice(-8), b.status.length === 1 && /^Live/.test(b.status[0]),
+      b.mot === 'Live',
       /^Mis à jour à \d\d:\d\d$/.test(b.heure), c.h1 === 'Mis à jour à 09:05', c.h2 === 'Mis à jour à 21:47']; })()")" \
   "[true,true,true,true,true,true,true,true]"
-assert_eq "CN2.4b — direct coupé : « Reprise en cours, mise à jour à HH:MM » ; branche hostile (T-80-10) : aucun élément créé, aucun code exécuté" \
+assert_eq "CN2.4b — sous ?lang=en, direct coupé (mot « Live off », clé de t) : « Reprise en cours, mise à jour à HH:MM » ; branche hostile (T-80-10) : aucun élément créé, aucun code exécuté" \
   "$(E "(() => { const c = j.cn2.c24; if (!c || !c.coupe) return 'sans mesure';
-    return [c.coupe.mot, /^Reprise en cours, mise à jour à \d\d:\d\d$/.test(c.coupe.heure), c.base.xss.join()]; })()")" '["Direct coupé",true,"true,0"]'
+    return [c.coupe.mot, /^Reprise en cours, mise à jour à \d\d:\d\d$/.test(c.coupe.heure), c.base.xss.join()]; })()")" '["Live off",true,"true,0"]'
+RF2="$(mesurer cn2fr)"
+assert_eq "CN2.4f — sous le défaut (français), la ligne d'état dit « Direct » (étiquette du dictionnaire) puis « Direct coupé » quand le direct est coupé" \
+  "$(E "(() => { const c = j.cn2.c24; if (!c || !c.base || !c.coupe) return 'sans mesure';
+    return [c.base.mot, /^Direct/.test(c.base.status[0]), c.coupe.mot, /^Mis à jour à \d\d:\d\d$/.test(c.base.heure)]; })()" "$RF2")" '["Direct",true,"Direct coupé",true]'
 assert_eq "CN2.5 — sans --terminal : aucun nœud vf-term dans #vf-coin, aucun mot « terminal », aucune commande (P71-D-02, P67-D-14)" \
   "$(E 'j.cn2.c25 ? [j.cn2.c25.term, j.cn2.c25.texte, j.cn2.c25.commandes] : "sans mesure"')" "[0,false,0]"
 assert_eq "CN2.6 — 1440 et 1024 px, panneau et tiroir Git ouverts ou non : bloc, zoom, barre disjoints ; 900 px aucun bloc ; 1100 px tactile : état seul" \
