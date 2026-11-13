@@ -6,13 +6,13 @@
 //        spec : { sessions: [{ id, lignes: [{ age: secondes, outils: [{ name, input, ouvert }] }] }] } ; `age` : ancienneté de la ligne (jamais plus de 24 h)
 //   claude-faux <dossier> <json>               pose (ou réécrit) un faux `claude agents --json` dans <dossier> qui imprime <json>
 //   forge <sortie.json> <nombre> [variante]    liste de voies forgées, valides et cohérentes (segments croissants, durées = somme des segments)
-//   arbres <dossier>                           dépôt réel et worktrees réels (voir l'en-tête de la section) ; imprime un JSON { lab, principal, wt… }
+//   ajouter <home> <lab> <id> <spec.json>      ajoute des lignes (spec : { lignes: [{ age, outils }] }) à une session existante
 //   volumineux <home> <lab> <voies> <appels>   voies de plusieurs Mio, appels d'outil à entrées variées (écrites sous <home>)
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 
-const [, , mode, a1, a2, a3, a4, a5] = process.argv;
+const [, , mode, a1, a2, a3, a4] = process.argv;
 const ISO = (ms) => new Date(ms).toISOString();
 const GIT_ENV = { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' };
 for (const k of ['GIT_DIR', 'GIT_WORK_TREE', 'GIT_INDEX_FILE', 'GIT_COMMON_DIR', 'GIT_OBJECT_DIRECTORY', 'GIT_NAMESPACE', 'GIT_CEILING_DIRECTORIES']) delete GIT_ENV[k];
@@ -72,7 +72,22 @@ export function voieForgee(i, { t0 = Date.now() - 3600e3, etat = null, vivante =
     cibles: cibles ? { etat: 'ok', tronque: false, ecritures: [{ arbre: null, cible: 'src/a.js', n: 1, dernierMs: t0 + 300e3 }], lectures: [] } : null };
 }
 
+// voies de plusieurs Mio : des milliers d'appels Write et Read à entrées variées (environ 300 cibles distinctes par voie), texte de remplissage
+export function volumineux(home, lab, voies, appels, maintenant = Date.now()) {
+  const d = path.join(home, '.claude', 'projects', '-lab'); fs.mkdirSync(d, { recursive: true });
+  for (let v = 0; v < voies; v++) {
+    const sid = `big-${String(v).padStart(3, '0')}`, L = [JSON.stringify({ type: 'user', timestamp: ISO(maintenant - 86000e3), cwd: lab, sessionId: sid, version: '2.1.322', origin: { kind: 'human' }, message: { role: 'user', content: 'MARQ-TEXTE' } })];
+    for (let k = 0; k < appels; k++) {
+      const nom = k % 3 === 0 ? 'Read' : 'Write', f = `${lab}/src/d${(k + v) % 20}/f${(k * 7 + v) % 330}.js`;
+      for (const o of ligneAssistant({ lab, sid, t: maintenant - 80000e3 + k * 20000, outils: [{ name: nom, input: { file_path: f, content: 'MARQ-ENTREE ' + 'y'.repeat(300) } }], texte: 'MARQ-TEXTE ' + 'x'.repeat(700) })) L.push(JSON.stringify(o));
+    }
+    fs.writeFileSync(path.join(d, `${sid}.jsonl`), L.join('\n') + '\n');
+  }
+}
+
 if (mode === 'lab') creerLab(a1);
+else if (mode === 'ajouter') ajouterLignes(a1, a2, a3, JSON.parse(fs.readFileSync(a4, 'utf8')).lignes);
+else if (mode === 'volumineux') volumineux(a1, a2, Number(a3), Number(a4));
 else if (mode === 'transcripts') ecrireSessions(a1, a2, JSON.parse(fs.readFileSync(a3, 'utf8')));
 else if (mode === 'claude-faux') {
   fs.mkdirSync(a1, { recursive: true });

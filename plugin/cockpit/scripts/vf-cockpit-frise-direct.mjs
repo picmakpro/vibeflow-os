@@ -4,7 +4,8 @@
 //  posée dans
 // l'instantané (poserFrise, qui la gèle) qu'au paquet final de la séquence (`suite` faux) ; une séquence interrompue par un paquet `complet` est
 //  abandonnée.
-import { poserFrise } from './vf-cockpit-instantane.mjs';
+import { poserFrise, surInstantane } from './vf-cockpit-instantane.mjs';
+import { creerSignaleur } from './vf-cockpit-flux-etat.mjs';
 
 let table = new Map();
 const SIG = /^[0-9a-f]{16}$/;
@@ -19,5 +20,21 @@ export function recevoirFrise(m) {
   poserFrise({ at: Date.now(), sig: m.sig, source: m.source, tronque: m.tronque === true, voies });
 }
 
-export const brancherFluxFrise = () => ({ stop() {} });
-export const finDeTour = () => {};
+// événement `frise` { seq, at, sig } (C4, A21) : sans contenu, `seq` jamais avancé. L'abonnement à l'instantané NOTE la signature de la frise
+//  posée ; seul
+// finDeTour (appelée par le pilote à la fin d'une demande qui portait `tour`) la passe au signaleur de 79-12, qui n'émet qu'au changement de
+//  signature depuis
+// son dernier événement : au plus un événement par tour, les poses d'un même tour (paquets de la passe de fond compris) se fondant en un. Aucune
+//  minuterie.
+let branche = null, note = null;
+
+export function brancherFluxFrise({ diffuser, seq }) {
+  const signaleur = creerSignaleur({ diffuser, seq });
+  const retirer = surInstantane((inst) => { note = inst && inst.frise ? inst.frise.sig : null; }); // garde:frise-pose
+  branche = signaleur;
+  return { stop() { retirer(); if (branche === signaleur) branche = null; note = null; } };
+}
+
+export function finDeTour() {
+  if (branche && note) branche.signaler('frise', '', note); // garde:frise-tour
+}

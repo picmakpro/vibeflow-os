@@ -60,3 +60,18 @@ Suites existantes adaptées : `test-cockpit-transcript.sh` (copie complète des 
 Régression de la tâche 3 : who 157/0, equipe 215/0, equipe-etats 86/0, lecture-fil 17/0, git-config-depot 138/0, git-env 135/0, collecte 149/0 (323 s), vendor : V4 « check-file-size » rouge au moment du
 rejeu (base : fichier du module à 300 lignes qui n'est pas à moi, signalé par le manager) ; V4c.9a (cliquet de colonnes) rouge sur ma HAUSSE de 13 à 15 lignes longues de `vf-cockpit-transcript.mjs`,
 corrigée dans le commit (retour à 13, `colonnes-cliquet.mjs verifier` : OK, baseline inchangée).
+
+## Tâche 4 — rouges sur le code de la tâche 3 (suite complète jouée sur l'arbre du commit de la tâche 3 exporté, `brancherFluxFrise` et `finDeTour` en coquilles vides)
+123 PASS / 10 FAIL (3 min) : F5.1 (aucun événement frise à la fin du tour), F5.3, F5.4, F5.9, F5.6b (aucun événement après la ligne ajoutée), F5.6c, F5.6d (aucun événement au passage actif -> attend),
+F5.8 (aucun événement pendant la passe), M-EMET-PAQUET.0 (ancre `garde:frise-pose` absente), M-SIG-AT (rouge parce qu'aucun événement n'existe : la raison du flip n'était pas encore atteignable).
+Verts d'emblée (garde-fous prouvés ensuite par leurs mutants ou leurs témoins positifs) : F5.2, F5.5 (module de signature présent), F5.6a, F5.7, F6.1 à F6.6.
+
+## Tâche 4 — vert, mutants, mesures
+`test-cockpit-frise.sh` : 135 PASS / 0 FAIL (environ 170 s), graine imprimée (F2.2, F4.1, F4.5, F4.6, F4.13, F5.5), 30 mutants (60 assertions `M-`).
+Mutants de la tâche : M-SIG-CIBLES -> F5.5 et F5.3 ; M-SIG-AT -> F5.2 ; M-SIG-ORDRE -> F5.5 ; M-EMET-PAQUET -> F5.1 et F5.9.
+Mesures (serveur B, fixture de 6 voies de 4 000 appels d'outil) : sonde de latence pendant le démarrage et la passe : n=78, p50 1 ms, p99 5 ms, max 5 ms, pics 5, 3, 2, 2, 2, zéro erreur ;
+même sonde sur le collecteur en ligne (étapes sur la boucle) : p99 et max 463 ms (547 ms à une autre exécution), pics 463, 366, 265, 162, 153 : la sonde sait rougir.
+Taille : 2 400 entrées de cible, 178 273 octets de réponse, durées de `GET /api/vf/frise` : 40, 43, 43, 44, 40 ms (médiane 43 ms) ; un événement `frise` pendant la passe.
+Serveur A : fenêtre calme de 12 s sans événement ; une ligne ajoutée : un événement ; `etat` actif -> attend : un événement ; segment de queue `attend-humain` commençant à `fin` puis retiré au retour à actif.
+Suites existantes rejouées sur la tête (T4) : routes 56/0, serveur 98/0, securite 103/0, etat 127/0 (494 s), direct 76/0, cycle-serveur rc 0, lancer-serveur 82/0, robustesse 25/0,
+git-signature 47/0, reseau 15/0, signal 76/0 ; vendor : un seul rouge, V4 `check-file-size` (base : fichier du module à 300 lignes qui n'est pas à moi) ; le cliquet de colonnes (V4c.9a) est vert.

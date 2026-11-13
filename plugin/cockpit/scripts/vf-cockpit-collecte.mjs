@@ -20,7 +20,7 @@
 // est détaché de la boucle (`unref`) : il ne retient jamais l'arrêt. Chaque marqueur `garde:` n'est écrit que sur sa ligne (ancres des mutants).
 import { Worker } from 'node:worker_threads';
 import { monitorEventLoopDelay } from 'node:perf_hooks';
-import { recevoirFrise } from './vf-cockpit-frise-direct.mjs';
+import { recevoirFrise, finDeTour } from './vf-cockpit-frise-direct.mjs';
 
 export const LIMITES = Object.freeze({ maxOldGenerationSizeMb: 768, maxYoungGenerationSizeMb: 64, stackSizeMb: 4 });
 export const DELAIS = Object.freeze({ fenetreMortMs: 30000, reprisePauseMs: 60000, indexSuspenduMs: 600000, demandeMs: 120000 });
@@ -100,7 +100,12 @@ export function creerCollecte({ racine, sortie, scriptsDir, home, entree, limite
       }
       if (m && m.type === 'index' && m.index && typeof m.index === 'object') index = { ...INDEX_ATTENTE, ...m.index };
       dire(m);
-      if (m && m.type === 'fini') { ok = true; suivante(); }
+      if (m && m.type === 'fini') {
+        if (enVol && enVol.tour) { // 79-13 : l'événement `frise` part à la fin du tour, au plus un par tour
+          try { finDeTour(); } catch (e) { log('error', `frise : ${String(e.message).slice(0, 160)}`); }
+        }
+        ok = true; suivante();
+      }
     });
     cur.w.on('error', (e) => {
       cur.cause = e && e.code === 'ERR_WORKER_OUT_OF_MEMORY' ? 'memoire' : 'erreur'; cur.detail = String(e && e.message).slice(0, 160);

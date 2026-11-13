@@ -33,6 +33,7 @@ import { HISTORIQUE, FLUX, reponse, controlerAcces, creerRepartiteur } from './v
 import { lireState, LECTEURS } from './vf-cockpit-state.mjs';
 import { brancherFluxEtat, VIE_MS } from './vf-cockpit-flux-etat.mjs';
 import { lireFrise } from './vf-cockpit-frise.mjs';
+import { brancherFluxFrise } from './vf-cockpit-frise-direct.mjs';
 
 let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
 try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
@@ -140,6 +141,7 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
     live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); }, aClient, nbClients: () => clients.size, garde: (o) => !porteInterdit(o) }); // AUDC-H2 : le filet ne collecte que si un onglet écoute ; garde : l'instantané passe la garde d'émission avant sa pose
   } catch (e) { log('error', `direct indisponible : ${e.message}`); }
   const fluxEtat = brancherFluxEtat({ diffuser, seq: () => (live ? live.etat().seq : 0), nbClients: () => clients.size, vieMs }); // 79-12 : `vie` et `etat`
+  const fluxFrise = brancherFluxFrise({ diffuser, seq: () => (live ? live.etat().seq : 0) }); // 79-13 : `frise` à la fin d'un tour de collecte
   lancer.sourceWho(() => (live ? live.snapshot().who : null)); // états attendue / vue / terminee des cartes lancées (72-07)
 
   const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
@@ -203,6 +205,6 @@ export function attach({ here, root, token, inject, log = () => {}, routes = ROU
     // AUDC-H1 : une page n'ouvre qu'UN flux (celui-ci). Le rechargement de la carte y passe (sans séquence ni journal : la page se recharge) et chaque flux ouvert compte comme une page ouverte.
     diffuserCarte: (nom, data) => { if (nom !== 'reload') return; const s = `event: reload\ndata: ${JSON.stringify(data || {})}\n\n`; for (const c of clients) c.write(s); },
     nbPages: () => clients.size,
-    stop() { fluxEtat.stop(); live?.stop(); for (const c of clients) c.end(); },
+    stop() { fluxEtat.stop(); fluxFrise.stop(); live?.stop(); for (const c of clients) c.end(); },
   };
 }

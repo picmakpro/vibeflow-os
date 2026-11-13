@@ -292,7 +292,136 @@ NOMS_WT="$(jf "$WORK/wts-a.json" 'j.worktrees.filter((w)=>w.verifie).map((w)=>w.
 assert_eq "F6.6 — arbres sur le serveur réel : écriture de l'arbre principal (arbre nul) et du worktree prouvé (arbre = son nom, rendu par /api/vf/git/worktrees), cibles relatives ; la lecture est comptée ; Grep ne produit aucune cible ; aucun chemin absolu" "$F66|$NOMS_WT|$(grep -c -F "$ALAB" "$WORK/frise-a.json")" '[[[null,"src/MARQ-CIBLE-79-13.js"],[null,"src/a.js"],["wt-in","src/b.js"]],[[null,"src/b.js"]],null]|["'"$(basename "$ALAB")"'","wt-in"]|0'
 
 
-cockpit_arreter
+echo "=== F5 — événement frise : signature entière, une émission par tour ==="
+pr() { local f="$WORK/p-$(basename "$1")-signature.json"; [ -s "$f" ] || VF_FRISE_GRAINE="$GRAINE" node "$TESTS/frise-propriete.mjs" signature "$1" > "$f" 2> "$WORK/p-sig.err"; echo "$f"; }
+chk4() { # <id> <copie> -> ok | ko
+  local d="$2" f
+  case "$1" in
+    F5.1) f="$(cas "$d" emission)"; [ "$(jf "$f" 'j.avant+"|"+j.apres+"|"+j.cles+"|"+j.sig+"|"+j.seq+"|"+j.at')" = '0|1|at,seq,sig|true|true|true' ] ;;
+    F5.2) f="$(cas "$d" non-emission)"; [ "$(jf "$f" 'j.memeFrise+"|"+j.autreAt+"|"+j.signalSeul')" = '0|0|0' ] ;;
+    F5.3) f="$(cas "$d" changements)"; [ "$(jf "$f" 'Object.values(j.rep).every(Boolean)+"|"+Object.keys(j.rep).length')" = 'true|11' ] ;;
+    F5.4) f="$(cas "$d" emission)"; [ "$(jf "$f" 'j.seq+"|"+j.hello')" = 'true|true' ] ;;
+    F5.5) f="$(pr "$d")"; [ "$(jf "$f" 'j.ok+"|"+j.ordre+"|"+j.instant+"|"+j.couverture+"|"+j.degenere')" = 'true|true|true|ok|dégénéré' ] ;;
+    F5.9) f="$(cas "$d" tours)"; [ "$(jf "$f" 'JSON.stringify([j.troisPoses,j.derniereSig,j.deuxTours,j.sansChangement,j.retour,j.paquets])')|$(jf "$(cas "$d" sansbranche)" 'j.leve')" = '[1,true,1,0,0,1]|false' ] ;;
+  esac && echo ok || echo ko
+}
+sansb() { local f="$WORK/e-$(basename "$1")-sansbranche.json"; [ -s "$f" ] || node "$TESTS/frise-clients.mjs" etape sansbranche "$1" "$LAB" "$WORK/home-et" 2>/dev/null | tail -1 > "$f"; echo "$f"; }
+cas() { local f="$WORK/c-$(basename "$1")-$2.json"; if [ "$2" = sansbranche ]; then sansb "$1"; return; fi; [ -s "$f" ] || hn "$2" "$1" "${3:-}" > "$f"; echo "$f"; }
+for id in F5.1 F5.2 F5.3 F5.4 F5.5 F5.9; do
+  case "$id" in
+    F5.1) t="poserFrise seul n'émet rien ; à la fin du tour (finDeTour) exactement un événement frise de clés exactement seq, at, sig (16 hexadécimaux, at en ms, seq du direct)" ;;
+    F5.2) t="non-émission : même frise reposée, même frise avec un autre at, poser du signal seul : aucun événement de plus" ;;
+    F5.3) t="émission au changement : n, dernierMs, entrée ajoutée, cibles.etat, cibles.tronque, état officiel, rattachement, voie ajoutée ou retirée, source.etat, tronque : un événement chacun, signature différente" ;;
+    F5.4) t="le seq de l'événement égale celui du direct, et le hello d'une seconde connexion rend ce même seq (l'événement n'avance pas seq)" ;;
+    F5.5) t="propriété de sigFrise (graine $GRAINE) : stable sous le mélange des clés, sensible à chaque feuille (cibles comprises), indépendante de l'instant ; couverture par nature" ;;
+    F5.9) t="un seul événement par tour : trois poses puis finDeTour, retour à la signature d'avant dans le même tour, quatre paquets puis un cinquième, finDeTour sans branchement sans effet" ;;
+  esac
+  assert_eq "$id — $t" "$(chk4 "$id" "$COPIE")" "ok"
+done
+mut4() { local d; d="$(mutcopie "$1" "$2" "$3")"; assert_eq "$1.0 — la copie existe, diffère et charge" "$([ -n "$d" ] && echo oui || echo non)" "oui"
+  [ -n "$d" ] && for id in $4; do assert_eq "$1 — $5 : $id rougit" "$(chk4 "$id" "$d")" "ko"; done; }
+mut4 M-SIG-CIBLES vf-cockpit-frise-voie.mjs '/garde:frise-sig/s/canon({ source, tronque, voies })/canon({ source, tronque, voies: voies.map(({ cibles, ...r }) => r) })/' "F5.5 F5.3" "la signature exclut les cibles"
+mut4 M-SIG-AT vf-cockpit-frise-voie.mjs '/garde:frise-sig/s/canon({ source, tronque, voies })/canon({ source, tronque, voies, at: Date.now() })/' "F5.2" "la signature compte l'instant de pose"
+mut4 M-SIG-ORDRE vf-cockpit-frise-voie.mjs '/garde:frise-canon/s/Object.keys(v).sort()/Object.keys(v)/' "F5.5" "les clés ne sont plus triées"
+mut4 M-EMET-PAQUET vf-cockpit-frise-direct.mjs '/garde:frise-pose/s/note = inst \&\& inst.frise ? inst.frise.sig : null;/note = inst \&\& inst.frise ? inst.frise.sig : null; if (note \&\& branche) branche.signaler("frise", "", note);/' "F5.1 F5.9" "le rappel d'abonnement émet l'événement au lieu de le noter"
+
+echo "=== F5.6, F5.7, F6.1, F6.2 — serveur A : flux tenu, fenêtre calme, ligne ajoutée, attente de permission ==="
+FLOG="$WORK/flux-a.json"
+node "$TESTS/etat-clients.mjs" sse "$VF_PORT" "$VF_JETON" 170000 "$FLOG" > /dev/null 2>&1 &
+SSE_A=$!; PIDS+=("$SSE_A")
+nfr() { grep -c '"nom":"frise"' "$FLOG.log" 2>/dev/null; }
+hello_a() { grep -q '"nom":"hello"' "$FLOG.log" 2>/dev/null; }
+attendre 20 hello_a
+CALME=ko; for _ in 1 2 3 4 5 6; do a="$(nfr)"; sleep 8; [ "$(nfr)" = "$a" ] && { CALME=ok; break; }; done
+N0="$(nfr)"; sleep 12; N1="$(nfr)"
+assert_eq "F5.6a — serveur réel A, flux tenu, voie rattrapée : zéro événement frise pendant 12 s de fenêtre calme (après stabilisation : $CALME)" "$CALME|$((N1 - N0))" "ok|0"
+cat > "$WORK/spec-ajout.json" <<'JSON'
+{ "lignes": [ { "age": 1, "outils": [ { "name": "Write", "input": { "file_path": "@LAB@/src/b.js" } }, { "name": "Read", "input": { "file_path": "@LAB@/src/a.js" }, "ouvert": true } ] } ] }
+JSON
+node "$TESTS/frise-labo.mjs" ajouter "$AHOME" "$ALAB" sess-a-0001 "$WORK/spec-ajout.json"
+plus_un() { [ "$(nfr)" -gt "$N1" ]; }
+attendre 20 plus_un; sleep 8
+N2="$(nfr)"; get '/api/vf/frise?champs=cibles' > "$WORK/frise-a2.json"
+assert_eq "F5.6b — une ligne ajoutée au transcript (écriture sur src/b.js) : exactement un événement en 20 s au plus, et la route montre la nouvelle cible" "$((N2 - N1))|$(jf "$WORK/frise-a2.json" 'j.voies[0].cibles.ecritures.some((e)=>e.arbre===null&&e.cible==="src/b.js")')" "1|true"
+LSEQ="$(node -e "const l=require('fs').readFileSync(process.argv[1],'utf8').trim().split('\n').map((x)=>JSON.parse(x)).filter((e)=>e.nom==='frise');console.log(l.length?l[l.length-1].seq:'aucun')" "$FLOG.log")"
+node "$TESTS/etat-clients.mjs" sse "$VF_PORT" "$VF_JETON" 2500 "$WORK/hello-a.json" > /dev/null 2>&1
+HSEQ="$(node -e "const l=require('fs').readFileSync(process.argv[1],'utf8').trim().split('\n').map((x)=>JSON.parse(x)).filter((e)=>e.nom==='hello');console.log(l.length?l[0].seq:'aucun')" "$WORK/hello-a.json.log")"
+assert_eq "F5.6c — un hello ouvert ensuite rend un seq au moins égal à celui du dernier événement frise (l'événement n'avance pas seq : l'égalité exacte est prouvée en processus, F5.4)" "$([ "$HSEQ" -ge "$LSEQ" ] 2>/dev/null && echo ok || echo "$HSEQ<$LSEQ")" "ok"
+node "$TESTS/frise-labo.mjs" claude-faux "$BIN" '[{"sessionId":"sess-a-0001","status":"waiting"}]'
+plus_un2() { [ "$(nfr)" -gt "$N2" ]; }
+attendre 35 plus_un2
+get /api/vf/frise > "$WORK/frise-a3.json"
+assert_eq "F5.6d — le faux claude agents --json passe de actif à attend : un événement en 30 s au plus" "$(( $(nfr) - N2 ))|$(jf "$WORK/frise-a3.json" 'j.voies[0].etatOfficiel')" "1|attend"
+assert_eq "F5.7 — A35 de bout en bout : voie à appel ouvert d'état officiel attend : la route rend un dernier segment attend-humain qui commence à fin" "$(jf "$WORK/frise-a3.json" '(()=>{const v=j.voies[0],s=v.segments[v.segments.length-1];return [s[2],s[0]===v.fin,s[1]>s[0]].join("|")})()')" "attend-humain|true|true"
+node "$TESTS/frise-labo.mjs" claude-faux "$BIN" '[{"sessionId":"sess-a-0001","status":"busy"}]'
+retour_actif() { get /api/vf/frise > "$WORK/frise-a4.json"; [ "$(jf "$WORK/frise-a4.json" 'j.voies[0].etatOfficiel')" = actif ]; }
+attendre 35 retour_actif
+assert_eq "F5.7b — après retour à actif : plus de segment de queue attend-humain" "$(jf "$WORK/frise-a4.json" '(()=>{const v=j.voies[0];return v.etatOfficiel+"|"+v.segments[v.segments.length-1][2]!=="attend-humain"})()')" "true"
+# F6.1, F6.2 : rien sur disque ; aucun contenu dans le corps ni le flux
+node "$TESTS/etat-clients.mjs" sse "$VF_PORT" "$VF_JETON" 4000 "$WORK/brut-a.json" > /dev/null 2>&1
+get /api/vf/frise > "$WORK/frise-a5.json"; get '/api/vf/frise?champs=cibles' > "$WORK/frise-a6.json"
+TRANS="$AHOME/.claude/projects/-lab/sess-a-0001.jsonl"
+mkdir -p "$ALAB/.vibeflow/cockpit"; echo "MARQ-CIBLE-79-13" > "$ALAB/.vibeflow/cockpit/plante.txt"
+BALAYAGE_POS="$(grep -rlF "MARQ-CIBLE-79-13" "$ALAB" --exclude-dir=.git 2>/dev/null | wc -l | tr -d ' ')"; rm -f "$ALAB/.vibeflow/cockpit/plante.txt"
+BALAYAGE="$(grep -rlF "MARQ-CIBLE-79-13" "$ALAB" --exclude-dir=.git 2>/dev/null | wc -l | tr -d ' ')"
+assert_eq "F6.1 — mémoire seule : le marqueur de cible est dans le transcript et dans la réponse de ?champs=cibles, et nulle part sous le dossier du lab (témoin positif du balayage : le même marqueur planté est trouvé)" "$(grep -c -F MARQ-CIBLE-79-13 "$TRANS")|$(grep -c -F MARQ-CIBLE-79-13 "$WORK/frise-a6.json")|$BALAYAGE_POS|$BALAYAGE" "1|1|1|0"
+FUITE2=""; for m in MARQ-COMMANDE MARQ-TEXTE MARQ-SORTIE MARQ-MOTIF MARQ-ENTREE-79-13; do FUITE2="$FUITE2 $([ "$(grep -c -F "$m" "$TRANS")" -ge 1 ] && echo 1 || echo 0)/$(cat "$WORK/frise-a5.json" "$WORK/frise-a6.json" "$WORK/brut-a.json" 2>/dev/null | grep -c -F "$m")"; done
+assert_eq "F6.2 — aucun marqueur de contenu (commande, texte, sortie d'outil, motif, second champ d'entrée) dans le corps avec et sans champs ni dans le flux brut (témoin positif : chacun est dans le transcript)" "$(echo $FUITE2)" "1/0 1/0 1/0 1/0 1/0"
+vf_hyg_stop "$SSE_A"; cockpit_arreter
+
+echo "=== serveur B : fixture volumineuse — rythme de l'événement, latence de boucle, taille (F5.8, F6.3 à F6.5) ==="
+BLAB="$WORK/blab"; BHOME="$WORK/home-b"; mkdir -p "$BHOME"
+node "$TESTS/frise-labo.mjs" lab "$BLAB"; node "$TESTS/frise-labo.mjs" volumineux "$BHOME" "$BLAB" 6 4000
+node "$SCRIPTS/vf-cockpit-build.mjs" "$BLAB" --quiet > "$WORK/build-b.out" 2>&1
+node "$TESTS/frise-labo.mjs" claude-faux "$BIN" '[]'
+BOCT="$(du -sk "$BHOME/.claude/projects" | cut -f1)"
+cat > "$AUX/tours.mjs" <<'JS'
+// tours.mjs <port> <jeton> <duree-ms> : interroge /api/vf/etat toutes les 200 ms, une ligne JSON { tours: [instants des valeurs distinctes de collecte.derniereA] }
+import http from 'node:http';
+const [, , port, jeton, duree] = process.argv, tours = []; let der = null;
+const t = setInterval(() => http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/etat', headers: { Host: `127.0.0.1:${port}`, 'x-vf-cockpit-token': jeton } }, (r) => {
+  let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => { try { const d = JSON.parse(b).collecte.derniereA; if (d && d !== der) { der = d; tours.push(Date.now()); } } catch { /* pas encore */ } });
+}).on('error', () => {}), 200);
+setTimeout(() => { clearInterval(t); setTimeout(() => { console.log(JSON.stringify({ tours })); process.exit(0); }, 600); }, Number(duree));
+JS
+cockpit_lancer "$BLAB" VF_COCKPIT_SCRIPTS_DIR="$FAUX" PATH="$BIN:$PATH" HOME="$BHOME"; RB=$?
+assert_eq "FB.0 — le serveur B (fixture de $BOCT Kio de transcripts) est lancé" "$RB" "0"
+if [ "$RB" = 0 ]; then
+  FLOGB="$WORK/flux-b.json"
+  node "$TESTS/etat-clients.mjs" sse "$VF_PORT" "$VF_JETON" 120000 "$FLOGB" > /dev/null 2>&1 &
+  SSE_B=$!; PIDS+=("$SSE_B")
+  node "$AUX/tours.mjs" "$VF_PORT" "$VF_JETON" 60000 > "$WORK/tours-b.json" 2>/dev/null &
+  TOURS_B=$!; PIDS+=("$TOURS_B")
+  node "$TESTS/collecte-sonde.mjs" "$VF_PORT" 100 8000 > "$WORK/sonde-b.json"
+  tout_ok() { get '/api/vf/frise?champs=cibles' > "$WORK/frise-b.json" 2>/dev/null; [ "$VF_CODE" = 200 ] && [ "$(jf "$WORK/frise-b.json" 'j.voies.length>=6&&j.voies.every((v)=>v.cibles.etat==="ok")' 2>/dev/null)" = true ]; }
+  attendre 100 tout_ok
+  sleep 12; wait "$TOURS_B" 2>/dev/null
+  echo "  (sonde B : $(cat "$WORK/sonde-b.json"))"
+  assert_eq "F6.3a — latence de boucle : la sonde a mesuré (au moins 60 réponses, aucune erreur de connexion)" "$(jf "$WORK/sonde-b.json" 'j.n>=60&&j.erreurs===0')" "true"
+  assert_eq "F6.3b — p99 inférieur à 50 ms et maximum inférieur à 100 ms pendant le démarrage et la passe de fond" "$(jf "$WORK/sonde-b.json" '(j.p99<50)+"|"+(j.max<100)')" "true|true"
+  NF="$(grep -c '"nom":"frise"' "$FLOGB.log")"
+  RYTHME="$(node -e "
+const fs=require('fs');const ev=fs.readFileSync(process.argv[1],'utf8').trim().split('\n').map((x)=>JSON.parse(x)).filter((e)=>e.nom==='frise').map((e)=>e.t);
+const t=JSON.parse(fs.readFileSync(process.argv[2],'utf8')).tours;const gaps=t.slice(1).map((x,i)=>x-t[i]),min=gaps.length?Math.min(...gaps):0;
+const eg=ev.slice(1).map((x,i)=>x-ev[i]);console.log([ev.length>=1,ev.length<=t.length+1,eg.every((g)=>g>=min-500)].join('|'))" "$FLOGB.log" "$WORK/tours-b.json" 2>/dev/null)"
+  assert_eq "F5.8 — rythme pendant la passe : au moins un événement frise, jamais plus d'événements que de tours vus plus un, écart entre deux événements d'au moins l'écart minimal entre deux tours moins 500 ms ; au terme, cibles.etat ok pour toutes les voies" "$RYTHME|$(jf "$WORK/frise-b.json" 'j.voies.every((v)=>v.cibles.etat==="ok")')" "true|true|true|true"
+  TAILLE="$(jf "$WORK/frise-b.json" 'j.voies.reduce((s,v)=>s+v.cibles.ecritures.length+v.cibles.lectures.length,0)')"
+  DUREES=""; for _ in 1 2 3 4 5; do t0=$(date +%s%N 2>/dev/null || echo 0); get /api/vf/frise > "$WORK/frise-b2.json"; t1=$(date +%s%N 2>/dev/null || echo 0); DUREES="$DUREES $(( (t1 - t0) / 1000000 ))"; done
+  echo "  (taille : $TAILLE entrées de cible, $(wc -c < "$WORK/frise-b2.json" | tr -d ' ') octets de réponse, $NF événements, durées de GET /api/vf/frise (ms) :$DUREES)"
+  assert_eq "F6.5 — taille : au plus 20 000 entrées de cible dans la frise de la fixture volumineuse, GET /api/vf/frise sous 400 ms à chaque essai (mesure consignée à la trace)" "$([ "$TAILLE" -le 20000 ] && [ "$TAILLE" -gt 0 ] && echo ok)|$(echo $DUREES | tr ' ' '\n' | awk '$1>400{n++} END{print n+0}')" "ok|0"
+  vf_hyg_stop "$SSE_B"; cockpit_arreter
+  # F6.4 : la sonde sait rougir sur le collecteur en ligne (les étapes tournent sur la boucle)
+  rm -f "$BLAB/.vibeflow/cockpit/.cache/index-transcripts.json"
+  PORT_EL="$(node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
+  VF_COCKPIT_SCRIPTS_DIR="$FAUX" PATH="$BIN:$PATH" HOME="$BHOME" node "$TESTS/frise-en-ligne.mjs" "$SCRIPTS" "$BLAB" "$BLAB/.vibeflow/cockpit" "$PORT_EL" "$WORK/el-etat.json" > "$WORK/el.out" 2>&1 &
+  EL_PID=$!; PIDS+=("$EL_PID")
+  attendre 30 test -f "$WORK/el-etat.json"
+  node "$TESTS/collecte-sonde.mjs" "$PORT_EL" 100 8000 > "$WORK/sonde-el.json"
+  vf_hyg_stop "$EL_PID"
+  echo "  (sonde en ligne : $(cat "$WORK/sonde-el.json"))"
+  assert_eq "F6.4 — la sonde sait rougir : sur le collecteur en ligne (étapes sur la boucle), la même sonde mesure un maximum d'au moins 100 ms, sans erreur de connexion (M-EN-LIGNE-FRISE : le rouge est celui de la sonde)" "$(jf "$WORK/sonde-el.json" 'j.n>=20&&j.erreurs===0&&j.max>=100')" "true"
+fi
+
 
 # @@SUITE@@
 vf_hyg_assert

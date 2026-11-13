@@ -119,6 +119,57 @@ if (mode === 'harnais') {
     const d = T - 3600e3 + 300e3, j = T - 3600e3 + 1000e3, x = await get(`depuis=${d}&jusqua=${j}`), q = x.j.voies[0];
     Object.assign(res, { segments: q.segments, evenements: q.evenements, durees: q.durees });
     const tout = await get(''); res.dureesTout = tout.j.voies[0].durees; res.dureesForgee = v.durees;
+  } else if (['emission', 'non-emission', 'changements', 'tours'].includes(cas)) {
+    const D2 = await imp('vf-cockpit-frise-direct.mjs'), dormir = (ms) => new Promise((r) => setTimeout(r, ms));
+    const ouvrir = () => new Promise((resolve) => {
+      const evs = []; let tampon = '';
+      const rq = http.get({ host: '127.0.0.1', port, path: '/api/vf/events', headers: { Host: `127.0.0.1:${port}`, 'x-vf-cockpit-token': TC }, agent: false }, (res) => {
+        res.setEncoding('utf8');
+        res.on('data', (c) => { tampon += c; let i; while ((i = tampon.indexOf('\n\n')) >= 0) { const b = tampon.slice(0, i); tampon = tampon.slice(i + 2);
+          const nom = /^event: (.*)$/m.exec(b)?.[1], d = /^data: (.*)$/m.exec(b)?.[1]; if (nom) { let data = null; try { data = JSON.parse(d); } catch { /* flux */ } evs.push({ nom, data }); if (nom === 'hello') resolve(z); } } });
+      });
+      rq.on('error', () => {});
+      const z = { evs, frises: () => evs.filter((e) => e.nom === 'frise'), hello: () => evs.find((e) => e.nom === 'hello'), fermer: () => rq.destroy() };
+    });
+    const base = () => voies(3), tour = async (v, o) => { poser(v, o); D2.finDeTour(); await dormir(60); };
+    const z = await ouvrir();
+    if (cas === 'emission') {
+      D.seq = 41; poser(base()); await dormir(80); res.avant = z.frises().length; D2.finDeTour(); await dormir(80);
+      const e = z.frises(); res.apres = e.length; res.cles = e[0] ? Object.keys(e[0].data).sort().join(',') : ''; res.sig = !!e[0] && /^[0-9a-f]{16}$/.test(e[0].data.sig);
+      res.seq = !!e[0] && e[0].data.seq === 41 && D.seq === 41; res.at = !!e[0] && Number.isInteger(e[0].data.at) && e[0].data.at > 1.7e12;
+      const z2 = await ouvrir(); res.hello = z2.hello().data.seq === 41; z2.fermer();
+    } else if (cas === 'non-emission') {
+      await tour(base()); const n0 = z.frises().length;
+      await tour(base()); res.memeFrise = z.frises().length - n0;
+      const b = base(), sig = V.sigFrise({ source: { etat: 'ok', ccVerifie: '2.1.322', versionsVues: [] }, tronque: false, voies: b });
+      I.poserFrise({ at: Date.now() + 5000, sig, source: { etat: 'ok', ccVerifie: '2.1.322', versionsVues: [] }, tronque: false, voies: b }); D2.finDeTour(); await dormir(60); res.autreAt = z.frises().length - n0;
+      I.poser({ seq: 9, at: Date.now(), git: null, signal: { x: 2 }, projet: { nodes: [], files: [] } }); D2.finDeTour(); await dormir(60); res.signalSeul = z.frises().length - n0;
+    } else if (cas === 'changements') {
+      const muts = { n: (v) => { v[0].cibles.ecritures[0].n += 1; }, dernierMs: (v) => { v[0].cibles.ecritures[0].dernierMs += 1; },
+        ajout: (v) => { v[0].cibles.ecritures.push({ arbre: null, cible: 'src/neuf.js', n: 1, dernierMs: T }); }, cibleEtat: (v) => { v[0].cibles.etat = 'en-construction'; },
+        cibleTronque: (v) => { v[0].cibles.tronque = true; }, officiel: (v) => { v[0].etatOfficiel = 'attend'; },
+        rattachement: (v) => { v[0].rattachement = { dag: 'p.json', noeud: 'n1', source: 'registre' }; }, voieAjoutee: (v) => { v.push(voieForgee(99)); }, voieRetiree: (v) => { v.pop(); } };
+      const rep = {};
+      for (const [nom, f] of Object.entries(muts)) {
+        await tour(base()); const n0 = z.frises().length, s0 = z.frises().at(-1)?.data.sig; const v = base(); f(v); await tour(v);
+        const n1 = z.frises().length, s1 = z.frises().at(-1)?.data.sig; rep[nom] = n1 - n0 === 1 && s1 !== s0;
+      }
+      for (const [nom, o] of Object.entries({ sourceEtat: { source: { etat: 'partielle', ccVerifie: '2.1.322', versionsVues: [] } }, tronque: { tronque: true } })) {
+        await tour(base()); const n0 = z.frises().length; await tour(base(), o); rep[nom] = z.frises().length - n0 === 1;
+      }
+      res.rep = rep;
+    } else {
+      await tour(base()); const n0 = z.frises().length;
+      poser(voies(3, { etat: 'actif' })); poser(voies(3, { etat: 'attend' })); poser(voies(4)); const s3 = I.instantane().frise.sig; D2.finDeTour(); await dormir(80);
+      res.troisPoses = z.frises().length - n0; res.derniereSig = z.frises().at(-1).data.sig === s3;
+      const n1 = z.frises().length; poser(voies(5)); D2.finDeTour(); await dormir(60); res.deuxTours = z.frises().length - n1;
+      const n2 = z.frises().length; D2.finDeTour(); await dormir(60); res.sansChangement = z.frises().length - n2;
+      poser(voies(6)); poser(voies(5)); D2.finDeTour(); await dormir(60); res.retour = z.frises().length - n2;
+      const n3 = z.frises().length, src = { etat: 'ok', ccVerifie: '', versionsVues: [] };
+      for (const [i, suite] of [true, true, true, false, false].entries()) D2.recevoirFrise({ complet: i === 0, majs: [{ ...voieForgee(i + 20) }], suite, retirees: [], source: src, tronque: false, sig: `${i}`.repeat(16) });
+      D2.finDeTour(); await dormir(80); res.paquets = z.frises().length - n3;
+    }
+    z.fermer();
   } else if (cas === 'cap') {
     const r = {};
     poser(voies(620, { }).map((v, i) => ({ ...v, etatOfficiel: i < 5 ? 'actif' : null }))); let x = await get(''), y = await get('champs=cibles');
@@ -181,6 +232,8 @@ if (mode === 'harnais') {
     const retire = vs.pop(); const r4 = run(m);
     const r5 = run(memo(vs));
     Object.assign(res, { forme, sig: /^[0-9a-f]{16}$/.test(dernier.sig), champsFin: ['source', 'tronque', 'retirees', 'sig'].every((k) => k in dernier), second: r2.messages.length, ids3, retirees: r4.messages.at(-1).retirees, retire: retire.id, completNeuf: r5.messages[0].complet === true });
+  } else if (cas === 'sansbranche') {
+    let leve = false; try { D2.finDeTour(); D2.finDeTour(); } catch { leve = true; } res.leve = leve;
   } else if (cas === 'fusion') {
     const sigs = []; I.surInstantane((i) => sigs.push(i && i.frise ? i.frise.sig : null));
     const pv = (id, d) => ({ ...voieForgee(0), id, debut: d });
