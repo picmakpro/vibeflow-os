@@ -21,3 +21,6 @@ terminal-activation 53/1 (T7.5 : `ui/04-vf-canevas-champ.js`, 80-12 d'un voisin)
 
 rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
 CHANGELOG demandé par 80-18 : « Les extensions de la page lisent l'attribut neutre `data-vf-flottant` posé par le terminal, plus une forme ; le tiroir Git se replace à l'arrivée de la pastille. »
+
+## Complément (correction ciblée du manager p80)
+02-vf-reperes.js : l'observateur du corps observe aussi childList (arrivée tardive de la pastille). Témoin NE1.6 rouge (1 -> 1) puis vert (1 -> 0), mutant M-REPERES-REJEU. Suites : neutre 13/0, coin 44/0, couloirs voir bloc.
