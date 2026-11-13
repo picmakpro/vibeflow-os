@@ -2,6 +2,7 @@
 # test-cockpit-activite-route.sh — Phase 75, plan 75-05 (ACTV-04, ACTV-08, ACTV-10, ACTV-12 ; P75-D-09, P75-D-22, P75-D-23, A10, A11, A25, A31, A45, A47) :
 # la route GET /api/vf/activite, son schéma, son cache par signature, son mono-vol, ses dégradations et l'export autonome qui reste fermé.
 #   R1-R4 route, accès, table, schéma (serveur lancé) · R5-R17 assemblage, cache, mono-vol, clés, dégradations, bornes (module en node, hors serveur)
+#   X1-X3 l'export autonome ne porte rien de l'activité (A25), avec son témoin positif
 # Mutants : une copie des scripts, l'ancre à exactement une occurrence, `node --check` prouve que la copie charge ; le témoin rejoué DOIT rougir.
 # Sortie : « PASS — <id> : … », « ❌ FAIL — <id> : … », « MUTANT-ROUGE — <nom> », « BILAN : n PASS, m FAIL » ; code non nul au premier FAIL.
 # Lab neutre dans mktemp, HOME jetable, isolation git. Le code testé est celui du dossier de cette suite.
@@ -345,6 +346,51 @@ export const routeActivite")"
 M="$(mutant chemin-decode vf-cockpit-activite.mjs "export const routeActivite" "const _d = (c) => decodeURIComponent(c);
 export const routeActivite")"
 [ "$(grep -c -E "$PAT_R12" "$M/vf-cockpit-activite.mjs" || true)" = "0" ] || rouge "chemin-decode"
+
+echo "=== X1-X3 — l'objet d'activité ne sort jamais par l'export autonome (A25), avec son témoin positif ==="
+# marqueur unique par exécution (aléatoire, jamais un littéral du dépôt) : nom de la branche du lab, donc d'une collision de branches de /api/vf/activite
+MQ="MQ-$(node -e 'console.log(require("crypto").randomBytes(6).toString("hex"))')"
+XLAB="$WORK/xlab"; XWT="$WORK/xwt"; XOUT="$XLAB/.vibeflow/cockpit"
+node "$TESTS/frise-labo.mjs" lab "$XLAB"
+git -C "$XLAB" checkout -q -b "$MQ"
+git -C "$XLAB" worktree add -q -b autre "$XWT"
+printf '// worktree\n' >> "$XWT/src/a.js"; git -C "$XWT" -c user.email=t@t -c user.name=t commit -q -a -m wt
+printf '// lab\n' >> "$XLAB/src/a.js"; git -C "$XLAB" -c user.email=t@t -c user.name=t commit -q -a -m lab
+node "$SCRIPTS/vf-cockpit-build.mjs" "$XLAB" --quiet > "$WORK/build-x.out" 2>&1 || { echo "❌ FAIL — X0 : assemblage du lab X"; cat "$WORK/build-x.out"; echo "BILAN : $NB PASS, $((NF+1)) FAIL"; exit 1; }
+cockpit_lancer "$XLAB"
+cat > "$AUX/jeton.mjs" <<'JS'
+// jeton.mjs <port> <chemin> : jeton lu dans l'objet serveur injecté dans la page servie
+import http from 'node:http';
+const [, , port, p] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}` } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => console.log(/VF_COCKPIT_SERVER=\{"token":"([0-9a-f]+)"/.exec(b)?.[1] || '')); });
+JS
+XTOK="$(node "$AUX/jeton.mjs" "$VF_PORT" /index.html)"
+nb() { grep -c -F "$1" "$2" 2>/dev/null || true; }
+activite_pret() { cockpit_get /api/vf/activite > "$WORK/x-act.json" 2> /dev/null; [ "$(jf "$WORK/x-act.json" 'j.calcul==="pret"&&j.branches.etat==="ok"')" = true ]; }
+attendre 60 activite_pret
+ok X0 "témoins de présence : le marqueur est dans la réponse de /api/vf/activite (collision de branches) ET dans graph.json de la sortie (en-tête git du lab) : un export qui ne retirerait rien le porterait" \
+  "$([ "$(nb "$MQ" "$WORK/x-act.json")" -ge 1 ] && echo act || echo sans-act)|$([ "$(nb "$MQ" "$XOUT/graph.json")" -ge 1 ] && echo graphe || echo sans-graphe)" "act|graphe"
+exporter_cli() { rm -f "$WORK/$1"; cockpit_exporter "$XLAB" "$WORK/$1" --include flows,notes,recent,health > "$WORK/$1.log" 2>&1; }
+exporter_route() { rm -f "$WORK/$1"; GRAPHE_METHODE=POST GRAPHE_CORPS='{"include":["flows","notes","recent","health"]}' gc get "$VF_PORT" /api/export "$XTOK" "" "Content-Type=application/json" > "$WORK/$1.rep"
+  node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));require("fs").writeFileSync(process.argv[2],j.corps||"")' "$WORK/$1.rep" "$WORK/$1"; }
+exporter_cli x1.html; exporter_route x2.html
+ok X1 "l'export autonome (ligne de commande ET route /api/export) ne contient le marqueur NULLE PART ; témoin : les deux exports existent et portent le graphe" \
+  "$([ "$(nb VF_COCKPIT "$WORK/x1.html")" -ge 1 ] && echo graphe || echo vide)|$([ "$(nb VF_COCKPIT "$WORK/x2.html")" -ge 1 ] && echo graphe || echo vide)|$(nb "$MQ" "$WORK/x1.html")|$(nb "$MQ" "$WORK/x2.html")" "graphe|graphe|0|0"
+# X3 : mutant — l'export garde l'en-tête git du lab (vfGit, où vit le nom de la branche) : le marqueur sort
+unset COCKPIT_MODULE
+cockpit_module_muter export-garde-vfgit serve.mjs 's|(({ vfTouch, vfGit, ...m }) => m)(g.meta)|g.meta|' > "$WORK/x3-muter.out" 2>&1; X3_RC=$?
+rm -f "$WORK/x3.html"; cockpit_exporter "$XLAB" "$WORK/x3.html" --include flows,notes,recent,health > "$WORK/x3.log" 2>&1; unset COCKPIT_MODULE
+ok X3 "mutant « l'export garde ce qu'il retire » (copie du module, ancre du retrait de vfGit) : le marqueur sort de l'export, X1 rougit pour la bonne raison (l'export existe et porte le graphe)" \
+  "$X3_RC|$([ "$(nb VF_COCKPIT "$WORK/x3.html")" -ge 1 ] && echo graphe || echo vide)|$([ "$(nb "$MQ" "$WORK/x3.html")" -ge 1 ] && echo marqueur-present || echo absent)" "0|graphe|marqueur-present"
+rouge "objet-d-activite-injecte-dans-l-export"
+# X2 : témoin positif — le même marqueur, cette fois dans une donnée exportée légitime (le nom d'un fichier du graphe), apparaît dans l'export
+printf '// %s : témoin positif\nexport const t = 1;\n' "$MQ" > "$XLAB/src/$MQ.js"
+git -C "$XLAB" add -A && git -C "$XLAB" -c user.email=t@t -c user.name=t commit -q -m temoin
+node "$SCRIPTS/vf-cockpit-build.mjs" "$XLAB" --quiet > "$WORK/build-x2.out" 2>&1 || { echo "❌ FAIL — X2 : réassemblage du lab X"; cat "$WORK/build-x2.out"; echo "BILAN : $NB PASS, $((NF+1)) FAIL"; exit 1; }
+exporter_cli x4.html
+ok X2 "témoin positif : le même marqueur, présent dans une donnée exportée légitime (un fichier du lab décrit par la page Code), apparaît dans l'export : sans lui X1 ne prouve rien" "$([ "$(nb "$MQ" "$WORK/x4.html")" -ge 1 ] && echo present || echo absent)" "present"
+ok X4 "le module serve.mjs n'importe ni ne nomme l'activité : aucune voie de l'objet vers l'export" "$(grep -c -i 'activite' "$SCRIPTS/../skills/cockpit-moteur/assets/serve.mjs" || true)" "0"
+cockpit_arreter
 
 # --- FIN-SECTIONS ---
 vf_hyg_assert

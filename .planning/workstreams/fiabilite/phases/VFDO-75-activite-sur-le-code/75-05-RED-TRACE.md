@@ -79,3 +79,20 @@ Mutants (rejoués : un cas en node sur une copie des scripts, l'ancre à exactem
 | `borne-de-la-reponse-retiree` | réponse bornée à 500 collisions | R18 | 700 tuples servis |
 | `lecture-propre-du-lab` | aucune lecture du lab par le module | R12b | `node:fs` apparaît dans le module |
 | `chemin-decode` | aucun chemin décodé | R12b | `decodeURIComponent` apparaît dans le module |
+
+## Tâche 3 — témoin d'export à marqueur unique, avec son témoin positif (A25)
+
+Base : `97e821f3`. Marqueur : `MQ-` suivi de douze hexadécimaux tirés à chaque exécution (jamais un littéral du dépôt, jamais imprimé : la suite ne l'écrit pas) ; il nomme la branche du lab,
+donc il figure à la fois dans une collision de branches de `/api/vf/activite` et dans l'en-tête git de `graph.json` (`meta.vfGit`, que l'export retire).
+
+| Témoin | Résultat | Note |
+|---|---|---|
+| X0 | vrai | le marqueur est dans la réponse de la route ET dans `graph.json` : un export qui ne retirerait rien le porterait (sans cela X1 serait vide) |
+| X1 | vert d'emblée | export en ligne de commande et par `/api/export` : zéro occurrence ; les deux exports existent et portent le graphe. Vert sur la base : l'export ne reçoit déjà rien de l'objet d'activité (aucun import), ce que X4 dit par la source de `serve.mjs` |
+| X3 (mutant) | rouge | `export-garde-vfgit` : copie du module où l'export garde `g.meta` entier, vérifiée chargée (code 0), le marqueur SORT de l'export : X1 rougit, pour la bonne raison (l'export existe et porte le graphe) |
+| X2 (positif) | vrai | le même marqueur, posé dans le nom d'un fichier du lab décrit par la page Code, apparaît dans l'export : X1 ne prouve donc pas « le marqueur ne sort jamais par aucun chemin » à vide |
+| X4 | vert | `serve.mjs` ne nomme pas l'activité |
+
+Le correctif d'une fuite irait dans le module d'export de la 79 (hors plan) : aucune fuite constatée, rien à remonter. Vert : `30 PASS / 0 FAIL`, 95 s, `20` mutants rouges cumulés (4 + 13 + 2 de source + 1).
+Écart au plan : le plan voulait « une cible d'empreinte » dans les données ; une cible d'empreinte a toujours une carte (le radar ne rend que des chemins à carte), donc son nom est aussi dans `graph.json` et
+dans l'export légitime : elle ne peut pas servir de marqueur de fuite. Le nom de branche, lui, n'est pas une donnée exportée (retirée avec `vfGit`).
