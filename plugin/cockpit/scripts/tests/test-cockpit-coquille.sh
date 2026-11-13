@@ -349,15 +349,18 @@ if cockpit_module_muter cle vf-coquille.js "s|const remplacee = .*// garde:coqui
 else assert_eq "M-CLE — mutant sans effet (ancre garde:coquille-cle absente)" "sans effet" "effet"; fi
 echo "=== C6 — après des changements d'onglet, le document équivaut à un chargement à froid (par classes) ==="
 cat > "$AUX/c6froid.js" <<'JS'
-await pause(400);
-const emp = await s.ev(`__s.empreinte()`);
+await s.attendre(`document.documentElement.dataset.vfPret === 'oui'`, 'document prêt');
+// la pastille #vf-lock naît du premier évènement du flux du direct : elle arrive APRÈS « pret », en un temps que la charge allonge ; mesurer une fois posée
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+const emp = await s.stable('__s.empreinte()', 'empreinte du document à froid'); // mesurer une fois posé : deux relevés consécutifs égaux, jamais une pause fixe
 return { emp, prof: await s.ev(`__s.profondeurFetch()`) };
 JS
 cat > "$AUX/c6seq.js" <<'JS'
 const res = [];
 for (const nom of (JSON.parse('SUITE'))) {
-  await s.ev(`VF_COQUILLE.chargerOnglet('${nom}')`); await pause(400);
-  res.push({ nom, emp: await s.ev(`__s.empreinte()`), prof: await s.ev(`__s.profondeurFetch()`) });
+  await s.ev(`VF_COQUILLE.chargerOnglet('${nom}')`);
+  await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+  res.push({ nom, emp: await s.stable('__s.empreinte()', 'empreinte après ' + nom), prof: await s.ev(`__s.profondeurFetch()`) });
 }
 return res;
 JS
@@ -394,12 +397,12 @@ JS
 CPX="$(cockpit_module_copie)"; printf '%s\n' '(() => { const f = window.fetch; window.fetch = function (...a) { return f.apply(this, a); }; })();' > "$CPX/skills/cockpit-moteur/assets/ui/96-vf-fixture-fetch.js"
 COCKPIT_MODULE="$CPX" demarrer "$LAB"; chrome avec "http://127.0.0.1:$PORT/project.html" "$AUX/c6fetch.js" > "$WORK/c6fetch-t.json"; cockpit_arreter; unset COCKPIT_MODULE
 assert_eq "C6.2 — témoin du mutant M-FETCH : une extension de test enveloppe fetch à chaque onglet ; la profondeur reste la même à chaque onglet (le remplacement est défait à chaque changement) et l'enveloppe est vue (profondeur au moins 1)" "$(oj '[new Set(j).size===1,j[0]>=1]' < "$WORK/c6fetch-t.json")" "[true,true]"
-for m in "ecouteurs|balises,ecouteurs|s|for (const \[c, t, f, o\] of j.ecouteurs) REL.call(c, t, f, o); // garde:coquille-demontage-ecouteurs|;|" \
+for m in "ecouteurs|ecouteurs|s|for (const \[c, t, f, o\] of j.ecouteurs) REL.call(c, t, f, o); // garde:coquille-demontage-ecouteurs|;|" \
          "corps|balises,ids,vivants|s|for (const n of \[...D.body.childNodes\]) if (!etrangers.has(n)) n.remove(); // garde:coquille-corps|;|" \
-         "head|balises,tete|s|for (const n of apres.tete) if (!j.avant.tete.has(n)) n.remove(); // garde:coquille-head|;|"; do
+         "head|tete|s|for (const n of apres.tete) if (!j.avant.tete.has(n)) n.remove(); // garde:coquille-head|;|"; do
   nom="${m%%|*}"; reste="${m#*|}"; att="${reste%%|*}"; expr="${reste#*|}"
   if cockpit_module_muter "$nom" vf-coquille-portee.js "$expr"; then
-    demarrer "$LAB"; assert_eq "M-$(echo "$nom" | tr a-z A-Z) — rougit les classes « $att » (la sienne et ses effets directs : des gestionnaires ou des observateurs d'un moteur mort qui agissent encore), aucune autre, sur code, projet, equipe depuis /project.html" "$(suite_classes "$WORK/froid" '["code","projet","equipe"]')" "$att"; cockpit_arreter; unset COCKPIT_MODULE
+    demarrer "$LAB"; assert_eq "M-$(echo "$nom" | tr a-z A-Z) — rougit les classes « $att » (les siennes seules : la visite du premier passage, qui réveillait selon la charge les gestionnaires d'un moteur mort, est lue comme faite), aucune autre, sur code, projet, equipe depuis /project.html" "$(suite_classes "$WORK/froid" '["code","projet","equipe"]')" "$att"; cockpit_arreter; unset COCKPIT_MODULE
   else assert_eq "M-$(echo "$nom" | tr a-z A-Z) — mutant sans effet (ancre absente)" "sans effet" "effet"; fi
 done
 CPY="$(cockpit_module_copie)"; cp "$CPX/skills/cockpit-moteur/assets/ui/96-vf-fixture-fetch.js" "$CPY/skills/cockpit-moteur/assets/ui/"
@@ -472,8 +475,10 @@ cat > "$AUX/c8c.js" <<'JS'
 // panne: oui
 await pause(300); panne.actif = false;
 await s.ev(`document.querySelector('#vf-coquille-echec button').click()`);
-await s.attendre(`VF_COQUILLE.etat().phase === 'pret'`, 'retour à pret après Réessayer'); await pause(400);
-return { ...(await s.ev(MESURE)), emp: await s.ev('__s.empreinte()'), prof: await s.ev('__s.profondeurFetch()') };
+await s.attendre(`VF_COQUILLE.etat().phase === 'pret'`, 'retour à pret après Réessayer');
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+const empC = await s.stable('__s.empreinte()', 'empreinte après Réessayer');
+return { ...(await s.ev(MESURE)), emp: empC, prof: await s.ev('__s.profondeurFetch()') };
 JS
 cat > "$AUX/c8d.js" <<'JS'
 // echec: true
@@ -483,7 +488,7 @@ return await s.ev(MESURE);
 JS
 cat > "$AUX/c8e.js" <<'JS'
 // panne: non
-await pause(700); const avant = await s.ev(MESURE);
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await pause(700); const avant = await s.ev(MESURE);
 panne.actif = true;
 const rej = await s.ev(`VF_COQUILLE.chargerOnglet('code').then(() => 'resolu', (e) => String(e.message))`); await pause(300);
 const apres = await s.ev(MESURE); panne.actif = false;
@@ -492,7 +497,7 @@ return { avant, rej, apres, suite };
 JS
 cat > "$AUX/c8f.js" <<'JS'
 // panne: non
-await pause(300); return { ...(await s.ev(MESURE)), emp: await s.ev('__s.empreinte()'), prof: await s.ev('__s.profondeurFetch()') };
+await s.attendre(`document.documentElement.dataset.vfPret === 'oui'`, 'document prêt'); await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); const empF = await s.stable('__s.empreinte()', 'empreinte du chargement normal'); return { ...(await s.ev(MESURE)), emp: empF, prof: await s.ev('__s.profondeurFetch()') };
 JS
 cat > "$AUX/c8verdict.mjs" <<'JS'
 // c8verdict.mjs <dossier> : les contrôles de C8 qui échouent (noms), un par ligne ; vide = tout vert
@@ -554,7 +559,6 @@ mut_a37() { # <nom> <sed> : le modèle de jugement muté, rejoué sur les mêmes
 }
 assert_eq "M-LEXICAL — moduleAdmis jugeant des chemins normalisés : rougit A37.1 sur les liens (vers l'intérieur, chaîne, vers l'extérieur, pendant, boucle), jamais sur les cas sains" "$(mut_a37 lexical 's|const r = cheminPhysique(d); // garde:coquille-chemin|const r = path.resolve(d);|')" "lien-vers-interieur,chaine-de-deux,lien-vers-exterieur,pendant,boucle"
 assert_eq "M-ECHEC-OUVERT — un échec de résolution vaut accord : rougit A37.1 sur le lien pendant et la boucle" "$(mut_a37 ouvert 's|if (r === null) throw refus(.dossier du module introuvable : refus..); // garde:coquille-echec|if (r === null) continue;|')" "pendant,boucle"
-
 mut_id() { # <nom> <sed> : identiteServeur muté, rejoué sur les mêmes dispositions ; rend les quatre verdicts d'A37.2
   cockpit_module_muter "$1" vf-cockpit-serveur-vivant.mjs "$2" || return 1
   rm -rf "$WORK/a37i"; node "$TESTS/coquille-propriete.mjs" gardes "$COCKPIT_MODULE/scripts" "$WORK/a37i" 2>/dev/null | oj '[j.identites.memeLab,j.identites.prefixe,j.identites.pendante,j.identites.memeModule].join()'
