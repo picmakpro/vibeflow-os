@@ -21,7 +21,7 @@
     return p;
   };
 
-  // zone : un conteneur rempli d'une lecture asynchrone ; chargement montré après 150 ms seulement, séquence contre les réponses périmées,
+  // zone : un conteneur rempli d'une lecture asynchrone ; chargement montré après 150 ms seulement, séquence contre les réponses en retard,
   // cache, erreur avec « Réessayer » (sauf `sansEtat` : une zone qui reste cachée sans donnée)
   VT.zone = (cont, { cle, lire, rendre, ouvert, sansEtat }) => {
     const z = { cont, seq: 0, rendu: false, ouvert: ouvert || (() => true) };
