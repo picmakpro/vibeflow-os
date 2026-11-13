@@ -7,7 +7,8 @@
 //           etapeTour({ racine, sortie, scriptsDir, home, memo, maintenant, sansIndex })
 //           (verrou lu une fois ; équipe avec l'état officiel et CE MÊME verrou ; verrous projetés avec les sessions de la collecte ; signal construit sur
 //           cette équipe et ces verrous ; puis l'index des transcripts, sauf sansIndex) -> { verrous, equipe, signal, erreurs, dureeMs, index }
-//           (index : rapport en comptes ; les voies restent dans memo.index ; memo.sessions : sessions de la dernière équipe lue ;
+//           (memo.table : table des agents de la dernière équipe lue, 79-22 ;
+//           index : rapport en comptes ; les voies restent dans memo.index ; memo.sessions : sessions de la dernière équipe lue ;
 //           `frise` : { messages, reste } de l'étape de frise, 79-13, jamais posté dans le message `tour`).
 // `erreurs` : noms d'étapes d'une liste fermée (`verrous`, `equipe`, `signal`, `index`, `frise`, et `tour` posté par le fil quand le tour entier lève) ;
 // un échec laisse un résultat neutre, comme la collecte d'avant : le tour dégrade, il ne lève jamais.
@@ -18,6 +19,7 @@ import { etapeIndex } from './vf-cockpit-collecte-index.mjs';
 import { etapeFrise } from './vf-cockpit-collecte-frise.mjs';
 import { verrousDe } from './vf-cockpit-vie.mjs';
 import { collectSignal, projeterVerrous } from './vf-cockpit-signal.mjs';
+import { creerTable } from './vf-cockpit-agents-table.mjs';
 
 export const creerMemoire = () => ({});
 
@@ -39,8 +41,8 @@ export function etapeTour({ racine, sortie, scriptsDir, home, memo = creerMemoir
   const t0 = Date.now(), erreurs = [];
   let brut = { available: false };
   try { brut = lireBrut({ racine, scriptsDir, home }); } catch { erreurs.push('verrous'); }
-  let equipe;
-  try { equipe = collectWho(racine, { scriptsDir, verrous: brut, officiel: true, home }); } catch (e) {
+  let equipe; memo.table ||= creerTable(); // 79-22 : la table des agents du fil est alimentée par CETTE collecte (surAgents), jamais par une seconde
+  try { equipe = collectWho(racine, { scriptsDir, verrous: brut, officiel: true, home, surAgents: (w, r) => memo.table.remplacer(w, r) }); } catch (e) {
     erreurs.push('equipe'); equipe = { workers: [], sources: {}, error: String(e.message).slice(0, 200) };
   }
   // sansSession se décide sur les sessions de CETTE équipe ; équipe illisible : aucun verdict (l'ensemble reste celui du tour précédent, ou absent)

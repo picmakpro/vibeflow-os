@@ -23,8 +23,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { startLive } from './vf-cockpit-live.mjs';
-import { revealDoing, revealTranscript } from './vf-cockpit-who.mjs';
-import { resolveScriptsDir, trustedScriptsDir } from './vf-cockpit-paths.mjs';
+import { lireAgent } from './vf-cockpit-agents-table.mjs';
+import { trustedScriptsDir } from './vf-cockpit-paths.mjs';
 import { dossierModule, substituerModule } from './vf-cockpit-module.mjs';
 import { ID_RE } from './vf-cockpit-lecture.mjs';
 import { creerGraphes } from './vf-cockpit-graphe.mjs';
@@ -69,11 +69,11 @@ const lireJournal = (c) => ({ evenements: c.journal });
 const idOuRefus = (url) => { const id = url.searchParams.get('id'); return typeof id === 'string' && ID_RE.test(id) ? id : null; };
 const lireDoing = (c, req, url) => { // jamais journalisée ni écrite : la réponse part et c'est tout
   const id = idOuRefus(url);
-  return id === null ? reponse(400, { erreur: 'id-invalide' }) : revealDoing(c.root, id, { scriptsDir: resolveScriptsDir(c.here) });
+  return id === null ? reponse(400, { erreur: 'id-invalide' }) : lireAgent('doing', id);
 };
 const lireTranscript = (c, req, url) => { // à la demande seulement, jamais journalisée ni écrite (P69-D-19)
   const id = idOuRefus(url);
-  return id === null ? reponse(400, { erreur: 'id-invalide' }) : revealTranscript(c.root, id, { scriptsDir: resolveScriptsDir(c.here) });
+  return id === null ? reponse(400, { erreur: 'id-invalide' }) : lireAgent('transcript', id);
 };
 const lireModeles = (c) => {
   let reel = c.root; try { reel = fs.realpathSync(c.root); } catch {} // le lab peut disparaître en cours de route : jamais une exception

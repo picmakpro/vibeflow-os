@@ -90,18 +90,20 @@ async function egal(scripts, lab, home, faux) {
   const ids = ['sess-ag-0001', 'role1', 'gone1', 'inconnu-xyz'], r = { avant: {}, egal: {}, sorti: {} };
   for (const id of ids) r.avant[id] = entree(await T.lireAgent('transcript', id)) === entree({ schema: 'vibeflow/cockpit-transcript@2', id, erreur: 'inconnu' });
   c.demander({ tour: true }); r.tour1 = await c.pret(60000);
-  fs.rmSync(path.join(home, '.claude/projects/-lab/sess-ag-0001/subagents/agent-gone1.jsonl'));
+  const sous = path.join(home, '.claude/projects/-lab/sess-ag-0001/subagents'), gone = path.join(sous, 'agent-gone1.jsonl'), sortant = path.join(sous, 'agent-out1.jsonl');
+  const gardeGone = fs.readFileSync(gone), mt = fs.statSync(gone).mtime; // la fixture est rendue telle quelle à la fin (les scénarios suivants la relisent)
+  fs.rmSync(gone);
   for (const id of ids) {
     const nouveau = { t: await T.lireAgent('transcript', id), d: await T.lireAgent('doing', id) };
     const ancien = { t: W.revealTranscript(lab, id, opts), d: W.revealDoing(lab, id, opts) };
     r.egal[id] = [entree(nouveau.t) === entree(ancien.t), entree(nouveau.d) === entree(ancien.d), nouveau.t.erreur || 'corps', nouveau.d.erreur || nouveau.d.doing];
   }
   r.mandat = (await T.lireAgent('transcript', 'role1')).mandat;
-  const vieux = new Date(Date.now() - 25 * 3600e3), f = path.join(home, '.claude/projects/-lab/sess-ag-0001/subagents/agent-out1.jsonl');
+  const vieux = new Date(Date.now() - 25 * 3600e3), f = sortant, mtOut = fs.statSync(f).mtime;
   r.presentAvant = (await T.lireAgent('transcript', 'out1')).erreur === undefined;
   fs.utimesSync(f, vieux, vieux); c.demander({ tour: true }); await c.pret(60000);
   r.sorti = (await T.lireAgent('transcript', 'out1')).erreur;
-  c.arreter(); console.log(JSON.stringify(r));
+  c.arreter(); fs.writeFileSync(gone, gardeGone); fs.utimesSync(gone, mt, mt); fs.utimesSync(f, mtOut, mtOut); console.log(JSON.stringify(r));
 }
 async function borne(scripts) {
   const T = await imp(scripts, 'vf-cockpit-agents-table.mjs'), t = T.creerTable({ max: T.TABLE_MAX }), r = { max: T.TABLE_MAX, retenus: [], inconnus: {} };
@@ -140,7 +142,7 @@ async function file(scripts, lab, sortie) {
   c.arreter(); console.log(JSON.stringify(r));
 }
 async function erreur(scripts, lab) {
-  const T = await imp(scripts, 'vf-cockpit-agents-table.mjs'), forge = `${lab}/x\0${M_ERREUR}`, r = {};
+  const T = await imp(scripts, 'vf-cockpit-agents-table.mjs'), forge = `x\0${M_ERREUR}`, r = {};
   const t = T.creerTable({ max: 10 }); t.remplacer([{ kind: 'subagent', id: 'forge1', _tr: forge }, { kind: 'session', id: 'forge2', _tr: forge }], new Map());
   const vide = T.creerTable({ max: 10 });
   for (const q of ['transcript', 'doing']) {
