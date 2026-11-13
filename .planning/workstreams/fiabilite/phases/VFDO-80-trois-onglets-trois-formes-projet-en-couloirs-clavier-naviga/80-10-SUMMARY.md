@@ -23,6 +23,7 @@
 - Défaut hors périmètre (signalé par le nœud sf35) : `41-vf-projet-clavier.js`, `membres(h1)` lève (`closest('.vp-details')` nul) quand `repli` pose le focus sur le `h1`.
   À chaque arrivée sur Projet sans sélection, `aller` était rejetée ; `00-vf-onglets.js` protège désormais ses gestes d'arrivée (la promesse ne dit que le chargement) et
   consigne l'erreur. Correctif de la cause confié au nœud `fixclav`. OG2.13 (modale ouverte puis `aller`) en témoin, qui ignore cette seule erreur de console.
+- Correction ciblée (constat du nœud p13) : le moteur d'arrivée lisait le fragment de l'onglet quitté (`z`, `s`, `v`) au premier rendu. `aller`, le clic et Précédent-Suivant retirent le fragment (replaceState, aucune entrée) pendant le chargement, le mémorisent, le remettent à l'entrée quittée après le chargement ou si le chargement est rejeté ; depuis `popstate` rien n'est touché. OG2.14 et OG2.14b (rouge d'abord : `z` appliqué à Projet sur la version d'avant). Premier essai sans remise de l'entrée quittée : OG2.4, OG2.4b, OG2.12 rouges (le replaceState effaçait son fragment), d'où la remise. Suites : onglets 29/0, lien-vue 14/0.
 - Mutants M-RECHARGE … M-FRAGMENT-REPORTE : non écrits. Rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale).
 
 ## Suites (sur la tête commitée)

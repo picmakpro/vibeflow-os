@@ -162,6 +162,16 @@ await executer(chrome, async (s) => {
     });
   }
 
+  if (mode === 'og214') {
+    await sec('og214', async () => { // un z posé sur Code ne s'applique pas au premier rendu de Projet ; un rejet rend l'adresse à l'identique
+      await charger('/'); await s.ev(`history.replaceState(null, '', '/#z=1.5,10.5,20.25')`); const e0 = await etat(); await s.ev('__o.echec = 1');
+      const r = JSON.parse(await s.ev(`(async () => JSON.stringify(await VF_ONGLETS.aller('projet').then(() => 'ok', () => 'rejet')))()`));
+      o.og214r = { r, apres: await rien(300), avant: e0 }; await s.ev('__o.echec = 0');
+      await s.ev(`VF_ONGLETS.aller('projet')`); const e1 = await arrivee(1, 'projet');
+      o.og214 = { p: e1.p, h: e1.h, tk: e1.tk, cont: e1.cont };
+    });
+  }
+
   if (mode === 'og3') {
     await sec('og3', async () => {
       await charger('/'); const id = await premier(); await s.ev(`VibeFlow.select(${JSON.stringify(id)})`); await pause(300);

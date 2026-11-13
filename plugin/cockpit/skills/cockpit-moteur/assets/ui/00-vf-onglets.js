@@ -21,14 +21,12 @@
   const fragmentValide = (f) => typeof f === 'string' && f.length <= 1024 && /^#[^\s\u0000-\u001f\u007f]*$/.test(f);
 
   // la vue de l'onglet quitté, juste avant son démontage ; le fragment est lu avant tout changement d'adresse (sauf départ par popstate)
-  const memoriser = (nom, depart) => {
+  const memoriser = (nom) => {
     const SC = moteur(); if (!SC || !SC.state) return;
     const t = SC.state.t, v = { cont: SC.state.container, sel: typeof SC.state.selected === 'string' ? SC.state.selected : null, t: null };
     if (t && [t.k, t.x, t.y].every(Number.isFinite)) v.t = { k: t.k, x: t.x, y: t.y };
     vues.set(nom, v);
-    if (depart !== 'popstate') hashes.set(nom, location.hash);
   };
-  let depart = 'clic';
 
   const titrer = (nom) => {
     const SC = moteur(), p = SC && SC.graph && SC.graph.project, n = String((p && p.name) || '').replace(/ — (Projet|Équipe)$/, '');
@@ -79,14 +77,22 @@
 
   // la seule fonction de chargement : clic, popstate et aller. `pop` : le navigateur a déjà posé l'adresse ; `fragment` : posé tel quel (aller)
   const charger = (nom, { pop = false, fragment = null } = {}) => {
-    const precedent = C.onglet(), git = gitOuvert();
-    depart = pop ? 'popstate' : 'clic';
+    const precedent = C.onglet(), git = gitOuvert(), avant = location.hash;
+    // le moteur d'arrivée lit l'adresse au premier rendu : le fragment de l'onglet quitté (v, s, z, git) ne doit pas s'y appliquer. Il est mémorisé, retiré
+    // pendant le chargement (replaceState, aucune entrée d'historique) et remis à l'identique, chargement rejeté ou non (l'entrée quittée le garde).
+    // Depuis popstate, l'adresse est déjà celle de l'arrivée.
+    if (!pop) {
+      if (precedent) hashes.set(precedent, avant);
+      if (avant) history.replaceState(null, '', location.pathname + location.search);
+    }
     return C.chargerOnglet(nom).then(() => {
+      if (!pop && avant) history.replaceState(null, '', location.pathname + location.search + avant); // l'entrée quittée garde son fragment
       if (!pop) history.pushState(null, '', CHEMIN[nom] + (fragment !== null ? fragment : hashes.get(nom) || ''));
       return arriver(nom, precedent, !pop && fragment === null, git);
     }, (e) => {
       const a = C.onglet();
       if (pop && a) history.replaceState(null, '', CHEMIN[a] + (hashes.get(a) || ''));
+      if (!pop && avant) history.replaceState(null, '', location.pathname + location.search + avant);
       throw e;
     });
   };
@@ -115,7 +121,7 @@
       if (nom !== C.onglet()) charger(nom).catch(() => {});
     };
     document.addEventListener('click', clic, true);
-    return () => { document.removeEventListener('click', clic, true); memoriser(onglet, depart); depart = 'clic'; };
+    return () => { document.removeEventListener('click', clic, true); memoriser(onglet); };
   }, { cle: '00-vf-onglets.js' });
 
   window.VF_ONGLETS = Object.freeze({ aller, courant: () => C.onglet() });

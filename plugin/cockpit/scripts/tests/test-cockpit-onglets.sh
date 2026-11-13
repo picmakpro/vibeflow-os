@@ -84,6 +84,11 @@ assert_eq "OG2.13 — modale ouverte puis aller('projet') : promesse résolue, P
 assert_eq "OG2.12 — history.back() : l'adresse de l'entrée (chemin et fragment) à l'identique, aucun replaceState du routeur" \
   "$(E2 '[j.og212.p, j.og212.h, j.og212.repl]')" '["/","#s=zz",0]'
 
+R5="$(mesurer og214)"; sonde "$R5"
+assert_eq "OG2.14 — z posé sur Code : le premier rendu de Projet ne l'applique pas, adresse d'arrivée sans fragment" \
+  "$(E '[j.og214.p, j.og214.h, j.og214.tk.k === 1.5 && j.og214.tk.x === 10.5 && j.og214.tk.y === 20.25]' "$R5")" '["/project.html","",false]'
+assert_eq "OG2.14b — chargement rejeté : le fragment (z) de l'adresse et l'historique reviennent à l'identique" \
+  "$(E '[j.og214r.r, j.og214r.apres.h === j.og214r.avant.h, j.og214r.apres.n === j.og214r.avant.n, j.og214r.apres.p]' "$R5")" '["rejet",true,true,"/"]'
 echo "=== OG3 — chargement rejeté sans effet visible ==="
 R3="$(mesurer og3)"; sonde "$R3"; E3() { E "$1" "$R3"; }
 assert_eq "OG3.1 — lecture en échec, clic sur Projet : adresse, historique, titre, sélection, focus inchangés, aucun vf:onglet, aucun rejet non capté" \
@@ -107,7 +112,7 @@ R4="$(mesurer og2t)"; sonde "$R4"
 assert_eq "OG2.2 — le cadre du terminal est le même nœud, jamais rechargé, après un aller-retour d'onglet (tampon gardé)" \
   "$(E 'j.og22' "$R4")" '{"meme":true,"connecte":true,"charges":0}'
 echo "=== Sans erreur de pilote ==="
-ERR=""; for r in "$R1" "$R2" "$R3" "$R4"; do ERR="$ERR$(E 'Object.keys(j.erreurs).join()' "$r")"; done
+ERR=""; for r in "$R1" "$R2" "$R3" "$R4" "$R5"; do ERR="$ERR$(E 'Object.keys(j.erreurs).join()' "$r")"; done
 assert_eq "OG9 — aucune section du pilote n'a échoué" "$ERR" ""
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
