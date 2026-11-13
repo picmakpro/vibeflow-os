@@ -3,8 +3,9 @@
 #   CC1 un seul arrêt de tabulation, flèches vers le voisin spatial, rôle listbox · CC2 noms accessibles (arbre d'accessibilité), Origine/Fin
 #   CC3 sélection qui suit le focus (panneau latéral), plongée et remontée, redessin, tiroir Git, repli sur #stage · CC4 feuille de détail
 #   CC5 Équipe intacte · CC6 anneau sur la .card (deux thèmes), clic sans anneau, mouvement réduit
-#   Mutants (copie du module dans $WORK, jamais le module) : M-VOISIN-DOM, M-REPOSE, M-EQUIPE, M-REPLI-BODY.
-#   CC_SCRIPTS = dossier de scripts à bâtir (rejeu sur la base, sans le module).
+#   Mutants (copie COMPLÈTE du module par cockpit_module_copie, page rebâtie depuis la copie, serveur lancé par socle-serveur.sh sur COCKPIT_MODULE ;
+#   jamais le module du dépôt) : M-VOISIN-DOM, M-REPOSE, M-EQUIPE, M-REPLI-BODY, M-FOCUS-VOLE.
+#   CC_SCRIPTS = dossier de scripts à bâtir (rejeu sur la base) : sa racine de module est servie comme COCKPIT_MODULE.
 # Sans navigateur : SUITE SAUTÉE (exit 0, message explicite), jamais un vert à vide.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -22,6 +23,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 PASS=0; FAIL=0
 assert_eq() {
   if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1))
@@ -73,21 +75,19 @@ mklab() { # un module avec fichier, un module sans fichier (niveau vide), 13 not
   echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
 }
-# bâtir et servir : build_serve <lab> <dossier de scripts> <dossier du moteur> -> PORT, SRV
+# bâtir et servir : build_serve <lab> -> PORT, SRV, LANCE_RC. Le module est COCKPIT_MODULE s'il est posé (une copie mutée), sinon la racine de CC_SCRIPTS si elle est posée, sinon celui du dépôt.
 build_serve() {
-  local L="$1" O="$1/.vibeflow/cockpit"; node "$2/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
-  rm -f "$O/.cache/server.json"; mkdir -p "$WORK/fauxbin"
-  cp "$SCRIPTS/tests/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"
-  ( cd "$L" && PATH="$WORK/fauxbin:$PATH" VF_COCKPIT_ENGINE_DIR="$3" VF_COCKPIT_SCRIPTS_DIR="$2" \
-      exec node "$O/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV=$!; PIDS+=($SRV)
-  for _ in $(seq 1 300); do grep -q '"port"' "$O/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$O/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  local L="$1" mod="${COCKPIT_MODULE:-${CC_SCRIPTS:+$RACINE_BASE}}"
+  local env=(PATH="$WORK/fauxbin:$PATH") opt=(); [ -z "${SANS_CLI:-}" ] || { mkdir -p "$WORK/vide"; env=(PATH="$WORK/vide:/usr/bin:/bin"); opt=(--claude "$WORK/absent"); } # SANS_CLI=1 : serveur sans CLI (barre de question absente), passage de la jointure J1
+  node "${mod:-$SCRIPTS/..}/scripts/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
+  mkdir -p "$WORK/fauxbin"; cp "$SCRIPTS/tests/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"
+  COCKPIT_MODULE="$mod" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$L" "${env[@]}" ${opt[@]+"${opt[@]}"}; LANCE_RC=$?
+  SRV="$VF_PID"; PORT="$VF_PORT"
 }
 mesurer() { REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-clavier-canevas.mjs" "$CHROME" "http://127.0.0.1:$PORT" "${1:-}" 2>"$WORK/mesure.err"; }
 LAB="$WORK/lab"; mklab "$LAB"; node "$AUX/mk-agents.mjs" "$HOME" "$LAB" aaaa1111-2222-3333-4444-555555555555
-SC_BASE="${CC_SCRIPTS:-$SCRIPTS}"; ln -s "$SC_BASE" "$WORK/scripts-hote"
-build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+SC_BASE="${CC_SCRIPTS:-$SCRIPTS}"; RACINE_BASE="$(cd "$SC_BASE/.." && pwd -P)"
+build_serve "$LAB"
 assert_eq "CC0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
 R="$(mesurer)"; [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }; [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/mesure.json"
 E() { printf '%s' "${2:-$R}" | node "$AUX/ev.mjs" "$1"; }
@@ -166,20 +166,23 @@ printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n\
 for m in m1 m2; do printf '{"name":"%s","type":"skill","description":"Module."}\n' "$m" > "$L2/plugin/$m/module.json"; done
 printf "import { b } from '../m2/b.js';\nexport const a = () => b();\n" > "$L2/plugin/m1/a.js"; printf 'export const b = () => 1;\n' > "$L2/plugin/m2/b.js"
 git -C "$L2" init -q && git -C "$L2" add -A && git -C "$L2" -c user.email=t@t -c user.name=t commit -q -m init
-build_serve "$L2" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"; R7="$(mesurer cc7)"; vf_hyg_stop "$SRV"
+build_serve "$L2"; R7="$(mesurer cc7)"; vf_hyg_stop "$SRV"
 assert_eq "CC7.1 — niveau à connecteurs : cartes x: options nommées « Vers/Depuis <entité> », jamais l'id interne, comptées dans la liste" \
   "$(E '[j.cc7.x.length >= 1, j.cc7.x.every((c) => c[1] === "option" && !c[2].includes(c[0])
     && /^(Vers|Depuis) [^:]+(, reliée à \d+ cartes?|, aucune liaison)$/.test(c[2]))]' "$R7")" "[true,true]"
 
-echo "=== Mutants (copie du module dans \$WORK) ==="
+echo "=== Mutants (copie du module, page rebâtie, serveur sur la copie) ==="
 mutant() { # mutant <nom> <ancien> <nouveau> -> RM (mesure du mutant) ; une mutation impossible compte comme un échec
-  local M="$WORK/mod-$1" L="$WORK/lab-$1"; mkdir -p "$M/scripts" "$M/skills"
-  cp "$SC_BASE"/*.mjs "$SC_BASE"/*.json "$M/scripts/"; cp -R "$SC_BASE/../skills/cockpit-moteur" "$M/skills/cockpit-moteur"
+  local M L="$WORK/lab-$1"
+  rm -rf "$WORK/mod-$1" "$L"; M="$(cockpit_module_copie "$WORK/mod-$1")" || { echo "  ❌ FAIL — $1 : copie du module impossible"; FAIL=$((FAIL+1)); RM="{}"; return; }
   cp -R "$LAB" "$L"; node "$AUX/mk-agents.mjs" "$HOME" "$L" bbbb1111-2222-3333-4444-555555555555
   if ! node "$AUX/mut.mjs" "$M/skills/cockpit-moteur/assets/ui/04-vf-clavier-canevas.js" "$2" "$3"; then
     echo "  ❌ FAIL — $1 : mutation impossible"; FAIL=$((FAIL+1)); RM="{}"; return
   fi
-  build_serve "$L" "$M/scripts" "$M/skills/cockpit-moteur"; RM="$(mesurer)"; vf_hyg_stop "$SRV"; rm -rf "$L"
+  COCKPIT_MODULE="$M" build_serve "$L"
+  [ "$LANCE_RC" = 0 ] || { echo "  ❌ FAIL — $1 : serveur non lancé sur la copie (code $LANCE_RC ; 5 = la copie n'est pas celle qui est chargée)"; FAIL=$((FAIL+1)); RM="{}"; return; }
+  echo "     trace $1 — copie chargée : empreinte publiée = celle de la copie ; $(cmp -s "$M/skills/cockpit-moteur/assets/ui/04-vf-clavier-canevas.js" "$SC_BASE/../skills/cockpit-moteur/assets/ui/04-vf-clavier-canevas.js" && echo 'ATTENTION copie identique au dépôt' || echo 'copie différente du dépôt')"
+  RM="$(mesurer)"; vf_hyg_stop "$SRV"; rm -rf "$L"
 }
 mutant M-VOISIN-DOM "const tous = ordre(), moi = rect(id);" \
   "const tous = ordre(), moi = rect(id); if (dir !== 'debut' && dir !== 'fin') {
