@@ -68,6 +68,22 @@ Modules neufs (les neuf ci-dessus) et fichiers repris ; suite `test-cockpit-coll
 
 `memo.rattachements` (fil seulement, jamais posté) : `Map` identifiant de voie vers `{ dag, noeud, source }` ou `null`, mise à jour à chaque tour par `etapeIndex` (A8, A14) ; `memo.index` (voies), `memo.sessions` (`Set`). 79-13 ajoute son étape de frise après l'index dans `etapeTour` et son champ `frise` à l'instantané par `poser` ; 79-12 lit `instantane()` (`signal`, `git`, `projet`) et `collecte`, étend `aClient` au lecteur de `GET /api/vf/state`.
 
+## Correction ciblée après l'audit de sécurité (2026-11-13)
+
+Audit : `gaps_found`, aucun constat haut. Commit du code et de la suite : 759fd4bf ; amendement daté du plan, trace des rouges et ce complément : commit suivant. Détail des rouges, des verts et des mutants : `79-09-RED-TRACE.md`, dernière section.
+1. MOYEN — le script de verrou lisait hors du lab : corrigé au point central `shBorne` (`vf-cockpit-git-lanceur.mjs`, fichier de 79-07, déclaré par l'amendement ; T-79-705 intacte). Couvre `lireBrut`, `lireRegistre`, `vf-cockpit-vie.mjs` et `vf-cockpit-who.mjs` sans garde en double. Un lab à gitfile sortant donne une projection `erreur` et un registre `absente`.
+2. BAS — `signatureDuLab` : lecture bornée (512 octets, `O_NOFOLLOW`, `O_NONBLOCK`, fichier régulier). 3. BAS — `redemarrer` réentrant (promesse partagée). 4. BAS — chien de garde `DELAIS.demandeMs` (120 s, cause `erreur` dans `derniereMort`), `motifs` plafonnés à 64 et dédoublonnés, `MAX_MOTIFS` exporté.
+Suites rejouées seules sur le code définitif (règle 9, `rtk proxy grep -l` de `vf-cockpit-collecte.mjs`, `-code-cache`, `-git-lanceur` et `shBorne`) : `test-cockpit-collecte.sh` 126 / 0 (111 plus 15 de la section C12 : trois témoins C12.1, un C12.2, un C12.3, trois C12.4, sept mutants), `test-cockpit-git-env.sh` 135 / 0, `test-cockpit-git-config-depot.sh` 138 / 0, `test-cockpit-terminal-lanceur.sh` 111 / 0, `test-cockpit-path-enfants.sh` 37 / 0, `test-cockpit-signal.sh` 76 / 0, `test-cockpit-confinement.sh` 111 / 0, `test-cockpit-git-details.sh` 136 / 0 ; `check-machine-paths.sh` code 0. Premier essai de `test-cockpit-git-config-depot.sh` rouge (2 échecs) : la première forme de la garde réécrivait la ligne que le mutant M-BASH de cette suite ancre ; la garde est une ligne à part, la ligne ancrée est restée à l'identique, la suite n'a pas été touchée. Premier essai de `test-cockpit-terminal-lanceur.sh` rouge sur H0 (un processus de mutant de cette suite encore vivant sous charge, sans lien avec ce correctif) : vert au rejeu sur le code définitif.
+
+### Limites (points d'information de l'audit, sans correctif)
+- `ws`, `owner` et `step` d'une entrée de verrou ne sont pas revalidés par la grammaire `WS_RE` à la projection (ils sont nettoyés et bornés).
+- `equipe.error` ne passe pas par `nettoie` avant d'être posté (message de 200 caractères au plus).
+- La garde d'émission par défaut de `startLive` n'est pas une garde de contenu.
+- Le volume total des `dag` publiés (500 verrous, 200 nœuds chacun) n'est pas plafonné globalement.
+- Les contrôles « sans lien » et « fichier régulier » de la lecture du cache se couvrent l'un l'autre sous la borne de 512 octets : aucun mutant ne les tue séparément. Un `HEAD` ou une référence qui est un lien symbolique légitime donne un texte vide (signature sans cette valeur).
+- Le chien de garde et la politique de mort partagent la cause `erreur` : `derniereMort` ne distingue pas un fil bloqué d'un fil sorti sur erreur (le détail est au journal). `redemarrer` : les options du premier appel valent pour les appels simultanés.
+- Un lab à gitfile sortant : la projection des verrous rend `erreur` et non `absente` (la sortie vide d'un enfant refusé se lit comme illisible).
+
 ## Menaces
 
 T-79-901 (flux : payload brut du verrou) : C9.1, C9.2, M-LISTE. T-79-902 (sorties du script falsifiées) : C5.3, C9.1, M-VERROU-DAG. T-79-903 à T-79-908 : tâches 1 à 3 (latence, fil, écrivain unique, garde d'émission, comptes seuls, cache) ; un audit de sécurité reste à commander par le manager.
