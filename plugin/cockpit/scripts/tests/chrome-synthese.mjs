@@ -106,7 +106,8 @@ if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(im
   if (mode === 'lab') console.log(labFixture(a[0]));
   else if (mode === 'lab2') console.log(labDeuxEtats(a[0]).lab);
   else if (mode === 'visite') import('./chrome-synthese-visite.mjs').then(({ jouer }) => jouer(...a));
+  else if (mode === 'cout') import('./chrome-synthese-cout.mjs').then(({ jouer }) => jouer(...a));
   else if (mode === 'temoin') ecrireBlocTemoin(a[0]);
   else if (mode === 'scenario') import('./chrome-synthese-scenarios.mjs').then(({ jouer }) => jouer(...a)); // sans attente de tête : le module des scénarios importe celui-ci
-  else { console.error('usage : lab <dossier> | lab2 <dossier> | visite <chrome> <port> <complet|xss> | temoin <copie> | scenario <chrome> <port> <nue|temoin> [<export>]'); process.exit(2); }
+  else { console.error('usage : lab <dossier> | lab2 <dossier> | visite <chrome> <port> <complet|xss> | cout <chrome> <port> | temoin <copie> | scenario <chrome> <port> <nue|temoin> [<export>]'); process.exit(2); }
 }
