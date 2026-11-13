@@ -66,11 +66,10 @@ function verdicts(racine, texteBaseline) {
   for (const [c, n] of reel) if (n > 0 && !entrees.has(c)) v.push(['HAUSSE', `${c} réel=${n} baseline=0`]);
   return { v, reel };
 }
-// délégation : la ligne est NFKD-normalisée, puis privée par classes Unicode de tout ce qui masque un mot (formats Cf, contrôles Cc, marques M,
-// fillers de Hangul, séparateurs, tirets Pd, soulignés Pc, points) ; le radical « deleg » est cherché sans égard à la casse dans la chaîne compactée.
-// Filtre lexical, ligne par ligne : ni homoglyphes ni synonymes ni coupure par retour à la ligne (limites écrites au plan 79-11).
-const MASQUES = /[\p{Cf}\p{Cc}\p{M}\u115f\u1160\u3164\s\p{Pd}\p{Pc}\-_.\u00b7]/gu;
-const delegation = (l) => /deleg/i.test(l.normalize('NFKD').replace(MASQUES, ''));
+// délégation : ensemble POSITIF. Après NFKD, on ne GARDE QUE les lettres (\p{L}) : ponctuation, symboles, espaces, marques, invisibles, usage privé
+// et points non assignés disparaissent, ainsi que les fillers de Hangul (des lettres sans trait). Le radical « deleg » est cherché sans égard à la casse.
+// Filtre lexical, ligne par ligne : ni homoglyphes ni synonymes ni coupure par retour à la ligne ; fail-closed, « mode léger » en tombe (limites du plan 79-11).
+const delegation = (l) => /deleg/i.test(l.normalize('NFKD').replace(/[^\p{L}]|[\u115f\u1160\u3164]/gu, ''));
 // citation d'arbitrage : la forme de citation_ok de la garde G-1 (mot-clé, au moins deux virgules, date ISO) ; « directe » écarte toute ligne de délégation
 function citationConforme(message, directe) {
   const conforme = (l) => /arbitrage|décision|decision/.test(l) && (l.match(/,/g) || []).length >= 2 && /[0-9]{4}-[0-9]{2}-[0-9]{2}/.test(l);
