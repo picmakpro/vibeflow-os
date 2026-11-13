@@ -55,7 +55,7 @@ export async function cheminsSupprimes(root, sha, { fin, max = BORNES_MEMOIRE.co
   const args = ['log', '--no-renames', '--diff-filter=D', '--name-only', '-z', '--format=%x01', `--max-count=${max}`, '--end-of-options', sha, '--'];
   const r = await passage(root, args, fin);
   const recs = r.sortie.split('\x01').slice(1); // un enregistrement par commit : la borne atteinte se constate au nombre de commits lus
-  return { chemins: new Set(recs.flatMap((x) => noms(x.replace(/^\n/, '')))), tronque: r.mauvais || recs.length >= max };
+  return { chemins: new Set(recs.flatMap((x) => noms(x).map((c) => c.replace(/^\n+/, '')).filter(Boolean))), tronque: r.mauvais || recs.length >= max };
 }
 
 // jour (AAAA-MM-JJ) du dernier commit de chaque chemin de la racine de mémoire : première apparition dans le journal, du plus récent au plus ancien

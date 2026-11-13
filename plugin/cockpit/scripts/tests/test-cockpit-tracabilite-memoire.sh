@@ -1,7 +1,10 @@
 #!/usr/bin/env bash
-# test-cockpit-tracabilite-memoire.sh — mémoire versionnée des agents lue en structure, fonctions pures sans serveur (TRAC-07, TRAC-08 ; P76-D-19 à P76-D-23)
-#   T7 entrée de mémoire : champs servis, périmètre (suivi par git, confiné), mémoire locale et lien sortant exclus, `.claude/` ignoré compté sans noms, bornes
-#   T8 liens et états : code et classes POSIX ignorés, résolution en deux temps, hors index exact, sans lien entrant, chemin cité disparu, aucune péremption
+# test-cockpit-tracabilite-memoire.sh — mémoire versionnée des agents lue en structure, fonctions pures sans serveur
+#   (TRAC-07, TRAC-08 ; P76-D-19 à P76-D-23)
+#   T7 entrée de mémoire : champs servis, périmètre (suivi par git, confiné), mémoire locale et lien sortant exclus,
+#      `.claude/` ignoré compté sans noms, bornes
+#   T8 liens et états : code et classes POSIX ignorés, résolution en deux temps, hors index exact, sans lien entrant,
+#      chemin cité disparu, aucune péremption
 # Labs fabriqués dans mktemp (dates de commit fixées, aucun chemin du poste dans les fichiers écrits). Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -16,7 +19,10 @@ trap 'vf_hyg_fin; [ -n "${KEEP:-}" ] || { chmod -R u+rwx "$WORK" 2>/dev/null; rm
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 
 PASS=0; FAIL=0
-assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 — attendu: [$3] obtenu: [$2]"; FAIL=$((FAIL+1)); fi; }
+assert_eq() {
+  if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — $1 — attendu: [$3] obtenu: [$2]"; FAIL=$((FAIL+1)); fi
+}
 
 # --- outils node écrits par la suite ---
 # j.mjs <fichier> <expression sur j> : JSON lu dans le fichier, expression évaluée ; « absent » si l'expression échoue
@@ -65,7 +71,13 @@ V() { local f; f="$WORK/v-$(basename "$1")-${2:-x}.json"; node "$AUX/memoire.mjs
 # E <fichier> <cle> <expression sur l'entrée e> : valeur dans l'entrée de clé <cle>
 E() { J "$1" "(e=>e?($3):'sans-entree')(j.entrees.find(x=>x.cle==='$2'))"; }
 # SANS <fichier> <marqueur...> : « ok » si la sortie est lisible, non vide et sans aucun des marqueurs ; « fuite » sinon ; « vide » si elle manque
-SANS() { local f="$1"; shift; [ -s "$f" ] || { echo vide; return; }; grep -q '"erreur"' "$f" && { echo vide; return; }; local m; for m in "$@"; do grep -qF -- "$m" "$f" && { echo fuite; return; }; done; echo ok; }
+SANS() {
+  local f="$1" m; shift
+  [ -s "$f" ] || { echo vide; return; }
+  grep -q '"erreur"' "$f" && { echo vide; return; }
+  for m in "$@"; do grep -qF -- "$m" "$f" && { echo fuite; return; }; done
+  echo ok
+}
 
 # --- fabrication des labs ---
 wr() { mkdir -p "$(dirname "$1")"; cat > "$1"; }
@@ -74,7 +86,11 @@ lab_init() { mkdir -p "$1"; git -C "$1" init -q -b main; git -C "$1" config user
 # gc <lab> <date> <message> : tout ajouter puis commit daté
 gc() { git -C "$1" add -A >/dev/null 2>&1; GIT_AUTHOR_DATE="$2T12:00:00Z" GIT_COMMITTER_DATE="$2T12:00:00Z" git -C "$1" commit -q -m "$3"; }
 # mem <lab> <agent> <fichier> <name | -> <type> [corps] : entrée de mémoire (frontmatter name, description, metadata.type)
-mem() { local f="$1/.claude/agent-memory/$2/$3"; mkdir -p "$(dirname "$f")"; { printf -- '---\n'; [ "$4" = "-" ] || printf 'name: %s\n' "$4"; printf 'description: DESC-MARQUEUR-76\nmetadata:\n  type: %s\n---\n\n%s\n' "$5" "${6:-corps}"; } > "$f"; }
+mem() {
+  local f="$1/.claude/agent-memory/$2/$3"; mkdir -p "$(dirname "$f")"
+  { printf -- '---\n'; [ "$4" = "-" ] || printf 'name: %s\n' "$4"
+    printf 'description: DESC-MARQUEUR-76\nmetadata:\n  type: %s\n---\n\n%s\n' "$5" "${6:-corps}"; } > "$f"
+}
 # idx <lab> <agent> <lignes> : MEMORY.md de l'agent
 idx() { mkdir -p "$1/.claude/agent-memory/$2"; printf '# Mémoire\n\n%s\n' "$3" > "$1/.claude/agent-memory/$2/MEMORY.md"; }
 
@@ -92,7 +108,8 @@ assert_eq "T7.1 metadata.type imbriqué" "$(E "$O1" vf-coder/a.md 'e.type')" "pr
 assert_eq "T7.1 jour du dernier commit" "$(E "$O1" vf-coder/a.md 'e.jour')" "2026-01-10"
 assert_eq "T7.1 lien résolu par name" "$(E "$O1" vf-coder/a.md 'e.sortants')" '[{"cible":"entree-b","etat":"resolu","vers":"vf-coder/b.md"}]'
 assert_eq "T7.1 lien entrant de b" "$(E "$O1" vf-coder/b.md 'e.entrants')" '["vf-coder/a.md"]'
-assert_eq "T7.2 témoin positif : description et corps sont dans le fichier du lab" "$(cat "$L1/.claude/agent-memory/vf-coder/a.md" | grep -c 'DESC-MARQUEUR-76\|CORPS-MARQUEUR-76')" "2"
+FA="$L1/.claude/agent-memory/vf-coder/a.md"
+assert_eq "T7.2 témoin positif : description et corps sont dans le fichier du lab" "$(grep -c 'DESC-MARQUEUR-76\|CORPS-MARQUEUR-76' "$FA")" "2"
 assert_eq "T7.2 ni description ni corps dans la sortie (sortie non vide)" "$(SANS "$O1" DESC-MARQUEUR-76 CORPS-MARQUEUR-76)" "ok"
 
 echo "T7.9 — chemin du fichier de mémoire, relatif au dépôt"
@@ -134,12 +151,14 @@ idx "$L4" vf-coder '- [A](a.md) — première'
 mem "$L4" vf-coder a.md entree-a project "lab $L4/docs/z.md, ~/.claude/x.md et $HOME/.claude/y.md"
 gc "$L4" 2026-01-10 'chemins du poste'
 O4="$(V "$L4")"
-assert_eq "T7.5 témoin positif : les trois chemins sont dans le fichier" "$(grep -c -e "$L4/docs/z.md" -e '~/.claude/x.md' -e "$HOME/.claude/y.md" "$L4/.claude/agent-memory/vf-coder/a.md")" "1"
+FA="$L4/.claude/agent-memory/vf-coder/a.md"
+assert_eq "T7.5 témoin positif : les trois chemins sont dans le fichier" "$(grep -c -e "$L4/docs/z.md" -e '~/.claude/x.md' -e "$HOME/.claude/y.md" "$FA")" "1"
 assert_eq "T7.5 aucun des trois dans la sortie" "$(SANS "$O4" "$L4" '~/.claude/x.md' "$HOME" "$WORK")" "ok"
 
 echo "T7.6 — .claude/ ignoré : compté, jamais nommé"
 L5="$WORK/l5"; lab_init "$L5"; printf '.claude/\n' > "$L5/.gitignore"; printf 'x\n' > "$L5/readme.txt"
-mkdir -p "$L5/.claude/agent-memory/vf-coder"; for n in UN DEUX TROIS; do printf -- '---\nname: n\n---\n' > "$L5/.claude/agent-memory/vf-coder/NONSUIVI-$n.md"; done
+mkdir -p "$L5/.claude/agent-memory/vf-coder"
+for n in UN DEUX TROIS; do printf -- '---\nname: n\n---\n' > "$L5/.claude/agent-memory/vf-coder/NONSUIVI-$n.md"; done
 gc "$L5" 2026-01-10 'ignoré'
 O5="$(V "$L5")"
 assert_eq "T7.6 témoin positif : le dossier contient trois noms" "$(ls "$L5/.claude/agent-memory/vf-coder" | grep -c NONSUIVI)" "3"
@@ -193,7 +212,8 @@ MD
 mem "$L8" vf-coder b.md entree-b project 'rien'
 gc "$L8" 2026-01-10 'extraction'
 O8="$(V "$L8")"
-assert_eq "T8.1 témoin positif : les trois formes ignorées sont dans le fichier" "$(grep -c -e 'dans-bloc' -e 'entre-accents' -e ':alpha:' "$L8/.claude/agent-memory/vf-coder/a.md")" "3"
+FA="$L8/.claude/agent-memory/vf-coder/a.md"
+assert_eq "T8.1 témoin positif : les trois formes ignorées sont dans le fichier" "$(grep -c -e 'dans-bloc' -e 'entre-accents' -e ':alpha:' "$FA")" "3"
 assert_eq "T8.1 seul le lien hors code est retenu" "$(E "$O8" vf-coder/a.md 'e.sortants.map(s=>s.cible)')" '["entree-b"]'
 
 echo "T8.2 — résolution en deux temps"
@@ -245,7 +265,7 @@ gc "$L12" 2026-01-01 'début'
 git -C "$L12" rm -q docs/vieux.md; gc "$L12" 2026-01-02 'suppression'
 git -C "$L12" mv docs/ancien.md docs/nouveau.md; gc "$L12" 2026-01-03 'déplacement'
 O12="$(V "$L12")"
-assert_eq "T8.5 témoin positif : jamais.md n'est ni dans HEAD ni dans l'historique" "$(git -C "$L12" log --all --name-only --format= | grep -c 'docs/jamais.md')" "0"
+assert_eq "T8.5 témoin positif : jamais.md absent de HEAD et de l'historique" "$(git -C "$L12" log --all --name-only --format= | grep -c 'docs/jamais')" "0"
 assert_eq "T8.5 supprimé et déplacé listés, relatifs, triés" "$(E "$O12" vf-coder/a.md 'e.cheminsAbsents')" '["docs/ancien.md","docs/vieux.md"]'
 assert_eq "T8.5 compteur : deux chemins distincts" "$(J "$O12" "j.compteurs.cheminsAbsents")" "2"
 
@@ -256,14 +276,18 @@ mem "$L13" vf-coder a.md entree-a project 'rien'; gc "$L13" 2025-01-01 'vieille'
 mem "$L13" vf-coder b.md entree-b project 'rien'; gc "$L13" 2026-11-01 'récente'
 O13="$(V "$L13")"
 assert_eq "T8.6 témoin positif : deux jours distincts lus" "$(J "$O13" "[j.entrees[0].jour,j.entrees[1].jour]")" '["2025-01-01","2026-11-01"]'
-assert_eq "T8.6 aucune clé perim* à aucune profondeur" "$(J "$O13" "(function f(o){return !!o&&typeof o==='object'&&Object.keys(o).some(k=>/^perim/i.test(k)||f(o[k]))})(j)")" "false"
-assert_eq "T8.6 l'entrée d'un an n'a aucun état de plus que la récente" "$(J "$O13" "Object.keys(j.entrees[0]).join()===Object.keys(j.entrees[1]).join()")" "true"
+RE_PERIM='/^perim/i'; RE_CONTENU='/^(description|corps|texte)$/i'
+CLE='(function f(o){return !!o&&typeof o==="object"&&Object.keys(o).some(k=>MOTIF.test(k)||f(o[k]))})(j)'
+assert_eq "T8.6 aucune clé perim* à aucune profondeur" "$(J "$O13" "${CLE/MOTIF/$RE_PERIM}")" "false"
+KEYS='Object.keys(j.entrees[0]).join()===Object.keys(j.entrees[1]).join()'
+assert_eq "T8.6 l'entrée d'un an n'a aucun état de plus que la récente" "$(J "$O13" "$KEYS")" "true"
 
 echo "T8.7 — dépôt réel (lecture seule)"
 OR="$(V "$REPO" reel)"
-assert_eq "T8.7 témoin positif : le dépôt porte des descriptions dans ses fichiers de mémoire" "$(git -C "$REPO" ls-files '.claude/agent-memory/' | head -400 | xargs grep -l '^description:' 2>/dev/null | head -1 | wc -c | tr -d ' ' | awk '{print ($1>0)?"oui":"non"}')" "oui"
+DESCR="$(cd "$REPO" && git ls-files -z '.claude/agent-memory/' | xargs -0 grep -l '^description:' 2>/dev/null | wc -l | tr -d ' ')"
+assert_eq "T8.7 témoin positif : le dépôt porte des descriptions dans ses fichiers de mémoire" "$([ "${DESCR:-0}" -gt 0 ] && echo oui || echo non)" "oui"
 assert_eq "T8.7 au moins une entrée et un lien" "$(J "$OR" "[j.entrees.length>0,j.entrees.some(e=>e.nbSortants>0)]")" "[true,true]"
-assert_eq "T8.7 aucune clé description, corps ni texte" "$(J "$OR" "(function f(o){return !!o&&typeof o==='object'&&Object.keys(o).some(k=>/^(description|corps|texte)\$/i.test(k)||f(o[k]))})(j)")" "false"
+assert_eq "T8.7 aucune clé description, corps ni texte" "$(J "$OR" "${CLE/MOTIF/$RE_CONTENU}")" "false"
 assert_eq "T8.7 aucune occurrence du chemin absolu de la racine" "$(SANS "$OR" "$REPO")" "ok"
 
 echo
