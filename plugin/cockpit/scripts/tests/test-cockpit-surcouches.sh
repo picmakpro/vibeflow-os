@@ -5,7 +5,9 @@
 #   SU3 panneau fermé : aucun focalisable (1440 px), focus rendu au bouton, mouvement réduit
 #   SU4 tiroirs et Échap : dessus de pile, palette sur tiroir, contrat Échap consommé (Code, Équipe, Terminal), ordre des écouteurs, cas interdit
 #   SU5 les trois listes recopiées ont disparu · SU6 coquille de la 79 (en attente : témoin exécutable après la 79)
-#   Mutants (copie de la sortie du lab dans $WORK) : M-INERT-TOUT, M-PIEGE, M-PALETTE, M-ECHAP-VIDE, M-SANS-PREVENT, M-UNICITE ; M-PERSISTANT après la 79
+#   Mutants (copie COMPLÈTE du module par cockpit_module_copie, page rebâtie depuis la copie, serveur lancé par socle-serveur.sh sur COCKPIT_MODULE ;
+#   jamais le module du dépôt, jamais un lien) : M-INERT-TOUT, M-PIEGE, M-PALETTE, M-ECHAP-VIDE, M-SANS-PREVENT, M-UNICITE, M-LEVEE, M-PROPRIO,
+#   M-TIROIR-COUVERT, M-FLUX, M-BULLE, M-RIEN, M-IDPANEL, M-RENDRE, M-TOUR ; M-PERSISTANT après la 79
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -24,6 +26,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 PASS=0; FAIL=0; MUTANTS=0
 assert_eq() {
   if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1))
@@ -36,7 +39,9 @@ const v = new Function('j', 'return (' + process.argv[2] + ')')(j); console.log(
 JS
 cat > "$AUX/chg.mjs" <<'JS'
 import fs from 'node:fs'; const [, , a, b] = process.argv; const x = fs.readFileSync(a, 'utf8').split('\n'), y = fs.readFileSync(b, 'utf8').split('\n');
-console.log(x.length === y.length ? x.filter((l, i) => l !== y[i]).length : -1);
+// la ligne des données (« window.VF_COCKPIT = … », avec generatedAt) change à chaque assemblage : ce n'est pas la mutation
+const donnees = (l) => l.startsWith('<script>window.VF_COCKPIT = ');
+console.log(x.length === y.length ? x.filter((l, i) => l !== y[i] && !(donnees(l) && donnees(y[i]))).length : -1);
 JS
 cat > "$AUX/mk-agents.mjs" <<'JS'
 import fs from 'node:fs'; import path from 'node:path';
@@ -67,23 +72,21 @@ mklab() { # un module, une phase, un dépôt git (le tiroir Git et la touche g e
   git -C "$L" init -q -b main && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
   node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$N" 2>&1 || cat "$N"
 }
-SCRIPTS_HOTE="$WORK/scripts-hote"; ln -s "$SCRIPTS" "$SCRIPTS_HOTE"
 mkdir -p "$WORK/fauxbin"; cp "$SCRIPTS/tests/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"
-serve() { # serve <lab> <dossier de sortie> [--terminal] : serveur en fond, port dans SERVED (pas de sous-shell : PIDS doit survivre)
-  local lab="$1" o="$2"; shift 2; rm -f "$o/.cache/server.json"; mkdir -p "$o/.cache"
+serve() { # serve <lab> [--terminal] : serveur en fond lancé par le socle (cockpit_lancer), port dans SERVED, code du lanceur dans SERVED_RC (COCKPIT_MODULE : le module servi)
+  local lab="$1" o="$1/.vibeflow/cockpit" pret=port; shift
+  local env=(PATH="$WORK/fauxbin:$PATH") opt=(); [ -z "${SANS_CLI:-}" ] || { mkdir -p "$WORK/vide"; env=(PATH="$WORK/vide:/usr/bin:/bin"); opt=(--claude "$WORK/absent"); } # SANS_CLI=1 : serveur sans CLI (barre de question absente), passage de la jointure J1
   if [ "${1:-}" = "--terminal" ]; then
+    pret=terminal; mkdir -p "$o/.cache"; rm -f "$o/.cache/terminal-amorce"
     (umask 077; node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" | tr -d '\n' > "$o/.cache/terminal-amorce")
   fi
-  ( cd "$lab" && PATH="$WORK/fauxbin:$PATH" SHELL=/bin/sh VF_COCKPIT_TERM_GRACE_MS=5000 VF_COCKPIT_ENGINE_DIR="$ENG" \
-      VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE" exec node "$o/serve.mjs" --no-open "$@" --port "$(libre)" \
-      > "$WORK/serve-$(basename "$o").out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  PIDS+=($!); for _ in $(seq 1 300); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SERVED="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  COCKPIT_PRET="$pret" COCKPIT_LOG="$WORK/serve-$(basename "$lab").out" cockpit_lancer "$lab" "${env[@]}" SHELL=/bin/sh VF_COCKPIT_TERM_GRACE_MS=5000 "$@" ${opt[@]+"${opt[@]}"}
+  SERVED_RC=$?; SERVED="$VF_PORT"
 }
 LAB="$WORK/lab"; mklab "$LAB"; node "$AUX/mk-agents.mjs" "$HOME" "$LAB" aaaa1111-2222-3333-4444-555555555555
-O="$LAB/.vibeflow/cockpit"; serve "$LAB" "$O"; PORT="$SERVED"
+O="$LAB/.vibeflow/cockpit"; serve "$LAB"; PORT="$SERVED"
 assert_eq "A0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
-TL="$WORK/lab-term"; mklab "$TL"; OT="$TL/.vibeflow/cockpit"; serve "$TL" "$OT" --terminal; PORT_T="$SERVED"
+TL="$WORK/lab-term"; mklab "$TL"; serve "$TL" --terminal; PORT_T="$SERVED"
 pilote() { # pilote <port> <module> <racine-terminal> <sections>
   REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-surcouches.mjs" "$CHROME" "http://127.0.0.1:$1" "$2" "${3:-}" "${4:-su1,su2,su3,su4,su7}" 2>"$WORK/mesure.err"
 }
@@ -153,19 +156,24 @@ echo "=== SU5 — les listes recopiées ont disparu (retrait 4) ==="
 assert_eq "SU5.1 — « #palette.open, #flowmenu.open » absent de 02, 73 et 77 (baseline : 1 dans chacun)" \
   "$(cd "$UI" && grep -lF '#palette.open, #flowmenu.open' 02-vf-telephone.js 73-vf-tiroir-travail.js 77-vf-git-tiroir.js | tr '\n' ',')" ""
 echo "=== SU6 — coquille de la 79 ==="
-echo "  ⏳ ATTENTE — SU6.1 (coquille de la 79 absente : témoin exécutable après la 79, exigé vert par la jointure)"
-echo "=== Mutants (copie de la sortie du lab) ==="
+echo "  ⏳ ATTENTE — SU6.1 (coquille de la 79 absente : window.VF_COQUILLE n'est définie nulle part, 79-16 n'est pas livrée à la jointure J1 ; témoin exécutable après elle, exigé vert par la jointure)"
+echo "=== Mutants (copie du module, page rebâtie, serveur sur la copie) ==="
 [ -z "${SU_SANS_MUTANTS:-}" ] || { echo "  ⊘ mutants sautés (SU_SANS_MUTANTS) : mise au point seulement"; vf_hyg_assert; exit 0; }
-mutant() { # mutant <nom> <sections> <motif sed> <assertion> : copie la sortie et le module, applique le motif, rejoue, attend ROUGE
-  local nom="$1" sec="$2" motif="$3" test="$4" ml="$WORK/lab-mut-$1" nj nh port RM
-  rm -rf "$ml"; cp -R "$LAB" "$ml"; cp "$PILE" "$ml.js"; local m="$ml/.vibeflow/cockpit" # un lab entier : le tiroir Git a besoin de son dépôt
-  sed -i.bak "$motif" "$m/index.html" "$ml.js"
-  nj="$(node "$AUX/chg.mjs" "$PILE" "$ml.js")"; nh="$(node "$AUX/chg.mjs" "$O/index.html" "$m/index.html")"
+mutant() { # mutant <nom> <sections> <motif sed> <assertion> : copie du module, motif appliqué DANS LA COPIE, page rebâtie depuis elle, serveur sur la copie, attend ROUGE
+  local nom="$1" sec="$2" motif="$3" test="$4" ml="$WORK/lab-mut-$1" nj nh port RM M f
+  rm -rf "$ml" "$WORK/mod-$nom"; cp -R "$LAB" "$ml" # un lab entier : le tiroir Git a besoin de son dépôt
+  M="$(cockpit_module_copie "$WORK/mod-$nom")" || { echo "  ❌ FAIL — mutant $nom : copie du module impossible"; FAIL=$((FAIL+1)); return; }
+  f="$M/skills/cockpit-moteur/assets/ui/00-vf-surcouches.js"
+  sed -i.bak "$motif" "$f"; rm -f "$f.bak"
+  node "$M/scripts/vf-cockpit-build.mjs" "$ml" --quiet > "$WORK/build-mut-$nom.out" 2>&1 || cat "$WORK/build-mut-$nom.out"
+  nj="$(node "$AUX/chg.mjs" "$PILE" "$f")"; nh="$(node "$AUX/chg.mjs" "$O/index.html" "$ml/.vibeflow/cockpit/index.html")"
   { [ "$nj" -ge 1 ] && [ "$nj" = "$nh" ]; } || {
-    echo "  ❌ FAIL — mutant $nom : $nj ligne(s) du module, $nh de la page (attendu : égales, au moins une)"; FAIL=$((FAIL+1)); return; }
-  serve "$ml" "$m"; port="$SERVED"; RM="$(pilote "$port" "$ml.js" "" "$sec")"
+    echo "  ❌ FAIL — mutant $nom : $nj ligne(s) du module, $nh de la page rebâtie (attendu : égales, au moins une)"; FAIL=$((FAIL+1)); return; }
+  COCKPIT_MODULE="$M" serve "$ml"; port="$SERVED"
+  [ "$SERVED_RC" = 0 ] || { echo "  ❌ FAIL — mutant $nom : serveur non lancé sur la copie (code $SERVED_RC ; 5 = la copie n'est pas celle qui est chargée)"; FAIL=$((FAIL+1)); return; }
+  RM="$(pilote "$port" "$f" "" "$sec")"; cockpit_arreter
   if [ "$(printf '%s' "$RM" | node "$AUX/ev.mjs" "$test")" = "false" ]; then
-    echo "  ✅ PASS — $nom : le mutant rougit"; PASS=$((PASS+1)); MUTANTS=$((MUTANTS+1))
+    echo "  ✅ PASS — $nom : le mutant rougit (assertion « $test » = false ; copie chargée : empreinte publiée = celle de la copie ; $nj ligne(s) changée(s) dans le module, autant dans la page servie)"; PASS=$((PASS+1)); MUTANTS=$((MUTANTS+1))
   else echo "  ❌ FAIL — $nom : le mutant ne rougit pas"; echo "     sortie: ${RM:0:400}"; FAIL=$((FAIL+1)); fi
 }
 mutant M-INERT-TOUT su2 's#for (const x of e.inertes)#for (const x of document.querySelectorAll("[inert]"))#' \
@@ -187,7 +195,7 @@ mutant M-RIEN su7 's|if (rien(t) \&\& !flux|if (!flux|' 'j.su7.rien'
 mutant M-IDPANEL su7 "s|d.id !== 'panel' \&\& ||" 'j.su7.feuille === '"'"'{"role":"dialog:true","ouverte":false}'"'"
 mutant M-RENDRE su7 's|if (e.rendu) rendre(e);|void 0;|' 'j.su7.rendre'
 mutant M-TOUR su7 's|if (tv \&\& !dT \&\& refs.tourBtn)|if (false)|' 'j.su7.tour.arrets.every(Boolean)'
-echo "  ⏳ ATTENTE — M-PERSISTANT (marqueur vf-coquille: persistant retiré : exécutable après la 79, exigé rouge par la jointure)"
+echo "  ⏳ ATTENTE — M-PERSISTANT (marqueur vf-coquille: persistant retiré : exécutable après 79-16 (coquille non livrée à la jointure J1), exigé rouge par la jointure)"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
