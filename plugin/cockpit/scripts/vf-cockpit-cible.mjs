@@ -6,7 +6,6 @@
 // Une cible est jugée, jamais ouverte : la résolution est celle du noyau (cheminPhysique de 79-07, mode plus proche parent), un échec rend HORS. Aucun
 // chemin absolu ne sort d'ici. Aucune lecture de fichier hors de cette résolution, aucun processus, aucune variable d'environnement.
 import path from 'node:path';
-import { masque } from './vf-cockpit-lecture.mjs';
 import { cheminPhysique } from './vf-cockpit-git-sortant.mjs';
 import { nettoie } from './vf-cockpit-arbres.mjs';
 
@@ -19,7 +18,7 @@ const dedans = (p, r) => p === r || p.startsWith(r.endsWith(path.sep) ? r : r + 
 //  substitution),
 // puis la marque ; 120 unités ou moins restent intactes
 export function fin(s) {
-  const t = masque(String(typeof s === 'string' ? s : '').replace(/\s+/g, ' ').trim());
+  const t = nettoie(String(typeof s === 'string' ? s : '').replace(/\s+/g, ' ').trim(), 4000); // garde:cible-nettoie : sans contrôle ni format, masqué
   if (t.length <= BORNE) return t;
   const c = t.charCodeAt(BORNE - 2), n = c >= 0xd800 && c <= 0xdbff ? BORNE - 2 : BORNE - 1;
   return t.slice(0, n) + '…'; // garde:cible-fin
