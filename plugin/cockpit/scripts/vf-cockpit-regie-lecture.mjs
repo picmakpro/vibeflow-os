@@ -1,18 +1,18 @@
-// vf-cockpit-gouvernance-lecture — la lecture de la gouvernance pour la collecte « qui » (P73-D-08, P73-D-35 ; REGI-04, 05, 07, 10)
-// Exports : poserGouvernance(workers, { brut, dags, phases }) — pose sur chaque SESSION `detient`, `retient`, `attendAgents`
+// vf-cockpit-regie-lecture — la lecture de la regie pour la collecte « qui » (P73-D-08, P73-D-35 ; REGI-04, 05, 07, 10)
+// Exports : poserRegie(workers, { brut, dags, phases }) — pose sur chaque SESSION `detient`, `retient`, `attendAgents`
 //           (champs de collecte, bornés par collectWho)
 //           fenetreDeStall({ scriptsDir, labRoot, home }) -> entier | null · phasesHumainesSortie(liste, bornes) -> [{ phase, ws, ref? }]
-//           lireGouvernance(racine, graphe) -> { phases (Map), phasesHumaines } — UNE lecture du planning, appelée à chaque reconstruction
+//           lireRegie(racine, graphe) -> { phases (Map), phasesHumaines } — UNE lecture du planning, appelée à chaque reconstruction
 //           du graphe, jamais par tour de 5 s
 // La détention se décide ici sur le statut BRUT du verrou (`brut`, déjà lu par l'appelant), avant toute projection : seule la paire
 // { ws, phase } part vers who@2. Les calculs eux-mêmes (détention, impact, fenêtre, « attend ses agents ») sont dans
-// vf-cockpit-gouvernance.mjs ; ici : le branchement et la lecture.
+// vf-cockpit-regie-donnees.mjs ; ici : le branchement et la lecture.
 import fs from 'node:fs';
 import path from 'node:path';
 import { readPlanning } from './vf-cockpit-planning.mjs';
 import { realUnder } from './vf-cockpit-paths.mjs';
 import { dagDe } from './vf-cockpit-vie.mjs';
-import { detention, retientDe, attendAgents, fenetreStall, scriptGarde, phasesHumaines, wsValide, phaseValide } from './vf-cockpit-gouvernance.mjs';
+import { detention, retientDe, attendAgents, fenetreStall, scriptGarde, phasesHumaines, wsValide, phaseValide } from './vf-cockpit-regie-donnees.mjs';
 
 // plan publié d'un verrou (champ `dag`, revalidé par dagDe) : un DAG de plus, rattaché par sa phase ; ignoré s'il n'a ni phase ni nœud
 const dagsDeVerrous = (brut) => (Array.isArray(brut?.locks) ? brut.locks : []).flatMap((l) => {
@@ -20,7 +20,7 @@ const dagsDeVerrous = (brut) => (Array.isArray(brut?.locks) ? brut.locks : []).f
   return d && d.phase && d.nodes.length ? [{ name: '', ws: d.ws || null, wsDeclare: d.ws || null, phase: d.phase, nodes: d.nodes }] : [];
 });
 
-export function poserGouvernance(workers, { brut, dags = [], phases } = {}) {
+export function poserRegie(workers, { brut, dags = [], phases } = {}) {
   const tous = [...dags, ...dagsDeVerrous(brut)];
   for (const w of workers) {
     if (w.kind !== 'session') continue;
@@ -62,7 +62,7 @@ const tete = (racine, f) => {
   } catch { return ''; }
 };
 
-export function lireGouvernance(racine, graphe) {
+export function lireRegie(racine, graphe) {
   // verrous injectés vides : le shell-out du verrou n'est jamais relancé par cette lecture
   const P = readPlanning(racine, undefined, { sansTags: true, verrous: { etat: 'absente', plat: false, liste: [] } });
   const dirDe = (cle) => {

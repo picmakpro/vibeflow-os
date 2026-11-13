@@ -21,7 +21,7 @@ import { lireRegistre, fusionnerRegistre } from './vf-cockpit-registre.mjs';
 import { demander, lire } from './vf-cockpit-etat-officiel.mjs';
 import { reduireTranscript } from './vf-cockpit-transcript.mjs';
 import { entreeLanceeValide } from './vf-cockpit-lancer-suivi.mjs';
-import { poserGouvernance, fenetreDeStall, phasesHumainesSortie } from './vf-cockpit-gouvernance-lecture.mjs';
+import { poserRegie, fenetreDeStall, phasesHumainesSortie } from './vf-cockpit-regie-lecture.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const sh = shBorne; // timeout, échéance globale de l'émetteur (F-06) et PATH assaini (H-1, 4e argument = le lab) : un git ou un bash bloqué ne gèle pas la boucle
@@ -93,7 +93,7 @@ export function agentsConnus(root, { fresh = 180, now = Date.now(), home = os.ho
 const rolesDe = (ws) => new Map(ws.filter((w) => w.kind === 'subagent' && typeof w.role === 'string' && w.role).map((w) => [w.id, w.role]));
 
 // collecte interne : les travailleurs gardent `_tr` (chemin du transcript) hors de la sortie publique
-function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir, verrous, officiel = false, gouvernance } = {}) { // AUDC-H2 : `verrous` = le statut déjà lu par l'appelant (un seul appel au verrou par cycle) ; AUDC-D1 : `officiel` = la vue du cockpit lit les seules sources officielles
+function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir, verrous, officiel = false, regie } = {}) { // AUDC-H2 : `verrous` = le statut déjà lu par l'appelant (un seul appel au verrou par cycle) ; AUDC-D1 : `officiel` = la vue du cockpit lit les seules sources officielles
   const cx = contexte(root, { fresh, now, home, officiel }); root = cx.root;
   const { trees, label } = cx; const sources = {}; const workers = [];
   // 1 + 2 — sessions et sous-agents, en arbre (vf-cockpit-equipe.mjs : fenêtre de 24 h, forme Claude Code lue du contrat)
@@ -137,7 +137,7 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
   try { dags = lireConfine(root, () => lireDags(root, planningLayout(root))); } catch {} // AUDC-A-02 : un DAG lié hors du lab n'est pas lu
   const trDe = new Map(workers.filter((w) => w.kind === 'subagent' && w._tr).map((w) => [w.id, w._tr]));
   rattacher(workers, { index: indexDesNoeuds(dags), registre, mandatDe: (id) => { const c = trDe.has(id) ? premiereLigne(trDe.get(id))?.message?.content : ''; return typeof c === 'string' ? c : ''; } });
-  poserGouvernance(workers, { brut: bruts, dags, phases: gouvernance?.phases }); // P73-D-35 : detient, retient, attendAgents sur les sessions
+  poserRegie(workers, { brut: bruts, dags, phases: regie?.phases }); // P73-D-35 : detient, retient, attendAgents sur les sessions
 
   // 4 — DAG : nœuds running, dans les DAG du lab (lireDags : .planning, compartiments, missions, phases) et dans le dossier commun des verrous
   const fichiers = dags.map((g) => { const fp = path.join(root, g.file); return { d: path.dirname(fp), f: path.basename(fp), nodes: g.nodes }; });
@@ -186,12 +186,12 @@ export function collectWho(root, opts = {}) {
   poserLancees(workers, opts.lancees); // P73-D-21 : la ligne de lancement des sessions lancées depuis la carte
   const sources = { ...g.sources };
   if (typeof sources.sessions?.path === 'string') sources.sessions = { ...sources.sessions, path: sources.sessions.path.replace(opts.home || os.homedir(), '~') };
-  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees.map((t) => bornes(t, 200)), fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine' && w.etat !== 'au-repos' && w.etat !== 'attend'), workers, sources, sortisSilence: Number.isInteger(g.sortisSilence) ? g.sortisSilence : 0, ...gouvernanceSortie(g, opts) };
+  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees.map((t) => bornes(t, 200)), fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine' && w.etat !== 'au-repos' && w.etat !== 'attend'), workers, sources, sortisSilence: Number.isInteger(g.sortisSilence) ? g.sortisSilence : 0, ...regieSortie(g, opts) };
 }
 
-// champs de premier niveau de la gouvernance, facultatifs : absents quand ils n'ont pas de valeur (P73-D-35)
-const gouvernanceSortie = (g, opts) => {
-  const ph = phasesHumainesSortie(opts.gouvernance?.phasesHumaines, (v, n) => masque(v).slice(0, n));
+// champs de premier niveau de la regie, facultatifs : absents quand ils n'ont pas de valeur (P73-D-35)
+const regieSortie = (g, opts) => {
+  const ph = phasesHumainesSortie(opts.regie?.phasesHumaines, (v, n) => masque(v).slice(0, n));
   return { ...(ph.length ? { phasesHumaines: ph } : {}), ...(Number.isInteger(g.fenetreStallS) ? { fenetreStallS: g.fenetreStallS } : {}) };
 };
 

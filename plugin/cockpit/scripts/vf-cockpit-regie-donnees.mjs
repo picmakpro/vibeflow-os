@@ -1,4 +1,4 @@
-// vf-cockpit-gouvernance — calculs de gouvernance côté serveur, en fonctions pures
+// vf-cockpit-regie-donnees — calculs de regie côté serveur, en fonctions pures
 // (P73-D-06, P73-D-07, P73-D-09, P73-D-12, P73-D-31, P73-D-35 ; REGI-04, 05, 07, 10)
 // Exports : aval(noeuds, depart) · restants(noeuds) · detention(idSession, verrous)
 //           missionDe({ ws, phase }, { dags, phases }) · retientDe({ rattachement, detention }, { dags, phases })

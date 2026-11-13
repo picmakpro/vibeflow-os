@@ -78,7 +78,7 @@ export function startLive({
   let graph = null, idx = new Map(), who = { workers: [], sources: {} }, semeeTour = false;
   // A15 : projection des verrous, rang et date de leur dernière pose, signal du dernier tour
   let verrous = { etat: 'absente', plat: false, liste: [] }, lockSeq = 0, lockAt = Date.now(), signalTour = null;
-  let lecturesPlanning = 0; // 73-03 : lectures du planning de gouvernance comptées par le fil (une par reconstruction du graphe), exposé par etat()
+  let lecturesPlanning = 0; // 73-03 : lectures du planning de regie comptées par le fil (une par reconstruction du graphe), exposé par etat()
   let gitSig = null, gitSemee = false, gitInfo = null, projetGarde = null; // 78-09 ; gitInfo : { sig, at } posé dans l'instantané (A47)
   const collecte = collecteur({ racine: root, sortie, scriptsDir, home: os.homedir(), log });
   const snapshot = () => ({ seq: state.seq, lock: { seq: lockSeq, at: lockAt, verrous }, who });

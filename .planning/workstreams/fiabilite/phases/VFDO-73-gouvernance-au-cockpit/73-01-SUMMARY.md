@@ -31,3 +31,5 @@ Exigences : REGI-04, REGI-05, REGI-07, REGI-10, REGI-16. Trace du rouge et valeu
 - `check-version-sync.sh` : seule ligne en échec, la ligne « suites » des deux README (`226 suites` écrit, 227 réelles, recompte au plan 73-10) ; toutes les autres lignes ✓.
 
 rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
+
+Écart : module renommé (P4.8) — `vf-cockpit-gouvernance.mjs` devient `vf-cockpit-regie-donnees.mjs`, `vf-cockpit-gouvernance-lecture.mjs` devient `vf-cockpit-regie-lecture.mjs` ; identifiants `gouvernance*` passés à `regie*` (le socle ne nomme aucun compartiment de ce dépôt).

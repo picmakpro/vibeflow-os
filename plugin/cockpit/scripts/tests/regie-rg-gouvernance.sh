@@ -3,11 +3,11 @@
 # RG7_donnees (fenêtre de stall à source unique, REGI-07) · RG10_donnees (« attend ses agents », REGI-10). Mutants nommés M-<NOM> : une assertion chacun.
 # Fixtures : noms inventés, identifiants de session en UUID inventés, aucun chemin de poste (les chemins sont construits à l'exécution).
 
-# gv <dossier de scripts> <corps JS> [args…] : importe vf-cockpit-gouvernance.mjs de ce dossier (m), évalue le corps (A = args, fs), imprime le résultat en JSON ;
+# gv <dossier de scripts> <corps JS> [args…] : importe vf-cockpit-regie-donnees.mjs de ce dossier (m), évalue le corps (A = args, fs), imprime le résultat en JSON ;
 # module absent ou illisible : sortie vide (le témoin rougit)
 gv() {
   local d="$1" body="$2"; shift 2
-  node --input-type=module -e 'import { pathToFileURL } from "node:url"; import fs from "node:fs"; const m = await import(pathToFileURL(process.argv[1]).href); const F = Object.getPrototypeOf(async () => {}).constructor; let r; try { r = await new F("m", "A", "fs", process.argv[2])(m, process.argv.slice(3), fs); } catch (e) { r = "ERR " + e.message; } console.log(typeof r === "string" ? r : JSON.stringify(r));' "$d/vf-cockpit-gouvernance.mjs" "$body" "$@" 2>/dev/null
+  node --input-type=module -e 'import { pathToFileURL } from "node:url"; import fs from "node:fs"; const m = await import(pathToFileURL(process.argv[1]).href); const F = Object.getPrototypeOf(async () => {}).constructor; let r; try { r = await new F("m", "A", "fs", process.argv[2])(m, process.argv.slice(3), fs); } catch (e) { r = "ERR " + e.message; } console.log(typeof r === "string" ? r : JSON.stringify(r));' "$d/vf-cockpit-regie-donnees.mjs" "$body" "$@" 2>/dev/null
 }
 
 # ---------- RG0 — autotest du socle ----------
@@ -56,8 +56,8 @@ rg_RG4_donnees() {
   assert_eq "RG4.2 — A1 : même dossier, phase cochée au ROADMAP : aucune entrée" "$(rg4_cochee "$SCRIPTS")" '[]'
   assert_eq "RG4.2b — phase archivée : aucune entrée" "$(gv "$SCRIPTS" "$HUM"' return m.phasesHumaines({ phases: mk({ archive: true }), lire: L(OK), fichiers: F });')" '[]'
   assert_eq "RG4.3 — corps après le second ---, en-tête sans statut, bloc non fermé, tête seule lue sur 2 Mio, statut au-delà de 40 lignes" "$(rg4_entete "$SCRIPTS")" '[0,0,0,1,0]'
-  rg_mutant HUMAN-NEEDED-COCHEE "filtre « cochée » retiré" "$SCRIPTS" vf-cockpit-gouvernance.mjs 'if (p.done || p.archive) continue;' 'if (p.archive) continue;' rg4_cochee '[]'
-  rg_mutant ENTETE-CORPS "statut cherché hors de l'en-tête" "$SCRIPTS" vf-cockpit-gouvernance.mjs 'const bloc = lignes.slice(1, fin);' 'const bloc = lignes;' rg4_entete '[0,0,0,1,0]'
+  rg_mutant HUMAN-NEEDED-COCHEE "filtre « cochée » retiré" "$SCRIPTS" vf-cockpit-regie-donnees.mjs 'if (p.done || p.archive) continue;' 'if (p.archive) continue;' rg4_cochee '[]'
+  rg_mutant ENTETE-CORPS "statut cherché hors de l'en-tête" "$SCRIPTS" vf-cockpit-regie-donnees.mjs 'const bloc = lignes.slice(1, fin);' 'const bloc = lignes;' rg4_entete '[0,0,0,1,0]'
 }
 
 # ---------- RG5 — impact : aval, détention, impact retenu (REGI-05) ----------
@@ -74,8 +74,8 @@ rg_RG5_donnees() {
   assert_eq "RG5.3 — detention : listée → { ws, phase } ; non listée, verrou absent, ws hors grammaire → null" "$(gv "$SCRIPTS" 'const L = { locks: [{ present: true, ws: "w", phase: "72", session_ids: ["s-1"] }, { present: true, ws: "w", phase: "73", session_ids: [A[0], "s-2"] }, { present: false, ws: "w", phase: "74", session_ids: ["s-3"] }] };
     return [m.detention(A[0], L), m.detention("autre", L), m.detention("s-3", L), m.detention("s-9", { locks: [{ present: true, ws: "../x", phase: "73", session_ids: ["s-9"] }] }), m.detention(A[0], L.locks)];' "$sid")" '[{"ws":"w","phase":"73"},null,null,null,{"ws":"w","phase":"73"}]'
   assert_eq "RG5.4 — retientDe : détention + DAG → mission (4) ; sans DAG → null ; sans détention → null ; rattachement → nœuds (2)" "$(rg5_retient "$SCRIPTS")" '[{"n":4,"portee":"mission"},null,null,{"n":2,"portee":"noeuds"}]'
-  rg_mutant IMPACT-TERMINES "aval compte aussi les nœuds terminés" "$SCRIPTS" vf-cockpit-gouvernance.mjs "return [...vus].filter((id) => statut.get(id) !== 'done').length;" 'return vus.size;' rg5_aval '[2,0,0]'
-  rg_mutant IMPACT-DEVINE "retientDe rend les restants du premier DAG sans détention" "$SCRIPTS" vf-cockpit-gouvernance.mjs 'return null; // impact inconnu : jamais deviné' "return liste(dags).length ? { n: restants(liste(dags)[0].nodes), portee: 'mission' } : null;" rg5_retient '[{"n":4,"portee":"mission"},null,null,{"n":2,"portee":"noeuds"}]'
+  rg_mutant IMPACT-TERMINES "aval compte aussi les nœuds terminés" "$SCRIPTS" vf-cockpit-regie-donnees.mjs "return [...vus].filter((id) => statut.get(id) !== 'done').length;" 'return vus.size;' rg5_aval '[2,0,0]'
+  rg_mutant IMPACT-DEVINE "retientDe rend les restants du premier DAG sans détention" "$SCRIPTS" vf-cockpit-regie-donnees.mjs 'return null; // impact inconnu : jamais deviné' "return liste(dags).length ? { n: restants(liste(dags)[0].nodes), portee: 'mission' } : null;" rg5_retient '[{"n":4,"portee":"mission"},null,null,{"n":2,"portee":"noeuds"}]'
 }
 
 # ---------- RG7 — fenêtre de stall à source unique (REGI-07, P73-D-09, P73-D-31) ----------
@@ -107,9 +107,9 @@ rg_RG7_donnees() {
   : > "$lab/.claude/scripts/driver-lock.sh"; : > "$lab/.claude/scripts/check-guard-health.sh"
   assert_eq "RG7.5 — scriptGarde : voisin dans un dossier explicite ; dossier sans ce script, script posé sous le lab observé, rien : null" "$(gv "$SCRIPTS" 'const [a, b, lab, vide] = A; const s = (o) => { const r = m.scriptGarde(o); return r === null ? null : r.slice(a.length); };
     return [s({ scriptsDir: a, labRoot: lab, home: vide }), s({ scriptsDir: b, labRoot: lab, home: vide }), s({ scriptsDir: vide + "/absent", labRoot: lab, home: lab }), s({ labRoot: lab, home: vide })];' "$a" "$b" "$lab" "$WORK/g75/vide")" '["/check-guard-health.sh",null,null,null]'
-  rg_mutant STALL-DUR "extraction qui rend toujours 900" "$SCRIPTS" vf-cockpit-gouvernance.mjs 'return m && Number(m[1]) > 0 ? Number(m[1]) : null;' 'return 900;' rg7_600 '600'
-  rg_mutant STALL-ENV "variable d'environnement ignorée" "$SCRIPTS" vf-cockpit-gouvernance.mjs 'if (typeof e === '"'string'"' && /^\d+$/.test(e) && Number(e) > 0) return Number(e);' '' rg7_env '600'
-  rg_mutant STALL-ANCRE "ancrage de début de ligne retiré" "$SCRIPTS" vf-cockpit-gouvernance.mjs '/^STALL_WINDOW=' '/STALL_WINDOW=' rg7_3b 'null'
+  rg_mutant STALL-DUR "extraction qui rend toujours 900" "$SCRIPTS" vf-cockpit-regie-donnees.mjs 'return m && Number(m[1]) > 0 ? Number(m[1]) : null;' 'return 900;' rg7_600 '600'
+  rg_mutant STALL-ENV "variable d'environnement ignorée" "$SCRIPTS" vf-cockpit-regie-donnees.mjs 'if (typeof e === '"'string'"' && /^\d+$/.test(e) && Number(e) > 0) return Number(e);' '' rg7_env '600'
+  rg_mutant STALL-ANCRE "ancrage de début de ligne retiré" "$SCRIPTS" vf-cockpit-regie-donnees.mjs '/^STALL_WINDOW=' '/STALL_WINDOW=' rg7_3b 'null'
 }
 
 # ---------- RG10 — « attend ses agents (N) » (REGI-10, P73-D-12, A12) ----------
@@ -129,5 +129,5 @@ rg_RG10_donnees() {
   assert_eq "RG10.3 — A12 : une ligne system d'un autre sous-type après : 0" "$(gv "$SCRIPTS" 'return m.attendAgents(A[0]);' "$d/t3.jsonl")" '0'
   assert_eq "RG10.4 — valeur 0, négative, non entière, 5000 : 0, 0, 0, 999" "$(gv "$SCRIPTS" 'return A.map((f) => m.attendAgents(f));' "$d/v0.jsonl" "$d/vneg.jsonl" "$d/vfrac.jsonl" "$d/vmax.jsonl")" '[0,0,0,999]'
   assert_eq "RG10.5 — champ absent : 0 ; fichier absent : 0" "$(gv "$SCRIPTS" 'return A.map((f) => m.attendAgents(f));' "$d/vabs.jsonl" "$d/absent.jsonl")" '[0,0]'
-  rg_mutant ATTEND-REMONTE "le prédicat laisse passer les autres lignes et remonte à une ancienne turn_duration" "$SCRIPTS" vf-cockpit-gouvernance.mjs 'return { n: 0 }; // toute autre ligne : la dernière écriture décide' 'return null;' rg10_apres '0'
+  rg_mutant ATTEND-REMONTE "le prédicat laisse passer les autres lignes et remonte à une ancienne turn_duration" "$SCRIPTS" vf-cockpit-regie-donnees.mjs 'return { n: 0 }; // toute autre ligne : la dernière écriture décide' 'return null;' rg10_apres '0'
 }

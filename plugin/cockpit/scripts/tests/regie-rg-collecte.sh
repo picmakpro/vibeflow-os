@@ -1,4 +1,4 @@
-# regie-rg-collecte.sh — fragment du plan 73-03, SOURCÉ par test-cockpit-regie.sh (ne définit que des fonctions) : champs de gouvernance de who@2 (P73-D-35).
+# regie-rg-collecte.sh — fragment du plan 73-03, SOURCÉ par test-cockpit-regie.sh (ne définit que des fonctions) : champs de regie de who@2 (P73-D-35).
 #   RG4_collecte · RG4_direct (À vous : phases à vérification humaine lues une fois par reconstruction, REGI-04) · RG5_collecte (détention et impact, REGI-05)
 #   RG6_collecte (aucun champ brut du verrou, REGI-06) · RG7_collecte (fenêtre de stall, REGI-07) · RG9_direct (âge frais au hello, REGI-09)
 #   RG10_collecte (« attend ses agents », REGI-10) · RG16_collecte · RG16_direct (nettoyage à l'émission, contrat et signature, REGI-16).
@@ -64,9 +64,9 @@ function lab(nom, { ws = false, verif = false, dag = false, branche = 'main', se
   for (const s of sessions) transcript(path.join(home, '.claude', 'projects', slug(nom), s.id + '.jsonl'), d, s.id, s.ageS, s);
   return d;
 }
-// gouvernance de test : les phases lues par readPlanning et phasesHumaines() du module, sans passer par le code livré du fil de collecte
+// regie de test : les phases lues par readPlanning et phasesHumaines() du module, sans passer par le code livré du fil de collecte
 async function gov(d) {
-  const { readPlanning } = await imp('vf-cockpit-planning.mjs'), gm = await imp('vf-cockpit-gouvernance.mjs');
+  const { readPlanning } = await imp('vf-cockpit-planning.mjs'), gm = await imp('vf-cockpit-regie-donnees.mjs');
   const P = readPlanning(d, undefined, { sansTags: true });
   const dir = (cle) => { const p = P.phases.get(cle); return P.phaseDirs.get(`${p.ws || ''}|${p.n}`) || P.phaseDirs.get(`*|${p.n}`); };
   const ph = gm.phasesHumaines({ phases: P.phases, fichiers: (cle) => fs.readdirSync(dir(cle)), lire: (cle, f) => fs.readFileSync(path.join(dir(cle), f), 'utf8') });
@@ -75,7 +75,7 @@ async function gov(d) {
 const collecte = async (d, o = {}) => (await imp('vf-cockpit-who.mjs')).collectWho(d, { home, scriptsDir: path.join(work, 'noscripts'), ...o });
 const session = (w, id) => w.workers.find((x) => x.kind === 'session' && x.id === id);
 const SC = {
-  rg4: async () => { const d = lab('rg4', { verif: a1 === '1' }); const w = await collecte(d, { gouvernance: await gov(d) }); return 'phasesHumaines' in w ? JSON.stringify(w.phasesHumaines.map((p) => p.phase)) : 'absent'; },
+  rg4: async () => { const d = lab('rg4', { verif: a1 === '1' }); const w = await collecte(d, { regie: await gov(d) }); return 'phasesHumaines' in w ? JSON.stringify(w.phasesHumaines.map((p) => p.phase)) : 'absent'; },
   // revue 1, majeur 1 : le fil relancé repart avec un memo vide ; un tour SANS planning doit rendre les phases à vérification humaine comme avant
   memo: async () => {
     const d = lab('rg4m', { verif: true }), sortie = path.join(d, '.vibeflow', 'cockpit'); fs.mkdirSync(sortie, { recursive: true });
@@ -89,7 +89,7 @@ const SC = {
   },
   fabrique5: async () => { lab('lab', { ws: true, verif: true, dag: a1 === '1', sessions: [{ id: SID, ageS: 3600 }] }); return 'ok'; },
   collecte5: async () => {
-    const d = path.join(work, 'lab'); const w = await collecte(d, { scriptsDir: a1, gouvernance: await gov(d) });
+    const d = path.join(work, 'lab'); const w = await collecte(d, { scriptsDir: a1, regie: await gov(d) });
     fs.writeFileSync(a2 || path.join(work, 'who.json'), JSON.stringify(w)); const s = session(w, SID);
     return JSON.stringify({ detient: s?.detient, retient: s?.retient });
   },
@@ -111,7 +111,7 @@ const SC = {
   // constat d'audit 1 : le ws d'une phase humaine vient d'un nom de dossier de compartiment (sans grammaire) ; phase et ref viennent aussi du disque
   rg4s: async () => {
     const d = lab('rg4s'), U1 = '‮', BEL = '\u0007';
-    const w = await collecte(d, { gouvernance: { phasesHumaines: [{ phase: '7', ws: 'alpha', ref: 'n:ph-7' }, { phase: '8', ws: 'be' + U1 + 'ta' + BEL, ref: 'n:ph-8' },
+    const w = await collecte(d, { regie: { phasesHumaines: [{ phase: '7', ws: 'alpha', ref: 'n:ph-7' }, { phase: '8', ws: 'be' + U1 + 'ta' + BEL, ref: 'n:ph-8' },
       { phase: '9' + U1, ws: '' }, { phase: '10', ws: '', ref: 'n:x' + U1 + 'y' + BEL }, { phase: '11', ws: '..', ref: 'n:ph-11' }] } });
     return JSON.stringify(w.phasesHumaines ?? 'absent');
   },
@@ -168,7 +168,7 @@ rg_RG4_collecte() {
   assert_eq "RG4.14 — revue 1, majeur 1 : fil relancé (redemarrer, memo vide) puis un tour SANS planning : phasesHumaines reste [\"7\"], elle ne retombe pas à null" "$(rgc memo "$WORK/rg4-m")" '[["7"],["7"]]'
 }
 
-# ---------- RG4_direct — planning de gouvernance lu une fois par reconstruction (REGI-04) ----------
+# ---------- RG4_direct — planning de regie lu une fois par reconstruction (REGI-04) ----------
 # faux `claude` en tête du PATH (sortie 1) : aucun vrai appel, l'état officiel reste absent et l'état des sessions ne change pas en cours de mesure
 rgc_faux_claude() { mkdir -p "$WORK/fakebin"; printf '#!/bin/sh\nexit 1\n' > "$WORK/fakebin/claude"; chmod +x "$WORK/fakebin/claude"; }
 rgc_direct() { [ -f "$WORK/direct.json" ] && return 0; rgc_faux_claude; PATH="$WORK/fakebin:$PATH" rgc direct "$WORK/rgd" > "$WORK/direct.json"; }
@@ -203,7 +203,7 @@ rg_RG6_collecte() {
   # M-DETENTION-BRUTE : les DEUX gardes de la paire { ws, phase } retirées (detention() rend le verrou entier ET collectWho ne borne plus `detient`) :
   # l'entrée brute du verrou atteint who@2, RG6.10 doit rougir. Une seule garde retirée ne fuit pas (défense en profondeur) : le mutant les retire ensemble.
   local msg got
-  msg="$(rg_mut DETENTION-BRUTE "$SCRIPTS" vf-cockpit-gouvernance.mjs 'return { ws, phase };' 'return l;')" \
+  msg="$(rg_mut DETENTION-BRUTE "$SCRIPTS" vf-cockpit-regie-donnees.mjs 'return { ws, phase };' 'return l;')" \
     && msg="$(FROM="if (w.detient) w.detient = sous(w.detient, { ws: 40, phase: 20 }); // garde:detient" TO="// garde:detient" node "$AUX/mutsub.mjs" "$WORK/mut-DETENTION-BRUTE/vf-cockpit-who.mjs")" \
     || { assert_eq "M-DETENTION-BRUTE — le verrou entier posé sur la session (ancre)" "$msg" "muté"; return 0; }
   got="$(rgc6_sonde "$WORK/mut-DETENTION-BRUTE")"
@@ -240,7 +240,7 @@ rg_RG16_collecte() {
   assert_eq "RG16.14 — toute clé émise par who@2 (premier niveau et travailleurs, collecte riche : détention, impact, phases humaines, fenêtre) est déclarée au contrat" "$(rgc contrat "$WORK/rg16c" 14 "$WORK/rg5-a/who.json")" '[]'
   rg_mutant NETTOIE-EMISSION "branche et titre repassés au seul masque" "$SCRIPTS" vf-cockpit-who.mjs 'w.branch = nettoie(w.branch, LIBRES.branch); // garde:nettoie' 'w.branch = bornes(w.branch, LIBRES.branch); // garde:nettoie' rgc16_sonde 'branch:propre|titre:propre'
   assert_eq "RG16.15 — phasesHumaines : ws, phase et ref revalidés à l'émission (grammaire de detention) ; ws avec U+202E et BEL, phase avec U+202E, ws « .. » : entrée rejetée ; ref hors forme : ref retirée" "$(rgc16s_sonde "$SCRIPTS")" '[{"phase":"7","ws":"alpha","ref":"n:ph-7"},{"phase":"10","ws":""}]'
-  rg_mutant GRAMMAIRE-WS "la grammaire du compartiment n'est plus appliquée à l'émission de phasesHumaines" "$SCRIPTS" vf-cockpit-gouvernance-lecture.mjs '.filter((p) => p && typeof p.phase === '"'"'string'"'"' && phaseValide(p.phase) && wsValide(p.ws ?? '"'"''"'"'))' '.filter((p) => p && typeof p.phase === '"'"'string'"'"' && phaseValide(p.phase))' rgc16s_sonde '[{"phase":"7","ws":"alpha","ref":"n:ph-7"},{"phase":"10","ws":""}]'
+  rg_mutant GRAMMAIRE-WS "la grammaire du compartiment n'est plus appliquée à l'émission de phasesHumaines" "$SCRIPTS" vf-cockpit-regie-lecture.mjs '.filter((p) => p && typeof p.phase === '"'"'string'"'"' && phaseValide(p.phase) && wsValide(p.ws ?? '"'"''"'"'))' '.filter((p) => p && typeof p.phase === '"'"'string'"'"' && phaseValide(p.phase))' rgc16s_sonde '[{"phase":"7","ws":"alpha","ref":"n:ph-7"},{"phase":"10","ws":""}]'
 }
 rgc16s_sonde() { RGC_SCRIPTS="$1" rgc rg4s "$WORK/rg4s-$(basename "$1")"; }
 rg_RG16_direct() {
