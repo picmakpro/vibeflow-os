@@ -131,9 +131,19 @@ assert_eq "R5.2 — panneau d'ensemble sans bloc « Maintenant » ni « Phase �
 assert_has "R5.3 — témoin : le panneau montre bien les effectifs du lab" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[0].valeur.panneau')" "phases"
 assert_eq "R6.1 — titre de l'onglet Projet : « Projet · <nom> » (format unique, AUDC-X7)" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[0].valeur.titre')" "Projet · lab-court"
 assert_eq "R6.2 — titre de l'onglet Code : « Code · <nom> » (format unique, AUDC-X7)" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[1].valeur.titre')" "Code · lab-court"
-EXPR='window.__vfFrT("Thinking…")' # 79-10 : la phrase est traduite là où elle naît (aucun observateur ne réécrit un texte inséré après coup)
-XT="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$PC/project.html")"; unsrv
-assert_eq "R6.3 — « Thinking… » émis par le traducteur est montré en français, sans attendre de réécriture (79-10)" "$(printf '%s' "$XT" | node "$AUX/ev.mjs" 'j.resultats[0].valeur')" "Réflexion…"
+# R6.3 (79-10, amendement daté 2026-11-13, rv-1021) : le texte est inséré dans le DOM par le CHEMIN D'ÉMISSION RÉEL (une question posée dans le tiroir : submitAsk écrit « Thinking… » dans la feuille
+# avant le premier await), puis lu : français affiché. Lecture unique (garde window.__r63) : le relevé est répété jusqu'à stabilité, et une seconde soumission annulerait la première.
+EXPR63='(() => { if (window.__r63) return window.__r63; const i = document.querySelector("#ask-input"); i.value = "Combien de fichiers ?"; document.querySelector("#ask-form").requestSubmit(); const t = document.querySelector("#ask-sheet").innerText; return (window.__r63 = { fr: /Réflexion…/.test(t), en: /Thinking…/.test(t) }); })()'
+PRET63='document.readyState === "complete" && !!document.querySelector("header .brand .mark") && !document.querySelector("#ask-send").disabled' # le moteur de questions est détecté (faux claude du PATH)
+XT="$(CDP_PRET="$PRET63" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$EXPR63" "http://127.0.0.1:$PC/project.html")"; unsrv
+assert_eq "R6.3 — « Thinking… » écrit par le chemin d'émission réel (question posée dans le tiroir) est montré en français, jamais en anglais (79-10)" "$(printf '%s' "$XT" | node "$AUX/ev.mjs" 'JSON.stringify(j.resultats[0].valeur)')" '{"fr":true,"en":false}'
+# mutant (dans la suite) : la même page dont l'émission contourne le traducteur (« [t('Thinking…')] » devient « ['Thinking…'] ») : R6.3 doit rougir, c'est-à-dire lire l'anglais
+LM="$WORK/lab-mutant63"; mkdir -p "$LM"; ( cd "$LC" && tar -cf - . ) | ( cd "$LM" && tar -xf - )
+sed "s/\[t('Thinking…')\]/['Thinking…']/g" "$LC/.vibeflow/cockpit/project.html" > "$LM/.vibeflow/cockpit/project.html"
+MUT_N="$(grep -c "\['Thinking…'\]" "$LM/.vibeflow/cockpit/project.html")"
+srv "$LM/.vibeflow/cockpit"; PM=$SRV_PORT
+XM="$(CDP_PRET="$PRET63" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$EXPR63" "http://127.0.0.1:$PM/project.html")"; unsrv
+assert_eq "R6.3 mutant — avec l'émission qui contourne le traducteur ($MUT_N sites mutés), la même sonde lit « Thinking… » et non « Réflexion… » (la sonde sait voir l'anglais)" "$([ "$MUT_N" -ge 1 ] && printf '%s' "$XM" | node "$AUX/ev.mjs" 'JSON.stringify(j.resultats[0].valeur)' || echo "mutation sans effet")" '{"fr":false,"en":true}'
 
 # O2 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : un fil d'Ariane profond (Vue d'ensemble / Historique / Phases) à 1 280 et 1 440 px.
 # Un segment de moins de 12 caractères n'est jamais rogné (scrollWidth <= clientWidth) ; si une troncature est nécessaire, elle porte sur un segment du MILIEU, jamais le premier ni le dernier.
