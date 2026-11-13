@@ -755,3 +755,16 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - 75-01 (revue, m5) : le tri de la base commune multiple (`baseCommune`, historiques en croix) n'a pas de témoin ; les quatre autres mutants de m5 ont leur témoin (G11).
 
 **Déclencheur de reprise :** la prochaine passe sur l'activité du cockpit (75-07 ou la phase suivante qui la lit).
+
+## Cockpit : mineurs de la revue du point de fusion 2 de la Phase 76 (pages 76-06 et 76-07) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** revue (`vf-reviewer`) des plans 76-06 et 76-07, une passe, verdict passed, aucun majeur ; régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale).
+- M1 : `74-vf-trace-sections.js` lit les exigences de l'entrée haute sans garde ; une réponse vide, indisponible ou en cours de collecte lève une erreur non rattrapée (console seule, l'entrée reste cachée).
+- M2 : les zones rendues de `74-vf-trace.js` ne sont élaguées qu'au rafraîchissement ; des conteneurs détachés restent retenus jusqu'à un événement ou au départ d'onglet (fuite bornée).
+- M3 : Échap retrouve la ligne d'origine par un sélecteur sans `CSS.escape` ; un chemin de preuve à guillemet ne rend pas le focus.
+- M4 : `ouvrirAgent` (`74-vf-trace-memoire.js`) avale l'échec de lecture ; un clic ne produit rien, ou une liste vide trompeuse pendant la collecte.
+- M5 : le marqueur d'injection des sondes ne couvre que le libellé d'exigence et les critères, pas les titres d'ADR, noms de mémoire ni sujets de commit (le code passe tout par `textContent`).
+- M6 : trois sondes Chrome à durcir : seuil de 150 ms contre une lecture à 40 ms (à-coup de CI), comparaison de défilement tautologique si le panneau ne défile pas, pause fixe sans témoin d'arrivée de l'événement.
+- Non sondé : l'état « collecte en cours » ne se relance que par la clé `planning` de `VF_ETAT` ; si la fin de la première collecte n'émet pas d'événement, la phrase reste jusqu'au prochain changement de panneau. À trancher avec le correctif de la clé `planning` annoncé par la Phase 79.
+
+**Déclencheur de reprise :** la passe du juge de design de fin de Phase 76, ou la prochaine retouche des fichiers `ui/74-vf-trace*.js`.
