@@ -19,7 +19,11 @@
     ? [...el.closest('.vp-jalon').querySelectorAll('.vp-couloir .vp-carte')] : [...el.closest('.vp-details').querySelectorAll('.vp-rangee')]);
   const ordre = (el) => membres(el).map((e) => e.dataset.id);
   // seuls une carte et une rangée itinèrent : le h1 du repli, hors de toute collection, ne lève rien
-  const itinerer = (el) => { if (!el.matches('.vp-carte, .vp-rangee')) return; for (const e of membres(el))e.setAttribute('tabindex', e === el ? '0' : '-1'); memoire.set(cle(el), el.dataset.id); };
+  const itinerer = (el) => {
+    if (!el.matches('.vp-carte, .vp-rangee')) return;
+    for (const e of membres(el)) e.setAttribute('tabindex', e === el ? '0' : '-1');
+    memoire.set(cle(el), el.dataset.id);
+  };
   const appliquer = (racine) => { // après un rendu : l'arrêt mémorisé de chaque collection, sinon son premier élément
     for (const c of racine.querySelectorAll('.vp-jalon, .vp-details')) {
       const liste = [...c.querySelectorAll(c.classList.contains('vp-jalon') ? '.vp-couloir .vp-carte' : '.vp-rangee')];
