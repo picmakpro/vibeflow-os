@@ -122,3 +122,26 @@ Commande : `bash plugin/cockpit/scripts/tests/test-cockpit-tracabilite-route.sh`
 ```
 
 Les quatre mutants de cache (M-VOL, M-EMPREINTE, M-SIG, M-EMPREINTE-PLANNING) ne rougissent pas encore : leur ancre (`enVol`, `const parties = [`) n'existe pas dans le code de la tâche 2 (« ancre introuvable »). Le harnais mesure K = 8 appels git par calcul sur le code naïf (aucun cache) ; T10.8a, T10.8b, T10.8g rouges (chaque requête relance git). M-GARDE, M-CLE, M-NUE-RELIEE-EXIG, M-CONFINE : leur sonde nominale est atteinte, le mutant a un effet une fois la garde posée (voir le vert).
+
+## H-1 — coût de lecture d'un fichier de mémoire (audit de sécurité)
+
+Classe : expression régulière de coût quadratique sur une ligne longue, lecture de la mémoire des agents
+(retrait des classes POSIX de `liensDe`, lecture d'un index par `nomsIndexes`). Témoin : section T9 de
+`test-cockpit-tracabilite-memoire.sh` (entrées générées, limite de temps fixe, croissance 2N sous 3 fois N,
+sans saut de ligne, avec `\r` et U+2028, témoin positif sur un fichier normal).
+
+Rouge sur le code d'avant (tête `9aac974f`, témoin seul) : 61 passés, 8 échoués.
+
+```
+  ❌ FAIL — T9.1 liens-sans-saut : sous la limite de temps fixe — attendu: [true] obtenu: [false]
+  ❌ FAIL — T9.1 liens-sans-saut : le temps à 2N reste sous 3 fois celui à N — attendu: [true] obtenu: [false]
+  (idem liens-cr, liens-u2028, index-sans-saut)
+  ✅ PASS — T9.2 témoin positif : liens d'un fichier normal lus, code et classe POSIX ignorés
+  ✅ PASS — T9.2 témoin positif : noms indexés lus (lien nu et lien ./), hors index exact
+```
+
+Vert après le correctif (quantificateurs bornés) : 69 passés, 0 échoués.
+
+Mutant (copie jetable hors du dépôt, quantificateurs ouverts rétablis) : T9 rougit, 59 passés, 10 échoués
+(mêmes 8 assertions de coût rouges que ci-dessus, les deux témoins positifs restent verts), donc le témoin tue le mutant.
+Note : `index-cr` et `index-u2028` restent verts par construction (`\s` borne déjà le nom) ; ce sont des témoins de contrôle.

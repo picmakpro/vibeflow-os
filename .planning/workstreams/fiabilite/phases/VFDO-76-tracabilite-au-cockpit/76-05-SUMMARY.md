@@ -75,3 +75,7 @@ Compteurs de la mémoire : `GET /api/vf/tracabilite?vue=memoire` -> `memoire.com
 | `test-cockpit-confinement.sh` | 111 PASS / 0 FAIL | 49 s |
 
 Temps total des suites de la tête : 246 s (plus les rejeux de développement). `check-version-sync.sh` § 9 non lancé (rouge attendu jusqu'à 76-08).
+
+## Correctif H-1
+
+Correctif H-1 (audit de sécurité, classe : expression régulière de coût quadratique sur une ligne longue, lecture de la mémoire des agents) : témoin `9aac974f` (rouge), correctif `16057a84` (quantificateurs bornés dans `liensDe` et `nomsIndexes`), mutant tué (trace dans `76-05-RED-TRACE.md`, section H-1). Suites jouées sur la tête : `test-cockpit-tracabilite-memoire.sh` 69/0, `test-cockpit-tracabilite-route.sh` exit 0, `test-cockpit-vendor.sh` 252/0 (119 s). Échéance de la route étendue au code synchrone : non faite (le coût est désormais linéaire et borné ; un témoin déterministe exigerait d'injecter une horloge dans `calculer`), reportée au BACKLOG par le manager.
