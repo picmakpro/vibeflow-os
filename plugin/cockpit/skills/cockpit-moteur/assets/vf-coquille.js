@@ -1,8 +1,9 @@
 // VibeFlow (79-16, SOCL-20) : le client de la coquille. Le document ne porte aucune donnée : la coquille lit celle d'un onglet par GET /api/vf/graphe,
 // pose les scripts de /_vf/ (liste du manifeste ; classes : bibliothèque, persistant, i18n, moteur, onglet) puis le moteur, et rend la main quand il a
 // fait son premier rendu. Ordre au premier chargement : bibliothèques, persistants (ordre d'octets du nom), puis l'onglet (i18n, moteur, extensions).
-// Le fragment de l'adresse n'est jamais lu ni écrit ici. Premier script de la tête : son écoute de DOMContentLoaded précède celle du tiroir du
-// terminal, donc le squelette du corps est pris avant qu'il y ajoute ses nœuds.
+// Un changement d'onglet démonte l'onglet affiché (vf-coquille-portee.js), puis ré-exécute le moteur et les scripts d'onglet ; les persistants restent.
+// Le fragment de l'adresse n'est jamais écrit ici. Premier script de la tête : son écoute de DOMContentLoaded précède celle du tiroir du terminal,
+// donc le squelette du corps est pris avant qu'il y ajoute ses nœuds.
 (() => {
   'use strict';
   if (window.VF_COQUILLE) return;
@@ -10,12 +11,14 @@
   const PAR_ADRESSE = { '/': 'code', '/index.html': 'code', '/project.html': 'projet', '/equipe.html': 'equipe' };
   const TITRES = { code: 'VibeFlow · Code', projet: 'VibeFlow · Projet', equipe: 'VibeFlow · Équipe' };
   const MESSAGE_LECTURE = 'Lecture impossible : les données de cet onglet n\'ont pas pu être lues.';
-  let manifeste = null, affiche = null, porte = null, file = Promise.resolve();
+  const P = window.VF_PORTEE;
+  let manifeste = null, squelette = null, affiche = null, porte = null, file = Promise.resolve(), enLot = false, enDemarrage = false;
   let etat = { onglet: null, phase: 'chargement', motif: null };
   const retenu = {}; // onglet -> { etag, texte } : la dernière réponse 200 (le 304 ré-analyse ce texte, jamais un objet muté par le moteur)
+  const inscriptions = [], differes = [];
   const delai = () => { const n = window.VF_COQUILLE_REGLAGES?.delaiMs; return Number.isInteger(n) && n >= 1000 && n <= 120000 ? n : 30000; };
-  const attendreMs = (ms) => new Promise((ok) => setTimeout(ok, ms));
   const nomsDe = (...classes) => manifeste.fichiers.filter((f) => classes.includes(f.classe)).map((f) => f.nom);
+  const erreur = (m, e) => console.error(`VibeFlow coquille : ${m} : ${e && e.message}`);
 
   const poser = (nom) => new Promise((ok, ko) => {
     const s = D.createElement('script');
@@ -24,10 +27,36 @@
   });
   const enchainer = async (noms) => { for (const n of noms) await poser(n); };
 
-  // la lecture de l'onglet : jeton de l'onglet, étiquette retenue ; 200 garde le texte, 304 réutilise le texte retenu, le reste est un échec au message fixe
+  // ---- surOnglet : rappels appelés une fois par arrivée, nettoyage rendu appelé avant le changement suivant ----
+  const nettoyer = (ins) => { const f = ins.nettoyage; ins.nettoyage = null; if (f) { try { f(); } catch (e) { erreur('un nettoyage a levé', e); } } };
+  const appeler = (ins) => {
+    try { const r = ins.rappel({ onglet: affiche }); ins.nettoyage = typeof r === 'function' ? r : null; } catch (e) { erreur('un rappel a levé', e); }
+  };
+  // un rappel posé pendant un autre est appelé après le lot
+  const lot = (appels) => {
+    enLot = true; try { for (const ins of appels) if (ins.actif) appeler(ins); } finally { enLot = false; }
+    if (differes.length) lot(differes.splice(0));
+  };
+  function surOnglet(rappel, options) {
+    const cle = options && typeof options === 'object' && Object.hasOwn(options, 'cle') ? options.cle : undefined;
+    const valide = cle === undefined || (typeof cle === 'string' && cle.length > 0 && cle.length < 100);
+    if (typeof rappel !== 'function' || !valide) return () => {};
+    const remplacee = cle === undefined ? null : inscriptions.find((i) => i.cle === cle); // garde:coquille-cle
+    if (remplacee) { remplacee.actif = false; nettoyer(remplacee); inscriptions.splice(inscriptions.indexOf(remplacee), 1); }
+    const ins = { rappel, cle, nettoyage: null, actif: true, demarrage: enDemarrage }; // posé au démarrage d'un onglet : par ses scripts, donc défait avec lui
+    inscriptions.push(ins);
+    if (etat.phase === 'pret' && affiche !== null) { if (enLot) differes.push(ins); else lot([ins]); }
+    return () => {
+      if (!ins.actif) return;
+      ins.actif = false; nettoyer(ins);
+      const i = inscriptions.indexOf(ins); if (i >= 0) inscriptions.splice(i, 1);
+    };
+  }
+
+  // la lecture de l'onglet : jeton de l'onglet, étiquette retenue ; 200 garde le texte, 304 réutilise le texte retenu,
+  // le reste est un échec au message fixe
   async function lireGraphe(nom) {
-    const jeton = window.VF_COCKPIT_SERVER?.jetons?.[nom];
-    const entetes = { 'x-vf-cockpit-token': jeton || '' };
+    const entetes = { 'x-vf-cockpit-token': window.VF_COCKPIT_SERVER?.jetons?.[nom] || '' };
     if (retenu[nom]) entetes['If-None-Match'] = retenu[nom].etag;
     let r; try { r = await fetch('/api/vf/graphe?onglet=' + nom, { headers: entetes }); } catch { throw new Error(MESSAGE_LECTURE); }
     if (r.status === 200) { const texte = await r.text(); retenu[nom] = { etag: r.headers.get('ETag') || '', texte }; }
@@ -35,36 +64,60 @@
     return JSON.parse(retenu[nom].texte);
   }
 
-  // le démontage de l'onglet affiché : à la tâche suivante, la portée défait ce que le moteur et les extensions ont posé
-  function demonter() {}
+  // ---- l'échec d'un chargement (A55) : l'état, l'événement annulable, et au premier chargement le texte fixe avec « Réessayer » ----
+  function afficherEchec(nom) {
+    if (D.getElementById('vf-coquille-echec')) return;
+    const n = D.createElement('div'), t = D.createElement('p'), b = D.createElement('button');
+    n.id = 'vf-coquille-echec'; n.setAttribute('role', 'status');
+    n.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;'
+      + 'gap:12px;padding:24px;text-align:center';
+    t.textContent = MESSAGE_LECTURE; // garde:coquille-echec-corps
+    b.type = 'button'; b.textContent = 'Réessayer';
+    b.addEventListener('click', () => { chargerOnglet(nom).catch(() => {}); });
+    n.append(t, b); (D.getElementById('stage') || D.body).appendChild(n);
+  }
+  function echec(nom, motif) {
+    etat = { onglet: nom, phase: 'echec', motif };
+    if (motif !== 'lecture') return;
+    const initial = affiche === null;
+    const ev = new CustomEvent('vf:coquille-echec', { cancelable: true, detail: { onglet: nom, initial } });
+    const annule = !D.dispatchEvent(ev); // garde:coquille-echec-emission
+    if (initial && !annule) afficherEchec(nom); // garde:coquille-echec-prevent
+  }
 
-  async function demarrerOnglet(nom, graphe) {
+  async function demarrerOnglet(nom, graphe, initial) {
     window.VF_COCKPIT = graphe;
     if (window.VF_COCKPIT_SERVER) window.VF_COCKPIT_SERVER.token = window.VF_COCKPIT_SERVER.jetons[nom];
     D.title = TITRES[nom];
-    if (matchMedia('(max-width: 700px)').matches && !/[#&]s=/.test(location.hash)) D.body.classList.add('no-panel'); // un téléphone démarre panneau fermé
+    // un téléphone démarre panneau fermé
+    if (matchMedia('(max-width: 700px)').matches && !/[#&]s=/.test(location.hash)) D.body.classList.add('no-panel');
     let ouvrirPorte; porte = new Promise((ok) => { ouvrirPorte = ok; });
-    await enchainer(nomsDe('i18n', 'moteur', 'onglet')); // l'ordre du manifeste : i18n, moteur, extensions
-    const V = window.VibeFlow;
-    const pret = new Promise((ok) => V.on('ready', () => ok()));
+    await enchainer(nomsDe('i18n', 'moteur', 'onglet')); // garde:coquille-persistants
+    const pret = new Promise((ok) => window.VibeFlow.on('ready', () => ok()));
     ouvrirPorte();
-    const limite = attendreMs(delai()).then(() => { throw new Error('Le premier rendu de l\'onglet n\'a pas eu lieu à temps.'); });
-    await Promise.race([pret, limite]);
+    let minuterie;
+    const limite = new Promise((ok, ko) => {
+      minuterie = setTimeout(() => ko(new Error('Le premier rendu de l\'onglet n\'a pas eu lieu à temps.')), delai());
+    });
+    try { await Promise.race([pret, limite]); } finally { clearTimeout(minuterie); }
   }
 
   async function sequence(nom, initial) {
     etat = { onglet: nom, phase: 'chargement', motif: null };
-    const graphe = await lireGraphe(nom);
+    let graphe;
+    try { graphe = await lireGraphe(nom); } catch (e) { echec(nom, 'lecture'); throw e; }
+    D.getElementById('vf-coquille-echec')?.remove();
     H.dataset.vfPret = 'non';
-    demonter();
-    await demarrerOnglet(nom, graphe);
+    for (const ins of [...inscriptions].reverse()) nettoyer(ins); // les fonctions rendues par les rappels, avant le démontage
+    // les rappels inscrits par les scripts de l'onglet affiché (au démarrage) s'en vont avec lui : ses scripts sont ré-exécutés et s'inscriront de nouveau
+    for (const ins of inscriptions.splice(0)) if (ins.demarrage) ins.actif = false; else inscriptions.push(ins);
+    P.demonter();
+    P.ouvrir(squelette); enDemarrage = true;
+    try { await demarrerOnglet(nom, graphe, initial); } catch (e) { enDemarrage = false; etat = { onglet: nom, phase: 'echec', motif: null }; throw e; }
+    enDemarrage = false;
     affiche = nom; etat = { onglet: nom, phase: 'pret', motif: null };
     H.dataset.vfPret = 'oui';
-  }
-
-  async function initial() {
-    await enchainer(nomsDe('bibliotheque', 'persistant')); // garde:coquille-persistants
-    await sequence(PAR_ADRESSE[location.pathname] || 'code', true);
+    lot([...inscriptions]);
   }
 
   function chargerOnglet(nom) {
@@ -75,12 +128,15 @@
   }
 
   window.VF_COQUILLE = Object.freeze({
-    version: 1, chargerOnglet, onglet: () => affiche, etat: () => ({ ...etat }),
+    version: 1, chargerOnglet, surOnglet, onglet: () => affiche, etat: () => ({ ...etat }), natif: P.natif,
     porteMoteur: () => porte || Promise.resolve(),
   });
 
   D.addEventListener('DOMContentLoaded', () => {
     try { manifeste = JSON.parse(D.getElementById('vf-coquille-manifeste').textContent); } catch { return; }
-    file = initial().catch(() => {});
+    const orig = [...D.body.childNodes];
+    squelette = { orig, copie: orig.map((n) => n.cloneNode(true)) };
+    H.dataset.vfPret = 'non';
+    file = enchainer(nomsDe('bibliotheque', 'persistant')).then(() => sequence(PAR_ADRESSE[location.pathname] || 'code', true)).catch(() => {});
   }, { once: true });
 })();

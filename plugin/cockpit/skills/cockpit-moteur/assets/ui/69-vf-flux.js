@@ -2,7 +2,12 @@
 // EventSource et relaie chaque événement aux autres onglets du même lab par BroadcastChannel ; aucun jeton ne circule sur le canal.
 // Sans ces primitives, hors contexte sûr ou sans empreinte du lab : un flux par page. Veille : au-delà de 45 s sans événement (vie compris)
 // le flux est déclaré perdu, d'après des instants. Porte du magasin : window.VF_FLUX. Rien ne s'exécute avant ouvrir() (page exportée : aucun effet).
+// vf-coquille: persistant
 (() => {
+  // 79-16 : ce que ce fichier pose APRÈS son élection (flux, veille, minuteries) passe par les primitives natives de la coquille :
+  // la portée d'un onglet n'y touche pas
+  const N = (typeof window !== 'undefined' && window.VF_COQUILLE && window.VF_COQUILLE.natif) || null;
+  const SO = N ? N.setTimeout : (...a) => setTimeout(...a), SI = N ? N.setInterval : (...a) => setInterval(...a);
   const PREFIXE = 'vf-cockpit-flux:';
   const MAX_DONNEE = 1048576;
   const MAX_NOEUDS = 100000;
@@ -106,7 +111,7 @@
   };
   const ouvrirReel = () => {
     if (S.es) return;
-    const es = new EventSource('/api/vf/events?token=' + encodeURIComponent(S.jeton));
+    const es = new (N && N.EventSource ? N.EventSource : EventSource)('/api/vf/events?token=' + encodeURIComponent(S.jeton));
     S.es = es;
     for (const nom of EVENEMENTS) es.addEventListener(nom, (e) => recu(nom, e.data));
     es.onerror = () => { if (S.es !== es) return; declarerPerdu('erreur'); };
@@ -155,7 +160,7 @@
   const interrogerElu = () => { // un suiveur dont la veille a coupé : ping, puis vol sans pong après PONG_MS plus une gigue
     S.pong = false; annulerVol(); poster({ v: 1, t: 'ping', id: S.id });
     const delai = PONG_MS + Math.floor(Math.random() * GIGUE_MS); // garde:flux-gigue
-    S.tVol = setTimeout(() => { S.tVol = null; if (!S.pong && S.role === 'suiveur' && S.conn !== 'ouvert') voler(); }, delai);
+    S.tVol = SO(() => { S.tVol = null; if (!S.pong && S.role === 'suiveur' && S.conn !== 'ouvert') voler(); }, delai);
   };
   const elire = () => {
     apresVerrou(navigator.locks.request(S.nom, { ifAvailable: true }, (verrou) => {
@@ -179,9 +184,10 @@
   };
   const demarrer = () => {
     S.derniere = Date.now();
-    if (typeof setInterval === 'function') setInterval(verifier, 1000);
+    if (typeof setInterval === 'function') SI(verifier, 1000);
     if (typeof document !== 'undefined' && document && typeof document.addEventListener === 'function') {
-      document.addEventListener('visibilitychange', () => { if (document.visibilityState === 'visible') verifier(); });
+      const veille = () => { if (document.visibilityState === 'visible') verifier(); };
+      if (N) N.addEventListener(document, 'visibilitychange', veille); else document.addEventListener('visibilitychange', veille);
     }
     decider();
   };
@@ -192,7 +198,11 @@
     for (const s of [...S.sources]) s.close();
     const src = creerSource(); S.sources.add(src);
     if (premier) { S.init = true; demarrer(); return src; }
-    Promise.resolve().then(() => { for (const [nom, data] of S.mem) src._livrer(nom, data); }); // état connu, quand 70 a posé ses abonnements
+    const rejouer = () => { for (const [nom, data] of S.mem) src._livrer(nom, data); }; // état connu, quand 70 a posé ses abonnements
+    // 79-16 : sous la coquille, le rejeu attend le premier rendu de l'onglet (les éléments qui affichent l'état existent alors) : un rappel de démarrage, défait avec l'onglet
+    const C = typeof window !== 'undefined' ? window.VF_COQUILLE : null;
+    if (C && typeof C.surOnglet === 'function') C.surOnglet(rejouer);
+    else Promise.resolve().then(rejouer);
     S.derniere = Date.now(); if (S.conn === 'perdu') majConn('reprise');
     if (S.role === 'elu' || S.role === 'page') ouvrirReel();
     else if (S.role === 'suiveur' && S.motif === 'silence') interrogerElu();
