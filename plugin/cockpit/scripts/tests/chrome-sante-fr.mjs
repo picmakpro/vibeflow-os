@@ -7,6 +7,7 @@
 //   hostile  : le constat dont le titre porte un nom de fichier hostile — texte du titre, nombre d'éléments img du panneau, window.__p
 //   invite   : le texte de l'invite (<pre>) du constat de clé en fichier de test
 //   services : la liste des services lue dans les données de la page
+//   retour   : SF3.5, après Code -> Projet -> Code par VF_ONGLETS.aller : { trajet, memeOrigine, rouvert (titre, détail), invite }
 // Chaque état est attendu par une condition de la page, jamais par une pause fixe.
 import { executer, stabiliser, attendreValeur } from './chrome-session.mjs';
 
@@ -45,5 +46,21 @@ await executer(chrome, async (s) => {
     invite = await posee(() => s.ev("document.querySelector('#modal pre').textContent"));
   }
   const services = await s.ev(`${SANTE}.services || null`);
-  return { donnees, affiches, intro, hostile, invite, services };
+  // SF3.5 (P80-D-59) : Code -> Projet -> Code par VF_ONGLETS.aller (promesses attendues), sans rechargement : prouvé par performance.timeOrigin
+  // (un marqueur posé sur window est retiré par la portée d'onglet de la 79). Puis le panneau Santé rouvert : même constat que à froid.
+  const origine = await s.ev('performance.timeOrigin');
+  const aller = (nom) => s.ev(`VF_ONGLETS.aller(${JSON.stringify(nom)}).then(() => 'ok', (e) => String(e && e.message))`);
+  await s.ev("const c = document.querySelector('#modal [data-close]'); if (c) c.click()");
+  const trajet = [await aller('projet'), await aller('code')];
+  await s.attendre(PRET, 'page Code revenue'); await s.attendre("document.getElementById('btn-health')", 'bouton Santé');
+  if (!(await s.ev("!!document.querySelector('#panel .hc-issue')"))) await s.ev("document.getElementById('btn-health').click()");
+  await s.attendre("!!document.querySelector('#panel .hc-issue')", 'liste de Santé rouverte');
+  const rouvert = await posee(() => s.ev(AFFICHES));
+  let inviteRouverte = null;
+  if (await s.ev(OUVRIR_INVITE)) {
+    await s.attendre("!!document.querySelector('#modal pre')", 'invite rouverte');
+    inviteRouverte = await posee(() => s.ev("document.querySelector('#modal pre').textContent"));
+  }
+  const retour = { trajet, memeOrigine: (await s.ev('performance.timeOrigin')) === origine, rouvert, invite: inviteRouverte };
+  return { donnees, affiches, intro, hostile, invite, services, retour };
 });
