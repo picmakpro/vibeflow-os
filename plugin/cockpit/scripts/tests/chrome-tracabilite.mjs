@@ -45,7 +45,7 @@ await executer(chrome, async (s) => {
     await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: r.x, y: r.y });
     for (const type of ['mousePressed', 'mouseReleased']) await s.send('Input.dispatchMouseEvent', { type, x: r.x, y: r.y, button: 'left', clickCount: 1 });
   };
-  const touche = async (key, code, vk) => { for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk }); };
+  const touche = async (key, code, vk) => { for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, nativeVirtualKeyCode: vk, ...(key === 'Enter' && type === 'keyDown' ? { text: '\r' } : {}) }); };
   const ligneDe = (id, sel) => lire(`(() => { const l = __tr.ligne('${id}'); return l ? ${sel} : null; })()`);
 
   await sec('c10', async () => { // C1.0 : le fichier neuf est servi (A48) ; la première ligne porte le marqueur
@@ -116,11 +116,11 @@ await executer(chrome, async (s) => {
     o.c19avant = reqs.filter((r) => r.includes('vue=jalon')).length;
     await clic('#panel details[data-vf-trace-jalon] > summary');
     await attendreVrai("!!document.querySelector('#panel details[data-vf-trace-jalon] .vf-trace-ligne')");
+    o.c19req = reqs.filter((r) => r.includes('vue=jalon')).length;
     o.c19 = await lire(`(async () => { const d = document.querySelector('#panel details[data-vf-trace-jalon]'), r = await VF_ETAT.lireJson('/api/vf/tracabilite?vue=jalon'), b = r.jalon.bilan;
       const l = [...d.querySelectorAll('.vf-trace-ligne')].map((x) => __tr.nb(x.textContent));
       return { route: [b.contradiction, b.manque, b.nonLisible, b.sansExigence, b.complete, b.total].join(), bilan: __tr.nb(d.querySelector('.vf-trace-bilan').textContent),
         phases: l.length, ph1: l.find((x) => x.startsWith('Phase 1')) || null, octo: d.querySelectorAll('.vf-trace-g-contradiction').length }; })()`);
-    o.c19req = reqs.filter((r) => r.includes('vue=jalon')).length;
     await s.ev("document.querySelector('#panel details[data-vf-trace-jalon] .vf-trace-ligne').focus()"); await touche('Enter', 'Enter', 13); await pause(500);
     o.c19ouvre = await lire("({ sel: VibeFlow.state.selected, sec: !!__tr.sec() })");
   });
@@ -161,7 +161,7 @@ await executer(chrome, async (s) => {
   await sec('c112', async () => { // C1.12 (filet) : hauteurs de la section, aucun défilement horizontal, carte non poussée
     for (const [w, h, cle] of [[1440, 900, 'c112b'], [390, 844, 'c112f']]) {
       await charger(w, h); const carte = () => lire("(() => { const c = document.querySelector('.vp-carte').getBoundingClientRect(); return [c.x, c.y, c.width].join(); })()");
-      const avant = await carte(); await phase(1); const ferme = await lire('Math.round(__tr.sec().getBoundingClientRect().height)');
+      await phase(1); const avant = await carte(); const ferme = await lire('Math.round(__tr.sec().getBoundingClientRect().height)');
       await clic('#vf-trace-phase details.vf-trace-repli > summary'); await pause(300);
       const ouvert = await lire('Math.round(__tr.sec().getBoundingClientRect().height)');
       o[cle] = { ferme, ouvert, defilement: await lire("(() => { const p = document.getElementById('panel'); return p.scrollWidth <= p.clientWidth; })()"), carte: w === 1440 ? avant === await carte() : true };
