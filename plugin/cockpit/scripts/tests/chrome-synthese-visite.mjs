@@ -107,6 +107,10 @@ export async function jouer(chrome, port, mode) {
     r.v5 = { resume: await resumeLu(s), fiche: await fiche(s), vues: i5.vues() }; await s.naviguer(base + '/'); r.v5.cles = Object.keys(await stockageLu(s, null)).filter((k) => /derniere-visite/.test(k)); await i5.arreter();
     // ---- V9 : git en panne ----
     const i9 = await intercepter(s, '/api/vf/git', { statut: 500, corps: '{}' }); await charger(s, base, v2); r.v9 = { fiche: await fiche(s), vues: i9.vues() }; await i9.arreter();
+    // ---- V11 : dépôt lisible mais base inconnue (base.h nul) : jamais « rien de nouveau » sur la foi des commits ----
+    const i11 = await intercepter(s, '/api/vf/git', { statut: 200, corps: JSON.stringify({ etat: 'ok', base: { nom: null, h: null }, rangees: [] }) });
+    await charger(s, base, val(null, inst(maintenant() - 7200, identique(f)))); r.v11 = { fiche: await fiche(s), resume: null, vues: i11.vues() };
+    await fermer(s); r.v11.resume = await resumeLu(s); await i11.arreter();
     // ---- V7, V10, OB1 : sur l'état V2 ----
     await charger(s, base, v2); await fiche(s); r.ob1 = await s.ev(ORDRE); await fermer(s);
     r.ecout0 = await s.ev('window.__nbEcout()'); const origine = await s.ev('performance.timeOrigin');

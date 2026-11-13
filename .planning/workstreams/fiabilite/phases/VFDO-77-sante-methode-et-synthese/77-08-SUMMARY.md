@@ -36,3 +36,5 @@
 
 rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale) — mutants non joués (M-TEINTE, M-CLE-PAGE, M-TOUTVU-FOCUS, M-CLE-REPLI,
 M-NETTOIE-STORAGE) ; la garde d'échappement du texte rendu garde son témoin rouge ET son mutant (M-INNER : `createTextNode` remplacé par `insertAdjacentHTML`, W15 rougit, charge de la copie prouvée).
+
+Correction après revue : base de git inconnue (dépôt lisible, `base.h` nul, par exemple `master` sans remote) — le bloc posait `gitLu` vrai, `commitsArrives` rendait « inconnu » et la synthèse concluait « Rien de nouveau ». Désormais `gitLu` est faux quand `base.h` n'est pas un sha (ou que la visite précédente n'avait pas de sommet) : le bloc dit « Commits : non lus, le dépôt git est indisponible. » et la ligne-résumé « commits non lus ». Corrigé côté page, `74-vf-synthese-calcul.js` inchangé. Preuve : V11 (rouge sur la tête précédente : « rien », vert après) ; suite 45 PASS / 0 FAIL (42 s). OB1 attend aussi le bloc `cout` de 77-07 quand son fichier existe.

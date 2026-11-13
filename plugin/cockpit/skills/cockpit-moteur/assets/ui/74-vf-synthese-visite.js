@@ -77,7 +77,8 @@
     }
     if (S.cle && (S.gitPerime || !S.gitVu)) {
       const g = await S.ctx.lireJson('/api/vf/git'); if (S.mort) return;
-      S.gitVu = true; S.gitPerime = false; S.gitLu = !!(g && g.etat === 'ok' && g.base && Array.isArray(g.rangees));
+      S.gitVu = true; S.gitPerime = false; // base inconnue (base.h nul) : les commits ne sont pas lisibles, donc « non lus »
+      S.gitLu = !!(g && g.etat === 'ok' && g.base && Array.isArray(g.rangees) && typeof g.base.h === 'string' && g.base.h);
       S.rangees = S.gitLu ? g.rangees : []; S.sommet = S.gitLu ? g.base.h : null;
     }
     if (!E.lire('etat') && !S.etatLu) { S.etatLu = await S.ctx.lireJson('/api/vf/state'); if (S.mort) return; }
@@ -90,7 +91,7 @@
     if (!pre) return { etat: 'premiere' };
     const p = S.present;
     const d = calcul().difference(pre, p.inst, {
-      rangees: S.rangees, sommet: S.sommet, gitLu: S.gitLu, workers: p.brut.equipe.workers, maintenant: p.inst.vu, blocages: p.blocs,
+      rangees: S.rangees, sommet: S.sommet, gitLu: S.gitLu && !!pre.tete, workers: p.brut.equipe.workers, maintenant: p.inst.vu, blocages: p.blocs,
     });
     return { etat: d.vide ? 'rien' : 'neuf', d, vu: pre.vu, now: p.inst.vu };
   }
