@@ -5,7 +5,7 @@
 # écouteur factice en capture sur window (preventDefault puis stopPropagation, le geste de la 80) : la suite n'en dépend pas.
 #   P1 ouverture  P2 session et sous-agent  P3 faits (a à f)  P4 rattachement  P5 fil (a états, b fusion, c corps inconnu)  P6 direct  P7 bornes  P8 fermeture et Échap
 #   P9 lien du parent  P10 deux colonnes  P11 aucune fuite  P12 forme du code (statique)  P13 mouvement, contrastes, focus  P14 donnée hostile
-#   P15 cycle de vie  P16 vf-agent:lu  P17 les trois déclencheurs de la régie  P18 aller-retour d'onglet
+#   P15 cycle de vie  P16 vf-agent:lu  P17 les trois déclencheurs de la régie  P18 aller-retour d'onglet  P19 clic sur la bascule fiche ouverte
 # Plan 74-05 non marqué audit : le régime allégé de la session principale (2026-11-13) ne demande aucun mutant ; la suite n'en joue pas.
 # Chrome headless en CDP (SAUTÉ, jamais compté réussi, sans navigateur). Exit 0 si tout passe, 1 sinon.
 
@@ -404,7 +404,7 @@ export default async function (h) {
 JS
 cat > "$AUX/s8.mjs" <<'JS'
 import { voies, WHO, corps, msg } from './fix.mjs';
-export const ids = ['P8', 'P17'];
+export const ids = ['P8', 'P17', 'P19'];
 const ORIGINE = (id) => `#vf-equipe li[data-vf-agent="${id}"] .vf-rg-tog`;
 const ETAT = (sel) => ({ ferme: !document.querySelector('.vf-fiche'), foc: document.activeElement === document.querySelector(sel) });
 export default async function (h) {
@@ -501,6 +501,26 @@ export default async function (h) {
       return { autre, ouvertAutre, nom, ouvertNom: !!document.querySelector('.vf-fiche') }; });
     h.egal('P17.b', 'un déclencheur inconnu n\'est pas annulé et n\'ouvre rien ; « nom » (témoin positif) est annulé et ouvre', faux, { autre: true, ouvertAutre: false, nom: false, ouvertNom: true });
   });
+  await h.section('P19', async () => {
+    const vues = () => h.ev(() => [...document.querySelectorAll('#vf-equipe .vf-vue')].map((v) => [v.getAttribute('data-vf-vue'), v.hidden, v.inert]));
+    const tab = (lib) => h.ev((l) => { const t = [...document.querySelectorAll('#vf-equipe [role=tablist] [role=tab]')].find((x) => x.textContent === l); if (t) t.click(); return !!t; }, lib);
+    await h.monter({ voies, who: WHO, fil });
+    await h.attendre("[...document.querySelectorAll('#vf-equipe [role=tablist] [role=tab]')].some((x) => x.textContent === 'Frise')", 'bascule Régie et Frise');
+    await h.ouvrir('wk-2', ORIGINE('wk-2'));
+    await tab('Frise');
+    await h.attendre("!document.querySelector('.vf-fiche')", 'fiche fermée par la bascule');
+    const a = await vues();
+    h.egal('P19', 'fiche ouverte depuis la régie, clic sur « Frise » : la fiche se ferme, UNE seule vue visible (la frise), aucune inert', a, [['regie', true, false], ['frise', false, false]]);
+    await h.ouvrir('wk-2');
+    await tab('Régie');
+    await h.attendre("!document.querySelector('.vf-fiche')", 'fiche fermée par la bascule');
+    const b = await vues();
+    h.egal('P19.a', 'fiche ouverte depuis la frise, clic sur « Régie » : une seule vue visible (la régie), aucune inert', b, [['regie', false, false], ['frise', true, false]]);
+    await h.ouvrir('wk-2');
+    await tab('Régie');
+    await h.attendre("!document.querySelector('.vf-fiche')", 'fiche fermée par la bascule');
+    h.egal('P19.b', 'clic sur la vue déjà choisie (témoin) : la vue d\'origine revient, aucune inert', await vues(), [['regie', false, false], ['frise', true, false]]);
+  });
 }
 JS
 cat > "$AUX/s10.mjs" <<'JS'
@@ -594,15 +614,17 @@ export default async function (h) {
     const av = await h.ev(ETAT);
     await h.cycle('code'); await h.cycle('code');
     const ap = await h.ev(ETAT);
-    h.egal('P15', 'après deux allers-retours d\'onglet : un seul écouteur Échap, un seul écouteur vf-agent:ouvrir, un seul abonnement frise, aucune fiche, aucune minuterie',
-      [av.esc, av.ouvrir, av.abo, ap.esc, ap.ouvrir, ap.abo, ap.nFiches, ap.tm], [1, 1, 1, 1, 1, 1, 0, 0]);
+    h.egal('P15', 'après deux allers-retours d\'onglet : un seul écouteur Échap, un seul écouteur vf-agent:ouvrir, AUCUN abonnement frise (il n\'existe que fiche ouverte), aucune fiche, aucune minuterie',
+      [av.esc, av.ouvrir, av.abo, ap.esc, ap.ouvrir, ap.abo, ap.nFiches, ap.tm], [1, 1, 0, 1, 1, 0, 0, 0]);
     await h.ouvrir('wk-2');
+    const ouvert = (await h.ev(ETAT)).abo;
     const n0 = [await h.reqs('depuis='), await h.reqs('/api/vf/transcript')];
     await h.emettre('frise', 900);
     await h.pause(2500);
     const n1 = [await h.reqs('depuis='), await h.reqs('/api/vf/transcript')];
-    h.egal('P15.a', 'un événement frise : UNE relecture de la frise et UNE du fil (aucun abonnement doublé), un seul DOM de fiche', [n1[0] - n0[0], n1[1] - n0[1], (await h.ev(ETAT)).nFiches], [1, 1, 1]);
+    h.egal('P15.a', 'un événement frise : UNE relecture de la frise et UNE du fil, UN abonnement fiche ouverte, un seul DOM de fiche', [n1[0] - n0[0], n1[1] - n0[1], (await h.ev(ETAT)).nFiches, ouvert], [1, 1, 1, 1]);
     await h.fermer();
+    h.egal('P15.b', 'fiche fermée : l\'abonnement frise est retiré', (await h.ev(ETAT)).abo, 0);
   });
   await h.section('P18', async () => {
     await h.monter({ voies, who: WHO, fil });
@@ -610,8 +632,8 @@ export default async function (h) {
     await h.ouvrir('wk-2', ORIGINE('wk-2'));
     await h.cycle('code'); await h.cycle('code');
     const a = await h.ev(ETAT);
-    h.egal('P18', 'Code, Équipe, Code, Équipe avec la fiche ouverte : au retour elle est FERMÉE, la vue d\'origine ni hidden ni inert, un seul écouteur Échap, un seul vf-agent:ouvrir, un seul abonnement frise, aucune minuterie',
-      [a.ferme, a.vue, a.esc, a.ouvrir, a.abo, a.tm], [true, [false, false], 1, 1, 1, 0]);
+    h.egal('P18', 'Code, Équipe, Code, Équipe avec la fiche ouverte : au retour elle est FERMÉE, la vue d\'origine ni hidden ni inert, un seul écouteur Échap, un seul vf-agent:ouvrir, aucun abonnement frise, aucune minuterie',
+      [a.ferme, a.vue, a.esc, a.ouvrir, a.abo, a.tm], [true, [false, false], 1, 1, 0, 0]);
     await h.ev(() => { window.__esc2 = null; window.addEventListener('keydown', (e) => { if (e.key === 'Escape') window.__esc2 = e.defaultPrevented; }); });
     await h.echap(); await h.pause(300);
     const e = await h.ev(() => ({ esc: window.__esc2, fiches: document.querySelectorAll('.vf-fiche').length, errs: window.__errs.length }));
@@ -689,7 +711,7 @@ else
   echo "=== P3 — faits ==="; joue s3 "$PORT" P3
   echo "=== P5, P7 — fil, bornes ==="; joue s5 "$PORT" P5 P7
   echo "=== P6 — direct ==="; joue s6 "$PORT" P6
-  echo "=== P8, P17 — fermeture, Échap, déclencheurs de la régie ==="; joue s8 "$PORT" P8 P17
+  echo "=== P8, P17, P19 — fermeture, Échap, déclencheurs de la régie, bascule de vue ==="; joue s8 "$PORT" P8 P17 P19
   echo "=== P10, P11, P13, P14 — colonnes, fuites, mouvement et contrastes, donnée hostile ==="; joue s10 "$PORT" P10 P11 P13 P14
   echo "=== P15, P16, P18 — cycle de vie, vf-agent:lu, aller-retour d'onglet ==="; joue s15 "$PORT" P15 P16 P18
   assert_eq "S0 — aucun fichier du lab modifié (somme du dossier avant/après)" "$(somme_lab)" "$avant"

@@ -27,7 +27,7 @@
 
   function monter() {
     const retraits = [], mq = W.matchMedia('(max-width: 700px)');
-    let ouv = null, tm = null, dernier = 0, gen = 0;
+    let ouv = null, tm = null, dernier = 0, gen = 0, desabo = null; // l'abonnement frise n'existe que fiche ouverte
     const ecouter = (cible, type, f) => { cible.addEventListener(type, f); retraits.push(() => cible.removeEventListener(type, f)); };
     const worker = (id) => { const w = E() && E().lire('who'); return w && Array.isArray(w.workers) ? w.workers.find((x) => x && x.id === id) || null : null; };
     const signal = () => { const s = E() && E().lire('etat'); return s && s.signal ? s.signal : {}; };
@@ -44,12 +44,15 @@
       const cible = cands.find((c) => c && !c.closest('[hidden], [inert], details:not([open])') && c.getClientRects().length > 0);
       if (cible) cible.focus({ preventScroll: true });
     };
-    const fermer = (focus = true) => {
+    // restaurer : rendre la vue d'origine ; faux quand la bascule vient de choisir une vue (la régie a déjà réglé hidden)
+    const fermer = (focus = true, restaurer = true) => {
       if (!ouv) return false;
       const o = ouv;
       ouv = null; gen++;
       if (tm !== null) { clearTimeout(tm); tm = null; }
-      D.removeEventListener('scroll', o.surScroll); o.racine.remove(); o.vue.hidden = false; o.vue.inert = false;
+      if (desabo) { desabo(); desabo = null; }
+      D.removeEventListener('scroll', o.surScroll); o.racine.remove(); o.vue.inert = false;
+      if (restaurer) o.vue.hidden = false;
       if (focus) focaliser(o);
       return true;
     };
@@ -228,6 +231,7 @@
       if (ancien) { D.removeEventListener('scroll', ancien.surScroll); ancien.racine.remove(); } else { vue.hidden = true; vue.inert = true; }
       D.addEventListener('scroll', o.surScroll);
       ouv = o; gen++;
+      if (!desabo && E()) desabo = E().abonner('frise', surFrise);
       o.titre.textContent = FA().nomDe(id, null, worker(id));
       o.racine.setAttribute('aria-label', `Fiche de ${o.titre.textContent}`);
       const w = worker(id);
@@ -257,11 +261,9 @@
       if (e.defaultPrevented || e.key !== 'Escape' || !ouv) return;
       e.preventDefault(); e.stopPropagation(); fermer(true);
     });
-    ecouter(D, 'click', (e) => { if (ouv && e.target.closest && e.target.closest('#vf-equipe [role=tablist]')) fermer(false); });
+    ecouter(D, 'click', (e) => { if (ouv && e.target.closest && e.target.closest('#vf-equipe [role=tablist]')) fermer(false, false); });
     const surMq = () => { if (ouv) ouv.det.open = !mq.matches; };
     mq.addEventListener('change', surMq); retraits.push(() => mq.removeEventListener('change', surMq));
-    const desabo = E() ? E().abonner('frise', surFrise) : () => {};
-    retraits.push(desabo);
     monte = { ouvrir, fermer: () => fermer(true), ouverte: () => ouv !== null };
     return () => { fermer(false); for (const r of retraits.splice(0)) r(); monte = null; };
   }
