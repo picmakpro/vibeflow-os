@@ -230,9 +230,12 @@ function construireGraphe(root, { layout } = {}) {
     project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files, phaseEtat) },
     nodes, files, routes: [], links: links.filter((l) => [l.a, l.b].every((x) => (x.startsWith('n:') ? ids.has(x) : fids.has(x)))), flows, tour: tour.length >= 2 ? tour : [],
   };
-  // 77-02 (P77-D-13, P77-D-14) : burn-up du jalon mis en avant ; le pourcentage est celui du pied de jalon (la fonction `pct` du fichier, jamais une seconde)
-  const bu = active ? burnup({ jalon: active.key, phases: active.ks.map((p) => ({ n: p.n, nom: p.name, line: p.line, etat: p.avancement.etat })), pct }) : null;
+  // 77-02 (P77-D-13, P77-D-14, P77-D-10, P77-D-20) : burn-up du jalon mis en avant (le pourcentage est celui du pied de jalon, la fonction `pct` du fichier)
+  // et blocages du STATE (nettoyés et condensés, absents si la section manque)
+  const phasesBu = active ? active.ks.map((p) => ({ n: p.n, nom: p.name, line: p.line, etat: p.avancement.etat })) : [];
+  const bu = active ? burnup({ jalon: active.key, phases: phasesBu, pct }) : null;
   if (bu) graphe.meta.vf.burnup = bu;
+  if (P.blocages) graphe.meta.vf.blocagesState = P.blocages;
   // 76-04 (P76-D-31) : champs facultatifs de traçabilité posés sur le graphe ; le jalon mis en avant est celui de `active`, jamais recalculé ailleurs
   return projeterTrace(graphe, P.trace, { jalonActif: active ? 'n:' + active.id : null, couper: clip, racine: root });
 }

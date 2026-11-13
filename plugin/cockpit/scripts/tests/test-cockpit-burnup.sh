@@ -102,7 +102,7 @@ assert_eq "BU8 — clôture antérieure à l'inscription : la phase entre au pé
 mk_bu() { local L="$1" B="$1/.planning"; mkdir -p "$B"
 printf '%s\n' '# Roadmap' '' '## Milestones' '' '- 🚧 **v1.0 Démo** - Phases 1-3 (in progress)' '' '## Phases' '' \
   '- [x] Phase 1: Socle (inscrite 2026-01-02, jalon v1.0 Démo) — complete 2026-01-05' '- [x] Phase 2: Écran (inscrite 2026-01-03, jalon v1.0 Démo) — complete 2026-01-08' '- [ ] Phase 3: Reste (inscrite 2026-01-04, jalon v1.0 Démo)' > "$B/ROADMAP.md"
-printf -- '---\nstatus: executing\ncurrent_phase: 3\ncurrent_phase_name: MARQUEUR-NOM-77\nmilestone: v1.0 Démo\nlast_activity_desc: MARQUEUR-PROSE-77 une prose recopiée\n---\n' > "$B/STATE.md"
+printf -- '---\nstatus: executing\ncurrent_phase: 3\ncurrent_phase_name: MARQUEUR-NOM-77\nmilestone: v1.0 Démo\nlast_activity_desc: MARQUEUR-PROSE-77 une prose recopiée\n---\n\n### Blockers/Concerns\n\n- un blocage du lab\n' > "$B/STATE.md"
 for n in 01-socle/01-01 02-ecran/02-01; do printf '<objective>Faire</objective>\n' | wr "$B/phases/$n-PLAN.md"; echo ok > "$B/phases/$n-SUMMARY.md"; done
 git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -qm init; }
 LB="$WORK/lab-bu"; mk_bu "$LB"; graph "$LB" "$WORK/g-bu.json"
@@ -138,6 +138,7 @@ JS
 if /usr/bin/git -C "$SCRIPTS" cat-file -e HEAD:plugin/cockpit/scripts/vf-cockpit-instantane.mjs 2>/dev/null; then
   node "$AUX/bu11.mjs" "$SCRIPTS" "$LB" > "$WORK/bu11.json" 2>&1
   assert_eq "BU11 — instantane().projet.meta.vf.burnup est égal, en JSON canonique, à celui de buildProjectGraph sur le même lab (non vide)" "$(G "$WORK/bu11.json" 'j.burnup && j.egalBurnup')" "true"
+  assert_eq "BU11 — instantane().projet.meta.vf.blocagesState est égal, en JSON canonique, à celui de buildProjectGraph (non vide)" "$(G "$WORK/bu11.json" 'j.blocages && j.egalBlocages')" "true"
 else echo "  BU11 — non applicable : 79-09 absent (ne compte pas comme PASS)"; fi
 
 # ---------- RT1..RT3 — la prose du STATE n'est plus servie ----------

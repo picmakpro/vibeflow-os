@@ -79,6 +79,8 @@ durees() {
 1 plugin/cockpit/scripts/tests/test-cockpit-ailleurs.sh
 4 plugin/cockpit/scripts/tests/test-cockpit-assemblage.sh
 18 plugin/cockpit/scripts/tests/test-cockpit-avancement.sh
+10 plugin/cockpit/scripts/tests/test-cockpit-blocages.sh
+12 plugin/cockpit/scripts/tests/test-cockpit-burnup.sh
 56 plugin/cockpit/scripts/tests/test-cockpit-chaine-xss.sh
 18 plugin/cockpit/scripts/tests/test-cockpit-chrome-fr.sh
 62 plugin/cockpit/scripts/tests/test-cockpit-direct.sh
