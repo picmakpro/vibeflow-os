@@ -149,13 +149,13 @@ fi
 
 Q="$(printf '\047')"  # apostrophe : les expressions sed des mutants la portent
 cat > "$AUX/lien-sortie.mjs" <<'JS'
-// lien-sortie.mjs <serve.mjs> <sortie> : lance le serveur sur une sortie donnée par un chemin non réel ; « refus » (sortie 1, message) ou « demarre » (tué après 8 s)
+// lien-sortie.mjs <serve.mjs> <sortie> [<motif du message>, défaut « chemin r »] : lance le serveur sur une sortie donnée par un chemin non réel ; « refus » (sortie 1, message) ou « demarre » (tué après 8 s)
 import { spawn } from 'node:child_process';
-const [, , serve, sortie] = process.argv;
+const [, , serve, sortie, motif = 'chemin r'] = process.argv;
 const c = spawn(process.execPath, [serve, '--no-open', '--port', '0', `--sortie=${sortie}`], { stdio: ['ignore', 'ignore', 'pipe'] });
 let err = ''; c.stderr.on('data', (d) => { err += d; });
 const t = setTimeout(() => { c.kill('SIGKILL'); console.log('demarre'); }, 8000);
-c.on('exit', (code) => { clearTimeout(t); console.log(code === 1 && /chemin r/.test(err) ? 'refus' : `autre ${code}`); });
+c.on('exit', (code) => { clearTimeout(t); console.log(code === 1 && new RegExp(motif).test(err) ? 'refus' : `autre ${code}`); });
 JS
 if [ -n "$CHROME" ]; then
 echo "=== C2 à C5 — changer d'onglet dans le même document ==="
@@ -541,16 +541,32 @@ fi
 echo "=== A37 — les gardes de chemin jugent la résolution physique, jamais la forme écrite ==="
 node "$TESTS/coquille-propriete.mjs" gardes "$SCRIPTS" "$WORK/a37" > "$WORK/a37.json" 2>"$WORK/a37.err"
 assert_eq "A37.1 — moduleAdmis : le verdict égale celui du noyau (realpath natif) pour neuf dispositions de liens (intérieur, chaîne, extérieur, pendant, boucle, sain, deux orthographes)" "$(oj 'Object.entries(j.cas).filter(([,c])=>!c.ok).map(([n])=>n).join(",")||"tous"' < "$WORK/a37.json")" "tous"
-assert_eq "A37.2 — identité du serveur : deux orthographes d'un même lab = une identité ; un lab préfixe d'un autre = deux identités ; une sortie pendante n'a pas d'identité" "$(oj '[j.identites.memeLab,j.identites.prefixe,j.identites.pendante]' < "$WORK/a37.json")" "[true,true,true]"
+assert_eq "A37.2 — identité du serveur : deux orthographes d'un même lab = une identité, deux orthographes d'un même module = une identité ; un lab préfixe d'un autre = deux identités ; une sortie pendante n'a pas d'identité" "$(oj '[j.identites.memeLab,j.identites.prefixe,j.identites.pendante,j.identites.memeModule]' < "$WORK/a37.json")" "[true,true,true,true]"
 assert_eq "A37.3 — couverture : au moins quatre refus et trois accords parmi les dispositions (la propriété n'est pas vide)" "$(oj '[Object.values(j.cas).filter(c=>c.oracle==="refus").length>=4,Object.values(j.cas).filter(c=>c.oracle==="accord").length>=3]' < "$WORK/a37.json")" "[true,true]"
 ln -sfn "$OUT" "$WORK/lien-sortie"
 assert_eq "A37.4 — serve.mjs --sortie= donné par un chemin qui traverse un lien : refus (code 1, message)" "$(node "$AUX/lien-sortie.mjs" "$ENG/assets/serve.mjs" "$WORK/lien-sortie")" "refus"
+mkdir -p "$WORK/pend/.vibeflow"; ln -sfn "$WORK/nexiste-pas" "$WORK/pend/.vibeflow/cockpit"   # AU16-02 : une sortie PENDANTE à la bonne forme (<lab>/.vibeflow/cockpit) : seule la résolution physique la refuse
+PEND="--sortie= est introuvable"
+assert_eq "A37.5 — serve.mjs --sortie= pendante, de la forme <lab>/.vibeflow/cockpit : refus (code 1, « introuvable »), jamais un jugement sur la forme écrite" "$(node "$AUX/lien-sortie.mjs" "$ENG/assets/serve.mjs" "$WORK/pend/.vibeflow/cockpit" "$PEND")" "refus"
 mut_a37() { # <nom> <sed> : le modèle de jugement muté, rejoué sur les mêmes dispositions
   cockpit_module_muter "$1" vf-cockpit-module.mjs "$2" || return 1
   rm -rf "$WORK/a37m"; node "$TESTS/coquille-propriete.mjs" gardes "$COCKPIT_MODULE/scripts" "$WORK/a37m" 2>/dev/null | oj 'Object.entries(j.cas).filter(([,c])=>!c.ok).map(([n])=>n).join(",")||"tous"'
 }
 assert_eq "M-LEXICAL — moduleAdmis jugeant des chemins normalisés : rougit A37.1 sur les liens (vers l'intérieur, chaîne, vers l'extérieur, pendant, boucle), jamais sur les cas sains" "$(mut_a37 lexical 's|const r = cheminPhysique(d); // garde:coquille-chemin|const r = path.resolve(d);|')" "lien-vers-interieur,chaine-de-deux,lien-vers-exterieur,pendant,boucle"
 assert_eq "M-ECHEC-OUVERT — un échec de résolution vaut accord : rougit A37.1 sur le lien pendant et la boucle" "$(mut_a37 ouvert 's|if (r === null) throw refus(.dossier du module introuvable : refus..); // garde:coquille-echec|if (r === null) continue;|')" "pendant,boucle"
+
+mut_id() { # <nom> <sed> : identiteServeur muté, rejoué sur les mêmes dispositions ; rend les quatre verdicts d'A37.2
+  cockpit_module_muter "$1" vf-cockpit-serveur-vivant.mjs "$2" || return 1
+  rm -rf "$WORK/a37i"; node "$TESTS/coquille-propriete.mjs" gardes "$COCKPIT_MODULE/scripts" "$WORK/a37i" 2>/dev/null | oj '[j.identites.memeLab,j.identites.prefixe,j.identites.pendante,j.identites.memeModule].join()'
+}
+assert_eq "M-IDENTITE-SORTIE (AU16-02) — identiteServeur jugeant la sortie par path.resolve : A37.2 rougit (deux orthographes d'un lab, sortie pendante), le reste vert" "$(mut_id idsortie 's|reelle = cheminPhysique(sortie);|reelle = path.resolve(sortie);|')" "false,true,false,true"
+assert_eq "M-IDENTITE-SERVE (AU16-02) — identiteServeur jugeant serve.mjs par path.resolve : A37.2 rougit (deux orthographes d'un module), le reste vert" "$(mut_id idserve 's|const serve = cheminPhysique(path.join(moteur, .assets., .serve.mjs.)), reelle|const serve = path.resolve(path.join(moteur, "assets", "serve.mjs")), reelle|')" "true,true,true,false"
+assert_eq "M-IDENTITE-LEXICALE (AU16-02) — les deux à la forme lexicale (path.resolve) : A37.2 rougit sur les trois identités qui dépendent de la résolution" "$(mut_id idlex 's|const serve = cheminPhysique(path.join(moteur, .assets., .serve.mjs.)), reelle = cheminPhysique(sortie);|const serve = path.resolve(path.join(moteur, "assets", "serve.mjs")), reelle = path.resolve(sortie);|')" "false,true,false,false"
+if cockpit_module_muter sortielex serve.mjs 's#^if (!here) refus(.*);$#if (!here) here = path.resolve(sortieArg);#'; then
+  SM="$(node "$AUX/lien-sortie.mjs" "$COCKPIT_MODULE/skills/cockpit-moteur/assets/serve.mjs" "$WORK/pend/.vibeflow/cockpit" "$PEND")|$(node "$AUX/lien-sortie.mjs" "$COCKPIT_MODULE/skills/cockpit-moteur/assets/serve.mjs" "$WORK/lien-sortie")"
+  assert_eq "M-SORTIE-LEXICALE (AU16-02) — la garde « if (!here) refus » remplacée par un repli sur la forme écrite : A37.5 rougit (le refus d'une sortie pendante disparaît), A37.4 reste vert (le contrôle de forme du lien le tient seul)" "$SM" "autre 1|refus"
+else assert_eq "M-SORTIE-LEXICALE — mutant sans effet (ancre absente)" "sans effet" "effet"; fi
+unset COCKPIT_MODULE
 
 echo "=== K6 — le module servi est celui que cockpit_lancer démarre (A48, point 41) ==="
 base_srv; rq GET /_vf/ui/25-recent.js "$WORK/k6-base.js"; E0="$(hv etag)"
