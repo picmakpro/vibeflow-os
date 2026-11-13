@@ -11,8 +11,8 @@ await executer(chrome, async (s) => {
   await s.naviguer(url + '#sans-visite');
   await s.attendre("document.readyState === 'complete' && !!document.querySelector('#vf-lock') && window.__es.some((e) => e.url.includes('/api/vf/events'))", 'flux et badge');
   await s.ev(`window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 9000, at: Date.now(), who: { workers: [{ kind: 'lock', id: 'L1', tree: 'depot', task: 'x', ageS: 1, stale: false }], sources: {} } })`);
-  // le `who` reste figé (ageS 1, whoSig exclut l'âge) pendant que le battement du verrou vieillit : le flux `lock` porte lease_seconds 57 (la prise du verrou) et un age_seconds différent, 3 (le dernier battement) : la durée « tenu depuis » doit venir du premier (PU-G-179)
-  await s.ev(`window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('lock', { seq: 9001, at: Date.now(), lock: { present: true, locks: [{ present: true, owner: 'L1', step: 'x', scope: 'depot', age_seconds: 3, lease_seconds: 57 }] } })`);
+  // le `who` reste figé (ageS 1, whoSig exclut l'âge) pendant que le battement du verrou vieillit : le flux `lock` porte leaseS 57 (la prise du verrou) et un ageS différent, 3 (le dernier battement) : la durée « tenu depuis » doit venir du premier (PU-G-179)
+  await s.ev(`window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('lock', { seq: 9001, at: Date.now(), verrous: { etat: 'lue', plat: false, liste: [{ ws: '', scope: 'depot', phase: null, tenu: true, stale: false, ageS: 3, ttl: 1800, progressAgeS: null, owner: 'L1', step: 'x', leaseS: 57 }] } })`);
   await s.ev("document.querySelector('#vf-lock').click()");
   await s.attendre("!!document.querySelector('.vf-whop .r-verr li')", 'ligne de verrou');
   // la ligne peut se dessiner depuis `who` (âge figé à 1 s) avant que le flux `lock` n'y pose les 57 s : on attend l'âge du verrou, puis une lecture stable

@@ -443,19 +443,20 @@ const page = (g) => template
   .replace(/__FLOORPLAN_TITLE__/g, () => escapeHtml(`${arch.project.name} map`))
   .replace(/__FLOORPLAN_LOGO__/g, () => svgUri('vibeflow-logo-clair.svg')) // vibeflow P12
   .replace(/__FLOORPLAN_FAVICON__/g, () => svgUri('vibeflow-logo-clair.svg')) // vibeflow P12
+  .replace('<!--__UI_I18N__-->', () => uiI18n) // vibeflow 79-10 : le traducteur et la table (blocs « // vibeflow:fr ») avant le script principal ; sans l'emplacement dans le gabarit, l'ancien ordre
   .replace('<!--__UI_EXTENSIONS__-->', () => uiScripts);
 const uiDir = path.join(SKILL_DIR, 'assets', 'ui');
-const uiScripts = fs.existsSync(uiDir) ? fs.readdirSync(uiDir).filter((n) => n.endsWith('.js')).sort().map((n) => `<script>/* ui/${n} */\n${fs.readFileSync(path.join(uiDir, n), 'utf8').replace(/<\/script/gi, '<\\/script')}</script>`).join('\n') : '';
+const uiTag = (n) => `<script>/* ui/${n} */\n${fs.readFileSync(path.join(uiDir, n), 'utf8').replace(/<\/script/gi, '<\\/script')}</script>`;
+const uiFiles = fs.existsSync(uiDir) ? fs.readdirSync(uiDir).filter((n) => n.endsWith('.js')).sort() : [];
+const uiFr = (n) => fs.readFileSync(path.join(uiDir, n), 'utf8').split('\n', 1)[0] === '// vibeflow:fr';
+const uiAvant = template.includes('<!--__UI_I18N__-->'); // seul un gabarit qui porte l'emplacement reçoit les blocs de traduction avant le script principal
+const uiI18n = uiAvant ? uiFiles.filter(uiFr).map(uiTag).join('\n') : '';
+const uiScripts = uiFiles.filter((n) => !uiAvant || !uiFr(n)).map(uiTag).join('\n');
 const html = page(graph);
 fs.writeFileSync(path.join(outDir, 'index.html'), html);
 // --artifact: a copy to publish to the Claude app, without this machine's absolute path (editor links)
 if (args.artifact) fs.writeFileSync(path.join(outDir, 'artifact.html'), page({ ...graph, meta: { ...graph.meta, root: null, agent: 'claude' } }));
-// Self-contained helpers next to the map: ask questions through the Claude Code CLI or Codex (serve.mjs)
-// and the graph lookups it hands to them (query.mjs). They need only Node, not this skill.
-fs.writeFileSync(path.join(outDir, 'query.mjs'), `${graphQuery}
-// ---- cli ----
-${fs.readFileSync(path.join(SKILL_DIR, 'assets', 'query-cli.mjs'), 'utf8')}`);
-fs.copyFileSync(path.join(SKILL_DIR, 'assets', 'serve.mjs'), path.join(outDir, 'serve.mjs'));
+// vibeflow 79-06 : la sortie ne porte que des données ; le serveur (serve.mjs) et le cœur de requête (graph-query.js, query-cli.mjs) restent dans le module.
 // a blueprint can be changed from the map: serve.mjs redraws it with this skill's plan.mjs and build.mjs
 if (scan.blueprint) { fs.mkdirSync(path.join(outDir, '.cache'), { recursive: true }); fs.writeFileSync(path.join(outDir, '.cache', 'skill.json'), JSON.stringify({ dir: SKILL_DIR })); }
 // the logo and tab icon are inlined so the map stays one self-contained file

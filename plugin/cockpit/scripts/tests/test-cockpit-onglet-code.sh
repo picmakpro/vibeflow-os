@@ -17,7 +17,7 @@ assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)
 assert_gt() { if [ "${2:-0}" -gt "$3" ] 2>/dev/null; then echo "  ✅ PASS — $1 ($2 > $3)"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 ($2 ≤ $3)"; FAIL=$((FAIL+1)); fi; }
 
 cat > "$AUX/donnees.mjs" <<'JS'
-// donnees.mjs <sortie> <page> <expression sur j> : lit la zone de données par vf-cockpit-embed.mjs
+// donnees.mjs <dossier de scripts du module> <page> <expression sur j> : lit la zone de données par vf-cockpit-embed.mjs du module
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -48,7 +48,7 @@ mklab() { # mklab <dossier> modules|neutre
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
 }
 assembler() { PATH="$WORK/fake:$PATH" node "$SCRIPTS/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1; echo $?; }
-donnee() { node "$AUX/donnees.mjs" "$1/.vibeflow/cockpit" "$1/.vibeflow/cockpit/index.html" "$2"; }
+donnee() { node "$AUX/donnees.mjs" "$SCRIPTS" "$1/.vibeflow/cockpit/index.html" "$2"; }
 
 echo "=== C1 — lab à modules : extracteur VibeFlow ==="
 LM="$WORK/modules"; mklab "$LM" modules

@@ -13,19 +13,27 @@
 # Chaque refus a son témoin positif ; aucune attente d'armement n'est une durée codée en dur (arme_apres_ms est lu). Chrome non requis. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-libre() { local p i; for i in 1 2 3 4 5 6 7 8 9 10; do p="$(node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"; [ "$p" -ge 4600 ] && [ "$p" != 4456 ] && { echo "$p"; return; }; done; echo 0; }
-SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; COCKPIT="$(cd "$SCRIPTS/.." && pwd)"
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; export HERE_T; COCKPIT="$(cd "$SCRIPTS/.." && pwd)"
 ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"; TA="$HERE_T/terminal-aux.mjs"; MOD="$SCRIPTS/vf-cockpit-lancer-mode.mjs"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; RUN="$WORK/run"; mkdir -p "$AUX" "$WORK/home" "$WORK/bin" "$WORK/fauxbin" "$RUN" "$WORK/temoins" "$WORK/u"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 STATE="$WORK/etat"; mkdir -p "$STATE"; chmod 700 "$STATE"; export VF_COCKPIT_MODE_DIR="$STATE"; unset XDG_CACHE_HOME # jamais le dossier d'état réel de l'utilisateur ni de la CI
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 PASS=0; FAIL=0; NONJOUE=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 nonjouee() { echo "  ⊘ $1 — non jouée : $2"; NONJOUE=$((NONJOUE+1)); }
 MODULE_OK=0; [ -f "$MOD" ] && MODULE_OK=1
+# 79-06 : la sortie (MUT_OUT) ne porte que des données ; le code muté vit dans une COPIE du module (MUT_MOD), posée par mutant().
+# mod_de <arg> : dossier de SCRIPTS dont une aide lit le code (la copie mutée si l'argument est MUT_OUT, sinon l'argument tel quel) ; scripts_de / eng_de / racine_de <sortie> : ce qui sert une sortie (le dépôt, sauf MUT_OUT)
+MUT_OUT=""; MUT_MOD=""
+mutee() { [ -n "$MUT_OUT" ] && [ -n "$MUT_MOD" ] && [ "$1" = "$MUT_OUT" ]; }
+mod_de() { if mutee "$1"; then printf '%s\n' "$MUT_MOD/scripts"; else printf '%s\n' "$1"; fi; }
+scripts_de() { if mutee "$1"; then printf '%s\n' "$MUT_MOD/scripts"; else printf '%s\n' "$SCRIPTS"; fi; }
+eng_de() { if mutee "$1"; then printf '%s\n' "$MUT_MOD/skills/cockpit-moteur"; else printf '%s\n' "$ENG"; fi; }
+racine_de() { if mutee "$1"; then printf '%s\n' "$MUT_MOD"; else printf '%s\n' "$COCKPIT"; fi; }
 
 # ---- aides écrites par la suite (jamais dans le dépôt) ----
 cat > "$AUX/ev.mjs" <<'JS'
@@ -37,13 +45,13 @@ import fs from 'node:fs'; const f = process.argv[2];
 try { const st = fs.lstatSync(f); console.log(JSON.stringify({ ino: st.ino, mtime: st.mtimeMs, perm: (st.mode & 0o777).toString(8), contenu: fs.readFileSync(f, 'utf8') })); } catch { console.log('absent'); }
 JS
 cat > "$AUX/parent.mjs" <<'JS'
-// parent.mjs <sortie> <lab> <moteur> <travail> : joue P. Lance le processus de Q de la sortie (IPC json), lui envoie `init`, consigne ses messages (sauf `pret`) ;
+// parent.mjs <sortie> <lab> <moteur> <travail> <dossier-de-scripts> : joue P. Lance le processus de Q du module (dossier de scripts), la sortie ne porte que des données (IPC json), lui envoie `init`, consigne ses messages (sauf `pret`) ;
 // serveur de commande 127.0.0.1 : POST /send, GET /recus, POST /stop (message `arret`). Première ligne de sortie : PRET <Q> <commande> <P>.
 import { fork } from 'node:child_process'; import http from 'node:http'; import net from 'node:net';
-const [, , sortie, lab, moteur, travail] = process.argv;
+const [, , sortie, lab, moteur, travail, scripts] = process.argv;
 const libre = () => new Promise((r) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
 const portP = await libre(); const recus = []; let portQ = null, portC = null;
-const enfant = fork(sortie + '/vf-cockpit-terminal-processus.mjs', [], { env: process.env, cwd: lab, stdio: ['inherit', 'inherit', 'inherit', 'ipc'], serialization: 'json' });
+const enfant = fork(scripts + '/vf-cockpit-terminal-processus.mjs', [], { env: process.env, cwd: lab, stdio: ['inherit', 'inherit', 'inherit', 'ipc'], serialization: 'json' });
 const pret = () => { if (portQ && portC) console.log(`PRET ${portQ} ${portC} ${portP}`); };
 enfant.on('message', (m) => { if (m && m.t === 'pret') { portQ = m.port; pret(); } else recus.push(m); });
 enfant.send({ t: 'init', engineDir: moteur, root: lab, here: sortie, jetons: [], portP, envOrigine: { ...process.env, PATH: travail + '/fauxbin:' + process.env.PATH } });
@@ -269,7 +277,7 @@ const rep = (status, corps) => ({ status, ok: status >= 200 && status < 300, jso
 globalThis.fetch = (u, o = {}) => { const url = String(u); J.journal.push({ m: o.method || 'GET', u: url, b: typeof o.body === 'string' ? o.body : '' });
   if (url === '/proposition') return Promise.resolve(rep(200, JSON.parse(JSON.stringify(S.prop)))); if (url === '/lancer') return Promise.resolve(rep(S.lancer, null));
   if (url === '/flux') return new Promise(() => {}); return Promise.resolve(rep(204, null)); };
-const m = await import(pathToFileURL(chemin).href);
+const m = (await import(pathToFileURL(process.env.HERE_T + '/navigateur-charger.mjs').href)).chargerFonctions([chemin]); // 79-11 : le client est un fichier du moteur
 m.clientTerminal({ origineP: 'http://127.0.0.1:1', theme: 'dark' });
 const nData = () => J.vue.filter(Boolean).length;
 let k = 100; const afficher = async (over) => { const n = nData(); S.prop = valide(ID(++k), over); await until(() => nData() > n, 'affichage'); return J.vue.filter(Boolean).slice(-1)[0]; };
@@ -330,22 +338,24 @@ LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"; FM="$(fm_de "$LAB")
 etat_dirs() { local d; d="$(dirname "${1:-$FM}")"; mkdir -p "$STATE" "$d"; chmod 700 "$STATE" "$d"; } # dossiers du support, posés comme Q les poserait (0700)
 lab_liste() { /usr/bin/find "$1" -path "$1/.git" -prune -o -print | sort; } # tout ce qui existe sous le lab (hors .git)
 etat_liste() { /usr/bin/find "$STATE" 2>/dev/null | sort | tr '\n' ';'; }
-# mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed>... -> MUT_OUT ; code 1 si le module manque, la cible manque ou la copie n'a pas changé
+# mutant <nom> <fichier-du-module> <expression-sed>... -> MUT_OUT (sortie : données et chemin dont dérive la clé du mode retenu) + MUT_MOD (copie du module muté) ; code 1 si le module manque, la cible manque ou la copie n'a pas changé
 mutant() {
   [ "$MODULE_OK" = 1 ] || return 1 # tant que le module n'existe pas, aucun mutant ne se joue (« non jouée : module absent »)
-  local d="$WORK/mut-$1" f e; local a; a=(); local nom="$1" cible="$2"; shift 2; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$cible"; [ -f "$f" ] || return 1
-  for e in "$@"; do a+=(-e "$e"); done
-  cp "$f" "$f.orig"; sed -i.bak "${a[@]}" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+  local d="$WORK/mut-$1" e x=""; local nom="$1" cible="$2"; shift 2; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  for e in "$@"; do x="${x:+$x
+}$e"; done
+  cockpit_module_muter "$nom" "$cible" "$x" || return 1
+  MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; return 0
 }
 # sans_effet <nom> : « module absent » tant que le module n'existe pas (non jouée), sinon FAIL « mutant sans effet »
 sans_effet() { if [ "$MODULE_OK" = 0 ]; then nonjouee "$1" "module absent"; else assert_eq "$1 — mutant sans effet (ancre absente ou inchangée)" "sans effet" "effet"; fi; }
 # faits U : un module (dossier) -> JSON ; module absent : { erreur }
-facts_u() { if [ -f "$1/vf-cockpit-lancer-mode.mjs" ]; then node "$AUX/u.mjs" "$1" "$WORK/u" "${2:-tout}" 2>&1 | tail -1; else echo '{"erreur":"module absent"}'; fi; }
+facts_u() { local c; c="$(mod_de "$1")"; if [ -f "$c/vf-cockpit-lancer-mode.mjs" ]; then node "$AUX/u.mjs" "$c" "$WORK/u" "${2:-tout}" 2>&1 | tail -1; else echo '{"erreur":"module absent"}'; fi; }
 uq() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "(j.erreur ? 'plante: ' + j.erreur : ($2))" 2>/dev/null || echo "illisible"; }
-fifo_u() { if [ -f "$1/vf-cockpit-lancer-mode.mjs" ]; then "$AUX/borne.sh" 20 node "$AUX/u.mjs" "$1" "$WORK/u" fifo | tail -1; else echo '{"erreur":"module absent"}'; fi; }
+fifo_u() { local c; c="$(mod_de "$1")"; if [ -f "$c/vf-cockpit-lancer-mode.mjs" ]; then "$AUX/borne.sh" 20 node "$AUX/u.mjs" "$c" "$WORK/u" fifo | tail -1; else echo '{"erreur":"module absent"}'; fi; }
 # faits client : (dossier-du-client) -> JSON des doublures
-facts_c() { node "$AUX/cdoubles.mjs" "$1/vf-cockpit-terminal-client.mjs" 2>&1 | tail -1; }
+facts_c() { node "$AUX/cdoubles.mjs" "$(mod_de "$1")/../skills/cockpit-moteur/assets/ui/terminal/client.js" 2>&1 | tail -1; }
 cq() { uq "$1" "$2"; }
 uqp() { uq "$1" "(j.perr ? 'plante: ' + j.perr : ($2))"; } # faits du support du poste (LM.U7 à LM.U12) : la cause de l'échec reste lisible
 PLANPUR='plan'
@@ -357,7 +367,7 @@ else assert_eq "LM.S1 — vf-cockpit-lancer-mode.mjs existe et exporte FICHIER_M
 # fichiers côté P : TOUS les .mjs du module cockpit (scripts et moteur, hors tests) sauf le module lui-même et son seul importeur ; liste dérivée, jamais tenue à la main
 p_refs() { # p_refs <dossier> -> « <nombre de fichiers examinés>:<nombre de références à terminal-mode ou lancer-mode hors module et importeur> »
   local n=0 r=0 f b; while IFS= read -r f; do b="$(basename "$f")"; case "$b" in vf-cockpit-lancer-mode.mjs|vf-cockpit-terminal-processus.mjs) continue ;; esac
-    n=$((n+1)); r=$((r + $(grep -c -e 'terminal-mode' -e 'lancer-mode' "$f" | tr -d ' '))); done < <(/usr/bin/find "$1" -name '*.mjs' -not -path '*/tests/*' -not -path '*/node_modules/*' | sort); echo "$n:$r"
+    n=$((n+1)); r=$((r + $(grep -c -e 'terminal-mode' -e 'lancer-mode' "$f" | tr -d ' '))); done < <(/usr/bin/find "$(racine_de "$1")" -name '*.mjs' -not -path '*/tests/*' -not -path '*/node_modules/*' | sort); echo "$n:$r"
 }
 importeurs() { local f; while IFS= read -r f; do grep -q "from './vf-cockpit-lancer-mode.mjs'" "$f" && basename "$f"; done < <(/usr/bin/find "$1" -name '*.mjs' -not -path '*/tests/*' | sort) | sort | tr '\n' ',' ; }
 if [ "$MODULE_OK" = 1 ]; then
@@ -368,7 +378,7 @@ else nonjouee "LM.S2" "module absent (elle s'écrit avec le module)"; fi
 # LM.S7 : la ligne garde:mode-support du processus (code, sans le commentaire) ne nomme ni la sortie (here), ni .cache, ni FICHIER_MODE : le support n'est plus dans le lab
 SUPPORT_CODE="$(grep 'garde:mode-support' "$SCRIPTS/vf-cockpit-terminal-processus.mjs" | sed 's#//.*##')"
 assert_eq "LM.S7 — la ligne garde:mode-support (code, hors commentaire) construit le support du poste par la racine seule : ni here, ni .cache, ni FICHIER_MODE, ni path.join (témoin : la ligne existe et appelle creerMemoireModePoste)" "$(printf '%s' "$SUPPORT_CODE" | grep -c -E 'here|\.cache|FICHIER_MODE|path\.join' | tr -d ' ') $(printf '%s' "$SUPPORT_CODE" | grep -c 'creerMemoireModePoste' | tr -d ' ')" "0 1"
-SF="$(node "$AUX/stat.mjs" "$SCRIPTS/vf-cockpit-terminal-processus.mjs" "$SCRIPTS/vf-cockpit-terminal-client.mjs")"
+SF="$(node "$AUX/stat.mjs" "$SCRIPTS/vf-cockpit-terminal-processus.mjs" "$ENG/assets/ui/terminal/client.js")"
 ROUTES_BASE='/amorce:POST,/annuler:POST,/entree:POST,/etat:GET,/flux:GET,/lancer:POST,/proposition:GET,/taille:POST'
 if [ "$MODULE_OK" = 1 ]; then assert_eq "LM.S3 — la table fermée routes de Q : mêmes clés et méthodes que la base (huit routes, aucune de plus)" "$(uq "$SF" j.routes)" "$ROUTES_BASE"
 else nonjouee "LM.S3" "module absent"; fi
@@ -435,7 +445,7 @@ NM=0; QP=0; CP=0; PP=0; SECRET=""; PARENT=""; FPID=""; FLUX=""; QPID=""; ARME=20
 manche_debut() { # manche_debut <sortie> [sans-flux] -> QP CP PP SECRET PARENT QPID FPID FLUX
   NM=$((NM+1)); local s="$1" am="$WORK/amorce.$NM" po="$WORK/parent-$NM.out"; FLUX="$WORK/flux-$NM.out"; : > "$FLUX"; FPID=""; rm -f "$RUN/argv" "$RUN/argv.tmp" "$RUN/recept.hex"; mkdir -p "$s/.cache"
   node -e "console.log(require('crypto').randomBytes(24).toString('hex'))" > "$am.tmp"; (umask 077; tr -d '\n' < "$am.tmp" > "$s/.cache/terminal-amorce"; tr -d '\n' < "$am.tmp" > "$am")
-  VF_COCKPIT_LANCER_ARME_MS=$ARME node "$AUX/parent.mjs" "$s" "${MLAB:-$LAB}" "$ENG" "$WORK" > "$po" 2>&1 < /dev/null & PARENT=$!; PIDS+=($PARENT)
+  VF_COCKPIT_LANCER_ARME_MS=$ARME node "$AUX/parent.mjs" "$s" "${MLAB:-$LAB}" "$(eng_de "$s")" "$WORK" "$(scripts_de "$s")" > "$po" 2>&1 < /dev/null & PARENT=$!; PIDS+=($PARENT)
   for _ in $(seq 1 100); do grep -q '^PRET ' "$po" 2>/dev/null && break; sleep 0.1; done
   read -r _ QP CP PP < <(grep '^PRET ' "$po" | head -1); QP="${QP:-0}"; CP="${CP:-0}"; PP="${PP:-0}"
   QPID="$(command pgrep -P "$PARENT" | head -1)"
@@ -596,10 +606,10 @@ psrv_debut() { # psrv_debut <sortie> -> PS_PID PS_PORT PS_QP PS_TOK PS_N (serveu
   PS_N=$((PS_N+1)); NM=$((NM+1)); local o="$1" lab am; PS_OUT="$1"; lab="$(cd "$1/../.." && pwd)"; am="$WORK/amorce.$NM"
   rm -f "$RUN/shell.pid" "$RUN/argv" "$o/.cache/server.json" "$o/.cache/terminal-amorce"; mkdir -p "$o/.cache"
   node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" > "$am.tmp"; (umask 077; tr -d '\n' < "$am.tmp" > "$o/.cache/terminal-amorce"; tr -d '\n' < "$am.tmp" > "$am")
-  ( cd "$lab" && VF_COCKPIT_PATH_ORIGINE="$WORK/fauxbin:$PATH" VF_COCKPIT_LANCER_ARME_MS=$ARME VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-$NM.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  PS_PID=$!; PIDS+=($PS_PID); PS_SERVE="$WORK/serve-$NM.out"; PS_AM="$am"
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  PS_PORT="$(node "$AUX/ev.mjs" j.port < "$o/.cache/server.json" 2>/dev/null)"; PS_PORT="${PS_PORT:-0}"
+  local cm=""; mutee "$o" && cm="$MUT_MOD"   # copie mutée : l'aide vérifie que le serveur lancé la charge (code 5 sinon)
+  COCKPIT_MODULE="$cm" COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$NM.out" cockpit_lancer "$lab" VF_COCKPIT_PATH_ORIGINE="$WORK/fauxbin:$PATH" VF_COCKPIT_LANCER_ARME_MS=$ARME VF_COCKPIT_ENGINE_DIR="$(eng_de "$o")" VF_COCKPIT_SCRIPTS_DIR="$(scripts_de "$o")" --terminal
+  PS_PID="$VF_PID"; PS_SERVE="$WORK/serve-$NM.out"; PS_AM="$am"
+  PS_PORT="${VF_PORT:-0}"
   PS_QP="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json" 2>/dev/null)"; PS_QP="${PS_QP##*:}"; PS_QP="${PS_QP:-0}"
   rq "$PS_PORT" GET /project.html --corps-vers "$WORK/page-$NM.html" > /dev/null; PS_TOK="$(node "$AUX/ptok.mjs" "$WORK/page-$NM.html")"
 }
@@ -608,7 +618,7 @@ gp() { local p="$1"; shift; rq "$PS_PORT" GET "$p" --jeton "$PS_TOK" --echeance 
 # p1_run <sortie> -> « <nombre de chemins> <statuts de traversée> <occurrences de la sentinelle> » : GET de chaque chemin de P dérivé du disque, puis des sondes de traversée
 p1_run() {
   local o="$1" paths="$WORK/p1-paths.$PS_N" f n=0 tot=0 trav="" st c
-  { grep -oh "pathname === '[^']*'" "$SCRIPTS/vf-cockpit-server.mjs" "$SERVE" | sed "s/.*'\(.*\)'/\1/"; printf '%s\n' / /index.html /project.html /api/vf/etat /.cache/server.json /api/vf/lancer/cibles /api/vf/terminal; } | sort -u | grep -v '/api/vf/events' > "$paths"
+  { grep -oh "pathname === '[^']*'" "$SERVE" | sed "s/.*'\(.*\)'/\1/"; node --input-type=module -e "import('file://$SCRIPTS/vf-cockpit-server.mjs').then((m) => { for (const l of m.ROUTES) console.log(l[0]); })"; printf '%s\n' / /index.html /project.html /api/vf/etat /.cache/server.json /api/vf/lancer/cibles /api/vf/terminal; } | sort -u | grep -v '/api/vf/events' > "$paths"
   while IFS= read -r f; do n=$((n+1)); gp "$f" --corps-vers "$WORK/p1.body" > "$WORK/p1.out"; c="$(grep -c -a "$SENT" "$WORK/p1.body" "$WORK/p1.out" | awk -F: '{s+=$NF} END {print s+0}')"; tot=$((tot + c)); done < "$paths"
   local cle; cle="$(cle_de "$(cd "$o/../.." && pwd -P)")"
   for f in /.cache/terminal-mode /..%2F.cache/terminal-mode //.cache/terminal-mode /%2e%2e/.cache/terminal-mode /api/vf/../.cache/terminal-mode "/$cle/terminal-mode" "/cockpit-mode/$cle/terminal-mode" "/$cle"; do
@@ -727,16 +737,16 @@ if mutant mode-aucune "$PROCF" '/garde:mode-servi/s#.*#const lireProposition = (
 else sans_effet "M-MODE-DANS-AUCUNE"; fi
 echo "=== M-NOUVELLE-ROUTE — une route POST /mode ajoutée à routes (LM.S3) ==="
 if mutant route "$PROCF" "s#'/annuler': 'POST' };#'/annuler': 'POST', '/mode': 'POST' };#"; then
-  assert_eq "M-NOUVELLE-ROUTE — sous le mutant LM.S3 rougit : la table de routes compte une route de plus" "$(node "$AUX/stat.mjs" "$MUT_OUT/$PROCF" "$MUT_OUT/vf-cockpit-terminal-client.mjs" | evj j.routes)" "/amorce:POST,/annuler:POST,/entree:POST,/etat:GET,/flux:GET,/lancer:POST,/mode:POST,/proposition:GET,/taille:POST"
+  assert_eq "M-NOUVELLE-ROUTE — sous le mutant LM.S3 rougit : la table de routes compte une route de plus" "$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/client.js" | evj j.routes)" "/amorce:POST,/annuler:POST,/entree:POST,/etat:GET,/flux:GET,/lancer:POST,/mode:POST,/proposition:GET,/taille:POST"
 else sans_effet "M-NOUVELLE-ROUTE"; fi
 echo "=== M-MODE-VERS-P — le mode ajouté au message lancee (LM.S5, LM.P3) ==="
 if mutant mode-vers-p "$PROCF" 's#process.send(msg);#process.send({ ...msg, mode: demande.mode });#'; then
-  assert_eq "M-MODE-VERS-P — sous le mutant LM.S5 rougit : une ligne process.send( porte le mode" "$(node "$AUX/stat.mjs" "$MUT_OUT/$PROCF" "$MUT_OUT/vf-cockpit-terminal-client.mjs" | evj j.envoisMode)" "1"
+  assert_eq "M-MODE-VERS-P — sous le mutant LM.S5 rougit : une ligne process.send( porte le mode" "$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/client.js" | evj j.envoisMode)" "1"
   surp "$MUT_OUT"; pose_mode "$SENT"$'\n'; psrv_debut "$MUT_OUT"; P3R=""; p3_run
   assert_eq "M-MODE-VERS-P — sous le mutant LM.P3 rougit : P refuse le message lancee à clé de plus (forme fermée) : la cible n'est jamais marquée lancée (son témoin positif)" "$P3R" "lancee=non fuites=0"; psrv_fin; sur_out
 else sans_effet "M-MODE-VERS-P"; fi
 echo "=== M-P-LIT-LE-FICHIER — une route de P répond le contenu du fichier (LM.P1, LM.S2) ==="
-if mutant p-lit "vf-cockpit-server.mjs" "s#if (url.pathname === '/api/vf/journal') {#if (url.pathname === '/api/vf/journal') { const B = process.env.VF_COCKPIT_MODE_DIR; res.writeHead(200); res.end(fs.readdirSync(B).map((k) => { try { return fs.readFileSync(path.join(B, k, 'terminal-mode')); } catch (e) { return ''; } }).join('')); return true; } if (url.pathname === '/api/vf/journal-origine') {#"; then
+if mutant p-lit "vf-cockpit-server.mjs" "s#  \['/api/vf/journal', lireJournal, HISTORIQUE\],#  ['/api/vf/journal', (c) => { const B = process.env.VF_COCKPIT_MODE_DIR; return { contenu: fs.readdirSync(B).map((k) => { try { return fs.readFileSync(path.join(B, k, 'terminal-mode')); } catch (e) { return ''; } }).join('') }; }, HISTORIQUE],#"; then
   if [ "$MODULE_OK" = 1 ]; then assert_eq "M-P-LIT-LE-FICHIER — sous le mutant LM.S2 rougit : le fichier de P nomme terminal-mode (au moins une référence)" "$(p_refs "$MUT_OUT" | awk -F: '{print ($2 >= 1) ? "reference" : "aucune"}')" "reference"
   else nonjouee "M-P-LIT-LE-FICHIER (LM.S2)" "module absent"; fi
   surp "$MUT_OUT"; pose_mode "$SENT"$'\n'; psrv_debut "$MUT_OUT"; P1M="$(p1_run "$MUT_OUT")"; read -r _ _ P1MS <<< "$P1M"
@@ -746,7 +756,7 @@ echo "=== M-ANCIEN-FICHIER — le support revient dans le lab : l'ancien fichier
 if mutant ancien "$PROCF" "s#creerMemoireModePoste({ racine: root })#creerMemoireMode({ fichier: path.join(here, '.cache', 'terminal-mode') })#" "s#import { creerMemoireModePoste }#import { creerMemoireMode }#"; then
   assert_eq "M-ANCIEN-FICHIER — sous le mutant LM.Q10 (a) rougit : l'ancien fichier herite est servi, puis réécrit par le lancement (plan)" "$(q_vieux "$MUT_OUT")" "herite 204 plan absent"
   assert_eq "M-ANCIEN-FICHIER — sous le mutant LM.Q10 (aucun fichier sous le lab) rougit : le lancement crée le fichier sous le lab, rien au poste" "$(q_aucun "$MUT_OUT")" "204 lab-change absent"
-  assert_eq "M-ANCIEN-FICHIER — sous le mutant LM.S7 rougit : la ligne garde:mode-support nomme here, .cache et path.join" "$(grep 'garde:mode-support' "$MUT_OUT/$PROCF" | sed 's#//.*##' | grep -c -E 'here|\.cache|path\.join' | tr -d ' ')" "1"
+  assert_eq "M-ANCIEN-FICHIER — sous le mutant LM.S7 rougit : la ligne garde:mode-support nomme here, .cache et path.join" "$(grep 'garde:mode-support' "$MUT_MOD/scripts/$PROCF" | sed 's#//.*##' | grep -c -E 'here|\.cache|path\.join' | tr -d ' ')" "1"
 else sans_effet "M-ANCIEN-FICHIER"; fi
 echo "=== M-CLE-COMMUNE — la clé ne dépend plus du projet (LM.U7, LM.U8, LM.Q10) ==="
 if mutant cle-commune "$MODF" "s#update(fs.realpathSync(racine), 'utf8')#update('commun', 'utf8')#"; then
@@ -786,11 +796,11 @@ if mutant dossier-proprio "$MODF" "s#ls.uid !== os.getuid() || ##"; then
   assert_eq "M-DOSSIER-PROPRIETAIRE — sous le mutant LM.U14 rougit : un dossier d'un autre uid est lu (plan) et écrit (le même fichier relu donne acceptEdits)" "$(uq "$(facts_u "$MUT_OUT" rapide)" 'j.p7uid')" "plan,true|acceptEdits,true"
 else sans_effet "M-DOSSIER-PROPRIETAIRE"; fi
 echo "=== M-STOCKAGE-RESTE — repli sur le stockage du navigateur (LM.S4, LM.C3) ==="
-if mutant stockage-reste vf-cockpit-terminal-client.mjs "/garde:mode-lecture/s#.*#const v = p.mode_retenu !== undefined ? p.mode_retenu : localStorage.getItem('vf.terminal.mode'); // garde:mode-lecture#"; then
-  assert_eq "M-STOCKAGE-RESTE — sain/mutant/occurrences : LM.C3 sain sur le client livré, rouge sous le mutant (getItem d'une clé mode) ; LM.S4 compte 1 occurrence sous le mutant" "$(cq "$CF" "$C3EXPR")/$(cq "$(facts_c "$MUT_OUT")" "$C3EXPR")/$(node "$AUX/stat.mjs" "$MUT_OUT/$PROCF" "$MUT_OUT/vf-cockpit-terminal-client.mjs" | evj j.cliCleMode)" "0/true/1/true/1"
+if mutant stockage-reste client.js "/garde:mode-lecture/s#.*#const v = p.mode_retenu !== undefined ? p.mode_retenu : localStorage.getItem('vf.terminal.mode'); // garde:mode-lecture#"; then
+  assert_eq "M-STOCKAGE-RESTE — sain/mutant/occurrences : LM.C3 sain sur le client livré, rouge sous le mutant (getItem d'une clé mode) ; LM.S4 compte 1 occurrence sous le mutant" "$(cq "$CF" "$C3EXPR")/$(cq "$(facts_c "$MUT_OUT")" "$C3EXPR")/$(node "$AUX/stat.mjs" "$MUT_MOD/scripts/$PROCF" "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/client.js" | evj j.cliCleMode)" "0/true/1/true/1"
 else sans_effet "M-STOCKAGE-RESTE"; fi
 echo "=== M-SERVI-NON-RELU — la valeur servie n'est pas relue contre la liste (LM.C2) ==="
-if mutant servi-non-relu vf-cockpit-terminal-client.mjs "/garde:mode-relu/s#.*#return v;#"; then
+if mutant servi-non-relu client.js "/garde:mode-relu/s#.*#return v;#"; then
   assert_eq "M-SERVI-NON-RELU — sain/mutant : LM.C2 sain sur le client livré, rouge sous le mutant (bypassPermissions devient la présélection)" "$(cq "$CF" "$C2EXPR")/$(cq "$(facts_c "$MUT_OUT")" "$C2EXPR")" "true/false"
 else sans_effet "M-SERVI-NON-RELU"; fi
 

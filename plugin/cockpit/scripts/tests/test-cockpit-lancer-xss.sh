@@ -29,6 +29,7 @@ export VF_COCKPIT_MODE_DIR="$WORK/etat"; unset XDG_CACHE_HOME # AUDC-B-05 : le m
 export CHROME_SESSION="$HERE_T/chrome-session.mjs"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0; NONVERIF=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
@@ -45,8 +46,8 @@ command -v python3 >/dev/null 2>&1 || { echo "  ❌ python3 introuvable : le ter
 
 # clé de stockage de Q sondée par la charge de P (LANC-09) : relevée dans le client de Q, jamais écrite ici.
 # 72-16 a retiré la constante CLE_MODE (le mode est servi par Q et persisté dans un fichier du lab, P72-D-20) : on sonde donc une clé VIVANTE, le secret de session de Q.
-CLE_STOCK="$(sed -n "s/^.*CLE_SECRET = '\\([^']*\\)'.*\$/\\1/p" "$SCRIPTS/vf-cockpit-terminal-client.mjs" | head -1)"
-assert_eq "clé de stockage de Q sondée relevée dans vf-cockpit-terminal-client.mjs (constante CLE_SECRET, clé vivante) : clé introuvable sinon" "$CLE_STOCK" "vf.terminal.secret"
+CLE_STOCK="$(sed -n "s/^.*CLE_SECRET = '\\([^']*\\)'.*\$/\\1/p" "$SCRIPTS/../skills/cockpit-moteur/assets/ui/terminal/client.js" | head -1)"
+assert_eq "clé de stockage de Q sondée relevée dans client.js de la page de Q (constante CLE_SECRET, clé vivante) : clé introuvable sinon" "$CLE_STOCK" "vf.terminal.secret"
 
 # faux claude (témoin neuf), shell de test (PL-11.4 : echo $$ puis exec bash, invite VFP> ), PATH d'ORIGINE du shell seulement (PL-11.3)
 cp "$HERE_T/temoins/lancer-fauxbin/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"
@@ -127,7 +128,7 @@ printf -- '---\nwave: 1\nfiles_modified: [src/util.js]\n---\n<objective>Quatre</
 git -C "$LAB" init -q && git -C "$LAB" add -A && git -C "$LAB" -c user.email=t@t -c user.name=t commit -q -m init
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 SORTIE="$LAB/.vibeflow/cockpit"
-[ -f "$SORTIE/vf-cockpit-lancer.mjs" ] || echo "  ❌ la sortie construite ne porte pas vf-cockpit-lancer.mjs" >&2
+[ -f "$SCRIPTS/vf-cockpit-lancer.mjs" ] || echo "  ❌ le module testé ne porte pas vf-cockpit-lancer.mjs" >&2   # 79-06 : le code vit dans le module, la sortie ne porte que des données
 
 # --- mutants (liste du plan) ; sed -i.bak ; un mutant sans effet ou à ancre absente est un FAIL nommé ---
 cat > "$AUX/interp-p.sed" <<'SED'
@@ -143,15 +144,18 @@ SED
 cat > "$AUX/entree-auto.sed" <<'SED'
 s|^        vers_shell += ligne$|        vers_shell += ligne + bytes([13])|
 SED
-MUTFILES=(serve.mjs index.html project.html vf-cockpit-terminal-processus.mjs vf-cockpit-terminal-session.mjs vf-cockpit-lancer.mjs vf-cockpit-terminal-vue.mjs)
-empreinte() { local f; for f in "${MUTFILES[@]}"; do cat "$1/$f"; done | cksum; } # chaque fichier ; une pièce d'un mutant qui touche deux fichiers se contrôle à part
-# mutant <sortie> <nom> : 0 si le texte a changé ; 1 sinon (message sur stderr)
+MUTFILES=(serve.mjs index.html project.html vf-cockpit-terminal-processus.mjs vf-cockpit-terminal-session.mjs vf-cockpit-lancer.mjs vue.js)
+# 79-06 : la sortie (MUT_OUT) ne porte que des pages ; le code muté vit dans une COPIE du module (MUT_MOD), une par manche, mutée sur place
+MUT_OUT=""; MUT_MOD=""
+fichier_de() { case "$1" in index.html|project.html) printf '%s\n' "$MUT_OUT/$1" ;; serve.mjs) printf '%s\n' "$MUT_MOD/skills/cockpit-moteur/assets/serve.mjs" ;; vue.js) printf '%s\n' "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/vue.js" ;; *) printf '%s\n' "$MUT_MOD/scripts/$1" ;; esac; }
+empreinte() { local f; for f in "${MUTFILES[@]}"; do cat "$(fichier_de "$f")"; done | cksum; } # chaque fichier ; une pièce d'un mutant qui touche deux fichiers se contrôle à part
+# mutant <sortie> <nom> : 0 si le texte a changé ; 1 sinon (message sur stderr) ; le code est muté dans MUT_MOD, les pages dans la sortie
 mutant() {
-  local o="$1" m="$2" p="$o/vf-cockpit-terminal-processus.mjs" s="$o/vf-cockpit-terminal-session.mjs" l="$o/vf-cockpit-lancer.mjs" avant apres a2 b2
+  local o="$1" m="$2" p="$MUT_MOD/scripts/vf-cockpit-terminal-processus.mjs" s="$MUT_MOD/scripts/vf-cockpit-terminal-session.mjs" l="$MUT_MOD/scripts/vf-cockpit-lancer.mjs" sv="$MUT_MOD/skills/cockpit-moteur/assets/serve.mjs" avant apres a2 b2
   avant="$(empreinte "$o")"
   case "$m" in
     M-ESC) for f in index.html project.html; do sed -i.bak 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' "$o/$f"; done ;;
-    M-CSP) sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-Mutant-Csp'#g" "$o/serve.mjs" ;;
+    M-CSP) sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-Mutant-Csp'#g" "$sv" ;;
     M-ORIGINE-TERM) sed -i.bak "s/if (!page \&\& !navigateur) return /if (false) return /; s/else if (o !== origineQ())/else if (false)/" "$p" ;;
     M-SECRET-TERM) sed -i.bak "s/if (!egal(req.headers\['x-vf-terminal'\], secret)) return refus(res, 401, 'secret');//" "$p" ;;
     M-ONGLET-TERM) sed -i.bak "s/if (s.onglet !== onglet) return 409;//g" "$s" ;;
@@ -160,7 +164,7 @@ mutant() {
     M-ONGLET-SESSION) sed -i.bak "s#if (!actif(c) || c.onglet !== onglet) return non('absente');#if (!actif(c)) return non('absente');#" "$s" ;;
     M-ORIGINE-LANCER) sed -i.bak "s#else if (o !== origineQ())#else if (o !== origineQ() \\&\\& !(url.pathname === '/lancer' \\&\\& o === 'http://127.0.0.1:' + portP))#" "$p" ;;
     M-SANS-CONFIRM) sed -i.bak -E -f "$AUX/sans-confirm.sed" "$p" ;;
-    M-CASE-COCHEE) sed -i.bak "s#caseChat.type = 'checkbox';#caseChat.type = 'checkbox'; caseChat.checked = true;#" "$o/vf-cockpit-terminal-vue.mjs" ;;
+    M-CASE-COCHEE) sed -i.bak "s#caseChat.type = 'checkbox';#caseChat.type = 'checkbox'; caseChat.checked = true;#" "$MUT_MOD/skills/cockpit-moteur/assets/ui/terminal/vue.js" ;;
     M-INTERPOLE)
       # trois remplacements, un seul mutant : chacun doit avoir un effet
       a2="$(cksum < "$l")"; sed -i.bak -E -f "$AUX/interp-p.sed" "$l"; [ "$a2" != "$(cksum < "$l")" ] || { echo "  ❌ mutant M-INTERPOLE (P) sans effet : ancre absente (t: 'proposition',)" >&2; return 1; }
@@ -169,7 +173,7 @@ mutant() {
     *) echo "  ❌ mutant inconnu : $m" >&2; return 1 ;;
   esac
   apres="$(empreinte "$o")"
-  [ "$avant" != "$apres" ] || { echo "  ❌ mutant $m sans effet (motif absent de la sortie)" >&2; return 1; }
+  [ "$avant" != "$apres" ] || { echo "  ❌ mutant $m sans effet (motif absent du module ou de la sortie)" >&2; return 1; }
 }
 nassistants() { ps -eo pid=,ppid=,args= | awk -v p="$1" '$2 == p && /vf-cockpit-pty\.py/ { n++ } END { print n + 0 }'; }
 assistants_srv() { local c n=0; for c in $(pgrep -P "$1" 2>/dev/null); do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && n=$((n + $(nassistants "$c"))); done; echo $((n + $(nassistants "$1"))); }
@@ -241,11 +245,13 @@ manche() {
   local label="$1" scen="$2"; shift 2
   R_ERR=""; R_XSS=""; R_ARGV=non; R_LIGNE=non; R_MARQ=non; R_AV=?; R_AP=?; R_SESS=?; R_PROP=?
   # le moteur déduit la racine du lab de l'emplacement de la sortie (<lab>/.vibeflow/cockpit) : chaque manche a donc sa copie complète du lab
-  local L="$WORK/lab-$label" ENG_USE="$ENG" m o; rm -rf "$L"; cp -R "$LAB" "$L"; o="$L/.vibeflow/cockpit"
+  local L="$WORK/lab-$label" ENG_USE m o; rm -rf "$L"; cp -R "$LAB" "$L"; o="$L/.vibeflow/cockpit"
+  MUT_OUT="$o"; rm -rf "$WORK/mod-$label"; MUT_MOD="$(cockpit_module_copie "$WORK/mod-$label")" || R_ERR="copie du module impossible"; ENG_USE="$MUT_MOD/skills/cockpit-moteur"
   RUN="$WORK/run-$label"; rm -rf "$RUN"; mkdir -p "$RUN"; export FAUX_CLAUDE_SORTIE="$RUN"
   for m in "$@"; do
-    if [ "$m" = M-ENTREE-AUTO ]; then # même fichier cible, même expression que test-cockpit-lancer-pty.sh (72-02) : copie du moteur
-      ENG_USE="$WORK/eng-$label"; rm -rf "$ENG_USE"; cp -R "$ENG" "$ENG_USE"; local f="$ENG_USE/terminal/vf-cockpit-pty.py"; cp "$f" "$f.orig"; sed -i.bak -f "$AUX/entree-auto.sed" "$f"
+    [ -z "$R_ERR" ] || break
+    if [ "$m" = M-ENTREE-AUTO ]; then # même fichier cible, même expression que test-cockpit-lancer-pty.sh (72-02) : le moteur de la copie du module
+      local f="$ENG_USE/terminal/vf-cockpit-pty.py"; cp "$f" "$f.orig"; sed -i.bak -f "$AUX/entree-auto.sed" "$f"
       cmp -s "$f" "$f.orig" && { R_ERR="mutant M-ENTREE-AUTO sans effet"; echo "  ❌ mutant M-ENTREE-AUTO sans effet (expression absente de vf-cockpit-pty.py)" >&2; break; }; rm -f "$f.orig" "$f.bak"
     else mutant "$o" "$m" || { R_ERR="mutant $m sans effet"; break; }; fi
   done
@@ -253,10 +259,9 @@ manche() {
   [ -z "$R_ERR" ] || return 0
   rm -f "$o/.cache/server.json"; mkdir -p "$o/.cache"
   local amorce; amorce="$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")"; (umask 077; printf '%s' "$amorce" > "$o/.cache/terminal-amorce"; printf '%s' "$amorce" > "$WORK/amorce.copy")
-  ( cd "$L" && VF_COCKPIT_ENGINE_DIR="$ENG_USE" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  local pid=$!; PIDS+=($pid)
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  port="$(node "$AUX/ev.mjs" j.port < "$o/.cache/server.json")"; q="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; q="${q##*:}"
+  COCKPIT_MODULE="$MUT_MOD" COCKPIT_SORTIE="$o" COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$label.out" cockpit_lancer "$L" VF_COCKPIT_ENGINE_DIR="$ENG_USE" VF_COCKPIT_SCRIPTS_DIR="$MUT_MOD/scripts" --terminal
+  local pid="$VF_PID"
+  port="${VF_PORT:-0}"; q="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; q="${q##*:}"
   local _c; sec=""; read -r _c sec < <(node "$TA" amorcer "$q" "$WORK/amorce.copy" | tr '\n' ' ')
   [[ "$sec" =~ ^[0-9a-f]{64}$ ]] || { R_ERR="session-impossible"; assert_eq "[$label] — session légitime établie" "$R_ERR" ""; vf_hyg_stop "$pid"; return 0; }
   FLUX="$WORK/flux-$label.bin"; rm -f "$FLUX"
@@ -370,10 +375,10 @@ if [ -n "$CHROME" ]; then
 else nonverif "TIT.0-TIT.3 (titres hostiles rendus par la page, violations CSP)"; fi
 
 echo "=== ACT — F-1 : la reprise du chat ne retient que l'UUID d'une question envoyée par un VRAI geste (P72-D-21) ==="
-# Page hôte jetable (le vrai /api/ask exige claude) : elle installe installerObservateurChat de la SORTIE sur la vraie fenêtre ; un FAUX /api/ask (SSE, un UUID neuf par requête, documenté ici) tient la place du chat.
+# Page hôte jetable (le vrai /api/ask exige claude) : elle installe installerObservateurChat du MODULE sur la vraie fenêtre ; un FAUX /api/ask (SSE, un UUID neuf par requête, documenté ici) tient la place du chat.
 # La charge de P est jouée sans geste (script, puis click() programmatique) ; le témoin positif est un clic de confiance (Input.dispatchMouseEvent), qui produit une activation réelle.
 cat > "$AUX/hote.mjs" <<'JS'
-// hote.mjs <dossier-sortie> <port> : sert /hote.html, /ui.mjs (vf-cockpit-lancer-ui.mjs de la sortie) et un FAUX POST /api/ask (SSE, événement answer, UUID neuf par requête)
+// hote.mjs <dossier-de-scripts-du-module> <port> : sert /hote.html, /ui.mjs (les deux fichiers du chat du moteur du module) et un FAUX POST /api/ask (SSE, événement answer, UUID neuf par requête)
 import http from 'node:http'; import fs from 'node:fs'; import crypto from 'node:crypto';
 const [, , dossier, port] = process.argv;
 const PAGE = `<!doctype html><meta charset="utf-8"><body><button id="envoi" style="position:fixed;left:10px;top:10px;width:90px;height:40px">envoi</button><script type="module">
@@ -383,29 +388,29 @@ window.__pret = true;</script>`;
 http.createServer((req, res) => {
   const u = new URL(req.url, 'http://x');
   if (req.method === 'GET' && u.pathname === '/hote.html') { res.writeHead(200, { 'content-type': 'text/html' }); res.end(PAGE); return; }
-  if (req.method === 'GET' && u.pathname === '/vf-cockpit-lancer-style.mjs') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(fs.readFileSync(dossier + '/vf-cockpit-lancer-style.mjs')); return; } // importé par ui.mjs
-  if (req.method === 'GET' && u.pathname === '/ui.mjs') { res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(fs.readFileSync(dossier + '/vf-cockpit-lancer-ui.mjs')); return; }
+  // 79-11 : les deux fonctions du chat sont des fichiers du moteur ; /ui.mjs les met bout à bout (même portée : l'une est la valeur par défaut de l'autre) et les exporte
+  if (req.method === 'GET' && u.pathname === '/ui.mjs') { const d = dossier + '/../skills/cockpit-moteur/assets/ui/tiroir/'; res.writeHead(200, { 'content-type': 'text/javascript' }); res.end(fs.readFileSync(d + 'lancer-extraire-chat.js', 'utf8') + fs.readFileSync(d + 'lancer-observer-chat.js', 'utf8') + 'export { installerObservateurChat, extraireSessionChat };\n'); return; }
   if (req.method === 'POST' && u.pathname === '/api/ask') { req.resume(); req.on('end', () => { res.writeHead(200, { 'content-type': 'text/event-stream' }); res.end(`event: answer\ndata: ${JSON.stringify({ title: 'OK', answer: 'OK', items: [], session: crypto.randomUUID() })}\n\n`); }); return; }
   res.writeHead(404); res.end();
 }).listen(Number(port), '127.0.0.1');
 JS
 if [ -n "$CHROME" ]; then
-  act() { # act <dossier-sortie> -> UNE ligne JSON
+  act() { # act <dossier de scripts du module> -> UNE ligne JSON
     local hp hpid res; hp="$(libre)"; node "$AUX/hote.mjs" "$1" "$hp" & hpid=$!; PIDS+=($hpid)
     for _ in $(seq 1 50); do curl -s -o /dev/null "http://127.0.0.1:$hp/hote.html" && break; sleep 0.1; done
     res="$(node "$HERE_T/temoins/lancer-xss.mjs" "$CHROME" "{\"mode\":\"activation\",\"url\":\"http://127.0.0.1:$hp/hote.html\"}")"; vf_hyg_stop "$hpid"; printf '%s' "$res"
   }
-  RACT="$(act "$SORTIE")"
+  RACT="$(act "$SCRIPTS")"
   assert_eq "ACT.0 — témoin : avant tout geste la page n'a AUCUNE activation (sans lui, l'absence de reprise forgée ne prouverait rien)" "$(rj "$RACT" 'j.erreur||j.actif0')" "false"
   assert_eq "ACT.1 — la charge poste sa propre question (script, puis click() programmatique) : aucun UUID retenu, donc aucune reprise forgée à proposer" "$(rj "$RACT" 'j.erreur||j.forge+"/"+j.forgeClic')" "0/0"
   assert_eq "ACT.2 — témoin positif : un VRAI clic (Input.dispatchMouseEvent) sur l'envoi retient l'UUID de cette conversation, une activation est active" "$(rj "$RACT" 'j.erreur||j.humain+"/"+j.actifApresClic+"/"+/^[0-9a-f-]{36}$/.test(j.premier)')" "1/true/true"
   assert_eq "ACT.3 — activation expirée : une nouvelle requête de la charge n'efface ni ne remplace l'UUID retenu par le geste humain (rien n'est retenu de plus)" "$(rj "$RACT" 'j.erreur||j.inchange+"/"+j.apres')" "true/$(rj "$RACT" 'j.humain+j.residuel')"
   echo "  ℹ résiduel accepté (P72-D-21, Samuel, 2026-11-06) : pendant l'activation laissée par un geste réel, une requête de la charge est retenue — mesuré : $(rj "$RACT" 'j.residuel') UUID de plus"
-  rm -rf "$WORK/sortie-act"; cp -R "$SORTIE" "$WORK/sortie-act"; cp "$WORK/sortie-act/vf-cockpit-lancer-ui.mjs" "$WORK/ui.orig"
-  sed -i.bak 's/const humain = actif();/const humain = true;/' "$WORK/sortie-act/vf-cockpit-lancer-ui.mjs"
-  if cmp -s "$WORK/ui.orig" "$WORK/sortie-act/vf-cockpit-lancer-ui.mjs"; then assert_eq "M-ACTIVATION-RETIREE — mutant sans effet (ancre absente)" "sans effet" "effet"
+  rm -rf "$WORK/mod-act"; MODACT="$(cockpit_module_copie "$WORK/mod-act")"; cp "$MODACT/skills/cockpit-moteur/assets/ui/tiroir/lancer-observer-chat.js" "$WORK/ui.orig"
+  sed -i.bak 's/const humain = actif();/const humain = true;/' "$MODACT/skills/cockpit-moteur/assets/ui/tiroir/lancer-observer-chat.js"
+  if cmp -s "$WORK/ui.orig" "$MODACT/skills/cockpit-moteur/assets/ui/tiroir/lancer-observer-chat.js"; then assert_eq "M-ACTIVATION-RETIREE — mutant sans effet (ancre absente)" "sans effet" "effet"
   else
-    RMUT="$(act "$WORK/sortie-act")"
+    RMUT="$(act "$MODACT/scripts")"
     assert_eq "M-ACTIVATION-RETIREE — garde d'activation retirée : la charge fait retenir l'UUID de SA conversation (ACT.1 rougit : retenu au lieu de 0/0)" "$(rj "$RMUT" 'j.erreur||(j.forge>0)+"/"+(j.forgeClic>0)')" "true/true"
   fi
 else nonverif "ACT.0-ACT.3 et M-ACTIVATION-RETIREE (activation utilisateur réelle sous navigateur)"; fi
@@ -420,11 +425,13 @@ mkdir -p "$WORK/askbin"; cp "$HERE_T/temoins/lancer-fauxbin/claude-ask" "$WORK/a
 manche_res() {
   local label="$1"; shift
   R_ERR=""; R_RES=""; R_ARGV=non
-  local L="$WORK/lab-$label" ENG_USE="$ENG" m o; rm -rf "$L"; cp -R "$LAB" "$L"; o="$L/.vibeflow/cockpit"
+  local L="$WORK/lab-$label" ENG_USE m o; rm -rf "$L"; cp -R "$LAB" "$L"; o="$L/.vibeflow/cockpit"
+  MUT_OUT="$o"; rm -rf "$WORK/mod-$label"; MUT_MOD="$(cockpit_module_copie "$WORK/mod-$label")" || R_ERR="copie du module impossible"; ENG_USE="$MUT_MOD/skills/cockpit-moteur"
   RUN="$WORK/run-$label"; rm -rf "$RUN"; mkdir -p "$RUN"; export FAUX_CLAUDE_SORTIE="$RUN" FAUX_ASK_SESSION="$UUID_RES"
   for m in "$@"; do
+    [ -z "$R_ERR" ] || break
     if [ "$m" = M-ENTREE-AUTO ]; then
-      ENG_USE="$WORK/eng-$label"; rm -rf "$ENG_USE"; cp -R "$ENG" "$ENG_USE"; local f="$ENG_USE/terminal/vf-cockpit-pty.py"; cp "$f" "$f.orig"; sed -i.bak -f "$AUX/entree-auto.sed" "$f"
+      local f="$ENG_USE/terminal/vf-cockpit-pty.py"; cp "$f" "$f.orig"; sed -i.bak -f "$AUX/entree-auto.sed" "$f"
       cmp -s "$f" "$f.orig" && { R_ERR="mutant M-ENTREE-AUTO sans effet"; echo "  ❌ mutant M-ENTREE-AUTO sans effet (expression absente de vf-cockpit-pty.py)" >&2; break; }; rm -f "$f.orig" "$f.bak"
     else mutant "$o" "$m" || { R_ERR="mutant $m sans effet"; break; }; fi
   done
@@ -432,10 +439,9 @@ manche_res() {
   [ -z "$R_ERR" ] || return 0
   rm -f "$o/.cache/server.json"; mkdir -p "$o/.cache"
   local amorce; amorce="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"; (umask 077; printf '%s' "$amorce" > "$o/.cache/terminal-amorce")
-  ( cd "$L" && PATH="$WORK/askbin:$PATH" VF_COCKPIT_ENGINE_DIR="$ENG_USE" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  local pid=$!; PIDS+=($pid)
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  local rport rq; rport="$(node "$AUX/ev.mjs" j.port < "$o/.cache/server.json")"; rq="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; rq="${rq##*:}"
+  COCKPIT_MODULE="$MUT_MOD" COCKPIT_SORTIE="$o" COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$label.out" cockpit_lancer "$L" PATH="$WORK/askbin:$PATH" VF_COCKPIT_ENGINE_DIR="$ENG_USE" VF_COCKPIT_SCRIPTS_DIR="$MUT_MOD/scripts" --terminal
+  local pid="$VF_PID"
+  local rport rq; rport="${VF_PORT:-0}"; rq="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; rq="${rq##*:}"
   R_RES="$(node "$HERE_T/temoins/lancer-xss.mjs" "$CHROME" "{\"mode\":\"residuel\",\"P\":$rport,\"Q\":$rq,\"amorce\":\"$amorce\",\"cible\":\"ph-4\"}")"
   sleep 2; [ -e "$RUN/argv" ] && R_ARGV=oui
   echo "     [$label] mesure : argv=$R_ARGV charge=${R_RES:0:900}"

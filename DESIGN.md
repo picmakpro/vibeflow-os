@@ -218,7 +218,7 @@ serait 8, mais les rayons ne font pas partie de la grille d'espacement.
 | `plugin/cockpit/skills/cockpit-moteur/assets/ui/00-vibeflow.js` | couche VibeFlow : onglets, statuts, barres, « qui travaille » |
 | `plugin/cockpit/skills/cockpit-moteur/assets/ui/05-theme.js` | bascule de thème |
 | `plugin/cockpit/skills/cockpit-moteur/assets/ui/01-vf-responsive.js` | adaptations mobile et tactile |
-| `plugin/cockpit/skills/cockpit-moteur/VENDORED.txt` | journal des patchs du moteur vendorisé |
+| `plugin/cockpit/skills/cockpit-moteur/VENDORED.txt` | origine du moteur, sentinelle de détection du moteur, inventaire de nos fichiers (plafond de 300 lignes) |
 
 Stack : HTML, CSS et JS vanilla servis en local. Pas de Tailwind, pas de framework. Le système de
 design, ce sont les variables CSS de `viewer.html`.
@@ -231,8 +231,9 @@ design, ce sont les variables CSS de `viewer.html`.
 - Passer par les jetons d'espacement : aucune valeur d'espacement hors jeton (`--sp-*`, `--edge`,
   `--inset-*`, §4), sauf les exceptions écrites.
 - Vérifier chaque écran dans les deux thèmes, sombre et clair.
-- Ajouter le style VibeFlow dans les fichiers `ui/*vf*` et le tracer dans `VENDORED.txt` dès qu'on
-  touche un fichier du moteur.
+- Ajouter le style VibeFlow dans les fichiers `ui/*vf*` ; un fichier à nous posé sous le moteur
+  s'inscrit en `AJOUT` dans `VENDORED.txt` (il entre ainsi dans le plafond de 300 lignes) ;
+  l'édition d'un fichier d'origine du moteur ne se trace nulle part (fork assumé, P79-D-07).
 - Écrire l'interface en français (texte visible, `aria-label`, infobulles), avec des espaces
   insécables avant `: ; ! ?` et dans « 1 024 px ».
 - Rendre chaque élément interactif atteignable au clavier, avec un focus visible (`--ring`).

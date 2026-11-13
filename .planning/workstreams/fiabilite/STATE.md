@@ -12,7 +12,7 @@ progress:
   total_phases: 16
   completed_phases: 8
   total_plans: 172
-  completed_plans: 79
+  completed_plans: 100
 milestone_name: « le cockpit VibeFlow » — Phases 67-81 —
 stopped_at: "integration/cockpit-audit : jointure des cadrages faite le 2026-11-11 (7 phases, 93 plans) ; exécution à venir ; PR #226 et #227 ouvertes ; gel des publications"
 ---
@@ -34,7 +34,7 @@ See: .planning/PROJECT.md
 
 Phase: aucune en cours ; prochaines : 79 et 80, en parallèle. Sept phases du jalon `vibeflow-v2.0` cadrées et planifiées le 2026-11-11 (73, 74, 75, 76, 77, 79, 80 : 93 plans, 109 exigences), fusionnées dans `integration/cockpit-audit` (jointure, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 : « Oui, dans la branche de travail (Recommandé) ») avec le lot 0 et le lot 0 bis ; PR #227 ouverte. Dernière phase close : 72.
 
-Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 79 plans exécutés sur 172 (la 71.5 est une mission design, sans plan GSD ; 93 plans planifiés, non exécutés).
+Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 100 plans exécutés sur 172 (la 71.5 est une mission design, sans plan GSD ; 93 plans planifiés, non exécutés).
 
 - Publié : 67 en `v2.75.0` (2026-11-03) ; 68, 69, 70, 71, 71.5, 72 et 78 en `v2.76.0` (2026-11-06, PR de release #217, module `cockpit` v1.4.0). `VERSION` reste `v2.76.0`.
 - Non publié, sur `release/v2.77.0` (PR #226 ouverte, non mergée) : panel, recette du 2026-11-08 et correctifs, audit du cockpit.
@@ -62,8 +62,8 @@ Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 79
 - 2026-11-11 — Phases 74 et 76 cadrées et planifiées (10 et 9 plans ; P74-D-46 et P76-D-32 à D-34 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).
 - 2026-11-11 — Phase 75 cadrée et planifiée (P75-D-01..31 ; P75-D-28 et P75-D-29 arbitrages Samuel, AskUserQuestion session principale, 2026-11-11) ; P75-Q-06 (amendements de DESIGN.md) en attente, bloque 75-10.
 - 2026-11-11 — Phase 77 cadrée et planifiée : 8 plans, 6 vagues, SYNT-01..10, P77-Q-01 et P77-Q-02 appliquées par décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
-- 2026-11-11 — Phase 79 cadrée et planifiée : 22 plans, 11 vagues, SOCL-01..27, contrats C0-C6 et amendements A1-A55 fournis aux Phases 73 à 77 et 80. P79-Q-03 (S-3) tranchée (P79-D-33, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) ; P79-Q-01 et Q-02 appliquées par décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; P79-Q-04 (S-4, réduction d'I18) en attente, non bloquante.
 - 2026-11-12 — Phase 80 : segment a exécuté le 2026-11-12 (80-01 à 80-08, vagues 1-3), PR #237 (CI verte) vers integration/cockpit-audit ; 80-09+ après la jointure avec la 79. Cadrée le 2026-11-11 (21 plans ; P80-D-52..56 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).
+- 2026-11-13 — Phase 79, segment a : 13 plans faits (79-01 à 79-12, 79-21), SUMMARY commités ; 79-13 à 79-20 et 79-22 restent, phase non close. Cadrée le 2026-11-11 : SOCL-01..27, C0-C6, A1-A55 ; Q-03 tranchée (P79-D-33, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) ; Q-01, Q-02 par décision déléguée (message session principale, 2026-11-08), option recommandée ; Q-04 tranchée (retrait AUDC-I18, segment c).
 
 ### Pending Todos
 

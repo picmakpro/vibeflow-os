@@ -1,8 +1,9 @@
 // vf-cockpit-ask — questions sur l'onglet Projet (67-05, promu du spike 005). Chargé par le serveur (vf-cockpit-server.mjs) et
-// par vf-cockpit-query.mjs, copié à côté d'eux dans .vibeflow/cockpit/. Deux voies, même format de réponse que le moteur
+// par vf-cockpit-query.mjs. Deux voies, même format de réponse que le moteur
 // ({ title, answer, items, steps, followups }, ids [[n:…]] / [[f:…]] cliquables) :
 //   - answerLocally : les questions courantes, calculées sur le graphe Projet, sans modèle ni jeton ;
-//   - instructions  : la consigne de l'agent (claude -p) pour tout le reste, outillé par vf-cockpit-query.mjs.
+//   - instructions  : la consigne de l'agent (claude -p) pour tout le reste, outillé par vf-cockpit-query.mjs ; elle porte le jeton `<module>`
+//     (racine du module, voir vf-cockpit-module.mjs) que le serveur remplace au lancement : la fonction reste pure.
 // Identité d'une phase = (compartiment, numéro) : « phase N » se résout par le champ `num` des nœuds de phase ; si plusieurs
 // compartiments portent ce numéro, la réponse les liste avec leur compartiment et ne choisit pas au hasard.
 // Exports : projectIndex(G), answerLocally(G, question), instructions(G).
@@ -168,7 +169,9 @@ export function instructions(G) {
     `Tu réponds à des questions sur l'avancement du projet « ${G.project.name} » (méthode VibeFlow, planning dans .planning/), pour quelqu'un qui explore la carte interactive de ce planning. Réponds en français.`,
     'Cartes de la carte : jalons (n:ms-<clé>), phases (n:ph-<N>), groupe des exigences d\'une phase (n:ph-<N>.req), missions (n:dag-MISSION-<N>), Historique, Backlog, Graines, Releases ; éléments : plans (f:<chemin du PLAN.md>), exigences (f:req/<ID>), étapes de mission, entrées de backlog, tags (f:tag/<vX>).',
     'Chaque carte porte un statut st (done = fait, active = en cours, todo = à faire, blocked = étape de mission en échec) et un pied foot (progression, vague, nombre de fichiers). « blocked » de dag.sh (attend ses dépendances) est déjà ramené à todo.',
-    'Interroge la carte depuis le shell : `node .vibeflow/cockpit/vf-cockpit-query.mjs overview`, `find "<mots>"`, `show <id>`, `status <done|active|todo|blocked> [--in <id>]`, `path <idA> <idB>`. Chaque résultat est du JSON avec ids et statuts. Lis les fichiers de .planning/ (ROADMAP, PLAN, SUMMARY, STATE) seulement pour un détail que la carte n\'a pas.',
+    'Interroge la carte depuis le shell : `node <module>/scripts/vf-cockpit-query.mjs overview`, `find "<mots>"`, `show <id>`, ' +
+    '`status <done|active|todo|blocked> [--in <id>]`, `path <idA> <idB>`. Chaque résultat est du JSON avec ids et statuts. ' +
+    'Lis les fichiers de .planning/ (ROADMAP, PLAN, SUMMARY, STATE) seulement pour un détail que la carte n\'a pas.',
     'Quelques requêtes, pas des dizaines. Puis réponds en JSON seulement : {"title", "answer", "items", "steps", "followups"}.',
     '- answer : Markdown, ~180 mots au plus, concret. Cite les cartes en ligne sous la forme [[id]] (elles deviennent cliquables).',
     '- items : les 3 à 14 cartes qui montrent la réponse, la plus importante d\'abord, chacune avec une note de 15 mots au plus.',

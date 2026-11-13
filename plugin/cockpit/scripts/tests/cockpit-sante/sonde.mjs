@@ -70,7 +70,10 @@ function panneau({ issues, services, vfTab, plan = false }) {
     state: { selected: null, container: null }, iconI: () => '', icon: () => '', exists: () => false, on() {}, closePanel() {}, canChange: () => false,
     addHeaderButton: (o) => { const b = Object.assign(el(), o); boutons.push(b); return b; }, addPanelSection: (n, f) => { sections[n] = f; }, showPanel: (html) => panneaux.push(html),
   };
-  const ctx = { window: { Floorplan: SC }, document: { createElement: el, head: { appendChild() {} } }, JSON };
+  // 79-10 : le traducteur du moteur, sous forme neutre (la clé remplie, comme sous ?lang=en) : l'extension le lit au chargement
+  const tf = (k, ...v) => k.replace(/@[\w-]+$/, '').split('{}').reduce((x, q, i) => (i ? x + String(v[i - 1] ?? '') + q : x + q), '');
+  Object.assign(tf, { pl: (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`, mot: (n, k) => k, k: (x) => x, type: () => null, constat: (x) => x });
+  const ctx = { window: { Floorplan: SC, __vfFrT: tf }, document: { createElement: el, head: { appendChild() {} } }, JSON };
   vm.runInNewContext(fs.readFileSync(path.join(moteur, 'assets/ui/20-health.js'), 'utf8'), ctx);
   boutons[0].onClick();
   return { liste: panneaux[0] || '', apercu: sections.overview ? sections.overview().html : '', bouton: boutons[0] };

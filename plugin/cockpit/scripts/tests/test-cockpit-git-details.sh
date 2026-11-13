@@ -20,10 +20,10 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || { chmod -R u+rwx "$WORK" 2>/dev/null; rm -rf "$WORK"; }' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
 
 # --- outils node écrits par la suite ---
 # req.mjs <port> <méthode> <chemin> <jeton|-> <origin|-> : ligne 1 = statut, puis le corps
@@ -120,10 +120,8 @@ printf '<objective>Faire le socle</objective>\n' > "$LAB/.planning/phases/01-x/0
 printf '.planning\n.vibeflow\n' >> "$LAB/.git/info/exclude"
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 OUT="$LAB/.vibeflow/cockpit"
-node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-SRV=$!
-for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-PORT=$(node "$AUX/j.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
+cockpit_lancer "$LAB"; SRV="${VF_PID:-}"
+PORT="${VF_PORT:-0}"
 TOK=$(node "$AUX/token.mjs" "$PORT" /)
 assert_eq "X0.2 — serveur démarré, jeton lu dans la page" "$([ "$PORT" -gt 0 ] && [ "${#TOK}" -ge 16 ] && echo oui || echo non)" "oui"
 GET() { node "$AUX/req.mjs" "$PORT" GET "$1" "$TOK" - ; }
@@ -452,7 +450,9 @@ NSM="$(STATUTS "$D" "$WORK/m-lien.json")"
 assert_eq "X7 M-LIEN — rouge sur X7.1 ET X7.2 : les 4 faux sont « vérifiés » et 4 status sont lancés ailleurs que dans lab3 et lab3-wt (journal d'argv)" "$(J "$WORK/m-lien.json" 'j.worktrees.filter(w=>w.verifie).length')|$NSM" "6|4"
 D="$(mutant_dir retour)"
 A="$(muter "$D/vf-cockpit-git-details.mjs" "return reelOuNull(retour) === reelOuNull(dotgit) && reelOuNull(dotgit) !== null;" "return true;")"
-assert_eq "X7 M-RETOUR — le lien retour n'est plus comparé (cible présente)" "$A" "applique"
+# 79-07 : gitSortant exige désormais le lien retour d'un worktree hors de la racine du lab (G19) : la seconde défense est neutralisée aussi, comme pour M-LIEN et M-PRINCIPAL
+A="$A|$(SANS_SORTANT "$D")"
+assert_eq "X7 M-RETOUR — le lien retour n'est plus comparé, seconde défense comprise (cibles présentes)" "$A" "applique|applique"
 NSM="$(STATUTS "$D" "$WORK/m-retour.json")"
 assert_eq "X7 M-RETOUR — rouge sur X7.1 : seul le cas (d) devient « vérifié » (w4:true), les trois autres restent refusés" "$(J "$WORK/m-retour.json" 'j.worktrees.map(w=>w.nom+":"+w.verifie).sort().join(" ")')" "dossier:false lab3-wt:true lab3:true victime:false vw:false w4:true"
 assert_eq "X7 M-RETOUR — rouge aussi sur X7.2 : un status est lancé dans w4 (journal d'argv)" "$NSM" "1"

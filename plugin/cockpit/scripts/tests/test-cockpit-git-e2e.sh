@@ -27,6 +27,7 @@ SRV=""; PIDS=()
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -129,10 +130,9 @@ mk_depot() { # $1 = racine : `depot` (principal, main), `wt-a` (feat/x, le LAB),
 build_lab() { env $ENVX "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"; }
 serve_out() { # $1 = dossier de sortie (contient serve.mjs), $2.. = options de serve.mjs ; $ENVX, $ENVS ; pose PORT et SRV
   local o="$1"; shift; rm -f "$o/.cache/server.json"
-  ( cd "$o/../.." && exec env $ENVX ${ENVS:-} "$NODE" "$o/serve.mjs" --no-open "$@" --port "$(libre)" > "$WORK/serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && grep -q '"port"' "$o/.cache/server.json" && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  COCKPIT_MODULE="${MUT_MOD:-}" COCKPIT_SORTIE="$o" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$o/../.." $ENVX ${ENVS:-} "$@" || true   # MUT_MOD : copie du module muté (79-06), vide = le module du dépôt
+  SRV="$VF_PID"
+  PORT="$VF_PORT"
 }
 
 # --- B2 + B3 : un seul parcours, une seule session, sur le vrai serveur ---
@@ -212,11 +212,17 @@ faux_b3() { jq_ "$1" '(() => { const f = []; const o = j.ok || {};
   return f.join("; "); })()'; }
 
 # --- jonction : sortie copiée DANS le lab (racine = deux niveaux au-dessus), mutant posé, parcours rejoué ---
-mutant_jonction() { # $1 = nom, $2 = fichier de la copie, $3 = ancien, $4 = nouveau, $5 = faux_b2|faux_b3 ; rend les mesures dans RM
+MUT_OUT=""; MUT_MOD=""
+mutant_jonction() { # $1 = nom, $2 = fichier(s) à muter, $3 = ancien, $4 = nouveau, $5 = faux_b2|faux_b3 ; rend les mesures dans RM. Un fichier de code (vf-cockpit-*.mjs) est muté dans une COPIE du module (MUT_MOD) ; une page, dans la copie de la sortie (MUT_OUT, des données)
   local nom="$1" R="$WORK/mj-$1"; mk_depot "$R"; build_lab "$R/wt-a"
-  local o="$R/wt-a/.vibeflow/mut-$nom"; cp -R "$R/wt-a/.vibeflow/cockpit" "$o"
-  local f; for f in $2; do mutate "$o/$f" "$3" "$4" || { RM='{"erreur":"mutation impossible"}'; return; }; done
-  serve_out "$o"; RM="$(cdp "$AUX/parcours.js" "http://127.0.0.1:$PORT" "$R/wt-a" 1 2)"; stop_srv
+  local o="$R/wt-a/.vibeflow/cockpit"; MUT_OUT="$o"; MUT_MOD=""   # 79-06 : serve.mjs exige --sortie=<lab>/.vibeflow/cockpit ; un dépôt neuf par mutant (mk_depot), la sortie de ce lab est donc déjà sa propre copie
+  local f; for f in $2; do
+    case "$f" in
+      vf-cockpit-*) [ -n "$MUT_MOD" ] || { rm -rf "$WORK/mod-$nom"; MUT_MOD="$(cockpit_module_copie "$WORK/mod-$nom")" || { RM='{"erreur":"copie du module impossible"}'; MUT_MOD=""; return; }; }; mutate "$MUT_MOD/scripts/$f" "$3" "$4" ;;
+      *) mutate "$o/$f" "$3" "$4" ;;
+    esac || { RM='{"erreur":"mutation impossible"}'; MUT_MOD=""; return; }
+  done
+  serve_out "$o"; RM="$(cdp "$AUX/parcours.js" "http://127.0.0.1:$PORT" "$R/wt-a" 1 2)"; stop_srv; MUT_MOD=""
 }
 
 if joue MJ; then

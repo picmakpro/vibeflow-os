@@ -23,6 +23,7 @@ SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 WORK="$(cd "$WORK" && pwd -P)"
 AUX="$WORK/aux"; NOSCRIPTS="$WORK/noscripts"
 mkdir -p "$AUX" "$NOSCRIPTS"
@@ -322,10 +323,9 @@ NOW="$(node -e 'console.log(Date.now())')"
 HS="$(mkhome srv "$AUX/spec-e22.json" "$LABS")"
 OUT="$LABS/.vibeflow/cockpit"
 node "$WORK/leurre.mjs" "$(libre)" & LEURRE=$!; PIDS+=("$LEURRE")
-HOME="$HS" node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-SRV=$!; PIDS+=("$SRV")
-for _ in $(seq 1 300); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-PORT="$(G "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$LABS" HOME="$HS" || true
+SRV="$VF_PID"
+PORT="$VF_PORT"
 TOK="$(node "$AUX/token.mjs" "$PORT" /)"
 assert_eq "E22.0b — contrôle positif : serveur démarré, jeton lu dans la page, leurre vivant" "$([ "$PORT" -gt 0 ] && [ "${#TOK}" -ge 16 ] && echo serveur)|$(ps -p "$LEURRE" >/dev/null 2>&1 && echo leurre)" "serveur|leurre"
 : > "$WORK/flux.jsonl"; node "$AUX/sse.mjs" "$PORT" "$TOK" 3000 hello "$WORK/flux.jsonl"
@@ -387,7 +387,7 @@ const [, , port, p, out] = process.argv;
 http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}` } }, (r) => { const c = []; r.on('data', (d) => c.push(d)); r.on('end', () => { fs.writeFileSync(out, Buffer.concat(c)); console.log(r.statusCode); }); }).on('error', (e) => console.log('ERR ' + e.code));
 JS
 cat > "$AUX/graphe.mjs" <<'JS'
-// graphe.mjs <dossier du module> <page.html> : le graphe embarqué de la page (extraireGraphe du module de ce dossier : la sortie assemblée), ou { erreur }
+// graphe.mjs <dossier du module> <page.html> : le graphe embarqué de la page (extraireGraphe du module de ce dossier), ou { erreur }
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -428,17 +428,19 @@ JSON
 NOW="$(node -e 'console.log(Date.now())')"
 H23="$(mkhome e23 "$AUX/spec-e23.json" "$LABS")"
 rm -f "$OUT/.cache/server.json"
-HOME="$H23" node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve23.out" 2>&1 &
-SRV23=$!; PIDS+=("$SRV23")
-for _ in $(seq 1 300); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-PORT23="$(G "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+COCKPIT_LOG="$WORK/serve23.out" cockpit_lancer "$LABS" HOME="$H23" || true
+SRV23="$VF_PID"
+PORT23="$VF_PORT"
+# 79-09 : la collecte tourne dans un fil et la page Équipe se construit sur l'instantané du moment : la première collecte est attendue (borne de 20 s) avant de demander la page
+collecte_prete_e23() { cockpit_get /api/vf/etat 2> /dev/null | node -e 'try{process.exit(JSON.parse(require("fs").readFileSync(0,"utf8")).collecte.etat==="ok"?0:1)}catch{process.exit(1)}'; }
+attendre 20 collecte_prete_e23 || true
 S23="$(node "$AUX/fetchp.mjs" "$PORT23" /equipe.html "$WORK/equipe.html")"
 P23="$(node "$AUX/fetchp.mjs" "$PORT23" /project.html "$WORK/project23.html")"
 assert_eq "E23.0 — contrôle positif : serveur démarré et /project.html servi (200)" "$([ "$PORT23" -gt 0 ] && echo serveur)|$P23" "serveur|200"
 assert_eq "E23.1 — GET /equipe.html -> 200" "$S23" "200"
 assert_has "E23.2 — le titre de la page contient « VibeFlow · Équipe »" "$(grep -o '<title>[^<]*</title>' "$WORK/equipe.html" 2>/dev/null || echo 'aucun titre')" "VibeFlow · Équipe"
-# 69-07 : le lecteur du graphe est celui de la SORTIE assemblée (marqueur renommé window.VF_COCKPIT), comme le code servi — jamais celui des sources (window.FLOORPLAN)
-node "$AUX/graphe.mjs" "$OUT" "$WORK/equipe.html" > "$WORK/graphe-e23.json"
+# 79-06 : le lecteur du graphe est celui du MODULE (il écrit le marqueur window.VF_COCKPIT : la sortie ne porte plus de code), comme le code servi
+node "$AUX/graphe.mjs" "$SCRIPTS" "$WORK/equipe.html" > "$WORK/graphe-e23.json"
 assert_eq "E23.3 — le graphe embarqué porte le schéma vibeflow/cockpit-equipe@1 et meta.vfTab = equipe" "$(G "$WORK/graphe-e23.json" 'j.erreur||(j.schema+"|"+(j.meta||{}).vfTab)')" "vibeflow/cockpit-equipe@1|equipe"
 assert_eq "E23.4 — cartes : session racine, manager sous la session, worker sous son manager, terminés sous un bloc du manager, st active/done, aucun fichier" "$(G "$WORK/graphe-e23.json" 'j.erreur||(()=>{const n=(id)=>(j.nodes||[]).find((x)=>x.id===id)||{};return [n("se-'$SID'").parent??"-",n("ag-mgr1").parent,n("ag-w1").parent,n("ag-mgr1~termines").parent,n("ag-fin2h").parent,n("ag-w1").st,n("ag-fin2h").st,(j.files||[]).length].join("|")})()')" "-|se-$SID|ag-mgr1|ag-mgr1|ag-mgr1~termines|active|done|0"
 assert_eq "E23.5 — le graphe est conforme au schéma vibeflow/cockpit-equipe@1 du contrat" "$(node "$AUX/validate2.mjs" "$IFACE" vibeflow/cockpit-equipe@1 "$WORK/graphe-e23.json")" "OK"
@@ -882,10 +884,9 @@ JSON
   OUTEK="$LABEK/.vibeflow/cockpit"; cp "$OUTEK/project.html" "$WORK/project-ek.html.orig"
   ek_rafraichir() { touch "$HEK/.claude/projects/-lab/$SID/subagents/"agent-*.jsonl "$HEK/.claude/projects/-lab/"*.jsonl; }
   ek_demarrer() { rm -f "$OUTEK/.cache/server.json"; ek_rafraichir
-    HOME="$HEK" node "$OUTEK/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-ek.out" 2>&1 &
-    EK_PID=$!; PIDS+=("$EK_PID")
-    for _ in $(seq 1 300); do [ -s "$OUTEK/.cache/server.json" ] && break; sleep 0.1; done
-    EK_PORT="$(G "$OUTEK/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"; }
+    COCKPIT_LOG="$WORK/serve-ek.out" cockpit_lancer "$LABEK" HOME="$HEK" || true
+    EK_PID="$VF_PID"
+    EK_PORT="$VF_PORT"; }
   # ek_muter <ancre> <remplacement> : pose le mutant dans la page assemblée (project.html de la sortie), « muté » ou « ancre absente »
   ek_muter() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; if [ -z "${3:-}" ]; then EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; else EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html" >/dev/null || return 1; EK_FROM="$3" EK_TO="$4" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; fi; }  # $3/$4 : seconde substitution (fusion de la 68 : deux règles de pied de carte)
   ek_restaurer() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; }
@@ -1050,7 +1051,7 @@ assert_eq "EA1.6 — carte : aucune description vide (groupe « Terminés », ag
 
 echo "=== EA2 — tiroir « Au travail » : orphelins, verrous, libellés (PU-G-177, 178, 179, 180, 182, 184, 186, 187) ==="
 cat > "$AUX/vm70s.mjs" <<'JS'
-// vm70s.mjs <70-vf-live.js> <71-vf-equipe-rendu.js> <scénario.json> : le tiroir hors navigateur (vm) ; le scénario porte `who` (workers, sources) et, facultatif, `lock` (flux lock brut). Sortie : le HTML du tiroir, ou { erreur }.
+// vm70s.mjs <70-vf-live.js> <71-vf-equipe-rendu.js> <scénario.json> : le tiroir hors navigateur (vm) ; le scénario porte `who` (workers, sources) et, facultatif, `verrous` (la projection en liste blanche que porte l'événement lock : { etat, plat, liste }, A15). Sortie : le HTML du tiroir, ou { erreur }.
 import fs from 'node:fs';
 import vm from 'node:vm';
 const [, , f70, f71, scen] = process.argv;
@@ -1067,7 +1068,7 @@ try {
   const S = JSON.parse(fs.readFileSync(scen, 'utf8'));
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
-  if (S.lock) ES.last.l.lock({ data: JSON.stringify({ seq: 1, lock: S.lock }) });
+  if (S.verrous) ES.last.l.lock({ data: JSON.stringify({ seq: 1, at: Date.now(), verrous: S.verrous }) });
   ES.last.l.who({ data: JSON.stringify({ seq: 2, who: S.who }) });
   bouton.onClick();
   console.log(JSON.stringify({ html: panneau }));
@@ -1083,14 +1084,14 @@ cat > "$AUX/ea2-orph.json" <<'JSON'
 JSON
 sed 's/"ageS":2400/"ageS":600/' "$AUX/ea2-orph.json" > "$AUX/ea2-orph-court.json"
 cat > "$AUX/ea2-verrou.json" <<JSON
-{"lock":{"present":true,"locks":[{"present":true,"owner":"$UUID_OWNER","step":"exec","scope":"depot","age_seconds":1,"lease_seconds":3000,"session_ids":["sess-presente"]}]},
+{"verrous":{"etat":"lue","plat":false,"liste":[{"ws":"","scope":"depot","phase":null,"tenu":true,"stale":false,"ageS":1,"ttl":1800,"progressAgeS":null,"owner":"$UUID_OWNER","step":"exec","leaseS":3000,"sansSession":false}]},
  "who":{"sources":{"sessions":{"etat":"lue"},"locks":{"etat":"lue"},"dags":{"etat":"lue"}},"workers":[
  {"kind":"lock","id":"$UUID_OWNER","task":"exec","tree":"depot","ageS":1,"stale":false},
  {"kind":"session","id":"sess-presente","etat":"actif","ageS":2,"tree":".","branch":"main"}]}}
 JSON
-sed 's/"sess-presente"\]/"sess-absente"]/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-absent.json"
-sed 's/"sess-presente"\]/]/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-vide.json"
-sed 's/"lease_seconds":3000,//' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-sanslease.json"
+sed 's/"sansSession":false/"sansSession":true/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-absent.json" # le serveur dit : aucune session de la collecte ne tient ce verrou
+sed 's/,"sansSession":false//' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-vide.json" # aucun verdict : le serveur n'a pas pu comparer (liste d'identifiants vide, collecte pas lue)
+sed 's/"leaseS":3000,//' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-sanslease.json"
 sed 's/"locks":{"etat":"lue"}/"locks":{"etat":"erreur"}/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-illisible.json"
 cat > "$AUX/ea2-vide.json" <<'JSON'
 {"who":{"sources":{"sessions":{"etat":"lue"},"locks":{"etat":"lue"},"dags":{"etat":"lue"}},"workers":[]}}
@@ -1099,10 +1100,10 @@ T70() { node "$AUX/vm70s.mjs" "${3:-$UI/70-vf-live.js}" "${4:-$RENDU}" "$AUX/$1"
 assert_eq "EA2.1 — orphelin du registre (PU-G-182) : l'agent consigné sans verrou tenu est montré, « orphelin ? » ; le nœud de DAG périmé reste écarté (P71.5-D-14, apparié)" "$(T70 ea2-orph.json '[j.html.includes("TACHE-ORPH"), j.html.includes("orphelin ?"), j.html.includes("NOEUD-PERIME")].join()')" "true,true,false"
 assert_eq "EA2.2 — enfant actif d'une session muette depuis 40 min : « orphelin ? » sur sa ligne (PU-G-182)" "$(T70 ea2-orph.json '/class="r-task">TACHE-ENFANT <span class="sr">\(([^)]*)\)/.exec(j.html)[1].includes("orphelin ?")')" "true"
 assert_eq "EA2.2b — apparié : la même session muette depuis 10 min ne marque pas l'enfant, et l'orphelin du registre reste dit une seule fois" "$(T70 ea2-orph-court.json '[/class="r-task">TACHE-ENFANT <span class="sr">\(([^)]*)\)/.exec(j.html)[1].includes("orphelin ?"), j.html.split("orphelin ?").length-1].join()')" "false,1"
-assert_eq "EA2.3 — « tenu depuis » lit la date de prise (lease_seconds 3000 s = 50 min), jamais le battement (age_seconds 1 s) : ligne du verrou ET ligne du driver (PU-G-179)" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length+"|"+j.html.includes("tenu depuis 1 s")')" "2|false"
-assert_eq "EA2.4 — lease_seconds absent : « tenu » sans durée, jamais un battement présenté comme une prise (PU-G-179)" "$(T70 ea2-verrou-sanslease.json '[j.html.includes("tenu depuis"), (j.html.match(/>tenu</g)||[]).length].join()')" "false,2"
-assert_eq "EA2.5 — verrou dont session_ids ne nomme aucune session de la collecte : « aucune session active », jamais « orphelin » ni « introuvable » (PU-G-179)" "$(T70 ea2-verrou-absent.json '[j.html.includes("aucune session active"), /orphelin|introuvable/.test(j.html.replace(/<[^>]*>/g, " "))].join()')" "true,false"
-assert_eq "EA2.6 — apparié : session présente ou session_ids vide : aucun verdict" "$(T70 ea2-verrou.json 'j.html.includes("aucune session active")')|$(T70 ea2-verrou-vide.json 'j.html.includes("aucune session active")')" "false|false"
+assert_eq "EA2.3 — « tenu depuis » lit la date de prise (leaseS 3000 s = 50 min), jamais le battement (ageS 1 s) : ligne du verrou ET ligne du driver (PU-G-179)" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length+"|"+j.html.includes("tenu depuis 1 s")')" "2|false"
+assert_eq "EA2.4 — leaseS absent : « tenu » sans durée, jamais un battement présenté comme une prise (PU-G-179)" "$(T70 ea2-verrou-sanslease.json '[j.html.includes("tenu depuis"), (j.html.match(/>tenu</g)||[]).length].join()')" "false,2"
+assert_eq "EA2.5 — verrou que le serveur dit sans session de la collecte (sansSession vrai) : « aucune session active », jamais « orphelin » ni « introuvable » (PU-G-179)" "$(T70 ea2-verrou-absent.json '[j.html.includes("aucune session active"), /orphelin|introuvable/.test(j.html.replace(/<[^>]*>/g, " "))].join()')" "true,false"
+assert_eq "EA2.6 — apparié : sansSession faux ou absent : aucun verdict" "$(T70 ea2-verrou.json 'j.html.includes("aucune session active")')|$(T70 ea2-verrou-vide.json 'j.html.includes("aucune session active")')" "false|false"
 assert_eq "EA2.7 — le driver se dit en clair : « Session qui pilote : », jamais l'identifiant brut du propriétaire, ni dans le driver ni dans la liste (PU-G-177)" "$(T70 ea2-verrou.json '[j.html.includes("Session qui pilote : "), j.html.includes("88f83d8b")].join()')" "true,false"
 assert_eq "EA2.8 — « Qui a la main » remplace « Verrous tenus », avec « rien à faire de votre côté » (PU-G-178)" "$(T70 ea2-verrou.json '[j.html.includes("Qui a la main"), j.html.includes("Verrous tenus"), j.html.includes("rien à faire de votre côté")].join()')" "true,false,true"
 assert_eq "EA2.9 — tout est lu : aucun pied de sources ; une source illisible : le pied la nomme, elle seule (PU-G-180)" "$(T70 ea2-verrou.json '[j.html.includes("Sessions et sous-agents"), j.html.includes("class=\"src\"")].join()')|$(T70 ea2-verrou-illisible.json '(/class="src">([^<]*)</.exec(j.html)||[])[1]')" "false,false|Source illisible : Verrous du dépôt"
@@ -1111,8 +1112,8 @@ assert_eq "EA2.10 — personne : « Personne ne travaille en ce moment », sans 
 mkdir -p "$MUT/avant"
 for f in 70-vf-live.js 71-vf-equipe-rendu.js; do git -C "$SCRIPTS" show "c7d96740:plugin/cockpit/skills/cockpit-moteur/assets/ui/$f" > "$MUT/avant/$f" 2>/dev/null; done
 assert_eq "EA2.11 — témoin rouge : le code d'avant (c7d96740) ne montre pas l'orphelin du registre, ne marque pas l'enfant et lit le battement" "$(T70 ea2-orph.json '[j.html.includes("TACHE-ORPH"), j.html.includes("orphelin ?")].join()' "$MUT/avant/70-vf-live.js" "$MUT/avant/71-vf-equipe-rendu.js")|$(T70 ea2-verrou.json 'j.html.includes("tenu depuis 50 min")' "$MUT/avant/70-vf-live.js" "$MUT/avant/71-vf-equipe-rendu.js")" "false,false|false"
-sed 's#lease_seconds#age_seconds#g' "$UI/70-vf-live.js" > "$MUT/70-lease.js"
-assert_eq "EA2.12 — mutant (lease_seconds lu comme age_seconds) : la durée de prise disparaît, détecté" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length' "$MUT/70-lease.js")" "0"
+sed 's#leaseS#ageS#g' "$UI/70-vf-live.js" > "$MUT/70-lease.js"
+assert_eq "EA2.12 — mutant (leaseS lu comme ageS) : la durée de prise disparaît, détecté" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length' "$MUT/70-lease.js")" "0"
 M "$UI/70-vf-live.js" "$MUT/70-orph.js" "orph = reste.filter((w) => w.orphan)" "orph = []"
 assert_eq "EA2.13 — mutant (orphelins du registre non listés) : détecté" "$(T70 ea2-orph.json 'j.html.includes("TACHE-ORPH")' "$MUT/70-orph.js")" "false"
 cat > "$AUX/ea2-rendu.mjs" <<'JS'

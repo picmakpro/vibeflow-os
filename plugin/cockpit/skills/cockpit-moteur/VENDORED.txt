@@ -1,30 +1,13 @@
 floorplan v0.6.0 @ 92d6854 (haydenschmitty/floorplan, MIT) — copie de skills/floorplan
-Reconstruction et vérification hors réseau : plugin/cockpit/amont/SYNCHRO.md (synchro.sh).
-Lignes machine : PATCH <chemin> <Pn[,Pm]> <description> · AJOUT <chemin> · RETRAIT <chemin> · TAILLE <chemin> <lignes>.
+Fork assumé (P79-D-07) : plus de rejeu depuis l'origine, plus de journal de patchs ; une édition d'un fichier du moteur ne se trace pas ici.
+Lignes machine : AJOUT chemin (fichier à nous : inventaire du plafond de 300 lignes, V4 de test-cockpit-vendor.sh ; une ligne par fichier, insérée à sa place alphabétique octet par octet, jamais en fin de fichier ni en bloc : contrôle V10.5) · TAILLE chemin [note] (fichier d'origine au-delà du plafond : marqueur vibeflow:allow-large-file dans ses cinq premières lignes).
 Licence : MIT, copyright d'origine conservé dans LICENSE ; composants tiers dans LICENCES-TIERCES.txt.
+Ce fichier est aussi la sentinelle de détection du moteur (engineDir, vf-cockpit-paths.mjs) : il ne se supprime pas.
 
-PATCH assets/viewer.html P1,P2,P3,P4,P6,P8,P11,P12,P16,P21,P22,P23,P27,P28,P29,P30,P31,AUDC-H1,AUDC-M7 espacements : grille 71.5, jetons --sp-* et --inset-* (P27), libellés de liens, pied de carte et pastille de statut, classe st-<statut>, setOverview, rerender, pictogrammes fournis par le graphe ; résidu CSS de la carte Cloud retiré ; lien de crédit retiré ; favicon SVG ; pied de carte, pastille et classe de statut : tout champ du graphe est échappé par h() (XSS stockée, audit 67-SECURITY B2) ; P21 : le rechargement automatique remet un flux coupé à la page hôte (window.FLOORPLAN_STREAM_LOST) au lieu de réessayer chaque seconde sans fin (E-6) ; P22 : à la dernière étape d'un parcours le chevron « suivant » est inactif (comme « précédent » à la première), la croix de fermeture est la seule (recette 2026-11-02, D1) ; P23 : l'italique *…* et _…_ est rendu dans les réponses de l'agent (après l'échappement, hors des spans de code, bornes de mot) et les chevrons de la Trajectoire portent un nom accessible « Previous step » / « Next step » (recette 2026-11-03, O3 et O6) ; P28 : couleurs 71.5 (jeu pastel lumineux, P71.5-D-18 à D-30) : fonds, anneaux, halos et tuiles teintés retirés, pastille .rw sans fond (glyphe + mot), verbe HTTP en point + texte, icônes nues, jetons d'alias (--ok, --ok-bg, --ok-text, --warn-sheet) et créés (--note-bg, --recent-text, --accent) ; P29 : retours du panel utilisateurs (2026-11) : panneau de détail fermé par défaut sous 1 000 px ; infobulle de carte fermée au déplacement et posée à côté, hints de souris « right-click: more » avec son deux-points et masqués au toucher ; carte lisible (ordre de tabulation, plancher du zoom, liens discrets, molette, toucher) ; bloc titre à description courte avec « Lire la suite » ; chemin du panneau coupé sur les « / » ; recherche « / » (focus rendu ou posé), vrai nom de fichier et dossier pour les homonymes ; Échap et focus de la fenêtre d'export ; vue de réponse remise à zéro ; carte sans lien rangée dans la colonne du milieu, titres de colonnes lisibles ; titre d'un tableau coupé à 24 cartes qui dit l'écart ; dossier parent des homonymes du travail récent ; un seul tableau des mots d'état ; sur l'onglet Projet, les listes du panneau et les titres de colonnes lisent le lien dans son sens (« Dépend de » côté entrant, « Utilisé par » côté sortant), sans changer l'ordre des cartes (PU-G-100) ; P30 : les lignes de « On this board » et de « Walkthrough » se coupent au mot entier côté page (cutWord) et passent à la ligne au lieu d'une ellipse en plein mot, libellé complet au title (PU-G-147, recette du 2026-11-08) ; P29 : l'infobulle d'une carte ne dépend plus de :hover : la carte quittée est couverte par hideTip (mouseleave et pointerleave efface le minuteur), la carte retirée par isConnected, faux sur un appareil sans survol (PU-G-035, recette du 2026-11-08, D7.16) ; P31 : le premier rendu et l'évènement `ready` attendent que les scripts d'extension (ui/*.js) aient été exécutés (DOMContentLoaded) en plus des polices : polices déjà prêtes (Linux), ils partaient avant eux (K5, corrige la recette du 2026-11-08) ; AUDC-H1 : la page ouvre un seul flux quand le serveur le dit (unFlux) et expose reload au flux du direct ; AUDC-M7 : le calcul d'un gros niveau (24 cartes ou plus) peint l'indicateur de chargement avant de bloquer le fil ; élément principal <main id=stage>
-PATCH assets/serve.mjs P5,P9,P10,P11,P13,P14,P15,P17,P18,P19,P20,P24,P25,P26,AUDC-A-01,AUDC-B-02,AUDC-B-03,AUDC-B-03bis,AUDC-B-06,AUDC-H1,AUDC-H3,AUDC-B-04 Cache-Control no-store ; serveur unique : crochet vf-cockpit-server.mjs (direct SSE /api/vf/*, onglet Projet, jeton propre) après le contrôle du Host et du jeton, segments cachés refusés ; questions : réponse locale de l'onglet Projet, confinement mesuré et modèle validé de l'agent, moteur fixé à Claude Code (P7 du spike remplacé par P13/P14) ; marqueur de taille ; racine du lab à deux niveaux ; fonction Cloud retirée (liste d'attente, e-mail du compte, réglages personnels) ; P15 : « modifier le plan » durci, seuls plan.mjs et build.mjs du MOTEUR du module (VF_COCKPIT_ENGINE_DIR, posé par le lanceur) s'exécutent, .cache/skill.json et .cache/history/ du lab sont ignorés puis supprimés ; P17 : Content-Security-Policy (empreintes des scripts en ligne, connect-src 'self', frame-ancestors 'none', form-action 'none'), X-Content-Type-Options, X-Frame-Options sur toutes les réponses ; P18 : corps JSON non objet = 400, routeur et exceptions rattrapés, .cache/server.json en 0600, --resume=<uuid> validé, échec franc sans vf-cockpit-server.mjs, --stop borné, timeouts ; P19 : le serveur statique ne sert aucun lien symbolique qui sort de son dossier ; chaque < du JSON exporté devient \u003c ; P20 : le fichier exporté se nomme <projet>-carte.html (et non -map.html) ; P24 : page Équipe servie en mémoire (même CSP à empreintes que la page Projet) ; P25 : le PATH du processus est assaini au démarrage (vf-cockpit-env.mjs : jamais d'élément vide, relatif ou du lab), donc which, claude et les enfants n'exécutent aucun outil du lab (audit H-1) ; P26 : terminal intégré (Phase 71), crochets du module vf-cockpit-terminal.mjs chargé seulement sous --terminal (frame-src, injection du tiroir, route /api/vf/terminal, garde d'inactivité, démarrage du second serveur) ; audit du cockpit (lot 0) : « Demander » ne reprend qu'une session rendue par ce serveur (A-01), deux exécutions au plus et délai global avec 429 (B-02), requête inter-sites refusée hors /api (B-03), sauf la navigation de premier niveau vers la page Projet qui porte le secret d'ouverture du lanceur (à usage unique, valide tant que la clé d'amorçage du terminal est armée), pour la page de redirection ouverte en file:// (B-03 bis), « < » échappé dans l'objet injecté et jeton comparé en temps constant (B-06) ; AUDC-H1 : une page n'ouvre qu'un flux (champ unFlux injecté, rechargement de la carte diffusé par le flux du direct, /api/status compte les pages ouvertes) ; AUDC-H3 : toute requête authentifiée est une activité (jamais avant le refus 403), un flux de page ouvert retient l'arrêt sur inactivité, démarrage et arrêt (motif) écrits au journal, période de contrôle réglable ; export sans vfTouch ni vfGit (AUDC-B-04)
-PATCH scripts/build.mjs P9,P12,P16 marqueur de taille ; logo et favicon VibeFlow (data URI SVG) ; chaque < du JSON de la page devient \u003c (ferme </script et <!--)
-PATCH scripts/scan.mjs P9,P10 marqueur de taille ; dossier de sortie à deux segments exclu du scan ; lien symbolique dont la cible sort du lab ni lu ni décrit (AUDC-A-02)
-PATCH scripts/lib/health.mjs P9,P11,P29 marqueur de taille ; littéral de liste d'attente retiré des exemples et du motif de chemins publics ; P29 : santé : alertes comptées comme la légende, clé au format réel en fichier de test ou d'exemple dite factice, vendor/ third_party/ node_modules/ *.bundled.js *.min.js lus comme tiers, services (Supabase, Firebase, Stripe) repérés aux imports
-PATCH scripts/lib/screens.mjs P9,P29 marqueur de taille ; P29 : findScreens blanchit les commentaires avant de lire createFileRoute (l'écran fantôme) ; la marque vibeflow:allow-large-file n'est plus prise pour le résumé d'un écran
-PATCH scripts/lib/extract.mjs P9,P29 marqueur de taille ; P29 : headerComment et hashHeader : la ligne de la marque vibeflow:allow-large-file est blanchie avant la lecture (indices conservés), le résumé qui suit est gardé
-PATCH scripts/lib/common.mjs P10,P27 MAP_DIR = .vibeflow/cockpit ; commentaire du .gitignore de sortie ; P27 : git() ne tourne que sous l'environnement durci posé par l'assemblage (VF_COCKPIT_GIT_DURCI, P78-D-25), sinon il rend null (hors dépôt) ; discover() ne lit pas un dépôt dont les métadonnées git ne sont pas celles du lab (dossier git ou commun hors du lab sauf worktree vérifié ou sous-module à core.worktree, lien symbolique dans les métadonnées, alternates, core.worktree étranger : scripts/lib/vf-git-sortant.mjs) (AUDC-A-02)
-PATCH assets/vendor/elk.bundled.js P9 marqueur de taille
-PATCH assets/ui/40-tour.js P25,P27,P29 visite guidée : chaque étape cible une carte (centrée, zoomée, hors de la carte de visite) ou un élément du chrome (`cible`, mis en évidence), texte jamais coupé, « Skip » à chaque étape, aucune étape de parcours sur l'onglet Projet ; l'ajustement d'ouverture ne vaut que pour une première étape sur la vue d'ensemble ; le centrage d'une carte dézoome une carte plus large que sa zone et laisse tout le graphe dans la zone libre, sans sélectionner ; le contour est un élément posé sur la cible (indépendant de son className) ; toute sortie de la visite rend la vue d'ensemble ; la carte de visite se place là où elle recouvre le moins de surfaces fixes (zoom, panneau, titre, en-tête, barre de question, cible : rétrécie, de l'autre côté ou plus haut, replacée dès qu'une surface bouge, raccourcie jusqu'à 200 x 120 px si rien d'autre ne suffit ; le zoom de la carte ciblée est contrôlé une seconde fois une fois le mouvement fini ; la description du titre est repliée pendant la visite en dernier recours ; diag() pour les suites ; placement jugé sur la boîte de mise en page de la carte, pas sur sa boîte animée ; le cadrage réduit le zoom jusqu'à garder tout le graphe dans la zone libre avec la carte ciblée visible, au-dessus de 701 px) ; la visite ne s'ouvre jamais d'elle-même sur l'onglet Équipe (le bouton y est désactivé) ; sous 701 px une petite carte est zoomée jusqu'à être lisible ; l'étape des services extérieurs allume leurs cartes ; l'infobulle et le texte du dernier pas disent le bouton tel qu'il s'affiche ; P27 : espacements de la grille 71.5 (carte de visite à 20 sur ses quatre bords, jetons --sp-*) ; la pastille du terminal est un obstacle de la visite (obstacles()) ; P29 : visite guidée : cadrage lisible, services extérieurs allumés, feuille au téléphone qui cède la place, pastille Terminal laissée libre ; fichier ramené sous le seuil de 300 lignes ; I-3 : la carte peut se poser à droite de la colonne du zoom et de la pastille (troisième côté, le moins favorisé) ; J1 : 4e côté « titre » (à droite du bloc titre, borné par l'en-tête seul), coût du texte rogné (le titre entier et la première ligne de la description pèsent le plus), description du titre repliée aussi quand le texte serait rogné, carte resserrée sous 480 px de haut, replacement quand la hauteur du texte change
-PATCH assets/ui/05-theme.js P27,P29 espacements : jetons de la grille 71.5 ; P29 : le mot du thème (état courant, à côté de l'icône) ne s'affiche que si l'en-tête a la place ; fit() le revoit à chaque changement de l'en-tête, du fil d'Ariane et de la colonne de gauche, et le masque aussi quand le bouton déborde de lui-même (1 000 à 1 279 px)
-PATCH assets/ui/10-glossary.js P27 espacements : boîte d'information (--inset-box)
-PATCH assets/ui/60-export.js P27 espacements : grille 71.5, plancher tactile de .xp-opt
-PATCH assets/ui/20-health.js P27,P29 espacements : boîtes de santé sur --inset-box, retrait unique de 16 ; P29 : contrôle de santé : titre et pastille comptent toutes les alertes comme la légende, clé factice d'un fichier de test ou d'exemple en texte, services cités, bloc de l'onglet Projet intitulé « Health (security only) »
-PATCH assets/ui/25-recent.js P27,P28,P29 espacements : tâches récentes sur --inset-box, note 8 x 12, marqueur de 8 ; couleurs 71.5 : fonds verts remplacés par --note-bg, titre de bloc en --text-2 ; P29 : travail récent : dossier parent des lignes « Recent work inside » pour les homonymes ; compteurs en cartes (une par carte, non par couple fichier/tâche) ; plus d'écran fantôme
-PATCH assets/ui/30-screens.js P27 espacements : menu des écrans sur la grille (--inset-row)
-RETRAIT SKILL.md
-RETRAIT assets/ui/50-cloud.js
-RETRAIT agents/openai.yaml
+AJOUT LICENCES-TIERCES.txt
+AJOUT VENDORED.txt
 AJOUT assets/ui/00-vf-surcouches.js
 AJOUT assets/ui/00-vibeflow.js
-AJOUT scripts/lib/vf-git-sortant.mjs
 AJOUT assets/ui/01-vf-responsive.js
 AJOUT assets/ui/02-vf-coin.js
 AJOUT assets/ui/02-vf-ligne-etat.js
@@ -55,25 +38,37 @@ AJOUT assets/ui/77-vf-git-vue-detail.js
 AJOUT assets/ui/78-vf-fr-dict-a.js
 AJOUT assets/ui/79-vf-fr-dict-b.js
 AJOUT assets/ui/80-vf-fr.js
+AJOUT assets/ui/terminal/client.js
+AJOUT assets/ui/terminal/q.css
+AJOUT assets/ui/terminal/vue.js
+AJOUT assets/ui/tiroir/lancer-extraire-chat.js
+AJOUT assets/ui/tiroir/lancer-observer-chat.js
+AJOUT assets/ui/tiroir/lancer-proposition.js
+AJOUT assets/ui/tiroir/lancer.css
+AJOUT assets/ui/tiroir/lancer.js
+AJOUT assets/ui/tiroir/tiroir-construire.js
+AJOUT assets/ui/tiroir/tiroir-message.js
+AJOUT assets/ui/tiroir/tiroir.css
+AJOUT assets/ui/tiroir/tiroir.js
+AJOUT assets/vendor/fonts/SHA256SUMS
+AJOUT assets/vendor/fonts/jetbrains-mono-2.304-OFL.txt
+AJOUT assets/vendor/fonts/jetbrains-mono-2.304-regular.woff2
+AJOUT assets/vendor/xterm/LICENSE-addon-fit.txt
+AJOUT assets/vendor/xterm/LICENSE-xterm.txt
+AJOUT assets/vendor/xterm/SHA256SUMS
+AJOUT assets/vendor/xterm/addon-fit.js
+AJOUT assets/vendor/xterm/xterm.css
+AJOUT assets/vendor/xterm/xterm.js
 AJOUT assets/vibeflow-logo-clair.svg
 AJOUT assets/vibeflow-logo-sombre.svg
-AJOUT assets/vendor/xterm/xterm.js
-AJOUT assets/vendor/xterm/xterm.css
-AJOUT assets/vendor/xterm/addon-fit.js
-AJOUT assets/vendor/xterm/LICENSE-xterm.txt
-AJOUT assets/vendor/xterm/LICENSE-addon-fit.txt
-AJOUT assets/vendor/xterm/SHA256SUMS
-AJOUT assets/vendor/fonts/jetbrains-mono-2.304-regular.woff2
-AJOUT assets/vendor/fonts/jetbrains-mono-2.304-OFL.txt
-AJOUT assets/vendor/fonts/SHA256SUMS
+AJOUT scripts/lib/vf-git-sortant.mjs
+AJOUT scripts/lib/vf-glob.mjs
 AJOUT terminal/vf-cockpit-pty.py
-AJOUT VENDORED.txt
-AJOUT LICENCES-TIERCES.txt
-TAILLE assets/serve.mjs 645
-TAILLE assets/vendor/elk.bundled.js 6697
-TAILLE assets/viewer.html 2579 .html, hors gate
-TAILLE scripts/build.mjs 484
-TAILLE scripts/lib/extract.mjs 602
-TAILLE scripts/lib/health.mjs 1213
-TAILLE scripts/lib/screens.mjs 646
-TAILLE scripts/scan.mjs 320
+TAILLE assets/serve.mjs
+TAILLE assets/vendor/elk.bundled.js
+TAILLE assets/viewer.html .html, hors gate
+TAILLE scripts/build.mjs
+TAILLE scripts/lib/extract.mjs
+TAILLE scripts/lib/health.mjs
+TAILLE scripts/lib/screens.mjs
+TAILLE scripts/scan.mjs

@@ -10,13 +10,12 @@
 #   B7  proposition sans confirmation : rien d'écrit, puis annulée            B8  programme au premier plan : 409, rien d'écrit, puis 204 à son retour
 #   B9  sans `claude` dans le PATH d'origine : bloquant claude-introuvable, refus
 #   CH  Chromium : bandeau, clic de confiance précoce ignoré, clic après armement (ligne SANS Entrée), Entrée au clavier, présélection du mode, Annuler
-#   M-RETOUR-CHARIOT (rougit B2) · M-LISTE-PAGE (rougit B6) : mutants sur copies de la sortie
+#   M-RETOUR-CHARIOT (rougit B2) · M-LISTE-PAGE (rougit B6) : mutants sur copies du module
 # Sans Chrome : la section CH annonce « NON vérifiée, non comptée ». Limite : Chrome headless Linux a `pointer: none` — aucune assertion ici ne lit ce media.
 # La recette avec le VRAI `claude` (skill /vf-dev ouvert, boîte de confiance du dossier, transcript dans l'onglet Équipe) est par juges, hors suite.
 # Chaque absence est précédée du témoin positif de la même observation ; seules attentes à durée fixe : fenêtres d'observation d'une ABSENCE (2 s ou arme_apres_ms + 1,5 s).
 # Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
-libre() { local p i; for i in 1 2 3 4 5 6 7 8 9 10; do p="$(node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"; [ "$p" -ge 4600 ] && [ "$p" != 4456 ] && { echo "$p"; return; }; done; echo 0; }
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"; TA="$HERE_T/terminal-aux.mjs"
@@ -25,6 +24,7 @@ export REAL_HOME="$HOME"; export HOME="$WORK/home"
 export VF_COCKPIT_MODE_DIR="$WORK/etat"; unset XDG_CACHE_HOME # AUDC-B-05 : le mode retenu d'un lancement accepté va dans un dossier jetable, jamais dans le dossier d'état réel de l'utilisateur ni de la CI
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 PASS=0; FAIL=0; NONVERIF=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
@@ -110,10 +110,13 @@ RM
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé (« mutant sans effet »)
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
-  cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+MODULE="$(cd "$SCRIPTS/.." && pwd -P)"; MUT_OUT=""; MUT_MOD=""
+mod_de() { if [ -n "$MUT_OUT" ] && [ "$1" = "$MUT_OUT" ]; then printf '%s\n' "$MUT_MOD"; else printf '%s\n' "$MODULE"; fi; } # racine du module qui sert une sortie : la copie mutée pour MUT_OUT, sinon celui du dépôt
+mutant() { # mutant <nom> <fichier-du-module> <expression-sed> -> MUT_OUT (données) + MUT_MOD (copie du module muté) ; code 1 si la cible manque ou si la copie n'a pas changé (« mutant sans effet »)
+  local d="$WORK/mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  cockpit_module_muter "$(basename "$d")" "$2" "$3" || return 1
+  MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; return 0
 }
 LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"
 
@@ -127,11 +130,10 @@ serveur_debut() { # serveur_debut <sortie> [PATH d'origine du shell] -> SRV_PID 
   NM=$((NM+1)); local o="$1" porigine="${2:-$WORK/fauxbin:$PATH}" lab; lab="$(cd "$1/../.." && pwd)"
   reset_run; rm -f "$RUN/shell.pid" "$o/.cache/server.json" "$o/.cache/terminal-amorce"; mkdir -p "$o/.cache"
   AMORCE="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"; (umask 077; printf '%s' "$AMORCE" > "$o/.cache/terminal-amorce"; printf '%s' "$AMORCE" > "$WORK/amorce.$NM")
-  ( cd "$lab" && CLAUDE_CODE_SESSION_ID=leurre-72-12 CLAUDECODE=1 FAUX_CLAUDE_SORTIE="$RUN" VF_COCKPIT_PATH_ORIGINE="$porigine" \
-      VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-$NM.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SRV_PORT="$(node "$AUX/ev.mjs" j.port < "$o/.cache/server.json" 2>/dev/null)"; SRV_PORT="${SRV_PORT:-0}"
+  local mod cm=""; mod="$(mod_de "$o")"; [ "$mod" = "$MODULE" ] || cm="$mod"   # copie mutée : l'aide vérifie que le serveur lancé la charge (code 5 sinon)
+  COCKPIT_MODULE="$cm" COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$NM.out" cockpit_lancer "$lab" CLAUDE_CODE_SESSION_ID=leurre-72-12 CLAUDECODE=1 FAUX_CLAUDE_SORTIE="$RUN" VF_COCKPIT_PATH_ORIGINE="$porigine" \
+      VF_COCKPIT_ENGINE_DIR="$mod/skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$mod/scripts" --terminal
+  SRV_PID="$VF_PID"; SRV_PORT="${VF_PORT:-0}"
   QP="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json" 2>/dev/null)"; QP="${QP##*:}"; QP="${QP:-0}"
   rq "$SRV_PORT" GET /project.html --corps-vers "$WORK/page-$NM.html" > /dev/null; PTOK="$(node "$AUX/ptok.mjs" "$WORK/page-$NM.html")"
 }
@@ -289,7 +291,7 @@ else
   nonverif "CH1 à CH9 (bandeau, clic de confiance armé, Entrée au clavier, présélection du mode)"
 fi
 
-# ---- mutants : copies de la sortie, résultat fautif exact asserté (la sonde rougit pour la bonne raison) ----
+# ---- mutants : copies du module, résultat fautif exact asserté (la sonde rougit pour la bonne raison) ----
 echo "=== M-RETOUR-CHARIOT — la ligne part avec un retour chariot : B2 rougit ==="
 if mutant cr vf-cockpit-terminal-processus.mjs "s#sessions.lancer(ligneQ, onglet)#sessions.lancer(ligneQ + '\\\\r', onglet)#"; then
   manche_debut "$MUT_OUT"; prop_p ph-1 "$V1"; lire_prop; attente_arme; R="$(lancer_q herite)"

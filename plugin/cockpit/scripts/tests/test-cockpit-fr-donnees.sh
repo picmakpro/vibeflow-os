@@ -7,7 +7,6 @@
 #   D3 témoins : le chrome reste traduit (bouton « Santé », « Pas encore de description » d'une carte sans description)
 # Chrome headless ; sans navigateur la suite est SAUTÉE hors CI, et ÉCHOUE en CI (jamais un vert à vide).
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; ENG="$SCRIPTS/../skills/cockpit-moteur"
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
@@ -18,6 +17,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [${2:0:400}]"; FAIL=$((FAIL+1)); fi; }
 cat > "$AUX/ev.mjs" <<'JS'
@@ -33,12 +33,9 @@ mklab() {
   node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 }
 srv() { # srv <sortie> -> SRV_PORT
-  local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  PIDS+=($!)
-  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
-  SRV_REAL="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).pid)" 2>/dev/null || echo 0)"
+  local o="$1" lab; lab="$(cd "$1/../.." && pwd)"
+  COCKPIT_SORTIE="$o" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS"
+  SRV_PORT="${VF_PORT:-0}"; SRV_REAL="${VF_PID:-0}"
 }
 mesure() { # mesure <lab> -> JSON sur la sortie ; arrête le serveur ensuite
   local o="$1/.vibeflow/cockpit"; srv "$o"
@@ -66,9 +63,8 @@ assert_eq "D6.0 — témoin : le conteneur porte au moins un lien (hors « conti
 assert_eq "D6.1 — panneau d'un lien sans description : le texte de repli du viewer reste traduit (aucun « connection » anglais)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.lien ? (/connection|endpoint/.test(j.lien.desc) ? "anglais:" + j.lien.desc : "traduit") : "absent"')" "traduit"
 assert_eq "D6.2 — panneau « réponse » réel : les noms de cartes listées (rangées de la réponse et du parcours) sont ceux des fichiers" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.reponse.join(",")')" "Tokens,Open,1. Health,2. Open"
 assert_eq "D6.3 — panneau « réponse » : le title des rangées (nom de la carte, suivi de la note) n'est pas traduit" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.reponseTitres.join("|")')" "Tokens|Open — Health|Health|Open"
-assert_eq "D6.4 — panneau « réponse » : la NOTE d'une rangée reste traduite (« Health » → « Santé »)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.reponseNote')" "Santé"
-assert_eq "D6.5 — repli d'un lien, formes plurielles et « across m endpoints » (balisage du viewer posé dans le panneau) : toutes traduites" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.replis.filter((t) => /connection|endpoint|across/.test(t)).length + "/" + j.replis.length')" "0/3"
-assert_eq "D5.5 — gabarits à noms : « Tokens contient Open » (chrome traduit, noms gardés)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.gabarits.lien')" "Tokens contient Open"
+assert_eq "D6.4 — panneau « réponse » : la note d'une rangée n'est jamais réécrite après coup (« Health » reste « Health » ; les notes d'assemblage de Santé sont traduites à l'émission par t.constat)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.reponseNote')" "Health"
+assert_eq "D5.5 — gabarits à noms, par le traducteur : « Tokens contient Open » (chrome traduit, noms gardés)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.gabarits.lien')" "Tokens contient Open"
 assert_eq "D5.6 — « Inside Tokens » → « Dans Tokens », « Everything behind Health » garde « Health »" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.gabarits.dans + "|" + j.gabarits.derriere')" "Dans Tokens|Tout ce qu'il y a derrière Health"
 assert_eq "D7.1 — carte atteinte au clavier : le nom accessible (aria-label) est le nom de la donnée" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.ariaCarte')" "Tokens"
 assert_eq "D7.2 — description d'un panneau contenant un mot du glossaire (« endpoints ») : gardée mot pour mot" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.descGlossaire')" "Lists the endpoints anyone can use"
@@ -76,8 +72,9 @@ assert_eq "D7.3 — témoin : un dossier a été trouvé à la racine" "$(printf
 assert_eq "D7.4 — panneau d'un dossier : « N files in chemin/ » dit « N fichiers dans chemin/ » (ici big/a/), chemin intact" "$(printf '%s' "$R" | node "$AUX/ev.mjs" '/^\d+ fichiers? dans \S+\/$/.test(j.dossier || "") ? "fr:" + j.dossier.replace(/^\d+ /, "N ") : "autre:" + j.dossier')" "fr:N fichiers dans big/a/"
 assert_eq "D7.8 — dossier OUVERT (go, sans sélection) : le panneau décrit le conteneur, le gabarit est traduit" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.dossierOuvert')" "13 fichiers dans big/a/"
 assert_eq "D7.9 — entité de connecteur (x:in:<dossier>) : jugée sur l'item décrit, gabarit traduit" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.dossierConnecteur')" "13 fichiers dans big/a/"
-assert_eq "D7.5 — lignes de liste : singulier, chemin contenant « files in », formes qui ne sont pas le gabarit (suffixe, sans « / ») intactes, ligne FICHIER dont la description est le gabarit intacte" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.dossiersPoses.join("|")')" "1 fichier dans src/lib/|12 fichiers dans src/mes files in/|3 files in src/ were changed|3 files in src|3 files in x/|See 3 files in src/ and more"
-assert_eq "D7.6 — résultats de recherche : le dossier du moteur est traduit, le fichier dont la description est le gabarit non" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.resultatsPoses.join("|")')" "5 fichiers dans src/|3 files in x/"
+assert_eq "D7.5 — lignes de liste RÉELLES du nœud qui porte les dossiers du moteur (émises par le viewer) : « 13 fichiers dans big/a/ » et « 13 fichiers dans big/b/ », chemins intacts" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.lignesReelles && j.lignesReelles.join("|")')" "13 fichiers dans big/a/|13 fichiers dans big/b/"
+assert_eq "D7.5b — plus de réécriture après coup : des lignes de liste POSÉES dans le DOM (gabarit anglais, dossier ou fichier) restent telles quelles" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.dossiersPoses.join("|")')" "1 file in src/lib/|12 files in src/mes files in/|3 files in src/ were changed|3 files in src|3 files in x/|See 3 files in src/ and more"
+assert_eq "D7.6 — plus de réécriture après coup : des résultats de recherche POSÉS dans le DOM (type dir, type file) restent tels quels" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.resultatsPoses.join("|")')" "5 files in src/|3 files in x/"
 assert_eq "D7.7 — panneau d'une carte FICHIER du lab dont la description est le gabarit : intacte (donnée, jugée par l'identité de l'item, pas par la forme du texte)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.panneauGabarit')" "3 files in x/"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

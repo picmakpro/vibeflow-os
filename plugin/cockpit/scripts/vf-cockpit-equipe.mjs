@@ -29,10 +29,11 @@ export function formeSousAgent(meta, premiere, id, CC) {
 export function collecteAgents(ctx) {
   const { projects, now, fresh, fenetre = FENETRE, inScope, label, branche, byActivity, CC, tail, root, officiel } = ctx; // officiel : Map session -> { etat } de `claude agents --json`, optionnelle (AUDC-V8)
   const action = (w) => { if (w.etat === 'actif') { const a = derniereAction(w._tr, root); if (a) w.action = a; } return w; }; // P69-D-16 : agents actifs seulement
-  if (!fs.existsSync(projects)) return { workers: [], source: { etat: 'absente', path: projects } };
+  if (!fs.existsSync(projects)) return { workers: [], sortisSilence: 0, source: { etat: 'absente', path: projects } };
   const seuil = CC?.metaSousAgent?.requisSiProfondeur?.parentAgentId ?? 2;
   const workers = [];
   let scanned = 0, live = 0, subLive = 0, inconnuSub = 0, inconnuSession = 0;
+  let sortisSilence = 0; // A20 : agents non finis sortis de la collecte pour un silence au-delà de SILENCE_MAX_S
   for (const slug of ls(projects)) {
     const dir = path.join(projects, slug);
     for (const f of ls(dir).filter((x) => x.endsWith('.jsonl'))) {
@@ -51,11 +52,11 @@ export function collecteAgents(ctx) {
         }
         infos.set(aid, r); return r;
       };
-      const cands = [];
+      const cands = [], ecartes = [];
       for (const m of ls(subDir).filter((x) => x.endsWith('.meta.json'))) {
         const aid = m.replace(/^agent-|\.meta\.json$/g, '');
         const sAge = (now - mtime(path.join(subDir, `agent-${aid}.jsonl`))) / 1000;
-        if (sAge >= fenetre) continue; // FENETRE-24H
+        if (sAge >= fenetre) continue; // FENETRE-24H garde:equipe-fenetre
         const c = charge(aid, true); if (!c) { inconnuSub++; continue; } // identifiant hors ID_RE
         cands.push(c);
       }
@@ -75,7 +76,7 @@ export function collecteAgents(ctx) {
         }
         if (casse) { inconnuSub++; continue; }
         const etat = propre(c);
-        if (etat === 'en-attente' && c.sAge >= SILENCE_MAX_S) continue; // un candidat ni fini ni vivant (muet depuis plus de SILENCE_MAX_S) n'est présent que comme ancêtre
+        if (etat === 'en-attente' && c.sAge >= SILENCE_MAX_S) { ecartes.push(c.id); continue; } // garde:equipe-silence (muet : présent seulement comme ancêtre)
         if (etat === 'actif' && c.sAge < fresh) for (const x of anc) parentsFrais.add(x.id);
         for (const x of [c, ...anc]) if (!inclus.has(x.id)) inclus.set(x.id, { c: x, etat: null });
       }
@@ -86,6 +87,7 @@ export function collecteAgents(ctx) {
       if (last && !ctx.formeOk(last)) { inconnuSession++; continue; }
       const tree = inScope(last?.cwd);
       if (!tree) continue;
+      sortisSilence += ecartes.filter((x) => !inclus.has(x)).length; // les écartés revenus comme ancêtres d'un agent retenu ne comptent pas
       if (age <= fresh) live++;
       {
         const at = byActivity(last, tree, file);
@@ -93,8 +95,9 @@ export function collecteAgents(ctx) {
         // état LU, jamais deviné : l'état officiel quand il est là (vous attend, close), sinon l'écriture du transcript ; une session au repos n'est jamais « terminé » (AUDC-D2)
         // liste officielle lue avec succès et de forme attendue : une session du lab qui n'y figure plus (ni écrite récemment, ni portant des agents vivants) est close ; liste absente, en échec ou illisible : jamais « close »
         const off = officiel?.get(id)?.etat || (officiel && !officiel.has(id) && age > fresh && !desc ? 'termine' : undefined);
+        const motif = off === 'termine' ? officiel?.get(id)?.motif : undefined; // A20 : la cause d'une session finie, lue de l'état officiel (jamais devinée)
         const etatSession = off === 'termine' || off === 'attend' || off === 'actif' ? off : off === 'au-repos' ? (desc ? 'en-attente' : 'au-repos') : age <= fresh ? 'actif' : desc ? 'en-attente' : 'au-repos';
-        workers.push(action({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ...(titreSession(file) ? { titre: titreSession(file) } : {}), ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: etatSession, _tr: file }));
+        workers.push(action({ kind: 'session', id, tree: label(at.tree), treeBy: at.how, branch: branche(at.tree, last.gitBranch), cwd: last.cwd, ...(titreSession(file) ? { titre: titreSession(file) } : {}), ageS: Math.round(age), lastAt: last.timestamp, source: 'transcript', etat: etatSession, ...(motif ? { finMotif: motif } : {}), _tr: file }));
       }
       for (const { c, etat } of inclus.values()) {
         const sl = tail(c.tr); if (sl && !ctx.formeOk(sl)) { inconnuSub++; continue; } // dernière ligne hors forme : l'agent est exclu
@@ -116,7 +119,7 @@ export function collecteAgents(ctx) {
   const etatDe = new Map(workers.filter((w) => w.kind === 'session' || w.kind === 'subagent').map((w) => [w.id, w.etat]));
   for (const w of workers) if (w.kind === 'subagent' && w.etat !== 'termine' && etatDe.get(w.parent) === 'termine') w.orphan = true;
   const inconnue = inconnuSub > 0 || (inconnuSession > 0 && live + subLive === 0);
-  return { workers, source: { etat: inconnue ? 'forme-inconnue' : 'lue', path: projects, recentFiles: scanned, liveSessions: live, liveSubagents: subLive, formeInconnue: inconnuSub + inconnuSession } };
+  return { workers, sortisSilence, source: { etat: inconnue ? 'forme-inconnue' : 'lue', path: projects, recentFiles: scanned, liveSessions: live, liveSubagents: subLive, formeInconnue: inconnuSub + inconnuSession } };
 }
 
 // index des nœuds de mission : Map identifiant de nœud -> [{ dag, ws, wsDeclare }] (une entrée par DAG ; une Map, la clé vient d'un fichier : T-69-09)

@@ -655,23 +655,25 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
 <script>if (/AppleWebKit/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|OPR/.test(navigator.userAgent)) document.documentElement.classList.add('wk');</script>
 <script>window.FLOORPLAN = /*__FLOORPLAN_DATA__*/null;</script>
 <script>/*__GRAPH_QUERY__*/</script>
+<!--__UI_I18N__-->
 <script>
 (() => {
 'use strict';
+const t = window.__vfFrT;
 const G = window.FLOORPLAN;
 // who answers questions and takes "Fix with …" prompts: the CLI the map server runs, else the agent that built the map
 const AGENT = (window.FLOORPLAN_SERVER?.engine || window.FLOORPLAN_SERVER?.want || G.meta.agent) === 'codex'
   ? { id: 'codex', name: 'Codex', app: 'Codex', cli: 'Codex', docs: 'https://developers.openai.com/codex',
-      signIn: 'Open the Codex app (or run <code>codex login</code> in a terminal) to sign in, then ask again.' }
-  : { id: 'claude', name: 'Claude', app: 'Claude Code', cli: 'the Claude Code CLI', docs: 'https://docs.claude.com/en/docs/claude-code/overview',
-      signIn: 'Run <code>claude</code> in a terminal once to sign in, then ask again.' };
-const Cap = (t) => t[0].toUpperCase() + t.slice(1);
-if (!G) { document.body.innerHTML = '<p style="padding:2rem">No data. Run build.mjs.</p>'; return; }
+      signIn: `${t('Open the Codex app (or run')} <code>codex login</code> ${t('in a terminal) to sign in, then ask again.')}` }
+  : { id: 'claude', name: 'Claude', app: 'Claude Code', cli: t('the Claude Code CLI'), docs: 'https://docs.claude.com/en/docs/claude-code/overview',
+      signIn: `${t('Run')} <code>claude</code> ${t('in a terminal once to sign in, then ask again.')}` };
+const Cap = (s) => s[0].toUpperCase() + s.slice(1);
+if (!G) { document.body.innerHTML = `<p style="padding:2rem">${t('No data. Run build.mjs.')}</p>`; return; }
 // a blueprint: planned from a PRD, so its files don't exist yet (no line counts, nothing to open in an editor)
 const PLAN = !!G.meta.blueprint;
 // an exported copy (serve.mjs --export, or the Export button): read-only, for people without Claude or Codex
 const EXPORTED = G.meta.exported || null;
-if (typeof ELK === 'undefined') { document.body.innerHTML = '<p style="padding:2rem">Could not load the ELK layout engine. Rebuild the map with build.mjs.</p>'; return; }
+if (typeof ELK === 'undefined') { document.body.innerHTML = `<p style="padding:2rem">${t('Could not load the ELK layout engine. Rebuild the map with build.mjs.')}</p>`; return; }
 
 const NS = 'http://www.w3.org/2000/svg';
 const $ = (s) => document.querySelector(s);
@@ -679,19 +681,28 @@ const svg = $('#svg'), vp = $('#viewport'), panel = $('#panel');
 const elk = new ELK();
 const KINDS = ['import', 'http', 'call', 'rpc', 'event', 'queue', 'data', 'config'];
 // connection names: plain by default, developer terms when "Show technical detail" is on
-const KIND_TECH = { contains: 'Contains', import: 'Imports', http: 'HTTP', call: 'Calls', rpc: 'RPC', event: 'Events', queue: 'Queues', data: 'Data', config: 'Config' };
-const KIND_PLAIN = { contains: 'Contains', import: 'Uses', http: 'Web requests', call: 'Calls', rpc: 'Calls', event: 'Events', queue: 'Background jobs', data: 'Reads & writes data', config: 'Settings' };
+const KIND_TECH = { contains: t('Contains'), import: t('Imports'), http: 'HTTP', call: t('Calls'), rpc: 'RPC', event: t('Events'), queue: t('Queues'), data: t('Data'), config: t('Config') };
+const KIND_PLAIN = { contains: t('Contains'), import: t('Uses'), http: t('Web requests'), call: t('Calls'), rpc: t('Calls'), event: t('Events'),
+  queue: t('Background jobs'), data: t('Reads & writes data'), config: t('Settings') };
 if (G.meta.kindLabels) { Object.assign(KIND_PLAIN, G.meta.kindLabels); Object.assign(KIND_TECH, G.meta.kindLabels); } // vibeflow P1
+// 79-10 : le titre du panneau d'un lien, par genre de lien (une entrée de table par combinaison) ;
+// un genre dont le graphe fournit le libellé (onglet Projet) garde « libellé + connection »
+const KIND_CONN_TECH = { import: t('Imports connection'), http: t('HTTP connection'), call: t('Calls connection'), rpc: t('RPC connection'),
+  event: t('Events connection'), queue: t('Queues connection'), data: t('Data connection'), config: t('Config connection') };
+const KIND_CONN_PLAIN = { import: t('Uses connection'), http: t('Web requests connection'), call: t('Calls connection'), rpc: t('Calls connection'),
+  event: t('Events connection'), queue: t('Background jobs connection'), data: t('Reads & writes data connection'), config: t('Settings connection') };
 const KIND_LABEL = new Proxy({}, { get: (_, k) => (technical() ? KIND_TECH : KIND_PLAIN)[k] || k });
 let technicalFlag = false;
 const technical = () => technicalFlag;
 const METHODS = { GET: 1, POST: 1, PUT: 1, PATCH: 1, DELETE: 1, CALL: 1 };
 const store = { get(k, d) { try { return JSON.parse(localStorage.getItem('floorplan:' + k) ?? localStorage.getItem('show-code:' + k)) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem('floorplan:' + k, JSON.stringify(v)); } catch {} } };
 const h = (s) => String(s ?? '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
-const fmt = (n) => n >= 10000 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n);
+const fmt = (n) => t.k(n >= 10000 ? Math.round(n / 1000) + 'k' : n >= 1000 ? (n / 1000).toFixed(1) + 'k' : String(n));
 const dirname = (p) => p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '';
 const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
-const plural = (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`;
+const plural = (n, w) => t.pl(n, w);
+// le type fixe d'une carte (« library ») passe par t.type ; le mot « file » (onglet Projet, panneau d'un fichier) par la table, qui le dit selon l'onglet
+const kindFr = (k) => t.type(k) ?? (k === 'file' ? t('file') : k);
 function el(tag, attrs = {}, parent) {
   const e = document.createElementNS(NS, tag);
   for (const [k, v] of Object.entries(attrs)) if (v !== undefined && v !== null) e.setAttribute(k, v);
@@ -799,7 +810,7 @@ for (const it of G.recent?.items || []) { if (!parentOf.has(it.id)) continue; if
 const recentIn = new Map();
 for (const id of recentBy.keys()) for (const a of chain(id).slice(1)) if (a !== 'root') { if (!recentIn.has(a)) recentIn.set(a, []); recentIn.get(a).push(id); }
 const recentOf = (item) => recentBy.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item);
-const recentLabel = (list) => (list.some((x) => x.change === 'new') ? 'New' : 'Changed');
+const recentLabel = (list) => (list.some((x) => x.change === 'new') ? t('New') : t('Changed@pastille'));
 let recentShown = !!store.get('recent-hl', true);
 const setRecentShown = (on) => { recentShown = on; store.set('recent-hl', on); document.body.classList.toggle('no-recent', !on); };
 document.body.classList.toggle('no-recent', !recentShown);
@@ -808,14 +819,14 @@ function humanize(s) { s = s.replace(/[_\-.]+/g, ' ').replace(/([a-z])([A-Z])/g,
 
 function info(item) {
   if (item === 'root') return { type: 'root', name: G.project.name, desc: G.project.summary || '', kind: 'root' };
-  if (item === 'q:answer') return { type: 'answer', name: state.answer?.title || 'Answer', desc: state.answer?.question || '', kind: 'answer' };
-  const t = item.slice(0, 2);
-  if (t === 'n:') { const n = nodes.get(item.slice(2)); return { type: 'node', name: n.label, desc: n.summary, kind: n.kind, n }; }
-  if (t === 'd:') { const d = dirs.get(item); return { type: 'dir', name: humanize(d.path.split('/').pop()), desc: `${plural(d.files.length, 'file')} in ${d.path}/`, kind: 'dir', d, path: d.path + '/' }; }
-  if (t === 'f:') { const f = files.get(item.slice(2)); return { type: 'file', name: f.name, desc: f.d, kind: 'file', f, path: f.p }; }
-  if (t === 'm:') { const f = files.get(item.slice(2)); return { type: 'module', name: f.name, desc: f.d, kind: 'module', f, path: f.p }; }
-  if (t === 'r:') { const r = routes[+item.slice(2)]; return { type: 'route', name: r.name, desc: r.d, kind: 'route', r, f: files.get(r.f), path: `${r.m} ${r.p}` }; }
-  if (t === 's:') { const { f, s } = symOf(item); return { type: 'symbol', name: s[0], desc: s[4] || '', kind: symIcon(s[1]), symKind: s[1], f, s, path: `${f.p}:${s[2]}` }; }
+  if (item === 'q:answer') return { type: 'answer', name: state.answer?.title || t('Answer'), desc: state.answer?.question || '', kind: 'answer' };
+  const k = item.slice(0, 2);
+  if (k === 'n:') { const n = nodes.get(item.slice(2)); return { type: 'node', name: n.label, desc: n.summary, kind: n.kind, n }; }
+  if (k === 'd:') { const d = dirs.get(item); return { type: 'dir', name: humanize(d.path.split('/').pop()), desc: t('{} in {}/', plural(d.files.length, 'file'), d.path), kind: 'dir', d, path: d.path + '/' }; }
+  if (k === 'f:') { const f = files.get(item.slice(2)); return { type: 'file', name: f.name, desc: f.d, kind: 'file', f, path: f.p }; }
+  if (k === 'm:') { const f = files.get(item.slice(2)); return { type: 'module', name: f.name, desc: f.d, kind: 'module', f, path: f.p }; }
+  if (k === 'r:') { const r = routes[+item.slice(2)]; return { type: 'route', name: r.name, desc: r.d, kind: 'route', r, f: files.get(r.f), path: `${r.m} ${r.p}` }; }
+  if (k === 's:') { const { f, s } = symOf(item); return { type: 'symbol', name: s[0], desc: s[4] || '', kind: symIcon(s[1]), symKind: s[1], f, s, path: `${f.p}:${s[2]}` }; }
   return { type: 'unknown', name: item, desc: '', kind: 'misc' };
 }
 const connEntity = (id) => id.replace(/^x:(in|out):/, '');
@@ -829,12 +840,12 @@ const sameName = sharing((f) => f.name), sameBase = sharing((f) => baseName(f.p)
 function dirTag(p, group) {
   if (!group || group.length < 2) return '';
   const mine = parentDir(p).split('/').filter(Boolean), others = group.filter((q) => q !== p).map((q) => parentDir(q).split('/').filter(Boolean));
-  for (let n = 1; n <= mine.length; n++) { const t = mine.slice(-n).join('/'); if (others.every((o) => o.slice(-n).join('/') !== t)) return t; }
+  for (let n = 1; n <= mine.length; n++) { const sf = mine.slice(-n).join('/'); if (others.every((o) => o.slice(-n).join('/') !== sf)) return sf; }
   return mine.join('/');
 }
 /** The name a file shows: its own, plus " · folder" when another file has the same name. */
 const shownName = (item) => {
-  const t = item.slice(0, 2); if (t !== 'f:' && t !== 'm:') return info(item).name;
+  const k = item.slice(0, 2); if (k !== 'f:' && k !== 'm:') return info(item).name;
   const f = files.get(item.slice(2)), tag = dirTag(f.p, sameName.get(f.name));
   return tag ? `${f.name} · ${tag}` : f.name;
 };
@@ -947,7 +958,7 @@ function buildView(container) {
         const targets = new Set();
         for (const nm of l.names || []) { const i = (f.s || []).findIndex((s) => nm === 'default' ? s[3] : s[0] === nm); if (i >= 0 && ctx.vis.has(`s:${f.p}#${i}`)) targets.add(`s:${f.p}#${i}`); }
         if (!targets.size) targets.add('m:' + f.p);
-        for (const t of targets) add(src, t, l);
+        for (const tg of targets) add(src, tg, l);
       } else if (l.a === fid && l.b !== fid) {
         const pb = project(l.b, ctx); if (!pb?.outside) continue;
         const dst = conn('out', pb.outside);
@@ -988,12 +999,12 @@ function cardFoot(item) {
   let size = '';
   if (i.type === 'node' && i.n.kind !== 'external') { const sub = (kids.get(item) || []).filter((k) => k.startsWith('n:')).length; size = sub ? plural(sub, 'module') : plural(statsOf(item).files, 'file'); }
   else if (i.type === 'dir') size = plural(statsOf(item).files, 'file');
-  else if (i.type === 'module') size = 'this file';
+  else if (i.type === 'module') size = t('this file');
   else if (i.type === 'file') { const nr = (routesByFile.get(i.f.p) || []).length; size = nr ? plural(nr, 'endpoint') : ''; }
   if (i.n?.foot || i.f?.foot) size = i.n?.foot || i.f?.foot; // vibeflow P2
   const vst = i.n?.st || i.f?.st;
   const rec = recentOf(item), inside = recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item);
-  const pill = vst ? `<span class="vst vst-${h(vst).replace(/[^\w-]/g, '')}">${h(STATE_WORD[vst] || vst)}</span>` : rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${inside.length} changed</span>` : '';
+  const pill = vst ? `<span class="vst vst-${h(vst).replace(/[^\w-]/g, '')}">${h(STATE_WORD[vst] || vst)}</span>` : rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${t('{} changed', inside.length)}</span>` : '';
   return size || pill ? `<div class="foot">${size ? `<span class="meta">${h(size)}</span>` : '<span></span>'}${pill}</div>` : '';
 }
 /** Extra height a card needs beyond its base size: a footer, and a title long enough to wrap. */
@@ -1007,7 +1018,7 @@ function cardExtraH(item) {
 function cardHTML(item) {
   const i = info(item);
   let head = '', title = '', desc = '', cls = i.type;
-  const dsc = (t, lines = 2) => t ? `<div class="desc" style="--lines:${lines}">${h(t)}</div>` : `<div class="desc empty">No description yet</div>`;
+  const dsc = (d0, lines = 2) => d0 ? `<div class="desc" style="--lines:${lines}">${h(d0)}</div>` : `<div class="desc empty">${t('No description yet')}</div>`;
   if (i.type === 'node') {
     const n = i.n;
     if (n.kind === 'external') cls += ' external';
@@ -1047,29 +1058,29 @@ const tipHints = (spans) => matchMedia('(pointer: coarse)').matches ? '' : `<div
 function cardTip(id) {
   if (id.startsWith('x:')) {
     const i = info(connEntity(id));
-    return `<div class="tt">${id.startsWith('x:in') ? 'From' : 'To'} ${h(i.name)}</div>${i.desc ? `<div class="td">${h(i.desc)}</div>` : ''}${tipHints('<span><span class="kbd">2×click</span> go there</span><span><span class="kbd">right-click</span><span class="sep">:</span> more</span>')}`;
+    return `<div class="tt">${id.startsWith('x:in') ? t('From') : t('To')} ${h(i.name)}</div>${i.desc ? `<div class="td">${h(i.desc)}</div>` : ''}${tipHints(`<span><span class="kbd">${t('2×click')}</span> ${t('go there')}</span><span><span class="kbd">${t('right-click')}</span><span class="sep">:</span> ${t('more')}</span>`)}`;
   }
   const i = info(id);
   const st = statsOf(id);
   const kind = i.type === 'node' ? i.kind : i.type === 'route' ? 'endpoint' : i.type === 'symbol' ? i.symKind : i.type === 'module' ? 'file' : i.type;
   const where = i.type === 'node' ? (i.n.paths || []).join('\n') : i.type === 'route' ? `${i.f.p}${i.r.h ? ` · ${i.r.h}()` : ''}` : i.path || '';
   const sv = i.n?.st || i.f?.st;
-  const size = sv ? '' : !st?.files ? '' : PLAN ? (i.type === 'file' || i.type === 'module' ? 'planned' : plural(st.files, 'planned file')) : i.type === 'file' || i.type === 'module' ? `${fmt(st.loc)} lines` : `${plural(st.files, 'file')} · ${fmt(st.loc)} lines`;
-  const hints = [drillable(id) && state.container !== id ? '<span><span class="kbd">2×click</span> open</span>' : '', '<span><span class="kbd">right-click</span><span class="sep">:</span> more</span>'].join('');
-  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kind)}${size ? ` · ${size}` : ''}</div>${sv ? `<div class="td">${statePill(sv)}</div>` : ''}${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}${tipHints(hints)}`;
+  const size = sv ? '' : !st?.files ? '' : PLAN ? (i.type === 'file' || i.type === 'module' ? 'planned' : plural(st.files, 'planned file')) : i.type === 'file' || i.type === 'module' ? t('{} lines', fmt(st.loc)) : `${plural(st.files, 'file')} · ${t('{} lines', fmt(st.loc))}`;
+  const hints = [drillable(id) && state.container !== id ? `<span><span class="kbd">${t('2×click')}</span> ${t('open')}</span>` : '', `<span><span class="kbd">${t('right-click')}</span><span class="sep">:</span> ${t('more')}</span>`].join('');
+  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kindFr(kind))}${size ? ` · ${size}` : ''}</div>${sv ? `<div class="td">${statePill(sv)}</div>` : ''}${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}${tipHints(hints)}`;
 }
 /** Hover lines for recent work: what changed on this card and how it serves the request, or what changed inside it. */
 function recentTip(id) {
   if (!recentShown) return '';
   const key = id.startsWith('m:') ? 'f:' + id.slice(2) : id;
-  const task = (t) => h(recentTasks[t]?.title || 'Recent work');
+  const task = (ix) => h(recentTasks[ix]?.title || t('Recent work'));
   const rec = recentBy.get(key);
-  if (rec) return rec.map((x) => `<div class="trw"><div class="trh">${x.change === 'new' ? 'New' : 'Changed'} · ${task(x.task)}</div>${x.note ? `<div class="trn">${h(x.note)}</div>` : ''}</div>`).join('');
+  if (rec) return rec.map((x) => `<div class="trw"><div class="trh">${x.change === 'new' ? `${t('New')} · ${task(x.task)}` : t('Changed · {}', task(x.task))}</div>${x.note ? `<div class="trn">${h(x.note)}</div>` : ''}</div>`).join('');
   const inside = recentIn.get(key);
   if (!inside) return '';
   const tasks = [...new Set(inside.flatMap((x) => recentBy.get(x).map((r) => r.task)))];
   const names = inside.slice(0, 3).map((x) => info(x).name);
-  return `<div class="trw"><div class="trh">${inside.length} changed inside · ${tasks.map(task).join(', ')}</div><div class="trn">${h(names.join(', '))}${inside.length > 3 ? ` and ${inside.length - 3} more` : ''}</div></div>`;
+  return `<div class="trw"><div class="trh">${t('{} changed inside · {}', inside.length, tasks.map(task).join(', '))}</div><div class="trn">${h(names.join(', '))}${inside.length > 3 ? ` ${inside.length === 4 ? t('and 1 more') : t('and {} more', inside.length - 3)}` : ''}</div></div>`;
 }
 
 // ======================= layout =======================
@@ -1130,10 +1141,13 @@ async function render(opts = {}) {
   // vibeflow AUDC-M7 : le calcul tourne sur le fil principal, une temporisation ne s'y déclenche jamais pendant un gros niveau (2,3 s de canevas blanc à 70 cartes) : pour une navigation seulement (go, premier rendu : jamais un redessin en direct, qui garde la temporisation), l'indicateur est allumé tout de suite (sans fondu) et peint (une image) AVANT le calcul
   const gros = !!opts.nav && view.visible.length >= 24, indicateur = $('#loading');
   const loading = gros ? 0 : setTimeout(() => indicateur.classList.add('on'), 160);
-  if (gros) { indicateur.classList.add('on', 'now'); await new Promise((ok) => { const t = setTimeout(ok, 120); requestAnimationFrame(() => setTimeout(() => { clearTimeout(t); ok(); }, 0)); }); }
+  if (gros) { indicateur.classList.add('on', 'now'); await new Promise((ok) => { const tm = setTimeout(ok, 120); requestAnimationFrame(() => setTimeout(() => { clearTimeout(tm); ok(); }, 0)); }); }
   let res;
   try { res = await layout(view); }
-  catch (e) { console.error(e); clearTimeout(loading); indicateur.classList.remove('on', 'now'); $('#empty').hidden = false; $('#empty').textContent = 'Layout failed: ' + e.message; return; }
+  catch (e) {
+    console.error(e); clearTimeout(loading); indicateur.classList.remove('on', 'now'); $('#empty').hidden = false;
+    $('#empty').textContent = `${t('Layout failed:')} ${e.message}`; return;
+  }
   clearTimeout(loading);
   indicateur.classList.remove('on', 'now');
   if (token !== renderToken) return;
@@ -1142,7 +1156,7 @@ async function render(opts = {}) {
   draw(view, res);
   renderContext(); renderCrumbs(); renderLegend(view);
   $('#empty').hidden = view.visible.length > 0;
-  $('#empty').textContent = view.visible.length ? '' : 'Nothing inside.';
+  $('#empty').textContent = view.visible.length ? '' : t('Nothing inside.');
   if (opts.keepTransform) applyTransform(); else fit(false);
   applySelection();
   if (opts.after) opts.after();
@@ -1215,7 +1229,7 @@ function drawColumns(g, view, res) {
   const mid = res.children.filter((c) => !c.id.startsWith('x:'));
   const y = Math.min(...res.children.map((c) => c.y)) - 26;
   const depFirst = G.meta?.vfTab === 'project'; // same reading as the panel lists: on the Project tab the incoming side is what this part depends on (PU-G-100)
-  const cols = [[span(ins), depFirst ? 'Depends on' : 'Used by'], [span(mid), `Inside ${info(state.container).name}`], [span(outs), depFirst ? 'Used by' : 'Uses']];
+  const cols = [[span(ins), depFirst ? t('Depends on') : t('Used by')], [span(mid), t('Inside {}', info(state.container).name)], [span(outs), depFirst ? t('Used by') : t('Uses')]];
   for (const [s, label] of cols) {
     if (!s) continue;
     const [x0, x1] = s, cx = (x0 + x1) / 2;
@@ -1223,7 +1237,7 @@ function drawColumns(g, view, res) {
     const half = Math.min(textW(label, fs, 500) / 2 + 10, (x1 - x0) / 2 - 12);
     // ⌐—— label ——¬ : end ticks curl down toward the cards, with a gap in the line for the label
     el('path', { d: `M${x0},${y + 9} v-5 q0,-4 4,-4 H${cx - half} M${cx + half},${y} H${x1 - 4} q4,0 4,4 v5` }, g);
-    const t = el('text', { x: cx, y }, g); t.textContent = label; t.style.fontSize = fs + 'px';
+    const tx = el('text', { x: cx, y }, g); tx.textContent = label; tx.style.fontSize = fs + 'px';
   }
 }
 
@@ -1232,7 +1246,7 @@ const tip = $('#tooltip');
 let tipTimer = null, lastPointer = null, tipAnchor = null; // tipAnchor: the card the tooltip belongs to, so it can sit beside it
 // a tap also sends mouseenter, so remember whether the last pointer was a finger: hover tooltips are for a mouse
 let touching = false;
-['pointerdown', 'pointermove'].forEach((t) => window.addEventListener(t, (ev) => { touching = ev.pointerType === 'touch'; }, { capture: true, passive: true }));
+['pointerdown', 'pointermove'].forEach((e) => window.addEventListener(e, (ev) => { touching = ev.pointerType === 'touch'; }, { capture: true, passive: true }));
 function showTip(ev, html, anchor) { clearTimeout(tipTimer); if (!html || touching || drag?.moved || !$('#ctxmenu').hidden) return; tip.innerHTML = html; tip.hidden = false; tipAnchor = anchor || null; moveTip(ev); }
 /** Cards explain themselves after a short hover, so passing over them doesn't flicker tooltips. */
 function tipSoon(ev, make) { clearTimeout(tipTimer); lastPointer = ev; const anchor = ev.currentTarget; tipTimer = setTimeout(() => { if (anchor.isConnected) showTip(lastPointer, make(), anchor); }, 420); } // PU-G-035 : la carte a pu être retirée (vue redessinée) ou quittée pendant le délai : jamais d'infobulle pour une carte qui n'est plus sous le pointeur. La carte quittée est couverte par hideTip (mouseleave et pointerleave), qui efface le minuteur : aucun suivi du pointeur à part, et jamais :hover, faux sur un appareil sans survol (recette du 2026-11-08, D7.16)
@@ -1266,14 +1280,14 @@ function endpointsOf(e) {
   return [...m.entries()].sort((a, b) => b[1] - a[1]).map(([ri, n]) => ({ r: routes[ri], i: ri, n }));
 }
 function edgeTip(e) {
-  if (e.k === 'contains') return `<div class="tt">${h(nameOf(e.a))} contains ${h(nameOf(e.b))}</div>`;
+  if (e.k === 'contains') return `<div class="tt">${t('{} contains {}', h(nameOf(e.a)), h(nameOf(e.b)))}</div>`;
   const eps = endpointsOf(e);
   const names = [...new Set(e.links.flatMap((l) => l.names || []))];
   const labels = [...new Set(e.links.flatMap((l) => l.labels || []))].filter((x) => !/^[A-Z]+ \//.test(x));
   const desc = e.links.map((l) => l.desc).find(Boolean);
-  const meta = eps.length ? eps.slice(0, 4).map((x) => `${x.r.m} ${x.r.p}`).join('\n') + (eps.length > 4 ? `\n+${eps.length - 4} more` : '')
+  const meta = eps.length ? eps.slice(0, 4).map((x) => `${x.r.m} ${x.r.p}`).join('\n') + (eps.length > 4 ? `\n${t('+{} more', eps.length - 4)}` : '')
     : names.length ? 'uses ' + names.slice(0, 8).join(', ') + (names.length > 8 ? '…' : '') : labels.slice(0, 4).join('\n');
-  return `<div class="tt">${h(nameOf(e.a))} → ${h(nameOf(e.b))}</div><div class="td">${h(KIND_LABEL[e.k])} · ${plural(e.w, 'connection')}${eps.length ? ` · ${plural(eps.length, 'endpoint')}` : ''}</div>${desc ? `<div class="td">${h(desc)}</div>` : ''}${meta ? `<div class="tp">${h(meta)}</div>` : ''}<div class="th"><span><span class="kbd">click</span> details</span><span><span class="kbd">right-click</span><span class="sep">:</span> more</span></div>`;
+  return `<div class="tt">${h(nameOf(e.a))} → ${h(nameOf(e.b))}</div><div class="td">${h(KIND_LABEL[e.k])} · ${plural(e.w, 'connection')}${eps.length ? ` · ${plural(eps.length, 'endpoint')}` : ''}</div>${desc ? `<div class="td">${h(desc)}</div>` : ''}${meta ? `<div class="tp">${h(meta)}</div>` : ''}<div class="th"><span><span class="kbd">${t('click')}</span> ${t('details')}</span><span><span class="kbd">${t('right-click')}</span><span class="sep">:</span> ${t('more')}</span></div>`;
 }
 
 // ======================= right-click menus =======================
@@ -1304,22 +1318,22 @@ function itemMenu(id) {
   return [
     { title: i.name },
     id.startsWith('x:') ? { label: `Go to ${i.name}`, icon: 'right', hint: matchMedia('(pointer: coarse)').matches ? undefined : '2×click', run: () => reveal(real) }
-      : drillable(real) && state.container !== real ? { label: 'Open', icon: 'drill', hint: matchMedia('(pointer: coarse)').matches ? undefined : '2×click', run: () => open(real) } : null,
-    state.container === 'q:answer' && !id.startsWith('x:') ? { label: 'Show on the map', icon: 'external', run: () => reveal(real) } : null,
-    EXPORTED ? null : { label: 'Ask about this', icon: 'spark', run: () => addAskContext(real) },
-    { label: 'Show details', icon: 'panel', run: () => { setPanel(true); if (id.startsWith('x:')) reveal(real); else select(id); } },
+      : drillable(real) && state.container !== real ? { label: t('Open'), icon: 'drill', hint: matchMedia('(pointer: coarse)').matches ? undefined : t('2×click'), run: () => open(real) } : null,
+    state.container === 'q:answer' && !id.startsWith('x:') ? { label: t('Show on the map'), icon: 'external', run: () => reveal(real) } : null,
+    EXPORTED ? null : { label: t('Ask about this'), icon: 'spark', run: () => addAskContext(real) },
+    { label: t('Show details'), icon: 'panel', run: () => { setPanel(true); if (id.startsWith('x:')) reveal(real); else select(id); } },
     '-',
-    path ? { label: i.type === 'route' ? 'Copy endpoint' : 'Copy path', icon: 'copy', run: () => copy(path) } : null,
-    { label: 'Copy name', icon: 'copy', run: () => copy(i.name) },
-    url ? { label: 'Open in editor', icon: 'open', run: () => { location.href = url; } } : null,
+    path ? { label: i.type === 'route' ? t('Copy endpoint') : t('Copy path'), icon: 'copy', run: () => copy(path) } : null,
+    { label: t('Copy name'), icon: 'copy', run: () => copy(i.name) },
+    url ? { label: t('Open in editor'), icon: 'open', run: () => { location.href = url; } } : null,
   ];
 }
 function edgeMenu(e) {
   const ep = (x) => x.startsWith('x:') ? connEntity(x) : x.startsWith('m:') ? 'f:' + x.slice(2) : x;
   return [
     { title: `${nameOf(e.a)} → ${nameOf(e.b)}` },
-    EXPORTED ? null : { label: 'Ask about this connection', icon: 'spark', run: () => { addAskContext(ep(e.a)); addAskContext(ep(e.b)); } },
-    { label: 'Show details', icon: 'panel', run: () => { setPanel(true); select({ edge: e.id }); } },
+    EXPORTED ? null : { label: t('Ask about this connection'), icon: 'spark', run: () => { addAskContext(ep(e.a)); addAskContext(ep(e.b)); } },
+    { label: t('Show details'), icon: 'panel', run: () => { setPanel(true); select({ edge: e.id }); } },
     '-',
     { label: `Go to ${nameOf(e.a)}`, icon: 'left', run: () => reveal(ep(e.a)) },
     { label: `Go to ${nameOf(e.b)}`, icon: 'right', run: () => reveal(ep(e.b)) },
@@ -1327,12 +1341,12 @@ function edgeMenu(e) {
 }
 function canvasMenu() {
   return [
-    { label: 'Fit to screen', icon: 'fit', hint: 'F', run: () => fit(true) },
-    state.container !== 'root' ? { label: 'Up one level', icon: 'left', hint: '⌫', run: up } : null,
-    state.container !== 'root' ? { label: 'Back to overview', icon: 'home', run: () => go('root') } : null,
+    { label: t('Fit to screen'), icon: 'fit', hint: 'F', run: () => fit(true) },
+    state.container !== 'root' ? { label: t('Up one level'), icon: 'left', hint: '⌫', run: up } : null,
+    state.container !== 'root' ? { label: t('Back to overview'), icon: 'home', run: () => go('root') } : null,
     '-',
-    { label: 'Search', icon: 'search', hint: '/', run: openPalette },
-    EXPORTED ? null : { label: 'Ask about this view', icon: 'spark', run: () => { if (state.container !== 'root' && state.container !== 'q:answer') addAskContext(state.container); askInput.focus(); } },
+    { label: t('Search'), icon: 'search', hint: '/', run: openPalette },
+    EXPORTED ? null : { label: t('Ask about this view'), icon: 'spark', run: () => { if (state.container !== 'root' && state.container !== 'q:answer') addAskContext(state.container); askInput.focus(); } },
   ];
 }
 svg.addEventListener('contextmenu', (ev) => { ev.preventDefault(); hideTip(); openMenu(ev, canvasMenu()); });
@@ -1349,8 +1363,8 @@ function applyTransform() {
   if (colsG && state.view && state.layout && Math.abs(colFont(k) - colsK) > 0.5) { colsK = colFont(k); colsG.replaceChildren(); drawColumns(colsG, state.view, state.layout); }
 }
 const stageRect = () => svg.getBoundingClientRect();
-function setT(t, animate) {
-  state.t = t;
+function setT(m, animate) {
+  state.t = m;
   if (animate) { vp.classList.add('anim'); requestAnimationFrame(applyTransform); setTimeout(() => vp.classList.remove('anim'), 520); } else applyTransform();
 }
 /** The canvas area not covered by the header, context title, details panel and ask bar. */
@@ -1549,13 +1563,13 @@ function applySelection() {
 // ======================= chrome: context, crumbs, legend =======================
 function renderContext() {
   if (state.container === 'q:answer') {
-    $('#context').innerHTML = `<div class="k"><span class="ico" style="--c:var(--on)">${icon(state.answer.icon || 'spark')}</span>${h(state.answer.kind || 'Answer')} · ${state.answer.total > state.answer.items.length ? `${state.answer.items.length} of ${state.answer.total} cards` : plural(state.answer.items.length, 'card')}</div><h1>${h(state.answer.title)}</h1><p>${h(state.answer.question)}</p>`;
+    $('#context').innerHTML = `<div class="k"><span class="ico" style="--c:var(--on)">${icon(state.answer.icon || 'spark')}</span>${h(state.answer.kind || t('Answer'))} · ${state.answer.total > state.answer.items.length ? t('{} of {} cards', state.answer.items.length, state.answer.total) : plural(state.answer.items.length, 'card')}</div><h1>${h(state.answer.title)}</h1><p>${h(state.answer.question)}</p>`;
     return;
   }
   const i = info(state.container);
-  const kind = state.container === 'root' ? 'Overview' : i.type === 'node' ? i.kind.charAt(0).toUpperCase() + i.kind.slice(1) : i.type === 'dir' ? 'Folder' : i.type === 'file' ? 'File' : i.type;
+  const kind = state.container === 'root' ? t('Overview') : i.type === 'node' ? kindFr(Cap(i.kind)) : i.type === 'dir' ? t('Folder') : i.type === 'file' ? t('File') : kindFr(i.type);
   const badge = state.container === 'root' ? '' : `<span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span>`;
-  $('#context').innerHTML = `<div class="k">${badge}${h(kind)}</div><h1>${h(i.name)}</h1>${i.desc ? `<p class="cd" id="ctx-desc">${h(i.desc)}</p>` : ''}${state.view?.hidden ? `<p class="cx" style="color:var(--text-3);font-size:12.5px;margin-top:var(--sp-8)">${state.view.hidden} more exports aren't imported by name anywhere; they're listed in the details panel.</p>` : ''}${i.desc ? '<button type="button" class="ctx-more" aria-controls="ctx-desc" hidden></button>' : ''}`;
+  $('#context').innerHTML = `<div class="k">${badge}${h(kind)}</div><h1>${h(i.name)}</h1>${i.desc ? `<p class="cd" id="ctx-desc">${h(i.desc)}</p>` : ''}${state.view?.hidden ? `<p class="cx" style="color:var(--text-3);font-size:12.5px;margin-top:var(--sp-8)">${t("{} more exports aren't imported by name anywhere; they're listed in the details panel.", state.view.hidden)}</p>` : ''}${i.desc ? '<button type="button" class="ctx-more" aria-controls="ctx-desc" hidden></button>' : ''}`;
   foldContext();
 }
 /** On a phone the description folds to one line; the More / Less toggle shows only when there's more to read, and the choice is remembered on this device. */
@@ -1568,7 +1582,7 @@ function foldContext() {
   ctx.classList.toggle('folded', !open);
   more.hidden = !long;
   ctxTabs();
-  more.textContent = open ? 'Show less' : 'Read more';
+  more.textContent = open ? t('Show less') : t('Read more');
   more.setAttribute('aria-expanded', String(open));
   more.onclick = () => { store.set('contextOpen', !open); foldContext(); };
 }
@@ -1589,7 +1603,8 @@ function renderCrumbs() {
   path.forEach((item, idx) => {
     if (idx) { const s = document.createElement('span'); s.className = 'sep'; s.textContent = '/'; c.appendChild(s); }
     const b = document.createElement('button');
-    b.textContent = item === 'root' ? 'Overview' : item === 'q:answer' ? `${state.answer.kind || 'Answer'}: ${state.answer.title}` : info(item).name;
+    b.textContent = item === 'root' ? t('Overview')
+      : item === 'q:answer' ? (state.answer.kind ? (state.answer.kind === state.answer.title ? state.answer.title : `${state.answer.kind}: ${state.answer.title}`) : t('Answer: {}', state.answer.title)) : info(item).name;
     if (item === state.container) b.className = 'cur';
     b.onclick = () => go(item, { select: path[idx + 1] || null });
     c.appendChild(b);
@@ -1599,8 +1614,8 @@ function renderCrumbs() {
 function renderLegend(view) {
   const total = {}; for (const l of G.links) total[l.k] = (total[l.k] || 0) + 1;
   const here = {}; for (const e of view.edges) here[e.k] = (here[e.k] || 0) + 1;
-  const L = $('#legend'); L.innerHTML = '<div class="lh">Show connections</div>';
-  const techRow = () => { const lab = document.createElement('label'); lab.className = 'tech' + (technical() ? '' : ' off'); lab.innerHTML = `<input type="checkbox" ${technical() ? 'checked' : ''}><span>Show technical detail</span><span class="tog" style="margin-left:auto"></span>`; lab.querySelector('input').onchange = (ev) => setTechnical(ev.target.checked); return lab; };
+  const L = $('#legend'); L.innerHTML = `<div class="lh">${t('Show connections')}</div>`;
+  const techRow = () => { const lab = document.createElement('label'); lab.className = 'tech' + (technical() ? '' : ' off'); lab.innerHTML = `<input type="checkbox" ${technical() ? 'checked' : ''}><span>${t('Show technical detail')}</span><span class="tog" style="margin-left:auto"></span>`; lab.querySelector('input').onchange = (ev) => setTechnical(ev.target.checked); return lab; };
   let off = 0;
   for (const k of KINDS) {
     if (!total[k]) continue;
@@ -1614,7 +1629,7 @@ function renderLegend(view) {
   L.appendChild(techRow());
   if (recentBy.size) {
     const lab = document.createElement('label'); lab.className = 'tech' + (recentShown ? '' : ' off');
-    lab.innerHTML = `<input type="checkbox" ${recentShown ? 'checked' : ''}><span>Highlight recent work</span><span class="tog" style="margin-left:auto"></span>`;
+    lab.innerHTML = `<input type="checkbox" ${recentShown ? 'checked' : ''}><span>${t('Highlight recent work')}</span><span class="tog" style="margin-left:auto"></span>`;
     lab.querySelector('input').onchange = (ev) => { setRecentShown(ev.target.checked); lab.classList.toggle('off', !ev.target.checked); };
     L.appendChild(lab);
   }
@@ -1637,12 +1652,12 @@ const routeRow = (ri, extra = '') => {
   const r = routes[ri];
   return `<a class="row" data-go="r:${ri}"><span class="method" style="--m:${methodVar(r.m)};margin-top:var(--sp-2)">${h(r.m)}</span><span class="rt"><div class="rn">${h(r.name)}</div>${r.d ? `<div class="rd">${h(r.d)}</div>` : ''}<div class="rp">${h(r.p)}</div></span>${extra ? `<span class="rc">${extra}</span>` : ''}</a>`;
 };
-const listSec = (title, rows, count, max = 30, note = '') => rows.length ? `<div class="sec"><h3>${h(title)} <span class="c">${count ?? rows.length}</span></h3>${note ? `<p class="pd">${h(note)}</p>` : ''}<div class="list">${rows.slice(0, max).join('')}${rows.length > max ? `<div class="more">+${rows.length - max} more</div>` : ''}</div></div>` : '';
-const pathBox = (p) => `<div class="pp"><span>${h(p).split('/').map((x) => `<span class="sg">${x}</span>`).join('/<wbr>')}</span><button data-copy="${h(p)}" title="Copy" aria-label="Copy path">${iconI('copy')}</button></div>`;
+const listSec = (title, rows, count, max = 30, note = '') => rows.length ? `<div class="sec"><h3>${h(title)} <span class="c">${count ?? rows.length}</span></h3>${note ? `<p class="pd">${h(note)}</p>` : ''}<div class="list">${rows.slice(0, max).join('')}${rows.length > max ? `<div class="more">${t('+{} more', rows.length - max)}</div>` : ''}</div></div>` : '';
+const pathBox = (p) => `<div class="pp"><span>${h(p).split('/').map((x) => `<span class="sg">${x}</span>`).join('/<wbr>')}</span><button data-copy="${h(p)}" title="${t('Copy')}" aria-label="${t('Copy path')}">${iconI('copy')}</button></div>`;
 function header(i) {
-  const kind = i.type === 'node' ? i.kind : i.type === 'symbol' ? i.symKind : i.type === 'route' ? 'Endpoint' : i.type === 'module' ? 'file' : i.type;
-  return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kind)}</span></div>
-    <h2 class="pt">${h(i.name)}</h2>${i.desc ? `<p class="pd">${h(i.desc)}</p>` : '<p class="pd empty">No description yet.</p>'}`;
+  const kind = i.type === 'node' ? i.kind : i.type === 'symbol' ? i.symKind : i.type === 'route' ? t('Endpoint') : i.type === 'module' ? t('file') : i.type;
+  return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kindFr(kind))}</span></div>
+    <h2 class="pt">${h(i.name)}</h2>${i.desc ? `<p class="pd">${h(i.desc)}</p>` : `<p class="pd empty">${t('No description yet.')}</p>`}`;
 }
 
 function renderPanel() {
@@ -1678,7 +1693,7 @@ function renderPanel() {
   panel.querySelectorAll('[data-flow]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); startFlow(a.dataset.flow); }));
   panel.querySelectorAll('[data-sel]').forEach((a) => a.addEventListener('click', (ev) => { ev.preventDefault(); select(a.dataset.sel); centerOn(a.dataset.sel); }));
   panel.querySelector('[data-goroot]')?.addEventListener('click', () => backToAsker(true));
-  panel.querySelectorAll('[data-copycmd]').forEach((b) => b.addEventListener('click', () => { copy(b.dataset.copycmd); const was = b.textContent; b.textContent = 'Copied'; setTimeout(() => { if (b.isConnected) b.textContent = was; }, 1600); }));
+  panel.querySelectorAll('[data-copycmd]').forEach((b) => b.addEventListener('click', () => { copy(b.dataset.copycmd); const was = b.textContent; b.textContent = t('Copied'); setTimeout(() => { if (b.isConnected) b.textContent = was; }, 1600); }));
   // every row that acts is a control: reachable with Tab, opened with Enter or Space (PU-G-174)
   panel.querySelectorAll('a.row[data-go], a.row[data-open], a.row[data-flow], a.row[data-sel]').forEach((a) => { a.tabIndex = 0; a.setAttribute('role', 'link'); a.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); a.click(); } }); });
   panel.querySelectorAll('[data-copy]').forEach((a) => a.addEventListener('click', () => { navigator.clipboard?.writeText(a.dataset.copy); a.textContent = '✓'; }));
@@ -1690,29 +1705,29 @@ function renderPanel() {
 const cutWord = (s, n) => { s = String(s ?? '').replace(/\s+/g, ' ').trim(); if (s.length <= n) return s; let c = s.slice(0, n - 1); if (/\S/.test(c.at(-1)) && /\S/.test(s[n - 1])) { const m = c.replace(/\s*\S+$/, ''); if (m) c = m; } return c.replace(/[\s,;:·(–—-]+$/, '') + '…'; };
 function answerPanel() {
   const a = state.answer;
-  return `<div class="sec"><div class="ph"><span class="ico" style="--c:var(--accent)">${icon('feature')}</span><span class="kind">${h(a.kind || 'Answer')}</span></div><h2 class="pt">${h(a.title)}</h2><p class="pd">${h(a.question)}</p>${a.kind && a.answer ? `<div class="pd md">${md(a.answer)}</div>` : ''}
-      <div class="actions"><button class="btn soft" data-goroot>Back to map</button></div></div>
-    ${listSec('On this board', a.items.map((x, i) => { const ii = info(x.id); return `<a class="row vf-rep" title="${h([ii.name, x.note].filter(Boolean).join(' — '))}" data-sel="${h(x.id)}"><span class="anote" style="margin:0;padding:0;background:none;border:0"><b>${i + 1}</b></span><span class="rt"><div class="rn">${h(cutWord(ii.name, 90))}</div>${x.note ? `<div class="rd">${h(cutWord(x.note, 90))}</div>` : ''}${ii.path ? `<div class="rp">${h(ii.path)}</div>` : ''}</span></a>`; }))}
-    ${a.steps?.length >= 2 ? `<div class="sec"><h3>Walkthrough <span class="c">${a.steps.length}</span></h3><div class="list">${a.steps.map((s, i) => `<a class="row vf-rep" title="${h([info(s.id).name, s.note].filter(Boolean).join(' — '))}" data-sel="${h(s.id)}"><span class="dot" style="background:var(--accent)"></span><span class="rt"><div class="rn">${i + 1}. ${h(cutWord(info(s.id).name, 90))}</div><div class="rd">${h(cutWord(s.note, 90))}</div></span></a>`).join('')}</div></div>` : ''}`;
+  return `<div class="sec"><div class="ph"><span class="ico" style="--c:var(--accent)">${icon('feature')}</span><span class="kind">${h(a.kind || t('Answer'))}</span></div><h2 class="pt">${h(a.title)}</h2><p class="pd">${h(a.question)}</p>${a.kind && a.answer ? `<div class="pd md">${md(a.answer)}</div>` : ''}
+      <div class="actions"><button class="btn soft" data-goroot>${t('Back to map')}</button></div></div>
+    ${listSec(t('On this board'), a.items.map((x, i) => { const ii = info(x.id); return `<a class="row vf-rep" title="${h([ii.name, x.note].filter(Boolean).join(' — '))}" data-sel="${h(x.id)}"><span class="anote" style="margin:0;padding:0;background:none;border:0"><b>${i + 1}</b></span><span class="rt"><div class="rn">${h(cutWord(ii.name, 90))}</div>${x.note ? `<div class="rd">${h(cutWord(x.note, 90))}</div>` : ''}${ii.path ? `<div class="rp">${h(ii.path)}</div>` : ''}</span></a>`; }))}
+    ${a.steps?.length >= 2 ? `<div class="sec"><h3>${t('Walkthrough')} <span class="c">${a.steps.length}</span></h3><div class="list">${a.steps.map((s, i) => `<a class="row vf-rep" title="${h([info(s.id).name, s.note].filter(Boolean).join(' — '))}" data-sel="${h(s.id)}"><span class="dot" style="background:var(--accent)"></span><span class="rt"><div class="rn">${i + 1}. ${h(cutWord(info(s.id).name, 90))}</div><div class="rd">${h(cutWord(s.note, 90))}</div></span></a>`).join('')}</div></div>` : ''}`;
 }
 
 // Top-level parts, grouped under names people understand instead of bare colour dots.
 const SYSTEM_GROUPS = [
-  { label: 'Apps people use', hint: 'what users and staff open', kinds: ['ui'] },
-  { label: 'Behind the scenes', hint: 'servers, background work, shared code', kinds: ['service', 'worker', 'library', 'feature', 'data', 'config'] },
-  { label: 'Outside services', hint: 'other companies your app relies on', kinds: ['external'] },
-  { label: 'Developer tools', hint: 'scripts, tests, deployment', kinds: ['script', 'test', 'infra'] },
+  { label: t('Apps people use'), hint: t('what users and staff open'), kinds: ['ui'] },
+  { label: t('Behind the scenes'), hint: t('servers, background work, shared code'), kinds: ['service', 'worker', 'library', 'feature', 'data', 'config'] },
+  { label: t('Outside services'), hint: t('other companies your app relies on'), kinds: ['external'] },
+  { label: t('Developer tools'), hint: t('scripts, tests, deployment'), kinds: ['script', 'test', 'infra'] },
 ];
 function systemsSection(tops) {
   const placed = new Set();
   const parts = SYSTEM_GROUPS.map((g) => {
-    const items = tops.filter((t) => g.kinds.includes(info(t).kind));
-    items.forEach((t) => placed.add(t));
-    return items.length ? `<div class="group-h">${h(g.label)}<span class="gd">${h(g.hint)}</span></div><div class="list">${items.map((t) => rowFor(t, info(t).kind === 'external' ? '' : technical() && !PLAN && statsOf(t)?.files ? fmt(statsOf(t).loc) + ' loc' : statsOf(t)?.files ? plural(statsOf(t).files, 'file') : '')).join('')}</div>` : '';
+    const items = tops.filter((tp) => g.kinds.includes(info(tp).kind));
+    items.forEach((tp) => placed.add(tp));
+    return items.length ? `<div class="group-h">${h(g.label)}<span class="gd">${h(g.hint)}</span></div><div class="list">${items.map((tp) => rowFor(tp, info(tp).kind === 'external' ? '' : technical() && !PLAN && statsOf(tp)?.files ? fmt(statsOf(tp).loc) + ' loc' : statsOf(tp)?.files ? plural(statsOf(tp).files, 'file') : '')).join('')}</div>` : '';
   });
-  const rest = tops.filter((t) => !placed.has(t));
-  if (rest.length) parts.push(`<div class="group-h">Other</div><div class="list">${rest.map((t) => rowFor(t)).join('')}</div>`);
-  return `<div class="sec"><h3>Systems <span class="c">${tops.length}</span></h3>${parts.join('')}</div>`;
+  const rest = tops.filter((tp) => !placed.has(tp));
+  if (rest.length) parts.push(`<div class="group-h">${t('Other')}</div><div class="list">${rest.map((tp) => rowFor(tp)).join('')}</div>`);
+  return `<div class="sec"><h3>${t('Systems')} <span class="c">${tops.length}</span></h3>${parts.join('')}</div>`;
 }
 
 const DESCRIBE_CMD = '/vf-cockpit build'; // descriptions come from the header of each .md / .sh, read again by this command (PU-G-074)
@@ -1720,14 +1735,14 @@ function overviewPanel() {
   const p = G.project;
   const tops = kids.get('root') || [];
   const undescribed = G.files.filter((f) => f.auto).length + routes.filter((r) => r.auto).length;
-  return `<div class="sec"><div class="ph"><span class="ico" style="--c:var(--accent)">${icon('feature')}</span><span class="kind">${PLAN ? 'Blueprint' : 'Codebase'}</span></div><h2 class="pt">${h(p.name)}</h2>${p.summary ? `<p class="pd">${h(p.summary)}</p>` : ''}
-      <div class="stats" style="margin-top:var(--sp-12)"><div><b>${fmt(G.meta.counts.files)}</b><span>${PLAN ? 'planned files' : 'files'}</span></div>${PLAN ? `<div><b>${fmt((G.screens || []).length)}</b><span>screens</span></div>` : `<div><b>${fmt(G.meta.counts.loc)}</b><span>lines</span></div>`}<div><b>${fmt(routes.length)}</b><span>endpoints</span></div></div>
-      ${undescribed ? `<div class="callout"><p>${undescribed} files and endpoints still use generated names: they are named after their file, with no description. To describe them, run this command again.</p><div class="cmd"><code>${h(DESCRIBE_CMD)}</code><button type="button" class="btn soft" data-copycmd="${h(DESCRIBE_CMD)}">Copy command</button></div></div>` : ''}</div>
+  return `<div class="sec"><div class="ph"><span class="ico" style="--c:var(--accent)">${icon('feature')}</span><span class="kind">${PLAN ? 'Blueprint' : t('Codebase')}</span></div><h2 class="pt">${h(p.name)}</h2>${p.summary ? `<p class="pd">${h(p.summary)}</p>` : ''}
+      <div class="stats" style="margin-top:var(--sp-12)"><div><b>${fmt(G.meta.counts.files)}</b><span>${PLAN ? 'planned files' : t.mot(G.meta.counts.files, 'files')}</span></div>${PLAN ? `<div><b>${fmt((G.screens || []).length)}</b><span>${t.mot((G.screens || []).length, 'screens')}</span></div>` : `<div><b>${fmt(G.meta.counts.loc)}</b><span>${t.mot(G.meta.counts.loc, 'lines')}</span></div>`}<div><b>${fmt(routes.length)}</b><span>${t.mot(routes.length, 'endpoints')}</span></div></div>
+      ${undescribed ? `<div class="callout"><p>${t('{} files and endpoints still use generated names: they are named after their file, with no description. To describe them, run this command again.', undescribed)}</p><div class="cmd"><code>${h(DESCRIBE_CMD)}</code><button type="button" class="btn soft" data-copycmd="${h(DESCRIBE_CMD)}">${t('Copy command')}</button></div></div>` : ''}</div>
     ${systemsSection(tops)}
-    ${listSec('Guided flows', G.flows.map((f) => `<a class="row" data-flow="${h(f.id)}"><span class="dot" style="background:var(--accent)"></span><span class="rt"><div class="rn">${h(f.title)}</div>${f.description ? `<div class="rd">${h(f.description)}</div>` : ''}</span><span class="rc">${f.steps.length} steps</span></a>`))}
-    ${listSec('Repositories', G.meta.repos.map((r) => `<div class="row" style="cursor:default"><span class="dot" style="background:var(--text-4)"></span><span class="rt"><div class="rn">${h(r.name)}</div><div class="rp">${h(r.branch || '')} @ ${h((r.head || '').slice(0, 7))}</div></span></div>`))}
-    ${p.entrypoints?.length ? listSec('Entrypoints', p.entrypoints.filter((e) => files.has(e)).map((e) => rowFor('f:' + e))) : ''}
-    <div class="sec" style="color:var(--text-3);line-height:1.7;font-size:12px">Click a card to inspect it · double-click to open it<br><span class="kbd">/</span> search · <span class="kbd">⌫</span> up · <span class="kbd">F</span> fit · <span class="kbd">P</span> inspector</div>`;
+    ${listSec(t('Guided flows'), G.flows.map((f) => `<a class="row" data-flow="${h(f.id)}"><span class="dot" style="background:var(--accent)"></span><span class="rt"><div class="rn">${h(f.title)}</div>${f.description ? `<div class="rd">${h(f.description)}</div>` : ''}</span><span class="rc">${plural(f.steps.length, 'step')}</span></a>`))}
+    ${listSec(t('Repositories'), G.meta.repos.map((r) => `<div class="row" style="cursor:default"><span class="dot" style="background:var(--text-4)"></span><span class="rt"><div class="rn">${h(r.name)}</div><div class="rp">${h(r.branch || '')} @ ${h((r.head || '').slice(0, 7))}</div></span></div>`))}
+    ${p.entrypoints?.length ? listSec(t('Entrypoints'), p.entrypoints.filter((e) => files.has(e)).map((e) => rowFor('f:' + e))) : ''}
+    <div class="sec" style="color:var(--text-3);line-height:1.7;font-size:12px">${t('Click a card to inspect it · double-click to open it')}<br><span class="kbd">/</span> ${t('search ·')} <span class="kbd">⌫</span> ${t('up ·')} <span class="kbd">F</span> ${t('fit ·')} <span class="kbd">P</span> ${t('inspector')}</div>`;
 }
 
 function connections(item) {
@@ -1752,8 +1767,8 @@ function itemPanel(item, viaConnector) {
   const i = info(item);
   let html = `<div class="sec">${header(i)}`;
   const actions = [];
-  if (drillable(item) && state.container !== item) actions.push(`<button class="btn soft" data-open="${h(item)}">${iconI('drill')}Open</button>`);
-  if (viaConnector || (parentOf.get(item) !== state.container && state.container !== item)) actions.push(`<button class="btn soft" data-go="${h(item)}">Show on map</button>`);
+  if (drillable(item) && state.container !== item) actions.push(`<button class="btn soft" data-open="${h(item)}">${iconI('drill')}${t('Open')}</button>`);
+  if (viaConnector || (parentOf.get(item) !== state.container && state.container !== item)) actions.push(`<button class="btn soft" data-go="${h(item)}">${t('Show on map')}</button>`);
   if (i.type === 'node' || i.type === 'dir') {
     const n = i.n, s = statsOf(item);
     if (n?.details) html += n.details.split(/\n\n+/).map((p) => `<p class="pd" style="margin-top:var(--sp-8)">${h(p)}</p>`).join('');
@@ -1765,55 +1780,55 @@ function itemPanel(item, viaConnector) {
       const tot = langs.reduce((a, [, v]) => a + v, 0) || 1;
       const palette = ['#a78bfa', '#38bdf8', '#34d399', '#fbbf24', '#f472b6'];
       const nr = routes.filter((r) => chain('f:' + r.f).includes(item)).length;
-      html += `<div class="sec"><div class="stats"><div><b>${fmt(s.files)}</b><span>${PLAN ? 'planned files' : 'files'}</span></div>${PLAN ? '' : `<div><b>${fmt(s.loc)}</b><span>lines</span></div>`}<div><b>${nr}</b><span>endpoints</span></div></div>
+      html += `<div class="sec"><div class="stats"><div><b>${fmt(s.files)}</b><span>${PLAN ? 'planned files' : t.mot(s.files, 'files')}</span></div>${PLAN ? '' : `<div><b>${fmt(s.loc)}</b><span>${t.mot(s.loc, 'lines')}</span></div>`}<div><b>${nr}</b><span>${t.mot(nr, 'endpoints')}</span></div></div>
         ${langs.length && !PLAN ? `<div class="bar">${langs.map(([, v], k) => `<span style="flex:${v};background:${palette[k]}"></span>`).join('')}</div><div class="legend-row">${langs.map(([l, v], k) => `<span><span class="dot" style="background:${palette[k]}"></span>${h(l)} ${Math.round((v / tot) * 100)}%</span>`).join('')}</div>` : ''}</div>`;
     }
-    if (n?.packages?.length || n?.hosts?.length || n?.tags?.length) html += `<div class="sec"><h3>Matched by</h3><div class="tags">${[...n.packages.map((p) => 'pkg ' + p), ...n.hosts.map((p) => 'host ' + p), ...n.tags.map((t) => '#' + t)].map((t) => `<span class="tag">${h(t)}</span>`).join('')}</div></div>`;
-    html += listSec('Inside', (kids.get(item) || []).filter((k) => !k.startsWith('f:')).map((k) => rowFor(k)));
+    if (n?.packages?.length || n?.hosts?.length || n?.tags?.length) html += `<div class="sec"><h3>${t('Matched by')}</h3><div class="tags">${[...n.packages.map((p) => `${t('pkg')} ${p}`), ...n.hosts.map((p) => `${t('host')} ${p}`), ...n.tags.map((g) => `${t('#')}${g}`)].map((g) => `<span class="tag">${h(g)}</span>`).join('')}</div></div>`;
+    html += listSec(t('Inside'), (kids.get(item) || []).filter((k) => !k.startsWith('f:')).map((k) => rowFor(k)));
     const c = connections(item);
     // on the Project tab a link runs from what comes first to what follows (a phase, then the one that depends on it): the incoming side is what this card depends on, not what uses it (PU-G-100)
     const depFirst = G.meta?.vfTab === 'project';
-    html += listSec(depFirst ? 'Depends on' : 'Used by', c.inn) + listSec(depFirst ? 'Used by' : 'Depends on', c.out);
+    html += listSec(depFirst ? t('Depends on') : t('Used by'), c.inn) + listSec(depFirst ? t('Used by') : t('Depends on'), c.out);
     const fl = (i.d ? i.d.files : G.files.filter((f) => chain('f:' + f.p).includes(item))).slice().sort((a, b) => b.loc - a.loc);
-    html += listSec(PLAN ? 'Planned files' : 'Files', fl.map((f) => rowFor('f:' + f.p, f.st ? statePill(f.st) : PLAN ? '' : fmt(f.loc))), fl.length, 25);
+    html += listSec(PLAN ? 'Planned files' : t('Files'), fl.map((f) => rowFor('f:' + f.p, f.st ? statePill(f.st) : PLAN ? '' : fmt(f.loc))), fl.length, 25);
   } else if (i.type === 'file' || i.type === 'module') {
     const f = i.f, fid = 'f:' + f.p, url = editorUrl(f.p);
     if (f.note) html += `<div class="callout">${h(f.note)}</div>`;
-    if (f.tooLarge) html += `<div class="callout">Too big for Floorplan to read, so what it uses, its endpoints and any secrets in it weren’t checked. Ask Claude or Codex to update the floorplan with a bigger file limit to include it.</div>`;
+    if (f.tooLarge) html += `<div class="callout">${t('Too big for Floorplan to read, so what it uses, its endpoints and any secrets in it weren’t checked. Ask Claude or Codex to update the floorplan with a bigger file limit to include it.')}</div>`;
     html += pathBox(f.p);
-    if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}Open in editor</a>`);
+    if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}${t('Open in editor')}</a>`);
     if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
     const owner = nodes.get(f.n);
-    html += `</div><div class="sec"><div class="stats">${PLAN ? `<div><b>${fmt(G.links.filter((l) => l.a === fid).length)}</b><span>uses</span></div>` : `<div><b>${fmt(f.loc)}</b><span>lines</span></div>`}<div><b>${(routesByFile.get(f.p) || []).length}</b><span>endpoints</span></div><div><b>${fmt(G.links.filter((l) => l.b === 'f:' + f.p).length)}</b><span>used by</span></div></div>
+    html += `</div><div class="sec"><div class="stats">${PLAN ? `<div><b>${fmt(G.links.filter((l) => l.a === fid).length)}</b><span>${t('uses')}</span></div>` : `<div><b>${fmt(f.loc)}</b><span>${t.mot(f.loc, 'lines')}</span></div>`}<div><b>${(routesByFile.get(f.p) || []).length}</b><span>${t.mot((routesByFile.get(f.p) || []).length, 'endpoints')}</span></div><div><b>${fmt(G.links.filter((l) => l.b === 'f:' + f.p).length)}</b><span>${t('used by')}</span></div></div>
       ${owner ? `<div class="list" style="margin-top:var(--sp-12)">${rowFor('n:' + owner.id, 'module')}</div>` : ''}</div>`;
-    html += listSec('Endpoints', (routesByFile.get(f.p) || []).map((ri) => routeRow(ri)), undefined, 60);
+    html += listSec(t('Endpoints'), (routesByFile.get(f.p) || []).map((ri) => routeRow(ri)), undefined, 60);
     const inL = G.links.filter((l) => l.b === fid), outL = G.links.filter((l) => l.a === fid);
     // the same words in both modes (PU-G-058): the technical switch adds the Exports list below, it never renames what is already there
     const doc = /\.(md|mdx|markdown|rst|txt)$/i.test(f.p) && !/(^|\/)SKILL\.md$|(^|\/)agents\//.test(f.p); // a document mentions files, it doesn't call or depend on them; an agent or a skill really dispatches (PU-G-072)
-    const rowL = (l, other) => rowFor(other, doc ? (l.calls?.length ? plural(l.calls.length, 'mention') : 'Mention') : l.calls?.length ? plural(l.calls.length, 'call') : KIND_PLAIN[l.k] || l.k, `var(--k-${l.k})`);
-    html += listSec('Used by', inL.map((l) => rowL(l, l.a)));
-    html += doc ? listSec('Mentions', outL.map((l) => rowL(l, l.b)), undefined, 30, 'The files, folders and pages this document names or links to.') : listSec('Depends on', outL.map((l) => rowL(l, l.b)));
+    const rowL = (l, other) => rowFor(other, doc ? (l.calls?.length ? plural(l.calls.length, 'mention') : t('Mention')) : l.calls?.length ? plural(l.calls.length, 'call') : KIND_PLAIN[l.k] || l.k, `var(--k-${l.k})`);
+    html += listSec(t('Used by'), inL.map((l) => rowL(l, l.a)));
+    html += doc ? listSec(t('Mentions'), outL.map((l) => rowL(l, l.b)), undefined, 30, t('The files, folders and pages this document names or links to.')) : listSec(t('Depends on'), outL.map((l) => rowL(l, l.b)));
     const handlers = new Set((routesByFile.get(f.p) || []).map((ri) => routes[ri].h));
     if (technical()) html += listSec('Exports', (f.s || []).map((s, k) => [s, k]).filter(([s]) => !handlers.has(s[0])).map(([s, k]) => `<a class="row" ${parentOf.has(`s:${f.p}#${k}`) ? `data-go="s:${h(f.p)}#${k}"` : ''}><span class="dot" style="background:var(--n-symbol)"></span><span class="rt"><div class="rn" style="font-family:var(--mono);font-size:12px">${h(s[0])}</div>${s[4] ? `<div class="rd">${h(s[4])}</div>` : ''}</span><span class="rc">${h(s[1])} · L${s[2]}</span></a>`), undefined, 60);
   } else if (i.type === 'route') {
     const r = i.r, url = editorUrl(r.f, r.l);
     html += pathBox(`${r.m} ${r.p}`);
-    if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}Open handler</a>`);
+    if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}${t('Open handler')}</a>`);
     html += `<div class="actions">${actions.join('')}</div></div>`;
-    html += `<div class="sec"><h3>Handled by</h3><div class="list">${rowFor('f:' + r.f, r.h ? h(r.h) + '()' : '')}</div></div>`;
+    html += `<div class="sec"><h3>${t('Handled by')}</h3><div class="list">${rowFor('f:' + r.f, r.h ? h(r.h) + '()' : '')}</div></div>`;
     const ri = routes.indexOf(r);
     const callers = new Map();
     for (const l of G.links) { const n = (l.calls || []).filter(([x]) => x === ri).length; if (n) callers.set(l.a, (callers.get(l.a) || 0) + n); }
-    html += callers.size ? listSec('Called from', [...callers.entries()].map(([a, n]) => rowFor(a, plural(n, 'call'), 'var(--k-http)')))
-      : `<div class="sec"><h3>Called from</h3><p class="pd empty">No call sites matched in the scanned code. It may be called by an external system, or through a URL built at runtime.</p></div>`;
+    html += callers.size ? listSec(t('Called from'), [...callers.entries()].map(([a, n]) => rowFor(a, plural(n, 'call'), 'var(--k-http)')))
+      : `<div class="sec"><h3>${t('Called from')}</h3><p class="pd empty">${t('No call sites matched in the scanned code. It may be called by an external system, or through a URL built at runtime.')}</p></div>`;
   } else if (i.type === 'symbol') {
     const url = editorUrl(i.f.p, i.s[2]);
     html += pathBox(`${i.f.p}:${i.s[2]}`);
-    if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}Open in editor</a>`);
+    if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}${t('Open in editor')}</a>`);
     html += `<div class="actions">${actions.join('')}</div></div>`;
-    html += `<div class="sec"><h3>Defined in</h3><div class="list">${rowFor('f:' + i.f.p)}</div></div>`;
+    html += `<div class="sec"><h3>${t('Defined in')}</h3><div class="list">${rowFor('f:' + i.f.p)}</div></div>`;
     const users = G.links.filter((l) => l.b === 'f:' + i.f.p && (l.names || []).some((nm) => nm === i.s[0] || (nm === 'default' && i.s[3])));
-    html += listSec('Imported by', users.map((l) => rowFor(l.a)));
+    html += listSec(t('Imported by'), users.map((l) => rowFor(l.a)));
   } else html += '</div>';
   return html;
 }
@@ -1825,13 +1840,13 @@ function edgePanel(e) {
   const desc = e.links.map((l) => l.desc).filter(Boolean);
   const ep = (id) => id.startsWith('x:') ? connEntity(id) : id;
   const pairs = e.links.filter((l) => l.a.startsWith('f:') || l.b.startsWith('f:'));
-  return `<div class="sec"><div class="ph"><span class="ico" style="--c:var(--k-${e.k})">${icon(e.k === 'http' ? 'route' : 'feature')}</span><span class="kind">${KIND_LABEL[e.k]} connection</span></div>
+  return `<div class="sec"><div class="ph"><span class="ico" style="--c:var(--k-${e.k})">${icon(e.k === 'http' ? 'route' : 'feature')}</span><span class="kind">${(!G.meta.kindLabels?.[e.k] && (technical() ? KIND_CONN_TECH : KIND_CONN_PLAIN)[e.k]) || `${KIND_LABEL[e.k]} ${t('connection')}`}</span></div>
       <h2 class="pt">${h(nameOf(e.a))} → ${h(nameOf(e.b))}</h2>
-      <p class="pd">${desc.length ? h(desc.join(' ')) : `${plural(e.w, 'connection')}${eps.length ? ` across ${plural(eps.length, 'endpoint')}` : ''}${e.k === 'http' && eps.length ? ', matched from call sites to route definitions' : ''}.`}</p>
-      <div class="actions"><button class="btn soft" data-go="${h(ep(e.a))}">Go to source</button><button class="btn soft" data-go="${h(ep(e.b))}">Go to target</button></div></div>
-    ${listSec('Endpoints', eps.map((x) => routeRow(x.i, plural(x.n, 'call'))), eps.length, 40)}
-    ${names.length && technical() ? `<div class="sec"><h3>Imported names <span class="c">${names.length}</span></h3><div class="tags">${names.slice(0, 60).map((x) => `<span class="tag">${h(x)}</span>`).join('')}</div></div>` : ''}
-    ${listSec('Files involved', pairs.map((l) => { const a = l.a.startsWith('f:') ? files.get(l.a.slice(2)) : null, b = l.b.startsWith('f:') ? files.get(l.b.slice(2)) : null;
+      <p class="pd">${desc.length ? h(desc.join(' ')) : !eps.length ? (e.w === 1 ? t('1 connection.') : t('{} connections.', e.w)) : e.k === 'http' ? t('{} connections across {} endpoints, matched from call sites to route definitions.', e.w, eps.length) : t('{} connections across {} endpoints.', e.w, eps.length)}</p>
+      <div class="actions"><button class="btn soft" data-go="${h(ep(e.a))}">${t('Go to source')}</button><button class="btn soft" data-go="${h(ep(e.b))}">${t('Go to target')}</button></div></div>
+    ${listSec(t('Endpoints'), eps.map((x) => routeRow(x.i, plural(x.n, 'call'))), eps.length, 40)}
+    ${names.length && technical() ? `<div class="sec"><h3>${t('Imported names')} <span class="c">${names.length}</span></h3><div class="tags">${names.slice(0, 60).map((x) => `<span class="tag">${h(x)}</span>`).join('')}</div></div>` : ''}
+    ${listSec(t('Files involved'), pairs.map((l) => { const a = l.a.startsWith('f:') ? files.get(l.a.slice(2)) : null, b = l.b.startsWith('f:') ? files.get(l.b.slice(2)) : null;
       return `<a class="row" data-go="${h(l.a)}"><span class="dot" style="background:var(--k-${l.k})"></span><span class="rt"><div class="rn">${h(a ? a.name : nameOf(l.a))} → ${h(b ? b.name : nameOf(l.b))}</div><div class="rp">${h(a ? a.p : '')}</div></span><span class="rc">${l.w}</span></a>`; }), pairs.length, 40)}`;
 }
 
@@ -1860,8 +1875,8 @@ function runSearch() {
     if (!technical() && (it.kind === 'function' || it.kind === 'class')) continue;
     const n = it.name.toLowerCase(), d = it.desc.toLowerCase(), p = it.path.toLowerCase();
     let s = 0;
-    for (const t of terms) {
-      const sc = n === t ? 30 : n.startsWith(t) ? 20 : n.includes(t) ? 12 : p.includes(t) ? 6 : d.includes(t) ? 4 : 0;
+    for (const w of terms) {
+      const sc = n === w ? 30 : n.startsWith(w) ? 20 : n.includes(w) ? 12 : p.includes(w) ? 6 : d.includes(w) ? 4 : 0;
       if (!sc) { s = 0; break; }
       s += sc;
     }
@@ -1874,9 +1889,10 @@ function runSearch() {
     const ic = it.kind === 'route' ? `<span class="method" style="--m:${methodVar(ii.r.m)}">${h(ii.r.m)}</span>` : `<span class="ico" style="--c:${colorOf(ii)}">${icon(iconKey(ii))}</span>`;
     // a file shows its real file name and, on the right, its folder instead of the word "file" (PU-G-050) — on the Code tab only: on the Project tab a "file" is a card of the planning (BACKLOG entry, requirement, plan), its readable title stays; when another result has the same file name, its whole folder also sits under the name (PU-G-049)
     const file = it.kind === 'file' && G.meta?.vfTab !== 'project', dir = file ? parentDir(it.path) : '', twin = file && (sameBase.get(baseName(it.path)) || []).length > 1;
-    const right = file ? dirTag(it.path, sameBase.get(baseName(it.path))) || dir.split('/').slice(-2).join('/') || '/' : it.kind === 'route' ? ii.r.p : it.kind;
+    const right = file ? dirTag(it.path, sameBase.get(baseName(it.path))) || dir.split('/').slice(-2).join('/') || '/'
+      : it.kind === 'route' ? ii.r.p : kindFr(it.kind);
     return `<div class="r${i === 0 ? ' active' : ''}" data-i="${i}">${ic}<span class="rt"><div class="rn">${h(file ? baseName(it.path) : it.name)}</div><div class="rd">${h(twin && dir ? `${dir} · ${it.desc || ''}` : it.desc || it.path)}</div></span>${file ? `<span class="rdr rp" title="${h(dir || '/')}"><bdi dir="ltr">${h(right)}</bdi></span>` : `<span class="rk">${h(right)}</span>`}</div>`;
-  }).join('') || '<div class="empty">No matches</div>';
+  }).join('') || `<div class="empty">${t('No matches')}</div>`;
   sRes.querySelectorAll('.r').forEach((r) => { r.addEventListener('mousedown', (ev) => { ev.preventDefault(); pick(+r.dataset.i); }); r.addEventListener('mousemove', () => setActive(+r.dataset.i)); });
 }
 function setActive(i) { sActive = i; sRes.querySelectorAll('.r').forEach((r, k) => r.classList.toggle('active', k === i)); sRes.children[i]?.scrollIntoView({ block: 'nearest' }); }
@@ -1896,19 +1912,20 @@ const fm = $('#flowmenu');
 fm.addEventListener('click', (ev) => ev.stopPropagation());
 function renderFlowMenu() {
   fm.innerHTML = G.flows.map((f) => f.custom && !EXPORTED
-    ? `<div class="r custom" data-flow="${h(f.id)}"><div class="rt"><b>${h(f.title)}<span class="yours">yours</span></b><span>${f.steps.length} steps${f.description ? ' · ' + h(f.description) : ''}</span></div><button class="del" data-del="${h(f.id)}" title="Delete flow">${iconI('x')}</button></div>`
-    : `<div class="r" data-flow="${h(f.id)}"><b>${h(f.title)}</b><span>${f.steps.length} steps${f.description ? ' · ' + h(f.description) : ''}</span></div>`).join('')
-    + (EXPORTED ? (G.flows.length ? '' : '<div class="r" style="cursor:default"><span>No flows in this copy.</span></div>') : (G.flows.length ? '<div class="mi-sep"></div>' : '')
-    + `<div class="r new" data-new>${iconI('spark')}<b>Request a new flow…</b></div>`);
+    ? `<div class="r custom" data-flow="${h(f.id)}"><div class="rt"><b>${h(f.title)}<span class="yours">${t('yours')}</span></b><span>${plural(f.steps.length, 'step')}${f.description ? ' · ' + h(f.description) : ''}</span></div><button class="del" data-del="${h(f.id)}" title="${t('Delete flow')}">${iconI('x')}</button></div>`
+    : `<div class="r" data-flow="${h(f.id)}"><b>${h(f.title)}</b><span>${plural(f.steps.length, 'step')}${f.description ? ' · ' + h(f.description) : ''}</span></div>`).join('')
+    + (EXPORTED ? (G.flows.length ? '' : `<div class="r" style="cursor:default"><span>${t('No flows in this copy.')}</span></div>`) : (G.flows.length ? '<div class="mi-sep"></div>' : '')
+    + `<div class="r new" data-new>${iconI('spark')}<b>${t('Request a new flow…')}</b></div>`);
   fm.querySelectorAll('[data-flow]').forEach((r) => r.onclick = () => { fm.classList.remove('open'); startFlow(r.dataset.flow); });
   fm.querySelectorAll('[data-del]').forEach((b) => b.onclick = (ev) => { ev.stopPropagation(); deleteCustomFlow(b.dataset.del); });
   const nf = fm.querySelector('[data-new]'); if (nf) nf.onclick = showFlowForm;
 }
 function showFlowForm() {
-  fm.innerHTML = `<form class="ff"><label>Describe what to trace, and ${AGENT.name} builds a step-by-step flow through the map.</label>
-    <textarea placeholder="e.g. How does an order end up charged through Stripe?" spellcheck="false"></textarea>
-    ${askState.engine ? '' : `<div class="note">Needs ${AGENT.cli} (run node floorplan/serve.mjs)${AGENT.id === 'claude' ? ' or the Claude app' : ''}.</div>`}
-    <div class="ffa"><button type="button" class="btn" data-cancel>Cancel</button><button type="submit" class="btn primary" ${askState.engine ? '' : 'disabled'}>Build flow</button></div></form>`;
+  fm.innerHTML = `<form class="ff"><label>${t('Describe what to trace, and {} builds a step-by-step flow through the map.', AGENT.name)}</label>
+    <textarea placeholder="${t('e.g. How does an order end up charged through Stripe?')}" spellcheck="false"></textarea>
+    ${askState.engine ? '' : `<div class="note">${t('Needs {} (run node floorplan/serve.mjs){}.', AGENT.cli,
+      AGENT.id === 'claude' ? ` ${t('or the Claude app')}` : '')}</div>`}
+    <div class="ffa"><button type="button" class="btn" data-cancel>${t('Cancel')}</button><button type="submit" class="btn primary" ${askState.engine ? '' : 'disabled'}>${t('Build flow')}</button></div></form>`;
   const form = fm.querySelector('form'), ta = form.querySelector('textarea');
   setTimeout(() => ta.focus(), 30);
   ta.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && !ev.shiftKey) { ev.preventDefault(); form.requestSubmit(); } if (ev.key === 'Escape') { ev.stopPropagation(); renderFlowMenu(); } });
@@ -1930,7 +1947,7 @@ function addFlow(stored) {
   if (G.flows.some((x) => x.id === stored.id)) return null;
   const steps = (stored.steps || []).map((s) => ({ ref: liveRef(s.ref), note: s.note || '' })).filter((s) => s.ref);
   if (steps.length < 2) return null;
-  const fl = { id: stored.id, title: stored.title || 'Flow', description: stored.description || '', steps, custom: true };
+  const fl = { id: stored.id, title: stored.title || t('Flow'), description: stored.description || '', steps, custom: true };
   G.flows.push(fl);
   return fl;
 }
@@ -1957,7 +1974,7 @@ async function loadCustomFlows() {
 (function liveReload() {
   const S = window.FLOORPLAN_SERVER;
   if (!S || typeof EventSource === 'undefined') return;
-  const reload = () => { toast('Map updated'); setTimeout(() => location.reload(), 500); };
+  const reload = () => { toast(t('Map updated')); setTimeout(() => location.reload(), 500); };
   window.FLOORPLAN_RELOAD = reload; // vibeflow AUDC-H1 : une page n'ouvre qu'un flux ; le serveur la dit (unFlux) et le flux du direct (ui/70) porte aussi `reload`
   if (S.unFlux) return;
   const connect = () => {
@@ -1982,20 +1999,20 @@ async function requestFlow(prompt) {
   if (askState.busy) cancelAsk();
   setBusy(true);
   askState.ctl = new AbortController();
-  const label = `New flow: ${prompt}`;
-  const lines = ['Thinking…'];
-  const progress = (t) => { lines.push(t); showProgress(label, lines.slice(-6)); };
+  const label = t('New flow: {}', prompt);
+  const lines = [t('Thinking…')];
+  const progress = (ln) => { lines.push(ln); showProgress(label, lines.slice(-6)); };
   showProgress(label, lines);
   try {
     const raw = askState.engine === 'cli' ? await askViaCli(prompt, progress, 'flow') : await askViaApp(prompt, progress, 'flow');
     const steps = (raw.steps || []).map((s) => ({ ref: String(s.id || ''), note: String(s.note || '') })).filter((s) => Q.exists(s.ref));
-    if (steps.length < 2) throw { code: 'flow_empty', message: `${AGENT.name} couldn't find enough connected steps for that. Try naming where it starts or ends.` };
+    if (steps.length < 2) throw { code: 'flow_empty', message: t("{} couldn't find enough connected steps for that. Try naming where it starts or ends.", AGENT.name) };
     const fl = { id: 'custom-' + Date.now().toString(36), title: String(raw.title || prompt).slice(0, 80), description: String(raw.description || ''), steps, custom: true };
     G.flows.push(fl);
     await saveCustomFlow(fl);
     renderFlowMenu();
-    sheetShell(label, `<p>Added <strong>${h(fl.title)}</strong> to Flows, ${plural(fl.steps.length, 'step')}.${fl.description ? ' ' + h(fl.description) : ''}</p>
-      <div class="sheet-actions"><button class="btn soft" data-play="${h(fl.id)}">${iconI('right')}Play again</button></div>`);
+    sheetShell(label, `<p>${t('Added')} <strong>${h(fl.title)}</strong> ${t('to Flows, {}.{}', plural(fl.steps.length, 'step'), fl.description ? ' ' + h(fl.description) : '')}</p>
+      <div class="sheet-actions"><button class="btn soft" data-play="${h(fl.id)}">${iconI('right')}${t('Play again')}</button></div>`);
     sheet.querySelector('[data-play]').onclick = () => startFlow(fl.id);
     startFlow(fl.id);
   } catch (e) {
@@ -2021,8 +2038,8 @@ function flowStep() {
   const a = f.steps[i].ref, b = f.steps[i + 1]?.ref;
   const container = b ? lcaContainer(a, b) : parentOf.get(a) || 'root';
   const bar = $('#flowbar'); bar.hidden = false;
-  bar.innerHTML = `<div class="ft"><div class="fk">${h(f.title)} · step ${i + 1} of ${f.steps.length}</div><b>${h(info(a).name)}</b>${b ? ` <span>→</span> <b>${h(info(b).name)}</b>` : ''}<br><span>${h(f.steps[i].note)}</span><div class="dots">${f.steps.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div></div>
-    <button class="btn icon" id="fl-prev" aria-label="Previous step" title="Previous step" ${i === 0 ? 'disabled' : ''}>${iconI('left')}</button><button class="btn icon" id="fl-next" aria-label="Next step" title="Next step" ${i >= f.steps.length - 1 ? 'disabled' : ''}>${iconI('right')}</button><button class="btn icon" id="fl-x" title="Exit">${iconI('x')}</button>`;
+  bar.innerHTML = `<div class="ft"><div class="fk">${h(f.title)} · ${t('step {} of {}', i + 1, f.steps.length)}</div><b>${h(info(a).name)}</b>${b ? ` <span>→</span> <b>${h(info(b).name)}</b>` : ''}<br><span>${h(f.steps[i].note)}</span><div class="dots">${f.steps.map((_, k) => `<i class="${k <= i ? 'on' : ''}"></i>`).join('')}</div></div>
+    <button class="btn icon" id="fl-prev" aria-label="${t('Previous step')}" title="${t('Previous step')}" ${i === 0 ? 'disabled' : ''}>${iconI('left')}</button><button class="btn icon" id="fl-next" aria-label="${t('Next step')}" title="${t('Next step')}" ${i >= f.steps.length - 1 ? 'disabled' : ''}>${iconI('right')}</button><button class="btn icon" id="fl-x" title="${t('Exit')}">${iconI('x')}</button>`;
   $('#fl-prev').onclick = () => { state.flow.i--; flowStep(); };
   $('#fl-next').onclick = () => { if (state.flow.i < f.steps.length - 1) { state.flow.i++; flowStep(); } }; // vibeflow P22 : à la dernière étape le chevron est inactif (comme « précédent » à la première) ; la fermeture est la seule croix
   $('#fl-x').onclick = stopFlow;
@@ -2059,31 +2076,31 @@ const askState = { engine: null, sample: null, busy: false, ctl: null, session: 
 const askInput = $('#ask-input'), askSend = $('#ask-send'), sheet = $('#ask-sheet'), warn = $('#ask-warn');
 const DOCS = 'https://docs.claude.com/en/docs/claude-code/overview'; // the Claude app's tip: install the CLI
 const WARNINGS = {
-  no_engine: `Asking needs <b>${AGENT.cli}</b>. From the codebase root run <code>node floorplan/serve.mjs</code>${AGENT.id === 'claude' ? ', or open this map in the Claude app' : ''}.`,
-  cli_missing: `Requires <b>${AGENT.cli}</b> installed to work. <a href="${AGENT.docs}" target="_blank" rel="noopener">Install it</a>, then restart <code>serve.mjs</code>.`,
-  not_logged_in: `${Cap(AGENT.cli)} isn't signed in. ${AGENT.signIn}`,
-  app_unavailable: `Claude isn't available for this map in this view.`,
-  not_granted: `Claude access was declined for this map. Reload the page to be asked again.`,
-  cli_tip: `Install the <b>Claude Code CLI</b> for a better experience: it can read your source code, not just this map. <a href="${DOCS}" target="_blank" rel="noopener">Install it</a>, then run <code>node floorplan/serve.mjs</code> in the codebase.`,
+  no_engine: `${t('Asking needs')} <b>${AGENT.cli}</b>${t('. From the codebase root run')} <code>node floorplan/serve.mjs</code>${AGENT.id === 'claude' ? t(', or open this map in the Claude app') : ''}.`,
+  cli_missing: `${t('Requires')} <b>${AGENT.cli}</b> ${t('installed to work.')} <a href="${AGENT.docs}" target="_blank" rel="noopener">${t('Install it')}</a>${t(', then restart')} <code>serve.mjs</code>.`,
+  not_logged_in: t("{} isn't signed in. {}", Cap(AGENT.cli), AGENT.signIn),
+  app_unavailable: t("Claude isn't available for this map in this view."),
+  not_granted: t('Claude access was declined for this map. Reload the page to be asked again.'),
+  cli_tip: `${t('Install the')} <b>Claude Code CLI</b> ${t('for a better experience: it can read your source code, not just this map.')} <a href="${DOCS}" target="_blank" rel="noopener">${t('Install it')}</a>${t(', then run')} <code>node floorplan/serve.mjs</code> ${t('in the codebase.')}`,
 };
 function setWarning(code) {
   warn.hidden = !code;
   warn.classList.toggle('info', code === 'cli_tip');
   if (!code) return;
-  warn.innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>${WARNINGS[code] || h(code)}</span>${code === 'no_engine' ? '<button type="button" data-copycmd>Copy command</button>' : code === 'cli_tip' ? '<button type="button" data-dismiss>Got it</button>' : ''}`;
+  warn.innerHTML = `<svg class="i" viewBox="0 0 24 24"><path d="M12 9v4M12 17h.01M10.3 3.9 1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z"/></svg><span>${WARNINGS[code] || h(code)}</span>${code === 'no_engine' ? `<button type="button" data-copycmd>${t('Copy command')}</button>` : code === 'cli_tip' ? `<button type="button" data-dismiss>${t('Got it')}</button>` : ''}`;
   warn.querySelector('[data-dismiss]')?.addEventListener('click', () => setWarning(null));
-  warn.querySelector('[data-copycmd]')?.addEventListener('click', (e) => { navigator.clipboard?.writeText('node floorplan/serve.mjs'); e.target.textContent = 'Copied'; });
+  warn.querySelector('[data-copycmd]')?.addEventListener('click', (e) => { navigator.clipboard?.writeText('node floorplan/serve.mjs'); e.target.textContent = t('Copied'); });
 }
 function setEngine(engine, label, warning) {
   askState.engine = engine;
   const tag = $('#ask-engine');
   tag.className = 'engine ' + (engine ? 'ok' : 'warn');
-  tag.innerHTML = `<i></i>${h(engine ? label : 'Unavailable')}${engine === 'app' ? `<button type="button" class="einfo" title="Install the Claude Code CLI for a better experience" aria-label="About the Claude Code CLI"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></button>` : ''}`;
+  tag.innerHTML = `<i></i>${h(engine ? label : t('Unavailable'))}${engine === 'app' ? `<button type="button" class="einfo" title="${t('Install the Claude Code CLI for a better experience')}" aria-label="${t('About the Claude Code CLI')}"><svg class="i" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 11v5M12 8h.01"/></svg></button>` : ''}`;
   tag.querySelector('.einfo')?.addEventListener('click', () => setWarning(warn.hidden || !warn.classList.contains('info') ? 'cli_tip' : null));
-  tag.title = engine === 'cli' ? `Answers come from ${AGENT.cli} on this computer, which can read the source` : engine === 'app' ? 'Answers come from Claude in the Claude app, using the map (not the source files)' : '';
+  tag.title = engine === 'cli' ? t('Answers come from {} on this computer, which can read the source', AGENT.cli) : engine === 'app' ? t('Answers come from Claude in the Claude app, using the map (not the source files)') : '';
   askInput.disabled = !engine;
   askSend.disabled = !engine;
-  askInput.placeholder = engine ? `Ask anything about ${G.project.name}…` : 'Asking is unavailable';
+  askInput.placeholder = engine ? t('Ask anything about {}…', G.project.name) : t('Asking is unavailable');
   if (typeof renderChips === 'function' && askState.context) renderChips();
   setWarning(warning || null);
   addModeSwitch();
@@ -2092,7 +2109,7 @@ async function detectEngine() {
   const S = window.FLOORPLAN_SERVER;
   if (S) { S.cli ? setEngine('cli', AGENT.app + (S.model ? ' · ' + S.model : '')) : setEngine(null, null, 'cli_missing'); return; }
   if (window.claude?.use) {
-    setEngine(null, null); $('#ask-engine').innerHTML = '<i></i>connecting…';
+    setEngine(null, null); $('#ask-engine').innerHTML = `<i></i>${t('connecting…')}`;
     let sample = null;
     try { sample = await window.claude.use('sample'); } catch {}
     const lim = sample ? await sample.limits().catch(() => null) : null;
@@ -2113,7 +2130,7 @@ function refChip(id) {
 function md(src) {
   // *italique* et _italique_ (P23) : après l'échappement, hors des <code>, jamais sur du texte déjà balisé. Bornes de mot : l'ouvrant suit le début ou un caractère qui n'est ni lettre, chiffre, `_`, `*` ni `\` (et pas `/` pour `*`, donc `**/*.js`),
   // le fermant précède la fin ou un non-mot ; ni l'un ni l'autre n'est collé à une espace (`a * b * c`), l'ouvrant `*` n'est jamais suivi d'un point (`*.js,*.ts`), et le contenu ne porte ni `<` ni le marqueur (`snake_case_var`, `2*3*4`, `***x***` restent tels quels).
-  const em = (t) => t.replace(/(^|[^\w*\\/])\*(?![\s*.])([^*<\n]*[^*<\s])\*(?![\w*])/g, '$1<em>$2</em>').replace(/(^|[^\w\\])_(?!\s)([^_<\n]*[^_<\s])_(?!\w)/g, '$1<em>$2</em>');
+  const em = (x) => x.replace(/(^|[^\w*\\/])\*(?![\s*.])([^*<\n]*[^*<\s])\*(?![\w*])/g, '$1<em>$2</em>').replace(/(^|[^\w\\])_(?!\s)([^_<\n]*[^_<\s])_(?!\w)/g, '$1<em>$2</em>');
   const inline = (s) => h(s).replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>').replace(/`([^`]+)`/g, '<code>$1</code>').split(/(<code>.*?<\/code>)/).map((p, i) => (i % 2 ? p : em(p))).join('').replace(/\[\[([^\]]+)\]\]/g, (_, id) => refChip(id.replace(/&#39;|&quot;/g, '').trim()));
   const out = [];
   let list = null;
@@ -2140,9 +2157,9 @@ let keepSheet = false; // the answer's own links move around the map without put
 function sheetShell(question, body) {
   sheet.hidden = false;
   sheet.innerHTML = `<div class="sh"><span class="q" title="${h(question)}">${h(question)}</span>
-    ${askState.last?.items?.length && state.container !== 'q:answer' ? '<button class="btn soft" data-act="board">Show answer board</button>' : ''}
-    ${state.container === 'q:answer' ? '<button class="btn soft" data-act="map">Back to map</button>' : ''}
-    <button class="btn icon" data-act="close" title="Close">${iconI('x')}</button></div><div class="sb">${body}</div>`;
+    ${askState.last?.items?.length && state.container !== 'q:answer' ? `<button class="btn soft" data-act="board">${t('Show answer board')}</button>` : ''}
+    ${state.container === 'q:answer' ? `<button class="btn soft" data-act="map">${t('Back to map')}</button>` : ''}
+    <button class="btn icon" data-act="close" title="${t('Close')}">${iconI('x')}</button></div><div class="sb">${body}</div>`;
   sheet.querySelector('[data-act="close"]').onclick = () => { if (askState.busy) cancelAsk(); sheet.hidden = true; if (state.container === 'q:answer') backToAsker(); else fit(true); };
   sheet.querySelector('[data-act="map"]')?.addEventListener('click', () => backToAsker(true));
   sheet.querySelector('[data-act="board"]')?.addEventListener('click', () => go('q:answer'));
@@ -2163,7 +2180,8 @@ function showProgress(question, lines) {
 function renderAnswer(a) {
   const steps = a.steps?.length >= 2;
   sheetShell(a.question, `${md(a.answer)}
-    <div class="sheet-actions">${steps ? `<button class="btn soft" data-act="steps">${iconI('right')}Walk through ${a.steps.length} steps</button>` : ''}</div>
+    <div class="sheet-actions">${steps ? `<button class="btn soft" data-act="steps">${iconI('right')}${t('Walk through {} steps', a.steps.length)}</button>`
+      : ''}</div>
     ${a.followups?.length ? `<div class="followups">${a.followups.slice(0, 3).map((f) => `<button data-follow="${h(f)}">${h(f)}</button>`).join('')}</div>` : ''}`);
 }
 function showAnswer(raw, question) {
@@ -2171,7 +2189,7 @@ function showAnswer(raw, question) {
   const items = clean(raw.items);
   const steps = clean(raw.steps);
   for (const s of steps) if (!items.some((x) => x.id === s.id)) items.push({ id: s.id, note: s.note });
-  const a = { title: String(raw.title || 'Answer'), answer: String(raw.answer || ''), items: items.slice(0, 18), steps, followups: (raw.followups || []).map(String), question };
+  const a = { title: String(raw.title || t('Answer')), answer: String(raw.answer || ''), items: items.slice(0, 18), steps, followups: (raw.followups || []).map(String), question };
   askState.last = a;
   if (a.items.length) { state.answer = a; go('q:answer', { force: true, after: () => renderAnswer(a) }); }
   else {
@@ -2185,14 +2203,17 @@ function showFailure(question, code, message, partial) {
   if (code === 'not_logged_in' || code === 'not_granted') setWarning(code);
   if (code === 'not_granted' || code === 'sampling_disabled') setEngine(null, null, code === 'not_granted' ? 'not_granted' : 'app_unavailable');
   if (code === 'cancelled') { sheet.hidden = true; return; }
-  const copy = { rate_limited: `${AGENT.name} is busy or you have hit a usage limit. Try again in a bit.`, not_logged_in: `${Cap(AGENT.cli)} needs you to sign in first.`, cli_missing: `${Cap(AGENT.cli)} not found.`, invalid_json: `${AGENT.name}'s answer couldn't be read as a map view. Try rephrasing.`, session_expired: `Your ${AGENT.name} session expired. Sign in again.` }[code];
-  sheetShell(question, `<p class="err">${h(copy || message || 'Something went wrong.')}</p>${partial ? md(partial) : ''}${code === 'cli_error' && message ? `<p style="font-family:var(--mono);font-size:11px;color:var(--text-3)">${h(message.slice(0, 400))}</p>` : ''}`);
+  const copy = { rate_limited: t('{} is busy or you have hit a usage limit. Try again in a bit.', AGENT.name),
+    not_logged_in: t('{} needs you to sign in first.', Cap(AGENT.cli)), cli_missing: t('{} not found.', Cap(AGENT.cli)),
+    invalid_json: t("{}'s answer couldn't be read as a map view. Try rephrasing.", AGENT.name),
+    session_expired: t('Your {} session expired. Sign in again.', AGENT.name) }[code];
+  sheetShell(question, `<p class="err">${h(copy || message || t('Something went wrong.'))}</p>${partial ? md(partial) : ''}${code === 'cli_error' && message ? `<p style="font-family:var(--mono);font-size:11px;color:var(--text-3)">${h(message.slice(0, 400))}</p>` : ''}`);
 }
 function setBusy(b) {
   askState.busy = b;
   askSend.classList.toggle('stop', b);
   askSend.innerHTML = b ? `<svg class="i" viewBox="0 0 24 24"><rect x="7" y="7" width="10" height="10" rx="2"/></svg>` : `<svg class="i" viewBox="0 0 24 24"><path d="M12 19V5M5 12l7-7 7 7"/></svg>`;
-  askSend.title = b ? 'Stop' : 'Ask'; askSend.setAttribute('aria-label', askSend.title);
+  askSend.title = b ? t('Stop') : t('Ask'); askSend.setAttribute('aria-label', askSend.title);
 }
 function cancelAsk() {
   askState.ctl?.abort();
@@ -2209,14 +2230,14 @@ const canChange = () => PLAN && askState.engine === 'cli' && window.FLOORPLAN_SE
 function setAskMode(m) {
   askState.mode = canChange() && m === 'change' ? 'change' : 'ask';
   $('#ask-mode')?.querySelectorAll('button').forEach((b) => { b.classList.toggle('on', b.dataset.m === askState.mode); b.setAttribute('aria-pressed', String(b.dataset.m === askState.mode)); });
-  if (askState.engine) askInput.placeholder = askState.mode === 'change' ? 'Ask for a change, e.g. “also plan out refunds”…' : `Ask anything about ${G.project.name}…`;
-  askSend.title = askState.busy ? 'Stop' : askState.mode === 'change' ? 'Make this change' : 'Ask';
+  if (askState.engine) askInput.placeholder = askState.mode === 'change' ? 'Ask for a change, e.g. “also plan out refunds”…' : t('Ask anything about {}…', G.project.name);
+  askSend.title = askState.busy ? t('Stop') : askState.mode === 'change' ? 'Make this change' : t('Ask');
 }
 function addModeSwitch() {
   if (!canChange() || $('#ask-mode')) return;
   const sw = document.createElement('span');
   sw.id = 'ask-mode';
-  sw.innerHTML = '<button type="button" data-m="ask" title="Ask a question about the plan">Ask</button><button type="button" data-m="change" title="Ask for a change, addition or removal, and the map is redrawn">Change</button>';
+  sw.innerHTML = `<button type="button" data-m="ask" title="Ask a question about the plan">${t('Ask')}</button><button type="button" data-m="change" title="Ask for a change, addition or removal, and the map is redrawn">${t('Change')}</button>`;
   sw.querySelectorAll('button').forEach((b) => b.onclick = () => { setAskMode(b.dataset.m); askInput.focus(); });
   $('#ask-form').prepend(sw);
   setAskMode('ask');
@@ -2226,7 +2247,7 @@ async function requestChange(question) {
   setBusy(true);
   askState.ctl = new AbortController();
   const lines = ['Reading the plan…'];
-  const progress = (t) => { lines.push(t); showProgress(question, lines.slice(-6)); };
+  const progress = (ln) => { lines.push(ln); showProgress(question, lines.slice(-6)); };
   showProgress(question, lines);
   try {
     const r = await askViaCli(question, progress, 'change');
@@ -2249,12 +2270,12 @@ function showChangeResult() {
   const items = (G.recent?.items || []).filter((x) => parentOf.has(x.id)).map((x) => ({ id: x.id, note: x.note }));
   closeSheet(); // a card in the link opens the details sheet on a phone, and it would sit on top of this summary
   sheetShell(c.question, `<p><strong>${h(c.title || 'Plan updated')}</strong></p>${md(c.summary)}
-    <div class="sheet-actions">${items.length ? `<button class="btn soft" data-cr="show">${iconI('search')}Show ${plural(items.length, 'change')}</button>` : ''}<button class="btn soft" data-cr="undo">${iconI('left')}Undo</button></div>
+    <div class="sheet-actions">${items.length ? `<button class="btn soft" data-cr="show">${iconI('search')}${t('Show {}', plural(items.length, 'change'))}</button>` : ''}<button class="btn soft" data-cr="undo">${iconI('left')}${t('Undo')}</button></div>
     ${c.followups?.length ? `<div class="followups">${c.followups.slice(0, 3).map((f) => `<button data-cf="${h(f)}">${h(f)}</button>`).join('')}</div>` : ''}`);
   sheet.querySelector('[data-cr="show"]')?.addEventListener('click', () => showBoard({ title: c.title || 'What changed', question: c.question, items }));
   sheet.querySelector('[data-cr="undo"]').addEventListener('click', async (ev) => {
     ev.currentTarget.disabled = true;
-    const r = await fetch('/api/plan/undo', { method: 'POST', headers: { 'x-floorplan-token': window.FLOORPLAN_SERVER.token } }).then((x) => x.json()).catch(() => ({ ok: false, error: 'Could not reach the map server.' }));
+    const r = await fetch('/api/plan/undo', { method: 'POST', headers: { 'x-floorplan-token': window.FLOORPLAN_SERVER.token } }).then((x) => x.json()).catch(() => ({ ok: false, error: t('Could not reach the map server.') }));
     if (!r.ok) { toast(r.error || 'Couldn’t undo'); ev.currentTarget.disabled = false; return; }
     stash.set({ undone: true, at: Date.now() });
     setTimeout(() => location.reload(), 4000);
@@ -2268,7 +2289,7 @@ async function askViaCli(question, progress, mode = 'ask') {
     headers: { 'content-type': 'application/json', 'x-floorplan-token': window.FLOORPLAN_SERVER.token },
     body: JSON.stringify({ question, mode, session: mode === 'ask' ? askState.session : undefined }),
   });
-  if (!res.ok || !res.body) throw { code: 'cli_error', message: `Server returned ${res.status}` };
+  if (!res.ok || !res.body) throw { code: 'cli_error', message: t('Server returned {}', res.status) };
   const reader = res.body.getReader(), dec = new TextDecoder();
   let buf = '', answer = null;
   for (;;) {
@@ -2284,7 +2305,7 @@ async function askViaCli(question, progress, mode = 'ask') {
       else if (ev === 'failure') throw data;
     }
   }
-  if (!answer) throw { code: 'cli_error', message: 'The CLI ended without an answer.' };
+  if (!answer) throw { code: 'cli_error', message: t('The CLI ended without an answer.') };
   return answer;
 }
 
@@ -2293,13 +2314,14 @@ async function askViaApp(question, progress, mode = 'ask') {
   const tools = [
     { name: 'find_items', description: 'Search the map by words. Returns up to 15 items {id, type, name, description, path}. kind optionally limits results to module, file, endpoint or symbol.',
       inputSchema: { type: 'object', properties: { query: { type: 'string' }, kind: { type: 'string', enum: ['module', 'file', 'endpoint', 'symbol'] } }, required: ['query'] },
-      execute: ({ query, kind }) => { progress(`Searching the map for "${query}"`); return clip(Q.find(String(query), kind ? String(kind) : undefined)); } },
+      execute: ({ query, kind }) => { progress(t('Searching the map for "{}"', query));
+        return clip(Q.find(String(query), kind ? String(kind) : undefined)); } },
     { name: 'get_item', description: "Details of one map item by id: its description, parent module, children/files, endpoints, exports, and what it depends on and is used by (with ids).",
       inputSchema: { type: 'object', properties: { id: { type: 'string' } }, required: ['id'] },
-      execute: ({ id }) => { const b = Q.brief(String(id)); progress(`Looking at ${b ? b.name : id}`); return clip(Q.show(String(id))); } },
+      execute: ({ id }) => { const b = Q.brief(String(id)); progress(t('Looking at {}', b ? b.name : id)); return clip(Q.show(String(id))); } },
     { name: 'dependency_path', description: 'Shortest chain of imports/HTTP calls from anything inside one item to anything inside another. Returns hops with ids.',
       inputSchema: { type: 'object', properties: { from: { type: 'string' }, to: { type: 'string' } }, required: ['from', 'to'] },
-      execute: ({ from, to }) => { progress('Tracing a dependency path'); return clip(Q.path(String(from), String(to))); } },
+      execute: ({ from, to }) => { progress(t('Tracing a dependency path')); return clip(Q.path(String(from), String(to))); } },
   ];
   const flow = mode === 'flow';
   const rules = `${flow ? floorplanFlowInstructions(G, 'app') : floorplanAskInstructions(G, 'app')}\nThe JSON must match this schema:\n${JSON.stringify(flow ? FLOORPLAN_FLOW_SCHEMA : FLOORPLAN_ANSWER_SCHEMA)}\n\nMap overview:\n${clip(Q.overview())}`;
@@ -2320,9 +2342,9 @@ function addAskContext(id) {
 }
 function renderChips() {
   const box = $('#ask-chips');
-  box.innerHTML = askState.context.map((id) => { const i = info(id); return `<span class="chip" title="${h(i.path || '')}"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span>${h(i.name)}</span><button type="button" data-rm="${h(id)}" aria-label="Remove">${iconI('x')}</button></span>`; }).join('');
+  box.innerHTML = askState.context.map((id) => { const i = info(id); return `<span class="chip" title="${h(i.path || '')}"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span>${h(i.name)}</span><button type="button" data-rm="${h(id)}" aria-label="${t('Remove')}">${iconI('x')}</button></span>`; }).join('');
   box.querySelectorAll('[data-rm]').forEach((b) => b.onclick = () => { askState.context = askState.context.filter((x) => x !== b.dataset.rm); renderChips(); askInput.focus(); });
-  askInput.placeholder = !askState.engine ? 'Asking is unavailable' : askState.mode === 'change' ? (askState.context.length ? 'What should change here?' : 'Ask for a change, e.g. “also plan out refunds”…') : askState.context.length ? 'Ask about this…' : `Ask anything about ${G.project.name}…`;
+  askInput.placeholder = !askState.engine ? t('Asking is unavailable') : askState.mode === 'change' ? (askState.context.length ? 'What should change here?' : 'Ask for a change, e.g. “also plan out refunds”…') : askState.context.length ? t('Ask about this…') : t('Ask anything about {}…', G.project.name);
   askSend.disabled = !askState.engine;
 }
 askInput.addEventListener('keydown', (ev) => { if (ev.key === 'Backspace' && !askInput.value && askState.context.length) { askState.context.pop(); renderChips(); } });
@@ -2330,21 +2352,26 @@ askInput.addEventListener('keydown', (ev) => { if (ev.key === 'Backspace' && !as
 async function submitAsk() {
   if (askState.busy) { cancelAsk(); return; }
   const ctxIds = askState.context.slice();
-  let question = askInput.value.trim();
-  if (!question && ctxIds.length) question = ctxIds.length === 1 ? `What is ${info(ctxIds[0]).name} and how does it fit in?` : `How do ${ctxIds.map((id) => info(id).name).join(' and ')} relate?`;
+  let question = askInput.value.trim(), fabriquee = ''; // la question fabriquée part à l'agent en anglais ; la copie affichée est traduite
+  if (!question && ctxIds.length) {
+    const noms = ctxIds.map((id) => info(id).name);
+    question = ctxIds.length === 1 ? `What is ${noms[0]} and how does it fit in?` : `How do ${noms.join(' and ')} relate?`;
+    fabriquee = ctxIds.length === 1 ? t('What is {} and how does it fit in?', noms[0])
+      : t('How do {} relate?', t('{} and {}', noms.slice(0, -1).join(', '), noms[noms.length - 1]));
+  }
   if (!question || !askState.engine) return;
   askInput.value = '';
   askState.context = []; renderChips();
   if (askState.mode === 'change') return requestChange(ctxIds.length ? `${question}\n\nThis is about: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.` : question);
-  const shown = question;
+  const shown = fabriquee || question;
   noteAskOrigin();
   askState.last = null; // the previous answer is not this question's: no « Show answer board » for it while this one is pending (PU-G-143)
   // what Claude sees: the question plus the pinned items, by id, so it starts from them
   if (ctxIds.length) question += `\n\nFocus on these map items: ${ctxIds.map((id) => `${id} (${info(id).name})`).join(', ')}.`;
   setBusy(true);
   askState.ctl = new AbortController();
-  const lines = ['Thinking…'];
-  const progress = (t) => { lines.push(t); showProgress(shown, lines.slice(-6)); };
+  const lines = [t('Thinking…')];
+  const progress = (ln) => { lines.push(ln); showProgress(shown, lines.slice(-6)); };
   showProgress(shown, lines);
   try {
     const raw = askState.engine === 'cli' ? await askViaCli(question, progress) : await askViaApp(question, progress);
@@ -2367,12 +2394,12 @@ if (EXPORTED) {
   const at = new Date(EXPORTED.at);
   const tag = document.createElement('span');
   tag.className = 'xtag';
-  tag.textContent = isNaN(at) ? 'Exported copy' : `Exported ${at.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`;
-  tag.title = 'A copy of this map to look around in. Asking questions needs Floorplan with Claude Code or Codex, in the codebase itself.';
+  tag.textContent = isNaN(at) ? t('Exported copy') : t('Exported {}', at.toLocaleDateString(t.langue, { month: 'short', day: 'numeric', year: 'numeric' }));
+  tag.title = t('A copy of this map to look around in. Asking questions needs Floorplan with Claude Code or Codex, in the codebase itself.');
   $('#proj-name').after(tag);
   // vibeflow P12 : le lien de crédit vers le dépôt amont est retiré (la licence reste dans LICENSE et LICENCES-TIERCES.txt)
 }
-document.title = `${G.project.name} map`;
+document.title = t('{} map', G.project.name);
 $('#btn-up').onclick = up;
 // drag the panel's left edge to resize it; the width sticks between visits
 const setPanelWidth = (w) => { document.documentElement.style.setProperty('--panel-w', `${clamp(Math.round(w), 300, Math.min(720, innerWidth - 360))}px`); };
@@ -2407,13 +2434,13 @@ const askOn = (on) => {
   askLive.textContent = '';
   if (on && isPhone() && !warn.hidden) setTimeout(() => { askLive.textContent = warn.querySelector('span')?.textContent || ''; }, 50);
 };
-['pointerdown', 'touchstart', 'focusin'].forEach((t) => askBox.addEventListener(t, () => askOn(true), { passive: true }));
+['pointerdown', 'touchstart', 'focusin'].forEach((ev0) => askBox.addEventListener(ev0, () => askOn(true), { passive: true }));
 window.addEventListener('pointerdown', (ev) => { if (!askBox.contains(ev.target)) askOn(false); }, true);
 askBox.addEventListener('focusout', (ev) => { if (!askBox.contains(ev.relatedTarget)) askOn(false); });
 window.addEventListener('resize', foldContext); // whether there is more to read depends on the width
 // with nothing connected the input is switched off, so on a phone the bar itself takes keyboard focus to show the note
 const askForm = $('#ask-form');
-const askTab = () => { const on = isPhone() && askInput.disabled && !warn.hidden; if (on) { askForm.tabIndex = 0; askForm.setAttribute('aria-label', 'Ask bar: show why asking is unavailable'); } else { askForm.removeAttribute('tabindex'); askForm.removeAttribute('aria-label'); } };
+const askTab = () => { const on = isPhone() && askInput.disabled && !warn.hidden; if (on) { askForm.tabIndex = 0; askForm.setAttribute('aria-label', t('Ask bar: show why asking is unavailable')); } else { askForm.removeAttribute('tabindex'); askForm.removeAttribute('aria-label'); } };
 new MutationObserver(askTab).observe(warn, { attributes: true, attributeFilter: ['hidden'] });
 new MutationObserver(askTab).observe(askInput, { attributes: true, attributeFilter: ['disabled'] });
 phoneQuery.addEventListener('change', askTab); askTab();
@@ -2421,7 +2448,7 @@ phoneQuery.addEventListener('change', askTab); askTab();
 let keyboardUser = false, sheetReturn = null;
 window.addEventListener('keydown', () => { keyboardUser = true; }, true);
 window.addEventListener('pointerdown', () => { keyboardUser = false; }, true);
-const sheetRole = () => { if (isPhone()) { panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', 'Details'); panel.tabIndex = -1; } else { panel.removeAttribute('role'); panel.removeAttribute('aria-label'); panel.removeAttribute('tabindex'); } };
+const sheetRole = () => { if (isPhone()) { panel.setAttribute('role', 'dialog'); panel.setAttribute('aria-label', t('Details')); panel.tabIndex = -1; } else { panel.removeAttribute('role'); panel.removeAttribute('aria-label'); panel.removeAttribute('tabindex'); } };
 phoneQuery.addEventListener('change', sheetRole); sheetRole();
 const setPanel = (on) => {
   const was = !document.body.classList.contains('no-panel'); document.body.classList.toggle('no-panel', !on); $('#btn-panel').setAttribute('aria-expanded', String(on));
@@ -2479,7 +2506,7 @@ window.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && modalClo
 function showModal({ title = '', html = '', actions = [] } = {}) {
   const m = $('#modal'), box = m.querySelector('.box');
   const origin = m.classList.contains('open') && modalClose ? null : document.activeElement; // a window opened over another keeps the first origin
-  box.innerHTML = `<h2 id="modal-title">${h(title)}</h2><div class="mb">${html}</div><div class="ma">${actions.map((a, i) => `<button class="btn ${a.primary ? 'primary' : 'soft'}" data-mi="${i}">${a.icon ? iconI(a.icon) : ''}${h(a.label)}</button>`).join('')}<button class="btn" data-close>Close</button></div>`;
+  box.innerHTML = `<h2 id="modal-title">${h(title)}</h2><div class="mb">${html}</div><div class="ma">${actions.map((a, i) => `<button class="btn ${a.primary ? 'primary' : 'soft'}" data-mi="${i}">${a.icon ? iconI(a.icon) : ''}${h(a.label)}</button>`).join('')}<button class="btn" data-close>${t('Close')}</button></div>`;
   box.setAttribute('role', 'dialog'); box.setAttribute('aria-modal', 'true'); box.setAttribute('aria-labelledby', 'modal-title'); box.tabIndex = -1;
   if (origin !== null) m.__origin = origin;
   const close = () => {
@@ -2497,17 +2524,17 @@ function showModal({ title = '', html = '', actions = [] } = {}) {
   return { close, el: box };
 }
 let toastTimer = null;
-function toast(msg) { const t = $('#toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => t.classList.remove('on'), 2200); }
+function toast(msg) { const nt = $('#toast'); nt.textContent = msg; nt.classList.add('on'); clearTimeout(toastTimer); toastTimer = setTimeout(() => nt.classList.remove('on'), 2200); }
 function showBoard({ title, question = '', answer = '', items = [], steps = [], kind = '', icon: ic = '' }) {
   const clean = (arr) => (arr || []).map((x) => typeof x === 'string' ? { id: x, note: '' } : x).filter((x) => x && Q.exists(String(x.id))).map((x) => ({ id: String(x.id), note: String(x.note || '') }));
   const all = clean(items); // the board holds 24 cards at most; when it is cut, its title says so (PU-G-054)
-  const a = { title: title || 'Board', question, answer, items: all.slice(0, 24), ...(all.length > 24 ? { total: all.length } : {}), steps: clean(steps), followups: [], ...(kind ? { kind } : {}), ...(ic ? { icon: ic } : {}) };
-  if (!a.items.length) { toast('Nothing on the map matches that.'); return; }
+  const a = { title: title || t('Board'), question, answer, items: all.slice(0, 24), ...(all.length > 24 ? { total: all.length } : {}), steps: clean(steps), followups: [], ...(kind ? { kind } : {}), ...(ic ? { icon: ic } : {}) };
+  if (!a.items.length) { toast(t('Nothing on the map matches that.')); return; }
   noteAskOrigin();
   state.answer = a; askState.last = a;
   go('q:answer', { force: true });
 }
-function playFlow({ title = 'Tour', description = '', steps = [], inPlace = false }) {
+function playFlow({ title = t('Tour'), description = '', steps = [], inPlace = false }) {
   const st = steps.map((s) => ({ ref: s.ref || s.id, note: s.note || '', title: s.title || '' })).filter((s) => Q.exists(s.ref) || s.ref === 'root');
   if (!st.length) return;
   state.flow = { f: { id: 'tmp-' + Date.now(), title, description, steps: st }, i: 0, inPlace };

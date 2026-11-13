@@ -19,6 +19,7 @@ UI="$SCRIPTS/../skills/cockpit-moteur/assets/ui"
 WORK="$(mktemp -d)"
 trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 WORK="$(cd "$WORK" && pwd -P)"
 AUX="$WORK/aux"; mkdir -p "$AUX"
 PIDS=()
@@ -335,10 +336,9 @@ node "$AUX/mk-f3.mjs" "$SUBD/agent-xsec.jsonl" "$LABS" "$SECRET_F3"
 rafraichir() { touch "$SUBD/agent-mgr1.jsonl" "$SUBD/agent-ag1.jsonl" "$SUBD/agent-ximg.jsonl" "$SUBD/agent-xsec.jsonl" "$H/.claude/projects/-lab/$SID.jsonl"; }
 demarrer() { # $1 dossier de sortie, $2 HOME -> SRV_PID SRV_PORT (le serveur est celui de la sortie assemblée ; sa racine est <sortie>/../..)
   local o="$1"; rm -f "$o/.cache/server.json"
-  HOME="$2" node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-$(basename "$o").out" 2>&1 &
-  SRV_PID=$!; PIDS+=("$SRV_PID")
-  for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && break; sleep 0.1; done
-  SRV_PORT="$(G "$o/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+  COCKPIT_MODULE="${MUT_MOD:-}" COCKPIT_SORTIE="$o" COCKPIT_LOG="$WORK/serve-$(basename "$o").out" cockpit_lancer "$o/../.." HOME="$2" || true   # MUT_MOD : copie du module muté (79-06), vide = le module du dépôt
+  SRV_PID="$VF_PID"
+  SRV_PORT="$VF_PORT"
 }
 node "$WORK/leurre.mjs" "$(libre)" & LEURRE=$!; PIDS+=("$LEURRE")
 demarrer "$OUT" "$H"; SRV="$SRV_PID"; PORT="$SRV_PORT"
@@ -381,12 +381,13 @@ vf_hyg_stop "$SRV"
 assert_eq "T25.14 — le leurre est toujours vivant après l'arrêt du serveur (jamais arrêté par la marque seule)" "$(ps -p "$LEURRE" >/dev/null 2>&1 && echo vivant || echo mort)" "vivant"
 vf_hyg_stop "$LEURRE"
 
-# --- M-JETON : copie de la sortie dont le contrôle du jeton est neutralisé (le test de T25.3 sait rougir) ---
-MJ="$LABS/.vibeflow/mut-jeton"; cp -R "$OUT" "$MJ"
-sed -i.bak "s#if (!sameOrigin || (!sameToken(given, token) \&\& !VF?.jetonValide(given)))#if (false)#" "$MJ/serve.mjs"
+# --- M-JETON : copie du module dont le contrôle du jeton est neutralisé (le test de T25.3 sait rougir) ; la sortie copiée (MUT_OUT) ne porte que des données ---
+MJ="$OUT"; MUT_OUT="$MJ"   # 79-06 : serve.mjs exige --sortie=<lab>/.vibeflow/cockpit, la sortie du lab sert donc (elle ne porte pas de code)
+rm -rf "$WORK/mod-jeton"; MJM="$(cockpit_module_copie "$WORK/mod-jeton")"; MUT_MOD="$MJM"
+sed -i.bak "s#if (!sameOrigin || (!sameToken(given, token) \&\& !VF?.jetonValide(given)))#if (false)#" "$MJM/skills/cockpit-moteur/assets/serve.mjs"
 rafraichir
-demarrer "$MJ" "$H"; PORT="$SRV_PORT"
-assert_eq "T25.15 — témoin : sans contrôle de jeton, la route répond 200 sans jeton (le mutant est vu)" "appliqué:$(grep -c 'if (false)' "$MJ/serve.mjs")|sans-jeton:$(RQ GET "/api/vf/transcript?id=ag1" | sed -n 1p)" "appliqué:1|sans-jeton:200"
+demarrer "$MJ" "$H"; PORT="$SRV_PORT"; MUT_MOD=""
+assert_eq "T25.15 — témoin : sans contrôle de jeton, la route répond 200 sans jeton (le mutant est vu)" "appliqué:$(grep -c 'if (false)' "$MJM/skills/cockpit-moteur/assets/serve.mjs")|sans-jeton:$(RQ GET "/api/vf/transcript?id=ag1" | sed -n 1p)" "appliqué:1|sans-jeton:200"
 vf_hyg_stop "$SRV_PID"
 
 # --- M-PORTE : la garde d'émission (flux, hello) et son mutant ---

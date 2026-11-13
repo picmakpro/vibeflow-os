@@ -3,6 +3,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { gitSortant } from './vf-git-sortant.mjs'; // vibeflow AUDC-A-02
+import { automateDe, MAX_MOTIF } from './vf-glob.mjs'; // vibeflow SOCL-26
 
 export const toPosix = (p) => p.replace(/\\/g, '/');
 export const rel = (from, to) => toPosix(path.relative(from, to)) || '.';
@@ -11,7 +12,8 @@ export const rel = (from, to) => toPosix(path.relative(from, to)) || '.';
 
 const GLOB_CHARS = /[*?{[]/;
 
-export function globToRegExp(glob) {
+// Source de regex (sans ancres) d'un motif : le fragment que lit l'automate de vf-glob.mjs.
+export function globSource(glob) {
   const g = toPosix(glob).replace(/^\.\//, '').replace(/\/$/, '');
   let re = '';
   let braces = 0;
@@ -47,20 +49,22 @@ export function globToRegExp(glob) {
     re += c.replace(/[.+^$()|\\\]]/g, '\\$&');
     i++;
   }
-  return new RegExp('^' + re + '$');
+  return re;
 }
 
 /** Compile a glob. A pattern with no wildcards also matches everything under it as a directory. */
 export function compileGlob(glob) {
   const g = toPosix(glob).replace(/^\.\//, '').replace(/\/$/, '');
-  const literalPrefix = g.split(GLOB_CHARS)[0];
+  const premier = g.search(GLOB_CHARS); // vibeflow SOCL-26 : le préfixe littéral se lit sans découper le motif entier
   if (!GLOB_CHARS.test(g)) {
     return { glob, specificity: g.length, test: (p) => p === g || p.startsWith(g + '/') };
   }
+  if (g.length > MAX_MOTIF) { // vibeflow SOCL-26 : motif au-delà du plafond, jamais traduit ; un avis d'une ligne, ne correspond à rien
+    console.error(`cockpit : motif de plus de ${MAX_MOTIF} caractères ignoré (${JSON.stringify(g.slice(0, 40))}…)`);
+    return { glob, specificity: premier, test: () => false };
+  }
   // A glob that names directories (src/components/{a,b}) also matches everything beneath them.
-  const re = globToRegExp(g);
-  const under = globToRegExp(g + '/**');
-  return { glob, specificity: literalPrefix.length, test: (p) => re.test(p) || under.test(p) };
+  return { glob, specificity: premier, test: automateDe(globSource(g), globSource(g + '/**')) };
 }
 
 // ---------- file classification ----------

@@ -7,7 +7,7 @@
 # Navigateur : Chrome headless (CDP, WebSocket de node) quand il existe ($CHROME_BIN, macOS, google-chrome, chromium) ;
 # sinon SIMULATION FIDÈLE : le rendu du pied de carte est rejoué par node (cardFoot extrait de la page servie), les
 # en-têtes sont lus sur la réponse, et la charge du navigateur (lire le jeton, POST /api/plan/undo) est jouée par un client node.
-# Mutants (copies de la sortie, jamais le module) : M-ESC retire h() du pied de carte, M-CSP neutralise les en-têtes
+# Mutants (le code muté vit dans une copie du module ; les pages mutées, dans une copie de la sortie) : M-ESC retire h() du pied de carte, M-CSP neutralise les en-têtes
 # Content-Security-Policy, M-GARDE rend à skillScript la lecture de .cache/skill.json.
 #   C0 témoin : les trois maillons retirés -> la chaîne ABOUTIT (script du lab exécuté, jeton reçu par l'origine tierce)
 #   C1 code livré : rien n'aboutit · C2 échappement seul · C3 CSP seule · C4 garde seule
@@ -31,6 +31,7 @@ PIDS=()
 cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }
 trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 skip() { echo "  ⏭️  SAUTÉ — $1 ($2)"; SKIP=$((SKIP+1)); }
@@ -106,33 +107,35 @@ plante() { # $1 = sortie
   mkdir -p "$1/.cache/history/a"; printf '{"dir":"%s"}\n' "$LAB/evil" > "$1/.cache/skill.json"; printf '{}\n' > "$1/.cache/history/a/plan.json"; }
 
 # mutant <sortie> <M-ESC|M-CSP|M-GARDE> : applique le mutant ; échoue si rien n'a changé (jamais un mutant sans effet)
+# 79-06 : la sortie (o) ne porte que des pages ; serve.mjs muté vit dans une COPIE du module (MUT_MOD, une par manche, mutée sur place)
+MUT_OUT=""; MUT_MOD=""
 mutant() {
-  local o="$1" m="$2" before after
-  before="$(cat "$o/serve.mjs" "$o/index.html" "$o/project.html" | cksum)"
+  local o="$1" m="$2" sv="$MUT_MOD/skills/cockpit-moteur/assets/serve.mjs" before after
+  before="$(cat "$sv" "$o/index.html" "$o/project.html" | cksum)"
   case "$m" in
     M-ESC) for f in index.html project.html; do sed -i.bak 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' "$o/$f"; done ;;
-    M-CSP) sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-Mutant-Csp'#g" "$o/serve.mjs" ;;
+    M-CSP) sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-Mutant-Csp'#g" "$sv" ;;
     M-GIT-TEXTE) for f in index.html project.html; do sed -i.bak "s#if (txt != null) e.textContent = String(txt);#if (txt != null) e.innerHTML = String(txt);#; s#corpsMsg.textContent = m.length#corpsMsg.innerHTML = m.length#" "$o/$f"; done
       for f in index.html project.html; do [ "$(grep -c 'e.innerHTML = String(txt);' "$o/$f")" = 1 ] && [ "$(grep -c 'corpsMsg.innerHTML = m.length' "$o/$f")" = 1 ] || { echo "  ❌ mutant M-GIT-TEXTE incomplet dans $f" >&2; return 1; }; done ;;
-    M-GARDE) sed -i.bak "s#const dir = engineDirFromLauncher();#let dir; try { dir = JSON.parse(fs.readFileSync(path.join(here, '.cache', 'skill.json'), 'utf8')).dir; } catch {}#; s#^try { fs.rmSync(path.join(here, '.cache', 'skill.json')#if (false) try { fs.rmSync(path.join(here, '.cache', 'skill.json')#" "$o/serve.mjs" ;;
+    M-GARDE) sed -i.bak "s#const dir = engineDirFromLauncher();#let dir; try { dir = JSON.parse(fs.readFileSync(path.join(here, '.cache', 'skill.json'), 'utf8')).dir; } catch {}#; s#^try { fs.rmSync(path.join(here, '.cache', 'skill.json')#if (false) try { fs.rmSync(path.join(here, '.cache', 'skill.json')#" "$sv" ;;
   esac
-  after="$(cat "$o/serve.mjs" "$o/index.html" "$o/project.html" | cksum)"
-  [ "$before" != "$after" ] || { echo "  ❌ mutant $m sans effet (motif absent de la sortie)" >&2; return 1; }
+  after="$(cat "$sv" "$o/index.html" "$o/project.html" | cksum)"
+  [ "$before" != "$after" ] || { echo "  ❌ mutant $m sans effet (motif absent du module ou de la sortie)" >&2; return 1; }
 }
 
 # manche <étiquette> <mutants...> : sortie copiée, mutants posés, serveur lancé, page ouverte, effets relevés
 # résultat : variables R_CHARGES R_MARQUEUR R_EXFIL R_UNDO
 manche() {
   local label="$1"; shift
-  local o="$WORK/sortie-$label"; rm -rf "$o"; cp -R "$SORTIE" "$o"; plante "$o"
+  # 79-06 : serve.mjs exige --sortie=<lab>/.vibeflow/cockpit (chemin réel) : chaque manche a sa copie du lab, la sortie copiée est celle de cette copie
+  local L="$WORK/lab-$label"; rm -rf "$L"; cp -R "$LAB" "$L"; local o="$L/.vibeflow/cockpit"; plante "$o"
+  MUT_OUT="$o"; rm -rf "$WORK/mod-$label"; MUT_MOD="$(cockpit_module_copie "$WORK/mod-$label")" || { R_CHARGES="copie-du-module-impossible"; return; }
   # le module d'exécution du lab piégé vit sous <lab>/.vibeflow/cockpit : les copies tournent dans leur propre dossier
   local m; for m in "$@"; do mutant "$o" "$m" || { R_CHARGES="mutant-sans-effet"; return; }; done
   rm -f "$WORK/MARQUEUR-SCRIPT-DU-LAB"; : > "$COLL_LOG"
-  local eng="$SCRIPTS/../skills/cockpit-moteur"
-  ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  local pid=$!; PIDS+=($pid)
-  for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && grep -q '"port"' "$o/.cache/server.json" && break; sleep 0.1; done
-  local port; port="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)")"
+  COCKPIT_MODULE="$MUT_MOD" COCKPIT_SORTIE="$o" COCKPIT_LOG="$WORK/serve-$label.out" cockpit_lancer "$L" VF_COCKPIT_ENGINE_DIR="$MUT_MOD/skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$MUT_MOD/scripts" || true
+  local pid="$VF_PID"
+  local port="$VF_PORT"
   local res
   if [ -n "$CHROME" ]; then
     res="$(node "$AUX/browser.mjs" "$CHROME" "http://127.0.0.1:$port/project.html#v=n:ph-1" 1500)"
@@ -226,10 +229,9 @@ await executer(chrome, async (s) => {
     .then(async (r) => ({ ...r, violations: [...s.violations] }));
 }, { csp: true });
 JS
-o="$WORK/sortie-livre"; ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-c5.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-pid5=$!; PIDS+=($pid5)
-for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && grep -q '"port"' "$o/.cache/server.json" && break; sleep 0.1; done
-port5="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)")"
+COCKPIT_LOG="$WORK/serve-c5.out" cockpit_lancer "$LAB" VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" || true
+pid5="$VF_PID"
+port5="$VF_PORT"
 X5="$(node "$AUX/italique.mjs" "$CHROME" "http://127.0.0.1:$port5/project.html")"; vf_hyg_stop "$pid5"
 assert_eq "C5.1 — la charge entre marqueurs ne devient aucun élément (img, svg, b, onerror, onload, onclick)" "$(printf '%s' "$X5" | jq_ '(j.erreur||"")+"|"+j.charges')" "|0"
 assert_eq "C5.2 — le texte de la charge est affiché tel quel et le titre de la page n'a pas bougé" "$(printf '%s' "$X5" | jq_ '[/<img src=x onerror=document.title=1>/.test(j.texte), /<svg onload=/.test(j.texte), j.titre!=="1"&&j.titre!=="2"]')" "[true,true,true]"
@@ -287,14 +289,14 @@ JS
 # résultat : R_CHARGES R_MARQUEUR R_ROWS R_VIOL
 manche_g() {
   local label="$1"; shift
-  local o="$LABG/.vibeflow/sortie-g-$label"; rm -rf "$o"; cp -R "$SORTIE_G" "$o"
+  local L="$WORK/labg-$label"; rm -rf "$L"; cp -R "$LABG" "$L"; local o="$L/.vibeflow/cockpit"   # 79-06 : serve.mjs exige --sortie=<lab>/.vibeflow/cockpit : une copie du lab par manche
+  MUT_OUT="$o"; rm -rf "$WORK/mod-g-$label"; MUT_MOD="$(cockpit_module_copie "$WORK/mod-g-$label")" || { R_CHARGES="copie-du-module-impossible"; return; }
   mkdir -p "$o/.cache/history/a"; printf '{"dir":"%s"}\n' "$LABG/evil" > "$o/.cache/skill.json"; printf '{}\n' > "$o/.cache/history/a/plan.json"; rm -f "$o/.cache/server.json"
   local m; for m in "$@"; do mutant "$o" "$m" || { R_CHARGES="mutant-sans-effet"; return; }; done
   rm -f "$WORK/MARQUEUR-SCRIPT-DU-LAB"
-  ( cd "$LABG" && VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-g-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  local pid=$!; PIDS+=($pid)
-  for _ in $(seq 1 100); do [ -s "$o/.cache/server.json" ] && grep -q '"port"' "$o/.cache/server.json" && break; sleep 0.1; done
-  local port; port="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)")"
+  COCKPIT_MODULE="$MUT_MOD" COCKPIT_SORTIE="$o" COCKPIT_LOG="$WORK/serve-g-$label.out" cockpit_lancer "$L" VF_COCKPIT_ENGINE_DIR="$MUT_MOD/skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$MUT_MOD/scripts" || true
+  local pid="$VF_PID"
+  local port="$VF_PORT"
   local res; res="$(node "$AUX/gitbrowser.mjs" "$CHROME" "http://127.0.0.1:$port/")"
   local want=""; case "$label" in temoing) want="marq" ;; esac
   local fin=$((SECONDS + ${VF_CDP_ECHEANCE_S:-60}))

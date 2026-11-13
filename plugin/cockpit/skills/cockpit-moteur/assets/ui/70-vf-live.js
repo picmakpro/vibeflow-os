@@ -51,11 +51,14 @@
 
   let badge = null, who = null;
   const lockText = (l) => {
-    const held = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present); // lab plat : un seul verrou, sans `locks`
+    const held = tenusDe(l);
     if (!held.length) return { cls: '', text: 'Driver libre', title: "Personne n'a la main" };
     const x = held[0];
-    return { cls: 'held', text: `${x.owner || '?'} · ${x.step || ''} · ${x.age_seconds ?? '?'} s`, title: held.map((y) => `${[y.scope === 'depot' ? 'dépôt' : y.scope, y.ws].filter(Boolean).join(' ')}${y.scope || y.ws ? ' : ' : ''}${y.owner || '?'}${y.step ? ` (${y.step})` : ''}`).join('\n') }; // lab plat : pas de scope, jamais « undefined : … » ; recette 68 R12 (P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04) : la portée « depot » s'affiche « dépôt » (libellé seul, la valeur scope du JSON reste depot)
+    return { cls: 'held', text: `${x.owner || '?'} · ${x.step || ''} · ${x.ageS ?? '?'} s`, title: held.map((y) => `${[y.scope === 'depot' ? 'dépôt' : y.scope, y.ws].filter(Boolean).join(' ')}${y.scope || y.ws ? ' : ' : ''}${y.owner || '?'}${y.step ? ` (${y.step})` : ''}`).join('\n') }; // lab plat : pas de scope, jamais « undefined : … » ; recette 68 R12 (P68-D-35, arbitrage Samuel, AskUserQuestion session principale Claude Code, 2026-11-04) : la portée « depot » s'affiche « dépôt » (libellé seul, la valeur scope du JSON reste depot)
   };
+  // A15 : le flux `lock` et `hello` portent { seq, at, verrous: { etat, plat, liste } }, liste blanche construite par le serveur
+  // (owner, step, ageS, scope, ws, phase, leaseS, sansSession) ; une seule aide la lit
+  const tenusDe = (l) => (Array.isArray(l?.verrous?.liste) ? l.verrous.liste.filter((x) => x && typeof x === 'object') : []);
   const KIND = { session: 'Session', subagent: 'Sous-agent', lock: 'Verrou', registered: 'Enregistré', 'dag-node': 'Nœud de DAG' };
   const duree = (s) => window.__vfEquipeRendu.duree(s); // le format vit dans 71-vf-equipe-rendu.js (chargé après ce fichier, appelé après)
   const AGENT = (w) => w.kind === 'session' || w.kind === 'subagent';
@@ -65,21 +68,21 @@
   // P68-D-39 : le verrou se lit dans le flux `lock` (rafraîchi à chaque événement), jamais dans l'ageS du `who`, figé tant que la liste ne change pas (whoSig l'exclut) ;
   // il se retrouve par son propriétaire (et sa portée quand plusieurs verrous ont le même)
   const verrouDe = (w) => {
-    const l = probe.lock, tenus = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present && x.owner === w.id);
+    const tenus = tenusDe(probe.lock).filter((x) => x.owner === w.id);
     // correspondance EXACTE sur la portée et le compartiment (M-3), jamais par sous-chaîne (`fiabilite` n'est pas `fiabilite-2`) : `tree` d'un compartiment se lit en mots
     // (mot 1 = le nom, mot 3 = la phase éventuelle, comme l'écrit vf-cockpit-who.mjs), celui d'un verrou sans compartiment est sa portée ; aucun libellé n'est reconstruit ici
     const mots = String(w.tree).split(' '), ph = (y) => /^[0-9]+(\.[0-9]+)*$/.test(String(y.phase)) ? String(y.phase) : '';
     return tenus.find((y) => y.ws ? mots[1] === y.ws && (mots[3] || '') === ph(y) : y.scope === w.tree) || (tenus.length === 1 ? tenus[0] : undefined);
   };
-  // PU-G-179 : « tenu depuis » dit la date de PRISE (lease_seconds), jamais l'âge du dernier battement (age_seconds, qui repart à 0) ; absente : « tenu » sans durée
-  const ageDe = (w) => (w.kind !== 'lock' ? w.ageS : typeof verrouDe(w)?.lease_seconds === 'number' ? verrouDe(w).lease_seconds : null);
+  // PU-G-179 : « tenu depuis » dit la date de PRISE (leaseS), jamais l'âge du dernier battement (ageS, qui repart à 0) ; absente : « tenu » sans durée
+  const ageDe = (w) => (w.kind !== 'lock' ? w.ageS : typeof verrouDe(w)?.leaseS === 'number' ? verrouDe(w).leaseS : null);
   const tenuDepuis = (n) => (typeof n === 'number' ? 'tenu depuis' + NB + h(duree(n)) : 'tenu');
-  // le détenteur d'un verrou (PU-G-177, 179) : une session de la collecte se nomme par son titre, jamais par son identifiant brut ; un verrou dont `session_ids` n'en nomme aucune de la collecte dit « aucune session active »
-  // (une session muette sans enfant n'est pas dans `who` : ni « orphelin » ni « introuvable » ; `session_ids` vide, ou collecte pas encore reçue : aucun verdict)
+  // le détenteur d'un verrou (PU-G-177, 179) : une session de la collecte se nomme par son titre, jamais par son identifiant brut ; un verrou que le serveur dit sans session de la collecte (`sansSession`) dit « aucune session active »
+  // (une session muette sans enfant n'est pas dans `who` : ni « orphelin » ni « introuvable » ; liste d'identifiants vide, ou collecte pas encore reçue : le serveur ne dit rien, aucun verdict)
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-/i;
   const sessions = () => (who?.workers || []).filter((w) => w.kind === 'session');
   const detenteur = (id) => (sessions().some((s) => s.id === id) ? window.__vfEquipeRendu.nomDeSession(who.workers, id) : UUID.test(String(id)) ? null : id || null);
-  const sansSession = (x) => !!who && Array.isArray(x?.session_ids) && x.session_ids.length > 0 && !x.session_ids.some((i) => sessions().some((s) => s.id === i));
+  const sansSession = (x) => x?.sansSession === true;
   // verrous et nœuds : un verrou dit « tenu depuis … » (durée au sens explicite) ; un nœud de DAG périmé n'est plus montré (P71.5-D-14), un nœud récent reste (aucun agent ne le porte forcément)
   const ligneVerrou = (w) => { const nom = detenteur(w.id), vide = sansSession(verrouDe(w)), gl = window.__vfEquipeRendu.glyphe;
     return `<li><span>${vide ? gl('orphelin', 'aw-s-orphelin') : ''}<b>${h(w.kind === 'lock' && w.tree === 'depot' ? 'dépôt' : String(w.tree || '').replace(/^compartiment /, ''))}</b>${nom ? ' · ' + h(nom) : ''}</span><span class="n">${vide ? 'aucune session active · ' : ''}${tenuDepuis(ageDe(w))}</span></li>`; };
@@ -87,10 +90,10 @@
   const ligneNoeud = (w) => `<li><span><b>${h(KIND[w.kind] || w.kind)}${w.role ? ' · ' + h(w.role) : ''}</b>${w.task ? ' · ' + h(w.task) : ''}</span><span class="n">${h(duree(ageDe(w)))}</span></li>`;
   const pluriel = (n, un, plusieurs) => `${n} ${n > 1 ? plusieurs : un}`;
   const driverLigne = () => {
-    const l = probe.lock, tenus = (Array.isArray(l?.locks) ? l.locks : l?.present ? [l] : []).filter((x) => x.present);
+    const tenus = tenusDe(probe.lock);
     if (!tenus.length) return '<p class="aw-driver"><span class="t">' + "Personne n'a la main" + '</span></p>';
     const x = tenus[0], nom = detenteur(x.owner) || (UUID.test(String(x.owner)) ? 'non listée' : '?'); // PU-G-177 : la session qui pilote, en clair
-    return `<p class="aw-driver"><span class="d"></span><span class="t">Session qui pilote : ${h(nom)}${x.step ? ' · ' + h(x.step) : ''}</span><span class="n">${tenuDepuis(x.lease_seconds)}</span></p>`;
+    return `<p class="aw-driver"><span class="d"></span><span class="t">Session qui pilote : ${h(nom)}${x.step ? ' · ' + h(x.step) : ''}</span><span class="n">${tenuDepuis(x.leaseS)}</span></p>`;
   };
   // le CSS du tiroir vit avec ses rendus (71-vf-equipe-rendu.js, chargé après ce fichier) : posé une fois, au premier dessin
   let cssPose = false;
@@ -265,7 +268,7 @@
     });
     es.addEventListener('reload', () => { if (window.FLOORPLAN_RELOAD) window.FLOORPLAN_RELOAD(); else location.reload(); }); // AUDC-H1 : la carte reconstruite recharge la page par ce flux (le viewer n'en ouvre plus un second)
     es.addEventListener('who', (e) => setWho(vu(JSON.parse(e.data)).who));
-    es.addEventListener('lock', (e) => showLock(vu(JSON.parse(e.data)).lock));
+    es.addEventListener('lock', (e) => showLock(vu(JSON.parse(e.data))));
     es.addEventListener('git', (e) => { const d = vu(JSON.parse(e.data)); document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: d.sig } })); }); // 78-09 : signal sans contenu, l'en-tête et le tiroir relisent leurs routes
     es.addEventListener('patch', (e) => {
       const d = vu(JSON.parse(e.data));

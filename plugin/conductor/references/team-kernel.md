@@ -15,7 +15,7 @@
 
 | Brique | Script / contrat | Garantie |
 |---|---|---|
-| **Verrou de driver** | `driver-lock.sh` (acquire / heartbeat / release / status / recover / takeover / reclaim, TTL ; register / close / orphans pour le registre des agents dispatchés) | une seule mission pilote par compartiment dans un lab partitionné (un seul verrou dans un lab plat), un seul geste de dépôt à la fois ; la reprise d'un lock périmé est un geste EXPLICITE et tracé (`takeover`), jamais un effet de bord d'une acquisition ordinaire (`acquire` refuse et nomme la marche à suivre) ; `reclaim` re-rattache une session légitime sans jamais prolonger la fraîcheur du lock (Phase 32) ; chaque dispatch (manager ET worker) est consigné à côté du verrou (`<lock>.children.jsonl`, append-only), `reclaim`/`takeover` rendent l'inventaire des agents encore `running` (feuille vers racine) et un manager de remplacement les fait arrêter par la session principale avant tout dispatch (issue #82, doctrine `dev-orchestrator-references/mission-flow.md` §Pattern I) |
+| **Verrou de driver** | `driver-lock.sh` (acquire / heartbeat / release / status / recover / takeover / reclaim / mark-progress, TTL ; register / close / orphans / registry pour le registre des agents dispatchés ; publish-plan pour le plan de mission) | une seule mission pilote par compartiment dans un lab partitionné (un seul verrou dans un lab plat), un seul geste de dépôt à la fois ; la reprise d'un lock périmé est un geste EXPLICITE et tracé (`takeover`), jamais un effet de bord d'une acquisition ordinaire (`acquire` refuse et nomme la marche à suivre) ; `reclaim` re-rattache une session légitime sans jamais prolonger la fraîcheur du lock (Phase 32) ; chaque dispatch (manager ET worker) est consigné à côté du verrou (`<lock>.children.jsonl`, append-only), `reclaim`/`takeover` rendent l'inventaire des agents encore `running` (feuille vers racine) et un manager de remplacement les fait arrêter par la session principale avant tout dispatch (issue #82, doctrine `dev-orchestrator-references/mission-flow.md` §Pattern I) |
 | **Plan de bataille** | `dag.sh` (init / add --deps **--scope** / ready / mark / reopen / status) | contrôle de flux déterministe ; la frontière `ready` est une **liste à dispatcher en parallèle** quand les périmètres sont disjoints ; `reopen` force `review_regime=full` sur tout nœud de revue/jointure rouvert — aucun allègement ne s'applique jamais à un diff de comblement (D-14, Phase 20) |
 | **Rapports typés** (Pattern C) | `{ statut: passed\|gaps_found\|human_needed\|blocked, findings[{severity, action: auto-fix\|no-op\|ask-user, ref, confiance?}], noeuds_debloques[], confiance? }` | fin de l'interprétation de prose ; escalade humaine impérative sur `ask-user` ; `confiance` (0–1, optionnel, 2026-09-24) ne qualifie qu'un **jugement** — jamais une preuve machine — et un `passed` de jugement sous `SEUIL_CONFIANCE` est requalifié `gaps_found` + `ask-user` par le manager (doctrine et seuil : `dev-orchestrator-references/mission-contracts.md` §Confiance d'un jugement, implémentation de référence) |
 | **Halt conditions** | 5 codes (P11) : boucle sans progrès · action destructive · ressource manquante · budget épuisé · drift de scope | l'humain arbitre en 30 s sur un message structuré |
@@ -363,6 +363,27 @@ compartiment. `dag.sh init --ws --phase` lie le DAG à la phase (`progress_epoch
 
 Protocole complet (registre, snapshot de budget, DAG, refus nommés) : `dev-orchestrator-references/mission-flow.md`
 §Verrou par compartiment (lab partitionné).
+
+## Nœud dans le mandat, plan de mission publié (Phase 79, SOCL-05)
+
+Chaque mandat, de tout manager quel que soit le métier, porte dans son digest la ligne `Nœud` du
+gabarit de `dev-orchestrator-references/mission-contracts.md` §Digest de mission ; elle n'est pas
+recopiée ici (une seule voix, ADR-057). Un manager d'un autre métier, dont le gabarit de digest
+est écrit dans son agent, ajoute la même ligne à son digest. La valeur est l'identifiant rendu par
+`dag.sh add` (`added`, jamais l'identifiant demandé quand `remapped` est vrai) ; quand le registre
+(`register --node`) n'a pas d'entrée pour l'agent, c'est cette ligne que le cockpit lit pour
+rattacher l'agent à son nœud.
+
+Le manager qui tient un verrou publie le résumé de son plan de mission à côté du verrou (dossier
+du verrou, sous le dossier git commun, jamais dans l'arbre de travail), par
+`"$S"/driver-lock.sh publish-plan --owner="<id>" --file="<DAG>"` et les mêmes `--ws` et `--phase`
+que ses autres verbes (forme d'appel exacte : en-tête du script). Il le fait à l'initialisation,
+après `dag.sh init` et les `dag.sh add` du premier jet, puis dans le même tour que chaque
+`dag.sh mark`. Le résumé ne porte que les identifiants de nœuds, leurs dépendances, leur statut,
+le compartiment et la phase du verrou, jamais le texte libre d'un nœud. Le verbe
+`driver-lock.sh status --all` le rend dans un champ `dag` que lit le cockpit. C'est un cache :
+le disque fait foi. Un refus de publication ne bloque pas la mission : le manager le consigne à
+son rapport (finding `no-op`) et continue.
 
 ## Jeton de fence — quel commit sous quel mandat (LOCK-05)
 

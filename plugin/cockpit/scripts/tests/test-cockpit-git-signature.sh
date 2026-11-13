@@ -19,6 +19,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -113,9 +114,8 @@ mk_lab() { # $1 = dossier : lab GSD minimal
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; pose OUT, PORT, TOK ; démarre le serveur (SRV), git emballé
   "$NODE" "${2:-$SCRIPTS}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"; rm -f "$OUT/.cache/server.json"
-  PATH="$WORK/bin:$PATH" "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
+  COCKPIT_MODULE="$(cd "${2:-$SCRIPTS}/.." && pwd -P)" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" PATH="$WORK/bin:$PATH" || true   # 79-06 : le serveur est celui du module qui a assemblé (un mutant est une copie du module)
+  SRV="$VF_PID"
   PORT=0; TOK=""
   for _ in $(seq 1 50); do # le fichier peut être lu à moitié écrit : on relit jusqu'à un port valide et un jeton
     PORT="$("$NODE" "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
@@ -177,6 +177,8 @@ temps_sig() { # temps_sig <lab> : médiane de 7 appels de signatureGit (ms), 2 d
 
 # sous_cmds <journal> : la sous-commande de chaque ligne d'argv, options globales (--no-optional-locks, -c <v>, -C <dir>) écartées
 sous_cmds() { awk '{ i=1; while (i<=NF) { if ($i=="-c"||$i=="-C") i+=2; else if ($i ~ /^--/ && $i!="") i++; else break } print $i }' "$1"; }
+# config_hors <journal> : les lignes d'argv dont la sous-commande est `config` et qui ne sont pas exactement `config --name-only --get-regexp <motif>` (lecture seule des pilotes nommés, un seul motif)
+config_hors() { awk '{ i=1; while (i<=NF) { if ($i=="-c"||$i=="-C") i+=2; else if ($i ~ /^--/ && $i!="") i++; else break } if ($i=="config" && !($(i+1)=="--name-only" && $(i+2)=="--get-regexp" && NF==i+3)) print $0 }' "$1"; }
 echo "=== R2 — worktrees, index, argv journalisé, coût ==="
 build_serve "$DEPOT"
 fenetre 10000 "$WORK/w2a.sse" G_ -C "$WT" switch -q -c autre
@@ -193,7 +195,10 @@ assert_eq "R2.1d — un fichier suivi modifié sans add : aucun événement (lim
 fenetre 11000 "$WORK/w2e.sse" true
 assert_eq "R2.2a — témoin : le journal d'argv voit les appels de la signature (for-each-ref)" "$([ "$(sous_cmds "$WORK/git.log" | grep -c '^for-each-ref$')" -ge 1 ] && echo oui || echo non)" "oui"
 assert_eq "R2.2b — 11 s sans changement : aucune sous-commande log, status ni diff" "$(sous_cmds "$WORK/git.log" | grep -cE '^(log|status|diff)$')" "0"
-assert_eq "R2.2c — sous-commandes vues : seulement for-each-ref, worktree, show-ref, symbolic-ref, rev-list, rev-parse" "$(sous_cmds "$WORK/git.log" | sort -u | grep -vxE 'for-each-ref|worktree|show-ref|symbolic-ref|rev-list|rev-parse' | tr '\n' ' ')" ""
+assert_eq "R2.2c — sous-commandes vues : seulement for-each-ref, worktree, show-ref, symbolic-ref, rev-list, rev-parse, plus config (lecture des pilotes nommés du dépôt, 79-07)" "$(sous_cmds "$WORK/git.log" | sort -u | grep -vxE 'for-each-ref|worktree|show-ref|symbolic-ref|rev-list|rev-parse|config' | tr '\n' ' ')" ""
+assert_eq "R2.2d — toute sous-commande config vue est une lecture : exactement « config --name-only --get-regexp <motif> », jamais une écriture ni une autre lecture" "$(config_hors "$WORK/git.log" | wc -l | tr -d ' ')" "0"
+printf '%s\n' "--no-optional-locks -c core.fsmonitor=false -C /d config --name-only --get-regexp ^(filter)$" "-C /d config --unset core.bare" "-C /d config --get-regexp ^a$ --global" "-C /d config user.name x" "-C /d config --name-only --get-regexp" > "$WORK/config-faux.log"
+assert_eq "R2.2e — témoin : le filtre de R2.2d rougit sur une écriture, une option de plus, une lecture simple et un motif absent (4 lignes), et laisse passer la forme exacte" "$(config_hors "$WORK/config-faux.log" | wc -l | tr -d ' ')" "4"
 stop_srv
 # R2 (revue serveur 2026-11-06, S3) : la mesure vise le dépôt de CETTE suite (celui qui contient le dossier du script), jamais un chemin de poste ; hors dépôt : SAUTÉ, jamais un PASS.
 # Le plafond est large (250 ms sur la médiane de 7 appels, 3 git par appel) : il garde contre un coût démesuré, pas contre la charge de la machine (48 à 55 ms mesurés sous charge contre un plafond de 50).

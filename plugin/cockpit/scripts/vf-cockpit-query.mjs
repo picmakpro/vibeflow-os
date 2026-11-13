@@ -1,26 +1,40 @@
-// vf-cockpit-query (67-05, promu du spike 005) : interroger le graphe Projet (project.html), comme query.mjs le fait pour le
-// graphe de code. L'agent de l'onglet Projet l'appelle (c'est l'un des deux seuls Bash que son confinement autorise) ; les
-// résultats portent st et foot. Lit project.html et le cœur de query.mjs à côté de lui, dans .vibeflow/cockpit/.
+// vf-cockpit-query (67-05, promu du spike 005 ; 79-06, SOCL-09, P79-D-09) : interroger le graphe Projet (project.html), comme query-cli.mjs
+// le fait pour le graphe de code. L'agent de l'onglet Projet l'appelle PAR SON CHEMIN DANS LE MODULE (c'est l'un des deux seuls Bash que son
+// confinement autorise) ; les résultats portent st et foot. Le cœur de requête est lu dans graph-query.js du moteur du module (jamais dans
+// la sortie du lab, inscriptible par tout processus du lab) ; le lab est trouvé depuis le dossier courant et project.html est lu dans sa
+// sortie, après contrôle que le chemin reste sous le lab.
 //
-// usage: node .vibeflow/cockpit/vf-cockpit-query.mjs overview
-//        node .vibeflow/cockpit/vf-cockpit-query.mjs find "<mots>" [--limit 15]
-//        node .vibeflow/cockpit/vf-cockpit-query.mjs show <id>
-//        node .vibeflow/cockpit/vf-cockpit-query.mjs status <done|active|todo|blocked> [--in <id>] [--limit 30]
-//        node .vibeflow/cockpit/vf-cockpit-query.mjs path <idA> <idB>
-//        node .vibeflow/cockpit/vf-cockpit-query.mjs ask "<question>"      (voie locale seule, pour tester)
+// usage: node <module>/scripts/vf-cockpit-query.mjs overview
+//        node <module>/scripts/vf-cockpit-query.mjs find "<mots>" [--limit 15]
+//        node <module>/scripts/vf-cockpit-query.mjs show <id>
+//        node <module>/scripts/vf-cockpit-query.mjs status <done|active|todo|blocked> [--in <id>] [--limit 30]
+//        node <module>/scripts/vf-cockpit-query.mjs path <idA> <idB>
+//        node <module>/scripts/vf-cockpit-query.mjs ask "<question>"      (voie locale seule, pour tester)
 // Codes : 0 ok · 1 commande inconnue ou erreur (JSON { error }).
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { extraireGraphe } from './vf-cockpit-embed.mjs';
 import { projectIndex, answerLocally } from './vf-cockpit-ask.mjs';
+import { findLabRoot, engineDir, outputDir, confiner } from './vf-cockpit-paths.mjs';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const G = extraireGraphe(fs.readFileSync(path.join(here, 'project.html'), 'utf8'));
-// moteur de requête du graphe (query.mjs, partie avant la CLI), comme le serveur le charge
-const coreSrc = fs.readFileSync(path.join(here, 'query.mjs'), 'utf8').split('// ---- cli ----')[0];
-const { createGraphQuery } = new Function(`${coreSrc.replace(/^import .*$/gm, '')}; return { createGraphQuery };`)();
-const q = createGraphQuery(G), I = projectIndex(G);
+let G, q, I;
+try {
+  const lab = findLabRoot(process.cwd());
+  if (!lab) throw new Error('aucun lab (dossier .planning) trouvé depuis le dossier courant');
+  const moteur = engineDir(here).chemin;
+  if (!moteur) throw new Error('moteur du module introuvable à côté du dossier de scripts');
+  const page = confiner(lab, path.join(outputDir(lab), 'project.html'));
+  G = extraireGraphe(fs.readFileSync(page, 'utf8'));
+  // moteur de requête du graphe (graph-query.js du module), comme le serveur le charge
+  const coreSrc = fs.readFileSync(path.join(moteur, 'assets', 'graph-query.js'), 'utf8');
+  const { createGraphQuery } = new Function(`${coreSrc}; return { createGraphQuery };`)();
+  q = createGraphQuery(G); I = projectIndex(G);
+} catch (e) {
+  console.log(JSON.stringify({ error: e.message }));
+  process.exit(1);
+}
 
 const argv = process.argv.slice(2);
 const flag = (name) => { const i = argv.indexOf('--' + name); if (i < 0) return undefined; const v = argv[i + 1]; argv.splice(i, 2); return v; };

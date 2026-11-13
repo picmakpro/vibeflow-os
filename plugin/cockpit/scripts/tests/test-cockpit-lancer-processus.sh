@@ -21,6 +21,7 @@ export REAL_HOME="$HOME"; export HOME="$WORK/home"
 export VF_COCKPIT_MODE_DIR="$WORK/etat"; unset XDG_CACHE_HOME # AUDC-B-05 : le mode retenu d'un lancement accepté va dans un dossier jetable, jamais dans le dossier d'état réel de l'utilisateur ni de la CI
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"   # 79-06 : cockpit_module_muter (le mutant de code vit dans une copie du MODULE, jamais dans la sortie)
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
@@ -79,13 +80,13 @@ for (;;) {
 }
 JS
 cat > "$AUX/parent.mjs" <<'JS'
-// parent.mjs <sortie> <lab> <moteur> <travail> : joue P (PL-10.1). Lance le processus de Q de la sortie (IPC json), lui envoie `init`, consigne ses messages
+// parent.mjs <sortie> <lab> <moteur> <travail> <dossier-de-scripts> : joue P (PL-10.1). Lance le processus de Q de la sortie (IPC json), lui envoie `init`, consigne ses messages
 // (sauf `pret`) ; serveur de commande 127.0.0.1 : POST /send (retransmet le corps JSON), GET /recus, POST /stop. Première ligne de sortie : PRET <Q> <commande> <P>.
 import { fork } from 'node:child_process'; import http from 'node:http'; import net from 'node:net';
-const [, , sortie, lab, moteur, travail] = process.argv;
+const [, , sortie, lab, moteur, travail, scripts] = process.argv;
 const libre = () => new Promise((r) => { const s = net.createServer().listen(0, '127.0.0.1', () => { const p = s.address().port; s.close(() => r(p)); }); });
 const portP = await libre(); const recus = []; let portQ = null, portC = null;
-const enfant = fork(sortie + '/vf-cockpit-terminal-processus.mjs', [], { env: process.env, cwd: lab, stdio: ['inherit', 'inherit', 'inherit', 'ipc'], serialization: 'json' });
+const enfant = fork(scripts + '/vf-cockpit-terminal-processus.mjs', [], { env: process.env, cwd: lab, stdio: ['inherit', 'inherit', 'inherit', 'ipc'], serialization: 'json' });
 const pret = () => { if (portQ && portC) console.log(`PRET ${portQ} ${portC} ${portP}`); };
 enfant.on('message', (m) => { if (m && m.t === 'pret') { portQ = m.port; pret(); } else recus.push(m); });
 enfant.send({ t: 'init', engineDir: moteur, root: lab, here: sortie, jetons: [], portP, envOrigine: { ...process.env, PATH: travail + '/fauxbin:' + process.env.PATH } });
@@ -123,11 +124,15 @@ mklab() { local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$B/phases/01-socle";
   printf -- '---\nwave: 1\nfiles_modified: [src/u.js]\n---\n<objective>Poser le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"
   git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"; }
-mutant() { # mutant <nom> <expression-sed>... -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé (« mutant sans effet »)
-  local d="$WORK/mut-$1" f e; local a; a=(); shift; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/vf-cockpit-terminal-processus.mjs"; [ -f "$f" ] || return 1
-  for e in "$@"; do a+=(-e "$e"); done
-  cp "$f" "$f.orig"; sed -i.bak "${a[@]}" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+MODULE="$(cd "$SCRIPTS/.." && pwd -P)"; MUT_OUT=""; MUT_MOD=""
+mod_de() { if [ -n "$MUT_OUT" ] && [ "$1" = "$MUT_OUT" ]; then printf '%s\n' "$MUT_MOD"; else printf '%s\n' "$MODULE"; fi; } # racine du module qui sert une sortie : la copie mutée pour MUT_OUT, sinon celui du dépôt
+mutant() { # mutant <nom> <expression-sed>... -> MUT_OUT (données) + MUT_MOD (copie du module muté) ; code 1 si la cible manque ou si la copie n'a pas changé (« mutant sans effet »)
+  local d="$WORK/mut-$1" e x=""; shift; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  for e in "$@"; do x="${x:+$x
+}$e"; done
+  cockpit_module_muter "$(basename "$d")" vf-cockpit-terminal-processus.mjs "$x" || return 1
+  MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; return 0
 }
 LAB="$WORK/lab"; mklab "$LAB"; OUT="$LAB/.vibeflow/cockpit"
 
@@ -136,7 +141,7 @@ NM=0; QP=0; CP=0; PP=0; SECRET=""; PARENT=""; FPID=""; FLUX=""; ARME=2000
 manche_debut() { # manche_debut <sortie> -> QP CP PP SECRET PARENT FPID FLUX
   NM=$((NM+1)); local s="$1" am="$WORK/amorce.$NM" po="$WORK/parent-$NM.out"; FLUX="$WORK/flux-$NM.out"; : > "$FLUX"; rm -f "$RUN/argv" "$RUN/argv.tmp" "$RUN/recept.hex"; mkdir -p "$s/.cache"
   node -e "console.log(require('crypto').randomBytes(24).toString('hex'))" > "$am.tmp"; (umask 077; tr -d '\n' < "$am.tmp" > "$s/.cache/terminal-amorce"; tr -d '\n' < "$am.tmp" > "$am")
-  VF_COCKPIT_LANCER_ARME_MS=$ARME node "$AUX/parent.mjs" "$s" "$LAB" "$ENG" "$WORK" > "$po" 2>&1 < /dev/null & PARENT=$!; PIDS+=($PARENT)
+  VF_COCKPIT_LANCER_ARME_MS=$ARME node "$AUX/parent.mjs" "$s" "$LAB" "$(mod_de "$s")/skills/cockpit-moteur" "$WORK" "$(mod_de "$s")/scripts" > "$po" 2>&1 < /dev/null & PARENT=$!; PIDS+=($PARENT)
   for _ in $(seq 1 100); do grep -q '^PRET ' "$po" 2>/dev/null && break; sleep 0.1; done
   read -r _ QP CP PP < <(grep '^PRET ' "$po" | head -1); QP="${QP:-0}"; CP="${CP:-0}"; PP="${PP:-0}"
   SECRET="$(node "$TA" amorcer "$QP" "$am" | sed -n 2p)"

@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 // vf-cockpit-build — assemble le cockpit d'un lab GSD sous <lab>/.vibeflow/cockpit (67-03, P67-D-06).
 // Sans modèle : scan, architecture mécanique (onglet Code brut), graphe Projet du socle, build du moteur
-// vendorisé, épissure des deux pages, copie du code d'exécution. Aucun appel à `claude`.
-// Exports : assembler({ lab, quiet, scriptsDir }), fichiersExecution(scriptsDir), OUTILS_ASSEMBLAGE.
+// vendorisé, épissure des deux pages. La sortie ne porte que des données : le code s'exécute depuis le module. Aucun appel à `claude`.
+// Exports : assembler({ lab, quiet, scriptsDir, annotateurs }), fichiersExecution(scriptsDir), OUTILS_ASSEMBLAGE, ANNOTATEURS, appliquerAnnotateurs.
+// Annotateurs du graphe Code (A27) : une ligne `[nom, fonction]` par annotateur, à sa place alphabétique ;
+// il tourne à chaque assemblage et modifie `g` en mémoire seulement.
 // CLI : node vf-cockpit-build.mjs [<lab>] [--quiet]   Codes : 0 ok · 2 pas de .planning · 3 moteur absent · 4 échec d'une étape.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -10,16 +12,25 @@ import { read as lireGarde, lireConfine, clipMot } from './vf-cockpit-planning.m
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { execFileSync } from 'node:child_process';
 import { findLabRoot, engineDir, envGit, configFiltres, filtresEtat, MAX_FILTRES, outputDir, verifierSortie } from './vf-cockpit-paths.mjs';
+import { signatureDuLab, lireSignature, ecrireSignature } from './vf-cockpit-code-cache.mjs';
+import { OUTILS_ASSEMBLAGE, fichiersExecution } from './vf-cockpit-module.mjs';
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { enteteGit } from './vf-cockpit-git-entete.mjs';
 import { ecrireArchitecture } from './vf-cockpit-code.mjs';
 import { insererGraphe } from './vf-cockpit-embed.mjs';
-import { renommerHtml, renommerTexte, MARQUEUR_LICENCE } from './vf-cockpit-rename.mjs';
+import { renommerPageMoteur, MARQUEUR_LICENCE } from './vf-cockpit-rename.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
-// outils d'assemblage et de test : jamais recopiés dans la sortie (le motif général les y mettrait)
-export const OUTILS_ASSEMBLAGE = [/^vf-cockpit-build\.mjs$/, /^vf-cockpit-rename\.mjs$/, /^vf-cockpit-code.*\.mjs$/, /^vf-cockpit-fr-.*\.mjs$/];
-export const fichiersExecution = (scriptsDir) => fs.readdirSync(scriptsDir).filter((f) => /^vf-cockpit-.*\.mjs$/.test(f) && !OUTILS_ASSEMBLAGE.some((re) => re.test(f))).sort();
+export { OUTILS_ASSEMBLAGE, fichiersExecution }; // déplacés dans vf-cockpit-module.mjs (79-06) : ré-exportés pour leurs importeurs
+// la sortie ne porte plus que des données : l'assemblage purge ce que les versions précédentes y ont laissé (code et contrat), jamais autre chose
+const CODE_ANCIEN = [/\.mjs$/, /^vf-cockpit-interface\.json$/];
+function purgerCodeAncien(sortie) {
+  for (const f of fs.readdirSync(sortie)) {
+    if (!CODE_ANCIEN.some((re) => re.test(f))) continue;
+    const p = path.join(sortie, f);
+    try { if (!fs.lstatSync(p).isDirectory()) fs.rmSync(p, { force: true }); } catch {} // le lien lui-même, jamais sa cible
+  }
+}
 
 const GITIGNORE = '# Sortie générée par le cockpit VibeFlow : ignorée par git (ce fichier compris).\n*\n';
 const fin = (code, msg) => { const e = new Error(msg); e.code = code; return e; };
@@ -51,8 +62,70 @@ const run = (engine, script, lab, ...a) => {
   }
 };
 
-export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
+// ---- annotateurs du graphe Code (A27) : `annotateur(g, ctx)` modifie `g` en mémoire, synchrone, indépendant des autres ----
+// ctx = { lab, sortie, project, arch, eng }
+function annoterDescriptions(g, { lab }) { // descriptions tirées du frontmatter ou de l'en-tête des scripts ; rend le nombre de fichiers décrits
+  let decrits = 0;
+  for (const f of g.files) {
+    const txt = lireConfine(lab, () => lireGarde(path.join(lab, f.p))).slice(0, 6000); // AUDC-A-02 : défense en profondeur assumée — le scan écarte déjà un lien sortant, donc aucun cas de suite ne dépend de ce seul confinement ; il garde l'assemblage sûr si la liste du scan change
+    const fmBlock = /^---\n([\s\S]*?)\n---/.exec(txt)?.[1];
+    let d = '';
+    if (fmBlock) { d = /^description:\s*"?(.*?)"?\s*$/m.exec(fmBlock)?.[1] || ''; const nm = /^name:\s*(.*)$/m.exec(fmBlock)?.[1]; if (nm) f.name = nm.trim(); }
+    else if (/\.(sh|bash)$/.test(f.p)) d = txt.split('\n').slice(txt.startsWith('#!') ? 1 : 0).filter((l, i, a) => /^#/.test(l) && a.slice(0, i).every((x) => /^#/.test(x))).map((l) => l.replace(/^#+\s?/, '')).join(' ');
+    else if (f.p.endsWith('.md')) d = nettoyerMarkdown(txt.replace(/^#.*$/gm, '')).split(/\n\s*\n/).map((p) => p.replace(/\s+/g, ' ').trim()).find((p) => p.length > 30) || '';
+    if (d) { f.d = extraitBrut(sentence(d)); f.auto = false; decrits++; }
+  }
+  return decrits;
+}
+const annoterGit = (g, { lab }) => { g.meta.vfGit = enteteGit(lab); }; // 78-04 : nom du dépôt, branche, worktree
+function annoterLogos(g, { eng }) {
+  const logo = (n) => 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(eng.chemin, 'assets', n)).toString('base64');
+  g.meta.vfLogos = { clair: logo('vibeflow-logo-clair.svg'), sombre: logo('vibeflow-logo-sombre.svg') };
+}
+const annoterOnglet = (g, { arch }) => { g.meta.vfTab = 'code'; g.meta.vfCodeExtractor = arch.extracteur; };
+const annoterSchema = (g) => { g.schema = 'vf-cockpit/graph@1'; }; // garde:annot-schema — seul champ de données amont qui porte le nom du produit
+function annoterTouche(g, { project }) { // index inverse fichier -> plans
+  const touch = Object.create(null); // un chemin `constructor` ou `__proto__` du lab n'est qu'une clé
+  for (const f of project.files) for (const p of f.touched || []) (touch[p] ||= []).push({ ref: 'f:' + f.p, label: f.name.slice(0, 90), st: f.st });
+  g.meta.vfTouch = touch;
+}
+// la table (une ligne par annotateur, ordre alphabétique par nom : l'ordre d'exécution ne doit rien changer au résultat)
+export const ANNOTATEURS = [
+  ['descriptions', annoterDescriptions],
+  ['git', annoterGit],
+  ['logos', annoterLogos],
+  ['onglet', annoterOnglet],
+  ['schema', annoterSchema],
+  ['touche', annoterTouche],
+];
+function validerAnnotateurs(table) {
+  const vus = new Set();
+  if (!Array.isArray(table)) throw fin(4, 'table des annotateurs invalide : un tableau est attendu');
+  for (const l of table) {
+    const [nom, f] = Array.isArray(l) ? l : [];
+    const ok = typeof nom === 'string' && nom && typeof f === 'function' && !vus.has(nom);
+    if (!ok) throw fin(4, `table des annotateurs invalide (${String(nom).slice(0, 60)})`);
+    vus.add(nom);
+  }
+}
+export function appliquerAnnotateurs(g, ctx, table = ANNOTATEURS) {
+  validerAnnotateurs(table);
+  const retours = {};
+  for (const [nom, f] of table) {
+    let r;
+    try { r = f(g, ctx); } catch (e) { throw fin(4, `échec de l'annotateur ${nom} du graphe Code. Cause : ${String(e && e.message).slice(0, 200)}`); }
+    if (r && typeof r.then === 'function') {
+      r.catch(() => {});
+      throw fin(4, `échec de l'annotateur ${nom} du graphe Code. Cause : annotateur asynchrone refusé`);
+    }
+    retours[nom] = r;
+  }
+  return retours;
+}
+
+export function assembler({ lab: labArg, quiet = false, scriptsDir: sd, annotateurs = ANNOTATEURS } = {}) {
   const t0 = Date.now();
+  validerAnnotateurs(annotateurs); // avant toute écriture
   const lab = findLabRoot(labArg || process.cwd());
   if (!lab) throw fin(2, 'aucun dossier .planning trouvé : le cockpit se construit dans un lab GSD.');
   const scriptsDir = sd || HERE; // AUDC-B-06 : le dossier de scripts de l'assembleur est son propre emplacement, jamais une VF_COCKPIT_SCRIPTS_DIR héritée
@@ -62,9 +135,17 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
   if (fs.existsSync(path.dirname(sortie))) verifierSortie(lab, path.dirname(sortie)); // M4 : aucun lien symbolique avant la moindre écriture
   fs.mkdirSync(sortie, { recursive: true });
   verifierSortie(lab, sortie);
+  purgerCodeAncien(sortie); // avant toute écriture : la sortie n'est jamais source de code (P79-D-26)
 
   const ferme = etatMoteur(lab).ferme; // R6 : dit dans le résumé quand git du moteur reste fermé
-  run(eng.chemin, 'scan.mjs', lab); // le moteur refuse un dossier de sortie non vide qui n'est pas encore une carte : .gitignore après
+  // AB1 : un lab inchangé (fichiers, index git, environnement git et code du moteur) ne relance pas le scan ;
+  // la signature est posée APRÈS un scan réussi, effacée avant
+  const sigLab = signatureDuLab({ lab, moteur: eng.chemin, etatGit: JSON.stringify([ferme, filtresEtat(lab, lab).noms]) });
+  if (!(sigLab && sigLab === lireSignature(sortie) && fs.existsSync(path.join(sortie, '.cache', 'scan.json')))) {
+    fs.rmSync(path.join(sortie, '.cache', 'scan-signature.json'), { force: true });
+    run(eng.chemin, 'scan.mjs', lab); // le moteur refuse un dossier de sortie non vide qui n'est pas encore une carte : .gitignore après
+    if (sigLab) ecrireSignature(lab, sortie, sigLab);
+  }
   const arch = ecrireArchitecture({ lab, sortie });
   const project = buildProjectGraph(lab);
   // travail récent : les deux dernières phases exécutées du jalon en cours (plans à SUMMARY)
@@ -81,41 +162,23 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd } = {}) {
   run(eng.chemin, 'build.mjs', lab, '--no-claude-md');
   fs.writeFileSync(path.join(sortie, '.gitignore'), GITIGNORE); // deux lignes : commentaire VibeFlow puis *
 
-  // onglet Code : descriptions tirées du frontmatter ou de l'en-tête des scripts, et index inverse fichier -> plans
+  // onglet Code : les annotateurs de la table (descriptions, index inverse fichier -> plans, logos, entête Git…) puis le schéma
   const g = JSON.parse(read(path.join(sortie, 'graph.json')));
-  let decrits = 0;
-  for (const f of g.files) {
-    const txt = lireConfine(lab, () => lireGarde(path.join(lab, f.p))).slice(0, 6000); // AUDC-A-02 : défense en profondeur assumée — le scan écarte déjà un lien sortant, donc aucun cas de suite ne dépend de ce seul confinement ; il garde l'assemblage sûr si la liste du scan change
-    const fmBlock = /^---\n([\s\S]*?)\n---/.exec(txt)?.[1];
-    let d = '';
-    if (fmBlock) { d = /^description:\s*"?(.*?)"?\s*$/m.exec(fmBlock)?.[1] || ''; const nm = /^name:\s*(.*)$/m.exec(fmBlock)?.[1]; if (nm) f.name = nm.trim(); }
-    else if (/\.(sh|bash)$/.test(f.p)) d = txt.split('\n').slice(txt.startsWith('#!') ? 1 : 0).filter((l, i, a) => /^#/.test(l) && a.slice(0, i).every((x) => /^#/.test(x))).map((l) => l.replace(/^#+\s?/, '')).join(' ');
-    else if (f.p.endsWith('.md')) d = nettoyerMarkdown(txt.replace(/^#.*$/gm, '')).split(/\n\s*\n/).map((p) => p.replace(/\s+/g, ' ').trim()).find((p) => p.length > 30) || '';
-    if (d) { f.d = extraitBrut(sentence(d)); f.auto = false; decrits++; }
-  }
-  const touch = Object.create(null); // un chemin `constructor` ou `__proto__` du lab n'est qu'une clé
-  for (const f of project.files) for (const p of f.touched || []) (touch[p] ||= []).push({ ref: 'f:' + f.p, label: f.name.slice(0, 90), st: f.st });
-  const logo = (n) => 'data:image/svg+xml;base64,' + fs.readFileSync(path.join(eng.chemin, 'assets', n)).toString('base64');
-  const vfLogos = { clair: logo('vibeflow-logo-clair.svg'), sombre: logo('vibeflow-logo-sombre.svg') };
-  g.meta.vfTab = 'code'; g.meta.vfTouch = touch; g.meta.vfCodeExtractor = arch.extracteur; g.meta.vfLogos = vfLogos; g.meta.vfGit = enteteGit(lab); // 78-04 : nom du dépôt, branche, worktree
-  g.schema = 'vf-cockpit/graph@1'; // seul champ de données amont qui porte le nom du produit
+  const decrits = appliquerAnnotateurs(g, { lab, sortie, project, arch, eng }, annotateurs).descriptions || 0;
   fs.writeFileSync(path.join(sortie, 'graph.json'), JSON.stringify(g));
 
   // les deux pages : même viewer, données différentes
-  const html = read(path.join(sortie, 'index.html'));
+  const html = renommerPageMoteur(read(path.join(sortie, 'index.html'))); // A48 : la page du moteur est renommée AVANT l'insertion des données
   fs.writeFileSync(path.join(sortie, 'index.html'), insererGraphe(html, { ...g, meta: { ...g.meta, repos: [] } }).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Code</title>'));
-  project.meta.root = g.meta.root; project.meta.vfLogos = vfLogos; project.meta.vfGit = g.meta.vfGit;
+  project.meta.root = g.meta.root; project.meta.vfLogos = g.meta.vfLogos; project.meta.vfGit = g.meta.vfGit;
   fs.writeFileSync(path.join(sortie, 'project.html'), insererGraphe(html, project).replace(/<title>[^<]*<\/title>/, '<title>VibeFlow · Projet</title>'));
 
-  // code d'exécution du socle, licences, pointeur de dossier de scripts (jamais de modèle ni de dernière commande)
-  for (const f of fichiersExecution(scriptsDir)) fs.copyFileSync(path.join(scriptsDir, f), path.join(sortie, f));
-  for (const f of ['index.html', 'project.html']) { // marque blanche : la sortie seulement, jamais la copie amont ni les données du lab
-    const p = path.join(sortie, f); const h = renommerHtml(read(p));
+  // bannière de licence (marque blanche : déjà faite sur la page du moteur, jamais sur les données du lab)
+  for (const f of ['index.html', 'project.html']) {
+    const p = path.join(sortie, f); const h = read(p);
     const licence = `<!-- ${MARQUEUR_LICENCE} : logiciel tiers sous licence MIT, voir LICENSE et LICENCES-TIERCES.txt (floorplan) -->`;
     fs.writeFileSync(p, /^<!doctype[^\n]*\n/i.test(h) ? h.replace(/^(<!doctype[^\n]*\n)/i, `$1${licence}\n`) : `${licence}\n${h}`);
   }
-  for (const f of ['serve.mjs', 'query.mjs', ...fichiersExecution(scriptsDir)]) { const p = path.join(sortie, f); fs.writeFileSync(p, renommerTexte(read(p))); }
-  fs.copyFileSync(path.join(scriptsDir, 'vf-cockpit-interface.json'), path.join(sortie, 'vf-cockpit-interface.json'));
   for (const f of ['LICENSE', 'LICENCES-TIERCES.txt']) fs.copyFileSync(path.join(eng.chemin, f), path.join(sortie, f));
   fs.mkdirSync(path.join(sortie, '.cache'), { recursive: true });
   fs.writeFileSync(path.join(sortie, '.cache', 'vf-cockpit.json'), JSON.stringify({ scriptsDir, engineDir: eng.chemin, builtAt: new Date().toISOString() }, null, 2));

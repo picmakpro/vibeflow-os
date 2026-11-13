@@ -9,7 +9,6 @@
 # Le poste d'essai n'a pas besoin de `claude` : un faux, posé dans le PATH d'origine du shell, tient le pré-vol du lancement.
 # Chaque absence a son témoin positif dans le même scénario. Sans Chrome : FIN.1, FIN.3 et FIN.4 annoncent « NON vérifiée ». Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"; TA="$HERE_T/terminal-aux.mjs"
@@ -17,6 +16,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; RUN="$WORK
 export REAL_HOME="$HOME"; export HOME="$WORK/home"; export CHROME_SESSION="$HERE_T/chrome-session.mjs"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 PASS=0; FAIL=0; NONVERIF=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
@@ -56,10 +56,9 @@ NS=0; SRV_PID=0; SRV_PORT=0; QP=0
 srv() { # serveur --terminal réel ; amorce neuve dans le fichier du lanceur -> SRV_PID SRV_PORT QP AMORCE
   NS=$((NS+1)); rm -f "$OUT/.cache/server.json" "$RUN/shell.pid"; mkdir -p "$OUT/.cache"
   AMORCE="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"; (umask 077; printf '%s' "$AMORCE" > "$OUT/.cache/terminal-amorce")
-  ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" TMPDIR="$WORK/tmp-serveur" exec node "$OUT/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-$NS.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$OUT/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SRV_PORT="$(sj j.port)"; QP="$(sj '(j.terminal&&j.terminal.url)||""')"; QP="${QP##*:}"
+  COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$NS.out" cockpit_lancer "$LAB" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" TMPDIR="$WORK/tmp-serveur" --terminal
+  SRV_PID="$VF_PID"
+  SRV_PORT="${VF_PORT:-0}"; QP="$(sj '(j.terminal&&j.terminal.url)||""')"; QP="${QP##*:}"
 }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
 vivant() { kill -0 "$1" 2>/dev/null && echo oui || echo non; }

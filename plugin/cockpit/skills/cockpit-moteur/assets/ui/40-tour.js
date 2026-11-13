@@ -4,6 +4,7 @@
 (() => {
   const SC = window.Floorplan;
   if (!SC) return;
+  const t = window.__vfFrT;
   const G = SC.graph;
   const { h } = SC;
   const SEEN = 'tour-seen:' + (G.project?.name || G.meta?.rootName || 'map');
@@ -46,7 +47,7 @@
   const clip = (s) => String(s || '').trim(); // the whole text: a step is never cut short (P70-D-02)
   const okSel = (q) => { if (typeof q !== 'string' || !q) return false; try { return !!document.querySelector(q); } catch { return false; } }; // a selector from the data may be invalid
   const isProject = () => G.meta?.vfTab === 'project';
-  const listOf = (names) => names.length <= 1 ? names.join('') : `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+  const listOf = (names) => names.length <= 1 ? names.join('') : t('{} and {}', names.slice(0, -1).join(', '), names[names.length - 1]);
   const tops = G.nodes.filter((n) => !n.parent && n.id !== 'unassigned');
   const bySize = (a, b) => (b.stats?.files || 0) - (a.stats?.files || 0);
   const screensOf = (id) => (G.screens || []).filter((s) => s.app === id).length;
@@ -56,28 +57,34 @@
     const f = (G.flows || []).find((x) => !x.custom) || (G.flows || [])[0];
     if (!f || !f.steps?.length) return null;
     const first = f.steps[0]?.ref;
-    return { ref: first && SC.exists(first) ? first : 'root', flow: f.id, kicker: 'One real path', title: f.title, note: `${f.description ? clip(f.description) + ' ' : ''}Press Play to follow it through the code, one step at a time.` };
+    return { ref: first && SC.exists(first) ? first : 'root', flow: f.id, kicker: t('One real path'), title: f.title,
+      note: `${f.description ? clip(f.description) + ' ' : ''}${t('Press Play to follow it through the code, one step at a time.')}` };
   }
   function autoSteps() {
     const p = G.project || {};
     const steps = isProject()
-      ? [{ ref: 'root', kicker: 'The project', title: p.name || 'This project', note: clip(p.summary) || 'The work of this project: milestones, phases, backlog and releases.' }]
-      : [{ ref: 'root', kicker: 'The codebase', title: p.name || 'This codebase', note: clip(p.summary) || 'A map of the main parts of this app and how they talk to each other.' }];
+      ? [{ ref: 'root', kicker: t('The project'), title: p.name || t('This project'),
+        note: clip(p.summary) || t('The work of this project: milestones, phases, backlog and releases.') }]
+      : [{ ref: 'root', kicker: t('The codebase'), title: p.name || t('This codebase'),
+        note: clip(p.summary) || t('A map of the main parts of this app and how they talk to each other.') }];
     const ui = tops.filter((n) => n.kind === 'ui').sort(bySize).slice(0, 2);
     for (const n of ui) {
       const k = screensOf(n.id);
-      steps.push({ ref: 'n:' + n.id, kicker: 'What people use', title: n.label, note: clip(n.summary) + (k > 1 ? ` It has ${k} screens.` : '') });
+      steps.push({ ref: 'n:' + n.id, kicker: t('What people use'), title: n.label,
+        note: clip(n.summary) + (k > 1 ? ' ' + t('It has {} screens.', k) : '') });
     }
     let back = tops.filter((n) => n.kind === 'service' || n.kind === 'worker').sort(bySize);
     if (!back.length) back = tops.filter((n) => !['ui', 'external', 'test', 'script', 'config', 'infra', 'misc'].includes(n.kind)).sort(bySize);
-    for (const n of back.slice(0, ui.length > 1 ? 1 : 2)) steps.push({ ref: 'n:' + n.id, kicker: 'Behind the scenes', title: n.label, note: clip(n.summary) });
+    for (const n of back.slice(0, ui.length > 1 ? 1 : 2)) steps.push({ ref: 'n:' + n.id, kicker: t('Behind the scenes'), title: n.label, note: clip(n.summary) });
     const data = tops.find((n) => n.kind === 'data' && !back.includes(n));
-    if (data && steps.length < 5) steps.push({ ref: 'n:' + data.id, kicker: 'Where the data lives', title: data.label, note: clip(data.summary) });
+    if (data && steps.length < 5) steps.push({ ref: 'n:' + data.id, kicker: t('Where the data lives'), title: data.label, note: clip(data.summary) });
     const ext = tops.filter((n) => n.kind === 'external');
     if (ext.length) {
       steps.push({
-        ref: ext.length === 1 ? 'n:' + ext[0].id : 'root', lit: ext.length === 1 ? undefined : ext.slice(0, 6).map((n) => 'n:' + n.id), kicker: 'Outside services', title: ext.length === 1 ? ext[0].label : `${ext.length} outside services`,
-        note: ext.length === 1 ? clip(ext[0].summary) : `It also relies on ${listOf(ext.slice(0, 6).map((n) => n.label))}${ext.length > 6 ? ` and ${ext.length - 6} more` : ''}. They sit at the edge of the map; the lines show which parts talk to them.`,
+        ref: ext.length === 1 ? 'n:' + ext[0].id : 'root', lit: ext.length === 1 ? undefined : ext.slice(0, 6).map((n) => 'n:' + n.id), kicker: t('Outside services'),
+        title: ext.length === 1 ? ext[0].label : t('{} outside services', ext.length),
+        note: ext.length === 1 ? clip(ext[0].summary) : t('It also relies on {}{}. They sit at the edge of the map; the lines show which parts talk to them.',
+          listOf(ext.slice(0, 6).map((n) => n.label)), ext.length > 6 ? ' ' + t('and {} more', ext.length - 6) : ''),
       });
     }
     return steps;
@@ -99,7 +106,7 @@
   card.className = 'glass';
   card.hidden = true;
   card.setAttribute('role', 'dialog');
-  card.setAttribute('aria-label', 'Start here tour');
+  card.setAttribute('aria-label', t('Start here tour'));
   document.body.appendChild(card);
   let steps = [], at = -1;
   const active = () => at >= 0;
@@ -110,7 +117,7 @@
   // the outline is its own element laid over the target, found again by its selector: the page may rewrite the target's classes or replace it (the live layer does) without losing the outline
   let rings = [], ringTimer = 0; // le premier repère est la cible de l'étape ; les suivants sont des boutons de l'en-tête éclairés (.lit)
   function ringPlace() {
-    for (const r of rings) { let t = null; try { t = document.querySelector(r.sel); } catch {} const b = t && t.getBoundingClientRect(); if (!b || !b.width || !b.height) { r.el.style.display = 'none'; continue; } Object.assign(r.el.style, { display: '', left: b.left + 'px', top: b.top + 'px', width: b.width + 'px', height: b.height + 'px' }); }
+    for (const r of rings) { let tg = null; try { tg = document.querySelector(r.sel); } catch {} const b = tg && tg.getBoundingClientRect(); if (!b || !b.width || !b.height) { r.el.style.display = 'none'; continue; } Object.assign(r.el.style, { display: '', left: b.left + 'px', top: b.top + 'px', width: b.width + 'px', height: b.height + 'px' }); }
   }
   function ring(sel, lits = []) {
     clearInterval(ringTimer); ringTimer = 0; for (const r of rings) r.el.remove(); rings = [];
@@ -120,14 +127,14 @@
   // the free part of the map that the tour card does not cover: above the card or beside it, whichever is larger
   function zone() {
     const m = document.getElementById('svg').getBoundingClientRect(), a = SC.freeArea(), c = card.getBoundingClientRect();
-    const l = m.left + a.x, t = m.top + a.y, r = l + a.w, b = t + a.h;
-    const zs = [{ l, t, r, b: Math.min(b, c.top - 8) }, { l: Math.max(l, c.right + 8), t, r, b }].filter((z) => z.r - z.l > 40 && z.b - z.t > 40);
-    return zs.sort((p, q) => (q.r - q.l) * (q.b - q.t) - (p.r - p.l) * (p.b - p.t))[0] || { l, t, r, b };
+    const l = m.left + a.x, tp = m.top + a.y, r = l + a.w, b = tp + a.h;
+    const zs = [{ l, t: tp, r, b: Math.min(b, c.top - 8) }, { l: Math.max(l, c.right + 8), t: tp, r, b }].filter((z) => z.r - z.l > 40 && z.b - z.t > 40);
+    return zs.sort((p, q) => (q.r - q.l) * (q.b - q.t) - (p.r - p.l) * (p.b - p.t))[0] || { l, t: tp, r, b };
   }
   // put the card in the middle of that zone, zooming in on a small card and out on one wider than the zone, but never zooming in so far that the rest of the map leaves the free area;
   function aim(ids, retry) {
     ids = [].concat(ids); const gs = ids.map((i) => SC.state.chipEls?.get(i)).filter(Boolean); if (!gs.length) return; const box = (e) => { const b = e.getBoundingClientRect(); return { l: b.left, t: b.top, r: b.right, b: b.bottom, w: b.width, h: b.height }; };
-    const union = () => { const bs = gs.map(box); const l = Math.min(...bs.map((x) => x.l)), t = Math.min(...bs.map((x) => x.t)), r = Math.max(...bs.map((x) => x.r)), b = Math.max(...bs.map((x) => x.b)); return { l, t, r, b, w: r - l, h: b - t }; };
+    const union = () => { const bs = gs.map(box); const l = Math.min(...bs.map((x) => x.l)), tp = Math.min(...bs.map((x) => x.t)), r = Math.max(...bs.map((x) => x.r)), b = Math.max(...bs.map((x) => x.b)); return { l, t: tp, r, b, w: r - l, h: b - tp }; };
     const r = union(), z = zone(), vp = document.getElementById('viewport'), svg = document.getElementById('svg');
     const m = svg.getBoundingClientRect(), a = SC.freeArea(), F = { l: m.left + a.x, t: m.top + a.y, r: m.left + a.x + a.w, b: m.top + a.y + a.h };
     const all = [...svg.querySelectorAll('g.node')].map(box).filter((x) => x.w > 0 && x.h > 0);
@@ -182,14 +189,18 @@
     const s = steps[at], last = at === steps.length - 1;
     const tb = document.getElementById('tour-btn'); // on a phone the button sits behind the « ⋯ » menu, not at the top
     const bl = tb && tb.querySelector('.bl'), iconOnly = bl && getComputedStyle(bl).display === 'none'; // under 1 600 px the button shows its icon only
-    const tip = last ? `${tb && tb.offsetParent === null ? 'Replay this tour any time from <b>⋯ › Start here</b>.' : iconOnly ? 'Replay this tour any time from <b>the tour button (icon)</b> at the top.' : 'Replay this tour any time from <b>Start here</b> at the top.'}${window.FloorplanScreens ? ' <b>Screens</b> shows everything behind any page.' : ''}` : '';
-    card.innerHTML = `<button class="btn icon tx" data-x title="Close (Esc)" aria-label="Close tour">${SC.iconI('x')}</button>
-      <div class="tb"><div class="tk"><span>Start here</span><i></i><span>Step ${at + 1} of ${steps.length}</span>${s.kicker ? `<i></i><span>${h(s.kicker)}</span>` : ''}</div>
+    const from = t('Replay this tour any time from'), top = t('at the top.');
+    const tip = last ? `${tb && tb.offsetParent === null ? `${from} <b>${t('⋯ › Start here')}</b>.`
+      : iconOnly ? `${from} <b>${t('the tour button (icon)')}</b> ${top}` : `${from} <b>${t('Start here')}</b> ${top}`}${window.FloorplanScreens
+      ? ` <b>${t('Screens')}</b> ${t('shows everything behind any page.')}` : ''}` : '';
+    card.innerHTML = `<button class="btn icon tx" data-x title="${t('Close (Esc)')}" aria-label="${t('Close tour')}">${SC.iconI('x')}</button>
+      <div class="tb"><div class="tk"><span>${t('Start here')}</span><i></i><span>${t('Step {} of {}', at + 1, steps.length)}</span>${s.kicker ? `<i></i><span>${h(s.kicker)}</span>` : ''}</div>
       <div class="tt">${h(s.title)}</div>${s.note ? `<div class="tn">${h(s.note)}</div>` : ''}${tip ? `<div class="tip">${tip}</div>` : ''}</div>
       <div class="tf"><div class="dots">${steps.map((_, k) => `<i class="${k <= at ? 'on' : ''}"></i>`).join('')}</div>
-        <div class="acts"><button class="btn" data-x>Skip</button>
-        ${at > 0 ? `<button class="btn icon soft" data-back title="Back (←)">${SC.iconI('left')}</button>` : ''}
-        ${s.flow ? `<button class="btn primary" data-play>${SC.iconI('right')}Play it</button>${last ? '' : '<button class="btn soft" data-next>Next</button>'}` : `<button class="btn primary" data-next>${last ? 'Done' : 'Next'}</button>`}
+        <div class="acts"><button class="btn" data-x>${t('Skip')}</button>
+        ${at > 0 ? `<button class="btn icon soft" data-back title="${t('Back (←)')}">${SC.iconI('left')}</button>` : ''}
+        ${s.flow ? `<button class="btn primary" data-play>${SC.iconI('right')}${t('Play it')}</button>${last ? '' : `<button class="btn soft" data-next>${t('Next')}</button>`}`
+          : `<button class="btn primary" data-next>${last ? t('Done') : t('Next')}</button>`}
         </div>
       </div>`;
     card.querySelectorAll('[data-x]').forEach((b) => b.onclick = () => end());
@@ -237,13 +248,14 @@
   function start() {
     if (G.meta?.vfTab === 'equipe') return; // the Team tab has no tour of its own (its map is live sessions, not a codebase): it never opens, by itself or by the button
     steps = buildSteps();
-    if (steps.length < 2) { SC.toast('There is not enough on this map for a tour yet.'); return; }
+    if (steps.length < 2) { SC.toast(t('There is not enough on this map for a tour yet.')); return; }
     SC.store.set(SEEN, true);
     show(0);
   }
 
-  const tourBtn = SC.addHeaderButton({ id: 'tour-btn', label: 'Start here', icon: 'home', title: isProject() ? 'A one-minute tour of this project' : 'A one-minute tour of this codebase', onClick: (ev) => { if (active()) end(); else { start(); if (ev && ev.detail > 0) tourBtn.blur(); } } }); // ouverte à la souris, le bouton ne garde pas le focus : le clavier utilisé ensuite dans la visite n'y fait pas apparaître d'anneau (PU-G-013)
-  if (G.meta?.vfTab === 'equipe') { tourBtn.setAttribute('aria-disabled', 'true'); tourBtn.title = 'There is no tour for the Team tab'; tourBtn.style.opacity = '0.5'; tourBtn.style.cursor = 'default'; } // the Team tab has no tour designed: the button says so and does nothing
+  const tourBtn = SC.addHeaderButton({ id: 'tour-btn', label: t('Start here'), icon: 'home',
+    title: isProject() ? t('A one-minute tour of this project') : t('A one-minute tour of this codebase'), onClick: (ev) => { if (active()) end(); else { start(); if (ev && ev.detail > 0) tourBtn.blur(); } } }); // ouverte à la souris, le bouton ne garde pas le focus : le clavier utilisé ensuite dans la visite n'y fait pas apparaître d'anneau (PU-G-013)
+  if (G.meta?.vfTab === 'equipe') { tourBtn.setAttribute('aria-disabled', 'true'); tourBtn.title = t('There is no tour for the Team tab'); tourBtn.style.opacity = '0.5'; tourBtn.style.cursor = 'default'; } // the Team tab has no tour designed: the button says so and does nothing
   const ic = tourBtn.querySelector('svg');
   if (ic) ic.innerHTML = '<circle cx="12" cy="12" r="9"/><path d="m15.5 8.5-2.2 4.8-4.8 2.2 2.2-4.8z"/>'; // compass
   window.addEventListener('keydown', (ev) => {

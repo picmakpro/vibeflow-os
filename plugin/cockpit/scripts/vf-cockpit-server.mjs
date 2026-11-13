@@ -1,17 +1,14 @@
 // vf-cockpit-server — le crochet VibeFlow du serveur unique (67-04, P67-D-13, P67-D-14). Le serveur patché
 // (serve.mjs, patch P13) l'importe à côté de lui et lui délègue tout /api/vf/* APRÈS son contrôle du Host et du
 // jeton : même port que la page, aucun en-tête CORS. Le direct vient de vf-cockpit-live.mjs.
-// Export : attach({ here, root, token, inject, log }) -> { ptoken, load, pageProjet, pageEquipe, jetonValide, route, stop,
-//   avantQuestion, modes, argsAgent } (les trois derniers : crochets P14 des questions, 67-05).
-//   GET /api/vf/events  flux SSE : retry, hello { seq, lock, who }, puis patch / structural / who / lock
-//   GET /api/vf/etat    { mode, seq, derniereMaj, clients }
-//   GET /api/vf/journal  { evenements } : les 100 derniers événements du direct (nom, séquence, date, compte), sans contenu
-//   GET /api/vf/doing?id=  dernière commande d'UNE session, à la demande (schéma vibeflow/cockpit-doing@1)
-//   GET /api/vf/transcript?id=  transcript réduit d'UN agent connu (mandat d'agent, fil daté de messages et d'outils), à la demande (schéma vibeflow/cockpit-transcript@2)
-//   GET /api/vf/modeles    { modeles, defaut, lab } : liste fermée des modèles, défaut effectif, identifiant du lab
-//   GET /api/vf/git        topologie Git du lab (schéma vibeflow/cockpit-git@1), lecture seule (78-05)
-//   GET /api/vf/git/entete dépôt, branche, worktree (schéma vibeflow/cockpit-git-entete@1)
-//   GET /api/vf/lancer/cibles · POST /api/vf/lancer  lancement depuis les cartes (72-09) : servies par vf-cockpit-lancer.mjs, SEULEMENT sous `--terminal` (sinon une route inconnue)
+// Export : attach({ here, root, token, inject, log, routes = ROUTES, scriptsDir = trustedScriptsDir() }) -> { ptoken, load, pageProjet, pageEquipe, jetonValide,
+//   route, stop, avantQuestion, modes, argsAgent, substituerConsigne } (les quatre derniers : crochets P14 des questions, 67-05 ; 79-06 : le dossier du module,
+//   parent du dossier de scripts, remplace le jeton `<module>` des consignes et des règles de l'agent ; refusé ou introuvable, l'agent est indisponible), ROUTES, repondreGardee.
+// Routes GET /api/vf/* : la table ROUTES (une ligne par route : chemin, lecteur, régime). Ajouter une route = un lecteur et UNE ligne à sa place
+//   alphabétique ; sa réponse sort par repondreGardee (accès contrôlé, garde d'émission, no-store, 503 emission-refusee). Régimes HISTORIQUE (réponse
+//   JSON simple, comportement antérieur) et FLUX (le lecteur écrit le flux). Mécanisme : vf-cockpit-routes.mjs. Le sous-routeur Git (/api/vf/git…)
+//   et celui du lanceur (/api/vf/lancer/cibles · POST /api/vf/lancer, SEULEMENT sous `--terminal`) restent des délégués placés après la table.
+// GET /api/vf/state (79-12, SOCL-16) : l'état du cockpit en une enveloppe, lu en mémoire (vf-cockpit-state.mjs) ; jamais une collecte à la demande.
 // La dernière commande et le transcript ne figurent jamais dans le flux ni dans un fichier : la garde d'émission refuse tout
 // objet qui porte une clé de la liste `interdits` du contrat (vf-cockpit-interface.json, à côté), à n'importe quelle profondeur.
 // Contrat illisible ou liste vide : rien n'est émis (fermé par défaut).
@@ -21,7 +18,8 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { startLive } from './vf-cockpit-live.mjs';
 import { revealDoing, revealTranscript } from './vf-cockpit-who.mjs';
-import { resolveScriptsDir } from './vf-cockpit-paths.mjs';
+import { resolveScriptsDir, trustedScriptsDir } from './vf-cockpit-paths.mjs';
+import { dossierModule, substituerModule } from './vf-cockpit-module.mjs';
 import { ID_RE } from './vf-cockpit-lecture.mjs';
 import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
 import { buildEquipeGraph, missionsEnCours } from './vf-cockpit-equipe-carte.mjs';
@@ -29,6 +27,9 @@ import { answerLocally, instructions } from './vf-cockpit-ask.mjs';
 import { MODELES, resoudreModele, argsAgent as argsConfines } from './vf-cockpit-agent.mjs';
 import { routeGit } from './vf-cockpit-git.mjs';
 import { creerLancer } from './vf-cockpit-lancer.mjs';
+import { HISTORIQUE, FLUX, reponse, controlerAcces, creerRepartiteur } from './vf-cockpit-routes.mjs';
+import { lireState, LECTEURS } from './vf-cockpit-state.mjs';
+import { brancherFluxEtat, VIE_MS } from './vf-cockpit-flux-etat.mjs';
 
 let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
 try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
@@ -37,7 +38,67 @@ const porteInterdit = (o) => !INTERDITS.length || (!!o && typeof o === 'object' 
 // comparaison de jeton en temps constant (AUDC-B-06) : jamais un `===` sur un secret
 const memeJeton = (a, b) => { if (typeof a !== 'string' || typeof b !== 'string') return false; const x = Buffer.from(a), y = Buffer.from(b); return x.length === y.length && crypto.timingSafeEqual(x, y); };
 
-export function attach({ here, root, token, inject, log = () => {} }) {
+// réponse gardée (A11, C0) : accès contrôlé (`acces` obligatoire), puis garde d'émission, puis en-têtes, puis écriture ; jamais de CORS
+export function repondreGardee(req, res, corps, { code = 200, entetes = {}, acces, log = () => {} } = {}) {
+  if (typeof acces !== 'function') throw new Error('repondreGardee : contrôle d\'accès absent');
+  const a = acces(req);
+  if (!a || a.ok !== true) { res.writeHead(Number(a && a.code) || 403); res.end(); return; }
+  const base = { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }; // garde:reponse-nostore
+  if (corps !== undefined && porteInterdit(corps)) {
+    log('error', 'réponse refusée : contenu interdit ou contrat illisible');
+    res.writeHead(503, base); res.end('{"erreur":"emission-refusee"}'); return; // garde:reponse-503
+  }
+  const extra = {};
+  for (const [k, v] of Object.entries(entetes || {})) if (!/^(access-control-|content-type$|cache-control$)/i.test(k)) extra[k] = v;
+  res.writeHead(code, { ...extra, ...base }); res.end(corps === undefined ? undefined : JSON.stringify(corps));
+}
+
+// lecteurs : `lecteur(ctx, req, url)` rend un corps JSON, une reponse(…) ou une promesse de l'un ou de l'autre ; ctx est gelé (root, here, log, dep, clients, journal, live, fluxFerme)
+const lireEtat = (c) => ({ ...(c.live ? c.live.etat() : { mode: 'absent', seq: 0, derniereMaj: null }), clients: c.clients.size });
+const lireJournal = (c) => ({ evenements: c.journal });
+const idOuRefus = (url) => { const id = url.searchParams.get('id'); return typeof id === 'string' && ID_RE.test(id) ? id : null; };
+const lireDoing = (c, req, url) => { // jamais journalisée ni écrite : la réponse part et c'est tout
+  const id = idOuRefus(url);
+  return id === null ? reponse(400, { erreur: 'id-invalide' }) : revealDoing(c.root, id, { scriptsDir: resolveScriptsDir(c.here) });
+};
+const lireTranscript = (c, req, url) => { // à la demande seulement, jamais journalisée ni écrite (P69-D-19)
+  const id = idOuRefus(url);
+  return id === null ? reponse(400, { erreur: 'id-invalide' }) : revealTranscript(c.root, id, { scriptsDir: resolveScriptsDir(c.here) });
+};
+const lireModeles = (c) => {
+  let reel = c.root; try { reel = fs.realpathSync(c.root); } catch {} // le lab peut disparaître en cours de route : jamais une exception
+  return { modeles: MODELES, defaut: c.dep.modele, lab: crypto.createHash('sha256').update(reel).digest('hex').slice(0, 12) };
+};
+function ouvrirFlux(c, req, url, res) {
+  res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
+  res.write('retry: 1000\n\n');
+  let ouvert = true;
+  req.on('close', () => { ouvert = false; c.clients.delete(res); c.fluxFerme(); }); // inscrite avant tout délai : un onglet fermé pendant l'attente ne reçoit rien
+  c.live?.reveil?.(); // AUDC-H2 : rien n'a été collecté depuis un moment s'il n'y avait aucun onglet
+  // 79-09 : `hello` attend la première collecte (5 s au plus), puis part complet ; les doubles de suites n'ont pas `pret`
+  Promise.resolve(c.live?.pret?.(5000)).catch(() => {}).then(() => {
+    if (!ouvert) return;
+    const vide = { seq: 0, at: Date.now(), verrous: { etat: 'absente', plat: false, liste: [] } }; // A15 : la forme de hello.lock avant toute collecte
+    const snap = c.live ? c.live.snapshot() : { seq: 0, lock: vide, who: { workers: [], sources: {} } };
+    if (porteInterdit(snap)) { c.log('error', 'hello refusé : contenu interdit'); res.end(); return; }
+    res.write(`event: hello\ndata: ${JSON.stringify(snap)}\n\n`);
+    c.clients.add(res);
+  });
+}
+
+// la table des routes (A10) : une ligne par route, ordre alphabétique par chemin ; sans régime = gardée
+export const ROUTES = [
+  ['/api/vf/doing', lireDoing, HISTORIQUE],
+  ['/api/vf/etat', lireEtat, HISTORIQUE],
+  ['/api/vf/events', ouvrirFlux, FLUX],
+  ['/api/vf/journal', lireJournal, HISTORIQUE],
+  ['/api/vf/modeles', lireModeles, HISTORIQUE],
+  ['/api/vf/state', lireState],
+  ['/api/vf/transcript', lireTranscript, HISTORIQUE],
+];
+
+export function attach({ here, root, token, inject, log = () => {}, routes = ROUTES, scriptsDir = trustedScriptsDir(), vieMs = VIE_MS }) {
+  const dossier = dossierModule(scriptsDir); // racine réelle du module (null si introuvable : jamais une exception ici, l'agent est refusé à la question)
   const ptoken = crypto.randomBytes(16).toString('hex'); // onglet Projet : dit de quel onglet vient une requête
   let pageP = null, GP = null, gabarit = null, genP = 0, memoE = null; // genP : génération du gabarit ; memoE : la page Équipe déjà construite (AUDC-B-03)
   const load = () => { // relue après chaque réécriture de project.html par le direct
@@ -65,54 +126,29 @@ export function attach({ here, root, token, inject, log = () => {} }) {
   };
   const diffuser = (nom, data) => {
     if (porteInterdit(data)) { log('error', `événement ${nom} refusé : contenu interdit`); return; }
-    noter(nom, data);
+    if (nom !== 'vie') noter(nom, data); // garde:vie-journal
     const s = `event: ${nom}\ndata: ${JSON.stringify(data)}\n\n`;
     for (const c of clients) c.write(s);
   };
+  const aClient = () => clients.size > 0 || LECTEURS.actif(); // garde:lecteur-arme
   let live = null;
   try {
-    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); }, aClient: () => clients.size > 0 }); // AUDC-H2 : le filet ne collecte que si un onglet écoute
+    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => { if (nom === 'structural' || nom === 'patch') load(); diffuser(nom, data); }, aClient, nbClients: () => clients.size, garde: (o) => !porteInterdit(o) }); // AUDC-H2 : le filet ne collecte que si un onglet écoute ; garde : l'instantané passe la garde d'émission avant sa pose
   } catch (e) { log('error', `direct indisponible : ${e.message}`); }
+  const fluxEtat = brancherFluxEtat({ diffuser, seq: () => (live ? live.etat().seq : 0), nbClients: () => clients.size, vieMs }); // 79-12 : `vie` et `etat`
   lancer.sourceWho(() => (live ? live.snapshot().who : null)); // états attendue / vue / terminee des cartes lancées (72-07)
 
   const json = (res, code, obj) => { res.writeHead(code, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(obj)); };
 
+  const acces = (req) => controlerAcces(req, { jetonValide: (j) => memeJeton(j, token) || memeJeton(j, ptoken) }); // le jeton de la page Code ou celui de la page Projet
+  const contexte = Object.freeze({ root, here, log, dep, clients, journal, get live() { return live; }, fluxFerme: () => { dernierFlux = Date.now(); } });
+  const repondre = (req, res, corps, o) => repondreGardee(req, res, corps, { ...o, acces, log });
+  const repartiteur = creerRepartiteur({ table: routes, contexte, repondre, json, acces, log });
+
   function route(req, res, url) {
     if (!url.pathname.startsWith('/api/vf/')) return false;
     if (req.method !== 'GET') { if (lancer.reconnait(url)) { lancer.traiter(req, res, url); return true; } res.writeHead(405); res.end(); return true; }
-    if (url.pathname === '/api/vf/events') {
-      res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });
-      res.write('retry: 1000\n\n');
-      live?.reveil?.(); // AUDC-H2 : rien n'a été collecté depuis un moment s'il n'y avait aucun onglet
-      const snap = live ? live.snapshot() : { seq: 0, lock: { available: false }, who: { workers: [], sources: {} } };
-      if (porteInterdit(snap)) { log('error', 'hello refusé : contenu interdit'); res.end(); return true; }
-      res.write(`event: hello\ndata: ${JSON.stringify(snap)}\n\n`);
-      clients.add(res);
-      const ka = setInterval(() => res.write(': ka\n\n'), 15000);
-      req.on('close', () => { clearInterval(ka); clients.delete(res); dernierFlux = Date.now(); });
-      return true;
-    }
-    if (url.pathname === '/api/vf/etat') { json(res, 200, { ...(live ? live.etat() : { mode: 'absent', seq: 0, derniereMaj: null }), clients: clients.size }); return true; }
-    if (url.pathname === '/api/vf/journal') { json(res, 200, { evenements: journal }); return true; }
-    if (url.pathname === '/api/vf/doing') {
-      const id = url.searchParams.get('id');
-      if (typeof id !== 'string' || !ID_RE.test(id)) { json(res, 400, { erreur: 'id-invalide' }); return true; }
-      // jamais journalisée ni écrite : la réponse part et c'est tout
-      json(res, 200, revealDoing(root, id, { scriptsDir: resolveScriptsDir(here) }));
-      return true;
-    }
-    if (url.pathname === '/api/vf/transcript') {
-      const id = url.searchParams.get('id');
-      if (typeof id !== 'string' || !ID_RE.test(id)) { json(res, 400, { erreur: 'id-invalide' }); return true; }
-      // à la demande seulement, jamais journalisée ni écrite (P69-D-19) : la réponse part et c'est tout
-      json(res, 200, revealTranscript(root, id, { scriptsDir: resolveScriptsDir(here) }));
-      return true;
-    }
-    if (url.pathname === '/api/vf/modeles') {
-      let reel = root; try { reel = fs.realpathSync(root); } catch {} // le lab peut disparaître en cours de route : jamais une exception
-      json(res, 200, { modeles: MODELES, defaut: dep.modele, lab: crypto.createHash('sha256').update(reel).digest('hex').slice(0, 12) });
-      return true;
-    }
+    if (repartiteur.servir(req, res, url)) return true;
     if (routeGit(req, res, url, { root, json })) return true; // 78-05 : topologie Git, GET seul
     if (lancer.get(req, res, url)) return true;
     res.writeHead(404); res.end(); return true;
@@ -120,7 +156,7 @@ export function attach({ here, root, token, inject, log = () => {} }) {
 
   // ---- crochets des questions (P14) : la page d'où vient la question se reconnaît à son jeton ----
   function avantQuestion({ req, body, send }) {
-    body.project = memeJeton(req.headers['x-floorplan-token'], ptoken) && !!GP; // jamais lu du corps : le navigateur ne le fixe pas
+    body.project = memeJeton(req.headers['x-vf-cockpit-token'], ptoken) && !!GP; // jamais lu du corps : le navigateur ne le fixe pas
     const r = resoudreModele({ choix: body.model, env: process.env });
     if (r.erreur) { send('failure', { code: 'modele_refuse', message: `Modèle refusé : seuls ${MODELES.join(', ')} sont admis.` }); return 'repondu'; }
     body.modeleResolu = r.modele; // écrasé à chaque question, jamais écrit sur disque ni journalisé avec la question
@@ -132,11 +168,15 @@ export function attach({ here, root, token, inject, log = () => {} }) {
     }
     return 'agent';
   }
-  const modes = (MODES, body) => (body.project && GP ? { ...MODES, ask: { ...MODES.ask, instructions: instructions(GP) } } : MODES); // flow et change gardent leur schéma
-  const argsAgent = (args, body) => argsConfines(args, { modele: body.modeleResolu || resoudreModele({ env: process.env }).modele });
+  const substituerConsigne = (texte) => substituerModule(texte, dossier); // lève (français) si le dossier du module est refusé : appelée à la question, jamais au chargement
+  const modes = (MODES, body) => { // flow et change gardent leur schéma ; chaque consigne reçoit le chemin du module à la place du jeton
+    const base = body.project && GP ? { ...MODES, ask: { ...MODES.ask, instructions: instructions(GP) } } : MODES;
+    return Object.fromEntries(Object.entries(base).map(([nom, m]) => [nom, { ...m, instructions: substituerConsigne(m.instructions) }]));
+  };
+  const argsAgent = (args, body) => argsConfines(args, { modele: body.modeleResolu || resoudreModele({ env: process.env }).modele, dossierModule: dossier });
 
   return {
-    ptoken, load, route, avantQuestion, modes, argsAgent,
+    ptoken, load, route, avantQuestion, modes, argsAgent, substituerConsigne,
     pageProjet: () => pageP,
     // onglet Équipe (69-05, P69-D-17) : construite en mémoire depuis le gabarit de project.html, jamais écrite ; jeton de la page Code (inject tel quel)
     // AUDC-B-03 : mémorisée tant que rien n'a changé (même gabarit, même instantané du direct, mêmes cartes lancées) : une requête de plus ne reconstruit pas 2,5 Mo
@@ -159,6 +199,6 @@ export function attach({ here, root, token, inject, log = () => {} }) {
     // AUDC-H1 : une page n'ouvre qu'UN flux (celui-ci). Le rechargement de la carte y passe (sans séquence ni journal : la page se recharge) et chaque flux ouvert compte comme une page ouverte.
     diffuserCarte: (nom, data) => { if (nom !== 'reload') return; const s = `event: reload\ndata: ${JSON.stringify(data || {})}\n\n`; for (const c of clients) c.write(s); },
     nbPages: () => clients.size,
-    stop() { live?.stop(); for (const c of clients) c.end(); },
+    stop() { fluxEtat.stop(); live?.stop(); for (const c of clients) c.end(); },
   };
 }

@@ -20,6 +20,7 @@ export REAL_HOME="$HOME"; export HOME="$WORK/home"
 NODE="$(command -v node)"; REAL_PATH="$PATH"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 
@@ -156,10 +157,9 @@ http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127
 JS
 for s in "${NOMS[@]}"; do
   vider; rm -f "$OUT/.cache/server.json"
-  ( cd "$LAB" && PATH="$(chemin_de "$s")" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-$s.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SP=$!; PIDS+=($SP)
-  for _ in $(seq 1 100); do grep -q '"port"' "$OUT/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  PORT="$("$NODE" -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  COCKPIT_LOG="$WORK/serve-$s.out" cockpit_lancer "$LAB" PATH="$(chemin_de "$s")" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" || true
+  SP="$VF_PID"
+  PORT="$VF_PORT"
   "$NODE" "$WORK/req.mjs" "$PORT" /project.html > "$WORK/rep.out"; "$NODE" "$WORK/req.mjs" "$PORT" / >> "$WORK/rep.out"; sleep 3
   vf_hyg_stop "$SP"
   assert_eq "S-$s — aucun outil du lab exécuté au démarrage ni par le direct (which, claude, git, bash, awk, tr…)" "[$(marqueurs)]" "[]"

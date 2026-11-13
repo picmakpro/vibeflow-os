@@ -76,7 +76,7 @@ mutant() {
   assert_ne "M.$nom — la clé $cle rougit sur le mutant" "$(val "$d.out" "$cle")" "$(val "$R" "$cle")"
 }
 echo "=== M — mutations ==="
-mutant 079-titre assets/ui/20-health.js "SC.plural(total, 'thing')" "SC.plural(urgent, 'thing')" g079.titre
+mutant 079-titre assets/ui/20-health.js "t.pl(total, 'thing')" "t.pl(urgent, 'thing')" g079.titre
 mutant 079-pastille assets/ui/20-health.js "total > 99 ? '99+' : String(total)" "urgent > 99 ? '99+' : String(urgent)" g079.pastille
 mutant 081-severite scripts/lib/health.mjs "const allTest = group.every((g) => g.list.every((s) => s.test));" "const allTest = false;" g081.severite
 mutant 081-titre scripts/lib/health.mjs "const allTest = group.every((g) => g.list.every((s) => s.test));" "const allTest = false;" g081.titre
@@ -84,8 +84,8 @@ mutant 082-gros scripts/lib/health.mjs "&& !THIRD_PARTY.test(f.p) && !/(^|" "&& 
 mutant 082-inutilises scripts/lib/health.mjs "TEST_FILE.test(f.p) || THIRD_PARTY.test(f.p) ||" "TEST_FILE.test(f.p) ||" g082.inutilises
 mutant 083-moteur scripts/lib/health.mjs "if (usesSupabase) services.push('Supabase');" "services.push('Supabase');" g083.aucun
 mutant 083-ui assets/ui/20-health.js "\${!PLAN && services.length ?" "\${!PLAN ?" g083.ui.phrase_vide
-mutant 083-liste-figee assets/ui/20-health.js "services.join(', ')}.\`)}</p>\` : ''}" "services.join(', ')}. Supabase, Firebase, Stripe.\`)}</p>\` : ''}" g083.ui.avec_supabase
-mutant 084 assets/ui/20-health.js "'Health (security only)' : 'Health'" "'Health' : 'Health'" g084.projet
+mutant 083-liste-figee assets/ui/20-health.js "services.join(', ')))}</p>\` : ''}" "services.join(', ') + '. Supabase, Firebase, Stripe')))}</p>\` : ''}" g083.ui.avec_supabase
+mutant 084 assets/ui/20-health.js "t('Health (security only)') : t('Health')" "t('Health') : t('Health')" g084.projet
 
 echo
 echo "=== Bilan : $PASS passés, $FAIL en échec ==="

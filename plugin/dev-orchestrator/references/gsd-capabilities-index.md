@@ -1,5 +1,5 @@
 # GSD Capabilities Index (auto-généré — NE PAS ÉDITER)
-> Généré le 2026-09-27T22:42:31+02:00 par build-gsd-capabilities-index.sh
+> Généré le 2026-11-13T08:52:16+01:00 par build-gsd-capabilities-index.sh
 > Source : registre de capabilities du moteur GSD (`capability-registry.cjs`), schéma déclaré `1`
 
 **Ce que cette table dit.** Elle énumère ce que le moteur **déclare** à la version depuis
@@ -29,7 +29,7 @@ fichier.
 |---|---|---|---|---|
 | `ai-integration` | step | `workflow.ai_integration_phase` | — | `skip` |
 | `intel` | step | `intel.enabled` | — | `skip` |
-| `mempalace` | step | `mempalace.enabled` | — | `skip` |
+| `mempalace` | step | `mempalace.recall_on_plan` | — | `skip` |
 | `research` | step | `workflow.research` | — | `skip` |
 | `ui` | step | `workflow.ui_phase` | — | `skip` |
 | `pattern-mapper` | step | `workflow.pattern_mapper` | — | `skip` |
@@ -162,6 +162,7 @@ d'inactive, et `—` en colonne `Type` signale un toggle que le registre ne déc
 | `mempalace.enabled` | `mempalace` | boolean | non |
 | `workflow.ai_integration_phase` | `ai-integration` | boolean | oui |
 | `intel.enabled` | `intel` | boolean | non |
+| `mempalace.recall_on_plan` | `mempalace` | boolean | oui |
 | `workflow.research` | `research` | boolean | oui |
 | `workflow.ui_phase` | `ui` | boolean | oui |
 | `workflow.pattern_mapper` | `pattern-mapper` | boolean | oui |
@@ -224,4 +225,4 @@ rendre inerte : c'est exactement ce que `check-capability-activation.sh` confron
 
 ---
 
-> 12 point(s) de hook parcouru(s), 38 étage(s) déclaré(s) par le registre, 26 capability(ies) hors point de hook sur 45 déclarée(s), 26 toggle(s) gouvernant(s) distinct(s), 25 brique(s) routée(s).
+> 12 point(s) de hook parcouru(s), 38 étage(s) déclaré(s) par le registre, 26 capability(ies) hors point de hook sur 45 déclarée(s), 27 toggle(s) gouvernant(s) distinct(s), 25 brique(s) routée(s).

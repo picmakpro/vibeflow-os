@@ -17,17 +17,25 @@
       "jalon": { "requis": ["key", "icone", "texte", "ws", "phases"], "optionnels": [] },
       "mission": { "requis": ["nom", "fichier", "phaseKey", "ws", "etat", "libelle", "vie"], "optionnels": ["noeuds"], "vieNulle": ["inconnu", "done", "ready", "failed"], "vieNulleDit": "vie vaut null seulement pour ces etats : inconnu = source des verrous illisible ; done, ready, failed = aucun noeud running, verrous non lus. running et abandonnee portent toujours une vie. Lire vie: null sur etat, jamais seul." },
       "noeud": { "requis": ["id", "status", "step", "stage", "deps"], "optionnels": [] },
-      "verrou": { "requis": ["ws", "scope", "phase", "tenu", "stale", "ageS", "ttl", "progressAgeS", "owner"], "optionnels": [] },
+      "verrou": { "requis": ["ws", "scope", "phase", "tenu", "stale", "ageS", "ttl", "progressAgeS", "owner"], "dag": { "cles": ["ws", "phase", "at", "nodes"], "noeud": ["id", "deps", "status"], "statuts": ["blocked", "ready", "running", "done", "failed"], "bornes": { "noeuds": 200, "dependances": 32, "identifiant": 64 } }, "optionnels": ["step", "childrenRunning", "dag", "leaseS", "sansSession"] },
       "arbre": { "requis": ["label", "branche", "principal", "courant", "phaseActive", "retard"], "optionnels": [] },
       "retard": { "requis": ["base", "main", "origin", "fetchAgeS"], "optionnels": [] },
       "etatsVerrous": ["lue", "absente", "erreur"],
       "interdits": ["doing", "mandat", "messages", "outils", "fil"]
     },
+    "vibeflow/cockpit-state@1": {
+      "description": "GET /api/vf/state (79-12, C2) : l'enveloppe de l'état du cockpit. `signal` est le `signal` de vibeflow/cockpit-signal@1, de forme inchangée, nul seulement avant la première collecte (collecte.etat vaut alors en-cours). `collecte` : liste blanche de cinq champs ; les diagnostics du direct restent sur /api/vf/etat.",
+      "requis": { "schema": "string", "at": "string", "seq": "number", "collecte": "object", "signal": "any" },
+      "collecte": { "requis": ["etat", "derniereA", "dureeMs", "mode", "clients"], "optionnels": [], "etats": ["ok", "en-cours", "partielle", "indisponible"], "modes": ["watch", "poll", "absent"] },
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"]
+    },
     "vibeflow/cockpit-who@2": {
       "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "fenetre": "number", "busy": "boolean", "workers": "array", "sources": "object" },
+      "optionnels": ["sortisSilence"],
       "travailleur": {
         "requis": ["kind", "id", "tree", "source"],
-        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "action", "rattachement", "enCours"],
+        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "finMotif", "action", "rattachement", "enCours"],
+        "motifsFin": ["echec", "arret"],
         "etats": ["actif", "en-attente", "au-repos", "attend", "termine"]
       },
       "rattachement": {
@@ -50,6 +58,20 @@
     "vibeflow/cockpit-transcript@2": {
       "requis": { "schema": "string", "id": "string" },
       "optionnels": ["mandat", "fil", "tronque", "erreur"]
+    },
+    "vibeflow/cockpit-index@1": {
+      "description": "fichier d'index incrémental des transcripts du lab (.vibeflow/cockpit/.cache/index-transcripts.json), écrit par le seul serveur, jamais servi tel quel, ni exporté, ni évalué ; non fiable à la lecture (schéma, version et bornes revérifiés, fichier invalide écarté puis reconstruit) ; borné à heures, durées, jetons et verbes, sans texte ni cible",
+      "requis": { "schema": "string", "ccVerifie": "string", "versionsVues": "array", "genereA": "string", "fenetreS": "number", "evinces": "number", "voies": "array" },
+      "voie": ["id", "kind", "session", "parent", "depth", "role", "arbre", "background", "debut", "fin", "dispatchA", "fini", "arrete", "modeles", "compteurs", "jetons", "durees", "segments", "evenements", "enCours", "forme", "tronque", "versions", "curseur"],
+      "curseur": ["octets", "taille", "mtimeMs", "tete", "dernierMsgId", "usage", "maxClos", "clos", "ouverts", "lancements", "etat", "saut"],
+      "segments": ["travail", "attend-agents", "attend-humain", "repos", "silence"],
+      "evenements": ["compaction", "erreur", "humain", "rapport", "dispatch"],
+      "compteurs": ["appels", "erreurs", "refus", "questions", "compactions", "tours", "reponsesApi"],
+      "jetons": ["entree", "sortie", "cacheLu", "cacheCree", "contexteMax", "contexteDernier"],
+      "durees": ["travailS", "attenteHumainS", "attenteAgentsS", "reposS", "silenceS"],
+      "bornes": { "fenetreS": 86400, "silenceS": 180, "segments": 500, "evenements": 500, "ouverts": 64, "lancements": 256, "clos": 256, "modeles": 4, "versions": 4, "versionsVues": 8, "role": 64, "arbre": 200, "tete": 1024, "bloc": 1048576, "ligneMax": 33554432, "fichierOctets": 33554432, "voiesMax": 2000 },
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"],
+      "jamaisStocke": ["cibles", "ecritures", "lectures", "cible"]
     },
     "vibeflow/cockpit-equipe@1": {
       "requis": { "schema": "string", "meta": "object", "project": "object", "nodes": "array", "files": "array", "links": "array", "flows": "array" },
@@ -91,7 +113,7 @@
     }
   },
   "claudeCode": {
-    "verifieSur": "2.1.317",
+    "verifieSur": "2.1.322",
     "transcript": {
       "requis": ["cwd", "type", "message", "timestamp", "sessionId"],
       "attendus": ["gitBranch", "version"]
@@ -105,10 +127,23 @@
     "transcriptSousAgent": {
       "requis": ["isSidechain", "agentId"]
     },
+    "index": {
+      "description": "champs du transcript lus par l'index incrémental (vibeflow/cockpit-index@1) : chemins pointés lus par l'accesseur unique de vf-cockpit-index-voie.mjs, jamais un texte, une entrée ou une sortie d'outil. requis : un champ absent ou de mauvais type rend la voie de forme inconnue, mesures nulles ; facultatifs : absents sans conséquence",
+      "lignesDatees": { "types": ["user", "assistant"], "requis": ["timestamp"], "facultatifs": ["type", "version", "cwd", "message.content"] },
+      "assistant": { "requis": ["message.id", "message.usage.input_tokens", "message.usage.output_tokens"], "facultatifs": ["message.usage.cache_read_input_tokens", "message.usage.cache_creation_input_tokens", "message.model", "message.stop_reason", "message.content"] },
+      "appel": { "requis": ["id", "name"] },
+      "resultat": { "requis": ["tool_use_id"], "facultatifs": ["is_error"] },
+      "systeme": { "facultatifs": ["subtype", "pendingBackgroundAgentCount", "timestamp"] },
+      "origine": { "facultatifs": ["origin.kind"] },
+      "permission": { "facultatifs": ["permissionDecision.decision"] },
+      "types": { "type": "string", "timestamp": "string", "version": "string", "cwd": "string", "message.id": "string", "message.usage.input_tokens": "number", "message.usage.output_tokens": "number", "message.usage.cache_read_input_tokens": "number", "message.usage.cache_creation_input_tokens": "number", "message.model": "string", "message.stop_reason": "string", "message.content": "array", "id": "string", "name": "string", "tool_use_id": "string", "is_error": "boolean", "subtype": "string", "pendingBackgroundAgentCount": "number", "origin.kind": "string", "permissionDecision.decision": "string" }
+    },
     "vueAgents": {
-      "description": "sortie de `claude agents --json` (AUDC-V8), enrichissement optionnel de l'état des sessions ; jamais la source unique",
+      "description": "sortie de `claude agents --json` (AUDC-V8) : source de référence de l'état des sessions, lue derrière ce contrat de forme (AUDC-Q4) ; les transcripts en sont le repli quand la commande est absente, en échec, trop lente ou de forme inattendue",
       "cleSession": "sessionId",
       "etats": { "working": "actif", "blocked": "attend", "done": "termine", "failed": "termine", "stopped": "termine" },
+      "motifs": { "failed": "echec", "stopped": "arret" },
+      "motifsDit": "cause d'une session finie, jamais d'un état vivant : `failed` donne `echec`, `stopped` donne `arret`, `done` aucune ; elle sort en `finMotif` du travailleur (l'état reste `termine`)",
       "statuts": { "busy": "actif", "waiting": "attend", "idle": "au-repos" }
     },
     "transcriptTitre": {

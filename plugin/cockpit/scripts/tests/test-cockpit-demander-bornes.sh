@@ -14,6 +14,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export HOME="$WORK/home"; NODE="$(command -v node)"
 SRV=""; cleanup() { [ -n "$SRV" ] && vf_hyg_stop "$SRV"; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
 
@@ -77,10 +78,9 @@ node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || 
 OUT="$LAB/.vibeflow/cockpit"
 demarrer() { # demarrer [VAR=val ...] -> PORT, TOK, PTOK
   [ -n "$SRV" ] && vf_hyg_stop "$SRV"; SRV=""; rm -f "$OUT/.cache/server.json" "$WORK"/fkd/call-*.json
-  ( cd "$LAB" && export PATH="$WORK/fk:$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" && { [ "$#" -eq 0 ] || export "$@"; } && exec "$NODE" ${NODE_ARGS:+$NODE_ARGS} "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do grep -q '"port"' "$OUT/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  PORT="$(H json "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+  COCKPIT_NODE_ARGS="${NODE_ARGS:-}" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$LAB" PATH="$WORK/fk:$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" "$@" || true
+  SRV="$VF_PID"
+  PORT="$VF_PORT"
   H r "$PORT" GET / '{}' "$WORK/p.txt"; TOK="$(sed -n 's/.*VF_COCKPIT_SERVER={"token":"\([0-9a-f]*\)".*/\1/p' "$WORK/p.txt" | head -1)"
 }
 ask() { # ask <jeton> <session|""> <sortie> -> $3 (statut puis flux)
@@ -130,10 +130,10 @@ done
 H r "$PORT" GET /api/vf/etat "{\"x-vf-cockpit-token\":\"$TOK\",\"Sec-Fetch-Site\":\"same-origin\"}" "$WORK/d3.txt"
 assert_eq "D3.2 — témoin : une route d'API avec son jeton répond toujours" "$(H statut "$WORK/d3.txt")" "200"
 cat > "$AUX/memo.mjs" <<'JS'
-// memo.mjs <sortie> <lab> : (le module de la SORTIE assemblée, marque blanche appliquée) le serveur du cockpit reconstruit-il la page Équipe à chaque appel ? (l'espion : inject est concaténé à chaque construction)
+// memo.mjs <sortie> <lab> <scripts> : (le module du cockpit : le code ne vient plus de la sortie, 79-06) le serveur du cockpit reconstruit-il la page Équipe à chaque appel ? (l'espion : inject est concaténé à chaque construction)
 import path from 'node:path'; import { pathToFileURL } from 'node:url';
 const [, , sortie, lab, scripts] = process.argv;
-const { attach } = await import(pathToFileURL(path.join(sortie, 'vf-cockpit-server.mjs')).href);
+const { attach } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-server.mjs')).href);
 let n = 0; const inject = { replace: () => '<!--p-->', [Symbol.toPrimitive]: () => { n++; return '<!--i-->'; } };
 const VF = attach({ here: sortie, root: lab, token: 'ab'.repeat(16), inject, log: () => {} });
 let a = null; for (let i = 0; i < 100 && !(a = VF.pageEquipe()); i++) await new Promise((r) => setTimeout(r, 100)); // le direct écrit la page Projet (avec ses données) peu après le démarrage
@@ -148,7 +148,8 @@ echo "=== D4 — injection de version : « < » échappé (AUDC-B-06 1) ==="
 demarrer VF_FAKE_VERSION='</script><b id=zz>2.1.316'
 H r "$PORT" GET / '{}' "$WORK/d4.txt"; H r "$PORT" GET /project.html '{}' "$WORK/d4p.txt"
 assert_eq "D4.1 — la page ne porte jamais la balise fermante issue de la version (page Code, page Projet)" "$(grep -c '<b id=zz>' "$WORK/d4.txt")|$(grep -c '<b id=zz>' "$WORK/d4p.txt")" "0|0"
-assert_eq "D4.2 — témoin : la version reste lisible une fois l'objet relu" "$(node -e "const t=require('fs').readFileSync('$WORK/d4.txt','utf8');const m=/VF_COCKPIT_SERVER=(\{.*?\});<\/script>/.exec(t);console.log(m?JSON.parse(m[1]).version:'absent')")" "</script><b id=zz>2.1.316"
+for _ in $(seq 1 30); do H r "$PORT" GET /api/health "{\"x-vf-cockpit-token\":\"$TOK\",\"Sec-Fetch-Site\":\"same-origin\"}" "$WORK/d4h.txt"; grep -q 'zz' "$WORK/d4h.txt" && break; sleep 0.1; done   # 79-06 : la version n'est plus dans l'objet injecté (lue en asynchrone, rendue par /api/health, JSON)
+assert_eq "D4.2 — témoin : la version (lue en asynchrone) reste lisible, intacte, dans la réponse JSON de /api/health ; la page, elle, ne la porte plus (D4.1)" "$(node -e "const t=require('fs').readFileSync('$WORK/d4h.txt','utf8');const m=/\{[^\n]*\"version\"[^\n]*\}/.exec(t);console.log(m?JSON.parse(m[0]).version:'absent')")" "</script><b id=zz>2.1.316"
 
 echo "=== D5 — le jeton se compare en temps constant (AUDC-B-06 2) ==="
 : > "$WORK/spy.txt"; NODE_ARGS="--import $AUX/espion.mjs"; demarrer VF_SPY_FILE="$WORK/spy.txt"; NODE_ARGS=""
@@ -162,7 +163,7 @@ cat > "$AUX/jeton.mjs" <<'JS'
 import path from 'node:path'; import crypto from 'node:crypto'; import { pathToFileURL } from 'node:url';
 const [, , sortie, lab, scripts] = process.argv;
 let n = 0; const o = crypto.timingSafeEqual; crypto.timingSafeEqual = (x, y) => { n++; return o(x, y); };
-const { attach } = await import(pathToFileURL(path.join(sortie, 'vf-cockpit-server.mjs')).href);
+const { attach } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-server.mjs')).href);
 const VF = attach({ here: sortie, root: lab, token: 'ab'.repeat(16), inject: '<x>', log: () => {} });
 const p = VF.ptoken, faux = p.slice(0, -1) + (p.endsWith('0') ? '1' : '0');
 console.log(JSON.stringify({ ok: VF.jetonValide(p), meme: VF.jetonValide(faux), court: VF.jetonValide(p.slice(1)), long: VF.jetonValide(p + '0'), vide: VF.jetonValide(undefined), tableau: VF.jetonValide([p]), constant: n >= 1 }));
@@ -174,7 +175,7 @@ echo "=== D6 — le lanceur ne croit pas un dossier de scripts hérité (AUDC-B-
 mkdir -p "$WORK/leurre"
 LAB6="$WORK/lab6"; cp -R "$LAB" "$LAB6"; rm -rf "$LAB6/.vibeflow"
 VF_COCKPIT_SCRIPTS_DIR="$WORK/leurre" node "$SCRIPTS/vf-cockpit.mjs" build --lab "$LAB6" > "$WORK/d6.out" 2>&1; RC6=$?
-assert_eq "D6.1 — avec une variable héritée vers un dossier sans moteur, le lanceur assemble quand même (code 0, sortie présente)" "$RC6|$([ -f "$LAB6/.vibeflow/cockpit/serve.mjs" ] && echo oui || echo non)" "0|oui"
+assert_eq "D6.1 — avec une variable héritée vers un dossier sans moteur, le lanceur assemble quand même (code 0, sortie présente)" "$RC6|$([ -f "$LAB6/.vibeflow/cockpit/index.html" ] && echo oui || echo non)" "0|oui"
 VF_COCKPIT_SCRIPTS_DIR="$WORK/leurre" node "$SCRIPTS/vf-cockpit.mjs" open --no-open --lab "$LAB6" --port "$(libre)" > "$WORK/d6o.out" 2>&1; RCO=$?
 PID6="$(sed -n 's/.*PID \([0-9][0-9]*\).*/\1/p' <(node "$SCRIPTS/vf-cockpit.mjs" status --lab "$LAB6") | head -1)"
 if [ -n "$PID6" ] && [ -r "/proc/$PID6/environ" ]; then ENV6="$(tr '\0' '\n' < "/proc/$PID6/environ")"; elif [ -n "$PID6" ]; then ENV6="$(ps eww -p "$PID6" 2>/dev/null | tr ' ' '\n')"; else ENV6=""; fi
@@ -223,7 +224,7 @@ assert_eq "D9.1 — la borne de deux exécutions est contrôlée par runAgent lu
 assert_eq "D9.2 — aucune comparaison directe (=== ou !==) d'un jeton du cockpit dans le serveur et son crochet" "$(grep -hcE "(===|!==)[[:space:]]*(ptoken|token|jeton)\b|\b(ptoken|token|jeton)[[:space:]]*(===|!==)|token'\][[:space:]]*(===|!==)" "$ENG/assets/serve.mjs" "$SCRIPTS/vf-cockpit-server.mjs" | tr '\n' ',')" "0,0,"
 LAB9="$WORK/lab9"; cp -R "$LAB" "$LAB9"; rm -rf "$LAB9/.vibeflow"
 VF_COCKPIT_SCRIPTS_DIR="$WORK/leurre" node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB9" --quiet > "$WORK/d9.out" 2>&1; RC9=$?
-assert_eq "D9.3 — l'assembleur lancé directement prend le dossier de scripts de son propre emplacement, jamais une valeur héritée (code 0, sortie présente)" "$RC9|$([ -f "$LAB9/.vibeflow/cockpit/serve.mjs" ] && echo oui || echo non)" "0|oui"
+assert_eq "D9.3 — l'assembleur lancé directement prend le dossier de scripts de son propre emplacement, jamais une valeur héritée (code 0, sortie présente)" "$RC9|$([ -f "$LAB9/.vibeflow/cockpit/index.html" ] && echo oui || echo non)" "0|oui"
 cat > "$AUX/drift-cite.mjs" <<'JS'
 import path from 'node:path'; import { pathToFileURL } from 'node:url'; import fs from 'node:fs';
 const [, , scripts] = process.argv;

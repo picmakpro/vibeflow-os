@@ -12,7 +12,6 @@
 # et les assertions se lisent ensuite dans l'ordre d'origine ; le fil d'Ariane (O2b) attend l'état posé de la page (géométrie identique sur deux images), plus une durée fixe de 500 ms.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$SCRIPTS/../skills/cockpit-moteur"
@@ -22,6 +21,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0
 # Moteur de questions : sans `claude` sur le PATH du serveur, la barre de question porte l'avis « no_engine » et mesure 56 à 75 px de plus (CI Linux, run 42486502412, R14.4 et R17.2 :
 # 376 au lieu de 432 à 800 px, 256 au lieu de 312 à 768 px, 587 au lieu de 662 à 1 024 px ; reproduit sous macOS en retirant `claude` du PATH). Les positions absolues de la suite sont celles de la barre
@@ -76,11 +76,9 @@ mklab() { # mklab <dir> [sans-agent] [sans-git] : lab GSD sans STATE.md, deux ph
 # le serveur reçoit les scripts par un lien nommé autrement que « scripts » : pas de conductor voisin, le faux driver-lock.sh de HOME répond (v1.1.1 : le conductor voisin passe avant)
 SCRIPTS_HOTE="$WORK/scripts-hote"; ln -s "$SCRIPTS" "$SCRIPTS_HOTE"
 srv() { # srv <sortie> -> SRV_PORT SRV_PID
-  local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  local o="$1" lab; lab="$(cd "$1/../.." && pwd)"
+  COCKPIT_SORTIE="$o" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE"
+  SRV_PID="${VF_PID:-}"; SRV_PORT="${VF_PORT:-0}"
 }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
 mes() { REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME" "$@"; } # mes <url> <largeurs> <resize|-> [<captures>]
@@ -133,9 +131,19 @@ assert_eq "R5.2 — panneau d'ensemble sans bloc « Maintenant » ni « Phase �
 assert_has "R5.3 — témoin : le panneau montre bien les effectifs du lab" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[0].valeur.panneau')" "phases"
 assert_eq "R6.1 — titre de l'onglet Projet : « Projet · <nom> » (format unique, AUDC-X7)" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[0].valeur.titre')" "Projet · lab-court"
 assert_eq "R6.2 — titre de l'onglet Code : « Code · <nom> » (format unique, AUDC-X7)" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[1].valeur.titre')" "Code · lab-court"
-EXPR='(async () => { const d = document.createElement("div"); d.textContent = "Thinking…"; document.body.appendChild(d); await Promise.resolve(); await Promise.resolve(); const t = d.textContent; d.remove(); return t; })()'
-XT="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$PC/project.html")"; unsrv
-assert_eq "R6.3 — « Thinking… » inséré est traduit avant toute image (deux micro-tâches)" "$(printf '%s' "$XT" | node "$AUX/ev.mjs" 'j.resultats[0].valeur')" "Réflexion…"
+# R6.3 (79-10, amendement daté 2026-11-13, rv-1021) : le texte est inséré dans le DOM par le CHEMIN D'ÉMISSION RÉEL (une question posée dans le tiroir : submitAsk écrit « Thinking… » dans la feuille
+# avant le premier await), puis lu : français affiché. Lecture unique (garde window.__r63) : le relevé est répété jusqu'à stabilité, et une seconde soumission annulerait la première.
+EXPR63='(() => { if (window.__r63) return window.__r63; const i = document.querySelector("#ask-input"); i.value = "Combien de fichiers ?"; document.querySelector("#ask-form").requestSubmit(); const t = document.querySelector("#ask-sheet").innerText; return (window.__r63 = { fr: /Réflexion…/.test(t), en: /Thinking…/.test(t) }); })()'
+PRET63='document.readyState === "complete" && !!document.querySelector("header .brand .mark") && !document.querySelector("#ask-send").disabled' # le moteur de questions est détecté (faux claude du PATH)
+XT="$(CDP_PRET="$PRET63" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$EXPR63" "http://127.0.0.1:$PC/project.html")"; unsrv
+assert_eq "R6.3 — « Thinking… » écrit par le chemin d'émission réel (question posée dans le tiroir) est montré en français, jamais en anglais (79-10)" "$(printf '%s' "$XT" | node "$AUX/ev.mjs" 'JSON.stringify(j.resultats[0].valeur)')" '{"fr":true,"en":false}'
+# mutant (dans la suite) : la même page dont l'émission contourne le traducteur (« [t('Thinking…')] » devient « ['Thinking…'] ») : R6.3 doit rougir, c'est-à-dire lire l'anglais
+LM="$WORK/lab-mutant63"; mkdir -p "$LM"; ( cd "$LC" && tar -cf - . ) | ( cd "$LM" && tar -xf - )
+sed "s/\[t('Thinking…')\]/['Thinking…']/g" "$LC/.vibeflow/cockpit/project.html" > "$LM/.vibeflow/cockpit/project.html"
+MUT_N="$(grep -c "\['Thinking…'\]" "$LM/.vibeflow/cockpit/project.html")"
+srv "$LM/.vibeflow/cockpit"; PM=$SRV_PORT
+XM="$(CDP_PRET="$PRET63" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$EXPR63" "http://127.0.0.1:$PM/project.html")"; unsrv
+assert_eq "R6.3 mutant — avec l'émission qui contourne le traducteur ($MUT_N sites mutés), la même sonde lit « Thinking… » et non « Réflexion… » (la sonde sait voir l'anglais)" "$([ "$MUT_N" -ge 1 ] && printf '%s' "$XM" | node "$AUX/ev.mjs" 'JSON.stringify(j.resultats[0].valeur)' || echo "mutation sans effet")" '{"fr":false,"en":true}'
 
 # O2 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : un fil d'Ariane profond (Vue d'ensemble / Historique / Phases) à 1 280 et 1 440 px.
 # Un segment de moins de 12 caractères n'est jamais rogné (scrollWidth <= clientWidth) ; si une troncature est nécessaire, elle porte sur un segment du MILIEU, jamais le premier ni le dernier.
@@ -468,11 +476,9 @@ done
 echo "=== R-M — carte d'une mission abandonnée : pastille « Abandonnée », pied dans la carte (sombre et clair) ==="
 mkdir -p "$WORK/locks-abs"; printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": false}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks-abs/driver-lock.sh"; chmod +x "$WORK/locks-abs/driver-lock.sh"
 LM="$WORK/lab-mission"; mklab "$LM" sans-agent
-o="$LM/.vibeflow/cockpit"; rm -f "$o/.cache/server.json"
-( cd "$LM" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$WORK/locks-abs" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-SRV_PID=$!; PIDS+=($SRV_PID)
-for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-PM="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+o="$LM/.vibeflow/cockpit"
+cockpit_lancer "$LM" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$WORK/locks-abs"
+SRV_PID="${VF_PID:-}"; PM="${VF_PORT:-0}"
 RM="$(REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-mission.mjs" "$CHROME" "http://127.0.0.1:$PM/project.html" dag-demo ${SHOTS:+"$SHOTS/mission"})"; unsrv
 assert_eq "R-M.0 — témoin : la mesure a eu lieu dans les deux thèmes, sur la carte abandonnée (data-theme sombre puis clair)" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" '(j.erreur||"")+"|"+(j.sombre||{}).n+"|"+(j.sombre||{}).theme+"|"+(j.clair||{}).n+"|"+(j.clair||{}).theme')" "|1|dark|1|light"
 for th in sombre clair; do
@@ -781,10 +787,9 @@ assert_eq "R24.5 — racine à 1 279 px : nom non rogné, racine écrite « Ense
 # se pose quand même 8 px au-dessus de la barre telle qu'elle est (PU-G-021), jamais sur elle. Le PATH du serveur est un dossier de liens vers les seuls outils dont il a besoin (jamais celui du poste, qui peut porter un vrai `claude`).
 echo "=== R25 — sans moteur de questions : l'avis allonge la barre, le zoom reste 8 px au-dessus d'elle ==="
 SANS="$WORK/bin-sans-moteur"; mkdir -p "$SANS"; for b in node git sh bash env dirname date mkdir cat rm grep sed seq sleep ln cp chmod touch kill pwd printf tr awk ps pgrep head tail wc basename uname; do p="$(command -v $b 2>/dev/null)"; [ -n "$p" ] && ln -sf "$p" "$SANS/$b"; done
-r25_serveur() { PATH="$SANS" command -v claude >/dev/null 2>&1 && { echo "  ❌ le dossier sans moteur porte un claude"; FAIL=$((FAIL+1)); }; local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && PATH="$SANS" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID); for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"; }
+r25_serveur() { PATH="$SANS" command -v claude >/dev/null 2>&1 && { echo "  ❌ le dossier sans moteur porte un claude"; FAIL=$((FAIL+1)); }; local o="$1" lab; lab="$(cd "$1/../.." && pwd)"
+  COCKPIT_SORTIE="$o" cockpit_lancer "$lab" PATH="$SANS" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE"
+  SRV_PID="${VF_PID:-}"; SRV_PORT="${VF_PORT:-0}"; }
 r25_serveur "$LC/.vibeflow/cockpit"; P_sm=$SRV_PORT; PID_sm=$SRV_PID
 OPIDS=()
 for onglet in index project; do mes "http://127.0.0.1:$P_sm/$onglet.html" 768,800,1024 - > "$WORK/r25-$onglet.json" & OPIDS+=($!); done

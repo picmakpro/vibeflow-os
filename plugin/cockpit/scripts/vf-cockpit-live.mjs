@@ -1,21 +1,27 @@
 // vf-cockpit-live — le direct du cockpit, sans serveur HTTP propre (67-04, P67-D-13, P67-D-16 ; promu du spike 003).
-// Surveille <root>/.planning et le dossier des verrous (<git-common-dir>/vf-driver), reconstruit le graphe Projet en
-// processus, pousse le diff de statuts à `onEvent`, et réécrit <sortie>/project.html par fichier temporaire puis
-// rename quand la structure change. Lecture seule sur le dépôt observé.
-// Export : startLive({ root, sortie, onEvent, log, mode }) -> { etat(), snapshot(), stop() }.
+// Surveille <root>/.planning et le dossier des verrous (<git-common-dir>/vf-driver), demande la collecte à UN fil (vf-cockpit-collecte.mjs :
+// graphe Projet, verrous, équipe ; 79-09, P79-D-12 : plus aucune collecte sur la boucle), pousse le diff de statuts à `onEvent`, pose
+// l'instantané gelé (vf-cockpit-instantane.mjs) et réécrit <sortie>/project.html par fichier temporaire puis rename quand la structure change.
+// Lecture seule sur le dépôt observé.
+// Export : startLive({ root, sortie, onEvent, log, mode, aClient, nbClients, garde, collecteur }) -> { etat(), snapshot(), reveil(), pret(ms), stop() }.
+//   garde(objet) : garde d'émission injectée par le serveur (vrai = permis), appliquée aux résultats de collecte (verrous, équipe, signal) avant leur
+//     pose et leur émission, et à la pose de l'instantané ; FERMÉE par défaut (79-09, correction ciblée) : un appelant qui n'en fournit pas ne pose
+//     ni n'émet rien de la collecte, il ne contourne pas le filtre par oubli ;
+//   collecteur : fabrique du pilote (défaut creerCollecte, seam de test).
 //   mode : 'auto' (fs.watch récursif, repli par scrutation des mtimes si l'appel lève ou si le watcher échoue),
 //          'poll' (scrutation d'emblée) ; défaut = VF_COCKPIT_WATCH. etat().mode vaut 'watch' ou 'poll'.
-// Événements : patch { seq, at, patch, vf? } · structural { seq, at } · who { seq, at, who } · lock { seq, at, lock } · git { seq, at, sig } (78-09 : signal sans contenu, la page relit ses routes).
+// Événements : patch { seq, at, patch, vf? } · structural { seq, at } · who { seq, at, who } · lock { seq, at, verrous } · git { seq, at, sig }
+//   (78-09 : signal sans contenu, la page relit ses routes). `verrous` : { etat, plat, liste } en liste blanche, construite dans le fil de la collecte (A15) ;
+//   `snapshot().lock` = { seq, at, verrous } ; le signal@1 de la dernière collecte est posé dans l'instantané.
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { execFileSync } from 'node:child_process';
-import { envEnfant } from './vf-cockpit-env.mjs';
-import { buildProjectGraph } from './vf-cockpit-project.mjs';
-import { collectWho } from './vf-cockpit-who.mjs';
-import { driverLockScript, gitCommonDir, resolveScriptsDir, confiner } from './vf-cockpit-paths.mjs';
+import { gitCommonDir, resolveScriptsDir, confiner } from './vf-cockpit-paths.mjs';
 import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
 import { signatureGit } from './vf-cockpit-git-signature.mjs';
+import { creerCollecte } from './vf-cockpit-collecte.mjs';
+import { poser } from './vf-cockpit-instantane.mjs';
+import { whoSig } from './vf-cockpit-who-signature.mjs';
 
 const IGNORE = /(^|\/)\.git(\/|$)|\.tmp$|~$|\.swp$/;
 const POLL_MS = 2000, DEBOUNCE_MS = 300, HOLD_MS = 600, NET_MS = 5000;
@@ -47,11 +53,15 @@ const empreinte = (dir) => {
 };
 const changes = (a, b) => [...new Set([...a.keys(), ...b.keys()])].filter((k) => a.get(k) !== b.get(k));
 
-// signature de la liste « qui » (PU-G-162 : testable seule, déplacée hors de startLive sans changer son corps) : poussée seulement quand la liste change, pas à chaque seconde d'âge qui passe
-export const whoSig = (w) => JSON.stringify((w.workers || []).map((x) => [x.kind, x.id, x.tree, x.branch || '', !!x.stale, x.titre || '', x.task || '', x.parent || '', x.etat || '', x.action ? `${x.action.verbe} ${x.action.cible}` : '', x.rattachement ? [x.rattachement.etat, x.rattachement.dag, x.rattachement.noeud, x.rattachement.raison].join('|') : '']));
+// signature de la liste « qui » (PU-G-162, A17) : poussée seulement quand la liste change, pas à chaque seconde d'âge qui passe ;
+// le calcul vit dans vf-cockpit-who-signature.mjs, ré-exporté ici pour ses importeurs
+export { whoSig };
 
 // aClient : y a-t-il un onglet connecté au flux ? (AUDC-H2) Sans onglet, le filet ne collecte rien ; `reveil()` rattrape à la connexion. Défaut : toujours vrai (comportement d'avant).
-export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mode = process.env.VF_COCKPIT_WATCH || 'auto', aClient = () => true }) {
+export function startLive({
+  root, sortie, onEvent = () => {}, log = () => {}, mode = process.env.VF_COCKPIT_WATCH || 'auto',
+  aClient = () => true, nbClients = () => 0, garde = () => false, collecteur = creerCollecte, // garde:live-garde-defaut
+}) {
   root = path.resolve(root);
   const common = gitCommonDir(root);
   const driverDir = process.env.VF_DRIVER_DIR || (common && path.join(common, 'vf-driver'));
@@ -60,37 +70,49 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   const timers = new Set(), watchers = new Map();
   let stopped = false;
 
-  const lockStatus = () => {
-    const dl = driverLockScript({ scriptsDir, labRoot: root, home: os.homedir() });
-    if (dl.etat === 'absent') return { available: false };
-    try { return JSON.parse(execFileSync('bash', [dl.chemin, 'status', '--all'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'], timeout: 10000, env: envEnfant(root) })); }
-    catch (e) { try { return JSON.parse(e.stdout); } catch { return { error: String(e.message).slice(0, 200) }; } }
-  };
-  const whoNow = (verrous) => { try { return collectWho(root, { scriptsDir, verrous, officiel: true }); } catch (e) { return { workers: [], sources: {}, error: e.message }; } };
-  // « qui » : poussé seulement quand la liste change (pas à chaque seconde d'âge qui passe)
-
-  let graph = buildProjectGraph(root), idx = index(graph), lock = lockStatus(), who = whoNow(lock), gitSig = null, gitSemee = false; // 78-09
-  // A5 : la signature Git est asynchrone ; le premier calcul SEME gitSig sans événement (comme avant), les suivants (filet) n'émettent qu'au changement, et seulement une fois la graine posée
-  signatureGit(root, { commun: common }).then((gs) => { if (!stopped && !gitSemee) { gitSemee = true; gitSig = gs; } }, () => {});
-  const snapshot = () => ({ seq: state.seq, lock, who });
+  // première collecte : graine posée sans événement (comme la lecture de démarrage d'avant) ; tant qu'elle n'est pas revenue,
+  // `snapshot()` rend un « qui » vide de la forme du repli du serveur
+  let refusee = false; // la garde d'émission a refusé le dernier résultat : collecte.etat vaut « partielle »
+  let graph = null, idx = new Map(), who = { workers: [], sources: {} }, semeeTour = false;
+  // A15 : projection des verrous, rang et date de leur dernière pose, signal du dernier tour
+  let verrous = { etat: 'absente', plat: false, liste: [] }, lockSeq = 0, lockAt = Date.now(), signalTour = null;
+  let gitSig = null, gitSemee = false, gitInfo = null, projetGarde = null; // 78-09 ; gitInfo : { sig, at } posé dans l'instantané (A47)
+  const collecte = collecteur({ racine: root, sortie, scriptsDir, home: os.homedir(), log });
+  const snapshot = () => ({ seq: state.seq, lock: { seq: lockSeq, at: lockAt, verrous }, who });
   const emit = (nom, data) => { try { onEvent(nom, data); } catch (e) { log('error', `onEvent(${nom}) : ${e.message}`); } };
 
+  // instantané (A31) : refusé par la garde d'émission, le précédent est gardé ; un graphe déjà approuvé n'est pas reparcouru à chaque pose
+  const poserInstantane = () => {
+    if (stopped || !graph) return;
+    const inst = { seq: state.seq, at: Date.now(), git: gitInfo, signal: signalTour, projet: graph };
+    if (!garde(projetGarde === graph ? { ...inst, projet: null } : inst)) {
+      log('error', 'instantané refusé : contenu interdit, instantané précédent gardé'); refusee = true; return;
+    }
+    projetGarde = graph;
+    try { poser(inst); } catch (e) { log('error', `instantané non posé : ${e.message}`); }
+  };
+
   // project.html : le gabarit est la page courante de la sortie ; meta.root et meta.vfLogos viennent de l'assemblage
+  // (le graphe reçu n'est pas modifié : il est gelé dans l'instantané)
   const ecrirePage = (g) => {
     const f = path.join(sortie, 'project.html');
     confiner(root, f); confiner(root, f + '.tmp'); // aucun lien symbolique dans la sortie : ni lu, ni écrasé
     const html = fs.readFileSync(f, 'utf8');
-    try { const old = extraireGraphe(html); g.meta.root = old.meta?.root; g.meta.vfLogos = old.meta?.vfLogos; g.meta.vfGit = old.meta?.vfGit; /* 78-04 */ } catch {}
-    fs.writeFileSync(f + '.tmp', insererGraphe(html, g));
+    let meta = g.meta;
+    try {
+      const old = extraireGraphe(html);
+      meta = { ...g.meta, root: old.meta?.root, vfLogos: old.meta?.vfLogos, vfGit: old.meta?.vfGit }; // 78-04
+    } catch {}
+    fs.writeFileSync(f + '.tmp', insererGraphe(html, { ...g, meta }));
     fs.renameSync(f + '.tmp', f); // jamais de page à moitié écrite
   };
 
-  const refresh = (reasons) => { try { refreshSur(reasons); } catch (e) { log('error', `refresh : ${e.message}`); } };
-  const refreshSur = (reasons) => {
+  // demande de graphe : le verrou suit quand un onglet écoute (AUDC-H2), sauf à la seconde lecture d'un retrait (déjà lu avec la première)
+  const refresh = (reasons) => { if (!stopped) collecte.demander({ planning: true, verrous: aClient() && !reasons.includes('confirm'), motifs: reasons }); };
+  const refreshSur = (g, reasons) => {
     if (stopped) return;
-    let g;
-    try { g = buildProjectGraph(root); } catch (e) { log('error', `graphe illisible, état précédent gardé : ${String(e.message).slice(0, 200)}`); return; }
     const nidx = index(g);
+    if (graph === null) { graph = g; idx = nidx; poserInstantane(); return; }
     const { patch, structural, retrait, removed } = diff(idx, nidx);
     // dag.sh save() peut laisser un fichier tronqué : tout retrait (seul ou avec un ajout) n'est cru qu'à la seconde lecture, 600 ms plus tard
     if (retrait && !reasons.includes('confirm')) {
@@ -98,18 +120,55 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
       const t = setTimeout(() => { timers.delete(t); refresh(['confirm', ...reasons]); }, HOLD_MS); timers.add(t);
       return;
     }
-    const nlock = aClient() ? lockStatus() : lock; // AUDC-H2 : sans onglet, le verrou n'est pas interrogé (la connexion suivante le relit)
-    const lockChanged = JSON.stringify(nlock) !== JSON.stringify(lock);
     const vfChanged = JSON.stringify(g.meta?.vf) !== JSON.stringify(graph.meta?.vf);
-    graph = g; idx = nidx; lock = nlock; state.seq++; state.derniereMaj = new Date().toISOString();
+    graph = g; idx = nidx; state.seq++; state.derniereMaj = new Date().toISOString();
     // la page sur disque suit TOUT changement (F5, nouvel onglet, réponses locales et vf-cockpit-query lisent project.html) : avant l'événement
     if (structural || patch.length || vfChanged) { try { ecrirePage(g); } catch (e) { log('error', `project.html non réécrit : ${e.message}`); } }
-    log('refresh', `${patch.length} patch(s)${structural ? ', structure' : ''}${lockChanged ? ', verrou' : ''}`);
+    log('refresh', `${patch.length} patch(s)${structural ? ', structure' : ''}`);
     const at = Date.now();
     if (structural) emit('structural', { seq: state.seq, at });
     else if (patch.length || vfChanged) emit('patch', { seq: state.seq, at, patch, ...(vfChanged ? { vf: g.meta.vf } : {}) });
-    if (lockChanged) emit('lock', { seq: state.seq, at, lock });
+    poserInstantane();
   };
+  const surVerrous = (n) => {
+    if (JSON.stringify(n) === JSON.stringify(verrous)) return;
+    verrous = n; lockSeq = ++state.seq; lockAt = Date.now(); emit('lock', { seq: lockSeq, at: lockAt, verrous });
+  };
+  const surTour = ({ verrous: n, equipe: nw, signal: sg }) => {
+    if (!garde({ verrous: n, equipe: nw, signal: sg })) { // garde:live-garde-tour — avant toute pose et toute émission
+      refusee = true; log('error', 'tour refusé : contenu interdit, état précédent gardé'); return;
+    }
+    refusee = false;
+    if (sg) signalTour = sg; // le signal de ce tour (toujours posé : son `at` avance même quand rien ne change)
+    if (!semeeTour) { semeeTour = true; who = nw; verrous = n; lockAt = Date.now(); poserInstantane(); return; }
+    if (whoSig(nw) !== whoSig(who)) { who = nw; emit('who', { seq: ++state.seq, at: Date.now(), who }); }
+    surVerrous(n);
+    poserInstantane();
+  };
+  collecte.surResultat((m) => {
+    if (stopped || !m) return;
+    try {
+      if (m.type === 'planning') {
+        if (m.erreur) log('error', `graphe illisible, état précédent gardé : ${String(m.erreur).slice(0, 200)}`); else refreshSur(m.graphe, m.motifs || []);
+      } else if (m.type === 'verrous') {
+        if (garde({ verrous: m.verrous })) surVerrous(m.verrous);
+        else { refusee = true; log('error', 'verrous refusés : contenu interdit, état précédent gardé'); }
+      }
+      else if (m.type === 'tour') surTour(m);
+    } catch (e) { log('error', `résultat ${m.type} : ${e.message}`); }
+  });
+
+  // A5 : la signature Git est asynchrone ; le calcul du démarrage SEME gitSig sans événement (comme avant), ceux du filet n'émettent
+  // qu'au changement, et seulement une fois la graine posée. A47 : chaque calcul réussi range { sig, at } dans l'instantané ;
+  // un doute (null) ne remplace jamais la valeur précédente. Deux sites d'appel, chacun avec son `.then` (R5.8 de test-cockpit-git-signature.sh)
+  const majGit = (gs) => { gitInfo = { sig: gs.slice(0, 16), at: Date.now() }; }; // garde:live-git
+  signatureGit(root, { commun: common }).then((gs) => {
+    if (stopped || !gs) return;
+    majGit(gs);
+    if (!gitSemee) { gitSemee = true; gitSig = gs; }
+    poserInstantane();
+  }, () => {});
+  collecte.demander({ planning: true, tour: true });
 
   // anti-rebond : une seule régénération par rafale
   let debounce = null, pending = [];
@@ -143,14 +202,13 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   // AUDC-H2 : UN seul appel au verrou par tour (partagé avec « qui »), et aucune collecte tant qu'aucun onglet n'écoute.
   let dernierTour = Date.now();
   const tour = () => {
-    dernierTour = Date.now();
-    const n = lockStatus();
-    const nw = whoNow(n);
-    if (whoSig(nw) !== whoSig(who)) { who = nw; emit('who', { seq: ++state.seq, at: Date.now(), who }); }
-    if (JSON.stringify(n) !== JSON.stringify(lock)) { lock = n; emit('lock', { seq: ++state.seq, at: Date.now(), lock }); }
-    signatureGit(root, { commun: common }).then((gs) => { // 78-09 : refs, worktrees, index ; un événement sans charge au seul changement. A5 : asynchrone, un git muet ne gèle plus la boucle
-      if (stopped || !gitSemee) return;
+    dernierTour = Date.now(); collecte.demander({ tour: true });
+    signatureGit(root, { commun: common }).then((gs) => { // 78-09 : refs, worktrees, index ; un événement sans charge au seul changement
+      if (stopped || !gs) return;
+      majGit(gs);
+      if (!gitSemee) return;
       if (gs && gs !== gitSig) { gitSig = gs; emit('git', { seq: ++state.seq, at: Date.now(), sig: gs.slice(0, 16) }); }
+      poserInstantane();
     }, () => {});
   };
   const filet = setInterval(() => { try {
@@ -160,10 +218,18 @@ export function startLive({ root, sortie, onEvent = () => {}, log = () => {}, mo
   filet.unref?.(); timers.add(filet);
 
   return {
-    etat: () => ({ mode: state.mode, seq: state.seq, derniereMaj: state.derniereMaj }),
+    etat: () => ({
+      mode: state.mode, seq: state.seq, derniereMaj: state.derniereMaj, collecte: { ...(({ etat, ...c }) => ({ ...c, etat: refusee && etat === 'ok' ? 'partielle' : etat }))(collecte.etat()), mode: state.mode, clients: nbClients() },
+    }),
     snapshot,
     // à la connexion d'un onglet : l'instantané n'a pas bougé depuis un moment (aucune collecte sans onglet), un tour le remet à jour avant d'être servi ; au plus un tour par période du filet
     reveil() { if (!stopped && Date.now() - dernierTour >= NET_MS) { try { tour(); } catch (e) { log('error', `réveil : ${e.message}`); } } },
-    stop() { stopped = true; clearTimeout(debounce); for (const t of timers) { clearTimeout(t); clearInterval(t); } for (const w of watchers.values()) { try { w.close(); } catch {} } },
+    pret: (ms = 5000) => collecte.pret(ms), // vrai quand aucune demande n'est en vol, faux après `ms` : le serveur retient `hello` jusque-là
+    stop() {
+      stopped = true; clearTimeout(debounce);
+      for (const t of timers) { clearTimeout(t); clearInterval(t); }
+      for (const w of watchers.values()) { try { w.close(); } catch {} }
+      collecte.arreter();
+    },
   };
 }

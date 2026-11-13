@@ -11,6 +11,7 @@ SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 AUX="$WORK/aux"; HOME_T="$WORK/home"; NOSCRIPTS="$WORK/noscripts"
 mkdir -p "$AUX" "$HOME_T/.claude/scripts" "$NOSCRIPTS"
 
@@ -345,12 +346,9 @@ LABD="$(cd "$LABD" && pwd -P)"
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LABD" --quiet > "$WORK/build-d.out" 2>&1 || cat "$WORK/build-d.out"
 HD="$WORK/homed"; mkdir -p "$HD/.claude/projects/-lab"
 node "$AUX/mk-d3.mjs" "$HD/.claude/projects/-lab/$SID.jsonl" "$LABD" cmd-puis-texte
-PORTD="$(node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})")"
 OUTD="$LABD/.vibeflow/cockpit"
-( cd "$LABD" && HOME="$HD" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$OUTD/serve.mjs" --no-open --port "$PORTD" > "$WORK/serve-d.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-SRVD=$!; PIDS+=($SRVD)
-for _ in $(seq 1 100); do grep -q '"port"' "$OUTD/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-PORTD="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUTD/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+cockpit_lancer "$LABD" HOME="$HD" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS"
+SRVD="${VF_PID:-}"; PORTD="${VF_PORT:-0}"
 cat > "$AUX/tiroir.js" <<'JS'
 (async () => {
   const SC = window.VibeFlow || window.Floorplan, pa = document.getElementById('panel');
@@ -682,8 +680,8 @@ mut23 branchedet vf-cockpit-equipe-carte.mjs "const branche = retireAffichage(w.
 assert_eq "M-W23-BRANCHE-DETAIL — mutant (branche brute dans le détail et le résumé) : W23.10 rougit sur le détail" "$(g23 "$WORK/w23-branchedet-b" 'j.t8[1]')" "false"
 mut23 iface vf-cockpit-interface.json '"task", "titre",' '"task",'
 assert_eq "M-W23-IFACE — mutant (contrat sans `titre`) : W23.14 rougit" "$(g23 "$WORK/w23-iface-b" 'j.t13.join(",")')" "titre"
-mut23 sig vf-cockpit-live.mjs "x.titre || ''" "0 && x.titre || ''"
-assert_eq "M-W23-SIG — mutant du juge (titre neutralisé dans whoSig par « 0 && x.titre || '' », un grep resterait vert) : W23.15 rougit" "$(g23 "$WORK/w23-sig-b" 'j.t14.join(",")')" "false,true"
+mut23 sig vf-cockpit-who-signature.mjs "'lastAt']" "'lastAt', 'titre']"
+assert_eq "M-W23-SIG — mutant du juge (titre ajouté à la liste des champs volatils de la ligne garde:who-volatils, un grep resterait vert) : W23.15 rougit" "$(g23 "$WORK/w23-sig-b" 'j.t14.join(",")')" "false,true"
 mut17 w23-lib vf-cockpit-who.mjs "LIBRES = { titre: 80," "LIBRES = {" >/dev/null
 assert_eq "M-W23-LIBRES — mutant (titre retiré de LIBRES) : W23.16 rougit" "$(grep -c "LIBRES = { titre: 80," "$WORK/mut17-w23-lib/vf-cockpit-who.mjs")" "0"
 
