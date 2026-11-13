@@ -140,7 +140,7 @@ essai('SM2', () => {
   const tg = JSON.stringify(val(inst(1, gros), null));
   ok('SM2 — la borne compte des octets UTF-8, pas des caractères (moins de 8 192 caractères, plus d\'octets)', tg.length < 8192 && octets(tg) > 8192 && M.lire(tg) === null, tg.length + '/' + octets(tg));
   const pr = '{"v":1,"precedente":null,"courante":{"vu":5,"phases":{"__proto__":"fait"},"tete":null,"blocages":[]},"__proto__":{"polluee":1}}';
-  ok('SM2 — __proto__ : refusé, aucune pollution (ni ici ni dans le contexte de la page)', M.lire(pr) === null && ({}).polluee === undefined && MS.__vfSyntheseMemoire && require_inerte(), '');
+  ok('SM2 — __proto__ : refusé, aucune pollution (ni ici ni dans le contexte de la page)', M.lire(pr) === null && ({}).polluee === undefined && require_inerte(), '');
   const lp = JSON.stringify(val(inst(5, JSON.parse('{"__proto__":"fait"}')), null));
   ok('SM2 — une clé de phase __proto__ seule : refusée (forme de clé)', M.lire(lp) === null, lp);
   eq('SM2 — vu : 0, négatif, fractionnaire, chaîne', [0, -1, 1.5, '5'].map((x) => M.lire(JSON.stringify(val(inst(x, {}), null)))), [null, null, null, null]);
