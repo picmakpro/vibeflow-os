@@ -15,6 +15,9 @@ import { trouverPhase, rattacherMission } from './vf-cockpit-avancement.mjs';
 
 const WS_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/, PH_RE = /^[0-9]+(\.[0-9]+)*$/; // grammaires de vf-cockpit-who.mjs
 const liste = (v) => (Array.isArray(v) ? v : []);
+// grammaires uniques du compartiment et de la phase : detention() et l'émission de phasesHumaines (constat d'audit 73-03) s'y plient de la même façon
+export const wsValide = (ws) => typeof ws === 'string' && (ws === '' || (WS_RE.test(ws) && !ws.includes('..')));
+export const phaseValide = (p) => typeof p === 'string' && (p === '' || PH_RE.test(p));
 
 // Graphe des nœuds valides (identifiant chaîne) : statut par identifiant, enfants par dépendance ;
 // `deps` non tableau et dépendances non chaîne sont ignorés.
@@ -54,8 +57,7 @@ export function detention(idSession, verrous) {
   for (const l of locks) {
     if (!l || typeof l !== 'object' || l.present !== true || !liste(l.session_ids).includes(idSession)) continue;
     const ws = l.ws == null ? '' : l.ws, phase = l.phase == null ? '' : l.phase;
-    if (typeof ws !== 'string' || (ws !== '' && (!WS_RE.test(ws) || ws.includes('..')))) return null;
-    if (typeof phase !== 'string' || (phase !== '' && !PH_RE.test(phase))) return null;
+    if (!wsValide(ws) || !phaseValide(phase)) return null;
     return { ws, phase };
   }
   return null;

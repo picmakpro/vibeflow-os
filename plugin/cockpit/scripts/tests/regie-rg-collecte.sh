@@ -97,6 +97,13 @@ const SC = {
     const s = session(await collecte(d), U(1)), sale = /[\u0000-\u001f\u007f-\u009f‮​]/;
     return `branch:${typeof s.branch === 'string' && s.branch.includes('feat/') && !sale.test(s.branch) ? 'propre' : 'sale ' + JSON.stringify(s.branch)}|titre:${typeof s.titre === 'string' && s.titre.includes('Mon') && !sale.test(s.titre) ? 'propre' : 'sale ' + JSON.stringify(s.titre)}`;
   },
+  // constat d'audit 1 : le ws d'une phase humaine vient d'un nom de dossier de compartiment (sans grammaire) ; phase et ref viennent aussi du disque
+  rg4s: async () => {
+    const d = lab('rg4s'), U1 = '‮', BEL = '\u0007';
+    const w = await collecte(d, { gouvernance: { phasesHumaines: [{ phase: '7', ws: 'alpha', ref: 'n:ph-7' }, { phase: '8', ws: 'be' + U1 + 'ta' + BEL, ref: 'n:ph-8' },
+      { phase: '9' + U1, ws: '' }, { phase: '10', ws: '', ref: 'n:x' + U1 + 'y' + BEL }, { phase: '11', ws: '..', ref: 'n:ph-11' }] } });
+    return JSON.stringify(w.phasesHumaines ?? 'absent');
+  },
   contrat: async () => {
     const c = JSON.parse(fs.readFileSync(path.join(scripts, 'vf-cockpit-interface.json'), 'utf8')).schemas;
     const w = c['vibeflow/cockpit-who@2'], a = c['vibeflow/cockpit-ailleurs@1'];
@@ -220,7 +227,10 @@ rg_RG16_collecte() {
   rgc_prepare5
   assert_eq "RG16.14 — toute clé émise par who@2 (premier niveau et travailleurs, collecte riche : détention, impact, phases humaines, fenêtre) est déclarée au contrat" "$(rgc contrat "$WORK/rg16c" 14 "$WORK/rg5-a/who.json")" '[]'
   rg_mutant NETTOIE-EMISSION "branche et titre repassés au seul masque" "$SCRIPTS" vf-cockpit-who.mjs 'w.branch = nettoie(w.branch, LIBRES.branch); // garde:nettoie' 'w.branch = bornes(w.branch, LIBRES.branch); // garde:nettoie' rgc16_sonde 'branch:propre|titre:propre'
+  assert_eq "RG16.15 — phasesHumaines : ws, phase et ref revalidés à l'émission (grammaire de detention) ; ws avec U+202E et BEL, phase avec U+202E, ws « .. » : entrée rejetée ; ref hors forme : ref retirée" "$(rgc16s_sonde "$SCRIPTS")" '[{"phase":"7","ws":"alpha","ref":"n:ph-7"},{"phase":"10","ws":""}]'
+  rg_mutant GRAMMAIRE-WS "la grammaire du compartiment n'est plus appliquée à l'émission de phasesHumaines" "$SCRIPTS" vf-cockpit-gouvernance-lecture.mjs '.filter((p) => p && typeof p.phase === '"'"'string'"'"' && phaseValide(p.phase) && wsValide(p.ws ?? '"'"''"'"'))' '.filter((p) => p && typeof p.phase === '"'"'string'"'"' && phaseValide(p.phase))' rgc16s_sonde '[{"phase":"7","ws":"alpha","ref":"n:ph-7"},{"phase":"10","ws":""}]'
 }
+rgc16s_sonde() { RGC_SCRIPTS="$1" rgc rg4s "$WORK/rg4s-$(basename "$1")"; }
 rg_RG16_direct() {
   assert_eq "RG16.13 — whoSig diffère quand seul un champ ajouté (attendAgents, lancee, detient, retient, orphan, phasesHumaines, fenetreStallS) diffère, et ne diffère pas quand seuls ageS et at diffèrent" "$(rgc sigs "$WORK/rg16s")" 'champs:true,true,true,true,true,true,true|age:egal'
 }

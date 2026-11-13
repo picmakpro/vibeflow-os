@@ -12,7 +12,7 @@ import path from 'node:path';
 import { readPlanning } from './vf-cockpit-planning.mjs';
 import { realUnder } from './vf-cockpit-paths.mjs';
 import { dagDe } from './vf-cockpit-vie.mjs';
-import { detention, retientDe, attendAgents, fenetreStall, scriptGarde, phasesHumaines } from './vf-cockpit-gouvernance.mjs';
+import { detention, retientDe, attendAgents, fenetreStall, scriptGarde, phasesHumaines, wsValide, phaseValide } from './vf-cockpit-gouvernance.mjs';
 
 // plan publié d'un verrou (champ `dag`, revalidé par dagDe) : un DAG de plus, rattaché par sa phase ; ignoré s'il n'a ni phase ni nœud
 const dagsDeVerrous = (brut) => (Array.isArray(brut?.locks) ? brut.locks : []).flatMap((l) => {
@@ -42,12 +42,14 @@ export function fenetreDeStall(a) {
   return fenetreStall({ texteScript: texte });
 }
 
-// phases à vérification humaine telles que collectWho les émet : chaînes bornées, `ref` seulement s'il est donné ; au plus 50 entrées
+// phases à vérification humaine telles que collectWho les émet : `phase` et `ws` revalidés par la grammaire de detention() (entrée rejetée sinon : le ws vient
+// d'un nom de dossier de compartiment du lab), `ref` seulement s'il a la forme d'un identifiant de nœud (n:<id>), sinon retiré ; chaînes bornées ; au plus 50 entrées
+const REF_RE = /^n:[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$/;
 export const phasesHumainesSortie = (liste, bornes) => (Array.isArray(liste) ? liste : []).slice(0, 50)
-  .filter((p) => p && typeof p.phase === 'string')
+  .filter((p) => p && typeof p.phase === 'string' && phaseValide(p.phase) && wsValide(p.ws ?? ''))
   .map((p) => ({
-    phase: bornes(p.phase, 20), ws: bornes(typeof p.ws === 'string' ? p.ws : '', 40),
-    ...(typeof p.ref === 'string' && p.ref ? { ref: bornes(p.ref, 140) } : {}),
+    phase: bornes(p.phase, 20), ws: bornes(p.ws ?? '', 40),
+    ...(typeof p.ref === 'string' && REF_RE.test(p.ref) ? { ref: bornes(p.ref, 140) } : {}),
   }));
 
 // tête d'un fichier de VERIFICATION : 4 Kio au plus, fichier régulier sous la racine réelle du lab, sinon texte vide
