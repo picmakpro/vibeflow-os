@@ -118,6 +118,17 @@ assert_eq "V4c.2b'' — zéro : FORME (le fichier ne liste que les fichiers à p
 assert_eq "V4c.2b3 — chemin absolu : FORME" "$(col_v2b f3 '/scripts/vf-cockpit-a.mjs 1')" "rouge FORME"
 assert_eq "V4c.2b4 — segment .. : FORME" "$(col_v2b f4 'scripts/../scripts/vf-cockpit-a.mjs 1')" "rouge FORME"
 assert_eq "V4c.2b5 — un champ de trop : FORME" "$(col_v2b f5 'scripts/vf-cockpit-a.mjs 1 2')" "rouge FORME"
+col_vdbl() { # <nom> <1re ligne> <2e ligne> : un réel d'une ligne longue, une baseline qui nomme deux fois le même fichier
+  local r; r="$(col_racine "$1")"; col_ligne "$r/scripts/vf-cockpit-a.mjs" 161; col_base "$r/b.txt" "$2" "$3"; col_juger "$r" "$r/b.txt"
+}
+assert_eq "V4c.2b6 — le même fichier nommé deux fois, deux entrées égales au réel : FORME (jamais une entrée écrasée en silence)" "$(col_vdbl dbl 'scripts/vf-cockpit-a.mjs 1' 'scripts/vf-cockpit-a.mjs 1')" "rouge FORME"
+assert_eq "V4c.2b7 — le même fichier nommé deux fois, valeurs différentes : FORME" "$(col_vdbl dbl2 'scripts/vf-cockpit-a.mjs 1' 'scripts/vf-cockpit-a.mjs 2')" "rouge FORME"
+# initialiser : écrit une baseline neuve à l'état trouvé, ne réécrit JAMAIS une baseline qui existe
+col_init_existe() { local r; r="$(col_racine init1)"; col_ligne "$r/scripts/vf-cockpit-a.mjs" 161; col_base "$r/b.txt" 'scripts/vf-cockpit-a.mjs 9'; cp "$r/b.txt" "$r/b.avant"
+  node "$CLIQUET" initialiser "$r" "$r/b.txt" > /dev/null 2>&1; local rc=$?; echo "$rc $(cmp -s "$r/b.avant" "$r/b.txt" && echo intacte || echo modifiee)"; }
+col_init_neuf() { local r rc; r="$(col_racine init2)"; col_ligne "$r/scripts/vf-cockpit-a.mjs" 161; node "$CLIQUET" initialiser "$r" "$r/neuf.txt" > /dev/null 2>&1; rc=$?; echo "$rc $(col_juger "$r" "$r/neuf.txt")"; }
+assert_eq "V4c.2c — initialiser sur une baseline qui existe : code 1, baseline intacte à l'octet" "$(col_init_existe)" "1 intacte"
+assert_eq "V4c.2c' — initialiser sur un chemin neuf : code 0 et le verdict de la baseline écrite est ok" "$(col_init_neuf)" "0 ok"
 # V4c.3 : le marqueur des gros fichiers n'exempte rien
 col_vmarq() { local r; r="$(col_racine marq)"; printf '%s\n' '// vibeflow:allow-large-file' > "$r/scripts/vf-cockpit-a.mjs"; col_ligne "$r/scripts/vf-cockpit-a.mjs" 161; col_base "$r/b.txt"; col_juger "$r" "$r/b.txt"; }
 assert_eq "V4c.3 — le marqueur vibeflow:allow-large-file dans les cinq premières lignes n'exempte pas une ligne de 161 : HAUSSE" "$(col_vmarq)" "rouge HAUSSE"
@@ -152,12 +163,25 @@ DELEG='décision déléguée par Samuel (message session principale, 2026-11-08)
 assert_eq "V4c.5g — la ligne de délégation ne vaut pas citation d'une hausse : code 1 et HAUSSE-SANS-ARBITRAGE" "$(col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' "$DELEG")" "1 HAUSSE-SANS-ARBITRAGE"
 assert_eq "V4c.5g' — la délégation et un arbitrage direct sur deux lignes : code 0" "$(col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' "$DELEG
 $CITE")" "0 "
+# V4c.5h : toute forme de délégation écarte la ligne, pas seulement « déléguée » : une hausse ne se règle jamais par une ligne de délégation
+col_cmp3() { col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' "$1"; }
+DELEG_FORME='décision prise par délégation de Samuel (message session principale, 2026-11-08), option recommandée'
+assert_eq "V4c.5h — « par délégation de Samuel » (la forme relevée par la revue rv-11, avec le mot « décision ») ne vaut pas citation d'une hausse : code 1" "$(col_cmp3 "$DELEG_FORME")" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5h' — « DÉLÉGUÉE » en capitales : code 1" "$(col_cmp3 'décision DÉLÉGUÉE par Samuel (message session principale, 2026-11-08), option recommandée')" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5h'' — « delegation » sans accents : code 1" "$(col_cmp3 'decision par delegation de Samuel (message session principale, 2026-11-08)')" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5h3 — « a délégué » : code 1" "$(col_cmp3 'arbitrage : Samuel a délégué le choix (session principale, 2026-11-08)')" "1 HAUSSE-SANS-ARBITRAGE"
+assert_eq "V4c.5h4 — la délégation et la citation directe sur deux lignes : code 0 (la ligne directe suffit)" "$(col_cmp3 "$DELEG_FORME
+$CITE")" "0 "
 # V4c.6 : l'historique git du fichier de baseline (dépôt jetable)
 col_historique() { # <dépôt> <chemin relatif de la baseline> : « commits=N » puis une ligne par violation ; code 1 s'il y en a
-  local d="$1" p="$2" n=0 rc=0 sha out c
+  # « avant » = la version du parent si elle existe, sinon la DERNIÈRE version existante vue plus haut dans l'historique (une baseline supprimée
+  # puis recréée plus haut est comparée à celle d'avant la suppression) ; la toute première création n'a rien à comparer
+  local d="$1" p="$2" n=0 rc=0 sha out c have=0
   while IFS= read -r sha; do
-    n=$((n+1)); git -C "$d" cat-file -e "$sha^:$p" 2>/dev/null || continue
-    git -C "$d" show "$sha^:$p" > "$WORK/h-av.txt"; git -C "$d" show "$sha:$p" > "$WORK/h-ap.txt" 2>/dev/null || : > "$WORK/h-ap.txt"
+    n=$((n+1)); git -C "$d" cat-file -e "$sha:$p" 2>/dev/null || continue
+    git -C "$d" show "$sha:$p" > "$WORK/h-ap.txt"
+    if git -C "$d" cat-file -e "$sha^:$p" 2>/dev/null; then git -C "$d" show "$sha^:$p" > "$WORK/h-av.txt"; elif [ "$have" = 1 ]; then cp "$WORK/h-prev.txt" "$WORK/h-av.txt"; else cp "$WORK/h-ap.txt" "$WORK/h-prev.txt"; have=1; continue; fi
+    cp "$WORK/h-ap.txt" "$WORK/h-prev.txt"; have=1
     out="$(node "$CLIQUET" comparer "$WORK/h-av.txt" "$WORK/h-ap.txt" "$(git -C "$d" log -1 --format=%B "$sha")" 2>&1)" || { rc=1; c="$(git -C "$d" rev-parse --short=8 "$sha")"; printf '%s\n' "$out" | sed "s/^/$c /" >> "$WORK/h-viol.txt"; }
   done < <(git -C "$d" log --no-merges --reverse --format=%H -- "$p")
   if git -C "$d" cat-file -e "HEAD:$p" 2>/dev/null && [ -f "$d/$p" ]; then
@@ -184,6 +208,22 @@ col_historique "$d" b.txt > "$WORK/h6c.out"; h6_rc=$?
 assert_eq "V4c.6c — création seule : code 0, un commit examiné, rien à comparer" "$h6_rc $(head -1 "$WORK/h6c.out")" "0 commits=1"
 printf '%s\n' 'scripts/vf-cockpit-a.mjs 5' > "$d/b.txt"; : > "$WORK/h-viol.txt"; col_historique "$d" b.txt > "$WORK/h6d.out"; h6_rc=$?
 assert_eq "V4c.6d — une hausse non commitée de la copie de travail est rouge" "$h6_rc $(grep -c '^copie-de-travail HAUSSE-SANS-ARBITRAGE' "$WORK/h6d.out")" "1 1"
+col_depot_recree() { # <nom> <message de la recréation> : création à 2, suppression, recréation à 9 (trois commits successifs) ; imprime le dépôt
+  local d="$WORK/dep-$1" g; rm -rf "$d"; mkdir -p "$d"; : > "$WORK/h-viol.txt"
+  g() { git -C "$d" -c user.name=essai -c user.email=essai@example.invalid -c commit.gpgsign=false "$@" > /dev/null; }
+  git -C "$d" init -q; printf '%s\n' '# base' 'scripts/vf-cockpit-a.mjs 2' > "$d/b.txt"; g add b.txt; g commit -q -m 'creation de la baseline'
+  g rm -q b.txt; g commit -q -m 'suppression de la baseline'
+  printf '%s\n' '# base' 'scripts/vf-cockpit-a.mjs 9' > "$d/b.txt"; g add b.txt; g commit -q -m "$2"
+  printf '%s\n' "$d"
+}
+d="$(col_depot_recree sans 'recreation haute sans rien')"; col_historique "$d" b.txt > "$WORK/h6e.out"; h6_rc=$?
+assert_eq "V4c.6e — baseline supprimée puis recréée plus haut (2 à 9), sans citation : code 1 et le commit de la recréation est nommé" "$h6_rc $(grep -c "^$(git -C "$d" log --format=%h --grep='recreation haute' --abbrev=8) HAUSSE-SANS-ARBITRAGE" "$WORK/h6e.out")" "1 1"
+d="$(col_depot_recree cite "recreation haute citee : $CITE")"; col_historique "$d" b.txt > "$WORK/h6f.out"; h6_rc=$?
+assert_eq "V4c.6f — la même recréation avec une citation d'arbitrage direct : code 0, trois commits examinés" "$h6_rc $(head -1 "$WORK/h6f.out")" "0 commits=3"
+d="$(col_depot_recree deux 'recreation haute encore')"; printf '%s\n' '# base' 'scripts/vf-cockpit-a.mjs 1' > "$d/b.txt"; git -C "$d" -c user.name=essai -c user.email=essai@example.invalid -c commit.gpgsign=false commit -q -a -m 'baisse apres recreation'
+printf '%s\n' '# base' 'scripts/vf-cockpit-a.mjs 2' > "$d/b.txt"; git -C "$d" -c user.name=essai -c user.email=essai@example.invalid -c commit.gpgsign=false commit -q -a -m 'remontee sans rien'; : > "$WORK/h-viol.txt"
+col_historique "$d" b.txt > "$WORK/h6g.out"; h6_rc=$?
+assert_eq "V4c.6g — recréation haute sans citation, baisse, puis remontée sans citation : code 1 et les deux hausses sont nommées" "$h6_rc $(grep -c ' HAUSSE-SANS-ARBITRAGE' "$WORK/h6g.out")" "1 2"
 # V4c.7 : l'historique réel du fichier de baseline, dans le dépôt de développement seulement
 DEPOT_DEV="$(git -C "$SCRIPTS" rev-parse --show-toplevel 2>/dev/null)"
 if [ -n "$DEPOT_DEV" ] && [ -f "$DEPOT_DEV/plugin/cockpit/scripts/tests/test-cockpit-vendor.sh" ]; then
@@ -210,6 +250,10 @@ col_mutant_temoin SEUIL 's/SEUIL = 160;/SEUIL = 161;/' "le plafond relâché d'u
 col_mutant_temoin MARQUEUR 's|const comptes = (texte) => |const comptes = (texte) => /vibeflow:allow-large-file/.test(texte.split("\\n").slice(0, 5).join("\\n")) ? 0 : |' "le marqueur exempte : 161 sous marqueur passe (V4c.3)" col_vmarq "ok" col_v161x "rouge HAUSSE"
 col_mutant_temoin CR "s|l\\.replace(/\\\\r\\$/, '')|l|" "le CR final est compté : 160 plus CR deviennent rouges (V4c.1d)" col_v160c "rouge HAUSSE" col_v160x "ok"
 col_mutant_temoin ORPHELINE "s|v\\.push(\\['ORPHELINE', c\\]);|;|" "les entrées orphelines sont ignorées (V4c.2b)" col_orph "ok" col_v160x "ok"
+col_deleg_forme() { col_cmp3 "$DELEG_FORME"; }; col_cite_ok() { col_cmp3 "$CITE"; }; col_dbl() { col_vdbl dblm 'scripts/vf-cockpit-a.mjs 1' 'scripts/vf-cockpit-a.mjs 1'; }
+col_mutant_temoin DELEGATION 's|d\[ée\]l\[ée\]g/i|d[ée]l[ée]gu/i|' "le filtre ne voit que « déléguée » : « par délégation de Samuel » vaut citation (V4c.5h)" col_deleg_forme "0 " col_cite_ok "0 "
+col_mutant_temoin DOUBLON 's/ || entrees\.has(c\[0\])//' "un fichier nommé deux fois est accepté : la seconde entrée écrase la première (V4c.2b6)" col_dbl "ok" col_v160x "ok"
+col_mutant_temoin INITIALISER 's|^  if (fs\.existsSync(b)) fin(1,.*$||' "initialiser réécrit une baseline qui existe (V4c.2c)" col_init_existe "0 modifiee" col_init_neuf "0 ok"
 
 # V4c.9 : le réel (armé par 79-11, état trouvé après rangement) : le vrai module contre la vraie baseline, et deux mutations de copie
 BASE_REELLE="$SCRIPTS/tests/colonnes-baseline.txt"
@@ -304,6 +348,53 @@ assert_eq "V11.Q4i — une fermeture de script dans une fonction est refusée (c
 assert_eq "V11.Q4j — une fermeture de feuille dans une feuille est refusée" "$(q4 'fermeture-feuille=refus:nomme')" "1"
 assert_eq "V11.Q4k — un fichier absent est refusé" "$(q4 'absent=refus:nomme')" "1"
 assert_eq "V11.Q4l — une feuille intacte est rendue telle quelle" "$(q4 'feuille-telle-quelle=true')" "1"
+# q4b.mjs : les gardes du contenu d'une fonction, un fichier par cause (chacune refusée par le lecteur, chacune lue par le mutant qui retire sa garde)
+cat > "$WORK/q4b.mjs" <<'FIN'
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [dossierTmp, nav] = process.argv.slice(2);
+const m = await import(pathToFileURL(nav).href);
+const cas = (nom, contenu) => {
+  const racine = path.join(dossierTmp, nom); fs.mkdirSync(path.join(racine, 'assets/ui/terminal'), { recursive: true });
+  fs.writeFileSync(path.join(racine, 'assets/ui/terminal/vue.js'), contenu);
+  try { m.lireFonction('terminal', 'vue.js', { moteur: racine }); console.log(`${nom}=lu`); } catch (e) { console.log(`${nom}=refus:${/vue\.js/.test(String(e.message)) ? 'nomme' : 'muet'}`); }
+};
+cas('intact', 'function vue() {\n  return 1;\n}\n');
+cas('intact-sans-fin', 'function vue() {\n  return 1;\n}');
+cas('utf8', Buffer.concat([Buffer.from('function vue() { /* '), Buffer.from([0xff, 0xfe]), Buffer.from(' */ }\n')]));
+cas('deux-fins', 'function vue() {\n}\n\n');
+cas('espace-en-tete', ' function vue() {\n}\n');
+cas('ligne-vide-en-tete', '\nfunction vue() {\n}\n');
+cas('espace-en-queue', 'function vue() {\n} \n');
+cas('commentaire-html', 'function vue() { const s = "<!--"; }\n');
+cas('sans-accolade', 'function vue() {\n} // fin\n');
+cas('sans-function', 'const vue = () => {\n};\nfunction f() {\n}\n');
+FIN
+mkdir -p "$WORK/q4b"; node "$WORK/q4b.mjs" "$WORK/q4b" "$NAV" > "$WORK/q4b.out" 2>&1
+q4b() { grep -c -x -- "$1" "$WORK/q4b.out"; }
+assert_eq "V11.Q4m — témoin positif : deux fonctions intactes (avec et sans fin de ligne) sont lues" "$(q4b 'intact=lu') $(q4b 'intact-sans-fin=lu')" "1 1"
+assert_eq "V11.Q4n — un fichier qui n'est pas de l'UTF-8 est refusé, en nommant le fichier" "$(q4b 'utf8=refus:nomme')" "1"
+assert_eq "V11.Q4o — une seconde fin de ligne n'est pas retirée : refus (la fonction ne finit plus par l'accolade)" "$(q4b 'deux-fins=refus:nomme')" "1"
+assert_eq "V11.Q4p — un espace ou une ligne vide avant « function », ou un espace avant la fin de ligne : refus" "$(q4b 'espace-en-tete=refus:nomme') $(q4b 'ligne-vide-en-tete=refus:nomme') $(q4b 'espace-en-queue=refus:nomme')" "1 1 1"
+assert_eq "V11.Q4q — un commentaire HTML dans la fonction est refusé" "$(q4b 'commentaire-html=refus:nomme')" "1"
+assert_eq "V11.Q4r — une fonction qui ne finit pas par une accolade est refusée" "$(q4b 'sans-accolade=refus:nomme')" "1"
+assert_eq "V11.Q4s — un fichier qui ne commence pas à « function » est refusé" "$(q4b 'sans-function=refus:nomme')" "1"
+# V11.Q4t : cinq mutants du lecteur (copies jetables) ; chacun change la copie, laisse lire le cas qui le vise et laisse lire le témoin intact
+nav_mutant() { # <nom> <expression sed -E> : copie mutée du lecteur dans $WORK/navm-<nom>/ ; code 0 si la copie diffère du lecteur
+  mkdir -p "$WORK/navm-$1"; sed -E "$2" "$NAV" > "$WORK/navm-$1/vf-cockpit-navigateur.mjs" 2>/dev/null
+  [ -s "$WORK/navm-$1/vf-cockpit-navigateur.mjs" ] && ! cmp -s "$NAV" "$WORK/navm-$1/vf-cockpit-navigateur.mjs"
+}
+nav_mutant_temoin() { # <nom> <expression sed -E> <cas visé>
+  nav_mutant "$1" "$2" && c0=change || c0=identique
+  assert_eq "V11.Q4t — M-$1.0 : la substitution change la copie du lecteur" "$c0" "change"
+  mkdir -p "$WORK/navm-$1/t"; node "$WORK/q4b.mjs" "$WORK/navm-$1/t" "$WORK/navm-$1/vf-cockpit-navigateur.mjs" > "$WORK/navm-$1/sortie.txt" 2>&1
+  assert_eq "V11.Q4t — M-$1 : le cas « $3 » est lu (la garde retirée ne protège plus) et le témoin intact reste lu" "$(grep -c -x -- "$3=lu" "$WORK/navm-$1/sortie.txt") $(grep -c -x -- 'intact=lu' "$WORK/navm-$1/sortie.txt")" "1 1"
+}
+nav_mutant_temoin UTF8 's/fatal: true/fatal: false/' utf8
+nav_mutant_temoin TRIM 's/const texte = brut\.endsWith.*$/const texte = brut.trim();/' deux-fins
+nav_mutant_temoin TRIM2 's/const texte = brut\.endsWith.*$/const texte = brut.trim();/' espace-en-tete
+nav_mutant_temoin HTML 's/ \|\| texte\.includes\(.<!--.\)//' commentaire-html
+nav_mutant_temoin ACCOLADE 's/ \|\| !texte\.endsWith\(.\}.\)//' sans-accolade
+nav_mutant_temoin FUNCTION 's/!texte\.startsWith\(.function .\) \|\| //' sans-function
 # V11.Q5 : ni conversion de fonction en chaîne ni évaluation dynamique de code dans le lecteur et la page
 MOTIF_EVAL='\.toString\(\)|new Function|[^a-zA-Z.]eval\(|node:vm'
 printf '%s\n' 'const s = f.toString();' > "$WORK/q5-t1.txt"; printf '%s\n' 'const g = new Function("x");' > "$WORK/q5-t2.txt"; printf '%s\n' 'const r = eval(code);' > "$WORK/q5-t3.txt"; printf '%s\n' "import vm from 'node:vm';" > "$WORK/q5-t4.txt"
