@@ -95,6 +95,7 @@ durees() {
 157 plugin/cockpit/scripts/tests/test-cockpit-git-tiroir.sh
 84 plugin/cockpit/scripts/tests/test-cockpit-git.sh
 20 plugin/cockpit/scripts/tests/test-cockpit-hygiene.sh
+60 plugin/cockpit/scripts/tests/test-cockpit-jauges.sh
 311 plugin/cockpit/scripts/tests/test-cockpit-lancer-bandeau.sh
 77 plugin/cockpit/scripts/tests/test-cockpit-lancer-bout-en-bout.sh
 62 plugin/cockpit/scripts/tests/test-cockpit-lancer-chat.sh
@@ -255,6 +256,7 @@ durees() {
 48 plugin/cockpit/scripts/tests/test-cockpit-sondes-stables.sh
 82 plugin/cockpit/scripts/tests/test-cockpit-panneau-retour.sh
 263 plugin/cockpit/scripts/tests/test-cockpit-surcouches.sh
+10 plugin/cockpit/scripts/tests/test-cockpit-synthese.sh
 232 plugin/cockpit/scripts/tests/test-cockpit-clavier-canevas.sh
 139 plugin/cockpit/scripts/tests/test-cockpit-coin.sh
 154 plugin/cockpit/scripts/tests/test-cockpit-couloirs.sh

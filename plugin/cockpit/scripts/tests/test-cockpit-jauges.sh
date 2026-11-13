@@ -372,6 +372,116 @@ if cockpit_module_muter m-env-git vf-cockpit-methode.mjs 's#envGit(root)#process
   cockpit_arreter; unset COCKPIT_MODULE
 else assert_eq "M-ENV-GIT — construction du mutant" "échec" "ok"; fi
 
+# ===== les vrais gates : JR1b, JR2, JR6 réel, JR7b, JR10 a, b, d et mutants M-AUTO, M-TSV-RANGEMENT =====
+echo "=== vrais gates du conductor ==="
+GI=(/usr/bin/git -c user.email=t@t -c user.name=t)
+lab_reel() { # <parent> : <parent>/lab (git, BACKLOG avec un sujet clos, origin, branche intégrée sur origin), <parent>/wt (worktree secondaire, branche attachée avec un commit de plus)
+  local P="$1"; mkdir -p "$P"
+  "${GI[@]}" init -q -b main "$P/lab"; mkdir -p "$P/lab/.planning"
+  printf '# Backlog\n\n## Ouvert — DIFFÉRÉ\ntexte\n\n## Clos — CLOS (2026-01-02)\ncorps clos\n' > "$P/lab/.planning/BACKLOG.md"; printf 'x\n' > "$P/lab/.planning/STATE.md"
+  printf -- '- [x] **Phase 1: Socle** - premier jet\n' > "$P/lab/.planning/ROADMAP.md"
+  "${GI[@]}" -C "$P/lab" add -A; "${GI[@]}" -C "$P/lab" commit -q -m init
+  "${GI[@]}" clone -q --bare "$P/lab" "$P/origin.git"; "${GI[@]}" -C "$P/lab" remote add origin "$P/origin.git"; "${GI[@]}" -C "$P/lab" fetch -q
+  "${GI[@]}" -C "$P/lab" push -q origin main:refs/heads/feat-x
+  mkdir -p "$P/lab/.claude/agent-memory/x"; printf '# x\n' > "$P/lab/.claude/agent-memory/x/MEMORY.md"; printf 'note\n' > "$P/lab/.claude/agent-memory/x/note.md" # hors git : lu par la passe de rangement
+  "${GI[@]}" -C "$P/lab" branch wt-b; "${GI[@]}" -C "$P/lab" worktree add -q "$P/wt" wt-b; echo y > "$P/wt/f"; "${GI[@]}" -C "$P/wt" add f; "${GI[@]}" -C "$P/wt" commit -q -m c2
+}
+empreinte() { # <lab> : liste et cksum de .planning (verrous et index compris) puis git status
+  ( cd "$1" && find .planning -type f | LC_ALL=C sort | while IFS= read -r f; do printf '%s %s\n' "$f" "$(cksum < "$f")"; done; "${GI[@]}" status --porcelain | LC_ALL=C sort )
+}
+mkdir -p "$WORK/fauxgh" "$WORK/fauxgit"
+printf '#!/bin/bash\ntouch "%s/MARQUEUR-GH"\nexit 1\n' "$WORK" > "$WORK/fauxgh/gh"; chmod +x "$WORK/fauxgh/gh"
+cat > "$WORK/fauxgit/git" <<'SH'
+#!/bin/bash
+# journalise la sous-commande des seuls appels des gates (le père est le script du gate), puis relaie au vrai git PAR SON CHEMIN ABSOLU
+case "$(ps -o args= -p "$PPID" 2> /dev/null)" in
+  *check-method-budget*|*check-instruction-budget*)
+    a=("$@"); i=0; while [ "$i" -lt "${#a[@]}" ]; do case "${a[$i]}" in -C|-c) i=$((i+2)) ;; -*) i=$((i+1)) ;; *) break ;; esac; done
+    s="${a[$i]:-}"; case "$s" in worktree|reflog|stash|config) s="$s ${a[$((i+1))]:-}" ;; esac
+    echo "$s" >> "${GITLOG:-/dev/null}" ;;
+esac
+exec /usr/bin/git "$@"
+SH
+chmod +x "$WORK/fauxgit/git"
+# JR1b — réseau, sur un lab à branche distante intégrée
+lab_reel "$WORK/r1"; LR="$WORK/r1/lab"; rm -f "$WORK/MARQUEUR-GH"
+PATH="$WORK/fauxgh:$PATH" bash "$CONDUCTOR/check-method-budget.sh" --root "$LR" > /dev/null 2>&1
+assert_eq "JR1b.0 — sonde positive : le vrai gate en mode texte SANS --no-remote appelle gh (faux gh hors du lab, marqueur présent)" "$([ -e "$WORK/MARQUEUR-GH" ] && echo présent || echo absent)" "présent"
+rm -f "$WORK/MARQUEUR-GH"
+srv "$LR" PATH="$WORK/fauxgh:$PATH"; RC1=$?
+for i in 1 2 3; do methode "$WORK/r1-$i.json"; done
+assert_eq "JR1b — trois GET sur ce lab, vrais gates : aucun gh lancé (marqueur absent) et jauges mesurées" "$RC1|$([ -e "$WORK/MARQUEUR-GH" ] && echo présent || echo absent)|$(E "$WORK/r1-3.json" 'j.sources.methode.etat')" "0|absent|ok"
+# JR2 — lecture seule
+EMP0="$(empreinte "$LR")"; for i in 1 2 3; do methode "$WORK/r2-$i.json"; done; EMP1="$(empreinte "$LR")"
+assert_eq "JR2 — .planning (liste, cksum, .archive.lock et INDEX.tsv compris) et git status --porcelain identiques après trois appels, sur un lab où --auto archiverait" "$([ "$EMP0" = "$EMP1" ] && echo identique || echo modifié)|$(printf '%s' "$EMP0" | /usr/bin/grep -c 'BACKLOG.md')" "identique|1"
+cockpit_arreter
+cp -R "$LR" "$WORK/r1/copie"
+( cd "$WORK/r1/copie" && bash "$CONDUCTOR/check-method-budget.sh" --root "$WORK/r1/copie" --auto > /dev/null 2>&1 )
+assert_eq "JR2.0 — sonde positive : --auto en mode texte sur une copie change l'arbre (BACKLOG.md modifié)" "$("${GI[@]}" -C "$WORK/r1/copie" status --porcelain | /usr/bin/grep -c 'BACKLOG.md')" "1"
+# M-AUTO : copie du gate qui force l'archivage en TSV
+mutcond() { # <nom> <fichier> <expression sed…> : copie plate du dossier du conductor (fichiers seuls), mutation d'un gate ; code 1 si rien n'a changé
+  local d="$WORK/cond-$1" f; f="$2"; shift 2; mkdir -p "$d"; for x in "$CONDUCTOR"/*; do [ -f "$x" ] && cp "$x" "$d/"; done
+  cp "$d/$f" "$d/$f.avant"; sed "$@" "$d/$f.avant" > "$d/$f"; rm -f "$d/$f.avant"; cmp -s "$CONDUCTOR/$f" "$d/$f" && return 1; bash -n "$d/$f" || return 1; return 0
+}
+lab_reel "$WORK/r2"; LR2="$WORK/r2/lab"
+if mutcond auto check-method-budget.sh -e 's/--format=tsv) FORMAT=tsv; shift ;;/--format=tsv) FORMAT=tsv; AUTO=1; shift ;;/' -e '/^if \[ "\$FORMAT" = tsv \] && {/s/\[ "\$AUTO" -eq 1 \] || //'; then
+  srv "$LR2" VF_COCKPIT_SCRIPTS_DIR="$WORK/cond-auto"; RCM=$?
+  E0="$(empreinte "$LR2")"; methode "$WORK/r2m.json"; E1="$(empreinte "$LR2")"
+  assert_eq "M-AUTO — le gate forcé en archivage sous --format=tsv (copie via VF_COCKPIT_SCRIPTS_DIR) : l'arbre du lab change, JR2 rougit" "$RCM|$([ "$E0" = "$E1" ] && echo identique || echo modifié)" "0|modifié"
+  cockpit_arreter
+else assert_eq "M-AUTO — construction du mutant" "échec" "ok"; fi
+# JR6 réel — lab tiers, vrais gates
+node "$TESTS/collecte-labo.mjs" lab "$WORK/r6b/lab" > /dev/null; srv "$WORK/r6b/lab"; methode "$WORK/r6.json"
+assert_eq "JR6 réel — lab tiers, vrais gates : agent, skill, socle « na » sans valeur ni 0 ; le gate de méthode mesuré" "$VF_CODE|$(E "$WORK/r6.json" 'j.jauges.filter(g=>["agent","skill","socle"].includes(g.type)).every(g=>g.verdict==="na" && g.mesures.every(m=>m.valeur===null)) && j.sources.methode.etat==="ok" && j.sources.densite.etat==="non-applicable"')" "200|true"
+cockpit_arreter
+# JR7b — les vrais gates sur la racine du dépôt lui-même, en --format=tsv
+REPO="$(cd "$SCRIPTS/../../.." && pwd -P)"
+bash "$CONDUCTOR/check-method-budget.sh" --root "$REPO" --no-remote --format=tsv > "$WORK/j7-m.tsv" 2> /dev/null
+bash "$CONDUCTOR/check-instruction-budget.sh" --path "$REPO" --format=tsv > "$WORK/j7-i.tsv" 2> /dev/null
+cat > "$AUX/jr7b.mjs" <<'JS'
+import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
+const M = await import(pathToFileURL(process.argv[2] + '/vf-cockpit-jauges.mjs').href), [, , , fm, fi] = process.argv;
+const m = M.etatSource({ sortie: fs.readFileSync(fm, 'utf8'), code: 0 }, 'check-method-budget'), d = M.etatSource({ sortie: fs.readFileSync(fi, 'utf8'), code: 0 }, 'check-instruction-budget');
+const o = M.assembler({ methode: m, densite: d, at: 'T' });
+console.log(JSON.stringify({ src: [m.etat, d.etat], vides: o.jauges.filter((g) => g.mesures.length === 0).map((g) => g.type), format: o.jauges.flatMap((g) => g.mesures.filter((x) => x.verdict === 'format').map(() => g.type)) }));
+JS
+assert_eq "JR7b — les vrais gates en --format=tsv sur la racine du dépôt : chaque type de TYPES a au moins une mesure et aucune n'est « format »" "$(node "$AUX/jr7b.mjs" "$SCRIPTS" "$WORK/j7-m.tsv" "$WORK/j7-i.tsv" | node "$AUX/ev.mjs" - 'j.src.join(",")+"|"+j.vides.join(",")+"|"+j.format.join(",")')" "ok,ok||"
+# JR10 — programme déclaré par le lab : journal des sous-commandes git des gates
+echo "config --get
+config --get-regexp
+for-each-ref
+merge-base
+reflog show
+rev-parse
+stash list
+symbolic-ref
+worktree list" | LC_ALL=C sort > "$WORK/git-liste"
+printf 'merge-base\nreflog show\nrev-parse\nsymbolic-ref\nworktree list\n' | LC_ALL=C sort > "$WORK/git-requis"
+lab_reel "$WORK/r10"; L10="$WORK/r10/lab"; cp -R "$L10" "$WORK/r10/copie"; : > "$WORK/gl-a"
+( cd "$WORK/r10/copie" && PATH="$WORK/fauxgit:$PATH" GITLOG="$WORK/gl-a" bash "$CONDUCTOR/check-method-budget.sh" --root "$WORK/r10/copie" --auto > /dev/null 2>&1 )
+assert_eq "JR10a — sonde positive : le vrai gate en mode archivage (--auto, texte, sur une copie) lance ls-files, vu par le journal du faux git hors du lab (journal vide = canal aveugle = FAIL)" "$([ -s "$WORK/gl-a" ] && /usr/bin/grep -c '^ls-files$' "$WORK/gl-a" | sed 's/^[1-9][0-9]*$/ls-files-vu/' || echo canal-aveugle)" "ls-files-vu"
+jr10b() { # <fichier journal> : « hors-liste=… manquants=… »
+  local f="$1"; LC_ALL=C sort -u "$f" > "$f.u"
+  printf 'hors-liste=%s manquants=%s\n' "$(LC_ALL=C comm -23 "$f.u" "$WORK/git-liste" | tr '\n' ',')" "$(LC_ALL=C comm -13 "$f.u" "$WORK/git-requis" | tr '\n' ',')"
+}
+: > "$WORK/gl-b"; srv "$L10" PATH="$WORK/fauxgit:$PATH" GITLOG="$WORK/gl-b" FAUX_ARGV=/dev/null
+for i in 1 2 3; do methode "$WORK/r10-$i.json"; done; cockpit_arreter
+assert_eq "JR10b — trois GET : le journal est non vide, voit rev-parse, symbolic-ref, worktree list, reflog show et merge-base (un seul absent = FAIL), et chaque sous-commande appartient à la liste fermée du mode TSV (comparaison d'ensemble)" "$([ -s "$WORK/gl-b" ] && jr10b "$WORK/gl-b" || echo journal-vide)" "hors-liste= manquants="
+if mutcond rangement check-method-budget.sh -e 's/\[ "\$FORMAT" = tsv \] || rangement /rangement /'; then
+  : > "$WORK/gl-m"; srv "$L10" VF_COCKPIT_SCRIPTS_DIR="$WORK/cond-rangement" PATH="$WORK/fauxgit:$PATH" GITLOG="$WORK/gl-m"; RCM=$?
+  methode "$WORK/r10m.json"; cockpit_arreter
+  assert_has "M-TSV-RANGEMENT — la passe de rangement rétablie en mode TSV (copie du gate) : une sous-commande hors critère (ls-files) sort de la liste fermée, JR10b rougit" "$RCM $(jr10b "$WORK/gl-m")" "ls-files"
+else assert_eq "M-TSV-RANGEMENT — construction du mutant" "échec" "ok"; fi
+# JR10d — dépôt dont les métadonnées sortent du lab
+node "$TESTS/collecte-labo.mjs" lab "$WORK/r10d/lab" > /dev/null; node "$SCRIPTS/vf-cockpit-build.mjs" "$WORK/r10d/lab" --quiet > /dev/null 2>&1
+CD="$WORK/r10d-compte"; : > "$CD"; srv "$WORK/r10d/lab" VF_COCKPIT_SCRIPTS_DIR="$GATES" FAUX_COMPTE="$CD"; methode "$WORK/r10d-ok.json"
+assert_eq "JR10d.0 — sonde positive : le même lab non détourné lance le gate" "$(compte "$CD")" "1"
+cockpit_arreter
+mv "$WORK/r10d/lab/.git" "$WORK/r10d/ext.git"; printf 'gitdir: %s\n' "$WORK/r10d/ext.git" > "$WORK/r10d/lab/.git"; : > "$CD"
+srv "$WORK/r10d/lab" VF_COCKPIT_SCRIPTS_DIR="$GATES" FAUX_COMPTE="$CD"; methode "$WORK/r10d.json"
+assert_eq "JR10d — métadonnées du dépôt hors du lab : sources indisponibles cause « echec » et aucun gate lancé (compteur 0)" "$(E "$WORK/r10d.json" 'j.sources.methode.etat+"/"+j.sources.methode.cause+" "+j.jauges.every(g=>g.verdict==="indispo")')|$(compte "$CD")" "indisponible/echec true|0"
+cockpit_arreter
+
 vf_hyg_assert
 echo "== Résultats : $PASS PASS / $FAIL FAIL =="
 [ "$PASS" -gt 0 ] || { echo "garde anti-vert-à-vide : aucune assertion jouée"; exit 1; }
