@@ -260,7 +260,7 @@
   let lastSeq = null;
   const vu = (d) => { if (typeof d?.seq === 'number') lastSeq = d.seq; return d; };
   const connecter = () => {
-    const es = new EventSource('/api/vf/events?token=' + encodeURIComponent(SRV.token));
+    const es = window.VF_FLUX.ouvrir(SRV.token); // 79-14 : flux partagé entre les onglets (ui/69-vf-flux.js)
     es.addEventListener('hello', (e) => {
       probe.connected = true; const d = JSON.parse(e.data);
       if (TAB === 'project' && lastSeq !== null && typeof d.seq === 'number' && d.seq !== lastSeq) { probe.resync = (probe.resync || 0) + 1; location.reload(); return; }

@@ -379,6 +379,7 @@ assert_eq "EP.2 — les 40 sous-agents (20 actifs, 20 terminés depuis moins de 
 
 echo "=== E23 — onglet Équipe : page, graphe, onglets, libellés (P69-D-17 ; CKPT-23) ==="
 UI="$SCRIPTS/../skills/cockpit-moteur/assets/ui"
+export VF_FLUX_JS="$UI/69-vf-flux.js"
 cat > "$AUX/fetchp.mjs" <<'JS'
 // fetchp.mjs <port> <chemin> <sortie> : écrit le corps dans <sortie>, rend le statut ; « ERR <code> » si la connexion échoue
 import http from 'node:http';
@@ -660,6 +661,7 @@ const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' } };
 const ctx = vm.createContext({ window, document, MutationObserver: class { observe() {} }, EventSource: ES, CustomEvent: class { constructor(t) { this.type = t; } }, location: { reload() {} }, fetch: async () => ({ ok: false }), setTimeout, clearTimeout, Date, console, encodeURIComponent });
 try {
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_FLUX_JS, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
   const w = [{ kind: 'subagent', id: 'a', etat: 'actif', tree: '.' }, { kind: 'subagent', id: 'f', etat: 'termine', tree: '.', parent: 'a' }, { kind: 'subagent', id: 'w', etat: 'en-attente', tree: '.' }, { kind: 'lock', id: 'v', tree: '.' }, { kind: 'dag-node', id: 'd', tree: '.', etat: 'actif' }, { kind: 'registered', id: 'r', tree: '.' }]; // un actif, un terminé, un en attente, puis ce qui n'est pas un agent
   ES.last.l.who({ data: JSON.stringify({ seq: 1, who: { workers: w, sources: {} } }) });
@@ -1067,6 +1069,7 @@ const ctx = vm.createContext({ window, document, MutationObserver: class { obser
 try {
   const S = JSON.parse(fs.readFileSync(scen, 'utf8'));
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_FLUX_JS, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
   if (S.verrous) ES.last.l.lock({ data: JSON.stringify({ seq: 1, at: Date.now(), verrous: S.verrous }) });
   ES.last.l.who({ data: JSON.stringify({ seq: 2, who: S.who }) });
