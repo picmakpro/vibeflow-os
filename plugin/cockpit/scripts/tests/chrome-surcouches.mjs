@@ -11,7 +11,7 @@ const SEL = "a[href], button, input, select, textarea, summary, [tabindex]";
 
 // posé avant tout script de la page : journal des écouteurs (type, capture, cible, fichier de l'extension qui l'a posé) + écouteur du « cas interdit »
 function espion() {
-  window.__ec = []; window.__interdit = []; window.__su6 = null; window.__su6t = null; // __su6 : posée AVANT toute portée d'onglet, donc jamais défaite par la coquille
+  window.__ec = []; window.__interdit = []; window.__su6 = null; window.__su6t = null; // __su6, __su6t : posées AVANT toute portée, jamais défaites par la coquille
   const nom = () => {
     const c = document.currentScript; if (!c) return '';
     if (c.src) return c.src.split('/').pop();
@@ -161,7 +161,9 @@ await executer(chrome, async (s) => {
     const pile = ec.filter((x) => x[N] === '00-vf-surcouches.js' && x.t === 'keydown' && x.cap && x.cible === 'window');
     const rang = pile.length ? ec.indexOf(pile[0]) : -1;
     const ext = (x) => /^\d\d-/.test(x[N]) && x[N] !== '00-vf-surcouches.js' && x[N] !== '00-vf-onglets.js';
-    r.ordre = { pile: pile.length, avantTout: rang >= 0 && ec.every((x, i) => !(ext(x) && i < rang)), dernier: ec.filter(ext).length };
+    // la propriété est celle de l'Échap : seul un écouteur `keydown` d'extension posé avant la pile pourrait le consommer
+    // (00-vf-onglets-echec.js, persistant de 80-21, n'écoute que vf:coquille-echec : il précède la pile sans toucher Échap)
+    r.ordre = { pile: pile.length, avantTout: rang >= 0 && ec.every((x, i) => !(ext(x) && x.t === 'keydown' && i < rang)), dernier: ec.filter(ext).length };
     if (racineTerm) {
       try {
         await charger('index.html', racineTerm);
@@ -187,8 +189,9 @@ await executer(chrome, async (s) => {
     r.pile = ec.filter((x) => x[N] === '00-vf-surcouches.js' && x.t === 'keydown' && x.cap && x.cible === 'window').length;
     r.identite = await s.ev('!!window.__su6 && window.VF_SURCOUCHES === window.__su6');
     r.onglet = await s.ev('window.VF_COQUILLE.onglet()');
-    // contrat de 80-10 et 80-13 : le tiroir ouvert au départ est rouvert à l'arrivée ; l'ancien nœud est parti, il n'y en a qu'un, une seule entrée vivante dans la pile
-    r.retire = await s.ev(`!!window.__su6t && !window.__su6t.isConnected && document.querySelectorAll('#vf-git-tiroir').length === 1 && window.__su6t !== ${tiroir}
+    // contrat de 80-10 et 80-13 : le tiroir ouvert au départ est rouvert à l'arrivée ; l'ancien nœud est parti, un seul nœud, une seule entrée
+    r.retire = await s.ev(`!!window.__su6t && !window.__su6t.isConnected && document.querySelectorAll('#vf-git-tiroir').length === 1
+      && window.__su6t !== ${tiroir}
       && ${tiroir}.hidden === false && window.VF_SURCOUCHES.dessus() === ${tiroir}`);
     if (racineTerm) { // le Terminal, posé une fois : ouvert (ou resté ouvert), un Échap dans sa région passe intact à la vue
       try {
