@@ -7,7 +7,7 @@ Statut : exécuté (quatre tâches), `AVANT-09` = cbffb929 (première ligne de `
 Tâche 1 (tracer) : 954618bd témoins rouges · f8636e1c amendement daté (trois suites hors liste) · f8335dc4 suites routes et git-env · 66a9af10 collecte hors boucle, instantané, hello complet.
 Tâche 2 : 6382c17b aides et sections C2 à C4 (témoins) · 535f2b47 trace des rouges · f164a933 relance bornée, un seul écrivain, index incrémental, ligne géante.
 Tâche 3 : c4e29c68 témoins rouges · 8b2fac07 registre clos, voies rattachées, silence et motif de fin, signature du who, cache du scan · 0a25743f E23 attend la première collecte · c779710c trace.
-Tâche 4 : 4375cd47 témoins rouges de la projection des verrous et de ses lecteurs · 0bf75d19 verrous en liste blanche, signal construit dans le serveur, page à jour · 9cd4940b commentaire de `signal.mjs` sur sa ligne (colonnes) · puis le commit de ce SUMMARY (et de la section « Tâche 4 » de la trace, état vert).
+Tâche 4 : 4375cd47 témoins rouges de la projection des verrous et de ses lecteurs · 0bf75d19 verrous en liste blanche, signal construit dans le serveur, page à jour · 9cd4940b commentaire de `signal.mjs` sur sa ligne (colonnes) · 9134cbff amendement daté du plan · 05850343 ce SUMMARY et la section « Tâche 4 » de la trace (état vert) · puis le commit de cette ligne.
 
 ## Signatures exportées (neuf modules neufs et fichiers repris)
 
