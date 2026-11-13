@@ -34,3 +34,9 @@ Aucun. Le lanceur `test-cockpit-regie.sh` joué sur la tête (après la fusion d
 | `test-cockpit-regie.sh` (73) | exit 0, 234 PASS, 0 FAIL | 144 |
 | `test-cockpit-fiche-texte.sh` | 34 PASS, 0 FAIL | 20 |
 | `css-jetons.mjs`, `check-file-size.sh` | 0 écart ; 74-vf-fiche.js à 278 lignes (avertissement ≥ 250) | < 1 |
+
+## Correction après revue (point de fusion, une passe)
+- Bascule de vue : la fermeture provoquée par un clic sur la bascule ne touche plus `hidden` de la vue d'origine (la régie l'a déjà réglé), elle lève seulement `inert`. Sonde P19 (régie vers frise, frise vers régie, vue déjà choisie) lit `hidden` et `inert` de toutes les `.vf-vue` ; vue rouge avant le correctif (régie restée visible à côté de la frise), verte après.
+- Écart : l'abonnement VF_ETAT « frise » de la fiche n'existe que fiche ouverte (posé à l'ouverture, retiré à la fermeture et au départ d'onglet) : décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; prise par le manager de la Phase 74 le 2026-11-14. P15 et P18 ajustées (0 abonnement au repos, 1 fiche ouverte, 0 après fermeture).
+- Suite de la frise (`test-cockpit-frise-vue.sh`) : l'espion `window.__vfFiche` est un accesseur (lecture figée, écriture ignorée) qui survit au chargement du vrai module ; S17 et S19 comptent les abonnements frise attribués par la pile d'appel (`74-vf-frise*.js`), via un enrobage de `VF_ETAT.abonner`. Le mutant SANS-NETTOYAGE (S17, S19) reste rouge.
+- Suites jouées sur la tête commitée : `test-cockpit-fiche.sh` 78 PASS, 0 FAIL (47 s) ; `test-cockpit-frise-cout.sh` 82 PASS, 0 FAIL (43 s) ; `test-cockpit-frise-vue.sh` 102 PASS, 0 FAIL, 12 mutants rouges (169 s) au troisième passage : les deux premiers ont rougi une sonde différente chaque fois (S6 survol, puis S16 scrollLeft de la piste, `load average` 46 à 73 sur le poste), jamais une sonde touchée par la correction.
