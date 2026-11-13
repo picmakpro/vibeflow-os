@@ -11,6 +11,7 @@ import { gitSortant } from './vf-cockpit-git-sortant.mjs';
 import { avancement, rattacherMission, etatMission } from './vf-cockpit-avancement.mjs';
 import { lireVerrous, vieDe } from './vf-cockpit-vie.mjs';
 import { COLON, NUM, normNum, texte, lireGoal, lireDependances, reTitreCase, reTitreSection, reExigences, idExigence, texteExigence, reTraceabilite, normStatut, phaseCourante } from './vf-cockpit-formats.mjs';
+import { lireTrace } from './vf-cockpit-trace-collecte.mjs';
 export { COLON, normNum };
 
 // jamais d'ouverture d'un fichier non régulier (un tube FIFO bloque ; un lien vers /dev/zero ne finit pas, et git versionne les liens symboliques) ni d'un fichier au-delà de MAX_LECTURE
@@ -107,6 +108,7 @@ export function lireDags(root, layout, phaseDirs) {
 }
 
 // opts : { sansTags (aucun appel git pour les tags : lecture d'un autre arbre), verrous (injectable : { etat, plat, liste }), scriptsDir, home, lab (racine du LAB observé pour l'environnement borné des sous-processus, H-1 ; défaut : root) } — la vie d'une mission se lit sur le verrou de sa phase (VFSG-06) ; lecture seulement si un nœud est `running`
+// opts.trace (opt-in, 76-04 : P76-D-31) : rend aussi `trace` (lireTrace : maillons des exigences, registres) ; les autres appelants ne paient rien
 export function readPlanning(root, layout, opts = {}) {
   root = path.resolve(root);
   // AUDC-A-02 : lecture confinée à la racine RÉELLE du lab par défaut — un lien symbolique sortant n'est jamais suivi (un confinement posé par l'appelant, N5, prime)
@@ -132,8 +134,10 @@ export function readPlanning(root, layout, opts = {}) {
 
   // exigences : cases à cocher et table de traçabilité, rattachées dans le compartiment du fichier porteur
   const reqFiles = [...comps.map((c) => [c.ws || '', path.join(c.dir, 'REQUIREMENTS.md')]), ...archives.filter((f) => f.endsWith('-REQUIREMENTS.md')).map((f) => ['*', path.join(B, 'milestones', f)])];
+  const ledgers = []; // textes des REQUIREMENTS des compartiments, gardés pour lireTrace (76-04)
   for (const [ws, f] of reqFiles) {
     const txt = texte(read(f));
+    if (ws !== '*') ledgers.push({ ws, fichier: rel(f), txt });
     for (const m of txt.matchAll(reExigences())) { const id = idExigence(m); if (!reqs.has(`${ws}|${id}`)) reqs.set(`${ws}|${id}`, { id, ws: ws || null, wsKey: ws, done: m[1].toLowerCase() === 'x', text: texteExigence(m), file: rel(f) }); }
     for (const m of txt.matchAll(reTraceabilite())) { const r = reqs.get(`${ws}|${m[1]}`); if (r && !r.phase) r.phase = normNum(m[2]); }
   }
@@ -170,6 +174,10 @@ export function readPlanning(root, layout, opts = {}) {
       return { id: f.replace('-PLAN.md', ''), fichier: f, vague: n >= 1 && Number.isSafeInteger(n) ? n : null };
     });
   }
+  let trace = null; // une panne de la lecture de traçabilité ne casse jamais la collecte (P76-D-12)
+  if (opts.trace) {
+    try { trace = lireTrace({ phases, phaseDirs, reqs, ledgers, lire: read, lister: ls, rel, fm, list }); } catch { trace = { erreur: true }; }
+  }
   const backlog = texte(read(path.join(B, 'BACKLOG.md')));
   const seeds = ls(path.join(B, 'seeds')).filter((f) => f.endsWith('.md')).map((f) => ({ file: rel(path.join(B, 'seeds', f)), text: texte(read(path.join(B, 'seeds', f))) }));
   let tags = [];
@@ -179,5 +187,5 @@ export function readPlanning(root, layout, opts = {}) {
   }
   const title = /^# (.*)$/m.exec(texte(read(path.join(B, 'PROJECT.md'))))?.[1];
   const projectName = (title ? title.replace(/^(Project|Roadmap):\s*/i, '').trim() : '') || path.basename(root);
-  return { phases, phaseDirs, reqs, milestones, state, dags, backlog, seeds, tags, projectName, activeKeys, rel };
+  return { phases, phaseDirs, reqs, milestones, state, dags, backlog, seeds, tags, projectName, activeKeys, rel, trace };
 }
