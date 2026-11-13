@@ -54,6 +54,12 @@ async function sortie() {
   }
   const g = buildProjectGraph(racine);
   if (mode === 'graphe') return g;
+  if (mode === 'm1') {
+    const { vuePhase } = await imp('vf-cockpit-trace-bilans.mjs'); const { vue } = await imp('vf-cockpit-trace-vues.mjs');
+    const phases = g.nodes.filter((n) => n.kind === 'phase').map((n) => { const v = vuePhase(g, `${n.ws || ''}|${n.num}`); return { ws: n.ws || '', num: n.num, ids: v.exigences.map((e) => e.id).sort(), total: v.bilan.total }; });
+    const vues = {}; for (const c of (cle || '').split(',').filter(Boolean)) { const r = vue({ vue: 'exigence', cle: c, projet: g, modele: null }); vues[c] = r.statut + '/' + (r.corps.erreur || r.corps.etat); }
+    return { phases, vues };
+  }
   if (mode === 'equiv') {
     const anc = g.files.filter((f) => f.n === 'ph-1.req').map((f) => ({ id: f.name, st: f.st, d: f.d }));
     const nou = g.meta.vf.trace.exigences.filter((e) => e.phase === '1');
@@ -265,10 +271,34 @@ POIDS="POIDS avant=$(J "$P8" j.avant) apres=$(J "$P8" j.apres) delta=$(J "$P8" '
 echo "$POIDS"; echo "DUREE sans=$(J "$P8" j.sans) avec=$(J "$P8" j.avec)"
 assert_eq "T9.8 la ligne POIDS est mesurée et delta > 0" "$(J "$P8" "j.apres-j.avant>0")" "true"
 
+echo "=== T9.12 — Revue M1 : une exigence d'archive ne se rattache qu'à sa phase, compartiment compris ==="
+L12="$WORK/l12"; mkdir -p "$L12/.planning/phases/01-a" "$L12/.planning/milestones"
+printf -- '---\nmilestone: v1\nstatus: executing\ncurrent_phase: 1\n---\n' > "$L12/.planning/STATE.md"
+printf '# Roadmap\n\n## Milestones\n\n- 🚧 **v1** - Phases 1-1 (in progress)\n\n## Phases\n\n- [ ] **Phase 1: A** - p\n\n### Phase 1: A\n**Goal**: g\n**Depends on**: Nothing\n' > "$L12/.planning/ROADMAP.md"
+printf '# Req\n\n- [x] **REQ-01**: vivante\n\n| REQ-01 | Phase 1 | Complete |\n' > "$L12/.planning/REQUIREMENTS.md"
+printf '# Old\n\n- [x] **REQ-01**: ancienne jumelle\n- [x] **OLD-01**: ancienne sans jumelle\n' > "$L12/.planning/milestones/v0-REQUIREMENTS.md"
+mkplan "$L12/.planning/phases/01-a/01-01-PLAN.md" '[REQ-01, OLD-01]'
+M12="$(C "$L12" m1 'REQ-01,OLD-01')"
+assert_eq "T9.12 lab plat : la jumelle d'archive ne double ni la ligne ni le total de la phase 1" "$(J "$M12" "j.phases.map(p=>p.ids.join('+')+'#'+p.total).join()")" "OLD-01+REQ-01#2"
+assert_eq "T9.12b la clé de l'exigence vivante reste résoluble (200, pas cle-ambigue)" "$(J "$M12" "j.vues['REQ-01']")" "200/ok"
+assert_eq "T9.12c témoin positif : l'exigence d'archive sans jumelle reste listée et ouvrable" "$(J "$M12" "j.vues['OLD-01']")" "200/ok"
+L13="$WORK/l13"; mkdir -p "$L13/.planning/milestones"
+for w in a b; do
+  mkdir -p "$L13/.planning/workstreams/$w/phases/01-p"
+  printf -- '---\nmilestone: v1\nstatus: executing\ncurrent_phase: 1\n---\n' > "$L13/.planning/workstreams/$w/STATE.md"
+  printf '# Roadmap\n\n## Milestones\n\n- 🚧 **v1** - Phases 1-1 (in progress)\n\n## Phases\n\n- [ ] **Phase 1: P1** - p\n\n### Phase 1: P1\n**Goal**: but\n**Depends on**: Nothing\n' > "$L13/.planning/workstreams/$w/ROADMAP.md"
+  printf '# Exigences\n\n- [ ] **LIVE-0%s**: vivante\n' "$w" > "$L13/.planning/workstreams/$w/REQUIREMENTS.md"
+done
+printf '# Archive\n\n- [x] **AR-01**: archivée\n' > "$L13/.planning/milestones/v0-REQUIREMENTS.md"
+mkplan "$L13/.planning/workstreams/a/phases/01-p/01-01-PLAN.md" '[AR-01]'
+M13="$(C "$L13" m1 'AR-01')"
+assert_eq "T9.12d deux compartiments : AR-01, citée par un plan de a, sort dans la phase 1 de a seulement" "$(J "$M13" "j.phases.map(p=>p.ws+':'+p.ids.join('+')).sort().join()")" "a:AR-01,b:"
+assert_eq "T9.12e témoin positif : AR-01 reste ouvrable par sa clé" "$(J "$M13" "j.vues['AR-01']")" "200/ok"
+
 # --- FIN-SECTIONS ---
 echo
 echo "Résultats : $PASS passés, $FAIL échoués"
 # garde anti-vert-à-vide : le nombre d'assertions jouées doit atteindre l'attendu
-ATTENDU=31
+ATTENDU=36
 [ $((PASS + FAIL)) -ge "$ATTENDU" ] || { echo "  ❌ FAIL — anti-vert-à-vide : $((PASS + FAIL)) assertions jouées, $ATTENDU attendues"; FAIL=$((FAIL+1)); }
 [ "$FAIL" -eq 0 ]
