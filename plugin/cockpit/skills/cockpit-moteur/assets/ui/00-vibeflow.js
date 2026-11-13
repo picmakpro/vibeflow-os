@@ -11,7 +11,6 @@
   document.body.classList.add('vf-tab-' + TAB); // 70-12 (P70-D-20) : marqueur de l'onglet sur le corps de page (`vf-tab-code`, `vf-tab-project`, `vf-tab-equipe`), pour les règles de mise en page propres à un onglet
   // titre de l'onglet du navigateur (AUDC-X7) : un seul format, « <Onglet> · <nom> » : l'onglet d'abord, parce qu'un onglet étroit coupe par la fin et que trois pages du même projet doivent se distinguer d'un coup d'œil (le viewer écrit « <nom> map », qui devenait le nom seul)
   { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); document.title = `${TAB === 'equipe' ? 'Équipe' : TAB === 'project' ? 'Projet' : 'Code'} · ${nom}`; }
-  const ST = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué' };
   // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
   const LOGOS = G.meta.vfLogos;
   if (LOGOS) {
@@ -247,25 +246,6 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(dit, repli); else repli();
   };
 
-  // ---------- pont entre onglets ----------
-  const fileOf = (id) => id && id.startsWith('f:') ? SC.files.get?.(id.slice(2)) || (G.files || []).find((f) => 'f:' + f.p === id) : null;
-  if (TAB === 'project') {
-    SC.addPanelSection('item', (id) => {
-      const f = fileOf(id);
-      if (!f || !f.touched || !f.touched.length) return '';
-      const rows = f.touched.slice(0, 40).map((p) => `<a class="vf-link" href="index.html#r=${encodeURIComponent(p)}"><span>→</span><code>${h(p)}</code></a>`).join('');
-      return `<div class="sec"><h3>Fichiers touchés dans l'onglet Code <span class="c">${f.touched.length}</span></h3>${rows}</div>`;
-    });
-  } else if (TAB === 'code') {
-    const touch = G.meta.vfTouch || {};
-    SC.addPanelSection('item', (id) => {
-      const f = fileOf(id);
-      const list = f && touch[f.p];
-      if (!list || !list.length) return '';
-      const rows = list.slice(0, 30).map((t) => `<a class="vf-link" href="project.html#r=${encodeURIComponent(t.ref)}"><span class="vst vst-${h(t.st).replace(/[^\w-]/g, '')}">${h(ST[t.st] || t.st)}</span><span>${h(t.label)}</span></a>`).join('');
-      return `<div class="sec"><h3>Touché par <span class="c">${list.length}</span></h3>${rows}</div>`;
-    });
-  }
   if (TAB === 'project') {
     const TECH = /^(Source :|Ligne de ROADMAP :|Avancement lu dans le worktree)/;
     SC.on('panel', () => {

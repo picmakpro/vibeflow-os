@@ -199,7 +199,8 @@
     const src = creerSource(); S.sources.add(src);
     if (premier) { S.init = true; demarrer(); return src; }
     const rejouer = () => { for (const [nom, data] of S.mem) src._livrer(nom, data); }; // état connu, quand 70 a posé ses abonnements
-    // 79-16 : sous la coquille, le rejeu attend le premier rendu de l'onglet (les éléments qui affichent l'état existent alors) : un rappel de démarrage, défait avec l'onglet
+    // 79-16 : sous la coquille, le rejeu attend le premier rendu de l'onglet (les éléments qui affichent l'état existent alors) :
+    // un rappel de démarrage, défait avec l'onglet
     const C = typeof window !== 'undefined' ? window.VF_COQUILLE : null;
     if (C && typeof C.surOnglet === 'function') C.surOnglet(rejouer);
     else Promise.resolve().then(rejouer);

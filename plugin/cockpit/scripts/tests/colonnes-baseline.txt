@@ -63,7 +63,7 @@ scripts/vf-cockpit-transcript.mjs 13
 scripts/vf-cockpit-vie.mjs 7
 scripts/vf-cockpit-who.mjs 43
 scripts/vf-cockpit.mjs 36
-skills/cockpit-moteur/assets/ui/00-vibeflow.js 91
+skills/cockpit-moteur/assets/ui/00-vibeflow.js 89
 skills/cockpit-moteur/assets/ui/01-vf-responsive.js 63
 skills/cockpit-moteur/assets/ui/02-vf-telephone.js 54
 skills/cockpit-moteur/assets/ui/03-vf-accessibilite.js 6
