@@ -39,5 +39,6 @@ export function entreesMemoire({ fichiers = [], index = new Map(), jours = new M
       if (vers && vers !== e && !vers.entrants.includes(e.cle)) vers.entrants.push(e.cle);
     }
   }
+  for (const e of entrees) { e.nbSortants = e.sortants.length; e.nbEntrants = e.entrants.length; }
   return { agents: [], entrees, compteurs: { entrees: entrees.length } };
 }
