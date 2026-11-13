@@ -738,3 +738,20 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - Audit B-1 à B-3 : noms de fichiers suivis servis sans passer par `servi` ; fragments `cible` et `name` bornés mais issus du texte de la mémoire ; empreinte sans signal git quand `git.sig` est nul.
 
 **Déclencheur de reprise :** la prochaine passe sur la traçabilité du cockpit (76-08 ou la phase suivante qui la lit).
+
+## Cockpit : mineurs des plans 75-01 à 75-06 (Phase 75, activité posée sur le code) — DIFFÉRÉ (2026-11-13)
+
+**Priorité : basse.** **Origine :** exécution des plans 75-01 à 75-06, régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale).
+- 75-01 : `merge-base` absent de la liste fermée des sous-commandes git (`vf-cockpit-git-durci.mjs`) ; P75-D-10 tenu par `rev-list`, à revoir si la liste s'élargit.
+- 75-03 : gardes de forme à bords ouverts (bidi U+202E, U+200B, `%2e%2e`, `a\..\x`) : affichage seulement, les chemins ne sont jamais ouverts.
+- 75-03 : collisions de plans en texte brut (`./src/a` ≠ `src/a`).
+- 75-04 : un bloc de frontmatter de plus de 400 lignes est lu comme absent, sans compteur.
+- 75-05 : la partie synchrone de `contexteGardes` (parcours des suites) ne cède pas la main.
+- 75-06 : une carte prévue est créée pour tout chemin absent du lab, documents compris (pas de filtre par catégorie).
+- 75-06 (revue, m2) : `vf-cockpit-activite-prevues.mjs` crée une carte prévue pour des fichiers non code et des sous-dossiers ignorés ; filtrer par `classify()` et `arch.include`/`ignore`.
+- 75-0x (revue, m3) : le nœud `unassigned` vide ajouté par l'annotateur reste dans l'export autonome (`serve.mjs`).
+- 75-01 (revue, m4) : `vf-cockpit-activite-branches.mjs`, échéance globale de 15 s pour 66 paires ; plusieurs reprises de 60 s avant convergence sous charge, ce que dit `radar` (`branches-indisponible`).
+- 75-04 (revue, m6) : la lecture des listes en bloc peuple `vfTouch`, soit +885 Ko dans `graph.json` et dans l'`index.html` Code ; effet voulu, non mesuré.
+- 75-01 (revue, m5) : le tri de la base commune multiple (`baseCommune`, historiques en croix) n'a pas de témoin ; les quatre autres mutants de m5 ont leur témoin (G11).
+
+**Déclencheur de reprise :** la prochaine passe sur l'activité du cockpit (75-07 ou la phase suivante qui la lit).

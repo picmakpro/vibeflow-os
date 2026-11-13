@@ -59,6 +59,7 @@ DEFAUT=7
 # (mesure du run 43155820890), les trois autres retombent sur DEFAUT, à mesurer sur le premier run complet qui les joue.
 # Deux suites raccourcies (terminal-tiroir : mutants TH rejoués par cas ; terminal-xterm : attentes de 2 s sous mutant) sont remesurées sur
 # le run 43459074372 de la PR #241 : 955 s et 667 s.
+# Phase 75 : sept suites neuves (activite-*) mesurées par les nœuds d'exécution sur le poste, pas sur le runner ; à remesurer sur le premier run complet.
 durees() {
   cat <<'DUREES'
 1 plugin/_internal/runtime-adapter/tests/test-agent-to-codex.sh
@@ -83,6 +84,13 @@ durees() {
 0 plugin/_internal/tests/test-windows-crlf.sh
 0 plugin/business-pilot-bundle/scripts/tests/test-business-pilot-bundle.sh
 10 plugin/cockpit/scripts/tests/test-cockpit-accessibilite.sh
+5 plugin/cockpit/scripts/tests/test-cockpit-activite-chemins.sh
+49 plugin/cockpit/scripts/tests/test-cockpit-activite-empreinte.sh
+9 plugin/cockpit/scripts/tests/test-cockpit-activite-gardes.sh
+10 plugin/cockpit/scripts/tests/test-cockpit-activite-git.sh
+1 plugin/cockpit/scripts/tests/test-cockpit-activite-planning.sh
+5 plugin/cockpit/scripts/tests/test-cockpit-activite-prevues.sh
+214 plugin/cockpit/scripts/tests/test-cockpit-activite-route.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-ailleurs.sh
 66 plugin/cockpit/scripts/tests/test-cockpit-amorce-navigateur.sh
 7 plugin/cockpit/scripts/tests/test-cockpit-assemblage.sh

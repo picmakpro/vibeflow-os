@@ -32,7 +32,7 @@ const commande = (cmd, ...noms) => (cmd !== null && noms.every((n) => masque(n) 
 // MONO-VOL : une échéance plus longue ne doit pas empiler les lectures (le tiroir relit à chaque rafale de signal, filet de 5 s). Une lecture en cours pour un lab n'est jamais doublée : tout appel qui arrive
 // pendant qu'elle tourne partage UNE seule lecture suivante, lancée à sa fin (jamais deux en même temps, et jamais l'état d'avant un `git switch` rendu à un appel d'après).
 const EN_VOL = new Map();
-function monoVol(cle, lire) {
+export function monoVol(cle, lire) { // exporté tel quel (75-01 : la tâche d activité de 75-05 est mono-vol)
   const v = EN_VOL.get(cle);
   if (v) return v.suivante ??= v.cour.then(() => monoVol(cle, lire), () => monoVol(cle, lire));
   const cour = lire().finally(() => EN_VOL.delete(cle));

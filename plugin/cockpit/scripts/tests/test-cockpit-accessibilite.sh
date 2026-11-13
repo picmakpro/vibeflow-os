@@ -100,6 +100,9 @@ assert_eq "X6.5 — ce contour est STATIQUE : aucune animation, contour de 2 px 
 assert_eq "X6.6 — … et il est retiré ensuite (aucun état ne reste posé)" "$(E 'j.x6.reduit.flash.perdu')" "true"
 assert_eq "X6.7 — l'attente de « Demander » reste un anneau lisible (13 px, un quart coloré), sans mouvement" "$(E "j.x6.reduit.attente.anim === 'none' && j.x6.reduit.attente.actives === 0 && j.x6.reduit.attente.largeur >= 13 && j.x6.reduit.attente.quartColore")" "true"
 assert_eq "X6.8 — une entrée qui attend animationend (tiroir Git, terminal) perd sa classe quand même" "$(E 'j.x6.reduit.entree')" "true"
+echo "=== S — un premier rendu supplanté émet quand même « ready » (garde de disponibilité) ==="
+assert_eq "S1 — témoin : le second rendu a bien été demandé pendant le premier (au moins deux calculs de mise en page)" "$(E 'j.sup.calculs >= 2')" "true"
+assert_eq "S2 — la coquille se dit prête malgré le rendu supplanté ($(E 'j.sup.erreur || "ok"'))" "$(E 'j.sup.pret')" "true"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

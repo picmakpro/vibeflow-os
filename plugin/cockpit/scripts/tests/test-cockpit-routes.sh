@@ -178,7 +178,7 @@ import { pathToFileURL } from 'node:url';
 const [, , dir, lab, sortie, extra] = process.argv;
 const imp = (f) => import(pathToFileURL(path.join(dir, f)).href);
 setTimeout(() => process.exit(2), 40000).unref();
-const ATTENDU = ['/api/vf/ailleurs', '/api/vf/doing', '/api/vf/etat', '/api/vf/events', '/api/vf/frise', '/api/vf/graphe', '/api/vf/journal', '/api/vf/methode', '/api/vf/modeles', '/api/vf/state', '/api/vf/tracabilite', '/api/vf/transcript', ...JSON.parse(extra || '[]')].sort();
+const ATTENDU = ['/api/vf/activite', '/api/vf/ailleurs', '/api/vf/doing', '/api/vf/etat', '/api/vf/events', '/api/vf/frise', '/api/vf/graphe', '/api/vf/journal', '/api/vf/methode', '/api/vf/modeles', '/api/vf/state', '/api/vf/tracabilite', '/api/vf/transcript', ...JSON.parse(extra || '[]')].sort();
 const REGIMES = { '/api/vf/doing': 'historique', '/api/vf/etat': 'historique', '/api/vf/journal': 'historique', '/api/vf/modeles': 'historique', '/api/vf/transcript': 'historique', '/api/vf/events': 'flux' };
 const v = {}; let S = null, R = null;
 try { S = await imp('vf-cockpit-server.mjs'); R = await imp('vf-cockpit-routes.mjs'); } catch {}
@@ -210,7 +210,7 @@ import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 const [, , dir, scripts, cas, lab, arg] = process.argv;
 const M = await import(pathToFileURL(path.join(dir, 'vf-cockpit-build.mjs')).href);
-const sortie = path.join(lab, '.vibeflow', 'cockpit'), VOL = new Set(['generatedAt', 'scanAt', 'builtAt', 'updatedAt']);
+const sortie = path.join(lab, '.vibeflow', 'cockpit'), VOL = new Set(['generatedAt', 'scanAt', 'builtAt', 'updatedAt', 'vfPrevuAt']);
 const tri = (o) => (Array.isArray(o) ? o.map(tri) : o && typeof o === 'object' ? Object.fromEntries(Object.keys(o).filter((k) => !VOL.has(k)).sort().map((k) => [k, tri(o[k])])) : o);
 const canon = (j) => JSON.stringify(tri(j)).split(lab).join('<LAB>').split(fs.realpathSync(lab)).join('<LAB>');
 const graphe = () => JSON.parse(fs.readFileSync(path.join(sortie, 'graph.json'), 'utf8')), page = async () => (await import(pathToFileURL(path.join(scripts, 'vf-cockpit-embed.mjs')).href)).extraireGraphe(fs.readFileSync(path.join(sortie, 'index.html'), 'utf8')); // le lecteur de la sortie (marque blanche)
@@ -288,7 +288,7 @@ assert_eq "B1.2 — l'annotateur schema migré : graph.json porte vf-cockpit/gra
 echo "=== RK — table des routes (A10) ==="
 STR="$(node "$AUX/struct.mjs" "$SCRIPTS" "$LABH" "$OUTH")"
 va() { printf '%s' "$1" | tr ' ' '\n' | grep "^$2=" | cut -d= -f2; }
-assert_eq "RK.1 — les chemins de ROUTES égalent la liste écrite à la main (ailleurs, doing, etat, events, frise, graphe, journal, methode, modeles, state, tracabilite, transcript) ; une ligne par route ajoutée, à sa place alphabétique" "$(va "$STR" RK.1)" "ok"
+assert_eq "RK.1 — les chemins de ROUTES égalent la liste écrite à la main (activite, ailleurs, doing, etat, events, frise, graphe, journal, methode, modeles, state, tracabilite, transcript) ; une ligne par route ajoutée, à sa place alphabétique" "$(va "$STR" RK.1)" "ok"
 assert_eq "RK.2 — chemins uniques, triés par unités de code, chaque entrée [chaîne, fonction, régime?]" "$(va "$STR" RK.2)" "ok"
 assert_eq "RK.3 — une ligne de source par route (lignes « deux espaces, crochet, chemin /api/vf/ » = longueur de ROUTES)" "$(va "$STR" RK.3)" "ok"
 assert_eq "RK.4 — aucune comparaison littérale de url.pathname avec un chemin /api/vf/ dans le serveur" "$(va "$STR" RK.4)" "ok"
@@ -309,7 +309,7 @@ JS
 TOKC="$(node "$AUX/jeton.mjs" "$PORT" /)"; TOKP="$(node "$AUX/jeton.mjs" "$PORT" /project.html)"
 assert_eq "RK.0 — témoin : le serveur est lancé par le lanceur, les deux jetons sont lus dans les deux pages" "$([ "$PORT" -gt 0 ] && [ "${#TOKC}" -ge 16 ] && [ "${#TOKP}" -ge 16 ] && [ "$TOKC" != "$TOKP" ] && echo oui || echo non)" "oui"
 SO="$(node "$AUX/sondes.mjs" "$OUTS" "$PORT" "$TOKC" "$TOKP" "$SCRIPTS" 2>"$WORK/sondes.err" | tail -1)"; [ -n "$SO" ] || SO='{}'
-assert_eq "RK.7 — pour chaque route de ROUTES (dérivée de l'export) : sans jeton 403, hôte et origine étrangers 403, POST 405, ?token= 403 sauf events, accès valides ni 403/404/405, JSON no-store sans CORS ; témoin de couverture : toutes les routes sondées" "$(ev "$SO" 'j.ko.join(",")||"aucun-echec"')|$(ev "$SO" 'j.sondees')|$(node "$AUX/exp.mjs" "$SCRIPTS" vf-cockpit-server.mjs ROUTES >/dev/null; node --input-type=module -e "import('file://$SCRIPTS/vf-cockpit-server.mjs').then(m=>console.log(m.ROUTES.length))")" "aucun-echec|12|12"
+assert_eq "RK.7 — pour chaque route de ROUTES (dérivée de l'export) : sans jeton 403, hôte et origine étrangers 403, POST 405, ?token= 403 sauf events, accès valides ni 403/404/405, JSON no-store sans CORS ; témoin de couverture : toutes les routes sondées" "$(ev "$SO" 'j.ko.join(",")||"aucun-echec"')|$(ev "$SO" 'j.sondees')|$(node "$AUX/exp.mjs" "$SCRIPTS" vf-cockpit-server.mjs ROUTES >/dev/null; node --input-type=module -e "import('file://$SCRIPTS/vf-cockpit-server.mjs').then(m=>console.log(m.ROUTES.length))")" "aucun-echec|13|13"
 assert_eq "RK.8 — le portail précède la résolution : /api/vf/inconnu 403 sans jeton et 404 avec ; /api/vf/git ni 403, 404 ni 405 ; /api/vf/git/inconnu 404 (délégués conservés)" "$(ev "$SO" 'j.rk8.join(" ")')" "403 404 true 404"
 FL="$(hh flux)"
 assert_eq "RK.9 — le flux : ouverts() et dernierFlux() valent 0 et 0 avant, ouverts() vaut 1 pendant, 0 après et dernierFlux() > 0" "$(ev "$FL" 'JSON.stringify(j.avant)+" "+j.ouvert+" "+JSON.stringify(j.apres)')" "[0,0] 1 [0,true]"
@@ -336,7 +336,7 @@ export MUT_F=$'  [\'/api/vf/modeles\', lireModeles, HISTORIQUE],\n' MUT_R=""
 assert_eq "M-TABLE — la ligne modeles retirée : RK.1 et RC.3 rougissent (RC.3 obtient 404)" "$(mutstruct table)" "2|RK.1,RC.3,"
 
 echo "=== AN — table des annotateurs (A27) ==="
-assert_eq "AN.1 — ANNOTATEURS porte exactement descriptions, git, logos, onglet, schema, touche (liste à la main ; une ligne par annotateur ajouté, à sa place alphabétique), uniques et triés" "$(ev "$B" 'j.noms.join(",")')" "descriptions,git,logos,onglet,schema,touche"
+assert_eq "AN.1 — ANNOTATEURS porte exactement descriptions, git, logos, onglet, prevues, schema, touche (liste à la main ; une ligne par annotateur ajouté, à sa place alphabétique), uniques et triés" "$(ev "$B" 'j.noms.join(",")')" "descriptions,git,logos,onglet,prevues,schema,touche"
 LABV="$WORK/an1/lab"; mkdir -p "$WORK/an1"; copielab "$LABV"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LABV" --quiet >/dev/null 2>&1
 AV="$(node "$AUX/an.mjs" "$SCRIPTS" "$SCRIPTS" valeurs "$LABV" 2>/dev/null | tail -1)"; BR="$(git -C "$LABV" branch --show-current)"
 assert_eq "AN.2 — valeurs du lab neutre : onglet code, logos clair et sombre en data:image/svg+xml, entête Git (branche du lab), vfTouch de src/app.js, extracteur, description du script, schéma" "$(ev "$AV" '[j.tab,j.logos,j.git,j.touche,j.extracteur,j.d,j.auto,j.schema].join("|")')" "code|true,true|$BR|true|true|Lance la démonstration du socle : une phrase accentuée en tête.|false|vf-cockpit/graph@1"

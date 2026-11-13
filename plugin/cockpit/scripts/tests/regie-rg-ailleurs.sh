@@ -154,12 +154,12 @@ rg13_mutant_serveur() { # rg13_mutant_serveur <NOM> <libellé> <fichier> <expr s
 }
 
 # constats d'audit 2 et 3 (73-02) ------------------------------------------------------------------------------------------------
-# rg13_inj <NOM> <expr sed sur vf-cockpit-etat-officiel.mjs> [<expr sed sur vf-cockpit-server.mjs>] : copie jetable du module, dans laquelle l'état officiel
+# rg13_inj <NOM> <expr sed sur vf-cockpit-etat-officiel.mjs> [<expr sed sur vf-cockpit-route-ailleurs.mjs>] : copie jetable du module, dans laquelle l'état officiel
 # émet une entrée à clé en trop (injection, pas une garde) et, pour un mutant, la garde du serveur est retirée ; exporte COCKPIT_MODULE (code 1 si une ancre manque)
 rg13_inj() {
   cockpit_module_muter "RG13-$1" vf-cockpit-etat-officiel.mjs "$2" || return 1
   if [ -n "${3:-}" ]; then
-    local s="$COCKPIT_MODULE/scripts/vf-cockpit-server.mjs"
+    local s="$COCKPIT_MODULE/scripts/vf-cockpit-route-ailleurs.mjs"
     sed "$3" "$s" > "$s.mut" && ! cmp -s "$s" "$s.mut" && mv "$s.mut" "$s" || return 1
   fi
 }
@@ -190,7 +190,7 @@ rg_RG13_route() {
   assert_eq "RG13.13 — précondition (la route a rendu la liste) puis dix GET : le journal du faux claude et celui du faux git ne gagnent aucune ligne" "$(rg13_ch "$r" rendue)|$(rg13_ch "$r" dclaude)|$(rg13_ch "$r" dgit)" "oui|0|0"
   assert_eq "RG13.14 — témoin positif (au moins un git dans un arbre du lab) puis aucun git hors du lab ni dans un autre lab pendant tout le scénario" "$([ "$(rg13_ch "$r" gitlab)" -gt 0 ] 2>/dev/null && echo oui || echo non)|$(rg13_ch "$r" gitdehors)" "oui|0|0"
   rg13_mutant_serveur AILLEURS-GIT "un git lancé dans le dossier de la session" vf-cockpit-etat-officiel.mjs 's@const lab = nomDuLab(d, hd);@const lab = (execFile("git", ["-C", d, "status"], () => {}), nomDuLab(d, hd));@' gitdehors "0|0"
-  rg13_mutant_serveur ROUTE-PAR-REQUETE "la route relance la lecture officielle" vf-cockpit-server.mjs 's@const l = ailleurs(os.homedir(), @const l = (import("./vf-cockpit-etat-officiel.mjs").then((m) => m.rafraichir({ home: os.homedir(), cwd: c.root })), ailleurs)(os.homedir(), @' dclaude 0
+  rg13_mutant_serveur ROUTE-PAR-REQUETE "la route relance la lecture officielle" vf-cockpit-route-ailleurs.mjs 's@const l = ailleurs(os.homedir(), @const l = (import("./vf-cockpit-etat-officiel.mjs").then((m) => m.rafraichir({ home: os.homedir(), cwd: c.root })), ailleurs)(os.homedir(), @' dclaude 0
   rg13_mutant_serveur ROUTE-SANS-JETON "contrôle de jeton neutralisé (portail de serve.mjs et accès gardé)" serve.mjs 's@(!sameToken(given, token) && !VF?.jetonValide(given))@false@' sanstoken 403 's@if (!jetonValide(h\[entete\])) return { ok: false, code: 403 };@@'
   # constat d'audit 2 : une entrée à clé en trop (injectée dans l'état officiel d'une copie du module) ne sort pas ; seules des entrées { lab, n } sortent
   local x="$WORK/rg13-extra.res" got
