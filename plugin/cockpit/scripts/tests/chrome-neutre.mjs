@@ -6,6 +6,7 @@
 //   pile-marque    : la même région porte data-vf-flottant="tiroir" : la pile la laisse à son Échap (palette encore ouverte)
 //   reperes        : cartes hors champ, un bouton fixe étranger couvre la fenêtre : les repères restent-ils posés ?
 //   reperes-marque : le même bouton porte data-vf-flottant="bouton" : c'est un obstacle, aucun repère ne trouve de place
+//   reperes-tard   : repères posés, PUIS le bouton marqué arrive sous body, sans aucun autre geste : les repères le contournent-ils ?
 //   reperes-sans   : témoin de méthode, le même geste sans aucun élément posé : les repères restent
 import { executer, pause, stabiliser } from './chrome-session.mjs';
 const [, , chrome, racine, mode] = process.argv;
@@ -57,14 +58,15 @@ await executer(chrome, async (s) => {
     o.pris = JSON.parse(await s.ev(`JSON.stringify((() => { const e = new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true });
       document.getElementById('region-fils').dispatchEvent(e); return e.defaultPrevented; })())`));
     await pause(300); o.palette = JSON.parse(await s.ev(`JSON.stringify(${PALETTE})`));
-  } else if (mode === 'reperes' || mode === 'reperes-marque' || mode === 'reperes-sans') {
+  } else if (mode === 'reperes' || mode === 'reperes-marque' || mode === 'reperes-sans' || mode === 'reperes-tard') {
     await s.ev('VF_CANEVAS.deplacer({ x: 3000, y: 0 })'); await pause(300);
     const n = () => s.ev("document.querySelectorAll('button.vf-repere').length");
     o.avant = await stabiliser(n, { pas: 150, max: 4000 });
-    const marque = mode === 'reperes-marque' ? "b.setAttribute('data-vf-flottant', 'bouton');" : '';
+    const marque = mode === 'reperes-marque' || mode === 'reperes-tard' ? "b.setAttribute('data-vf-flottant', 'bouton');" : '';
     const plein = 'position: fixed; inset: 0; width: 100vw; height: 100vh; opacity: 0; pointer-events: none; z-index: 5';
     if (mode !== 'reperes-sans') await s.ev(POSER('button', plein, marque));
-    await s.ev("document.body.classList.add('sonde-neutre')"); await pause(300); // 02 réévalue à tout changement de classe du corps
+    if (mode !== 'reperes-tard') await s.ev("document.body.classList.add('sonde-neutre')"); // 02 réévalue à tout changement de classe du corps
+    await pause(300);
     o.apres = await stabiliser(n, { pas: 150, max: 4000 });
   }
   return o;

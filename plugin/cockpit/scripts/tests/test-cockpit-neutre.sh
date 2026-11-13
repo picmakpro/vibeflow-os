@@ -32,8 +32,8 @@ assert_eq "NE0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui ||
 echo "=== NE1 — les lecteurs lisent l'attribut, jamais une forme ==="
 RP="$(mesurer chrome-neutre.mjs pile)"; RPM="$(mesurer chrome-neutre.mjs pile-marque)"
 RR="$(mesurer chrome-neutre.mjs reperes)"; RRM="$(mesurer chrome-neutre.mjs reperes-marque)"
-RS="$(mesurer chrome-neutre.mjs reperes-sans)"; RT="$(mesurer chrome-neutre.mjs tiroir)"; vf_hyg_stop "$SRV"
-[ -z "${SONDE:-}" ] || { printf '%s\n' "$RP" "$RPM" "$RR" "$RRM" "$RS" "$RT"; cat "$WORK/mesure.err"; }
+RS="$(mesurer chrome-neutre.mjs reperes-sans)"; RTD="$(mesurer chrome-neutre.mjs reperes-tard)"; RT="$(mesurer chrome-neutre.mjs tiroir)"; vf_hyg_stop "$SRV"
+[ -z "${SONDE:-}" ] || { printf '%s\n' "$RP" "$RPM" "$RR" "$RRM" "$RS" "$RTD" "$RT"; cat "$WORK/mesure.err"; }
 assert_eq "NE1.1 — 00 : Échap tapé dans une région fixe ÉTRANGÈRE sous body ferme la palette (la pile ne la prend pas pour le tiroir du terminal)" \
   "$(E '[j.pris, j.palette]' "$RP")" '[true,false]'
 assert_eq "NE1.2 — 00 (témoin positif) : la même région marquée data-vf-flottant=\"tiroir\" garde son Échap : la palette reste ouverte" \
@@ -44,6 +44,8 @@ assert_eq "NE1.4 — 02 (témoin positif) : le même bouton marqué data-vf-flot
   "$(E '[j.avant > 0, j.apres]' "$RRM")" '[true,0]'
 assert_eq "NE1.5 — 02 (témoin de méthode) : sans élément posé, le même geste laisse les repères ($(E 'j.avant + " -> " + j.apres' "$RS"))" \
   "$(E '[j.avant > 0, j.apres > 0]' "$RS")" '[true,true]'
+assert_eq "NE1.6 — 02 : repères posés, PUIS un bouton marqué arrive, sans autre geste : ils le contournent ($(E 'j.avant + " -> " + j.apres' "$RTD"))" \
+  "$(E '[j.avant > 0, j.apres]' "$RTD")" '[true,0]'
 
 echo "=== NE2 — le tiroir Git se rejoue à l'arrivée d'un élément flottant ==="
 assert_eq "NE2.1 — tiroir Git ouvert, PUIS un bouton fixe en bas à gauche : aucun chevauchement sans redimensionnement (témoin : aucun avec)" \
@@ -68,6 +70,11 @@ mutant M-EVITER-REJEU 77-vf-git-tiroir.js "$OBS_ANCIEN" "{ attributes: true, att
 echo "     trace M-EVITER-REJEU — sonde NE2.1 [chevauche, témoin] : attendu [false,false], obtenu $(E '[j.apres, j.temoin]' "$RM")"
 assert_eq "M-EVITER-REJEU — le mutant (rejeu d'eviter retiré à l'arrivée d'un enfant de body) rougit NE2.1 : chevauchement (témoin : redimensionnement)" \
   "$(E '[typeof j.apres, j.apres, j.temoin]' "$RM")" '["boolean",true,false]'
+OBS_REP="{ childList: true, attributes: true, attributeFilter: ['class'] }"
+mutant M-REPERES-REJEU 02-vf-reperes.js "$OBS_REP" "{ attributes: true, attributeFilter: ['class'] }" chrome-neutre.mjs reperes-tard ""
+echo "     trace M-REPERES-REJEU — sonde NE1.6 [avant, après] : attendu 1 -> 0, obtenu $(E 'j.avant + " -> " + j.apres' "$RM")"
+assert_eq "M-REPERES-REJEU — le mutant (observateur du corps sans childList) rougit NE1.6 : l'arrivée tardive n'est pas vue (témoin : repères posés)" \
+  "$(E '[j.avant > 0, j.apres > 0]' "$RM")" '[true,true]'
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
