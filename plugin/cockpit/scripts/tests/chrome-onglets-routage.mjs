@@ -16,7 +16,7 @@ const AMORCE = `(() => { const A = window.__o = { pop: 0, push: 0, repl: 0, fetc
     History.prototype[k] = function (...a) { A[k === 'pushState' ? 'push' : 'repl']++; return o.apply(this, a); }; }
   const f = window.fetch;
   window.fetch = function (u, ...r) { if (String(u).includes('/api/vf/graphe')) { A.fetchs.push(String(u));
-    if (!/vf-coquille\\.js/.test((new Error().stack.split('\\n')[2] || ''))) A.directs++;
+    if (/00-vf-onglets/.test(new Error().stack)) A.directs++;
     if (A.echec) return Promise.reject(new TypeError('forcé')); } return f.call(this, u, ...r); };
   addEventListener('unhandledrejection', () => A.rej++);
   document.addEventListener('vf:onglet', (e) => A.evs.push(e.detail.onglet + '<' + e.detail.precedent)); })()`;
@@ -27,7 +27,7 @@ const ETAT = `({ p: location.pathname, h: location.hash, n: history.length, t: d
   pret: document.documentElement.dataset.vfPret, evs: __o.evs.length, last: __o.evs[__o.evs.length - 1] || null, push: __o.push, repl: __o.repl,
   fetchs: __o.fetchs.length, rej: __o.rej, directs: __o.directs, sel: VibeFlow.state.selected, cont: VibeFlow.state.container, tk: VibeFlow.state.t,
   git: (document.querySelector('#vf-git-ligne') || { getAttribute: () => null }).getAttribute('aria-expanded'),
-  live: (document.getElementById('ask-live') || {}).textContent || '', ae: (() => { const a = document.activeElement;
+  live: (document.querySelector('.vp-status') || document.getElementById('ask-live') || {}).textContent || '', ae: (() => { const a = document.activeElement;
     return !a ? null : a === document.body ? 'body' : a.id || (a.dataset && a.dataset.id) || (a.closest && a.closest('svg') ? 'carte' : a.tagName); })() })`;
 const TAB = { code: 'index.html', projet: 'project.html', equipe: 'equipe.html' };
 
@@ -105,8 +105,8 @@ await executer(chrome, async (s) => {
       o.og24 = { code: e1.p, retour: [e2.p, e2.sel, a], clic: [e4.p, e4.sel, b], h: e4.h };
     });
     await sec('og24l', async () => {
-      await charger('/project.html?vue=liste'); await s.attendre("document.querySelectorAll('.vp-rangee').length > 0", 'liste');
-      await clic('.vp-rangee[data-id="n:ph-2"]'); await s.attendre(`VibeFlow.state.selected === 'n:ph-2'`, 'ph-2'); await pause(300);
+      await charger('/project.html?vue=liste'); await s.attendre("document.querySelectorAll('.vp-ligne').length > 0", 'liste');
+      await clic('.vp-ligne[data-id="n:ph-2"]'); await s.attendre(`VibeFlow.state.selected === 'n:ph-2'`, 'ph-2'); await pause(300);
       await onglet('code', 1); const e2 = await retour('history.back()', 2); await pause(300);
       o.og24l = { p: e2.p, sel: e2.sel, ae: await lire(`(() => { const e = document.activeElement; return { id: e.dataset.id, tag: e.tagName }; })()`) };
     });
@@ -158,6 +158,7 @@ await executer(chrome, async (s) => {
   if (mode === 'og3') {
     await sec('og3', async () => {
       await charger('/'); const id = await premier(); await s.ev(`VibeFlow.select(${JSON.stringify(id)})`); await pause(300);
+      await s.ev(`document.querySelector('nav.vf-tabs a[href="project.html"]').focus()`); // le clic ne déplace alors pas le focus de lui-même
       const e0 = await etat(); await s.ev('__o.echec = 1'); const nf = e0.fetchs;
       await clic('nav.vf-tabs a[href="project.html"]'); await s.attendre(`__o.fetchs.length > ${nf}`, 'lecture tentée'); const e1 = await rien(700);
       o.og31 = { e0, e1 }; await s.ev('__o.echec = 0');
@@ -183,9 +184,10 @@ await executer(chrome, async (s) => {
       await clic('button.vf-term-pastille'); await s.attendre("!!document.querySelector('iframe')", 'cadre du terminal');
       await s.ev(`(() => { const f = document.querySelector('iframe'); f.__vf = { charges: 0 };
         f.addEventListener('load', () => { f.__vf.charges++; }); window.__o.cadre = f; })()`);
+      await pause(2500); await s.ev('__o.cadre.__vf.c0 = __o.cadre.__vf.charges'); // le premier chargement du cadre est fini
       await onglet('projet', 1); await onglet('code', 2);
       o.og22 = await lire(`(() => { const f = document.querySelector('iframe');
-        return { meme: f === __o.cadre, connecte: !!f && f.isConnected, charges: f && f.__vf ? f.__vf.charges : -1 }; })()`);
+        return { meme: f === __o.cadre, connecte: !!f && f.isConnected, charges: f && f.__vf ? f.__vf.charges - f.__vf.c0 : -1 }; })()`);
     });
   }
   return o;

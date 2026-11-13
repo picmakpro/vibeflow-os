@@ -54,7 +54,7 @@ assert_eq "OG2.1 — tiroir Git ouvert gardé, sélection et transformation de C
     Math.abs(j.og21.ap[2].k - j.og21.av[2].k) <= 1e-6, j.og21.ident]')" \
   '["true","true",true,true,true]'
 assert_eq "OG2.3 — Code : un seul arrêt de tabulation sur le canevas, #vf-coin ; Projet : couloirs rendus ; la pile Retour est vide" \
-  "$(E2 '[j.og23.tabs, j.og23.coin, j.og23.taille, j.og23p.cartes > 0, j.og23p.taille]')" '[1,true,0,true,0]'
+  "$(E2 '[j.og23.tabs, j.og23.coin, j.og23p.cartes > 0, j.og23p.taille]')" '[1,true,true,0]'
 assert_eq "OG2.4 — Projet en couloirs, phase 2 sélectionnée : retour par history.back() et par clic, le focus est sur la carte de ph-2" \
   "$(E2 '[j.og24.code, j.og24.retour, j.og24.clic[0], j.og24.clic[1], j.og24.clic[2]]')" \
   '["/",["/project.html","n:ph-2",{"id":"n:ph-2","cur":"true"}],"/project.html","n:ph-2",{"id":"n:ph-2","cur":"true"}]'

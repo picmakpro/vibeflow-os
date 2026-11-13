@@ -34,11 +34,24 @@
     const SC = moteur(), p = SC && SC.graph && SC.graph.project, n = String((p && p.name) || '').replace(/ — (Projet|Équipe)$/, '');
     if (!document.title.startsWith(LIBELLE[nom] + ' · ')) document.title = LIBELLE[nom] + ' · ' + n;
   };
-  const annoncer = (nom) => { const z = document.getElementById('ask-live'); if (z) z.textContent = LIBELLE[nom]; };
+  const annoncer = (nom) => { // la zone status de Projet quand elle existe, sinon celle de la barre de question (aucune lecture ici)
+    const F = window.VF_PROJET, z = document.getElementById('ask-live');
+    if (F && typeof F.annoncer === 'function') F.annoncer(LIBELLE[nom]); else if (z) z.textContent = LIBELLE[nom];
+  };
+  // le tiroir Git se ferme avec l'onglet qu'il quitte (son nettoyage précède le nôtre) : l'état est lu au départ, avant tout chargement, et rendu à l'arrivée
+  const gitOuvert = () => {
+    const G = window.VFGitTiroir;
+    return !!G && typeof G.ouvert === 'function' && G.ouvert();
+  };
+  const rouvrirGit = () => {
+    const G = window.VFGitTiroir;
+    if (G && typeof G.ouvrir === 'function' && !G.ouvert()) G.ouvrir();
+  };
   // repli unique (80-UI-SPEC § 5) : l'élément sélectionné rendu, sinon le h1 ; Code et Graphe : la carte sélectionnée ou itinérante, sinon #stage ; jamais body
   const focaliser = () => {
-    const SC = moteur(), P = window.__vfProjetClavier, K = window.VF_CANEVAS, F = window.VF_PROJET;
+    const SC = moteur(), K = window.VF_CANEVAS, F = window.VF_PROJET;
     const projet = !!SC && !!SC.graph.meta && SC.graph.meta.vfTab === 'project';
+    const P = F && F.forme() === 'liste' ? window.__vfProjetListe : window.__vfProjetClavier; // la forme affichée a son propre repli
     if (projet && P && F && F.forme() !== 'graphe' && P.repli({ defiler: false })) return;
     const sel = SC && typeof SC.state.selected === 'string' ? SC.state.selected : null;
     if (K && sel && K.focaliser(sel)) return;
@@ -55,20 +68,22 @@
       if (v.t && v.cont === SC.state.container && typeof SC.transformer === 'function') SC.transformer(v.t);
     } catch (e) { console.error('VibeFlow onglets : vue non restituée : ' + (e && e.message)); }
   };
-  const arriver = async (nom, precedent, avecVue) => {
+  const arriver = async (nom, precedent, avecVue, git) => {
     await restituer(nom, avecVue);
-    titrer(nom); hashes.set(nom, location.hash);
-    document.dispatchEvent(new CustomEvent('vf:onglet', { detail: { onglet: nom, precedent } }));
-    focaliser(); annoncer(nom);
+    // l'arrivée ne rejette jamais : un geste d'arrivée qui lève est consigné, la promesse de `aller` ne dit que le chargement
+    for (const geste of [() => git && rouvrirGit(), () => titrer(nom), () => hashes.set(nom, location.hash),
+      () => document.dispatchEvent(new CustomEvent('vf:onglet', { detail: { onglet: nom, precedent } })), focaliser, () => annoncer(nom)]) {
+      try { geste(); } catch (e) { console.error('VibeFlow onglets : arrivée : ' + (e && e.message)); }
+    }
   };
 
   // la seule fonction de chargement : clic, popstate et aller. `pop` : le navigateur a déjà posé l'adresse ; `fragment` : posé tel quel (aller)
   const charger = (nom, { pop = false, fragment = null } = {}) => {
-    const precedent = C.onglet();
+    const precedent = C.onglet(), git = gitOuvert();
     depart = pop ? 'popstate' : 'clic';
     return C.chargerOnglet(nom).then(() => {
       if (!pop) history.pushState(null, '', CHEMIN[nom] + (fragment !== null ? fragment : hashes.get(nom) || ''));
-      return arriver(nom, precedent, !pop && fragment === null);
+      return arriver(nom, precedent, !pop && fragment === null, git);
     }, (e) => {
       const a = C.onglet();
       if (pop && a) history.replaceState(null, '', CHEMIN[a] + (hashes.get(a) || ''));
