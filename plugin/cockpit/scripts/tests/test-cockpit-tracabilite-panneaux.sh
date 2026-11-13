@@ -114,7 +114,7 @@ E() { node "$AUX/ev.mjs" "$2" < "$WORK/$1.json"; }
 
 LL="$WORK/labL"; mklabL "$LL"; lancer_page "$LL"; attendre 30 pret
 assert_eq "C0 — témoin : le serveur du lab écoute et la première collecte est faite (ADR, décisions et mémoire servies)" "$([ "${VF_PORT:-0}" -gt 0 ] && cockpit_get '/api/vf/tracabilite?vue=adr' | grep -q '"ADR-001"' && echo oui || echo non)" "oui"
-harnais chrome-tracabilite-panneaux.mjs hl "d1"
+harnais chrome-tracabilite-panneaux.mjs hl "d1,d3,d7"
 echo "=== C3.1 à C3.2 — Décisions, ADR, commits qui la citent (tracer) ==="
 assert_eq "C3.1a — section « Décisions » repliée par défaut, aucune requête vue=adr avant l'ouverture, une seule à l'ouverture" "$(E hl 'j.d1avant.ferme+"|"+j.d1avant.req+"|"+j.d1sec.req')" "true|0|1"
 assert_eq "C3.1b — bilan « 2 ADR · 3 décisions · 1 registre de phase », compteur « 2 ADR », une ligne par ADR avec section (ADR-007 sans section n'en a pas)" "$(E hl 'j.d1sec.bilan+"|"+j.d1sec.compteur+"|"+j.d1sec.ids')" "2 ADR · 3 décisions · 1 registre de phase|2 ADR|ADR-001,ADR-002"
@@ -122,7 +122,35 @@ assert_eq "C3.1c — Entrée sur ADR-001 : panneau d'ADR, titre « ADR-001 », i
 assert_eq "C3.1d — le panneau liste « Décisions qui la citent » (P90-D-01) puis « Commits qui la citent », le sha court, le jour en français et le sujet" "$(E hl 'j.d1adr.secs.join()+"|"+j.d1adr.dec+"|"+j.d1adr.commits.join()')" "Décisions qui la citent,Commits qui la citent|P90-D-01|$(sha7 "$LL" 'suit ADR-001')·9 nov. 2026·feat: suit ADR-001"
 assert_eq "C3.1e — pied « Lu dans docs/ADR.md », titre lu après le numéro, le corps du message n'apparaît pas" "$(E hl 'j.d1adr.pied+"|"+j.d1adr.pd')" "Lu dans docs/ADR.md|Premier choix ADR-MARQUEUR-76"
 assert_eq "C3.2 — témoin voisin : ADR-002 sans commit : « Aucun commit ne cite cet objet. Un message de commit qui nomme son identifiant le relierait. »" "$(E hl 'j.d2.titre+"|"+j.d2.aucun+"|"+j.d2.lignes')" "ADR-002|true|0"
-assert_eq "C3.x — aucune section n'a échoué par erreur de harnais" "$(E hl 'JSON.stringify(j.erreurs)')" "{}"
+SHA_D="$(sha7 "$LL" 'applique P90-D-01')"
+assert_eq "C3.3a — Décisions, « Registres de phase » : un sous-repli « Phase 90, 3 décisions » fermé ; déplié : identifiant et début de définition de P90-D-01, P90-D-02 et D-04" "$(E hl 'j.d3sous.n+"|"+j.d3sous.ferme+"|"+j.d3sous.resume+"|"+j.d3lignes.map(l=>l.split("|")[0]).join()')" "1|true|Phase 90 3 décisions|P90-D-01,P90-D-02,D-04"
+assert_eq "C3.3b — panneau de P90-D-01 : étiquette « Décision », titre, titre de définition, sections « Phase », « ADR citées », « Commits qui la citent »" "$(E hl 'j.d3.kind+"|"+j.d3.titre+"|"+j.d3.id+"|"+j.d3.trace+"|"+j.d3.pd+"|"+j.d3.secs.join()')" "Décision|P90-D-01|vf-trace-decision-P90-D-01_ph-90|decision:P90-D-01:ph-90|DECISION-MARQUEUR-76 première définition (ADR-001, ADR-007)|Phase,ADR citées,Commits qui la citent"
+assert_eq "C3.3c — « Phase » est un bouton qui sélectionne la phase ; ADR-001 en bouton ; ADR-007 (citée sans section) en texte non interactif « sans section dans docs/ADR.md », non focalisable" "$(E hl '(j.d3.phase.startsWith("Phase 90"))+"|"+j.d3sel+"|"+j.d3.adr.boutons+"|"+JSON.stringify(j.d3.adr.inertes)')" 'true|n:ph-90|ADR-001|[{"tag":"P","texte":"ADR-007 sans section dans docs/ADR.md","tab":null}]'
+assert_eq "C3.3d — « Commits qui la citent » : sha, jour et sujet du commit qui nomme P90-D-01 ; pied « Lu dans <registre> »" "$(E hl 'j.d3.commits.join()+"|"+j.d3.pied')" "${SHA_D}·11 nov. 2026·fix: applique P90-D-01|Lu dans .planning/workstreams/x/phases/90-registre/90-CONTEXT.md"
+assert_eq "C3.4 — décision nue : titre « D-04, Phase 90 », phrase « Décision nue : … », aucune section ni ligne de commit ; témoin positif : un commit du lab cite « D-04 » et la préfixée porte sa ligne de commit" "$(E hl 'j.d4.titre+"|"+j.d4.nue+"|"+j.d4.lignes+"|"+j.d4.secs.includes("Commits qui la citent")+"|"+j.d3.lignes')|$(git -C "$LL" log --format=%s | grep -c 'D-04')" "D-04, Phase 90|true|0|false|1|1"
+assert_eq "C3.7a — clic sur une ligne de commit : VFGitTiroir.ouvrir appelé une fois (espion) ; nom accessible « Commit <sha>, <jour>, <sujet>. Ouvrir dans l'historique Git. »" "$(E hl 'j.d7appels+"|"+j.d7nom')" "1|Commit $(sha7 "$LL" 'suit ADR-001'), 9 nov. 2026, feat: suit ADR-001. Ouvrir dans l'historique Git."
+assert_eq "C3.7b — sans VFGitTiroir : la ligne de commit est du texte, aucun button.vf-trace-commit, non focalisable ; témoin positif : la ligne est là" "$(E hl 'j.d7sans.boutons+"|"+(j.d7sans.lignes>0)+"|"+j.d7sans.tab')" "0|true|"
+assert_eq "C3.x — aucune section n'a échoué par erreur de harnais (lab L)" "$(E hl 'JSON.stringify(j.erreurs)')" "{}"
+cockpit_arreter
+# lab R : 31 registres de phase, pas de docs/ADR.md
+LR="$WORK/labR"; mklabR "$LR"; lancer_page "$LR"; attendre 30 pret; harnais chrome-tracabilite-panneaux.mjs hr "d5"
+assert_eq "C3.5a — 31 registres : 30 sous-replis fermés, du plus récent (Phase 80, 2 décisions) au plus ancien montré (Phase 51), puis « + 1 autre registre »" "$(E hr 'j.d5.n+"|"+j.d5.ferme+"|"+j.d5.premier+"|"+j.d5.dernier+"|"+j.d5.plus')" "30|true|Phase 80 2 décisions|Phase 51 1 décision|+ 1 autre registre"
+assert_eq "C3.5b — un sous-repli ouvert montre ses décisions : identifiant mono et début de la ligne de définition" "$(E hr 'j.d5dec.join("//")')" "P80-D-01|décision de la phase 80, début de définition//P80-D-02|seconde décision de la phase quatre-vingts"
+assert_eq "C3.5c — « + 1 autre registre » ouvre la liste « Registres de phase » (« 1 à 30 sur 31 registres ») ; « Suivantes » : le registre de la Phase 50" "$(E hr 'j.d5liste.n+"|"+j.d5liste.compte+"|"+j.d5page2.n+"|"+j.d5page2.resume')" "30|1 à 30 sur 31 registres|1|Phase 50 1 décision"
+assert_eq "C3.9a — sans docs/ADR.md : « Pas de docs/ADR.md dans ce dossier. … », les registres de phase restent montrés ; bilan « 0 ADR · 32 décisions · 31 registres de phase »" "$(E hr 'j.d5.sansAdr+"|"+(j.d5.n>0)+"|"+j.d5.bilan')" "true|true|0 ADR · 32 décisions · 31 registres de phase"
+assert_eq "C3.x — aucune section n'a échoué par erreur de harnais (lab R)" "$(E hr 'JSON.stringify(j.erreurs)')" "{}"
+cockpit_arreter
+# lab C : 31 commits qui citent ADR-001, aucun registre
+LC="$WORK/labC"; mklabC "$LC"; lancer_page "$LC"; attendre 30 pret; harnais chrome-tracabilite-panneaux.mjs hc "d6"
+assert_eq "C3.6a — 31 commits citant ADR-001 : 30 lignes puis « + 1 autre commit » ; la liste dit « 1 à 30 sur 31 commits » puis, à « Suivantes », 1 ligne" "$(E hc 'j.d6.n+"|"+j.d6.plus+"|"+j.d6p1.n+"|"+j.d6p1.compte+"|"+j.d6p2.n+"|"+j.d6p2.compte')" "30|+ 1 autre commit|30|1 à 30 sur 31 commits|1|31 à 31 sur 31 commits"
+assert_eq "C3.6b — témoin positif : le lab porte bien 31 commits qui citent ADR-001" "$(git -C "$LC" log --format=%s | grep -c 'ADR-001')" "31"
+assert_eq "C3.9b — sans registre : « Aucune décision définie dans les registres de phase. Les lignes Pnn-D-nn d'un fichier CONTEXT de phase apparaissent ici. »" "$(E hc 'j.d6sans')" "true"
+assert_eq "C3.x — aucune section n'a échoué par erreur de harnais (lab C)" "$(E hc 'JSON.stringify(j.erreurs)')" "{}"
+cockpit_arreter
+# même lab C, borne des commits abaissée à 2 (variable d'environnement de la route, voir 76-05)
+lancer_page "$LC" VF_COCKPIT_TRACE_MAX_COMMITS=2; attendre 30 pret; harnais chrome-tracabilite-panneaux.mjs hb "d8"
+assert_eq "C3.8 — borne atteinte : « Lecture bornée : la liste peut être incomplète. Une lecture plus courte, ou moins de commits, la lèverait. » au-dessus de la liste, 11,5 px, 8 px d'écart, graisse 400" "$(E hb 'j.d8.texte+"|"+j.d8.avant+"|"+j.d8.taille+"|"+j.d8.marge+"|"+j.d8.graisse')" "Lecture bornée : la liste peut être incomplète. Une lecture plus courte, ou moins de commits, la lèverait.|true|11.5px|8px|400"
+assert_eq "C3.x — aucune section n'a échoué par erreur de harnais (borne)" "$(E hb 'JSON.stringify(j.erreurs)')" "{}"
 cockpit_arreter
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
