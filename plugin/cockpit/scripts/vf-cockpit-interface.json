@@ -74,6 +74,7 @@
       "jamaisStocke": ["cibles", "ecritures", "lectures", "cible"]
     },
     "vibeflow/cockpit-equipe@1": {
+      "description": "coquille sans cartes depuis la Phase 73 : nodes vide, meta conservée (la liste des agents se lit dans la régie, depuis who@2)",
       "requis": { "schema": "string", "meta": "object", "project": "object", "nodes": "array", "files": "array", "links": "array", "flows": "array" },
       "noeud": { "requis": ["id", "label", "kind"] },
       "lien": { "requis": ["a", "b", "k"] },

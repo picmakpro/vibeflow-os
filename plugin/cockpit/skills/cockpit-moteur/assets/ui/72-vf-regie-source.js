@@ -53,6 +53,8 @@
     });
     const P = D.getElementById('panel'), O = W.VF_SURCOUCHES;
     if (O && P) O.ouvrir(P, { modale: false, ouvreur, fermer: () => { SC.closePanel(); O.fermer(P); } });
+    // 73-08 (UIFN-12) : le bouton quitte la ligne une fois le rapport lu ; le focus passe au titre du lecteur, jamais à body
+    const T = P && P.querySelector('.pt'); if (T) { T.tabIndex = -1; T.focus({ preventScroll: true }); }
     emettre('vf-agent:lu', { id }, false);
   }
 
