@@ -144,10 +144,10 @@ import fs from 'node:fs';
 const c = JSON.parse(fs.readFileSync(process.argv[2] + '/vf-cockpit-interface.json', 'utf8')).schemas;
 console.log(Object.entries(c).filter(([, v]) => Array.isArray(v.interdits) && v.interdits.includes('messages')).map(([k, v]) => k.split('/')[1] + ':' + v.interdits.includes('fil')).sort().join(','));
 JS
-assert_eq "D8.9 — les cinq schémas (equipe, git, index, signal, who) qui interdisent messages et outils interdisent aussi fil (tripwire du flux ; cockpit-index@1 ajouté par 79-08, changement de contrat voulu)" "$(node "$WORK/interdits.mjs" "$SCRIPTS")" "cockpit-equipe@1:true,cockpit-git@1:true,cockpit-index@1:true,cockpit-signal@1:true,cockpit-who@2:true"
+assert_eq "D8.9 — les six schémas (equipe, git, index, signal, state, who) qui interdisent messages et outils interdisent aussi fil (tripwire du flux ; cockpit-index@1 ajouté par 79-08, cockpit-state@1 par 79-12, changements de contrat voulus)" "$(node "$WORK/interdits.mjs" "$SCRIPTS")" "cockpit-equipe@1:true,cockpit-git@1:true,cockpit-index@1:true,cockpit-signal@1:true,cockpit-state@1:true,cockpit-who@2:true"
 # témoin D8.9b : un contrat où cockpit-index@1 n'interdit plus `fil` (copie jetable) est vu par le détecteur, pour la bonne raison
 mkdir -p "$WORK/mut-fil" && node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const i=j.schemas["vibeflow/cockpit-index@1"].interdits;i.splice(i.indexOf("fil"),1);fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$SCRIPTS/vf-cockpit-interface.json" "$WORK/mut-fil/vf-cockpit-interface.json"
-assert_eq "D8.9b — mutant : sans fil dans les interdits de cockpit-index@1, le détecteur rend cockpit-index@1:false (et D8.9 rougit)" "$(node "$WORK/interdits.mjs" "$WORK/mut-fil")" "cockpit-equipe@1:true,cockpit-git@1:true,cockpit-index@1:false,cockpit-signal@1:true,cockpit-who@2:true"
+assert_eq "D8.9b — mutant : sans fil dans les interdits de cockpit-index@1, le détecteur rend cockpit-index@1:false (et D8.9 rougit)" "$(node "$WORK/interdits.mjs" "$WORK/mut-fil")" "cockpit-equipe@1:true,cockpit-git@1:true,cockpit-index@1:false,cockpit-signal@1:true,cockpit-state@1:true,cockpit-who@2:true"
 
 echo; echo "Résultat : $PASS réussis, $FAIL échoués"
 [ "$FAIL" -eq 0 ]
