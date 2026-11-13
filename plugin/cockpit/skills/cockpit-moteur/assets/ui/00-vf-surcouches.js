@@ -124,7 +124,8 @@
       if (tv && !dT && refs.tourBtn) { // visite ouverte par le bouton : modale ; ouverte d'elle-même : jamais (Q5)
         ouvrir(T, { modale: true, ouvreur: refs.tourBtn, fermer: () => window.FloorplanTour.end() }); refs.tourBtn = null;
       } else if (!tv && dT) retirer(T);
-      const r = [...document.body.children].find((e) => e.matches('section[role="region"]') && getComputedStyle(e).position === 'fixed') || null, on = !!r && !r.hidden, dedansT = !!r && pile.some((e) => e.el === r);
+      const r = [...document.body.children].find((e) => e.matches('section[role="region"]') && getComputedStyle(e).position === 'fixed') || null;
+      const on = !!r && !r.hidden, dedansT = !!r && pile.some((e) => e.el === r);
       if (on && !dedansT) ouvrir(r, { persistant: true }); else if (r && !on && dedansT) retirer(r);
       const ferme = document.body.classList.contains('no-panel'), p = par('panel'), a = document.activeElement;
       if (ferme && !sansPanneau && p && a && p.contains(a) && !pile.some((e) => e.el === p)) {
