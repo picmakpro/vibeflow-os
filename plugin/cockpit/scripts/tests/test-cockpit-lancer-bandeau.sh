@@ -10,6 +10,7 @@
 #   LB.E  client réel + serveur factice du contrat §4 + faux P sous Chrome (E1 à E7, E9 à E11, puis E8 cadre masqué)
 #   LB.F  F1 (focus) : faux P à champ de saisie, frappes abc, fenêtre focalisée puis non focalisée ; SP-1 : clic Lancer, tiroir fermé, le bandeau apparaît dans Q
 #   LB.P  le serveur factice écoute un port >= 4600 et différent de 4456
+#   LB.D  doublure, sans navigateur : le serveur factice tient la règle du flux du serveur réel (vf-cockpit-terminal-session.mjs, attacher : le nouveau flux remplace l'ancien)
 #   M-*   vingt-six mutants, plus six du lot 8 LB3-S, plus huit de la revue du 2026-11-08 (S1, S2, S3, S4, P5), plus quatre du 3e tour (F2, F4, F6b ; le mutant de réserve M-RESERVE-PIED vise désormais F3) (copies des sources, « mutant sans effet » = FAIL)
 # Sans Chrome : les sections statiques et les doublures tournent, la suite annonce SUITE SAUTÉE (navigateur) pour V et E.
 # Variables : VF_CLIENT_MS (échéance d'une attente navigateur, 20000 par défaut) · VF_LB_PORTS=bas-haut (plage de ports du serveur factice ; sinon ports libres du système).
@@ -272,12 +273,16 @@ cat > "$AUX/faux.mjs" <<'JS'
 // Q factice : GET / (page rendue par le module du dossier), /flux, /etat, /taille, /entree (octets consignés en hexadécimal dans <run>/entree.log), /proposition, /lancer, /annuler,
 // avec les contrôles de Q (Host exact, secret 401, Origin exacte pour tout POST 403, GET admis sans Origin si Sec-Fetch-Site vaut same-origin) et l'armement côté serveur (425).
 // P factice : page vide à espion de messages ; POST /__scenario { prop, lancers } et GET /__journal (hors de la table fermée de Q).
+// /flux : UN flux à la fois, comme le serveur réel (vf-cockpit-terminal-session.mjs, attacher : « même onglet : le nouveau flux remplace l'ancien »). Sans cette règle, chaque page que
+// la sonde quitte (naviguer) reste gelée dans le cache de retour arrière de Chrome avec son flux ouvert, jusqu'à 60 s ; chaque flux tient une des six connexions que Chrome accorde à un
+// hôte, et à cinq flux tenus le cadre mesuré n'a plus de connexion pour /taille, /proposition ni /entree : l'Entrée fraîche arrive après la fenêtre de mesure (LB.E11 à E14 rouges par
+// intermittence en CI, runs 42989224903 et 43408047589 ; mesuré le 2026-11-13). Garde : LB.D1 et M-FLUX-NON-REMPLACE.
 import http from 'node:http'; import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
 const [, , dossier, moteur, portQ, portP, secret, run] = process.argv;
 const page = await import(pathToFileURL(`${dossier}/vf-cockpit-terminal-page.mjs`).href);
 page.preparerPage({ engineDir: moteur });
 const OQ = `http://127.0.0.1:${portQ}`, OP = `http://127.0.0.1:${portP}`;
-const journal = [], premiere = {}; let scen = { prop: null, lancers: [] }, finEtat = false; // scen.fin : le premier /flux se termine aussitôt et /etat dit la session terminée (bouton « Relancer le shell »)
+const journal = [], premiere = {}; let scen = { prop: null, lancers: [] }, finEtat = false, fluxCourant = null; // scen.fin : le premier /flux se termine aussitôt et /etat dit la session terminée (bouton « Relancer le shell »)
 const lire = (req) => new Promise((ok) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => ok(Buffer.concat(c))); });
 const q = http.createServer(async (req, res) => {
   const chemin = new URL(req.url, OQ).pathname, corps = await lire(req);
@@ -293,7 +298,7 @@ const q = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (req.headers.origin ? req.headers.origin !== OQ : req.headers['sec-fetch-site'] !== 'same-origin')) return fin(403);
   const json = (st, o) => fin(st, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, JSON.stringify(o));
   if (req.method === 'GET' && chemin === '/etat') return json(200, finEtat ? { etat: 'ok', session: 'terminee', code: 0 } : { etat: 'ok', session: 'vivante' });
-  if (req.method === 'GET' && chemin === '/flux') { note(200); res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' }); if (scen.fin) { scen.fin = false; finEtat = true; return res.end(); } finEtat = false; res.write('$ '); return; }
+  if (req.method === 'GET' && chemin === '/flux') { note(200); const ancien = fluxCourant; fluxCourant = res; if (ancien) { try { ancien.end(); } catch {} } res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' }); if (scen.fin) { scen.fin = false; finEtat = true; return res.end(); } finEtat = false; res.write('$ '); return; }
   if (req.method === 'POST' && chemin === '/taille') return fin(204);
   if (req.method === 'POST' && chemin === '/entree') { fs.appendFileSync(`${run}/entree.log`, corps.toString('hex') + '\n'); return fin(204); }
   if (req.method === 'GET' && chemin === '/proposition') {
@@ -336,6 +341,26 @@ const p = http.createServer(async (req, res) => {
 });
 await new Promise((ok) => q.listen(Number(portQ), '127.0.0.1', ok)); await new Promise((ok) => p.listen(Number(portP), '127.0.0.1', ok));
 fs.writeFileSync(`${run}/pret`, `${process.pid}\n`);
+JS
+cat > "$AUX/flux-remplace.mjs" <<'JS'
+// flux-remplace.mjs <portQ> <secret> : deux GET /flux successifs contre le serveur factice, sans navigateur ; UNE ligne « <premier terminé>/<second terminé> ».
+// Le premier flux doit être TERMINÉ par le serveur à l'arrivée du second (attendu, jamais supposé : relu jusqu'à 3 s) ; le second doit rester ouvert (témoin).
+import http from 'node:http';
+const [, , portQ, secret] = process.argv;
+const entetes = { 'X-VF-Terminal': secret, 'X-VF-Onglet': 'a'.repeat(32), Origin: `http://127.0.0.1:${portQ}` };
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+const ouvrir = () => new Promise((ok, ko) => {
+  const rq = http.get({ host: '127.0.0.1', port: Number(portQ), path: '/flux', headers: entetes, agent: false }, (res) => {
+    const f = { fini: false }; res.on('data', () => ok(f)); res.on('end', () => { f.fini = true; ok(f); }); res.on('error', () => {});
+  });
+  rq.on('error', ko); setTimeout(() => ko(new Error('flux sans réponse en 5 s')), 5000);
+});
+try {
+  const a = await ouvrir(), b = await ouvrir();
+  for (let i = 0; i < 30 && !a.fini; i++) await pause(100);
+  console.log(`${a.fini}/${b.fini}`);
+} catch (e) { console.log('plante: ' + e.message); }
+process.exit(0);
 JS
 cat > "$AUX/chrome-bandeau.mjs" <<'JS'
 // chrome-bandeau.mjs <chrome> <mode> <json> : scénarios navigateur du bandeau de proposition ; UNE ligne JSON. Modes : vue (LB.V) · client (LB.E1 à E7) · froid (LB.E8) · reprise (LB.R, AUDC-M11).
@@ -1072,7 +1097,7 @@ faux() { # faux <dossier-des-modules> -> FQ FP FSEC FRUN FPID ; un seul processu
   if [ "$1" != "$SCRIPTS" ] || [ "${FAUX_INJ:-$SCRIPTS}" != "$SCRIPTS" ]; then export VF_CLIENT_MS=20000; elif [ -n "$VF_CLIENT_MS0" ]; then export VF_CLIENT_MS="$VF_CLIENT_MS0"; else unset VF_CLIENT_MS; fi
   port; FQ="$PORT"; port; FP="$PORT"; FSEC="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
   FN=$((FN+1)); FRUN="$WORK/run/$FN"; mkdir -p "$FRUN"
-  FAUX_INJ="${FAUX_INJ:-}" node "$AUX/faux.mjs" "$1" "$(moteur_de "$1")" "$FQ" "$FP" "$FSEC" "$FRUN" > "$FRUN/faux.out" 2>&1 < /dev/null &
+  FAUX_INJ="${FAUX_INJ:-}" node "${FAUX_MJS:-$AUX/faux.mjs}" "$1" "$(moteur_de "$1")" "$FQ" "$FP" "$FSEC" "$FRUN" > "$FRUN/faux.out" 2>&1 < /dev/null &
   FPID=$!; PIDS+=($FPID)
   for _ in $(seq 1 100); do [ -s "$FRUN/pret" ] && break; sleep 0.1; done
 }
@@ -1238,6 +1263,16 @@ if [ -n "$CHROME" ]; then
   assert_eq "LB.R5 — tiroir déjà assez haut (448 px, au-dessus des 420 du bandeau) : jamais rehaussé, rien n'est repris à « Annuler » (448 avant, pendant et après), mémo intacte" "$(rep_ assez-haut)" "448/448/1/1/448/448/448>448/true"
   assert_eq "LB.R6 — une proposition en remplace une autre pendant le rehaussement : aucun retrait n'est émis par le remplacement (0), la hauteur d'origine n'est pas oubliée (160 à la fin, après « Annuler »)" "$(rj "$RJ" "(j.erreur ? 'plante: ' + j.erreur : (j.reprise || {}).remplace === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.reprise.remplace)")" "160/420/0/160/160>160"
   assert_eq "LB.P — le serveur factice écoute des ports >= 4600 et différents de 4456 (Q $FQ0, P $FP0)" "$([ "$FQ0" -ge 4600 ] && [ "$FP0" -ge 4600 ] && [ "$FQ0" -ne 4456 ] && [ "$FP0" -ne 4456 ] && [ "$FQ0" -ne "$FP0" ] && echo oui || echo non)" "oui"
+fi
+
+# --- LB.D : la doublure tient la règle du flux du serveur réel (sans navigateur) -------------------------------------------------------------------------
+echo "=== LB.D — serveur factice : un flux à la fois ==="
+faux "$SCRIPTS"; DJ="$(node "$AUX/flux-remplace.mjs" "$FQ" "$FSEC" 2>&1 | tail -1)"; unfaux
+assert_eq "LB.D1 — deux GET /flux successifs : le serveur factice TERMINE le premier à l'arrivée du second (règle du serveur réel, vf-cockpit-terminal-session.mjs : le nouveau flux remplace l'ancien) ; témoin : le second reste ouvert ; cadre : <premier terminé>/<second terminé>" "$DJ" "true/false"
+sed 's/if (ancien) { try { ancien.end(); } catch {} }//' "$AUX/faux.mjs" > "$AUX/faux-mut.mjs"
+if cmp -s "$AUX/faux.mjs" "$AUX/faux-mut.mjs"; then sans_effet "M-FLUX-NON-REMPLACE"; else
+  FAUX_MJS="$AUX/faux-mut.mjs" faux "$SCRIPTS"; MJ="$(node "$AUX/flux-remplace.mjs" "$FQ" "$FSEC" 2>&1 | tail -1)"; unfaux
+  assert_eq "M-FLUX-NON-REMPLACE — le mutant (le serveur factice ne termine plus l'ancien flux : une page quittée garderait sa connexion) rougit LB.D1 : le premier flux reste ouvert (témoin : la sonde s'exécute, le second flux est ouvert)" "$MJ" "false/false"
 fi
 
 # --- mutants ---------------------------------------------------------------------------------------------------------------------------------------------
