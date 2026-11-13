@@ -7,7 +7,8 @@
 #   E2E  amorçage à usage unique, aucun assistant avant le flux, commande aller-retour, ligne de commande de l'assistant, arrêt sans reste
 #   T11.4 sous Windows : aucun écouteur, état « indisponible »
 #   POSE l'engine pose `terminal/vf-cockpit-pty.py` dans les trois scopes et un serveur INSTALLÉ le lance
-#   M-*  mutants (copies du module par cockpit_module_muter ; la sortie ne porte que des données) : M-ACTIF, M-ECOUTE0, M-FRAMESRC, M-WIN, M-HORS-MOTEUR
+#   T7.11 server.json jamais vu tronqué pendant la publication de terminal.url (écriture à côté puis renommée ; ecoute0)
+#   M-*  mutants (copies du module par cockpit_module_muter ; la sortie ne porte que des données) : M-ACTIF, M-ECOUTE0, M-FRAMESRC, M-WIN, M-HORS-MOTEUR, M-SRVJSON
 # Chaque témoin négatif a son contrôle positif ; la suite rougit sur un module antérieur à la tranche. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -22,7 +23,7 @@ PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap c
 # P71-D-33 : Q tourne dans un processus enfant du serveur ; « les enfants du serveur » = les assistants, enfants de ce processus (pgrep -P ne voit qu'un étage)
 pgrep() { if [ "$1" = "-P" ] && [ $# -eq 2 ]; then local c; for c in $(command pgrep -P "$2"); do if ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs'; then command pgrep -P "$c"; else echo "$c"; fi; done; else command pgrep "$@"; fi; }
 # écouteurs du serveur ET de son processus du terminal (Q y écoute, P71-D-33) ; lignes vides écartées
-ecoutes_srv() { local c; { node "$TA" ecoutes "$1"; for c in $(command pgrep -P "$1"); do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && node "$TA" ecoutes "$c"; done; } | sed '/^$/d'; }
+ecoutes_srv() { local c; [ -n "${1:-}" ] || { echo "ecoutes_srv : PID du serveur vide — le serveur n'a pas été lancé, rien n'est mesuré" >&2; return 2; }; { node "$TA" ecoutes "$1"; for c in $(command pgrep -P "$1"); do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && node "$TA" ecoutes "$c"; done; } | sed '/^$/d'; }
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 assert_ge() { if [ "$2" -ge "$3" ] 2>/dev/null; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 ($2 < $3)"; FAIL=$((FAIL+1)); fi; }
@@ -71,6 +72,7 @@ srv() { # srv <sortie> <0|1 terminal> [moteur] [scripts] [module] -> SRV_PORT SR
   else COCKPIT_MODULE="$(mod_de "$o")" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${flag[@]+"${flag[@]}"}; fi
   if [ "$term" = 1 ]; then attendre 5 grep -qs '"terminal"' "$o/.cache/server.json"; fi # la clé terminal manque quand le moteur refuse l'assistant : attente bornée, sans échec
   SRV_PID="$VF_PID"; SRV_PORT="${VF_PORT:-0}"
+  if [ -z "${SRV_REFUS_ATTENDU:-}" ] && { [ -z "$SRV_PID" ] || [ "$SRV_PORT" -le 0 ]; }; then echo "  ❌ FAIL — srv : le serveur de $o n'a pas démarré (cockpit_lancer a échoué ou refusé) — les mesures qui suivent ne valent rien"; FAIL=$((FAIL+1)); fi
 }
 sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
@@ -164,6 +166,48 @@ SURV=""; if [ -n "$APID" ] && [ -n "$SHPID" ]; then
 else SURV="rien à surveiller (assistant=${APID:-aucun} shell=${SHPID:-aucun})"; fi
 assert_eq "E2E.6 — à l'arrêt du serveur, l'assistant et le shell disparaissent en moins de 5 s" "${SURV:-aucun}" "aucun"
 [ -n "$FPID" ] && { wait "$FPID" 2>/dev/null; true; }
+
+echo "=== T7.11 — server.json n'est jamais vu tronqué quand Q publie son adresse (ecoute0, 2026-11-13) ==="
+# La publication de terminal.url réécrit server.json APRÈS le « prêt » du serveur. Un lecteur qui tombait dans la réécriture (cockpit_module_charge du socle) lisait un
+# fichier tronqué et refusait un serveur sain (CI Linux, tête f07c8801). L'écriture est ralentie à 400 ms (troncature, pause, contenu) : la fenêtre est certaine, jamais laissée à la machine.
+cat > "$AUX/ralentir.mjs" <<'JS'
+import fs from 'node:fs';
+const ecrire = fs.writeFileSync;
+fs.writeFileSync = function (p, d, ...r) {
+  if (String(p).includes('server.json') && String(d).includes('"terminal"')) {
+    fs.closeSync(fs.openSync(p, 'w')); fs.appendFileSync(process.env.RALENTI_MARQUE, 'x');
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 400);
+  }
+  return ecrire.call(this, p, d, ...r);
+};
+JS
+cat > "$AUX/sonde-json.mjs" <<'JS'
+import fs from 'node:fs';
+const [f, ms] = process.argv.slice(2); const fin = Date.now() + Number(ms);
+let vu = false, ill = 0, term = 0, n = 0;
+while (Date.now() < fin) {
+  let j = null; try { j = JSON.parse(fs.readFileSync(f, 'utf8')); } catch {}
+  n++; if (j && typeof j.hash === 'string' && j.hash) { vu = true; if (j.terminal) term = 1; } else if (vu) ill++;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+}
+console.log(`illisibles=${ill} terminal=${term}`);
+JS
+t711() { # t711 <sortie> -> T711_PORT T711_SONDE T711_MARQUE ; la sonde tourne AVANT le lancement : la fenêtre ralentie est couverte en entier
+  local o="$1" sp; : > "$WORK/ralenti.marque"
+  node "$AUX/sonde-json.mjs" "$o/.cache/server.json" 4000 > "$WORK/sonde.out" & sp=$!
+  SRV_REFUS_ATTENDU=1 RALENTI_MARQUE="$WORK/ralenti.marque" COCKPIT_NODE_ARGS="--import=file://$AUX/ralentir.mjs" srv "$o" 1
+  wait "$sp"; T711_PORT="$SRV_PORT"; T711_SONDE="$(cat "$WORK/sonde.out")"; T711_MARQUE="$(wc -c < "$WORK/ralenti.marque" | tr -d ' ')"
+}
+t711 "$OUT"
+assert_ge "T7.11 — témoin : la publication de terminal.url a été ralentie (la fenêtre existe)" "$T711_MARQUE" 1
+assert_eq "T7.11 — le serveur à publication lente est accepté par le socle (empreinte lue, jamais refusé à tort)" "$([ "$T711_PORT" -gt 0 ] && echo oui || echo non)" "oui"
+assert_eq "T7.11 — server.json n'est jamais illisible ni sans empreinte après sa première lecture, et finit par porter terminal" "$T711_SONDE" "illisibles=0 terminal=1"
+[ -z "$SRV_PID" ] || unsrv
+if mutant srvjson vf-cockpit-terminal.mjs 's#const tmp = `${f}\.${process\.pid}\.tmp`;#const tmp = f;#'; then
+  t711 "$MUT_OUT"
+  assert_eq "M-SRVJSON — le mutant rougit T7.11 : server.json réécrit sur place est vu tronqué (ou le serveur refusé)" "$([ "$T711_PORT" -gt 0 ] && [ "$T711_SONDE" = "illisibles=0 terminal=1" ] && echo vert || echo rouge)" "rouge"
+  [ -z "$SRV_PID" ] || unsrv
+else assert_eq "M-SRVJSON — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== M-ECOUTE0 / M-FRAMESRC — mutants du serveur Q ==="
 if mutant ecoute0 vf-cockpit-terminal-processus.mjs "s/\.listen(0, '127\.0\.0\.1'/.listen(0, '0.0.0.0'/"; then
