@@ -1,9 +1,8 @@
 // chrome-coin.mjs — mesures du coin bas-droit, de la ligne d'état et des repères de bord (80-05, FORM-10, FORM-12), un vrai Chrome, sans réseau.
-// Usage : node chrome-coin.mjs <chrome> <racine-du-serveur> <mode>   Rend UNE ligne JSON { … } ou { erreur }. Modes : cn1 · cn2 · cn3 · term.
+// Usage : node chrome-coin.mjs <chrome> <racine-du-serveur> <mode>   Rend UNE ligne JSON { … } ou { erreur }. Modes : cn1 · cn2 · cn3 · term (+ fr : défaut).
 // Chaque section est isolée (sec) : une section qui échoue laisse ses champs vides, les autres sont mesurées. Gestes par Input.dispatch*.
 import { executer, pause, stabiliser, positionPosee } from './chrome-session.mjs';
-const [, , chrome, racine, modeArg, filtre] = process.argv;
-const FR = /fr$/.test(modeArg || ''), mode = FR ? modeArg.slice(0, -2) : modeArg; // « cn1fr », « cn2fr » : le même mode sous le défaut (français), sans ?lang=en; // filtre : sections à jouer (mutants), séparées par des virgules ; vide = toutes
+const [, , chrome, racine, modeArg, filtre] = process.argv, FR = /fr$/.test(modeArg || ''), mode = FR ? modeArg.slice(0, -2) : modeArg;
 const SEC = new Set((filtre || '').split(',').filter(Boolean));
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!VibeFlow.state && !!VibeFlow.state.layout";
 const POSEE = "(() => { const v = document.querySelector('#viewport'); return !!v && v.style.opacity !== '0' && !v.classList.contains('anim'); })()";
