@@ -49,3 +49,11 @@ Gate-Touche : aucun chemin des six classes touché. `colonnes-baseline.txt` inch
 - Contrat consommé par 73-07 : réponse `{ schema, ailleurs }`, `ailleurs` est une liste ou `null` (le client ne doit pas lire `null` comme 0).
 - `ROUTES` compte désormais 8 routes ; toute phase qui en ajoute une met à jour `ATTENDU` et le compteur de RK.7 dans `test-cockpit-routes.sh`.
 - 73-03 : la clé `lecturesPlanning` de `/api/vf/etat` fait rougir R1.8 et RC.1 de `test-cockpit-routes.sh` tant que leurs attendus ne la citent pas.
+
+## Correctifs d'audit
+
+- Constat 2 (clés en trop) : la liste d'interdits d'ailleurs@1 n'était lue par aucun code, la route appliquait celle de who@2. Correctif : à l'émission, une entrée sort seulement si elle a exactement les clés `lab` et `n`. Témoin : RG13.15, vu rouge sur la tête d'avant ; mutant EXTRA-GARDE vu rouge puis retiré. Commit f5b9ff46.
+- Constat 3 (git synchrone dans le gestionnaire) : nouvelle `arbresGitAsync` (`lancerGitAsync`, comme P78-D-41), lecture lancée en tâche de fond, au plus une à la fois et une par `REPIT_MS` ; contrat inchangé (`{ schema, ailleurs }`, `null` avant la première lecture). Témoin : RG13.16 (faux git qui dort 3 s, requête d'état servie en moins de 1,5 s), vu rouge sur la tête d'avant ; mutant LENT-SYNC vu rouge puis retiré. Commit 49db6e0f.
+- Écart : l'ancre du mutant ROUTE-PAR-REQUETE suit la ligne déplacée du serveur.
+
+rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)

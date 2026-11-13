@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 // vf-cockpit-arbres — arbres git du lab, branche de base, retard sans réseau, phase active (socle du cockpit, VFSG-05 ; P68-D-04). Lecture seule.
-// Exports : GIT_SUR (préfixe d'arguments de chaque appel git), arbresGit(root, { sh }) -> [{ chemin, branche, principal }], arbresGitAsync(root, { fin }) -> Promise de la même liste,
+// Exports : GIT_SUR (préfixe d'arguments de chaque appel git), arbresGit(root, { sh }) -> [{ chemin, branche, principal }],
+//           arbresGitAsync(root, { fin }) -> Promise de la même liste,
 //           brancheBase(root, { sh }) -> nom | null, brancheBaseAsync(root, { fin }) -> Promise<nom | null>, retard({ chemin, base, commonDir, now, sh, lab }) -> { base, main, origin, fetchAgeS },
 //           phaseActive({ phases, branche }) -> { key, n, nom, etat } | null, nettoie(s, n) -> chaîne sans caractère de contrôle, masquée, bornée
 // Aucune sous-commande réseau (ni fetch, pull, ls-remote, remote) ; git sans fsmonitor ; sous-commandes qui ne lisent ni l'index ni l'arbre de travail ;
@@ -44,7 +45,16 @@ export async function arbresGitAsync(root, { fin } = {}) {
   root = path.resolve(root);
   const arbres = [];
   let commun; // lu à la première entrée non principale seulement
-  const dossierCommun = async () => { if (commun === undefined) { commun = null; try { const c = (await lancerGitAsync(root, ['rev-parse', '--path-format=absolute', '--git-common-dir'], { fin })).sortie.trim(); commun = c ? fs.realpathSync(c) : null; } catch {} } return commun; };
+  const dossierCommun = async () => {
+    if (commun === undefined) {
+      commun = null;
+      try {
+        const c = (await lancerGitAsync(root, ['rev-parse', '--path-format=absolute', '--git-common-dir'], { fin })).sortie.trim();
+        commun = c ? fs.realpathSync(c) : null;
+      } catch {}
+    }
+    return commun;
+  };
   for (const b of (await lancerGitAsync(root, ['worktree', 'list', '--porcelain'], { fin })).sortie.split('\n\n')) {
     const t = /^worktree (.*)$/m.exec(b)?.[1];
     if (!t || !fs.existsSync(t)) continue;

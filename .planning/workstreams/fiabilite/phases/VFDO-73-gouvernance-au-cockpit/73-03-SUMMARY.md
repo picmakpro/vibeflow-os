@@ -32,3 +32,9 @@ verts : lancer-suivi (47/0), who (157/0), equipe-etats, equipe, signal, signal-m
 `colonnes-cliquet` : aucune hausse. `check-version-sync.sh` : seul écart, la ligne « suites » (attendu).
 
 rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
+
+## Correctifs d'audit
+
+- Constat 1 (`ws` sans grammaire) : le champ `ws` de `phasesHumaines` vient d'un nom de dossier de compartiment, borné par le masque seulement (U+202E et BEL survivaient). Correctif : `phasesHumainesSortie` applique la grammaire de `detention()` (`wsValide`, `phaseValide`, exportées de `vf-cockpit-gouvernance.mjs`) : entrée rejetée si `ws` ou `phase` est hors forme ; `ref` retirée si elle n'a pas la forme `n:<identifiant>`. Témoin : RG16.15, vu rouge sur la tête d'avant ; mutant GRAMMAIRE-WS vu rouge puis retiré. Commit c3ffb7d8.
+
+rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)

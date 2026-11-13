@@ -42,8 +42,9 @@ export function fenetreDeStall(a) {
   return fenetreStall({ texteScript: texte });
 }
 
-// phases à vérification humaine telles que collectWho les émet : `phase` et `ws` revalidés par la grammaire de detention() (entrée rejetée sinon : le ws vient
-// d'un nom de dossier de compartiment du lab), `ref` seulement s'il a la forme d'un identifiant de nœud (n:<id>), sinon retiré ; chaînes bornées ; au plus 50 entrées
+// phases à vérification humaine telles que collectWho les émet : `phase` et `ws` revalidés par la grammaire de detention()
+// (entrée rejetée sinon : le ws vient d'un nom de dossier du lab), `ref` seulement de la forme n:<id>, sinon retiré ;
+// chaînes bornées ; au plus 50 entrées
 const REF_RE = /^n:[A-Za-z0-9][A-Za-z0-9._:@-]{0,127}$/;
 export const phasesHumainesSortie = (liste, bornes) => (Array.isArray(liste) ? liste : []).slice(0, 50)
   .filter((p) => p && typeof p.phase === 'string' && phaseValide(p.phase) && wsValide(p.ws ?? ''))
