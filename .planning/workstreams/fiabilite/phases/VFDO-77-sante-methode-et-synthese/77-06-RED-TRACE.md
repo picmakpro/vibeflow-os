@@ -16,3 +16,10 @@ du module et les faux gates sont posés, aucun processus ne survit).
 
 Sondes positives posées d'abord (vues vertes dans la même suite) : le journal réseau voit des `GET /api/vf/` avec jeton ; l'audit de couleur voit une teinte injectée (W4b, `sondeAudit`) ; le compteur
 d'écouteurs de média voit un écouteur posé puis retiré (BO1, `sondeMQ`) ; le faux gate « tout dans le budget » donne des barres (JA5.b).
+
+# Verts, sur la tête commitée
+
+Même suite, avec les deux fichiers neufs : 59 PASS / 0 FAIL en 26 s (seule sur le poste). Mutant gardé, la seule garde du plan :
+- M-INNERHTML (copie du module chargée de façon prouvée, `e.textContent = t;` remplacé par `e.innerHTML = t;` dans `ui/74-vf-synthese-jauges.js`, faux gate émettant le chemin
+  `<img src=x onerror=window.__xss=1>`) : un élément `img` est injecté sous la jauge (1 vu) ; la suite sur le code livré en voit 0. `window.__xss` reste faux sur le mutant : la CSP
+  de la page refuse le gestionnaire en ligne, d'où le témoin sur l'élément injecté et non sur l'exécution du script.
