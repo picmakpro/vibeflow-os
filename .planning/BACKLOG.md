@@ -709,3 +709,32 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 ## Verrous par `mkdir` : non exclusifs sous les coreutils uutils jusqu'à 0.10.0 — DIFFÉRÉ (2026-11-13)
 
 **Priorité : à proposer à Samuel par la session principale.** **Origine :** constat de la session principale, 2026-11-12 ; registre J1-31. Sur Ubuntu 25.10 et 26.04 (donc le runner de la CI), `mkdir d` sans `-p` teste l'existence puis crée, et rend 0 si un autre processus a créé `d` entre les deux (lu dans le source de l'outil, versions 0.1.0 à 0.10.0, corrigé en 0.11.0). Preuve en CI : sonde KC2 de `plugin/conductor/scripts/tests/test-check-method-budget.sh`, run 43281286911, première tentative, shard 2 (deux passes d'archivage dans la section critique, l'archive de la gagnante supprimée par le retour arrière de l'autre) ; 2 rouges sur 89 runs mesurés. Sites du même type, hors tests : `plugin/conductor/scripts/check-method-budget.sh`, `plugin/consolidator/scripts/archive.sh` et `reindex.sh`, `plugin/conductor/scripts/check-plugin-update.sh`, `scripts/check-gsd-core-update.sh`. Non concernés : `driver-lock.sh` (départage par `ln -sn`) et `fs.mkdirSync` de Node. **Destination :** lot court à part, compartiment `fiabilite`. **Preuve attendue du correctif :** un faux `mkdir` en tête de PATH qui reproduit la sémantique fautive (rouge avant, vert après). En attendant, un rouge KC2 isolé en CI se relance, en le disant. **Déclencheur de reprise :** la décision de Samuel sur le lot, ou un nouveau rouge KC2.
+
+
+## Cockpit : mineurs de la revue du point de fusion 1 de la Phase 73 — DIFFÉRÉ (2026-11-13)
+
+**Priorité : non fixée.** **Origine :** revue `vf-reviewer` du point de fusion 1 de la Phase 73 (plans 73-01 à 73-04, PR #243), une passe ; les deux majeurs sont corrigés dans la branche de la phase.
+- **`dag` du verrou :** le serveur le projette en objet (`vf-cockpit-vie.mjs`) ; `72-vf-regie-modele.js` n'admet qu'une chaîne et le vide toujours : champ mort, marque « nœuds running » de P73-D-09 non livrée. Trancher : retirer `dag` de la liste blanche, ou admettre l'objet borné.
+- **Grammaires du modèle plus étroites que le serveur :** `wsOk` (`[a-z0-9-]`) et `phaseOk` (deux niveaux) contre `[A-Za-z0-9][A-Za-z0-9._-]*` et `1.2.3` : un compartiment à point ou une phase à trois niveaux se vide, deux missions peuvent partager une clé.
+- **Échec de lecture des arbres de la route `ailleurs` :** avalé sans trace, et la dernière bonne liste effacée.
+- **`fenetreDeStall` :** relit le script de garde (jusqu'à 256 Kio) en synchrone à chaque tour de 5 s ; mémoïser par date de modification.
+- **`attendAgents` :** calculé aussi pour les sessions terminées (lecture de transcript inutile).
+
+**Déclencheur de reprise :** la prochaine passe sur la collecte ou le modèle de la régie.
+
+## Cockpit : poids de la traçabilité dans le graphe Projet (P76-Q-03) — OPTION (a) GARDÉE, MESURÉE (2026-11-13)
+
+**Priorité : à juger à la recette.** **Origine :** plan 76-04, mesure de sa suite T9.8 (`76-04-SUMMARY.md`) ; P76-Q-03 gardée en option (a), décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée, prise par la session principale le 2026-11-13. Mesure sur ce dépôt : le graphe Projet passe de 1 538 945 à 2 824 073 octets (+1,29 Mo, trois fois l'estimation de 0,4 Mo du cadrage), dont 820 Ko de références de plans et de critères pour 87 phases (`nodes[].trace`). **Piste (b) :** les définitions des registres et les références de plans lues par la route `GET /api/vf/tracabilite`, à la demande, hors du graphe. **Déclencheur de reprise :** Samuel juge à la recette que l'onglet Projet est lent.
+
+## Cockpit : mineurs de la revue et de l'audit du point de fusion 1 de la Phase 76 — DIFFÉRÉ (2026-11-13)
+
+**Priorité : basse.** **Origine :** revue (`vf-reviewer`) et audit de sécurité (`vf-auditer`) des plans 76-01 à 76-05, une passe chacun, régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Majeur de la revue et constat haut de l'audit corrigés avant la fusion ; restent :
+- Revue m1 : les listes `requirements` des PLAN et SUMMARY projetées par la collecte ne passent pas par `servi`, alors que le contrat de 76-04 dit tout texte nettoyé.
+- Revue m2 : la recette est cherchée par `-RECETTE-*.md` (premier du tri) dans la traçabilité, par `-RECETTE-HUMAINE.md` dans `avancement.mjs` : un autre nom ferait diverger les deux lectures (P76-D-14).
+- Revue m4 : `name` d'une entrée de mémoire lu avec ses guillemets ; un `name: "x"` ne résout pas un lien `[[x]]` (aucun cas dans le dépôt).
+- Audit M-1 : la lecture synchrone des fichiers de mémoire n'a ni budget cumulé d'octets ni contrôle d'horloge entre fichiers ; l'échéance de la route ne couvre que git (le coût par fichier est borné depuis le correctif H-1). Un témoin déterministe demande une horloge injectée dans `calculer` (`vf-cockpit-trace.mjs`).
+- Audit M-2 : réponse en cache périmée après une écriture en place, non indexée, d'un fichier de mémoire (empreinte par dates de dossiers) ; limite déjà dite au cadrage, à écrire aussi au SUMMARY de 76-05.
+- Audit M-3 : les échecs ou troncatures des lectures git de la mémoire (chemins de HEAD, jours, non suivis) ne remontent pas dans `bornes.tronque` : la liste se donne pour complète.
+- Audit B-1 à B-3 : noms de fichiers suivis servis sans passer par `servi` ; fragments `cible` et `name` bornés mais issus du texte de la mémoire ; empreinte sans signal git quand `git.sig` est nul.
+
+**Déclencheur de reprise :** la prochaine passe sur la traçabilité du cockpit (76-08 ou la phase suivante qui la lit).

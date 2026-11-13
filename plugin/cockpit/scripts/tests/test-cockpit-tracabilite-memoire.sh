@@ -290,6 +290,49 @@ assert_eq "T8.7 au moins une entrée et un lien" "$(J "$OR" "[j.entrees.length>0
 assert_eq "T8.7 aucune clé description, corps ni texte" "$(J "$OR" "${CLE/MOTIF/$RE_CONTENU}")" "false"
 assert_eq "T8.7 aucune occurrence du chemin absolu de la racine" "$(SANS "$OR" "$REPO")" "ok"
 
+echo "T9 — coût de lecture d'un fichier de mémoire : linéaire et borné, quel que soit le contenu"
+cat > "$AUX/cout.mjs" <<'JS'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const M = await import(pathToFileURL(path.join(process.argv[2], 'vf-cockpit-trace-memoire.mjs')).href);
+const LIMITE_MS = 200, N = 10000;
+const meilleur = (f, essais) => {
+  let m = Infinity;
+  for (let i = 0; i < essais; i++) { const t = process.hrtime.bigint(); f(); m = Math.min(m, Number(process.hrtime.bigint() - t) / 1e6); }
+  return m;
+};
+const lit = (txt) => () => M.entreesMemoire({ fichiers: [{ chemin: '.claude/agent-memory/a/x.md', txt }], index: new Map([['a', txt]]) });
+const cas = {
+  liens: { gen: { 'sans-saut': '[[:', 'cr': '[[:\r', 'u2028': '[[: ' }, appel: (t) => () => M.liensDe(t) },
+  index: { gen: { 'sans-saut': '](a', 'cr': '](a\r', 'u2028': '](a ' }, appel: lit },
+};
+const out = {};
+for (const [fn, { gen, appel }] of Object.entries(cas)) {
+  for (const [nom, motif] of Object.entries(gen)) {
+    const petit = meilleur(appel(motif.repeat(N)), 3), grand = meilleur(appel(motif.repeat(2 * N)), 1);
+    out[`${fn}-${nom}`] = { borne: grand < LIMITE_MS, croissance: grand < 3 * petit + 20 };
+  }
+}
+console.log(JSON.stringify(out));
+JS
+node "$AUX/cout.mjs" "$SCRIPTS" > "$WORK/cout.json" 2>/dev/null
+for k in liens-sans-saut liens-cr liens-u2028 index-sans-saut index-cr index-u2028; do
+  assert_eq "T9.1 $k : sous la limite de temps fixe" "$(J "$WORK/cout.json" "j['$k'].borne")" "true"
+  assert_eq "T9.1 $k : le temps à 2N reste sous 3 fois celui à N" "$(J "$WORK/cout.json" "j['$k'].croissance")" "true"
+done
+L14="$WORK/l14"; lab_init "$L14"
+idx "$L14" vf-coder '- [A](a.md) — première
+- [B](./b.md)'
+mem "$L14" vf-coder a.md entree-a project 'voir [[entree-b]] et [[entree-c|alias]] ; ignoré : `[[code]]` [[:alpha:]]'
+mem "$L14" vf-coder b.md entree-b feedback 'rien'
+mem "$L14" vf-coder c.md entree-c feedback 'rien'
+gc "$L14" 2026-02-01 'témoin positif'
+O14="$(V "$L14")"
+assert_eq "T9.2 témoin positif : liens d'un fichier normal lus, code et classe POSIX ignorés" \
+  "$(E "$O14" vf-coder/a.md 'e.sortants.map(s=>s.cible)')" '["entree-b","entree-c"]'
+assert_eq "T9.2 témoin positif : noms indexés lus (lien nu et lien ./), hors index exact" \
+  "$(J "$O14" "j.entrees.map(e=>e.cle+':'+e.horsIndex).join()")" "vf-coder/a.md:false,vf-coder/b.md:false,vf-coder/c.md:true"
+
 echo
 echo "=== Bilan : $PASS passés, $FAIL échoués ==="
 [ "$FAIL" -eq 0 ]

@@ -72,8 +72,8 @@ node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || 
 echo "=== E0 — exports, table des routes, contrat ==="
 E01="$(node --input-type=module -e "try{const m=await import('file://$SCRIPTS/vf-cockpit-state.mjs');console.log(Object.keys(m).sort().join(','))}catch(e){console.log('absent')}")"
 assert_eq "E0.1 — vf-cockpit-state.mjs exporte les neuf noms (SCHEMA_STATE, VOLATILS_ETAT, FENETRE_LECTEUR_MS, collecteDe, corpsState, sigState, creerLecteurs, LECTEURS, lireState)" "$E01" "FENETRE_LECTEUR_MS,LECTEURS,SCHEMA_STATE,VOLATILS_ETAT,collecteDe,corpsState,creerLecteurs,lireState,sigState"
-E02="$(node --input-type=module -e "const m=await import('file://$SCRIPTS/vf-cockpit-server.mjs');const c=m.ROUTES.map((l)=>l[0]);const i=c.indexOf('/api/vf/state');console.log([i>0&&c[i-1]==='/api/vf/modeles'&&c[i+1]==='/api/vf/transcript',new Set(c).size===c.length,JSON.stringify(c)===JSON.stringify([...c].sort()),i>=0&&m.ROUTES[i].length===2].join(','))")"
-assert_eq "E0.2 — ROUTES porte /api/vf/state entre modeles et transcript, chemins uniques et triés, la ligne n'a aucun régime" "$E02" "true,true,true,true"
+E02="$(node --input-type=module -e "const m=await import('file://$SCRIPTS/vf-cockpit-server.mjs');const c=m.ROUTES.map((l)=>l[0]);const i=c.indexOf('/api/vf/state');console.log([i>0&&c[i-1]==='/api/vf/modeles'&&c[i+1]==='/api/vf/tracabilite'&&c[i+2]==='/api/vf/transcript',new Set(c).size===c.length,JSON.stringify(c)===JSON.stringify([...c].sort()),i>=0&&m.ROUTES[i].length===2].join(','))")"
+assert_eq "E0.2 — ROUTES porte /api/vf/state entre modeles et tracabilite (puis transcript), chemins uniques et triés, la ligne n'a aucun régime" "$E02" "true,true,true,true"
 E03="$(node -e "
 const j=JSON.parse(require('fs').readFileSync('$SCRIPTS/vf-cockpit-interface.json','utf8')).schemas;const s=j['vibeflow/cockpit-state@1'],g=j['vibeflow/cockpit-signal@1'];
 if(!s){console.log('absent');process.exit(0)}

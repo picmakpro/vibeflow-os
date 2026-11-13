@@ -1,7 +1,7 @@
 // vf-cockpit-collecte-etapes — les étapes SYNCHRONES de la collecte, appelables sans fil (79-09, P79-D-12, A32). Le fil (vf-cockpit-collecte-fil.mjs)
 // les appelle ; les suites les appellent directement. Aucun changement de dossier courant de processus : tout `cwd` passe en option. Aucune
 // diffusion : une étape rend un résultat.
-// Exports : creerMemoire() (état du fil entre deux demandes), etapePlanning({ racine }) (graphe Projet, lu une fois : A32, lieu unique de la
+// Exports : creerMemoire() (état du fil entre deux demandes), etapePlanning({ racine, memo }) (graphe Projet, lu une fois : A32, lieu unique de la
 //           lecture du planning), etapeVerrous({ racine, scriptsDir, home, memo }) (`driver-lock.sh status --all` lu puis PROJETÉ en liste blanche :
 //           { etat, plat, liste }, A15 ; la sortie brute ne quitte jamais l'étape),
 //           etapeTour({ racine, sortie, scriptsDir, home, memo, maintenant, sansIndex })
@@ -13,6 +13,7 @@
 // un échec laisse un résultat neutre, comme la collecte d'avant : le tour dégrade, il ne lève jamais.
 import { buildProjectGraph } from './vf-cockpit-project.mjs';
 import { collectWho } from './vf-cockpit-who.mjs';
+import { lireRegie } from './vf-cockpit-regie-lecture.mjs';
 import { driverLockScript, shBorne } from './vf-cockpit-paths.mjs';
 import { etapeIndex } from './vf-cockpit-collecte-index.mjs';
 import { etapeFrise } from './vf-cockpit-collecte-frise.mjs';
@@ -21,7 +22,21 @@ import { collectSignal, projeterVerrous } from './vf-cockpit-signal.mjs';
 
 export const creerMemoire = () => ({});
 
-export const etapePlanning = ({ racine }) => buildProjectGraph(racine);
+// 73-03 (P73-D-35) : avec `memo`, la regie du planning (phases, phases à vérification humaine avec leur `ref`) est lue ICI,
+// une fois par reconstruction du graphe, et rangée dans memo.regie pour les tours (jamais relue par tour de 5 s) ;
+// memo.lecturesPlanning compte ces lectures (diagnostic de /api/vf/etat).
+export function etapePlanning({ racine, memo }) {
+  const graphe = buildProjectGraph(racine);
+  if (memo) {
+    // lecture illisible : la regie précédente est gardée ; trace bornée (3 au plus par fil)
+    try { memo.regie = lireRegie(racine, graphe); } catch (e) {
+      memo.echecsRegie = (memo.echecsRegie || 0) + 1;
+      if (memo.echecsRegie <= 3) console.error(`collecte : regie illisible (${String(e && e.message).slice(0, 160)})`);
+    }
+    memo.lecturesPlanning = (memo.lecturesPlanning || 0) + 1;
+  }
+  return graphe;
+}
 
 // forme `{ available: false }` si le script est absent, `{ error }` si la sortie est illisible, sinon l'objet de `status --all`
 // (BRUT : reste dans l'étape et dans `who`)
@@ -40,7 +55,7 @@ export function etapeTour({ racine, sortie, scriptsDir, home, memo = creerMemoir
   let brut = { available: false };
   try { brut = lireBrut({ racine, scriptsDir, home }); } catch { erreurs.push('verrous'); }
   let equipe;
-  try { equipe = collectWho(racine, { scriptsDir, verrous: brut, officiel: true, home }); } catch (e) {
+  try { equipe = collectWho(racine, { scriptsDir, verrous: brut, officiel: true, home, regie: memo.regie }); } catch (e) {
     erreurs.push('equipe'); equipe = { workers: [], sources: {}, error: String(e.message).slice(0, 200) };
   }
   // sansSession se décide sur les sessions de CETTE équipe ; équipe illisible : aucun verdict (l'ensemble reste celui du tour précédent, ou absent)

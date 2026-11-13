@@ -31,3 +31,19 @@ Résultats : 9 passés, 22 échoués
 ```
 
 Les passes du rouge sont les témoins positifs (T9.4d, T9.5b, T9.9d, T9.10c, T9.7d), la copie mutée (T9.6a), T9.9 et T9.7b-c (champs absents donc rien à trouver, couverts par leurs voisins T9.9b-c et T9.7).
+
+## Revue M1 — une exigence d'archive ne se rattache qu'à sa phase, compartiment compris
+
+Témoins ajoutés à `test-cockpit-tracabilite-collecte.sh` (section T9.12, commit `8993f733`), vus rouges sur le code d'avant le correctif
+(`16057a84`), dans trois labs fabriqués. Rouge : 3 assertions sur 36 (33 passées dont les deux témoins positifs).
+
+```
+❌ FAIL — T9.12 lab plat : la jumelle d'archive ne double ni la ligne ni le total de la phase 1 — attendu: [OLD-01+REQ-01#2] obtenu: [OLD-01+REQ-01+REQ-01#3]
+❌ FAIL — T9.12b la clé de l'exigence vivante reste résoluble (200, pas cle-ambigue) — attendu: [200/ok] obtenu: [400/cle-ambigue]
+✅ PASS — T9.12c témoin positif : l'exigence d'archive sans jumelle reste listée et ouvrable
+❌ FAIL — T9.12d deux compartiments : AR-01, citée par un plan de a, sort dans la phase 1 de a seulement — attendu: [a:AR-01,b:] obtenu: [a:AR-01,b:AR-01]
+✅ PASS — T9.12e témoin positif : AR-01 reste ouvrable par sa clé
+Résultats : 33 passés, 3 échoués
+```
+
+Vert après le correctif (`438a2ef6`) : `Résultats : 36 passés, 0 échoués`.

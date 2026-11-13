@@ -99,12 +99,18 @@ export function lireTrace({ phases, phaseDirs, reqs, ledgers, lire, lister, rel,
   for (const r of reqs.values()) {
     const cle = `${r.wsKey ?? ''}|${r.id}`, st = statuts.get(cle) || null;
     const citeParPlan = (ph) => traces.get(ph.key).plans.some((p) => p.exigences && p.exigences.includes(r.id));
-    const parPlan = vivantes.filter((ph) => (r.wsKey === '*' || (ph.ws || '') === r.wsKey) && citeParPlan(ph))
-      .map((ph) => ph.n).sort((a, b) => parseFloat(a) - parseFloat(b));
+    // une exigence d'archive (clé joker `*`) se rattache par un plan, dans le compartiment de CE plan, et jamais là où le ledger vivant du même
+    // compartiment porte déjà le même identifiant (jumelle : la ligne vivante fait foi)
+    const archive = r.wsKey === '*';
+    const parPlanPh = vivantes.filter((ph) => (archive ? !reqs.has(`${ph.ws || ''}|${r.id}`) : (ph.ws || '') === r.wsKey) && citeParPlan(ph))
+      .sort((a, b) => parseFloat(a.n) - parseFloat(b.n));
+    const parPlan = parPlanPh.map((ph) => ph.n);
     const phase = st && st.phase != null ? st.phase : parPlan[0] ?? null;
     exigences.push({ id: r.id, ws: r.ws, coche: r.done, phase, phasesParPlan: parPlan, statut: st ? st.statut : null, fait: st ? st.fait : false,
       rattachement: st && st.phase != null ? st.rattachement : parPlan.length ? 'plan' : null,
-      libelle: r.text, fichier: r.file, cites: citationsLigne(lignes.get(cle)) });
+      libelle: r.text, fichier: r.file, cites: citationsLigne(lignes.get(cle)),
+      // clé `<compartiment>|<n>` du nœud de phase d'une exigence d'archive : le numéro seul ne désigne pas un compartiment
+      ...(archive && parPlanPh.length ? { cleNoeud: `${parPlanPh[0].ws || ''}|${parPlanPh[0].n}` } : {}) });
   }
   const ledger = { statuts, lignes, lignesSansExigence: sans, etapes: etapes.lues ? etapes : null, n: (ledgers || []).length };
   return { phases: traces, ledger, exigences, contextes };
