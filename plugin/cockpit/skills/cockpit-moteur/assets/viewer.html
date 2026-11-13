@@ -697,7 +697,7 @@ const elk = (() => {
       fil.onmessage = (e) => { // une réponse est une donnée non fiable : forme vérifiée avant toute pose
         const d = e.data, p = d && Number.isInteger(d.id) ? attente.get(d.id) : null; if (!p) return; attente.delete(d.id);
         if (typeof d.erreur === 'string') p.ko(new Error(d.erreur.slice(0, 200)));
-        else if (d.resultat && Array.isArray(d.resultat.children)) p.ok(d.resultat); else p.ko(new Error('Invalid layout reply'));
+        else if (d.resultat && Array.isArray(d.resultat.children)) p.ok(d.resultat); else p.ko(new Error(t('Invalid layout reply')));
       };
       const off = window.VF_COQUILLE.surOnglet(() => () => { // l'onglet s'en va : le worker meurt avec lui, rien n'est résolu ni rejeté (le moteur démonté n'écrit plus)
         const f = fil; fil = null; attente.clear(); if (f) f.terminate(); off(); // garde:mep-fuite
