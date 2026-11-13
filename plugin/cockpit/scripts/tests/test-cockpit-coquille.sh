@@ -104,6 +104,10 @@ assert_eq "K1.5 — Sec-Fetch-Site: cross-site : 403 sur les quatre adresses et 
 echo "=== K2 (suite) — table fermée, lien symbolique, liste calculée au démarrage ==="
 FERME="$(for u in /_vf/ /_vf//moteur.js /_vf/../serve.mjs /_vf/ui/../moteur.js /_vf/%2e%2e/serve.mjs '/_vf/moteur.js%00' /_vf/MOTEUR.js /_vf/ui/ "/_vf/$(printf 'a%.0s' $(seq 1 4096))"; do rq GET "$u" "$WORK/x.out"; printf '%s ' "$RQ_CODE"; done)"
 assert_eq "K2.3 — table fermée : /_vf/, //, .., ui/.., %2e%2e, NUL, majuscules, ui/, 4 Kio → 404 chacun" "$FERME" "404 404 404 404 404 404 404 404 404 "
+ALIAS="$(for u in //x/ //x/project.html /./project.html /./ //project.html /project.html/ /equipe.html/. /index.html/../project.html; do rq GET "$u" "$WORK/x.out"; printf '%s ' "$RQ_CODE"; done)"
+assert_eq "K2.3 (AU16-01) — seules les quatre adresses déclarées répondent : //x/, //x/project.html, /./project.html, /./, //project.html, barre finale, segment .. → 404 (chemin brut, comme /_vf/)" "$ALIAS" "404 404 404 404 404 404 404 404 "
+rq GET "/project.html?x=1" "$WORK/x.out"
+assert_eq "K2.3 (AU16-01) — témoin positif : /project.html?x=1 répond 200 (la requête est coupée avant le jugement)" "$RQ_CODE" "200"
 rq GET "/_vf/moteur.js?x=1" "$WORK/x.out"; Q1="$RQ_CODE"; rq POST /_vf/moteur.js "$WORK/x.out"
 assert_eq "K2.3 — témoin positif : ?x=1 est ignoré (200) ; K2.4 — POST /_vf/moteur.js : 405" "$Q1|$RQ_CODE" "200|405"
 # fichiers plantés dans la SORTIE, après le démarrage (E9, A40)
@@ -571,6 +575,15 @@ base_srv; rq GET /project.html "$WORK/x.out"; CSPB="$(hv content-security-policy
 COCKPIT_MODULE="$CP3" demarrer "$LAB"; rq GET /project.html "$WORK/doc-c3.html"; CSP3="$(hv content-security-policy | sed "s/'sha256-[^']*'//g; s/:$PORT/:PORT/g; s/  */ /g")"; rq GET /_vf/ui/zz-vf-plante-avant.js "$WORK/x.out"
 assert_eq "K2.6 — le même nom ajouté AVANT le démarrage est servi (200), nommé au manifeste, sans que la CSP change (hors empreintes et port)" "$RQ_CODE|$(node "$OR" manifeste "$WORK/doc-c3.html" | oj 'j.noms.includes("ui/zz-vf-plante-avant.js")')|$([ "$CSP3" = "$CSPB" ] && echo meme || echo diff)" "200|true|meme"
 cockpit_arreter
+
+echo "=== M-PATHNAME (AU16-01) — la route du document jugeant url.pathname au lieu du chemin brut ==="
+if cockpit_module_muter pathname serve.mjs "s#const brut = String(req.url || '').split('?')\[0\];#const brut = url.pathname;#"; then
+  demarrer "$LAB"
+  PM="$(for u in //x/ //x/project.html /./project.html /./ //project.html /project.html/ /equipe.html/. /index.html/../project.html /project.html / /index.html /equipe.html; do rq GET "$u" "$WORK/x.out"; printf '%s ' "$RQ_CODE"; done)"
+  assert_eq "M-PATHNAME — url.pathname remis : les alias //x/, //x/project.html, /./project.html, /./, //project.html, /index.html/../project.html répondent 200 (K2.3 AU16-01 rouge), les quatre adresses restent 200, la barre finale reste 404" "$PM" "200 200 200 200 200 404 404 200 200 200 200 200 "
+  cockpit_arreter
+else assert_eq "M-PATHNAME — mutant sans effet (ancre absente)" "sans effet" "effet"; fi
+unset COCKPIT_MODULE
 
 echo "=== M-MARQUEUR — un marqueur de gabarit absent : le serveur refuse de démarrer et le nomme ==="
 if cockpit_module_muter marq viewer.html 's|/\*__FONTS__\*/||'; then

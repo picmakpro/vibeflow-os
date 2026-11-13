@@ -633,9 +633,10 @@ function route(req, res) {
     res.writeHead(404); return res.end();
   }
   if (servirAsset(req, res, coquille.table)) return; // vibeflow 79-16 : les scripts de la coquille, table fermée (aucun fichier de la sortie n'est servi)
-  if (coquille.document(url.pathname)) { // vibeflow 79-16 : le même document aux quatre adresses de page, GET et HEAD seulement
+  const brut = String(req.url || '').split('?')[0]; // AU16-01 : chemin BRUT comme servirAsset, pas new URL (alias `.`, `//x/`)
+  if (coquille.document(brut)) { // vibeflow 79-16 : le même document aux quatre adresses de page, GET et HEAD seulement
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }); return res.end(); }
-    return sendDoc(req, res, url.pathname);
+    return sendDoc(req, res, brut);
   }
   res.writeHead(404); return res.end(); // garde:coquille-404
 }
