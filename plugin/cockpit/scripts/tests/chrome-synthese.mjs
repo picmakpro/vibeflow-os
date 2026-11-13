@@ -10,9 +10,15 @@
 //   mesurerUneFoisPose(lire, opts)  attend la stabilité (jamais une pause fixe qui juge) ; { valeur, obtenue } : « mesure obtenue » non vide avant toute comparaison
 //   sourceTemoin() / ecrireBlocTemoin(copie)  fichier ui/74-vf-synthese-temoin.js posé dans une COPIE du module (jamais dans le module livré) : des blocs au registre,
 //                                  le fournisseur de la ligne-résumé (majResume), un rafraîchissement déclenché par la sonde
-// CLI : lab <dossier> (imprime le chemin du lab) · temoin <copie du module> · scenario <chrome> <port> <nue|temoin> [<fichier d'export>] (une ligne JSON)
+//   (77-08, chacun avec sa sonde positive dans test-cockpit-synthese-visite.sh, section « B »)
+//   deuxiemeOnglet(s, url)         second onglet du MÊME Chrome (même origine, même stockage) : { send, ev, fermer } ; sonde : un `storage` écrit par le premier arrive au second
+//   intercepter(s, motif, reponse) interception CDP (Fetch) des requêtes dont l'adresse porte `motif` : { arreter, vues } ; sonde : la réponse interceptée est vue par la page
+//   stockageLu(s, cle)             relecture de localStorage (cle null : toutes les clés) ; sonde : une clé écrite par la page est lue
+//   stockageAvant(s, cle, valeur)  valeur posée avant le prochain chargement (null : clé retirée) ; rend retirer(), à appeler avant le chargement suivant
+//   labDeuxEtats(dossier)          lab fixture avant (un commit) et après (trois commits de plus) : { lab, avant, apres } ; sonde : le calcul de 77-04 y voit une différence
+// CLI : lab <dossier> (imprime le chemin du lab) · lab2 <dossier> · temoin <copie du module> · scenario <chrome> <port> <nue|temoin> [<fichier d'export>] · visite <chrome> <port> <complet|xss>
 import fs from 'node:fs'; import path from 'node:path'; import { execFileSync } from 'node:child_process';
-import { stabiliser } from './chrome-session.mjs';
+import { stabiliser, pause } from './chrome-session.mjs';
 
 export const MARQUEUR_RACINE = 'RACINE-MARQUEUR-77', MARQUEUR_PROSE = 'MARQUEUR-PROSE-77';
 const git = (lab, ...a) => execFileSync('git', ['-C', lab, '-c', 'user.email=t@t', '-c', 'user.name=t', ...a], { stdio: 'ignore', env: { ...process.env, GIT_CONFIG_NOSYSTEM: '1', GIT_CONFIG_GLOBAL: '/dev/null' } });
@@ -34,6 +40,39 @@ export const AMORCE_ECOUTEURS = `(() => { const reg = []; const A = EventTarget.
 // la visite guidée se lit « déjà vue » (clés tour-seen:… et vibeflow-cockpit:visite:…), sans rien écrire : une visite qui s'ouvre vole le focus et prend Échap
 export const AMORCE_VISITE = `(() => { const g = Storage.prototype.getItem; Storage.prototype.getItem = function (k) { return /tour-seen:|^vibeflow-cockpit:visite:/.test(String(k)) ? 'true' : g.call(this, k); }; })();`;
 export const ecrireStockageAvantChargement = (s, cle, valeur) => s.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { localStorage.setItem(${JSON.stringify(cle)}, ${JSON.stringify(valeur)}); } catch {}` });
+
+export function labDeuxEtats(dossier) {
+  const lab = labFixture(dossier); git(lab, 'branch', '-M', 'main'); // la base du cockpit est la branche `main` (arbres.mjs) : sans elle, le sommet de la base est inconnu
+  const sha = () => execFileSync('git', ['-C', lab, 'rev-parse', 'HEAD'], { encoding: 'utf8' }).trim(), avant = sha();
+  for (const i of [1, 2, 3]) { fs.writeFileSync(path.join(lab, `src/suite${i}.js`), `export const s${i} = ${i};\n`); git(lab, 'add', '-A'); git(lab, 'commit', '-q', '-m', `suite ${i}`); }
+  return { lab, avant, apres: sha() };
+}
+export const stockageLu = (s, cle) => s.ev(cle === null ? `Object.fromEntries(Object.keys(localStorage).map((k) => [k, localStorage.getItem(k)]))` : `localStorage.getItem(${JSON.stringify(cle)})`);
+export async function stockageAvant(s, cle, valeur) {
+  const pose = valeur === null ? `localStorage.removeItem(${JSON.stringify(cle)})` : `localStorage.setItem(${JSON.stringify(cle)}, ${JSON.stringify(valeur)})`;
+  const { identifier } = await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `try { ${pose}; } catch {}` });
+  return () => s.send('Page.removeScriptToEvaluateOnNewDocument', { identifier });
+}
+export async function intercepter(s, motif, reponse) {
+  let actif = true, n = 0; await s.send('Fetch.enable', { patterns: [{ urlPattern: `*${motif}*` }] });
+  s.ecouter('Fetch.requestPaused', (p) => {
+    if (!actif) return void s.send('Fetch.continueRequest', { requestId: p.requestId }).catch(() => {});
+    n++; s.send('Fetch.fulfillRequest', { requestId: p.requestId, responseCode: reponse.statut, responseHeaders: [{ name: 'Content-Type', value: 'application/json' }],
+      body: Buffer.from(reponse.corps || '{}').toString('base64') }).catch(() => {});
+  });
+  return { arreter: async () => { actif = false; await s.send('Fetch.disable'); }, vues: () => n };
+}
+export async function deuxiemeOnglet(s, url) {
+  const cible = await (await fetch(`http://127.0.0.1:${s.port}/json/new?about:blank`, { method: 'PUT' })).json();
+  const ws = new WebSocket(cible.webSocketDebuggerUrl), pend = new Map(); let id = 0;
+  ws.onmessage = (e) => { const j = JSON.parse(e.data); if (j.id && pend.has(j.id)) { pend.get(j.id)(j.result); pend.delete(j.id); } };
+  await new Promise((ok, ko) => { ws.onopen = ok; ws.onerror = () => ko(new Error('second onglet : connexion impossible')); });
+  const send = (method, params = {}) => new Promise((ok) => { const i = ++id; pend.set(i, ok); ws.send(JSON.stringify({ id: i, method, params })); });
+  const ev = async (x) => (await send('Runtime.evaluate', { expression: x, returnByValue: true, awaitPromise: true }))?.result?.value;
+  await send('Page.enable'); await send('Page.addScriptToEvaluateOnNewDocument', { source: AMORCE_VISITE }); await send('Page.navigate', { url });
+  for (let i = 0; i < 100 && (await ev(`document.documentElement.dataset.vfPret === 'oui'`)) !== true; i++) await pause(100);
+  return { send, ev, fermer: async () => { ws.close(); await fetch(`http://127.0.0.1:${s.port}/json/close/${cible.id}`).catch(() => {}); } };
+}
 
 export async function journalReseau(s) {
   const j = []; await s.send('Network.enable');
@@ -65,7 +104,9 @@ export const ecrireBlocTemoin = (copie) => fs.writeFileSync(path.join(copie, 'sk
 if (process.argv[1] && path.resolve(process.argv[1]) === path.resolve(new URL(import.meta.url).pathname)) {
   const [, , mode, ...a] = process.argv;
   if (mode === 'lab') console.log(labFixture(a[0]));
+  else if (mode === 'lab2') console.log(labDeuxEtats(a[0]).lab);
+  else if (mode === 'visite') import('./chrome-synthese-visite.mjs').then(({ jouer }) => jouer(...a));
   else if (mode === 'temoin') ecrireBlocTemoin(a[0]);
   else if (mode === 'scenario') import('./chrome-synthese-scenarios.mjs').then(({ jouer }) => jouer(...a)); // sans attente de tête : le module des scénarios importe celui-ci
-  else { console.error('usage : lab <dossier> | temoin <copie> | scenario <chrome> <port> <nue|temoin> [<export>]'); process.exit(2); }
+  else { console.error('usage : lab <dossier> | lab2 <dossier> | visite <chrome> <port> <complet|xss> | temoin <copie> | scenario <chrome> <port> <nue|temoin> [<export>]'); process.exit(2); }
 }
