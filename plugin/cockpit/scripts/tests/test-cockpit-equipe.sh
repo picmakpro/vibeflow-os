@@ -655,7 +655,7 @@ const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 class ES { constructor() { ES.last = this; this.l = {}; } addEventListener(n, f) { this.l[n] = f; } close() {} }
 let bouton = null, panneau = '';
 const el = () => ({ setAttribute() {}, appendChild() {}, remove() {}, style: {} });
-const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
+const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, on() {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
   addHeaderButton: (o) => { bouton = { ...o, className: '', innerHTML: '', setAttribute() {} }; return bouton; } };
 const document = { createElement: el, head: { appendChild() {} }, body: { appendChild() {}, classList: { contains: () => false } }, documentElement: {}, addEventListener() {}, dispatchEvent: () => true, getElementById: () => null, querySelectorAll: () => [], querySelector: () => null };
 const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' } };
@@ -1077,7 +1077,7 @@ const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 class ES { constructor() { ES.last = this; this.l = {}; } addEventListener(n, f) { this.l[n] = f; } close() {} }
 let bouton = null, panneau = '';
 const el = () => ({ setAttribute() {}, appendChild() {}, remove() {}, style: {} });
-const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
+const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, on() {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
   addHeaderButton: (o) => { bouton = { ...o, className: '', innerHTML: '', setAttribute() {} }; return bouton; } };
 const document = { createElement: el, head: { appendChild() {} }, body: { appendChild() {}, classList: { contains: () => false } }, documentElement: {}, addEventListener() {}, dispatchEvent: () => true, getElementById: () => null, querySelectorAll: () => [], querySelector: () => null };
 const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' } };

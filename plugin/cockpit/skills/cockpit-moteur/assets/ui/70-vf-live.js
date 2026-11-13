@@ -284,9 +284,8 @@
     es.addEventListener('structural', (e) => { vu(JSON.parse(e.data)); probe.structural++; if (TAB === 'project') { SC.toast('Projet modifié : rechargement'); setTimeout(() => location.reload(), 400); } });
     es.onerror = () => { es.close(); perdu('direct', connecter); };
   };
-  // 79-17 (SOCL-21) : who, lock et connexion se lisent dans le magasin d'état, puis on s'y abonne ; perdu : « Direct coupé », ouvert : l'état courant.
-  // Sous la coquille, une fois l'onglet rendu (le rendu du tiroir vit dans 71, chargé après ce fichier) : la pastille d'un onglet neuf dit l'état
-  // courant sans attendre un événement, et la désinscription est rendue à `surOnglet` (les inscriptions meurent avec leur onglet, 79-16)
+  // 79-17 (SOCL-21) : who, lock et connexion se lisent dans le magasin d'état, puis on s'y abonne (perdu : « Direct coupé », ouvert : l'état courant).
+  // Sous la coquille, une fois l'onglet rendu (71 se charge après ce fichier) ; la désinscription est rendue à `surOnglet` (79-16)
   const E = window.VF_ETAT, CQ = window.VF_COQUILLE;
   const surConnexion = (c) => { if (c === 'perdu') showLock(null, true); else if (c === 'ouvert') showLock(); };
   const brancher = () => {
