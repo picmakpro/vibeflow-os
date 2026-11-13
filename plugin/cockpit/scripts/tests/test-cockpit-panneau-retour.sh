@@ -35,8 +35,8 @@ mklabdep() {
   printf '\n### Phase 3: Liens\n**Goal**: liens\n**Depends on**: Phase 2\n' >> "$1/.planning/ROADMAP.md"
   git -C "$1" add -A && git -C "$1" -c user.email=t@t -c user.name=t commit -q -m dependances
 }
-LAB="$WORK/lab"; mklabdep "$LAB"; ln -s "$SC_BASE" "$WORK/scripts-hote"
-build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+LAB="$WORK/lab"; mklabdep "$LAB"
+build_serve "$LAB"
 assert_eq "PR0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
 
 echo "=== PR1 — un lien du panneau empile, Retour ramène la phase d'avant ==="
@@ -102,7 +102,7 @@ assert_eq "PR2.16 — retour() sur pile vide : le bouton n'est pas reconstruit, 
   "$(E5 'j.pr216')" '{"foc":"vf-retour","meme":true,"taille":0}'
 assert_eq "PR2.16b — témoin : aucune section du pilote n'a échoué (clavier)" "$(E5 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
-LABT="$WORK/lab-term"; mklabdep "$LABT"; build_serve "$LABT" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur" --terminal
+LABT="$WORK/lab-term"; mklabdep "$LABT"; build_serve "$LABT" --terminal
 R4="$(mesurer chrome-panneau-retour.mjs pr2c)"; sonde "$R4"; E4() { E "$1" "$R4"; }; vf_hyg_stop "$SRV"
 for CLE in a b; do
   GAB="800 px"; HT=true; [ $CLE = a ] && { GAB="390 px tactile (appui ≥ 44 px)"; HT="j.pr210a.h >= 44"; }

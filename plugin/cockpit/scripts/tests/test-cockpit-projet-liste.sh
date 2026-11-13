@@ -3,7 +3,7 @@
 #   PL1 la bascule « Liste » : tables par jalon, tri par état, rangée = sélection
 #   PL2 intérieur d'une phase (plans par vague, exigences par la porte unique), troncature, Entrée et Espace, porte substituée
 #   PL3 touche v, mémoire par lab et par largeur, tri, rôles et cibles à 390 px, mouvement réduit, focus orphelin, zone basse
-#   Mutants (copie du module dans $WORK, jamais le module ; passage à `cockpit_module_copie` (79-06) et à `COCKPIT_MODULE` : tâche de la jointure) :
+#   Mutants (copie complète du module par `cockpit_module_copie`, servie par `COCKPIT_MODULE` ; jamais le module, jamais un lien) :
 #   M-CLE, M-TRI, M-SAISIE, M-ORPHELIN-TRI, M-PORTE. PL_SCRIPTS = dossier de scripts à bâtir (rejeu sur la base).
 # Sans navigateur : SUITE SAUTÉE (exit 0, message explicite), jamais un vert à vide.
 set -uo pipefail
@@ -36,8 +36,8 @@ mklabl() { # mklab + titres de 52, 53 et 70 caractères ; phase 1 : trois plans 
   git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m liste
 }
 mklabs() { local L="$1"; mklab "$L"; rm -f "$L/.planning/REQUIREMENTS.md"; git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m sans; }
-LAB="$WORK/lab"; mklabl "$LAB"; ln -s "$SC_BASE" "$WORK/scripts-hote"
-build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+LAB="$WORK/lab"; mklabl "$LAB"
+build_serve "$LAB"
 assert_eq "PL0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
 
 echo "=== PL1 — la forme Liste à la racine ==="
@@ -83,7 +83,7 @@ assert_eq "PL2.8 — Espace sélectionne, Entrée plonge, sur un plan Entrée ou
   '["n:ph-3",["n:ph-3"],"n:ph-3",true,[true,true,"n:ph-1"],["n:ph-3",true,"root",1],"n:ph-4","n:ph-4"]'
 assert_eq "PL2.9a — témoin : aucune section du pilote n'a échoué" "$(E2 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
-LABS="$WORK/lab-sans"; mklabs "$LABS"; build_serve "$LABS" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+LABS="$WORK/lab-sans"; mklabs "$LABS"; build_serve "$LABS"
 R2B="$(mesurer chrome-projet-liste.mjs pl2b)"; sonde "$R2B"; E2B() { E "$1" "$R2B"; }; vf_hyg_stop "$SRV"
 assert_eq "PL2.9 — porte substituée : le lab n'a aucune exigence (témoin positif) ; avec la fausse porte, deux exigences et « 2 exigences couvertes » par plan ; restaurée : vide" \
   "$(E2B '[j.pl29.graphe, j.pl29.vraie.li, j.pl29.fausse.li.length, j.pl29.fausse.li[0].includes("Cochée") && j.pl29.fausse.li[1].includes("Non cochée"), j.pl29.fausse.cov.length > 0 && j.pl29.fausse.cov.every((c) => c === "2 exigences couvertes"), j.pl29.restaure.li]')" \
@@ -91,7 +91,7 @@ assert_eq "PL2.9 — porte substituée : le lab n'a aucune exigence (témoin pos
 assert_eq "PL2.9b — témoin : aucune section du pilote n'a échoué" "$(E2B 'Object.keys(j.erreurs).join()')" ""
 
 echo "=== PL3 — touche v, mémoire, tri, largeurs, focus orphelin, zone basse ==="
-build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+build_serve "$LAB"
 [ -n "${PL_PNG:-}" ] && { PNG="$(PL_PNG="$PL_PNG" mesurer chrome-projet-liste.mjs png)"; echo "  captures : $(E 'j.png.join(" ")' "$PNG")"; } # PL_PNG = dossier des captures de revue
 R3="$(mesurer chrome-projet-liste.mjs pl3a)"; sonde "$R3"; E3() { E "$1" "$R3"; }
 assert_eq "PL3.1 — v : couloirs → liste → graphe → couloirs ; focus sur l'élément équivalent (même phase), jamais body ; annonce « Affichage en liste, 6 phases »" \
@@ -121,7 +121,7 @@ assert_eq "PL3.7 — focus orphelin : en-tête de tri (clic, Entrée, direct) et
 assert_eq "PL3.9b — témoin : aucune section du pilote n'a échoué (focus orphelin)" "$(E3B 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
 echo "=== PL3.8 — zone basse (lab lancé avec --terminal) ==="
-LABT="$WORK/lab-term"; mklabl "$LABT"; build_serve "$LABT" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur" --terminal
+LABT="$WORK/lab-term"; mklabl "$LABT"; build_serve "$LABT" --terminal
 R5="$(mesurer chrome-projet-liste.mjs pl3c)"; sonde "$R5"; E5() { E "$1" "$R5"; }; vf_hyg_stop "$SRV"
 for CLE in 1440 1024 390; do
   X="j.pl38['$CLE']"
@@ -132,7 +132,7 @@ assert_eq "PL3.8z — témoin : aucune section du pilote n'a échoué (zone bass
 
 echo "=== PL4 — témoins de pointeur (P80-D-50 b : le Chrome sans tête de la CI Linux n'annonce aucun pointeur) ==="
 printf '#!/bin/bash\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$AUX/chrome-sans-pointeur"; chmod +x "$AUX/chrome-sans-pointeur"
-CHROME_REEL="$CHROME"; build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+CHROME_REEL="$CHROME"; build_serve "$LAB"
 CHROME="$AUX/chrome-sans-pointeur"; RLN="$(mesurer chrome-pointeur-forme.mjs none liste)"; CHROME="$CHROME_REEL"
 RLC="$(mesurer chrome-pointeur-forme.mjs coarse liste)"; vf_hyg_stop "$SRV"
 PL41='[j.pointeur.fine, j.pointeur.coarse, j.focus.n > 0, j.focus.actif, j.focus.sel === j.focus.id]'

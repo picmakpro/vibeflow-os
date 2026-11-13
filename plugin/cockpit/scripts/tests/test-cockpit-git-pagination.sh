@@ -14,6 +14,7 @@ export HOME="$WORK/home"; SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"   # cockpit_lancer, cockpit_module_copie (79-02, 79-06) : le lancement et les copies mutées passent par l'aide commune
 PASS=0; FAIL=0; SKIP=0
 ok_() { echo "  ✅ PASS — $1"; PASS=$((PASS+1)); }
 ko_() { echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); }
@@ -56,19 +57,18 @@ mk_lab() {
   printf -- '---\nstatus: executing\nmilestone: vibeflow-test\n---\n# State\n' > "$1/.planning/STATE.md"
   printf '<objective>Faire le socle</objective>\n' > "$1/.planning/phases/01-x/01-01-PLAN.md"; echo ok > "$1/.planning/phases/01-x/01-01-SUMMARY.md"
 }
-build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; pose OUT, PORT ; démarre le serveur (SRV)
-  env $ENVX "$NODE" "${2:-${GP_SCRIPTS:-$SCRIPTS}}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
+build_serve() { # $1 = lab ; pose OUT, PORT, SRV ; le module servi est COCKPIT_MODULE (copie d'un mutant), sinon celui de GP_SCRIPTS (rejeu sur une autre copie) ou du dépôt
+  local racine="${COCKPIT_MODULE:-$(cd "${GP_SCRIPTS:-$SCRIPTS}/.." && pwd -P)}"
+  env $ENVX "$NODE" "$racine/scripts/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
   # un CLI `claude` factice, comme les autres suites du cockpit : sans CLI, serve.mjs affiche #ask-warn au-dessus de la barre de question à
-  # 1024 px, la barre passe de 40 à 115 px et le tiroir se cale 69 px plus haut (liste à 237 px). Dans le serve.mjs assemblé, given('claude') lit
+  # 1024 px, la barre de question grandit et le tiroir se cale plus haut (liste plus courte). Dans le serve.mjs du module, given('claude') lit
   # l'option `--claude <chemin>`, sinon VF_COCKPIT_CLAUDE (FLOORPLAN_CLAUDE dans la source, renommé à l'assemblage) ; une valeur donnée, même
   # absente, exclut tout repli. On passe --claude, plus explicite : GP_CLAUDE la fixe, un chemin absent donne un serveur SANS CLI quel que
   # soit le PATH du poste (GP2.3b), le défaut est le faux claude.
   mkdir -p "$WORK/fauxbin"; cp "$HERE_T/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude"
-  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --claude "${GP_CLAUDE:-$WORK/fauxbin/claude}" --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  COCKPIT_MODULE="$racine" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} --claude "${GP_CLAUDE:-$WORK/fauxbin/claude}" || true
+  SRV="${VF_PID:-}"; PORT="${VF_PORT:-0}"
 }
 DEPOT="$WORK/depot"; mk_lab "$DEPOT"
 $GIT -C "$DEPOT" init -q -b main && $GIT -C "$DEPOT" add -A && $GIT -C "$DEPOT" commit -q -m init
@@ -335,15 +335,19 @@ JS
   stop_srv
 fi
 
-echo "=== GP2.3b — 1024 x 768 SANS CLI claude : le tiroir tient avec une barre de question à 115 px ==="
+echo "=== GP2.3b — 1024 x 768 SANS CLI claude : le tiroir tient avec la barre de question rehaussée par l'avertissement ==="
 # Même scène que GP2.3 mais serveur lancé avec `--claude` vers un exécutable absent (jamais le PATH : un poste qui a claude donnerait le même vert que GP2.3) :
-# #ask-warn s'affiche, #ask passe de 40 à 115 px, le zoom monte, eviter() cale le tiroir plus haut. Le produit ne garantit pas 240 px de liste ici
+# #ask-warn s'affiche, #ask devient plus haute que dans GP2.3 (propriété voulue : avertissement visible ET barre plus haute que SANS lui, mesure comparée à celle
+# de GP2.3, lue dans R2 : jamais une hauteur en pixels, qui dépend de la police et du zoom du poste), le zoom monte, eviter() cale le tiroir plus haut. Le produit ne garantit pas 240 px de liste ici
 # (mesuré : tiroir 511, volet au plancher 192, liste 237) : il garantit des RANGÉES ENTIÈRES, comptées dans la liste, jamais une hauteur.
 # N = 3 : rangée de 40 px, première rangée à 76 px du haut de la liste, 4 rangées entières mesurées (76 + 160 <= 237) ; on en exige une de moins, car la 4e tient à 1 px près.
 if ! veut GP2B; then :; elif [ -z "$CHROME" ]; then skip "GP2.3b" "pas de navigateur"; else
+  # référence : la hauteur de la barre de question AVEC CLI, mesurée par GP2.3 au même instant et à la même taille de fenêtre (R2 : GP2 se joue avant GP2B)
+  ASK_AVEC=""; [ -z "${R2:-}" ] || ASK_AVEC="$(jq_ "$R2" 'j.petit.mesures.ask.h' 2>/dev/null)"
+  case "$ASK_AVEC" in ''|*[!0-9]*|0) ko_ "GP2.3b — référence : la hauteur de la barre de question avec CLI (mesurée par GP2.3) est lue" "${ASK_AVEC:-absente}" "un entier positif (GP2 se joue avant GP2B)" ;; esac
   GP_CLAUDE="$WORK/absent/claude" build_serve "$DEPOT"; BASE="http://127.0.0.1:$PORT"
   cat > "$AUX/gp2b.js" <<'JS'
-const [base] = ARGS, { ouvrirPage, LIGNE, RANGEES, pause, touche } = await import(process.env.GP_ENTREE);
+const [base, refAsk] = ARGS, { ouvrirPage, LIGNE, RANGEES, pause, touche } = await import(process.env.GP_ENTREE);
 const { attendreEtStabiliser } = await import(process.env.VF_CS);
 const out = {}, VOL = `document.querySelector('#vf-git-tiroir .vf-git-detail')`, REG = `document.querySelector('#vf-git-tiroir .vf-git-detail [role=region]')`;
 const att = (e, l, ms = 4000) => s.attendre(e, l, ms).catch(() => null);
@@ -362,14 +366,14 @@ const lire = () => s.ev(`(() => { const T = document.querySelector('#vf-git-tiro
     police: Math.min(...tx.map((e) => parseFloat(getComputedStyle(e).fontSize))), debord: v.scrollWidth > v.clientWidth || z.scrollWidth > z.clientWidth,
     warn: !!warn && !warn.hidden && warn.getClientRects().length > 0, ask: ask ? h(ask) : null, bottom: T.style.bottom }; })()`);
 // mesure une fois posée : la condition (l'avertissement affiché, la barre à sa hauteur d'avertissement) PUIS deux lectures égales
-out.petit = await attendreEtStabiliser(lire, (m) => m && m.warn && m.ask > 100, { pas: 200, max: 8000 });
+out.petit = await attendreEtStabiliser(lire, (m) => m && m.warn && m.ask > Number(refAsk), { pas: 200, max: 8000 });
 out.errs = await s.ev(`window.__errs`);
 return out;
 JS
-  R2B="$(cdp "$AUX/gp2b.js" "$BASE")"; trace gp2b "$R2B"
-  echo "     GP2.3b mesuré (diagnostic) : $(jq_ "$R2B" 'JSON.stringify(j.petit)' 2>/dev/null)"
-  assert_eq "GP2.3b — témoin : sans CLI l'avertissement est affiché et la barre de question passe à 115 px (la configuration voulue est réellement servie)" \
-    "$(jq_ "$R2B" '[j.petit.warn, j.petit.ask].join("|")' 2>/dev/null)" "true|115"
+  R2B="$(cdp "$AUX/gp2b.js" "$BASE" "$ASK_AVEC")"; trace gp2b "$R2B"
+  echo "     GP2.3b mesuré (diagnostic ; barre avec CLI : ${ASK_AVEC:-?} px) : $(jq_ "$R2B" 'JSON.stringify(j.petit)' 2>/dev/null)"
+  assert_eq "GP2.3b — témoin : sans CLI l'avertissement est affiché et la barre de question est plus haute que dans GP2.3 (la configuration voulue est réellement servie)" \
+    "$(jq_ "$R2B" "[j.petit.warn, j.petit.ask > Number('$ASK_AVEC')].join(\"|\")" 2>/dev/null)" "true|true"
   assert_eq "GP2.3b — 1024 x 768 sans CLI : tiroir 352 px, volet entre 192 et 256, texte >= 12 px, sans débord, Worktrees fermé" \
     "$(jq_ "$R2B" '(() => { const p = j.petit; return [p.l, p.volet >= 192 && p.volet <= 256, p.police >= 12, p.debord, p.wt].join("|"); })()' 2>/dev/null)" \
     "352|true|true|false|true"
@@ -633,19 +637,38 @@ fi
 
 echo "=== Mutants (copie du module dans \$WORK, jamais le module) ==="
 if ! veut MUTANTS; then :; elif [ -z "$CHROME" ]; then skip "mutants" "pas de navigateur"; else
-  mkmod() { local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"
-    cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"; echo "$d/scripts"; }
   mutlab() { local L="$WORK/lab-$1"; mk_lab "$L"; $GIT -C "$L" init -q -b main && $GIT -C "$L" add -A && $GIT -C "$L" commit -q -m init; echo "$L"; }
-  # mutant <nom> <fichier ui> <ancien> <nouveau> <scénario> <lab ou -> <pre> [arguments du scénario] -> RM ; une mutation qui ne s'applique pas est un échec
+  cat > "$AUX/compte.mjs" <<'JS'
+// compte.mjs <dossier> <ancien> <nouveau> : « n_ancien n_nouveau », occurrences (littérales) des deux textes dans les fichiers de la sortie, hors .cache — preuve de chargement d'un mutant
+import fs from 'node:fs'; import path from 'node:path';
+const [, , dir, a, b] = process.argv; let na = 0, nb = 0;
+const compte = (t, x) => (x ? t.split(x).length - 1 : 0);
+const marche = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) {
+  if (e.name === '.cache') continue; const p = path.join(d, e.name);
+  if (e.isDirectory()) marche(p); else if (e.isFile()) { const t = fs.readFileSync(p, 'utf8'); na += compte(t, a); nb += compte(t, b); } } };
+marche(dir); console.log(na + ' ' + nb);
+JS
+  BASEMOD="$(cd "${GP_SCRIPTS:-$SCRIPTS}/.." && pwd -P)"
+  # mutant <nom> <fichier ui (ou viewer.html)> <ancien> <nouveau> <scénario> <lab ou -> <pre> [arguments du scénario] -> RM
+  # La mutation s'écrit dans une copie COMPLÈTE du module (COCKPIT_MODULE="$(cockpit_module_copie)", jamais un lien, jamais le dépôt : 79-06, A48 point 41).
+  # Une mutation impossible, un mutant non chargé (empreinte publiée différente : code 5 de cockpit_lancer) ou absent de la sortie servie sont des échecs.
   mutant() {
-    local nom="$1" f="$2" a="$3" b="$4" sc="$5" lab="$6" pre="$7" M L; shift 7
+    local nom="$1" f="$2" a="$3" b="$4" sc="$5" lab="$6" pre="$7" copie cible L avant apres; shift 7
     [ -z "${GP_MUT:-}" ] || [ "$GP_MUT" = "$nom" ] || { RM="{}"; return; } # GP_MUT=M-POUSSE : ne joue que ce mutant (mise au point)
-    M="$(mkmod "$nom")"; if [ "$lab" = "-" ]; then L="$(mutlab "$nom")"; else L="$lab"; fi
-    if ! mutate "$M/../skills/cockpit-moteur/assets/ui/$f" "$a" "$b"; then ko_ "$nom : mutation impossible" "impossible" "appliquée"; RM="{}"; return; fi
-    if cmp -s "$M/../skills/cockpit-moteur/assets/ui/$f" "$SCRIPTS/../skills/cockpit-moteur/assets/ui/$f"; then
-      ko_ "$nom : la copie n'a pas changé" "identique" "différente"; RM="{}"; return; fi
-    build_serve "$L" "$M"; RM="$(VF_PRE="$AUX/$pre" cdp "$AUX/$sc" "http://127.0.0.1:$PORT" "$@")"; stop_srv
-    rm -rf "$WORK/mod-$nom"; [ "$lab" = "-" ] && rm -rf "$L"
+    if ! copie="$(cockpit_module_copie)"; then ko_ "$nom : copie du module impossible" "impossible" "copiée"; RM="{}"; return; fi
+    case "$f" in viewer.html) cible="$copie/skills/cockpit-moteur/assets/$f" ;; *) cible="$copie/skills/cockpit-moteur/assets/ui/$f" ;; esac
+    if [ "$lab" = "-" ]; then L="$(mutlab "$nom")"; else L="$lab"; fi
+    if ! mutate "$cible" "$a" "$b"; then ko_ "$nom : mutation impossible" "impossible" "appliquée"; RM="{}"; rm -rf "$copie"; return; fi
+    [ -d "$DEPOT/.vibeflow/cockpit" ] || env $ENVX "$NODE" "$BASEMOD/scripts/vf-cockpit-build.mjs" "$DEPOT" --quiet > "$WORK/build.out" 2>&1
+    avant="$(node "$AUX/compte.mjs" "$DEPOT/.vibeflow/cockpit" "$a" "$b")"
+    COCKPIT_MODULE="$copie" build_serve "$L"
+    if [ "${PORT:-0}" -le 0 ]; then ko_ "$nom : le serveur de la copie mutée n'est pas prêt ou ne la charge pas" "pas de serveur" "serveur chargé"; RM="{}"; stop_srv; rm -rf "$copie"; [ "$lab" = "-" ] && rm -rf "$L"; return; fi
+    apres="$(node "$AUX/compte.mjs" "$L/.vibeflow/cockpit" "$a" "$b")"
+    if [ "${apres#* }" -le "${avant#* }" ] && [ "${apres% *}" -ge "${avant% *}" ]; then   # chargé = le texte neuf gagne une occurrence OU l'ancien en perd une
+      ko_ "$nom : la mutation n'est pas dans la sortie servie" "$avant -> $apres (ancien / nouveau)" "changement"; RM="{}"; stop_srv; rm -rf "$copie"; [ "$lab" = "-" ] && rm -rf "$L"; return; fi
+    echo "     charge $nom : empreinte publiée = celle de la copie ; occurrences ancien / nouveau dans la sortie servie : $avant -> $apres"
+    RM="$(VF_PRE="$AUX/$pre" cdp "$AUX/$sc" "http://127.0.0.1:$PORT" "$@")"; stop_srv
+    rm -rf "$copie"; [ "$lab" = "-" ] && rm -rf "$L"; return 0
   }
   mutant M-TOUT 77-vf-git-rendu.js "Math.max(et.n || 0, total <= SEUIL ? total : PAGE)" "total" gp1.js - pre-mock.js
   assert_eq "M-TOUT — le mutant rougit GP1.1 (toutes les rangées rendues d'un coup, ni bouton) alors que 105 rangées se rendent toujours" \
@@ -680,9 +703,14 @@ if ! veut MUTANTS; then :; elif [ -z "$CHROME" ]; then skip "mutants" "pas de na
     ".vf-git-p-lecture::before { content: '◌ ' / ''; } .vf-git-p-warn { background: var(--warn-bg); }" gp5.js - pre-mock.js
   assert_eq "M-PASTILLE — le mutant rougit la mesure de D8.2 (fond teinté sur « modifiés » : false en position 2) alors que « propre » reste neutre" \
     "$(jq_ "$RM" '[j.mention, j.couleurs.mod, j.couleurs.pro, j.couleurs.tous, j.couleurs.gl].join("|")' 2>/dev/null)" "true|false|true|false|true"
-  GP_CLAUDE="$WORK/absent/claude" mutant M-ASK-HAUT 77-vf-git-tiroir.js "Math.round(H - haut + 8)" "Math.round(H - haut + 60)" gp2b.js - pre-mock.js
+  GP_CLAUDE="$WORK/absent/claude" mutant M-ASK-HAUT 77-vf-git-tiroir.js "Math.round(H - haut + 8)" "Math.round(H - haut + 60)" gp2b.js - pre-mock.js "$ASK_AVEC"
   assert_eq "M-ASK-HAUT — le mutant rougit GP2.3b (eviter() cale le tiroir 52 px plus haut : moins de 3 rangées entières) alors que la config sans CLI est bien servie, le volet reste dans [192, 256] et la largeur est 352" \
-    "$(jq_ "$RM" '[j.petit.warn, j.petit.ask, j.petit.l, j.petit.volet >= 192 && j.petit.volet <= 256, j.petit.entieres >= 3, j.petit.entieres].join("|")' 2>/dev/null)" "true|115|352|true|false|2"
+    "$(jq_ "$RM" "[j.petit.warn, j.petit.ask > Number('$ASK_AVEC'), j.petit.l, j.petit.volet >= 192 && j.petit.volet <= 256, j.petit.entieres >= 3, j.petit.entieres].join(\"|\")" 2>/dev/null)" "true|true|352|true|false|2"
+  # point 11 (jointure J1) : la propriété est « l'avertissement est affiché ET la barre est plus haute qu'avec CLI » ; le mutant retire l'affichage de l'avertissement (viewer.html du module copié)
+  GP_CLAUDE="$WORK/absent/claude" mutant M-ASK-AVERT viewer.html "  warn.hidden = !code;" "  warn.hidden = true;" gp2b.js - pre-mock.js "$ASK_AVEC"
+  echo "     trace M-ASK-AVERT — témoin GP2.3b [avertissement affiché, barre plus haute qu'avec CLI (${ASK_AVEC:-?} px)] : attendu [true,true], obtenu $(jq_ "$RM" "[j.petit.warn, j.petit.ask > Number('$ASK_AVEC')]" 2>/dev/null) (barre mesurée : $(jq_ "$RM" 'j.petit.ask' 2>/dev/null) px)"
+  assert_eq "M-ASK-AVERT — le mutant (avertissement jamais affiché) rougit le témoin de GP2.3b : ni avertissement ni barre rehaussée (témoin : la page est servie, le tiroir est à 352 px)" \
+    "$(jq_ "$RM" "[j.petit.warn, j.petit.ask > Number('$ASK_AVEC'), j.petit.l].join(\"|\")" 2>/dev/null)" "false|false|352"
 fi
 
 vf_hyg_assert

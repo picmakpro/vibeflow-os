@@ -25,8 +25,8 @@ PASS=0; FAIL=0; SC_BASE="${CL_SCRIPTS:-$SCRIPTS}"
 . "$HERE_T/couloirs-commun.sh"
 mesurer() { REAL_HOME="$REAL_HOME" node "$HERE_T/$1" "$CHROME" "http://127.0.0.1:$PORT" "${2:-}" "${3:-}" "${4:-}" 2>"$WORK/mesure.err"; }
 sonde() { [ -n "${SONDE:-}" ] && { printf '%s\n' "$1"; cat "$WORK/mesure.err"; }; return 0; }
-LAB="$WORK/lab"; mklab "$LAB"; ln -s "$SC_BASE" "$WORK/scripts-hote"
-build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+LAB="$WORK/lab"; mklab "$LAB"
+build_serve "$LAB"
 assert_eq "CL0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
 
 echo "=== CL1 — couloirs par défaut, graphe à la demande ==="
@@ -151,7 +151,7 @@ vf_hyg_stop "$SRV"
 echo "=== CL3.6 — zone basse (lab lancé avec --terminal : pastille « Terminal », tiroir du terminal) ==="
 DBL=1; [ -f "$SC_BASE/../skills/cockpit-moteur/assets/ui/02-vf-coin.js" ] && DBL=0
 [ "$DBL" = 1 ] && echo "  #vf-coin : doublure (assets/ui/02-vf-coin.js absent de l'arbre : la fusion de la vague 2 le pose)"
-LABT="$WORK/lab-term"; mklab "$LABT"; build_serve "$LABT" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur" --terminal
+LABT="$WORK/lab-term"; mklab "$LABT"; build_serve "$LABT" --terminal
 R5="$(mesurer chrome-couloirs-clavier.mjs cl3c "" "$DBL")"; sonde "$R5"; E5() { E "$1" "$R5"; }; vf_hyg_stop "$SRV"
 for CLE in 1440 1024 390 800 1100t; do
   X="j.cl36['$CLE']"
@@ -165,7 +165,7 @@ assert_eq "CL3.6b — témoins : la feuille de détail est mesurée à 390 px ; 
 echo "=== CL4 — témoins de pointeur (le poste voit ce que la CI Linux voit : Chrome sans tête = aucun pointeur) ==="
 # décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; prise par la session principale le 2026-11-12
 printf '#!/bin/bash\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$AUX/chrome-sans-pointeur"; chmod +x "$AUX/chrome-sans-pointeur"
-build_serve "$LAB" "$WORK/scripts-hote" "$SC_BASE/../skills/cockpit-moteur"
+build_serve "$LAB"
 RPN="$(node "$HERE_T/chrome-pointeur.mjs" "$AUX/chrome-sans-pointeur" "http://127.0.0.1:$PORT" none 2>/dev/null)"
 RPC="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" coarse 2>/dev/null)"
 RPE="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" etranger 2>/dev/null)"
