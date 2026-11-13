@@ -3,7 +3,8 @@
 // Un clic d'onglet, Précédent et Suivant, VF_ONGLETS.aller(nom) passent par une même fonction : VF_COQUILLE.chargerOnglet(nom) d'abord, puis, après sa
 // résolution SEULEMENT, history.pushState du chemin (jamais depuis popstate : le navigateur a déjà changé l'adresse), puis la vue mémorisée, le titre,
 // vf:onglet, le focus et l'annonce. Un chargement rejeté ne change ni l'adresse, ni l'onglet affiché, ni le focus (après un popstate rejeté, l'adresse
-// est ramenée par replaceState) ; dire l'échec à l'écran est 00-vf-onglets-echec.js (80-21). Évaluation : l'objet, l'écouteur popstate et UNE inscription surOnglet ;
+// est ramenée par replaceState) ; dire l'échec à l'écran est 00-vf-onglets-echec.js (80-21).
+// Évaluation : l'objet, l'écouteur popstate et UNE inscription surOnglet ;
 // tout ce qui dépend du document de l'onglet vit dans le rappel de surOnglet. Seule donnée gardée : la mémoire de vue par onglet (données simples).
 (() => {
   if (window.VF_ONGLETS) return;
