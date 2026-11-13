@@ -18,10 +18,13 @@
 
   const style = document.createElement('style');
   style.textContent = `
-    /* a 44 px target; the round hover shape stays 36 px like the buttons beside it */
-    #theme-toggle { position: relative; flex: none; width: auto; min-width: 44px; height: 44px; padding: 0 var(--sp-12) 0 var(--sp-12); gap: var(--sp-6); background: none; }
+    /* one header button height, read from --hdr-btn (36 px in the side panel, 44 px as a sheet or on touch: 03-vf-charte.js);
+       the round hover shape stays 36 px */
+    #theme-toggle { position: relative; flex: none; width: auto; min-width: var(--hdr-btn, 44px); height: var(--hdr-btn, 44px);
+      padding: 0 var(--sp-12) 0 var(--sp-12); gap: var(--sp-6); background: none; }
     .theme-word { position: relative; font-size: 12px; color: var(--text-2); white-space: nowrap; }
-    #theme-toggle::before { content: ""; position: absolute; inset: var(--sp-4) var(--sp-4); border-radius: 999px; transition: background .2s var(--ease); }
+    #theme-toggle::before { content: ""; position: absolute; inset: calc((var(--hdr-btn, 44px) - 36px) / 2) var(--sp-4);
+      border-radius: 999px; transition: background .2s var(--ease); }
     #theme-toggle:hover { background: none; }
     #theme-toggle:hover::before { background: rgba(var(--ink), .07); }
     #theme-toggle svg { position: relative; width: 18px; height: 18px; }

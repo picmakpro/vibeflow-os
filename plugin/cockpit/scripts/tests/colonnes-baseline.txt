@@ -81,7 +81,7 @@ skills/cockpit-moteur/assets/ui/78-vf-fr-dict-a.js 43
 skills/cockpit-moteur/assets/ui/79-vf-fr-dict-b.js 45
 skills/cockpit-moteur/assets/ui/80-vf-fr.js 19
 skills/cockpit-moteur/assets/ui/terminal/client.js 50
-skills/cockpit-moteur/assets/ui/terminal/q.css 21
+skills/cockpit-moteur/assets/ui/terminal/q.css 20
 skills/cockpit-moteur/assets/ui/terminal/vue.js 82
 skills/cockpit-moteur/assets/ui/tiroir/lancer-extraire-chat.js 1
 skills/cockpit-moteur/assets/ui/tiroir/lancer-observer-chat.js 7
