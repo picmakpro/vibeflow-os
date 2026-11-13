@@ -16,7 +16,7 @@ for (const f of FICHIERS) if (!fs.existsSync(path.join(ui, f))) dire({ erreur: '
 const JETON = 'tok-vm', horloge = { now: 1_700_000_000_000 };
 const dom = creerDom(horloge), { window: W, document: D, Evt } = dom;
 W.window = W; W.self = W;
-const etat = { who: null, lock: null, connexion: 'ouvert' }, abos = new Map(), journal = { fetchs: [], evts: [], surcouches: [], vues: [], toasts: [], stockage: [], reveals: [] };
+const etat = { who: null, lock: null, connexion: 'ouvert' }, abos = new Map(), journal = { sc: [], fetchs: [], evts: [], surcouches: [], vues: [], toasts: [], stockage: [], reveals: [] };
 const compteurs = { ouverteLue: 0, panneauLu: 0 };
 const el = (tag, id, parent = D.body) => { const e = D.createElement(tag); if (id) e.id = id; parent.appendChild(e); return e; };
 const stage = el('div', 'stage'), zoom = el('div', 'zoom'), resultats = el('div', 'results'), panneau = el('div', 'panel'); el('div', 'hdr-ext'); const recherche = el('input', 'search');
@@ -27,9 +27,10 @@ const mem = (init) => { const m = new Map(Object.entries(init || {})); return { 
 const session = mem(S.sessionStorage), local = mem({});
 const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 const hand = {}, noeuds = [];
-const SC = { graph: { meta: { vfTab: ong0, vf: {} }, nodes: noeuds, project: { name: 'p' } }, h, setOverview() {}, addPanelSection() {}, rerender: async () => {},
-  on: (e, f) => { (hand[e] ||= []).push(f); }, exists: (id) => noeuds.includes(id), reveal: (id) => journal.reveals.push(id), toast: (m) => journal.toasts.push(m), closePanel() { panneau.replaceChildren(); },
-  showPanel(html, bind) { journal.panneauHtml = html; panneau.replaceChildren(); if (bind) bind(panneau); } };
+const appelSC = (n, f) => (...a) => { journal.sc.push(n); return f ? f(...a) : undefined; };
+const SC = { selected: null, graph: { meta: { vfTab: ong0, vf: {} }, nodes: noeuds, project: { name: 'p' } }, h, setOverview: appelSC('setOverview'), addPanelSection() {}, rerender: appelSC('rerender', async () => {}),
+  on: (e, f) => { (hand[e] ||= []).push(f); }, exists: (id) => noeuds.includes(id), reveal: (id) => journal.reveals.push(id), toast: (m) => journal.toasts.push(m), closePanel() { journal.sc.push('closePanel'); panneau.replaceChildren(); },
+  showPanel(html, bind) { journal.sc.push('showPanel'); journal.panneauHtml = html; panneau.replaceChildren(); if (bind) bind(panneau); } };
 const tick = () => new Promise((r) => setImmediate(r));
 // fetch factice : enregistre l'URL et les en-têtes, rend le transcript du scénario
 const fetchF = async (url, opts = {}) => { journal.fetchs.push({ url: String(url), entetes: Object.values((opts && opts.headers) || {}) }); return { ok: true, status: 200, json: async () => S.transcript || { fil: [{ genre: 'message', texte: 'texte du transcript factice' }] } }; };
@@ -88,7 +89,7 @@ const obs = (o) => {
     case 'classes': return n.map((x) => x.className); case 'sansAttr': return n.filter((x) => !x.hasAttribute(o.attr)).length;
     default: return JSON.parse(JSON.stringify({ ...journal, ...compteurs, ecouteurs: dom.ecouteurs(), types: dom.types(), minuteries: dom.minuteries(), violations: dom.violations, defilements: dom.defilements.map((d) => (d.el.closest('li[data-vf-cle]') || { dataset: {} }).dataset.vfCle || d.el.localName),
       appels: dom.appels, ecritures: dom.ecritures(), corps: D.body.className, abonnes: Object.fromEntries([...abos].map(([k, v]) => [k, v.size])), panneau: panneau.textContent, recherche: recherche.value,
-      monte: W.__vfRegie && W.__vfRegie.monte ? W.__vfRegie.monte() : null, fiche: ficheFocus() }));
+      selection: SC.selected, monte: W.__vfRegie && W.__vfRegie.monte ? W.__vfRegie.monte() : null, fiche: ficheFocus() }));
   }
 };
 const sortie = {};
@@ -110,6 +111,7 @@ try {
       else if (e.hash !== undefined) { loc.hash = e.hash; W.dispatchEvent(new Evt('hashchange')); }
       else if (e.onglet) { affiche = e.onglet; SC.graph.meta.vfTab = e.onglet; D.body.className = D.body.className.replace(/vf-tab-\w+/, 'vf-tab-' + e.onglet); for (const i of ins.slice()) nettoyer(i); for (const i of ins.slice()) appeler(i); }
       else if (e.declarerVue) { const v = e.declarerVue; W.__vfEquipeVues.declarer({ id: v.id, libelle: v.libelle, monter(c) { journal.vues.push('monter:' + v.id); c.textContent = 'vue ' + v.id; }, demonter() { journal.vues.push('demonter:' + v.id); } }); }
+      else if (e.selectionner) SC.selected = e.selectionner;
       else if (e.annuler) annulees = new Set(e.annuler);
       else if (e.marquer) for (const x of D.querySelectorAll(e.marquer)) x._m = true;
       else if (e.raz) { dom.razEcritures(); journal.fetchs.length = 0; journal.evts.length = 0; journal.surcouches.length = 0; dom.defilements.length = 0; }

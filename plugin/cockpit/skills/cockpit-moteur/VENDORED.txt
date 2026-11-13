@@ -49,6 +49,7 @@ AJOUT assets/ui/77-vf-git-vue-detail.js
 AJOUT assets/ui/78-vf-fr-dict-a.js
 AJOUT assets/ui/79-vf-fr-dict-b.js
 AJOUT assets/ui/80-vf-fr.js
+AJOUT assets/ui/90-vf-titre.js
 AJOUT assets/ui/terminal/client.js
 AJOUT assets/ui/terminal/q.css
 AJOUT assets/ui/terminal/vue.js

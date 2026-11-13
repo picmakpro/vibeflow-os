@@ -8,6 +8,7 @@
 #   section.vf-rg-sec[data-vf-section] > h2 (tabindex -1) ; li.vf-rg-lig[data-vf-cle][data-vf-agent][data-vf-noeud][data-vf-etat] ; .vf-rg-nom (le nom, une fois) ; button[aria-expanded] (le nom, déplie) ;
 #   .vf-rg-plus (détail en flux) ; .vf-rg-dur ; .vf-rg-act button.btn (actions) ; .vf-rg-note (messages) ; recherche : input#search du moteur.
 
+[ -n "${RG_PAGE_COMMUN:-}" ] || { . "$TESTS_DIR/regie-page-commun.sh"; RG_PAGE_COMMUN=1; }
 PG_SID='s0000000-aaaa-bbbb-cccc-111111111111'; PG_A='a1b2c3d4e5f6'; PG_F='f0f0f0f0f0f0'; PG_B='b9b9b9b9b9b9'
 PG_WHO='{"workers":[
  {"kind":"session","id":"s0000000-aaaa-bbbb-cccc-111111111111","etat":"attend","titre":"Atelier alpha","tree":".","branch":"feat/x","ageS":120,"dureeS":900,"retient":{"n":3,"portee":"noeuds"},"rattachement":{"etat":"rattache","dag":"D1","noeud":"N1"}},
@@ -86,6 +87,17 @@ rg_RG9_page() {
   pg_ok "RG9.21 — 30 s sans poussée : les durées avancent" "$o" '(j.out.a.length > 0) + "|" + (j.out.a.join() !== j.out.b.join())' "true|true"
   o="$(pg_sc '"who":{"workers":[{"kind":"subagent","id":"f0f0f0f0f0f0","etat":"termine","role":"vf-reviewer","task":"Relire","ageS":600,"dureeS":90,"tree":"."}]}' '[{"raz":true},{"avancer":30000},{"nom":"e","obs":{}}]')"
   pg_ok "RG9.21 — 30 s sans poussée, texte identique : aucune écriture du DOM" "$o" 'j.out.e.ecritures + "|" + (j.out.e.minuteries >= 1)' "0|true"
+}
+
+# RG9.22 : un rendu qui suit un événement du magasin (who, lock, connexion) ou la minuterie ne touche ni la sélection du moteur ni le focus : aucun appel au moteur
+# (rerender, showPanel, closePanel…), la sélection posée avant reste posée. Sans horloge : l'événement est rejoué puis le rendu attendu par un cycle de promesses.
+rg_RG9_selection() {
+  local src o ev='{"poser":{"who":'"$PG_WHO"',"lock":'"$PG_LOCK"'}}'
+  for src in etat live; do
+    o="$(pg_sc '"source":"'"$src"'"' '[{"selectionner":"n:ag-'"$PG_A"'"},{"focus":"'"$PG_BTN_A"'"},{"nom":"av","obs":{"mode":"focus"}},'"$ev"','"$ev"',{"conn":"perdu"},{"conn":"ouvert"},{"avancer":30000},{"nom":"ap","obs":{"mode":"focus"}},{"nom":"e","obs":{}}]')"
+    pg_ok "RG9.22 — source $src : événements du magasin et minuterie, puis rendu : aucun appel au moteur, sélection et focus intacts" "$o" \
+      'j.out.e.sc.length + "|" + j.out.e.selection + "|" + (j.out.ap.cle === j.out.av.cle && j.out.ap.tag === "BUTTON")' "0|n:ag-$PG_A|true"
+  done
 }
 
 rg_RG11_page() {
@@ -200,4 +212,67 @@ rg_RG16_page() {
   pg_ok "RG16.1 — Entrée dans la recherche : le focus va à la première ligne retenue" "$o" 'j.out.f.cle' "au-travail:$PG_A"
   pg_ok "RG16.1 — aucune correspondance : « Aucun agent ne correspond » avec sa résolution ; champ vidé : tout revient et les quatre sections" "$o" \
     'j.out.z.length + "|" + j.out.nt.some((t) => t.includes("Aucun agent ne correspond") && t.length > 40) + "|" + (j.out.v.length === j.out.tous.length) + "|" + j.out.sv.length' "0|true|true|4"
+}
+
+rg_RG0_ordre_pied() {
+  cat > "$AUX/ordre-pied.mjs" <<'JS'
+// ordre-pied.mjs <html> : « ok » si le repère du pied existe une fois et vient avant celui de la source (la source monte le pied) ; « faux:… » sinon
+import fs from 'node:fs';
+let t; try { t = fs.readFileSync(process.argv[2], 'utf8'); } catch { console.log('illisible'); process.exit(0); }
+const m = (n) => `/* ui/${n} */`, n = (s) => t.split(s).length - 1, p = t.indexOf(m('72-vf-regie-pied.js')), s = t.indexOf(m('72-vf-regie-source.js'));
+console.log(n(m('72-vf-regie-pied.js')) === 1 && p >= 0 && s > p ? 'ok' : `faux:pied ×${n(m('72-vf-regie-pied.js'))}`);
+JS
+  local L="$WORK/ordq-lab" r="" f; mkdir -p "$L/src" "$L/.planning"; printf 'x\n' > "$L/src/u.js"; printf '## Phases\n\n- [ ] **Phase 1: Socle** - jet\n' > "$L/.planning/ROADMAP.md"
+  node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/ordq-build.out" 2>&1
+  for f in index.html project.html; do r="$r$f=$(node "$AUX/ordre-pied.mjs" "$L/.vibeflow/cockpit/$f" 2>&1) "; done
+  assert_eq "RG0.12 — le pied de la régie existe une fois et se charge avant sa source" "$r" "index.html=ok project.html=ok "
+}
+
+rg_RG1_etats() {
+  local o ev='{"workers":[{"kind":"session","id":"s0000000-aaaa-bbbb-cccc-111111111111","etat":"actif","titre":"Atelier alpha","tree":".","ageS":10,"dureeS":40}]}'
+  local note='{"nom":"NN","obs":{"mode":"visibles","sel":".vf-rg-note"}}' busy='{"nom":"BB","obs":{"mode":"attr","sel":"#vf-equipe","attr":"aria-busy"}}'
+  o="$(pg_sc '"who":null' '['"${busy/BB/b0}"','"${note/NN/n0}"',{"avancer":160},'"${busy/BB/b1}"','"${note/NN/n1}"',{"poser":{"who":'"$ev"'}},'"${busy/BB/b2}"','"${note/NN/n2}"']')"
+  pg_ok "RG1.12 (états) — avant le premier who : aria-busy tout de suite, « Lecture de l'équipe » au-delà de 150 ms seulement ; au premier who, ni l'un ni l'autre" "$o" \
+    'j.out.b0.join() + "|" + j.out.n0.length + "|" + j.out.b1.join() + "|" + j.out.n1.join() + "|" + j.out.b2.join() + "|" + j.out.n2.length' "true|0|true|Lecture de l'équipe||0"
+  o="$(pg_sc '"who":{"workers":[]}' '[{"nom":"n","obs":{"mode":"textes","sel":".vf-rg-note p"}},{"nom":"h2","obs":{"mode":"compte","sel":"#vf-equipe h2"}}]')"
+  pg_ok "RG1.12 (états) — aucun agent : la boîte dit ses deux phrases, les quatre titres sont gardés" "$o" 'j.out.n.join(" | ") + "|" + j.out.h2' \
+    "Aucun agent dans les dernières 24 h. | Les sessions de ce dépôt apparaîtront ici dès qu'elles écrivent.|4"
+  o="$(pg_sc '"serveur":false' '[{"nom":"n","obs":{"mode":"visibles","sel":".vf-rg-note p"}},{"nom":"h2","obs":{"mode":"visibles","sel":"#vf-equipe h2"}}]')"
+  pg_ok "RG1.12 (états) — page sans FLOORPLAN_SERVER : seulement la boîte « Le direct n'est pas branché. » avec sa résolution, aucune section" "$o" 'j.out.n.join(" | ") + "|" + j.out.h2.length' \
+    "Le direct n'est pas branché. | Ouvrez le cockpit depuis le projet pour voir l'équipe.|0"
+  local err lue; err="$(printf '%s' "$ev" | sed 's/^{"workers"/{"sources":{"sessions":{"etat":"erreur"}},"workers"/')"; lue="$(printf '%s' "$ev" | sed 's/^{"workers"/{"sources":{"sessions":{"etat":"lue"}},"workers"/')"
+  o="$(pg_sc '"who":'"$err" '[{"nom":"a","obs":{"mode":"visibles","sel":".vf-rg-source"}},{"poser":{"who":'"$lue"'}},{"nom":"b","obs":{"mode":"visibles","sel":".vf-rg-source"}}]')"
+  pg_ok "RG1.12 (états) — source illisible : pied « Source illisible : Sessions et sous-agents », qui disparaît à la poussée suivante où la source est lue" "$o" \
+    'j.out.a.map((t) => t.replace(/ /g, " ")).join() + "|" + j.out.b.length' "Source illisible : Sessions et sous-agents|0"
+  local dur='{"nom":"DD","obs":{"mode":"textes","sel":".vf-rg-dur"}}' dc='{"nom":"CC","obs":{"mode":"compte","sel":".vf-rg-direct"}}'
+  o="$(pg_sc '"source":"etat","who":'"$ev" '[{"conn":"perdu"},{"avancer":10000},'"${dc/CC/c10}"',{"avancer":6000},'"${dc/CC/c16}"','"${dur/DD/d16}"',{"avancer":30000},'"${dur/DD/d46}"',{"nom":"txt","obs":{"mode":"textes","sel":".vf-rg-direct"}},{"conn":"ouvert"},'"${dc/CC/cfin}"']')"
+  pg_ok "RG1.12 (états) — direct coupé : rien avant 15 s ; à 16 s la ligne « Direct coupé : durées figées, données d'il y a … » ; les durées ne bougent plus ; la reconnexion la retire" "$o" \
+    'j.out.c10 + "|" + j.out.c16 + "|" + (j.out.d16.join() === j.out.d46.join()) + "|" + j.out.txt.join().replace(/ /g, " ").startsWith("Direct coupé : durées figées, données d\u0027il y a") + "|" + j.out.cfin' "0|1|true|true|0"
+}
+
+# ---------- sections navigateur (CDP) : sans Chrome hors CI elles disent « NON VÉRIFIÉ » et ne comptent aucun PASS ----------
+rg_RG1_chrome() {
+  rg_chrome || return 0
+  rg_page montage "$WORK/pg-montage.json"
+  pg_ok "RG1.20 — sur Équipe : #stage non affiché, section#vf-equipe seule région principale visible, quatre titres" "$WORK/pg-montage.json" \
+    'j.stage + "|" + j.mains.join() + "|" + j.h2.length' "none|vf-equipe|4"
+  pg_ok "RG1.20 — aucun défilement horizontal à 375, 700, 768, 1 000 et 1 440 px (mesuré une fois posé)" "$WORK/pg-montage.json" \
+    '[375, 700, 768, 1000, 1440].map((w) => j.defil[w]).join()' "0,0,0,0,0"
+}
+
+rg_RG6_chrome() {
+  rg_chrome || return 0
+  rg_page fuite-verrou "$WORK/pg-fuite.json"
+  pg_ok "RG6.20 — témoin positif : la ligne de mission « verrou : … » s'affiche pour un événement lock à forme projetée (le négatif ne prouve rien sans lui)" "$WORK/pg-fuite.json" \
+    '/verrou/i.test(j.positif) + "|" + j.jeton + "|" + j.exportStatut' "true|true|200"
+  pg_ok "RG6.20 — avec identifiant de session, chemin, emplacement et durée de bail sentinelles : aucune dans le HTML, localStorage, sessionStorage ni l'export" "$WORK/pg-fuite.json" \
+    'j.html.length + "|" + j.local.length + "|" + j.session.length + "|" + j.export.length' "0|0|0|0"
+  # M-VERROU-PAGE-BRUT : la page pose l'objet lock BRUT dans un attribut de la régie (copie jetable du module, jamais le dépôt) : la garde de non-fuite doit rougir
+  local v
+  if cockpit_module_muter_page verrou-brut 's|ui.rendre(m, { sections: !sansDirect });|&racine.setAttribute("data-vf-lock", JSON.stringify(A.lock()));|' 2> "$WORK/mut-verrou.err"; then
+    rg_page fuite-verrou "$WORK/pg-fuite-mut.json"
+    v="$(pg_g "$WORK/pg-fuite-mut.json" 'j.html.length + "|" + j.local.length + "|" + j.session.length + "|" + j.export.length')"
+    assert_eq "M-VERROU-PAGE-BRUT — l'objet lock brut dans un attribut de la page : la non-fuite rougit (mutant tué)" "$([ "$v" != "0|0|0|0" ] && [[ "$v" != ERR:* ]] && echo tue || echo "survivant:$v")" "tue"
+  else assert_eq "M-VERROU-PAGE-BRUT — ancre présente dans les sources de page" "$(cat "$WORK/mut-verrou.err")" "muté"; fi
+  unset COCKPIT_MODULE
 }
