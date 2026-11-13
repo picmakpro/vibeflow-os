@@ -75,9 +75,9 @@ mklab() { # mklab <dir> [sans-agent] [sans-git] : lab GSD sans STATE.md, deux ph
 }
 # le serveur reçoit les scripts par un lien nommé autrement que « scripts » : pas de conductor voisin, le faux driver-lock.sh de HOME répond (v1.1.1 : le conductor voisin passe avant)
 SCRIPTS_HOTE="$WORK/scripts-hote"; ln -s "$SCRIPTS" "$SCRIPTS_HOTE"
-srv() { # srv <sortie> -> SRV_PORT SRV_PID
+srv() { # srv <sortie> [<racine d'une copie du module : mutant de page, 79-16>] -> SRV_PORT SRV_PID
   local o="$1" lab; lab="$(cd "$1/../.." && pwd)"
-  COCKPIT_SORTIE="$o" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE"
+  COCKPIT_MODULE="${2:-}" COCKPIT_SORTIE="$o" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE"
   SRV_PID="${VF_PID:-}"; SRV_PORT="${VF_PORT:-0}"
 }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
@@ -139,9 +139,10 @@ XT="$(CDP_PRET="$PRET63" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$EXPR63" "
 assert_eq "R6.3 — « Thinking… » écrit par le chemin d'émission réel (question posée dans le tiroir) est montré en français, jamais en anglais (79-10)" "$(printf '%s' "$XT" | node "$AUX/ev.mjs" 'JSON.stringify(j.resultats[0].valeur)')" '{"fr":true,"en":false}'
 # mutant (dans la suite) : la même page dont l'émission contourne le traducteur (« [t('Thinking…')] » devient « ['Thinking…'] ») : R6.3 doit rougir, c'est-à-dire lire l'anglais
 LM="$WORK/lab-mutant63"; mkdir -p "$LM"; ( cd "$LC" && tar -cf - . ) | ( cd "$LM" && tar -xf - )
-sed "s/\[t('Thinking…')\]/['Thinking…']/g" "$LC/.vibeflow/cockpit/project.html" > "$LM/.vibeflow/cockpit/project.html"
-MUT_N="$(grep -c "\['Thinking…'\]" "$LM/.vibeflow/cockpit/project.html")"
-srv "$LM/.vibeflow/cockpit"; PM=$SRV_PORT
+# 79-16 : la page vient du module ; le mutant est une COPIE du module dont les sources de page (viewer.html, ui/*.js) portent la substitution
+MODM63="$(cockpit_module_copie "$WORK/mod-r63")"; cockpit_page_muter_dans "$MODM63" "s/\[t('Thinking…')\]/['Thinking…']/g" 2>/dev/null
+MUT_N="$(cat "$MODM63/skills/cockpit-moteur/assets/viewer.html" "$MODM63"/skills/cockpit-moteur/assets/ui/*.js | grep -c "\['Thinking…'\]")"
+srv "$LM/.vibeflow/cockpit" "$MODM63"; PM=$SRV_PORT
 XM="$(CDP_PRET="$PRET63" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$EXPR63" "http://127.0.0.1:$PM/project.html")"; unsrv
 assert_eq "R6.3 mutant — avec l'émission qui contourne le traducteur ($MUT_N sites mutés), la même sonde lit « Thinking… » et non « Réflexion… » (la sonde sait voir l'anglais)" "$([ "$MUT_N" -ge 1 ] && printf '%s' "$XM" | node "$AUX/ev.mjs" 'JSON.stringify(j.resultats[0].valeur)' || echo "mutation sans effet")" '{"fr":false,"en":true}'
 
@@ -259,10 +260,8 @@ done
 #   m3 le milieu au même poids que les bouts (1, au lieu de 100 000 : on ne tronque plus le milieu d'abord) -> « le premier est tronqué alors que le milieu garde plus de 64 px »
 mutant_o2b() { # mutant_o2b <nom> <nature> <ancien> <nouveau> : <ancien> doit exister dans la page (sinon FAIL nommé)
   local M="$WORK/mut-o2b-$1"; mkdir -p "$M/.planning/missions" "$M/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$M/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$M/.planning/missions/"
-  node -e "
-const fs=require('fs');let n=0;for(const f of ['index.html','project.html']){const p='$M/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');const o=process.argv[1],r=process.argv[2];if(!h.includes(o))continue;fs.writeFileSync(p,h.split(o).join(r));n++}
-if(!n){console.error('mutant $1 : motif introuvable');process.exit(1)}" "$3" "$4" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans la page"; return; }
-  srv "$M/.vibeflow/cockpit"; MUT_SRV+=("$SRV_PID"); MUT_ID+=("$1"); MUT_NAT+=("$2"); MUT_LIB+=("$5")
+  local MX; MX="$(cockpit_module_copie "$WORK/modx-o2b-$1")"; cockpit_page_muter_litteral "$MX" "$3" "$4" 2>/dev/null || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans les sources de page du module"; return; } # 79-16 : copie du module
+  srv "$M/.vibeflow/cockpit" "$MX"; MUT_SRV+=("$SRV_PID"); MUT_ID+=("$1"); MUT_NAT+=("$2"); MUT_LIB+=("$5")
   o2b_mesure "$SRV_PORT" 1280 > "$WORK/mut-o2b-$1.json" & MUT_PIDS+=($!) # les trois mutants se mesurent en même temps ; les verdicts tombent dans l'ordre d'origine (P70-D-18)
 }
 MUT_SRV=(); MUT_ID=(); MUT_NAT=(); MUT_LIB=(); MUT_PIDS=()
@@ -306,19 +305,17 @@ unsrv
 echo "=== R4 — témoin rouge : sans la mise en page du cockpit, la mesure rougit ==="
 LM="$WORK/lab-mutant"; mkdir -p "$LM/.planning" "$LM/.vibeflow" "$LM/.planning/missions"; cp -R "$LL/.vibeflow/cockpit" "$LM/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM/.planning/missions/"
 agent_actif "$LM"
-node -e "
-const fs=require('fs');for(const f of ['index.html','project.html']){const p='$LM/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');
-const n=h.replace(/<script>\/\* ui\/01-vf-responsive\.js \*\/[\s\S]*?<\/script>/,'<script>/* mutant */</script>');if(n===h){console.error('mutant : bloc 01-vf-responsive.js introuvable');process.exit(1)}fs.writeFileSync(p,n)}" || FAIL=$((FAIL+1))
-srv "$LM/.vibeflow/cockpit"; RM="$(mes "http://127.0.0.1:$SRV_PORT/project.html" 1440 - )"; unsrv
+# 79-16 : la page vient du module ; le témoin rouge est une COPIE du module dont ui/01-vf-responsive.js est vidé (la sortie ne porte que des données)
+MXR4="$(cockpit_module_copie "$WORK/modx-r4")"; printf '/* mutant */\n' > "$MXR4/skills/cockpit-moteur/assets/ui/01-vf-responsive.js"
+srv "$LM/.vibeflow/cockpit" "$MXR4"; RM="$(mes "http://127.0.0.1:$SRV_PORT/project.html" 1440 - )"; unsrv
 assert_has "R4.1 — témoin rouge : sans 01-vf-responsive.js, l'en-tête à 1 440 px est signalé" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" 'j.mesures["1440"].v.join(" | ")')" "en-tête"
 
 # R4.2 — témoin rouge de R-1 (recalculé en 70-04, P70-D-16 et P70-D-22 : borne de 342 px mesurée, badge « au travail » réduit à son point ; la place libre à 1 024 px va jusqu'à une borne de 380 px, mesurée : le mutant à 342 + 58 = 400 px reste rouge avec de la marge, alors que 342 + 36 tenait encore) : une colonne gauche de 400 px fait sortir le dernier bouton de l'onglet Code à 1 024 px
 LM2="$WORK/lab-mutant2"; mkdir -p "$LM2/.planning/missions" "$LM2/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$LM2/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM2/.planning/missions/"
 agent_actif "$LM2"   # sans agent actif le badge dit « Personne », plus étroit : la mesure ne verrait plus le même en-tête
-node -e "
-const fs=require('fs');const p='$LM2/.vibeflow/cockpit/index.html';const h=fs.readFileSync(p,'utf8');
-const n=h.replace('header .hl { flex: 1 1 0; min-width: 342px; }','header .hl { flex: 1 1 0; min-width: 400px; }');if(n===h){console.error('mutant : borne de 342 px introuvable');process.exit(1)}fs.writeFileSync(p,n)" || FAIL=$((FAIL+1))
-srv "$LM2/.vibeflow/cockpit"; RM2="$(RESP_INJECT="$INJ_CODE" mes "http://127.0.0.1:$SRV_PORT/index.html" 1024 - )"; unsrv
+# 79-16 : copie du module dont la borne de la colonne gauche passe de 342 à 400 px (la page vient du module)
+MXR42="$(cockpit_module_copie "$WORK/modx-r42")"; cockpit_page_muter_litteral "$MXR42" 'header .hl { flex: 1 1 0; min-width: 342px; }' 'header .hl { flex: 1 1 0; min-width: 400px; }' 2>/dev/null || FAIL=$((FAIL+1))
+srv "$LM2/.vibeflow/cockpit" "$MXR42"; RM2="$(RESP_INJECT="$INJ_CODE" mes "http://127.0.0.1:$SRV_PORT/index.html" 1024 - )"; unsrv
 assert_has "R4.2 — témoin rouge : avec la colonne gauche à 400 px, un bouton de l'en-tête sort de la fenêtre à 1 024 px (onglet Code)" "$(printf '%s' "$RM2" | node "$AUX/ev.mjs" 'j.mesures["1024"].v.join(" | ")')" "sort de la fenêtre"
 
 # R8 — témoin indépendant de la police ET de la plateforme : Chrome headless sous Linux n'a aucun périphérique de pointage (`pointer: none`) ; la mise en page
@@ -420,15 +417,13 @@ srv "$LC/.vibeflow/cockpit"; X="$(node "$AUX/d39-absent.mjs" "$CHROME" "http://1
 assert_eq "D39.7a — Git présent à 1 024 px : drapeau posé, plancher 152 px, invite courte « Chercher… » (témoin positif de l'état de départ)" "$(printf '%s' "$X" | node "$AUX/ev.mjs" '[j.avant.drapeau, j.avant.plancher, j.avant.invite, j.avant.stVisible].join("|")')" 'true|152px|"Chercher…"|false'
 assert_eq "D39.7b — la relecture de l'en-tête rend « absent » : drapeau retiré, plancher 200 px, invite d'origine rendue, ouvreur et seconde ligne cachés" "$(printf '%s' "$X" | node "$AUX/ev.mjs" '[j.apres.drapeau, j.apres.plancher, j.apres.invite, j.apres.stVisible, j.ouvreurCache].join("|")')" "false|200px|none|true|true"
 # mutants : chacun doit rougir un témoin de SA propre règle (copie du lab construit, une chaîne remplacée, échec si la chaîne est introuvable)
-mut39() { # mut39 <labSource> <dest> <ancien> <nouveau>
+mut39() { # mut39 <labSource> <dest> <ancien> <nouveau> : copie du lab (données) et COPIE DU MODULE (79-16) dont les sources de page portent la substitution ; MUT39_MOD = sa racine
   mkdir -p "$2/.planning/missions" "$2/.vibeflow"; cp -R "$1/.vibeflow/cockpit" "$2/.vibeflow/cockpit"; cp "$1/.planning/missions/demo.dag.json" "$2/.planning/missions/"; agent_actif "$2"
-  M39_A="$3" M39_B="$4" node -e "
-const fs=require('fs');for(const f of ['index.html','project.html']){const p='$2/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');
-const n=h.split(process.env.M39_A).join(process.env.M39_B);if(n===h){console.error('mutant : chaîne introuvable');process.exit(1)}fs.writeFileSync(p,n)}"
+  MUT39_MOD="$(cockpit_module_copie "$WORK/modx-$(basename "$2")")" && cockpit_page_muter_litteral "$MUT39_MOD" "$3" "$4" 2>/dev/null
 }
 # mutant 1 : le plancher de 152 px s'applique aussi sans Git (le défaut de c743e356 : une règle posée avant la sortie « pas de dépôt » de 76-vf-git-entete.js, sans clé sur l'ouvreur)
 if mut39 "$LS" "$WORK/lab-mut39a" "if (!V || V.etat === 'absent' || !V.depot) return; // P78-D-11" "document.head.appendChild(Object.assign(document.createElement('style'), { textContent: '@media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) { header .hc { min-width: 152px; } }' })); if (!V || V.etat === 'absent' || !V.depot) return; // P78-D-11"; then
-  srv "$WORK/lab-mut39a/.vibeflow/cockpit"; X="$(mes39 $SRV_PORT 1024)"; unsrv
+  srv "$WORK/lab-mut39a/.vibeflow/cockpit" "$MUT39_MOD"; X="$(mes39 $SRV_PORT 1024)"; unsrv
   assert_eq "D39m1a — mutant « plancher de 152 px aussi SANS Git » : le plancher mesuré à 1 024 px sans Git est 152 px" "$(v39 "$X" 'j.resultats[0].valeur.plancher')" "152px"
   assert_eq "D39m1 — le même mutant : le témoin D39.5 (sans Git, 1 024 px) rougit" "$([ "$(v39 "$X" 'j.resultats[0].valeur.git + "/" + j.resultats[0].valeur.plancher + "/" + j.resultats[0].valeur.invite + "/" + j.resultats[0].valeur.stVisible')" != "false/200px/none/true" ] && echo rouge || echo vert)" "rouge"
 else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m1 : mutant non construit"; fi
@@ -437,14 +432,14 @@ if mut39 "$LC" "$WORK/lab-mut39b" '(max-width: 1279px) and (not (pointer: coarse
       header[data-vf-git] .hc' '(max-width: 1280px) and (not (pointer: coarse)) {
       header[data-vf-git] .hc'; then
   git -C "$WORK/lab-mut39b" init -q -b main # la page relit l'en-tête au chargement : la copie du lab doit rester un dépôt, sinon « absent » retire le drapeau avant la mesure
-  srv "$WORK/lab-mut39b/.vibeflow/cockpit"; X="$(mes39 $SRV_PORT 1280 git)"; unsrv
+  srv "$WORK/lab-mut39b/.vibeflow/cockpit" "$MUT39_MOD"; X="$(mes39 $SRV_PORT 1280 git)"; unsrv
   assert_eq "D39m2a — mutant « plancher de 152 px aussi à 1 280 px » : le plancher mesuré à 1 280 px est 152 px" "$(v39 "$X" 'j.resultats[0].valeur.plancher')" "152px"
   assert_eq "D39m2 — le même mutant : le témoin D39.4 (avec Git, 1 280 px) rougit" "$([ "$(v39 "$X" 'j.resultats[0].valeur.plancher + "/" + j.resultats[0].valeur.invite + "/" + j.resultats[0].valeur.stVisible')" != "200px/none/true" ] && echo rouge || echo vert)" "rouge"
 else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m2 : mutant non construit"; fi
 # mutant 3 (F6a) : le drapeau est posé sans condition, même quand la relecture rend « absent »
 if mut39 "$LC" "$WORK/lab-mut39c" "if (entete) entete.toggleAttribute('data-vf-git', d.etat !== 'absent');" "if (entete) entete.setAttribute('data-vf-git', '');"; then
   git -C "$WORK/lab-mut39c" init -q -b main
-  srv "$WORK/lab-mut39c/.vibeflow/cockpit"; X="$(node "$AUX/d39-absent.mjs" "$CHROME" "http://127.0.0.1:$SRV_PORT/index.html" 2>&1 | tail -1)"; unsrv
+  srv "$WORK/lab-mut39c/.vibeflow/cockpit" "$MUT39_MOD"; X="$(node "$AUX/d39-absent.mjs" "$CHROME" "http://127.0.0.1:$SRV_PORT/index.html" 2>&1 | tail -1)"; unsrv
   assert_eq "D39m3 — mutant « setAttribute inconditionnel » : rougit D39.7b (drapeau et plancher de 152 px restent après « absent ») alors que l'état de départ (D39.7a) est le bon" "$(printf '%s' "$X" | node "$AUX/ev.mjs" '[j.avant.drapeau, j.avant.plancher, j.apres.drapeau, j.apres.plancher, j.ouvreurCache].join("|")')" "true|152px|true|152px|true"
 else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m3 : mutant non construit"; fi
 
@@ -546,9 +541,8 @@ node "$HERE_T/chrome-panneau-etroit.mjs" "$CHROME" "http://127.0.0.1:$P_c/projec
 R15C_SRV=(); R15C_ID=(); R15C_PIDS=()
 r15c_mutant() { # r15c_mutant <nom> <ancien> <nouveau> : <ancien> doit exister dans la page (sinon FAIL nommé)
   local M="$WORK/mut-r15c-$1"; rm -rf "$M"; cp -R "$LC" "$M"
-  node -e "
-const fs=require('fs');const p='$M/.vibeflow/cockpit/project.html';const h=fs.readFileSync(p,'utf8');const o=process.argv[1],r=process.argv[2];if(!h.includes(o)){console.error('mutant $1 : motif introuvable');process.exit(1)}fs.writeFileSync(p,h.split(o).join(r))" "$2" "$3" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant R15c.$1 : motif introuvable dans la page"; return; }
-  srv "$M/.vibeflow/cockpit"; R15C_SRV+=("$SRV_PID"); R15C_ID+=("$1")
+  local MX; MX="$(cockpit_module_copie "$WORK/modx-r15c-$1")"; cockpit_page_muter_litteral "$MX" "$2" "$3" 2>/dev/null || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant R15c.$1 : motif introuvable dans les sources de page du module"; return; } # 79-16 : copie du module
+  srv "$M/.vibeflow/cockpit" "$MX"; R15C_SRV+=("$SRV_PID"); R15C_ID+=("$1")
   node "$HERE_T/chrome-panneau-etroit.mjs" "$CHROME" "http://127.0.0.1:$SRV_PORT/project.html" > "$WORK/mut-r15c-$1.json" 2>&1 & R15C_PIDS+=($!)
 }
 r15c_mutant p1 "sansMemoire && k === 'panel' ? undefined : ecrire(k, v)" "ecrire(k, v)"
@@ -688,16 +682,12 @@ INJ_R22C="(async () => { $J_PAUSE $INJ_CODE; $(J_LIBELLE 99) $J_EXTRA await p(50
 INJ_R22P="(async () => { $J_PAUSE $INJ_CODE; $(J_LIBELLE 99) $J_EXTRA window.VibeFlow.reveal('n:ph-1'); for (let i = 0; i < 100; i++) { const u = document.getElementById('btn-up'); if (u && !u.hidden) break; await p(50); } await p(500); return true; })()"
 INJ_R23="(async () => { $J_PAUSE document.getElementById('vf-plus')?.click(); for (let i = 0; i < 40 && !(document.getElementById('vf-plus-menu')?.getBoundingClientRect().width > 0); i++) await p(50); await p(100); return true; })()"
 W21="1600,1610,1619,1625,1630,1635,1639"; W22="1640,1700,1800"
-mutant_suite() { # mutant_suite <dossier> <ancien> <nouveau> : seconde retouche, sur la copie déjà faite par mutant_page
-  node -e "
-const fs=require('fs');let n=0;for(const f of ['index.html','project.html','equipe.html']){const p='$WORK/mut-$1/.vibeflow/cockpit/'+f;if(!fs.existsSync(p))continue;const h=fs.readFileSync(p,'utf8');if(!h.includes(process.argv[1]))continue;fs.writeFileSync(p,h.split(process.argv[1]).join(process.argv[2]));n++}
-if(!n){console.error('mutant $1 : second motif introuvable');process.exit(1)}" "$2" "$3" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : second motif introuvable dans la page"; return 1; }
+mutant_suite() { # mutant_suite <dossier> <ancien> <nouveau> : seconde retouche, sur la copie du module déjà faite par mutant_page
+  cockpit_page_muter_litteral "$WORK/modx-$1" "$2" "$3" 2>/dev/null || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : second motif introuvable dans les sources de page du module"; return 1; }
 }
 mutant_page() { # mutant_page <dossier> <ancien> <nouveau> : copie de la page du lab long, <ancien> doit exister (sinon FAIL nommé)
   local M="$WORK/mut-$1"; mkdir -p "$M/.planning/missions" "$M/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$M/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$M/.planning/missions/"; agent_actif "$M"
-  node -e "
-const fs=require('fs');let n=0;for(const f of ['index.html','project.html','equipe.html']){const p='$M/.vibeflow/cockpit/'+f;if(!fs.existsSync(p))continue;const h=fs.readFileSync(p,'utf8');if(!h.includes(process.argv[1]))continue;fs.writeFileSync(p,h.split(process.argv[1]).join(process.argv[2]));n++}
-if(!n){console.error('mutant $1 : motif introuvable');process.exit(1)}" "$2" "$3" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans la page"; return 1; }
+  rm -rf "$WORK/modx-$1"; cockpit_module_copie "$WORK/modx-$1" > /dev/null; cockpit_page_muter_litteral "$WORK/modx-$1" "$2" "$3" 2>/dev/null || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans les sources de page du module"; return 1; } # 79-16 : copie du module
 }
 # R21 : le repli mesuré rattrape seul un badge trop large ; le mutant retire donc la tranche (1 599 px) ET le repli, pour que la tranche soit ce qui est éprouvée
 mutant_page r21 '@media (min-width: 701px) and (max-width: 1639px)' '@media (min-width: 701px) and (max-width: 1599px)'; M21=$?
@@ -706,9 +696,9 @@ mutant_page r22 "badge.setAttribute('data-vf-point', '');" ''; M22=$?
 mutant_page r23 "src.disabled || src.getAttribute('aria-disabled') === 'true'" 'false'; M23=$?
 srv "$LL/.vibeflow/cockpit"; P_l=$SRV_PORT; PID_l=$SRV_PID
 srv "$LC/.vibeflow/cockpit"; P_c=$SRV_PORT; PID_c=$SRV_PID
-[ $M21 = 0 ] && { srv "$WORK/mut-r21/.vibeflow/cockpit"; P_m21=$SRV_PORT; PID_m21=$SRV_PID; }
-[ $M22 = 0 ] && { srv "$WORK/mut-r22/.vibeflow/cockpit"; P_m22=$SRV_PORT; PID_m22=$SRV_PID; }
-[ $M23 = 0 ] && { srv "$WORK/mut-r23/.vibeflow/cockpit"; P_m23=$SRV_PORT; PID_m23=$SRV_PID; }
+[ $M21 = 0 ] && { srv "$WORK/mut-r21/.vibeflow/cockpit" "$WORK/modx-r21"; P_m21=$SRV_PORT; PID_m21=$SRV_PID; }
+[ $M22 = 0 ] && { srv "$WORK/mut-r22/.vibeflow/cockpit" "$WORK/modx-r22"; P_m22=$SRV_PORT; PID_m22=$SRV_PID; }
+[ $M23 = 0 ] && { srv "$WORK/mut-r23/.vibeflow/cockpit" "$WORK/modx-r23"; P_m23=$SRV_PORT; PID_m23=$SRV_PID; }
 OPIDS=()
 RESP_INJECT="$INJ_R21" mes "http://127.0.0.1:$P_l/project.html" "$W21" - > "$WORK/r21.json" & OPIDS+=($!)
 RESP_INJECT="$INJ_R22C" mes "http://127.0.0.1:$P_l/index.html" "$W22" - > "$WORK/r22-code.json" & OPIDS+=($!)

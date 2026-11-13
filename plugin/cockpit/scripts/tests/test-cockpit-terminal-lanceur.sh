@@ -241,6 +241,35 @@ lance "$LAUNCH" open --terminal
 assert_eq "L13 — page préplacée en lien symbolique : la cible est intacte, refus nommé ou page ordinaire en 600" "$([ "$(cksum < "$WORK/cible")" = "$EMP" ] && { { [ ! -L "$PAGE" ] && [ -f "$PAGE" ] && [ "$(mode "$PAGE")" = 600 ]; } || grep -q -e 'lien symbolique refusé' "$LOUT"; } && echo sur || echo non)" "sur"
 rm -f "$PAGE"; arrete; [ -n "$S13" ] && attendre_mort "$S13"
 
+echo "=== L13s — J1-08 : le fichier du secret d'ouverture (terminal-ouvrir-secret) est retiré à l'échange de la clé et au balayage (60 s) ==="
+SECF13="$OUT/.cache/terminal-ouvrir-secret"
+SC_MODE=reel; SC_ROUGE=""
+sc() { if [ "$SC_MODE" = reel ]; then assert_eq "$@"; elif [ "$2" != "$3" ]; then SC_ROUGE="$SC_ROUGE|$1 : attendu « $3 », obtenu « $2 »"; fi; }
+secret_retire() { # secret_retire <lanceur> <arrêt> <étiquette> -> assertions : témoin positif, absent après l'échange, présent de nouveau, absent après balayage d'un secret de 61 s
+  local l="$1" arret="$2" e="$3" q a
+  rm -f "$OUVERT" "$WORK/run/page-ouverte.html" "$AM" "$SJ" "$SECF13"; lance "$l" open --terminal; fichier_ouvert; sleep 0.5; q="$(qport)"; a="$WORK/amorce13s.copy"; cp "$AM" "$a"
+  sc "$e — témoin : le secret d'ouverture existe avant l'échange (fichier ordinaire, 600)" "$([ -f "$SECF13" ] && [ ! -L "$SECF13" ] && echo "ordinaire $(mode "$SECF13")" || echo absent)" "ordinaire 600"
+  sc "$e — l'échange de la clé est accepté (200)" "$(node "$TA" amorcer "$q" "$a" | sed -n 1p)" "200"
+  sc "$e — le fichier du secret n'existe plus une fois la clé échangée" "$(disparu "$SECF13" 15)" "oui"
+  rm -f "$OUVERT"; lance "$l" open --terminal; fichier_ouvert
+  sc "$e — témoin du balayage : le secret est posé de nouveau (même serveur)" "$([ -f "$SECF13" ] && echo oui || echo non)" "oui"
+  vieillir "$SECF13" 61
+  sc "$e — balayage : un secret de plus de 60 s est retiré (délai borné, 8 s au plus)" "$(disparu "$SECF13" 40)" "oui"
+  "$arret"
+}
+secret_retire "$LAUNCH" arrete "L13s"; [ -n "$(sj j.pid)" ] && attendre_mort "$(sj j.pid)"
+echo "--- L13s mutants (copie du module) : le retrait du secret supprimé à l'échange, puis au balayage ---"
+if MUT_CIBLE=vf-cockpit-terminal-processus.mjs mutant secretechange '/^  const retirerOuvrir/s/ try { fs.unlinkSync(fichierSecret); } catch {}//'; then
+  SC_MODE=mutant; SC_ROUGE=""; secret_retire "$MUT_L" arrete_m "M-SECRET-ECHANGE"; SC_MODE=reel; rm -f "$SECF13"
+  assert_eq "M-SECRET-ECHANGE — le mutant (retrait du secret à l'échange supprimé) rougit « n'existe plus une fois la clé échangée » et lui seul" "$([[ "$SC_ROUGE" == *"n'existe plus une fois la clé échangée"* ]] && [ "$(printf '%s' "$SC_ROUGE" | tr -cd '|' | wc -c | tr -d ' ')" = 1 ] && echo rouge || echo "identique ou autre : $SC_ROUGE")" "rouge"
+  echo "    trace du rouge :$SC_ROUGE"
+else assert_eq "M-SECRET-ECHANGE — le mutant change vf-cockpit-terminal-processus.mjs" "changé" "inchangé"; fi
+if MUT_CIBLE=vf-cockpit-terminal-processus.mjs mutant secretbalai '/^  const balayerOuvrir/s/ > DUREE_AMORCE_MS) fs.unlinkSync(fichierSecret);/ > DUREE_AMORCE_MS) {};/'; then
+  SC_MODE=mutant; SC_ROUGE=""; secret_retire "$MUT_L" arrete_m "M-SECRET-BALAYAGE"; SC_MODE=reel; rm -f "$SECF13"
+  assert_eq "M-SECRET-BALAYAGE — le mutant (retrait du secret au balayage supprimé) rougit « balayage : un secret de plus de 60 s est retiré » et lui seul" "$([[ "$SC_ROUGE" == *"balayage : un secret de plus de 60 s est retiré"* ]] && [ "$(printf '%s' "$SC_ROUGE" | tr -cd '|' | wc -c | tr -d ' ')" = 1 ] && echo rouge || echo "identique ou autre : $SC_ROUGE")" "rouge"
+  echo "    trace du rouge :$SC_ROUGE"
+else assert_eq "M-SECRET-BALAYAGE — le mutant change vf-cockpit-terminal-processus.mjs" "changé" "inchangé"; fi
+
 echo "=== L14 — ouvreur absent : l'erreur asynchrone du spawn est rattrapée, la marche à suivre est dite (M6, N6b) ==="
 mkdir -p "$WORK/sansouvreur"; for t in node ps git sh env python3 sed cat; do c="$(command -v "$t")"; [ -n "$c" ] && ln -sf "$c" "$WORK/sansouvreur/$t"; done
 sans_ouvreur() { # sans_ouvreur <lanceur> [PATH] -> LRC, LOUT : PATH sans open ni xdg-open (ou, avec un PATH donné, un ouvreur présent mais qui ne se lance pas)

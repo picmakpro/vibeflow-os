@@ -3,12 +3,21 @@
 // résultats ; il ne diffuse rien et n'importe que les étapes.
 // Demande { id, planning, verrous, tour, motifs } -> messages { id, type: 'planning' (graphe | erreur, motifs) | 'verrous' (projection en liste
 // blanche, A15) | 'tour' (verrous projetés, equipe, signal, erreurs, dureeMs) | 'index' (rapport en comptes, jamais les voies) |
-// 'fini' }. workerData.sansIndex : relance sans l'index. 73-03 : 'planning' et 'tour' portent aussi `lecturesPlanning` (compteur du fil).
+// 'frise' (paquet de voies, 79-13) | 'fini' }. workerData.sansIndex : relance sans l'index. 73-03 : 'planning' et 'tour' portent aussi `lecturesPlanning` (compteur du fil).
 import { parentPort, workerData } from 'node:worker_threads';
 import { creerMemoire, etapePlanning, etapeVerrous, etapeTour } from './vf-cockpit-collecte-etapes.mjs';
+import { tranche } from './vf-cockpit-collecte-frise.mjs';
 
 const { racine, sortie, scriptsDir, home, sansIndex } = workerData, base = { racine, sortie, scriptsDir, home }, memo = creerMemoire();
 const compte = () => ({ lecturesPlanning: memo.lecturesPlanning }); // 73-03
+
+// passe de fond des cibles (79-13) : une tranche par rendez-vous de boucle, donc les messages entrants passent entre deux tranches
+let chaine = false; // une seule chaîne de tranches à la fois
+const enchainer = () => { chaine = true; setImmediate(() => {
+  let t; try { t = tranche({ memo }); } catch { chaine = false; return; }
+  for (const x of t.messages) parentPort.postMessage({ type: 'frise', id: 0, ...x });
+  if (t.reste) enchainer(); else chaine = false;
+}); };
 
 parentPort.on('message', (m) => {
   const { id, motifs = [] } = m;
@@ -32,8 +41,10 @@ parentPort.on('message', (m) => {
       r = { verrous: { etat: 'erreur', plat: false, liste: [] }, equipe: { workers: [], sources: {} }, signal: null, erreurs: ['tour'], dureeMs: 1,
         index: { etat: 'erreur', tronque: false, voies: 0, formeInconnue: 0, evinces: 0 } };
     }
-    const { index, ...tour } = r;
+    const { index, frise, ...tour } = r;
     parentPort.postMessage({ type: 'tour', id, ...tour, ...compte() }); parentPort.postMessage({ type: 'index', id, index });
+    for (const f of (frise && frise.messages) || []) parentPort.postMessage({ type: 'frise', id, ...f }); // 79-13 : voies par paquets, avant `fini`
   }
   parentPort.postMessage({ type: 'fini', id });
+  if (m.tour && !chaine && memo.frise && memo.frise.suivi.reste()) enchainer();
 });

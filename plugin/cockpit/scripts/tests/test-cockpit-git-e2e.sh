@@ -213,12 +213,16 @@ faux_b3() { jq_ "$1" '(() => { const f = []; const o = j.ok || {};
 
 # --- jonction : sortie copiée DANS le lab (racine = deux niveaux au-dessus), mutant posé, parcours rejoué ---
 MUT_OUT=""; MUT_MOD=""
-mutant_jonction() { # $1 = nom, $2 = fichier(s) à muter, $3 = ancien, $4 = nouveau, $5 = faux_b2|faux_b3 ; rend les mesures dans RM. Un fichier de code (vf-cockpit-*.mjs) est muté dans une COPIE du module (MUT_MOD) ; une page, dans la copie de la sortie (MUT_OUT, des données)
+mutant_jonction() { # $1 = nom, $2 = fichier(s) à muter, $3 = ancien, $4 = nouveau, $5 = faux_b2|faux_b3 ; rend les mesures dans RM. Un fichier de code (vf-cockpit-*.mjs) est muté dans une COPIE du module (MUT_MOD) ; une page (viewer.html, ui/*.js), elle aussi dans la COPIE du module (79-16 : la sortie ne porte que des données)
   local nom="$1" R="$WORK/mj-$1"; mk_depot "$R"; build_lab "$R/wt-a"
   local o="$R/wt-a/.vibeflow/cockpit"; MUT_OUT="$o"; MUT_MOD=""   # 79-06 : serve.mjs exige --sortie=<lab>/.vibeflow/cockpit ; un dépôt neuf par mutant (mk_depot), la sortie de ce lab est donc déjà sa propre copie
   local f; for f in $2; do
     case "$f" in
       vf-cockpit-*) [ -n "$MUT_MOD" ] || { rm -rf "$WORK/mod-$nom"; MUT_MOD="$(cockpit_module_copie "$WORK/mod-$nom")" || { RM='{"erreur":"copie du module impossible"}'; MUT_MOD=""; return; }; }; mutate "$MUT_MOD/scripts/$f" "$3" "$4" ;;
+      index.html) # 79-16 : les sources de page sont celles de la COPIE du module (viewer.html, ui/*.js) : la substitution littérale vise la source qui porte le motif
+        [ -n "$MUT_MOD" ] || { rm -rf "$WORK/mod-$nom"; MUT_MOD="$(cockpit_module_copie "$WORK/mod-$nom")" || { RM='{"erreur":"copie du module impossible"}'; MUT_MOD=""; return; }; }
+        local g n=0; for g in "$MUT_MOD/skills/cockpit-moteur/assets/viewer.html" "$MUT_MOD"/skills/cockpit-moteur/assets/ui/*.js; do mutate "$g" "$3" "$4" 2>/dev/null && n=$((n+1)); done; [ "$n" -ge 1 ] ;;
+      project.html) : ;;   # même source que index.html : la page est unique
       *) mutate "$o/$f" "$3" "$4" ;;
     esac || { RM='{"erreur":"mutation impossible"}'; MUT_MOD=""; return; }
   done

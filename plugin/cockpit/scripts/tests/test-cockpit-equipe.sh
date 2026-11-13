@@ -379,6 +379,8 @@ assert_eq "EP.2 — les 40 sous-agents (20 actifs, 20 terminés depuis moins de 
 
 echo "=== E23 — onglet Équipe : page, graphe, onglets, libellés (P69-D-17 ; CKPT-23) ==="
 UI="$SCRIPTS/../skills/cockpit-moteur/assets/ui"
+export VF_FLUX_JS="$UI/69-vf-flux.js"
+export VF_ETAT_JS="$UI/70-vf-etat.js" # 79-17 : le magasin d'état se charge entre le flux et 70 (ordre alphabétique de la page)
 cat > "$AUX/fetchp.mjs" <<'JS'
 // fetchp.mjs <port> <chemin> <sortie> : écrit le corps dans <sortie>, rend le statut ; « ERR <code> » si la connexion échoue
 import http from 'node:http';
@@ -439,11 +441,11 @@ P23="$(node "$AUX/fetchp.mjs" "$PORT23" /project.html "$WORK/project23.html")"
 assert_eq "E23.0 — contrôle positif : serveur démarré et /project.html servi (200)" "$([ "$PORT23" -gt 0 ] && echo serveur)|$P23" "serveur|200"
 assert_eq "E23.1 — GET /equipe.html -> 200" "$S23" "200"
 assert_has "E23.2 — le titre de la page contient « VibeFlow · Équipe »" "$(grep -o '<title>[^<]*</title>' "$WORK/equipe.html" 2>/dev/null || echo 'aucun titre')" "VibeFlow · Équipe"
-# 79-06 : le lecteur du graphe est celui du MODULE (il écrit le marqueur window.VF_COCKPIT : la sortie ne porte plus de code), comme le code servi
-node "$AUX/graphe.mjs" "$SCRIPTS" "$WORK/equipe.html" > "$WORK/graphe-e23.json"
-assert_eq "E23.3 — le graphe embarqué porte le schéma vibeflow/cockpit-equipe@1 et meta.vfTab = equipe" "$(G "$WORK/graphe-e23.json" 'j.erreur||(j.schema+"|"+(j.meta||{}).vfTab)')" "vibeflow/cockpit-equipe@1|equipe"
+# 79-16 : le document de /equipe.html ne porte plus de donnée ; le graphe Équipe se lit dans le corps de la route, là où la coquille le lit
+cockpit_get "/api/vf/graphe?onglet=equipe" > "$WORK/graphe-e23.json" 2> /dev/null
+assert_eq "E23.3 — le graphe de la route porte le schéma vibeflow/cockpit-equipe@1 et meta.vfTab = equipe" "$(G "$WORK/graphe-e23.json" 'j.erreur||(j.schema+"|"+(j.meta||{}).vfTab)')" "vibeflow/cockpit-equipe@1|equipe"
 assert_eq "E23.4 — cartes : session racine, manager sous la session, worker sous son manager, terminés sous un bloc du manager, st active/done, aucun fichier" "$(G "$WORK/graphe-e23.json" 'j.erreur||(()=>{const n=(id)=>(j.nodes||[]).find((x)=>x.id===id)||{};return [n("se-'$SID'").parent??"-",n("ag-mgr1").parent,n("ag-w1").parent,n("ag-mgr1~termines").parent,n("ag-fin2h").parent,n("ag-w1").st,n("ag-fin2h").st,(j.files||[]).length].join("|")})()')" "-|se-$SID|ag-mgr1|ag-mgr1|ag-mgr1~termines|active|done|0"
-assert_eq "E23.5 — le graphe est conforme au schéma vibeflow/cockpit-equipe@1 du contrat" "$(node "$AUX/validate2.mjs" "$IFACE" vibeflow/cockpit-equipe@1 "$WORK/graphe-e23.json")" "OK"
+assert_eq "E23.5 — le graphe de la route est conforme au schéma vibeflow/cockpit-equipe@1 du contrat" "$(node "$AUX/validate2.mjs" "$IFACE" vibeflow/cockpit-equipe@1 "$WORK/graphe-e23.json")" "OK"
 assert_eq "E23.6 — 00-vibeflow.js reconnaît la valeur equipe de vfTab et porte le lien equipe.html intitulé « Équipe »" "$([ "$(grep -c "'equipe'" "$UI/00-vibeflow.js")" -ge 1 ] && echo vfTab)|$([ "$(grep -c 'equipe\.html' "$UI/00-vibeflow.js")" -ge 1 ] && echo lien)|$([ "$(grep -c 'Équipe' "$UI/00-vibeflow.js")" -ge 1 ] && echo intitule)" "vfTab|lien|intitule"
 assert_eq "E23.7 — sonde de libellés : aucune chaîne anglaise nouvelle dans le chrome de l'équipe (couche d'affichage, onglet, tiroir, onglets)" "$(node "$AUX/sonde-fr.mjs" "$SCRIPTS" "$UI/71-vf-equipe-rendu.js" "$UI/72-vf-equipe.js" "$UI/70-vf-live.js" "$UI/00-vibeflow.js")" "aucune"
 mkdir -p "$AUX/sonde"; cp "$UI/70-vf-live.js" "$AUX/sonde/70-vf-live.js"
@@ -660,6 +662,8 @@ const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' } };
 const ctx = vm.createContext({ window, document, MutationObserver: class { observe() {} }, EventSource: ES, CustomEvent: class { constructor(t) { this.type = t; } }, location: { reload() {} }, fetch: async () => ({ ok: false }), setTimeout, clearTimeout, Date, console, encodeURIComponent });
 try {
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_FLUX_JS, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_ETAT_JS, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
   const w = [{ kind: 'subagent', id: 'a', etat: 'actif', tree: '.' }, { kind: 'subagent', id: 'f', etat: 'termine', tree: '.', parent: 'a' }, { kind: 'subagent', id: 'w', etat: 'en-attente', tree: '.' }, { kind: 'lock', id: 'v', tree: '.' }, { kind: 'dag-node', id: 'd', tree: '.', etat: 'actif' }, { kind: 'registered', id: 'r', tree: '.' }]; // un actif, un terminé, un en attente, puis ce qui n'est pas un agent
   ES.last.l.who({ data: JSON.stringify({ seq: 1, who: { workers: w, sources: {} } }) });
@@ -884,12 +888,19 @@ JSON
   OUTEK="$LABEK/.vibeflow/cockpit"; cp "$OUTEK/project.html" "$WORK/project-ek.html.orig"
   ek_rafraichir() { touch "$HEK/.claude/projects/-lab/$SID/subagents/"agent-*.jsonl "$HEK/.claude/projects/-lab/"*.jsonl; }
   ek_demarrer() { rm -f "$OUTEK/.cache/server.json"; ek_rafraichir
-    COCKPIT_LOG="$WORK/serve-ek.out" cockpit_lancer "$LABEK" HOME="$HEK" || true
+    COCKPIT_MODULE="$(cat "$EKMOD" 2>/dev/null)" COCKPIT_LOG="$WORK/serve-ek.out" cockpit_lancer "$LABEK" HOME="$HEK" || true   # 79-16 : le mutant est la copie du module nommée par $EKMOD (vide : le module du dépôt)
     EK_PID="$VF_PID"
     EK_PORT="$VF_PORT"; }
-  # ek_muter <ancre> <remplacement> : pose le mutant dans la page assemblée (project.html de la sortie), « muté » ou « ancre absente »
-  ek_muter() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; if [ -z "${3:-}" ]; then EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; else EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html" >/dev/null || return 1; EK_FROM="$3" EK_TO="$4" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; fi; }  # $3/$4 : seconde substitution (fusion de la 68 : deux règles de pied de carte)
-  ek_restaurer() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; }
+  # ek_muter <ancre> <remplacement> [<ancre2> <remplacement2>] : pose le mutant dans les sources de page d'une COPIE du module (79-16 : la sortie ne porte que des données ; la page vient du module), « muté » ou « ancre absente » ;
+  # le chemin de la copie est écrit dans $EKMOD, lu par ek_demarrer. Une ancre présente plus d'une fois est refusée (« ancre ambiguë » : deux occurrences, le mutant pourrait viser le mauvais fichier, 70-11)
+  EKMOD="$WORK/ek-mod"
+  ek_muter() {
+    rm -f "$EKMOD"; rm -rf "$WORK/mod-ek"; local c r; c="$(cockpit_module_copie "$WORK/mod-ek")" || return 1
+    cockpit_page_muter_litteral "$c" "$1" "$2" unique 2>/dev/null; r=$?; [ "$r" = 0 ] || { [ "$r" = 2 ] && echo "ancre ambiguë" || echo "ancre absente"; return 1; }
+    if [ -n "${3:-}" ]; then cockpit_page_muter_litteral "$c" "$3" "$4" unique 2>/dev/null; r=$?; [ "$r" = 0 ] || { [ "$r" = 2 ] && echo "ancre ambiguë" || echo "ancre absente"; return 1; }; fi  # $3/$4 : seconde substitution (fusion de la 68 : deux règles de pied de carte)
+    printf '%s' "$c" > "$EKMOD"; echo muté
+  }
+  ek_restaurer() { rm -f "$EKMOD"; }
   # EKC <action> <page> : une interaction, un Chromium ; la ligne JSON rendue est lue par G
   EKC() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EK_ACTION="$1" node "$HERE_EK/chrome-equipe-clavier.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ek-$1.json"; }
   EKA1="equipe.html#r=n%3Aag-a1"
@@ -986,7 +997,7 @@ JSON
   assert_eq "EK15.3 — mutant (aucun écouteur d'Échap dans le tiroir) : le tiroir reste ouvert et Échap remonte au viewer, détecté (PU-G-175 : le viewer ne désélectionne plus hors du canevas, c'est le tiroir resté ouvert qui trahit le mutant ; trace sain : fermé | sélection gardée | remonté au viewer : non)" "$(EK15M panneau "panneau.addEventListener('keydown', echap);" "" "$EK15V")" "muté|ouvert | sélection gardée | remonté au viewer : oui"
   assert_eq "EK15.4 — mutant (aucun écouteur d'Échap pour le bouton) : focus sur le bouton, le tiroir reste ouvert et Échap remonte au viewer, détecté" "$(EK15M bouton "document.addEventListener('keydown', (e) => { if (e.target === bouton()) echap(e); }, true);" "" "$EK15V")" "muté|ouvert | sélection gardée | remonté au viewer : oui"
   assert_eq "EK15.5 — mutant (l'Échap du tiroir ne s'arrête pas avant le viewer) : le tiroir se ferme MAIS Échap remonte jusqu'au viewer (qui, depuis PU-G-175, ne désélectionne plus hors du canevas : on lit la remontée sur un écouteur de fenêtre), détecté" "$(EK15M panneau "e.stopPropagation(); e.preventDefault(); // le viewer" "e.preventDefault(); // le viewer" "$EK15V")" "muté|fermé | sélection gardée | remonté au viewer : oui"
-  assert_eq "EK15.6 — mutant (le focus n'est plus rendu au bouton) : il reste sur le bouton du tiroir (BUTTON) au lieu de revenir sur #vf-lock, détecté" "$(EK15M panneau "bouton()?.focus({ preventScroll: true });" "" 'j.erreur||j.apres.actif')" "muté|BUTTON"
+  assert_eq "EK15.6 — mutant (le focus n'est plus rendu au bouton) : il ne revient plus sur #vf-lock (79-16 : la valeur de l'élément actif sous la coquille est celle du moteur, « btn-panel », plus un « BUTTON » anonyme du tiroir), détecté" "$(EK15M panneau "bouton()?.focus({ preventScroll: true });" "" 'j.erreur||(j.apres.actif==="vf-lock"?"retourne-sur-vf-lock":"hors-de-vf-lock")')" "muté|hors-de-vf-lock"
   assert_eq "EK15.7 — mutant (aria-expanded figé à false) : le tiroir ouvert n'est pas dit ouvert, détecté" "$(EK15M panneau "b.setAttribute('aria-controls', 'panel'); b.setAttribute('aria-expanded', String(o));" "b.setAttribute('aria-controls', 'panel'); b.setAttribute('aria-expanded', 'false');" 'j.erreur||j.ouvert.expanded')" "muté|false"
   assert_eq "EK15.8 — mutant (aria-controls retiré) : le bouton ne dit plus ce qu'il ouvre, détecté" "$(EK15M panneau "b.setAttribute('aria-controls', 'panel'); " "" 'j.erreur||String(j.ouvert.controls)')" "muté|null"
   EK16M() { local m; m="$(ek_muter "$3" "$4")"; ek_demarrer; EK_LARGEUR="$1" EK_ORDRE="$2" EKC un-lateral "project.html#t"; local v; v="$(G "$WORK/ek-un-lateral.json" "$EK16V")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
@@ -1009,7 +1020,7 @@ JSON
   # témoins de la sonde de mutation elle-même
   ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
   assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"
-  assert_eq "EK7 — témoin de la sonde : un mutant dont l'ancre n'existe pas est refusé, la page servie reste intacte" "$(ek_muter 'ANCRE-QUI-N-EXISTE-PAS-70-11' 'x')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "ancre absente|identique"
+  assert_eq "EK7 — témoin de la sonde : un mutant dont l'ancre n'existe pas est refusé, aucune copie de module n'est posée, la page servie reste celle du module" "$(ek_muter 'ANCRE-QUI-N-EXISTE-PAS-70-11' 'x')|$([ ! -e "$EKMOD" ] && echo identique || echo differe)" "ancre absente|identique"
 fi
 
 echo "=== EA1 — retours du panel (PU-G-134, 163, 164, 165, 167, 171 compatible, 173) ==="
@@ -1067,6 +1078,8 @@ const ctx = vm.createContext({ window, document, MutationObserver: class { obser
 try {
   const S = JSON.parse(fs.readFileSync(scen, 'utf8'));
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_FLUX_JS, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_ETAT_JS, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
   if (S.verrous) ES.last.l.lock({ data: JSON.stringify({ seq: 1, at: Date.now(), verrous: S.verrous }) });
   ES.last.l.who({ data: JSON.stringify({ seq: 2, who: S.who }) });

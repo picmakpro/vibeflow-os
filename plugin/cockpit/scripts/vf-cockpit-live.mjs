@@ -1,8 +1,8 @@
 // vf-cockpit-live — le direct du cockpit, sans serveur HTTP propre (67-04, P67-D-13, P67-D-16 ; promu du spike 003).
 // Surveille <root>/.planning et le dossier des verrous (<git-common-dir>/vf-driver), demande la collecte à UN fil (vf-cockpit-collecte.mjs :
 // graphe Projet, verrous, équipe ; 79-09, P79-D-12 : plus aucune collecte sur la boucle), pousse le diff de statuts à `onEvent`, pose
-// l'instantané gelé (vf-cockpit-instantane.mjs) et réécrit <sortie>/project.html par fichier temporaire puis rename quand la structure change.
-// Lecture seule sur le dépôt observé.
+// l'instantané gelé (vf-cockpit-instantane.mjs). Lecture seule sur le dépôt observé et sur la sortie : le direct ne touche aucun fichier (79-15 :
+// project.html n'est plus réécrit).
 // Export : startLive({ root, sortie, onEvent, log, mode, aClient, nbClients, garde, collecteur }) -> { etat(), snapshot(), reveil(), pret(ms), stop() }.
 //   garde(objet) : garde d'émission injectée par le serveur (vrai = permis), appliquée aux résultats de collecte (verrous, équipe, signal) avant leur
 //     pose et leur émission, et à la pose de l'instantané ; FERMÉE par défaut (79-09, correction ciblée) : un appelant qui n'en fournit pas ne pose
@@ -16,8 +16,7 @@
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
-import { gitCommonDir, resolveScriptsDir, confiner } from './vf-cockpit-paths.mjs';
-import { extraireGraphe, insererGraphe } from './vf-cockpit-embed.mjs';
+import { gitCommonDir, resolveScriptsDir } from './vf-cockpit-paths.mjs';
 import { signatureGit } from './vf-cockpit-git-signature.mjs';
 import { creerCollecte } from './vf-cockpit-collecte.mjs';
 import { poser } from './vf-cockpit-instantane.mjs';
@@ -95,21 +94,6 @@ export function startLive({
     try { poser(inst); } catch (e) { log('error', `instantané non posé : ${e.message}`); }
   };
 
-  // project.html : le gabarit est la page courante de la sortie ; meta.root et meta.vfLogos viennent de l'assemblage
-  // (le graphe reçu n'est pas modifié : il est gelé dans l'instantané)
-  const ecrirePage = (g) => {
-    const f = path.join(sortie, 'project.html');
-    confiner(root, f); confiner(root, f + '.tmp'); // aucun lien symbolique dans la sortie : ni lu, ni écrasé
-    const html = fs.readFileSync(f, 'utf8');
-    let meta = g.meta;
-    try {
-      const old = extraireGraphe(html);
-      meta = { ...g.meta, root: old.meta?.root, vfLogos: old.meta?.vfLogos, vfGit: old.meta?.vfGit }; // 78-04
-    } catch {}
-    fs.writeFileSync(f + '.tmp', insererGraphe(html, { ...g, meta }));
-    fs.renameSync(f + '.tmp', f); // jamais de page à moitié écrite
-  };
-
   // demande de graphe : le verrou suit quand un onglet écoute (AUDC-H2), sauf à la seconde lecture d'un retrait (déjà lu avec la première)
   const refresh = (reasons) => { if (!stopped) collecte.demander({ planning: true, verrous: aClient() && !reasons.includes('confirm'), motifs: reasons }); };
   const refreshSur = (g, reasons) => {
@@ -125,8 +109,6 @@ export function startLive({
     }
     const vfChanged = JSON.stringify(g.meta?.vf) !== JSON.stringify(graph.meta?.vf);
     graph = g; idx = nidx; state.seq++; state.derniereMaj = new Date().toISOString();
-    // la page sur disque suit TOUT changement (F5, nouvel onglet, réponses locales et vf-cockpit-query lisent project.html) : avant l'événement
-    if (structural || patch.length || vfChanged) { try { ecrirePage(g); } catch (e) { log('error', `project.html non réécrit : ${e.message}`); } }
     log('refresh', `${patch.length} patch(s)${structural ? ', structure' : ''}`);
     const at = Date.now();
     if (structural) emit('structural', { seq: state.seq, at });
