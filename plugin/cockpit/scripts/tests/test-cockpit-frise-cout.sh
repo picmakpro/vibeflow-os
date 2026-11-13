@@ -131,7 +131,7 @@ JS
 
 # ---------- scénarios ----------
 cat > "$AUX/d1.mjs" <<'JS'
-import { monterD, sha, NB } from './commun.mjs';
+import { monterD, sha, NB, L } from './commun.mjs';
 export const ids = ['D1', 'D2'];
 const lire = () => (document => {
   const row = document.querySelector('.vf-frise-rang-depot'), c = row.querySelector('.vf-frise-c'), p = row.querySelector('.vf-frise-p'), t = (e) => (e ? e.textContent : null);
@@ -191,6 +191,11 @@ export default async function (h) {
     h.sonde('D2', 'abscisse d\'un commit posée à la milliseconde de son `at` en secondes (aucun écart d\'un facteur 1 000)', Math.abs(m.a[0] - m.a[1]) < 1.5 && Math.abs(m.d[0] - m.d[1]) < 1.5, JSON.stringify([m.a, m.d]));
     const pente = (m.a[0] - m.d[0]) / (m.ta - m.td);
     h.sonde('D2', 'l\'échelle mesurée dans le DOM entre deux commits est celle de la fenêtre (15 min = 900 000 ms)', Math.abs(pente / m.echelle - 1) < 0.02, JSON.stringify([pente, m.echelle]));
+    await monterD(h, { git: { rangees: [[1, [], 0, [L('main')]], [2, [1], 1, [L('feat/a')]]] } });
+    const bord = await h.ev(() => { const p = document.querySelector('.vf-frise-rang-depot .vf-frise-p').getBoundingClientRect(), d = document.querySelector('.vf-frise-defil');
+      return { hors: [...document.querySelectorAll('.vf-depot-commit')].filter((b) => b.getBoundingClientRect().right > p.right + 0.5 || b.getBoundingClientRect().left < p.left - 0.5).length, n: document.querySelectorAll('.vf-depot-commit').length,
+        defil: d.scrollWidth <= d.clientWidth || Math.abs(d.scrollLeft - (d.scrollWidth - d.clientWidth)) <= 1 }; });
+    h.sonde('D2', 'un commit à l\'instant « maintenant » : sa zone de saisie reste dans la piste, le défilement ne déborde pas', bord.n === 2 && bord.hors === 0 && bord.defil, JSON.stringify(bord));
   });
 }
 JS

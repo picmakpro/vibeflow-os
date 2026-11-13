@@ -105,6 +105,9 @@
 
     const cale = h('div', 'vf-depot-cale'), pistes = h('div', 'vf-depot-pistes'), cible = mesurer(p, '--frise-depot');
     cale.style.height = `${tete.offsetHeight}px`; p.append(cale, pistes);
+    // la zone de saisie d'un commit reste dans la piste (un commit à l'instant « maintenant » ne la fait pas déborder),
+    // les commits ramenés au même point se groupent
+    const px = (ms) => Math.max(cible / 2, Math.min(ctx.x(ms), ctx.largeur - cible / 2));
     const ouvrable = !!W.VFGitTiroir && typeof W.VFGitTiroir.ouvrirSur === 'function';
     const voie = (nom, commits, autres) => {
       const cls = autres ? ' vf-depot-autres' : '', lib = h('div', `vf-depot-voie${autres ? ' vf-depot-lib' : ''}${cls}`);
@@ -116,7 +119,7 @@
         const n = h('span', 'vf-depot-nom', nom); n.title = nom; lib.append(n);
         lib.setAttribute('data-branche', nom); piste.setAttribute('data-branche', nom);
       }
-      for (const g of C.grouper(commits, ctx.x, cible)) piste.append(commit(g, autres ? null : nom, M, ouvrable));
+      for (const g of C.grouper(commits, px, cible)) piste.append(commit(g, autres ? null : nom, M, ouvrable));
       c.append(lib); pistes.append(piste);
     };
     const visibles = st.deplie ? vues.voies : vues.voies.slice(0, LIMITE);

@@ -42,6 +42,7 @@
     st.textContent = `
       .vf-frise { --frise-depot: var(--sp-24); }
       @media (pointer: coarse) { .vf-frise { --frise-depot: 44px; } }
+      .vf-frise-rang-depot { min-height: calc(var(--frise-depot) + var(--sp-16)); } /* l'état d'échec ou de chargement ne change pas la hauteur de la rangée */
       .vf-depot-tete { padding: var(--sp-4) var(--sp-8) var(--sp-4) 0; color: var(--text-3); }
       .vf-depot-titre { color: var(--text); font-weight: 500; }
       .vf-depot-compte, .vf-depot-mention { color: var(--text-3); }
