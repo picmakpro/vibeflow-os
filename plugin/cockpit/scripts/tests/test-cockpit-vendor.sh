@@ -183,24 +183,40 @@ assert_eq "V4c.5h6 — « délégué » en NFD (accent combinant) : code 1" "$(c
 assert_eq "V4c.5h7 — « délégation » coupée par un caractère de largeur nulle : code 1" "$(col_cmp3 "$DELEG_ZW")" "1 HAUSSE-SANS-ARBITRAGE"
 # V4c.5i : la CLASSE, par un générateur de variantes (radicaux, casse, NFC/NFD, un caractère invisible à chaque position) : toutes refusées ; les citations légitimes restent acceptées
 cat > "$WORK/gen-deleg.mjs" <<'FIN'
-import { spawnSync } from 'node:child_process';
+import { execFile } from 'node:child_process';
 const [cliquet] = process.argv.slice(2);
-const radicaux = ['délégation', 'déléguée', 'délégué', 'délègue', 'délèguent', 'delegation', 'delegue', 'DÉLÉGATION', 'Délègue', 'DELEGUE'];
-const invisibles = ['\u200b', '\u200c', '\u200d', '\u2060', '\ufeff', '\u00ad'];
-const variantes = new Set();
+const radicaux = ['délégation', 'déléguée', 'délègue', 'delegation', 'DÉLÉGUÉE'];
+// une classe par ligne ; chaque caractère est inséré à chaque position du mot, en NFC et en NFD
+const classes = {
+  Cf: ['​', '‌', '‍', '‎', '‮', '⁠', '⁡', '⁤', '﻿', '­', '️', '\u{e0041}'],
+  Cc: ['\x01', '\x7f', '\x85'],
+  M: ['҃', '⃐', '᪰', '̀'],
+  Rempli: ['ᅟ', 'ᅠ', 'ㅤ'],
+  Sep: [' ', ' ', ' ', '\t'],
+  Tiret: ['-', '‐', '‑', '_', '.', '·', '＿'],
+};
+const variantes = new Map();
 for (const r of radicaux) for (const f of ['NFC', 'NFD']) {
-  const base = r.normalize(f); variantes.add(base);
-  for (let i = 1; i < base.length; i++) for (const z of invisibles) variantes.add(base.slice(0, i) + z + base.slice(i));
+  const base = r.normalize(f);
+  for (const [classe, cars] of Object.entries(classes)) for (let i = 1; i < base.length; i++) for (const z of cars) variantes.set(base.slice(0, i) + z + base.slice(i), classe);
 }
-const verdict = (m) => spawnSync('node', [cliquet, 'citation', m, '--directe']).status;
-let rejetes = 0;
-for (const v of variantes) if (verdict(`arbitrage Samuel, session principale, 2026-11-08 : ${v}`) === 1) rejetes++;
+const statut = (m) => new Promise((res) => execFile('node', [cliquet, 'citation', m, '--directe'], (e) => res(e ? e.code : 0)));
+const lancer = async (liste, attendu) => { // concurrence bornée
+  let i = 0, bon = 0; const pool = Array.from({ length: 8 }, async () => { while (i < liste.length) { const m = liste[i++]; if ((await statut(m)) === attendu) bon++; } });
+  await Promise.all(pool); return bon;
+};
+const gabarit = (v) => `arbitrage Samuel, session principale, 2026-11-08 : ${v}`;
+const refusees = await lancer([...variantes.keys()].map(gabarit), 1);
 const legit = ['arbitrage Samuel, AskUserQuestion session principale, 2026-11-12', 'décision de Samuel, message session principale, 2026-11-08', 'arbitrage Samuel, canal WhatsApp, 2026-11-12 : option B'];
-const acceptes = legit.filter((m) => verdict(m) === 0).length;
-console.log(`rejetes=${rejetes}/${variantes.size} legitimes=${acceptes}/${legit.length}`);
+const acceptees = await lancer(legit, 0);
+console.log(`rejetes=${refusees}/${variantes.size} legitimes=${acceptees}/${legit.length}`);
 FIN
 col_generatif() { node "$WORK/gen-deleg.mjs" "$CLIQUET" | sed -E 's|rejetes=([0-9]+)/([0-9]+)|\1 sur \2|; s|legitimes=([0-9]+)/([0-9]+)|\1 sur \2|' | awk '{ print ($1==$3 ? "tous-rejetes" : "fuite") " " ($4==$6 ? "legitimes-ok" : "legitime-refusee") }'; }
-assert_eq "V4c.5i — le générateur de variantes (accents, casse, NFC/NFD, un invisible à chaque position, conjugaisons) : toutes refusées, et les citations légitimes toutes acceptées" "$(col_generatif)" "tous-rejetes legitimes-ok"
+assert_eq "V4c.5i — le générateur de variantes (accents, casse, NFC/NFD, conjugaisons ; à chaque position un format Cf, un contrôle Cc, une marque, un filler, un séparateur, un tiret ou un souligné) : toutes refusées, et les citations légitimes toutes acceptées" "$(col_generatif)" "tous-rejetes legitimes-ok"
+# V4c.5j : limites écrites, jamais corrigées (filtre lexical, ligne par ligne) : une coupure par retour à la ligne et un synonyme passent ; le test les fige pour qu'un changement soit vu
+col_directe() { node "$CLIQUET" citation "$1" --directe > /dev/null 2>&1; echo $?; }
+assert_eq "V4c.5j — limites : « dé » puis « légation » sur deux lignes, « par procuration », « au nom de » passent (code 0, filtre lexical, ligne par ligne)" "$(col_directe "arbitrage Samuel, session principale, 2026-11-08 : dé
+légation") $(col_directe 'arbitrage Samuel, session principale, 2026-11-08 : par procuration') $(col_directe 'arbitrage Samuel, session principale, 2026-11-08 : au nom de Samuel')" "0 0 0"
 assert_eq "V4c.5h4 — la délégation et la citation directe sur deux lignes : code 0 (la ligne directe suffit)" "$(col_cmp3 "$DELEG_FORME
 $CITE")" "0 "
 # V4c.6 : l'historique git du fichier de baseline (dépôt jetable)
@@ -285,7 +301,13 @@ col_deleg_forme() { col_cmp3 "$DELEG_FORME"; }; col_cite_ok() { col_cmp3 "$CITE"
 col_deleg_sans_accent() { col_cmp3 "$DELEG_SANS_ACCENT"; }
 col_mutant_temoin DELEGATION 's|/deleg/i|/dél[ée]gu/i|' "le filtre ne voit que « déléguée » accentué : « delegation » et « par délégation » valent citation (V4c.5h'')" col_deleg_sans_accent "0 " col_cite_ok "0 "
 col_mutant_temoin DELEGATION2 's|/deleg/i|/dél[ée]g/i|' "le filtre sans normalisation d'accents : « delegation » sans accent vaut citation (V4c.5h'')" col_deleg_sans_accent "0 " col_cite_ok "0 "
-col_mutant_temoin NORMALISATION "s|l\.normalize[(]'NFKD'[)]\.replace[(]INVISIBLES, ''[)]|l|" "le filtre lit le texte brut : NFD et largeur nulle valent citation (V4c.5i)" col_generatif "fuite legitimes-ok" col_cite_ok "0 "
+col_mutant_temoin NORMALISATION "s|l\.normalize[(]'NFKD'[)]\.replace[(]MASQUES, ''[)]|l|" "le filtre lit le texte brut : toutes les classes valent citation (V4c.5i)" col_generatif "fuite legitimes-ok" col_cite_ok "0 "
+col_mutant_temoin CLASSE-Cf 's|[\\]p{Cf}||' "la classe des formats Cf n'est plus retirée : largeur nulle et bidi valent citation (V4c.5i)" col_generatif "fuite legitimes-ok" col_cite_ok "0 "
+col_mutant_temoin CLASSE-Cc 's|[\\]p{Cc}||' "la classe des contrôles Cc n'est plus retirée (V4c.5i)" col_generatif "fuite legitimes-ok" col_cite_ok "0 "
+col_mutant_temoin CLASSE-M 's|[\\]p{M}||' "la classe des marques M n'est plus retirée : accent combinant hors U+0300 à 036F vaut citation (V4c.5i)" col_generatif "fuite legitimes-ok" col_cite_ok "0 "
+col_mutant_temoin CLASSE-REMPLI 's|[\\]u115f[\\]u1160[\\]u3164||' "les fillers de Hangul ne sont plus retirés (V4c.5i)" col_generatif "fuite legitimes-ok" col_cite_ok "0 "
+col_mutant_temoin CLASSE-SEP 's|[\\]s[\\]p{Pd}|\\p{Pd}|' "les séparateurs (espace, insécable) ne sont plus retirés : « dé léguée » vaut citation (V4c.5i)" col_generatif "fuite legitimes-ok" col_cite_ok "0 "
+col_mutant_temoin CLASSE-TIRET 's|[\\]p{Pd}[\\]p{Pc}[\\]-_[.][\\]u00b7||' "les tirets, soulignés et points ne sont plus retirés : « dé-léguée » vaut citation (V4c.5i)" col_generatif "fuite legitimes-ok" col_cite_ok "0 "
 col_mutant_temoin DOUBLON 's/ || entrees\.has(c\[0\])//' "un fichier nommé deux fois est accepté : la seconde entrée écrase la première (V4c.2b6)" col_dbl "ok" col_v160x "ok"
 col_mutant_temoin INITIALISER 's|^  if (fs\.existsSync(b)) fin(1,.*$||' "initialiser réécrit une baseline qui existe (V4c.2c)" col_init_existe "0 modifiee" col_init_neuf "0 ok"
 
