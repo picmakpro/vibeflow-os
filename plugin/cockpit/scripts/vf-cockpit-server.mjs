@@ -76,6 +76,8 @@ const lireModeles = (c) => {
 // la dernière lecture officielle gardée en mémoire de CE processus (la collecte lit la sienne dans son fil : invisible ici ;
 // `demander` relance la lecture au plus une fois par REPIT_MS, jamais une par requête). Les arbres du lab sont relus au plus une
 // fois par REPIT_MS ; jamais de git dans un autre dépôt ; avant la première lecture : null.
+// Garde d'émission propre à ailleurs@1 (audit 73-02) : la liste d'interdits de who@2 (porteInterdit) ne dit rien de ce contrat ; chaque entrée a EXACTEMENT les clés { lab, n }, sinon elle ne sort pas.
+const exacte = (e) => !!e && typeof e === 'object' && Object.keys(e).sort().join() === 'lab,n';
 const racinesLab = new Map(); // racine du lab -> { at, liste }
 const lireAilleurs = (c) => {
   const now = Date.now();
@@ -86,7 +88,8 @@ const lireAilleurs = (c) => {
     try { m.liste = arbresGit(c.root).map((t) => t.chemin); } catch {}
     racinesLab.set(c.root, m);
   }
-  return { schema: 'vibeflow/cockpit-ailleurs@1', ailleurs: ailleurs(os.homedir(), { racines: m.liste }) };
+  const l = ailleurs(os.homedir(), { racines: m.liste });
+  return { schema: 'vibeflow/cockpit-ailleurs@1', ailleurs: Array.isArray(l) ? l.filter(exacte) : l };
 };
 function ouvrirFlux(c, req, url, res) {
   res.writeHead(200, { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-store', Connection: 'keep-alive' });

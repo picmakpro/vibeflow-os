@@ -22,7 +22,8 @@ rg13_fixtures() {
   git -C "$RG13_LAB" worktree add -q "$RG13_LAB/.claude/worktrees/w1" -b w1
   RG13_REALGIT="$(command -v git)"
   printf '#!/bin/sh\necho "$@" >> "%s"\ncat "%s"\nexit "$(cat "%s" 2>/dev/null || echo 0)"\n' "$RG13_MARK" "$RG13_JSON" "$RG13_RC" > "$RG13_BIN/claude"
-  printf '#!/bin/sh\nprintf "%%s|%%s\\n" "$(pwd -P)" "$*" >> "%s"\nexec "%s" "$@"\n' "$RG13_GITLOG" "$RG13_REALGIT" > "$RG13_BIN/git"
+  RG13_GITSLEEP="$w/git.sleep" # le faux git dort ce nombre de secondes tant que ce fichier existe (constat d'audit 3 : git lent)
+  printf '#!/bin/sh\nprintf "%%s|%%s\\n" "$(pwd -P)" "$*" >> "%s"\n[ -f "%s" ] && sleep "$(cat "%s")"\nexec "%s" "$@"\n' "$RG13_GITLOG" "$RG13_GITSLEEP" "$RG13_GITSLEEP" "$RG13_REALGIT" > "$RG13_BIN/git"
   chmod +x "$RG13_BIN/claude" "$RG13_BIN/git"
   : > "$RG13_MARK"; : > "$RG13_GITLOG"; echo 0 > "$RG13_RC"; echo '[]' > "$RG13_JSON"
   RG13_FX="{\"home\":\"$RG13_HOME\",\"lab\":\"$RG13_LAB\",\"poste\":\"$RG13_POSTE\",\"bin\":\"$RG13_BIN\",\"fichier\":\"$RG13_JSON\",\"rc\":\"$RG13_RC\",\"w\":\"$RG13_W\"}"
@@ -85,11 +86,23 @@ const headers = { Host: `127.0.0.1:${port}` }; if (token) headers['x-vf-cockpit-
 const r = http.request({ host: '127.0.0.1', port: Number(port), path: p, method, headers, agent: false }, (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => { console.log(res.statusCode); console.log(b); process.exit(0); }); });
 r.on('error', () => { console.log('000'); process.exit(1); }); r.end();
 JS
+  cat > "$AUX/rg13lent.mjs" <<'JS'
+// rg13lent.mjs <port> <jeton> : GET /api/vf/ailleurs lancé sans attendre, puis GET /api/vf/etat 300 ms plus tard ; imprime { etat, ms (de l'état), ailleurs (code), schema }
+import http from 'node:http';
+const [, , port, token] = process.argv;
+const get = (p) => new Promise((ok) => { const t0 = Date.now(); const r = http.request({ host: '127.0.0.1', port: Number(port), path: p, method: 'GET', headers: { Host: `127.0.0.1:${port}`, 'x-vf-cockpit-token': token }, agent: false }, (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => ok({ code: res.statusCode, ms: Date.now() - t0, b })); }); r.on('error', () => ok({ code: 0, ms: Date.now() - t0, b: '' })); r.end(); });
+const a = get('/api/vf/ailleurs');
+await new Promise((k) => setTimeout(k, 300));
+const e = await get('/api/vf/etat'), r = await a;
+let schema = ''; try { schema = JSON.parse(r.b).schema; } catch {}
+console.log(JSON.stringify({ etat: e.code, ms: e.ms, ailleurs: r.code, schema }));
+process.exit(0);
+JS
   RG13_SERVEUR=1
 }
 rg13_n() { wc -l < "$1" | tr -d ' '; }
 rg13_get() { cockpit_get /api/vf/ailleurs > "$WORK/rg13-body" 2>/dev/null; RG13_CODE="$VF_CODE"; }
-rg13_liste() { rg13_get; [ "$RG13_CODE" = 200 ] && [[ "$(cat "$WORK/rg13-body")" == *'"lab"'* ]]; }
+rg13_liste() { rg13_get; [ "$RG13_CODE" = 200 ] && { [[ "$(cat "$WORK/rg13-body")" == *'"lab"'* ]] || { [ -n "${RG13_VIDE:-}" ] && [[ "$(cat "$WORK/rg13-body")" == *'"ailleurs":[]'* ]]; }; }; }
 
 # rg13_run <fichier résultat> : lance le serveur (COCKPIT_MODULE s'il est posé), joue le scénario, écrit des lignes « clé=valeur », arrête le serveur.
 # À appeler dans le shell courant (jamais dans $(…)).
@@ -134,6 +147,32 @@ rg13_mutant_serveur() { # rg13_mutant_serveur <NOM> <libellé> <fichier> <expr s
   else echo "  ❌ FAIL — M-$nom — $lib (mutant survivant ou serveur muet)"; echo "     attendu: [différent de $sain]"; echo "     obtenu:  [$got]"; FAIL=$((FAIL+1)); fi
 }
 
+# constats d'audit 2 et 3 (73-02) ------------------------------------------------------------------------------------------------
+# rg13_inj <NOM> <expr sed sur vf-cockpit-etat-officiel.mjs> [<expr sed sur vf-cockpit-server.mjs>] : copie jetable du module, dans laquelle l'état officiel
+# émet une entrée à clé en trop (injection, pas une garde) et, pour un mutant, la garde du serveur est retirée ; exporte COCKPIT_MODULE (code 1 si une ancre manque)
+rg13_inj() {
+  cockpit_module_muter "RG13-$1" vf-cockpit-etat-officiel.mjs "$2" || return 1
+  if [ -n "${3:-}" ]; then
+    local s="$COCKPIT_MODULE/scripts/vf-cockpit-server.mjs"
+    sed "$3" "$s" > "$s.mut" && ! cmp -s "$s" "$s.mut" && mv "$s.mut" "$s" || return 1
+  fi
+}
+RG13_INJ='s@const l = lignes.get(lab) || { lab, n: 0 };@const l = lignes.get(lab) || { lab, n: 0, extra: "x" };@'
+# rg13_run_lent <fichier résultat> : un git qui dort 3 s ; la première requête de la route déclenche la lecture des arbres, une seconde requête (état) part 300 ms après
+rg13_run_lent() {
+  local res="$1"
+  rg13_serveur_init
+  printf '[{"sessionId":"3f2c9a10-5b7e-4c1d-9a2e-0d4f6b8c1e10","kind":"interactive","pid":4001,"cwd":"%s","state":"blocked"}]' "$RG13_POSTE/atelier" > "$RG13_JSON"
+  echo 0 > "$RG13_RC"
+  COCKPIT_SORTIE="$RG13_LAB/.vibeflow/cockpit" cockpit_lancer "$RG13_LAB" PATH="$RG13_BIN:$PATH"
+  if [ "${VF_PORT:-0}" = 0 ]; then echo '{"lancement":"ko"}' > "$res"; return 0; fi
+  echo 3 > "$RG13_GITSLEEP"
+  node "$AUX/rg13lent.mjs" "$VF_PORT" "$VF_JETON" > "$res" 2>&1
+  rm -f "$RG13_GITSLEEP"; sleep 4   # les git déjà partis finissent avant l'arrêt
+  cockpit_arreter
+}
+rg13_etat_libre() { G "$1" '[j.etat, j.ms < 1500, j.ailleurs, j.schema]' 2>/dev/null; }
+
 rg_RG13_route() {
   local r d
   rg13_serveur_init
@@ -145,7 +184,15 @@ rg_RG13_route() {
   assert_eq "RG13.13 — précondition (la route a rendu la liste) puis dix GET : le journal du faux claude et celui du faux git ne gagnent aucune ligne" "$(rg13_ch "$r" rendue)|$(rg13_ch "$r" dclaude)|$(rg13_ch "$r" dgit)" "oui|0|0"
   assert_eq "RG13.14 — témoin positif (au moins un git dans un arbre du lab) puis aucun git hors du lab ni dans un autre lab pendant tout le scénario" "$([ "$(rg13_ch "$r" gitlab)" -gt 0 ] 2>/dev/null && echo oui || echo non)|$(rg13_ch "$r" gitdehors)" "oui|0|0"
   rg13_mutant_serveur AILLEURS-GIT "un git lancé dans le dossier de la session" vf-cockpit-etat-officiel.mjs 's@const lab = nomDuLab(d, hd);@const lab = (execFile("git", ["-C", d, "status"], () => {}), nomDuLab(d, hd));@' gitdehors "0|0"
-  rg13_mutant_serveur ROUTE-PAR-REQUETE "la route relance la lecture officielle" vf-cockpit-server.mjs 's@ailleurs: ailleurs(os.homedir(), @ailleurs: (import("./vf-cockpit-etat-officiel.mjs").then((m) => m.rafraichir({ home: os.homedir(), cwd: c.root })), ailleurs)(os.homedir(), @' dclaude 0
+  rg13_mutant_serveur ROUTE-PAR-REQUETE "la route relance la lecture officielle" vf-cockpit-server.mjs 's@const l = ailleurs(os.homedir(), @const l = (import("./vf-cockpit-etat-officiel.mjs").then((m) => m.rafraichir({ home: os.homedir(), cwd: c.root })), ailleurs)(os.homedir(), @' dclaude 0
   rg13_mutant_serveur ROUTE-SANS-JETON "contrôle de jeton neutralisé (portail de serve.mjs et accès gardé)" serve.mjs 's@(!sameToken(given, token) && !VF?.jetonValide(given))@false@' sanstoken 403 's@if (!jetonValide(h\[entete\])) return { ok: false, code: 403 };@@'
+  # constat d'audit 2 : une entrée à clé en trop (injectée dans l'état officiel d'une copie du module) ne sort pas ; seules des entrées { lab, n } sortent
+  local x="$WORK/rg13-extra.res" got
+  if rg13_inj EXTRA "$RG13_INJ"; then RG13_VIDE=1 rg13_run "$x"; fi; unset COCKPIT_MODULE
+  assert_eq "RG13.15 — état officiel qui rend une entrée { lab, n, extra } : la route ne l'émet pas (ailleurs = [])" "$(rg13_ch "$x" liste)|$(rg13_ch "$x" rendue)" '[]|oui'
+  x="$WORK/rg13-extra-mut.res"
+  if rg13_inj EXTRA-GARDE "$RG13_INJ" 's@l\.filter(exacte)@l@'; then RG13_VIDE=1 rg13_run "$x"; got="$(rg13_ch "$x" liste)"; else got="ancre absente"; fi; unset COCKPIT_MODULE
+  if [ -n "$got" ] && [ "$got" != '[]' ] && [ "$got" != "ancre absente" ]; then echo "  ✅ PASS — M-EXTRA-GARDE — la garde d'émission retirée (mutant tué : liste=$got, saine [])"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — M-EXTRA-GARDE — la garde d'émission retirée (mutant survivant, serveur muet ou ancre absente)"; echo "     attendu: [différent de []]"; echo "     obtenu:  [$got]"; FAIL=$((FAIL+1)); fi
   vf_hyg_assert
 }
