@@ -44,7 +44,7 @@
   };
   // S6 (revue de la recette du 2026-11-08) : tiroir Git ouvert (body.vf-git-ouvert), le titre est masqué dessous (opacity 0, 77-vf-git-tiroir.js) ; il ne reste pas un arrêt de Tab (focus invisible, bulle par-dessus le tiroir) ; le tabindex revient à la fermeture ; F6a (3e tour) : il ne revient que si le titre porte encore une définition (data-vf-aide), jamais sur le seul fait qu'il en a porté une (un dépôt « indisponible » la retire : le titre n'est alors plus un arrêt)
   const tabTitre = () => { const h1 = document.querySelector('#context h1'); if (!h1 || !h1.dataset.vfAide) return; if (document.body.classList.contains('vf-git-ouvert')) h1.removeAttribute('tabindex'); else h1.tabIndex = 0; };
-  new MutationObserver(tabTitre).observe(document.body, { attributes: true, attributeFilter: ['class'] });
+  window.addEventListener('vf-git:etat', tabTitre); // 79-17 : émis par le tiroir Git après chaque pose ou retrait de la classe du corps
   const ecrireVue = () => { // réécrit le bloc que renderContext vient de poser ; sous-vues et réponses (q:answer) inchangées
     const ctx = document.querySelector('#context'), k = ctx && ctx.querySelector('.k'), h1 = ctx && ctx.querySelector('h1');
     if (!k || !h1) return;

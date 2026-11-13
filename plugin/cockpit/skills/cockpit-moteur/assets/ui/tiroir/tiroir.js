@@ -56,8 +56,12 @@ function scriptTiroir(cfg, accepte, construire) {
     new MutationObserver(eviterTout).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     // la barre de question apparaît, disparaît ou change de largeur sans que la fenêtre bouge (panneau ouvert ou fermé) : ResizeObserver, puis transitionend de la barre elle-même
     // (left et width transitionnent 450 ms : le dernier rappel de l'observateur tombe avant la fin de left). Filtré sur la barre : un enfant qui finit sa transition ne relance rien.
+    // 79-16 : les rappels ResizeObserver suivent l'ordre de création des observateurs ; les scripts d'onglet (ui/01) s'exécutent après les
+    // persistants, donc créent le leur APRÈS celui-ci : --vf-ask-bas (qui place le zoom) est périmée à la mesure, le zoom est jugé sans
+    // recouvrement, vidé, puis tombe sur la pastille. Un second passage à la frame suivante lit la variable à jour, quel que soit l'ordre.
+    const doubler = (f) => () => { f(); requestAnimationFrame(f); };
     { const ask = document.getElementById('ask');
-      if (ask) { if (window.ResizeObserver) new ResizeObserver(eviterTout).observe(ask); const surTransition = (e) => { if (e.target === ask) eviterTout(); }; ask.addEventListener('transitionend', surTransition); } }
+      if (ask) { if (window.ResizeObserver) new ResizeObserver(doubler(eviterTout)).observe(ask); const surTransition = (e) => { if (e.target === ask) eviterTout(); }; ask.addEventListener('transitionend', surTransition); } }
     const puce = (texte) => { d.puce.textContent = texte; document.body.appendChild(d.puce); eviter(d.puce); };
     if (cfg.indisponible) { puce(T.windows); return; }
     if (location.hostname !== '127.0.0.1') { puce(T.localhost); return; }

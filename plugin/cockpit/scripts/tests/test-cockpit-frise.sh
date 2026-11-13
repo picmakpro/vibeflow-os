@@ -502,7 +502,7 @@ mkdir -p "$WORK/ag-fil"; ag_node file "$COPIE" "$AGLAB" "$WORK/ag-fil" > "$WORK/
 FILE_EXPR='[j.tot40,j.tot40Inconnus,j.tot40Apres,j.bons,j.muetsAvant,j.muetsApres,j.muetsInconnus,j.nouveaux,j.nouveauxInconnus,j.morts,j.mortsInconnus,j.apresRelance].join("|")'
 FILE_ATT="24|true|40|16|0|3|true|16|1|2|true|true"
 assert_eq "F7.6 — 40 lectures simultanées pendant que le fil retient : 16 en vol, 24 inconnues sans attendre ; réponses libérées : les 16 reçoivent leur corps ; fil muet : inconnu au délai (horloge injectée) puis aucune fuite (16 nouvelles lectures répondues, la 17e inconnue) ; fil mort : lectures en vol inconnues, lecture suivante répondue après un tour du nouveau fil" "$(jf "$WORK/ag-file.json" "$FILE_EXPR")" "$FILE_ATT"
-d="$(mutcopie M-FILE vf-cockpit-agents-table.mjs '/garde:agents-file/s/enVol >= 16/false/')"; assert_eq "M-FILE.0 — la copie existe, diffère et charge" "$([ -n "$d" ] && echo oui || echo non)" "oui"
+d="$(mutcopie M-FILE vf-cockpit-agents-table.mjs '/garde:agents-file/s/enVol >= EN_VOL_MAX/false/')"; assert_eq "M-FILE.0 — la copie existe, diffère et charge" "$([ -n "$d" ] && echo oui || echo non)" "oui"
 [ -n "$d" ] && { mkdir -p "$WORK/ag-fil-m"; ag_node file "$d" "$AGLAB" "$WORK/ag-fil-m" > "$WORK/ag-file-m.json"; assert_eq "M-FILE — la ligne garde:agents-file retire le plafond de 16 : les 40 lectures partent, aucune n'est refusée, F7.6 rougit" "$(rougit "$(jf "$WORK/ag-file-m.json" "$FILE_EXPR")" "$FILE_ATT")|$(jf "$WORK/ag-file-m.json" 'j.tot40')" "ko|0"; }
 
 # F7.9 — chemin d'erreur en processus (fichier au nom forgé), puis son mutant
@@ -510,7 +510,7 @@ ag_node erreur "$COPIE" "$AGLAB" > "$WORK/ag-erreur.json"
 ERR_EXPR='j.transcript.join()+"|"+j.doing.join()+"|"+j.leve'
 ERR_ATT="true,false,false,erreur,id,schema|true,false,false,doing,erreur,id,schema|oui"
 assert_eq "F7.9 — un fichier au nom forgé (octet nul) : lireDansLeFil rend, pour transcript et doing, le corps d'un agent absent (mêmes clés, sans message), sans le marqueur ni la racine du lab ; témoin positif : fs.statSync sur ce chemin lève et son message porte le marqueur" "$(jf "$WORK/ag-erreur.json" "$ERR_EXPR")" "$ERR_ATT"
-d="$(mutcopie M-ERREUR-LECTURE vf-cockpit-agents-table.mjs '/garde:agents-erreur/s/catch { return inconnu(quoi, id); }/catch (e) { return { ...inconnu(quoi, id), erreur: String(e.message) }; }/')"; assert_eq "M-ERREUR-LECTURE.0 — la copie existe, diffère et charge" "$([ -n "$d" ] && echo oui || echo non)" "oui"
+d="$(mutcopie M-ERREUR-LECTURE vf-cockpit-agents-table.mjs '/garde:agents-erreur/s/catch { return inconnu(q, id); }/catch (e) { return { ...inconnu(q, id), erreur: String(e.message) }; }/')"; assert_eq "M-ERREUR-LECTURE.0 — la copie existe, diffère et charge" "$([ -n "$d" ] && echo oui || echo non)" "oui"
 [ -n "$d" ] && { ag_node erreur "$d" "$AGLAB" > "$WORK/ag-erreur-m.json"; assert_eq "M-ERREUR-LECTURE — la ligne garde:agents-erreur rend le texte de l'exception : F7.9 rougit pour la raison tracée (le marqueur est dans le corps)" "$(rougit "$(jf "$WORK/ag-erreur-m.json" "$ERR_EXPR")" "$ERR_ATT")|$(jf "$WORK/ag-erreur-m.json" 'j.transcript[1]')" "ko|true"; }
 
 # F7.7 — une seule collecte par tour (garde-fou : vert avant et après), en processus sur une copie instrumentée
@@ -577,7 +577,7 @@ fi
 ag_arreter
 
 # M-ERREUR-LECTURE sur le serveur réel : F7.10 rougit
-ag_demarrer M-ERREUR-LECTURE vf-cockpit-agents-table.mjs '/garde:agents-erreur/s/catch { return inconnu(quoi, id); }/catch (e) { return { ...inconnu(quoi, id), erreur: String(e.message) }; }/'; RE=$?
+ag_demarrer M-ERREUR-LECTURE vf-cockpit-agents-table.mjs '/garde:agents-erreur/s/catch { return inconnu(q, id); }/catch (e) { return { ...inconnu(q, id), erreur: String(e.message) }; }/'; RE=$?
 assert_eq "M-ERREUR-LECTURE.1 — la copie existe, diffère, charge, et le serveur muté est lancé" "$RE" "0"
 if [ "$RE" = 0 ]; then
   get "/api/vf/transcript?id=err1" > "$WORK/ag-err-m.json"
