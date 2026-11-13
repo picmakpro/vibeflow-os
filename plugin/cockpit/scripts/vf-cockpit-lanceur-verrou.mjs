@@ -1,5 +1,6 @@
 // vf-cockpit-lanceur-verrou — verrou de lanceur et reprise d'un serveur orphelin (AUDC-H3), pour vf-cockpit.mjs.
-// Aucune adresse ni PID n'est cru sans contrôle : le PID doit être le serveur de CE lab (estNotre, fourni par le lanceur ; identité dans vf-cockpit-serveur-vivant.mjs).
+// Aucune adresse ni PID n'est cru sans contrôle : le PID doit être le serveur de CE lab (estNotre, fourni par le lanceur ;
+// identité dans vf-cockpit-serveur-vivant.mjs).
 import fs from 'node:fs';
 import path from 'node:path';
 import { confiner } from './vf-cockpit-paths.mjs';
@@ -54,14 +55,16 @@ export async function prendreVerrou(lab, sortie, { vivant, attendre }) {
     }
   }
 }
-// AUDC-H3 : un serveur de CE lab déjà à l'écoute alors que server.json manque (fichier perdu) est repris, jamais doublé. La DÉTECTION (page à jeton, /api/status, PID reconnu par estNotre)
-// vit dans vf-cockpit-serveur-vivant.mjs et n'écrit rien (79-06, D-M13) ; l'ADOPTION, qui écrit server.json, reste ici : c'est le geste de `open`.
+// AUDC-H3 : un serveur de CE lab déjà à l'écoute alors que server.json manque (fichier perdu) est repris, jamais doublé. La DÉTECTION (page à jeton,
+// /api/status, PID reconnu par estNotre) vit dans vf-cockpit-serveur-vivant.mjs et n'écrit rien (79-06, D-M13) ; l'ADOPTION, qui écrit
+// server.json, reste ici : c'est le geste de `open`.
 export async function serveurOrphelin(lab, sortie, port0, { estNotre, etatFile, adresseLocale, serveurVivant, noter }) {
   const o = await detecterServeur(lab, sortie, port0, { estNotre: (pid) => estNotre(pid, path.join(sortie, 'serve.mjs'), lab) });
   if (!o) return null;
   // adopté : server.json est réécrit (0600) pour que `status`, `stop` et les relances le retrouvent
   const fd = ouvrirSur(lab, etatFile(sortie)); if (fd === null) return null; // jamais à travers un lien, jamais hors du lab
-  try { fs.writeSync(fd, JSON.stringify({ pid: o.pid, port: o.port, url: adresseLocale(o.port), token: o.token, hash: o.hash, startedAt: new Date().toISOString() }, null, 2)); } catch { return null; } finally { fs.closeSync(fd); }
+  const etat = { pid: o.pid, port: o.port, url: adresseLocale(o.port), token: o.token, hash: o.hash, startedAt: new Date().toISOString() };
+  try { fs.writeSync(fd, JSON.stringify(etat, null, 2)); } catch { return null; } finally { fs.closeSync(fd); }
   noter(sortie, `serveur déjà à l'écoute (PID ${o.pid}, port ${o.port}) sans server.json : repris, aucun second serveur lancé`);
   return serveurVivant(sortie);
 }

@@ -18,7 +18,9 @@ export const MODELE_DEFAUT = 'sonnet';
 export const ARGS_CONFINEMENT = [
   '--permission-mode', 'dontAsk',
   '--tools', 'Read,Grep,Glob,Bash',
-  '--allowedTools', 'Bash(node <module>/scripts/vf-cockpit-query.mjs:*)', 'Bash(node <module>/skills/cockpit-moteur/assets/query-cli.mjs:*)', 'Read(./**)', 'Grep(./**)', 'Glob(./**)',
+  '--allowedTools',
+  'Bash(node <module>/scripts/vf-cockpit-query.mjs:*)', 'Bash(node <module>/skills/cockpit-moteur/assets/query-cli.mjs:*)',
+  'Read(./**)', 'Grep(./**)', 'Glob(./**)',
   '--setting-sources', '',
   '--strict-mcp-config',
 ];
