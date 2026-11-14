@@ -6,7 +6,7 @@
 //   pile-marque    : la même région porte data-vf-flottant="tiroir" : la pile la laisse à son Échap (palette encore ouverte)
 //   reperes        : cartes hors champ, un bouton fixe étranger couvre la fenêtre : les repères restent-ils posés ?
 //   reperes-marque : le même bouton porte data-vf-flottant="bouton" : c'est un obstacle, aucun repère ne trouve de place
-//   reperes-tard   : repères posés, PUIS le bouton marqué arrive sous body, sans aucun autre geste : les repères le contournent-ils ?
+//   reperes-tard   : repères posés, page au repos (ni `panel` ni `render` sur 1,5 s), PUIS le bouton marqué arrive sous body : les repères le contournent-ils ?
 //   reperes-sans   : témoin de méthode, le même geste sans aucun élément posé : les repères restent
 import { executer, pause, stabiliser } from './chrome-session.mjs';
 const [, , chrome, racine, mode] = process.argv;
@@ -62,6 +62,10 @@ await executer(chrome, async (s) => {
     await s.ev('VF_CANEVAS.deplacer({ x: 3000, y: 0 })'); await pause(300);
     const n = () => s.ev("document.querySelectorAll('button.vf-repere').length");
     o.avant = await stabiliser(n, { pas: 150, max: 4000 });
+    if (mode === 'reperes-tard') { // page au repos AVANT l'arrivée : la relecture tardive de l'activité (75) re-rend le panneau, 02 se réévalue par `panel`
+      await s.ev("window.__vue = 0; for (const e of ['panel', 'render']) window.Floorplan.on(e, () => { window.__vue++; })");
+      let vu = -1; for (let i = 0; i < 12 && vu !== (vu = await s.ev('window.__vue')); i++) await pause(1500);
+    }
     const marque = mode === 'reperes-marque' || mode === 'reperes-tard' ? "b.setAttribute('data-vf-flottant', 'bouton');" : '';
     const plein = 'position: fixed; inset: 0; width: 100vw; height: 100vh; opacity: 0; pointer-events: none; z-index: 5';
     if (mode !== 'reperes-sans') await s.ev(POSER('button', plein, marque));
