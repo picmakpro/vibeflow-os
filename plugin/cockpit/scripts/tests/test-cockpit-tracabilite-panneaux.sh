@@ -119,7 +119,7 @@ E() { node "$AUX/ev.mjs" "$2" < "$WORK/$1.json"; }
 
 LL="$WORK/labL"; mklabL "$LL"; lancer_page "$LL"; attendre 30 pret
 assert_eq "C0 — témoin : le serveur du lab écoute et la première collecte est faite (ADR, décisions et mémoire servies)" "$([ "${VF_PORT:-0}" -gt 0 ] && cockpit_get '/api/vf/tracabilite?vue=adr' | grep -q '"ADR-001"' && echo oui || echo non)" "oui"
-harnais chrome-tracabilite-panneaux.mjs hl "d1,d3,d7,j1"; harnais chrome-tracabilite-memoire.mjs hm "m1,m2,m3,m4,m6,m7,m8,m10"
+harnais chrome-tracabilite-panneaux.mjs hl "d1,d3,d7,j1,j3"; harnais chrome-tracabilite-memoire.mjs hm "m1,m2,m3,m4,m6,m7,m8,m10"
 echo "=== C3.1 à C3.2 — Décisions, ADR, commits qui la citent (tracer) ==="
 assert_eq "C3.1a — section « Décisions » repliée par défaut, aucune requête vue=adr avant l'ouverture, une seule à l'ouverture" "$(E hl 'j.d1avant.ferme+"|"+j.d1avant.req+"|"+j.d1sec.req')" "true|0|1"
 assert_eq "C3.1b — bilan « 2 ADR · 3 décisions · 1 registre de phase », compteur « 2 ADR », une ligne par ADR avec section (ADR-007 sans section n'en a pas)" "$(E hl 'j.d1sec.bilan+"|"+j.d1sec.compteur+"|"+j.d1sec.ids')" "2 ADR · 3 décisions · 1 registre de phase|2 ADR|ADR-001,ADR-002"
@@ -161,10 +161,13 @@ assert_eq "C4.8b — l'export existe et ne porte aucun des trois marqueurs (le c
 assert_eq "C4.10a — Projet, Code, Projet : ADR-001, P90-D-01, Retour (le Retour nomme ADR-001) ; entrée, entrée cible, Retour : chaque panneau se rouvre et revient comme à la première arrivée" "$(E hm 'j.m10a.label.endsWith("ADR-001")+"|"+j.m10b+"|"+j.m10c')" "true|ADR-001|entree-a-MEMOIRE-MARQUEUR-76"
 assert_eq "C4.10b — clés bien formées : l'entrée vf-coder/a.md (vf-coder%2Fa.md), la décision P90-D-01:ph-90 (P90-D-01%3Aph-90) et l'ADR passent la grammaire de lireJson (aucun refus), requêtes vues au réseau" "$(E hm 'j.m10cles.join()+"|"+(j.m10req>=3)')" "ok,ok,ok|true"
 assert_eq "C4.x — aucune section n'a échoué par erreur de harnais (mémoire)" "$(E hm 'JSON.stringify(j.erreurs)')" "{}"
-echo "=== C3.10 — correctif du juge de design : débordement des panneaux d'objet ==="
+echo "=== C3.10 à C3.11 — correctifs du juge de design : débordement des panneaux d'objet, indicateur de pliage ==="
 assert_eq "C3.10a — panneaux d'objet (ADR, décision, entrée, exigence, liste) à 1 440, 1 024 et 390 px, titre de 3 lignes et chemin long compris : 30 mesures, aucune ne défile à l'horizontale" "$(E hl 'Object.keys(j.j1).length+"|"+Object.entries(j.j1).filter(([k,v])=>!v||v.sw>v.cw).map(([k,v])=>k+":"+(v&&v.sw+">"+v.cw)).join()')" "30|"
 assert_eq "C3.10b — en-tête, titre, sections et pied partagent le même bord gauche (20 px) et le même bord droit dans chaque panneau" "$(E hl 'Object.entries(j.j1).filter(([k,v])=>!v||v.gauches!==1||v.droits!==1).map(([k,v])=>k+":"+(v&&v.gauches+"/"+v.droits)).join()')" ""
 assert_eq "C3.10c — aucun élément (pastille de type comprise) ne dépasse le bord droit des sections" "$(E hl 'Object.entries(j.j1).filter(([k,v])=>!v||v.hors>0).map(([k,v])=>k+":"+(v&&v.hors)).join()')" ""
+assert_eq "C3.11a — sections repliables (Jalon, Décisions, Mémoire, sous-repli) : indicateur de pliage de 16 px au trait, immobile fermé" "$(E hl '["jalon","decisions","memoire","sous"].map(n=>{const c=n==="sous"?j.j3.sous:j.j3[n].ferme;return [c.content,c.w,c.h,c.img,c.t].join("/")}).join("|")')" "$(printf '%s' '""/16px/16px/linear-gradient/none' ; for _ in 1 2 3; do printf '|%s' '""/16px/16px/linear-gradient/none'; done)"
+assert_eq "C3.11b — ouvert : l'indicateur est tourné de 90 degrés (Jalon, Décisions, Mémoire)" "$(E hl '["jalon","decisions","memoire"].map(n=>{const m=(j.j3[n].ouvert.t.match(/-?[\d.e-]+/g)||[]).map(Number);return Math.abs(m[0])<.001&&Math.round(m[1])===1}).join()')" "true,true,true"
+assert_eq "C3.11c — couleur de --text-3 dans les deux thèmes, sans couleur ajoutée (le clair diffère du sombre)" "$(E hl 'j.j3.light.ok+"|"+j.j3.dark.ok+"|"+(j.j3.light.couleur!==j.j3.dark.couleur)')" "true|true|true"
 assert_eq "C3.x — aucune section n'a échoué par erreur de harnais (lab L)" "$(E hl 'JSON.stringify(j.erreurs)')" "{}"
 cockpit_arreter
 # lab R : 31 registres de phase, pas de docs/ADR.md

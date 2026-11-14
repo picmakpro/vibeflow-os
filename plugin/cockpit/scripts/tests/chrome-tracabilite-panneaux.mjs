@@ -2,7 +2,7 @@
 // Usage : node chrome-tracabilite-panneaux.mjs <chrome> <racine-du-serveur> <sections>   Rend UNE ligne JSON { d1, … } ou { erreur }. Chaque section est isolée.
 import { executer, pause, stabiliser, attendreValeur } from './chrome-session.mjs';
 const [, , chrome, racine, liste] = process.argv;
-const SEL = new Set((liste || 'd1,d3,d5,d6,d7,d8,j1').split(','));
+const SEL = new Set((liste || 'd1,d3,d5,d6,d7,d8,j1,j3').split(','));
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!VibeFlow.state && !!VibeFlow.state.layout";
 const SANS_VISITE = "(() => { const g = Storage.prototype.getItem; Storage.prototype.getItem = function (k) {"
   + " const vue = typeof k === 'string' && (k.indexOf('floorplan:tour-seen:') === 0 || k.indexOf('vibeflow-cockpit:visite:') === 0);"
@@ -150,6 +150,20 @@ await executer(chrome, async (s) => {
         o.j1[`${w}|${nom}`] = await lire(MESURE); await s.ev(ETIRER); await pause(200); o.j1[`${w}|${nom}|etire`] = await lire(MESURE);
       }
     }
+  });
+  await sec('j3', async () => { // indicateur de pliage au gabarit des rangées « Backlog » : présent, tourné ouvert, couleur de --text-3 dans les deux thèmes
+    await charger(); await s.ev("VibeFlow.go('root')"); await vrai(`!!document.querySelector(${JSON.stringify(SEC('decisions'))})`); o.j3 = {};
+    const PSEUDO = `(sel) => { const e = document.querySelector(sel), c = getComputedStyle(e, '::before'), i = document.createElement('i'); i.style.color = 'var(--text-3)';
+      document.body.append(i); const ref = getComputedStyle(i).color; i.remove(); return { content: c.content, w: c.width, h: c.height, t: c.transform, img: c.backgroundImage.slice(0, 15),
+        ok: c.color === ref, couleur: c.color }; }`;
+    for (const [nom, sel] of [['jalon', SEC('jalon')], ['decisions', SEC('decisions')], ['memoire', SEC('memoire')]]) {
+      await clic(`${sel} > summary`); await pause(400); const ouvert = await lire(`(${PSEUDO})(${JSON.stringify(sel + ' > summary')})`);
+      await clic(`${sel} > summary`); await pause(400); const ferme = await lire(`(${PSEUDO})(${JSON.stringify(sel + ' > summary')})`);
+      o.j3[nom] = { ferme, ouvert }; }
+    await clic(`${SEC('decisions')} > summary`); await pause(300);
+    o.j3.sous = await lire(`(${PSEUDO})(${JSON.stringify(SEC('decisions') + ' details.vf-trace-sous > summary')})`);
+    for (const th of ['light', 'dark']) { await s.ev(`document.documentElement.setAttribute('data-theme', '${th}')`); await pause(200);
+      o.j3[th] = await lire(`(${PSEUDO})(${JSON.stringify(SEC('decisions') + ' > summary')})`); }
   });
   return o;
 }, { csp: true });

@@ -64,6 +64,12 @@
     .vf-trace-repli > summary { display: flex; align-items: center; gap: var(--sp-6); min-height: 32px; cursor: pointer; font-weight: 500;
       color: var(--text-3); }
     .vf-trace-repli > summary:hover { color: var(--text); }
+    .vf-trace-repli > summary::before { content: ""; flex: none; width: 16px; height: 16px; color: var(--text-3); transition: transform 150ms var(--ease);
+      --vf-trait: transparent calc(50% - .75px), currentcolor calc(50% - .75px), currentcolor calc(50% + .75px), transparent calc(50% + .75px);
+      background: linear-gradient(to bottom left, var(--vf-trait)) 6px 3px / 5px 5px no-repeat,
+        linear-gradient(to bottom right, var(--vf-trait)) 6px 8px / 5px 5px no-repeat; }
+    .vf-trace-repli[open] > summary::before { transform: rotate(90deg); }
+    @media (prefers-reduced-motion: reduce) { .vf-trace-repli > summary::before { transition: none; } }
     .vf-trace-repli > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     .vf-trace-repli[open] > summary { margin-bottom: var(--sp-8); } .vf-trace-repli > summary .c { font-weight: 400; color: var(--text-4); }
     .vf-trace-preuve { display: flex; flex-direction: column; padding: var(--sp-8) 0 0; }

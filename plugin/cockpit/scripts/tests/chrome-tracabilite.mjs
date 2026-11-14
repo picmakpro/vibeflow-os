@@ -178,6 +178,9 @@ await executer(chrome, async (s) => {
         return { nom: n.textContent, entier: n.scrollWidth <= n.clientWidth, coupe: t.scrollWidth > t.clientWidth && getComputedStyle(t).textOverflow === 'ellipsis',
           droite: V.right <= L.right - 11 && V.right >= L.right - 13, etat: v.textContent }; })()`);
     }
+    await charger(); await phase(1); await clic('#vf-trace-phase details.vf-trace-repli > summary'); await pause(400);
+    o.c113preuves = await lire(`(() => { const c = getComputedStyle(document.querySelector('#vf-trace-phase details.vf-trace-repli > summary'), '::before');
+      return { content: c.content, w: c.width, t: c.transform }; })()`);
   });
   return o;
 }, { csp: true });
