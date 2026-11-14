@@ -39,3 +39,6 @@ rituel levé : régime allégé (consigne de Samuel, message session principale,
 
 ## Contrat consommé par une autre phase
 Aucun contrat modifié. Les lignes `AJOUT` de la 74 sont complètes pour l'arbre à ce commit : la 73 et la 80 qui ajoutent des modules insèrent les leurs à leur place alphabétique (B9 ne contrôle que `74-vf-*`).
+
+## Correction de fin de phase
+Correction ciblée (audit et revue de fin de phase) : le parcours XSS pose le curseur sur les écritures piégées et couvre chaque surface de nom par un mutant HTML (colonne, encart nom et cible, coût, titre de fiche) ; le lab piège aussi `description` et le titre de session ; B1 c et B1 d, B3 b, c et e passent par des mutants de code ou d'événement ; `lire()` borne segments et événements à 500 (B7) ; M-POST en if/else. Suites rejouées : test-cockpit-frise-bornes.sh 46 PASS / 0 FAIL (171 s), test-cockpit-chaine-xss.sh 34 PASS, test-cockpit-frise-modele.sh 146 PASS, test-cockpit-vendor.sh 253 PASS. Le premier jeu, lancé à cinq suites à la fois, a rougi sur des lectures faites avant le rendu : attente ajoutée avant la mesure, rejeu vert.
