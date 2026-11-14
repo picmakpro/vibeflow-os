@@ -758,6 +758,11 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - 75-07 : écarts de géométrie face à 75-UI-SPEC (barres à 2, tige à 13,5, contour pointillé de la prévue), au goût de la recette.
 - 75-08 : étiquette `.bl` du sélecteur masquée à tout gabarit et section « Points chauds » du panneau absente de la spec § 4, au goût de la recette.
 - 75-10 : un lab hors dépôt rend `gardes.etat = indisponible` (ligne Gardes désactivée), la spec dit « présente » ; à trancher.
+- 75-10 (fin de phase) : la phrase des Gardes « hors dépôt » promet une relecture qui n'aura pas lieu ; une phrase propre, ou des gardes lues sans git.
+- 75-08 (fin de phase) : `on` et `addPanelSection` du moteur ne se défont pas ; au retour sur Code les sections du panneau d'un passage précédent restent mortes (limite du moteur, le relais des écouteurs de 75-08 n'en couvre que la moitié).
+- 75-08 (fin de phase) : la chaîne XSS des agents est passée par une route amorcée, et le nom accessible n'est vérifié que sur son début.
+- 75-07 (juge design) : le palier bas des barres est peu lisible à l'ouverture.
+- 75-0x (juge design) : à 390 px la vue d'un dossier s'ouvre avec des cartes coupées à droite ; à vérifier.
 
 **Déclencheur de reprise :** la prochaine passe sur l'activité du cockpit (75-07 ou la phase suivante qui la lit).
 
