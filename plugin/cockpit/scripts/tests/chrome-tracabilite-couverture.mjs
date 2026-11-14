@@ -36,12 +36,20 @@ await executer(chrome, async (s) => {
   for (const e of lignes) {
     const n = await lire(`(${GRAPHE}.nodes.find((x) => x.kind === 'phase' && String(x.num) === ${JSON.stringify(String(e.phase))}
       && ((x.ws || null) === ${JSON.stringify(e.ws || null)} || ${JSON.stringify(e.ws)} === '*')) || {}).id || null`);
-    if (!n) continue;
-    await s.ev(`VibeFlow.select('n:${n}')`);
-    if (!(await vrai("!!document.querySelector('#vf-trace-phase .vf-trace-ligne')"))) continue;
-    await s.ev(`VFTrace.lire('phase', '${n}').then((p) => VFTrace.ouvrirExigence(p.phase.exigences.find((l) => l.id === ${JSON.stringify(e.id)}), false, null))`);
-    if (!(await vrai(`(() => { const t = document.querySelector('#panel [data-vf-trace-panneau] .pt'); return !!t && t.textContent === ${JSON.stringify(e.id)}; })()`))) continue;
-    await pause(150);
+    if (!n) throw new Error(`apres : aucun nœud de phase pour ${e.id} (phase ${e.phase})`);
+    // la phase se sélectionne puis la traçabilité se lit de façon asynchrone : sous charge la première lecture peut tarder ; trois essais, puis une erreur NOMMÉE (jamais une exigence sautée en silence)
+    let ouvert = false;
+    for (let essai = 0; essai < 3 && !ouvert; essai++) {
+      await s.ev(`VibeFlow.select('n:${n}')`);
+      if (!(await vrai("!!document.querySelector('#vf-trace-phase .vf-trace-ligne')", 20000))) continue;
+      await s.ev(`VFTrace.lire('phase', '${n}').then((p) => VFTrace.ouvrirExigence(p.phase.exigences.find((l) => l.id === ${JSON.stringify(e.id)}), false, null))`);
+      ouvert = await vrai(`(() => { const t = document.querySelector('#panel [data-vf-trace-panneau] .pt'); return !!t && t.textContent === ${JSON.stringify(e.id)}; })()`, 20000);
+    }
+    if (!ouvert) throw new Error(`apres : le panneau d'exigence de ${e.id} (phase ${n}) ne s'ouvre pas après trois essais`);
+    // le corps du panneau se lit de façon asynchrone (la première ouverture est la plus lente) : les sections et la bande des quatre maillons sont posées avant la lecture des puces
+    if (!(await vrai("document.querySelectorAll('#panel [data-vf-trace-panneau] .sec').length >= 4 && document.querySelectorAll('#panel .vf-trace-maillon').length >= 4", 20000))) {
+      throw new Error(`apres : le corps du panneau d'exigence de ${e.id} n'est pas posé`);
+    }
     const puces = await lire("[...document.querySelectorAll('#panel [data-vf-trace-panneau] .vf-trace-puce')].map((b) => b.textContent.trim())") || [];
     for (const p of puces) o.apres.push(`${e.id}\t${p}`);
   }
