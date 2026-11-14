@@ -1394,25 +1394,25 @@ else sans_effet "M-STRINGS-COMMENTE"; fi
 if mutant strings-apres-open client.js '/^ *if (Terminal.strings)/{h;d;};/term.open(/G'; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v26"]'; assert_eq "M-STRINGS-APRES-OPEN — le mutant (la ligne Terminal.strings est posée après term.open()) rougit LB.V26 : le champ est déjà nommé en anglais (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v26 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v26 === 'Saisie du terminal' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-STRINGS-APRES-OPEN"; fi
-if mutant couleur-proposition q.css "s|^#proposition-mode { border: thin solid|#proposition-mode { color: #fff; border: thin solid|"; then
+if mutant couleur-proposition q.css "s|^#proposition-mode { appearance: none;|#proposition-mode { color: #fff; appearance: none;|"; then
   assert_eq "M-COULEUR-PROPOSITION — le mutant (un littéral de couleur dans une règle de la proposition) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-PROPOSITION"; fi
 if mutant couleur-accueil q.css "s|^#accueil .vf-q-texte { font-weight: 400;|#accueil .vf-q-texte { background: rgba(0, 0, 0, .5); font-weight: 400;|"; then
   assert_eq "M-COULEUR-ACCUEIL — le mutant (un rgba( dans la règle de l'accueil, hors #proposition) rougit LB.S4 élargi (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-ACCUEIL"; fi
-if mutant couleur-nom q.css "s|^#proposition-mode { border: thin solid|#proposition-mode { color: red; border: thin solid|"; then
+if mutant couleur-nom q.css "s|^#proposition-mode { appearance: none;|#proposition-mode { color: red; appearance: none;|"; then
   assert_eq "M-COULEUR-NOM — le mutant (un nom de couleur, red, dans une règle de la proposition) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-NOM"; fi
 if mutant couleur-transparent q.css "s|^#accueil .vf-q-texte { font-weight: 400;|#accueil .vf-q-texte { background: transparent; font-weight: 400;|"; then
   assert_eq "M-COULEUR-TRANSPARENT — le mutant (transparent dans la règle de l accueil) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-TRANSPARENT"; fi
-if mutant couleur-courante q.css "s|^#proposition-mode { border: thin solid|#proposition-mode { color: currentColor; border: thin solid|"; then
+if mutant couleur-courante q.css "s|^#proposition-mode { appearance: none;|#proposition-mode { color: currentColor; appearance: none;|"; then
   assert_eq "M-COULEUR-COURANTE — le mutant (currentColor hors du picto, « stroke: currentColor » restant seul autorisé) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-COURANTE"; fi
-if mutant couleur-oklch q.css "s|^#proposition-mode { border: thin solid|#proposition-mode { color: oklch(60% .1 20); border: thin solid|"; then
+if mutant couleur-oklch q.css "s|^#proposition-mode { appearance: none;|#proposition-mode { color: oklch(60% .1 20); appearance: none;|"; then
   assert_eq "M-COULEUR-OKLCH — le mutant (une fonction moderne, oklch() rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-OKLCH"; fi
-if mutant couleur-color-mix q.css "s|^#proposition-mode { border: thin solid|#proposition-mode { color: color-mix(in srgb, var(--text) 50%, var(--on)); border: thin solid|"; then
+if mutant couleur-color-mix q.css "s|^#proposition-mode { appearance: none;|#proposition-mode { color: color-mix(in srgb, var(--text) 50%, var(--on)); appearance: none;|"; then
   assert_eq "M-COULEUR-COLOR-MIX — le mutant (color-mix() rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-COLOR-MIX"; fi
 if mutant px-proposition q.css "s|#proposition .vf-q-pied { justify-content: flex-end; }|#proposition .vf-q-pied { justify-content: flex-end; padding: 6px; }|"; then

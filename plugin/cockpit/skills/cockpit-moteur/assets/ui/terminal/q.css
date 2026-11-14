@@ -12,6 +12,7 @@
   --warn-bg: rgba(var(--ink), .05); --warn-text: #ffe9a8; --err-text: #ffb3bc;
   --ring: rgba(var(--ink), .88);
   --r-card: 20px; --r-ctl: 12px;
+  --h-ctl: 28px; --h-ctl-tactile: 36px; /* contrôle de formulaire (80-17, même valeur que #vf-modele) et cible au pointeur grossier */
   --ease: cubic-bezier(.16, 1, .3, 1);
   --sp-2: 2px; --sp-4: 4px; --sp-6: 6px; --sp-8: 8px; --sp-12: 12px; --sp-16: 16px; --sp-20: 20px; --sp-24: 24px; --sp-32: 32px;
   --edge: var(--sp-16); --inset-panel: var(--sp-20); --gap-section: var(--sp-24); --inset-card: var(--sp-16);
@@ -69,7 +70,7 @@ button { font: inherit; color: inherit; }
 /* bandeau de proposition (72 LB2, réglages du 2026-11-06) : contrôles aux variables de Q, texte neutre ; sorti de la vue au lot 8 LB3 pour lui rendre ses lignes */
 /* 80-17 (P80-D-20, AUDC-F1) : mêmes valeurs que #vf-modele (assets/ui/03-vf-charte.js) ; autre origine, donc des valeurs
    en dur, seule exception à « aucune valeur en dur » ; chevron en dégradés, aucune URL */
-#proposition-mode { appearance: none; -webkit-appearance: none; box-sizing: border-box; height: 28px; padding: 0 var(--sp-24) 0 var(--sp-8);
+#proposition-mode { appearance: none; -webkit-appearance: none; box-sizing: border-box; height: var(--h-ctl); padding: 0 var(--sp-24) 0 var(--sp-8);
   border: 1px solid var(--hair-2); border-radius: 8px; background-color: var(--raise); color: var(--text); color-scheme: inherit; font: inherit;
   --vf-chev: var(--text-3);
   --vf-trait: transparent calc(50% - .75px), var(--vf-chev) calc(50% - .75px), var(--vf-chev) calc(50% + .75px), transparent calc(50% + .75px);
@@ -77,7 +78,7 @@ button { font: inherit; color: inherit; }
   background-repeat: no-repeat; background-size: 5px 5px; background-position: right 14px center, right 9px center; }
 #proposition-mode:disabled { color: var(--text-4); opacity: 1; --vf-chev: var(--text-4);
   --vf-trait: transparent calc(50% - .75px), var(--vf-chev) calc(50% - .75px), var(--vf-chev) calc(50% + .75px), transparent calc(50% + .75px); }
-@media (pointer: coarse) { #proposition-mode { height: 36px; } }
+@media (pointer: coarse) { #proposition-mode { height: var(--h-ctl-tactile); } }
 #proposition input[type="checkbox"] { accent-color: var(--on); color-scheme: inherit; }
 #proposition-lancer[aria-disabled="true"], #proposition-lancer[aria-disabled="true"]:hover { cursor: not-allowed; background: var(--raise-2); color: var(--text-3); }
 .vf-lancer-armement { display: none; } #proposition:has(#proposition-lancer[aria-disabled="true"]) .vf-lancer-armement { display: inline; }
