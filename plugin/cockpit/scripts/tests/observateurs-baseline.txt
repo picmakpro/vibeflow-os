@@ -4,6 +4,9 @@
 00-vf-surcouches.js 1
 00-vibeflow.js 1
 01-vf-responsive.js 6
+02-vf-coin.js 3
+02-vf-ligne-etat.js 1
+02-vf-reperes.js 2
 02-vf-telephone.js 6
 03-vf-accessibilite.js 1
 05-theme.js 1
