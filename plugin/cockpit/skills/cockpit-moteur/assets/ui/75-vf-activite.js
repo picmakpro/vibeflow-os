@@ -17,6 +17,7 @@
   // l'état actif : le libellé `.bl` le dit, ce fond neutre est celui du survol ; bouton carré (budget de l'en-tête à 1 024 px) dont la pastille se pose en coin
   const CSS = `#btn-lentilles.vfa-actif { background: rgba(var(--ink), .07); }
     #btn-lentilles { position: relative; }
+    #btn-lentilles .bl { display: none; } /* le libellé suit la lentille : visible (1 600 px et plus), il ferait bouger l'en-tête ; le « ⋯ » le lit */
     #btn-lentilles .badge { position: absolute; top: var(--sp-4); right: var(--sp-2); }`;
   const parties = new Map(); // nom -> { fabrique, inst }
   let session = null; // la session de l'onglet Code, ou null
