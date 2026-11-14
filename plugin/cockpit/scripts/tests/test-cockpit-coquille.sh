@@ -457,7 +457,7 @@ cat > "$AUX/c8mesure.js" <<'JS'
 const MESURE = `(() => { const st = document.querySelector('#stage'), n = document.getElementById('vf-coquille-echec'), b = n && n.querySelector('button'), cs = n && getComputedStyle(n), ps = n && getComputedStyle(n.parentElement);
   const texte = document.body.innerText;
   return { etat: VF_COQUILLE.etat(), onglet: VF_COQUILLE.onglet(), pret: document.documentElement.dataset.vfPret, stageTexte: st.innerText.trim().length > 0, nbTextes: texte.split("TEXTE-FIXE").length - 1, noeud: !!n,
-    bouton: b ? b.textContent.trim() : null, nbBoutons: n ? n.querySelectorAll('button').length : 0, evts: window.__fix16e || [], evals: window.__fix16eval, r: window.__fix16r,
+    bouton: b ? b.textContent.trim() : null, bh: b ? Math.round(b.getBoundingClientRect().height) : 0, titre: n && n.querySelector('h1') ? n.querySelector('h1').textContent : null, cause: n && n.querySelector('.vf-ce-cause') ? n.querySelector('.vf-ce-cause').textContent : null, langue: n ? n.lang : null, carteL: n && n.querySelector('.vf-ce') ? Math.round(n.querySelector('.vf-ce').getBoundingClientRect().width) : 0, largeurFenetre: innerWidth, nbBoutons: n ? n.querySelectorAll('button').length : 0, evts: window.__fix16e || [], evals: window.__fix16eval, r: window.__fix16r,
     corps: texte.includes('MQ16-CORPS') || JSON.stringify(window.__fix16e || []).includes('MQ16-CORPS'), fond: cs && cs.backgroundColor, couleur: cs && cs.color, couleurParent: ps && ps.color, h: document.body.querySelectorAll('*').length }; })()`;
 JS
 # un corps de scénario = en-têtes + la mesure ; TEXTE-FIXE remplacé par le texte attendu
@@ -510,7 +510,7 @@ const ok = (nom, v) => { if (!v) rouge.push(nom); };
 const a = L('c8a'), b = L('c8b'), c = L('c8c'), e = L('c8d'), f = L('c8e'), g = L('c8f');
 ok('c81.etat', JSON.stringify(a.etat) === JSON.stringify({ onglet: 'projet', phase: 'echec', motif: 'lecture' })); ok('c81.nonBlanche', a.stageTexte); ok('c81.texteUnique', a.nbTextes === 1);
 ok('c81.bouton', a.bouton === 'Réessayer' && a.nbBoutons === 1); ok('c81.evenement', a.evts.length === 1 && a.evts[0].initial === true && a.evts[0].onglet === 'projet'); ok('c81.rappels', a.r === 0);
-ok('c81.sansErreurPage', a.erreurs === 0); ok('c81.corps', !a.corps); ok('c81.sobre', a.fond === 'rgba(0, 0, 0, 0)' && a.couleur === a.couleurParent);
+ok('c81.sansErreurPage', a.erreurs === 0); ok('c81.ecranFrancais', a.langue === 'fr' && a.titre === 'Le cockpit n\'a pas pu démarrer'); ok('c81.cible44', a.bh >= 44); ok('c81.cause', !!a.cause && /serveur du cockpit/.test(a.cause) && a.cause !== a.corpsTexte); ok('c81.tientDansLaFenetre', a.carteL > 0 && a.carteL <= a.largeurFenetre); ok('c81.corps', !a.corps); ok('c81.sobre', a.fond === 'rgba(0, 0, 0, 0)' && a.couleur === a.couleurParent);
 ok('c82.evenement', b.evts.length === 1); ok('c82.texteAbsent', b.nbTextes === 0 && !b.noeud && b.nbBoutons === 0); ok('c82.etat', b.etat.phase === 'echec');
 ok('c83.pret', c.etat.phase === 'pret' && c.onglet === 'projet' && c.pret === 'oui'); ok('c83.rappels', c.r === 1); ok('c83.retire', !c.noeud && c.nbTextes === 0); ok('c83.uneEvaluation', c.evals === 1);
 ok('c84.evenementRepete', e.evts.length === 2 && e.evts[1].initial === true); ok('c84.uniques', e.nbTextes === 1 && e.nbBoutons === 1);
