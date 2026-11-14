@@ -85,3 +85,6 @@ Suite vendor rejouée : 283 PASS / 3 FAIL : V12.4 (rouge voulu) et V11.Q6b, V11.
 - COMPTEUR-AVANT 244 (README.md l.65 et README.fr.md l.67, première occurrence) ; COMPTEUR-APRES 244 ; nombre réel du gate (`find plugin scripts -path '*/tests/test-*.sh'`) : 244. `check-version-sync.sh` vert : aucun des deux README racine n'a été touché.
 - Balayage de prose (section, README, `module.json`, trace) : 0 chemin du poste, identifiant de session ni marqueur de fixture ; témoin positif : une ligne plantée est comptée (1). `check-machine-paths.sh` : exit 0.
 - Fichiers qui citent les deux jetons de détachement hors `.planning/` : 0 à AVANT-20, 0 à HEAD.
+
+## Rejeu final sur la tête `1d251c716` (2026-11-14)
+vendor 286 PASS / 0 FAIL (90 s, V12 : 33) ; update-cockpit rc 0 ; nouveaux-modules rc 0 ; accessibilité 37/0 ; questions 133/0 ; robustesse 25/0 ; git-entete 136/0 ; marque-blanche 36/0 ; réseau 15/0 ; coquille 114/0 ; `check-version-sync.sh` et `check-machine-paths.sh` exit 0. Suites de navigateur jouées par le jeton commun.
