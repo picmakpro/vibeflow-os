@@ -8,7 +8,8 @@
   'use strict';
   const SCHEMA = 'vibeflow/cockpit-frise@1';
   const FENETRES = Object.freeze({ '1h30': 5400000, '6h': 21600000, '24h': 86400000 }); // clés fermées, jamais au-delà de 24 h (AUDC-Q2)
-  const SEUIL_REPLI = 12, SILENCE_MS = 120000, MAX_VOIES = 500, MAX_PAR_VOIE = 500; // MAX_PAR_VOIE : bornes `segments` et `evenements` du bloc cockpit-frise@1 (vf-cockpit-interface.json)
+  const SEUIL_REPLI = 12, SILENCE_MS = 120000, MAX_VOIES = 500;
+  const MAX_PAR_VOIE = 500; // bornes `segments` et `evenements` du bloc cockpit-frise@1 (vf-cockpit-interface.json)
   const GENRES_SEG = ['travail', 'attend-agents', 'attend-humain', 'repos', 'silence'];
   const GENRES_EVT = ['compaction', 'erreur', 'humain', 'rapport', 'dispatch'];
   const COMPTEURS = ['appels', 'erreurs', 'refus', 'questions', 'compactions', 'tours', 'reponsesApi'];
