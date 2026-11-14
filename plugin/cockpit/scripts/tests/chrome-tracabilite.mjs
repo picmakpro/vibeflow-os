@@ -2,7 +2,7 @@
 // Usage : node chrome-tracabilite.mjs <chrome> <racine-du-serveur> [sections]   Rend UNE ligne JSON { c10, c11, … } ou { erreur }. Chaque section est isolée.
 import { executer, pause, stabiliser, attendreValeur } from './chrome-session.mjs';
 const [, , chrome, racine, liste] = process.argv;
-const SEL = new Set((liste || 'c10,c11,c13,c14,c15,c16,c17,c18,c19,c110,c111,c112').split(','));
+const SEL = new Set((liste || 'c10,c11,c13,c14,c15,c16,c17,c18,c19,c110,c111,c112,c113').split(','));
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!VibeFlow.state && !!VibeFlow.state.layout";
 const SANS_VISITE = "(() => { const g = Storage.prototype.getItem; Storage.prototype.getItem = function (k) {"
   + " const vue = typeof k === 'string' && (k.indexOf('floorplan:tour-seen:') === 0 || k.indexOf('vibeflow-cockpit:visite:') === 0);"
@@ -165,6 +165,18 @@ await executer(chrome, async (s) => {
       await clic('#vf-trace-phase details.vf-trace-repli > summary'); await pause(300);
       const ouvert = await lire('Math.round(__tr.sec().getBoundingClientRect().height)');
       o[cle] = { ferme, ouvert, defilement: await lire("(() => { const p = document.getElementById('panel'); return p.scrollWidth <= p.clientWidth; })()"), carte: w === 1440 ? avant === await carte() : true };
+    }
+  });
+  await sec('c113', async () => { // correctif du juge de design : « Phase N » reste entier avec un nom long, le nom est coupé, l'état reste à droite ; pliage des preuves
+    o.c113 = {};
+    for (const [w, h] of [[1440, 900], [390, 844]]) {
+      await charger(w, h); await s.ev("VibeFlow.go('root')"); await pause(500);
+      await s.ev("document.body.classList.contains('no-panel') && document.getElementById('btn-panel').click()"); await pause(500);
+      await clic('#panel details[data-vf-trace-jalon] > summary'); await attendreVrai("!!document.querySelector('#panel details[data-vf-trace-jalon] .vf-trace-ligne')");
+      o.c113[w] = await lire(`(() => { const l = [...document.querySelectorAll('#panel details[data-vf-trace-jalon] .vf-trace-ligne')].find((x) => __tr.nb(x.textContent).startsWith('Phase 3'));
+        if (!l) return null; const n = l.querySelector('.vf-trace-nom1'), t = l.querySelector('.vf-trace-tt'), v = l.querySelector('.vst'), L = l.getBoundingClientRect(), V = v.getBoundingClientRect();
+        return { nom: n.textContent, entier: n.scrollWidth <= n.clientWidth, coupe: t.scrollWidth > t.clientWidth && getComputedStyle(t).textOverflow === 'ellipsis',
+          droite: V.right <= L.right - 11 && V.right >= L.right - 13, etat: v.textContent }; })()`);
     }
   });
   return o;

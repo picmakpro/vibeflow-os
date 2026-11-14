@@ -120,7 +120,7 @@
       line-height: 16px; color: var(--text-3); }
     .vf-trace-absent .vf-trace-chem span:last-child { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .vf-trace-jalon-l1 { display: flex; gap: var(--sp-6); align-items: center; min-width: 0; }
-    .vf-trace-jalon-l1 .vst { margin-inline-start: auto; }
+    .vf-trace-jalon-l1 .vf-trace-nom1 { flex: none; } .vf-trace-jalon-l1 .vst { flex: none; margin-inline-start: auto; }
     @media (max-width: 700px) { .vf-trace-tx { -webkit-line-clamp: 1; } }
     @media (max-width: 700px), (pointer: coarse) {
       .vf-trace-plus, .vf-trace-repli > summary, .vf-trace .btn.soft { min-height: 44px; height: 44px; }

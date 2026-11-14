@@ -37,8 +37,8 @@ mklab() {
   local L="$1" B="$1/.planning/workstreams/x" P
   mkdir -p "$B"
   { printf '# Roadmap\n\n## Milestones\n\n- 🚧 **v1** - Phases 1-3 (in progress)\n\n## Phases\n\n'
-    for i in 1 2 3; do printf -- '- [ ] **Phase %s: P%s** - p\n' "$i" "$i"; done; printf '\n'
-    for i in 1 2 3; do printf '### Phase %s: P%s\n**Goal**: but %s\n**Depends on**: Nothing\n\n' "$i" "$i" "$i"; done
+    for i in 1 2 3; do printf -- '- [ ] **Phase %s: P%s%s** - p\n' "$i" "$i" "$([ "$i" = 3 ] && printf ' nom de phase très long qui dépasse la largeur du panneau de projet et doit être coupé par une ellipse')"; done; printf '\n'
+    for i in 1 2 3; do printf '### Phase %s: P%s%s\n**Goal**: but %s\n**Depends on**: Nothing\n\n' "$i" "$i" "$([ "$i" = 3 ] && printf ' nom de phase très long qui dépasse la largeur du panneau de projet et doit être coupé par une ellipse')" "$i"; done
     printf -- '- [ ] **Phase 90: P90** - p\n\n### Phase 90: P90\n**Goal**: but 90\n**Depends on**: Nothing\n'
     printf -- '- [ ] **Phase 5: P5** - p\n\n### Phase 5: P5\n**Goal**: but 5\n**Depends on**: Nothing\n'; } > "$B/ROADMAP.md"
   printf -- '---\nmilestone: v1\nstatus: executing\ncurrent_phase: 1\n---\n' > "$B/STATE.md"
@@ -132,6 +132,7 @@ assert_eq "C1.10a — avant 150 ms rien n'est montré ; au-delà : aria-busy, tr
 assert_eq "C1.10b — route refusée : boîte « La traçabilité est indisponible », cause, « Réessayer » de 12,5 px et 32 px ; il relit" "$(E1 'j.c110erreur.texte+"|"+j.c110erreur.taille+"|"+j.c110erreur.haut+"|"+j.c110erreur.pasDeLigne+"|"+j.c110reessai')" "La traçabilité est indisponible La lecture du dépôt a échoué ou dépassé le délai. Réessayer|12.5px|32|true|true"
 assert_eq "C1.10c — phase sans exigence : la phrase dit sa cause et ce qui la lèverait" "$(E1 'j.c110vide')" "Aucune exigence rattachée à cette phase. Une ligne du tableau de traçabilité du registre des exigences, ou le champ « requirements » d'un plan, la rattache."
 assert_eq "C1.11 — quatre tailles de texte seulement sous .vf-trace, aucune couleur ni espacement en dur, aucune variable inventée, aucun tiret cadratin, aucune violation de CSP" "$(E1 'j.c111.tailles.split(",").every(t=>["11.5","12.5","13.5","20"].includes(t))+"|"+j.c111.css+"|"+j.c111.couleurs+"|"+j.c111.espaces+"|"+j.c111.interdits+"|"+j.c111.cadratin+"|"+j.c111violations')" "true|true|0|0|0|false|0"
+assert_eq "C1.13a — Jalon, phase 3 à nom long (1 440 px et 390 px) : « Phase 3 » entier, nom coupé par une ellipse, pastille d'état à droite (12 px du bord de la ligne)" "$(E1 '[1440,390].map(w=>{const c=j.c113[w]; return c?[c.nom,c.entier,c.coupe,c.droite].join("/"):"absent"}).join("|")')" "Phase 3/true/true/true|Phase 3/true/true/true"
 assert_eq "C1.12a — bureau : section ≤ 888 px (repli fermé) et ≤ 1 306 px (ouvert), bornes de l'UI-SPEC § 2.3, aucun défilement horizontal, carte non poussée" "$(E1 '(j.c112b.ferme<=888)+"|"+(j.c112b.ouvert<=1306)+"|"+j.c112b.defilement+"|"+j.c112b.carte')" "true|true|true|true"
 assert_eq "C1.12b — feuille de 390 px : section ≤ 614 px (repli fermé) et ≤ 968 px (ouvert), bornes de l'UI-SPEC § 2.3, aucun défilement horizontal" "$(E1 '(j.c112f.ferme<=614)+"|"+(j.c112f.ouvert<=968)+"|"+j.c112f.defilement')" "true|true|true"
 assert_eq "C1.x — aucune section n'a échoué par erreur de harnais" "$(E1 'JSON.stringify(j.erreurs)')" "{}"
