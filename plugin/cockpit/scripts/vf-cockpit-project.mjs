@@ -87,11 +87,14 @@ function construireGraphe(root, { layout } = {}) {
   const count = new Map(); for (const ph of phases.values()) count.set(ph.n, (count.get(ph.n) || 0) + 1);
   const phId = (ph) => (count.get(ph.n) > 1 && ph.ws ? `ph-${ph.n}@${ph.ws}` : `ph-${ph.n}`);
   const dirOf = (ph) => P.phaseDirs.get(`${ph.ws || ''}|${ph.n}`) || P.phaseDirs.get(`*|${ph.n}`);
-  // 76-08 (438a2ef6) : une exigence d'archive (clé joker `*`) ne se rattache à une phase vivante que par un plan de CETTE phase qui la cite, jamais par
-  // le numéro seul, et jamais là où le ledger vivant du même compartiment porte déjà le même identifiant ; une phase d'archive (numéro unique) garde le numéro
-  const citeParPlan = (ph, id) => !!P.trace?.phases?.get?.(ph.key)?.plans?.some((p) => p.exigences?.includes(id));
-  const archiveDe = (ph, r) => ph.archive || (!reqs.has(`${ph.ws || ''}|${r.id}`) && citeParPlan(ph, r.id));
-  const ownReqs = (ph) => [...reqs.values()].filter((r) => r.phase === ph.n && (r.wsKey === '*' ? archiveDe(ph, r) : r.wsKey === (ph.ws || '')));
+  // 76-08 (revue finale M1) : UNE seule attribution phase/exigence, celle de la collecte (meta.vf.trace.exigences) : le pied, le champ `exigences`,
+  // la porte de la 80 et le chat la lisent ; une exigence d'archive (ws '*') se rattache au nœud que la collecte a désigné (cleNoeud, 438a2ef6),
+  // jamais par le numéro seul. Sans traçabilité lue (erreur de collecte), repli sur la phase du tableau de traçabilité.
+  const traceEx = P.trace && Array.isArray(P.trace.exigences) ? P.trace.exigences : null;
+  const dePhase = (ph) => (e) => (e.ws === '*' ? e.cleNoeud === `${ph.ws || ''}|${ph.n}`
+    : String(e.phase) === String(ph.n) && (e.ws || null) === (ph.ws || null));
+  const ownReqs = (ph) => (traceEx ? traceEx.filter(dePhase(ph)).map((e) => ({ id: e.id, done: e.coche }))
+    : [...reqs.values()].filter((r) => r.phase === ph.n && (r.wsKey === '*' || r.wsKey === (ph.ws || ''))));
   const phaseStatus = (ph) => PROJECTION_ST[ph.avancement.etat] || 'todo'; // l'avancement vient des fichiers, jamais du STATE (CKPT-18)
 
   // jalons : ceux de la section « ## Milestones », sinon un jalon synthétique « Phases » ; les phases orphelines y vont aussi
