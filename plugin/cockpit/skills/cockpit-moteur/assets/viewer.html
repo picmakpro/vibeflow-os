@@ -1477,8 +1477,8 @@ function zoomCentre() {
   const areas = readingAreas(), { k, x, y } = state.t;
   const c = typeof state.selected === 'string' && state.layout && state.layout.children.find((n) => n.id === state.selected);
   if (c) {
-    const px = (c.x + c.width / 2) * k + x, py = (c.y + c.height / 2) * k + y;
-    if (areas.some((a) => px >= a.x && px <= a.x + a.w && py >= a.y && py <= a.y + a.h)) return [px, py];
+    const cx = (c.x + c.width / 2) * k + x, cy = (c.y + c.height / 2) * k + y;
+    if (areas.some((a) => cx >= a.x && cx <= a.x + a.w && cy >= a.y && cy <= a.y + a.h)) return [cx, cy];
   }
   const a = areas.reduce((p, q) => (q.w * q.h > p.w * p.h ? q : p));
   return [a.x + a.w / 2, a.y + a.h / 2];
