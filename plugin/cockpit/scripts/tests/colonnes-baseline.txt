@@ -7,7 +7,7 @@ scripts/vf-cockpit-ailleurs.mjs 6
 scripts/vf-cockpit-arbres.mjs 8
 scripts/vf-cockpit-ask.mjs 37
 scripts/vf-cockpit-avancement.mjs 7
-scripts/vf-cockpit-build.mjs 16
+scripts/vf-cockpit-build.mjs 14
 scripts/vf-cockpit-code-vf.mjs 13
 scripts/vf-cockpit-code.mjs 5
 scripts/vf-cockpit-drift.mjs 13
