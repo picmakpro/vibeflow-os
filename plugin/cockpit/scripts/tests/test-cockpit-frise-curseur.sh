@@ -115,7 +115,7 @@ export const encartPret = (h) => h.attendre(() => { const f = document.querySele
 export const fil = (h, id, elements, tronque = false) => h.ev((i, e, t) => { window.__tr.corps[i] = { fil: e, tronque: t }; return true; }, id, elements, tronque);
 export const nbTr = (h) => h.ev(() => window.__tr.reqs.length);
 export const idsTr = (h, depuis = 0) => h.ev((d) => window.__tr.reqs.slice(d).map((r) => r.id).sort(), depuis);
-export const el = (t, cible, extra = {}) => ({ t, genre: 'outil', outil: 'Edit', verbe: 'modifie', cible, n: 1, ...extra });
+export const el = (t, cible, extra = {}) => ({ t: typeof t === 'number' ? new Date(t).toISOString() : t, genre: 'outil', outil: 'Edit', verbe: 'modifie', cible, n: 1, ...extra });
 // fixture des fichiers : x1.js certain (route), z.js, w.js (worktree wt-a), cible coupée et « hors du lab » lus dans le fil de fa-3
 export const fixFichiers = (now, F) => { const d = (m) => now - m * MIN, E = F.entree, base = { debut: d(40), fin: d(20), fini: true, segments: [[d(40), d(20), 'travail']] };
   return [F.voie({ id: 'fa-1', ...base, cibles: { etat: 'ok', tronque: false, ecritures: [E('x1.js', d(30)), E('old.js', d(50))], lectures: [] } }),
