@@ -68,11 +68,11 @@
       if (h) h.focus({ preventScroll: true });
     };
     bouton.addEventListener('click', ouvrir);
-    const obs = new MutationObserver(() => { if (vivant && !document.querySelector('#context .vfa-compte')) place(); });
-    const ctxEl = document.getElementById('context');
-    if (ctxEl) obs.observe(ctxEl, { childList: true, subtree: true });
-    const bords = new MutationObserver(() => ajuster()); // le panneau ouvert ou fermé change la largeur de `#context`
-    bords.observe(document.body, { attributes: true, attributeFilter: ['class'] });
+    // `#context` est réécrit à chaque rendu (en-têtes, git) : après tous les écouteurs de `render` (microtâche), le compte est reposé s'il manque
+    const surRendu = ctx.sur('render', () => queueMicrotask(() => { if (vivant && !document.querySelector('#context .vfa-compte')) place(); ajuster(); }));
+    // le panneau ouvert ou fermé change la largeur de `#context` : il se ferme par un clic ou une touche, la mesure se refait juste après
+    const surGeste = () => ctx.apres(0, ajuster);
+    window.addEventListener('click', surGeste, true); window.addEventListener('keydown', surGeste, true);
     window.addEventListener('resize', ajuster);
     court.addEventListener('change', ajuster);
 
@@ -92,7 +92,8 @@
       } else if (radar.etat === 'zero') avant = 0;
     };
     const detruire = () => {
-      vivant = false; obs.disconnect(); bords.disconnect(); window.removeEventListener('resize', ajuster);
+      vivant = false; surRendu(); window.removeEventListener('click', surGeste, true); window.removeEventListener('keydown', surGeste, true);
+      window.removeEventListener('resize', ajuster);
       court.removeEventListener('change', ajuster); bouton.remove(); st.remove();
     };
     return { maj, detruire };

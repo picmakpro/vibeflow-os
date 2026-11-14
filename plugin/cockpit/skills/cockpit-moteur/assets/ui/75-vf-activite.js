@@ -21,6 +21,14 @@
     #btn-lentilles .badge { position: absolute; top: var(--sp-4); right: var(--sp-2); }`;
   const parties = new Map(); // nom -> { fabrique, inst }
   let session = null; // la session de l'onglet Code, ou null
+  // `on` du moteur ne se défait pas : un seul écouteur par événement, qui relaie vers les rappels de la session courante (chacun se défait par son retour)
+  const relais = new Map();
+  const sur = (M, evt, f) => {
+    let ens = relais.get(evt);
+    if (!ens) { ens = new Set(); relais.set(evt, ens); M.on(evt, (d) => { for (const g of [...ens]) g(d); }); }
+    ens.add(f);
+    return () => ens.delete(f);
+  };
 
   const demarrerPartie = (p) => {
     try { p.inst = p.fabrique(session.ctx); if (session.etat.m && p.inst.maj) p.inst.maj(session.etat.m);
@@ -89,11 +97,12 @@
       poser('activite', 'activite', m.lentille === 'aucune' || m.indispo ? [] : m.rows, true);
       poser('activite-collisions', 'collisions', etat.d ? T.tableCollisions(etat.d, v) : [], false);
       majBouton(m);
+      appliquerPaliers();
       if (avant && !avant.indispo && m.indispo) annoncer(m.annonce); // la lentille active devient indisponible : « Lentille Points chauds indisponible. »
       for (const p of parties.values()) if (p.inst && p.inst.maj) p.inst.maj(m);
     };
 
-    // le palier de Points chauds est aussi dit par le texte : le canal réécrit le nom accessible de la carte à chaque passage, on y revient après lui
+    // le palier de Points chauds est aussi dit par le texte : le canal réécrit le nom accessible de la carte à chaque rendu et à chaque pose, on y revient après lui
     const appliquerPaliers = () => {
       const cs = M.state && M.state.chipEls;
       if (!etat.m || etat.m.lentille !== 'chauds' || !(cs instanceof Map)) return;
@@ -102,8 +111,6 @@
         if (i >= 0 && !a.includes(ajout) && r[0].startsWith('f:')) g.setAttribute('aria-label', a.slice(0, i) + ajout + a.slice(i + mot.length));
       }
     };
-    const vp = document.getElementById('viewport'), noms = new MutationObserver(appliquerPaliers);
-    if (vp) noms.observe(vp, { attributes: true, attributeFilter: ['aria-label'], subtree: true });
 
     // la lecture : une requête en vol à la fois, une relance au plus ; jamais de sondage hors d'un calcul en cours (15 relectures, une par seconde)
     let envol = false, rattrape = false, essais = 0, minut = null;
@@ -134,12 +141,13 @@
         annonceSel = apres(300, () => annoncer(T.F.annonceCouplage(etat.m.rows.length - 1)));
       }
     };
-    M.on('panel', () => { if (etat.vivant) surSelection(); });
-    M.on('render', () => { if (etat.vivant && etat.lentille === 'couplage') calculer(); });
+    offs.push(sur(M, 'panel', () => { if (etat.vivant) surSelection(); }));
+    // après tous les écouteurs de `render` (microtâche) : le canal a reposé les noms, les paliers reviennent
+    offs.push(sur(M, 'render', () => { if (etat.vivant && etat.lentille === 'couplage') calculer(); queueMicrotask(() => { if (etat.vivant) appliquerPaliers(); }); }));
     etat.sel = idSel(M.state && M.state.selected);
 
     const ctx = { M, T, E, S, MQ, bouton, racine, annoncer, apres, vue, partage: {}, filtre: () => etat.filtre, modele: () => etat.m,
-      donnees: () => etat.d, conn: () => etat.conn,
+      donnees: () => etat.d, conn: () => etat.conn, sur: (evt, f) => sur(M, evt, f),
       choisir: (id) => { etat.lentille = id; calculer(); annoncer(etat.m.annonce); },
       filtrer: (nom) => { etat.filtre = nom; calculer(); } };
     session = { ctx, etat };
@@ -151,7 +159,6 @@
       for (const t of minuteries) clearTimeout(t);
       minuteries.clear();
       for (const o of offs) o();
-      noms.disconnect();
       for (const p of [...parties.values()].reverse()) if (p.inst) { try { p.inst.detruire(); } catch { /* déjà défait */ } p.inst = null; }
       MQ.retirer('activite'); MQ.retirer('activite-collisions');
       racine.remove(); style.remove(); session = null;

@@ -97,7 +97,7 @@
     const fermer = (rendre) => {
       if (!ouvert) return;
       ouvert = false; menu.classList.remove('open'); bouton.setAttribute('aria-expanded', 'false'); S && S.fermer(menu);
-      window.removeEventListener('click', dehors);
+      window.removeEventListener('click', dehors); window.removeEventListener('click', voisins, true);
       if (rendre) ouvreur().focus();
     };
     const dehors = (ev) => { if (!menu.contains(ev.target) && !bouton.contains(ev.target)) fermer(false); };
@@ -106,12 +106,11 @@
       if (M.closeMenus) M.closeMenus(); // #legend, #flowmenu et le menu contextuel : hors de la pile, ils se ferment l'un l'autre
       ouvert = true; menu.classList.add('open'); bouton.setAttribute('aria-expanded', 'true');
       if (S) S.ouvrir(menu, { modale: false, ouvreur: ouvreur(), fermer: () => fermer(true) });
-      window.addEventListener('click', dehors);
+      window.addEventListener('click', dehors); window.addEventListener('click', voisins, true);
       (menu.querySelector('.lr[aria-checked="true"]') || rangs()[0]).focus();
     };
-    const voisins = new MutationObserver(() => { if (document.querySelector('#legend.open, #flowmenu.open')) fermer(false); });
-    for (const id of ['legend', 'flowmenu']) { const n = document.getElementById(id);
-      if (n) voisins.observe(n, { attributes: true, attributeFilter: ['class'] }); }
+    // les boutons de #legend et de #flowmenu arrêtent la propagation du clic : la phase de capture les voit, le menu cède la place
+    const voisins = (ev) => { if (ev.target.closest && ev.target.closest('#filters-btn, #flows-btn')) fermer(false); };
     menu.addEventListener('click', (ev) => {
       ev.stopPropagation();
       const r = ev.target.closest('.lr');
@@ -128,7 +127,7 @@
       ev.preventDefault(); ev.stopPropagation(); l[j].focus();
     });
     return { maj, ouvrir, fermer, basculer: () => (ouvert ? fermer(true) : ouvrir()), ouvert: () => ouvert, el: menu,
-      detruire: () => { fermer(false); voisins.disconnect(); menu.remove(); st.remove(); } };
+      detruire: () => { fermer(false); menu.remove(); st.remove(); } };
   };
 
   const arrivee = (ev) => {
