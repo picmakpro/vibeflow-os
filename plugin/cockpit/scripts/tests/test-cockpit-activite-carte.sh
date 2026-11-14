@@ -3,14 +3,17 @@
 # Première moitié du plan : D1 (canal, objet gelé du moteur jamais étendu), D2 (pile des couches exclusives), D2b (couche non exclusive),
 # D5 (agrégat aux ancêtres : palier maximal et compte, jamais une somme), D18 (inscription par cle, nettoyage, aucun doublement),
 # D19 (point d'entrée du dessin, tolérant), D20 (file de résolution tardive : une pose déposée avant le canal est appliquée une fois).
-# La part visuelle (D3, D4, D6 à D17) viendra avec la seconde moitié, quand le moteur de mise en page de la 79 sera livré.
+# Seconde moitié (navigateur, un Chrome sans affichage, lab construit par la suite) : D3 (marque, mot par textContent), D4 (géométrie invariante),
+# D6 à D12 et D17 (pied réservé, glyphes, contraste, zooms, prévues), D13 à D16 (nom accessible, collisions, XSS). Sans navigateur : saut explicite.
+# Régime allégé (mandat commun de la Phase 75) : seuls les mutants de la chaîne XSS (D3, D15) sont joués (MUTANT-ROUGE — <nom>).
 # Variable MARQUES_JS : un autre fichier du canal (le témoin rouge se rejoue sur la base, où le fichier n'existe pas).
 # Forme : « PASS — <id> : <texte> », « ❌ FAIL — <id> : <texte> », ligne finale « BILAN : <n> PASS, <m> FAIL » ; sort en 1 au premier FAIL.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 MODULE="${MARQUES_JS:-$HERE/../../skills/cockpit-moteur/assets/ui/75-vf-marques.js}"
 FX="$HERE/fixtures/test-cockpit-activite-carte"
-WORK="$(mktemp -d "${TMPDIR:-/tmp}/75-07-activite-carte-XXXXXX")"; trap 'rm -rf "$WORK"' EXIT
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"
+cleanup() { type vf_hyg_fin > /dev/null 2>&1 && vf_hyg_fin; rm -rf "$WORK"; }; trap cleanup EXIT
 PASS=0; FAIL=0
 
 fin() { echo "BILAN : $PASS PASS, $FAIL FAIL"; [ "$FAIL" -eq 0 ]; exit $?; }
@@ -78,5 +81,50 @@ assert_eq D20 "une pose déposée avant le canal est appliquée une fois, la fil
 assert_eq D20 "la réexécution du script ne rejoue rien" "$(val D20.rejeu)" "0|0"
 assert_eq D20 "les poses de la file s'appliquent dans l'ordre de dépôt" "$(val D20.ordre)" "b|col|b"
 assert_eq D20 "sans file : aucune erreur, aucune file créée" "$(val D20.sans-file)" "null|undefined"
+
+# ====================== moitié navigateur ======================
+SCRIPTS="$(cd "$HERE/.." && pwd)"
+CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" > /dev/null 2>&1; then CHROME="$c"; break; fi; done
+if [ -z "$CHROME" ]; then . "$HERE/chrome-saut.sh"; vf_chrome_saut "  ⊘ MOITIÉ NAVIGATEUR SAUTÉE : aucun navigateur (Chrome, Chromium) — la marque sur la carte NON vérifiée, non comptée comme réussie"; fin; fi
+mkdir -p "$WORK/home/.claude"; export REAL_HOME="$HOME"; export HOME="$WORK/home"; AUX="$WORK/aux"; mkdir -p "$AUX"
+. "$HERE/hygiene.sh"; vf_hyg_init
+. "$HERE/socle-serveur.sh"
+. "$FX/mk-lab.sh"
+cat > "$AUX/ev.mjs" <<'JS'
+import fs from 'node:fs'; let j; try { j = JSON.parse(fs.readFileSync(0, 'utf8')); } catch { console.log('sortie illisible'); process.exit(0); }
+if (j.erreur) { console.log('mesure indisponible : ' + j.erreur); process.exit(0); }
+const v = new Function('j', 'return (' + process.argv[2] + ')')(j); console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+LAB="$WORK/lab"; mklab75 "$LAB"
+mesurer() { REAL_HOME="$REAL_HOME" node "$HERE/chrome-activite-carte.mjs" "$CHROME" "http://127.0.0.1:$VF_PORT" "$1" > "$WORK/mesure.json" 2> "$WORK/mesure.err"; cat "$WORK/mesure.json"; } # sections en $1 ; le serveur courant (VF_PORT)
+E() { printf '%s' "$R" | node "$AUX/ev.mjs" "$1"; }
+mutant_rouge() { # mutant_rouge <nom> <sections> <expression de mutation sed, sur chaque source de page> <expression js : vraie quand la suite a VU le mutant> ; le serveur du mutant est arrêté ensuite
+  local nom="$1" sec="$2" sed_="$3" vu="$4" RM
+  if ! cockpit_module_muter_page "$nom" "$sed_"; then ok_ko "$nom : la mutation n'a rien changé (ancre périmée)"; return; fi
+  cockpit_lancer "$LAB"; local rc=$?
+  if [ "$rc" -ne 0 ]; then ok_ko "$nom : le serveur du mutant ne démarre pas (code $rc)"; unset COCKPIT_MODULE; return; fi
+  RM="$(mesurer "$sec")"; cockpit_arreter; unset COCKPIT_MODULE; export VF_PORT="$PORT" # le serveur du lab (non muté) reste celui des témoins suivants
+  if [ "$(printf '%s' "$RM" | node "$AUX/ev.mjs" "$vu")" = "true" ]; then echo "  MUTANT-ROUGE — $nom"; else ok_ko "$nom : le mutant n'est pas vu rouge (attendu: vrai)"; fi
+}
+ok_ko() { echo "  ❌ FAIL — MUTANT : $1"; FAIL=$((FAIL+1)); fin; }
+cockpit_lancer "$LAB"; PORT="${VF_PORT:-0}"
+assert_eq D0 "serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
+
+echo "== D3 la marque, le mot par textContent, noms hostiles =="
+R="$(mesurer d3)"
+assert_eq D3 "le dossier aux fichiers hostiles (balises, très long, U+2028) garde ses 17 cartes" "$(E 'j.d3.cartesB')" "17"
+assert_eq D3 "une marque posée sur une carte ajoute UN .lm dans son pied" "$(E 'j.d3.n')" "1"
+assert_eq D3 "le mot hostile est lu tel quel, sans aucun élément enfant" "$(E 'j.d3.mot === j.d3.hostile && j.d3.enfants === 0')" "true"
+assert_eq D3 "l'infobulle est le texte littéral" "$(E 'j.d3.titre === j.d3.hostile')" "true"
+assert_eq D3 "aucun élément injecté, aucun script exécuté, marque cachée aux lecteurs d'écran" "$(E 'j.d3.injectes === j.d3.avant && j.d3.xss && j.d3.cache')" "true"
+mutant_rouge "D3-texte-par-innerHTML" d3 's/e\.textContent = txt/e.innerHTML = txt/' 'j.d3.injectes > j.d3.avant || !j.d3.xss'
+
+echo "== D4 géométrie invariante, aucun render() après une pose =="
+R="$(mesurer d4)"
+assert_eq D4 "trois largeurs, deux conteneurs, trois paliers de zoom : 18 séries mesurées" "$(E 'j.d4.length')" "18"
+assert_eq D4 "la pose a marqué des cartes dans chaque série qui en a un pied (mesure non aveugle ; les cartes de fichier sans pied : tâche 2)" "$(E 'j.d4.filter((x) => x.marques > 0).length')" "9"
+assert_eq D4 "géométrie des cartes et hauteur des pieds identiques à 0 px après poser, retirer, cinq bascules et une mise à jour" "$(E 'j.d4.filter((x) => x.ecarts.length).length')" "0"
+assert_eq D4 "aucun événement render après les poses" "$(E 'j.d4.filter((x) => x.renders > 0).length')" "0"
+mutant_rouge "D4-pose-relance-le-placement" d4 's/const change = () => { index = null; dessiner(); };/const change = () => { index = null; dessiner(); if (moteur() \&\& moteur().rerender) moteur().rerender(); };/' 'j.d4.some((x) => x.renders > 0)'
 
 fin
