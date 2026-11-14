@@ -32,7 +32,8 @@
         if (E) return ['who', 'lock', 'connexion', 'graphe'].map((k) => E.abonner(k, () => f(k)));
         D.addEventListener('vf-who', f); return [() => D.removeEventListener('vf-who', f)];
       },
-      // les missions en cours : meta.vf.missions de l'enveloppe de l'onglet (le graphe posé par la coquille), relue par la route quand VF_ETAT dit que l'enveloppe a changé
+      // les missions en cours : meta.vf.missions de l'enveloppe de l'onglet (le graphe posé par la coquille),
+      // relue par la route quand VF_ETAT annonce que l'enveloppe a changé
       missions: (g) => { const v = g && g.meta && g.meta.vf; return Array.isArray(v && v.missions) ? v.missions.filter((m) => typeof m === 'string') : []; },
       graphe: () => (E ? E.lireJson('/api/vf/graphe?onglet=equipe') : Promise.resolve(null)),
       graphePose: () => (E && E.lire('graphe') && E.lire('graphe').onglet) || null,
@@ -165,7 +166,12 @@
       if (A.graphePose() !== 'equipe') return;
       A.graphe().then((j) => { if (!vivant || !j) return; missions = A.missions(j); rendre(); }, () => {});
     };
-    for (const d of A.ecouter((cle) => { if (cle === 'graphe') { relireMissions(); return; } if (cle === 'who') { recu = Date.now(); P.surWho(); } rendre(); })) retraits.push(d);
+    const surEtat = (cle) => {
+      if (cle === 'graphe') { relireMissions(); return; }
+      if (cle === 'who') { recu = Date.now(); P.surWho(); }
+      rendre();
+    };
+    for (const d of A.ecouter(surEtat)) retraits.push(d);
     minuteries.push(setInterval(rendre, 30000));
 
     monte = { declaree: () => declaree(), ancre };
