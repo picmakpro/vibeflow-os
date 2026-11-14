@@ -25,7 +25,9 @@
   const restaurer = (b) => { // une fois, au premier passage où le bouton existe (il est posé au premier événement du direct)
     aRestaurer = false;
     if (!lireMemo() || ouvert()) return;
-    sansFocus = true; try { b.click(); etat(); } finally { sansFocus = false; }
+    // le clic de restauration ouvre le tiroir : il ne va pas à la section « Au travail » de la régie (70-vf-live.js lit ce drapeau)
+    sansFocus = true; window.__vfTiroirRestaure = true;
+    try { b.click(); etat(); } finally { sansFocus = false; window.__vfTiroirRestaure = false; }
   };
   const etat = () => {
     const b = bouton(); if (!b) return;
