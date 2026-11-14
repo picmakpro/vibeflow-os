@@ -95,9 +95,11 @@
   const aVous = (who) => sessionsQuiAttendent(who).length + phasesDe(who).length;
 
   const VERBES = { cadrer: 'cadrer', planifier: 'planifier', executer: 'exécuter', verifier: 'vérifier', reprendre: 'reprendre' };
-  const lancement = (l) => (l && typeof l === 'object' && /^[0-9]+(\.[0-9]+)*$/.test(String(l.phase)) && Object.hasOwn(VERBES, l.verbe)
+  // « Phase N · espace · verbe » : le détail du lancement, repris par la ligne 2 de la régie et par la fiche (74-vf-fiche-faits.js)
+  const lancementDe = (l) => (l && typeof l === 'object' && /^[0-9]+(\.[0-9]+)*$/.test(String(l.phase)) && Object.hasOwn(VERBES, l.verbe)
     && /^[A-Za-z0-9._-]{0,80}$/.test(l.ws || '')
-    ? `Lancée depuis la carte${DP} Phase ${l.phase}${l.ws ? ` · ${l.ws}` : ''} · ${VERBES[l.verbe]}` : '');
+    ? `Phase ${l.phase}${l.ws ? ` · ${l.ws}` : ''} · ${VERBES[l.verbe]}` : '');
+  const lancement = (l) => (lancementDe(l) ? `Lancée depuis la carte${DP} ${lancementDe(l)}` : '');
   const court = (o) => (/^[0-9a-f-]{16,}$/i.test(o) ? o.slice(0, 8) : o);
   const LIMITE = "L'impact compte les nœuds du plan, pas leur durée ni leur importance.";
   // une ligne de la régie : tous les champs, ceux qui ne servent pas à un genre de ligne gardent leur valeur vide
@@ -136,7 +138,7 @@
       return rangee({ cle: `${sec}:${w.id}`, id: w.id, kind: w.kind, nom: nomDe(w), role: !sess && w.task ? w.role || 'Agent' : '',
         etat: e.etat, mot: e.mot, poids: e.poids, detail: sec === 'au-travail' && w.etat === 'attend' ? '' : e.detail, ligne2, duree: e.duree,
         action: lire ? 'lire-rapport' : null, niveau: o.niveau || 0, parent: o.parent ? o.parent.id : null, grise: !!o.grise,
-        noeud: n ? String(n.noeud) : '', age: nbf(w.ageS) ? w.ageS + ecoule(w, c) : null, lien: n ? ref(`f:${n.dag}#${n.noeud}`) : '',
+        noeud: n ? String(n.noeud) : '', age: nbf(w.ageS) ? w.ageS + ecoule(w, c) : null,
         impact: impact ? impact.n : null, infobulle: sec === 'a-vous' && !impact ? LIMITE : '' }, w.id);
     };
     const lignePhase = (p) => {
@@ -205,5 +207,5 @@
     return { entete: { h1, sousTitre, verrouDepot }, sections, etatPage: W.length ? '' : 'Aucun agent dans les dernières 24 h.' };
   }
 
-  window.__vfRegieModele = { modele, aVous, verrouBlanc, verrous, trierAVous, etatVivant };
+  window.__vfRegieModele = { modele, aVous, verrouBlanc, verrous, trierAVous, etatVivant, lancementDe };
 })();

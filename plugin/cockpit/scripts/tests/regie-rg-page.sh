@@ -5,8 +5,8 @@
 # Mutants : aucun dans ce fragment (régime allégé) ; ceux des gardes de non-fuite du verrou viendront avec les sections navigateur.
 # Fixtures : noms et identifiants inventés. Les formes simulées de VF_ETAT, VF_COQUILLE et VF_SURCOUCHES sont dans vm-regie-page.mjs (à aligner sur le code livré).
 # Contrat du DOM attendu de la régie (écrit ici AVANT le code) : section#vf-equipe[role=main] > #vf-equipe-entete (h1, .vf-rg-sous, bascule role=tablist) puis .vf-vue[data-vf-vue] ;
-#   section.vf-rg-sec[data-vf-section] > h2 (tabindex -1) ; li.vf-rg-lig[data-vf-cle][data-vf-agent][data-vf-noeud][data-vf-etat] ; .vf-rg-nom (le nom, une fois) ; button[aria-expanded] (le nom, déplie) ;
-#   .vf-rg-plus (détail en flux) ; .vf-rg-dur ; .vf-rg-act button.btn (actions) ; .vf-rg-note (messages) ; recherche : input#search du moteur.
+#   section.vf-rg-sec[data-vf-section] > h2 (tabindex -1) ; li.vf-rg-lig[data-vf-cle][data-vf-agent][data-vf-noeud][data-vf-etat] ; .vf-rg-nom (le nom, une fois) ; button.vf-rg-tog (le nom, ouvre la fiche : aucun aria-expanded) ;
+#   .vf-rg-dur ; .vf-rg-act button.btn (actions) ; .vf-rg-note (messages) ; recherche : input#search du moteur.
 
 [ -n "${RG_PAGE_COMMUN:-}" ] || { . "$TESTS_DIR/regie-page-commun.sh"; RG_PAGE_COMMUN=1; }
 PG_SID='s0000000-aaaa-bbbb-cccc-111111111111'; PG_A='a1b2c3d4e5f6'; PG_F='f0f0f0f0f0f0'; PG_B='b9b9b9b9b9b9'
@@ -149,10 +149,10 @@ rg_RG15_page() {
   pg_ok "RG15.8 — valeur inconnue ou absente : « Régie »" "$o" 'j.out.sel.join()' "true,false"
   o="$(pg_sc '' '[{"nom":"ag","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-agent"}},{"nom":"no","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-noeud"}},{"nom":"et","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-etat"}},{"nom":"vn","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-noeud"}},{"nom":"ve","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-etat"}},{"nom":"va","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-agent"}}]')"
   pg_ok "RG15.2 — data-vf-agent, data-vf-noeud et data-vf-etat sur chaque ligne ; valeurs d'une ligne rattachée" "$o" 'j.out.ag + "|" + j.out.no + "|" + j.out.et + "|" + j.out.va + "|" + j.out.vn + "|" + j.out.ve' "0|0|0|$PG_A|N2|actif"
-  o="$(pg_sc '' '[{"annuler":[]},{"clic":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog"},{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","attr":"aria-expanded"}},{"nom":"det","obs":{"mode":"textes","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-plus"}},{"nom":"lien","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-plus a","attr":"href"}},{"touche":"Escape","sur":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","nom":"esc"},{"nom":"ex2","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","attr":"aria-expanded"}},{"nom":"f","obs":{"mode":"focus"}}]')"
-  pg_ok "RG15.3 — le nom, non annulé : vf-agent:ouvrir (nom) puis détail en flux (identifiant court, branche, arbre, lien Nœud) avec aria-expanded ; Échap replie et rend le focus au bouton" "$o" \
-    'j.out.e.evts[0].declencheur + "|" + j.out.ex.join() + "|" + ["s0000000","feat/x","main","Nœud"].map((s) => j.out.det.join(" ").includes(s)).join() + "|" + j.out.lien.join().includes("project.html#r=") + "|" + j.out.ex2.join() + "|" + j.out.f.tag + ":" + j.out.f.cle' \
-    "nom|true|true,true,true,true|true|false|BUTTON:au-travail:$PG_SID"
+  o="$(pg_sc '' '[{"annuler":[]},{"clic":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog"},{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"sansAttr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","attr":"aria-expanded"}},{"touche":"Escape","sur":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","nom":"esc"},{"nom":"ex2","obs":{"mode":"sansAttr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","attr":"aria-expanded"}},{"nom":"f","obs":{"mode":"focus"}}]')"
+  pg_ok "RG15.3 — le nom, non annulé : vf-agent:ouvrir (nom) et rien d'autre ; le bouton ne porte jamais aria-expanded (il ouvre la fiche, il ne déplie rien : le détail de ligne n'existe plus), ni après le clic ni après Échap ; le focus reste au bouton" "$o" \
+    'j.out.e.evts[0].declencheur + "|" + j.out.e.evts.length + "|" + j.out.ex + "|" + j.out.ex2 + "|" + j.out.f.tag + ":" + j.out.f.cle' \
+    "nom|1|1|1|BUTTON:au-travail:$PG_SID"
   local ar='{"appel":"__vfRegie.arriver","args":["n:se-'"$PG_SID"'"],"nom":"r1"}'
   o="$(pg_sc '' '[{"raz":true},'"$ar"',{"nom":"f1","obs":{"mode":"focus"}},{"nom":"d1","obs":{}},{"raz":true},{"appel":"__vfRegie.arriver","args":["n:se-inconnu"],"nom":"r2"},{"nom":"d2","obs":{}},{"nom":"f2","obs":{"mode":"focus"}},{"raz":true},{"appel":"__vfRegie.arriver","args":["n:ag-'"$PG_A"'"],"nom":"r3"},{"nom":"f3","obs":{"mode":"focus"}}]')"
   pg_ok "RG15.4 — #r=n:se-<id> avec la ligne dans « À vous » et dans l'arbre : défilement et focus sur celle d'« À vous », une fois ; n:ag-<id> : la ligne de l'arbre" "$o" \
@@ -168,12 +168,13 @@ rg_RG15_page() {
 rg15_annule() {
   local av='li[data-vf-cle=\"a-vous:'"$PG_SID"'\"] button.vf-rg-tog'
   local o ouv='li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog' ar='{"appel":"__vfRegie.arriver","args":["n:se-'"$PG_SID"'"]}'
-  o="$(pg_sc '' '[{"annuler":["nom","ancre","rapport"]},{"focus":"#search"},{"clic":"'"$ouv"'"},{"clic":"'"$PG_BTN_RAPPORT"'"},'"$ar"',{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"'"$ouv"'","attr":"aria-expanded"}},{"nom":"det","obs":{"mode":"compte","sel":".vf-rg-plus"}},{"nom":"f","obs":{"mode":"focus"}}]')"
-  pg_ok "RG15.6 — vf-agent:ouvrir annulé (nom, rapport, ancre) : détail dans son état (replié), aucun lecteur, aucune requête, aucun vf-agent:lu, aucun défilement" "$o" \
-    'j.out.e.evts.map((x) => x.type + ":" + x.declencheur).join() + "|" + j.out.ex.join() + "|" + j.out.det + "|" + j.out.e.fetchs.length + "|" + j.out.e.panneau.length + "|" + j.out.e.defilements.length' \
-    "vf-agent:ouvrir:nom,vf-agent:ouvrir:rapport,vf-agent:ouvrir:ancre|false|0|0|0|0"
-  o="$(pg_sc '' '[{"annuler":[]},'"$ar"',{"nom":"ex","obs":{"mode":"attr","sel":"'"$av"'","attr":"aria-expanded"}},{"nom":"e","obs":{}}]')"
-  pg_ok "RG15.6 — non annulés : « ancre » déplie la ligne (défile et prend le focus)" "$o" 'j.out.ex.join() + "|" + j.out.e.evts.map((x) => x.declencheur).join()' "true|ancre"
+  o="$(pg_sc '' '[{"annuler":["nom","ancre","rapport"]},{"focus":"#search"},{"clic":"'"$ouv"'"},{"clic":"'"$PG_BTN_RAPPORT"'"},'"$ar"',{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"sansAttr","sel":"'"$ouv"'","attr":"aria-expanded"}},{"nom":"f","obs":{"mode":"focus"}}]')"
+  pg_ok "RG15.6 — vf-agent:ouvrir annulé (nom, rapport, ancre) : ligne inchangée (le bouton ne porte pas aria-expanded), aucun lecteur, aucune requête, aucun vf-agent:lu, aucun défilement" "$o" \
+    'j.out.e.evts.map((x) => x.type + ":" + x.declencheur).join() + "|" + j.out.ex + "|" + j.out.e.fetchs.length + "|" + j.out.e.panneau.length + "|" + j.out.e.defilements.length' \
+    "vf-agent:ouvrir:nom,vf-agent:ouvrir:rapport,vf-agent:ouvrir:ancre|1|0|0|0"
+  o="$(pg_sc '' '[{"annuler":[]},'"$ar"',{"nom":"ex","obs":{"mode":"sansAttr","sel":"'"$av"'","attr":"aria-expanded"}},{"nom":"f","obs":{"mode":"focus"}},{"nom":"e","obs":{}}]')"
+  pg_ok "RG15.6 — non annulés : « ancre » défile jusqu'à la ligne et lui donne le focus (le geste que la fiche lit à froid), sans la déplier : aucun aria-expanded" "$o" \
+    'j.out.e.evts.map((x) => x.declencheur).join() + "|" + j.out.f.cle + "|" + j.out.e.defilements.join() + "|" + j.out.ex' "ancre|a-vous:$PG_SID|a-vous:$PG_SID|1"
 }
 
 rg15_cycle() {
@@ -196,24 +197,24 @@ rg15_cycle() {
 
 rg15_echap() {
   local o d='li[data-vf-cle=\"au-travail:'"$PG_A"'\"] button.vf-rg-tog'
-  local pre='{"clic":"'"$d"'"}' mana='{"saisie":"#search","valeur":"mana"}'
-  local ex='{"nom":"EXN","obs":{"mode":"attr","sel":"'"$d"'","attr":"aria-expanded"}}'
+  # le cran 2 (un détail déplié se replie) est retiré avec le détail de ligne : le focus est posé sur le bouton du nom, rien ne s'ouvre
+  local pre='{"focus":"'"$d"'"}' mana='{"saisie":"#search","valeur":"mana"}'
   # (réel) surcouche factice ouverte (le lecteur de repli est retiré, 73-C2), pile simulée en capture sur window : la régie ne voit jamais l'appui
-  o="$(pg_sc '"surcouches":"pile"' '['"$pre"',{"surcoucheFactice":true},'"$mana"',{"nom":"av","obs":{}},{"touche":"Escape","sur":"#search","nom":"p1"},{"nom":"ap","obs":{}},'"${ex/EXN/ex1}"',{"touche":"Escape","sur":"'"$d"'","nom":"p2"},'"${ex/EXN/ex2}"',{"nom":"f2","obs":{"mode":"focus"}},{"touche":"Escape","sur":"#search","nom":"p3"},{"nom":"r3","obs":{}},{"nom":"s3","obs":{"mode":"ser","sel":"#vf-equipe"}},{"touche":"Escape","sur":"#search","nom":"p4"},{"nom":"s4","obs":{"mode":"ser","sel":"#vf-equipe"}}]')"
-  pg_ok "RG15.9 (réel) — lecteur ouvert : la pile le ferme (preventDefault) et l'appui n'atteint JAMAIS la régie ; détail et recherche inchangés" "$o" \
-    'j.out.p1.prevenu + "|" + (j.out.ap.appels.keydown === j.out.av.appels.keydown) + "|" + j.out.ap.surcouches.some((x) => x.op === "fermee-par-pile") + "|" + j.out.ex1.join() + "|" + j.out.ap.recherche' "true|true|true|true|mana"
-  pg_ok "RG15.9 — le lecteur fermé, trois appuis intacts : cran 2 (détail replié, focus au bouton du nom), cran 3 (recherche vidée), cran 4 (rien : DOM identique, defaultPrevented faux)" "$o" \
-    'j.out.ex2.join() + "|" + j.out.f2.tag + ":" + j.out.f2.cle + "|" + j.out.r3.recherche + "|" + (j.out.s3 === j.out.s4) + "|" + j.out.p4.prevenu' "false|BUTTON:au-travail:$PG_A||true|false"
+  o="$(pg_sc '"surcouches":"pile"' '['"$pre"',{"surcoucheFactice":true},'"$mana"',{"nom":"av","obs":{}},{"touche":"Escape","sur":"#search","nom":"p1"},{"nom":"ap","obs":{}},{"touche":"Escape","sur":"'"$d"'","nom":"p2"},{"nom":"r2","obs":{}},{"nom":"f2","obs":{"mode":"focus"}},{"touche":"Escape","sur":"#search","nom":"p3"},{"nom":"r3","obs":{}},{"nom":"s3","obs":{"mode":"ser","sel":"#vf-equipe"}},{"touche":"Escape","sur":"#search","nom":"p4"},{"nom":"s4","obs":{"mode":"ser","sel":"#vf-equipe"}}]')"
+  pg_ok "RG15.9 (réel) — surcouche ouverte : la pile la ferme (preventDefault) et l'appui n'atteint JAMAIS la régie ; la recherche reste inchangée" "$o" \
+    'j.out.p1.prevenu + "|" + (j.out.ap.appels.keydown === j.out.av.appels.keydown) + "|" + j.out.ap.surcouches.some((x) => x.op === "fermee-par-pile") + "|" + j.out.ap.recherche' "true|true|true|mana"
+  pg_ok "RG15.9 — la surcouche fermée, trois appuis intacts : un appui sur le bouton du nom vide la recherche (plus de détail à replier : cran 3, le focus reste au bouton), un appui de plus ne fait rien (DOM identique, defaultPrevented faux)" "$o" \
+    'j.out.f2.tag + ":" + j.out.f2.cle + "|" + (j.out.r2.recherche === "") + "|" + j.out.r3.recherche + "|" + (j.out.s3 === j.out.s4) + "|" + j.out.p4.prevenu' "BUTTON:au-travail:$PG_A|true||true|false"
   # (forcé) appui déjà prévenu envoyé directement, ouverte() faux
-  o="$(pg_sc '"surcouches":"pile"' '['"$pre"','"$mana"',{"nom":"s1","obs":{"mode":"ser","sel":"#vf-equipe"}},{"touche":"Escape","sur":"'"$d"'","prevenu":true,"nom":"p"},{"nom":"s2","obs":{"mode":"ser","sel":"#vf-equipe"}},'"${ex/EXN/ex}"',{"nom":"e","obs":{}}]')"
-  pg_ok "RG15.9 (forcé) — appui avec defaultPrevented déjà vrai et ouverte() faux : la régie ne fait rien (DOM identique), sans lire ouverte()" "$o" '(j.out.s1 === j.out.s2) + "|" + j.out.ex.join() + "|" + j.out.e.recherche + "|" + j.out.e.ouverteLue' "true|true|mana|0"
+  o="$(pg_sc '"surcouches":"pile"' '['"$pre"','"$mana"',{"nom":"s1","obs":{"mode":"ser","sel":"#vf-equipe"}},{"touche":"Escape","sur":"'"$d"'","prevenu":true,"nom":"p"},{"nom":"s2","obs":{"mode":"ser","sel":"#vf-equipe"}},{"nom":"e","obs":{}}]')"
+  pg_ok "RG15.9 (forcé) — appui avec defaultPrevented déjà vrai et ouverte() faux : la régie ne fait rien (DOM identique, recherche gardée), sans lire ouverte()" "$o" '(j.out.s1 === j.out.s2) + "|" + j.out.e.recherche + "|" + j.out.e.ouverteLue' "true|mana|0"
   # (intact avec surcouche) terminal simulé, ouverte() vrai, l'appui arrive intact ; et sans VF_SURCOUCHES
-  local sc='['"$pre"','"$mana"',{"touche":"Escape","sur":"'"$d"'"},'"${ex/EXN/ex2}"',{"touche":"Escape","sur":"#search"},{"nom":"r3","obs":{}},{"touche":"Escape","sur":"#search","nom":"p4"},{"nom":"e","obs":{}}]'
+  local sc='['"$pre"','"$mana"',{"touche":"Escape","sur":"'"$d"'"},{"nom":"r1","obs":{}},{"touche":"Escape","sur":"#search"},{"nom":"r3","obs":{}},{"touche":"Escape","sur":"#search","nom":"p4"},{"nom":"e","obs":{}}]'
   o="$(pg_sc '"surcouches":"terminal"' "$sc")"
-  pg_ok "RG15.9 (intact avec surcouche) — terminal ouvert, ouverte() vrai : la régie applique ses crans, sans lire ouverte() ; ni VF_SURCOUCHES.ouvrir ni VF_PANNEAU au montage" "$o" \
-    'j.out.ex2.join() + "|" + j.out.r3.recherche + "|" + j.out.p4.prevenu + "|" + j.out.e.ouverteLue + "|" + j.out.e.panneauLu + "|" + j.out.e.surcouches.filter((x) => x.op === "ouvrir").length' "false||false|0|0|0"
+  pg_ok "RG15.9 (intact avec surcouche) — terminal ouvert, ouverte() vrai : la régie applique ses crans (la recherche se vide au premier appui), sans lire ouverte() ; ni VF_SURCOUCHES.ouvrir ni VF_PANNEAU au montage" "$o" \
+    '(j.out.r1.recherche === "") + "|" + j.out.r3.recherche + "|" + j.out.p4.prevenu + "|" + j.out.e.ouverteLue + "|" + j.out.e.panneauLu + "|" + j.out.e.surcouches.filter((x) => x.op === "ouvrir").length' "true||false|0|0|0"
   o="$(pg_sc '' "$sc")"
-  pg_ok "RG15.9 — sans VF_SURCOUCHES (repli sans pile) : aucune exception et les crans 2 à 4 tiennent" "$o" 'j.out.ex2.join() + "|" + j.out.r3.recherche + "|" + j.out.p4.prevenu' "false||false"
+  pg_ok "RG15.9 — sans VF_SURCOUCHES (repli sans pile) : aucune exception et les crans 3 et 4 tiennent" "$o" '(j.out.r1.recherche === "") + "|" + j.out.r3.recherche + "|" + j.out.p4.prevenu' "true||false"
 }
 
 rg_RG16_page() {

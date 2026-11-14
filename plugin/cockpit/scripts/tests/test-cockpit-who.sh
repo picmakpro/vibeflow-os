@@ -610,18 +610,18 @@ const who = (await imp('vf-cockpit-who.mjs')).collectWho(lab, { home, scriptsDir
 const who2 = (await imp('vf-cockpit-who.mjs')).collectWho(lab2, { home, scriptsDir: noscripts, fresh: 600 });
 // 73-09 (P73-D-22) : les propriétés se lisent sur who@2 (collectWho, titre et branche nettoyés à l'ÉMISSION) et sur le texte de la ligne de la régie (page Équipe jouée hors navigateur par vm-regie-page.mjs) ;
 // plus aucune lecture de buildEquipeGraph. Le libellé d'une session sans titre est « Session principale » (suivi de son lieu quand plusieurs sessions le portent) ; la branche est dite par la ligne (« branche <b> »).
-const regie = (wh, ids, ouverts = []) => {
-  const etapes = [...ouverts.map((id) => ({ clic: `li[data-vf-agent="${id}"] button[aria-expanded]` })),
-    ...ids.flatMap((id) => [['n', '.vf-rg-nom'], ['l', '.vf-rg-l2'], ['p', '.vf-rg-plus']].map(([k, c]) => ({ nom: `${k}:${id}`, obs: { mode: 'textes', sel: `li[data-vf-agent="${id}"] ${c}` } }))),
+const regie = (wh, ids) => {
+  const etapes = [
+    ...ids.flatMap((id) => [['n', '.vf-rg-nom'], ['l', '.vf-rg-l2']].map(([k, c]) => ({ nom: `${k}:${id}`, obs: { mode: 'textes', sel: `li[data-vf-agent="${id}"] ${c}` } }))),
     { nom: 'page', obs: { mode: 'textes', sel: '.vf-rg-lig' } }];
-  const f = path.join(base, `sc-${ids.join('-') || 'x'}-${ouverts.join('-')}.json`);
+  const f = path.join(base, `sc-${ids.join('-') || 'x'}.json`);
   fs.writeFileSync(f, JSON.stringify({ onglet: 'equipe', source: 'live', who: wh, lock: null, etapes }));
   const r = JSON.parse(execFileSync('node', [path.join(TESTS, 'vm-regie-page.mjs'), UI, f], { encoding: 'utf8' }));
   if (r.erreur) throw new Error(r.erreur);
   return r.out;
 };
 const IDS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's10', 's11', 's12'];
-const R1 = regie(who, IDS, ['s1']), R2 = regie(who2, ['s9'], ['s9']);
+const R1 = regie(who, IDS), R2 = regie(who2, ['s9']);
 const nom = (R, id) => (R['n:' + id] || [])[0] ?? '', pref = (t) => t.split(' · ')[0], sp = (t) => String(t).replace(/\s/g, ' ');
 const w = (id) => who.workers.find((x) => x.id === id), w9 = who2.workers.find((x) => x.id === 's9');
 const CTRL = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]'), CF = /\p{Cf}/u, json = JSON.stringify({ who, regie: R1 }), h = nom(R1, 's3'), hw = w('s3')?.titre;
@@ -634,12 +634,12 @@ ecris(uf, 'ZZ'); fs.chmodSync(uf, 0); const u1 = L.titreSession(uf); fs.chmodSyn
 const { whoSig } = await imp('vf-cockpit-live.mjs'), deux = JSON.parse(JSON.stringify(who)); deux.workers.find((x) => x.id === 's1').titre = 'Autre nom';
 const iface = JSON.parse(fs.readFileSync(path.join(S, 'vf-cockpit-interface.json'), 'utf8')).schemas['vibeflow/cockpit-who@2'].travailleur;
 const permis = new Set([...iface.requis, ...iface.optionnels]), nonDeclares = [...new Set(who.workers.flatMap((x) => Object.keys(x)).filter((k) => !permis.has(k)))];
-console.log(JSON.stringify({ t1a: nom(R1, 's1'), t1b: pref(nom(R1, 's5')), t1c: sp((R1['p:s1'] || []).join(' ')).includes('Identifiant : s1'), t1d: [w('s1')?.titre, w('s5')?.titre === undefined], t2a: pref(nom(R1, 's2')), t2b: json.includes('TITRE-IA-SECRET-MODELE'),
+console.log(JSON.stringify({ t1a: nom(R1, 's1'), t1b: pref(nom(R1, 's5')), t1d: [w('s1')?.titre, w('s5')?.titre === undefined], t2a: pref(nom(R1, 's2')), t2b: json.includes('TITRE-IA-SECRET-MODELE'),
   t3a: [h.startsWith('<img src=x'), h.length <= 80, CTRL.test(h), h.includes('A1b2C3d4'), /\[masqué\]/.test(h)], t3b: [typeof hw === 'string' && hw.length <= 80, CTRL.test(hw || ''), String(hw).includes('A1b2C3d4')],
   t3cf: [CF.test(h), CF.test(hw || '')], t4: [pref(nom(R1, 's4')), json.includes('TITRE-TROP-LOIN')],
   t6: [nom(R1, 's6').includes('ghp_'), nom(R1, 's6').length <= 80, nom(R1, 's6').length],
   t7: [nom(R1, 's7').isWellFormed(), String(w('s7')?.titre).isWellFormed(), nom(R1, 's7').length],
-  t8: [w9?.branch, sp((R2['p:s9'] || []).join(' ')).includes('branche feat/evilx'), CF.test(JSON.stringify(who2) + JSON.stringify(R2))],
+  t8: [w9?.branch, sp((R2['l:s9'] || []).join(' ')).includes('branche feat/evilx'), CF.test(JSON.stringify(who2) + JSON.stringify(R2))],
   t10: [pref(nom(R1, 's10')), pref(nom(R1, 's11')), nom(R1, 's12')], t11: [m1, m2, m3], t12: [u1, u2], t13: nonDeclares, t14: [whoSig(who) !== whoSig(deux), whoSig(who) === whoSig(JSON.parse(JSON.stringify(who)))] }));
 JS
 TESTS23="$(cd "$(dirname "$0")" && pwd)"; UI23="$SCRIPTS/../skills/cockpit-moteur/assets/ui"
@@ -648,7 +648,6 @@ g23() { node "$AUX/get.mjs" "$1.json" "$2"; }
 mkdir -p "$WORK/w23a" && w23 "$SCRIPTS" "$WORK/w23a"
 assert_eq "W23.0 — contrôle positif : la fabrique rend un JSON lisible" "$(g23 "$WORK/w23a" 'typeof j.t1b')" "string"
 assert_eq "W23.1 — custom-title -> titre de who@2 et nom de la ligne de régie ; sans titre -> pas de titre, ligne « Session principale » (73-09 : lu sur la régie, plus sur la carte)" "$(g23 "$WORK/w23a" '[j.t1a,j.t1b,j.t1d.join("/")].join("|")')" "Mon chantier carte|Session principale|Mon chantier carte/true"
-assert_eq "W23.2 — l'identifiant de session passe au détail de la ligne de régie (ligne dépliée)" "$(g23 "$WORK/w23a" 'j.t1c')" "true"
 assert_eq "W23.3 — ai-title seul : aucun titre lu, ligne « Session principale », l'ai-title n'est nulle part dans who@2 ni dans la régie" "$(g23 "$WORK/w23a" '[j.t2a,j.t2b].join("|")')" "Session principale|false"
 assert_eq "W23.4 — custom-title hostile (balises, contrôles, U+2028, 500 car., secret) : texte inerte, ≤ 80, sans contrôle, masqué (nom de la ligne de régie)" "$(g23 "$WORK/w23a" 'j.t3a.join(",")')" "true,true,false,false,true"
 assert_eq "W23.5 — custom-title hostile : le champ titre de la collecte est ≤ 80, sans contrôle, masqué" "$(g23 "$WORK/w23a" 'j.t3b.join(",")')" "true,false,false"

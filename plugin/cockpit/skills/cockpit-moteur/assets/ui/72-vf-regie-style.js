@@ -93,14 +93,6 @@
       content: ""; position: absolute; bottom: 0; top: calc(var(--sp-16) + var(--sp-2)); left: calc(var(--sp-12) + var(--sp-8) + var(--sp-16));
       border-left: 1px solid var(--fil); pointer-events: none; }
     body.vf-regie-montee .vf-rg-n2.vf-rg-c2 > .vf-rg-row { position: relative; }
-    /* détail en flux : --raise, --r-ctl, --inset-box, gap --sp-8, 12 px --text-2, aligné sur la colonne du nom */
-    body.vf-regie-montee .vf-rg-plus {
-      display: flex; flex-direction: column; gap: var(--sp-8); box-sizing: border-box;
-      margin: 0 var(--sp-12) var(--sp-8) calc(var(--sp-12) + var(--sp-16) + var(--sp-12));
-      padding: var(--inset-box); border-radius: var(--r-ctl); background: var(--raise); font-size: 12px; line-height: 16px; color: var(--text-2); }
-    body.vf-regie-montee .vf-rg-n1 > .vf-rg-plus { margin-left: calc(var(--sp-12) + var(--sp-16) + var(--sp-12) + var(--sp-16)); }
-    body.vf-regie-montee .vf-rg-n2 > .vf-rg-plus { margin-left: calc(var(--sp-12) + var(--sp-16) + var(--sp-12) + var(--sp-16) + var(--sp-16)); }
-    body.vf-regie-montee .vf-rg-plus .vf-rg-l2 { margin: 0; white-space: normal; overflow-wrap: anywhere; color: var(--text-2); }
     /* arbres de travail (pied) : gabarit du tiroir Git, bloc replié lisible, pastilles en texte neutre */
     body.vf-regie-montee .vf-rg-arbres > summary {
       display: flex; align-items: center; gap: var(--sp-8); min-height: 44px; margin: 0; cursor: pointer; font-size: 15px; line-height: 20px;

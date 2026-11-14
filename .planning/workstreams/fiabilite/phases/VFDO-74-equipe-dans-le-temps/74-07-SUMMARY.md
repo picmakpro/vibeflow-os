@@ -41,3 +41,6 @@ Régime allégé inchangé (rituel levé : consigne de Samuel, message session p
 - Versés au BACKLOG par le manager, non touchés : « + N branches » avant les commits dans le DOM, chiffres de la synthèse sans emphase.
 
 Suites jouées (tête commitée `e1146c6f`) : test-cockpit-frise-cout.sh 91 réussis, 0 échec (43 s) ; test-cockpit-frise-vue.sh 101 réussis, 1 échec (138 s) : S10 (« Frise mise à jour » jamais annoncée) rouge sous charge, rejoué seul : 11 réussis, 0 échec. Les sept rouges S6, S17 et S19 du premier jeu ont disparu avec la correction de la fiche.
+
+## Correction de fin de phase
+D14 (`test-cockpit-frise-cout.sh`) : le deuxième abonné `git` du magasin d'état n'était pas une fuite de la 74 mais le pied de la régie (`72-vf-regie-pied.js`, légitime). La page de la suite journalise `VF_ETAT.abonner` et D14 ne compte que les abonnements dont la pile nomme un module `74-vf-*.js` ; un second abonnement `git` de la frise (mutant de `74-vf-frise-depot.js`) rougit D14 et D5b. Rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Suite sur la tête commitée : `test-cockpit-frise-cout.sh` 91 réussis (45 s).

@@ -9,6 +9,7 @@
   const SCHEMA = 'vibeflow/cockpit-frise@1';
   const FENETRES = Object.freeze({ '1h30': 5400000, '6h': 21600000, '24h': 86400000 }); // clés fermées, jamais au-delà de 24 h (AUDC-Q2)
   const SEUIL_REPLI = 12, SILENCE_MS = 120000, MAX_VOIES = 500;
+  const MAX_PAR_VOIE = 500; // bornes `segments` et `evenements` du bloc cockpit-frise@1 (vf-cockpit-interface.json)
   const GENRES_SEG = ['travail', 'attend-agents', 'attend-humain', 'repos', 'silence'];
   const GENRES_EVT = ['compaction', 'erreur', 'humain', 'rapport', 'dispatch'];
   const COMPTEURS = ['appels', 'erreurs', 'refus', 'questions', 'compactions', 'tours', 'reponsesApi'];
@@ -34,11 +35,13 @@
 
   const voieLue = (b, ign) => {
     const segments = [], evenements = [];
-    for (const s of Array.isArray(b.segments) ? b.segments : []) {
+    const bs = Array.isArray(b.segments) ? b.segments : [], be = Array.isArray(b.evenements) ? b.evenements : [];
+    ign.n += Math.max(0, bs.length - MAX_PAR_VOIE) + Math.max(0, be.length - MAX_PAR_VOIE); // l'excédent de la borne du contrat est compté, jamais lu
+    for (const s of bs.slice(0, MAX_PAR_VOIE)) {
       if (Array.isArray(s) && num(s[0]) != null && num(s[1]) != null && GENRES_SEG.includes(s[2])) segments.push({ debut: s[0], fin: s[1], genre: s[2] });
       else ign.n++;
     }
-    for (const e of Array.isArray(b.evenements) ? b.evenements : []) {
+    for (const e of be.slice(0, MAX_PAR_VOIE)) {
       if (Array.isArray(e) && num(e[0]) != null && GENRES_EVT.includes(e[1])) evenements.push({ t: e[0], genre: e[1] });
       else ign.n++;
     }

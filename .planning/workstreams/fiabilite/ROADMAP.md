@@ -102,7 +102,7 @@
 - [x] Phase 71.5: Réexamen du design system du cockpit (INSERTED, inscrite 2026-11-05, jalon vibeflow-v2.0) — complete 2026-11-06 : mission design, sans plan GSD ni exigence au ledger, publiée en `v2.76.0`
 - [x] Phase 72: Lancer du travail depuis les cartes du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-06 : 16/16 plans, LANC-12 décochée, publiée en `v2.76.0`
 - [ ] Phase 73: Gouvernance au cockpit — arbitrages en attente, worktrees et verrous (inscrite 2026-11-03, jalon vibeflow-v2.0) — cadrée et planifiée le 2026-11-11 (11 plans, REGI-01..17)
-- [ ] Phase 74: L'équipe dans le temps — swim-lanes, coût, replay (inscrite 2026-11-03, jalon vibeflow-v2.0) — cadrée et planifiée le 2026-11-11 (10 plans, 6 vagues, TEMP-01..12)
+- [ ] Phase 74: L'équipe dans le temps — swim-lanes, coût, replay (inscrite 2026-11-03, jalon vibeflow-v2.0) — cadrée et planifiée le 2026-11-11 (10 plans, 6 vagues, TEMP-01..12) ; 10/10 plans exécutés (2026-11-14), en attente de fusion dans `integration/cockpit-audit`
 - [ ] Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte (inscrite 2026-11-03, jalon vibeflow-v2.0) — cadrée et planifiée le 2026-11-11 (12 plans, 9 vagues, ACTV-01..12)
 - [ ] Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire (inscrite 2026-11-03, jalon vibeflow-v2.0 ; cadrée et planifiée 2026-11-11, 9 plans)
 - [ ] Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up (inscrite 2026-11-03, jalon vibeflow-v2.0) — planifiée 2026-11-11 (8 plans)
@@ -138,7 +138,7 @@
 | 71.5. Réexamen du design system du cockpit | vibeflow-v2.0 | mission design, sans plan GSD | Complete — PR #213, release `v2.76.0` | 2026-11-06 |
 | 72. Lancer du travail depuis les cartes du cockpit | vibeflow-v2.0 | 16/16 | Complete — PR #214, LANC-12 décochée, release `v2.76.0` | 2026-11-06 |
 | 73. Gouvernance au cockpit — arbitrages en attente, worktrees et verrous | vibeflow-v2.0 | 11/11 | In progress | - |
-| 74. L'équipe dans le temps — swim-lanes, coût, replay | vibeflow-v2.0 | 6/10 | In Progress | - |
+| 74. L'équipe dans le temps — swim-lanes, coût, replay | vibeflow-v2.0 | 10/10 | Executed — en attente de fusion dans `integration/cockpit-audit` | - |
 | 75. L'activité posée sur le code — hotspots, couplage, gardes, empreinte | vibeflow-v2.0 | 12/12 | Complete | 2026-11-14 |
 | 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 9/9 | Complete    | - |
 | 77. Santé de la méthode et synthèse — jauges, dernière visite, burn-up | vibeflow-v2.0 | 0/8 | Planned | - |
@@ -339,11 +339,11 @@ Plans:
 - [x] 74-03-PLAN.md — Fil de la fiche, markdown fermé et fusion des événements (vague 2)
 - [x] 74-04-PLAN.md — Frise : vue de la régie, voies, segments, axe, direct (vague 3)
 - [x] 74-05-PLAN.md — Fiche d'agent plein cadre, ouverture depuis la régie, Échap (vague 3)
-- [ ] 74-06-PLAN.md — Curseur, encart « À cet instant », « Voir sur la carte » (vague 4)
+- [x] 74-06-PLAN.md — Curseur, encart « À cet instant », « Voir sur la carte » (vague 4)
 - [x] 74-07-PLAN.md — Bandeau Dépôt, commit dans le tiroir Git, coût (vague 4)
-- [ ] 74-08-PLAN.md — Retraits et gardes d'absence, annulation des trois déclencheurs (vague 4)
-- [ ] 74-10-PLAN.md — Retrait du lecteur de repli de la régie (P73-C2) (vague 5)
-- [ ] 74-09-PLAN.md — Bornes, chaîne XSS, contrat, VENDORED, documentation et compteur (vague 6)
+- [x] 74-08-PLAN.md — Retraits et gardes d'absence, annulation des trois déclencheurs (vague 4)
+- [x] 74-10-PLAN.md — Retrait du lecteur de repli de la régie (P73-C2) (vague 5)
+- [x] 74-09-PLAN.md — Bornes, chaîne XSS, contrat, VENDORED, documentation et compteur (vague 6)
 
 ### Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte
 

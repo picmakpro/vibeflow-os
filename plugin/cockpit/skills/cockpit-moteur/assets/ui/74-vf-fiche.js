@@ -96,7 +96,9 @@
       o.racine.setAttribute('aria-label', `Fiche de ${nom}`);
       o.faitsCol.setAttribute('aria-label', `Faits de ${nom}`);
       o.fil.setAttribute('aria-label', `Fil de ${nom}`);
-      const fv = FA().faits(voie, w, { statut: f.ok ? 'ok' : 'indisponible', tronque });
+      const P = W.__vfRegiePied, MR = W.__vfRegieModele, nc = P && typeof P.nonCommite === 'function' ? P.nonCommite() : null;
+      const fv = FA().faits(voie, w, { statut: f.ok ? 'ok' : 'indisponible', tronque, id: o.id, modifies: w && w.branch && nc ? nc[w.branch] : 0,
+        lancee: w && w.kind === 'session' && MR && MR.lancementDe ? MR.lancementDe(w.lancee) : '' });
       o.faitsCorps.replaceChildren(...FA().dom(fv, D, () => lire()));
       o.resume.textContent = `Faits de l'agent${fv.chiffres ? ' · ' + fv.chiffres[0][1] : ''}`;
       const pid = voie && voie.parent, pv = pid && f.ok ? f.frise.voies.find((v) => v.id === pid) || null : null, pw = pid ? worker(pid) : null;

@@ -169,7 +169,7 @@ await executer(chrome, async (s) => {
     const ids = [...hr.querySelectorAll('button')].filter((b) => !b.closest('.menu')).map((b) => b.id);
     const bt = [...hr.querySelectorAll('button')].filter((b) => V(b) && !b.closest('.menu')).map((b) => { const r = b.getBoundingClientRect();
       return [b.id, Math.round(r.left), Math.round(r.top), Math.round(r.width), Math.round(r.height)]; });
-    return { ids, bt, groupes: hr.querySelectorAll('[role=group]').length, libs: [...hr.querySelectorAll('.vf-hdr-lib')].filter(V).length }; })()`;
+    return { ids, bt, groupes: hr.querySelectorAll(':scope > [role=group]').length, libs: [...hr.querySelectorAll('.vf-hdr-lib')].filter(V).length }; })()`;
   if (mode === 'en2') {
     o.g = {}; o.inv = {};
     for (const w of [1440, 1600]) {
@@ -199,8 +199,7 @@ await executer(chrome, async (s) => {
     });
     await sec('icones', async () => {
       await charger('index.html', 1100, 900); await pause(500);
-      o.icones = await J(`({ flows: document.querySelector('#flows-btn svg path').getAttribute('d'),
-        recent: document.querySelector('#btn-recent svg path').getAttribute('d') })`);
+      o.icones = await J(`({ flows: document.querySelector('#flows-btn svg path').getAttribute('d') })`);
       const point = `(() => { const b = document.getElementById('vf-lock'), d = b.querySelector('.dot'), c = getComputedStyle(d),
         l = b.querySelector('.bl'), g = document.querySelector('.vf-git-ligne');
         return { clip: c.clipPath.slice(0, 5), w: Math.round(d.getBoundingClientRect().width), bl: getComputedStyle(l).display,

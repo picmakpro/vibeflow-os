@@ -59,6 +59,14 @@ const appelant = () => String(new Error().stack).split('\n')[3] || '';
     ouvrir: (...a) => { window.__sp.appels.push(['volet.ouvrir', appelant()]); return x.ouvrir(...a); } })) : x; } }); }
 { let c; Object.defineProperty(window, 'VF_COQUILLE', { configurable: true, get: () => c,
   set: (x) => { c = x && typeof x.surOnglet === 'function' ? Object.freeze(Object.assign({}, x, { surOnglet: (r, o) => { window.__surOnglet.push(o && o.cle); return x.surOnglet(r, o); } })) : x; } }); }
+// __abo74 : les abonnements du magasin d'état encore vivants et posés par un module de la 74 (la pile de l'appel nomme 74-vf-*.js) ; le pied de la régie (72)
+// s'abonne à `git` de son côté, légitimement : il n'est jamais compté, une fuite de la frise ou du coût l'est
+window.__abos = [];
+{ let e; Object.defineProperty(window, 'VF_ETAT', { configurable: true, get: () => e,
+  set: (x) => { e = x && typeof x.abonner === 'function' ? Object.freeze(Object.assign({}, x, { abonner: (cle, f) => {
+    const o = { cle, de74: /74-vf-[a-z-]+\.js/.test(String(new Error().stack)), vif: true }; window.__abos.push(o); const off = x.abonner(cle, f);
+    return () => { o.vif = false; return off(); }; } })) : x; } }); }
+window.__abo74 = () => { const r = { git: 0, frise: 0, etat: 0 }; for (const o of window.__abos) if (o.de74 && o.vif) r[o.cle] = (r[o.cle] || 0) + 1; return r; };
 { const f0 = window.fetch.bind(window);
   const rep = (st, o) => new Response(JSON.stringify(o), { status: st, headers: { 'content-type': 'application/json' } });
   const apres = (ms, f) => new Promise((ok) => setTimeout(() => ok(f()), ms || 0));
@@ -462,25 +470,22 @@ import { monterD, voiesCout } from './commun.mjs';
 export const ids = ['D14'];
 export default async function (h) {
   const lire = () => h.ev(() => ({ cout: document.querySelectorAll('.vf-cout').length, depot: document.querySelectorAll('.vf-frise-rang-depot').length, racines: document.querySelectorAll('.vf-frise').length,
-    tire: document.querySelectorAll('.vf-frise-synthese a').length, ab: window.VF_ETAT.abonnes(),
-    // l'arbre de la régie (Phase 73) pose son propre abonnement git : on le retranche, il n'est pas celui de la 74-07
-    gitSans: window.VF_ETAT.abonnes().git - document.querySelectorAll('.vf-rg-arbres').length }));
+    tire: document.querySelectorAll('.vf-frise-synthese a').length, ab: window.__abo74() }));
   const ou = (n) => h.attendre(`window.VF_COQUILLE.onglet() === '${n}' && document.documentElement.dataset.vfPret === 'oui'`, `onglet ${n}`);
   await h.section('D14', async () => {
     await monterD(h, { voies: voiesCout });
     const a = await lire();
-    h.egal('D14', 'témoin : un seul bandeau, une seule section, un seul abonnement git (les abonnés frise sont ceux des autres modules, jamais ceux de la 74-07)', [a.cout, a.depot, a.racines, a.tire, a.gitSans, a.ab.frise >= 1], [1, 1, 1, 1, 1, true]);
+    h.egal('D14', 'témoin : un seul bandeau, une seule section, un seul abonnement git posé par la 74 (le pied de la régie, de la 72, a le sien et n\'est pas compté)', [a.cout, a.depot, a.racines, a.tire, a.ab.git, a.ab.frise >= 1], [1, 1, 1, 1, 1, true]);
     await h.ev("window.VF_COQUILLE.chargerOnglet('code').then(() => 1)"); await ou('code');
-    const loin = await h.ev(() => window.VF_ETAT.abonnes());
-    // sur Code, 75-vf-activite.js abonne `git` (contrat de 75-08) : seul cet abonné reste, ceux de la régie et de la 74-07 sont partis
-    h.egal('D14', 'hors de l\'onglet Équipe : plus aucun abonnement git de la régie ni de la 74-07 (reste le seul abonné de l\'activité de la 75 sur Code)', loin.git, 1);
+    const loin = await h.ev(() => window.__abo74());
+    h.egal('D14', 'hors de l\'onglet Équipe : plus aucun abonnement git', loin.git, 0);
     await h.ev("window.VF_COQUILLE.chargerOnglet('equipe').then(() => 1)"); await ou('equipe'); await h.attendreFrise();
     const b = await lire();
     await h.cycle('code'); await h.attendreFrise();
     const c = await lire();
-    h.egal('D14', 'après DEUX changements d\'onglet : une seule section, un seul bandeau, aucun abonnement doublé (git, frise, etat)', [c.cout, c.depot, c.racines, c.tire, c.gitSans, c.ab.frise, c.ab.etat],
+    h.egal('D14', 'après DEUX changements d\'onglet : une seule section, un seul bandeau, aucun abonnement doublé (git, frise, etat)', [c.cout, c.depot, c.racines, c.tire, c.ab.git, c.ab.frise, c.ab.etat],
       [1, 1, 1, 1, 1, a.ab.frise, a.ab.etat]);
-    h.egal('D14', 'les deux changements d\'onglet donnent le même état que le premier', [b.cout, b.depot, b.gitSans, b.ab.frise, b.ab.etat], [1, 1, 1, a.ab.frise, a.ab.etat]);
+    h.egal('D14', 'les deux changements d\'onglet donnent le même état que le premier', [b.cout, b.depot, b.ab.git, b.ab.frise, b.ab.etat], [1, 1, 1, a.ab.frise, a.ab.etat]);
     const s = await h.ev(() => window.__surOnglet.filter((x) => /^74-vf-(frise-depot|cout)\.js$/.test(x)));
     h.sonde('D14', 'surOnglet appelé avec { cle: \'74-vf-frise-depot.js\' } et { cle: \'74-vf-cout.js\' } à chaque arrivée, jamais sans clé', s.filter((x) => x === '74-vf-frise-depot.js').length >= 3
       && s.filter((x) => x === '74-vf-cout.js').length >= 3, JSON.stringify(s));

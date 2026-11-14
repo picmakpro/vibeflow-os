@@ -1,5 +1,6 @@
 // mesures-pied.mjs — mesures navigateur du pied réservé, des glyphes et des zooms (tâche 2 du plan 75-07). Mêmes règles que mesures.mjs :
 // une fonction par section, un objet JSON simple en retour, la mise en page (worker) attendue stable avant chaque relevé.
+import fs from 'node:fs'; import path from 'node:path';
 const DIR_A = 'd:d-src|src/a', DIR_B = 'd:d-src|src/b', NOEUD = 'n:d-src';
 const CLES = ['bas', 'moyen', 'haut', 'confluent', 'bouclier', 'sans-temoin', 'en-cours', 'modifie', 'lu', 'fini', 'prevu'];
 const ZOOMS = ['ouverture', 'mid', 'bas'];
@@ -49,10 +50,20 @@ const SONDES = (theme) => `(() => { document.documentElement.setAttribute('data-
   zone.remove(); return JSON.stringify(out); })()`;
 
 // La durée d'un agent (« depuis 9 min », « 12 s ») dépend de l'horloge : deux serveurs mesurés à des instants différents n'ont pas la même largeur de texte,
-// pour un octet de plus. Ce qui se compare est la mise en page de la section, pas l'horloge : la valeur de chaque durée est posée à une largeur fixe,
+// pour un octet de plus. Ce qui se compare est la mise en page de la section, pas l'horloge : la valeur de chaque durée est posée à une largeur fixe et toute animation est figée à son instant 0 (les glyphes « en cours » respirent en scale .82 : leur boîte, lue par getBoundingClientRect, change avec la phase — 16 contre 13 px mesurés sur les svg/circle de la section),
 // dans la même évaluation que le relevé (aucun rendu ne passe entre les deux). Ni le nombre ni la place des éléments ne sont touchés.
-const GEOM_EQUIPE = `(() => { document.querySelectorAll('section#vf-equipe .vf-rg-dur > span').forEach((e) => { e.textContent = '00 min'; }); return true; })() && JSON.stringify([...document.querySelectorAll('section#vf-equipe, section#vf-equipe *')].map((e) => { const r = e.getBoundingClientRect(); return [e.tagName, e.id, Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)]; }))`;
+const GEOM_EQUIPE = `(() => { document.querySelectorAll('section#vf-equipe .vf-rg-dur > span').forEach((e) => { e.textContent = '00 min'; }); document.getAnimations().forEach((an) => { an.pause(); an.currentTime = 0; }); return true; })() && JSON.stringify([...document.querySelectorAll('section#vf-equipe, section#vf-equipe *')].map((e) => { const r = e.getBoundingClientRect(); return [e.tagName, e.id, Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)]; }))`;
 const GEOM = `JSON.stringify({ L: VibeFlow.state.layout.children.map((c) => [c.id, Math.round(c.x), Math.round(c.y), c.width, c.height]), F: [...document.querySelectorAll('#viewport .node')].map((g) => { const f = g.querySelector('.card .foot'), c = g.querySelector('.card'); return [f ? f.offsetHeight : null, c ? c.offsetWidth : null, c ? c.offsetHeight : null]; }), k: Math.round(VibeFlow.state.t.k * 1000) / 1000, H: Math.round(VibeFlow.state.bounds.h), W: Math.round(VibeFlow.state.bounds.w) })`;
+
+// Les agents de la section Équipe sont datés par la date de modification de leurs fichiers (mk-agents.mjs) : leur âge, donc leur régime (« au travail »
+// avant 120 s, « sans nouvelle » et le détail « commande en cours depuis » après, 180 s côté serveur), grandit avec l'horloge. Les deux serveurs comparés sont
+// mesurés à plus d'une minute d'écart : sans cette remise à l'heure, l'un est lu avant le seuil et l'autre après (lignes de 56 px contre 72 px). Les
+// fichiers sont donc rajeunis juste avant le chargement de la page : les deux lectures partent du même âge, à quelques secondes près, très en deçà du seuil.
+const rajeunirAgents = () => {
+  const racine = path.join(process.env.HOME || '', '.claude', 'projects', '-lab'), t = new Date();
+  const marcher = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) marcher(p); else fs.utimesSync(p, t, t); } };
+  if (fs.existsSync(racine)) marcher(racine);
+};
 
 export const mesuresPied = {
   // D6, D7 : le pied est réservé dès la construction, sans lentille, à 20 puis 28 aux paliers lod ; connecteurs sans pied
@@ -81,6 +92,7 @@ export const mesuresPied = {
     // depuis 73-08 la page Équipe n'a plus de canevas ni de carte : elle est prête quand body.vf-regie-montee et section#vf-equipe sont là,
     // et ce qui se compare est la géométrie de la section et de tout ce qu'elle contient
     if (c.sid) {
+      rajeunirAgents();
       await s.naviguer(`${c.racine}/equipe.html?lang=fr`);
       await s.attendre("document.readyState === 'complete' && document.body.classList.contains('vf-regie-montee') && !!document.querySelector('section#vf-equipe')", 'page Équipe montée');
       // la régie est montée avant sa première lecture : #vf-equipe porte aria-busy=true jusqu'à ce que les données soient arrivées, puis la boîte
