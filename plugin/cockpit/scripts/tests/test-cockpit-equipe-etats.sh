@@ -110,7 +110,7 @@ const S = {
     const e = collecte(monter({ session: { ageS: 600 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 600, outil: 'Agent' }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 600, outil: 'Read' }] }));
     const t = texte(rendu().arbre(m.workers, h));
     ok('D1.10 — le tiroir dit « outil en cours, sans nouvelle depuis 10 min » pour l\'agent muet', /outil en cours, sans nouvelle depuis 10 min/.test(t), t);
-    ok('D1.11 — l\'agent muet y garde sa place d\'agent actif (pas de repli dans « Terminés »)', !/Terminés depuis/.test(t), t);
+    ok('D1.11 — l\'agent muet y garde sa place d\'agent actif (pas de repli dans les terminés de la régie : ni « Terminé », ni lien « à relire »)', /vf-coder/.test(t) && !/Terminé|à relire/.test(t), t);
     const pe = collecte(monter({ session: { ageS: 600 }, agents: [{ id: 'mgr', role: 'vf-dev-manager', ageS: 600, outil: 'Read' }, { id: 'wrk', role: 'vf-coder', parent: 'mgr', ageS: 4 }] }));
     eq('D1.12 — un agent muet dont un descendant écrit encore attend celui-ci : « en attente » même avec un outil sans résultat', [sous(pe, 'mgr')?.etat, sous(pe, 'wrk')?.etat], ['en-attente', 'actif']);
     eq('D1.9 — l\'action tirée de l\'outil en cours est celle d\'un fichier lu, jamais l\'argument', [sous(e, 'wrk')?.etat, sous(e, 'wrk')?.action?.verbe, sous(e, 'wrk')?.enCours], ['actif', 'lit', true]);
@@ -174,7 +174,7 @@ const S = {
     ok('D4.4 — sur la régie, le worker orphelin est dans l\'arbre « Au travail » juste sous la ligne de son parent, jamais dans « Terminé, à relire »', rgo.ordre.includes('wrk') && rgo.ordre.indexOf('wrk') === rgo.ordre.indexOf('mgr') + 1 && rgo.relire === 0, rgo);
     ok('D4.5 — la ligne de régie le nomme « orphelin » (mot et détail)', JSON.stringify(rgo.mot) === '["orphelin"]' && /son parent est terminé/.test(sp((rgo.det || []).join(' '))), rgo);
     const t = texte(rendu().arbre(o.workers, h));
-    ok('D4.6 — le tiroir le nomme « orphelin ? »', /orphelin \?/.test(t) && !/Terminés depuis/.test(t), t);
+    ok('D4.6 — le tiroir le nomme « orphelin ? »', /orphelin \?/.test(t) && !/Terminé|à relire/.test(t), t);
   },
   // ---- D3 : « À surveiller » et « commande en cours depuis 15 min » de bout en bout ; l'âge avance dans la page ----
   D3() {
@@ -195,7 +195,7 @@ const S = {
     const v = vive(960);
     ok('D3.6 — 16 min après la réception, le même agent est « commande en cours depuis plus de 15 min » sans nouveau `who`', /commande en cours depuis plus de 15 min/.test(texte(v.surveiller(w))), texte(v.surveiller(w)));
     ok('D3.7 — son âge affiché a avancé (17 min), la durée « depuis » aussi', /sans nouvelle depuis 17 min/.test(texte(v.arbre(w, h))) && /depuis 18 min/.test(texte(v.arbre(w, h))), texte(v.arbre(w, h)));
-    ok('D3.8 — un terminé ne vieillit pas dans la page', /a duré 2 min/.test(texte(vive(960).arbre([{ kind: 'subagent', id: 'b', etat: 'termine', tree: '.', role: 'vf-coder', task: 'y', ageS: 60, dureeS: 120 }], h))));
+    ok('D3.8 — un terminé (porteur d\'un agent en cours : le tiroir ne rend plus un terminé seul) ne vieillit pas dans la page', /a duré 2 min/.test(texte(vive(960).arbre([{ kind: 'subagent', id: 'b', etat: 'termine', tree: '.', role: 'vf-coder', task: 'y', ageS: 60, dureeS: 120 }, { kind: 'subagent', id: 'c', etat: 'actif', parent: 'b', tree: '.', role: 'vf-reviewer', task: 'z', ageS: 3, dureeS: 30 }], h))));
   },
   // ---- M3 : le titre de la vue Équipe est vrai, la santé d'Équipe ne contredit plus celle de Code ----
   M3() {

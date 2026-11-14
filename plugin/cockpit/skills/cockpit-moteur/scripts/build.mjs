@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compileGlob, parseArgs, fmtNum, mapDir, keepOutOfGit } from './lib/common.mjs';
+import { compileGlob, regleDeNoeuds, rattacher, parseArgs, fmtNum, mapDir, keepOutOfGit } from './lib/common.mjs';
 import { fallbackFileName, fallbackRouteName, routeKey } from './lib/names.mjs';
 import { buildHealth } from './lib/health.mjs';
 import { buildPlanHealth } from './lib/blueprint.mjs';
@@ -114,32 +114,15 @@ const included = filesAll.filter((f) => include.includes(f.category) && !ignoreG
 const includedSet = new Set(included.map((f) => f.path));
 
 // ---------- assign files to nodes ----------
-// A node's `exclude` also applies to its descendants, so "web excludes tests" holds all the way down.
-const inheritedExcludes = (n, seen = new Set()) => {
-  if (!n || seen.has(n.id)) return [];
-  seen.add(n.id);
-  return [...(isStrArr(n.exclude) ? n.exclude : []), ...(n.parent ? inheritedExcludes(byId.get(n.parent), seen) : [])];
-};
-const matchers = nodes.filter((n) => n?.id && isStrArr(n.paths ?? [])).map((n, order) => ({
-  id: n.id, order, depth: depthOf.get(n.id) || 0,
-  paths: (n.paths || []).map(compileGlob), exclude: inheritedExcludes(n).map(compileGlob), hits: new Array((n.paths || []).length).fill(0),
-}));
+// vibeflow 75-06 : la règle (profondeur, spécificité, `exclude` hérité par les descendants) vit dans lib/common.mjs, appelée aussi par les cartes prévues
+const matchers = regleDeNoeuds(nodes);
 const owner = new Map();
 let ambiguous = 0;
 const ambiguousEx = [];
 for (const f of included) {
-  let best = null, bestKey = null, tie = null;
-  for (const m of matchers) {
-    if (m.exclude.some((g) => g.test(f.path))) continue;
-    let spec = -1;
-    m.paths.forEach((g, i) => { if (g.test(f.path)) { m.hits[i]++; spec = Math.max(spec, g.specificity); } });
-    if (spec < 0) continue;
-    const key = [m.depth, spec];
-    if (!best || key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] > bestKey[1])) { best = m; bestKey = key; tie = null; }
-    else if (key[0] === bestKey[0] && key[1] === bestKey[1]) tie = m.id;
-  }
-  if (tie) { ambiguous++; if (ambiguousEx.length < 3) ambiguousEx.push(`${f.path} (${best.id} vs ${tie})`); }
-  owner.set(f.path, best ? best.id : 'unassigned');
+  const { id: best, tie } = rattacher(matchers, f.path);
+  if (tie) { ambiguous++; if (ambiguousEx.length < 3) ambiguousEx.push(`${f.path} (${best} vs ${tie})`); }
+  owner.set(f.path, best);
 }
 for (const m of matchers) m.hits.forEach((h, i) => { if (!h) warn(`node "${m.id}" path "${m.paths[i].glob}" matches no included file`); });
 if (ambiguous) warn(`${ambiguous} file(s) matched two sibling nodes equally; the first declared won. Make globs more specific or add an exclude. e.g. ${ambiguousEx.join('; ')}`);

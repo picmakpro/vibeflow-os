@@ -113,8 +113,16 @@ croix (ignoré), disque plein (actif), anneau et pause, anneau pointillé, annea
 œil. La famille ci-dessous est faite de **carrés à angles vifs** (`rx` 1,5, plats de 7 px ou plus) et d'un **octogone au
 trait** : aucune de ces formes n'y figure.
 
-**Glyphes de 16 px fixes** : `width: 16px; height: 16px` sur `.vf-trace-g`, jamais `1.45em` ; **chaque paire glyphe et mot** (bande, légende, état d'un lien, état de la section « État ») est un `display: inline-flex; align-items: center; gap: var(--sp-4)` : le glyphe de 16 px tient dans la ligne de 16 ou 18 px et **la hauteur de ligne est conservée** ; ils ne suivent ni la police ni
-le zoom d'éloignement. Masque : patron `GLYPHE(...)` de `00-vibeflow.js` (viewBox 16), teinté par `--c-st`. Chaque corps
+**Glyphes de 16 px fixes** : `width: 16px; height: 16px` sur `.vf-trace-g`, jamais `1.45em` ; **chaque paire glyphe et mot** (bande, légende, état d'un lien, état de la section « État », glyphe d'une ligne de § 2.2, § 4, § 5.1, § 5.4, § 6) est un `display: inline-flex; align-items: flex-start; gap: var(--sp-4)` : le glyphe de 16 px tient dans la ligne de 16 ou 18 px et **la hauteur de ligne est conservée** ; ils ne suivent ni la police ni
+le zoom d'éloignement.
+
+**Alignement d'une paire dont le mot passe sur deux lignes** (règle de classe, tour de craft du 2026-11-13) : le glyphe se cale sur la
+**première ligne** du mot, jamais au centre du bloc (un `align-items: center` le ferait flotter entre deux lignes). Le glyphe est
+`flex: none`, le mot est dans un `span` `min-width: 0` qui porte son clamp ; le glyphe prend `margin-top: 0` devant un mot de 16 px de
+ligne (11,5 px) et `margin-top: calc(var(--sp-2) / 2) /* optique : centre 16 px sur une ligne de 18 px */` devant un mot de 18 px de
+ligne (12,5 px). Les paires de la **légende** (§ 2.2) sont des atomes : `white-space: nowrap`, jamais coupées entre le glyphe et le
+mot, elles passent à la ligne d'un bloc. Sur la ligne 2 d'une exigence, la bande de quatre glyphes se cale aussi en haut
+(`align-items: flex-start`) : son mot de deux lignes la voit sur sa première ligne. Masque : patron `GLYPHE(...)` de `00-vibeflow.js` (viewBox 16), teinté par `--c-st`. Chaque corps
 du tableau se copie **tel quel** dans `GLYPHE(...)`. Le masque ne lit que l'opacité : tout élément au trait porte
 `stroke='black'` et `fill='none'` explicites (sans `stroke` explicite, il disparaît), tout élément plein porte `fill='black'`.
 
@@ -155,11 +163,13 @@ Seul un maillon « lu » a un niveau (P76-D-14).
   ou une recette, pas qu'elle couvre cette exigence. Seuls VERIFICATION et recette peuvent être de niveau phase.
 
 **Une seule source du niveau par surface** (règle de classe, toutes les surfaces balayées) :
-- **Ligne de liste** (§ 2.2) : le texte masqué `.vf-trace-sr` est l'unique source accessible du niveau (un « lu, niveau … » par
-  maillon lu, jamais repris ailleurs dans ce texte, pas dans « Mentions » non plus). La mention visible « lu au niveau phase :
-  VERIFICATION, recette » n'en est que le rendu visuel et **n'est visible en ligne que si elle est la première mention** (priorité c,
-  soit seulement quand la ligne n'a ni contradiction ni mention neutre) ; sinon elle compte dans « et N autres mentions » et le
-  niveau se lit dans « Chaîne ».
+- **Ligne de liste** (§ 2.2) : le **nom accessible complet** (texte visible, puis texte masqué `.vf-trace-sr`) dit le niveau d'un
+  maillon lu **une seule fois**, jamais repris dans « Mentions ». Le texte masqué est la source par défaut (un « lu, niveau … » par
+  maillon lu). La mention visible « lu au niveau phase : VERIFICATION, recette » **n'est visible en ligne que si elle est la première
+  mention** (priorité c, soit seulement quand la ligne n'a ni contradiction ni mention neutre) ; sinon elle compte dans « et N autres
+  mentions » et le niveau se lit dans « Chaîne ». **Quand elle est visible, son texte fait partie du nom (contenu natif du bouton)
+  et porte le niveau des maillons qu'elle nomme : le texte masqué écrit alors ces maillons sans niveau** (« VERIFICATION : lu. »,
+  jamais « VERIFICATION : lu, niveau phase. » en plus), et garde le niveau des autres maillons lus.
 - **Panneau d'une exigence** (§ 5.1) : la ligne du maillon dans « Chaîne » **seulement**. Ni « Preuves » (sa ligne 2 ne porte que le
   statut), ni « Mentions », ni l'aide ne le répètent.
 - **Panneaux de liste et de preuve** (§ 6), **bilans, « Jalon », légende** : aucun niveau.
@@ -247,7 +257,10 @@ var(--sp-12))`, `padding: var(--inset-row)`, rayon `var(--r-ctl)`, sur le fond d
   à l'écran**, puis un `span.vf-trace-sr` masqué visuellement (position absolue, 1 px, `overflow: hidden`, `clip-path:
   inset(50%)` ; exception écrite de taille) qui énumère tout : « Plan : lu, niveau exigence. SUMMARY : manque. VERIFICATION : lu,
   niveau phase. Recette : manque. Mentions : non cochée, SUMMARY lu ; sans ligne de traçabilité. Ouvrir l'exigence. » (le niveau n'est
-  dit qu'au maillon, jamais repris dans « Mentions » : § 1.2). Glyphes `aria-hidden`.
+  dit qu'au maillon, jamais repris dans « Mentions » : § 1.2). **Cas de la mention de niveau visible** (première mention, § 1.2) : le
+  texte visible « lu au niveau phase : VERIFICATION, recette » dit le niveau de ces deux maillons ; le texte masqué ne le redit pas :
+  « Plan : lu, niveau exigence. SUMMARY : lu, niveau exigence. VERIFICATION : lu. Recette : lu. Ouvrir l'exigence. » Le nom complet dit
+  ainsi chaque niveau une fois. Glyphes `aria-hidden`.
 - États : repos fond transparent ; survol `rgba(var(--ink), .06)` ; focus clavier `outline: 2px solid var(--ring);
   outline-offset: -2px` ; actif sans échelle. Un glyphe de contradiction n'est jamais posé sur `--raise` ni `--raise-2`
   (thème clair, sous 3:1).
@@ -290,11 +303,16 @@ Variante tactile sur un grand écran (`pointer: coarse` au-dessus de 700 px) : �
 (`min(56vh, 480px)`, 480 px au plus). Le contenu existant du panneau précède la section et reste atteignable sans la traverser ;
 l'entrée haute (≤ 112 px, § 2.1) y mène.
 
-**Repli « Preuves attachées » ouvert, plafonné** : 6 lignes de preuve (4 sous 700 px) ; une ligne = remplissage 16 + libellé et statut
-sur **une seule ligne** 18 + écart 2 + chemin clampé à 1 ligne 16 = 52. Bureau : 8 (marge sous `summary`) + 6 × 52 + 5 × 2 (= 322) +
-8 + 32 (« + N autres fichiers de preuve ») = **370** ; feuille : 8 + 4 × 52 + 3 × 2 (= 214) + 8 + 44 = **274**. Le repli ne
-contient **que des fichiers de preuve** : les critères d'un plan n'y figurent pas (§ 3, § 6). Section ouverte au pire :
-**1 258** (888 + 370) bureau, **888** (614 + 274) feuille, bornes et non garanties.
+**Repli « Preuves attachées » ouvert, plafonné** : 6 lignes de preuve (4 sous 700 px). **Hauteur réelle du chemin `.vf-ref`** : le
+chemin est un `.vf-ref` (§ Typography : `display: flex`, `padding: var(--inset-row)`, `min-height: 32px`, **44 px sous 700 px ou
+`pointer: coarse`**) ; ses 16 px de remplissage et son `code` clampé à 1 ligne de 16 donnent 32, soit exactement le plancher, et 44
+quand la cible tactile s'applique. La ligne de preuve ne porte donc de remplissage qu'en haut : `padding: var(--sp-8) 0 0` ; le
+libellé et le statut (une seule ligne de 18) gardent `padding-inline: var(--sp-12)` pour s'aligner sur le chemin. Une ligne =
+8 + 18 + écart 2 + `.vf-ref` 32 = **60** au bureau à la souris, 8 + 18 + 2 + 44 = **72** sur la feuille ou en tactile. Bureau : 8 (marge
+sous `summary`) + 6 × 60 + 5 × 2 (= 370) + 8 + 32 (« + N autres fichiers de preuve ») = **418** ; feuille : 8 + 4 × 72 + 3 × 2 (= 294)
++ 8 + 44 = **354**. Le repli ne contient **que des fichiers de preuve** : les critères d'un plan n'y figurent pas (§ 3, § 6).
+Section ouverte au pire : **1 306** (888 + 418) bureau, **968** (614 + 354) feuille, bornes et non garanties ; **1 414** (912 + 502,
+avec 502 = 8 + 6 × 72 + 5 × 2 + 8 + 44) en tactile au-dessus de 700 px.
 
 **Lignes des autres listes, au pire** (hors budget de la section, qui est repliée ou dans un panneau de liste) : ligne du « Jalon »
 155 px (remplissage 16 + écarts 6 + **ligne 1 de 21**, la pastille `.vst` faisant 20,7 px de haut, + ligne 2 de 48 + ligne 3 de 32 + ligne 4 de 32) ; ligne d'agent
@@ -335,13 +353,14 @@ dernière ligne remplit plus de 85 % de la largeur** (réserve de 15 %, au-delà
 | Ligne 3 d'un agent (11,5 px) | « 9 999+ entrées sans lien entrant · 9 999+ liens résolus par nom de fichier » | 74 | 2 (2) | 70 % | 2 |
 | Ligne 2 d'une entrée de mémoire (11,5 px) | « modifiée le 28 sept. 2026 · 9 999+ liens entrants · 9 999+ liens sortants » | 73 | 2 (2) | 69 % | 2 |
 | Ligne 3 d'une entrée de mémoire (11,5 px, avec l'octogone) | « hors index · 9 999+ liens cassés · 9 999+ chemins cités absents · sans lien entrant » | 83 | 2 (2) | 89 % | 3 |
+| Message « Lecture bornée » (11,5 px) | « Lecture bornée : la liste peut être incomplète. Une lecture plus courte, ou moins de commits, la lèverait. » | 106 | 3 (3) | 70 % | 3 |
 | Compte de pagination (11,5 px) | « 9 999+ à 9 999+ sur 9 999+ fichiers de preuve » | 45 | 2 (1) | 15 % | 2 |
 
 **Autres éléments à longueur variable : une règle écrite chacun** (tour 6, classe « tout élément à longueur variable ») :
 
 | Élément | Règle fermée | Pire cas calculé |
 |---------|--------------|------------------|
-| Pagination (§ 6) | **toujours deux lignes**, à toute largeur : ligne 1, le compte « N à M sur T <unité> » (11,5 px/400 `--text-3`, clamp 2), ligne 2, les deux boutons côte à côte (`flex: 1 1 0`, `gap: var(--sp-8)`, `white-space: nowrap`, 32 px ; 44 px tactile) | 72 px (84 px tactile) ; boutons « Précédentes » et « Suivantes » sur une ligne à 248 px |
+| Pagination (§ 6) | **toujours deux lignes**, à toute largeur : ligne 1, le compte « N à M sur T <unité> » (11,5 px/400 `--text-3`, clamp 2), ligne 2, les deux boutons côte à côte (`flex: 1 1 0`, `gap: var(--sp-8)`, `white-space: nowrap`, 32 px ; 44 px tactile) ; **écart déclaré entre les deux lignes : `row-gap: var(--sp-8)`** (nav en `display: flex; flex-direction: column`), et **8 px au-dessus** de la nav (`margin-top: var(--sp-8)`, hors des 72 px) | 72 px = 32 + 8 + 32 (84 px tactile = 32 + 8 + 44) ; boutons « Précédentes » et « Suivantes » sur une ligne à 248 px |
 | « + N autres <sorte> » | `white-space: nowrap`, `overflow: hidden`, `text-overflow: ellipsis`, `title` = libellé entier ; N plafonné à « 9 999+ » ; sorte du lexique fermé (exigences, ADR, registres, commits, agents, liens, décisions, phases, fichiers de preuve, critères, entrées, plans) | libellé le plus large : « + 9 999+ autres fichiers de preuve » = 201 px pour 224 px de largeur interne au plancher (248 − 2 × 12) : tient sans ellipsis |
 | Puces de plan du panneau d'exigence (§ 5.1) | **au plus 3 puces** `.tag`, puis une 4e puce « + N » (N plafonné à « 9 999+ ») qui ouvre le panneau de liste « Plans de l'exigence <identifiant> » (§ 6) ; `flex-wrap: wrap`, `gap: var(--sp-6)` ; identifiant de plan d'une ligne, `max-width: 100%`, ellipsis, `title` | 2 rangées au plus (puce la plus large simulée : 89 px) : 46 px (94 px tactile) |
 | Titre passé à `empiler` (§ 0) | borné à 40 caractères par la 76, « … » en fin ; texte entier dans le panneau ; clamp du bouton de la 80 à valider (§ 15) | 40 caractères au plus |
@@ -499,8 +518,9 @@ entrées (§ 10.1). Pire cas : § 2.4. Une ligne par agent (le dossier sous `.cl
 - **Ouverture des voisins (plan, décision, ADR, preuve, liste des plans) : la règle d'empilement de § 0.** Le panneau de l'exigence est
   un panneau sur mesure : au clic sur une ligne de voisin, il appelle **une fois** `window.VF_PANNEAU.empiler({ titre, rouvrir })`
   avec l'identifiant de l'exigence (texte, jamais HTML, ≤ 40 caractères) et un `rouvrir` qui rend de nouveau ce panneau, puis ouvre le
-  voisin (`SC.showPanel` pour une décision, une ADR ou une liste ; `select('f:<chemin>')` pour un plan). L'exigence a été empilée
-  elle-même à son arrivée par la phase (départ d'un nœud par `SC.showPanel`, § 2.2). Le bouton « Retour : <titre> » de l'en-tête ramène à l'exigence **en une pression** et le
+  voisin (`SC.showPanel` pour une décision, une ADR ou une liste ; `select('f:<chemin>')` pour un plan). Chaque panneau quitté est
+  empilé une fois, par celui qui le quitte : la phase l'a été à son départ vers l'exigence (§ 2.2), l'exigence l'est ici, à son départ
+  vers le voisin ; aucun appel n'est fait à l'arrivée sur un panneau. Le bouton « Retour : <titre> » de l'en-tête ramène à l'exigence **en une pression** et le
   focus revient sur la ligne qui a ouvert le voisin (retrouvée par son `data-trace`, **à revalider**). Clavier : chaque ligne est
   un `button` natif (Tab, Entrée, Espace), focus `outline: 2px solid var(--ring); outline-offset: -2px`, aucune touche globale ;
   l'ordre de tabulation suit l'ordre des sections ci-dessus.
@@ -545,6 +565,23 @@ décisions »), « Commits qui la citent » (≤ 30, § 5.5). Source : « Lu dan
   source.
 - Jamais `description`, jamais le corps, jamais un chemin `~/` ou absolu (P76-D-20).
 
+**Gabarit des lignes de § 5.4** (règle de classe de § 2.4 : emplacements fermés, ordre fixe, une seule donnée libre par ligne, coupée
+ou clampée, lisible en entier ailleurs). Largeurs de ligne : 224 px au plancher (248 − 2 × 12 de `--inset-row`), 204 px pour un texte placé
+après un glyphe de 16 px et son écart (`var(--sp-4)`), sans retrait de ce genre pour les lignes sans glyphe.
+
+| Ligne | Gabarit (de haut en bas) | Coupe | Hauteur |
+|-------|--------------------------|-------|---------|
+| Titre (`.pt`, le `name`) | une seule donnée : le `name` mono, `overflow-wrap: anywhere` | **clamp 3 lignes** de 26, `title` = nom entier ; le nom entier se lit aussi dans le chemin du pied de source | 78 au plus |
+| Rappel « Seule la structure est lue… » | phrase fixe, 11,5 px/16 | aucune (copy fermé : 2 lignes à 248 px) | 32 |
+| Fiche, une rangée | `dl` en grille `minmax(0, 40%) minmax(0, 1fr)`, `column-gap: var(--sp-8)`, `row-gap: var(--sp-2)`, `align-items: baseline` : étiquette (11,5 px/400 `--text-3`) puis valeur (12,5 px/400 `--text`, mono pour « Agent ») | valeur d'une ligne, ellipsis, `title` ; « Type » est un `.tag` (20 px) | 18 (20 pour « Type ») ; cinq rangées : 5 × 18 + 2 + 4 × 2 = **100** |
+| « État » | un mot (12,5 px/500 `--text`) avec son glyphe, **ou** la phrase neutre (12,5 px/400 `--text-3`) ; au plus deux mots, un par ligne | phrase neutre clamp 2 | 18 par mot (2 × 18 + 2 = 38 au plus) ; 36 pour la phrase |
+| Lien sortant | `padding: var(--inset-row)` ; ligne 1 : nom cible mono 12,5 px/500 `--text` ; ligne 2 (`row-gap: var(--sp-2)`) : état 11,5 px/400 `--text-3`, glyphe seulement pour « résolu par nom de fichier » et « lien cassé » | ligne 1 ellipsis + `title` ; ligne 2 `nowrap` (« résolu par nom de fichier » + glyphe : 180 px pour 224 px) | 16 + 18 + 2 + 16 = **52** |
+| Lien entrant | `padding: var(--inset-row)` ; une ligne : nom mono 12,5 px/500 `--text` | ellipsis + `title` | 16 + 18 = **34** |
+| Chemin cité absent (texte non interactif) | `padding: var(--inset-row)` ; ligne 1 : octogone puis chemin mono 11,5 px/400 `--text-3` ; ligne 2, **alignée sous le chemin** (retrait `calc(var(--sp-16) + var(--sp-4))`) : « absent de HEAD, présent dans l'historique lu » 11,5 px/400 `--text-3` | ligne 1 ellipsis + `title` = chemin entier ; ligne 2 **clamp 2** (2 lignes à 204 px, dernière à 44 %) | 16 + 16 + 2 + 32 = **66** |
+| Pied de source | « Lu dans » + `.vf-ref` du chemin (§ Typography) | `code` ellipsis, copie du chemin entier | 32 (44 tactile) |
+
+Les listes de liens sont plafonnées à 30 (§ 7) ; « + N autres liens » ouvre la liste paginée (§ 6).
+
 ### 5.5 Ligne de commit
 
 `button.vf-trace-commit` : sha court en `--mono` 11,5 px/500 `--text-2` (7 caractères), jour (« 8 nov. 2026 », `--text-3`), puis
@@ -552,8 +589,10 @@ le sujet (12,5 px `--text`, une ligne, ellipsis, `title` = sujet complet). Le co
 Entrée : ouvre le tiroir Git existant (`window.VFGitTiroir.ouvrir()`, Phase 78, détail sans diff) ; la sélection par sha dépend
 d'un crochet de la 78 (`VFGitExt`), **à revalider** ; à défaut, le tiroir s'ouvre sans sélection. Git ou `VFGitTiroir` absent :
 la ligne est du texte, non interactive. Nom : « Commit a1b2c3d, 8 nov. 2026, <sujet>. Ouvrir dans l'historique Git. » (le
-texte visible est contenu dans le nom). Borne atteinte (`bornes.tronque`) : au-dessus de la liste, « Lecture bornée : la liste
-peut être incomplète. »
+texte visible est contenu dans le nom). Borne atteinte (`bornes.tronque`) : au-dessus de la liste, le message de § 9 en entier
+(« Lecture bornée : la liste peut être incomplète. Une lecture plus courte, ou moins de commits, la lèverait. »), **11,5 px/16, 400,
+`--text-3`, clamp 3 lignes, 8 px d'écart sous lui** (3 lignes simulées à 248 px, dernière à 70 % ; 48 + 8 = 56 px au pire) : une seule
+taille et une seule forme du message dans tout le document.
 
 ## 6. Panneaux de liste et pagination
 
@@ -629,7 +668,7 @@ ou dégradé dit ce qui l'a produit puis ce qui le lèverait.**
 | Aucun commit citant | panneau ADR, décision | « Aucun commit ne cite cet objet. Un message de commit qui nomme son identifiant le relierait. » |
 | Agent sans entrée | liste d'agent | « Aucune entrée suivie pour cet agent. Un fichier de mémoire suivi par git sous son dossier apparaît ici. » |
 | Aucune preuve | « Preuves attachées » | « Aucune preuve attachée. Un fichier VERIFICATION, de recette, de trace rouge, de sécurité ou de validation dans le dossier de la phase l'attacherait. » |
-| Réponse bornée | listes de commits, d'entrées | « Lecture bornée : la liste peut être incomplète. Une lecture plus courte, ou moins de commits, la lèverait. » (11,5 px `--text-3`, au-dessus de la liste ; une réponse bornée ne se présente jamais comme complète) |
+| Réponse bornée | listes de commits, d'entrées | « Lecture bornée : la liste peut être incomplète. Une lecture plus courte, ou moins de commits, la lèverait. » (11,5 px/16, 400, `--text-3`, **clamp 3**, au-dessus de la liste avec 8 px d'écart sous le message ; une réponse bornée ne se présente jamais comme complète) |
 | Collecte en cours (`collecte: en-cours`, avant la première collecte) | section, panneau | « La collecte du dépôt est en cours. La traçabilité apparaît dès qu'elle est faite. » (12,5 px/400 `--text-3`) ; sans bouton : la clé `planning` de `VF_ETAT` relance l'appel |
 | Route en échec (503, délai, 400 inattendu) | section, panneau | boîte neutre : titre « La traçabilité est indisponible » (12,5 px/500 `--text`), cause « La lecture du dépôt a échoué ou dépassé le délai. » (12,5 px, `--text-2`), `.btn.soft` « Réessayer » ; le reste du panneau fonctionne |
 | Objet introuvable ou disparu | panneau | « Cet objet n'existe plus dans le dépôt. Le bouton Retour de l'en-tête rouvre la vue précédente. » |
@@ -709,7 +748,7 @@ n'est modifié.
 
 **Quatre tailles seulement** : 20, 13,5 (hérité), 12,5 et 11,5 px. **Deux graisses posées** : 500 et 600 (600 réservé au titre `.pt`,
 existant) ; le 400 est hérité du moteur et n'est jamais écrit. **Interlignes déclarés** : 18 px pour 12,5 px, 16 px pour 11,5 px
-(`line-height` écrit en px sur `.vf-trace`), 26 px (1,3) pour le titre de 20 px et 21,6 px (1,6) pour le 13,5 px, ces deux derniers
+(`line-height` écrit en px sur `.vf-trace` ; `.tag` surchargé à 16 px, § Surcharges), 26 px (1,3) pour le titre de 20 px et 21,6 px (1,6) pour le 13,5 px, ces deux derniers
 existants. Chaque élément nommé ci-dessous a **une seule taille, une seule graisse, une seule teinte**, reprises à l'identique dans
 sa section.
 
@@ -723,15 +762,16 @@ sa section.
 | Compteur `.c` | § 2, § 3, § 4 | 12,5 px / 18 px | 400 hérité | `--text-4` |
 | Bilan (phase, Jalon, Décisions, Mémoire), résumé de l'entrée haute, ligne neutre d'état vide ou dégradé (§ 9), phrase « Décision nue » | § 2, § 4, § 5, § 9 | 12,5 px / 18 px | 400 hérité | `--text-3` |
 | Nom en ligne : « Phase 76 », libellé de maillon, de preuve, de lien ; mot d'état de la section « État » d'une entrée (« hors index ») ; bouton de « Rattachement » ; libellé « Critères du plan, 5 critères » | § 2 à § 6 | 12,5 px / 18 px | 500 | `--text` |
-| Nom mono : agent, `name` d'entrée, nom cible d'un lien ; bouton « + N autres » (12,5 px/500 `--text-2`) | § 4.3, § 5.4, § 6, § 7 | 12,5 px / 18 px | 500 | `--text` (mono) ; `--text-2` pour « + N » |
+| Nom mono : agent, `name` d'entrée, nom cible d'un lien | § 4.3, § 5.4, § 6 | 12,5 px / 18 px | 500 | `--text` (mono) |
+| Bouton « + N autres » (`.vf-trace-plus`) : **une seule graisse, 500**, comme § 7 ; action sans fond, la graisse porte son statut de contrôle | § 7 | 12,5 px / 18 px (hauteur 32 px) | 500 | `--text-2` |
 | Texte de ligne : exigence, sujet de commit, valeur d'une « Fiche » | § 2, § 4, § 5 | 12,5 px / 18 px | 400 hérité | `--text` |
 | Nom de phase du « Jalon » ; phrase neutre de la section « État » (« Dans l'index, avec au moins un lien entrant. ») | § 4.1, § 5.4 | 12,5 px / 18 px | 400 hérité | `--text-3` |
 | Titre d'ADR et titre de décision en liste (une seule teinte), ligne de critères, cause d'erreur | § 3, § 4.2, § 6, § 9 | 12,5 px / 18 px | 400 hérité | `--text-2` |
 | Titre d'erreur « La traçabilité est indisponible » | § 9 | 12,5 px / 18 px | 500 | `--text` |
-| Boutons `.btn.soft` et `.vf-trace-plus` (`--text-2` pour ce dernier) | § 6, § 7, § 9 | 12,5 px / 18 px (hauteur 32 px) | 400 hérité | `--text` |
+| Boutons `.btn.soft` (Réessayer, Précédentes, Suivantes) | § 6, § 9 | 12,5 px / 18 px (hauteur 32 px) | 400 hérité | `--text` |
 | Identifiant mono (TRAC-01, ADR-075, P41-D-02), sha | § 2 à § 6 | 11,5 px / 16 px | 500 | `--text-2` |
 | Mot de ligne 2 d'une exigence ; **ligne 2 d'une phase du « Jalon »** (« Maillons non lus : … ») ; comptes d'agent en défaut ; contradictions de la ligne 3 d'une entrée (les trois premiers emplacements) | § 2.2, § 4.1, § 4.3, § 6 | 11,5 px / 16 px | 500 | `--text-2` |
-| Mentions et compte, légende des glyphes, comptes secondaires de ligne (lignes 3 et 4 du « Jalon », ligne 3 d'un agent, **« sans lien entrant » de la ligne 3 d'une entrée**), dates, jour de commit, statut | § 2 à § 6 | 11,5 px / 16 px | 400 hérité | `--text-3` |
+| Mentions et compte, légende des glyphes, comptes secondaires de ligne (lignes 3 et 4 du « Jalon », ligne 3 d'un agent, **« sans lien entrant » de la ligne 3 d'une entrée**), dates, jour de commit, statut, **message « Lecture bornée » (11,5 px/16, § 5.5, § 9)** | § 2 à § 6, § 9 | 11,5 px / 16 px | 400 hérité | `--text-3` |
 | État et niveau d'un maillon dans « Chaîne » (« lu, niveau exigence »), état d'un lien (« résolu »), étiquette de « Fiche », phrase de contradiction, **phrases de « Mentions » et de « Rattachement » (« Ligne du tableau de traçabilité : Phase 76, Pending »)**, aide, rappel de mémoire, « absent de HEAD… », pied de source, **compte de pagination** | § 5, § 6 | 11,5 px / 16 px | 400 hérité | `--text-3` |
 | Chemin copiable (`.vf-ref code`, mono) et chemin cité (mono) | § 3, § 5.4 | 11,5 px / 16 px | 400 hérité | `--text-3` |
 | Commit : sujet (12,5 px/400 `--text`), sha (11,5 px/500 `--text-2`), jour (11,5 px/400 `--text-3`) | § 5.5 | voir l'élément | voir l'élément | voir l'élément |
@@ -750,7 +790,7 @@ sans toucher la règle d'origine) : le moteur pose des tailles hors de ces quatr
 | `.vf-ref` | `border-radius: 10px` littéral | `.vf-trace .vf-ref { border-radius: var(--r-ctl) }` |
 | `.vf-copie-etat` (« Copié ») | 11 px, `float: right`, `margin-left: 8px` | `.vf-trace .vf-ref .vf-copie-etat { font-size: 11.5px; float: none; margin: 0; flex: none }` : à droite du chemin, dans la même rangée flex, 1,6 s |
 | `.vst` (pastille de phase du « Jalon ») | 11 px (glyphe `1.45em`) | `font-size: 11.5px` (glyphe 16,7 px : brique du moteur, pas un glyphe de la famille § 1.1) |
-| `.tag` (type, plan) | 11,5 px | aucune |
+| `.tag` (type, plan) | 11,5 px, `padding: var(--inset-pill)`, **aucun `line-height` propre** : la pastille hérite de la ligne qui la porte (18 px dans une ligne de 12,5 px, 21,6 px hors `.vf-trace`) | `.vf-trace .tag { line-height: 16px }` : pastille de 16 + 2 + 2 = **20 px** de haut, partout (type d'une entrée, valeur « Type » de la fiche, puces de plan) ; la hauteur de 46 px des deux rangées de puces (2 × 20 + `--sp-6`) en dépend ; `.vf-trace-puce` tactile garde `min-height: 44px` |
 | `.group-h` | 12,5 px | aucune ; sa variante `.gd` (12 px) n'est pas employée |
 
 ## Color
@@ -888,7 +928,7 @@ en dur ; seules exceptions de DESIGN § 4 (filets 1 px, tailles de contrôle).
    et 614 px feuille au pire, sommée exactement (§ 2.3) ; repli « Preuves attachées » ouvert plafonné à 6 lignes (4 sous 700 px), sans
    critères de plan ; contenu existant du panneau non déplacé ; entrée haute d'une ligne qui mène à la section.
 6. Nom accessible d'une ligne d'exigence : texte visible contenu dans le nom, puis états des maillons ; niveau dit une seule fois par
-   surface (§ 1.2) : texte masqué de la ligne comme source accessible unique, mention visible seulement si elle est la première, « Chaîne »
+   surface (§ 1.2) : nom accessible complet de la ligne qui dit chaque niveau une fois (texte masqué par défaut, mention visible seulement si elle est la première et, alors, texte masqué sans niveau pour les maillons qu'elle nomme), « Chaîne »
    seule dans le panneau, « Preuves » (ligne 2) sans niveau ; « niveau phase » et « niveau exigence » expliqués.
 7. Mémoire : seuls les chemins « cite un chemin absent », relatifs ; jamais `description` ni corps ; trois contradictions
    distinguées par emplacement et mot ; bilan cohérent (hors index compté) ; aucun mot « périmée ».
@@ -909,7 +949,7 @@ en dur ; seules exceptions de DESIGN § 4 (filets 1 px, tailles de contrôle).
    (§ 10) ; mention neutre du niveau phase ; chips de plan interactifs (focus `--ring`, survol, 44 px tactile).
 8sexies. Éléments à longueur variable (§ 2.4) : pagination sur deux lignes fixes, « + N » nowrap plafonné, puces de plan ≤ 3 avec renvoi,
    titre empilé ≤ 40 caractères ; `.vf-ref` : `min-height: 44px` tactile, `code` nowrap avec ellipsis, « Copié » dans la rangée flex ; paires
-   glyphe et mot en `inline-flex` centré ; ligne 1 du Jalon comptée à 21 px.
+   glyphe et mot en `inline-flex` calé sur la première ligne du mot (§ 1.1) ; ligne 1 du Jalon comptée à 21 px.
 8quinquies. Légende des glyphes neutre (seule exception à l'octogone corail) ; mots anglais affichés tous classés (§ Copywriting :
    A donnée, B littéral inscrit au garde, C remplacé) ; coupe de titre visible (« … ») et dite dans le panneau ; interlignes déclarés ;
    éléments des § 5.2 à § 5.5 présents dans le tableau de typographie.
@@ -943,7 +983,7 @@ en dur ; seules exceptions de DESIGN § 4 (filets 1 px, tailles de contrôle).
   stroke-linejoin='round'/><rect x='6' y='6' width='4' height='4' rx='1' fill='black'/>` (tracé relu : chanfreins de 4,2 px, carré central
   de 4 px à plus de 2 px du trait).
 - Que les clamps de § 2.3 et les gabarits de § 2.4 tiennent au rendu à 248 px et 308 px (largeurs utiles, barre de défilement de 12 px comptée : `::-webkit-scrollbar` forcé, **à contrôler aussi là où la barre est en surimpression**, où la largeur utile est de 260 px), pire cas rempli aux plafonds, et que le plafond de la feuille reste `min(56vh, 480px)`.
-- Hauteur réelle de la section de phase à 1440 et 390 px (mesure au rendu : 888 px et 614 px annoncés  § 2.3  repli fermé ; 1 258 px et 888 px repli ouvert).
+- Hauteur réelle de la section de phase à 1440 et 390 px (mesure au rendu : 888 px et 614 px annoncés  § 2.3  repli fermé ; 1 306 px et 968 px repli ouvert).
 
 ## UI Considerations
 
@@ -973,3 +1013,21 @@ Applicable state considerations resolved: à renseigner par la sonde
 - [ ] Dimension 7 Inventory Provenance: PASS
 
 **Approval:** pending
+
+
+## Mineurs fermés à l'exécution (2026-11-13)
+
+Huit mineurs du juge de design du tour 6 (92/100), fermés par le craft d'exécution avant les plans d'interface 76-06 et 76-07
+(P76-D-26). Aucune décision P76-D-NN rouverte, ni forme, ni données, ni navigation. Une passe, sans juge ici (un juge de design passe
+sur captures à la fin de la phase).
+
+| N | Mineur | Correction | § touché |
+|---|--------|------------|----------|
+| 1 | Niveau dit deux fois dans le nom accessible d'une ligne | Le nom complet (texte visible puis texte masqué) dit chaque niveau une fois : la mention visible de niveau, quand elle est la première, porte le niveau des maillons qu'elle nomme ; le texte masqué les écrit sans niveau | § 1.2, § 2.2 (nom accessible), § 14.6 |
+| 2 | Une phrase d'empilement du § 5.1 qui disait « l'exigence a été empilée à son arrivée » | Remplacée par la règle unique : chaque panneau quitté est empilé une fois, par celui qui le quitte ; aucun appel à l'arrivée | § 5.1 (ouverture des voisins) |
+| 3 | Hauteur réelle de `.vf-ref` dans le budget du repli de preuves | `.vf-ref` compté à 32 px (44 px feuille et tactile) ; ligne de preuve 60 / 72 px au lieu de 52 ; repli ouvert 418 / 354 px, section ouverte 1 306 / 968 px (1 414 px tactile) | § 2.3, § 15 |
+| 4 | Surcharge `line-height` de `.tag` et écart de pagination | `.vf-trace .tag { line-height: 16px }` (pastille de 20 px) ; pagination : `row-gap` et `margin-top` de `--sp-8` déclarés, 72 = 32 + 8 + 32 | § Typography (surcharges, interlignes), § 2.4 |
+| 5 | Gabarit des lignes du § 5.4 | Tableau fermé : titre clampé à 3 lignes, fiche en grille de deux colonnes, lien sortant (52 px), lien entrant (34 px), chemin absent (66 px, ligne 2 sous le chemin), pied de source | § 5.4 |
+| 6 | Deux graisses pour `.vf-trace-plus` | Une seule : 500 (comme § 7) ; `.btn.soft` reste à 400 dans sa propre ligne du tableau | § Typography |
+| 7 | Taille de « Lecture bornée » | Message entier de § 9 partout, 11,5 px/16, 400, `--text-3`, clamp 3, 8 px d'écart ; ligne ajoutée au tableau des gabarits | § 5.5, § 9, § 2.4, § Typography |
+| 8 | Alignement des paires glyphe-mot sur deux lignes | `align-items: flex-start`, glyphe sur la première ligne (décalage optique de 1 px devant un mot de 18 px) ; paires de la légende en `nowrap` | § 1.1, § 14.8sexies |

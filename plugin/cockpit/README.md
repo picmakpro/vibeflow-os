@@ -124,6 +124,7 @@ des raccourcis : P78-D-29). La copie passe par l'API presse-papiers de la page P
 | `/api/vf/git/entete` | `vibeflow/cockpit-git-entete@1` : dépôt, branche, worktree, HEAD détaché |
 | `/api/vf/git/commit?sha=<40 hexadécimaux>` | `vibeflow/cockpit-git-commit@1` : détail d'un commit (sha validé par motif strict puis `rev-parse --verify`) |
 | `/api/vf/git/worktrees` | `vibeflow/cockpit-git-worktrees@1` : état de chaque worktree, à la demande |
+| `/api/vf/tracabilite?vue=<jalon\|phase\|exigence\|decision\|adr\|memoire\|entree>[&cle=<clé>]` | `vibeflow/cockpit-trace@1` : traçabilité à la demande, lecture seule (paramètre invalide : 400) |
 
 **Sans git, ou hors dépôt** (P78-D-11) : la seconde ligne et l'ouvreur sont absents, le reste du cockpit est identique ; une commande git en échec ou qui dépasse sa
 borne rend un état « indisponible » local au tiroir, jamais une page cassée.
@@ -342,6 +343,7 @@ Schémas lisibles dans `scripts/vf-cockpit-interface.json` (copié à l'identiqu
 `abandonnee`, `inconnu` et le champ `vie`), `vibeflow/cockpit-signal@1` (ce que la pane lit : phases, jalons, missions, verrous, worktrees et retard, équipe),
 `vibeflow/cockpit-who@2` (arbre des agents : parent, état, action, rattachement, fenêtre de 24 h ; remplace `@1`),
 `vibeflow/cockpit-transcript@2` (transcript réduit ; **monté de `@1` à `@2`** : `messages` et `outils` remplacés par le fil daté `fil`) et `vibeflow/cockpit-equipe@1` (**coquille sans cartes depuis la Phase 73** : `nodes` vide, `meta` conservée). Les autres schémas restent à `@1`.
+`vibeflow/cockpit-trace@1` (`GET /api/vf/tracabilite`, 76-05) : une vue de traçabilité par requête (jalon, phase, exigence, décision, ADR, mémoire des agents), planning lu dans l'instantané de la collecte, ADR, commits citants et mémoire lus par la route sous confinement, en cache par empreinte ; `bornes.tronque` dit une lecture bornée, `absences` dit ce que le lab n'a pas.
 
 Ajouts de la Phase 73, tous facultatifs et sans bump : `cockpit-who@2` porte, par session, `attendAgents`, `detient { ws, phase }`, `retient { n, portee }` et `lancee { phase, ws, verbe }`, et, au premier niveau,
 `phasesHumaines` et `fenetreStallS` ; `vibeflow/cockpit-ailleurs@1` (route `GET /api/vf/ailleurs`, `{ schema, ailleurs: [[lab, n]] }`, jamais un chemin, un identifiant ni un titre) dit combien de sessions d'autres
