@@ -53,6 +53,7 @@ async function tracer(s) {
 }
 
 async function onglets(s) {
+  const ACTIVITE_CODE = 1;
   const R = { exc: [] };
   await s.send('Runtime.enable');
   s.ecouter('Runtime.exceptionThrown', (p) => R.exc.push(String((p.exceptionDetails.exception || {}).description || p.exceptionDetails.text).slice(0, 300)));
@@ -72,7 +73,8 @@ async function onglets(s) {
     // 76-07 : la section Traçabilité du panneau d'un projet (74-vf-trace.js) s'abonne à `planning` tant que l'onglet Projet est affiché, une seule fois par affichage :
     // le premier chargement à froid de Projet compte donc un abonné `planning` de plus que le départ (PLUS1), jamais davantage
     const n = await s.ev('JSON.stringify(window.VF_ETAT.abonnes())'); if (o !== 'code' && froid[o] === undefined) froid[o] = n;
-    const plus1 = o !== 'projet' || (JSON.parse(froid[o]).planning === JSON.parse(R.n0).planning + 1 + (R.syn || 0));
+    // 75-08 : l'activité (75-vf-activite.js) s'abonne à `planning` sur Code SEULEMENT (arrivee : onglet === 'code') : n0 en porte un de plus que Projet n'en retrouve (ACTIVITE_CODE)
+    const plus1 = o !== 'projet' || (JSON.parse(froid[o]).planning === JSON.parse(R.n0).planning - ACTIVITE_CODE + 1 + (R.syn || 0));
     R.pas.push([o, n === (o === 'code' ? R.n0 : froid[o]) && plus1 && (await s.ev('performance.timeOrigin')) === R.t0]); // jamais un rechargement de page
   }
   R.badge = await s.ev(BADGE);
