@@ -233,9 +233,9 @@ svg.lod-low .meta, svg.lod-low .anote { visibility: hidden; }
 svg.lod-low .desc { display: none; }
 svg.lod-low .title { font-size: 22px; white-space: normal; }
 svg.dim .node:not(.hl) .card { box-shadow: none; }
-/* 80-16 (AUDC-X5 c) : texte estompé à .72 avec --text-3 et --text-4 ramenés à --text-2 (≥ 4,5:1 composé) ; la pastille d'état (.vst, .rw) reste pleine */
+/* 80-16 (AUDC-X5 c) : texte estompé à .72 avec --text-3 et --text-4 ramenés à --text-2 (≥ 4,5:1 composé) ; la pastille d'état (.vst) reste pleine */
 svg.dim .node:not(.hl) .card { --text-3: var(--text-2); --text-4: var(--text-2); }
-svg.dim .node:not(.hl) .card > :not(.foot), svg.dim .node:not(.hl) .card .foot > :not(.vst):not(.rw) { opacity: .72; transition: opacity .3s var(--ease); }
+svg.dim .node:not(.hl) .card > :not(.foot), svg.dim .node:not(.hl) .card .foot > :not(.vst) { opacity: .72; transition: opacity .3s var(--ease); }
 
 /* ---------- edges ---------- */
 .edges { animation: fadeIn .7s var(--ease) .12s both; }

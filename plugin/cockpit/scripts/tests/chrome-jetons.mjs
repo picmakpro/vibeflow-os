@@ -86,7 +86,7 @@ await executer(chrome, async (s) => {
               const fg = J.norm(st.color), a = J.alpha(t, card.parentElement) * fg[3];
               min = Math.min(min, J.ratio(J.sur(fg, a, bg), bg)); n++;
             }
-            for (const p of card.querySelectorAll('.vst, .rw')) {
+            for (const p of card.querySelectorAll('.vst')) {
               const c = J.norm(getComputedStyle(p, '::before').backgroundColor), a = J.alpha(p, card.parentElement);
               past.push({ cls: p.className, alpha: Math.round(a * 100) / 100, ratio: J.ratio(J.sur(c, a * c[3], bg), bg) });
             }

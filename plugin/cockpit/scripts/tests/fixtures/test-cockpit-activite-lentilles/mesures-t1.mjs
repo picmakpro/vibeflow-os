@@ -19,6 +19,10 @@ export const mesuresT1 = {
       return b && { bl: bl.textContent, haspopup: b.getAttribute('aria-haspopup'), expanded: b.getAttribute('aria-expanded'), pressed: b.hasAttribute('aria-pressed'), title: b.title,
         avant: r.previousElementSibling && r.previousElementSibling.id, apres: r.nextElementSibling && r.nextElementSibling.id, visible: getComputedStyle(b).display !== 'none',
         rond: b.querySelector('.vfa-i') ? +b.querySelector('.vfa-i').getAttribute('r') : null }; })())`));
+    await c.vue(1100, 800); await c.charger('index.html'); // sous 1 280 px : aucun groupe, ordre d'origine
+    o.boutonEtroit = JSON.parse(await s.ev(`JSON.stringify((() => { const r = document.getElementById('btn-lentilles').parentNode;
+      return { avant: r.previousElementSibling && r.previousElementSibling.id, apres: r.nextElementSibling && r.nextElementSibling.id }; })())`));
+    await c.vue(1440, 900); await c.charger('index.html');
     o.ariaInactif = await s.ev("document.getElementById('btn-lentilles').getAttribute('aria-label')");
     o.entete = await s.ev("(() => { const h = document.querySelector('header'); return [h.scrollWidth, h.clientWidth, document.getElementById('btn-lentilles').getBoundingClientRect().width]; })()");
     await c.vue(1024, 768); await c.pause(500);
