@@ -5,7 +5,9 @@
 //   routes <port> <jeton> <chemins…>     par chemin : GET authentifié, sans jeton, Host forgé, Origin forgé, POST, PUT, DELETE (codes)
 //   flux <port> <jeton> <ms> <lab> <marqueurs,…>   flux SSE : un tour de transcript est ajouté, événements relevés, clés et marqueurs jugés
 //   balayage <fichier> <marqueurs,…>     marqueurs présents dans le fichier (octets)
-//   recompte <dossier ui>                modules ui/74-vf-*.js dont le CODE (commentaires retirés) lit un usage de jetons ; témoin : le motif trouve une lecture plantée
+//   recompte <dossier ui>                modules ui/74-vf-*.js dont le CODE (commentaires retirés, jamais ceux d'une chaîne) lit un usage de jetons ; témoin : le motif trouve une lecture plantée, même après un « // » dans une chaîne
+//   bornes <racine du module>            lire() du modèle de la frise sur une voie à 600 segments et 700 événements : lignes gardées, ignores, bornes du contrat ; une voie de 10 segments passe entière
+//   recensement <dossier ui>             modules ui/*.js qui nomment la route /api/vf/transcript (CODE : commentaires retirés, forme coupée « '/api/vf/' + 'transcript' » comprise)
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
@@ -105,11 +107,52 @@ function flux(port, jeton, ms, lab, marqueurs) {
   }, 200);
 }
 
+// code d'un module : commentaires `/* */` et `//` retirés HORS chaînes. Un « // » dans une chaîne (une URL) n'efface pas la fin de la ligne ; ' et \" se ferment à la fin de la ligne
+// (un motif d'expression régulière qui porte une guillemet ne retient pas le reste du fichier), la chaîne `…` peut courir sur plusieurs lignes.
+const code = (t) => {
+  let o = '', i = 0, q = null;
+  while (i < t.length) {
+    const c = t[i], d = t[i + 1];
+    if (q) {
+      o += c;
+      if (c === '\\') { o += d === undefined ? '' : d; i += 2; continue; }
+      if (c === q || (c === '\n' && q !== '`')) q = null;
+      i++; continue;
+    }
+    if (c === '"' || c === "'" || c === '`') { q = c; o += c; i++; continue; }
+    if (c === '/' && d === '*') { const j = t.indexOf('*/', i + 2); i = j < 0 ? t.length : j + 2; o += ' '; continue; }
+    if (c === '/' && d === '/') { while (i < t.length && t[i] !== '\n') i++; continue; }
+    o += c; i++;
+  }
+  return o;
+};
 function recompte(dir) {
   const motif = /usage|input_tokens|output_tokens/;
-  const code = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').split('\n').map((l) => l.replace(/\/\/.*$/, '')).join('\n');
   const fichiers = fs.readdirSync(dir).filter((n) => /^74-vf-.*\.js$/.test(n) && motif.test(code(fs.readFileSync(path.join(dir, n), 'utf8'))));
-  sortie({ fichiers, temoin: motif.test(code('const u = m.message.usage.input_tokens; // lu à l\'usage')) && !motif.test(code('// lu à l\'usage\nconst a = 1;')) });
+  sortie({ fichiers, temoin: motif.test(code('const u = m.message.usage.input_tokens; // lu à l\'usage')) && !motif.test(code('// lu à l\'usage\nconst a = 1;'))
+    && motif.test(code('const u = "http://x"; const n = m.usage; // fin')) && motif.test(code("const u = 'a//b'; const n = m.usage;")) });
+}
+
+function recensement(dir) {
+  const motif = /\/api\/vf\/transcript|['"`]\/api\/vf\/['"`]\s*\+\s*['"`]transcript|vf\/['"`]\s*\+\s*['"`]transcript/;
+  const fichiers = fs.readdirSync(dir).filter((n) => /\.js$/.test(n) && motif.test(code(fs.readFileSync(path.join(dir, n), 'utf8')))).sort();
+  sortie({ fichiers, temoin: motif.test(code("E.lireJson('/api/vf/transcript?id=' + id)")) && motif.test(code("fetch('/api/vf/' + 'transcript')")) && !motif.test(code("// '/api/vf/transcript'\nconst a = 1;")) });
+}
+
+async function bornes(racine) {
+  const C = lireContrat(racine).schemas['vibeflow/cockpit-frise@1'].bornes;
+  const ctx = vm.createContext({ window: {}, document: undefined });
+  const ui = path.join(racine, 'skills', 'cockpit-moteur', 'assets', 'ui');
+  for (const n of ['74-vf-frise-calculs.js', '74-vf-frise-modele.js']) vm.runInContext(fs.readFileSync(path.join(ui, n), 'utf8'), ctx, { filename: n });
+  const M = ctx.window.__vfFriseModele, T0 = 1700000000000;
+  const seg = (n) => Array.from({ length: n }, (_, i) => [T0 + i * 1000, T0 + i * 1000 + 500, 'travail']);
+  const evt = (n) => Array.from({ length: n }, (_, i) => [T0 + i * 1000, 'erreur']);
+  const lu = M.lire({ schema: 'vibeflow/cockpit-frise@1', at: new Date(T0).toISOString(), depuis: T0, jusqua: T0 + 1e6, fenetreS: 1000,
+    voies: [{ id: 'grosse', kind: 'session', segments: seg(600), evenements: evt(700) }, { id: 'petite', kind: 'session', segments: seg(10), evenements: evt(3) }] });
+  if (!lu.ok) return sortie({ erreur: 'lire a refusé la fiche' });
+  const [g, p] = lu.frise.voies;
+  sortie({ segments: g.segments.length, evenements: g.evenements.length, ignores: lu.frise.ignores, petite: [p.segments.length, p.evenements.length],
+    bornesContrat: [C.segments, C.evenements] });
 }
 
 if (mode === 'contrat') await contrat(a1);
@@ -117,5 +160,7 @@ else if (mode === 'garde') await garde(a1);
 else if (mode === 'routes') await routes(a1, a2, process.argv.slice(5));
 else if (mode === 'flux') flux(a1, a2, a3, a4, a5);
 else if (mode === 'recompte') recompte(a1);
+else if (mode === 'recensement') recensement(a1);
+else if (mode === 'bornes') await bornes(a1);
 else if (mode === 'balayage') { const b = fs.readFileSync(a1); sortie({ presents: String(a2).split(',').filter((m) => m && b.includes(m)) }); }
 else sortie({ erreur: 'mode inconnu' });
