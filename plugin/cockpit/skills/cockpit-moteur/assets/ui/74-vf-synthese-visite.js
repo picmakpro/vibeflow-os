@@ -103,7 +103,7 @@
     if (d.phases.length) p.push(pluriel(d.phases.length, 'phase', 'phases'));
     if (c.plusDe500) p.push('plus de 500 commits');
     else if (c.n > 0) p.push(pluriel(c.n, 'commit', 'commits'));
-    else if (c.etat === 'non-lus') p.push('commits non lus');
+    else if (c.etat === 'non-lus' || c.etat === 'inconnu') p.push('commits non lus');
     if (s.n > 0) p.push((s.auMoins ? 'au moins ' : '') + pluriel(s.n, 'session', 'sessions'));
     if (b.nouveaux.length) p.push(b.nouveaux.length === 1 ? '1 nouveau blocage' : b.nouveaux.length + ' nouveaux blocages');
     if (b.leves) p.push(b.leves === 1 ? '1 blocage levé' : b.leves + ' blocages levés');
@@ -134,12 +134,13 @@
       g.push(grp(tete(pluriel(d.phases.length, 'phase a avancé', 'phases ont avancé')), ...lignes, reste));
     }
     const c = d.commits, ouvreur = document.getElementById('vf-git-ouvreur');
-    if (c.plusDe500 || c.n > 0 || c.etat === 'non-lus') {
+    const nonLus = c.etat === 'non-lus' || c.etat === 'inconnu';
+    if (c.plusDe500 || c.n > 0 || nonLus) {
       let t = c.n === 1 ? '1 commit est arrivé' : c.n + ' commits sont arrivés';
       if (c.plusDe500) t = 'Plus de 500 commits sont arrivés';
-      if (c.etat === 'non-lus') t = 'Commits : non lus, le dépôt git est indisponible.';
+      if (nonLus) t = c.etat === 'inconnu' ? 'Commits : non lus, hors de la fenêtre lue.' : 'Commits : non lus, le dépôt git est indisponible.';
       const clic = (e) => { e.preventDefault(); ouvreur.click(); };
-      const lien = c.etat !== 'non-lus' && ouvreur ? el('a', { class: 'vf-link', href: '#', 'data-vf-k': 'git', clic }, 'Voir dans Git') : null;
+      const lien = !nonLus && ouvreur ? el('a', { class: 'vf-link', href: '#', 'data-vf-k': 'git', clic }, 'Voir dans Git') : null;
       g.push(grp(tete(t), lien));
     }
     const s = d.sessions;

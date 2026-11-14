@@ -66,7 +66,13 @@ essai('SC2', () => {
   eq('SC2 — la branche fusionnée tard est comptée même avec des dates anciennes (sommet 9 : 6, 7, 8, 9 et 101, 102 = 6)', C.commitsArrives(rg, '5', '9').n, 6);
 });
 essai('SC3', () => {
-  eq('SC3 — tete absente des rangées : plus de 500', C.commitsArrives(rg, '999', '10'), { etat: 'ok', n: null, plusDe500: true });
+  eq('SC3 — tete absente d\'une fenêtre courte : inconnu, jamais « plus de 500 » (L4c-02)', C.commitsArrives(rg, '999', '10'), { etat: 'inconnu', n: null, plusDe500: false });
+  const longue = []; for (let i = 1; i <= 500; i++) longue.push(R(i, i === 1 ? [] : [i - 1], i));
+  eq('SC3 — plus de 500 seulement quand la fenêtre entière est la lignée du sommet', C.commitsArrives(longue, '999', '500'), { etat: 'ok', n: null, plusDe500: true });
+  const melee = longue.slice(0, 499).concat([R('w1', [], 600)]);
+  eq('SC3 — fenêtre pleine partagée avec une autre branche : inconnu', C.commitsArrives(melee, '999', '499').etat, 'inconnu');
+  eq('SC3 — sommet absent de la fenêtre : inconnu (cas A)', C.commitsArrives(longue.map((r) => R('z' + r.h, r.p.map((x) => 'z' + x), 1)), '5', '30'), { etat: 'inconnu', n: null, plusDe500: false });
+  eq('SC3 — tete égale au sommet absent : rien n\'est arrivé', C.commitsArrives(rg, '999', '999'), { etat: 'ok', n: 0, plusDe500: false });
   eq('SC3 — tete égale au sommet : 0', C.commitsArrives(rg, '10', '10'), { etat: 'ok', n: 0, plusDe500: false });
   eq('SC3 — tete nulle ou sommet absent : inconnu', [C.commitsArrives(rg, null, '10').etat, C.commitsArrives(rg, '5', null).etat, C.commitsArrives(rg, '5', '999').etat], ['inconnu', 'inconnu', 'inconnu']);
 });
@@ -113,11 +119,16 @@ essai('SC9', () => {
   const o = { rangees: rg, sommet: '10', gitLu: true, workers: [], maintenant: 1500 };
   const a = C.instantane({ phases: { 'a|1': 'fait' }, tete: '0'.repeat(40), blocages: [], vu: 1000 });
   eq('SC9 — première visite : premiere', C.difference(null, a, o), { premiere: true });
-  const e = C.difference(a, a, { ...o, rangees: [R('x', [], 1)], sommet: 'x' }); // tete = 0…0 absente des rangées : plus de 500
-  ok('SC9 — tete absente des rangées : « plus de 500 » n\'est pas vide', e.premiere === false && e.vide === false && e.commits.plusDe500 === true, JSON.stringify(e));
+  const e = C.difference(a, a, { ...o, rangees: [R('x', [], 1)], sommet: 'x' }); // tete = 0…0 absente de la fenêtre : inconnu, dit comme tel
+  ok('SC9 — tete absente de la fenêtre : « inconnu » n\'est pas vide (jamais « rien de nouveau »)', e.premiere === false && e.vide === false && e.commits.etat === 'inconnu' && e.commits.plusDe500 === false, JSON.stringify(e));
+  const e2 = C.difference(a, a, { ...o, rangees: [R('x', [], 1)], sommet: 'absent' });
+  ok('SC9 — sommet absent de la fenêtre (cas A) : pas vide, état inconnu', e2.vide === false && e2.commits.etat === 'inconnu', JSON.stringify(e2));
   const b = C.instantane({ phases: { 'a|1': 'fait' }, tete: null, blocages: [], vu: 1000 });
   const v = C.difference(b, b, { rangees: [], sommet: null, gitLu: true, workers: [], maintenant: 1500 });
-  eq('SC9 — deux instantanés égaux : vide', [v.premiere, v.vide, v.phases], [false, true, []]);
+  eq('SC9 — repère sans sommet et sommet nul : commits inconnus, donc dits (pas vide)', [v.premiere, v.vide, v.commits.etat], [false, false, 'inconnu']);
+  const bs = C.instantane({ phases: { 'a|1': 'fait' }, tete: A40, blocages: [], vu: 1000 });
+  const vs = C.difference(bs, bs, { rangees: [R(A40, [], 1)], sommet: A40, gitLu: true, workers: [], maintenant: 1500 });
+  eq('SC9 — deux instantanés égaux, tete = sommet : vide', [vs.premiere, vs.vide, vs.phases], [false, true, []]);
   eq('SC9 — réserve des 24 h : pas vide', C.difference(b, b, { rangees: [], sommet: null, gitLu: true, workers: [], maintenant: 1000 + 90000 }).vide, false);
   eq('SC9 — commits non lus : pas vide, étiquette non-lus', (({ vide, commits }) => [vide, commits.etat])(C.difference(b, b, { rangees: [], sommet: null, gitLu: false, workers: [], maintenant: 1500 })), [false, 'non-lus']);
   eq('SC9 — résumé chiffré, sans texte', C.resume(C.difference(a, C.instantane({ phases: { 'a|1': 'fait', 'a|2': 'a-faire' }, tete: null, blocages: [], vu: 2000 }), { ...o, gitLu: false })), { phases: 1, commits: null, sessions: 0, nouveaux: 0, leves: 0 });
@@ -270,7 +281,7 @@ mut() { # <nom> <fichier relatif au module> <expression sed> <étiquette de la s
 }
 CAL=skills/cockpit-moteur/assets/ui/74-vf-synthese-calcul.js; MEM=skills/cockpit-moteur/assets/ui/74-vf-synthese-memoire.js
 mut M-DATE "$CAL" 's/if (!anc\.has(h)) n++;/if (!anc.has(h) \&\& (par.get(h).at | 0) > 1050) n++;/' SC2
-mut M-NONFUS "$CAL" 's/for (const h of ancetres(sommet))/for (const h of par.keys())/' SC2
+mut M-NONFUS "$CAL" 's/for (const h of depuisSommet)/for (const h of par.keys())/' SC2
 mut M-RESERVE "$CAL" 's/const longue = maintenant - vu > FENETRE_S;/const longue = false;/' SC4
 mut M-LEVE "$CAL" 's/const leves = precedente\.blocages\.filter((c) => !presents\.has(c))\.length;/const leves = precedente.blocages.filter((c) => !presents.has(c)).map((c) => ({ cle: c }));/' SC5
 mut M-BASEH scripts/vf-cockpit-git.mjs 's/h: refBase ? shaRef(refBase) : null/h: ici ? ici.head : null/' SG1 sg
@@ -288,3 +299,6 @@ echo "=================================="
 TOTAL=$((PASS+FAIL))
 if [ "$TOTAL" -eq 0 ]; then echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE — zéro assertion exécutée, résultat non fiable"; exit 1; fi
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
+mut M-INCONNU "$CAL" 's/if (!par.has(sommet)) return { etat: .inconnu., n: null, plusDe500: false };/if (!par.has(sommet)) return { etat: "ok", n: 0, plusDe500: false };/' SC3
+mut M-500 "$CAL" 's/depuisSommet.size >= 500 ?/true ?/' SC3
+mut M-DIT "$CAL" "s/ || commits.etat === 'inconnu'//" SC9
