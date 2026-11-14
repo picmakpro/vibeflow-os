@@ -157,6 +157,11 @@ done
 printf '// la forme new MutationObserver(cb) dans un commentaire\n' > "$FX/ui/d.js"; printf 'b.js 1\n' > "$FX/com.txt"
 assert_eq "O2.6 — un commentaire qui porte la forme compte (témoin positif de la mesure)" "$(cq juger "$FX/ui" "$FX/com.txt" | grep -c 'HAUSSE d.js réel=1 baseline=0')" "1"
 rm -f "$FX/ui/d.js"
+for forme in 'obs(MutationObserver, document.body, {}, () => {});' 'const MO = window.MutationObserver;' 'new window.MutationObserver(() => {});'; do
+  printf '%s\n' "$forme" > "$FX/ui/e.js"; printf 'b.js 1\n' > "$FX/aide.txt"
+  assert_eq "O2.8 — la forme « $forme » (aide, alias, constructeur qualifié) compte aussi : HAUSSE nommant le fichier" "$(cq juger "$FX/ui" "$FX/aide.txt" | grep -c 'HAUSSE e.js réel=1 baseline=0')" "1"
+done
+rm -f "$FX/ui/e.js"
 assert_eq "O2.7 — dossier illisible, baseline illisible, usage : code 2, jamais 0 (fermé par défaut)" "$(cq juger "$FX/nulle-part" "$FX/base.txt" | tail -1)|$(cq juger "$FX/ui" "$FX/nulle-part.txt" | tail -1)|$(cq juger | tail -1)" "rc=2|rc=2|rc=2"
 
 echo "=== R — les observateurs de réparation retirés, un événement existant à la place de chacun ==="

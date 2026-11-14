@@ -1,6 +1,6 @@
 // observateurs-cliquet.mjs — cliquet strict des observateurs de mutations par fichier de ui/*.js (79-17, SOCL-21, P79-D-19). Node seul, aucun processus enfant.
 // Un observateur de mutations réparait un état après un redessin ; ce qui le remplace est un événement qui existe (`panel` du moteur, `vf-git:etat`).
-// La mesure compte, par fichier du dossier (niveau plat, *.js), les occurrences de la forme constructeur, commentaires compris : une phrase qui porte
+// La mesure compte, par fichier du dossier (niveau plat, *.js), les occurrences du mot MutationObserver (constructeur, aide qui reçoit la classe, alias), commentaires compris : une phrase qui porte
 // la forme est comptée. La baseline liste les fichiers à plus de 0 (`<fichier> <n>`, trié par octets) et est SERRÉE : le réel doit l'égaler.
 // Usage : mesurer <dossier-ui> · juger <dossier-ui> <baseline> · abaisser <dossier-ui> <baseline>
 // Verdicts de juger : HAUSSE (réel au-dessus, ou fichier neuf à plus de 0) · PERIMEE (réel au-dessous : la baseline suit la baisse dans le même commit) ·
@@ -10,7 +10,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const FORME = /new\s+MutationObserver\s*\(/g;
+const FORME = /\bMutationObserver\b/g; // le mot seul : constructeur, aide (`obs(MutationObserver, …)`), alias, `window.MutationObserver`
 const fin = (code, texte) => { if (texte) process.stderr.write(texte + '\n'); process.exit(code); };
 const octets = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
