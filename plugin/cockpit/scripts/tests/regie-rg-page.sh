@@ -117,7 +117,7 @@ rg_RG11_page() {
   local o="$WORK/_" a b c
   b="$(pg_sc '' '[{"annuler":["rapport"]},{"clic":"'"$PG_BTN_RAPPORT"'"},{"nom":"e","obs":{}}]')"
   pg_ok "RG11.10 — annulé : aucune requête, aucun panneau, aucun vf-agent:lu" "$b" 'j.out.e.evts.map((x) => x.type).join(",") + "|" + j.out.e.fetchs.length + "|" + (j.out.e.panneau === "")' "vf-agent:ouvrir|0|true"
-  pg_ok "RG15.7 — la régie n'émet vf-agent:lu que quand SON lecteur s'ouvre (jamais sur un ouvrir annulé)" "$b" 'j.out.e.evts.filter((x) => x.type === "vf-agent:lu").length' "0"
+  pg_ok "RG15.7 — sur un vf-agent:ouvrir annulé (rapport), la régie n'émet aucun vf-agent:lu : son lecteur de repli est retiré (74-10), seule la fiche lit" "$b" 'j.out.e.evts.filter((x) => x.type === "vf-agent:lu").length' "0"
 }
 
 rg_RG14_page() {

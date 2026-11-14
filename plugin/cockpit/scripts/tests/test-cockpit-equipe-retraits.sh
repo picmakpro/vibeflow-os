@@ -170,7 +170,7 @@ export default async function (h) {
       else { await h.ev((s) => document.querySelector(s).focus(), sel); if (geste === 'Entrée') await h.touche('Enter', 'Enter', 13, '\r'); else await h.touche(' ', 'Space', 32, ' '); }
       await h.attendre(BAS, 'fiche posée', 8000).catch(() => {}); // un cas rouge se dit par son libellé, il n'interrompt pas les suivants
       const o = await h.ev(OUVERTS);
-      const r = await h.ev(() => ({ ouverte: !!(window.__vfFiche && window.__vfFiche.ouverte()), lus: window.__lus.slice(), repli: document.querySelectorAll('#panel [data-vf-repli], #panel .vf-transcript, .vf-rg-lecteur').length }));
+      const r = await h.ev(() => ({ ouverte: !!(window.__vfFiche && window.__vfFiche.ouverte()), lus: window.__lus.slice(), repli: document.querySelectorAll('#panel .sec .pt').length /* forme réelle du lecteur retiré (72-vf-regie-source.js : div.sec, h2.pt dans #panel) */ }));
       h.egal('R5b', `${decl} (${geste}) : vf-agent:ouvrir annulé (defaultPrevented), la fiche s'ouvre, le lecteur de repli de la 73 ne s'ouvre pas, vf-agent:lu seulement pour un terminé`,
         [o.map((x) => x.slice(0, 3)), r.ouverte, r.repli, r.lus], [[[decl, id, true]], true, 0, decl === 'rapport' ? [id] : []]);
       await h.echap();

@@ -3,9 +3,10 @@
 # La page n'a plus qu'un lecteur de transcript : la fiche. Ni `ouvrirRepli` (72-vf-regie-source.js) ni l'export `transcript` de window.__vfEquipeRendu (71-vf-equipe-rendu.js).
 #   RP0 préalable : la fiche annule et ouvre pour `nom`, `ancre` et `rapport` (R5 et R5b de test-cockpit-equipe-retraits.sh) ; sans lui, retrait interdit
 #   RP1 `ouvrirRepli` absent des modules d'interface   RP2 export `transcript` absent, aucun appelant   RP3 sans fiche, un `rapport` non annulé ne fait rien
+#   RP6 recensement : seuls 74-vf-fiche.js et 74-vf-frise-fichiers.js nomment la route /api/vf/transcript dans leur code (un lecteur sous un autre nom que ouvrirRepli se verrait ici)
 #   RP4 les témoins de la régie qui doivent rester verts le sont (test-cockpit-regie.sh)   RP5 témoin de remplacement : la ligne du fil de la fiche dit « × n » et l'heure,
 #   une ligne sans heure lisible est écartée (ce que disaient T26.5, D8.6 et D8.8 du rendu retiré)
-#   Mutants (copies du MODULE ; « MUTANT-ROUGE <nom> <sonde> » seulement quand la sonde a rougi) : M-REPLI-REVENU (RP1, RP3), M-EXPORT-REVENU (RP2). REPLI_SANS_MUTANTS=1 les saute.
+#   Mutants (copies du MODULE ; « MUTANT-ROUGE <nom> <sonde> » seulement quand la sonde a rougi) : M-REPLI-REVENU (RP1, RP3), M-EXPORT-REVENU (RP2), M-LECTEUR-AUTRE-NOM (RP6). REPLI_SANS_MUTANTS=1 les saute.
 #   Chaque ligne : « ✅ PASS — <id> — <libellé> » ou « ❌ FAIL — <id> — <libellé> ». Navigateur absent : sondes de page SAUTÉES (dites). Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -71,7 +72,7 @@ export default async function (h) {
     await h.ev(() => new Promise((ok) => setTimeout(ok, 900)));
     const r = await h.ev(() => ({ panneau: (document.getElementById('panel') || {}).textContent || '', req: window.__req.filter((u) => /transcript/.test(u)).length, lus: window.__lus.length,
       ouv: window.__ouv.map((x) => x.join(':')), surcouche: !!(window.VF_SURCOUCHES && typeof window.VF_SURCOUCHES.ouverte === 'function' && window.VF_SURCOUCHES.ouverte()),
-      lecteur: document.querySelectorAll('#panel [data-vf-repli], #panel .vf-transcript, .vf-rg-lecteur').length }));
+      lecteur: document.querySelectorAll('#panel .sec .pt').length }));
     h.egal('RP3', 'sans fiche, un vf-agent:ouvrir « rapport » non annulé : l\'événement est émis, mais ni panneau, ni surcouche, ni requête de transcript, ni vf-agent:lu',
       [avant.fiche, r.ouv, r.panneau === avant.panneau, r.lecteur, r.surcouche, r.req, r.lus], [false, ['rapport:false'], true, 0, false, 0, 0]);
   });
@@ -120,6 +121,11 @@ echo "=== RP1, RP2 — le lecteur de repli et l'export transcript ne sont plus d
 assert_eq "RP1 — aucune occurrence de ouvrirRepli dans ui/*.js (2 avant le retrait : définition et appel)" "$(rp1 "$UI")" "0"
 assert_eq "RP2 — window.__vfEquipeRendu.transcript est undefined et aucun module ne l'appelle" "$(rp2 "$UI")" "undefined|appelants=0"
 
+# ---------- RP6 : recensement des lecteurs de transcript (statique, code sans commentaires) ----------
+rp6() { local r; r="$("$NODE" "$HERE_T/frise-bornes-sondes.mjs" recensement "$1" 2>&1 | tail -1)"; "$NODE" -e 'try { const j = JSON.parse(process.argv[1]); console.log(j.temoin ? j.fichiers.join(",") : "temoin-rouge"); } catch { console.log("illisible"); }' "$r"; }
+echo "=== RP6 — seuls la fiche et la lecture des fichiers de l'encart lisent /api/vf/transcript ==="
+assert_eq "RP6 — les modules d'interface qui nomment /api/vf/transcript (code) : 74-vf-fiche.js et 74-vf-frise-fichiers.js, et le motif sait trouver une lecture (témoin)" "$(rp6 "$UI")" "74-vf-fiche.js,74-vf-frise-fichiers.js"
+
 # ---------- RP5 : témoin de remplacement, le rendu du fil de la fiche ----------
 cat > "$AUX/fil.cjs" <<'JS'
 const fs = require('fs'), vm = require('vm');
@@ -164,7 +170,7 @@ assert_eq "RP4 — aucune ligne FAIL dans les sections jouées de la régie" "$(
 # ---------- mutants ----------
 if [ -n "$CHROME" ] && [ -z "${REPLI_SANS_MUTANTS:-}" ]; then
   echo "=== mutants (copies du module ; chacun rougit sa sonde) ==="
-  if cockpit_module_muter M-REPLI-REVENU 72-vf-regie-source.js "s#if (declencheur === 'rapport') return;#if (declencheur === 'rapport') { ouvrirRepli(A, l.id, bouton, l.nom); return; }#;s#  function monter() {#  async function ouvrirRepli(A, id, ouvreur, nom) { emettre('vf-agent:lu', { id }, false); }  function monter() {#"; then
+  if cockpit_module_muter M-REPLI-REVENU 72-vf-regie-source.js "s#if (declencheur === 'rapport') return;#if (declencheur === 'rapport') { ouvrirRepli(A, l.id, bouton, l.nom); return; }#;s#  function monter() {#  async function ouvrirRepli(A, id, ouvreur, nom) { emettre('vf-agent:lu', { id }, false); const P = document.getElementById('panel'); if (P) { const sec = document.createElement('div'), t = document.createElement('h2'); sec.className = 'sec'; t.className = 'pt'; t.textContent = nom; sec.appendChild(t); P.appendChild(sec); } }  function monter() {#"; then
     sans_fiche "$COCKPIT_MODULE"
     if [ "$(rp1 "$COCKPIT_MODULE/skills/cockpit-moteur/assets/ui")" != "0" ]; then echo "MUTANT-ROUGE M-REPLI-REVENU RP1"; PASS=$((PASS+1)); else echo "MUTANT-VERT M-REPLI-REVENU RP1"; echo "  ❌ FAIL — M-REPLI-REVENU — RP1 n'a pas rougi"; FAIL=$((FAIL+1)); fi
     demarrer mrepli
@@ -178,6 +184,12 @@ if [ -n "$CHROME" ] && [ -z "${REPLI_SANS_MUTANTS:-}" ]; then
   if cockpit_module_muter M-EXPORT-REVENU 71-vf-equipe-rendu.js "s#agentsDuNoeud, pied,#agentsDuNoeud, transcript: () => null, pied,#"; then
     if [ "$(rp2 "$COCKPIT_MODULE/skills/cockpit-moteur/assets/ui")" != "undefined|appelants=0" ]; then echo "MUTANT-ROUGE M-EXPORT-REVENU RP2"; PASS=$((PASS+1)); else echo "MUTANT-VERT M-EXPORT-REVENU RP2"; echo "  ❌ FAIL — M-EXPORT-REVENU — RP2 n'a pas rougi"; FAIL=$((FAIL+1)); fi
   else echo "  ❌ FAIL — M-EXPORT-REVENU — mutation non posée (ancre absente)"; FAIL=$((FAIL+1)); fi
+  unset COCKPIT_MODULE
+  # M-LECTEUR-AUTRE-NOM : un lecteur de transcript rendu sous un autre nom que ouvrirRepli (RP1 ne le voit pas, RP6 oui)
+  if cockpit_module_muter M-LECTEUR-AUTRE-NOM 71-vf-equipe-rendu.js "s#agentsDuNoeud, pied,#agentsDuNoeud, lireFil: (id) => window.VF_ETAT.lireJson('/api/vf/transcript?id=' + encodeURIComponent(id)), pied,#"; then
+    U="$COCKPIT_MODULE/skills/cockpit-moteur/assets/ui"
+    if [ "$(rp1 "$U")" = "0" ] && [ "$(rp6 "$U")" != "74-vf-fiche.js,74-vf-frise-fichiers.js" ]; then echo "MUTANT-ROUGE M-LECTEUR-AUTRE-NOM RP6 (RP1 resté vert : $(rp6 "$U"))"; PASS=$((PASS+1)); else echo "MUTANT-VERT M-LECTEUR-AUTRE-NOM RP6"; echo "  ❌ FAIL — M-LECTEUR-AUTRE-NOM — RP6 n'a pas rougi"; FAIL=$((FAIL+1)); fi
+  else echo "  ❌ FAIL — M-LECTEUR-AUTRE-NOM — mutation non posée (ancre absente)"; FAIL=$((FAIL+1)); fi
   unset COCKPIT_MODULE
 fi
 
