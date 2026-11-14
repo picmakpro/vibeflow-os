@@ -852,7 +852,8 @@ try {
   vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), ctx, { timeout: 5000 });
   const R = ctx.window.__vfEquipeRendu;
   const S = { kind: 'session', id: 'S', etat: 'actif', tree: '.' }, A = { kind: 'subagent', id: 'A', etat: 'en-attente', parent: 'S', tree: '.' }, F = { kind: 'subagent', id: 'F', etat: 'termine', parent: 'S', tree: '.' };
-  const html = R.arbre([S, A, F], h);
+  const FA = { kind: 'subagent', id: 'FA', etat: 'actif', parent: 'F', tree: '.' }, G = { kind: 'subagent', id: 'G', etat: 'termine', parent: 'S', tree: '.' }; // F : terminé listé car il porte un agent en cours (« terminé ») ; G : terminé compté par le lien (P73-D-14)
+  const html = R.arbre([S, A, F, FA, G], h);
   for (const [nom, attendu] of [['titre session', 'Session principale'], ['rôle sous-agent', '<b>Agent</b>'], ['mot lu « en attente »', '(en attente'], ['mot visible « en attente »', ' · en attente'], ['mot lu « terminé »', '(terminé)'], ['lien des terminés (P73-D-14)', '1 à relire dans Équipe']]) if (!html.includes(attendu)) ko.push(nom);
   if (!R.pied(A).startsWith('en attente')) ko.push('pied en attente : ' + R.pied(A));
   if (!R.pied(F).startsWith('terminé')) ko.push('pied terminé : ' + R.pied(F));
@@ -993,8 +994,10 @@ JSON
   G "$WORK/ek-echelle.json" '(j.erreur?[]:["390","768"].flatMap((l)=>j[l].map((m,i)=>[l+"#"+i,m]))).filter(([,m])=>m.aire>0||m.k<0.75).map(([n,m])=>"  diag EK13 "+n+" : "+m.diag).join("\n")'
   EKC titre-grandi "equipe.html"
   assert_eq "EK14 — le titre de la régie grandit après le premier affichage (768 px, corps 40 px sur 9 caractères de large) : aucun recouvrement avec la première section une fois la page stable, aucune ligne ne déborde" "$(G "$WORK/ek-titre-grandi.json" 'j.erreur||((j.k>=0.75?"k":"k="+j.k)+" / "+(j.aire===0?"sans recouvrement":"recouvre "+j.aire+" px²"))')" "k / sans recouvrement"
+  # P73-D-14 : le tiroir « Au travail » n'existe plus sur Équipe (son bouton mène à la régie) : le pied du tiroir se lit sur Projet, l'infobulle de la recherche sur Équipe
+  EKC libelles "project.html#t"; mv "$WORK/ek-libelles.json" "$WORK/ek-libelles-tiroir.json"
   EKC libelles "equipe.html#t"
-  assert_eq "EK11 — le pied du tiroir, qui ne nomme plus qu'une source illisible (PU-G-180), est en français (aucune clé « sessions », « locks », « dags » brute)" "$(G "$WORK/ek-libelles.json" 'j.erreur||(/\b(sessions|locks|dags)\b/.test(j.src)?"anglais : "+j.src:"français")')" "français"
+  assert_eq "EK11 — le pied du tiroir, qui ne nomme plus qu'une source illisible (PU-G-180), est en français (aucune clé « sessions », « locks », « dags » brute)" "$(G "$WORK/ek-libelles-tiroir.json" 'j.erreur||(/\b(sessions|locks|dags)\b/.test(j.src)?"anglais : "+j.src:"français")')" "français"
   assert_eq "EK12 — l'infobulle de la recherche de l'onglet Équipe dit la même chose que son libellé" "$(G "$WORK/ek-libelles.json" 'j.erreur||j.titre')" "Chercher un agent ou une session"
   # EK15 (EA3, PU-G-189, PU-G-190) : Échap ferme le tiroir « Au travail » seul, le bouton dit s'il est ouvert et ce qu'il ouvre
   EK15() { EK_FOCUS="$1" EKC echap-tiroir "project.html#t"; mv "$WORK/ek-echap-tiroir.json" "$WORK/ek-echap-$1.json"; }
@@ -1036,7 +1039,7 @@ JSON
   assert_eq "EK8.2 — mutant (mise à jour en place et suivi du focus retirés : les lignes sont réinsérées à chaque rendu) : le focus tombe sur BODY, détecté" "$(ek_mutant r1 focus-puis-who "$EKA1" 'j.erreur||(j.apres.tag)' "lis.forEach((li, i) => { if (ul.childNodes[i] !== li) ul.insertBefore(li, ul.childNodes[i] || null); });" "lis.forEach((li, i) => { if (true) ul.insertBefore(li, ul.childNodes[i] || null); });" "if (garde && D.activeElement !== garde.el) {" "if (false) {")" "muté|BODY"
   assert_eq "EK9.2 — même mutant, tiroir « Au travail » : le focus tombe sur BODY, détecté" "$(ek_mutant r2 focus-tiroir "project.html#t" 'j.erreur||(j.apres.tag)' "SC.on('panel', () => { rendreFocus(); " "SC.on('panel', () => { ")" "muté|BODY"
   assert_eq "EK10.2 — mutant (le mot d'état sort de sa ligne dans la feuille servie) : le mot sort de sa ligne à 1440 px, détecté" "$(ek_mutant r3 badge "$EKA1" 'j.erreur||(j["1440"]<0?"rogné":"dans la carte")' "body.vf-regie-montee .vf-rg-mot { font-size: 13px; line-height: 20px; color: var(--text); }" "body.vf-regie-montee .vf-rg-mot { font-size: 13px; line-height: 20px; color: var(--text); position: relative; left: 4000px; }")" "muté|rogné"
-  assert_eq "EK11.2 — mutant (les clés de la collecte affichées telles quelles) : « sessions : lue » reparaît, détecté" "$(ek_mutant r4 libelles "equipe.html#t" 'j.erreur||(/\b(sessions|locks|dags)\b/.test(j.src)?"anglais":"français")' '.map(([k]) => SOURCES[k] || k);' '.map(([k]) => k);')" "muté|anglais"
+  assert_eq "EK11.2 — mutant (les clés de la collecte affichées telles quelles) : « sessions : lue » reparaît, détecté" "$(ek_mutant r4 libelles "project.html#t" 'j.erreur||(/\b(sessions|locks|dags)\b/.test(j.src)?"anglais":"français")' '.map(([k]) => SOURCES[k] || k);' '.map(([k]) => k);')" "muté|anglais"
   assert_eq "EK16.8 — mutant (le focus du titre n'est plus rendu après un redessin du tiroir) : le focus tombe sur BODY, détecté" "$(EK_LARGEUR=1024 EK_ORDRE=git-puis-travail ek_mutant r6 un-lateral "project.html#t" 'j.erreur||(j.etapes.redessin.travail?"T":"-")+":"+j.etapes.redessin.focus' "cleFocus === 'titre' ? document.querySelector('#panel > .vf-whop h3') :" "cleFocus === 'titre' ? null :")" "muté|T:BODY"
   assert_eq "EK12.2 — mutant (infobulle laissée au viewer) : « Chercher un fichier, une route, un module » reparaît, détecté" "$(ek_mutant r5 libelles "equipe.html#t" 'j.erreur||j.titre' "bouton.setAttribute('aria-label', LIB); bouton.title = LIB;" "bouton.setAttribute('aria-label', LIB);")" "muté|Chercher un fichier, une route, un module"
   assert_eq "EK13.2 — mutant (largeur minimale de 900 px sur la régie) : les lignes débordent de l'écran, détecté" "$(ek_mutant r6 echelle "equipe.html" 'j.erreur||(j["390"].concat(j["768"]).some((m)=>m.k<0.75)?"réduit":"plafonné")' "box-sizing: border-box; max-width: 960px; margin: 0;" "box-sizing: border-box; min-width: 900px; margin: 0;")" "muté|réduit"
@@ -1183,13 +1186,13 @@ console.log(JSON.stringify({
   memeArbre: noms(R.arbre([s('aaaaaaaa-1111', '.'), s('bbbbbbbb-2222', '.')], h)),
   arbres: noms(R.arbre([s('aaaaaaaa-1111', '.'), s('bbbbbbbb-2222', '.claude/worktrees/wt1')], h)),
   une: noms(R.arbre([s('aaaaaaaa-1111', '.')], h)),
-  fini: noms(R.arbre([{ kind: 'subagent', id: 'cccccccc-3333', tree: '.', etat: 'termine', role: 'vf-coder', ageS: 5, dureeS: 360 }], h)),
+  fini: noms(R.arbre([{ kind: 'subagent', id: 'cccccccc-3333', tree: '.', etat: 'termine', role: 'vf-coder', ageS: 5, dureeS: 360 }, { kind: 'subagent', id: 'dddddddd-4444', parent: 'cccccccc-3333', tree: '.', etat: 'actif', task: 'enfant', ageS: 1 }], h)), // P73-D-14 : un terminé n'est listé dans le tiroir que s'il porte un agent en cours
   terminal: R.arbre([s('aaaaaaaa-1111', '.')], h).includes('M3 4.5'),
 }));
 JS
 ER() { node "$AUX/ea2-rendu.mjs" "${2:-$RENDU}" | node "$AUX/jq.mjs" "$1"; }
 assert_eq "EA2.14 — plusieurs « Session principale » se distinguent par l'arbre, puis par l'identifiant court quand l'arbre est le même ; une seule garde son titre (PU-G-186)" "$(ER 'JSON.stringify([j.memeArbre,j.arbres,j.une])')" '[["Session principale · main · aaaaaaaa","Session principale · main · bbbbbbbb"],["Session principale · main","Session principale · wt1"],["Session principale"]]'
-assert_eq "EA2.15 — agent terminé sans titre : « rôle · identifiant court » (PU-G-184)" "$(ER 'j.fini.join()')" "vf-coder · cccccccc"
+assert_eq "EA2.15 — agent terminé sans titre, parent d'un agent en cours : « rôle · identifiant court » (PU-G-184)" "$(ER 'j.fini[0]')" "vf-coder · cccccccc"
 assert_eq "EA2.16 — le bouton « Voir la dernière commande » ne porte plus le chevron et le tiret d'un terminal (PU-G-187) ; témoin : le code d'avant le portait" "$(ER 'j.terminal')|$(ER 'j.terminal' "$MUT/avant/71-vf-equipe-rendu.js")" "false|true"
 
 # --- EA3 (lot 9) : « À surveiller » (PU-G-181), commande longue (PU-G-183), titre /rename des sessions (PU-G-186) ---

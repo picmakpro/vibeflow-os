@@ -139,7 +139,7 @@
     for (const e of document.querySelectorAll('#panel > *')) e.style.animation = 'none';
     if (p) p.scrollTop = haut;
   };
-  // AUDC-D3 : entre deux poussées, l'âge des agents avance dans la page : le tiroir ouvert est recalculé toutes les 30 s (aucun dessin si le texte est identique)
+  // AUDC-D3 : entre deux poussées, l'âge des agents avance dans la page : le tiroir ouvert est recalculé toutes les 30 s (aucun dessin si texte identique)
   if (typeof setInterval === 'function') setInterval(() => { if (!document.hidden) redessiner(); }, 30000); // `typeof` : le harnais vm de test-cockpit-equipe.sh (EUI) n'a pas de minuterie
   // révélation ponctuelle : la réponse reste affichée tant que sa ligne l'est. Elle est gardée en mémoire de la page seulement (ni graphe, ni stockage, ni export) et reposée
   // par l'événement `panel` du moteur dès que le panneau est redessiné : le tiroir et le panneau d'un agent sont redessinés à chaque `who`, et une réponse qui arrive pendant un redessin
@@ -190,7 +190,7 @@
   });
   const showLock = (l, off) => {
     if (l !== undefined) probe.lock = l;
-    if (!badge) badge = SC.addHeaderButton({ id: 'vf-lock', label: '…', title: 'Qui est au travail', onClick: whoPanel });
+    if (!badge) badge = SC.addHeaderButton({ id: 'vf-lock', label: '…', title: 'Qui est au travail', onClick: () => (window.__vfRegie?.monte?.() ? document.dispatchEvent(new CustomEvent('vf-regie:aller', { detail: { section: 'au-travail' } })) : whoPanel()) });
     const t = off ? { cls: 'off', text: 'Direct coupé', title: 'Le serveur du cockpit ne répond pas' } : lockText(probe.lock);
     const n = (who?.workers || []).filter(auTravail).length;
     badge.className = 'btn ' + (off ? 'off' : n ? 'held' : t.cls); badge.title = off ? t.title : `${n ? n + ' au travail' : 'Personne au travail'} · ${t.title}`;

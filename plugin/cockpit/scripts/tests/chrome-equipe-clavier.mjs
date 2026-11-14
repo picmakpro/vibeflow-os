@@ -204,8 +204,8 @@ await executer(chrome, async (s) => {
     await s.attendre("!!window.__es && !!window.__es.find((e) => e.url.includes('/api/vf/events')) && !!document.querySelector('#vf-lock')", 'flux et badge');
     await s.ev(`(() => { window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 9000, at: Date.now(), who: { workers: window.__vfLive.who.workers, sources: { sessions: { etat: 'lue' }, locks: { etat: 'erreur' }, dags: { etat: 'lue' } } } }); })()`); // PU-G-180 : le pied ne paraît que pour une source illisible
     await s.ev("document.querySelector('#vf-lock').click()");
-    await s.attendre("!!document.querySelector('.vf-whop .src')", 'ligne des sources').catch(async () => { throw new Error('ligne des sources absente ; panneau : ' + (await s.ev("document.getElementById('panel').innerHTML.slice(0, 300)")) + ' ; no-panel=' + (await s.ev("document.body.classList.contains('no-panel')"))); });
-    return await s.stable("({ src: document.querySelector('.vf-whop .src').textContent, titre: (document.getElementById('search-btn') || {}).title || 'absent' })", 'libellés');
+    if (!(await s.ev("document.body.classList.contains('vf-regie-montee')"))) await s.attendre("!!document.querySelector('.vf-whop .src')", 'ligne des sources').catch(async () => { throw new Error('ligne des sources absente ; panneau : ' + (await s.ev("document.getElementById('panel').innerHTML.slice(0, 300)")) + ' ; no-panel=' + (await s.ev("document.body.classList.contains('no-panel')"))); });
+    return await s.stable("({ src: (document.querySelector('.vf-whop .src') || {}).textContent || 'sans tiroir', titre: (document.getElementById('search-btn') || {}).title || 'absent' })", 'libellés');
   }
   if (ACTION === 'echap-tiroir') { // (EK15, PU-G-189, PU-G-190) Échap sur le tiroir « Au travail », focus dans le tiroir (EK_FOCUS=panneau) ou sur le bouton (EK_FOCUS=bouton)
     const corps = `const flux = () => window.__es.find((e) => e.url.includes('/api/vf/events'));
