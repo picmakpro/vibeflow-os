@@ -519,6 +519,25 @@ assert_eq "M-NFC.0 — l'ancre du mutant existe (la comparaison en NFC des deux 
 if [ "$LK_GFORME" = git-nfc ]; then
   assert_eq "M-NFC — rougit A15.2 : sans normalisation, le nom stocké en NFD n'égale plus le nom de la liste git et le fichier disparaît" "$(lk_a15n "$LK_MN/scripts")" "nfd=perdu"
 else echo "  (M-NFC sans objet : git ne recompose pas les noms sur ce système, liste et disque sont tous deux en NFD)"; fi
+
+# fichier neuf ni suivi ni ignoré : la liste du moteur le garde (ls-files -co) ; un fichier ignoré par .gitignore n'y entre pas. Lab GIT (sinon le scan passe par la marche et ne lit pas ls-files).
+MK_SUI="MKSUIVI-FICHIER-INDEXE-A153"; MK_NSU="MKNONSUIVI-FICHIER-NEUF-A153"; MK_IGA="MKIGNORE-FICHIER-IGNORE-A153"
+LK_S="$LK_RACINE/a15ns/lab"; mkdir -p "$LK_S/src"; mkplan "$LK_S"
+printf '#!/bin/sh\n# %s : fichier suivi (témoin).\necho ok\n' "$MK_SUI" > "$LK_S/src/suivi.sh"
+printf '#!/bin/sh\n# %s : fichier neuf, ni suivi ni ignoré.\necho ok\n' "$MK_NSU" > "$LK_S/src/nonsuivi.sh"
+printf '#!/bin/sh\n# %s : fichier ignoré par .gitignore.\necho ok\n' "$MK_IGA" > "$LK_S/src/ignore.sh"
+printf 'src/ignore.sh\n' > "$LK_S/.gitignore"
+G "$LK_S" init -q; G "$LK_S" add .planning src/u.js src/suivi.sh .gitignore >/dev/null 2>&1
+lk_a15ns() { # RACINE-DU-MODULE : « suivi=lu|perdu nonsuivi=lu|perdu ignore=absent|present » d'après les pages et scan.json
+  local o="$LK_S/.vibeflow/cockpit" f; rm -rf "$o"; node "$1/vf-cockpit-build.mjs" "$LK_S" --quiet > "$AUX/a15ns.out" 2>&1
+  f=("$o/index.html" "$o/graph.json" "$o/architecture.json" "$o/.cache/scan.json")
+  echo "suivi=$([ "$(compte "$MK_SUI" "${f[@]}")" -ge 1 ] && echo lu || echo perdu) nonsuivi=$([ "$(compte "$MK_NSU" "${f[@]}")" -ge 1 ] && echo lu || echo perdu) ignore=$([ "$(compte "$MK_IGA" "${f[@]}")" -eq 0 ] && echo absent || echo present)"
+}
+assert_eq "A15.3 — un fichier suivi et un fichier neuf non ignoré sont décrits ; un fichier ignoré par .gitignore ne l'est pas (pages et scan.json)" "$(lk_a15ns "$SCRIPTS")" "suivi=lu nonsuivi=lu ignore=absent"
+LK_MS="$WORK/mm-a15ns"; rm -rf "$LK_MS"; mkdir -p "$LK_MS/scripts" "$LK_MS/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$LK_MS/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$LK_MS/skills/cockpit-moteur"
+FROM="['ls-files', '-co', '--exclude-standard', '-z']" TO="['ls-files', '-c', '--exclude-standard', '-z']" node "$AUX/mutsub.mjs" "$LK_MS/skills/cockpit-moteur/scripts/lib/common.mjs" > "$AUX/mm-a15ns.res" 2>&1
+assert_eq "M-NON-SUIVI.0 — l'ancre du mutant existe (la liste du moteur est ls-files -co dans gitFiles de common.mjs)" "$(cat "$AUX/mm-a15ns.res")" "muté"
+assert_eq "M-NON-SUIVI — rougit A15.3 : sans -o, le fichier neuf non ignoré disparaît ; le suivi et l'ignoré sont inchangés" "$(lk_a15ns "$LK_MS/scripts")" "suivi=lu nonsuivi=perdu ignore=absent"
 echo "=== G18 — verrou de pilotage, gitdir et inclusion à maillon divergent (gitSortant) ==="
 LK_Y="$LK_RACINE/g18"
 lk_depot() { mkdir -p "$1"; "$GIT_REEL" init -q "$1"; }
