@@ -2,7 +2,7 @@
 // Usage : node chrome-tracabilite-panneaux.mjs <chrome> <racine-du-serveur> <sections>   Rend UNE ligne JSON { d1, … } ou { erreur }. Chaque section est isolée.
 import { executer, pause, stabiliser, attendreValeur } from './chrome-session.mjs';
 const [, , chrome, racine, liste] = process.argv;
-const SEL = new Set((liste || 'd1,d3,d5,d6,d7,d8').split(','));
+const SEL = new Set((liste || 'd1,d3,d5,d6,d7,d8,j1').split(','));
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!VibeFlow.state && !!VibeFlow.state.layout";
 const SANS_VISITE = "(() => { const g = Storage.prototype.getItem; Storage.prototype.getItem = function (k) {"
   + " const vue = typeof k === 'string' && (k.indexOf('floorplan:tour-seen:') === 0 || k.indexOf('vibeflow-cockpit:visite:') === 0);"
@@ -127,6 +127,29 @@ await executer(chrome, async (s) => {
     o.d8 = await lire(`(() => { const b = document.querySelector('#panel [data-vf-trace-panneau] .vf-trace-borne'), l = document.querySelector('#panel [data-vf-trace-panneau] .vf-trace-lignes');
       return { texte: b && __tr.nb(b.textContent), avant: !!b && !!l && !!(b.compareDocumentPosition(l) & Node.DOCUMENT_POSITION_FOLLOWING),
         taille: b && getComputedStyle(b).fontSize, marge: b && getComputedStyle(b).marginBottom, graisse: b && getComputedStyle(b).fontWeight }; })()`);
+  });
+  // Correctifs du juge de design (76-07) : aucun défilement horizontal des panneaux d'objet, bord commun, indicateur de pliage
+  const MESURE = `(() => { const P = document.getElementById('panel'), r = P.querySelector('[data-vf-trace-panneau]'); if (!r) return null;
+    const g = (e) => e ? Math.round(e.getBoundingClientRect().left * 10) / 10 : null, d = (e) => e ? Math.round(e.getBoundingClientRect().right * 10) / 10 : null;
+    const h3 = r.querySelector('.sec h3'), pied = r.querySelector('.vf-trace-pied'), bord = d(h3), uniq = (l) => new Set(l.filter((x) => x !== null)).size;
+    const hors = [...r.querySelectorAll('*')].filter((e) => !e.closest('.vf-trace-sr') && !/(vf-trace-(ligne|inerte|commit|sr)|vf-ref)\\b/.test(e.className)
+      && e.getClientRects().length && d(e) > bord + 0.5).length;
+    return { sw: P.scrollWidth, cw: P.clientWidth, gauches: uniq([g(r.querySelector('.ph')), g(r.querySelector('.pt')), g(h3), g(pied)]),
+      droits: uniq([d(r.querySelector('.pt')), d(h3), d(pied)]), hors, pied: !!pied }; })()`;
+  const ETIRER = `(() => { const r = document.querySelector('#panel [data-vf-trace-panneau]'); r.querySelector('.pt').textContent = 'entree-de-memoire-au-nom-tres-long-'.repeat(4);
+    const c = r.querySelector('.vf-trace-pied code'); if (c) c.textContent = 'dossier/' .repeat(14) + 'fichier-au-chemin-tres-long.md'; })()`;
+  await sec('j1', async () => { // le panneau d'objet ne défile pas à l'horizontale, aux trois largeurs, titre de 3 lignes et chemin de pied compris
+    o.j1 = {};
+    const OUV = { adr: "VFTrace.ouvrir('adr', 'ADR-001')", decision: "VFTrace.ouvrir('decision', 'P90-D-01:ph-90')", entree: "VFTrace.ouvrir('entree', 'vf-coder/a.md')",
+      exigence: "VFTrace.ouvrirExigence({ id: 'REQ-01' })", liste: `VFTrace.ouvrirListe({ titre: 'Liste d essai', sorte: ['ligne', 'lignes'], elements: [1, 2, 3],
+        rendreLigne: (n) => VFTrace.ligneVoisin('P90-D-0' + n, 'Titre de la ligne ' + n, 'decision:x' + n, 'Ouvre ' + n, () => {}) })` };
+    for (const [w, h] of [[1440, 900], [1024, 800], [390, 844]]) {
+      await charger(w, h); await s.ev("VibeFlow.go('root')");
+      for (const [nom, ev] of Object.entries(OUV)) {
+        await s.ev(ev); await vrai("!!document.querySelector('#panel [data-vf-trace-panneau] .sec') && !document.querySelector('#panel [aria-busy=\"true\"]')"); await pause(500);
+        o.j1[`${w}|${nom}`] = await lire(MESURE); await s.ev(ETIRER); await pause(200); o.j1[`${w}|${nom}|etire`] = await lire(MESURE);
+      }
+    }
   });
   return o;
 }, { csp: true });

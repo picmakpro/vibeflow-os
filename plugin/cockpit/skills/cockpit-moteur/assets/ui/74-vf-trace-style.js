@@ -19,6 +19,7 @@
   const CSS = `
     .vf-trace { font-size: 12.5px; line-height: 18px; }
     .vf-trace[hidden], .vf-trace [hidden] { display: none; }
+    .vf-trace[data-vf-trace-panneau] { padding-inline: var(--inset-panel); } .vf-trace[data-vf-trace-panneau] .sec { padding-inline: 0; }
     .vf-trace-g { display: inline-block; flex: none; width: 16px; height: 16px; background: var(--c-st, var(--text-3));
       -webkit-mask: var(--g-st) center / contain no-repeat; mask: var(--g-st) center / contain no-repeat; }
     .vf-trace-g-lu { --g-st: ${G.lu}; --c-st: var(--text-2); } .vf-trace-g-manque { --g-st: ${G.manque}; --c-st: var(--st-todo); }
