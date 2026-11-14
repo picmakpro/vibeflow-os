@@ -29,3 +29,9 @@
 
 Ligne de CHANGELOG demandée par 80-18 : « Quand un onglet ne se charge pas, le cockpit le dit (« Lecture impossible ») et propose « Réessayer » : au premier chargement dans une vue
 dédiée, ensuite par une annonce, la palette de commandes et la ligne d'état ; l'onglet affiché ne bouge pas. »
+
+## Correctifs ciblés de revue (commit 62ab1e173)
+- Majeur établi en rejouant : test-cockpit-coquille.sh 97/7 sur la tête précédente (la feuille de style du persistant restait dans la tête, `#vf-coquille-echec` annulé, mesures « intact » touchées par l'annonce et la rangée). Corrigé : le persistant retire boîte et feuille à toute arrivée (`surOnglet`) ; C8 joue sans lui (retiré des copies de module) ; les mesures « intact » de C3.3 et C8 ignorent les zones d'annonce et la rangée d'échec. Suite de la 79 touchée : 4 lignes, trailer Gate-Touche. Après : 104/0 (jeton Chrome, poste calme) ; trois rejeux sous charge de 200 à 290 ont rougi des contrôles de document différents à chaque fois (flake de charge, non attribué).
+- Échec de démarrage : aller et le clic rechargent l'onglet d'origine (`etat()` en échec, motif nul, n'est plus « rien à charger »), sans entrée d'historique en plus ; EC4.1 (rouge d'abord, 16/5 avec EC2.3). Le clic lui-même n'est pas prouvé (l'écouteur du routeur est défait par la coquille sans le correctif 73f7ad5f de la 79).
+- Mineur : le repli `#ask-live` se remet à zéro avant d'écrire. La rangée d'état rend à `#vf-coin-etat` son état caché en partant.
+- Suites : coquille 104/0, echec-onglet 21/0, onglets 32/0. Écart connu : un Réessayer par le routeur après un premier échec laisse le bouton Retour de Projet (focus de repli), différence avec un chargement à froid propre à ce chemin.
