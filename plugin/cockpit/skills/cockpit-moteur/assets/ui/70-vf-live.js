@@ -186,6 +186,8 @@
   });
   const showLock = (l, off) => {
     if (l !== undefined) probe.lock = l;
+    // un rejeu (brancher) ou un who tardif respecte la connexion courante : jamais « au travail » sur un direct coupé
+    if (off === undefined) off = E.lire('connexion') === 'perdu';
     if (!badge) badge = SC.addHeaderButton({ id: 'vf-lock', label: '…', title: 'Qui est au travail', onClick: () => (window.__vfRegie?.monte?.() && !window.__vfTiroirRestaure ? document.dispatchEvent(new CustomEvent('vf-regie:aller', { detail: { section: 'au-travail' } })) : whoPanel()) });
     const t = off ? { cls: 'off', text: 'Direct coupé', title: 'Le serveur du cockpit ne répond pas' } : lockText(probe.lock);
     const n = (who?.workers || []).filter(auTravail).length;
