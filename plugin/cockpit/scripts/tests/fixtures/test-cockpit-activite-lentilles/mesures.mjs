@@ -2,4 +2,5 @@
 import { mesuresT1 } from './mesures-t1.mjs';
 import { mesuresT2 } from './mesures-t2.mjs';
 import { mesuresT3 } from './mesures-t3.mjs';
-export const sections = { ...mesuresT1, ...mesuresT2, ...mesuresT3 };
+import { mesuresT4 } from './mesures-t4.mjs';
+export const sections = { ...mesuresT1, ...mesuresT2, ...mesuresT3, ...mesuresT4 };

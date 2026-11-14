@@ -4,14 +4,14 @@
 # lab construit par la suite, avec un vrai historique git) : bouton, menu, clavier, marques, panneau, compte de `.k`, `surOnglet`. La route /api/vf/activite est lue pour de vrai (Points
 # chauds, onglets, fraîcheur) ou remplacée par la page (états, empreinte, collisions : la même forme, poussée par un événement `git` du flux).
 # Régime allégé (mandat commun de la Phase 75) : seuls les mutants de la chaîne XSS sont joués (MUTANT-ROUGE — <nom>).
-# Variables : TABLES_JS (autre fichier de tables : le témoin rouge se rejoue sur la base, où il n'existe pas), SECTIONS (liste de sections navigateur : t1,t2,t3).
+# Variables : TABLES_JS (autre fichier de tables : le témoin rouge se rejoue sur la base, où il n'existe pas), SECTIONS (liste de sections navigateur : t1,t2,t3,t4).
 # Forme : « PASS — <id> : <texte> », « ❌ FAIL — <id> : <texte> », ligne finale « BILAN : <n> PASS, <m> FAIL » ; sort en 1 au premier FAIL.
 set -uo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 MODULE_UI="$HERE/../../skills/cockpit-moteur/assets/ui"
 TABLES="${TABLES_JS:-$MODULE_UI/75-vf-activite-tables.js}"
 FX="$HERE/fixtures/test-cockpit-activite-lentilles"
-SECTIONS="${SECTIONS:-t1,t2,t3}"
+SECTIONS="${SECTIONS:-t1,t2,t3,t4}"
 WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"
 cleanup() { type vf_hyg_fin > /dev/null 2>&1 && vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 PASS=0; FAIL=0
@@ -233,6 +233,15 @@ mutant_rouge "XSS-nom-d-agent-par-innerHTML" "s/r\\.querySelector('b')\\.textCon
 
 echo "== L18 surOnglet retire sections, compte et marques =="
 assert_eq L18 "sur Code : sections du panneau, compte et marques présents ; sur Projet : plus rien (jamais #ask-live) ; retour sur Code : aucun doublon" "$(E "[j.t3.avantQuitter.join(), j.t3.projet.join(), j.t3.code.join(), j.t3.retour.join()].join(' ## ')")" "4,1,2 ## 0,0,0,true ## 4,1,2,true ## 1,1,1"
+fi
+
+if wantsection t4; then
+echo "== L22 correctifs de fin de phase : légende stable, surface du menu, section Collisions visible =="
+R="$(mesurer t4)"
+assert_eq L22 "légende : à un événement sans changement (git, frise, planning, mêmes données), le <details> « limites » est le MÊME nœud, reste ouvert, garde le focus ; le menu reste ouvert" "$(E "[j.t4.avant, j.t4.memeDonnee].map((x) => x.join()).join('|')")" "true,true,true,true|true,true,true,true"
+assert_eq L22 "légende : quand ses lignes changent (relecture de l'empreinte), elle est reconstruite et dit la relecture ; elle revient avec ses limites ensuite" "$(E "[j.t4.change.join(), j.t4.revient.join()].join('|')")" "false,true|1,false"
+assert_eq L22 "#lens-menu : fond non transparent et ombre non nulle, identiques à #legend, à 1440, 1024 et 390 px, thèmes sombre et clair" "$(E "Object.entries(j.t4.surface).map(([k, v]) => k + ':' + v.join()).join(' ')")" "dark-1440:true,true,true,true dark-1024:true,true,true,true dark-390:true,true,true,true light-1440:true,true,true,true light-1024:true,true,true,true light-390:true,true,true,true"
+assert_eq L22 "le compte ouvre le panneau : le titre de « Collisions possibles » est dans le champ du panneau à 1440 et à 390 px" "$(E "[j.t4.visible[1440], j.t4.visible[390]].map((v) => v && v[0]).join('|')")" "true|true"
 fi
 
 echo "== L21 aucune valeur en dur dans les fichiers CSS et JS neufs =="

@@ -61,7 +61,7 @@
       return s;
     };
     const rangs = () => [...menu.querySelectorAll('.lr')].filter((r) => r.offsetParent !== null && !r.closest('details:not([open])'));
-    let ouvert = false;
+    let ouvert = false, sigLeg = null;
     const maj = (m) => {
       const actifs = new Set(m.lignes.map((l) => l.id));
       for (const r of [...lentilles.children]) if (!actifs.has(r.dataset.id)) r.remove();
@@ -87,9 +87,13 @@
       }
       const ligne = (g, t) => { const l = el('div', 'll'); if (g) { const i = el('i', 'lg lg-' + g); i.setAttribute('aria-hidden', 'true');
         l.appendChild(i); } l.appendChild(el('span', '', t)); return l; };
-      leg.replaceChildren(...m.legende.map((x) => ligne(x.g, x.t)));
-      if (m.limites.length) { const d = el('details', 'lim'); d.append(el('summary', '', TX.limites), ...m.limites.map((t) => ligne(null, t)));
-        leg.appendChild(d); }
+      const sig = JSON.stringify([m.legende, m.limites]); // reconstruite seulement si ses lignes changent : un <details> ouvert et le focus restent
+      if (sig !== sigLeg) {
+        sigLeg = sig;
+        leg.replaceChildren(...m.legende.map((x) => ligne(x.g, x.t)));
+        if (m.limites.length) { const d = el('details', 'lim'); d.append(el('summary', '', TX.limites), ...m.limites.map((t) => ligne(null, t)));
+          leg.appendChild(d); }
+      }
       radar.textContent = m.radar.ligne;
     };
 
