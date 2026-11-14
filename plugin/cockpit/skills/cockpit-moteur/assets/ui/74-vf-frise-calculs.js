@@ -96,7 +96,10 @@
     for (const v of voies) { const x = f(v); if (x == null) return [k, null]; s += x; } // un champ absent : la ligne dit null, jamais 0
     return [k, s];
   }));
-  const totaux = (voies) => Object.fromEntries(COLS.map(([k, f]) => [k, voies.reduce((s, v) => s + (f(v) ?? 0), 0)]));
+  const totaux = (voies) => Object.fromEntries(COLS.map(([k, f]) => { // somme des voies qui publient le champ ; personne ne le mesure : null, jamais 0
+    const xs = voies.map(f).filter((x) => x != null);
+    return [k, xs.length ? xs.reduce((s, x) => s + x, 0) : null];
+  }));
   const ligne = (cle, libelle, voies, extra) => ({ cle, libelle, ...somme(voies), ...extra });
   const nomVoie = (v) => `${v.kind === 'session' ? 'Session' : v.role || 'agent'} ${String(v.id).slice(0, 8)}`;
 

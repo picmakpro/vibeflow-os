@@ -259,6 +259,9 @@ section('F9', () => {
   eq(R.agent.lignes.reduce((a, l) => a + l.travailS, 0), tot.travailS, 'aucune durée recoupée : somme des durees.travailS des voies');
   const inc = M.agreger(vs([raw[0], voie({ id: 'zz', jetons: null })]), 'agent', opt);
   ok(inc.inconnus === 1 && inc.lignes.find((l) => l.cle === 'zz').entree === null && inc.total.entree === 100, 'champ absent : ligne nulle, exclue du total, comptée dans inconnus', j([inc.inconnus, inc.total]));
+  const nul = M.agreger(vs([voie({ id: 'n1', jetons: null }), voie({ id: 'n2', jetons: null })]), 'agent', opt);
+  ok(['entree', 'sortie', 'cacheLu', 'cacheCree'].every((k) => nul.total[k] === null) && typeof nul.total.travailS === 'number', 'champ que personne ne mesure : le total vaut null, jamais 0 (L4b-02)', j(nul.total));
+  eq(M.agreger(vs([raw[0], voie({ id: 'n3', jetons: null })]), 'agent', opt).total.entree, 100, 'champ mesuré par une voie seulement : le total est la somme des voies qui le publient');
 });
 
 section('F10', () => {
