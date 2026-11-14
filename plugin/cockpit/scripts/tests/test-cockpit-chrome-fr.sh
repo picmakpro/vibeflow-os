@@ -133,7 +133,7 @@ assert_eq "F4 : chaque exclusion a une raison et son texte figure dans l'inventa
 assert_eq "F5 : valeurs du dictionnaire sans nom amont, sans balise, ≠ clé, sans {} en trop" "$(lire "$WORK/m.json" 'j.problemesDico')" "[]"
 # le rendu est renommé à l'assemblage : le nom amont d'une valeur y disparaîtrait ; on le cherche donc aussi dans les SOURCES du dictionnaire
 UI="$SCRIPTS/../skills/cockpit-moteur/assets/ui"
-assert_eq "F5.2 : sources 78 et 79 du dictionnaire sans le nom amont (insensible à la casse)" "$(cat "$UI"/78-vf-fr-dict-a.js "$UI"/79-vf-fr-dict-b.js | grep -ci "$AMONT")" "0"
+assert_eq "F5.2 : sources 78 et 79 (a, b, c) du dictionnaire sans le nom amont (insensible à la casse)" "$(cat "$UI"/78-vf-fr-dict-a.js "$UI"/79-vf-fr-dict-b.js "$UI"/79-vf-fr-dict-c.js | grep -ci "$AMONT")" "0"
 assert_eq "F5.3 : témoin — le compte voit bien un nom amont dans un texte jetable" "$(printf '"a": "Le %s de a"\n' "$AMONT" | grep -ci "$AMONT")" "1"
 assert_eq "F6.1 : motif « Answer · 3 cards »" "$(lire "$WORK/m.json" 'j.f6.motif')" "Réponse · 3 cartes"
 assert_eq "F6.2 : entrée exacte du dictionnaire" "$(lire "$WORK/m.json" 'j.f6.exact')" "Ajuster à l'écran"
@@ -371,12 +371,12 @@ assert_eq "F22.4 : une ligne ECART-ADMIS sans côté est elle-même un écart (j
 M22="$WORK/mut22"; mkdir -p "$M22"; cp "$SCRIPTS/tests/chrome-session.mjs" "$M22/"; sed 's/admis.has(`APRES \${cle}/admis.has(`AVANT ${cle}/' "$ET22" > "$M22/chrome-fr-etats.mjs"
 assert_eq "F22.5 mutant : la vérification du côté APRÈS rabattue sur AVANT laisse passer le retour à l'anglais de F22.2 (la suite sait le voir, F22.2 rougit)" "$([ "$(cmp -s "$ET22" "$M22/chrome-fr-etats.mjs" && echo identique)" = identique ] && echo "mutation sans effet" || node "$M22/chrome-fr-etats.mjs" comparer "$D22/avant2.json" "$D22/apres2.json" "$D22/trace-avant.md")" '[]'
 node "$AUX/ordre.mjs" "$SORTIE/index.html" > "$WORK/ordre.json"
-assert_eq "F18.1 : les blocs vibeflow:fr (78, 79, 80) précèdent le script principal et ui/00-vibeflow.js dans la page assemblée" "$(lire "$WORK/ordre.json" '[j.blocs, j.avantPrincipal, j.avant00, j.marqueurRestant].join()')" "3,true,true,false"
+assert_eq "F18.1 : les blocs vibeflow:fr (78 a, 79 b, 79 c, 80) précèdent le script principal et ui/00-vibeflow.js dans la page assemblée" "$(lire "$WORK/ordre.json" '[j.blocs, j.avantPrincipal, j.avant00, j.marqueurRestant].join()')" "4,true,true,false"
 # F18.2 : un gabarit sans l'emplacement garde l'ancien ordre (copie du module, jamais une édition du module) ; jouée sur une copie du module (même copie que cockpit_module_copie)
 M18="$WORK/mod-f18"; mkdir -p "$M18"; ( cd "$SCRIPTS/.." && tar -cf - --exclude='scripts/tests' scripts skills ) | ( cd "$M18" && tar -xf - ); L18="$WORK/lab18"; mkdir -p "$L18"; ( cd "$LAB" && tar -cf - --exclude=.vibeflow . ) | ( cd "$L18" && tar -xf - )
 grep -v '<!--__UI_I18N__-->' "$M18/skills/cockpit-moteur/assets/viewer.html" > "$M18/viewer.sans" && mv "$M18/viewer.sans" "$M18/skills/cockpit-moteur/assets/viewer.html"
 node "$M18/scripts/vf-cockpit-build.mjs" "$L18" --quiet >/dev/null 2>&1; node "$AUX/ordre.mjs" "$L18/.vibeflow/cockpit/index.html" > "$WORK/ordre18.json"
-assert_eq "F18.2 : sans l'emplacement dans le gabarit, la page garde l'ancien ordre (blocs après le script principal, aucun marqueur laissé)" "$(lire "$WORK/ordre18.json" '[j.blocs, j.avantPrincipal, j.avant00, j.marqueurRestant].join()')" "3,false,false,false"
+assert_eq "F18.2 : sans l'emplacement dans le gabarit, la page garde l'ancien ordre (blocs après le script principal, aucun marqueur laissé)" "$(lire "$WORK/ordre18.json" '[j.blocs, j.avantPrincipal, j.avant00, j.marqueurRestant].join()')" "4,false,false,false"
 node "$AUX/t19.mjs" "$SORTIE/index.html" essai > "$WORK/t19e.json" 2>"$WORK/t19.err" || echo '{}' > "$WORK/t19e.json"
 node "$AUX/t19.mjs" "$SORTIE/index.html" reelle > "$WORK/t19r.json" 2>>"$WORK/t19.err" || echo '{}' > "$WORK/t19r.json"
 assert_eq "F19.1 : __vfFrT est une fonction" "$(lire "$WORK/t19e.json" 'j.fonction')" "function"

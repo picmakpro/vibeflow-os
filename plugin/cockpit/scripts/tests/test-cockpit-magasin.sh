@@ -165,7 +165,7 @@ assert_eq "R1.2 — 70 porte l'événement panel (ancre imposée : focus rendu, 
 assert_eq "R1.3 — 72 (réduit en 73-08, sans canevas) ne garde ni observateur de mutations ni abonnement à l'événement panel" "$(n 'new MutationObserver' "$A72")|$(n "SC.on(" "$A72")" "0|0"
 assert_eq "R1.4 — 76 sans observateur et deux écouteurs de vf-git:etat (l'arrêt de tabulation du titre suit l'ouverture du tiroir Git)" "$(n 'new MutationObserver' "$A76")|$(n "addEventListener('vf-git:etat'" "$A76")" "0|2"
 assert_eq "R1.5 — le magasin n'est pas touché par les retraits : aucun observateur, aucun écouteur de document dans 70-vf-etat.js" "$(n 'MutationObserver' "$STORE")|$(n 'addEventListener' "$STORE")" "0|0"
-assert_eq "R1.6 — les fichiers que ce plan ne touche pas gardent leur observateur sans événement source (73, 77 tiroir Git)" "$(n 'new MutationObserver' "$UI/73-vf-tiroir-travail.js")|$(n 'new MutationObserver' "$UI/77-vf-git-tiroir.js")" "1|1"
+assert_eq "R1.6 — les fichiers que ce plan ne touche pas gardent leur observateur sans événement source (73 ; 77 tiroir Git, posé par l aide obs(MutationObserver, …) depuis l idiome A51)" "$(n 'new MutationObserver' "$UI/73-vf-tiroir-travail.js")|$(( $(n 'new MutationObserver' "$UI/77-vf-git-tiroir.js") + $(n 'obs(MutationObserver,' "$UI/77-vf-git-tiroir.js") ))" "1|1"
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

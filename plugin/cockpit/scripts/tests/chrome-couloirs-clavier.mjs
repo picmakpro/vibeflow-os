@@ -82,6 +82,13 @@ await executer(chrome, async (s) => {
       await charger('?vue=couloirs', 800, 900); await muter(`${noeud('ph-4')}.st = 'todo'`); await seq('ph-3', ['ArrowRight']);
       o.cl32 = { suite, corps: !suite.some(([, id]) => !id) };
     });
+    await sec('cl3arr', async () => { // 80-04 : l'arrivée sur Projet sans sélection (VF_ONGLETS.aller) ne lève rien dans le clavier, le focus va au h1
+      await s.naviguer(`${racine}/`, { brut: true }); await s.attendre('!!window.VF_ONGLETS', 'VF_ONGLETS'); await pause(300);
+      o.cl3arr = JSON.parse(await s.ev(`(async () => { const ce = console.error, err = []; console.error = function (...a) { err.push(String(a[0]));
+        return ce.apply(this, a); }; window.addEventListener('error', (e) => err.push(String(e.message)));
+        await VF_ONGLETS.aller('projet'); await new Promise((r) => setTimeout(r, 600)); console.error = ce;
+        return JSON.stringify({ err, foc: document.activeElement.id, sel: VibeFlow.state.selected }); })()`));
+    });
     await sec('cl33', async () => {
       await charger('?vue=couloirs', 1024, 768); await focus('.vp-bascule button:last-child'); await presser('Tab'); await presser('ArrowRight');
       const sel = await etat(), esc = await presser('Escape'), esp = await presser('Space');

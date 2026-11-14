@@ -19,6 +19,8 @@
 //   - sous 1 280 px (PU-G-001, PU-G-002, coque étroite 2026-11-06) : la vue d'ensemble s'écrit « Ensemble » (le nom entier reste le nom accessible) ; le niveau COURANT du fil est toujours entier (flèche « Remonter » + niveau), les niveaux d'avant cèdent d'abord (masqués un à un, du plus proche de la racine), puis, de 1 000 à 1 279 px
 //     (souris), le nom du dépôt cède au niveau courant tant qu'on est dans un dossier ; à la racine le nom du dépôt garde sa place et le libellé « Ensemble » est masqué plutôt que rogné. Le bouton Thème passe à 36 px (comme les autres boutons de la rangée) : 8 px rendus au nom ; l'ouvreur Git garde ses 44 px (P78-D-34).
 (() => {
+  const SESSIONS = 'M6 2.5a2.75 2.75 0 1 0 0 5.5 2.75 2.75 0 0 0 0-5.5zM1 14c0-2.8 2.2-4.5 5-4.5s5 1.7 5 4.5z'
+    + 'M11.5 3.5a2.2 2.2 0 1 0 0 4.4 2.2 2.2 0 0 0 0-4.4zM12.2 9.7c1.8.3 3.3 1.6 3.3 4.3h-2.8c0-1.8-.4-3.2-.5-4.3z';
   const style = document.createElement('style');
   style.textContent = `
     .brand .mark, :root[data-theme="light"] .brand .mark, :root[data-theme="light"] #madewith .mark { filter: none !important; }
@@ -51,6 +53,19 @@
     @media (min-width: 1000px) and (max-width: 1279px) {
       #ask { width: min(700px, calc(100% - var(--pw) - 48px)); }
     }
+    /* 80-20 (P80-D-53 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, « Trois groupes libellés (Recommandé) ») : dès 1 280 px les boutons
+       de .hr sont rangés en trois groupes libellés (ranger, plus bas) ; un groupe sans bouton affiché disparaît avec son libellé. Le point de « au travail »
+       réduit prend un glyphe de sessions (deux silhouettes, tracé de 16 × 16 découpé dans le point : il garde la teinte de l'état). */
+    :root { --vf-sessions: path('${SESSIONS}'); }
+    .vf-hdr-groupe { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
+    .vf-hdr-groupe:not(:has(> .vf-hdr-rangee > :not([hidden]))) { display: none; }
+    .vf-hdr-groupe + .vf-hdr-groupe { margin-inline-start: var(--sp-8); }
+    header[data-vf-serre] .vf-hdr-groupe + .vf-hdr-groupe { margin-inline-start: 0; }
+    .vf-hdr-lib { font-size: 12px; line-height: 1; color: var(--text-3); padding-inline: var(--sp-4); white-space: nowrap; }
+    .vf-hdr-rangee { display: flex; align-items: center; gap: var(--sp-4); }
+    @media (min-width: 701px) and (max-width: 1639px) { header #vf-lock .dot { width: 16px; height: 16px; border-radius: 0; clip-path: var(--vf-sessions); } }
+    @media (min-width: 701px) { header #vf-lock[data-vf-point] .dot { width: 16px; height: 16px; border-radius: 0; clip-path: var(--vf-sessions); } }
+    header #vf-lock:not(.held):not(.off) .dot { background: var(--text-3); }
     /* Zone basse, axe commun de 701 à 1 279 px (recette du 2026-11-08, lot C ; PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») : le zoom n'est plus la pile
        verticale du haut à droite (celle du viewer sous 1 000 px et sur tactile, et celle de ce fichier de 1 000 à 1 279 px), mais la rangée de 1 280 px et plus, au bord gauche --edge ; il se pose au-dessus de la pastille « Terminal »
        (qui prend sa largeur, vf-cockpit-terminal-tiroir.mjs), elle-même au-dessus de la barre de question quand elles se recouvrent. Plus de bouton à droite : le titre retrouve sa largeur d'origine. Sous 701 px la pile du téléphone reste (P70-D-09). */
@@ -105,7 +120,6 @@
       header[data-vf-git] .hc { flex-basis: 72px; } /* l'ouvreur Git ajoute 48 px à la rangée : la recherche en cède autant (même règle que 76-vf-git-entete.js), pour que l'en-tête se replie aux MÊMES largeurs avec et sans Git (témoin F5, Phase 78) */
     }
     @media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) {
-      header #theme-toggle { width: 36px; height: 36px; padding: 0; justify-content: center; } /* l'ouvreur Git garde ses 44 px (P78-D-34) */
       header .hl { flex: 1 1 auto; } /* la colonne gauche prend la largeur naturelle de son contenu et c'est la RECHERCHE (poids 100 000, plancher de 152 px de P78-D-39) qui cède la première, comme dès 1 280 px */
       header .hc { flex: 0 100000 400px; }
       
@@ -193,16 +207,78 @@
   // (un bouton hors de la fenêtre, l'en-tête plus large que la fenêtre, ou le fil d'Ariane rogné malgré son masquage), le badge se réduit à son point. Filet derrière la tranche 701-1 639 px : un libellé plus long
   // (« 99 au travail ») ou un bouton d'en-tête de plus ne dépend d'aucun seuil fixe. Rejoué comme le fil : rendu, changement du badge ou des boutons, redimensionnement, chargement, polices.
   const colDroite = document.querySelector('header .hr'); // le badge (#vf-lock) est ajouté plus tard par 70-vf-live.js : relu à chaque mesure
+  // 80-20 (P80-D-53, P80-D-59) : trois groupes libellés dès 1 280 px. Les boutons sont DÉPLACÉS (jamais clonés : id, menu .rel et ordre relatif gardés) ;
+  // un bouton posé plus tard rejoint son groupe par son id, sinon « Affichage ». Sous 1 280 px le rangement est défait (ordre et parents d'origine).
+  // L'écouteur `change` vit dans le rappel de surOnglet.
+  const GROUPES = [['lire', 'Read', ['flows-btn', 'screens-btn', 'filters-btn', 'tour-btn']],
+    ['suivre', 'Follow', ['btn-recent', 'btn-health', 'btn-synthese', 'vf-lock']], // 77 : Synthèse juste après Santé
+    ['affichage', 'Display', ['btn-export', 'theme-toggle', 'btn-panel']]];
+  const mq1280 = window.matchMedia('(min-width: 1280px)'), tr = window.__vfFrT || ((x) => x), extHdr = document.getElementById('hdr-ext');
+  let origine = null; // [unité, parent d'origine] dans l'ordre du document, relevé avant son rangement
+  const SEL = ':scope > .rel, :scope > button, :scope > .vf-hdr-groupe > .vf-hdr-rangee > *, #hdr-ext > button';
+  const unites = () => (colDroite ? [...colDroite.querySelectorAll(SEL)].filter((e) => e.id !== 'vf-plus' && e.id !== 'vf-git-ouvreur') : []);
+  const cleDe = (e) => (e.classList.contains('rel') ? (e.querySelector('button') || e).id : e.id);
+  const deranger = () => {
+    if (!colDroite || !colDroite.querySelector(':scope > .vf-hdr-groupe')) return;
+    const rang = (e) => { const i = (origine || []).findIndex((x) => x[0] === e); return i < 0 ? 1e6 : i; };
+    for (const e of unites().sort((a, b) => rang(a) - rang(b))) {
+      const o = (origine || []).find((x) => x[0] === e);
+      if ((o ? o[1] : extHdr) === extHdr && extHdr) extHdr.appendChild(e); else colDroite.insertBefore(e, document.getElementById('vf-plus'));
+    }
+    for (const g of colDroite.querySelectorAll(':scope > .vf-hdr-groupe')) g.remove();
+  };
+  const ranger = () => {
+    if (!colDroite) return;
+    if (!mq1280.matches) { deranger(); return; }
+    origine = origine || [];
+    // un bouton posé plus tard suit les autres
+    for (const e of unites()) if (!origine.some((x) => x[0] === e)) origine.push([e, e.parentElement === extHdr ? extHdr : colDroite]);
+    const cibles = [];
+    for (const [cle, lib] of GROUPES) {
+      let g = colDroite.querySelector(`:scope > [data-vf-groupe="${cle}"]`);
+      if (!g) {
+        g = document.createElement('div'); g.className = 'vf-hdr-groupe'; g.setAttribute('role', 'group'); g.setAttribute('data-vf-groupe', cle);
+        const l = document.createElement('span'), r = document.createElement('div');
+        l.className = 'vf-hdr-lib'; l.id = 'vf-hdr-lib-' + cle; l.textContent = tr(lib);
+        r.className = 'vf-hdr-rangee'; g.setAttribute('aria-labelledby', l.id); g.append(l, r);
+        colDroite.insertBefore(g, document.getElementById('vf-plus'));
+      }
+      cibles.push([g.lastElementChild, []]);
+    }
+    unites().forEach((e, pos) => {
+      const k = cleDe(e), gi = GROUPES.findIndex((x) => x[2].includes(k)), i = gi < 0 ? GROUPES.length - 1 : gi;
+      cibles[i][1].push([gi < 0 ? 1e6 + pos : GROUPES[gi][2].indexOf(k), e]);
+    });
+    for (const [rangee, l] of cibles) {
+      const voulu = l.sort((a, b) => a[0] - b[0]).map((x) => x[1]);
+      if (voulu.length !== rangee.children.length || voulu.some((e, i) => rangee.children[i] !== e)) for (const e of voulu) rangee.appendChild(e);
+    }
+  };
+  const initGroupes = () => {
+    mq1280.addEventListener('change', ranger); ranger();
+    return () => { mq1280.removeEventListener('change', ranger); deranger(); };
+  };
+  const coq = window.VF_COQUILLE;
+  if (coq && typeof coq.surOnglet === 'function') coq.surOnglet(initGroupes, { cle: '01-vf-responsive.js' }); else initGroupes();
   const replie = () => {
     const badge = document.getElementById('vf-lock'); if (!badge || !hd) return;
     badge.removeAttribute('data-vf-point'); // on mesure avec le badge entier
+    hd.removeAttribute('data-vf-serre');
     if (!matchMedia('(min-width: 701px)').matches) return;
     if (fil) ajuste0();
     const dehors = [...hd.querySelectorAll('button')].some((b) => b.offsetWidth > 0 && (b.getBoundingClientRect().right > innerWidth + 0.5 || b.getBoundingClientRect().left < -0.5));
     if (dehors || hd.scrollWidth > innerWidth + 1 || (fil && fil.offsetWidth > 0 && fil.scrollWidth > fil.clientWidth + 1)) badge.setAttribute('data-vf-point', '');
   };
+  // Phase 80 : badge déjà au point et fil encore rogné (trois groupes de 80-20, « 99 au travail » + un bouton, 1 640 px) : l'écart entre groupes cède
+  const serrer = () => {
+    const badge = document.getElementById('vf-lock'); if (!badge || !hd || !mq1280.matches || !badge.hasAttribute('data-vf-point')) return;
+    if (fil) ajuste0();
+    const sorti = (x) => x.offsetWidth > 0 && (x.getBoundingClientRect().right > innerWidth + 0.5 || x.getBoundingClientRect().left < -0.5);
+    const rogne = fil && fil.offsetWidth > 0 && fil.scrollWidth > fil.clientWidth + 1;
+    if ([...hd.querySelectorAll('button')].some(sorti) || hd.scrollWidth > innerWidth + 1 || rogne) hd.setAttribute('data-vf-serre', '');
+  };
   if (colDroite && hd) {
-    let q = 0; replieRaf = () => { if (!q) q = requestAnimationFrame(() => { q = 0; replie(); }); };
+    let q = 0; replieRaf = () => { if (!q) q = requestAnimationFrame(() => { q = 0; ranger(); replie(); serrer(); }); };
     new MutationObserver(replieRaf).observe(colDroite, { childList: true, characterData: true, subtree: true }); // création du badge, changement de son libellé, bouton ajouté
     window.addEventListener('resize', replieRaf); window.addEventListener('load', replieRaf); if (document.fonts?.ready) document.fonts.ready.then(replieRaf);
     replieRaf();

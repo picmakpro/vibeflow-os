@@ -9,6 +9,7 @@ window.__vfFrDict = Object.assign(window.__vfFrDict || {}, {
     'Nothing on the map matches that.': 'Rien sur la carte ne correspond.', Flows: 'Parcours', 'Guided flows': 'Parcours guidés',
     'Connection types': 'Types de liens', 'Toggle details (P)': 'Afficher ou masquer le détail (P)', 'Toggle details': 'Afficher ou masquer le détail',
     'Drag to resize': 'Glisser pour redimensionner', 'Show technical detail': 'Afficher le détail technique', 'Start here': 'Par où commencer', Export: 'Exporter',
+    Read: 'Lire', Follow: 'Suivre', Display: 'Affichage', // 80-20 : libellés des trois groupes de l'en-tête (01-vf-responsive.js)
     Overview: "Vue d'ensemble", 'Back to overview': "Retour à la vue d'ensemble", 'Back to map': 'Quitter le tableau', Folder: 'Dossier', File: 'Élément', file: 'élément',
     Answer: 'Réponse', 'On this board': 'Sur ce tableau', Board: 'Tableau', 'Show answer board': 'Afficher le tableau de réponse', Walkthrough: 'Parcours pas à pas',
     'Thinking…': 'Réflexion…', Stop: 'Arrêter', Close: 'Fermer', Cancel: 'Annuler', Copy: 'Copier', Copied: 'Copié', 'Copy path': 'Copier le chemin', 'Copy name': 'Copier le nom',

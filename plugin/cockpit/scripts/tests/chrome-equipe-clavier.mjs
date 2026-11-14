@@ -110,11 +110,12 @@ await executer(chrome, async (s) => {
     await s.ev(`(() => { const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }, M = { kind: 'subagent', id: 'M1', etat: 'actif', role: 'vf-dev-manager', tree: '.', parent: 'S1', task: 'manager', dureeS: 60 };
       window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 5000, at: Date.now(), who: { workers: [S, M], sources: {} } }); })()`);
     await s.ev("document.querySelector('#vf-lock').click()");
-    await s.attendre("!!document.querySelector('.vf-whop [data-vf-doing]')", 'bouton « Voir la dernière commande » du tiroir');
+    const ZB = ".vf-whop [data-vf-doing=\"M1\"]"; // la ligne du bouton cliqué (M1), jamais la première zone de la page
+    await s.attendre(`!!document.querySelector('${ZB}')`, 'bouton « Voir la dernière commande » du tiroir');
     await s.ev(`(() => { const R = window.fetch.bind(window); window.fetch = (u, o) => String(u).includes('/api/vf/doing') ? Promise.resolve({ ok: true, json: async () => ({ doing: '<b id=ek-injecte>gras</b>' }) }) : R(u, o); })()`); // le serveur ne rend jamais de balisage (résumé de la commande) : on le fait rendre à la page, pour prouver SON rendu
-    await s.ev("document.querySelector('.vf-whop [data-vf-doing]').click()");
-    await s.attendre("(() => { const z = document.querySelector('.vf-whop .vf-doing'); return !!z && !z.hidden && z.textContent.length > 0; })()", 'commande affichée');
-    return await s.stable(`(() => { const z = document.querySelector('.vf-whop .vf-doing'); return { elements: z.querySelectorAll('*').length, injecte: !!document.getElementById('ek-injecte'), texte: z.textContent, zone: z.innerHTML.slice(0, 120) }; })()`, 'zone de commande stable');
+    await s.ev(`document.querySelector('${ZB}').click()`);
+    await s.attendre(`(() => { const z = document.querySelector('${ZB} + .vf-doing'); return !!z && !z.hidden && z.textContent.length > 0; })()`, 'commande affichée');
+    return await s.stable(`(() => { const z = document.querySelector('${ZB} + .vf-doing'); return { elements: z.querySelectorAll('*').length, injecte: !!document.getElementById('ek-injecte'), texte: z.textContent, zone: z.innerHTML.slice(0, 120) }; })()`, 'zone de commande stable');
   }
   if (ACTION === 'focus-doing-tiroir') {
     const corps = `const flux = () => window.__es.find((e) => e.url.includes('/api/vf/events'));
@@ -123,13 +124,13 @@ await executer(chrome, async (s) => {
     await s.ev(`(() => { ${corps} flux().__emit('who', { seq: 5000, at: Date.now(), who: { workers: [S, M], sources: {} } });
       const R = window.fetch.bind(window); window.fetch = (u, o) => String(u).includes('/api/vf/doing') ? new Promise((r) => setTimeout(() => r({ ok: true, json: async () => ({ doing: 'ls -la (témoin EK8)' }) }), 150)) : R(u, o); })()`);
     await s.ev("document.querySelector('#vf-lock').click()");
-    await s.attendre("!!document.querySelector('.vf-whop [data-vf-doing]')", 'bouton « Voir la dernière commande » du tiroir');
-    await s.ev(`window.__b = document.querySelector('.vf-whop [data-vf-doing]'); window.__b.focus(); window.__tr = []; (() => { ${DECRIRE}
+    const ZB = '.vf-whop [data-vf-doing="M1"]'; await s.attendre(`!!document.querySelector('${ZB}')`, 'bouton du tiroir (ligne de M1, jamais la première de la page)');
+    await s.ev(`window.__b = document.querySelector('${ZB}'); window.__b.focus(); window.__tr = []; (() => { ${DECRIRE}
       const rel = () => { const a = document.activeElement; return JSON.stringify([a ? a.tagName : null, !!window.__b.disabled, a === window.__b, document.contains(window.__b)]); };
       let prec = ''; window.__iv = setInterval(() => { const r = rel(); if (r !== prec) { window.__tr.push(r); prec = r; } }, 10); })()`);
     const avant = await s.ev(`(() => { ${DECRIRE} const e = document.activeElement; return Object.assign(dec(e), { doing: (e && e.dataset && e.dataset.vfDoing) || '' }); })()`);
     await touche('Enter', 'Enter', 13, '\r');
-    const lu = await s.attendre("(() => { const z = document.querySelector('.vf-whop .vf-doing'); return !!z && !z.hidden && z.textContent.includes('témoin EK8'); })()", 'commande affichée', 8000).then(() => true, () => false);
+    const lu = await s.attendre(`(() => { const z = document.querySelector('${ZB} + .vf-doing'); return !!z && !z.hidden && z.textContent.includes('témoin EK8'); })()`, 'commande affichée', 8000).then(() => true, () => false);
     const apres = await s.stable(`(() => { ${DECRIRE} const e = document.activeElement; return Object.assign(dec(e), { doing: (e && e.dataset && e.dataset.vfDoing) || '' }); })()`, 'élément actif stable');
     const trace = await s.ev('(() => { clearInterval(window.__iv); return window.__tr; })()');
     return { avant, apres, lu, trace };
@@ -140,7 +141,7 @@ await executer(chrome, async (s) => {
       const emettre = (workers) => flux().__emit('who', { seq: seq++, at: Date.now(), who: { workers, sources: {} } });
       const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }, M = { kind: 'subagent', id: 'M1', etat: 'actif', role: 'vf-dev-manager', tree: '.', parent: 'S1', task: 'manager', dureeS: 60 };
       const C = (task) => ({ kind: 'subagent', id: 'C1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task, dureeS: 5 });`;
-    const SEL = tiroir ? '.vf-whop [data-vf-doing]' : RAPPORT;
+    const SEL = tiroir ? '.vf-whop [data-vf-doing="M1"]' : RAPPORT; // la ligne du manager M1, jamais la première de la page
     if (tiroir) {
       await s.attendre("!!window.__es && !!window.__es.find((e) => e.url.includes('/api/vf/events')) && !!document.querySelector('#vf-lock')", 'flux et badge');
       await s.ev(`(() => { ${corps} emettre([S, M, C('un')]); })()`);

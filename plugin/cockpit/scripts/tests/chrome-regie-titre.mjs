@@ -70,6 +70,24 @@ await executer(chrome, async (s) => {
     // simule l'aller d'onglet de la Phase 80 : le titre brut est écrit, puis l'événement de document `vf:onglet` est émis
     await s.ev("document.title = 'Projet · brut'; document.dispatchEvent(new CustomEvent('vf:onglet', { detail: { onglet: 'projet', precedent: 'equipe' } }))");
     const aller = await attendreValeur(titre, (t) => /^\(2\) vous attendent · Projet · /.test(t), { max: 3000 });
+    // 80-10 : un aller d'onglet réel (VF_ONGLETS) avec N > 0 : aucune écriture du titre nu « Onglet · nom », le titre final nomme l'onglet d'arrivée
+    // chaque ÉCRITURE du titre est consignée par un accesseur posé sur document (un observateur ne verrait que la valeur finale du tour)
+    await s.ev("(() => { sessionStorage.setItem('vf-t-titres', '[]'); const d = Object.getOwnPropertyDescriptor(Document.prototype, 'title');"
+      + " Object.defineProperty(document, 'title', { configurable: true, get() { return d.get.call(document); }, set(v) {"
+      + " sessionStorage.setItem('vf-t-titres', JSON.stringify(JSON.parse(sessionStorage.getItem('vf-t-titres')).concat(String(v)))); d.set.call(document, v); } }); })()");
+    await s.ev("window.VF_ONGLETS.aller('code')");
+    const allerOnglet = await attendreValeur(titre, (t) => /^\(2\) vous attendent · Code · /.test(t), { max: 6000 });
+    const intermediaires = JSON.parse(await s.ev("sessionStorage.getItem('vf-t-titres')")).filter((t) => /^(Code|Projet|Équipe) · /.test(t)) // les écritures du moteur au remplacement du document (« VibeFlow · Code ») ne sont pas des titres d'onglet;
+    await s.ev("window.VF_ONGLETS.aller('projet')"); await attendreValeur(titre, (t) => /^\(2\) vous attendent · Projet · /.test(t), { max: 6000 });
+    // 80-10 : 90-vf-titre.js garde le dernier mot : après CHAQUE vf:onglet le titre servi est celui que recompose le compositeur (n > 0 ici, n = 0 plus bas)
+    const LIB = { code: 'Code', projet: 'Projet', equipe: 'Équipe' };
+    const fidele = async (o, pre) => {
+      await s.ev(`window.VF_ONGLETS.aller('${o}')`);
+      await attendreValeur(titre, (x) => x.startsWith(pre + LIB[o] + ' · '), { max: 6000 });
+      const servi = await titre(); await s.ev('window.__vfTitre.composer()');
+      return servi === await titre() && servi.startsWith(pre + LIB[o] + ' · ');
+    };
+    const fidelesN = []; for (const o of ['code', 'equipe', 'projet']) fidelesN.push(await fidele(o, '(2) vous attendent · '));
     await pousser(attendent(1));
     const un = await attendreValeur(titre, (t) => /^\(1\)/.test(t), { max: 6000 });
     const av = reqs.length;
@@ -78,7 +96,8 @@ await executer(chrome, async (s) => {
     const pastille = await href(), reseau = reqs.slice(av).filter((r) => !r.u.startsWith('data:') && /icon|favicon|\.svg|image/i.test(r.u)).map((r) => r.u);
     await pousser([]);
     const retour = await attendreValeur(titre, (t) => /^Projet · /.test(t), { max: 6000 });
-    return { navs: navs.slice(n0), zero, change: pastille !== zero.href, deux: titres, abonnes, sansRecharge, focus, signal, moteur, aller, un, pastille: pastille.slice(0, 40), sansChiffre: !/<text/.test(decodeURIComponent(pastille)),
+    const fideles0 = []; for (const o of ['code', 'equipe', 'projet']) fideles0.push(await fidele(o, ''));
+    return { navs: navs.slice(n0), zero, change: pastille !== zero.href, deux: titres, abonnes, sansRecharge, focus, signal, moteur, aller, allerOnglet, intermediaires, fidelesN, fideles0, un, pastille: pastille.slice(0, 40), sansChiffre: !/<text/.test(decodeURIComponent(pastille)),
       reseau, csp: s.violations.slice(), retour, hrefRetour: await href(), nonGet: nonGet() };
   }
   if (scenario === 'lu') {

@@ -111,6 +111,14 @@ for CLE in a b; do
 done
 assert_eq "PR2.10c — témoin : aucune section du pilote n'a échoué" "$(E4 'Object.keys(j.erreurs).join()')" ""
 
+echo "=== PR5 — idiome A51 : deux allers-retours Projet / Code, extension réévaluée (80-a51) ==="
+. "$HERE_T/a51-commun.sh"
+build_serve "$LAB"
+a51_mesurer "$WORK/a51-pr.json" "http://127.0.0.1:$PORT/project.html?vue=couloirs" projet code "42-vf-panneau-retour.js" ".vf-retour-barre {" ".vf-retour-barre"
+vf_hyg_stop "$SRV"
+assert_eq "PR5.1 — deux allers-retours Projet / Code : écouteurs, observateurs, feuille et globale VF_PANNEAU comme à la première arrivée ; rien du Retour sur Code" \
+  "$(a51_verdict "$WORK/a51-pr.json" retours --absent-ailleurs)" "ok"
+assert_eq "PR5.2 — le fichier réévalué deux fois (même cle) : un seul branchement actif, une seule feuille" "$(a51_verdict "$WORK/a51-pr.json" rejeu)" "ok"
 echo "=== Mutants (copie du module dans \$WORK) ==="
 UIF=42-vf-panneau-retour.js
 mutant M-REEMPILE $UIF "const e = pile.pop(); enRetour = Date.now() + DELAI;" "const e = pile.pop(); enRetour = 0;" chrome-panneau-retour.mjs pr1 pr13

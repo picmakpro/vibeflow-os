@@ -182,7 +182,7 @@ cat > "$AUX/c3.js" <<'JS'
 const tabs = { code: 'code', projet: 'project', equipe: 'equipe' };
 const un = (nom) => s.ev(`VF_COQUILLE.chargerOnglet(${JSON.stringify(nom)}).then(() => ({ ok: true, tab: VibeFlow.graph.meta.vfTab, layout: !!VibeFlow.state.layout, pret: document.documentElement.dataset.vfPret, j: __s.journal.slice(-1)[0] }), (e) => ({ ok: false, msg: String(e.message) }))`);
 const c31 = []; for (const nom of ['code', 'equipe', 'projet', 'projet']) c31.push({ nom, tab: tabs[nom], ...(await un(nom)) });
-const empreinte = () => s.ev(`({ n: __s.req.length, h: document.body.innerHTML.length, onglet: VF_COQUILLE.onglet(), tab: VibeFlow.graph.meta.vfTab })`);
+const empreinte = () => s.ev(`({ n: __s.req.length, h: (() => { const c = document.body.cloneNode(true); c.querySelectorAll('#ask-live, .vp-status').forEach((z) => { z.textContent = ''; }); c.querySelectorAll('.vf-ech').forEach((z) => z.remove()); return c.innerHTML.length; })(), onglet: VF_COQUILLE.onglet(), tab: VibeFlow.graph.meta.vfTab })`);
 const avant = await empreinte();
 const mauvais = [ '', 'Code', 'PROJET', 'projet ', '__proto__', 'constructor', 'toString', 'projet&onglet=code', 7, null, ['projet'] ];
 const c32 = await s.ev(`(async () => { const r = []; for (const v of ${JSON.stringify(mauvais)}) { try { await VF_COQUILLE.chargerOnglet(v); r.push('resolu'); } catch (e) { r.push('rejete'); } } return r; })()`);
@@ -449,7 +449,7 @@ else assert_eq "C7 — le serveur --terminal n'a pas démarré (port de Q absent
 cockpit_arreter
 echo "=== C8 — échec d'un chargement d'onglet : jamais une page blanche, jamais le corps de la réponse (A55) ==="
 cockpit_arreter
-CPE="$(cockpit_module_copie)"
+CPE="$(cockpit_module_copie)"; rm -f "$CPE/skills/cockpit-moteur/assets/ui/00-vf-onglets-echec.js" # C8 mesure le texte de repli de la coquille : le persistant de 80-21 l'annule
 printf '%s\n' '// vf-coquille: persistant' '(() => {' '  window.__fix16eval = (window.__fix16eval || 0) + 1; window.__fix16e = window.__fix16e || []; window.__fix16r = 0;' \
   "  document.addEventListener('vf:coquille-echec', (ev) => { window.__fix16e.push(ev.detail); if (window.__fix16Annule) ev.preventDefault(); });" \
   "  VF_COQUILLE.surOnglet(() => { window.__fix16r += 1; }, { cle: '00-vf-zz-fixture-echec.js' });" '})();' > "$CPE/skills/cockpit-moteur/assets/ui/00-vf-zz-fixture-echec.js"
@@ -459,7 +459,7 @@ const MESURE = `(() => { const st = document.querySelector('#stage'), n = docume
   const texte = document.body.innerText;
   return { etat: VF_COQUILLE.etat(), onglet: VF_COQUILLE.onglet(), pret: document.documentElement.dataset.vfPret, stageTexte: st.innerText.trim().length > 0, nbTextes: texte.split("TEXTE-FIXE").length - 1, noeud: !!n,
     bouton: b ? b.textContent.trim() : null, nbBoutons: n ? n.querySelectorAll('button').length : 0, evts: window.__fix16e || [], evals: window.__fix16eval, r: window.__fix16r,
-    corps: texte.includes('MQ16-CORPS') || JSON.stringify(window.__fix16e || []).includes('MQ16-CORPS'), fond: cs && cs.backgroundColor, couleur: cs && cs.color, couleurParent: ps && ps.color, h: document.body.querySelectorAll('*').length }; })()`;
+    corps: texte.includes('MQ16-CORPS') || JSON.stringify(window.__fix16e || []).includes('MQ16-CORPS'), fond: cs && cs.backgroundColor, couleur: cs && cs.color, couleurParent: ps && ps.color, h: [...document.body.querySelectorAll('*')].filter((e) => !e.closest('.vf-ech')).length }; })()`;
 JS
 # un corps de scénario = en-têtes + la mesure ; TEXTE-FIXE remplacé par le texte attendu
 corps8() { { head -n "$1" "$AUX/c8$2.js"; cat "$AUX/c8mesure.js"; tail -n +"$(($1+1))" "$AUX/c8$2.js"; } | sed "s|TEXTE-FIXE|$LET|"; }
@@ -536,7 +536,7 @@ if [ -n "$CHROME" ]; then
            "prevent|c82.texteAbsent |s|if (initial \&\& !annule) afficherEchec(nom); // garde:coquille-echec-prevent|if (initial) afficherEchec(nom);|" \
            "corps|c81.corps |s|t.textContent = MESSAGE_LECTURE; // garde:coquille-echec-corps|t.textContent = MESSAGE_LECTURE; fetch('/api/vf/graphe?onglet=' + nom, { headers: { 'x-vf-cockpit-token': window.VF_COCKPIT_SERVER.jetons[nom] } }).then((r) => r.text()).then((x) => { t.textContent += ' ' + x; });|"; do
     nom="${m%%|*}"; reste="${m#*|}"; att="${reste%%|*}"; expr="${reste#*|}"; expr="${expr#*|}"; expr="s|${expr}"
-    CPM="$(cockpit_module_copie)"; cp "$CPE/skills/cockpit-moteur/assets/ui/00-vf-zz-fixture-echec.js" "$CPM/skills/cockpit-moteur/assets/ui/"
+    CPM="$(cockpit_module_copie)"; rm -f "$CPM/skills/cockpit-moteur/assets/ui/00-vf-onglets-echec.js"; cp "$CPE/skills/cockpit-moteur/assets/ui/00-vf-zz-fixture-echec.js" "$CPM/skills/cockpit-moteur/assets/ui/"
     cp "$CPM/skills/cockpit-moteur/assets/vf-coquille.js" "$WORK/vf-coquille-$nom.avant"; sed -i.bak "$expr" "$CPM/skills/cockpit-moteur/assets/vf-coquille.js"
     if ! cmp -s "$WORK/vf-coquille-$nom.avant" "$CPM/skills/cockpit-moteur/assets/vf-coquille.js"; then
       COCKPIT_MODULE="$CPM" demarrer "$LAB"
