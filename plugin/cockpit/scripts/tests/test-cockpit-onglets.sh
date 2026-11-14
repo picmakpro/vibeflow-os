@@ -76,8 +76,10 @@ assert_eq "OG2.10 — le fragment courant n'est pas reporté ; au retour sur Pro
   "$(E2 '[j.og210.code, j.og210.projet]')" '[["/","","root",null],["/project.html","#v=liste&s=ph-2"]]'
 assert_eq "OG2.11 — aller('equipe', { fragment }) : #vf-x à la résolution, un seul pushState ; fragments invalides rejetés sans effet" \
   "$(E2 '[j.og211.r.h, j.og211.r.p, j.og211.r.n - j.og211.e0.n, j.og211.r.push - j.og211.e0.push, j.og211.bad.join(),
-    j.og211.apres.n === j.og211.r.n, j.og211.apres.fetchs - j.og211.e0.fetchs]')" \
+    j.og211.apres.n === j.og211.r.n, (j.og211.apres.ong.equipe || 0) - (j.og211.e0.ong.equipe || 0)]')" \
   '["#vf-x","/equipe.html",1,1,"rejet,rejet,rejet,rejet,rejet",true,1]'
+assert_eq "OG2.11b — témoin du compteur : un GET vers Projet ne compte pas pour Équipe, un GET de plus vers Équipe s'y compte" \
+  "$(E2 '[j.og211.temoin[0] === j.og211.apres.ong.equipe, j.og211.temoin[1] - j.og211.temoin[0]]')" '[true,1]'
 assert_eq "OG2.13 — modale ouverte puis aller('projet') : résolue, Projet chargé, focus posé, aucune erreur (hors 41-clavier), modale défaite" \
   "$(E2 '[j.og213.r[0], j.og213.p, /^Projet · /.test(j.og213.t), j.og213.ae !== "body",
     j.og213.cerr.filter((x) => !/querySelectorAll/.test(x)).join(), j.og213.modale]')" '["ok","/project.html",true,true,"",false]'
