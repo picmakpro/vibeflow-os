@@ -587,6 +587,11 @@ JS
   return 'focus=' + focus + ' | img=' + document.querySelectorAll('#panel img').length + ' | texte=' + (lu.indexOf('<img src=x onerror=') >= 0);
 })()
 JS
+  # 74-08 : T26.7, T26.8, T27.B2, T27.C1 et T27.C2 exercent le lecteur de repli de la 73 (panneau #panel, focus sur la ligne) ; la page complète les envoie à la fiche (74-05). Ils se jouent
+  # donc sur une copie du module SANS ui/74-vf-fiche*.js (le repli vit jusqu'à 74-10) ; la même propriété est rejouée contre la fiche par test-cockpit-equipe-retraits.sh (R2 remplace T26.7,
+  # R4 remplace T26.8, T27.B2, T27.C1 et T27.C2). Le serveur de la page complète est relancé après T27.C2.
+  vf_hyg_stop "$SRV_PID"; rm -rf "$WORK/mod-sf"; MSF="$(cockpit_module_copie "$WORK/mod-sf")"; rm -f "$MSF"/skills/cockpit-moteur/assets/ui/74-vf-fiche*.js
+  MUT_MOD="$MSF"; demarrer "$OUT" "$H"; MUT_MOD=""; SRV="$SRV_PID"; PORT="$SRV_PORT"
   rafraichir
   RT="$(CI sc-t26.js "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg")"
   assert_eq "T26.7 — Chrome : le rapport d'un agent terminé au message <img onerror> s'affiche en texte depuis « Terminé, à relire » (0 élément img, la source lisible)" "$(echo "$RT" | sed -E 's/^focus=.* \| (img=[0-9]+) \| (texte=.*)$/\1|\2/')" "img=0|texte=true"
@@ -599,6 +604,7 @@ JS
   assert_eq "T27.C1 — recette : le rapport ouvert depuis « Terminé, à relire » reste affiché après quatre autres who, et rien du transcript n'est gardé dans un stockage du navigateur" "$(CI sc-c.js "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg")" "rapport lu=true | rapport après 4 who=true | rien du transcript en stockage=true"
   rafraichir
   assert_eq "T27.C2 — recette : après un rechargement de la page, rien n'est affiché et le rapport est redemandé à la lecture (jamais son contenu gardé)" "$(CI sc-c2.js "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg" "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg")" "ouvert=true ;; rien gardé=true | rouvert après rechargement=true"
+  vf_hyg_stop "$SRV_PID"; demarrer "$OUT" "$H"; SRV="$SRV_PID"; PORT="$SRV_PORT"   # 74-08 : retour à la page complète (avec la fiche)
   rafraichir
   RF="$(CI sc-f.js "http://127.0.0.1:$PORT/equipe.html#t")"
   assert_eq "T27.F1 — recette : le badge « au travail » égale les actifs de l'onglet Équipe, même avec un verrou, un nœud de DAG et un enregistrement dans la collecte (apparié : le nombre est non nul)" "$(echo "$RF" | sed -E 's/^badge=([0-9]+) \| actifs=([0-9]+) .*/\1 \2/' | awk '{print ($1==$2 && $1>0) ? "égaux" : "badge=" $1 " actifs=" $2}')" "égaux"
