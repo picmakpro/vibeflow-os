@@ -966,6 +966,7 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - **Serve et outils (L5)** :
   - `recent-work.json` et `references/schema.md` § recent work, reliquats (`serve.mjs:437`) ; `ps` sans `-ww` dans `--stop` ; `ASK_DELAI` ne libère pas la place d'un enfant qui ignore SIGTERM.
   - `41-vf-projet-liste:30` : deux comptes interpolés sans `h()` ; `77-vf-git-tiroir.js:253` : observateur de `body` qui force la mise en page pendant le glissement du terminal (L5u-04).
+  - L5u-03 : `tiroir/tiroir.js:69` — `monter()` après la réponse de `/api/vf/terminal` peut tomber pendant la première portée ; ses écouteurs seraient alors retirés au premier changement d'onglet (course théorique, non observée).
   - `check-method-budget.sh:599` : sortie TSV « OK » pour un STATE illisible ; `driver-lock.sh:1441` : archive du registre laissée dans un lab plat ; `worktree-procs.sh:123` (mode `/proc`) : sélection sur un cwd non échappé ; bloc « Fin de mandat » contradictoire pour un juge en lecture seule (`prd-gate`, `vf-design-judge`, `vf-auditer`, `vf-reviewer`).
 - **Équipe, fiche, synthèse, visite (L4, EX, DL)** :
   - `72-vf-regie-rendu:92` : lien « Carte de la phase » jamais mis à jour ni retiré ; `74-vf-frise:77` : `feuilles()` en O(n²) à chaque rendu ; `74-vf-fiche:66` : `Promise.all` sans `catch`, fiche figée sur « Lecture du fil » ; `74-vf-frise-encart:66` : encart redessiné à chaque `pointermove`.

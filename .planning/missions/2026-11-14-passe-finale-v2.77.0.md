@@ -25,8 +25,7 @@ L2/L3/L5 ; B2 : fusion de `f68185ee`, L4, fichiers écartés, régie. Relecteurs
 | magasin : abonnements, patch, rejeu, reconnexion | 5, 5, 5, 5 | 4, 1, 4, 4 | 1, 4, 1, 1 |
 | régie : questions, modèle, rendu/pied | 5, 5, 5 | 5, 2, 3 | 0, 3, 2 |
 | observateurs `02-*` | 7 | 3 | 4 trous de couverture, au BACKLOG |
-Total relevé par les lots : 112 mutants hors observateurs, 76 tués d'emblée, 1 équivalent, 35 survivants tués ensuite ; les lignes ci-dessus
-n'en détaillent que 85 (59, 1, 25) : l'écart vient de cibles comptées au total sans ligne propre, à recouper aux rapports de lot.
+Total : 85 mutants, 59 tués d'emblée, 1 équivalent, 25 survivants, tous tués ensuite par un cas ajouté. À part : 7 mutants des observateurs `02-*`, 3 tués, 4 trous de couverture versés au BACKLOG.
 
 ## Notes SOBR-04 (pour les notes de release)
 - Commande : `git diff v2.76.0..<sha final> -- plugin/` (hors `plugin/cockpit/scripts/tests/**`) ; relecteurs : agents frais non auteurs, un par lot, revue des corrections par `vf-reviewer`, vérification par un nœud distinct.
