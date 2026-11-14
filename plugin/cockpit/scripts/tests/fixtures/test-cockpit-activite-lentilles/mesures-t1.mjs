@@ -20,6 +20,10 @@ export const mesuresT1 = {
         avant: r.previousElementSibling && r.previousElementSibling.id, apres: r.nextElementSibling && r.nextElementSibling.id, visible: getComputedStyle(b).display !== 'none',
         rond: b.querySelector('.vfa-i') ? +b.querySelector('.vfa-i').getAttribute('r') : null }; })())`));
     o.ariaInactif = await s.ev("document.getElementById('btn-lentilles').getAttribute('aria-label')");
+    o.entete = await s.ev("(() => { const h = document.querySelector('header'); return [h.scrollWidth, h.clientWidth, document.getElementById('btn-lentilles').getBoundingClientRect().width]; })()");
+    await c.vue(1024, 768); await c.pause(500);
+    o.entete1024 = await s.ev("(() => { const h = document.querySelector('header'), b = document.getElementById('btn-panel').getBoundingClientRect(); return [h.scrollWidth, h.clientWidth, Math.round(b.right), innerWidth]; })()");
+    await c.vue(1440, 900); await c.pause(300);
     // L1, à 900 px : le bouton quitte l'en-tête, l'entrée du « ⋯ » prend sa place (entre Santé et la suite)
     await c.vue(900, 700); await c.pause(400);
     await s.ev("document.getElementById('vf-plus').click()"); await c.pause(250);

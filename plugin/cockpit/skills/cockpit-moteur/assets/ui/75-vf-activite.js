@@ -14,7 +14,10 @@
   // le signe de l'état actif, distinct du survol
   const LENTILLE = '<circle cx="12" cy="12" r="8"/><path d="M8.5 10a4 4 0 0 1 3-2.5"/>'
     + '<circle class="vfa-i" cx="12" cy="12" r="0" fill="currentColor" stroke="none"/>';
-  const CSS = '#btn-lentilles.vfa-actif { background: rgba(var(--ink), .07); }'; // l'état actif : le libellé `.bl` le dit, ce fond neutre est celui du survol
+  // l'état actif : le libellé `.bl` le dit, ce fond neutre est celui du survol ; bouton carré (budget de l'en-tête à 1 024 px) dont la pastille se pose en coin
+  const CSS = `#btn-lentilles.vfa-actif { background: rgba(var(--ink), .07); }
+    #btn-lentilles { position: relative; }
+    #btn-lentilles .badge { position: absolute; top: var(--sp-4); right: var(--sp-2); }`;
   const parties = new Map(); // nom -> { fabrique, inst }
   let session = null; // la session de l'onglet Code, ou null
 
@@ -52,6 +55,7 @@
     racine.className = 'rel'; racine.id = 'vfa-rel';
     const bouton = M.addHeaderButton({ id: 'btn-lentilles', label: T.F.bouton('Aucune'), svg: LENTILLE, title: T.TEXTES.infobulle,
       onClick: () => { const p = parties.get('menu'); if (p && p.inst) p.inst.basculer(); } });
+    bouton.classList.add('icon'); // carré : l'étiquette `.bl` reste (le « ⋯ » la lit), l'en-tête garde son budget
     bouton.setAttribute('aria-haspopup', 'menu'); bouton.setAttribute('aria-expanded', 'false');
     racine.appendChild(bouton);
     const sante = document.getElementById('btn-health'); // le créneau : juste après Santé, avant « Par où commencer »
