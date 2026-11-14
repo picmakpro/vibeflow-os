@@ -766,3 +766,6 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - **Nom du lab voisin :** pas d'assainissement côté page des caractères de contrôle (assuré par le serveur).
 
 **Déclencheur de reprise :** la prochaine passe sur la page de la régie.
+- **Revue du point de fusion 2 de la Phase 73 (mineurs) :** `ouvrirRepli` émet `vf-agent:lu` même quand la lecture du transcript échoue, et deux clics rapprochés laissent le transcript le plus lent écraser le panneau ; `relireMissions` lance une lecture par événement `graphe` sans sérialisation (deux réponses croisées peuvent poser des missions plus anciennes).
+- **Durée d'un agent terminé (constat de la Phase 74) :** la régie calcule `dureeS` en tenue et compte les veilles de l'agent ; la spec ne tranche pas entre durée active et durée de tenue : à décider au prochain réglage de la régie.
+- **Juge design de fin de Phase 73 (74/100, passed ; mineurs) :** ligne 2 « nœud · arbre · branche » rendue sous Quoi au lieu de Qui, rôle sous la tâche au lieu d'avant ; colonne Quoi qui dérive de 361 à 376 px (grille par ligne) ; ligne de verrou plus bavarde que la spec § 6.1 ; ligne de phase `human_needed` avec le lien en double ; format de la ligne « ailleurs » et noms de lab en mono (§ 10) ; hors phase : à 800 px, la bascule de Projet recouvre son titre.
