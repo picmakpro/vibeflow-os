@@ -38,7 +38,7 @@
 # Usage :
 #   check-method-budget.sh [--root <dir>] [--repo <dir>]... [--strict] [--quiet]
 #                          [--owner <login>]... [--no-remote]
-#                          [--archive <types> | --auto] [--ws <nom>]...
+#                          [--archive <types> | --auto] [--ws <nom>]... [--format=tsv]
 #   --root   racine du lab (défaut .). STATE.md lus : <root>/.planning/STATE.md et celui de
 #            chaque compartiment de workstream (énumérés par vf_ws_enumerate).
 #   --repo   dépôt git dont compter les worktrees (répétable). Défaut : <root> s'il est un dépôt
@@ -101,6 +101,17 @@
 #            verrou (un Stop ne se bloque pas 10 s par fichier) : verrou tenu = refus immédiat qui nomme le pid et dit
 #            s'il est vivant ; aucune reprise automatique.
 #
+#   --format=tsv  SORTIE MACHINE, lecture seule (contrat #vf-budget@1, Phase 77, P77-D-03) : sur la sortie standard,
+#            l'en-tête `#vf-budget@1<TAB>check-method-budget`, puis UNE ligne par mesure déjà calculée par ce script, six champs
+#            séparés par une tabulation : type, chemin relatif à --root (`.` = la racine, `-` = sans objet ; jamais un chemin
+#            absolu), valeur (entier, `-` si NON-VERIFIABLE ou NON-APPLICABLE), budget EFFECTIF (variables VF_* comprises),
+#            unité, verdict. Types : state (Ko), state-prose (lignes), backlog-ouverts (sujets), backlog-entree (lignes),
+#            backlog-clos (sujets, budget 0), roadmap (Ko), memory-index (lignes), worktrees (worktrees). Verdicts : OK,
+#            DEPASSE, NON-VERIFIABLE, NON-APPLICABLE. state-prose et backlog-entree portent la valeur la plus HAUTE vue, sous
+#            le plafond comme au-delà. Aucun texte `[budget]` sur la sortie standard, aucun appel réseau (--no-remote implicite),
+#            ni passe de rangement, ni écriture. Refusé (64, sortie standard vide) avec --auto, --archive et --dry-run, et
+#            pour tout autre format. Codes de retour : ceux du mode texte. Sans cette option, rien ne change.
+#
 # JETONS de constat (CONTRAT lu par guard-fin-de-geste.sh et check-mission-exit.sh E7 ; une ligne chacun) :
 #   RANGEABLE, À VALIDER  (rangement, plan 41.3-02 ; un stash se désigne par son SHA, jamais par sa position stash@{N} : elle se décale à chaque nouveau stash) · ARCHIVABLE (sujet clos encore au BACKLOG) · ARCHIVÉ (ce que
 #   l'archivage vient de déplacer) · ARCHIVAGE REFUSÉ · ARCHIVAGE NON TENTÉ · DÉPASSÉ / PROSE DÉPASSÉE (budget ou
@@ -139,6 +150,7 @@ ARCHIVE_TYPES=""
 AUTO=0
 DRY=0
 WS_NAMED=""
+FORMAT="text"
 
 usage() { sed -n '/^# Usage :/,/^# Sortie standard/p' "$0" >&2; exit 64; }
 
@@ -159,6 +171,8 @@ $2"; shift 2 ;;
     --dry-run) DRY=1; shift ;;
     --ws) [ "$#" -ge 2 ] || usage; WS_NAMED="$WS_NAMED
 $2"; shift 2 ;;
+    --format=tsv) FORMAT=tsv; shift ;;
+    --format=*) echo "[budget] format inconnu : ${1#--format=} (attendu : tsv)" >&2; exit 64 ;;
     -h|--help) usage ;;
     *) echo "[budget] argument inconnu : $1" >&2; usage ;;
   esac
@@ -174,6 +188,9 @@ case "$ARCHIVE_DATE" in [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;; *) echo "
 if [ "$AUTO" -eq 1 ] && [ -n "$ARCHIVE_TYPES" ]; then echo "[budget] --archive et --auto s'excluent" >&2; exit 64; fi
 if [ "$DRY" -eq 1 ] && [ "$AUTO" -eq 0 ]; then echo "[budget] --dry-run exige --auto" >&2; exit 64; fi
 if [ -n "${WS_NAMED//[$'\n ']/}" ] && [ "$AUTO" -eq 0 ] && [ -z "$ARCHIVE_TYPES" ]; then echo "[budget] --ws exige --archive ou --auto" >&2; exit 64; fi
+if [ "$FORMAT" = tsv ] && { [ "$AUTO" -eq 1 ] || [ -n "$ARCHIVE_TYPES" ] || [ "$DRY" -eq 1 ]; }; then
+  echo "[budget] --format=tsv est en lecture seule : incompatible avec --auto, --archive et --dry-run" >&2; exit 64
+fi
 if [ -n "$ARCHIVE_TYPES" ]; then
   for _t in $(printf '%s' "$ARCHIVE_TYPES" | tr ',' ' '); do
     case "$_t" in backlog|state|roadmap) ;; *) echo "[budget] type d'archive inconnu : $_t (attendu : backlog, state, roadmap)" >&2; exit 64 ;; esac
@@ -195,6 +212,45 @@ OVER=0
 UNVERIFIABLE=0
 say() { [ "$QUIET" -eq 1 ] || echo "[budget] $*"; }
 flag() { echo "[budget] $*"; }
+# --- Sortie machine (--format=tsv, contrat #vf-budget@1) : lecture seule, émise là où la mesure est déjà faite -------
+_TAB=$'\t'; _NL=$'\n'
+rel() { # <chemin> : relatif à ROOT, « . » pour la racine, « - » hors de la racine ou illisible en champ (tabulation, saut de ligne, « .. »)
+  local p="$1" r
+  case "$p" in *"$_TAB"*|*"$_NL"*|*/../*|../*|*/..|..) printf -- '-'; return 0 ;; esac
+  for r in "$ROOT" "$ROOT_ABS" "$ROOT_PHYS"; do
+    [ "$p" = "$r" ] && { printf '.'; return 0; }
+    case "$p" in "$r"/*) p="${p#"$r"/}"; case "$p" in /*|'~'*|'') printf -- '-' ;; *) printf '%s' "$p" ;; esac; return 0 ;; esac
+  done
+  printf -- '-'
+}
+tsv_row() { # <type> <chemin> <valeur> <budget> <unité> <verdict> : une ligne du contrat, sur la sortie standard
+  [ "$FORMAT" = tsv ] || return 0
+  printf '%s\t%s\t%s\t%s\t%s\t%s\n' "$1" "$2" "$3" "$4" "$5" "$6"
+}
+tsv_cmp() { # <type> <chemin> <valeur> <budget> <unité> : verdict décidé par la comparaison -gt que le gate fait déjà
+  [ "$FORMAT" = tsv ] || return 0
+  if [ "$3" -gt "$4" ]; then tsv_row "$1" "$2" "$3" "$4" "$5" DEPASSE; else tsv_row "$1" "$2" "$3" "$4" "$5" OK; fi
+}
+tsv_nv() { # <étiquette de readable> <fichier> : ligne(s) NON-VERIFIABLE du ou des types mesurés dans ce fichier
+  [ "$FORMAT" = tsv ] || return 0
+  local p; p="$(rel "$2")"
+  case "$1" in
+    BACKLOG) tsv_row backlog-ouverts "$p" - "$BACKLOG_OPEN_MAX" sujets NON-VERIFIABLE
+             tsv_row backlog-clos "$p" - 0 sujets NON-VERIFIABLE
+             tsv_row backlog-entree "$p" - "$BACKLOG_ENTRY_MAX" lignes NON-VERIFIABLE ;;
+    ROADMAP) tsv_row roadmap "$p" - "$ROADMAP_KB" Ko NON-VERIFIABLE ;;
+    STATE)   tsv_row state-prose "$p" - "$STATE_NOTE_MAX" lignes NON-VERIFIABLE ;;
+    MEMORY)  tsv_row memory-index "$p" - "$MEMIDX_MAX" lignes NON-VERIFIABLE ;;
+  esac
+}
+EMAXV=0
+if [ "$FORMAT" = tsv ]; then
+  NO_REMOTE=1
+  say() { :; }
+  flag() { :; }
+  EMAXV=1
+  printf '#vf-budget@1\tcheck-method-budget\n'
+fi
 
 roadmap_phase_set() { # <phases_dir> : imprime « |1|5.2| » (numéros normalisés des dossiers de phase) ; rc 1 si non vérifiable
   # Source UNIQUE de la correspondance dossier -> numéro : check-divergence.sh --list-phase-numbers (la même que S4(a)).
@@ -223,25 +279,25 @@ AWK_BACKLOG_MEASURE="$AWK_COMMON"'
 function endb() {
   if (!inb) return
   if (cl) nc++; else no++
-  if (last > MAX) printf "L\t%d\t%d\t%s\n", start, last, title
+  if (last > mx) mx = last; if (last > MAX) printf "L\t%d\t%d\t%s\n", start, last, title
   inb = 0; last = 0
 }
 { if (isfence($0)) fence = !fence }
 !fence && /^## / { endb(); title = substr($0, 4); cl = isclosed(title); start = NR; len = 0; inb = 1 }
 inb { len++; if ($0 !~ /^[ \t]*$/) last = len }
-END { endb(); printf "C\t%d\t%d\n", no + 0, nc + 0 }
+END { endb(); printf "C\t%d\t%d\n", no + 0, nc + 0; if (EMAX) printf "M\t%d\n", mx + 0 }
 '
 AWK_STATE_PROSE='
 NR == 1 && /^---[ \t]*$/ { fm = 1; next }
 fm == 1 { if ($0 ~ /^---[ \t]*$/) fm = 2; next }
-function endrun() { if (run > MAX) printf "%d\t%d\n", start, run; run = 0 }
+function endrun() { if (run > mx) mx = run; if (run > MAX) printf "%d\t%d\n", start, run; run = 0 }
 isfence($0) { fence = !fence; endrun(); next }
 fence { next }
 {
   prose = ($0 !~ /^[ \t]*$/ && $0 !~ /^#/ && $0 !~ /^[ \t]*[-*+] / && $0 !~ /^[ \t]*[0-9]+[.)] / && $0 !~ /^[ \t]*\|/ && $0 !~ /^[ \t]*>/ && $0 !~ /^<!--/)
   if (prose) { if (run == 0) start = NR; run++ } else endrun()
 }
-END { endrun() }
+END { endrun(); if (EMAX) printf "M\t%d\n", mx + 0 }
 '
 AWK_STATE_PROSE="$AWK_COMMON$AWK_STATE_PROSE"
 # Archivage : chaque programme écrit la source allégée sur la sortie standard, le contenu déplacé dans ARCH
@@ -464,6 +520,7 @@ if [ -e "$ROOT/.planning/workstreams" ]; then
   if [ -z "$WS_POLICY" ]; then
     UNVERIFIABLE=1
     flag "STATE NON VÉRIFIABLE : workstream-policy.sh introuvable, compartiments de workstream non mesurés"
+    tsv_row state - - "$STATE_KB" Ko NON-VERIFIABLE
   else
     # shellcheck source=/dev/null
     . "$WS_POLICY"
@@ -481,6 +538,7 @@ EOF
       *)
         UNVERIFIABLE=1
         flag "STATE NON VÉRIFIABLE : .planning/workstreams illisible (vf_ws_enumerate rc $_ws_rc)"
+        tsv_row state - - "$STATE_KB" Ko NON-VERIFIABLE
         ;;
     esac
   fi
@@ -535,10 +593,12 @@ EOF6
 if [ "$AUTO" -eq 1 ] || [ -n "$ARCHIVE_TYPES" ]; then archive_pass; fi
 if [ "${#STATE_FILES[@]}" -eq 0 ]; then
   say "STATE : aucun fichier d'état sous $ROOT/.planning, budget non applicable"
+  tsv_row state - - "$STATE_KB" Ko NON-APPLICABLE
 fi
 for f in "${STATE_FILES[@]+"${STATE_FILES[@]}"}"; do
   bytes=$(wc -c < "$f" | tr -d ' ')
   kb=$(( (bytes + 1023) / 1024 ))
+  tsv_cmp state "$(rel "$f")" "$kb" "$STATE_KB" Ko
   if [ "$bytes" -gt $(( STATE_KB * 1024 )) ]; then
     OVER=1
     flag "STATE DÉPASSÉ : $f fait $kb Ko (budget $STATE_KB Ko). Réécrire la position courante, archiver l'historique sous .planning/archives/state/"
@@ -551,7 +611,7 @@ done
 readable() { # <fichier> <étiquette> : 0 lisible, 1 absent, 2 présent mais illisible (NON VÉRIFIABLE dit)
   [ -e "$1" ] || return 1
   if [ -f "$1" ] && [ -r "$1" ]; then return 0; fi
-  UNVERIFIABLE=1; flag "$2 NON VÉRIFIABLE : $1 est illisible ou n'est pas un fichier"; return 2
+  UNVERIFIABLE=1; flag "$2 NON VÉRIFIABLE : $1 est illisible ou n'est pas un fichier"; tsv_nv "$2" "$1"; return 2
 }
 PLAN_DIRS="$ROOT/.planning"
 [ -z "$WS_DIRS" ] || PLAN_DIRS="$PLAN_DIRS
@@ -560,17 +620,21 @@ while IFS= read -r d; do
   [ -n "$d" ] || continue
   f="$d/BACKLOG.md"
   if readable "$f" BACKLOG; then
-    out=$(LC_ALL=C awk -v MAX="$BACKLOG_ENTRY_MAX" "$AWK_BACKLOG_MEASURE" "$f"); rc=$?
-    if [ "$rc" -ne 0 ]; then UNVERIFIABLE=1; flag "BACKLOG NON VÉRIFIABLE : $f lecture en échec (awk rc $rc)"; else
-      nopen=0; nclosed=0
+    out=$(LC_ALL=C awk -v MAX="$BACKLOG_ENTRY_MAX" -v EMAX="$EMAXV" "$AWK_BACKLOG_MEASURE" "$f"); rc=$?
+    if [ "$rc" -ne 0 ]; then UNVERIFIABLE=1; flag "BACKLOG NON VÉRIFIABLE : $f lecture en échec (awk rc $rc)"; tsv_nv BACKLOG "$f"; else
+      nopen=0; nclosed=0; bmax=0
       while IFS=$'\t' read -r kind a b c; do
         case "$kind" in
           C) nopen="$a"; nclosed="$b" ;;
+          M) bmax="$a" ;;
           L) OVER=1; flag "PROSE DÉPASSÉE : ${f}:${a} (entrée « ${c} » de ${b} lignes, plafond ${BACKLOG_ENTRY_MAX})" ;;
         esac
       done <<EOF7
 $out
 EOF7
+      tsv_cmp backlog-ouverts "$(rel "$f")" "$nopen" "$BACKLOG_OPEN_MAX" sujets
+      tsv_cmp backlog-clos "$(rel "$f")" "$nclosed" 0 sujets
+      tsv_cmp backlog-entree "$(rel "$f")" "$bmax" "$BACKLOG_ENTRY_MAX" lignes
       if [ "$nopen" -gt "$BACKLOG_OPEN_MAX" ]; then
         OVER=1; flag "BACKLOG DÉPASSÉ : $f compte $nopen sujets ouverts (budget $BACKLOG_OPEN_MAX) — trier, clore ou traiter"
       else
@@ -584,6 +648,7 @@ EOF7
   f="$d/ROADMAP.md"
   if readable "$f" ROADMAP; then
     bytes=$(wc -c < "$f" | tr -d ' '); kb=$(( (bytes + 1023) / 1024 ))
+    tsv_cmp roadmap "$(rel "$f")" "$kb" "$ROADMAP_KB" Ko
     if [ "$bytes" -gt $(( ROADMAP_KB * 1024 )) ]; then
       OVER=1; flag "ROADMAP DÉPASSÉ : $f fait $kb Ko (budget $ROADMAP_KB Ko) — replier les jalons livrés (<details>) puis --archive roadmap"
     else
@@ -595,20 +660,24 @@ $PLAN_DIRS
 EOF8
 for f in "${STATE_FILES[@]+"${STATE_FILES[@]}"}"; do
   readable "$f" STATE || continue
-  out=$(LC_ALL=C awk -v MAX="$STATE_NOTE_MAX" "$AWK_STATE_PROSE" "$f"); rc=$?
-  if [ "$rc" -ne 0 ]; then UNVERIFIABLE=1; flag "STATE NON VÉRIFIABLE : $f lecture en échec (awk rc $rc)"; continue; fi
+  out=$(LC_ALL=C awk -v MAX="$STATE_NOTE_MAX" -v EMAX="$EMAXV" "$AWK_STATE_PROSE" "$f"); rc=$?
+  if [ "$rc" -ne 0 ]; then UNVERIFIABLE=1; flag "STATE NON VÉRIFIABLE : $f lecture en échec (awk rc $rc)"; tsv_nv STATE "$f"; continue; fi
+  smax=0
   while IFS=$'\t' read -r a b; do
     [ -n "$a" ] || continue
+    [ "$a" = M ] && { smax="$b"; continue; }
     OVER=1; flag "PROSE DÉPASSÉE : ${f}:${a} (paragraphe de ${b} lignes, plafond ${STATE_NOTE_MAX})"
   done <<EOF9
 $out
 EOF9
+  tsv_cmp state-prose "$(rel "$f")" "$smax" "$STATE_NOTE_MAX" lignes
 done
 MEM_INDEXES=$( { find "$ROOT/.claude/agent-memory" -maxdepth 2 -name MEMORY.md 2>/dev/null; [ -f "$ROOT/.claude/memory/MEMORY.md" ] && echo "$ROOT/.claude/memory/MEMORY.md"; } | LC_ALL=C sort )
 while IFS= read -r f; do
   [ -n "$f" ] || continue
   readable "$f" MEMORY || continue
   nl=$(awk 'END { print NR }' "$f")
+  tsv_cmp memory-index "$(rel "$f")" "$nl" "$MEMIDX_MAX" lignes
   if [ "$nl" -gt "$MEMIDX_MAX" ]; then
     OVER=1; flag "MEMORY DÉPASSÉ : $f fait $nl lignes (budget $MEMIDX_MAX : au-delà l'index n'est plus chargé en entier)"
   else
@@ -934,15 +1003,16 @@ for repo in "${REPOS[@]+"${REPOS[@]}"}"; do
 $porcelain
 EOF
   flush
+  tsv_cmp worktrees "$(rel "$repo")" "$active" "$WT_MAX" worktrees
   if [ "$active" -gt "$WT_MAX" ]; then
     OVER=1
     flag "worktrees DÉPASSÉ : $repo en a $active actifs (budget $WT_MAX)"
   else
     say "worktrees ok : $repo en a $active actifs (budget $WT_MAX)"
   fi
-  [ -n "$details" ] && printf '%s\n' "${details#?}"
+  [ -n "$details" ] && [ "$FORMAT" != tsv ] && printf '%s\n' "${details#?}"
   wt_branches=$(printf '%s\n' "$porcelain" | sed -n 's|^branch refs/heads/||p')
-  rangement "$repo" "$base" "$wt_branches"
+  [ "$FORMAT" = tsv ] || rangement "$repo" "$base" "$wt_branches"
 done
 
 if [ -n "$ARCHIVE_TYPES" ] && [ "$ARCHIVE_REFUSED" -eq 1 ]; then

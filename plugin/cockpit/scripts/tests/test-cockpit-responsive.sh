@@ -44,7 +44,9 @@ const equipe = /equipe/.test(process.argv[3] || ''); // 70-12 : l'onglet Équipe
 // à 152 px, et seulement de 1 000 à 1 279 px (dernière largeur de la clé : « 1024 », « resize:1920:1024 »). Sans drapeau, ou hors de cette plage, le minimum reste 200 px, à l'identique.
 const larg = Number((String(process.argv[2]).match(/(\d+)$/) || [])[1]), git = /git/.test(process.argv[3] || '');
 const garde = (x) => { const r = /^recherche : (\d+) px, minimum 200$/.exec(x); return !(git && larg >= 1000 && larg <= 1279 && r && Number(r[1]) >= 152); };
-const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || /#panel/.test(m.m.surfaces || '')) && (equipe || /#ask/.test(m.m.surfaces || ''));
+// Phase 73 (juge design, spec § 1 et § 16.3) : sur Équipe la feuille du moteur est masquée ; son absence est le témoin, sa présence une violation
+const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || equipe || /#panel/.test(m.m.surfaces || '')) && (equipe || /#ask/.test(m.m.surfaces || ''));
+if (plein && equipe && !bas && /#panel/.test(m.m.surfaces || '')) { console.log('panneau du moteur visible sur Équipe'); process.exit(0); }
 console.log(!plein ? 'mesure vide : ' + JSON.stringify(m.m) : m.v.filter(garde).length ? m.v.filter(garde).slice(0, 4).join(' | ') : 'aucune');
 JS
 # faux verrou de driver (HOME jetable) : un propriétaire au nom long, comme en vraie mission
@@ -570,7 +572,9 @@ for onglet in index project equipe; do
 done
 assert_eq "R13.3 — Code / 390 px, menu ouvert : une entrée par action présente (huit avec le sélecteur de lentilles et Écrans), libellé visible égal à celui du bouton d'origine, pastille reportée sur l'entrée et sur « ⋯ »" "$(mv_ "$WORK/r13-menu.json" '(()=>{const m=j.mesures["390"].m,s=m.sources,e=m.menu;if(!e)return "menu absent";const p=[];if(s.length<8)p.push("témoin : "+s.length+" actions seulement");if(!s.some((x)=>x.b))p.push("témoin : aucune pastille sur les boutons d origine");if(e.length!==s.length)p.push(e.length+" entrées pour "+s.length+" actions");s.forEach((x,i)=>{if(!e[i]||!e[i].t||e[i].t!==x.t)p.push("entrée "+i+" : ["+(e[i]&&e[i].t)+"] au lieu de ["+x.t+"]");if(e[i]&&e[i].b!==x.b)p.push("pastille de "+x.t+" : ["+(e[i]&&e[i].b)+"] au lieu de ["+x.b+"]")});if(s.some((x)=>x.b)&&!m.plusPastille)p.push("« ⋯ » sans pastille");return p.join(" ; ")||"aucune"})()')" "aucune"
 assert_eq "Q9.1 — Code / 390 px : le sélecteur de lentilles est à la place de l'ancien bouton, juste après Santé (créneau d'en-tête et entrée du « ⋯ »)" "$(mv_ "$WORK/r13-menu.json" '(()=>{const ids=j.mesures["390"].m.sources.map((x)=>x.id),i=ids.indexOf("btn-lentilles");return i>0&&ids[i-1]==="btn-health"?"ok":"ordre : "+ids.join(",")})()')" "ok"
-for onglet in index project equipe; do
+# 73-09 (P73-D-04) : la boucle du zoom en pile sort `equipe` : la page Équipe n'a plus de canevas, donc plus de zoom de canevas (P70-D-20 et UIFN-14 devenus sans objet, voir R14.7 et R17.1) ;
+# la propriété reste jugée, avec son témoin positif, sur Code et Projet
+for onglet in index project; do
   F="$WORK/r13-$onglet.json"
   assert_eq "R14.1 — $onglet / 390 px : le zoom n'est plus dans l'en-tête" "$(mv_ "$F" '(()=>{const z=j.mesures["390"].m.zoom;return z?z.entete+"|"+z.vis:"zoom absent"})()')" "false|true"
   assert_eq "R14.2 — $onglet / 390 px : pile verticale à gauche, au-dessus de la barre de question sans la recouvrir" "$(mv_ "$F" '(()=>{const m=j.mesures["390"].m,z=m.zoom;if(!z)return "zoom absent";const p=[];if(z.dir!=="column")p.push("direction "+z.dir);if(z.r[0]>=195)p.push("à droite (x="+z.r[0]+")");if(m.askRect&&z.r[1]+z.r[3]>m.askRect[1])p.push("bas du zoom "+(z.r[1]+z.r[3])+" > haut de la question "+m.askRect[1]);return p.join(" ; ")||"ok"})()')" "ok"
@@ -578,6 +582,7 @@ for onglet in index project equipe; do
     assert_eq "R14.3 — $onglet / $w px : chaque bouton de zoom a un nom accessible en français (différent de sa source anglaise)" "$(mv_ "$F" "(()=>{const z=j.mesures[\"$w\"].m.zoom;if(!z||!z.boutons.length)return 'zoom absent';return z.boutons.filter((b)=>!b.aria||/^(zoom out|fit to screen|zoom in)/i.test(b.aria)).map((b)=>b.id+' ['+b.aria+']').join(' | ')||'aucun'})()")" "aucun"
   done
 done
+assert_eq "R14.7 — equipe / 390 px : aucun contrôle de zoom visible (la page n'a plus de canevas ; témoin : la mesure a eu lieu à 390 px, R13.1 la lit aussi)" "$(mv_ "$WORK/r13-equipe.json" '(()=>{const m=j.mesures["390"].m;if(!m||!m.fenetre||m.fenetre[0]!==390)return "témoin : mesure absente";return m.zoom&&m.zoom.vis?"visible":"aucun"})()')" "aucun"
 for onglet in index project; do # sur l'onglet Équipe, la position du zoom à ≥ 701 px change en 70-12 (P70-D-20) : non jugée ici
   assert_eq "R14.4 — $onglet / 800 px : la position du zoom (x,y,largeur,hauteur) : la rangée au bord --edge, 8 au-dessus de la barre de question de 92 px (fenêtre de 800 x 600, cibles de 44 : 144 x 52) ; avant la recette du 2026-11-08 (lot C, PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px »), la pile du haut à droite [732,64,52,144]" "$(mv_ "$WORK/r13-$onglet.json" '(()=>{const z=j.mesures["800"].m.zoom;return z?z.r.join(","):"zoom absent"})()')" "16,432,144,52"
   assert_eq "R14.4b — $onglet / 800 px : le panneau de détail est fermé par défaut (PU-G-045) ; le zoom, au bord gauche depuis le lot C, ne dépend plus de lui" "$(mv_ "$WORK/r13-$onglet.json" 'j.mesures["800"].m.tiroir')" "false"
@@ -639,20 +644,29 @@ LE="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-equipe"; mklab "$LE"; 
 srv "$LE/.vibeflow/cockpit"; P_e=$SRV_PORT; PID_e=$SRV_PID
 zoom_base() { case "$1" in 768) echo "16|312|144|52" ;; 1024) echo "16|662|114|42" ;; 1440) echo "16|842|114|42" ;; esac; } # x|y|largeur|hauteur du zoom de Code et de Projet (labs de la suite, sans le terminal donc sans pastille) : 1 440 px, celui de 794c6dba ; de 701 à 1 279 px (recette du 2026-11-08, lot C ; PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») la rangée au bord --edge, 8 au-dessus de la barre de question (768 px : fenêtre de 480, barre de 92, cibles de 44 donc 144 x 52 ; 1 024 px : fenêtre de 768, barre de 40, 114 x 42)
 J_PAUSE_E='const p = (ms) => new Promise((r) => setTimeout(r, ms));'
-INJ_SESSION="(async () => { $J_PAUSE_E const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); for (let i = 0; i < 60 && !/^Session/.test(document.querySelector('#context .k')?.textContent || ''); i++) await p(50); await p(400); return true; })()"
 OPIDS=()
 mes "http://127.0.0.1:$P_e/equipe.html" 390,768,1024,1440 - > "$WORK/r17-equipe.json" & OPIDS+=($!)
-RESP_INJECT="$INJ_SESSION" mes "http://127.0.0.1:$P_e/equipe.html" 390,1024 - > "$WORK/r19-session.json" & OPIDS+=($!)
 mes "http://127.0.0.1:$P_e/project.html" 1024 - > "$WORK/r18-projet.json" & OPIDS+=($!)
 wait "${OPIDS[@]}"
 # R18 (PU-G-001, coque étroite 2026-11-06) : sous 1 280 px la racine du fil prend un libellé court et cède sa place au NOM DU DÉPÔT (masquée plutôt que rognée) ; le témoin ne dit donc plus « fil visible » mais « fil visible ou masqué par la règle » : un fil absent sans l'attribut de masquage reste un échec
 R18X='(() => { const f = document.getElementById("crumbs"), b = f && f.querySelector("button"), s = document.getElementById("search-btn"), v = (e) => e && e.getBoundingClientRect().width > 0 && getComputedStyle(e).display !== "none"; const rf = f && v(f) && v(b) ? f.getBoundingClientRect() : null, rs = s && v(s) ? s.getBoundingClientRect() : null; return { visible: !!rf, masque: !!(b && b.hasAttribute("data-vf-masque")), recherche: !!rs, recouvre: rf && rs ? Math.min(rf.right, rs.right) - Math.max(rf.left, rs.left) > 1 && Math.min(rf.bottom, rs.bottom) - Math.max(rf.top, rs.top) > 1 : false }; })()'
 for pg in equipe project; do CDP_VIEWPORT=1024x768 node "$HERE_T/chrome-cdp.mjs" "$CHROME" 800 "$R18X" "http://127.0.0.1:$P_e/$pg.html" > "$WORK/r18x-$pg.json"; done
+# 73-09 : la page Équipe est la régie : ses mesures se lisent sur section#vf-equipe (lignes, en-tête, première section, zoom éventuel) ; R19.2 les relit une fois la première ligne dépliée (clic idempotent : chrome-cdp relève jusqu'à deux relevés identiques)
+REGMES='const vis = (e) => { if (!e) return false; const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.display !== "none" && s.visibility !== "hidden" && !e.hidden; };
+  const rect = (e) => e.getBoundingClientRect(); const aire = (a, b) => { const x = Math.min(a.right, b.right) - Math.max(a.left, b.left), y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top); return x > 0 && y > 0 ? Math.round(x * y) : 0; };
+  const lignes = () => [...document.querySelectorAll("section#vf-equipe li.vf-rg-lig")].filter(vis);
+  const mesure = () => { const e = document.querySelector("#vf-equipe-entete"), s1 = [...document.querySelectorAll("section#vf-equipe section[data-vf-section]")].find(vis), z = document.querySelector("#zoom");
+    return { lignes: lignes().length, entete: vis(e), section: !!s1, aire: vis(e) && s1 ? aire(rect(e), rect(s1)) : null, zoom: vis(z), zoomLignes: vis(z) ? lignes().filter((l) => aire(rect(z), rect(l)) > 0).length : 0 }; };'
+REGX='(async () => { const p = (ms) => new Promise((r) => setTimeout(r, ms)); '"$REGMES"' for (let i = 0; i < 100 && lignes().length < 1; i++) await p(100); await p(300); return mesure(); })()'
+REGX_OUVERT='(async () => { const p = (ms) => new Promise((r) => setTimeout(r, ms)); '"$REGMES"' for (let i = 0; i < 100 && lignes().length < 1; i++) await p(100); const b = document.querySelector("section#vf-equipe li.vf-rg-lig button[aria-expanded]"); if (b && b.getAttribute("aria-expanded") === "false") b.click(); await p(400); return { ouverte: !!b && b.getAttribute("aria-expanded") === "true", apres: mesure() }; })()'
+regie_haut() { case "$1" in 390) echo 844 ;; 768) echo 480 ;; 1024) echo 768 ;; 1440) echo 900 ;; esac; } # hauteurs de chrome-responsive.mjs (HAUT)
+for w in 390 768 1024 1440; do CDP_VIEWPORT="${w}x$(regie_haut "$w")" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 300 "$REGX" "http://127.0.0.1:$P_e/equipe.html" > "$WORK/r17-regie-$w.json" 2> "$WORK/r17-regie-$w.err"; done
+for w in 390 1024; do CDP_VIEWPORT="${w}x$(regie_haut "$w")" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 300 "$REGX_OUVERT" "http://127.0.0.1:$P_e/equipe.html" > "$WORK/r19-regie-$w.json" 2> "$WORK/r19-regie-$w.err"; done
 SRV_PID=$PID_e; unsrv
-assert_eq "R17.0 — témoin : la fixture de l'onglet Équipe montre au moins une carte à 1 024 px" "$(mv_ "$WORK/r17-equipe.json" 'j.mesures["1024"].m.nCartes>=1')" "true"
+assert_eq "R17.0 — témoin : la fixture de l'onglet Équipe montre au moins une ligne de régie à 1 024 px (73-09 : plus de carte de canevas)" "$(mv_ "$WORK/r17-regie-1024.json" 'j.resultats[0].valeur.lignes>=1')" "true"
 for w in 768 1024 1440; do
-  assert_eq "R17.1 — Équipe / $w px : le zoom est la rangée en bas à gauche (x, écart au bas de la fenêtre, direction)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;const z=m.zoom;if(!z)return 'zoom absent';return z.r[0]+'|'+(m.fenetre[1]-(z.r[1]+z.r[3]))+'|'+z.dir})()")" "16|16|row"
-  assert_eq "R17.1b — Équipe / $w px : le zoom ne recouvre aucune carte" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1?String(m.zoomCartes):'témoin : aucune carte'})()")" "0"
+  assert_eq "R17.1 — Équipe / $w px : aucun zoom de canevas visible (témoin négatif : P70-D-20 est devenue sans objet, la page n'a plus de canevas ; la rangée en bas à gauche reste jugée, positive, sur Code et Projet par R17.2 ; témoin : au moins une ligne de régie est mesurée)" "$(mv_ "$WORK/r17-regie-$w.json" '(()=>{const v=j.resultats[0].valeur;return v.lignes>=1?String(v.zoom):"témoin : aucune ligne"})()')" "false"
+  assert_eq "R17.1b — Équipe / $w px : le zoom ne recouvre aucune ligne de régie (aucun zoom visible, donc aucune ligne recouverte)" "$(mv_ "$WORK/r17-regie-$w.json" '(()=>{const v=j.resultats[0].valeur;return v.lignes>=1?String(v.zoomLignes):"témoin : aucune ligne"})()')" "0"
   for onglet in index project; do
     assert_eq "R17.2 — $onglet / $w px : la position du zoom (x,y,largeur,hauteur) : celle de 794c6dba à 1 440 px ; de 768 à 1 024 px, la rangée au bord --edge posée 8 au-dessus de la barre de question, plus la pile du haut à droite (PU-G-021, lot C de la recette du 2026-11-08)" "$(mv_ "$WORK/r13-$onglet.json" "(()=>{const z=j.mesures[\"$w\"].m.zoom;return z?z.r.join('|'):'zoom absent'})()")" "$(zoom_base "$w")"
   done
@@ -661,10 +675,10 @@ for spec in "Équipe:equipe" "Projet:project"; do
   assert_eq "R18 — ${spec%%:*} / 1 024 px, lab au nom long : le fil d'Ariane ne recouvre pas la recherche (témoin : la recherche est visible, le fil est visible ou masqué par la règle de la racine)" "$(mv_ "$WORK/r18x-${spec#*:}.json" '(()=>{const v=j.resultats[0].valeur;if(!v.recherche)return "témoin : recherche absente";if(!v.visible&&!v.masque)return "témoin : fil absent sans masquage";return v.recouvre?"recouvrement":"aucun"})()')" "aucun"
 done
 for w in 390 768 1024 1440; do
-  assert_eq "R19.1 — Équipe / $w px, premier affichage : le titre ne recouvre pas la première carte (aire en px²)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1&&m.titreRect?String(m.titreCarte):'témoin : titre ou carte absents'})()")" "0"
+  assert_eq "R19.1 — Équipe / $w px, premier affichage : l'en-tête de la régie (#vf-equipe-entete) ne recouvre pas la première section (aire en px²)" "$(mv_ "$WORK/r17-regie-$w.json" '(()=>{const v=j.resultats[0].valeur;return v.lignes>=1&&v.entete&&v.section?String(v.aire):"témoin : en-tête ou section absents"})()')" "0"
 done
 for w in 390 1024; do
-  assert_eq "R19.2 — Équipe / $w px, session ouverte : le titre ne recouvre pas la première carte (aire en px²)" "$(mv_ "$WORK/r19-session.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1&&m.titreRect?String(m.titreCarte):'témoin : titre ou carte absents'})()")" "0"
+  assert_eq "R19.2 — Équipe / $w px, première ligne dépliée : l'en-tête de la régie ne recouvre pas la première section (aire en px²)" "$(mv_ "$WORK/r19-regie-$w.json" '(()=>{const v=j.resultats[0].valeur;return v.ouverte&&v.apres.entete&&v.apres.section?String(v.apres.aire):"témoin : ligne non dépliée, en-tête ou section absents"})()')" "0"
 done
 for w in 390 768 1024 1440; do
   mode=equipe-git; [ "$w" -lt 1000 ] && mode=equipe-bas # lab avec Git : le plancher de la recherche est de 152 px de 1 000 à 1 279 px (P78-D-39), comme pour Code et Projet (R1) ; le nom du dépôt entier prend la place avant (PU-G-001)

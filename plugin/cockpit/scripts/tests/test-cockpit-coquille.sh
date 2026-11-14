@@ -191,10 +191,12 @@ panne.actif = true;
 const c33 = await un('code'); const intact = await empreinte(); panne.actif = false; const suite = await un('projet');
 const j0 = await s.ev('__s.journal.length');
 const c34 = await s.ev(`(async () => { const a = VF_COQUILLE.chargerOnglet('code'), b = VF_COQUILLE.chargerOnglet('equipe'); await Promise.all([a, b]); return { onglet: VF_COQUILLE.onglet(), j: __s.journal.slice(${j0}) }; })()`);
+// 73-08 : l'onglet Équipe n'a plus de canevas ni de lecture de graphe ; le témoin du 304 se joue sur Code, déjà lu plus haut (c31, c34)
+await s.ev(`VF_COQUILLE.chargerOnglet('code')`);
 await s.ev(`(VibeFlow.graph.nodes[0].MQ16 = 'MQ16-MUTE', 1)`); const nr = reseau.length;
-await s.ev(`VF_COQUILLE.chargerOnglet('equipe')`);
-const gr = reseau.slice(nr).filter((x) => /api\/vf\/graphe/.test(x.url)).pop() || {};
-const c35 = { inm: !!gr.inm, statut: gr.statut, neuf: await s.ev(`JSON.stringify(VibeFlow.graph).includes('MQ16-MUTE') ? 'mute' : 'neuf'`) };
+await s.ev(`VF_COQUILLE.chargerOnglet('code')`);
+const gr = reseau.slice(nr).filter((x) => /api\/vf\/graphe\?onglet=code$/.test(x.url))[0] || {}; // la lecture demandée par chargerOnglet('code') ; le moteur de Code en demande d'autres (onglet=projet) ensuite
+const c35 = {  inm: !!gr.inm, statut: gr.statut, neuf: await s.ev(`JSON.stringify(VibeFlow.graph).includes('MQ16-MUTE') ? 'mute' : 'neuf'`) };
 return { c31, c32: { rej: c32, req: [avant.n, apres.n], h: [avant.h, apres.h], onglet: [avant.onglet, apres.onglet] }, c33, intact: [intact.h === apres.h, intact.onglet === apres.onglet, intact.tab === apres.tab], suite, c34, c35, viol: s.violations.length };
 JS
 chrome avec "http://127.0.0.1:$PORT/project.html" "$AUX/c3.js" > "$WORK/c3.json"
@@ -352,7 +354,7 @@ echo "=== C6 — après des changements d'onglet, le document équivaut à un ch
 cat > "$AUX/c6froid.js" <<'JS'
 await s.attendre(`document.documentElement.dataset.vfPret === 'oui'`, 'document prêt');
 // la pastille #vf-lock naît du premier évènement du flux du direct : elle arrive APRÈS « pret », en un temps que la charge allonge ; mesurer une fois posée
-await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await s.attendre(`__s.complet()`, 'état complet de l\'onglet (régie, ou en-tête git, ou panneau de retour et synthèse)');
 const emp = await s.stable('__s.empreinte()', 'empreinte du document à froid'); // mesurer une fois posé : deux relevés consécutifs égaux, jamais une pause fixe
 return { emp, prof: await s.ev(`__s.profondeurFetch()`) };
 JS
@@ -360,7 +362,7 @@ cat > "$AUX/c6seq.js" <<'JS'
 const res = [];
 for (const nom of (JSON.parse('SUITE'))) {
   await s.ev(`VF_COQUILLE.chargerOnglet('${nom}')`);
-  await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+  await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await s.attendre(`__s.complet()`, 'état complet de l\'onglet (régie, ou en-tête git, ou panneau de retour et synthèse)');
   res.push({ nom, emp: await s.stable('__s.empreinte()', 'empreinte après ' + nom), prof: await s.ev(`__s.profondeurFetch()`) });
 }
 return res;
@@ -384,7 +386,7 @@ froids() { # <dossier de sortie des fichiers> : les trois chargements à froid d
 }
 suite_classes() { # <préfixe des froids> <suite JSON> : les classes qui diffèrent, sur un document chargé depuis /project.html
   sed "s|SUITE|$2|" "$AUX/c6seq.js" > "$AUX/c6seq-x.js"; chrome avec "http://127.0.0.1:$PORT/project.html" "$AUX/c6seq-x.js" > "$WORK/c6suite.json"
-  node "$AUX/classes.mjs" "$1-code.json" "$1-projet.json" "$1-equipe.json" "$WORK/c6suite.json" | oj 'j.classes.join(",")||"aucune"'
+  C6DETAIL=1 node "$AUX/classes.mjs" "$1-code.json" "$1-projet.json" "$1-equipe.json" "$WORK/c6suite.json" | tee -a "${C6JOURNAL:-/dev/null}" | oj 'j.classes.join(",")||"aucune"'
 }
 base_srv; froids "$WORK/froid"
 assert_eq "C6.0 — témoin : les trois chargements à froid portent des écouteurs et des identifiants (l'empreinte n'est pas vide)" "$(for o in code projet equipe; do oj '[Object.keys(j.emp.ecouteurs).length>5,j.emp.corps.ids.length>20,j.emp.tete.length>5]' < "$WORK/froid-$o.json"; done | tr '\n' ' ')" "[true,true,true] [true,true,true] [true,true,true] "
@@ -403,7 +405,8 @@ for m in "ecouteurs|ecouteurs|s|for (const \[c, t, f, o\] of j.ecouteurs) REL.ca
          "head|tete|s|for (const n of apres.tete) if (!j.avant.tete.has(n)) n.remove(); // garde:coquille-head|;|"; do
   nom="${m%%|*}"; reste="${m#*|}"; att="${reste%%|*}"; expr="${reste#*|}"
   if cockpit_module_muter "$nom" vf-coquille-portee.js "$expr"; then
-    demarrer "$LAB"; assert_eq "M-$(echo "$nom" | tr a-z A-Z) — rougit les classes « $att » (les siennes seules : la visite du premier passage, qui réveillait selon la charge les gestionnaires d'un moteur mort, est lue comme faite), aucune autre, sur code, projet, equipe depuis /project.html" "$(suite_classes "$WORK/froid" '["code","projet","equipe"]')" "$att"; cockpit_arreter; unset COCKPIT_MODULE
+    # le document porte le chemin du module (<code> du lancement, coupé après chaque « / » par un <wbr>) : la copie mutée vit sous un autre chemin que le dépôt, donc le nombre de <wbr> diffère de celui du serveur de base selon la profondeur de CHAQUE disposition (dépôt, worktree, export) ; la référence à froid est prise sur le serveur muté lui-même
+    demarrer "$LAB"; froids "$WORK/froidm"; assert_eq "M-$(echo "$nom" | tr a-z A-Z) — rougit les classes « $att » (les siennes seules : la visite du premier passage, qui réveillait selon la charge les gestionnaires d'un moteur mort, est lue comme faite), aucune autre, sur code, projet, equipe depuis /project.html" "$(suite_classes "$WORK/froidm" '["code","projet","equipe"]')" "$att"; cockpit_arreter; unset COCKPIT_MODULE
   else assert_eq "M-$(echo "$nom" | tr a-z A-Z) — mutant sans effet (ancre absente)" "sans effet" "effet"; fi
 done
 CPY="$(cockpit_module_copie)"; cp "$CPX/skills/cockpit-moteur/assets/ui/96-vf-fixture-fetch.js" "$CPY/skills/cockpit-moteur/assets/ui/"
@@ -477,7 +480,7 @@ cat > "$AUX/c8c.js" <<'JS'
 await pause(300); panne.actif = false;
 await s.ev(`document.querySelector('#vf-coquille-echec button').click()`);
 await s.attendre(`VF_COQUILLE.etat().phase === 'pret'`, 'retour à pret après Réessayer');
-await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await s.attendre(`__s.complet()`, 'état complet de l\'onglet (régie, ou en-tête git, ou panneau de retour et synthèse)');
 const empC = await s.stable('__s.empreinte()', 'empreinte après Réessayer');
 return { ...(await s.ev(MESURE)), emp: empC, prof: await s.ev('__s.profondeurFetch()') };
 JS
@@ -489,7 +492,7 @@ return await s.ev(MESURE);
 JS
 cat > "$AUX/c8e.js" <<'JS'
 // panne: non
-await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await pause(700); const avant = await s.ev(MESURE);
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await s.attendre(`__s.complet()`, 'état complet de l\'onglet (régie, ou en-tête git, ou panneau de retour et synthèse)'); await pause(700); const avant = await s.ev(MESURE);
 panne.actif = true;
 const rej = await s.ev(`VF_COQUILLE.chargerOnglet('code').then(() => 'resolu', (e) => String(e.message))`); await pause(300);
 const apres = await s.ev(MESURE); panne.actif = false;
@@ -498,7 +501,7 @@ return { avant, rej, apres, suite };
 JS
 cat > "$AUX/c8f.js" <<'JS'
 // panne: non
-await s.attendre(`document.documentElement.dataset.vfPret === 'oui'`, 'document prêt'); await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); const empF = await s.stable('__s.empreinte()', 'empreinte du chargement normal'); return { ...(await s.ev(MESURE)), emp: empF, prof: await s.ev('__s.profondeurFetch()') };
+await s.attendre(`document.documentElement.dataset.vfPret === 'oui'`, 'document prêt'); await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await s.attendre(`__s.complet()`, 'état complet de l\'onglet (régie, ou en-tête git, ou panneau de retour et synthèse)'); const empF = await s.stable('__s.empreinte()', 'empreinte du chargement normal'); return { ...(await s.ev(MESURE)), emp: empF, prof: await s.ev('__s.profondeurFetch()') };
 JS
 cat > "$AUX/c8verdict.mjs" <<'JS'
 // c8verdict.mjs <dossier> : les contrôles de C8 qui échouent (noms), un par ligne ; vide = tout vert

@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test-cockpit-mise-en-page.sh — la mise en page du canevas (ELK) dans un worker servi par le module (79-18, SOCL-22 ; C5, A4, A30, A40 ; P79-D-15).
-#   W0 témoins · W1 le fichier du worker servi (table fermée, ETag, CSP propre) · W2 la CSP de page (worker-src au préfixe) · W3 le worker a vraiment servi
+#   W0 témoins · W1 le fichier du worker servi (table fermée, ETag, CSP propre) · W2 la CSP de page (worker-src à l'URL exacte du fil) · W3 le worker a vraiment servi
 #   W4 le fil principal reste libre (pouls, tâche longue, clic) · W5 le worker rend ce que rend le calcul en ligne (propriété à graine) · W6 l'API du moteur (A4)
 #   W7 repli et export · W8 cycle de vie (propriété à graine) · W9 messages bornés · X mutants (copies du module : une garde, une raison)
 # Un Chrome par mesure (mise-en-page-chrome.mjs), sonde posée avant tout script de la page. Sans navigateur : saut déclaré (rouge en CI), jamais un vert à vide.
@@ -80,18 +80,23 @@ assert_eq "W1.4 — une autre casse, une barre finale, un octet nul, un retour d
 assert_eq "W1.5 — les octets servis sont ceux du fichier du module" "$(cmp -s "$WORK/fil.out" "$ENG/assets/elk-fil.js" && echo egaux || echo differents)" "egaux"
 rq POST /_vf/elk-fil.js "$WORK/x.out"; P1="$RQ_CODE"; rq GET /_vf/elk-fil.js "$WORK/x.out" --entete sec-fetch-site:cross-site
 assert_eq "W1.6 — POST : 405 ; Sec-Fetch-Site: cross-site : 403" "$P1|$RQ_CODE" "405|403"
+verif_304() { # le serveur lancé : une requête conditionnelle à l'ETag du fil rend 304 ET la CSP propre du fil (la politique accompagne aussi la réponse « inchangé »)
+  local et h; rq GET /_vf/elk-fil.js "$WORK/x.out"; et="$(hv etag)"
+  for h in "127.0.0.1:$PORT" "localhost:$PORT"; do rq GET /_vf/elk-fil.js "$WORK/x.out" --host "$h" --entete "if-none-match:$et"; printf '%s|%s ' "$RQ_CODE" "$(hv content-security-policy)"; done
+}
+assert_eq "W1.7 — requête conditionnelle à l'ETag (If-None-Match) : 304 avec la CSP propre du fil, pour les deux noms d'hôte (AU18-03 : la politique ne se perd pas sur « inchangé »)" "$(verif_304)" "304|default-src 'none'; script-src http://127.0.0.1:$PORT/_vf/vendor/elk.bundled.js 304|default-src 'none'; script-src http://localhost:$PORT/_vf/vendor/elk.bundled.js "
 
-echo "=== W2 — la CSP de page : une seule directive de plus, worker-src au préfixe du module ==="
+echo "=== W2 — la CSP de page : une seule directive de plus, worker-src à l'URL exacte du fil ==="
 W2A=""; W2B=""; W2C=""
 for H in "127.0.0.1:$PORT" "localhost:$PORT"; do
   for U in / /index.html /project.html /equipe.html; do
     rq GET "$U" "$WORK/doc.html" --host "$H"; CSP="$(hv content-security-policy)"
-    W2A="$W2A$(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep -c '^worker-src ') $(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep '^worker-src ' | sed "s|^worker-src http://$H/_vf/\$|exact|") "
+    W2A="$W2A$(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep -c '^worker-src ') $(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep '^worker-src ' | sed "s|^worker-src http://$H/_vf/elk-fil.js\$|exact|") "
     W2B="$W2B$([ "$CSP" = "$(node "$TA" csp-v275 "$WORK/doc.html" "http://$H/_vf/")" ] && echo egale || echo differente) "
     node "$OR" csp "$WORK/doc.html" "$CSP" "http://$H/_vf/" > "$WORK/csp.json"; W2C="$W2C$(oj '[j.egales,JSON.stringify(j.autres)].join("|")' < "$WORK/csp.json" | sed "s|\\[\"http://$H/_vf/\"\\]|prefixe|") "
   done
 done
-assert_eq "W2.1 — quatre adresses, deux noms d'hôte (huit réponses) : une directive worker-src, égale à http://<hôte>/_vf/ (ni source d'origine, ni adresse d'objet local, ni data:)" "$W2A" "$(for i in 1 2 3 4 5 6 7 8; do printf '1 exact '; done)"
+assert_eq "W2.1 — quatre adresses, deux noms d'hôte (huit réponses) : une directive worker-src, égale à http://<hôte>/_vf/elk-fil.js, sans barre finale donc correspondance exacte (ni autre entrée de la table, ni préfixe, ni source d'origine, ni adresse d'objet local, ni data:)" "$W2A" "$(for i in 1 2 3 4 5 6 7 8; do printf '1 exact '; done)"
 assert_eq "W2.2 — oracle indépendant : la chaîne entière égale celle de la formule de terminal-aux sur les scripts en ligne du corps servi (huit réponses)" "$W2B" "$(for i in 1 2 3 4 5 6 7 8; do printf 'egale '; done)"
 assert_eq "W2.3 — script-src reste celui de 79-16 : les empreintes des scripts en ligne plus une seule source, le préfixe (huit réponses)" "$W2C" "$(for i in 1 2 3 4 5 6 7 8; do printf 'true|prefixe '; done)"
 
@@ -121,7 +126,8 @@ SEQ_ALL=""; SOMME_FUITES="$(printf '%s' "$TR" | oj 'j.worker.resume.fuites')"
 
 echo "=== W5 — le worker rend ce que rend le calcul en ligne (propriété à graine) ==="
 EQ="$(chrome equivalence)"; [ -n "${KEEP:-}" ] && printf '%s\n' "$EQ" > "$WORK/equivalence.json"
-assert_eq "W5.1 — moteur entier, trois niveaux (code, lots, équipe) : positions des cartes et sections des arêtes égales entre le mode worker et le mode en ligne ; le mode worker a bien construit un worker, le mode en ligne aucun" "$(printf '%s' "$EQ" | oj 'Object.entries(j.niveaux).map(([k, v]) => k + ":" + (v.cartes > 0 && v.egalCartes && v.egalAretes && v.construitsWorker === 1 && v.construitsLigne === 0)).join(" ")')" "code:true lots:true equipe:true"
+assert_eq "W5.1 — moteur entier, deux niveaux de mise en page (code, lots) : positions des cartes et sections des arêtes égales entre le mode worker et le mode en ligne ; le mode worker a bien construit un worker, le mode en ligne aucun" "$(printf '%s' "$EQ" | oj 'Object.entries(j.niveaux).filter(([k]) => k !== "equipe").map(([k, v]) => k + ":" + (v.cartes > 0 && v.egalCartes && v.egalAretes && v.construitsWorker === 1 && v.construitsLigne === 0)).join(" ")')" "code:true lots:true"
+assert_eq "W5.1 (équipe, 73-08) — témoin : la page Équipe n'a plus de mise en page : zéro carte, le worker construit une fois en mode worker comme sur les autres niveaux, aucun en mode en ligne (un canevas rendu à Équipe rougit par les cartes)" "$(printf '%s' "$EQ" | oj '(() => { const v = j.niveaux.equipe; return v ? [v.cartes, v.construitsWorker, v.construitsLigne] : "absent"; })()')" "[0,1,0]"
 for G in $GRAINES; do
   prop graphes "$CHROME" "http://127.0.0.1:$PORT" "$G"
   echo "  $PG"
@@ -160,6 +166,34 @@ echo "=== W9 — le protocole est borné : { id, graphe } dans un sens, { id, re
 assert_eq "W9.1 — clés des requêtes dans {id, graphe}, des réponses dans {id, resultat, erreur}, aucune des cinq clés interdites à aucune profondeur ; témoin : des messages ont bien été balayés" "$(printf '%s %s' "$SEQ_ALL" "$(printf '%s' "$TR" | oj 'JSON.stringify([j.worker.resume.reqTop, j.worker.resume.repTop, j.worker.resume.interdites, j.worker.resume.req])')" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const L=s.trim().split(/ (?=\[)/).map((x)=>JSON.parse(x));console.log(L.length>=5&&L.every(([q,r,i,n])=>n>0&&i===0&&q.every((k)=>["id","graphe"].includes(k))&&r.every((k)=>["id","resultat","erreur"].includes(k))))})')" "true"
 assert_eq "W9.2 — témoin positif : une requête de test qui porte une clé interdite est signalée par le balayage" "$(printf '%s' "$TR" | oj 'j.worker.temoinCle.interdites >= 1')" "true"
 
+echo "=== W10 — l'empreinte du module couvre le fil et son paquet : un serveur dont l'un des deux a changé est jugé périmé (AU18-02) ==="
+emp() { node --input-type=module -e "const m=await import('file://$1/scripts/vf-cockpit-module.mjs');console.log(m.empreinteModule({dossierScripts:'$1/scripts',dossierMoteur:'$1/skills/cockpit-moteur'})||'nul')"; }
+chg() { # chg <racine d'une copie du module> <fichier sous assets/> : l'empreinte avant et après un ajout au fichier -> « change » ou « <avant>/<après> »
+  local a b; a="$(emp "$1")"; printf '\n// un octet de plus\n' >> "$1/skills/cockpit-moteur/assets/$2"; b="$(emp "$1")"
+  if [[ "$a" =~ ^[0-9a-f]{12}$ && "$b" =~ ^[0-9a-f]{12}$ ]]; then [ "$a" != "$b" ] && echo change || echo identique; else echo "$a/$b"; fi
+}
+E1="$WORK/emp1"; cockpit_module_copie "$E1" > /dev/null; E2="$WORK/emp2"; cockpit_module_copie "$E2" > /dev/null
+assert_eq "W10.1 — un octet de plus dans elk-fil.js change l'empreinte du module (deux empreintes de 12 hexadécimaux)" "$(chg "$E1" elk-fil.js)" "change"
+assert_eq "W10.2 — un octet de plus dans vendor/elk.bundled.js (le paquet que le fil importe) change l'empreinte du module" "$(chg "$E2" vendor/elk.bundled.js)" "change"
+
+echo "=== W11 — des messages hostiles posés directement au worker et au client (sous vm, avec le paquet ELK réel, sans Chrome) ==="
+HO="$TESTS/mise-en-page-hostile.mjs"
+VEC="$AUX/vec-hostile.mjs"
+cat > "$VEC" <<'JS'
+let s = ''; process.stdin.on('data', (d) => (s += d)).on('end', () => {
+  let j; try { j = JSON.parse(s); } catch { console.log('illisible'); return; }
+  if (j.erreur) { console.log('mesure indisponible : ' + j.erreur); return; }
+  if (process.argv[2] === 'fil') console.log(JSON.stringify([j.charge, j.plantages, j.ignores > 0, j.lectures > 0, j.interne.reponses.join(','), j.interne.positions, j.interne.egal, j.interne.nu13, j.cles.join(','), j.limite.texte && j.limite.borne && j.limite.sansResultat]));
+  else console.log(JSON.stringify([j.protocoles.replace(/[a-z-]+:/g, ''), j.sansManifeste, j.hostiles.plantages + '/' + j.hostiles.regle + '/' + j.hostiles.rejete, j.formes.join('|').replace(/rejete:Invalid layout reply/g, 'I'), j.erreurLongue, j.juste.join('/')]));
+});
+JS
+hf() { node "$HO" fil "$1" 2> /dev/null | node "$VEC" fil; }      # hf <dossier assets> : le vecteur du worker
+hp() { node "$HO" page "$1" 2> /dev/null | node "$VEC" page; }    # hp <viewer.html> : le vecteur du client
+FIL_OK='[0,0,false,false,"11,12",true,true,true,"id,resultat",true]'
+PAGE_OK='["1 1 0 0 0 0 0 0",0,"0/0/0","I|I|I|I|I|I|I|I|I",200,"regle:0/sans effet"]'
+assert_eq "W11.1 — le worker (paquet réel sous vm) : dix-huit messages hors protocole sans réponse ni plantage ; l'identifiant est contrôlé avant toute lecture du graphe ; des clés internes du paquet ne sont pas transmises (même résultat qu'un message propre) ; seul le protocole { id, resultat | erreur } sort ; une erreur de calcul est bornée à 200 caractères, sans résultat ; témoin : un message propre est calculé avec des positions" "$(hf "$ENG/assets")" "$FIL_OK"
+assert_eq "W11.2 — le client (fabrique d'adaptateur du gabarit sous vm, faux Worker) : un Worker seulement sous http: et https: (file:, blob:, about:, data:, ftp:, extension : aucun) et jamais sans manifeste ; des réponses hostiles ne règlent ni ne rejettent rien et ne plantent pas ; une réponse de forme fausse est rejetée avec le texte fixe ; une erreur est bornée à 200 caractères ; une réponse juste règle une fois" "$(hp "$ENG/assets/viewer.html")" "$PAGE_OK"
+
 echo "=== X — mutants : chaque garde rougit pour sa seule raison (copies du module, jamais le module du dépôt) ==="
 verif_csp() { # l'état des gardes de CSP sur le serveur lancé : W1.2 W1.3 W2.1 W2.2 W2.3 (ok|ko)
   local r="" H U CSP e1 e2; rq GET /_vf/elk-fil.js "$WORK/x.out"; [ "$(hv content-security-policy)" = "default-src 'none'; script-src http://127.0.0.1:$PORT/_vf/vendor/elk.bundled.js" ] && r="$r W1.2=ok" || r="$r W1.2=ko"
@@ -167,7 +201,7 @@ verif_csp() { # l'état des gardes de CSP sur le serveur lancé : W1.2 W1.3 W2.1
   e1=ok; e2=ok; local e3=ok
   for H in "127.0.0.1:$PORT" "localhost:$PORT"; do for U in / /index.html /project.html /equipe.html; do
     rq GET "$U" "$WORK/doc.html" --host "$H"; CSP="$(hv content-security-policy)"
-    [ "$(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep -c "^worker-src http://$H/_vf/\$")" = 1 ] || e1=ko
+    [ "$(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep -c "^worker-src http://$H/_vf/elk-fil.js\$")" = 1 ] || e1=ko
     [ "$CSP" = "$(node "$TA" csp-v275 "$WORK/doc.html" "http://$H/_vf/")" ] || e2=ko
     node "$OR" csp "$WORK/doc.html" "$CSP" "http://$H/_vf/" > "$WORK/csp.json"; [ "$(oj '[j.egales,JSON.stringify(j.autres)].join("|")' < "$WORK/csp.json")" = "true|[\"http://$H/_vf/\"]" ] || e3=ko
   done; done
@@ -178,13 +212,17 @@ mutant() { # mutant <nom> <cible : module|page> <fichier-ou-motif> <expression s
   if [ "$2" = page ]; then cockpit_module_muter_page "$1" "$4"; else cockpit_module_muter "$1" "$3" "$4"; fi; MR=$?
   [ "$MR" -eq 0 ] && { demarrer "$LAB"; MR=$RL; }
 }
-mutant X-CSP-ORIGINE module vf-cockpit-mise-en-page.mjs "s#worker-src \${prefixeScripts(hote)}#& 'self'#"
+mutant X-CSP-ORIGINE module vf-cockpit-mise-en-page.mjs "s#worker-src \${prefixeScripts(hote)}\${NOM_FIL}#& 'self'#"
 assert_eq "X-CSP-ORIGINE — la source d'origine du document ajoutée à worker-src : la copie diffère et démarre ; W2.1 et W2.2 rouges (la directive et la chaîne), le reste vert" "$MR|$(verif_csp)" "0|W1.2=ok W1.3=ok W2.1=ko W2.2=ko W2.3=ok"
-mutant X-CSP-OBJET module vf-cockpit-mise-en-page.mjs "s#worker-src \${prefixeScripts(hote)}#& blob:#"
+mutant X-CSP-OBJET module vf-cockpit-mise-en-page.mjs "s#worker-src \${prefixeScripts(hote)}\${NOM_FIL}#& blob:#"
 assert_eq "X-CSP-OBJET — une adresse d'objet local ajoutée à worker-src : W2.1 et W2.2 rouges, le reste vert" "$MR|$(verif_csp)" "0|W1.2=ok W1.3=ok W2.1=ko W2.2=ko W2.3=ok"
+mutant X-CSP-PREFIXE module vf-cockpit-mise-en-page.mjs "s#worker-src \${prefixeScripts(hote)}\${NOM_FIL}#worker-src \${prefixeScripts(hote)}#"
+assert_eq "X-CSP-PREFIXE — worker-src rouvert au préfixe entier de /_vf/ (AU18-01 : toute entrée de la table serait admise comme worker) : W2.1 et W2.2 rouges, le reste vert" "$MR|$(verif_csp)" "0|W1.2=ok W1.3=ok W2.1=ko W2.2=ko W2.3=ok"
 mutant X-CSP-FIL-LARGE module vf-cockpit-mise-en-page.mjs "s#script-src \${prefixeScripts(hote)}vendor/elk.bundled.js#script-src \${prefixeScripts(hote)} https:#"
 assert_eq "X-CSP-FIL-LARGE — la CSP du worker élargie au préfixe et au réseau : W1.2 et W1.3 rouges seuls (la CSP de page est intacte)" "$MR|$(verif_csp)" "0|W1.2=ko W1.3=ko W2.1=ok W2.2=ok W2.3=ok"
 
+mutant X-304-CSP module vf-cockpit-coquille-assets.mjs "/writeHead(304/s#, \\.\\.\\.politique(f, req)##"
+assert_eq "X-304-CSP — la réponse 304 ne porte plus la politique propre du fil : W1.7 rouge (304 avec la seule CSP de base du serveur), la CSP des réponses 200 (W1.2, W1.3) reste verte" "$MR|$(verif_304)|$(verif_csp | cut -d' ' -f1-2)" "0|304|default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none' 304|default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none' |W1.2=ok W1.3=ok"
 mutant X-FIL-404 module vf-cockpit-coquille-assets.mjs "/ENTREE_FIL\\.nom/d"
 M1="$(chrome tracer)"; M2="$(chrome repli serveur)"
 assert_eq "X-FIL-404 — l'entrée de table retirée : /_vf/elk-fil.js introuvable, le worker échoue : plus de réponse (W3.2), un avertissement (W3.3), calcul en ligne (W3.4), fil bloqué (W4.1) — tout rouge" "$MR|$(printf '%s' "$M1" | oj '[j.worker.resume.rep >= 1, j.worker.resume.avert.length === 0, j.worker.resume.enLigne === 0, j.worker.ecart < 150]')" "0|[false,false,false,false]"
@@ -205,6 +243,27 @@ assert_eq "X-INTERROMPU — la terminaison rejette les requêtes en attente : W8
 mutant X-A4-VIDE page x "s#p.ok(d.resultat)#p.ok(p.graphe)#"
 M3="$(chrome tracer)"
 assert_eq "X-A4-VIDE — l'adaptateur résout avec le graphe de la requête (sans positions) : W6.1 et W6.3 rouges" "$MR|$(printf '%s' "$M3" | oj '[(() => { const r = j.worker.rendus; return !!r && r.ids.length > 0 && r.pos.every((p) => p.slice(1).every(Number.isFinite)); })(), (() => { const r = j.worker.rendus; return !!r && !!r.derniere && JSON.stringify([...r.pos].sort()) === JSON.stringify([...r.derniere].sort()); })()]')" "0|[false,false]"
+
+vmut() { # vmut <nom> <fichier-du-module> <expression sed> <f|p> : copie du module muté (aucun serveur) ; imprime le vecteur ; « copie inchangée » si l'ancre manque
+  cockpit_module_muter "$1" "$2" "$3" > /dev/null 2>&1 || { echo "copie inchangée"; unset COCKPIT_MODULE; return; }
+  local a="$COCKPIT_MODULE/skills/cockpit-moteur/assets"; unset COCKPIT_MODULE
+  if [ "$4" = f ]; then hf "$a"; else hp "$a/viewer.html"; fi
+}
+assert_eq "X-FIL-ID — le contrôle de l'identifiant retiré du worker : le graphe d'un message d'identifiant faux est lu (lectures), W11.1 rouge seul" "$(vmut X-FIL-ID elk-fil.js 's#!Number.isInteger(m.id) || m.id < 0) return;#false) return;#' f)" '[0,0,false,true,"11,12",true,true,true,"id,resultat",true]'
+assert_eq "X-FIL-GRAPHE — le contrôle du graphe retiré du worker : des messages sans graphe valide sont calculés et répondus (erreurs), W11.1 rouge" "$(vmut X-FIL-GRAPHE elk-fil.js "s#if (!m.graphe || typeof m.graphe !== 'object' || Array.isArray(m.graphe)) return;##" f)" '[0,0,true,false,"11,12,13",true,true,false,"erreur,id,resultat",true]'
+assert_eq "X-FIL-CALCUL — les options du message passent au calcul (garde:mep-calcul élargie) : un message à clés internes change le résultat, W11.1 rouge" "$(vmut X-FIL-CALCUL elk-fil.js 's#layoutOptions: {}, options: {} } }); // garde:mep-calcul#layoutOptions: m.layoutOptions || {}, options: m.options || {} } }); // garde:mep-calcul#' f)" '[0,0,false,false,"11,12",true,false,true,"erreur,id,resultat",true]'
+assert_eq "X-FIL-REPONSE — le filtre des réponses internes du paquet retiré : l'accusé d'enregistrement (identifiant -1) sort du worker au chargement, W11.1 rouge" "$(vmut X-FIL-REPONSE elk-fil.js 's#if (!r || !Number.isInteger(r.id) || r.id < 0) return;#if (!r) return;#' f)" '[1,0,true,false,"11,12",true,true,true,"id,resultat",true]'
+assert_eq "X-PAGE-PROTOCOLE — la condition de repli /^https?:\$/ retirée : un Worker est construit sous file:, blob:, about:, data:, ftp: et extension, W11.2 rouge" "$(vmut X-PAGE-PROTOCOLE viewer.html 's#&& /^https?:$/.test(location.protocol)##' p)" '["1 1 1 1 1 1 1 1",0,"0/0/0","I|I|I|I|I|I|I|I|I",200,"regle:0/sans effet"]'
+assert_eq "X-PAGE-NUL — la garde « réponse absente » retirée du client : une réponse null ou indéfinie fait lever le gestionnaire, W11.2 rouge" "$(vmut X-PAGE-NUL viewer.html 's#const d = e.data, p = d && Number.isInteger(d.id)#const d = e.data, p = Number.isInteger(d.id)#' p)" '["1 1 0 0 0 0 0 0",0,"2/0/0","I|I|I|I|I|I|I|I|I",200,"regle:0/sans effet"]'
+assert_eq "X-PAGE-FORME — la forme du résultat (children en tableau) n'est plus vérifiée : des réponses de forme fausse règlent la requête, W11.2 rouge" "$(vmut X-PAGE-FORME viewer.html 's#else if (d.resultat && Array.isArray(d.resultat.children)) p.ok#else if (d.resultat) p.ok#' p)" '["1 1 0 0 0 0 0 0",0,"0/0/0","regle|I|regle|regle|regle|I|I|I|I",200,"regle:0/sans effet"]'
+assert_eq "X-PAGE-ERREUR — le texte d'erreur n'est plus exigé chaîne : une erreur non textuelle fait lever le gestionnaire, W11.2 rouge" "$(vmut X-PAGE-ERREUR viewer.html "s#if (typeof d.erreur === 'string') p.ko#if (d.erreur) p.ko#" p)" '["1 1 0 0 0 0 0 0",0,"0/0/0","I|I|I|I|I|I|plantage|plantage|I",200,"regle:0/sans effet"]'
+assert_eq "X-PAGE-BORNE — le texte d'erreur n'est plus borné à 200 caractères : il garde ses 500, W11.2 rouge" "$(vmut X-PAGE-BORNE viewer.html 's#d.erreur.slice(0, 200)#d.erreur#' p)" '["1 1 0 0 0 0 0 0",0,"0/0/0","I|I|I|I|I|I|I|I|I",500,"regle:0/sans effet"]'
+vemp() { # vemp <nom> <expression sed sur vf-cockpit-module.mjs> <fichier sous assets/> : « change » ou « identique » sur la copie du module muté (aucun serveur)
+  cockpit_module_muter "$1" vf-cockpit-module.mjs "$2" > /dev/null 2>&1 || { echo "copie inchangée"; unset COCKPIT_MODULE; return; }
+  local r="$COCKPIT_MODULE"; unset COCKPIT_MODULE; chg "$r" "$3"
+}
+assert_eq "X-EMP-FIL — le motif de elk-fil.js ne désigne plus le fil : un octet de plus dans le fil ne change plus l'empreinte, W10.1 rouge" "$(vemp X-EMP-FIL 's#/\^elk-fil#/^elk-fiX#' elk-fil.js)" "identique"
+assert_eq "X-EMP-PAQUET — le paquet vendor/elk.bundled.js retiré de l'empreinte : un octet de plus dans le paquet ne change plus l'empreinte, W10.2 rouge" "$(vemp X-EMP-PAQUET '/garde:empreinte-vendus/d' vendor/elk.bundled.js)" "identique"
 cockpit_arreter; unset COCKPIT_MODULE
 
 cockpit_arreter; unset COCKPIT_MODULE

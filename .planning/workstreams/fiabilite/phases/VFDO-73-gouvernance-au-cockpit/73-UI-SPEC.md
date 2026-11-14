@@ -445,3 +445,24 @@ Chaque choix initial (C-01 à C-16) a été confronté à `73-CONTEXT.md`. Forma
 
 Questions restantes (non bloquantes, côté Samuel dans le CONTEXT) : S-1 à S-4. Dépendances à revalider à la fusion de la Phase 79 : A15 (verrous
 projetés), A16 (plan publié), A20 (`sortisSilence`, `finMotif`).
+
+## 18. Questions en attente des cadrages (73-11)
+
+Source : `meta.vf.questions` (C76-Q2). Libellés (espace insécable avant chaque deux-points) :
+
+| Emplacement | Libellé exact |
+|---|---|
+| Repli des décisions appliquées | « Décisions prises pour vous, contestables (N) » (fermé, absent à N = 0, jamais compté) |
+| Entrée d'une décision | la question ; « Option appliquée : (a) <texte> » ; « Décision : P90-D-03 » ; lien de phase |
+| Repli à vérifier | « À vérifier (N) » ; entrée : identifiant, question, « <fichier relatif>, ligne <n> », défauts en mots |
+| Signalement | « Entrée mal formée : <id>, <fichier>, ligne <n> : <défauts> » ou « … <id>, emplacement non affiché : <défauts> » ; cinq au plus puis « et N autres » |
+| Bilan | « Cadrages lus : 1 tranchée · 2 à vérifier · 2 mal formées · 2 questions écrites dans un autre format, non lues · 2 entrées de forme inattendue, ignorées » |
+| Troncature | « Liste tronquée à N questions : les suivantes ne sont pas lues. » |
+| Champ absent | « Lecture des questions des cadrages pas encore livrée (Phase 76) » |
+| Lecture en cours | « Lecture des questions des cadrages… » |
+| Champ illisible | « Questions des cadrages illisibles : forme inattendue, relue à la prochaine mise à jour. » |
+| Recommandation | « recommandée » après l'option recommandée seule ; « Aucune recommandation. » si aucune |
+| Ce qu'elle bloque | « bloque : 90-02, Phase 91 » ; rien si vide |
+| Lien de phase | « Voir la phase 90 dans Projet » ; sans carte : « Phase 90, sans carte dans Projet » |
+
+Structure d'une ligne : `li[data-vf-cle="a-vous:<id>"][data-vf-question="<id>"][data-vf-etat="attend"]` : glyphe « attend », identifiant en mono, titre, question, options, recommandation, ce qu'elle bloque, lien de phase ; aucun bouton. Replis en flux : `details[data-vf-repli="decisions"|"a-verifier"]` dans le pied de « À vous » (`[data-vf-qpied]`), après la liste, avec message d'état, signalements, bilan, troncature. États de source : absente, lecture, illisible, lue.

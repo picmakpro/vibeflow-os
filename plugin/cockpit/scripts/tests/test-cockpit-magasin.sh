@@ -54,7 +54,8 @@ assert_eq "F6 — graphe : le dernier événement, deux onglets d'affilée donne
 assert_eq "F7 — structural : planning égale { seq, at }, at numérique même si la charge n'en porte pas" "$(J 'j.F7')" "9,number,at,seq"
 assert_eq "F8 — perte, reprise, retour : chaque transition notifie une fois (une répétition ne notifie pas)" "$(J 'j.F8')" "perdu,reprise,ouvert|ouvert"
 assert_eq "F9 — une charge mal formée (non objet, champ absent, nombres hors bornes) est ignorée sans lever, sans notifier" "$(J 'j.F9')" "aucune,true,true"
-assert_eq "F10 — vie, patch, reload : aucune clé touchée" "$(J 'j.F10')" "true"
+assert_eq "F10 — vie, reload : aucune clé touchée" "$(J 'j.F10')" "true"
+assert_eq "F11 — patch : les abonnés de planning sont notifiés, la clé égale { seq, at } (comme structural), sans le contenu du patch" "$(J 'j.F11')" '12|{"seq":12,"at":7}'
 
 echo "=== L — les lectures d'état et de frise ==="
 R="$(VM lectures)"
@@ -80,12 +81,12 @@ assert_eq "J8 — jeton null : refus sans requête" "$(J 'j.J8')" "0:0"
 assert_eq "J9 — aucun jeton dans une valeur du magasin ni dans le journal" "$(J 'j.J9')" "true"
 
 echo "=== forme du fichier du magasin (R1, R9) ==="
-G() { rtk proxy grep -c "$@" "$STORE" 2>/dev/null; }
+G() { grep -c "$@" "$STORE" 2>/dev/null; }
 assert_eq "S1 — moins de 300 lignes, aucune ligne de plus de 160 colonnes" "$(awk 'END{print NR}' "$STORE" 2>/dev/null | awk '{print ($1 < 300 && $1 > 0)}')|$(awk 'length > 160' "$STORE" 2>/dev/null | awk 'END{print NR}')" "1|0"
-assert_eq "S2 — persistant : le marqueur est dans les huit premières lignes" "$(head -n 8 "$STORE" 2>/dev/null | rtk proxy grep -c 'vf-coquille: persistant')" "1"
+assert_eq "S2 — persistant : le marqueur est dans les huit premières lignes" "$(head -n 8 "$STORE" 2>/dev/null | grep -c 'vf-coquille: persistant')" "1"
 assert_eq "S3 — aucune clé ni mot de la liste interdite (doing, mandat, messages, outils, fil), commentaires compris" "$(G -w -E 'doing|mandat|messages|outils|fil')" "0"
 assert_eq "S4 — ni écouteur, ni minuterie, ni observateur, ni flux, ni eval, ni Function, ni blob, ni insertion de script, ni nom du moteur" "$(G -E 'addEventListener|setInterval|setTimeout|MutationObserver|EventSource|eval|new Function|blob:|importScripts|createElement|document[.]write|Floorplan|FLOORPLAN')" "0"
-assert_eq "S5 — la ligne AJOUT de VENDORED.txt" "$(rtk proxy grep -c '^AJOUT assets/ui/70-vf-etat.js$' "$ENG/VENDORED.txt")" "1"
+assert_eq "S5 — la ligne AJOUT de VENDORED.txt" "$(grep -c '^AJOUT assets/ui/70-vf-etat.js$' "$ENG/VENDORED.txt")" "1"
 
 if [ -z "$CHROME" ]; then
   . "$(dirname "$0")/chrome-saut.sh"; vf_chrome_saut "  ⊘ SECTIONS K ET C SAUTÉES : aucun navigateur — le magasin dans Chrome n'est PAS vérifié, non compté comme réussi"
@@ -137,31 +138,31 @@ FX="$WORK/cliquet"; mkdir -p "$FX/ui"; printf 'const a = 1;\n' > "$FX/ui/a.js"; 
 printf '# entête\nb.js 1\n' > "$FX/base.txt"
 assert_eq "O1.3 — témoin : fixture conforme (un observateur dans b.js, baseline b.js 1) : code 0" "$(cq juger "$FX/ui" "$FX/base.txt" | tail -1)" "rc=0"
 printf 'new MutationObserver(() => {});\n' > "$FX/ui/a.js"
-assert_eq "O2.1 — un observateur ajouté dans un fichier à baseline 0 : HAUSSE nommant le fichier, code 1" "$(cq juger "$FX/ui" "$FX/base.txt" | rtk proxy grep -E 'HAUSSE a.js réel=1 baseline=0|rc=1' | tr '\n' ' ')" "HAUSSE a.js réel=1 baseline=0 rc=1 "
-assert_eq "O2.1b — un observateur de plus dans un fichier à baseline 1 : HAUSSE" "$(printf 'new MutationObserver(() => {});\n' >> "$FX/ui/b.js"; printf 'b.js 1\n' > "$FX/b1.txt"; printf 'a.js 1\n' >> "$FX/b1.txt"; cq juger "$FX/ui" "$FX/b1.txt" | rtk proxy grep -c 'HAUSSE b.js réel=2 baseline=1')" "1"
+assert_eq "O2.1 — un observateur ajouté dans un fichier à baseline 0 : HAUSSE nommant le fichier, code 1" "$(cq juger "$FX/ui" "$FX/base.txt" | grep -E 'HAUSSE a.js réel=1 baseline=0|rc=1' | tr '\n' ' ')" "HAUSSE a.js réel=1 baseline=0 rc=1 "
+assert_eq "O2.1b — un observateur de plus dans un fichier à baseline 1 : HAUSSE" "$(printf 'new MutationObserver(() => {});\n' >> "$FX/ui/b.js"; printf 'b.js 1\n' > "$FX/b1.txt"; printf 'a.js 1\n' >> "$FX/b1.txt"; cq juger "$FX/ui" "$FX/b1.txt" | grep -c 'HAUSSE b.js réel=2 baseline=1')" "1"
 printf 'const a = 1;\n' > "$FX/ui/a.js"; printf 'new MutationObserver(() => {}).observe(document.body, {});\n' > "$FX/ui/b.js"
 printf 'a.js 3\nb.js 1\n' > "$FX/haute.txt"
-assert_eq "O2.2 — une baseline au-dessus du réel : PERIMEE (a.js réel=0), code 1" "$(cq juger "$FX/ui" "$FX/haute.txt" | rtk proxy grep -E 'PERIMEE a.js réel=0 baseline=3|rc=1' | tr '\n' ' ')" "PERIMEE a.js réel=0 baseline=3 rc=1 "
-assert_eq "O2.2b — abaisser réécrit la baseline au réel (b.js 1 seul) puis le verdict est conforme" "$(cq abaisser "$FX/ui" "$FX/haute.txt" | tail -1)|$(rtk proxy grep -v '^#' "$FX/haute.txt" | tr '\n' ' ')|$(cq juger "$FX/ui" "$FX/haute.txt" | tail -1)" "rc=0|b.js 1 |rc=0"
+assert_eq "O2.2 — une baseline au-dessus du réel : PERIMEE (a.js réel=0), code 1" "$(cq juger "$FX/ui" "$FX/haute.txt" | grep -E 'PERIMEE a.js réel=0 baseline=3|rc=1' | tr '\n' ' ')" "PERIMEE a.js réel=0 baseline=3 rc=1 "
+assert_eq "O2.2b — abaisser réécrit la baseline au réel (b.js 1 seul) puis le verdict est conforme" "$(cq abaisser "$FX/ui" "$FX/haute.txt" | tail -1)|$(grep -v '^#' "$FX/haute.txt" | tr '\n' ' ')|$(cq juger "$FX/ui" "$FX/haute.txt" | tail -1)" "rc=0|b.js 1 |rc=0"
 printf 'new MutationObserver(() => {});\nnew MutationObserver(() => {});\n' > "$FX/ui/c.js"; cp "$FX/haute.txt" "$FX/intacte.txt"
 assert_eq "O2.3 — abaisser quand le réel monte (c.js à 2, absent de la baseline) : code 1, baseline intacte à l'octet" "$(cq abaisser "$FX/ui" "$FX/haute.txt" | tail -1)|$(cmp -s "$FX/haute.txt" "$FX/intacte.txt" && echo intacte)" "rc=1|intacte"
 rm -f "$FX/ui/c.js"; printf 'b.js 1\nabsent.js 2\n' > "$FX/orph.txt"
-assert_eq "O2.4 — l'entrée d'un fichier absent : ORPHELINE, code 1" "$(cq juger "$FX/ui" "$FX/orph.txt" | rtk proxy grep -E 'ORPHELINE absent.js|rc=1' | tr '\n' ' ')" "ORPHELINE absent.js baseline=2 rc=1 "
+assert_eq "O2.4 — l'entrée d'un fichier absent : ORPHELINE, code 1" "$(cq juger "$FX/ui" "$FX/orph.txt" | grep -E 'ORPHELINE absent.js|rc=1' | tr '\n' ' ')" "ORPHELINE absent.js baseline=2 rc=1 "
 for forme in 'b.js un' 'b.js 0' '/etc/b.js 1' '../b.js 1' 'b.js 1 2' 'b.js'; do
   printf '%s\n' "$forme" > "$FX/forme.txt"
-  assert_eq "O2.5 — ligne mal formée « $forme » : FORME, code 1" "$(cq juger "$FX/ui" "$FX/forme.txt" | rtk proxy grep -c -E '^FORME ligne 1 |rc=1')" "2"
+  assert_eq "O2.5 — ligne mal formée « $forme » : FORME, code 1" "$(cq juger "$FX/ui" "$FX/forme.txt" | grep -c -E '^FORME ligne 1 |rc=1')" "2"
 done
 printf '// la forme new MutationObserver(cb) dans un commentaire\n' > "$FX/ui/d.js"; printf 'b.js 1\n' > "$FX/com.txt"
-assert_eq "O2.6 — un commentaire qui porte la forme compte (témoin positif de la mesure)" "$(cq juger "$FX/ui" "$FX/com.txt" | rtk proxy grep -c 'HAUSSE d.js réel=1 baseline=0')" "1"
+assert_eq "O2.6 — un commentaire qui porte la forme compte (témoin positif de la mesure)" "$(cq juger "$FX/ui" "$FX/com.txt" | grep -c 'HAUSSE d.js réel=1 baseline=0')" "1"
 rm -f "$FX/ui/d.js"
 assert_eq "O2.7 — dossier illisible, baseline illisible, usage : code 2, jamais 0 (fermé par défaut)" "$(cq juger "$FX/nulle-part" "$FX/base.txt" | tail -1)|$(cq juger "$FX/ui" "$FX/nulle-part.txt" | tail -1)|$(cq juger | tail -1)" "rc=2|rc=2|rc=2"
 
 echo "=== R — les observateurs de réparation retirés, un événement existant à la place de chacun ==="
 A70="$UI/70-vf-live.js"; A72="$UI/72-vf-equipe.js"; A76="$UI/76-vf-git-entete.js"
-n() { rtk proxy grep -c -F "$1" "$2"; }
+n() { grep -c -F "$1" "$2"; }
 assert_eq "R1.1 — 70 sans observateur de mutations (le panneau est reposé par l'événement panel)" "$(n 'new MutationObserver' "$A70")" "0"
 assert_eq "R1.2 — 70 porte l'événement panel (ancre imposée : focus rendu, puis réponses « dernière commande » reposées)" "$(n "SC.on('panel', () => { rendreFocus(); " "$A70")|$(n "for (const b of document.querySelectorAll('#panel [data-vf-doing]')) poser(b);" "$A70")" "1|1"
-assert_eq "R1.3 — 72 ne garde qu'un observateur (le garde de cadrage) et porte l'événement panel" "$(n 'new MutationObserver' "$A72")|$(n "SC.on('panel', remettre);" "$A72")" "1|1"
+assert_eq "R1.3 — 72 (réduit en 73-08, sans canevas) ne garde ni observateur de mutations ni abonnement à l'événement panel" "$(n 'new MutationObserver' "$A72")|$(n "SC.on(" "$A72")" "0|0"
 assert_eq "R1.4 — 76 sans observateur et deux écouteurs de vf-git:etat (l'arrêt de tabulation du titre suit l'ouverture du tiroir Git)" "$(n 'new MutationObserver' "$A76")|$(n "addEventListener('vf-git:etat'" "$A76")" "0|2"
 assert_eq "R1.5 — le magasin n'est pas touché par les retraits : aucun observateur, aucun écouteur de document dans 70-vf-etat.js" "$(n 'MutationObserver' "$STORE")|$(n 'addEventListener' "$STORE")" "0|0"
 assert_eq "R1.6 — les fichiers que ce plan ne touche pas gardent leur observateur sans événement source (73, 77 tiroir Git)" "$(n 'new MutationObserver' "$UI/73-vf-tiroir-travail.js")|$(n 'new MutationObserver' "$UI/77-vf-git-tiroir.js")" "1|1"
