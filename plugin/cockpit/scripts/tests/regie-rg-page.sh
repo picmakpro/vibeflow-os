@@ -111,6 +111,29 @@ rg_RG9_page() {
 
 # RG9.22 : un rendu qui suit un événement du magasin (who, lock, connexion) ou la minuterie ne touche ni la sélection du moteur ni le focus : aucun appel au moteur
 # (rerender, showPanel, closePanel…), la sélection posée avant reste posée. Sans horloge : l'événement est rejoué puis le rendu attendu par un cycle de promesses.
+# RG9.30 à RG9.33 (passe finale, L4a-01 et L4a-03) : VF_ETAT garde le who d'un onglet à l'autre et jette son `at` ; l'âge affiché compte depuis la RÉCEPTION de ce who,
+# jamais depuis le montage de la régie. Le who est reçu à T0 ; la régie est démontée puis remontée 600 s plus tard (onglet Code, puis Équipe).
+rg_RG9_remontage() {
+  local o c ligne='li[data-vf-agent=\"a1\"]' remonte='{"avancer":600000},{"onglet":"code"},{"onglet":"equipe"}'
+  local s1='{"kind":"session","id":"s1","etat":"actif","titre":"Atelier","tree":".","ageS":5,"dureeS":40}'
+  local lent='{"workers":['"$s1"',{"kind":"subagent","id":"a1","parent":"s1","etat":"actif","tree":".","ageS":30,"dureeS":30,"task":"worker lent"}],"fenetreStallS":300}'
+  c='"source":"etat","coquille":{"onglet0":"equipe"},"who":'
+  o="$(pg_sc "$c$lent" '[{"nom":"a","obs":{"mode":"textes","sel":"'"$ligne"' .vf-rg-dur"}},'"$remonte"',{"nom":"b","obs":{"mode":"textes","sel":"'"$ligne"' .vf-rg-dur"}},{"nom":"t","obs":{"mode":"textes","sel":"'"$ligne"'"}}]')"
+  pg_ok "RG9.30 — remontage à +600 s : l'âge affiché vaut 30 + 600 s (11 min), pas 30 s depuis le montage ; l'avant-remontage dit 30 s" "$o" \
+    '(j.out.a.join() + "|" + j.out.b.join()).replace(/\u00a0/g, " ")' "depuis 30 s|écrit il y a 11 min"
+  pg_ok "RG9.31 — remontage à +600 s : la ligne dit « suspect » (la régie montre le blocage au lieu de le cacher), jamais « au travail »" "$o" \
+    '/suspect : aucun signe de vie depuis 11 min/.test(j.out.t.join().replace(/\u00a0/g, " ")) + "|" + /au travail/.test(j.out.t.join())' "true|false"
+  local pl='{"workers":[{"kind":"session","id":"s1","etat":"actif","titre":"Atelier","tree":".","ageS":1500,"dureeS":3000},{"kind":"subagent","id":"a1","parent":"s1","etat":"actif","tree":".","ageS":20,"dureeS":20,"task":"worker lent"}],"fenetreStallS":900}'
+  o="$(pg_sc "$c$pl" '[{"nom":"a","obs":{"mode":"attr","sel":"'"$ligne"'","attr":"data-vf-etat"}},'"$remonte"',{"nom":"b","obs":{"mode":"attr","sel":"'"$ligne"'","attr":"data-vf-etat"}}]')"
+  pg_ok "RG9.32 — orphelin (L4a-03) : un parent muet depuis 1 500 s à la réception passe le seuil de 1 800 s à +600 s, même après remontage (l'âge du parent compte depuis la réception)" "$o" \
+    'j.out.a.join() + "|" + j.out.b.join()' "actif|orphelin"
+  o="$(pg_sc "$c$pl" '[{"avancer":400000},{"nom":"b","obs":{"mode":"attr","sel":"'"$ligne"'","attr":"data-vf-etat"}}]')"
+  pg_ok "RG9.32 — orphelin (L4a-03), sans remontage : 400 s sans poussée, l'âge du parent (1 500 s à la réception) dépasse 1 800 s" "$o" 'j.out.b.join()' "orphelin"
+  o="$(pg_sc "$c"'{"workers":['"$s1"']}' '[{"avancer":5000},{"conn":"perdu"},{"avancer":595000},{"onglet":"code"},{"onglet":"equipe"},{"avancer":16000},{"nom":"txt","obs":{"mode":"textes","sel":".vf-rg-direct"}}]')"
+  pg_ok "RG9.33 — direct coupé déjà là au remontage : « données d'il y a » compte depuis la réception du who (616 s : 10 min), pas depuis le montage (16 s)" "$o" \
+    'j.out.txt.join().replace(/\u00a0/g, " ")' "Direct coupé : durées figées, données d'il y a 10 min"
+}
+
 rg_RG9_selection() {
   local src o ev='{"poser":{"who":'"$PG_WHO"',"lock":'"$PG_LOCK"'}}'
   for src in etat live; do

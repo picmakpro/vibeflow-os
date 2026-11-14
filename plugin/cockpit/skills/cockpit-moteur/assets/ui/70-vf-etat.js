@@ -7,7 +7,7 @@
   'use strict';
   if (window.VF_ETAT) return;
   const CLES = Object.freeze(['connexion', 'etat', 'frise', 'git', 'graphe', 'lock', 'planning', 'who']);
-  const ENTREES = new Map(CLES.map((c) => [c, { valeur: null, abonnes: [] }]));
+  const ENTREES = new Map(CLES.map((c) => [c, { valeur: null, abonnes: [], recuA: null }]));
   const SCHEMA_ETAT = 'vibeflow/cockpit-state@1', SCHEMA_FRISE = 'vibeflow/cockpit-frise@1';
   const CONNEXIONS = ['ouvert', 'perdu', 'reprise'];
   const ROUTE = /^\/api\/vf\/[A-Za-z0-9_-]+(\/[A-Za-z0-9_-]+)*(\?[A-Za-z0-9_.~%=&,-]*)?$/;
@@ -25,8 +25,10 @@
       try { a.rappel(valeur); } catch (x) { console.error('VF_ETAT : un rappel a levé : ' + (x && x.message)); }
     }
   };
-  const poser = (cle, valeur) => { const e = ENTREES.get(cle); e.valeur = valeur; notifier(e, valeur); };
+  const poser = (cle, valeur) => { const e = ENTREES.get(cle); e.valeur = valeur; e.recuA = Date.now(); notifier(e, valeur); };
   const lire = (cle) => entree(cle).valeur;
+  // l'instant (ms) de la dernière pose de la clé, gardé avec la valeur : survit au changement d'onglet, null avant la première réception
+  const recu = (cle) => entree(cle).recuA;
   const abonner = (cle, rappel) => {
     const e = entree(cle);
     if (typeof rappel !== 'function') throw new TypeError('VF_ETAT : rappel attendu');
@@ -100,5 +102,5 @@
     if (typeof F.surConnexion === 'function') F.surConnexion(connexion);
   }
 
-  window.VF_ETAT = Object.freeze({ CLES, lire, abonner, jeton, lireJson, abonnes });
+  window.VF_ETAT = Object.freeze({ CLES, lire, recu, abonner, jeton, lireJson, abonnes });
 })();

@@ -58,6 +58,7 @@ assert_eq "F8 — perte, reprise, retour : chaque transition notifie une fois (u
 assert_eq "F9 — une charge mal formée (non objet, champ absent, nombres hors bornes) est ignorée sans lever, sans notifier" "$(J 'j.F9')" "aucune,true,true"
 assert_eq "F10 — vie, reload : aucune clé touchée" "$(J 'j.F10')" "true"
 assert_eq "F11 — patch : les abonnés de planning sont notifiés, la clé égale { seq, at } (comme structural), sans le contenu du patch" "$(J 'j.F11')" '12|{"seq":12,"at":7}'
+assert_eq "F12 — recu(cle) : null avant la première réception, l'instant de la dernière pose ensuite, gardé tant que la clé ne change pas (une autre clé posée plus tard ne le touche pas), RangeError sur une clé inconnue" "$(J 'j.F12')" ",1000,1000/5000,7000,RangeError,function"
 
 echo "=== L — les lectures d'état et de frise ==="
 R="$(VM lectures)"

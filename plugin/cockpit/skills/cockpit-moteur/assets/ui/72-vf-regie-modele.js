@@ -60,7 +60,8 @@
       const mot = w.finMotif === 'echec' ? 'échec' : w.finMotif === 'arret' ? 'arrêté' : w.kind === 'subagent' && !c.grise ? 'rapport rendu' : 'terminé';
       return S(G.termine, mot, 400, age == null ? '' : `il y a ${D(age)}`, 'a duré', D(w.dureeS));
     }
-    if (r.estOrphelin(w, c.parent)) return S('orphelin', 'orphelin', 600, 'son parent est terminé, cet agent travaille encore', 'depuis', D(depuis));
+    const orphelin = r.estOrphelin(w, c.parent, ecoule(c.parent || w, c)); // l'âge du parent avance comme celui de l'agent (L4a-03)
+    if (orphelin) return S('orphelin', 'orphelin', 600, 'son parent est terminé, cet agent travaille encore', 'depuis', D(depuis));
     if (attendA(w)) return S(G['en-attente'], `attend ses agents (${w.attendAgents})`, 400, '', 'depuis', D(age));
     if (w.etat === 'attend') return S(G.attend, 'vous attend', 400, impactMot(impactDe(w)), 'attend depuis', D(age));
     if (w.etat === 'au-repos') {

@@ -197,7 +197,9 @@
     badge.innerHTML = `<span class="dot"></span><span class="bl">${off ? t.text : n ? `${n} au travail` : 'Personne'}</span>`;
     redessiner();
   };
-  const setWho = (w) => { if (!w) return; who = probe.who = w; probe.whoAt = Date.now(); showLock(); document.dispatchEvent(new CustomEvent('vf-who')); }; // 69-05 : l'onglet Équipe (72-vf-equipe.js) suit le même flux
+  // l'instant de réception du who vient du magasin (VF_ETAT, persistant) : un onglet ré-exécuté ne remet pas les âges à zéro
+  const recuWho = () => { const M = window.VF_ETAT; return M && typeof M.recu === 'function' ? M.recu('who') : null; };
+  const setWho = (w) => { if (!w) return; who = probe.who = w; probe.whoAt = recuWho() || Date.now(); showLock(); document.dispatchEvent(new CustomEvent('vf-who')); }; // 69-05 : l'onglet Équipe (72-vf-equipe.js) suit le même flux
 
   // I3 (recette 2026-11-02) : une bascule en direct redessine la carte, qui rejouait son animation d'apparition (cartes, liens, colonnes,
   // panneau). On ne l'anime plus : les éléments redessinés portent `animation: none` en ligne AVANT la première image (la suite de

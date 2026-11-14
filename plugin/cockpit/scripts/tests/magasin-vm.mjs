@@ -88,6 +88,14 @@ async function alimentation() {
   // patch : le contenu du graphe change sans changement de structure (vf-cockpit-live.mjs) ; la clé planning prend { seq, at } comme pour structural
   const pl = []; E.abonner('planning', (v) => pl.push(v.seq)); m.emettre('patch', { seq: 12, at: 7, patch: [{ op: 'replace' }], vf: { x: 1 } });
   R.F11 = [pl.join(), JSON.stringify(E.lire('planning'))].join('|');
+  // recu(cle) : l'instant de la dernière pose, gardé avec la valeur (L4a-01 : la régie en tire l'âge d'un who qui a traversé un changement d'onglet)
+  const m3 = monde(); m3.charger(); const E3 = m3.window.VF_ETAT, horloge = Date.now; const w3 = { workers: [], sources: {} };
+  try {
+    const avant3 = E3.recu('who'); Date.now = () => 1000; m3.emettre('who', { seq: 1, at: 1, who: w3 }); const t1 = E3.recu('who');
+    Date.now = () => 5000; m3.emettre('lock', { seq: 2, at: 2, verrous: {} }); const garde = [E3.recu('who'), E3.recu('lock')];
+    Date.now = () => 7000; m3.emettre('who', { seq: 3, at: 3, who: w3 }); const t2 = E3.recu('who');
+    R.F12 = [avant3, t1, garde.join('/'), t2, nom(() => E3.recu('__proto__')), Object.isFrozen(E3) && typeof E3.recu].join();
+  } finally { Date.now = horloge; }
   return R;
 }
 

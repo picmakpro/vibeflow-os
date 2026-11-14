@@ -27,7 +27,7 @@ async function scenario(nom, etapes) {
   const fetchs = [];
   let serveur = true;
   const fetchSim = (url) => { fetchs.push(url); return serveur ? Promise.resolve({ ok: true, status: 200, json: async () => ({}) }) : Promise.reject(new TypeError('Failed to fetch')); };
-  const rappels = []; let pret = false;
+  const rappels = [], inscrits = []; let pret = false;
   const minuteur = (f, ms) => { const id = ++T.nt; T.timers.push({ id, f, due: T.now + (ms || 0) }); return id; };
   const ctx = {
     console: { error: (...a) => ctx.__err.push(a.join(' ')), log() {}, warn() {} }, __err: [],
@@ -39,7 +39,7 @@ async function scenario(nom, etapes) {
   ctx.window = ctx;
   ctx.FLOORPLAN_SERVER = { token: 'jeton-synthetique' };
   ctx.VF_COCKPIT_SERVER = { token: 'jeton-synthetique' };
-  ctx.VF_COQUILLE = { surOnglet: (f) => { if (pret) f({}); else rappels.push(f); return () => {}; } };
+  ctx.VF_COQUILLE = { surOnglet: (f) => { inscrits.push(f); if (pret) f({}); else rappels.push(f); return () => {}; } };
   const listeners = {};
   ctx.Floorplan = { graph: { meta: { vfTab: 'code' }, nodes: [], files: [] }, h: (s) => String(s),
     addHeaderButton({ id }) { const b = mk('button'); b.id = id; els.set(id, b); return b; },
@@ -56,20 +56,23 @@ async function scenario(nom, etapes) {
   const es = () => flux.filter((x) => !x.closed).at(-1);
   const pastille = () => { const b = els.get('vf-lock'); return b ? b.className + ' | ' + (b.attrs['aria-label'] || '') : 'absente'; };
   const ops = {
-    hello: () => { const e = es(); for (const f of e.l.hello || []) f({ data: JSON.stringify({ seq: 3, who: { workers: [{ kind: 'session', id: 's1', etat: 'actif' }] }, lock: { seq: 3, at: 1, verrous: { liste: [] } } }) }); },
+    hello: () => { ctx.__t0 = T.now; const e = es(); for (const f of e.l.hello || []) f({ data: JSON.stringify({ seq: 3, who: { workers: [{ kind: 'session', id: 's1', etat: 'actif' }] }, lock: { seq: 3, at: 1, verrous: { liste: [] } } }) }); },
     arret: () => { serveur = false; const e = es(); if (e && typeof e.onerror === 'function') e.onerror({}); },
     rendu: () => { pret = true; for (const f of rappels.splice(0)) f({}); },
+    attendre: () => { T.now += 600000; }, // 600 s sans événement du serveur
+    remonter: () => { for (const f of inscrits) f({}); }, // changement d'onglet : la coquille rejoue les rappels de surOnglet (le magasin, lui, n'est pas ré-exécuté)
   };
   const trace = [];
   await vide(); await vide();
   for (const op of etapes) { ops[op](); await vide(); await vide(); trace.push(op + ' -> ' + pastille()); }
   await avancer(20000);
-  return { nom, trace, finale: pastille(), connexion: ctx.VF_ETAT.lire('connexion'), banniere: !!els.get('vf-reco'), sondages: ctx.__vfLive.sondages, erreurs: ctx.__err.length };
+  return { nom, trace, finale: pastille(), connexion: ctx.VF_ETAT.lire('connexion'), banniere: !!els.get('vf-reco'), sondages: ctx.__vfLive.sondages, erreurs: ctx.__err.length, t0: ctx.__t0, whoAt: ctx.__vfLive.whoAt };
 }
 
 const out = [];
 out.push(await scenario('A hello, arrêt, puis premier rendu', ['hello', 'arret', 'rendu']));
 out.push(await scenario('B témoin : arrêt sans hello, puis premier rendu', ['arret', 'rendu']));
 out.push(await scenario('C témoin : premier rendu, hello, puis arrêt', ['rendu', 'hello', 'arret']));
+out.push(await scenario('D témoin : hello, rendu, 600 s, remontage de l\'onglet', ['hello', 'rendu', 'attendre', 'remonter']));
 console.log(JSON.stringify(out));
 process.exit(0);

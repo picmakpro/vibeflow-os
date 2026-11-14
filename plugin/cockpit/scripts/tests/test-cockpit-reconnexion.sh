@@ -53,6 +53,7 @@ assert_eq "RV6 — élu dont la page a abandonné (flux fermé, plus de sondage)
 assert_eq "RV6.2 — témoin : un élu dont la page rouvre sa source garde le verrou (aucun vol), un flux réel, le suiveur reçoit" "$(printf '%s' "$RT" | node "$AUX/ev.mjs" '[j.vols, j.fluxReels, j.suiveurRecoitWho, j.connF].join()')" "0,1,true,ouvert"
 assert_eq "RV7 — serveur arrêté entre le hello et le premier rendu : la pastille rejouée au premier rendu reste « Direct coupé » (connexion perdue), jamais « au travail »" "$(printf '%s' "$RU" | node "$AUX/ev.mjs" 'j[0].finale')" "btn off | Direct coupé"
 assert_eq "RV7.2 — témoins : arrêt sans hello puis rendu, et rendu puis hello puis arrêt, finissent « Direct coupé »" "$(printf '%s' "$RU" | node "$AUX/ev.mjs" '[j[1].finale, j[2].finale].join()')" "btn off | Direct coupé,btn off | Direct coupé"
+assert_eq "RV7.3 — L4a-01 : le who reçu à T0 garde son instant de réception (VF_ETAT) quand l'onglet est remonté 600 s plus tard : whoAt de la page égale T0, pas l'instant du remontage" "$(printf '%s' "$RU" | node "$AUX/ev.mjs" '[typeof j[3].t0, j[3].whoAt === j[3].t0].join()')" "number,true"
 if [ -z "$CHROME" ]; then
   . "$(dirname "$0")/chrome-saut.sh"; vf_chrome_saut "  ⊘ SUITE SAUTÉE : aucun navigateur — la reconnexion à recul n'est PAS vérifiée, non comptée comme réussie"
   vf_hyg_assert; echo ""; echo "  Résultats : $PASS PASS / $FAIL FAIL"; [ "$FAIL" -eq 0 ]; exit $?
