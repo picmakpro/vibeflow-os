@@ -53,7 +53,10 @@
   const ecrireStock = (cle, t) => {
     try { if (t === null) localStorage.removeItem(cle); else localStorage.setItem(cle, t); } catch { /* refusé : la visite reste en mémoire */ }
   };
-  const garder = (S, v) => ecrireStock(S.cle, v ? memoire().ecrire(v) : null); // valeur trop grosse ou non relue : la clé est retirée
+  const garder = (S, v) => { // une valeur qui ne se garde pas (trop grosse, non relue) laisse le repère existant : jamais d'effacement silencieux
+    const t = v ? memoire().ecrire(v) : null;
+    if (!v || t !== null) ecrireStock(S.cle, t);
+  };
 
   // ---------- données : le présent (signal, sinon graphe), git, blocages ----------
   function lirePresent(S) {

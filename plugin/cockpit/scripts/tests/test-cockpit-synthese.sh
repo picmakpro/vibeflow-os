@@ -146,10 +146,10 @@ essai('SM2', () => {
   eq('SM2 — valeur valide : relue égale', JSON.stringify(M.lire(t)), t);
   eq('SM2 — non chaîne, texte corrompu, v: 2', [M.lire(undefined), M.lire(42), M.lire('{pas du json'), M.lire(t.replace('"v":1', '"v":2'))], [null, null, null, null]);
   eq('SM2 — clé en plus au premier niveau, dans un instantané, clé en moins', [M.lire(t.replace('{"v":1', '{"x":1,"v":1')), M.lire(t.replace('"vu":1000', '"vu":1000,"x":1')), M.lire(t.replace(',"tete":null', ''))], [null, null, null]);
-  eq('SM2 — 8 192 octets valides : objet ; 8 193 : null', [M.lire(pad(8192)) !== null, M.lire(pad(8193))], [true, null]);
-  const gros = {}; for (let i = 0; i < 70; i++) gros['é'.repeat(60) + String(i).padStart(4, '0') + '|1'] = 'fait';
+  eq('SM2 — 65 536 octets valides : objet ; 65 537 : null', [M.lire(pad(65536)) !== null, M.lire(pad(65537))], [true, null]);
+  const gros = {}; for (let i = 0; i < 500; i++) gros['é'.repeat(60) + String(i).padStart(4, '0') + '|1'] = 'fait';
   const tg = JSON.stringify(val(inst(1, gros), null));
-  ok('SM2 — la borne compte des octets UTF-8, pas des caractères (moins de 8 192 caractères, plus d\'octets)', tg.length < 8192 && octets(tg) > 8192 && M.lire(tg) === null, tg.length + '/' + octets(tg));
+  ok('SM2 — la borne compte des octets UTF-8, pas des caractères (moins de 65 536 caractères, plus d\'octets)', tg.length < 65536 && octets(tg) > 65536 && M.lire(tg) === null, tg.length + '/' + octets(tg));
   const pr = '{"v":1,"precedente":null,"courante":{"vu":5,"phases":{"__proto__":"fait"},"tete":null,"blocages":[]},"__proto__":{"polluee":1}}';
   ok('SM2 — __proto__ : refusé, aucune pollution (ni ici ni dans le contexte de la page)', M.lire(pr) === null && ({}).polluee === undefined && require_inerte(), '');
   const lp = JSON.stringify(val(inst(5, JSON.parse('{"__proto__":"fait"}')), null));
@@ -189,8 +189,19 @@ essai('SM6', () => {
   eq('SM6 — « Tout vu » : précédente et courante égales au présent ; avecCourante ne touche que la courante', [JSON.stringify(t.precedente) === JSON.stringify(p) && JSON.stringify(t.courante) === JSON.stringify(p), a.precedente.vu, a.courante.vu, M.toutVu(null, p).precedente.vu], [true, 3, 9, 9]);
 });
 essai('SM7', () => {
-  const gros = {}; for (let i = 0; i < 150; i++) gros['x'.repeat(60) + String(i).padStart(4, '0') + '|1'] = 'fait';
-  eq('SM7 — au-delà de 8 192 octets : null (la page retire la clé) ; valeur ordinaire : texte', [M.ecrire(val(inst(1, gros), null)), typeof M.ecrire(bon)], [null, 'string']);
+  const gros = {}; for (let i = 0; i < 500; i++) gros['é'.repeat(60) + String(i).padStart(4, '0') + '|1'] = 'fait';
+  eq('SM7 — un seul instantané au-delà de 65 536 octets : null ; valeur ordinaire : texte', [M.ecrire(val(inst(1, gros), null)), typeof M.ecrire(bon)], [null, 'string']);
+});
+// SM9 (L4c-01) : les bornes tiennent leurs promesses — 500 phases acceptées par l'instantané, jamais un repère effacé en silence
+const graphe = (n, ws) => { const o = {}; for (let i = 0; i < n; i++) o[ws + '|' + (10 + Math.floor(i / 3)) + '.' + (i % 3)] = 'a-recetter'; return o; };
+essai('SM9', () => {
+  for (const [n, ws] of [[200, 'fiabilite'], [500, 'fiabilite'], [500, '']]) {
+    const i = C.instantane({ phases: graphe(n, ws), tete: A40, blocages: [], vu: 1763000000 }), v = M.toutVu(null, i), t = M.ecrire(v), r = t === null ? null : M.lire(t);
+    ok('SM9 — ' + n + ' phases (workstream « ' + ws + ' ») : écrit, relu, deux instantanés entiers', t !== null && r !== null && Object.keys(r.precedente.phases).length === n && Object.keys(r.courante.phases).length === n, t === null ? 'null' : t.length);
+  }
+  const lourd = {}; for (let i = 0; i < 500; i++) lourd['x'.repeat(60) + String(i).padStart(4, '0') + '|1'] = 'fait';
+  const t = M.ecrire(val(inst(2000, lourd), inst(1000, lourd))), r = t === null ? null : M.lire(t);
+  ok('SM9 — deux instantanés trop gros : repli sur le plus récent, jamais null', t !== null && r !== null && r.precedente.vu === 2000 && r.courante === null, t === null ? 'null' : t.length);
 });
 essai('SM8', () => { const t = M.ecrire(bon); eq('SM8 — aller-retour lire(ecrire(v)) égal', [JSON.stringify(M.lire(t)), t], [JSON.stringify(bon), JSON.stringify(bon)]); });
 JS
@@ -289,6 +300,11 @@ mut M-CLE-VISITE "$MEM" 's/vibeflow-cockpit:derniere-visite:/vibeflow-cockpit:vi
 mut M-ORIGINE "$MEM" 's/? PREFIXE + lab : null/? PREFIXE + lab : PREFIXE + "origine"/' SM1
 mut M-SEUIL "$MEM" 's/SEUIL_ROTATION_S = 1800/SEUIL_ROTATION_S = 1/' SM4
 mut M-FUSION "$MEM" 's/b\.vu > a\.vu ? b : a/b/' SM5
+mut M-INCONNU "$CAL" 's/if (!par.has(sommet)) return { etat: .inconnu., n: null, plusDe500: false };/if (!par.has(sommet)) return { etat: "ok", n: 0, plusDe500: false };/' SC3
+mut M-500 "$CAL" 's/depuisSommet.size >= 500 ?/true ?/' SC3
+mut M-DIT "$CAL" "s/ || commits.etat === 'inconnu'//" SC9
+mut M-TAILLE "$MEM" 's/TAILLE_MAX = 65536/TAILLE_MAX = 8192/' SM9
+mut M-REPLI "$MEM" 's/return texteDe(v) || texteDe(valeur(plusRecent(v.precedente, v.courante), null));/return texteDe(v);/' SM9
 mut M-LISTE "$MEM" 's/Object\.keys(o)\.length === cles\.length/Object.keys(o).length >= cles.length/' SM2
 
 vf_hyg_assert
@@ -299,6 +315,3 @@ echo "=================================="
 TOTAL=$((PASS+FAIL))
 if [ "$TOTAL" -eq 0 ]; then echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE — zéro assertion exécutée, résultat non fiable"; exit 1; fi
 [ "$FAIL" -eq 0 ] && exit 0 || exit 1
-mut M-INCONNU "$CAL" 's/if (!par.has(sommet)) return { etat: .inconnu., n: null, plusDe500: false };/if (!par.has(sommet)) return { etat: "ok", n: 0, plusDe500: false };/' SC3
-mut M-500 "$CAL" 's/depuisSommet.size >= 500 ?/true ?/' SC3
-mut M-DIT "$CAL" "s/ || commits.etat === 'inconnu'//" SC9
