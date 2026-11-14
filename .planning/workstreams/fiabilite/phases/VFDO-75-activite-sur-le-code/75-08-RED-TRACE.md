@@ -17,3 +17,14 @@ Même mesure sur la tête de la tâche 1 : `29 PASS, 0 FAIL` (49 s). L'échec «
 
 Écart : le code de la tâche 1 (`75-vf-activite.js`, `-tables.js`, `-menu.js`) et celui des tâches 2 et 3 (`-panneau.js`, `-collisions.js`, états, phrases) ont été écrits en un jet avant les témoins de ces tâches (mêmes fichiers) ;
 les témoins de la tâche 2 et de la tâche 3 sont rouges sur la base pour la même raison (voir leurs sections ci-dessous, ajoutées avec elles). Les mutants des tâches sont levés par le régime allégé.
+
+## Tâche 2 : le menu complet, ses états exacts, le clavier, les trois autres lentilles et leurs mots
+
+Base du rouge : `95f9b75a` pour le navigateur ; tête de la tâche 1 (`323a1bf6`) pour l'état intermédiaire. Suite sur la copie de la base, avec les témoins de la tâche 2 (`SECTIONS=t2`, `VF_CDP_ECHEANCE_MS=20000`).
+
+| Rouge | Attendu | Obtenu | Bonne raison |
+|---|---|---|---|
+| tables sans couplage, gardes, empreinte (`sed` sur une copie du module : `const TABLES = { chauds: tableChauds };`), `VM_SEUL=1 TABLES_JS=<tmp>/tables-sans-trois.js` | `L0 : le harnais lit les tables` (code 0) | `L0 : le harnais a échoué (code 1)` : `rows('couplage', …)[0]` est `undefined` | la table de couplage n'existe plus : l'observation `L8.noeud-et-vide` lit sa première rangée ; la pile des autres lentilles est la même |
+| base, navigateur (`TABLES_JS=<tmp>/tables-nouveau.js`), 38 témoins purs verts puis `L5` | `lens-boite|Lentille,Agents,Légende de la lentille|true,true,true|lens-titre lens-legende lens-radar|Lentille d'activité sur le code` | `mesure indisponible : attente de « sélecteur posé et première lecture » dépassée (20000 ms)` ; `BILAN : 38 PASS, 1 FAIL` | pas de `#btn-lentilles` ni de `#lens-menu` sur la base (même cause que la tâche 1, témoins de la tâche 2 : L5 à L12) |
+
+Même mesure sur la tête de la tâche 2 : `67 PASS, 0 FAIL` (`SECTIONS=t2`, 43 s). Écart : le code de la tâche 2 (états, clavier, légendes) est dans les fichiers livrés par le commit de la tâche 1 ; l'état intermédiaire est donc une copie mutée, pas un commit antérieur.

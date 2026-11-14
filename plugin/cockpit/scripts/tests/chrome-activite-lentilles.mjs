@@ -12,10 +12,15 @@ const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!windo
 // la route : relevée (compteur de lectures) et, quand `window.__act` est posé, servie par la page à la place du serveur
 const STUB = `(() => { window.__act = null; window.__reads = 0; const f0 = window.fetch;
   window.fetch = function (u, o) { if (String(u).includes('/api/vf/activite')) { window.__reads++; if (window.__act) return Promise.resolve(new Response(JSON.stringify(window.__act), { status: 200, headers: { 'content-type': 'application/json' } })); } return f0.apply(this, arguments); }; })();`;
+// la visite du premier passage s'ouvre d'elle-même et prend Échap (40-tour.js : « tour-seen », 75-vf-modele.js : « vibeflow-cockpit:visite ») : ces clés sont lues comme posées
+const SANS_VISITE = "(() => { const g = Storage.prototype.getItem; Storage.prototype.getItem = function (k) {"
+  + " const vue = typeof k === 'string' && (k.indexOf('floorplan:tour-seen:') === 0 || k.indexOf('vibeflow-cockpit:visite:') === 0);"
+  + " return vue ? 'true' : g.call(this, k); }; })()";
 const KEYS = { ArrowDown: [40, ''], ArrowUp: [38, ''], Home: [36, ''], End: [35, ''], Enter: [13, '\r'], ' ': [32, ' '], Escape: [27, ''], Tab: [9, ''] };
 
 await executer(chrome, async (s) => {
-  await s.send('Page.addScriptToEvaluateOnNewDocument', { source: AMORCE_FLUX + ';' + STUB });
+  await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  await s.send('Page.addScriptToEvaluateOnNewDocument', { source: AMORCE_FLUX + ';' + STUB + ';' + SANS_VISITE });
   const vue = (w, h, tactile = false) => s.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: tactile });
   const SNAP = `JSON.stringify([...VibeFlow.state.chipEls].map(([id, g]) => { const r = g.getBoundingClientRect(); return [id, Math.round(r.x * 10), Math.round(r.y * 10), Math.round(r.width * 10), Math.round(r.height * 10)]; }))`;
   const poser = async () => { await s.attendre("!!document.querySelector('#viewport .node') && document.querySelector('#viewport').style.opacity !== '0'", 'cartes dessinées'); return stabiliser(() => s.ev(SNAP), { pas: 150, max: 12000 }); };

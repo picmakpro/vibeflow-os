@@ -60,7 +60,7 @@
         p.setAttribute('d', 'M5 12.5l4.5 4.5L19 7.5'); s.appendChild(p);
       return s;
     };
-    const rangs = () => [...menu.querySelectorAll('.lr')].filter((r) => r.offsetParent !== null);
+    const rangs = () => [...menu.querySelectorAll('.lr')].filter((r) => r.offsetParent !== null && !r.closest('details:not([open])'));
     let ouvert = false;
     const maj = (m) => {
       const actifs = new Set(m.lignes.map((l) => l.id));

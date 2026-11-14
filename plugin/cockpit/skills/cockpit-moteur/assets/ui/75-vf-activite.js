@@ -77,12 +77,14 @@
     const calculer = () => {
       if (!etat.vivant) return;
       const v = vue(), m = T.modele({ d: etat.d, conn: etat.conn, lentille: etat.lentille, filtre: etat.filtre, vue: v });
+      const avant = etat.m;
       etat.m = m; etat.lentille = m.lentille;
       // le filtre ne vit que sur Empreinte, avec un rattachement
       if (etat.filtre && !m.agents.includes(etat.filtre)) { etat.filtre = null; calculer(); return; }
       poser('activite', 'activite', m.lentille === 'aucune' || m.indispo ? [] : m.rows, true);
       poser('activite-collisions', 'collisions', etat.d ? T.tableCollisions(etat.d, v) : [], false);
       majBouton(m);
+      if (avant && !avant.indispo && m.indispo) annoncer(m.annonce); // la lentille active devient indisponible : « Lentille Points chauds indisponible. »
       for (const p of parties.values()) if (p.inst && p.inst.maj) p.inst.maj(m);
     };
 
