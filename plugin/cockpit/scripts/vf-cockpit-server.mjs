@@ -25,7 +25,7 @@ import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { startLive } from './vf-cockpit-live.mjs';
 import { lireAgent } from './vf-cockpit-agents-table.mjs';
-import { trustedScriptsDir, finDans } from './vf-cockpit-paths.mjs';
+import { trustedScriptsDir } from './vf-cockpit-paths.mjs';
 import { dossierModule, substituerModule } from './vf-cockpit-module.mjs';
 import { ID_RE } from './vf-cockpit-lecture.mjs';
 import { creerGraphes } from './vf-cockpit-graphe.mjs';
