@@ -428,7 +428,7 @@ JS
 node "$AUX/vm-rendu.mjs" "$RENDU" "$AUX/pilote-transcript-n.js" > "$WORK/vm-tn.json"
 assert_eq "T26.5 — PU-G-170 : le transcript dit « lance une commande (Bash) × 14 » pour 14 appels, et rien après un appel seul" "$(G "$WORK/vm-tn.json" 'j.erreur||j.textes.filter((t)=>/\(Bash\)|\(Read\)/.test(t)).map((t)=>t.replace(/^\d\d:\d\d:\d\d /,"")).join("|")')" "lance une commande (Bash) × 14|lit src/a.js (Read)"
 assert_eq "T26.4 — arbre() avec l'échappement standard : la description piégée sort en &lt;img, jamais en <img" "$(G "$WORK/vm-a.json" 'j.erreur||(String(j.retour).includes("&lt;img")+"|"+!String(j.retour).includes("<img"))')" "true|true"
-CSPV="default-src 'none'; script-src http://127.0.0.1:PORTX/_vf/; worker-src http://127.0.0.1:PORTX/_vf/; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
+CSPV="default-src 'none'; script-src http://127.0.0.1:PORTX/_vf/; worker-src http://127.0.0.1:PORTX/_vf/elk-fil.js; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
 rafraichir
 demarrer "$OUT" "$H"; PORT="$SRV_PORT"
 csp_de() { RQ GET "$1" | sed -n 2p | node "$AUX/jq.mjs" 'j["content-security-policy"]||"aucun en-tête"' | node "$AUX/csp.mjs"; }

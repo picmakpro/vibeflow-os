@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test-cockpit-mise-en-page.sh — la mise en page du canevas (ELK) dans un worker servi par le module (79-18, SOCL-22 ; C5, A4, A30, A40 ; P79-D-15).
-#   W0 témoins · W1 le fichier du worker servi (table fermée, ETag, CSP propre) · W2 la CSP de page (worker-src au préfixe) · W3 le worker a vraiment servi
+#   W0 témoins · W1 le fichier du worker servi (table fermée, ETag, CSP propre) · W2 la CSP de page (worker-src à l'URL exacte du fil) · W3 le worker a vraiment servi
 #   W4 le fil principal reste libre (pouls, tâche longue, clic) · W5 le worker rend ce que rend le calcul en ligne (propriété à graine) · W6 l'API du moteur (A4)
 #   W7 repli et export · W8 cycle de vie (propriété à graine) · W9 messages bornés · X mutants (copies du module : une garde, une raison)
 # Un Chrome par mesure (mise-en-page-chrome.mjs), sonde posée avant tout script de la page. Sans navigateur : saut déclaré (rouge en CI), jamais un vert à vide.
@@ -81,17 +81,17 @@ assert_eq "W1.5 — les octets servis sont ceux du fichier du module" "$(cmp -s 
 rq POST /_vf/elk-fil.js "$WORK/x.out"; P1="$RQ_CODE"; rq GET /_vf/elk-fil.js "$WORK/x.out" --entete sec-fetch-site:cross-site
 assert_eq "W1.6 — POST : 405 ; Sec-Fetch-Site: cross-site : 403" "$P1|$RQ_CODE" "405|403"
 
-echo "=== W2 — la CSP de page : une seule directive de plus, worker-src au préfixe du module ==="
+echo "=== W2 — la CSP de page : une seule directive de plus, worker-src à l'URL exacte du fil ==="
 W2A=""; W2B=""; W2C=""
 for H in "127.0.0.1:$PORT" "localhost:$PORT"; do
   for U in / /index.html /project.html /equipe.html; do
     rq GET "$U" "$WORK/doc.html" --host "$H"; CSP="$(hv content-security-policy)"
-    W2A="$W2A$(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep -c '^worker-src ') $(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep '^worker-src ' | sed "s|^worker-src http://$H/_vf/\$|exact|") "
+    W2A="$W2A$(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep -c '^worker-src ') $(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep '^worker-src ' | sed "s|^worker-src http://$H/_vf/elk-fil.js\$|exact|") "
     W2B="$W2B$([ "$CSP" = "$(node "$TA" csp-v275 "$WORK/doc.html" "http://$H/_vf/")" ] && echo egale || echo differente) "
     node "$OR" csp "$WORK/doc.html" "$CSP" "http://$H/_vf/" > "$WORK/csp.json"; W2C="$W2C$(oj '[j.egales,JSON.stringify(j.autres)].join("|")' < "$WORK/csp.json" | sed "s|\\[\"http://$H/_vf/\"\\]|prefixe|") "
   done
 done
-assert_eq "W2.1 — quatre adresses, deux noms d'hôte (huit réponses) : une directive worker-src, égale à http://<hôte>/_vf/ (ni source d'origine, ni adresse d'objet local, ni data:)" "$W2A" "$(for i in 1 2 3 4 5 6 7 8; do printf '1 exact '; done)"
+assert_eq "W2.1 — quatre adresses, deux noms d'hôte (huit réponses) : une directive worker-src, égale à http://<hôte>/_vf/elk-fil.js, sans barre finale donc correspondance exacte (ni autre entrée de la table, ni préfixe, ni source d'origine, ni adresse d'objet local, ni data:)" "$W2A" "$(for i in 1 2 3 4 5 6 7 8; do printf '1 exact '; done)"
 assert_eq "W2.2 — oracle indépendant : la chaîne entière égale celle de la formule de terminal-aux sur les scripts en ligne du corps servi (huit réponses)" "$W2B" "$(for i in 1 2 3 4 5 6 7 8; do printf 'egale '; done)"
 assert_eq "W2.3 — script-src reste celui de 79-16 : les empreintes des scripts en ligne plus une seule source, le préfixe (huit réponses)" "$W2C" "$(for i in 1 2 3 4 5 6 7 8; do printf 'true|prefixe '; done)"
 
@@ -167,7 +167,7 @@ verif_csp() { # l'état des gardes de CSP sur le serveur lancé : W1.2 W1.3 W2.1
   e1=ok; e2=ok; local e3=ok
   for H in "127.0.0.1:$PORT" "localhost:$PORT"; do for U in / /index.html /project.html /equipe.html; do
     rq GET "$U" "$WORK/doc.html" --host "$H"; CSP="$(hv content-security-policy)"
-    [ "$(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep -c "^worker-src http://$H/_vf/\$")" = 1 ] || e1=ko
+    [ "$(printf '%s' "$CSP" | tr ';' '\n' | sed 's/^ //' | grep -c "^worker-src http://$H/_vf/elk-fil.js\$")" = 1 ] || e1=ko
     [ "$CSP" = "$(node "$TA" csp-v275 "$WORK/doc.html" "http://$H/_vf/")" ] || e2=ko
     node "$OR" csp "$WORK/doc.html" "$CSP" "http://$H/_vf/" > "$WORK/csp.json"; [ "$(oj '[j.egales,JSON.stringify(j.autres)].join("|")' < "$WORK/csp.json")" = "true|[\"http://$H/_vf/\"]" ] || e3=ko
   done; done
@@ -178,10 +178,12 @@ mutant() { # mutant <nom> <cible : module|page> <fichier-ou-motif> <expression s
   if [ "$2" = page ]; then cockpit_module_muter_page "$1" "$4"; else cockpit_module_muter "$1" "$3" "$4"; fi; MR=$?
   [ "$MR" -eq 0 ] && { demarrer "$LAB"; MR=$RL; }
 }
-mutant X-CSP-ORIGINE module vf-cockpit-mise-en-page.mjs "s#worker-src \${prefixeScripts(hote)}#& 'self'#"
+mutant X-CSP-ORIGINE module vf-cockpit-mise-en-page.mjs "s#worker-src \${prefixeScripts(hote)}\${NOM_FIL}#& 'self'#"
 assert_eq "X-CSP-ORIGINE — la source d'origine du document ajoutée à worker-src : la copie diffère et démarre ; W2.1 et W2.2 rouges (la directive et la chaîne), le reste vert" "$MR|$(verif_csp)" "0|W1.2=ok W1.3=ok W2.1=ko W2.2=ko W2.3=ok"
-mutant X-CSP-OBJET module vf-cockpit-mise-en-page.mjs "s#worker-src \${prefixeScripts(hote)}#& blob:#"
+mutant X-CSP-OBJET module vf-cockpit-mise-en-page.mjs "s#worker-src \${prefixeScripts(hote)}\${NOM_FIL}#& blob:#"
 assert_eq "X-CSP-OBJET — une adresse d'objet local ajoutée à worker-src : W2.1 et W2.2 rouges, le reste vert" "$MR|$(verif_csp)" "0|W1.2=ok W1.3=ok W2.1=ko W2.2=ko W2.3=ok"
+mutant X-CSP-PREFIXE module vf-cockpit-mise-en-page.mjs "s#worker-src \${prefixeScripts(hote)}\${NOM_FIL}#worker-src \${prefixeScripts(hote)}#"
+assert_eq "X-CSP-PREFIXE — worker-src rouvert au préfixe entier de /_vf/ (AU18-01 : toute entrée de la table serait admise comme worker) : W2.1 et W2.2 rouges, le reste vert" "$MR|$(verif_csp)" "0|W1.2=ok W1.3=ok W2.1=ko W2.2=ko W2.3=ok"
 mutant X-CSP-FIL-LARGE module vf-cockpit-mise-en-page.mjs "s#script-src \${prefixeScripts(hote)}vendor/elk.bundled.js#script-src \${prefixeScripts(hote)} https:#"
 assert_eq "X-CSP-FIL-LARGE — la CSP du worker élargie au préfixe et au réseau : W1.2 et W1.3 rouges seuls (la CSP de page est intacte)" "$MR|$(verif_csp)" "0|W1.2=ko W1.3=ko W2.1=ok W2.2=ok W2.3=ok"
 
