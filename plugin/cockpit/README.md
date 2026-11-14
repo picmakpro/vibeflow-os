@@ -82,6 +82,15 @@ Sans `--terminal`, rien ne change : aucun bouton, aucune route `POST`, aucun scr
   rattaché. Preuve : `test-cockpit-equipe.sh` (E19 à E23, EUI) et `test-cockpit-forme-claude.sh`.
 - **Code** : carte des fichiers et des liens d'appel ; extracteur VibeFlow quand le lab porte des modules (`plugin/*/module.json`),
   architecture brute sinon. Aucun modèle n'est appelé pour l'assembler.
+  **Lentilles d'activité (Phase 75).** Un sélecteur dans l'en-tête (« Lentille : Aucune ») pose une marque, un glyphe neutre et un mot, sur les cartes de fichier :
+  **Points chauds** (les fichiers les plus modifiés sur 90 jours, trois paliers), **Couplage** (ceux qui changent avec le fichier sélectionné), **Gardes** (les
+  fichiers qu'aucune suite ni aucun gate ne nomme : « aucune suite ne le nomme ») et **Empreinte** (ce que les agents lisent et écrivent en ce moment, « en écriture · vf-coder »).
+  Le **radar** compte, dans la rangée de contexte, les fichiers en collision possible (deux agents, deux arbres, deux branches, deux plans) et ouvre un panneau qui les liste.
+  Une carte **prévue** (contour pointillé, mot « Prévu ») montre un fichier que le `files_modified` d'un plan non fait annonce et qui n'existe pas encore.
+  Le récent ne se dit plus par une couche à part : l'ancien bouton « Travail récent » est remplacé par ce sélecteur ; seule teinte, `--recent` pour « en cours d'écriture ».
+  Limites dites à l'écran : « écritures par commande non vues », « historique partiel », « écritures hors du lab : n comptées, non dessinées », « Radar incomplet : … ».
+  Jamais fait : aucun réseau, rien d'écrit dans le lab, aucune suite exécutée pour savoir si un fichier est gardé (les noms cités sont lus), rien d'exporté.
+  Sans git (lab hors dépôt), les lignes Points chauds et Couplage ne sont pas posées ; les cartes, les liens et la place des pieds restent identiques. Preuve : `test-cockpit-activite-*.sh`, `test-cockpit-chaine-xss.sh` (volet activité).
 
 Les onglets sont resserrés pour que trois tiennent dans l'en-tête (`test-cockpit-responsive.sh`, R1 à R4). Depuis la Phase 70,
 ils reviennent aux valeurs de `DESIGN.md` (13 px, piste de 3 px) en largeur téléphone (R13.4 à 390 px) ; à 1 024 et 1 440 px ils restent
@@ -333,7 +342,7 @@ session principale, 2026-11-03). À faire toi-même, après avoir vérifié que 
 `scripts/` (le socle : lecture du planning, `vf-cockpit-vie.mjs`, `vf-cockpit-arbres.mjs`, l'émetteur `vf-cockpit-signal.mjs`, le lanceur), `signal/` (le mod : `hooks/`,
 `tests/`, `types/`, jouée par `claude plugin test`) et `skills/` (le moteur d'affichage). Suites neuves de la Phase 68 : `test-cockpit-vie.sh` (règle de mission
 vivante), `test-cockpit-retard.sh` (retard et worktrees), `test-cockpit-signal.sh` (l'émetteur) et `test-cockpit-signal-mod.sh` (déclaration, import et
-gardes statiques du mod). Phase 72 (lancer du travail depuis les cartes, avec `--terminal`) : neuf scripts `scripts/vf-cockpit-lancer*.mjs` (gabarit, cibles, POST, canal, état de Q, interface, suivi, mode retenu, assemblage) et quatorze suites `scripts/tests/test-cockpit-lancer-*.sh` (`gabarit`, `cibles`, `post`, `q`, `ui`, `suivi`, `bandeau`, `serveur`, `processus`, `pty`, `xss`, `bout-en-bout`, `chat`, `mode`). Retours du panel utilisateurs (2026-11) : `test-cockpit-sante.sh` (panneau Santé), `test-cockpit-ecrans-recent.sh` (écrans et Travail récent), `test-cockpit-moteur-carte.sh` (carte du moteur) et `test-cockpit-visite-retours.sh` (visite).
+gardes statiques du mod). Phase 72 (lancer du travail depuis les cartes, avec `--terminal`) : neuf scripts `scripts/vf-cockpit-lancer*.mjs` (gabarit, cibles, POST, canal, état de Q, interface, suivi, mode retenu, assemblage) et quatorze suites `scripts/tests/test-cockpit-lancer-*.sh` (`gabarit`, `cibles`, `post`, `q`, `ui`, `suivi`, `bandeau`, `serveur`, `processus`, `pty`, `xss`, `bout-en-bout`, `chat`, `mode`). Retours du panel utilisateurs (2026-11) : `test-cockpit-sante.sh` (panneau Santé), `test-cockpit-ecrans-recent.sh` (écrans fantômes et compteurs de cartes), `test-cockpit-moteur-carte.sh` (carte du moteur) et `test-cockpit-visite-retours.sh` (visite).
 
 ## Interface du socle pour `vf-signal`
 
