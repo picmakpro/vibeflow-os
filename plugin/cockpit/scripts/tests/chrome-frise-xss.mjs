@@ -22,6 +22,8 @@ await executer(chrome, async (s) => {
   await s.ev("[...document.querySelectorAll('#vf-equipe [role=tab]')].find((x) => x.textContent === 'Frise').click()");
   await s.attendre("document.querySelectorAll('.vf-frise .vf-frise-c').length >= 4", 'voies de la frise'); // la session porte un titre piégé : « Session principale » n'est plus son nom
   await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  // sous charge, le coût et le curseur se posent après les voies : on attend ce qu'on va mesurer
+  await s.attendre("/Détail du coût/.test((document.querySelector('.vf-frise') || { innerText: '' }).innerText) && !!document.querySelector('.vf-frise [role=slider]')", 'coût et curseur de la frise');
   etapes.frise = await s.ev("!!document.querySelector('.vf-frise') && /Détail du coût/.test(document.querySelector('.vf-frise').innerText)");
   // éléments injectés : dans toute la page, ou à l'intérieur des conteneurs désignés (une surface)
   const compter = (sel) => s.ev(`(() => { const C = ${JSON.stringify(CHARGE)}, cs = ${sel ? `[...document.querySelectorAll(${JSON.stringify(sel)})]` : '[document.documentElement]'};
@@ -30,7 +32,7 @@ await executer(chrome, async (s) => {
     for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: 'ArrowLeft', code: 'ArrowLeft', modifiers: shift ? 8 : 0, windowsVirtualKeyCode: 37, nativeVirtualKeyCode: 37 });
   };
   // curseur : les écritures piégées datent de 23 à 30 minutes, un pas vaut une minute (Maj = dix) : trois pas, deux pas de dix, puis un pas de plus tant que l'encart ne liste aucun fichier
-  await s.ev("document.querySelector('[role=slider]').focus()");
+  await s.attendre("(() => { const e = document.querySelector('[role=slider]'); e.focus(); return document.activeElement === e; })()", 'curseur au focus');
   for (let i = 0; i < 3; i++) await touche(false);
   for (let i = 0; i < 2; i++) await touche(true);
   const nFichiers = () => s.ev("document.querySelectorAll('.vf-encart li[data-fichier]').length");

@@ -166,11 +166,12 @@ export default async function (h) {
     const cas = [['nom', 'clic', 'wk-2', ORIGINE('wk-2')], ['nom', 'Entrée', 'wk-2', ORIGINE('wk-2')], ['nom', 'Espace', 'wk-2', ORIGINE('wk-2')], ['rapport', 'clic', 'wk-5', RAPPORT('wk-5')], ['rapport', 'Entrée', 'wk-6', RAPPORT('wk-6')]];
     for (const [decl, geste, id, sel] of cas) {
       await h.ev(() => { window.__ouv = []; window.__lus = []; });
+      const repli0 = await h.ev(() => document.querySelectorAll('#panel .sec .pt').length); // le panneau porte déjà ses propres titres : on compte ce que le geste AJOUTE
       if (geste === 'clic') await h.ev((s) => document.querySelector(s).click(), sel);
       else { await h.ev((s) => document.querySelector(s).focus(), sel); if (geste === 'Entrée') await h.touche('Enter', 'Enter', 13, '\r'); else await h.touche(' ', 'Space', 32, ' '); }
       await h.attendre(BAS, 'fiche posée', 8000).catch(() => {}); // un cas rouge se dit par son libellé, il n'interrompt pas les suivants
       const o = await h.ev(OUVERTS);
-      const r = await h.ev(() => ({ ouverte: !!(window.__vfFiche && window.__vfFiche.ouverte()), lus: window.__lus.slice(), repli: document.querySelectorAll('#panel .sec .pt').length /* forme réelle du lecteur retiré (72-vf-regie-source.js : div.sec, h2.pt dans #panel) */ }));
+      const r = await h.ev((r0) => ({ ouverte: !!(window.__vfFiche && window.__vfFiche.ouverte()), lus: window.__lus.slice(), repli: document.querySelectorAll('#panel .sec .pt').length - r0 /* forme réelle du lecteur retiré (72-vf-regie-source.js : div.sec, h2.pt dans #panel) */ }), repli0);
       h.egal('R5b', `${decl} (${geste}) : vf-agent:ouvrir annulé (defaultPrevented), la fiche s'ouvre, le lecteur de repli de la 73 ne s'ouvre pas, vf-agent:lu seulement pour un terminé`,
         [o.map((x) => x.slice(0, 3)), r.ouverte, r.repli, r.lus], [[[decl, id, true]], true, 0, decl === 'rapport' ? [id] : []]);
       await h.echap();
