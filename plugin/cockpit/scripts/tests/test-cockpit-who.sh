@@ -610,18 +610,18 @@ const who = (await imp('vf-cockpit-who.mjs')).collectWho(lab, { home, scriptsDir
 const who2 = (await imp('vf-cockpit-who.mjs')).collectWho(lab2, { home, scriptsDir: noscripts, fresh: 600 });
 // 73-09 (P73-D-22) : les propriétés se lisent sur who@2 (collectWho, titre et branche nettoyés à l'ÉMISSION) et sur le texte de la ligne de la régie (page Équipe jouée hors navigateur par vm-regie-page.mjs) ;
 // plus aucune lecture de buildEquipeGraph. Le libellé d'une session sans titre est « Session principale » (suivi de son lieu quand plusieurs sessions le portent) ; la branche est dite par la ligne (« branche <b> »).
-const regie = (wh, ids, ouverts = []) => {
-  const etapes = [...ouverts.map((id) => ({ clic: `li[data-vf-agent="${id}"] button[aria-expanded]` })),
+const regie = (wh, ids) => {
+  const etapes = [
     ...ids.flatMap((id) => [['n', '.vf-rg-nom'], ['l', '.vf-rg-l2']].map(([k, c]) => ({ nom: `${k}:${id}`, obs: { mode: 'textes', sel: `li[data-vf-agent="${id}"] ${c}` } }))),
     { nom: 'page', obs: { mode: 'textes', sel: '.vf-rg-lig' } }];
-  const f = path.join(base, `sc-${ids.join('-') || 'x'}-${ouverts.join('-')}.json`);
+  const f = path.join(base, `sc-${ids.join('-') || 'x'}.json`);
   fs.writeFileSync(f, JSON.stringify({ onglet: 'equipe', source: 'live', who: wh, lock: null, etapes }));
   const r = JSON.parse(execFileSync('node', [path.join(TESTS, 'vm-regie-page.mjs'), UI, f], { encoding: 'utf8' }));
   if (r.erreur) throw new Error(r.erreur);
   return r.out;
 };
 const IDS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's10', 's11', 's12'];
-const R1 = regie(who, IDS, ['s1']), R2 = regie(who2, ['s9'], ['s9']);
+const R1 = regie(who, IDS), R2 = regie(who2, ['s9']);
 const nom = (R, id) => (R['n:' + id] || [])[0] ?? '', pref = (t) => t.split(' · ')[0], sp = (t) => String(t).replace(/\s/g, ' ');
 const w = (id) => who.workers.find((x) => x.id === id), w9 = who2.workers.find((x) => x.id === 's9');
 const CTRL = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]'), CF = /\p{Cf}/u, json = JSON.stringify({ who, regie: R1 }), h = nom(R1, 's3'), hw = w('s3')?.titre;

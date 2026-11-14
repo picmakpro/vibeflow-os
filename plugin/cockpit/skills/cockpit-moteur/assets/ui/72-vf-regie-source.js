@@ -90,8 +90,8 @@
     const ouvrir = (li, declencheur, bouton) => {
       const l = li && li._ln; if (!l) return;
       if (!emettre('vf-agent:ouvrir', { id: l.id, kind: l.kind, declencheur }, true)) return;
-      if (declencheur === 'rapport') return; // la fiche (74) annule et ouvre ; sans elle, un rapport ne fait rien
-      ui.basculer(l.cle, declencheur === 'ancre' || !ui.deplie().includes(l.cle));
+      // la fiche (74) annule et ouvre ; sans elle, ni le nom ni le rapport ne font rien. Seule l'ancre garde son geste : défiler et focaliser la
+      // ligne, que la fiche lit à froid (74-vf-fiche.js : focus dans la ligne de l'agent = ancre déjà consommée, la fiche s'ouvre à sa place)
       if (declencheur === 'ancre') { li.scrollIntoView({ block: 'center' }); (li._t || li).focus(); }
     };
     const ancre = (id, kind) => {
@@ -143,17 +143,13 @@
       if (e.defaultPrevented) return;
       if (e.key === 'Enter' && recherche && e.target === recherche) { const li = ui.premiere(); if (li) { e.preventDefault(); li._t.focus(); } return; }
       if (e.key !== 'Escape') return;
-      const o = ui.deplie(), a = D.activeElement, fl = a && a.closest ? a.closest('li[data-vf-cle]') : null;
-      if (o.length) { // cran 2 : un détail déplié se replie, le focus revient à son bouton
-        const li = ui.basculer(fl && o.includes(fl.getAttribute('data-vf-cle')) ? fl.getAttribute('data-vf-cle') : o[o.length - 1], false);
-        e.preventDefault(); e.stopPropagation(); if (li && li._t) li._t.focus(); return;
-      }
+      // le cran 2 (un détail déplié se replie) est retiré avec le détail
       if (recherche && recherche.value) { recherche.value = ''; ui.filtrer(''); e.preventDefault(); e.stopPropagation(); } // cran 3 ; cran 4 : rien
     });
     if (recherche) ecouter(recherche, 'input', () => ui.filtrer(recherche.value));
     ecouter(D, 'vf-regie:aller', (e) => aller(e.detail && e.detail.section));
     ecouter(D, 'vf-regie:redessiner', () => rendre());
-    const nettoyerQ = QS.monter ? QS.monter(racine) : () => {}; // 73-11 : Échap des replis, après celui du détail en flux
+    const nettoyerQ = QS.monter ? QS.monter(racine) : () => {}; // 73-11 : Échap des replis des questions, après celui de la recherche
     ecouter(D, 'vf:onglet', (e) => { if (e.detail && e.detail.onglet === 'equipe' && String(W.location.hash || '') !== luHash) fragment(); });
     const relireMissions = () => { // l'enveloppe d'Équipe a changé : on relit ses missions, le dessin suit ; une lecture refusée garde les missions connues
       if (A.graphePose() !== 'equipe') return;

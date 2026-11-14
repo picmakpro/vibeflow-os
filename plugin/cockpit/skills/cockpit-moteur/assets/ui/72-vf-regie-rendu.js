@@ -19,7 +19,7 @@
   };
 
   function monter(racine) {
-    let seq = 0; const cache = new Map(), secs = new Map(), ouverts = new Set(), replies = new Set(), parentDe = new Map(); let avous = null;
+    let seq = 0; const cache = new Map(), secs = new Map(), replies = new Set(), parentDe = new Map(); let avous = null;
     const entete = h('div'), h1 = h('h1'), sous = h('p', 'vf-rg-sous'), verrou = h('p', 'vf-rg-verrou'), live = h('div');
     entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou); cacher(verrou, true);
     live.setAttribute('role', 'status'); live.setAttribute('aria-live', 'polite'); live.className = 'vf-rg-live';
@@ -44,10 +44,10 @@
       qui.append(r.nom, r.role); quoi.append(r.mot, r.det, r.l2); dur.append(r.di, r.dv); row.append(qui, quoi, dur, act); li.append(row);
       return li;
     };
-    // le nom est le bouton d'ouverture du détail (spec § 7) : le bouton enveloppe l'élément du nom, qui reste écrit une fois
+    // le nom est le bouton qui ouvre la fiche de l'agent (74), il ne déplie rien : pas d'aria-expanded ; il enveloppe l'élément du nom, écrit une fois
     const tog = (li) => {
       const r = li._r, b = h('button', 'vf-rg-tog'), l1 = h('div', 'vf-rg-l1');
-      b.setAttribute('type', 'button'); b.setAttribute('aria-expanded', 'false'); b.setAttribute('aria-labelledby', r.id); b.append(r.nom);
+      b.setAttribute('type', 'button'); b.setAttribute('aria-labelledby', r.id); b.append(r.nom);
       l1.append(b); r.qui.insertBefore(l1, r.qui.firstChild); li._l1 = l1; return b;
     };
     // le caret n'est posé que sur le parent qui a des enfants (spec § 3) : il replie ou rouvre ses sous-agents, ouvert par défaut
@@ -79,9 +79,8 @@
         if (li._gn) li._gn.remove();
         r.row.prepend(g); li._gn = g; li._g = l.etat;
       }
-      const agent = l.kind === 'session' || l.kind === 'subagent', ouvert = agent && ouverts.has(l.cle);
+      const agent = l.kind === 'session' || l.kind === 'subagent';
       if (agent && !li._t) li._t = tog(li);
-      if (li._t) attr(li._t, 'aria-expanded', ouvert ? 'true' : 'false');
       if (li._t) caret(li, l);
       ecrire(r.nom, l.nom); ecrire(r.role, l.role); ecrire(r.mot, l.mot); ecrire(r.det, l.detail); ecrire(r.l2, l.ligne2.join(' · '));
       if (l.infobulle) attr(r.det, 'title', l.infobulle); else if (r.det.hasAttribute('title')) r.det.removeAttribute('title');
@@ -141,7 +140,7 @@
         ecrire(r.pied, [s.pied, s.autresTexte].filter(Boolean).join(' ')); cacher(r.pied, !r.pied.textContent);
         ecrire(r.sm, s.relusTitre); synchro(r.ulr, s.relus.map(ligne)); cacher(r.det, s.relus.length === 0);
       }
-      for (const [k, li] of cache) if (!vus.has(k)) { li.remove(); cache.delete(k); ouverts.delete(k); }
+      for (const [k, li] of cache) if (!vus.has(k)) { li.remove(); cache.delete(k); }
       for (const li of cache.values()) {
         if (!li._c) continue;
         const ids = [...cache.values()].filter((x) => x._ln && x._ln.parent === li._ln.id && x._ln.niveau > 0 && x.id).map((x) => x.id);
@@ -159,7 +158,7 @@
       }
     };
 
-    // ---------- recherche, ouverture de la ligne, bascule ----------
+    // ---------- recherche, repli des sous-agents, bascule de vue ----------
     const filtrer = (q) => {
       q = norme(q).trim(); let total = 0;
       for (const [cle, li] of cache) {
@@ -170,11 +169,6 @@
       cacher(note, !(q && total === 0));
     };
     const premiere = () => { for (const li of racine.querySelectorAll('li[data-vf-cle]')) if (!li.hasAttribute('hidden') && li._t) return li; return null; };
-    const basculer = (cle, oui) => {
-      const li = cache.get(cle); if (!li || !li._ln) return null;
-      if (oui) ouverts.add(cle); else ouverts.delete(cle);
-      majLigne(li, li._ln); return li;
-    };
     const replier = (cle) => { // le caret d'un parent : replie ou rouvre ses sous-agents
       const li = cache.get(cle); if (!li || !li._ln) return null;
       if (replies.has(li._ln.id)) replies.delete(li._ln.id); else replies.add(li._ln.id);
@@ -195,9 +189,9 @@
       }
       for (const v of liste) { const c = vue(v.id); cacher(c, v.id !== choisie); }
     };
-    return { rendre, filtrer, premiere, basculer, replier, bascule, vue, entete,
+    return { rendre, filtrer, premiere, replier, bascule, vue, entete,
       ligne: (cle) => cache.get(cle) || null, lignes: (id) => [...cache.values()].filter((li) => li._ln && (li.getAttribute('data-vf-agent') === id)),
-      titre: (id) => (secs.has(id) ? secs.get(id).h2 : null), deplie: () => [...ouverts] };
+      titre: (id) => (secs.has(id) ? secs.get(id).h2 : null) };
   }
   window.__vfRegieRendu = { monter, glyphe };
 })();
