@@ -68,7 +68,11 @@ export function creerRepartiteur({ table, contexte, repondre, json, acces, log =
       if (!e) return false;
       const [lecteur, regime] = e;
       if (regime === FLUX) lecteur(contexte, req, url, res);
-      else if (regime === HISTORIQUE) { const v = lecteur(contexte, req, url); if (estReponse(v)) json(res, v.code, v.corps); else json(res, 200, v); }
+      else if (regime === HISTORIQUE) {
+        const sortir = (v) => (estReponse(v) ? json(res, v.code, v.corps) : json(res, 200, v));
+        const r = lecteur(contexte, req, url); // 79-22 : un lecteur peut rendre une promesse (lecture d'un agent dans le fil), sinon `{}`
+        if (r && typeof r.then === 'function') r.then(sortir).catch(() => echec(res)); else sortir(r);
+      }
       else gardee(lecteur, req, res, url);
       return true;
     },

@@ -9,6 +9,7 @@
 //   JSON simple, comportement antérieur) et FLUX (le lecteur écrit le flux). Mécanisme : vf-cockpit-routes.mjs. Le sous-routeur Git (/api/vf/git…)
 //   et celui du lanceur (/api/vf/lancer/cibles · POST /api/vf/lancer, SEULEMENT sous `--terminal`) restent des délégués placés après la table.
 // GET /api/vf/state (79-12, SOCL-16) : l'état du cockpit en une enveloppe, lu en mémoire (vf-cockpit-state.mjs) ; jamais une collecte à la demande.
+// GET /api/vf/methode  jauges de la méthode à la demande (vibeflow/cockpit-jauges@1, P77-D-04)
 // GET /api/vf/frise (79-13, SOCL-17) : les voies des 24 dernières heures (heures, durées, jetons, segments, état officiel, nœud, cibles
 // réduites au lab), lues en mémoire (vf-cockpit-frise.mjs) ; jamais une collecte, jamais un fichier du lab.
 // GET /api/vf/graphe?onglet=code|projet|equipe (79-15, SOCL-19) : la donnée de la page de l'onglet, ETag et 304 ; événement `graphe` { seq, at,
@@ -23,8 +24,8 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { startLive } from './vf-cockpit-live.mjs';
-import { revealDoing, revealTranscript } from './vf-cockpit-who.mjs';
-import { resolveScriptsDir, trustedScriptsDir } from './vf-cockpit-paths.mjs';
+import { lireAgent } from './vf-cockpit-agents-table.mjs';
+import { trustedScriptsDir } from './vf-cockpit-paths.mjs';
 import { dossierModule, substituerModule } from './vf-cockpit-module.mjs';
 import { ID_RE } from './vf-cockpit-lecture.mjs';
 import { creerGraphes } from './vf-cockpit-graphe.mjs';
@@ -38,6 +39,7 @@ import { creerLancer } from './vf-cockpit-lancer.mjs';
 import { HISTORIQUE, FLUX, reponse, controlerAcces, creerRepartiteur } from './vf-cockpit-routes.mjs';
 import { lireState, LECTEURS } from './vf-cockpit-state.mjs';
 import { brancherFluxEtat, VIE_MS } from './vf-cockpit-flux-etat.mjs';
+import { lireMethode } from './vf-cockpit-methode.mjs';
 import { lireFrise } from './vf-cockpit-frise.mjs';
 import { brancherFluxFrise } from './vf-cockpit-frise-direct.mjs';
 import { routeActivite } from './vf-cockpit-activite.mjs';
@@ -72,11 +74,11 @@ const lireJournal = (c) => ({ evenements: c.journal });
 const idOuRefus = (url) => { const id = url.searchParams.get('id'); return typeof id === 'string' && ID_RE.test(id) ? id : null; };
 const lireDoing = (c, req, url) => { // jamais journalisée ni écrite : la réponse part et c'est tout
   const id = idOuRefus(url);
-  return id === null ? reponse(400, { erreur: 'id-invalide' }) : revealDoing(c.root, id, { scriptsDir: resolveScriptsDir(c.here) });
+  return id === null ? reponse(400, { erreur: 'id-invalide' }) : lireAgent('doing', id);
 };
 const lireTranscript = (c, req, url) => { // à la demande seulement, jamais journalisée ni écrite (P69-D-19)
   const id = idOuRefus(url);
-  return id === null ? reponse(400, { erreur: 'id-invalide' }) : revealTranscript(c.root, id, { scriptsDir: resolveScriptsDir(c.here) });
+  return id === null ? reponse(400, { erreur: 'id-invalide' }) : lireAgent('transcript', id);
 };
 const lireModeles = (c) => {
   let reel = c.root; try { reel = fs.realpathSync(c.root); } catch {} // le lab peut disparaître en cours de route : jamais une exception
@@ -109,6 +111,7 @@ export const ROUTES = [
   ['/api/vf/frise', lireFrise],
   ['/api/vf/graphe', (c, req, url) => c.routeGraphe(c, req, url)],
   ['/api/vf/journal', lireJournal, HISTORIQUE],
+  ['/api/vf/methode', lireMethode],
   ['/api/vf/modeles', lireModeles, HISTORIQUE],
   ['/api/vf/state', lireState],
   ['/api/vf/tracabilite', lireTracabilite],
@@ -128,7 +131,7 @@ export function attach({ here, root, token, log = () => {}, routes = ROUTES, scr
   });
 
   // lecture en mémoire (A31), jamais une collecte
-  const majGraphes = () => graphes.maj({ projet: instantane()?.projet, who: live ? live.snapshot()?.who : null, lancees: lancer.lancees() });
+  const majGraphes = () => graphes.maj({ projet: instantane()?.projet, who: live ? live.snapshot()?.who : null });
   // à l'attache (au premier besoin) et à chaque nouvel assemblage de la carte : le gabarit n'est plus relu à chaque événement du direct
   const load = () => {
     charge = true;
@@ -162,7 +165,7 @@ export function attach({ here, root, token, log = () => {}, routes = ROUTES, scr
   const aClient = () => clients.size > 0 || LECTEURS.actif(); // garde:lecteur-arme
   let live = null;
   try {
-    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => diffuser(nom, data), aClient, nbClients: () => clients.size, garde: (o) => !porteInterdit(o) }); // AUDC-H2 : le filet ne collecte que si un onglet écoute ; garde : l'instantané passe la garde d'émission avant sa pose
+    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => diffuser(nom, data), aClient, nbClients: () => clients.size, garde: (o) => !porteInterdit(o), lancees: () => lancer.lancees() }); // 73-08 (P73-D-21) : la ligne « Lancée depuis la carte » est posée sur le `who` du direct, plus sur une carte. AUDC-H2 : le filet ne collecte que si un onglet écoute ; garde : l'instantané passe la garde d'émission avant sa pose
   } catch (e) { log('error', `direct indisponible : ${e.message}`); }
   const fluxEtat = brancherFluxEtat({ diffuser, seq: () => (live ? live.etat().seq : 0), nbClients: () => clients.size, vieMs }); // 79-12 : `vie` et `etat`
   const fluxFrise = brancherFluxFrise({ diffuser, seq: () => (live ? live.etat().seq : 0) }); // 79-13 : `frise` à la fin d'un tour de collecte

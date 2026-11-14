@@ -1,0 +1,13 @@
+# observateurs-baseline.txt — observateurs de mutations (forme constructeur) par fichier de ui/*.js (79-17, SOCL-21). Format : <fichier> <n>, trié, n > 0.
+# La baseline est serrée (réel = baseline). Une baisse : node plugin/cockpit/scripts/tests/observateurs-cliquet.mjs abaisser <dossier ui> <ce fichier>.
+# Une hausse exige dans le message du commit une citation d'arbitrage (canal et date) : la règle est « un ajout, un retrait », jamais un relèvement muet.
+00-vf-surcouches.js 1
+00-vibeflow.js 1
+01-vf-responsive.js 6
+02-vf-telephone.js 6
+03-vf-accessibilite.js 1
+05-theme.js 1
+41-vf-projet-vue.js 2
+42-vf-panneau-retour.js 1
+73-vf-tiroir-travail.js 1
+77-vf-git-tiroir.js 1

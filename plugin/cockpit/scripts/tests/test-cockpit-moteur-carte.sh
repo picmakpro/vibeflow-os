@@ -13,7 +13,7 @@
 #   K17 compteurs et homonymes du travail récent (PU-G-054, PU-G-049)
 #   K18 l'infobulle ne revient pas après une navigation par la recherche, sur Code (1 440 et 768 px) et Projet (PU-G-035, recette du 2026-11-08)
 #   K19 titres de la recherche : vrai nom de fichier sur Code seulement, titre lisible sur Projet (PU-G-050) ; dossier à point en tête (recette du 2026-11-08)
-#   K12 nœud d'une mission : état réel en glyphe et mot, plus de « 0 » ni de « 0 lines » (PU-G-105) · K13 onglet Équipe à 390 px : une seule colonne (PU-G-176)
+#   K12 nœud d'une mission : état réel en glyphe et mot, plus de « 0 » ni de « 0 lines » (PU-G-105) · K13 onglet Équipe à 390 px : une seule colonne de lignes de la régie (PU-G-176, re-pointé 73-08)
 # Un chargement de page unique (chrome-moteur-carte.mjs, un Chrome, profil jetable) ; les assertions se lisent ensuite sur sa sortie JSON. Lab construit par la suite, dans mktemp.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
 set -uo pipefail
@@ -140,9 +140,9 @@ assert_eq "K12.5 — PU-G-100 : le panneau de la phase 2 dit « Dépend de » (l
 assert_eq "K12.6 — PU-G-100 : le panneau de la phase 1 dit « Utilisé par » (la phase 2), pas « Dépend de »" "$(E "j.sens.p1.titres.join('|') + ' : ' + j.sens.p1.lignes.join('|')")" "Utilisé par : Phase 2 · Suite"
 assert_eq "K12.7 — PU-G-100 : l'ordre des cartes de phase est celui d'avant (la phase 1 avant la phase 2, lien non inversé)" "$(E "j.sens.ordre.join('>')")" "n:ph-1>n:ph-2"
 echo "=== K13 — onglet Équipe à 390 px ==="
-assert_eq "K13.1 — contrôle positif : la session porte une grille d'au moins 3 cartes" "$(E 'j.equipe.cartes >= 3')" "true"
-assert_eq "K13.2 — une seule colonne de cartes" "$(E 'j.equipe.colonnes')" "1"
-assert_eq "K13.3 — aucune carte ne déborde de l'écran" "$(E 'j.equipe.debordent')" "0"
+assert_eq "K13.1 — contrôle positif : la régie porte une colonne d'au moins 3 lignes (nouveau support : lignes de la régie, plus des cartes du canevas)" "$(E 'j.equipe.cartes >= 3')" "true"
+assert_eq "K13.2 — une seule colonne de lignes (bord droit commun à 390 px)" "$(E 'j.equipe.colonnes')" "1"
+assert_eq "K13.3 — aucune ligne ne déborde de l'écran" "$(E 'j.equipe.debordent')" "0"
 echo "=== K14 — panneau de détail par défaut ==="
 assert_eq "K14.1 — à 768 px le panneau de détail est fermé par défaut" "$(E 'j.panneau.a768')" "false"
 assert_eq "K14.2 — contrôle positif : à 1 024 px il est ouvert par défaut" "$(E 'j.panneau.a1024')" "true"

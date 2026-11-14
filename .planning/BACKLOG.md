@@ -755,3 +755,45 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - 75-01 (revue, m5) : le tri de la base commune multiple (`baseCommune`, historiques en croix) n'a pas de témoin ; les quatre autres mutants de m5 ont leur témoin (G11).
 
 **Déclencheur de reprise :** la prochaine passe sur l'activité du cockpit (75-07 ou la phase suivante qui la lit).
+
+## Cockpit : mineurs de la revue et de l'audit de la Phase 77 — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** une passe de `vf-reviewer` à chacun des deux points de fusion de la Phase 77 (têtes `cf945818` puis `d6bc84fb`) et une passe de `vf-auditer` (tête `cf945818`), régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Les majeurs (exécution d'un résolveur pris dans le lab observé, faux « rien de nouveau » sur une base git inconnue) sont corrigés dans la phase ; ce qui suit ne l'est pas.
+- **Route des jauges (77-03) :** un gate qui meurt après son en-tête (code autre que 0 ou 64, aucune ligne) donne onze jauges « non applicable » au lieu de « indisponible » ; le cache de 60 s garde aussi un résultat tout indisponible ; la liste fermée des verdicts se lit dans un objet ordinaire (jetons hérités du prototype acceptés : `Object.hasOwn` ou `Map`) ; `chemin` refuse `/`, `~` et une lettre de lecteur, pas les formes UNC ni les schémas (`file:`), côté serveur comme dans `74-vf-synthese-jauges.js` ; le délai de 10 s arrête le shell du gate, pas ses petits-enfants.
+- **Gates en TSV (77-01) :** la ligne TSV de densité est relue du rapport texte par un séparateur ` | ` qu'un nom de fichier peut contenir ; le gate de méthode suit un lien `.planning` sortant du lab (tailles seulement) ; la surcharge de test `VF_BUDGET_RESOLVER` est honorée hors des suites et l'environnement des gates lancés par le cockpit ne la retire pas (aucun cas ne la couvre) ; un gate copié à plat sans résolveur voisin rend le socle non vérifiable (dégradation voulue).
+- **Mémoire de visite (77-04, 77-08) :** un `vu` futur est accepté sans borne (rotation figée, date illisible pour une valeur extrême) ; au-delà de 8 192 octets (vers 165 phases) l'écriture est refusée et chaque visite redevient « première visite » sans le dire ; le bloc de visite ne s'abonne pas à `graphe` (fraîcheur différée au prochain `etat`, `who` ou `git`).
+- **Registre des blocs (77-06) :** `74-vf-synthese-burnup.js` et `74-vf-synthese-jauges.js` empilent leur entrée à chaque exécution du script au lieu de la remplacer (patron de `74-vf-synthese-visite.js`) ; la feuille `74-vf-synthese-style.js` est injectée au chargement, sur tout onglet.
+- **Blocages du STATE (77-02) :** le texte servi `t` masque les secrets mais garde un chemin absolu du poste, et le condensat `h` est calculé sur le texte non masqué.
+- **Bloc de visite et bloc coût (77-08, 77-07), seconde revue :** sur une base git inconnue, le bloc dit « Commits : non lus, le dépôt git est indisponible » alors que le dépôt est lisible, et « Tout vu » ne le rend jamais vide (libellé distinct à ajouter à l'UI-SPEC) ; `commitsArrives` rend « inconnu » quand le sommet manque des rangées lues, sans le dire ; le bloc coût relit `/api/vf/frise` tant que Projet est affiché, Synthèse fermée comprise (voulu par le plan) ; un 404 transitoire retire la section coût jusqu'au prochain aller-retour d'onglet.
+- **Design de la Synthèse (juge sur captures, 84/100, fin de phase) :** ligne-résumé de l'aperçu décalée de 12 px, interligne de 16 px et vide d'environ 50 px dessous (`74-vf-synthese.js`) ; bloc de visite réduit à son titre pendant la lecture (une ligne neutre à valider) ; `!important` sur la taille du `summary` (`74-vf-synthese-burnup.js`) et rayon de 8 px écrit en dur ; titres de bloc plus pâles que les têtes de groupe, blocs séparés par 24 px seulement : à arbitrer en recette (règle du viewer et de l'UI-SPEC).
+- **Libellé de Synthèse dès 1 600 px :** second palier de repli à poser dans `01-vf-responsive.js` (le bouton est en icône seule depuis la correction de R21 et R22 ; décision déléguée par Samuel, message session principale, 2026-11-08, prise par la session principale le 2026-11-14) ; à juger à la recette.
+- **Jauge « socle » :** en dépassement permanent sur le dépôt source alors que la baseline la tient pour égale ; la relation à la baseline est affichée à côté (77-06), le verdict n'est pas recalculé.
+
+**Déclencheur de reprise :** la prochaine phase qui touche la route des jauges, la mémoire de visite ou les blocs de la Synthèse.
+
+## Cockpit : mineurs de la revue du point de fusion 2 de la Phase 76 (pages 76-06 et 76-07) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** revue (`vf-reviewer`) des plans 76-06 et 76-07, une passe, verdict passed, aucun majeur ; régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale).
+- M1 : `74-vf-trace-sections.js` lit les exigences de l'entrée haute sans garde ; une réponse vide, indisponible ou en cours de collecte lève une erreur non rattrapée (console seule, l'entrée reste cachée).
+- M2 : les zones rendues de `74-vf-trace.js` ne sont élaguées qu'au rafraîchissement ; des conteneurs détachés restent retenus jusqu'à un événement ou au départ d'onglet (fuite bornée).
+- M3 : Échap retrouve la ligne d'origine par un sélecteur sans `CSS.escape` ; un chemin de preuve à guillemet ne rend pas le focus.
+- M4 : `ouvrirAgent` (`74-vf-trace-memoire.js`) avale l'échec de lecture ; un clic ne produit rien, ou une liste vide trompeuse pendant la collecte.
+- M5 : le marqueur d'injection des sondes ne couvre que le libellé d'exigence et les critères, pas les titres d'ADR, noms de mémoire ni sujets de commit (le code passe tout par `textContent`).
+- M6 : trois sondes Chrome à durcir : seuil de 150 ms contre une lecture à 40 ms (à-coup de CI), comparaison de défilement tautologique si le panneau ne défile pas, pause fixe sans témoin d'arrivée de l'événement.
+- Non sondé : l'état « collecte en cours » ne se relance que par la clé `planning` de `VF_ETAT` ; si la fin de la première collecte n'émet pas d'événement, la phrase reste jusqu'au prochain changement de panneau. À trancher avec le correctif de la clé `planning` annoncé par la Phase 79.
+
+**Déclencheur de reprise :** la passe du juge de design de fin de Phase 76, ou la prochaine retouche des fichiers `ui/74-vf-trace*.js`.
+
+## Cockpit : constats bas de l'audit de la régie (Phase 73, 73-05 et 73-07) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : non fixée.** **Origine :** audit `vf-auditer` de 73-05 et 73-07, une passe, verdict passed (aucun moyen ni haut).
+- **Témoins sensibles à la charge :** RG6.20 (témoin positif de la ligne verrou) et RG13.13 (aucun git relancé pendant dix lectures) rougissent en lot sous charge et verdissent seuls ; un faux rouge sur un témoin positif fait perdre la valeur du négatif qui le suit.
+- **Stockage « lu » :** la purge de 24 h ne vise que la clé du lab ouvert, au chargement ; les clés d'autres labs de la même origine ne sont jamais purgées.
+- **Identifiant du lecteur de repli :** pas de contrôle de forme côté page (la garde réelle est la route serveur).
+- **Lecteur de transcript :** une entrée nulle dans le fil lève une erreur non attrapée (pas de message « Indisponible »).
+- **Nom du lab voisin :** pas d'assainissement côté page des caractères de contrôle (assuré par le serveur).
+
+**Déclencheur de reprise :** la prochaine passe sur la page de la régie.
+- **Revue du point de fusion 2 de la Phase 73 (mineurs) :** `ouvrirRepli` émet `vf-agent:lu` même quand la lecture du transcript échoue, et deux clics rapprochés laissent le transcript le plus lent écraser le panneau ; `relireMissions` lance une lecture par événement `graphe` sans sérialisation (deux réponses croisées peuvent poser des missions plus anciennes).
+- **Durée d'un agent terminé (constat de la Phase 74) :** la régie calcule `dureeS` en tenue et compte les veilles de l'agent ; la spec ne tranche pas entre durée active et durée de tenue : à décider au prochain réglage de la régie.
+- **Juge design de fin de Phase 73 (74/100, passed ; mineurs) :** ligne 2 « nœud · arbre · branche » rendue sous Quoi au lieu de Qui, rôle sous la tâche au lieu d'avant ; colonne Quoi qui dérive de 361 à 376 px (grille par ligne) ; ligne de verrou plus bavarde que la spec § 6.1 ; ligne de phase `human_needed` avec le lien en double ; format de la ligne « ailleurs » et noms de lab en mono (§ 10) ; hors phase : à 800 px, la bascule de Projet recouvre son titre.
