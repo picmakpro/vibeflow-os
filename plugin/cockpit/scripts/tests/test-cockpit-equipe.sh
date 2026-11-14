@@ -940,6 +940,7 @@ JSON
   EKMOD="$WORK/ek-mod"
   ek_muter() {
     rm -f "$EKMOD"; rm -rf "$WORK/mod-ek"; local c r; c="$(cockpit_module_copie "$WORK/mod-ek")" || return 1
+    rm -f "$c"/skills/cockpit-moteur/assets/ui/74-vf-fiche*.js   # 74-08 : les mutants visent le lecteur de repli de la 73, que la fiche détourne sur la page complète
     cockpit_page_muter_litteral "$c" "$1" "$2" unique 2>/dev/null; r=$?; [ "$r" = 0 ] || { [ "$r" = 2 ] && echo "ancre ambiguë" || echo "ancre absente"; return 1; }
     if [ -n "${3:-}" ]; then cockpit_page_muter_litteral "$c" "$3" "$4" unique 2>/dev/null; r=$?; [ "$r" = 0 ] || { [ "$r" = 2 ] && echo "ancre ambiguë" || echo "ancre absente"; return 1; }; fi  # $3/$4 : seconde substitution (fusion de la 68 : deux règles de pied de carte)
     printf '%s' "$c" > "$EKMOD"; echo muté
@@ -1082,7 +1083,7 @@ JSON
   assert_eq "EK18.1 — mutant (le titre de la régie reçoit un tabindex) : masqué sous le tiroir Git, il devient un arrêt de Tab, détecté" "$(EK18M "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou);" "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou); h1.tabIndex = 0;" "true/true/true/true")" "muté|true/true/true/true"
   assert_eq "EK18.2 — mutant (l'en-tête de la régie porte un lien) : le lien, masqué sous le tiroir Git, redevient un arrêt de Tab, détecté" "$(EK18M "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou);" "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou); const lien = h('a', 'vf-link', 'x'); lien.setAttribute('href', '#'); entete.append(lien);" "true/true/true/true")" "muté|true/true/true/true"
   # témoins de la sonde de mutation elle-même
-  ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
+  ek_repli_module; printf '%s' "$WORK/mod-ek-sf" > "$EKMOD"; ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"; rm -f "$EKMOD"   # 74-08 : EK2.1 rejoué sur le repli, sans fiche
   assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "null|null|identique"
   assert_eq "EK7 — témoin de la sonde : un mutant dont l'ancre n'existe pas est refusé, aucune copie de module n'est posée, la page servie reste celle du module" "$(ek_muter 'ANCRE-QUI-N-EXISTE-PAS-70-11' 'x')|$([ ! -e "$EKMOD" ] && echo identique || echo differe)" "ancre absente|identique"
 fi
