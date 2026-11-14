@@ -152,6 +152,8 @@
 
     // ---------- clavier, clic, recherche ----------
     ecouter(racine, 'click', (e) => {
+      // 00-vibeflow.js annule le clic de tout élément sous [data-vf-section] (lien, résumé de repli) : il s'arrête ici, sans preventDefault
+      if (e.target && e.target.closest && e.target.closest('a[href], summary')) { e.stopPropagation(); return; }
       const b = e.target && e.target.closest ? e.target.closest('button, [data-vf-tout]') : null, li = b && b.closest('li[data-vf-cle]');
       if (!b) return;
       if (b.hasAttribute('data-vf-tout')) { if (tm && W.__vfRegieLu) { W.__vfRegieLu.toutMarquer(tm._ids); rendre(); } return; }
