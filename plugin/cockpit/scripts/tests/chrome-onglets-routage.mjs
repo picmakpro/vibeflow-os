@@ -194,6 +194,32 @@ await executer(chrome, async (s) => {
     });
   }
 
+  if (mode === 'og218') { // palette ouverte puis fermée par Échap, puis aller : la promesse se règle et la page répond (bornes : un gel ne gèle pas la suite)
+    const borne = (p, ms = 8000) => Promise.race([p, pause(ms).then(() => 'gel')]);
+    const touche = async (key, code, vk, text, modifiers = 0) => {
+      for (const type of ['keyDown', 'keyUp']) {
+        const txt = text && type === 'keyDown' ? { text } : {};
+        await s.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, modifiers, ...txt });
+      }
+    };
+    await sec('og218', async () => {
+      o.og218 = [];
+      const cas = [['/', '/', 'projet'], ['/', 'k', 'equipe'], ['/project.html?vue=couloirs', '/', 'code'], ['/equipe.html', 'k', 'projet']];
+      for (const [depart, ouvrir, cible] of cas) {
+        await charger(depart); await s.ev('document.body.focus()');
+        if (ouvrir === 'k') await touche('k', 'KeyK', 75, 'k', 2); else await touche('/', 'Slash', 191, '/');
+        await pause(500); const ouverte = await lire(`document.getElementById('palette').classList.contains('open')`);
+        await touche('Escape', 'Escape', 27); await pause(500);
+        const attente = `new Promise((ok) => setTimeout(() => ok('attente'), 5000))`;
+        const aller = `VF_ONGLETS.aller('${cible}').then(() => 'regle', () => 'rejet')`;
+        const r = await borne(s.ev(`(async () => JSON.stringify(await Promise.race([${aller}, ${attente}])))()`), 12000);
+        const vivante = await borne(s.ev('1 + 1'), 5000);
+        o.og218.push({ depart, ouvrir, cible, ouverte, r: typeof r === 'string' ? JSON.parse(r) : r, vivante });
+        if (o.og218[o.og218.length - 1].vivante === 'gel') break;
+      }
+    });
+  }
+
   if (mode === 'og3') {
     await sec('og3', async () => {
       await charger('/'); const id = await premier(); await s.ev(`VibeFlow.select(${JSON.stringify(id)})`); await pause(300);

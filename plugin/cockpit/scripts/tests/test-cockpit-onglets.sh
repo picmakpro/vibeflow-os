@@ -96,6 +96,9 @@ assert_eq "OG2.16 — aller('code') puis aller('projet') : la dernière demande,
   "$(E '[j.og216.evs, j.og216.p, j.og216.onglet]' "$R6")" '[["code<projet","projet<code"],"/project.html","projet"]'
 assert_eq "OG2.17 — Précédent pendant un chargement en vol : la dernière demande l'emporte, adresse et onglet concordent" \
   "$(E '[j.og217.p, j.og217.onglet]' "$R6")" '["/project.html","projet"]'
+R7="$(mesurer og218)"; sonde "$R7"
+assert_eq "OG2.18 — palette ouverte (/ ou Ctrl+K) puis fermée par Échap, puis aller : promesse réglée, page réactive (quatre départs)" \
+  "$(E 'j.og218.map((x) => [x.ouverte, x.r, x.vivante].join()).join(" ")' "$R7")" "true,regle,2 true,regle,2 true,regle,2 true,regle,2"
 echo "=== OG3 — chargement rejeté sans effet visible ==="
 R3="$(mesurer og3)"; sonde "$R3"; E3() { E "$1" "$R3"; }
 assert_eq "OG3.1 — lecture en échec, clic sur Projet : adresse, historique, titre, sélection, focus inchangés, aucun vf:onglet, aucun rejet non capté" \
@@ -119,7 +122,7 @@ R4="$(mesurer og2t)"; sonde "$R4"
 assert_eq "OG2.2 — le cadre du terminal est le même nœud, jamais rechargé, après un aller-retour d'onglet (tampon gardé)" \
   "$(E 'j.og22' "$R4")" '{"meme":true,"connecte":true,"charges":0}'
 echo "=== Sans erreur de pilote ==="
-ERR=""; for r in "$R1" "$R2" "$R3" "$R4" "$R5" "$R6"; do ERR="$ERR$(E 'Object.keys(j.erreurs).join()' "$r")"; done
+ERR=""; for r in "$R1" "$R2" "$R3" "$R4" "$R5" "$R6" "$R7"; do ERR="$ERR$(E 'Object.keys(j.erreurs).join()' "$r")"; done
 assert_eq "OG9 — aucune section du pilote n'a échoué" "$ERR" ""
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
