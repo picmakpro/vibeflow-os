@@ -40,6 +40,14 @@ AJOUT assets/ui/74-vf-synthese-memoire.js
 AJOUT assets/ui/74-vf-synthese-style.js
 AJOUT assets/ui/74-vf-synthese-visite.js
 AJOUT assets/ui/74-vf-synthese.js
+AJOUT assets/ui/74-vf-trace-decisions.js
+AJOUT assets/ui/74-vf-trace-exigence.js
+AJOUT assets/ui/74-vf-trace-liste.js
+AJOUT assets/ui/74-vf-trace-memoire.js
+AJOUT assets/ui/74-vf-trace-rendu.js
+AJOUT assets/ui/74-vf-trace-sections.js
+AJOUT assets/ui/74-vf-trace-style.js
+AJOUT assets/ui/74-vf-trace.js
 AJOUT assets/ui/75-vf-modele.js
 AJOUT assets/ui/76-vf-git-entete.js
 AJOUT assets/ui/77-vf-git-poignee.js
