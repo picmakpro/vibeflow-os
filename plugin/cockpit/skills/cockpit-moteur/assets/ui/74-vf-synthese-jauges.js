@@ -183,5 +183,6 @@
     return () => { lecture++; corpsCourant = null; ctxCourant = null; };
   }
   const R = (window.__vfSyntheseBlocs = window.__vfSyntheseBlocs || []);
+  for (let i = R.length - 1; i >= 0; i--) if (R[i] && R[i].id === 'methode') R.splice(i, 1);
   R.push(Object.freeze({ id: 'methode', titre: 'Santé de la méthode', installer, present: () => true, rendre, ouvrir }));
 })();

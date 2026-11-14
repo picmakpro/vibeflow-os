@@ -65,10 +65,12 @@ async function onglets(s) {
   await s.attendre(`${BADGE}.includes('1 au travail')`, 'pastille « 1 au travail »');
   await s.attendre("window.VF_ETAT.lire('connexion') === 'ouvert'", 'connexion ouverte');
   R.n0 = await s.ev('JSON.stringify(window.VF_ETAT.abonnes())');
-  R.pas = [];
+  R.pas = []; const froid = {};
   for (const o of ['code', 'equipe', 'projet', 'projet', 'code', 'equipe']) {
     await s.ev(`window.VF_COQUILLE.chargerOnglet('${o}')`);
-    R.pas.push([o, (await s.ev('JSON.stringify(window.VF_ETAT.abonnes())')) === R.n0 && (await s.ev('performance.timeOrigin')) === R.t0]); // jamais un rechargement de page
+    // référence d'un chargement à froid : Code et Équipe n'inscrivent rien (n0) ; Projet porte les abonnés de la Synthèse (77), constants à chaque visite
+    const n = await s.ev('JSON.stringify(window.VF_ETAT.abonnes())'); if (o === 'projet' && froid.projet === undefined) froid.projet = n;
+    R.pas.push([o, n === (o === 'projet' ? froid.projet : R.n0) && (await s.ev('performance.timeOrigin')) === R.t0]); // jamais un rechargement de page
   }
   R.badge = await s.ev(BADGE);
   R.memeObjet = await s.ev(`performance.timeOrigin === ${R.t0} && window.VF_ETAT.lire('who') !== null`);

@@ -140,5 +140,6 @@
     return () => { if (mql) mql.removeEventListener('change', refaire); clearTimeout(minuterie); if (off) off(); corpsCourant = null; ctxCourant = null; };
   }
   const R = (window.__vfSyntheseBlocs = window.__vfSyntheseBlocs || []);
+  for (let i = R.length - 1; i >= 0; i--) if (R[i] && R[i].id === 'burnup') R.splice(i, 1);
   R.push(Object.freeze({ id: 'burnup', titre: 'Burn-up du jalon', installer, present: () => true, rendre, ouvrir: () => {} }));
 })();
