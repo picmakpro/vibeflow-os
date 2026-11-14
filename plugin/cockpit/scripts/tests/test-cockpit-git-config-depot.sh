@@ -741,10 +741,49 @@ assert_eq "M-ABSENT-LARGE.0 — l'ancre existe (absent élargi à code 128, éch
 assert_eq "M-ABSENT-LARGE — rougit D10.4 (code 128) et D10.6 (échéance passée) ; D10.1, D10.2, D10.3 et D10.5 restent verts" "$(lk_d10 "$WORK/mut-absent-large" sans-git)/$(lk_d10 "$WORK/mut-absent-large" avec-git)/$(lk_d10 "$WORK/mut-absent-large" faux "$AUX/g128")/$(lk_d10 "$WORK/mut-absent-large" lent "$AUX/glent")/$(lk_d10 "$WORK/mut-absent-large" echeance)" "true,false,true|true,false,true/false,false,false|false,false,false/true,false,true|true,false,true/false,true,true|false,true,true/true,false,true|true,false,true"
 assert_eq "M-ABSENT — rougit D10.1 : git introuvable redevient « délai » (absent=false, delai=true), le refus reste fermé ; D10.2 reste vert" "$(lk_d10 "$WORK/mut-absent" sans-git)|$(lk_d10 "$WORK/mut-absent" avec-git)" "false,true,true|false,true,true|false,false,false|false,false,false"
 # Limite connue gardée : la lecture des pilotes lance toujours `git`, le lancement suit `binaire` (réservé aux tests). Aucun appelant de production ne doit le passer.
-lk_bin() { find "$1" -type f \( -name '*.mjs' -o -name '*.js' \) -not -path '*/tests/*' -not -path '*/node_modules/*' -exec grep -hE '(^|[^A-Za-z_])binaire[[:space:]]*:' {} + 2>/dev/null | grep -vE '^[[:space:]]*(//|\*)' | wc -l | tr -d ' '; }
-assert_eq "D10.7 — aucun appelant de production (module du cockpit hors tests) ne passe le paramètre binaire à lancerGit ni à lancerGitAsync (0 occurrence de « binaire: »)" "$(lk_bin "$SCRIPTS/..")" "0"
+cat > "$AUX/binaire.mjs" <<'JS'
+// binaire.mjs <racine du module> : écarts à « aucun appelant de production ne passe `binaire`, et le défaut est le littéral 'git' » — indépendant de la graphie.
+// (1) tout appel lancerGit( / lancerGitAsync( (hors définition) dont le texte d'arguments (parenthèses équilibrées, chaînes comprises) contient le mot « binaire » ou une clé calculée `[…]:` ;
+// (2) les deux signatures de vf-cockpit-git-lanceur.mjs portent exactement « binaire = 'git' » (provenance du défaut : ni variable d'environnement, ni autre source). Une ligne par écart ; NV si rien n'est examiné.
+import fs from 'node:fs'; import path from 'node:path';
+const mod = process.argv[2]; const fichiers = []; const ecarts = []; let appels = 0;
+const marche = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) { if (e.name !== 'tests' && e.name !== 'node_modules') marche(p); } else if (/\.(mjs|js)$/.test(e.name)) fichiers.push(p); } };
+marche(mod);
+const argsDe = (s, i) => { let p = 0, q = null; for (let j = i; j < s.length; j++) { const c = s[j]; if (q) { if (c === '\\') { j++; continue; } if (c === q) q = null; continue; } if (c === '"' || c === "'" || c === '`') { q = c; continue; } if (c === '(') p++; else if (c === ')') { p--; if (p === 0) return s.slice(i, j + 1); } } return s.slice(i); };
+for (const f of fichiers) {
+  const s = fs.readFileSync(f, 'utf8'); const re = /\blancerGit(?:Async)?\s*\(/g; let m;
+  while ((m = re.exec(s))) {
+    if (/function\s+$/.test(s.slice(Math.max(0, m.index - 16), m.index))) continue;
+    appels++; const a = argsDe(s, m.index + m[0].length - 1);
+    if (/\bbinaire\b|[{,]\s*\[[^\]\n]*\]\s*:/.test(a)) ecarts.push(`${path.basename(f)}:${s.slice(0, m.index).split('\n').length} appel avec binaire ou clé calculée`);
+  }
+}
+const lk = fichiers.find((f) => path.basename(f) === 'vf-cockpit-git-lanceur.mjs');
+const src = lk ? fs.readFileSync(lk, 'utf8') : '';
+for (const nom of ['lancerGit', 'lancerGitAsync']) {
+  const sig = new RegExp(`export (?:async )?function ${nom}\\(([^\\n]*)\\)\\s*\\{`).exec(src);
+  const b = sig && /binaire\s*=\s*([^,}]+)/.exec(sig[1]);
+  if (!b || b[1].trim() !== "'git'") ecarts.push(`${nom} : défaut de binaire ${b ? b[1].trim() : 'absent'} (attendu 'git')`);
+}
+if (appels === 0) ecarts.push('NON-VERIFIABLE : aucun appel examiné');
+for (const e of ecarts) console.log(e);
+JS
+lk_bin() { node "$AUX/binaire.mjs" "$1" | wc -l | tr -d ' '; }
+assert_eq "D10.7 — aucun appelant de production ne passe binaire à lancerGit ni à lancerGitAsync (toute graphie : clé nue, entre guillemets, calculée, abrégée) et le défaut des deux signatures est le littéral 'git' (0 écart)" "$(lk_bin "$SCRIPTS/..")" "0"
 mutant_sur binaire vf-cockpit-git-lanceur.mjs '// A1 : jamais lancé' '// A1 : jamais lancé' >/dev/null; printf 'import { lancerGit } from "./vf-cockpit-git-lanceur.mjs";\nlancerGit(process.cwd(), ["status"], { binaire: "/x/git" });\n' > "$WORK/mut-binaire/injecte.mjs"
 assert_eq "M-BINAIRE — rougit D10.7 : un appelant qui passe binaire (fichier injecté dans une copie) est compté (1) ; la copie sans injection compte 0" "$(lk_bin "$WORK/mut-binaire")|$(rm -f "$WORK/mut-binaire/injecte.mjs"; lk_bin "$WORK/mut-binaire")" "1|0"
+# M-BINAIRE-GRAPHIE : une graphie de plus que « binaire: » nue ; chacune rougit D10.7 (un écart), la copie témoin en compte 0
+mutant_sur binaire-quote vf-cockpit-git-lanceur.mjs '// A1 : jamais lancé' '// A1 : jamais lancé' >/dev/null; printf 'import { lancerGitAsync } from "./vf-cockpit-git-lanceur.mjs";\nawait lancerGitAsync(process.cwd(), ["status"], { fin: 0, \x27binaire\x27: \x27git\x27 });\n' > "$WORK/mut-binaire-quote/injecte.mjs"
+mutant_sur binaire-abrege vf-cockpit-git-lanceur.mjs '// A1 : jamais lancé' '// A1 : jamais lancé' >/dev/null; printf 'import { lancerGitAsync } from "./vf-cockpit-git-lanceur.mjs";\nconst binaire = \x27git\x27;\nawait lancerGitAsync(process.cwd(), ["status"], { fin: 0, binaire });\n' > "$WORK/mut-binaire-abrege/injecte.mjs"
+mutant_sur binaire-calcule vf-cockpit-git-lanceur.mjs '// A1 : jamais lancé' '// A1 : jamais lancé' >/dev/null; printf 'import { lancerGitAsync } from "./vf-cockpit-git-lanceur.mjs";\nawait lancerGitAsync(process.cwd(), ["status"], { fin: 0, [\x27bin\x27 + \x27aire\x27]: \x27git\x27 });\n' > "$WORK/mut-binaire-calcule/injecte.mjs"
+assert_eq "M-BINAIRE-GRAPHIE — rougit D10.7 : clé entre guillemets, forme abrégée { binaire }, clé calculée (un écart chacune)" "$(lk_bin "$WORK/mut-binaire-quote")|$(lk_bin "$WORK/mut-binaire-abrege")|$(lk_bin "$WORK/mut-binaire-calcule")" "1|1|1"
+# M-BINAIRE-DEFAUT : la provenance du défaut (variable d'environnement) rougit D10.7 pour chacune des deux signatures
+LK_NB="$(mutant_sur binaire-env vf-cockpit-git-lanceur.mjs "binaire = 'git' } = {}) {" "binaire = process.env.VF_COCKPIT_GIT || 'git' } = {}) {")"
+assert_eq "M-BINAIRE-DEFAUT.0 — l'ancre de lancerGit existe" "$LK_NB" "muté"
+assert_eq "M-BINAIRE-DEFAUT — rougit D10.7 : un défaut tiré de l'environnement est un écart (1 ; la signature asynchrone, intacte, reste verte)" "$(lk_bin "$WORK/mut-binaire-env")" "1"
+LK_NC="$(mutant_sur binaire-env-async vf-cockpit-git-lanceur.mjs "binaire = 'git', fin } = {}) {" "binaire = process.env.VF_COCKPIT_GIT || 'git', fin } = {}) {")"
+assert_eq "M-BINAIRE-DEFAUT.1 — l'ancre de lancerGitAsync existe" "$LK_NC" "muté"
+assert_eq "M-BINAIRE-DEFAUT.2 — idem pour la signature asynchrone (1)" "$(lk_bin "$WORK/mut-binaire-env-async")" "1"
 echo "=== D5 — aucune trace hors du dossier temporaire ==="
 HORS="$(find "$SCRIPTS/.." -newer "$AUX/sonde.mjs" -type f \( -name 'SSH' -o -name 'UPLOAD' -o -name 'GPG' -o -name 'CLE-*' \) 2>/dev/null | head -3)"
 assert_eq "D5.1 — aucun marqueur de leurre dans l'arbre du module" "$HORS" ""
