@@ -218,12 +218,15 @@
   const SEL = ':scope > .rel, :scope > button, :scope > .vf-hdr-groupe > .vf-hdr-rangee > *, #hdr-ext > button, #hdr-ext > .rel';
   const unites = () => (colDroite ? [...colDroite.querySelectorAll(SEL)].filter((e) => e.id !== 'vf-plus' && e.id !== 'vf-git-ouvreur') : []);
   const cleDe = (e) => (e.classList.contains('rel') ? (e.querySelector('button') || e).id : e.id);
+  // le « ⋯ » (vf-plus) se cherche par id dans le document, la colonne a été prise une fois : après un changement d'onglet, un rappel de l'ancienne page
+  // visait une colonne détachée avec le « ⋯ » de la nouvelle (NotFoundError). Le repère n'est valable que s'il est un enfant direct de CETTE colonne.
+  const repere = () => { const p = document.getElementById('vf-plus'); return p && p.parentNode === colDroite ? p : null; };
   const deranger = () => {
     if (!colDroite || !colDroite.querySelector(':scope > .vf-hdr-groupe')) return;
     const rang = (e) => { const i = (origine || []).findIndex((x) => x[0] === e); return i < 0 ? 1e6 : i; };
     for (const e of unites().sort((a, b) => rang(a) - rang(b))) {
       const o = (origine || []).find((x) => x[0] === e);
-      if ((o ? o[1] : extHdr) === extHdr && extHdr) extHdr.appendChild(e); else colDroite.insertBefore(e, document.getElementById('vf-plus'));
+      if ((o ? o[1] : extHdr) === extHdr && extHdr) extHdr.appendChild(e); else colDroite.insertBefore(e, repere());
     }
     for (const g of colDroite.querySelectorAll(':scope > .vf-hdr-groupe')) g.remove();
   };
@@ -245,7 +248,7 @@
         const l = document.createElement('span'), r = document.createElement('div');
         l.className = 'vf-hdr-lib'; l.id = 'vf-hdr-lib-' + cle; l.textContent = tr(lib);
         r.className = 'vf-hdr-rangee'; g.setAttribute('aria-labelledby', l.id); g.append(l, r);
-        colDroite.insertBefore(g, document.getElementById('vf-plus'));
+        colDroite.insertBefore(g, repere());
       }
       cibles.push([g.lastElementChild, []]);
     }
