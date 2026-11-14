@@ -463,7 +463,7 @@ lk_mut_moteur() { # NOM ANCRE REMPLACEMENT : construit une copie du lab, l'assem
   o="$l/lab/.vibeflow/cockpit"
   echo "cfg=$(compte "$MK_CFG" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") cac=$(compte "$MK_CAC" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") ign=$(compte "$MK_IGN" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") ext=$(compte "$MK_EXT" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") pos=$([ "$(compte "$MK_POS" "$o/index.html")" -ge 1 ] && [ "$(compte 'src/interne.sh' "$o/graph.json")" -ge 1 ] && [ "$(compte "$MK_LEU" "$o/index.html")" -ge 1 ] && echo oui || echo non)"
 }
-lk_mut_moteur membre "|| seen.has(toPosix(path.relative(rootReal, r)));" "|| true;" > "$AUX/mm-membre.val"
+lk_mut_moteur membre "|| seen.has(toPosix(path.relative(rootReal, rn)));" "|| true;" > "$AUX/mm-membre.val"
 assert_eq "M-MEMBRE.0 — l'ancre du mutant existe (le lien est jugé sur l'appartenance de sa cible à la liste du moteur)" "$(cat "$AUX/mm-membre.res")" "muté"
 LK_MM="$(cat "$AUX/mm-membre.val")"
 assert_eq "M-MEMBRE — rougit A8, A9 et A10 (le lien n'est plus jugé que sur « sa cible est dans le lab » : configuration du dossier git, sortie du cockpit et fichier ignoré sortent) ; A12 reste vert (la cible extérieure est encore refusée)" "$(printf '%s' "$LK_MM" | sed 's/ pos=.*//')" "cfg=4 cac=4 ign=4 ext=0"
@@ -502,6 +502,18 @@ FROM="function lisibleDansLab(p) {" TO="function lisibleDansLab(p) { if (!fs.lst
 assert_eq "M-DERNIER-ELEMENT.0 — l'ancre du mutant existe (la garde de confinement est la fonction lisibleDansLab de scan.mjs)" "$(cat "$AUX/mm-a15.res")" "muté"
 assert_eq "M-DERNIER-ELEMENT — rougit A15.1 : jugée sur le seul dernier élément (et seulement s'il est un lien), la garde laisse sortir les deux fichiers extérieurs ; le témoin positif reste vert" "$(lk_a15_sortie "$LK_MM15/scripts")" "up=5 int=5 pos=oui"
 
+# nom stocké en NFD sur le disque, suivi par git en NFC (core.precomposeunicode, défaut macOS) : la garde compare aussi en NFC, sinon ces fichiers disparaissent en silence
+MK_NFD="MKNOM-NFD-SUIVI-EN-NFC"; LK_N="$LK_RACINE/a15nfd/lab"; mkdir -p "$LK_N/src"; mkplan "$LK_N"
+printf '#!/bin/sh\n# %s : nom stocké décomposé.\necho ok\n' "$MK_NFD" > "$LK_N/src/$(printf 'e\314\201te\314\201.sh')"
+G "$LK_N" init -q; G "$LK_N" -c core.precomposeunicode=true add -A >/dev/null 2>&1
+LK_NNFD=""; for f in "$LK_N/src"/*.sh; do LK_NNFD="$(printf '%s' "${f##*/}" | od -An -tx1 | tr -d ' \n')"; done
+lk_a15n() { local o="$LK_N/.vibeflow/cockpit"; rm -rf "$o"; node "$1/vf-cockpit-build.mjs" "$LK_N" --quiet > "$AUX/a15n.out" 2>&1; echo "nfd=$(compte "$MK_NFD" "$o/index.html" "$o/.cache/scan.json" | awk '{print ($1>0)?"lu":"perdu"}')"; }
+assert_eq "A15.2 — nom stocké en NFD, suivi par git en NFC : le fichier reste lu (garde comparée en NFC des deux côtés) ; témoin : le disque porte bien la forme décomposée" "$(lk_a15n "$SCRIPTS") $([ "$LK_NNFD" = '65cc817465cc812e7368' ] && echo nfd-disque || echo disque-normalise)" "nfd=lu nfd-disque"
+
+LK_MN="$WORK/mm-a15n"; rm -rf "$LK_MN"; mkdir -p "$LK_MN/scripts" "$LK_MN/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$LK_MN/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$LK_MN/skills/cockpit-moteur"
+FROM="const a = attendu.normalize('NFC'), n = r.normalize('NFC'); const rn = rootReal + path.sep + path.relative(rootReal, r).normalize('NFC');" TO="const a = attendu, n = r; const rn = r;" node "$AUX/mutsub.mjs" "$LK_MN/skills/cockpit-moteur/scripts/scan.mjs" > "$AUX/mm-a15n.res" 2>&1
+assert_eq "M-NFC.0 — l'ancre du mutant existe (la comparaison en NFC des deux côtés est dans lisibleDansLab de scan.mjs)" "$(cat "$AUX/mm-a15n.res")" "muté"
+assert_eq "M-NFC — rougit A15.2 : sans normalisation, le nom stocké en NFD n'égale plus le nom de la liste git et le fichier disparaît" "$(lk_a15n "$LK_MN/scripts")" "nfd=perdu"
 echo "=== G18 — verrou de pilotage, gitdir et inclusion à maillon divergent (gitSortant) ==="
 LK_Y="$LK_RACINE/g18"
 lk_depot() { mkdir -p "$1"; "$GIT_REEL" init -q "$1"; }

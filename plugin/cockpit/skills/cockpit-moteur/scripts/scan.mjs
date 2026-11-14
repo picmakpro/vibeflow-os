@@ -74,7 +74,9 @@ function lisibleDansLab(p) {
   const attendu = rootReal + path.sep + p.split('/').join(path.sep);
   const r = cheminPhysique(attendu);
   if (r === null || !r.startsWith(rootReal + path.sep)) return false;
-  return r === attendu || r.toLowerCase() === attendu.toLowerCase() || seen.has(toPosix(path.relative(rootReal, r)));
+  // la liste git est en NFC (core.precomposeunicode) alors que le disque peut garder le nom en NFD : on compare en NFC des deux côtés
+  const a = attendu.normalize('NFC'), n = r.normalize('NFC'); const rn = rootReal + path.sep + path.relative(rootReal, r).normalize('NFC');
+  return n === a || n.toLowerCase() === a.toLowerCase() || seen.has(toPosix(path.relative(rootReal, rn)));
 }
 for (const { path: p, repo } of fileList) {
   const abs = path.join(root, p);
