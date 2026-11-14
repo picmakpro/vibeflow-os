@@ -65,7 +65,7 @@ voiles s'écrivent `rgba(var(--ink), α)` pour suivre le thème tout seuls.
 
 | Sens | Variable | Sombre | Clair |
 |---|---|---|---|
-| Récent / fait, succès | `--recent` (encre dessus `--on-recent-text`) | `#9ece6a` | `#009e5a` |
+| Récent / fait, succès, en cours d'écriture | `--recent` (encre dessus `--on-recent-text`) | `#9ece6a` | `#009e5a` |
 | Sévérité haute (erreur, bloqué) | `--sev-high` | `#ff9aa8` | `#f2384a` |
 | Sévérité moyenne (attention, en cours) | `--sev-medium` | `#ffe08a` | `#b88100` |
 | Sévérité basse | `--sev-low` | `#8b8b8b` | `#666666` |
@@ -105,6 +105,7 @@ Texte d'état (le texte coloré lit au moins 4,5:1) :
   infra, external…).
 - Types de liens : `--k-*` (import, http, call, rpc, event, queue, data, config, contains).
 - Méthodes HTTP : `--m-*` (GET, POST, PUT, PATCH, DELETE, CALL, ANY).
+- Lentilles d'activité (Phase 75) : points chauds, couplage, gardes et empreinte marquent une carte par un glyphe neutre et un mot, jamais par une teinte ; la seule teinte est `--recent` (écriture en cours).
 
 Ces familles ont une valeur sombre et une valeur claire. Une nouvelle catégorie réutilise une
 couleur existante avant d'en créer une.
@@ -149,7 +150,7 @@ Seules deux graisses servent vraiment, 500 et 600. Le 700 est réservé à un ca
   contrôles et gardent 12 en haut, en bas et côté bouton (barre du tiroir, `#flowbar`, `#ask-warn`).
 - **Gouttière de carte** : `--gutter` 24 px (réserve d'ombre, égale à la constante `GUTTER` du
   viewer). **Panneau latéral** : `--panel-w` 360 px (+ 32 px de marge, `--pw`).
-- **Carte** : padding 16 sur les quatre côtés (`--inset-card`), gap 8 px entre ses lignes.
+- **Carte** : padding 16 sur les quatre côtés (`--inset-card`), gap 8 px entre ses lignes. Sur l'onglet Code, un pied de 28 unités est réservé à toute carte marquable, posé à la construction du graphe : la géométrie ne change ni avec la lentille ni avec la présence de git. Le contour pointillé de 1,5 px de la carte prévue se pose en `outline` à décalage négatif, sans bordure : le contenu ne bouge pas.
 - **Rayons** :
 
 | Élément | Variable / valeur |
@@ -170,14 +171,16 @@ serait 8, mais les rayons ne font pas partie de la grille d'espacement.
 ## 5. Composants
 
 - **Carte** (`.card`) : fond `--surface`, rayon `--r-card`, `--shadow-card`, c'est sa seule élévation. Variantes :
-  - `recent` : aucune bordure ni anneau ; le récent se dit par la pastille `.rw` ;
+  - `st-prevu` : fond transparent, contour pointillé de 1,5 px `--hair-2`, sans ombre, glyphe anneau à trois arcs (`--st-todo`) et mot « Prévu » dans le pied ; le statut reprend `--st-todo` ;
   - `st-active` : palier neutre un cran au-dessus de `--surface-hover` (`--raise` allégé), titre 600 `--text` ; `st-done` et `st-todo` : titre 500 `--text-2` ;
   - `st-blocked` : aucun anneau ; glyphe anneau-barré et mot « Bloqué » dans le pied ;
   - `dir` : verre `--dir-bg` ;
   - `module` : fond `--raise` ;
   - `external` : contour seul, fond transparent ;
   - `has-note` : point de 6 px après le titre (`--sev-medium`).
-- **Pastille de statut** (`.vst`, `.rw`) : 20 px de haut à l'échelle 1 (`line-height 16` + `padding var(--inset-pill)` vertical), pastille sans fond : glyphe et mot. Un glyphe coloré (coche fait, demi-disque en cours, anneau-point à recetter, anneau à faire, anneau barré bloqué, anneau barré en diagonale abandonnée, disque plein récent) suivi du mot en `--text-2`, 11 px, 500. Le glyphe suit la taille de police (`em`), donc les paliers du zoom d'éloignement ; il vaut 1,45 em (16 px à l'échelle 1, la hauteur de ligne), assez pour distinguer le demi-disque « en cours » de l'anneau-point « à recetter » à 1x. Un lien qui porte une pastille ne la souligne jamais : seul son libellé l'est.
+- **Pastille de statut** (`.vst`) : 20 px de haut à l'échelle 1 (`line-height 16` + `padding var(--inset-pill)` vertical), pastille sans fond : glyphe et mot. Un glyphe coloré (coche fait, demi-disque en cours, anneau-point à recetter, anneau à faire, anneau barré bloqué, anneau barré en diagonale abandonnée) suivi du mot en `--text-2`, 11 px, 500. Le glyphe suit la taille de police (`em`), donc les paliers du zoom d'éloignement ; il vaut 1,45 em (16 px à l'échelle 1, la hauteur de ligne), assez pour distinguer le demi-disque « en cours » de l'anneau-point « à recetter » à 1x. Un lien qui porte une pastille ne la souligne jamais : seul son libellé l'est.
+- **Marque de lentille** (`.lm`) : posée dans l'emplacement droit du pied de carte, glyphe 1,45 em et mot 11 px `--text-2`, sans fond. Glyphes : barres 1, 2 et 3 (largeur de 3 au moins), confluent, bouclier, bouclier barré, rond plein, triangle plein, carré creux, tiret, anneau à trois arcs. Aux paliers `lod-low`, le glyphe seul. Une clé de glyphe inconnue se rend par le glyphe neutre (carré creux `--text-3`).
+- **Menu des lentilles** (`#lens-menu`) : rangées radio ; la légende et le radar sont hors du `role="menu"`, qui ne porte que les rangées. Le bouton-compte de la rangée `.k` (glyphe confluent, `--text-2`, anneau `--ring` en pseudo-élément) ouvre le panneau des collisions. La pastille de compte reste la pastille neutre `--on`, sans exception.
 - **Groupe d'onglets** (`.vf-tabs`) : piste `--raise`, rayon 12 px, 4 px de padding (onglet 4 × 12). L'onglet actif
   prend `--surface` et une ombre de 1 px. Un nouvel onglet (par exemple « Équipe », P69-D-17) suit
   exactement ce modèle.
@@ -199,7 +202,7 @@ serait 8, mais les rayons ne font pas partie de la grille d'espacement.
   `cubic-bezier(.65, 0, .35, 1)` pour un aller-retour.
 - **Durées** : 150 ms (survol), 200 ms (le défaut), 250-300 ms (ouverture d'un panneau),
   450 ms (grands déplacements). On ne dépasse pas 700 ms.
-- **Respiration du glyphe « actif »** (tiroir « Au travail ») : une échelle de 1 à .82 en 2,4 s, jamais une variation d'opacité (le glyphe garde son contraste à chaque instant : `--st-active` clair fait 3,06:1 sur `--bg`, aucun palier d'opacité n'y tient 3:1).
+- **Respiration du glyphe « actif »** (glyphe « en cours » de l'empreinte, sur les cartes ; elle a quitté les tiroirs) : une échelle de 1 à .82 en 2,4 s, jamais une variation d'opacité (le glyphe garde son contraste à chaque instant : `--st-active` clair fait 3,06:1 sur `--bg`, aucun palier d'opacité n'y tient 3:1).
 - **Mouvement réduit** : toute animation a une variante `prefers-reduced-motion: reduce` qui la
   coupe.
 - **Jamais animé** : le changement de thème (`html.theme-switching`, transitions coupées).
@@ -208,7 +211,7 @@ serait 8, mais les rayons ne font pas partie de la grille d'espacement.
 
 - Pictos au trait, en SVG inline : classe `svg.i`, 16 × 16 px, `stroke: currentColor`, épaisseur
   1,75, extrémités arrondies, sans remplissage.
-- La couleur de l'icône vient du texte qui la porte, avec une seule exception : les icônes de nœud du graphe de code (onglet Code : carte, résultat de recherche) prennent la couleur de leur famille (`--n-*`), parce que ce type est l'information. Ailleurs (Projet, Équipe, panneaux) l'icône est nue, de la couleur de son texte, sans tuile ni fond coloré. Jamais d'icône en couleur pleine, sauf le glyphe d'une pastille de statut.
+- La couleur de l'icône vient du texte qui la porte, avec une seule exception : les icônes de nœud du graphe de code (onglet Code : carte, résultat de recherche) prennent la couleur de leur famille (`--n-*`), parce que ce type est l'information. Ailleurs (Projet, Équipe, panneaux) l'icône est nue, de la couleur de son texte, sans tuile ni fond coloré. Jamais d'icône en couleur pleine, sauf le glyphe d'une pastille de statut, y compris le glyphe « en cours » de l'empreinte.
 
 ## 8. Fichiers de référence
 
@@ -231,6 +234,7 @@ design, ce sont les variables CSS de `viewer.html`.
 - Passer par les jetons d'espacement : aucune valeur d'espacement hors jeton (`--sp-*`, `--edge`,
   `--inset-*`, §4), sauf les exceptions écrites.
 - Vérifier chaque écran dans les deux thèmes, sombre et clair.
+- Sur `.card.module` en clair, faire prendre à un glyphe d'état la variante texte (`--recent-text`), jamais `--recent` (2,91:1).
 - Ajouter le style VibeFlow dans les fichiers `ui/*vf*` ; un fichier à nous posé sous le moteur
   s'inscrit en `AJOUT` dans `VENDORED.txt` (il entre ainsi dans le plafond de 300 lignes) ;
   l'édition d'un fichier d'origine du moteur ne se trace nulle part (fork assumé, P79-D-07).
