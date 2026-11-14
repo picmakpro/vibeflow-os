@@ -114,12 +114,18 @@ assert_eq "D8.5 — session : même forme de fil daté, la première ligne user 
 cat > "$WORK/interdits.mjs" <<'JS'
 import fs from 'node:fs';
 const c = JSON.parse(fs.readFileSync(process.argv[2] + '/vf-cockpit-interface.json', 'utf8')).schemas;
-console.log(Object.entries(c).filter(([, v]) => Array.isArray(v.interdits) && v.interdits.includes('messages')).map(([k, v]) => k.split('/')[1] + ':' + v.interdits.includes('fil')).sort().join(','));
+const TROIS = ['messages', 'outils', 'fil'];  // la famille : un schéma qui en interdit UNE les interdit TOUTES (le détecteur ne regarde plus la seule clé messages)
+console.log(Object.entries(c).filter(([, v]) => Array.isArray(v.interdits) && TROIS.some((x) => v.interdits.includes(x))).map(([k, v]) => k.split('/')[1] + ':' + TROIS.every((x) => v.interdits.includes(x))).sort().join(','));
 JS
-assert_eq "D8.9 — les dix schémas (activite, equipe, frise, git, index, jauges, signal, state, trace, who) qui interdisent messages et outils interdisent aussi fil (tripwire du flux ; cockpit-index@1 ajouté par 79-08, cockpit-state@1 par 79-12, cockpit-frise@1 par 79-13, cockpit-activite@1 par 75-05, cockpit-trace@1 par 76-05, cockpit-jauges@1 par 77-03, changements de contrat voulus)" "$(node "$WORK/interdits.mjs" "$SCRIPTS")" "cockpit-activite@1:true,cockpit-equipe@1:true,cockpit-frise@1:true,cockpit-git@1:true,cockpit-index@1:true,cockpit-jauges@1:true,cockpit-signal@1:true,cockpit-state@1:true,cockpit-trace@1:true,cockpit-who@2:true"
+assert_eq "D8.9 — les dix schémas (activite, equipe, frise, git, index, jauges, signal, state, trace, who) qui interdisent l'une des trois clés messages, outils, fil les interdisent toutes les trois (tripwire du flux ; cockpit-index@1 ajouté par 79-08, cockpit-state@1 par 79-12, cockpit-frise@1 par 79-13, cockpit-activite@1 par 75-05, cockpit-trace@1 par 76-05, cockpit-jauges@1 par 77-03, changements de contrat voulus)" "$(node "$WORK/interdits.mjs" "$SCRIPTS")" "cockpit-activite@1:true,cockpit-equipe@1:true,cockpit-frise@1:true,cockpit-git@1:true,cockpit-index@1:true,cockpit-jauges@1:true,cockpit-signal@1:true,cockpit-state@1:true,cockpit-trace@1:true,cockpit-who@2:true"
 # témoin D8.9b : un contrat où cockpit-index@1 n'interdit plus `fil` (copie jetable) est vu par le détecteur, pour la bonne raison
 mkdir -p "$WORK/mut-fil" && node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const i=j.schemas["vibeflow/cockpit-index@1"].interdits;i.splice(i.indexOf("fil"),1);fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$SCRIPTS/vf-cockpit-interface.json" "$WORK/mut-fil/vf-cockpit-interface.json"
 assert_eq "D8.9b — mutant : sans fil dans les interdits de cockpit-index@1, le détecteur rend cockpit-index@1:false (et D8.9 rougit)" "$(node "$WORK/interdits.mjs" "$WORK/mut-fil")" "cockpit-activite@1:true,cockpit-equipe@1:true,cockpit-frise@1:true,cockpit-git@1:true,cockpit-index@1:false,cockpit-jauges@1:true,cockpit-signal@1:true,cockpit-state@1:true,cockpit-trace@1:true,cockpit-who@2:true"
+# témoins D8.9c et D8.9d : un contrat qui perd `outils` (ou `messages`) sur cockpit-index@1 est vu aussi, pour la bonne raison (le détecteur ne regarde plus la seule clé `messages` puis `fil`)
+for cle in outils messages; do
+  mkdir -p "$WORK/mut-$cle" && node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const i=j.schemas["vibeflow/cockpit-index@1"].interdits;i.splice(i.indexOf(process.argv[3]),1);fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$SCRIPTS/vf-cockpit-interface.json" "$WORK/mut-$cle/vf-cockpit-interface.json" "$cle"
+  assert_eq "D8.9-$cle — mutant : sans $cle dans les interdits de cockpit-index@1, le détecteur rend cockpit-index@1:false (et D8.9 rougit) ; les neuf autres restent vrais" "$(node "$WORK/interdits.mjs" "$WORK/mut-$cle")" "cockpit-activite@1:true,cockpit-equipe@1:true,cockpit-frise@1:true,cockpit-git@1:true,cockpit-index@1:false,cockpit-jauges@1:true,cockpit-signal@1:true,cockpit-state@1:true,cockpit-trace@1:true,cockpit-who@2:true"
+done
 
 echo; echo "Résultat : $PASS réussis, $FAIL échoués"
 [ "$FAIL" -eq 0 ]

@@ -73,11 +73,14 @@ if (cas === 'essai') { // R1 : cinq routes d'essai inscrites par l'option `route
     ['/api/vf/essai-asynchrone', async () => ({ ok: true })],
     ['/api/vf/essai-entetes', () => rep(200, { ok: true }, { 'Access-Control-Allow-Origin': '*', 'Cache-Control': 'public', ETag: 'x' })],
     ['/api/vf/essai-interdit', () => ({ a: { b: { fil: MARQ } } })],
+    ['/api/vf/essai-interdit-messages', () => ({ a: { b: { messages: MARQ } } })],
+    ['/api/vf/essai-interdit-outils', () => ({ a: { b: { outils: MARQ } } })],
     ['/api/vf/essai-propre', () => ({ ok: true, valeur: 7 })],
     ['/api/vf/essai-rejet', async () => { throw new Error(MSG); }]]);
   const h = (p, o = {}) => req(z.port, p, { token: TC, ...o }), P = '/api/vf/essai-propre', r = {};
   const pr = await h(P); r.r11 = { s: pr.status, ct: pr.headers['content-type'], cc: pr.headers['cache-control'], b: pr.body };
   const it = await h('/api/vf/essai-interdit'); r.r12 = { s: it.status, b: it.body, fuite: JSON.stringify([it, z.logs]).includes(MARQ) };
+  for (const [cle, n] of [['m', 'messages'], ['o', 'outils']]) { const x = await h('/api/vf/essai-interdit-' + n); r['r12' + cle] = { s: x.status, b: x.body, fuite: JSON.stringify([x, z.logs]).includes(MARQ) }; }
   r.r13 = { sans: (await h(P, { token: undefined })).status, projet: (await h(P, { token: z.a.ptoken })).status, faux: (await h(P, { token: flip(TC) })).status,
     hote: (await h(P, { host: `evil.example:${z.port}` })).status, origine: (await h(P, { origin: 'http://evil.example' })).status };
   r.r13.sansCorps = (await h(P, { token: undefined })).body;
@@ -270,6 +273,7 @@ assert_eq "R1.1a — route propre : 200 et le corps attendu" "$(ev "$E" 'j.r11.s
 assert_eq "R1.1b — Content-Type JSON" "$(ev "$E" 'j.r11.ct')" "application/json"
 assert_eq "R1.1c — Cache-Control no-store" "$(ev "$E" 'j.r11.cc')" "no-store"
 assert_eq "R1.2 — la clé fil à trois niveaux : 503 emission-refusee, marqueur absent de la réponse et du journal ; témoin : la route propre répond 200" "$(ev "$E" 'j.r12.s+" "+j.r12.b+" fuite="+j.r12.fuite+" propre="+j.r11.s')" '503 {"erreur":"emission-refusee"} fuite=false propre=200'
+assert_eq "R1.2b — les clés messages et outils à trois niveaux (comme fil) : 503 emission-refusee chacune, marqueur absent de la réponse et du journal ; témoin : la route propre répond 200" "$(ev "$E" 'j.r12m.s+" "+j.r12m.b+" fuite="+j.r12m.fuite+" | "+j.r12o.s+" "+j.r12o.b+" fuite="+j.r12o.fuite+" propre="+j.r11.s')" '503 {"erreur":"emission-refusee"} fuite=false | 503 {"erreur":"emission-refusee"} fuite=false propre=200'
 assert_eq "R1.3 — sans jeton 403 (sans corps) · jeton Projet 200 · jeton faux 403 · hôte étranger 403 · origine étrangère 403" "$(ev "$E" '[j.r13.sans,j.r13.sansCorps===""?"vide":"corps",j.r13.projet,j.r13.faux,j.r13.hote,j.r13.origine].join(" ")')" "403 vide 200 403 403 403"
 assert_eq "R1.4 — POST avec accès valides : 405" "$(ev "$E" 'j.r14')" "405"
 assert_eq "R1.5a — la réponse personnalisée garde un en-tête ajouté (ETag)" "$(ev "$E" 'j.r15.s+" "+j.r15.etag')" "200 x"
@@ -382,6 +386,16 @@ MM="$(copie methode)"; sed -i.bak "/garde:acces-methode/d" "$MM/vf-cockpit-route
 assert_eq "M-METHODE — sans la ligne garde:acces-methode : seul AX.U rougit (le POST valide rend ok), route() rend 405 avant le vérificateur : AX.2 et AX.3 restent verts" "$(ev "$(hh unit "$MM")" 'j[1]')|$(ev "$(hh classe "$MM" 0 x x)" 'j.verif.n+" "+j.post[1]')" "ok|0 405"
 
 echo "=== mutants de la réponse gardée ==="
+sans_cle() { # <nom> <clé> : copie du module dont le contrat (cockpit-who@2, source de la garde d'émission) n'interdit plus <clé> ; rend le dossier de scripts
+  local d; d="$(copie "i-$1")" || return 1
+  node -e 'const fs=require("fs");const f=process.argv[1];const j=JSON.parse(fs.readFileSync(f,"utf8"));const i=j.schemas["vibeflow/cockpit-who@2"].interdits;const k=i.indexOf(process.argv[2]);if(k<0)process.exit(1);i.splice(k,1);fs.writeFileSync(f,JSON.stringify(j))' "$d/vf-cockpit-interface.json" "$2" || return 1
+  echo "$d"
+}
+rouge_r12() { ev "$(hh essai "$1")" '[ (j.r12.s===503&&!j.r12.fuite)?"":"R1.2", (j.r12m.s===503&&!j.r12m.fuite&&j.r12o.s===503&&!j.r12o.fuite)?"":"R1.2b", j.r11.s===200?"":"R1.1a" ].filter(Boolean).join(",")'; }
+MO="$(sans_cle outils outils)"; MM2="$(sans_cle messages messages)"; MF="$(sans_cle fil fil)"
+assert_eq "M-INTERDIT-OUTILS — outils retiré des interdits de cockpit-who@2 (le contrat que lit la garde d'émission) : R1.2b rougit seul, R1.2 (fil) et R1.1a restent verts" "$(rouge_r12 "$MO")" "R1.2b"
+assert_eq "M-INTERDIT-MESSAGES — messages retiré des interdits de cockpit-who@2 : R1.2b rougit seul" "$(rouge_r12 "$MM2")" "R1.2b"
+assert_eq "M-INTERDIT-FIL — fil retiré des interdits de cockpit-who@2 : R1.2 rougit seul, R1.2b reste vert" "$(rouge_r12 "$MF")" "R1.2"
 verd() { # verd <dossier> -> ids rouges parmi R1.1c R1.2 R1.5b R1.7
   local e e7 sc; e="$(hh essai "$1")"; sc="$(sc_dir "v-$(basename "$1")")"; cp "$1"/vf-cockpit-*.mjs "$sc/"; e7="$(hh essai "$sc")"
   node -e "
