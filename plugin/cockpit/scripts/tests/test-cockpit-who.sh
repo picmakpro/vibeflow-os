@@ -732,6 +732,7 @@ const GEN = {
   'bearer-u2028': (n) => rep('Bearer' + LS + a(15) + LS, n), akia: (n) => rep('AKIA', n), 'akia-presque': (n) => rep('AKIA' + 'A'.repeat(15) + LS, n), xox: (n) => rep('xoxb', n), pat: (n) => rep('github_pat_', n), 'pat-presque': (n) => rep('github_pat_' + a(19) + LS, n),
 };
 const mesure = (f) => { let best = Infinity; for (let e = 0; e < essais; e++) { let reps = 1, t = 0; for (;;) { const t0 = performance.now(); for (let i = 0; i < reps; i++) f(); t = performance.now() - t0; if (t >= 30 || reps >= 256 || t * reps > 400 && reps > 1) break; reps = Math.min(256, Math.max(reps * 2, Math.ceil(reps * 40 / Math.max(t, 0.05)))); } best = Math.min(best, t / reps); } return best; };
+const PLANCHER = 5; // ms : un ReDoS réel à 100 000 caractères coûte des secondes, il dépasse ce plancher de plusieurs ordres de grandeur
 const rapports = []; const pire = { r: 0, nom: '', t1: 0, t2: 0 }; let lent = 0;
 // masque et coupe lisent toute l'entrée (rapport 2N/N) ; titre, arbres et commande bornent l'entrée AVANT les masques (4 000 car.) : leur temps est constant, jugé en absolu (noyé de bruit en rapport)
 const LECTEURS = { masque: (t) => () => L.masque(t, t.length), coupe: (t) => () => L.masqueCoupe(t, t.length >> 1), titre: (t) => () => L.nettoieTitre(t), arbres: (t) => () => A.nettoie(t, 200), commande: (t) => () => W.commandeAffichee(t) };
@@ -739,6 +740,7 @@ const BORNES = new Set(['titre', 'arbres', 'commande']);
 for (const [g, mk] of Object.entries(GEN)) for (const [lec, mkf] of Object.entries(LECTEURS)) {
   let t1 = mesure(mkf(mk(N))), t2 = mesure(mkf(mk(2 * N))), r = t2 / Math.max(t1, 0.001);
   if (BORNES.has(lec)) { if (t2 > 100) lent++; rapports.push(1); continue; }
+  if (Math.max(t1, t2) < PLANCHER) { rapports.push(1); continue; } // sous le plancher de mesure (5 ms) la croissance n'est pas jugée : à 0,04 ms le bruit d'horloge domine le rapport
   if (r > 3) { t1 = Math.min(t1, mesure(mkf(mk(N)))); t2 = Math.min(t2, mesure(mkf(mk(2 * N)))); r = t2 / Math.max(t1, 0.001); } // une seconde mesure avant de conclure : la charge du poste déforme une mesure, jamais deux
   rapports.push(r); if (r > pire.r) { pire.r = r; pire.nom = g + '/' + lec; pire.t1 = t1; pire.t2 = t2; }
 }
