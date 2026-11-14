@@ -89,7 +89,7 @@ skills/cockpit-moteur/assets/ui/tiroir/lancer.css 1
 skills/cockpit-moteur/assets/ui/tiroir/lancer.js 16
 skills/cockpit-moteur/assets/ui/tiroir/tiroir-construire.js 9
 skills/cockpit-moteur/assets/ui/tiroir/tiroir.css 24
-skills/cockpit-moteur/assets/ui/tiroir/tiroir.js 42
+skills/cockpit-moteur/assets/ui/tiroir/tiroir.js 40
 skills/cockpit-moteur/assets/vendor/xterm/addon-fit.js 1
 skills/cockpit-moteur/assets/vendor/xterm/xterm.js 1
 skills/cockpit-moteur/scripts/lib/vf-git-sortant.mjs 3
