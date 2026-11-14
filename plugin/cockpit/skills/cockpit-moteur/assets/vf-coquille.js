@@ -59,11 +59,15 @@
   async function lireGraphe(nom) {
     const entetes = { 'x-vf-cockpit-token': window.VF_COCKPIT_SERVER?.jetons?.[nom] || '' };
     if (retenu[nom]) entetes['If-None-Match'] = retenu[nom].etag;
-    let r;
-    try { r = await fetch('/api/vf/graphe?onglet=' + nom, { headers: entetes }); } catch {
+    let r, texte;
+    const ctl = new AbortController(), minuterie = setTimeout(() => ctl.abort(), delai()); // sans réponse : échec dit, file libre
+    try {
+      r = await fetch('/api/vf/graphe?onglet=' + nom, { headers: entetes, signal: ctl.signal });
+      if (r.status === 200) texte = await r.text();
+    } catch {
       cause = 'Le serveur du cockpit ne répond pas. Vérifiez qu\'il tourne toujours, puis réessayez.'; throw new Error(MESSAGE_LECTURE);
-    }
-    if (r.status === 200) { const texte = await r.text(); retenu[nom] = { etag: r.headers.get('ETag') || '', texte }; }
+    } finally { clearTimeout(minuterie); }
+    if (r.status === 200) retenu[nom] = { etag: r.headers.get('ETag') || '', texte };
     else if (r.status !== 304 || !retenu[nom]) {
       cause = 'Le serveur du cockpit a répondu ' + r.status + ' au lieu des données. Relancez-le, puis réessayez.'; throw new Error(MESSAGE_LECTURE);
     }

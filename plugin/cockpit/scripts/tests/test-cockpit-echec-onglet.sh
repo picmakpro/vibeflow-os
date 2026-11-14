@@ -73,8 +73,11 @@ R4="$(mesurer ec4)"; sonde "$R4"
 assert_eq "EC4.1 — après un échec de démarrage, aller vers l'onglet d'origine le recharge (pas « rien à charger »), sans entrée d'historique de plus" \
   "$(E '[j.ec4.motif, j.ec4.phase, j.ec4.aff, j.ec4.r, j.ec4.pret, j.ec4.aff2, j.ec4.lectures >= 1, j.ec4.p, j.ec4.dn]' "$R4")" \
   '[null,"echec","code","resolu","pret","code",true,"/",0]'
+R5="$(mesurer ec5)"; sonde "$R5"
+assert_eq "EC5.1 — lecture sans réponse : bornée, aller rejeté, échec dit (phase, echec(), vf:coquille-echec), la file libérée : l'aller suivant aboutit" \
+  "$(E '[j.ec5.r1, j.ec5.phase, !!j.ec5.ech, j.ec5.evs, j.ec5.r2, j.ec5.p]' "$R5")" '["rejet","echec",true,1,"resolue","/project.html"]'
 echo "=== Sans erreur de pilote ==="
-ERR=""; for r in "$R1" "$R2" "$R4"; do ERR="$ERR$(E 'Object.entries(j.erreurs).map((x) => x[0] + "=" + x[1]).join()' "$r")"; done
+ERR=""; for r in "$R1" "$R2" "$R4" "$R5"; do ERR="$ERR$(E 'Object.entries(j.erreurs).map((x) => x[0] + "=" + x[1]).join()' "$r")"; done
 assert_eq "EC9 — aucune section du pilote n'a échoué" "$ERR" ""
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
