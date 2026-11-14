@@ -102,7 +102,8 @@
       for (const p of parties.values()) if (p.inst && p.inst.maj) p.inst.maj(m);
     };
 
-    // le palier de Points chauds est aussi dit par le texte : le canal réécrit le nom accessible de la carte à chaque rendu et à chaque pose, on y revient après lui
+    // le palier de Points chauds est aussi dit par le texte : le canal réécrit le nom accessible de la carte à chaque rendu et à chaque pose,
+    // on y revient après lui
     const appliquerPaliers = () => {
       const cs = M.state && M.state.chipEls;
       if (!etat.m || etat.m.lentille !== 'chauds' || !(cs instanceof Map)) return;
@@ -143,7 +144,10 @@
     };
     offs.push(sur(M, 'panel', () => { if (etat.vivant) surSelection(); }));
     // après tous les écouteurs de `render` (microtâche) : le canal a reposé les noms, les paliers reviennent
-    offs.push(sur(M, 'render', () => { if (etat.vivant && etat.lentille === 'couplage') calculer(); queueMicrotask(() => { if (etat.vivant) appliquerPaliers(); }); }));
+    offs.push(sur(M, 'render', () => {
+      if (etat.vivant && etat.lentille === 'couplage') calculer();
+      queueMicrotask(() => { if (etat.vivant) appliquerPaliers(); });
+    }));
     etat.sel = idSel(M.state && M.state.selected);
 
     const ctx = { M, T, E, S, MQ, bouton, racine, annoncer, apres, vue, partage: {}, filtre: () => etat.filtre, modele: () => etat.m,

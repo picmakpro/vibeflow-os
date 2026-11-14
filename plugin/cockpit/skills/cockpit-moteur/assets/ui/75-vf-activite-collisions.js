@@ -65,7 +65,9 @@
         });
         h = document.querySelector('#panel [data-vfa-titre="collisions"]');
       }
-      if (h) { h.focus({ preventScroll: true }); h.scrollIntoView({ block: 'start', behavior: 'instant' }); } // le titre est dans le champ du panneau, qui défile
+      if (h) { // le titre est dans le champ du panneau, qui défile
+        h.focus({ preventScroll: true }); h.scrollIntoView({ block: 'start', behavior: 'instant' });
+      }
     };
     bouton.addEventListener('click', ouvrir);
     // `#context` est réécrit à chaque rendu (en-têtes, git) : après tous les écouteurs de `render` (microtâche), le compte est reposé s'il manque
