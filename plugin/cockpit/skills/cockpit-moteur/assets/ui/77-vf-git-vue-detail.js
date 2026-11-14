@@ -36,7 +36,6 @@
     .vf-git-p-lecture::before { content: '◌ ' / ''; }
     @media (max-width: 999px), (pointer: coarse) { .vf-git-det .btn { min-height: 44px; } }
   `;
-  document.head.appendChild(style);
 
   const lire = (url) => fetch(url, { method: 'GET', headers: { 'x-floorplan-token': (window.FLOORPLAN_SERVER || {}).token || '' }, cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
   const lignes = () => [...document.querySelectorAll('#vf-git-tiroir li[role=option]')];
@@ -177,10 +176,16 @@
       if (g.change || w.change) annoncer('Historique mis à jour');
     });
   };
-  document.addEventListener('vf-git:signal', () => {
+  const surSignal = () => {
     if (!T.ouvert()) { perime = true; return; } // tiroir fermé : aucune requête, la lecture sera refaite à l'ouverture
     clearTimeout(minuterie); minuterie = setTimeout(rafraichir, RAFALE);
-  });
+  };
+  const globaux = () => { // A51 : la feuille, l'écoute du signal et sa minuterie vivent avec l'onglet
+    document.head.appendChild(style); document.addEventListener('vf-git:signal', surSignal);
+    return () => { document.removeEventListener('vf-git:signal', surSignal); clearTimeout(minuterie); minuterie = null; style.remove(); };
+  };
+  const C = window.VF_COQUILLE;
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(globaux, { cle: '77-vf-git-vue-detail.js' }); else globaux();
   const restaurer = () => {
     const a = ancre, c = corps(); ancre = null;
     if (!a || !c) return;

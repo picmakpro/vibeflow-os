@@ -26,7 +26,6 @@
   // seulement. aideFocus la montre aussi au FOCUS clavier, dans une bulle visuelle unique (texte posé en textContent, jamais du HTML ; aria-hidden : le lecteur d'écran lit déjà la même phrase par aria-description ou aria-label).
   // Échap la ferme sans fermer le tiroir ; elle se ferme aussi au départ du focus et suit l'élément quand il défile.
   let bulle = null, ancre = null, clavier = false; // clavier : la dernière entrée était une touche (un focus posé par script ne vaut :focus-visible qu'après une touche ou sur un élément déjà visible au clavier) ; un clic de souris la remet à faux
-  document.addEventListener('keydown', () => { clavier = true; }, true); document.addEventListener('pointerdown', () => { clavier = false; }, true);
   const cacher = () => { if (bulle) bulle.hidden = true; ancre = null; };
   const placer = () => {
     if (!bulle || bulle.hidden || !ancre) return;
@@ -274,6 +273,16 @@
     d.append(el('h3', 'vf-git-titre', 'Git est indisponible'), el('p', 'vf-git-note', raison), b, commande(cmd, annonce, t('for diagnosis')));
     return d;
   };
+  const brancher = () => { // A51 : l'écoute du clavier et de la souris sur le document, la bulle et son défilement vivent avec l'onglet
+    const touche = () => { clavier = true; }, souris = () => { clavier = false; };
+    document.addEventListener('keydown', touche, true); document.addEventListener('pointerdown', souris, true);
+    return () => {
+      document.removeEventListener('keydown', touche, true); document.removeEventListener('pointerdown', souris, true);
+      window.removeEventListener('scroll', placer, true); if (bulle) bulle.remove(); bulle = null; ancre = null; clavier = false;
+    };
+  };
+  const C = window.VF_COQUILLE;
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(brancher, { cle: '77-vf-git-rendu.js' }); else brancher();
   window.VFGitRendu = Object.freeze({
     graphe, pages, rangee, sectionWorktrees, sectionTags, sectionStash, sectionAuteurs, mergees, commande,
     etatChargement, etatVide, etatIndisponible, relatif, section, ico, el, aideFocus,

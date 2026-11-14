@@ -141,7 +141,9 @@
     const U = all.length ? { l: Math.min(...all.map((x) => x.l)), t: Math.min(...all.map((x) => x.t)), r: Math.max(...all.map((x) => x.r)), b: Math.max(...all.map((x) => x.b)) } : r;
     const cx = (r.l + r.r) / 2, cy = (r.t + r.b) / 2, zw = z.r - z.l, zh = z.b - z.t, narrow = innerWidth < 701, lisible = !narrow && !isProject(); // sur l'onglet Code d'un gros lab le graphe entier tient à 0,3 : le plafond « tout le graphe reste dans la zone libre » laissait la carte présentée à 100 px, illisible ; la carte est alors cadrée (jusqu'à 60 % de sa zone) sans ce plafond, la vue d'ensemble revient à la sortie (PU-G-085) // on a phone the whole map is tiny: a small card is zoomed until it can be read, and the rest of the map may leave the screen
     let f = Math.max(1, Math.min(narrow || lisible ? 4 : 1.6, zw * (narrow || lisible ? 0.6 : 0.45) / r.w, zh * (narrow || lisible ? 0.6 : 0.45) / r.h)); // in on a small card...
-    const fit = Math.min((F.r - F.l) / (U.r - U.l), (F.b - F.t) / (U.b - U.t)); // the zoom at which the whole map exactly fills the free area; zoom in only up to it (on a phone, down to a card readable at 120 px)
+    // the zoom factor at which the whole map fills the free area, by the engine's one framing formula (80-09, no floor: the tour decides its own legibility);
+    // zoom in only up to it (on a phone, down to a card readable at 120 px)
+    const kc = SC.cadrage({ plancher: false, zone: SC.freeArea() }), fit = kc ? kc.k / SC.state.t.k : 1;
     f = lisible ? f : narrow ? Math.max(Math.min(f, Math.max(1, fit)), Math.min(f, 120 / r.w)) : Math.min(f, Math.max(1, fit));
     f = Math.min(f, 0.92 * zw / r.w, 0.92 * zh / r.h); // ...and out on a card wider than its zone: it must fit whole
     const wheel = (o) => svg.dispatchEvent(new WheelEvent('wheel', { bubbles: true, cancelable: true, deltaMode: 0, ...o })), dx0 = (z.l + z.r) / 2 - cx, dy0 = (z.t + z.b) / 2 - cy, cr = { left: card.offsetLeft, top: card.offsetTop, right: card.offsetLeft + card.offsetWidth, bottom: card.offsetTop + card.offsetHeight };

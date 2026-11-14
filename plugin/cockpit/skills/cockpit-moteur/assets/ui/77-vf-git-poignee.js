@@ -34,10 +34,10 @@
     .vf-git-poignee:focus-visible::before { width: 6px; background: var(--text-3); box-shadow: 0 0 0 2px var(--ring); }
     @media (max-width: 999px), (pointer: coarse) { .vf-git-poignee { display: none; } }
   `;
-  document.head.appendChild(style);
 
-  const monter = (tiroir) => {
-    if (!tiroir || tiroir.querySelector('.vf-git-poignee')) return;
+  const relires = new Set(); // une relecture par poignée montée ; les écouteurs de window sont posés une fois, par le rappel de la coquille (A51)
+  const monter = (tiroir) => { // rend le retrait de sa relecture
+    if (!tiroir || tiroir.querySelector('.vf-git-poignee')) return undefined;
     const p = document.createElement('div');
     p.className = 'vf-git-poignee';
     const at = { role: 'separator', 'aria-orientation': 'vertical', tabindex: '0', 'aria-label': t('Git history width') };
@@ -75,7 +75,15 @@
     tiroir.appendChild(p);
     poser(lue(), false);
     const relire = () => poser(choisie == null ? lue() : choisie, false, false); // bornes à jour, choix gardé : il revient avec la place
-    for (const ev of ['resize', 'vf-git:etat']) window.addEventListener(ev, relire);
+    relires.add(relire);
+    return () => { relires.delete(relire); };
   };
+  const globaux = () => {
+    const toutes = () => relires.forEach((f) => f()), types = ['resize', 'vf-git:etat'];
+    document.head.appendChild(style); for (const ev of types) window.addEventListener(ev, toutes);
+    return () => { for (const ev of types) window.removeEventListener(ev, toutes); style.remove(); relires.clear(); };
+  };
+  const C = window.VF_COQUILLE;
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(globaux, { cle: '77-vf-git-poignee.js' }); else globaux(); // A51
   window.VFGitPoignee = Object.freeze({ monter, lue, maximum });
 })();

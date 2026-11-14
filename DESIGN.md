@@ -98,6 +98,7 @@ Texte d'état (le texte coloré lit au moins 4,5:1) :
 > « À recetter » a la teinte de « en cours » et se distingue par son glyphe (anneau et point) et son mot, sur la carte de phase comme dans le panneau (statut `recette`, classe `st-recette`, mêmes paliers que `st-active`) (P69-D-25, P71.5-D-20). Le glyphe est la seule couleur d'une pastille ; le mot est en `--text-2`.
 > Une famille du graphe qui valait une teinte d'état la suit (`--n-worker`, `--k-queue`, `--m-PUT` = `--sev-medium` ; `--n-library`, `--m-GET` = `--recent` ; `--n-infra`, `--m-DELETE` = `--sev-high`).
 > **En thème clair, une teinte d'état ne se pose ni sur `--raise` ni sur `--raise-2`** (2,6 à 2,9:1) : seules les variantes texte y reposent.
+> **Exception mesurée, thème clair** (Phase 80, P80-D-31, AUDC-X5 a ; mesure en rendu, NAVIGATION § 6) : en clair, `--st-active` vaut `#a37100`, déclaré dans le bloc `[data-theme="light"]` de `viewer.html`, et `--st-recette` le suit. Le glyphe « En cours » y tient 3,84:1 sur `--bg` et 4,27:1 sur `--surface` ; avec `--sev-medium` clair (`#b88100`) il n'en tenait que 3,06 et 3,40, sous la cible de 3,5:1 (P80-D-20). `--sev-medium` et ses familles, ainsi que le sombre (`#ffe08a`, 14,86:1 sur `--bg`), ne changent pas : la colonne « Doit valoir » ci-dessus est celle du sombre et de l'écriture dans `00-vibeflow.js`.
 
 ### Graphe de code (vendorisé, ne pas étendre sans besoin)
 
@@ -147,6 +148,7 @@ Seules deux graisses servent vraiment, 500 et 600. Le 700 est réservé à un ca
   (un bas de 96 px posé au-dessus de la barre de question, le décalage du halo du titre), les
   hauteurs et tailles de contrôle (24, 28, 32, 36, 44 px) et les barres d'une seule ligne, qui sont des
   contrôles et gardent 12 en haut, en bas et côté bouton (barre du tiroir, `#flowbar`, `#ask-warn`).
+- **Exception écrite aux hauteurs de contrôle** (Phase 80, P80-D-46, NAVIGATION § 9 écart 5) : la rangée de liste dense mesure 40 px, 44 au tactile ; c'est la hauteur des rangées du tiroir Git, reprise par la liste de Projet. La palette de commandes, neuve, reste à 36. Une zone basse dérivée de hauteurs mesurées (`--vf-bas` : `#ask` + `--edge` + coin + feuille de détail + pastille « Terminal ») s'écrit `calc(…) /* dérivé : … */`.
 - **Gouttière de carte** : `--gutter` 24 px (réserve d'ombre, égale à la constante `GUTTER` du
   viewer). **Panneau latéral** : `--panel-w` 360 px (+ 32 px de marge, `--pw`).
 - **Carte** : padding 16 sur les quatre côtés (`--inset-card`), gap 8 px entre ses lignes.
@@ -171,7 +173,8 @@ serait 8, mais les rayons ne font pas partie de la grille d'espacement.
 
 - **Carte** (`.card`) : fond `--surface`, rayon `--r-card`, `--shadow-card`, c'est sa seule élévation. Variantes :
   - `recent` : aucune bordure ni anneau ; le récent se dit par la pastille `.rw` ;
-  - `st-active` : palier neutre un cran au-dessus de `--surface-hover` (`--raise` allégé), titre 600 `--text` ; `st-done` et `st-todo` : titre 500 `--text-2` ;
+  - `st-active` : en sombre, palier neutre un cran au-dessus de `--surface-hover` (`--raise` allégé) ; en clair, `--surface` (Phase 80, P80-D-31, AUDC-X5 b) : une carte active claire se lit par son glyphe, son mot et son titre, contour ou glyphe, jamais fond teinté ni grisé. Titre 600 `--text` ; `st-done` et `st-todo` : titre 500 `--text-2` ;
+  - carte estompée (voisine d'une sélection, AUDC-X5 c) : ses enfants passent à `opacity: .72` sauf la pastille d'état, laissée pleine ; `--text-3` et `--text-4` y valent `--text-2`. Texte composé mesuré en rendu : 4,61:1 au minimum en clair, 5,65:1 en sombre ; WebKit, sans couche propre : `.72` sur tout le contenu de la carte (la pastille s'y estompe avec elle) ;
   - `st-blocked` : aucun anneau ; glyphe anneau-barré et mot « Bloqué » dans le pied ;
   - `dir` : verre `--dir-bg` ;
   - `module` : fond `--raise` ;
@@ -248,7 +251,7 @@ design, ce sont les variables CSS de `viewer.html`.
 - Un liseré, un contour ou une bordure colorés (latéral, haut, ou anneau de carte) : la couleur d'un état ne dessine pas un conteneur.
 - Un fond teinté pour un état (bandeau, callout, pastille, tuile d'icône, hero-metric, puce de verbe) : une boîte d'information est neutre.
 - Un halo coloré (ombre diffuse ou lueur, y compris `drop-shadow`, `box-shadow` flou teinté).
-- Deux intentions d'élévation sur une même carte (anneau et ombre, halo et ombre) : une seule.
+- Deux intentions d'élévation sur une même carte (anneau et ombre, halo et ombre) : une seule. L'anneau de focus (2 px `--ring`, décalage 2) est un état d'interaction, pas une intention d'élévation : il peut se poser sur une carte qui porte `--shadow-card`.
 - Une teinte d'état (glyphe, trait, remplissage) sur `--raise` ou `--raise-2` en thème clair (sous 3:1) : seules les variantes texte y reposent.
 - Un titre de section en capitales espacées (« kicker ») au-dessus d'un titre.
 - Une animation sans variante en mouvement réduit, ou plus longue que 700 ms.

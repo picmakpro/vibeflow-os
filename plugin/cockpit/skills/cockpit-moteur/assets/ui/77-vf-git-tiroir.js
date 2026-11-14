@@ -108,7 +108,6 @@
     @media (max-width: 700px) { .vf-git-tiroir { top: calc(var(--hh, 56px) + 4px); } }
     @media (prefers-reduced-motion: reduce) { .vf-git-tiroir.vf-git-entree { animation: none; } .vf-git-sec-t svg { transition: none; } }
   `;
-  document.head.appendChild(style);
 
   const tiroir = R.el('aside', 'vf-git-tiroir glass', null, { id: 'vf-git-tiroir', role: 'complementary', 'aria-label': t('Git history') }), barre = R.el('div', 'vf-git-barre');
   const titre = R.el('h2', 'vf-git-titre-t', t('Git history'), { tabindex: '-1' }), fermerB = R.el('button', 'vf-git-fermer', null, { type: 'button', 'aria-label': t('Close the Git history') });
@@ -117,10 +116,18 @@
   barre.append(titre, fermerB);
   tiroir.append(barre, R.el('p', 'vf-git-aide', 'Lecture seule. Chaque action est une commande à copier.'), corps, live);
   tiroir.hidden = true;
-  document.body.appendChild(tiroir);
-  if (window.VFGitPoignee) window.VFGitPoignee.monter(tiroir); // 77-vf-git-poignee.js (chargée avant) : largeur réglable, 80-06
 
-  let ouvert = false, donnees = null, seq = 0, avant = null;
+  let ouvert = false, donnees = null, seq = 0, avant = null, demontage = false;
+  // 80-13 : l'état « ouvert » voyage dans le lien (git=1) et dans la mémoire de session (au nom du lab), jamais dans le stockage durable
+  const cleMemo = () => 'vf-tiroirs:' + String(((SC.graph || {}).project || {}).name || '').replace(/ — (Projet|Équipe)$/, '');
+  const lireMemo = () => { try { const j = JSON.parse(sessionStorage.getItem(cleMemo())); return !!j && j.git === true; } catch { return false; } };
+  const ecrireMemo = (v) => {
+    try {
+      const k = cleMemo(), j = JSON.parse(sessionStorage.getItem(k));
+      sessionStorage.setItem(k, JSON.stringify({ ...(j && typeof j === 'object' ? j : {}), git: v }));
+    } catch { /* stockage refusé */ }
+  };
+  const ecrireLien = (v) => { if (typeof SC.paramVue === 'function') SC.paramVue('git', v); };
   const etatPages = { n: 0 }; // rangées montrées (80-06) : gardé d'une relecture à l'autre
   const annoncer = (txt) => { live.textContent = txt; };
   const visible = (e) => !!e && !e.hidden && e.getClientRects().length > 0;
@@ -141,7 +148,6 @@
     }
     if (haut < Infinity) tiroir.style.bottom = Math.max(16, Math.round(H - haut + 8)) + 'px';
   };
-  if (window.ResizeObserver && document.querySelector('#stage')) new ResizeObserver(() => eviter()).observe(document.querySelector('#stage')); // la scène bouge quand un panneau bas s'ouvre, se ferme ou se redimensionne
 
   const montrer = (j) => {
     donnees = j;
@@ -181,12 +187,13 @@
       });
   }
 
-  const ouvrir = () => {
+  const ouvrir = (sansFocus) => { // sansFocus === true : rouvert par un lien ou par la mémoire (un événement, pas l'humain) : le focus reste où il est
     if (ouvert) return;
     ouvert = true; avant = document.activeElement;
     tiroir.hidden = false; tiroir.classList.add('vf-git-entree'); document.body.classList.add('vf-git-ouvert');
     if (!donnees) recharger();
-    eviter(); titre.focus({ preventScroll: true });
+    eviter(); if (sansFocus !== true) titre.focus({ preventScroll: true });
+    ecrireLien('1'); ecrireMemo(true);
     // 80-02 : le tiroir s'inscrit dans la pile (ordre d'Échap), sans piège ni prise de focus
     window.VF_SURCOUCHES.ouvrir(tiroir, { modale: false, ouvreur: avant, fermer: () => fermer() });
     emettre('vf-git:etat', { ouvert: true }); crochet('etat', true);
@@ -197,6 +204,7 @@
     tiroir.hidden = true; tiroir.classList.remove('vf-git-entree'); document.body.classList.remove('vf-git-ouvert'); window.VF_SURCOUCHES.fermer(tiroir);
     const cible = [ligne(), ouvreur(), plus()].find(visible) || (avant && document.contains(avant) && visible(avant) ? avant : null);
     if (cible && sansFocus !== true) cible.focus({ preventScroll: true });
+    if (!demontage) { ecrireLien(null); ecrireMemo(false); } // le démontage d'un onglet ne dit pas que l'humain a fermé le tiroir
     emettre('vf-git:etat', { ouvert: false }); crochet('etat', false);
   };
   // Entrée publique pour les autres phases (74) : ouvre le tiroir et son volet sur un commit. Valide le sha avant tout effet ; ne pagine ni ne relit la liste ;
@@ -217,12 +225,11 @@
   const basculer = () => (ouvert ? fermer() : ouvrir());
   tiroir.addEventListener('animationend', () => tiroir.classList.remove('vf-git-entree'));
   fermerB.addEventListener('click', fermer);
-  window.addEventListener('vf-git:basculer', basculer);
 
   const echap = (e) => { if (ouvert && e.key === 'Escape' && !e.defaultPrevented && !window.VF_SURCOUCHES.couverte(tiroir)) { e.stopPropagation(); e.preventDefault(); fermer(); } };
   tiroir.addEventListener('keydown', echap);
-  document.addEventListener('keydown', (e) => { const l = ligne(), o = ouvreur(), p = plus(); if ((l && l === e.target) || (o && o === e.target) || (p && p === e.target)) echap(e); }, true);
-  window.addEventListener('keydown', (e) => { // touche g : ni dans un champ, ni palette ouverte, ni avec Ctrl, Alt ou Meta, ni sans ouvreur
+  const surOuvreur = (e) => { const l = ligne(), o = ouvreur(), p = plus(); if ((l && l === e.target) || (o && o === e.target) || (p && p === e.target)) echap(e); };
+  const surTouche = (e) => { // touche g : ni dans un champ, ni palette ouverte, ni avec Ctrl, Alt ou Meta, ni sans ouvreur
     if ((e.key !== 'g' && e.key !== 'G') || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing) return;
     const tg = e.target;
     if (tg && (tg.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(tg.tagName) >= 0)) return;
@@ -230,10 +237,28 @@
     const l = ligne(), o = ouvreur();
     if (!(l && !l.hidden) && !(o && !o.hidden)) return;
     e.preventDefault(); basculer();
-  });
-  window.addEventListener('resize', eviter);
+  };
   const reevaluer = () => { eviter(); if (donnees && donnees.etat === 'ok') montrer(donnees); };
-  MOBILE.addEventListener('change', reevaluer);
-  new MutationObserver(eviter).observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] }); // le Terminal s'ouvre ou se ferme : la réserve basse change
+  const brancher = () => { // A51 : tout ce qui se branche sur le global (feuille, nœud du corps, écouteurs, observateurs) est posé ici et retiré avec l'onglet
+    const pose = [], sur = (c, ty, f, o) => { c.addEventListener(ty, f, o); pose.push(() => c.removeEventListener(ty, f, o)); };
+    const obs = (O, cible, opts, fn) => { const o = new O(fn); o.observe(cible, opts); pose.push(() => o.disconnect()); };
+    document.head.appendChild(style); document.body.appendChild(tiroir);
+    const demonter = window.VFGitPoignee && window.VFGitPoignee.monter(tiroir); // 77-vf-git-poignee.js (chargée avant) : largeur réglable, 80-06
+    const scene = document.querySelector('#stage'); // la scène bouge quand un panneau bas s'ouvre, se ferme ou se redimensionne
+    if (window.ResizeObserver && scene) obs(ResizeObserver, scene, undefined, () => eviter());
+    sur(window, 'vf-git:basculer', basculer); sur(document, 'keydown', surOuvreur, true); sur(window, 'keydown', surTouche);
+    sur(window, 'resize', eviter); sur(MOBILE, 'change', reevaluer);
+    // 80-10 pose l'adresse de l'onglet d'arrivée après le chargement : le lien redit le tiroir
+    sur(document, 'vf:onglet', () => { if (ouvert) ecrireLien('1'); });
+    obs(MutationObserver, document.body, { childList: true, attributes: true, attributeFilter: ['class', 'style'] }, eviter); // le Terminal s'ouvre ou se ferme, sa pastille arrive : la réserve basse change
+    if (SC.lireParamVue && (SC.lireParamVue('git') === '1' || lireMemo())) ouvrir(true); // lien d'abord, puis mémoire de session ; sans focus
+    return () => {
+      pose.splice(0).forEach((f) => f()); demontage = true; if (ouvert) fermer(true); demontage = false;
+      if (demonter) demonter();
+      tiroir.remove(); style.remove();
+    };
+  };
+  const C = window.VF_COQUILLE;
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(brancher, { cle: '77-vf-git-tiroir.js' }); else brancher();
   window.VFGitTiroir = Object.freeze({ ouvrir, fermer, ouvert: () => ouvert, recharger, donnees: () => donnees, ouvrirSur });
 })();

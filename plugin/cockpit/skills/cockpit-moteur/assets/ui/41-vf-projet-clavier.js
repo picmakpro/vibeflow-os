@@ -18,7 +18,12 @@
     // ordre de lecture, couloir par couloir
     ? [...el.closest('.vp-jalon').querySelectorAll('.vp-couloir .vp-carte')] : [...el.closest('.vp-details').querySelectorAll('.vp-rangee')]);
   const ordre = (el) => membres(el).map((e) => e.dataset.id);
-  const itinerer = (el) => { for (const e of membres(el)) e.setAttribute('tabindex', e === el ? '0' : '-1'); memoire.set(cle(el), el.dataset.id); };
+  // seuls une carte et une rangée itinèrent : le h1 du repli, hors de toute collection, ne lève rien
+  const itinerer = (el) => {
+    if (!el.matches('.vp-carte, .vp-rangee')) return;
+    for (const e of membres(el)) e.setAttribute('tabindex', e === el ? '0' : '-1');
+    memoire.set(cle(el), el.dataset.id);
+  };
   const appliquer = (racine) => { // après un rendu : l'arrêt mémorisé de chaque collection, sinon son premier élément
     for (const c of racine.querySelectorAll('.vp-jalon, .vp-details')) {
       const liste = [...c.querySelectorAll(c.classList.contains('vp-jalon') ? '.vp-couloir .vp-carte' : '.vp-rangee')];
@@ -112,6 +117,6 @@
   };
   window.__vfProjetClavier = Object.freeze({ appliquer, poser, ramener, ordre, repli, memoire, cle });
   const C = window.VF_COQUILLE, demarrer = () => (vivant ? undefined : init());
-  if (C && typeof C.surOnglet === 'function') C.surOnglet(init); // P80-D-42 : la coquille, sinon `ready` (ou le premier rendu, s'il l'a devancé)
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(init, { cle: '41-vf-projet-clavier.js' }); // la coquille (A51), sinon `ready`
   else if (state.layout) demarrer(); else { SC.on('ready', demarrer); SC.on('render', demarrer); }
 })();

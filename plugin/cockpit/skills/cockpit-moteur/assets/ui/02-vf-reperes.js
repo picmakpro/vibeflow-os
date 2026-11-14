@@ -12,9 +12,8 @@
   const ORDRE = ['gauche', 'droite', 'haut', 'bas'];
   const DIT = { gauche: t('on the left'), droite: t('on the right'), haut: t('at the top'), bas: t('at the bottom') };
   const OBSTACLES = ['#vf-coin', '#zoom', '#ask'];
-  // pastille, puce et tiroir d'un module de bas de page : lus par leur nature (fixes, posés directement sous body), jamais par leur nom
-  const flottants = () => [...document.body.children]
-    .filter((e) => e.matches('button, div[role="status"], section[role="region"]') && getComputedStyle(e).position === 'fixed');
+  // éléments flottants d'un module de bas de page : l'attribut neutre data-vf-flottant qu'il pose (jamais un nom de classe, jamais une forme)
+  const flottants = () => [...document.querySelectorAll('[data-vf-flottant]')];
   const equipe = () => !!G.meta && G.meta.vfTab === 'equipe';
   const feuille = () => matchMedia('(max-width: 999px), (pointer: coarse)').matches; // feuille de détail ; sinon panneau latéral
   // la forme affichée est le canevas : #svg a une boîte et n'est pas masqué (couloirs, liste : visibility hidden)
@@ -31,7 +30,6 @@
     .vf-repere[data-bord=bas] svg { transform: rotate(90deg); }
     @media (pointer: coarse) { .vf-repere { height: 32px; } .vf-repere::after { inset: -6px; } } /* 32 + 2 x 6 = 44 */
   `;
-  document.head.appendChild(style);
 
   const els = {}; // bord -> button
   let vivant = false, fruit = null; // fruit : la carte que le geste en cours vient d'amener (focus orphelin, ordre unique de la famille)
@@ -127,10 +125,10 @@
 
   const pose = [];
   const init = () => {
-    vivant = true;
+    vivant = true; document.head.appendChild(style);
     const observer = (O, cible, opts, fn) => { const o = new O(fn); o.observe(cible, opts); pose.push(() => o.disconnect()); };
     observer(MutationObserver, vp, { attributes: true, attributeFilter: ['style'] }, maj); // la transformation : aucun événement du moteur
-    observer(MutationObserver, document.body, { attributes: true, attributeFilter: ['class'] }, maj);
+    observer(MutationObserver, document.body, { childList: true, attributes: true, attributeFilter: ['class'] }, maj); // + l'arrivée d'un flottant
     if (window.ResizeObserver) {
       for (const q of ['#ask', '#vf-coin']) { const e = document.querySelector(q); if (e) observer(ResizeObserver, e, undefined, maj); }
     }
@@ -141,10 +139,10 @@
     }
     SC.on('render', maj); SC.on('panel', maj);
     maj();
-    return () => { vivant = false; pose.splice(0).forEach((f) => f()); for (const b of ORDRE) if (els[b]) { els[b].remove(); delete els[b]; } };
+    return () => { vivant = false; pose.splice(0).forEach((f) => f()); for (const b of ORDRE) if (els[b]) { els[b].remove(); delete els[b]; } style.remove(); };
   };
   const C0 = window.VF_COQUILLE;
   const demarrer = () => (vivant ? undefined : init());
-  if (C0 && typeof C0.surOnglet === 'function') C0.surOnglet(init); // P80-D-42 : la coquille, sinon `ready` (ou le premier rendu, s'il l'a devancé)
+  if (C0 && typeof C0.surOnglet === 'function') C0.surOnglet(init, { cle: '02-vf-reperes.js' }); // la coquille (A51), sinon `ready`
   else if (state.layout) demarrer(); else { SC.on('ready', demarrer); SC.on('render', demarrer); }
 })();

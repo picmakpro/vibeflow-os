@@ -33,14 +33,14 @@ const sec = par(t, 'secret')[0];
 out('g081.present', !!sec);
 out('g081.severite', sec ? sec.severity : 'absent');
 out('g081.titre', sec ? sec.title : '');
-out('g081.detail_factice', !!sec && /probably fake/.test(sec.detail));
-out('g081.detail_alarmiste', !!sec && /get into/.test(sec.detail));
+out('g081.detail_factice', !!sec && /probablement factice/.test(sec.detail));
+out('g081.detail_alarmiste', !!sec && /Quiconque peut voir le code/.test(sec.detail));
 // témoin : la même clé dans le code de l'application reste grave et alarmiste
 const r = depot([{ p: 'src/aws.js', src: `const k = "${AWS}";\n` }]);
 const sr = par(r, 'secret')[0];
 out('g081.reel.severite', sr ? sr.severity : 'absent');
-out('g081.reel.alarmiste', !!sr && /get into/.test(sr.detail));
-out('g081.reel.factice', !!sr && /probably fake/.test(sr.detail));
+out('g081.reel.alarmiste', !!sr && /Quiconque peut voir le code/.test(sr.detail));
+out('g081.reel.factice', !!sr && /probablement factice/.test(sr.detail));
 
 // G-082 : fichiers tiers exclus des conseils « très gros » et « inutilisé »
 const g = depot([

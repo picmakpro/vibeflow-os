@@ -62,8 +62,12 @@ export async function ouvrir(chrome, { csp = false } = {}) {
     let premier = true; // le premier chargement d'une session paie l'amorçage de la page (Chrome à froid) : borné par max(ECHEANCE, AMORCE)
     // P80-D-37 : toute adresse `…/project.html` sans `vue=` reçoit `vue=graphe` (requête, avant le fragment) : les suites écrites pour le canevas de Projet y restent ; { brut: true } charge l'adresse telle quelle
     const sansVue = (u) => { const [base, ...fr] = u.split('#'); return /\/project\.html(\?|$)/.test(base) && !/[?&]vue=/.test(base) ? [base + (base.includes('?') ? '&' : '?') + 'vue=graphe', ...fr].join('#') : u; };
-    const naviguer = async (url, { brut = false, echec = false } = {}) => {
+    // 80-13 : la mémoire de session des tiroirs (vf-tiroirs:*) rouvre un tiroir au chargement suivant ; elle ne passe pas d'une page à l'autre d'une suite
+    // (le tiroir ouvert d'un scénario ferait basculer le clic du suivant), sauf { garderTiroirs: true } (test-cockpit-lien-vue.sh la mesure)
+    const OUBLIER = "Object.keys(sessionStorage).filter((k) => k.startsWith('vf-tiroirs:')).forEach((k) => sessionStorage.removeItem(k))";
+    const naviguer = async (url, { brut = false, echec = false, garderTiroirs = false } = {}) => {
       if (!brut) url = sansVue(url);
+      if (!garderTiroirs) await ev(OUBLIER);
       violations.length = 0; const ms = premier ? Math.max(ECHEANCE, AMORCE) : ECHEANCE; premier = false;
       await send('Page.navigate', { url: 'about:blank' }, ms);
       const charge = new Promise((ok) => ecoutes.push({ m: 'Page.loadEventFired', f: ok }));

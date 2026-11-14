@@ -147,6 +147,16 @@ echo "     trace M-POINTEUR-LISTE — sonde PL4.1 [fine, coarse, rangées, focus
 assert_eq "M-POINTEUR-LISTE — le mutant (ancienne requête (pointer: fine)) rougit PL4.1 : sans pointeur la sélection ne suit plus le focus (témoin : Chrome sans pointeur, rangée focalisée)" \
   "$(E '[j.pointeur.fine, j.pointeur.coarse, j.focus.n > 0, j.focus.actif, j.focus.sel === j.focus.id]' "$RM")" '[false,false,true,true,false]'
 
+echo "=== PL5 — idiome A51 : deux allers-retours Projet / Code, extensions réévaluées (80-a51) ==="
+. "$HERE_T/a51-commun.sh"
+build_serve "$LAB"
+a51_mesurer "$WORK/a51-pl.json" "http://127.0.0.1:$PORT/project.html?vue=liste" projet code \
+  "41-vf-projet-liste.js,41-vf-projet-phase.js,41-vf-projet-formes.js" ".vp-table,.vp-etat-l" "section.vf-projet,.vp-table"
+vf_hyg_stop "$SRV"
+assert_eq "PL5.1 — deux allers-retours Projet / Code : écouteurs, observateurs, feuilles et nœuds de la liste comme à la première arrivée ; rien de la liste sur Code" \
+  "$(a51_verdict "$WORK/a51-pl.json" retours --absent-ailleurs)" "ok"
+assert_eq "PL5.2 — liste, phase et touche v réévaluées deux fois (même cle) : un seul branchement actif, une seule feuille chacune" \
+  "$(a51_verdict "$WORK/a51-pl.json" rejeu)" "ok"
 echo "=== Mutants (copie du module dans \$WORK) ==="
 mutant M-CLE 41-vf-projet-formes.js "'vf-projet-forme:' + nom + ':' + classe()" "'vf-projet-forme:' + classe()" chrome-projet-liste.mjs pl3a pl33
 assert_eq "M-CLE — le mutant rougit PL3.3 (clé sans le nom du lab) (témoin : la mémoire fonctionne encore)" \

@@ -104,6 +104,6 @@
     return () => { vivant = false; pile = []; pose.splice(0).forEach((f) => f()); style.remove(); delete window.VF_PANNEAU; poser(); };
   };
   const C = window.VF_COQUILLE;
-  if (C && typeof C.surOnglet === 'function') C.surOnglet(init); // P80-D-42 : la coquille, sinon `ready` (ou le premier rendu, s'il l'a devancé)
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(init, { cle: '42-vf-panneau-retour.js' }); // la coquille (A51), sinon `ready`
   else if (SC.state.layout) init(); else { SC.on('ready', init); SC.on('render', init); }
 })();

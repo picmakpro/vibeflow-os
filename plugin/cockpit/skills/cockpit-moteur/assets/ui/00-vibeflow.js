@@ -11,7 +11,6 @@
   document.body.classList.add('vf-tab-' + TAB); // 70-12 (P70-D-20) : marqueur de l'onglet sur le corps de page (`vf-tab-code`, `vf-tab-project`, `vf-tab-equipe`), pour les règles de mise en page propres à un onglet
   // titre de l'onglet du navigateur (AUDC-X7) : un seul format, « <Onglet> · <nom> » : l'onglet d'abord, parce qu'un onglet étroit coupe par la fin et que trois pages du même projet doivent se distinguer d'un coup d'œil (le viewer écrit « <nom> map », qui devenait le nom seul)
   { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); window.__vfTitreBase = { onglet: TAB === 'equipe' ? 'Équipe' : TAB === 'project' ? 'Projet' : 'Code', nom }; } // 73-06 : 90-vf-titre.js compose et écrit le titre
-  const ST = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué' };
   // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
   const LOGOS = G.meta.vfLogos;
   if (LOGOS) {
@@ -78,7 +77,10 @@
     .foot .meta { white-space: normal; min-width: 0; border-radius: 12px; }
     .foot .vst { flex: none; }
     /* 71.5 (P71.5-D-18, D-28, N2) : ni anneau ni halo, une seule élévation ; l'état se lit dans le pied (glyphe + mot) et la graisse du titre. « En cours » : palier neutre plus marqué (--raise allégé), car --surface-hover ne se voit pas en clair */
-    .card.st-active, .card.st-recette, .node:hover .card.st-active, .node:hover .card.st-recette { background: color-mix(in srgb, var(--raise) 70%, var(--surface)); }
+    /* 80-16 (P80-D-31, AUDC-X5 b) : le palier neutre n'est posé qu'en sombre ; en clair la carte active reste sur --surface (jamais grisée) :
+       l'état se lit au glyphe, au mot et au titre */
+    :root:not([data-theme="light"]) .card.st-active, :root:not([data-theme="light"]) .card.st-recette, :root:not([data-theme="light"]) .node:hover .card.st-active,
+    :root:not([data-theme="light"]) .node:hover .card.st-recette { background: color-mix(in srgb, var(--raise) 70%, var(--surface)); }
     .card.st-active, .card.st-recette, .card.st-blocked { box-shadow: var(--shadow-card); }
     .card.st-active .title, .card.st-recette .title, .card.st-blocked .title { font-weight: 600; color: var(--text); }
     .card.st-done .title, .card.st-todo .title { font-weight: 500; color: var(--text-2); }
@@ -247,25 +249,6 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(dit, repli); else repli();
   };
 
-  // ---------- pont entre onglets ----------
-  const fileOf = (id) => id && id.startsWith('f:') ? SC.files.get?.(id.slice(2)) || (G.files || []).find((f) => 'f:' + f.p === id) : null;
-  if (TAB === 'project') {
-    SC.addPanelSection('item', (id) => {
-      const f = fileOf(id);
-      if (!f || !f.touched || !f.touched.length) return '';
-      const rows = f.touched.slice(0, 40).map((p) => `<a class="vf-link" href="index.html#r=${encodeURIComponent(p)}"><span>→</span><code>${h(p)}</code></a>`).join('');
-      return `<div class="sec"><h3>Fichiers touchés dans l'onglet Code <span class="c">${f.touched.length}</span></h3>${rows}</div>`;
-    });
-  } else if (TAB === 'code') {
-    const touch = G.meta.vfTouch || {};
-    SC.addPanelSection('item', (id) => {
-      const f = fileOf(id);
-      const list = f && touch[f.p];
-      if (!list || !list.length) return '';
-      const rows = list.slice(0, 30).map((t) => `<a class="vf-link" href="project.html#r=${encodeURIComponent(t.ref)}"><span class="vst vst-${h(t.st).replace(/[^\w-]/g, '')}">${h(ST[t.st] || t.st)}</span><span>${h(t.label)}</span></a>`).join('');
-      return `<div class="sec"><h3>Touché par <span class="c">${list.length}</span></h3>${rows}</div>`;
-    });
-  }
   if (TAB === 'project') {
     const TECH = /^(Source :|Ligne de ROADMAP :|Avancement lu dans le worktree)/;
     SC.on('panel', () => {

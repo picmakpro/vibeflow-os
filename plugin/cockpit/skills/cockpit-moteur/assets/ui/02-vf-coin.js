@@ -31,7 +31,6 @@
       header .vf-tabs a::after { content: ""; position: absolute; inset: -4px 0; }
     }
   `;
-  document.head.appendChild(style);
 
   const NS = 'http://www.w3.org/2000/svg', C = () => window.VF_CANEVAS;
   const el = (t, a) => { const e = document.createElementNS(NS, t); for (const k in a) e.setAttribute(k, a[k]); return e; };
@@ -101,7 +100,7 @@
 
   const pose = [];
   const init = () => {
-    vivant = true; stage.appendChild(coin);
+    vivant = true; stage.appendChild(coin); document.head.appendChild(style);
     const sur = (cible, type, fn, o) => { cible.addEventListener(type, fn, o); pose.push(() => cible.removeEventListener(type, fn, o)); };
     const observer = (O, cible, opts, fn) => { const o = new O(fn); o.observe(cible, opts); pose.push(() => o.disconnect()); };
     observer(MutationObserver, vp, { attributes: true, attributeFilter: ['style'] }, dessiner);
@@ -122,11 +121,11 @@
     for (const t of ['pointerup', 'pointercancel']) sur(mini, t, () => { gel = null; dessiner(); });
     SC.on('render', bloc); SC.on('panel', () => { marquer(); dessiner(); });
     bloc();
-    return () => { vivant = false; pose.splice(0).forEach((f) => f()); coin.remove(); };
+    return () => { vivant = false; pose.splice(0).forEach((f) => f()); coin.remove(); style.remove(); };
   };
   window.VF_COIN = Object.freeze({ rectangle: () => (coin.isConnected && coin.getClientRects().length ? coin.getBoundingClientRect() : null) });
   const K = window.VF_COQUILLE;
   const demarrer = () => (vivant ? undefined : init());
-  if (K && typeof K.surOnglet === 'function') K.surOnglet(init); // P80-D-42 : la coquille, sinon `ready` (ou le premier rendu, s'il l'a devancé)
+  if (K && typeof K.surOnglet === 'function') K.surOnglet(init, { cle: '02-vf-coin.js' }); // la coquille (A51), sinon `ready`
   else if (state.layout) demarrer(); else { SC.on('ready', demarrer); SC.on('render', demarrer); }
 })();

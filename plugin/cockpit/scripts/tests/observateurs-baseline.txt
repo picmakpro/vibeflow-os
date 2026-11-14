@@ -11,4 +11,3 @@
 42-vf-panneau-retour.js 1
 72-vf-equipe.js 1
 73-vf-tiroir-travail.js 1
-77-vf-git-tiroir.js 1

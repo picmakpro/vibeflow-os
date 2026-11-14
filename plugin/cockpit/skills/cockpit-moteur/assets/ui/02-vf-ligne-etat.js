@@ -23,7 +23,6 @@
     .vf-ls-hr.coupe { white-space: normal; }
     #vf-coin[data-compact] .vf-ls-hr { display: none; } #vf-coin[data-compact] .vf-ls-hc { display: inline; }
   `;
-  document.head.appendChild(style);
 
   const NS = 'http://www.w3.org/2000/svg';
   const div = (c, txt) => { const d = document.createElement('div'); d.className = c; if (txt !== undefined) d.textContent = txt; return d; };
@@ -75,7 +74,7 @@
   const pose = [];
   const init = () => {
     const s = slot(); if (!s) return undefined;
-    vivant = true; const p = sonde(); majA = p && p.whoAt ? new Date(p.whoAt) : new Date(); patches = p ? p.patches : -1;
+    vivant = true; document.head.appendChild(style); const p = sonde(); majA = p && p.whoAt ? new Date(p.whoAt) : new Date(); patches = p ? p.patches : -1;
     s.appendChild(ls);
     const sur = (cible, type, fn) => { cible.addEventListener(type, fn); pose.push(() => cible.removeEventListener(type, fn)); };
     const observer = (O, cible, opts, fn) => { const o = new O(fn); o.observe(cible, opts); pose.push(() => o.disconnect()); };
@@ -85,9 +84,9 @@
     sur(document, 'vf-who', () => { majA = new Date(); rendre(); }); // l'événement du direct reçu par la page (avant l'événement `graphe` de la Phase 79)
     SC.on('render', () => { const q = sonde(); if (q && q.patches !== patches) { patches = q.patches; majA = new Date(); } rendre(); });
     rendre();
-    return () => { vivant = false; pose.splice(0).forEach((f) => f()); ls.remove(); };
+    return () => { vivant = false; pose.splice(0).forEach((f) => f()); ls.remove(); style.remove(); };
   };
   const K = window.VF_COQUILLE, demarrer = () => (vivant ? undefined : init());
-  if (K && typeof K.surOnglet === 'function') K.surOnglet(init); // P80-D-42 : la coquille, sinon `ready` (ou le premier rendu, s'il l'a devancé)
+  if (K && typeof K.surOnglet === 'function') K.surOnglet(init, { cle: '02-vf-ligne-etat.js' }); // la coquille (A51), sinon `ready`
   else if (SC.state.layout) demarrer(); else { SC.on('ready', demarrer); SC.on('render', demarrer); }
 })();

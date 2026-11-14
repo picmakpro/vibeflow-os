@@ -1,7 +1,7 @@
 // VibeFlow (80-06) : volet bas du tiroir Git — l'enveloppe du détail d'un commit (P80-D-19, FORM-13), jamais sous la rangée.
 // Exposé : window.VFGitVolet = { ouvrir(sha, rangee) -> Promise<boolean>, fermer(focus), ouvert(), sha(), lier(), brancher(contenu) }.
 // Le contenu (GET /api/vf/git/commit?sha=, rendu en textContent) vient de 77-vf-git-vue-detail.js par brancher(contenu(zone, sha, vivant)).
-// `ouvrir` pose un volet neuf sans fermer le précédent : l'appelant ferme d'abord. Un sha hors motif : « Indisponible » local, aucune requête, false.
+// `ouvrir` remplace le volet présent : jamais deux `.vf-git-detail`. Un sha hors motif : « Indisponible » local, aucune requête, false.
 (() => {
   const R = window.VFGitRendu;
   if (!R) return; // sans dépôt, le tiroir n'existe pas
@@ -17,7 +17,6 @@
       border-radius: var(--r-ctl); background: var(--raise); }
     @media (max-width: 999px), (pointer: coarse) { .vf-git-detail { height: clamp(160px, 45%, 320px); } }
   `;
-  document.head.appendChild(style);
 
   const tiroir = () => document.querySelector('#vf-git-tiroir');
   const lignes = () => [...document.querySelectorAll('#vf-git-tiroir li[role=option]')];
@@ -29,6 +28,7 @@
   };
   const monter = (sha) => {
     const T = tiroir(); if (!T) return null;
+    for (const d of T.querySelectorAll('.vf-git-detail')) d.remove(); // un seul volet, même si l'appelant n'a pas fermé le précédent
     const barre = el('div', 'vf-git-det-barre'), f = el('button', 'vf-git-fermer', null, { type: 'button', 'aria-label': 'Fermer le détail' });
     const titre = el('span', null, 'Détail du commit ' + sha.slice(0, 7));
     f.appendChild(R.ico('M6 6l12 12M18 6L6 18'));
@@ -61,4 +61,7 @@
   // fermé, le volet quitte le DOM (`.vf-git-detail` : 0)
   const brancher = (f) => { if (typeof f === 'function') contenu = f; };
   window.VFGitVolet = Object.freeze({ ouvrir, fermer, ouvert: () => courant !== null, sha: () => courant, lier, brancher });
+  const globaux = () => { document.head.appendChild(style); return () => { style.remove(); fermer(); }; }; // A51 : la feuille, et le volet avec l'onglet
+  const C = window.VF_COQUILLE;
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(globaux, { cle: '77-vf-git-volet.js' }); else globaux();
 })();

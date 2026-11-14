@@ -637,6 +637,21 @@ JS
   stop_srv
 fi
 
+echo "=== GP7 — idiome A51 : deux allers-retours Code / Projet, tiroir ouvert, volet ouvert deux fois, extensions réévaluées (80-a51) ==="
+if ! veut GP7; then :; elif [ -z "$CHROME" ]; then skip "GP7" "pas de navigateur"; else
+  . "$HERE_T/a51-commun.sh"
+  build_serve "$DEPOT"
+  A51_AMORCE="window.VFGitTiroir.ouvrir(); await new Promise((r) => setTimeout(r, 900)); const li = document.querySelector('#vf-git-tiroir li[role=option]'); if (li) { await window.VFGitVolet.ouvrir(li.dataset.h, null); await window.VFGitVolet.ouvrir(li.dataset.h, null); }"
+  a51_mesurer "$WORK/a51-gp.json" "http://127.0.0.1:$PORT/index.html" code projet \
+    "77-vf-git-poignee.js,77-vf-git-rendu.js,77-vf-git-tiroir.js,77-vf-git-volet.js,77-vf-git-vue-detail.js" \
+    ".vf-git-poignee {,.vf-git-tiroir {,.vf-git-detail {,.vf-git-d-msg {" "#vf-git-tiroir,.vf-git-poignee,.vf-git-detail,.vf-git-bulle" "$A51_AMORCE"
+  stop_srv
+  assert_eq "GP7.1 — tiroir ouvert, volet ouvert deux fois, deux allers-retours Code / Projet : un seul tiroir, une seule poignée, un seul volet, écouteurs de window comme à la première arrivée" \
+    "$(a51_verdict "$WORK/a51-gp.json" retours)" "ok"
+  assert_eq "GP7.2 — les cinq extensions Git réévaluées deux fois (même cle) : un seul branchement actif, une seule feuille chacune, un seul tiroir et un seul volet" \
+    "$(a51_verdict "$WORK/a51-gp.json" rejeu)" "ok"
+fi
+
 echo "=== Mutants (copie du module dans \$WORK, jamais le module) ==="
 if ! veut MUTANTS; then :; elif [ -z "$CHROME" ]; then skip "mutants" "pas de navigateur"; else
   mutlab() { local L="$WORK/lab-$1"; mk_lab "$L"; $GIT -C "$L" init -q -b main && $GIT -C "$L" add -A && $GIT -C "$L" commit -q -m init; echo "$L"; }
