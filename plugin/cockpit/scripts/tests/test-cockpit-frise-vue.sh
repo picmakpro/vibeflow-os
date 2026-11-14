@@ -378,6 +378,12 @@ export default async function (h) {
     h.sonde('S11', 'les pistes (svg de courbe, d\'axe et de voies) sont aria-hidden', m.caches, String(m.caches));
     h.egal('S11', 'h3.sr « Frise en liste, sur les dernières 1 h 30, lecture horloge »', m.titre, 'Frise en liste, sur les dernières 1 h 30, lecture horloge');
     h.sonde('S11', 'un élément par voie et par segment affiché', m.voies === m.rangs && m.segs === m.dessines && m.dessines > 0, JSON.stringify(m));
+    // la liste est hors écran (motif .sr) mais reste lue ; elle ne repousse rien : l'encart suit directement la légende
+    const o = await h.ev(() => { const sr = document.querySelector('.vf-frise-sr'), cs = getComputedStyle(sr), r = sr.getBoundingClientRect(), leg = document.querySelector('.vf-frise-legende').getBoundingClientRect(), enc = document.querySelector('.vf-encart');
+      return { pos: cs.position, w: r.width, h: r.height, ov: cs.overflow, lue: cs.display !== 'none' && cs.visibility !== 'hidden' && !sr.hidden && !sr.closest('[aria-hidden=true]') && sr.querySelectorAll('li').length > 0,
+        ecart: enc ? Math.round(enc.getBoundingClientRect().top - leg.bottom) : null }; });
+    h.sonde('S11', 'la liste .sr est hors écran (position absolute, 1 px, overflow hidden) et reste lue (ni display none, ni aria-hidden)', o.pos === 'absolute' && o.w <= 1 && o.h <= 1 && o.ov === 'hidden' && o.lue, JSON.stringify(o));
+    h.sonde('S11', 'l\'encart suit directement la légende (aucun bloc de 400 px entre les deux)', o.ecart !== null && o.ecart >= 0 && o.ecart <= 32, JSON.stringify(o));
   });
 }
 JS
