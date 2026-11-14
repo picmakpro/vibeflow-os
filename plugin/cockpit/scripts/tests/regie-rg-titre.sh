@@ -47,13 +47,13 @@ JS
 rg_RG12_titre() {
   # ---------- structure (sans navigateur) : qui écrit document.title, et le compositeur sans observateur ni marqueur persistant ----------
   cat > "$AUX/titre-structure.mjs" <<'JS'
-// titre-structure.mjs <dossier ui> <mode> : mode « ecrivains » = fichiers ui/*.js qui affectent document.title (hors commentaires) hors 90-vf-titre.js et 80-vf-fr.js ;
+// titre-structure.mjs <dossier ui> <mode> : mode « ecrivains » = fichiers ui/*.js qui affectent document.title (hors commentaires) hors 90-vf-titre.js, 80-vf-fr.js et 00-vf-onglets.js (repli sans compositeur, RG12.9 prouve qu'avec lui il n'écrit pas) ;
 // mode « compositeur » = « ok » si 90-vf-titre.js existe, sans `new MutationObserver` ni `.observe(` (hors commentaires) ni marqueur persistant dans ses huit premières lignes
 import fs from 'node:fs'; import path from 'node:path';
 const [, , dir, mode] = process.argv;
 const nu = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'`])\/\/.*$/gm, '$1');
 if (mode === 'ecrivains') {
-  const r = fs.readdirSync(dir).filter((n) => n.endsWith('.js') && !['90-vf-titre.js', '80-vf-fr.js'].includes(n) && /document\.title\s*=[^=]/.test(nu(fs.readFileSync(path.join(dir, n), 'utf8'))));
+  const r = fs.readdirSync(dir).filter((n) => n.endsWith('.js') && !['90-vf-titre.js', '80-vf-fr.js', '00-vf-onglets.js'].includes(n) && /document\.title\s*=[^=]/.test(nu(fs.readFileSync(path.join(dir, n), 'utf8'))));
   console.log(r.join(',') || 'aucun');
 } else {
   let t; try { t = fs.readFileSync(path.join(dir, '90-vf-titre.js'), 'utf8'); } catch { console.log('fichier absent'); process.exit(0); }
@@ -62,7 +62,7 @@ if (mode === 'ecrivains') {
   console.log(pb.length ? 'faux:' + pb.join(',') : 'ok');
 }
 JS
-  assert_eq "RG12.6 — dans ui/*.js, hors commentaires, document.title n'est affecté que par 90-vf-titre.js (et 80-vf-fr.js)" "$(node "$AUX/titre-structure.mjs" "$UI" ecrivains)" "aucun"
+  assert_eq "RG12.6 — dans ui/*.js, hors commentaires, document.title n'est affecté que par 90-vf-titre.js (et 80-vf-fr.js, 00-vf-onglets.js en repli)" "$(node "$AUX/titre-structure.mjs" "$UI" ecrivains)" "aucun"
   assert_eq "RG12.7 — 90-vf-titre.js : ni observateur du <title> ni marqueur « persistant » (P73-D-38, A53)" "$(node "$AUX/titre-structure.mjs" "$UI" compositeur)" "ok"
 
   # ---------- navigateur ----------
@@ -77,6 +77,8 @@ JS
     'j.sansRecharge + "|" + j.deux.projet.startsWith("(2)") + "|" + (j.abonnes[0] === j.abonnes[3]) + "|" + (j.abonnes[1] === j.abonnes[4])' "true|true|true|true"
   ti_ok "RG12.8 — la Phase 80 écrit le titre brut puis émet vf:onglet : le compositeur recompose « (2) vous attendent · Projet · … » (jamais le titre brut)" "$T" \
     'j.aller.startsWith("(2) vous attendent · Projet · ") + "|" + !j.aller.includes("brut")' "true|true"
+  ti_ok "RG12.9 — un aller d'onglet réel (VF_ONGLETS) avec 2 sessions en attente : le préfixe reste, l'onglet d'arrivée est nommé, aucune écriture du titre nu « Onglet · nom » (un seul auteur du titre, 80-10)" "$T" \
+    'j.allerOnglet.startsWith("(2) vous attendent · Code · ") + "|" + j.intermediaires.length' "true|0"
   ti_ok "RG12.3 — une session : « (1) vous attend · … » au singulier ; aucune : « Projet · <nom> » et l'icône d'origine rendue" "$T" \
     'j.un.startsWith("(1) vous attend · Projet · ") + "|" + !j.un.includes("attendent") + "|" + j.zero.titre.startsWith("Équipe · ") + "|" + /^Projet · /.test(j.retour) + "|" + (j.hrefRetour === j.zero.href)' "true|true|true|true|true"
   ti_ok "RG12.4 — N > 0 : une icône data:image/svg+xml qui change l'icône d'origine, sans chiffre, aucune requête réseau d'icône, aucun message de la CSP" "$T" \
