@@ -139,12 +139,12 @@ assert_eq L20 "état actif : libellé « Lentille : Points chauds », fond neutr
 assert_eq L20 "choisir une ligne ferme le menu, rend le focus au bouton, aria-expanded repasse à faux, la couche de marques est celle de la lentille" "$(E "[j.t1.actif.ferme, j.t1.actif.focus, j.t1.actif.expanded, j.t1.actif.active].join('|')")" "true|true|false|activite"
 
 echo "== L2 Points chauds sur la route réelle : mots, paliers, infobulles, nœuds =="
-assert_eq L2 "src/a/m14.js (12 commits, palier haut) : « 12 changements », glyphe de palier haut, infobulle chiffrée" "$(E "((m) => [m.n, m.mot, m.glyphe.includes('lg-haut'), m.titre].join('|'))(j.t1.marques['f:src/a/m14.js'])")" "1|12 changements|true|12 changements sur 90 jours · 14 lignes · rang 1 sur 30"
+assert_eq L2 "src/a/m14.js (12 commits, palier haut) : « 12 changements », glyphe de palier haut, infobulle chiffrée" "$(E "((m) => [m.n, m.mot, m.glyphe.includes('lg-haut'), m.titre].join('|'))(j.t1.marques['f:src/a/m14.js'])")" "1|12 changements|true|12 changements sur 90 jours · 14 lignes · rang 1 sur 31"
 assert_eq L2 "src/a/m04.js (2 commits, palier moyen) : « 2 changements » ; une seule marque par carte partout" "$(E "[j.t1.marques['f:src/a/m04.js'].mot, j.t1.marques['f:src/a/m04.js'].glyphe.includes('lg-moyen'), Object.values(j.t1.marques).every((m) => m.n <= 1)].join('|')")" "2 changements|true|true"
 assert_eq L2 "carte prévue : aucune marque de lentille ; une suite : aucune marque ; un gate : sa marque" "$(E "[j.t1.prevue, j.t1.marques['f:src/a/neuf.mjs'].n, j.t1.sansMarque].join('|')")" "0|0|[0,1]"
-assert_eq L2 "carte de nœud : le palier maximal et son nombre, jamais une somme (« 10 chauds », « 14 moyens »)" "$(E "JSON.parse(j.t1.noeud).map(([id, m]) => id + '=' + m).join(' ; ')")" "d:d-src|src/a=10 chauds ; d:d-src|src/b=14 moyens"
+assert_eq L2 "carte de nœud : le palier maximal et son nombre, jamais une somme (« 11 chauds », « 14 moyens »)" "$(E "JSON.parse(j.t1.noeud).map(([id, m]) => id + '=' + m).join(' ; ')")" "d:d-src|src/a=11 chauds ; d:d-src|src/b=14 moyens"
 assert_eq L19 "le palier est aussi dit par le texte : le nom accessible porte « palier haut » (moyen : « palier moyen »), à la place du mot de lentille" "$(E "[j.t1.nom.includes('12 changements, palier haut, '), j.t1.nomMoyen.includes('4 changements, palier moyen, ')].join('|')")" "true|true"
-assert_eq L19 "le rang figure dans la ligne du panneau du fichier (« rang 1 sur 30 »), pas seulement dans le title" "$(E "j.t1.panneau.includes('12 changements sur 90 jours · 14 lignes · rang 1 sur 30')")" "true"
+assert_eq L19 "le rang figure dans la ligne du panneau du fichier (« rang 1 sur 31 »), pas seulement dans le title" "$(E "j.t1.panneau.includes('12 changements sur 90 jours · 14 lignes · rang 1 sur 31')")" "true"
 
 assert_eq L1b "pastille neutre : le nombre de fichiers en écriture (1) sur le fond --on, jamais --recent ; l'aria-label dit l'état" "$(E "[j.t1.badge.txt, j.t1.badge.fond === j.t1.badge.on, j.t1.badge.fond !== j.t1.badge.recent, j.t1.badge.aria].join('|')")" "1|true|true|Lentille${NB}: Points chauds, 1 fichier en cours d'écriture"
 
