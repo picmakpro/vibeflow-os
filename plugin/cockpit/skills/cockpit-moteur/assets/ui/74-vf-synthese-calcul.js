@@ -92,12 +92,15 @@
       }
       return vus;
     };
-    if (!tete || !sommet || !par.has(sommet)) return { etat: 'inconnu', n: null, plusDe500: false };
+    if (!tete || !sommet) return { etat: 'inconnu', n: null, plusDe500: false };
     if (tete === sommet) return { etat: 'ok', n: 0, plusDe500: false };
-    if (!par.has(tete)) return { etat: 'ok', n: null, plusDe500: true };
+    if (!par.has(sommet)) return { etat: 'inconnu', n: null, plusDe500: false };
+    const depuisSommet = ancetres(sommet);
+    // la fenêtre est partagée avec les têtes des autres worktrees : une tete absente n'est « plus de 500 » que si la lignée du sommet la remplit à elle seule
+    if (!par.has(tete)) return depuisSommet.size >= 500 ? { etat: 'ok', n: null, plusDe500: true } : { etat: 'inconnu', n: null, plusDe500: false };
     const anc = ancetres(tete);
     let n = 0;
-    for (const h of ancetres(sommet)) if (!anc.has(h)) n++;
+    for (const h of depuisSommet) if (!anc.has(h)) n++;
     return { etat: 'ok', n, plusDe500: false };
   }
 
@@ -129,7 +132,7 @@
     const nouveaux = noms.filter((x) => presents.has(x.cle) && !avant.has(x.cle))
       .map((x) => ({ cle: x.cle, kind: x.kind, texte: x.texte }));
     const leves = precedente.blocages.filter((c) => !presents.has(c)).length;
-    const dit = phases.length > 0 || commits.plusDe500 || commits.etat === 'non-lus' || (commits.n || 0) > 0
+    const dit = phases.length > 0 || commits.plusDe500 || commits.etat === 'non-lus' || commits.etat === 'inconnu' || (commits.n || 0) > 0
       || sessions.n > 0 || sessions.reserve24h || nouveaux.length > 0 || leves > 0;
     return { premiere: false, phases, commits, sessions, blocages: { nouveaux, leves }, vide: !dit };
   }

@@ -29,11 +29,13 @@ cat > "$AUX/sondes.mjs" <<'JS'
 import fs from 'node:fs';
 import path from 'node:path';
 import vm from 'node:vm';
+import os from 'node:os';
 import { pathToFileURL } from 'node:url';
 
 const [, , DIR, FAB, SCRIPTS] = process.argv;
 const F = await import(pathToFileURL(FAB).href);
-const { NOW, MIN, voie, entree, fabrique, quiMissions, quiPhases, element, rangee, tete, git } = F;
+const { reduireTranscript } = await import(pathToFileURL(path.join(SCRIPTS, 'vf-cockpit-transcript.mjs')).href); // le fil RÉEL de la route, pas une fabrique
+const { NOW, MIN, voie, entree, fabrique, quiMissions, quiPhases, element, iso, rangee, tete, git } = F;
 const FICHIERS = ['74-vf-frise-calculs.js', '74-vf-frise-modele.js'];
 const NB = ' ';
 let pass = 0, fail = 0, neutres = 0, sec = '';
@@ -257,6 +259,9 @@ section('F9', () => {
   eq(R.agent.lignes.reduce((a, l) => a + l.travailS, 0), tot.travailS, 'aucune durée recoupée : somme des durees.travailS des voies');
   const inc = M.agreger(vs([raw[0], voie({ id: 'zz', jetons: null })]), 'agent', opt);
   ok(inc.inconnus === 1 && inc.lignes.find((l) => l.cle === 'zz').entree === null && inc.total.entree === 100, 'champ absent : ligne nulle, exclue du total, comptée dans inconnus', j([inc.inconnus, inc.total]));
+  const nul = M.agreger(vs([voie({ id: 'n1', jetons: null }), voie({ id: 'n2', jetons: null })]), 'agent', opt);
+  ok(['entree', 'sortie', 'cacheLu', 'cacheCree'].every((k) => nul.total[k] === null) && typeof nul.total.travailS === 'number', 'champ que personne ne mesure : le total vaut null, jamais 0 (L4b-02)', j(nul.total));
+  eq(M.agreger(vs([raw[0], voie({ id: 'n3', jetons: null })]), 'agent', opt).total.entree, 100, 'champ mesuré par une voie seulement : le total est la somme des voies qui le publient');
 });
 
 section('F10', () => {
@@ -342,10 +347,10 @@ section('F14', () => {
   eq([FA([W('B', [entree('new.js', hi + 1)])]).ecrits, FA([W('B', [entree('new.js', hi + 1)])]).aLire], [[], ['B']], 'a) dernierMs après t + δ : incertain, la voie est à lire');
   const X = voie({ id: 'X', debut: t - 10 * MIN, fin: t + 10 * MIN, segments: trav, cibles: null });
   const fx = (elements, tronque = false) => new Map([['X', { fil: elements, tronque }]]);
-  const b1 = FA([X], fx([element(t - 600000, { n: 3 }), { t: t + 600000, genre: 'message' }]));
+  const b1 = FA([X], fx([element(t - 600000, { n: 3 }), { t: iso(t + 600000), genre: 'message' }]));
   eq([cibles(b1), b1.aLire, b1.nonLues], [[[null, 'a.js']], [], []], 'b) entrée regroupée : couvre de son t jusqu\'à l\'élément suivant, couvre t');
-  eq(cibles(FA([X], fx([element(t - 600000, { n: 3 }), { t: t - 500000, genre: 'message' }]))), [], 'b) élément suivant avant t - δ : absent');
-  eq(cibles(FA([X], fx([element(t - 600000, { n: 1 }), { t: t + 600000, genre: 'message' }]))), [], 'b) une entrée simple n\'est qu\'un instant');
+  eq(cibles(FA([X], fx([element(t - 600000, { n: 3 }), { t: iso(t - 500000), genre: 'message' }]))), [], 'b) élément suivant avant t - δ : absent');
+  eq(cibles(FA([X], fx([element(t - 600000, { n: 1 }), { t: iso(t + 600000), genre: 'message' }]))), [], 'b) une entrée simple n\'est qu\'un instant');
   const c1 = FA([X], fx([element(lo + 1000, { cible: 'z.js' })], true)), c2 = FA([X], fx([element(lo + 1000, { cible: 'z.js' })], false));
   eq([c1.nonLues, c1.partiel, cibles(c1)], [['X'], true, [[null, 'z.js']]], 'c) fil trop court (premier élément après t - δ, tronque) : nonLues, partiel, jamais une liste muette');
   eq([c2.nonLues, c2.partiel], [[], false], 'c) même fil sans tronque : pas nonLues');
@@ -359,6 +364,29 @@ section('F14', () => {
   const avant = j([entrees, [...fils]]);
   let leve = null; try { M.fichiersA(t, d, entrees, fils); } catch (e) { leve = e.message; }
   ok(leve === null && j([entrees, [...fils]]) === avant, 'f) fonction pure : entrées gelées, rien de modifié', leve);
+  // g) le fil que rend la route : `t` en chaîne ISO (L4b-01) ; produit par le vrai reduireTranscript, jamais par la fabrique
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'f14-')), lab = path.join(dir, 'lab');
+  try {
+    fs.mkdirSync(path.join(lab, 'src'), { recursive: true });
+    const lg = (ms, id, f) => j({ type: 'assistant', timestamp: new Date(ms).toISOString(), message: { content: [{ type: 'tool_use', id, name: 'Edit', input: { file_path: path.join(lab, 'src', f), old_string: 'x', new_string: 'y' } }] } });
+    const tr = path.join(dir, 'tr.jsonl');
+    fs.writeFileSync(tr, [j({ type: 'user', message: { content: 'mandat' } }), lg(t - 600000, 'u1', 'avant.js'), lg(t, 'u2', 'dans.js'), lg(t + 600000, 'u3', 'apres.js')].join('\n') + '\n');
+    const reel = reduireTranscript(tr, { root: lab, roles: [], kind: 'agent' });
+    ok(reel.fil.length > 0 && reel.fil.every((e) => typeof e.t === 'string'), 'g) le fil réel porte `t` en chaîne ISO', j(reel.fil.map((e) => typeof e.t)));
+    const g1 = FA([X], fx(reel.fil));
+    eq([cibles(g1), g1.nonLues], [[[null, 'src/dans.js']], []], 'g) fil réel (t ISO) : l\'écriture dans [t - δ, t + δ] est retenue, celles avant et après non');
+    const g2 = FA([X], fx(reel.fil.slice(1), true));
+    eq(g2.nonLues, ['X'], 'g) fil réel tronqué qui commence après t - δ : voie non lue (la chaîne ISO est comparée comme une date)');
+    const g3 = FA([X], fx(reel.fil.slice(0, 1), true));
+    eq(g3.nonLues, [], 'g) fil réel tronqué qui remonte jusqu\'à t - δ : lu');
+  } finally { fs.rmSync(dir, { recursive: true, force: true }); }
+  // h) une date illisible est écartée et la voie comptée non lue, jamais lue comme 0 (L4b-01)
+  for (const mauvais of [null, 'pas une date', undefined, {}]) {
+    const h1 = FA([X], fx([{ ...element(t, { cible: 'i.js' }), t: mauvais }]));
+    eq([cibles(h1), h1.nonLues, h1.partiel], [[], ['X'], true], `h) \`t\` illisible (${j(mauvais) ?? 'undefined'}) : écriture écartée, voie non lue`);
+  }
+  eq(FA([X], fx([element(t, { cible: 'ok.js' }), { ...element(t, { cible: 'x.js' }), t: null }])).nonLues, ['X'], 'h) une seule entrée illisible suffit à dire « non lue »');
+  eq(FA([X], fx([element(t, { cible: 'ok.js', t: t }), element(t + 1000, { cible: 'n.js' })].map((e, i) => (i ? e : { ...e, t })))).nonLues, [], 'h) un `t` numérique reste accepté');
 });
 
 section('F15', () => {

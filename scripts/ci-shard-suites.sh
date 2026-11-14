@@ -224,6 +224,7 @@ durees() {
 955 plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh
 27 plugin/cockpit/scripts/tests/test-cockpit-terminal-xss.sh
 667 plugin/cockpit/scripts/tests/test-cockpit-terminal-xterm.sh
+40 plugin/cockpit/scripts/tests/test-cockpit-texte-lineaire.sh
 4 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-chaine.sh
 4 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-collecte.sh
 3 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-decisions.sh

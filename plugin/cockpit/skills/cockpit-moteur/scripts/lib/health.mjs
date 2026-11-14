@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { git, compileGlob } from './common.mjs';
+import { cheminPhysique } from './vf-git-sortant.mjs';
 
 const lineIndex = (src) => {
   const starts = [0];
@@ -213,7 +214,7 @@ function pyRoutes(src, f, out) {
     guardedVars.set(m[1], m[2]);
     if (m[1] === 'app') out.push({ k: 'global-guard', framework: 'flask', name: m[2], line: defIdx + 1 });
   }
-  for (const m of src.matchAll(/^\s*(\w+)\s*=\s*(?:\w+\.)?APIRouter\(([^)]*(?:\([^)]*\)[^)]*)*)\)/gm)) {
+  for (const m of src.matchAll(/^[^\S\r\n\u2028\u2029]*(\w+)\s*=\s*(?:\w+\.)?APIRouter\(([^)]*(?:\([^)]*\)[^)]*)*)\)/gm)) {
     const dep = /dependencies\s*=\s*\[[^\]]*Depends\(\s*([\w.]+)/.exec(m[2]);
     if (dep && isGuardDep(dep[1].split('.').pop())) guardedVars.set(m[1], dep[1]);
   }
@@ -246,7 +247,7 @@ function pyRoutes(src, f, out) {
   const decoratorish = (body) => /wraps|decorat|def\s+\w+\(\s*\*args|return\s+\w+\s*$/m.test(body);
   for (let pass = 0; pass < 2; pass++) for (const d of defs) {
     if (localGuards.has(d.name) || !decoratorish(d.body)) continue;
-    const applied = [...d.body.matchAll(/^\s*@([\w.]+)/gm)].map((m) => m[1].split('.').pop());
+    const applied = [...d.body.matchAll(/^[^\S\r\n\u2028\u2029]*@([\w.]+)/gm)].map((m) => m[1].split('.').pop());
     const wraps = applied.some((a) => isGuardName(a) || localGuards.has(a));
     if (isGuardName(d.name) || wraps) { localGuards.add(d.name); out.push({ k: 'guard-def', name: d.name, line: d.line, ...(wraps && !isGuardName(d.name) ? { wrapper: true } : {}) }); }
   }
@@ -451,8 +452,8 @@ function findCors(src, f, out) {
       if (/\borigins["']?\s*[:=]\s*(?!(['"])\*\1)/.test(opts)) continue; // a list of allowed sites (origins=… or "origins": …)
       add(m.index, 'CORS(app) avec toutes les origines autorisées', /supports_credentials\s*=\s*True/.test(opts));
     }
-    const all = /^\s*CORS_(?:ALLOW_ALL_ORIGINS|ORIGIN_ALLOW_ALL)\s*=\s*True\b/m.exec(src);
-    if (all) add(all.index, 'CORS_ALLOW_ALL_ORIGINS = True', /^\s*CORS_ALLOW_CREDENTIALS\s*=\s*True\b/m.test(src));
+    const all = /^[^\S\r\n\u2028\u2029]*CORS_(?:ALLOW_ALL_ORIGINS|ORIGIN_ALLOW_ALL)\s*=\s*True\b/m.exec(src);
+    if (all) add(all.index, 'CORS_ALLOW_ALL_ORIGINS = True', /^[^\S\r\n\u2028\u2029]*CORS_ALLOW_CREDENTIALS\s*=\s*True\b/m.test(src));
   }
 }
 
@@ -499,9 +500,9 @@ function findSql(src, f, out) {
   for (const x of found.sort((a, b) => a.i - b.i)) { const { i, ...rest } = x; out.push({ ...rest, line: at(i) }); }
 }
 
-const USES_FIREBASE = /\bfrom\s+['"]firebase(?:-admin|-functions)?(?:\/[\w./-]+)?['"]|require\(\s*['"]firebase(?:-admin|-functions)?(?:\/[\w./-]+)?['"]\s*\)|^\s*(?:import|from)\s+firebase_admin\b|@firebase\//m;
-const USES_STRIPE = /\bfrom\s+['"]stripe['"]|require\(\s*['"]stripe['"]\s*\)|^\s*import\s+stripe\b|@stripe\//m;
-const USES_SUPABASE = /@supabase\/(?:supabase-js|ssr|auth-helpers[\w-]*)|from\s+supabase\s+import|^\s*import\s+supabase\b/m;
+const USES_FIREBASE = /\bfrom\s+['"]firebase(?:-admin|-functions)?(?:\/[\w./-]+)?['"]|require\(\s*['"]firebase(?:-admin|-functions)?(?:\/[\w./-]+)?['"]\s*\)|^[^\S\r\n\u2028\u2029]*(?:import|from)\s+firebase_admin\b|@firebase\//m;
+const USES_STRIPE = /\bfrom\s+['"]stripe['"]|require\(\s*['"]stripe['"]\s*\)|^[^\S\r\n\u2028\u2029]*import\s+stripe\b|@stripe\//m;
+const USES_SUPABASE = /@supabase\/(?:supabase-js|ssr|auth-helpers[\w-]*)|from\s+supabase\s+import|^[^\S\r\n\u2028\u2029]*import\s+supabase\b/m;
 
 // ---------- per-file entry point ----------
 
@@ -545,6 +546,7 @@ const plural = (n, w, ws) => `${n} ${n === 1 ? w : ws || w + 's'}`;
 const nl = (n) => `${n.toLocaleString('fr-FR')} ligne${n === 1 ? '' : 's'}`;
 
 export function buildHealth({ graph, scan, arch, root }) {
+  racineLue = root;
   const issues = [];
   const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
   const fileByPath = new Map(graph.files.map((f) => [f.p, f]));
@@ -1372,8 +1374,12 @@ function firebaseRtdbRules(src, now) {
   return out;
 }
 
+let racineLue = null; // racine du lab de l'appel en cours de buildHealth (L5m-01)
 function readHead(file, max) {
-  const fd = fs.openSync(file, 'r');
+  // L5m-01 : jamais lu hors de la racine réelle du lab (chemin d'une liste qui remonte, ancêtre lié), quel que soit l'appelant
+  const r = cheminPhysique(file), rr = cheminPhysique(racineLue);
+  if (r === null || rr === null || !r.startsWith(rr + path.sep)) throw new Error('hors du lab');
+  const fd = fs.openSync(r, 'r');
   try { const buf = Buffer.alloc(max); const n = fs.readSync(fd, buf, 0, max, 0); return buf.subarray(0, n).toString('utf8'); } finally { fs.closeSync(fd); }
 }
 function stemOf(p) {

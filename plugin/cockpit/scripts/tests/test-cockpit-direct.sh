@@ -3,6 +3,7 @@
 #   D1 flux SSE sur le port de la page, sans CORS · D2 phase cochée -> patch · D3 PLAN ajouté -> structural + page relue
 #   D4 corruption passagère d'un DAG -> aucun structural (hystérésis), disparition durable -> structural
 #   D5 repli par scrutation (VF_COCKPIT_WATCH=poll) : mode annoncé et mêmes événements
+#   D6b (sans serveur ni Chrome) le diff de statuts de vf-cockpit-live.mjs et le patch appliqué par ui/70-vf-live.js
 # Lab neutre assemblé dans mktemp, HOME jetable, isolation git, clients node auto-bornés, aucun timeout externe.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -207,6 +208,14 @@ printf '{"nodes":[{"id":"a","step":"un","deps":[],"status":"done"},{"id":"b","st
 wait "$C"
 assert_has "D6.1 — le patch de la mission porte son résumé à jour (1 nœud fait)" "$(node "$AUX/ev.mjs" "$WORK/e6.jsonl" 'E.filter(e=>e.event==="patch").flatMap(e=>e.data.patch).filter(p=>p.ref==="n:dag-MISSION-1-x").map(p=>p.sum).join("|")')" "2 nœuds, 1 fait."
 stop_srv
+
+echo "=== D6b — le diff de statuts du serveur et le patch appliqué par la page (sans serveur HTTP ni Chrome) ==="
+RL="$(node "$SCRIPTS/tests/live-serveur.mjs" "$SCRIPTS/vf-cockpit-live.mjs")"
+assert_eq "D6b.1 — un résumé qui change seul (ni statut ni pied) part dans un patch, un seul, avec le nouveau résumé" "$(printf '%s' "$RL" | node "$AUX/json.mjs" /dev/stdin 'j.erreur || j.sum.ok + ":" + j.sum.detail.sum')" "true:But B"
+assert_eq "D6b.2 — un graphe relu au contenu identique (objets neufs, meta.vf égal en valeur) n'émet aucun événement : ni patch vide, ni vf" "$(printf '%s' "$RL" | node "$AUX/json.mjs" /dev/stdin 'j.erreur || j.identique.ok + ":" + j.identique.detail.evenements.length')" "true:0"
+assert_eq "D6b.3 — snapshot().seq (le seq du hello suivant) égale le seq du dernier événement émis, et n'est pas nul" "$(printf '%s' "$RL" | node "$AUX/json.mjs" /dev/stdin 'j.erreur || j.snapshot.ok + ":" + (j.snapshot.detail.snapshotSeq === j.snapshot.detail.dernierSeq)')" "true:true"
+RP="$(node "$SCRIPTS/tests/live-page.mjs" "$SCRIPTS/../skills/cockpit-moteur/assets/ui")"
+assert_eq "D6b.4 — côté page, un patch dont st et foot sont vides les retire de la carte (appliqué, st et foot indéfinis)" "$(printf '%s' "$RP" | node "$AUX/json.mjs" /dev/stdin 'j.erreur || j.retrait.ok + ":" + j.retrait.detail.applied + ":" + j.retrait.detail.st + ":" + j.retrait.detail.foot')" "true:1:null:null"
 
 
 echo "=== D7 — recette humaine du 2026-11-02 dans le navigateur (D1 parcours, I2 titre flouté, I3 direct sans réapparition, libellé de type) ==="

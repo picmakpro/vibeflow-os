@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 // mise-en-page-chrome.mjs — mesures navigateur de la suite de la mise en page (79-18, SOCL-22). Socle : chrome-session.mjs ; la sonde est posée avant tout script.
 // Usage : node mise-en-page-chrome.mjs <chrome> <racine-du-serveur> <mode> [argument] ; MEP_LAB = chemin du lab (valeur de test qui ne doit jamais voyager).
-//   tracer                niveau « lots » (au moins 90 cartes), en mode en ligne (Worker retiré) puis en mode worker : fenêtre de calcul, pouls, tâche longue, clic, API (A4)
+//   tracer                niveau « lots » (au moins 90 cartes) atteint et posé, puis redessiné, en mode en ligne (Worker retiré) puis en mode worker : fenêtre de calcul du redessin, pouls, tâche longue, clic, API (A4)
 //   equivalence           trois niveaux, mode en ligne et mode worker : positions des cartes et sections des arêtes
 //   repli <sans|serveur>  `sans` : Worker retiré ; `serveur` : le serveur lancé décide (fichier du worker introuvable) : le canevas, le compte de workers, les avertissements
 //   export <fichier>      l'export autonome ouvert en `file:` : le canevas, aucun Worker
@@ -31,8 +31,11 @@ async function niveauLourd(s, options) {
   return sous(s, options, `${racine}/index.html?lang=en`, async () => {
     await s.ev("(() => { const e = document.createElement('div'); e.id = 'mep-cible'; e.setAttribute('style', 'position:fixed;right:4px;bottom:4px;width:40px;height:40px;"
       + "z-index:2147483647;background:#888'); document.body.appendChild(e); window.__mep.surRender(); })()");
+    // le niveau est atteint et la page posée AVANT la mesure ; la fenêtre jugée est celle d'un redessin du niveau posé : le travail de la page qui suit l'ouverture d'un niveau
+    // (transitions, panneaux) n'est pas le calcul jugé et ne doit pas se compter dans le blocage du fil principal
+    await s.ev(`setTimeout(() => ${LOTS}, 0)`); await s.attendre("VibeFlow.state.container !== 'root'", 'niveau atteint'); await attendrePose(s);
     const t0 = await s.ev('performance.now()'), lourde = `(window.__mep.fenetres.find((f) => f.cartes >= 24 && f.debut > ${t0}) || null)`;
-    await s.ev(`setTimeout(() => ${LOTS}, 0)`);
+    await s.ev('setTimeout(() => VibeFlow.render(), 0)');
     let ouverte = null; const fin = Date.now() + 60000;
     while (!ouverte && Date.now() < fin) ouverte = await s.ev(`(() => { const f = ${lourde}; return f ? true : false; })()`);
     const envoye = await s.ev('performance.now()');

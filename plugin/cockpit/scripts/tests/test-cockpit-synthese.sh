@@ -66,7 +66,13 @@ essai('SC2', () => {
   eq('SC2 — la branche fusionnée tard est comptée même avec des dates anciennes (sommet 9 : 6, 7, 8, 9 et 101, 102 = 6)', C.commitsArrives(rg, '5', '9').n, 6);
 });
 essai('SC3', () => {
-  eq('SC3 — tete absente des rangées : plus de 500', C.commitsArrives(rg, '999', '10'), { etat: 'ok', n: null, plusDe500: true });
+  eq('SC3 — tete absente d\'une fenêtre courte : inconnu, jamais « plus de 500 » (L4c-02)', C.commitsArrives(rg, '999', '10'), { etat: 'inconnu', n: null, plusDe500: false });
+  const longue = []; for (let i = 1; i <= 500; i++) longue.push(R(i, i === 1 ? [] : [i - 1], i));
+  eq('SC3 — plus de 500 seulement quand la fenêtre entière est la lignée du sommet', C.commitsArrives(longue, '999', '500'), { etat: 'ok', n: null, plusDe500: true });
+  const melee = longue.slice(0, 499).concat([R('w1', [], 600)]);
+  eq('SC3 — fenêtre pleine partagée avec une autre branche : inconnu', C.commitsArrives(melee, '999', '499').etat, 'inconnu');
+  eq('SC3 — sommet absent de la fenêtre : inconnu (cas A)', C.commitsArrives(longue.map((r) => R('z' + r.h, r.p.map((x) => 'z' + x), 1)), '5', '30'), { etat: 'inconnu', n: null, plusDe500: false });
+  eq('SC3 — tete égale au sommet absent : rien n\'est arrivé', C.commitsArrives(rg, '999', '999'), { etat: 'ok', n: 0, plusDe500: false });
   eq('SC3 — tete égale au sommet : 0', C.commitsArrives(rg, '10', '10'), { etat: 'ok', n: 0, plusDe500: false });
   eq('SC3 — tete nulle ou sommet absent : inconnu', [C.commitsArrives(rg, null, '10').etat, C.commitsArrives(rg, '5', null).etat, C.commitsArrives(rg, '5', '999').etat], ['inconnu', 'inconnu', 'inconnu']);
 });
@@ -113,11 +119,16 @@ essai('SC9', () => {
   const o = { rangees: rg, sommet: '10', gitLu: true, workers: [], maintenant: 1500 };
   const a = C.instantane({ phases: { 'a|1': 'fait' }, tete: '0'.repeat(40), blocages: [], vu: 1000 });
   eq('SC9 — première visite : premiere', C.difference(null, a, o), { premiere: true });
-  const e = C.difference(a, a, { ...o, rangees: [R('x', [], 1)], sommet: 'x' }); // tete = 0…0 absente des rangées : plus de 500
-  ok('SC9 — tete absente des rangées : « plus de 500 » n\'est pas vide', e.premiere === false && e.vide === false && e.commits.plusDe500 === true, JSON.stringify(e));
+  const e = C.difference(a, a, { ...o, rangees: [R('x', [], 1)], sommet: 'x' }); // tete = 0…0 absente de la fenêtre : inconnu, dit comme tel
+  ok('SC9 — tete absente de la fenêtre : « inconnu » n\'est pas vide (jamais « rien de nouveau »)', e.premiere === false && e.vide === false && e.commits.etat === 'inconnu' && e.commits.plusDe500 === false, JSON.stringify(e));
+  const e2 = C.difference(a, a, { ...o, rangees: [R('x', [], 1)], sommet: 'absent' });
+  ok('SC9 — sommet absent de la fenêtre (cas A) : pas vide, état inconnu', e2.vide === false && e2.commits.etat === 'inconnu', JSON.stringify(e2));
   const b = C.instantane({ phases: { 'a|1': 'fait' }, tete: null, blocages: [], vu: 1000 });
   const v = C.difference(b, b, { rangees: [], sommet: null, gitLu: true, workers: [], maintenant: 1500 });
-  eq('SC9 — deux instantanés égaux : vide', [v.premiere, v.vide, v.phases], [false, true, []]);
+  eq('SC9 — repère sans sommet et sommet nul : commits inconnus, donc dits (pas vide)', [v.premiere, v.vide, v.commits.etat], [false, false, 'inconnu']);
+  const bs = C.instantane({ phases: { 'a|1': 'fait' }, tete: A40, blocages: [], vu: 1000 });
+  const vs = C.difference(bs, bs, { rangees: [R(A40, [], 1)], sommet: A40, gitLu: true, workers: [], maintenant: 1500 });
+  eq('SC9 — deux instantanés égaux, tete = sommet : vide', [vs.premiere, vs.vide, vs.phases], [false, true, []]);
   eq('SC9 — réserve des 24 h : pas vide', C.difference(b, b, { rangees: [], sommet: null, gitLu: true, workers: [], maintenant: 1000 + 90000 }).vide, false);
   eq('SC9 — commits non lus : pas vide, étiquette non-lus', (({ vide, commits }) => [vide, commits.etat])(C.difference(b, b, { rangees: [], sommet: null, gitLu: false, workers: [], maintenant: 1500 })), [false, 'non-lus']);
   eq('SC9 — résumé chiffré, sans texte', C.resume(C.difference(a, C.instantane({ phases: { 'a|1': 'fait', 'a|2': 'a-faire' }, tete: null, blocages: [], vu: 2000 }), { ...o, gitLu: false })), { phases: 1, commits: null, sessions: 0, nouveaux: 0, leves: 0 });
@@ -135,10 +146,10 @@ essai('SM2', () => {
   eq('SM2 — valeur valide : relue égale', JSON.stringify(M.lire(t)), t);
   eq('SM2 — non chaîne, texte corrompu, v: 2', [M.lire(undefined), M.lire(42), M.lire('{pas du json'), M.lire(t.replace('"v":1', '"v":2'))], [null, null, null, null]);
   eq('SM2 — clé en plus au premier niveau, dans un instantané, clé en moins', [M.lire(t.replace('{"v":1', '{"x":1,"v":1')), M.lire(t.replace('"vu":1000', '"vu":1000,"x":1')), M.lire(t.replace(',"tete":null', ''))], [null, null, null]);
-  eq('SM2 — 8 192 octets valides : objet ; 8 193 : null', [M.lire(pad(8192)) !== null, M.lire(pad(8193))], [true, null]);
-  const gros = {}; for (let i = 0; i < 70; i++) gros['é'.repeat(60) + String(i).padStart(4, '0') + '|1'] = 'fait';
+  eq('SM2 — 65 536 octets valides : objet ; 65 537 : null', [M.lire(pad(65536)) !== null, M.lire(pad(65537))], [true, null]);
+  const gros = {}; for (let i = 0; i < 500; i++) gros['é'.repeat(60) + String(i).padStart(4, '0') + '|1'] = 'fait';
   const tg = JSON.stringify(val(inst(1, gros), null));
-  ok('SM2 — la borne compte des octets UTF-8, pas des caractères (moins de 8 192 caractères, plus d\'octets)', tg.length < 8192 && octets(tg) > 8192 && M.lire(tg) === null, tg.length + '/' + octets(tg));
+  ok('SM2 — la borne compte des octets UTF-8, pas des caractères (moins de 65 536 caractères, plus d\'octets)', tg.length < 65536 && octets(tg) > 65536 && M.lire(tg) === null, tg.length + '/' + octets(tg));
   const pr = '{"v":1,"precedente":null,"courante":{"vu":5,"phases":{"__proto__":"fait"},"tete":null,"blocages":[]},"__proto__":{"polluee":1}}';
   ok('SM2 — __proto__ : refusé, aucune pollution (ni ici ni dans le contexte de la page)', M.lire(pr) === null && ({}).polluee === undefined && require_inerte(), '');
   const lp = JSON.stringify(val(inst(5, JSON.parse('{"__proto__":"fait"}')), null));
@@ -178,8 +189,19 @@ essai('SM6', () => {
   eq('SM6 — « Tout vu » : précédente et courante égales au présent ; avecCourante ne touche que la courante', [JSON.stringify(t.precedente) === JSON.stringify(p) && JSON.stringify(t.courante) === JSON.stringify(p), a.precedente.vu, a.courante.vu, M.toutVu(null, p).precedente.vu], [true, 3, 9, 9]);
 });
 essai('SM7', () => {
-  const gros = {}; for (let i = 0; i < 150; i++) gros['x'.repeat(60) + String(i).padStart(4, '0') + '|1'] = 'fait';
-  eq('SM7 — au-delà de 8 192 octets : null (la page retire la clé) ; valeur ordinaire : texte', [M.ecrire(val(inst(1, gros), null)), typeof M.ecrire(bon)], [null, 'string']);
+  const gros = {}; for (let i = 0; i < 500; i++) gros['é'.repeat(60) + String(i).padStart(4, '0') + '|1'] = 'fait';
+  eq('SM7 — un seul instantané au-delà de 65 536 octets : null ; valeur ordinaire : texte', [M.ecrire(val(inst(1, gros), null)), typeof M.ecrire(bon)], [null, 'string']);
+});
+// SM9 (L4c-01) : les bornes tiennent leurs promesses — 500 phases acceptées par l'instantané, jamais un repère effacé en silence
+const graphe = (n, ws) => { const o = {}; for (let i = 0; i < n; i++) o[ws + '|' + (10 + Math.floor(i / 3)) + '.' + (i % 3)] = 'a-recetter'; return o; };
+essai('SM9', () => {
+  for (const [n, ws] of [[200, 'fiabilite'], [500, 'fiabilite'], [500, '']]) {
+    const i = C.instantane({ phases: graphe(n, ws), tete: A40, blocages: [], vu: 1763000000 }), v = M.toutVu(null, i), t = M.ecrire(v), r = t === null ? null : M.lire(t);
+    ok('SM9 — ' + n + ' phases (workstream « ' + ws + ' ») : écrit, relu, deux instantanés entiers', t !== null && r !== null && Object.keys(r.precedente.phases).length === n && Object.keys(r.courante.phases).length === n, t === null ? 'null' : t.length);
+  }
+  const lourd = {}; for (let i = 0; i < 500; i++) lourd['x'.repeat(60) + String(i).padStart(4, '0') + '|1'] = 'fait';
+  const t = M.ecrire(val(inst(2000, lourd), inst(1000, lourd))), r = t === null ? null : M.lire(t);
+  ok('SM9 — deux instantanés trop gros : repli sur le plus récent, jamais null', t !== null && r !== null && r.precedente.vu === 2000 && r.courante === null, t === null ? 'null' : t.length);
 });
 essai('SM8', () => { const t = M.ecrire(bon); eq('SM8 — aller-retour lire(ecrire(v)) égal', [JSON.stringify(M.lire(t)), t], [JSON.stringify(bon), JSON.stringify(bon)]); });
 JS
@@ -270,7 +292,7 @@ mut() { # <nom> <fichier relatif au module> <expression sed> <étiquette de la s
 }
 CAL=skills/cockpit-moteur/assets/ui/74-vf-synthese-calcul.js; MEM=skills/cockpit-moteur/assets/ui/74-vf-synthese-memoire.js
 mut M-DATE "$CAL" 's/if (!anc\.has(h)) n++;/if (!anc.has(h) \&\& (par.get(h).at | 0) > 1050) n++;/' SC2
-mut M-NONFUS "$CAL" 's/for (const h of ancetres(sommet))/for (const h of par.keys())/' SC2
+mut M-NONFUS "$CAL" 's/for (const h of depuisSommet)/for (const h of par.keys())/' SC2
 mut M-RESERVE "$CAL" 's/const longue = maintenant - vu > FENETRE_S;/const longue = false;/' SC4
 mut M-LEVE "$CAL" 's/const leves = precedente\.blocages\.filter((c) => !presents\.has(c))\.length;/const leves = precedente.blocages.filter((c) => !presents.has(c)).map((c) => ({ cle: c }));/' SC5
 mut M-BASEH scripts/vf-cockpit-git.mjs 's/h: refBase ? shaRef(refBase) : null/h: ici ? ici.head : null/' SG1 sg
@@ -278,6 +300,11 @@ mut M-CLE-VISITE "$MEM" 's/vibeflow-cockpit:derniere-visite:/vibeflow-cockpit:vi
 mut M-ORIGINE "$MEM" 's/? PREFIXE + lab : null/? PREFIXE + lab : PREFIXE + "origine"/' SM1
 mut M-SEUIL "$MEM" 's/SEUIL_ROTATION_S = 1800/SEUIL_ROTATION_S = 1/' SM4
 mut M-FUSION "$MEM" 's/b\.vu > a\.vu ? b : a/b/' SM5
+mut M-INCONNU "$CAL" 's/if (!par.has(sommet)) return { etat: .inconnu., n: null, plusDe500: false };/if (!par.has(sommet)) return { etat: "ok", n: 0, plusDe500: false };/' SC3
+mut M-500 "$CAL" 's/depuisSommet.size >= 500 ?/true ?/' SC3
+mut M-DIT "$CAL" "s/ || commits.etat === 'inconnu'//" SC9
+mut M-TAILLE "$MEM" 's/TAILLE_MAX = 65536/TAILLE_MAX = 8192/' SM9
+mut M-REPLI "$MEM" 's/return texteDe(v) || texteDe(valeur(plusRecent(v.precedente, v.courante), null));/return texteDe(v);/' SM9
 mut M-LISTE "$MEM" 's/Object\.keys(o)\.length === cles\.length/Object.keys(o).length >= cles.length/' SM2
 
 vf_hyg_assert

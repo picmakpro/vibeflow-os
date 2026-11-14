@@ -7,14 +7,15 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { executer, pause, stabiliser } from './chrome-session.mjs';
 const [, , chrome, racine, mode, fichier] = process.argv;
-const amorce = (e0) => `(() => { const A = window.__e = { echec: ${e0}, casse: 0, fetchs: [], posts: 0, evs: [], prevented: [] };
+const amorce = (e0) => `(() => { const A = window.__e = { echec: ${e0}, pend: 0, casse: 0, fetchs: [], posts: 0, evs: [], prevented: [] };
   const ap = HTMLHeadElement.prototype.appendChild; // casse : un script de l'onglet n'arrive jamais (échec de DÉMARRAGE, après la lecture)
   HTMLHeadElement.prototype.appendChild = function (n) {
     if (A.casse && n.tagName === 'SCRIPT' && /\\/ui\\/30-screens\\.js/.test(n.src)) { setTimeout(() => n.onerror && n.onerror(new Event('error'))); return n; }
     return ap.call(this, n); };
   const f = window.fetch;
   window.fetch = function (u, o) { const m = String((o && o.method) || 'GET').toUpperCase(); if (m !== 'GET') A.posts++;
-    if (String(u).includes('/api/vf/graphe')) { A.fetchs.push(String(u)); if (A.echec) return Promise.reject(new TypeError('forcé')); }
+    if (String(u).includes('/api/vf/graphe')) { A.fetchs.push(String(u)); if (A.echec) return Promise.reject(new TypeError('forcé'));
+      if (A.pend) return new Promise((ok, ko) => { const g = o && o.signal; if (g) g.addEventListener('abort', () => ko(new DOMException('abandon', 'AbortError'))); }); }
     return f.apply(this, arguments); };
   document.addEventListener('vf:coquille-echec', (ev) => { A.evs.push(ev.detail.onglet + ':' + ev.detail.initial);
     queueMicrotask(() => A.prevented.push(ev.defaultPrevented)); }); })()`;
@@ -162,6 +163,17 @@ await executer(chrome, async (s) => {
         r.residu = await lire("[!!document.getElementById('vf-onglets-echec'), !!document.getElementById('vf-onglets-echec-style')]"); await poser(0);
       });
     }
+  }
+  if (mode === 'ec5') { // EC5.1 : une lecture qui ne répond jamais est bornée : échec dit par le chemin existant, la file est libérée
+    await sec('ec5', async () => {
+      await poser(0); await charger('/'); await s.attendre("document.documentElement.dataset.vfPret === 'oui'", 'Code prêt');
+      await s.ev('window.VF_COQUILLE_REGLAGES = { delaiMs: 1500 }; __e.pend = 1');
+      const att = (p, ms) => Promise.race([p, pause(ms).then(() => 'pendante')]);
+      const r1 = await att(s.ev("VF_ONGLETS.aller('projet').then(() => 'resolue', () => 'rejet')"), 8000);
+      const e1 = await etat(); await s.ev('__e.pend = 0');
+      const r2 = await att(s.ev("VF_ONGLETS.aller('projet').then(() => 'resolue', () => 'rejet')"), 8000);
+      o.ec5 = { r1, phase: e1.etat.phase, ech: e1.ech, evs: e1.evs, r2, p: await lire('location.pathname') };
+    });
   }
   return o;
 });

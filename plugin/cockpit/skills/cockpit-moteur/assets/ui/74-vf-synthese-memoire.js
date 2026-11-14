@@ -3,7 +3,7 @@
 // corrompue, trop grosse, d'une autre version ou portant une clé de plus est lue comme « première visite » (null), sans exception.
 // Pose window.__vfSyntheseMemoire.
 (() => {
-  const PREFIXE = 'vibeflow-cockpit:derniere-visite:', TAILLE_MAX = 8192, SEUIL_ROTATION_S = 1800, LAB_RE = /^[0-9a-f]{12}$/;
+  const PREFIXE = 'vibeflow-cockpit:derniere-visite:', TAILLE_MAX = 65536, SEUIL_ROTATION_S = 1800, LAB_RE = /^[0-9a-f]{12}$/;
   const ETATS = ['a-faire', 'en-cours', 'a-recetter', 'fait'];
   const CLE_PHASE = /^[^|\s]{0,64}\|[0-9]+(\.[0-9]+)*$/, SHA = /^[0-9a-f]{40}$/, H12 = /^[0-9a-f]{12}$/;
   const possede = (o, k) => Object.prototype.hasOwnProperty.call(o, k);
@@ -44,6 +44,7 @@
     r.vu = o.vu; r.phases = phases; r.tete = o.tete; r.blocages = o.blocages.slice();
     return r;
   }
+  const plusRecent = (a, b) => (!a ? b : !b ? a : b.vu > a.vu ? b : a);
   const valeur = (precedente, courante) => {
     const r = Object.create(null);
     r.v = 1; r.precedente = precedente; r.courante = courante;
@@ -59,11 +60,15 @@
     return p === undefined || c === undefined ? null : valeur(p, c);
   }
 
-  // le texte à garder, ou null s'il dépasse la borne ou ne se relirait pas (la page retire alors la clé)
-  function ecrire(v) {
-    if (!v) return null;
+  // le texte à garder : les deux instantanés ; s'ils dépassent la borne, le plus récent seul (jamais l'effacement du repère) ; null seulement si même lui
+  // ne tient pas — la page garde alors la clé existante au lieu de la retirer. La borne couvre 500 phases (plafond de l'instantané) sur deux instantanés
+  const texteDe = (v) => {
     const t = JSON.stringify({ v: 1, precedente: v.precedente, courante: v.courante });
     return lire(t) === null ? null : t;
+  };
+  function ecrire(v) {
+    if (!v) return null;
+    return texteDe(v) || texteDe(valeur(plusRecent(v.precedente, v.courante), null));
   }
 
   // rotation au chargement : la courante plus vieille que le seuil devient la précédente
@@ -73,7 +78,6 @@
   }
 
   // fusion de deux écritures : pour chacun des deux instantanés, le plus récent (vu) gagne, null perd
-  const plusRecent = (a, b) => (!a ? b : !b ? a : b.vu > a.vu ? b : a);
   function fusionner(stocke, local) {
     if (!stocke && !local) return null;
     const s = stocke || valeur(null, null), l = local || valeur(null, null);

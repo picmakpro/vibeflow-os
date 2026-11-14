@@ -445,6 +445,41 @@ if [ "${QPORT:-0}" -gt 0 ]; then
   assert_eq "C7.1 — /project.html#t=<amorce> : le fragment est effacé de l'adresse, un seul cadre, d'origine celle de Q" "$(oj '[j.avant.hash,j.avant.cadres,j.avant.origine]' < "$WORK/c7.json")" "[\"\",1,\"http://127.0.0.1:$QPORT\"]"
   assert_eq "C7.2 — après six changements d'onglet : mêmes pastille et même cadre (marque posée sur l'élément), un seul cadre, aucune navigation de cadre de plus, fragment jamais revenu, l'amorce n'a servi qu'une fois" "$(oj '[j.apres.marques,j.apres.cadres,j.apres.navigations,j.apres.hash,j.amorces]' < "$WORK/c7.json")" '[["x","x"],1,0,"",1]'
   assert_eq "C7.3 — le raccourci du tiroir (Ctrl+Maj+Espace) bascule encore vf-term-ouvert sur body" "$(oj 'j.bascule' < "$WORK/c7.json")" "true"
+  # L5u-02 : l'état du corps que le tiroir pose (classe vf-term-ouvert, --vf-term-reserve) est reposé à chaque arrivée d'onglet, et l'onglet Équipe (Q8 / P71-D-08) n'a pas de terminal :
+  # l'exclusion suit l'onglet COURANT, pas celui d'arrivée. Le terminal est ouvert, puis la suite d'onglets est jouée ; chaque relevé est pris l'onglet rendu (data-vf-pret = oui).
+  cat > "$AUX/c7-corps.js" <<'JS'
+const T = (e) => s.ev(e);
+await s.attendre(`!!document.querySelector('.vf-term-pastille')`, 'pastille du tiroir posée');
+const lire = () => T(`(() => { const b = document.body, r = document.querySelector('.vf-term-tiroir'), p = document.querySelector('.vf-term-pastille'); const v = b.style.getPropertyValue('--vf-term-reserve');
+  return { classe: b.classList.contains('vf-term-ouvert'), reserve: v !== '' && v !== '0px', tiroir: !r.hidden, pastille: !p.hidden }; })()`);
+const aller = async (nom) => { await T(`VF_COQUILLE.chargerOnglet('${nom}')`); await s.attendre(`VF_COQUILLE.onglet() === '${nom}' && document.documentElement.dataset.vfPret === 'oui'`, `onglet ${nom} rendu`); };
+const suite = [];
+if ((await T(`VF_COQUILLE.onglet()`)) === 'equipe') suite.push(['equipe-arrivee', await lire()]); else {
+  await T(`document.querySelector('.vf-term-pastille').click()`); await s.attendre(`document.body.classList.contains('vf-term-ouvert')`, 'terminal ouvert'); suite.push(['ouvert', await lire()]);
+}
+for (const nom of ['code', 'projet', 'equipe', 'code']) { await aller(nom); if (suite.length === 1 && suite[0][0] === 'equipe-arrivee' && nom === 'code') { await T(`document.querySelector('.vf-term-pastille').click()`); await s.attendre(`document.body.classList.contains('vf-term-ouvert')`, 'terminal ouvert depuis Code'); } suite.push([nom, await lire()]); }
+return suite;
+JS
+  chrome avec "http://127.0.0.1:$PORT/project.html" "$AUX/c7-corps.js" > "$WORK/c7-corps-p.json"
+  assert_eq "C7.5 — terminal ouvert sur Projet puis Code, Projet, Équipe, Code : classe vf-term-ouvert et réserve posées sur Code et Projet, tiroir affiché ; sur Équipe ni classe, ni réserve, ni tiroir, ni pastille ; de retour sur Code tout revient" "$(oj 'j.map(([n,e])=>n+":"+[e.classe,e.reserve,e.tiroir,e.pastille].join(","))' < "$WORK/c7-corps-p.json")" '["ouvert:true,true,true,false","code:true,true,true,false","projet:true,true,true,false","equipe:false,false,false,false","code:true,true,true,false"]'
+  chrome avec "http://127.0.0.1:$PORT/equipe.html" "$AUX/c7-corps.js" > "$WORK/c7-corps-e.json"
+  assert_eq "C7.6 — session ouverte sur Équipe : le tiroir est posé mais caché (pas de terminal sur Équipe), puis Code le montre : ouvrir par la pastille pose classe et réserve, Équipe les retire" "$(oj 'j.map(([n,e])=>n+":"+[e.classe,e.reserve,e.tiroir,e.pastille].join(","))' < "$WORK/c7-corps-e.json")" '["equipe-arrivee:false,false,false,false","code:true,true,true,false","projet:true,true,true,false","equipe:false,false,false,false","code:true,true,true,false"]'
+  # L5u-01 : la section « Lancer du travail » (inscrite auprès du moteur) suit l'onglet : le moteur est ré-exécuté à chaque onglet, sa table de sections est neuve
+  cat > "$AUX/c7-lanceur.js" <<'JS'
+const T = (e) => s.ev(e);
+const aller = async (nom) => { await T(`VF_COQUILLE.chargerOnglet('${nom}')`); await s.attendre(`VF_COQUILLE.onglet() === '${nom}' && document.documentElement.dataset.vfPret === 'oui'`, `onglet ${nom} rendu`); };
+const section = async () => { await T(`(VibeFlow.select('n:ph-1'), VibeFlow.refreshPanel(), 1)`); return T(`!!document.querySelector('#panel [data-vf-lancer]')`); };
+const lu = () => T(`!!document.querySelector('#panel [data-vf-lancer]')`);
+const r = [];
+if ((await T(`VF_COQUILLE.onglet()`)) !== 'projet') { await T(`history.replaceState(null, '', location.pathname + '#s=n:ph-1')`); await aller('projet'); r.push(await lu()); } // fiche choisie par l'adresse : le panneau est dessiné dès l'arrivée
+r.push(await section());
+for (const nom of ['code', 'projet']) { await aller(nom); if (nom === 'projet') r.push(await section()); }
+return r;
+JS
+  chrome avec "http://127.0.0.1:$PORT/project.html" "$AUX/c7-lanceur.js" > "$WORK/c7-lanceur-p.json"
+  chrome avec "http://127.0.0.1:$PORT/" "$AUX/c7-lanceur.js" > "$WORK/c7-lanceur-c.json"
+  assert_eq "C7.7 — Projet → Code → Projet : la section « Lancer du travail » est dans le panneau de la fiche avant et après le détour" "$(oj 'j' < "$WORK/c7-lanceur-p.json")" '[true,true]'
+  assert_eq "C7.8 — session ouverte sur Code : la section « Lancer du travail » est dans le panneau dessiné dès la première arrivée sur Projet (fiche choisie par l'adresse), puis après un choix, et encore après Code → Projet" "$(oj 'j' < "$WORK/c7-lanceur-c.json")" '[true,true,true]'
 else assert_eq "C7 — le serveur --terminal n'a pas démarré (port de Q absent)" "sans terminal" "terminal"; fi
 cockpit_arreter
 echo "=== C8 — échec d'un chargement d'onglet : jamais une page blanche, jamais le corps de la réponse (A55) ==="

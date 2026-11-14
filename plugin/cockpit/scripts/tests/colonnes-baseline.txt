@@ -20,7 +20,7 @@ scripts/vf-cockpit-formats.mjs 10
 scripts/vf-cockpit-fr-inventaire.mjs 12
 scripts/vf-cockpit-fr-sources.mjs 1
 scripts/vf-cockpit-git-commandes.mjs 2
-scripts/vf-cockpit-git-details.mjs 24
+scripts/vf-cockpit-git-details.mjs 23
 scripts/vf-cockpit-git-durci.mjs 8
 scripts/vf-cockpit-git-entete.mjs 3
 scripts/vf-cockpit-git-graphe.mjs 1
@@ -47,7 +47,7 @@ scripts/vf-cockpit-module.mjs 3
 scripts/vf-cockpit-paths.mjs 8
 scripts/vf-cockpit-planning.mjs 25
 scripts/vf-cockpit-port.mjs 3
-scripts/vf-cockpit-project.mjs 66
+scripts/vf-cockpit-project.mjs 65
 scripts/vf-cockpit-query.mjs 3
 scripts/vf-cockpit-server.mjs 16
 scripts/vf-cockpit-serveur-vivant.mjs 3
@@ -89,7 +89,7 @@ skills/cockpit-moteur/assets/ui/tiroir/lancer.css 1
 skills/cockpit-moteur/assets/ui/tiroir/lancer.js 16
 skills/cockpit-moteur/assets/ui/tiroir/tiroir-construire.js 9
 skills/cockpit-moteur/assets/ui/tiroir/tiroir.css 24
-skills/cockpit-moteur/assets/ui/tiroir/tiroir.js 42
+skills/cockpit-moteur/assets/ui/tiroir/tiroir.js 40
 skills/cockpit-moteur/assets/vendor/xterm/addon-fit.js 1
 skills/cockpit-moteur/assets/vendor/xterm/xterm.js 1
 skills/cockpit-moteur/scripts/lib/vf-git-sortant.mjs 3

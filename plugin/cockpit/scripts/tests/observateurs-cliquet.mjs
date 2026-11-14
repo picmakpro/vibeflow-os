@@ -1,7 +1,7 @@
-// observateurs-cliquet.mjs — cliquet strict des observateurs de mutations par fichier de ui/*.js (79-17, SOCL-21, P79-D-19). Node seul, aucun processus enfant.
+// observateurs-cliquet.mjs — cliquet strict des observateurs de mutations par fichier de ui/ et de ses sous-dossiers, *.js (79-17, SOCL-21, P79-D-19). Node seul, aucun processus enfant.
 // Un observateur de mutations réparait un état après un redessin ; ce qui le remplace est un événement qui existe (`panel` du moteur, `vf-git:etat`).
-// La mesure compte, par fichier du dossier (niveau plat, *.js), les occurrences de la forme constructeur, commentaires compris : une phrase qui porte
-// la forme est comptée. La baseline liste les fichiers à plus de 0 (`<fichier> <n>`, trié par octets) et est SERRÉE : le réel doit l'égaler.
+// La mesure compte, par fichier du dossier et de ses sous-dossiers (récursif, *.js ; clé = chemin relatif en `/`, ex. `tiroir/tiroir.js` ; aucun lien symbolique suivi, fichier ou dossier : ignoré), les occurrences du mot MutationObserver (constructeur, aide qui reçoit la classe, alias), commentaires compris : une phrase qui porte
+// la forme est comptée. La baseline liste les fichiers à plus de 0 (`<chemin relatif> <n>`, trié par octets sur le chemin) et est SERRÉE : le réel doit l'égaler.
 // Usage : mesurer <dossier-ui> · juger <dossier-ui> <baseline> · abaisser <dossier-ui> <baseline>
 // Verdicts de juger : HAUSSE (réel au-dessus, ou fichier neuf à plus de 0) · PERIMEE (réel au-dessous : la baseline suit la baisse dans le même commit) ·
 // ORPHELINE (entrée d'un fichier absent) · FORME (ligne mal formée). Codes : 0 conforme · 1 verdict · 2 usage ou fichier illisible (fermé par défaut).
@@ -10,21 +10,30 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-const FORME = /new\s+MutationObserver\s*\(/g;
+const FORME = /\bMutationObserver\b/g; // le mot seul : constructeur, aide (`obs(MutationObserver, …)`), alias, `window.MutationObserver`
 const fin = (code, texte) => { if (texte) process.stderr.write(texte + '\n'); process.exit(code); };
 const octets = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
 
-function mesurer(dossier) {
-  let noms;
-  try { noms = fs.readdirSync(dossier).filter((n) => n.endsWith('.js')); } catch { return fin(2, `observateurs-cliquet : dossier illisible : ${dossier}`); }
+// Tous les *.js de ui/ et de ses sous-dossiers, clé = chemin relatif en `/`, compte compris à 0. Un lien symbolique (Dirent) n'est ni descendu ni lu.
+function mesurerTout(dossier) {
   const comptes = new Map();
-  for (const n of noms.sort(octets)) {
-    let texte;
-    try { texte = fs.readFileSync(path.join(dossier, n), 'utf8'); } catch { return fin(2, `observateurs-cliquet : fichier illisible : ${n}`); }
-    const k = (texte.match(FORME) || []).length; if (k > 0) comptes.set(n, k);
-  }
-  return comptes;
+  const descendre = (rel) => {
+    let entrees;
+    try { entrees = fs.readdirSync(path.join(dossier, rel), { withFileTypes: true }); } catch { return fin(2, `observateurs-cliquet : dossier illisible : ${rel || dossier}`); }
+    for (const e of entrees) {
+      const cle = rel ? `${rel}/${e.name}` : e.name;
+      if (e.isDirectory()) descendre(cle);
+      else if (e.isFile() && e.name.endsWith('.js')) {
+        let texte;
+        try { texte = fs.readFileSync(path.join(dossier, cle), 'utf8'); } catch { return fin(2, `observateurs-cliquet : fichier illisible : ${cle}`); }
+        comptes.set(cle, (texte.match(FORME) || []).length);
+      }
+    }
+  };
+  descendre('');
+  return new Map([...comptes].sort((a, b) => octets(a[0], b[0])));
 }
+const mesurer = (dossier) => new Map([...mesurerTout(dossier)].filter(([, k]) => k > 0));
 
 function lireBaseline(fichier) {
   let texte;
@@ -33,7 +42,7 @@ function lireBaseline(fichier) {
   texte.split('\n').forEach((ligne, i) => {
     const l = ligne.replace(/\r$/, ''); if (l === '' || l.startsWith('#')) return;
     const m = /^(\S+) (\d+)$/.exec(l);
-    if (!m || m[1].startsWith('/') || m[1].split('/').includes('..') || m[1].includes('/') || Number(m[2]) < 1 || entrees.has(m[1])) { formes.push(i + 1); return; }
+    if (!m || m[1].startsWith('/') || m[1].split('/').some((s) => s === '' || s === '..') || Number(m[2]) < 1 || entrees.has(m[1])) { formes.push(i + 1); return; }
     entrees.set(m[1], Number(m[2]));
   });
   return { entrees, formes };
@@ -55,7 +64,7 @@ function juger(dossier, fichier) {
 }
 
 const ENTETE = [
-  '# observateurs-baseline.txt — observateurs de mutations (forme constructeur) par fichier de ui/*.js (79-17, SOCL-21). Format : <fichier> <n>, trié, n > 0.',
+  '# observateurs-baseline.txt — observateurs de mutations (constructeur nu ou qualifié, alias du constructeur, aide qui le construit) par fichier de ui/ et de ses sous-dossiers, clé = chemin relatif (79-17, SOCL-21). Format : <chemin relatif> <n>, trié par octets, n > 0.',
   '# La baseline est serrée (réel = baseline). Une baisse : node plugin/cockpit/scripts/tests/observateurs-cliquet.mjs abaisser <dossier ui> <ce fichier>.',
   '# Une hausse exige dans le message du commit une citation d\'arbitrage (canal et date) : la règle est « un ajout, un retrait », jamais un relèvement muet.',
 ];

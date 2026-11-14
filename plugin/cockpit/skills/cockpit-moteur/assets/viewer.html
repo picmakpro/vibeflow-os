@@ -2652,6 +2652,7 @@ new ResizeObserver(syncHeader).observe(headerEl); syncHeader(); window.addEventL
 const zoomEl = $('#zoom'), zoomHome = zoomEl.parentNode, zoomNext = zoomEl.nextSibling;
 const placeZoom = () => { if (isPhone()) headerEl.insertBefore(zoomEl, headerEl.querySelector('.hc')); else zoomHome.insertBefore(zoomEl, zoomNext); syncHeader(); };
 phoneQuery.addEventListener('change', placeZoom); placeZoom();
+window.VF_COQUILLE?.surOnglet?.(() => () => { for (const f of [askTab, sheetRole, placeZoom]) phoneQuery.removeEventListener('change', f); }, { cle: 'moteur-phone-query' }); // le moteur est ré-exécuté à chaque arrivée sur un onglet ; la portée ne défait pas les listes de requêtes média
 $('#btn-panel').onclick = () => setPanel(document.body.classList.contains('no-panel'));
 Object.assign(state.kinds, store.get('kinds', {}));
 window.addEventListener('keydown', (ev) => {

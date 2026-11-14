@@ -72,12 +72,17 @@
       const lu = fils && fils.get(v.id);
       if (!lu) { aLire.push(v.id); continue; }
       const f = Array.isArray(lu.fil) ? lu.fil : [];
-      if (lu.tronque && (!f.length || f[0].t > lo)) nonLues.push(v.id); // fil trop court : il ne remonte pas jusqu'à t - δ
+      const ms = (x) => (typeof x === 'number' ? x : typeof x === 'string' ? Date.parse(x) : NaN); // `t` de la route : chaîne ISO ; illisible = NaN, jamais 0
+      const t0 = f.length ? ms(f[0].t) : NaN;
+      let illisible = false;
       f.forEach((el, i) => {
-        if (el.genre !== 'outil' || el.verbe !== 'modifie' || typeof el.cible !== 'string' || typeof el.t !== 'number') return;
-        const fin = el.n > 1 && f[i + 1] && typeof f[i + 1].t === 'number' ? f[i + 1].t : el.t; // une entrée regroupée n'est pas un instant
-        if (el.t <= hi && fin >= lo) { const o = cibleDeFil(el.cible); noter(o.arbre, o.cible); }
+        if (el.genre !== 'outil' || el.verbe !== 'modifie' || typeof el.cible !== 'string') return;
+        const d0 = ms(el.t), suiv = el.n > 1 && f[i + 1] ? ms(f[i + 1].t) : d0; // une entrée regroupée n'est pas un instant
+        if (!Number.isFinite(d0) || !Number.isFinite(suiv)) { illisible = true; return; } // écartée, jamais lue comme 0
+        if (d0 <= hi && suiv >= lo) { const o = cibleDeFil(el.cible); noter(o.arbre, o.cible); }
       });
+      // fil trop court (il ne remonte pas jusqu'à t - δ, ou sa première date est illisible) ou entrée écartée : la voie reste « non lue »
+      if ((lu.tronque && !(t0 <= lo)) || illisible) nonLues.push(v.id);
     }
     return { ecrits: [...ecrits.values()], plus, aLire, nonLues, partiel: nonLues.length > 0 };
   };
@@ -91,7 +96,10 @@
     for (const v of voies) { const x = f(v); if (x == null) return [k, null]; s += x; } // un champ absent : la ligne dit null, jamais 0
     return [k, s];
   }));
-  const totaux = (voies) => Object.fromEntries(COLS.map(([k, f]) => [k, voies.reduce((s, v) => s + (f(v) ?? 0), 0)]));
+  const totaux = (voies) => Object.fromEntries(COLS.map(([k, f]) => { // somme des voies qui publient le champ ; personne ne le mesure : null, jamais 0
+    const xs = voies.map(f).filter((x) => x != null);
+    return [k, xs.length ? xs.reduce((s, x) => s + x, 0) : null];
+  }));
   const ligne = (cle, libelle, voies, extra) => ({ cle, libelle, ...somme(voies), ...extra });
   const nomVoie = (v) => `${v.kind === 'session' ? 'Session' : v.role || 'agent'} ${String(v.id).slice(0, 8)}`;
 

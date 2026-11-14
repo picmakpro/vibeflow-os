@@ -114,7 +114,7 @@ if cockpit_module_muter_page mtete 's/gitLu: S\.gitLu && !!pre\.tete/gitLu: S.gi
   cockpit_lancer "$LAB"; RLT=$?; PT="${VF_PORT:-0}"
   assert_eq "M-TETE.0 — le serveur du mutant est prêt et charge la copie mutée (charge prouvée)" "$RLT|$([ "$PT" -gt 0 ] && echo prêt)|$(cockpit_module_charge "$COCKPIT_MODULE" && echo charge)" "0|prêt|charge"
   RM="$(mesurer "$PT" complet)"; cockpit_arreter
-  assert_eq "M-TETE — sur le mutant V12 rougit (« Rien de nouveau » au lieu de « Commits : non lus »), la sonde est donc capable d'échouer" "$(JM '[j.v12.fiche.etat, j.v12.fiche.texte.includes("Commits : non lus")].join()')" "rien,false"
+  assert_eq "M-TETE — sur le mutant V12 rougit (« hors de la fenêtre lue » au lieu de « le dépôt git est indisponible » : l'état inconnu est dit, plus jamais « Rien de nouveau »), la sonde est donc capable d'échouer" "$(JM '[j.v12.fiche.etat, j.v12.fiche.texte.includes("le dépôt git est indisponible"), j.v12.fiche.texte.includes("hors de la fenêtre lue")].join()')" "neuf,false,true"
 else assert_eq "M-TETE.0 — la mutation s'applique (ancre présente dans le fichier du bloc)" "refusée" "appliquée"; fi
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

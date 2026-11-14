@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { confiner } from './vf-cockpit-paths.mjs';
+import { gitSortant } from './vf-cockpit-git-sortant.mjs';
 
 export const MAX_ENTREES = 200000;
 const IGNORES = new Set(['.git', '.vibeflow', 'node_modules']);
@@ -30,13 +31,22 @@ function texte(f) {
   } catch { return ''; } finally { if (fd >= 0) try { fs.closeSync(fd); } catch {} }
 }
 
-// le dossier git du lab (`.git` dossier ou fichier `gitdir:`), en remontant : un lab peut être un sous-dossier du dépôt
+// le dossier git du lab (`.git` dossier, lien vers un dossier ou fichier `gitdir:`), en remontant : un lab peut être un sous-dossier du dépôt
 function dossierGit(lab) {
   for (let d = lab; ; d = path.dirname(d)) {
     const g = path.join(d, '.git');
     try {
-      const s = fs.statSync(g); if (s.isDirectory()) return g;
-      const m = /^gitdir:\s*(.+)$/m.exec(texte(g)); if (m) return path.resolve(d, m[1].trim());
+      const s = fs.statSync(g);
+      if (s.isDirectory()) {
+        // un `.git` du lab en LIEN vers un dossier git : jugé comme le gitfile (jamais lu s'il sort du lab) ;
+        // un autre type (tube, périphérique) passe par `texte`
+        if (d === lab && fs.lstatSync(g).isSymbolicLink() && gitSortant(lab, lab)) return null; // garde:code-cache-lien
+        return g;
+      }
+      const m = /^gitdir:\s*(.+)$/m.exec(texte(g));
+      // le gitfile du lab désigne un dossier git hors du lab : jamais lu (même règle que les lancements git)
+      if (m && d === lab && gitSortant(lab, lab)) return null;
+      if (m) return path.resolve(d, m[1].trim());
     } catch {}
     if (path.dirname(d) === d) return null;
   }

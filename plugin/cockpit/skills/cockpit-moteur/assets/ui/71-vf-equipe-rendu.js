@@ -77,8 +77,10 @@
   let noms = new Map();
   const SILENCE_PARENT_S = 1800; // PU-G-182 : une session parente en attente ou muette depuis plus de 30 min (le TTL de driver-lock.sh)
   // PU-G-182, P73-D-13 : le garde d'orphelin, nommé pour que la régie (72-vf-regie-modele.js) l'appelle au lieu de le recopier
-  const estOrphelin = (w, parent) => !!w.orphan
-    || (w.kind === 'subagent' && w.etat === 'actif' && !!parent && parent.kind === 'session' && parent.etat !== 'termine' && parent.ageS > SILENCE_PARENT_S);
+  // `plus` : secondes écoulées depuis la réception du who (l'âge du parent avance comme celui de l'agent) ; omis, la page les lit dans ecoule()
+  const estOrphelin = (w, parent, plus) => !!w.orphan
+    || (w.kind === 'subagent' && w.etat === 'actif' && !!parent && parent.kind === 'session' && parent.etat !== 'termine'
+      && parent.ageS + (plus === undefined ? ecoule() : plus) > SILENCE_PARENT_S);
   const aVivant = (w, enfants) => w.etat !== 'termine' || (enfants.get(w.id) || []).some((k) => aVivant(k, enfants));
 
   // la durée dit de quoi elle parle : tenue d'un sous-agent en cours, ancienneté de la dernière écriture d'une session, durée d'un terminé

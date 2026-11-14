@@ -1068,7 +1068,7 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | TEMP-09 | Phase 74 | Complete — 2026-11-14, 74-01 et 74-07 |
 | TEMP-10 | Phase 74 | Complete — 2026-11-14, 74-01 et 74-09 |
 | TEMP-11 | Phase 74 | Complete — 2026-11-14, 74-09 |
-| TEMP-12 | Phase 74 | Partial — 2026-11-14, retraits faits (74-08, 74-10) mais non cochée : règles mortes de 70-vf-live.js non retirées, sondes rouges attribuées à d'autres phases, suites du cockpit à revoir vertes sur la CI de la seconde PR |
+| TEMP-12 | Phase 74 | Complete — 2026-11-14, 74-08 et 74-10 ; CI verte, run 43610046755 sur 1ac5bae5 (arbre = f68185ee) |
 | ACTV-01 | Phase 75 | Pending — 2026-11-11 (cadrage) |
 | ACTV-02 | Phase 75 | Pending — 2026-11-11 (cadrage) |
 | ACTV-03 | Phase 75 | Pending — 2026-11-11 (cadrage) |
@@ -1810,7 +1810,7 @@ la Phase 80.
 - [x] **TEMP-09**: Coût en jetons et en durée, par agent, par mission, par phase et par étage (tête, manager, worker), chaque agrégat portant sa fenêtre ; les agents non rattachés comptés à part en « hors mission » ; temps d'agent perdu à attendre l'humain ; aucun montant en devise ni limite d'abonnement (P74-D-20, D-21, D-23, D-24 ; AUDC-I07, AUDC-I08).
 - [x] **TEMP-10**: Un seul calcul de jetons : la somme de `message.usage` dédoublonnée par identifiant de message, posée dans l'index de la Phase 79 ; la 74 l'agrège sans jamais recompter un transcript ; aucun champ affiché qui ne soit déclaré au contrat de forme ; témoin : transcript dont un message tient sur plusieurs lignes, compté une fois (P74-D-22, D-25).
 - [x] **TEMP-11**: Bornes : routes en GET seul derrière Host, Origin et jeton ; clés `doing`, `mandat`, `messages`, `outils`, `fil` refusées dans le flux ; ni frise, ni fiche, ni fil dans l'export ; aucune lecture réseau ; la dernière commande nulle part ; chaîne XSS étendue aux données de frise et de fiche (nom d'agent, nœud, titre, message hostiles) (P74-D-27 ; P67-D-02, P67-D-14, P69-D-23).
-- [ ] **TEMP-12**: Forme et retrait : clavier complet (voies, curseur, filtres ; la bascule est celle de la régie), alternative textuelle de la frise pour lecteur d'écran, focus visible, mouvement réduit, deux thèmes, grille d'espacements fermée, aucune valeur en dur, interface en français ; retirés : la boîte de transcript du panneau et son bouton « Lire le transcript », la durée qui compte les veilles, la carte « Terminés depuis moins de 24 h » du canevas si elle existe encore, et le lecteur de repli de la régie avec l'export `transcript` (74-10, P73-C2) ; suites du cockpit vertes ; aucun bump propre, un seul pour la vague à la jointure (P74-D-28, D-43, D-51, D-53 ; P71.5-D-01, Q11).
+- [x] **TEMP-12**: Forme et retrait : clavier complet (voies, curseur, filtres ; la bascule est celle de la régie), alternative textuelle de la frise pour lecteur d'écran, focus visible, mouvement réduit, deux thèmes, grille d'espacements fermée, aucune valeur en dur, interface en français ; retirés : la boîte de transcript du panneau et son bouton « Lire le transcript », la durée qui compte les veilles, la carte « Terminés depuis moins de 24 h » du canevas si elle existe encore, et le lecteur de repli de la régie avec l'export `transcript` (74-10, P73-C2) ; suites du cockpit vertes ; aucun bump propre, un seul pour la vague à la jointure (P74-D-28, D-43, D-51, D-53 ; P71.5-D-01, Q11).
 
 ### L'activité posée sur le code (Phase 75 — posées au cadrage, 2026-11-11)
 

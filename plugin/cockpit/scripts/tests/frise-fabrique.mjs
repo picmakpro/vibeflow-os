@@ -68,10 +68,11 @@ export function quiMissions(n = 8) {
 }
 export const quiPhases = () => [{ key: '74', n: 74, ws: null, nom: "L'équipe dans le temps", fait: false }];
 
-// Fil réduit (74-02) : éléments datés ; une entrée regroupée porte `n` > 1.
-export const element = (t, o = {}) => ({ t, genre: 'outil', outil: 'Edit', verbe: 'modifie', cible: 'a.js', ...o });
+// Fil réduit (74-02) : éléments datés ; une entrée regroupée porte `n` > 1. `t` est en chaîne ISO, comme la rend la route (reduireTranscript) ; un nombre est converti.
+export const iso = (t) => (typeof t === 'number' ? new Date(t).toISOString() : t);
+export const element = (t, o = {}) => ({ t: iso(t), genre: 'outil', outil: 'Edit', verbe: 'modifie', cible: 'a.js', ...o });
 export function fil(id = 'ag-0001', { elements, tronque = false, now = NOW } = {}) {
-  return { id, fil: elements ?? [element(now - 20 * MIN, { n: 1 }), { t: now - 10 * MIN, genre: 'message', texte: 'rapport' }], tronque };
+  return { id, fil: elements ?? [element(now - 20 * MIN, { n: 1 }), { t: iso(now - 10 * MIN), genre: 'message', texte: 'rapport' }], tronque };
 }
 
 // `cockpit-git@1` réduit : `rangees[{h, p, at (SECONDES), s, refs[{type, nom}]}]`, `bornes.tronque`, `base.nom`.

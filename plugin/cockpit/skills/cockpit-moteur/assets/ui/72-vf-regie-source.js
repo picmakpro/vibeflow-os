@@ -27,7 +27,7 @@
     const jeton = () => (E ? E.jeton() : null) || (S() && S().token) || null;
     return {
       who: () => (E ? E.lire('who') : L().who) || null, lock: () => (E ? E.lire('lock') : L().lock) || null, jeton,
-      whoAt: () => (E ? null : L().whoAt),
+      whoAt: () => (E ? (typeof E.recu === 'function' ? E.recu('who') : null) : L().whoAt),
       perdu: () => (E ? !!E.lire('connexion') && E.lire('connexion') !== 'ouvert' : L().connected === false && !!L().who),
       ecouter: (f) => {
         if (E) return ['who', 'lock', 'connexion', 'graphe'].map((k) => E.abonner(k, () => f(k)));

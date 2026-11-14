@@ -63,7 +63,10 @@ export function lireStatusV2(sortie, { max = BORNES_DETAILS.statut } = {}) {
 
 function tronqueOctets(texte, max) {
   if (Buffer.byteLength(texte) <= max) return { texte, tronque: false };
-  return { texte: Buffer.from(texte).subarray(0, max).toString('utf8').replace(/�+$/, ''), tronque: true }; // une coupe au milieu d'un caractère n'en laisse pas de fragment
+  let coupe = Buffer.from(texte).subarray(0, max).toString('utf8'), e = coupe.length;
+  // une coupe au milieu d'un caractère n'en laisse pas de fragment (lu à la fin : une RegExp `+$` est quadratique)
+  while (e > 0 && coupe[e - 1] === '\ufffd') e--;
+  return { texte: coupe.slice(0, e), tronque: true };
 }
 
 export async function detailCommit(lab, sha) {
@@ -83,7 +86,8 @@ export async function detailCommit(lab, sha) {
     if ((!lg.ok && !lg.tronque) || c.length < 7 || c[0] !== sha) return ko200;
     const p = c[1] === '' ? [] : c[1].split(' ');
     if (!p.every(motifLong)) return ko200;
-    const brut = c.slice(6).join('\0').replace(/\0$/, '').replace(/\s+$/, '');
+    // trimEnd : même ensemble de blancs que `\s`, sans le coût quadratique d'un `\s+$` sur un long message
+    const brut = c.slice(6).join('\0').replace(/\0$/, '').trimEnd();
     const m = tronqueOctets(masque(brut.replace(ILLISIBLE_G, ''), BORNES_DETAILS.message * 2), BORNES_DETAILS.message);
     const dt = await git(['diff-tree', '-r', '-z', '--numstat', '-M', `-l${BORNES_DETAILS.renommages}`, '--no-commit-id', ...(p.length ? [`${sha}^1`, sha] : ['--root', sha]), '--'], { maxBuffer: BORNES_DETAILS.octetsNumstat }); // merge : contre le PREMIER parent seulement ; racine : --root
     const ns = dt.ok ? lireNumstat(dt.sortie) : ko('diff-tree');

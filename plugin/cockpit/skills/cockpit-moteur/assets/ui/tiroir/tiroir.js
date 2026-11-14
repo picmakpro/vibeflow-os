@@ -1,5 +1,8 @@
 function scriptTiroir(cfg, accepte, construire) {
-  if (['/', '/index.html', '/project.html'].indexOf(location.pathname) < 0) return;
+  // L5u-02 : sous la coquille, le document est le même pour les trois onglets : le tiroir est posé une fois et suit l'onglet COURANT (surOnglet) ;
+  // seul le document d'avant la coquille s'exclut par son adresse
+  const K = window.VF_COQUILLE, sousCoquille = !!K && typeof K.surOnglet === 'function';
+  if (!sousCoquille && ['/', '/index.html', '/project.html'].indexOf(location.pathname) < 0) return;
   // SAF-1 : l'amorçage du terminal arrive dans le fragment de l'adresse (page de redirection du lanceur) ; il est lu AVANT tout autre traitement, effacé aussitôt de l'adresse,
   // et retenu seulement s'il a le format exact de l'amorçage (64 chiffres hexadécimaux). Il ne sert qu'une fois : il part dans l'adresse du cadre de Q, qui fait elle-même l'échange.
   let amorce = '';
@@ -15,6 +18,9 @@ function scriptTiroir(cfg, accepte, construire) {
   };
   const demarrer = () => {
     const d = construire(document, T);
+    // Q8 / P71-D-08 : pas de terminal sur l'onglet Équipe. `equipe` dit l'onglet courant ; `suivreTiroir` est rappelé à chaque arrivée d'onglet
+    // (inscrit ici, de façon synchrone : un rappel posé pendant le démarrage d'un onglet serait défait avec lui)
+    let equipe = location.pathname === '/equipe.html', suivreTiroir = null;
     // P71-D-34 (E2), inversé en v1.3.3 : jamais sur les boutons de zoom. Tiroir fermé, la pastille garde sa place au plus bas ; si elle recouvre #zoom, c'est #zoom qui remonte juste au-dessus d'elle.
     // 71.5 (P71.5-D-06) : la barre de question #ask est un obstacle de plus, lue comme le zoom avec la même marge de 8 : la pastille se pose 8 au-dessus d'elle quand elle la recouvre (#zoom remonte ensuite
     // au-dessus de la pastille). La visite « Par où commencer » traite la pastille comme un obstacle de son côté (ui/40, obstacles()) : aucune marge fixe ici. La puce (message d'indisponibilité) se pose au-dessus du plus haut des deux.
@@ -60,9 +66,24 @@ function scriptTiroir(cfg, accepte, construire) {
     // persistants, donc créent le leur APRÈS celui-ci : --vf-ask-bas (qui place le zoom) est périmée à la mesure, le zoom est jugé sans
     // recouvrement, vidé, puis tombe sur la pastille. Un second passage à la frame suivante lit la variable à jour, quel que soit l'ordre.
     const doubler = (f) => () => { f(); requestAnimationFrame(f); };
-    { const ask = document.getElementById('ask');
-      if (ask) { if (window.ResizeObserver) new ResizeObserver(doubler(eviterTout)).observe(ask); const surTransition = (e) => { if (e.target === ask) eviterTout(); }; ask.addEventListener('transitionend', surTransition); } }
-    const puce = (texte) => { d.puce.textContent = texte; document.body.appendChild(d.puce); eviter(d.puce); };
+    // la barre de question est un nœud du corps du moteur : un changement d'onglet en pose un neuf, qu'il faut relier de nouveau
+    // (l'observateur de la portée disparaît avec elle)
+    let askLie = null;
+    const lierAsk = () => {
+      const ask = document.getElementById('ask'); if (!ask || ask === askLie) return; askLie = ask;
+      if (window.ResizeObserver) new ResizeObserver(doubler(eviterTout)).observe(ask);
+      const surTransition = (e) => { if (e.target === ask) eviterTout(); };
+      ask.addEventListener('transitionend', surTransition);
+    };
+    lierAsk();
+    // la puce et la carte posées au corps ne se montrent pas sur Équipe
+    const masquerAutonomes = () => { for (const n of [d.puce, d.carteInjoignable]) if (n.parentNode === document.body) n.hidden = equipe; };
+    const puce = (texte) => { d.puce.textContent = texte; document.body.appendChild(d.puce); masquerAutonomes(); eviter(d.puce); };
+    if (sousCoquille) {
+      K.surOnglet(({ onglet }) => {
+        equipe = onglet === 'equipe'; lierAsk(); masquerAutonomes(); if (suivreTiroir) suivreTiroir(); eviterTout();
+      }, { cle: 'tiroir-terminal' });
+    }
     if (cfg.indisponible) { puce(T.windows); return; }
     if (location.hostname !== '127.0.0.1') { puce(T.localhost); return; }
     const jeton = (window.VF_COCKPIT_SERVER || {}).token || '';
@@ -71,9 +92,9 @@ function scriptTiroir(cfg, accepte, construire) {
       .then((j) => {
         if (j && j.etat === 'indisponible') puce(T.windows);
         else if (j && j.etat === 'actif' && Number.isInteger(j.port)) monter('http:' + '//127.0.0.1:' + j.port);
-        else { d.carteInjoignable.style.position = 'fixed'; document.body.appendChild(d.carteInjoignable); }
+        else { d.carteInjoignable.style.position = 'fixed'; document.body.appendChild(d.carteInjoignable); masquerAutonomes(); }
       })
-      .catch(() => { d.carteInjoignable.style.position = 'fixed'; document.body.appendChild(d.carteInjoignable); });
+      .catch(() => { d.carteInjoignable.style.position = 'fixed'; document.body.appendChild(d.carteInjoignable); masquerAutonomes(); });
 
     const monter = (origineQ) => {
       let ouvert = false, plein = false, cadre = null, ouvreur = null, minuterie = null, session = false, chargeur = null;
@@ -88,10 +109,16 @@ function scriptTiroir(cfg, accepte, construire) {
       const annoncer = (t) => { d.annonce.textContent = t; };
       // P71-D-35 (G1) : le viewer ajuste sur la hauteur de son canevas ; la feuille la réduit (--vf-term-reserve), puis on rappelle SON ajustement (jamais pendant le glissement : au relâchement)
       const ajuster = () => { try { if (window.VibeFlow && typeof window.VibeFlow.fit === 'function') window.VibeFlow.fit(false); } catch (e) { void e; } };
+      // ce que l'humain voit : le tiroir ouvert, ou la pastille, jamais l'un ni l'autre sur Équipe ;
+      // `ouvert` reste l'état voulu, retrouvé au retour sur Code ou Projet
+      const affichage = () => {
+        const v = ouvert && !equipe;
+        d.region.hidden = !v; d.region.inert = !v; d.pastille.hidden = ouvert || equipe; document.body.classList.toggle('vf-term-ouvert', v);
+      };
       const appliquer = () => {
         d.region.style.height = h + 'px';
-        const reserve = ouvert && !plein ? h + 28 : 0; // dérivé : bas 16 + respiration 12
-        document.body.style.setProperty('--vf-term-h', ouvert && !plein ? h + 'px' : '0px');
+        const reserve = ouvert && !equipe && !plein ? h + 28 : 0; // dérivé : bas 16 + respiration 12
+        document.body.style.setProperty('--vf-term-h', ouvert && !equipe && !plein ? h + 'px' : '0px');
         document.body.style.setProperty('--vf-term-reserve', reserve + 'px');
         if (reserve !== reserveVue && !glisse) { reserveVue = reserve; ajuster(); }
         d.poignee.setAttribute('aria-valuenow', String(h)); d.poignee.setAttribute('aria-valuetext', h + ' px'); d.poignee.setAttribute('aria-valuemax', String(pleinMax())); // PU-G-142 : la valeur se lit avec son unité (« 324 px »)
@@ -118,7 +145,10 @@ function scriptTiroir(cfg, accepte, construire) {
         session = cle === 'connecte' || cle === 'reconnexion'; pastilleEtat();
       };
       const retirerCarte = () => { if (d.carteInjoignable.parentNode) d.carteInjoignable.parentNode.removeChild(d.carteInjoignable); };
-      const injoignable = () => { minuterie = null; d.carteInjoignable.style.position = ''; d.emplacementCadre.appendChild(d.carteInjoignable); etat('arrete'); };
+      const injoignable = () => {
+        minuterie = null; d.carteInjoignable.hidden = false; d.carteInjoignable.style.position = '';
+        d.emplacementCadre.appendChild(d.carteInjoignable); etat('arrete');
+      };
       const creerCadre = () => {
         const f = document.createElement('iframe');
         f.title = T.titre; f.setAttribute('sandbox', cfg.sandbox);
@@ -132,18 +162,17 @@ function scriptTiroir(cfg, accepte, construire) {
       const ouvrir = (avecFocus) => {
         if (ouvert) return;
         ouvreur = document.activeElement; ouvert = true; plein = plein || window.matchMedia('(max-width: 700px)').matches;
-        d.region.hidden = false; d.region.inert = false; d.pastille.hidden = true;
         d.region.classList.toggle('vf-term-plein-etat', plein); d.region.classList.add('vf-term-entree');
         try { if (window.VibeFlowTour && window.VibeFlowTour.active()) window.VibeFlowTour.end(); } catch (e) { void e; }
-        document.body.classList.add('vf-term-ouvert'); appliquer(); pastilleEtat(); eviter(d.pastille);
-        if (!cadre) creerCadre();
+        affichage(); appliquer(); pastilleEtat(); eviter(d.pastille);
+        if (!cadre && !equipe) creerCadre(); // sur Équipe, rien n'est ouvert : le cadre de Q se monte à l'arrivée sur un autre onglet
         stock.ecrire('vf.terminal.open', 1); annoncer(T.annonceOuvert);
         if (avecFocus) cadre.focus();
       };
       const fermer = () => {
         if (!ouvert) return;
-        ouvert = false; d.region.hidden = true; d.region.inert = true; d.pastille.hidden = false; d.region.classList.remove('vf-term-entree');
-        document.body.classList.remove('vf-term-ouvert'); appliquer(); pastilleEtat(); eviter(d.pastille);
+        ouvert = false; d.region.classList.remove('vf-term-entree');
+        affichage(); appliquer(); pastilleEtat(); eviter(d.pastille);
         stock.ecrire('vf.terminal.open', 0); annoncer(T.annonceFerme);
         const visible = ouvreur && ouvreur !== document.body && document.contains(ouvreur) && !ouvreur.disabled && ouvreur.getClientRects().length > 0;
         (visible ? ouvreur : d.pastille).focus();
@@ -175,7 +204,7 @@ function scriptTiroir(cfg, accepte, construire) {
 
       // raccourci : bascule à trois temps ; seule cette combinaison est reconnue, tout le reste atteint la page ou le shell
       document.addEventListener('keydown', (e) => {
-        if (e.code !== RACCOURCI.code || e.ctrlKey !== RACCOURCI.ctrl || e.shiftKey !== RACCOURCI.shift || e.altKey || e.metaKey) return;
+        if (equipe || e.code !== RACCOURCI.code || e.ctrlKey !== RACCOURCI.ctrl || e.shiftKey !== RACCOURCI.shift || e.altKey || e.metaKey) return;
         e.preventDefault();
         if (!ouvert) ouvrir(true); else if (document.activeElement !== cadre) cadre.focus(); else fermer();
       }, true);
@@ -221,7 +250,11 @@ function scriptTiroir(cfg, accepte, construire) {
         try { cadre.contentWindow.location.replace(adresse); } catch (err) { cadre.setAttribute('src', adresse); }
       }).observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
 
-      appliquer(); pastilleEtat();
+      affichage(); appliquer(); pastilleEtat();
+      // L5u-02 : le changement d'onglet remet le corps comme avant la portée (classe, variables) alors que le tiroir reste ouvert :
+      // l'état du tiroir est reposé après chaque montage de l'onglet, la réserve est redite au moteur (reserveVue remis à zéro : son ajustement suit),
+      // et le cadre voulu ouvert se monte s'il ne l'était pas (session commencée sur Équipe)
+      suivreTiroir = () => { reserveVue = -1; if (ouvert && !equipe && !cadre) creerCadre(); affichage(); appliquer(); pastilleEtat(); eviter(d.pastille); };
       // SAF-1 : avec un amorçage, le cadre est monté dès le chargement, tiroir fermé : l'échange se fait dans le cadre, qui ne démarre le shell qu'à l'ouverture
       if (amorce) creerCadre();
       if (stock.lire('vf.terminal.open') === '1') ouvrir(false);

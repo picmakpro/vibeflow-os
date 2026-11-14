@@ -124,7 +124,8 @@
     const suiveur = S.role === 'suiveur';
     if (m.t === 'salut' || m.t === 'ping') {
       if (S.role !== 'elu') return;
-      if (m.t === 'salut') rejouerA(m.id); else poster({ v: 1, t: 'pong' }); // garde:flux-pong
+      if (m.t === 'salut') rejouerA(m.id); else if (S.es) poster({ v: 1, t: 'pong' }); // garde:flux-pong
+      // un élu sans flux réel (page qui a abandonné) ne répond pas : un suiveur prend le relais
     } else if (!suiveur) return;
     else if (m.t === 'pong') S.pong = true;
     else if (m.t === 'perdu') declarerPerdu('relais');

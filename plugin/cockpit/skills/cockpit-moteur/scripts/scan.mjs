@@ -66,19 +66,23 @@ for (const p of found.loose) if (!seen.has(p) && !inMap(p)) { seen.add(p); fileL
 const files = [];
 const rootReal = cheminPhysique(root);
 if (rootReal === null) { console.error('scan: racine illisible ou introuvable'); process.exit(1); }
+// vibeflow AUDC-A-02, D-M15, L5m-01 : un chemin de la liste n'est lu que si TOUS ses composants se résolvent physiquement sous la racine réelle (ni `..`,
+// ni chemin absolu, ni ancêtre lié qui sort) ; s'il passe par un lien (lui-même ou un ancêtre), sa cible doit être un fichier retenu par la marche
+// (liste git ou marche : ni dossier git, ni sortie du cockpit, ni fichier ignoré)
+function lisibleDansLab(p) {
+  if (p === '' || p.includes('\0') || path.isAbsolute(p) || p.split('/').some((s) => s === '' || s === '.' || s === '..')) return false;
+  const attendu = rootReal + path.sep + p.split('/').join(path.sep);
+  const r = cheminPhysique(attendu);
+  if (r === null || !r.startsWith(rootReal + path.sep)) return false;
+  // la liste git est en NFC (core.precomposeunicode) alors que le disque peut garder le nom en NFD : on compare en NFC des deux côtés
+  const a = attendu.normalize('NFC'), n = r.normalize('NFC'); const rn = rootReal + path.sep + path.relative(rootReal, r).normalize('NFC');
+  return n === a || n.toLowerCase() === a.toLowerCase() || seen.has(toPosix(path.relative(rootReal, rn)));
+}
 for (const { path: p, repo } of fileList) {
   const abs = path.join(root, p);
   let st;
-  // vibeflow AUDC-A-02, D-M15 : un lien n'est lu que si sa cible physique est un fichier retenu par la marche
-  // (liste git ou marche : ni dossier git, ni sortie du cockpit, ni fichier ignoré)
-  try {
-    st = fs.lstatSync(abs);
-    if (st.isSymbolicLink()) {
-      const r = cheminPhysique(abs);
-      if (r === null || !r.startsWith(rootReal + path.sep) || !seen.has(toPosix(path.relative(rootReal, r)))) continue;
-      st = fs.statSync(abs);
-    }
-  } catch { continue; }
+  if (!lisibleDansLab(p)) continue;
+  try { st = fs.statSync(abs); } catch { continue; }
   if (!st.isFile()) continue;
   const { category, lang } = classify(p, st.size);
   const f = { path: p, repo, category, lang, bytes: st.size, loc: 0 };

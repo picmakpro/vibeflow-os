@@ -18,9 +18,11 @@
   function synthese(ctx, agg, voies, M, sec) {
     const p = ctx.nodes && ctx.nodes.lignes && ctx.nodes.lignes.querySelector('.vf-frise-synthese');
     if (!p) return;
-    const t = agg.total, lib = ctx.libFenetre, jet = (n) => M.fmtJetons(n), au = voies.filter((v) => M.etatA(v, ctx.jusqua - 1) === 'travail').length;
-    let texte = `Sur les dernières ${lib}${NB}: ${pluriel(au, 'agent', 'agents')} au travail maintenant, ${M.fmtDuree(t.travailS)} au travail `
-      + `dont ${M.fmtDuree(t.attenteHumainS)} à vous attendre. Jetons sur les dernières 24${NB}h${NB}: ${jet(t.entree)} en entrée, ${jet(t.sortie)} en sortie.`;
+    // valeur nulle : « inconnu », comme le tableau
+    const t = agg.total, lib = ctx.libFenetre, jet = (n) => (n == null ? 'inconnu' : M.fmtJetons(n) ?? 'inconnu');
+    const dur = (n) => (n == null ? 'inconnu' : M.fmtDuree(n) ?? 'inconnu'), au = voies.filter((v) => M.etatA(v, ctx.jusqua - 1) === 'travail').length;
+    let texte = `Sur les dernières ${lib}${NB}: ${pluriel(au, 'agent', 'agents')} au travail maintenant, ${dur(t.travailS)} au travail `
+      + `dont ${dur(t.attenteHumainS)} à vous attendre. Jetons sur les dernières 24${NB}h${NB}: ${jet(t.entree)} en entrée, ${jet(t.sortie)} en sortie.`;
     if (agg.inconnus) texte += ` ${pluriel(agg.inconnus, 'agent sans mesure', 'agents sans mesure')}.`;
     if (agg.incomplet) {
       const n = ctx.voiesOmises;

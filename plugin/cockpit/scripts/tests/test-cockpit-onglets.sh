@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test-cockpit-onglets.sh — changer d'onglet sans recharger la page (80-10, FORM-16, P80-D-22, P80-D-42, P80-D-59), un vrai Chrome, sans réseau.
-#   OG1 de Code à Projet sans rechargement, Précédent revient, focus, titre et annonce suivent (pilote : chrome-onglets-routage.mjs, modes og1, og2, og3, og2t)
+#   OG1 de Code à Projet sans rechargement, Précédent revient, focus, titre et annonce suivent (pilote : chrome-onglets-routage.mjs, modes og1, og1e, og2, og3, og2t) ; OG1.5 : vrai clic vers Équipe
 #   OG2 vue et tiroir gardés, repli du focus, VF_ONGLETS.aller (promesse), script persistant, fragment d'adresse
 #   OG3 chargement rejeté sans effet visible (adresse, onglet affiché, focus inchangés, promesse rejetée)
 #   Mutants : levés (régime allégé de la Phase 80, ce plan n'est pas une garde).  OG_SCRIPTS = dossier de scripts à bâtir (rejeu sur la base).
@@ -46,6 +46,9 @@ assert_eq "OG1.4 — document.title « Projet · <nom> » puis « Code · <nom> 
   "$(E1 '[/^Projet · .+/.test(j.og1.e1.t), /^Code · .+/.test(j.og1.e2.t), j.og1.e1.t.split(" · ")[1] === j.og1.e2.t.split(" · ")[1]]')" '[true,true,true]'
 assert_eq "OG2.8 — deux changements d'onglet de plus : un seul écouteur popstate posé par 00-vf-onglets.js, aucun load" \
   "$(E1 '[j.og28.pop, j.og1.e3.origine, j.og1.e4.origine, j.og28.nb]')" '[1,true,true,4]'
+R9="$(mesurer og1e)"; sonde "$R9"
+assert_eq "OG1.5 — VRAI clic (Input.dispatchMouseEvent) sur l'onglet Équipe : /equipe.html, même page (timeOrigin), aucun load, vf:onglet equipe<code, onglet affiché Équipe" \
+  "$(E '[j.og1e.p, j.og1e.origine, j.og1e.loads, j.og1e.last, j.og1e.onglet]' "$R9")" '["/equipe.html",true,0,"equipe<code","equipe"]'
 
 echo "=== OG2 — vue, repli du focus, aller, script persistant, fragment ==="
 R2="$(mesurer og2)"; sonde "$R2"; E2() { E "$1" "$R2"; }
@@ -127,7 +130,7 @@ R4="$(mesurer og2t)"; sonde "$R4"
 assert_eq "OG2.2 — le cadre du terminal est le même nœud, jamais rechargé, après un aller-retour d'onglet (tampon gardé)" \
   "$(E 'j.og22' "$R4")" '{"meme":true,"connecte":true,"charges":0}'
 echo "=== Sans erreur de pilote ==="
-ERR=""; for r in "$R1" "$R2" "$R3" "$R4" "$R5" "$R6" "$R7" "$R8"; do ERR="$ERR$(E 'Object.keys(j.erreurs).join()' "$r")"; done
+ERR=""; for r in "$R1" "$R2" "$R3" "$R4" "$R5" "$R6" "$R7" "$R8" "$R9"; do ERR="$ERR$(E 'Object.keys(j.erreurs).join()' "$r")"; done
 assert_eq "OG9 — aucune section du pilote n'a échoué" "$ERR" ""
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

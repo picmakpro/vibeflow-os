@@ -1,8 +1,8 @@
 # Changelog — product-team-bundle
 
-## [Non publié] — 2026-11-08 (fin de mandat, #223)
+## [v1.1.2] — 2026-11-14 (fin de mandat, #223 ; livrée par /vf-update) — non publiée
 
-**Patch** (aucune release racine : groupée ; aucun bump de `VERSION`). Issue #223 : des workers restaient vivants après leur travail (tâche de fond jamais terminée, commande de premier plan basculée en fond, processus survivants dans le worktree). Les agents `vf-product-manager` et `prd-gate` reçoivent des blocs **Fin de mandat** (rien en attente d'une tâche de fond, attente au premier plan bornée par une échéance, commit avant le rapport, aucun processus à soi vivant au rapport) et **Clôture des workers** / **Balayage de sortie** selon leur rôle, avec renvoi vers `conductor/references/team-kernel.md` § Fin de mandat (source unique) ; les autres agents du module, sans `Bash` ni `Agent` dans leurs `tools:`, ne peuvent lancer aucune tâche de fond et ne portent pas le bloc. Aucune ligne ajoutée au compteur du budget d'instructions.
+**Patch** (aucune release racine : groupée). Bump de VERSION : à version égale, `update_module` ne resynchronise que scripts et hooks et ne recopie jamais les agents — sans bump, /vf-update ne livrait pas les corps d'agent modifiés ni le renvoi à `team-kernel.md` § Fin de mandat. Issue #223 : des workers restaient vivants après leur travail (tâche de fond jamais terminée, commande de premier plan basculée en fond, processus survivants dans le worktree). Les agents `vf-product-manager` et `prd-gate` reçoivent des blocs **Fin de mandat** (rien en attente d'une tâche de fond, attente au premier plan bornée par une échéance, commit avant le rapport, aucun processus à soi vivant au rapport) et **Clôture des workers** / **Balayage de sortie** selon leur rôle, avec renvoi vers `conductor/references/team-kernel.md` § Fin de mandat (source unique) ; les autres agents du module, sans `Bash` ni `Agent` dans leurs `tools:`, ne peuvent lancer aucune tâche de fond et ne portent pas le bloc. Aucune ligne ajoutée au compteur du budget d'instructions.
 
 ## [v1.1.1] — 2026-11-05 (fin de tour inerte) — non publiée
 

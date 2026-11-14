@@ -5,7 +5,7 @@
 // Rend UNE ligne JSON : { etapes, charges, surfaces, encart, cout, carte, xss, requetes, hors, csp, violations, texteVu, cmdDom, doing } ; { erreur } nommée si une mesure manque.
 //   surfaces : nombre d'éléments injectés (img[src=x], [onerror], [onload], [onfocus]) par surface (colonne, pistes, encart, cout, fiche, depot) : un mutant se nomme par sa surface.
 import { pathToFileURL } from 'node:url';
-const { executer, pause, stabiliser } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, stabiliser, attendreValeur } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, base] = process.argv;
 const ORIGINE = new URL(base).origin + '/';
 const CHARGE = 'img[src="x"], [onerror], [onload], [onfocus]';
@@ -76,8 +76,10 @@ await executer(chrome, async (s) => {
   const avant = await lire(); // le marqueur n'est plus lisible après l'ouverture de l'onglet Code (mesuré au témoin C0 : 1 avant, 0 après) : on le lit AVANT
   // « Voir sur la carte » : la cible hostile est posée sur le canal des marques, l'onglet Code s'ouvre
   const clic = await s.ev("(() => { const b = document.querySelector('.vf-encart-carte'); if (!b) return false; b.click(); return true; })()");
-  const marque = await s.ev("(() => { const V = window.VF_MARQUES; return !!V && V.active() === 'relecture' && V.table().some(([id]) => id.includes('<img')); })()");
-  const carte = { clic, marque: marque || !!(await stabiliser(() => s.ev("(() => { const V = window.VF_MARQUES; return !!V && V.active() === 'relecture' && V.table().some(([id]) => id.includes('<img')); })()"), { pas: 300, max: 8000 })) };
+  // la marque se pose quand l'onglet Code a fini de s'ouvrir (le canal ne s'ouvre qu'à l'arrivée) : on ATTEND qu'elle paraisse (attendreValeur, jusqu'à 8 s) ;
+  // `stabiliser` concluait « stable » sur deux lectures fausses de suite, 300 ms après le clic, avant la pose (rouge CI Linux, reproduit au CPU ralenti)
+  const marque = await attendreValeur(() => s.ev("(() => { const V = window.VF_MARQUES; return !!V && V.active() === 'relecture' && V.table().some(([id]) => id.includes('<img')); })()"), (v) => v === true, { pas: 100, max: 8000 });
+  const carte = { clic, marque: marque === true };
   etapes.carte = clic && carte.marque;
   await pause(800);
   charges = Math.max(charges, await compter());

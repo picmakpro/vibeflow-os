@@ -60,7 +60,8 @@ export const sonde = ({ sansWorker = false, secrets = [], longueur = 260 } = {})
   S.surRender = () => window.VibeFlow.on('render', (d) => { const V = window.VibeFlow, l = V.state.layout, fa = V.freeArea();
     S.rendus.push({ ids: ((l && l.children) || []).map((n) => n.id).sort(), pos: ((l && l.children) || []).map((n) => [n.id, n.x, n.y, n.width, n.height]),
       vus: [...d.view.visible, ...(d.view.connectors || []).map((c) => c.id)].sort(), fa, derniere: S.derniere }); });
-  S.ecart = (a, b) => { let m = 0; const p = S.pouls; for (let i = 1; i < p.length; i++) if (p[i] >= a && p[i - 1] <= b) m = Math.max(m, p[i] - p[i - 1]); return m; };
+  // le blocage mesuré est celui de la fenêtre : un écart qui chevauche une borne compte pour sa part dans la fenêtre (le dessin qui pose la réponse du worker démarre quand elle se ferme)
+  S.ecart = (a, b) => { let m = 0; const p = S.pouls; for (let i = 1; i < p.length; i++) if (p[i] >= a && p[i - 1] <= b) m = Math.max(m, Math.min(p[i], b) - Math.max(p[i - 1], a)); return m; };
   S.tache = (a, b) => S.longues.reduce((m, [d, l]) => (d + l >= a && d <= b ? Math.max(m, l) : m), 0);
   S.resume = () => JSON.stringify({ construits: S.construits, termines: S.termines, enLigne: S.enLigne, urls: S.urls, req: S.req, rep: S.rep, reqTop: [...S.reqTop].sort(),
     repTop: [...S.repTop].sort(), interdites: S.interdites, fuites: S.fuites, avert: S.avert, erreurs: S.erreurs, vides: S.vides, erreurMax: S.erreurMax });

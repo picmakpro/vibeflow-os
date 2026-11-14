@@ -463,17 +463,81 @@ lk_mut_moteur() { # NOM ANCRE REMPLACEMENT : construit une copie du lab, l'assem
   o="$l/lab/.vibeflow/cockpit"
   echo "cfg=$(compte "$MK_CFG" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") cac=$(compte "$MK_CAC" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") ign=$(compte "$MK_IGN" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") ext=$(compte "$MK_EXT" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") pos=$([ "$(compte "$MK_POS" "$o/index.html")" -ge 1 ] && [ "$(compte 'src/interne.sh' "$o/graph.json")" -ge 1 ] && [ "$(compte "$MK_LEU" "$o/index.html")" -ge 1 ] && echo oui || echo non)"
 }
-lk_mut_moteur membre "|| !seen.has(toPosix(path.relative(rootReal, r)))" "" > "$AUX/mm-membre.val"
+lk_mut_moteur membre "|| seen.has(toPosix(path.relative(rootReal, rn)));" "|| true;" > "$AUX/mm-membre.val"
 assert_eq "M-MEMBRE.0 — l'ancre du mutant existe (le lien est jugé sur l'appartenance de sa cible à la liste du moteur)" "$(cat "$AUX/mm-membre.res")" "muté"
 LK_MM="$(cat "$AUX/mm-membre.val")"
 assert_eq "M-MEMBRE — rougit A8, A9 et A10 (le lien n'est plus jugé que sur « sa cible est dans le lab » : configuration du dossier git, sortie du cockpit et fichier ignoré sortent) ; A12 reste vert (la cible extérieure est encore refusée)" "$(printf '%s' "$LK_MM" | sed 's/ pos=.*//')" "cfg=4 cac=4 ign=4 ext=0"
 assert_eq "M-MEMBRE — témoins positifs verts (A11) : fichier normal, lien interne vers un fichier listé et leurre intérieur toujours décrits" "$(printf '%s' "$LK_MM" | sed 's/.* pos=//')" "oui"
-lk_mut_moteur js "const r = cheminPhysique(abs);" "const r = fs.realpathSync(abs);" > "$AUX/mm-js.val"
+lk_mut_moteur js "const r = cheminPhysique(attendu);" "const r = fs.realpathSync(attendu);" > "$AUX/mm-js.val"
 assert_eq "M-JS-SCAN.0 — l'ancre du mutant existe (la résolution d'un lien passe par cheminPhysique)" "$(cat "$AUX/mm-js.res")" "muté"
 LK_MJ="$(cat "$AUX/mm-js.val")"
 assert_eq "M-JS-SCAN — rougit A12 (la résolution redevient le realpath JS qui replie « .. » : le fichier extérieur sort) ; A8, A9 et A10 restent verts (l'appartenance à la liste les écarte encore)" "$(printf '%s' "$LK_MJ" | sed 's/ pos=.*//')" "cfg=0 cac=0 ign=0 ext=4"
 assert_eq "M-JS-SCAN — témoins positifs verts (A11)" "$(printf '%s' "$LK_MJ" | sed 's/.* pos=//')" "oui"
 
+echo "=== A15 — chaque chemin de la liste du moteur est confiné à la racine réelle, composants compris (L5m-01, D-M15) ==="
+# classe : l'index d'un lab peut nommer un chemin qui sort de la racine (`..`) ou qui traverse un dossier intermédiaire lié ; le dernier élément n'est alors pas un lien
+# et seule la résolution de TOUS les composants le voit. Index forgé octet par octet (git refuse d'y inscrire de tels chemins).
+cat > "$AUX/idx.cjs" <<'JS'
+const fs = require('fs'), c = require('crypto'); const [, , idx, ...paths] = process.argv;
+const sha = Buffer.from('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 'hex');
+const ents = paths.sort().map((p) => { const pb = Buffer.from(p); const len = 62 + pb.length; const b = Buffer.alloc(len + 8 - (len % 8)); b.writeUInt32BE(0o100644, 24); sha.copy(b, 40); b.writeUInt16BE(Math.min(pb.length, 0xfff), 60); pb.copy(b, 62); return b; });
+const h = Buffer.alloc(12); h.write('DIRC'); h.writeUInt32BE(2, 4); h.writeUInt32BE(ents.length, 8);
+const body = Buffer.concat([h, ...ents]); fs.writeFileSync(idx, Buffer.concat([body, c.createHash('sha1').update(body).digest()]));
+JS
+MK_UP="MKREMONTE-HORS-DE-LA-RACINE"; MK_INT="MKDOSSIER-LIE-SORTANT"; MK_P15="MKPOSITIF-FICHIER-NORMAL-A15"
+LK_F="$LK_RACINE/a15"; mkdir -p "$LK_F/lab/src" "$LK_F/dehors"; mkplan "$LK_F/lab"
+printf '#!/bin/sh\n# %s : fichier hors du lab, nommé par un chemin qui remonte.\necho ok\n' "$MK_UP" > "$LK_RACINE/remonte15.sh"
+printf '#!/bin/sh\n# %s : fichier hors du lab, derrière un dossier lié.\necho ok\n' "$MK_INT" | wr "$LK_F/dehors/x.sh"
+printf '#!/bin/sh\n# %s : fichier normal du lab.\necho ok\n' "$MK_P15" > "$LK_F/lab/src/normal.sh"
+G "$LK_F/lab" init -q; ln -s "$LK_F/dehors" "$LK_F/lab/a"
+node "$AUX/idx.cjs" "$LK_F/lab/.git/index" ../../remonte15.sh .planning/ROADMAP.md a/x.sh src/normal.sh
+lk_a15_sortie() { # RACINE-DU-MODULE : assemble le lab forgé avec ce module, rend « up=… int=… pos=… »
+  local o="$LK_F/lab/.vibeflow/cockpit" f; rm -rf "$o"; node "$1/vf-cockpit-build.mjs" "$LK_F/lab" --quiet > "$AUX/a15.out" 2>&1
+  f=("$o/index.html" "$o/graph.json" "$o/architecture.json" "$o/.cache/scan.json")
+  echo "up=$(compte "$MK_UP" "${f[@]}") int=$(compte "$MK_INT" "${f[@]}") pos=$([ "$(compte "$MK_P15" "$o/index.html")" -ge 1 ] && echo oui || echo non)"
+}
+assert_eq "A15.1 — entrée d'index qui remonte hors de la racine, puis dossier intermédiaire lié vers l'extérieur : aucun des deux contenus n'est dans les pages ni dans scan.json ; témoin positif : le fichier normal est décrit" "$(lk_a15_sortie "$SCRIPTS")" "up=0 int=0 pos=oui"
+LK_MM15="$WORK/mm-a15"; rm -rf "$LK_MM15"; mkdir -p "$LK_MM15/scripts" "$LK_MM15/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$LK_MM15/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$LK_MM15/skills/cockpit-moteur"
+FROM="function lisibleDansLab(p) {" TO="function lisibleDansLab(p) { if (!fs.lstatSync(path.join(root, p), { throwIfNoEntry: false })?.isSymbolicLink()) return true;" node "$AUX/mutsub.mjs" "$LK_MM15/skills/cockpit-moteur/scripts/scan.mjs" > "$AUX/mm-a15.res" 2>&1
+assert_eq "M-DERNIER-ELEMENT.0 — l'ancre du mutant existe (la garde de confinement est la fonction lisibleDansLab de scan.mjs)" "$(cat "$AUX/mm-a15.res")" "muté"
+assert_eq "M-DERNIER-ELEMENT — rougit A15.1 : jugée sur le seul dernier élément (et seulement s'il est un lien), la garde laisse sortir les deux fichiers extérieurs ; le témoin positif reste vert" "$(lk_a15_sortie "$LK_MM15/scripts")" "up=5 int=5 pos=oui"
+
+# nom stocké en NFD sur le disque, suivi par git en NFC (core.precomposeunicode, défaut macOS) : la garde compare aussi en NFC, sinon ces fichiers disparaissent en silence
+MK_NFD="MKNOM-NFD-SUIVI-EN-NFC"; LK_N="$LK_RACINE/a15nfd/lab"; mkdir -p "$LK_N/src"; mkplan "$LK_N"
+printf '#!/bin/sh\n# %s : nom stocké décomposé.\necho ok\n' "$MK_NFD" > "$LK_N/src/$(printf 'e\314\201te\314\201.sh')"
+G "$LK_N" init -q; G "$LK_N" -c core.precomposeunicode=true add -A >/dev/null 2>&1
+LK_NNFD=""; for f in "$LK_N/src"/*.sh; do LK_NNFD="$(printf '%s' "${f##*/}" | od -An -tx1 | tr -d ' \n')"; done
+lk_a15n() { local o="$LK_N/.vibeflow/cockpit"; rm -rf "$o"; node "$1/vf-cockpit-build.mjs" "$LK_N" --quiet > "$AUX/a15n.out" 2>&1; echo "nfd=$(compte "$MK_NFD" "$o/index.html" "$o/.cache/scan.json" | awk '{print ($1>0)?"lu":"perdu"}')"; }
+# prémisse mesurée : la forme sous laquelle git LISTE ce fichier (la recomposition de core.precomposeunicode n'est compilée que pour macOS ; ailleurs git rend le nom lu sur le disque, donc en NFD)
+LK_GNFC="$(G "$LK_N" ls-files -z | od -An -tx1 | tr -d ' \n')"; case "$LK_GNFC" in *c3a9*) LK_GFORME=git-nfc;; *65cc81*) LK_GFORME=git-nfd;; *) LK_GFORME=git-inconnu;; esac
+if [ "$(uname -s)" = Darwin ]; then LK_GATTENDU=git-nfc; else LK_GATTENDU=git-nfd; fi
+assert_eq "A15.2 — nom stocké en NFD : le fichier reste lu (garde comparée en NFC des deux côtés) ; témoins : le disque porte bien la forme décomposée, git liste sous la forme que le système impose (NFC sous macOS, NFD ailleurs)" "$(lk_a15n "$SCRIPTS") $([ "$LK_NNFD" = '65cc817465cc812e7368' ] && echo nfd-disque || echo disque-normalise) $LK_GFORME" "nfd=lu nfd-disque $LK_GATTENDU"
+
+LK_MN="$WORK/mm-a15n"; rm -rf "$LK_MN"; mkdir -p "$LK_MN/scripts" "$LK_MN/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$LK_MN/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$LK_MN/skills/cockpit-moteur"
+FROM="const a = attendu.normalize('NFC'), n = r.normalize('NFC'); const rn = rootReal + path.sep + path.relative(rootReal, r).normalize('NFC');" TO="const a = attendu, n = r; const rn = r;" node "$AUX/mutsub.mjs" "$LK_MN/skills/cockpit-moteur/scripts/scan.mjs" > "$AUX/mm-a15n.res" 2>&1
+assert_eq "M-NFC.0 — l'ancre du mutant existe (la comparaison en NFC des deux côtés est dans lisibleDansLab de scan.mjs)" "$(cat "$AUX/mm-a15n.res")" "muté"
+if [ "$LK_GFORME" = git-nfc ]; then
+  assert_eq "M-NFC — rougit A15.2 : sans normalisation, le nom stocké en NFD n'égale plus le nom de la liste git et le fichier disparaît" "$(lk_a15n "$LK_MN/scripts")" "nfd=perdu"
+else echo "  (M-NFC sans objet : git ne recompose pas les noms sur ce système, liste et disque sont tous deux en NFD)"; fi
+
+# fichier neuf ni suivi ni ignoré : la liste du moteur le garde (ls-files -co) ; un fichier ignoré par .gitignore n'y entre pas. Lab GIT (sinon le scan passe par la marche et ne lit pas ls-files).
+MK_SUI="MKSUIVI-FICHIER-INDEXE-A153"; MK_NSU="MKNONSUIVI-FICHIER-NEUF-A153"; MK_IGA="MKIGNORE-FICHIER-IGNORE-A153"
+LK_S="$LK_RACINE/a15ns/lab"; mkdir -p "$LK_S/src"; mkplan "$LK_S"
+printf '#!/bin/sh\n# %s : fichier suivi (témoin).\necho ok\n' "$MK_SUI" > "$LK_S/src/suivi.sh"
+printf '#!/bin/sh\n# %s : fichier neuf, ni suivi ni ignoré.\necho ok\n' "$MK_NSU" > "$LK_S/src/nonsuivi.sh"
+printf '#!/bin/sh\n# %s : fichier ignoré par .gitignore.\necho ok\n' "$MK_IGA" > "$LK_S/src/ignore.sh"
+printf 'src/ignore.sh\n' > "$LK_S/.gitignore"
+G "$LK_S" init -q; G "$LK_S" add .planning src/u.js src/suivi.sh .gitignore >/dev/null 2>&1
+lk_a15ns() { # RACINE-DU-MODULE : « suivi=lu|perdu nonsuivi=lu|perdu ignore=absent|present » d'après les pages et scan.json
+  local o="$LK_S/.vibeflow/cockpit" f; rm -rf "$o"; node "$1/vf-cockpit-build.mjs" "$LK_S" --quiet > "$AUX/a15ns.out" 2>&1
+  f=("$o/index.html" "$o/graph.json" "$o/architecture.json" "$o/.cache/scan.json")
+  echo "suivi=$([ "$(compte "$MK_SUI" "${f[@]}")" -ge 1 ] && echo lu || echo perdu) nonsuivi=$([ "$(compte "$MK_NSU" "${f[@]}")" -ge 1 ] && echo lu || echo perdu) ignore=$([ "$(compte "$MK_IGA" "${f[@]}")" -eq 0 ] && echo absent || echo present)"
+}
+assert_eq "A15.3 — un fichier suivi et un fichier neuf non ignoré sont décrits ; un fichier ignoré par .gitignore ne l'est pas (pages et scan.json)" "$(lk_a15ns "$SCRIPTS")" "suivi=lu nonsuivi=lu ignore=absent"
+LK_MS="$WORK/mm-a15ns"; rm -rf "$LK_MS"; mkdir -p "$LK_MS/scripts" "$LK_MS/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$LK_MS/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$LK_MS/skills/cockpit-moteur"
+FROM="['ls-files', '-co', '--exclude-standard', '-z']" TO="['ls-files', '-c', '--exclude-standard', '-z']" node "$AUX/mutsub.mjs" "$LK_MS/skills/cockpit-moteur/scripts/lib/common.mjs" > "$AUX/mm-a15ns.res" 2>&1
+assert_eq "M-NON-SUIVI.0 — l'ancre du mutant existe (la liste du moteur est ls-files -co dans gitFiles de common.mjs)" "$(cat "$AUX/mm-a15ns.res")" "muté"
+assert_eq "M-NON-SUIVI — rougit A15.3 : sans -o, le fichier neuf non ignoré disparaît ; le suivi et l'ignoré sont inchangés" "$(lk_a15ns "$LK_MS/scripts")" "suivi=lu nonsuivi=perdu ignore=absent"
 echo "=== G18 — verrou de pilotage, gitdir et inclusion à maillon divergent (gitSortant) ==="
 LK_Y="$LK_RACINE/g18"
 lk_depot() { mkdir -p "$1"; "$GIT_REEL" init -q "$1"; }
@@ -741,10 +805,54 @@ assert_eq "M-ABSENT-LARGE.0 — l'ancre existe (absent élargi à code 128, éch
 assert_eq "M-ABSENT-LARGE — rougit D10.4 (code 128) et D10.6 (échéance passée) ; D10.1, D10.2, D10.3 et D10.5 restent verts" "$(lk_d10 "$WORK/mut-absent-large" sans-git)/$(lk_d10 "$WORK/mut-absent-large" avec-git)/$(lk_d10 "$WORK/mut-absent-large" faux "$AUX/g128")/$(lk_d10 "$WORK/mut-absent-large" lent "$AUX/glent")/$(lk_d10 "$WORK/mut-absent-large" echeance)" "true,false,true|true,false,true/false,false,false|false,false,false/true,false,true|true,false,true/false,true,true|false,true,true/true,false,true|true,false,true"
 assert_eq "M-ABSENT — rougit D10.1 : git introuvable redevient « délai » (absent=false, delai=true), le refus reste fermé ; D10.2 reste vert" "$(lk_d10 "$WORK/mut-absent" sans-git)|$(lk_d10 "$WORK/mut-absent" avec-git)" "false,true,true|false,true,true|false,false,false|false,false,false"
 # Limite connue gardée : la lecture des pilotes lance toujours `git`, le lancement suit `binaire` (réservé aux tests). Aucun appelant de production ne doit le passer.
-lk_bin() { find "$1" -type f \( -name '*.mjs' -o -name '*.js' \) -not -path '*/tests/*' -not -path '*/node_modules/*' -exec grep -hE '(^|[^A-Za-z_])binaire[[:space:]]*:' {} + 2>/dev/null | grep -vE '^[[:space:]]*(//|\*)' | wc -l | tr -d ' '; }
-assert_eq "D10.7 — aucun appelant de production (module du cockpit hors tests) ne passe le paramètre binaire à lancerGit ni à lancerGitAsync (0 occurrence de « binaire: »)" "$(lk_bin "$SCRIPTS/..")" "0"
+cat > "$AUX/binaire.mjs" <<'JS'
+// binaire.mjs <racine du module> : écarts à « aucun appelant de production ne passe `binaire`, et le défaut est le littéral 'git' » — indépendant de la graphie.
+// (1) tout appel lancerGit( / lancerGitAsync( (hors définition) dont le texte d'arguments (parenthèses équilibrées, chaînes comprises) contient le mot « binaire » ou une clé calculée `[…]:` ;
+// (2) les deux signatures de vf-cockpit-git-lanceur.mjs portent exactement « binaire = 'git' » (provenance du défaut : ni variable d'environnement, ni autre source). Une ligne par écart ; NV si rien n'est examiné.
+import fs from 'node:fs'; import path from 'node:path';
+const mod = process.argv[2]; const fichiers = []; const ecarts = []; let appels = 0;
+const marche = (d) => { for (const e of fs.readdirSync(d, { withFileTypes: true })) { const p = path.join(d, e.name); if (e.isDirectory()) { if (e.name !== 'tests' && e.name !== 'node_modules') marche(p); } else if (/\.(mjs|js)$/.test(e.name)) fichiers.push(p); } };
+marche(mod);
+const argsDe = (s, i) => { let p = 0, q = null; for (let j = i; j < s.length; j++) { const c = s[j]; if (q) { if (c === '\\') { j++; continue; } if (c === q) q = null; continue; } if (c === '"' || c === "'" || c === '`') { q = c; continue; } if (c === '(') p++; else if (c === ')') { p--; if (p === 0) return s.slice(i, j + 1); } } return s.slice(i); };
+for (const f of fichiers) {
+  const s = fs.readFileSync(f, 'utf8'); const re = /\blancerGit(?:Async)?\s*\(/g; let m;
+  while ((m = re.exec(s))) {
+    if (/function\s+$/.test(s.slice(Math.max(0, m.index - 16), m.index))) continue;
+    appels++; const a = argsDe(s, m.index + m[0].length - 1);
+    if (/\bbinaire\b|[{,]\s*\[[^\]\n]*\]\s*:/.test(a)) ecarts.push(`${path.basename(f)}:${s.slice(0, m.index).split('\n').length} appel avec binaire ou clé calculée`);
+  }
+}
+const lk = fichiers.find((f) => path.basename(f) === 'vf-cockpit-git-lanceur.mjs');
+const src = lk ? fs.readFileSync(lk, 'utf8') : '';
+for (const nom of ['lancerGit', 'lancerGitAsync']) {
+  const sig = new RegExp(`export (?:async )?function ${nom}\\(([^\\n]*)\\)\\s*\\{`).exec(src);
+  const b = sig && /binaire\s*=\s*([^,}]+)/.exec(sig[1]);
+  if (!b || b[1].trim() !== "'git'") ecarts.push(`${nom} : défaut de binaire ${b ? b[1].trim() : 'absent'} (attendu 'git')`);
+}
+if (appels === 0) ecarts.push('NON-VERIFIABLE : aucun appel examiné');
+for (const e of ecarts) console.log(e);
+JS
+lk_bin() { node "$AUX/binaire.mjs" "$1" | wc -l | tr -d ' '; }
+assert_eq "D10.7 — aucun appelant de production ne passe binaire à lancerGit ni à lancerGitAsync (toute graphie : clé nue, entre guillemets, calculée, abrégée) et le défaut des deux signatures est le littéral 'git' (0 écart)" "$(lk_bin "$SCRIPTS/..")" "0"
 mutant_sur binaire vf-cockpit-git-lanceur.mjs '// A1 : jamais lancé' '// A1 : jamais lancé' >/dev/null; printf 'import { lancerGit } from "./vf-cockpit-git-lanceur.mjs";\nlancerGit(process.cwd(), ["status"], { binaire: "/x/git" });\n' > "$WORK/mut-binaire/injecte.mjs"
 assert_eq "M-BINAIRE — rougit D10.7 : un appelant qui passe binaire (fichier injecté dans une copie) est compté (1) ; la copie sans injection compte 0" "$(lk_bin "$WORK/mut-binaire")|$(rm -f "$WORK/mut-binaire/injecte.mjs"; lk_bin "$WORK/mut-binaire")" "1|0"
+# M-BINAIRE-GRAPHIE : une graphie de plus que « binaire: » nue ; chacune rougit D10.7 (un écart), la copie témoin en compte 0
+mutant_sur binaire-quote vf-cockpit-git-lanceur.mjs '// A1 : jamais lancé' '// A1 : jamais lancé' >/dev/null; printf 'import { lancerGitAsync } from "./vf-cockpit-git-lanceur.mjs";\nawait lancerGitAsync(process.cwd(), ["status"], { fin: 0, \x27binaire\x27: \x27git\x27 });\n' > "$WORK/mut-binaire-quote/injecte.mjs"
+mutant_sur binaire-abrege vf-cockpit-git-lanceur.mjs '// A1 : jamais lancé' '// A1 : jamais lancé' >/dev/null; printf 'import { lancerGitAsync } from "./vf-cockpit-git-lanceur.mjs";\nconst binaire = \x27git\x27;\nawait lancerGitAsync(process.cwd(), ["status"], { fin: 0, binaire });\n' > "$WORK/mut-binaire-abrege/injecte.mjs"
+mutant_sur binaire-calcule vf-cockpit-git-lanceur.mjs '// A1 : jamais lancé' '// A1 : jamais lancé' >/dev/null; printf 'import { lancerGitAsync } from "./vf-cockpit-git-lanceur.mjs";\nawait lancerGitAsync(process.cwd(), ["status"], { fin: 0, [\x27bin\x27 + \x27aire\x27]: \x27git\x27 });\n' > "$WORK/mut-binaire-calcule/injecte.mjs"
+assert_eq "M-BINAIRE-GRAPHIE — rougit D10.7 : clé entre guillemets, forme abrégée { binaire }, clé calculée (un écart chacune)" "$(lk_bin "$WORK/mut-binaire-quote")|$(lk_bin "$WORK/mut-binaire-abrege")|$(lk_bin "$WORK/mut-binaire-calcule")" "1|1|1"
+# garde conservée EN PLUS de l'analyse des arguments : l'ancien comptage de « binaire: » sur tout le module (une clé définie avant l'appel, hors de son texte, n'est vue que par lui)
+lk_bin_grep() { find "$1" -type f \( -name '*.mjs' -o -name '*.js' \) -not -path '*/tests/*' -not -path '*/node_modules/*' -exec grep -hE '(^|[^A-Za-z_])binaire[[:space:]]*:' {} + 2>/dev/null | grep -vE '^[[:space:]]*(//|\*)' | wc -l | tr -d ' '; }
+assert_eq "D10.7b — le comptage de « binaire: » sur tout le module de production (hors tests) rend 0, en plus de l'analyse des appels" "$(lk_bin_grep "$SCRIPTS/..")" "0"
+mutant_sur binaire-objet vf-cockpit-git-lanceur.mjs '// A1 : jamais lancé' '// A1 : jamais lancé' >/dev/null; printf 'import { lancerGit } from "./vf-cockpit-git-lanceur.mjs";\nconst o = { binaire: "/x/git" };\nlancerGit(process.cwd(), ["status"], o);\n' > "$WORK/mut-binaire-objet/injecte.mjs"
+assert_eq "M-BINAIRE-OBJET — rougit D10.7b : un objet d'options défini avant l'appel (clé hors du texte des arguments) échappe à l'analyse des appels (0) mais pas au comptage (1)" "$(lk_bin "$WORK/mut-binaire-objet")|$(lk_bin_grep "$WORK/mut-binaire-objet")" "0|1"
+# M-BINAIRE-DEFAUT : la provenance du défaut (variable d'environnement) rougit D10.7 pour chacune des deux signatures
+LK_NB="$(mutant_sur binaire-env vf-cockpit-git-lanceur.mjs "binaire = 'git' } = {}) {" "binaire = process.env.VF_COCKPIT_GIT || 'git' } = {}) {")"
+assert_eq "M-BINAIRE-DEFAUT.0 — l'ancre de lancerGit existe" "$LK_NB" "muté"
+assert_eq "M-BINAIRE-DEFAUT — rougit D10.7 : un défaut tiré de l'environnement est un écart (1 ; la signature asynchrone, intacte, reste verte)" "$(lk_bin "$WORK/mut-binaire-env")" "1"
+LK_NC="$(mutant_sur binaire-env-async vf-cockpit-git-lanceur.mjs "binaire = 'git', fin } = {}) {" "binaire = process.env.VF_COCKPIT_GIT || 'git', fin } = {}) {")"
+assert_eq "M-BINAIRE-DEFAUT.1 — l'ancre de lancerGitAsync existe" "$LK_NC" "muté"
+assert_eq "M-BINAIRE-DEFAUT.2 — idem pour la signature asynchrone (1)" "$(lk_bin "$WORK/mut-binaire-env-async")" "1"
 echo "=== D5 — aucune trace hors du dossier temporaire ==="
 HORS="$(find "$SCRIPTS/.." -newer "$AUX/sonde.mjs" -type f \( -name 'SSH' -o -name 'UPLOAD' -o -name 'GPG' -o -name 'CLE-*' \) 2>/dev/null | head -3)"
 assert_eq "D5.1 — aucun marqueur de leurre dans l'arbre du module" "$HORS" ""

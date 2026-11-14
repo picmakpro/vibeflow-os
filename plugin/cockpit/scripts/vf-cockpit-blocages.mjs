@@ -16,7 +16,10 @@ export const PLACEHOLDERS = ['none', 'none yet', 'aucun', 'aucune', 'néant', 'r
 export const normaliser = (texte) => String(texte ?? '').replace(/\*\*|__|`/g, '').replace(/\s+/g, ' ').trim().toLowerCase();
 export const condensat = (texte) => crypto.createHash('sha256').update(normaliser(texte)).digest('hex').slice(0, 12);
 
-const vide = (texte) => PLACEHOLDERS.includes(normaliser(texte).replace(/[.!\s]+$/, ''));
+// ponctuation finale retirée d'un pas par la fin (une RegExp `[.!\s]+$` non ancrée au début est quadratique sur une longue suite de points ou de blancs)
+const FIN_VIDE = /[.!\s]/;
+const sansFin = (s) => { let e = s.length; while (e > 0 && FIN_VIDE.test(s[e - 1])) e--; return s.slice(0, e); };
+const vide = (texte) => PLACEHOLDERS.includes(sansFin(normaliser(texte)));
 
 // puces de premier niveau de la section « ### Blockers/Concerns » (jusqu'au titre suivant de niveau 1 à 3) ; null si la section manque
 export function lireBlocages(texteState) {

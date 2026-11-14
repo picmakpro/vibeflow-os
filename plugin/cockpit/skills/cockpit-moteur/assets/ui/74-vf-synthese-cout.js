@@ -43,7 +43,10 @@
     for (const v of vs) { const x = f(v); if (x == null) return [k, null]; s += x; } // un champ absent : la ligne dit null, jamais 0
     return [k, s];
   }));
-  const totaux = (vs) => Object.fromEntries(COLS.map(([k, f]) => [k, vs.reduce((s, v) => s + (f(v) ?? 0), 0)]));
+  const totaux = (vs) => Object.fromEntries(COLS.map(([k, f]) => { // somme des voies qui publient le champ ; personne ne le mesure : null, jamais 0
+    const xs = vs.map(f).filter((x) => x != null);
+    return [k, xs.length ? xs.reduce((s, x) => s + x, 0) : null];
+  }));
   const rattache = (v) => !!v.rattachement && v.rattachement.dag != null;
   const poser = (m, k, x) => (m.get(k) || m.set(k, []).get(k)).push(x);
   // calcul propre, de la forme de `agreger(…, 'mission', …)` de la 74 : une ligne par mission rattachée, `horsMission`, `total`, `inconnus`

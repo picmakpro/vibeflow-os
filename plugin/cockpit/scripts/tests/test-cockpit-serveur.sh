@@ -100,6 +100,17 @@ assert_eq "S1.1 — sans jeton : 403" "$(status "$PORT" /api/vf/etat)" "403"
 assert_eq "S1.2 — mauvais jeton : 403" "$(status "$PORT" /api/vf/etat "" "ffffffffffffffffffffffffffffffff")" "403"
 assert_eq "S1.3 — jeton de la page Code : 200" "$(status "$PORT" /api/vf/etat "" "$TOK")" "200"
 assert_eq "S1.4 — jeton de la page Projet : 200" "$(status "$PORT" /api/vf/etat "" "$PTOK")" "200"
+cat > "$AUX/jetons.mjs" <<'JS'
+// jetons.mjs <port> <jeton> : statuts de /api/vf/etat pour le jeton entier, son premier caractère, sa moitié, sa longueur moins un, puis le jeton suivi d'un caractère en trop
+import http from 'node:http';
+const [, , port, t] = process.argv;
+const st = (j) => new Promise((ok) => http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/etat', headers: { Host: `127.0.0.1:${port}`, 'x-vf-cockpit-token': j } }, (r) => { r.resume(); r.on('end', () => ok(r.statusCode)); }).on('error', () => ok('ERR')));
+const essais = [t, t.slice(0, 1), t.slice(0, t.length >> 1), t.slice(0, -1), t + '0'];
+console.log((await Promise.all(essais.map(st))).join(' '));
+JS
+echo "=== S1b — le jeton se compare en entier : préfixe strict et suffixe en trop refusés (classe « jeton par préfixe ») ==="
+assert_eq "S1.5 — jeton de la page Code : entier 200 ; 1 caractère, moitié, longueur moins un, suffixe en trop : 403" "$(node "$AUX/jetons.mjs" "$PORT" "$TOK")" "200 403 403 403 403"
+assert_eq "S1.6 — jeton de la page Projet : entier 200 ; 1 caractère, moitié, longueur moins un, suffixe en trop : 403" "$(node "$AUX/jetons.mjs" "$PORT" "$PTOK")" "200 403 403 403 403"
 
 echo "=== S2 — Host étranger ==="
 for p in / /project.html "/api/vf/events?token=$TOK" "/api/vf/etat"; do
@@ -123,6 +134,18 @@ for p in / /project.html /api/vf/etat; do node "$AUX/get.mjs" "$PORT" "$p" "" "$
 node "$AUX/ev.mjs" "$WORK/e4.jsonl" 'Object.keys(E[0].headers).join(",")' | grep -qi 'access-control-allow-origin' && CORS=$((CORS+1))
 assert_eq "S4.1 — ni la page, ni la page Projet, ni l'état, ni le flux ne portent l'en-tête" "$CORS" "0"
 assert_eq "S4.2 — témoin : le flux a bien répondu (statut lu)" "$(node "$AUX/ev.mjs" "$WORK/e4.jsonl" 'E[0].status')" "200"
+
+cat > "$AUX/csp.mjs" <<'JS'
+// csp.mjs <port> <chemin> [jeton] : « statut directives-triées » de la Content-Security-Policy de la réponse (directives séparées par « | »)
+import http from 'node:http';
+const [, , port, p, jeton] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}`, ...(jeton ? { 'x-vf-cockpit-token': jeton } : {}) } }, (r) => { r.resume(); r.on('end', () => console.log(r.statusCode + ' ' + String(r.headers['content-security-policy'] || '').split(';').map((x) => x.trim()).filter(Boolean).sort().join(' | '))); }).on('error', () => console.log('ERR'));
+JS
+echo "=== S4b — la CSP de base est exacte sur les réponses qui ne sont pas un document (refus, introuvable, route) ==="
+CSPB="base-uri 'none' | default-src 'none' | form-action 'none' | frame-ancestors 'none'"
+assert_eq "S4b.1 — refus 403 (sans jeton) : exactement les quatre directives de la CSP de base" "$(node "$AUX/csp.mjs" "$PORT" /api/vf/etat)" "403 $CSPB"
+assert_eq "S4b.2 — introuvable 404 : exactement les quatre directives" "$(node "$AUX/csp.mjs" "$PORT" /inexistant)" "404 $CSPB"
+assert_eq "S4b.3 — route JSON 200 (avec jeton) : exactement les quatre directives" "$(node "$AUX/csp.mjs" "$PORT" /api/vf/etat "$TOK")" "200 $CSPB"
 
 echo "=== S5 — le flux ne porte jamais la dernière commande ==="
 : > "$WORK/e5.jsonl"; node "$AUX/sse.mjs" "$PORT" "$PTOK" 12000 who "$WORK/e5.jsonl" & C=$!
@@ -534,6 +557,48 @@ cockpit_module_muter mf4sor serve.mjs 's# retirerTemporairesEtat(stateFile); };#
 assert_eq "M-TMP-SORTIE — le balayage à la sortie du serveur retiré (une seule ligne) : la copie est valide, AM6.F4-C3 rougit sur la sortie seule" "$(valide "$MF4D") $(c3_sur "$MF4D")" "valide démarrage=0 sortie=2 arrêt=0 leurres=2"
 cockpit_module_muter mf4arr serve.mjs '/^  retirerTemporairesEtat(stateFile);$/d'; MF4E="$COCKPIT_MODULE"; unset COCKPIT_MODULE
 assert_eq "M-TMP-ARRET — le balayage de \`--stop\` retiré (une seule ligne) : la copie est valide, AM6.F4-C3 rougit sur \`--stop\` seul" "$(valide "$MF4E") $(c3_sur "$MF4E")" "valide démarrage=0 sortie=0 arrêt=2 leurres=2"
+
+echo "=== MJ — mutants de la comparaison de jeton : un préfixe (ou un suffixe) accepté est vu pour chacun des deux jetons ==="
+jetons_sur() { # <racine du module muté> [Code|Projet] : « Code[…] Projet[…] » (ou la seule ligne demandée) rejoué sur un serveur de ce module (lab copié, jetons lus dans les deux pages)
+  local L="$WORK/lab-mj-$RANDOM" t p; am4_lab "$L"
+  COCKPIT_MODULE="$1" cockpit_lancer "$L" || { echo "serveur non lancé"; return; }
+  t="$(node "$AUX/token.mjs" "$VF_PORT" /)"; p="$(node "$AUX/token.mjs" "$VF_PORT" /project.html)"
+  # un mutant de comparaison n'ouvre que le jeton qu'il vise ; l'autre ligne n'est pas lue (le premier caractère des deux jetons peut coïncider : 1 chance sur 16)
+  case "${2:-}" in Code) echo "Code[$(node "$AUX/jetons.mjs" "$VF_PORT" "$t")]" ;; Projet) echo "Projet[$(node "$AUX/jetons.mjs" "$VF_PORT" "$p")]" ;;
+    *) echo "Code[$(node "$AUX/jetons.mjs" "$VF_PORT" "$t")] Projet[$(node "$AUX/jetons.mjs" "$VF_PORT" "$p")]" ;; esac; cockpit_arreter
+}
+OKJ="Code[200 403 403 403 403] Projet[200 403 403 403 403]"
+assert_eq "MJ.0 — témoin : le module du dépôt rend la grille attendue (entier admis, tout le reste refusé) pour les deux jetons" "$(jetons_sur "$(cockpit_module_copie)")" "$OKJ"
+PREF='return x.length > 0 \&\& x.length <= y.length \&\& crypto.timingSafeEqual(x, y.subarray(0, x.length)); }'
+SUFF='return y.length > 0 \&\& x.length >= y.length \&\& crypto.timingSafeEqual(x.subarray(0, y.length), y); }'
+ANC='return x.length === y.length \&\& crypto.timingSafeEqual(x, y); }'
+cockpit_module_muter mjp1 vf-cockpit-server.mjs "s#$ANC#$PREF#"; MJ1="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-JETON-PROJET-PREFIXE — memeJeton (jeton de la page Projet) compare par préfixe : la copie est valide, S1.6 rougit (1 caractère, moitié, longueur moins un : 200)" "$(node --check "$MJ1/scripts/vf-cockpit-server.mjs" 2> /dev/null && echo valide || echo invalide) $(jetons_sur "$MJ1" Projet)" "valide Projet[200 200 200 200 403]"
+cockpit_module_muter mjs1 vf-cockpit-server.mjs "s#$ANC#$SUFF#"; MJ2="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-JETON-PROJET-SUFFIXE — memeJeton accepte un jeton suivi de caractères en trop : la copie est valide, S1.6 rougit (suffixe : 200)" "$(node --check "$MJ2/scripts/vf-cockpit-server.mjs" 2> /dev/null && echo valide || echo invalide) $(jetons_sur "$MJ2" Projet)" "valide Projet[200 403 403 403 200]"
+cockpit_module_muter mjp2 serve.mjs "s#$ANC#$PREF#"; MJ3="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-JETON-CODE-PREFIXE — sameToken (jeton de la page Code) compare par préfixe : la copie est valide, S1.5 rougit (1 caractère, moitié, longueur moins un : 200)" "$(node --check "$MJ3/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(jetons_sur "$MJ3" Code)" "valide Code[200 200 200 200 403]"
+cockpit_module_muter mjs2 serve.mjs "s#$ANC#$SUFF#"; MJ4="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-JETON-CODE-SUFFIXE — sameToken accepte un jeton suivi de caractères en trop : la copie est valide, S1.5 rougit (suffixe : 200)" "$(node --check "$MJ4/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(jetons_sur "$MJ4" Code)" "valide Code[200 403 403 403 200]"
+
+echo "=== MC — mutants de la CSP de base : une directive retirée est vue sur le 403, le 404 et la route ==="
+csp_sur() { # <racine du module muté> : « 403 … || 404 … || 200 … » rejoué sur un serveur de ce module
+  local L="$WORK/lab-mc-$RANDOM" t o; am4_lab "$L"
+  COCKPIT_MODULE="$1" cockpit_lancer "$L" || { echo "serveur non lancé"; return; }
+  t="$(node "$AUX/token.mjs" "$VF_PORT" /)"
+  o="$(node "$AUX/csp.mjs" "$VF_PORT" /api/vf/etat) || $(node "$AUX/csp.mjs" "$VF_PORT" /inexistant) || $(node "$AUX/csp.mjs" "$VF_PORT" /api/vf/etat "$t")"; echo "$o"; cockpit_arreter
+}
+assert_eq "MC.0 — témoin : le module du dépôt rend la CSP de base complète sur les trois réponses" "$(csp_sur "$(cockpit_module_copie)")" "403 $CSPB || 404 $CSPB || 200 $CSPB"
+read -r -d '' EXPFA <<'SED' || true
+s#BASE_CSP = "default-src 'none'; frame-ancestors 'none'; #BASE_CSP = "default-src 'none'; #
+SED
+read -r -d '' EXPFO <<'SED' || true
+s#base-uri 'none'; form-action 'none'";#base-uri 'none'";#
+SED
+cockpit_module_muter mcfa serve.mjs "$EXPFA"; MC1="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-CSP-FRAME-ANCESTORS — frame-ancestors retiré de la CSP de base : la copie est valide, S4b rougit sur les trois réponses (la page reste encadrable hors document)" "$(node --check "$MC1/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(csp_sur "$MC1")" "valide 403 base-uri 'none' | default-src 'none' | form-action 'none' || 404 base-uri 'none' | default-src 'none' | form-action 'none' || 200 base-uri 'none' | default-src 'none' | form-action 'none'"
+cockpit_module_muter mcfo serve.mjs "$EXPFO"; MC2="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-CSP-FORM-ACTION — form-action retiré de la CSP de base : la copie est valide, S4b rougit sur les trois réponses" "$(node --check "$MC2/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(csp_sur "$MC2")" "valide 403 base-uri 'none' | default-src 'none' | frame-ancestors 'none' || 404 base-uri 'none' | default-src 'none' | frame-ancestors 'none' || 200 base-uri 'none' | default-src 'none' | frame-ancestors 'none'"
 
 vf_hyg_assert
 echo ""

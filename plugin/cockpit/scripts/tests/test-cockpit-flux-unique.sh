@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 # test-cockpit-flux-unique.sh — AUDC-H1 (lot 0) puis SOCL-18 (79-14, P79-D-14, C4) : les onglets d'un même lab ne tiennent qu'UN flux d'événements.
+#   FV9 (sans Chrome) la réouverture de la source par la page ne construit pas de second EventSource
 #   FU0 la mesure a eu lieu · FU1 un seul EventSource construit pour tous les onglets, au chemin /api/vf/events
 #   FU2 le serveur compte un seul flux (/api/status tabs et /api/vf/etat clients valent 1), le dernier onglet lit /api/vf/state en 200,
 #       un onglet élu et les autres suiveurs, un `who` émis sur le flux de l'élu atteint tous les onglets, aucune violation de CSP
@@ -62,6 +63,9 @@ R="$(FV entree)"
 assert_eq "FV7.1 — les classes hostiles du canal sont refusées, les messages conformes livrés (aucune exception, aucun cas hors oracle)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.nbCas + ":" + JSON.stringify(j.ko)')" "37:[]"
 assert_eq "FV7.2 — le compteur des refus augmente exactement du nombre de messages refusés" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.refusesTotal === j.attendus')" "true"
 assert_eq "FV7.5 — la liste des cinq clés interdites de la page est celle du contrat cockpit-who@2 (témoin de dérive)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.derive')" "true"
+R="$(node "$HERE_T/flux-reouverture.mjs" "$F69")"
+assert_eq "FV9.1 — un onglet élu dont la page rouvre sa source trois fois : un seul flux ouvert, un seul construit (pas de second EventSource)" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.erreur || [j.elu.role, j.elu.avant, j.elu.apres, j.elu.construits].join()')" "elu,1,1,1"
+assert_eq "FV9.2 — de même en repli « page » (sans verrous) : un seul flux ouvert, un seul construit" "$(printf '%s' "$R" | node "$AUX/ev.mjs" 'j.erreur || [j.page.role, j.page.avant, j.page.apres, j.page.construits].join()')" "page,1,1,1"
 if [ -z "$CHROME" ]; then
   . "$(dirname "$0")/chrome-saut.sh"; vf_chrome_saut "  ⊘ SUITE SAUTÉE : aucun navigateur — le flux unique dans Chrome n'est PAS vérifié, non compté comme réussi"
   vf_hyg_assert; echo ""; echo "  Résultats : $PASS PASS / $FAIL FAIL"; [ "$FAIL" -eq 0 ]; exit $?

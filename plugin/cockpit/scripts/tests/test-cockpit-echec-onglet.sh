@@ -1,6 +1,7 @@
 #!/usr/bin/env bash
 # test-cockpit-echec-onglet.sh — dire l'échec d'un chargement d'onglet (80-21, FORM-16, P80-D-22), un vrai Chrome, sans réseau.
 #   EC1 un onglet affiché, la lecture de Projet en échec : annonce, palette, relance, ligne d'état (pilote : chrome-echec-onglet.mjs, mode ec1)
+#   EC1.5 sans Chrome (aide echec-onglet-sonde.mjs, vm de Node) : relance qui rejette, file libérée après un rejet, rangée de palette qui relance
 #   EC2 premier chargement en échec : un seul message, « Réessayer » prend le focus ; script persistant (mode ec2)
 #   Mutants : levés (régime allégé de la Phase 80, ce plan n'est pas une garde).  EC_SCRIPTS = dossier de scripts à bâtir (rejeu sur la base).
 # Sans navigateur : SUITE SAUTÉE (exit 0, message explicite), jamais un vert à vide.
@@ -41,7 +42,7 @@ assert_eq "EC1.1 — échec annoncé une fois, annulé, Code reste affiché (adr
 assert_eq "EC1.2 — palette : une rangée « Réessayer » (détail : Projet) au champ vide, à la saisie, en mode > ; absente du registre ; sans échec : aucune" \
   "$(E1 '[j.ec12.vide, j.ec12.saisie, j.ec12.action, j.ec12.reg, j.ec12.sansEchec.vide, j.ec12.sansEchec.saisie]')" \
   '[["Réessayer|Projet"],["Réessayer|Projet"],["Réessayer|Projet"],[],[],[]]'
-assert_eq "EC1.2b — Entrée sur la rangée relance : Projet affiché, même page, état prêt, une seule lecture, aucun POST, echec() nul" \
+assert_eq "EC1.2b — Entrée sur « Réessayer » de la ligne d'état (bouton #vf-coin .vf-ech) relance : Projet affiché, même page, état prêt, une seule lecture, aucun POST, echec() nul" \
   "$(E1 '[j.ec12.apres.p, j.ec12.apres.origine, j.ec12.apres.pret.phase, j.ec12.apres.aff, j.ec12.apres.ech, j.ec12.apres.fetchs, j.ec12.apres.posts]')" \
   '["/project.html",true,"pret","projet",null,1,0]'
 assert_eq "EC3.1 — ligne d'état : « Lecture impossible · Réessayer », une rangée, zone d'appui de 44 au moins, retirée après la relance réussie" \
@@ -52,6 +53,15 @@ assert_eq "EC1.3 — échec, deux changements d'onglet réussis, nouvel échec :
   "$(E1 '[j.ec13.un, j.ec13.entre, j.ec13.deux, j.ec13.rangees]')" '[1,0,1,1]'
 assert_eq "EC1.4 — le script d'échec réévalué après coup : echec() lit toujours l'échec, l'entrée est offerte, aucune annonce de plus" \
   "$(E1 '[j.ec14.ech && j.ec14.ech.onglet, j.ec14.live, j.ec14.rangees]')" '["projet",true,1]'
+
+echo "=== EC1.5 — relance, file et rangée de palette (Node, sans Chrome) ==="
+SN="$(node "$HERE_T/echec-onglet-sonde.mjs" "$SC_BASE/../skills/cockpit-moteur/assets/ui" 2>"$WORK/sonde-node.err")"; [ -s "$WORK/sonde-node.err" ] && cat "$WORK/sonde-node.err"
+assert_eq "EC1.5a — reessayer() se résout quand la relance réussit (témoin) et REJETTE quand elle échoue encore, une seule lecture" \
+  "$(E '[j.reessayer.temoin, j.reessayer.rejet]' "$SN")" '[["resolu","projet"],["rejete",1]]'
+assert_eq "EC1.5b — un aller() rejeté libère le compteur : un popstate interne à l'onglet affiché n'est ni arrêté ni chargé, avant (témoin) comme après" \
+  "$(E '[j.compteur.temoin, j.compteur.zero]' "$SN")" '[[false,0],["rejete",false,0]]'
+assert_eq "EC1.5c — la rangée « Réessayer » de la palette : absente sans échec, présente avec, et executer() relance une fois sans lever ni rejeter" \
+  "$(E '[j.palette.source, j.palette.sans, j.palette.rangee, j.palette.relance]' "$SN")" '[1,0,["Réessayer|Projet"],[1,null,false]]'
 
 echo "=== EC2 — premier chargement en échec ==="
 R2="$(mesurer ec2)"; sonde "$R2"; E2() { E "$1" "$R2"; }
@@ -73,8 +83,11 @@ R4="$(mesurer ec4)"; sonde "$R4"
 assert_eq "EC4.1 — après un échec de démarrage, aller vers l'onglet d'origine le recharge (pas « rien à charger »), sans entrée d'historique de plus" \
   "$(E '[j.ec4.motif, j.ec4.phase, j.ec4.aff, j.ec4.r, j.ec4.pret, j.ec4.aff2, j.ec4.lectures >= 1, j.ec4.p, j.ec4.dn]' "$R4")" \
   '[null,"echec","code","resolu","pret","code",true,"/",0]'
+R5="$(mesurer ec5)"; sonde "$R5"
+assert_eq "EC5.1 — lecture sans réponse : bornée, aller rejeté, échec dit (phase, echec(), vf:coquille-echec), la file libérée : l'aller suivant aboutit" \
+  "$(E '[j.ec5.r1, j.ec5.phase, !!j.ec5.ech, j.ec5.evs, j.ec5.r2, j.ec5.p]' "$R5")" '["rejet","echec",true,1,"resolue","/project.html"]'
 echo "=== Sans erreur de pilote ==="
-ERR=""; for r in "$R1" "$R2" "$R4"; do ERR="$ERR$(E 'Object.entries(j.erreurs).map((x) => x[0] + "=" + x[1]).join()' "$r")"; done
+ERR=""; for r in "$R1" "$R2" "$R4" "$R5"; do ERR="$ERR$(E 'Object.entries(j.erreurs).map((x) => x[0] + "=" + x[1]).join()' "$r")"; done
 assert_eq "EC9 — aucune section du pilote n'a échoué" "$ERR" ""
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

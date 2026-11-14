@@ -42,11 +42,13 @@ Object.assign(W, { Floorplan: SC, FLOORPLAN_SERVER: S.serveur === false ? undefi
   EventSource: class { addEventListener() {} close() {} } });
 // VF_ETAT simulé d'après ui/70-vf-etat.js (79-17) : lire(cle) (who = l'objet, lock = { seq, verrous: { liste } }, connexion = 'ouvert'|'perdu'|'reprise'), abonner(cle, rappel) rend
 // le désabonnement, abonnes(), jeton(), lireJson(chemin) (GET avec l'en-tête x-vf-cockpit-token)
-const notifier = (cle, v) => { for (const f of [...(abos.get(cle) || [])]) f(v); }; // comme VF_ETAT : la valeur posée est passée au rappel
+const recus = {}; // instant de la dernière pose de chaque clé (VF_ETAT.recu) : posé avant la notification, comme dans le magasin
+const notifier = (cle, v) => { recus[cle] = horloge.now; for (const f of [...(abos.get(cle) || [])]) f(v); }; // comme VF_ETAT : la valeur posée est passée au rappel
 if (S.source === 'etat') W.VF_ETAT = { lire: (k) => (k === 'who' ? etat.who : k === 'lock' ? { seq: 1, verrous: { etat: 'lue', plat: false, liste: etat.lock || [] } } : k === 'connexion' ? etat.connexion : null),
-  abonner: (k, f) => { if (!abos.has(k)) abos.set(k, new Set()); abos.get(k).add(f); return () => abos.get(k).delete(f); }, jeton: () => JETON, abonnes: () => ({}),
+  abonner: (k, f) => { if (!abos.has(k)) abos.set(k, new Set()); abos.get(k).add(f); return () => abos.get(k).delete(f); }, jeton: () => JETON, abonnes: () => ({}), recu: (k) => (k in recus ? recus[k] : null),
   lireJson: async (url) => { const r = await fetchF(url, { headers: { 'x-vf-cockpit-token': JETON } }); return r.json(); } };
 etat.who = S.who || null; etat.lock = S.lock || null;
+if (S.who) recus.who = horloge.now; // le who du scénario est reçu au chargement
 if (S.source !== 'etat') W.__vfLive = { who: etat.who, whoAt: horloge.now, lock: etat.lock, connected: true };
 if (S.lus) W.__vfRegieLu = { lus: () => new Set(S.lus), marquer() {} }; // état « lu » simulé (90-vf-titre.js) : les identifiants du scénario
 Object.defineProperty(W, 'VF_PANNEAU', { get() { compteurs.panneauLu++; return undefined; }, configurable: true });

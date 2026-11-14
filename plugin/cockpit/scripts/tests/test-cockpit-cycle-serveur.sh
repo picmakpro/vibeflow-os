@@ -148,6 +148,13 @@ $LAN stop --lab "$LH" > "$WORK/l6.out" 2>&1
 for _ in $(seq 1 30); do [ "$(nserv "$LH")" = 0 ] && break; sleep 0.2; done
 assert_has "H3.12 — « stop » : l'arrêt demandé et le signal reçu sont au journal" "$(cat "$LOG")" "lanceur : arrêt demandé"
 assert_eq "H3.13 — après « stop », plus aucun serveur" "$(nserv "$LH")" "0"
+# H3.28 L5m-03 : un lab désigné dans une AUTRE casse (poste insensible à la casse) : la sortie passée au serveur est la forme native, que le serveur exige (sinon refus, code 5)
+LC="$WORK/labc/CasseMixte"; mklab "$LC"; LCL="$WORK/labc/cassemixte"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LC" --quiet > "$WORK/build-c.out" 2>&1 || cat "$WORK/build-c.out"
+if [ -d "$LCL" ]; then
+  PC=$(libre); $LAN open --lab "$LCL" --no-open --port "$PC" > "$WORK/l27.out" 2>&1; RC27=$?
+  assert_eq "H3.28 — lab désigné dans une autre casse que celle du disque : le lanceur réussit (rc 0) et un serveur sert ce lab" "$RC27 $(nserv "$LC")" "0 1"
+  $LAN stop --lab "$LCL" > /dev/null 2>&1; for _ in $(seq 1 30); do [ "$(nserv "$LC")" = 0 ] && break; sleep 0.2; done
+else echo "  (H3.28 sans objet : système de fichiers sensible à la casse)"; fi
 
 # H3.23-H3.24 verrou créé à l'instant (PID pas encore écrit) : jamais pris pour un verrou périmé
 LV="$WORK/labv"; mklab "$LV"; node "$SCRIPTS/vf-cockpit-build.mjs" "$LV" --quiet > "$WORK/build-v.out" 2>&1 || cat "$WORK/build-v.out"
