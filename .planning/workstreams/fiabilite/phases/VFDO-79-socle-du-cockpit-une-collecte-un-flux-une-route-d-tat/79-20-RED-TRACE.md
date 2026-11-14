@@ -60,3 +60,8 @@ ROUGE-BASE V12.2h attendu=14 obtenu=non-documente
 VERT-EMBLEE V12.0a, V12.0b : gardes contre le saut silencieux ; V12.0a est la détection du dépôt de dev, V12.0b la lecture des cinq sources ; leur pouvoir de rougir tient à `dc_depot_de_dev` et au test `-s`, non à un témoin (hors dépôt la section saute et le dit).
 VERT-EMBLEE V12.1a, V12.1b : à la base les quatre numéros disent v1.4.0 et le type est le même dans `module.json` et l'en-tête ; gardés par les témoins V12.6 (titre, version de `module.json`, en-tête, type).
 VERT-EMBLEE V12.3a, V12.3b, V12.3c : le README de la base ne nomme que des modules, suites et routes existants ; gardés par les témoins du module, de la suite et de la route inexistants plantés.
+
+## Tranche traceur : version et tableau (2026-11-14)
+- V12.1a avant le bump : OK v1.4.0 (les quatre numéros). Après : OK v1.5.0 (VERSION, `module.json`, en-tête du README, premier titre `## v1.5.0 — 2026-11-14 — non publié` du CHANGELOG).
+- Suite vendor jouée après le tableau : 28 PASS de V12 (V12.0a, 0b, 1a, 1b, 2a à 2h, 3a à 3c, 12 témoins, V12.7) et aucun FAIL de V12. Deux FAIL hors V12 (V11.Q6b, V11.P5, empreinte du module sur copie) : le voisin 79-18 modifiait `vf-cockpit-module.mjs` dans l'arbre partagé pendant ce rejeu (fix `42c41fbd1`, AU18-02) ; rejeu plus tard.
+- `bash scripts/check-version-sync.sh` : exit 0 (module aligné, compteur de suites 244 dans les deux README racine).

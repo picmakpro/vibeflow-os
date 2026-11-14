@@ -1,6 +1,6 @@
 # Changelog — cockpit
 
-## Non publié
+## v1.5.0 — 2026-11-14 — non publié
 
 Retours du panel d'utilisateurs du cockpit (2026-11-06, registre `.planning/missions/2026-11-06-panel-utilisateurs-GLOBAL.md`, PU-G-001 à PU-G-204) : correctifs et réglages, aucune capacité nouvelle, aucun bump de version à ce stade. Réponses de Samuel aux 14 questions du registre, formulaire unique : arbitrage Samuel, AskUserQuestion session principale, 2026-11-06. Libellés choisis : Q1 « Icônes dans le menu ⋯ », Q3 « Termes Git + définition », Q4 « Préparer, puis Entrée », Q5 « Non, annoncé seulement », Q6 « Tout visible, expliqué », Q7 « Oui, 120 s visibles », Q8 « Non, Projet et Code », Q9 « Règle actuelle », Q10 « Flou gardé, texte court », Q11 « Inchangés » (et PU-G-045 « Fermer sous 1000 px », même jour), Q12 « Un seul latéral sous 1280 px » puis « Non, lecture étroite », Q13 « Inchangé, mieux dit », Q14 « Oui pour ces trois ». Même canal et même jour : PU-G-162 « Branche + ton nom /rename », DG-09 « Non, garder l'exclusion », PU-G-026 « Projet sans plancher », PU-G-001 « Garder ce compromis », PU-G-086 « Rien ne change », focus sur « Annuler » « Garder l'exception », Entrée tenue « Corriger maintenant », masque des secrets « Corriger maintenant ». Même canal, 2026-11-07 : Entrée tenue « Étendre à tous ».
 

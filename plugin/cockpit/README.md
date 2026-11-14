@@ -3,7 +3,7 @@
 > Une page locale, en lecture seule (sauf le terminal intégré, si on le demande), qui dit où en est le lab : jalons, phases (à faire, en cours, à recetter, faites), plans,
 > exigences, missions, et qui travaille en ce moment, en arbre. Ouverte par `/vf-cockpit`.
 
-**Type** : skill + scripts + moteur vendorisé · **Version** : v1.4.0 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
+**Type** : skill + scripts + moteur (fork de floorplan) · **Version** : v1.5.0 · **Dépend de** : aucun module (lit le verrou de `conductor` s'il est posé)
 
 ## Ce que ça donne
 
@@ -334,6 +334,21 @@ session principale, 2026-11-03). À faire toi-même, après avoir vérifié que 
 `tests/`, `types/`, jouée par `claude plugin test`) et `skills/` (le moteur d'affichage). Suites neuves de la Phase 68 : `test-cockpit-vie.sh` (règle de mission
 vivante), `test-cockpit-retard.sh` (retard et worktrees), `test-cockpit-signal.sh` (l'émetteur) et `test-cockpit-signal-mod.sh` (déclaration, import et
 gardes statiques du mod). Phase 72 (lancer du travail depuis les cartes, avec `--terminal`) : neuf scripts `scripts/vf-cockpit-lancer*.mjs` (gabarit, cibles, POST, canal, état de Q, interface, suivi, mode retenu, assemblage) et quatorze suites `scripts/tests/test-cockpit-lancer-*.sh` (`gabarit`, `cibles`, `post`, `q`, `ui`, `suivi`, `bandeau`, `serveur`, `processus`, `pty`, `xss`, `bout-en-bout`, `chat`, `mode`). Retours du panel utilisateurs (2026-11) : `test-cockpit-sante.sh` (panneau Santé), `test-cockpit-ecrans-recent.sh` (écrans et Travail récent), `test-cockpit-moteur-carte.sh` (carte du moteur) et `test-cockpit-visite-retours.sh` (visite).
+
+## Chiffres tenus par le code
+
+Chaque ligne est comparée à sa source par la section V12 de `test-cockpit-vendor.sh` : une phase qui change un de ces chiffres corrige la ligne dans son commit. Le reste du README renvoie à ce tableau pour ces huit valeurs.
+
+| Clé | Valeur | Source dans le code |
+|---|---|---|
+| `fenetre-index-h` | 24 | `fenetreS` de `scripts/vf-cockpit-index-voie.mjs`, en secondes, divisé par 3600 : fenêtre de l'index |
+| `battement-flux-s` | 15 | `VIE_MS` de `scripts/vf-cockpit-flux-etat.mjs`, en millisecondes, divisé par 1000 : battement `vie` du flux |
+| `veille-flux-s` | 45 | `SILENCE_MS` de `69-vf-flux.js`, en millisecondes, divisé par 1000 : silence qui déclare le flux perdu |
+| `fraicheur-signal-s` | 20 | `FRAICHEUR_MAX_MS` de `scripts/vf-cockpit-signal-serveur.mjs`, divisé par 1000 : fraîcheur de l'état lu par `vf-signal` |
+| `plafond-lignes` | 300 | défaut de `VF_ARCH_BLOCK` dans `check-file-size.sh` : lignes au plus par fichier de code |
+| `plafond-colonnes` | 160 | `SEUIL` de `scripts/tests/colonnes-cliquet.mjs` : colonnes au plus par ligne de code navigateur |
+| `scripts-lancer` | 9 | nombre de fichiers `scripts/vf-cockpit-lancer*.mjs` |
+| `suites-lancer` | 14 | nombre de fichiers `scripts/tests/test-cockpit-lancer-*.sh` |
 
 ## Interface du socle pour `vf-signal`
 

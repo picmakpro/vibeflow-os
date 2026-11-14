@@ -1,7 +1,7 @@
 {
   "name": "cockpit",
-  "version": "v1.4.0",
-  "type": "skill + scripts + moteur vendorisé",
+  "version": "v1.5.0",
+  "type": "skill + scripts + moteur (fork de floorplan)",
   "description": "Cockpit web local du lab : onglet Projet (jalons, phases avec leur état d'avancement, plans, exigences, missions, qui est au travail en direct, questions locales ou à l'agent claude -p confiné), onglet Équipe (arbre des agents, transcript lu à la demande) et onglet Code, plus un tiroir Git (graphe des branches et des worktrees, détail d'un commit, commandes à copier, en lecture seule). Lecture seule, sauf le terminal intégré ouvert par --terminal (shell du compte à la racine du lab, second serveur 127.0.0.1) ; avec ce drapeau, les cartes de phase et de mission proposent de lancer une session claude, confirmée dans le terminal ; 127.0.0.1, aucun appel sortant hors l'agent. Ouvert par /vf-cockpit, sortie sous .vibeflow/cockpit/.",
   "requires": []
 }
