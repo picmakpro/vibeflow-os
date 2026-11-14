@@ -30,6 +30,7 @@
   };
 
   // le titre est composé par 90-vf-titre.js (préfixe « vous attend » compris) : on lui donne l'onglet affiché ; sans lui, repli autonome
+  // repli défensif, aucun cas réel établi (un script illisible rejette chargerOnglet avant titrer) ; RG12.9 prouve qu'il n'écrase rien
   const titrer = (nom) => {
     const SC = moteur(), p = SC && SC.graph && SC.graph.project, n = String((p && p.name) || '').replace(/ — (Projet|Équipe)$/, '');
     const T = window.__vfTitre, b = window.__vfTitreBase;
