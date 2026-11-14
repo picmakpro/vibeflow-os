@@ -41,7 +41,7 @@ Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 10
 - Gel des publications : décision de Samuel du 2026-11-08 (`.planning/missions/2026-11-08-recette-correctifs.md`) ; levée du gel, merge, bump, tag et release restent ses gestes.
 - Exécution : segments b et c de 79 et 80, puis 73, 74, 75, 76, 77 ; 81 reportée (`AUDC-Q3` « plus tard », 2026-11-11).
 - Phase 76 : 76-01 à 76-07 faits (2026-11-14).
-- Phase 73 : 73-01 à 73-10 exécutés (branche `feat/phase-73-gouvernance-regie`) ; 73-11 en cours ; RG1.12 attend 80-10.
+- Phase 73 : 73-01 à 73-11 exécutés (PR #243 et #248 fusionnées, la seconde dans le lot #249) ; RG1.12 rebranché sur `VF_ONGLETS.aller` (80-10) ; vérification de but faite (human_needed : CI Linux, sonde réelle de `claude agents`).
 - Phase 75 : 75-01 à 75-06 exécutés (2026-11-13), 75-07 à 75-10 restent.
 - Phase 74 : 74-01 à 74-05 et 74-07 exécutés (2026-11-14) ; 74-06, 74-08, 74-10, 74-09 restent.
 - Phase 80 : 80-01 à 80-21 exécutés (2026-11-14, branche `feat/phase-80-trois-formes`, PR vers le lot 242-246-248-238) ; FORM-17 attend la CI Linux.
