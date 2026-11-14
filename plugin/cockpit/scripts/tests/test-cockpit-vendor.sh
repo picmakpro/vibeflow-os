@@ -489,7 +489,8 @@ copier_avec_imports() { # <dossier-cible> <fichier>... (chemins absolus)
     done
   done
 }
-rm -rf "$WORK/q6"; mkdir -p "$WORK/q6/scripts" "$WORK/q6/skills/cockpit-moteur/assets/ui"; copier_avec_imports "$WORK/q6/scripts" "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs
+rm -rf "$WORK/q6"; mkdir -p "$WORK/q6/scripts" "$WORK/q6/skills/cockpit-moteur/assets/ui" "$WORK/q6/skills/cockpit-moteur/assets/vendor"; cp "$MOTEUR/assets/vendor/elk.bundled.js" "$WORK/q6/skills/cockpit-moteur/assets/vendor/"; # 79-18 (AU18-02) : le paquet ELK fait partie du code évalué
+  copier_avec_imports "$WORK/q6/scripts" "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs
 cp "$MOTEUR/assets/serve.mjs" "$WORK/q6/skills/cockpit-moteur/assets/"; cp -R "$MOTEUR/assets/ui/terminal" "$WORK/q6/skills/cockpit-moteur/assets/ui/terminal" 2>/dev/null; cp -R "$MOTEUR/assets/ui/tiroir" "$WORK/q6/skills/cockpit-moteur/assets/ui/tiroir" 2>/dev/null   # la liste close porte aussi les neuf fichiers de P
 node "$WORK/q6.mjs" "$WORK/q6" > "$WORK/q6.out" 2>&1
 assert_eq "V11.Q6a — fichiersCodeEvalue liste les trois fichiers de Q" "$(sed -n 1p "$WORK/q6.out")" "liste=true"
@@ -526,7 +527,7 @@ assert_eq "V11.P2b — injectionLancer : (lancer.js)(configuration portant lance
 assert_eq "V11.P2c — injectionLancer({ indisponible }) rend la chaîne vide" "$(sed -n 3p "$WORK/p2.out")" 'indispo=""'
 # p3 : une copie jetable du module (scripts utiles et moteur réduit) : un fichier muté change l'injection ; un fichier illisible la rend vide avec une ligne d'erreur
 mini_module() { # <dossier> : copie réduite du module (le lecteur, le module, les deux injecteurs et le dossier rangé)
-  rm -rf "$1"; mkdir -p "$1/scripts" "$1/skills/cockpit-moteur/assets/ui"
+  rm -rf "$1"; mkdir -p "$1/scripts" "$1/skills/cockpit-moteur/assets/ui" "$1/skills/cockpit-moteur/assets/vendor"; cp "$MOTEUR/assets/vendor/elk.bundled.js" "$1/skills/cockpit-moteur/assets/vendor/" # 79-18 (AU18-02) : le paquet ELK fait partie du code évalué
   copier_avec_imports "$1/scripts" "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs "$SCRIPTS"/vf-cockpit-terminal-tiroir.mjs "$SCRIPTS"/vf-cockpit-lancer-ui.mjs
   cp "$MOTEUR/assets/serve.mjs" "$1/skills/cockpit-moteur/assets/" 2>/dev/null; cp -R "$MOTEUR/assets/ui/terminal" "$MOTEUR/assets/ui/tiroir" "$1/skills/cockpit-moteur/assets/ui/" 2>/dev/null
 }
