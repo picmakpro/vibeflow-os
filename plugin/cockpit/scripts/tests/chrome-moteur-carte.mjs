@@ -188,10 +188,9 @@ await executer(chrome, async (s) => {
   const ouvertA = async (w, h) => { await vue(w, h); await charger('index.html'); return stabiliser(() => s.ev("!document.body.classList.contains('no-panel') && document.querySelector('#btn-panel').getAttribute('aria-expanded') === 'true'"), { pas: 150, max: 3000 }); };
   o.panneau = { a768: await ouvertA(768, 1024), a1024: await ouvertA(1024, 768) };
 
-  // ---------- onglet Équipe à 390 px : une seule colonne (PU-G-176) ----------
-  await vue(390, 844, true); await charger('equipe.html');
-  await aller('n:ag-' + equipeSession);
-  o.equipe = JSON.parse(await stabiliser(() => s.ev(`JSON.stringify((() => { const cs = [...document.querySelectorAll('#viewport .node .card')].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0); return { cartes: cs.length, colonnes: new Set(cs.map((r) => Math.round(r.left / 20))).size, debordent: cs.filter((r) => r.right > innerWidth + 1 || r.left < -1).length }; })())`), { pas: 150, max: 5000 }));
+  // ---------- onglet Équipe à 390 px : une seule colonne (PU-G-176 ; 73-08 : la régie a remplacé le canevas de cartes, les lignes de la régie portent la propriété) ----------
+  await vue(390, 844, true); await s.naviguer(U('equipe.html')); await s.attendre(PRET, 'page prête (equipe.html)'); await poserVue(); // la page n'a plus de carte : on n'attend pas `#viewport .node`
+  o.equipe = JSON.parse(await stabiliser(() => s.ev(`JSON.stringify((() => { const cs = [...document.querySelectorAll('#vf-equipe li[data-vf-cle]')].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0); return { cartes: cs.length, colonnes: new Set(cs.map((r) => Math.round(r.right / 20))).size, debordent: cs.filter((r) => r.right > innerWidth + 1 || r.left < -1).length }; })())`), { pas: 150, max: 5000 }));
   // ---------- M5 : diagnostics de viewer.html (DG-12 colonnes, DG-04 vue de réponse, DG-03 compteurs, PU-G-049 homonymes) ----------
   await vue(1280, 720); await charger('index.html');
   // DG-12 / PU-G-040 : une carte sans aucun lien, dans la vue d'une partie qui a des liens avec l'extérieur, se range dans la colonne « Inside … », jamais sous « Used by »

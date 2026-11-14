@@ -350,15 +350,23 @@ JS
   R="$(cdp "$AUX/h6.js" "$BASE" /project.html 2>&1 | tail -1)"
   assert_eq "H6.2 — Projet : surtitre, titre « Jalon <jalon> », sous-titre = phases faites (le titre n'y est plus répété, voir H7.9)" "$(jq_ "$R" '[j.k, j.h1, j.p].join("|")' 2>/dev/null)" "Projet|Jalon vibeflow-test|1 phase faite sur 2."
   assert_eq "H6.3 — Projet : le titre ne répète pas le nom du projet" "$(jq_ "$R" '[j.h1.includes(j.nomProjet), /vf-ctx-titre/.test(j.cls)].join("|")' 2>/dev/null)" "false|true"
-  R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"
-  assert_eq "H6.2 — Équipe sans mission : « Aucune mission en cours », « L'équipe est au repos. »" "$(jq_ "$R" '[j.k, j.h1, j.p].join("|")' 2>/dev/null)" "Équipe|Aucune mission en cours|L'équipe est au repos."
+  # 73-09 (P73-D-04) : l'en-tête d'Équipe est celui de la régie : h1 du gabarit du lot 0 (#vf-equipe-entete h1) et sous-titre de la régie (.vf-rg-sous) à la place de la ligne « Agents : … » du bloc #context
+  cat > "$AUX/h6e.js" <<'JS'
+const [base] = ARGS;
+const { stabiliser } = await import(process.env.VF_CS); // aide commune (chrome-session.mjs)
+await s.naviguer(base + '/equipe.html');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#vf-equipe-entete h1') && !!document.querySelector('#vf-equipe-entete h1').textContent`, 'en-tête de la régie');
+return await stabiliser(() => s.ev(`(() => { const e = document.querySelector('#vf-equipe-entete'); return { h1: e.querySelector('h1').textContent, p: (e.querySelector('.vf-rg-sous') || {}).textContent || '' }; })()`), { max: 10000 });
+JS
+  R="$(cdp "$AUX/h6e.js" "$BASE" 2>&1 | tail -1)"
+  assert_eq "H6.2 — Équipe sans mission : « Aucune mission en cours », sous-titre de la régie « Aucun agent en vie »" "$(jq_ "$R" '[j.h1, j.p].join("|")' 2>/dev/null)" "Aucune mission en cours|Aucun agent en vie"
   mkdir -p "$WT/.planning/missions"; printf '{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$WT/.planning/missions/MISSION-x.dag.json"
-  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "Mission : x" ] && break; sleep 0.5; done
+  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6e.js" "$BASE" 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "Mission : x" ] && break; sleep 0.5; done
   assert_eq "H6.2 — Équipe avec une mission en cours : « Mission : x »" "$(jq_ "$R" 'j.h1' 2>/dev/null)" "Mission : x"
   printf '{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$WT/.planning/missions/MISSION-y.dag.json"
-  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "2 missions en cours" ] && break; sleep 0.5; done
+  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6e.js" "$BASE" 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "2 missions en cours" ] && break; sleep 0.5; done
   assert_eq "H6.2 — Équipe avec deux missions : « 2 missions en cours »" "$(jq_ "$R" 'j.h1' 2>/dev/null)" "2 missions en cours"
-  assert_eq "H6.2 — PU-G-166 : sous le titre des missions, les agents sont nommés et comptés à part (« Agents : … actif · … en attente · … terminé »), jamais « actifs » seul" "$(jq_ "$R" 'j.p' 2>/dev/null)" "Agents : 0 actif · 0 en attente · 0 terminé depuis moins de 24 h."
+  assert_eq "H6.2 — PU-G-166 : sous le titre des missions, le sous-titre de la régie dit les agents à part (« Aucun agent en vie » ici), jamais « actifs » seul" "$(jq_ "$R" 'j.p' 2>/dev/null)" "Aucun agent en vie"
   cat > "$AUX/h64.js" <<'JS'
 const [base] = ARGS;
 const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)

@@ -5,8 +5,23 @@
 #   LS2 une seule source de la récence (cibles), heure de P (jamais le champ `at` du message)
 #   LS3 états : attendue / vue / terminee par l'identifiant de session SEUL, oubli à ATTENTE_MAX_MS et TTL_MS
 #   LS4 sorties : clés exactes, aucune clé interdite, module sans import ni écriture, constantes
-#   LE  carte Équipe : paramètre optionnel `lancees` ; sortie d'avant identique octet pour octet sans lui (copie figée, sha256)
-#   M-… onze mutants, un par garde (marqueur `// garde:<nom>` du module visé)
+#   LE  provenance : la copie figée de vf-cockpit-equipe-carte.mjs (sha256) ; les autres LE sont devenus LR (plan 73-09, P73-D-04, P73-D-21, hypothèse A8)
+#   LR  ligne de lancement portée par who@2 (donnée) et lue sur la ligne de la régie (texte)
+#   M-… mutants, un par garde (marqueur `// garde:<nom>` du module visé)
+#
+# Correspondance LE → LR (le support change, la propriété reste ; aucun identifiant n'est supprimé) :
+#   LE.0   → LE.0   provenance : la copie figée garde son sha256, elle documente le support d'avant (ni re-figée ni supprimée)
+#   LE.0b  → LR.0b  la valeur saine A/B n'est pas tautologique : les empreintes de LR.1 sont des littéraux, celles du commit de capture (73-03), jamais recalculées
+#   LE.0c  → LR.0c  un mutant sans effet est détecté (cible absente)
+#   LE.1   → LR.1   sans `lancees`, sortie identique octet pour octet à la valeur saine
+#   LE.2   → LR.2   la ligne « Lancée depuis la carte : Phase 72 · alpha · <verbe> » : donnée sur who@2 (LR.2), texte sur la ligne de régie (LR.2b)
+#   LE.3   → LR.3   sans compartiment : donnée (LR.3), texte (LR.3b)
+#   LE.4   → LR.4   valeurs hostiles : aucun champ, aucune exception
+#   LE.5   → LR.5   sous-agent ou clé absente : rien
+#   LE.6   → LR.7   name, nom, title, customTitle hostiles absents ; libellé « Session principale » sur la ligne de régie
+#   M-LANCEES-HORS-SESSION   → M-LANCEE-HORS-SESSION    garde de session (garde:lancee-session)
+#   M-LIGNE-SANS-VALIDATION  → M-LANCEE-SANS-VALIDATION garde de revalidation (garde:lancee-valide)
+#   M-LIGNE-VIDE-TOUJOURS    → M-LANCEE-VIDE-TOUJOURS   garde d'insertion (garde:lancee) : un champ toujours posé rougit LR.1
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -229,90 +244,6 @@ console.log(JSON.stringify({
 }));
 JS
 
-# --- harnais de la carte : carte.mjs <dossier-neuf> <dossier-copie-figée> <scénario> ---
-cat > "$AUX/carte.mjs" <<'JS'
-import { pathToFileURL } from 'node:url';
-import path from 'node:path';
-const [, , dNew, dBase, sc] = process.argv;
-const imp = (d) => import(pathToFileURL(path.join(d, 'vf-cockpit-equipe-carte.mjs')).href);
-const N = (await imp(dNew)).buildEquipeGraph, Bz = (await imp(dBase)).buildEquipeGraph;
-const OPT = { nom: 'Lab', racine: '/x', logos: {} };
-const norm = (g) => { const c = JSON.parse(JSON.stringify(g)); c.meta.generatedAt = 'X'; return c; };
-// Phase 78 : buildEquipeGraph émet désormais meta.vf.missions = [] même sans option (vfGit reste absent sans option). La copie figée d'avant 72-07
-// ne connaît pas ce champ : on le réconcilie côté BASE seulement, en dernier dans meta.vf (même ordre que le module), et rien d'autre.
-const normBase = (g) => { const c = norm(g); if (!('missions' in c.meta.vf)) c.meta.vf.missions = []; return c; };
-const U = (n) => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`;
-const S1 = U(1), S2 = U(2), S3 = U(3);
-const sess = (id, o = {}) => ({ kind: 'session', id, etat: 'actif', tree: 'arbre', source: 'transcript', ...o });
-const ag = (id, o = {}) => ({ kind: 'subagent', id, parent: S1, etat: 'actif', role: 'worker', task: 'faire', source: 'transcript', ...o });
-const V = (phase, ws, verbe) => ({ phase, ws, verbe });
-const JEUX = {
-  complete: { workers: [sess(S1, { role: 'manager', branch: 'feat/x', tree: 'wt', task: 't', rattachement: { etat: 'rattache', noeud: 'n1', dag: 'd.json' } }), sess(S2, { etat: 'en-attente' })], fenetre: 86400, sources: { sessions: { etat: 'lue' } } },
-  agents: { workers: [sess(S1), ag('a1'), ag('a2', { etat: 'termine' }), ag('a3', { etat: 'termine', parent: 'inconnu' }), ag('a4', { etat: 'en-attente' })], sources: {} },
-  nonrattache: { workers: [sess(S1, { rattachement: { etat: 'inconnu' } }), sess(S3, { etat: 'termine', rattachement: { etat: 'rattache', noeud: 'n2', dag: 'd2.json' } })], sources: {} },
-  vide: { workers: [], sources: {} },
-  nul: null,
-  sources: { workers: [sess(S1)], fenetre: 86400, sources: { sessions: { etat: 'lue' }, locks: { etat: 'erreur' }, dags: { etat: 'forme-inconnue' }, x: { etat: 'autre' } } },
-  nonTableau: { workers: 'x' },
-};
-const VARS = [['absent', OPT], ['undefined', { ...OPT, lancees: undefined }], ['map-vide', { ...OPT, lancees: new Map() }],
-  ['map-sans', { ...OPT, lancees: new Map([['zzz', V('72', 'alpha', 'planifier')]]) }], ['objet', { ...OPT, lancees: {} }], ['tableau', { ...OPT, lancees: [] }],
-  ['chaine', { ...OPT, lancees: 'x' }], ['null', { ...OPT, lancees: null }], ['nombre', { ...OPT, lancees: 42 }]];
-const noeud = (g, id) => g.nodes.find((n) => n.id === id);
-const essai = (who, lancees, id, L) => { // la ligne L juste après « État : », aucun autre champ du graphe ne change
-  const base = normBase(Bz(who, OPT)); const g = norm(N(who, { ...OPT, lancees }));
-  const nb = noeud(base, id), ng = noeud(g, id); const lg = nb.details.split('\n\n'); let i = lg.findIndex((l) => l.startsWith('État : ')); if (lg[i + 1] && lg[i + 1].startsWith('Identifiant : ')) i++; // PU-G-162 : la ligne « Identifiant : » (sessions) suit « État : », la ligne de lancement vient juste après
-  const attendu = [...lg.slice(0, i + 1), L, ...lg.slice(i + 1)].join('\n\n');
-  // depuis c7d96740 (PU-G-134/163), la description d'une carte de session lancée s'ouvre sur « Depuis Phase N » ; le reste de la description est celui de la copie figée
-  const R = (/Phase (\d+)/.exec(L) || [])[1];
-  const attenduResume = nb.summary ? `Depuis Phase ${R} · ${nb.summary}` : `Depuis Phase ${R}`;
-  const reste = JSON.stringify({ ...g, nodes: g.nodes.map((n) => (n.id === id ? { ...n, details: nb.details, summary: nb.summary } : n)) }) === JSON.stringify(base);
-  return `details:${ng.details === attendu ? 'ok' : 'ko'}|resume:${ng.summary === attenduResume ? 'ok' : 'ko'}|reste:${reste ? 'ok' : 'ko'}`;
-};
-const W2 = { workers: [sess(S1, { role: 'manager' }), sess(S2)], sources: {} };
-const SC = {
-  identique: () => {
-    let n = 0; const diffs = [];
-    for (const [jn, who] of Object.entries(JEUX)) {
-      const base = JSON.stringify(normBase(Bz(who, OPT)));
-      for (const [vn, o] of VARS) { n++; let got; try { got = JSON.stringify(norm(N(who, o))); } catch (e) { got = 'EXC ' + e.message; } if (got !== base) diffs.push(jn + '/' + vn); }
-    }
-    return n + '|' + diffs.length + (diffs.length ? '|' + diffs.slice(0, 5).join(',') : '');
-  },
-  ligne: () => essai(W2, new Map([[S1, V('72', 'alpha', 'planifier')]]), 'se-' + S1, 'Lancée depuis la carte : Phase 72 · alpha · Planifier'),
-  'sans-ws': () => essai(W2, new Map([[S1, V('72', null, 'planifier')]]), 'se-' + S1, 'Lancée depuis la carte : Phase 72 · Planifier'),
-  hostile: () => {
-    const T = () => ({ toString() { throw new Error('piege'); } });
-    const H = [V('$(touch M)', 'alpha', 'planifier'), V('72;x', 'alpha', 'planifier'), V('72', 'a$(id)', 'planifier'), V('72', 'Alpha', 'planifier'), V('72', 'alpha\nx', 'planifier'),
-      V('72', 'alpha', '<img src=x onerror=1>'), V('72', 'alpha', 'executer '), V('72', 'alpha', T()), V(72, 'alpha', 'planifier'), V('72', 'alpha', 'constructor'),
-      V(T(), 'alpha', 'planifier'), null, 'x', 42];
-    const ids = H.map((_, i) => 'aaaaaaaa-aaaa-4aaa-8aaa-' + String(i).padStart(12, '0'));
-    const who = { workers: [...ids.map((id) => sess(id)), sess(S2)], sources: {} };
-    const map = new Map(ids.map((id, i) => [id, H[i]])); map.set(S2, V('72', 'alpha', 'verifier'));
-    let exc = 0, g; try { g = norm(N(who, { ...OPT, lancees: map })); } catch { exc = 1; return `exc:1`; }
-    const base = normBase(Bz(who, OPT)); const nb = noeud(base, 'se-' + S2), ng = noeud(g, 'se-' + S2);
-    const reste = JSON.stringify({ ...g, nodes: g.nodes.map((n) => (n.id === ng.id ? { ...n, details: nb.details, summary: nb.summary } : n)) }) === JSON.stringify(base);
-    const hostile = /\$\(|touch M|onerror|72;x|piege|constructor|alpha\\n/.test(JSON.stringify(g));
-    return `exc:${exc}|reste:${reste ? 'ok' : 'ko'}|temoin:${ng.details.includes('Lancée depuis la carte : Phase 72 · alpha · Vérifier') ? 'ok' : 'ko'}|hostile:${hostile ? 'presente' : 'aucune'}`;
-  },
-  'hors-session': () => {
-    const who = { workers: [sess(S1), sess(S2), ag('agent-1')], sources: {} };
-    const map = new Map([['agent-1', V('72', 'alpha', 'executer')], ['absent-id', V('72', 'alpha', 'executer')], [S2, V('72', 'alpha', 'executer')]]);
-    const base = normBase(Bz(who, OPT)), g = norm(N(who, { ...OPT, lancees: map }));
-    const diff = g.nodes.filter((n) => JSON.stringify(n) !== JSON.stringify(noeud(base, n.id))).map((n) => n.id);
-    return `diff:${diff.join(',')}|noeuds:${g.nodes.length === base.nodes.length}|ligne:${noeud(g, 'se-' + S2).details.includes('Lancée depuis la carte : Phase 72 · alpha · Exécuter') ? 'ok' : 'ko'}`;
-  },
-  noms: () => {
-    const P = '<img src=x onerror=1>';
-    const who = { workers: [sess(S1, { name: P, nom: P, title: P, customTitle: P })], sources: {} };
-    const a = JSON.stringify(norm(N(who, { ...OPT, lancees: new Map([[S1, V('72', 'alpha', 'planifier')]]) })));
-    const b = norm(N(who, OPT));
-    return `absent:${/onerror|<img/.test(a + JSON.stringify(b)) ? 'non' : 'oui'}|label:${noeud(b, 'se-' + S1).label === 'Session principale' ? 'ok' : 'ko'}`;
-  },
-};
-console.log(SC[sc]());
-JS
-
 # --- mutants : copie des deux modules dans $WORK/mut-<nom>/, sed ; code 1 si la cible manque ou reste inchangée ---
 MUT_DIR=""
 mutant() { # mutant <nom> <fichier> <expression-sed>
@@ -330,13 +261,6 @@ mut_ls() { # mut_ls <nom> <expression-sed> <scénario> <valeur saine> <sonde>
     assert_eq "$1 — le mutant rougit $5 : le relevé [${got:0:60}] n'est plus la valeur saine (témoin : le scénario s'exécute)" "$v" "rouge"
   else sans_effet "$1"; fi
 }
-mut_le() { # mut_le <nom> <expression-sed> <scénario> <valeur saine> <sonde>
-  if mutant "$1" vf-cockpit-equipe-carte.mjs "$2"; then
-    local got v=vert; got="$(node "$AUX/carte.mjs" "$MUT_DIR" "$AUX/base" "$3" 2>&1)"
-    if [ -n "$got" ] && [ "$got" != "$4" ]; then v=rouge; fi
-    assert_eq "$1 — le mutant rougit $5 : le relevé [${got:0:60}] n'est plus la valeur saine (témoin : le scénario s'exécute)" "$v" "rouge"
-  else sans_effet "$1"; fi
-}
 
 SAIN_LS12="forme,forme,forme,forme,forme,forme,forme,forme|0"
 SAIN_LS22="true/true"
@@ -346,10 +270,6 @@ SAIN_LS34="attendue,attendue,attendue,vue"
 SAIN_LS33="terminee"
 SAIN_LS35="0,0,0|vue,terminee,vue"
 SAIN_LS36="1,0,0"
-SAIN_LE1="63|0"
-SAIN_LE2="details:ok|resume:ok|reste:ok"
-SAIN_LE4="exc:0|reste:ok|temoin:ok|hostile:aucune"
-SAIN_LE5="diff:se-22222222-2222-4222-8222-222222222222|noeuds:true|ligne:ok"
 
 echo "== LS1 noter =="
 assert_eq "LS1.1 — un message valide : {ok:true}, une entrée" "$(LSM ls11)" '{"ok":true}|1'
@@ -377,31 +297,21 @@ assert_eq "LS4.2 — aucune clé doing, mandat, messages, outils dans ce que ren
 assert_eq "LS4.3 — le module n'importe rien, n'écrit rien, ne journalise rien, ne lit pas l'environnement" "$(node "$AUX/statique.mjs" "$SCRIPTS/vf-cockpit-lancer-suivi.mjs")" '{"imports":false,"console":false,"env":false,"fs":false,"live":false}'
 assert_eq "LS4.4 — constantes et libellés des cinq verbes" "$(LSM ls44)" "600000|86400000|200|cadrer,planifier,executer,verifier,reprendre|Cadrer,Planifier,Exécuter,Vérifier,Reprendre|true"
 
-echo "== LE carte Équipe =="
-assert_eq "LE.0 — la copie figée est figée : son sha256 est celui de la constante (module courant moins la fonction 72-07, rafraîchi le 2026-11-07)" "$(shasum -a 256 "$AUX/base/vf-cockpit-equipe-carte.mjs" | cut -d' ' -f1)" "$BASE_EQUIPE_CARTE_SHA256"
-# LE.0b : la copie ne diffère du module courant QUE par l'import 72-07 et les trois lignes garde:lancees / garde:ligne-valide / garde:ligne-insert (neutralisées en `const l = undefined;` et `const t = '';`) ;
-# sans cela un rafraîchissement silencieux de la copie rendrait la comparaison A/B tautologique (la copie suivrait le module, LE.1 à LE.5 ne verraient plus rien)
-cat > "$AUX/copie.mjs" <<'JS'
-import fs from 'node:fs';
-const [, , courant, copie] = process.argv;
-const att = fs.readFileSync(courant, 'utf8').split('\n').flatMap((l) => l.startsWith('import { LIBELLES_VERBES, entreeLanceeValide }') || l.includes('// garde:ligne-insert') ? [] : l.includes('// garde:lancees') ? ['    const l = undefined; // copie figée : sans la ligne de lancement (72-07)'] : l.includes('// garde:ligne-valide') ? ["    const t = '';"] : [l]);
-const obt = fs.readFileSync(copie, 'utf8').split('\n');
-const trim = (a) => { while (a.length && a[a.length - 1] === '') a.pop(); return a; };
-const A = trim(att), O = trim(obt);
-const i = A.findIndex((l, k) => l !== O[k]);
-console.log(i < 0 && A.length === O.length ? 'identique' : 'écart ligne ' + ((i < 0 ? Math.min(A.length, O.length) : i) + 1) + ' : attendu [' + (A[i] ?? '').slice(0, 80) + '] obtenu [' + (O[i] ?? '').slice(0, 80) + ']');
-JS
-assert_eq "LE.0b — la copie figée ne diffère du module courant que par l'import 72-07 et les trois lignes garde:lancees / garde:ligne-valide / garde:ligne-insert" "$(node "$AUX/copie.mjs" "$SCRIPTS/vf-cockpit-equipe-carte.mjs" "$AUX/base/vf-cockpit-equipe-carte.mjs")" "identique"
-sed '/^const ST = /s/done/fini/' "$AUX/base/vf-cockpit-equipe-carte.mjs" > "$AUX/base-mutee.mjs"
-cmp -s "$AUX/base-mutee.mjs" "$AUX/base/vf-cockpit-equipe-carte.mjs" && assert_eq "LE.0c — mutant sans effet (cible de sed absente)" "sans effet" "effet"
-assert_eq "LE.0c — mutant : une quatrième différence dans la copie (état « done » renommé) rougit LE.0b" "$(node "$AUX/copie.mjs" "$SCRIPTS/vf-cockpit-equipe-carte.mjs" "$AUX/base-mutee.mjs" | cut -c1-12)" "écart ligne "
-assert_eq "LE.1 — sept jeux who × neuf valeurs de paramètre : sortie identique octet pour octet à la copie figée (generatedAt neutralisé)" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" identique 2>&1)" "$SAIN_LE1"
-assert_eq "LE.2 — la ligne « Lancée depuis la carte : Phase 72 · alpha · Planifier » juste après « État : » (et de « Identifiant : » qui le suit sur une session, PU-G-162), la description s'ouvre sur « Depuis Phase 72 » (c7d96740), aucun autre champ ne change" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" ligne 2>&1)" "$SAIN_LE2"
-assert_eq "LE.3 — sans compartiment : « Lancée depuis la carte : Phase 72 · Planifier »" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" sans-ws 2>&1)" "$SAIN_LE2"
-assert_eq "LE.4 — valeurs hostiles : aucune ligne, aucune exception, rien d'hostile dans le JSON ; le témoin positif de la même Map donne sa ligne" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" hostile 2>&1)" "$SAIN_LE4"
-assert_eq "LE.5 — un sous-agent clé de la Map et une clé absente de who : rien ; seule la session valide de la même Map change" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" hors-session 2>&1)" "$SAIN_LE5"
-assert_eq "LE.6 — name, nom, title, customTitle hostiles : absents de la sortie, libellé « Session principale » (sans titre ni branche, PU-G-162)" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" noms 2>&1)" "absent:oui|label:ok"
-
+echo "== LE provenance =="
+assert_eq "LE.0 — la copie figée est figée : son sha256 est celui de la constante (module d'avant la ligne de lancement, rafraîchi le 2026-11-07 ; provenance seule depuis le plan 73-09, A8)" "$(shasum -a 256 "$AUX/base/vf-cockpit-equipe-carte.mjs" | cut -d' ' -f1)" "$BASE_EQUIPE_CARTE_SHA256"
+# la correspondance de l'en-tête est tenue : chaque identifiant LE ou M-LANCEES… d'avant pointe vers un identifiant (assertion ou mutant) qui existe encore dans cette suite
+cible() { local c; c="$(sed -n "s/^#   $1  *→ \([A-Za-z0-9.-]*\).*/\1/p" "$0" | head -1)"; if [ -n "$c" ] && { grep -Fq "assert_eq \"$c " "$0" || grep -Fq "mut_lr $c " "$0"; }; then echo "$c"; else echo "cible absente"; fi; }
+assert_eq "LE.0b → LR.0b — correspondance de l'en-tête tenue" "$(cible LE.0b)" "LR.0b"
+assert_eq "LE.0c → LR.0c — correspondance de l'en-tête tenue" "$(cible LE.0c)" "LR.0c"
+assert_eq "LE.1 → LR.1 — correspondance de l'en-tête tenue" "$(cible LE.1)" "LR.1"
+assert_eq "LE.2 → LR.2 — correspondance de l'en-tête tenue" "$(cible LE.2)" "LR.2"
+assert_eq "LE.3 → LR.3 — correspondance de l'en-tête tenue" "$(cible LE.3)" "LR.3"
+assert_eq "LE.4 → LR.4 — correspondance de l'en-tête tenue" "$(cible LE.4)" "LR.4"
+assert_eq "LE.5 → LR.5 — correspondance de l'en-tête tenue" "$(cible LE.5)" "LR.5"
+assert_eq "LE.6 → LR.7 — correspondance de l'en-tête tenue" "$(cible LE.6)" "LR.7"
+assert_eq "M-LANCEES-HORS-SESSION → M-LANCEE-HORS-SESSION — correspondance de l'en-tête tenue" "$(cible M-LANCEES-HORS-SESSION)" "M-LANCEE-HORS-SESSION"
+assert_eq "M-LIGNE-SANS-VALIDATION → M-LANCEE-SANS-VALIDATION — correspondance de l'en-tête tenue" "$(cible M-LIGNE-SANS-VALIDATION)" "M-LANCEE-SANS-VALIDATION"
+assert_eq "M-LIGNE-VIDE-TOUJOURS → M-LANCEE-VIDE-TOUJOURS — correspondance de l'en-tête tenue" "$(cible M-LIGNE-VIDE-TOUJOURS)" "M-LANCEE-VIDE-TOUJOURS"
 echo "== LR ligne de lancement portée par who@2 (P73-D-21) =="
 # Harnais : labs de fixture jetables (git, HOME jetable, horloge figée à `now`), collectWho sans verrou ; LR.6 : startLive (fil de collecte) avec l'option `lancees`.
 cat > "$AUX/lr.mjs" <<'JS'
@@ -410,7 +320,7 @@ import path from 'node:path';
 import crypto from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
-const [, , scripts, sc, work0] = process.argv;
+const [, , scripts, sc, work0, tests] = process.argv;
 fs.mkdirSync(work0, { recursive: true });
 const work = fs.realpathSync(work0), home = path.join(work, 'home'), noscripts = path.join(work, 'noscripts');
 fs.mkdirSync(noscripts, { recursive: true });
@@ -451,6 +361,14 @@ function lab(nom, { sessions = [], dag = false, ws = false, sub = null } = {}) {
 const collect = async (d, o = {}) => (await imp('vf-cockpit-who.mjs')).collectWho(d, { home, scriptsDir: noscripts, now: NOW, ...o });
 const V = (phase, ws, verbe) => ({ phase, ws, verbe });
 const sess = (w, id) => w.workers.find((x) => x.kind === 'session' && x.id === id);
+// la page Équipe (régie) hors navigateur : le who@2 collecté passe tel quel au rendu de la régie (vm-regie-page.mjs), on lit les textes des sélecteurs demandés
+const regie = (who, sels) => {
+  const f = path.join(work, 'sc-regie.json');
+  fs.writeFileSync(f, JSON.stringify({ onglet: 'equipe', source: 'live', who, lock: null, etapes: sels.map(([nom, sel]) => ({ nom, obs: { mode: 'textes', sel } })) }));
+  const r = JSON.parse(execFileSync('node', [path.join(tests, 'vm-regie-page.mjs'), path.join(scripts, '..', 'skills', 'cockpit-moteur', 'assets', 'ui'), f], { encoding: 'utf8' }));
+  return r.erreur ? { erreur: r.erreur } : r.out;
+};
+const lancement = (out) => ((out.l2 || []).map((t) => (/Lancée.*$/.exec(t.replace(/\s/g, ' ')) || [''])[0]).filter(Boolean)).join('|') || 'aucune ligne';
 const norm = (w, d) => JSON.stringify({ ...w, at: '' }).split(d).join('<LAB>').split(work).join('<W>');
 const SC = {
   sain: async () => {
@@ -480,6 +398,14 @@ const SC = {
     const sa = w.workers.filter((x) => x.kind === 'subagent');
     return `sub:${sa.length === 1 && sa.every((x) => !('lancee' in x))}|absent:${!w.workers.some((x) => x.id === 'absent-id')}|s1:${!('lancee' in sess(w, U(1)))}|temoin:${!!sess(w, U(2)).lancee}`;
   },
+  'regie-valide': async () => { const d = lab('rv', { sessions: [{ id: U(1), ageS: 60 }] }); return lancement(regie(await collect(d, { lancees: new Map([[U(1), V('72', 'alpha', 'planifier')]]) }), [['l2', '.vf-rg-l2']])); },
+  'regie-sans-ws': async () => { const d = lab('rv', { sessions: [{ id: U(1), ageS: 60 }] }); return lancement(regie(await collect(d, { lancees: new Map([[U(1), V('72', null, 'planifier')]]) }), [['l2', '.vf-rg-l2']])); },
+  'regie-sans-lancee': async () => { const d = lab('rv', { sessions: [{ id: U(1), ageS: 60 }] }); return lancement(regie(await collect(d), [['l2', '.vf-rg-l2']])); },
+  noms: async () => {
+    const P = '<img src=x onerror=1>', d = lab('nm', { sessions: [{ id: U(1), ageS: 60, extra: { name: P, nom: P, title: P, customTitle: P } }] });
+    const w = await collect(d), s = sess(w, U(1)), r = regie(w, [['nom', '.vf-rg-nom']]);
+    return `absent:${/onerror|<img/.test(JSON.stringify(w)) ? 'non' : 'oui'}|titre:${'titre' in s ? 'present' : 'absent'}|ligne:${r.erreur ? 'ERR ' + r.erreur : (r.nom || []).join(',')}`;
+  },
   live: async () => {
     const d = lab('lv', { sessions: [{ id: U(1), ageS: 60 }] }); const sortie = path.join(d, '.vibeflow', 'cockpit'); fs.mkdirSync(sortie, { recursive: true });
     // l'âge de la fixture est figé à NOW : on le recale sur l'horloge réelle pour que la session soit lue
@@ -495,17 +421,34 @@ console.log(await SC[sc]());
 process.exit(0);
 JS
 mkdir -p "$WORK/fakebin"; printf '#!/bin/sh\nexit 1\n' > "$WORK/fakebin/claude"; chmod +x "$WORK/fakebin/claude" # faux claude : aucun vrai appel de la collecte (LR.6)
-LRH() { local sc="$1"; HOME="$WORK/lr-$sc/home" PATH="$WORK/fakebin:$PATH" node "$AUX/lr.mjs" "$SCRIPTS" "$sc" "$WORK/lr-$sc" 2>&1; } # HOME jetable : le fil de collecte lit les sessions de la fixture, jamais celles du poste
+TESTS_DIR="$(cd "$(dirname "$0")" && pwd)"
+LRH() { local sc="$1"; HOME="$WORK/lr-$sc/home" PATH="$WORK/fakebin:$PATH" node "$AUX/lr.mjs" "$SCRIPTS" "$sc" "$WORK/lr-$sc" "$TESTS_DIR" 2>&1; } # HOME jetable : le fil de collecte lit les sessions de la fixture, jamais celles du poste
 # valeur saine de LR.1 : capturée sur le code d'AVANT 73-03 (commit de base et commande dans 73-03-RED-TRACE.md), figée ici ; sept labs, un sha256 chacun
 SAIN_LR1="b4b3cd3802ee2be2b817b81c87f1d7f863ce263a76f5fe003fdc9a409c683545,b7f9cff75d7e6ed44e866b3dcc88a3e1fef3389ff9450d7f2f84269ec04b57a6,0c427f45db0037900967dd5d8a965da74556e2ade8f45ef0d180d8e0976e099c,fdb2203e921beead8f3cef7a8683bfc3f7042606f180662d920b1d8b64e3834d,213202c267bb388346f711fec10ef1164d9668f999a9526ed2690a788fbf51c6,5618478371c026523073379b88611170819b21bc745f38764735ef97814f4adc,3fe8cdb6715034a6ff1957ea19bd206cc12b19e376fdf9eff0c41c7f3030146f" # capture : code de base c4053a32, voir 73-03-RED-TRACE.md
 SAIN_LR2='{"phase":"72","ws":"alpha","verbe":"planifier"}'
 SAIN_LR4="exc:0|aucune:true|temoin:ok"
 SAIN_LR5="sub:true|absent:true|s1:true|temoin:true"
+# LR.0b : la valeur saine de LR.1 n'est pas tautologique : sept empreintes sha256 distinctes, écrites en littéral (jamais calculées par cette suite), celles du commit de capture
+assert_eq "LR.0b — SAIN_LR1 : sept empreintes sha256 hexadécimales de 64 caractères" "$(printf '%s' "$SAIN_LR1" | tr ',' '\n' | grep -Ec '^[0-9a-f]{64}$')" "7"
+assert_eq "LR.0b — SAIN_LR1 : les sept empreintes sont distinctes (un lab de chaque forme, pas sept fois la même sortie)" "$(printf '%s' "$SAIN_LR1" | tr ',' '\n' | sort -u | awk 'END{print NR}')" "7"
+assert_eq "LR.0b — SAIN_LR1 est un littéral de cette suite (la ligne de la constante n'appelle aucun calcul)" "$(grep -Ec '^SAIN_LR1="[0-9a-f]{64}(,[0-9a-f]{64}){6}" # capture' "$0")" "1"
+# mutant de who.mjs : copie de tous les modules dans $WORK/mut-<nom>/, sed sur le fichier ; rend 1 (sans effet : cible absente ou inchangée) ou 0
+mut_who_prepare() { # mut_who_prepare <nom> <expression-sed>
+  local d="$WORK/mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$d/"
+  cp "$d/vf-cockpit-who.mjs" "$d/who.orig"; sed -i.bak "$2" "$d/vf-cockpit-who.mjs"
+  local r=0; cmp -s "$d/vf-cockpit-who.mjs" "$d/who.orig" && r=1; rm -f "$d/who.orig" "$d/vf-cockpit-who.mjs.bak"; return $r
+}
+assert_eq "LR.0c — un mutant dont la cible est absente est détecté « sans effet » (code 1)" "$(mut_who_prepare lr0c-absent 's#CIBLE-QUI-N-EXISTE-PAS-ZZ#x#'; echo $?)" "1"
+assert_eq "LR.0c — témoin positif : un mutant dont la cible existe a un effet (code 0)" "$(mut_who_prepare lr0c-present '/garde:lancee-valide/s#entreeLanceeValide(e)#entreeLanceeValide(e) \&\& true#'; echo $?)" "0"
 assert_eq "LR.1 — sept labs sans verrou, sans fin de tour, sans VERIFICATION, sans scripts du conductor : collectWho sans l'option lancees rend, au champ at près, la sortie d'avant (sha256 par lab)" "$(LRH sain)" "$SAIN_LR1"
 assert_eq "LR.2 — une entrée valide pour la session : lancee { phase, ws, verbe } sur la session" "$(LRH valide)" "$SAIN_LR2"
+assert_eq "LR.2b — la ligne de la régie dit « Lancée depuis la carte : Phase 72 · alpha · planifier » (texte lu sur le rendu de la régie, donnée de LR.2)" "$(LRH regie-valide)" "Lancée depuis la carte : Phase 72 · alpha · planifier"
 assert_eq "LR.3 — sans compartiment : ws absent ou vide dans lancee" "$(LRH sans-ws)" "ok"
+assert_eq "LR.3b — sans compartiment, la ligne de la régie dit « Lancée depuis la carte : Phase 72 · planifier »" "$(LRH regie-sans-ws)" "Lancée depuis la carte : Phase 72 · planifier"
+assert_eq "LR.3c — sans lancement, la ligne de la régie n'en porte aucune (le témoin positif de LR.2b rend sa ligne sur la même fixture)" "$(LRH regie-sans-lancee)" "aucune ligne"
 assert_eq "LR.4 — valeurs hostiles (phase « 72; x », verbe inconnu, objets à toString piégé) : aucun champ lancee, aucune exception ; la même Map pose lancee sur la session valide" "$(LRH hostile)" "$SAIN_LR4"
 assert_eq "LR.5 — la clé d'un sous-agent et une clé absente de who : rien ; la session valide de la même Map reçoit lancee" "$(LRH hors-session)" "$SAIN_LR5"
+assert_eq "LR.7 — name, nom, title, customTitle hostiles : absents de who@2 (aucun champ titre), libellé « Session principale » sur la ligne de la régie" "$(LRH noms)" "absent:oui|titre:absent|ligne:Session principale"
 assert_eq "LR.6 — startLive reçoit lancees : snapshot().who porte lancee sur la session" "$(LRH live)" "$SAIN_LR2"
 
 echo "== Mutants =="
@@ -517,22 +460,18 @@ mut_ls M-ATTENTE-ILLIMITEE '/garde:attente-max/d' ls35 "$SAIN_LS35" LS3.5
 mut_ls M-TTL-IGNORE '/garde:ttl/d' ls36 "$SAIN_LS36" LS3.6
 mut_ls M-RATTACHE-PAR-NOM "/garde:session-id/s#w\\.id === e\\.session#(w.id === e.session || w.task === 'vf-phase-' + String(e.phase).replace('.', '-') + '-' + e.ws)#" ls34 "$SAIN_LS34" LS3.4
 mut_ls M-TERMINEE-PERDUE "/garde:termine/s#w.etat === 'termine'#false#" ls33 "$SAIN_LS33" LS3.3
-mut_le M-LANCEES-HORS-SESSION "/garde:lancees/s# && w\\.kind === 'session'##" hors-session "$SAIN_LE5" LE.5
-mut_le M-LIGNE-SANS-VALIDATION '/garde:ligne-valide/s#l && entreeLanceeValide(l)#l#' hostile "$SAIN_LE4" LE.4
-mut_le M-LIGNE-VIDE-TOUJOURS "/garde:ligne-insert/s#.*#      lignes.push(t || ''); // garde:ligne-insert#" identique "$SAIN_LE1" LE.1
 
 # mutants de la ligne de lancement portée par who@2 (P73-D-21) : copie de tous les modules du module dans $WORK/mut-<nom>/, sed sur la ligne marquée ; sonde = scénario LR rejoué sur la copie
 mut_lr() { # mut_lr <nom> <expression-sed> <scénario> <valeur saine> <sonde>
-  local d="$WORK/mut-$1" got v=vert; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$d/"
-  cp "$d/vf-cockpit-who.mjs" "$d/who.orig"; sed -i.bak "$2" "$d/vf-cockpit-who.mjs"
-  if cmp -s "$d/vf-cockpit-who.mjs" "$d/who.orig"; then sans_effet "$1"; return 0; fi
-  rm -f "$d/who.orig" "$d/vf-cockpit-who.mjs.bak"
-  got="$(HOME="$WORK/lrm-$1/home" node "$AUX/lr.mjs" "$d" "$3" "$WORK/lrm-$1" 2>&1 | tail -1)"
+  local d="$WORK/mut-$1" got v=vert
+  if ! mut_who_prepare "$1" "$2"; then sans_effet "$1"; return 0; fi
+  got="$(HOME="$WORK/lrm-$1/home" node "$AUX/lr.mjs" "$d" "$3" "$WORK/lrm-$1" "$TESTS_DIR" 2>&1 | tail -1)"
   if [ -n "$got" ] && [ "$got" != "$4" ]; then v=rouge; fi
   assert_eq "$1 — le mutant rougit $5 : le relevé [${got:0:60}] n'est plus la valeur saine (témoin : le scénario s'exécute)" "$v" "rouge"
 }
 mut_lr M-LANCEE-HORS-SESSION "/garde:lancee-session/s#w\.kind === 'session' ? lancees\.get(w\.id) : undefined#lancees.get(w.id)#" hors-session "$SAIN_LR5" LR.5
 mut_lr M-LANCEE-SANS-VALIDATION '/garde:lancee-valide/s#e \&\& entreeLanceeValide(e)#e#' hostile "$SAIN_LR4" LR.4
+mut_lr M-LANCEE-VIDE-TOUJOURS 's#if (!(lancees instanceof Map)) return;#for (const w of workers) w.lancee = null; if (!(lancees instanceof Map)) return;#' sain "$SAIN_LR1" LR.1
 
 vf_hyg_assert
 

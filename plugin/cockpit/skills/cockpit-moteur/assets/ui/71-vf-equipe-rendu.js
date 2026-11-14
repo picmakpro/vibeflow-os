@@ -137,12 +137,13 @@
       if (p === null) racines.push(w); else enfants.set(p, [...(enfants.get(p) || []), w]);
     }
     const vivants = racines.filter((w) => aVivant(w, enfants));
-    // les terminés qui ne portent aucun agent en cours : un seul bloc, les plus récents d'abord, les 5 premiers ; le reste est dans l'onglet Équipe
+    // les terminés qui ne portent aucun agent en cours
     const hors = tous.filter((w) => w.etat === 'termine' && !aVivant(w, enfants)).sort((a, b) => (a.ageS || 0) - (b.ageS || 0));
-    const montres = hors.slice(0, 5), autres = hors.length - montres.length;
+    // P73-D-14 : les terminés ne sont plus listés ici, un lien dit combien restent à relire dans Équipe (sous-agents, hors ceux que ce navigateur a déjà lus)
+    const lus = window.__vfRegieLu && typeof window.__vfRegieLu.lus === 'function' ? window.__vfRegieLu.lus() : null;
+    const relire = hors.filter((w) => w.kind === 'subagent' && !(lus && lus.has(w.id))).length;
     return (vivants.length ? `<ul class="r-tree">${vivants.map((r) => ligne(r, null, enfants, enfants, h)).join('')}</ul>` : '')
-      + (hors.length ? `<details class="vf-termines"><summary class="aw-sec"><span>Terminés depuis moins de 24 h (${hors.length})</span>${glyphe('repli', 'r-caret')}</summary><ul class="r-tree r-tl">${montres.map((w) => ligne(w, null, enfants, enfants, h)).join('')}</ul>`
-        + (autres > 0 ? `<a class="r-more" href="equipe.html">${autres > 1 ? `Les ${autres} autres` : 'Un autre'} dans l'onglet Équipe</a>` : '') + '</details>' : '');
+      + (relire ? `<a class="r-more" href="equipe.html#vf-a-relire">${relire} à relire dans Équipe</a>` : '');
   };
 
   const agentsDuNoeud = (workers, ref, h) => {

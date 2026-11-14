@@ -136,6 +136,16 @@ if (mode === 'l3' || mode === 'l4' || mode === 'q') {
   lancer.sourceWho(() => ({ workers: [{ kind: 'session', id: uuid, etat: 'actif' }] })); r.push(await etat());
   lancer.sourceWho(() => ({ workers: [{ kind: 'session', id: uuid, etat: 'termine' }] })); r.push(await etat()); sortir(r.join(','));
 }
+if (mode === 'l3b') { // 73-08 (P73-D-21) : la ligne de lancement se pose sur le `who` du DIRECT : startLive reçoit la Map du lanceur (même expression que le serveur) et la session du tour porte `lancee`
+  const Lv = await imp('vf-cockpit-live.mjs'); const f = faux(); C.definir(f.canal); const lancer = lanceur(); await lire(lancer);
+  const uuid = crypto.randomUUID(); f.pousser({ t: 'lancee', cible: 'ph-1', verbe: 'executer', session: uuid, at: 1 });
+  let rappel = null;
+  const collecteur = () => ({ surResultat: (fn) => { rappel = fn; return () => {}; }, pret: async () => true, etat: () => ({ etat: 'ok' }), arreter() {}, redemarrer() {},
+    demander: ({ tour } = {}) => { if (tour) setImmediate(() => rappel && rappel({ type: 'tour', verrous: { etat: 'absente', plat: false, liste: [] }, equipe: { workers: [{ kind: 'session', id: uuid, etat: 'actif', tree: '.' }, { kind: 'subagent', id: 'a1b2c3d4e5f6', etat: 'actif', parent: uuid, tree: '.' }], sources: {} }, signal: null })); } });
+  const live = Lv.startLive({ root: lab, sortie, log: () => {}, mode: 'poll', garde: () => true, collecteur, lancees: () => lancer.lancees() });
+  await new Promise((r) => setTimeout(r, 400)); const ws = live.snapshot().who.workers; live.stop();
+  sortir({ session: ws[0] && ws[0].lancee || null, agent: ws[1] && ws[1].lancee || null });
+}
 if (mode === 'e2') { // preparerTerminal sous win32 : registre « indisponible », aucune balise du lanceur
   const T = await imp('vf-cockpit-terminal.mjs'); const t = T.preparerTerminal({ here: sortie, root: lab, jetons: () => [], plateforme: 'win32' });
   const j = await lire(lanceur()), marque = U.injectionLancer({ indisponible: false });
@@ -348,7 +358,8 @@ for _ in $(seq 1 30); do grep -q '"envoye"' "$STUB_LOG" && break; sleep 0.1; don
 assert_eq "L2 — cinq messages lancee mal formés (UUID, clé en trop, verbe, at absent, cible hors liste) envoyés : la carte reste false" "$(grep -c '"envoye"' "$STUB_LOG") $(lancee_de)" "1 false"
 unsrv
 assert_eq "L3 — message valide poussé à l'abonné : lancees() est une Map portant la session avec { phase, ws, verbe }" "$(node "$AUX/harnais.mjs" l3 "$STUBO" "$LAB")" '{"estMap":true,"taille":1,"entree":{"phase":"1","ws":null,"verbe":"executer"}}'
-assert_has "L3 — vf-cockpit-server.mjs de la sortie passe lancees: lancer.lancees() à pageEquipe" "$(cat "$(mod_de "$STUBO")/scripts/vf-cockpit-server.mjs")" "lancees: lancer.lancees()"
+assert_has "L3 — vf-cockpit-server.mjs de la sortie passe lancees: () => lancer.lancees() au direct (startLive), plus à la page Équipe (P73-D-21)" "$(cat "$(mod_de "$STUBO")/scripts/vf-cockpit-server.mjs")" "lancees: () => lancer.lancees() })"
+assert_eq "L3b — après le message valide poussé à l'abonné, le who du direct porte lancee { phase, verbe } sur la session lancée, jamais sur un sous-agent" "$(node "$AUX/harnais.mjs" l3b "$STUBO" "$LAB")" '{"session":{"phase":"1","verbe":"executer"},"agent":null}'
 assert_eq "L4 — les trois états du suivi atteignent la carte : attendue, vue, terminee" "$(node "$AUX/harnais.mjs" l4 "$STUBO" "$LAB")" "attendue,vue,terminee"
 
 echo "=== E — états inertes et bloquants ==="

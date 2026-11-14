@@ -29,9 +29,14 @@
       whoAt: () => (E ? null : L().whoAt),
       perdu: () => (E ? !!E.lire('connexion') && E.lire('connexion') !== 'ouvert' : L().connected === false && !!L().who),
       ecouter: (f) => {
-        if (E) return ['who', 'lock', 'connexion'].map((k) => E.abonner(k, () => f(k)));
+        if (E) return ['who', 'lock', 'connexion', 'graphe'].map((k) => E.abonner(k, () => f(k)));
         D.addEventListener('vf-who', f); return [() => D.removeEventListener('vf-who', f)];
       },
+      // les missions en cours : meta.vf.missions de l'enveloppe de l'onglet (le graphe posé par la coquille),
+      // relue par la route quand VF_ETAT annonce que l'enveloppe a changé
+      missions: (g) => { const v = g && g.meta && g.meta.vf; return Array.isArray(v && v.missions) ? v.missions.filter((m) => typeof m === 'string') : []; },
+      graphe: () => (E ? E.lireJson('/api/vf/graphe?onglet=equipe') : Promise.resolve(null)),
+      graphePose: () => (E && E.lire('graphe') && E.lire('graphe').onglet) || null,
       transcript: (id) => {
         const chemin = '/api/vf/transcript?id=' + encodeURIComponent(id);
         if (E) return E.lireJson(chemin);
@@ -53,6 +58,8 @@
     });
     const P = D.getElementById('panel'), O = W.VF_SURCOUCHES;
     if (O && P) O.ouvrir(P, { modale: false, ouvreur, fermer: () => { SC.closePanel(); O.fermer(P); } });
+    // 73-08 (UIFN-12) : le bouton quitte la ligne une fois le rapport lu ; le focus passe au titre du lecteur, jamais à body
+    const T = P && P.querySelector('.pt'); if (T) { T.tabIndex = -1; T.focus({ preventScroll: true }); }
     emettre('vf-agent:lu', { id }, false);
   }
 
@@ -62,6 +69,7 @@
     racine.id = 'vf-equipe'; racine.setAttribute('role', 'main'); racine.setAttribute('aria-busy', 'true');
     D.body.append(racine); D.body.classList.add('vf-regie-montee');
     const ui = R.monter(racine), nettoyerPied = P.monter(racine), retraits = [], minuteries = [];
+    let missions = A.missions((W.Floorplan && W.Floorplan.graph) || W.VF_COCKPIT);
     let vivant = true, recu = Date.now(), coupeT0 = null, fige = null, tCoupe = null, lectureT0 = Date.now(), choisie = 'regie', luHash = null, tm = null;
     const sess = (k) => { try { return W.sessionStorage.getItem(k); } catch { return null; } };
     const ecouter = (cible, type, f) => { cible.addEventListener(type, f); retraits.push(() => cible.removeEventListener(type, f)); };
@@ -75,7 +83,7 @@
       if (perdu && fige === null && tCoupe === null) tCoupe = setTimeout(() => { tCoupe = null; rendre(); }, DELAI_COUPE - (now - coupeT0));
       const recuA = A.whoAt() || recu, lus = W.__vfRegieLu && typeof W.__vfRegieLu.lus === 'function' ? W.__vfRegieLu.lus() : null;
       if (!who && !sansDirect) { P.maj({ lecture: true, muet: now - lectureT0 < 150 }); return; }
-      const m = M.modele(who || { workers: [] }, A.lock(), { now: fige !== null ? fige : now, recuA, lus, missions: [] });
+      const m = M.modele(who || { workers: [] }, A.lock(), { now: fige !== null ? fige : now, recuA, lus, missions, nonCommite: P.nonCommite() });
       ui.rendre(m, { sections: !sansDirect });
       if (recherche) ui.filtrer(recherche.value);
       P.maj({ direct: !sansDirect, aucun: !!m.etatPage, sources: who && who.sources, coupe: fige !== null ? (fige - recuA) / 1000 : null });
@@ -154,7 +162,16 @@
     ecouter(D, 'vf-regie:aller', (e) => aller(e.detail && e.detail.section));
     ecouter(D, 'vf-regie:redessiner', () => rendre());
     ecouter(D, 'vf:onglet', (e) => { if (e.detail && e.detail.onglet === 'equipe' && String(W.location.hash || '') !== luHash) fragment(); });
-    for (const d of A.ecouter((cle) => { if (cle === 'who') recu = Date.now(); rendre(); })) retraits.push(d);
+    const relireMissions = () => { // l'enveloppe d'Équipe a changé : on relit ses missions, le dessin suit ; une lecture refusée garde les missions connues
+      if (A.graphePose() !== 'equipe') return;
+      A.graphe().then((j) => { if (!vivant || !j) return; missions = A.missions(j); rendre(); }, () => {});
+    };
+    const surEtat = (cle) => {
+      if (cle === 'graphe') { relireMissions(); return; }
+      if (cle === 'who') { recu = Date.now(); P.surWho(); }
+      rendre();
+    };
+    for (const d of A.ecouter(surEtat)) retraits.push(d);
     minuteries.push(setInterval(rendre, 30000));
 
     monte = { declaree: () => declaree(), ancre };

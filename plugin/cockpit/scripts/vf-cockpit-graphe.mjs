@@ -1,7 +1,7 @@
 // vf-cockpit-graphe — les graphes des trois onglets, leur signature et leur validateur d'étiquette (79-15, SOCL-19 ; C5, A5, R1 à R6).
 // Exports : ONGLETS (gelé), ongletValide(v), VOLATILS, signatureGraphe(g) (16 hexadécimaux, hors champs volatils), etagDe(sig), correspond(enTete, etag),
-// avecMetaDeBase(g, base), projectionGarde(g), creerGraphes({ forcerGabarit, nomDe, code, gardeWho }) -> { recharger(html), maj({ projet, who,
-// lancees }), courant(onglet), dues(), emises(onglet, sig) }.
+// avecMetaDeBase(g, base), projectionGarde(g),
+// creerGraphes({ forcerGabarit, nomDe, code, gardeWho }) -> { recharger(html), maj({ projet, who }), courant(onglet), dues(), emises(onglet, sig) }.
 // `courant(onglet)` rend `{ g, sig, brut(), page() }` (JSON brut et JSON échappé pour une page, mémoïsés), `{ interdit: true }` (Équipe fermée par la
 // garde) ou null.
 // Deux signatures par onglet : la COURANTE (avancée par `maj`, idempotente) et l'ÉMISE (ce que le flux a annoncé) ; `dues()` rend les onglets où
@@ -55,7 +55,7 @@ const fabrique = (g, sig, brut) => {
 export function creerGraphes({ forcerGabarit = false, nomDe = () => 'Projet', code = () => null, gardeWho = () => true } = {}) {
   let base = null, gabarit = null; // méta de base et graphe de l'assemblage (gabarit de page)
   const courants = { code: null, projet: null, equipe: null }, emise = {};
-  let mP = { src: undefined, gab: undefined, val: null }, mE = { who: undefined, p: undefined, cles: '', val: null }, mC = { src: undefined, val: null };
+  let mP = { src: undefined, gab: undefined, val: null }, mE = { who: undefined, p: undefined, val: null, fait: null }, mC = { src: undefined, val: null };
   const suivre = (o) => { // au démarrage les émises valent les courantes
     const c = courants[o];
     if (c && c.sig && emise[o] === undefined) emise[o] = c.sig;
@@ -67,7 +67,7 @@ export function creerGraphes({ forcerGabarit = false, nomDe = () => 'Projet', co
     base = { root: m.root, vfLogos: m.vfLogos, vfGit: m.vfGit };
   }
 
-  function maj({ projet = null, who = null, lancees = [] } = {}) {
+  function maj({ projet = null, who = null } = {}) {
     const src = forcerGabarit ? null : projet; // le réglage d'essai garde au serveur la source du gabarit
     if (mP.src !== src || mP.gab !== gabarit) { // garde:graphe-page
       const g = src ? avecMetaDeBase(src, base) : gabarit;
@@ -75,15 +75,20 @@ export function creerGraphes({ forcerGabarit = false, nomDe = () => 'Projet', co
     }
     courants.projet = mP.val;
     const p = mP.val && mP.val.g;
-    let cles = '[]'; try { cles = JSON.stringify([...lancees]); } catch { cles = '[]'; }
-    if (mE.who !== who || mE.p !== p || mE.cles !== cles) {
+    // 73-08 (P73-D-03, P73-D-21) : l'enveloppe d'Équipe est une coquille sans cartes ; elle ne dépend plus ni de `who` ni des lancements
+    // (la ligne de lancement vit sur le `who` du direct) :
+    // construite une fois par génération de la source du gabarit, sa signature (donc l'ETag de la route) ne bouge plus à chaque poussée.
+    // La garde d'émission, elle, suit chaque `who`.
+    if (mE.who !== who || mE.p !== p) {
       let val = { interdit: true };
-      if (gardeWho(who)) {
-        const g = buildEquipeGraph(who, { nom: nomDe(p), racine: p?.meta?.root, logos: p?.meta?.vfLogos, git: p?.meta?.vfGit,
-          missions: missionsEnCours(p), lancees });
-        val = fabrique(g, signatureGraphe(g));
+      if (gardeWho(who)) { // garde:graphe-equipe
+        if (!mE.fait || mE.fait.p !== p) {
+          const g = buildEquipeGraph(who, { nom: nomDe(p), racine: p?.meta?.root, logos: p?.meta?.vfLogos, git: p?.meta?.vfGit, missions: missionsEnCours(p) });
+          mE = { ...mE, fait: { p, val: fabrique(g, signatureGraphe(g)) } };
+        }
+        val = mE.fait.val;
       }
-      mE = { who, p, cles, val };
+      mE = { ...mE, who, p, val };
     }
     courants.equipe = mE.val;
     const c = code();

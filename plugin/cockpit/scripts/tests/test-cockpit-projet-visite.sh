@@ -186,7 +186,9 @@ UEQ="$(HOME="$HEQ" adr4 "$LEQ")"; SRVPIDS+=("$(pid4 "$LEQ")"); PEQ="${UEQ%index.
 XEQ="$(node "$SCRIPTS/tests/chrome-visite-etapes.mjs" "$CHROME" "$PEQ" 768 equipe)"
 [ -n "${DBG:-}" ] && echo "RAWEQ: $XEQ"
 xeq() { printf '%s' "$XEQ" | node "$AUX/get.mjs" /dev/stdin "$1"; }
-assert_eq "O6.14a — témoin : la mesure a eu lieu sans erreur, l'onglet Équipe a au moins deux cartes (une session et un sous-agent)" "$(xeq "j.erreur||''")|$(xeq 'j.e768.cartes>=2')" "|true"
+# 73-09 : l'onglet Équipe n'a plus de cartes de canevas (plan 73-08) : le témoin compte les lignes de la régie (une session et un sous-agent), attendues jusqu'à 10 s
+XRG="$(node "$SCRIPTS/tests/chrome-cdp.mjs" "$CHROME" 300 "(async () => { const n = () => document.querySelectorAll('section#vf-equipe li.vf-rg-lig').length; for (let i = 0; i < 100 && n() < 2; i++) await new Promise((r) => setTimeout(r, 100)); return n(); })()" "$PEQ")"
+assert_eq "O6.14a — témoin : la mesure a eu lieu sans erreur, l'onglet Équipe a au moins deux lignes de régie (une session et un sous-agent)" "$(xeq "j.erreur||''")|$(printf '%s' "$XRG" | node "$AUX/get.mjs" /dev/stdin 'j.resultats[0].valeur>=2')" "|true"
 assert_eq "O6.14 — Équipe / 768 px : le démarrage d'office (start() sans argument) n'ouvre pas la visite" "$(xeq 'j.e768.auto')" "false"
 assert_eq "O6.14b — Équipe : le bouton « Par où commencer » n'ouvre plus de visite (Samuel, AskUserQuestion session principale Claude Code, 2026-11-04 : « Tout selon les recos (Recommandé) », P70-D-23, Q13a), il est désactivé (aria-disabled) avec une infobulle qui le dit" "$(xeq 'j.e768.manuel')|$(xeq 'j.e768.bouton.aria')|$(xeq '/Équipe/.test(j.e768.bouton.titre)')" "false|true|true"
 # O6.15 (CI Linux de 03bada92 : R15.4b « Échap ferme le tiroir » rouge sous Linux, où la visite d'office s'ouvre pendant la mesure) : quand la visite est ouverte, elle est la couche du dessus et capte la première Échap ; le tiroir de détail
