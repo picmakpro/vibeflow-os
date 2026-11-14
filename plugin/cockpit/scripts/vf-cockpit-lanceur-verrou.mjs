@@ -36,6 +36,7 @@ export function noter(sortie, msg) {
 const VERROU_MAX_MS = 120000;
 export async function prendreVerrou(lab, sortie, { vivant, attendre }) {
   const f = path.join(sortie, '.cache', 'lanceur.lock'); // sous le dossier ignoré de la sortie
+  confiner(lab, f); // d'abord : aucun dossier n'est créé hors du lab (une sortie liée vers l'extérieur est refusée avant tout mkdir)
   fs.mkdirSync(path.dirname(f), { recursive: true }); confiner(lab, f);
   const fin = Date.now() + VERROU_MAX_MS;
   for (;;) {
