@@ -186,7 +186,7 @@
   });
   const showLock = (l, off) => {
     if (l !== undefined) probe.lock = l;
-    if (!badge) badge = SC.addHeaderButton({ id: 'vf-lock', label: '…', title: 'Qui est au travail', onClick: () => (window.__vfRegie?.monte?.() ? document.dispatchEvent(new CustomEvent('vf-regie:aller', { detail: { section: 'au-travail' } })) : whoPanel()) });
+    if (!badge) badge = SC.addHeaderButton({ id: 'vf-lock', label: '…', title: 'Qui est au travail', onClick: () => (window.__vfRegie?.monte?.() && !window.__vfTiroirRestaure ? document.dispatchEvent(new CustomEvent('vf-regie:aller', { detail: { section: 'au-travail' } })) : whoPanel()) });
     const t = off ? { cls: 'off', text: 'Direct coupé', title: 'Le serveur du cockpit ne répond pas' } : lockText(probe.lock);
     const n = (who?.workers || []).filter(auTravail).length;
     badge.className = 'btn ' + (off ? 'off' : n ? 'held' : t.cls); badge.title = off ? t.title : `${n ? n + ' au travail' : 'Personne au travail'} · ${t.title}`;

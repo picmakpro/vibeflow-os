@@ -1,5 +1,5 @@
 // VibeFlow (73-05) : la régie de l'onglet Équipe : adaptateur de source unique (VF_ETAT, sinon vf-who et __vfLive), montage par onglet (VF_COQUILLE.surOnglet),
-// registre des vues de la Phase 74, événements annulables vf-agent:*, ancres, recherche, Échap, lecteur de repli. Le rendu est dans 72-vf-regie-rendu.js.
+// registre des vues de la Phase 74, événements annulables vf-agent:*, ancres, recherche, Échap. Le rendu est dans 72-vf-regie-rendu.js.
 // Rien ne se dessine au chargement du script avec la coquille : le montage a lieu au rappel de surOnglet,
 // son nettoyage retire tout (écouteurs, abonnements, minuteries, DOM).
 (() => {
@@ -38,32 +38,9 @@
       missions: (g) => { const v = g && g.meta && g.meta.vf; return Array.isArray(v && v.missions) ? v.missions.filter((m) => typeof m === 'string') : []; },
       graphe: () => (E ? E.lireJson('/api/vf/graphe?onglet=equipe') : Promise.resolve(null)),
       graphePose: () => (E && E.lire('graphe') && E.lire('graphe').onglet) || null,
-      transcript: (id) => {
-        const chemin = '/api/vf/transcript?id=' + encodeURIComponent(id);
-        if (E) return E.lireJson(chemin);
-        return W.fetch(chemin, { headers: { 'x-floorplan-token': jeton() }, cache: 'no-store' }).then((r) => (r.ok ? r.json() : null));
-      },
     };
   };
   const emettre = (type, detail, annulable) => D.dispatchEvent(new CustomEvent(type, { detail, cancelable: annulable, bubbles: true }));
-
-  // ---------- le lecteur de repli (P73-D-33) : le transcript réduit, dans le panneau latéral ; la Phase 74 le retire d'un geste ----------
-  async function ouvrirRepli(A, id, ouvreur, nom) {
-    const SC = W.Floorplan; if (!SC || typeof SC.showPanel !== 'function') return;
-    let d = null; try { d = await A.transcript(id); } catch { d = null; }
-    if (!monte) return; // l'onglet a changé pendant la lecture
-    const lecteur = W.__vfEquipeRendu.transcript(d, D);
-    SC.showPanel('', (p) => {
-      const sec = D.createElement('div'), t = D.createElement('h2'); sec.className = 'sec'; t.className = 'pt'; t.textContent = nom;
-      sec.append(t, lecteur); p.replaceChildren(sec);
-    });
-    const P = D.getElementById('panel'), O = W.VF_SURCOUCHES;
-    if (P && P.classList) P.classList.add('vf-rg-lecteur'); // la feuille masque le contenu par défaut du moteur ; seul le lecteur la montre
-    if (O && P) O.ouvrir(P, { modale: false, ouvreur, fermer: () => { if (P.classList) P.classList.remove('vf-rg-lecteur'); SC.closePanel(); O.fermer(P); } });
-    // 73-08 (UIFN-12) : le bouton quitte la ligne une fois le rapport lu ; le focus passe au titre du lecteur, jamais à body
-    const T = P && P.querySelector('.pt'); if (T) { T.tabIndex = -1; T.focus({ preventScroll: true }); }
-    emettre('vf-agent:lu', { id }, false);
-  }
 
   function monter() {
     if (!D.body) return () => {};
@@ -113,7 +90,7 @@
     const ouvrir = (li, declencheur, bouton) => {
       const l = li && li._ln; if (!l) return;
       if (!emettre('vf-agent:ouvrir', { id: l.id, kind: l.kind, declencheur }, true)) return;
-      if (declencheur === 'rapport') { ouvrirRepli(A, l.id, bouton, l.nom); return; }
+      if (declencheur === 'rapport') return; // la fiche (74) annule et ouvre ; sans elle, un rapport ne fait rien
       ui.basculer(l.cle, declencheur === 'ancre' || !ui.deplie().includes(l.cle));
       if (declencheur === 'ancre') { li.scrollIntoView({ block: 'center' }); (li._t || li).focus(); }
     };
@@ -193,7 +170,8 @@
     monte = { declaree: () => declaree(), ancre };
     declaree(); rendre();
     // avec VF_ONGLETS le fragment se lit à vf:onglet, émis après pushState (l'adresse du rappel est encore celle de l'onglet précédent)
-    if (!W.VF_ONGLETS) fragment();
+    // au chargement de la page (aucun vf:onglet à venir) le fragment se lit ici ; lors d'une arrivée, vf:onglet le lit (luHash)
+    if (!W.VF_ONGLETS) fragment(); else minuteries.push(setTimeout(() => { if (luHash === null) fragment(); }, 0));
     if (!A.who()) { minuteries.push(setTimeout(rendre, 150)); }
     return () => {
       vivant = false; monte = null;

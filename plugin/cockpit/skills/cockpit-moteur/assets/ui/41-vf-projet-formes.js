@@ -33,6 +33,6 @@
   };
   const demarrer = () => (vivant ? undefined : init());
   const C = window.VF_COQUILLE;
-  if (C && typeof C.surOnglet === 'function') C.surOnglet(init); // P80-D-42 : la coquille, sinon `ready` (ou le premier rendu)
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(init, { cle: '41-vf-projet-formes.js' }); // la coquille (A51), sinon `ready`
   else if (SC.state.layout) demarrer(); else { SC.on('ready', demarrer); SC.on('render', demarrer); }
 })();

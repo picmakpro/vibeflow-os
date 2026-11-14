@@ -187,6 +187,16 @@ done
 assert_eq "CN3.3z — témoin : aucune section du pilote n'a échoué" "$(E 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
 
+echo "=== CN6 — idiome A51 : deux allers-retours Code / Projet, extensions réévaluées (80-a51) ==="
+. "$HERE_T/a51-commun.sh"
+build_serve "$LAB"
+a51_mesurer "$WORK/a51-cn.json" "http://127.0.0.1:$PORT/index.html" code projet "02-vf-reperes.js,02-vf-coin.js,02-vf-ligne-etat.js" \
+  ".vf-repere {,#vf-coin {,.vf-ls {" "#vf-coin,.vf-ls,.vf-repere"
+vf_hyg_stop "$SRV"
+assert_eq "CN6.1 — deux allers-retours Code / Projet : écouteurs, observateurs, feuilles et nœuds (coin, ligne d'état, repères) comme à la première arrivée" \
+  "$(a51_verdict "$WORK/a51-cn.json" retours)" "ok"
+assert_eq "CN6.2 — repères, coin et ligne d'état réévalués deux fois (même cle) : un seul branchement actif, une seule feuille, un seul coin" \
+  "$(a51_verdict "$WORK/a51-cn.json" rejeu)" "ok"
 echo "=== Mutants (copie du module, page rebâtie, serveur sur la copie) ==="
 mutant() { # mutant <nom> <fichier relatif au moteur> <ancien> <nouveau> <mode> <sections> -> RM ; une mutation impossible compte comme un échec
   local M L="$WORK/lab-$1"

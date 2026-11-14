@@ -108,7 +108,7 @@
 - [ ] Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up (inscrite 2026-11-03, jalon vibeflow-v2.0) — planifiée 2026-11-11 (8 plans)
 - [x] Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git (inscrite 2026-11-05, jalon vibeflow-v2.0) — complete 2026-11-06 : 11/11 plans, GITC-01..14 cochées, publiée en `v2.76.0`
 - [ ] Phase 79: Socle du cockpit — une collecte, un flux, une route d'état (inscrite 2026-11-11, jalon vibeflow-v2.0) — 13/22 plans faits (segment a fusionné 2026-11-13) ; restent 79-13 à 79-20, 79-22
-- [ ] Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation (inscrite 2026-11-11, jalon vibeflow-v2.0) — 8/21 plans faits (segment a fusionné 2026-11-13) ; restent 80-09 à 80-21 (FORM-01..18)
+- [ ] Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation (inscrite 2026-11-11, jalon vibeflow-v2.0) — 21/21 plans faits (2026-11-14, branche feat/phase-80-trois-formes) ; FORM-17 attend la CI Linux
 - [ ] Phase 81: Agir sur une session depuis le cockpit (inscrite 2026-11-11, jalon vibeflow-v2.0, reportée : `AUDC-Q3` tranchée « plus tard » le 2026-11-11)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
@@ -138,9 +138,9 @@
 | 71.5. Réexamen du design system du cockpit | vibeflow-v2.0 | mission design, sans plan GSD | Complete — PR #213, release `v2.76.0` | 2026-11-06 |
 | 72. Lancer du travail depuis les cartes du cockpit | vibeflow-v2.0 | 16/16 | Complete — PR #214, LANC-12 décochée, release `v2.76.0` | 2026-11-06 |
 | 73. Gouvernance au cockpit — arbitrages en attente, worktrees et verrous | vibeflow-v2.0 | 11/11 | In progress | - |
-| 74. L'équipe dans le temps — swim-lanes, coût, replay | vibeflow-v2.0 | 0/10 | Planned | - |
+| 74. L'équipe dans le temps — swim-lanes, coût, replay | vibeflow-v2.0 | 6/10 | In Progress | - |
 | 75. L'activité posée sur le code — hotspots, couplage, gardes, empreinte | vibeflow-v2.0 | 6/12 | In Progress | - |
-| 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 5/9 | In Progress | - |
+| 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 7/9 | In Progress | - |
 | 77. Santé de la méthode et synthèse — jauges, dernière visite, burn-up | vibeflow-v2.0 | 0/8 | Planned | - |
 | 78. Git dans le cockpit | vibeflow-v2.0 | 11/11 | Complete — PR #216, release `v2.76.0` | 2026-11-06 |
 | 79. Socle du cockpit — une collecte, un flux, une route d'état | vibeflow-v2.0 | 13/22 | In progress — segment a fusionné (PR #238) | - |
@@ -334,13 +334,13 @@ qui les portent (aucun horodatage de transition dans les DAG).
 
 Plans:
 
-- [ ] 74-01-PLAN.md — Modèle pur de la frise, de la relecture et du coût (vague 1)
-- [ ] 74-02-PLAN.md — Fil réduit : échec d'outil apparié (vague 1, après 79-13)
-- [ ] 74-03-PLAN.md — Fil de la fiche, markdown fermé et fusion des événements (vague 2)
-- [ ] 74-04-PLAN.md — Frise : vue de la régie, voies, segments, axe, direct (vague 3)
-- [ ] 74-05-PLAN.md — Fiche d'agent plein cadre, ouverture depuis la régie, Échap (vague 3)
+- [x] 74-01-PLAN.md — Modèle pur de la frise, de la relecture et du coût (vague 1)
+- [x] 74-02-PLAN.md — Fil réduit : échec d'outil apparié (vague 1, après 79-13)
+- [x] 74-03-PLAN.md — Fil de la fiche, markdown fermé et fusion des événements (vague 2)
+- [x] 74-04-PLAN.md — Frise : vue de la régie, voies, segments, axe, direct (vague 3)
+- [x] 74-05-PLAN.md — Fiche d'agent plein cadre, ouverture depuis la régie, Échap (vague 3)
 - [ ] 74-06-PLAN.md — Curseur, encart « À cet instant », « Voir sur la carte » (vague 4)
-- [ ] 74-07-PLAN.md — Bandeau Dépôt, commit dans le tiroir Git, coût (vague 4)
+- [x] 74-07-PLAN.md — Bandeau Dépôt, commit dans le tiroir Git, coût (vague 4)
 - [ ] 74-08-PLAN.md — Retraits et gardes d'absence, annulation des trois déclencheurs (vague 4)
 - [ ] 74-10-PLAN.md — Retrait du lecteur de repli de la régie (P73-C2) (vague 5)
 - [ ] 74-09-PLAN.md — Bornes, chaîne XSS, contrat, VENDORED, documentation et compteur (vague 6)
@@ -404,8 +404,8 @@ Plans:
 - [x] 76-03-PLAN.md — Mémoire des agents : entrées, liens, états (v2)
 - [x] 76-04-PLAN.md — Branchement dans la collecte (champs facultatifs de `cockpit-project@1`) (v2)
 - [x] 76-05-PLAN.md — Route `GET /api/vf/tracabilite` (v3)
-- [ ] 76-06-PLAN.md — Page : section de phase, preuves, Jalon, panneau d'exigence (v4)
-- [ ] 76-07-PLAN.md — Page : Décisions, Mémoire, panneaux d'ADR, de décision, d'entrée, commits (v5)
+- [x] 76-06-PLAN.md — Page : section de phase, preuves, Jalon, panneau d'exigence (v4)
+- [x] 76-07-PLAN.md — Page : Décisions, Mémoire, panneaux d'ADR, de décision, d'entrée, commits (v5)
 - [ ] 76-08-PLAN.md — Retrait du nœud `.req`, puis clôture (v6)
 - [ ] 76-09-PLAN.md — Questions en attente : lecture des sections « À Samuel » et champ `meta.vf.questions` (v4)
 
@@ -430,14 +430,14 @@ Plans:
 
 Plans:
 
-- [ ] 77-01-PLAN.md — gates, `--format=tsv` dans `check-method-budget.sh` et `check-instruction-budget.sh`, lecture seule, texte identique octet pour octet (v1)
-- [ ] 77-02-PLAN.md — données du planning de la collecte, dates du burn-up et blocages du STATE, retrait de `lastDesc` (v1)
-- [ ] 77-03-PLAN.md — route `GET /api/vf/methode`, lancement asynchrone borné, cache de 60 s, un seul appel en cours (v2)
-- [ ] 77-04-PLAN.md — modules purs du calcul « depuis votre dernière visite » et de la mémoire de visite (v2)
-- [ ] 77-05-PLAN.md — coquille de la Synthèse (bouton, panneau, registre des blocs, ligne-résumé) et banc navigateur commun (v3)
-- [ ] 77-06-PLAN.md — blocs burn-up du jalon et santé de la méthode (v4)
-- [ ] 77-08-PLAN.md — bloc « Depuis votre dernière visite », feuille neutre, README et CHANGELOG du module (v5)
-- [ ] 77-07-PLAN.md — coût par phase et par étage sur les dernières 24 h (v6, à revalider après les Phases 79 et 74)
+- [x] 77-01-PLAN.md — gates, `--format=tsv` dans `check-method-budget.sh` et `check-instruction-budget.sh`, lecture seule, texte identique octet pour octet (v1)
+- [x] 77-02-PLAN.md — données du planning de la collecte, dates du burn-up et blocages du STATE, retrait de `lastDesc` (v1)
+- [x] 77-03-PLAN.md — route `GET /api/vf/methode`, lancement asynchrone borné, cache de 60 s, un seul appel en cours (v2)
+- [x] 77-04-PLAN.md — modules purs du calcul « depuis votre dernière visite » et de la mémoire de visite (v2)
+- [x] 77-05-PLAN.md — coquille de la Synthèse (bouton, panneau, registre des blocs, ligne-résumé) et banc navigateur commun (v3)
+- [x] 77-06-PLAN.md — blocs burn-up du jalon et santé de la méthode (v4)
+- [x] 77-08-PLAN.md — bloc « Depuis votre dernière visite », feuille neutre, README et CHANGELOG du module (v5)
+- [x] 77-07-PLAN.md — coût par phase et par étage sur les dernières 24 h (v6, à revalider après les Phases 79 et 74)
 
 ### Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-11-11-jointure.md — Phase 78 (corps) -->
@@ -514,19 +514,19 @@ Plans:
 - [x] 80-06-PLAN.md — Tiroir Git : pagination, worktrees repliés, volet bas, poignée de largeur, ouvrirSur(sha) (v2)
 - [x] 80-07-PLAN.md — Forme Liste, intérieur de phase, touche v, mémoire par lab (v3)
 - [x] 80-08-PLAN.md — Pile Retour du panneau VF_PANNEAU (C76-3, C76-5) (v3)
-- [ ] 80-09-PLAN.md — Lot moteur A1 : cadrage unique, champ de lecture, zoom réversible, garde de saisie (v4)
-- [ ] 80-10-PLAN.md — Onglets sans rechargement, « Réessayer », VF_ONGLETS.aller (v5)
-- [ ] 80-11-PLAN.md — Lot moteur A2 : vocabulaire du panneau de Projet (v5)
-- [ ] 80-12-PLAN.md — Cadrer la sélection et ses voisins (touche C) (v5)
-- [ ] 80-13-PLAN.md — Lot moteur A3 : lien de vue (z=, git=1), mémoire des tiroirs (v6)
-- [ ] 80-14-PLAN.md — Lot moteur B : palette, registre des raccourcis, ARIA, copier le lien, ligne du terminal (P80-D-55) (v7)
-- [ ] 80-15-PLAN.md — Aide ?, ligne du terminal (P80-D-55) (v8)
-- [ ] 80-16-PLAN.md — Jetons X5, DESIGN.md, découpe de 00-vibeflow.js (v8)
-- [ ] 80-19-PLAN.md — Santé en français (P80-Q-03, P80-D-54) (v8)
-- [ ] 80-21-PLAN.md — Échec d'un changement d'onglet : Lecture impossible, Réessayer (v8)
-- [ ] 80-17-PLAN.md — Finitions F1, F3, F4, F5 (après 80-16 : colonnes-baseline.txt partagé) (v9)
-- [ ] 80-20-PLAN.md — Titre de vue, en-tête en trois groupes, chevron, icônes, ouvreur Git 36/44 (P80-Q-01, P80-Q-02, P80-Q-05) (v10)
-- [ ] 80-18-PLAN.md — Assemblage : compteur des README, table du partage CI, CHANGELOG, non-régression (v11)
+- [x] 80-09-PLAN.md — Lot moteur A1 : cadrage unique, champ de lecture, zoom réversible, garde de saisie (v4)
+- [x] 80-10-PLAN.md — Onglets sans rechargement, « Réessayer », VF_ONGLETS.aller (v5)
+- [x] 80-11-PLAN.md — Lot moteur A2 : vocabulaire du panneau de Projet (v5)
+- [x] 80-12-PLAN.md — Cadrer la sélection et ses voisins (touche C) (v5)
+- [x] 80-13-PLAN.md — Lot moteur A3 : lien de vue (z=, git=1), mémoire des tiroirs (v6)
+- [x] 80-14-PLAN.md — Lot moteur B : palette, registre des raccourcis, ARIA, copier le lien, ligne du terminal (P80-D-55) (v7)
+- [x] 80-15-PLAN.md — Aide ?, ligne du terminal (P80-D-55) (v8)
+- [x] 80-16-PLAN.md — Jetons X5, DESIGN.md, découpe de 00-vibeflow.js (v8)
+- [x] 80-19-PLAN.md — Santé en français (P80-Q-03, P80-D-54) (v8)
+- [x] 80-21-PLAN.md — Échec d'un changement d'onglet : Lecture impossible, Réessayer (v8)
+- [x] 80-17-PLAN.md — Finitions F1, F3, F4, F5 (après 80-16 : colonnes-baseline.txt partagé) (v9)
+- [x] 80-20-PLAN.md — Titre de vue, en-tête en trois groupes, chevron, icônes, ouvreur Git 36/44 (P80-Q-01, P80-Q-02, P80-Q-05) (v10)
+- [x] 80-18-PLAN.md — Assemblage : compteur des README, table du partage CI, CHANGELOG, non-régression (v11)
 
 ### Phase 81: Agir sur une session depuis le cockpit
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-11-11-jointure.md — Phase 81 (corps ; à réinsérer au cadrage de la phase) -->

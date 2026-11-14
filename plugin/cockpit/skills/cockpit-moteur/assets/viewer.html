@@ -86,6 +86,7 @@
   --recent-text: #007f3d;
   --on: #161616; --on-hover: #000; --on-text: #fff; --on-sev-text: #161616;
   --ok: var(--recent); --sev-high: #f2384a; --sev-medium: #b88100; --sev-low: #666666;
+  --st-active: #a37100; /* 80-16 (P80-D-31, AUDC-X5 a) : glyphe « En cours » clair, 3,84:1 sur --bg et 4,27:1 sur --surface (--sev-medium en donnait 3,06 et 3,40) ; --st-recette le suit */
   --warn-bg: rgba(var(--ink), .05); --warn-text: #986300; --warn-sheet: var(--menu-solid);
   --ok-bg: var(--note-bg); --ok-text: var(--recent-text); --err-text: #da1637;
   --dir-bg: rgba(255, 255, 255, .7); --menu-solid: rgba(255, 255, 255, .96); --well: rgba(0, 0, 0, .06);
@@ -125,7 +126,8 @@ header > * { pointer-events: auto; }
 .brand { display: flex; align-items: center; gap: var(--sp-8); font-weight: 600; letter-spacing: -.01em; white-space: nowrap; padding-right: var(--sp-6); }
 .mark { height: 22px; width: auto; display: block; flex: none; }
 #crumbs { display: flex; align-items: center; min-width: 0; overflow: hidden; }
-#crumbs .sep { color: var(--text-4); padding: 0; }
+#crumbs .sep { color: var(--text-4); padding: 0; display: inline-flex; align-items: center; }
+#crumbs .sep svg.i { margin-inline: -4px; } /* 80-20 : chevron de 16 dont le tracé en couvre 4 ; l'écart reste celui du « / » */
 #crumbs button { background: none; border: 0; padding: var(--sp-6) var(--sp-8); border-radius: 999px; cursor: pointer; color: var(--text-3); white-space: nowrap; max-width: 220px; overflow: hidden; text-overflow: ellipsis; transition: background .2s var(--ease), color .2s var(--ease); }
 #crumbs button:hover { background: rgba(var(--ink), .06); color: var(--text); }
 #crumbs button.cur { color: var(--text); }
@@ -240,7 +242,9 @@ svg.lod-low .meta, svg.lod-low .anote { visibility: hidden; }
 svg.lod-low .desc { display: none; }
 svg.lod-low .title { font-size: 22px; white-space: normal; }
 svg.dim .node:not(.hl) .card { box-shadow: none; }
-svg.dim .node:not(.hl) .card > * { opacity: .55; transition: opacity .3s var(--ease); }
+/* 80-16 (AUDC-X5 c) : texte estompé à .72 avec --text-3 et --text-4 ramenés à --text-2 (≥ 4,5:1 composé) ; la pastille d'état (.vst, .rw) reste pleine */
+svg.dim .node:not(.hl) .card { --text-3: var(--text-2); --text-4: var(--text-2); }
+svg.dim .node:not(.hl) .card > :not(.foot), svg.dim .node:not(.hl) .card .foot > :not(.vst):not(.rw) { opacity: .72; transition: opacity .3s var(--ease); }
 
 /* ---------- edges ---------- */
 .edges { animation: fadeIn .7s var(--ease) .12s both; }
@@ -382,6 +386,8 @@ body.no-panel #panel-resize { opacity: 0; pointer-events: none; }
 .stats div { background: none; padding: 0; }
 .stats b { display: block; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .stats span { font-size: 12px; color: var(--text-3); }
+.vf-champs { display: flex; flex-wrap: wrap; gap: var(--sp-8) var(--sp-24); margin-bottom: var(--sp-12); } .vf-champs div { background: none; padding: 0; }
+.vf-champs span { display: block; font-size: 12px; color: var(--text-3); } .vf-champs b { display: block; font-size: 13px; font-weight: 500; }
 .bar { display: flex; height: 6px; border-radius: 999px; overflow: hidden; margin: var(--sp-12) 0 var(--sp-8); gap: var(--sp-4); }
 .bar span { border-radius: 999px; }
 .legend-row { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-12); font-size: 12px; color: var(--text-2); }
@@ -414,13 +420,24 @@ body.no-panel #panel-resize { opacity: 0; pointer-events: none; }
 #palette input { flex: 1; height: 58px; background: none; border: 0; outline: none; font-size: 16px; color: var(--text); }
 #results { max-height: 52vh; overflow: auto; padding: 0 var(--sp-8) var(--sp-8); }
 #results .r { display: flex; gap: var(--sp-12); align-items: center; padding: var(--inset-row); border-radius: 14px; cursor: pointer; }
-#results .r.active { background: rgba(var(--ink), .07); }
+#results .r { min-height: 36px; box-sizing: border-box; }
+#results .r.active { background: var(--raise); outline: 2px solid var(--ring); outline-offset: -2px; }
+#results .gt { font-size: 11px; font-weight: 500; color: var(--text-3); padding: var(--sp-8) var(--sp-12) var(--sp-4); }
+#results .gt[hidden], #palette .pill[hidden], #palette .kbd[hidden] { display: none; }
+#results .r .rk .kbd { font-size: 11px; font-weight: 500; line-height: 20px; padding: 0 var(--sp-6); border: 1px solid var(--hair-2); background: none; border-radius: 8px; }
+#results .r .rk .plus { color: var(--text-4); padding: 0 var(--sp-2); }
+#palette .pill { flex: none; font-size: 12px; font-weight: 500; color: var(--text-2); background: var(--raise); border-radius: 999px; padding: var(--sp-2) var(--sp-8); }
+#pal-live { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+@media (max-width: 700px) { #palette .hint > span { display: none; } }
 #results .r .rt { flex: 1; min-width: 0; }
 #results .r .rn { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #results .r .rd { color: var(--text-3); font-size: 12.5px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 #results .r .rdr { font-size: 12px; color: var(--text-4); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; direction: rtl; text-align: right; } /* the folder: when it is too long, its end (the part that differs) stays */
 #results .r .rk { font-size: 12px; color: var(--text-4); white-space: nowrap; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
-#results .empty { padding: var(--sp-24); color: var(--text-3); text-align: center; }
+#results .empty { padding: var(--sp-24); color: var(--text-3); text-align: left; }
+#results .empty .en { font-size: 13px; font-weight: 500; color: var(--text); overflow-wrap: anywhere; }
+#results .empty .ed { font-size: 12px; color: var(--text-3); margin-top: var(--sp-4); }
+@media (pointer: coarse) { #results .r { min-height: 44px; } }
 #palette .pal-x { display: none; }
 #palette .hint { display: flex; gap: var(--sp-16); padding: var(--sp-12) var(--inset-panel); color: var(--text-4); font-size: 12px; background: rgba(var(--ink), .02); }
 @media (pointer: coarse) { /* a finger has no ↑↓ ↵ esc: the foot of the search is a 44 px Close cross instead (PU-G-048) */
@@ -522,8 +539,8 @@ header .btn:focus-visible, #zoom button:focus-visible { outline: 2px solid var(-
 html.wk .node foreignObject { overflow: hidden; }
 html.wk .card, html.wk .card * { position: static !important; transform: none !important; animation: none !important; transition: none !important; will-change: auto !important; }
 html.wk .card { overflow: visible; }
-html.wk svg.dim .node:not(.hl) .card > * { opacity: 1; }
-html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+html.wk svg.dim .node:not(.hl) .card > *, html.wk svg.dim .node:not(.hl) .card .foot > * { opacity: 1; }
+html.wk svg.dim .node:not(.hl) foreignObject { opacity: .72; }
 /* ---------- phones and tablets: windows under 1000 px and touch screens under 1280 px (a mouse at 1000 px and wider is untouched) ---------- */
 @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) {
   #btn-up, .brand { flex: none; }
@@ -612,7 +629,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
   </div>
   <div class="hr">
     <div id="hdr-ext" class="hr-ext"></div>
-    <div class="rel"><button class="btn" id="flows-btn" aria-label="Flows"><svg class="i" viewBox="0 0 24 24"><path d="M7 5v14l11-7z"/></svg><span class="bl">Flows</span></button><div id="flowmenu" class="menu glass"></div></div>
+    <div class="rel"><button class="btn" id="flows-btn" aria-label="Flows"><svg class="i" viewBox="0 0 24 24"><circle cx="6" cy="19" r="3"/><path d="M9 19h8.5a3.5 3.5 0 0 0 0-7h-11a3.5 3.5 0 0 1 0-7H15"/><circle cx="18" cy="5" r="3"/></svg><span class="bl">Flows</span></button><div id="flowmenu" class="menu glass"></div></div>
     <div class="rel"><button class="btn icon" id="filters-btn" title="Connection types" aria-label="Connection types"><svg class="i" viewBox="0 0 24 24"><path d="M4 6h16M7 12h10M10 18h4"/></svg></button><div id="legend" class="menu glass"></div></div>
     <button class="btn icon" id="btn-panel" title="Toggle details (P)" aria-label="Toggle details" aria-expanded="true"><svg class="i" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="16" rx="3"/><path d="M15 4v16"/></svg></button>
   </div>
@@ -646,10 +663,11 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
 <div id="ctxmenu" class="menu glass" hidden></div>
 <div id="modal"><div class="box glass"></div></div>
 <div id="toast" class="glass"></div>
-<div id="palette"><div class="box glass">
-  <div class="in"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><input id="search" placeholder="Search by name, description, path or route…" autocomplete="off" spellcheck="false"></div>
-  <div id="results"></div>
-  <div class="hint"><span><span class="kbd">↑↓</span> navigate</span><span><span class="kbd">↵</span> open</span><span><span class="kbd">esc</span> close</span><button type="button" id="pal-x" class="pal-x" aria-label="Close" title="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
+<div id="palette"><div class="box glass" role="dialog" aria-modal="true" aria-label="Search or run an action">
+  <div class="in"><svg class="i" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg><span id="pal-mode" class="pill" hidden>Actions mode</span><input id="search" role="combobox" aria-expanded="false" aria-controls="results" aria-autocomplete="list" autocomplete="off" spellcheck="false"><span id="pal-slash" class="kbd">/</span></div>
+  <div id="results" role="listbox" aria-label="Search results"></div>
+  <div id="pal-live" aria-live="polite"></div>
+  <div class="hint"><span><span class="kbd">↑ ↓</span> Choose</span><span><span class="kbd">↵</span> Open</span><span><span class="kbd">&gt;</span> Actions mode</span><span><span class="kbd">Esc</span> Close</span><button type="button" id="pal-x" class="pal-x" aria-label="Close" title="Close"><svg class="i" viewBox="0 0 24 24"><path d="M18 6 6 18M6 6l12 12"/></svg></button></div>
 </div></div>
 <!--__ELK_SCRIPT__-->
 <script>if (/AppleWebKit/.test(navigator.userAgent) && !/Chrome|Chromium|Edg|OPR/.test(navigator.userAgent)) document.documentElement.classList.add('wk');</script>
@@ -678,13 +696,46 @@ if (typeof ELK === 'undefined') { document.body.innerHTML = `<p style="padding:2
 const NS = 'http://www.w3.org/2000/svg';
 const $ = (s) => document.querySelector(s);
 const svg = $('#svg'), vp = $('#viewport'), panel = $('#panel');
-const elk = new ELK();
+// vibeflow 79-18 (SOCL-22) : le calcul de mise en page tourne dans un worker du module quand la coquille est là ; sinon (export en fichier,
+// navigateur sans worker) ou si le worker échoue, il tourne en ligne comme avant. Même forme d'appel : elk.layout(graphe) -> promesse du graphe positionné.
+const elk = (() => {
+  let ligne = null, fil = null, avertie = false, n = 0; const attente = new Map();
+  const enLigne = (g) => (ligne ||= new ELK()).layout(g);
+  const replier = () => { // un worker qui échoue : toutes les requêtes en attente et les suivantes se calculent en ligne, un seul avertissement de texte fixe
+    if (!fil) return; fil = null;
+    if (!avertie) { avertie = true; console.warn('vf-cockpit : mise en page en ligne (le fil de calcul n\'a pas démarré)'); }
+    for (const [id, p] of [...attente]) { attente.delete(id); enLigne(p.graphe).then(p.ok, p.ko); }
+  };
+  // le préfixe vient du manifeste de la coquille ; le nom du fichier est écrit en deux morceaux : l'export autonome embarque ce script et ne doit porter aucune trace du worker
+  let man = null; try { man = JSON.parse(document.getElementById('vf-coquille-manifeste').textContent); } catch { man = null; }
+  if (man && typeof man.prefixe === 'string' && window.VF_COQUILLE && typeof window.VF_COQUILLE === 'object' && typeof Worker === 'function' && /^https?:$/.test(location.protocol)) {
+    try {
+      fil = new Worker(man.prefixe + 'elk-' + 'fil.js'); // construit en avance : son démarrage recouvre l'attente des polices
+      fil.onerror = (e) => { e.preventDefault(); replier(); };
+      fil.onmessage = (e) => { // une réponse est une donnée non fiable : forme vérifiée avant toute pose
+        const d = e.data, p = d && Number.isInteger(d.id) ? attente.get(d.id) : null; if (!p) return; attente.delete(d.id);
+        if (typeof d.erreur === 'string') p.ko(new Error(d.erreur.slice(0, 200)));
+        else if (d.resultat && Array.isArray(d.resultat.children)) p.ok(d.resultat); else p.ko(new Error(t('Invalid layout reply')));
+      };
+      const off = window.VF_COQUILLE.surOnglet(() => () => { // l'onglet s'en va : le worker meurt avec lui, rien n'est résolu ni rejeté (le moteur démonté n'écrit plus)
+        const f = fil; fil = null; attente.clear(); if (f) f.terminate(); off(); // garde:mep-fuite
+      });
+    } catch { fil = null; avertie = true; console.warn('vf-cockpit : mise en page en ligne (le fil de calcul n\'a pas démarré)'); }
+  }
+  return { layout: (graphe) => (!fil ? enLigne(graphe) : new Promise((ok, ko) => {
+    const id = n++; attente.set(id, { ok, ko, graphe });
+    try { fil.postMessage({ id, graphe }); } catch { attente.delete(id); enLigne(graphe).then(ok, ko); } // garde:mep-envoi
+  })) };
+})();
 const KINDS = ['import', 'http', 'call', 'rpc', 'event', 'queue', 'data', 'config'];
 // connection names: plain by default, developer terms when "Show technical detail" is on
 const KIND_TECH = { contains: t('Contains'), import: t('Imports'), http: 'HTTP', call: t('Calls'), rpc: 'RPC', event: t('Events'), queue: t('Queues'), data: t('Data'), config: t('Config') };
 const KIND_PLAIN = { contains: t('Contains'), import: t('Uses'), http: t('Web requests'), call: t('Calls'), rpc: t('Calls'), event: t('Events'),
   queue: t('Background jobs'), data: t('Reads & writes data'), config: t('Settings') };
 if (G.meta.kindLabels) { Object.assign(KIND_PLAIN, G.meta.kindLabels); Object.assign(KIND_TECH, G.meta.kindLabels); } // vibeflow P1
+// 80-11 (P80-D-08, P80-D-35) : sur l'onglet Projet les libellés de type, de section et de champ viennent de meta.kindLabels (clés à préfixe) ;
+// une clé absente = repli actuel
+const PROJ = G.meta?.vfTab === 'project', KL = (k) => (PROJ ? G.meta.kindLabels?.[k] : undefined);
 // 79-10 : le titre du panneau d'un lien, par genre de lien (une entrée de table par combinaison) ;
 // un genre dont le graphe fournit le libellé (onglet Projet) garde « libellé + connection »
 const KIND_CONN_TECH = { import: t('Imports connection'), http: t('HTTP connection'), call: t('Calls connection'), rpc: t('RPC connection'),
@@ -1139,7 +1190,7 @@ async function render(opts = {}) {
   const token = ++renderToken;
   hideTip(); // the cards are about to be redrawn
   const view = buildView(state.container);
-  // vibeflow AUDC-M7 : le calcul tourne sur le fil principal, une temporisation ne s'y déclenche jamais pendant un gros niveau (2,3 s de canevas blanc à 70 cartes) : pour une navigation seulement (go, premier rendu : jamais un redessin en direct, qui garde la temporisation), l'indicateur est allumé tout de suite (sans fondu) et peint (une image) AVANT le calcul
+  // vibeflow AUDC-M7 : le calcul tourne dans un worker du module (79-18), ou sur le fil principal en repli ; une temporisation ne se déclenche pas à temps pendant un calcul en ligne sur un gros niveau (2,3 s de canevas blanc à 70 cartes) : pour une navigation seulement (go, premier rendu : jamais un redessin en direct, qui garde la temporisation), l'indicateur est allumé tout de suite (sans fondu) et peint (une image) AVANT le calcul
   const gros = !!opts.nav && view.visible.length >= 24, indicateur = $('#loading');
   const loading = gros ? 0 : setTimeout(() => indicateur.classList.add('on'), 160);
   if (gros) { indicateur.classList.add('on', 'now'); await new Promise((ok) => { const tm = setTimeout(ok, 120); requestAnimationFrame(() => setTimeout(() => { clearTimeout(tm); ok(); }, 0)); }); }
@@ -1343,7 +1394,7 @@ function edgeMenu(e) {
 }
 function canvasMenu() {
   return [
-    { label: t('Fit to screen'), icon: 'fit', hint: 'F', run: () => fit(true) },
+    { label: t('Fit to screen'), icon: 'fit', hint: 'F', run: () => cadrer() },
     state.container !== 'root' ? { label: t('Up one level'), icon: 'left', hint: '⌫', run: up } : null,
     state.container !== 'root' ? { label: t('Back to overview'), icon: 'home', run: () => go('root') } : null,
     '-',
@@ -1379,29 +1430,81 @@ function freeArea() {
   const bottom = open && sheet ? $('#panel').offsetHeight + 24 : $('#ask').offsetHeight + 36;
   return { x: 16, y: top, w: Math.max(200, r.width - panelW - 32), h: Math.max(140, r.height - top - bottom) };
 }
-function fit(animate) {
-  const b = state.bounds; if (!b) return;
-  const a = freeArea();
-  // floor, Code tab only: card names stay at 11 px or more (13 px connector labels are the smallest names), even if that means not showing everything.
-  // The Project tab keeps its own zoom steps (ui/00-vibeflow.js) and the responsive suite wants its cards inside the free area.
-  const kFit = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1), k = /\/(index\.html)?$/.test(location.pathname) ? Math.max(kFit, 11 / 13) : kFit;
-  // what does not fit is cropped on the right and at the bottom: the top-left corner (where a view starts) stays in sight
-  const x = b.w * k + 40 * k > a.w ? a.x - (b.x - 20) * k : a.x + (a.w - b.w * k) / 2 - b.x * k;
-  const y = b.h * k + 20 * k > a.h ? a.y - (b.y - 10) * k : a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k;
-  setT({ k, x, y }, animate);
+// The tab whose graph is loaded, never read from the address (the shell serves the three tabs under any of them, 80-09): the shell's own answer
+// while it loads, then `onglet()`, else the graph's `meta.vfTab` (project | equipe; absent or any other value = code). Returns code | projet | equipe.
+function loadedTab() {
+  const C = window.VF_COQUILLE;
+  if (C && typeof C.onglet === 'function') {
+    const e = typeof C.etat === 'function' ? C.etat() : null, o = e && e.phase === 'chargement' && e.onglet ? e.onglet : C.onglet();
+    if (o) return o;
+  }
+  const v = G.meta && G.meta.vfTab;
+  return v === 'project' ? 'projet' : v === 'equipe' ? 'equipe' : 'code';
+}
+let readingProvider = null; // the VF layer's reading field: () => one rectangle or an array of candidate rectangles (NAVIGATION 4.6)
+/** The reading field's candidates {x, y, w, h}: the provider's (bounded like freeArea, a throwing provider is ignored), else the free area. */
+function readingAreas() {
+  if (readingProvider) {
+    try {
+      const r = [].concat(readingProvider()).filter((c) => c && [c.x, c.y, c.w, c.h].every(Number.isFinite) && c.w >= 200 && c.h >= 140);
+      if (r.length) return r;
+    } catch (e) { console.error('floorplan reading area', e); }
+  }
+  return [freeArea()];
+}
+/** The one framing formula (80-09). Pure: { k, x, y } that shows the cards `ids` of the level (else all of it) in the best reading-field candidate.
+ *  `plancher` (default: only on the Code tab) keeps card names at 11 px or more, even if that means not showing everything. */
+function cadrage({ plancher, zone, ids } = {}) {
+  const list = ids && ids.length && state.layout ? state.layout.children.filter((c) => ids.includes(c.id)) : [];
+  const b = list.length
+    ? { x: Math.min(...list.map((c) => c.x)), y: Math.min(...list.map((c) => c.y)), w: 0, h: 0 }
+    : state.bounds;
+  if (!b) return null;
+  if (list.length) { b.w = Math.max(...list.map((c) => c.x + c.width)) - b.x; b.h = Math.max(...list.map((c) => c.y + c.height)) - b.y; }
+  const floor = plancher === undefined ? loadedTab() === 'code' : plancher;
+  const put = (a) => {
+    const kFit = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1), k = floor ? Math.max(kFit, 11 / 13) : kFit;
+    // what does not fit is cropped on the right and at the bottom: the top-left corner (where a view starts) stays in sight
+    return { kFit, k, x: b.w * k + 40 * k > a.w ? a.x - (b.x - 20) * k : a.x + (a.w - b.w * k) / 2 - b.x * k,
+      y: b.h * k + 20 * k > a.h ? a.y - (b.y - 10) * k : a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k };
+  };
+  const { k, x, y } = (zone ? [zone] : readingAreas()).map(put).reduce((p, q) => (q.kFit > p.kFit ? q : p));
+  return { k, x, y };
+}
+function fit(animate) { const m = cadrage(); if (m) setT(m, animate); }
+/** Where a keyboard or button zoom is centred: the selected card if its centre is in the reading field, else the middle of the largest candidate. */
+function zoomCentre() {
+  const areas = readingAreas(), { k, x, y } = state.t;
+  const c = typeof state.selected === 'string' && state.layout && state.layout.children.find((n) => n.id === state.selected);
+  if (c) {
+    const cx = (c.x + c.width / 2) * k + x, cy = (c.y + c.height / 2) * k + y;
+    if (areas.some((a) => cx >= a.x && cx <= a.x + a.w && cy >= a.y && cy <= a.y + a.h)) return [cx, cy];
+  }
+  const a = areas.reduce((p, q) => (q.w * q.h > p.w * p.h ? q : p));
+  return [a.x + a.w / 2, a.y + a.h / 2];
 }
 function zoomBy(f, cx, cy) {
-  const r = stageRect();
-  cx ??= r.width / 2; cy ??= r.height / 2;
+  if (cx === undefined || cy === undefined) [cx, cy] = zoomCentre();
   const k = clamp(state.t.k * f, 0.08, 2.5);
   setT({ k, x: cx - (cx - state.t.x) * (k / state.t.k), y: cy - (cy - state.t.y) * (k / state.t.k) }, false);
+  programmerZ();
+}
+/** A transformation applied through the engine's own path (levels of detail, columns): never animated; non-finite values are refused (80-09). */
+function transformer(m) {
+  if (!m || ![m.k, m.x, m.y].every(Number.isFinite)) return false;
+  setT({ k: clamp(m.k, 0.08, 2.5), x: m.x, y: m.y }, false); return true;
+}
+/** The one input guard: no shortcut from an INPUT, TEXTAREA, SELECT or contenteditable element (80-09). */
+function enSaisie(ev) {
+  const e = ev && ev.target;
+  return !!e && (/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName) || e.isContentEditable === true);
 }
 // Ctrl + wheel (and the trackpad pinch, which sends ctrlKey) zooms around the cursor; a plain wheel or two-finger scroll pans
 svg.addEventListener('wheel', (ev) => {
   ev.preventDefault();
   const r = stageRect();
   if (ev.ctrlKey) zoomBy(Math.exp(-ev.deltaY * 0.01), ev.clientX - r.left, ev.clientY - r.top);
-  else { const u = ev.deltaMode === 1 ? 16 : 1; setT({ ...state.t, x: state.t.x - ev.deltaX * u, y: state.t.y - ev.deltaY * u }, false); }
+  else { const u = ev.deltaMode === 1 ? 16 : 1; setT({ ...state.t, x: state.t.x - ev.deltaX * u, y: state.t.y - ev.deltaY * u }, false); programmerZ(); }
 }, { passive: false });
 let drag = null;
 const fingers = new Map(); let pinch = null; // touch only: the fingers on the map, and the pinch they make
@@ -1426,6 +1529,7 @@ window.addEventListener('pointermove', (ev) => {
 const endDrag = (ev) => {
   if (!drag || ev.pointerId !== drag.id) return;
   if (drag.moved) { if (ev.pointerType === 'touch') swallowClick = true; else svg.addEventListener('click', (e) => e.stopPropagation(), { capture: true, once: true }); }
+  if (drag.moved) programmerZ();
   drag = null; svg.classList.remove('panning');
 };
 window.addEventListener('pointerup', endDrag);
@@ -1444,7 +1548,7 @@ window.addEventListener('pointermove', (ev) => {
 });
 const liftFinger = (ev) => {
   if (!fingers.delete(ev.pointerId)) return;
-  if (pinch?.moved) swallowClick = true; // lifting a finger after a pinch isn't a tap
+  if (pinch?.moved) { swallowClick = true; programmerZ(); } // lifting a finger after a pinch isn't a tap
   if (fingers.size < 2) pinch = null;
 };
 window.addEventListener('pointerup', liftFinger);
@@ -1458,25 +1562,62 @@ window.addEventListener('resize', () => {
 });
 $('#z-in').onclick = () => zoomBy(1.25);
 $('#z-out').onclick = () => zoomBy(0.8);
-$('#z-fit').onclick = () => fit(true);
+const cadrer = () => { fit(true); programmerZ(); }; // the user's own framing (button, key F, palette): the address follows
+$('#z-fit').onclick = cadrer;
 
 // ======================= navigation =======================
-function setHash(container, sel) {
+// 80-13 (FORM-15) : the fragment carries the view (v), the selection (s), the zoom (z = k,x,y) and the extension keys of a closed list (git = 1)
+const EXT_CLES = ['git'];
+function ecrireFragment(s, remplacer) { // the query (?vue=) is kept
+  const url = s ? '#' + s : location.pathname + location.search;
+  try { if (location.hash.slice(1) !== s) history[remplacer ? 'replaceState' : 'pushState'](null, '', url); } catch {}
+}
+function setHash(container, sel, autreNiveau) {
   if (container.startsWith('q:')) return; // answer views are transient
-  const p = new URLSearchParams();
+  const cur = new URLSearchParams(location.hash.slice(1)), p = new URLSearchParams();
   if (container !== 'root') p.set('v', container);
   if (sel && typeof sel === 'string') p.set('s', sel);
-  const s = p.toString();
-  try { if (location.hash.slice(1) !== s) history.pushState(null, '', s ? '#' + s : location.pathname + location.search); } catch {}
+  for (const k of EXT_CLES) if (cur.has(k)) p.set(k, cur.get(k));
+  if (!autreNiveau && cur.has('z')) p.set('z', cur.get('z')); // another level has its own framing: z only follows a selection on the same level
+  ecrireFragment(p.toString().replace(/%2C/g, ','), false); // the comma of z stays readable
+}
+/** Replaces (or removes, null) the `cle=…` token of the fragment; every other token (#t, #vf-x, #r=…) is left as it is. */
+function majFragment(cle, valeur) {
+  const jetons = location.hash.slice(1).split('&').filter((x) => x && x.split('=')[0] !== cle);
+  if (valeur !== null) jetons.push(cle + '=' + valeur);
+  ecrireFragment(jetons.join('&'), true);
+}
+/** z = k,x,y : finite decimals only, k within the zoom bounds, x and y bounded; anything else is ignored. */
+function lireZ(texte) {
+  const a = String(texte || '').split(',');
+  if (a.length !== 3 || !a.every((x) => /^-?\d{1,9}(\.\d{1,6})?$/.test(x))) return null;
+  const [k, x, y] = a.map(Number);
+  return k >= 0.08 && k <= 2.5 && Math.abs(x) <= 1e5 && Math.abs(y) <= 1e5 ? { k, x, y } : null;
 }
 function readHash() {
   const p = new URLSearchParams(location.hash.slice(1));
   let v = p.get('v') || 'root', s = p.get('s');
-  if (v !== 'root' && !parentOf.has(v)) v = 'root';
+  const inconnue = v !== 'root' && !parentOf.has(v);
+  if (inconnue) v = 'root';
   if (s && !parentOf.has(s) && !s.startsWith('x:') && !s.startsWith('m:')) s = null;
-  return { v, s };
+  return { v, s, z: inconnue ? null : lireZ(p.get('z')) }; // a link to a level this graph does not have carries no framing for it
 }
-window.addEventListener('popstate', () => { const { v, s } = readHash(); go(v, { select: s, push: false }); });
+const arrondi = (n) => Math.round(n * 1000) / 1000;
+let zMinuterie = 0;
+function ecrireZ() { // the end of a user gesture: the framing goes into the address, without a history entry per gesture
+  const m = state.t;
+  if (state.container.startsWith('q:') || ![m.k, m.x, m.y].every(Number.isFinite)) return;
+  majFragment('z', [m.k, m.x, m.y].map(arrondi).join(','));
+}
+function programmerZ() { clearTimeout(zMinuterie); zMinuterie = setTimeout(ecrireZ, 250); }
+/** An extension key of the fragment (git = 1): read, written or removed (null); a key outside the closed list or a value other than 1 is refused. */
+function paramVue(cle, valeur) {
+  if (!EXT_CLES.includes(cle) || (valeur !== null && valeur !== '1')) return false;
+  majFragment(cle, valeur); return true;
+}
+function lireParamVue(cle) { return EXT_CLES.includes(cle) && new URLSearchParams(location.hash.slice(1)).get(cle) === '1' ? '1' : null; }
+const surZ = (z) => () => { if (z) transformer(z); };
+window.addEventListener('popstate', () => { const { v, s, z } = readHash(); go(v, { select: s, push: false, after: surZ(z) }); });
 
 async function go(container, { select: sel = null, push = true, zoomFrom = null, after, force = false } = {}) {
   if (container === 'q:answer' && !state.answer?.items) return; // no answer on a board to show (the last one had no cards): nothing to open, no error (PU-G-144)
@@ -1486,7 +1627,7 @@ async function go(container, { select: sel = null, push = true, zoomFrom = null,
   const changed = container !== state.container;
   if (changed && container !== 'q:answer' && !keepSheet) $('#ask-sheet').hidden = true; // going to another map puts the answer bubble away: it covered the canvas (PU-G-149)
   state.container = container; state.selected = sel;
-  if (push) setHash(container, sel);
+  if (push) setHash(container, sel, changed);
   if (!changed && state.layout && !force) { applySelection(); renderPanel(); if (after) after(); return; }
   const c = zoomFrom && state.layout?.children.find((x) => x.id === zoomFrom);
   if (c) {
@@ -1603,7 +1744,7 @@ function renderCrumbs() {
   const c = $('#crumbs'); c.innerHTML = '';
   const path = chain(state.container).slice().reverse();
   path.forEach((item, idx) => {
-    if (idx) { const s = document.createElement('span'); s.className = 'sep'; s.textContent = '/'; c.appendChild(s); }
+    if (idx) { const s = document.createElement('span'); s.className = 'sep'; s.setAttribute('aria-hidden', 'true'); s.innerHTML = '<svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="m9 6 6 6-6 6"/></svg>'; c.appendChild(s); }
     const b = document.createElement('button');
     b.textContent = item === 'root' ? t('Overview')
       : item === 'q:answer' ? (state.answer.kind ? (state.answer.kind === state.answer.title ? state.answer.title : `${state.answer.kind}: ${state.answer.title}`) : t('Answer: {}', state.answer.title)) : info(item).name;
@@ -1656,9 +1797,25 @@ const routeRow = (ri, extra = '') => {
 };
 const listSec = (title, rows, count, max = 30, note = '') => rows.length ? `<div class="sec"><h3>${h(title)} <span class="c">${count ?? rows.length}</span></h3>${note ? `<p class="pd">${h(note)}</p>` : ''}<div class="list">${rows.slice(0, max).join('')}${rows.length > max ? `<div class="more">${t('+{} more', rows.length - max)}</div>` : ''}</div></div>` : '';
 const pathBox = (p) => `<div class="pp"><span>${h(p).split('/').map((x) => `<span class="sg">${x}</span>`).join('/<wbr>')}</span><button data-copy="${h(p)}" title="${t('Copy')}" aria-label="${t('Copy path')}">${iconI('copy')}</button></div>`;
+const kindLab = (i, kind) => (i.f && KL('feuille:' + nodes.get(i.f.n)?.kind)) || kindFr(kind); // 80-11 : « Plan », « Exigence »… sur Projet
+const ouvrirLab = (i) => (i.type === 'node' && KL('ouvrir:' + i.kind)) || t('Open');
+const rowsFiles = (fl) => fl.map((f) => rowFor('f:' + f.p, f.st ? statePill(f.st) : PLAN ? '' : fmt(f.loc)));
+// la liste des éléments d'un nœud : sur Projet, ceux du nœud puis ceux de ses sous-nœuds, chaque liste titrée par kindLabels['liste:<type>']
+// et sans compte (80-UI-SPEC § 4.2) ; un nœud sans titre de liste n'en rend aucune (le jalon : ses phases suffisent)
+const filesSec = (n, fl) => {
+  if (!PROJ) return listSec(PLAN ? 'Planned files' : t('Files'), rowsFiles(fl), fl.length, 25);
+  if (!KL('liste:' + n?.kind)) return '';
+  const sous = [...nodes.values()].filter((c) => c.parent === n.id);
+  const liste = (o) => {
+    const ti = KL('liste:' + o.kind);
+    return ti ? listSec(ti, rowsFiles(fl.filter((f) => f.n === o.id)), '', 25) : '';
+  };
+  return [n, ...sous].map(liste).join('');
+};
+const parentLab = (owner) => (PROJ ? KL('parent:' + owner.kind) || '' : 'module');
 function header(i) {
   const kind = i.type === 'node' ? i.kind : i.type === 'symbol' ? i.symKind : i.type === 'route' ? t('Endpoint') : i.type === 'module' ? t('file') : i.type;
-  return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kindFr(kind))}</span></div>
+  return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kindLab(i, kind))}</span></div>
     <h2 class="pt">${h(i.name)}</h2>${i.desc ? `<p class="pd">${h(i.desc)}</p>` : `<p class="pd empty">${t('No description yet.')}</p>`}`;
 }
 
@@ -1765,11 +1922,24 @@ function connections(item) {
   return { out: rows(out), inn: rows(inn) };
 }
 
+// 80-11 : statut (glyphe + mot) et vague d'un élément du planning ; la vague seulement pour ce qui en porte une (champ présent, nul = sans vague)
+const champs = (f, owner) => {
+  const w = KL('statut:' + owner?.kind + ':' + f.st) || STATE_WORD[f.st] || f.st, nb = Number.isInteger(f.vague);
+  const v = nb ? KL('champ:vague') + ' ' + f.vague : KL('valeur:sans-vague'), cls = h(f.st).replace(/[^\w-]/g, '');
+  const st = f.st ? `<span class="vst vst-${cls}">${h(w)}</span>` : '';
+  return `<div class="vf-champs"><div><span>${h(KL('champ:statut') || '')}</span><b>${st}</b></div>`
+    + ('vague' in f && v ? `<div><span>${h(KL('champ:vague') || '')}</span><b>${h(v)}</b></div>` : '') + '</div>';
+};
+// 80-11 : sur Projet, les liens d'une feuille par sens puis par genre, titrés par kindLabels['entrant:<genre>'] / ['sortant:<genre>'] ;
+// une étiquette vide n'est pas rendue
+const parSens = (ls, sens, autre) => { const m = new Map(); for (const l of ls) m.set(l.k, [...(m.get(l.k) || []), l]);
+  return [...m].map(([k, g]) => { const ti = KL(sens + ':' + k); return ti === '' ? '' : listSec(ti ?? (sens === 'entrant' ? t('Depends on') : t('Used by')),
+    g.map((l) => rowFor(autre(l), '', `var(--k-${l.k})`))); }).join(''); };
 function itemPanel(item, viaConnector) {
   const i = info(item);
   let html = `<div class="sec">${header(i)}`;
   const actions = [];
-  if (drillable(item) && state.container !== item) actions.push(`<button class="btn soft" data-open="${h(item)}">${iconI('drill')}${t('Open')}</button>`);
+  if (drillable(item) && state.container !== item) actions.push(`<button class="btn soft" data-open="${h(item)}">${iconI('drill')}${ouvrirLab(i)}</button>`);
   if (viaConnector || (parentOf.get(item) !== state.container && state.container !== item)) actions.push(`<button class="btn soft" data-go="${h(item)}">${t('Show on map')}</button>`);
   if (i.type === 'node' || i.type === 'dir') {
     const n = i.n, s = statsOf(item);
@@ -1777,7 +1947,7 @@ function itemPanel(item, viaConnector) {
     if (n?.paths?.length || i.d) html += pathBox(i.d ? i.d.path + '/' : n.paths.join('  '));
     if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
     html += '</div>';
-    if (s?.files) {
+    if (s?.files && !PROJ) {
       const langs = Object.entries(n?.stats.langs || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
       const tot = langs.reduce((a, [, v]) => a + v, 0) || 1;
       const palette = ['#a78bfa', '#38bdf8', '#34d399', '#fbbf24', '#f472b6'];
@@ -1792,7 +1962,7 @@ function itemPanel(item, viaConnector) {
     const depFirst = G.meta?.vfTab === 'project';
     html += listSec(depFirst ? t('Depends on') : t('Used by'), c.inn) + listSec(depFirst ? t('Used by') : t('Depends on'), c.out);
     const fl = (i.d ? i.d.files : G.files.filter((f) => chain('f:' + f.p).includes(item))).slice().sort((a, b) => b.loc - a.loc);
-    html += listSec(PLAN ? 'Planned files' : t('Files'), fl.map((f) => rowFor('f:' + f.p, f.st ? statePill(f.st) : PLAN ? '' : fmt(f.loc))), fl.length, 25);
+    html += filesSec(n, fl);
   } else if (i.type === 'file' || i.type === 'module') {
     const f = i.f, fid = 'f:' + f.p, url = editorUrl(f.p);
     if (f.note) html += `<div class="callout">${h(f.note)}</div>`;
@@ -1801,15 +1971,16 @@ function itemPanel(item, viaConnector) {
     if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}${t('Open in editor')}</a>`);
     if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
     const owner = nodes.get(f.n);
-    html += `</div><div class="sec"><div class="stats">${PLAN ? `<div><b>${fmt(G.links.filter((l) => l.a === fid).length)}</b><span>${t('uses')}</span></div>` : `<div><b>${fmt(f.loc)}</b><span>${t.mot(f.loc, 'lines')}</span></div>`}<div><b>${(routesByFile.get(f.p) || []).length}</b><span>${t.mot((routesByFile.get(f.p) || []).length, 'endpoints')}</span></div><div><b>${fmt(G.links.filter((l) => l.b === 'f:' + f.p).length)}</b><span>${t('used by')}</span></div></div>
-      ${owner ? `<div class="list" style="margin-top:var(--sp-12)">${rowFor('n:' + owner.id, 'module')}</div>` : ''}</div>`;
+    html += `</div><div class="sec">${PROJ ? champs(f, owner) : `<div class="stats">${PLAN ? `<div><b>${fmt(G.links.filter((l) => l.a === fid).length)}</b><span>${t('uses')}</span></div>` : `<div><b>${fmt(f.loc)}</b><span>${t.mot(f.loc, 'lines')}</span></div>`}<div><b>${(routesByFile.get(f.p) || []).length}</b><span>${t.mot((routesByFile.get(f.p) || []).length, 'endpoints')}</span></div><div><b>${fmt(G.links.filter((l) => l.b === 'f:' + f.p).length)}</b><span>${t('used by')}</span></div></div>`}
+      ${owner ? `<div class="list" style="margin-top:var(--sp-12)">${rowFor('n:' + owner.id, parentLab(owner))}</div>` : ''}</div>`;
     html += listSec(t('Endpoints'), (routesByFile.get(f.p) || []).map((ri) => routeRow(ri)), undefined, 60);
     const inL = G.links.filter((l) => l.b === fid), outL = G.links.filter((l) => l.a === fid);
     // the same words in both modes (PU-G-058): the technical switch adds the Exports list below, it never renames what is already there
-    const doc = /\.(md|mdx|markdown|rst|txt)$/i.test(f.p) && !/(^|\/)SKILL\.md$|(^|\/)agents\//.test(f.p); // a document mentions files, it doesn't call or depend on them; an agent or a skill really dispatches (PU-G-072)
+    const doc = !PROJ && /\.(md|mdx|markdown|rst|txt)$/i.test(f.p) && !/(^|\/)SKILL\.md$|(^|\/)agents\//.test(f.p); // a document mentions files, it doesn't call or depend on them; an agent or a skill really dispatches (PU-G-072)
     const rowL = (l, other) => rowFor(other, doc ? (l.calls?.length ? plural(l.calls.length, 'mention') : t('Mention')) : l.calls?.length ? plural(l.calls.length, 'call') : KIND_PLAIN[l.k] || l.k, `var(--k-${l.k})`);
-    html += listSec(t('Used by'), inL.map((l) => rowL(l, l.a)));
-    html += doc ? listSec(t('Mentions'), outL.map((l) => rowL(l, l.b)), undefined, 30, t('The files, folders and pages this document names or links to.')) : listSec(t('Depends on'), outL.map((l) => rowL(l, l.b)));
+    if (PROJ) html += parSens(inL, 'entrant', (l) => l.a) + parSens(outL, 'sortant', (l) => l.b);
+    else html += listSec(t('Used by'), inL.map((l) => rowL(l, l.a)));
+    if (!PROJ) html += doc ? listSec(t('Mentions'), outL.map((l) => rowL(l, l.b)), undefined, 30, t('The files, folders and pages this document names or links to.')) : listSec(t('Depends on'), outL.map((l) => rowL(l, l.b)));
     const handlers = new Set((routesByFile.get(f.p) || []).map((ri) => routes[ri].h));
     if (technical()) html += listSec('Exports', (f.s || []).map((s, k) => [s, k]).filter(([s]) => !handlers.has(s[0])).map(([s, k]) => `<a class="row" ${parentOf.has(`s:${f.p}#${k}`) ? `data-go="s:${h(f.p)}#${k}"` : ''}><span class="dot" style="background:var(--n-symbol)"></span><span class="rt"><div class="rn" style="font-family:var(--mono);font-size:12px">${h(s[0])}</div>${s[4] ? `<div class="rd">${h(s[4])}</div>` : ''}</span><span class="rc">${h(s[1])} · L${s[2]}</span></a>`), undefined, 60);
   } else if (i.type === 'route') {
@@ -1859,20 +2030,50 @@ const index = [
   ...routes.map((r, i) => ({ id: 'r:' + i, name: r.name, desc: r.d || '', path: `${r.m} ${r.p}`, kind: 'route', w: 3 })),
   ...G.files.flatMap((f) => (f.s || []).map((s, i) => ({ id: `s:${f.p}#${i}`, name: s[0], desc: s[4] || '', path: f.p, kind: symIcon(s[1]), w: 1 }))).filter((x) => parentOf.has(x.id)),
 ];
-const pal = $('#palette'), sInput = $('#search'), sRes = $('#results');
-let sActive = 0, sItems = [];
+const pal = $('#palette'), sInput = $('#search'), sRes = $('#results'), palMode = $('#pal-mode'), palSlash = $('#pal-slash'), palLive = $('#pal-live');
+let sActive = 0, sItems = [], sRows = [], liveTimer = null;
 let palOrigin = null; // where the focus was before the search opened
-function openPalette() { palOrigin = document.activeElement; pal.classList.add('open'); sInput.value = ''; runSearch(); setTimeout(() => sInput.focus(), 0); }
+// 80-14 (P80-D-14) : les extensions ajoutent des sources à la palette (actions, onglets, entités des autres onglets). Une source reçoit
+// { q, termes, actions, vide } et rend des résultats { groupe, titre, id, libelle, detail, touches, icone, executer, avant, info } : choisir un résultat ferme
+// la palette puis appelle executer(q) ; `avant` rend d'abord le focus d'avant ; `info` : ligne de texte, rien n'est exécuté.
+const palSources = [];
+function ajouterSource(fn) {
+  if (typeof fn !== 'function') return () => {};
+  palSources.push(fn);
+  return () => { const i = palSources.indexOf(fn); if (i >= 0) palSources.splice(i, 1); };
+}
+const ORDRE_VIDE = ['actions', 'onglets', 'entites'], ORDRE_SAISIE = ['entites', 'actions', 'onglets', 'phases', 'agents'];
+function openPalette() {
+  palOrigin = document.activeElement; pal.classList.add('open'); sInput.setAttribute('aria-expanded', 'true'); sInput.value = '';
+  runSearch(true); setTimeout(() => sInput.focus(), 0);
+}
 /** Closing without choosing (Esc, a click outside, the Close button) gives the focus back to where it was; choosing sends it to the opened card (PU-G-019). */
 function closePalette(restore) {
-  pal.classList.remove('open');
+  pal.classList.remove('open'); sInput.setAttribute('aria-expanded', 'false'); clearTimeout(liveTimer); palLive.textContent = '';
   if (restore && palOrigin && palOrigin !== document.body && palOrigin.isConnected) palOrigin.focus?.({ preventScroll: true });
   palOrigin = null;
 }
-function runSearch() {
-  const terms = sInput.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+function rowEntite(it) {
+    const ii = info(it.id);
+    const ic = it.kind === 'route' ? `<span class="method" style="--m:${methodVar(ii.r.m)}">${h(ii.r.m)}</span>` : `<span class="ico" style="--c:${colorOf(ii)}">${icon(iconKey(ii))}</span>`;
+    // a file shows its real file name and, on the right, its folder instead of the word "file" (PU-G-050) — on the Code tab only: on the Project tab a "file" is a card of the planning (BACKLOG entry, requirement, plan), its readable title stays; when another result has the same file name, its whole folder also sits under the name (PU-G-049)
+    const file = it.kind === 'file' && G.meta?.vfTab !== 'project', dir = file ? parentDir(it.path) : '', twin = file && (sameBase.get(baseName(it.path)) || []).length > 1;
+    const right = file ? dirTag(it.path, sameBase.get(baseName(it.path))) || dir.split('/').slice(-2).join('/') || '/'
+      : it.kind === 'route' ? ii.r.p : kindFr(it.kind);
+    return `${ic}<span class="rt"><div class="rn">${h(file ? baseName(it.path) : it.name)}</div><div class="rd">${h(twin && dir ? `${dir} · ${it.desc || ''}` : it.desc || it.path)}</div></span>${file ? `<span class="rdr rp" title="${h(dir || '/')}"><bdi dir="ltr">${h(right)}</bdi></span>` : `<span class="rk">${h(right)}</span>`}`;
+  }
+function rowSource(it) {
+  const k = (it.touches || []).map((x) => `<span class="kbd">${h(x)}</span>`).join('<span class="plus">+</span>');
+  return `<span class="ico" style="--c:var(--text-3)">${icon(it.icone || 'right')}</span><span class="rt"><div class="rn">${h(it.libelle)}</div>${it.detail ? `<div class="rd">${h(it.detail)}</div>` : ''}</span>${k ? `<span class="rk">${k}</span>` : ''}`;
+}
+function runSearch(muet) {
+  const brut = sInput.value, modeA = brut.trimStart().startsWith('>'), q = modeA ? brut.trimStart().slice(1) : brut;
+  const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean), vide = !terms.length;
+  palMode.hidden = !modeA; palSlash.hidden = brut !== '';
+  const par = Object.create(null); // a source's group name is only a key here, never an identifier
   let scored = [];
-  if (!terms.length) scored = (kids.get('root') || []).map((id) => [1, index.find((x) => x.id === id)]).filter((x) => x[1]);
+  if (modeA) { /* le mode actions : les actions seules */ }
+  else if (vide) scored = (kids.get('root') || []).map((id) => [1, index.find((x) => x.id === id)]).filter((x) => x[1]);
   else for (const it of index) {
     if (!technical() && (it.kind === 'function' || it.kind === 'class')) continue;
     const n = it.name.toLowerCase(), d = it.desc.toLowerCase(), p = it.path.toLowerCase();
@@ -1884,22 +2085,40 @@ function runSearch() {
     }
     if (s) scored.push([s + it.w * 2 - n.length * 0.02, it]);
   }
-  sItems = scored.sort((a, b) => b[0] - a[0]).slice(0, 40).map((x) => x[1]);
-  sActive = 0;
-  sRes.innerHTML = sItems.map((it, i) => {
-    const ii = info(it.id);
-    const ic = it.kind === 'route' ? `<span class="method" style="--m:${methodVar(ii.r.m)}">${h(ii.r.m)}</span>` : `<span class="ico" style="--c:${colorOf(ii)}">${icon(iconKey(ii))}</span>`;
-    // a file shows its real file name and, on the right, its folder instead of the word "file" (PU-G-050) — on the Code tab only: on the Project tab a "file" is a card of the planning (BACKLOG entry, requirement, plan), its readable title stays; when another result has the same file name, its whole folder also sits under the name (PU-G-049)
-    const file = it.kind === 'file' && G.meta?.vfTab !== 'project', dir = file ? parentDir(it.path) : '', twin = file && (sameBase.get(baseName(it.path)) || []).length > 1;
-    const right = file ? dirTag(it.path, sameBase.get(baseName(it.path))) || dir.split('/').slice(-2).join('/') || '/'
-      : it.kind === 'route' ? ii.r.p : kindFr(it.kind);
-    return `<div class="r${i === 0 ? ' active' : ''}" data-i="${i}">${ic}<span class="rt"><div class="rn">${h(file ? baseName(it.path) : it.name)}</div><div class="rd">${h(twin && dir ? `${dir} · ${it.desc || ''}` : it.desc || it.path)}</div></span>${file ? `<span class="rdr rp" title="${h(dir || '/')}"><bdi dir="ltr">${h(right)}</bdi></span>` : `<span class="rk">${h(right)}</span>`}</div>`;
-  }).join('') || `<div class="empty">${t('No matches')}</div>`;
-  sRes.querySelectorAll('.r').forEach((r) => { r.addEventListener('mousedown', (ev) => { ev.preventDefault(); pick(+r.dataset.i); }); r.addEventListener('mousemove', () => setActive(+r.dataset.i)); });
+  par.entites = scored.sort((a, b) => b[0] - a[0]).slice(0, 40).map((x) => ({ ent: x[1] }));
+  for (const fn of palSources) {
+    let r; try { r = fn({ q, termes: terms, actions: modeA, vide }); } catch (e) { console.error('floorplan extension', e); continue; }
+    for (const it of Array.isArray(r) ? r : []) {
+      if (!it || typeof it.libelle !== 'string' || typeof it.executer !== 'function' || typeof it.groupe !== 'string' || (modeA && it.groupe !== 'actions')) continue;
+      (par[it.groupe] ||= []).push(it);
+    }
+  }
+  const ordre = vide && !modeA ? ORDRE_VIDE : ORDRE_SAISIE, tous = [...ordre, ...Object.keys(par).filter((g) => !ordre.includes(g))].filter((g) => par[g] && par[g].length);
+  const titres = tous.length > 1; // an heading only when two groups at least have results
+  sItems = tous.flatMap((g) => par[g]); sActive = 0;
+  let n = 0;
+  sRes.innerHTML = tous.map((g, gi) => `<div role="group" aria-labelledby="pal-g-${gi}"><div class="gt" id="pal-g-${gi}"${titres ? '' : ' hidden'}>${h(g === 'entites' ? t('Entities') : par[g][0].titre || g)}</div>${
+    par[g].map((it) => { const i = n++; return `<div class="r" role="option" id="pal-o-${i}" aria-selected="false" data-i="${i}">${it.ent ? rowEntite(it.ent) : rowSource(it)}</div>`; }).join('')}</div>`).join('')
+    || (vide ? `<div class="empty"><div class="en">${t('No matches')}</div></div>`
+      : `<div class="empty"><div class="en">${t('No matches for “{}”', h(q.trim()))}</div><div class="ed">${t('Try a file name, or type {} for actions.', '>')}</div></div>`);
+  sRows = [...sRes.querySelectorAll('.r')];
+  sRows.forEach((r) => { r.addEventListener('mousedown', (ev) => { ev.preventDefault(); pick(+r.dataset.i); }); r.addEventListener('mousemove', () => setActive(+r.dataset.i)); });
+  setActive(0);
+  if (!muet) { clearTimeout(liveTimer); liveTimer = setTimeout(() => { palLive.textContent = !sItems.length ? t('No results') : sItems.length === 1 ? t('1 result') : t('{} results', sItems.length); }, 300); }
 }
-function setActive(i) { sActive = i; sRes.querySelectorAll('.r').forEach((r, k) => r.classList.toggle('active', k === i)); sRes.children[i]?.scrollIntoView({ block: 'nearest' }); }
-function pick(i) { const it = sItems[i]; if (!it) return; closePalette(); reveal(it.id, { focus: true }); }
-sInput.addEventListener('input', runSearch);
+function setActive(i) {
+  sActive = i; sRows.forEach((r, k) => { r.classList.toggle('active', k === i); r.setAttribute('aria-selected', String(k === i)); });
+  if (sRows[i]) { sInput.setAttribute('aria-activedescendant', sRows[i].id); sRows[i].scrollIntoView({ block: 'nearest' }); } else sInput.removeAttribute('aria-activedescendant');
+}
+function pick(i) {
+  const it = sItems[i]; if (!it) return;
+  if (it.ent) { closePalette(); reveal(it.ent.id, { focus: true }); return; }
+  const q = sInput.value; closePalette(!!(it.avant || it.info));
+  if (it.info) return; // a line of text: choosing it only closes the palette
+  try { Promise.resolve(it.executer(q)).catch((e) => console.error('floorplan extension', e)); } catch (e) { console.error('floorplan extension', e); }
+}
+sInput.placeholder = t('Search for a file, a phase, or type {} for actions', '>');
+sInput.addEventListener('input', () => runSearch());
 sInput.addEventListener('keydown', (ev) => {
   if (ev.key === 'ArrowDown' || ev.key === 'ArrowUp') { ev.preventDefault(); setActive(clamp(sActive + (ev.key === 'ArrowDown' ? 1 : -1), 0, sItems.length - 1)); }
   else if (ev.key === 'Enter') pick(sActive);
@@ -2474,7 +2693,7 @@ phoneQuery.addEventListener('change', placeZoom); placeZoom();
 $('#btn-panel').onclick = () => setPanel(document.body.classList.contains('no-panel'));
 Object.assign(state.kinds, store.get('kinds', {}));
 window.addEventListener('keydown', (ev) => {
-  if (pal.classList.contains('open') || ev.target.tagName === 'INPUT') return;
+  if (pal.classList.contains('open') || enSaisie(ev)) return;
   if (ev.key === '/' || (ev.key === 'k' && (ev.metaKey || ev.ctrlKey))) { ev.preventDefault(); openPalette(); }
   else if (ev.key === 'Backspace') { ev.preventDefault(); up(); }
   else if (ev.key === 'Escape') {
@@ -2485,13 +2704,14 @@ window.addEventListener('keydown', (ev) => {
     else if (ev.target === document.body || ev.target === document.documentElement || svg.contains(ev.target)) { if (state.selected) select(null); else up(); }
   }
   else if (G.meta?.vfTab === 'equipe' && /^[fFpP=+-]$/.test(ev.key)) { /* Équipe : ni cadrage, ni tiroir, ni zoom par la frappe (PU-G-137, Q8) */ }
-  else if (ev.key === 'f' || ev.key === 'F') fit(true);
+  else if ((ev.metaKey || ev.ctrlKey || ev.altKey) && /^[fFpP=+-]$/.test(ev.key)) { /* une lettre seule : jamais avec ⌘, Ctrl ou Alt */ }
+  else if (ev.key === 'f' || ev.key === 'F') cadrer();
   else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
   else if (ev.key === 'Enter' && typeof state.selected === 'string') open(state.selected);
   else if (state.flow && ev.key === 'ArrowRight') $('#fl-next')?.click();
   else if (state.flow && ev.key === 'ArrowLeft') $('#fl-prev')?.click();
-  else if (ev.key === '=' || ev.key === '+') zoomBy(1.2);
-  else if (ev.key === '-') zoomBy(0.83);
+  else if (ev.key === '=' || ev.key === '+') zoomBy(1.25);
+  else if (ev.key === '-') zoomBy(0.8);
 });
 // ======================= extension API =======================
 // Features in assets/ui/*.js are inlined after this script and talk to the viewer only through
@@ -2557,6 +2777,9 @@ window.Floorplan = Object.freeze({
   go, reveal, select, open, up, fit, render: (o) => render({ keepTransform: true, ...o }), refreshPanel: () => renderPanel(),
   showBoard, playFlow, startFlow, stopFlow: () => { if (state.flow) stopFlow(); },
   freeArea: () => freeArea(),
+  // 80-09 : cadrage unique, champ de lecture, garde de saisie, transformation par le chemin du moteur ; 80-13 : paramètres du lien de vue
+  cadrage, enSaisie, transformer, paramVue, lireParamVue, setReadingArea(fn) { readingProvider = typeof fn === 'function' ? fn : null; },
+  ajouterSource, // 80-14 : sources de la palette de commandes
   closeMenus: () => { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); },
   // asking
   addAskContext, ask: (text) => { closeSheet(); askInput.value = text; submitAsk(); }, askEngine: () => askState.engine,
@@ -2600,7 +2823,7 @@ if (init.s && isPhone()) { document.body.classList.remove('no-panel'); $('#btn-p
 const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();
 // vibeflow K5 : le premier rendu et `ready` attendent aussi que les scripts d'extension (ui/*.js, posés APRÈS ce script par la page) aient été exécutés (DOMContentLoaded) : polices déjà prêtes (Linux), `fontsReady` est résolue à la fin de ce script et le rendu partait avant eux (titre du panneau, définitions au focus posés sur un rendu déjà fait, écouteurs de `ready` posés trop tard)
 const extensionsPosees = window.VF_COQUILLE?.porteMoteur ? window.VF_COQUILLE.porteMoteur() : document.readyState === 'loading' ? /* vibeflow 79-16 : la coquille lève la porte du premier rendu une fois les extensions posées */ new Promise((ok) => document.addEventListener('DOMContentLoaded', ok, { once: true })) : Promise.resolve();
-Promise.all([fontsReady, extensionsPosees]).then(() => render({ nav: true, durable: true, after: () => { renderPanel(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
+Promise.all([fontsReady, extensionsPosees]).then(() => render({ nav: true, durable: true, after: () => { renderPanel(); surZ(init.z)(); emit('ready', {}); if (PLAN && window.FLOORPLAN_SERVER) showChangeResult(); } }));
 })();
 </script>
 <!--__UI_EXTENSIONS__-->

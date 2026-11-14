@@ -1026,7 +1026,7 @@ EOF
   assert_eq "M-HTML — rougit D2.5 (un message rendu en HTML fait naître un <img>) alors que les 40 rangées sont là (pas une panne d'un autre ordre)" "$(jq_ "$RM" '[j.xss.img > 0, j.xss.lit.includes("false"), j.ouvert.rangees].join("|")' 2>/dev/null)" "true|true|40"
   mutant M-COPIE 77-vf-git-rendu.js "writeText(code.textContent)" "writeText(code.textContent.slice(0, -1))" d2.js
   assert_eq "M-COPIE — rougit D2.4 (le texte reçu par l'API n'est plus celui du <code>) alors que la copie a bien eu lieu" "$(jq_ "$RM" '[j.copie.spy === j.copie.affiche, typeof j.copie.spy, j.copie.retour].join("|")' 2>/dev/null)" "false|string|Copiée"
-  mutant M-AJUSTEMENT ../viewer.html "else if (ev.key === 'f' || ev.key === 'F') fit(true);" "else if (ev.key === 'f' || ev.key === 'F') { }" d3a-complet.js
+  mutant M-AJUSTEMENT ../viewer.html "else if (ev.key === 'f' || ev.key === 'F') cadrer();" "else if (ev.key === 'f' || ev.key === 'F') { }" d3a-complet.js
 assert_eq "M-AJUSTEMENT — rougit D3.3 (la touche f ne fait rien : ni changement de k ni ajustement animé fit(true)) alors que + et - marchent" "$(jq_ "$RM" '[j.zoom.plus, j.zoom.moins, j.zoom.fit].join("|")' 2>/dev/null)" "true|true|false"
 mutant M-GLOBAL-G 77-vf-git-tiroir.js "if (tg && (tg.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(tg.tagName) >= 0)) return;" "if (false) return;" d3a-complet.js
   assert_eq "M-GLOBAL-G — rougit D3.1 (g ouvre le tiroir depuis un champ de saisie) alors que g hors champ marche toujours" "$(jq_ "$RM" '[j.champ_input.ouvert, j.g1, j.g2].join("|")' 2>/dev/null)" "true|true|false"
@@ -1034,7 +1034,8 @@ mutant M-GLOBAL-G 77-vf-git-tiroir.js "if (tg && (tg.isContentEditable || ['INPU
   assert_eq "M-HORS-DEPOT — rougit D3.1 hors dépôt (le tiroir existe alors qu'aucun ouvreur n'existe) alors que la page est rendue" "$(jq_ "$RM" '[j.tiroir, j.ligne].join("|")' 2>/dev/null)" "true|false"
   mutant M-DETAIL-HTML 77-vf-git-vue-detail.js "corpsMsg.textContent = m.length > 1 ? '\n' + m.slice(1).join('\n') : '';" "corpsMsg.innerHTML = m.length > 1 ? '\n' + m.slice(1).join('\n') : '';" d7-complet.js
   assert_eq "M-DETAIL-HTML — rougit D7.2 (un message rendu en HTML fait naître un <script> dans le détail) alors que le détail et ses 30 fichiers sont là" "$(jq_ "$RM" '[j.hostile.balises > 0, j.hostile.msgLit, j.ouvert.nb, j.ouvert.nVrais].join("|")' 2>/dev/null)" "true|false|1|30"
-  mutant M-SELECTION 77-vf-git-vue-detail.js "fermerDetail(); // un seul détail à la fois" "/* mutant : le détail précédent reste ouvert */" d8-complet.js
+  # deux garde-fous indépendants de « un seul détail » (80-06) : la fermeture explicite de ouvrirDetail ET la purge de monter() dans le volet ; le mutant retire les deux (sinon l'un masque l'autre)
+  MUT_AUX="77-vf-git-volet.js|for (const d of T.querySelectorAll('.vf-git-detail')) d.remove(); // un seul volet, même si l'appelant n'a pas fermé le précédent|/* mutant : le volet précédent reste monté */" mutant M-SELECTION 77-vf-git-vue-detail.js "fermerDetail(); // un seul détail à la fois" "/* mutant : le détail précédent reste ouvert */" d8-complet.js; MUT_AUX=
   assert_eq "M-SELECTION — rougit D8.1 (deux détails ouverts) alors que le clavier du graphe marche (↓ ↓ ↑ -> 2e rangée)" "$(jq_ "$RM" '[j.unSeul.details > 1, j.bas2haut1.i, j.entree.details].join("|")' 2>/dev/null)" "true|1|1"
   mutant M-RAFALE 77-vf-git-vue-detail.js "clearTimeout(minuterie); minuterie = setTimeout(rafraichir, RAFALE);" "rafraichir();" d9-complet.js
   assert_eq "M-RAFALE — rougit D9.1 (une relecture par signal : 3 et 3 au lieu de 1 et 1) alors que la sélection est conservée" "$(jq_ "$RM" '[j.deltas.git, j.deltas.wt, j.selection.sel.join() === j.selection.attendu].join("|")' 2>/dev/null)" "3|3|true"
