@@ -265,8 +265,9 @@
     const surMq = () => { if (ouv) ouv.det.open = !mq.matches; };
     mq.addEventListener('change', surMq); retraits.push(() => mq.removeEventListener('change', surMq));
     monte = { ouvrir, fermer: () => fermer(true), ouverte: () => ouv !== null };
-    // arrivée à froid sur #r=n:ag-<id> : les scripts se posent un à un, la régie (72) consomme l'ancre avant que ce fichier n'existe, donc avant l'abonnement ci-dessus ;
-    // elle a alors déplié et focalisé la ligne. Ce focus sur la ligne de l'agent est le témoin d'une ancre déjà consommée : la fiche s'ouvre à sa place.
+    // arrivée à froid sur #r=n:ag-<id> : les scripts se posent un à un, la régie (72) consomme l'ancre
+    // avant que ce fichier n'existe, donc avant l'abonnement ci-dessus ; elle a déplié et focalisé la ligne.
+    // Ce focus sur la ligne de l'agent est le témoin d'une ancre déjà consommée : la fiche s'ouvre à sa place.
     const froid = new URLSearchParams(String(W.location.hash || '').slice(1)).get('r'), af = froid && /^n:ag-(.+)$/.exec(froid);
     if (af) {
       const li = D.querySelector(`#vf-equipe li[data-vf-agent="${sel(af[1])}"]`);
