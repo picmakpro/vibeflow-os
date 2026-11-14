@@ -21,3 +21,6 @@
 Sur la tête finale commitée : burnup 26 PASS (2 s), blocages 17 PASS (2 s), vendor 252 PASS (83 s), projet-visite vert (647 s), projet-graphe 119 PASS (485 s, en parallèle de la visite).
 Sur la tête avant recoupe des lignes longues (changement sans effet de comportement) : serveur 98 PASS (56 s), securite 103 PASS (72 s), signal 76 PASS (32 s), transcript 103 PASS, lancer-suivi 39 PASS ; `test-ci-shard-suites.sh` 22 PASS (5 s) ; `check-version-sync.sh` vert.
 Premier rouge rencontré : V4c.9a (cliquet de colonnes) de `test-cockpit-vendor.sh`, corrigé en recoupant mes lignes ; vendor vert ensuite. T28-F de `test-dev-orchestrator.sh` non jouée (rouge local connu).
+
+## Correction après CI
+PC3.2 de `test-cockpit-projet-champs.sh` (rouge déterministe en CI, shard 6) attendait `metaVf` sans mes deux champs : `burnup` et `blocagesState` y sont inscrits à la suite de ceux de 76-04, rien d'autre n'est modifié. Rouge vu en local avant, vert après (suite rejouée une fois).
