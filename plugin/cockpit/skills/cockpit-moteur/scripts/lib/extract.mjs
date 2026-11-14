@@ -571,9 +571,12 @@ function headerComment(lines) {
   return cleanDoc(buf.join('\n'));
 }
 
+// The size mark (vibeflow:allow-large-file …) is a lint pragma, not a summary: blank its line (indexes kept) before reading the header.
+const SIZE_MARK = /^\s*(?:\/\/+|#+|\/\*+)?\s*vibeflow:allow-large-file\b/;
 function addDocs(src, lang, r) {
   const lines = src.split('\n');
-  r.doc = lang === 'python' ? pyDocAfter(lines, -1) : HASH_LANGS.has(lang) ? hashHeader(lines) : headerComment(lines);
+  const head = lines.map((l) => (SIZE_MARK.test(l) ? '' : l));
+  r.doc = lang === 'python' ? pyDocAfter(lines, -1) : HASH_LANGS.has(lang) ? hashHeader(head) : headerComment(head);
   for (const s of r.symbols || []) {
     const d = lang === 'python' ? pyDocAfter(lines, s.line - 1) : commentBefore(lines, s.line - 1);
     if (d) s.doc = d;

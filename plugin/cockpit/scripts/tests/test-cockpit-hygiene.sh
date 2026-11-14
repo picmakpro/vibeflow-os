@@ -107,6 +107,7 @@ M = {
  "M1-purge": ('[ "$q" = "$p" ] || n+=("$q")', 'n+=("$q")'),
  "m1": ('if (d || index(arg[top], t) > 0) print q " " arg[q]', 'print q " " arg[q]'),
  "m2": ('vf_hyg_ps_ok() { ps -eo', 'vf_hyg_ps_ok() { return 0; ps -eo'),
+ "AM7-tardif": ('. "$VF_HYG_DIR/chrome-saut.sh"', '. "$(dirname "${BASH_SOURCE[0]}")/chrome-saut.sh"'),
 }
 i, src, dst = sys.argv[1:4]; o, n = M[i]; s = open(src).read()
 if s.count(o) != 1: sys.exit("motif muté présent %d fois" % s.count(o))
@@ -141,6 +142,30 @@ mutant M1-kill m1pid "M1 — vf_hyg_kill refuse un PID sans la marque"
 mutant M1-purge m1pid "M1 — vf_hyg_stop retire le pid arrêté de PIDS"
 mutant m1 m1tree "m1 — l'étranger (marqué, ni descendant ni orphelin) n'est jamais listé"
 mutant m2 m2 "m2 — ps inutilisable"
+
+echo "=== H-AM7 — le filet de sortie AM7 (chrome-saut.sh) tient quand la suite est lancée par un chemin RELATIF et change de dossier ==="
+cat > "$WORK/am7-essai.sh" <<'EOF'
+# Suite d'essai : lancée par « bash ./essai.sh » depuis son propre dossier, source ./hygiene.sh (chemin relatif), pose CHROME vide (moitié navigateur non jouée) puis CHANGE DE DOSSIER, comme test-cockpit-questions.sh
+set -uo pipefail
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; PIDS=()
+trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
+. ./hygiene.sh; vf_hyg_init
+CHROME=""
+cd "$WORK"
+echo "essai : moitié navigateur non jouée"
+exit 0
+EOF
+am7() { # am7 <hygiene.sh à essayer> : « code de sortie / lignes FAIL AM7 / lignes « No such file » » de la suite d'essai, CI=1, lancée par chemin relatif
+  local d out rc; [ -f "$1" ] || { printf 'copie absente'; return 0; }   # une copie manquante donnerait « No such file » sur ./hygiene.sh : un mutant mort qui ressemble à un mutant tué
+  d="$(mktemp -d "$WORK/am7.XXXXXX")"
+  cp "$1" "$d/hygiene.sh"; cp "$HERE_T/chrome-saut.sh" "$d/chrome-saut.sh"; cp "$WORK/am7-essai.sh" "$d/essai.sh"
+  out="$( cd "$d" && env -u VF_CHROME_OPTIONNEL -u CHAINE_SANS_NAVIGATEUR -u SIGNAL_SANS_NAVIGATEUR LC_ALL=C CI=1 TMPDIR="$WORK" bash ./essai.sh 2>&1 )"; rc=$?
+  printf '%s/%s/%s' "$rc" "$(printf '%s\n' "$out" | grep -c 'FAIL — AM7')" "$(printf '%s\n' "$out" | grep -c 'No such file')"
+}
+assert_eq "H-AM7 — suite lancée par chemin relatif, CI=1, CHROME vide, dossier changé au niveau du script : sortie 1, un message AM7, aucun chargement en échec" "$(am7 "$HYG")" "1/1/0"
+python3 -I "$WORK/muter.py" AM7-tardif "$HYG" "$WORK/mut-AM7-tardif.sh" 2>&1; assert_eq "mutant AM7-tardif — la mutation s'applique (motif présent une fois)" "$?" "0"
+assert_eq "mutant AM7-tardif — la copie mutée porte la résolution tardive, une seule fois (preuve qu'elle est celle qui est chargée)" "$(grep -cF '. "$(dirname "${BASH_SOURCE[0]}")/chrome-saut.sh"' "$WORK/mut-AM7-tardif.sh" 2>/dev/null)" "1"
+assert_eq "mutant AM7-tardif — le chargement de chrome-saut.sh se résout de nouveau à la sortie (copie mutée bien chargée : « No such file » vu, sortie 0, aucun message AM7)" "$(am7 "$WORK/mut-AM7-tardif.sh")" "0/0/1"
 
 vf_hyg_assert
 TOTAL=$((PASS+FAIL))

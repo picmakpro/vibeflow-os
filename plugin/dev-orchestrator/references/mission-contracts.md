@@ -73,6 +73,7 @@ lignes** qui amortit les relectures intégrales de `.planning/` à chaque étage
 ```
 DIGEST (cache — le disque fait foi)
 - Mission : <objectif en 1 ligne> · Mode : <superviser|autonome>
+- Nœud : `<id du nœud DAG>`
 - Étape courante : <n° + objectif + critères de succès>
 - Périmètre de fichiers du nœud : <déclaré au dag add>
 - NE charge PAS : <périmètres gelés des autres nœuds en vol, dérivés de `dag.sh status --frozen`>
@@ -80,6 +81,19 @@ DIGEST (cache — le disque fait foi)
 - Verdicts amont utiles : <revue/audit/test pertinents pour ce mandat>
 - Conventions cibles : <2-3 lignes du CLAUDE.md projet qui engagent ce mandat>
 ```
+
+**Nœud du mandat (SOCL-05, P79-D-18).** La ligne `Nœud` porte l'identifiant du nœud DAG que le
+mandat sert, tel que `dag.sh add` l'a rendu dans `added` (jamais l'identifiant demandé quand
+`remapped` est vrai) : le même que celui passé à `register --node`. Un seul identifiant, deux
+canaux : le registre décide seul quand il porte un nœud pour l'agent, la ligne du mandat est le
+repli que lit le cockpit. Forme lue par `citationsDuMandat` (module `cockpit`, fichier
+`vf-cockpit-transcript.mjs`) : « nœud », deux-points facultatif, accents graves, identifiant du
+motif `[A-Za-z0-9][A-Za-z0-9._-]{0,63}`. La lecture porte sur les 8 000 premiers caractères du
+mandat seulement : le digest, ou au moins cette ligne, ouvre le mandat. Limite mesurée : un
+identifiant remappé (`remapped` vrai, forme `id::étape`) est hors motif, jamais rattaché par la
+citation du mandat (le registre, qui décide d'abord, le porte tel quel) ; poser des
+identifiants distincts d'emblée, pour que les deux canaux disent la même chose. La ligne n'est
+définie qu'ici : `team-kernel.md` y renvoie, aucun corps d'agent ne la recopie.
 
 Pour un nœud `revue-N` (ou `join-N` : l'union des plans des lots joints), le digest porte en plus le
 chemin du PLAN de l'étape : c'est l'entrée de l'axe Spec (§Étage revue, « Deux axes de revue »).

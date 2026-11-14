@@ -118,3 +118,18 @@
 - [cwd des workers = celui du manager](project_cwd-des-workers-herite-du-manager.md) — un worker part du cwd du manager, pas du worktree du mandat : imposer `cd <abs> &&`, vérifier `branch --contains`
 - [Coût d'une correction ciblée prouvée](project_cout-correction-ciblee-vf-coder.md) — 4 arbitrages + témoins + mutants = 203k tokens ; un budget de 300k ne loge pas aussi la revue
 - [TaskStop : propriétaire seul](project_taskstop-proprietaire-seul.md) — un parent ne stoppe pas son enfant ; « waiting on its own background work » ≠ retour, jamais close done dessus
+- [Pause remplacée qui drainait un flux](feedback_pause-remplacee-drainait-un-flux.md) — attendre la FIN du flux, pas son premier octet : R1.3 rouge 2 runs CI, 2 hypothèses fausses, signature `1R` tranchait
+- [Vert par effet de bord produit](feedback_vert-par-effet-de-bord-produit.md) — D3.3 vert avec `f` mort (auto-fit de la visite) : exiger le mutant « fonction morte » avant de croire un vert
+
+- [Scratchpad partagé : vert emprunté](feedback_scratchpad-partage-vert-emprunte.md) — partagé aussi avec les managers frères : tout sous `scratchpad/<mission>/`, nommer par worker
+- [Rouges Linux seulement : pointer, thème, gitconfig](project_chrome-headless-linux-pointer-none.md) — pointer: none, thème clair par défaut, /etc/gitconfig lfs que envGit laisse passer ; jamais les polices
+- [Garde côté page contre script de page](feedback_garde-cote-page-contre-script-de-page.md) — un script dans P POSTe la route lui-même : vérifier la route avant de proposer une garde client (F-1, Phase 72)
+- [ReDoS : 3 tours sans preuve générative](feedback_redos-trois-tours-sans-preuve-generative.md) — regex élargie = quadratique ; exiger N/2N généré dès le 1er mandat, U+2028 et tous les lecteurs
+- [Force-push refusé par le classifieur](project_force-push-refuse-classifieur.md) — même sur la branche de mission ; pousser après les juges, sinon corrections en avance rapide après le bump
+- [Suites à base figée rougissent à la fusion](project_fusion-suites-a-base-figee-rougissent-sans-conflit.md) — aucun conflit textuel, --cc muet : rejouer les suites sur le merge ET sur chaque parent
+- [Nettoyage par cwd](project_nettoyage-par-cwd-pas-par-chemin.md) — suites lancées en relatif échappent à pgrep : lsof -d cwd sous mon scratchpad ; la charge locale (50-60) fausse les suites temporisées
+- [Balayer les processus des workers](feedback_balayer-processus-des-workers.md) — « waiting on its own background work » = processus égaré ; ps sur le chemin du scratchpad, kill par PID
+- [Jeton de suites, attentes orphelines](project_jeton-de-suites-et-attentes-orphelines.md) — sous charge, jeton mkdir une-suite.sh tient ; les until…sleep des workers gèlent sous zsh et survivent à leur fin
+- [Budget de largeur de l'en-tête](feedback_budget-largeur-entete-partage-entre-lots.md) — deux lots disjoints par fichier ont rogné l'en-tête ensemble : responsive sur la branche fusionnée
+- [Jeton de suite de groupe](project_jeton-de-suite-de-groupe.md) — 4 managers en parallèle : baseline complète impossible ; jeton mkdir « une suite à la fois » + worktree parent figé comme ancre
+- [CI sans claude, rendu avant extensions](project_ci-sans-claude-avis-no-engine.md) — rouges Linux de #222 : avis no_engine et fonts.ready précoce, pas pointer: none ; mutants trop étroits après changement d ordre

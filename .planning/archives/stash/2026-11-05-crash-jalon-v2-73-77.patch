@@ -1,0 +1,209 @@
+diff --git a/.planning/BACKLOG.md b/.planning/BACKLOG.md
+index 55725096..ea671987 100644
+--- a/.planning/BACKLOG.md
++++ b/.planning/BACKLOG.md
+@@ -717,3 +717,13 @@ non corrigés. Lignes de `plugin/product-team-bundle/scripts/check-prd.sh` à re
+ - **Source :** `plugin/conductor/skills/vf-update/SKILL.md` et `plugin/_internal/vibeflow-update.sh`. Correctif = PR plus release patch.
+ 
+ **Déclencheur de reprise :** juste après la planification de la Phase 69 (demande de Samuel, session principale Claude Code, 2026-11-03).
++
++## Jalon inscrit sans `gsd-new-milestone` : le STATE ne bascule jamais au démarrage de sa première phase — DIFFÉRÉ (2026-11-03)
++
++**Origine :** session principale du 2026-11-03. Samuel constate que le STATE du compartiment `fiabilite` pointe toujours `equipe-produit-v1.0` avec la Phase 67 « closed ». Inscription demandée par Samuel (session principale Claude Code, 2026-11-03).
++- **Constat, mesuré :** sur `main` et sur `feat/phase-69-suivi-travail`, le frontmatter du STATE dit `milestone: equipe-produit-v1.0`, `milestone_name: « l'équipe produit » — Phases 57-66`, `current_phase: 67`. Or la 67 appartient à `vibeflow-v2.0`, et `equipe-produit-v1.0` n'est pas clos (Phases 63 à 66 ouvertes).
++- **Cause :** la forme « section de jalon distincte, **sans `gsd-new-milestone`** », posée par `11882c80` (gouvernance-labs, 2026-09-23) puis recopiée pour ECC, equipe-produit et vibeflow-v2.0 (`16387283`), sert à inscrire un jalon **sans le démarrer**, parce que le STATE ne tient qu'une position. Elle ne prévoit pas le geste suivant : basculer le STATE quand une phase de ce jalon démarre vraiment. La 67 a été exécutée, releasée et close sans que personne bascule.
++- **Piste :** au démarrage d'une phase (cadrage, plan ou exécution), comparer le jalon de la phase dans le ROADMAP à celui du STATE ; s'ils diffèrent, proposer la bascule (édition à la main du frontmatter, jamais `state record-session`, destructif), jamais d'office. Témoin rouge : un STATE sur `equipe-produit-v1.0` et une phase 69 de `vibeflow-v2.0` qui démarre → aucune alerte aujourd'hui.
++- **Correction ponctuelle :** STATE basculé à la main sur `vibeflow-v2.0`, phase 69 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « vibeflow-v2.0, phase 69 (Recommandé) »), dans la PR qui inscrit les Phases 73 à 77.
++
++**Déclencheur de reprise :** la prochaine inscription d'un jalon, ou la Phase 64 (contrôles branchés en nœuds du plan de bataille).
+diff --git a/.planning/workstreams/fiabilite/ROADMAP.md b/.planning/workstreams/fiabilite/ROADMAP.md
+index e9de2d1f..be0dd826 100644
+--- a/.planning/workstreams/fiabilite/ROADMAP.md
++++ b/.planning/workstreams/fiabilite/ROADMAP.md
+@@ -27,11 +27,12 @@
+   dans la ROADMAP plate **sans `gsd-new-milestone`** (même forme que `gouvernance-labs-v1.0`) ;
+   **exécution après la clôture de `fiabilite-v1.0`**, en parallèle du jalon de Willy
+   (compartiment `gouvernance`) — arbitrage Samuel, AskUserQuestion session principale, 2026-09-25.
+-- 📋 **vibeflow-v2.0** — « le cockpit VibeFlow » — Phases 67-72 — **inscrit 2026-11-01** — le cockpit en tête :
++- 📋 **vibeflow-v2.0** — « le cockpit VibeFlow » — Phases 67-77 — **inscrit 2026-11-01** — le cockpit en tête :
+   un cockpit floorplan (onglets Projet et Code) sur un socle partagé, puis `vf-signal` embarqué sur ce même socle, puis
+   le suivi du travail en cours dans le cockpit (Phase 69, inscrite 2026-11-03), puis les finitions UI du cockpit (Phase 70, inscrite 2026-11-03), puis le terminal intégré (Phase 71) et
+-  lancer du travail depuis les cartes (Phase 72), inscrites 2026-11-03 ; ordre 69 → 68 → 70 → 71 → 72 (arbitrage Samuel,
+-  AskUserQuestion session principale, 2026-11-03).
++  lancer du travail depuis les cartes (Phase 72), inscrites 2026-11-03, puis les Phases 73 à 77 (gouvernance, équipe dans le
++  temps, activité sur le code, traçabilité, santé et synthèse), inscrites 2026-11-03 ; ordre
++  69 → 73 → 68 → 70 → 71 → 72 → 74 → 75 → 76 → 77 (arbitrages Samuel, AskUserQuestion session principale, 2026-11-03).
+   `equipe-produit-v1.0` reste ouvert, son sort se tranche à sa clôture (arbitrage Samuel, AskUserQuestion session
+   principale, 2026-11-01). Sources : `.planning/notes/2026-11-01-cockpit-facettes.md`,
+   `docs/research/2026-11-01-etude-floorplan-cockpit.md`, `.planning/spikes/WRAP-UP-SUMMARY.md`. Même forme que ECC : section
+@@ -129,6 +130,11 @@
+ - [ ] Phase 70: Finitions UI du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
+ - [ ] Phase 71: Terminal intégré au cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
+ - [ ] Phase 72: Lancer du travail depuis les cartes du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0)
++- [ ] Phase 73: Gouvernance au cockpit — arbitrages en attente, worktrees et verrous (inscrite 2026-11-03, jalon vibeflow-v2.0)
++- [ ] Phase 74: L'équipe dans le temps — swim-lanes, coût, replay (inscrite 2026-11-03, jalon vibeflow-v2.0)
++- [ ] Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte (inscrite 2026-11-03, jalon vibeflow-v2.0)
++- [ ] Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire (inscrite 2026-11-03, jalon vibeflow-v2.0)
++- [ ] Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up (inscrite 2026-11-03, jalon vibeflow-v2.0)
+ 
+ <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
+ 
+@@ -797,7 +803,7 @@ Plans:
+ 
+ - [ ] TBD (run /gsd-plan-phase 66 to break down)
+ 
+-## 📋 Milestone vibeflow-v2.0 — « le cockpit VibeFlow » (Phases 67-72)
++## 📋 Milestone vibeflow-v2.0 — « le cockpit VibeFlow » (Phases 67-77)
+ 
+ **Milestone Goal :** un saut d'usage visible pour qui installe VibeFlow : un cockpit qui montre le projet, le code
+ et qui est au travail, dans tout lab GSD, sur un socle partagé avec le panneau compact `vf-signal`. Le cockpit
+@@ -819,6 +825,11 @@ Cadrage mis à jour le même jour : la 69 couvre aussi l'équipe au travail (P69
+ terminal en 71 (Recommandé) », puis « Oui, 69 / 71 / 72 (Recommandé) »). **Ordre du jalon :** 69 → 68 → 70 → 71 → 72 (même arbitrage :
+ « 69 → 68 → 70 → 71 → 72 (Recommandé) ») ; la 72 dépend de la 71.
+ 
++**Phases 73 à 77 :** inscrites le 2026-11-03 depuis la recherche `.planning/notes/2026-11-03-cockpit-idees-recherche.md`
++(arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « toutes les propositions sont bien, intègre-les au jalon », puis « 5 phases thématiques (Recommandé) »).
++**Ordre du jalon, mis à jour :** 69 → 73 → 68 → 70 → 71 → 72 → 74 → 75 → 76 → 77 (même session : « Gouvernance tôt, reste après
++72 (Recommandé) »). Contraintes communes : traces locales seulement, aucune lecture réseau, lecture seule, un ajout = un retrait.
++
+ ### Phase 67: Cockpit floorplan sur socle partagé
+ 
+ > Cadrée le 2026-11-01 (`67-CONTEXT.md`, P67-D-01..18) ; planifiée le 2026-11-01.
+@@ -939,3 +950,73 @@ Plans:
+ Plans:
+ 
+ - [ ] TBD (run /gsd-plan-phase 72 to break down)
++
++### Phase 73: Gouvernance au cockpit — arbitrages en attente, worktrees et verrous
++
++> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
++
++**Goal:** Le cockpit montre ce qui attend une décision humaine (arbitrages en attente, reliés à leur phase et à ce qu'ils bloquent), qui tient le verrou de driver, quels worktrees et branches existent avec leur travail non commité, et l'alerte du watchdog posée sur le nœud de mission concerné.
++**Requirements**: TBD — posées au cadrage.
++**Depends on:** Phase 69 (objet `avancement`, collecteur `who`) ; ordre du jalon : juste après la 69.
++**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 9, 13, 4).
++**Plans:** 0 plans
++
++Plans:
++
++- [ ] TBD (run /gsd-plan-phase 73 to break down)
++
++### Phase 74: L'équipe dans le temps — swim-lanes, coût, replay
++
++> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
++
++**Goal:** L'onglet Équipe montre les agents sur un axe de temps (une ligne par agent, colorée par nœud de DAG), le coût en jetons et en durée par mission, phase et agent, et rejoue une mission nœud par nœud avec un curseur temporel.
++**Requirements**: TBD — posées au cadrage.
++**Depends on:** Phase 69 (onglet Équipe, lien agent ↔ nœud) ; ordre du jalon : après la 72.
++**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 1, 2, 3).
++**Plans:** 0 plans
++
++Plans:
++
++- [ ] TBD (run /gsd-plan-phase 74 to break down)
++
++### Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte
++
++> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
++
++**Goal:** La carte Code se colore par l'activité : fréquence de changement croisée avec la taille, fichiers qui changent ensemble, fichiers couverts par un gate ou une suite et zones sans témoin, fichiers lus ou modifiés par la mission en cours.
++**Requirements**: TBD — posées au cadrage.
++**Depends on:** Phase 67 (onglet Code) ; Phase 69 pour l'empreinte des agents ; ordre du jalon : après la 74.
++**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 5, 6, 7, 8).
++**Plans:** 0 plans
++
++Plans:
++
++- [ ] TBD (run /gsd-plan-phase 75 to break down)
++
++### Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire
++
++> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
++
++**Goal:** Le cockpit relie exigence → plan → SUMMARY → VERIFICATION → recette avec les trous en rouge, les décisions (ADR, arbitrages préfixés, commits qui les citent) en graphe navigable, et la mémoire des agents en graphe de liens avec ses entrées orphelines ou périmées.
++**Requirements**: TBD — posées au cadrage.
++**Depends on:** Phase 69 (rattachement des missions) ; ordre du jalon : après la 75.
++**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 10, 11, 14).
++**Plans:** 0 plans
++
++Plans:
++
++- [ ] TBD (run /gsd-plan-phase 76 to break down)
++
++### Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up
++
++> **Non cadrée — cadrage par le manager à suivre.** Inscrite le 2026-11-03 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03).
++
++**Goal:** Le cockpit montre en jauges les budgets de la méthode (densité des agents, skills, taille du ROADMAP et du BACKLOG, baseline d'instructions), résume ce qui a changé depuis la dernière visite, et trace le burn-up du jalon en pourcentage strict.
++**Requirements**: TBD — posées au cadrage.
++**Depends on:** Phase 69 (avancement des phases et du jalon) ; ordre du jalon : après la 76.
++**Sources:** `.planning/notes/2026-11-03-cockpit-idees-recherche.md` (idées 12, 15, 16).
++**Plans:** 0 plans
++
++Plans:
++
++- [ ] TBD (run /gsd-plan-phase 77 to break down)
+diff --git a/.planning/notes/2026-11-03-cockpit-idees-recherche.md b/.planning/notes/2026-11-03-cockpit-idees-recherche.md
+new file mode 100644
+index 00000000..27fed29b
+--- /dev/null
++++ b/.planning/notes/2026-11-03-cockpit-idees-recherche.md
+@@ -0,0 +1,58 @@
++# Cockpit — idées au-delà des Phases 67 à 72 (recherche du 2026-11-03)
++
++**Statut :** inscrites au jalon `vibeflow-v2.0` en Phases 73 à 77 (arbitrage Samuel, AskUserQuestion session
++principale, 2026-11-03 : « toutes les propositions sont bien, intègre-les au jalon », découpage « 5 phases
++thématiques (Recommandé) », ordre « Gouvernance tôt, reste après 72 (Recommandé) »). Aucune n'est cadrée.
++
++## Contraintes communes (reprises du cockpit livré)
++
++- Traces locales seulement, aucune lecture réseau (suite de CKPT-03 ; CI, PR, merge hors carte comme en 69).
++- Lecture seule sur `.planning/` ; calcul dans le socle, schéma versionné.
++- Un ajout = un retrait (SOBR-01..08) : chaque phase nomme son retrait au cadrage.
++- Libellés en français ; rendu en texte, CSP inchangée.
++
++## Ce que montrent les outils comparables
++
++- Tableaux de bord d'agents Claude Code (agents-observe, disler/claude-code-hooks-multi-agent-observability,
++  skill agent-observability) : hiérarchie parent / sous-agent, swim-lanes d'agents parallèles, replay de session,
++  jetons par modèle ; tous alimentés par les hooks (PreToolUse, PostToolUse, SubagentStop).
++- Observabilité LLM (Langfuse, W&B Weave) : waterfall de spans imbriqués avec latence et coût, « traces les plus chères »,
++  coût moyen par type d'agent.
++- Analyse de code par l'historique (CodeScene) : hotspots (fréquence de changement × complexité), couplage de changement,
++  îlots de connaissance.
++- Tableaux de bord d'ingénierie (Cortex, LinearB, Metabase, Jellyfish) : cycle découpé par étape, burn-up, travail en cours,
++  métriques lues en tendance plutôt qu'en classement.
++
++## Les 16 idées et leur phase
++
++| # | Idée | Phase | Source locale envisagée |
++|---|------|-------|-------------------------|
++| 9 | File des arbitrages en attente (décisions qui attendent Samuel, reliées à leur phase et à ce qu'elles bloquent) | 73 | `*-CONTEXT.md` (décisions préfixées `P<n>-D-xx`), DAG de mission |
++| 13 | Worktrees, branches et verrous (qui tient `driver-lock`, worktrees et leur travail non commité, serveurs orphelins) | 73 | `git worktree list`, registre `driver-lock.sh`, `.vibeflow/cockpit/.cache/` |
++| 4 | Alerte du watchdog sur le nœud concerné | 73 | sortie de `mission-watchdog` |
++| 1 | Swim-lanes des agents (une ligne par agent sur un axe de temps) | 74 | `meta.json` des sous-agents (horodatages) |
++| 2 | Coût par mission, phase et agent (jetons, durée) | 74 | champ `usage` des transcripts `.jsonl` |
++| 3 | Replay d'une mission (curseur temporel sur le DAG) | 74 | transitions des DAG de mission, historique git |
++| 5 | Hotspots sur la carte Code (fréquence de changement × taille) | 75 | `git log` local |
++| 6 | Couplage de changement (fichiers qui changent ensemble) | 75 | `git log` local |
++| 7 | Carte des gardes (fichiers couverts par quel gate ou suite, zones sans témoin) | 75 | `ci.yml`, motifs de `check-gate-touche.sh` |
++| 8 | Empreinte des agents (fichiers lus ou modifiés par la mission en cours) | 75 | transcripts (nom d'outil et cible, jamais le contenu) |
++| 10 | Traçabilité exigence → plan → SUMMARY → VERIFICATION → recette, trous en rouge | 76 | `REQUIREMENTS.md`, dossiers de phase |
++| 11 | Graphe des décisions (ADR ↔ arbitrages ↔ commits qui les citent) | 76 | `docs/ADR.md`, `*-CONTEXT.md`, `git log` |
++| 14 | Graphe de la mémoire (liens `[[...]]`, mémoires orphelines ou périmées) | 76 | mémoires d'agents du lab |
++| 12 | Santé de la méthode (jauges : densité agents, skills, ROADMAP, BACKLOG, baseline d'instructions) | 77 | `check-*.sh`, baseline du budget d'instructions |
++| 15 | « Depuis ta dernière visite » (ce qui a changé) | 77 | état précédent mémorisé côté navigateur ou socle |
++| 16 | Burn-up du jalon (phases closes dans le temps, pourcentage strict) | 77 | dates git, cases du ROADMAP |
++
++## Sources
++
++- https://awesome.ecosyste.ms/projects/github.com%2Fsimple10%2Fagents-observe
++- https://docsearch.algolia.com/mcp/docs/repo/disler/claude-code-hooks-multi-agent-observability
++- https://www.pulse.bot/ai/news/show-hn-real-time-dashboard-for-claude-code-agent-teams-298d7a5e-8671-43f1-b26a-dd21730d9a63
++- https://skillsmp.com/ar/creators/zpankz/mcp-skillset/agent-observability
++- https://blog.elest.io/self-host-langfuse-to-trace-your-ai-agents/
++- https://research.aimultiple.com/agentic-monitoring
++- https://thectoclub.com/fr/tools/avis-codescene/
++- https://docs.cortex.io/eng-intelligence/dora-dashboard
++- https://www.metabase.com/dashboards/engineering-teams
++- https://jellyfish.co/library/developer-productivity/dashboard/

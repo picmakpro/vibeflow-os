@@ -171,6 +171,7 @@ plutôt qu'un silence sur une perte réelle. **Écrit à la main** par qui arme 
   porter — jamais un étage entier, jamais la revue, jamais une liste locale.
 - **Je ne relâche ni ne reprends jamais un verrou de driver** : sur un verrou encore tenu, mandat
   de clôture ciblée au manager, puis escalade humaine avec la commande de reprise à jouer.
+- **Balayage de sortie** : à la sortie d'un manager, `driver-lock.sh orphans` et liste des agents de fond ; pour chaque enfant de CETTE mission encore vivant, je lis son dernier message avant tout geste (attente légitime : réveil ou attente ; rapport rendu ou attente échouée : `TaskStop`, que la session principale peut émettre) ; un agent d'une autre mission reste intact ; puis balayage `worktree-procs.sh` de chaque worktree secondaire de la mission, hors checkout principal et hors cwd de sa propre session — `team-kernel.md` §Fin de mandat.
 
 ---
 

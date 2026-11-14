@@ -7,11 +7,18 @@
 # incapable de rougir est un defaut, au meme titre que le gate qu'elle verifie.
 #
 # Trois issues QUAL-01 (PASS / FAIL / BRUYANT) plus SILENCE et USAGE, et NEUF mutants opposables
-# (MUT-1 a MUT-9), un par comparaison du script sous test — regle de comptage (decision du manager,
+# d'origine (MUT-1 a MUT-9), un par comparaison du script sous test — regle de comptage (decision du manager,
 # 2026-09-17) : chaque mutant asserte le rc EXACT attendu sur le mutant ET sur l'original. Un mutant
 # qui « echoue » par un plantage (rc 2) ou une plage vide (rc 3) la ou le cas attendait un flip 0/1
 # n'est PAS compte comme tue. La ligne de succes d'un mutant a une forme UNIQUE, exigee par le verify
 # du plan : « ✓ MUT-<n> TUE : rc_mutant=<x> attendu <x>, rc_original=<y> attendu <y> ».
+# Section DELEGATION (2026-11-12) : une ligne portant le radical « deleg » ne vaut pas citation (hausse,
+# retrait de ligne, sentinelle). Six verifications de mutant s'y ajoutent, soit QUINZE au total :
+# MUT-10 (exclusion retiree), MUT-10b (meme mutant, usage sentinelle), MUT-11 (radical reduit a « delegue »),
+# MUT-12 (repli de l'accent combinant retire), MUT-13 (test de forme de la ligne d'information retire),
+# MUT-14 (radical remis a « delegu » : « delegation » et « delegate » ne seraient plus ecartes).
+# MUT-10 a MUT-12 suivent le patron rc_mutant/rc_original ; MUT-13 compare la presence de la ligne
+# INFO-LIGNE-DELEGATION-ECARTEE (rc 1 des deux cotes) et a sa propre ligne de succes.
 set -uo pipefail
 
 SCRIPT="$(cd "$(dirname "$0")/.." && pwd)/check-baseline-arbitrage.sh"
@@ -79,7 +86,9 @@ w_baseline() { cat > "$1/.planning/instruction-budget-baselines.tsv"; }
 commit_avec() {  # <root> <message>
   local root="$1" msg="$2"
   git_c "$root" add -A >/dev/null
-  git_c "$root" commit -q -m "$msg" >/dev/null
+  # precomposeunicode=false : sur macOS, la valeur par defaut (true) renormalise en NFC un message passe
+  # par -m ; les cas DEL a accent combinant (NFD) seraient alors vides en local (revue F2).
+  git_c "$root" -c core.precomposeunicode=false commit -q -m "$msg" >/dev/null
 }
 
 base_of() { git_c "$1" rev-list --max-parents=0 HEAD | tail -1; }
@@ -117,7 +126,9 @@ safe_run() {
 make_mutant() {
   local name="$1" old="$2" new="$3"
   local out="$MUTD/${name}.sh"
-  awk -v old="$old" -v new="$new" '{ if ($0 == old) { print new } else { print } }' "$SCRIPT" > "$out"
+  # ENVIRON et non -v : awk -v interprete les echappements (\314 deviendrait un octet), le mutant ne
+  # retrouverait plus la ligne a remplacer.
+  MUT_OLD="$old" MUT_NEW="$new" awk '{ if ($0 == ENVIRON["MUT_OLD"]) { print ENVIRON["MUT_NEW"] } else { print } }' "$SCRIPT" > "$out"
   if cmp -s "$out" "$SCRIPT"; then
     echo "$out"
     return 1
@@ -526,6 +537,339 @@ else
   TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D" --base-ref "$B"
   if [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 0 ]; then okmut 9 "$rc_mut" 1 "$rc_orig" 0
   else komut 9 "echappatoire par citation du retrait de ligne neutralisee" "rc_mutant=1 rc_original=0" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+
+TARGET="$SCRIPT"
+
+echo "== test-check-baseline-arbitrage : DELEGATION (une ligne de delegation ne vaut pas arbitrage) =="
+
+# Une ligne du message qui porte le radical « delegu » (toute casse, avec ou sans accent) ne vaut JAMAIS
+# citation, meme si elle porte « decision », deux virgules et une date : c'est la forme exacte d'une
+# decision DELEGUEE, pas d'un arbitrage direct. La regle vaut pour TOUS les usages de la citation :
+# hausse, retrait de ligne dont la cible existe encore, neutralisation de sentinelle. Le mot-cle
+# « décision » reste volontairement en minuscules accentuees dans toutes les lignes de delegation
+# ci-dessous : seule l'exclusion du radical peut alors les faire rougir.
+DIRECT='arbitrage Samuel, AskUserQuestion session principale, 2026-09-17'
+deleg_ligne() { printf 'décision %s par Samuel (message session principale, 2026-11-08), option recommandée' "$1"; }
+DELEG="$(deleg_ligne déléguée)"
+NFD_ACUTE="$(printf '\314\201')"
+
+# cas_hausse <nom> <message> -> out, rc (hausse de a.md 5 -> 9 portee par un commit au message donne)
+cas_hausse() {
+  D="$(mk_repo "$1")"; B="$(base_of "$D")"
+  printf '%s\n' '# baseline de fixture' "plugin/demo/a.md${TAB}10${TAB}9" "plugin/demo/b.md${TAB}20${TAB}8" | w_baseline "$D"
+  commit_avec "$D" "$2"
+  safe_run out rc "$D" --base-ref "$B"
+}
+# cas_retrait <nom> <message> -> out, rc (ligne a.md retiree de la baseline, fichier conserve)
+cas_retrait() {
+  D="$(mk_repo "$1")"; B="$(base_of "$D")"
+  printf '%s\n' '# baseline de fixture' "plugin/demo/b.md${TAB}20${TAB}8" | w_baseline "$D"
+  commit_avec "$D" "$2"
+  safe_run out rc "$D" --base-ref "$B"
+}
+# cas_sentinelle <nom> <message> -> out, rc (sentinelle armed supprimee)
+cas_sentinelle() {
+  D="$(mk_repo "$1")"; B="$(base_of "$D")"
+  rm -f "$D/.planning/.instruction-budget-armed"
+  commit_avec "$D" "$2"
+  safe_run out rc "$D" --base-ref "$B"
+}
+
+# --- DEL 1 : hausse dont la SEULE citation est la ligne de delegation -> rc 1 -----------------------
+cas_hausse del1 "feat: hausse instructions a.md
+
+${DELEG}"
+case "$out" in *HAUSSE-SANS-ARBITRAGE*) has=1 ;; *) has=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "DEL hausse, ligne de delegation seule -> rc 1 HAUSSE-SANS-ARBITRAGE"
+else ko "DEL hausse, ligne de delegation seule" "rc=1 HAUSSE-SANS-ARBITRAGE" "rc=$rc :: $out"; fi
+case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE:*) hasinfo=1 ;; *) hasinfo=0 ;; esac
+[ "$hasinfo" -eq 1 ] && ok "DEL refus hausse, delegation seule -> INFO-LIGNE-DELEGATION-ECARTEE presente" \
+  || ko "DEL refus hausse, delegation seule : ligne d'information" "INFO-LIGNE-DELEGATION-ECARTEE presente" "absente :: $out"
+
+# La derniere ligne de sortie d'un refus reste la ligne de verdict (l'etape CI en prend `tail -1`)
+last="$(printf '%s\n' "$out" | tail -1)"
+case "$last" in HAUSSE-SANS-ARBITRAGE:*) lastok=1 ;; *) lastok=0 ;; esac
+[ "$lastok" -eq 1 ] && ok "DEL refus hausse, delegation seule -> derniere ligne = verdict" \
+  || ko "DEL refus hausse, delegation seule : derniere ligne" "HAUSSE-SANS-ARBITRAGE: ..." "derniere ligne = $last"
+
+# --- DEL 1b : refus sans aucune ligne de delegation -> pas de ligne d'information ----------------------------
+cas_hausse del1b "feat: hausse instructions a.md sans citation"
+case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE*) hasinfo=1 ;; *) hasinfo=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$hasinfo" -eq 0 ]; then ok "DEL refus hausse sans delegation -> rc 1, pas de ligne d'information"
+else ko "DEL refus hausse sans delegation" "rc=1 sans INFO-LIGNE-DELEGATION-ECARTEE" "rc=$rc :: $out"; fi
+
+# --- DEL 1c : refus dont le message porte une ligne de delegation NON formee (sans date ni virgules) -> pas d'info
+cas_hausse del1c "feat: hausse instructions a.md
+
+décision déléguée par Samuel"
+case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE*) hasinfo=1 ;; *) hasinfo=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$hasinfo" -eq 0 ]; then ok "DEL refus, ligne de delegation non formee -> rc 1, pas de ligne d'information"
+else ko "DEL refus, ligne de delegation non formee" "rc=1 sans INFO-LIGNE-DELEGATION-ECARTEE" "rc=$rc :: $out"; fi
+
+# --- DEL 2 : citation directe seule, sur plusieurs lignes de corps -> rc 0 ----------------------------
+cas_hausse del2 "feat: hausse instructions a.md
+
+Contexte de la hausse.
+${DIRECT}
+Fin du message."
+[ "$rc" -eq 0 ] && ok "DEL hausse, citation directe seule -> rc 0" || ko "DEL hausse, citation directe seule" "rc=0" "rc=$rc :: $out"
+
+# --- DEL 3 : citation directe ET ligne de delegation, deux lignes distinctes -> rc 0 ------------------
+cas_hausse del3 "feat: hausse instructions a.md
+
+${DELEG}
+${DIRECT}"
+[ "$rc" -eq 0 ] && ok "DEL hausse, citation directe + ligne de delegation -> rc 0" || ko "DEL hausse, citation directe + delegation" "rc=0" "rc=$rc :: $out"
+
+# --- DEL 3b : meme chose, delegation APRES la citation directe -> rc 0 ---------------------------------
+cas_hausse del3b "feat: hausse instructions a.md
+
+${DIRECT}
+${DELEG}"
+[ "$rc" -eq 0 ] && ok "DEL hausse, citation directe puis ligne de delegation -> rc 0" || ko "DEL hausse, directe puis delegation" "rc=0" "rc=$rc :: $out"
+
+# --- DEL 4 : formes du radical, chacune SEULE -> rc 1 (casse, accents, forme decomposee) ---------------
+n=0
+for forme in "delegue" "DÉLÉGUÉE" "Déléguée" "DELEGUEE" "délègue" "DéLéGuée" "déléguons" "déléguant" "DÉLÉGUANT" "de${NFD_ACUTE}le${NFD_ACUTE}guee" "DE${NFD_ACUTE}LE${NFD_ACUTE}GUEE"; do
+  n=$((n + 1))
+  cas_hausse "del4-$n" "feat: hausse instructions a.md
+
+$(deleg_ligne "$forme")"
+  case "$out" in *HAUSSE-SANS-ARBITRAGE*) has=1 ;; *) has=0 ;; esac
+  if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "DEL forme « ${forme} » seule -> rc 1 HAUSSE-SANS-ARBITRAGE"
+  else ko "DEL forme « ${forme} » seule" "rc=1 HAUSSE-SANS-ARBITRAGE" "rc=$rc :: $out"; fi
+done
+
+# --- DEL 4b : une forme de delegation + citation directe -> rc 0 (formes sans accent et majuscules) ----
+n=0
+for forme in "delegue" "DÉLÉGUÉE" "Déléguée"; do
+  n=$((n + 1))
+  cas_hausse "del4b-$n" "feat: hausse instructions a.md
+
+$(deleg_ligne "$forme")
+${DIRECT}"
+  [ "$rc" -eq 0 ] && ok "DEL forme « ${forme} » + citation directe -> rc 0" || ko "DEL forme « ${forme} » + citation directe" "rc=0" "rc=$rc :: $out"
+done
+
+# --- DEL 5 : retrait de ligne, cible presente, delegation seule -> rc 1 ----------------------------------
+cas_retrait del5 "chore: retire a.md de la baseline, fichier conserve
+
+${DELEG}"
+case "$out" in *LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE*) has=1 ;; *) has=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "DEL retrait cible presente, delegation seule -> rc 1 LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE"
+else ko "DEL retrait cible presente, delegation seule" "rc=1 LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE" "rc=$rc :: $out"; fi
+case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE:*) hasinfo=1 ;; *) hasinfo=0 ;; esac
+[ "$hasinfo" -eq 1 ] && ok "DEL refus retrait, delegation seule -> INFO-LIGNE-DELEGATION-ECARTEE presente" \
+  || ko "DEL refus retrait, delegation seule : ligne d'information" "INFO-LIGNE-DELEGATION-ECARTEE presente" "absente :: $out"
+last="$(printf '%s\n' "$out" | tail -1)"
+case "$last" in LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE:*) lastok=1 ;; *) lastok=0 ;; esac
+[ "$lastok" -eq 1 ] && ok "DEL refus retrait, delegation seule -> derniere ligne = verdict" \
+  || ko "DEL refus retrait, delegation seule : derniere ligne" "LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE: ..." "derniere ligne = $last"
+
+# --- DEL 6 : retrait de ligne, delegation + citation directe -> rc 0, la ligne DIRECTE est recopiee -------
+cas_retrait del6 "chore: retire a.md de la baseline, fichier conserve
+
+${DELEG}
+${DIRECT}"
+case "$out" in *AVERTISSEMENT-LIGNE-RETIREE-ARBITREE*) hasw=1 ;; *) hasw=0 ;; esac
+case "$out" in *"citation : ${DIRECT}"*) hascit=1 ;; *) hascit=0 ;; esac
+case "$out" in *"option recommandée"*) hasdel=1 ;; *) hasdel=0 ;; esac
+if [ "$rc" -eq 0 ] && [ "$hasw" -eq 1 ] && [ "$hascit" -eq 1 ] && [ "$hasdel" -eq 0 ]; then
+  ok "DEL retrait cible presente, delegation + directe -> rc 0, ligne directe recopiee, jamais la delegation"
+else ko "DEL retrait cible presente, delegation + directe" "rc=0 AVERTISSEMENT-LIGNE-RETIREE-ARBITREE, citation = ligne directe, delegation absente de la sortie" "rc=$rc :: $out"; fi
+
+# --- DEL 7 : sentinelle supprimee, delegation seule -> rc 1 ------------------------------------------------
+cas_sentinelle del7 "chore: retire la sentinelle armed
+
+${DELEG}"
+case "$out" in *SENTINELLE-NEUTRALISEE*) has=1 ;; *) has=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "DEL sentinelle supprimee, delegation seule -> rc 1 SENTINELLE-NEUTRALISEE"
+else ko "DEL sentinelle supprimee, delegation seule" "rc=1 SENTINELLE-NEUTRALISEE" "rc=$rc :: $out"; fi
+case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE:*) hasinfo=1 ;; *) hasinfo=0 ;; esac
+[ "$hasinfo" -eq 1 ] && ok "DEL refus sentinelle, delegation seule -> INFO-LIGNE-DELEGATION-ECARTEE presente" \
+  || ko "DEL refus sentinelle, delegation seule : ligne d'information" "INFO-LIGNE-DELEGATION-ECARTEE presente" "absente :: $out"
+last="$(printf '%s\n' "$out" | tail -1)"
+case "$last" in SENTINELLE-NEUTRALISEE:*) lastok=1 ;; *) lastok=0 ;; esac
+[ "$lastok" -eq 1 ] && ok "DEL refus sentinelle, delegation seule -> derniere ligne = verdict" \
+  || ko "DEL refus sentinelle, delegation seule : derniere ligne" "SENTINELLE-NEUTRALISEE: ..." "derniere ligne = $last"
+
+# --- DEL 8 : sentinelle supprimee, delegation + citation directe -> rc 0 ------------------------------------
+cas_sentinelle del8 "chore: retire la sentinelle armed
+
+${DELEG}
+${DIRECT}"
+[ "$rc" -eq 0 ] && ok "DEL sentinelle supprimee, delegation + directe -> rc 0" || ko "DEL sentinelle supprimee, delegation + directe" "rc=0" "rc=$rc :: $out"
+
+# --- DEL 9 : sentinelle non vide videe, delegation seule -> rc 1 (voie M -> taille nulle) ------------------
+D="$(mk_repo del9)"; B="$(base_of "$D")"
+: > "$D/.planning/.requirements-survival-armed"
+commit_avec "$D" "chore: vide la sentinelle requirements-survival
+
+${DELEG}"
+safe_run out rc "$D" --base-ref "$B"
+case "$out" in *SENTINELLE-NEUTRALISEE*) has=1 ;; *) has=0 ;; esac
+if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ]; then ok "DEL sentinelle videe, delegation seule -> rc 1 SENTINELLE-NEUTRALISEE"
+else ko "DEL sentinelle videe, delegation seule" "rc=1 SENTINELLE-NEUTRALISEE" "rc=$rc :: $out"; fi
+
+# ===================================================================================================
+# Radical elargi a « deleg » (precision du 2026-11-12, decision de la session principale) : « delegation »,
+# « delegate », « DÉLÉGATION » sont ecartes comme « deleguee ». Memes usages, memes temoins.
+# ===================================================================================================
+deleg2_ligne() { printf 'décision prise par %s de Samuel (message session principale, 2026-11-08), option recommandée' "$1"; }
+
+# verifie_refus <libelle> <verdict> : rc 1, verdict present, INFO presente, derniere ligne = verdict
+verifie_refus() {
+  local lib="$1" verdict="$2" l
+  case "$out" in *"${verdict}"*) has=1 ;; *) has=0 ;; esac
+  case "$out" in *INFO-LIGNE-DELEGATION-ECARTEE:*) hasinfo=1 ;; *) hasinfo=0 ;; esac
+  l="$(printf '%s\n' "$out" | tail -1)"
+  case "$l" in "${verdict}:"*) lastok=1 ;; *) lastok=0 ;; esac
+  if [ "$rc" -eq 1 ] && [ "$has" -eq 1 ] && [ "$hasinfo" -eq 1 ] && [ "$lastok" -eq 1 ]; then ok "$lib -> rc 1 ${verdict}, INFO presente, derniere ligne = verdict"
+  else ko "$lib" "rc=1 ${verdict}, INFO presente, derniere ligne = verdict" "rc=$rc info=$hasinfo derniere=$l :: $out"; fi
+}
+
+n=0
+for forme in "délégation" "delegation" "delegate" "DÉLÉGATION"; do
+  n=$((n + 1))
+  cas_hausse "del10-$n" "feat: hausse instructions a.md
+
+$(deleg2_ligne "$forme")"
+  verifie_refus "DEL2 hausse, forme « ${forme} » seule" HAUSSE-SANS-ARBITRAGE
+  cas_hausse "del10b-$n" "feat: hausse instructions a.md
+
+$(deleg2_ligne "$forme")
+${DIRECT}"
+  [ "$rc" -eq 0 ] && ok "DEL2 hausse, forme « ${forme} » + citation directe -> rc 0" || ko "DEL2 hausse, forme « ${forme} » + citation directe" "rc=0" "rc=$rc :: $out"
+done
+
+for forme in "délégation" "delegate"; do
+  cas_retrait "del11" "chore: retire a.md de la baseline, fichier conserve
+
+$(deleg2_ligne "$forme")"
+  verifie_refus "DEL2 retrait cible presente, forme « ${forme} » seule" LIGNE-RETIREE-CIBLE-PRESENTE-SANS-ARBITRAGE
+  cas_retrait "del11b" "chore: retire a.md de la baseline, fichier conserve
+
+$(deleg2_ligne "$forme")
+${DIRECT}"
+  case "$out" in *AVERTISSEMENT-LIGNE-RETIREE-ARBITREE*) hasw=1 ;; *) hasw=0 ;; esac
+  case "$out" in *"citation : ${DIRECT}"*) hascit=1 ;; *) hascit=0 ;; esac
+  case "$out" in *"option recommandée"*) hasdel=1 ;; *) hasdel=0 ;; esac
+  if [ "$rc" -eq 0 ] && [ "$hasw" -eq 1 ] && [ "$hascit" -eq 1 ] && [ "$hasdel" -eq 0 ]; then ok "DEL2 retrait, forme « ${forme} » + directe -> rc 0, ligne directe recopiee"
+  else ko "DEL2 retrait, forme « ${forme} » + directe" "rc=0 ARBITREE, citation = ligne directe, delegation absente" "rc=$rc :: $out"; fi
+
+  cas_sentinelle "del12" "chore: retire la sentinelle armed
+
+$(deleg2_ligne "$forme")"
+  verifie_refus "DEL2 sentinelle supprimee, forme « ${forme} » seule" SENTINELLE-NEUTRALISEE
+  cas_sentinelle "del12b" "chore: retire la sentinelle armed
+
+$(deleg2_ligne "$forme")
+${DIRECT}"
+  [ "$rc" -eq 0 ] && ok "DEL2 sentinelle, forme « ${forme} » + directe -> rc 0" || ko "DEL2 sentinelle, forme « ${forme} » + directe" "rc=0" "rc=$rc :: $out"
+done
+
+# --- MUT-14 : remet le radical a « delegu » (« delegation », « delegate » doivent rester ecartes) ----------
+MUT14_OLD='  return index(t, "deleg") > 0'
+MUT14_NEW='  return index(t, "delegu") > 0'
+MUT14_PATH="$(make_mutant mut14 "$MUT14_OLD" "$MUT14_NEW")"; MUT14_STAT=$?
+cas_hausse mut14 "chore: hausse instructions a.md, forme delegation (MUT-14)
+
+$(deleg2_ligne délégation)"
+if [ "$MUT14_STAT" -ne 0 ]; then komut 14 "radical remis a delegu" "mutant opposable et valide" "statut mutant=$MUT14_STAT"
+else
+  D14="$D"; B14="$B"
+  TARGET="$MUT14_PATH"; safe_run _mutout rc_mut "$D14" --base-ref "$B14"
+  TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D14" --base-ref "$B14"
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then okmut 14 "$rc_mut" 0 "$rc_orig" 1
+  else komut 14 "radical remis a delegu" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+TARGET="$SCRIPT"
+
+# --- MUT-10 : retire l'exclusion de la ligne de delegation (un seul point sert les trois usages) ----------
+MUT10_OLD='  if (est_delegation(s)) return 0'
+MUT10_NEW='  if (0) return 0'
+MUT10_PATH="$(make_mutant mut10 "$MUT10_OLD" "$MUT10_NEW")"; MUT10_STAT=$?
+D="$(mk_repo mut10)"; B="$(base_of "$D")"
+printf '%s\n' '# baseline de fixture' "plugin/demo/a.md${TAB}10${TAB}9" "plugin/demo/b.md${TAB}20${TAB}8" | w_baseline "$D"
+commit_avec "$D" "chore: hausse instructions a.md, delegation seule (MUT-10)
+
+${DELEG}"
+if [ "$MUT10_STAT" -eq 1 ]; then komut 10 "exclusion de la ligne de delegation retiree" "mutation differente de l'original (cmp)" "mutant identique — NON OPPOSABLE"
+elif [ "$MUT10_STAT" -eq 2 ]; then komut 10 "exclusion de la ligne de delegation retiree" "bash -n OK sur le mutant" "syntaxe invalide"
+else
+  TARGET="$MUT10_PATH"; safe_run _mutout rc_mut "$D" --base-ref "$B"
+  TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D" --base-ref "$B"
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then okmut 10 "$rc_mut" 0 "$rc_orig" 1
+  else komut 10 "exclusion de la ligne de delegation retiree" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+
+# --- MUT-10b : meme mutant, usage « sentinelle » : l'exclusion est bien au point UNIQUE ---------------------
+D="$(mk_repo mut10b)"; B="$(base_of "$D")"
+rm -f "$D/.planning/.instruction-budget-armed"
+commit_avec "$D" "chore: retire la sentinelle armed, delegation seule (MUT-10b)
+
+${DELEG}"
+if [ "$MUT10_STAT" -eq 0 ]; then
+  TARGET="$MUT10_PATH"; safe_run _mutout rc_mut "$D" --base-ref "$B"
+  TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D" --base-ref "$B"
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then okmut 10b "$rc_mut" 0 "$rc_orig" 1
+  else komut 10b "exclusion retiree, usage sentinelle" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+else
+  komut 10b "exclusion retiree, usage sentinelle" "mutant MUT-10 valide" "statut mutant=$MUT10_STAT"
+fi
+
+# --- MUT-11 : reduit le radical a « delegue » (une forme « deleguons » / « deleguant » doit rester ecartee) --
+MUT11_OLD='  return index(t, "deleg") > 0'
+MUT11_NEW='  return index(t, "delegue") > 0'
+MUT11_PATH="$(make_mutant mut11 "$MUT11_OLD" "$MUT11_NEW")"; MUT11_STAT=$?
+cas_hausse mut11 "chore: hausse instructions a.md, forme sans e (MUT-11)
+
+$(deleg_ligne déléguons)"
+if [ "$MUT11_STAT" -ne 0 ]; then komut 11 "radical reduit a delegue" "mutant opposable et valide" "statut mutant=$MUT11_STAT"
+else
+  D11="$D"; B11="$B"
+  TARGET="$MUT11_PATH"; safe_run _mutout rc_mut "$D11" --base-ref "$B11"
+  TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D11" --base-ref "$B11"
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then okmut 11 "$rc_mut" 0 "$rc_orig" 1
+  else komut 11 "radical reduit a delegue" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+
+# --- MUT-12 : retire le repli de l'accent combinant U+0301 (forme decomposee NFD) ------------------------------
+MUT12_OLD='  gsub(/\314\201/, "", t)'
+MUT12_NEW='  t = t'
+MUT12_PATH="$(make_mutant mut12 "$MUT12_OLD" "$MUT12_NEW")"; MUT12_STAT=$?
+cas_hausse mut12 "chore: hausse instructions a.md, forme NFD (MUT-12)
+
+$(deleg_ligne "de${NFD_ACUTE}le${NFD_ACUTE}guee")"
+# les octets NFD doivent etre REELLEMENT commites (macOS renormalise en NFC par defaut) : sinon le temoin est vide
+if ! git_c "$D" log -1 --format=%B | od -An -tx1 | tr -d ' \n' | grep -q 'cc81'; then
+  ko "MUT-12 fixture NFD" "octets cc81 dans le message commite" "absents (renormalises en NFC)"
+fi
+if [ "$MUT12_STAT" -ne 0 ]; then komut 12 "repli U+0301 retire" "mutant opposable et valide" "statut mutant=$MUT12_STAT"
+else
+  TARGET="$MUT12_PATH"; safe_run _mutout rc_mut "$D" --base-ref "$B"
+  TARGET="$SCRIPT"; safe_run _mutout rc_orig "$D" --base-ref "$B"
+  if [ "$rc_mut" -eq 0 ] && [ "$rc_orig" -eq 1 ]; then okmut 12 "$rc_mut" 0 "$rc_orig" 1
+  else komut 12 "repli U+0301 retire" "rc_mutant=0 rc_original=1" "rc_mutant=$rc_mut rc_original=$rc_orig"; fi
+fi
+
+# --- MUT-13 : retire le test de forme de ligne_ecartee (toute ligne de delegation declencherait l'info) ------
+MUT13_OLD='  return (est_delegation(s) && ligne_forme_ok(s)) ? 1 : 0'
+MUT13_NEW='  return est_delegation(s) ? 1 : 0'
+MUT13_PATH="$(make_mutant mut13 "$MUT13_OLD" "$MUT13_NEW")"; MUT13_STAT=$?
+cas_hausse mut13 "chore: hausse instructions a.md, delegation non formee (MUT-13)
+
+décision déléguée par Samuel"
+if [ "$MUT13_STAT" -ne 0 ]; then komut 13 "test de forme de ligne_ecartee retire" "mutant opposable et valide" "statut mutant=$MUT13_STAT"
+else
+  TARGET="$MUT13_PATH"; safe_run out_mut rc_mut "$D" --base-ref "$B"
+  TARGET="$SCRIPT"; safe_run out_orig rc_orig "$D" --base-ref "$B"
+  case "$out_mut" in *INFO-LIGNE-DELEGATION-ECARTEE*) info_mut=1 ;; *) info_mut=0 ;; esac
+  case "$out_orig" in *INFO-LIGNE-DELEGATION-ECARTEE*) info_orig=1 ;; *) info_orig=0 ;; esac
+  if [ "$info_mut" -eq 1 ] && [ "$info_orig" -eq 0 ] && [ "$rc_mut" -eq 1 ] && [ "$rc_orig" -eq 1 ]; then
+    echo "  ✓ MUT-13 TUE : info_mutant=1 attendu 1, info_original=0 attendu 0 (rc 1 des deux cotes)"; PASS=$((PASS + 1))
+  else komut 13 "test de forme de ligne_ecartee retire" "info_mutant=1 info_original=0, rc 1 des deux" "info_mutant=$info_mut info_original=$info_orig rc_mutant=$rc_mut rc_original=$rc_orig"; fi
 fi
 
 TARGET="$SCRIPT"

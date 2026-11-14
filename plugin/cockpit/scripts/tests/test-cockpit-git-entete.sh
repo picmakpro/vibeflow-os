@@ -18,6 +18,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -69,13 +70,14 @@ mk_lab() { # $1 = dossier : lab GSD minimal, un commit
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; $ENVX = préfixe d'environnement ; pose OUT, PORT ; démarre le serveur (SRV)
   env $ENVX "$NODE" "${2:-$SCRIPTS}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
-  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  # 79-16 : la page vient des sources du MODULE servi ; un mutant (copie passée en $2) n'agit que s'il est le module LANCÉ
+  if [ -n "${2:-}" ]; then COCKPIT_MODULE="${2%/scripts}" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true
+  else COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true; fi
+  SRV="$VF_PID"
+  PORT="$VF_PORT"
 }
 
-# faux driver-lock.sh TENU (comme test-cockpit-projet.sh) : une mission dont un nœud est running n'est « en cours » que si son verrou est vivant (P68-D-05) ;
+# faux driver-lock.sh TENU (comme projet-commun.sh, socle de test-cockpit-projet-graphe.sh) : une mission dont un nœud est running n'est « en cours » que si son verrou est vivant (P68-D-05) ;
 # VF_COCKPIT_SCRIPTS_DIR n'est posé que pour le SERVEUR (ENVS), jamais pour le build
 mkdir -p "$WORK/locks"
 printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": true, \\"ws\\": \\"\\", \\"stale\\": false, \\"ttl\\": 1800, \\"progress_age_seconds\\": 30}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks/driver-lock.sh"; chmod +x "$WORK/locks/driver-lock.sh"
@@ -121,8 +123,7 @@ PRET="document.readyState === 'complete' && !!document.querySelector('#proj-name
 
 # --- copies privées du module pour les mutants et le témoin (VENDORED non nécessaire : le build lit assets/ui/*.js) ---
 mkmod() { # $1 = nom ; rend le dossier des scripts de la copie (frère : skills/cockpit-moteur)
-  local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"
-  cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"
+  local d; d="$(cockpit_module_copie "$WORK/mod-$1")" || return 1   # 79-16 : la copie complète du module (le serveur lancé est celui de la copie, voir build_serve)
   echo "$d/scripts"
 }
 cat > "$AUX/mut.mjs" <<'JS'
@@ -142,7 +143,7 @@ const [base, page] = ARGS;
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow`, 'page rendue');
 return await s.ev(`(() => ({ nom: document.querySelector('#proj-name').textContent, entete: document.querySelector('header').textContent,
-  titre: document.title, attendu: window.VibeFlow.graph.meta.rootName,
+  titre: document.title, attendu: document.querySelector('#proj-name').textContent,
   ligne: (document.querySelector('.vf-git-ligne') || {}).textContent || null }))()`);
 JS
   for pg in / /project.html /equipe.html; do
@@ -150,24 +151,29 @@ JS
     assert_eq "H2.2 — $pg : #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
     assert_eq "H2.2 — $pg : aucun suffixe « — Projet » ni « — Équipe » dans l'en-tête" "$(jq_ "$R" '/ — (Projet|Équipe)/.test(j.entete) ? "suffixe" : "propre"' 2>/dev/null)" "propre"
     assert_eq "H2.2 — $pg : la seconde ligne dit la branche" "$(jq_ "$R" '/feat\/x/.test(j.ligne||"") ? "oui" : "non"' 2>/dev/null)" "oui"
-    case "$pg" in /project.html) assert_eq "H2.2 — titre de l'onglet du navigateur inchangé (R6.1)" "$(jq_ "$R" 'j.titre === j.attendu + " — Projet" ? "inchangé" : j.titre' 2>/dev/null)" "inchangé";; esac
+    case "$pg" in /project.html) assert_eq "H2.2 — titre de l'onglet du navigateur : « Projet · » puis le nom que l'en-tête affiche (AUDC-X7, forme unique)" "$(jq_ "$R" 'j.titre === "Projet · " + j.attendu ? "inchangé" : j.titre' 2>/dev/null)" "inchangé";; esac
   done
-  # H2.3 : une réécriture de project.html par le direct garde le nom du dépôt
-  printf '<objective>Second plan ajouté par le test H2.3</objective>\n' > "$WT/.planning/phases/01-x/01-02-PLAN.md" # un plan neuf change la structure : le direct réécrit project.html
-  for _ in $(seq 1 150); do grep -q 'Second plan ajouté par le test H2.3' "$OUT/project.html" 2>/dev/null && break; sleep 0.2; done
-  assert_eq "H2.3a — témoin : project.html a bien été réécrit par le direct" "$(grep -c 'Second plan ajouté par le test H2.3' "$OUT/project.html")" "1"
-  assert_eq "H2.3b — la page réécrite porte toujours meta.vfGit" "$(grep -c '"vfGit":{"etat":"ok"' "$OUT/project.html")" "1"
+  # H2.3 : un changement de planning garde le nom du dépôt (79-15 : la page est servie depuis la mémoire, project.html du disque ne bouge plus)
+  # 79-16 : le document de la coquille ne porte plus aucune donnée ; ce que la page servie porte (plans, meta.vfGit) se lit sur la route du graphe de l'onglet Projet
+  servi() { local tok; tok="$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).token)}catch{}' "$OUT/.cache/server.json")"; node "$SCRIPTS/tests/graphe-client.mjs" get "$PORT" "/api/vf/graphe?onglet=projet" "$tok" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).corps||"")}catch{}})'; }
+  printf '<objective>Second plan ajouté par le test H2.3</objective>\n' > "$WT/.planning/phases/01-x/01-02-PLAN.md" # un plan neuf change la structure : la page servie le porte, project.html du disque reste celui de l'assemblage
+  for _ in $(seq 1 150); do servi | grep -q 'Second plan ajouté par le test H2.3' && break; sleep 0.2; done
+  assert_eq "H2.3a — témoin : la page servie porte le second plan, project.html du disque est resté celui de l'assemblage" "$(servi | grep -c 'Second plan ajouté par le test H2.3')|$(grep -c 'Second plan ajouté par le test H2.3' "$OUT/project.html")" "1|0"
+  assert_eq "H2.3b — la page servie après le changement porte toujours meta.vfGit" "$(servi | grep -c '"vfGit":{"etat":"ok"')" "1"
   R="$(cdp "$AUX/h2.js" "$BASE" /project.html 2>&1 | tail -1)"
-  assert_eq "H2.3c — après réécriture, #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
+  assert_eq "H2.3c — après le changement, #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
 
   echo "=== H3 — seconde ligne, événements, ouvreur ==="
   cat > "$AUX/h3.js" <<'JS'
 const [base] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs) : on mesure une fois posé
 await s.naviguer(base + '/');
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false }); // la fenêtre headless par défaut est sous 1000 px : la seconde ligne y est masquée
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
 const out = {};
 const ligne = () => `document.querySelector('.vf-git-ligne')`;
+await s.attendre(`performance.getEntriesByType('resource').some((e) => e.name.includes('/api/vf/git/entete'))`, 'lecture du chargement terminée'); // sa réponse réelle, tardive sous charge, écraserait sinon les événements simulés ci-dessous
+await stabiliser(() => s.ev(`(${ligne()} || {}).textContent`), { max: 10000 });
 const evt = (nom, d) => s.ev(`window.dispatchEvent(new CustomEvent('${nom}', { detail: ${JSON.stringify(d)} }))`);
 // Revue de code S2 (P78-D-15) : 70-vf-live.js émet `vf-git:signal` sur `document`, SANS bubbles (contrat de 78-09), exactement comme ici. L'ancienne forme (window.dispatchEvent) atteignait un écouteur posé sur window
 // que le vrai émetteur n'atteint jamais : H3.4b était vert alors que l'en-tête ne se relisait pas sur le signal réel.
@@ -175,12 +181,14 @@ const signal = () => s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal
 // H3.3 : noms longs
 const longB = 'feature/' + 'b'.repeat(112), longW = 'w'.repeat(60);
 await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: longB, worktree: longW, detache: false });
-out.longs = await s.ev(`(() => { const l = ${ligne()}, b = l.querySelector('.vf-git-branche'), w = l.querySelector('.vf-git-wt');
-  return { ellipseB: b.scrollWidth > b.clientWidth, ellipseW: w.scrollWidth > w.clientWidth, titre: l.title, largeur: l.getBoundingClientRect().width }; })()`);
+// la ligne se redessine après l'événement, pas dans la même tâche : on attend la valeur postérieure à l'événement (titre = noms longs), puis on la lit posée (CI Linux, run 42408767738)
+out.longs = await attendreEtStabiliser(() => s.ev(`(() => { const l = ${ligne()}; if (!l) return null; const b = l.querySelector('.vf-git-branche'), w = l.querySelector('.vf-git-wt');
+  return { ellipseB: b.scrollWidth > b.clientWidth, ellipseW: w.scrollWidth > w.clientWidth, titre: l.title, largeur: l.getBoundingClientRect().width }; })()`), (v) => !!v && v.titre.includes(longW), { max: 10000 });
+out.longs = out.longs || { titre: '' };
 out.longs.complet = out.longs.titre.includes(longB) && out.longs.titre.includes(longW);
 // H3.4 : l'événement met la ligne à jour
 await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: 'autre' });
-out.evt = await s.ev(`(() => ({ texte: ${ligne()}.querySelector('.vf-git-branche').textContent, wt: ${ligne()}.querySelector('.vf-git-wt').textContent }))()`);
+out.evt = await attendreEtStabiliser(() => s.ev(`(() => ({ texte: ${ligne()}.querySelector('.vf-git-branche').textContent, wt: ${ligne()}.querySelector('.vf-git-wt').textContent }))()`), (v) => v.texte === 'autre', { max: 10000 }); // redessin hors de la tâche de l'événement
 // H3.4b : signal -> relecture de /api/vf/git/entete avec le jeton ; réponse hors schéma refusée
 await s.ev(`window.__vfFetch.reponse = { schema: 'vibeflow/cockpit-git-entete@1', etat: 'ok', depot: 'depot', branche: 'via-signal', worktree: null, detache: false }`);
 await signal();
@@ -193,7 +201,7 @@ await s.ev(`new Promise((r) => setTimeout(r, 400))`);
 out.horsSchema = await s.ev(`${ligne()}.querySelector('.vf-git-branche').textContent`);
 // H3.2b : état indisponible -> texte et ouvreur présent
 await evt('vf-git:entete', { etat: 'indisponible', depot: 'depot' });
-out.indispo = await s.ev(`(() => ({ texte: ${ligne()}.querySelector('.vf-git-branche').textContent, ouvreur: !!document.querySelector('#vf-git-ouvreur') }))()`);
+out.indispo = await attendreEtStabiliser(() => s.ev(`(() => ({ texte: ${ligne()}.querySelector('.vf-git-branche').textContent, ouvreur: !!document.querySelector('#vf-git-ouvreur') }))()`), (v) => /^○/.test(v.texte), { max: 10000 }); // redessin hors de la tâche de l'événement
 // H3.5 : clic -> basculer ; etat -> aria-expanded
 await s.ev(`window.__bas = []; window.addEventListener('vf-git:basculer', (e) => window.__bas.push(e.detail && e.detail.source))`);
 await s.ev(`${ligne()}.click(); (document.querySelector('#vf-git-ouvreur') || { click() {} }).click()`);
@@ -214,7 +222,7 @@ JS
   assert_eq "H3.4 — vf-git:entete met la ligne à jour (sans worktree)" "$(jq_ "$R" '[j.evt.texte, j.evt.wt].join("|")' 2>/dev/null)" "autre|"
   assert_eq "H3.4 — vf-git:signal relit l'en-tête avec le jeton" "$(jq_ "$R" '[j.signal.appels, j.signal.jeton].join("|")' 2>/dev/null)" "1|true"
   assert_eq "H3.4 — une réponse hors schéma est refusée" "$(jq_ "$R" 'j.horsSchema' 2>/dev/null)" "via-signal"
-  assert_eq "H3.2b — indisponible : « Branche indisponible », ouvreur présent" "$(jq_ "$R" '[j.indispo.texte, j.indispo.ouvreur].join("|")' 2>/dev/null)" "Branche indisponible|true"
+  assert_eq "H3.2b — indisponible APRÈS une lecture réussie (PU-G-003) : la dernière branche reste, grisée d'un glyphe (« ○ via-signal »), ouvreur présent ; « Branche indisponible » n'est plus que la première lecture sans valeur connue (H9.2)" "$(jq_ "$R" '[j.indispo.texte, j.indispo.ouvreur].join("|")' 2>/dev/null)" "○ via-signal|true"
   assert_eq "H3.5 — clic sur la ligne et sur l'ouvreur : vf-git:basculer" "$(jq_ "$R" 'j.basculer.join(",")' 2>/dev/null)" "ligne,ouvreur"
   assert_eq "H3.5 — vf-git:etat ouvert : aria-expanded sur les deux" "$(jq_ "$R" 'j.ouvert.join(",")' 2>/dev/null)" "true,true"
   assert_eq "H3.5 — vf-git:etat fermé : aria-expanded false" "$(jq_ "$R" 'j.ferme' 2>/dev/null)" "false"
@@ -232,7 +240,7 @@ for (const w of [375, 700, 768, 999, 1000, 1100, 1279, 1280, 1440]) {
   res[w] = await s.stable(`(() => { const l = document.querySelector('.vf-git-ligne'), o = document.querySelector('#vf-git-ouvreur'), h = document.querySelector('header');
     const r = o ? o.getBoundingClientRect() : { width: 0, height: 0 };
     return { ligneVisible: getComputedStyle(l).display !== 'none' && l.getBoundingClientRect().width > 0, ouvreurVisible: !!o && getComputedStyle(o).display !== 'none' && r.width > 0,
-      w: Math.round(r.width), h: Math.round(r.height), debord: h.scrollWidth > h.clientWidth + 1, premier: o ? o.parentElement.firstElementChild === o && o.parentElement.classList.contains('hr') : false,
+      w: Math.round(r.width), h: Math.round(r.height), appui: !!o && [[-21, 0], [21, 0], [0, -21], [0, 21]].every(([a, b]) => { const x = document.elementFromPoint(r.left + r.width / 2 + a, r.top + r.height / 2 + b); return !!x && (x === o || o.contains(x)); }), debord: h.scrollWidth > h.clientWidth + 1, premier: o ? o.parentElement.firstElementChild === o && o.parentElement.classList.contains('hr') : false,
       rangees: h.getBoundingClientRect().height > 80 ? 2 : 1,
       hors: [...document.querySelectorAll('header .hr > *')].filter((e) => e.getClientRects().length).filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).length,
       chevauche: (() => { const k = [...document.querySelectorAll('header .hr > *')].filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect()); let n = 0;
@@ -249,7 +257,8 @@ return res;
 JS
   R="$(cdp "$AUX/h4.js" "$BASE" 2>&1 | tail -1)"
   for w in 768 999 1000 1100 1279; do
-    assert_eq "H4.1 — ${w} px : ligne masquée, ouvreur 44 × 44 en tête de .hr (P78-D-34, icône de 701 à 1279 px)" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible, j['$w'].w, j['$w'].h, j['$w'].premier].join('|')" 2>/dev/null)" "false|true|44|44|true"
+    T=36; [ "$w" -lt 1000 ] && T=44
+    assert_eq "H4.1 — ${w} px : ligne masquée, ouvreur dessiné à ${T} × ${T} (--hdr-btn, comme ses voisins), zone d'appui de 44 × 44 au moins, en tête de .hr (P78-D-34, icône de 701 à 1279 px ; P80-D-56)" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible, j['$w'].w, j['$w'].h, j['$w'].premier, j['$w'].appui].join('|')" 2>/dev/null)" "false|true|${T}|${T}|true|true"
   done
   for w in 375 700; do
     assert_eq "H4.1 — ${w} px (téléphone) : ligne masquée, ouvreur absent de la rangée" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible].join('|')" 2>/dev/null)" "false|false"
@@ -321,13 +330,13 @@ JS
   echo "=== H6 — bloc de vue racine, retrait de « Repositories » ==="
   cat > "$AUX/h6.js" <<'JS'
 const [base, page] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && !!window.VibeFlow`, 'bloc de vue rendu');
-await s.ev(`new Promise((r) => setTimeout(r, 700))`);
-return await s.ev(`(() => { const c = document.querySelector('#context'), G = window.VibeFlow.graph;
-  return { k: c.querySelector('.k').textContent, h1: c.querySelector('h1').textContent, p: (c.querySelector('p') || {}).textContent || '', cls: c.querySelector('h1').className,
+return await stabiliser(() => s.ev(`(() => { const c = document.querySelector('#context'), G = window.VibeFlow.graph;
+  return { k: [...c.querySelector('.k').childNodes].filter((n) => !(n.classList && n.classList.contains('vfa-compte'))).map((n) => n.textContent).join(''), h1: c.querySelector('h1').textContent, p: (c.querySelector('p') || {}).textContent || '', cls: c.querySelector('h1').className,
     nomProjet: String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''), resume: G.project.summary,
-    sections: [...document.querySelectorAll('#panel h3')].map((h) => h.textContent), depots: document.querySelectorAll('#panel .rp').length }; })()`);
+    sections: [...document.querySelectorAll('#panel h3')].map((h) => h.textContent), depots: document.querySelectorAll('#panel .rp').length }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
 JS
   ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
   R="$(cdp "$AUX/h6.js" "$BASE" / 2>&1 | tail -1)"
@@ -341,20 +350,30 @@ JS
   R="$(cdp "$AUX/h6.js" "$BASE" /project.html 2>&1 | tail -1)"
   assert_eq "H6.2 — Projet : surtitre, titre « Jalon <jalon> », sous-titre = phases faites (le titre n'y est plus répété, voir H7.9)" "$(jq_ "$R" '[j.k, j.h1, j.p].join("|")' 2>/dev/null)" "Projet|Jalon vibeflow-test|1 phase faite sur 2."
   assert_eq "H6.3 — Projet : le titre ne répète pas le nom du projet" "$(jq_ "$R" '[j.h1.includes(j.nomProjet), /vf-ctx-titre/.test(j.cls)].join("|")' 2>/dev/null)" "false|true"
-  R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"
-  assert_eq "H6.2 — Équipe sans mission : « Aucune mission en cours », « L'équipe est au repos. »" "$(jq_ "$R" '[j.k, j.h1, j.p].join("|")' 2>/dev/null)" "Équipe|Aucune mission en cours|L'équipe est au repos."
+  # 73-09 (P73-D-04) : l'en-tête d'Équipe est celui de la régie : h1 du gabarit du lot 0 (#vf-equipe-entete h1) et sous-titre de la régie (.vf-rg-sous) à la place de la ligne « Agents : … » du bloc #context
+  cat > "$AUX/h6e.js" <<'JS'
+const [base] = ARGS;
+const { stabiliser } = await import(process.env.VF_CS); // aide commune (chrome-session.mjs)
+await s.naviguer(base + '/equipe.html');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#vf-equipe-entete h1') && !!document.querySelector('#vf-equipe-entete h1').textContent`, 'en-tête de la régie');
+return await stabiliser(() => s.ev(`(() => { const e = document.querySelector('#vf-equipe-entete'); return { h1: e.querySelector('h1').textContent, p: (e.querySelector('.vf-rg-sous') || {}).textContent || '' }; })()`), { max: 10000 });
+JS
+  R="$(cdp "$AUX/h6e.js" "$BASE" 2>&1 | tail -1)"
+  assert_eq "H6.2 — Équipe sans mission : « Aucune mission en cours », sous-titre de la régie « Aucun agent en vie »" "$(jq_ "$R" '[j.h1, j.p].join("|")' 2>/dev/null)" "Aucune mission en cours|Aucun agent en vie"
   mkdir -p "$WT/.planning/missions"; printf '{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$WT/.planning/missions/MISSION-x.dag.json"
-  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "Mission : x" ] && break; sleep 0.5; done
+  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6e.js" "$BASE" 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "Mission : x" ] && break; sleep 0.5; done
   assert_eq "H6.2 — Équipe avec une mission en cours : « Mission : x »" "$(jq_ "$R" 'j.h1' 2>/dev/null)" "Mission : x"
   printf '{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$WT/.planning/missions/MISSION-y.dag.json"
-  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "2 missions en cours" ] && break; sleep 0.5; done
+  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6e.js" "$BASE" 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "2 missions en cours" ] && break; sleep 0.5; done
   assert_eq "H6.2 — Équipe avec deux missions : « 2 missions en cours »" "$(jq_ "$R" 'j.h1' 2>/dev/null)" "2 missions en cours"
+  assert_eq "H6.2 — PU-G-166 : sous le titre des missions, le sous-titre de la régie dit les agents à part (« Aucun agent en vie » ici), jamais « actifs » seul" "$(jq_ "$R" 'j.p' 2>/dev/null)" "Aucun agent en vie"
   cat > "$AUX/h64.js" <<'JS'
 const [base] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 await s.naviguer(base + '/project.html');
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && !!window.VibeFlow`, 'page Projet');
-await s.ev(`new Promise((r) => setTimeout(r, 700))`);
-const lire = () => s.ev(`(() => ({ k: document.querySelector('#context .k').textContent, h1: document.querySelector('#context h1').textContent, cls: document.querySelector('#context h1').className }))()`);
+const lire0 = () => s.ev(`(() => ({ k: document.querySelector('#context .k').textContent, h1: document.querySelector('#context h1').textContent, cls: document.querySelector('#context h1').className }))()`);
+const lire = () => stabiliser(lire0, { max: 10000 }); // relevé posé (le bloc est réécrit après l'arrivée de l'en-tête git)
 const racine = await lire();
 const noeud = await s.ev(`(() => { const n = window.VibeFlow.graph.nodes.find((x) => x.kind === 'phase') || window.VibeFlow.graph.nodes[0]; window.VibeFlow.go('n:' + n.id); return { id: n.id, label: n.label }; })()`);
 await s.attendre(`document.querySelector('#context h1').textContent === ${JSON.stringify(noeud.label)}`, 'sous-vue du nœud');
@@ -375,23 +394,24 @@ JS
   # F1 : un seul nom, celui du dépôt principal, dans tout le cockpit (panneau compris), sans suffixe ; le titre de l'onglet garde le nom du dossier du lab (inchangé)
   cat > "$AUX/h7-nom.js" <<'JS'
 const [base, page] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow && !!document.querySelector('#panel .pt')`, 'page et panneau rendus');
-await s.ev(`new Promise((r) => setTimeout(r, 500))`);
-return await s.ev(`(() => { const G = window.VibeFlow.graph, T = G.meta.vfTab, p = document.querySelector('#panel');
-  return { nom: document.querySelector('#proj-name').textContent, pt: [...p.querySelectorAll('.pt')].map((e) => e.textContent), panneauWt: /wt-a/.test(p.innerText), suffixe: / — (Projet|Équipe)/.test(p.innerText),
-    titre: document.title, attendu: T === 'equipe' ? 'Équipe · ' + G.meta.rootName : G.meta.rootName + ' — ' + (T === 'project' ? 'Projet' : 'Code') }; })()`);
+return await stabiliser(() => s.ev(`(() => { const G = window.VibeFlow.graph, T = G.meta.vfTab, p = document.querySelector('#panel');
+  return { nom: document.querySelector('#proj-name').textContent, pt: [...p.querySelectorAll('.pt')].map((e) => e.textContent), panneauWt: /wt-a/.test((() => { const c = p.cloneNode(true); c.querySelectorAll('.vf-cmd').forEach((e) => e.remove()); return c.textContent; })()), /* hors la commande de correctif du panneau Format, qui cite le chemin absolu du lab (PU-G-153) ; le titre et les en-têtes restent jugés */ suffixe: / — (Projet|Équipe)/.test(p.innerText),
+    titre: document.title, attendu: (T === 'equipe' ? 'Équipe' : T === 'project' ? 'Projet' : 'Code') + ' · ' + document.querySelector('#proj-name').textContent }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
 JS
   ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
   for pg in / /project.html /equipe.html; do
     R="$(cdp "$AUX/h7-nom.js" "$BASE" "$pg" 2>&1 | tail -1)"
     assert_eq "H7.1 — $pg (lab dans un worktree wt-a) : le panneau dit « depot », sans « wt-a » ni suffixe « — Projet » / « — Équipe »" "$(jq_ "$R" '[j.nom, j.pt.join("+"), j.panneauWt, j.suffixe].join("|")' 2>/dev/null)" "depot|depot|false|false"
-    assert_eq "H7.1 — $pg : le titre de l'onglet garde sa forme (nom du dossier du lab, R6.1 inchangé)" "$(jq_ "$R" 'j.titre === j.attendu ? "inchangé" : j.titre + " ≠ " + j.attendu' 2>/dev/null)" "inchangé"
+    assert_eq "H7.1 — $pg : le titre de l'onglet a la forme unique « <Onglet> · <nom du dossier du lab> » (AUDC-X7 ; le nom que l'en-tête affiche, celui du dépôt principal, jamais celui du worktree)" "$(jq_ "$R" 'j.titre === j.attendu ? "inchangé" : j.titre + " ≠ " + j.attendu' 2>/dev/null)" "inchangé"
   done
   # F6, F8, F11 : couleurs et anneau de focus de la seconde ligne
   cat > "$AUX/h7-ligne.js" <<'JS'
 const [base] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.naviguer(base + '/');
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
@@ -402,21 +422,27 @@ const mesure = `(() => { const rgb = (c) => c.match(/[\\d.]+/g).slice(0, 3).map(
   const t = document.createElement('i'); t.style.color = 'var(--text-3)'; document.body.appendChild(t); const neutre = getComputedStyle(t).color; t.remove();
   return { ratio: (h + 0.05) / (c + 0.05), couleur: getComputedStyle(l).color, neutre, bgOpaque: !/rgba\\(.*, 0\\)$/.test(getComputedStyle(document.body).backgroundColor) }; })()`;
 // F6 : « Branche indisponible », deux thèmes
+const texteLigne = () => s.ev(`(document.querySelector('.vf-git-ligne') || {}).textContent || ''`);
+await s.attendre(`performance.getEntriesByType('resource').some((e) => e.name.includes('/api/vf/git/entete'))`, 'lecture du chargement terminée'); // sa réponse réelle, tardive sous charge, écraserait sinon les événements simulés
+await stabiliser(texteLigne, { max: 10000 });
 await evt('vf-git:entete', { etat: 'indisponible', depot: 'depot' });
+await attendreValeur(texteLigne, (v) => /indisponible/.test(v), { max: 10000 }); // la ligne se redessine après l'événement : on mesure la ligne postérieure à lui
 out.indispo = {};
-for (const t of ['dark', 'light']) { await s.ev(`document.documentElement.setAttribute('data-theme', '${t}')`); out.indispo[t] = await s.ev(mesure); }
+for (const t of ['dark', 'light']) { await s.ev(`document.documentElement.setAttribute('data-theme', '${t}')`); out.indispo[t] = await stabiliser(() => s.ev(mesure), { max: 10000 }); }
 // F11 : HEAD détaché, texte neutre
 await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: null, detache: true, sha7: 'abc1234', worktree: null });
+await attendreValeur(texteLigne, (v) => /abc1234/.test(v), { max: 10000 }); // ligne « HEAD détaché · abc1234 » rendue avant toute mesure
 out.detache = {};
-for (const t of ['dark', 'light']) { await s.ev(`document.documentElement.setAttribute('data-theme', '${t}')`); out.detache[t] = await s.ev(mesure); }
+for (const t of ['dark', 'light']) { await s.ev(`document.documentElement.setAttribute('data-theme', '${t}')`); out.detache[t] = await stabiliser(() => s.ev(mesure), { max: 10000 }); }
 // F8 : anneau de focus au clavier
 await evt('vf-git:entete', { etat: 'ok', depot: 'depot', branche: 'feat/x', detache: false, sha7: null, worktree: null });
+await attendreValeur(texteLigne, (v) => /feat\/x/.test(v), { max: 10000 }); // ligne redessinée avant le focus et la mesure de l'anneau
 await s.ev(`document.querySelector('#vf-git-ligne').focus()`);
 await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Shift', code: 'ShiftLeft' }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Shift', code: 'ShiftLeft' });
 await s.ev(`document.activeElement.blur(); document.querySelector('#vf-git-ligne').focus()`);
-out.anneau = await s.ev(`(() => { const l = document.querySelector('#vf-git-ligne'), n = document.querySelector('#proj-name'), cs = getComputedStyle(l), e = parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth), r = l.getBoundingClientRect(), m = n.getBoundingClientRect();
+out.anneau = await stabiliser(() => s.ev(`(() => { const l = document.querySelector('#vf-git-ligne'), n = document.querySelector('#proj-name'), cs = getComputedStyle(l), e = parseFloat(cs.outlineOffset) + parseFloat(cs.outlineWidth), r = l.getBoundingClientRect(), m = n.getBoundingClientRect();
   const boite = { l: r.left - e, t: r.top - e, r: r.right + e, b: r.bottom + e }, x = Math.min(boite.r, m.right) - Math.max(boite.l, m.left), y = Math.min(boite.b, m.bottom) - Math.max(boite.t, m.top);
-  return { focusVisible: l.matches(':focus-visible'), style: cs.outlineStyle, aire: Math.max(0, x) * Math.max(0, y) }; })()`);
+  return { focusVisible: l.matches(':focus-visible'), style: cs.outlineStyle, aire: Math.max(0, x) * Math.max(0, y) }; })()`), { max: 10000 });
 return out;
 JS
   R="$(cdp "$AUX/h7-ligne.js" "$BASE" 2>&1 | tail -1)"
@@ -424,10 +450,12 @@ JS
   assert_eq "H7.11 — HEAD détaché : texte neutre (même couleur que var(--text-3)) dans les deux thèmes" "$(jq_ "$R" '[j.detache.dark.couleur === j.detache.dark.neutre, j.detache.light.couleur === j.detache.light.neutre].join("|")' 2>/dev/null)" "true|true"
   assert_eq "H7.8 — anneau de focus : témoin :focus-visible vrai et contour tracé" "$(jq_ "$R" '[j.anneau.focusVisible, j.anneau.style].join("|")' 2>/dev/null)" "true|solid"
   assert_eq "H7.8 — anneau de focus de la seconde ligne : aucune intersection avec la boîte du nom (aire en px²)" "$(jq_ "$R" 'j.anneau.aire' 2>/dev/null)" "0"
-  # F5 : même seuil de passage sur deux rangées avec et sans git (701 à 939 px)
+  # F5 : même seuil de passage sur deux rangées avec et sans git (701 à 1000 px). Depuis la coque étroite (menu « ⋯ » dès 999 px, fil d'Ariane entier) l'en-tête racine tient
+  # sur une rangée à toute largeur : le repli ne se mesure plus à la racine mais dans la vue d'un fichier (fil d'Ariane long), où il existe encore. Les deux labs portent
+  # le MÊME nom de dossier (« depot ») : un nom plus long avancerait le repli de lui-même et fausserait la comparaison.
   cat > "$AUX/h7-seuil.js" <<'JS'
-const [base] = ARGS;
-await s.naviguer(base + '/');
+const [base, vue] = ARGS;
+await s.naviguer(base + '/' + (vue || ''));
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow`, 'page rendue');
 const res = [];
 for (let w = 700; w <= 1000; w += 10) {
@@ -436,37 +464,157 @@ for (let w = 700; w <= 1000; w += 10) {
 }
 return res;
 JS
-  NOG7="$WORK/hors-depot-7"; mk_lab "$NOG7"
-  stop_srv; build_serve "$NOG7"; RS0="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
-  ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; RS1="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"
-  assert_eq "H7.5 — témoin : le lab sans git passe d'une rangée double à une rangée simple dans la plage mesurée" "$(jq_ "$RS0" 'j.some((m) => m[1] === 2) && j.some((m) => m[1] === 1) ? "deux régimes" : "un seul : " + JSON.stringify(j)' 2>/dev/null)" "deux régimes"
-  assert_eq "H7.5 — de 700 à 1000 px, l'en-tête passe sur deux rangées aux mêmes largeurs avec et sans git" "$(jq_ "$RS1" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)" "$(jq_ "$RS0" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)"
+  NOG7="$WORK/hors-depot-7/depot"; mk_lab "$NOG7"; VUE7="#v=f%3Asrc%2Futil.js"
+  stop_srv; build_serve "$NOG7"; RS0="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; RD0="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" "$VUE7" 2>&1 | tail -1)"; stop_srv
+  ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; RS1="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; RD1="$(cdp "$AUX/h7-seuil.js" "http://127.0.0.1:$PORT" "$VUE7" 2>&1 | tail -1)"
+  assert_eq "H7.5 — témoin : le lab sans git passe d'une rangée double à une rangée simple dans la plage mesurée (vue d'un fichier : le fil d'Ariane long replie encore l'en-tête)" "$(jq_ "$RD0" 'j.some((m) => m[1] === 2) && j.some((m) => m[1] === 1) ? "deux régimes" : "un seul : " + JSON.stringify(j)' 2>/dev/null)" "deux régimes"
+  assert_eq "H7.5 — de 700 à 1000 px, l'en-tête racine passe sur les mêmes rangées avec et sans git (une rangée partout depuis la coque étroite)" "$(jq_ "$RS1" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)" "$(jq_ "$RS0" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)"
+  assert_eq "H7.5b — de 700 à 1000 px, dans la vue d'un fichier, l'en-tête passe sur deux rangées aux mêmes largeurs avec et sans git" "$(jq_ "$RD1" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)" "$(jq_ "$RD0" 'j.map((m) => m.join(":")).join(" ")' 2>/dev/null)"
   # F13 : le bloc de vue Code ne se coupe qu'après « / » ou « - » (ou une espace), jamais en plein mot ; branche longue, 768 px
   WTL="$WORK/wt-long"; $GIT -C "$DEPOT" worktree add -q -b "feat/phase-78-git-cockpit-corrections-de-la-critique-fraiche" "$WTL" >/dev/null 2>&1
   cat > "$AUX/h7-coupure.js" <<'JS'
 const [base] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 await s.send('Emulation.setDeviceMetricsOverride', { width: 768, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.naviguer(base + '/');
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && /feat/.test(document.querySelector('#context h1').textContent)`, 'bloc de vue Code');
-await s.ev(`new Promise((r) => setTimeout(r, 500))`);
-return await s.ev(`(() => { const h = document.querySelector('#context h1'), box = h.getBoundingClientRect(), w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), coupes = []; let prev = null, tout = '', lignes = new Set();
+return await stabiliser(() => s.ev(`(() => { const h = document.querySelector('#context h1'), box = h.getBoundingClientRect(), w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), coupes = []; let prev = null, tout = '', lignes = new Set();
   for (let n = w.nextNode(); n; n = w.nextNode()) for (let i = 0; i < n.data.length; i++) {
     const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1); const b = r.getBoundingClientRect(); tout += n.data[i];
     if (!b.height || b.top >= box.bottom - 1) { prev = null; continue; } // hors du cadre (ligne écrêtée) ou sans boîte
     lignes.add(Math.round(b.top));
     if (prev !== null && b.top > prev.top + 2) coupes.push({ avant: tout[tout.length - 2], apres: n.data[i] });
     prev = { top: b.top }; }
-  return { texte: h.textContent, lignes: lignes.size, coupes, enPleinMot: coupes.filter((c) => !/[\\/\\- ]/.test(c.avant)).map((c) => c.avant + '|' + c.apres), wbr: h.querySelectorAll('wbr').length }; })()`);
+  return { texte: h.textContent, lignes: lignes.size, coupes, enPleinMot: coupes.filter((c) => !/[\\/\\- ]/.test(c.avant)).map((c) => c.avant + '|' + c.apres), wbr: h.querySelectorAll('wbr').length }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
 JS
   stop_srv; build_serve "$WTL"; R="$(cdp "$AUX/h7-coupure.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
   assert_eq "H7.13 — témoin : le titre du bloc de vue Code passe bien sur deux lignes à 768 px (au moins une coupure mesurée)" "$(jq_ "$R" 'j.lignes >= 2 && j.coupes.length >= 1 ? "oui" : "non : " + j.lignes + " ligne(s)"' 2>/dev/null)" "oui"
   assert_eq "H7.13 — aucune coupure en plein mot dans le titre du bloc de vue (coupures hors « / », « - », espace)" "$(jq_ "$R" 'j.enPleinMot.join(",")' 2>/dev/null)" ""
+  # PU-G-042 : à 390 px, « integration/cockpit-final » se coupe sur « / », jamais sur le trait d'union ; PU-G-193 : le titre porte une définition constante (title), jamais le nom de branche
+  DI="$WORK/depot-int"; mk_lab "$DI"; $GIT -C "$DI" init -q -b "integration/cockpit-final" && $GIT -C "$DI" add -A && $GIT -C "$DI" commit -q -m init
+  cat > "$AUX/h7-coupure390.js" <<'JS'
+const [base, largeur] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
+await s.send('Emulation.setDeviceMetricsOverride', { width: Number(largeur), height: 900, deviceScaleFactor: 1, mobile: false });
+await s.naviguer(base + '/');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && /integration|svg/.test(document.querySelector('#context h1').textContent)`, 'bloc de vue Code');
+return await stabiliser(() => s.ev(`(() => { const h = document.querySelector('#context h1'), box = h.getBoundingClientRect(), w = document.createTreeWalker(h, NodeFilter.SHOW_TEXT), coupes = []; let prev = null, tout = '';
+  for (let n = w.nextNode(); n; n = w.nextNode()) for (let i = 0; i < n.data.length; i++) {
+    const r = document.createRange(); r.setStart(n, i); r.setEnd(n, i + 1); const b = r.getBoundingClientRect(); tout += n.data[i];
+    if (!b.height || b.top >= box.bottom - 1) { prev = null; continue; }
+    if (prev !== null && b.top > prev.top + 2) coupes.push(tout[tout.length - 2]);
+    prev = { top: b.top }; }
+  return { texte: h.textContent, coupes, enfants: [...new Set([...h.children].map((e) => e.tagName))].sort().join(','), svg: h.querySelector('svg') !== null, title: h.getAttribute('title') }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
+JS
+  stop_srv; build_serve "$DI"; RI="$(cdp "$AUX/h7-coupure390.js" "http://127.0.0.1:$PORT" 390 2>&1 | tail -1)"; stop_srv
+  assert_eq "H7.14 — PU-G-042 : à 390 px le titre « Le code, branche integration/cockpit-final » passe sur deux lignes, coupé sur « / » et jamais sur « - »" "$(jq_ "$RI" '[j.texte, [...new Set(j.coupes)].join("")].join("|")' 2>/dev/null)" "Le code, branche integration/cockpit-final|/"
+  MCO="$(mkmod mcoupure)"
+  mutate "$MCO/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "display: inline-block;" "display: inline;" || echo "  ❌ FAIL — M-COUPURE : mutation impossible" >&2
+  build_serve "$DI" "$MCO"; RMC="$(cdp "$AUX/h7-coupure390.js" "http://127.0.0.1:$PORT" 390 2>&1 | tail -1)"; stop_srv
+  assert_eq "M-COUPURE — rougit H7.14 (sans bloc insécable, le titre se recoupe sur le trait d'union comme avant)" "$(jq_ "$RMC" '[...new Set(j.coupes)].join("") === "/" ? "vert" : "rouge"' 2>/dev/null)" "rouge"
+  stop_srv; build_serve "$HX"; RHX="$(cdp "$AUX/h7-coupure390.js" "http://127.0.0.1:$PORT" 1440 2>&1 | tail -1)"; stop_srv
+  assert_eq "H7.15 — branche hostile : le titre l'écrit en texte (aucun svg, seulement des WBR) et son title est la définition constante, sans le nom" "$(jq_ "$RHX" '[j.texte.includes("<svg/onload=alert(1)>"), j.svg, j.enfants, j.title.includes("svg"), j.title.startsWith("Branche : une ligne de travail")].join("|")' 2>/dev/null)" "true|false|WBR|false|true"
   # F9 : bloc de vue Projet, sous-titre qui résume la vue sans répéter le titre
   P97="$WORK/depot-f9"; mk_lab "$P97"; printf -- '---\nstatus: executing\nmilestone: vibeflow-test\ncurrent_phase: 2\n---\n# State\n' > "$P97/.planning/STATE.md"
   $GIT -C "$P97" init -q -b main && $GIT -C "$P97" add -A && $GIT -C "$P97" commit -q -m init
   build_serve "$P97"; R="$(cdp "$AUX/h6.js" "http://127.0.0.1:$PORT" /project.html 2>&1 | tail -1)"; stop_srv
   assert_eq "H7.9 — Projet : le sous-titre ne contient ni le titre ni le nom du jalon" "$(jq_ "$R" '[j.p.includes(j.h1), j.p.includes("vibeflow-test")].join("|")' 2>/dev/null)" "false|false"
   assert_eq "H7.9 — Projet : le sous-titre résume la vue (« Phase N en cours, k phases faites sur n. »)" "$(jq_ "$R" 'j.p' 2>/dev/null)" "Phase 2 en cours, 1 phase faite sur 2."
+
+  echo "=== H9 — PU-G-003 : une lecture « indisponible » n'efface ni la branche ni l'ouvreur ==="
+  cat > "$AUX/h9.js" <<'JS'
+const [base, mode] = ARGS;
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
+if (mode === 'premiere') await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `window.__vfFetch.reponse = { schema: 'vibeflow/cockpit-git-entete@1', etat: 'indisponible', depot: 'depot', branche: null, worktree: null, detache: false, sha7: null }; { const f1 = window.fetch.bind(window); window.fetch = (u, i) => { const r = f1(u, i); return /\\/api\\/vf\\/graphe/.test(typeof u === 'string' ? u : u.url) ? r.then((x) => x.text().then((t) => new Response(t.split('"vfGit":{"etat":"ok"').join('"vfGit":{"etat":"indisponible"'), { status: x.status, headers: x.headers }))) : r; }; }` }); // la lecture du chargement dit « indisponible » aussi : jamais de valeur connue ; 79-16 : la page tient meta.vfGit de la route du graphe (plus du document), réécrite ici à l'arrivée
+await s.naviguer(base + '/');
+await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
+const out = {};
+const L = `document.querySelector('.vf-git-ligne')`;
+if (mode === 'connue') await s.attendre(`performance.getEntriesByType('resource').some((e) => e.name.includes('/api/vf/git/entete'))`, 'lecture du chargement terminée'); // sa réponse réelle, tardive sous charge, écraserait sinon la simulation
+else { await attendreValeur(() => s.ev(`window.__vfFetch.appels.length`), (n) => n >= 1, { max: 10000 }); await stabiliser(() => s.ev(`${L}.querySelector('.vf-git-branche').textContent`), { max: 10000 }); } // la lecture du chargement (simulée) est faite et appliquée avant la simulation
+const signal = () => s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'abc' } }))`);
+const lecture = async (rep) => { // une lecture du serveur (réponse simulée) ; rend l'état de la page une fois la réponse appliquée
+  const n = await s.ev(`window.__vfFetch.appels.length`);
+  await s.ev(`window.__vfFetch.reponse = ${JSON.stringify(Object.assign({ schema: 'vibeflow/cockpit-git-entete@1', depot: 'depot', branche: null, worktree: null, detache: false, sha7: null }, rep))}`);
+  await signal();
+  await s.attendre(`window.__vfFetch.appels.length === ${n + 1}`, 'lecture faite');
+  // la réponse s'applique après l'appel du mock : on attend la valeur postérieure (branche de la réponse, ligne masquée sur « absent »), puis on la lit posée
+  const lire = () => s.ev(`(() => { const l = ${L}, o = document.querySelector('#vf-git-ouvreur'), cs = getComputedStyle(l), t = document.createElement('i'); t.style.color = 'var(--text-3)'; document.body.appendChild(t); const neutre = getComputedStyle(t).color; t.remove();
+    return { branche: l.querySelector('.vf-git-branche').textContent, wt: l.querySelector('.vf-git-wt').textContent, etat: l.querySelector('.vf-git-ligne-etat').textContent, ligneCachee: l.hidden || cs.display === 'none',
+      ouvreurCache: !o || o.hidden, dataGit: document.querySelector('header').hasAttribute('data-vf-git'), titre: l.title, aria: l.getAttribute('aria-label'), largeur: l.getBoundingClientRect().width,
+      neutre: cs.color === neutre, halo: cs.boxShadow !== 'none' || cs.borderTopWidth !== '0px' || cs.backgroundColor !== 'rgba(0, 0, 0, 0)' }; })()`);
+  return attendreEtStabiliser(lire, (v) => rep.etat === 'ok' ? v.branche.includes(rep.branche) : rep.etat === 'absent' ? v.ligneCachee : /indisponible/.test(v.branche) || /^○/.test(v.branche), { max: 10000 }); // « indisponible » : « Branche indisponible » (aucune valeur connue) ou « ○ <dernière branche> » (non confirmée) — jamais l'état d'avant la réponse
+};
+if (mode === 'connue') {
+  out.avant = await lecture({ etat: 'ok', branche: 'feat/memoire', worktree: 'wt-m' });
+  // F6a (3e tour de la recette du 2026-11-08) : le titre de la vue n'est un arrêt de Tab que s'il porte une définition. Branche connue : titre atteignable (témoin) ; dépôt « indisponible » : plus de définition, donc plus d'arrêt, MÊME après un changement de classe du corps (ouverture/fermeture du tiroir Git) qui relance l'observateur de tabindex
+  const titre = () => s.ev(`(() => { const h = document.querySelector('#context h1'); return h ? [h.hasAttribute('tabindex') ? h.getAttribute('tabindex') : 'aucun', h.hasAttribute('title') || h.hasAttribute('aria-description')].join('/') : 'absent'; })()`);
+  const classeDuCorps = async () => { await s.ev(`document.body.classList.add('vf-git-ouvert')`); await s.ev(`document.body.classList.remove('vf-git-ouvert')`); await s.ev(`window.dispatchEvent(new CustomEvent('vf-git:etat', { detail: { ouvert: false } }))`); await s.ev(`new Promise((r) => setTimeout(r, 50))`); }; // 79-17 : le tiroir pose ou retire la classe PUIS émet vf-git:etat, qui relance l'arrêt de tabulation (plus d'observateur de la classe)
+  await attendreValeur(titre, (v) => v === '0/true', { max: 6000 }); out.titreConnu = await titre();
+  out.muet = await lecture({ etat: 'indisponible' });
+  await classeDuCorps(); out.titreIndispo = await attendreEtStabiliser(titre, (v) => v !== 'absent', { max: 6000 });
+  out.encore = await lecture({ etat: 'indisponible' });
+  out.revenue = await lecture({ etat: 'ok', branche: 'autre', worktree: null });
+  out.absent = await lecture({ etat: 'absent' });
+  out.apresAbsent = await lecture({ etat: 'indisponible' });
+} else {
+  out.premiere = await s.ev(`(() => ({ branche: ${L}.querySelector('.vf-git-branche').textContent, etat: ${L}.querySelector('.vf-git-ligne-etat').textContent, cachee: ${L}.hidden, ouvreurCache: document.querySelector('#vf-git-ouvreur').hidden }))()`);
+  out.muet = await lecture({ etat: 'indisponible' });
+  out.ok = await lecture({ etat: 'ok', branche: 'revenue', worktree: null });
+}
+out.errs = await s.ev(`window.__errs`);
+return out;
+JS
+  build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
+  R9="$(cdp "$AUX/h9.js" "$BASE" connue 2>&1 | tail -1)"; stop_srv
+  assert_eq "H9.1 — branche et worktree connus, puis deux lectures « indisponible » : la dernière valeur reste (« ○ feat/memoire », « · worktree wt-m »), le mot « non confirmée » s'ajoute, la ligne et l'ouvreur restent, data-vf-git reste posé" "$(jq_ "$R9" '[j.muet, j.encore].map((x) => [x.branche, x.wt, x.etat, x.ligneCachee, x.ouvreurCache, x.dataGit].join("|")).join(" // ")' 2>/dev/null)" "○ feat/memoire| · worktree wt-m| · non confirmée|false|false|true // ○ feat/memoire| · worktree wt-m| · non confirmée|false|false|true"
+  assert_eq "H9.1b — état non confirmé : texte neutre (--text-3), ni halo ni liseré ni fond, la ligne tient dans 220 px ; le nom complet et le mot sont dans le title et le nom accessible" "$(jq_ "$R9" '[j.muet.neutre, j.muet.halo, j.muet.largeur <= 221, j.muet.titre.includes("feat/memoire") && j.muet.titre.includes("non confirmée"), /feat\/memoire.*non confirmée/.test(j.muet.aria)].join("|")' 2>/dev/null)" "true|false|true|true|true"
+  assert_eq "H9.1c — la lecture suivante réussie remplace tout (« autre », plus de mot, plus de worktree) ; « absent » (vrai « pas un dépôt ») masque toujours la ligne et l'ouvreur" "$(jq_ "$R9" '[j.revenue.branche, j.revenue.etat, j.revenue.wt, j.absent.ligneCachee, j.absent.ouvreurCache, j.absent.dataGit].join("|")' 2>/dev/null)" "autre|||true|true|false"
+  assert_eq "H9.1e — après « absent » puis « indisponible » : aucune ancienne branche ne réapparaît comme non confirmée (« Branche indisponible », sans mot)" "$(jq_ "$R9" '[j.apresAbsent.branche, j.apresAbsent.etat].join("|")' 2>/dev/null)" "Branche indisponible|"
+  assert_eq "H9.1d — aucune erreur de page" "$(jq_ "$R9" 'j.errs.length' 2>/dev/null)" "0"
+  assert_eq "H9.1f — F6a (3e tour) : le titre de la vue est un arrêt de Tab (tabindex 0) tant qu'il porte sa définition (branche connue, témoin) ; dépôt « indisponible », il n'en porte plus et n'est plus un arrêt, même après un changement de classe du corps qui relance l'observateur de tabindex (aucun tabindex, ni title ni aria-description)" "$(jq_ "$R9" '[j.titreConnu, j.titreIndispo].join("|")' 2>/dev/null)" "0/true|aucun/false"
+  # première lecture SANS valeur connue : le graphe reçu par la page dit déjà « indisponible » (réponse de la route réécrite dans le navigateur par h9.js, mode premiere) -> « Branche indisponible », jamais masquée
+  build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
+  R92="$(cdp "$AUX/h9.js" "$BASE" premiere 2>&1 | tail -1)"; stop_srv
+  assert_eq "H9.2 — première lecture sans valeur connue : « Branche indisponible », sans mot ajouté, ligne et ouvreur présents ; la lecture réussie suivante donne la branche" "$(jq_ "$R92" '[j.premiere.branche, j.premiere.etat, j.premiere.cachee, j.premiere.ouvreurCache, j.muet.branche, j.muet.ligneCachee, j.ok.branche].join("|")' 2>/dev/null)" "Branche indisponible||false|false|Branche indisponible|false|revenue"
+
+  # F6a (3e tour) : mutant de la garde de tabindex (elle ne regarde plus la définition COURANTE mais le fait d'en avoir déjà porté une) -> le titre d'un dépôt « indisponible » redevient un arrêt de Tab muet (H9.1f rougit)
+  MTI="$(mkmod mtabindex)"  # 79-16 : la garde est dans la source de page du module (ui/76), plus dans un document posé : le mutant est une copie du module, LANCÉE
+  mutate "$MTI/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "if (!h1 || !h1.dataset.vfAide) return; if (document.body.classList.contains('vf-git-ouvert'))" "if (!h1 || !h1.dataset.vfAideLie) return; if (document.body.classList.contains('vf-git-ouvert'))" || echo "  ❌ FAIL — M-TABINDEX-DEFINITION : mutation impossible" >&2
+  build_serve "$WT" "$MTI"; BASE="http://127.0.0.1:$PORT"
+  RTI="$(cdp "$AUX/h9.js" "$BASE" connue 2>&1 | tail -1)"; stop_srv
+  assert_eq "M-TABINDEX-DEFINITION — le mutant (le titre redevient un arrêt de Tab dès qu'il a porté une définition) rougit H9.1f : « 0/true|0/false » au lieu de « 0/true|aucun/false » (témoin : le témoin positif reste « 0/true »)" "$(jq_ "$RTI" '[j.titreConnu, j.titreIndispo].join("|")' 2>/dev/null)" "0/true|0/false"
+
+  # H7.1b (K4, CI Linux, run 42500903126) : sous Linux, `document.fonts.ready` est déjà résolu quand le script du viewer s'achève ; le viewer pose alors le panneau AVANT les scripts d'extension (dont ui/76, qui réécrit le nom du projet en nom du dépôt) et le titre du panneau gardait « wt-a » (H7.1 : obtenu [depot|wt-a|true|false] sur « / », [depot|wt-a — Projet|true|true] sur le Projet). Condition reproduite sur n'importe quel poste : le viewer d'une copie du module attend `Promise.resolve()` au lieu des polices. Témoin rouge sans le correctif de ui/76 : les deux cas rougissent comme en CI.
+  MP="$(mkmod mpolices)"
+  mutate "$MP/../skills/cockpit-moteur/assets/viewer.html" "const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();" "const fontsReady = Promise.resolve();" || echo "  ❌ FAIL — H7.1b : mutation impossible" >&2
+  WTP="$WORK/wt-p"; $GIT -C "$DEPOT" worktree add -q -b feat/p "$WTP" >/dev/null 2>&1
+  ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WTP" "$MP"; BASE="http://127.0.0.1:$PORT"
+  for pg in / /project.html; do
+    R="$(cdp "$AUX/h7-nom.js" "$BASE" "$pg" 2>&1 | tail -1)"
+    assert_eq "H7.1b — $pg, polices déjà prêtes avant les scripts d'extension (Linux, CI) : le panneau dit « depot » (le dépôt principal), sans le nom du worktree (wt-p, mesuré par j.pt) ni suffixe « — Projet »" "$(jq_ "$R" '[j.nom, j.pt.join("+"), j.panneauWt, j.suffixe].join("|")' 2>/dev/null)" "depot|depot|false|false"
+  done
+  # H7.1c (K5-2) : garde de non-régression de l'arrivée par lien profond `#r=<id>` dans le nouvel ordre de démarrage, sous la même condition que H7.1b (polices déjà prêtes avant les scripts d'extension). Ce n'est pas le témoin du correctif : l'arrivée par `#r=` n'était pas cassée, H7.1c et M-ARRIVER restent verts avec le viewer d'avant K5 ; le témoin du correctif, ce sont D18.4b et H7.1b. La carte (d-src, le seul nœud du lab) doit être sélectionnée.
+  cat > "$AUX/h7-arrivee.js" <<'JS'
+const [base, page, cible] = ARGS;
+const { stabiliser } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
+await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+await s.naviguer(base + page + '#r=' + encodeURIComponent(cible));
+await s.attendre(`document.readyState === 'complete' && !!window.VibeFlow && !!document.querySelector('#panel .pt')`, 'page et panneau rendus');
+return await stabiliser(() => s.ev(`({ selection: window.VibeFlow.state.selected, existe: window.VibeFlow.exists(${JSON.stringify(cible)}), toast: (document.querySelector('.toast, #toast')?.textContent || '') })`), { max: 10000 }); // mesure posée (deux relevés identiques)
+JS
+  R="$(cdp "$AUX/h7-arrivee.js" "$BASE" / "n:d-src" 2>&1 | tail -1)"
+  assert_eq "H7.1c — polices déjà prêtes avant les scripts d'extension : l'arrivée par #r=n:d-src sélectionne la carte visée (nœud présent, aucun toast « Pas sur cette carte »)" "$(jq_ "$R" '[j.selection, j.existe, /Pas sur cette carte/.test(j.toast)].join("|")' 2>/dev/null)" "n:d-src|true|false"
+  # M-ARRIVER : l'écouteur `ready` de l'arrivée par lien profond est débranché -> H7.1c rougit (le témoin peut rougir ; la promesse « #r= révèle la carte » ne tient que par cet écouteur à la première arrivée)
+  MA="$(mkmod marriver)"
+  mutate "$MA/../skills/cockpit-moteur/assets/viewer.html" "const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();" "const fontsReady = Promise.resolve();" || echo "  ❌ FAIL — M-ARRIVER : mutation impossible" >&2
+  mutate "$MA/../skills/cockpit-moteur/assets/ui/00-vibeflow.js" "SC.on('ready', arriver);" "void 0;" || echo "  ❌ FAIL — M-ARRIVER : mutation impossible (00-vibeflow.js)" >&2
+  stop_srv
+  ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WTP" "$MA"; BASE="http://127.0.0.1:$PORT"
+  R="$(cdp "$AUX/h7-arrivee.js" "$BASE" / "n:d-src" 2>&1 | tail -1)"
+  assert_eq "M-ARRIVER — mutant (écouteur de l'arrivée par #r= débranché) : la carte visée n'est plus sélectionnée, H7.1c rougit" "$(jq_ "$R" '[j.selection === "n:d-src", j.existe].join("|")' 2>/dev/null)" "false|true"
+  stop_srv
 
   echo "=== Mutants ==="
   # M-DEPOT : le nom du dépôt pris de --show-toplevel (le worktree) -> H1.1 et H2.2 rougissent
@@ -489,9 +637,19 @@ JS
   NOGIT_M="$WORK/hors-depot-mutant"; mk_lab "$NOGIT_M"
   build_serve "$NOGIT_M" "$MA"; RMA="$(cdp "$AUX/struct.js" "http://127.0.0.1:$PORT" 2>&1 | tail -1)"; stop_srv
   assert_eq "M-ABSENT — rougit H5.1 (la ligne et le bloc existent sans git)" "$(jq_ "$RMA" '[j.ligne, j.bloc].join("|")' 2>/dev/null)" "true|true"
-  # M-REPOS : l'index garde la liste des dépôts (retrait annulé dans une copie du build) -> H6.5 rougit
+  # M-MEMOIRE : la lecture « indisponible » remplace de nouveau la branche connue -> H9.1 rougit
+  MM="$(mkmod mmemoire)"
+  mutate "$MM/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "const indispo = d.etat === 'indisponible' && !connue;" "const indispo = d.etat === 'indisponible';" || echo "  ❌ FAIL — M-MEMOIRE : mutation impossible" >&2
+  build_serve "$WT" "$MM"; RMM="$(cdp "$AUX/h9.js" "http://127.0.0.1:$PORT" connue 2>&1 | tail -1)"; stop_srv
+  assert_eq "M-MEMOIRE — rougit H9.1 (la branche connue est écrasée par « Branche indisponible »)" "$(jq_ "$RMM" 'j.muet.branche' 2>/dev/null)" "Branche indisponible"
+  # M-MASQUE : une lecture « indisponible » masque de nouveau la ligne et l'ouvreur (comme l'ancien « absent » sur git muet) -> H9.1 rougit
+  MK="$(mkmod mmasque)"
+  mutate "$MK/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "if (d.etat === 'absent') { connue = null; ligne.hidden = true;" "if (d.etat === 'absent' || d.etat === 'indisponible') { connue = null; ligne.hidden = true;" || echo "  ❌ FAIL — M-MASQUE : mutation impossible" >&2
+  build_serve "$WT" "$MK"; RMK="$(cdp "$AUX/h9.js" "http://127.0.0.1:$PORT" connue 2>&1 | tail -1)"; stop_srv
+  assert_eq "M-MASQUE — rougit H9.1 (la ligne et l'ouvreur disparaissent sur une lecture non confirmée)" "$(jq_ "$RMK" '[j.muet.ligneCachee, j.muet.ouvreurCache].join("|")' 2>/dev/null)" "true|true"
+  # M-REPOS : le graphe servi garde la liste des dépôts (retrait annulé dans une copie du module lancée ; 79-15 : il est servi depuis la mémoire, plus lu dans index.html) -> H6.5 rougit
   MR="$(mkmod mrepos)"
-  mutate "$MR/vf-cockpit-build.mjs" "insererGraphe(html, { ...g, meta: { ...g.meta, repos: [] } })" "insererGraphe(html, g)" || echo "  ❌ FAIL — M-REPOS : mutation impossible" >&2
+  mutate "$MR/vf-cockpit-graphe-fichier.mjs" "const g = { ...g0, meta: { ...g0.meta, repos: [] } };" "const g = g0;" || echo "  ❌ FAIL — M-REPOS : mutation impossible" >&2
   REPOS="$WORK/depot-repos"; mk_lab "$REPOS"; $GIT -C "$REPOS" init -q -b main && $GIT -C "$REPOS" add -A && $GIT -C "$REPOS" commit -q -m init
   build_serve "$REPOS" "$MR"; RMR="$(cdp "$AUX/h6.js" "http://127.0.0.1:$PORT" / 2>&1 | tail -1)"; stop_srv
   assert_eq "M-REPOS — rougit H6.5 (la liste « Dépôts » ou ses lignes réapparaissent)" "$(jq_ "$RMR" '(j.sections.filter((t) => /^(Repositories|Dépôts)/.test(t)).length + j.depots) > 0 ? "rouge" : "vert"' 2>/dev/null)" "rouge"
@@ -502,26 +660,25 @@ JS
   $GIT -C "$DEP8" worktree add -q -b feat/x "$WT8" >/dev/null 2>&1
   cat > "$AUX/h8.js" <<'JS'
 const [base, page, branche] = ARGS; const out = {};
+const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
 const pause = (ms) => new Promise((r) => setTimeout(r, ms));
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
 const lue = () => s.ev(`document.querySelector('.vf-git-branche').textContent`);
-const t0 = Date.now(); let txt = await lue();
-while (txt !== branche && Date.now() - t0 < 2000) { await pause(100); txt = await lue(); }
+const txt = await attendreValeur(lue, (v) => v === branche, { pas: 100, max: 2000 }); // « en moins de 2 s » est l'attendu : borne inchangée
 out.ligne = txt;
 await pause(500);
 out.lectures = await s.ev(`performance.getEntriesByType('resource').filter((e) => e.name.includes('/api/vf/git/entete')).length`);
 out.h1 = await s.ev(`(document.querySelector('#context h1') || {}).textContent || null`);
-out.ecart = await s.ev(`(() => { const b = document.querySelector('.vf-git-branche'), w = document.querySelector('.vf-git-wt'), n = w.firstChild, r = document.createRange();
+out.ecart = await stabiliser(() => s.ev(`(() => { const b = document.querySelector('.vf-git-branche'), w = document.querySelector('.vf-git-wt'), n = w.firstChild, r = document.createRange();
   const rect = (a, z) => { r.setStart(n, a); r.setEnd(n, z); return r.getBoundingClientRect(); }, txt = n.textContent, i = txt.indexOf('worktree');
   const point = rect(txt.indexOf('·'), txt.indexOf('·') + 1), mot = rect(i, i + 1), B = b.getBoundingClientRect();
-  return { texte: txt, avant: Math.round((point.left - B.right) * 10) / 10, apres: Math.round((mot.left - point.right) * 10) / 10 }; })()`);
+  return { texte: txt, avant: Math.round((point.left - B.right) * 10) / 10, apres: Math.round((mot.left - point.right) * 10) / 10 }; })()`), { max: 10000 }); // écart mesuré une fois posé
 if (page === '/' && process.env.H8_SIGNAL) {
   (await import('node:child_process')).execFileSync('git', ['-C', process.env.H8_LAB, 'switch', '-q', '-c', process.env.H8_SIGNAL], { stdio: 'ignore' }); // la branche change APRÈS le chargement de la page
   await s.ev(`document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'x' } }))`);
-  const t1 = Date.now(); let h = await s.ev(`document.querySelector('#context h1').textContent`);
-  while (!h.includes(process.env.H8_SIGNAL) && Date.now() - t1 < 2000) { await pause(100); h = await s.ev(`document.querySelector('#context h1').textContent`); }
+  const h = await attendreValeur(() => s.ev(`document.querySelector('#context h1').textContent`), (v) => !!v && v.includes(process.env.H8_SIGNAL), { pas: 100, max: 2000 });
   out.h1Signal = h; out.ligneSignal = await lue();
 }
 out.errs = await s.ev(`window.__errs`);
@@ -529,6 +686,27 @@ return out;
 JS
   build_serve "$WT8"; B8="http://127.0.0.1:$PORT"
   $GIT -C "$WT8" switch -q -c feat/y
+  # le serveur a été lancé AVANT le switch : son filet (NET_MS = 5 s, vf-cockpit-live.mjs:148-150) émet un événement `git` au premier tick qui voit le switch, et la page ouverte à ce moment relirait
+  # l'en-tête une 2e fois (diagnostic H8.1). On laisse donc le filet absorber le switch AVANT les chargements : attente OBSERVABLE du premier événement `git` du flux direct (borne 15 s = 3 ticks).
+  # Sans événement en 15 s, la graine du filet est postérieure au switch (rien à absorber) : on continue, ce que le script dit (« aucun »).
+  cat > "$AUX/attendre-git.mjs" <<'JS'
+// attendre-git.mjs <port> <jeton> <maxMs> : s'abonne à /api/vf/events, imprime « git » au premier événement `git`, « aucun » à l'échéance, « erreur » si l'abonnement échoue
+import http from 'node:http';
+const [, , port, jeton, max] = process.argv; let tampon = '';
+const fin = (m) => { console.log(m); process.exit(0); };
+setTimeout(() => fin('aucun'), Number(max));
+http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/events?token=' + encodeURIComponent(jeton) }, (r) => { r.on('data', (c) => { tampon += c; if (/^event: git$/m.test(tampon)) fin('git'); }); }).on('error', () => fin('erreur'));
+JS
+  absorber_filet() { # absorber_filet <étiquette> : après un git switch, attend le premier événement `git` du filet (serveur courant : $OUT, $PORT) ; avertit si rien, FAIL nommé si l'outil d'attente échoue
+    local tok g; tok="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).token)" 2>/dev/null)"
+    g="$(node "$AUX/attendre-git.mjs" "$PORT" "$tok" 15000 2>&1 | tail -1)"
+    case "$g" in
+      git) echo "     filet [$1] : événement git absorbé" >&2 ;;
+      aucun) echo "     ⚠ filet [$1] : aucun événement git en 15 s — graine postérieure au switch (rien à absorber) ou filet muet ; la mesure continue" >&2 ;;
+      *) echo "  ❌ FAIL — H8.0 [$1] — l'attente d'absorption du filet a échoué (« $g ») : la mesure qui suit n'est pas fiable" >&2; echo "$1" >> "$WORK/absorption-ratee.txt" ;; # le FAIL est compté une fois, après les mutants (un sous-shell $(…) ne remonte pas FAIL)
+    esac
+  }
+  absorber_filet principal
   for pg in / /project.html /equipe.html; do
     R8="$(cdp "$AUX/h8.js" "$B8" "$pg" feat/y 2>&1 | tail -1)"
     assert_eq "H8.1 — $pg : après un switch sans réassemblage, la seconde ligne dit la branche réelle (feat/y) en moins de 2 s" "$(jq_ "$R8" 'j.ligne' 2>/dev/null)" "feat/y"
@@ -541,22 +719,39 @@ JS
   assert_eq "H8.x — aucune erreur de page" "$(jq_ "$R8" 'j.errs.length' 2>/dev/null)" "0"
   stop_srv
   # mutants H8 : copie du module mutée, lab neuf assemblé sur feat/x puis basculé sur feat/y (le défaut de chaque mutant ne rougit que SON témoin)
-  h8mut() { # h8mut <nom> <ancien> <nouveau> : rend la ligne JSON de h8.js sur / (« {} » si la mutation est impossible)
+  h8mut() { # h8mut <nom> <ancien> <nouveau> [<ancien2> <nouveau2>] : rend la ligne JSON de h8.js sur / (« {} » si la mutation est impossible)
     local M D W; M="$(mkmod "$1")"; D="$WORK/depot-$1"; W="$WORK/wt-$1"; mk_lab "$D"
     $GIT -C "$D" init -q -b main && $GIT -C "$D" add -A && $GIT -C "$D" commit -q -m init
     $GIT -C "$D" worktree add -q -b feat/x "$W" >/dev/null 2>&1
     mutate "$M/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "$2" "$3" || { echo "  ❌ FAIL — $1 : mutation impossible" >&2; echo '{}'; return; }
-    build_serve "$W" "$M"; $GIT -C "$W" switch -q -c feat/y
+    if [ -n "${4:-}" ]; then mutate "$M/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "$4" "$5" || { echo "  ❌ FAIL — $1 : seconde mutation impossible" >&2; echo '{}'; return; }; fi # seconde mutation du même fichier ($4 -> $5), facultative
+    if [ -n "${H8_POLICES:-}" ]; then # condition Linux (H7.1b) : le viewer n'attend plus les polices, `ready` arrive donc aux écouteurs d'extension
+      mutate "$M/../skills/cockpit-moteur/assets/viewer.html" "const fontsReady = document.fonts?.ready ? Promise.race([document.fonts.ready, new Promise((ok) => setTimeout(ok, 1500))]) : Promise.resolve();" "const fontsReady = ${H8_POLICES};" || { echo "  ❌ FAIL — $1 : mutation des polices impossible" >&2; echo '{}'; return; }
+    fi
+    build_serve "$W" "$M"; $GIT -C "$W" switch -q -c feat/y; absorber_filet "$1"
     cdp "$AUX/h8.js" "http://127.0.0.1:$PORT" / feat/y 2>&1 | tail -1; stop_srv
   }
   RM="$(h8mut m-chargement "  relire(); // chargement : la page assemblée peut dater d'avant un \`git switch\`, une seule lecture par chargement
 " "")"
   assert_eq "M-CHARGEMENT — rougit H8.1 (sans la lecture au chargement, la seconde ligne garde feat/x et aucune lecture ne part) alors que l'écart du point médian est là" "$(jq_ "$RM" '[j.ligne, j.lectures, j.ecart.avant >= 4].join("|")' 2>/dev/null)" "feat/x|0|true"
-  RM="$(h8mut m-bloc "    if (change && TAB === 'code') ecrireEtRecadrer(); // le bloc de vue Code cite la branche de la même lecture que la seconde ligne
-" "")"
+  RM="$(h8mut m-double "  relire(); // chargement : la page assemblée peut dater d'avant un \`git switch\`, une seule lecture par chargement
+" "  relire(); relire(); // mutant : deux lectures au chargement
+")"
+  assert_eq "M-DOUBLE-LECTURE — témoin : une DOUBLE lecture au chargement rend H8.1 rouge (obtenu 2 ou plus au lieu de 1) : la mesure sait voir un doublon" "$(jq_ "$RM" 'j.lectures >= 2 ? "rouge" : "vert (lectures=" + j.lectures + ")"' 2>/dev/null)" "rouge"
+  # M-BLOC-VUE (K6) : le bloc de vue s'écrit par QUATRE chemins dans ui/76 (la lecture `lire`, l'écouteur `render`, l'écouteur `ready`, la pose à l'arrivée du fichier), qui lisent tous la même variable V. Retirer le seul appel de `lire` ne suffisait pas : sous Linux (CI, run 42522934974) le premier rendu ou `ready` arrive APRÈS la réponse de la lecture et réécrit le bloc avec la branche neuve, le mutant ne produisait plus son effet. Le mutant coupe donc la SOURCE du texte du bloc (une copie figée de V, posée à l'assemblage) : aucun chemin d'écriture, présent ou à venir, ne peut plus le remettre à jour.
+  BLOC_B="let V = G.meta && G.meta.vfGit;"; BLOC_C="let V = G.meta && G.meta.vfGit; const V0 = V; /* mutant : copie figée */"
+  BLOC_D="  const texteVue = () => {"; BLOC_E="  const texteVue = () => { const V = V0; /* mutant : le bloc ne lit jamais la lecture neuve */"
+  RM="$(h8mut m-bloc "$BLOC_B" "$BLOC_C" "$BLOC_D" "$BLOC_E")"
   assert_eq "M-BLOC-VUE — rougit H8.2 (le bloc de vue garde feat/x alors que la seconde ligne dit feat/y)" "$(jq_ "$RM" '[j.ligne, j.h1].join("|")' 2>/dev/null)" "feat/y|Le code, branche feat/x"
+  RM="$(H8_POLICES="Promise.resolve()" h8mut m-bloc-tot "$BLOC_B" "$BLOC_C" "$BLOC_D" "$BLOC_E")"
+  assert_eq "M-BLOC-VUE — polices prêtes tôt (Linux, H7.1b) : rougit H8.2 de la même façon" "$(jq_ "$RM" '[j.ligne, j.h1].join("|")' 2>/dev/null)" "feat/y|Le code, branche feat/x"
+  RM="$(H8_POLICES="new Promise((ok) => setTimeout(ok, 250))" h8mut m-bloc-tard "$BLOC_B" "$BLOC_C" "$BLOC_D" "$BLOC_E")"
+  assert_eq "M-BLOC-VUE — premier rendu APRÈS la réponse de la lecture (polices en retard de 250 ms) : rougit H8.2 de la même façon" "$(jq_ "$RM" '[j.ligne, j.h1].join("|")' 2>/dev/null)" "feat/y|Le code, branche feat/x"
+  # recensement (comme T21.7r pour la pastille) : un nouveau chemin d'écriture du bloc rougit ici ; le mutant ci-dessus coupe la source, ce nombre dit que la source est toujours la seule lue par ces chemins
+  assert_eq "M-BLOC-VUE — recensement des chemins d'écriture du bloc de vue dans ui/76 : 4 appels de ecrireEtRecadrer() (lire, render, ready, pose initiale), 1 appel de ecrireVue(), 2 mentions de texteVue (définition + ecrireVue)" "$(grep -oF 'ecrireEtRecadrer()' "$UI/76-vf-git-entete.js" | wc -l | tr -d ' ')/$(grep -oF 'ecrireVue()' "$UI/76-vf-git-entete.js" | wc -l | tr -d ' ')/$(grep -oF 'texteVue' "$UI/76-vf-git-entete.js" | wc -l | tr -d ' ')" "4/1/2"
   RM="$(h8mut m-ecart "flex: 0 2 auto; white-space: pre; }" "flex: 0 2 auto; }")"
   assert_eq "M-ECART — rougit H8.3 (plus d'écart avant le point médian) alors que la branche est à jour" "$(jq_ "$RM" '[j.ecart.avant >= 4, j.ligne].join("|")' 2>/dev/null)" "false|feat/y"
+  [ ! -s "$WORK/absorption-ratee.txt" ] || { echo "  ❌ FAIL — H8.0 — l'attente d'absorption du filet a échoué ($(tr '\n' ' ' < "$WORK/absorption-ratee.txt")) : leurs mesures ne sont pas fiables"; FAIL=$((FAIL+1)); } # FAIL posé dans un sous-shell $(…) ne remonte pas : relayé par fichier
 fi
 
 echo "=== H6.6 — la feuille de 76 n'emploie que des variables et des valeurs existantes (P78-D-12) ==="

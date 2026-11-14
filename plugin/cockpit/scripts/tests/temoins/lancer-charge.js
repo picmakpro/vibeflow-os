@@ -27,7 +27,7 @@
       f.contentWindow.postMessage('toggle', '*'); f.contentWindow.postMessage('lancer', '*'); f.contentWindow.postMessage({ id: '__ID1__', mode: 'herite' }, '*'); return 'envoye';
     });
     const w = window.open(Q + '/', '_blank'); X.open = w ? 'ouvert' : 'bloque';
-    if (w) { await att(1500); await essai('stockageFenetre', () => { w.localStorage.getItem('__CLE_STOCK__'); return 'lisible'; }); try { w.postMessage('lancer', '*'); } catch (x) { void x; } }
+    if (w) { for (let i = 0; i < 80; i++) { try { w.localStorage.getItem('__CLE_STOCK__'); } catch (x) { break; } await att(100); } await essai('stockageFenetre', () => { w.localStorage.getItem('__CLE_STOCK__'); return 'lisible'; }); try { w.postMessage('lancer', '*'); } catch (x) { void x; } }
     X.etape1 = true;
     // signal du pilote : la proposition a été lue, l'armement est passé (attente bornée, 60 s)
     for (let i = 0; i < 600 && !window.__go; i++) await att(100);

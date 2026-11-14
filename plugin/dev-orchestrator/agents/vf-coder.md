@@ -64,6 +64,12 @@ Enchaîne les sous-phases en déléguant à la machinerie existante :
 
 Si une sous-phase est déjà faite (CONTEXT ou PLAN existants dans `.planning/phases/<étape>/`), ne la refais pas : reprends où c'est pertinent.
 
+**Mandat qui touche une UI** : lis `dev-orchestrator-references/design-craft-lexicon.md` (au
+moins la règle de dosage et les termes que cite le digest ; aucun cité → choisis-les toi-même
+dans la table « Quels termes pour quel écran ») et passe-les à la brique d'exécution comme
+contraintes d'implémentation. La DA du projet (`DESIGN.md`) prime. Au rapport, une ligne :
+termes appliqués, termes écartés à dessein avec leur motif.
+
 ## Compartiment de planning — passer `--ws`, ne jamais présumer
 
 `.planning/workstreams/` existe → le dépôt est partitionné : **passe `--ws <nom>`** aux commandes
@@ -98,9 +104,7 @@ creuser. Tu ne pars en debug empirique QUE si la recherche n'a rien donné.
   --depth=2 [--ws=<sujet du mandat>]`, `$S` résolu comme en `mission-flow.md` §Résolution) et fermé à son retour
   (`close --agent=<agentId> --status=done|failed`). Ton transcript n'est lu par personne à la reprise :
   seul le registre permet de retrouver ton enfant (`mission-flow.md` §Pattern I).
-- **Fin de tour inerte** : rends la main sans enfant ni tâche de fond vivants (bascule auto du
-  timeout Bash comprise) ; commandes bornées, `TaskStop` avant le rapport, sinon `blocked` avec l'identifiant
-  de tâche en finding — `team-kernel.md` §Fin de tour inerte.
+- **Fin de mandat** : aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (`TaskStop(<id de tâche>)`) ; attente au premier plan, bornée par une échéance ; commit avant tout rejeu long ; au rapport, tes processus arrêtés par PID consigné, sans motif de commande, dans le même tour, sinon `blocked` — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 

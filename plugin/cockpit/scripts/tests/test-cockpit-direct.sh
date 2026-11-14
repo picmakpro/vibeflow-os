@@ -3,11 +3,11 @@
 #   D1 flux SSE sur le port de la page, sans CORS · D2 phase cochée -> patch · D3 PLAN ajouté -> structural + page relue
 #   D4 corruption passagère d'un DAG -> aucun structural (hystérésis), disparition durable -> structural
 #   D5 repli par scrutation (VF_COCKPIT_WATCH=poll) : mode annoncé et mêmes événements
+#   D6b (sans serveur ni Chrome) le diff de statuts de vf-cockpit-live.mjs et le patch appliqué par ui/70-vf-live.js
 # Lab neutre assemblé dans mktemp, HOME jetable, isolation git, clients node auto-bornés, aucun timeout externe.
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
@@ -16,6 +16,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -72,10 +73,17 @@ const v = new Function('j', 'return (' + process.argv[3] + ')')(j);
 console.log(typeof v === 'string' ? v : JSON.stringify(v));
 JS
 cat > "$AUX/pg.mjs" <<'JS'
-// pg.mjs <dossier-sortie> <page.html> <expression sur g> : le graphe de la page (module d'embarquement de la sortie)
+// pg.mjs <dossier-sortie> <page.html> <expression sur g> : le graphe de la page (module d'embarquement du MODULE, dossier de scripts dans VF_PG_SCRIPTS ; la sortie ne porte que des données)
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const [, , out, file, expr] = process.argv; const m = await import(pathToFileURL(out + '/vf-cockpit-embed.mjs').href);
+const [, , out, file, expr] = process.argv; const m = await import(pathToFileURL(process.env.VF_PG_SCRIPTS + '/vf-cockpit-embed.mjs').href);
 console.log(String(new Function('g', 'return (' + expr + ')')(m.extraireGraphe(fs.readFileSync(file, 'utf8')))));
+JS
+export VF_PG_SCRIPTS="$SCRIPTS"   # 79-06 : pg.mjs importe l'embarquement du module, plus de la sortie
+cat > "$AUX/route.mjs" <<'JS'
+// route.mjs <port> <jeton> <onglet> : le corps (JSON) de GET /api/vf/graphe?onglet=… (79-15 : la donnée vit en mémoire, plus dans project.html)
+import http from 'node:http';
+const [, , port, jeton, onglet] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/graphe?onglet=' + onglet, headers: { Host: `127.0.0.1:${port}`, 'x-vf-cockpit-token': jeton } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => process.stdout.write(r.statusCode === 200 ? b : '{}')); }).on('error', () => process.stdout.write('{}'));
 JS
 cat > "$AUX/now.mjs" <<'JS'
 console.log(Date.now());
@@ -93,11 +101,8 @@ mklab() {
 }
 demarrer() { # demarrer <lab> [VAR=val ...] -> PORT, TOK, PTOK
   local L="$1"; shift; local OUT="$L/.vibeflow/cockpit"
-  rm -f "$OUT/.cache/server.json"
-  env "$@" node "$OUT/serve.mjs" --no-open --port $(libre) > "$WORK/serve.out" 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
+  cockpit_lancer "$L" "$@"; SRV="${VF_PID:-}"
+  PORT="${VF_PORT:-0}"
   TOK=$(node "$AUX/token.mjs" "$PORT" /); PTOK=$(node "$AUX/token.mjs" "$PORT" /project.html)
 }
 attendre_hello() { for _ in $(seq 1 80); do grep -q '"event":"hello"' "$1" 2>/dev/null && return 0; sleep 0.1; done; return 1; }
@@ -132,10 +137,12 @@ assert_eq "D2.2 — le patch nomme la carte de la phase 2" "$(node "$AUX/ev.mjs"
 assert_eq "D2.3 — le patch porte le résumé du projet (vf) quand il change" "$(node "$AUX/ev.mjs" "$WORK/e2.jsonl" 'typeof E.filter(e=>e.event==="patch")[0].data.vf')" "object"
 LAT=$(( $(node "$AUX/ev.mjs" "$WORK/e2.jsonl" 'E.filter(e=>e.event==="patch")[0].abs') - T0 ))
 assert_lt "D2.4 — latence du patch en ms" "$LAT" 5000
-# S2 : un patch non structurel réécrit aussi project.html (F5, nouvel onglet, réponses locales à jour)
-assert_eq "D2.5 — project.html SUR DISQUE porte la phase 2 faite (pas l'instantané du dernier structural)" "$(node "$AUX/pg.mjs" "$OUT" "$OUT/project.html" 'g.nodes.find(n=>n.id==="ph-2").st')" "done"
-node "$AUX/get.mjs" "$PORT" /project.html | sed '1,2d' > "$WORK/servi.html"
-assert_eq "D2.6 — GET /project.html sert la phase 2 faite (le serveur a rechargé la page)" "$(node "$AUX/pg.mjs" "$OUT" "$WORK/servi.html" 'g.nodes.find(n=>n.id==="ph-2").st')" "done"
+# S2 (79-15) : un patch ne réécrit plus project.html ; la donnée vit en mémoire et la route la porte
+node "$AUX/route.mjs" "$PORT" "$PTOK" projet > "$WORK/route-projet.json"
+assert_eq "D2.5 — project.html SUR DISQUE est INCHANGÉ (phase 2 toujours à faire) et la route porte la phase 2 faite" "$(node "$AUX/pg.mjs" "$OUT" "$OUT/project.html" 'g.nodes.find(n=>n.id==="ph-2").st!=="done"')|$(node "$AUX/json.mjs" "$WORK/route-projet.json" 'j.nodes.find(n=>n.id==="ph-2").st')" "true|done"
+# 79-16 : le document servi ne porte plus de donnée ; l'énoncé passe à la route, là où le moteur lit
+node "$AUX/route.mjs" "$PORT" "$PTOK" projet > "$WORK/route-projet2.json"
+assert_eq "D2.6 — GET /api/vf/graphe?onglet=projet sert la phase 2 faite (le serveur a rechargé la donnée)" "$(node "$AUX/json.mjs" "$WORK/route-projet2.json" 'j.nodes.find(n=>n.id==="ph-2").st')" "done"
 
 echo "=== D3 — PLAN ajouté -> structural, page réécrite et servie ==="
 assert_eq "D3.0 — témoin : le nouveau plan est absent de la page avant" "$(grep -c '02-01-PLAN.md' "$OUT/project.html")" "0"
@@ -145,10 +152,11 @@ mkdir -p "$LAB/.planning/phases/02-y"; printf '<objective>Faire la suite</object
 wait "$C"
 assert_eq "D3.1 — un événement structural est reçu" "$(node "$AUX/ev.mjs" "$WORK/e3.jsonl" 'E.filter(e=>e.event==="structural").length')" "1"
 assert_lt "D3.2 — latence du structural en ms" "$(( $(node "$AUX/ev.mjs" "$WORK/e3.jsonl" 'E.filter(e=>e.event==="structural")[0]?.abs||0') - T0 ))" 5000
-assert_eq "D3.3 — project.html sur disque contient le nouveau plan" "$([ "$(grep -c '02-01-PLAN.md' "$OUT/project.html")" -ge 1 ] && echo oui || echo non)" "oui"
-assert_eq "D3.4 — GET /project.html sert le nouveau plan" "$([ "$(node "$AUX/get.mjs" "$PORT" /project.html | grep -c '02-01-PLAN.md')" -ge 1 ] && echo oui || echo non)" "oui"
+node "$AUX/route.mjs" "$PORT" "$PTOK" projet > "$WORK/route-projet3.json"
+assert_eq "D3.3 — project.html sur disque ne contient pas le nouveau plan, la route le contient" "$(grep -c '02-01-PLAN.md' "$OUT/project.html")|$([ "$(grep -c '02-01-PLAN.md' "$WORK/route-projet3.json")" -ge 1 ] && echo oui || echo non)" "0|oui"
+assert_eq "D3.4 — GET /api/vf/graphe?onglet=projet sert le nouveau plan" "$([ "$(node "$AUX/route.mjs" "$PORT" "$PTOK" projet | grep -c '02-01-PLAN.md')" -ge 1 ] && echo oui || echo non)" "oui"
 assert_eq "D3.5 — le gabarit est conservé (titre de l'onglet et jeton du serveur)" "$(node "$AUX/get.mjs" "$PORT" /project.html | grep -c '<title>VibeFlow · Projet</title>')$(node "$AUX/token.mjs" "$PORT" /project.html | grep -c "$PTOK")" "11"
-assert_eq "D3.6 — l'écriture a été atomique : aucun .tmp résiduel" "$(ls "$OUT" | grep -c 'project.html.tmp')" "0"
+assert_eq "D3.6 — l'écriture a été atomique : aucun .tmp résiduel (project.html.tmp, projet.json.tmp) et projet.json est là" "$(ls "$OUT" | grep -c -E 'project.html.tmp|projet.json.tmp')|$([ -f "$OUT/projet.json" ] && echo present || echo absent)" "0|present"
 
 echo "=== D4 — corruption passagère d'un DAG : hystérésis ==="
 DAGF="$LAB/.planning/missions/MISSION-1-x.dag.json"; cp "$DAGF" "$WORK/dag.save"
@@ -157,7 +165,8 @@ attendre_hello "$WORK/e4.jsonl"
 printf '{"nodes":[' > "$DAGF"; sleep 0.45; cp "$WORK/dag.save" "$DAGF"
 wait "$C"
 assert_eq "D4.1 — aucun structural pendant la corruption passagère (3,5 s)" "$(node "$AUX/ev.mjs" "$WORK/e4.jsonl" 'E.filter(e=>e.event==="structural").length')" "0"
-assert_eq "D4.2 — la page n'a pas perdu la mission" "$([ "$(grep -c 'MISSION-1-x.dag.json#a' "$OUT/project.html")" -ge 1 ] && echo oui || echo non)" "oui"
+node "$AUX/route.mjs" "$PORT" "$PTOK" projet > "$WORK/route-projet4.json"
+assert_eq "D4.2 — la route n'a pas perdu la mission" "$([ "$(grep -c 'MISSION-1-x.dag.json#a' "$WORK/route-projet4.json")" -ge 1 ] && echo oui || echo non)" "oui"
 : > "$WORK/e4b.jsonl"; node "$AUX/sse.mjs" "$PORT" "$PTOK" 6000 structural "$WORK/e4b.jsonl" & C=$!
 attendre_hello "$WORK/e4b.jsonl"
 rm -f "$DAGF"
@@ -200,6 +209,14 @@ wait "$C"
 assert_has "D6.1 — le patch de la mission porte son résumé à jour (1 nœud fait)" "$(node "$AUX/ev.mjs" "$WORK/e6.jsonl" 'E.filter(e=>e.event==="patch").flatMap(e=>e.data.patch).filter(p=>p.ref==="n:dag-MISSION-1-x").map(p=>p.sum).join("|")')" "2 nœuds, 1 fait."
 stop_srv
 
+echo "=== D6b — le diff de statuts du serveur et le patch appliqué par la page (sans serveur HTTP ni Chrome) ==="
+RL="$(node "$SCRIPTS/tests/live-serveur.mjs" "$SCRIPTS/vf-cockpit-live.mjs")"
+assert_eq "D6b.1 — un résumé qui change seul (ni statut ni pied) part dans un patch, un seul, avec le nouveau résumé" "$(printf '%s' "$RL" | node "$AUX/json.mjs" /dev/stdin 'j.erreur || j.sum.ok + ":" + j.sum.detail.sum')" "true:But B"
+assert_eq "D6b.2 — un graphe relu au contenu identique (objets neufs, meta.vf égal en valeur) n'émet aucun événement : ni patch vide, ni vf" "$(printf '%s' "$RL" | node "$AUX/json.mjs" /dev/stdin 'j.erreur || j.identique.ok + ":" + j.identique.detail.evenements.length')" "true:0"
+assert_eq "D6b.3 — snapshot().seq (le seq du hello suivant) égale le seq du dernier événement émis, et n'est pas nul" "$(printf '%s' "$RL" | node "$AUX/json.mjs" /dev/stdin 'j.erreur || j.snapshot.ok + ":" + (j.snapshot.detail.snapshotSeq === j.snapshot.detail.dernierSeq)')" "true:true"
+RP="$(node "$SCRIPTS/tests/live-page.mjs" "$SCRIPTS/../skills/cockpit-moteur/assets/ui")"
+assert_eq "D6b.4 — côté page, un patch dont st et foot sont vides les retire de la carte (appliqué, st et foot indéfinis)" "$(printf '%s' "$RP" | node "$AUX/json.mjs" /dev/stdin 'j.erreur || j.retrait.ok + ":" + j.retrait.detail.applied + ":" + j.retrait.detail.st + ":" + j.retrait.detail.foot')" "true:1:null:null"
+
 
 echo "=== D7 — recette humaine du 2026-11-02 dans le navigateur (D1 parcours, I2 titre flouté, I3 direct sans réapparition, libellé de type) ==="
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
@@ -227,7 +244,7 @@ cat > "$AUX/d1.js" <<'JS'
   const debut = mesure();
   for (let i = 0; i < f.steps.length - 1; i++) { const vieux = document.getElementById('fl-next'); vieux.click(); if (!await att(() => !vieux.isConnected && document.getElementById('fl-next'))) return { erreur: 'étape ' + (i + 2) + ' non atteinte' }; }
   const fin = mesure();
-  document.getElementById('fl-x').click(); await pause(200);
+  document.getElementById('fl-x').click(); await att(() => bar().hidden); // la barre se ferme : on attend l'état, plus de délai fixe
   return { etapes: f.steps.length, debut, fin, barreFermee: bar().hidden };
 })()
 JS
@@ -258,7 +275,7 @@ cat > "$AUX/i3.js" <<'JS'
   const a0 = window.__vfLive.applied;
   const marque = new EventSource('/api/vf/events?token=' + encodeURIComponent(window.VF_COCKPIT_SERVER.token)); // un second client : le signal « prêt » que la suite lit sur /api/vf/etat
   if (!await att(() => window.__vfLive.applied > a0 && !vieille.isConnected, 600)) return { erreur: 'patch non appliqué', applied: window.__vfLive.applied };
-  await pause(120);
+  await att(() => document.getAnimations().some((a) => a.animationName === 'flash' && a.effect?.target?.closest?.('#stage, #panel')), 60); // l'animation « flash » (600 ms) est VIVANTE : on relève l'ensemble des animations à cet instant, plus après un délai fixe
   const anims = document.getAnimations().filter((a) => a.animationName && a.effect?.target?.closest?.('#stage, #panel'));
   marque.close();
   return window.__i3 = { avant, apres: { t: tr(), cartes: document.querySelectorAll('#viewport .node .card').length }, entree: anims.filter((a) => ENTREE.test(a.animationName)).map((a) => a.animationName), flash: anims.filter((a) => a.animationName === 'flash').length, autres: anims.filter((a) => !ENTREE.test(a.animationName) && a.animationName !== 'flash').map((a) => a.animationName) };
@@ -272,12 +289,12 @@ cat > "$AUX/lib.js" <<'JS'
   if (!lib) return { erreur: 'aucun nœud de type library' };
   SC.select('n:' + lib.id);
   if (!await att(() => document.querySelector('#panel .kindlabel'))) return { erreur: 'panneau sans libellé de type' };
-  await pause(400);
+  await att(() => /biblioth/i.test((document.querySelector('#panel .kindlabel') || {}).textContent || '')); // la traduction passe après la pose du panneau : on attend le libellé, plus de délai fixe
   const panneau = document.querySelector('#panel .kindlabel').textContent;
   const g = [...document.querySelectorAll('#viewport .node')].find((x) => x.querySelector('.title')?.textContent === lib.label);
   let infobulle = null;
   if (g) { g.dispatchEvent(new MouseEvent('mouseenter', { bubbles: true, clientX: 400, clientY: 300 })); infobulle = await att(() => document.querySelector('#tooltip .td')?.textContent || null); }
-  return { lib: lib.label, panneau, infobulle, titres: [...document.querySelectorAll('#viewport .node .title')].map((t) => t.textContent), anglais: /\blibrary\b/i.test(document.getElementById('panel').innerText + ' ' + (document.getElementById('tooltip')?.innerText || '')) };
+  return { lib: lib.label, panneau, survol: matchMedia("(hover: hover)").matches, infobulle, titres: [...document.querySelectorAll('#viewport .node .title')].map((t) => t.textContent), anglais: /\blibrary\b/i.test(document.getElementById('panel').innerText + ' ' + (document.getElementById('tooltip')?.innerText || '')) };
 })()
 JS
 LABN="$WORK/labn"; mkdir -p "$LABN/src" "$LABN/library" "$LABN/config" "$LABN/.planning/phases/01-x" "$LABN/.planning/missions"
@@ -326,6 +343,11 @@ assert_eq "D7.14 — libellé témoin : la mesure a eu lieu et le nœud library 
 assert_eq "D7.15 — libellé : le type « library » est en français dans le panneau" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "$V.panneau.toLowerCase()")" "bibliothèque"
 assert_eq "D7.16 — libellé : le type est en français dans l'infobulle (et plus de « library » nulle part dans l'interface)" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "[/^bibliothèque/i.test($V.infobulle||''),$V.anglais]")" "[true,false]"
 assert_eq "D7.17 — libellé : une DONNÉE du lab (dossiers nommés library et config) n'est jamais traduite" "$(printf '%s' "$XL" | node "$AUX/jg.mjs" "['library','config','src'].every((t)=>$V.titres.includes(t))")" "true"
+# D7.16b (recette du 2026-11-08, corrige PU-G-035) : même mesure sous un Chrome SANS survol ni pointeur (`pointer: none`, `hover: none`, comme Chrome headless Linux, CI) : l'infobulle ne dépend pas de `:hover`
+CHROME_NOPTR="$AUX/chrome-sans-pointeur.sh"
+printf '#!/bin/sh\nexec "%s" --blink-settings=primaryPointerType=1,availablePointerTypes=1,primaryHoverType=1,availableHoverTypes=1 "$@"\n' "$CHROME" > "$CHROME_NOPTR"; chmod +x "$CHROME_NOPTR"
+XLN="$(CDP_VIEWPORT=1280x800 CDP_PRET="document.readyState === 'complete' && !!window.VibeFlow && !!document.querySelector('#viewport .node .card')" node "$SCRIPTS/tests/chrome-cdp.mjs" "$CHROME_NOPTR" 500 "$(cat "$AUX/lib.js")" "$URLC")"
+assert_eq "D7.16b — libellé sans survol ni pointeur : témoin (mesure faite, aucun pointeur ni survol dans le navigateur) puis l'infobulle dit le type en français" "$(printf '%s' "$XLN" | node "$AUX/jg.mjs" "[($V.erreur||j.erreur||''),$V.panneau.length>0,$V.survol===false,/^bibliothèque/i.test($V.infobulle||'')]")" '["",true,true,true]'
 
 # O3 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : *italique* et _italique_ rendus dans les réponses de l'agent (VibeFlow.md, le rendu du viewer).
 # Bornes de mot : l'ouvrant suit le début ou un non-mot (ni lettre, chiffre, `_`, `*`, `\`, ni `/` pour `*`) et n'est pas suivi d'une espace ; le fermant n'est pas précédé d'une espace et est suivi d'un non-mot.

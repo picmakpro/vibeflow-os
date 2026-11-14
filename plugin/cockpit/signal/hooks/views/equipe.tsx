@@ -13,7 +13,7 @@ import type { SignalWorker } from '../../types'
 const STOP_TEXT =
   "vf-signal (geste humain) : arrête-toi proprement. Termine l'action en cours, écris ton rapport et rends la main sans entamer d'autre étape."
 
-type Etat = 'actif' | 'en-attente' | 'termine'
+type Etat = 'actif' | 'en-attente' | 'au-repos' | 'attend' | 'termine'
 
 // Statuts de `$.agent.list()` qui disent « fini » ; tout autre statut (running, …) est un agent vivant (P68-D-35, R2).
 const STATUTS_FINIS = new Set(['completed', 'failed', 'killed'])
@@ -22,7 +22,7 @@ const STATUTS_FINIS = new Set(['completed', 'failed', 'killed'])
 let deplie = false
 
 /** L'état écrit par who@2 ; à défaut (verrou, nœud, registre) : périmé = en attente, sinon actif. */
-const etatDe = (w: SignalWorker): Etat => (w.etat === 'actif' || w.etat === 'en-attente' || w.etat === 'termine' ? w.etat : w.stale ? 'en-attente' : 'actif')
+const etatDe = (w: SignalWorker): Etat => (w.etat === 'actif' || w.etat === 'en-attente' || w.etat === 'au-repos' || w.etat === 'attend' || w.etat === 'termine' ? w.etat : w.stale ? 'en-attente' : 'actif')
 
 /** Racines : sans parent, ou parent absent de la liste ; un cycle ne fait jamais disparaître un travailleur. */
 function arbre(workers: SignalWorker[]): { w: SignalWorker; depth: number }[] {
@@ -81,7 +81,7 @@ export function equipe($: EngineInterface, ctx: Ctx): JSX.Element {
         {compact ? null : (
           <Box paddingLeft={depth > 0 ? 4 : 2}>
             <Text color={pal['text-3']} wrap="wrap">
-              {w.orphan ? 'orphelin (registre)' : termine ? 'terminé' : etat === 'en-attente' ? 'en attente' : 'actif'}
+              {w.orphan ? 'orphelin (registre)' : termine ? 'terminé' : etat === 'attend' ? 'vous attend' : etat === 'au-repos' ? 'au repos' : etat === 'en-attente' ? 'en attente' : 'actif'}
               {` · ${libellePortee(w.tree)}`}
               {w.branch ? ` · ${w.branch}` : ''}
               {w.ageS != null ? ` · ${age(w.ageS)}` : ''}

@@ -7,24 +7,26 @@
 #   E2E  amorçage à usage unique, aucun assistant avant le flux, commande aller-retour, ligne de commande de l'assistant, arrêt sans reste
 #   T11.4 sous Windows : aucun écouteur, état « indisponible »
 #   POSE l'engine pose `terminal/vf-cockpit-pty.py` dans les trois scopes et un serveur INSTALLÉ le lance
-#   M-*  mutants (copies de la sortie, jamais le module) : M-ACTIF, M-ECOUTE0, M-FRAMESRC, M-WIN, M-HORS-MOTEUR
+#   T7.11 server.json jamais vu tronqué pendant la publication de terminal.url (écriture à côté puis renommée ; ecoute0)
+#   M-*  mutants (copies du module par cockpit_module_muter ; la sortie ne porte que des données) : M-ACTIF, M-ECOUTE0, M-FRAMESRC, M-WIN, M-HORS-MOTEUR, M-SRVJSON
 # Chaque témoin négatif a son contrôle positif ; la suite rougit sur un module antérieur à la tranche. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$SCRIPTS/../skills/cockpit-moteur"; PLUGIN="$(cd "$SCRIPTS/../.." && pwd)"; INSTALLER="$PLUGIN/_internal/vibeflow-update.sh"
 TA="$HERE_T/terminal-aux.mjs"
-WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/bin" "$WORK/run"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/bin" "$WORK/run"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 # P71-D-33 : Q tourne dans un processus enfant du serveur ; « les enfants du serveur » = les assistants, enfants de ce processus (pgrep -P ne voit qu'un étage)
 pgrep() { if [ "$1" = "-P" ] && [ $# -eq 2 ]; then local c; for c in $(command pgrep -P "$2"); do if ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs'; then command pgrep -P "$c"; else echo "$c"; fi; done; else command pgrep "$@"; fi; }
 # écouteurs du serveur ET de son processus du terminal (Q y écoute, P71-D-33) ; lignes vides écartées
-ecoutes_srv() { local c; { node "$TA" ecoutes "$1"; for c in $(command pgrep -P "$1"); do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && node "$TA" ecoutes "$c"; done; } | sed '/^$/d'; }
+ecoutes_srv() { local c; [ -n "${1:-}" ] || { echo "ecoutes_srv : PID du serveur vide — le serveur n'a pas été lancé, rien n'est mesuré" >&2; return 2; }; { node "$TA" ecoutes "$1"; for c in $(command pgrep -P "$1"); do ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs' && node "$TA" ecoutes "$c"; done; } | sed '/^$/d'; }
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
+assert_ge() { if [ "$2" -ge "$3" ] 2>/dev/null; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1 ($2 < $3)"; FAIL=$((FAIL+1)); fi; }
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; } # une valeur longue montre son début ET sa fin
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
 assert_not() { if [[ "$2" != *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     sous-chaîne interdite: [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
@@ -55,23 +57,33 @@ mklab() { # mklab <dir> : lab GSD minimal, construit ; sortie dans <dir>/.vibefl
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build-$(basename "$L").out" 2>&1 || cat "$WORK/build-$(basename "$L").out"
 }
 SRVN=0
-srv() { # srv <sortie> <0|1 terminal> [moteur] [scripts] -> SRV_PORT SRV_PID SRV_O SRV_OUT ; serveur lancé directement depuis la sortie, comme le lanceur
-  local o="$1" term="${2:-0}" eng="${3:-$ENG}" scr="${4:-$SCRIPTS}" lab; lab="$(cd "$1/../.." && pwd)"
+# 79-06 : le code ne vit plus dans la sortie. MOD_DEPOT = racine du module du dépôt ; mod_de <sortie> = racine du module que COMMANDE cette sortie
+# (table posée par mutant() : sortie TAB module ; par défaut le module du dépôt). La table est lue par bash (awk) et par les petits scripts node.
+MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODS_TABLE="$WORK/.mods"; : > "$MODS_TABLE"; export MODS_TABLE MOD_DEPOT
+mod_de() { local m; m="$(awk -F'\t' -v s="${1:-}" '$1==s{m=$2} END{print m}' "$MODS_TABLE" 2>/dev/null)"; printf '%s\n' "${m:-$MOD_DEPOT}"; }
+srv() { # srv <sortie> <0|1 terminal> [moteur] [scripts] [module] -> SRV_PORT SRV_PID SRV_O SRV_OUT ; serveur du MODULE (celui de la sortie visée, ou celui passé), lancé par l'aide
+  local o="$1" term="${2:-0}" eng="${3:-}" scr="${4:-}" mod="${5:-}" lab; lab="$(cd "$1/../.." && pwd)"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN-$RANDOM.out"; rm -f "$o/.cache/server.json" "$o/.cache/terminal-amorce"
-  local flag=(); mkdir -p "$o/.cache"
+  local flag=() ev=(); mkdir -p "$o/.cache"
   if [ "$term" = 1 ]; then flag=(--terminal); AMORCE="$(amorce_neuve)"; (umask 077; printf '%s' "$AMORCE" > "$o/.cache/terminal-amorce"); (umask 077; printf '%s' "$AMORCE" > "$WORK/amorce.copy"); fi
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$eng" VF_COCKPIT_SCRIPTS_DIR="$scr" exec node "$o/serve.mjs" --no-open ${flag[@]+"${flag[@]}"} --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  if [ "$term" = 1 ]; then for _ in $(seq 1 50); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done; fi
-  SRV_PORT="$(sj j.port)"; SRV_PORT="${SRV_PORT:-0}"
+  [ -z "$eng" ] || ev+=(VF_COCKPIT_ENGINE_DIR="$eng"); [ -z "$scr" ] || ev+=(VF_COCKPIT_SCRIPTS_DIR="$scr")
+  if [ -n "$mod" ]; then COCKPIT_MODULE="$mod" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${ev[@]+"${ev[@]}"} ${flag[@]+"${flag[@]}"}
+  elif [ -n "$eng$scr" ]; then COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${ev[@]+"${ev[@]}"} ${flag[@]+"${flag[@]}"}   # dossiers de recherche factices : le serve.mjs du dépôt, les variables de la suite gagnent
+  else COCKPIT_MODULE="$(mod_de "$o")" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${flag[@]+"${flag[@]}"}; fi
+  if [ "$term" = 1 ]; then attendre 5 grep -qs '"terminal"' "$o/.cache/server.json"; fi # la clé terminal manque quand le moteur refuse l'assistant : attente bornée, sans échec
+  SRV_PID="$VF_PID"; SRV_PORT="${VF_PORT:-0}"
+  if [ -z "${SRV_REFUS_ATTENDU:-}" ] && { [ -z "$SRV_PID" ] || [ "$SRV_PORT" -le 0 ]; }; then echo "  ❌ FAIL — srv : le serveur de $o n'a pas démarré (cockpit_lancer a échoué ou refusé) — les mesures qui suivent ne valent rien"; FAIL=$((FAIL+1)); fi
 }
 sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
 nlignes() { printf '%s\n' "$1" | grep -c . ; }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : données) et MUT_MOD (racine de la copie du module) ; code 1 si la cible manque ou si la copie n'a pas changé
+  local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  case "$(basename "$2")" in
+    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  f="$d/.vibeflow/cockpit/$2"; [ -f "$f" ] || return 1   # page de la copie du lab (donnée) : même chemin que MUT_OUT/<fichier>
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 # empreinte des fichiers du cockpit du VRAI ~/.claude (la suite ne doit rien y poser)
@@ -88,10 +100,10 @@ rq "$P0" GET / --corps-vers "$WORK/page-index.html" > "$WORK/r-index.out"; rq "$
 for pg in index projet; do
   nom="/"; [ "$pg" = projet ] && nom="/project.html"
   CSPS="$(sed -n 2p "$WORK/r-$pg.out" | node "$AUX/ev.mjs" 'j["content-security-policy"]')"
-  assert_eq "T7.2 — $nom : CSP = formule de v2.75.0 appliquée aux scripts de la page servie" "$CSPS" "$(node "$TA" csp-v275 "$WORK/page-$pg.html")"
+  assert_eq "T7.2 — $nom : CSP = formule de v2.75.0 (plus la source du préfixe, A40) appliquée aux scripts du document servi" "$CSPS" "$(node "$TA" csp-v275 "$WORK/page-$pg.html" "http://127.0.0.1:$P0/_vf/")"
   assert_not "T7.2 — $nom : aucune sous-chaîne frame-src" "$CSPS" "frame-src"
 done
-assert_eq "T7.2b — la ligne « const csp = » de la sortie serve.mjs est la copie figée de v2.75.0" "$(node "$TA" ligne-csp "$OUT/serve.mjs")" "$(node "$TA" ligne-csp-v275)"
+assert_eq "T7.2b — la ligne « const csp = » de serve.mjs du module est la copie figée de v2.75.0 AVEC la seule source du préfixe (A40, 79-16)" "$(node "$TA" ligne-csp "$ENG/assets/serve.mjs")" "$(node "$TA" ligne-csp-v275)"
 ECO0="$(node "$TA" ecoutes "$PID0")"
 assert_eq "T7.3 — témoin : la mesure des écouteurs voit le port de P" "$ECO0" "127.0.0.1:$P0"
 assert_eq "T7.3 — sans le drapeau, un seul écouteur pour le PID du serveur" "$(nlignes "$ECO0")" "1"
@@ -99,6 +111,14 @@ assert_eq "T7.4 — témoin : server.json porte la clé port" "$(sj 'typeof j.po
 assert_eq "T7.4 — sans le drapeau, server.json n'a pas de clé terminal" "$(sj '"terminal" in j')" "false"
 assert_eq "T7.5 — témoin : les deux pages servies sont lues en entier" "$([ "$(wc -c < "$WORK/page-index.html")" -gt 100000 ] && [ "$(wc -c < "$WORK/page-projet.html")" -gt 100000 ] && echo oui || echo non)" "oui"
 assert_eq "T7.5 — pages servies sans « VibeFlow (71- » ni « vf-term- »" "$(cat "$WORK/page-index.html" "$WORK/page-projet.html" | grep -c -e 'VibeFlow (71-' -e 'vf-term-')" "0"
+assert_eq "T7.5 — ni le document ni aucun fichier de /_vf/ (sans le drapeau) ne contient « VibeFlow (71- » ni « vf-term- » (79-16 : les scripts de la coquille sont aussi balayés)" "$(node "$HERE_T/coquille-oracle.mjs" contient "$P0" "$WORK/page-index.html" 'VibeFlow (71-' 'vf-term-')" ""
+assert_eq "T7.5b — pages servies sans « VibeFlow (72- », « data-vf-lancer » ni « vfTermVue » (79-11 : le code est rangé en fichiers, il ne vient que sous --terminal)" "$(cat "$WORK/page-index.html" "$WORK/page-projet.html" | grep -c -e 'VibeFlow (72-' -e 'data-vf-lancer' -e 'vfTermVue')" "0"
+# T7.5c (témoin) : la recherche voit quelque chose : les marques existent dans les fichiers rangés (vf-term-, data-vf-lancer, vfTermVue) et dans la SORTIE des injections (VibeFlow (71-, VibeFlow (72-)
+RANGES="$ENG/assets/ui"
+marque_fichiers() { cat "$RANGES"/tiroir/* "$RANGES"/terminal/* 2>/dev/null | grep -c -e "$1"; }
+marque_injection() { node --input-type=module -e "import { pathToFileURL } from 'node:url'; const t = await import(pathToFileURL(process.argv[1] + '/vf-cockpit-terminal-tiroir.mjs').href); const l = await import(pathToFileURL(process.argv[1] + '/vf-cockpit-lancer-ui.mjs').href); const s = t.injectionTiroir() + l.injectionLancer(); console.log(s.split(process.argv[2]).length - 1);" "$SCRIPTS" "$1" 2>/dev/null || echo 0; }
+for m in 'vf-term-' 'data-vf-lancer' 'vfTermVue'; do assert_ge "T7.5c — la marque « $m » existe dans les fichiers rangés (témoin de T7.5 et T7.5b)" "$(marque_fichiers "$m")" 1; done
+for m in 'VibeFlow (71-' 'VibeFlow (72-'; do assert_ge "T7.5c — la marque « $m » existe dans la sortie des injections (témoin de T7.5)" "$(marque_injection "$m")" 1; done
 unsrv
 
 echo "=== M-ACTIF — import du terminal sans le test du drapeau ==="
@@ -114,7 +134,8 @@ QPORT="${QPORT:-1}"
 ECO1="$(ecoutes_srv "$PID1")"
 assert_eq "T7.8 — exactement deux écouteurs, tous deux 127.0.0.1 (P et Q)" "$(printf '%s\n' "$ECO1" | sort | tr '\n' ' ')" "$(printf '127.0.0.1:%s\n127.0.0.1:%s\n' "$P1" "$QPORT" | sort | tr '\n' ' ')"
 rq "$P1" GET / --corps-vers "$WORK/page-index-t.html" > "$WORK/r-index-t.out"
-assert_eq "T8.1 — CSP de / avec le drapeau = formule de v2.75.0 + « ; frame-src http://127.0.0.1:<Q> » exact" "$(sed -n 2p "$WORK/r-index-t.out" | node "$AUX/ev.mjs" 'j["content-security-policy"]')" "$(node "$TA" csp-v275 "$WORK/page-index-t.html"); frame-src http://127.0.0.1:$QPORT"
+assert_eq "T8.1 — CSP de / avec le drapeau = formule de v2.75.0 + « ; frame-src http://127.0.0.1:<Q> » exact" "$(sed -n 2p "$WORK/r-index-t.out" | node "$AUX/ev.mjs" 'j["content-security-policy"]')" "$(node "$TA" csp-v275 "$WORK/page-index-t.html" "http://127.0.0.1:$P1/_vf/"); frame-src http://127.0.0.1:$QPORT"
+assert_eq "T8.2b — avec le drapeau, la page / porte « VibeFlow (71- », « vf-term- » et « VibeFlow (72-06) » (79-11 : le tiroir et le lancement rangés sont injectés)" "$(for m in 'VibeFlow (71-' 'vf-term-' 'VibeFlow (72-06)'; do grep -c -F -e "$m" "$WORK/page-index-t.html" | awk '$1>0{print "oui"}'; done | tr '\n' ' ')" "oui oui oui "
 assert_eq "P5.1 — GET /api/vf/terminal sous jeton : {\"etat\":\"actif\",\"port\":<Q>}" "$(rq "$P1" GET /api/vf/terminal --jeton "$TOK1" | sed '1,2d')" "{\"etat\":\"actif\",\"port\":$QPORT}"
 assert_eq "P5.1 — sans jeton : 403" "$(sta "$P1" GET /api/vf/terminal)" "403"
 
@@ -147,6 +168,79 @@ else SURV="rien à surveiller (assistant=${APID:-aucun} shell=${SHPID:-aucun})";
 assert_eq "E2E.6 — à l'arrêt du serveur, l'assistant et le shell disparaissent en moins de 5 s" "${SURV:-aucun}" "aucun"
 [ -n "$FPID" ] && { wait "$FPID" 2>/dev/null; true; }
 
+echo "=== T7.11 — server.json n'est jamais vu tronqué quand Q publie son adresse (ecoute0, 2026-11-13) ==="
+# La publication de terminal.url réécrit server.json APRÈS le « prêt » du serveur. Un lecteur qui tombait dans la réécriture (cockpit_module_charge du socle) lisait un
+# fichier tronqué et refusait un serveur sain (CI Linux, tête f07c8801). L'écriture est ralentie à 400 ms (troncature, pause, contenu) : la fenêtre est certaine, jamais laissée à la machine.
+cat > "$AUX/ralentir.mjs" <<'JS'
+import fs from 'node:fs';
+const ecrire = fs.writeFileSync;
+fs.writeFileSync = function (p, d, ...r) {
+  if (String(p).includes('server.json') && String(d).includes('"terminal"')) {
+    if (String(p).endsWith('/server.json')) fs.closeSync(fs.openSync(p, 'w')); // l'écriture sur place : le fichier d'état est d'abord créé vide (une écriture à côté ne le touche pas)
+    fs.appendFileSync(process.env.RALENTI_MARQUE, 'x');
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 400);
+  }
+  return ecrire.call(this, p, d, ...r);
+};
+JS
+cat > "$AUX/sonde-json.mjs" <<'JS'
+import fs from 'node:fs';
+const [f, ms] = process.argv.slice(2); const fin = Date.now() + Number(ms); let finTerm = Infinity; // plafond de sécurité ; la sonde s'arrête 300 ms après avoir vu terminal (condition observable)
+let vu = false, ill = 0, term = 0, n = 0;
+while (Date.now() < Math.min(fin, finTerm)) {
+  let j = null; try { j = JSON.parse(fs.readFileSync(f, 'utf8')); } catch {}
+  n++; if (j && typeof j.hash === 'string' && j.hash) { vu = true; if (j.terminal) { term = 1; if (finTerm === Infinity) finTerm = Date.now() + 300; } } else if (vu) ill++;
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+}
+console.log(`illisibles=${ill} terminal=${term}`);
+JS
+t711() { # t711 <sortie> -> T711_PORT T711_SONDE T711_MARQUE ; la sonde tourne AVANT le lancement : la fenêtre ralentie est couverte en entier
+  local o="$1" sp; : > "$WORK/ralenti.marque"
+  node "$AUX/sonde-json.mjs" "$o/.cache/server.json" 20000 > "$WORK/sonde.out" & sp=$!
+  SRV_REFUS_ATTENDU=1 RALENTI_MARQUE="$WORK/ralenti.marque" COCKPIT_NODE_ARGS="--import=file://$AUX/ralentir.mjs" srv "$o" 1
+  wait "$sp"; T711_PORT="$SRV_PORT"; T711_SONDE="$(cat "$WORK/sonde.out")"; T711_MARQUE="$(wc -c < "$WORK/ralenti.marque" | tr -d ' ')"
+}
+t711 "$OUT"
+assert_ge "T7.11 — témoin : la publication de terminal.url a été ralentie (la fenêtre existe)" "$T711_MARQUE" 1
+assert_eq "T7.11 — le serveur à publication lente est accepté par le socle (empreinte lue, jamais refusé à tort)" "$([ "$T711_PORT" -gt 0 ] && echo oui || echo non)" "oui"
+assert_eq "T7.11 — server.json n'est jamais illisible ni sans empreinte après sa première lecture, et finit par porter terminal" "$T711_SONDE" "illisibles=0 terminal=1"
+[ -z "$SRV_PID" ] || unsrv
+if mutant srvjson vf-cockpit-terminal.mjs 's#ecrireEtat(f, #fs.writeFileSync(f, #'; then
+  t711 "$MUT_OUT"
+  assert_eq "M-SRVJSON — le mutant rougit T7.11 : server.json réécrit sur place est vu tronqué (ou le serveur refusé)" "$([ "$T711_PORT" -gt 0 ] && [ "$T711_SONDE" = "illisibles=0 terminal=1" ] && echo vert || echo rouge)" "rouge"
+  [ -z "$SRV_PID" ] || unsrv
+else assert_eq "M-SRVJSON — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
+echo "=== T7.12 — la publication de terminal.url ne suit jamais un lien posé à la place de son temporaire (fix2-x06, 2026-11-13) ==="
+# Le lab peut poser un lien à la place du temporaire de la réécriture de server.json : la cible (un fichier précieux) ne doit jamais être écrasée par le JSON du jeton. Le préchargement fixe les noms
+# aléatoires de 12 octets (1er appel : « a », 2e : « b ») pour que le lab « devine » le nom du temporaire de la publication, et pose aussi un lien sous l'ancien nom `server.json.<pid>.tmp`,
+# une fois server.json écrit (le balayage du démarrage a déjà eu lieu).
+cat > "$AUX/planter-tmp.mjs" <<'JS'
+import fs from 'node:fs'; import path from 'node:path'; import crypto from 'node:crypto';
+const sortie = process.argv[process.argv.length - 1].slice('--sortie='.length); const cache = path.join(sortie, '.cache');
+let n = 0; const vrai = crypto.randomBytes; crypto.randomBytes = function (k, ...r) { return k === 12 ? Buffer.alloc(k, ++n === 1 ? 0x61 : 0x62) : vrai.call(this, k, ...r); };
+// les liens sont posés dès que server.json existe : APRÈS le balayage des temporaires du démarrage, AVANT la publication de terminal.url (le processus de Q met plus d'une milliseconde à répondre)
+const t = setInterval(() => {
+  if (!fs.existsSync(path.join(cache, 'server.json'))) return;
+  clearInterval(t);
+  fs.symlinkSync(process.env.PLANT_V1, path.join(cache, `server.json.${process.pid}.tmp`));
+  fs.symlinkSync(process.env.PLANT_V2, path.join(cache, `server.json.${process.pid}.${'62'.repeat(12)}.tmp`));
+}, 1);
+JS
+t712() { # t712 <sortie> -> T712 : contenu des deux cibles précieuses après la publication
+  local o="$1"; printf 'PRECIEUX1\n' > "$WORK/precieux1"; printf 'PRECIEUX2\n' > "$WORK/precieux2"
+  PLANT_V1="$WORK/precieux1" PLANT_V2="$WORK/precieux2" COCKPIT_NODE_ARGS="--import=file://$AUX/planter-tmp.mjs" srv "$o" 1
+  T712="v1=$(tr -d '\n' < "$WORK/precieux1") v2=$(tr -d '\n' < "$WORK/precieux2") etat=$([ -f "$o/.cache/server.json" ] && [ ! -L "$o/.cache/server.json" ] && echo fichier || echo autre)"
+}
+t712 "$OUT"
+assert_eq "T7.12 — liens posés sous le nom ancien et sous le nom du temporaire : les deux cibles gardent leur contenu, server.json reste un fichier ordinaire" "$T712" "v1=PRECIEUX1 v2=PRECIEUX2 etat=fichier"
+[ -z "$SRV_PID" ] || unsrv
+if mutant srvjsonlien vf-cockpit-etat-ecrire.mjs 's#fs\.constants\.O_CREAT | fs\.constants\.O_EXCL | (fs\.constants\.O_NOFOLLOW || 0)#fs.constants.O_CREAT#'; then
+  t712 "$MUT_OUT"
+  assert_eq "M-SRVJSON-LIEN — création exclusive retirée (une ligne) : le mutant rougit T7.12 (la cible du lien sous le nom du temporaire est écrasée)" "$([ "$T712" = "v1=PRECIEUX1 v2=PRECIEUX2 etat=fichier" ] && echo vert || echo rouge)" "rouge"
+  [ -z "$SRV_PID" ] || unsrv
+else assert_eq "M-SRVJSON-LIEN — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
+
 echo "=== M-ECOUTE0 / M-FRAMESRC — mutants du serveur Q ==="
 if mutant ecoute0 vf-cockpit-terminal-processus.mjs "s/\.listen(0, '127\.0\.0\.1'/.listen(0, '0.0.0.0'/"; then
   srv "$MUT_OUT" 1; assert_eq "M-ECOUTE0 — le mutant rougit T7.8 : Q n'écoute plus sur 127.0.0.1 seulement" "$(ecoutes_srv "$SRV_PID" | grep -c -v '^127\.0\.0\.1:')" "1"; unsrv
@@ -162,9 +256,12 @@ cat > "$AUX/win.mjs" <<'JS'
 import { pathToFileURL } from 'node:url';
 const msgs = []; console.error = (...a) => msgs.push(a.join(' '));
 const [, , sortie, lab] = process.argv;
-let m; try { m = await import(pathToFileURL(sortie + '/vf-cockpit-terminal.mjs').href); } catch { console.log('module introuvable'); process.exit(0); }
+// 79-06 : le code n'est plus dans la sortie : le module est celui que commande cette sortie (table MODS_TABLE : sortie TAB module ; défaut MOD_DEPOT)
+import fs from 'node:fs';
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === sortie && r) racine = r; } } catch {}
+let m; try { m = await import(pathToFileURL(racine + '/scripts/vf-cockpit-terminal.mjs').href); } catch { console.log('module introuvable'); process.exit(0); }
 const ecoutes = () => process._getActiveHandles().filter((h) => h && h.listening).length;
-const t = m.preparerTerminal({ here: sortie, root: lab, jetons: () => [], plateforme: 'win32' });
+const t = m.preparerTerminal({ here: racine + '/scripts', root: lab, jetons: () => [], plateforme: 'win32' });
 t.demarrer(0); await new Promise((r) => setTimeout(r, 300));
 let corps = ''; const res = { setHeader() {}, writeHead() {}, end(b) { corps = String(b || ''); } };
 t.routeP({ method: 'GET', url: '/api/vf/terminal', headers: {} }, res);
@@ -195,7 +292,7 @@ assert_eq "POSE.1 — l'engine pose terminal/vf-cockpit-pty.py dans les scopes p
 sonde_pose() { # sonde_pose <lab> <moteur> <scripts> : construit avec le lanceur POSÉ, lance le serveur de la sortie avec les chemins POSÉS, rend « ok » ou la raison
   local lab="$1" eng="$2" scr="$3" o="$1/.vibeflow/cockpit" sec fp res=""
   (cd "$lab" && HOME="$FH" node "$scr/vf-cockpit.mjs" build --lab "$lab" > "$WORK/build-pose.out" 2>&1) || { echo "construction impossible"; return; }
-  srv "$o" 1 "$eng" "$scr"; local q; q="$(sj '(j.terminal&&j.terminal.url)||""')"; q="${q##*:}"
+  srv "$o" 1 "$eng" "$scr" "${eng%/skills/cockpit-moteur}"; local q; q="$(sj '(j.terminal&&j.terminal.url)||""')"; q="${q##*:}"
   if [ -z "$q" ]; then unsrv; echo "pas de second écouteur (terminal arrêté)"; return; fi
   sec="$(node "$TA" amorcer "$q" "$WORK/amorce.copy" | sed -n 2p)"
   if [ -z "$sec" ]; then unsrv; echo "échange refusé"; return; fi

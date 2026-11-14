@@ -78,3 +78,6 @@ __pycache__/
 plugin/.claude-plugin/types/
 # tsconfig du mod, écrit par l'engine des mods quand il charge --plugin-dir (R13, P68-D-35).
 plugin/tsconfig.json
+
+# Captures et rapports locaux du MCP Playwright : jamais versionnés (ils peuvent porter des identifiants de session).
+.playwright-mcp/

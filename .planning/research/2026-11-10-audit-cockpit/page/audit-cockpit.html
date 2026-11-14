@@ -1,0 +1,978 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit du cockpit VibeFlow</title>
+<style>
+/* Mise en page : une colonne de lecture de 72 caractères, et des planches plus larges pour les maquettes et les tableaux.
+   Direction « Graphite » du cockpit : neutres presque monochromes, trois teintes d'état portées par un glyphe ou un trait,
+   jamais par un fond ni un contour. Sombre d'abord, clair complet. */
+:root {
+  color-scheme: dark;
+  --ink: 255,255,255;
+  --bg: #0f0f0f; --grid: #1f1f1f; --surface: #191919; --raise: #232323; --raise-2: #2b2b2b;
+  --hair: rgba(var(--ink), .07); --hair-2: rgba(var(--ink), .12);
+  --text: #ececec; --text-2: #c6c6c6; --text-3: #a8a8a8; --text-4: #828282;
+  --ok: #9ece6a; --warn: #ffe08a; --err: #ff9aa8;
+  --ok-text: #9ece6a; --warn-text: #ffe9a8; --err-text: #ffb3bc;
+  --note-bg: rgba(var(--ink), .05);
+  --ring: rgba(var(--ink), .88);
+  --shadow-card: 0 10px 28px rgba(0,0,0,.38);
+  --shadow-tab: 0 1px 1px rgba(0,0,0,.3);
+  --sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --mono: "JetBrains Mono", ui-monospace, "Cascadia Code", "SF Mono", Consolas, monospace;
+  --r-card: 20px; --r-panel: 24px; --r-ctl: 12px;
+  --ease: cubic-bezier(.16, 1, .3, 1);
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    color-scheme: light;
+    --ink: 0,0,0;
+    --bg: #f3f3f1; --grid: #d2d2ce; --surface: #ffffff; --raise: #ebebe8; --raise-2: #e0e0dc;
+    --hair: rgba(var(--ink), .09); --hair-2: rgba(var(--ink), .15);
+    --text: #161616; --text-2: #3f3f3f; --text-3: #595959; --text-4: #666666;
+    --ok: #009e5a; --warn: #b88100; --err: #f2384a;
+    --ok-text: #007f3d; --warn-text: #986300; --err-text: #da1637;
+    --shadow-card: 0 1px 2px rgba(0,0,0,.05), 0 10px 28px rgba(0,0,0,.07);
+    --shadow-tab: 0 1px 1px rgba(0,0,0,.12);
+  }
+}
+:root[data-theme="light"] {
+  color-scheme: light;
+  --ink: 0,0,0;
+  --bg: #f3f3f1; --grid: #d2d2ce; --surface: #ffffff; --raise: #ebebe8; --raise-2: #e0e0dc;
+  --hair: rgba(var(--ink), .09); --hair-2: rgba(var(--ink), .15);
+  --text: #161616; --text-2: #3f3f3f; --text-3: #595959; --text-4: #666666;
+  --ok: #009e5a; --warn: #b88100; --err: #f2384a;
+  --ok-text: #007f3d; --warn-text: #986300; --err-text: #da1637;
+  --shadow-card: 0 1px 2px rgba(0,0,0,.05), 0 10px 28px rgba(0,0,0,.07);
+  --shadow-tab: 0 1px 1px rgba(0,0,0,.12);
+}
+
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 400 15px/1.62 var(--sans); -webkit-font-smoothing: antialiased; }
+.page { max-width: 1120px; margin: 0 auto; padding-block: 48px 96px; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: flex; flex-direction: column; gap: 72px; }
+section, header { display: flex; flex-direction: column; gap: 20px; min-width: 0; }
+.prose { max-width: 72ch; display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+h1 { font: 600 clamp(32px, 5.4vw, 46px)/1.06 var(--sans); letter-spacing: -.028em; margin: 0; text-wrap: balance; }
+h2 { font: 600 27px/1.2 var(--sans); letter-spacing: -.02em; margin: 0; text-wrap: balance; }
+h3 { font: 600 17px/1.35 var(--sans); letter-spacing: -.015em; margin: 0; text-wrap: balance; }
+h4 { font: 600 14px/1.4 var(--sans); margin: 0; }
+p { margin: 0; color: var(--text-2); }
+ul, ol { margin: 0; padding-left: 20px; color: var(--text-2); display: flex; flex-direction: column; gap: 6px; }
+strong, b { color: var(--text); font-weight: 600; }
+.lead { font-size: 19px; line-height: 1.5; color: var(--text); max-width: 64ch; }
+.meta { font: 500 12.5px/1.6 var(--mono); color: var(--text-3); }
+code { font-family: var(--mono); font-size: .86em; background: var(--note-bg); padding: 1px 5px; border-radius: 6px; color: var(--text); overflow-wrap: anywhere; }
+a { color: var(--text); text-underline-offset: 3px; text-decoration-color: var(--text-4); }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 6px; }
+
+.toc { display: flex; flex-wrap: wrap; gap: 6px; }
+.toc a { font: 500 13px/1 var(--sans); padding: 9px 12px; border-radius: 999px; background: var(--raise); color: var(--text-2); text-decoration: none; }
+.toc a:hover { color: var(--text); background: var(--raise-2); }
+
+/* État : un glyphe de forme distincte et un mot. La couleur ne fait que renforcer. */
+.st { display: inline-flex; align-items: center; gap: 6px; font: 500 12px/16px var(--sans); color: var(--text-2); white-space: nowrap; }
+.st svg, .gl { width: 15px; height: 15px; flex: none; }
+.g-ok { color: var(--ok); } .g-warn { color: var(--warn); } .g-err { color: var(--err); } .g-mute { color: var(--text-4); }
+.tag { display: inline-block; font: 500 11.5px/1 var(--mono); padding: 5px 8px; border-radius: 999px; background: var(--raise); color: var(--text-2); white-space: nowrap; }
+
+/* Mesures : une rangée ouverte, sans tuiles. */
+.mes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 20px 28px; }
+.mes div { display: flex; flex-direction: column; gap: 4px; min-width: 0; }
+.mes b { font: 600 28px/1.1 var(--sans); letter-spacing: -.02em; font-variant-numeric: tabular-nums; }
+.mes span { font: 400 12.5px/1.45 var(--sans); color: var(--text-3); }
+
+.causes { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+.cause { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-card); padding: 20px; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.cause p { font-size: 14px; line-height: 1.55; }
+
+/* Tableaux */
+.scroll-x { overflow-x: auto; -webkit-overflow-scrolling: touch; min-width: 0; }
+table { border-collapse: collapse; width: 100%; font-size: 13.5px; line-height: 1.5; }
+table.w { min-width: 760px; }
+th { font: 500 12px/1.4 var(--sans); color: var(--text-3); text-align: left; padding: 8px 12px; border-bottom: 1px solid var(--hair-2); white-space: nowrap; }
+td { padding: 12px; border-bottom: 1px solid var(--hair); vertical-align: top; color: var(--text-2); }
+tr:last-child td { border-bottom: 0; }
+td.id, td.eff { font: 500 12px/1.7 var(--mono); color: var(--text-3); white-space: nowrap; }
+td .src { display: block; font: 400 11.5px/1.5 var(--mono); color: var(--text-4); overflow-wrap: anywhere; margin-top: 4px; }
+
+details { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-card); min-width: 0; }
+summary { cursor: pointer; list-style: none; padding: 16px 20px; display: flex; align-items: center; gap: 12px; font: 600 16px/1.4 var(--sans); letter-spacing: -.01em; }
+summary::-webkit-details-marker { display: none; }
+summary .count { font: 500 12px/1 var(--mono); color: var(--text-3); margin-left: auto; }
+summary::after { content: ""; width: 8px; height: 8px; border-right: 1.75px solid var(--text-3); border-bottom: 1.75px solid var(--text-3); transform: rotate(45deg); transition: transform .2s var(--ease); flex: none; margin-right: 4px; }
+details[open] > summary::after { transform: rotate(-135deg); }
+details > .in { padding: 0 20px 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.note { background: var(--note-bg); border-radius: var(--r-ctl); padding: 12px 14px; font-size: 13.5px; line-height: 1.55; color: var(--text-2); }
+
+/* Planches de maquette : le fond pointé du canevas du cockpit. */
+.planche { border-radius: var(--r-panel); background-color: var(--bg); background-image: radial-gradient(var(--grid) 1px, transparent 1px); background-size: 16px 16px; border: 1px solid var(--hair-2); padding: 20px; display: flex; flex-direction: column; gap: 16px; min-width: 0; }
+.cap { font: 500 12px/1.5 var(--mono); color: var(--text-4); }
+.mk { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-card); padding: 16px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.mk-top { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; }
+.tabs { display: inline-flex; background: var(--raise); border-radius: 12px; padding: 4px; }
+.tabs span { font: 500 13px/1 var(--sans); padding: 8px 12px; border-radius: 9px; color: var(--text-3); }
+.tabs .on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-tab); }
+.mk-count { font: 500 12.5px/1.4 var(--sans); color: var(--text-3); }
+.mk-h { display: flex; align-items: baseline; gap: 8px; flex-wrap: wrap; font: 600 13px/1.4 var(--sans); padding: 0 12px; }
+.mk-h .n { font: 500 12px/1 var(--mono); color: var(--text-3); }
+.mk-h .hint { font: 400 12px/1.4 var(--sans); color: var(--text-4); }
+.rows { display: flex; flex-direction: column; min-width: 0; }
+.row { display: grid; grid-template-columns: 18px minmax(0, 1.45fr) minmax(0, 1.2fr) 60px 124px; gap: 4px 12px; align-items: center; padding: 10px 12px; min-width: 0; }
+.row + .row { border-top: 1px solid var(--hair); }
+.row .gl { align-self: start; margin-top: 2px; }
+.row .who { position: relative; min-width: 0; display: flex; flex-direction: column; padding-left: calc(var(--d, 0) * 18px); }
+.row .who b { font: 600 13px/1.4 var(--sans); overflow-wrap: anywhere; }
+.row .who span { font: 400 12px/1.45 var(--sans); color: var(--text-3); overflow-wrap: anywhere; }
+.row.child .who::before { content: ""; position: absolute; left: calc((var(--d) - 1) * 18px + 3px); top: 1px; width: 9px; height: 9px; border-left: 1px solid var(--text-4); border-bottom: 1px solid var(--text-4); border-bottom-left-radius: 5px; opacity: .7; }
+.row .what { font: 400 12.5px/1.45 var(--sans); color: var(--text-2); min-width: 0; overflow-wrap: anywhere; }
+.row .what em { font-style: normal; color: var(--text-4); }
+.row .t { font: 500 12px/1.4 var(--mono); color: var(--text-3); text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.row .ctx { display: flex; align-items: center; gap: 8px; font: 500 11.5px/1 var(--mono); color: var(--text-3); min-width: 0; justify-content: flex-end; }
+.bar { flex: 1; height: 6px; border-radius: 999px; background: var(--raise-2); overflow: hidden; min-width: 36px; }
+.bar i { display: block; height: 100%; background: var(--text-3); border-radius: 999px; }
+.bar.hot i { background: var(--warn-text); }
+.btn { display: inline-block; font: 500 12px/1 var(--sans); padding: 8px 10px; border-radius: 10px; background: var(--raise); color: var(--text); border: 1px solid var(--hair-2); white-space: nowrap; }
+.btn.on { background: var(--text); color: var(--bg); border-color: transparent; }
+@media (max-width: 760px) {
+  .row { grid-template-columns: 18px minmax(0, 1fr) auto; }
+  .row .t { grid-column: 3; grid-row: 1; }
+  .row .what, .row .ctx { grid-column: 2 / -1; justify-content: flex-start; }
+  .planche { padding: 12px; }
+}
+
+/* Frise */
+.frise { display: block; width: 100%; min-width: 880px; height: auto; }
+.frise text { font: 500 12px var(--sans); fill: var(--text-2); }
+.frise .l2 { font: 400 11px var(--sans); fill: var(--text-4); }
+.frise .ax { font: 500 11px var(--mono); fill: var(--text-4); }
+.frise .gr { stroke: var(--hair); stroke-width: 1; }
+.frise .act { fill: var(--text-3); }
+.frise .thin { stroke: var(--text-4); stroke-width: 2; stroke-linecap: round; fill: none; }
+.frise .rest { stroke: var(--text-4); stroke-width: 2; stroke-dasharray: 1 6; stroke-linecap: round; fill: none; }
+.frise .link { stroke: var(--text-4); stroke-width: 1.25; fill: none; opacity: .75; }
+.frise .hf { fill: var(--warn); }
+.frise .wo { fill: none; stroke: var(--warn); stroke-width: 1; }
+.frise .c-commit { fill: var(--ok); }
+.frise .c-comp { fill: var(--surface); stroke: var(--text-2); stroke-width: 1.5; }
+.frise .c-err { stroke: var(--err); stroke-width: 1.9; stroke-linecap: round; fill: none; }
+.frise .c-you { fill: var(--text); }
+.frise .c-end { stroke: var(--ok); stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; fill: none; }
+.frise .now { stroke: var(--text); stroke-width: 1; stroke-dasharray: 3 3; }
+.frise .par { fill: var(--raise-2); stroke: var(--text-4); stroke-width: 1; }
+.leg { display: flex; flex-wrap: wrap; gap: 8px 18px; font: 400 12px/1.4 var(--sans); color: var(--text-3); padding: 0 4px; }
+.leg span { display: inline-flex; align-items: center; gap: 6px; white-space: nowrap; }
+.leg svg { width: 26px; height: 12px; flex: none; }
+.seg { display: inline-flex; background: var(--raise); border-radius: 10px; padding: 3px; }
+.seg span { font: 500 12px/1 var(--sans); padding: 6px 10px; border-radius: 8px; color: var(--text-3); }
+.seg .on { background: var(--surface); color: var(--text); box-shadow: var(--shadow-tab); }
+
+/* Fiche de session */
+.fiche { display: grid; grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr); gap: 20px 28px; }
+@media (max-width: 820px) { .fiche { grid-template-columns: minmax(0, 1fr); } }
+.fiche > div { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 12px 16px; }
+.kv div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.kv b { font: 600 17px/1.2 var(--sans); font-variant-numeric: tabular-nums; }
+.kv span { font: 400 12px/1.35 var(--sans); color: var(--text-3); }
+.fil { display: flex; flex-direction: column; }
+.fil div { display: grid; grid-template-columns: 42px 16px minmax(0, 1fr); gap: 8px; padding: 6px 0; font: 400 12.5px/1.45 var(--sans); color: var(--text-2); align-items: start; }
+.fil div + div { border-top: 1px solid var(--hair); }
+.fil time { font: 500 11.5px/1.6 var(--mono); color: var(--text-4); }
+.fil .gl { margin-top: 1px; }
+.acts { display: flex; flex-wrap: wrap; gap: 8px; }
+.sub { font: 500 12px/1.4 var(--sans); color: var(--text-3); }
+
+figure { margin: 0; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+figure img { display: block; width: 100%; max-width: 100%; height: auto; border-radius: 16px; border: 1px solid var(--hair-2); }
+figcaption { font: 400 12.5px/1.5 var(--sans); color: var(--text-3); max-width: 72ch; }
+.duo { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px; }
+
+.scores { display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 16px 40px; align-items: start; }
+.score { display: grid; grid-template-columns: minmax(0, 1fr) 34px; grid-template-rows: auto auto auto; align-content: start; gap: 6px 12px; align-items: center; font: 500 13px/1.4 var(--sans); }
+.score b { font: 600 13px/1.4 var(--mono); text-align: right; font-variant-numeric: tabular-nums; }
+.score .bar { grid-column: 1 / -1; }
+.score small { grid-column: 1 / -1; font: 400 12px/1.45 var(--sans); color: var(--text-3); }
+
+.lots { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+.lot { background: var(--surface); border-radius: var(--r-card); box-shadow: var(--shadow-card); padding: 20px; display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.lot .k { font: 500 12px/1 var(--mono); color: var(--text-3); }
+.lot ul { font-size: 13.5px; line-height: 1.5; padding-left: 18px; }
+.lot p { font-size: 13.5px; line-height: 1.5; }
+
+@media (prefers-reduced-motion: reduce) { summary::after { transition: none; } }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <symbol id="g-done" viewBox="0 0 16 16"><path d="M3.2 8.6l3.1 3.1 6.5-7.2" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round"/></symbol>
+  <symbol id="g-active" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M8 2a6 6 0 0 1 0 12z" fill="currentColor"/></symbol>
+  <symbol id="g-wait" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.75"/><circle cx="8" cy="8" r="2.2" fill="currentColor"/></symbol>
+  <symbol id="g-pause" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M6.4 5.6v4.8M9.6 5.6v4.8" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></symbol>
+  <symbol id="g-todo" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.75"/></symbol>
+  <symbol id="g-block" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.75"/><path d="M4.5 8h7" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round"/></symbol>
+  <symbol id="g-silent" viewBox="0 0 16 16"><circle cx="8" cy="8" r="6" fill="none" stroke="currentColor" stroke-width="1.75" stroke-dasharray="2.6 2.6"/></symbol>
+  <symbol id="g-tri" viewBox="0 0 16 16"><path d="M8 2.6l6 10.6H2z" fill="currentColor"/></symbol>
+  <symbol id="g-tri-o" viewBox="0 0 16 16"><path d="M8 3.2l5.4 9.6H2.6z" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linejoin="round"/></symbol>
+  <symbol id="g-commit" viewBox="0 0 16 16"><path d="M8 2.5l5.5 5.5L8 13.5 2.5 8z" fill="currentColor"/></symbol>
+  <symbol id="g-x" viewBox="0 0 16 16"><path d="M4.5 4.5l7 7M11.5 4.5l-7 7" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round"/></symbol>
+  <symbol id="g-dot" viewBox="0 0 16 16"><circle cx="8" cy="8" r="3.2" fill="currentColor"/></symbol>
+</svg>
+<div class="page">
+<header>
+  <div class="meta">cockpit v1.4.0 et retours du panel non publiés · branche release/v2.77.0 · 10 novembre 2026</div>
+  <h1>Audit du cockpit</h1>
+  <p class="lead">Le cockpit est solide là où il a été construit avec soin : le périmètre de sécurité, le tiroir Git, le terminal, le lancement en deux temps, la direction Graphite. Il est faible à l'endroit exact que vous pointez. L'onglet Équipe ne sait dire ni qui travaille, ni qui vous attend, ni ce qui s'est passé.</p>
+  <nav class="toc" aria-label="Sommaire">
+    <a href="#verdict">Verdict</a>
+    <a href="#dabord">À traiter d'abord</a>
+    <a href="#equipe">Équipe repensée</a>
+    <a href="#interface">Interface et design</a>
+    <a href="#constats">Tous les constats</a>
+    <a href="#idees">Idées</a>
+    <a href="#trajectoire">Par où commencer</a>
+    <a href="#limites">À confirmer</a>
+  </nav>
+</header>
+
+<section id="verdict">
+  <h2>Le verdict en quatre causes</h2>
+  <div class="prose">
+    <p>Sept audits ont tourné en parallèle, puis ont été recoupés : l'antériorité (le panel de juges, vos arbitrages, les Phases 73 à 77), la chaîne de données des agents, l'architecture, la sécurité, un parcours complet dans le navigateur, une veille de quinze outils, et la surface officielle de Claude Code. Ils ramènent presque tout à quatre causes.</p>
+  </div>
+  <div class="causes">
+    <div class="cause">
+      <h3>L'état des agents est deviné</h3>
+      <p>Le cockpit déduit l'activité de la date de modification des transcripts, avec un seuil de 180 secondes. Un agent qui lance des tests pendant dix minutes disparaît. Une session au repos n'existe plus après trois minutes. Claude Code publie pourtant l'état de chaque session, et répond en 0,14 s sur ce poste.</p>
+    </div>
+    <div class="cause">
+      <h3>Le temps n'est pas gardé</h3>
+      <p>Rien n'est conservé d'une minute à l'autre : ni durée fiable, ni frise, ni coût. Tout est déjà écrit dans les transcripts (l'heure de chaque ligne, la durée de chaque outil, les jetons, les compactions). Il manque un index.</p>
+    </div>
+    <div class="cause">
+      <h3>Une seule boucle fait tout</h3>
+      <p>Le serveur collecte en bloquant toutes les cinq secondes et reste sourd 9 % du temps. La page sert de base de données. Trois onglets ouverts épuisent les connexions du navigateur et figent le cockpit sans un message.</p>
+    </div>
+    <div class="cause">
+      <h3>Une seule forme pour tout</h3>
+      <p>Le canevas à cartes sert bien la carte du code. Appliqué à la feuille de route et à l'équipe, il échoue : des titres de 7 px à l'ouverture de Projet, une carte seule sur un canevas vide dans Équipe, et aucune carte atteignable au clavier.</p>
+    </div>
+  </div>
+  <div class="mes">
+    <div><b>35 %</b><span>des sous-agents du dépôt ont connu un silence de plus de 180 s, donc une disparition de l'écran</span></div>
+    <div><b>14 %</b><span>des mandats citent leur nœud de plan ; les autres s'affichent sans mission</span></div>
+    <div><b>9 %</b><span>du temps, le serveur ne répond pas, bloqué par sa propre collecte</span></div>
+    <div><b>0,14 s</b><span>pour obtenir l'état officiel de toutes les sessions du poste</span></div>
+    <div><b>0</b><span>constat de sécurité critique ou haut ; seize sondes hostiles refusées</span></div>
+  </div>
+</section>
+<section id="dabord">
+  <h2>À traiter d'abord</h2>
+  <div class="prose">
+    <p>Dix constats, tous domaines confondus, dans l'ordre où je les traiterais. La plupart tiennent dans un commit.</p>
+  </div>
+  <div class="scroll-x">
+    <table class="w">
+      <thead><tr><th>Id</th><th>Constat</th><th>Domaine</th><th>Effort</th></tr></thead>
+      <tbody>
+        <tr><td class="id">D1</td><td><b>Un agent qui travaille disparaît de l'écran</b> après 180 secondes de silence. Un test long suffit.</td><td>Données</td><td class="eff">S</td></tr>
+        <tr><td class="id">H1</td><td><b>Trois onglets ouverts figent le cockpit</b>, sans un message.</td><td>Architecture</td><td class="eff">S</td></tr>
+        <tr><td class="id">D2 · M3</td><td><b>Une session au repos disparaît</b>, et l'onglet titre « Aucune mission en cours » avec sept agents actifs.</td><td>Données, interface</td><td class="eff">S</td></tr>
+        <tr><td class="id">D4</td><td><b>Les workers orphelins sont rangés dans « Terminés ».</b></td><td>Données</td><td class="eff">S</td></tr>
+        <tr><td class="id">BL1</td><td><b>Projet est illisible à l'ouverture</b> : titres de carte à 7 px.</td><td>Interface</td><td class="eff">M</td></tr>
+        <tr><td class="id">BL2</td><td><b>Aucune carte n'est atteignable au clavier.</b></td><td>Interface</td><td class="eff">M</td></tr>
+        <tr><td class="id">H2</td><td><b>Le serveur est sourd 9 % du temps</b>, bloqué par sa propre collecte.</td><td>Architecture</td><td class="eff">S puis M</td></tr>
+        <tr><td class="id">H4</td><td><b>La traduction réécrit des noms de fichiers</b> : <code>tokens.ts</code> s'affiche « Jetons ».</td><td>Architecture</td><td class="eff">S</td></tr>
+        <tr><td class="id">A-01</td><td><b>« Demander » peut reprendre n'importe quelle session du lab.</b></td><td>Sécurité</td><td class="eff">S</td></tr>
+        <tr><td class="id">M9 · M10</td><td><b>Des états muets</b> : une coupure du serveur invisible cinq minutes, un terminal absent sans explication.</td><td>Interface</td><td class="eff">S</td></tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+<section id="equipe">
+  <h2>L'onglet Équipe, repensé</h2>
+  <div class="prose">
+    <p>C'est le point que vous jugez le plus améliorable, et l'audit vous donne raison. La capture de gauche a été prise pendant cet audit : sept agents travaillaient, trois avaient fini, et l'écran montrait une carte sur un canevas vide, sous le titre « Aucune mission en cours ».</p>
+  </div>
+
+  <div class="duo">
+    <figure>
+      <img src="equipe-aujourdhui.png" alt="Onglet Équipe du cockpit : une seule carte de session au milieu d'un canevas vide, titre « Aucune mission en cours », compteur « 7 actifs ».">
+      <figcaption><strong>Aujourd'hui, l'entrée.</strong> Sept agents actifs, une carte. Ni durée, ni modèle, ni contexte, ni coût. La seconde session du dépôt, au repos depuis plus de trois minutes, a disparu.</figcaption>
+    </figure>
+    <figure>
+      <img src="equipe-plongee.png" alt="Onglet Équipe après un double-clic sur la session : six cartes de sous-agents en grille, chacune répétant son titre deux fois, et la même liste répétée dans le panneau de droite.">
+      <figcaption><strong>Aujourd'hui, après un double-clic.</strong> Les sous-agents sont une grille de cartes sans lien entre elles. Chaque nom est écrit trois fois (titre, description, panneau). Aucun axe de temps.</figcaption>
+    </figure>
+  </div>
+
+  <div class="prose">
+    <h3>Quatre principes</h3>
+    <ol>
+      <li><strong>Lire l'état au lieu de le deviner.</strong> Claude Code publie la liste des sessions vivantes et leur état (<code>claude agents --json</code>). Mesuré sur ce poste : 0,14 s, cinq sessions, états « occupée », « au repos », « bloquée ».</li>
+      <li><strong>L'attention d'abord.</strong> La première chose à l'écran est la liste de ceux qui vous attendent. Les outils de pilotage d'agents examinés ouvrent presque tous sur ce motif. Aucun ne classe cette file par ce qu'elle retient en aval, et le cockpit a le plan de mission pour le faire.</li>
+      <li><strong>Une liste et une frise à la place du canevas.</strong> Le canevas zoomable sert la carte du code et la feuille de route. Pour deux à dix agents, une liste hiérarchique se lit d'un regard et une frise raconte la journée.</li>
+      <li><strong>Trois graphes reliés.</strong> Qui a lancé qui, quel nœud du plan chacun porte, quelle phase de la feuille de route avance. Aucun outil examiné ne relie les trois ; le cockpit les a déjà tous, séparés.</li>
+    </ol>
+  </div>
+
+  <h3>Maquette 1 · la régie</h3>
+  <div class="planche">
+    <div class="cap">Maquette, données d'exemple. La même scène est reprise dans la frise et la fiche plus bas.</div>
+    <div class="mk">
+      <div class="mk-top">
+        <div class="tabs" aria-hidden="true"><span>Code</span><span>Projet</span><span class="on">Équipe</span></div>
+        <div class="mk-count">6 agents · <strong>2 vous attendent</strong></div>
+      </div>
+
+      <div class="mk-h">À vous <span class="n">2</span> <span class="hint">classé par ce que chaque attente retient dans le plan</span></div>
+      <div class="rows">
+        <div class="row">
+          <svg class="gl g-warn" aria-hidden="true"><use href="#g-pause"/></svg>
+          <div class="who"><b>vf-dev-manager · Phase 73</b><span>pose une question, deux options</span></div>
+          <div class="what">retient toute la mission <em>· 4 nœuds en aval</em></div>
+          <div class="t">14 min</div>
+          <div class="ctx"><span class="btn on">Répondre</span></div>
+        </div>
+        <div class="row">
+          <svg class="gl g-warn" aria-hidden="true"><use href="#g-pause"/></svg>
+          <div class="who"><b>vf-coder · lot B</b><span>demande une permission pour pousser sa branche</span></div>
+          <div class="what">retient 1 nœud <em>· la revue du lot B</em></div>
+          <div class="t">6 min</div>
+          <div class="ctx"><span class="btn">Ouvrir</span></div>
+        </div>
+      </div>
+
+      <div class="mk-h">Au travail <span class="n">4</span></div>
+      <div class="rows">
+        <div class="row">
+          <svg class="gl g-warn" aria-hidden="true"><use href="#g-active"/></svg>
+          <div class="who"><b>Session principale</b><span>tête · arbre principal · fable 5.2</span></div>
+          <div class="what">attend ses agents <em>· 3 en cours</em></div>
+          <div class="t">1 h 28</div>
+          <div class="ctx"><span class="bar hot"><i style="width:86%"></i></span>86 %</div>
+        </div>
+        <div class="row child" style="--d:1">
+          <svg class="gl g-warn" aria-hidden="true"><use href="#g-pause"/></svg>
+          <div class="who"><b>vf-dev-manager · Phase 73</b><span>nœud <code>plan-73</code></span></div>
+          <div class="what">vous attend <em>· depuis 14 min</em></div>
+          <div class="t">1 h 22</div>
+          <div class="ctx"><span class="bar"><i style="width:41%"></i></span>41 %</div>
+        </div>
+        <div class="row child" style="--d:2">
+          <svg class="gl g-warn" aria-hidden="true"><use href="#g-active"/></svg>
+          <div class="who"><b>vf-coder · lot A</b><span>nœud <code>exec-lot-a</code> · arbre phase-73-a</span></div>
+          <div class="what">lance les tests <em>· commande en cours depuis 7 min</em></div>
+          <div class="t">1 h 10</div>
+          <div class="ctx"><span class="bar"><i style="width:71%"></i></span>71 %</div>
+        </div>
+        <div class="row child" style="--d:2">
+          <svg class="gl g-warn" aria-hidden="true"><use href="#g-pause"/></svg>
+          <div class="who"><b>vf-coder · lot B</b><span>nœud <code>exec-lot-b</code> · arbre phase-73-b</span></div>
+          <div class="what">vous attend <em>· depuis 6 min</em></div>
+          <div class="t">1 h 10</div>
+          <div class="ctx"><span class="bar"><i style="width:38%"></i></span>38 %</div>
+        </div>
+      </div>
+
+      <div class="mk-h">Terminé, à relire <span class="n">1</span></div>
+      <div class="rows">
+        <div class="row">
+          <svg class="gl g-ok" aria-hidden="true"><use href="#g-done"/></svg>
+          <div class="who"><b>vf-reviewer</b><span>nœud <code>revue-73</code> · rapport rendu il y a 3 min</span></div>
+          <div class="what">2 constats majeurs <em>· 6 fichiers relus</em></div>
+          <div class="t">29 min</div>
+          <div class="ctx"><span class="btn">Lire le rapport</span></div>
+        </div>
+      </div>
+
+      <div class="mk-h">Au repos <span class="n">1</span></div>
+      <div class="rows">
+        <div class="row">
+          <svg class="gl g-mute" aria-hidden="true"><use href="#g-todo"/></svg>
+          <div class="who"><b>Session « lexique »</b><span>autre arbre : wt-lexique</span></div>
+          <div class="what">au repos <em>· depuis 45 min</em></div>
+          <div class="t">2 h 10</div>
+          <div class="ctx"><span class="bar"><i style="width:22%"></i></span>22 %</div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="prose">
+    <p><strong>Ce que la régie corrige.</strong> Le worker qui lance des tests depuis sept minutes reste à l'écran avec sa commande en cours ; aujourd'hui il disparaît après 180 secondes de silence. La session au repos reste listée. Le manager porte son nœud de plan, et l'attente est un état à part entière, alors que le cockpit n'en connaît aucun.</p>
+    <p><strong>Les états, dérivés de preuves.</strong> « Au travail », « commande longue », « silencieux » puis « suspect » quand aucun signe de vie n'arrive, « vous attend », « attend ses agents », « au repos », « terminé, à relire », « orphelin » quand le parent a fini et que l'enfant tourne encore. Chaque état garde son glyphe et son mot, sans fond teinté, comme le veut Graphite.</p>
+  </div>
+
+  <h3>Maquette 2 · la frise des sessions</h3>
+  <div class="planche">
+    <div class="cap">Maquette, données d'exemple. Une voie par agent, les enfants sous leur parent, une horloge commune.</div>
+    <div class="mk">
+      <div class="mk-top">
+        <div class="seg" aria-hidden="true"><span class="on">Horloge</span><span>Événements</span></div>
+        <div class="seg" aria-hidden="true"><span class="on">1 h 30</span><span>6 h</span><span>24 h</span><span>7 j</span></div>
+      </div>
+      <div class="scroll-x">
+        <svg class="frise" viewBox="0 0 1040 352" role="img" aria-label="Frise d'exemple : six voies d'agents entre 14 h et 15 h 30, avec leurs périodes de travail, leurs attentes, leurs commits, une compaction et une erreur d'outil.">
+          <defs>
+            <pattern id="hach" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)"><rect width="2.6" height="6" class="hf"/></pattern>
+          </defs>
+
+          <!-- agents actifs -->
+          <text x="0" y="46">Agents actifs</text>
+          <text x="0" y="60" class="l2">jusqu'à 4 en même temps</text>
+          <path class="par" d="M240 62V54H257.3V46H309.3V38H326.7V46H413.3V38H586.7V30H612.7V38H630V46H742.7V30H760V38H803.3V30H820.7V38H968V46H994V54H1020V62Z"/>
+
+          <!-- axe -->
+          <g class="gr">
+            <path d="M240 92V340M370 92V340M500 92V340M630 92V340M760 92V340M890 92V340"/>
+          </g>
+          <text class="ax" x="240" y="84">14:00</text>
+          <text class="ax" x="370" y="84" text-anchor="middle">14:15</text>
+          <text class="ax" x="500" y="84" text-anchor="middle">14:30</text>
+          <text class="ax" x="630" y="84" text-anchor="middle">14:45</text>
+          <text class="ax" x="760" y="84" text-anchor="middle">15:00</text>
+          <text class="ax" x="890" y="84" text-anchor="middle">15:15</text>
+          <text class="ax" x="1020" y="84" text-anchor="end">maintenant</text>
+          <path class="now" d="M1020 92V340"/>
+
+          <!-- libellés -->
+          <text x="0" y="117">Session principale</text>
+          <text x="0" y="131" class="l2">tête · arbre principal</text>
+          <path class="link" d="M5 138v14h8"/>
+          <text x="18" y="155">vf-dev-manager · Phase 73</text>
+          <text x="18" y="169" class="l2">nœud plan-73</text>
+          <path class="link" d="M23 176v14h8M23 190v38h8M23 228v38h8"/>
+          <text x="36" y="193">vf-coder · lot A</text>
+          <text x="36" y="207" class="l2">nœud exec-lot-a</text>
+          <text x="36" y="231">vf-coder · lot B</text>
+          <text x="36" y="245" class="l2">nœud exec-lot-b</text>
+          <text x="36" y="269">vf-reviewer</text>
+          <text x="36" y="283" class="l2">nœud revue-73</text>
+          <path class="gr" d="M0 298H1020"/>
+          <text x="0" y="319">Session « lexique »</text>
+          <text x="0" y="333" class="l2">autre arbre : wt-lexique</text>
+
+          <!-- dispatch : traits parent vers enfant -->
+          <path class="link" d="M309.3 123V156M413.3 161V232M742.7 161V270"/>
+
+          <!-- voie 1 : session principale (c = 118) -->
+          <path class="thin" d="M326.7 118H1020"/>
+          <rect class="act" x="257.3" y="113" width="69.4" height="10" rx="5"/>
+          <rect class="act" x="586.7" y="113" width="26" height="10" rx="5"/>
+          <rect class="act" x="803.3" y="113" width="17.4" height="10" rx="5"/>
+          <circle class="c-you" cx="257.3" cy="105" r="3"/>
+          <circle class="c-you" cx="586.7" cy="105" r="3"/>
+          <circle class="c-you" cx="803.3" cy="105" r="3"/>
+
+          <!-- voie 2 : manager (c = 156) -->
+          <path class="thin" d="M413.3 156H898.7"/>
+          <rect class="act" x="309.3" y="151" width="104" height="10" rx="5"/>
+          <rect class="act" x="742.7" y="151" width="17.3" height="10" rx="5"/>
+          <rect x="898.7" y="151" width="121.3" height="10" rx="5" fill="url(#hach)"/>
+          <rect class="wo" x="898.7" y="151" width="121.3" height="10" rx="5"/>
+
+          <!-- voie 3 : lot A (c = 194) -->
+          <rect class="act" x="413.3" y="189" width="606.7" height="10" rx="5"/>
+          <path class="c-err" d="M556.7 176l8 8M564.7 176l-8 8"/>
+          <path class="c-commit" d="M690.7 187l7 7-7 7-7-7z"/>
+          <path class="c-comp" d="M777.3 175l5.5 9h-11z"/>
+          <path class="c-commit" d="M881.3 187l7 7-7 7-7-7z"/>
+
+          <!-- voie 4 : lot B (c = 232) -->
+          <rect class="act" x="413.3" y="227" width="554.7" height="10" rx="5"/>
+          <path class="c-commit" d="M846.7 225l7 7-7 7-7-7z"/>
+          <rect x="968" y="227" width="52" height="10" rx="5" fill="url(#hach)"/>
+          <rect class="wo" x="968" y="227" width="52" height="10" rx="5"/>
+
+          <!-- voie 5 : reviewer (c = 270) -->
+          <rect class="act" x="742.7" y="265" width="251.3" height="10" rx="5"/>
+          <path class="c-end" d="M1000 270l4 4 7-9"/>
+
+          <!-- voie 6 : session lexique (c = 320) -->
+          <path class="rest" d="M632 320H1020"/>
+          <rect class="act" x="240" y="315" width="390" height="10" rx="5"/>
+          <path class="c-commit" d="M621.3 313l7 7-7 7-7-7z"/>
+        </svg>
+      </div>
+      <div class="leg" aria-hidden="true">
+        <span><svg viewBox="0 0 26 12"><rect class="act" x="1" y="1" width="24" height="10" rx="5" style="fill:var(--text-3)"/></svg>au travail</span>
+        <span><svg viewBox="0 0 26 12"><path d="M2 6H24" style="stroke:var(--text-4);stroke-width:2;stroke-linecap:round"/></svg>attend ses agents</span>
+        <span><svg viewBox="0 0 26 12"><rect x="1" y="1" width="24" height="10" rx="5" fill="url(#hach)"/><rect x="1" y="1" width="24" height="10" rx="5" style="fill:none;stroke:var(--warn)"/></svg>vous attend</span>
+        <span><svg viewBox="0 0 26 12"><path d="M2 6H24" style="stroke:var(--text-4);stroke-width:2;stroke-linecap:round;stroke-dasharray:1 6"/></svg>au repos</span>
+        <span><svg class="gl g-ok" viewBox="0 0 16 16" style="width:13px"><use href="#g-commit"/></svg>commit</span>
+        <span><svg class="gl" viewBox="0 0 16 16" style="width:13px;color:var(--text-2)"><use href="#g-tri-o"/></svg>compaction</span>
+        <span><svg class="gl g-err" viewBox="0 0 16 16" style="width:13px"><use href="#g-x"/></svg>erreur d'outil</span>
+        <span><svg class="gl" viewBox="0 0 16 16" style="width:13px;color:var(--text)"><use href="#g-dot"/></svg>message de vous</span>
+        <span><svg class="gl g-ok" viewBox="0 0 16 16" style="width:13px"><use href="#g-done"/></svg>rapport rendu</span>
+      </div>
+    </div>
+  </div>
+  <div class="prose">
+    <p><strong>Ce que la frise répond.</strong> Qui a tourné en parallèle, qui a attendu quoi, combien de temps d'agent a été perdu à vous attendre (ici 20 minutes cumulées), quand les commits sont tombés. Un clic sur une voie ouvre la fiche ; un clic sur un commit ouvre le tiroir Git.</p>
+    <p><strong>Deux lectures du même axe.</strong> En mode Horloge les durées sont vraies. En mode Événements les silences sont compressés, sinon une minute dense devient un trait et une nuit creuse un désert. Les outils qui s'en sortent proposent les deux.</p>
+    <p><strong>La Phase 74 la prévoit déjà, sans cadrage.</strong> Trois précisions pour ce cadrage. La note de la phase donne <code>meta.json</code> comme source des horodatages ; il n'en porte aucun, ils sont dans les transcripts. « Colorée par nœud de plan » contredit Graphite : le nœud s'écrit sur la voie, la couleur reste aux états. Et une frise au-delà de 24 heures demande de conserver un index sur disque, ce qui rouvre la fenêtre de 24 heures décidée en Phase 69.</p>
+  </div>
+
+  <h3>Maquette 3 · la fiche d'un agent</h3>
+  <div class="planche">
+    <div class="cap">Maquette, données d'exemple. Le fil ne montre que des verbes et des cibles réduites, jamais une sortie d'outil.</div>
+    <div class="mk">
+      <div class="fiche">
+        <div>
+          <div class="sub">Worker de vf-dev-manager · Phase 73</div>
+          <h3>vf-coder · lot A</h3>
+          <div class="sub">nœud <code>exec-lot-a</code> · arbre phase-73-a · fable 5.2</div>
+          <div class="kv">
+            <div><b>1 h 10</b><span>au travail, dont 0 min à vous attendre</span></div>
+            <div><b>71 %</b><span>du contexte, 1 compaction</span></div>
+            <div><b>212</b><span>appels d'outil, 3 en erreur</span></div>
+            <div><b>96 k</b><span>jetons produits</span></div>
+            <div><b>3,10 $</b><span>coût estimé au tarif public</span></div>
+            <div><b>5</b><span>fichiers écrits, 14 lus</span></div>
+          </div>
+          <div class="acts" aria-hidden="true"><span class="btn">Ouvrir dans le terminal</span><span class="btn">Lui écrire</span><span class="btn">Demander l'arrêt</span><span class="btn">Voir ses fichiers sur la carte</span></div>
+          <p class="sub">Chaque action prépare une commande dans le terminal. Rien ne part sans votre touche Entrée, comme pour « Lancer ».</p>
+        </div>
+        <div>
+          <h4>Fil</h4>
+          <div class="fil">
+            <div><time>14:20</time><svg class="gl g-mute" aria-hidden="true"><use href="#g-dot"/></svg><span>Mandat reçu <span style="color:var(--text-4)">· à lire à la demande</span></span></div>
+            <div><time>14:21</time><svg class="gl g-mute" aria-hidden="true"><use href="#g-todo"/></svg><span>lit 6 fichiers du plan</span></div>
+            <div><time>14:26</time><svg class="gl g-mute" aria-hidden="true"><use href="#g-todo"/></svg><span>modifie <code>vf-cockpit-equipe.mjs</code></span></div>
+            <div><time>14:37</time><svg class="gl g-err" aria-hidden="true"><use href="#g-x"/></svg><span>lance les tests · échec après 2 min</span></div>
+            <div><time>14:52</time><svg class="gl g-ok" aria-hidden="true"><use href="#g-commit"/></svg><span>commit <code>a1b2c3d</code></span></div>
+            <div><time>15:02</time><svg class="gl" style="color:var(--text-2)" aria-hidden="true"><use href="#g-tri-o"/></svg><span>compaction · 168 k puis 41 k jetons</span></div>
+            <div><time>15:14</time><svg class="gl g-ok" aria-hidden="true"><use href="#g-commit"/></svg><span>commit <code>e4f5a6b</code></span></div>
+            <div><time>15:23</time><svg class="gl g-warn" aria-hidden="true"><use href="#g-active"/></svg><span>lance les tests · en cours depuis 7 min</span></div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="prose">
+    <p>Aujourd'hui, la fiche d'une session tient en quatre lignes (état, identifiant, branche, arbre). Le transcript réduit affiche un intertitre « Mandat » toujours vide pour une session, puis les messages et les outils dans deux listes séparées, sans heure. L'heure est pourtant présente sur chaque ligne du transcript.</p>
+  </div>
+
+  <h3>D'où viennent les données</h3>
+  <div class="scroll-x">
+    <table class="w">
+      <thead><tr><th>Besoin</th><th>Aujourd'hui</th><th>Source proposée</th><th>Stabilité</th></tr></thead>
+      <tbody>
+        <tr><td><b>Qui est vivant, occupé, au repos</b></td><td>date de modification du transcript, seuil de 180 s</td><td><code>claude agents --json</code><span class="src">vérifié sur ce poste : Claude Code 2.1.322, 0,14 s par appel</span></td><td>documentée, en aperçu de recherche</td></tr>
+        <tr><td><b>Qui attend une permission ou une réponse</b></td><td>rien</td><td>hooks <code>PermissionRequest</code> et <code>Notification</code> ; en repli, un <code>AskUserQuestion</code> sans résultat dans le transcript</td><td>documentée ; le repli est une déduction</td></tr>
+        <tr><td><b>Début et fin des sous-agents</b></td><td>balayage de 1 587 fichiers <code>meta.json</code> à chaque tour</td><td>hooks <code>SubagentStart</code> et <code>SubagentStop</code>, qui donnent le chemin du transcript</td><td>documentée</td></tr>
+        <tr><td><b>Durées, outils, erreurs, compactions, fichiers</b></td><td>non lus</td><td>transcripts, par un index incrémental (décalage d'octets par fichier)<span class="src">prototype mesuré : 147 Ko d'index pour 1 068 transcripts</span></td><td>format interne : à garder derrière le contrat de forme existant</td></tr>
+        <tr><td><b>Contexte, coût, limites de 5 h et de 7 jours</b></td><td>vf-signal seulement, pour la session courante</td><td>le JSON que Claude Code passe au script de ligne d'état, relayé par ce script ; en repli, le champ <code>usage</code> des transcripts</td><td>documentée ; repli interne</td></tr>
+        <tr><td><b>Agir sur une session</b></td><td>rien</td><td><code>claude attach</code>, <code>claude --resume &lt;id&gt; "message"</code>, <code>claude stop</code>, <code>--fork-session</code></td><td>documentée</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="note">Tout reste local : aucune de ces sources ne demande de lecture réseau. Des fichiers internes de Claude Code donnent les mêmes états (l'audit en a trouvé sous <code>~/.claude/sessions</code>), mais leur format n'est pas garanti et la documentation déconseille de lire le registre du démon. La commande est la voie stable.</div>
+</section>
+<style>
+.duo-tel { display: grid; grid-template-columns: minmax(0, 2.6fr) minmax(0, 1fr); gap: 20px; align-items: start; }
+@media (max-width: 760px) { .duo-tel { grid-template-columns: minmax(0, 1fr); } }
+figure.tel img { width: auto; max-width: min(100%, 260px); }
+.couloirs { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; }
+@media (max-width: 760px) { .couloirs { grid-template-columns: minmax(0, 1fr); } }
+.col { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.col-h { display: flex; align-items: center; justify-content: space-between; padding: 0 4px; }
+.col-h .n { font: 500 12px/1 var(--mono); color: var(--text-3); }
+.ph { background: var(--raise); border-radius: 12px; padding: 10px 12px; display: grid; grid-template-columns: 34px minmax(0, 1fr); gap: 2px 8px; align-items: baseline; }
+.ph b { font: 500 12px/1.5 var(--mono); color: var(--text-3); }
+.ph span { font: 500 13px/1.4 var(--sans); color: var(--text); }
+.ph em { grid-column: 2; font: 400 12px/1.4 var(--sans); font-style: normal; color: var(--text-4); }
+.jbar { display: flex; align-items: center; gap: 10px; font: 500 12px/1 var(--mono); color: var(--text-3); min-width: 180px; }
+.formes { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px 28px; }
+.formes div { display: flex; flex-direction: column; gap: 2px; }
+.formes b { font: 600 15px/1.4 var(--sans); }
+.formes span { font: 400 13.5px/1.5 var(--sans); color: var(--text-2); }
+</style>
+
+<section id="interface">
+  <h2>Interface et design</h2>
+  <div class="prose">
+    <p>Le parcours a été fait dans le navigateur, à 1440, 1024 et 390 pixels de large, en clair et en sombre, au clavier seul, avec le terminal et le lancement ouverts en direct. 85 captures. Aucune session n'a été lancée.</p>
+    <p><strong>Graphite est tenu, surtout en sombre.</strong> Le couple glyphe et mot pour les états est la signature la plus solide de l'interface. Les meilleures surfaces sont les moins « graphe » : le tiroir Git, le terminal, le bandeau de lancement, la recherche. Le défaut de fond est ailleurs : le canevas à cartes est appliqué à tout, y compris là où il échoue.</p>
+  </div>
+
+  <div class="scores">
+    <div class="score"><span>Direction Graphite</span><b>74</b><span class="bar"><i style="width:74%"></i></span><small>Calme, cohérente, états lisibles par la forme et par le mot.</small></div>
+    <div class="score"><span>Terminal</span><b>72</b><span class="bar"><i style="width:72%"></i></span><small>Bon outil. Absent sans explication quand l'option manque ; un shell qu'on ne peut pas terminer.</small></div>
+    <div class="score"><span>Lancer</span><b>70</b><span class="bar"><i style="width:70%"></i></span><small>Le double geste est clair. Bandeau rogné, état périmé après une annulation.</small></div>
+    <div class="score"><span>Git</span><b>68</b><span class="bar"><i style="width:68%"></i></span><small>Lecture seule nette. Tiroir étroit, 653 rangées rendues d'un coup.</small></div>
+    <div class="score"><span>Code</span><b>62</b><span class="bar"><i style="width:62%"></i></span><small>Carte riche. « Ajuster » laisse 16 cartes sur 26 hors de l'écran.</small></div>
+    <div class="score"><span>Téléphone</span><b>44</b><span class="bar"><i style="width:44%"></i></span><small>Le menu libelle tout. Le canevas, lui, est illisible.</small></div>
+    <div class="score"><span>Équipe</span><b>40</b><span class="bar"><i style="width:40%"></i></span><small>Dit « aucune mission » avec sept agents actifs.</small></div>
+    <div class="score"><span>Accessibilité</span><b>36</b><span class="bar"><i style="width:36%"></i></span><small>Aucune carte n'est atteignable au clavier.</small></div>
+    <div class="score"><span>Projet</span><b>34</b><span class="bar"><i style="width:34%"></i></span><small>Titres de carte à 7 px à l'ouverture, 5 px dans un jalon.</small></div>
+  </div>
+  <p class="sub">Barème : 90, livrable tel quel ; 70, utilisable avec des frictions ; 50, la tâche principale est gênée ; 30, elle échoue. Ce sont les notes de ce parcours. Le panel du 6 novembre donnait 53 de moyenne, la recette du 8 novembre entre 64 et 84.</p>
+
+  <div class="duo-tel">
+    <figure>
+      <img src="projet-ouverture.png" alt="Onglet Projet à l'ouverture en thème sombre : de très petites cartes au milieu d'un grand canevas vide, et un panneau latéral lisible à droite.">
+      <figcaption><strong>Projet à l'ouverture, 1440 px.</strong> Les titres de carte mesurent 7 px, moins que leur propre légende. Toute l'information lisible est dans le panneau de droite.</figcaption>
+    </figure>
+    <figure class="tel">
+      <img src="projet-telephone.png" alt="Le même onglet au téléphone, après une plongée dans un jalon : une rangée de cartes microscopiques au milieu de l'écran.">
+      <figcaption><strong>Un jalon au téléphone.</strong> Une carte y mesure 27 × 15 px.</figcaption>
+    </figure>
+  </div>
+
+  <h3>Trois onglets, trois formes</h3>
+  <div class="prose">
+    <p>C'est la décision de design que je recommande. Chaque onglet répond à une question différente et mérite la forme qui y répond. Le graphe reste là où il est vrai.</p>
+  </div>
+  <div class="formes">
+    <div><b>Code : une carte</b><span>« Où est quoi, et qu'est-ce qui dépend de quoi ? » Le graphe zoomable est la bonne forme. Il lui manque une minicarte et un vrai « tout voir ».</span></div>
+    <div><b>Projet : des couloirs</b><span>« Où en est-on ? » Des phases rangées par état se lisent à toute largeur, téléphone compris. Le graphe de dépendances reste accessible, à la demande.</span></div>
+    <div><b>Équipe : une régie et une frise</b><span>« Qui m'attend, qui travaille, que s'est-il passé ? » Une liste par état, puis le temps.</span></div>
+  </div>
+
+  <div class="planche">
+    <div class="cap">Maquette de l'onglet Projet en couloirs. Les phases et leurs états sont ceux que le cockpit affiche aujourd'hui pour ce jalon.</div>
+    <div class="mk">
+      <div class="mk-top">
+        <div><h3>Jalon vibeflow-v2.0</h3><div class="sub">5 phases faites sur 12, 1 à recetter</div></div>
+        <div class="jbar"><span class="bar"><i style="width:42%"></i></span>42 %</div>
+      </div>
+      <div class="couloirs">
+        <div class="col">
+          <div class="col-h"><span class="st"><svg class="g-mute" aria-hidden="true"><use href="#g-todo"/></svg>À faire</span><span class="n">6</span></div>
+          <div class="ph"><b>71.5</b><span>Réexamen du design system du cockpit</span><em>pas de plan</em></div>
+          <div class="ph"><b>73</b><span>Gouvernance au cockpit</span><em>pas de plan · non cadrée</em></div>
+          <div class="ph"><b>74</b><span>L'équipe dans le temps</span><em>pas de plan · non cadrée</em></div>
+          <div class="ph"><b>75</b><span>L'activité posée sur le code</span><em>pas de plan · non cadrée</em></div>
+          <div class="ph"><b>76</b><span>Traçabilité au cockpit</span><em>pas de plan · non cadrée</em></div>
+          <div class="ph"><b>77</b><span>Santé de la méthode et synthèse</span><em>pas de plan · non cadrée</em></div>
+        </div>
+        <div class="col">
+          <div class="col-h"><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-wait"/></svg>À recetter</span><span class="n">1</span></div>
+          <div class="ph"><b>72</b><span>Lancer du travail depuis les cartes du cockpit</span><em>16 plans sur 16 · 11 exigences sur 12</em></div>
+        </div>
+        <div class="col">
+          <div class="col-h"><span class="st"><svg class="g-ok" aria-hidden="true"><use href="#g-done"/></svg>Fait</span><span class="n">5</span></div>
+          <div class="ph"><b>67</b><span>Cockpit floorplan sur socle partagé</span></div>
+          <div class="ph"><b>68</b><span>Embarquer vf-signal sur le socle partagé</span></div>
+          <div class="ph"><b>69</b><span>Suivi du travail en cours dans le cockpit</span></div>
+          <div class="ph"><b>70</b><span>Finitions UI du cockpit</span></div>
+          <div class="ph"><b>71</b><span>Terminal intégré au cockpit</span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <h3>Constats d'interface</h3>
+  <div class="scroll-x">
+    <table class="w">
+      <thead><tr><th>Id</th><th>Gravité</th><th>Constat, observé et mesuré</th><th>Correction</th><th>Antériorité</th></tr></thead>
+      <tbody>
+        <tr><td class="id">BL1</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri"/></svg>Bloquant</span></td><td><b>Projet est illisible à l'ouverture.</b> Titres de carte à 7,1 px à 1440, 5,4 px dans le jalon v2.0, 1,9 px au téléphone. Les cartes occupent 12 % puis 4 % de la zone libre. Zoomé à taille lisible, on ne voit plus que trois phases.</td><td>Les couloirs ci-dessus ; à défaut un plancher de lisibilité et une mise en page compacte.</td><td><span class="tag">rouvre le plancher de zoom réservé à Code</span></td></tr>
+        <tr><td class="id">BL2</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri"/></svg>Bloquant</span></td><td><b>Le canevas est hors du clavier.</b> Aucune carte parmi les 54, 22 et 17 arrêts de tabulation des trois onglets. Les cartes n'ont ni rôle ni nom ; les flèches et Entrée sont sans effet.</td><td>Un rôle de bouton, un nom, une tabulation itinérante, les flèches entre voisins, Entrée pour plonger.</td><td><span class="tag">connu du panel, non livré</span></td></tr>
+        <tr><td class="id">M1</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>« Ajuster à l'écran » ne montre pas l'ensemble.</b> Sur Code, 6 cartes sur 26 sont entièrement visibles, 16 sont hors écran, 2 sous le panneau. Six crans de molette et le canevas est vide, sans repère.</td><td>Ajuster sur la zone libre, une minicarte, un compteur de cartes hors champ.</td><td><span class="tag">nouveau</span></td></tr>
+        <tr><td class="id">M2</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>Le titre de la vue flotte sur les cartes.</b> Sans fond, il se superpose à elles dès qu'on se déplace.</td><td>Une zone réservée, ou le titre dans l'en-tête.</td><td><span class="tag">rouvre « flou sans fond »</span></td></tr>
+        <tr><td class="id">M3</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>Équipe dit l'inverse de ce qu'elle montre.</b> « Aucune mission en cours » avec sept agents, un canevas vide à 93 %, et « Santé : aucun problème » quand Code en affiche quatre.</td><td>La régie.</td><td><span class="tag">nouveau</span></td></tr>
+        <tr><td class="id">M4</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>Fiche de session et transcript pauvres.</b> La branche est écrite trois fois. Le transcript tient dans une boîte de 308 px à défilement imbriqué, en markdown brut.</td><td>Un lecteur large, un fil unique.</td><td><span class="tag">markdown connu du panel</span></td></tr>
+        <tr><td class="id">M5</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>L'en-tête se décode mal.</b> Neuf icônes sans libellé sur Code. Le triangle ouvre « Parcours », la roue veut dire « récent », un point beige vaut « N au travail ». « Vue d'ensemble » se lit comme un quatrième onglet. La branche est tronquée malgré la place.</td><td>Trois groupes libellés au-delà de 1 280 px ; un fil d'Ariane avec chevron.</td><td><span class="tag">troncature connue du panel</span></td></tr>
+        <tr><td class="id">M6</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>Les surcouches ne retiennent pas le focus.</b> Tab sort de la recherche restée ouverte, puis Échap ne la ferme plus. Même sortie pour l'export. Panneau fermé : 43 arrêts invisibles.</td><td>Rendre inerte ce qui est masqué ou derrière ; Échap au niveau du document.</td><td><span class="tag">nouveau</span></td></tr>
+        <tr><td class="id">M7</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>Un gel de 2,3 s.</b> Ouvrir un résultat de recherche dans un niveau de 70 cartes bloque l'onglet, canevas blanc. « Mise en page… » ne s'affiche jamais.</td><td>La mise en page dans un worker ; l'indicateur avant le calcul.</td><td><span class="tag">nouveau</span></td></tr>
+        <tr><td class="id">M8</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>La santé parle anglais.</b> Les constats sortent en anglais dans une interface française, et l'introduction cite des services que le dépôt n'utilise probablement pas.</td><td>Traduire les gabarits ; fonder la détection sur les dépendances.</td><td><span class="tag">rouvre « constats laissés en anglais »</span></td></tr>
+        <tr><td class="id">M9</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>Une coupure du serveur reste muette cinq minutes.</b> La pastille ne change pas. La bannière arrive à 300 s et reste après le retour, jusqu'à un clic.</td><td>« Direct coupé » à 5 s, bannière à 15 s, qui se retire seule.</td><td><span class="tag">nouveau</span></td></tr>
+        <tr><td class="id">M10</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>Terminal : absence muette, puis message trompeur.</b> Sans l'option, ni pastille ni « Lancer », sans explication. Avec l'option, un onglet ouvert à la main lit « non disponible » alors que le serveur l'a. Fermer le tiroir ne termine pas le shell, et rien ne permet de le terminer.</td><td>Dire la vraie cause ; une pastille expliquée ; une action « Terminer la session ».</td><td><span class="tag">nouveau</span></td></tr>
+        <tr><td class="id">M11</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>Bandeau de lancement rogné, état périmé.</b> La phrase « écrit cette ligne sans la lancer » est coupée, les modes sont sous le pli. Après « Annuler », le panneau dit toujours « Confirmez-la ».</td><td>Un tiroir qui s'ajuste au bandeau ; un statut remis à zéro.</td><td><span class="tag">connu du panel, partiel</span></td></tr>
+        <tr><td class="id">M12</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Majeur</span></td><td><b>Tiroir Git étroit.</b> À 1024 px, un seul commit est visible. Les sujets sont coupés vers 22 caractères. Les 653 rangées sont rendues d'un coup.</td><td>Worktrees repliés, détail dans le panneau, liste virtualisée, largeur réglable.</td><td><span class="tag">nouveau</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <figure>
+    <img src="entete.png" alt="L'en-tête de l'onglet Code : logo, trois onglets, le mot « Vue d'ensemble », un champ de recherche et neuf icônes sans libellé.">
+    <figcaption><strong>L'en-tête de l'onglet Code.</strong> Neuf icônes sans libellé, et « Vue d'ensemble » à huit pixels des onglets, dans le même corps.</figcaption>
+  </figure>
+  <figure>
+    <img src="lancer-bandeau.png" alt="Le tiroir Terminal ouvert avec le bandeau « Lancement proposé » : la commande exacte, le mode, un compte à rebours, les boutons Annuler et Préparer dans le terminal.">
+    <figcaption><strong>Le lancement en deux temps, la meilleure idée de l'interface.</strong> La commande exacte est montrée, rien ne part sans la touche Entrée. Ici le bandeau est rogné : la phrase qui le dit est coupée, et les contrôles de zoom recouvrent une carte.</figcaption>
+  </figure>
+
+  <div class="prose">
+    <h3>Ce qui a du caractère, ce qui fait générique</h3>
+    <p><strong>Du caractère :</strong> le graphite sombre ; les glyphes d'état ; le tiroir Git en lecture seule, où chaque action est une commande à copier ; le lancement en deux temps. <strong>Générique :</strong> la grille de cartes sur fond pointé, pour tout.</p>
+    <ul>
+      <li><strong>Hiérarchie.</strong> Le même titre apparaît trois fois (fil d'Ariane, grand titre flottant, panneau). Les paliers de zoom grossissent la légende et la pastille, pas le titre.</li>
+      <li><strong>Densité.</strong> Deux extrêmes : un canevas vide à 70 ou 95 %, et un panneau en murs de prose recopiée de la feuille de route.</li>
+      <li><strong>Couleur.</strong> En sombre tout tient, entre 6 et 15 de contraste. En clair, la carte active devient grise et se lit comme désactivée ; le glyphe « En cours » est à 3,01. Les liens violets et la barre de langages arc-en-ciel, hérités du moteur, sont les seules couleurs libres.</li>
+      <li><strong>Icônes.</strong> Trois faux amis : un fichier pour les sessions et les agents, un triangle de lecture pour « Parcours », une roue pour « récent ».</li>
+      <li><strong>Mouvement.</strong> Le fondu de plongée et la caméra de la visite ont de la tenue. Le gel de 2,3 s et le zoom qui perd la carte sélectionnée les défont. En mouvement réduit, 23 animations restent actives.</li>
+    </ul>
+    <h3>Finitions relevées</h3>
+    <p>Le vocabulaire du Code appliqué au planning (« Élément », « module », « Utilisé par ») ; Backlog et Releases en vignettes à 8 px qui doublent la liste du panneau ; deux anneaux de focus différents ; trois formats de titre d'onglet ; le tiroir Git qui se ferme à chaque changement d'onglet, parce que la page se recharge en entier ; « Verifie » sans accent dans la commande de lancement ; l'historique du terminal perdu au changement d'onglet.</p>
+  </div>
+</section>
+<section id="constats">
+  <h2>Tous les constats</h2>
+  <div class="prose">
+    <p>Chaque ligne donne la preuve et la façon dont elle a été obtenue : <strong>mesuré</strong> ou <strong>sondé</strong> (exécuté pendant l'audit), <strong>lu</strong> (dans le code), <strong>déduit</strong>. L'effort est une taille : S pour un commit, M pour un lot, L pour une phase.</p>
+  </div>
+
+  <details open>
+    <summary>Données des agents et des sessions <span class="count">9 constats</span></summary>
+    <div class="in">
+      <p>Matière mesurée : 63 sessions (193 Mo) et 1 005 transcripts de sous-agents (2,42 Go) de ce dépôt. Le collecteur réel a été rejoué sur un dossier personnel factice, avec un témoin positif.</p>
+      <div class="scroll-x">
+        <table class="w">
+          <thead><tr><th>Id</th><th>Gravité</th><th>Constat et preuve</th><th>Correction</th><th>Effort</th></tr></thead>
+          <tbody>
+            <tr><td class="id">D1</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri"/></svg>Critique</span></td><td><b>Un agent qui travaille disparaît de l'écran.</b> Un sous-agent non fini, muet depuis 180 s, est exclu, et sa session avec lui si rien d'autre n'y est affiché. Sondé : un worker dans une commande depuis 10 min donne « Personne au travail ». 35 % des sous-agents du dépôt ont connu un tel silence, 133 de plus de 10 min. vf-signal hérite du trou.<span class="src">vf-cockpit-equipe.mjs:72-76 · sondé</span></td><td>Un agent non fini reste affiché tant que sa session vit, avec « outil en cours depuis N » tiré de l'appel sans résultat.</td><td class="eff">S</td></tr>
+            <tr><td class="id">D2</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Haute</span></td><td><b>Une session au repos n'existe plus après trois minutes.</b> La fenêtre de 24 h ne vaut que pour les sous-agents. Quatre sessions du dépôt écrites dans les 24 h étaient absentes, dont une vivante. Aucun état « vous attend ». C'est la vraie cause des sessions « manquantes » des autres worktrees.<span class="src">vf-cockpit-equipe.mjs:76,83,86 · mesuré</span></td><td>Lire l'état officiel des sessions : occupée, au repos, vous attend, close.</td><td class="eff">S</td></tr>
+            <tr><td class="id">D3</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Haute</span></td><td><b>L'alerte « à surveiller » ne peut pas se déclencher.</b> Elle exige un agent actif depuis 120 s ou plus (900 s pour « commande en cours depuis 15 min »), alors que l'état actif est borné à 180 s. Les tests passent sur des données écrites à la main. L'âge affiché reste figé entre deux mises à jour.<span class="src">71-vf-equipe-rendu.js:55-61,109-113 · test-cockpit-equipe.sh:1146 · lu</span></td><td>Âge recalculé dans la page, et un test qui traverse le collecteur.</td><td class="eff">S</td></tr>
+            <tr><td class="id">D4</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Haute</span></td><td><b>Les workers orphelins sont invisibles.</b> Un worker encore actif sous un manager terminé est rangé dans « Terminés ». Le contrôle « orphelin ? » ne regarde qu'un parent de type session. C'est le cas de l'issue #223.<span class="src">vf-cockpit-equipe-carte.mjs:47-49 · vf-cockpit-who.mjs:118 · sondé</span></td><td>Orphelin = parent terminé et enfant vivant, affiché dans la régie avec « Demander l'arrêt ».</td><td class="eff">S</td></tr>
+            <tr><td class="id">D5</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Haute</span></td><td><b>Le lien entre un agent et sa mission tient à un fil.</b> 14 % des mandats citent leur nœud (143 sur 1 005). Le registre du verrou n'est lu que pour ses entrées en cours, puis supprimé. 20 plans de mission sur 55 s'appellent <code>dag-*.json</code> ; seuls les <code>*.dag.json</code> sont lus. D'où « Aucune mission en cours » avec sept agents actifs.<span class="src">vf-cockpit-planning.mjs:98 · vf-cockpit-who.mjs:113-132 · mesuré</span></td><td>Lire les deux nommages, conserver le registre après relâchement, faire écrire le nœud dans le mandat par le team-kernel.</td><td class="eff">M</td></tr>
+            <tr><td class="id">D6</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>« New session » est pris pour un nom choisi.</b> C'est le titre par défaut d'un client de Claude, lu comme un renommage.<span class="src">vf-cockpit-lecture.mjs:96 · mesuré</span></td><td>Lire le nom officiel et sa provenance ; ignorer les valeurs par défaut.</td><td class="eff">S</td></tr>
+            <tr><td class="id">D7</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>« Mandat » est vide par construction.</b> Le mandat est la première ligne du transcript si elle vient de l'utilisateur ; aucune des 63 sessions ne commence ainsi. L'intertitre s'affiche quand même.<span class="src">vf-cockpit-transcript.mjs:95 · mesuré</span></td><td>Pas de mandat pour une session ; pour un agent, le lire dans son dispatch.</td><td class="eff">S</td></tr>
+            <tr><td class="id">D8</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>Le transcript perd l'ordre et l'heure.</b> Messages et outils partent dans deux listes ; l'horodatage, présent sur toutes les lignes, est jeté. Le graphe Équipe n'a aucun lien : la hiérarchie n'est qu'un emboîtement.<span class="src">vf-cockpit-transcript.mjs:99-114 · lu</span></td><td>Un seul fil daté, comme dans la maquette 3.</td><td class="eff">S</td></tr>
+            <tr><td class="id">D9</td><td><span class="st"><svg class="g-mute" aria-hidden="true"><use href="#g-todo"/></svg>Basse</span></td><td><b>États et durées approximatifs.</b> La durée inclut les veilles d'un agent réveillé (jusqu'à 101 h). L'état « bloqué » n'est jamais produit. Le champ de fin manque pour 38 agents sur 888 depuis Claude Code 2.1.308.<span class="src">mesuré, en partie déduit</span></td><td>Durées par segments d'activité, tirées de l'index.</td><td class="eff">M</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+
+  <details open>
+    <summary>Architecture et performance <span class="count">13 constats</span></summary>
+    <div class="in">
+      <p>Ce qui tient : le moteur vendorisé se reconstruit à l'identique et la CI le rejoue, les routes Git sont asynchrones, le terminal est isolé dans son processus, les schémas sont versionnés, et aucune fuite n'apparaît après 120 rendus.</p>
+      <div class="scroll-x">
+        <table class="w">
+          <thead><tr><th>Id</th><th>Gravité</th><th>Constat et preuve</th><th>Correction</th><th>Effort</th></tr></thead>
+          <tbody>
+            <tr><td class="id">H1</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Haute</span></td><td><b>Trois onglets ouverts figent le cockpit.</b> Chaque page tient deux flux d'événements, et Chrome plafonne à six connexions par origine. Avec Code, Projet et Équipe ouverts, une requête d'état reste sans réponse et une quatrième page ne charge jamais. Un onglet fermé : 2 ms. Rien ne le dit à l'écran.<span class="src">viewer.html:1958 · 70-vf-live.js:257 · mesuré</span></td><td>Un seul flux par page, puis un flux partagé entre les onglets.</td><td class="eff">S</td></tr>
+            <tr><td class="id">H2</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Haute</span></td><td><b>Le serveur est sourd 9 % du temps.</b> Toutes les 5 s, la collecte bloque la boucle pendant 318 ms (1 959 lectures d'état de fichier, 9,8 Mio de fins de transcripts, des sous-processus git et verrou), même sans aucun onglet. Un changement de planning ajoute 901 ms : le planning est lu deux fois et le verrou interrogé quatre fois.<span class="src">vf-cockpit-live.mjs:142-153 · vf-cockpit-project.mjs:64-66 · mesuré</span></td><td>Lectures asynchrones, un seul appel au verrou par cycle, cache par date de modification, aucune collecte sans client.</td><td class="eff">S puis M</td></tr>
+            <tr><td class="id">H3</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Haute</span></td><td><b>Le serveur s'arrête et se remplace sans laisser de trace.</b> Une relance avec une option différente l'arrête et le remplace, jeton neuf compris. L'arrêt sur inactivité (60 min) ne compte que les flux de page. Le journal ne porte ni date ni motif, et rien n'empêche deux lanceurs de se croiser. Observé : le serveur de recette s'est arrêté au début de l'audit sans que le journal dise pourquoi.<span class="src">vf-cockpit.mjs:176,239-250 · serve.mjs:88,220 · lu et observé</span></td><td>Journal daté avec motif d'arrêt, verrou de lanceur, relance seulement si le code a changé.</td><td class="eff">S</td></tr>
+            <tr><td class="id">H4</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Haute</span></td><td><b>La traduction réécrit vos données.</b> Le dictionnaire s'applique à tout texte après le rendu, avec 99 clés d'un seul mot. Dans la page servie, le fichier <code>tokens.ts</code> s'affiche « Jetons », <code>open.mjs</code> « Ouvrir », <code>health.mjs</code> « Santé ». À l'inverse, une chaîne nouvelle du moteur reste en anglais sans alerte.<span class="src">80-vf-fr.js:142-146 · mesuré : 11 libellés de données sur 1 547</span></td><td>Exclure les titres et les descriptions de cartes, puis traduire au point d'émission.</td><td class="eff">S puis M</td></tr>
+            <tr><td class="id">H5</td><td><span class="st"><svg class="g-err" aria-hidden="true"><use href="#g-tri-o"/></svg>Haute</span></td><td><b>Le couplage au moteur vendorisé coûtera cher à la première montée de version.</b> 83 modifications sur l'amont, dont 63 dans le seul <code>viewer.html</code> ; dix lignes portent un marqueur maison. La base n'a jamais bougé depuis la v0.6.0.<span class="src">amont/patches · lu ; coût en jours déduit</span></td><td>Sortir le CSS dans une extension, proposer à l'amont les patchs génériques, ou assumer le fork et retirer l'appareil de patchs.</td><td class="eff">M à L</td></tr>
+            <tr><td class="id">M1</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>La page sert de base de données.</b> Le graphe Projet ne vit que dans <code>project.html</code> : chaque mise à jour relit puis réécrit 3,66 Mo. Aucune route JSON n'expose les schémas pourtant décrits ; vf-signal refait donc toute la collecte dans un processus neuf toutes les 10 s.<span class="src">vf-cockpit-live.mjs:78-85 · vf-cockpit-query.mjs:19 · lu</span></td><td>Une coquille statique et des données en JSON.</td><td class="eff">M</td></tr>
+            <tr><td class="id">M2</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>3,4 Mo par page.</b> La bibliothèque de mise en page pèse 47,7 %, les données 26,6 %. 2,47 Mo sont identiques dans les trois pages et renvoyés à chaque navigation.<span class="src">mesuré</span></td><td>La même coquille, mise en cache une fois.</td><td class="eff">M</td></tr>
+            <tr><td class="id">M3</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>La mise en page gèle l'onglet.</b> Elle tourne sur le fil principal : 1,2 s de gel pour 100 cartes et 216 liens.<span class="src">viewer.html:678 · mesuré</span></td><td>La déplacer dans un worker.</td><td class="eff">M</td></tr>
+            <tr><td class="id">M4</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>Le code exécuté n'est pas celui du dépôt.</b> 52 modules sont copiés dans chaque lab puis renommés par expression régulière. Un serveur vivant garde l'ancien code après une mise à jour du plugin.<span class="src">vf-cockpit-build.mjs:111-117 · lu</span></td><td>Lancer le serveur depuis le module. Corrige aussi A-03.</td><td class="eff">M</td></tr>
+            <tr><td class="id">M5</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>Le plafond de lignes est tenu par des lignes longues.</b> 13 % des lignes dépassent 160 caractères, jusqu'à 761. À 100 colonnes, les 6 831 lignes en feraient 9 667. Environ 1 100 lignes de code de navigateur vivent côté serveur et partent sérialisées.<span class="src">mesuré</span></td><td>Plafonner aussi en colonnes ; ranger ce code avec l'interface.</td><td class="eff">M</td></tr>
+            <tr><td class="id">M6</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>Pas d'état côté page.</b> 21 observateurs maison réparent le focus, le défilement et les replis après chaque redessin. Chaque nouvelle vue recode sa propre réparation.<span class="src">70-vf-live.js:115-161 · lu</span></td><td>Un magasin d'état alimenté par le flux, des panneaux abonnés.</td><td class="eff">M</td></tr>
+            <tr><td class="id">M7</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>Des tests solides, mais chers et parfois muets.</b> 68 suites, 4 130 assertions, des mutants dans 52 suites. En face : 77 % du temps de CI, 400 pauses fixes, et sans Chrome 28 suites sautent leur moitié navigateur en sortant 0. Trois onglets, deux lanceurs et la collision de port ne sont pas couverts.<span class="src">ci.yml:402-446 · compté, non rejoué</span></td><td>Exiger Chrome en CI ; deux scénarios de plus.</td><td class="eff">S</td></tr>
+            <tr><td class="id">B1</td><td><span class="st"><svg class="g-mute" aria-hidden="true"><use href="#g-todo"/></svg>Basse</span></td><td><b>Assemblage complet à chaque ouverture.</b> Le scan n'a pas de cache (4,7 s ici), et le serveur lance <code>claude --version</code> en synchrone avant d'écouter.<span class="src">serve.mjs:168 · lu</span></td><td>Cache de scan par date de modification.</td><td class="eff">S</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </details>
+
+  <details open>
+    <summary>Sécurité <span class="count">9 constats, aucun critique ni haut</span></summary>
+    <div class="in">
+      <p>Le périmètre réseau tient. Le serveur n'écoute que sur 127.0.0.1, contrôle l'hôte exact, exige l'origine et un jeton de 128 bits sur ses routes, n'émet aucun en-tête de partage inter-origine, et sert une politique de contenu fermée avec des scripts autorisés par empreinte. Le terminal demande un secret de 256 bits à usage unique. Les seize sondes hostiles ont toutes été refusées.</p>
+      <div class="scroll-x">
+        <table class="w">
+          <thead><tr><th>Id</th><th>Gravité</th><th>Constat et preuve</th><th>Correction</th><th>Effort</th></tr></thead>
+          <tbody>
+            <tr><td class="id">A-01</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>« Demander » peut reprendre n'importe quelle session du lab.</b> Le serveur ne contrôle que le format de l'identifiant qu'on lui passe. Qui tient le jeton d'une page peut faire répondre le modèle avec tout le contexte d'une session de travail, sorties d'outils comprises, et son tour s'ajoute à cette session.<span class="src">serve.mjs:280 · lu, non sondé</span></td><td>N'accepter que les identifiants que ce serveur a lui-même rendus.</td><td class="eff">S</td></tr>
+            <tr><td class="id">A-02</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>Les liens symboliques du lab sont suivis à l'assemblage.</b> Un dépôt qui porte un lien vers un fichier extérieur voit le début de ce fichier copié dans la page, servie sans jeton, puis dans l'export partagé.<span class="src">vf-cockpit-build.mjs:87-94 · scan.mjs:69-75 · sondé avec un faux fichier marqué</span></td><td>Confiner à la racine réelle du lab, ne pas suivre les liens dans le scan, masquer les descriptions.</td><td class="eff">M</td></tr>
+            <tr><td class="id">A-03</td><td><span class="st"><svg class="g-warn" aria-hidden="true"><use href="#g-active"/></svg>Moyenne</span></td><td><b>Le dossier de sortie du lab est exécuté comme du code.</b> Un agent qui n'a que le droit d'écrire dans le projet peut y réécrire un module que le serveur évalue ensuite, hors de tout contrôle de permission. Le README affirme l'inverse.<span class="src">serve.mjs:183-184,214-219 · lu, non sondé</span></td><td>Charger ce code depuis le module du plugin ; la sortie ne porte plus que des données.</td><td class="eff">M</td></tr>
+            <tr><td class="id">B-01</td><td><span class="st"><svg class="g-mute" aria-hidden="true"><use href="#g-todo"/></svg>Basse</span></td><td><b>Un worktree forgé élargit « qui est au travail ».</b> Une archive de lab peut déclarer un worktree qui pointe vers un autre projet ; ses sessions et leur transcript réduit apparaissent alors.<span class="src">vf-cockpit-arbres.mjs:25-33 · sondé</span></td><td>Appliquer aux arbres le contrôle déjà fait pour le tiroir Git.</td><td class="eff">S</td></tr>
+            <tr><td class="id">B-02</td><td><span class="st"><svg class="g-mute" aria-hidden="true"><use href="#g-todo"/></svg>Basse</span></td><td><b>« Demander » n'a ni plafond ni délai.</b> Chaque requête lance un processus Claude, sans limite de nombre ni de durée.<span class="src">serve.mjs:323-363 · lu</span></td><td>Deux exécutions au plus, un délai global.</td><td class="eff">S</td></tr>
+            <tr><td class="id">B-03</td><td><span class="st"><svg class="g-mute" aria-hidden="true"><use href="#g-todo"/></svg>Basse</span></td><td><b>Les pages sans jeton sont joignables depuis un site tiers.</b> La page Équipe (2,5 Mo) est reconstruite à chaque requête.<span class="src">vf-cockpit-server.mjs:136-143 · mesuré, rafale non jouée</span></td><td>Refuser les requêtes inter-sites hors des routes d'API ; mémoriser la page.</td><td class="eff">S</td></tr>
+            <tr><td class="id">B-04</td><td><span class="st"><svg class="g-mute" aria-hidden="true"><use href="#g-todo"/></svg>Basse</span></td><td><b>L'export emporte les métadonnées VibeFlow.</b> Titres et chemins de plans (532 entrées), dépôt, worktree et branche partent quel que soit le choix d'export.<span class="src">serve.mjs:51-60 · vérifié sur l'instance</span></td><td>Retirer ces clés par défaut.</td><td class="eff">S</td></tr>
+            <tr><td class="id">B-05</td><td><span class="st"><svg class="g-mute" aria-hidden="true"><use href="#g-todo"/></svg>Basse</span></td><td><b>Le mode de lancement mémorisé peut être pré-planté.</b> Le fichier n'est pas purgé au démarrage : une archive peut présélectionner un mode. Le clic et la touche Entrée restent requis.<span class="src">vf-cockpit-lancer-mode.mjs:24-27 · lu</span></td><td>Purger à l'assemblage, ou ranger ce fichier hors du lab.</td><td class="eff">S</td></tr>
+            <tr><td class="id">B-06</td><td><span class="st"><svg class="g-mute" aria-hidden="true"><use href="#g-todo"/></svg>Basse</span></td><td><b>Durcissements.</b> Le jeton du serveur n'est pas comparé en temps constant ; deux variables d'environnement de Claude passent au terminal ; une injection de version n'échappe pas un caractère.<span class="src">serve.mjs:174,514 · vf-cockpit-terminal-env.mjs:18 · lu</span></td><td>Trois retouches.</td><td class="eff">S</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="note">Les risques déjà acceptés par arbitrage n'ont pas été rouverts : jeton lisible par tout processus local (poste à un seul utilisateur), injection de consigne dans l'agent des questions, shell du terminal sous votre compte. A-01 et B-01 élargissent toutefois la portée du premier au-delà de ce que l'arbitrage décrit.</div>
+    </div>
+  </details>
+</section>
+<section id="idees">
+  <h2>Idées et nouvelles fonctions</h2>
+  <div class="prose">
+    <p>Seize idées sont déjà inscrites au jalon (Phases 73 à 77), sans cadrage. Je ne les redécouvre pas : chaque ligne ci-dessous dit si elle est nouvelle, si elle précise une phase inscrite, ou si elle rouvre une de vos décisions.</p>
+    <h3>Cinq endroits où le cockpit peut être seul</h3>
+    <p>La veille a couvert quinze outils (la vue d'agents de Claude Code, Conductor, Cursor 3, Codex, GitHub Agent HQ, Warp, Factory, Devin, Amp, Langfuse, Braintrust…). Tous convergent vers une liste d'agents par état. Aucun ne fait ce qui suit, et le cockpit a déjà la matière pour chacun.</p>
+    <ol>
+      <li><strong>Une file d'attente classée par impact.</strong> Les blocages triés par le nombre de nœuds du plan qu'ils retiennent en aval. Le plan de mission est déjà lu ; il manque l'état « vous attend ».</li>
+      <li><strong>Une frise du dépôt à horloge commune.</strong> Toutes les sessions sur le même axe, avec les commits, les fusions et vos réponses comme événements. Les frises existantes s'arrêtent à une session.</li>
+      <li><strong>Un radar de collisions.</strong> Deux agents, ou deux worktrees, qui écrivent le même fichier ou le même module : l'alerte arrive avant la fusion, posée sur la carte du code. Sources locales : les cibles des outils d'écriture et la liste des fichiers modifiés de chaque arbre. L'assemblage de la v2.76.0 avait révélé trois rencontres invisibles tant que chaque branche était verte seule.</li>
+      <li><strong>La vivacité plutôt que le statut.</strong> Un état « au travail » qui décroît vers « silencieux » puis « suspect » faute de signe de vie, et un orphelin nommé comme tel. Des praticiens le réclament ; la veille ne l'a vu livré nulle part.</li>
+      <li><strong>Le coût par phase et par étage.</strong> Jetons, durée et coût agrégés par tête, manager et worker, puis par mission et par phase de la feuille de route. Ailleurs le coût s'arrête à la session.</li>
+    </ol>
+  </div>
+
+  <h3>Agents, code et socle</h3>
+  <div class="scroll-x">
+    <table class="w">
+      <thead><tr><th>Idée</th><th>Ce qu'elle apporte</th><th>Statut</th><th>Effort</th></tr></thead>
+      <tbody>
+        <tr><td><b>Régie</b> : liste par état, « À vous » en tête</td><td>Répond d'abord à « qui a besoin de moi ». Remplace le canevas de l'onglet Équipe.</td><td><span class="tag">nouveau</span></td><td class="eff">M</td></tr>
+        <tr><td><b>États officiels et vivacité</b></td><td>Fin des agents qui disparaissent et des sessions fantômes. Corrige D1, D2, D4.</td><td><span class="tag">nouveau</span></td><td class="eff">S</td></tr>
+        <tr><td><b>Fiche d'agent</b> avec fil daté</td><td>Durée, contexte, outils, erreurs, fichiers, dans l'ordre et à l'heure.</td><td><span class="tag">nouveau</span></td><td class="eff">S puis M</td></tr>
+        <tr><td><b>Frise des sessions</b></td><td>La journée d'un coup d'œil, les attentes hachurées, les commits posés dessus.</td><td><span class="tag">précise la Phase 74</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Relecture d'une mission</b> au curseur</td><td>Le curseur de la frise allume en même temps les fichiers touchés sur la carte Code et le nœud du plan.</td><td><span class="tag">Phase 74, lien nouveau</span></td><td class="eff">L</td></tr>
+        <tr><td><b>Coût, contexte, limites</b></td><td>Par agent, par étage, par phase. Une jauge des limites de 5 h et de 7 jours, et le temps d'agent perdu à vous attendre.</td><td><span class="tag">étend la Phase 74</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Notifications</b></td><td>Le titre de l'onglet devient « (2) vous attendent », l'icône porte une pastille, une notification du système en option. Trois motifs seulement : besoin d'une réponse, fin, échec.</td><td><span class="tag">nouveau</span></td><td class="eff">S</td></tr>
+        <tr><td><b>Ailleurs sur ce poste</b></td><td>Une ligne qui dit qu'une session d'un autre lab vous attend. Pendant l'audit, c'était le cas, et rien ne le signalait.</td><td><span class="tag">nouveau</span></td><td class="eff">S</td></tr>
+        <tr><td><b>Agir sur une session</b> : ouvrir, écrire, arrêter, bifurquer</td><td>Chaque action prépare une commande dans le terminal ; votre touche Entrée l'exécute.</td><td><span class="tag">rouvre « pas de terminal sur Équipe »</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Radar de collisions</b></td><td>Deux agents sur le même fichier, signalés avant la fusion.</td><td><span class="tag">nouveau, prolonge la Phase 75</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Empreinte en direct sur la carte Code</b></td><td>Les fichiers en cours d'écriture s'allument, avec le nom de l'agent.</td><td><span class="tag">Phase 75</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Depuis votre dernière visite</b></td><td>Phases avancées, commits, sessions finies, nouveaux blocages. À avancer : c'est la troisième question d'un pilote, après « qui m'attend » et « qui travaille ».</td><td><span class="tag">Phase 77, à avancer</span></td><td class="eff">S puis M</td></tr>
+        <tr><td><b>Résumé d'une session à la demande</b></td><td>« Que s'est-il passé ? » en cinq lignes, écrit par l'agent des questions à partir du fil réduit.</td><td><span class="tag">à arbitrer : pas de titre généré</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Revue par agent</b></td><td>Le diff de ce qu'un agent a changé, avec la portée « dernier tour ». C'est le goulot réel au-delà de cinq agents.</td><td><span class="tag">rouvre « détail sans diff »</span></td><td class="eff">L</td></tr>
+        <tr><td><b>Vue de plusieurs labs</b></td><td>Une coquille, plusieurs sources. Devient simple une fois les données sorties de la page.</td><td><span class="tag">nouveau</span></td><td class="eff">L</td></tr>
+        <tr><td><b>Journal d'événements par les hooks officiels</b></td><td>Un fichier en ajout seul, écrit même quand le serveur est arrêté. Le serveur le suit au lieu de relire les transcripts.</td><td><span class="tag">nouveau, socle</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Une route d'état en JSON</b></td><td>vf-signal, la page et un futur client lisent la même chose. Fin de la collecte en double.</td><td><span class="tag">nouveau, socle</span></td><td class="eff">M</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <h3>Interface</h3>
+  <div class="scroll-x">
+    <table class="w">
+      <thead><tr><th>Idée</th><th>Ce qu'elle apporte</th><th>Statut</th><th>Effort</th></tr></thead>
+      <tbody>
+        <tr><td><b>Projet en couloirs</b></td><td>Les phases rangées par état, lisibles à toute largeur. Corrige BL1 sans toucher au zoom.</td><td><span class="tag">nouveau</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Palette de commandes</b></td><td>Fichiers, phases, agents et actions dans un seul champ. Le clavier atteint tout, avant même que le canevas soit corrigé.</td><td><span class="tag">nouveau</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Bascule liste ou tableau</b> à chaque niveau</td><td>Triable, par défaut au téléphone. Les exigences se lisent comme une liste à cocher.</td><td><span class="tag">liste mobile connue du panel</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Minicarte et repères de bord</b></td><td>« 16 cartes par là ». On ne se perd plus dans la carte du code.</td><td><span class="tag">nouveau</span></td><td class="eff">S puis M</td></tr>
+        <tr><td><b>Mode focus</b></td><td>Sélectionner une carte recompose son seul voisinage, à taille lisible. Fin du « sélectionner puis zoomer ».</td><td><span class="tag">nouveau</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Lecteur de transcript plein cadre</b></td><td>Un fil daté, des filtres (messages, outils, erreurs), le suivi en direct.</td><td><span class="tag">nouveau</span></td><td class="eff">M</td></tr>
+        <tr><td><b>Barre d'état en pied</b></td><td>La branche entière, l'état du direct, le shell vivant avec « Terminer », l'heure de la dernière mise à jour. Corrige M9 et M10.</td><td><span class="tag">nouveau</span></td><td class="eff">S</td></tr>
+        <tr><td><b>Onglets sans rechargement</b></td><td>Les tiroirs et le zoom survivent au changement d'onglet ; « copier le lien de cette vue ».</td><td><span class="tag">nouveau, après le lot 1</span></td><td class="eff">M</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <div class="prose">
+    <h3>Deux pistes que je ne recommande pas maintenant</h3>
+    <ul>
+      <li><strong>Répondre à une permission depuis la page.</strong> Techniquement possible par les hooks, mais cela fait du cockpit un organe de décision, à l'opposé de votre règle du double geste. À garder pour après un audit de sécurité dédié.</li>
+      <li><strong>Le badge de PR et de CI.</strong> Les meilleurs outils dérivent l'état de preuves git et CI. Ici il faudrait lire le réseau, ce que vous avez écarté. L'équivalent local existe : l'état des gardes du dépôt et des hooks.</li>
+    </ul>
+    <h3>Un ajout, un retrait</h3>
+    <p>La règle de sobriété du projet demande que chaque ajout nomme son retrait. Ce plan en paie sept :</p>
+    <ul>
+      <li>le canevas de l'onglet Équipe et sa mise en page pour deux cartes ;</li>
+      <li>le nom de chaque agent écrit trois fois ;</li>
+      <li>la carte « Terminés depuis moins de 24 h », remplacée par « Terminé, à relire » et par la frise ;</li>
+      <li>la page Équipe reconstruite à chaque requête et rechargée en entier ;</li>
+      <li>la collecte refaite par vf-signal toutes les dix secondes ;</li>
+      <li>le second flux d'événements de chaque page ;</li>
+      <li>la copie renommée de 52 modules dans chaque lab.</li>
+    </ul>
+  </div>
+</section>
+
+<section id="trajectoire">
+  <h2>Par où commencer</h2>
+  <div class="prose">
+    <p>Quatre lots, dans cet ordre. Le premier ne demande aucune décision de conception : il fait dire vrai à l'écran actuel.</p>
+  </div>
+  <div class="lots">
+    <div class="lot">
+      <div class="k">Lot 0</div>
+      <h3>Dire vrai</h3>
+      <p>Des corrections d'un commit chacune.</p>
+      <ul>
+        <li>État officiel des sessions (D2, D6)</li>
+        <li>Un agent non fini reste affiché (D1, D3)</li>
+        <li>Orphelin nommé (D4), plans <code>dag-*.json</code> lus (D5)</li>
+        <li>Transcript en un fil daté (D7, D8)</li>
+        <li>Un flux par page (H1), journal du serveur (H3)</li>
+        <li>Traduction hors des données (H4)</li>
+        <li>« Demander » borné à ses sessions (A-01, B-02)</li>
+      </ul>
+    </div>
+    <div class="lot">
+      <div class="k">Lot 1</div>
+      <h3>Un socle</h3>
+      <p>Une collecte, un flux, une route d'état.</p>
+      <ul>
+        <li>Collecte asynchrone, hors de la boucle (H2)</li>
+        <li>Index incrémental des transcripts</li>
+        <li>Route d'état en JSON, lue aussi par vf-signal (M1)</li>
+        <li>Données hors de la page (M2, M3)</li>
+        <li>Serveur lancé depuis le module (M4, A-03)</li>
+        <li>Liens symboliques confinés (A-02)</li>
+      </ul>
+    </div>
+    <div class="lot">
+      <div class="k">Lot 2</div>
+      <h3>Régie et frise</h3>
+      <p>L'onglet Équipe des maquettes.</p>
+      <ul>
+        <li>Régie : « À vous », arbre, « à relire »</li>
+        <li>Fiche d'agent</li>
+        <li>Frise, en cadrant la Phase 74 dessus</li>
+        <li>Coût et contexte par agent</li>
+        <li>Notifications dans l'onglet</li>
+      </ul>
+    </div>
+    <div class="lot">
+      <div class="k">Lot 3</div>
+      <h3>Agir et prévenir</h3>
+      <p>Ce qui fait du cockpit un poste de pilotage.</p>
+      <ul>
+        <li>Actions sur une session, par le double geste</li>
+        <li>Radar de collisions sur la carte Code</li>
+        <li>Coût par phase et par étage</li>
+        <li>Relecture d'une mission</li>
+        <li>Revue par agent, si vous rouvrez la question du diff</li>
+      </ul>
+    </div>
+  </div>
+  <div class="prose">
+    <p>Côté feuille de route : le lot 0 se traite hors phase. Le lot 1 mérite d'être la première vague de la Phase 74, parce que la frise, les coûts et les notifications deviennent alors des lectures d'un même index. La file « À vous » rejoint naturellement la Phase 73, qui prévoit déjà les arbitrages en attente et les orphelins.</p>
+  </div>
+</section>
+<section id="limites">
+  <h2>À confirmer, et limites de cet audit</h2>
+  <div class="prose">
+    <h3>Cinq décisions qui vous reviennent</h3>
+    <ol>
+      <li><strong>Le mode de lancement « hérité du poste ».</strong> Il peut valoir le mode sans permissions. Il vient de votre réponse libre « choix + hérité don bypass », que le manager a lue ainsi sans vous reposer la question (registre de la Phase 72, décision P72-D-02). À confirmer, ou à retirer.</li>
+      <li><strong>Conserver un index sur disque.</strong> Sans lui, pas de frise au-delà de quelques heures. Cela rouvre la fenêtre de 24 heures de la Phase 69. Heures, durées, jetons et verbes tiennent dans vos limites de confidentialité actuelles ; les sorties d'outil restent dehors.</li>
+      <li><strong>Des actions depuis l'onglet Équipe.</strong> Vous aviez écarté le terminal de cet onglet. Ouvrir, écrire ou arrêter une session depuis sa fiche l'y ramène, par le double geste.</li>
+      <li><strong>Dépendre de la vue d'agents de Claude Code.</strong> La commande qui donne l'état officiel est documentée mais encore en aperçu : son format peut changer. Les transcripts restent le repli, derrière le contrat de forme existant.</li>
+      <li><strong>Le moteur vendorisé : suivre l'amont, ou assumer le fork.</strong> Les deux se défendent. Ce qui coûte, c'est de ne pas choisir.</li>
+    </ol>
+    <h3>Ce que l'audit n'a pas vérifié</h3>
+    <ul>
+      <li>Windows et Linux, Safari et Firefox, un lecteur d'écran, un second compte sur le poste.</li>
+      <li>A-01 et A-03 de bout en bout : lus dans le code, non exécutés. Aucune question n'a été envoyée à « Demander ».</li>
+      <li>Les suites de tests n'ont pas été rejouées ; leurs chiffres sont comptés.</li>
+      <li>Les coûts en jours (montée de version du moteur, très gros dépôts) sont des estimations.</li>
+      <li>Le parcours en direct a porté sur un seul lab, celui-ci.</li>
+      <li>Le compte « 127 propositions du panel livrées » date du 8 novembre ; des correctifs sont passés depuis, sans recomptage.</li>
+    </ul>
+  </div>
+</section>
+</div>
+<script>
+// Typographie française : espaces insécables avant la ponctuation haute, dans les guillemets et les nombres.
+(function () {
+  var skip = { CODE: 1, PRE: 1, SCRIPT: 1, STYLE: 1, TIME: 1, svg: 1, text: 1 };
+  var w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+  var n, list = [];
+  while ((n = w.nextNode())) list.push(n);
+  list.forEach(function (t) {
+    for (var p = t.parentNode; p && p !== document.body; p = p.parentNode) { if (skip[p.nodeName]) return; }
+    var s = t.nodeValue;
+    var r = s
+      .replace(/ ([:;!?»%])/g, ' $1')
+      .replace(/« /g, '« ')
+      .replace(/(\d) (\d{3})(?!\d)/g, '$1 $2')
+      .replace(/(\d) (h|min|s|j|ms|px|k|Ko|Mo|Go|Mio|\$)(?![A-Za-zÀ-ÿ])/g, '$1 $2');
+    if (r !== s) t.nodeValue = r;
+  });
+})();
+</script>
+
+</body>
+</html>

@@ -1,0 +1,3 @@
+- [Reprise après crash : transcripts](reprise-apres-crash-transcripts.md) — scratchpad vidé au redémarrage, mandats et maquettes se reconstituent depuis ~/.claude/projects/<session>/subagents/*.jsonl
+- [Panel juges-utilisateurs, banc Playwright](panel-utilisateurs-juges-playwright.md) — playwright@1.60.0 = Chromium en cache, lab = clone local, juges general-purpose, 782 fichiers et non 1300
+- [Banc panel cockpit + faux claude](banc-panel-cockpit-faux-claude.md) — ZDOTDIR isolé sinon le zshrc rend le vrai claude, FLOORPLAN_CLAUDE pour le chat, amorce 60 s, panneau Format masqué si lab conforme

@@ -42,3 +42,10 @@ reprennent pas le découpage du code jugé, et chaque caractère hors liste blan
 Après correction du `\r`, la re-revue a trouvé deux voisins non figés : l'espacement Unicode (U+00A0, U+3000) et `trim()`,
 qui a sa propre définition de l'espace. Quand un correctif resserre un découpage, commander aussi deux mutants : la famille
 Unicode seule, et la lecture des extrémités.
+
+**Récidive (2026-11-06/07, retours du panel, lot 8 « Entrée tenue ») :** une garde de sécurité posée sur un geste
+(« Préparer » rend le focus au terminal) puis étendue bouton par bouton (Annuler, Coller, Relancer) a laissé
+passer un retour de focus venu du PARENT (`cadre.focus()` de la pastille du tiroir → `window focus`). Trois
+revues pour arriver au point fixe : armer la garde sur l'événement `focus` du terminal lui-même, indépendant de la
+source. Pour une garde « après retour du focus », exiger d'emblée le point fixe sur la cible, plus un témoin par
+SOURCE (bouton local, parent, retour d'onglet), jamais une garde par appelant.

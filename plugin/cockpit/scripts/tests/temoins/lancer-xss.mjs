@@ -10,7 +10,7 @@
 //   titres : { mode, url } — page P NON compromise, CSP en place : violations comptées, window.__titre3 indéfini, témoin de la mesure (une balise insérée par la suite est comptée).
 import { pathToFileURL } from 'node:url';
 import http from 'node:http';
-const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const { executer, pause, attendreValeur, attendreEtStabiliser } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, brut] = process.argv;
 const a = JSON.parse(brut);
 
@@ -35,11 +35,11 @@ await executer(chrome, async (s) => {
     res.actifApresForge = await s.ev('navigator.userActivation.isActive');
     const c = await s.ev(`(() => { const b = document.getElementById('envoi').getBoundingClientRect(); return { x: b.left + b.width / 2, y: b.top + b.height / 2 }; })()`);
     await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); await souris('mouseReleased', c.x, c.y);
-    for (let i = 0; i < 30 && (await s.ev('window.__retenu.length')) === res.forgeClic; i++) await pause(100);
+    await attendreValeur(() => s.ev('window.__retenu.length'), (n) => n > res.forgeClic, { pas: 100, max: 10000 }); // l'UUID du vrai clic est lu une fois retenu (fetch, flux, observateur), pas dans une fenêtre de 3 s
     res.humain = await s.ev('window.__retenu.length'); res.actifApresClic = await s.ev('navigator.userActivation.isActive');
     res.premier = await s.ev('window.__retenu[0] || null');
     // résiduel accepté (P72-D-21) : pendant l'activation laissée par le geste réel, une requête de la charge est retenue ; mesuré, non asserté comme défaut
-    res.residuel = (await s.ev(FORGE)) - res.humain;
+    await s.ev(FORGE); res.residuel = (await attendreEtStabiliser(() => s.ev('window.__retenu.length'), (n) => n > res.humain, { pas: 250, max: 3000 })) - res.humain; // la valeur retenue est lue une fois posée : un UUID en retard ne fausse plus le résiduel
     await s.attendre('navigator.userActivation.isActive === false', "l'activation transitoire expire", 15000);
     const avant = await s.ev('JSON.stringify(window.__retenu)');
     res.apres = await s.ev(FORGE); res.inchange = (await s.ev('JSON.stringify(window.__retenu)')) === avant;
@@ -116,7 +116,9 @@ await executer(chrome, async (s) => {
   // la même tentative window.open, avec un geste utilisateur (le bloqueur de fenêtres ne l'arrête plus) : la fenêtre s'ouvre-t-elle, son stockage est-il lisible ?
   const g = await s.send('Runtime.evaluate', { userGesture: true, awaitPromise: true, returnByValue: true, expression: `(async () => {
     const w = window.open('http://127.0.0.1:' + window.__xss.q + '/', '_blank'); if (!w) return { open: 'bloque' };
-    await new Promise((r) => setTimeout(r, 1500)); let st, ec; try { w.localStorage.getItem('${a.cle}'); st = 'lisible'; } catch (x) { st = x.name; }
+    const lit = () => { try { w.localStorage.getItem('${a.cle}'); return 'lisible'; } catch (x) { return x.name; } };
+    for (let i = 0; i < 80 && lit() === 'lisible'; i++) await new Promise((r) => setTimeout(r, 100));
+    let st = lit(), ec;
     try { w.localStorage.setItem('${a.cle}', 'bypassPermissions'); ec = 'inscrit'; } catch (x) { ec = x.name; }
     try { w.postMessage('lancer', '*'); } catch (x) { void x; } return { open: 'ouvert', stockage: st, ecriture: ec }; })()` });
   res.geste = g && g.result && g.result.value;

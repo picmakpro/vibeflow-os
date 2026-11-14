@@ -184,7 +184,7 @@ G "$WORK/o1.json" 'j.equipe' > "$WORK/o1-equipe.json"
 assert_eq "S2.2 — equipe valide cockpit-who@2" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-who@2 "$WORK/o1-equipe.json")" "OK"
 node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));j.missions[0].vie={doing:"x"};fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$WORK/o1.json" "$WORK/o1-doing.json" 2>/dev/null
 assert_has "S2.3 — témoin : un champ doing glissé en profondeur est refusé" "$(node "$AUX/validate.mjs" "$IFACE" vibeflow/cockpit-signal@1 "$WORK/o1-doing.json")" "clé interdite présente : doing"
-assert_eq "S2.4 — le contrat déclare schema dans requis et les quatre interdits" "$(G "$IFACE" 'j.schemas["vibeflow/cockpit-signal@1"]?.requis?.schema+"|"+(j.schemas["vibeflow/cockpit-signal@1"]?.interdits||[]).join()')" "string|doing,mandat,messages,outils"
+assert_eq "S2.4 — le contrat déclare schema dans requis et les cinq interdits (dont fil, AUDC-D8)" "$(G "$IFACE" 'j.schemas["vibeflow/cockpit-signal@1"]?.requis?.schema+"|"+(j.schemas["vibeflow/cockpit-signal@1"]?.interdits||[]).join()')" "string|doing,mandat,messages,outils,fil"
 
 echo "=== S3 — contenu ==="
 S="$WORK/o1.json"

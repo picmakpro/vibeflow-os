@@ -1,0 +1,94 @@
+{
+  "ph-1@deux": {
+    "exigences": [
+      {
+        "id": "DEUX-01",
+        "texte": "exigence de l'autre compartiment",
+        "cochee": false,
+        "cible": null
+      }
+    ],
+    "couverture": {
+      "f:.planning/workstreams/deux/phases/01-autre/01-01-PLAN.md": [
+        {
+          "id": "DEUX-01",
+          "texte": "exigence de l'autre compartiment",
+          "cochee": false,
+          "cible": null
+        }
+      ]
+    }
+  },
+  "ph-1@un": {
+    "exigences": [
+      {
+        "id": "UN-01",
+        "texte": "première exigence",
+        "cochee": true,
+        "cible": null
+      },
+      {
+        "id": "UN-02",
+        "texte": "Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au…",
+        "cochee": false,
+        "cible": null
+      }
+    ],
+    "couverture": {
+      "f:.planning/workstreams/un/phases/01-socle/01-01-PLAN.md": [
+        {
+          "id": "UN-01",
+          "texte": "première exigence",
+          "cochee": true,
+          "cible": null
+        },
+        {
+          "id": "UN-02",
+          "texte": "Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au libellé long. Exigence au…",
+          "cochee": false,
+          "cible": null
+        }
+      ],
+      "f:.planning/workstreams/un/phases/01-socle/01-02-PLAN.md": [
+        {
+          "id": "UN-01",
+          "texte": "première exigence",
+          "cochee": true,
+          "cible": null
+        }
+      ]
+    }
+  },
+  "ph-2": {
+    "exigences": [
+      {
+        "id": "OLD-09",
+        "texte": "exigence d'archive",
+        "cochee": true,
+        "cible": null
+      },
+      {
+        "id": "UN-03",
+        "texte": "troisième",
+        "cochee": true,
+        "cible": null
+      }
+    ],
+    "couverture": {
+      "f:.planning/workstreams/un/phases/02-suite/02-01-PLAN.md": [
+        {
+          "id": "UN-03",
+          "texte": "troisième",
+          "cochee": true,
+          "cible": null
+        },
+        {
+          "id": "OLD-09",
+          "texte": "exigence d'archive",
+          "cochee": true,
+          "cible": null
+        }
+      ]
+    }
+  }
+}

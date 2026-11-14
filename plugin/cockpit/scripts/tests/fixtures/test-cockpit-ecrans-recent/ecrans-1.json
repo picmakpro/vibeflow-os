@@ -1,0 +1,1 @@
+{ "graph": { "nodes": [ { "id": "app", "label": "App" } ], "screens": [ { "id": "screen:app:/vraie/:id", "url": "/vraie/:id", "file": "routes/x.tsx", "app": "app", "name": "Vraie", "description": "", "behind": [ { "id": "f:routes/x.tsx", "note": "The screen itself", "kind": "screen" }, { "id": "f:y.tsx", "note": "part", "kind": "part" } ] } ] } }

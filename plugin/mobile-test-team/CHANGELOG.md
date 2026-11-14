@@ -1,5 +1,9 @@
 # Changelog — mobile-test-team
 
+## [v1.4.10] — 2026-11-14 (fin de mandat, #223 ; livrée par /vf-update) — non publiée
+
+**Patch** (aucune release racine : groupée). Bump de VERSION : à version égale, `update_module` ne resynchronise que scripts et hooks et ne recopie jamais les agents — sans bump, /vf-update ne livrait pas les corps d'agent modifiés ni le renvoi à `team-kernel.md` § Fin de mandat. Issue #223 : des workers restaient vivants après leur travail (tâche de fond jamais terminée, commande de premier plan basculée en fond, processus survivants dans le worktree). Les agents `vf-test-orchestrator`, `vf-test-runner`, `vf-app-fixer` reçoivent des blocs **Fin de mandat** (rien en attente d'une tâche de fond, attente au premier plan bornée par une échéance, commit avant le rapport, aucun processus à soi vivant au rapport) et **Clôture des workers** / **Balayage de sortie** selon leur rôle, avec renvoi vers `conductor/references/team-kernel.md` § Fin de mandat (source unique). Aucune ligne ajoutée au compteur du budget d'instructions.
+
 ## [v1.4.9] — 2026-11-05 (fin de tour inerte) — non publiée
 
 **Patch.** Correctif des workers orphelins des 3-5 novembre : un agent qui rend la main pendant qu'une commande Bash tourne en fond (bascule automatique du timeout comprise) reste vivant sans que personne ne l'arrête. `TaskStop` ajouté au champ `tools:` et une ligne de règle ajoutée, avec renvoi vers `conductor/references/team-kernel.md` § Fin de tour inerte (source unique) : vf-test-orchestrator, vf-test-runner, vf-app-fixer. Arbitrages Samuel, AskUserQuestion session principale, 2026-11-05 : « Mandat maintenant » (correctif) ; hook `SubagentStop` « Plus tard, en spike » (`.planning/BACKLOG.md`).  `vf-test-orchestrator` reçoit `SendMessage` (relais des enfants vivants à la session principale).

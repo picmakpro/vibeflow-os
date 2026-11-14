@@ -1,0 +1,207 @@
+{
+  "nodes": [
+    {
+      "id": "design-spec",
+      "step": "SPEC design complète du cockpit (AI, interaction, tokens, états, a11y)",
+      "stage": "craft",
+      "deps": [],
+      "scope": [
+        "plugin/vf-cockpit/references/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "vendor",
+      "step": "vendorisation Mermaid v11 ESM + note de taille",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/vf-cockpit/assets/vendor/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-core",
+      "step": "scaffolding module + serveur Node zéro-dep + parsers + tests",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/vf-cockpit/server/",
+        "plugin/vf-cockpit/module.json",
+        "plugin/vf-cockpit/VERSION",
+        "plugin/vf-cockpit/tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-ui",
+      "step": "front cockpit implémentant la SPEC design",
+      "stage": "exec",
+      "deps": [
+        "design-spec",
+        "vendor",
+        "exec-core"
+      ],
+      "scope": [
+        "plugin/vf-cockpit/assets/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "exec-skill",
+      "step": "SKILL.md + commande /vf-cockpit + câblage marketplace",
+      "stage": "exec",
+      "deps": [
+        "exec-core"
+      ],
+      "scope": [
+        "plugin/vf-cockpit/SKILL.md",
+        "plugin/commands/",
+        ".claude-plugin/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "verif",
+      "step": "exécution réelle du serveur + endpoints + check-agents.sh",
+      "stage": "verif",
+      "deps": [
+        "exec-ui",
+        "exec-skill"
+      ],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "critique",
+      "step": "critique design scorée /100 (seuil 80)",
+      "stage": "verif",
+      "deps": [
+        "exec-ui"
+      ],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "revue",
+      "step": "revue de code du diff final (robustesse parsers, sécurité, échappement HTML)",
+      "stage": "verif",
+      "deps": [
+        "exec-ui",
+        "exec-skill"
+      ],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "docs",
+      "step": "README + CHANGELOG du module, hygiène documentaire",
+      "stage": "docs",
+      "deps": [
+        "verif",
+        "critique",
+        "revue"
+      ],
+      "scope": [
+        "plugin/vf-cockpit/README.md",
+        "plugin/vf-cockpit/CHANGELOG.md",
+        ".planning/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-scripts",
+      "step": "correctifs ciblés serveur+tests (SSE, watch, TOCTOU, orphelin, tests tautologiques)",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/vf-cockpit/scripts/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-ui",
+      "step": "correctifs ciblés UI (cible 44px, contrastes AA, text-xl milestone) + spec",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/vf-cockpit/references/ui/",
+        "plugin/vf-cockpit/references/DESIGN-SPEC.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "recritique",
+      "step": "re-score design après correctifs a11y",
+      "stage": "verif",
+      "deps": [
+        "fix-ui"
+      ],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "reverif",
+      "step": "re-vérification finale après correctifs (suite, gates, install e2e)",
+      "stage": "verif",
+      "deps": [
+        "fix-scripts",
+        "fix-ui"
+      ],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-guard",
+      "step": "garde lecture seule : allowlist fs (point fixe) au lieu d'un denylist énumératif",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/vf-cockpit/scripts/tests/"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-ui2",
+      "step": "régression en-tête (débordement) + 3 mineurs a11y/tokens/spec",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/vf-cockpit/references/ui/",
+        "plugin/vf-cockpit/references/DESIGN-SPEC.md"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "critique3",
+      "step": "confirmation finale design — non-régression après fix-ui2",
+      "stage": "verif",
+      "deps": [],
+      "scope": [
+        "(lecture seule)"
+      ],
+      "status": "done"
+    },
+    {
+      "id": "fix-ui3",
+      "step": "message de verrou périmé tronqué + 2 mineurs",
+      "stage": "exec",
+      "deps": [],
+      "scope": [
+        "plugin/vf-cockpit/references/ui/",
+        "plugin/vf-cockpit/references/DESIGN-SPEC.md"
+      ],
+      "status": "done"
+    }
+  ]
+}

@@ -118,7 +118,7 @@ seul usage : **Bash sert uniquement à `check-prd.sh`**, appelé comme décrit p
 d'écrire (`disallowedTools` ne restreint pas Bash) : l'absence d'écriture est ici un engagement de prompt que tu tiens, comme
 le juge de l'équipe design, pas une barrière. Aucune autre commande, aucune écriture, aucun réseau. Tu n'as pas l'outil Task :
 tu ne dispatches personne. Effet de bord assumé : tu ne peux plus écrire ton fichier de mémoire, tu continues de le lire. Ne suggère jamais « je peux le corriger ».
-**Fin de tour inerte** : rends la main sans tâche de fond vivante (bascule auto du timeout Bash comprise) ; commandes bornées, `TaskStop` avant le rapport, sinon `blocked` — `team-kernel.md` §Fin de tour inerte.
+**Fin de mandat** : aucune main rendue en attente d'une tâche de fond, bascule automatique comprise (`TaskStop(<id de tâche>)`) ; attente au premier plan, bornée par une échéance ; commit avant tout rejeu long ; au rapport, tes processus arrêtés par PID consigné, sans motif de commande, dans le même tour, sinon `blocked` — `team-kernel.md` §Fin de mandat.
 
 ## Retour
 

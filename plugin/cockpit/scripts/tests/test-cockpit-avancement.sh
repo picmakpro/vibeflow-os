@@ -236,6 +236,24 @@ printf '# Recette\n\n**Statut : FAITE — close**\n' | wr "$B/phases/05-cinq/05-
 echo ok > "$B/phases/05-cinq/05-VERIFICATION.md"
 initgit "$L4"
 
+# lab L7 (PU-G-098) : phases sans plan ni mission vivante — rien commencé : « cadrage, plan, exécution » précèdent le reste ; un CONTEXT retire « cadrage » ; une mission vivante ou un plan les retire
+L7="$WORK/lab-l7"; B="$L7/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+## Phases
+
+- [ ] **Phase 1: Vide** - rien
+- [ ] **Phase 2: Cadrée** - un CONTEXT
+- [ ] **Phase 3: Vivante** - mission en cours, aucun plan
+- [ ] **Phase 4: Planifiée** - un plan
+MD
+mkdir -p "$B/phases/01-vide"
+echo ctx | wr "$B/phases/02-cadree/02-CONTEXT.md"
+wr "$B/missions/MISSION-3.dag.json" <<'JSON'
+{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}
+JSON
+plans "$B/phases/04-planifiee" 04 1 0
+initgit "$L7"
+
 # lab L5 : mutation — phase 1 cochée, phase 2 avec un PLAN sans SUMMARY, STATE sur la phase 2
 L5="$WORK/lab-l5"; B="$L5/.planning"
 wr "$B/ROADMAP.md" <<'MD'
@@ -264,6 +282,7 @@ graph "$L" "$WORK/gl.json"; plan "$L" "$WORK/pl.json"
 graph "$L3" "$WORK/g3.json"
 graph "$L4" "$WORK/g4.json"; plan "$L4" "$WORK/p4.json"
 graph "$L5" "$WORK/g5.json"
+graph "$L7" "$WORK/g7.json"; plan "$L7" "$WORK/p7.json"
 plan "$L6" "$WORK/p6.json"
 
 # ---------- A0 — contrôles positifs des fixtures (verts avant et après le code) ----------
@@ -314,6 +333,13 @@ for i in 1 2 3 4 5; do
   case $i in 1) e='[]';; 2|3) e='["verification","cloture"]';; 4) e='["recette","verification","cloture"]';; 5) e='["cloture"]';; esac
   assert_eq "A5.$i — reste de la phase $i du lab L4" "$(G "$WORK/p4.json" "JSON.stringify(j.phases[$((i-1))].avancement?.reste)")" "$e"
 done
+
+# PU-G-098 : une phase sans plan ni mission vivante dit ce qui reste depuis le début
+for i in 1 2 3 4; do
+  case $i in 1) e='["cadrage","plan","execution","verification","cloture"]';; 2) e='["plan","execution","verification","cloture"]';; 3|4) e='["verification","cloture"]';; esac
+  assert_eq "A5.1$i — reste de la phase $i du lab L7 (PU-G-098)" "$(G "$WORK/p7.json" "JSON.stringify(j.phases[$((i-1))].avancement?.reste)")" "$e"
+done
+assert_eq "A5.15 — la carte de la phase 1 du lab L7 écrit « Reste : cadrage, plan, exécution, vérification, clôture. », celle de la phase 2 « plan, exécution, vérification, clôture »" "$(NDF "$WORK/g7.json" ph-1 .details | grep -c 'Reste : cadrage, plan, exécution, vérification, clôture\.')|$(NDF "$WORK/g7.json" ph-2 .details | grep -c 'Reste : plan, exécution, vérification, clôture\.')|$(NDF "$WORK/g7.json" ph-4 .details | grep -c 'Reste : vérification, clôture\.')" "1|1|1"
 
 # ---------- A6 — aucune connexion sortante (T-69-11) ----------
 echo "=== A6 — aucune connexion sortante ==="
@@ -452,15 +478,16 @@ echo "=== A14 — lecture bornée des fichiers du dépôt ==="
 assert_eq "A14.0 — contrôle positif : sans lien spécial, le graphe se rend (1 plan, enfant borné)" "$(QB "$SCRIPTS" "$L10" "$NPLANS")" "rendu|1"
 assert_eq "A14.1 — contrôle positif : lab partitionné sans lien, le graphe se rend" "$(QB "$SCRIPTS" "$L11" "$NNODES")" "rendu|true"
 assert_eq "A14.2 — le source de project.mjs n'a plus de lecture à lui (read partagé de planning)" "$(grep -c 'const read = ' "$SCRIPTS/vf-cockpit-project.mjs")" "0"
-ln -s /dev/zero "$B/phases/01-a/01-02-PLAN.md"; ln -s /dev/zero "$B11/active-workstream"
+# AUDC-A-02 : le PLAN et le pointeur sont des liens vers un fichier spécial (tube) DANS le lab — le confinement à la racine réelle ne les coupe pas, seule la garde de type le fait (un lien sortant est écarté avant : test-cockpit-confinement.sh, familles A et N)
+mkfifo "$B/phases/01-a/tube-cible"; ln -s tube-cible "$B/phases/01-a/01-02-PLAN.md"; mkfifo "$B11/tube-pointeur"; ln -s tube-pointeur "$B11/active-workstream"
 mut gardeplan vf-cockpit-planning.mjs "return st.isFile() && st.size <= MAX_LECTURE ? fs.readFileSync(f, 'utf8') : '';" "return fs.readFileSync(f, 'utf8');" >/dev/null
 mut gardepointeur vf-cockpit-paths.mjs "st.isFile() && st.size <= 4096 ? fs.readFileSync(pf, 'utf8').trim() : ''" "fs.readFileSync(pf, 'utf8').trim()" > "$WORK/ancre-pointeur.txt"
 R1="$(QB "$SCRIPTS" "$L10" "$NPLANS")"; M1="$(QB "$WORK/mut-gardeplan" "$L10" "$NPLANS")"
 R2="$(QB "$SCRIPTS" "$L11" "$NNODES")"; M2="$(QB "$WORK/mut-gardepointeur" "$L11" "$NNODES")"
-rm -f "$B/phases/01-a/01-02-PLAN.md" "$B11/active-workstream"
-assert_eq "A14.3 — un PLAN lié à /dev/zero ne bloque pas le graphe Projet (les deux plans sont listés)" "$R1" "rendu|2"
+rm -f "$B/phases/01-a/01-02-PLAN.md" "$B/phases/01-a/tube-cible" "$B11/active-workstream" "$B11/tube-pointeur"
+assert_eq "A14.3 — un PLAN lié à un tube du lab ne bloque pas le graphe Projet (les deux plans sont listés)" "$R1" "rendu|2"
 assert_eq "A14.4 — mutant : lecture sans contrôle du type -> le graphe est bloqué (SIGKILL), détecté" "$M1" "bloqué|illisible"
-assert_eq "A14.5 — un pointeur active-workstream lié à /dev/zero ne bloque pas la résolution du compartiment" "$R2" "rendu|true"
+assert_eq "A14.5 — un pointeur active-workstream lié à un tube du lab ne bloque pas la résolution du compartiment" "$R2" "rendu|true"
 assert_eq "A14.6 — mutant : pointeur lu sans contrôle (ancre présente) -> bloqué, détecté" "$(cat "$WORK/ancre-pointeur.txt")|$M2" "muté|bloqué|illisible"
 
 echo ""

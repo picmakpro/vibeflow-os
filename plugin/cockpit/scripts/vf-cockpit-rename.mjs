@@ -6,6 +6,9 @@
 // Exports : REGLES, renommerTexte(texte), renommerHtml(html), compterOccurrences(texte), MARQUEUR_LICENCE.
 import { decouper } from './vf-cockpit-embed.mjs';
 
+// marqueur de début de la zone de données de la page du MOTEUR (nom amont) : seul fichier, avec les règles ci-dessous, à le nommer
+const DEBUT_PAGE_MOTEUR = '<script>window.FLOORPLAN = ';
+
 export const MARQUEUR_LICENCE = 'vibeflow:licence-tierce';
 // du plus spécifique au plus général : l'ordre fait le sens
 export const REGLES = [
@@ -26,6 +29,12 @@ export function renommerTexte(texte) {
 // seules les parties avant et après la zone de données sont renommées : les données du lab restent intactes
 export function renommerHtml(html) {
   const { avant, donnees, apres } = decouper(html);
+  return renommerTexte(avant) + donnees + renommerTexte(apres);
+}
+
+// la page produite par le moteur : renommée hors zone de données, qui est ensuite remplie sous son nom VibeFlow (A48 : le renommage précède l'insertion)
+export function renommerPageMoteur(html) {
+  const { avant, donnees, apres } = decouper(html, DEBUT_PAGE_MOTEUR);
   return renommerTexte(avant) + donnees + renommerTexte(apres);
 }
 

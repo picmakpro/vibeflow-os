@@ -21,13 +21,18 @@
 //   couvert = la carte de visite recouvre la cible · visible = la cible n'est pas entièrement dans la fenêtre · entier = le texte de l'étape n'a pas sa fin (FINDETEXTE) alors que sa source la porte · coupe = le texte finit par « … »
 //   surfaces = noms des surfaces fixes (#zoom, #panel, #context, header, #ask, contour de la cible) que la carte de visite recouvre : vide à chaque étape, à toute largeur, visite ouverte d'office ou par l'API
 //   selectionne = la visite a sélectionné quelque chose (le panneau montre alors le détail d'une carte au lieu de la vue d'ensemble) · toutLibre = une carte du graphe sort de la zone libre à gauche du panneau, visite active (critère de R1) · dansZone = la carte ciblée sort de la zone libre de la carte (sous le panneau, l'en-tête ou la barre de question ; 70-07, grandes cartes) · tient = la carte de visite sort de la fenêtre · passer = aucun bouton « Passer » visible dans la carte · repere = texte « n sur N » lu · anglais = mots témoins anglais (liste de F11) dans le texte de la carte de visite.
-import { executer, pause } from './chrome-session.mjs';
+import { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser } from './chrome-session.mjs';
 const [, , chrome, url, largeurs, options = ''] = process.argv;
 const recharge = /recharge/.test(options), passer = /passer/.test(options), panneau = /panneau/.test(options), equipe = /equipe/.test(options), echap = /echap/.test(options), police = /police/.test(options), dejavu = /dejavu/.test(options), titrehaut = /titrehaut/.test(options), tangent = /tangent/.test(options), cartehaute = /cartehaute/.test(options);
 const DEJAVU_DIR = process.env.VF_DEJAVU_DIR || '';
 const HAUT = { 390: 844, 768: 1024, 800: 600, 1024: 768, 1440: 900 };
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlowTour && !!document.getElementById('tour-btn')";
 const INIT = "!!window.__vfModele && !!window.__vfModele.modele";
+// signature de calme (même grain que CALME de chrome-responsive.mjs) : boîte du graphe, de la carte de visite, transformation, classe « anim » du viewport, repère « n sur N » affiché
+const CALME = `(() => { const b = (e) => { const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].map(Math.round); }; const n = [...document.querySelectorAll('#svg g.node')].map(b); const T = document.getElementById('tour'); const t = window.VibeFlow && window.VibeFlow.state.t; const v = document.getElementById('viewport');
+  return { n: n.length ? [Math.min(...n.map((x) => x[0])), Math.min(...n.map((x) => x[1])), Math.max(...n.map((x) => x[2])), Math.max(...n.map((x) => x[3]))] : null, tour: T && !T.hidden ? b(T) : null, t: t && [t.k, t.x, t.y].map((x) => Math.round(x * 100)), anim: !!v && v.classList.contains('anim'), rep: ((document.querySelector('#tour .tk') || {}).textContent || '') }; })()`;
+// géométrie des surfaces fixes : posée quand deux relevés espacés sont identiques (styles injectés par les options, transitions de #ask et du panneau)
+const SURFACES = `(() => { const b = (id) => { const e = document.getElementById(id); if (!e) return null; const r = e.getBoundingClientRect(); return [r.left, r.top, r.right, r.bottom].map(Math.round); }; return ['panel', 'context', 'ask', 'svg', 'zoom'].map(b); })()`;
 const DONNEE = `(() => { const G = window.VibeFlow.graph; const long = (n) => 'RESUME-' + n + ' Ce résumé de test est volontairement très long : il dépasse deux cent trente caractères pour que la visite le coupe, ou le montre entier. Il continue encore un peu pour être sûr de passer la limite, puis il se termine ici : FINDETEXTE';
   for (const n of G.nodes) n.summary = long(n.id); G.project = G.project || {}; G.project.summary = long('projet'); return G.nodes.length; })()`;
 const MESURE = `(() => {
@@ -102,15 +107,16 @@ await executer(chrome, async (s) => {
     await s.attendre(`innerWidth === ${w}`, `largeur ${w} appliquée`);
     await s.naviguer(url); await s.attendre(PRET, `page prête à ${w} px`); await s.attendre(INIT, `lab connu à ${w} px`);
     await s.attendre(`document.documentElement.lang === 'fr'`, `page en français à ${w} px`);
-    await pause(1200); // le démarrage d'office attend 700 ms après le rendu
+    // le démarrage d'office attend 700 ms après le rendu (plus sous un runner lent) : on attend qu'il ait eu lieu (plafond 3 s : l'onglet Équipe n'ouvre rien), PUIS on ferme
+    await attendreValeur(() => s.ev('window.VibeFlowTour.active()'), (v) => v === true, { max: 3000 });
     await s.ev('window.VibeFlowTour.end()');
     if (echap) {
-      await pause(1200); await s.ev('window.VibeFlowTour.end()'); await pause(500);
+      await attendreValeur(() => s.ev('window.VibeFlowTour.active()'), (v) => v === false, { max: 3000 });
       const T = () => s.ev("({ tiroir: !document.body.classList.contains('no-panel'), tour: window.VibeFlowTour.active() })");
       const esc = () => s.ev("document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))");
-      await s.ev("[...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0).dispatchEvent(new MouseEvent('click', { bubbles: true }))"); await pause(600);
-      const ouvert = await T(); await s.ev('window.VibeFlowTour.start()'); await pause(1200); const demarree = await T();
-      await esc(); await pause(500); const e1 = await T(); await esc(); await pause(500); const e2 = await T();
+      await s.ev("[...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0).dispatchEvent(new MouseEvent('click', { bubbles: true }))");
+      const ouvert = await attendreEtStabiliser(T, (v) => v.tiroir, { max: 10000 }); await s.ev('window.VibeFlowTour.start()'); const demarree = await attendreEtStabiliser(T, (v) => v.tour, { max: 10000 });
+      await esc(); const e1 = await attendreEtStabiliser(T, (v) => v.tour === false, { max: 10000 }); await esc(); const e2 = await attendreEtStabiliser(T, (v) => v.tiroir === false, { max: 10000 });
       sortie['t' + w] = { carteOuverte: ouvert, visiteDemarree: demarree, echap1: e1, echap2: e2 }; continue;
     }
     if (equipe) {
@@ -130,16 +136,18 @@ await executer(chrome, async (s) => {
     }
     if (cartehaute) await s.ev("(() => { const st = document.createElement('style'); st.textContent = '#tour { min-height: 420px !important; }'; document.head.appendChild(st); })()");
     if (tangent) await s.ev("(() => { const a = document.getElementById('ask'); a.style.setProperty('left', '374px', 'important'); a.style.setProperty('right', 'auto', 'important'); a.style.setProperty('transform', 'none', 'important'); a.style.setProperty('width', '560px', 'important'); a.style.setProperty('min-height', '150px', 'important'); })()");
-    if (tangent) await pause(1200); // la barre de question finit d'abord son déplacement : elle ne bouge plus quand la visite se place (comme sur la CI)
     if (titrehaut) await s.ev("(() => { const p = document.querySelector('#context p'); if (p) p.textContent = 'Description volontairement très longue du projet, pour que le bloc titre occupe beaucoup de place : ' + 'mot '.repeat(120); })()");
     if (police) await s.ev("(() => { const st = document.createElement('style'); st.id = 'vf-police-large'; st.textContent = '#tour, #tour *, #context, #context *, #svg * { font-family: Verdana, \\'DejaVu Sans\\', sans-serif !important; letter-spacing: 0.06em !important; }'; document.head.appendChild(st); })()");
     if (panneau) await s.ev("(() => { const p = document.getElementById('panel'); p.style.width = '440px'; })()");
+    // la mise en page posée avant la visite (tiroir, barre de question déplacée, titre, police, panneau élargi) : la visite place sa carte sur une géométrie qui ne bouge plus (comme sur la CI)
+    await stabiliser(() => s.ev(SURFACES), { pas: 250, max: 5000 });
     const noeuds = await s.ev(DONNEE);
     await s.ev('window.__vfK0 = window.VibeFlow.state.t.k; window.VibeFlowTour.start()');
     await s.attendre("window.VibeFlowTour.active()", `visite lancée à ${w} px (${noeuds} cartes)`, 15000);
     const etapes = [];
     for (let i = 0; i < 14 && (await s.ev('window.VibeFlowTour.active()')); i++) {
-      await pause(1000); // le centrage de la carte s'anime (520 ms) avant la mesure
+      // le centrage de la carte s'anime (520 ms) : on attend l'étape affichée (« i sur N »), l'animation finie (classe anim) et le graphe, la carte et la transformation immobiles, PUIS on mesure
+      await attendreEtStabiliser(() => s.ev(CALME), (v) => !v.anim && ((/(\d+) sur \d+/.exec(v.rep) || [])[1] === String(i + 1)), { pas: 300, max: 8000 });
       const m = await s.stable(MESURE, `étape ${i + 1} stable à ${w} px`, 20000);
       if (m.element) { await s.ev("(() => { const e = document.getElementById('vf-lock'); if (e) e.className = 'btn held'; })()"); await pause(1500); m.anneau = !(await s.ev("(() => { const e = document.querySelector('.tour-target'); if (!e) return false; const r = e.getBoundingClientRect(); return r.width > 0 && r.height > 0; })()")); }
       m.diag = await diag(i + 1, m);
@@ -153,11 +161,11 @@ await executer(chrome, async (s) => {
         const n = [...document.querySelectorAll('#svg g.node')].map(b).filter((x) => x.w > 0 && x.h > 0), c = b(document.getElementById('context'));
         const dans = (x) => x.l >= -1 && x.r <= innerWidth + 1 && x.t >= -1 && x.b <= innerHeight + 1;
         const t = window.VibeFlow.state.t; return { k: Math.round(t.k * 1000) / 1000, x: Math.round(t.x), y: Math.round(t.y), visibles: n.filter(dans).length, recouvre: n.filter((x) => Math.min(x.r, c.r) - Math.max(x.l, c.l) > 1 && Math.min(x.b, c.b) - Math.max(x.t, c.t) > 1).length }; })()`;
-      await pause(1200); const avant = await s.stable(VUE, 'vue avant la visite');
+      await pause(1200); await attendreEtStabiliser(() => s.ev(CALME), (v) => !v.anim && !v.tour, { pas: 300, max: 8000 }); const avant = await s.stable(VUE, 'vue avant la visite');
       await s.ev('window.VibeFlowTour.start()'); await s.attendre('window.VibeFlowTour.active()', 'visite relancée', 15000);
       for (let i = 0; i < 2; i++) { await pause(900); await s.ev("window.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowRight', bubbles: true }))"); }
       await pause(900); await s.ev("document.querySelector('#tour .tf [data-x]').click()");
-      await pause(1200); sortie['p' + w] = { avant, apres: await s.stable(VUE, 'vue après « Passer »') };
+      await pause(1200); await attendreEtStabiliser(() => s.ev(CALME), (v) => !v.anim && !v.tour, { pas: 300, max: 8000 }); sortie['p' + w] = { avant, apres: await s.stable(VUE, 'vue après « Passer »') };
     }
   }
   return sortie;

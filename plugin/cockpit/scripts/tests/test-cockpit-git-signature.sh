@@ -19,6 +19,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -113,9 +114,8 @@ mk_lab() { # $1 = dossier : lab GSD minimal
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; pose OUT, PORT, TOK ; démarre le serveur (SRV), git emballé
   "$NODE" "${2:-$SCRIPTS}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"; rm -f "$OUT/.cache/server.json"
-  PATH="$WORK/bin:$PATH" "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
+  COCKPIT_MODULE="$(cd "${2:-$SCRIPTS}/.." && pwd -P)" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" PATH="$WORK/bin:$PATH" || true   # 79-06 : le serveur est celui du module qui a assemblé (un mutant est une copie du module)
+  SRV="$VF_PID"
   PORT=0; TOK=""
   for _ in $(seq 1 50); do # le fichier peut être lu à moitié écrit : on relit jusqu'à un port valide et un jeton
     PORT="$("$NODE" "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
@@ -162,6 +162,7 @@ cat > "$AUX/r31.js" <<'JS'
 const [base, page, lab] = ARGS;
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!window.VibeFlow`, 'page rendue');
+await s.attendre('!!(window.__vfLive && window.__vfLive.connected)', 'flux direct branché avant le commit'); // un commit joué avant l'abonnement du flux n'émet aucun signal
 await s.ev(`(() => { window.__sig = 0; window.__marque = 1; document.addEventListener('vf-git:signal', () => { window.__sig++; }); })()`);
 const { execFileSync } = await import('node:child_process');
 execFileSync('git', ['-C', lab, 'commit', '-q', '--allow-empty', '-m', 'commit de R3.1'], { stdio: 'ignore' });
@@ -176,6 +177,8 @@ temps_sig() { # temps_sig <lab> : médiane de 7 appels de signatureGit (ms), 2 d
 
 # sous_cmds <journal> : la sous-commande de chaque ligne d'argv, options globales (--no-optional-locks, -c <v>, -C <dir>) écartées
 sous_cmds() { awk '{ i=1; while (i<=NF) { if ($i=="-c"||$i=="-C") i+=2; else if ($i ~ /^--/ && $i!="") i++; else break } print $i }' "$1"; }
+# config_hors <journal> : les lignes d'argv dont la sous-commande est `config` et qui ne sont pas exactement `config --name-only --get-regexp <motif>` (lecture seule des pilotes nommés, un seul motif)
+config_hors() { awk '{ i=1; while (i<=NF) { if ($i=="-c"||$i=="-C") i+=2; else if ($i ~ /^--/ && $i!="") i++; else break } if ($i=="config" && !($(i+1)=="--name-only" && $(i+2)=="--get-regexp" && NF==i+3)) print $0 }' "$1"; }
 echo "=== R2 — worktrees, index, argv journalisé, coût ==="
 build_serve "$DEPOT"
 fenetre 10000 "$WORK/w2a.sse" G_ -C "$WT" switch -q -c autre
@@ -192,7 +195,10 @@ assert_eq "R2.1d — un fichier suivi modifié sans add : aucun événement (lim
 fenetre 11000 "$WORK/w2e.sse" true
 assert_eq "R2.2a — témoin : le journal d'argv voit les appels de la signature (for-each-ref)" "$([ "$(sous_cmds "$WORK/git.log" | grep -c '^for-each-ref$')" -ge 1 ] && echo oui || echo non)" "oui"
 assert_eq "R2.2b — 11 s sans changement : aucune sous-commande log, status ni diff" "$(sous_cmds "$WORK/git.log" | grep -cE '^(log|status|diff)$')" "0"
-assert_eq "R2.2c — sous-commandes vues : seulement for-each-ref, worktree, show-ref, symbolic-ref, rev-list, rev-parse" "$(sous_cmds "$WORK/git.log" | sort -u | grep -vxE 'for-each-ref|worktree|show-ref|symbolic-ref|rev-list|rev-parse' | tr '\n' ' ')" ""
+assert_eq "R2.2c — sous-commandes vues : seulement for-each-ref, worktree, show-ref, symbolic-ref, rev-list, rev-parse, plus config (lecture des pilotes nommés du dépôt, 79-07)" "$(sous_cmds "$WORK/git.log" | sort -u | grep -vxE 'for-each-ref|worktree|show-ref|symbolic-ref|rev-list|rev-parse|config' | tr '\n' ' ')" ""
+assert_eq "R2.2d — toute sous-commande config vue est une lecture : exactement « config --name-only --get-regexp <motif> », jamais une écriture ni une autre lecture" "$(config_hors "$WORK/git.log" | wc -l | tr -d ' ')" "0"
+printf '%s\n' "--no-optional-locks -c core.fsmonitor=false -C /d config --name-only --get-regexp ^(filter)$" "-C /d config --unset core.bare" "-C /d config --get-regexp ^a$ --global" "-C /d config user.name x" "-C /d config --name-only --get-regexp" > "$WORK/config-faux.log"
+assert_eq "R2.2e — témoin : le filtre de R2.2d rougit sur une écriture, une option de plus, une lecture simple et un motif absent (4 lignes), et laisse passer la forme exacte" "$(config_hors "$WORK/config-faux.log" | wc -l | tr -d ' ')" "4"
 stop_srv
 # R2 (revue serveur 2026-11-06, S3) : la mesure vise le dépôt de CETTE suite (celui qui contient le dossier du script), jamais un chemin de poste ; hors dépôt : SAUTÉ, jamais un PASS.
 # Le plafond est large (250 ms sur la médiane de 7 appels, 3 git par appel) : il garde contre un coût démesuré, pas contre la charge de la machine (48 à 55 ms mesurés sous charge contre un plafond de 50).
@@ -233,7 +239,7 @@ echo "=== R5 — audit 2026-11-06 : A5 (git muet : la boucle reste libre, éché
 # le processus git bloqué est tué par le délai (SIGTERM sur le pid de l'emballage, exec'é en git), et la suite vérifie qu'aucun git du dépôt ne survit.
 HG="$WORK/muet"; mkdir -p "$HG"; mk_lab "$HG/lab"; G_ -C "$HG/lab" init -q -b main && G_ -C "$HG/lab" add -A && G_ -C "$HG/lab" commit -q -m init
 HGL="$(cd "$HG/lab" && pwd -P)"
-mkfifo "$HG/ff"; printf '[include]\n\tpath = %s\n' "$HG/ff" >> "$HGL/.git/config"
+mkfifo "$HGL/ff"; printf '[include]\n\tpath = %s\n' "$HGL/ff" >> "$HGL/.git/config"   # AUDC-A-02 : le FIFO vit DANS le lab (une inclusion hors du lab et du dossier git est refusée avant tout lancement de git : un git muet par ce biais n'est plus atteignable de l'extérieur)
 mkdir -p "$WORK/bin-h"; printf '#!/bin/sh\nprintf "%%s\\n" "$*" >> "%s/hang.log"\nexec "%s" "$@"\n' "$WORK" "$GIT_REEL" > "$WORK/bin-h/git"; chmod +x "$WORK/bin-h/git"
 cat > "$AUX/muet.mjs" <<'JS'
 // muet.mjs <scripts> <lab> <mode seq|concurrent> <journal> : signatureGit sur un git muet ; une ligne JSON {…} (durées, battement d'un minuteur de 50 ms posé avant l'appel, lancements journalisés)
@@ -272,11 +278,11 @@ import { pathToFileURL } from 'node:url';
 const [, , scripts, muet, hors] = process.argv;
 const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href);
 const t = Date.now(); const a = (await m.lireGit(muet)).etat; const ms = Date.now() - t; const b = (await m.lireGit(hors)).etat;
-console.log(JSON.stringify({ muet: a, hors: b, borne: ms < 9000 }));
+console.log(JSON.stringify({ muet: a, hors: b, borne: ms < 13000 }));
 JS
 mkdir -p "$WORK/sans-depot"
 LM="$(node "$AUX/lire-muet.mjs" "$SCRIPTS" "$HGL" "$WORK/sans-depot" 2>&1 | tail -1)"
-assert_eq "R5.6 — A5 : lireGit d'un git muet rend « indisponible » (jamais « absent ») dans l'échéance de 5 s ; un lab hors dépôt reste « absent »" "$(jq_ "$LM" '[j.muet, j.hors, j.borne].join("|")')" "indisponible|absent|true"
+assert_eq "R5.6 — A5 : lireGit d'un git muet rend « indisponible » (jamais « absent ») dans l'échéance de 15 s (REG-D-01 : une seule borne de lancement de 10 s est subie, l'assemblage s'arrête sur un git muet) ; un lab hors dépôt reste « absent »" "$(jq_ "$LM" '[j.muet, j.hors, j.borne].join("|")')" "indisponible|absent|true"
 sleep 0.5
 assert_eq "R5.7 — aucun git du dépôt muet ne survit à lireGit (pgrep)" "$(pgrep -f "$HGL" | wc -l | tr -d ' ')" "0"
 assert_eq "R5.8 — le direct appelle la signature en asynchrone, graine et filet (les deux appels de signatureGit portent .then) : un git muet ne gèle plus le serveur" "$(grep -c "signatureGit(root, " "$SCRIPTS/vf-cockpit-live.mjs" | tr -d ' ')|$(grep -c "signatureGit(root, { commun: common }).then(" "$SCRIPTS/vf-cockpit-live.mjs" | tr -d ' ')" "2|2"
@@ -296,7 +302,8 @@ R="$(MUET "$MD" "$HGL" seq)"
 assert_eq "M-SIGNATURE-SYNC — le git de la signature redevient synchrone : rouge sur R5.1 (la boucle est gelée : le minuteur de 50 ms ne sonne qu'après 300 ms)" "$(jq_ "$R" 'j.bloc < 300')" "false"
 sleep 0.5
 assert_eq "R5.9 — aucun git du dépôt muet ne survit aux mutants (pgrep)" "$(pgrep -f "$HGL" | wc -l | tr -d ' ')" "0"
-ME="$(mkmod sansdistinct)"; mutate "$ME/vf-cockpit-git.mjs" "if (sonde.delai) return" "if (false) return" || echo "  ❌ mutation M-ABSENT impossible"
+# REG-D-01 : l'état distinct tient par TROIS gardes en profondeur (l'en-tête traduit un git muet en « indisponible », l'assemblage s'arrête dessus, la sonde A5 le redit) ; M-ABSENT les retire toutes
+ME="$(mkmod sansdistinct)"; mutate "$ME/vf-cockpit-git.mjs" "if (sonde.delai) return" "if (false) return" && mutate "$ME/vf-cockpit-git.mjs" "vide(muet ? 'indisponible' : 'absent'" "vide('absent'" && mutate "$ME/vf-cockpit-git.mjs" "if (muet) return" "if (false) return" || echo "  ❌ mutation M-ABSENT impossible"
 LM="$(node "$AUX/lire-muet.mjs" "$ME" "$HGL" "$WORK/sans-depot" 2>&1 | tail -1)"
 assert_eq "M-ABSENT — l'état distinct est retiré : rouge sur R5.6 (un git muet redevient « absent »)" "$(jq_ "$LM" '[j.muet, j.hors].join("|")')" "absent|absent"
 sleep 0.5

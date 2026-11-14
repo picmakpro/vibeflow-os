@@ -1,21 +1,24 @@
 #!/usr/bin/env node
 // vf-cockpit-project — graphe Projet du cockpit (promu du spike 002, généralisé : lab plat, partitionné, sans jalons).
-// Export : buildProjectGraph(root, { layout }) -> schéma vibeflow/cockpit-project@1 (format du viewer :
+// Export : propre (nettoyage markdown d'un texte du lab), buildProjectGraph(root, { layout }) -> schéma vibeflow/cockpit-project@1 (format du viewer :
 //   nodes, files, links, flows, tour, routes, meta, project). CLI : node vf-cockpit-project.mjs <root> (JSON compact).
-// Hiérarchie : jalon -> phase -> plans + exigences ; missions (DAG) rattachées à leur phase ; backlog, graines, releases.
+// Hiérarchie : jalon -> phase -> plans ; missions (DAG) rattachées à leur phase ; backlog, graines, releases.
 // Identité d'une phase = (compartiment, numéro) : `ph-<N>` si le numéro est unique dans le lab, sinon `ph-<N>@<ws>`.
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { planningLayout } from './vf-cockpit-paths.mjs';
-import { readPlanning, read, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
+import { readPlanning, lireConfine, lister, read, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
 import { texte } from './vf-cockpit-formats.mjs';
-import { trouverPhase, LIBELLES_RESTE, LIBELLES_MISSION } from './vf-cockpit-avancement.mjs';
+import { listeImbriquee } from './vf-cockpit-frontmatter.mjs';
+import { trouverPhase, LIBELLES_RESTE, LIBELLES_MISSION, LIBELLES_ETAT } from './vf-cockpit-avancement.mjs';
 import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
-import { detectDrift } from './vf-cockpit-drift.mjs';
+import { detectDrift, commandeCorrectif } from './vf-cockpit-drift.mjs';
 import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
+import { projeterTrace } from './vf-cockpit-trace-collecte.mjs';
+import { burnup } from './vf-cockpit-burnup.mjs';
 
-const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
+const ls = lister; // AUDC-A-02 : listage confiné au lab (un dossier lié hors du lab n'est pas listé)
 const DST = { done: 'done', running: 'active', ready: 'todo', blocked: 'todo', failed: 'blocked' }; // dag.sh : blocked = en attente des deps
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
 // projection de l'état d'avancement sur les statuts du viewer : « à recetter » prend la teinte « en cours » mais son propre statut `recette` : glyphe et mot « À recetter » sur la carte (P69-D-25, P69-PL-02, P71.5-D-20) ; l'état exact reste dans avancement.etat
@@ -29,11 +32,77 @@ function piedJalon(ks) {
 // contenu de la première balise <objective> (indexOf : une balise sans fermeture ne fait pas rebalayer le texte pour chaque ouverture)
 const objectif = (t) => { const a = t.indexOf('<objective>'); if (a < 0) return undefined; const b = t.indexOf('</objective>', a + 11); return b < 0 ? undefined : t.slice(a + 11, b).replace(/^\s+/, ''); };
 
-export function buildProjectGraph(root, { layout } = {}) {
-  root = path.resolve(root); layout = layout || planningLayout(root);
+// P75-D-24 : `files_modified` d'un plan (ligne ou bloc), borné à 200 chemins de 4 096 octets ;
+// l'excédent est compté dans `touchedIgnores`, jamais tronqué en silence
+const fichiersPlan = (txt) => {
+  const tous = listeImbriquee(txt, ['files_modified'], { max: 1 << 20 });
+  const gardes = tous.filter((c) => Buffer.byteLength(c) <= 4096).slice(0, 200);
+  return { touched: gardes, touchedIgnores: tous.length - gardes.length };
+};
+
+// PU-G-102 : le texte d'un jalon ou d'une phase vient du ROADMAP en markdown : commentaires d'archive (`<!-- vf-archive … -->`, fermés ou non), gras, accents graves et liens sont retirés à la SOURCE,
+// le panneau n'affiche jamais de balisage brut. Un commentaire jamais fermé court jusqu'à la fin du texte (un seul passage : coût linéaire).
+// `[texte](cible)` -> `texte` en un seul passage : la fin du texte (« ] » ou « \n ») et celle de la cible (« ) » ou « \n ») se cherchent UNE fois par zone
+// (`prochain` rejoue sa dernière réponse tant que la recherche repart dans la même zone) : jamais la fin de ligne relue à chaque « [ »
+const prochain = (t, de, a, b, memo) => {
+  if (de >= memo.de && de <= memo.pos) return memo.pos;
+  let i = de; while (i < t.length && t[i] !== a && t[i] !== b) i++;
+  memo.de = de; memo.pos = i; return i;
+};
+function retireLiens(t) {
+  const m1 = { de: 0, pos: -1 }, m2 = { de: 0, pos: -1 };
+  let out = '', dep = 0, i = t.indexOf('[');
+  while (i >= 0) {
+    const j = prochain(t, i + 1, ']', '\n', m1);
+    if (j > i + 1 && t[j] === ']' && t[j + 1] === '(') {
+      const k = prochain(t, j + 2, ')', '\n', m2);
+      if (t[k] === ')') { out += t.slice(dep, i) + t.slice(i + 1, j); dep = k + 1; i = t.indexOf('[', k + 1); continue; }
+    }
+    i = t.indexOf('[', j); // les « [ » entre i et j ont la même fin de texte, donc le même échec
+  }
+  return out + t.slice(dep);
+}
+// blancs de fin de ligne retirés (lu par la fin de chaque ligne : une RegExp `[ \t]+\n` est quadratique sur une longue suite de blancs)
+const sansBlancsDeFin = (t) => t.split('\n').map((l) => {
+  let e = l.length; while (e > 0 && (l[e - 1] === ' ' || l[e - 1] === '\t')) e--; return l.slice(0, e);
+}).join('\n');
+export const propre = (t) => sansBlancsDeFin(retireLiens(String(t ?? '').replace(/<!--[\s\S]*?(?:-->|$)/g, '').replace(/\*\*/g, '').replace(/`/g, '')))
+  .replace(/[ \t]{2,}/g, ' ').trim();
+// PU-G-103 : le résumé (carte, haut du panneau) et le détail ne répètent plus le même texte. Le résumé porte tout le texte jusqu'à `max` caractères ; au-delà, il s'arrête à la dernière fin de phrase
+// (sinon au dernier mot, avec « … ») et le détail ne reprend que la SUITE, jamais le début.
+function scinder(t, max) {
+  const s = String(t ?? '').replace(/\s+/g, ' ').trim();
+  if (s.length <= max) return { resume: s, reste: '' };
+  let cut = -1; for (const m of s.matchAll(/[.!?](?=\s)/g)) { if (m.index + 1 > max) break; cut = m.index + 1; }
+  if (cut > 25) return { resume: s.slice(0, cut), reste: s.slice(cut).trim() };
+  const sp = s.lastIndexOf(' ', max - 1), c = sp > 25 ? sp : max - 1;
+  return { resume: s.slice(0, c).trimEnd() + '…', reste: '…' + s.slice(c).trim() };
+}
+
+// pied d'une carte de phase, part des exigences (PU-G-097, Q9 option A : mot en texte neutre, aucun glyphe ajouté — le pied n'a pas d'emplacement de pastille) :
+// une phase faite dont des exigences ne sont pas cochées dit « N exigence(s) non cochée(s) » (la pastille voisine dit « Fait ») au lieu de « 3/14 exigences », qui se lisait comme un travail à moitié fait
+// P80-C76-4 : le compte des exigences d'une phase, calculé UNE fois ici (pied de carte et champ `exigences`)
+const compteExigences = (reqs) => ({ faits: reqs.filter((r) => r.done).length, total: reqs.length });
+function piedExigences(etat, reqs) {
+  const { faits, total } = compteExigences(reqs); const ouvertes = total - faits;
+  if (!total) return '';
+  if (etat === 'fait' && ouvertes) return `${ouvertes} exigence${ouvertes > 1 ? 's' : ''} non cochée${ouvertes > 1 ? 's' : ''}`;
+  return `${faits}/${total} exigences`;
+}
+
+// PU-G-093 : l'état d'une phase est celui de sa carte (fichiers du dossier, P69-D-08) ; STATE.md ne dit que s'il s'accorde avec elle. Statuts de STATE compatibles avec chaque état de carte ;
+// un statut hors de cette table (pause, bloqué, inconnu) ne se contredit jamais.
+const COMPAT_STATE = { planning: ['a-faire'], ready_to_plan: ['a-faire'], ready_to_execute: ['a-faire', 'en-cours'], executing: ['a-faire', 'en-cours'], in_progress: ['a-faire', 'en-cours'],
+  verifying: ['a-recetter', 'en-cours'], ready_for_verification: ['a-recetter', 'en-cours'], complete: ['fait', 'a-recetter'], completed: ['fait', 'a-recetter'], closed: ['fait'], milestone_complete: ['fait'] };
+const etatPerime = (status, etat) => !!etat && Object.hasOwn(COMPAT_STATE, String(status ?? '').trim()) && !COMPAT_STATE[String(status).trim()].includes(etat);
+
+// AUDC-A-02 : tout le planning se lit sous confinement à la racine réelle du lab — un lien symbolique sortant n'est jamais suivi
+export function buildProjectGraph(root, opts = {}) { root = path.resolve(root); return fs.existsSync(root) ? lireConfine(root, () => construireGraphe(root, opts)) : construireGraphe(root, opts); }
+function construireGraphe(root, { layout } = {}) {
+  layout = layout || planningLayout(root);
   // dérive de format mesurée AVANT la lecture : le panneau propose le correctif au lieu d'une carte vide sans explication
-  let drift; try { drift = detectDrift(root, layout); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}` }; }
-  const P = readPlanning(root, layout); const { rel, state, reqs } = P;
+  const P = readPlanning(root, layout, { trace: true }); const { rel, state, reqs } = P; // AUDC-H2 : lu UNE fois, le contrôle de format reçoit cette lecture
+  let drift; try { drift = detectDrift(root, layout, P); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}`, erreur: true }; }
   P.phases = fusionner(P.phases, lireAilleurs(root)); // N5 : une phase menée dans un worktree du même dépôt prend l'avancement du worktree si elle y est plus avancée
   const { phases } = P;
   const nodes = [], files = [], links = [];
@@ -44,16 +113,25 @@ export function buildProjectGraph(root, { layout } = {}) {
   const count = new Map(); for (const ph of phases.values()) count.set(ph.n, (count.get(ph.n) || 0) + 1);
   const phId = (ph) => (count.get(ph.n) > 1 && ph.ws ? `ph-${ph.n}@${ph.ws}` : `ph-${ph.n}`);
   const dirOf = (ph) => P.phaseDirs.get(`${ph.ws || ''}|${ph.n}`) || P.phaseDirs.get(`*|${ph.n}`);
-  const reqOf = (id, ws) => reqs.get(`${ws || ''}|${id}`) || reqs.get(`*|${id}`);
-  const reqPath = (r) => `req/${r.ws ? r.ws + '/' : ''}${r.id}`;
-  const ownReqs = (ph) => [...reqs.values()].filter((r) => r.phase === ph.n && (r.wsKey === '*' || r.wsKey === (ph.ws || '')));
+  // 76-08 (revue finale M1) : UNE seule attribution phase/exigence, celle de la collecte (meta.vf.trace.exigences) : le pied, le champ `exigences`,
+  // la porte de la 80 et le chat la lisent ; une exigence d'archive (ws '*') se rattache au nœud que la collecte a désigné (cleNoeud, 438a2ef6),
+  // jamais par le numéro seul. Sans traçabilité lue (erreur de collecte), repli sur la phase du tableau de traçabilité.
+  const traceEx = P.trace && Array.isArray(P.trace.exigences) ? P.trace.exigences : null;
+  const dePhase = (ph) => (e) => (e.ws === '*' ? e.cleNoeud === `${ph.ws || ''}|${ph.n}`
+    : String(e.phase) === String(ph.n) && (e.ws || null) === (ph.ws || null));
+  const ownReqs = (ph) => (traceEx ? traceEx.filter(dePhase(ph)).map((e) => ({ id: e.id, done: e.coche }))
+    : [...reqs.values()].filter((r) => r.phase === ph.n && (r.wsKey === '*' || r.wsKey === (ph.ws || ''))));
   const phaseStatus = (ph) => PROJECTION_ST[ph.avancement.etat] || 'todo'; // l'avancement vient des fichiers, jamais du STATE (CKPT-18)
 
   // jalons : ceux de la section « ## Milestones », sinon un jalon synthétique « Phases » ; les phases orphelines y vont aussi
   const inMs = new Set(P.milestones.flatMap((m) => [...m.phases]));
   const loose = [...phases.values()].filter((p) => !p.archive && !inMs.has(p.key));
   const ms0 = [...P.milestones];
-  if (loose.length) ms0.push({ key: 'Phases', id: 'ms-phases', icon: '', text: 'Phases du lab', phases: new Set(loose.map((p) => p.key)), ws: null, synthetic: true });
+  // PU-G-099 : quand le ROADMAP a de vrais jalons, le groupe des phases sans jalon s'appelle « Hors jalon » : ni dans « Historique », ni dans meta.vf.milestones, jamais le jalon actif, sans enchaînement « puis ».
+  // Sans aucun jalon, il garde « Phases » : c'est alors le seul jalon du lab.
+  const horsJalon = P.milestones.length > 0;
+  if (loose.length) ms0.push(horsJalon ? { key: 'Hors jalon', id: 'ms-hors-jalon', icon: '', text: 'Phases qui ne figurent dans aucun jalon du ROADMAP', phases: new Set(loose.map((p) => p.key)), ws: null, synthetic: true, horsJalon: true }
+    : { key: 'Phases', id: 'ms-phases', icon: '', text: 'Phases du lab', phases: new Set(loose.map((p) => p.key)), ws: null, synthetic: true });
   const sortPh = (a, b) => num(a.n) - num(b.n);
   const msList = ms0.map((ms) => {
     const ks = [...ms.phases].map((k) => phases.get(k)).filter(Boolean).sort(sortPh);
@@ -62,15 +140,17 @@ export function buildProjectGraph(root, { layout } = {}) {
     const st = ms.icon === '✅' ? 'done' : done === ks.length && ks.length ? 'done' : enCours || done > 0 || ms.icon === '🚧' || (ms.synthetic && ks.length) ? 'active' : 'todo';
     return { ...ms, ks, done, st };
   });
-  const closed = msList.filter((m) => m.st === 'done');
+  const closed = msList.filter((m) => m.st === 'done' && !m.horsJalon);
   const hist = closed.length ? node({ id: 'history', parent: null, label: 'Historique', kind: 'historique', summary: `Les ${closed.length} jalons clos, du premier au dernier.`, st: 'done', foot: `${closed.length} jalons · ${closed.reduce((s, m) => s + m.ks.length, 0)} phases` }) : null;
   const prev = new Map(); // enchaînement « puis » limité à un même compartiment
   for (const ms of msList) {
     const wk = ms.ws || '';
-    const msId = node({ id: ms.id, parent: ms.st === 'done' ? hist : null, label: ms.key, kind: 'jalon', summary: sentence(ms.text.replace(/^[^—]*—\s*/, ''), 180) || ms.text, details: ms.text, st: ms.st,
+    const mt = propre(ms.text);
+    const msId = node({ id: ms.id, parent: ms.st === 'done' && !ms.horsJalon ? hist : null, label: ms.key, kind: 'jalon', summary: sentence(mt.replace(/^[^—]*—\s*/, ''), 180) || mt, details: mt, st: ms.st,
       foot: piedJalon(ms.ks), tags: [ms.ws ? 'compartiment ' + ms.ws : ''].filter(Boolean) });
-    const pv = prev.get(wk);
-    if (pv && ms.st !== 'done' && closed.some((m) => m.id === pv)) { link('n:history', 'n:' + msId, 'event', 'puis'); prev.set(wk, msId); }
+    const pv = ms.horsJalon ? null : prev.get(wk);
+    if (ms.horsJalon) { /* pas d'enchaînement : le groupe n'est pas un jalon de la chaîne */ }
+    else if (pv && ms.st !== 'done' && closed.some((m) => m.id === pv)) { link('n:history', 'n:' + msId, 'event', 'puis'); prev.set(wk, msId); }
     else if (pv && pv !== msId) { link('n:' + pv, 'n:' + msId, 'event', 'puis'); prev.set(wk, msId); }
     else if (!pv) prev.set(wk, msId);
     for (const ph of ms.ks) addPhase(ph, msId);
@@ -80,25 +160,28 @@ export function buildProjectGraph(root, { layout } = {}) {
     const planFiles = ls(dir).filter((f) => /-PLAN\.md$/.test(f)).sort();
     const sums = new Set(ls(dir).filter((f) => /-SUMMARY\.md$/.test(f)).map((f) => f.replace('-SUMMARY.md', '')));
     const av = ph.avancement;
+    const vagues = new Map((ph.plans || []).map((x) => [x.fichier, x.vague])); // P80-D-44 : posée par readPlanning
     const enCours = P.dags.filter((d) => d.phaseKey === ph.key && d.etat === 'running').flatMap((d) => d.nodes.filter((x) => x?.status === 'running')); // un plan non fait est actif si un nœud running d'une mission rattachée le désigne (P69-PL-04) ; seule une mission vivante désigne un plan actif (VFSG-06)
     const phReqs = ownReqs(ph); const id = phId(ph);
-    node({ id, parent: msId, label: `Phase ${ph.n} · ${ph.name}`, kind: 'phase', num: ph.n, ws: ph.ws, summary: sentence(ph.goal || ph.line || ph.name, 200),
-      details: [ph.goal, av.reste.length ? `Reste : ${av.reste.map((c) => LIBELLES_RESTE[c]).join(', ')}.` : '', av.ailleurs ? `Avancement lu dans le worktree ${av.ailleurs.arbre}${av.ailleurs.branche ? ` (branche ${av.ailleurs.branche})` : ''} : plus avancé que celui de l'arbre courant.` : '', av.mission ? `Mission : ${av.mission.nom} (${LIBELLES_MISSION[av.mission.etat] || av.mission.etat}).` : '', ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ph.line ? `Ligne de ROADMAP : ${ph.line}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
-      st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', phReqs.length ? `${phReqs.filter((r) => r.done).length}/${phReqs.length} exigences` : '', av.ailleurs ? `dans worktree ${av.ailleurs.arbre}` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [] });
+    const but = propre(ph.goal), ligne = propre(ph.line), { resume, reste: suite } = but ? scinder(but, 400) : { resume: sentence(ligne || ph.name, 200), reste: '' };
+    node({ id, parent: msId, label: `Phase ${ph.n} · ${ph.name}`, kind: 'phase', num: ph.n, ws: ph.ws, summary: resume,
+      details: [suite, av.reste.length ? `Reste : ${av.reste.map((c) => LIBELLES_RESTE[c]).join(', ')}.` : '', av.ailleurs ? `Avancement lu dans le worktree ${av.ailleurs.arbre}${av.ailleurs.branche ? ` (branche ${av.ailleurs.branche})` : ''} : plus avancé que celui de l'arbre courant.` : '', av.mission ? `Mission : ${av.mission.nom} (${LIBELLES_MISSION[av.mission.etat] || av.mission.etat}).` : '', ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ligne ? `Ligne de ROADMAP : ${ligne}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
+      st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', piedExigences(av.etat, phReqs), av.ailleurs ? `dans worktree ${av.ailleurs.arbre}` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [],
+      // P80-D-06 : les comptes en champs ; la mission se réduit à { nom, etat } (A25 : aucune clé de verrou dans cockpit-project@1)
+      avancement: { version: av.version, etat: av.etat, plans: { ...av.plans }, correctifs: av.correctifs, reste: av.reste,
+        mission: av.mission ? { nom: av.mission.nom, etat: av.mission.etat } : null },
+      exigences: compteExigences(phReqs) });
     for (const pf of planFiles) {
       const txt = texte(read(path.join(dir, pf))); const meta = fm(txt); const pid = pf.replace('-PLAN.md', '');
       const obj = objectif(txt) || /^#\s+(.*)$/m.exec(txt)?.[1] || '';
-      const touched = list(meta.files_modified); const p = rel(path.join(dir, pf));
+      const { touched, touchedIgnores } = fichiersPlan(txt); const p = rel(path.join(dir, pf));
       file({ p, n: id, name: `${pid} — ${clip(obj.split('\n').find((l) => l.trim()) || '', 70)}`, d: sentence(obj, 220), st: sums.has(pid) || ph.done ? 'done' : enCours.some((x) => x.id === pid || (Array.isArray(x.scope) && x.scope.includes(p))) ? 'active' : 'todo',
-        foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, touched });
+        foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, ...(touched.length ? { touched } : {}), ...(touchedIgnores ? { touchedIgnores } : {}),
+        vague: vagues.get(pf) ?? null });
       for (const dep of list(meta.depends_on)) { const dp = planFiles.find((x) => x.startsWith(dep.length <= 3 ? `${pf.split('-')[0]}-${dep.padStart(2, '0')}` : dep)); if (dp) link('f:' + rel(path.join(dir, dp)), 'f:' + p, 'import', 'puis'); }
-      for (const r of list(meta.requirements)) { const rq = reqOf(r, ph.ws); if (rq) link('f:' + p, 'f:' + reqPath(rq), 'data', 'couvre'); }
-    }
-    if (phReqs.length) {
-      const rId = node({ id: `${id}.req`, parent: id, label: 'Exigences', kind: 'exigences', summary: `${phReqs.filter((r) => r.done).length} cochées sur ${phReqs.length}.`, foot: `${phReqs.filter((r) => r.done).length}/${phReqs.length}`, st: phReqs.every((r) => r.done) ? 'done' : phReqs.some((r) => r.done) ? 'active' : 'todo' });
-      for (const r of phReqs) file({ p: reqPath(r), n: rId, name: r.id, d: sentence(r.text, 220), st: r.done ? 'done' : 'todo', foot: r.file.split('/').pop() });
     }
   }
+  // PU-G-100 (mis de côté) : le sens dépendance -> dépendant est celui que le viewer lit pour ranger les cartes (les entrants à gauche, « Utilisé par » ; les sortants à droite) : l'inverser corrige le panneau mais retourne l'ordre des cartes (mesuré en navigateur) ; le libellé « Utilisé par » est du viewer vendorisé, hors périmètre
   for (const ph of phases.values()) for (const d of ph.depends) { const dp = trouverPhase(phases, d, ph.ws); if (dp && nodes.some((n) => n.id === phId(dp)) && nodes.some((n) => n.id === phId(ph))) link('n:' + phId(dp), 'n:' + phId(ph), 'import', 'dépend de'); }
 
   // missions : chaque DAG rattaché à sa phase par le module d'avancement (champ `phase`, nom, dossier de phase), sinon « hors phase »
@@ -119,7 +202,7 @@ export function buildProjectGraph(root, { layout } = {}) {
   const bl = node({ id: 'backlog', parent: null, label: 'Backlog', kind: 'backlog', summary: 'Ce qui est consigné, différé ou investigué, hors des jalons.' });
   for (const m of P.backlog.matchAll(/^## ([^\n]*)\n([\s\S]*?)(?=^## |(?![\s\S]))/gm)) {
     const [title, status] = m[1].split(/(?<!\s)\s+—\s+(?=[A-ZÉ]{4,}|consigné|mesuré)/);
-    file({ p: `.planning/BACKLOG.md#${title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 60)}`, n: bl, name: clip(title, 80), d: sentence(m[2].replace(/^>.*$/gm, ''), 220), st: /INVESTIGUÉ|mesuré/i.test(status || '') ? 'done' : 'todo', foot: clip(status || '', 40) });
+    file({ p: `.planning/BACKLOG.md#${title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 60)}`, n: bl, name: clip(title, 80), d: sentence(m[2].replace(/^>.*$/gm, ''), 220), st: /INVESTIGUÉ|mesuré/i.test(status || '') ? 'done' : 'todo', foot: '' }); // P80-D-07 : le statut n'est plus répété au pied, la pastille le dit
   }
   const sd = node({ id: 'seeds', parent: null, label: 'Graines', kind: 'graine', summary: 'Idées de jalons futurs, avec leurs déclencheurs.' });
   for (const s of P.seeds) file({ p: s.file, n: sd, name: clip(/^#\s+(.*)$/m.exec(s.text)?.[1] || path.basename(s.file), 80), d: sentence(s.text.replace(/^---[\s\S]*?---/, '').replace(/^#.*$/gm, ''), 220), st: 'todo' });
@@ -129,39 +212,74 @@ export function buildProjectGraph(root, { layout } = {}) {
   nodes.find((n) => n.id === 'releases').foot = `${P.tags.length} tags`;
 
   // jalon mis en avant : celui que nomme le STATE du compartiment actif tant qu'il n'est pas clos, sinon le premier en cours (CKPT-16) ; le STATE ne décide jamais de l'état d'une PHASE (P69-D-08)
-  const active = msList.find((m) => state.milestone && m.key === state.milestone && m.ws === (layout.actif || null) && m.st !== 'done') || msList.find((m) => m.st === 'active') || msList.at(-1);
+  const active = msList.find((m) => state.milestone && m.key === state.milestone && m.ws === (layout.actif || null) && m.st !== 'done') || msList.find((m) => m.st === 'active' && !m.horsJalon) || msList.filter((m) => !m.horsJalon).at(-1) || msList.at(-1);
   const flows = active ? [{ id: 'trajectoire', title: `Trajectoire ${/^[aeiouyàâéèêîôû]/i.test(active.key) ? "d'" : 'de '}${active.key}`, description: "Les phases du jalon en cours, dans l'ordre.", steps: active.ks.map((p) => ({ ref: 'n:' + phId(p), note: `${p.done ? '✓' : '○'} ${p.name}` })) }] : [];
   // visite « Par où commencer » propre à l'onglet Projet (70-08, UIFN-05, P70-D-02) : jalon, phase en cours, missions, au travail ; une étape sans carte est omise, jamais affichée avec « ? » ;
   // sous deux étapes, la liste est vide et le repli du moteur s'applique. Les textes viennent des données du lab ; la `cible` est une constante, jamais une donnée (T-70-13).
   const tour = [], has = (id) => nodes.some((n) => n.id === id);
-  if (active && has(active.id)) tour.push({ ref: 'n:' + active.id, kicker: 'Le jalon', title: `Jalon ${active.key}`, note: `Le jalon en cours. Phases faites : ${active.done} sur ${active.ks.length}.` });
+  if (active && has(active.id)) tour.push({ ref: 'n:' + active.id, kicker: 'Le jalon', title: `Jalon ${active.key}`, note: `VibeFlow fait avancer votre projet par grandes étapes, avec Claude au travail. Jalon = une grande étape du projet ; phase = un morceau d'un jalon ; mission = le travail mené, étape par étape, pour réaliser une phase. Voici le jalon en cours. Phases faites : ${active.done} sur ${active.ks.length}.` }); // PU-G-091
   const cur = trouverPhase(phases, curPhase, layout.actif);
-  if (cur && has(phId(cur))) tour.push({ ref: 'n:' + phId(cur), kicker: 'La phase en cours', title: `Phase ${cur.n}${cur.name ? ` · ${cur.name}` : ''}`, note: `La phase sur laquelle le projet travaille${statutLisible(state.status) ? ` : ${statutLisible(state.status)}` : ''}.` });
-  const dg = P.dags.find((d) => d.nodes.some((x) => x?.status === 'running') && has('dag-' + d.name)) || P.dags.find((d) => has('dag-' + d.name));
+  const phaseEtat = cur ? cur.avancement.etat : null, perime = etatPerime(state.status, phaseEtat);
+  if (cur && has(phId(cur))) tour.push({ ref: 'n:' + phId(cur), kicker: 'La phase en cours', title: `Phase ${cur.n}${cur.name ? ` · ${cur.name}` : ''}`, note: `La phase sur laquelle le projet travaille : ${LIBELLES_ETAT[cur.avancement.etat]}${perime ? ' (STATE.md semble périmé)' : ''}.` });
+  // PU-G-092 : la mission montrée est une mission VIVANTE du jalon en cours (jamais une abandonnée d'un autre jalon) : celle qui travaille, sinon la première non terminée d'une phase pas faite, sinon la première non terminée,
+  // sinon la première vivante ; à défaut, une mission vivante hors phase (la carte « Missions hors phase ») ; aucune -> l'étape est omise. Les comptes sont ceux de ce groupe (les missions rattachées aux phases du jalon,
+  // ou celles hors phase), ils s'accordent avec la carte ; le mot du panneau est « étapes », jamais « nœuds ».
+  const clesJalon = new Set(active ? active.ks.map((p) => p.key) : []);
+  const duJalon = P.dags.filter((d) => clesJalon.has(d.phaseKey) && has('dag-' + d.name)), horsPhase = P.dags.filter((d) => !(d.phaseKey && phases.get(d.phaseKey)) && has('dag-' + d.name));
+  const vivante = (d) => d.etat !== 'abandonnee' && d.etat !== 'inconnu', travaille = (d) => d.nodes.some((x) => x?.status === 'running'), ouverte = (d) => d.nodes.some((x) => x?.status !== 'done');
+  const choisir = (g) => g.find(travaille) || g.find((d) => vivante(d) && ouverte(d) && phases.get(d.phaseKey)?.avancement.etat !== 'fait') || g.find((d) => vivante(d) && ouverte(d)) || g.find(vivante);
+  const grp = choisir(duJalon) ? duJalon : choisir(horsPhase) ? horsPhase : null, dg = grp && choisir(grp);
   if (dg) {
-    const fait = dg.nodes.filter((x) => x?.status === 'done').length;
-    tour.push({ ref: 'n:dag-' + dg.name, kicker: 'Les missions', title: `Mission ${dg.name.replace(/^MISSION-/, '')}`, note: `${P.dags.length} mission${P.dags.length > 1 ? 's' : ''} au total ; celle-ci a ${fait} nœud${fait > 1 ? 's' : ''} fait${fait > 1 ? 's' : ''} sur ${dg.nodes.length}.` });
+    const fait = dg.nodes.filter((x) => x?.status === 'done').length, enCoursN = grp.filter((d) => vivante(d) && travaille(d)).length, n = grp.length;
+    tour.push({ ref: 'n:dag-' + dg.name, kicker: 'Les missions', title: `Mission ${dg.name.replace(/^MISSION-/, '')}`, note: `${grp === duJalon ? 'Ce jalon compte' : 'Hors phase, le projet compte'} ${n} mission${n > 1 ? 's' : ''}${enCoursN ? `, dont ${enCoursN} en cours` : ''} ; celle-ci a ${fait} étape${fait > 1 ? 's' : ''} faite${fait > 1 ? 's' : ''} sur ${dg.nodes.length}.` });
   }
   tour.push({ ref: 'root', cible: '#vf-lock', kicker: 'Au travail', title: 'Qui est au travail', note: "Ce point en haut de la page s'anime quand quelqu'un travaille sur le projet, et reste éteint sinon ; un clic ouvre la liste. L'onglet Équipe en montre le détail." });
   const ids = new Set(nodes.map((n) => 'n:' + n.id)), fids = new Set(files.map((f) => 'f:' + f.p));
-  return {
+  const graphe = {
     schema: 'vibeflow/cockpit-project@1',
     meta: { generatedAt: new Date().toISOString(), rootName: path.basename(root), root, audience: 'everyone', agent: 'claude', repos: [], counts: { files: files.length, loc: 0 }, vfTab: 'project',
       kindIcons: KIND_ICONS, kindColors: KIND_COLORS,
-      kindLabels: { import: 'Dépend de', event: 'Enchaînement', data: 'Couvre', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient' },
-      vf: { milestone: state.milestone, phase: curPhase, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, lastDesc: state.last_activity_desc, progress: state.progress,
-        milestones: msList.map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),
+      kindLabels: { import: 'Dépend de', event: 'Enchaînement', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient',
+      // 80-11 (P80-D-35, FORM-08) : le vocabulaire du planning dans le panneau, lu par le moteur sur l'onglet Projet
+      // (clés à préfixe, jamais un genre de lien)
+      'feuille:phase': 'Plan', 'feuille:backlog': 'Entrée du backlog', 'feuille:graine': 'Graine',
+      'feuille:release': 'Release', 'feuille:mission': 'Étape', 'parent:phase': 'Dans la phase',
+      'parent:mission': 'Dans la mission', 'parent:backlog': 'Dans le backlog', 'parent:graine': 'Dans les graines', 'parent:release': 'Dans les releases',
+      'liste:phase': 'Plans', 'liste:backlog': 'Entrées', 'liste:graine': 'Graines', 'liste:release': 'Releases',
+      'liste:mission': 'Étapes', 'entrant:import': 'Dépend de', 'sortant:import': 'Attendu par',
+      'ouvrir:phase': 'Ouvrir la phase', 'champ:statut': 'Statut', 'champ:vague': 'Vague', 'valeur:sans-vague': 'Sans vague' },
+      vf: { milestone: state.milestone, phase: curPhase, phaseEtat, stateStale: perime, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, progress: state.progress,
+        milestones: msList.filter((m) => !m.horsJalon).map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),
         next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}`, etat: p.avancement.etat })) : [],
-        drift: { resume: drift.resume, regles: Object.values(drift.constats.reduce((o, c) => { (o[c.regle] ||= { regle: c.regle, niveau: c.niveau, message: c.message, fichier: c.fichier, n: 0 }).n++; return o; }, {})),
+        drift: { resume: drift.resume, erreur: !!drift.erreur,
+          // une règle = un groupe de constats ; `fichier` reste celui du PREMIER constat (champ historique) : la répartition vraie est dans `fichiers` ([{fichier, n}]) et les endroits dans `emplacements` ([{fichier, ligne}], 5 au plus) — PU-G-156
+          regles: Object.values(drift.constats.reduce((o, c) => { const r = (o[c.regle] ||= { regle: c.regle, niveau: c.niveau, message: c.message, fichier: c.fichier, n: 0, fichiers: [], emplacements: [], corrigeable: false });
+            r.n++; (r.fichiers.find((f) => f.fichier === c.fichier) || (r.fichiers.push({ fichier: c.fichier, n: 0 }), r.fichiers.at(-1))).n++;
+            if (c.ligne > 0 && r.emplacements.length < 5) r.emplacements.push({ fichier: c.fichier, ligne: c.ligne }); if (c.apres !== undefined) r.corrigeable = true; return o; }, {})),
           corrigeable: drift.constats.some((c) => c.apres !== undefined),
+          // PU-G-155 : le compte de chaque niveau, pour écrire « 5 écarts : 1 toléré, 4 non lus » sans recompter côté page ; `couvertsN` = écarts que le correctif remet en forme (PU-G-156)
+          ecartsN: drift.constats.length, couvertsN: drift.constats.filter((c) => c.apres !== undefined).length,
+          parNiveau: { bloquant: drift.constats.filter((c) => c.niveau === 'bloquant').length, tolere: drift.constats.filter((c) => c.niveau === 'toléré').length, info: drift.constats.filter((c) => c.niveau === 'info').length, ignore: drift.constats.filter((c) => c.niveau === 'ignoré').length },
+          // PU-G-153 : la commande complète (chemins absolus), seule source de ce que le panneau affiche ET copie
+          commande: drift.constats.some((c) => c.apres !== undefined) ? commandeCorrectif(root) : '',
           // lignes non comprises (fichier:ligne + extrait), au plus 20 : le total est dans `nonComprisesN` (diagnostic du premier assemblage, P-PARS)
           nonComprisesN: drift.constats.filter((c) => c.regle === 'ligne-non-comprise').length,
           nonComprises: drift.constats.filter((c) => c.regle === 'ligne-non-comprise').slice(0, 20).map((c) => ({ fichier: c.fichier, ligne: c.ligne, extrait: c.avant })) },
+        // PU-G-160 : le groupe « Hors jalon » (phases sans jalon dans un ROADMAP qui en a), signalé dans le panneau Format
+        horsJalon: horsJalon && loose.length ? { n: loose.length, id: 'n:ms-hors-jalon' } : null,
         counts: { phases: phases.size, plans: files.filter((f) => f.p.endsWith('-PLAN.md')).length, reqs: reqs.size, reqsDone: [...reqs.values()].filter((r) => r.done).length, dags: P.dags.length } },
       layout: { forme: layout.forme, actif: layout.actif } },
-    project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files) },
+    project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files, phaseEtat) },
     nodes, files, routes: [], links: links.filter((l) => [l.a, l.b].every((x) => (x.startsWith('n:') ? ids.has(x) : fids.has(x)))), flows, tour: tour.length >= 2 ? tour : [],
   };
+  // 77-02 (P77-D-13, P77-D-14, P77-D-10, P77-D-20) : burn-up du jalon mis en avant (le pourcentage est celui du pied de jalon, la fonction `pct` du fichier)
+  // et blocages du STATE (nettoyés et condensés, absents si la section manque)
+  const phasesBu = active ? active.ks.map((p) => ({ n: p.n, nom: p.name, line: p.line, etat: p.avancement.etat })) : [];
+  const bu = active ? burnup({ jalon: active.key, phases: phasesBu, pct }) : null;
+  if (bu) graphe.meta.vf.burnup = bu;
+  if (P.blocages) graphe.meta.vf.blocagesState = P.blocages;
+  // 76-04 (P76-D-31) : champs facultatifs de traçabilité posés sur le graphe ; le jalon mis en avant est celui de `active`, jamais recalculé ailleurs
+  return projeterTrace(graphe, P.trace, { jalonActif: active ? 'n:' + active.id : null, couper: clip, racine: root });
 }
 
 // libellés français des valeurs de `status:` que gsd-core écrit dans STATE.md ; table unique, reprise à l'identique par le navigateur (STATUT de 00-vibeflow.js, parité vérifiée par Q17)
@@ -171,8 +289,8 @@ export const STATUTS = { planning: 'en planification', ready_to_plan: 'prête à
 export function statutLisible(x) { return Object.hasOwn(STATUTS, String(x ?? '').trim()) ? STATUTS[String(x).trim()] : null; }
 
 // sous-titre du projet : seulement les champs connus (un lab sans STATE.md n'affiche ni « ? » ni parenthèses vides), sinon les effectifs
-function resume(state, curPhase, nbPhases, files) {
-  const seg = [state.milestone ? `Jalon ${state.milestone}` : '', curPhase ? `phase ${curPhase}${state.current_phase_name ? ` (${state.current_phase_name})` : ''}` : '', statutLisible(state.status) || ''].filter(Boolean);
+function resume(state, curPhase, nbPhases, files, phaseEtat) {
+  const seg = [state.milestone ? `Jalon ${state.milestone}` : '', curPhase ? `phase ${curPhase}${state.current_phase_name ? ` (${state.current_phase_name})` : ''}` : '', (phaseEtat ? LIBELLES_ETAT[phaseEtat] : statutLisible(state.status)) || ''].filter(Boolean);
   if (seg.length) return seg.join(' · ') + '.';
   const plans = files.filter((f) => f.p.endsWith('-PLAN.md')).length;
   return `${nbPhases} phase${nbPhases > 1 ? 's' : ''} · ${plans} plan${plans > 1 ? 's' : ''}.`;

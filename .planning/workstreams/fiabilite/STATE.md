@@ -1,26 +1,27 @@
 ---
 gsd_state_version: "1.0"
 milestone: vibeflow-v2.0
-current_phase: 72
-current_phase_name: Lancer du travail depuis les cartes du cockpit
-status: ready_to_plan
-last_updated: "2026-11-05T12:00:00.000Z"
-last_activity: 2026-11-05
-last_activity_desc: Phases 68, 69, 70, 71 mergées sur main (PR #199, #198, #200, #203) avec les correctifs #201, #202, #204 ; Phase 71 close le 2026-11-05 (recette humaine, PR #209), sans release ; Phase 72 et Phases 71.5 et 78 en cours, release groupée en attente
-state_head: 7ab2464d
+current_phase: 80
+current_phase_name: Trois onglets, trois formes — Projet en couloirs, clavier, navigation
+status: executing
+last_updated: "2026-11-14T19:16:46.000Z"
+last_activity: 2026-11-14
+last_activity_desc: Passe finale faite sur fix/passe-finale-v2.77.0 (PR #257 vers integration/cockpit-audit) ; suite = fusion vers release/v2.77.0, puis recette de Samuel ; gel des publications ; 81 reportée
+state_head: ea5dc16f
 progress:
-  total_phases: 6
-  completed_phases: 5
-  total_plans: 52
-  completed_plans: 52
-milestone_name: « le cockpit VibeFlow » — Phases 67-72 —
-stopped_at: "main 7ab2464d (PR #204, 2026-11-05) : 67 à 71 mergées ; 71 close le 2026-11-05 (recette humaine conforme, PR #203 et #209) ; Phase 72 et Phases 71.5 et 78 en cours, release groupée en attente"
+  total_phases: 16
+  completed_phases: 15
+  total_plans: 172
+  completed_plans: 172
+milestone_name: « le cockpit VibeFlow » — Phases 67-81 —
+stopped_at: "Toutes les phases du jalon cockpit-audit sont fusionnées dans integration/cockpit-audit ; passe finale faite, PR #257 ; gel des publications"
 ---
 
 # Project State
 
 Corps historique archivé tel quel (SOBR-02) : `.planning/archives/state/fiabilite-STATE-corps-2026-09-29.md`, puis
-`.planning/archives/state/fiabilite-STATE-2026-11-05.md` (position des Phases 57 à 69, évolution du ROADMAP, tâches rapides).
+`fiabilite-STATE-2026-11-05.md` (Phases 57 à 69, évolution du ROADMAP, tâches rapides), `fiabilite-STATE-2026-11-11.md`
+(Phases 67 à 72 avant `v2.76.0`), `fiabilite-STATE-2026-11-11-jointure.md` (position avant la jointure des cadrages), même dossier.
 Trace et blob d'origine : `.planning/archives/INDEX.tsv`. Frontmatter = seule source des compteurs.
 
 ## Project Reference
@@ -31,18 +32,17 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 72 (Lancer du travail depuis les cartes du cockpit, jalon `vibeflow-v2.0`) — EN COURS ; dépend de la 71 (close). Phases 71.5 et 78 aussi en cours, release groupée en attente. Sources de la 72 : `69-CONTEXT.md` P69-D-19 et P69-D-21.
+Phase: toutes les phases du jalon fusionnées dans integration/cockpit-audit ; passe finale v2.77.0 faite (PR #257 vers integration/cockpit-audit)
 
-Jalon `vibeflow-v2.0` (Phases 67-72, ordre 69 → 68 → 70 → 71 → 72) : 5 phases closes sur 6 (la 71 est close le 2026-11-05), 52 plans sur 52 exécutés.
+Toutes les phases du jalon (cockpit-audit, Phases 67-81 hors 81) sont fusionnées dans `integration/cockpit-audit`, puis la passe finale est faite (branche `fix/passe-finale-v2.77.0`, PR #257 vers `integration/cockpit-audit`). La suite est la fusion vers `release/v2.77.0`, puis la recette de Samuel. Rapport : `.planning/missions/2026-11-14-passe-finale-v2.77.0.md` ; mineurs : un seul sujet du BACKLOG.
 
-- 67 : CLOSE 2026-11-03, PR #187, release `v2.75.0` (CKPT-01..12).
-- 69 : CLOSE 2026-11-04, PR #198 (mergée 2026-11-04, `794c6dba`), vérification 16/16, CKPT-13..28.
-- 68 : CLOSE 2026-11-04, PR #199 (mergée 2026-11-04, `3c73fc0c`), VFSG-01..13 ; étapes 4 (VS Code) et 5 (mobile) de la recette reportées (P68-D-35).
-- 70 : CLOSE 2026-11-04, exécutée et recettée par juges (`70-RECETTE-JUGES.md`, tri tranché par Samuel le 2026-11-04), PR #200 (mergée 2026-11-04, `503aa657`) ; au ledger, UIFN-04, 06 et 07 cochées, onze autres à cocher (voir Pending).
-- 71 : CLOSE 2026-11-05, PR #203 (mergée 2026-11-04, `d4171ded`) et correctif Safari PR #209 (cockpit v1.3.2) ; recette humaine jouée par Samuel le 2026-11-05 (Arc, Firefox, Safari, clavier AZERTY : conforme, `71-RECETTE-HUMAINE.md`), `71-09-SUMMARY.md` passé en `passed`, TERM-01..12 cochées ; constat « plusieurs terminaux » au BACKLOG (PR #208). Pastille Terminal sous le zoom : cockpit v1.3.3.
-- Correctifs sur `main` : #201 (PATH assaini, H-1), #202 (phases en worktree, N5), #204 (gardien des orphelins PTY).
+Compteurs (recomptés au ROADMAP le 2026-11-14) : 15 phases sur 16 cochées (94 %) ; 172 plans sur 172 cochés (100 %). Les cases des Phases 73 à 77, 79 et 80 sont cochées au ROADMAP le 2026-11-14 : les cases suivent la fin de phase, non la publication (preuve : Phase 70 cochée le 2026-11-05, `v2.76.0` publiée le 2026-11-06). La Phase 81 est reportée (`AUDC-Q3`, 2026-11-11), sans plan.
 
-Aucune release depuis `v2.75.1` : release groupée (bump racine, tag, release GitHub) couvrant 68 à 71 et les correctifs, geste humain sur demande explicite de Samuel (P68-D-31).
+- Publié : 67 en `v2.75.0` (2026-11-03) ; 68, 69, 70, 71, 71.5, 72 et 78 en `v2.76.0` (2026-11-06, PR #217, module `cockpit` v1.4.0). `VERSION` reste `v2.76.0`.
+- Non publié, sur `release/v2.77.0` (PR #226 ouverte, non mergée) : panel, recette du 2026-11-08, correctifs, audit du cockpit, phases 73 à 77, 79 et 80 puis passe finale.
+- Gel des publications : décision de Samuel du 2026-11-08 (`.planning/missions/2026-11-08-recette-correctifs.md`) ; levée du gel, merge, bump, tag et release restent ses gestes.
+- TEMP-12 (Phase 74) cochée sur la CI verte de la tête du lot (run 43610046755, `1ac5bae5`). FORM-17 (Phase 80) attend la CI Linux. AM7.6 rouge en local à l'identique sur la base, la CI tranche.
+- Dettes nommées : UIFN-10 et LANC-12 (voir Pending) ; étapes 4 et 5 de la recette de la 68 reportées (P68-D-35).
 
 ## Accumulated Context
 
@@ -56,17 +56,28 @@ Aucune release depuis `v2.75.1` : release groupée (bump racine, tag, release Gi
 
 <!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-11-05.md -->
 
+<!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-11-11.md -->
+
+<!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-11-11-jointure.md -->
+
+- 2026-11-11 — Phases 73 à 77 cadrées et planifiées (P73-D-01..36, P74-D-46, P75-D-01..31, P76-D-32 à D-34, SYNT-01..10) : arbitrages Samuel, AskUserQuestion session principale, 2026-11-11, ou décisions déléguées (message session principale, 2026-11-08), option recommandée. Exécutées le 2026-11-14.
+- 2026-11-13 — Phase 80, segment a : PR #237 fusionné ; P80-D-52..56 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11.
+- 2026-11-14 — Phase 79, 22/22 plans (PR #238 fusionné) ; Q-03 : P79-D-33 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) ; Q-01, Q-02, Q-04 : décision déléguée (message session principale, 2026-11-08 et 2026-11-11), option recommandée.
+- 2026-11-14 — Phase 74 : pas d'interface morte, sonde W1 comptant les `role=tab` hors de la bascule (décisions déléguées, message session principale, 2026-11-08, option recommandée).
+- 2026-11-14 — Passe finale : une passe complète avant la fusion vers la branche de release (arbitrage Samuel, message session principale, 2026-11-14) ; cliquet d'observateurs élargi, option a (même canal et même date) ; second arbitrage (arbitrage Samuel, message session principale, 2026-11-14, option (a) : `77-vf-git-tiroir.js` gardé à 1, cliquet des observateurs étendu à `ui/tiroir/` avec `tiroir/tiroir.js` à 3, remplacement par des événements au BACKLOG).
+
 ### Pending Todos
 
-- Release groupée `vibeflow-v2.0` (68 à 71, #201, #202, #204, #209) : geste humain, notes de release préparées dans `68-RELECTURE-ADVERSE.md`.
-- Ledger : coché le 2026-11-05 — Phases 68 et 70, plans 70-01..12, UIFN-04, 06 et 07. À cocher : UIFN-01, 02, 03, 05 et 08 à 14 (leurs SUMMARY les portent sous `requirements:` et non `requirements-completed` : décision à prendre) ; TERM-01..12 et la Phase 71 : cochées le 2026-11-05.
-- H1-b (sécurité basse, `sous()` de `vf-cockpit-env.mjs`) : désormais au BACKLOG racine, dans l'entrée « Cockpit : mineurs d'affichage et sécurité basse » ; plus de copie ici.
-- `equipe-produit-v1.0` (57-66) non clos : 63 à 66 non cadrées, COLB-08 (preuve humaine, P61-B-01, P61-B-02), ARCG-01 et ARCG-09 partielles, réexamen de la 62 le 2027-01-31.
+- Sortie du gel (gestes de Samuel) : merge de la PR #226, bump `v2.77.0`, relecture adverse SOBR-04 du diff `plugin/` depuis `v2.76.0`, tag, release GitHub, `check-release-tag.sh --remote`.
+- Fusion de la PR de la passe finale vers `integration/cockpit-audit`, puis vers `release/v2.77.0` ; recette de Samuel.
+- Ledger : UIFN-10 décochée (captures hors dépôt sans empreinte) ; LANC-12 décochée (recette au vrai `claude` non jouée, `AUDC-Q1`).
+- SEED-004 (retrait de `vf-cockpit`) : déclencheur atteint depuis `v2.75.0`, graine `dormant`.
+- `equipe-produit-v1.0` (57-66) non clos : 63 à 66 non cadrées, COLB-08, ARCG-01 et ARCG-09 partielles, réexamen de la 62 le 2027-01-31.
 - `ecc-inspiration-v1.0` (51-56) inscrit, exécution après `equipe-produit-v1.0`.
 
 ### Échéances
 
-- **2027-01-31, ou plus tôt si C1 et C2 sont établis : réexamen de l'approche C (plateforme collaborative).** Décision A de la Phase 62 (approche C différée, P62-D-05), échéance humaine sans veille automatique. À la date : relire C1 et C2 (`62-DECISION-plateforme.md` §6) et constater leur état ; si un fait manque, repousser par un nouvel arbitrage, jamais en silence. C1 : compte rendu de la recette de la Phase 61 sur lab réel (COLB-08). C2 : besoin non-dev sans terminal documenté (option B possible, à la discrétion de Samuel). Entrée d'origine du BACKLOG, archivée le 2026-11-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-05 : « Transformer 28 et 29 ») : `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`, § « Réexamen approche C (plateforme collaborative) — 2027-01-31 ».
+- **2027-01-31, ou plus tôt si C1 et C2 sont établis : réexamen de l'approche C (plateforme collaborative).** Décision A de la Phase 62 (approche C différée, P62-D-05), échéance humaine sans veille automatique. À la date : relire C1 et C2 (`62-DECISION-plateforme.md` §6) et constater leur état ; si un fait manque, repousser par un nouvel arbitrage, jamais en silence. C1 : recette de la Phase 61 sur lab réel (COLB-08). C2 : besoin non-dev sans terminal documenté. Entrée d'origine : `.planning/archives/backlog/racine-BACKLOG-2026-11-05.md`.
 
 ### Blockers/Concerns
 
@@ -88,8 +99,8 @@ Tableau complet dans les archives (section `### Quick Tasks Completed`) ; les no
 
 ## Session Continuity
 
-**Resume file:** .planning/workstreams/fiabilite/ROADMAP.md (§ Phase 72)
+**Resume file:** .planning/workstreams/fiabilite/ROADMAP.md (§ Milestone vibeflow-v2.0, « Audit du 2026-11-10 ») .
 
-Last session: 2026-11-05 — fin de la Phase 71 et du correctif PTY (PR #204) ; rapport `.planning/missions/2026-11-05-pty-orphelin-HANDOFF.md`.
+Last session: 2026-11-14 — passe finale faite ; PR #257 vers `integration/cockpit-audit`, puis fusion vers `release/v2.77.0`.
 
 ## Performance Metrics

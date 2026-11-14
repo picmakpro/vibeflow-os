@@ -164,7 +164,7 @@ echo "  · $nb fichiers texte comparés ; réécrits sous --target :${reecrits:-
 OCC=$(cat > "$WORK/occ.mjs" <<JS
 import fs from 'node:fs';
 const { compterOccurrences } = await import('file://$T/scripts/vf-cockpit-rename.mjs');
-let n = 0; for (const f of ['index.html', 'project.html', 'serve.mjs']) n += compterOccurrences(fs.readFileSync('$LT/.vibeflow/cockpit/' + f, 'utf8'));
+let n = 0; for (const f of ['$LT/.vibeflow/cockpit/index.html', '$LT/.vibeflow/cockpit/project.html', '$T/skills/cockpit-moteur/assets/serve.mjs', '$T/skills/cockpit-moteur/assets/graph-query.js', '$T/skills/cockpit-moteur/assets/query-cli.mjs', '$T/scripts/vf-cockpit-embed.mjs', '$T/scripts/vf-cockpit-lancer-post.mjs', '$T/scripts/vf-cockpit-server.mjs']) n += compterOccurrences(fs.readFileSync(f, 'utf8')); // 79-06 : les pages de la sortie ET le code du module posé sous la cible (la sortie ne porte plus de code)
 console.log(n);
 JS
 node "$WORK/occ.mjs" 2>&1)

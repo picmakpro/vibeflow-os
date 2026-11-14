@@ -1,0 +1,1460 @@
+diff --git a/.planning/workstreams/fiabilite/MISSION-78.dag.json b/.planning/workstreams/fiabilite/MISSION-78.dag.json
+index 2e425b13..1eebcd5c 100644
+--- a/.planning/workstreams/fiabilite/MISSION-78.dag.json
++++ b/.planning/workstreams/fiabilite/MISSION-78.dag.json
+@@ -35,7 +35,7 @@
+         "plan"
+       ],
+       "scope": [],
+-      "status": "ready"
++      "status": "done"
+     },
+     {
+       "id": "exec-02",
+@@ -45,7 +45,7 @@
+         "plan"
+       ],
+       "scope": [],
+-      "status": "ready"
++      "status": "done"
+     },
+     {
+       "id": "exec-03",
+@@ -55,7 +55,7 @@
+         "plan"
+       ],
+       "scope": [],
+-      "status": "ready"
++      "status": "done"
+     },
+     {
+       "id": "exec-04",
+@@ -65,7 +65,7 @@
+         "plan"
+       ],
+       "scope": [],
+-      "status": "ready"
++      "status": "done"
+     },
+     {
+       "id": "exec-05",
+@@ -78,7 +78,7 @@
+         "exec-04"
+       ],
+       "scope": [],
+-      "status": "blocked"
++      "status": "done"
+     },
+     {
+       "id": "exec-06",
+@@ -88,7 +88,7 @@
+         "exec-04"
+       ],
+       "scope": [],
+-      "status": "blocked"
++      "status": "running"
+     },
+     {
+       "id": "exec-07",
+@@ -113,7 +113,7 @@
+         "exec-05"
+       ],
+       "scope": [],
+-      "status": "blocked"
++      "status": "running"
+     },
+     {
+       "id": "exec-09",
+@@ -124,7 +124,7 @@
+         "exec-04"
+       ],
+       "scope": [],
+-      "status": "blocked"
++      "status": "running"
+     },
+     {
+       "id": "exec-10",
+diff --git a/plugin/cockpit/scripts/tests/temoins/git-tiroir.json b/plugin/cockpit/scripts/tests/temoins/git-tiroir.json
+new file mode 100644
+index 00000000..9f1b11b0
+--- /dev/null
++++ b/plugin/cockpit/scripts/tests/temoins/git-tiroir.json
+@@ -0,0 +1,1196 @@
++{
++ "schema": "vibeflow/cockpit-git@1",
++ "etat": "ok",
++ "entete": {
++  "etat": "ok",
++  "depot": "depot",
++  "worktree": null,
++  "branche": "main",
++  "detache": false,
++  "sha7": null
++ },
++ "base": {
++  "nom": "main",
++  "locale": null,
++  "distante": null,
++  "divergent": false
++ },
++ "worktrees": [
++  {
++   "nom": "depot",
++   "chemin": "/tmp/depot",
++   "branche": "main",
++   "detache": false,
++   "ici": true,
++   "principal": true,
++   "commande": null
++  },
++  {
++   "nom": "wt-b",
++   "chemin": "/tmp/wt-b",
++   "branche": "feat/deux",
++   "detache": false,
++   "ici": false,
++   "principal": false,
++   "commande": "cd -- '/tmp/wt-b'"
++  },
++  {
++   "nom": "<iframe src=x>",
++   "chemin": "/tmp/wt-c",
++   "branche": null,
++   "detache": true,
++   "ici": false,
++   "principal": false,
++   "commande": "cd -- '/tmp/wt-c'"
++  }
++ ],
++ "rangees": [
++  {
++   "h": "2828282828282828282828282828282828282828",
++   "col": 0,
++   "entrants": [],
++   "sortants": [],
++   "largeur": 1,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "2828282",
++   "p": [
++    "2727272727272727272727272727272727272727"
++   ],
++   "at": 1794044000,
++   "an": "Alice",
++   "s": "Fusion M22",
++   "teinte": 0,
++   "refs": [
++    {
++     "type": "head",
++     "nom": "HEAD",
++     "courante": true,
++     "worktree": null,
++     "commande": null
++    },
++    {
++     "type": "locale",
++     "nom": "main",
++     "courante": true,
++     "worktree": null,
++     "commande": null
++    },
++    {
++     "type": "distante",
++     "nom": "origin/main",
++     "courante": false,
++     "worktree": null,
++     "commande": null
++    }
++   ],
++   "refsPlus": 0
++  },
++  {
++   "h": "2727272727272727272727272727272727272727",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [
++    {
++     "de": 0,
++     "vers": 1,
++     "parent": "1414141414141414141414141414141414141414"
++    }
++   ],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": true,
++   "racine": false,
++   "suite": true,
++   "h7": "2727272",
++   "p": [
++    "2626262626262626262626262626262626262626",
++    "1414141414141414141414141414141414141414"
++   ],
++   "at": 1794040400,
++   "an": "<b>x</b>",
++   "s": "Fusion M21",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "2626262626262626262626262626262626262626",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "2626262",
++   "p": [
++    "2525252525252525252525252525252525252525"
++   ],
++   "at": 1794036800,
++   "an": "Chloé",
++   "s": "Commit M17",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "2525252525252525252525252525252525252525",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "2525252",
++   "p": [
++    "2424242424242424242424242424242424242424"
++   ],
++   "at": 1794033200,
++   "an": "Alice",
++   "s": "Commit M16",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "2424242424242424242424242424242424242424",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "2424242",
++   "p": [
++    "2323232323232323232323232323232323232323"
++   ],
++   "at": 1794029600,
++   "an": "<b>x</b>",
++   "s": "Commit M15",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "2323232323232323232323232323232323232323",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "2323232",
++   "p": [
++    "2222222222222222222222222222222222222222"
++   ],
++   "at": 1794026000,
++   "an": "Chloé",
++   "s": "Commit M14",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "2222222222222222222222222222222222222222",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "2222222",
++   "p": [
++    "2121212121212121212121212121212121212121"
++   ],
++   "at": 1794022400,
++   "an": "Alice",
++   "s": "Commit M13",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "2121212121212121212121212121212121212121",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "2121212",
++   "p": [
++    "2020202020202020202020202020202020202020"
++   ],
++   "at": 1794018800,
++   "an": "<b>x</b>",
++   "s": "Commit M12",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "2020202020202020202020202020202020202020",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "2020202",
++   "p": [
++    "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f"
++   ],
++   "at": 1794015200,
++   "an": "Chloé",
++   "s": "Commit M11",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f1f",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1f1f1f1",
++   "p": [
++    "1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e"
++   ],
++   "at": 1794011600,
++   "an": "Alice",
++   "s": "Commit M10",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e1e",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1e1e1e1",
++   "p": [
++    "1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d"
++   ],
++   "at": 1794008000,
++   "an": "<b>x</b>",
++   "s": "Commit M9",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d1d",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1d1d1d1",
++   "p": [
++    "1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c"
++   ],
++   "at": 1794004400,
++   "an": "Chloé",
++   "s": "Commit M8",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1c1c1c1",
++   "p": [
++    "1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b"
++   ],
++   "at": 1794000800,
++   "an": "Alice",
++   "s": "Commit M7",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1b1b1b1",
++   "p": [
++    "1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a"
++   ],
++   "at": 1793997200,
++   "an": "<b>x</b>",
++   "s": "Commit M6",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1a1a1a1",
++   "p": [
++    "1919191919191919191919191919191919191919"
++   ],
++   "at": 1793993600,
++   "an": "Chloé",
++   "s": "Commit M5",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1919191919191919191919191919191919191919",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 2,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1919191",
++   "p": [
++    "1616161616161616161616161616161616161616"
++   ],
++   "at": 1793990000,
++   "an": "Alice",
++   "s": "Commit M4",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1818181818181818181818181818181818181818",
++   "col": 2,
++   "entrants": [],
++   "sortants": [],
++   "largeur": 3,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1818181",
++   "p": [
++    "1010101010101010101010101010101010101010"
++   ],
++   "at": 1793986400,
++   "an": "<b>x</b>",
++   "s": "<img src=x onerror=alert(2)>",
++   "teinte": 3,
++   "refs": [
++    {
++     "type": "locale",
++     "nom": "<svg/onload=alert(1)>",
++     "courante": false,
++     "worktree": null,
++     "commande": "git switch --end-of-options 'x;y|z`w'"
++    },
++    {
++     "type": "locale",
++     "nom": "feat/deux",
++     "courante": false,
++     "worktree": "/tmp/wt-b",
++     "commande": "cd -- '/tmp/wt-b'"
++    },
++    {
++     "type": "tag",
++     "nom": "v0.9",
++     "courante": false,
++     "worktree": null,
++     "commande": null
++    },
++    {
++     "type": "locale",
++     "nom": "feat/quatre",
++     "courante": false,
++     "worktree": null,
++     "commande": "git switch --end-of-options 'feat/quatre'"
++    }
++   ],
++   "refsPlus": 2
++  },
++  {
++   "h": "1717171717171717171717171717171717171717",
++   "col": 3,
++   "entrants": [],
++   "sortants": [],
++   "largeur": 4,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1717171",
++   "p": [
++    "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f"
++   ],
++   "at": 1793982800,
++   "an": "Chloé",
++   "s": "Commit f6c",
++   "teinte": 2,
++   "refs": [
++    {
++     "type": "distante",
++     "nom": "origin/f6",
++     "courante": false,
++     "worktree": null,
++     "commande": null
++    }
++   ],
++   "refsPlus": 0
++  },
++  {
++   "h": "1616161616161616161616161616161616161616",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 4,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1616161",
++   "p": [
++    "1313131313131313131313131313131313131313"
++   ],
++   "at": 1793979200,
++   "an": "Alice",
++   "s": "Commit M3",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1515151515151515151515151515151515151515",
++   "col": 4,
++   "entrants": [],
++   "sortants": [],
++   "largeur": 5,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1515151",
++   "p": [
++    "0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e"
++   ],
++   "at": 1793975600,
++   "an": "<b>x</b>",
++   "s": "Commit f5c",
++   "teinte": 1,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1414141414141414141414141414141414141414",
++   "col": 1,
++   "entrants": [
++    1
++   ],
++   "sortants": [],
++   "largeur": 5,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1414141",
++   "p": [
++    "0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d"
++   ],
++   "at": 1793972000,
++   "an": "Chloé",
++   "s": "Commit f4c",
++   "teinte": 5,
++   "refs": [
++    {
++     "type": "locale",
++     "nom": "feat/f4",
++     "courante": false,
++     "worktree": null,
++     "commande": "git switch --end-of-options 'feat/f4'"
++    }
++   ],
++   "refsPlus": 0
++  },
++  {
++   "h": "1313131313131313131313131313131313131313",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [
++    {
++     "de": 0,
++     "vers": 5,
++     "parent": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b"
++    },
++    {
++     "de": 0,
++     "vers": 5,
++     "parent": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
++    }
++   ],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": true,
++   "racine": false,
++   "suite": true,
++   "h7": "1313131",
++   "p": [
++    "1212121212121212121212121212121212121212",
++    "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
++    "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c"
++   ],
++   "at": 1793968400,
++   "an": "Alice",
++   "s": "Fusion octopus de trois branches",
++   "teinte": 0,
++   "refs": [
++    {
++     "type": "tag",
++     "nom": "v1.0",
++     "courante": false,
++     "worktree": null,
++     "commande": null
++    }
++   ],
++   "refsPlus": 0
++  },
++  {
++   "h": "1212121212121212121212121212121212121212",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [
++    {
++     "de": 0,
++     "vers": 5,
++     "parent": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
++    }
++   ],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": true,
++   "racine": false,
++   "suite": true,
++   "h7": "1212121",
++   "p": [
++    "1111111111111111111111111111111111111111",
++    "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a"
++   ],
++   "at": 1793964800,
++   "an": "<b>x</b>",
++   "s": "Fusion mf1",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1111111111111111111111111111111111111111",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1111111",
++   "p": [
++    "0202020202020202020202020202020202020202"
++   ],
++   "at": 1793961200,
++   "an": "Chloé",
++   "s": "Fusion M2",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "1010101010101010101010101010101010101010",
++   "col": 2,
++   "entrants": [
++    2
++   ],
++   "sortants": [],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "1010101",
++   "p": [
++    "0909090909090909090909090909090909090909"
++   ],
++   "at": 1793957600,
++   "an": "Alice",
++   "s": "Commit f7b",
++   "teinte": 3,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f0f",
++   "col": 3,
++   "entrants": [
++    3
++   ],
++   "sortants": [],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "0f0f0f0",
++   "p": [
++    "0808080808080808080808080808080808080808"
++   ],
++   "at": 1793954000,
++   "an": "<b>x</b>",
++   "s": "Commit f6b",
++   "teinte": 2,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e0e",
++   "col": 4,
++   "entrants": [
++    4
++   ],
++   "sortants": [],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "0e0e0e0",
++   "p": [
++    "0707070707070707070707070707070707070707"
++   ],
++   "at": 1793950400,
++   "an": "Chloé",
++   "s": "Commit f5b",
++   "teinte": 1,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d0d",
++   "col": 1,
++   "entrants": [
++    1
++   ],
++   "sortants": [],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "0d0d0d0",
++   "p": [
++    "0606060606060606060606060606060606060606"
++   ],
++   "at": 1793946800,
++   "an": "Alice",
++   "s": "Commit f4b",
++   "teinte": 5,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c0c",
++   "col": 5,
++   "entrants": [
++    5
++   ],
++   "sortants": [],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "0c0c0c0",
++   "p": [
++    "0505050505050505050505050505050505050505"
++   ],
++   "at": 1793943200,
++   "an": "<b>x</b>",
++   "s": "Commit f3b",
++   "teinte": 4,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b0b",
++   "col": 5,
++   "entrants": [
++    5
++   ],
++   "sortants": [],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "0b0b0b0",
++   "p": [
++    "0404040404040404040404040404040404040404"
++   ],
++   "at": 1793939600,
++   "an": "Chloé",
++   "s": "Commit f2b",
++   "teinte": 3,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a0a",
++   "col": 5,
++   "entrants": [
++    5
++   ],
++   "sortants": [],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "0a0a0a0",
++   "p": [
++    "0303030303030303030303030303030303030303"
++   ],
++   "at": 1793936000,
++   "an": "Alice",
++   "s": "Commit f1b",
++   "teinte": 2,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0909090909090909090909090909090909090909",
++   "col": 2,
++   "entrants": [
++    2
++   ],
++   "sortants": [
++    {
++     "de": 2,
++     "vers": 0,
++     "parent": "0202020202020202020202020202020202020202"
++    }
++   ],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": false,
++   "h7": "0909090",
++   "p": [
++    "0202020202020202020202020202020202020202"
++   ],
++   "at": 1793932400,
++   "an": "<b>x</b>",
++   "s": "Commit f7a",
++   "teinte": 3,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0808080808080808080808080808080808080808",
++   "col": 3,
++   "entrants": [
++    3
++   ],
++   "sortants": [
++    {
++     "de": 3,
++     "vers": 0,
++     "parent": "0202020202020202020202020202020202020202"
++    }
++   ],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": false,
++   "h7": "0808080",
++   "p": [
++    "0202020202020202020202020202020202020202"
++   ],
++   "at": 1793928800,
++   "an": "Chloé",
++   "s": "Commit f6a",
++   "teinte": 2,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0707070707070707070707070707070707070707",
++   "col": 4,
++   "entrants": [
++    4
++   ],
++   "sortants": [
++    {
++     "de": 4,
++     "vers": 0,
++     "parent": "0202020202020202020202020202020202020202"
++    }
++   ],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": false,
++   "h7": "0707070",
++   "p": [
++    "0202020202020202020202020202020202020202"
++   ],
++   "at": 1793925200,
++   "an": "Alice",
++   "s": "Commit f5a",
++   "teinte": 1,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0606060606060606060606060606060606060606",
++   "col": 1,
++   "entrants": [
++    1
++   ],
++   "sortants": [
++    {
++     "de": 1,
++     "vers": 0,
++     "parent": "0202020202020202020202020202020202020202"
++    }
++   ],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": false,
++   "h7": "0606060",
++   "p": [
++    "0202020202020202020202020202020202020202"
++   ],
++   "at": 1793921600,
++   "an": "<b>x</b>",
++   "s": "Commit f4a",
++   "teinte": 5,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0505050505050505050505050505050505050505",
++   "col": 5,
++   "entrants": [
++    5
++   ],
++   "sortants": [
++    {
++     "de": 5,
++     "vers": 0,
++     "parent": "0202020202020202020202020202020202020202"
++    }
++   ],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": false,
++   "h7": "0505050",
++   "p": [
++    "0202020202020202020202020202020202020202"
++   ],
++   "at": 1793918000,
++   "an": "Chloé",
++   "s": "Commit f3a",
++   "teinte": 4,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0404040404040404040404040404040404040404",
++   "col": 5,
++   "entrants": [
++    5
++   ],
++   "sortants": [
++    {
++     "de": 5,
++     "vers": 0,
++     "parent": "0202020202020202020202020202020202020202"
++    }
++   ],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": false,
++   "h7": "0404040",
++   "p": [
++    "0202020202020202020202020202020202020202"
++   ],
++   "at": 1793914400,
++   "an": "Alice",
++   "s": "Commit f2a",
++   "teinte": 3,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0303030303030303030303030303030303030303",
++   "col": 5,
++   "entrants": [
++    5
++   ],
++   "sortants": [
++    {
++     "de": 5,
++     "vers": 0,
++     "parent": "0202020202020202020202020202020202020202"
++    }
++   ],
++   "largeur": 6,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": false,
++   "h7": "0303030",
++   "p": [
++    "0202020202020202020202020202020202020202"
++   ],
++   "at": 1793910800,
++   "an": "<b>x</b>",
++   "s": "Commit f1a",
++   "teinte": 2,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0202020202020202020202020202020202020202",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 1,
++   "ouvertBas": [],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "0202020",
++   "p": [
++    "0101010101010101010101010101010101010101"
++   ],
++   "at": 1793907200,
++   "an": "Chloé",
++   "s": "Commit M1",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  },
++  {
++   "h": "0101010101010101010101010101010101010101",
++   "col": 0,
++   "entrants": [
++    0
++   ],
++   "sortants": [],
++   "largeur": 1,
++   "ouvertBas": [
++    0
++   ],
++   "fusion": false,
++   "racine": false,
++   "suite": true,
++   "h7": "0101010",
++   "p": [
++    "abababababababababababababababababababab"
++   ],
++   "at": 1793903600,
++   "an": "Alice",
++   "s": "Commit M0",
++   "teinte": 0,
++   "refs": [],
++   "refsPlus": 0
++  }
++ ],
++ "couloirsMax": 6,
++ "replies": 17,
++ "horsFenetre": [],
++ "mergees": [
++  {
++   "nom": "old-1",
++   "commande": "git branch -d --end-of-options 'old-1'"
++  },
++  {
++   "nom": "old-2",
++   "commande": "git branch -d --end-of-options 'old-2'"
++  },
++  {
++   "nom": "<b>vieille</b>",
++   "commande": "git branch -d --end-of-options '<b>vieille</b>'"
++  },
++  {
++   "nom": "origin/old-3",
++   "commande": null
++  }
++ ],
++ "tags": [
++  {
++   "nom": "v1.0",
++   "h7": "1313131",
++   "at": 1793968400
++  },
++  {
++   "nom": "<script>alert(3)</script>",
++   "h7": "0505050",
++   "at": 1793900000
++  }
++ ],
++ "stash": [
++  {
++   "ref": "stash@{0}",
++   "h7": "0909090",
++   "at": 1793900100,
++   "message": "WIP <u>essai</u>",
++   "branche": "main",
++   "commande": "git stash show --stat 'stash@{0}'"
++  },
++  {
++   "ref": "stash@{1}",
++   "h7": "0808080",
++   "at": 1793900050,
++   "message": "autre",
++   "branche": "feat/deux",
++   "commande": "git stash show --stat 'stash@{1}'"
++  }
++ ],
++ "auteurs": [
++  {
++   "nom": "Alice",
++   "commits": 14,
++   "dernier": 1793999999
++  },
++  {
++   "nom": "<b>x</b>",
++   "commits": 13,
++   "dernier": 1793905000
++  },
++  {
++   "nom": "Chloé",
++   "commits": 13,
++   "dernier": 1793903000
++  }
++ ],
++ "parBranche": [
++  {
++   "nom": "main",
++   "avance": 0,
++   "dernier": 1793999999
++  },
++  {
++   "nom": "feat/f4",
++   "avance": 3,
++   "dernier": 1793904000
++  }
++ ],
++ "bornes": {
++  "base": 500,
++  "nonMergees": 500,
++  "tronque": false
++ },
++ "commandes": {
++  "vide": null,
++  "diagnostic": "git status"
++ }
++}
+diff --git a/plugin/cockpit/scripts/tests/test-cockpit-git-details.sh b/plugin/cockpit/scripts/tests/test-cockpit-git-details.sh
+new file mode 100755
+index 00000000..25005b75
+--- /dev/null
++++ b/plugin/cockpit/scripts/tests/test-cockpit-git-details.sh
+@@ -0,0 +1,176 @@
++#!/usr/bin/env bash
++# test-cockpit-git-details.sh — détail d'un commit sans diff (GET /api/vf/git/commit?sha=) et état des worktrees à la demande (GET /api/vf/git/worktrees)
++#   (GITC-07, GITC-08, GITC-09 ; P78-D-06, D-13, D-14, D-21, D-23, D-31)
++#   X1 détail d'un commit : validation du sha (motif strict puis rev-parse --verify), fichiers, binaires, renommages, racine, merge, bornes
++#   X2 état des worktrees · X3 dépôt piégé (aucun filtre lancé), lecture seule, GET seul · X4 mutants · X5 ref sans date (P78-D-31), auteurs de la fenêtre
++# Dépôts fabriqués dans mktemp (dates de commit fixées, aucun dépôt distant). Exit 0 si tout passe, 1 sinon.
++
++set -uo pipefail
++export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
++export GIT_AUTHOR_NAME=Alice GIT_AUTHOR_EMAIL=a@t.test GIT_COMMITTER_NAME=Alice GIT_COMMITTER_EMAIL=a@t.test
++SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
++WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"
++AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
++export HOME="$WORK/home"
++GIT_REEL="$(command -v git)"
++SRV=""
++stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
++trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || { chmod -R u+rwx "$WORK" 2>/dev/null; rm -rf "$WORK"; }' EXIT
++. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
++
++PASS=0; FAIL=0
++assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
++libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
++
++# --- outils node écrits par la suite ---
++# req.mjs <port> <méthode> <chemin> <jeton|-> <origin|-> : ligne 1 = statut, puis le corps
++cat > "$AUX/req.mjs" <<'JS'
++import http from 'node:http';
++const [, , port, methode, p, token, origin] = process.argv;
++const headers = { Host: `127.0.0.1:${port}`, ...(token !== '-' ? { 'x-vf-cockpit-token': token } : {}), ...(origin !== '-' ? { Origin: origin } : {}) };
++const r = http.request({ host: '127.0.0.1', port: Number(port), path: p, method: methode, headers }, (res) => { let b = ''; res.on('data', (c) => (b += c)); res.on('end', () => { console.log(res.statusCode); process.stdout.write(b); }); });
++r.on('error', (e) => console.log('ERR ' + e.message)); r.end();
++JS
++cat > "$AUX/token.mjs" <<'JS'
++import http from 'node:http';
++const [, , port, p] = process.argv;
++http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}` } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => console.log(/VF_COCKPIT_SERVER=\{"token":"([0-9a-f]+)"/.exec(b)?.[1] || '')); });
++JS
++# j.mjs <fichier|-> <expression sur j> : JSON lu dans le fichier, expression évaluée
++cat > "$AUX/j.mjs" <<'JS'
++import fs from 'node:fs';
++let j; try { j = JSON.parse(fs.readFileSync(process.argv[2] === '-' ? 0 : process.argv[2], 'utf8')); } catch { console.log('illisible'); process.exit(0); }
++const v = new Function('j', 'return (' + process.argv[3] + ')')(j);
++console.log(typeof v === 'string' ? v : JSON.stringify(v));
++JS
++J() { node "$AUX/j.mjs" "$1" "$2" 2>/dev/null || echo "illisible"; }
++# det.mjs <scripts> <commit|wt|git|route> <lab> [arg] : JSON du module chargé depuis <scripts> (copie de mutant possible)
++cat > "$AUX/det.mjs" <<'JS'
++import { pathToFileURL } from 'node:url';
++import path from 'node:path';
++const [, , scripts, fn, lab, arg] = process.argv;
++let m, g;
++try { m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git-details.mjs')).href); } catch { console.log(JSON.stringify({ erreur: 'module absent' })); process.exit(0); }
++if (fn === 'commit') console.log(JSON.stringify(m.detailCommit(lab, arg)));
++else if (fn === 'wt') console.log(JSON.stringify(m.etatWorktrees(lab)));
++else if (fn === 'git') { g = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href); console.log(JSON.stringify(g.lireGit(lab))); }
++else if (fn === 'status') console.log(JSON.stringify(m.lireStatusV2(arg, { max: 200 })));
++JS
++# route.mjs <scripts> <méthode> <chemin> <lab> : appelle routeGit avec un faux req/res ; rend « traité|statut »
++cat > "$AUX/route.mjs" <<'JS'
++import { pathToFileURL } from 'node:url';
++import path from 'node:path';
++const [, , scripts, methode, p, lab] = process.argv;
++let m; try { m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-git.mjs')).href); } catch { console.log('module absent'); process.exit(0); }
++let statut = null; const res = { writeHead: (c) => { statut = c; }, end: () => {} };
++const traite = m.routeGit({ method: methode }, res, new URL('http://x' + p), { root: lab, json: (r, c) => { statut = c; } });
++console.log(traite + '|' + statut);
++JS
++# empreinte.mjs <dossier> : une ligne par fichier (chemin, taille, date), triée — lue en Node, jamais par stat ou find
++cat > "$AUX/empreinte.mjs" <<'JS'
++import fs from 'node:fs';
++import path from 'node:path';
++const lignes = [];
++const parcourir = (d) => { for (const e of fs.readdirSync(d)) { const p = path.join(d, e), s = fs.lstatSync(p); if (s.isDirectory()) parcourir(p); else lignes.push(`${path.relative(process.argv[2], p)} ${s.size} ${s.mtimeMs}`); } };
++parcourir(process.argv[2]);
++console.log(lignes.sort().join('\n'));
++JS
++# mut.mjs <fichier> <de> <vers> : remplace UNE occurrence exacte (rend « absent » si le motif n'existe plus : un mutant sans cible ne compte pas)
++cat > "$AUX/mut.mjs" <<'JS'
++import fs from 'node:fs';
++const [, , f, de, vers] = process.argv;
++const t = fs.readFileSync(f, 'utf8');
++if (!t.includes(de)) { console.log('absent'); process.exit(0); }
++fs.writeFileSync(f, t.replace(de, () => vers)); console.log('applique');
++JS
++
++# --- fixture : un dépôt à historique varié ---
++T=0
++tick() { T=$((T+1)); export GIT_AUTHOR_DATE="@$((1700000000+T*60)) +0000" GIT_COMMITTER_DATE="@$((1700000000+T*60)) +0000"; }
++LAB="$WORK/lab"; mkdir -p "$LAB"
++G() { "$GIT_REEL" -C "$LAB" "$@"; }
++G init -q -b main
++printf 'l1\nl2\nl3\n' > "$LAB/a.txt"; printf 'o1\no2\no3\no4\no5\n' > "$LAB/old.txt"
++G add -A; tick; G commit -q -m "c0 racine"; C0="$(G rev-parse HEAD)"
++printf 'l1\nL2\nl3\nl4\nl5\n' > "$LAB/a.txt"; printf 'n1\n' > "$LAB/new.txt"
++G add -A; tick; G commit -q -m "sujet" -m "corps ligne 2"; C1="$(G rev-parse HEAD)"
++printf 'a\0b\n' > "$LAB/img.bin"; G mv old.txt renamed.txt
++G add -A; tick; G commit -q -m "c2 binaire et renommage"; C2="$(G rev-parse HEAD)"
++G checkout -q -b f; printf 'f1\nf2\n' > "$LAB/f.txt"; G add -A; tick; G commit -q -m "f1"
++G checkout -q main; printf 'm1\n' > "$LAB/m.txt"; G add -A; tick; G commit -q -m "m1"; M1="$(G rev-parse HEAD)"
++tick; G merge -q --no-ff f -m "merge f"; MG="$(G rev-parse HEAD)"
++# message de 10 Kio
++node -e "process.stdout.write('sujet long\n\n' + ('x'.repeat(79) + '\n').repeat(128))" > "$WORK/msg10k.txt"
++tick; G commit -q --allow-empty -F "$WORK/msg10k.txt"; CMSG="$(G rev-parse HEAD)"
++# 600 fichiers
++mkdir -p "$LAB/many"; for i in $(seq 1 600); do printf 'x%s\n' "$i" > "$LAB/many/f$(printf '%03d' "$i").txt"; done
++G add -A; tick; G commit -q -m "600 fichiers"; CMANY="$(G rev-parse HEAD)"
++G tag v1 "$C1"; tick; G tag -a ann -m annotee "$C1"
++TREE="$(G rev-parse "$CMANY^{tree}")"; BLOB="$(G rev-parse "$C1:a.txt")"; TAGOBJ="$(G rev-parse ann)"
++assert_eq "X0.1 — fixture : racine, merge à 2 parents, tag annoté distinct du commit" "$(G rev-list --count --max-parents=0 HEAD)|$(G rev-list --count --min-parents=2 HEAD)|$([ "$TAGOBJ" != "$C1" ] && echo distinct)" "1|1|distinct"
++
++# --- serveur réel sur le lab ---
++node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
++OUT="$LAB/.vibeflow/cockpit"
++node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
++SRV=$!
++for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
++PORT=$(node "$AUX/j.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
++TOK=$(node "$AUX/token.mjs" "$PORT" /)
++assert_eq "X0.2 — serveur démarré, jeton lu dans la page" "$([ "$PORT" -gt 0 ] && [ "${#TOK}" -ge 16 ] && echo oui || echo non)" "oui"
++GET() { node "$AUX/req.mjs" "$PORT" GET "$1" "$TOK" - ; }
++CM() { GET "/api/vf/git/commit?sha=$1" > "$WORK/cm.out"; sed -n '2,$p' "$WORK/cm.out" > "$WORK/cm.json"; sed -n 1p "$WORK/cm.out"; } # statut ; corps dans cm.json
++
++echo "=== X1 — détail d'un commit ==="
++S="$(CM "$C1")"
++assert_eq "X1.1a — commit ordinaire : 200, schéma, état, sha, h7" "$S|$(J "$WORK/cm.json" 'j.schema+"|"+j.etat+"|"+(j.h==="'"$C1"'")+"|"+(j.h7==="'"${C1:0:7}"'")')" "200|vibeflow/cockpit-git-commit@1|ok|true|true"
++assert_eq "X1.1b — auteur, date ISO, message entier, un parent" "$(J "$WORK/cm.json" 'j.auteur+"|"+/^\d{4}-\d\d-\d\dT/.test(j.date)+"|"+JSON.stringify(j.message)+"|"+j.p.length')" 'Alice|true|"sujet\n\ncorps ligne 2"|1'
++assert_eq "X1.1c — fichiers touchés avec + et − exacts" "$(J "$WORK/cm.json" 'JSON.stringify(j.fichiers.map(f=>[f.chemin,f.ancien,f.plus,f.moins,f.binaire]))')" '[["a.txt",null,3,1,false],["new.txt",null,1,0,false]]'
++assert_eq "X1.1d — total, pas tronqué, aucun e-mail ni diff" "$(J "$WORK/cm.json" 'j.total+"|"+j.tronque+"|"+/a@t\.test|@/.test(JSON.stringify(j))+"|"+/^[-+]{3} |^@@/m.test(JSON.stringify(j))')" "2|false|false|false"
++assert_eq "X1.1e — commandes à copier (P78-D-14 : formes de 78-03)" "$(J "$WORK/cm.json" 'j.commandes.show+"|"+j.commandes.detacher')" "git show --stat --end-of-options ${C1:0:7}|git switch --detach --end-of-options ${C1:0:7}"
++
++echo "=== X1.2 — le sha : motif strict puis rev-parse --verify ==="
++# 400 sha-invalide : rien d'autre qu'un sha complet en minuscules n'est accepté (HEAD, v1 et un sha court de 12 caractères existent bel et bien)
++UPPER="$(printf '%s' "$C1" | tr 'a-f' 'A-F')"
++check400() { local nom="$1" q="$2"; S="$(CM "$q")"; assert_eq "X1.2 — $nom : 400 sha-invalide" "$S|$(J "$WORK/cm.json" 'j.etat')" "400|sha-invalide"; }
++check400 "sha court de 12 caractères (existe : rev-parse --verify l'accepterait)" "${C1:0:12}"
++check400 "sha en majuscules" "$UPPER"
++check400 "HEAD (existe)" "HEAD"
++check400 "v1 (le tag existe)" "v1"
++check400 "--all" "--all"
++check400 "-x" "-x"
++check400 "sha suivi d'une espace" "$C1%20"
++check400 "sha de 41 caractères" "${C1}0"
++check400 "paramètre vide" ""
++GET "/api/vf/git/commit" > "$WORK/cm0.out"
++assert_eq "X1.2 — paramètre sha absent : 400 sha-invalide" "$(sed -n 1p "$WORK/cm0.out")|$(sed -n '2,$p' "$WORK/cm0.out" | node "$AUX/j.mjs" - 'j.etat')" "400|sha-invalide"
++# 404 commit-inconnu : forme valide, mais pas un commit, ou un objet qui n'est pas lui-même le commit (rev-parse --verify <tag>^{commit} pèle jusqu'au commit)
++check404() { local nom="$1" q="$2"; S="$(CM "$q")"; assert_eq "X1.2 — $nom : 404 commit-inconnu" "$S|$(J "$WORK/cm.json" 'j.etat')" "404|commit-inconnu"; }
++check404 "0000…0" "0000000000000000000000000000000000000000"
++check404 "sha d'un arbre" "$TREE"
++check404 "sha d'un blob" "$BLOB"
++check404 "sha d'un tag annoté (pèle vers un commit : ce n'est pas le même sha)" "$TAGOBJ"
++check404 "sha inexistant bien formé" "1234567890123456789012345678901234567890"
++
++echo "=== X1.3 à X1.5 — binaire, renommage, racine, merge, bornes ==="
++CM "$C2" > /dev/null
++assert_eq "X1.3 — binaire (binaire: true, plus et moins nuls) et renommage (ancien et nouveau chemin)" "$(J "$WORK/cm.json" 'JSON.stringify(j.fichiers.map(f=>[f.chemin,f.ancien,f.plus,f.moins,f.binaire]))')" '[["img.bin",null,null,null,true],["renamed.txt","old.txt",0,0,false]]'
++CM "$C0" > /dev/null
++assert_eq "X1.4a — commit racine : fichiers de --root, aucun parent" "$(J "$WORK/cm.json" 'JSON.stringify(j.fichiers.map(f=>[f.chemin,f.plus,f.moins]))+"|"+j.p.length')" '[["a.txt",3,0],["old.txt",5,0]]|0'
++S="$(CM "$MG")"
++assert_eq "X1.4b — merge --no-ff : fichiers contre le PREMIER parent seulement (f.txt, pas m.txt), deux parents" "$S|$(J "$WORK/cm.json" 'JSON.stringify(j.fichiers.map(f=>f.chemin))+"|"+j.p.length+"|"+(j.p[0]==="'"$M1"'")')" '200|["f.txt"]|2|true'
++CM "$CMSG" > /dev/null
++assert_eq "X1.5a — message de 10 Kio : tronque vrai, au plus 8192 octets, début conservé" "$(J "$WORK/cm.json" 'j.tronque+"|"+(Buffer.byteLength(j.message)<=8192)+"|"+(Buffer.byteLength(j.message)>8000)+"|"+j.message.startsWith("sujet long")')" "true|true|true|true"
++CM "$CMANY" > /dev/null
++assert_eq "X1.5b — 600 fichiers : 500 lus, total 600" "$(J "$WORK/cm.json" 'j.fichiers.length+"|"+j.total')" "500|600"
++
++# --- FIN ---
++stop_srv
++vf_hyg_assert
++echo ""
++echo "=================================="
++echo "  Résultats : $PASS PASS / $FAIL FAIL"
++echo "=================================="
++TOTAL=$((PASS+FAIL))
++if [ "$TOTAL" -eq 0 ]; then echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE — zéro assertion exécutée, résultat non fiable"; exit 1; fi
++[ "$FAIL" -eq 0 ] && exit 0 || exit 1

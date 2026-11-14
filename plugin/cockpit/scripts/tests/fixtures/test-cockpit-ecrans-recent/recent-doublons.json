@@ -1,0 +1,9 @@
+{
+  "fichiers": ["a.js", "b.js", "c.js"],
+  "chains": { "f:a.js": ["f:a.js", "n:part", "root"], "f:b.js": ["f:b.js", "n:part", "root"], "f:c.js": ["f:c.js", "n:part", "root"] },
+  "marques": [
+    ["a.js", "en-cours", ["vf-coder · nœud 1", "vf-reviewer · nœud 2"]],
+    ["b.js", "en-cours", ["vf-coder · nœud 1"]],
+    ["c.js", "en-cours", ["vf-reviewer · nœud 2"]]
+  ]
+}
