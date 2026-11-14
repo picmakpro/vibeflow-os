@@ -24,11 +24,12 @@ import { execFileSync } from 'node:child_process';
 
 const [, , cmd, ...args] = process.argv;
 
-// copie figée de v2.75.0 (formule de pageCsp, serve.mjs) AVEC la seule source de script du préfixe de /_vf/ (79-16, A40 : `${source}` insérée après les empreintes) ; ne se met JAMAIS à jour avec le moteur
-const LIGNE_CSP_V275 = "  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')} ${source}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;";
+// copie figée de v2.75.0 (formule de pageCsp, serve.mjs) AVEC les deux seules insertions de la phase 79 (A40) : la source de script du préfixe de /_vf/ (79-16 : `${source}` après les empreintes)
+// et la directive de worker à l'URL exacte du fil (79-18 ; AU18-01 : `; ${worker}` juste après, deuxième et dernière extension) ; ne se met JAMAIS à jour avec le moteur
+const LIGNE_CSP_V275 = "  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')} ${source}; ${worker}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;";
 const cspV275 = (html, source) => {
   const hashes = [...String(html).matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`);
-  return `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')} ${source}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;
+  return `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')} ${source}; worker-src ${source}elk-fil.js; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;
 };
 
 const interpreter = (t) => String(t).replace(/\\x([0-9a-fA-F]{2})/g, (_, h) => String.fromCharCode(parseInt(h, 16))).replace(/\\n/g, '\n').replace(/\\r/g, '\r');

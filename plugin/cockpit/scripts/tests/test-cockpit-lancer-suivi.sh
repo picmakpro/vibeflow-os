@@ -402,6 +402,112 @@ assert_eq "LE.4 — valeurs hostiles : aucune ligne, aucune exception, rien d'ho
 assert_eq "LE.5 — un sous-agent clé de la Map et une clé absente de who : rien ; seule la session valide de la même Map change" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" hors-session 2>&1)" "$SAIN_LE5"
 assert_eq "LE.6 — name, nom, title, customTitle hostiles : absents de la sortie, libellé « Session principale » (sans titre ni branche, PU-G-162)" "$(node "$AUX/carte.mjs" "$SCRIPTS" "$AUX/base" noms 2>&1)" "absent:oui|label:ok"
 
+echo "== LR ligne de lancement portée par who@2 (P73-D-21) =="
+# Harnais : labs de fixture jetables (git, HOME jetable, horloge figée à `now`), collectWho sans verrou ; LR.6 : startLive (fil de collecte) avec l'option `lancees`.
+cat > "$AUX/lr.mjs" <<'JS'
+import fs from 'node:fs';
+import path from 'node:path';
+import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, sc, work0] = process.argv;
+fs.mkdirSync(work0, { recursive: true });
+const work = fs.realpathSync(work0), home = path.join(work, 'home'), noscripts = path.join(work, 'noscripts');
+fs.mkdirSync(noscripts, { recursive: true });
+const NOW = Date.parse('2026-11-01T12:00:00Z');
+const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
+const U = (n) => `${String(n).repeat(8)}-${String(n).repeat(4)}-4${String(n).repeat(3)}-8${String(n).repeat(3)}-${String(n).repeat(12)}`;
+const git = (d, ...a) => execFileSync('git', ['-C', d, ...a], { stdio: 'ignore' });
+const ligne = (d, id, o) => JSON.stringify({ cwd: d, sessionId: id, gitBranch: 'main', version: '2.1.316', ...o });
+function transcript(f, d, id, ageS, extra = {}) {
+  fs.mkdirSync(path.dirname(f), { recursive: true });
+  const l = [ligne(d, id, { type: 'user', timestamp: '2026-11-01T11:59:00Z', message: { content: 'salut' }, ...extra }),
+    ligne(d, id, { type: 'assistant', timestamp: '2026-11-01T11:59:05Z', message: { content: [{ type: 'tool_use', name: 'Bash', input: { description: 'ls', command: 'ls' } }] } })];
+  fs.writeFileSync(f, l.join('\n') + '\n');
+  const t = (NOW - ageS * 1000) / 1000; fs.utimesSync(f, t, t);
+}
+function lab(nom, { sessions = [], dag = false, ws = false, sub = null } = {}) {
+  const d = path.join(work, nom); fs.mkdirSync(d, { recursive: true });
+  git(d, 'init', '-q'); git(d, 'symbolic-ref', 'HEAD', 'refs/heads/main');
+  const plan = ws ? path.join(d, '.planning', 'workstreams', 'alpha') : path.join(d, '.planning'); fs.mkdirSync(plan, { recursive: true });
+  fs.writeFileSync(path.join(plan, 'ROADMAP.md'), '- [ ] **Phase 7: Alpha**\n');
+  if (dag) {
+    fs.mkdirSync(path.join(d, '.planning', 'missions'), { recursive: true });
+    const f = path.join(d, '.planning', 'missions', 'MISSION-7.dag.json');
+    fs.writeFileSync(f, JSON.stringify({ name: 'MISSION-7', nodes: [{ id: 'n1', deps: [], status: 'running', step: 'faire' }, { id: 'n2', deps: ['n1'], status: 'ready' }] }));
+    const t = (NOW - 60000) / 1000; fs.utimesSync(f, t, t);
+  }
+  for (const s of sessions) {
+    const f = path.join(home, '.claude', 'projects', '-' + nom, s.id + '.jsonl');
+    transcript(f, d, s.id, s.ageS, s.extra);
+    if (sub && s === sessions[0]) { const sd = path.join(home, '.claude', 'projects', '-' + nom, s.id, 'subagents'); const a = path.join(sd, `agent-${sub}`);
+      fs.mkdirSync(sd, { recursive: true });
+      fs.writeFileSync(a + '.meta.json', JSON.stringify({ agentType: 'vf-coder', description: 'tâche', spawnDepth: 1, toolUseId: 'toolu_x', requestShape: 'background' }));
+      transcript(a + '.jsonl', d, s.id, 30); const l = fs.readFileSync(a + '.jsonl', 'utf8').split('\n'); l[0] = l[0].replace(/^\{/, `{"isSidechain":true,"agentId":"${sub}",`); fs.writeFileSync(a + '.jsonl', l.join('\n'));
+      const t = (NOW - 30000) / 1000; fs.utimesSync(a + '.jsonl', t, t); }
+  }
+  return d;
+}
+const collect = async (d, o = {}) => (await imp('vf-cockpit-who.mjs')).collectWho(d, { home, scriptsDir: noscripts, now: NOW, ...o });
+const V = (phase, ws, verbe) => ({ phase, ws, verbe });
+const sess = (w, id) => w.workers.find((x) => x.kind === 'session' && x.id === id);
+const norm = (w, d) => JSON.stringify({ ...w, at: '' }).split(d).join('<LAB>').split(work).join('<W>');
+const SC = {
+  sain: async () => {
+    const jeux = [lab('l1'), lab('l2', { sessions: [{ id: U(1), ageS: 60 }] }), lab('l3', { sessions: [{ id: U(2), ageS: 3600 }] }), lab('l4', { sessions: [{ id: U(3), ageS: 60 }], sub: 'agent7' }),
+      lab('l5', { dag: true }), lab('l6', { sessions: [{ id: U(4), ageS: 60 }, { id: U(5), ageS: 3600 }] }), lab('l7', { ws: true, dag: true, sessions: [{ id: U(6), ageS: 90 }] })];
+    const out = [];
+    for (const d of jeux) out.push(crypto.createHash('sha256').update(norm(await collect(d), d)).digest('hex'));
+    return out.join(',');
+  },
+  valide: async () => { const d = lab('v', { sessions: [{ id: U(1), ageS: 60 }] }); return JSON.stringify(sess(await collect(d, { lancees: new Map([[U(1), V('72', 'alpha', 'planifier')]]) }), U(1)).lancee); },
+  'sans-ws': async () => {
+    const d = lab('v', { sessions: [{ id: U(1), ageS: 60 }] }); const l = sess(await collect(d, { lancees: new Map([[U(1), V('72', null, 'planifier')]]) }), U(1)).lancee;
+    return l && l.phase === '72' && l.verbe === 'planifier' && (!('ws' in l) || l.ws === '') ? 'ok' : 'ko:' + JSON.stringify(l);
+  },
+  hostile: async () => {
+    const T = () => ({ toString() { throw new Error('piege'); } });
+    const H = [V('72; x', 'alpha', 'planifier'), V('72', 'alpha', 'rm -rf'), V(T(), 'alpha', 'planifier'), V('72', T(), 'planifier'), V('72', 'alpha', T()), V('72', 'a$(id)', 'planifier'), null, 'x', 42];
+    const ids = H.map((_, i) => U(i + 1)), ok = U('a');
+    const d = lab('h', { sessions: [...ids.map((id) => ({ id, ageS: 60 })), { id: ok, ageS: 60 }] });
+    const map = new Map(ids.map((id, i) => [id, H[i]])); map.set(ok, V('72', 'alpha', 'verifier'));
+    let w; try { w = await collect(d, { lancees: map }); } catch (e) { return 'exc:1 ' + e.message; }
+    return `exc:0|aucune:${ids.every((id) => !('lancee' in sess(w, id)))}|temoin:${JSON.stringify(sess(w, ok).lancee) === JSON.stringify({ phase: '72', ws: 'alpha', verbe: 'verifier' }) ? 'ok' : 'ko'}`;
+  },
+  'hors-session': async () => {
+    const d = lab('s', { sessions: [{ id: U(1), ageS: 60 }, { id: U(2), ageS: 60 }], sub: 'agent7' });
+    const w = await collect(d, { lancees: new Map([['agent7', V('72', 'alpha', 'executer')], ['absent-id', V('72', 'alpha', 'executer')], [U(2), V('72', 'alpha', 'executer')]]) });
+    const sa = w.workers.filter((x) => x.kind === 'subagent');
+    return `sub:${sa.length === 1 && sa.every((x) => !('lancee' in x))}|absent:${!w.workers.some((x) => x.id === 'absent-id')}|s1:${!('lancee' in sess(w, U(1)))}|temoin:${!!sess(w, U(2)).lancee}`;
+  },
+  live: async () => {
+    const d = lab('lv', { sessions: [{ id: U(1), ageS: 60 }] }); const sortie = path.join(d, '.vibeflow', 'cockpit'); fs.mkdirSync(sortie, { recursive: true });
+    // l'âge de la fixture est figé à NOW : on le recale sur l'horloge réelle pour que la session soit lue
+    const f = path.join(home, '.claude', 'projects', '-lv', U(1) + '.jsonl'); const t = Date.now() / 1000 - 60; fs.utimesSync(f, t, t);
+    const { startLive } = await imp('vf-cockpit-live.mjs');
+    const live = startLive({ root: d, sortie, mode: 'poll', garde: () => true, lancees: () => new Map([[U(1), V('72', 'alpha', 'planifier')]]) });
+    let r = 'delai';
+    for (let i = 0; i < 200; i++) { const s = live.snapshot().who.workers.find((x) => x.kind === 'session' && x.id === U(1)); if (s) { r = JSON.stringify(s.lancee); break; } await new Promise((k) => setTimeout(k, 100)); }
+    live.stop(); return r;
+  },
+};
+console.log(await SC[sc]());
+process.exit(0);
+JS
+mkdir -p "$WORK/fakebin"; printf '#!/bin/sh\nexit 1\n' > "$WORK/fakebin/claude"; chmod +x "$WORK/fakebin/claude" # faux claude : aucun vrai appel de la collecte (LR.6)
+LRH() { local sc="$1"; HOME="$WORK/lr-$sc/home" PATH="$WORK/fakebin:$PATH" node "$AUX/lr.mjs" "$SCRIPTS" "$sc" "$WORK/lr-$sc" 2>&1; } # HOME jetable : le fil de collecte lit les sessions de la fixture, jamais celles du poste
+# valeur saine de LR.1 : capturée sur le code d'AVANT 73-03 (commit de base et commande dans 73-03-RED-TRACE.md), figée ici ; sept labs, un sha256 chacun
+SAIN_LR1="b4b3cd3802ee2be2b817b81c87f1d7f863ce263a76f5fe003fdc9a409c683545,b7f9cff75d7e6ed44e866b3dcc88a3e1fef3389ff9450d7f2f84269ec04b57a6,0c427f45db0037900967dd5d8a965da74556e2ade8f45ef0d180d8e0976e099c,fdb2203e921beead8f3cef7a8683bfc3f7042606f180662d920b1d8b64e3834d,213202c267bb388346f711fec10ef1164d9668f999a9526ed2690a788fbf51c6,5618478371c026523073379b88611170819b21bc745f38764735ef97814f4adc,3fe8cdb6715034a6ff1957ea19bd206cc12b19e376fdf9eff0c41c7f3030146f" # capture : code de base c4053a32, voir 73-03-RED-TRACE.md
+SAIN_LR2='{"phase":"72","ws":"alpha","verbe":"planifier"}'
+SAIN_LR4="exc:0|aucune:true|temoin:ok"
+SAIN_LR5="sub:true|absent:true|s1:true|temoin:true"
+assert_eq "LR.1 — sept labs sans verrou, sans fin de tour, sans VERIFICATION, sans scripts du conductor : collectWho sans l'option lancees rend, au champ at près, la sortie d'avant (sha256 par lab)" "$(LRH sain)" "$SAIN_LR1"
+assert_eq "LR.2 — une entrée valide pour la session : lancee { phase, ws, verbe } sur la session" "$(LRH valide)" "$SAIN_LR2"
+assert_eq "LR.3 — sans compartiment : ws absent ou vide dans lancee" "$(LRH sans-ws)" "ok"
+assert_eq "LR.4 — valeurs hostiles (phase « 72; x », verbe inconnu, objets à toString piégé) : aucun champ lancee, aucune exception ; la même Map pose lancee sur la session valide" "$(LRH hostile)" "$SAIN_LR4"
+assert_eq "LR.5 — la clé d'un sous-agent et une clé absente de who : rien ; la session valide de la même Map reçoit lancee" "$(LRH hors-session)" "$SAIN_LR5"
+assert_eq "LR.6 — startLive reçoit lancees : snapshot().who porte lancee sur la session" "$(LRH live)" "$SAIN_LR2"
+
 echo "== Mutants =="
 mut_ls M-FORME-LIBRE '/garde:forme/d' ls12 "$SAIN_LS12" LS1.2
 mut_ls M-AT-DU-MESSAGE '/garde:at-de-p/s#maintenant()#Number(msg.at) || maintenant()#' ls22 "$SAIN_LS22" LS2.2
@@ -414,6 +520,19 @@ mut_ls M-TERMINEE-PERDUE "/garde:termine/s#w.etat === 'termine'#false#" ls33 "$S
 mut_le M-LANCEES-HORS-SESSION "/garde:lancees/s# && w\\.kind === 'session'##" hors-session "$SAIN_LE5" LE.5
 mut_le M-LIGNE-SANS-VALIDATION '/garde:ligne-valide/s#l && entreeLanceeValide(l)#l#' hostile "$SAIN_LE4" LE.4
 mut_le M-LIGNE-VIDE-TOUJOURS "/garde:ligne-insert/s#.*#      lignes.push(t || ''); // garde:ligne-insert#" identique "$SAIN_LE1" LE.1
+
+# mutants de la ligne de lancement portée par who@2 (P73-D-21) : copie de tous les modules du module dans $WORK/mut-<nom>/, sed sur la ligne marquée ; sonde = scénario LR rejoué sur la copie
+mut_lr() { # mut_lr <nom> <expression-sed> <scénario> <valeur saine> <sonde>
+  local d="$WORK/mut-$1" got v=vert; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$d/"
+  cp "$d/vf-cockpit-who.mjs" "$d/who.orig"; sed -i.bak "$2" "$d/vf-cockpit-who.mjs"
+  if cmp -s "$d/vf-cockpit-who.mjs" "$d/who.orig"; then sans_effet "$1"; return 0; fi
+  rm -f "$d/who.orig" "$d/vf-cockpit-who.mjs.bak"
+  got="$(HOME="$WORK/lrm-$1/home" node "$AUX/lr.mjs" "$d" "$3" "$WORK/lrm-$1" 2>&1 | tail -1)"
+  if [ -n "$got" ] && [ "$got" != "$4" ]; then v=rouge; fi
+  assert_eq "$1 — le mutant rougit $5 : le relevé [${got:0:60}] n'est plus la valeur saine (témoin : le scénario s'exécute)" "$v" "rouge"
+}
+mut_lr M-LANCEE-HORS-SESSION "/garde:lancee-session/s#w\.kind === 'session' ? lancees\.get(w\.id) : undefined#lancees.get(w.id)#" hors-session "$SAIN_LR5" LR.5
+mut_lr M-LANCEE-SANS-VALIDATION '/garde:lancee-valide/s#e \&\& entreeLanceeValide(e)#e#' hostile "$SAIN_LR4" LR.4
 
 vf_hyg_assert
 

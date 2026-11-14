@@ -6,6 +6,7 @@ Ce fichier est aussi la sentinelle de détection du moteur (engineDir, vf-cockpi
 
 AJOUT LICENCES-TIERCES.txt
 AJOUT VENDORED.txt
+AJOUT assets/elk-fil.js
 AJOUT assets/ui/00-vf-onglets-echec.js
 AJOUT assets/ui/00-vf-onglets.js
 AJOUT assets/ui/00-vf-surcouches.js
@@ -39,6 +40,8 @@ AJOUT assets/ui/70-vf-etat.js
 AJOUT assets/ui/70-vf-live.js
 AJOUT assets/ui/71-vf-equipe-rendu.js
 AJOUT assets/ui/72-vf-equipe.js
+AJOUT assets/ui/72-vf-regie-modele.js
+AJOUT assets/ui/72-vf-regie-style.js
 AJOUT assets/ui/73-vf-tiroir-travail.js
 AJOUT assets/ui/75-vf-modele.js
 AJOUT assets/ui/76-vf-git-entete.js
@@ -83,6 +86,7 @@ TAILLE assets/serve.mjs
 TAILLE assets/vendor/elk.bundled.js
 TAILLE assets/viewer.html .html, hors gate
 TAILLE scripts/build.mjs
+TAILLE scripts/lib/common.mjs
 TAILLE scripts/lib/extract.mjs
 TAILLE scripts/lib/health.mjs
 TAILLE scripts/lib/screens.mjs
