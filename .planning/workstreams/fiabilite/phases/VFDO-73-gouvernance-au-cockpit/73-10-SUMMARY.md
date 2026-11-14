@@ -37,3 +37,15 @@ rituel levé : régime allégé (consigne de Samuel, message session principale,
 ## Rouge ouvert à cause de ce plan
 
 - `test-cockpit-equipe-etats.sh` D3.8 « un terminé ne vieillit pas dans la page » : il attend « a duré 2 min » dans l'arbre du tiroir pour un terminé seul, désormais compté par le lien. Fichier de 73-09 (interdit à ce mandat). Correction : donner au terminé un agent en cours comme enfant dans la fixture (même propriété, terminé listé), comme EA2.15 et EUI2.20.
+
+## Correctifs de fin de phase
+
+Écart relevé par la Phase 74, arbitré par le coordinateur : depuis le retrait du canevas d'Équipe (73-08), `ui/` ne produit plus aucun `[data-vf-transcript]` ni `.vf-transcript` (vérifié par grep sur `plugin/cockpit`, lecteur de repli de la régie compris : `72-vf-regie-source.js` et `71-vf-equipe-rendu.js` n'en citent aucun).
+
+- Retiré de `70-vf-live.js` : les deux sélecteurs `[data-vf-transcript]` des règles de bouton, les quatre règles `.vf-transcript`, la constante `BTN` et `DANS_PANNEAU` restreintes à `doing` et `repli`, la clé de focus `transcript:` de `cleBtn`. Cela corrige l'« Écart de feuille » du CHANGELOG, qui laissait ces lignes inertes.
+- Témoin : RG11.24 (`regie-rg-tiroir.sh`), `grep -c` à 0 ; vu rouge à 8 avant le retrait, vert après.
+- Sondes : `reposer-chrome.mjs`, l'action `transcript-puis-who` retirée (aucun appelant ; la propriété EKR2 reste mesurée sur le lecteur de repli de la régie par `lecteur-puis-who` de `chrome-equipe-clavier.mjs`, suite equipe). `chrome-equipe-clavier.mjs` : champ `transcript` du descripteur de focus et constante `LU` retirés (aucun lecteur).
+- Baseline des colonnes : `70-vf-live.js` abaissée de 59 à 56 (`abaisser`, baisse seule, aucune hausse).
+- Suites : `test-cockpit-regie.sh RG11_tiroir` 11 PASS / 0 FAIL ; `test-cockpit-equipe.sh` 219 PASS / 0 FAIL au rejeu (un premier passage : EK8 et EK18.3 rouges sous charge et travail concurrent sur `secondeVue`, vert au rejeu seul) ; `test-cockpit-vendor.sh` : V4c.9a/b rouges PERIMEE avant l'abaissement de la baseline (70-vf-live.js 59 à 56), puis 252 PASS / 1 FAIL : V4c.9a reste rouge sur des HAUSSE de 72-vf-regie-*.js (rendu, style, source), lignes d'autres plans, hors de ce correctif.
+
+rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
