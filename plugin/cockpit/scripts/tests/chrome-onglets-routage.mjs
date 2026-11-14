@@ -1,6 +1,6 @@
 // chrome-onglets-routage.mjs — mesures du routage des onglets sans rechargement (80-10, FORM-16) dans un vrai Chrome headless (vrais clics).
 // Usage : node chrome-onglets-routage.mjs <chrome> <racine-du-serveur> <mode> <fichier-00-vf-onglets.js> [filtre]   Rend UNE ligne JSON { … } ou { erreur }.
-// Modes : og1 (OG1.x, OG2.8), og2 (OG2.1, OG2.3 à OG2.7, OG2.9 à OG2.12), og3 (OG3.x), og2t (OG2.2, lab lancé avec --terminal).
+// Modes : og1 (OG1.x, OG2.8), og1e (OG1.5, clic réel vers Équipe), og2 (OG2.1, OG2.3 à OG2.7, OG2.9 à OG2.12), og3 (OG3.x), og2t (OG2.2, lab lancé avec --terminal).
 // Aucune absence de rechargement n'est lue sur une marque posée dans window (la portée d'onglet la retirerait) : performance.timeOrigin et les
 // évènements Page.loadEventFired du protocole. Les instruments (compteurs, échec forcé de GET /api/vf/graphe) sont posés avant la page, dans __o.
 import fs from 'node:fs';
@@ -78,6 +78,16 @@ await executer(chrome, async (s) => {
       const e3 = await onglet('projet', 3); o.og1.e3 = { ...e3, origine: e3.o === e0.o };
       const e4 = await onglet('code', 4); o.og1.e4 = { ...e4, origine: e4.o === e0.o };
       o.og28 = { pop: await lire('__o.pop'), nb: e4.evs };
+    });
+  }
+
+  if (mode === 'og1e') { // OG1.5 : un VRAI clic (Input.dispatchMouseEvent) sur l'onglet Équipe : intercepté, jamais un rechargement du document
+    await sec('og1e', async () => {
+      await charger('/'); const e0 = await etat(); const l0 = loads;
+      await clic('nav.vf-tabs a[href="equipe.html"]'); // sans attendre vf:onglet : un clic non intercepté recharge la page, et __o repart de zéro
+      await s.attendre(`location.pathname === '/equipe.html' && !!window.VF_ONGLETS && document.documentElement.dataset.vfPret === 'oui'`, 'Équipe', 15000);
+      const e1 = await stabiliser(etat, { pas: 200, max: 4000 });
+      o.og1e = { p: e1.p, origine: e1.o === e0.o, loads: loads - l0, last: e1.last, onglet: await lire('VF_ONGLETS.courant()') };
     });
   }
 
