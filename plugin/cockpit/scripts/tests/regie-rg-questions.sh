@@ -331,5 +331,5 @@ rg_RG17_liens() {
   q_fixtures
   local o="$WORK/q-chrome-liens.json"
   q_chrome liens "$o"
-  q_ok "RG17.L1 — navigateur : un clic sur « Carte de la phase » puis sur le lien du nœud d'une ligne ouverte mène à project.html" "$o" '[j.carte, j.noeud].join("|")' "/project.html|/project.html"
+  q_ok "RG17.L1 — navigateur : un clic sur « Carte de la phase » puis, la fiche d'un agent ouverte au clic sur son nom, sur le lien du nœud de sa ligne de rattachement mène à project.html" "$o" '[j.carte, j.noeud].join("|")' "/project.html|/project.html"
 }

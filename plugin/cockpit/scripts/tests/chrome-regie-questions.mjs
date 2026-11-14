@@ -17,7 +17,7 @@ const INJ = `(() => { const R = window.EventSource; window.__es = []; window.Eve
 // la carte de l'ancien onglet Équipe recharge la page quand un agent du who n'est pas dans la carte : un horodatage futur le tient en repos
 const CALME = "try { sessionStorage.setItem('vf-equipe-rechargement', String(Date.now() + 800000000)); } catch {}";
 const PRET = "document.readyState === 'complete' && !!document.getElementById('vf-equipe') && document.body.classList.contains('vf-regie-montee') && !!window.__vfRegieQuestions && !!window.__es && window.__es.some((e) => e.url.includes('/api/vf/events'))";
-const SID = 's0000000-aaaa-bbbb-cccc-111111111111';
+const SUB = 'a1b2c3d4e5f6', SID = 's0000000-aaaa-bbbb-cccc-111111111111';
 const AGENT = { kind: 'session', id: SID, etat: 'attend', titre: 'Atelier alpha', tree: '.', ageS: 120, dureeS: 900 };
 const PUSH = (w) => `window.__es.find((x) => x.url.includes('/api/vf/events')).__emit('who', { who: { workers: ${JSON.stringify(w)} } })`;
 // la valeur passe par la route du graphe Projet (VF_ETAT.lireJson), la même que celle de la 76 : l'enveloppe de la page Équipe ne porte pas le champ
@@ -86,7 +86,8 @@ await executer(chrome, async (s) => {
     return { ouvert, ferme, focusResume, secondFocus: await resume(), secondOuvert: await s.ev(`document.querySelector('${REPLI}').open`) };
   }
   if (scenario === 'liens') { // un clic réel sur les liens de la régie doit mener à leur cible (00-vibeflow.js annule les clics sous [data-vf-section])
-    const W = { phasesHumaines: [{ phase: '90', ws: '', ref: 'n:ph-90' }], workers: [{ ...AGENT, etat: 'actif', rattachement: { etat: 'rattache', dag: 'D1', noeud: 'N1' } }] };
+    const W = { phasesHumaines: [{ phase: '90', ws: '', ref: 'n:ph-90' }], workers: [{ ...AGENT, etat: 'actif' }, { kind: 'subagent', id: SUB, etat: 'actif', parent: SID, role: 'vf-coder', task: 'Tâche', tree: '.', ageS: 5, dureeS: 60, rattachement: { etat: 'rattache', dag: 'D1', noeud: 'N1' } }] };
+    const OUV = `li[data-vf-agent="${SUB}"] button.vf-rg-tog`; // un sous-agent : sa fiche porte le lien du nœud (une session, non)
     const cible = async (sel, avant) => {
       await s.ev(`document.querySelector(${JSON.stringify(sel)}).click()`);
       return attendreValeur(() => s.ev('location.pathname'), (p) => /project\.html$/.test(p), { max: 6000 });
@@ -96,13 +97,12 @@ await executer(chrome, async (s) => {
       for (let i = 0; i < 5; i++) { await s.ev(`window.__es.find((x) => x.url.includes('/api/vf/events')).__emit('who', { who: ${JSON.stringify(W)} })`); await pause(300); if (await s.ev(`!!document.querySelector(${JSON.stringify(sel)})`)) return; } };
     await pousseW(PH);
     const carte = await cible(PH);
-    await ouvrir(); await pousseW('button.vf-rg-tog');
-    // 74 : la fiche annule vf-agent:ouvrir et le détail de ligne (.vf-rg-plus) n'est plus atteignable au clic ; le lien du nœud se mesure dans la régie, isolée de la fiche (capture sur window)
-    await s.ev("window.addEventListener('vf-agent:ouvrir', (e) => e.stopImmediatePropagation(), true)");
-    await s.attendre("document.querySelector('button.vf-rg-tog')", 'ligne agent');
-    await s.ev("document.querySelector('button.vf-rg-tog').click()"); 
-    await s.attendre("!!document.querySelector('.vf-rg-plus a.vf-link')", 'lien du nœud');
-    const noeud = await cible('.vf-rg-plus a.vf-link');
+    await ouvrir(); await pousseW(OUV);
+    // 74 : le nom d'une ligne ouvre la fiche (elle annule vf-agent:ouvrir) ; le lien du nœud est celui de sa ligne de rattachement
+    await s.attendre(`!!document.querySelector(${JSON.stringify(OUV)})`, 'ligne agent');
+    await s.ev(`document.querySelector(${JSON.stringify(OUV)}).click()`);
+    await s.attendre("!!document.querySelector('.vf-fiche-ratt a[href*=\"project.html\"]')", 'lien du nœud de la fiche');
+    const noeud = await cible('.vf-fiche-ratt a[href*="project.html"]');
     return { carte, noeud };
   }
   if (scenario === 'titre') {

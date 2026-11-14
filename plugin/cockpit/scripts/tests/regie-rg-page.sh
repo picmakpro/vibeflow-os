@@ -6,7 +6,7 @@
 # Fixtures : noms et identifiants inventés. Les formes simulées de VF_ETAT, VF_COQUILLE et VF_SURCOUCHES sont dans vm-regie-page.mjs (à aligner sur le code livré).
 # Contrat du DOM attendu de la régie (écrit ici AVANT le code) : section#vf-equipe[role=main] > #vf-equipe-entete (h1, .vf-rg-sous, bascule role=tablist) puis .vf-vue[data-vf-vue] ;
 #   section.vf-rg-sec[data-vf-section] > h2 (tabindex -1) ; li.vf-rg-lig[data-vf-cle][data-vf-agent][data-vf-noeud][data-vf-etat] ; .vf-rg-nom (le nom, une fois) ; button[aria-expanded] (le nom, déplie) ;
-#   .vf-rg-plus (détail en flux) ; .vf-rg-dur ; .vf-rg-act button.btn (actions) ; .vf-rg-note (messages) ; recherche : input#search du moteur.
+#   .vf-rg-dur ; .vf-rg-act button.btn (actions) ; .vf-rg-note (messages) ; recherche : input#search du moteur.
 
 [ -n "${RG_PAGE_COMMUN:-}" ] || { . "$TESTS_DIR/regie-page-commun.sh"; RG_PAGE_COMMUN=1; }
 PG_SID='s0000000-aaaa-bbbb-cccc-111111111111'; PG_A='a1b2c3d4e5f6'; PG_F='f0f0f0f0f0f0'; PG_B='b9b9b9b9b9b9'
@@ -149,10 +149,10 @@ rg_RG15_page() {
   pg_ok "RG15.8 — valeur inconnue ou absente : « Régie »" "$o" 'j.out.sel.join()' "true,false"
   o="$(pg_sc '' '[{"nom":"ag","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-agent"}},{"nom":"no","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-noeud"}},{"nom":"et","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-etat"}},{"nom":"vn","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-noeud"}},{"nom":"ve","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-etat"}},{"nom":"va","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-agent"}}]')"
   pg_ok "RG15.2 — data-vf-agent, data-vf-noeud et data-vf-etat sur chaque ligne ; valeurs d'une ligne rattachée" "$o" 'j.out.ag + "|" + j.out.no + "|" + j.out.et + "|" + j.out.va + "|" + j.out.vn + "|" + j.out.ve' "0|0|0|$PG_A|N2|actif"
-  o="$(pg_sc '' '[{"annuler":[]},{"clic":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog"},{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","attr":"aria-expanded"}},{"nom":"det","obs":{"mode":"textes","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-plus"}},{"nom":"lien","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-plus a","attr":"href"}},{"touche":"Escape","sur":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","nom":"esc"},{"nom":"ex2","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","attr":"aria-expanded"}},{"nom":"f","obs":{"mode":"focus"}}]')"
-  pg_ok "RG15.3 — le nom, non annulé : vf-agent:ouvrir (nom) puis détail en flux (identifiant court, branche, arbre, lien Nœud) avec aria-expanded ; Échap replie et rend le focus au bouton" "$o" \
-    'j.out.e.evts[0].declencheur + "|" + j.out.ex.join() + "|" + ["s0000000","feat/x","main","Nœud"].map((s) => j.out.det.join(" ").includes(s)).join() + "|" + j.out.lien.join().includes("project.html#r=") + "|" + j.out.ex2.join() + "|" + j.out.f.tag + ":" + j.out.f.cle' \
-    "nom|true|true,true,true,true|true|false|BUTTON:au-travail:$PG_SID"
+  o="$(pg_sc '' '[{"annuler":[]},{"clic":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog"},{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","attr":"aria-expanded"}},{"touche":"Escape","sur":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","nom":"esc"},{"nom":"ex2","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","attr":"aria-expanded"}},{"nom":"f","obs":{"mode":"focus"}}]')"
+  pg_ok "RG15.3 — le nom, non annulé : vf-agent:ouvrir (nom) puis aria-expanded (le détail de ligne n'existe plus, la fiche prend le relais) ; Échap replie et rend le focus au bouton" "$o" \
+    'j.out.e.evts[0].declencheur + "|" + j.out.ex.join() + "|" + j.out.ex2.join() + "|" + j.out.f.tag + ":" + j.out.f.cle' \
+    "nom|true|false|BUTTON:au-travail:$PG_SID"
   local ar='{"appel":"__vfRegie.arriver","args":["n:se-'"$PG_SID"'"],"nom":"r1"}'
   o="$(pg_sc '' '[{"raz":true},'"$ar"',{"nom":"f1","obs":{"mode":"focus"}},{"nom":"d1","obs":{}},{"raz":true},{"appel":"__vfRegie.arriver","args":["n:se-inconnu"],"nom":"r2"},{"nom":"d2","obs":{}},{"nom":"f2","obs":{"mode":"focus"}},{"raz":true},{"appel":"__vfRegie.arriver","args":["n:ag-'"$PG_A"'"],"nom":"r3"},{"nom":"f3","obs":{"mode":"focus"}}]')"
   pg_ok "RG15.4 — #r=n:se-<id> avec la ligne dans « À vous » et dans l'arbre : défilement et focus sur celle d'« À vous », une fois ; n:ag-<id> : la ligne de l'arbre" "$o" \
@@ -168,10 +168,10 @@ rg_RG15_page() {
 rg15_annule() {
   local av='li[data-vf-cle=\"a-vous:'"$PG_SID"'\"] button.vf-rg-tog'
   local o ouv='li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog' ar='{"appel":"__vfRegie.arriver","args":["n:se-'"$PG_SID"'"]}'
-  o="$(pg_sc '' '[{"annuler":["nom","ancre","rapport"]},{"focus":"#search"},{"clic":"'"$ouv"'"},{"clic":"'"$PG_BTN_RAPPORT"'"},'"$ar"',{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"'"$ouv"'","attr":"aria-expanded"}},{"nom":"det","obs":{"mode":"compte","sel":".vf-rg-plus"}},{"nom":"f","obs":{"mode":"focus"}}]')"
-  pg_ok "RG15.6 — vf-agent:ouvrir annulé (nom, rapport, ancre) : détail dans son état (replié), aucun lecteur, aucune requête, aucun vf-agent:lu, aucun défilement" "$o" \
-    'j.out.e.evts.map((x) => x.type + ":" + x.declencheur).join() + "|" + j.out.ex.join() + "|" + j.out.det + "|" + j.out.e.fetchs.length + "|" + j.out.e.panneau.length + "|" + j.out.e.defilements.length' \
-    "vf-agent:ouvrir:nom,vf-agent:ouvrir:rapport,vf-agent:ouvrir:ancre|false|0|0|0|0"
+  o="$(pg_sc '' '[{"annuler":["nom","ancre","rapport"]},{"focus":"#search"},{"clic":"'"$ouv"'"},{"clic":"'"$PG_BTN_RAPPORT"'"},'"$ar"',{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"'"$ouv"'","attr":"aria-expanded"}},{"nom":"f","obs":{"mode":"focus"}}]')"
+  pg_ok "RG15.6 — vf-agent:ouvrir annulé (nom, rapport, ancre) : ligne dans son état (repliée), aucun lecteur, aucune requête, aucun vf-agent:lu, aucun défilement" "$o" \
+    'j.out.e.evts.map((x) => x.type + ":" + x.declencheur).join() + "|" + j.out.ex.join() + "|" + j.out.e.fetchs.length + "|" + j.out.e.panneau.length + "|" + j.out.e.defilements.length' \
+    "vf-agent:ouvrir:nom,vf-agent:ouvrir:rapport,vf-agent:ouvrir:ancre|false|0|0|0"
   o="$(pg_sc '' '[{"annuler":[]},'"$ar"',{"nom":"ex","obs":{"mode":"attr","sel":"'"$av"'","attr":"aria-expanded"}},{"nom":"e","obs":{}}]')"
   pg_ok "RG15.6 — non annulés : « ancre » déplie la ligne (défile et prend le focus)" "$o" 'j.out.ex.join() + "|" + j.out.e.evts.map((x) => x.declencheur).join()' "true|ancre"
 }
