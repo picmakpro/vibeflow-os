@@ -1,7 +1,8 @@
 // VibeFlow (74-06) : le curseur de relecture de la frise (P74-D-12). Extension `curseur` du registre de 74-vf-frise.js : un repère `role=slider` dans
 // la couche HTML superposée aux pistes (jamais sous aria-hidden), un trait plein dans la couche SVG. Au clavier : ← → d'un pas (1/90 de la fenêtre,
-// Maj = dix pas ; en lecture Événements, à la frontière de segment ou à l'événement voisin), Début, Fin, Échap (écouteur de capture sur le document :
-// le conteneur de la frise garde les touches pour lui). Au pointeur : un clic ou un glisser dans les pistes pose le curseur, le survol seul trace un
+// Maj = dix pas ; en lecture Événements, à la frontière de segment ou à l'événement voisin), Début, Fin, Échap (écouteur de REMONTÉE sur la racine de la vue,
+// jamais en capture : un appui dont defaultPrevented est vrai est ignoré, une surcouche vient de le prendre ; le conteneur de la frise garde les touches
+// pour lui). Au pointeur : un clic ou un glisser dans les pistes pose le curseur, le survol seul trace un
 // repère et dit l'heure ; au toucher, un tap seulement (un glissement fait défiler le conteneur). Un instant tombé dans un repère de silence se cale
 // sur le bord le plus proche. La pose passe par window.__vfFrise.poserCurseur ; le relâché dit `vf-frise:relache` (lecture immédiate des fichiers,
 // 74-vf-frise-fichiers.js). Rien ne se dessine au chargement : le rappel de surOnglet enregistre l'extension et rend son nettoyage (écouteurs, repère,
@@ -95,11 +96,8 @@
       e.preventDefault(); e.stopPropagation();
       if (t !== undefined) poser(ctx, t);
     };
-    const surEchap = (e) => { // capture : le conteneur de la frise retient Échap avant qu'il remonte au document
-      const ctx = st.ctx;
-      if (e.key !== 'Escape' || !ctx || pose() === null) return;
-      const racine = ctx.nodes.defil.closest('.vf-frise');
-      if (!racine || !racine.contains(e.target)) return;
+    const surEchap = (e) => { // remontée sur la racine de la vue : un appui déjà pris par une surcouche (defaultPrevented) est ignoré
+      if (e.key !== 'Escape' || e.defaultPrevented || !st.ctx || pose() === null) return;
       e.preventDefault(); e.stopPropagation(); retirer();
     };
     const relache = () => D.dispatchEvent(new CustomEvent('vf-frise:relache'));
@@ -137,6 +135,8 @@
       const d = st.defil = ctx.nodes.defil, el = st.el = D.createElement('div');
       el.className = 'vf-frise-curseur'; el.setAttribute('role', 'slider'); el.setAttribute('aria-label', 'Curseur de la frise'); el.tabIndex = 0;
       el.addEventListener('keydown', surTouche);
+      const racine = d.closest('.vf-frise');
+      if (racine) { racine.addEventListener('keydown', surEchap); st.retraits.push(() => racine.removeEventListener('keydown', surEchap)); }
       const ecouteurs = [['pointerdown', surBas], ['pointermove', surMouvement], ['pointerup', surHaut], ['pointercancel', surAnnule],
         ['pointerleave', sansSurvol]];
       for (const [n, f] of ecouteurs) {
@@ -150,7 +150,7 @@
       sansSurvol(); st.el = st.trait = st.defil = null;
     };
     const surCurseur = () => maj();
-    D.addEventListener('keydown', surEchap, true); D.addEventListener('vf-frise:curseur', surCurseur);
+    D.addEventListener('vf-frise:curseur', surCurseur);
     return {
       rendre(ctx) {
         st.ctx = ctx; lier(ctx);
@@ -159,7 +159,7 @@
         maj();
       },
       fin() {
-        D.removeEventListener('keydown', surEchap, true); D.removeEventListener('vf-frise:curseur', surCurseur); delier(); st.ctx = null;
+        D.removeEventListener('vf-frise:curseur', surCurseur); delier(); st.ctx = null;
         const f = F();
         if (f && typeof f.finirRelecture === 'function') f.finirRelecture();
       },

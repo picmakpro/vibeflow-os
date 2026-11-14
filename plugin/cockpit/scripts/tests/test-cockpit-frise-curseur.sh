@@ -65,16 +65,18 @@ window.__fiche = [];
     surOnglet: (r, o) => { const m = /74-vf-frise-(curseur|encart|fichiers|carte)\.js/.exec(String(new Error().stack));
       window.__surOnglet.push({ cle: o && o.cle, source: m ? m[0] : null }); return x.surOnglet(r, o); } }) : x; } }); }
 window.__kdC = []; window.__ecDoc = [];
-// __ecDoc : les écouteurs de `document` posés par curseur et encart, par couple (type, fonction, capture), ôtés SEULEMENT par un retrait que le module fait
-// lui-même (sa pile nomme son fichier) : le démontage de la portée de la coquille (vf-coquille-portee.js) défait tout écouteur resté, il masquerait la fuite ;
-// un retrait qui oublie la capture ne les ôte pas
+// __ecDoc : les écouteurs de `document` ou de la racine de la frise (.vf-frise) posés par curseur et encart, par couple (type, fonction, capture), ôtés SEULEMENT par un
+// retrait que le module fait lui-même (sa pile nomme son fichier) : le démontage de la portée de la coquille (vf-coquille-portee.js) défait tout écouteur resté, il
+// masquerait la fuite ; un retrait qui oublie la capture ne les ôte pas. __kdC : les écouteurs `keydown` de curseur sur ces deux cibles (l'Échap)
 { const A = EventTarget.prototype.addEventListener, R = EventTarget.prototype.removeEventListener, cap = (o) => (typeof o === 'boolean' ? o : !!(o && o.capture));
+  const cible = (e) => e === document || (e instanceof Element && e.classList.contains('vf-frise'));
   EventTarget.prototype.addEventListener = function (t, f, o) { const pile = String(new Error().stack);
-    if (t === 'keydown' && this === document && /74-vf-frise-curseur/.test(pile)) window.__kdC.push(f);
-    if (this === document && /74-vf-frise-(curseur|encart)/.test(pile)) window.__ecDoc.push([t, f, cap(o)]);
+    if (t === 'keydown' && cible(this) && /74-vf-frise-curseur/.test(pile)) window.__kdC.push([f, cap(o)]);
+    if (cible(this) && /74-vf-frise-(curseur|encart)/.test(pile)) window.__ecDoc.push([t, f, cap(o)]);
     return A.call(this, t, f, o); };
-  EventTarget.prototype.removeEventListener = function (t, f, o) { if (t === 'keydown' && this === document) window.__kdC = window.__kdC.filter((x) => x !== f);
-    if (this === document && /74-vf-frise-(curseur|encart)/.test(String(new Error().stack))) window.__ecDoc = window.__ecDoc.filter((x) => !(x[0] === t && x[1] === f && x[2] === cap(o)));
+  EventTarget.prototype.removeEventListener = function (t, f, o) { const moi = /74-vf-frise-(curseur|encart)/.test(String(new Error().stack));
+    if (t === 'keydown' && cible(this) && moi) window.__kdC = window.__kdC.filter((x) => !(x[0] === f && x[1] === cap(o)));
+    if (cible(this) && moi) window.__ecDoc = window.__ecDoc.filter((x) => !(x[0] === t && x[1] === f && x[2] === cap(o)));
     return R.call(this, t, f, o); }; }
 { const f0 = window.fetch.bind(window);
   const rep = (st, o) => new Response(JSON.stringify(o), { status: st, headers: { 'content-type': 'application/json' } });
@@ -533,10 +535,10 @@ export default async function (h) {
     h.sonde('C12', 'finirRelecture appelée à chaque départ de l\'onglet Équipe (deux)', m.fin >= 2, String(m.fin));
     // aucun écouteur de `document` ne survit au départ de l'onglet Équipe (témoin positif : il y en a quatre tant qu'on y est)
     const noms = () => h.ev(() => window.__ecDoc.map((x) => x[0] + (x[2] ? ':capture' : '')).sort());
-    h.egal('C12', 'témoin : sur Équipe, quatre écouteurs de document (keydown en capture, deux vf-frise:curseur, vf-frise:relache)', await noms(), ['keydown:capture', 'vf-frise:curseur', 'vf-frise:curseur', 'vf-frise:relache']);
+    h.egal('C12', 'témoin : sur Équipe, quatre écouteurs (keydown en remontée sur la racine de la frise, deux vf-frise:curseur, vf-frise:relache)', await noms(), ['keydown', 'vf-frise:curseur', 'vf-frise:curseur', 'vf-frise:relache']);
     await h.ev(() => window.VF_COQUILLE.chargerOnglet('code').then(() => 1));
     await h.attendre("window.VF_COQUILLE.onglet() === 'code' && document.documentElement.dataset.vfPret === 'oui'", 'onglet code');
-    h.egal('C12', 'après le départ vers Code : chaque écouteur de document posé par le curseur et l\'encart a été retiré par le module lui-même (capture comprise)', await noms(), []);
+    h.egal('C12', 'après le départ vers Code : chaque écouteur de document ou de racine posé par le curseur et l\'encart a été retiré par le module lui-même (capture comprise)', await noms(), []);
   });
 }
 JS
@@ -614,6 +616,25 @@ export default async function (h) {
 }
 JS
 
+cat > "$AUX/c15.mjs" <<'JS'
+import { MIN, K, touche, focus, poser, curseur } from './commun.mjs';
+export const ids = ['C15'];
+export default async function (h) {
+  await h.section('C15', async () => {
+    await h.monter({});
+    const now = await h.ev(() => window.__vfFrise.donnees().jusqua);
+    await poser(h, now - 30 * MIN); await focus(h);
+    // une surcouche factice (la pile de la 80) prend l'Échap en capture : elle le marque pris sans l'arrêter
+    await h.ev(() => { window.__pile = (e) => { if (e.key === 'Escape') e.preventDefault(); }; window.addEventListener('keydown', window.__pile, true); });
+    await touche(h, K.echap);
+    h.sonde('C15', 'un Échap déjà pris (defaultPrevented) ne retire pas le curseur', (await curseur(h)) !== null, String(await curseur(h)));
+    await h.ev(() => window.removeEventListener('keydown', window.__pile, true));
+    await touche(h, K.echap);
+    h.egal('C15', 'sans surcouche, Échap sur le repère retire le curseur', await curseur(h), null);
+  });
+}
+JS
+
 # ---------- lancement ----------
 LAB="$WORK/lab"; mkdir -p "$LAB/src" "$LAB/.planning/phases/01-x"
 printf 'export const util = () => 1;\n' > "$LAB/src/util.js"
@@ -667,7 +688,7 @@ ECARTS="$(statique "$UI")"
 assert_eq "C10 — quatre modules : jetons, aucun réseau direct, ni statut de DAG, ni showBoard, ≤ 299 lignes, ≤ 160 colonnes, aucun persistant" "${ECARTS:-aucun écart}" "aucun écart"
 
 if [ -z "$CHROME" ]; then
-  skip "C1 à C9, C11 à C14" "pas de navigateur"
+  skip "C1 à C9, C11 à C15" "pas de navigateur"
 else
   demarrer base; PORT="$VF_PORT"; SRV="$VF_PID"
   assert_eq "C0 — contrôle positif : serveur de la suite démarré, page Équipe servie" "$([ "$PORT" -gt 0 ] && echo serveur)" "serveur"
@@ -687,6 +708,7 @@ else
   echo "=== C12 — cycle de vie ==="; joue c12 "$PORT" C12
   echo "=== C13 — encart conforme à la spécification (§ 3) ==="; joue c13 "$PORT" C13
   echo "=== C14 — canal de marquage : couche exclusive ==="; joue c14 "$PORT" C14
+  echo "=== C15 — Échap en remontée, defaultPrevented ignoré ==="; joue c15 "$PORT" C15
   cockpit_arreter "$SRV"; SRV=""
 fi
 
