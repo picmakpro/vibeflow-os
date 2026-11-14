@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 // vf-cockpit-project — graphe Projet du cockpit (promu du spike 002, généralisé : lab plat, partitionné, sans jalons).
-// Export : buildProjectGraph(root, { layout }) -> schéma vibeflow/cockpit-project@1 (format du viewer :
+// Export : propre (nettoyage markdown d'un texte du lab), buildProjectGraph(root, { layout }) -> schéma vibeflow/cockpit-project@1 (format du viewer :
 //   nodes, files, links, flows, tour, routes, meta, project). CLI : node vf-cockpit-project.mjs <root> (JSON compact).
 // Hiérarchie : jalon -> phase -> plans ; missions (DAG) rattachées à leur phase ; backlog, graines, releases.
 // Identité d'une phase = (compartiment, numéro) : `ph-<N>` si le numéro est unique dans le lab, sinon `ph-<N>@<ws>`.
@@ -42,7 +42,7 @@ const fichiersPlan = (txt) => {
 
 // PU-G-102 : le texte d'un jalon ou d'une phase vient du ROADMAP en markdown : commentaires d'archive (`<!-- vf-archive … -->`, fermés ou non), gras, accents graves et liens sont retirés à la SOURCE,
 // le panneau n'affiche jamais de balisage brut. Un commentaire jamais fermé court jusqu'à la fin du texte (un seul passage : coût linéaire).
-const propre = (t) => String(t ?? '').replace(/<!--[\s\S]*?(?:-->|$)/g, '').replace(/\*\*/g, '').replace(/`/g, '').replace(/\[([^\]\n]+)\]\([^)\n]*\)/g, '$1').replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
+export const propre = (t) => String(t ?? '').replace(/<!--[\s\S]*?(?:-->|$)/g, '').replace(/\*\*/g, '').replace(/`/g, '').replace(/\[([^\]\n]+)\]\([^)\n]*\)/g, '$1').replace(/[ \t]+\n/g, '\n').replace(/[ \t]{2,}/g, ' ').trim();
 // PU-G-103 : le résumé (carte, haut du panneau) et le détail ne répètent plus le même texte. Le résumé porte tout le texte jusqu'à `max` caractères ; au-delà, il s'arrête à la dernière fin de phrase
 // (sinon au dernier mot, avec « … ») et le détail ne reprend que la SUITE, jamais le début.
 function scinder(t, max) {
