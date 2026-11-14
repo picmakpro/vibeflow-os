@@ -701,4 +701,32 @@ assert_eq "R76.4f — la seule ligne d'en-tête « === AM7 — en CI » n'est pa
 fausses "$WORK/f7"
 assert_eq "R76.4g — un dossier sans suite ne passe pas à vide : code 4" "$(rejouer "$WORK/f7")" "4"
 
+# R76.6 (revue finale M1) : UNE seule attribution phase/exigence pour le pied, le champ exigences et la porte. Lab fabriqué : REQ-01 cochée sans ligne de traçabilité, citée par
+# le plan de la phase 1 (la collecte la rattache par le plan) ; une exigence d'archive ARC-01 (phase 3 à la traçabilité) citée par le plan de la phase 3, absente du ledger vivant.
+L766="$WORK/r766"; B="$L766/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+- [ ] **Phase 1: Un** - a
+- [ ] **Phase 3: Trois** - c
+
+### Phase 1: Un
+**Goal**: but un
+
+### Phase 3: Trois
+**Goal**: but trois
+MD
+printf -- '- [x] **REQ-01**: exigence sans ligne de traçabilité\n' > "$B/REQUIREMENTS.md"
+printf -- '- [ ] **ARC-01**: exigence d archive\n\n| ARC-01 | Phase 3 | Pending |\n' | wr "$B/milestones/v0-REQUIREMENTS.md"
+printf -- '---\nrequirements: [REQ-01]\n---\n<objective>un</objective>\n' | wr "$B/phases/01-un/01-01-PLAN.md"
+printf -- '---\nrequirements: [ARC-01]\n---\n<objective>trois</objective>\n' | wr "$B/phases/03-trois/03-01-PLAN.md"
+graph "$L766" "$WORK/g766.json"; node "$RET" --porte-brut "$L766" > "$WORK/porte766.json"
+cat > "$AUX/r766.mjs" <<'JS'
+import fs from 'node:fs';
+const [, , gf, pf] = process.argv, g = JSON.parse(fs.readFileSync(gf, 'utf8')), p = JSON.parse(fs.readFileSync(pf, 'utf8'));
+console.log(['ph-1', 'ph-3'].map((id) => {
+  const n = g.nodes.find((x) => x.id === id), l = p[id].exigences;
+  return [n.exigences.faits + '/' + n.exigences.total, l.filter((e) => e.cochee).length + '/' + l.length, (/(\d+\/\d+) exigences/.exec(n.foot) || [])[1]].join('=');
+}).join(','));
+JS
+assert_eq "R76.6 — le champ exigences {faits,total}, le pied « x/y exigences » et les lignes de la porte disent la même chose pour chaque phase (ph-1 : 1/1 ; ph-3 : 0/1)" "$(node "$AUX/r766.mjs" "$WORK/g766.json" "$WORK/porte766.json")" "1/1=1/1=1/1,0/1=0/1=0/1"
+
 bilan
