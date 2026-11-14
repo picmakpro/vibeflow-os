@@ -68,7 +68,10 @@ async function onglets(s) {
   R.pas = [];
   for (const o of ['code', 'equipe', 'projet', 'projet', 'code', 'equipe']) {
     await s.ev(`window.VF_COQUILLE.chargerOnglet('${o}')`);
-    R.pas.push([o, (await s.ev('JSON.stringify(window.VF_ETAT.abonnes())')) === R.n0 && (await s.ev('performance.timeOrigin')) === R.t0]); // jamais un rechargement de page
+    // 76-07 : la section Traçabilité du panneau d'un projet (74-vf-trace.js) s'abonne à `planning` tant que l'onglet Projet est affiché, une seule fois par
+    // affichage ; le compte d'un chargement à froid de cet onglet est donc celui de départ plus cette inscription, jamais davantage
+    const froid = JSON.stringify(Object.fromEntries(Object.entries(JSON.parse(R.n0)).map(([k, v]) => [k, o === 'projet' && k === 'planning' ? v + 1 : v])));
+    R.pas.push([o, (await s.ev('JSON.stringify(window.VF_ETAT.abonnes())')) === froid && (await s.ev('performance.timeOrigin')) === R.t0]); // jamais un rechargement de page
   }
   R.badge = await s.ev(BADGE);
   R.memeObjet = await s.ev(`performance.timeOrigin === ${R.t0} && window.VF_ETAT.lire('who') !== null`);
