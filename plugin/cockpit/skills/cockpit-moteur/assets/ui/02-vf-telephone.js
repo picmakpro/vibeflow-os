@@ -12,9 +12,11 @@
   if (!hr) return;
   const t = window.__vfFrT, PLUS = t('More actions');
   const phone = matchMedia('(max-width: 700px)'), tablette = matchMedia('(max-width: 999px)'); // menu dès 999 px (amendement de P70-D-01), téléphone seul à 700 px
-  // la portée de la coquille ne défait pas les listes de requêtes média et ce script est ré-exécuté à chaque arrivée sur un onglet : ses écouteurs `change` se retirent au départ de l'onglet
+  // la portée de la coquille ne défait pas les listes de requêtes média, et ce script est ré-exécuté à chaque arrivée sur un onglet :
+  // ses écouteurs `change` se retirent au départ de l'onglet
   const mqs = [], sur = (mq, f) => { mq.addEventListener('change', f); mqs.push([mq, f]); };
-  const coq = window.VF_COQUILLE; if (coq && typeof coq.surOnglet === 'function') coq.surOnglet(() => () => { for (const [mq, f] of mqs.splice(0)) mq.removeEventListener('change', f); }, { cle: '02-vf-telephone.js' });
+  const coq = window.VF_COQUILLE, defaire = () => { for (const [mq, f] of mqs.splice(0)) mq.removeEventListener('change', f); };
+  if (coq && typeof coq.surOnglet === 'function') coq.surOnglet(() => defaire, { cle: '02-vf-telephone.js' });
   const style = document.createElement('style');
   style.textContent = `
     #vf-plus { display: none; }
