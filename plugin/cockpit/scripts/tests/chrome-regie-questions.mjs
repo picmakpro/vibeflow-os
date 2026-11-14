@@ -97,6 +97,8 @@ await executer(chrome, async (s) => {
     await pousseW(PH);
     const carte = await cible(PH);
     await ouvrir(); await pousseW('button.vf-rg-tog');
+    // 74 : la fiche annule vf-agent:ouvrir et le détail de ligne (.vf-rg-plus) n'est plus atteignable au clic ; le lien du nœud se mesure dans la régie, isolée de la fiche (capture sur window)
+    await s.ev("window.addEventListener('vf-agent:ouvrir', (e) => e.stopImmediatePropagation(), true)");
     await s.attendre("document.querySelector('button.vf-rg-tog')", 'ligne agent');
     await s.ev("document.querySelector('button.vf-rg-tog').click()"); 
     await s.attendre("!!document.querySelector('.vf-rg-plus a.vf-link')", 'lien du nœud');

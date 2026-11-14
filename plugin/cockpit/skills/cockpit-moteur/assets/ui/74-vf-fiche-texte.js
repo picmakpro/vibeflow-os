@@ -8,6 +8,7 @@
   const TXT_HUMAIN = "Message de l'humain";
   const TXT_COMPACTION = 'Compaction';
   const PLAFOND_GENRE = 200;
+  const GENRES = ['message', 'humain', 'compaction', 'outil'];
   const LIGNES_REPLI = 6;
   const chaine = (v) => (typeof v === 'string' ? v : '');
 
@@ -102,7 +103,9 @@
   function ligneDom(ligne, doc, options) {
     const glyphe = options && typeof options.glyphe === 'function' ? options.glyphe : null;
     const li = doc.createElement('li');
-    li.className = 'vf-fiche-ligne vf-fiche-' + ligne.genre;
+    li.className = 'vf-fiche-ligne';
+    if (!GENRES.includes(ligne && ligne.genre)) return li; // liste blanche au rendu : ni classe dérivée du genre ni contenu
+    li.className += ' vf-fiche-' + ligne.genre;
     const heure = doc.createElement('span');
     heure.className = 'vf-fiche-heure';
     heure.textContent = fmtHeureFil(ligne.t);
