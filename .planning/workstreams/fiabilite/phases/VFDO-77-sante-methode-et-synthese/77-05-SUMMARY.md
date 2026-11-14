@@ -55,3 +55,5 @@ rituel levé : régime allégé (consigne de Samuel, message session principale,
 M-ECHAP, M-REGISTRE, M-ONGLET, M-SANS-CLE) ; la coquille ne rend aucun texte venu du serveur (`textContent` partout, aucune garde d'échappement à muter).
 
 Correction après CI (EK15.3 de test-cockpit-equipe.sh) : le littéral « panneau.addEventListener('keydown', echap); » figurait deux fois dans la page (73 et 74) et rendait « ancre ambiguë » ; la fonction de la Synthèse est renommée `fermerAuClavier`, sans changement de comportement.
+
+Correction après CI (R21 et R22 de test-cockpit-responsive.sh) : le libellé « Synthèse » (visible dès 1 600 px) rognait le fil d'Ariane de Projet, hors de portée du repli mesuré qui ne réduit que le badge « au travail ». Le bouton est icône seule à toute largeur (règle `#btn-synthese .bl` dans la feuille de la coquille ; nom au title et à l'aria-label) : écart à l'UI-SPEC § 2 (libellé dès 1 600 px). Aucun fichier de l'en-tête hors 77 touché. Local : rouge reproduit (377 PASS / 2 FAIL), puis R21 et R22 verts (378 PASS / 1 FAIL : R19.1, Équipe 390 px, mesure d'aire sous charge 120, onglet où la Synthèse ne rend rien, vert au premier passage).

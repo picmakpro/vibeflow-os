@@ -39,6 +39,8 @@
       .sort((a, b) => ORDRE.indexOf(a.id) - ORDRE.indexOf(b.id));
   };
 
+  // icône seule à toute largeur (règle de #btn-synthese .bl) : avec son libellé (1 600 px et plus) le fil d'Ariane de Projet était rogné (R21, R22) ;
+  // le nom reste au title et à l'aria-label
   const feuille = () => {
     if (document.getElementById('vf-sy-coquille')) return;
     const st = document.createElement('style'); st.id = 'vf-sy-coquille';
@@ -46,6 +48,7 @@
         white-space: nowrap; }
       .vf-sy h2:focus-visible, .vf-sy h3:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; border-radius: 8px; }
       .vf-sy h2:focus:not(:focus-visible), .vf-sy h3:focus:not(:focus-visible) { outline: none; }
+      #btn-synthese .bl { display: none; }
       button.vf-rep { background: none; border: 0; font: inherit; color: inherit; text-align: left; width: 100%; cursor: pointer; }
       @media (pointer: coarse), (max-width: 999px) { #btn-synthese, .vf-sy .btn, button.row[data-vf-sy-resume] { min-height: 44px; } }`;
     document.head.appendChild(st);
