@@ -111,6 +111,24 @@ assert_eq "W4.0 — témoin de pouvoir : en mode en ligne (Worker retiré avant 
 assert_eq "W4.1 — en mode worker, le plus grand écart d'un pouls de 10 ms dans la fenêtre est inférieur à 150 ms" "$(printf '%s' "$TR" | oj 'j.worker.ecart < 150')" "true"
 assert_eq "W4.2 — … et la plus longue tâche du fil principal est inférieure à 200 ms" "$(printf '%s' "$TR" | oj 'j.worker.tache < 200')" "true"
 assert_eq "W4.3 — un clic réel envoyé pendant la fenêtre est traité (après l'envoi, avant la réponse) avec un retard inférieur à 100 ms" "$(printf '%s' "$TR" | oj '(() => { const c = j.worker.clics.filter((x) => x.traite >= j.worker.envoye && x.traite <= j.worker.fin); return [c.length >= 1, c.length > 0 && c.every((x) => x.retard < 100)]; })()')" "[true,true]"
+# W4.4 : la sonde mesure le blocage DANS la fenêtre de calcul. Un écart de pouls qui chevauche une borne (le dernier dessin, qui pose la réponse du worker sur la page, démarre au moment où
+# la fenêtre se ferme ; le travail de la page qui suit l'envoi du calcul) n'est compté que pour sa part dans la fenêtre. Mesure sur des pouls fabriqués (la sonde réelle, sans navigateur).
+cat > "$AUX/ecart-fenetre.mjs" <<'JS'
+import vm from 'node:vm';
+const { sonde } = await import(process.argv[2]);
+const noop = () => {}, ctx = { performance: { now: () => 0 }, setInterval: () => 0, PerformanceObserver: class { observe() {} }, MutationObserver: class { observe() {} },
+  console: { warn: noop, error: noop }, document: { addEventListener: noop, querySelector: () => null }, addEventListener: noop };
+ctx.window = ctx; vm.createContext(ctx); vm.runInContext(sonde({ sansWorker: true }), ctx);
+const S = ctx.__mep, pas = (a, b) => Array.from({ length: Math.floor((b - a) / 10) + 1 }, (_, i) => a + i * 10);
+const mesure = (pouls, a, b) => { S.pouls = pouls; return Math.round(S.ecart(a, b)); };
+console.log(JSON.stringify([
+  mesure([...pas(0, 990), 1190], 0, 995),                                  // 1 : le dernier dessin (200 ms) démarre 5 ms avant la fermeture : 5 ms dans la fenêtre (reste le pouls de 10 ms)
+  mesure([...pas(0, 1000), 1200, ...pas(1210, 2000)], 100, 2000),          // 2 : 200 ms de blocage ENTIÈREMENT dans la fenêtre (de 1000 à 1200)
+  mesure([...pas(0, 90), 1000, ...pas(1010, 2000)], 100, 2000),            // 3 : un blocage de 910 ms qui commence 10 ms avant l'ouverture : 900 ms dans la fenêtre
+  mesure([...pas(0, 2000)], 100, 1900),                                    // 4 : aucun blocage
+]));
+JS
+assert_eq "W4.4 — la sonde borne l'écart de pouls à la fenêtre : un dessin de 200 ms qui démarre à la fermeture ne compte pour rien de plus que le pouls (10) ; un blocage de 200 ms dans la fenêtre compte pour 200 ; un blocage de 910 ms qui commence 10 ms avant l'ouverture compte pour 900 ; sans blocage, 10" "$(node "$AUX/ecart-fenetre.mjs" "$TESTS/mise-en-page-sonde.mjs" 2>&1)" "[10,200,900,10]"
 
 echo "=== W6 — l'API du moteur ne change pas d'une clé (A4) ==="
 CLES='["addAskContext","addHeaderButton","addPanelSection","agent","ajouterSource","ask","askEngine","cadrage","canChange","chain","children","closeMenus","closePanel","colorOf","copy","draftChange","enSaisie","exists","exported","files","fit","fmt","freeArea","go","graph","h","icon","iconI","iconKey","icons","info","lireParamVue","md","modal","nodes","on","open","paramVue","parentOf","playFlow","plural","query","refreshPanel","render","rerender","reveal","routes","select","setOverview","setReadingArea","setTechnical","showBoard","showPanel","shownName","startFlow","state","stopFlow","store","technical","toast","transformer","up","version"]' # les clés de l'objet gelé du moteur, relevées à l'ouverture de la phase (A4)
