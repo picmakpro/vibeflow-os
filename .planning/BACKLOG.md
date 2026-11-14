@@ -788,3 +788,13 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - **Pas de correctif dans ce jalon.** Dite dans le README du module, à la suite de la description de la route `vibeflow/cockpit-trace@1`.
 
 **Déclencheur de reprise :** la prochaine phase qui touche `vf-cockpit-live.mjs` ou la comparaison des `patch`, ou un testeur qui ne voit pas une exigence neuve sans recharger.
+
+## Cockpit : mineurs de la revue finale et de la vérification de but de la Phase 76 (76-08, 76-09) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** revue finale (`vf-reviewer`) et vérification de but (`gsd-verifier`), une passe chacune ; régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Les deux majeurs de la revue (attribution phase/exigence unique, jumelle d'archive dans le chat) et le rouge C8.1 sont corrigés ; restent :
+- m1 : si la collecte de traçabilité échoue (`meta.vf.trace.erreur`), la porte des exigences rend vide et le chat dit « 0 exigence » au lieu de « lecture indisponible ».
+- m2 : `lireQuestions` coupe la liste à 200 par numéro de phase croissant ; les questions en attente récentes tombent d'abord (bilan et `tronque` restent justes ; inatteint aujourd'hui).
+- m3 : une question mal formée n'a ni `ws` ni `titre` ; le lecteur de la régie (Phase 73) doit le tolérer, non vérifié par un test.
+- Vérification : aucun test ne branche la vraie collecte des questions sur la lecture de la régie (fixture F2 de `regie-rg-questions.sh` traduite à la main) ; contrôle manuel fait le 2026-11-14 sur ce dépôt, forme conforme. À figer par un test bout en bout.
+
+**Déclencheur de reprise :** la prochaine retouche de la régie de la Phase 73 ou de `vf-cockpit-questions-attente.mjs`.
