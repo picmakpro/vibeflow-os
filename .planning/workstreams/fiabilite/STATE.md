@@ -42,10 +42,8 @@ Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 10
 - Exécution : segments b et c de 79 et 80, puis 73, 74, 75, 76, 77 ; 81 reportée (`AUDC-Q3` « plus tard », 2026-11-11).
 - Phase 76 : 76-01 à 76-09 faits (2026-11-14).
 - Phase 73 : 73-01 à 73-11 exécutés (PR #243 et #248 fusionnées, la seconde dans le lot #249) ; RG1.12 rebranché sur `VF_ONGLETS.aller` (80-10) ; vérification de but faite (human_needed : CI Linux, sonde réelle de `claude agents`).
-- Phase 75 : 75-01 à 75-06 exécutés (2026-11-13), 75-07 à 75-10 restent.
-- Phase 73 : 73-01 à 73-10 exécutés (branche `feat/phase-73-gouvernance-regie`) ; 73-11 en cours ; RG1.12 attend 80-10.
 - Phase 75 : 12/12 plans exécutés (2026-11-14)
-- Phase 74 : 74-01 à 74-05 et 74-07 exécutés (2026-11-14) ; 74-06, 74-08, 74-10, 74-09 restent.
+- Phase 74 : 10/10 plans exécutés (2026-11-14), en attente de fusion dans `integration/cockpit-audit` ; PR #247 (74-01 à 74-05, 74-07) et seconde PR pour le reste ; TEMP-01 à TEMP-11 cochées, TEMP-12 partielle.
 - Phase 80 : 80-01 à 80-21 exécutés (2026-11-14, branche `feat/phase-80-trois-formes`, PR vers le lot 242-246-248-238) ; FORM-17 attend la CI Linux.
 - Dettes nommées : UIFN-10 et LANC-12 (voir Pending) ; étapes 4 et 5 de la recette de la 68 reportées (P68-D-35).
 
@@ -71,6 +69,8 @@ Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 10
 - 2026-11-11 — Phase 77 cadrée, planifiée : SYNT-01..10, P77-Q-01 et P77-Q-02 par décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; exécutée 2026-11-14, PR #242.
 - 2026-11-13 — Phase 80, segment a (80-01 à 80-08) : PR #237, fusionné ; P80-D-52..56 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11.
 - 2026-11-14 — Phase 79, 22/22 plans (segment a : PR #238 fusionné) ; SOCL-01..27, SOCL-24 par la sonde S0 (79-19 sans code) ; Q-03 : P79-D-33 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) ; Q-01, Q-02 : décision déléguée (message session principale, 2026-11-08), option recommandée ; Q-04 : retrait d'AUDC-I18, sonde verte (décision déléguée par Samuel (message session principale, 2026-11-11 : « tranche pour chacun de ces points »), prise par la session principale).
+- 2026-11-14 — Phase 74, pas d'interface morte : décision déléguée (message session principale, 2026-11-08, option recommandée ; prise par la session principale le 2026-11-14) ; la fiche porte la carte de la phase et le lien du nœud, le détail de ligne de la régie est retiré.
+- 2026-11-14 — Phase 74, sonde W1 : décision déléguée (message session principale, 2026-11-08, option recommandée ; prise par le manager de la Phase 74 le 2026-11-14) ; W1 compte les `role=tab` hors de la bascule Vue de l'équipe (contrat 74-UI-SPEC).
 
 ### Pending Todos
 

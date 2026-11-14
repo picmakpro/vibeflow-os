@@ -26,3 +26,6 @@ rituel levé : régime allégé (consigne de Samuel, message session principale,
 
 ## Contrat consommé par d'autres phases
 74-06 (curseur, encart) et 74-07 (Dépôt, coût) se branchent par `__vfFrise.enregistrer` ; la fiche (74-05) est appelée par `window.__vfFiche.ouvrir(id, bouton)` s'il existe. Les modules ne sont pas encore inscrits dans VENDORED.txt ni dans ci-shard-suites.sh (travail à part).
+
+## Correction de fin de phase
+La liste d'accessibilité « Frise en liste… » (conteneur `vf-frise-sr`) est désormais hors écran (motif `.sr`, `74-vf-frise-style.js`) : l'encart suit la légende ; sonde S11 (rouge avant, verte après). Rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Suites rejouées sur la tête commitée : `test-cockpit-frise-vue.sh` 103 réussis (S10 rouge une fois sous charge, 11 réussis rejoué seul), 135 s.

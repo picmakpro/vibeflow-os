@@ -804,11 +804,21 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 **Priorité : basse.** **Origine :** exécution des plans 74-01 à 74-05 et 74-07, régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale) ; audit de 74-03 et deux passes de revue.
 - 74-03 (audit) : le critère de linéarité de X9 (`test-cockpit-fiche-texte.sh`) admet un ratio de 4 pour un doublement de N ; un tokenizer quadratique à petite constante resterait vert.
 - 74-04 : budget de nœuds SVG non tenu sur la fixture adversariale (40 voies de 500 segments à 24 h : 40 092 nœuds pour 26 240, un `title` par segment) ; rendu mesuré 79 ms, sous la limite de 150 ms.
-- 74-04 : S6 (survol) et S16 (`scrollLeft` de la piste) de `test-cockpit-frise-vue.sh` ont rougi chacune une fois sous forte charge du poste, vertes au passage suivant.
+- 74-04 : S6 (survol) et S10 (annonce « Frise mise à jour ») de `test-cockpit-frise-vue.sh` rougissent par intermittence sous forte charge du poste, verts rejoués seuls (S16 était un vrai défaut, corrigé en 74-07).
 - 74-04 et 74-07 : la première inscription `VF_ETAT.abonner('frise')` lit `/api/vf/frise` sans bornes.
 - 74-05 : un Échap déjà consommé par la régie (détail déplié dans la régie masquée) ne ferme pas la fiche ; il faut un second appui.
 - 74-07 (revue) : « + N branches » précède les commits dans l'ordre de tabulation du bandeau Dépôt (UI-SPEC § 2 et § 9 le veulent après).
 - 74-07 (revue) : les chiffres de la synthèse de coût ne sont pas en `--text` 500 (UI-SPEC § 5).
+- 74-06 (design) : noms de voie de l'encart « À cet instant » en mono au lieu de --sans (.vf-donnee).
+- 74-06 (design) : libellés de l'encart écartés de l'UI-SPEC § 3 et § 7 (aide, note de déduction, aria-label « Voir sur la carte : N fichiers »).
+- 74-04 (design) : l'étiquette « maintenant » chevauche la dernière graduation de l'axe.
+- 74-04 (design) : à 390 px, noms de voie tronqués jusqu'à l'indistinction, texte du bandeau haut rogné sous « Horloge ».
+- 73/74 (design) : la bascule « Régie · Frise » n'affiche pas sa position active (piste --raise, --surface, ombre 1 px).
+- 74-03/74-05 (design) : le glyphe du message d'agent dans le fil (anneau à deux barres) se confond avec « attend ses agents ».
+- 74-05 (design) : le résumé « Faits de l'agent » de la fiche à 390 px n'a pas d'indicateur d'ouverture.
+- 74-07 (design) : « Autres commits (branches fusionnées… » tronqué dans la colonne du Dépôt.
+- 74-04 (revue) : la racine de la frise arrête la propagation d'Échap ; un Échap global de la page ne le voit pas quand le focus est dans la frise (le curseur l'écoute donc sur la racine).
+- 74-10 (audit) : actions d'essai mortes dans `chrome-equipe-clavier.mjs` (`focus-transcript`, `lecteur-puis-who`, `changer-agent`, `recharger`) qui visent le lecteur retiré.
 
 **Déclencheur de reprise :** la prochaine passe sur la frise ou la fiche d'agent (74-06, 74-08 à 74-10, ou la recette de la Phase 74).
 

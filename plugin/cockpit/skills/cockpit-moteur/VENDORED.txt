@@ -57,9 +57,13 @@ AJOUT assets/ui/74-vf-fiche-style.js
 AJOUT assets/ui/74-vf-fiche-texte.js
 AJOUT assets/ui/74-vf-fiche.js
 AJOUT assets/ui/74-vf-frise-calculs.js
+AJOUT assets/ui/74-vf-frise-carte.js
 AJOUT assets/ui/74-vf-frise-colonne.js
+AJOUT assets/ui/74-vf-frise-curseur.js
 AJOUT assets/ui/74-vf-frise-depot-voies.js
 AJOUT assets/ui/74-vf-frise-depot.js
+AJOUT assets/ui/74-vf-frise-encart.js
+AJOUT assets/ui/74-vf-frise-fichiers.js
 AJOUT assets/ui/74-vf-frise-modele.js
 AJOUT assets/ui/74-vf-frise-pistes.js
 AJOUT assets/ui/74-vf-frise-source.js

@@ -230,10 +230,9 @@ rg_RG17_page() {
     '(() => { const a = j.out, p = (v) => (v[0] === null ? "ferme" : "ouvert"); return [p(a.v0), p(a.o1), a.t1.prevenu, p(a.c1), a.f1.tag, p(a.d2), p(a.v2), a.t3.prevenu, p(a.d3), a.t4.prevenu, a.f4.tag].join("|"); })()' "ferme|ouvert|true|ferme|SUMMARY|ouvert|ferme|true|ferme|false|A"
   o="$(q_page 'F1' '[{"appel":"__ouvrir","args":["'"$REPLI_D"'",true]},{"focus":"'"$REPLI_D"' summary"},{"touche":"Escape","prevenu":true,"nom":"t"},{"nom":"d","obs":{"mode":"attr","sel":"'"$REPLI_D"'","attr":"open"}},
     {"touche":"Escape","sur":"#search","nom":"h"},{"nom":"d2","obs":{"mode":"attr","sel":"'"$REPLI_D"'","attr":"open"}},
-    {"focus":"button.vf-rg-tog"},{"clic":"button.vf-rg-tog"},{"nom":"exp","obs":{"mode":"attr","sel":"button.vf-rg-tog","attr":"aria-expanded"}},{"focus":"button.vf-rg-tog"},{"touche":"Escape"},
-    {"nom":"exp2","obs":{"mode":"attr","sel":"button.vf-rg-tog","attr":"aria-expanded"}},{"nom":"d3","obs":{"mode":"attr","sel":"'"$REPLI_D"'","attr":"open"}}]')"
-  q_ok "RG17.16 — appui déjà pris : le repli reste ouvert ; cible hors de la régie : rien ; détail en flux ouvert : il se referme, le repli reste ouvert" "$o" \
-    '(() => { const a = j.out, p = (v) => (v.length === 0 ? "absent" : v[0] === null ? "ferme" : "ouvert"); return [p(a.d), p(a.d2), a.exp[0], a.exp2[0], p(a.d3)].join("|"); })()' "ouvert|ouvert|true|false|ouvert"
+    {"focus":"button.vf-rg-tog"},{"touche":"Escape"},{"nom":"d3","obs":{"mode":"attr","sel":"'"$REPLI_D"'","attr":"open"}}]')"
+  q_ok "RG17.16 — appui déjà pris : le repli reste ouvert ; cible hors de la régie : rien ; Échap sur le nom d'un agent (le détail de ligne n'existe plus, rien d'autre à refermer) : le repli ouvert se referme" "$o" \
+    '(() => { const a = j.out, p = (v) => (v.length === 0 ? "absent" : v[0] === null ? "ferme" : "ouvert"); return [p(a.d), p(a.d2), p(a.d3)].join("|"); })()' "ouvert|ouvert|ferme"
   assert_eq "RG17.16 — l'écouteur d'Échap des replis est posé sur document, en remontée, jamais en capture ni sur window" \
     "$(grep -c "D.addEventListener('keydown', surEchap)" "$UI/72-vf-regie-questions-rendu.js" 2>/dev/null)|$(grep -cE "window\.addEventListener\('keydown'|addEventListener\('keydown', [a-zA-Z]+, (true|\{ *capture)" "$UI/72-vf-regie-questions-rendu.js" 2>/dev/null)" "1|0"
   local base mont
@@ -331,5 +330,5 @@ rg_RG17_liens() {
   q_fixtures
   local o="$WORK/q-chrome-liens.json"
   q_chrome liens "$o"
-  q_ok "RG17.L1 — navigateur : un clic sur « Carte de la phase » puis sur le lien du nœud d'une ligne ouverte mène à project.html" "$o" '[j.carte, j.noeud].join("|")' "/project.html|/project.html"
+  q_ok "RG17.L1 — navigateur : un clic sur « Carte de la phase » puis, la fiche d'un agent ouverte au clic sur son nom, sur le lien du nœud de sa ligne de rattachement mène à project.html" "$o" '[j.carte, j.noeud].join("|")' "/project.html|/project.html"
 }

@@ -253,7 +253,7 @@ rg_RG9_modele() {
   assert_eq "RG9.6 — l'âge avance avec le temps écoulé depuis la réception : 60 s reçus il y a 200 s" "$(g "$o" 'j[10].mot')" "silencieux depuis 4 min"
   assert_eq "RG9.6 — contre-épreuve : 60 s reçus à l'instant restent « au travail »" "$(g "$o" 'j[9].mot')" "au travail"
   assert_eq "RG9.7 — chaque attrs.etat est une valeur de GLYPHE_ETAT ou surveiller, orphelin, attente" "$(g "$o" '(()=>{const ok=new Set([...j[12].glyphes,"surveiller","orphelin","attente"]); const l=[...j[8].sections,...j[11].sections].flatMap(s=>s.lignes.concat(s.relus||[])).filter(x=>x.kind!=="mission"); return (l.length>0 && l.every(x=>ok.has(x.attrs.etat)))})()')" "true"
-  assert_eq "RG9.7 — le modèle ne porte aucune forme de glyphe et pose les six exports du modèle" "$(g "$o" 'j[12].glypheCopie+"|"+j[12].sansDocument+"|"+j[12].modele.slice().sort().join(",")')" "false|true|aVous,etatVivant,modele,trierAVous,verrouBlanc,verrous"
+  assert_eq "RG9.7 — le modèle ne porte aucune forme de glyphe et pose les sept exports du modèle (lancementDe, 74 : le détail du lancement, repris par la fiche)" "$(g "$o" 'j[12].glypheCopie+"|"+j[12].sansDocument+"|"+j[12].modele.slice().sort().join(",")')" "false|true|aVous,etatVivant,lancementDe,modele,trierAVous,verrouBlanc,verrous"
   local d="$WORK/o9b.json"; rgm_play "$UI" "$WORK/sc9.json" "$d" brut
   assert_eq "RG9.8 — espaces insécables avant « : » et entre nombre et unité" "$(g "$d" 'j[2].mot===`suspect : aucun signe de vie depuis 18 min`')" "true"
   if [ -f "$UI/72-vf-regie-modele.js" ]; then

@@ -13,6 +13,7 @@
 #   C1 code livré : rien n'aboutit · C2 échappement seul · C3 CSP seule · C4 garde seule
 # CHAINE_SEUL=temoin : ne joue que C0 (mesure « avant » sur un module antérieur aux correctifs).
 # Volet terminal intégré (Phase 71, TERM-12) : test-cockpit-terminal-xss.sh (même lab piégé, chaîne prolongée jusqu'au serveur du terminal).
+# Volet frise et fiche (Phase 74, 74-09, TEMP-11) : test-cockpit-frise-bornes.sh (noms d'agent, branche, message, cible : C0 et C1 sur l'onglet Équipe, bornes d'émission).
 # Volet GIT (Phase 78, P78-D-17 ; T-78-43) : les DONNÉES d'un dépôt (nom de branche `<svg/onload=…>`, message de commit `<img onerror=…>`, auteur, message de stash)
 # sont une entrée hostile de plus pour le tiroir Git. Même chaîne (script dans la page -> jeton -> POST /api/plan/undo -> script du lab), même faux moteur, mêmes
 # mutants de CSP et de garde ; le maillon « échappement » est ici le rendu en textContent des fichiers 77 (M-GIT-TEXTE : innerHTML dans la copie de la sortie).
