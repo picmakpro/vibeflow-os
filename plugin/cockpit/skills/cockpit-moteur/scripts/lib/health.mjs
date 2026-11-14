@@ -45,33 +45,33 @@ const PLACEHOLDER = /your|xxxx|example|changeme|change[-_]?me|placeholder|replac
 
 // Well-known key formats. `sev` defaults to high; `live` formats are flagged even in test files.
 const FORMATS = [
-  { re: /\bAKIA[0-9A-Z]{16}\b/g, what: 'an Amazon Web Services (AWS) access key', svc: 'AWS', live: true },
-  { re: /\b(?:sk|rk)_live_[0-9a-zA-Z]{20,}/g, what: 'a Stripe live secret key', svc: 'Stripe', live: true },
-  { re: /\b(?:sk|rk)_test_[0-9a-zA-Z]{20,}/g, what: 'a Stripe test key', svc: 'Stripe', sev: 'medium' },
-  { re: /\bwhsec_[A-Za-z0-9]{24,}/g, what: 'a Stripe webhook signing secret', svc: 'Stripe' },
-  { re: /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g, what: 'a GitHub access token', svc: 'GitHub', live: true },
-  { re: /\bgithub_pat_[A-Za-z0-9_]{50,}/g, what: 'a GitHub access token', svc: 'GitHub', live: true },
-  { re: /\bglpat-[A-Za-z0-9_-]{20,}/g, what: 'a GitLab access token', svc: 'GitLab', live: true },
-  { re: /\bxox[abposr]-[A-Za-z0-9-]{10,}/g, what: 'a Slack token', svc: 'Slack', live: true },
-  { re: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[A-Za-z0-9]{20,}/g, what: 'a Slack webhook address (anyone with it can post to your Slack)', svc: 'Slack', sev: 'medium' },
-  { re: /\bAIza[0-9A-Za-z_\-]{35}\b/g, what: 'a Google API key', svc: 'Google Cloud', sev: 'medium', skipIf: /firebase|authDomain|messagingSenderId/i },
-  { re: /\bGOCSPX-[A-Za-z0-9_\-]{20,}/g, what: 'a Google sign-in client secret', svc: 'Google Cloud' },
-  { re: /\bsk-ant-[a-z]+\d*-[A-Za-z0-9_\-]{40,}/g, what: 'an Anthropic (Claude) API key', svc: 'Anthropic', live: true },
-  { re: /\bsk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_\-]{16,}T3BlbkFJ[A-Za-z0-9_\-]{16,}/g, what: 'an OpenAI API key', svc: 'OpenAI', live: true },
-  { re: /\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_\-]{40,}/g, what: 'an OpenAI API key', svc: 'OpenAI', live: true },
-  { re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----/g, what: 'a private key', svc: null, whole: true },
-  { re: /\bSG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}\b/g, what: 'a SendGrid email API key', svc: 'SendGrid', live: true },
-  { re: /\bsq0csp-[0-9A-Za-z_\-]{40,}/g, what: 'a Square app secret', svc: 'Square', live: true },
-  { re: /\bsq0atp-[0-9A-Za-z_\-]{20,}/g, what: 'a Square access token', svc: 'Square', live: true },
-  { re: /\bEAAA[A-Za-z0-9_\-]{60,}/g, what: 'a Square access token', svc: 'Square', live: true },
-  { re: /\bshp(?:at|ss|ca|pa)_[a-fA-F0-9]{32}\b/g, what: 'a Shopify access token', svc: 'Shopify', live: true },
-  { re: /\bhf_[A-Za-z0-9]{30,}\b/g, what: 'a Hugging Face token', svc: 'Hugging Face', live: true },
-  { re: /\bnpm_[A-Za-z0-9]{36}\b/g, what: 'an npm publishing token', svc: 'npm', live: true },
-  { re: /\bsbp_[a-f0-9]{40}\b/g, what: 'a Supabase account token', svc: 'Supabase', live: true },
-  { re: /\bsb_secret_[A-Za-z0-9_\-]{20,}/g, what: 'a Supabase secret key', svc: 'Supabase', live: true },
-  { re: /\b\d{8,10}:AA[0-9A-Za-z_\-]{33}\b/g, what: 'a Telegram bot token', svc: 'Telegram', live: true },
-  { re: /\bdop_v1_[a-f0-9]{64}\b/g, what: 'a DigitalOcean token', svc: 'DigitalOcean', live: true },
-  { re: /\bpat[A-Za-z0-9]{14}\.[a-f0-9]{64}\b/g, what: 'an Airtable token', svc: 'Airtable', live: true },
+  { re: /\bAKIA[0-9A-Z]{16}\b/g, what: 'une clé d’accès Amazon Web Services (AWS)', svc: 'AWS', live: true },
+  { re: /\b(?:sk|rk)_live_[0-9a-zA-Z]{20,}/g, what: 'une clé secrète Stripe de production', svc: 'Stripe', live: true },
+  { re: /\b(?:sk|rk)_test_[0-9a-zA-Z]{20,}/g, what: 'une clé de test Stripe', svc: 'Stripe', sev: 'medium' },
+  { re: /\bwhsec_[A-Za-z0-9]{24,}/g, what: 'un secret de signature de webhook Stripe', svc: 'Stripe' },
+  { re: /\bgh[pousr]_[A-Za-z0-9]{36,}\b/g, what: 'un jeton d’accès GitHub', svc: 'GitHub', live: true },
+  { re: /\bgithub_pat_[A-Za-z0-9_]{50,}/g, what: 'un jeton d’accès GitHub', svc: 'GitHub', live: true },
+  { re: /\bglpat-[A-Za-z0-9_-]{20,}/g, what: 'un jeton d’accès GitLab', svc: 'GitLab', live: true },
+  { re: /\bxox[abposr]-[A-Za-z0-9-]{10,}/g, what: 'un jeton Slack', svc: 'Slack', live: true },
+  { re: /https:\/\/hooks\.slack\.com\/services\/T[A-Z0-9]+\/B[A-Z0-9]+\/[A-Za-z0-9]{20,}/g, what: 'une adresse de webhook Slack (quiconque la possède peut écrire dans votre Slack)', svc: 'Slack', sev: 'medium' },
+  { re: /\bAIza[0-9A-Za-z_\-]{35}\b/g, what: 'une clé d’API Google', svc: 'Google Cloud', sev: 'medium', skipIf: /firebase|authDomain|messagingSenderId/i },
+  { re: /\bGOCSPX-[A-Za-z0-9_\-]{20,}/g, what: 'un secret client de connexion Google', svc: 'Google Cloud' },
+  { re: /\bsk-ant-[a-z]+\d*-[A-Za-z0-9_\-]{40,}/g, what: 'une clé d’API Anthropic (Claude)', svc: 'Anthropic', live: true },
+  { re: /\bsk-(?:proj-|svcacct-|admin-)?[A-Za-z0-9_\-]{16,}T3BlbkFJ[A-Za-z0-9_\-]{16,}/g, what: 'une clé d’API OpenAI', svc: 'OpenAI', live: true },
+  { re: /\bsk-(?:proj|svcacct|admin)-[A-Za-z0-9_\-]{40,}/g, what: 'une clé d’API OpenAI', svc: 'OpenAI', live: true },
+  { re: /-----BEGIN (?:RSA |EC |DSA |OPENSSH |PGP |ENCRYPTED )?PRIVATE KEY(?: BLOCK)?-----/g, what: 'une clé privée', svc: null, whole: true },
+  { re: /\bSG\.[A-Za-z0-9_\-]{22}\.[A-Za-z0-9_\-]{43}\b/g, what: 'une clé d’API d’envoi d’e-mails SendGrid', svc: 'SendGrid', live: true },
+  { re: /\bsq0csp-[0-9A-Za-z_\-]{40,}/g, what: 'un secret d’application Square', svc: 'Square', live: true },
+  { re: /\bsq0atp-[0-9A-Za-z_\-]{20,}/g, what: 'un jeton d’accès Square', svc: 'Square', live: true },
+  { re: /\bEAAA[A-Za-z0-9_\-]{60,}/g, what: 'un jeton d’accès Square', svc: 'Square', live: true },
+  { re: /\bshp(?:at|ss|ca|pa)_[a-fA-F0-9]{32}\b/g, what: 'un jeton d’accès Shopify', svc: 'Shopify', live: true },
+  { re: /\bhf_[A-Za-z0-9]{30,}\b/g, what: 'un jeton Hugging Face', svc: 'Hugging Face', live: true },
+  { re: /\bnpm_[A-Za-z0-9]{36}\b/g, what: 'un jeton de publication npm', svc: 'npm', live: true },
+  { re: /\bsbp_[a-f0-9]{40}\b/g, what: 'un jeton de compte Supabase', svc: 'Supabase', live: true },
+  { re: /\bsb_secret_[A-Za-z0-9_\-]{20,}/g, what: 'une clé secrète Supabase', svc: 'Supabase', live: true },
+  { re: /\b\d{8,10}:AA[0-9A-Za-z_\-]{33}\b/g, what: 'un jeton de bot Telegram', svc: 'Telegram', live: true },
+  { re: /\bdop_v1_[a-f0-9]{64}\b/g, what: 'un jeton DigitalOcean', svc: 'DigitalOcean', live: true },
+  { re: /\bpat[A-Za-z0-9]{14}\.[a-f0-9]{64}\b/g, what: 'un jeton Airtable', svc: 'Airtable', live: true },
 ];
 const JWT = /\beyJ[A-Za-z0-9_-]{10,}\.eyJ[A-Za-z0-9_-]{10,}\.[A-Za-z0-9_-]{20,}/g;
 const DB_URL = /\b(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|rediss?|amqps?)(?:\+\w+)?:\/\/([^:\s\/'"@]+):([^@\s'"]+)@([^\/\s'":?,]+)/g;
@@ -87,14 +87,14 @@ const CONFIG_LANGS = new Set(['yaml', 'yml', 'ini', 'cfg', 'conf', 'properties',
 const snake = (s) => s.replace(/([a-z0-9])([A-Z])/g, '$1_$2').toLowerCase();
 const kindFromName = (name) => {
   const n = snake(name);
-  if (/pass|pwd/.test(n)) return 'a password';
-  if (/private_?key/.test(n)) return 'a private key';
-  if (/token/.test(n)) return 'an access token';
-  if (/api_?key|apikey/.test(n)) return 'an API key';
-  if (/credential/.test(n)) return 'login credentials';
-  return 'a secret key';
+  if (/pass|pwd/.test(n)) return 'un mot de passe';
+  if (/private_?key/.test(n)) return 'une clé privée';
+  if (/token/.test(n)) return 'un jeton d’accès';
+  if (/api_?key|apikey/.test(n)) return 'une clé d’API';
+  if (/credential/.test(n)) return 'des identifiants de connexion';
+  return 'une clé secrète';
 };
-const mask = (v, password) => password || v.length < 12 ? `${v.length} characters` : `starts “${v.slice(0, 4)}…”, ${v.length} characters`;
+const mask = (v, password) => password || v.length < 12 ? `${v.length} caractères` : `commence par “${v.slice(0, 4)}…”, ${v.length} caractères`;
 
 function valueLooksReal(v, name) {
   if (/\s/.test(v) || PLACEHOLDER.test(v)) return false;
@@ -138,7 +138,7 @@ function findSecrets(src, f, out) {
       const v = m[0];
       if (isTest && (!fm.live || fm.whole)) continue;
       if (!fm.whole && (/EXAMPLE|xxxx|XXXX|0{10,}/.test(v) || entropy(v) < 3)) continue;
-      add(at(m.index), { what: fm.what, svc: fm.svc, sev: fm.sev || 'high', hint: fm.whole ? 'private key block' : mask(v), ...(isTest ? { test: true } : {}) });
+      add(at(m.index), { what: fm.what, svc: fm.svc, sev: fm.sev || 'high', hint: fm.whole ? 'bloc de clé privée' : mask(v), ...(isTest ? { test: true } : {}) });
     }
   }
   if (!isTest) {
@@ -146,12 +146,12 @@ function findSecrets(src, f, out) {
       let payload = null;
       try { payload = JSON.parse(Buffer.from(m[0].split('.')[1].replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8')); } catch { continue; }
       if (payload?.role !== 'service_role') continue; // "anon" keys are public by design
-      add(at(m.index), { what: 'a Supabase service-role key (full access to your database, skipping all security rules)', svc: 'Supabase', sev: 'high', hint: mask(m[0]) });
+      add(at(m.index), { what: 'une clé « service-role » Supabase (accès complet à votre base de données, sans aucune règle de sécurité)', svc: 'Supabase', sev: 'high', hint: mask(m[0]) });
     }
     for (const m of src.matchAll(DB_URL)) {
       const [, user, pw, host] = m;
       if (LOCAL_HOST.test(host) || PLACEHOLDER.test(pw) || /^[:$%{<]/.test(pw) || pw.length < 4 || /^(password|pass|postgres|root|secret|admin|user)$/i.test(pw)) continue;
-      add(at(m.index), { what: 'a database password inside a connection address', svc: 'your database', sev: 'high', hint: mask(pw, true) });
+      add(at(m.index), { what: 'un mot de passe de base de données dans une adresse de connexion', svc: 'votre base de données', sev: 'high', hint: mask(pw, true) });
     }
   }
   if (isTest || f.category === 'docs') return;
@@ -440,16 +440,16 @@ function findCors(src, f, out) {
     }
     const credHeader = /['"]Access-Control-Allow-Credentials['"]\s*[,:]\s*['"`]?true/i.test(src);
     for (const m of src.matchAll(/['"]Access-Control-Allow-Origin['"]\s*[,:]\s*(?:(['"`])\*\1|(req(?:uest)?\.headers(?:\.origin\b|\[\s*['"]origin['"]\s*\]|\.get\(\s*['"]origin['"]\s*\))))/gi)) {
-      add(m.index, m[2] ? 'Access-Control-Allow-Origin set to the caller’s origin' : 'Access-Control-Allow-Origin: *', !!m[2] && credHeader);
+      add(m.index, m[2] ? 'Access-Control-Allow-Origin fixé à l’origine de l’appelant' : 'Access-Control-Allow-Origin: *', !!m[2] && credHeader);
     }
   } else if (f.lang === 'python') {
     for (const m of src.matchAll(/CORSMiddleware\s*,([\s\S]{0,800}?)\)\s*$/gm)) {
-      if (/allow_origins\s*=\s*\[\s*(['"])\*\1\s*\]|allow_origin_regex\s*=\s*r?(['"])\.\*\2/.test(m[1])) add(m.index, 'CORSMiddleware with allow_origins=["*"]', /allow_credentials\s*=\s*True/.test(m[1]));
+      if (/allow_origins\s*=\s*\[\s*(['"])\*\1\s*\]|allow_origin_regex\s*=\s*r?(['"])\.\*\2/.test(m[1])) add(m.index, 'CORSMiddleware avec allow_origins=["*"]', /allow_credentials\s*=\s*True/.test(m[1]));
     }
     for (const m of src.matchAll(/\bCORS\(\s*\w+\s*(?:\)|,([^)]*)\))/g)) {
       const opts = m[1] || '';
       if (/\borigins["']?\s*[:=]\s*(?!(['"])\*\1)/.test(opts)) continue; // a list of allowed sites (origins=… or "origins": …)
-      add(m.index, 'CORS(app) with every origin allowed', /supports_credentials\s*=\s*True/.test(opts));
+      add(m.index, 'CORS(app) avec toutes les origines autorisées', /supports_credentials\s*=\s*True/.test(opts));
     }
     const all = /^\s*CORS_(?:ALLOW_ALL_ORIGINS|ORIGIN_ALLOW_ALL)\s*=\s*True\b/m.exec(src);
     if (all) add(all.index, 'CORS_ALLOW_ALL_ORIGINS = True', /^\s*CORS_ALLOW_CREDENTIALS\s*=\s*True\b/m.test(src));
@@ -542,6 +542,7 @@ const NOT_USED_KINDS = new Set(['test', 'script', 'infra', 'config', 'worker', '
 const SPECIAL_FILE = /(^|\/)(index|main|app|server|cli|manage|wsgi|asgi|__init__|__main__|conftest|setup|config|settings|env|middleware|instrumentation|layout|page|route|loading|error|not-found|template|default|global-error|sitemap|robots|manifest|opengraph-image|twitter-image|icon|apple-icon|_app|_document|_error|404|500|models|admin|apps|views|urls|signals|tasks|forms|serializers|celery|gunicorn\.conf|vite-env\.d|worker|sw|service-worker)\.[a-z]+$|\.d\.ts$|\.config\.[a-z]+$|\.stories\.|(^|\/)(pages|migrations|alembic|versions|scripts|bin|tools|seeds?|fixtures?|examples?|docs?|public|static|templates|\.github|e2e|cypress|playwright)\//i;
 const USED_LANGS = new Set(['typescript', 'javascript', 'python', 'vue', 'svelte', 'astro']);
 const plural = (n, w, ws) => `${n} ${n === 1 ? w : ws || w + 's'}`;
+const nl = (n) => `${n.toLocaleString('fr-FR')} ligne${n === 1 ? '' : 's'}`;
 
 export function buildHealth({ graph, scan, arch, root }) {
   const issues = [];
@@ -586,7 +587,7 @@ export function buildHealth({ graph, scan, arch, root }) {
     if (!/\.(pem|key|p12|pfx|jks|keystore)$|^id_(rsa|dsa|ecdsa|ed25519)$|service[-_]?account.*\.json$|^credentials?\.json$|firebase-adminsdk.*\.json$|^client_secret.*\.json$|-key\.json$/i.test(base)) continue;
     let head = '';
     try { head = readHead(path.join(root, f.path), 65536); } catch { continue; }
-    if (/PRIVATE KEY|"private_key"\s*:\s*"-----|"client_secret"\s*:\s*"[^"]{8,}/.test(head) || /\.(p12|pfx|jks|keystore)$/i.test(base)) secretFiles.push({ path: f.path, list: [{ k: 'secret', line: 1, what: 'a credentials file (a private key that logs in as your app)', sev: 'high', hint: 'whole file' }], file: true });
+    if (/PRIVATE KEY|"private_key"\s*:\s*"-----|"client_secret"\s*:\s*"[^"]{8,}/.test(head) || /\.(p12|pfx|jks|keystore)$/i.test(base)) secretFiles.push({ path: f.path, list: [{ k: 'secret', line: 1, what: 'un fichier d’identifiants (une clé privée qui se connecte en tant que votre app)', sev: 'high', hint: 'fichier entier' }], file: true });
   }
   const secretIssue = (group) => {
     const locations = [], notes = {}, items = [];
@@ -602,33 +603,63 @@ export function buildHealth({ graph, scan, arch, root }) {
         if (s.svc) svcs.add(s.svc);
       }
       if (isFrontend(p)) frontend = true;
-      if (it) notes[it] = (notes[it] ? notes[it] + ' · ' : '') + list.slice(0, 4).map((s) => `${file ? p.split('/').pop() : `line ${s.line}`}: ${s.name ? `${s.name}, ` : ''}${s.what.replace(/ \(.*\)$/, '')} (${s.hint})`).join(' · ') + (list.length > 4 ? ` · +${list.length - 4} more` : '');
+      if (it) notes[it] = (notes[it] ? notes[it] + ' · ' : '') + list.slice(0, 4).map((s) => `${file ? p.split('/').pop() : `ligne ${s.line}`} : `
+        + `${s.name ? `${s.name}, ` : ''}${s.what.replace(/ \(.*\)$/, '')} (${s.hint})`).join(' · ') + (list.length > 4 ? ` · +${list.length - 4} autres` : '');
     }
     const n = locations.length;
     // every hit sits in a test, fixture or example file: most likely a made-up key, so the tone drops (never above "worth fixing soon")
     const allTest = group.every((g) => g.list.every((s) => s.test));
     const sev = !allTest && group.some((g) => g.list.some((s) => s.sev === 'high')) ? 'high' : 'medium';
     const one = group.length === 1 ? group[0].path : null;
-    const kindText = kinds.size === 1 ? [...kinds][0].replace(/ \(.*\)$/, '') : 'passwords or keys';
+    const where = one ? one.split('/').pop() : `${group.length} autres fichiers`;
+    const src = one ? `${nameOf(one)} (${one})` : plural(group.length, 'fichier');
+    const kindText = kinds.size === 1 ? [...kinds][0].replace(/ \(.*\)$/, '') : 'des mots de passe ou des clés';
+    const sing = n === 1;
+    const testDetail = [
+      `${src} ${one ? 'est un fichier de test ou d’exemple et contient' : 'sont des fichiers de test ou d’exemple et contiennent'}`,
+      `${sing ? kindText : `${n} clés (${kindText})`} au format d’${sing ? 'un vrai secret' : 'de vrais secrets'}.`,
+      sing ? 'Ce secret est probablement factice, inventé pour le test.' : 'Ces secrets sont probablement factices, inventés pour le test.',
+      sing ? 'Si c’est un vrai secret, considérez-le comme divulgué et remplacez-le.' : 'Si ce sont de vrais secrets, considérez-les comme divulgués et remplacez-les.',
+    ].join(' ');
+    const target = svcs.size ? `à ${[...svcs].slice(0, 4).join(', ')}` : sing ? 'aux services qu’il ouvre' : 'aux services qu’ils ouvrent';
+    const realDetail = `${src} ${one ? 'contient' : 'contiennent'} ${sing ? kindText : `${n} secrets (${kindText})`}. `
+      + `Quiconque peut voir le code peut ${sing ? 'l’utiliser' : 'les utiliser'} pour accéder ${target} en se faisant passer pour vous`
+      + `${frontend ? ', et ce code est envoyé au navigateur de chaque visiteur' : ''}. `
+      + (sing ? 'Considérez ce secret comme divulgué : sortez-le du code et remplacez-le par un nouveau.'
+        : 'Considérez ces secrets comme divulgués : sortez-les du code et remplacez-les par de nouveaux.');
+    const hasPy = group.some((g) => /\.py$/.test(g.path)), hasJs = group.some((g) => /\.[jt]sx?$/.test(g.path));
+    const envLookup = [hasPy ? 'os.environ["NAME"] en Python' : '', hasPy && hasJs ? ', ' : '', hasJs ? 'process.env.NAME en JavaScript/TypeScript' : '',
+      !group.some((g) => /\.(py|[jt]sx?)$/.test(g.path)) ? 'ou une référence à un gestionnaire de secrets' : ''].join('');
     return {
       id: 'secret:' + (one || group.map((g) => g.path).join('|')),
       kind: 'secret', severity: sev,
-      title: allTest ? (n === 1 ? `A key in ${one ? one.split('/').pop() : `${group.length} more files`} is probably fake` : `${n} keys in ${one ? one.split('/').pop() : `${group.length} more files`} are probably fake`) : n === 1 ? `A secret key is written into ${one ? one.split('/').pop() : `${group.length} more files`}` : `${n} passwords or keys are written into ${one ? one.split('/').pop() : `${group.length} more files`}`,
-      detail: allTest ? `${one ? `${nameOf(one)} (${one})` : plural(group.length, 'file')} ${one ? 'is a test or example file and ' : 'are test or example files and '}contains ${n === 1 ? kindText : `${n} keys (${kindText})`} in the format of a real one. It is probably fake, made up for the test. If it is a real key, treat it as leaked and replace it.` : `${one ? `${nameOf(one)} (${one})` : plural(group.length, 'file')} contains ${n === 1 ? kindText : `${n} secrets (${kindText})`}. Anyone who can see the code can use ${n === 1 ? 'it' : 'them'} to get into ${svcs.size ? [...svcs].slice(0, 4).join(', ') : 'the services they unlock'} as you${frontend ? ', and this code is sent to every visitor’s browser' : ''}. Treat ${n === 1 ? 'it' : 'them'} as leaked: move ${n === 1 ? 'it' : 'them'} out of the code and replace ${n === 1 ? 'it with a new one' : 'them with new ones'}.`,
+      title: allTest
+        ? (sing ? `Une clé dans ${where} est probablement factice` : `${n} clés dans ${where} sont probablement factices`)
+        : sing ? `Une clé secrète est écrite dans ${where}` : `${n} mots de passe ou clés sont écrits dans ${where}`,
+      detail: allTest ? testDetail : realDetail,
       items, notes, locations,
       fix: [
-        `Security fix: hard-coded secrets. Do not print, echo or repeat any secret value in your replies, commits or logs.`,
+        `Correctif de sécurité : secrets écrits en dur. N’affiche, ne répète et n’écris jamais la valeur d’un secret dans tes réponses, tes commits `
+          + `ou tes journaux.`,
         ``,
-        `These lines contain ${n === 1 ? 'a secret' : 'secrets'} written directly in the code:`,
-        ...group.flatMap(({ path: p, list, file }) => list.map((s) => `- ${p}${file ? ' (the whole file)' : `:${s.line}`}: ${s.name ? `${s.name} — ` : ''}${s.what.replace(/ \(.*\)$/, '')}`)),
+        `Ces lignes contiennent ${sing ? 'un secret écrit' : 'des secrets écrits'} directement dans le code :`,
+        ...group.flatMap(({ path: p, list, file }) => list.map((s) => `- ${p}${file ? ' (le fichier entier)' : `:${s.line}`} : ${s.name ? `${s.name} `
+          + `— ` : ''}${s.what.replace(/ \(.*\)$/, '')}`)),
         ``,
-        `For each one:`,
-        `1. Replace the literal with an environment variable lookup (${group.some((g) => /\.py$/.test(g.path)) ? `os.environ["NAME"] in Python` : ''}${group.some((g) => /\.py$/.test(g.path)) && group.some((g) => /\.[jt]sx?$/.test(g.path)) ? ', ' : ''}${group.some((g) => /\.[jt]sx?$/.test(g.path)) ? 'process.env.NAME in JavaScript/TypeScript' : ''}${!group.some((g) => /\.(py|[jt]sx?)$/.test(g.path)) ? 'or a secret manager reference' : ''}), using a clear variable name. If the app can't run without it, fail with a clear error when it is missing instead of falling back to a hard-coded value.`,
-        `2. Add each variable name (with an empty value, never the real one) to .env.example, and make sure .env is listed in .gitignore.`,
-        frontend ? `3. This is frontend code that ships to the browser. Move the call that needs the secret to a server-side route or function so the key never reaches visitors.` : `3. Update any deployment config (Docker, Cloud Run, Vercel, etc.) so the variable is set in production.`,
-        group.some((g) => g.file) ? `4. Remove the credentials file from the repository (git rm --cached), add its name to .gitignore, and load it from a path given by an environment variable.` : `4. Run the app or its tests to confirm it still starts with the variables set.`,
+        `Pour chacun :`,
+        `1. Remplace la valeur littérale par la lecture d’une variable d’environnement (${envLookup}), avec un nom de variable explicite. Si l’app ne `
+          + `peut pas tourner sans elle, échoue avec une erreur claire quand elle manque au lieu de retomber sur une valeur écrite en dur.`,
+        `2. Ajoute le nom de chaque variable (avec une valeur vide, jamais la vraie) à .env.example, et vérifie que .env figure dans .gitignore.`,
+        frontend ? `3. Ce code part dans le navigateur. Déplace l’appel qui a besoin du secret vers une route ou une fonction côté serveur, pour que `
+          + `la clé n’atteigne jamais les visiteurs.` : `3. Mets à jour la configuration de déploiement (Docker, Cloud Run, Vercel, etc.) pour que la `
+          + `variable soit définie en production.`,
+        group.some((g) => g.file) ? `4. Retire le fichier d’identifiants du dépôt (git rm --cached), ajoute son nom à .gitignore, et charge-le depuis `
+          + `un chemin donné par une variable d’environnement.` : `4. Lance l’app ou ses tests pour confirmer qu’elle démarre encore avec les `
+          + `variables définies.`,
         ``,
-        `Then give me a short checklist (without the values) of which services these keys belong to, so I can rotate each one: create a new key in that service's dashboard, put it in my environment, and revoke the old one. Because the old values are in git history, assume they are compromised.`,
+        `Puis donne-moi une courte liste de contrôle (sans les valeurs) des services auxquels ces clés appartiennent, pour que je les renouvelle une `
+          + `à une : créer une nouvelle clé dans le tableau de bord du service, la mettre dans mon environnement, puis révoquer l’ancienne. Comme les `
+          + `anciennes valeurs sont dans l’historique git, considère-les comme compromises.`,
       ].join('\n'),
     };
   };
@@ -658,19 +689,28 @@ export function buildHealth({ graph, scan, arch, root }) {
     const it = itemFor(f.path);
     issues.push({
       id: 'env-file:' + f.path, kind: 'env-file', severity: tracked ? 'high' : 'medium',
-      title: tracked ? 'Your private settings file is saved in git' : 'Your private settings file isn’t hidden from git',
+      title: tracked ? 'Votre fichier de réglages privés est enregistré dans git' : 'Votre fichier de réglages privés n’est pas caché de git',
       detail: tracked
-        ? `${f.path} holds ${plural(secretVars.length, 'password or key', 'passwords and keys')} and is committed, so everyone with access to the code (and its history) can read them. This file is meant to stay on your computer only.`
-        : `${f.path} holds ${plural(secretVars.length, 'password or key', 'passwords and keys')} and isn’t listed in .gitignore, so the next commit will upload it with your code.`,
-      items: it ? [it] : [], notes: it ? { [it]: `${f.path}: ${secretVars.slice(0, 6).map((v) => v.name).join(', ')}${secretVars.length > 6 ? '…' : ''}` } : {},
+        ? `${f.path} contient ${plural(secretVars.length, 'mot de passe ou clé', 'mots de passe et clés')} et est commité : toute personne qui a accès au code `
+          + `(et à son historique) peut ${secretVars.length === 1 ? 'le lire' : 'les lire'}. Ce fichier doit rester uniquement sur votre ordinateur.`
+        : `${f.path} contient ${plural(secretVars.length, 'mot de passe ou clé', 'mots de passe et clés')} et n’est pas listé dans .gitignore : `
+          + `le prochain commit ${secretVars.length === 1 ? 'l’enverra' : 'les enverra'} avec votre code.`,
+      items: it ? [it] : [], notes: it ? { [it]: `${f.path} : `
+        + `${secretVars.slice(0, 6).map((v) => v.name).join(', ')}${secretVars.length > 6 ? '…' : ''}` } : {},
       locations: secretVars.map((v) => ({ file: f.path, line: v.line })),
       fix: [
-        `Security fix: ${f.path} contains secrets and ${tracked ? 'is committed to git' : 'is not ignored by git'}. Do not print or repeat any value from it.`,
+        `Correctif de sécurité : ${f.path} contient des secrets et ${tracked ? 'est commité dans git' : 'n’est pas ignoré par git'}. N’affiche et ne `
+          + `répète aucune valeur qu’il contient.`,
         ``,
-        `1. Add ${base} (and .env*.local) to ${f.repo ? f.repo + '/' : ''}.gitignore, keeping .env.example tracked.`,
-        tracked ? `2. Stop tracking it without deleting my local copy: git rm --cached "${relInRepo}" (run inside ${f.repo || 'the repo'}), then commit.` : `2. Confirm with git status that the file no longer shows up as a new file.`,
-        `3. Create or update .env.example next to it with the same variable names and empty values: ${secretVars.map((v) => v.name).join(', ')}.`,
-        tracked ? `4. Give me a checklist (names only, no values) of which keys I need to rotate in each service's dashboard, since they are in git history. Mention that removing them from history needs a tool like git filter-repo, and ask before doing that.` : `4. Tell me which deployment settings need these variables.`,
+        `1. Ajoute ${base} (et .env*.local) à ${f.repo ? f.repo + '/' : ''}.gitignore, en gardant .env.example suivi.`,
+        tracked ? `2. Arrête de le suivre sans supprimer ma copie locale : git rm --cached "${relInRepo}" (à lancer dans ${f.repo || 'le dépôt'}), `
+          + `puis commite.` : `2. Vérifie avec git status que le fichier n’apparaît plus comme nouveau fichier.`,
+        `3. Crée ou mets à jour .env.example à côté, avec les mêmes noms de variables et des valeurs vides : ${secretVars.map((v) => v.name).join(', ')}.`,
+        tracked
+          ? `4. Donne-moi une liste de contrôle (noms seulement, sans valeurs) des clés à renouveler dans le tableau de bord de chaque service, car `
+            + `elles sont dans l’historique git. `
+            + `Précise que les retirer de l’historique demande un outil comme git filter-repo, et demande-moi avant de le faire.`
+          : `4. Dis-moi quels réglages de déploiement ont besoin de ces variables.`,
       ].join('\n'),
     });
   }
@@ -701,26 +741,42 @@ export function buildHealth({ graph, scan, arch, root }) {
       const it = itemFor(loc.file);
       if (!it) continue;
       if (!items.includes(it)) items.push(it);
-      const note = `line ${loc.line}: ${v.name}`;
+      const note = `ligne ${loc.line} : ${v.name}`;
       if (!(notes[it] || '').includes(note)) notes[it] = (notes[it] ? notes[it] + ' · ' : '') + note;
     }
     const names = vars.map((v) => v.name);
     issues.push({
       id: 'public-env', kind: 'public-env-secret', severity: sev,
-      title: vars.length === 1 ? `${names[0]} is sent to every visitor’s browser` : `${vars.length} secret keys are sent to every visitor’s browser`,
-      detail: `Settings whose names start with NEXT_PUBLIC_, VITE_ and the like are copied into the code your site sends to every visitor, where anyone can read them in their browser’s developer tools. ${vars.length === 1 ? `${names[0]} looks like a secret key` : `${names.slice(0, 4).join(', ')}${vars.length > 4 ? '…' : ''} look like secret keys`}${svcs.length ? ` (for ${svcs.slice(0, 4).join(', ')})` : ''}, so anyone could use ${vars.length === 1 ? 'it' : 'them'} as you: run up your bill, send messages as you, or reach your data.${sev === 'medium' ? ' Right now only server code seems to read it, so it may not have reached a browser yet, but the name invites that.' : ''}`,
+      title: vars.length === 1 ? `Le réglage ${names[0]} est envoyé au navigateur de chaque visiteur` : `${vars.length} clés secrètes sont envoyées `
+        + `au navigateur de chaque visiteur`,
+      detail: `Les réglages dont le nom commence par NEXT_PUBLIC_, VITE_ et similaires sont copiés dans le code que votre site envoie à chaque visiteur, `
+        + `où n’importe qui peut les lire dans les outils de développement de son navigateur. `
+        + `${vars.length === 1 ? `${names[0]} ressemble à une clé secrète` : `${names.slice(0, 4).join(', ')}${vars.length > 4 ? '…' : ''} `
+          + `ressemblent à des clés secrètes`}`
+        + `${svcs.length ? ` (pour ${svcs.slice(0, 4).join(', ')})` : ''} : n’importe qui pourrait `
+          + `${vars.length === 1 ? 'l’utiliser' : 'les utiliser'} en se faisant passer pour vous, `
+        + `faire grimper votre facture, envoyer des messages en votre nom ou accéder à vos données.`
+        + `${sev === 'medium' ? ' Pour l’instant, seul du code serveur semble le lire : il n’a peut-être pas encore atteint un navigateur, mais son nom y invite.' : ''}`,
       items, notes, locations,
       fix: [
-        `Security fix: secret keys in public environment variables (the browser gets every variable with these prefixes). Do not print, echo or repeat any key value.`,
+        `Correctif de sécurité : clés secrètes dans des variables d’environnement publiques (le navigateur reçoit toute variable avec ces préfixes). `
+          + `N’affiche, n’écris et ne répète aucune valeur de clé.`,
         ``,
-        ...vars.map((v) => `- ${v.name}${v.svc ? ` (${v.svc})` : ''}: ${[...v.defs.map((d) => `set in ${d.file}:${d.line}`), ...v.refs.map((r) => `used in ${r.file}:${r.line}`)].slice(0, 6).join(', ')}`),
+        ...vars.map((v) => `- ${v.name}${v.svc ? ` (${v.svc})` : ''} : ${[...v.defs.map((d) => `défini dans `
+          + `${d.file}:${d.line}`), ...v.refs.map((r) => `utilisé dans ${r.file}:${r.line}`)].slice(0, 6).join(', ')}`),
         ``,
-        `For each one:`,
-        `1. Rename it without the public prefix (for example OPENAI_API_KEY instead of VITE_OPENAI_API_KEY) in the .env files, .env.example and the hosting settings.`,
-        `2. Move every place that uses it into server-side code (a Next.js route handler or server action, a Supabase Edge Function, a serverless function or the existing backend) and have the frontend call that instead, so the key never reaches the browser.`,
-        vars.some((v) => v.svc === 'Supabase') ? `3. For the Supabase service-role key: browser code should use the anon key and rely on row-level security; only server code may use the service-role key.` : `3. Keep the frontend working the same way, and run the app to check.`,
+        `Pour chacune :`,
+        `1. Renomme-la sans le préfixe public (par exemple OPENAI_API_KEY au lieu de VITE_OPENAI_API_KEY) dans les fichiers .env, .env.example et les `
+          + `réglages de l’hébergeur.`,
+        `2. Déplace chaque endroit qui l’utilise dans du code côté serveur (un route handler ou une server action Next.js, une Edge Function Supabase, `
+          + `une fonction serverless ou le backend existant) et fais appeler cela par le frontend, pour que la clé n’atteigne jamais le navigateur.`,
+        vars.some((v) => v.svc === 'Supabase')
+          ? `3. Pour la clé service-role Supabase : le code du navigateur doit utiliser la clé anon et s’appuyer sur la sécurité au niveau des lignes `
+            + `(RLS) ; seul le code serveur peut utiliser la clé service-role.`
+          : `3. Garde le frontend fonctionnel à l’identique, et lance l’app pour vérifier.`,
         ``,
-        `Then give me a checklist (names only, no values) of the keys to rotate in each service's dashboard: anyone who loaded the site may have copied them.`,
+        `Puis donne-moi une liste de contrôle (noms seulement, sans valeurs) des clés à renouveler dans le tableau de bord de chaque service : toute `
+          + `personne qui a chargé le site a pu les copier.`,
       ].join('\n'),
     });
   }
@@ -749,50 +805,75 @@ export function buildHealth({ graph, scan, arch, root }) {
           const it = itemFor(t.file);
           if (!it) continue;
           if (!items.includes(it)) items.push(it);
-          notes[it] = (notes[it] ? notes[it] + ' · ' : '') + `line ${t.line}: ${short(name)} (row-level security ${t.off ? 'switched off' : 'never switched on'})`;
+          notes[it] = (notes[it] ? notes[it] + ' · ' : '') + `ligne ${t.line} : ${short(name)} (sécurité au niveau des lignes `
+            + `${t.off ? 'désactivée' : 'jamais activée'})`;
         }
         const list = open.map(([name]) => short(name));
         issues.push({
           id: 'rls:' + repo, kind: 'database-rules', severity: 'high',
-          title: open.length === 1 ? `Anyone can read and change your ${list[0]} table` : `Anyone can read and change ${open.length} of your database tables`,
-          detail: `Your app talks to Supabase with a public key that every visitor’s browser has. Row-level security is what stops one person from reading or changing someone else’s rows, and it’s off for ${open.length === 1 ? `the ${list[0]} table` : `${list.slice(0, 6).join(', ')}${list.length > 6 ? ` and ${list.length - 6} more` : ''}`}. Without it, anyone can use that key to read, change or delete every row${open.length === 1 ? '' : ' in them'}. If your app only reaches the database from its own server, the risk is lower, but switching it on is still the safe default.`,
+          title: open.length === 1 ? `N’importe qui peut lire et modifier votre table ${list[0]}` : `N’importe qui peut lire et modifier `
+            + `${open.length} de vos tables`,
+          detail: `Votre application parle à Supabase avec une clé publique que le navigateur de chaque visiteur possède. `
+            + `La sécurité au niveau des lignes (RLS) empêche une personne de lire ou modifier les lignes d’une autre, et elle est désactivée pour `
+            + `${open.length === 1 ? `la table ${list[0]}` : `${list.slice(0, 6).join(', ')}${list.length > 6 ? ` et ${list.length - 6} autres` : ''}`}. `
+            + `Sans elle, n’importe qui peut utiliser cette clé pour lire, modifier ou supprimer chaque ligne${open.length === 1 ? '' : ' de ces tables'}. `
+            + `Si votre application n’accède à la base que depuis son propre serveur, le risque est plus faible, mais l’activer reste le choix le plus sûr.`,
           items, notes,
           locations: open.map(([, t]) => t.off || { file: t.file, line: t.line }),
           fix: [
-            `Security fix: Supabase tables without row-level security (RLS). Do not print any keys.`,
+            `Correctif de sécurité : tables Supabase sans sécurité au niveau des lignes (RLS). N’affiche aucune clé.`,
             ``,
-            `Anyone with the app's public (anon) key can read and change these tables:`,
-            ...open.map(([name, t]) => `- ${name}: created in ${t.file}:${t.line}${t.off ? `, row-level security switched off in ${t.off.file}:${t.off.line}` : ''}`),
+            `N’importe qui possédant la clé publique (anon) de l’app peut lire et modifier ces tables :`,
+            ...open.map(([name, t]) => `- ${name} : créée dans ${t.file}:${t.line}${t.off ? `, sécurité au niveau des lignes désactivée dans `
+              + `${t.off.file}:${t.off.line}` : ''}`),
             ``,
-            `1. Read how the app uses each table: which pages read or write it, and whether rows belong to a user (for example a user_id column that should match auth.uid()).`,
-            `2. Write one new migration (don't edit the old ones) that runs \`alter table <table> enable row level security;\` for each table, plus policies so the app keeps working: usually signed-in users can read and change only their own rows (\`using (auth.uid() = user_id)\`), and tables meant to be public get a read-only policy. Server code that uses the service-role key isn't affected by these rules.`,
-            `3. Explain the policies to me in plain words before applying anything, and don't loosen any existing policy.`,
-            `4. Tell me how to apply the migration (for example \`supabase db push\`) and how to check, while signed out, that I can't read other people's rows.`,
+            `1. Lis comment l’app utilise chaque table : quelles pages la lisent ou l’écrivent, et si les lignes appartiennent à un utilisateur (par `
+              + `exemple une colonne user_id qui doit correspondre à auth.uid()).`,
+            `2. Écris une nouvelle migration (ne modifie pas les anciennes) qui exécute \`alter table <table> enable row level security;\` pour chaque table, `
+              + `plus des policies pour que l’app continue de fonctionner : en général les utilisateurs connectés ne lisent et ne modifient que leurs `
+                + `propres lignes `
+              + `(\`using (auth.uid() = user_id)\`), et les tables faites pour être publiques reçoivent une policy en lecture seule. `
+              + `Le code serveur qui utilise la clé service-role n’est pas affecté par ces règles.`,
+            `3. Explique-moi les policies en langage simple avant d’appliquer quoi que ce soit, et n’assouplis aucune policy existante.`,
+            `4. Dis-moi comment appliquer la migration (par exemple \`supabase db push\`) et comment vérifier, déconnecté, que je ne peux pas lire `
+              + `les lignes des autres.`,
           ].join('\n'),
         });
       }
       const loose = policies.filter((pol) => tables.get(pol.table)?.rls === true);
       if (loose.length) {
-        const verb = (cmd) => ({ insert: 'add', update: 'change', delete: 'delete' }[cmd] || 'add, change and delete');
-        const rowsOf = (cmd, t) => `${verb(cmd)} rows ${{ insert: 'to', delete: 'from' }[cmd] || 'in'} ${t}`;
+        const rowsOf = (cmd, t) => ({ insert: `d’ajouter des lignes à ${t}`, update: `de modifier des lignes dans ${t}`, delete: `de supprimer des `
+          + `lignes de ${t}` }[cmd]
+          || `d’ajouter, de modifier et de supprimer des lignes dans ${t}`);
         const items = [], notes = {};
         for (const pol of loose) {
           const it = itemFor(pol.file);
           if (!it) continue;
           if (!items.includes(it)) items.push(it);
-          notes[it] = (notes[it] ? notes[it] + ' · ' : '') + `line ${pol.line}: “${pol.policy}” lets anyone ${rowsOf(pol.cmd, short(pol.table))}`;
+          notes[it] = (notes[it] ? notes[it] + ' · ' : '') + `ligne ${pol.line} : “${pol.policy}” permet à n’importe qui ${rowsOf(pol.cmd, short(pol.table))}`;
         }
         issues.push({
           id: 'open-policy:' + repo, kind: 'database-rules', severity: 'medium',
-          title: loose.length === 1 ? `A database rule lets anyone change your ${short(loose[0].table)} table` : `${loose.length} database rules let anyone change your data`,
-          detail: `${loose.length === 1 ? `The rule “${loose[0].policy}” lets anyone` : `These rules let anyone`}${loose.some((pol) => pol.signedOut) ? ', even people who aren’t signed in,' : ''} ${loose.length === 1 ? rowsOf(loose[0].cmd, short(loose[0].table)) : `add, change or delete rows in ${[...new Set(loose.map((pol) => short(pol.table)))].slice(0, 5).join(', ')}`}. If a table is a public form (like a mailing-list or contact form), letting anyone add rows is fine; otherwise limit it to signed-in users and their own rows.`,
+          title: loose.length === 1 ? `Une règle de base de données permet à n’importe qui de modifier votre table `
+            + `${short(loose[0].table)}` : `${loose.length} règles de base de données permettent à n’importe qui de modifier vos données`,
+          detail: `${loose.length === 1 ? `La règle “${loose[0].policy}” permet` : 'Ces règles permettent'} à n’importe `
+            + `qui${loose.some((pol) => pol.signedOut) ? ', même aux personnes non connectées,' : ''} `
+            + `${loose.length === 1 ? rowsOf(loose[0].cmd, short(loose[0].table)) : `d’ajouter, de modifier ou de supprimer des lignes dans `
+              + `${[...new Set(loose.map((pol) => short(pol.table)))].slice(0, 5).join(', ')}`}. `
+            + `Si une table est un formulaire public (liste de diffusion, formulaire de contact), laisser n’importe qui ajouter des lignes convient ; `
+            + `sinon, limitez-le aux personnes connectées et à leurs propres lignes.`,
           items, notes,
           locations: loose.map((pol) => ({ file: pol.file, line: pol.line })),
           fix: [
-            `Security review: Supabase row-level security policies that allow anyone to change data (\`using (true)\` / \`with check (true)\` for anon or public):`,
-            ...loose.map((pol) => `- “${pol.policy}” on ${pol.table} (for ${pol.cmd}) — ${pol.file}:${pol.line}`),
+            `Revue de sécurité : policies de sécurité au niveau des lignes Supabase qui permettent à n’importe qui de modifier des données (\`using `
+              + `(true)\` / \`with check (true)\` pour anon ou public) :`,
+            ...loose.map((pol) => `- “${pol.policy}” sur ${pol.table} (pour ${pol.cmd}) — ${pol.file}:${pol.line}`),
             ``,
-            `For each one, tell me in plain words what it allows and whether the app needs that. If the table isn't meant to be public, replace \`true\` with a check such as \`auth.uid() = user_id\`, limited to authenticated users, in a new migration. If it's a public form, keep adding rows open but make sure nobody can read, change or delete other people's rows. Show me the change before applying it.`,
+            `Pour chacune, dis-moi en langage simple ce qu’elle autorise et si l’app en a besoin. Si la table n’est pas faite pour être publique, `
+              + `remplace \`true\` par un contrôle comme \`auth.uid() = user_id\`, limité aux utilisateurs authentifiés, dans une nouvelle migration. `
+              + `Si c’est un formulaire public, laisse l’ajout de lignes ouvert mais assure-toi que personne ne puisse lire, modifier ou supprimer `
+                + `les lignes des autres. `
+              + `Montre-moi la modification avant de l’appliquer.`,
           ].join('\n'),
         });
       }
@@ -801,7 +882,7 @@ export function buildHealth({ graph, scan, arch, root }) {
 
   // ---------- Firebase security rules that let anyone in ----------
   const today = new Date();
-  const longDate = (d) => d.toLocaleDateString('en-US', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' });
+  const longDate = (d) => d.toLocaleDateString('fr-FR', { timeZone: 'UTC', month: 'long', day: 'numeric', year: 'numeric' });
   for (const f of scan.files) {
     const base = f.path.split('/').pop();
     if (!live(f.path) || !(/\.rules$/i.test(base) || /^database(\.[\w-]+)?\.rules\.json$/i.test(base))) continue;
@@ -826,39 +907,58 @@ export function buildHealth({ graph, scan, arch, root }) {
     let title, detail, severity;
     if (until && writes.length) {
       severity = 'high';
-      title = `Your Firebase ${service} is open to anyone until ${longDate(until.until)}`;
-      detail = `${base} still has Firebase’s “test mode” rules: anyone can read and change ${files ? 'every file' : 'everything'} until ${longDate(until.until)}, without signing in or using your app. After that date every request is refused and the app stops working, so replace them with real rules rather than moving the date.`;
+      title = `Votre Firebase ${service} est ouvert à tous jusqu’au ${longDate(until.until)}`;
+      detail = `${base} a encore les règles du « mode test » de Firebase : n’importe qui peut lire et modifier ${files ? 'tous les fichiers' : 'tout'} `
+        + `jusqu’au ${longDate(until.until)}, sans se connecter ni passer par votre app. Après cette date, toute requête est refusée et l’app cesse `
+          + `de fonctionner : `
+        + `remplacez-les par de vraies règles plutôt que de repousser la date.`;
     } else if (writes.length) {
       severity = 'high';
-      title = files ? 'Anyone can upload, replace or delete your Firebase files' : `Anyone can change or delete your Firebase ${service} data`;
-      detail = `A rule in ${base} (line ${writes[0].line}, at ${writes[0].where}) lets anyone, signed in or not, ${files ? 'upload, replace or delete files' : 'add, change or delete data'}. Your app’s Firebase settings are in every visitor’s browser, so anyone can use them to reach your ${service} directly, without going through your app.`;
+      title = files ? 'N’importe qui peut envoyer, remplacer ou supprimer vos fichiers Firebase' : `N’importe qui peut modifier ou supprimer vos `
+        + `données Firebase ${service}`;
+      detail = `Une règle de ${base} (ligne ${writes[0].line}, à ${writes[0].where}) permet à n’importe qui, connecté ou non, `
+        + `${files ? 'd’envoyer, de remplacer ou de supprimer des fichiers' : 'd’ajouter, de modifier ou de supprimer des données'}. `
+        + `Les réglages Firebase de votre app sont dans le navigateur de chaque visiteur : n’importe qui peut s’en servir pour atteindre directement `
+        + `votre ${service}, sans passer par votre app.`;
     } else if (deepWrites.length || reads.length) {
       severity = 'medium';
-      title = reads.length && !deepWrites.length ? `Anyone can read everything in your Firebase ${service}` : `Anyone can change part of your Firebase ${service}`;
+      title = reads.length && !deepWrites.length ? `N’importe qui peut tout lire dans votre Firebase ${service}` : `N’importe qui peut modifier une `
+        + `partie de votre Firebase ${service}`;
       detail = [
-        reads.length ? `A rule in ${base} (line ${reads[0].line}) lets anyone read every ${files ? 'file' : 'record'}, including data that may belong to your users. If everything there is meant to be public, that’s fine; otherwise it needs a sign-in check.` : '',
-        deepWrites.length ? `A rule in ${base} (line ${deepWrites[0].line}) lets anyone ${deepWrites[0].createOnly ? 'add to' : 'change'} ${deepWrites[0].where} without signing in. If that’s a public form (like a mailing-list or contact form), that can be fine; otherwise it needs a sign-in check.` : '',
+        reads.length ? `Une règle de ${base} (ligne ${reads[0].line}) permet à n’importe qui de lire ${files ? 'chaque fichier' : 'chaque enregistrement'}, `
+          + `y compris des données qui peuvent appartenir à vos utilisateurs. Si tout ce qui s’y trouve est fait pour être public, ce n’est pas grave `
+            + `; sinon il faut une vérification de connexion.` : '',
+        deepWrites.length ? `Une règle de ${base} (ligne ${deepWrites[0].line}) permet à n’importe qui `
+          + `${deepWrites[0].createOnly ? 'd’ajouter à' : 'de modifier'} ${deepWrites[0].where} sans se connecter. `
+          + `Si c’est un formulaire public (liste de diffusion, formulaire de contact), cela peut convenir ; sinon il faut une vérification de connexion.` : '',
       ].filter(Boolean).join(' ');
     } else {
       severity = 'medium';
-      title = `Your Firebase ${service} test-mode rules ran out on ${longDate(expired.until)}`;
-      detail = `${base} has Firebase’s “test mode” rules, which stopped allowing access on ${longDate(expired.until)}. Every read and write is now refused, so the parts of the app that use ${service} won’t work. Replace them with real rules instead of moving the date, which would open everything to anyone again.`;
+      title = `Les règles « mode test » de votre Firebase ${service} ont expiré le ${longDate(expired.until)}`;
+      detail = `${base} a les règles du « mode test » de Firebase, qui ont cessé d’autoriser l’accès le ${longDate(expired.until)}. `
+        + `Toute lecture et toute écriture est désormais refusée : les parties de l’app qui utilisent ${service} ne fonctionneront pas. `
+        + `Remplacez-les par de vraies règles plutôt que de repousser la date, ce qui rouvrirait tout à tout le monde.`;
     }
     const it = itemFor(f.path);
     issues.push({
       id: 'firebase-rules:' + f.path, kind: 'database-rules', severity, title, detail,
-      items: it ? [it] : [], notes: it ? { [it]: shown.slice(0, 4).map((r) => `line ${r.line}: ${r.text}`).join(' · ') } : {},
+      items: it ? [it] : [], notes: it ? { [it]: shown.slice(0, 4).map((r) => `ligne ${r.line} : ${r.text}`).join(' · ') } : {},
       locations: shown.map((r) => ({ file: f.path, line: r.line })),
       fix: [
-        `Security fix: Firebase ${service} security rules in ${f.path}.`,
+        `Correctif de sécurité : règles de sécurité Firebase ${service} dans ${f.path}.`,
         ``,
-        `These rules let anyone in (or have expired):`,
-        ...shown.map((r) => `- line ${r.line}: ${r.text}`),
+        `Ces règles laissent entrer n’importe qui (ou ont expiré) :`,
+        ...shown.map((r) => `- ligne ${r.line} : ${r.text}`),
         ``,
-        `1. Read how the app uses each ${rtdb ? 'path' : files ? 'storage folder' : 'collection'}: what each screen reads and writes, and which data belongs to a user (for example ${files ? 'files under a folder named after the user’s uid' : 'documents keyed by the user’s uid, or with an ownerId field'}).`,
-        `2. Rewrite the rules so signed-in users can only read and write their own ${what} (${rtdb ? 'auth != null && auth.uid === $uid' : files ? 'request.auth != null && request.auth.uid == userId' : 'request.auth != null && request.auth.uid == resource.data.ownerId'}), public content is read-only, and everything else is denied. Don't use test-mode dates.`,
-        `3. Explain the new rules to me in plain words and wait for my OK.`,
-        `4. Then deploy them with \`firebase deploy --only ${deploy}\` and check them in the Firebase console's Rules Playground (or the emulator): a signed-out user shouldn't be able to read or change anything private.`,
+        `1. Lis comment l’app utilise chaque ${rtdb ? 'chemin' : files ? 'dossier de stockage' : 'collection'} : ce que chaque écran lit et écrit, et `
+          + `quelles données appartiennent à un utilisateur `
+          + `(par exemple ${files ? 'des fichiers sous un dossier nommé d’après l’uid de l’utilisateur' : 'des documents indexés par l’uid de l’utilisateur, ou avec un champ ownerId'}).`,
+        `2. Réécris les règles pour que les utilisateurs connectés ne lisent et n’écrivent que leurs propres ${files ? 'fichiers' : 'données'} `
+          + `(${rtdb ? 'auth != null && auth.uid === $uid' : files ? 'request.auth != null && request.auth.uid == userId' : 'request.auth != null && request.auth.uid == resource.data.ownerId'}), `
+          + `que le contenu public soit en lecture seule, et que tout le reste soit refusé. N’utilise pas de dates de mode test.`,
+        `3. Explique-moi les nouvelles règles en langage simple et attends mon accord.`,
+        `4. Puis déploie-les avec \`firebase deploy --only ${deploy}\` et vérifie-les dans le Rules Playground de la console Firebase (ou l’émulateur) : `
+          + `un utilisateur déconnecté ne doit pouvoir rien lire ni modifier de privé.`,
       ].join('\n'),
     });
   }
@@ -874,23 +974,32 @@ export function buildHealth({ graph, scan, arch, root }) {
     const next = /(^|\/)app\/.*route\.[jt]s$|(^|\/)pages\/api\//.test(file);
     issues.push({
       id: 'stripe-webhook:' + file, kind: 'stripe-webhook', severity: 'high',
-      title: `Anyone could fake a Stripe payment in ${nameOf(file)}`,
-      detail: `${file.split('/').pop()} acts on Stripe events (like “${x.events[0]}”) without checking Stripe’s signature, so anyone who finds the address can send a fake “payment succeeded” message and get orders, credits or a subscription for free. Stripe signs every real event; checking that signature takes a few lines.`,
-      items, notes: Object.fromEntries(items.map((id) => [id, id.startsWith('r:') ? 'Receives Stripe events without checking they’re real' : `line ${x.line}: handles ${x.events.join(', ')} without checking Stripe’s signature`])),
+      title: `N’importe qui pourrait simuler un paiement Stripe dans ${nameOf(file)}`,
+      detail: `${file.split('/').pop()} traite des événements Stripe (comme « ${x.events[0]} ») sans vérifier la signature de Stripe : `
+        + `quiconque trouve l’adresse peut envoyer un faux message « paiement réussi » et obtenir gratuitement des commandes, des crédits ou un abonnement. `
+        + `Stripe signe chaque vrai événement ; vérifier cette signature tient en quelques lignes.`,
+      items, notes: Object.fromEntries(items.map((id) => [id, id.startsWith('r:') ? 'Reçoit des événements Stripe sans vérifier qu’ils sont authentiques' : `ligne ${x.line} : traite ${x.events.join(', ')} sans vérifier la signature Stripe`])),
       locations: [{ file, line: x.line }],
       fix: [
-        `Security fix in ${file}: verify Stripe webhook signatures before acting on any event. Do not print any secret values.`,
+        `Correctif de sécurité dans ${file} : vérifier les signatures des webhooks Stripe avant d’agir sur un événement. N’affiche aucune valeur secrète.`,
         ``,
-        `It handles ${x.events.join(', ')} (line ${x.line}) without calling ${py ? 'stripe.Webhook.construct_event' : 'stripe.webhooks.constructEvent'}.`,
+        `Il traite ${x.events.join(', ')} (ligne ${x.line}) sans appeler ${py ? 'stripe.Webhook.construct_event' : 'stripe.webhooks.constructEvent'}.`,
         ``,
         py
-          ? `1. Read the raw request body as bytes (FastAPI: \`await request.body()\`; Flask: \`request.get_data()\`), not the parsed JSON.`
-          : next ? `1. Read the raw request body with \`await req.text()\` (App Router) or turn off the body parser for this route (Pages Router), not the parsed JSON.` : `1. Give this route the raw body: \`express.raw({ type: 'application/json' })\` on it, registered before \`express.json()\` runs for it.`,
+          ? `1. Lis le corps brut de la requête en octets (FastAPI : \`await request.body()\` ; Flask : \`request.get_data()\`), pas le JSON analysé.`
+          : next ? `1. Lis le corps brut de la requête avec \`await req.text()\` (App Router) ou désactive le body parser pour cette route (Pages `
+            + `Router), pas le JSON analysé.`
+            : `1. Donne à cette route le corps brut : \`express.raw({ type: 'application/json' })\` sur elle, enregistré avant que \`express.json()\` `
+              + `ne s’exécute pour elle.`,
         py
-          ? `2. Call \`stripe.Webhook.construct_event(payload, request.headers["stripe-signature"], os.environ["STRIPE_WEBHOOK_SECRET"])\` and return 400 if it raises.`
-          : `2. Call \`stripe.webhooks.constructEvent(rawBody, signatureHeader, process.env.STRIPE_WEBHOOK_SECRET)\` (the \`stripe-signature\` header) and return 400 if it throws.`,
-        `3. Use only the verified event from then on, and handle each event once even if Stripe sends it again.`,
-        `4. Add STRIPE_WEBHOOK_SECRET (empty) to .env.example and tell me where to get it: the Stripe dashboard (Developers → Webhooks → the endpoint → Signing secret), or \`stripe listen\` when testing locally.`,
+          ? `2. Appelle \`stripe.Webhook.construct_event(payload, request.headers["stripe-signature"], os.environ["STRIPE_WEBHOOK_SECRET"])\` et `
+            + `renvoie 400 s’il lève une exception.`
+          : `2. Appelle \`stripe.webhooks.constructEvent(rawBody, signatureHeader, process.env.STRIPE_WEBHOOK_SECRET)\` (l’en-tête `
+            + `\`stripe-signature\`) et renvoie 400 s’il lève une erreur.`,
+        `3. N’utilise ensuite que l’événement vérifié, et traite chaque événement une seule fois même si Stripe le renvoie.`,
+        `4. Ajoute STRIPE_WEBHOOK_SECRET (vide) à .env.example et dis-moi où l’obtenir : le tableau de bord Stripe (Developers → Webhooks → le `
+          + `endpoint → Signing secret), `
+          + `ou \`stripe listen\` en test local.`,
       ].join('\n'),
     });
   }
@@ -906,21 +1015,32 @@ export function buildHealth({ graph, scan, arch, root }) {
       const it = itemFor(c.file);
       if (!it) continue;
       if (!items.includes(it)) items.push(it);
-      notes[it] = (notes[it] ? notes[it] + ' · ' : '') + `line ${c.line}: ${c.how}${c.credentials ? ', with login cookies' : ''}`;
+      notes[it] = (notes[it] ? notes[it] + ' · ' : '') + `ligne ${c.line} : ${c.how}${c.credentials ? ', avec les cookies de connexion' : ''}`;
     }
     issues.push({
       id: 'cors', kind: 'cors', severity: cred.length ? 'medium' : 'low',
-      title: cred.length ? 'Any website could act as your signed-in users' : 'Any website can call your server from a visitor’s browser',
+      title: cred.length ? 'N’importe quel site web pourrait agir comme vos utilisateurs connectés' : 'N’importe quel site web peut appeler votre serveur depuis le navigateur d’un visiteur',
       detail: cred.length
-        ? `${cred[0].file.split('/').pop()} lets any website call this server from a visitor’s browser and send along their login cookies. So a site a signed-in user happens to visit could quietly read their data or act as them. Allow only your own app’s address instead.`
-        : `${filesC.length === 1 ? filesC[0].split('/').pop() : `${filesC.length} files`} tell browsers that any website may call this server. That’s fine for a public API that doesn’t use login cookies (for example one that checks a token in the Authorization header); otherwise, allow only your own app’s address.`,
+        ? `${cred[0].file.split('/').pop()} permet à n’importe quel site web d’appeler ce serveur depuis le navigateur d’un visiteur et d’envoyer ses `
+          + `cookies de connexion. `
+          + `Un site qu’un utilisateur connecté visite par hasard pourrait donc lire discrètement ses données ou agir à sa place. Autorisez plutôt `
+            + `uniquement l’adresse de votre propre app.`
+        : `${filesC.length === 1 ? filesC[0].split('/').pop() : `${filesC.length} fichiers`} ${filesC.length === 1 ? 'indique' : 'indiquent'} aux `
+          + `navigateurs que n’importe quel site web peut appeler ce serveur. `
+          + `C’est acceptable pour une API publique qui n’utilise pas de cookies de connexion (par exemple une qui vérifie un jeton dans l’en-tête `
+            + `Authorization) ; `
+          + `sinon, autorisez uniquement l’adresse de votre propre app.`,
       items, notes,
       locations: cors.map((c) => ({ file: c.file, line: c.line })),
       fix: [
-        `Security review: CORS settings that allow every website:`,
-        ...cors.map((c) => `- ${c.file}:${c.line}: ${c.how}${c.credentials ? ' (with credentials)' : ''}`),
+        `Revue de sécurité : réglages CORS qui autorisent tous les sites web :`,
+        ...cors.map((c) => `- ${c.file}:${c.line} : ${c.how}${c.credentials ? ' (avec credentials)' : ''}`),
         ``,
-        `First tell me in plain words whether this server uses login cookies or sessions, and which websites legitimately call it. Then replace the allow-everything setting with an explicit list of allowed origins read from an environment variable (for example ALLOWED_ORIGINS=https://myapp.com,http://localhost:3000). Keep credentials only if the app logs in with cookies, and never combine them with "*" or with echoing back whatever origin asks. Show me the change before making it, and change nothing else.`,
+        `Dis-moi d’abord en langage simple si ce serveur utilise des cookies de connexion ou des sessions, et quels sites web l’appellent légitimement. `
+          + `Remplace ensuite le réglage « tout autoriser » par une liste explicite d’origines autorisées lue depuis une variable d’environnement `
+          + `(par exemple ALLOWED_ORIGINS=https://myapp.com,http://localhost:3000). Garde les credentials seulement si l’app se connecte par cookies, `
+          + `et ne les combine jamais avec "*" ni avec le renvoi de n’importe quelle origine qui le demande. `
+          + `Montre-moi la modification avant de la faire, et ne change rien d’autre.`,
       ].join('\n'),
     });
   }
@@ -986,23 +1106,31 @@ export function buildHealth({ graph, scan, arch, root }) {
     const guardHint = (file, lang) => {
       const local = top(pr.fileGuards.get(file));
       const name = local || top(new Map([...pr.guardCounts].filter(([n]) => !guardDefs.get(n)?.every((g) => g.wrapper))));
-      if (!name) return `the project's existing login check (find how other protected endpoints verify the user; if there is none, ask me before adding one)`;
+      if (!name) return `le contrôle de connexion existant du projet (trouve comment les autres points d’accès protégés vérifient l’utilisateur ; `
+        + `s’il n’y en a pas, demande-moi avant d’en ajouter un)`;
       const defs = guardDefs.get(name) || [];
-      const where = defs.find((g) => g.file === file) ? 'defined in this file' : defs.length ? `defined in ${defs[0].file}` : '';
-      const how = defs.some((g) => g.alias) ? `a parameter typed ${name}` : `${lang === 'python' ? '@' : ''}${name}`;
-      return `the same check ${local ? 'the other endpoints in this file' : 'the protected endpoints'} already use (${how}${where ? ', ' + where : ''})`;
+      const where = defs.find((g) => g.file === file) ? 'défini dans ce fichier' : defs.length ? `défini dans ${defs[0].file}` : '';
+      const how = defs.some((g) => g.alias) ? `un paramètre typé ${name}` : `${lang === 'python' ? '@' : ''}${name}`;
+      return `le même contrôle que ${local ? 'les autres points d’accès de ce fichier' : 'les points d’accès protégés'} utilisent déjà `
+        + `(${how}${where ? ', ' + where : ''})`;
     };
     const routeLine = (e) => `- ${e.r.m} ${e.r.p} — ${e.r.f}:${e.r.l}${e.fnd.fn && !/^[A-Z]+$/.test(e.fnd.fn) ? ` (${e.fnd.fn})` : ''}`;
     if (pr.misplaced.length) {
-      const list = pr.misplaced;
+      const list = pr.misplaced, un = list.length === 1;
       issues.push({
         id: 'misplaced-guard:' + repo, kind: 'unprotected-endpoint', severity: 'high',
-        title: 'A login check is in the wrong place, so it does nothing',
-        detail: `On ${plural(list.length, 'endpoint')} the login check (@${list[0].fnd.misplaced}) is written above the route line instead of below it. Flask only sees what's below, so ${list.length === 1 ? 'it is' : 'they are'} open to anyone even though ${list.length === 1 ? 'it looks' : 'they look'} protected.`,
+        title: 'Une vérification de connexion est au mauvais endroit : elle ne sert à rien',
+        detail: `Sur ${plural(list.length, 'point d’accès', 'points d’accès')}, la vérification de connexion (@${list[0].fnd.misplaced}) est écrite `
+          + `au-dessus de la ligne de la route `
+          + `au lieu d’en dessous. Flask ne voit que ce qui est en dessous : ${un ? 'il est ouvert' : 'ils sont ouverts'} à n’importe qui `
+          + `alors ${un ? 'qu’il paraît protégé' : 'qu’ils paraissent protégés'}.`,
         items: list.slice(0, 24).map((e) => 'r:' + e.i),
-        notes: Object.fromEntries(list.slice(0, 24).map((e) => ['r:' + e.i, `@${e.fnd.misplaced} sits above the route line, so it is skipped`])),
+        notes: Object.fromEntries(list.slice(0, 24).map((e) => ['r:' + e.i, `@${e.fnd.misplaced} est au-dessus de la ligne de la route : il est ignoré`])),
         locations: list.map((e) => ({ file: e.r.f, line: e.r.l })),
-        fix: [`Security fix: these endpoints have their auth decorator above the route decorator, so the framework registers the unprotected function:`, ...list.map(routeLine), ``, `Move each auth decorator directly below the @…route(...) line (route decorator first, then the auth decorator, then def). Change nothing else, then run the tests that cover these endpoints.`].join('\n'),
+        fix: [`Correctif de sécurité : ces points d’accès ont leur décorateur d’authentification au-dessus du décorateur de route, si bien que le `
+          + `framework enregistre la fonction non protégée :`, ...list.map(routeLine), ``,
+          `Déplace chaque décorateur d’authentification juste sous la ligne @…route(...) (le décorateur de route d’abord, puis celui `
+            + `d’authentification, puis def). Ne change rien d’autre, puis lance les tests qui couvrent ces points d’accès.`].join('\n'),
       });
     }
     if (!pr.open.length) continue;
@@ -1011,12 +1139,22 @@ export function buildHealth({ graph, scan, arch, root }) {
       const list = pr.open.sort((a, b) => b.write - a.write);
       issues.push({
         id: 'no-auth:' + repo, kind: 'unprotected-endpoint', severity: 'medium',
-        title: `None of ${repo ? `${repo}’s` : 'your'} endpoints check who is calling`,
-        detail: `${plural(list.length, 'endpoint')} answer anyone who knows the address, with no login check in the code. That's fine only if this server is private (for example behind a company network or a gateway that checks logins); otherwise anyone could read or change its data.`,
+        title: `Aucun des points d’accès ${repo ? `de ${repo}` : 'de votre app'} ne vérifie qui appelle`,
+        detail: `${plural(list.length, 'point d’accès', 'points d’accès')} ${list.length === 1 ? 'répond' : 'répondent'} à quiconque connaît `
+          + `l’adresse, sans aucune vérification de connexion dans le code. `
+          + `Ce n’est acceptable que si ce serveur est privé (par exemple derrière un réseau d’entreprise ou une passerelle qui vérifie les connexions) ; `
+          + `sinon n’importe qui pourrait lire ou modifier ses données.`,
         items: list.slice(0, 24).map((e) => 'r:' + e.i),
-        notes: Object.fromEntries(list.slice(0, 24).map((e) => ['r:' + e.i, e.write ? 'Changes data, no login check' : 'No login check'])),
+        notes: Object.fromEntries(list.slice(0, 24).map((e) => ['r:' + e.i, e.write ? 'Modifie des données, sans vérification de connexion' : 'Sans vérification de connexion'])),
         locations: list.map((e) => ({ file: e.r.f, line: e.r.l })),
-        fix: [`Review access control${repo ? ` in ${repo}` : ''}. None of these endpoints verify the caller in code:`, ...list.slice(0, 40).map(routeLine), list.length > 40 ? `- …and ${list.length - 40} more` : null, ``, `First tell me in plain words whether this server is reachable from the internet and whether anything in front of it (gateway, network rules) checks logins. If it is public, propose the smallest safe way to require login for the data-changing endpoints (POST/PUT/PATCH/DELETE) first, show me the plan, and wait for my OK before changing code.`].filter((x) => x !== null).join('\n'),
+        fix: [`Revue du contrôle d’accès${repo ? ` dans ${repo}` : ''}. Aucun de ces points d’accès ne vérifie l’appelant dans le code `
+          + `:`, ...list.slice(0, 40).map(routeLine),
+          list.length > 40 ? `- …et ${list.length - 40} autres` : null, ``,
+          `Dis-moi d’abord en langage simple si ce serveur est joignable depuis internet et si quelque chose devant lui (passerelle, règles réseau) `
+            + `vérifie les connexions. `
+          + `S’il est public, propose le moyen le plus petit et le plus sûr d’exiger une connexion pour les points d’accès qui modifient des données `
+            + `(POST/PUT/PATCH/DELETE) d’abord, `
+          + `montre-moi le plan, et attends mon accord avant de modifier le code.`].filter((x) => x !== null).join('\n'),
       });
       continue;
     }
@@ -1032,27 +1170,36 @@ export function buildHealth({ graph, scan, arch, root }) {
       const fileGuarded = pr.guardedIn.get(file) || 0;
       const sv = (n, one, many) => `${n} ${n === 1 ? one : many}`;
       const parts = [];
-      if (writes.length) parts.push(sv(writes.length, 'endpoint that changes data (create, update or delete)', 'endpoints that change data (create, update or delete)'));
-      if (reads.length) parts.push(sv(reads.length, 'endpoint that returns data', 'endpoints that return data'));
+      if (writes.length) parts.push(sv(writes.length, 'point d’accès qui modifie des données (créer, mettre à jour ou supprimer)', 'points d’accès qui modifient des données (créer, mettre à jour ou supprimer)'));
+      if (reads.length) parts.push(sv(reads.length, 'point d’accès qui renvoie des données', 'points d’accès qui renvoient des données'));
       const nOpen = writes.length + reads.length;
-      const hookText = hooks.length ? `${sv(hooks.length, 'webhook (an automatic message from another service) is', 'webhooks (automatic messages from another service) are')} accepted without checking that ${hooks.length === 1 ? 'it really comes' : 'they really come'} from that service, so anyone could send fake ones. Some providers can't sign their messages; if so, that's expected.` : '';
+      const hookText = hooks.length ? `${sv(hooks.length, 'webhook (un message automatique d’un autre service) est accepté', 'webhooks (des messages automatiques d’un autre service) sont acceptés')} `
+        + `sans vérifier ${hooks.length === 1 ? 'qu’il vient bien' : 'qu’ils viennent bien'} de ce service : n’importe qui pourrait en envoyer de faux. `
+        + `Certains fournisseurs ne peuvent pas signer leurs messages ; si c’est le cas, c’est normal.` : '';
       issues.push({
         id: 'open-endpoints:' + file, kind: 'unprotected-endpoint', severity: sev,
-        title: writes.length ? `Anyone could change data through ${nameOf(file)}` : hooks.length ? `Anyone could send fake events to ${nameOf(file)}` : `Anyone could read data from ${nameOf(file)}`,
+        title: writes.length ? `N’importe qui pourrait modifier des données via ${nameOf(file)}` : hooks.length ? `N’importe qui pourrait envoyer de `
+          + `faux événements à ${nameOf(file)}` : `N’importe qui pourrait lire des données depuis ${nameOf(file)}`,
         detail: [
-          parts.length ? `${file.split('/').pop()} has ${parts.join(' and ')} with no login check, so anyone who finds the address can use ${nOpen === 1 ? 'it' : 'them'}${fileGuarded > 0 ? ` (${sv(fileGuarded, 'other endpoint', 'other endpoints')} in the same file ${fileGuarded === 1 ? 'is' : 'are'} protected)` : ''}. If ${nOpen === 1 ? 'it is' : 'some are'} meant to be public, that's fine; otherwise ${nOpen === 1 ? 'it needs' : 'they need'} a login check.` : '',
-          parts.length && hooks.length ? `It also accepts ${sv(hooks.length, 'webhook', 'webhooks')} without checking who sent ${hooks.length === 1 ? 'it' : 'them'}.` : hookText,
+          parts.length ? `${file.split('/').pop()} a ${parts.join(' et ')} sans vérification de connexion : quiconque trouve l’adresse peut `
+            + `${nOpen === 1 ? 'l’utiliser' : 'les utiliser'}`
+            + `${fileGuarded > 0 ? ` (${sv(fileGuarded, 'autre point d’accès du même fichier est protégé', 'autres points d’accès du même fichier sont protégés')})` : ''}. `
+            + `${nOpen === 1 ? 'S’il est fait pour être public, c’est acceptable ; sinon il lui faut une vérification de connexion.' : 'Si certains sont faits pour être publics, c’est acceptable ; sinon ils ont besoin d’une vérification de connexion.'}` : '',
+          parts.length && hooks.length ? `Il accepte aussi ${sv(hooks.length, 'webhook', 'webhooks')} sans vérifier qui `
+            + `${hooks.length === 1 ? 'l’a envoyé' : 'les a envoyés'}.` : hookText,
         ].filter(Boolean).join(' '),
         items: list.slice(0, 24).map((e) => 'r:' + e.i),
-        notes: Object.fromEntries(list.slice(0, 24).map((e) => ['r:' + e.i, e.webhook ? 'Webhook with no visible signature check' : e.write ? 'Changes data, no login check' : 'Returns data, no login check'])),
+        notes: Object.fromEntries(list.slice(0, 24).map((e) => ['r:' + e.i, e.webhook ? 'Webhook sans vérification de signature visible' : e.write ? 'Modifie des données, sans vérification de connexion' : 'Renvoie des données, sans vérification de connexion'])),
         locations: list.map((e) => ({ file: e.r.f, line: e.r.l })),
         fix: [
-          `Security fix in ${file}: these endpoints don't check who is calling:`,
+          `Correctif de sécurité dans ${file} : ces points d’accès ne vérifient pas qui appelle :`,
           ...list.map((e) => routeLine(e) + (e.webhook ? ' [webhook]' : '')),
           ``,
-          `For each endpoint that isn't meant to be public, add ${guardHint(file, lang)}.`,
-          hooks.length ? `For webhooks, verify the provider's signature (using its signing secret from an environment variable) before doing anything, and reject requests that fail.` : null,
-          `If an endpoint is intentionally public (for example a public page or a health check), leave it and tell me why. Don't change anything else; afterwards list exactly which endpoints you protected and run the related tests.`,
+          `Pour chaque point d’accès qui n’est pas fait pour être public, ajoute ${guardHint(file, lang)}.`,
+          hooks.length ? `Pour les webhooks, vérifie la signature du fournisseur (avec son secret de signature pris dans une variable `
+            + `d’environnement) avant de faire quoi que ce soit, et rejette les requêtes qui échouent.` : null,
+          `Si un point d’accès est volontairement public (par exemple une page publique ou un contrôle de santé), laisse-le et dis-moi pourquoi. `
+          + `Ne change rien d’autre ; ensuite liste exactement quels points d’accès tu as protégés et lance les tests associés.`,
         ].filter((x) => x !== null).join('\n'),
       });
     }
@@ -1091,16 +1238,23 @@ export function buildHealth({ graph, scan, arch, root }) {
     const merged = groups.length > MAX ? [...groups.slice(0, MAX - 1), ['', groups.slice(MAX - 1).flatMap(([, l]) => l)]] : groups;
     for (const [nid, list] of merged) {
       list.sort((a, b) => b.loc - a.loc);
-      const where = nid ? label(nid) : 'other areas';
+      const where = nid ? label(nid) : 'd’autres zones';
       const lines = list.reduce((s, f) => s + f.loc, 0);
       issues.push({
         id: 'unused:' + (nid || 'other'), kind: 'unused-file', severity: 'low',
-        title: list.length === 1 ? `A file in ${where} looks unused` : `${list.length} files in ${where} look unused`,
-        detail: `Nothing in the app imports or calls ${list.length === 1 ? 'this file' : 'these files'} (${lines.toLocaleString('en-US')} lines). Leftover code confuses AI assistants, which may edit or copy the wrong version. Double-check before deleting: some files are loaded in ways the map can't see.`,
+        title: list.length === 1 ? `Un fichier dans ${where} semble inutilisé` : `${list.length} fichiers dans ${where} semblent inutilisés`,
+        detail: `Rien dans l’app n’importe ni n’appelle ${list.length === 1 ? 'ce fichier' : 'ces fichiers'} (${nl(lines)}). `
+          + `Le code laissé de côté perturbe les assistants IA, qui peuvent modifier ou copier la mauvaise version. `
+          + `Vérifiez avant de supprimer : certains fichiers sont chargés d’une façon que la carte ne voit pas.`,
         items: list.slice(0, 24).map((f) => 'f:' + f.p),
-        notes: Object.fromEntries(list.slice(0, 24).map((f) => ['f:' + f.p, `Nothing uses this file (${f.loc.toLocaleString('en-US')} lines)`])),
+        notes: Object.fromEntries(list.slice(0, 24).map((f) => ['f:' + f.p, `Rien n’utilise ce fichier (${nl(f.loc)})`])),
         locations: list.map((f) => ({ file: f.p, line: 1 })),
-        fix: [`Cleanup check: these files look unused (nothing imports or calls them):`, ...list.slice(0, 40).map((f) => `- ${f.p}`), list.length > 40 ? `- …and ${list.length - 40} more` : null, ``, `For each file, search the codebase (including configs, scripts, HTML templates and dynamic imports) to confirm nothing uses it. Then tell me which ones are safe to delete and which are actually used, with one line of evidence each. Don't delete anything until I confirm.`].filter((x) => x !== null).join('\n'),
+        fix: [`Contrôle de nettoyage : ces fichiers semblent inutilisés (rien ne les importe ni ne les appelle) :`, ...list.slice(0, 40).map((f) => `- ${f.p}`),
+          list.length > 40 ? `- …et ${list.length - 40} autres` : null, ``,
+          `Pour chaque fichier, cherche dans tout le code (y compris configs, scripts, templates HTML et imports dynamiques) pour confirmer que rien `
+            + `ne l’utilise. `
+          + `Dis-moi ensuite lesquels peuvent être supprimés sans risque et lesquels sont en fait utilisés, avec une ligne de preuve chacun. Ne `
+            + `supprime rien avant mon accord.`].filter((x) => x !== null).join('\n'),
       });
     }
   }
@@ -1111,12 +1265,23 @@ export function buildHealth({ graph, scan, arch, root }) {
     const huge = big.filter((f) => f.loc >= 2000);
     issues.push({
       id: 'large-files', kind: 'large-file', severity: huge.length ? 'medium' : 'low',
-      title: big.length === 1 ? 'One file is very large' : `${big.length} files are very large`,
-      detail: `${big.length === 1 ? 'This file has' : 'These files each have'} over 1,000 lines${huge.length ? ` (the biggest has ${big[0].loc.toLocaleString('en-US')})` : ''}. AI assistants read and edit big files less reliably: they lose track of what's where and can break one part while fixing another. Splitting them into smaller files by job makes future changes safer.`,
+      title: big.length === 1 ? 'Un fichier est très volumineux' : `${big.length} fichiers sont très volumineux`,
+      detail: `${big.length === 1 ? 'Ce fichier compte' : 'Ces fichiers comptent chacun'} plus de 1 000 lignes${huge.length ? ` (le plus gros en `
+        + `compte ${big[0].loc.toLocaleString('fr-FR')})` : ''}. `
+        + `Les assistants IA lisent et modifient moins fiablement les gros fichiers : ils perdent le fil de ce qui est où et peuvent casser une `
+          + `partie en en corrigeant une autre. `
+        + `Les découper en fichiers plus petits, un par rôle, rend les futures modifications plus sûres.`,
       items: big.slice(0, 24).map((f) => 'f:' + f.p),
-      notes: Object.fromEntries(big.slice(0, 24).map((f) => ['f:' + f.p, `${f.loc.toLocaleString('en-US')} lines${f.tooLarge ? ': too big for Floorplan to read, so what it connects to and any secrets in it weren’t checked' : ''}`])),
+      notes: Object.fromEntries(big.slice(0, 24).map((f) => ['f:' + f.p, `${nl(f.loc)}`
+        + `${f.tooLarge ? ' : trop gros pour être lu par VibeFlow, donc ce à quoi il se connecte et ses secrets éventuels n’ont pas été contrôlés' : ''}`])),
       locations: big.map((f) => ({ file: f.p, line: 1 })),
-      fix: [`Refactor plan: these files are very large:`, ...big.slice(0, 15).map((f) => `- ${f.p} (${f.loc.toLocaleString('en-US')} lines)`), ``, `Start with ${big[0].p}. Read it and propose how to split it into smaller files, each with one clear job (for example by feature or by type of work), keeping every public function name and behaviour the same. Show me the plan first. After I approve, move code in small steps, update the imports, and run the tests after each step. Don't change behaviour.`].join('\n'),
+      fix: [`Plan de refactorisation : ces fichiers sont très volumineux :`, ...big.slice(0, 15).map((f) => `- ${f.p} `
+        + `(${nl(f.loc)})`), ``,
+        `Commence par ${big[0].p}. Lis-le et propose comment le découper en fichiers plus petits, chacun avec un rôle clair (par exemple par `
+          + `fonctionnalité ou par type de travail), `
+        + `en gardant chaque nom de fonction publique et chaque comportement identiques. Montre-moi d’abord le plan. `
+        + `Après mon accord, déplace le code par petites étapes, mets à jour les imports et lance les tests après chaque étape. Ne change pas le `
+          + `comportement.`].join('\n'),
     });
   }
 
@@ -1127,12 +1292,16 @@ export function buildHealth({ graph, scan, arch, root }) {
     const filesL = [...new Set(local.map((x) => x.file))];
     issues.push({
       id: 'localhost-url', kind: 'hardcoded-url', severity: 'low',
-      title: 'The app points at your own computer’s address',
-      detail: `${filesL.length === 1 ? 'A frontend file' : `${filesL.length} frontend files`} call${filesL.length === 1 ? 's' : ''} a fixed “localhost” address. That only works on your machine; once the app is online those calls will fail for everyone else.`,
+      title: 'L’app pointe vers l’adresse de votre propre ordinateur',
+      detail: `${filesL.length === 1 ? 'Un fichier frontend appelle' : `${filesL.length} fichiers frontend appellent`} une adresse « localhost » fixe. `
+        + `Cela ne fonctionne que sur votre machine ; une fois l’app en ligne, ces appels échoueront pour tout le monde.`,
       items: filesL.slice(0, 24).map((p) => 'f:' + p),
-      notes: Object.fromEntries(filesL.slice(0, 24).map((p) => ['f:' + p, `localhost address on line ${local.filter((x) => x.file === p).map((x) => x.line).join(', ')}`])),
+      notes: Object.fromEntries(filesL.slice(0, 24).map((p) => ['f:' + p, `adresse localhost, ligne `
+        + `${local.filter((x) => x.file === p).map((x) => x.line).join(', ')}`])),
       locations: local,
-      fix: [`These frontend lines use a hard-coded localhost URL:`, ...local.map((x) => `- ${x.file}:${x.line}`), ``, `Replace each with the project's existing API base URL setting (or add one read from a public environment variable such as NEXT_PUBLIC_API_URL / VITE_API_URL, with the localhost value only in .env.development). Don't change anything else.`].join('\n'),
+      fix: [`Ces lignes du frontend utilisent une URL localhost écrite en dur :`, ...local.map((x) => `- ${x.file}:${x.line}`), ``,
+        `Remplace chacune par le réglage d’URL de base de l’API déjà présent dans le projet (ou ajoutes-en un, lu depuis une variable d’environnement publique `
+        + `comme NEXT_PUBLIC_API_URL / VITE_API_URL, avec la valeur localhost seulement dans .env.development). Ne change rien d’autre.`].join('\n'),
     });
   }
 
@@ -1171,7 +1340,7 @@ function firebaseRules(src, now) {
     const where = matches.filter((x) => x.i < m.index).pop()?.path || '/';
     const writeOps = ops.filter((o) => /^(write|create|update|delete)$/.test(o));
     out.push({
-      line: at(m.index), text: `allow ${ops.join(', ')}${m[2] ? `: if ${cond}` : ' (no condition)'} at ${where}`,
+      line: at(m.index), text: `allow ${ops.join(', ')}${m[2] ? ` : si ${cond}` : ' (sans condition)'} sur ${where}`,
       read: ops.some((o) => /^(read|get|list)$/.test(o)), write: writeOps.length > 0, createOnly: writeOps.length > 0 && writeOps.every((o) => o === 'create'),
       open: !end ? 'always' : end > now ? 'until' : 'expired', until: end, where,
       wide: /=\*\*\}/.test(where) || /\/documents$/.test(where) || where === '/',
@@ -1193,9 +1362,9 @@ function firebaseRtdbRules(src, now) {
     let depth = 0;
     for (let i = 0; i < m.index; i++) { if (s[i] === '{') depth++; else if (s[i] === '}') depth--; }
     const keys = [...s.slice(0, m.index).matchAll(/"([^".][^"]*)"\s*:\s*\{/g)].map((k) => k[1]);
-    const where = depth <= 2 ? 'the whole database' : '/' + keys.slice(-(depth - 2)).join('/');
+    const where = depth <= 2 ? 'toute la base de données' : '/' + keys.slice(-(depth - 2)).join('/');
     out.push({
-      line: at(m.index), text: `"${m[1] === 'read' ? '.read' : '.write'}": ${m[2]} for ${where}`,
+      line: at(m.index), text: `"${m[1] === 'read' ? '.read' : '.write'}" : ${m[2]} pour ${where}`,
       read: m[1] === 'read', write: m[1] === 'write', createOnly: false,
       open: !end ? 'always' : end > now ? 'until' : 'expired', until: end, where, wide: depth <= 2, root: depth <= 2,
     });

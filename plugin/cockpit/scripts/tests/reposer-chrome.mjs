@@ -29,12 +29,13 @@ await executer(chrome, async (s) => {
     await s.ev(`(() => { ${EMETTRE} emettre([S, M, C('un')]); const R = window.fetch.bind(window);
       window.fetch = (u, o) => String(u).includes('/api/vf/doing') ? Promise.resolve({ ok: true, json: async () => ({ doing: 'réponse fixe EKR1' }) }) : R(u, o); })()`);
     await s.ev("document.querySelector('#vf-lock').click()");
-    await s.attendre("!!document.querySelector('.vf-whop [data-vf-doing]')", 'bouton « Voir la dernière commande » du tiroir');
-    await s.ev("window.__b = document.querySelector('.vf-whop [data-vf-doing]'); window.__b.click()");
-    await s.attendre("(() => { const z = document.querySelector('.vf-whop .vf-doing'); return !!z && !z.hidden && z.textContent.includes('EKR1'); })()", 'réponse affichée');
+    const ZB = '.vf-whop [data-vf-doing="M1"]'; // la ligne du bouton cliqué (M1), jamais la première de la page
+    await s.attendre(`!!document.querySelector('${ZB}')`, 'bouton « Voir la dernière commande » du tiroir');
+    await s.ev(`window.__b = document.querySelector('${ZB}'); window.__b.click()`);
+    await s.attendre(`(() => { const z = document.querySelector('${ZB} + .vf-doing'); return !!z && !z.hidden && z.textContent.includes('EKR1'); })()`, 'réponse affichée');
     await s.ev(`(() => { ${EMETTRE} emettre([S, M, C('deux')]); })()`);
-    const remplace = await s.attendre("!document.contains(window.__b) && !!document.querySelector('.vf-whop [data-vf-doing]')", 'bouton remplacé par le redessin', 8000).then(() => true, () => false);
-    const r = await s.stable("(() => { const b = document.querySelector('.vf-whop [data-vf-doing]'); const z = b && b.nextElementSibling; return { texte: z ? z.textContent : null, visible: !!z && !z.hidden }; })()", 'zone de la réponse stable');
+    const remplace = await s.attendre(`!document.contains(window.__b) && !!document.querySelector('${ZB}')`, 'bouton remplacé par le redessin', 8000).then(() => true, () => false);
+    const r = await s.stable(`(() => { const b = document.querySelector('${ZB}'); const z = b && b.nextElementSibling; return { texte: z ? z.textContent : null, visible: !!z && !z.hidden }; })()`, 'zone de la réponse stable');
     return { remplace, texte: r.texte, visible: r.visible };
   }
   return { erreur: 'action inconnue : ' + ACTION };

@@ -170,7 +170,8 @@
     monte = { declaree: () => declaree(), ancre };
     declaree(); rendre();
     // avec VF_ONGLETS le fragment se lit à vf:onglet, émis après pushState (l'adresse du rappel est encore celle de l'onglet précédent)
-    if (!W.VF_ONGLETS) fragment();
+    // au chargement de la page (aucun vf:onglet à venir) le fragment se lit ici ; lors d'une arrivée, vf:onglet le lit (luHash)
+    if (!W.VF_ONGLETS) fragment(); else minuteries.push(setTimeout(() => { if (luHash === null) fragment(); }, 0));
     if (!A.who()) { minuteries.push(setTimeout(rendre, 150)); }
     return () => {
       vivant = false; monte = null;

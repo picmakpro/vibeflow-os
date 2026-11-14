@@ -3,7 +3,7 @@
 #   CL1 couloirs par défaut, graphe à ?vue=graphe, section de panneau, adresse de naviguer
 #   CL2 en-tête de jalon, ligne d'état, troncature, listes, XSS, contrastes, mouvement réduit
 #   CL3 clavier, panneau par-dessus, zone basse, visite, direct, focus orphelin, bords latéraux (pilote : chrome-couloirs-clavier.mjs)
-#   Mutants (copie du module dans $WORK, jamais le module) : M-FOOT, M-XSS, M-POUSSE, M-ORPHELIN, M-EXTREMITE, M-POINTEUR (CL4).
+#   Mutants (copie du module dans $WORK, jamais le module) : M-FOOT, M-XSS, M-POUSSE, M-ORPHELIN, M-EXTREMITE, M-POINTEUR, M-PASTILLE-FORME, M-PASTILLE-RIEN (CL4).
 #   CL_SCRIPTS = dossier de scripts à bâtir (rejeu sur la base).
 # Sans navigateur : SUITE SAUTÉE (exit 0, message explicite), jamais un vert à vide.
 set -uo pipefail
@@ -106,6 +106,8 @@ assert_eq "CL3.3b — Entrée plonge ; Échap (ou Retour arrière) revient à la
 assert_eq "CL3.4 — 390 px tactile : un toucher sélectionne (feuille ouverte, bouton d'ouvrir dedans) sans plonger ; Espace sélectionne ; Entrée plonge" \
   "$(E3 '[j.cl34.touch[0], j.cl34.touch[1], j.cl34.touch[2], j.cl34.touch[3] >= 1, j.cl34.focus, j.cl34.espace, j.cl34.entree]')" \
   '["n:ph-3",true,"root",true,"n:ph-3","n:ph-4","n:ph-4"]'
+assert_eq "CL3.3c — arrivée sur Projet par VF_ONGLETS.aller sans sélection : aucune erreur du clavier des couloirs, focus sur le h1 « Projet »" \
+  "$(E3 '[j.cl3arr.err.filter((m) => /clavier|querySelectorAll|null/.test(m)), j.cl3arr.foc, j.cl3arr.sel]')" '[[],"vf-projet-titre",null]'
 assert_eq "CL3.9a — témoin : aucune section du pilote n'a échoué (clavier)" "$(E3 'Object.keys(j.erreurs).join()')" ""
 
 echo "=== CL3 — panneau par-dessus, visite, direct, réveil, mouvement réduit, focus orphelin, bords latéraux ==="
@@ -169,6 +171,7 @@ build_serve "$LAB"
 RPN="$(node "$HERE_T/chrome-pointeur.mjs" "$AUX/chrome-sans-pointeur" "http://127.0.0.1:$PORT" none 2>/dev/null)"
 RPC="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" coarse 2>/dev/null)"
 RPE="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" etranger 2>/dev/null)"
+RPQ="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" marque 2>/dev/null)"
 RPD="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" div 2>/dev/null)"
 RPF="$(node "$HERE_T/chrome-pointeur.mjs" "$CHROME" "http://127.0.0.1:$PORT" nonfixe 2>/dev/null)"
 RKN="$(node "$HERE_T/chrome-pointeur-forme.mjs" "$AUX/chrome-sans-pointeur" "http://127.0.0.1:$PORT" none clavier 2>/dev/null)"
@@ -177,12 +180,12 @@ assert_eq "CL4.1 — sans aucun pointeur (Chrome de la CI Linux) : ni fine ni co
   "$(E '[j.pointeur.fine, j.pointeur.coarse, j.spie !== "auto" && j.spie !== ""]' "$RPN")" '[false,false,true]'
 assert_eq "CL4.2 — pointeur grossier (toucher émulé) : coarse vrai, la feuille de détail s'applique, aucun scroll-padding de fin (auto)" \
   "$(E '[j.pointeur.coarse, j.spie]' "$RPC")" '[true,"auto"]'
-# CL4.3 fige en POSITIF une limite connue : à la jointure, quand le terminal posera son attribut neutre (contrat Phase 79), il devra être INVERSÉ
-# (un bouton fixe étranger laissera la zone basse inchangée) ; CL4.3b/c (négatifs voisins) resteront valables tels quels.
-# limite connue, dite : la pastille « Terminal » est lue par sa nature (bouton fixe sous body), pas par un attribut neutre posé par le terminal
-# (contrat porté à la jointure avec la Phase 79). Un bouton fixe étranger EST donc pris pour elle : #ask + #vf-coin + pastille croissent.
-assert_eq "CL4.3 — limite connue : un bouton fixe étranger sous body est pris pour la pastille (la zone basse de la vue grandit : $(E 'j.avant + " -> " + j.apres' "$RPE"))" \
-  "$(E '[j.avant !== j.apres]' "$RPE")" '[true]'
+# CL4.3 (80-neutre) : le contrat est posé. Le terminal marque sa pastille data-vf-flottant="bouton" ; 41-vf-projet-vue.js lit CET attribut, jamais une forme.
+# Le témoin de la limite connue (un bouton fixe étranger pris pour la pastille) est INVERSÉ : il laisse maintenant la zone basse inchangée.
+assert_eq "CL4.3 — un bouton fixe étranger sous body n'est PLUS pris pour la pastille : la zone basse reste inchangée ($(E 'j.avant + " -> " + j.apres' "$RPE"))" \
+  "$(E '[!!j.avant, j.avant === j.apres]' "$RPE")" '[true,true]'
+assert_eq "CL4.3d — témoin positif : le même bouton fixe portant data-vf-flottant=\"bouton\" est mesuré : la zone basse grandit ($(E 'j.avant + " -> " + j.apres' "$RPQ"))" \
+  "$(E '[!!j.avant, j.avant !== j.apres]' "$RPQ")" '[true,true]'
 assert_eq "CL4.3b — négatif : un DIV fixe étranger sous body (pas un bouton) n'est pas pris pour la pastille : la zone basse reste inchangée ($(E 'j.avant + " -> " + j.apres' "$RPD"))" \
   "$(E '[j.avant !== "", j.avant === j.apres]' "$RPD")" '[true,true]'
 assert_eq "CL4.3c — négatif : un BOUTON étranger non fixe sous body n'est pas pris pour la pastille : la zone basse reste inchangée ($(E 'j.avant + " -> " + j.apres' "$RPF"))" \
@@ -204,15 +207,27 @@ echo "     trace M-POINTEUR-CLAVIER — sonde CL4.4 [fine, coarse, cartes, focus
 assert_eq "M-POINTEUR-CLAVIER — le mutant (ancienne requête (pointer: fine)) rougit CL4.4 : sans pointeur la sélection ne suit plus le focus de la carte (témoin : Chrome sans pointeur, carte focalisée)" \
   "$(E '[j.pointeur.fine, j.pointeur.coarse, j.focus.n > 0, j.focus.actif, j.focus.sel === j.focus.id]' "$RM")" '[false,false,true,true,false]'
 CHROME="$CHROME_REEL"
-mutant M-PASTILLE-DIV 41-vf-projet-vue.js "find((e) => e.matches('button') && getComputedStyle(e).position === 'fixed')" "filter((e) => getComputedStyle(e).position === 'fixed').pop()" chrome-pointeur.mjs div ""
-echo "     trace M-PASTILLE-DIV — sonde CL4.3b [avant, après] : attendu égaux, obtenu $(E 'j.avant + " -> " + j.apres' "$RM")"
-assert_eq "M-PASTILLE-DIV — le mutant (reconnaissance élargie : le dernier élément fixe, bouton ou non) rougit CL4.3b : le div fixe fait grandir la zone basse (témoin : mesure avant lue)" \
-  "$(E '[j.avant !== "", j.avant === j.apres]' "$RM")" '[true,false]'
-mutant M-PASTILLE-NONFIXE 41-vf-projet-vue.js "find((e) => e.matches('button') && getComputedStyle(e).position === 'fixed')" "find((e) => e.matches('button'))" chrome-pointeur.mjs nonfixe ""
-echo "     trace M-PASTILLE-NONFIXE — sonde CL4.3c [avant, après] : attendu égaux, obtenu $(E 'j.avant + " -> " + j.apres' "$RM")"
-assert_eq "M-PASTILLE-NONFIXE — le mutant (reconnaissance élargie : tout bouton) rougit CL4.3c : le bouton non fixe fait grandir la zone basse (témoin : mesure avant lue)" \
-  "$(E '[j.avant !== "", j.avant === j.apres]' "$RM")" '[true,false]'
+# 80-neutre : les anciens mutants M-PASTILLE-DIV et M-PASTILLE-NONFIXE élargissaient la reconnaissance par la forme, code qui n'existe plus ; CL4.3b et CL4.3c restent
+# des témoins négatifs voisins. Les deux gardes du contrat : lecture revenue à la forme (CL4.3 rougit), lecture supprimée (CL4.3d rougit).
+mutant M-PASTILLE-FORME 41-vf-projet-vue.js "document.querySelector('[data-vf-flottant=\"bouton\"]')" "[...document.body.children].find((e) => e.matches('button') && getComputedStyle(e).position === 'fixed') || null" chrome-pointeur.mjs etranger ""
+echo "     trace M-PASTILLE-FORME — sonde CL4.3 [avant, après] : attendu égaux, obtenu $(E 'j.avant + " -> " + j.apres' "$RM")"
+assert_eq "M-PASTILLE-FORME — le mutant (lecture revenue à la forme : bouton fixe sous body) rougit CL4.3 : le bouton étranger fait grandir la zone basse (témoin : mesure avant lue)" \
+  "$(E '[!!j.avant, j.avant === j.apres]' "$RM")" '[true,false]'
+mutant M-PASTILLE-RIEN 41-vf-projet-vue.js "document.querySelector('[data-vf-flottant=\"bouton\"]')" "null" chrome-pointeur.mjs marque ""
+echo "     trace M-PASTILLE-RIEN — sonde CL4.3d [avant, après] : attendu différents, obtenu $(E 'j.avant + " -> " + j.apres' "$RM")"
+assert_eq "M-PASTILLE-RIEN — le mutant (lecture supprimée) rougit CL4.3d : le bouton marqué n'est plus mesuré (témoin : mesure avant lue)" \
+  "$(E '[!!j.avant, j.avant !== j.apres]' "$RM")" '[true,false]'
 
+echo "=== CL5 — idiome A51 : deux allers-retours Projet / Code, extensions réévaluées (80-a51) ==="
+. "$HERE_T/a51-commun.sh"
+build_serve "$LAB"
+a51_mesurer "$WORK/a51-cl.json" "http://127.0.0.1:$PORT/project.html?vue=couloirs" projet code \
+  "41-vf-projet-vue.js,41-vf-projet-clavier.js,41-vf-projet-formes.js" "section.vf-projet" "section.vf-projet,.vp-status,#vf-projet-flottant"
+vf_hyg_stop "$SRV"
+assert_eq "CL5.1 — deux allers-retours Projet / Code : écouteurs, observateurs, classes du corps, feuille et nœuds de la vue comme à la première arrivée ; rien de la vue sur Code" \
+  "$(a51_verdict "$WORK/a51-cl.json" retours --absent-ailleurs)" "ok"
+assert_eq "CL5.2 — les trois extensions réévaluées deux fois (même cle) : un seul branchement actif, une seule feuille, une seule section, aucune classe orpheline" \
+  "$(a51_verdict "$WORK/a51-cl.json" rejeu)" "ok"
 echo "=== Mutants (copie du module dans \$WORK) ==="
 mutant M-FOOT 41-vf-projet-modele.js "const av = n && n.avancement, ex = n && n.exigences, seg = [];" \
   "if (n && n.foot !== undefined) return n.foot; const av = n && n.avancement, ex = n && n.exigences, seg = [];" chrome-couloirs.mjs cl2 cl23

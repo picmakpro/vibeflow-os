@@ -76,7 +76,12 @@
   };
   // Le rendu du viewer cadre la vue (fit) avec le bloc NATIF, puis émet « render » en microtâche : ecrireVue raccourcit alors le bloc, et le haut de la zone libre (freeArea) bouge sous une vue cadrée pour l'ancien.
   // Une vue qui était exactement le cadrage de l'ancienne zone est recadrée sur la nouvelle ; toute autre vue (déplacée, zoomée par la personne) reste où elle est.
-  const cadrage = () => { const b = SC.state && SC.state.bounds, T = SC.state && SC.state.t; if (!b || !T) return null; const a = SC.freeArea(), k = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1); return { y: a.y, cadree: Math.abs(T.k - k) <= k * 0.005 && Math.abs(T.x - (a.x + (a.w - b.w * k) / 2 - b.x * k)) <= 1 && Math.abs(T.y - (a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k)) <= 1 }; };
+  // la formule de cadrage est celle du moteur (SC.cadrage, 80-09) : « cadrée » = state.t en est égal à un pixel près
+  const cadrage = () => {
+    const T = SC.state && SC.state.t, m = T && SC.cadrage();
+    if (!m) return null;
+    return { y: m.y, cadree: Math.abs(T.k - m.k) <= m.k * 0.005 && Math.abs(T.x - m.x) <= 1 && Math.abs(T.y - m.y) <= 1 };
+  };
   const ecrireEtRecadrer = () => { const avant = cadrage(); ecrireVue(); const apres = avant && avant.cadree ? cadrage() : null; if (apres && apres.y !== avant.y) SC.fit(false); };
   const styleVue = document.createElement('style');
   styleVue.textContent = '.vf-ctx-titre { display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow: hidden; overflow-wrap: anywhere; }\n.vf-ctx-seg { display: inline-block; max-width: 100%; vertical-align: top; overflow-wrap: anywhere; }';
@@ -106,10 +111,16 @@
     .vf-git-ligne[hidden], #vf-git-ouvreur[hidden] { display: none !important; }
     #vf-git-ouvreur { display: none; }
     #vf-git-ouvreur:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
-    /* P78-D-34 (avis du juge de design) : la seconde ligne est illisible sous 1280 px ; l'ouvreur icône de 44 px la remplace de 701 à 1279 px */
+    /* P78-D-34 (avis du juge de design) : la seconde ligne est illisible sous 1280 px ; l'ouvreur icône la remplace de 701 à 1279 px.
+       P80-D-56 (80-20 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, « 36 visibles, 44 d'appui (Recommandé) ») : il est dessiné à la
+       taille de ses voisins (--hdr-btn : 36 px au pointeur fin dès 1 000 px, 44 en dessous et au toucher) et garde une zone d'appui de 44 × 44 au moins,
+       par un pseudo-élément centré. */
     @media (max-width: 1279px) {
       .vf-git-ligne { display: none; }
-      #vf-git-ouvreur { display: inline-flex; width: 44px; height: 44px; }
+      #vf-git-ouvreur { display: inline-flex; position: static; width: var(--hdr-btn, 44px); height: var(--hdr-btn, 44px); }
+      /* l'appui : le pseudo-élément se place à la position statique du bouton (flex centré), le bouton n'est pas son bloc conteneur : son débordement
+         de 4 px n'est pas celui du bouton (scrollWidth reste la largeur dessinée, sinon R1 lit « rogné ») */
+      #vf-git-ouvreur::after { content: ""; position: absolute; width: 44px; height: 44px; } /* pas de % : le bloc conteneur n'est pas le bouton */
     }
     /* même requête que viewer.html (« phones and tablets ») : le nom et sa seconde ligne partent ensemble */
     @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) { .vf-nom { display: none; } }
