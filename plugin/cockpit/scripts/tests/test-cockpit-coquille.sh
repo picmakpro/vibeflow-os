@@ -383,7 +383,7 @@ froids() { # <dossier de sortie des fichiers> : les trois chargements à froid d
 }
 suite_classes() { # <préfixe des froids> <suite JSON> : les classes qui diffèrent, sur un document chargé depuis /project.html
   sed "s|SUITE|$2|" "$AUX/c6seq.js" > "$AUX/c6seq-x.js"; chrome avec "http://127.0.0.1:$PORT/project.html" "$AUX/c6seq-x.js" > "$WORK/c6suite.json"
-  node "$AUX/classes.mjs" "$1-code.json" "$1-projet.json" "$1-equipe.json" "$WORK/c6suite.json" | oj 'j.classes.join(",")||"aucune"'
+  C6DETAIL=1 node "$AUX/classes.mjs" "$1-code.json" "$1-projet.json" "$1-equipe.json" "$WORK/c6suite.json" | tee -a "${C6JOURNAL:-/dev/null}" | oj 'j.classes.join(",")||"aucune"'
 }
 base_srv; froids "$WORK/froid"
 assert_eq "C6.0 — témoin : les trois chargements à froid portent des écouteurs et des identifiants (l'empreinte n'est pas vide)" "$(for o in code projet equipe; do oj '[Object.keys(j.emp.ecouteurs).length>5,j.emp.corps.ids.length>20,j.emp.tete.length>5]' < "$WORK/froid-$o.json"; done | tr '\n' ' ')" "[true,true,true] [true,true,true] [true,true,true] "
@@ -402,7 +402,8 @@ for m in "ecouteurs|ecouteurs|s|for (const \[c, t, f, o\] of j.ecouteurs) REL.ca
          "head|tete|s|for (const n of apres.tete) if (!j.avant.tete.has(n)) n.remove(); // garde:coquille-head|;|"; do
   nom="${m%%|*}"; reste="${m#*|}"; att="${reste%%|*}"; expr="${reste#*|}"
   if cockpit_module_muter "$nom" vf-coquille-portee.js "$expr"; then
-    demarrer "$LAB"; assert_eq "M-$(echo "$nom" | tr a-z A-Z) — rougit les classes « $att » (les siennes seules : la visite du premier passage, qui réveillait selon la charge les gestionnaires d'un moteur mort, est lue comme faite), aucune autre, sur code, projet, equipe depuis /project.html" "$(suite_classes "$WORK/froid" '["code","projet","equipe"]')" "$att"; cockpit_arreter; unset COCKPIT_MODULE
+    # le document porte le chemin du module (<code> du lancement, coupé après chaque « / » par un <wbr>) : la copie mutée vit sous un autre chemin que le dépôt, donc le nombre de <wbr> diffère de celui du serveur de base selon la profondeur de CHAQUE disposition (dépôt, worktree, export) ; la référence à froid est prise sur le serveur muté lui-même
+    demarrer "$LAB"; froids "$WORK/froidm"; assert_eq "M-$(echo "$nom" | tr a-z A-Z) — rougit les classes « $att » (les siennes seules : la visite du premier passage, qui réveillait selon la charge les gestionnaires d'un moteur mort, est lue comme faite), aucune autre, sur code, projet, equipe depuis /project.html" "$(suite_classes "$WORK/froidm" '["code","projet","equipe"]')" "$att"; cockpit_arreter; unset COCKPIT_MODULE
   else assert_eq "M-$(echo "$nom" | tr a-z A-Z) — mutant sans effet (ancre absente)" "sans effet" "effet"; fi
 done
 CPY="$(cockpit_module_copie)"; cp "$CPX/skills/cockpit-moteur/assets/ui/96-vf-fixture-fetch.js" "$CPY/skills/cockpit-moteur/assets/ui/"
