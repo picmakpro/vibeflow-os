@@ -379,10 +379,6 @@ const ecart = (x, y) => { const k = (v) => (Array.isArray(v) ? v.map(String) : O
 for (const etape of j) { const f = froid[etape.nom]; for (const n of classes(etape, f)) { tout.add(n); if (process.env.C6DETAIL) detail.push([etape.nom, n, n === 'fetch' ? [etape.prof, f.prof] : ecart(etape.emp[n === 'ids' || n === 'balises' ? 'corps' : n]?.[n] ?? etape.emp[n], f.emp[n === 'ids' || n === 'balises' ? 'corps' : n]?.[n] ?? f.emp[n])]); } }
 console.log(JSON.stringify({ classes: [...tout].sort(), etapes: j.length, ...(process.env.C6DETAIL ? { detail } : {}) }));
 JS
-# Phase 75 (75-10) : la route d'activité lit git hors de la requête ; tant qu'elle est « en-lecture », les lignes Points chauds et Couplage du sélecteur sont désactivées (ids lens-d-*), puis posées.
-# Le document dépend donc de l'âge du serveur : on attend un état lu (90 s au plus) avant de prendre les chargements à froid et la suite d'onglets, pour que C6 compare deux documents au même état de la route.
-activite_prete() { local f="$WORK/act-prete.json" fin=$((SECONDS + 90)); while [ "$SECONDS" -lt "$fin" ]; do cockpit_get /api/vf/activite > "$f" 2>/dev/null
-  node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); process.exit(j.git.etat !== "en-lecture" && j.gardes.etat !== "en-lecture" && j.calcul === "pret" ? 0 : 1)' "$f" 2>/dev/null && return 0; sleep 0.4; done; return 1; }
 froids() { # <dossier de sortie des fichiers> : les trois chargements à froid d'un serveur démarré
   chrome avec "http://127.0.0.1:$PORT/index.html" "$AUX/c6froid.js" > "$1-code.json"; chrome avec "http://127.0.0.1:$PORT/project.html" "$AUX/c6froid.js" > "$1-projet.json"; chrome avec "http://127.0.0.1:$PORT/equipe.html" "$AUX/c6froid.js" > "$1-equipe.json"
 }
@@ -392,9 +388,7 @@ suite_classes() { # <préfixe des froids> <suite JSON> : les classes qui diffèr
 }
 base_srv; froids "$WORK/froid"
 assert_eq "C6.0 — témoin : les trois chargements à froid portent des écouteurs et des identifiants (l'empreinte n'est pas vide)" "$(for o in code projet equipe; do oj '[Object.keys(j.emp.ecouteurs).length>5,j.emp.corps.ids.length>20,j.emp.tete.length>5]' < "$WORK/froid-$o.json"; done | tr '\n' ' ')" "[true,true,true] [true,true,true] [true,true,true] "
-# C6.1 compare au même état de la route (voir activite_prete) : ses chargements à froid sont repris une fois la route lue ; C6.0 et les mutants gardent les chargements du démarrage
-activite_prete; froids "$WORK/froid-c61"
-assert_eq "C6.1 — suite code, projet, equipe, code, equipe, projet, projet (auto-transition comprise) depuis /project.html : après CHAQUE changement le document est équivalent à un chargement à froid de l'onglet atteint (identifiants, balises, tête, classes, attributs, propriétés de window, écouteurs, minuteries, observateurs, flux)" "$(suite_classes "$WORK/froid-c61" '["code","projet","equipe","code","equipe","projet","projet"]')" "aucune"
+assert_eq "C6.1 — suite code, projet, equipe, code, equipe, projet, projet (auto-transition comprise) depuis /project.html : après CHAQUE changement le document est équivalent à un chargement à froid de l'onglet atteint (identifiants, balises, tête, classes, attributs, propriétés de window, écouteurs, minuteries, observateurs, flux)" "$(suite_classes "$WORK/froid" '["code","projet","equipe","code","equipe","projet","projet"]')" "aucune"
 cockpit_arreter
 cat > "$AUX/c6fetch.js" <<'JS'
 const res = [];
