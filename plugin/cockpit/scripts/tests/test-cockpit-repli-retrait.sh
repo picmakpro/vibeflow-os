@@ -122,9 +122,9 @@ assert_eq "RP1 — aucune occurrence de ouvrirRepli dans ui/*.js (2 avant le ret
 assert_eq "RP2 — window.__vfEquipeRendu.transcript est undefined et aucun module ne l'appelle" "$(rp2 "$UI")" "undefined|appelants=0"
 
 # ---------- RP6 : recensement des lecteurs de transcript (statique, code sans commentaires) ----------
-rp6() { local r; r="$("$NODE" "$HERE_T/frise-bornes-sondes.mjs" recensement "$1" 2>&1 | tail -1)"; "$NODE" -e 'try { const j = JSON.parse(process.argv[1]); console.log(j.temoin ? j.fichiers.join(",") : "temoin-rouge"); } catch { console.log("illisible"); }' "$r"; }
+rp6() { local r; r="$("$NODE" "$HERE_T/repli-recensement.mjs" "$1" 2>&1 | tail -1)"; "$NODE" -e 'try { const j = JSON.parse(process.argv[1]); console.log(j.temoin ? j.fichiers.join(",") : "temoin-rouge"); } catch { console.log("illisible"); }' "$r"; }
 echo "=== RP6 — seuls la fiche et la lecture des fichiers de l'encart lisent /api/vf/transcript ==="
-assert_eq "RP6 — les modules d'interface qui nomment /api/vf/transcript (code) : 74-vf-fiche.js et 74-vf-frise-fichiers.js, et le motif sait trouver une lecture (témoin)" "$(rp6 "$UI")" "74-vf-fiche.js,74-vf-frise-fichiers.js"
+assert_eq "RP6 — les modules d'interface qui nomment /api/vf/transcript (code) : 74-vf-fiche.js seule (74-vf-frise-fichiers.js, de 74-06, n'est pas sur cette tête), et le motif sait trouver une lecture (témoin)" "$(rp6 "$UI")" "74-vf-fiche.js"
 
 # ---------- RP5 : témoin de remplacement, le rendu du fil de la fiche ----------
 cat > "$AUX/fil.cjs" <<'JS'
@@ -188,7 +188,7 @@ if [ -n "$CHROME" ] && [ -z "${REPLI_SANS_MUTANTS:-}" ]; then
   # M-LECTEUR-AUTRE-NOM : un lecteur de transcript rendu sous un autre nom que ouvrirRepli (RP1 ne le voit pas, RP6 oui)
   if cockpit_module_muter M-LECTEUR-AUTRE-NOM 71-vf-equipe-rendu.js "s#agentsDuNoeud, pied,#agentsDuNoeud, lireFil: (id) => window.VF_ETAT.lireJson('/api/vf/transcript?id=' + encodeURIComponent(id)), pied,#"; then
     U="$COCKPIT_MODULE/skills/cockpit-moteur/assets/ui"
-    if [ "$(rp1 "$U")" = "0" ] && [ "$(rp6 "$U")" != "74-vf-fiche.js,74-vf-frise-fichiers.js" ]; then echo "MUTANT-ROUGE M-LECTEUR-AUTRE-NOM RP6 (RP1 resté vert : $(rp6 "$U"))"; PASS=$((PASS+1)); else echo "MUTANT-VERT M-LECTEUR-AUTRE-NOM RP6"; echo "  ❌ FAIL — M-LECTEUR-AUTRE-NOM — RP6 n'a pas rougi"; FAIL=$((FAIL+1)); fi
+    if [ "$(rp1 "$U")" = "0" ] && [ "$(rp6 "$U")" != "74-vf-fiche.js" ]; then echo "MUTANT-ROUGE M-LECTEUR-AUTRE-NOM RP6 (RP1 resté vert : $(rp6 "$U"))"; PASS=$((PASS+1)); else echo "MUTANT-VERT M-LECTEUR-AUTRE-NOM RP6"; echo "  ❌ FAIL — M-LECTEUR-AUTRE-NOM — RP6 n'a pas rougi"; FAIL=$((FAIL+1)); fi
   else echo "  ❌ FAIL — M-LECTEUR-AUTRE-NOM — mutation non posée (ancre absente)"; FAIL=$((FAIL+1)); fi
   unset COCKPIT_MODULE
 fi
