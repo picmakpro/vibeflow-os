@@ -20,7 +20,9 @@ la session principale). Base `faed809d` ; branche `feat/phase-73-gouvernance-reg
 - `vf-cockpit-live.mjs` n'était plus que le pilote de la collecte (79-09) : la gouvernance est lue dans le fil.
 - Le mot « gouvernance » (nom d'un compartiment du dépôt) a dû sortir des sources du socle : modules renommés.
 - La correction D3.8 d'`equipe-etats` est entrée dans le commit de fusion `b1993e8b` (mise en index pendant la fusion).
-- RG1.12 (`VF_ONGLETS.aller`, 80-10) joué sur le repli ; reprise à l'arrivée de 80-10.
+- RG1.12 rebranché sur le vrai `VF_ONGLETS.aller` après la fusion de `integration/cockpit-audit` (`ee39a192`, 80-10) :
+  `48a96545`, trois assertions, mutant témoin rouge (fragment non lu à `vf:onglet`). Limite : le harnais neutralise
+  `#stage.focus()` sous `vf-regie-montee` (`#stage` y est en `display:none`, `72-vf-regie-style.js`), prouvé en vm seulement.
 
 ## Rouges de CI rencontrés et leur cause
 
@@ -51,8 +53,17 @@ Revue 1 (5), audit de la régie (5), revue 2 (2), juge design (6), durée des te
  {"verdict":"gate:check-gate-touche","commande":"bash scripts/check-gate-touche.sh --base-ref origin/integration/cockpit-audit","exit_code":0,"sha":"7aa3e5f2feb5094e58d01d90200cd91d434179dd"},
  {"verdict":"gate:check-mission-invariants","commande":"bash plugin/conductor/scripts/check-mission-invariants.sh","exit_code":3,"sha":"faed809d83ed54114482da69875eea099155eba6"},
  {"verdict":"suite:test-cockpit-vendor","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-vendor.sh","exit_code":0,"sha":"7aa3e5f2feb5094e58d01d90200cd91d434179dd"},
- {"verdict":"ci:pr-248","commande":"gh pr checks 248 (run 43547039063)","exit_code":1,"sha":"7aa3e5f2feb5094e58d01d90200cd91d434179dd"}
+ {"verdict":"ci:pr-248","commande":"gh pr checks 248 (run 43547039063)","exit_code":1,"sha":"7aa3e5f2feb5094e58d01d90200cd91d434179dd"},
+ {"verdict":"suite:test-cockpit-regie","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-regie.sh (343 PASS / 0 FAIL)","exit_code":0,"sha":"48a965455"},
+ {"verdict":"suite:test-cockpit-vendor","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-vendor.sh (286 PASS / 0 FAIL)","exit_code":0,"sha":"48a965455"},
+ {"verdict":"suite:test-cockpit-routes","commande":"bash plugin/cockpit/scripts/tests/test-cockpit-routes.sh (56 PASS / 0 FAIL)","exit_code":0,"sha":"20ccdc8a7"},
+ {"verdict":"gate:check-version-sync","commande":"bash scripts/check-version-sync.sh (274 suites)","exit_code":0,"sha":"48a965455"},
+ {"verdict":"gate:check-machine-paths","commande":"bash scripts/check-machine-paths.sh","exit_code":0,"sha":"48a965455"},
+ {"verdict":"gate:check-gate-touche","commande":"bash scripts/check-gate-touche.sh --base-ref origin/integration/cockpit-audit","exit_code":0,"sha":"48a965455"},
+ {"verdict":"gate:colonnes-cliquet","commande":"node plugin/cockpit/scripts/tests/colonnes-cliquet.mjs verifier plugin/cockpit plugin/cockpit/scripts/tests/colonnes-baseline.txt","exit_code":0,"sha":"48a965455"}
 ]}
 ```
 
-Lecture : le seul rouge du run 43547039063 est C3.5 (coquille), corrigé sur le lot #249 par la Phase 79.
+Lecture : le seul rouge du run 43547039063 est C3.5 (coquille), corrigé sur le lot #249 par la Phase 79. Dernière
+livraison : fusion de `ee39a192` (`20ccdc8a`, conflits de planning seuls), RG1.12 (`48a96545`), PR de clôture vers
+`integration/cockpit-audit` (numéro dans la description de la PR).
