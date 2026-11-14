@@ -947,7 +947,7 @@ JSON
   ek_restaurer() { rm -f "$EKMOD"; }
   # EKC <action> <page> : une interaction, un Chromium ; la ligne JSON rendue est lue par G
   EKC() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EK_ACTION="$1" node "$HERE_EK/chrome-equipe-clavier.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ek-$1.json"; }
-  EKA1="equipe.html#r=n%3Aag-a1"
+  EKA1="equipe.html"   # 74 : sans ancre. Arriver à froid sur #r=n:ag-<id> ouvre la fiche (contrat P73-C2, T26.8), qui masque la vue : le bouton « Lire le rapport » n'est plus focalisable
   ek_demarrer
   assert_eq "EK0 — contrôle positif : serveur de la sortie démarré, page Équipe servie et fixture à deux agents lisibles" "$([ "$EK_PORT" -gt 0 ] && echo serveur)|$(node "$AUX/fetchp.mjs" "$EK_PORT" /equipe.html "$WORK/ek-equipe.html")" "serveur|200"
   # EK1 (UIFN-12) : Entrée sur « Lire le transcript » ne fait pas perdre le focus clavier

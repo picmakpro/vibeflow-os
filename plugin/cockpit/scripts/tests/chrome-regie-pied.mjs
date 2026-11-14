@@ -83,7 +83,9 @@ await executer(chrome, async (s) => {
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
     await s.naviguer(url + '#sans-visite');
     await s.attendre(PRET, 'régie montée et flux ouvert');
-    const P = ID(0), A1 = 'a1b2c3d4e5f6', A2 = 'b9b9b9b9b9b9';
+    // 74 : la fiche annule vf-agent:ouvrir (nom, ancre, rapport) et le détail de ligne (.vf-rg-plus) n'est plus atteignable au clic ; la mesure porte sur le détail de la régie, on l'isole de la fiche (capture sur window)
+    await s.ev("window.addEventListener('vf-agent:ouvrir', (e) => e.stopImmediatePropagation(), true)");
+    const P = ID(0), A1 ='a1b2c3d4e5f6', A2 = 'b9b9b9b9b9b9';
     const kid = (id, role) => ({ kind: 'subagent', id, etat: 'actif', parent: P, role, task: 'Tâche ' + role, ageS: 5, dureeS: 60, tree: '.' });
     await pousser([sess(P, 'actif', { ageS: 5 }), kid(A1, 'vf-coder'), kid(A2, 'vf-tester'), sess(ID(1), 'attend')]);
     const Q = `const q = (x, r = document) => r.querySelector(x), li = (k) => q('#vf-equipe li[data-vf-cle="au-travail:' + k + '"]');`;
