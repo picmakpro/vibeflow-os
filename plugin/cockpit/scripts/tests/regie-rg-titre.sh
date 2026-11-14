@@ -75,6 +75,8 @@ JS
     'j.signal + "|" + j.moteur.startsWith("(2) vous attendent · Projet · ")' "1|true"
   ti_ok "RG12.2 — trois changements d'onglet sans rechargement : préfixe présent, même nombre d'abonnés au who à chaque retour (un seul compositeur actif)" "$T" \
     'j.sansRecharge + "|" + j.deux.projet.startsWith("(2)") + "|" + (j.abonnes[0] === j.abonnes[3]) + "|" + (j.abonnes[1] === j.abonnes[4])' "true|true|true|true"
+  ti_ok "RG12.8 — la Phase 80 écrit le titre brut puis émet vf:onglet : le compositeur recompose « (2) vous attendent · Projet · … » (jamais le titre brut)" "$T" \
+    'j.aller.startsWith("(2) vous attendent · Projet · ") + "|" + !j.aller.includes("brut")' "true|true"
   ti_ok "RG12.3 — une session : « (1) vous attend · … » au singulier ; aucune : « Projet · <nom> » et l'icône d'origine rendue" "$T" \
     'j.un.startsWith("(1) vous attend · Projet · ") + "|" + !j.un.includes("attendent") + "|" + j.zero.titre.startsWith("Équipe · ") + "|" + /^Projet · /.test(j.retour) + "|" + (j.hrefRetour === j.zero.href)' "true|true|true|true|true"
   ti_ok "RG12.4 — N > 0 : une icône data:image/svg+xml qui change l'icône d'origine, sans chiffre, aucune requête réseau d'icône, aucun message de la CSP" "$T" \
@@ -92,6 +94,7 @@ JS
     else echo "  ❌ FAIL — M-$nom — $lib (mutant survivant)"; echo "     attendu: [différent de $sain]"; echo "     obtenu:  [$got]"; FAIL=$((FAIL+1)); fi
   }
   tm TITRE-SANS-WHO "compositeur non abonné au who : le titre ne suit plus une poussée (RG12.1)" "s/E\.abonner('who', composer)/(() => () => {})()/" 'j.deux.equipe.startsWith("(2) vous attendent")'
+  tm TITRE-SANS-ONGLET "compositeur sans écouteur de vf:onglet : l'aller d'onglet de la Phase 80 écrase le titre composé (RG12.8)" "s/ecouter(D, 'vf:onglet', composer);/void 0;/" 'j.aller.startsWith("(2) vous attendent")'
   tm TITRE-NETTOIE "nettoyage par onglet sans désabonnement : les abonnés au who s'accumulent (RG12.2)" "s/for (const f of defaire\.splice(0)) f();/for (const f of defaire.splice(0)) void f;/" '(j.abonnes[0] === j.abonnes[3]) + "|" + (j.abonnes[1] === j.abonnes[4])'
 }
 

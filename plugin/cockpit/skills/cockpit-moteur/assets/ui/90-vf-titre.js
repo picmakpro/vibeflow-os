@@ -94,6 +94,7 @@
     let vivant = true;
     if (E) defaire.push(E.abonner('who', composer)); else ecouter(D, 'vf-who', composer);
     ecouter(D, 'vf-git:signal', composer);
+    ecouter(D, 'vf:onglet', composer); // la Phase 80 écrit le titre brut au changement d'onglet puis émet vf:onglet : le titre se recompose
     ecouter(D, 'vf-regie:redessiner', composer); // 73-11 : l'état des questions a changé
     ecouter(W, 'floorplan-theme-change', composer); // la couleur du point suit le thème
     ecouter(D, 'vf-agent:lu', (e) => marquer(e.detail && e.detail.id));
