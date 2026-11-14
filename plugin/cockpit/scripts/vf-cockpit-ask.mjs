@@ -45,7 +45,13 @@ export function projectIndex(G) {
 const line = (I, x, note) => `- [[${I.ref(x)}]] · ${etat(x)}${note ? ' · ' + note : ''}`;
 // les exigences du graphe (champ facultatif posé par la collecte ; absent ou en erreur : aucune) et la carte de phase qui les porte
 // (une exigence d'archive : le nœud que la collecte a désigné)
-const exigencesDe = (G) => (Array.isArray(G.meta?.vf?.trace?.exigences) ? G.meta.vf.trace.exigences : []);
+// une exigence d'archive (ws '*') jumelle d'une exigence vivante de même identifiant n'est pas une exigence distincte
+// (la collecte la rattache à la vivante : 438a2ef6)
+const exigencesDe = (G) => {
+  const xs = Array.isArray(G.meta?.vf?.trace?.exigences) ? G.meta.vf.trace.exigences : [];
+  const vivantes = new Set(xs.filter((e) => e.ws !== '*').map((e) => e.id));
+  return xs.filter((e) => e.ws !== '*' || !vivantes.has(e.id));
+};
 const phaseDe = (G, e) => G.nodes.find((n) => n.kind === 'phase'
   && (e.ws === '*' ? e.cleNoeud === `${n.ws || ''}|${n.num}` : String(n.num) === String(e.phase) && (n.ws || null) === (e.ws || null)));
 const caseDe = (e) => (e.coche ? 'cochée' : 'non cochée');

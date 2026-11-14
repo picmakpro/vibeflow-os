@@ -508,7 +508,7 @@ fs.writeFileSync('$WORK/q76j.json', JSON.stringify(G));"
 H locg "$SCRIPTS" "$WORK/q76j.json" "REQ-01 ?" > "$WORK/q76b.json"
 H locg "$SCRIPTS" "$WORK/q76j.json" "ARC-01 ?" > "$WORK/q76c.json"
 assert_eq "Q76.3 — « REQ-01 ? » avec une jumelle d'archive : UNE exigence (réponse de l'exigence vivante, pas « 2 exigences … une par compartiment ») ; témoin : une exigence d'archive seule reste répondue" \
-  "$(H json "$WORK/q76b.json" "j !== null && !j.answer.includes('une par compartiment') && j.answer.includes('non cochée') && j.answer.includes('[[n:ph-1]]'))")|$(H json "$WORK/q76c.json" "j !== null && j.answer.includes('ARC-01')")" "true|true"
+  "$(H json "$WORK/q76b.json" "j !== null && !j.answer.includes('une par compartiment') && j.answer.includes('non cochée') && j.answer.includes('[[n:ph-1]]')")|$(H json "$WORK/q76c.json" "j !== null && j.answer.includes('ARC-01')")" "true|true"
 
 vf_hyg_assert
 echo ""
