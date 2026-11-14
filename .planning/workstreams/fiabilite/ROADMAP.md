@@ -101,14 +101,14 @@
 - [x] Phase 71: Terminal intégré au cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-05 : TERM-01..12 cochées, publiée en `v2.76.0`
 - [x] Phase 71.5: Réexamen du design system du cockpit (INSERTED, inscrite 2026-11-05, jalon vibeflow-v2.0) — complete 2026-11-06 : mission design, sans plan GSD ni exigence au ledger, publiée en `v2.76.0`
 - [x] Phase 72: Lancer du travail depuis les cartes du cockpit (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-06 : 16/16 plans, LANC-12 décochée, publiée en `v2.76.0`
-- [ ] Phase 73: Gouvernance au cockpit — arbitrages en attente, worktrees et verrous (inscrite 2026-11-03, jalon vibeflow-v2.0) — cadrée et planifiée le 2026-11-11 (11 plans, REGI-01..17)
-- [ ] Phase 74: L'équipe dans le temps — swim-lanes, coût, replay (inscrite 2026-11-03, jalon vibeflow-v2.0) — cadrée et planifiée le 2026-11-11 (10 plans, 6 vagues, TEMP-01..12) ; 10/10 plans exécutés (2026-11-14), en attente de fusion dans `integration/cockpit-audit`
-- [ ] Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte (inscrite 2026-11-03, jalon vibeflow-v2.0) — cadrée et planifiée le 2026-11-11 (12 plans, 9 vagues, ACTV-01..12)
-- [ ] Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire (inscrite 2026-11-03, jalon vibeflow-v2.0 ; cadrée et planifiée 2026-11-11, 9 plans)
-- [ ] Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up (inscrite 2026-11-03, jalon vibeflow-v2.0) — planifiée 2026-11-11 (8 plans)
+- [x] Phase 73: Gouvernance au cockpit — arbitrages en attente, worktrees et verrous (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-14 : 11/11 plans, fusionnée, pour `v2.77.0`
+- [x] Phase 74: L'équipe dans le temps — swim-lanes, coût, replay (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-14 : 10/10 plans, fusionnée, pour `v2.77.0`
+- [x] Phase 75: L'activité posée sur le code — hotspots, couplage, gardes, empreinte (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-14 : 12/12 plans, fusionnée, pour `v2.77.0`
+- [x] Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire (inscrite 2026-11-03, jalon vibeflow-v2.0 ; cadrée et planifiée 2026-11-11, 9 plans) — complete 2026-11-14 : 9/9 plans, fusionnée, pour `v2.77.0`
+- [x] Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up (inscrite 2026-11-03, jalon vibeflow-v2.0) — complete 2026-11-14 : 8/8 plans, fusionnée, pour `v2.77.0`
 - [x] Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git (inscrite 2026-11-05, jalon vibeflow-v2.0) — complete 2026-11-06 : 11/11 plans, GITC-01..14 cochées, publiée en `v2.76.0`
-- [ ] Phase 79: Socle du cockpit — une collecte, un flux, une route d'état (inscrite 2026-11-11, jalon vibeflow-v2.0) — 22/22 plans faits (SOCL-24 clos par la sonde S0)
-- [ ] Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation (inscrite 2026-11-11, jalon vibeflow-v2.0) — 21/21 plans faits (2026-11-14, branche feat/phase-80-trois-formes) ; FORM-17 attend la CI Linux
+- [x] Phase 79: Socle du cockpit — une collecte, un flux, une route d'état (inscrite 2026-11-11, jalon vibeflow-v2.0) — complete 2026-11-14 : 22/22 plans, fusionnée, pour `v2.77.0`
+- [x] Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation (inscrite 2026-11-11, jalon vibeflow-v2.0) — complete 2026-11-14 : 21/21 plans, fusionnée, pour `v2.77.0` ; FORM-17 attend la CI Linux
 - [ ] Phase 81: Agir sur une session depuis le cockpit (inscrite 2026-11-11, jalon vibeflow-v2.0, reportée : `AUDC-Q3` tranchée « plus tard » le 2026-11-11)
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ vfdo-v1.0 — Module dev-orchestrator (Phase 1) — SHIPPED 2026-06-04 -->
