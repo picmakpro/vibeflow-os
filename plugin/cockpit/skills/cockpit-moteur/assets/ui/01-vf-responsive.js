@@ -60,6 +60,7 @@
     .vf-hdr-groupe { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
     .vf-hdr-groupe:not(:has(> .vf-hdr-rangee > :not([hidden]))) { display: none; }
     .vf-hdr-groupe + .vf-hdr-groupe { margin-inline-start: var(--sp-8); }
+    header[data-vf-serre] .vf-hdr-groupe + .vf-hdr-groupe { margin-inline-start: 0; }
     .vf-hdr-lib { font-size: 12px; line-height: 1; color: var(--text-3); padding-inline: var(--sp-4); white-space: nowrap; }
     .vf-hdr-rangee { display: flex; align-items: center; gap: var(--sp-4); }
     @media (min-width: 701px) and (max-width: 1639px) { header #vf-lock .dot { width: 16px; height: 16px; border-radius: 0; clip-path: var(--vf-sessions); } }
@@ -209,7 +210,8 @@
   // 80-20 (P80-D-53, P80-D-59) : trois groupes libellés dès 1 280 px. Les boutons sont DÉPLACÉS (jamais clonés : id, menu .rel et ordre relatif gardés) ;
   // un bouton posé plus tard rejoint son groupe par son id, sinon « Affichage ». Sous 1 280 px le rangement est défait (ordre et parents d'origine).
   // L'écouteur `change` vit dans le rappel de surOnglet.
-  const GROUPES = [['lire', 'Read', ['flows-btn', 'screens-btn', 'filters-btn', 'tour-btn']], ['suivre', 'Follow', ['btn-recent', 'btn-health', 'vf-lock']],
+  const GROUPES = [['lire', 'Read', ['flows-btn', 'screens-btn', 'filters-btn', 'tour-btn']],
+    ['suivre', 'Follow', ['btn-recent', 'btn-health', 'btn-synthese', 'vf-lock']], // 77 : Synthèse juste après Santé
     ['affichage', 'Display', ['btn-export', 'theme-toggle', 'btn-panel']]];
   const mq1280 = window.matchMedia('(min-width: 1280px)'), tr = window.__vfFrT || ((x) => x), extHdr = document.getElementById('hdr-ext');
   let origine = null; // [unité, parent d'origine] dans l'ordre du document, relevé avant son rangement
@@ -261,13 +263,22 @@
   const replie = () => {
     const badge = document.getElementById('vf-lock'); if (!badge || !hd) return;
     badge.removeAttribute('data-vf-point'); // on mesure avec le badge entier
+    hd.removeAttribute('data-vf-serre');
     if (!matchMedia('(min-width: 701px)').matches) return;
     if (fil) ajuste0();
     const dehors = [...hd.querySelectorAll('button')].some((b) => b.offsetWidth > 0 && (b.getBoundingClientRect().right > innerWidth + 0.5 || b.getBoundingClientRect().left < -0.5));
     if (dehors || hd.scrollWidth > innerWidth + 1 || (fil && fil.offsetWidth > 0 && fil.scrollWidth > fil.clientWidth + 1)) badge.setAttribute('data-vf-point', '');
   };
+  // Phase 80 : badge déjà au point et fil encore rogné (trois groupes de 80-20, « 99 au travail » + un bouton, 1 640 px) : l'écart entre groupes cède
+  const serrer = () => {
+    const badge = document.getElementById('vf-lock'); if (!badge || !hd || !mq1280.matches || !badge.hasAttribute('data-vf-point')) return;
+    if (fil) ajuste0();
+    const sorti = (x) => x.offsetWidth > 0 && (x.getBoundingClientRect().right > innerWidth + 0.5 || x.getBoundingClientRect().left < -0.5);
+    const rogne = fil && fil.offsetWidth > 0 && fil.scrollWidth > fil.clientWidth + 1;
+    if ([...hd.querySelectorAll('button')].some(sorti) || hd.scrollWidth > innerWidth + 1 || rogne) hd.setAttribute('data-vf-serre', '');
+  };
   if (colDroite && hd) {
-    let q = 0; replieRaf = () => { if (!q) q = requestAnimationFrame(() => { q = 0; ranger(); replie(); }); };
+    let q = 0; replieRaf = () => { if (!q) q = requestAnimationFrame(() => { q = 0; ranger(); replie(); serrer(); }); };
     new MutationObserver(replieRaf).observe(colDroite, { childList: true, characterData: true, subtree: true }); // création du badge, changement de son libellé, bouton ajouté
     window.addEventListener('resize', replieRaf); window.addEventListener('load', replieRaf); if (document.fonts?.ready) document.fonts.ready.then(replieRaf);
     replieRaf();
