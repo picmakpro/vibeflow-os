@@ -427,6 +427,11 @@ export default async function (h) {
     const note = await h.ev(() => (document.querySelector('.vf-cout-note') || {}).textContent || '');
     h.sonde('D11', '« inconnu » pour une durée ou un jeton absent, jamais 0 ; la ligne est exclue du total, avec la mention du nombre d\'agents sans mesure',
       l4.length === 6 && l4.every((x) => x === 'inconnu') && t2[1][0] === `4${NB}h 05` && /1 agent sans mesure/.test(note), JSON.stringify([l4, t2 && t2[1][0], note]));
+    const nul = { entree: null, sortie: null, cacheLu: null, cacheCree: null, contexteMax: null, contexteDernier: null }, dnul = { travailS: null, attenteHumainS: null, attenteAgentsS: null, reposS: null, silenceS: null };
+    await monterD(h, { voies: (now, F) => [F.voie({ id: 'wk-5', parent: 'sess-1', debut: now - 20 * F.MIN, fin: now, rattachement: { dag: 'm2.md', noeud: 'n2', source: 'mandat' }, jetons: nul, durees: dnul })] });
+    const ph = await h.ev(() => (document.querySelector('.vf-frise-synthese') || {}).textContent || '');
+    h.sonde('D11', 'toutes voies sans mesure : la phrase de synthèse dit « inconnu », jamais « null » ni « undefined »',
+      ph.length > 0 && !/null|undefined/.test(ph) && (ph.match(/inconnu/g) || []).length === 4, JSON.stringify(ph));
   });
 }
 JS

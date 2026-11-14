@@ -65,6 +65,8 @@ out.co5 = same([brut.map((v) => C0.etage(v)), C0.ETAGES, ['gsd-executor', 'vf-cr
     ['Manager', 'Revue', 'Revue', 'Audit', 'Vérification', 'Vérification', 'Autres'], 'Autres', 'Tête de session']);
 const inc = js(F.friseInconnu().voies), partout = (C) => { const R = C.agreger(js(inc), O); return [ligne(R, 'fiabilite|78').entree, ligne(R, 'fiabilite|78').jetons, ligne(R, 'fiabilite|78').sortie, R.total.entree, R.total.sortie, R.inconnus]; };
 out.co6 = same([partout(C0), partout(C1)], Array(2).fill([null, null, 2500, att(brut).entree - 10000, att(brut).sortie, 1]));
+const nulles = js(inc).map((v) => ({ ...v, jetons: { entree: null, sortie: null, cacheLu: null, cacheCree: null }, durees: { travailS: null, attenteHumainS: null } })), toutNul = (C) => { const R = C.agreger(nulles, O); return CLES.map((k) => R.total[k]); };
+out.co6b = same([toutNul(C0), toutNul(C1)], Array(2).fill(CLES.map(() => null)));
 const inv = (R) => CLES.every((k) => R.lignes.reduce((s, l) => s + (l[k] ?? 0), 0) + (R.horsJalon ? R.horsJalon[k] : 0) + (R.nonRattache ? R.nonRattache[k] : 0) === R.total[k]);
 const corrompu = js(A), doublon = js(A); corrompu.lignes.shift(); doublon.lignes.push(js(A.lignes[0]));
 const T74 = K.agreger(js(M1.window.__vfFriseModele.lire(F.frise()).frise.voies), 'mission', { missions: F.MISSIONS, phases: F.PHASES, tronque: true });
@@ -139,6 +141,7 @@ assert_eq "CO3c — mission introuvable (dag inconnu) : « Non rattaché »" "$(
 assert_eq "CO4 — quatre compteurs sommés séparément (cache créé compris) ; chiffre principal = entrée + sortie sans cache ; durée = Σ travailS" "$(JC 'j.co4')" "ok"
 assert_eq "CO5 — table des étages : sept étages dans l'ordre, rôle inconnu → Autres, session → Tête de session" "$(JC 'j.co5')" "ok"
 assert_eq "CO6 — champ de jetons absent : null sur la ligne, exclu du total, inconnus = 1 (jamais 0)" "$(JC 'j.co6')" "ok"
+assert_eq "CO6b — aucune voie ne mesure : le total est null sur les cinq colonnes, avec et sans l'agrégat de la 74 (jamais 0)" "$(JC 'j.co6b')" "ok"
 assert_eq "CO7 — Σ phases + Hors jalon + Non rattaché = total (cinq colonnes), avec et sans la 74 ; sonde positive : une ligne perdue ou doublée le rougit ; incomplet = tronque" "$(JC 'j.co7')" "ok"
 assert_eq "CO7b — avec la 74 : des voies passées par __vfFriseModele.lire() donnent le même résultat" "$(JC 'j.co7b')" "ok"
 assert_eq "CO8 — formats « 1,2 M », « 340 k », « 3 h 10 », « 42 min » (espace insécable), identiques à ceux de la 74" "$(JC 'j.co8')" "ok"
