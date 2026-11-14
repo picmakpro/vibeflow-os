@@ -386,7 +386,8 @@ export default async function (h) {
       return { txt: tx.join('|').replace("Rien n'est estimé.", ''), fonds, graph: document.querySelectorAll('.vf-cout svg, .vf-cout canvas, .vf-cout progress, .vf-cout meter').length, cellules: document.querySelectorAll('.vf-cout td').length }; });
     h.sonde('D9', 'témoin : le tableau du coût est dessiné (aucun vert à vide)', t.cellules > 0, String(t.cellules));
     h.egal('D9', 'aucun montant, devise, « euro », « tarif » ni « estimé » dans la frise et le coût', /€|\$|euro|tarif|estimé/i.test(t.txt), false);
-    h.egal('D9', 'aucune limite d\'abonnement (5 h, 7 j)', /(^|[^\d])5\s*h\b|7\s*j\b|abonnement/i.test(t.txt), false);
+    // « 5 h » seul est une limite ; « 5 h 46 » est une heure d'horloge (les bulles de la frise) : le test ne dépend pas de l'heure du poste
+    h.egal('D9', 'aucune limite d\'abonnement (5 h, 7 j)', /(^|[^\d])5[\s ]*h(?![\s ]*\d)|7\s*j\b|abonnement/i.test(t.txt), false);
     h.egal('D9', 'aucune barre, aucune teinte dans le tableau (aucun fond hors --surface ou transparent)', [t.graph, t.fonds], [0, []]);
   });
   await h.section('D10', async () => {
@@ -461,12 +462,14 @@ import { monterD, voiesCout } from './commun.mjs';
 export const ids = ['D14'];
 export default async function (h) {
   const lire = () => h.ev(() => ({ cout: document.querySelectorAll('.vf-cout').length, depot: document.querySelectorAll('.vf-frise-rang-depot').length, racines: document.querySelectorAll('.vf-frise').length,
-    tire: document.querySelectorAll('.vf-frise-synthese a').length, ab: window.VF_ETAT.abonnes() }));
+    tire: document.querySelectorAll('.vf-frise-synthese a').length, ab: window.VF_ETAT.abonnes(),
+    // l'arbre de la régie (Phase 73) pose son propre abonnement git : on le retranche, il n'est pas celui de la 74-07
+    gitSans: window.VF_ETAT.abonnes().git - document.querySelectorAll('.vf-rg-arbres').length }));
   const ou = (n) => h.attendre(`window.VF_COQUILLE.onglet() === '${n}' && document.documentElement.dataset.vfPret === 'oui'`, `onglet ${n}`);
   await h.section('D14', async () => {
     await monterD(h, { voies: voiesCout });
     const a = await lire();
-    h.egal('D14', 'témoin : un seul bandeau, une seule section, un seul abonnement git (les abonnés frise sont ceux des autres modules, jamais ceux de la 74-07)', [a.cout, a.depot, a.racines, a.tire, a.ab.git, a.ab.frise >= 1], [1, 1, 1, 1, 1, true]);
+    h.egal('D14', 'témoin : un seul bandeau, une seule section, un seul abonnement git (les abonnés frise sont ceux des autres modules, jamais ceux de la 74-07)', [a.cout, a.depot, a.racines, a.tire, a.gitSans, a.ab.frise >= 1], [1, 1, 1, 1, 1, true]);
     await h.ev("window.VF_COQUILLE.chargerOnglet('code').then(() => 1)"); await ou('code');
     const loin = await h.ev(() => window.VF_ETAT.abonnes());
     h.egal('D14', 'hors de l\'onglet Équipe : plus aucun abonnement git', loin.git, 0);
@@ -474,9 +477,9 @@ export default async function (h) {
     const b = await lire();
     await h.cycle('code'); await h.attendreFrise();
     const c = await lire();
-    h.egal('D14', 'après DEUX changements d\'onglet : une seule section, un seul bandeau, aucun abonnement doublé (git, frise, etat)', [c.cout, c.depot, c.racines, c.tire, c.ab.git, c.ab.frise, c.ab.etat],
+    h.egal('D14', 'après DEUX changements d\'onglet : une seule section, un seul bandeau, aucun abonnement doublé (git, frise, etat)', [c.cout, c.depot, c.racines, c.tire, c.gitSans, c.ab.frise, c.ab.etat],
       [1, 1, 1, 1, 1, a.ab.frise, a.ab.etat]);
-    h.egal('D14', 'les deux changements d\'onglet donnent le même état que le premier', [b.cout, b.depot, b.ab.git, b.ab.frise, b.ab.etat], [1, 1, 1, a.ab.frise, a.ab.etat]);
+    h.egal('D14', 'les deux changements d\'onglet donnent le même état que le premier', [b.cout, b.depot, b.gitSans, b.ab.frise, b.ab.etat], [1, 1, 1, a.ab.frise, a.ab.etat]);
     const s = await h.ev(() => window.__surOnglet.filter((x) => /^74-vf-(frise-depot|cout)\.js$/.test(x)));
     h.sonde('D14', 'surOnglet appelé avec { cle: \'74-vf-frise-depot.js\' } et { cle: \'74-vf-cout.js\' } à chaque arrivée, jamais sans clé', s.filter((x) => x === '74-vf-frise-depot.js').length >= 3
       && s.filter((x) => x === '74-vf-cout.js').length >= 3, JSON.stringify(s));
