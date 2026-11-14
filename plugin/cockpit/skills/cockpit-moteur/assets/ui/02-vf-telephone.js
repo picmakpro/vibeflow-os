@@ -12,6 +12,9 @@
   if (!hr) return;
   const t = window.__vfFrT, PLUS = t('More actions');
   const phone = matchMedia('(max-width: 700px)'), tablette = matchMedia('(max-width: 999px)'); // menu dès 999 px (amendement de P70-D-01), téléphone seul à 700 px
+  // la portée de la coquille ne défait pas les listes de requêtes média et ce script est ré-exécuté à chaque arrivée sur un onglet : ses écouteurs `change` se retirent au départ de l'onglet
+  const mqs = [], sur = (mq, f) => { mq.addEventListener('change', f); mqs.push([mq, f]); };
+  const coq = window.VF_COQUILLE; if (coq && typeof coq.surOnglet === 'function') coq.surOnglet(() => () => { for (const [mq, f] of mqs.splice(0)) mq.removeEventListener('change', f); }, { cle: '02-vf-telephone.js' });
   const style = document.createElement('style');
   style.textContent = `
     #vf-plus { display: none; }
@@ -122,7 +125,7 @@
 
   // le viewer range le zoom dans l'en-tête sur un téléphone : il retourne dans la scène, après le geste du viewer (même requête, écouteur posé après le sien)
   const scene = () => { if (zoom && stage && phone.matches && zoom.parentNode !== stage) stage.insertBefore(zoom, document.getElementById('flowbar')); };
-  phone.addEventListener('change', () => { scene(); }); tablette.addEventListener('change', () => { if (!tablette.matches) fermer(false); }); scene();
+  sur(phone, () => { scene(); }); sur(tablette, () => { if (!tablette.matches) fermer(false); }); scene();
 
   // pile du zoom : la barre de question change de hauteur (invite, avertissement) et la visite guidée se pose au même endroit : on relit leurs hauteurs, le zoom reste au-dessus des deux
   const ask = document.getElementById('ask');
@@ -154,7 +157,7 @@
     x.onclick = (ev) => { ev.stopPropagation(); bascule(false); };
     bar.appendChild(x); panel.insertBefore(bar, panel.firstChild);
   };
-  if (panel) { new MutationObserver(barre).observe(panel, { childList: true }); phone.addEventListener('change', barre); barre(); }
+  if (panel) { new MutationObserver(barre).observe(panel, { childList: true }); sur(phone, barre); barre(); }
 
   // titre de la vue : cliquable sur téléphone ; ses mots à traits d'union ne se coupent plus au trait d'union (aussi hors téléphone)
   const titre = () => {
@@ -174,7 +177,7 @@
     if (phone.matches) { h1.setAttribute('role', 'button'); h1.tabIndex = 0; } else { h1.removeAttribute('role'); if (!h1.dataset.vfAide) h1.removeAttribute('tabindex'); } // le titre à définition Git reste atteignable par Tab (76-vf-git-entete.js)
   };
   if (ctx) {
-    new MutationObserver(titre).observe(ctx, { childList: true }); phone.addEventListener('change', titre); titre();
+    new MutationObserver(titre).observe(ctx, { childList: true }); sur(phone, titre); titre();
     ctx.addEventListener('click', (ev) => { if (phone.matches && ev.target.closest('h1')) bascule(true); });
     ctx.addEventListener('keydown', (ev) => { if (phone.matches && ev.target.closest?.('h1') && (ev.key === 'Enter' || ev.key === ' ')) { ev.preventDefault(); bascule(true); } });
   }

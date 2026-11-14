@@ -807,6 +807,15 @@ for onglet in index project; do
   done
 done
 
+# R26 (passe finale, EX-01) — les écouteurs de listes de requêtes média de 02-vf-telephone.js ne s'accumulent pas : la portée de la coquille ne les défait pas (limite écrite de vf-coquille-portee.js),
+# le script ré-exécuté à chaque arrivée sur un onglet les retire donc lui-même au départ. Mesure : écouteurs `change` vivants (posés moins retirés) du script, au chargement puis après six changements d'onglet ;
+# le témoin positif exige qu'il y en ait au chargement (sinon la comparaison serait vide contre vide).
+echo "=== R26 — listes de requêtes média de 02-vf-telephone.js : constantes après six changements d'onglet ==="
+srv "$LC/.vibeflow/cockpit"; PMQ=$SRV_PORT
+R26="$(REAL_HOME="$REAL_HOME" node "$HERE_T/coquille-chrome.mjs" avec "$CHROME" "http://127.0.0.1:$PMQ/" "$HERE_T/chrome-telephone-mq.js" 2>&1 | tail -1)"; unsrv
+assert_eq "R26.1 — six changements d'onglet menés à bout, et 02-vf-telephone.js pose au moins un écouteur au chargement (témoin positif)" "$(printf '%s' "$R26" | node "$AUX/ev.mjs" '(j.tours||[]).join(",")+"|"+((j.avant||{})["02-vf-telephone.js"]>0?"pose":"rien")')" "ok,ok,ok,ok,ok,ok|pose"
+assert_eq "R26.2 — 02-vf-telephone.js : le nombre d'écouteurs vivants après six changements d'onglet égale celui du chargement" "$(printf '%s' "$R26" | node "$AUX/ev.mjs" '(j.avant||{})["02-vf-telephone.js"]+" -> "+(j.apres||{})["02-vf-telephone.js"]')" "$(printf '%s' "$R26" | node "$AUX/ev.mjs" '(j.avant||{})["02-vf-telephone.js"]+" -> "+(j.avant||{})["02-vf-telephone.js"]')"
+
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
