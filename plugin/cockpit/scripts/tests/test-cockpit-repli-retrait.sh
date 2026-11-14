@@ -170,7 +170,7 @@ assert_eq "RP4 — aucune ligne FAIL dans les sections jouées de la régie" "$(
 # ---------- mutants ----------
 if [ -n "$CHROME" ] && [ -z "${REPLI_SANS_MUTANTS:-}" ]; then
   echo "=== mutants (copies du module ; chacun rougit sa sonde) ==="
-  if cockpit_module_muter M-REPLI-REVENU 72-vf-regie-source.js "s#if (declencheur === 'rapport') return;#if (declencheur === 'rapport') { ouvrirRepli(A, l.id, bouton, l.nom); return; }#;s#  function monter() {#  async function ouvrirRepli(A, id, ouvreur, nom) { emettre('vf-agent:lu', { id }, false); const P = document.getElementById('panel'); if (P) { const sec = document.createElement('div'), t = document.createElement('h2'); sec.className = 'sec'; t.className = 'pt'; t.textContent = nom; sec.appendChild(t); P.appendChild(sec); } }  function monter() {#"; then
+  if cockpit_module_muter M-REPLI-REVENU 72-vf-regie-source.js "s#if (declencheur === 'ancre') {#if (declencheur === 'rapport') { ouvrirRepli(A, l.id, bouton, l.nom); return; } if (declencheur === 'ancre') {#;s#  function monter() {#  async function ouvrirRepli(A, id, ouvreur, nom) { emettre('vf-agent:lu', { id }, false); const P = document.getElementById('panel'); if (P) { const sec = document.createElement('div'), t = document.createElement('h2'); sec.className = 'sec'; t.className = 'pt'; t.textContent = nom; sec.appendChild(t); P.appendChild(sec); } }  function monter() {#"; then
     sans_fiche "$COCKPIT_MODULE"
     if [ "$(rp1 "$COCKPIT_MODULE/skills/cockpit-moteur/assets/ui")" != "0" ]; then echo "MUTANT-ROUGE M-REPLI-REVENU RP1"; PASS=$((PASS+1)); else echo "MUTANT-VERT M-REPLI-REVENU RP1"; echo "  ❌ FAIL — M-REPLI-REVENU — RP1 n'a pas rougi"; FAIL=$((FAIL+1)); fi
     demarrer mrepli

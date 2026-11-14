@@ -487,10 +487,10 @@ export default async function (h) {
       await h.ev(geste);
       await h.fiche();
       const o = await h.ev((i) => ({ ouv: window.__ouv.slice(-1)[0], ouvre: !!document.querySelector(`.vf-fiche[data-vf-fiche="${i}"]`), panel: document.getElementById('panel').outerHTML,
-        repli: !!document.querySelector('.vf-transcript'), etendu: [...document.querySelectorAll('#vf-equipe .vf-rg-tog')].map((b) => b.getAttribute('aria-expanded')),
+        repli: !!document.querySelector('.vf-transcript'), etendu: [...document.querySelectorAll('#vf-equipe .vf-rg-tog')].map((b) => b.hasAttribute('aria-expanded')),
         lus: window.__lus.slice() }), id);
-      h.egal(`P17`, `déclencheur « ${decl} » : annulé (preventDefault), la fiche s'ouvre, la régie ne fait rien d'autre (aucun détail déplié, aucun lecteur de repli, #panel intact)`,
-        [o.ouv, o.ouvre, o.panel === av.panel, o.repli, o.etendu.every((x) => x === 'false'), o.lus.includes('wk-2')], [{ d: decl, prevented: true }, true, true, false, true, false]);
+      h.egal(`P17`, `déclencheur « ${decl} » : annulé (preventDefault), la fiche s'ouvre, la régie ne fait rien d'autre (aucun nom de ligne ne porte aria-expanded : le détail n'existe plus, aucun lecteur de repli, #panel intact)`,
+        [o.ouv, o.ouvre, o.panel === av.panel, o.repli, o.etendu.length > 0 && o.etendu.every((x) => x === false), o.lus.includes('wk-2')], [{ d: decl, prevented: true }, true, true, false, true, false]);
       await h.ev(() => document.querySelector('.vf-fiche-retour').click());
       await h.attendre("!document.querySelector('.vf-fiche')", 'fiche fermée');
       const r = await h.ev((s) => { const el = document.querySelector(s), a = document.activeElement;
