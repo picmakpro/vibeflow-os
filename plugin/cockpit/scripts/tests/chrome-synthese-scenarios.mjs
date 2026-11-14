@@ -19,7 +19,9 @@ async function pages(s, base, r) {
   r.pages = [];
   for (const u of ['/', '/project.html', '/equipe.html']) {
     await s.naviguer(base + u);
-    r.pages.push(await s.ev(`({ u: ${JSON.stringify(u)}, tabs: document.querySelectorAll('nav.vf-tabs a').length, roleTab: document.querySelectorAll('[role="tab"]').length,
+    r.pages.push(await s.ev(`({ u: ${JSON.stringify(u)}, tabs: document.querySelectorAll('nav.vf-tabs a').length,
+      // la bascule « Vue de l'équipe » (Régie, Frise) est voulue par la 74 (74-UI-SPEC) : seuls les role="tab" HORS d'elle sont « neufs »
+      roleTab: [...document.querySelectorAll('[role="tab"]')].filter((e) => !e.closest('[role="tablist"][aria-label="Vue de l\\'équipe"]')).length,
       btn: document.querySelectorAll('#btn-synthese').length, sante: document.querySelectorAll('#btn-health').length })`));
   }
 }

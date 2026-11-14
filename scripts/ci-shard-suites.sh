@@ -110,11 +110,17 @@ durees() {
 71 plugin/cockpit/scripts/tests/test-cockpit-direct.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-ecrans-recent.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-equipe-etats.sh
+75 plugin/cockpit/scripts/tests/test-cockpit-equipe-retraits.sh
 250 plugin/cockpit/scripts/tests/test-cockpit-equipe.sh
 490 plugin/cockpit/scripts/tests/test-cockpit-etat.sh
+19 plugin/cockpit/scripts/tests/test-cockpit-fiche-texte.sh
+32 plugin/cockpit/scripts/tests/test-cockpit-fiche.sh
 43 plugin/cockpit/scripts/tests/test-cockpit-flux-unique.sh
 4 plugin/cockpit/scripts/tests/test-cockpit-forme-claude.sh
 12 plugin/cockpit/scripts/tests/test-cockpit-fr-donnees.sh
+40 plugin/cockpit/scripts/tests/test-cockpit-frise-cout.sh
+1 plugin/cockpit/scripts/tests/test-cockpit-frise-modele.sh
+150 plugin/cockpit/scripts/tests/test-cockpit-frise-vue.sh
 69 plugin/cockpit/scripts/tests/test-cockpit-git-commandes.sh
 38 plugin/cockpit/scripts/tests/test-cockpit-git-config-depot.sh
 28 plugin/cockpit/scripts/tests/test-cockpit-git-details.sh
@@ -157,6 +163,7 @@ durees() {
 1509 plugin/cockpit/scripts/tests/test-cockpit-projet.sh
 20 plugin/cockpit/scripts/tests/test-cockpit-questions.sh
 23 plugin/cockpit/scripts/tests/test-cockpit-reconnexion.sh
+35 plugin/cockpit/scripts/tests/test-cockpit-repli-retrait.sh
 6 plugin/cockpit/scripts/tests/test-cockpit-reseau.sh
 605 plugin/cockpit/scripts/tests/test-cockpit-responsive.sh
 89 plugin/cockpit/scripts/tests/test-cockpit-retard.sh

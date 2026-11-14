@@ -3,7 +3,8 @@
 // (74-02), `vibeflow/cockpit-git@1` réduit aux champs lus. Aucune horloge réelle, aucun Math.random : tout est dérivé de NOW.
 // Usage module : import { fabrique, voie, quiMissions, quiPhases, fil, git, rangee } ; usage ligne de commande :
 //   node frise-fabrique.mjs frise|missions|phases|fil|git [options JSON] -> JSON sur stdout.
-// A REVALIDER sur la forme réellement écrite par 79-13 (champs de voie, `cibles.tronque`, `voiesOmises`, queue `attend-humain`).
+// Confrontée le 2026-11-13 à la route livrée par 79-13 (vf-cockpit-frise*.mjs, bloc du contrat) : `at` est une chaîne ISO ; la queue `attend-humain` n'existe que pour
+// un agent `attend` et se FUSIONNE au dernier segment quand il est déjà `attend-humain`.
 import { pathToFileURL } from 'node:url';
 
 export const SCHEMA = 'vibeflow/cockpit-frise@1';
@@ -51,7 +52,7 @@ export function voiesParDefaut(now = NOW) {
 
 export function fabrique({ now = NOW, voies, tronque = false, voiesOmises = 0, schema = SCHEMA, sourceEtat = 'ok' } = {}) {
   return {
-    schema, at: now, depuis: now - FENETRE, jusqua: now, fenetreS: FENETRE / 1000,
+    schema, at: new Date(now).toISOString(), depuis: now - FENETRE, jusqua: now, fenetreS: FENETRE / 1000,
     source: { etat: sourceEtat, ccVerifie: true, versionsVues: ['2.1.317'] },
     tronque, voiesOmises, voies: voies ?? voiesParDefaut(now),
   };
