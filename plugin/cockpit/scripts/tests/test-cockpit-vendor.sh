@@ -278,7 +278,7 @@ if [ -n "$DEPOT_DEV" ] && [ -f "$DEPOT_DEV/plugin/cockpit/scripts/tests/test-coc
     m="$(git -C "$DEPOT_DEV" log -1 --format=%B "$sha")"
     if node "$CLIQUET" citation "$m" --directe > /dev/null 2>&1; then [ -n "$reel_avec" ] || reel_avec="$m"; else [ -n "$reel_sans" ] || reel_sans="$m"; fi
     [ -n "$reel_avec" ] && [ -n "$reel_sans" ] && break
-  done < <(git -C "$DEPOT_DEV" log --no-merges -n 400 --format=%H)
+  done < <(git -C "$DEPOT_DEV" log --no-merges --format=%H)
   assert_eq "V4c.7b.0 — témoin : l'historique porte un message réel sans citation directe et un message réel avec" "$([ -n "$reel_sans" ] && echo sans) $([ -n "$reel_avec" ] && echo avec)" "sans avec"
   assert_eq "V4c.7b.1 — un message réel sans citation directe : une hausse est refusée (code 1)" "$(col_comparer 'scripts/vf-cockpit-a.mjs 2' 'scripts/vf-cockpit-a.mjs 3' "$reel_sans")" "1 HAUSSE-SANS-ARBITRAGE"
   assert_eq "V4c.7b.2 — le même message réel : une baisse est acceptée (code 0)" "$(col_comparer 'scripts/vf-cockpit-a.mjs 3' 'scripts/vf-cockpit-a.mjs 2' "$reel_sans")" "0 "
