@@ -48,3 +48,16 @@ Rituel levé : régime allégé (consigne de Samuel, message session principale,
 - Non écrit, au manager : ROADMAP, STATE, REQUIREMENTS ; CHANGELOG du module (« cockpit : sélecteur de lentilles d'activité sur le code, avec son menu, ses sections de panneau et le compte du radar dans la rangée de contexte ; l'ancien bouton est retiré par 75-09 ») ;
   `ci-shard-suites.sh` : `test-cockpit-activite-lentilles.sh` (environ 3 minutes) ; compteur « N suites » des README (`check-version-sync.sh`) : une suite de plus ; DESIGN.md § 12 (amendements prévus par la spec).
 - Écarts avec 75-UI-SPEC à corriger côté spec : « pastille `--recent` en bureau » (la pastille est neutre, P75-D-27 prime) ; pas d'`aria-pressed` ; `role="menu"` sur les seules rangées ; unité du radar : le fichier ; `.bl` masqué à tout gabarit ; disque central pour l'état actif ; section « Points chauds » du panneau (rang) ; « sans glyphe » rendu par le glyphe neutre.
+
+## Correctifs de fin de phase
+
+Correction ciblée (revue + juge design), régime allégé : rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Chaque point : témoin vu rouge, puis vert.
+
+- Observateurs (majeur) : zéro `MutationObserver` dans les `ui/75-vf-activite*.js`. Paliers reposés après la pose et en microtâche de `render` ; compte du radar reposé après `render` et mesuré au clic et à la touche ; menu refermé par un clic en capture sur `#filters-btn` et `#flows-btn` ; un relais par événement du moteur (`ctx.sur`). Témoin : `test-cockpit-magasin.sh` O1.1 et O1.2 (91/0 après), baseline intacte.
+- Légende du menu : reconstruite seulement quand la signature de ses lignes change ; `<details>` ouvert et focus conservés. Témoin L22 (section `t4`).
+- `#lens-menu` : classe `menu glass`, fond et ombre calculés égaux à ceux de `#legend`, 1440/1024/390 px, deux thèmes. Témoin L22.
+- Compte du radar : le titre « Collisions possibles » est amené dans le champ du panneau (1440 et 390 px). Témoin L22.
+- BACKLOG : cinq mineurs ajoutés à la suite des lignes 75.
+- Identifiants : `lens-d-<id>` posé en permanence ; C6.1, M-ECOUTEURS, M-HEAD de la coquille (111/3 avant, 114/0 après, suite non touchée).
+- Suites sur la tête commitée : `test-cockpit-activite-lentilles.sh` 114/0 (144 s), `test-cockpit-activite-carte.sh` 91/0 (rejeu isolé 115 s ; 50/1 une fois en parallèle sous charge, D6b Équipe), `test-cockpit-magasin.sh` 91/0 (10 s), `test-cockpit-vendor.sh` 286/0 (99 s), `check-machine-paths.sh` vert (102 s), `test-cockpit-coquille.sh` 114/0 (218 s).
+- Écart : le point 1 ajoute `ctx.sur` au contexte des parties (contrat interne de 75-08 seulement).
