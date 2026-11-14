@@ -36,6 +36,7 @@ window.__vfFrDict = Object.assign(window.__vfFrDict || {}, {
   "How the app remembers you are signed in, so you don't have to type your password on every screen.": "Comment l'application se souvient que vous êtes connecté, pour que vous n'ayez pas à retaper votre mot de passe à chaque écran.",
   "In Flask, a group of related requests bundled together, like all the order requests.": "Dans Flask, un groupe de requêtes liées, comme toutes les requêtes sur les commandes.",
   "In code, a model describes how one kind of record (an order, a customer) is stored in the database.": "Dans le code, un modèle décrit comment un type d'enregistrement (une commande, un client) est stocké dans la base.",
+  "Invalid layout reply": "Réponse de mise en page invalide",
   "One saved entry in the database, like a single order or customer; a table is the list of all records of one kind.": "Une entrée enregistrée dans la base, comme une commande ou un client ; une table est la liste de tous les enregistrements d'un type.",
   "One specific request the app can receive, like \"mark this order shipped\"; each has its own web address.": "Une requête précise que l'application peut recevoir, comme « marquer cette commande expédiée » ; chacune a sa propre adresse web.",
   "Putting a new version of the app live so people start using it.": "Mettre en ligne une nouvelle version de l'application pour que les gens l'utilisent.",

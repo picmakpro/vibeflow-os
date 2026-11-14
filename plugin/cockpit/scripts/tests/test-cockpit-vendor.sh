@@ -3,6 +3,7 @@
 #   V1 sentinelles et licence · V2 licences tierces · V3 rien que check-skills ou la CI jugeraient
 #   V4 tailles et marqueurs (V4c : plafond de 160 colonnes en cliquet) · V11 code navigateur rangé en fichiers (79-11) · V8 binaires · V10 fork assumé : ni dossier amont ni journal de patchs, sentinelle du moteur lue (79-01)
 #   V9 vendor xterm, police des traits de boîte, assistant du terminal
+#   V12 chiffres documentés = chiffres du code (79-20 : tableau du README, versions, type, modules et routes nommés ; aide doc-chiffres.sh)
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -488,7 +489,8 @@ copier_avec_imports() { # <dossier-cible> <fichier>... (chemins absolus)
     done
   done
 }
-rm -rf "$WORK/q6"; mkdir -p "$WORK/q6/scripts" "$WORK/q6/skills/cockpit-moteur/assets/ui"; copier_avec_imports "$WORK/q6/scripts" "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs
+rm -rf "$WORK/q6"; mkdir -p "$WORK/q6/scripts" "$WORK/q6/skills/cockpit-moteur/assets/ui" "$WORK/q6/skills/cockpit-moteur/assets/vendor"; cp "$MOTEUR/assets/vendor/elk.bundled.js" "$WORK/q6/skills/cockpit-moteur/assets/vendor/"; # 79-18 (AU18-02) : le paquet ELK fait partie du code évalué
+  copier_avec_imports "$WORK/q6/scripts" "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs
 cp "$MOTEUR/assets/serve.mjs" "$WORK/q6/skills/cockpit-moteur/assets/"; cp -R "$MOTEUR/assets/ui/terminal" "$WORK/q6/skills/cockpit-moteur/assets/ui/terminal" 2>/dev/null; cp -R "$MOTEUR/assets/ui/tiroir" "$WORK/q6/skills/cockpit-moteur/assets/ui/tiroir" 2>/dev/null   # la liste close porte aussi les neuf fichiers de P
 node "$WORK/q6.mjs" "$WORK/q6" > "$WORK/q6.out" 2>&1
 assert_eq "V11.Q6a — fichiersCodeEvalue liste les trois fichiers de Q" "$(sed -n 1p "$WORK/q6.out")" "liste=true"
@@ -525,7 +527,7 @@ assert_eq "V11.P2b — injectionLancer : (lancer.js)(configuration portant lance
 assert_eq "V11.P2c — injectionLancer({ indisponible }) rend la chaîne vide" "$(sed -n 3p "$WORK/p2.out")" 'indispo=""'
 # p3 : une copie jetable du module (scripts utiles et moteur réduit) : un fichier muté change l'injection ; un fichier illisible la rend vide avec une ligne d'erreur
 mini_module() { # <dossier> : copie réduite du module (le lecteur, le module, les deux injecteurs et le dossier rangé)
-  rm -rf "$1"; mkdir -p "$1/scripts" "$1/skills/cockpit-moteur/assets/ui"
+  rm -rf "$1"; mkdir -p "$1/scripts" "$1/skills/cockpit-moteur/assets/ui" "$1/skills/cockpit-moteur/assets/vendor"; cp "$MOTEUR/assets/vendor/elk.bundled.js" "$1/skills/cockpit-moteur/assets/vendor/" # 79-18 (AU18-02) : le paquet ELK fait partie du code évalué
   copier_avec_imports "$1/scripts" "$SCRIPTS"/vf-cockpit-module.mjs "$SCRIPTS"/vf-cockpit-navigateur.mjs "$SCRIPTS"/vf-cockpit-terminal-tiroir.mjs "$SCRIPTS"/vf-cockpit-lancer-ui.mjs
   cp "$MOTEUR/assets/serve.mjs" "$1/skills/cockpit-moteur/assets/" 2>/dev/null; cp -R "$MOTEUR/assets/ui/terminal" "$MOTEUR/assets/ui/tiroir" "$1/skills/cockpit-moteur/assets/ui/" 2>/dev/null
 }
@@ -684,6 +686,62 @@ mkdir -p "$WORK/m104/scripts" "$WORK/m104/skills/cockpit-moteur/assets"; echo '<
 assert_eq "V10.4b — arbre jetable sans VENDORED.txt : engineDir rend absent" "$(etat_moteur "$WORK/m104/scripts")" "absent"
 echo 'floorplan v0.6.0 @ 92d6854' > "$WORK/m104/skills/cockpit-moteur/VENDORED.txt"
 assert_eq "V10.4c — le même arbre avec VENDORED.txt : engineDir rend trouve" "$(etat_moteur "$WORK/m104/scripts")" "trouve"
+
+echo "=== V12 — chiffres documentés = chiffres du code (SOCL-25, P79-D-27) ==="
+DOCCH="${DOCCH:-$SCRIPTS/tests/doc-chiffres.sh}"
+# shellcheck disable=SC1090
+. "$DOCCH"
+RACINE_DOC="$(cd "$SCRIPTS/.." && pwd)"
+if [ "$(dc_depot_de_dev "$RACINE_DOC")" != oui ]; then
+  echo "  ⏭️  saut — V12 : module hors du dépôt de dev (aucun .planning/ au-dessus de plugin/cockpit) ; rien ne passe pour un vert ici"
+else
+  assert_eq "V12.0a — module posé sous plugin/cockpit d'une racine qui porte .planning/" "$(dc_depot_de_dev "$RACINE_DOC")" "oui"
+  lisibles=oui
+  for f in "$RACINE_DOC/README.md" "$RACINE_DOC/CHANGELOG.md" "$RACINE_DOC/VERSION" "$RACINE_DOC/module.json" "$CHKSIZE"; do [ -s "$f" ] || lisibles=non; done
+  assert_eq "V12.0b — README, CHANGELOG, VERSION, module.json et check-file-size.sh lisibles et non vides" "$lisibles" "oui"
+  dc_verifier "$RACINE_DOC" "$CHKSIZE" > "$WORK/v12-reel.txt"
+  grep '^ROUGE' "$WORK/v12-reel.txt" | sed 's/^/     /'
+  assert_eq "V12.1a — quatre numéros de version égaux (VERSION, module.json, en-tête du README, premier titre du CHANGELOG)" "$(dc_etat "$WORK/v12-reel.txt" V12.1a)" "ok"
+  assert_eq "V12.1b — type du module égal dans module.json et dans l'en-tête du README" "$(dc_etat "$WORK/v12-reel.txt" V12.1b)" "ok"
+  i=0
+  for k in "${DC_CLES[@]}"; do
+    l="abcdefgh"; l="${l:$i:1}"; i=$((i+1))
+    assert_eq "V12.2$l — chiffre documenté « $k » égal à celui du code" "$(dc_etat "$WORK/v12-reel.txt" "V12.2$l")" "ok"
+  done
+  assert_eq "V12.3a — chaque scripts/vf-cockpit-*.mjs nommé par le README existe" "$(dc_etat "$WORK/v12-reel.txt" V12.3a)" "ok"
+  assert_eq "V12.3b — chaque test-cockpit-*.sh nommé par le README existe" "$(dc_etat "$WORK/v12-reel.txt" V12.3b)" "ok"
+  assert_eq "V12.3c — chaque /api/vf/<segment> nommé par le README figure dans scripts/*.mjs" "$(dc_etat "$WORK/v12-reel.txt" V12.3c)" "ok"
+  assert_eq "V12.4 — aucun jeton retiré dans le README (appareil de patchs, nombres en lettres, modules retirés)" "$(dc_etat "$WORK/v12-reel.txt" V12.4)" "ok"
+  assert_eq "V12.5 — le README parle du journal des attentes si et seulement si hooks/hooks.json existe" "$(dc_etat "$WORK/v12-reel.txt" V12.5)" "ok"
+  # témoins : une mutation sur une copie jetable fait rougir le contrôle qui la vise (copie inchangée = échec « mutation sans effet »)
+  V12B="$WORK/v12-base"; dc_copie_base "$V12B" "$RACINE_DOC" "$CHKSIZE"
+  # v12_temoin <id> <libellé> <mutation> [arguments] : la mutation reçoit la copie en premier argument
+  v12_temoin() {
+    local id="$1" lib="$2" fn="$3" m="$WORK/v12-m-${1//./_}" res; shift 3
+    rm -rf "$m"; cp -R "$V12B" "$m"
+    if "$fn" "$m" "$@"; then dc_verifier "$m" "$m/chk/check-file-size.sh" > "$m.txt"; res="$(dc_etat "$m.txt" "$id")"; else res="sans-effet"; fi
+    assert_eq "V12.6 — témoin $id : $lib" "$res" "rouge"
+  }
+  v12_temoin V12.1a "premier titre du CHANGELOG muté" dc_sed CHANGELOG.md '1,/^## v[0-9]/s/^(## )v[0-9.]+/\1v9.9.9/'
+  v12_temoin V12.1a "version de module.json mutée" dc_sed module.json 's/"version": "[^"]*"/"version": "v9.9.9"/'
+  v12_temoin V12.1a "version de l'en-tête du README mutée" dc_sed README.md '1,12s/(\*\*Version\*\* : )v[0-9.]+/\1v9.9.9/'
+  v12_temoin V12.1b "type de module.json muté" dc_sed module.json 's/"type": "[^"]*"/"type": "autre type"/'
+  v12_temoin V12.2c "valeur documentée mutée (veille du flux)" dc_sed README.md 's/^(\| `veille-flux-s` \| )[0-9]+( \|)/\1777\2/'
+  v12_temoin V12.2c "constante du code mutée (copie de 69-vf-flux.js)" dc_sed skills/cockpit-moteur/assets/ui/69-vf-flux.js \
+    's/const SILENCE_MS = [0-9_*]+/const SILENCE_MS = 777000/'
+  v12_temoin V12.2b "ligne du tableau retirée (battement du flux)" dc_sed README.md '/^\| `battement-flux-s` \|/d'
+  v12_temoin V12.2b "ligne du tableau en double (battement du flux)" dc_sed README.md '/^\| `battement-flux-s` \|/p'
+  v12_temoin V12.3a "module inexistant planté dans le README" dc_ajouter README.md 'Le module `vf-cockpit-inexistant-zz.mjs`.'
+  v12_temoin V12.3b "suite inexistante plantée dans le README" dc_ajouter README.md 'La suite `test-cockpit-inexistante-zz.sh`.'
+  v12_temoin V12.3c "route inexistante plantée dans le README" dc_ajouter README.md 'La route `/api/vf/zzinexistant`.'
+  v12_temoin V12.2b "source d'un extracteur supprimée de la copie (le chiffre rougit, il ne disparaît pas)" dc_retirer scripts/vf-cockpit-flux-etat.mjs
+  v12_temoin V12.4 "jeton retiré planté dans le README" dc_ajouter README.md 'Voir SYNCHRO.md pour la resynchronisation.'
+  v12_temoin V12.5 "texte du journal planté sans fragment de hooks" dc_ajouter README.md 'Le journal des attentes est écrit sous .cache/.'
+  v12_temoin V12.5 "fragment de hooks planté dans une copie dont le README est muet" dc_creer hooks/hooks.json
+  dc_verifier "$V12B" "$V12B/chk/check-file-size.sh" > "$V12B.txt"
+  assert_eq "V12.7 — copie non mutée : zéro écart, quinze contrôles lus (témoin positif)" \
+    "$(grep -c '^ROUGE' "$V12B.txt")/$(grep -c '^OK' "$V12B.txt")" "0/15"
+fi
 
 echo ""
 echo "=================================="
