@@ -58,10 +58,16 @@ rg_RG1_page() {
   pg_ok "RG1.11 — vf-regie:aller { section: 'au-travail' } : focus sur le titre (tabindex -1) ; section inconnue : aucune exception" "$o" 'j.out.f.tag + "|" + j.out.f.section + "|" + j.out.ti.join(",") + "|" + (j.out.x.erreur || "sans erreur")' "H2|au-travail|-1|sans erreur"
   o="$(pg_sc '"hash":"#vf-a-relire"' '[{"nom":"f0","obs":{"mode":"focus"}},{"focus":"#search"},{"poser":{"who":'"$PG_WHO"'}},{"nom":"f1","obs":{"mode":"focus"}}]')"
   pg_ok "RG1.11 — fragment #vf-a-relire au montage : focus sur le titre de « Terminé, à relire », une seule fois (une poussée suivante ne le reprend pas)" "$o" 'j.out.f0.tag + "|" + j.out.f0.section + "|" + j.out.f1.tag' "H2|a-relire|INPUT"
-  # vue au retour de vf:onglet (80-10 non livré : le repli décrit au plan, l'événement de document vf:onglet émis après pushState)
-  o="$(pg_sc '"coquille":{"onglet0":"code"},"onglets":true,"hash":"#vf-au-repos"' '[{"onglet":"equipe"},{"nom":"f1","obs":{"mode":"focus"}},{"vfOnglet":"equipe","hash":"#vf-a-relire"},{"nom":"f2","obs":{"mode":"focus"}},{"focus":"#search"},{"vfOnglet":"equipe"},{"nom":"f3","obs":{"mode":"focus"}}]')"
-  pg_ok "RG1.12 — arrivée par onglet : au rappel de surOnglet le fragment est encore celui de l'onglet précédent (aucune action) ; à vf:onglet il est lu UNE fois ; un second vf:onglet identique ne refait rien" "$o" \
-    '(j.out.f1.section || "aucune") + "|" + j.out.f2.section + "|" + j.out.f3.tag' "aucune|a-relire|INPUT"
+  # vue au retour de vf:onglet : le VRAI VF_ONGLETS.aller de 00-vf-onglets.js (80-10), sur une coquille simulée qui lui sert chargerOnglet
+  local ar='"coquille":{"onglet0":"code"},"onglets":true,"hash":"#vf-au-repos"'
+  o="$(pg_sc "$ar" '[{"nom":"f0","obs":{"mode":"focus"}},{"aller":"equipe","fragment":"#vf-a-relire","nom":"r"},{"nom":"f1","obs":{"mode":"focus"}},{"nom":"e","obs":{}},{"focus":"#search"},{"vfOnglet":"equipe"},{"nom":"f2","obs":{"mode":"focus"}}]')"
+  pg_ok "RG1.12 — VF_ONGLETS.aller('equipe', { fragment: '#vf-a-relire' }) depuis Code : le focus va une fois au titre de « Terminé, à relire » ; au rappel de surOnglet (avant vf:onglet) l'ancien fragment ne déclenche rien ; un second vf:onglet identique ne refait rien" "$o" \
+    '(j.out.f0.section || "aucune") + "|" + j.out.r.ok + "|" + (j.out.e.avantVfOnglet[0].section || "aucune") + "|" + j.out.f1.section + "|" + j.out.e.corps.includes("vf-tab-equipe") + "|" + j.out.e.pushes.join(",") + "|" + j.out.f2.tag' "aucune|true|aucune|a-relire|true|/equipe.html#vf-a-relire|INPUT"
+  o="$(pg_sc "$ar" '[{"aller":"equipe","fragment":"#vf-a-relire"},{"focus":"#search"},{"raz":true},{"aller":"equipe","fragment":"#vf-au-repos","nom":"r"},{"nom":"f","obs":{"mode":"focus"}},{"nom":"e","obs":{}}]')"
+  pg_ok "RG1.12 — aller vers l'onglet déjà affiché avec un fragment : ignoré par 80-10, aucune action de la régie (focus laissé, ni poussée d'historique ni vf:onglet de plus)" "$o" \
+    'j.out.r.ok + "|" + j.out.f.tag + "|" + j.out.e.pushes.length + "|" + j.out.e.avantVfOnglet.length' "true|INPUT|1|1"
+  o="$(pg_sc "$ar" '[{"aller":"equipe","fragment":"#vf-a-relire"},{"focus":"#search"},{"avancer":1000},{"nom":"f","obs":{"mode":"focus"}}]')"
+  pg_ok "RG1.12 — le fragment n'est lu qu'à vf:onglet : la minuterie de repli du montage (luHash nul) ne reprend pas le focus une fois la lecture faite" "$o" 'j.out.f.tag' "INPUT"
 }
 
 rg_RG2_page() {
