@@ -34,3 +34,7 @@ rituel levé : régime allégé (consigne de Samuel, message session principale,
 | test-cockpit-lecture-fil.sh | 12 PASS / 0 FAIL | 2 |
 | test-cockpit-accessibilite.sh | 39 PASS / 0 FAIL | 21 |
 | test-cockpit-chrome-fr.sh | 141 PASS / 0 FAIL | 39 |
+
+## Complément (demande du manager)
+- Entrée sur « Lire le rapport » : R5b joue maintenant le cas `rapport (Entrée)` (second agent terminé, touche réelle par CDP) ; le mutant M-RAPPORT-NON-ANNULE-CLAVIER (la fiche n'annule plus `rapport`) rougit ce cas, après que R5b a cessé de s'interrompre au premier cas rouge ; RP0 attend 4 lignes de rapport ; test-cockpit-equipe-retraits.sh 25/0 et 5 mutants rouges, test-cockpit-repli-retrait.sh 11/0 et 2 mutants rouges.
+- Rejeu isolé (RG13_page, RG11_tiroir, RG11_tiroir_chrome) : M-AILLEURS-FLUX reste rouge (`ERR: attente de « hello reçu » dépassée (90000 ms)`, attendu « une fuite nommée ») et RG11.22 aussi (obtenu `au-travail`, attendu `a-relire`) : pas de la charge, rien corrigé. EK18 et RG12.6 : côté 73 (arbitrage du manager).
