@@ -45,8 +45,10 @@
 
   function arbres() {
     const bloc = h('details', 'vf-rg-sec vf-rg-arbres'), corps = h('div', 'vf-rg-corps vf-rg-arbres-corps');
-    const titre = h('summary', 'vf-rg-tete', 'Arbres de travail');
+    const titre = h('summary', 'vf-rg-tete'), mot = h('span', '', 'Arbres de travail');
     let vivant = true, signature = '';
+    const marque = W.__vfRegieRendu && W.__vfRegieRendu.glyphe ? W.__vfRegieRendu.glyphe('repli', 'r-caret') : null; // repère d'ouverture : le caret du tiroir, couleur du texte
+    titre.append(...(marque ? [marque] : []), mot);
     bloc.append(titre, corps);
     const bouton = (txt, f) => { const b = h('button', 'btn', txt); b.setAttribute('type', 'button'); b.addEventListener('click', f); return b; };
     const dire = (t, ...suite) => corps.replaceChildren(h('p', 'vf-rg-vide', t), ...suite);
@@ -79,17 +81,17 @@
         const d = lus.get(t.chemin);
         if (t.branche && branches.get(t.branche) === 1 && d && d.verifie && d.modifies > 0) carte[t.branche] = d.modifies;
       }
-      ecrire(titre, `Arbres de travail (${L.length})`);
+      ecrire(mot, `Arbres de travail (${L.length})`);
       const ouvrirGit = () => { const o = D.getElementById('vf-git-ouvreur'); if (o) o.click(); };
       const histo = D.getElementById('vf-git-ouvreur') ? bouton("Ouvrir l'historique Git (g)", ouvrirGit) : null;
       if (L.length <= 1) dire('Un seul arbre de travail.', ...(histo ? [histo] : []));
       else {
         const ul = h('ul', 'vf-rg-arbres-liste');
         for (const t of L) {
-          const li = h('li', 'vf-rg-lig vf-rg-arbre'), morceaux = [h('code', '', t.nom)];
+          const li = h('li', 'vf-rg-lig vf-rg-arbre'), morceaux = [h('code', 'vf-rg-arbre-nom', t.nom)];
           if (t.ici) morceaux.push(h('span', 'vf-rg-compte', 'ici'));
-          morceaux.push(h('code', '', t.detache ? 'HEAD détaché' : t.branche || '—'));
-          for (const p of pastilles(lus.get(t.chemin))) morceaux.push(h('span', 'vf-rg-compte', p));
+          morceaux.push(h('code', 'vf-rg-arbre-br', t.detache ? 'HEAD détaché' : t.branche || 'sans branche'));
+          for (const p of pastilles(lus.get(t.chemin))) morceaux.push(h('span', 'vf-rg-arbre-pastille', p));
           if (noms.get(t.nom) > 1) morceaux.push(h('span', 'vf-rg-l2', 'nom partagé : aucune cible rattachable'));
           morceaux.forEach((m, i) => { if (i) li.append(D.createTextNode(' ')); li.append(m); });
           ul.append(li);
