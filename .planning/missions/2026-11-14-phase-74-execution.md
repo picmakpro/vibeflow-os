@@ -58,3 +58,20 @@ Section « Cockpit : mineurs des plans 74-01 à 74-10 (Phase 74) » : 17 lignes 
  {"verdict":"ci:pr-247","commande":"gh run view 43534668886","exit_code":1,"sha":"44d44877"}
 ]}
 ```
+
+## Seconde PR et CI de la #247
+
+Rouges de la CI de la #247 et leur cause, une par une :
+
+- D9 (frise-cout) lisait l'heure du poste : son verdict changeait selon le moment du rejeu, la sonde ne fige plus l'horloge qu'elle mesure.
+- D14 comptait un abonné git de la régie en plus de celui de la frise : l'abonnement attendu n'était pas celui qu'il comptait. Réparé par `cea33f25` : la sonde d'origine lit l'abonnement git sur les deux cas d'aller-retour.
+- W1 tirait son compte du contrat de la 74 : la bascule Vue de l'équipe est un `role=tab` de plus ; W1 compte désormais les `role=tab` hors de cette bascule (contrat `74-UI-SPEC`, décision déléguée, STATE du 2026-11-14).
+- P2.1 prenait la flèche `=>` d'une fonction pour une écriture de page : le motif de balayage ne distingue plus la flèche d'une affectation.
+- EK et RG empruntaient les chemins que la fiche annule (ouverture du lecteur de repli par le nom, l'ancre et le rapport) : leurs sondes visent maintenant la fiche.
+
+Autres points de la seconde PR :
+
+- Fenêtre V4c.7b (`23d454d1`) : la sonde de `test-cockpit-vendor.sh` dépendait d'un plafond de fenêtre d'historique ; elle n'en pose plus, le correctif vient de la branche de la 75 et arrive avec le lot.
+- Fusion du lot `51c09d5f` (PR de la Phase 76 dans le lot de fusion 254-253-251) : le compteur de suites des deux README racine est à 280 suites après la fusion (la 74 l'avait posé à 266, la fusion le remonte).
+- Décision « pas d'interface morte » (décision déléguée, message session principale, 2026-11-08, option recommandée ; prise par la session principale le 2026-11-14) : la fiche porte la carte de la phase et le lien du nœud ; le détail de ligne de la régie, qui n'aurait plus rien à ouvrir, est retiré plutôt que laissé en place.
+- Vérification de but : `74-VERIFICATION.md` n'existe pas à ce jour ; TEMP-01 à TEMP-11 sont cochées d'après les SUMMARY 74-01 à 74-10, TEMP-12 reste partielle (règles mortes de `70-vf-live.js`, sondes attribuées à d'autres phases, CI de la seconde PR à lire).
