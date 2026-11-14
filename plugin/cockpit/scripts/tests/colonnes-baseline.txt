@@ -7,7 +7,7 @@ scripts/vf-cockpit-ailleurs.mjs 6
 scripts/vf-cockpit-arbres.mjs 8
 scripts/vf-cockpit-ask.mjs 37
 scripts/vf-cockpit-avancement.mjs 7
-scripts/vf-cockpit-build.mjs 16
+scripts/vf-cockpit-build.mjs 14
 scripts/vf-cockpit-code-vf.mjs 13
 scripts/vf-cockpit-code.mjs 5
 scripts/vf-cockpit-drift.mjs 13
@@ -77,7 +77,7 @@ skills/cockpit-moteur/assets/ui/76-vf-git-entete.js 37
 skills/cockpit-moteur/assets/ui/77-vf-git-rendu.js 25
 skills/cockpit-moteur/assets/ui/77-vf-git-tiroir.js 37
 skills/cockpit-moteur/assets/ui/77-vf-git-vue-detail.js 22
-skills/cockpit-moteur/assets/ui/78-vf-fr-dict-a.js 43
+skills/cockpit-moteur/assets/ui/78-vf-fr-dict-a.js 42
 skills/cockpit-moteur/assets/ui/79-vf-fr-dict-b.js 45
 skills/cockpit-moteur/assets/ui/80-vf-fr.js 19
 skills/cockpit-moteur/assets/ui/terminal/client.js 50

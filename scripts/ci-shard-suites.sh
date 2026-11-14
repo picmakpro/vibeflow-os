@@ -91,13 +91,16 @@ durees() {
 0 plugin/_internal/tests/test-windows-crlf.sh
 0 plugin/business-pilot-bundle/scripts/tests/test-business-pilot-bundle.sh
 10 plugin/cockpit/scripts/tests/test-cockpit-accessibilite.sh
+118 plugin/cockpit/scripts/tests/test-cockpit-activite-carte.sh
 5 plugin/cockpit/scripts/tests/test-cockpit-activite-chemins.sh
 49 plugin/cockpit/scripts/tests/test-cockpit-activite-empreinte.sh
 9 plugin/cockpit/scripts/tests/test-cockpit-activite-gardes.sh
 10 plugin/cockpit/scripts/tests/test-cockpit-activite-git.sh
+182 plugin/cockpit/scripts/tests/test-cockpit-activite-lentilles.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-activite-planning.sh
 5 plugin/cockpit/scripts/tests/test-cockpit-activite-prevues.sh
 214 plugin/cockpit/scripts/tests/test-cockpit-activite-route.sh
+130 plugin/cockpit/scripts/tests/test-cockpit-activite-sans-git.sh
 54 plugin/cockpit/scripts/tests/test-cockpit-aide.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-ailleurs.sh
 66 plugin/cockpit/scripts/tests/test-cockpit-amorce-navigateur.sh

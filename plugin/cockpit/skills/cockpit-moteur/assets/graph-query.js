@@ -98,8 +98,6 @@ function createGraphQuery(G) {
     if (!b) throw new Error(`Unknown id "${id}". Use find first; ids look like n:api, f:src/app.ts, r:12, s:src/app.ts#3.`);
     const parent = owners(id)[id.startsWith('n:') ? 1 : 0];
     const res = { ...b, ...(parent ? { partOf: brief('n:' + parent) && { id: 'n:' + parent, name: nodes.get(parent).label } } : {}) };
-    const recent = (G.recent?.items || []).filter((x) => x.id === id);
-    if (recent.length) res.recentWork = recent.map((x) => `${G.recent.tasks[x.task]?.title}: ${x.note}`);
     if (id.startsWith('n:')) {
       const n = nodes.get(id.slice(2));
       if (n.details) res.details = n.details;
@@ -169,7 +167,6 @@ function createGraphQuery(G) {
       systems: G.nodes.filter((n) => !n.parent).map((n) => ({ id: 'n:' + n.id, name: n.label, kind: n.kind, description: n.summary || '', modules: (kidsOf.get(n.id) || []).map((k) => `n:${k} ${nodes.get(k).label}`) })),
       flows: (G.flows || []).map((f) => ({ title: f.title, steps: f.steps.map((s) => `${s.ref} ${s.note}`) })),
       counts: { files: G.files.length, endpoints: routes.length },
-      ...(G.recent ? { recentWork: (G.recent.tasks || []).map((t, ti) => ({ title: t.title, request: t.request, summary: t.summary, changed: G.recent.items.filter((x) => x.task === ti).map((x) => `${x.id} ${x.note}`) })) } : {}),
     };
   }
 
