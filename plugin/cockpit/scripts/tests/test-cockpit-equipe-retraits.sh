@@ -1,12 +1,12 @@
 #!/usr/bin/env bash
 # test-cockpit-equipe-retraits.sh — gardes d'absence et jointure de la régie avec la fiche (Phase 74, plan 74-08 ; TEMP-06, TEMP-12 ; P74-D-28, D-51).
 # Ce que la 73 a retiré ne revient pas (R1 bouton et boîte de transcript, R6 carte « Terminés »), la durée des veilles n'est jamais affichée par la 74 (R3),
-# l'export `transcript` vit encore (R7, retiré par 74-10 seul : 73-C2), et la fiche porte l'ouverture d'un agent depuis la régie (R2 rendu en texte,
+# l'export `transcript` est retiré (absence prouvée par RP2 de test-cockpit-repli-retrait.sh, 74-10, contrat P73-C2), et la fiche porte l'ouverture d'un agent depuis la régie (R2 rendu en texte,
 # R5 ancre, R5b nom et rapport). Les sondes de page se jouent par chrome-fiche.mjs sur un serveur lancé depuis une COPIE du module.
-#   R1 absence (garde)   R2 rendu en texte contre la fiche   R3 durée (garde)   R4 T26.8, T27.B2, T27.C1, T27.C2 contre la fiche   R5 ancre   R5b nom, Entrée, Espace, rapport   R6 carte (garde)   R7 export (garde)
-#   RETRAITS_SANS_FICHE=1 : la copie du module est privée de ses ui/74-vf-fiche*.js (la base de la 73 seule) — R2, R4, R5, R5b y rougissent ; R1, R3, R6, R7 y restent verts.
+#   R1 absence (garde)   R2 rendu en texte contre la fiche   R3 durée (garde)   R4 T26.8, T27.B2, T27.C1, T27.C2 contre la fiche   R5 ancre   R5b nom, Entrée, Espace, rapport   R6 carte (garde)
+#   RETRAITS_SANS_FICHE=1 : la copie du module est privée de ses ui/74-vf-fiche*.js (la base de la 73 seule) — R2, R4, R5, R5b y rougissent ; R1, R3, R6 y restent verts.
 #   Mutants (copies du MODULE ; « MUTANT-ROUGE <nom> <sonde> » seulement quand la sonde a rougi) : M-BOUTON-REVENU (R1), M-DUREE-VEILLES-REVENUE (R3),
-#   M-CARTE-REVENUE (R6), M-NON-ANNULE (R5b), M-EXPORT-PREMATURE (R7). RETRAITS_SANS_MUTANTS=1 les saute. Navigateur absent : sondes de page SAUTÉES (dites).
+#   M-CARTE-REVENUE (R6), M-NON-ANNULE (R5b). RETRAITS_SANS_MUTANTS=1 les saute. Navigateur absent : sondes de page SAUTÉES (dites).
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -88,7 +88,7 @@ JS
 # ---------- scénario : toutes les sondes de page ----------
 cat > "$AUX/r.mjs" <<'JS'
 import { voies, WHO, corps, iso, HOSTILE, ORIGINE, RAPPORT, ESPIONS, OUVERTS } from './fix.mjs';
-export const ids = ['R1', 'R2', 'R3', 'R4', 'R5', 'R5b', 'R7'];
+export const ids = ['R1', 'R2', 'R3', 'R4', 'R5', 'R5b'];
 const BAS = "(() => { const e = document.querySelector('.vf-fiche'); return !!e && e.getAttribute('aria-busy') !== 'true'; })()";
 export default async function (h) {
   const fil = (now) => ({ 'wk-1': corps('wk-1', [{ t: iso(now, 150), genre: 'message', texte: HOSTILE }]), 'wk-2': corps('wk-2', [{ t: iso(now, 5), genre: 'message', texte: 'x' }]) });
@@ -180,10 +180,6 @@ export default async function (h) {
       h.egal('R5b', `${decl} (${geste}) : Échap ferme la fiche et rend le focus à l'élément d'origine (rapport : dans la régie, le bouton ayant disparu avec le marquage « lu »)`, foc, true);
     }
   });
-  await h.section('R7', async () => {
-    const r = await h.ev(() => typeof (window.__vfEquipeRendu && window.__vfEquipeRendu.transcript));
-    h.egal('R7', 'garde : window.__vfEquipeRendu.transcript est ENCORE une fonction (retiré par 74-10 seul, 73-C2)', r, 'function');
-  });
 }
 JS
 
@@ -231,9 +227,6 @@ JS
 carte() { "$NODE" "$AUX/carte.mjs" "$1" 2>&1 | tail -1; }
 R6_ATTENDU='{"termine":1,"nodes":0,"terminesNoeud":0}'
 
-# ---------- R7 statique : l'export vit encore dans le module (retiré par 74-10 seul) ----------
-ECART7="$(grep -c 'agentsDuNoeud, transcript,' "$UI/71-vf-equipe-rendu.js" 2>/dev/null || true)"
-
 RACINE_MODULE=""
 if [ -n "${RETRAITS_SANS_FICHE:-}" ]; then
   RACINE_MODULE="$(cockpit_module_copie)" || RACINE_MODULE=""
@@ -244,15 +237,13 @@ fi
 
 echo "=== R6 — aucune carte « Terminés » dans le graphe du canevas (garde, apparié : l'agent terminé est compté) ==="
 assert_eq "R6 — buildEquipeGraph : l'agent terminé il y a 5 h est compté, aucun nœud, aucun nœud ~termines ni kind « terminés »" "$(carte "${RACINE_MODULE:-$SCRIPTS/..}")" "$R6_ATTENDU"
-echo "=== R7 — l'export transcript est encore posé (garde statique) ==="
-assert_eq "R7 — 71-vf-equipe-rendu.js exporte encore transcript (une ligne d'export)" "$ECART7" "1"
 
 if [ -z "$CHROME" ]; then
-  skip "R1, R2, R3, R5, R5b, R7 (page)" "pas de navigateur"
+  skip "R1, R2, R3, R5, R5b (page)" "pas de navigateur"
 else
   demarrer base; PORT="$VF_PORT"; SRV="$VF_PID"
   assert_eq "S0 — contrôle positif : serveur de la suite démarré, page Équipe servie" "$([ "$PORT" -gt 0 ] && echo serveur)" "serveur"
-  echo "=== R1 à R5b, R7 — page Équipe : retraits, rendu en texte, durée, ancre, nom, rapport ==="
+  echo "=== R1 à R5b — page Équipe : retraits, rendu en texte, durée, ancre, nom, rapport ==="
   joue "$PORT"
   cockpit_arreter "$SRV"; SRV=""
 
@@ -270,7 +261,6 @@ else
     mutant_page M-BOUTON-REVENU R1 72-vf-regie-rendu.js "s#'Lire le rapport');#'Lire le rapport'); b.setAttribute('data-vf-transcript', '');#"
     mutant_page M-DUREE-VEILLES-REVENUE R3 74-vf-fiche-faits.js "s#\['Au travail', f(d, 'travailS', (x) => M().fmtDuree(x))\]#['Au travail', M().fmtDuree(v ? v.dureeS : null)]#"
     mutant_page M-NON-ANNULE R5b 74-vf-fiche.js "s#e.preventDefault(); ouvrir(d.id, elementDe(d));#ouvrir(d.id, elementDe(d));#"
-    mutant_page M-EXPORT-PREMATURE R7 71-vf-equipe-rendu.js "s#agentsDuNoeud, transcript, #agentsDuNoeud, #"
     # M-CARTE-REVENUE : sans navigateur, sur une copie du module
     if cockpit_module_muter M-CARTE-REVENUE vf-cockpit-equipe-carte.mjs "s#nodes: \[\], files: \[\]#nodes: [{ id: '~termines', kind: 'terminés' }], files: []#"; then
       if [ "$(carte "$COCKPIT_MODULE")" != "$R6_ATTENDU" ]; then echo "MUTANT-ROUGE M-CARTE-REVENUE R6"; PASS=$((PASS+1)); else echo "MUTANT-VERT M-CARTE-REVENUE R6"; echo "  ❌ FAIL — M-CARTE-REVENUE — R6 n'a pas rougi"; FAIL=$((FAIL+1)); fi

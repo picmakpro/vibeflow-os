@@ -121,6 +121,7 @@ try {
       else if (e.raz) { dom.razEcritures(); journal.fetchs.length = 0; journal.evts.length = 0; journal.surcouches.length = 0; dom.defilements.length = 0; }
       else if (e.appel) { const [o, f] = [e.appel.split('.').slice(0, -1).reduce((a, k) => a[k], W), e.appel.split('.').pop()]; r = o[f](...(e.args || [])); }
       else if (e.reexecuter) { for (const k of ['__vfRegie', '__vfEquipeVues', '__vfRegiePied', '__vfRegieModele', '__vfEquipeRendu']) delete W[k]; charger(); }
+      else if (e.surcoucheFactice) W.VF_SURCOUCHES.ouvrir(D.body, { modale: false, fermer: () => {} }); // 74-10 : une surcouche ouverte, sans lecteur de la régie
       else if (e.obs) r = obs(e.obs);
     } catch (x) { r = { erreur: String((x && x.message) || x).slice(0, 160) }; }
     await tick(); await tick();

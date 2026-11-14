@@ -106,37 +106,9 @@ assert_eq "D7.1 — agent : le mandat est lu dans son dispatch" "$(G "$WORK/t-ag
 assert_eq "D7.2 — session : aucun mandat (témoin : le fil de la session est rendu)" "$(G "$WORK/t-session.json" '(()=>{if(!(j.fil||[]).some((e)=>e.texte==="MSG-SESSION-2"))return "fil absent";return JSON.stringify(j.mandat||"")})()')" '""'
 assert_eq "D8.5 — session : même forme de fil daté, la première ligne user n'en est pas un message" "$(G "$WORK/t-session.json" "(()=>{const f=j.fil;if(!Array.isArray(f))return 'pas de fil';return $ENT+'|'+f.every((e)=>typeof e.t==='string'&&!isNaN(Date.parse(e.t)))})()")" "m:MSG-SESSION-1,o:Read/lit/src/a.js,m:MSG-SESSION-2|true"
 
-# --- D7 : le rendu ne pose jamais un intertitre « Mandat » vide ---
-cat > "$WORK/vm-rendu.mjs" <<'JS'
-// vm-rendu.mjs <couche.js> <pilote.js> : la couche d'affichage hors navigateur ; sortie { titres: [h4...], textes: [...] }
-import fs from 'node:fs';
-import vm from 'node:vm';
-const [, , couche, pilote] = process.argv; const j = { titres: [], textes: [] };
-function elt(tag) {
-  const o = { tag, children: [], attrs: {}, className: '', style: {}, dataset: {}, _t: '' };
-  Object.defineProperty(o, 'textContent', { get: () => o._t, set: (v) => { o._t = String(v); j.textes.push(String(v)); if (tag === 'h4') j.titres.push(String(v)); } });
-  for (const k of ['innerHTML', 'outerHTML']) Object.defineProperty(o, k, { get: () => '', set: () => {} });
-  o.appendChild = (c) => { o.children.push(c); return c; }; o.append = (...cs) => { o.children.push(...cs); };
-  o.setAttribute = (k, v) => { o.attrs[k] = String(v); }; o.getAttribute = (k) => o.attrs[k] ?? null; o.addEventListener = () => {};
-  o.classList = { add() {}, remove() {}, toggle() {}, contains: () => false };
-  return o;
-}
-const document = { createElement: (t) => elt(String(t).toLowerCase()), createDocumentFragment: () => elt('#fragment'), createTextNode: (s) => ({ nodeValue: String(s) }) };
-const ctx = vm.createContext({ window: {}, document, h: (s) => String(s), console });
-try { vm.runInContext(fs.readFileSync(couche, 'utf8'), ctx, { timeout: 5000 }); vm.runInContext(fs.readFileSync(pilote, 'utf8'), ctx, { timeout: 5000 }); console.log(JSON.stringify(j)); }
-catch (e) { console.log(JSON.stringify({ erreur: 'exécution : ' + String(e.message).slice(0, 120) })); }
-JS
-rend() { printf '__r = !!window.__vfEquipeRendu.transcript(%s, document);\n' "$1" > "$WORK/pilote.js"; node "$WORK/vm-rendu.mjs" "$UI/71-vf-equipe-rendu.js" "$WORK/pilote.js" > "$WORK/vm.json"; }
-FIL='[{"t":"2026-11-10T10:00:00.000Z","genre":"message","texte":"MSG-RENDU"},{"t":"2026-11-10T10:00:05.000Z","genre":"outil","outil":"Read","verbe":"lit","cible":"src/a.js"}]'
-rend "{\"mandat\":\"\",\"fil\":$FIL,\"tronque\":false}"
-assert_eq "D7.3 — mandat vide : aucun intertitre « Mandat » (témoin : le fil est rendu)" "$(G "$WORK/vm.json" 'j.erreur||(j.textes.some((t)=>t.includes("MSG-RENDU"))?String(j.titres.includes("Mandat")):"fil non rendu")')" "false"
-rend "{\"mandat\":\"MANDAT-RENDU\",\"fil\":$FIL,\"tronque\":false}"
-assert_eq "D7.4 — mandat présent : l'intertitre et le texte sont rendus" "$(G "$WORK/vm.json" 'j.erreur||(String(j.titres.includes("Mandat"))+"|"+String(j.textes.includes("MANDAT-RENDU")))')" "true|true"
-assert_eq "D8.6 — le rendu dit l'heure de chaque ligne du fil, du message comme de l'outil" "$(G "$WORK/vm.json" 'j.erreur||(()=>{const l=j.textes.filter((t)=>t.includes("MSG-RENDU")||t.includes("(Read)"));return l.length===2&&l.every((t)=>/\d\d:\d\d:\d\d/.test(t))?"ok":JSON.stringify(l)})()')" "ok"
-rend '{"mandat":"","fil":[],"tronque":false}'
-assert_eq "D7.5 — fil vide et mandat vide : pas d'exception, aucun intertitre (ni « Mandat » ni « Fil des échanges »)" "$(G "$WORK/vm.json" 'j.erreur||JSON.stringify(j.titres)')" "[]"
-rend '{"mandat":"","fil":[{"t":null,"genre":"message","texte":"MSG-SANS-HEURE"},{"t":"pas une date","genre":"message","texte":"MSG-HEURE-ILLISIBLE"}],"tronque":false}'
-assert_eq "D8.8 — une ligne sans heure lisible n'en affiche aucune (jamais l'heure de l'époque), témoin : les deux lignes sont rendues" "$(G "$WORK/vm.json" 'j.erreur||JSON.stringify(j.textes.filter((t)=>t.includes("MSG-")))')" '["MSG-SANS-HEURE","MSG-HEURE-ILLISIBLE"]'
+# --- D7.3 à D7.5, D8.6 et D8.8 : le rendu en texte de transcript() (71-vf-equipe-rendu.js) est retiré par 74-10 (contrat P73-C2) ---
+# L'intertitre « Mandat » (jamais vide) est porté par la fiche (test-cockpit-fiche.sh P2) ; l'heure par ligne, la ligne sans heure lisible écartée et le fil vide
+# par RP5 de test-cockpit-repli-retrait.sh (rendu du fil de la fiche, 74-vf-fiche-texte.js).
 
 # --- contrat : le contenu de transcript transite sous fil, les gardes-fous le connaissent ---
 cat > "$WORK/interdits.mjs" <<'JS'

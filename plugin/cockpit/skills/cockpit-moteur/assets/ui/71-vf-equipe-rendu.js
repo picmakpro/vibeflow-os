@@ -152,27 +152,6 @@
     return ls.map((w) => `<a class="vf-link" href="${h(lien('equipe.html', carte(w)))}"><span>${h(w.role || 'Agent')}</span><span>${h(w.task || '')}</span></a>`).join('');
   };
 
-  // transcript : texte seulement, aucune balise hors div, h4, p, ul, li, pre, span
-  const transcript = (d, doc) => {
-    const f = doc.createDocumentFragment();
-    const el = (tag, texte) => { const e = doc.createElement(tag); if (texte != null) e.textContent = String(texte); return e; };
-    const dit = (texte) => { f.appendChild(el('p', texte)); };
-    if (!d || d.erreur) { dit(d && d.erreur === 'inconnu' ? 'Plus dans la fenêtre de 24 h : rien à montrer.' : 'Indisponible.'); return f; }
-    if (d.tronque) dit('Transcript tronqué : seule la fin du fichier est lue.');
-    if (typeof d.mandat === 'string' && d.mandat) { f.appendChild(el('h4', 'Mandat')); f.appendChild(el('pre', d.mandat)); } // AUDC-D7 : jamais un intertitre sans mandat dessous (une session n'en a pas)
-    const fil = Array.isArray(d.fil) ? d.fil : [];
-    if (fil.length) f.appendChild(el('h4', 'Fil des échanges')); // jamais un intertitre sans contenu dessous
-    // AUDC-D8 : UN fil dans l'ordre du transcript, une heure par ligne (l'heure locale du poste, rendue depuis l'ISO 8601 du réducteur)
-    const hms = (t) => { if (typeof t !== 'string') return ''; const d = new Date(t); return Number.isNaN(d.getTime()) ? '' : [d.getHours(), d.getMinutes(), d.getSeconds()].map((x) => String(x).padStart(2, '0')).join(':'); };
-    const ul = el('ul');
-    for (const e of fil) {
-      const corps = e.genre === 'message' ? String(e.texte || '') : `${e.verbe || ''} ${e.cible || ''} (${e.outil || ''})${Number.isInteger(e.n) && e.n > 1 ? ' × ' + e.n : ''}`.replace(/\s+/g, ' '); // PU-G-170 : les répétitions consécutives sont regroupées par le réducteur
-      ul.appendChild(el('li', `${hms(e.t)} ${corps}`.trim()));
-    }
-    if (fil.length) f.appendChild(ul);
-    return f;
-  };
-
   // CSS du tiroir « Au travail » (posé par 70-vf-live.js au premier dessin : ce fichier ne touche jamais au DOM au chargement)
   const CSS = `
     /* PU-G-188 : le titre reste en haut au défilement (collant, fond --surface du tiroir, aucune teinte) ; il reprend la marge du tiroir pour garder sa place au repos. Le bouton de fermeture du tiroir est celui de l'en-tête de la page (#btn-panel), hors du défilement */
@@ -231,5 +210,5 @@
     .aw-foot { margin: var(--sp-12) 0 0; color: var(--text-3); font-size: 12px; line-height: 20px; }
   `;
 
-  window.__vfEquipeRendu = { GLYPHE_ETAT, MOT, estOrphelin, CALME_S, LONGUE_S, nommer, glyphe, nomDeSession: (workers, id) => nommer(workers).get(id) || null, arbre, agentsDuNoeud, transcript, pied, piedCarte, st, etat, duree, versNoeud, actif, surveiller, titreEquipe, ligneAgents, css: CSS };
+  window.__vfEquipeRendu = { GLYPHE_ETAT, MOT, estOrphelin, CALME_S, LONGUE_S, nommer, glyphe, nomDeSession: (workers, id) => nommer(workers).get(id) || null, arbre, agentsDuNoeud, pied, piedCarte, st, etat, duree, versNoeud, actif, surveiller, titreEquipe, ligneAgents, css: CSS };
 })();
