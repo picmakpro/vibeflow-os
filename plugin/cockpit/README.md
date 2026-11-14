@@ -75,6 +75,7 @@ Sans `--terminal`, rien ne change : aucun bouton, aucune route `POST`, aucun scr
   « à recetter » (tous les plans faits, phase pas encore cochée au ROADMAP) ou « fait ». Les plans de correction sont comptés
   à part du total. Les missions sont rattachées à leur phase. Preuve : `test-cockpit-avancement.sh` (A1 à A12, A18).
   Le bloc « Santé » n'est pas affiché sur cet onglet : il ne lit que le code, pas la planification (DG-15).
+  **Synthèse** (Phase 77) : le bouton « Synthèse » de l'en-tête, quand le cockpit est servi, ouvre un panneau à blocs ordonnés ; le premier, « Depuis votre dernière visite », dit les phases avancées, les commits arrivés, les sessions finies et les blocages nouveaux ou levés depuis la dernière visite faite dans ce navigateur, avec un bouton « Tout vu » ; une ligne-résumé en tête de l'aperçu donne le même texte. Preuve : `test-cockpit-synthese-visite.sh`.
   **Phases menées dans un worktree** (même dépôt git) : la carte affiche l'avancement du worktree (état, décompte de plans, reste) avec la mention
   « dans worktree <nom> ». Règle de priorité : l'état le plus avancé gagne (à faire < en cours < à recetter) ; un état clos
   sur l'arbre courant reste clos, jamais rouvert par un worktree ; une clôture lue seulement dans un worktree vaut « à recetter »
@@ -173,11 +174,13 @@ et `test-cockpit-chaine-xss.sh` (volet git C0g à C4g : un nom de branche, un me
 
 ## Équipe au travail
 
-Chaque agent actif affiche sa **dernière action**, en une phrase lisible (« lit … », « modifie … », « lance une commande »,
-« lance un agent ») ; les libellés sont provisoires. Cliquer un agent ouvre son panneau : état, durée, dernière action,
-nœud de mission, puis **« Lire le transcript »**. Le transcript est lu **à la demande** seulement : il est réduit au
-mandat de l'agent (une session n'en a pas) et à UN fil daté, dans l'ordre : ses messages et les outils employés, une heure par ligne (aucun résultat d'outil), rendu en texte brut, et rien n'en est
-gardé une fois le panneau fermé. Preuve : `test-cockpit-transcript.sh` (T24 à T26, dont T26.7 sous Chrome).
+L'onglet Équipe est **la régie** (Phase 73) : quatre sections, « À vous » (ce qui attend un humain), « Au travail », « Terminé, à relire » et « Au repos », une ligne par agent
+mise à jour en place. Chaque agent actif dit sa **dernière action**, en une phrase lisible (« lit … », « modifie … », « lance une commande », « lance un agent ») ; les libellés sont provisoires.
+Le rapport d'un agent terminé se lit **à la demande** depuis « Terminé, à relire » (« Lire le rapport ») : il est réduit au mandat de l'agent (une session n'en a pas) et à UN fil daté, dans l'ordre :
+ses messages et les outils employés, une heure par ligne (aucun résultat d'outil), rendu en texte brut, et rien n'en est gardé une fois le panneau fermé. Sur Projet et Code, le bouton « N au travail »
+ouvre le tiroir « Au travail » ; sur Équipe il mène à la section du même nom, et le lien « N à relire dans Équipe » du tiroir remplace l'ancien pli des terminés (N compté avec l'état « lu » de ce navigateur).
+**Questions en attente** (REGI-17) : « À vous » lit aussi `meta.vf.questions` (écrit par la Phase 76 dans le planning, route `GET /api/vf/graphe?onglet=projet`) : les questions `en-attente` y sont des lignes reliées à leur phase et à ce qu'elles bloquent ; les décisions appliquées sous délégation forment le repli fermé « Décisions prises pour vous, contestables (N) », jamais comptées ; les autres états sont dits par un bilan. États de la source : lecture en cours, champ absent (« pas encore livrée (Phase 76) »), illisible, lu. La page ne lit aucun CONTEXT ; la chaîne complète (76-09, serveur, page) reste à prouver à la jointure.
+Preuve : `test-cockpit-regie.sh` (la régie, dont `RG11_tiroir` et `RG17`) et `test-cockpit-transcript.sh` (T24 à T27, dont T26.7 sous Chrome).
 
 ## Questions et modèle
 
@@ -225,6 +228,8 @@ refuse tout objet si le contrat est illisible (fermée par défaut) (`test-cockp
 `test-cockpit-reseau.sh` R1.4). Aucun appel sortant, hors
 l'agent qui répond aux questions. **Garantie** : la sortie du cockpit n'est jamais source de code (P79-D-09 ; décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée). Le code que le serveur exécute vient du module (son `serve.mjs`, lancé avec `--sortie=<chemin réel>`) ; la sortie du lab ne porte que des données, le service statique de la sortie est retiré (`graph.json`, `projet.json` et les liens y répondent 404) et les scripts de la page viennent du module sous `/_vf/` (liste fermée calculée au démarrage depuis `ui/` du module). Le contrat d'émission est lu à côté du module, jamais de la sortie, et aucun lien symbolique de la sortie n'est suivi. La page porte une politique de contenu (P79-D-15 amendé par A40) : scripts en ligne par empreintes plus le préfixe `/_vf/` du module, `worker-src` au même préfixe, `connect-src 'self'`, jamais `'self'` pour les scripts, jamais `blob:` ; la page du terminal garde la sienne. **Limite de la pose projet** : en pose projet ou locale, le module vit sous `.claude/` du lab, que le lab peut écrire ; la garantie est alors celle de la sortie, non « le lab n'est jamais source de code », et seule la pose compte (`~/.claude`) tient la garantie complète. Le lanceur refuse un module dont le chemin réel est sous la sortie du lab ou sous `.vibeflow/`. Preuves : `test-cockpit-confinement.sh`, `test-cockpit-coquille.sh`, `test-cockpit-serveur.sh`. Hypothèse assumée : une machine à un seul utilisateur
 (le jeton est servi à tout processus local, `.cache/server.json` est en 0600). Conséquence : un autre processus du même poste peut lire ce jeton par `GET /project.html`, interroger l'agent par `POST /api/ask` et, avec `--terminal`, déposer une proposition dans le tiroir par `POST /api/vf/lancer` ; rien ne part au shell sans le geste humain dans le terminal (arbitrage Samuel, AskUserQuestion session principale, 2026-11-06).
+
+**Mémoire de la dernière visite** (Phase 77, SYNT-06). Le bloc « Depuis votre dernière visite » garde son repère dans le stockage local du navigateur (`localStorage`), sous la seule clé `vibeflow-cockpit:derniere-visite:<identifiant du lab>` : un objet de 8 Ko au plus, sur une liste fermée de champs (états de phase, sha du sommet de la base de git, condensats des blocages, instant de la visite) ; jamais un titre, un sujet de commit, une commande ni un chemin. Aucun fichier n'est écrit dans le lab, aucune route n'écrit. « Tout vu » remet la synthèse à zéro (le repère avance à maintenant, les autres onglets du navigateur suivent) ; l'oubli complet passe par l'effacement des données du site, dans les réglages du navigateur. La donnée reste dans le navigateur après la désinstallation du cockpit : désinstaller ne l'efface pas.
 
 L'index des transcripts est un fichier de données du lab : jamais servi, jamais exporté, non fiable à la lecture (relu sous bornes, il ne porte ni texte ni cible). La route d'état sert des chemins absolus de forme inchangée, comme `hello` (limite A38). L'export autonome n'embarque rien du socle neuf (index, état, frise, cibles, verrous, plan de mission publié) et garde la mise en page en ligne, sans worker.
 
@@ -377,9 +382,18 @@ Schémas lisibles dans `scripts/vf-cockpit-interface.json` (copié à l'identiqu
 `readPlanning` sur chaque phase : décompte de plans, correctifs, état dérivé, mission rattachée ; **monté de `@1` à `@2`** pour dire l'état de vie d'une mission :
 `abandonnee`, `inconnu` et le champ `vie`), `vibeflow/cockpit-signal@1` (ce que la pane lit : phases, jalons, missions, verrous, worktrees et retard, équipe),
 `vibeflow/cockpit-who@2` (arbre des agents : parent, état, action, rattachement, fenêtre de 24 h ; remplace `@1`),
-`vibeflow/cockpit-transcript@2` (transcript réduit ; **monté de `@1` à `@2`** : `messages` et `outils` remplacés par le fil daté `fil`) et `vibeflow/cockpit-equipe@1`. Les autres schémas restent à `@1`.
+`vibeflow/cockpit-transcript@2` (transcript réduit ; **monté de `@1` à `@2`** : `messages` et `outils` remplacés par le fil daté `fil`) et `vibeflow/cockpit-equipe@1` (**coquille sans cartes depuis la Phase 73** : `nodes` vide, `meta` conservée). Les autres schémas restent à `@1`.
 `vibeflow/cockpit-trace@1` (`GET /api/vf/tracabilite`, 76-05) : une vue de traçabilité par requête (jalon, phase, exigence, décision, ADR, mémoire des agents), planning lu dans l'instantané de la collecte, ADR, commits citants et mémoire lus par la route sous confinement, en cache par empreinte ; `bornes.tronque` dit une lecture bornée, `absences` dit ce que le lab n'a pas.
 Phase 79 : `vibeflow/cockpit-state@1` (`GET /api/vf/state`, ce que `vf-signal` lit d'un serveur reconnu), `vibeflow/cockpit-frise@1` (`GET /api/vf/frise`) et `vibeflow/cockpit-index@1` (privé au serveur, jamais servi) ; `cockpit-who@2` gagne les facultatifs `sortisSilence` et `finMotif` ; le bloc `claudeCode.index` dit la version de Claude Code de l'index. Le contrat est lu dans le module, jamais dans la sortie.
+
+Ajouts de la Phase 73, tous facultatifs et sans bump : `cockpit-who@2` porte, par session, `attendAgents`, `detient { ws, phase }`, `retient { n, portee }` et `lancee { phase, ws, verbe }`, et, au premier niveau,
+`phasesHumaines` et `fenetreStallS` ; `vibeflow/cockpit-ailleurs@1` (route `GET /api/vf/ailleurs`, `{ schema, ailleurs: [[lab, n]] }`, jamais un chemin, un identifiant ni un titre) dit combien de sessions d'autres
+dossiers du poste vous attendent. Il ne faut pas le confondre avec `scripts/vf-cockpit-ailleurs.mjs`, qui traite un autre sujet (le dessin de la carte). `VF_STALL_WINDOW` (chiffres, > 0) est lue par le serveur
+pour dire la fenêtre du chien de garde ; absente, la ligne d'affectation par défaut du script de garde.
+
+Contrats de page de la régie pour la Phase 74 (le reste de la page n'est pas une interface) : `window.__vfEquipeVues.declarer({ id, libelle, monter(conteneur), demonter() })`, `window.__vfRegie` (`arriver(r)`, `monte()`),
+les événements de document `vf-agent:ouvrir` `{ id, kind, declencheur }` (annulable) et `vf-agent:lu` `{ id }`, `vf-regie:aller` `{ section }`, et les attributs `data-vf-cle`, `data-vf-agent`, `data-vf-noeud`, `data-vf-etat`
+des lignes. Le lecteur de repli (`ouvrirRepli` et l'export `transcript` de `window.__vfEquipeRendu`) est retiré par la Phase 74.
 
 ## Code tiers
 
@@ -387,6 +401,7 @@ Le moteur d'affichage est issu de **floorplan v0.6.0 @ 92d6854** (`haydenschmitt
 
 ## Limites connues
 
+- **Dernière visite (Phase 77)** : le repère est gardé par navigateur et par origine, pour un poste mono-utilisateur : si le port du lab ou le navigateur change, le repère est perdu et le bloc dit « Première visite sur ce poste ». `localhost` et `127.0.0.1` sont deux origines distinctes : un repère posé depuis l'une n'est pas vu depuis l'autre. La borne de 8 Ko vaut en lecture comme en écriture : au-delà, la clé est retirée et le bloc repart de « Première visite sur ce poste ». Les commits arrivés ne se comptent que si le lab a une branche `main` (la base du cockpit).
 - **Transcript** (risque accepté, P69-D-27 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : le masque des
   secrets est fait au mieux sur la prose des mandats et des messages ; un secret écrit en clair dans une phrase peut donc
   s'afficher dans le transcript lu. Le jeton qui autorise la lecture est lisible par tout processus local (hypothèse d'une

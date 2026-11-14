@@ -99,6 +99,8 @@ durees() {
 66 plugin/cockpit/scripts/tests/test-cockpit-amorce-navigateur.sh
 7 plugin/cockpit/scripts/tests/test-cockpit-assemblage.sh
 18 plugin/cockpit/scripts/tests/test-cockpit-avancement.sh
+10 plugin/cockpit/scripts/tests/test-cockpit-blocages.sh
+12 plugin/cockpit/scripts/tests/test-cockpit-burnup.sh
 33 plugin/cockpit/scripts/tests/test-cockpit-cadrer.sh
 61 plugin/cockpit/scripts/tests/test-cockpit-chaine-xss.sh
 29 plugin/cockpit/scripts/tests/test-cockpit-chrome-fr.sh
@@ -134,6 +136,7 @@ durees() {
 85 plugin/cockpit/scripts/tests/test-cockpit-git.sh
 20 plugin/cockpit/scripts/tests/test-cockpit-hygiene.sh
 22 plugin/cockpit/scripts/tests/test-cockpit-index.sh
+60 plugin/cockpit/scripts/tests/test-cockpit-jauges.sh
 20 plugin/cockpit/scripts/tests/test-cockpit-jetons.sh
 632 plugin/cockpit/scripts/tests/test-cockpit-lancer-bandeau.sh
 71 plugin/cockpit/scripts/tests/test-cockpit-lancer-bout-en-bout.sh
@@ -181,6 +184,11 @@ durees() {
 27 plugin/cockpit/scripts/tests/test-cockpit-signal.sh
 49 plugin/cockpit/scripts/tests/test-cockpit-sondes-stables.sh
 263 plugin/cockpit/scripts/tests/test-cockpit-surcouches.sh
+60 plugin/cockpit/scripts/tests/test-cockpit-synthese-blocs.sh
+75 plugin/cockpit/scripts/tests/test-cockpit-synthese-cout.sh
+40 plugin/cockpit/scripts/tests/test-cockpit-synthese-page.sh
+140 plugin/cockpit/scripts/tests/test-cockpit-synthese-visite.sh
+10 plugin/cockpit/scripts/tests/test-cockpit-synthese.sh
 57 plugin/cockpit/scripts/tests/test-cockpit-terminal-activation.sh
 304 plugin/cockpit/scripts/tests/test-cockpit-terminal-client.sh
 30 plugin/cockpit/scripts/tests/test-cockpit-terminal-fin.sh

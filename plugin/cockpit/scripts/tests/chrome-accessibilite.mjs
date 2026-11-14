@@ -5,6 +5,11 @@
 import { executer, pause, stabiliser, attendreValeur } from './chrome-session.mjs';
 const [, , chrome, racine] = process.argv;
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
+// 73-09 : la page Équipe n'a plus de canevas de cartes (plan 73-08) : elle est prête quand la régie est montée et porte des lignes ; son contenu se lit sur section#vf-equipe
+const PRET_EQUIPE = "document.readyState === 'complete' && !!document.querySelector('section#vf-equipe #vf-equipe-entete')";
+const LIGNES_REGIE = "document.querySelectorAll('section#vf-equipe li.vf-rg-lig').length";
+// régions principales VISIBLES (« main, [role=main] » : la régie pose role=main sur section#vf-equipe) : exactement une par page (X4.5)
+const MAINS = "[...document.querySelectorAll('main, [role=main]')].filter((e) => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.display !== 'none' && c.visibility !== 'hidden' && !e.hidden; }).length";
 const VUE_POSEE = "(() => { const v = document.querySelector('#viewport'); return !!v && v.style.opacity !== '0' && !v.classList.contains('anim'); })()";
 
 await executer(chrome, async (s) => {
@@ -16,8 +21,9 @@ await executer(chrome, async (s) => {
     try { await s.naviguer(`${racine}/${page}?lang=en`); } catch (e) {
       let d = 'état illisible'; try { d = await s.ev("JSON.stringify({ href: location.href, rs: document.readyState, pret: document.documentElement.dataset.vfPret, etat: window.VF_COQUILLE && VF_COQUILLE.etat(), moteur: !!window.VibeFlow, erreurs: window.__err, scripts: document.scripts.length, t: Math.round(performance.now()) })"); } catch {}
       throw new Error(`${e.message} — ${d}`); }
-    await s.attendre(PRET, `page prête (${nom})`);
-    await s.attendre("!!document.querySelector('#viewport .node')", `cartes (${nom})`); await s.attendre(VUE_POSEE, `vue posée (${nom})`); await stabiliser(lireVue, { pas: 120, max: 5000 });
+    if (page === 'equipe.html') { await s.attendre(PRET_EQUIPE, `régie montée (${nom})`); await s.attendre(`${LIGNES_REGIE} >= 1`, `lignes de la régie (${nom})`); await stabiliser(() => s.ev(`JSON.stringify(${LIGNES_REGIE})`), { pas: 120, max: 5000 }); }
+    else { await s.attendre(PRET, `page prête (${nom})`);
+      await s.attendre("!!document.querySelector('#viewport .node')", `cartes (${nom})`); await s.attendre(VUE_POSEE, `vue posée (${nom})`); await stabiliser(lireVue, { pas: 120, max: 5000 }); }
     // la visite guidée s'ouvre au premier passage (profil jetable) : Échap la ferme, pour ne mesurer que la page
     await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
     await pause(200);
@@ -55,7 +61,9 @@ await executer(chrome, async (s) => {
   o.x7 = {};
   for (const [cle, page] of [['code', 'index.html'], ['projet', 'project.html'], ['equipe', 'equipe.html']]) {
     await charger(page, page);
-    o.x7[cle] = JSON.parse(await s.ev(`JSON.stringify({ titre: document.title, main: document.querySelectorAll('main').length, courants: [...document.querySelectorAll('[aria-current]')].map((e) => e.textContent.trim() + '=' + e.getAttribute('aria-current')), nom: document.querySelector('#proj-name').textContent })`));
+    o.x7[cle] = JSON.parse(await s.ev(`JSON.stringify({ titre: document.title, main: document.querySelectorAll('main').length, mains: ${MAINS}, attendent: document.querySelectorAll('section#vf-equipe section[data-vf-section="a-vous"] li').length, courants: [...document.querySelectorAll('[aria-current]')].map((e) => e.textContent.trim() + '=' + e.getAttribute('aria-current')), nom: document.querySelector('#proj-name').textContent })`));
+    // témoin de X4.5 : une seconde région principale visible, injectée, porte le compte à 2 (X4.5 rougit sur ce compte), puis elle est retirée
+    o.x7[cle].mainDeux = await s.ev(`(() => { const d = document.createElement('div'); d.id = 'vf-essai-main'; d.setAttribute('role', 'main'); d.textContent = 'x'; document.body.appendChild(d); const n = ${MAINS}; d.remove(); return n; })()`);
   }
 
   // ---------- X4 : un seul anneau de focus sur tout le parcours au clavier (trois pages) ----------

@@ -12,6 +12,7 @@ import { avancement, rattacherMission, etatMission } from './vf-cockpit-avanceme
 import { lireVerrous, vieDe } from './vf-cockpit-vie.mjs';
 import { COLON, NUM, normNum, texte, lireGoal, lireDependances, reTitreCase, reTitreSection, reExigences, idExigence, texteExigence, reTraceabilite, normStatut, phaseCourante } from './vf-cockpit-formats.mjs';
 import { lireTrace } from './vf-cockpit-trace-collecte.mjs';
+import { lireBlocages } from './vf-cockpit-blocages.mjs';
 export { COLON, normNum };
 
 // jamais d'ouverture d'un fichier non régulier (un tube FIFO bloque ; un lien vers /dev/zero ne finit pas, et git versionne les liens symboliques) ni d'un fichier au-delà de MAX_LECTURE
@@ -187,5 +188,6 @@ export function readPlanning(root, layout, opts = {}) {
   }
   const title = /^# (.*)$/m.exec(texte(read(path.join(B, 'PROJECT.md'))))?.[1];
   const projectName = (title ? title.replace(/^(Project|Roadmap):\s*/i, '').trim() : '') || path.basename(root);
-  return { phases, phaseDirs, reqs, milestones, state, dags, backlog, seeds, tags, projectName, activeKeys, rel, trace };
+  const blocages = lireBlocages(sTxt); // 77-02 (P77-D-20, A32) : blocages du STATE lu ci-dessus, aucune lecture neuve
+  return { phases, phaseDirs, reqs, milestones, state, dags, backlog, seeds, tags, projectName, activeKeys, rel, trace, blocages };
 }
