@@ -3,10 +3,11 @@
 // Extension d'onglet : réexécutée avec le moteur à chaque arrivée. Ses accroches : deux sections de panneau et l'accroche `render` de la zone du titre,
 // posées à l'évaluation ; l'écouteur `resize` et l'observateur de taille de la zone vivent dans le rappel de surOnglet (A51, P80-D-59) et sont retirés
 // avec lui. Ne parle au viewer que par window.Floorplan.
-// 80-20 (P80-D-52, FORM-18 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, « Zone réservée (Recommandé) ») : le bloc de titre #context a
-// une zone à lui, de la hauteur que freeArea() déduit déjà (min(130, hauteur du bloc)). Elle est retirée du dessin du canevas par une découpe de #svg : aucune
-// carte n'y est dessinée ni atteignable au pointeur, après un pan comme après un zoom. Le flou (#context::before) et le texte sont gardés, la mise en page
-// et `fit` ne changent pas. Couloirs et liste (#context masqué) : aucune découpe.
+// 80-20 (P80-D-52, FORM-18 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, « Zone réservée (Recommandé) ») :
+// le bloc de titre #context a une zone à lui, de la hauteur que freeArea() déduit déjà (min(130, hauteur du bloc)). Elle est retirée
+// du dessin du canevas par une découpe de #svg : aucune carte n'y est dessinée ni atteignable au pointeur, après un pan comme après
+// un zoom. Le flou (#context::before) et le texte sont gardés, la mise en page et `fit` ne changent pas. Couloirs et liste
+// (#context masqué) : aucune découpe.
 (() => {
   const SC = window.Floorplan;
   if (!SC) return;

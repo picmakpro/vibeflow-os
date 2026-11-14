@@ -123,7 +123,7 @@ OK07=false; [ "$C07" = 200 ] && grep -qF VF_RACCOURCIS "$WORK/f07.js" && OK07=tr
 OK79=false; [ "$C79" = 200 ] && grep -qF 'vibeflow:fr' "$WORK/f79.js" && OK79=true
 chk "PA3.5 — les deux fichiers sont servis (200, corps attendu) et chargés ; après deux allers-retours, chaque action une fois, la ligne du terminal une fois" \
   "[$OK07, $OK79, j.pa3.ressources, j.pa3.doubles]" '[true,true,[true,true],{"huit":[1,1,1,1,1,1,1,1],"terminal":1}]'
-chk "PA9 — témoin : aucune section du pilote n${AP}a échoué" "Object.keys(j.erreurs).join()" ""
+chk "PA9 — témoin : aucune section du pilote n${AP}a échoué" "Object.entries(j.erreurs).map(([k, v]) => k + ' ' + v).join(' | ')" ""
 
 echo "=== PA2.8t — avec --terminal : même rangée, même texte, aucun nœud du terminal créé par la palette ==="
 LAB2="$WORK/lab2"; cp -R "$LAB" "$LAB2"; rm -rf "$LAB2/.vibeflow"; build_serve "$LAB2" --terminal
@@ -132,7 +132,7 @@ R="$(mesurer term)"; [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mes
 chk "PA2.8t — avec --terminal : une rangée au même texte exact, sans kbd ; la palette ne crée ni requête ni nœud du terminal" \
   "[j.pa2.termAvec.lignes.map((x) => x.lib), j.pa2.termAvec.lignes[0].kbd, j.pa2.termAvec.apres === j.pa2.termAvec.avant, j.pa2.termAvec.requetes]" \
   "[[\"$TERM\"],[],true,0]"
-chk "PA9t — témoin : aucune section du pilote n${AP}a échoué (--terminal)" "Object.keys(j.erreurs).join()" ""
+chk "PA9t — témoin : aucune section du pilote n${AP}a échoué (--terminal)" "Object.entries(j.erreurs).map(([k, v]) => k + ' ' + v).join(' | ')" ""
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

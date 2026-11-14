@@ -35,7 +35,8 @@ mkpv() { # mklab + trois plans (vague 1, vague 2 dépendant du premier, sans vag
   printf 'export const a = 1;\n' | wr "$L/src/a.js"
   git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m vocabulaire
 }
-mkpvs() { local L="$1"; mkpv "$L"; rm -f "$L/.planning/REQUIREMENTS.md"; sed -i.bak 's/^requirements:.*$//' "$L"/.planning/phases/01-socle/*-PLAN.md; rm -f "$L"/.planning/phases/01-socle/*.bak
+mkpvs() { local L="$1"; mkpv "$L"; rm -f "$L/.planning/REQUIREMENTS.md"
+  sed -i.bak 's/^requirements:.*$//' "$L"/.planning/phases/01-socle/*-PLAN.md; rm -f "$L"/.planning/phases/01-socle/*.bak
   git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m sans; }
 LAB="$WORK/lab"; mkpv "$LAB"
 build_serve "$LAB"
@@ -47,33 +48,44 @@ assert_eq "PV1.1 — plan 01-01 : type « Plan » ; ni « Élément » ni « mod
   "$(E1 '[j.pv11.kind, /[Éé]lément|module/.test(j.pv11.kind + " " + j.pv11.txt)]')" '["Plan",false]'
 assert_eq "PV1.2 — la ligne du parent dit « Dans la phase » suivie de la phase" \
   "$(E1 'j.pv11.secs.flatMap((s) => s.rows).filter((r) => /Dans la phase/.test(r)).map((r) => /Phase 1/.test(r))')" '[true]'
-assert_eq "PV1.3 — témoin d'invariance : sur Code, un fichier garde son intitulé d'aujourd'hui (« fichier », mesuré sur la base)" "$(E1 'j.pv13.kind')" 'fichier'
+assert_eq "PV1.3 — témoin d'invariance : sur Code, un fichier garde son intitulé d'aujourd'hui (« fichier », mesuré sur la base)" \
+  "$(E1 'j.pv13.kind')" 'fichier'
 assert_eq "PV1.9 — témoin : aucune section du pilote n'a échoué" "$(E1 'Object.keys(j.erreurs).join()')" ""
 
 echo "=== PV2 — listes, statut, vague, exigences ==="
 R2="$(mesurer chrome-projet-vocabulaire.mjs pv2)"; sonde "$R2"; E2() { E "$1" "$R2"; }
-assert_eq "PV2.1 — plan 01-02 : « Exigences couvertes » (R-1 Cochée) une seule fois, avant « Dépend de » ; plan 01-01 : « Attendu par » ; ni « Mentions » ni « Une mention »" \
-  "$(E2 '[j.pv21.secs.map((s) => s.h).filter((h) => /Exigences couvertes|Dépend de|Attendu par/.test(h)), j.pv21.secs.filter((s) => s.h === "Exigences couvertes").map((s) => s.rows),
+assert_eq "PV2.1 — plan 01-02 : « Exigences couvertes » (R-1 Cochée) une seule fois, avant « Dépend de » ; "\
+"plan 01-01 : « Attendu par » ; ni « Mentions » ni « Une mention »" \
+  "$(E2 '[j.pv21.secs.map((s) => s.h).filter((h) => /Exigences couvertes|Dépend de|Attendu par/.test(h)),
+    j.pv21.secs.filter((s) => s.h === "Exigences couvertes").map((s) => s.rows),
     j.pv21b.secs.map((s) => s.h).filter((h) => /Dépend de|Attendu par/.test(h)), /Mention/.test(j.pv21.txt + j.pv21b.txt)]')" \
   '[["Exigences couvertes","Dépend de"],[["R-1 Cochée"]],["Attendu par"],false]'
 assert_eq "PV2.2 — plan : « Statut » (mot) et « Vague 2 » / « Sans vague », aucune statistique à 0" \
-  "$(E2 '[/Statut/.test(j.pv21.txt) && /Fait/.test(j.pv21.txt), /Vague 2/.test(j.pv21.txt), /Sans vague/.test(j.pv22.txt), /Vague 1/.test(j.pv21b.txt), j.pv21.stats, /lignes|points d.accès|utilisé par/i.test(j.pv21.txt)]')" \
+  "$(E2 '[/Statut/.test(j.pv21.txt) && /Fait/.test(j.pv21.txt), /Vague 2/.test(j.pv21.txt),
+    /Sans vague/.test(j.pv22.txt), /Vague 1/.test(j.pv21b.txt), j.pv21.stats,
+    /lignes|points d.accès|utilisé par/i.test(j.pv21.txt)]')" \
   '[true,true,true,true,0,false]'
 assert_eq "PV2.3 — exigence R-1 : type « Exigence », titre = identifiant, texte une seule fois, « Couverte par » (01-02)" \
-  "$(E2 '[j.pv23.kind, j.pv23.titre, j.pv23.txt.split("premier texte").length - 1, j.pv23.secs.filter((s) => s.h === "Couverte par").map((s) => s.rows.length)]')" '["Exigence","R-1",1,[1]]'
+  "$(E2 '[j.pv23.kind, j.pv23.titre, j.pv23.txt.split("premier texte").length - 1,
+    j.pv23.secs.filter((s) => s.h === "Couverte par").map((s) => s.rows.length)]')" \
+  '["Exigence","R-1",1,[1]]'
 assert_eq "PV2.4 — phase : section « Plans », bouton « Ouvrir la phase »" \
   "$(E2 '[j.pv24.secs.map((s) => s.h).includes("Plans"), j.pv24.actions.includes("Ouvrir la phase")]')" '[true,true]'
 assert_eq "PV2.6 — l'extension est servie sous /_vf/ et aucun script en ligne ne porte son code" \
   "$(E2 '[j.pv26.src.length >= 1 && /\/_vf\//.test(j.pv26.src[0]), j.pv26.enligne]')" '[true,0]'
 assert_eq "PV2.7 — après un aller-retour d'onglet la porte est recréée, la section lit la porte du moment (R-1, puis FX-1 et FX-2)" \
-  "$(E2 '[j.pv27.change, j.pv27.vraie.secs.filter((s) => s.h === "Exigences couvertes").map((s) => s.rows), j.pv27.fausse.secs.filter((s) => s.h === "Exigences couvertes").map((s) => s.rows)]')" \
+  "$(E2 '[j.pv27.change, j.pv27.vraie.secs.filter((s) => s.h === "Exigences couvertes").map((s) => s.rows),
+    j.pv27.fausse.secs.filter((s) => s.h === "Exigences couvertes").map((s) => s.rows)]')" \
   '[true,[["R-1 Cochée"]],[["FX-1 Cochée","FX-2 Non cochée"]]]'
 assert_eq "PV2.9 — témoin : aucune section du pilote n'a échoué" "$(E2 'Object.keys(j.erreurs).join()')" ""
 vf_hyg_stop "$SRV"
 LABS="$WORK/lab-sans"; mkpvs "$LABS"; build_serve "$LABS"
 R2B="$(mesurer chrome-projet-vocabulaire.mjs pv2b)"; sonde "$R2B"; E2B() { E "$1" "$R2B"; }; vf_hyg_stop "$SRV"
-assert_eq "PV2.5 — porte substituée : le lab n'a aucune exigence (témoin positif) ; fausse porte : une section « Exigences couvertes » avec FX-1 Cochée et FX-2 Non cochée ; restaurée : plus de section" \
-  "$(E2B '[j.pv25.graphe, j.pv25.vraie.secs.filter((s) => s.h === "Exigences couvertes").length, j.pv25.fausse.secs.filter((s) => s.h === "Exigences couvertes").map((s) => s.rows), j.pv25.restaure.secs.filter((s) => s.h === "Exigences couvertes").length]')" \
+assert_eq "PV2.5 — porte substituée : le lab n'a aucune exigence (témoin positif) ; fausse porte : "\
+"une section « Exigences couvertes » avec FX-1 Cochée et FX-2 Non cochée ; restaurée : plus de section" \
+  "$(E2B '[j.pv25.graphe, j.pv25.vraie.secs.filter((s) => s.h === "Exigences couvertes").length,
+    j.pv25.fausse.secs.filter((s) => s.h === "Exigences couvertes").map((s) => s.rows),
+    j.pv25.restaure.secs.filter((s) => s.h === "Exigences couvertes").length]')" \
   '[[0,0],0,[["FX-1 Cochée","FX-2 Non cochée"]],0]'
 assert_eq "PV2.5b — témoin : aucune section du pilote n'a échoué" "$(E2B 'Object.keys(j.erreurs).join()')" ""
 
@@ -81,7 +93,8 @@ echo "=== PV3 — phase, jalon, mots ==="
 build_serve "$LAB"
 R3="$(mesurer chrome-projet-vocabulaire.mjs pv3)"; sonde "$R3"; E3() { E "$1" "$R3"; }
 assert_eq "PV3.1 — phase 1 : sa ligne d'état une fois ; jalon : « N phases faites sur M » et une barre role=progressbar" \
-  "$(E3 '[(j.pv31.txt.match(/\d+ plans? sur \d+/g) || []).length, /exigence sur 2/.test(j.pv31.txt), /phases? faites? sur 6/.test(j.pv31j.txt), j.pv31j.progress]')" '[1,true,true,1]'
+  "$(E3 '[(j.pv31.txt.match(/\d+ plans? sur \d+/g) || []).length, /exigence sur 2/.test(j.pv31.txt),
+    /phases? faites? sur 6/.test(j.pv31j.txt), j.pv31j.progress]')" '[1,true,true,1]'
 assert_eq "PV3.3 — sur tout nœud et tout élément de Projet : aucun des mots « Élément », « module », « Mention »" \
   "$(E3 '[j.pv33.n > 10, j.pv33.mots]')" '[true,[]]'
 assert_eq "PV3.9 — témoin : aucune section du pilote n'a échoué" "$(E3 'Object.keys(j.erreurs).join()')" ""

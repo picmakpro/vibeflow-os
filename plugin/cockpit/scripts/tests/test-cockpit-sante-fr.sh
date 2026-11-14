@@ -154,7 +154,8 @@ else
   INTRO="$INTRO C'est un contrôle rapide, pas un audit de sécurité."
   INTRO="$INTRO || Contrôles propres à ce que ce projet utilise : Supabase, Firebase, Stripe."
   E35="const d=$CLE;const r=j.retour;return [r.trajet, r.memeOrigine, r.rouvert.some((a) => a.titre === d.title && a.detail === d.detail), r.invite === d.fix]"
-  assert_eq "SF3.5 — Code, Projet, Code par VF_ONGLETS.aller (promesses tenues, même performance.timeOrigin) : titre, détail et invite égaux à ceux du collecteur" \
+  assert_eq "SF3.5 — Code, Projet, Code par VF_ONGLETS.aller (promesses tenues, même performance.timeOrigin) : "\
+"titre, détail et invite égaux à ceux du collecteur" \
     "$(lire "$WORK/page.json" "$E35")" '[["ok","ok"],true,true,true]'
   assert_eq "SF3.2 — l'introduction du panneau, trois services, est le texte de la base (non retouchée)" "$(lire "$WORK/page.json" 'j.intro')" "$INTRO"
 

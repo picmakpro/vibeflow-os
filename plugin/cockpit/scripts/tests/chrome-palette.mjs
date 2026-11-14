@@ -47,8 +47,9 @@ await executer(chrome, async (s) => {
   const onglet = async (nom) => { await s.ev(`VF_ONGLETS.aller(${JSON.stringify(nom)})`);
       await s.attendre(`VF_ONGLETS.courant() === ${JSON.stringify(nom)} && ${PRET}`, `onglet ${nom}`); await pause(700); };
   const envoi = (depuis) => reqs.slice(depuis).filter((r) => r.m === 'POST' || (r.u.startsWith('/api/') && !r.u.startsWith('/api/vf/'))).length;
-  const aide = () => s.ev(`window.VF_ETAT = Object.freeze({ ...window.VF_ETAT,
-      lire: (c) => (c === 'who' ? { workers: ${JSON.stringify(WHO)} } : VF_ETAT.lire(c)) }); 1`);
+  // le magasin est lu à la saisie par `window.VF_ETAT` : un `who` de fixture, le reste du magasin réel
+  const aide = () => s.ev(`(() => { const r = window.VF_ETAT; window.VF_ETAT = Object.freeze({ ...r,
+      lire: (c) => (c === 'who' ? { workers: ${JSON.stringify(WHO)} } : r.lire(c)) }); return 1; })()`);
   const choisirLigne = async (lib) => { // flèches puis Entrée sur la rangée de ce libellé
     const i = (await lignes()).findIndex((l) => l.lib === lib); if (i < 0) throw new Error(`rangée absente : ${lib}`);
     for (let k = 0; k < i; k++) await touche('ArrowDown'); await touche('Enter');
@@ -115,7 +116,7 @@ await executer(chrome, async (s) => {
     o.pa2.lienKo = await s.ev("document.getElementById('toast').textContent");
     const n4 = reqs.length; await poser('>poser une question'); await touche('Enter'); await pause(500);
     o.pa2.question = await lire(`({ foc: document.activeElement.id, valeur: document.activeElement.value, envoi: ${envoi(n4)} })`);
-    await s.ev("document.activeElement.blur()"); await poser('>poser une question pourquoi'); await touche('Enter'); await pause(300);
+    await s.ev("document.activeElement.blur()"); await poser(">poser une question à l'agent pourquoi"); await touche('Enter'); await pause(300);
     o.pa2.questionTexte = await s.ev('document.activeElement.value'); await s.ev('document.activeElement.blur()');
     // PA2.6 : le focus propre à chaque action
     o.pa2.focus = {};
