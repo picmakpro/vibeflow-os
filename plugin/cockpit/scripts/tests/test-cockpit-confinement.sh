@@ -4,6 +4,7 @@
 #   B  un worktree déclaré mais non vérifié n'élargit pas la liste des arbres du lab (témoin positif : un vrai worktree y est)
 #   D  l'export ne porte plus les clés vfTouch et vfGit (témoin positif : il garde les logos et l'onglet pour s'afficher)
 #   GLOB  coût borné de la correspondance de motifs du moteur (79-21, SOCL-26) : équivalence à la copie gelée, croissance, plafonds, mutants
+#   C3  confinement par préfixe sans séparateur, ancêtre d'index lié, verrou du lanceur sans dossier créé dehors, droits d'un fichier préexistant (passe finale)
 # Isolation git, aucun serveur ni navigateur. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -408,6 +409,44 @@ node "$WORK/noter.mjs" "$SCRIPTS" "$SF9"
 assert_eq "H9 — .cache lié vers un dossier interne du lab : rien n'y est écrit (aucun composant du chemin n'est un lien)" "$(ls "$LF9/autre-dossier" | wc -l | tr -d ' ')" "0"
 LF10="$WORK/lab-f10"; mkplan "$LF10"; SF10="$LF10/.vibeflow/cockpit"; mkdir -p "$SF10/.cache"; node "$WORK/noter.mjs" "$SCRIPTS" "$SF10"
 assert_eq "H10 — témoin positif : sans lien ni tube, le journal s'écrit" "$(grep -c 'lanceur : essai' "$SF10/.cache/serveur.log")" "1"
+
+# ---------- C3 : préfixe sans séparateur, ancêtre d'index lié, verrou du lanceur, droits d'un fichier préexistant (passe finale) ----------
+# Chaque cas joue un code de dossier de scripts donné (le vrai, puis une copie mutée) et imprime une ligne ; témoin positif dans la ligne.
+echo "=== C3 — confinement : frère au même préfixe, ancêtre lié, verrou, droits ==="
+cat > "$WORK/c3.mjs" <<'JS'
+import fs from 'node:fs'; import path from 'node:path'; import { pathToFileURL } from 'node:url';
+const [, , scripts, cas, W] = process.argv; const imp = (f) => import(pathToFileURL(path.join(scripts, f)).href);
+const D = path.join(W, 'c3-' + cas); fs.rmSync(D, { recursive: true, force: true }); fs.mkdirSync(D, { recursive: true });
+const lab = path.join(D, 'lab'), voisin = path.join(D, 'lab-voisin'), dehors = path.join(D, 'dehors');
+const liste = (d) => fs.readdirSync(d, { recursive: true }).length;
+if (cas === 'confiner') {
+  const { confiner } = await imp('vf-cockpit-paths.mjs'); const { ecrireSignature } = await imp('vf-cockpit-code-cache.mjs');
+  const sortie = path.join(lab, '.vibeflow', 'cockpit'); fs.mkdirSync(sortie, { recursive: true }); fs.mkdirSync(voisin);
+  const essai = (c) => { try { confiner(lab, c); return 'accepte'; } catch { return 'refuse'; } };
+  const temoin = essai(path.join(lab, 'a', 'x')), direct = essai(path.join(voisin, 'x'));
+  fs.symlinkSync(voisin, path.join(sortie, '.cache')); ecrireSignature(lab, sortie, 'abc');
+  console.log(`temoin=${temoin} voisin=${direct} ecrits=${liste(voisin)}`);
+} else if (cas === 'realunder') {
+  const { realUnder, planningLayout } = await imp('vf-cockpit-paths.mjs'); const { lireConfine, read } = await imp('vf-cockpit-planning.mjs'); const B = path.join(lab, '.planning');
+  for (const w of ['alpha', 'beta']) { fs.mkdirSync(path.join(B, 'workstreams', w), { recursive: true }); fs.writeFileSync(path.join(B, 'workstreams', w, 'ROADMAP.md'), '# r\n'); }
+  fs.mkdirSync(voisin); fs.writeFileSync(path.join(voisin, 'secret.md'), 'SECRET\n'); fs.writeFileSync(path.join(voisin, 'pointeur'), 'beta\n'); fs.writeFileSync(path.join(lab, 'interne.md'), 'DANS-LE-LAB\n');
+  fs.symlinkSync(path.join(voisin, 'secret.md'), path.join(lab, 'lien.md')); fs.symlinkSync(path.join(voisin, 'pointeur'), path.join(B, 'active-workstream'));
+  const t = lireConfine(lab, () => read(path.join(lab, 'interne.md'))).trim(), lu = lireConfine(lab, () => read(path.join(lab, 'lien.md'))).trim();
+  console.log(`temoin=${t} lien=${JSON.stringify(lu)} realUnder=${realUnder(path.join(voisin, 'secret.md'), lab)} actif=${planningLayout(lab).actif}`);
+}
+JS
+c3() { node "$WORK/c3.mjs" "${2:-$SCRIPTS}" "$1" "$WORK" 2>&1 | head -1; }
+assert_eq "C3.1 — confiner : un frère au même préfixe que le lab (lab-voisin) est refusé, rien n'y est écrit (témoin : une cible du lab passe)" "$(c3 confiner)" "temoin=accepte voisin=refuse ecrits=0"
+assert_eq "C3.2 — realUnder : un lien vers un frère au même préfixe n'est ni lu ni pris pour un pointeur de compartiment (témoin : un fichier du lab est lu)" "$(c3 realunder)" 'temoin=DANS-LE-LAB lien="" realUnder=false actif=null'
+# mutants : copie fraîche des modules, UNE occurrence remplacée ; chacun doit rougir son cas, pour la raison attendue (valeur de la ligne)
+c3mut() { local nom="$1" f="$2" de="$3" vers="$4" d="$WORK/c3-mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d"/ 2>/dev/null
+  node -e 'const fs=require("fs");const [f,de,vers]=process.argv.slice(1);const s=fs.readFileSync(f,"utf8");const n=s.split(de).length-1;if(n!==1){console.log("ancre:"+n);process.exit(1)}fs.writeFileSync(f,s.replace(de,()=>vers))' "$d/$f" "$de" "$vers" > "$d.ancre" 2>&1 || { echo "ancre-ko $(cat "$d.ancre")"; return; }
+  node --check "$d/$f" 2>/dev/null || { echo "syntaxe-ko"; return; }; echo "$d"; }
+c3mj() { local d; d="$(c3mut "$@")"; case "$d" in /*) echo "$d";; *) echo "";; esac; }
+M="$(c3mj m01 vf-cockpit-paths.mjs '(parent !== racine && !parent.startsWith(racine + path.sep))' '(parent !== racine && !parent.startsWith(racine))')"
+assert_eq "C3.M1 — confiner sans séparateur : C3.1 rougit (le frère est accepté)" "$([ -n "$M" ] && c3 confiner "$M" | grep -c 'voisin=accepte')" "1"
+M="$(c3mj m02 vf-cockpit-paths.mjs 'r === d || r.startsWith(d + path.sep);' 'r === d || r.startsWith(d);')"
+assert_eq "C3.M2 — realUnder sans séparateur : C3.2 rougit (le lien vers le frère est lu)" "$([ -n "$M" ] && c3 realunder "$M" | grep -c 'lien="SECRET"')" "1"
 
 # ---------- GLOB : coût borné de la correspondance de motifs (79-21, P79-D-32, SOCL-26) ----------
 # Aucun serveur, aucun navigateur : scripts d'aide en heredoc dans $GL_AUX ; copie gelée de l'ancienne implémentation, équivalence générative à graine,
