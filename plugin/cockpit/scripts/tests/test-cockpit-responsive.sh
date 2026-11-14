@@ -815,6 +815,7 @@ srv "$LC/.vibeflow/cockpit"; PMQ=$SRV_PORT
 R26="$(REAL_HOME="$REAL_HOME" node "$HERE_T/coquille-chrome.mjs" avec "$CHROME" "http://127.0.0.1:$PMQ/" "$HERE_T/chrome-telephone-mq.js" 2>&1 | tail -1)"; unsrv
 assert_eq "R26.1 — six changements d'onglet menés à bout, et 02-vf-telephone.js pose au moins un écouteur au chargement (témoin positif)" "$(printf '%s' "$R26" | node "$AUX/ev.mjs" '(j.tours||[]).join(",")+"|"+((j.avant||{})["02-vf-telephone.js"]>0?"pose":"rien")')" "ok,ok,ok,ok,ok,ok|pose"
 assert_eq "R26.2 — 02-vf-telephone.js : le nombre d'écouteurs vivants après six changements d'onglet égale celui du chargement" "$(printf '%s' "$R26" | node "$AUX/ev.mjs" '(j.avant||{})["02-vf-telephone.js"]+" -> "+(j.apres||{})["02-vf-telephone.js"]')" "$(printf '%s' "$R26" | node "$AUX/ev.mjs" '(j.avant||{})["02-vf-telephone.js"]+" -> "+(j.avant||{})["02-vf-telephone.js"]')"
+assert_eq "R26.3 — moteur (écouteurs hors des scripts ui/) : le nombre d'écouteurs vivants après six changements d'onglet égale celui du chargement, témoin positif : il y en a" "$(printf '%s' "$R26" | node "$AUX/ev.mjs" '((j.avant||{}).autre>0?"pose":"rien")+" "+(j.avant||{}).autre+" -> "+(j.apres||{}).autre')" "$(printf '%s' "$R26" | node "$AUX/ev.mjs" '((j.avant||{}).autre>0?"pose":"rien")+" "+(j.avant||{}).autre+" -> "+(j.avant||{}).autre')"
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
