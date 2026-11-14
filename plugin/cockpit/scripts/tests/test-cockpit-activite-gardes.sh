@@ -3,7 +3,7 @@
 #   E1-E7 sept témoins d'équivalence contre scripts/ci-suites-perimetre.sh (le script s'exécute ICI, jamais dans le module)
 #   E8 gates appelés par ci.yml · E9 la citation est une sous-chaîne · E10 `git ls-files` (refus, hors dépôt, fichier supprimé)
 #   P1 parité des six classes « est une garde » avec scripts/check-gate-touche.sh · P2 tuples et zone sans témoin · P3 lab non VibeFlow
-#   P4 glob linéaire (justesse et croissance) · P5 coût sur ce dépôt
+#   P3b plafond de longueur des motifs (tronque) · P4 glob linéaire (justesse et croissance) · P5 coût sur ce dépôt
 # Dépôts fabriqués dans mktemp. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -132,6 +132,7 @@ const med = (fn) => { const t = []; for (let i = 0; i < 5; i++) { const d = perf
 if (mode === 'estgarde') for (const p of a) console.log(p + '\t' + (m.estGarde(p) ? 1 : 0));
 else if (mode === 'glob') for (const l of fs.readFileSync(a[0], 'utf8').split('\n')) { if (!l) continue; const i = l.indexOf('\x1f'); console.log(m.globLineaire(l.slice(0, i), l.slice(i + 1)) ? 1 : 0); }
 else if (mode === 'calc') console.log(JSON.stringify(await m.calculerGardes(a[0], JSON.parse(fs.readFileSync(a[1], 'utf8')))));
+else if (mode === 'plaf') { const c = JSON.parse(fs.readFileSync(a[1], 'utf8')), r = await m.contexteGardes(a[0]); console.log('defaut=' + (await m.calculerGardes(a[0], c)).etat + ' serre=' + (await m.calculerGardes(a[0], c, { plafond: r.ctx.globs.size })).etat); }
 else if (mode === 'croiss') {
   const f = { A: (n) => ['*'.repeat(n) + 'a', 'a'.repeat(n)], B: (n) => ['*a'.repeat(50) + 'b', 'a'.repeat(n)], C: (n) => ['*'.repeat(n) + 'x', '../'.repeat(n)], D: (n) => ['*', ' '.repeat(n)] };
   for (const [k, g] of Object.entries(f)) { const t1 = med(() => m.globLineaire(...g(20000))), t2 = med(() => m.globLineaire(...g(40000))); console.log(k + ' ' + t1.toFixed(2) + ' ' + t2.toFixed(2) + ' ' + (m.globLineaire(...g(20000)) ? 1 : 0)); }
@@ -184,6 +185,11 @@ SANS="$WORK/sanssuite"; mkdir -p "$SANS/plugin/x"; echo '// a' > "$SANS/plugin/x
 printf '%s' '{"meta":{"vfCodeExtractor":"vibeflow"},"files":[{"p":"plugin/x/a.mjs","l":"javascript"}]}' > "$WORK/carte-vf.json"
 assert_eq P3 "lab VibeFlow sans aucune suite : ok, fichier à 0 (distinct de non-lues)" "$(node "$AUX/g2.mjs" "$MOD" calc "$SANS" "$WORK/carte-vf.json" 2>&1)" '{"etat":"ok","gardes":[["plugin/x/a.mjs",0,0]],"estGarde":[]}'
 assert_eq P3 "ls-files refusé : indisponible, aucun tuple" "$(node "$AUX/g2.mjs" "$MOD" calc "$LOURD" "$WORK/carte-vf.json" 2>&1)" '{"etat":"indisponible","gardes":[],"estGarde":[]}'
+
+# P3b : le plafond compte aussi la LONGUEUR des motifs (une classe non fermée coûte en caractères, pas en nombre) ; avec un seul fichier, motifs x fichiers reste sous le plafond serré,
+# seule la longueur le dépasse : « tronque » ; plafond par défaut : « ok » (témoin)
+LONG="$WORK/longmotif"; cp -R "$FIX" "$LONG"; printf '# lit plugin/mod-a/%s/*.mjs\n' "$(printf 'd%.0s' $(seq 1 200))" > "$LONG/plugin/mod-t/scripts/tests/test-slong.sh"; git -C "$LONG" add -A; git -C "$LONG" commit -q -m long
+assert_eq P3b "un motif très long dépasse le plafond serré (motifs x fichiers, lui, ne le dépasse pas) : tronque ; plafond par défaut : ok" "$(node "$AUX/g2.mjs" "$MOD" plaf "$LONG" "$WORK/carte-vf.json" 2>&1)" "defaut=ok serre=tronque"
 
 # P4 : glob de `case` — justesse contre le `case` de bash (motif et sujet pris tels quels), puis croissance du temps pour N et 2N
 printf '%s\037%s\n' 'plugin/a/*.mjs' 'plugin/a/b/c.mjs' '*a' 'ba' '*a' 'bab' 'a*b*c' 'aXbYc' 'a*b*c' 'aXbY' '?x' 'ax' '?x' 'x' '[a-c]x' 'bx' '[a-c]x' 'dx' '[!a-c]x' 'bx' '[!a-c]x' 'dx' '[^a-c]x' 'dx' '[]a]x' ']x' 'a\*' 'a*' 'a\*' 'ab' '[' '[' '[a' '[a' 'plugin/*' 'plugin' 'plugin/*' 'plugin/' '' '' '*' '' 'a/*' 'a/' '**' 'zz' 'a**b' 'ab' 'a*' 'a/b/c' '*/x' 'a/b/x' '*x*y*' 'axbxcy' '*x*y*' 'axbxc' > "$WORK/glob.tsv"

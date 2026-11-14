@@ -1,7 +1,6 @@
 function scriptLancer(cfg, extraire, installer, corpsProp) {
   // L5u-01 : sous la coquille, le document est le même pour les trois onglets (le moteur est ré-exécuté à chaque onglet, table de sections neuve) :
   // la garde d'adresse ne vaut que pour le document d'avant la coquille, et l'inscription de la section suit l'onglet (surOnglet), pas l'adresse d'arrivée
-  // et l'inscription de la section suit l'onglet (surOnglet), pas l'adresse d'arrivée
   const K = window.VF_COQUILLE, sousCoquille = !!K && typeof K.surOnglet === 'function';
   if (!sousCoquille && location.pathname !== '/project.html') return; // garde:chemin
   if (location.hostname !== '127.0.0.1') return;
