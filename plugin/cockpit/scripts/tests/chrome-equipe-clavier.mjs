@@ -27,8 +27,7 @@ const INJ = `(() => { const R = window.EventSource; window.__es = []; window.Eve
   constructor(u, o) { super(u, o); this.__l = {}; window.__es.push(this); }
   addEventListener(n, f, o) { (this.__l[n] ||= []).push(f); super.addEventListener(n, f, o); }
   __emit(n, d) { for (const f of this.__l[n] || []) f({ data: JSON.stringify(d) }); } }; })();`;
-const DECRIRE = `const dec = (e) => e ? { tag: e.tagName, id: e.id || '', transcript: (e.dataset && e.dataset.vfTranscript) || '', rapport: !!(e.closest && e.closest('.vf-rg-act')), ou: !e.closest ? 'hors' : e.closest('#panel') ? 'panneau' : e.closest('#vf-equipe') ? 'regie' : 'hors', dansTiroir: !!(e.closest && e.closest('#panel')) } : null;`;
-const LU = "(() => { const z = document.querySelector('.vf-transcript'); return !!z && z.textContent.length > 0; })()";
+const DECRIRE = `const dec = (e) => e ? { tag: e.tagName, id: e.id || '', rapport: !!(e.closest && e.closest('.vf-rg-act')), ou: !e.closest ? 'hors' : e.closest('#panel') ? 'panneau' : e.closest('#vf-equipe') ? 'regie' : 'hors', dansTiroir: !!(e.closest && e.closest('#panel')) } : null;`;
 const RAPPORT = '#vf-equipe li[data-vf-cle^=a-relire] .vf-rg-act button'; // 73-08 : « Lire le rapport » d'une ligne terminée (régie)
 const LECTEUR = `!!document.querySelector('#panel .sec h4') && !document.querySelector('${RAPPORT}')`; // le lecteur de repli de la régie est affiché (mandat ou fil) ET la ligne est marquée lue (son bouton a quitté la ligne)
 const LIGNES = '#vf-equipe li[data-vf-cle]';
