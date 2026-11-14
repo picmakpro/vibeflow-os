@@ -112,7 +112,7 @@ assert_eq "FI4.3 — VENDORED.txt déclare 03-vf-charte.js une fois, à sa place
 03-vf-accessibilite.js : 03-vf-a < 03-vf-c)" \
   "$(grep -cx 'AJOUT assets/ui/03-vf-charte.js' "$VENDORED")|$(grep -n '^AJOUT assets/ui/0[23]-' "$VENDORED" | sed 's/^[0-9]*://' |
   tr '\n' ' ' | sed 's/AJOUT assets\/ui\///g')" \
-  "1|02-vf-coin.js 02-vf-ligne-etat.js 02-vf-reperes.js 02-vf-telephone.js 03-vf-accessibilite.js 03-vf-charte.js "
+  "1|02-vf-coin.js 02-vf-ligne-echec.js 02-vf-ligne-etat.js 02-vf-reperes.js 02-vf-telephone.js 03-vf-accessibilite.js 03-vf-charte.js "
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
