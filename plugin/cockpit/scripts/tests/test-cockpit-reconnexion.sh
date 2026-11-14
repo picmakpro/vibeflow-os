@@ -78,7 +78,6 @@ reco2() { # le PID du serveur est celui de server.json
   vf_hyg_kill TERM "$pid"; printf '%s\n' "$r"
 }
 R5="$(reco2 "$LAB")"; [ -n "${DBG:-}" ] && echo "RAW: $R5"
-echo "SONDE76: $R5" # SONDE TEMPORAIRE (76) : à retirer avec le correctif
 assert_eq "N5.0 — la mesure a eu lieu" "$(printf '%s' "$R5" | node "$AUX/ev.mjs" '!!j.erreur')" "false"
 assert_eq "N5.1 — le serveur arrêté, les DEUX pastilles passent en classe off en moins de dix secondes" "$(printf '%s' "$R5" | node "$AUX/ev.mjs" 'j.tOff.every((t) => t !== null)')" "true"
 assert_eq "N5.2 — le suiveur n'a construit aucun flux : il a été informé par le relais" "$(printf '%s' "$R5" | node "$AUX/ev.mjs" 'j.roles.slice().sort().join() + "," + j.fluxSuiveur')" "elu,suiveur,0"
