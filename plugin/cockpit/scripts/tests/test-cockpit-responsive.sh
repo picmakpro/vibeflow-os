@@ -44,7 +44,9 @@ const equipe = /equipe/.test(process.argv[3] || ''); // 70-12 : l'onglet Équipe
 // à 152 px, et seulement de 1 000 à 1 279 px (dernière largeur de la clé : « 1024 », « resize:1920:1024 »). Sans drapeau, ou hors de cette plage, le minimum reste 200 px, à l'identique.
 const larg = Number((String(process.argv[2]).match(/(\d+)$/) || [])[1]), git = /git/.test(process.argv[3] || '');
 const garde = (x) => { const r = /^recherche : (\d+) px, minimum 200$/.exec(x); return !(git && larg >= 1000 && larg <= 1279 && r && Number(r[1]) >= 152); };
-const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || /#panel/.test(m.m.surfaces || '')) && (equipe || /#ask/.test(m.m.surfaces || ''));
+// Phase 73 (juge design, spec § 1 et § 16.3) : sur Équipe la feuille du moteur est masquée ; son absence est le témoin, sa présence une violation
+const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || equipe || /#panel/.test(m.m.surfaces || '')) && (equipe || /#ask/.test(m.m.surfaces || ''));
+if (plein && equipe && !bas && /#panel/.test(m.m.surfaces || '')) { console.log('panneau du moteur visible sur Équipe'); process.exit(0); }
 console.log(!plein ? 'mesure vide : ' + JSON.stringify(m.m) : m.v.filter(garde).length ? m.v.filter(garde).slice(0, 4).join(' | ') : 'aucune');
 JS
 # faux verrou de driver (HOME jetable) : un propriétaire au nom long, comme en vraie mission

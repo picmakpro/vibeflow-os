@@ -8,7 +8,8 @@
     /* Q9 et P73-D-19 : monochrome, la forme et le mot portent l'état ; ni fond teinté, ni liseré, ni anneau, ni halo */
     body.vf-tab-equipe.vf-regie-montee #stage, body.vf-tab-equipe.vf-regie-montee #zoom, body.vf-tab-equipe.vf-regie-montee #z-fit,
     body.vf-tab-equipe.vf-regie-montee #results, body.vf-tab-equipe.vf-regie-montee #crumbs { display: none; }
-    /* le contenu par défaut du moteur (Base de code, Santé) n'a pas sa place sur Équipe ; la feuille ne s'affiche que pour le lecteur de repli (.vf-rg-lecteur) */
+    /* le contenu par défaut du moteur (Base de code, Santé) n'a pas sa place sur Équipe ; la feuille ne s'affiche que pour le lecteur de repli
+       (.vf-rg-lecteur) */
     body.vf-tab-equipe.vf-regie-montee #panel:not(.vf-rg-lecteur) { display: none; }
     body.vf-regie-montee.vf-git-ouvert #vf-equipe-entete { opacity: 0; pointer-events: none; }
     body.vf-regie-montee { overflow-y: auto; }
@@ -63,35 +64,46 @@
     body.vf-regie-montee .vf-rg-n2 > .vf-rg-row { padding-inline-start: calc(var(--sp-12) + var(--sp-16) + var(--sp-16)); }
     /* le nom est le bouton d'ouverture : texte nu, sans cadre ; le caret n'existe que sur un parent et reste nu, de la couleur du nom */
     body.vf-regie-montee .vf-rg-l1 { display: flex; align-items: center; gap: var(--sp-4); min-width: 0; }
-    body.vf-regie-montee .vf-rg-tog { min-width: 0; margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: start; cursor: pointer; border-radius: 8px; }
+    body.vf-regie-montee .vf-rg-tog {
+      min-width: 0; margin: 0; padding: 0; border: 0; background: none; font: inherit; color: inherit; text-align: start; cursor: pointer;
+      border-radius: 8px;
+    }
     body.vf-regie-montee .vf-rg-tog:hover .vf-rg-nom { text-decoration: underline; }
-    body.vf-regie-montee .vf-rg-caret { flex: none; width: 44px; height: 44px; margin-block: calc(-1 * var(--sp-12)); display: flex; align-items: center; justify-content: center;
+    body.vf-regie-montee .vf-rg-caret {
+      flex: none; width: 44px; height: 44px; margin-block: calc(-1 * var(--sp-12)); display: flex; align-items: center; justify-content: center;
       padding: 0; border: 0; background: none; color: var(--text); cursor: pointer; border-radius: 8px; }
     body.vf-regie-montee .vf-rg-grise .vf-rg-caret { color: var(--text-3); }
     body.vf-regie-montee .vf-rg-caret:hover { background: rgba(var(--ink), .05); }
     body.vf-regie-montee .vf-rg-caret[aria-expanded=true] .r-caret { transform: rotate(90deg); }
     body.vf-regie-montee .vf-rg-replie { display: none; }
-    /* le fil de l'arbre : 1 px (--fil), coude de rayon 8 ; c1 et c2 = le fil de ce niveau se poursuit sous la ligne ; les enfants n'ont pas de filet entre eux */
+    /* le fil de l'arbre : 1 px (--fil), coude de rayon 8 ; c1 et c2 = le fil de ce niveau se poursuit sous la ligne ; les enfants n'ont pas de filet
+       entre eux */
     body.vf-regie-montee .vf-rg-lig.vf-rg-n1, body.vf-regie-montee .vf-rg-lig.vf-rg-n2 { position: relative; border-top: 0; }
-    body.vf-regie-montee .vf-rg-n1::after, body.vf-regie-montee .vf-rg-n2::after { content: ""; position: absolute; top: 0; width: var(--sp-8); height: calc(var(--sp-16) + var(--sp-2));
+    body.vf-regie-montee .vf-rg-n1::after, body.vf-regie-montee .vf-rg-n2::after {
+      content: ""; position: absolute; top: 0; width: var(--sp-8); height: calc(var(--sp-16) + var(--sp-2));
       border-left: 1px solid var(--fil); border-bottom: 1px solid var(--fil); border-bottom-left-radius: 8px; pointer-events: none; }
     body.vf-regie-montee .vf-rg-n1::after { left: calc(var(--sp-12) + var(--sp-8)); }
     body.vf-regie-montee .vf-rg-n2::after { left: calc(var(--sp-12) + var(--sp-8) + var(--sp-16)); }
-    body.vf-regie-montee .vf-rg-n1.vf-rg-c1::before, body.vf-regie-montee .vf-rg-n2.vf-rg-c1::before { content: ""; position: absolute; bottom: 0; left: calc(var(--sp-12) + var(--sp-8));
+    body.vf-regie-montee .vf-rg-n1.vf-rg-c1::before, body.vf-regie-montee .vf-rg-n2.vf-rg-c1::before {
+      content: ""; position: absolute; bottom: 0; left: calc(var(--sp-12) + var(--sp-8));
       border-left: 1px solid var(--fil); pointer-events: none; }
     body.vf-regie-montee .vf-rg-n1.vf-rg-c1::before { top: calc(var(--sp-16) + var(--sp-2)); }
     body.vf-regie-montee .vf-rg-n2.vf-rg-c1::before { top: 0; }
-    body.vf-regie-montee .vf-rg-n2.vf-rg-c2 > .vf-rg-row::before { content: ""; position: absolute; bottom: 0; top: calc(var(--sp-16) + var(--sp-2)); left: calc(var(--sp-12) + var(--sp-8) + var(--sp-16));
+    body.vf-regie-montee .vf-rg-n2.vf-rg-c2 > .vf-rg-row::before {
+      content: ""; position: absolute; bottom: 0; top: calc(var(--sp-16) + var(--sp-2)); left: calc(var(--sp-12) + var(--sp-8) + var(--sp-16));
       border-left: 1px solid var(--fil); pointer-events: none; }
     body.vf-regie-montee .vf-rg-n2.vf-rg-c2 > .vf-rg-row { position: relative; }
     /* détail en flux : --raise, --r-ctl, --inset-box, gap --sp-8, 12 px --text-2, aligné sur la colonne du nom */
-    body.vf-regie-montee .vf-rg-plus { display: flex; flex-direction: column; gap: var(--sp-8); box-sizing: border-box; margin: 0 var(--sp-12) var(--sp-8) calc(var(--sp-12) + var(--sp-16) + var(--sp-12));
+    body.vf-regie-montee .vf-rg-plus {
+      display: flex; flex-direction: column; gap: var(--sp-8); box-sizing: border-box;
+      margin: 0 var(--sp-12) var(--sp-8) calc(var(--sp-12) + var(--sp-16) + var(--sp-12));
       padding: var(--inset-box); border-radius: var(--r-ctl); background: var(--raise); font-size: 12px; line-height: 16px; color: var(--text-2); }
     body.vf-regie-montee .vf-rg-n1 > .vf-rg-plus { margin-left: calc(var(--sp-12) + var(--sp-16) + var(--sp-12) + var(--sp-16)); }
     body.vf-regie-montee .vf-rg-n2 > .vf-rg-plus { margin-left: calc(var(--sp-12) + var(--sp-16) + var(--sp-12) + var(--sp-16) + var(--sp-16)); }
     body.vf-regie-montee .vf-rg-plus .vf-rg-l2 { margin: 0; white-space: normal; overflow-wrap: anywhere; color: var(--text-2); }
     /* arbres de travail (pied) : gabarit du tiroir Git, bloc replié lisible, pastilles en texte neutre */
-    body.vf-regie-montee .vf-rg-arbres > summary { display: flex; align-items: center; gap: var(--sp-8); min-height: 44px; margin: 0; cursor: pointer; font-size: 15px; line-height: 20px;
+    body.vf-regie-montee .vf-rg-arbres > summary {
+      display: flex; align-items: center; gap: var(--sp-8); min-height: 44px; margin: 0; cursor: pointer; font-size: 15px; line-height: 20px;
       font-weight: 600; color: var(--text); list-style: none; border-radius: 8px; }
     body.vf-regie-montee .vf-rg-arbres > summary::-webkit-details-marker { display: none; }
     body.vf-regie-montee .vf-rg-arbres > summary .r-caret { transition: transform .15s var(--ease); color: var(--text); }
@@ -99,7 +111,10 @@
     body.vf-regie-montee .vf-rg-arbres > summary:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
     body.vf-regie-montee .vf-rg-arbres-corps { margin: 0; }
     body.vf-regie-montee .vf-rg-arbres-liste { margin: 0; padding: 0; list-style: none; }
-    body.vf-regie-montee .vf-rg-arbre { display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4) var(--sp-8); box-sizing: border-box; min-height: 44px; padding: var(--inset-row); }
+    body.vf-regie-montee .vf-rg-arbre {
+      display: flex; flex-wrap: wrap; align-items: center; gap: var(--sp-4) var(--sp-8); box-sizing: border-box; min-height: 44px;
+      padding: var(--inset-row);
+    }
     body.vf-regie-montee .vf-rg-arbre-nom { font: 500 12px/16px var(--mono, monospace); color: var(--text); overflow-wrap: anywhere; }
     body.vf-regie-montee .vf-rg-arbre-br { font: 400 12px/16px var(--mono, monospace); color: var(--text-3); overflow-wrap: anywhere; }
     body.vf-regie-montee .vf-rg-arbre-pastille { font-size: 12px; line-height: 16px; color: var(--text-2); font-variant-numeric: tabular-nums; }
@@ -112,7 +127,8 @@
       stroke-linecap: round; stroke-linejoin: round; }
     body.vf-regie-montee [data-vf-etat=actif] > .vf-rg-row > .aw-g { color: var(--st-active); }
     body.vf-regie-montee [data-vf-etat=termine] > .vf-rg-row > .aw-g { color: var(--st-done); }
-    body.vf-regie-montee [data-vf-etat=attend] > .vf-rg-row > .aw-g, body.vf-regie-montee [data-vf-etat=attente] > .vf-rg-row > .aw-g, body.vf-regie-montee [data-vf-etat=repos] > .vf-rg-row > .aw-g,
+    body.vf-regie-montee [data-vf-etat=attend] > .vf-rg-row > .aw-g, body.vf-regie-montee [data-vf-etat=attente] > .vf-rg-row > .aw-g,
+    body.vf-regie-montee [data-vf-etat=repos] > .vf-rg-row > .aw-g,
     body.vf-regie-montee [data-vf-etat=surveiller] > .vf-rg-row > .aw-g, body.vf-regie-montee .vf-rg-marque .aw-g { color: var(--text-2); }
     body.vf-regie-montee [data-vf-etat=orphelin] > .vf-rg-row > .aw-g { color: var(--text-3); }
     body.vf-regie-montee [data-vf-etat=actif] > .vf-rg-row > .aw-g.aw-pulse { animation: vfregie-respire 2.4s ease-in-out infinite; }

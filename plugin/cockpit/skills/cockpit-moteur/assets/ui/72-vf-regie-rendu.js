@@ -151,7 +151,11 @@
         ecrire(r.sm, s.relusTitre); synchro(r.ulr, s.relus.map(ligne)); cacher(r.det, s.relus.length === 0);
       }
       for (const [k, li] of cache) if (!vus.has(k)) { li.remove(); cache.delete(k); ouverts.delete(k); }
-      for (const li of cache.values()) if (li._c) attr(li._c, 'aria-controls', [...cache.values()].filter((x) => x._ln && x._ln.parent === li._ln.id && x._ln.niveau > 0 && x.id).map((x) => x.id).join(' '));
+      for (const li of cache.values()) {
+        if (!li._c) continue;
+        const ids = [...cache.values()].filter((x) => x._ln && x._ln.parent === li._ln.id && x._ln.niveau > 0 && x.id).map((x) => x.id);
+        attr(li._c, 'aria-controls', ids.join(' '));
+      }
       const n = m.sections[0].compte;
       if (avous !== null && n > avous) ecrire(live, `${n} ${n > 1 ? 'vous attendent' : 'vous attend'}`);
       avous = n;

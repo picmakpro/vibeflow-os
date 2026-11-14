@@ -47,7 +47,8 @@
     const bloc = h('details', 'vf-rg-sec vf-rg-arbres'), corps = h('div', 'vf-rg-corps vf-rg-arbres-corps');
     const titre = h('summary', 'vf-rg-tete'), mot = h('span', '', 'Arbres de travail');
     let vivant = true, signature = '';
-    const marque = W.__vfRegieRendu && W.__vfRegieRendu.glyphe ? W.__vfRegieRendu.glyphe('repli', 'r-caret') : null; // repère d'ouverture : le caret du tiroir, couleur du texte
+    // repère d'ouverture : le caret du tiroir, couleur du texte
+    const G = W.__vfRegieRendu && W.__vfRegieRendu.glyphe, marque = G ? G('repli', 'r-caret') : null;
     titre.append(...(marque ? [marque] : []), mot);
     bloc.append(titre, corps);
     const bouton = (txt, f) => { const b = h('button', 'btn', txt); b.setAttribute('type', 'button'); b.addEventListener('click', f); return b; };

@@ -66,3 +66,15 @@ rituel levé : régime allégé (consigne de Samuel, message session principale,
 - Focus de « Tout marquer comme relu » : le bouton retiré alors qu'il porte le focus rend le focus au titre de « Terminé, à relire » (P73-D-29, UIFN-12). Témoin RG17.R2.
 - « Tout marquer comme relu » marque tous les identifiants à relire (`ids` du modèle, +0 ligne), pas les huit affichés. Témoin RG17.R3 (rouge 8, vert 12).
 Écart : un seul commit pour les trois points (même fichier, hunks entrelacés).
+
+## Correctifs design de fin de phase
+Six écarts du juge design de fin de phase (74/100) corrigés en une fois, plus un mineur ; témoins RG18.1 à RG18.7 (`regie-rg-pied.sh`, scénario `design` de `chrome-regie-pied.mjs`), mesures CDP à 1 440 px comparées aux jetons par sonde, vus rouges avant le correctif puis verts.
+- Panneau latéral du moteur masqué sur Équipe (`#panel:not(.vf-rg-lecteur)`) ; le lecteur de repli pose la classe et la retire à sa fermeture, il reste affiché.
+- Le nom est le bouton d'ouverture (`button.vf-rg-tog` enveloppe le nom) ; le caret (`.vf-rg-caret`) n'existe que sur un parent qui a des enfants, 44 × 44, nommé « Sous-agents, N », et replie ou rouvre ses sous-agents (ouvert par défaut). Lignes de 44 à 56 px.
+- Caret nu, de la couleur du nom : les teintes d'état ne visent plus que le glyphe de tête de ligne.
+- Détail `.vf-rg-plus` : `--raise`, `--r-ctl`, `--inset-box`, gap `--sp-8`, aligné sur la colonne du nom.
+- Arbres de travail : lignes, repère d'ouverture (caret du tiroir dans le résumé), pastilles en texte neutre sans fond.
+- Arbre : fil de 1 px (`--fil`) et coude de rayon 8 sur les niveaux 1 et 2, sans filet entre enfants.
+- Mineur : « sans branche » remplace le tiret cadratin quand la branche manque.
+Écart : le rendu visuel du fil sur plusieurs niveaux (continuations c1 et c2) n'est pas mesuré, seul le coude du premier niveau l'est.
+rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
