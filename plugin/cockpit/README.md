@@ -169,10 +169,26 @@ et `test-cockpit-chaine-xss.sh` (volet git C0g à C4g : un nom de branche, un me
 
 L'onglet Équipe est **la régie** (Phase 73) : quatre sections, « À vous » (ce qui attend un humain), « Au travail », « Terminé, à relire » et « Au repos », une ligne par agent
 mise à jour en place. Chaque agent actif dit sa **dernière action**, en une phrase lisible (« lit … », « modifie … », « lance une commande », « lance un agent ») ; les libellés sont provisoires.
-Le rapport d'un agent terminé se lit **à la demande** depuis « Terminé, à relire » (« Lire le rapport ») : il est réduit au mandat de l'agent (une session n'en a pas) et à UN fil daté, dans l'ordre :
-ses messages et les outils employés, une heure par ligne (aucun résultat d'outil), rendu en texte brut, et rien n'en est gardé une fois le panneau fermé. Sur Projet et Code, le bouton « N au travail »
+Le rapport d'un agent terminé s'ouvre, comme le nom de n'importe quel agent, dans la **fiche** (voir plus bas), pas dans un panneau de la régie.
+Sur Projet et Code, le bouton « N au travail »
 ouvre le tiroir « Au travail » ; sur Équipe il mène à la section du même nom, et le lien « N à relire dans Équipe » du tiroir remplace l'ancien pli des terminés (N compté avec l'état « lu » de ce navigateur).
-Preuve : `test-cockpit-regie.sh` (la régie, dont `RG11_tiroir`) et `test-cockpit-transcript.sh` (T24 à T27, dont T26.7 sous Chrome).
+Preuve : `test-cockpit-regie.sh` (la régie, dont `RG11_tiroir`).
+
+**L'équipe dans le temps** (Phase 74). Une bascule « Régie » / « Frise » au-dessus de la liste choisit la vue ; la régie reste la vue par défaut.
+- **Frise** : une voie par session ou par agent, sur la fenêtre choisie (1 h 30, 6 h ou 24 h, jamais plus de 24 h), en lecture « Horloge » ou « Événements » ; les voies nombreuses se replient.
+  Une courbe dit combien d'agents travaillent en même temps ; un bandeau « Dépôt » pose les commits par branche (un clic ouvre le tiroir Git). Une phrase de synthèse dit les durées au travail et
+  à vous attendre et mène au « Détail du coût ». Tout vient des routes du cockpit, lues en mémoire, rien n'est écrit sur disque.
+- **Fiche d'un agent** (plein cadre, depuis son nom, « Lire le rapport » ou une voie de la frise) : faits (rôle, nœud du plan, arbre, branche, modèle, durées, contexte au dernier tour, compactions,
+  appels d'outil, échecs, jetons, fichiers écrits et lus), mandat à la demande, puis un fil daté filtrable (Messages, Outils, Erreurs). Le texte est rendu sans HTML : un sous-ensemble fermé de markdown
+  (paragraphes, listes à puces et numérotées, code en ligne, blocs de code, emphase), un lien s'écrit « libellé (adresse) » et n'est jamais actif.
+- **Coût** : jetons (entrée, sortie, cache lu, cache écrit) et durées, regroupés par agent, par mission ou par étage sur la fenêtre. Un message de l'API écrit sur plusieurs lignes du transcript est compté une fois.
+  **Rien n'est estimé** et rien n'est converti en argent ; une donnée absente se dit « inconnu », jamais zéro.
+- **Relecture au curseur** : un repère se pose sur la frise au clavier, au pointeur ou au toucher (Échap le retire) ; l'encart « À cet instant » dit les voies actives, les nœuds portés et les fichiers touchés,
+  et « Voir sur la carte » les marque sur l'onglet Code.
+- **Limites** : 24 heures au plus ; la frise et la fiche observent, aucune action sur une session ; ni la frise, ni la fiche, ni le fil ne sortent par le flux ni par l'export, et la dernière commande
+  n'y figure jamais ; aucune requête hors de `127.0.0.1`.
+Preuve : `test-cockpit-frise-modele.sh`, `test-cockpit-fiche-texte.sh`, `test-cockpit-frise-vue.sh`, `test-cockpit-fiche.sh`, `test-cockpit-frise-curseur.sh`, `test-cockpit-frise-cout.sh`,
+`test-cockpit-equipe-retraits.sh`, `test-cockpit-repli-retrait.sh` et `test-cockpit-frise-bornes.sh` (bornes d'émission, chaîne XSS étendue, lignes `AJOUT` de `VENDORED.txt`).
 
 ## Questions et modèle
 
