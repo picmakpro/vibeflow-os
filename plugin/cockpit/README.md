@@ -172,7 +172,8 @@ mise à jour en place. Chaque agent actif dit sa **dernière action**, en une ph
 Le rapport d'un agent terminé se lit **à la demande** depuis « Terminé, à relire » (« Lire le rapport ») : il est réduit au mandat de l'agent (une session n'en a pas) et à UN fil daté, dans l'ordre :
 ses messages et les outils employés, une heure par ligne (aucun résultat d'outil), rendu en texte brut, et rien n'en est gardé une fois le panneau fermé. Sur Projet et Code, le bouton « N au travail »
 ouvre le tiroir « Au travail » ; sur Équipe il mène à la section du même nom, et le lien « N à relire dans Équipe » du tiroir remplace l'ancien pli des terminés (N compté avec l'état « lu » de ce navigateur).
-Preuve : `test-cockpit-regie.sh` (la régie, dont `RG11_tiroir`) et `test-cockpit-transcript.sh` (T24 à T27, dont T26.7 sous Chrome).
+**Questions en attente** (REGI-17) : « À vous » lit aussi `meta.vf.questions` (écrit par la Phase 76 dans le planning, route `GET /api/vf/graphe?onglet=projet`) : les questions `en-attente` y sont des lignes reliées à leur phase et à ce qu'elles bloquent ; les décisions appliquées sous délégation forment le repli fermé « Décisions prises pour vous, contestables (N) », jamais comptées ; les autres états sont dits par un bilan. États de la source : lecture en cours, champ absent (« pas encore livrée (Phase 76) »), illisible, lu. La page ne lit aucun CONTEXT ; la chaîne complète (76-09, serveur, page) reste à prouver à la jointure.
+Preuve : `test-cockpit-regie.sh` (la régie, dont `RG11_tiroir` et `RG17`) et `test-cockpit-transcript.sh` (T24 à T27, dont T26.7 sous Chrome).
 
 ## Questions et modèle
 
