@@ -167,11 +167,13 @@ et `test-cockpit-chaine-xss.sh` (volet git C0g à C4g : un nom de branche, un me
 
 ## Équipe au travail
 
-Chaque agent actif affiche sa **dernière action**, en une phrase lisible (« lit … », « modifie … », « lance une commande »,
-« lance un agent ») ; les libellés sont provisoires. Cliquer un agent ouvre son panneau : état, durée, dernière action,
-nœud de mission, puis **« Lire le transcript »**. Le transcript est lu **à la demande** seulement : il est réduit au
-mandat de l'agent (une session n'en a pas) et à UN fil daté, dans l'ordre : ses messages et les outils employés, une heure par ligne (aucun résultat d'outil), rendu en texte brut, et rien n'en est
-gardé une fois le panneau fermé. Preuve : `test-cockpit-transcript.sh` (T24 à T26, dont T26.7 sous Chrome).
+L'onglet Équipe est **la régie** (Phase 73) : quatre sections, « À vous » (ce qui attend un humain), « Au travail », « Terminé, à relire » et « Au repos », une ligne par agent
+mise à jour en place. Chaque agent actif dit sa **dernière action**, en une phrase lisible (« lit … », « modifie … », « lance une commande », « lance un agent ») ; les libellés sont provisoires.
+Le rapport d'un agent terminé se lit **à la demande** depuis « Terminé, à relire » (« Lire le rapport ») : il est réduit au mandat de l'agent (une session n'en a pas) et à UN fil daté, dans l'ordre :
+ses messages et les outils employés, une heure par ligne (aucun résultat d'outil), rendu en texte brut, et rien n'en est gardé une fois le panneau fermé. Sur Projet et Code, le bouton « N au travail »
+ouvre le tiroir « Au travail » ; sur Équipe il mène à la section du même nom, et le lien « N à relire dans Équipe » du tiroir remplace l'ancien pli des terminés (N compté avec l'état « lu » de ce navigateur).
+**Questions en attente** (REGI-17) : « À vous » lit aussi `meta.vf.questions` (écrit par la Phase 76 dans le planning, route `GET /api/vf/graphe?onglet=projet`) : les questions `en-attente` y sont des lignes reliées à leur phase et à ce qu'elles bloquent ; les décisions appliquées sous délégation forment le repli fermé « Décisions prises pour vous, contestables (N) », jamais comptées ; les autres états sont dits par un bilan. États de la source : lecture en cours, champ absent (« pas encore livrée (Phase 76) »), illisible, lu. La page ne lit aucun CONTEXT ; la chaîne complète (76-09, serveur, page) reste à prouver à la jointure.
+Preuve : `test-cockpit-regie.sh` (la régie, dont `RG11_tiroir` et `RG17`) et `test-cockpit-transcript.sh` (T24 à T27, dont T26.7 sous Chrome).
 
 ## Questions et modèle
 
@@ -341,8 +343,17 @@ Schémas lisibles dans `scripts/vf-cockpit-interface.json` (copié à l'identiqu
 `readPlanning` sur chaque phase : décompte de plans, correctifs, état dérivé, mission rattachée ; **monté de `@1` à `@2`** pour dire l'état de vie d'une mission :
 `abandonnee`, `inconnu` et le champ `vie`), `vibeflow/cockpit-signal@1` (ce que la pane lit : phases, jalons, missions, verrous, worktrees et retard, équipe),
 `vibeflow/cockpit-who@2` (arbre des agents : parent, état, action, rattachement, fenêtre de 24 h ; remplace `@1`),
-`vibeflow/cockpit-transcript@2` (transcript réduit ; **monté de `@1` à `@2`** : `messages` et `outils` remplacés par le fil daté `fil`) et `vibeflow/cockpit-equipe@1`. Les autres schémas restent à `@1`.
+`vibeflow/cockpit-transcript@2` (transcript réduit ; **monté de `@1` à `@2`** : `messages` et `outils` remplacés par le fil daté `fil`) et `vibeflow/cockpit-equipe@1` (**coquille sans cartes depuis la Phase 73** : `nodes` vide, `meta` conservée). Les autres schémas restent à `@1`.
 `vibeflow/cockpit-trace@1` (`GET /api/vf/tracabilite`, 76-05) : une vue de traçabilité par requête (jalon, phase, exigence, décision, ADR, mémoire des agents), planning lu dans l'instantané de la collecte, ADR, commits citants et mémoire lus par la route sous confinement, en cache par empreinte ; `bornes.tronque` dit une lecture bornée, `absences` dit ce que le lab n'a pas.
+
+Ajouts de la Phase 73, tous facultatifs et sans bump : `cockpit-who@2` porte, par session, `attendAgents`, `detient { ws, phase }`, `retient { n, portee }` et `lancee { phase, ws, verbe }`, et, au premier niveau,
+`phasesHumaines` et `fenetreStallS` ; `vibeflow/cockpit-ailleurs@1` (route `GET /api/vf/ailleurs`, `{ schema, ailleurs: [[lab, n]] }`, jamais un chemin, un identifiant ni un titre) dit combien de sessions d'autres
+dossiers du poste vous attendent. Il ne faut pas le confondre avec `scripts/vf-cockpit-ailleurs.mjs`, qui traite un autre sujet (le dessin de la carte). `VF_STALL_WINDOW` (chiffres, > 0) est lue par le serveur
+pour dire la fenêtre du chien de garde ; absente, la ligne d'affectation par défaut du script de garde.
+
+Contrats de page de la régie pour la Phase 74 (le reste de la page n'est pas une interface) : `window.__vfEquipeVues.declarer({ id, libelle, monter(conteneur), demonter() })`, `window.__vfRegie` (`arriver(r)`, `monte()`),
+les événements de document `vf-agent:ouvrir` `{ id, kind, declencheur }` (annulable) et `vf-agent:lu` `{ id }`, `vf-regie:aller` `{ section }`, et les attributs `data-vf-cle`, `data-vf-agent`, `data-vf-noeud`, `data-vf-etat`
+des lignes. Le lecteur de repli (`ouvrirRepli` et l'export `transcript` de `window.__vfEquipeRendu`) est retiré par la Phase 74.
 
 ## Code tiers
 

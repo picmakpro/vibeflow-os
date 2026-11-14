@@ -128,7 +128,7 @@ export function attach({ here, root, token, log = () => {}, routes = ROUTES, scr
   });
 
   // lecture en mémoire (A31), jamais une collecte
-  const majGraphes = () => graphes.maj({ projet: instantane()?.projet, who: live ? live.snapshot()?.who : null, lancees: lancer.lancees() });
+  const majGraphes = () => graphes.maj({ projet: instantane()?.projet, who: live ? live.snapshot()?.who : null });
   // à l'attache (au premier besoin) et à chaque nouvel assemblage de la carte : le gabarit n'est plus relu à chaque événement du direct
   const load = () => {
     charge = true;
@@ -162,7 +162,7 @@ export function attach({ here, root, token, log = () => {}, routes = ROUTES, scr
   const aClient = () => clients.size > 0 || LECTEURS.actif(); // garde:lecteur-arme
   let live = null;
   try {
-    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => diffuser(nom, data), aClient, nbClients: () => clients.size, garde: (o) => !porteInterdit(o) }); // AUDC-H2 : le filet ne collecte que si un onglet écoute ; garde : l'instantané passe la garde d'émission avant sa pose
+    live = startLive({ root, sortie: here, log, onEvent: (nom, data) => diffuser(nom, data), aClient, nbClients: () => clients.size, garde: (o) => !porteInterdit(o), lancees: () => lancer.lancees() }); // 73-08 (P73-D-21) : la ligne « Lancée depuis la carte » est posée sur le `who` du direct, plus sur une carte. AUDC-H2 : le filet ne collecte que si un onglet écoute ; garde : l'instantané passe la garde d'émission avant sa pose
   } catch (e) { log('error', `direct indisponible : ${e.message}`); }
   const fluxEtat = brancherFluxEtat({ diffuser, seq: () => (live ? live.etat().seq : 0), nbClients: () => clients.size, vieMs }); // 79-12 : `vie` et `etat`
   const fluxFrise = brancherFluxFrise({ diffuser, seq: () => (live ? live.etat().seq : 0) }); // 79-13 : `frise` à la fin d'un tour de collecte

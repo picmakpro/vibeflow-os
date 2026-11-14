@@ -230,8 +230,12 @@ await executer(chrome, async (s) => {
   // ---------- CC5 : Équipe : ni rôle ni tabindex ----------
   o.cc5 = null;
   await sec('cc5', async () => {
-    await charger('equipe.html');
-    o.cc5 = await lire(`JSON.stringify({ cartes: document.querySelectorAll('g.node').length, tab: document.querySelectorAll('g.node[tabindex]').length,
+    // 73-08 : Équipe n'a plus de canevas ni de cartes ; sa liste est la régie (#vf-equipe). Le témoin est la régie posée ; la propriété reste : ni tabindex ni role=option posés
+    // par le clavier du canevas (sur les cartes, #svg, #stage), pas de listbox ; la régie gère elle-même son clavier (EK)
+    await vue(1440, 900, false); await s.naviguer(`${racine}/equipe.html${LANG}`); await s.attendre(PRET, 'page equipe.html');
+    await s.attendre("!!document.getElementById('vf-equipe')", 'régie de l\'onglet Équipe'); await pause(1200);
+    for (let i = 0; i < 5 && await s.ev('!!(window.VibeFlowTour && VibeFlowTour.active())'); i++) { await touche('Escape'); await pause(400); }
+    o.cc5 = await lire(`JSON.stringify({ cartes: document.querySelectorAll('#vf-equipe').length, tab: document.querySelectorAll('g.node[tabindex]').length,
       opt: document.querySelectorAll('[role=option]').length, lb: document.getElementById('svg').getAttribute('role'),
       svgTab: document.getElementById('svg').getAttribute('tabindex'), canevas: typeof window.VF_CANEVAS,
       stageTab: document.getElementById('stage').getAttribute('tabindex') })`);
