@@ -117,11 +117,10 @@
        par un pseudo-élément centré. */
     @media (max-width: 1279px) {
       .vf-git-ligne { display: none; }
-      #vf-git-ouvreur { display: inline-flex; position: relative; width: var(--hdr-btn, 44px); height: var(--hdr-btn, 44px); }
-      /* l'appui déborde de 4 px sans être un défilement : scrollWidth reste la largeur dessinée (R1 : « rogné » sinon) */
-      #vf-git-ouvreur { overflow: clip; overflow-clip-margin: 4px; }
-      #vf-git-ouvreur::after { content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
-        width: max(100%, 44px); height: max(100%, 44px); }
+      #vf-git-ouvreur { display: inline-flex; position: static; width: var(--hdr-btn, 44px); height: var(--hdr-btn, 44px); }
+      /* l'appui : le pseudo-élément se place à la position statique du bouton (flex centré), le bouton n'est pas son bloc conteneur : son débordement
+         de 4 px n'est pas celui du bouton (scrollWidth reste la largeur dessinée, sinon R1 lit « rogné ») */
+      #vf-git-ouvreur::after { content: ""; position: absolute; width: 44px; height: 44px; } /* pas de % : le bloc conteneur n'est pas le bouton */
     }
     /* même requête que viewer.html (« phones and tablets ») : le nom et sa seconde ligne partent ensemble */
     @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) { .vf-nom { display: none; } }

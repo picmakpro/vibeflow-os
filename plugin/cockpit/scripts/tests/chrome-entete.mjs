@@ -230,7 +230,9 @@ await executer(chrome, async (s) => {
         cx = r.left + r.width / 2, cy = r.top + r.height / 2;
       const pts = [[-21, 0], [21, 0], [0, -21], [0, 21], [0, 0]].map(([a, b]) => { const e = document.elementFromPoint(cx + a, cy + b);
         return !!e && (e === o || o.contains(e)); });
-      return { w: Math.round(r.width), h: Math.round(r.height), voisin: Math.round(vr.height), pts, premier: o.parentElement.firstElementChild === o,
+      return { w: Math.round(r.width), h: Math.round(r.height), voisin: Math.round(vr.height), pts,
+        rogne: o.scrollWidth > o.clientWidth + 1 || o.scrollHeight > o.clientHeight + 1,
+        premier: o.parentElement.firstElementChild === o,
         ordre: Math.round(r.left) < Math.round(vr.left) }; })()`;
     o.o = {};
     for (const [w, doigt] of [[800, false], [1100, false], [1279, false], [1100, true], [1279, true]]) {

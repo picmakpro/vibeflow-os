@@ -120,6 +120,8 @@ assert_eq "EN3.1 — boîte dessinée de l'ouvreur : 36 px au pointeur fin à pa
   "$(E "$CLES.map((k) => [j.o[k].w, j.o[k].h, j.o[k].voisin])" "$R3")" '[[44,44,44],[36,36,36],[36,36,36],[44,44,44],[44,44,44]]'
 assert_eq "EN3.2 — zone d'appui : les points à 1 px d'un carré de 44 × 44 centré sur l'ouvreur tombent sur lui, en tête de .hr" \
   "$(E "$CLES.map((k) => [j.o[k].pts.every((x) => x), j.o[k].premier])" "$R3")" '[[true,true],[true,true],[true,true],[true,true],[true,true]]'
+assert_eq "EN3.3 — l'appui ne rend pas l'ouvreur « rogné » (scrollWidth et scrollHeight égaux à la boîte dessinée)" \
+  "$(E "$CLES.map((k) => j.o[k].rogne)" "$R3")" '[false,false,false,false,false]'
 assert_eq "EN3.4 — mouvement réduit : aucune animation active après un glisser, un zoom puis le passage de 1 440 à 1 100 px" \
   "$(E "j.actives" "$R3")" '[0,0]'
 vf_hyg_stop "$SRV"
