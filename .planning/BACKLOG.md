@@ -783,3 +783,17 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - Non sondé : l'état « collecte en cours » ne se relance que par la clé `planning` de `VF_ETAT` ; si la fin de la première collecte n'émet pas d'événement, la phrase reste jusqu'au prochain changement de panneau. À trancher avec le correctif de la clé `planning` annoncé par la Phase 79.
 
 **Déclencheur de reprise :** la passe du juge de design de fin de Phase 76, ou la prochaine retouche des fichiers `ui/74-vf-trace*.js`.
+
+## Cockpit : constats bas de l'audit de la régie (Phase 73, 73-05 et 73-07) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : non fixée.** **Origine :** audit `vf-auditer` de 73-05 et 73-07, une passe, verdict passed (aucun moyen ni haut).
+- **Témoins sensibles à la charge :** RG6.20 (témoin positif de la ligne verrou) et RG13.13 (aucun git relancé pendant dix lectures) rougissent en lot sous charge et verdissent seuls ; un faux rouge sur un témoin positif fait perdre la valeur du négatif qui le suit.
+- **Stockage « lu » :** la purge de 24 h ne vise que la clé du lab ouvert, au chargement ; les clés d'autres labs de la même origine ne sont jamais purgées.
+- **Identifiant du lecteur de repli :** pas de contrôle de forme côté page (la garde réelle est la route serveur).
+- **Lecteur de transcript :** une entrée nulle dans le fil lève une erreur non attrapée (pas de message « Indisponible »).
+- **Nom du lab voisin :** pas d'assainissement côté page des caractères de contrôle (assuré par le serveur).
+
+**Déclencheur de reprise :** la prochaine passe sur la page de la régie.
+- **Revue du point de fusion 2 de la Phase 73 (mineurs) :** `ouvrirRepli` émet `vf-agent:lu` même quand la lecture du transcript échoue, et deux clics rapprochés laissent le transcript le plus lent écraser le panneau ; `relireMissions` lance une lecture par événement `graphe` sans sérialisation (deux réponses croisées peuvent poser des missions plus anciennes).
+- **Durée d'un agent terminé (constat de la Phase 74) :** la régie calcule `dureeS` en tenue et compte les veilles de l'agent ; la spec ne tranche pas entre durée active et durée de tenue : à décider au prochain réglage de la régie.
+- **Juge design de fin de Phase 73 (74/100, passed ; mineurs) :** ligne 2 « nœud · arbre · branche » rendue sous Quoi au lieu de Qui, rôle sous la tâche au lieu d'avant ; colonne Quoi qui dérive de 361 à 376 px (grille par ligne) ; ligne de verrou plus bavarde que la spec § 6.1 ; ligne de phase `human_needed` avec le lien en double ; format de la ligne « ailleurs » et noms de lab en mono (§ 10) ; hors phase : à 800 px, la bascule de Projet recouvre son titre.

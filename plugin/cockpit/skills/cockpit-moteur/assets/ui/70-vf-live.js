@@ -29,8 +29,8 @@
     @media (min-width: 701px) { #panel:has(> .vf-whop) { bottom: auto; max-height: calc(100vh - var(--hh, 64px) - 20px); overflow: auto; } }
     .vf-whop h3 { margin: 0; } .vf-whop h4 { margin: var(--sp-16) 0 var(--sp-6); color: var(--text-3); }
     .vf-whop .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
-    .sec button[data-vf-doing], .sec button[data-vf-transcript] { font: inherit; font-size: 12px; cursor: pointer; padding: var(--sp-4) var(--sp-12); border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); margin: var(--sp-6) var(--sp-6) 0 0; transition: background .2s var(--ease), color .2s var(--ease); }
-    .sec button[data-vf-doing]:hover, .sec button[data-vf-transcript]:hover { background: rgba(var(--ink), .07); color: var(--text); } .sec button[data-vf-doing]:focus-visible, .sec button[data-vf-transcript]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    .sec button[data-vf-doing] { font: inherit; font-size: 12px; cursor: pointer; padding: var(--sp-4) var(--sp-12); border-radius: 8px; border: 1px solid rgba(var(--ink), .15); background: transparent; color: var(--text-2); margin: var(--sp-6) var(--sp-6) 0 0; transition: background .2s var(--ease), color .2s var(--ease); }
+    .sec button[data-vf-doing]:hover { background: rgba(var(--ink), .07); color: var(--text); } .sec button[data-vf-doing]:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     /* Q12a : les liens « Nœud … » et « Voir dans l'onglet Équipe » s'alignent sur la colonne de texte (le retrait de 12 px vient du padding de .vf-link, fait pour la liste « Sources lues ») */
     body.vf-tab-equipe .sec > a.vf-link { padding: var(--sp-6) 0; margin-inline: 0; }
     .vf-whop .src { color: var(--text-4); font-size: 11px; margin-top: var(--sp-16); }
@@ -41,10 +41,6 @@
     a.vf-link:has(> .vst):hover > :not(.vst) { text-decoration-color: currentColor; }
     a.vf-link:hover { color: var(--text); text-decoration-color: currentColor; } a.vf-link:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     .vf-nr { white-space: nowrap; }
-    .vf-transcript { max-height: 320px; overflow-y: auto; margin-top: var(--sp-8); font-size: 12px; color: var(--text-2); }
-    .vf-transcript h4 { margin: var(--sp-12) 0 var(--sp-4); color: var(--text-3); } .vf-transcript > h4:first-child { margin-top: 0; } .vf-transcript p, .vf-transcript li { margin: var(--sp-2) 0; word-break: break-word; }
-    .vf-transcript ul { margin: var(--sp-4) 0 0; padding-left: var(--sp-16); }
-    .vf-transcript pre { margin: 0; white-space: pre-wrap; word-break: break-word; font-family: var(--mono, monospace); }
     #vf-reco { position: fixed; left: 50%; bottom: 96px; /* dérivé : au-dessus de la barre de question */ transform: translateX(-50%); z-index: 60; display: flex; align-items: center; gap: var(--sp-12); max-width: calc(100vw - 2 * var(--edge)); padding: var(--inset-box) var(--inset-box) var(--inset-box) var(--sp-16); border-radius: 20px; font-size: 13px; line-height: 1.5; color: var(--text); }
     #vf-reco button { flex: none; border: 0; border-radius: 999px; padding: var(--sp-8) var(--sp-16); cursor: pointer; font: inherit; font-size: 12.5px; background: var(--on); color: var(--on-text); }`;
   document.head.appendChild(style);
@@ -139,7 +135,7 @@
     for (const e of document.querySelectorAll('#panel > *')) e.style.animation = 'none';
     if (p) p.scrollTop = haut;
   };
-  // AUDC-D3 : entre deux poussées, l'âge des agents avance dans la page : le tiroir ouvert est recalculé toutes les 30 s (aucun dessin si le texte est identique)
+  // AUDC-D3 : entre deux poussées, l'âge des agents avance dans la page : le tiroir ouvert est recalculé toutes les 30 s (aucun dessin si texte identique)
   if (typeof setInterval === 'function') setInterval(() => { if (!document.hidden) redessiner(); }, 30000); // `typeof` : le harnais vm de test-cockpit-equipe.sh (EUI) n'a pas de minuterie
   // révélation ponctuelle : la réponse reste affichée tant que sa ligne l'est. Elle est gardée en mémoire de la page seulement (ni graphe, ni stockage, ni export) et reposée
   // par l'événement `panel` du moteur dès que le panneau est redessiné : le tiroir et le panneau d'un agent sont redessinés à chaque `who`, et une réponse qui arrive pendant un redessin
@@ -151,10 +147,10 @@
   };
   // rien à reposer tant qu'aucune commande n'a été demandée
   // focus clavier (UIFN-12) : chaque `who` redessine le panneau et le tiroir, le bouton focalisé est remplacé et le focus tombe sur le corps de la page.
-  // On retient la clé du bouton « Voir la dernière commande » / « Lire le transcript » qui a le focus ; après un redessin, si le focus est perdu, il revient au bouton de même clé.
+  // On retient la clé du bouton « Voir la dernière commande » / de repli qui a le focus ; après un redessin, si le focus est perdu, il revient au bouton de même clé.
   // Un focus qui s'en va ailleurs (bouton encore dans la page) efface la clé : jamais de focus volé à quelqu'un qui est parti.
-  const BTN = '[data-vf-doing],[data-vf-transcript],[data-vf-repli]', DANS_PANNEAU = '#panel [data-vf-doing],#panel [data-vf-transcript],#panel [data-vf-repli]';
-  const cleBtn = (b) => (b.dataset.vfDoing !== undefined ? 'doing:' + b.dataset.vfDoing : b.dataset.vfRepli !== undefined ? 'repli:' + b.dataset.vfRepli : 'transcript:' + b.dataset.vfTranscript);
+  const BTN = '[data-vf-doing],[data-vf-repli]', DANS_PANNEAU = '#panel [data-vf-doing],#panel [data-vf-repli]';
+  const cleBtn = (b) => (b.dataset.vfDoing !== undefined ? 'doing:' + b.dataset.vfDoing : 'repli:' + b.dataset.vfRepli);
   let cleFocus = null;
   document.addEventListener('focusin', (ev) => { const b = ev.target.closest?.(DANS_PANNEAU); cleFocus = b ? cleBtn(b) : ev.target.matches?.('#panel > .vf-whop h3') ? 'titre' : null; }); // 'titre' : le focus posé sur le titre du tiroir à son ouverture (73-vf-tiroir-travail.js, PU-G-203) survit lui aussi à un redessin
   document.addEventListener('focusout', (ev) => { const b = ev.target; if (b.matches?.(BTN)) queueMicrotask(() => { if (b.isConnected && document.activeElement !== b) cleFocus = null; }); });
@@ -190,7 +186,7 @@
   });
   const showLock = (l, off) => {
     if (l !== undefined) probe.lock = l;
-    if (!badge) badge = SC.addHeaderButton({ id: 'vf-lock', label: '…', title: 'Qui est au travail', onClick: whoPanel });
+    if (!badge) badge = SC.addHeaderButton({ id: 'vf-lock', label: '…', title: 'Qui est au travail', onClick: () => (window.__vfRegie?.monte?.() ? document.dispatchEvent(new CustomEvent('vf-regie:aller', { detail: { section: 'au-travail' } })) : whoPanel()) });
     const t = off ? { cls: 'off', text: 'Direct coupé', title: 'Le serveur du cockpit ne répond pas' } : lockText(probe.lock);
     const n = (who?.workers || []).filter(auTravail).length;
     badge.className = 'btn ' + (off ? 'off' : n ? 'held' : t.cls); badge.title = off ? t.title : `${n ? n + ' au travail' : 'Personne au travail'} · ${t.title}`;

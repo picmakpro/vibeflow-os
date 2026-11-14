@@ -137,7 +137,7 @@
 | 71. Terminal intégré au cockpit | vibeflow-v2.0 | 11/11 | Complete — PR #203 et #209, release `v2.76.0` | 2026-11-05 |
 | 71.5. Réexamen du design system du cockpit | vibeflow-v2.0 | mission design, sans plan GSD | Complete — PR #213, release `v2.76.0` | 2026-11-06 |
 | 72. Lancer du travail depuis les cartes du cockpit | vibeflow-v2.0 | 16/16 | Complete — PR #214, LANC-12 décochée, release `v2.76.0` | 2026-11-06 |
-| 73. Gouvernance au cockpit — arbitrages en attente, worktrees et verrous | vibeflow-v2.0 | 4/11 | In progress | - |
+| 73. Gouvernance au cockpit — arbitrages en attente, worktrees et verrous | vibeflow-v2.0 | 10/11 | In progress | - |
 | 74. L'équipe dans le temps — swim-lanes, coût, replay | vibeflow-v2.0 | 0/10 | Planned | - |
 | 75. L'activité posée sur le code — hotspots, couplage, gardes, empreinte | vibeflow-v2.0 | 6/12 | In Progress | - |
 | 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 7/9 | In Progress | - |
@@ -295,12 +295,12 @@ Plans:
 - [x] 73-02-PLAN.md — `ailleurs()` et route `GET /api/vf/ailleurs`
 - [x] 73-03-PLAN.md — Champs de gouvernance de who@2 dans la collecte, LR.1 à LR.6
 - [x] 73-04-PLAN.md — Modèle de la régie (sans DOM), feuille, exports de 71
-- [ ] 73-05-PLAN.md — Page de la régie : adaptateur, accroches de la Phase 74, états de page
-- [ ] 73-06-PLAN.md — Compositeur du titre, pastille de favicon, état « lu »
-- [ ] 73-07-PLAN.md — Pied : arbres de travail, « ailleurs », non-fuite de bout en bout
-- [ ] 73-08-PLAN.md — Retrait du canevas d'Équipe, côté serveur et côté page
-- [ ] 73-09-PLAN.md — Correspondance LE → LR, témoins W23 et de page re-pointés
-- [ ] 73-10-PLAN.md — Tiroir hors d'Équipe, README, CHANGELOG, toutes les suites
+- [x] 73-05-PLAN.md — Page de la régie : adaptateur, accroches de la Phase 74, états de page
+- [x] 73-06-PLAN.md — Compositeur du titre, pastille de favicon, état « lu »
+- [x] 73-07-PLAN.md — Pied : arbres de travail, « ailleurs », non-fuite de bout en bout
+- [x] 73-08-PLAN.md — Retrait du canevas d'Équipe, côté serveur et côté page
+- [x] 73-09-PLAN.md — Correspondance LE → LR, témoins W23 et de page re-pointés
+- [x] 73-10-PLAN.md — Tiroir hors d'Équipe, README, CHANGELOG, toutes les suites
 - [ ] 73-11-PLAN.md — Questions en attente des cadrages dans « À vous », décisions prises pour vous à part (REGI-17)
 
 ### Phase 74: L'équipe dans le temps — swim-lanes, coût, replay

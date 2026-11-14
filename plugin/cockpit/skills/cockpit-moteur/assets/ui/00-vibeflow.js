@@ -10,7 +10,7 @@
   const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
   document.body.classList.add('vf-tab-' + TAB); // 70-12 (P70-D-20) : marqueur de l'onglet sur le corps de page (`vf-tab-code`, `vf-tab-project`, `vf-tab-equipe`), pour les règles de mise en page propres à un onglet
   // titre de l'onglet du navigateur (AUDC-X7) : un seul format, « <Onglet> · <nom> » : l'onglet d'abord, parce qu'un onglet étroit coupe par la fin et que trois pages du même projet doivent se distinguer d'un coup d'œil (le viewer écrit « <nom> map », qui devenait le nom seul)
-  { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); document.title = `${TAB === 'equipe' ? 'Équipe' : TAB === 'project' ? 'Projet' : 'Code'} · ${nom}`; }
+  { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); window.__vfTitreBase = { onglet: TAB === 'equipe' ? 'Équipe' : TAB === 'project' ? 'Projet' : 'Code', nom }; } // 73-06 : 90-vf-titre.js compose et écrit le titre
   const ST = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué' };
   // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
   const LOGOS = G.meta.vfLogos;
@@ -283,7 +283,7 @@
     const r = new URLSearchParams(location.hash.slice(1)).get('r');
     if (!r) return;
     const id = /^[nf]:/.test(r) ? r : 'f:' + r;
-    if (SC.exists(id)) SC.reveal(id); else SC.toast(`Pas sur cette carte : ${r}`);
+    if (TAB === 'equipe' && window.__vfRegie?.arriver(r)) return; if (SC.exists(id)) SC.reveal(id); else SC.toast(`Pas sur cette carte : ${r}`);
   };
   // recette 68 R5 : la carte d'une mission abandonnée porte `st: todo` (le viewer n'a pas d'état « abandonnée ») et sa pastille disait « À faire ». Le socle écrit « abandonnée » dans le pied de la carte
   // (LIBELLES_MISSION) : la pastille de CETTE carte est réécrite en « Abandonnée », avant lecture par un lecteur d'écran. Idempotent : une pastille réécrite n'est plus `vst-todo`.

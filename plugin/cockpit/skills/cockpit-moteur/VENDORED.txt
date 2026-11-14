@@ -30,6 +30,12 @@ AJOUT assets/ui/70-vf-live.js
 AJOUT assets/ui/71-vf-equipe-rendu.js
 AJOUT assets/ui/72-vf-equipe.js
 AJOUT assets/ui/72-vf-regie-modele.js
+AJOUT assets/ui/72-vf-regie-pied.js
+AJOUT assets/ui/72-vf-regie-questions-lecture.js
+AJOUT assets/ui/72-vf-regie-questions-rendu.js
+AJOUT assets/ui/72-vf-regie-questions-source.js
+AJOUT assets/ui/72-vf-regie-rendu.js
+AJOUT assets/ui/72-vf-regie-source.js
 AJOUT assets/ui/72-vf-regie-style.js
 AJOUT assets/ui/73-vf-tiroir-travail.js
 AJOUT assets/ui/74-vf-synthese-burnup.js
@@ -58,6 +64,7 @@ AJOUT assets/ui/77-vf-git-vue-detail.js
 AJOUT assets/ui/78-vf-fr-dict-a.js
 AJOUT assets/ui/79-vf-fr-dict-b.js
 AJOUT assets/ui/80-vf-fr.js
+AJOUT assets/ui/90-vf-titre.js
 AJOUT assets/ui/terminal/client.js
 AJOUT assets/ui/terminal/q.css
 AJOUT assets/ui/terminal/vue.js
