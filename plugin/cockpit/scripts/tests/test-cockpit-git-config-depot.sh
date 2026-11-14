@@ -508,12 +508,17 @@ printf '#!/bin/sh\n# %s : nom stocké décomposé.\necho ok\n' "$MK_NFD" > "$LK_
 G "$LK_N" init -q; G "$LK_N" -c core.precomposeunicode=true add -A >/dev/null 2>&1
 LK_NNFD=""; for f in "$LK_N/src"/*.sh; do LK_NNFD="$(printf '%s' "${f##*/}" | od -An -tx1 | tr -d ' \n')"; done
 lk_a15n() { local o="$LK_N/.vibeflow/cockpit"; rm -rf "$o"; node "$1/vf-cockpit-build.mjs" "$LK_N" --quiet > "$AUX/a15n.out" 2>&1; echo "nfd=$(compte "$MK_NFD" "$o/index.html" "$o/.cache/scan.json" | awk '{print ($1>0)?"lu":"perdu"}')"; }
-assert_eq "A15.2 — nom stocké en NFD, suivi par git en NFC : le fichier reste lu (garde comparée en NFC des deux côtés) ; témoin : le disque porte bien la forme décomposée" "$(lk_a15n "$SCRIPTS") $([ "$LK_NNFD" = '65cc817465cc812e7368' ] && echo nfd-disque || echo disque-normalise)" "nfd=lu nfd-disque"
+# prémisse mesurée : la forme sous laquelle git LISTE ce fichier (la recomposition de core.precomposeunicode n'est compilée que pour macOS ; ailleurs git rend le nom lu sur le disque, donc en NFD)
+LK_GNFC="$(G "$LK_N" ls-files -z | od -An -tx1 | tr -d ' \n')"; case "$LK_GNFC" in *c3a9*) LK_GFORME=git-nfc;; *65cc81*) LK_GFORME=git-nfd;; *) LK_GFORME=git-inconnu;; esac
+if [ "$(uname -s)" = Darwin ]; then LK_GATTENDU=git-nfc; else LK_GATTENDU=git-nfd; fi
+assert_eq "A15.2 — nom stocké en NFD : le fichier reste lu (garde comparée en NFC des deux côtés) ; témoins : le disque porte bien la forme décomposée, git liste sous la forme que le système impose (NFC sous macOS, NFD ailleurs)" "$(lk_a15n "$SCRIPTS") $([ "$LK_NNFD" = '65cc817465cc812e7368' ] && echo nfd-disque || echo disque-normalise) $LK_GFORME" "nfd=lu nfd-disque $LK_GATTENDU"
 
 LK_MN="$WORK/mm-a15n"; rm -rf "$LK_MN"; mkdir -p "$LK_MN/scripts" "$LK_MN/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$LK_MN/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$LK_MN/skills/cockpit-moteur"
 FROM="const a = attendu.normalize('NFC'), n = r.normalize('NFC'); const rn = rootReal + path.sep + path.relative(rootReal, r).normalize('NFC');" TO="const a = attendu, n = r; const rn = r;" node "$AUX/mutsub.mjs" "$LK_MN/skills/cockpit-moteur/scripts/scan.mjs" > "$AUX/mm-a15n.res" 2>&1
 assert_eq "M-NFC.0 — l'ancre du mutant existe (la comparaison en NFC des deux côtés est dans lisibleDansLab de scan.mjs)" "$(cat "$AUX/mm-a15n.res")" "muté"
-assert_eq "M-NFC — rougit A15.2 : sans normalisation, le nom stocké en NFD n'égale plus le nom de la liste git et le fichier disparaît" "$(lk_a15n "$LK_MN/scripts")" "nfd=perdu"
+if [ "$LK_GFORME" = git-nfc ]; then
+  assert_eq "M-NFC — rougit A15.2 : sans normalisation, le nom stocké en NFD n'égale plus le nom de la liste git et le fichier disparaît" "$(lk_a15n "$LK_MN/scripts")" "nfd=perdu"
+else echo "  (M-NFC sans objet : git ne recompose pas les noms sur ce système, liste et disque sont tous deux en NFD)"; fi
 echo "=== G18 — verrou de pilotage, gitdir et inclusion à maillon divergent (gitSortant) ==="
 LK_Y="$LK_RACINE/g18"
 lk_depot() { mkdir -p "$1"; "$GIT_REEL" init -q "$1"; }
