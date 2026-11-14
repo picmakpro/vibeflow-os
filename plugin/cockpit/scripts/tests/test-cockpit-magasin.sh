@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # test-cockpit-magasin.sh — SOCL-21 (79-17, C4, A13) : le magasin d'état de la page, window.VF_ETAT.
-#   A  l'API (clés fermées, abonnement, ordre, isolation, gel)           F  l'alimentation par le flux partagé (hello, who, lock, git, graphe, planning, connexion)
+#   A  l'API (clés fermées, abonnement, ordre, isolation, gel, valeur posée avant la notification)           F  l'alimentation par le flux partagé (hello, who, lock, git, graphe, planning, connexion)
 #   L  les lectures d'état et de frise (une requête en vol, un rattrapage) J  jeton et lecture JSON bornée aux routes de l'API
 #   K  (Chrome) un who et un changement de planning, du flux à l'écran    C  (Chrome) la vie à travers six changements d'onglet
 #   O  le cliquet des observateurs de mutations, par fichier de ui/         R  les observateurs de réparation retirés
@@ -41,6 +41,8 @@ assert_eq "A9 — un second chargement garde l'objet, l'état et les abonnements
 assert_eq "A10 — l'objet et CLES sont gelés, rien ne s'y réécrit" "$(J 'j.A10')" "true,true,function"
 assert_eq "A11 — hors page de serveur (ni flux ni serveur) : l'objet existe, tout est null, jeton null, rien ne lève" "$(J 'j.A11')" "true,,aucune"
 assert_eq "A11b — sans flux : lire rend null sans lever" "$(J 'j.A11b')" "aucune"
+R="$(node "$HERE_T/magasin-ordre.mjs" "$STORE")"
+assert_eq "A12 — la valeur est posée AVANT la notification : un abonné qui relit le magasin dans son rappel voit la valeur reçue (who, lock, git, planning)" "$(J 'j.erreur || JSON.stringify(j.lireDansLeRappelEgaleLaValeur)')" '{"who":true,"lock":true,"git":true,"planning":true}'
 
 echo "=== F — l'alimentation par le flux partagé ==="
 R="$(VM alimentation)"
