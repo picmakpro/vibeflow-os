@@ -10,6 +10,7 @@
 (() => {
   const hr = document.querySelector('header .hr'), stage = document.getElementById('stage'), zoom = document.getElementById('zoom');
   if (!hr) return;
+  const t = window.__vfFrT, PLUS = t('More actions');
   const phone = matchMedia('(max-width: 700px)'), tablette = matchMedia('(max-width: 999px)'); // menu dès 999 px (amendement de P70-D-01), téléphone seul à 700 px
   const style = document.createElement('style');
   style.textContent = `
@@ -19,7 +20,7 @@
     @media (max-width: 999px) { /* amendement de P70-D-01 (2026-11-06) : le menu « ⋯ » dès 999 px */
       #hdr-ext > button:not(#vf-lock), #theme-toggle, #btn-health, #flows-btn, #filters-btn { display: none !important; }
       #vf-plus { display: inline-flex; position: relative; }
-      #vf-plus .badge, .vf-pl-i .badge { min-width: 16px; height: 16px; border-radius: 999px; background: var(--on); color: var(--on-text); font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 var(--sp-4); }
+      #vf-plus .badge, .vf-pl-i .badge { min-width: 16px; height: 16px; border-radius: 999px; background: var(--vf-pl-teinte, var(--on)); color: var(--vf-pl-texte, var(--on-text)); font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 var(--sp-4); }
       #vf-plus .badge { position: absolute; top: var(--sp-8); right: var(--sp-8); min-width: 0; width: 8px; height: 8px; padding: 0; }
       #vf-plus-voile { position: fixed; inset: 0; z-index: 39; background: var(--scrim); } /* DESIGN.md §5 : un menu se pose toujours sur un voile --scrim */
       #vf-plus-menu { display: block; position: fixed; z-index: 40; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: var(--sp-8); max-height: 60vh; overflow: auto; padding: var(--sp-6); border-radius: 18px; background-color: var(--bg); background-image: linear-gradient(var(--menu-solid), var(--menu-solid)); box-shadow: var(--shadow-float); } /* PU-G-011 : --menu-solid est translucide (.94 en sombre), posé sur le fond plein du thème il devient opaque : le titre ne se lit plus à travers */
@@ -59,23 +60,31 @@
   // Q11 (même arbitrage) : le thème dit son état seulement (« Thème : Auto »), pas l'infobulle entière (« … (suit votre appareil). Appuyer pour clair. »)
   const court = (b) => b.id === 'theme-toggle' ? lib(b).split(/[(.]/)[0].trim() : lib(b);
   const pastille = (b) => (b.querySelector('.badge')?.textContent || '').trim();
+  // P80-D-20 (AUDC-F5) : la pastille du menu et le point de « ⋯ » prennent la teinte de la pastille du bureau
+  // (Santé : --hc-badge, Récent : --recent), relue telle que rendue
+  const colorer = (el, src) => {
+    const e = src && src.querySelector('.badge'); if (!e) return;
+    const c = getComputedStyle(e); el.style.setProperty('--vf-pl-teinte', c.backgroundColor); el.style.setProperty('--vf-pl-texte', c.color);
+  };
   const actions = () => [...hr.querySelectorAll('button')].filter((b) => !['vf-lock', 'vf-plus', 'btn-panel'].includes(b.id) && !b.hidden && !b.closest('.menu') && (phone.matches || b.id !== 'vf-git-ouvreur')); // de 701 à 999 px l'ouvreur Git reste dans l'en-tête
 
   const plus = document.createElement('button');
   plus.id = 'vf-plus'; plus.type = 'button'; plus.className = 'btn icon';
-  plus.setAttribute('aria-label', "Plus d'actions"); plus.title = "Plus d'actions"; plus.setAttribute('aria-haspopup', 'menu'); plus.setAttribute('aria-expanded', 'false');
+  plus.setAttribute('aria-label', PLUS); plus.title = PLUS; plus.setAttribute('aria-haspopup', 'menu'); plus.setAttribute('aria-expanded', 'false');
   const NS = 'http://www.w3.org/2000/svg', svg = document.createElementNS(NS, 'svg'); svg.setAttribute('class', 'i'); svg.setAttribute('viewBox', '0 0 24 24');
   for (const cx of [5, 12, 19]) { const c = document.createElementNS(NS, 'circle'); c.setAttribute('cx', cx); c.setAttribute('cy', 12); c.setAttribute('r', 1.6); svg.appendChild(c); }
   plus.appendChild(svg); hr.appendChild(plus);
 
   // pastille du « ⋯ » (Q8, « Tout selon les recos (Recommandé) », AskUserQuestion session principale, 2026-11-04) : un simple point de présence, jamais une somme ; les comptes restent sur les entrées du menu
   const majPastille = () => {
-    const a = actions().some((b) => pastille(b)); let badge = plus.querySelector('.badge');
-    const t = a ? "Plus d'actions, des compteurs à lire dans le menu" : "Plus d'actions"; plus.title = t; plus.setAttribute('aria-label', t); // PU-G-012 : la pastille dit ce qu'elle annonce
+    const avec = actions().filter((b) => pastille(b)), a = avec.length > 0; let badge = plus.querySelector('.badge');
+    const lbl = a ? t('More actions, counters to read in the menu') : PLUS; plus.title = lbl; plus.setAttribute('aria-label', lbl); // PU-G-012 : la pastille dit ce qu'elle annonce
     if (!a) { badge?.remove(); return; }
     if (!badge) { badge = document.createElement('span'); badge.className = 'badge'; badge.setAttribute('aria-hidden', 'true'); plus.appendChild(badge); }
+    colorer(badge, avec.find((b) => b.id === 'btn-health') || avec[0]); // la teinte la plus haute : Santé, sinon la première
   };
-  new MutationObserver((ms) => { if (ms.some((m) => !plus.contains(m.target))) majPastille(); }).observe(hr, { childList: true, subtree: true, characterData: true });
+  new MutationObserver((ms) => { if (ms.some((m) => !plus.contains(m.target))) majPastille(); }).observe(hr, { childList: true, subtree: true, characterData: true, attributes: true, attributeFilter: ['style', 'class'] });
+  window.addEventListener('floorplan-theme-change', () => requestAnimationFrame(majPastille)); // le thème change les teintes
   majPastille();
 
   let menu = null, voile = null;
@@ -83,14 +92,15 @@
   const ouvrir = () => {
     fermer(false);
     voile = document.createElement('div'); voile.id = 'vf-plus-voile'; voile.setAttribute('aria-hidden', 'true'); document.body.appendChild(voile);
-    menu = document.createElement('div'); menu.id = 'vf-plus-menu'; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', "Plus d'actions");
+    menu = document.createElement('div'); menu.id = 'vf-plus-menu'; menu.setAttribute('role', 'menu'); menu.setAttribute('aria-label', PLUS);
     const lock = document.getElementById('vf-lock'), etat = lock && (lock.getAttribute('aria-label') || lock.title || '').trim(); // PU-G-012 : légende du point « au travail » (« Personne au travail », « 2 au travail »)
     if (etat) { const l = document.createElement('div'); l.className = 'vf-pl-etat'; l.setAttribute('role', 'none'); l.textContent = etat; menu.appendChild(l); }
     for (const src of actions()) {
       const it = document.createElement('button'); it.type = 'button'; it.className = 'vf-pl-i'; it.setAttribute('role', 'menuitem');
       const ic = src.querySelector('svg'); if (ic) { const c = ic.cloneNode(true); c.setAttribute('class', 'i vf-pl-ic'); c.setAttribute('aria-hidden', 'true'); it.appendChild(c); } // PU-G-011 : l'icône du bouton d'origine
-      const t = document.createElement('span'); t.className = 'vf-pl-t'; t.textContent = court(src); it.appendChild(t);
-      const p = pastille(src); if (p) { const b = document.createElement('span'); b.className = 'badge'; b.textContent = p; it.appendChild(b); }
+      const lbl = document.createElement('span'); lbl.className = 'vf-pl-t'; lbl.textContent = court(src); it.appendChild(lbl);
+      const p = pastille(src);
+      if (p) { const b = document.createElement('span'); b.className = 'badge'; b.textContent = p; colorer(b, src); it.appendChild(b); }
       // Q13a : une action désactivée l'est aussi dans le menu (aria-disabled, atténuée, même infobulle) ; elle ne fait rien et ne ferme pas le menu
       const off = src.disabled || src.getAttribute('aria-disabled') === 'true';
       if (off) { it.setAttribute('aria-disabled', 'true'); it.classList.add('vf-pl-off'); if (src.title) it.title = src.title; }
@@ -150,7 +160,7 @@
     const h1 = ctx?.querySelector('h1'); if (!h1) return;
     if (!h1.dataset.vfNb) {
       h1.dataset.vfNb = '1';
-      const tw = document.createTreeWalker(h1, NodeFilter.SHOW_TEXT), noeuds = []; let t; while ((t = tw.nextNode())) noeuds.push(t);
+      const tw = document.createTreeWalker(h1, NodeFilter.SHOW_TEXT), noeuds = []; let nd; while ((nd = tw.nextNode())) noeuds.push(nd);
       for (const n of noeuds) {
         if (!/\S-\S/.test(n.data)) continue;
         const f = document.createDocumentFragment();
@@ -220,7 +230,7 @@
     }).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     document.addEventListener('keydown', (ev) => {
       if (ev.key !== 'Escape' || ev.defaultPrevented || !mi.matches || !ouvert() || panel.querySelector(':scope > .vf-whop')) return;
-      if (document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden])') || (window.FloorplanTour && window.FloorplanTour.active())) return; // une palette, un menu ou la visite prennent l'Échap d'abord
+      if (window.VF_SURCOUCHES.couverte(panel)) return; // une palette, un menu ou la visite (80-02 : la pile) prennent l'Échap d'abord
       if (ev.target && /^(INPUT|TEXTAREA|SELECT)$/.test(ev.target.tagName)) return;
       ev.stopPropagation(); ev.preventDefault(); sansTrace(() => bascule(false)); // le viewer n'entend pas cet Échap : il ne remonte pas le canevas ni n'efface la sélection (R15.8)
     });

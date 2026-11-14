@@ -9,7 +9,7 @@
 #   S2  lecture du mode d'un fichier : même valeur sous macOS, GNU et uutils (faux `stat` des trois familles)
 #   TC  T-71-10 : le secret se compare en temps constant (égalité condensée + timingSafeEqual, aucune comparaison directe)
 #   TM  moteur : un assistant sous .vibeflow/ ou en lien symbolique est refusé (terminal inerte, rien n'est lancé)
-#   M-* mutants (copies de la sortie) : M-ORIGIN, M-HOST, M-JETON, M-SANSORIGIN, M-EXPIRE, M-RETIRE, M-BALAI, M-REJEU, M-SERVI, M-LOG, M-URL, M-TD1, M-TEMPS-CONSTANT, M-EGAL, M-MOTEUR-VIBEFLOW, M-MOTEUR-LIEN
+#   M-* mutants (copies du module par cockpit_module_muter) : M-ORIGIN, M-HOST, M-JETON, M-SANSORIGIN, M-EXPIRE, M-RETIRE, M-BALAI, M-REJEU, M-SERVI, M-LOG, M-URL, M-TD1, M-TEMPS-CONSTANT, M-EGAL, M-MOTEUR-VIBEFLOW, M-MOTEUR-LIEN
 # Chaque refus a son témoin positif ; « 0 assistant » = aucun enfant du serveur dont la ligne de commande contient vf-cockpit-pty.py.
 # Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
@@ -17,9 +17,10 @@ libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$SCRIPTS/../skills/cockpit-moteur"; TA="$HERE_T/terminal-aux.mjs"
-WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/bin" "$WORK/run" "$WORK/t3" "$WORK/t5"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/bin" "$WORK/run" "$WORK/t3" "$WORK/t5"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 # P71-D-33 : Q tourne dans un processus enfant du serveur ; « les enfants du serveur » = les assistants, enfants de ce processus (pgrep -P ne voit qu'un étage)
 pgrep() { if [ "$1" = "-P" ] && [ $# -eq 2 ]; then local c; for c in $(command pgrep -P "$2"); do if ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs'; then command pgrep -P "$c"; else echo "$c"; fi; done; else command pgrep "$@"; fi; }
 PASS=0; FAIL=0
@@ -73,25 +74,32 @@ mklab() {
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build-$(basename "$L").out" 2>&1 || cat "$WORK/build-$(basename "$L").out"
 }
 SRVN=0
-srv() { # srv <sortie> <0|1> : serveur lancé directement depuis la sortie, comme le lanceur ; AMORCE posé en 0600 (copie dans $WORK/amorce.copy)
-  local o="$1" term="${2:-0}" lab; lab="$(cd "$1/../.." && pwd)"
+# 79-06 : le code ne vit plus dans la sortie. MOD_DEPOT = racine du module du dépôt ; mod_de <sortie> = racine du module que COMMANDE cette sortie
+# (table posée par mutant() : sortie TAB module ; par défaut le module du dépôt). ENG0 = le moteur du module du dépôt (ENG peut être remplacé par une copie).
+MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODS_TABLE="$WORK/.mods"; : > "$MODS_TABLE"; export MODS_TABLE MOD_DEPOT; ENG0="$ENG"
+mod_de() { local m; m="$(awk -F'\t' -v s="${1:-}" '$1==s{m=$2} END{print m}' "$MODS_TABLE" 2>/dev/null)"; printf '%s\n' "${m:-$MOD_DEPOT}"; }
+srv() { # srv <sortie> <0|1> : serveur du MODULE de la sortie visée, lancé par l'aide ; AMORCE posé en 0600 (copie dans $WORK/amorce.copy) ; ENG remplacé = moteur copié (contenu identique : même empreinte)
+  local o="$1" term="${2:-0}" lab ev=(); lab="$(cd "$1/../.." && pwd)"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN-$RANDOM.out"; rm -f "$o/.cache/server.json" "$o/.cache/terminal-amorce"
   local flag=(); mkdir -p "$o/.cache"
   if [ "$term" = 1 ]; then flag=(--terminal); AMORCE="$(amorce_neuve)"; (umask 077; printf '%s' "$AMORCE" > "$o/.cache/terminal-amorce"); (umask 077; printf '%s' "$AMORCE" > "$WORK/amorce.copy"); fi
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open ${flag[@]+"${flag[@]}"} --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  if [ "$term" = 1 ]; then for _ in $(seq 1 50); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done; fi
-  SRV_PORT="$(sj j.port)"; SRV_PORT="${SRV_PORT:-0}"
+  [ "$ENG" = "$ENG0" ] || ev=(VF_COCKPIT_ENGINE_DIR="$ENG")
+  COCKPIT_MODULE="$(mod_de "$o")" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${ev[@]+"${ev[@]}"} ${flag[@]+"${flag[@]}"}
+  if [ "$term" = 1 ]; then attendre 5 grep -qs '"terminal"' "$o/.cache/server.json"; fi # la clé terminal manque quand le moteur refuse l'assistant : attente bornée, sans échec
+  SRV_PID="$VF_PID"; SRV_PORT="${VF_PORT:-0}"
 }
 sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
 srvq() { srv "${1:-$OUT}" 1; QP="$(sj '(j.terminal&&j.terminal.url)||""')"; QP="${QP##*:}"; QP="${QP:-1}"; TOK="$(sj j.token)"; }
 echanger() { local r; r="$(node "$TA" amorcer "$QP" "$WORK/amorce.copy")"; EC_CODE="$(printf '%s\n' "$r" | sed -n 1p)"; SECRET="$(printf '%s\n' "$r" | sed -n 2p)"; }
 pty_compte() { local n=0 p; for p in $(pgrep -P "$SRV_PID" 2>/dev/null); do ps -o command= -p "$p" 2>/dev/null | grep -q 'vf-cockpit-pty.py' && n=$((n+1)); done; echo "$n"; }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : données) et MUT_MOD (racine de la copie du module)
+  local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  case "$(basename "$2")" in
+    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  f="$d/.vibeflow/cockpit/$2"; [ -f "$f" ] || return 1   # page de la copie du lab (donnée) : même chemin que MUT_OUT/<fichier>
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 temoin_compteur() { # lance un assistant sur un serveur jetable : prouve que pty_compte voit un PTY
@@ -395,6 +403,7 @@ unsrv
 echo "=== TC — T-71-10 : comparaison du secret en temps constant (sonde statique sur le chemin de comparaison) ==="
 sonde_tc() { # sonde_tc <dossier de sortie> -> « egal=<n> directes=<n> condense=<oui|non> » : usages de egal() sur le secret, comparaisons directes, timingSafeEqual dans egal()
   local d="$1" e dir c
+  [ -f "$d/vf-cockpit-terminal-processus.mjs" ] || d="$(mod_de "$1")/scripts"   # 79-06 : une sortie ne porte plus de code, le module qu'elle commande oui ; un dossier jetable qui porte les fichiers reste lu tel quel
   e="$(grep -c "egal(req.headers\['x-vf-terminal'\], secret)" "$d/vf-cockpit-terminal-processus.mjs" || true)"
   dir="$(grep -v '^ *//' "$d/vf-cockpit-terminal-processus.mjs" | grep -cE "x-vf-terminal'\] *[!=]==?|[!=]==? *req\.headers\['x-vf-terminal'\]|[!=]==? *secret\b|\bsecret *[!=]==" || true)"
   c="$(grep -c 'crypto.timingSafeEqual' "$d/vf-cockpit-terminal-amorce.mjs" || true)"
@@ -416,8 +425,17 @@ MOT_OK="$WORK/moteur-ok"; rm -rf "$MOT_OK"; cp -R "$ENG" "$MOT_OK"
 MOT_VF="$LAB/.vibeflow/moteur-copie"; rm -rf "$MOT_VF"; cp -R "$ENG" "$MOT_VF"
 MOT_LIEN="$WORK/moteur-lien"; rm -rf "$MOT_LIEN"; cp -R "$ENG" "$MOT_LIEN"; rm "$MOT_LIEN/terminal/vf-cockpit-pty.py"; ln -s "$ENG/terminal/vf-cockpit-pty.py" "$MOT_LIEN/terminal/vf-cockpit-pty.py"
 assert_eq "TM.0 — témoin : une copie ordinaire du moteur, hors du lab, donne un terminal actif" "$(sonde_moteur "$OUT" "$MOT_OK")" "terminal=true journal=autre"
-assert_eq "TM.1 — moteur sous <lab>/.vibeflow/ : assistant refusé, terminal inerte (journal : assistant introuvable)" "$(sonde_moteur "$OUT" "$MOT_VF")" "terminal=false journal=refus"
+# 79-06 (S3f, audit : classe T-79-601) : serve.mjs refuse lui-même un moteur désigné sous <lab>/.vibeflow/ (VF_COCKPIT_ENGINE_DIR) avant tout démarrage ;
+# la garde du terminal (celle que TM.1 et M-MOTEUR-VIBEFLOW visent) devient une défense en profondeur. TM.1b : le serveur du module refuse de démarrer ;
+# TM.1 : la même garde retirée de serve.mjs dans une copie du module (SANS_GARDE_SERVE) atteint la garde du terminal, qui refuse toujours : même attendu qu'avant.
+SANS_GARDE_SERVE='/^{ const vf = path.join(root, .\.vibeflow.); for (const nom of/d'
+assert_eq "TM.1b — moteur sous <lab>/.vibeflow/ : serve.mjs refuse de démarrer (aucun terminal, message en français)" "$(r="$(sonde_moteur "$OUT" "$MOT_VF")"; echo "$r $(grep -c 'VF_COCKPIT_ENGINE_DIR désigne un dossier de données du lab' "$(ls -t "$WORK"/serve-*.out | head -1)")")" "terminal= journal=autre 1"
 rm -rf "$MOT_VF" # copie de 3 Mo : les mutants qui suivent copient <lab>/.vibeflow
+if mutant sansgarde serve.mjs "$SANS_GARDE_SERVE"; then
+  cp -R "$ENG" "$MUT_OUT/../moteur-copie"
+  assert_eq "TM.1 — moteur sous <lab>/.vibeflow/ (garde de serve.mjs retirée dans la copie du module) : assistant refusé par le terminal, terminal inerte (journal : assistant introuvable)" "$(sonde_moteur "$MUT_OUT" "$MUT_OUT/../moteur-copie")" "terminal=false journal=refus"
+  rm -rf "$MUT_OUT/../moteur-copie"
+else assert_eq "TM.1 — copie du module sans la garde de serve.mjs : mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 assert_eq "TM.2 — assistant en lien symbolique : refusé, terminal inerte (journal : assistant introuvable)" "$(sonde_moteur "$OUT" "$MOT_LIEN")" "terminal=false journal=refus"
 
 echo "=== Mutants — chacun rougit sa sonde ==="
@@ -468,9 +486,10 @@ if mut tc vf-cockpit-terminal-processus.mjs "s/egal(req.headers\['x-vf-terminal'
   assert_eq "M-TEMPS-CONSTANT — le mutant (comparaison directe ===) rougit TC.1" "$(rouge "$(sonde_tc "$MUT_OUT")" "egal=2 directes=0 condense=oui")" "rouge"; fi
 if mut egal vf-cockpit-terminal-amorce.mjs "s/return crypto.timingSafeEqual(condense(a), condense(b));/return a === b;/"; then
   assert_eq "M-EGAL — le mutant (egal() sans timingSafeEqual) rougit TC.1" "$(rouge "$(sonde_tc "$MUT_OUT")" "egal=2 directes=0 condense=oui")" "rouge"; fi
-if mut moteurvf vf-cockpit-terminal.mjs "s/ && !realUnder(f, path.join(root, '.vibeflow'))//"; then
+if mut moteurvf vf-cockpit-terminal.mjs "s/ && !realUnder(f, path.join(root, '.vibeflow'), { siEchec: true })//"; then
   cp -R "$ENG" "$MUT_OUT/../moteur-copie"
-  assert_eq "M-MOTEUR-VIBEFLOW — le mutant (plus de refus sous .vibeflow/) rougit TM.1 : le terminal devient actif" "$(rouge "$(sonde_moteur "$MUT_OUT" "$MUT_OUT/../moteur-copie")" "terminal=false journal=refus")" "rouge"; fi
+  MSV="$MUT_MOD/skills/cockpit-moteur/assets/serve.mjs"; cp "$MSV" "$MSV.orig"; sed -i.bak "$SANS_GARDE_SERVE" "$MSV"; cmp -s "$MSV" "$MSV.orig" && assert_eq "M-MOTEUR-VIBEFLOW — garde de serve.mjs : mutant sans effet" "sans effet" "effet"; rm -f "$MSV.orig" "$MSV.bak"
+  assert_eq "M-MOTEUR-VIBEFLOW — le mutant (plus de refus sous .vibeflow/, la garde de serve.mjs retirée dans la même copie) rougit TM.1 : le terminal devient actif" "$(rouge "$(sonde_moteur "$MUT_OUT" "$MUT_OUT/../moteur-copie")" "terminal=false journal=refus")" "rouge"; fi
 if mut moteurlien vf-cockpit-terminal.mjs "s/fs.lstatSync(f).isFile()/fs.statSync(f).isFile()/"; then
   assert_eq "M-MOTEUR-LIEN — le mutant (lstat remplacé par stat : le lien est suivi) rougit TM.2 : le terminal devient actif" "$(rouge "$(sonde_moteur "$MUT_OUT" "$MOT_LIEN")" "terminal=false journal=refus")" "rouge"; fi
 

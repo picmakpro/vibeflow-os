@@ -13,7 +13,7 @@ export HOME="$WORK/home"; mkdir -p "$HOME"
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
-if [ -z "$CHROME" ]; then echo "  ⊘ SAUTÉE : aucun navigateur — les retours de visite ne sont PAS vérifiés"; exit 0; fi
+if [ -z "$CHROME" ]; then . "$(dirname "$0")/chrome-saut.sh"; vf_chrome_saut "  ⊘ SAUTÉE : aucun navigateur — les retours de visite ne sont PAS vérifiés"; exit 0; fi
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 L="$WORK/lab"; mkdir -p "$L/.planning"
@@ -48,7 +48,9 @@ assert_eq "T1.1 — mesure sans erreur, le texte du bouton suit le cycle Auto, C
 echo "=== T3 — anneau de focus du bouton de visite ==="
 X="$(mes 1280 focus)"; [ -n "${DBG:-}" ] && echo "RAW: $X"
 assert_eq "T3.1 — visite rouverte à la souris puis une flèche : le bouton ne porte pas d'anneau (focus-visible faux) et la visite est ouverte" "$(g "$X" "j.erreur||[j.souris1.fv,j.souris1.ouverte].join(',')")" "false,true"
-assert_eq "T3.2 — activé au clavier (Entrée), le bouton garde le focus et son anneau" "$(g "$X" "j.erreur||[j.clavier.actif,j.clavier.fv,j.clavier.ouverte].join(',')")" "true,true,true"
+# T3.2 réécrite (80-02, P80-D-11 / Q5) : l'ancien texte « le bouton garde le focus et son anneau » pendant la visite contredit le contrat de la Phase 80, la visite ouverte par son bouton est modale (inert sur les frères de #tour, bouton compris).
+assert_eq "T3.2 — activé au clavier (Entrée), la visite est ouverte et modale : le bouton est inerte et ne porte plus le focus" "$(g "$X" "j.erreur||[j.clavier.ouverte,j.clavier.inerte,j.clavier.actif].join(',')")" "true,true,false"
+assert_eq "T3.3 — visite fermée, le focus revient au bouton et son anneau (ouverture au clavier)" "$(g "$X" "j.erreur||[j.retour.ouverte,j.retour.inerte,j.retour.actif,j.retour.fv].join(',')")" "false,false,true,true"
 
 echo "=== T7 — tiroir Git ouvert pendant la visite : une seule Échap ==="
 X="$(mes 1440 tiroir)"; [ -n "${DBG:-}" ] && echo "RAW: $X"

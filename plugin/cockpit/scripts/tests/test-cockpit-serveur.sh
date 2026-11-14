@@ -8,7 +8,6 @@
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
@@ -18,6 +17,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -83,16 +83,15 @@ SID1="aaaa1111-2222-3333-4444-555566667777"; SID2="bbbb1111-2222-3333-4444-55556
 mk_session "$SID1" "$MARK"
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 OUT="$LAB/.vibeflow/cockpit"
-node "$OUT/serve.mjs" --no-open --port $(libre) > "$WORK/serve.out" 2>&1 &
-SRV=$!
-for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-PORT=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
+cockpit_lancer "$LAB"; SRV="${VF_PID:-}"
+PORT="${VF_PORT:-0}"
 TOK=$(node "$AUX/token.mjs" "$PORT" /); PTOK=$(node "$AUX/token.mjs" "$PORT" /project.html)
 assert_eq "S0 — serveur démarré, jetons lus dans les deux pages" "$([ "$PORT" -gt 0 ] && [ "${#TOK}" -ge 16 ] && [ "${#PTOK}" -ge 16 ] && echo oui || echo non)" "oui"
 cat > "$AUX/statut.mjs" <<'JS'
+// statut.mjs <port> <chemin> [jeton] : « statut|page|sans-page » ; avec un jeton, « page » = le corps porte le schéma Équipe (79-16 : le document ne porte plus de donnée, la route si)
 import http from 'node:http';
-const [, , port, p] = process.argv;
-http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}` } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => console.log(r.statusCode + '|' + (b.includes('VibeFlow · Équipe') ? 'page' : 'sans-page'))); }).on('error', (e) => console.log('ERR ' + e.message));
+const [, , port, p, jeton] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}`, ...(jeton ? { 'x-vf-cockpit-token': jeton } : {}) } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => console.log(r.statusCode + '|' + (b.includes(jeton ? 'vibeflow/cockpit-equipe@1' : 'VibeFlow · Équipe') ? 'page' : 'sans-page'))); }).on('error', () => console.log('ERR'));
 JS
 assert_eq "EQ.0 — témoin : le serveur d'origine sert /equipe.html (200, page Équipe)" "$(node "$AUX/statut.mjs" "$PORT" /equipe.html)" "200|page"
 
@@ -112,7 +111,7 @@ echo "=== S3 — fichiers cachés et traversée ==="
 assert_eq "S3.1 — /.cache/server.json : 404 (il porte le jeton)" "$(status "$PORT" /.cache/server.json)" "404"
 assert_eq "S3.2 — /.gitignore : 404" "$(status "$PORT" /.gitignore)" "404"
 assert_eq "S3.3 — témoin : le fichier server.json existe bien et porte le jeton" "$(grep -c "$TOK" "$OUT/.cache/server.json")" "1"
-assert_eq "S3.4 — /graph.json (fichier public) : 200" "$(status "$PORT" /graph.json)" "200"
+assert_eq "S3.4 — /graph.json n'est plus servi (404, A41 : aucun fichier de la sortie) alors qu'il existe sur disque" "$(status "$PORT" /graph.json)|$([ -s "$OUT/graph.json" ] && echo existe || echo absent)" "404|existe"
 for p in "/%2e%2e/%2e%2e/etc/passwd" "/..%2f..%2fREADME.md" "/%2e%2e%2f%2e%2e%2f.planning/ROADMAP.md"; do
   assert_eq "S3 — $p : jamais 200" "$([ "$(status "$PORT" "$p")" = "200" ] && echo 200 || echo refuse)" "refuse"
 done
@@ -154,11 +153,11 @@ SH
 SCAN=$(bash "$AUX/scan.sh" "$OUT" "$MARK" | tr '\n' ' ')
 assert_eq "S7.1 — .vibeflow/cockpit : 0 fichier à clé doing, 0 au marqueur" "$SCAN" "0 0 "
 mkdir -p "$WORK/temoin"; printf '{"doing":"x"}\n' > "$WORK/temoin/a.json"; printf '%s\n' "$MARK" > "$WORK/temoin/b.txt"
-assert_eq "S7.3 — l'exemption est exacte : le contrat de la sortie est celui du module, octet pour octet" "$(cmp -s "$OUT/vf-cockpit-interface.json" "$SCRIPTS/vf-cockpit-interface.json" && echo identique || echo different)" "identique"
+assert_eq "S7.3 — l'exemption est exacte : le contrat n'est plus dans la sortie (il n'y a que celui du module ; AM4.16 le couvre aussi)" "$([ -e "$OUT/vf-cockpit-interface.json" ] && echo présent || echo absent)|$([ -f "$SCRIPTS/vf-cockpit-interface.json" ] && echo module || echo manque)" "absent|module"
 assert_eq "S7.2 — témoin : le même balayage détecte une clé et un marqueur injectés" "$(bash "$AUX/scan.sh" "$WORK/temoin" "$MARK" | tr '\n' ' ')" "1 1 "
 
 echo "=== S8 — l'export ne la porte pas ==="
-node "$OUT/serve.mjs" --export "$WORK/export.html" > "$WORK/export.out" 2>&1; assert_eq "S8.1 — l'export rend 0" "$?" "0"
+cockpit_exporter "$LAB" "$WORK/export.html" > "$WORK/export.out" 2>&1; assert_eq "S8.1 — l'export rend 0" "$?" "0"
 assert_eq "S8.2 — témoin de données : l'export contient un fichier du lab" "$([ "$(grep -c 'util.js' "$WORK/export.html")" -ge 1 ] && echo oui || echo non)" "oui"
 assert_eq "S8.3 — ni clé doing ni marqueur dans l'export" "$(grep -cE '"doing"[[:space:]]*:' "$WORK/export.html")$(grep -c "$MARK" "$WORK/export.html")" "00"
 
@@ -294,35 +293,247 @@ cat > "$AUX/equipe-garde.mjs" <<'JS'
 import { pathToFileURL } from 'node:url';
 const [, , scripts, lab] = process.argv;
 const { attach } = await import(pathToFileURL(scripts + '/vf-cockpit-server.mjs').href);
-const a = attach({ here: lab, root: lab, token: 'tk', inject: '', log: () => {} });
+const a = attach({ here: lab, root: lab, token: 'tk', log: () => {} });
 a.load();
-const page = () => { const p = a.pageEquipe(); return p === null ? 'null' : typeof p === 'string' && p.includes('VibeFlow · Équipe') ? 'page' : 'autre'; };
+// 79-16 : la page Équipe n'existe plus (le document ne porte aucune donnée) ; le graphe Équipe se lit sur la route, en processus (double de la requête) ; verdicts inchangés : `page`, puis `null|false`
+const lire = async () => {
+  const r = { code: 0, corps: '' }; let fini = false;
+  const res = { writeHead(c) { r.code = c; }, end(b) { r.corps = String(b ?? ''); fini = true; } };
+  a.route({ method: 'GET', headers: { 'x-vf-cockpit-token': 'tk', host: '127.0.0.1:5000' }, socket: { localPort: 5000 } }, res, new URL('http://127.0.0.1:5000/api/vf/graphe?onglet=equipe'));
+  for (let i = 0; i < 50 && !fini; i++) await new Promise((ok) => setTimeout(ok, 40));
+  return r;
+};
+const page = async () => { const r = await lire(); return r.code === 200 && r.corps.includes('vibeflow/cockpit-equipe@1') ? 'page' : r.code === 503 && r.corps.includes('emission-refusee') ? 'null' : `autre:${r.code}`; };
 const sortie = {};
 globalThis.__vfSnap = { seq: 1, lock: { available: false }, who: { workers: [{ kind: 'session', id: 'w1', tree: 't', source: 's' }], sources: {} } };
-sortie.propre = page();
+sortie.propre = await page();
 globalThis.__vfSnap = { seq: 2, lock: { available: false }, who: { workers: [{ kind: 'session', id: 'w1', tree: 't', source: 's', sub: { doing: 'commande-secrete' } }], sources: {} } };
-const p = a.pageEquipe(); sortie.interdit = page(); sortie.fuite = typeof p === 'string' && p.includes('commande-secrete');
+const r = await lire(); sortie.interdit = r.code === 503 && r.corps.includes('emission-refusee') ? 'null' : `autre:${r.code}`; sortie.fuite = r.corps.includes('commande-secrete');
 console.log(JSON.stringify(sortie)); a.stop(); process.exit(0);
 JS
-mkdir -p "$WORK/lab-eq"; printf '%s' '<html><head><title>t</title></head><body><script>window.FLOORPLAN = {"meta":{"rootName":"x"},"nodes":[],"files":[],"links":[]};</script></body></html>' > "$WORK/lab-eq/project.html"
+mkdir -p "$WORK/lab-eq"; printf '%s' '<html><head><title>t</title></head><body><script>window.VF_COCKPIT = {"meta":{"rootName":"x"},"nodes":[],"files":[],"links":[]};</script></body></html>' > "$WORK/lab-eq/project.html"
 EQ="$(VF_DOUBLE_LIVE="file://$AUX/live-double.mjs" node --import "$AUX/reg-double.mjs" "$AUX/equipe-garde.mjs" "$SCRIPTS" "$WORK/lab-eq" 2>"$WORK/eq.err")"
 eqev() { printf '%s' "$EQ" | node "$AUX/json-stdin.mjs" "$1"; }
-assert_eq "EQ.1 — témoin positif : un who propre donne la page Équipe" "$(eqev 'j.propre')" "page"
-assert_eq "EQ.2 — un who portant une clé interdite (profondeur 2) : aucune page d'équipe, rien ne sort" "$(eqev 'j.interdit+"|"+j.fuite')" "null|false"
+assert_eq "EQ.1 — témoin positif : un who propre donne le graphe Équipe (route, en processus)" "$(eqev 'j.propre')" "page"
+assert_eq "EQ.2 — un who portant une clé interdite (profondeur 2) : le graphe Équipe est refusé (503 emission-refusee), rien ne sort" "$(eqev 'j.interdit+"|"+j.fuite')" "null|false"
 
 # F4 (69-07, P69-D-23) : la liste des clés interdites vient du contrat. Une copie de la sortie dont vf-cockpit-interface.json est retirée ne peut plus
 # la lire : le serveur de la copie doit tout refuser d'émettre (fermé par défaut). Témoin : le serveur d'origine a émis son hello (S4.2, S5.1).
-F4="$LAB/.vibeflow/mut-contrat"; rm -rf "$F4"; cp -R "$OUT" "$F4"; rm -rf "$F4/.cache"; rm -f "$F4/vf-cockpit-interface.json"
-node "$F4/serve.mjs" --no-open --port $(libre) > "$WORK/f4.out" 2>&1 &
-F4PID=$!
-for _ in $(seq 1 100); do [ -s "$F4/.cache/server.json" ] && break; sleep 0.1; done
-F4PORT=$(node "$AUX/json.mjs" "$F4/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
+F4="$(cockpit_module_copie)"; rm -f "$F4/scripts/vf-cockpit-interface.json"   # 79-06 : le contrat est celui du module ; une copie du module sans contrat
+COCKPIT_MODULE="$F4" cockpit_lancer "$LAB"; F4PID="${VF_PID:-}"
+F4PORT="${VF_PORT:-0}"
 F4TOK=$(node "$AUX/token.mjs" "$F4PORT" /)
 : > "$WORK/f4.jsonl"; node "$AUX/sse.mjs" "$F4PORT" "$F4TOK" 2000 hello "$WORK/f4.jsonl"
-assert_eq "F4.0 — témoin : la copie est sans contrat, son serveur répond (jeton lu, flux ouvert en 200)" "contrat:$([ -e "$F4/vf-cockpit-interface.json" ] && echo present || echo absent)|jeton:$([ "${#F4TOK}" -ge 16 ] && echo oui || echo non)|flux:$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E[0].status')" "contrat:absent|jeton:oui|flux:200"
+assert_eq "F4.0 — témoin : la copie est sans contrat, son serveur répond (jeton lu, flux ouvert en 200)" "contrat:$([ -e "$F4/scripts/vf-cockpit-interface.json" ] && echo present || echo absent)|jeton:$([ "${#F4TOK}" -ge 16 ] && echo oui || echo non)|flux:$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E[0].status')" "contrat:absent|jeton:oui|flux:200"
 assert_eq "F4 — contrat illisible : aucun événement hello n'est émis" "$(node "$AUX/ev.mjs" "$WORK/f4.jsonl" 'E.filter(e=>e.event).length')" "0"
-assert_eq "EQ.3 — contrat illisible : /equipe.html n'émet aucune donnée d'équipe (ni 200 avec la page)" "$(node "$AUX/statut.mjs" "$F4PORT" /equipe.html | grep -c '^200|page')" "0"
+assert_eq "EQ.3 — contrat illisible : la route Équipe n'émet aucune donnée d'équipe (ni 200 avec le graphe) ; le document, lui, ne porte aucune donnée" "$(node "$AUX/statut.mjs" "$F4PORT" "/api/vf/graphe?onglet=equipe" "$F4TOK" | grep -c '^200|page')" "0"
 vf_hyg_stop "$F4PID"
+
+
+echo "=== AM4 — la garde d'émission lit le contrat du MODULE, jamais celui de la sortie (E8, P79-D-09, 79-06) ==="
+# Un lab par témoin : copie du lab assemblé, sans .cache ; la sortie garde sa forme <lab>/.vibeflow/cockpit (forme exigée du serveur du module).
+am4_lab() { rm -rf "$1"; cp -R "$LAB" "$1"; rm -rf "$1/.vibeflow/cockpit/.cache"; }
+am4_flux() { # <lab> <fichier> : le serveur lancé est celui de VF_PORT / VF_JETON ; une ligne JSON par événement (hello compris)
+  : > "$2"; node "$AUX/sse.mjs" "$VF_PORT" "$VF_JETON" 2000 hello "$2"
+}
+# AM4.5 : le contrat de la SORTIE est vidé (liste de clés interdites vide) : s'il était lu, la garde fermerait tout. Le contrat du module, intact, est seul lu : le hello sort.
+L45="$WORK/lab-am45"; am4_lab "$L45"
+node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));for(const k of Object.keys(j.schemas||{}))if(j.schemas[k]&&Array.isArray(j.schemas[k].interdits))j.schemas[k].interdits=[];fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$SCRIPTS/vf-cockpit-interface.json" "$L45/.vibeflow/cockpit/vf-cockpit-interface.json"
+cockpit_lancer "$L45"; V45="$(cockpit_vivant && echo vivant || echo mort)"
+am4_flux "$L45" "$WORK/am45.jsonl"
+assert_eq "AM4.5 — contrat de la sortie vidé : il est ignoré, la garde lit celui du module et le flux émet son hello (${V45})" "$V45 hello=$(node "$AUX/ev.mjs" "$WORK/am45.jsonl" 'E.filter(e=>e.event==="hello").length')" "vivant hello=1"
+cockpit_arreter
+# AM4.6 (F4 déplacée côté module) : copie du MODULE sans son contrat : le serveur est VIVANT (contrôle de vie) et rien n'est émis (fermé par défaut, P69-D-23)
+L46="$WORK/lab-am46"; am4_lab "$L46"; C46="$(cockpit_module_copie)"; rm -f "$C46/scripts/vf-cockpit-interface.json"
+COCKPIT_MODULE="$C46" cockpit_lancer "$L46"; V46="$(cockpit_vivant && echo vivant || echo mort)"
+am4_flux "$L46" "$WORK/am46.jsonl"
+assert_eq "AM4.6 — copie du module sans son contrat : serveur vivant, aucun hello émis et la route Équipe sans donnée d'équipe (contrat illisible ferme tout)" "$V46 hello=$(node "$AUX/ev.mjs" "$WORK/am46.jsonl" 'E.filter(e=>e.event==="hello").length') equipe=$(node "$AUX/statut.mjs" "${VF_PORT:-0}" "/api/vf/graphe?onglet=equipe" "$(node "$AUX/token.mjs" "${VF_PORT:-0}" /)" | grep -c '^200|page')" "vivant hello=0 equipe=0"
+cockpit_arreter
+# ancre du mutant M-CONTRAT-OUVERT (« contrat illisible -> flux ouvert ») : la constante porteInterdit ferme sur une liste vide ; elle existe déjà : ancre VERTE dès cette tâche (l'assertion d'effet vient avec le serveur du module)
+assert_eq "M-CONTRAT-OUVERT.0 — ancre présente : porteInterdit ferme le flux quand la liste de clés interdites est vide (vf-cockpit-server.mjs du module)" "$(grep -cF 'const porteInterdit = (o) => !INTERDITS.length ||' "$SCRIPTS/vf-cockpit-server.mjs")" "1"
+# ancre du mutant M-CONTRAT (« le serveur relit le contrat dans la sortie ») : le contrat est lu à côté du fichier du serveur (import.meta.url), jamais depuis here ; ancre verte aussi
+assert_eq "M-CONTRAT.0 — ancre présente : le contrat est lu à côté de vf-cockpit-server.mjs (import.meta.url), jamais depuis la sortie" "$(grep -cF "fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json')" "$SCRIPTS/vf-cockpit-server.mjs")" "1"
+
+# ---- mutants de la tâche 4a (79-06) : copies du module (cockpit_module_muter : ancre présente, copie changée), témoin rejoué sur la copie ----
+am45_sur() { # <racine du module muté> : verdict d'AM4.5 (contrat de la sortie vidé) rejoué sur ce module
+  local L="$WORK/lab-am45m-$RANDOM"; am4_lab "$L"
+  node -e 'const fs=require("fs");const j=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));for(const k of Object.keys(j.schemas||{}))if(j.schemas[k]&&Array.isArray(j.schemas[k].interdits))j.schemas[k].interdits=[];fs.writeFileSync(process.argv[2],JSON.stringify(j))' "$SCRIPTS/vf-cockpit-interface.json" "$L/.vibeflow/cockpit/vf-cockpit-interface.json"
+  COCKPIT_MODULE="$1" cockpit_lancer "$L"; local v; v="$(cockpit_vivant && echo vivant || echo mort)"
+  am4_flux "$L" "$WORK/am45m.jsonl"; echo "$v hello=$(node "$AUX/ev.mjs" "$WORK/am45m.jsonl" 'E.filter(e=>e.event==="hello").length')"; cockpit_arreter
+}
+am46_sur() { # <racine du module muté, sans contrat> : verdict d'AM4.6 rejoué sur ce module
+  local L="$WORK/lab-am46m-$RANDOM"; am4_lab "$L"; rm -f "$1/scripts/vf-cockpit-interface.json"
+  COCKPIT_MODULE="$1" cockpit_lancer "$L"; local v; v="$(cockpit_vivant && echo vivant || echo mort)"
+  am4_flux "$L" "$WORK/am46m.jsonl"; echo "$v hello=$(node "$AUX/ev.mjs" "$WORK/am46m.jsonl" 'E.filter(e=>e.event==="hello").length')"; cockpit_arreter
+}
+cockpit_module_muter mcontrat vf-cockpit-server.mjs "s#path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json')#path.join(process.cwd(), '.vibeflow', 'cockpit', 'vf-cockpit-interface.json')#"; MC="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-CONTRAT — le serveur relit le contrat dans la sortie : la copie est valide (node --check), AM4.5 rougit (le contrat vidé ferme tout : hello=0)" "$(node --check "$MC/scripts/vf-cockpit-server.mjs" 2> /dev/null && echo valide || echo invalide) $(am45_sur "$MC")" "valide vivant hello=0"
+cockpit_module_muter mouvert vf-cockpit-server.mjs 's#const porteInterdit = (o) => !INTERDITS.length ||#const porteInterdit = (o) => INTERDITS.length \&\&#'; MO="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-CONTRAT-OUVERT — contrat illisible -> flux ouvert : la copie est valide, AM4.6 rougit SEUL (serveur vivant, hello émis) et AM4.5 reste vert (hello=1)" "$(node --check "$MO/scripts/vf-cockpit-server.mjs" 2> /dev/null && echo valide || echo invalide) | $(am46_sur "$MO") | $(am45_sur "$MO")" "valide | vivant hello=1 | vivant hello=1"
+
+# ---- AM6.F2 / AM6.F3 (79-06, S3b, audit au06a : classes T-79-601 et T-79-603) : serve.mjs lancé directement ----
+# F2 : un dossier de scripts ou de moteur SOUS <lab>/.vibeflow/ (ou <lab>/.vibeflow lui-même), passé par l'environnement, est refusé ; une valeur ailleurs (hors du lab, ou pose de projet sous <lab>/.claude/) garde son effet.
+# F3 : --stop ne signale le PID de server.json que s'il est CE serveur (serve.mjs du module ET --sortie= de ce dossier) ; un PID étranger n'est jamais signalé.
+f2_sur() { # <racine du module> : « scripts-sous-.vibeflow scripts-pose-projet scripts-hors scripts-sans scripts=.vibeflow moteur-sous-.vibeflow moteur=.vibeflow moteur-pose-projet » (codes de `serve.mjs --stop`)
+  local L="$WORK/lab-f2"; am4_lab "$L"; local S="$L/.vibeflow/cockpit" A="$1/skills/cockpit-moteur/assets/serve.mjs" a b c d e f g h
+  mkdir -p "$L/.vibeflow/scripts-lab" "$L/.vibeflow/moteur-lab" "$L/.claude/scripts" "$L/.claude/moteur" "$WORK/hors-lab-f2"
+  VF_COCKPIT_SCRIPTS_DIR="$L/.vibeflow/scripts-lab" node "$A" --stop --sortie="$S" > "$WORK/f2a.out" 2>&1; a=$?
+  VF_COCKPIT_SCRIPTS_DIR="$L/.claude/scripts" node "$A" --stop --sortie="$S" > "$WORK/f2b.out" 2>&1; b=$?
+  VF_COCKPIT_SCRIPTS_DIR="$WORK/hors-lab-f2" node "$A" --stop --sortie="$S" > "$WORK/f2c.out" 2>&1; c=$?
+  node "$A" --stop --sortie="$S" > "$WORK/f2d.out" 2>&1; d=$?
+  VF_COCKPIT_SCRIPTS_DIR="$L/.vibeflow" node "$A" --stop --sortie="$S" > "$WORK/f2e.out" 2>&1; e=$?
+  VF_COCKPIT_ENGINE_DIR="$L/.vibeflow/moteur-lab" node "$A" --stop --sortie="$S" > "$WORK/f2f.out" 2>&1; f=$?
+  VF_COCKPIT_ENGINE_DIR="$L/.vibeflow" node "$A" --stop --sortie="$S" > "$WORK/f2g.out" 2>&1; g=$?
+  VF_COCKPIT_ENGINE_DIR="$L/.claude/moteur" node "$A" --stop --sortie="$S" > "$WORK/f2h.out" 2>&1; h=$?
+  echo "$a $b $c $d $e $f $g $h"
+}
+f3_sur() { # <racine du module> : « rc vivant|tué » de `serve.mjs --stop` quand server.json désigne un processus étranger
+  local L="$WORK/lab-f3"; am4_lab "$L"; local S="$L/.vibeflow/cockpit" A="$1/skills/cockpit-moteur/assets/serve.mjs" P rc v
+  sleep 300 & P=$!
+  mkdir -p "$S/.cache"; printf '{"pid":%s,"url":"http://127.0.0.1:1/"}\n' "$P" > "$S/.cache/server.json"
+  node "$A" --stop --sortie="$S" > "$WORK/f3.out" 2>&1; rc=$?
+  kill -0 "$P" 2> /dev/null && v=vivant || v=tué
+  kill "$P" 2> /dev/null; wait "$P" 2> /dev/null
+  echo "rc=$rc $v"
+}
+F23M="$(cockpit_module_copie)"
+assert_eq "AM6.F2 — dossier de scripts sous .vibeflow, .vibeflow lui-même, moteur sous .vibeflow ou .vibeflow lui-même : refus (1) ; pose de projet sous .claude : sans effet (0) ; dossier hors du lab : 0 ; aucune variable : 0" "$(f2_sur "$F23M")" "1 0 0 0 1 1 1 0"
+assert_has "AM6.F2-message — le refus est en français et nomme la variable" "$(cat "$WORK/f2a.out")" "VF_COCKPIT_SCRIPTS_DIR désigne un dossier de données du lab"
+assert_has "AM6.F2-message-moteur — le refus du moteur nomme sa variable" "$(cat "$WORK/f2f.out")" "VF_COCKPIT_ENGINE_DIR désigne un dossier de données du lab"
+assert_eq "AM6.F3 — server.json désigne un processus étranger : refus (5), le processus n'est pas signalé" "$(f3_sur "$F23M")" "rc=5 vivant"
+assert_has "AM6.F3-message — le refus dit que rien n'a été arrêté" "$(cat "$WORK/f3.out")" "rien n'a été arrêté"
+L3P="$WORK/lab-f3p"; am4_lab "$L3P"; COCKPIT_MODULE="$F23M" cockpit_lancer "$L3P"; P3P="$VF_PID"
+node "$F23M/skills/cockpit-moteur/assets/serve.mjs" --stop --sortie="$L3P/.vibeflow/cockpit" > "$WORK/f3p.out" 2>&1; RC3P=$?
+attendre 5 bash -c "! kill -0 $P3P 2> /dev/null"; kill -0 "$P3P" 2> /dev/null && V3P=vivant || V3P=arrêté
+assert_eq "AM6.F3-témoin — le vrai serveur de ce dossier est reconnu et arrêté (rc 0, server.json retiré)" "rc=$RC3P $V3P $([ -e "$L3P/.vibeflow/cockpit/.cache/server.json" ] && echo état-resté || echo état-retiré)" "rc=0 arrêté état-retiré"
+cockpit_arreter
+cockpit_module_muter mf2 serve.mjs '/^{ const vf = path.join(root, .\.vibeflow.); for (const nom of/d'; MF2="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-F2 — la ligne de refus retirée (une seule) : la copie est valide, AM6.F2 rougit (le dossier sous .vibeflow est accepté : tout à 0)" "$(node --check "$MF2/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f2_sur "$MF2")" "valide 0 0 0 0 0 0 0 0"
+cockpit_module_muter mf2e serve.mjs 's#(r === vf || r.startsWith(vf + path.sep))#r.startsWith(vf + path.sep)#'; MF2E="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-F2-EGALITE — l'égalité avec .vibeflow n'est plus refusée (une seule ligne) : la copie est valide, AM6.F2 rougit sur .vibeflow lui-même (scripts et moteur) et reste vert sur les autres cas" "$(node --check "$MF2E/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f2_sur "$MF2E")" "valide 1 0 0 0 0 1 0 0"
+cockpit_module_muter mf2m serve.mjs "s#\['VF_COCKPIT_SCRIPTS_DIR', 'VF_COCKPIT_ENGINE_DIR'\]#['VF_COCKPIT_SCRIPTS_DIR']#"; MF2M="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-F2-MOTEUR — la variable du moteur n'est plus gardée (une seule ligne) : la copie est valide, AM6.F2 rougit sur les trois cas du moteur sous .vibeflow" "$(node --check "$MF2M/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f2_sur "$MF2M")" "valide 1 0 0 0 1 0 0 0"
+cockpit_module_muter mf3 serve.mjs 's#if (vit && !identite(s.pid))#if (false)#'; MF3="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-F3 — le contrôle d'identité neutralisé (une seule ligne) : la copie est valide, AM6.F3 rougit (le processus étranger est signalé : tué) et AM6.F2 reste vert" "$(node --check "$MF3/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f3_sur "$MF3") f2=$(f2_sur "$MF3")" "valide rc=0 tué f2=1 0 0 0 1 1 1 0"
+
+# AM6.F3 (revue rv-0607, majeur) : la règle d'identité de `--stop` tient en DEUX clauses, le serve.mjs du module en mot entier ET `--sortie=<ce dossier>` en toute fin de ligne ; la preuve M-F3 ne mutait que le contrôle entier.
+# Quatre processus portent une ligne de commande forgée (node -e, mots posés après le script) : le témoin (les deux clauses : reconnu, arrêté), la sortie suivie d'un autre argument (« fin »), la sortie de ce dossier
+# SUIVIE d'un mot (« lab » contre « lab bis » : « prefixe ») et le serve.mjs d'un autre module avec la bonne sortie (« autre »). Seul le témoin est arrêté ; chaque clause a son mutant d'une ligne.
+f3p_sur() { # <racine du module> : « temoin=rcN/état fin=… prefixe=… autre=… » de `serve.mjs --stop` quand server.json désigne chacun de ces processus
+  local L="$WORK/lab-f3q"; am4_lab "$L"; local S="$L/.vibeflow/cockpit" A="$1/skills/cockpit-moteur/assets/serve.mjs" SV out="" P rc v i
+  SV="$(cd "$1/skills/cockpit-moteur/assets" && pwd -P)/serve.mjs"; mkdir -p "$S/.cache"
+  f3p_un() { # <nom> <mots de la ligne de commande après le script>
+    local nom="$1"; shift
+    node -e 'setTimeout(function(){},300000)' "$@" & P=$!
+    printf '{"pid":%s,"url":"http://127.0.0.1:1/"}\n' "$P" > "$S/.cache/server.json"
+    node "$A" --stop --sortie="$S" > "$WORK/f3q-$nom.out" 2>&1; rc=$?
+    for i in 1 2 3 4 5 6 7 8 9 10; do kill -0 "$P" 2> /dev/null || break; sleep 0.1; done
+    kill -0 "$P" 2> /dev/null && v=vivant || v=tué
+    kill "$P" 2> /dev/null; wait "$P" 2> /dev/null
+    out="$out $nom=rc$rc/$v"
+  }
+  f3p_un temoin "$SV" "--sortie=$S"
+  f3p_un fin "$SV" "--sortie=$S" --port 1
+  f3p_un prefixe "$SV" "--sortie=$S bis"
+  f3p_un autre "$WORK/ailleurs/serve.mjs" "--sortie=$S"
+  echo "${out# }"
+}
+assert_eq "AM6.F3-prefixe — les deux clauses d'identité : seul le processus qui porte le serve.mjs du module ET se termine par --sortie=<ce dossier> est arrêté ; la sortie suivie d'un autre argument, la sortie préfixe d'une autre (« lab » contre « lab bis ») et le serve.mjs d'un autre module : refus (5), jamais signalés" "$(f3p_sur "$F23M")" "temoin=rc0/tué fin=rc5/vivant prefixe=rc5/vivant autre=rc5/vivant"
+cockpit_module_muter mf3f serve.mjs 's#c.endsWith(` --sortie=${here} `)#true#'; MF3F="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-F3-FIN — la fin de ligne exacte n'est plus exigée (une seule ligne) : la copie est valide, AM6.F3-prefixe rougit sur « fin » et « prefixe » (signalés : tués), le serve.mjs d'un autre module reste refusé" "$(node --check "$MF3F/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f3p_sur "$MF3F")" "valide temoin=rc0/tué fin=rc0/tué prefixe=rc0/tué autre=rc5/vivant"
+cockpit_module_muter mf3m serve.mjs 's#c.includes(` ${path.join(code, .serve.mjs.)} `)#true#'; MF3S="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-F3-MODULE — le serve.mjs du module n'est plus exigé (une seule ligne) : la copie est valide, AM6.F3-prefixe rougit sur « autre » (signalé : tué), « fin » et « prefixe » restent refusés" "$(node --check "$MF3S/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(f3p_sur "$MF3S")" "valide temoin=rc0/tué fin=rc5/vivant prefixe=rc5/vivant autre=rc0/tué"
+
+# ---- AM6.F4 (79-06, fix2-x06, audit au12 objet C : classes de server.json) : le fichier d'état porte le jeton et vit dans un dossier que le lab contrôle ----
+# C1 : l'écriture de démarrage de serve.mjs ne suit jamais un lien posé à la place de server.json (cible intacte, mode compris, et le lien est remplacé par un fichier ordinaire).
+# C2 : server.json n'est jamais vu vide ni à moitié écrit pendant le démarrage ; `--stop` ne supprime pas un fichier illisible et ne dit ni « arrêté » ni « pas lancé » sur une lecture vide.
+# C3 : aucun `server.json.*.tmp` (il porte le jeton) ne survit au démarrage, à l'arrêt par signal ni à `--stop`.
+cat > "$AUX/planter.mjs" <<'JS'
+// préchargé AVANT serve.mjs (--import) : pose, comme le ferait le lab, un lien à la place de server.json (C1)
+import fs from 'node:fs'; import path from 'node:path';
+const sortie = process.argv[process.argv.length - 1].slice('--sortie='.length);
+fs.mkdirSync(path.join(sortie, '.cache'), { recursive: true });
+fs.symlinkSync(process.env.PLANT_VICTIME, path.join(sortie, '.cache', 'server.json'));
+JS
+cat > "$AUX/ralentir-etat.mjs" <<'JS'
+// préchargé AVANT serve.mjs : la publication de server.json est ralentie à 400 ms ; si elle vise server.json lui-même, le fichier est d'abord créé vide (la troncature d'une écriture sur place) — la fenêtre est certaine
+import fs from 'node:fs'; import path from 'node:path';
+const ecrire = fs.writeFileSync;
+fs.writeFileSync = function (p, d, ...r) {
+  if (String(p).includes('server.json') && String(d).includes('"token"')) {
+    if (path.basename(String(p)) === 'server.json') fs.closeSync(fs.openSync(p, 'w'));
+    fs.appendFileSync(process.env.RALENTI_MARQUE, 'x');
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 400);
+  }
+  return ecrire.call(this, p, d, ...r);
+};
+JS
+cat > "$AUX/sonde-etat.mjs" <<'JS'
+// sonde-etat.mjs <fichier> <ms> : compte les lectures où le fichier EXISTE mais n'est pas un JSON (vide, tronqué)
+import fs from 'node:fs';
+const [f, ms] = process.argv.slice(2); const fin = Date.now() + Number(ms); let ill = 0, ok = 0;
+while (Date.now() < fin) {
+  let t = null; try { t = fs.readFileSync(f, 'utf8'); } catch {}
+  if (t !== null) { try { JSON.parse(t); ok++; } catch { ill++; } }
+  Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 5);
+}
+console.log(`illisibles=${ill} lus=${ok > 0 ? 'oui' : 'non'}`);
+JS
+mode_de() { node -e 'console.log((require("fs").statSync(process.argv[1]).mode & 0o777).toString(8))' "$1"; }
+c1s_sur() { # <racine du module> : « lancé contenu mode état jeton » quand server.json est un lien vers un fichier précieux au démarrage de serve.mjs
+  local L="$WORK/lab-c1s" V="$WORK/victime-c1s" S rc; am4_lab "$L"; S="$L/.vibeflow/cockpit"; printf 'PRECIEUX\n' > "$V"; chmod 644 "$V"
+  COCKPIT_NODE_ARGS="--import=file://$AUX/planter.mjs" COCKPIT_MODULE="$1" cockpit_lancer "$L" PLANT_VICTIME="$V"; rc=$?
+  echo "rc=$rc victime=$(tr -d '\n' < "$V") mode=$(mode_de "$V") etat=$([ -L "$S/.cache/server.json" ] && echo lien || { [ -f "$S/.cache/server.json" ] && echo fichier || echo absent; }) jeton=$(grep -c '"token"' "$S/.cache/server.json" 2> /dev/null)"
+  cockpit_arreter
+}
+c2d_sur() { # <racine du module> : « illisibles=N lus=… ralenti=… » pendant le démarrage de serve.mjs dont la publication est ralentie
+  local L="$WORK/lab-c2d" S SP; am4_lab "$L"; S="$L/.vibeflow/cockpit"; mkdir -p "$S/.cache"; : > "$WORK/ralenti-c2.marque"
+  node "$AUX/sonde-etat.mjs" "$S/.cache/server.json" 4000 > "$WORK/sonde-c2.out" & SP=$!
+  RALENTI_MARQUE="$WORK/ralenti-c2.marque" COCKPIT_NODE_ARGS="--import=file://$AUX/ralentir-etat.mjs" COCKPIT_MODULE="$1" cockpit_lancer "$L" > /dev/null 2>&1
+  wait "$SP"; echo "$(cat "$WORK/sonde-c2.out") ralenti=$([ "$(wc -c < "$WORK/ralenti-c2.marque" | tr -d ' ')" -ge 1 ] && echo oui || echo non)"
+  cockpit_arreter
+}
+c2s_sur() { # <racine du module> : « illisible: rc= message= fichier= serveur= | lisible: rc= serveur= fichier= » de `serve.mjs --stop` sur un server.json vide puis rétabli
+  local L="$WORK/lab-c2s" S A="$1/skills/cockpit-moteur/assets/serve.mjs" P rc1 rc2 v1 v2 m1 f1 f2 sauve; am4_lab "$L"; S="$L/.vibeflow/cockpit"
+  COCKPIT_MODULE="$1" cockpit_lancer "$L" || { echo "serveur non lancé"; return; }; P="$VF_PID"; sauve="$(cat "$S/.cache/server.json")"
+  : > "$S/.cache/server.json"
+  node "$A" --stop --sortie="$S" > "$WORK/c2s.out" 2>&1; rc1=$?
+  kill -0 "$P" 2> /dev/null && v1=vivant || v1=arrêté; [ -e "$S/.cache/server.json" ] && f1=resté || f1=supprimé
+  m1="$(tr 'A-Z' 'a-z' < "$WORK/c2s.out")"; case "$m1" in *"illisible"*) m1=illisible ;; *"stopped"*|*"arrêté"*) m1=dit-arrêté ;; *"not running"*) m1=dit-pas-lancé ;; *) m1=autre ;; esac
+  printf '%s' "$sauve" > "$S/.cache/server.json"
+  node "$A" --stop --sortie="$S" > "$WORK/c2s2.out" 2>&1; rc2=$?
+  attendre 5 bash -c "! kill -0 $P 2> /dev/null"; kill -0 "$P" 2> /dev/null && v2=vivant || v2=arrêté; [ -e "$S/.cache/server.json" ] && f2=resté || f2=supprimé
+  echo "illisible: rc=$rc1 message=$m1 fichier=$f1 serveur=$v1 | lisible: rc=$rc2 serveur=$v2 fichier=$f2"
+  cockpit_arreter
+}
+c3_sur() { # <racine du module> : « démarrage=N sortie=N arrêt=N leurres=M » : N = temporaires server.json.*.tmp restants, M = leurres (autre nom) conservés
+  local L="$WORK/lab-c3" S A="$1/skills/cockpit-moteur/assets/serve.mjs" d s a l P; am4_lab "$L"; S="$L/.vibeflow/cockpit"; mkdir -p "$S/.cache"
+  semer() { printf '{"token":"SECRET"}' > "$S/.cache/server.json.111.tmp"; printf '{"token":"SECRET"}' > "$S/.cache/server.json.222.aaaa.tmp"; printf 'x' > "$S/.cache/server.json.garde"; printf 'x' > "$S/.cache/autre.tmp"; }
+  restants() { find "$S/.cache" -maxdepth 1 -name 'server.json.*.tmp' | wc -l | tr -d ' '; }
+  semer; COCKPIT_MODULE="$1" cockpit_lancer "$L" > /dev/null 2>&1 || { echo "serveur non lancé"; return; }; P="$VF_PID"; d="$(restants)"
+  semer; kill "$P" 2> /dev/null; attendre 5 bash -c "! kill -0 $P 2> /dev/null"; s="$(restants)"
+  semer; rm -f "$S/.cache/server.json"; node "$A" --stop --sortie="$S" > /dev/null 2>&1; a="$(restants)"
+  l=0; [ -f "$S/.cache/server.json.garde" ] && l=$((l+1)); [ -f "$S/.cache/autre.tmp" ] && l=$((l+1))
+  echo "démarrage=$d sortie=$s arrêt=$a leurres=$l"
+  cockpit_arreter
+}
+F4M="$(cockpit_module_copie)"
+assert_eq "AM6.F4-C1 — server.json est un lien vers un fichier précieux au démarrage : la cible garde son contenu et son mode (644), le lien est remplacé par un fichier ordinaire qui porte le jeton" "$(c1s_sur "$F4M")" "rc=0 victime=PRECIEUX mode=644 etat=fichier jeton=1"
+assert_eq "AM6.F4-C2 — pendant un démarrage dont la publication est ralentie à 400 ms, server.json n'est jamais lu vide ni tronqué, et finit lisible" "$(c2d_sur "$F4M")" "illisibles=0 lus=oui ralenti=oui"
+assert_eq "AM6.F4-C2-stop — server.json vide : \`--stop\` refuse (6), le dit (illisible), ne supprime rien et le serveur reste vivant ; rétabli, le même \`--stop\` arrête le serveur (rc 0) et retire le fichier" "$(c2s_sur "$F4M")" "illisible: rc=6 message=illisible fichier=resté serveur=vivant | lisible: rc=0 serveur=arrêté fichier=supprimé"
+assert_eq "AM6.F4-C3 — les server.json.*.tmp laissés par un arrêt brutal sont retirés au démarrage, à l'arrêt par signal et par \`--stop\` ; un autre nom (server.json.garde, autre.tmp) n'est pas touché" "$(c3_sur "$F4M")" "démarrage=0 sortie=0 arrêt=0 leurres=2"
+# Un mutant d'une ligne par classe (la copie est valide : node --check ; le témoin de la classe rougit SEUL ; les autres restent verts)
+valide() { node --check "$1/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide; }
+cockpit_module_muter mf4plc serve.mjs 's#ecrireEtat(stateFile, #fs.writeFileSync(stateFile, #'; MF4A="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-ETAT-SUR-PLACE — l'état écrit sur place au démarrage (une seule ligne) : la copie est valide, AM6.F4-C1 (cible écrasée) et AM6.F4-C2 (fichier vu vide) rougissent" "$(valide "$MF4A") c1=$([ "$(c1s_sur "$MF4A")" = "rc=0 victime=PRECIEUX mode=644 etat=fichier jeton=1" ] && echo vert || echo rouge) c2=$([ "$(c2d_sur "$MF4A")" = "illisibles=0 lus=oui ralenti=oui" ] && echo vert || echo rouge)" "valide c1=rouge c2=rouge"
+cockpit_module_muter mf4stop serve.mjs "s#if (!s || typeof s !== 'object') { console.error#if (false) { console.error#"; MF4B="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-STOP-ILLISIBLE — la garde du fichier illisible neutralisée (une seule ligne) : la copie est valide, AM6.F4-C2-stop rougit (fichier supprimé, « pas lancé »), AM6.F4-C1 reste vert" "$(valide "$MF4B") $(c2s_sur "$MF4B" | cut -d'|' -f1) c1=$([ "$(c1s_sur "$MF4B")" = "rc=0 victime=PRECIEUX mode=644 etat=fichier jeton=1" ] && echo vert || echo rouge)" "valide illisible: rc=0 message=dit-pas-lancé fichier=supprimé serveur=vivant  c1=vert"
+cockpit_module_muter mf4dem serve.mjs '/^    retirerTemporairesEtat(stateFile); \/\/ un SIGKILL/d'; MF4C="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-TMP-DEMARRAGE — le balayage au démarrage retiré (une seule ligne) : la copie est valide, AM6.F4-C3 rougit sur le démarrage seul" "$(valide "$MF4C") $(c3_sur "$MF4C")" "valide démarrage=2 sortie=0 arrêt=0 leurres=2"
+cockpit_module_muter mf4sor serve.mjs 's# retirerTemporairesEtat(stateFile); };# };#'; MF4D="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-TMP-SORTIE — le balayage à la sortie du serveur retiré (une seule ligne) : la copie est valide, AM6.F4-C3 rougit sur la sortie seule" "$(valide "$MF4D") $(c3_sur "$MF4D")" "valide démarrage=0 sortie=2 arrêt=0 leurres=2"
+cockpit_module_muter mf4arr serve.mjs '/^  retirerTemporairesEtat(stateFile);$/d'; MF4E="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-TMP-ARRET — le balayage de \`--stop\` retiré (une seule ligne) : la copie est valide, AM6.F4-C3 rougit sur \`--stop\` seul" "$(valide "$MF4E") $(c3_sur "$MF4E")" "valide démarrage=0 sortie=0 arrêt=2 leurres=2"
 
 vf_hyg_assert
 echo ""

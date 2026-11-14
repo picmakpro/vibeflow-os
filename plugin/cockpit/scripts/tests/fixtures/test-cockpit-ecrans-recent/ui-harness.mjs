@@ -16,7 +16,10 @@ const SC = {
   showBoard: (b) => out.boards.push(b),
 };
 const document = { createElement: () => el(), head: { appendChild: (c) => out.head.push(c) }, body: { appendChild: (c) => out.body.push(c), click() {} } };
-const win = { Floorplan: SC, addEventListener() {}, innerWidth: 1280 };
+// 79-10 : le traducteur du moteur, sous forme neutre (la clé remplie, comme sous ?lang=en) : les extensions le lisent au chargement
+const tf = (k, ...v) => k.replace(/@[\w-]+$/, '').split('{}').reduce((x, p, i) => (i ? x + String(v[i - 1] ?? '') + p : x + p), '');
+Object.assign(tf, { pl: (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`, mot: (n, k) => k, k: (x) => x, type: () => null, constat: (x) => x });
+const win = { Floorplan: SC, __vfFrT: tf, addEventListener() {}, innerWidth: 1280 };
 vm.runInNewContext(fs.readFileSync(file, 'utf8'), { window: win, document, innerWidth: 1280, Date, Set, Map, Math, String, Number, Array });
 const render = {
   buttons: out.buttons.map((b) => ({ id: b.opts.id, badge: b.children.map((c) => c.textContent).filter(Boolean) })),

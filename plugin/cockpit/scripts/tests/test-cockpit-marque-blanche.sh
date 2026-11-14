@@ -7,7 +7,6 @@
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 MOTEUR="$SCRIPTS/../skills/cockpit-moteur"
@@ -15,6 +14,7 @@ WORK="$(mktemp -d)"; AUX="$WORK/aux"; mkdir -p "$AUX"
 SRV=""
 trap '[ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -70,11 +70,8 @@ echo "=== M1 — aucune occurrence visible du nom amont ==="
 assert_eq "M1.0 — l'assemblage rend 0" "$BRC" "0"
 assert_eq "M1.1 — témoin positif : le compteur voit le nom dans une chaîne jetable" "$(printf '%s\n' 'le moteur Floor''plan' | occ)" "1"
 assert_eq "M1.2 — témoin : une ligne de licence est exemptée" "$(printf '%s\n' '<!-- vibeflow:licence-tierce floor''plan -->' | occ)" "0"
-PORT=$(libre)
-node "$OUT/serve.mjs" --no-open --port "$PORT" > "$WORK/serve.out" 2>&1 &
-SRV=$!
-for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-RP=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
+COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$LAB"; SRV="$VF_PID"
+RP="$VF_PORT"
 for _ in $(seq 1 50); do [ -s "$WORK/serve.out" ] && break; sleep 0.1; done
 node "$AUX/get.mjs" "$RP" / > "$WORK/racine.html"; node "$AUX/get.mjs" "$RP" /project.html > "$WORK/projet.html"
 vf_hyg_stop "$SRV"; SRV=""
@@ -84,7 +81,7 @@ assert_eq "M1.5 — GET / : 0 occurrence" "$(occ < "$WORK/racine.html")" "0"
 assert_eq "M1.6 — GET /project.html : 0 occurrence" "$(occ < "$WORK/projet.html")" "0"
 assert_eq "M1.7 — messages du serveur : 0 occurrence" "$(occ < "$WORK/serve.out")" "0"
 assert_ge "M1.8 — le serveur a bien écrit son message de démarrage" "$(grep -c 'VibeFlow' "$WORK/serve.out")" 1
-bad=0; for f in "$OUT"/*.mjs "$OUT"/*.html; do [ "$(occ < "$f")" = 0 ] || { bad=$((bad+1)); echo "     occurrence dans $f"; }; done
+bad=0; for f in "$OUT"/*.html; do [ "$(occ < "$f")" = 0 ] || { bad=$((bad+1)); echo "     occurrence dans $f"; }; done
 assert_eq "M1.9 — aucune occurrence dans les fichiers de la sortie (hors licences)" "$bad" "0"
 
 echo "=== M2 — logo VibeFlow inliné ==="
@@ -93,21 +90,21 @@ assert_ge "M2.1 — préfixe du PNG amont non vide" "${#PFX}" 64
 assert_eq "M2.2 — témoin : le préfixe est retrouvé dans une chaîne qui le contient" "$(printf 'xx%sxx' "$PFX" | grep -c -F "$PFX")" "1"
 assert_ge "M2.3 — data:image/svg+xml dans la page servie" "$(grep -c 'data:image/svg+xml' "$WORK/racine.html")" 1
 assert_eq "M2.4 — le PNG amont n'est pas dans la page" "$(grep -c -F "$PFX" "$WORK/racine.html")" "0"
-assert_eq "M2.5 — les deux logos sont dans les données" "$(node "$AUX/donnees.mjs" "$OUT" "$OUT/index.html" 'Object.keys(j.meta.vfLogos).sort().join(",")')" "clair,sombre"
+assert_eq "M2.5 — les deux logos sont dans les données" "$(node "$AUX/donnees.mjs" "$SCRIPTS" "$OUT/index.html" 'Object.keys(j.meta.vfLogos).sort().join(",")')" "clair,sombre"
 
 echo "=== M3 — la syntaxe survit au renommage ==="
-bad=0; for f in "$OUT"/serve.mjs "$OUT"/query.mjs "$OUT"/vf-cockpit-*.mjs; do node --check "$f" 2>/dev/null || { bad=$((bad+1)); echo "     syntaxe invalide : $f"; }; done
-assert_eq "M3.1 — node --check sur serve.mjs, query.mjs et chaque vf-cockpit-*.mjs" "$bad" "0"
+bad=0; for f in "$MOTEUR"/assets/serve.mjs "$MOTEUR"/assets/query-cli.mjs "$SCRIPTS"/vf-cockpit-*.mjs; do node --check "$f" 2>/dev/null || { bad=$((bad+1)); echo "     syntaxe invalide : $f"; }; done
+assert_eq "M3.1 — node --check sur serve.mjs, query-cli.mjs du moteur et chaque vf-cockpit-*.mjs du module" "$bad" "0"
 B=$(node "$AUX/blocs.mjs" "$OUT/index.html" 2>&1)
 assert_eq "M3.2 — aucun bloc <script> invalide dans index.html" "$(printf '%s' "$B" | grep -c 'échecs=0')" "1"
 assert_ge "M3.3 — au moins 5 blocs compilés (témoin d'exposition)" "$(printf '%s' "$B" | sed -n 's/.*compilés=\([0-9]*\).*/\1/p')" 5
-assert_eq "M3.4 — le serveur de la sortie garde le marqueur de taille" "$(head -n 5 "$OUT/serve.mjs" | grep -c 'vibeflow:allow-large-file')" "1"
+assert_eq "M3.4 — le serveur du moteur garde le marqueur de taille" "$(head -n 5 "$MOTEUR/assets/serve.mjs" | grep -c 'vibeflow:allow-large-file')" "1"
 
 echo "=== M4 — les données du lab ne sont jamais renommées ==="
 LABB="$WORK/lab-b"; mklab "$LABB" "Carte floor""plan du quartier"
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LABB" --quiet >/dev/null 2>&1
-assert_eq "M4.1 — la phase du lab garde son nom" "$(node "$AUX/donnees.mjs" "$LABB/.vibeflow/cockpit" "$LABB/.vibeflow/cockpit/project.html" 'j.nodes.filter(n=>n.kind==="phase").map(n=>n.label).join(",")' | grep -c 'Carte floor''plan du quartier')" "1"
-assert_eq "M4.2 — schéma du graphe Code" "$(node "$AUX/donnees.mjs" "$OUT" "$OUT/index.html" 'j.schema')" "vf-cockpit/graph@1"
+assert_eq "M4.1 — la phase du lab garde son nom" "$(node "$AUX/donnees.mjs" "$SCRIPTS" "$LABB/.vibeflow/cockpit/project.html" 'j.nodes.filter(n=>n.kind==="phase").map(n=>n.label).join(",")' | grep -c 'Carte floor''plan du quartier')" "1"
+assert_eq "M4.2 — schéma du graphe Code" "$(node "$AUX/donnees.mjs" "$SCRIPTS" "$OUT/index.html" 'j.schema')" "vf-cockpit/graph@1"
 
 echo "=== M5 — conformité à DESIGN.md (UIFN-09, P70-D-07) ==="
 UIDIR="$MOTEUR/assets/ui"
@@ -131,6 +128,55 @@ M5C=$(for f in $M5FILES; do m5_couleurs "$f" | sed "s|^|$(basename "$f"):|"; don
 assert_eq "M5.3 — aucune couleur littérale hors lignes marquées vf-couleur-ok:" "$M5C" ""
 bad=0; for f in $M5FILES; do while IFS= read -r l; do r=$(printf '%s' "$l" | sed -n 's/.*vf-couleur-ok:[[:space:]]*//p' | sed 's/[[:space:]]*\*\/.*$//'); [ "${#r}" -ge 10 ] || { bad=$((bad+1)); echo "     raison absente ou trop courte : $(basename "$f")"; }; done < <(grep 'vf-couleur-ok:' "$f"); done
 assert_eq "M5.4 — chaque marqueur vf-couleur-ok: porte une raison d'au moins 10 caractères" "$bad" "0"
+
+
+echo "=== AM4 — les noms VibeFlow sont écrits une fois dans les six sources exécutées par Node (P79-D-08 option a, 79-06) ==="
+# les six sources : serve.mjs, graph-query.js, query-cli.mjs (moteur) et, côté scripts, vf-cockpit-embed.mjs, vf-cockpit-lancer-post.mjs, vf-cockpit-server.mjs ;
+# la liste jugée est CALCULÉE (tout le code d'exécution du dossier de scripts + les trois fichiers du moteur), jamais figée
+cat > "$AUX/execution.mjs" <<'JS'
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const m = await import(pathToFileURL(path.join(process.argv[2], 'vf-cockpit-build.mjs')).href);
+console.log(m.fichiersExecution(process.argv[2]).join('\n'));
+JS
+cat > "$AUX/occurrences.mjs" <<'JS'
+// occurrences.mjs <dossier de scripts> <dossier du moteur> : compte les occurrences (compterOccurrences, l'outil d'assemblage : lignes de licence exemptées) dans la liste calculée ; « total liste détail »
+import fs from 'node:fs';
+import path from 'node:path';
+import { pathToFileURL } from 'node:url';
+const [, , scripts, moteur] = process.argv;
+const { compterOccurrences } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-rename.mjs')).href);
+const { fichiersExecution } = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-build.mjs')).href);
+const liste = [...fichiersExecution(scripts).map((f) => path.join(scripts, f)), ...['serve.mjs', 'graph-query.js', 'query-cli.mjs'].map((f) => path.join(moteur, 'assets', f))];
+let total = 0; const detail = [];
+for (const f of liste) { const c = compterOccurrences(fs.readFileSync(f, 'utf8')); total += c; if (c) detail.push(`${path.basename(f)}=${c}`); }
+console.log(`${total} ${liste.length} ${detail.join(',') || 'aucune'}`);
+JS
+read -r AM4_N AM4_LISTE AM4_DETAIL <<< "$(node "$AUX/occurrences.mjs" "$SCRIPTS" "$MOTEUR")"
+echo "     (liste jugée : $AM4_LISTE fichiers ; occurrences par fichier : $AM4_DETAIL)"
+assert_ge "AM4.17a — témoin d'exposition : la liste des sources jugées est calculée et non vide" "$AM4_LISTE" 9
+assert_eq "AM4.17 — aucune occurrence du nom amont dans les sources exécutées par Node (hors lignes de licence)" "$AM4_N" "0"
+assert_eq "AM4.17b — témoin positif : le compteur voit le nom amont dans une chaîne jetable" "$(printf '%s\n' 'le moteur Floor''plan' | occ)" "1"
+MODROOT="$(cd "$SCRIPTS/.." && pwd -P)"; ENTETE_ANCIEN="$(printf 'x-%s-token' "floor""plan")"
+cat > "$AUX/entete.mjs" <<'JS'
+// entete.mjs <port> <chemin> <nom d'en-tête> <jeton> : statut HTTP de la requête portant ce seul en-tête de jeton
+import http from 'node:http';
+const [, , port, p, nom, jeton] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}`, [nom]: jeton } }, (r) => { r.resume(); r.on('end', () => console.log(r.statusCode)); }).on('error', () => console.log('000'));
+JS
+COCKPIT_MODULE="$MODROOT" COCKPIT_LOG="$WORK/am418.out" cockpit_lancer "$LAB"; RC418=$?
+cockpit_get / > "$WORK/am418.html" 2> /dev/null
+P418="$(grep -o '<script>window.VF_COCKPIT_SERVER={' "$WORK/am418.html" | awk 'END{print NR}')"   # l'injection du serveur, une fois : les lignes du viewer qui lisent la globale ne comptent pas
+cockpit_get /api/vf/etat > /dev/null 2>&1; N418="$VF_CODE"
+A418="$(node "$AUX/entete.mjs" "${VF_PORT:-0}" /api/vf/etat "$ENTETE_ANCIEN" "${VF_JETON:-x}")"
+cockpit_arreter
+assert_eq "AM4.18 — de bout en bout, serveur du module sur la sortie assemblée (rc=$RC418) : la page fournit VF_COCKPIT_SERVER, l'en-tête de jeton VibeFlow reçoit 200 et l'ancien 403" "page=$P418 neuf=$N418 ancien=$A418" "page=1 neuf=200 ancien=403"
+assert_eq "M-NOM.0 — ancre présente : l'en-tête de jeton est écrit sous son nom VibeFlow dans vf-cockpit-lancer-post.mjs" "$(grep -cF "ENTETE_JETON = 'x-vf-cockpit-token'" "$SCRIPTS/vf-cockpit-lancer-post.mjs")" "1"
+
+# mutant M-NOM (79-06) : le nom amont est remis dans l'un des trois modules (vf-cockpit-lancer-post.mjs) d'une COPIE du module ; le compteur de AM4.17 le voit
+NOMAMONT="floor""plan"
+cockpit_module_muter mnom vf-cockpit-lancer-post.mjs "s#ENTETE_JETON = 'x-vf-cockpit-token'#ENTETE_JETON = 'x-${NOMAMONT}-token'#"; MN="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-NOM — nom amont remis dans vf-cockpit-lancer-post.mjs : la copie est valide (node --check) et AM4.17 rougit (total 1, ce fichier seul)" "$(node --check "$MN/scripts/vf-cockpit-lancer-post.mjs" 2> /dev/null && echo valide || echo invalide) $(node "$AUX/occurrences.mjs" "$MN/scripts" "$MN/skills/cockpit-moteur" | awk '{print $1, $3}')" "valide 1 vf-cockpit-lancer-post.mjs=1"
 
 vf_hyg_assert
 echo ""

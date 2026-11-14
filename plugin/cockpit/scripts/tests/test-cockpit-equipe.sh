@@ -14,6 +14,13 @@
 #   EUI rendu de l'arbre hors navigateur (vm) : imbrication, terminés repliés, liens dans les deux sens, pied (CKPT-19 à 22 ; P69-D-14 à P69-D-18)
 #   EK  clavier et témoins mineurs de l'onglet Équipe dans un vrai Chromium : focus après Entrée sur « Lire le transcript », mutants de comportement (UIFN-12, UIFN-13)
 # 69-04 ajoute E23 et EUI.
+# Phase 73 : propriété → nouveau support (P73-D-04, plan 73-10). EUI.3 : le pli « Terminés depuis moins de 24 h » du tiroir devient le lien « N à relire dans Équipe » (compté avec l'état « lu »,
+#   ancre equipe.html#vf-a-relire) ; EUI2.20 : le libellé du bloc des terminés devient celui du lien. Les témoins du canevas et du panneau d'item avaient suivi la régie au plan 73-08.
+# Phase 73 (plan 73-08, P73-D-04) : le canevas de cartes d'Équipe est retiré ; chaque témoin du canevas suit la régie (même propriété, nouveau support), aucun n'est supprimé. Propriété -> support :
+#   E23.4 enveloppe : « 0 carte, meta conservée » · EUI2.8, 2.9, 2.23, 2.24 entrées piégées et mutants « pied brut », « nœud brut » : ligne de la régie (vm-regie-page.mjs ; mutants sur 72-vf-regie-rendu.js)
+#   EUI2.10 à 2.13, 2.25, 2.26 rechargement et signature : 0 rechargement, mise à jour en place, clé de ligne (mutants de clé) · EUI2.14 à 2.16 arrivée sur une carte : ancre de la ligne, une fois · EUI2.18c effectifs : sous-titre de la régie
+#   EA1.5, EA1.6 descriptions des cartes : ligne 2 et mot d'état des lignes de la régie (vm-regie.mjs) · EK1, EK1.0 à EK1.3, EK2, EK3, EK8 « Lire le transcript » du panneau : « Lire le rapport » d'une ligne terminée (harnais clavier ; mutants sur 72-vf-regie-source.js et -rendu.js)
+#   EK5 commande : tiroir « Au travail » (Projet) · EK10 pastille d'état : mot d'état de la ligne · EK13, EK14 cadrage du canevas : l'en-tête de la régie ne recouvre pas sa première section, aucune ligne ne déborde (mutants de feuille) · EK18 titre : #vf-equipe-entete ; EKR2 transcript reposé : lecteur de repli de la régie
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -23,6 +30,7 @@ SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"
 trap 'vf_hyg_fin; rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 WORK="$(cd "$WORK" && pwd -P)"
 AUX="$WORK/aux"; NOSCRIPTS="$WORK/noscripts"
 mkdir -p "$AUX" "$NOSCRIPTS"
@@ -244,7 +252,7 @@ cat > "$AUX/spec-e20b.json" <<'JSON'
 JSON
 H20B="$(mkhome e20b "$AUX/spec-e20b.json" "$LAB")"
 Q who "$LAB" "$H20B" "$NOSCRIPTS" "$NOW" > "$WORK/who-e20b.json"
-assert_eq "E20.5 — session silencieuse et un seul terminé : busy = false et la session racine est termine" "$(G "$WORK/who-e20b.json" 'j.busy+"|"+((j.workers.find(x=>x.kind==="session"&&x.id==="'$SID'")||{}).etat)')" "false|termine"
+assert_eq "E20.5 — session silencieuse et un seul terminé : busy = false et la session racine est au repos (jamais « terminé », AUDC-D2)" "$(G "$WORK/who-e20b.json" 'j.busy+"|"+((j.workers.find(x=>x.kind==="session"&&x.id==="'$SID'")||{}).etat)')" "false|au-repos"
 
 echo "=== E21 — rattachement aux nœuds de mission (P69-D-15) ==="
 LAB21="$WORK/lab21"; mkdir -p "$LAB21/.planning/missions"; git -C "$LAB21" init -q
@@ -322,10 +330,9 @@ NOW="$(node -e 'console.log(Date.now())')"
 HS="$(mkhome srv "$AUX/spec-e22.json" "$LABS")"
 OUT="$LABS/.vibeflow/cockpit"
 node "$WORK/leurre.mjs" "$(libre)" & LEURRE=$!; PIDS+=("$LEURRE")
-HOME="$HS" node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-SRV=$!; PIDS+=("$SRV")
-for _ in $(seq 1 300); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-PORT="$(G "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$LABS" HOME="$HS" || true
+SRV="$VF_PID"
+PORT="$VF_PORT"
 TOK="$(node "$AUX/token.mjs" "$PORT" /)"
 assert_eq "E22.0b — contrôle positif : serveur démarré, jeton lu dans la page, leurre vivant" "$([ "$PORT" -gt 0 ] && [ "${#TOK}" -ge 16 ] && echo serveur)|$(ps -p "$LEURRE" >/dev/null 2>&1 && echo leurre)" "serveur|leurre"
 : > "$WORK/flux.jsonl"; node "$AUX/sse.mjs" "$PORT" "$TOK" 3000 hello "$WORK/flux.jsonl"
@@ -379,6 +386,8 @@ assert_eq "EP.2 — les 40 sous-agents (20 actifs, 20 terminés depuis moins de 
 
 echo "=== E23 — onglet Équipe : page, graphe, onglets, libellés (P69-D-17 ; CKPT-23) ==="
 UI="$SCRIPTS/../skills/cockpit-moteur/assets/ui"
+export VF_FLUX_JS="$UI/69-vf-flux.js"
+export VF_ETAT_JS="$UI/70-vf-etat.js" # 79-17 : le magasin d'état se charge entre le flux et 70 (ordre alphabétique de la page)
 cat > "$AUX/fetchp.mjs" <<'JS'
 // fetchp.mjs <port> <chemin> <sortie> : écrit le corps dans <sortie>, rend le statut ; « ERR <code> » si la connexion échoue
 import http from 'node:http';
@@ -387,7 +396,7 @@ const [, , port, p, out] = process.argv;
 http.get({ host: '127.0.0.1', port: Number(port), path: p, headers: { Host: `127.0.0.1:${port}` } }, (r) => { const c = []; r.on('data', (d) => c.push(d)); r.on('end', () => { fs.writeFileSync(out, Buffer.concat(c)); console.log(r.statusCode); }); }).on('error', (e) => console.log('ERR ' + e.code));
 JS
 cat > "$AUX/graphe.mjs" <<'JS'
-// graphe.mjs <dossier du module> <page.html> : le graphe embarqué de la page (extraireGraphe du module de ce dossier : la sortie assemblée), ou { erreur }
+// graphe.mjs <dossier du module> <page.html> : le graphe embarqué de la page (extraireGraphe du module de ce dossier), ou { erreur }
 import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
@@ -407,7 +416,7 @@ const { litteraux, estAnglais } = await import(pathToFileURL(path.join(scripts, 
 const CONNU = {
   '70-vf-live.js': ['Driver libre', 'Session', 'Verrou', 'Nœud de DAG', '{} min', ' · orphelin', '<p>Personne. Sources lues : ', 'Personne', 'tenu depuis', 'Agent', 'Source illisible', 'Sources illisibles'],
   '72-vf-equipe.js': ['Source illisible', 'Sources illisibles'],
-  '71-vf-equipe-rendu.js': ['Session', 'en attente', '{} min', ' · orphelin', 'Agent', 'Mandat', 'Messages', 'Outils', 'Session principale', ', orphelin', 'arbre principal', ' · en attente', ', orphelin ?'], // libellés français affichés, que estAnglais prend pour de l'anglais faute d'accent (la sonde voit tout autre littéral)
+  '71-vf-equipe-rendu.js': ['Session', 'en attente', '{} min', ' · orphelin', 'Agent', 'Mandat', 'Messages', 'Outils', 'Session principale', ', orphelin', 'arbre principal', ' · en attente', ', orphelin ?', 'Mission : {}', 'agents actifs', 'agent actif', 'Agents : {} {} · {} en attente{}{} · {} {} depuis moins de 24 h.'], // AUDC-M3 : les quatre derniers sont le titre de la vue Équipe et sa ligne, déplacés de 76-vf-git-entete.js ; libellés français affichés, que estAnglais prend pour de l'anglais faute d'accent (la sonde voit tout autre littéral)
   '00-vibeflow.js': ['Projet', 'Code', ', #ask', '#btn-health{} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; } #panel .sec:has(> .list > a[data-hc-open]) { display: none; }', 'Bloquant', 'phase ne figure', 'phases ne figurent', 'non lu', 'non lus', 'header .brand', 'en planification', 'en pause', 'Phase {}{} '],
 };
 const sortie = [];
@@ -428,20 +437,22 @@ JSON
 NOW="$(node -e 'console.log(Date.now())')"
 H23="$(mkhome e23 "$AUX/spec-e23.json" "$LABS")"
 rm -f "$OUT/.cache/server.json"
-HOME="$H23" node "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve23.out" 2>&1 &
-SRV23=$!; PIDS+=("$SRV23")
-for _ in $(seq 1 300); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-PORT23="$(G "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"
+COCKPIT_LOG="$WORK/serve23.out" cockpit_lancer "$LABS" HOME="$H23" || true
+SRV23="$VF_PID"
+PORT23="$VF_PORT"
+# 79-09 : la collecte tourne dans un fil et la page Équipe se construit sur l'instantané du moment : la première collecte est attendue (borne de 20 s) avant de demander la page
+collecte_prete_e23() { cockpit_get /api/vf/etat 2> /dev/null | node -e 'try{process.exit(JSON.parse(require("fs").readFileSync(0,"utf8")).collecte.etat==="ok"?0:1)}catch{process.exit(1)}'; }
+attendre 20 collecte_prete_e23 || true
 S23="$(node "$AUX/fetchp.mjs" "$PORT23" /equipe.html "$WORK/equipe.html")"
 P23="$(node "$AUX/fetchp.mjs" "$PORT23" /project.html "$WORK/project23.html")"
 assert_eq "E23.0 — contrôle positif : serveur démarré et /project.html servi (200)" "$([ "$PORT23" -gt 0 ] && echo serveur)|$P23" "serveur|200"
 assert_eq "E23.1 — GET /equipe.html -> 200" "$S23" "200"
 assert_has "E23.2 — le titre de la page contient « VibeFlow · Équipe »" "$(grep -o '<title>[^<]*</title>' "$WORK/equipe.html" 2>/dev/null || echo 'aucun titre')" "VibeFlow · Équipe"
-# 69-07 : le lecteur du graphe est celui de la SORTIE assemblée (marqueur renommé window.VF_COCKPIT), comme le code servi — jamais celui des sources (window.FLOORPLAN)
-node "$AUX/graphe.mjs" "$OUT" "$WORK/equipe.html" > "$WORK/graphe-e23.json"
-assert_eq "E23.3 — le graphe embarqué porte le schéma vibeflow/cockpit-equipe@1 et meta.vfTab = equipe" "$(G "$WORK/graphe-e23.json" 'j.erreur||(j.schema+"|"+(j.meta||{}).vfTab)')" "vibeflow/cockpit-equipe@1|equipe"
-assert_eq "E23.4 — cartes : session racine, manager sous la session, worker sous son manager, terminés sous un bloc du manager, st active/done, aucun fichier" "$(G "$WORK/graphe-e23.json" 'j.erreur||(()=>{const n=(id)=>(j.nodes||[]).find((x)=>x.id===id)||{};return [n("se-'$SID'").parent??"-",n("ag-mgr1").parent,n("ag-w1").parent,n("ag-mgr1~termines").parent,n("ag-fin2h").parent,n("ag-w1").st,n("ag-fin2h").st,(j.files||[]).length].join("|")})()')" "-|se-$SID|ag-mgr1|ag-mgr1|ag-mgr1~termines|active|done|0"
-assert_eq "E23.5 — le graphe est conforme au schéma vibeflow/cockpit-equipe@1 du contrat" "$(node "$AUX/validate2.mjs" "$IFACE" vibeflow/cockpit-equipe@1 "$WORK/graphe-e23.json")" "OK"
+# 79-16 : le document de /equipe.html ne porte plus de donnée ; le graphe Équipe se lit dans le corps de la route, là où la coquille le lit
+cockpit_get "/api/vf/graphe?onglet=equipe" > "$WORK/graphe-e23.json" 2> /dev/null
+assert_eq "E23.3 — le graphe de la route porte le schéma vibeflow/cockpit-equipe@1 et meta.vfTab = equipe" "$(G "$WORK/graphe-e23.json" 'j.erreur||(j.schema+"|"+(j.meta||{}).vfTab)')" "vibeflow/cockpit-equipe@1|equipe"
+assert_eq "E23.4 — enveloppe sans cartes depuis la Phase 73 : nodes et files vides, meta conservée (vfTab, vf.compte, vf.fenetre, vf.missions, vf.sources, kindLabels)" "$(G "$WORK/graphe-e23.json" 'j.erreur||[(j.nodes||[]).length,(j.files||[]).length,j.meta.vfTab,Object.keys(j.meta.vf).sort().join(),Object.keys(j.meta.kindLabels).length].join("|")')" "0|0|equipe|compte,fenetre,missions,sources|6"
+assert_eq "E23.5 — le graphe de la route est conforme au schéma vibeflow/cockpit-equipe@1 du contrat" "$(node "$AUX/validate2.mjs" "$IFACE" vibeflow/cockpit-equipe@1 "$WORK/graphe-e23.json")" "OK"
 assert_eq "E23.6 — 00-vibeflow.js reconnaît la valeur equipe de vfTab et porte le lien equipe.html intitulé « Équipe »" "$([ "$(grep -c "'equipe'" "$UI/00-vibeflow.js")" -ge 1 ] && echo vfTab)|$([ "$(grep -c 'equipe\.html' "$UI/00-vibeflow.js")" -ge 1 ] && echo lien)|$([ "$(grep -c 'Équipe' "$UI/00-vibeflow.js")" -ge 1 ] && echo intitule)" "vfTab|lien|intitule"
 assert_eq "E23.7 — sonde de libellés : aucune chaîne anglaise nouvelle dans le chrome de l'équipe (couche d'affichage, onglet, tiroir, onglets)" "$(node "$AUX/sonde-fr.mjs" "$SCRIPTS" "$UI/71-vf-equipe-rendu.js" "$UI/72-vf-equipe.js" "$UI/70-vf-live.js" "$UI/00-vibeflow.js")" "aucune"
 mkdir -p "$AUX/sonde"; cp "$UI/70-vf-live.js" "$AUX/sonde/70-vf-live.js"
@@ -532,7 +543,7 @@ node "$AUX/vm-rendu.mjs" "$RENDU" "$AUX/pilote-pied.js" "$AUX/workers-eui.json" 
 G "$WORK/vm-arbre.json" 'j.erreur||j.retour' > "$WORK/arbre.html"
 assert_eq "EUI.1 — arbre : w1 est imbriqué sous mgr1 et mgr1 sous la session" "$(node "$AUX/nid.mjs" "$WORK/arbre.html" w1 mgr1)" "mgr1,$SID"
 assert_eq "EUI.2 — le tiroir (70-vf-live.js) appelle __vfEquipeRendu.arbre" "$([ "$(grep -c '__vfEquipeRendu\.arbre' "$UI/70-vf-live.js")" -ge 1 ] && echo appelle || echo non)" "appelle"
-assert_eq "EUI.3 — fin2h est dans un details.vf-termines fermé dont le résumé dit « Terminés depuis moins de 24 h »" "$(node "$AUX/nid.mjs" "$WORK/arbre.html" --termine fin2h)" "ferme|resume"
+assert_eq "EUI.3 — fin2h n'est plus listé dans le tiroir (aucun details.vf-termines) ; le lien « 1 à relire dans Équipe » le compte et mène à equipe.html#vf-a-relire (P73-D-14)" "$(node "$AUX/nid.mjs" "$WORK/arbre.html" fin2h)|$(grep -c 'vf-termines' "$WORK/arbre.html" | tr -d ' ')|$(grep -o '<a [^>]*href="equipe.html#vf-a-relire"[^>]*>[^<]*</a>' "$WORK/arbre.html" | sed -E 's/<[^>]*>//g')" "absent|0|1 à relire dans Équipe"
 assert_has "EUI.4 — un agent rattaché porte le lien vers son nœud de mission" "$(cat "$WORK/arbre.html")" 'href="project.html#r=f%3A.planning%2Fmissions%2Fm1.dag.json%23revue-p3"'
 assert_eq "EUI.5 — agentsDuNoeud : le lien vers la carte de w1 pour le nœud rattaché, une chaîne vide pour un nœud sans agent" "$(G "$WORK/vm-noeud.json" 'j.erreur||(String(j.retour.a).includes("equipe.html#r=n%3Aag-w1")+"|"+JSON.stringify(j.retour.b))')" 'true|""'
 assert_eq "EUI.6 — pied(a-bash) dit « actif » et « lance une commande »" "$(G "$WORK/vm-pied.json" 'j.erreur||(String(j.retour).includes("actif")+"|"+String(j.retour).includes("lance une commande"))')" "true|true"
@@ -582,7 +593,7 @@ const [, , scripts, root, home, ...ids] = process.argv;
 const m = await import(pathToFileURL(path.join(scripts, 'vf-cockpit-who.mjs')).href);
 for (const id of ids) { try { const r = m.revealTranscript(root, id, { home, scriptsDir: '/nonexistent' }); console.log(id + '|' + r.schema + '|' + (r.erreur || 'rendu')); } catch (e) { console.log(id + '|exception|' + e.message); } }
 JS
-assert_eq "E29.6 (F3) — revealTranscript ne lève jamais : agent sain rendu, agent à cwd objet et identifiant inconnu sans exception" "$(node "$AUX/rv-e29.mjs" "$SCRIPTS" "$LAB" "$H29" ok1 a-cwd absent-xyz | tr '\n' ' ')" "ok1|vibeflow/cockpit-transcript@1|rendu a-cwd|vibeflow/cockpit-transcript@1|inconnu absent-xyz|vibeflow/cockpit-transcript@1|inconnu "
+assert_eq "E29.6 (F3) — revealTranscript ne lève jamais : agent sain rendu, agent à cwd objet et identifiant inconnu sans exception" "$(node "$AUX/rv-e29.mjs" "$SCRIPTS" "$LAB" "$H29" ok1 a-cwd absent-xyz | tr '\n' ' ')" "ok1|vibeflow/cockpit-transcript@2|rendu a-cwd|vibeflow/cockpit-transcript@2|inconnu absent-xyz|vibeflow/cockpit-transcript@2|inconnu "
 
 echo "=== EUI2 — correction de revue : rechargement, arrivée sur une carte, échappement, badge, lien jamais deviné (P69-D-14, D-15 ; F1, F2, F4, F5) ==="
 cat > "$AUX/jq.mjs" <<'JS'
@@ -651,13 +662,15 @@ const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 class ES { constructor() { ES.last = this; this.l = {}; } addEventListener(n, f) { this.l[n] = f; } close() {} }
 let bouton = null, panneau = '';
 const el = () => ({ setAttribute() {}, appendChild() {}, remove() {}, style: {} });
-const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
+const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, on() {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
   addHeaderButton: (o) => { bouton = { ...o, className: '', innerHTML: '', setAttribute() {} }; return bouton; } };
 const document = { createElement: el, head: { appendChild() {} }, body: { appendChild() {}, classList: { contains: () => false } }, documentElement: {}, addEventListener() {}, dispatchEvent: () => true, getElementById: () => null, querySelectorAll: () => [], querySelector: () => null };
 const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' } };
 const ctx = vm.createContext({ window, document, MutationObserver: class { observe() {} }, EventSource: ES, CustomEvent: class { constructor(t) { this.type = t; } }, location: { reload() {} }, fetch: async () => ({ ok: false }), setTimeout, clearTimeout, Date, console, encodeURIComponent });
 try {
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_FLUX_JS, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_ETAT_JS, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
   const w = [{ kind: 'subagent', id: 'a', etat: 'actif', tree: '.' }, { kind: 'subagent', id: 'f', etat: 'termine', tree: '.', parent: 'a' }, { kind: 'subagent', id: 'w', etat: 'en-attente', tree: '.' }, { kind: 'lock', id: 'v', tree: '.' }, { kind: 'dag-node', id: 'd', tree: '.', etat: 'actif' }, { kind: 'registered', id: 'r', tree: '.' }]; // un actif, un terminé, un en attente, puis ce qui n'est pas un agent
   ES.last.l.who({ data: JSON.stringify({ seq: 1, who: { workers: w, sources: {} } }) });
@@ -704,6 +717,36 @@ M() { bash "$AUX/mutant.sh" "$1" "$2" "$3" "$4" || echo "MUTANT VIDE : $3"; }
 J71() { node "$AUX/juge71.mjs" "$1"; }
 V72() { node "$AUX/vm72.mjs" "$1" "$2" "$3"; }
 U72="$UI/72-vf-equipe.js"
+# 73-08 : le canevas d'Équipe est retiré ; les propriétés de EUI2.8 à EUI2.26 se jouent sur la ligne de la régie (vm-regie-page.mjs, plan 73-05) ; les mutants sont posés dans une COPIE des fichiers ui de la régie
+cat > "$AUX/msub.mjs" <<'JS'
+// msub.mjs <fichier> : remplace UNE fois la chaîne FROM par TO (variables d'environnement) ; « ancre absente » ou « ancre ambiguë » (sortie 1) sinon : un mutant vide ne prouve rien
+import fs from 'node:fs';
+const f = process.argv[2]; const t = fs.readFileSync(f, 'utf8'), n = process.env.FROM ? t.split(process.env.FROM).length - 1 : 0;
+if (n !== 1) { console.log(n === 0 ? 'ancre absente' : 'ancre ambiguë'); process.exit(1); }
+fs.writeFileSync(f, t.replace(process.env.FROM, () => process.env.TO)); console.log('muté');
+JS
+TESTS_E="$(cd "$(dirname "$0")" && pwd)"
+RG_FICH='"fichiers":["71-vf-equipe-rendu.js","72-vf-equipe.js","72-vf-regie-modele.js","72-vf-regie-pied.js","72-vf-regie-rendu.js","72-vf-regie-source.js"]'
+RG_S='s0000000-aaaa-bbbb-cccc-111111111111'; RG_A='a1b2c3d4e5f6'; RG_F='f0f0f0f0f0f0'
+RG_W3='{"workers":[{"kind":"session","id":"'"$RG_S"'","etat":"actif","titre":"Atelier","tree":".","ageS":5,"dureeS":30},{"kind":"subagent","id":"'"$RG_A"'","etat":"actif","parent":"'"$RG_S"'","role":"vf-coder","tree":".","ageS":3,"dureeS":20},{"kind":"subagent","id":"'"$RG_F"'","etat":"termine","parent":"'"$RG_S"'","role":"vf-coder","tree":".","ageS":3,"dureeS":20}]}'
+RG_W3B='{"workers":[{"kind":"session","id":"'"$RG_S"'","etat":"actif","titre":"Atelier","tree":".","ageS":5,"dureeS":30},{"kind":"subagent","id":"'"$RG_A"'","etat":"actif","parent":"'"$RG_S"'","role":"vf-coder","tree":".","ageS":4,"dureeS":21},{"kind":"subagent","id":"'"$RG_F"'","etat":"termine","parent":"'"$RG_S"'","role":"vf-coder","tree":".","ageS":3,"dureeS":20}]}'
+RG_W4='{"workers":[{"kind":"session","id":"'"$RG_S"'","etat":"actif","titre":"Atelier","tree":".","ageS":5,"dureeS":30},{"kind":"subagent","id":"'"$RG_A"'","etat":"actif","parent":"'"$RG_S"'","role":"vf-coder","tree":".","ageS":3,"dureeS":20},{"kind":"subagent","id":"'"$RG_F"'","etat":"termine","parent":"'"$RG_S"'","role":"vf-coder","tree":".","ageS":3,"dureeS":20},{"kind":"subagent","id":"c1c1c1c1c1c1","etat":"actif","parent":"'"$RG_S"'","role":"vf-coder","tree":".","ageS":2,"dureeS":10}]}'
+RG_W3C='{"workers":[{"kind":"session","id":"'"$RG_S"'","etat":"actif","titre":"Atelier","tree":".","ageS":5,"dureeS":30},{"kind":"subagent","id":"'"$RG_A"'","etat":"termine","parent":"'"$RG_S"'","role":"vf-coder","tree":".","ageS":3,"dureeS":20},{"kind":"subagent","id":"'"$RG_F"'","etat":"termine","parent":"'"$RG_S"'","role":"vf-coder","tree":".","ageS":3,"dureeS":20}]}'
+RG_PI='{"workers":[{"kind":"session","id":"'"$RG_S"'","etat":"actif","titre":"<x-titre>","tree":".","branch":"<x-branch>","ageS":5,"dureeS":30},{"kind":"subagent","id":"'"$RG_A"'","etat":"actif","parent":"'"$RG_S"'","role":"<x-role>","task":"<x-tache>","action":{"verbe":"lit","cible":"<x-cible>"},"tree":".","ageS":3,"dureeS":20,"rattachement":{"etat":"non-rattache","raison":"<x-raison>"}},{"kind":"subagent","id":"b9b9b9b9b9b9","etat":"actif","parent":"'"$RG_S"'","role":"vf-coder","tree":".","ageS":3,"dureeS":20,"rattachement":{"etat":"rattache","dag":"<x-dag>","noeud":"<x-noeud>"}}]}'
+# RGU <dossier ui> <who JSON> <étapes JSON> : écrit un scénario de la page Équipe (72 réduit et régie), le joue, rend le chemin de la sortie
+RGU() { local f="$WORK/rgu-$RANDOM-$$.sc.json" o; o="${f%.sc.json}.out.json"
+  printf '{"onglet":"equipe","source":"live","who":%s,"lock":null,%s,"etapes":%s}' "$2" "$RG_FICH" "$3" > "$f"; node "$TESTS_E/vm-regie-page.mjs" "$1" "$f" > "$o" 2>&1; printf '%s' "$o"; }
+# RGM <nom> <fichier> <ancre> <remplacement> : copie des fichiers ui de la régie dans $MUT/regie-<nom>/, une substitution ; rend « muté » ou « ancre absente / ambiguë »
+RGM() { local d="$MUT/regie-$1" f; rm -rf "$d"; mkdir -p "$d"; for f in 71-vf-equipe-rendu.js 72-vf-equipe.js 72-vf-regie-modele.js 72-vf-regie-pied.js 72-vf-regie-rendu.js 72-vf-regie-source.js; do cp "$UI/$f" "$d/"; done
+  FROM="$3" TO="$4" node "$AUX/msub.mjs" "$d/$2"; }
+RG_PIEGE='[{"clic":"li[data-vf-agent=\"'"$RG_A"'\"] button[aria-expanded]"},{"clic":"li[data-vf-agent=\"b9b9b9b9b9b9\"] button[aria-expanded]"},{"nom":"t","obs":{"mode":"textes","sel":"#vf-equipe .vf-rg-nom, #vf-equipe .vf-rg-role, #vf-equipe .vf-rg-det, #vf-equipe .vf-rg-l2, #vf-equipe .vf-rg-plus p, #vf-equipe .vf-link"}},{"nom":"l1","obs":{"mode":"compte","sel":"li[data-vf-agent=\"'"$RG_A"'\"] a.vf-link"}},{"nom":"l2","obs":{"mode":"attr","sel":"li[data-vf-agent=\"b9b9b9b9b9b9\"] a.vf-link","attr":"href"}}]'
+RG_CLES='{"nom":"cles","obs":{"mode":"attr","sel":"li[data-vf-cle]","attr":"data-vf-cle"}}'
+RG_E='{"nom":"e","obs":{}}'
+# expressions communes : pg = « 0 violation | texte échappé affiché | … » ; ok = rechargements | rendus du moteur | …
+RGV_PIEGE='j.erreur||(j.final.violations.length + "|" + j.out.t.some((s) => s.includes("<x-role>")) + "|" + j.out.t.some((s) => s.includes("non rattaché (<x-raison>)")) + "|" + j.out.l1)'
+RGV_NOEUD='j.erreur||(j.final.violations.length + "|" + j.out.t.some((s) => s.includes("nœud <x-noeud>")) + "|" + !j.out.l2.join().includes("<x-"))'
+RGV_CLES='j.erreur||((j.final.rechargements || 0) + "|" + j.out.e.sc.filter((x) => x === "rerender").length + "|" + j.out.cles.includes("a-relire:'"$RG_F"'") + "|" + (new Set(j.out.cles).size === j.out.cles.length))'
+
 
 # F4, F5b : échappement et lien jamais deviné (rendus de 71), puis chaque mutant doit rougir
 assert_eq "EUI2.1 — 71 : id, rôle, branche, cible, raison et tâche piégés sortent échappés ; un agent non rattaché n'a aucun lien de nœud" "$(J71 "$RENDU")" "ok"
@@ -720,23 +763,26 @@ assert_has "EUI2.6 — mutant : lien vers un nœud pour tout rattachement (même
 M "$RENDU" "$MUT/71-noeudrole.js" '<span>${h(w.role || '"'"'Agent'"'"')}</span>' '<span>${w.role || '"'"'Agent'"'"'}</span>'
 assert_has "EUI2.7 — mutant : rôle brut dans la liste d'un nœud -> détecté" "$(J71 "$MUT/71-noeudrole.js")" "balise piégée dans la liste d'un nœud"
 # le panneau de l'onglet Équipe (72) : mêmes propriétés, via le panneau d'un agent piégé
-assert_eq "EUI2.8 — panneau d'un agent piégé (72) : aucune balise, le pied et la raison échappés" "$(V72 "$U72" "$RENDU" piege | node "$AUX/jq.mjs" 'j.erreur||(!j.html.includes("<x-")&&j.html.includes("&lt;x-cible&gt;")&&j.html.includes("&lt;x-raison&gt;")&&!j.html.includes("project.html#r=")?"ok":"panneau : "+j.html.slice(0,200))')" "ok"
-M "$U72" "$MUT/72-pied.js" 'h(R().pied(w))' 'R().pied(w)'
-assert_has "EUI2.9 — mutant : pied brut dans le panneau -> détecté" "$(V72 "$MUT/72-pied.js" "$RENDU" piege | node "$AUX/jq.mjs" 'j.erreur||(j.html.includes("<x-")?"balise dans le panneau":"ok")')" "balise dans le panneau"
+assert_eq "EUI2.8 — ligne d'un agent piégé (régie) : aucun HTML posé, le rôle et la raison affichés en texte ; un agent non rattaché n'a aucun lien de nœud" "$(G "$(RGU "$UI" "$RG_PI" "$RG_PIEGE")" "$RGV_PIEGE")" "0|true|true|0"
+RGM pied 72-vf-regie-rendu.js 'if (e.textContent !== t) e.textContent = t;' 'if (e.textContent !== t) e.innerHTML = t;' > /dev/null || echo "MUTANT VIDE : pied brut"
+assert_has "EUI2.9 — mutant : pied brut dans la ligne de la régie (le texte posé en HTML) -> détecté" "$(G "$(RGU "$MUT/regie-pied" "$RG_PI" "$RG_PIEGE")" 'j.erreur||(j.final.violations.length > 0 ? "HTML posé dans la ligne" : "ok")')" "HTML posé dans la ligne"
 
 # F1 : tant que l'ensemble des agents (états compris) est stable, aucun rechargement, bloc « Terminés » compris ; F1 bis : la borne de 15 s
-assert_eq "EUI2.10 — un agent actif et un agent terminé (bloc « Terminés » dans les cartes) : 0 rechargement, 1 rendu" "$(V72 "$U72" "$RENDU" termine | node "$AUX/jq.mjs" 'j.erreur||(j.reloads+"|"+j.rerenders)')" "0|1"
-M "$U72" "$MUT/72-signature.js" "&& !x.id.includes('~')" ""
-assert_eq "EUI2.11 — mutant : le bloc « Terminés » compte comme un agent -> 1 rechargement, détecté" "$(V72 "$MUT/72-signature.js" "$RENDU" termine | node "$AUX/jq.mjs" 'j.erreur||(j.reloads+"|"+j.rerenders)')" "1|0"
-assert_eq "EUI2.12 — borne : un agent nouveau recharge une fois, puis rien avant 15 s, puis une fois de plus à l'échéance" "$(V72 "$U72" "$RENDU" borne | node "$AUX/jq.mjs" 'j.erreur||[j.r1,j.r2,j.r3].join("|")')" "1|1|2"
-M "$U72" "$MUT/72-borne.js" 'const PAUSE_MS = 15000' 'const PAUSE_MS = 0'
-assert_eq "EUI2.13 — mutant : borne à 0 -> le deuxième événement recharge aussitôt, détecté" "$(V72 "$MUT/72-borne.js" "$RENDU" borne | node "$AUX/jq.mjs" 'j.erreur||[j.r1,j.r2,j.r3].join("|")')" "1|2|2"
+assert_eq "EUI2.10 — un agent actif et un agent terminé : 0 rechargement, 0 rendu du moteur, une seule ligne par clé, le terminé dans « Terminé, à relire »" "$(G "$(RGU "$UI" "$RG_W3" "[$RG_CLES,$RG_E]")" "$RGV_CLES")" "0|0|true|true"
+RGM cle-section 72-vf-regie-modele.js 'cle: `${sec}:${w.id}`' 'cle: `${sec}`' > /dev/null || echo "MUTANT VIDE : clé de section seule"
+assert_eq "EUI2.11 — mutant : la clé de ligne ne porte plus l'agent (toutes les lignes d'une section en partagent une) -> le terminé n'a plus sa ligne, détecté" "$(G "$(RGU "$MUT/regie-cle-section" "$RG_W3" "[$RG_CLES,$RG_E]")" "$RGV_CLES")" "0|0|false|true"
+assert_eq "EUI2.12 — un agent nouveau : 0 rechargement, une ligne de plus en place (+1), et rien de plus 16 s après" "$(G "$(RGU "$UI" "$RG_W3" '[{"nom":"n1","obs":{"mode":"compte","sel":"li[data-vf-cle]"}},{"poser":{"who":'"$RG_W4"'}},{"avancer":16000},{"nom":"n2","obs":{"mode":"compte","sel":"li[data-vf-cle]"}},{"nom":"e","obs":{}}]')" 'j.erreur||((j.final.rechargements || 0) + "|" + j.out.e.sc.filter((x) => x === "rerender").length + "|" + (j.out.n2 - j.out.n1))')" "0|0|1"
+RGM cle-volatile 72-vf-regie-modele.js 'cle: `${sec}:${w.id}`' 'cle: `${sec}:${w.id}:${w.ageS}`' > /dev/null || echo "MUTANT VIDE : clé volatile"
+RG_MAJ='[{"marquer":"li[data-vf-cle=\"au-travail:'"$RG_A"'\"]"},{"poser":{"who":'"$RG_W3B"'}},{"nom":"m","obs":{"mode":"marques","sel":"li[data-vf-cle=\"au-travail:'"$RG_A"'\"]"}},'"$RG_CLES"']'
+assert_eq "EUI2.13 — mise à jour en place : la ligne marquée avant une poussée (l'âge change) est le même noeud après, une seule ligne par clé" "$(G "$(RGU "$UI" "$RG_W3" "$RG_MAJ")" 'j.erreur||(j.out.m + "|" + (new Set(j.out.cles).size === j.out.cles.length) + "|" + j.out.cles.length)')" "1|true|3"
+assert_eq "EUI2.13b — mutant : la clé de ligne porte l'âge (volatile) -> la ligne est reconstruite à chaque poussée, détecté" "$(G "$(RGU "$MUT/regie-cle-volatile" "$RG_W3" "$RG_MAJ")" 'j.erreur||(j.out.m + "|" + (new Set(j.out.cles).size === j.out.cles.length) + "|" + j.out.cles.length)')" "0|true|3"
 
 # F2 : l'arrivée sur #r=n:<carte> révèle la carte même quand `ready` n'est jamais émis ; une seule fois, et jamais en double quand 00-vibeflow.js l'a traitée à `ready`
-assert_eq "EUI2.14 — arrivée sur #r=n:ag-A sans ready : la carte est révélée une fois, après le premier rendu" "$(V72 "$U72" "$RENDU" arrivee | node "$AUX/jq.mjs" 'j.erreur||j.reveals.join(",")')" "n:ag-A"
-assert_eq "EUI2.15 — avec ready émis avant (00-vibeflow.js a révélé la carte) : 72 ne la révèle pas une seconde fois" "$(V72 "$U72" "$RENDU" arrivee-ready | node "$AUX/jq.mjs" 'j.erreur||("["+j.reveals.join(",")+"]")')" "[]"
-M "$U72" "$MUT/72-arrivee.js" '^    arrivee();$' '    void 0;'
-assert_eq "EUI2.16 — mutant : plus de révélation après le rendu -> aucune carte révélée, détecté" "$(V72 "$MUT/72-arrivee.js" "$RENDU" arrivee | node "$AUX/jq.mjs" 'j.erreur||("["+j.reveals.join(",")+"]")')" "[]"
+RG_ARR='[{"appel":"__vfRegie.arriver","args":["n:ag-'"$RG_A"'"]},{"nom":"f","obs":{"mode":"focus"}},{"nom":"d","obs":{}}]'
+assert_eq "EUI2.14 — arrivée sur #r=n:ag-<id> : la ligne de l'agent est atteinte une fois (défilement et focus sur sa ligne)" "$(G "$(RGU "$UI" "$RG_W3" "$RG_ARR")" 'j.erreur||(j.out.f.cle + "|" + j.out.d.defilements.length)')" "au-travail:$RG_A|1"
+assert_eq "EUI2.15 — arrivée puis une poussée de who : la ligne n'est pas atteinte une seconde fois (un seul défilement)" "$(G "$(RGU "$UI" "$RG_W3" '[{"appel":"__vfRegie.arriver","args":["n:ag-'"$RG_A"'"]},{"poser":{"who":'"$RG_W3B"'}},{"nom":"f","obs":{"mode":"focus"}},{"nom":"d","obs":{}}]')" 'j.erreur||(j.out.f.cle + "|" + j.out.d.defilements.length)')" "au-travail:$RG_A|1"
+RGM arrivee 72-vf-regie-source.js "if (declencheur === 'ancre') { li.scrollIntoView({ block: 'center' }); (li._t || li).focus(); }" "if (declencheur === 'ancre') { }" > /dev/null || echo "MUTANT VIDE : arrivée"
+assert_eq "EUI2.16 — mutant : plus d'ancrage de la ligne à l'arrivée -> ni défilement ni focus, détecté" "$(G "$(RGU "$MUT/regie-arrivee" "$RG_W3" "$RG_ARR")" 'j.erreur||(j.out.f.cle + "|" + j.out.d.defilements.length)')" "null|0"
 
 # F5a : le badge et le titre du tiroir ne comptent que les agents actifs (ni terminé, ni en attente)
 assert_eq "EUI2.17 — un actif, un terminé, un en attente, un verrou, un nœud de DAG, un enregistrement : badge « 1 au travail » et effectif « 1 actif » du panneau (seuls les agents actifs comptent)" "$(node "$AUX/vm70.mjs" "$UI/70-vf-live.js" "$RENDU" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "1 au travail|1"
@@ -744,7 +790,8 @@ M "$RENDU" "$MUT/71-actif.js" "w.etat !== 'termine' \&\& w.etat !== 'en-attente'
 assert_eq "EUI2.18 — mutant : le terminé et l'agent en attente comptent -> 3, détecté" "$(node "$AUX/vm70.mjs" "$UI/70-vf-live.js" "$MUT/71-actif.js" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "3 au travail|3"
 M "$UI/70-vf-live.js" "$MUT/70-badge.js" "window.__vfEquipeRendu.actif(w)" "!w.stale"
 assert_eq "EUI2.18b — mutant : le badge compte aussi verrous, nœuds de DAG et enregistrements (le défaut de la recette) -> 6, détecté" "$(node "$AUX/vm70.mjs" "$MUT/70-badge.js" "$RENDU" | node "$AUX/jq.mjs" 'j.erreur||(j.badge+"|"+j.panneau)')" "6 au travail|6"
-assert_eq "EUI2.18c — même collecte : les effectifs « actifs » de l'onglet Équipe valent ceux du badge (1), verrou et nœud de DAG exclus" "$(V72 "$U72" "$RENDU" compte | node "$AUX/jq.mjs" 'j.erreur||(j.compte.actif+"|"+j.compte.enAttente+"|"+j.compte.termine)')" "1|1|1"
+RG_WC='{"workers":[{"kind":"subagent","id":"aaaaaaaaaaaa","etat":"actif","tree":".","ageS":3},{"kind":"subagent","id":"ffffffffffff","etat":"termine","tree":".","parent":"aaaaaaaaaaaa"},{"kind":"subagent","id":"wwwwwwwwwwww","etat":"en-attente","tree":"."},{"kind":"lock","id":"v","tree":"."},{"kind":"dag-node","id":"d","tree":".","etat":"actif"},{"kind":"registered","id":"r","tree":"."}]}'
+assert_eq "EUI2.18c — même collecte : le sous-titre de la régie compte 2 agents (l'actif et celui en attente) et 1 à relire, verrou, nœud de DAG et enregistrement exclus" "$(G "$(RGU "$UI" "$RG_WC" '[{"nom":"s","obs":{"mode":"textes","sel":"#vf-equipe-entete .vf-rg-sous"}}]')" 'j.erreur||j.out.s.join()')" "2 agents · 1 à relire"
 
 # F6 : la liste CONNU de la sonde ne couvre que les mots français affichés par 71 ; un libellé anglais ajouté à une copie de 71 reste vu
 mkdir -p "$AUX/sonde"; cp "$RENDU" "$AUX/sonde/71-vf-equipe-rendu.js"
@@ -805,24 +852,26 @@ try {
   vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), ctx, { timeout: 5000 });
   const R = ctx.window.__vfEquipeRendu;
   const S = { kind: 'session', id: 'S', etat: 'actif', tree: '.' }, A = { kind: 'subagent', id: 'A', etat: 'en-attente', parent: 'S', tree: '.' }, F = { kind: 'subagent', id: 'F', etat: 'termine', parent: 'S', tree: '.' };
-  const html = R.arbre([S, A, F], h);
-  for (const [nom, attendu] of [['titre session', 'Session principale'], ['rôle sous-agent', '<b>Agent</b>'], ['mot lu « en attente »', '(en attente'], ['mot visible « en attente »', ' · en attente'], ['mot lu « terminé »', '(terminé)'], ['titre du bloc des terminés', 'Terminés depuis moins de 24 h (1)']]) if (!html.includes(attendu)) ko.push(nom);
+  const FA = { kind: 'subagent', id: 'FA', etat: 'actif', parent: 'F', tree: '.' }, G = { kind: 'subagent', id: 'G', etat: 'termine', parent: 'S', tree: '.' }; // F : terminé listé car il porte un agent en cours (« terminé ») ; G : terminé compté par le lien (P73-D-14)
+  const html = R.arbre([S, A, F, FA, G], h);
+  for (const [nom, attendu] of [['titre session', 'Session principale'], ['rôle sous-agent', '<b>Agent</b>'], ['mot lu « en attente »', '(en attente'], ['mot visible « en attente »', ' · en attente'], ['mot lu « terminé »', '(terminé)'], ['lien des terminés (P73-D-14)', '1 à relire dans Équipe']]) if (!html.includes(attendu)) ko.push(nom);
   if (!R.pied(A).startsWith('en attente')) ko.push('pied en attente : ' + R.pied(A));
   if (!R.pied(F).startsWith('terminé')) ko.push('pied terminé : ' + R.pied(F));
   if (!R.pied(S).startsWith('actif')) ko.push('pied actif : ' + R.pied(S));
 } catch (e) { ko.push('exécution : ' + String(e.message).slice(0, 100)); }
 console.log(ko.length ? ko.join(' ; ') : 'ok');
 JS
-assert_eq "EUI2.20 — libellés exacts : Session principale, rôle, « en attente » (lu et visible), « terminé », bloc « Terminés depuis moins de 24 h (1) »" "$(node "$AUX/libelles71.mjs" "$RENDU")" "ok"
+assert_eq "EUI2.20 — libellés exacts : Session principale, rôle, « en attente » (lu et visible), « terminé », lien « 1 à relire dans Équipe »" "$(node "$AUX/libelles71.mjs" "$RENDU")" "ok"
 M "$RENDU" "$MUT/71-attente.js" "'en attente'" "'en-attente'"
 assert_has "EUI2.21 — mutant : « en attente » devient « en-attente » -> détecté" "$(node "$AUX/libelles71.mjs" "$MUT/71-attente.js")" "pied en attente"
 M "$RENDU" "$MUT/71-noeud.js" 'Nœud ${h(w.rattachement.noeud)}' 'Nœud ${w.rattachement.noeud}'
 assert_has "EUI2.22 — mutant : noeud brut dans l'arbre -> détecté" "$(J71 "$MUT/71-noeud.js")" "balise piégée dans l'arbre"
-assert_eq "EUI2.23 — panneau d'un agent rattaché à un nœud et un DAG piégés : aucune balise, noeud échappé" "$(V72 "$U72" "$RENDU" piege2 | node "$AUX/jq.mjs" 'j.erreur||(!j.html.includes("<x-")&&j.html.includes("&lt;x-noeud&gt;")?"ok":"panneau : "+j.html.slice(0,200))')" "ok"
-assert_has "EUI2.24 — mutant : noeud brut dans le panneau (71 muté) -> détecté" "$(V72 "$U72" "$MUT/71-noeud.js" piege2 | node "$AUX/jq.mjs" 'j.erreur||(j.html.includes("<x-")?"balise dans le panneau":"ok")')" "balise dans le panneau"
-assert_eq "EUI2.25 — un agent passe d'actif à terminé (cartes inchangées) : 1 rechargement, puis aucun avant 15 s" "$(V72 "$U72" "$RENDU" passe | node "$AUX/jq.mjs" 'j.erreur||[j.r1,j.r2].join("|")')" "1|1"
-M "$U72" "$MUT/72-fini.js" "\${id}\${fini ? '~' : ''}" '${id}'
-assert_eq "EUI2.26 — mutant : l'appartenance aux terminés sort de la signature -> aucun rechargement, détecté" "$(V72 "$MUT/72-fini.js" "$RENDU" passe | node "$AUX/jq.mjs" 'j.erreur||[j.r1,j.r2].join("|")')" "0|0"
+assert_eq "EUI2.23 — ligne d'un agent rattaché à un nœud et un DAG piégés : aucun HTML posé, nœud affiché en texte, lien encodé" "$(G "$(RGU "$UI" "$RG_PI" "$RG_PIEGE")" "$RGV_NOEUD")" "0|true|true"
+RGM noeud 72-vf-regie-rendu.js "t.map((x) => h('p', 'vf-rg-l2', x))" "t.map((x) => { const p = h('p', 'vf-rg-l2'); p.innerHTML = x; return p; })" > /dev/null || echo "MUTANT VIDE : nœud brut"
+assert_has "EUI2.24 — mutant : nœud brut dans le détail de la ligne -> détecté" "$(G "$(RGU "$MUT/regie-noeud" "$RG_PI" "$RG_PIEGE")" 'j.erreur||(j.final.violations.length > 0 ? "HTML posé dans la ligne" : "ok")')" "HTML posé dans la ligne"
+assert_eq "EUI2.25 — un agent passe d'actif à terminé : 0 rechargement, sa ligne passe dans « Terminé, à relire » (une seule ligne par clé)" "$(G "$(RGU "$UI" "$RG_W3" '[{"poser":{"who":'"$RG_W3C"'}},'"$RG_CLES"','"$RG_E"']')" 'j.erreur||((j.final.rechargements || 0) + "|" + j.out.cles.includes("a-relire:'"$RG_A"'") + "|" + j.out.cles.includes("au-travail:'"$RG_A"'") + "|" + (new Set(j.out.cles).size === j.out.cles.length))')" "0|true|false|true"
+RGM cle-sans-section 72-vf-regie-modele.js 'cle: `${sec}:${w.id}`' 'cle: `x:${w.id}`' > /dev/null || echo "MUTANT VIDE : clé sans section"
+assert_eq "EUI2.26 — mutant : la clé de ligne ne dit plus la section -> la ligne terminée garde la clé de l'actif, détecté" "$(G "$(RGU "$MUT/regie-cle-sans-section" "$RG_W3" '[{"poser":{"who":'"$RG_W3C"'}},'"$RG_CLES"','"$RG_E"']')" 'j.erreur||((j.final.rechargements || 0) + "|" + j.out.cles.includes("a-relire:'"$RG_A"'") + "|" + j.out.cles.includes("au-travail:'"$RG_A"'") + "|" + (new Set(j.out.cles).size === j.out.cles.length))')" "0|false|false|true"
 
 assert_eq "E30.6 (point 5) — contrôle positif : ok1 est rattaché par le registre à un nœud dont l'identifiant porte un jeton" "$(sf "$WORK/who-e30.json" ok1 'w.rattachement.etat+"|"+w.rattachement.source')" "rattache|registre"
 assert_eq "E30.7 (point 5) — le jeton du nœud rattaché ne sort pas en clair (rattachement.noeud masqué)" "$(G "$WORK/who-e30.json" '(w=>w?(JSON.stringify(w).includes("ghp_")?"jeton en clair":(JSON.stringify(w).includes("[masqué]")?"ok":"rien de masqué")):"absent")(j.workers.find(x=>x.id==="ok1"))')" "ok"
@@ -873,7 +922,8 @@ JS
  {"id":"mgr1","spawnDepth":1,"ageS":5,"role":"vf-dev-manager"},
  {"id":"a1","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-coder"},
  {"id":"a2","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"vf-coder"},
- {"id":"a3","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"general-purpose","dureeS":130,"dernierAppel":{"name":"Agent","input":{"subagent_type":"general-purpose","description":"d","prompt":"p"}}}]}
+ {"id":"a3","spawnDepth":2,"parent":"mgr1","ageS":3,"role":"general-purpose","dureeS":130,"dernierAppel":{"name":"Agent","input":{"subagent_type":"general-purpose","description":"d","prompt":"p"}}},
+ {"id":"a4","spawnDepth":2,"parent":"mgr1","finished":true,"ageS":600,"role":"vf-reviewer"}]}
 JSON
   NOW="$(node -e 'console.log(Date.now())')"
   HEK="$(mkhome ek "$AUX/spec-ek.json" "$LABEK")"
@@ -882,35 +932,34 @@ JSON
   OUTEK="$LABEK/.vibeflow/cockpit"; cp "$OUTEK/project.html" "$WORK/project-ek.html.orig"
   ek_rafraichir() { touch "$HEK/.claude/projects/-lab/$SID/subagents/"agent-*.jsonl "$HEK/.claude/projects/-lab/"*.jsonl; }
   ek_demarrer() { rm -f "$OUTEK/.cache/server.json"; ek_rafraichir
-    HOME="$HEK" node "$OUTEK/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve-ek.out" 2>&1 &
-    EK_PID=$!; PIDS+=("$EK_PID")
-    for _ in $(seq 1 300); do [ -s "$OUTEK/.cache/server.json" ] && break; sleep 0.1; done
-    EK_PORT="$(G "$OUTEK/.cache/server.json" 'j.port' 2>/dev/null || echo 0)"; }
-  # ek_muter <ancre> <remplacement> : pose le mutant dans la page assemblée (project.html de la sortie), « muté » ou « ancre absente »
-  ek_muter() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; if [ -z "${3:-}" ]; then EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; else EK_FROM="$1" EK_TO="$2" node "$AUX/ek-sub.mjs" "$OUTEK/project.html" >/dev/null || return 1; EK_FROM="$3" EK_TO="$4" node "$AUX/ek-sub.mjs" "$OUTEK/project.html"; fi; }  # $3/$4 : seconde substitution (fusion de la 68 : deux règles de pied de carte)
-  ek_restaurer() { cp "$WORK/project-ek.html.orig" "$OUTEK/project.html"; }
+    COCKPIT_MODULE="$(cat "$EKMOD" 2>/dev/null)" COCKPIT_LOG="$WORK/serve-ek.out" cockpit_lancer "$LABEK" HOME="$HEK" || true   # 79-16 : le mutant est la copie du module nommée par $EKMOD (vide : le module du dépôt)
+    EK_PID="$VF_PID"
+    EK_PORT="$VF_PORT"; }
+  # ek_muter <ancre> <remplacement> [<ancre2> <remplacement2>] : pose le mutant dans les sources de page d'une COPIE du module (79-16 : la sortie ne porte que des données ; la page vient du module), « muté » ou « ancre absente » ;
+  # le chemin de la copie est écrit dans $EKMOD, lu par ek_demarrer. Une ancre présente plus d'une fois est refusée (« ancre ambiguë » : deux occurrences, le mutant pourrait viser le mauvais fichier, 70-11)
+  EKMOD="$WORK/ek-mod"
+  ek_muter() {
+    rm -f "$EKMOD"; rm -rf "$WORK/mod-ek"; local c r; c="$(cockpit_module_copie "$WORK/mod-ek")" || return 1
+    cockpit_page_muter_litteral "$c" "$1" "$2" unique 2>/dev/null; r=$?; [ "$r" = 0 ] || { [ "$r" = 2 ] && echo "ancre ambiguë" || echo "ancre absente"; return 1; }
+    if [ -n "${3:-}" ]; then cockpit_page_muter_litteral "$c" "$3" "$4" unique 2>/dev/null; r=$?; [ "$r" = 0 ] || { [ "$r" = 2 ] && echo "ancre ambiguë" || echo "ancre absente"; return 1; }; fi  # $3/$4 : seconde substitution (fusion de la 68 : deux règles de pied de carte)
+    printf '%s' "$c" > "$EKMOD"; echo muté
+  }
+  ek_restaurer() { rm -f "$EKMOD"; }
   # EKC <action> <page> : une interaction, un Chromium ; la ligne JSON rendue est lue par G
   EKC() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EK_ACTION="$1" node "$HERE_EK/chrome-equipe-clavier.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ek-$1.json"; }
-  EKA1="equipe.html#r=n%3Aag-a1"
+  EKA1="equipe.html"   # 74 : sans ancre. Arriver à froid sur #r=n:ag-<id> ouvre la fiche (contrat P73-C2, T26.8), qui masque la vue : le bouton « Lire le rapport » n'est plus focalisable
   ek_demarrer
   assert_eq "EK0 — contrôle positif : serveur de la sortie démarré, page Équipe servie et fixture à deux agents lisibles" "$([ "$EK_PORT" -gt 0 ] && echo serveur)|$(node "$AUX/fetchp.mjs" "$EK_PORT" /equipe.html "$WORK/ek-equipe.html")" "serveur|200"
   # EK1 (UIFN-12) : Entrée sur « Lire le transcript » ne fait pas perdre le focus clavier
   EKC focus-transcript "$EKA1"
-  assert_eq "EK1.0 — témoin : avant l'Entrée, l'élément actif est le bouton « Lire le transcript » de l'agent a1 (la sonde sait lire le focus)" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||(j.avant.tag+"|"+j.avant.transcript)')" "BUTTON|a1"
-  assert_eq "EK1 — après Entrée sur « Lire le transcript », le transcript s'affiche ET l'élément actif reste dans le tiroir, jamais BODY" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.tag==="BODY"?"BODY":(j.apres.dansTiroir?"dans le tiroir":"hors du tiroir : "+j.apres.tag)))')" "lu=true | actif=dans le tiroir"
-  EKC focus-transcript "equipe.html#r=n%3Aag-mgr1"
-  assert_eq "EK1.1 — sur un manager qui porte des agents, Entrée sur « Lire le transcript » lit le transcript, garde le focus et ne fait pas descendre le viewer dans le nœud" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag+" | vue "+(j.hashAvant===j.hashApres?"inchangée":"changée"))')" "lu=true | actif=BUTTON | vue inchangée"
-  # EK2 (m1) : changer d'agent efface la clé de rechargement
-  EKC changer-agent "$EKA1"
-  assert_eq "EK2.1 — changer d'agent efface la clé de rechargement (avant : l'identifiant a1 ; après : aucune)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')" "a1|null"
-  # EK3 (m10) : le sessionStorage ne garde que l'identifiant de l'agent
-  EKC recharger "$EKA1"
-  assert_eq "EK3.1 — le sessionStorage ne contient que l'identifiant de l'agent (jamais le texte lu, qui est bien affiché)" "$(G "$WORK/ek-recharger.json" 'j.erreur||(JSON.stringify(j.entrees)+"|"+j.texteLu+"|"+j.fuite)')" '{"vf-equipe-ouvert":"a1"}|true|false'
+  assert_eq "EK1.0 — témoin : avant l'Entrée, l'élément actif est le bouton « Lire le rapport » d'une ligne terminée de la régie (la sonde sait lire le focus)" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||(j.avant.tag+"|"+j.avant.rapport)')" "BUTTON|true"
+  # EK1, EK1.1, EK2.1, EK3.1 et EKR2 exerçaient le lecteur de repli de la régie, retiré par 74-10 (contrat P73-C2) : la fiche porte les mêmes propriétés (focus, rien du fil en stockage, lecture qui survit aux who)
+  # dans test-cockpit-equipe-retraits.sh (R4 : T27.C1 et T27.C2 ; R5b : nom, Entrée, Espace, rapport, focus rendu à l'origine) et test-cockpit-fiche.sh ; l'absence du repli est prouvée par test-cockpit-repli-retrait.sh (RP1 à RP3).
   # EK4 (m8) : un tiroir fermé n'est pas rouvert par un nouveau who
   EKC ferme-puis-who "project.html#t"
   assert_eq "EK4.1 — le tiroir « Au travail » fermé n'est pas rouvert par un who qui change l'arbre (ouvert, fermé, rouvert)" "$(G "$WORK/ek-ferme-puis-who.json" 'j.erreur||(j.ouvert+"|"+j.ferme+"|"+j.rouvert)')" "true|true|false"
   # EK5 (m5) : la commande demandée est rendue en texte, jamais en HTML
-  EKC rendu-commande "$EKA1"
+  EKC rendu-commande "project.html#t"
   assert_eq "EK5.1 — une commande qui porte du balisage s'affiche en texte (0 élément créé, aucun #ek-injecte, la source lisible)" "$(G "$WORK/ek-rendu-commande.json" 'j.erreur||(j.elements+"|"+j.injecte+"|"+j.texte.includes("<b id=ek-injecte>"))')" "0|false|true"
   # EK8 (UIFN-12, bouton voisin) : Entrée sur « Voir la dernière commande » du tiroir « Au travail » ne fait pas perdre le focus clavier
   EKC focus-doing-tiroir "project.html#t"
@@ -918,21 +967,28 @@ JSON
   assert_eq "EK8 — après Entrée sur « Voir la dernière commande » du tiroir, la commande s'affiche ET l'élément actif reste ce bouton, jamais BODY" "$(G "$WORK/ek-focus-doing-tiroir.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.tag==="BODY"?"BODY":(j.apres.doing?"bouton « dernière commande »":"autre : "+j.apres.tag)))')" "lu=true | actif=bouton « dernière commande »"
   # --- recette de la Phase 70 (juge Playwright frais) : focus au redessin, badge du pied long, libellés ---
   EKC focus-puis-who "$EKA1"
-  assert_eq "EK8.0 — témoin : le bouton du panneau avait le focus et le événement who l'a bien remplacé (le redessin a eu lieu)" "$(G "$WORK/ek-focus-puis-who.json" 'j.erreur||(j.focalise+"|"+j.remplace)')" "true|true"
-  assert_eq "EK8 — après le redessin du panneau par un événement who, le focus est rendu au bouton « Lire le transcript » de même identifiant" "$(G "$WORK/ek-focus-puis-who.json" 'j.erreur||(j.apres.tag==="BODY"?"BODY":(j.apres.estLeBouton&&j.apres.transcript==="a1"?"le bouton":"autre : "+j.apres.tag))')" "le bouton"
+  assert_eq "EK8.0 — témoin : le bouton « Lire le rapport » avait le focus et le événement who a bien été pris en compte (la ligne est mise à jour en place)" "$(G "$WORK/ek-focus-puis-who.json" 'j.erreur||(j.focalise+"|"+j.remplace)')" "true|true"
+  assert_eq "EK8 — après la mise à jour de la ligne par un événement who, le focus est resté sur le même bouton « Lire le rapport »" "$(G "$WORK/ek-focus-puis-who.json" 'j.erreur||(j.apres.tag==="BODY"?"BODY":(j.apres.estLeBouton?"le bouton":"autre : "+j.apres.tag))')" "le bouton"
   EKC focus-tiroir "project.html#t"
   assert_eq "EK9.0 — témoin : le bouton du tiroir avait le focus et le événement who l'a bien remplacé" "$(G "$WORK/ek-focus-tiroir.json" 'j.erreur||(j.focalise+"|"+j.remplace)')" "true|true"
   assert_eq "EK9 — après le redessin du tiroir « Au travail » par un événement who, le focus est rendu au bouton « Voir la dernière commande » de la même ligne" "$(G "$WORK/ek-focus-tiroir.json" 'j.erreur||(j.apres.tag==="BODY"?"BODY":(j.apres.estLeBouton?"le bouton":"autre : "+j.apres.tag))')" "le bouton"
+  # EKR (79-17, SOCL-21) : ce que le panneau reposait après un redessin par un observateur de mutations — la réponse « dernière commande » du tiroir et le transcript lu —
+  # est reposé par l'événement panel du moteur ; caractérisations VERTES avant et après le retrait des observateurs (le témoin rouge du retrait est le cliquet, section O de test-cockpit-magasin.sh)
+  EKR() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EKR_ACTION="$1" node "$HERE_EK/reposer-chrome.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ekr-$1.json"; }
+  EKR reponse-puis-who "project.html#t"
+  assert_eq "EKR1 — la réponse « Voir la dernière commande » reste affichée dans la ligne du bouton neuf quand un second who redessine le tiroir (le bouton a bien été remplacé)" "$(G "$WORK/ekr-reponse-puis-who.json" 'j.erreur||(j.remplace+"|"+j.texte+"|"+j.visible)')" "true|réponse fixe EKR1|true"
   EKC badge "$EKA1"
-  assert_eq "EK10 — pied long (« actif · … · lance un agent general-purpose ») : le badge d'état reste entièrement dans sa carte à 390, 1024 et 1440 px (marge >= 0)" "$(G "$WORK/ek-badge.json" 'j.erreur||(["390","1024","1440"].map((l)=>typeof j[l]==="number"&&j[l]>=0?"ok":l+"="+j[l]).join(","))')" "ok,ok,ok"
+  assert_eq "EK10 — mot d'état d'une ligne de la régie : il reste entièrement dans sa ligne à 390, 1024 et 1440 px (marge >= 0)" "$(G "$WORK/ek-badge.json" 'j.erreur||(["390","1024","1440"].map((l)=>typeof j[l]==="number"&&j[l]>=0?"ok":l+"="+j[l]).join(","))')" "ok,ok,ok"
   EKC echelle "equipe.html"
-  assert_eq "EK13.0 — témoin : la scène porte au moins une carte à chacun des 7 chargements (5 à 390 px, 2 à 768 px)" "$(G "$WORK/ek-echelle.json" 'j.erreur||(["390","768"].every((l)=>j[l].every((m)=>m.cartes>0))?"cartes":"aucune carte")')" "cartes"
-  assert_eq "EK13 — premier affichage, 5 chargements à 390 px et 2 à 768 px : échelle >= 0,75 à chacun, aucun recouvrement entre #context (lien « Plus » compris) et la première carte, carte entièrement visible (x >= 0)" "$(G "$WORK/ek-echelle.json" 'j.erreur||["390","768"].map((l)=>l+" : "+j[l].map((m)=>(m.k>=0.75?"k":"k="+m.k)+(m.aire===0?"":" recouvre "+m.aire+" px²")+(m.gauche>=0?"":" x="+m.gauche)).join(",")).join(" ; ")')" "390 : k,k,k,k,k ; 768 : k,k"
+  assert_eq "EK13.0 — témoin : la régie porte au moins une ligne à chacun des 7 chargements (5 à 390 px, 2 à 768 px)" "$(G "$WORK/ek-echelle.json" 'j.erreur||(["390","768"].every((l)=>j[l].every((m)=>m.cartes>0))?"cartes":"aucune carte")')" "cartes"
+  assert_eq "EK13 — premier affichage de la régie, 5 chargements à 390 px et 2 à 768 px : aucune ligne ne déborde de la largeur (k = 1), aucun recouvrement entre l'en-tête de la régie et sa première section, ligne entièrement visible (x >= 0)" "$(G "$WORK/ek-echelle.json" 'j.erreur||["390","768"].map((l)=>l+" : "+j[l].map((m)=>(m.k>=0.75?"k":"k="+m.k)+(m.aire===0?"":" recouvre "+m.aire+" px²")+(m.gauche>=0?"":" x="+m.gauche)).join(",")).join(" ; ")')" "390 : k,k,k,k,k ; 768 : k,k"
   G "$WORK/ek-echelle.json" '(j.erreur?[]:["390","768"].flatMap((l)=>j[l].map((m,i)=>[l+"#"+i,m]))).filter(([,m])=>m.aire>0||m.k<0.75).map(([n,m])=>"  diag EK13 "+n+" : "+m.diag).join("\n")'
   EKC titre-grandi "equipe.html"
-  assert_eq "EK14 — le titre grandit après le cadrage (768 px, corps 40 px sur 9 caractères de large) : aucun recouvrement avec la première carte une fois la page stable, échelle >= 0,75" "$(G "$WORK/ek-titre-grandi.json" 'j.erreur||((j.k>=0.75?"k":"k="+j.k)+" / "+(j.aire===0?"sans recouvrement":"recouvre "+j.aire+" px²"))')" "k / sans recouvrement"
+  assert_eq "EK14 — le titre de la régie grandit après le premier affichage (768 px, corps 40 px sur 9 caractères de large) : aucun recouvrement avec la première section une fois la page stable, aucune ligne ne déborde" "$(G "$WORK/ek-titre-grandi.json" 'j.erreur||((j.k>=0.75?"k":"k="+j.k)+" / "+(j.aire===0?"sans recouvrement":"recouvre "+j.aire+" px²"))')" "k / sans recouvrement"
+  # P73-D-14 : le tiroir « Au travail » n'existe plus sur Équipe (son bouton mène à la régie) : le pied du tiroir se lit sur Projet, l'infobulle de la recherche sur Équipe
+  EKC libelles "project.html#t"; mv "$WORK/ek-libelles.json" "$WORK/ek-libelles-tiroir.json"
   EKC libelles "equipe.html#t"
-  assert_eq "EK11 — le pied du tiroir, qui ne nomme plus qu'une source illisible (PU-G-180), est en français (aucune clé « sessions », « locks », « dags » brute)" "$(G "$WORK/ek-libelles.json" 'j.erreur||(/\b(sessions|locks|dags)\b/.test(j.src)?"anglais : "+j.src:"français")')" "français"
+  assert_eq "EK11 — le pied du tiroir, qui ne nomme plus qu'une source illisible (PU-G-180), est en français (aucune clé « sessions », « locks », « dags » brute)" "$(G "$WORK/ek-libelles-tiroir.json" 'j.erreur||(/\b(sessions|locks|dags)\b/.test(j.src)?"anglais : "+j.src:"français")')" "français"
   assert_eq "EK12 — l'infobulle de la recherche de l'onglet Équipe dit la même chose que son libellé" "$(G "$WORK/ek-libelles.json" 'j.erreur||j.titre')" "Chercher un agent ou une session"
   # EK15 (EA3, PU-G-189, PU-G-190) : Échap ferme le tiroir « Au travail » seul, le bouton dit s'il est ouvert et ce qu'il ouvre
   EK15() { EK_FOCUS="$1" EKC echap-tiroir "project.html#t"; mv "$WORK/ek-echap-tiroir.json" "$WORK/ek-echap-$1.json"; }
@@ -962,30 +1018,24 @@ JSON
   # --- mutants : chacun posé dans la page servie, serveur relancé, le témoin DOIT rougir ---
   ek_mutant() { # $1 nom, $2 action, $3 page, $4 expression sur la sortie, $5 ancre, $6 remplacement -> « muté|<valeur> »
     local m; m="$(ek_muter "$5" "$6" "${7:-}" "${8:-}")"; ek_demarrer; EKC "$2" "$3"; local v; v="$(G "$WORK/ek-$2.json" "$4")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
-  assert_eq "EK2.2 — mutant (marque(null) retiré de la page servie) : la clé survit au changement d'agent, détecté" "$(ek_mutant m1 changer-agent "$EKA1" 'j.erreur||(j.avant+"|"+j.apres)' 'lu = null; marque(null); return;' 'lu = null; return;')" "muté|a1|a1"
-  assert_eq "EK3.2 — mutant (le sessionStorage reçoit aussi le texte lu) : la fuite est détectée" "$(ek_mutant m10 recharger "$EKA1" 'j.erreur||(j.fuite+"|"+j.texteLu)' 'sessionStorage.setItem(CLE_OUVERT, id);' "sessionStorage.setItem(CLE_OUVERT, id + ' ' + lu.noeuds.map((n) => n.textContent).join(' '));")" "muté|true|true"
   assert_eq "EK4.2 — mutant (garde « tiroir fermé » retirée de redessiner) : le who rouvre le tiroir, détecté" "$(ek_mutant m8 ferme-puis-who "project.html#t" 'j.erreur||(j.ouvert+"|"+j.ferme+"|"+j.rouvert)' "if (!document.querySelector('.vf-whop') || document.body.classList.contains('no-panel')) return;" 'if (false) return;')" "muté|true|true|true"
-  assert_eq "EK5.2 — mutant (la commande est rendue en HTML) : un élément est créé, détecté" "$(ek_mutant m5 rendu-commande "$EKA1" 'j.erreur||(j.elements+"|"+j.injecte)' "z.textContent !== t) { z.textContent = t; z.hidden = false; }" "!z.dataset.ek) { z.dataset.ek = '1'; z.innerHTML = t; z.hidden = false; }")" "muté|1|true"
-  # l'ancre doit être propre à 72-vf-equipe.js : le viewer porte d'autres ev.stopPropagation(), un mutant posé sur l'un d'eux serait un faux vert
-  EKANC1="ev.target.closest?.('#panel [data-vf-transcript], #panel [data-vf-doing]')) ev.stopPropagation();"
-  assert_eq "EK1.2 — mutant (l'Entrée du bouton n'est plus arrêtée avant le viewer) : le viewer descend dans le nœud du manager (la vue change), détecté" "$(ek_mutant f1 focus-transcript "equipe.html#r=n%3Aag-mgr1"  'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag+" | vue "+(j.hashAvant===j.hashApres?"inchangée":"changée"))' "$EKANC1" "${EKANC1/ev.stopPropagation();/void 0;}")" "muté|lu=true | actif=BUTTON | vue changée"
-  assert_eq "EK1.3 — mutant (le bouton focalisé est désactivé pendant la lecture) : le transcript est lu mais le focus tombe sur BODY, détecté" "$(ek_mutant f2 focus-transcript "$EKA1" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true'); // jamais \`disabled\` : un bouton désactivé perd le focus clavier (UIFN-12)" 'b.disabled = true;')" "muté|lu=true | actif=BODY"
+  assert_eq "EK5.2 — mutant (la commande est rendue en HTML) : un élément est créé, détecté" "$(ek_mutant m5 rendu-commande "project.html#t" 'j.erreur||(j.elements+"|"+j.injecte)' "z.textContent !== t) { z.textContent = t; z.hidden = false; }" "!z.dataset.ek) { z.dataset.ek = '1'; z.innerHTML = t; z.hidden = false; }")" "muté|1|true"
   assert_eq "EK8.1 — mutant (le bouton focalisé du tiroir est désactivé pendant la lecture) : la commande est lue mais le focus tombe sur BODY, détecté" "$(ek_mutant f3 focus-doing-tiroir "project.html#t" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true'); // jamais \`disabled\` : un bouton focalisé désactivé perd le focus clavier (UIFN-12, même défaut" 'b.disabled = true; //')" "muté|lu=true | actif=BODY"
-  assert_eq "EK8.2 — mutant (le focus n'est plus rendu après un redessin) : il tombe sur BODY, détecté" "$(ek_mutant r1 focus-puis-who "$EKA1" 'j.erreur||(j.apres.tag)' 'new MutationObserver(() => { rendreFocus(); ' 'new MutationObserver(() => { ')" "muté|BODY"
-  assert_eq "EK9.2 — même mutant, tiroir « Au travail » : le focus tombe sur BODY, détecté" "$(ek_mutant r2 focus-tiroir "project.html#t" 'j.erreur||(j.apres.tag)' 'new MutationObserver(() => { rendreFocus(); ' 'new MutationObserver(() => { ')" "muté|BODY"
-  assert_eq "EK10.2 — mutant (la règle du pied retirée de la page servie) : le badge sort de sa carte à 1440 px, détecté" "$(ek_mutant r3 badge "$EKA1" 'j.erreur||(j["1440"]<0?"rogné":"dans la carte")' ".foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }" '.foot .meta { }' ".foot .meta { white-space: normal; min-width: 0; border-radius: 12px; }" '.foot .meta { }')" "muté|rogné"
-  assert_eq "EK11.2 — mutant (les clés de la collecte affichées telles quelles) : « sessions : lue » reparaît, détecté" "$(ek_mutant r4 libelles "equipe.html#t" 'j.erreur||(/\b(sessions|locks|dags)\b/.test(j.src)?"anglais":"français")' '.map(([k]) => SOURCES[k] || k);' '.map(([k]) => k);')" "muté|anglais"
+  assert_eq "EK8.2 — mutant (mise à jour en place et suivi du focus retirés : les lignes sont réinsérées à chaque rendu) : le focus tombe sur BODY, détecté" "$(ek_mutant r1 focus-puis-who "$EKA1" 'j.erreur||(j.apres.tag)' "lis.forEach((li, i) => { if (ul.childNodes[i] !== li) ul.insertBefore(li, ul.childNodes[i] || null); });" "lis.forEach((li, i) => { if (true) ul.insertBefore(li, ul.childNodes[i] || null); });" "if (garde && D.activeElement !== garde.el) {" "if (false) {")" "muté|BODY"
+  assert_eq "EK9.2 — même mutant, tiroir « Au travail » : le focus tombe sur BODY, détecté" "$(ek_mutant r2 focus-tiroir "project.html#t" 'j.erreur||(j.apres.tag)' "SC.on('panel', () => { rendreFocus(); " "SC.on('panel', () => { ")" "muté|BODY"
+  assert_eq "EK10.2 — mutant (le mot d'état sort de sa ligne dans la feuille servie) : le mot sort de sa ligne à 1440 px, détecté" "$(ek_mutant r3 badge "$EKA1" 'j.erreur||(j["1440"]<0?"rogné":"dans la carte")' "body.vf-regie-montee .vf-rg-mot { font-size: 13px; line-height: 20px; color: var(--text); }" "body.vf-regie-montee .vf-rg-mot { font-size: 13px; line-height: 20px; color: var(--text); position: relative; left: 4000px; }")" "muté|rogné"
+  assert_eq "EK11.2 — mutant (les clés de la collecte affichées telles quelles) : « sessions : lue » reparaît, détecté" "$(ek_mutant r4 libelles "project.html#t" 'j.erreur||(/\b(sessions|locks|dags)\b/.test(j.src)?"anglais":"français")' '.map(([k]) => SOURCES[k] || k);' '.map(([k]) => k);')" "muté|anglais"
   assert_eq "EK16.8 — mutant (le focus du titre n'est plus rendu après un redessin du tiroir) : le focus tombe sur BODY, détecté" "$(EK_LARGEUR=1024 EK_ORDRE=git-puis-travail ek_mutant r6 un-lateral "project.html#t" 'j.erreur||(j.etapes.redessin.travail?"T":"-")+":"+j.etapes.redessin.focus' "cleFocus === 'titre' ? document.querySelector('#panel > .vf-whop h3') :" "cleFocus === 'titre' ? null :")" "muté|T:BODY"
   assert_eq "EK12.2 — mutant (infobulle laissée au viewer) : « Chercher un fichier, une route, un module » reparaît, détecté" "$(ek_mutant r5 libelles "equipe.html#t" 'j.erreur||j.titre' "bouton.setAttribute('aria-label', LIB); bouton.title = LIB;" "bouton.setAttribute('aria-label', LIB);")" "muté|Chercher un fichier, une route, un module"
-  assert_eq "EK13.2 — mutant (plafond de 0,75 retiré) : la scène est réduite sous 0,75, détecté" "$(ek_mutant r6 echelle "equipe.html" 'j.erreur||(j["390"].concat(j["768"]).some((m)=>m.k<0.75)?"réduit":"plafonné")' 'if (!actif || !st.t || st.t.k > 0.75) return;' 'return;')" "muté|réduit"
-  assert_eq "EK13.3 — mutant (cadrage sous freeArea() au lieu du bas réel de #context) : le titre recouvre la première carte, détecté" "$(ek_mutant r7 echelle "equipe.html" 'j.erreur||(j["390"].concat(j["768"]).some((m)=>m.aire>0)?"recouvre":"libre")' 'const y = Math.max(a.y, bas - haut + 12)' 'const y = a.y')" "muté|recouvre"
-  assert_eq "EK14.2 — mutant (le cadrage n'écoute plus la taille du titre) : le titre qui grandit recouvre la première carte, détecté" "$(ek_mutant r8 titre-grandi "equipe.html" 'j.erreur||(j.aire>0?"recouvre":"libre")' 'taille?.observe(ctx);' '')" "muté|recouvre"
+  assert_eq "EK13.2 — mutant (largeur minimale de 900 px sur la régie) : les lignes débordent de l'écran, détecté" "$(ek_mutant r6 echelle "equipe.html" 'j.erreur||(j["390"].concat(j["768"]).some((m)=>m.k<0.75)?"réduit":"plafonné")' "box-sizing: border-box; max-width: 960px; margin: 0;" "box-sizing: border-box; min-width: 900px; margin: 0;")" "muté|réduit"
+  assert_eq "EK13.3 — mutant (l'en-tête de la régie sort du flux, sous le cadre de l'application) : le titre recouvre la première section, détecté" "$(ek_mutant r7 echelle "equipe.html" 'j.erreur||(j["390"].concat(j["768"]).some((m)=>m.aire>0)?"recouvre":"libre")' "body.vf-regie-montee #vf-equipe-entete { margin: 0 0 var(--gap-section); }" "body.vf-regie-montee #vf-equipe-entete { margin: 0 0 var(--gap-section); position: absolute; top: calc(var(--hh, 4rem) + var(--gap-section)); }")" "muté|recouvre"
+  assert_eq "EK14.2 — mutant (l'en-tête de la régie a une hauteur fixe) : le titre qui grandit recouvre la première section, détecté" "$(ek_mutant r8 titre-grandi "equipe.html" 'j.erreur||(j.aire>0?"recouvre":"libre")' "body.vf-regie-montee #vf-equipe-entete { margin: 0 0 var(--gap-section); }" "body.vf-regie-montee #vf-equipe-entete { margin: 0 0 var(--gap-section); height: 40px; overflow: visible; }")" "muté|recouvre"
   EK15M() { local m; m="$(ek_muter "$2" "$3")"; ek_demarrer; EK_FOCUS="$1" EKC echap-tiroir "project.html#t"; local v; v="$(G "$WORK/ek-echap-tiroir.json" "$4")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
   EK15V='j.erreur||(j.ferme?"fermé":"ouvert")+" | "+(j.apres.selection===j.avant.selection?"sélection gardée":"sélection perdue")+" | remonté au viewer : "+(j.remonte?"oui":"non")'
   assert_eq "EK15.3 — mutant (aucun écouteur d'Échap dans le tiroir) : le tiroir reste ouvert et Échap remonte au viewer, détecté (PU-G-175 : le viewer ne désélectionne plus hors du canevas, c'est le tiroir resté ouvert qui trahit le mutant ; trace sain : fermé | sélection gardée | remonté au viewer : non)" "$(EK15M panneau "panneau.addEventListener('keydown', echap);" "" "$EK15V")" "muté|ouvert | sélection gardée | remonté au viewer : oui"
   assert_eq "EK15.4 — mutant (aucun écouteur d'Échap pour le bouton) : focus sur le bouton, le tiroir reste ouvert et Échap remonte au viewer, détecté" "$(EK15M bouton "document.addEventListener('keydown', (e) => { if (e.target === bouton()) echap(e); }, true);" "" "$EK15V")" "muté|ouvert | sélection gardée | remonté au viewer : oui"
   assert_eq "EK15.5 — mutant (l'Échap du tiroir ne s'arrête pas avant le viewer) : le tiroir se ferme MAIS Échap remonte jusqu'au viewer (qui, depuis PU-G-175, ne désélectionne plus hors du canevas : on lit la remontée sur un écouteur de fenêtre), détecté" "$(EK15M panneau "e.stopPropagation(); e.preventDefault(); // le viewer" "e.preventDefault(); // le viewer" "$EK15V")" "muté|fermé | sélection gardée | remonté au viewer : oui"
-  assert_eq "EK15.6 — mutant (le focus n'est plus rendu au bouton) : il reste sur le bouton du tiroir (BUTTON) au lieu de revenir sur #vf-lock, détecté" "$(EK15M panneau "bouton()?.focus({ preventScroll: true });" "" 'j.erreur||j.apres.actif')" "muté|BUTTON"
+  assert_eq "EK15.6 — mutant (le focus n'est plus rendu au bouton) : il ne revient plus sur #vf-lock (79-16 : la valeur de l'élément actif sous la coquille est celle du moteur, « btn-panel », plus un « BUTTON » anonyme du tiroir), détecté" "$(EK15M panneau "bouton()?.focus({ preventScroll: true });" "" 'j.erreur||(j.apres.actif==="vf-lock"?"retourne-sur-vf-lock":"hors-de-vf-lock")')" "muté|hors-de-vf-lock"
   assert_eq "EK15.7 — mutant (aria-expanded figé à false) : le tiroir ouvert n'est pas dit ouvert, détecté" "$(EK15M panneau "b.setAttribute('aria-controls', 'panel'); b.setAttribute('aria-expanded', String(o));" "b.setAttribute('aria-controls', 'panel'); b.setAttribute('aria-expanded', 'false');" 'j.erreur||j.ouvert.expanded')" "muté|false"
   assert_eq "EK15.8 — mutant (aria-controls retiré) : le bouton ne dit plus ce qu'il ouvre, détecté" "$(EK15M panneau "b.setAttribute('aria-controls', 'panel'); " "" 'j.erreur||String(j.ouvert.controls)')" "muté|null"
   EK16M() { local m; m="$(ek_muter "$3" "$4")"; ek_demarrer; EK_LARGEUR="$1" EK_ORDRE="$2" EKC un-lateral "project.html#t"; local v; v="$(G "$WORK/ek-un-lateral.json" "$EK16V")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
@@ -996,19 +1046,22 @@ JSON
   ek_demarrer; EKC touches-canevas "equipe.html"; mv "$WORK/ek-touches-canevas.json" "$WORK/ek-touches.json"; vf_hyg_stop "$EK_PID"
   assert_eq "EK17.0 — témoin : sur Projet et sur Code, f, F, p, P, +, = et - agissent toujours, chacune, sur la caméra ou le tiroir (la sonde sait lire un clavier qui agit)" "$(G "$WORK/ek-touches.json" 'j.erreur||(j.projet.erreur||j.code.erreur||[j.projet,j.code].map((x)=>Object.values(x.agit).every(Boolean)).join())')" "true,true"
   assert_eq "EK17.1 — Équipe, après un clic sur le fond : f, F, p, P, +, = et - ne déplacent, ne cadrent ni ne zooment la carte et n'ouvrent ni ne ferment le tiroir de détail (chaque touche est frappée sur une caméra décalée du cadrage où elle aurait un effet ; caméra et tiroir inchangés)" "$(G "$WORK/ek-touches.json" 'j.erreur||(j.equipe.erreur||"agissent : "+Object.entries(j.equipe.agit).filter(([k,v])=>v).map(([k])=>k).join(","))')" "agissent : "
-  # EK18 (S6, revue de la recette du 2026-11-08, PU-G-193) : à 1 440 px, tiroir Git ouvert, le titre de la vue (masqué dessous) n'est plus un arrêt de Tab ; il le redevient à la fermeture
+  # EK18 (S6, revue de la recette du 2026-11-08, PU-G-193) : à 1 440 px, le titre de la vue est masqué sous le tiroir Git ; 73-08 : le titre de la régie (#vf-equipe-entete) n'est un arrêt de Tab ni Git fermé, ni Git ouvert, ni refermé
   EK18V='j.erreur||j.verdict'
   # DIAG (K4, run 42500903126) : quand le verdict n'est pas celui attendu, les arrêts de Tab visités à chaque parcours (balise, id, classe, texte court, tabindex, visibilité) sont écrits sur la sortie d'erreur
   ek18_diag() { local v; v="$(G "$WORK/ek-tab-titre.json" 'j.verdict')"; [ "$v" = "$1" ] && return 0; echo "  DIAG EK18 [$2] verdict=$v attendu=$1 ; arrêts visités :" >&2; G "$WORK/ek-tab-titre.json" "Object.entries(j.detail||{}).map(([k,v])=>'    '+k+' : '+v.join(' | ')).join('\n')" >&2; }
-  ek_demarrer; EKC tab-titre "equipe.html"; vf_hyg_stop "$EK_PID"; ek18_diag "true/false/true/true" témoin
-  assert_eq "EK18 — 1 440 px, vraies touches Tab : le titre de la vue est un arrêt Git fermé (témoin), n'en est PAS un Git ouvert (alors que d'autres arrêts existent : témoin), l'est de nouveau Git refermé" "$(G "$WORK/ek-tab-titre.json" "$EK18V")" "true/false/true/true"
+  ek_demarrer; EKC tab-titre "equipe.html"; vf_hyg_stop "$EK_PID"; ek18_diag "false/false/true/false" témoin
+  assert_eq "EK18 — 1 440 px, vraies touches Tab : le titre de la régie n'est un arrêt ni Git fermé, ni Git ouvert (alors que d'autres arrêts existent : témoin), ni Git refermé" "$(G "$WORK/ek-tab-titre.json" "$EK18V")" "false/false/true/false"
+  # EK18.3 : une seconde vue déclarée (Frise) ajoute la bascule [role=tab] à l'en-tête ; la sonde la distingue du titre, qui reste mesuré comme arrêt de Tab (témoin : sans la seconde vue, EK18 est vert ci-dessus)
+  ek_demarrer; EK_VUE=2 EKC tab-titre "equipe.html"; vf_hyg_stop "$EK_PID"; ek18_diag "false/false/true/false" "deux vues"
+  assert_eq "EK18.3 — une seconde vue déclarée (bascule « Régie / Frise » dans l'en-tête) : les onglets de la bascule ne sont pas le titre, le titre n'est un arrêt de Tab ni Git fermé, ni Git ouvert, ni refermé" "$(G "$WORK/ek-tab-titre.json" "$EK18V")" "false/false/true/false"
   EK18M() { local m; m="$(ek_muter "$1" "$2")"; ek_demarrer; EKC tab-titre "equipe.html"; local v; v="$(G "$WORK/ek-tab-titre.json" "$EK18V")"; vf_hyg_stop "$EK_PID"; ek_restaurer; ek18_diag "$3" "mutant"; echo "$m|$v"; }
-  assert_eq "EK18.1 — mutant (le tabindex du titre n'est plus retiré Git ouvert) : le titre, masqué sous le tiroir, redevient un arrêt de Tab, détecté" "$(EK18M "if (document.body.classList.contains('vf-git-ouvert')) h1.removeAttribute('tabindex'); else h1.tabIndex = 0;" "h1.tabIndex = 0;" "true/true/true/true")" "muté|true/true/true/true"
-  assert_eq "EK18.2 — mutant (le tabindex n'est plus rendu à la fermeture de Git) : le titre n'est plus atteignable une fois Git refermé, détecté" "$(EK18M "else h1.tabIndex = 0; };" "};" "true/false/true/false")" "muté|true/false/true/false"
+  assert_eq "EK18.1 — mutant (le titre de la régie reçoit un tabindex) : masqué sous le tiroir Git, il devient un arrêt de Tab, détecté" "$(EK18M "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou);" "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou); h1.tabIndex = 0;" "true/true/true/true")" "muté|true/true/true/true"
+  assert_eq "EK18.2 — mutant (l'en-tête de la régie porte un lien) : le lien, masqué sous le tiroir Git, redevient un arrêt de Tab, détecté" "$(EK18M "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou);" "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou); const lien = h('a', 'vf-link', 'x'); lien.setAttribute('href', '#'); entete.append(lien);" "true/true/true/true")" "muté|true/true/true/true"
   # témoins de la sonde de mutation elle-même
-  ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
-  assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "a1|null|identique"
-  assert_eq "EK7 — témoin de la sonde : un mutant dont l'ancre n'existe pas est refusé, la page servie reste intacte" "$(ek_muter 'ANCRE-QUI-N-EXISTE-PAS-70-11' 'x')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "ancre absente|identique"
+  ek_demarrer; EKC focus-transcript "$EKA1"; vf_hyg_stop "$EK_PID"; rm -f "$EKMOD"   # 74-10 : EK2.1 est retiré avec le repli ; le témoin rejoue la mesure d'EK1.0 sur la page remise à l'identique
+  assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK1.0 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||(j.avant.tag+"|"+j.avant.rapport)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "BUTTON|true|identique"
+  assert_eq "EK7 — témoin de la sonde : un mutant dont l'ancre n'existe pas est refusé, aucune copie de module n'est posée, la page servie reste celle du module" "$(ek_muter 'ANCRE-QUI-N-EXISTE-PAS-70-11' 'x')|$([ ! -e "$EKMOD" ] && echo identique || echo differe)" "ancre absente|identique"
 fi
 
 echo "=== EA1 — retours du panel (PU-G-134, 163, 164, 165, 167, 171 compatible, 173) ==="
@@ -1027,30 +1080,20 @@ assert_eq "EA1.1 — pied : « dernière activité il y a 11 s » (session), « 
 assert_eq "EA1.2 — pied de carte : pas de mot d'état quand la pastille le dit, « en attente » gardé sans pastille, action générique tue (PU-G-165)" "$(G "$WORK/vm-ea1.json" 'j.erreur||[j.retour.c1,j.retour.c2].join("|")')" "dernière activité il y a 11 s|en attente · dernière activité il y a 2 h"
 assert_eq "EA1.3 — pastille : l'agent en attente n'en porte aucune (jamais « En cours »)" "$(G "$WORK/vm-ea1.json" 'j.erreur||j.retour.st')" "active,undefined,active,done"
 assert_eq "EA1.4 — « non rattaché » : « sans-citation » dit en clair, une raison inattendue reste affichée et échappée (PU-G-167)" "$(G "$WORK/vm-ea1.json" 'j.erreur||(j.retour.v1.includes("pas lié à une phase du projet")+"|"+j.retour.v2.includes("non rattaché (&lt;x-raison&gt;)"))')" "true|true"
-cat > "$AUX/ea1-carte.mjs" <<'JS'
-const { buildEquipeGraph } = await import(process.argv[2]);
-const W = JSON.parse((await import('node:fs')).readFileSync(process.argv[3], 'utf8')).workers;
-const g = buildEquipeGraph({ workers: W }, { nom: 'x', lancees: new Map([['s1', { phase: '71.5', verbe: 'planifier' }]]) });
-const n = (i) => g.nodes.find((x) => x.id === i);
-console.log(JSON.stringify({ s1: n('se-s1').summary, s2: n('se-s2').summary, st: ['se-s1', 'se-s2', 'ag-a1', 'ag-a2'].map((i) => String(n(i).st)).join(',') }));
-JS
-assert_eq "EA1.5 — carte : étiquette de lancement, branche et arbre en description (jamais vide), « en attente » sans état projeté (PU-G-134, 163, 164, 165)" "$(node "$AUX/ea1-carte.mjs" "$SCRIPTS/vf-cockpit-equipe-carte.mjs" "$AUX/ea1-workers.json" 2>&1 | node "$AUX/jq.mjs" 'j.s1+"|"+j.s2+"|"+j.st' 2>&1)" "Depuis Phase 71.5 · Branche feat/x · arbre wt1|arbre principal|active,undefined,active,done"
+# 73-08 : la carte n'existe plus ; la description d'un agent se lit sur la ligne de la régie (vm-regie.mjs : ligne 2, mot d'état)
+RGMOD() { printf '{"fn":"modele","args":[%s,null,{"now":1000000000000,"recuA":1000000000000,"fenetre":900,"lus":null,"nonCommite":{},"missions":[]}]}' "$1" > "$WORK/rgmod.sc.json"; node "$TESTS_E/vm-regie.mjs" "$UI" "$WORK/rgmod.sc.json"; }
+RGL='j.sections.flatMap((s) => s.lignes).find((l) => l.cle === '
+EA1W="$(node -e 'const w=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")); w.workers[0].lancee={phase:"71.5",verbe:"planifier"}; console.log(JSON.stringify(w))' "$AUX/ea1-workers.json")"
+RGMOD "$EA1W" > "$WORK/vm-ea15.json"
+assert_eq "EA1.5 — ligne de la régie : lancement, branche et arbre en ligne 2 (jamais vide), « en attente » dit en mot et sans état actif, l'état de chaque ligne (PU-G-134, 163, 164, 165)" "$(G "$WORK/vm-ea15.json" 'j.erreur||('"$RGL"'"au-travail:s1").ligne2.join(" | ") + "#" + '"$RGL"'"au-travail:s2").ligne2.join(" | ") + "#" + '"$RGL"'"au-travail:s2").mot + "#" + ["au-travail:s1","au-travail:s2","au-travail:a1","a-relire:a2"].map((c) => '"$RGL"'c).etat).join(","))')" "arbre wt1 | branche feat/x | Lancée depuis la carte : Phase 71.5 · planifier#arbre main#en attente#actif,attente,actif,termine"
 
-cat > "$AUX/ea1-vides.mjs" <<'JS'
-const { buildEquipeGraph } = await import(process.argv[2]);
-const W = [{ kind: 'session', id: 's9', etat: 'actif', ageS: 3, titre: 'Travail', action: { verbe: 'lance une commande' } },
-  { kind: 'subagent', id: 'g1', etat: 'termine', parent: 's9', role: 'general-purpose', dureeS: 60 },
-  { kind: 'subagent', id: 'g2', etat: 'termine', parent: 's9', dureeS: 5 },
-  { kind: 'subagent', id: 'g3', etat: 'actif', parent: 's9', dureeS: 5 }];
-const g = buildEquipeGraph({ workers: W }, { nom: 'x' });
-console.log(JSON.stringify(g.nodes.map((x) => ({ id: x.id, vide: !String(x.summary || '').trim(), s: x.summary }))));
-JS
-# PU-G-163 (recette du 2026-11-08) : ni le groupe « Terminés depuis moins de 24 h » ni un agent sans tâche ne portent une description vide (le viewer y met « Pas encore de description »)
-assert_eq "EA1.6 — carte : aucune description vide (groupe « Terminés », agent general-purpose sans tâche, session sans tâche) ; le groupe compte ses agents (PU-G-163)" "$(node "$AUX/ea1-vides.mjs" "$SCRIPTS/vf-cockpit-equipe-carte.mjs" 2>&1 | node "$AUX/jq.mjs" 'j.length + "|" + j.filter((x) => x.vide).length + "|" + j.find((x) => x.id.endsWith("~termines")).s + "|" + j.find((x) => x.id === "ag-g3").s' 2>&1)" "5|0|2 agents de cette session, terminés depuis moins de 24 h.|Agent sans tâche annoncée · actif"
+# PU-G-163 (recette du 2026-11-08) : ni le groupe « Terminés » ni un agent sans tâche ne portent une description vide ; 73-08 : la ligne de la régie dit toujours quelque chose (nom, mot d'état, ligne 2)
+RGMOD '{"workers":[{"kind":"session","id":"s9","etat":"actif","ageS":3,"titre":"Travail","action":{"verbe":"lance une commande"}},{"kind":"subagent","id":"g1","etat":"termine","parent":"s9","role":"general-purpose","dureeS":60},{"kind":"subagent","id":"g2","etat":"termine","parent":"s9","dureeS":5},{"kind":"subagent","id":"g3","etat":"actif","parent":"s9","dureeS":5}]}' > "$WORK/vm-ea16.json"
+assert_eq "EA1.6 — ligne de la régie : aucune ligne sans texte (agent general-purpose sans tâche, session sans tâche, agents terminés) ; la section « Terminé, à relire » compte ses agents (PU-G-163)" "$(G "$WORK/vm-ea16.json" 'j.erreur||(j.sections.flatMap((s) => s.lignes).length + "|" + j.sections.flatMap((s) => s.lignes).filter((l) => !(String(l.nom).trim() && (l.mot || l.ligne2.length))).length + "|" + j.sections.find((s) => s.id === "a-relire").lignes.length + "|" + '"$RGL"'"au-travail:g3").nom)')" "4|0|2|Agent"
 
 echo "=== EA2 — tiroir « Au travail » : orphelins, verrous, libellés (PU-G-177, 178, 179, 180, 182, 184, 186, 187) ==="
 cat > "$AUX/vm70s.mjs" <<'JS'
-// vm70s.mjs <70-vf-live.js> <71-vf-equipe-rendu.js> <scénario.json> : le tiroir hors navigateur (vm) ; le scénario porte `who` (workers, sources) et, facultatif, `lock` (flux lock brut). Sortie : le HTML du tiroir, ou { erreur }.
+// vm70s.mjs <70-vf-live.js> <71-vf-equipe-rendu.js> <scénario.json> : le tiroir hors navigateur (vm) ; le scénario porte `who` (workers, sources) et, facultatif, `verrous` (la projection en liste blanche que porte l'événement lock : { etat, plat, liste }, A15). Sortie : le HTML du tiroir, ou { erreur }.
 import fs from 'node:fs';
 import vm from 'node:vm';
 const [, , f70, f71, scen] = process.argv;
@@ -1058,7 +1101,7 @@ const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 class ES { constructor() { ES.last = this; this.l = {}; } addEventListener(n, f) { this.l[n] = f; } close() {} }
 let bouton = null, panneau = '';
 const el = () => ({ setAttribute() {}, appendChild() {}, remove() {}, style: {} });
-const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
+const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, on() {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
   addHeaderButton: (o) => { bouton = { ...o, className: '', innerHTML: '', setAttribute() {} }; return bouton; } };
 const document = { createElement: el, head: { appendChild() {} }, body: { appendChild() {}, classList: { contains: () => false } }, documentElement: {}, addEventListener() {}, dispatchEvent: () => true, getElementById: () => null, querySelectorAll: () => [], querySelector: () => null };
 const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' } };
@@ -1066,8 +1109,10 @@ const ctx = vm.createContext({ window, document, MutationObserver: class { obser
 try {
   const S = JSON.parse(fs.readFileSync(scen, 'utf8'));
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_FLUX_JS, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_ETAT_JS, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
-  if (S.lock) ES.last.l.lock({ data: JSON.stringify({ seq: 1, lock: S.lock }) });
+  if (S.verrous) ES.last.l.lock({ data: JSON.stringify({ seq: 1, at: Date.now(), verrous: S.verrous }) });
   ES.last.l.who({ data: JSON.stringify({ seq: 2, who: S.who }) });
   bouton.onClick();
   console.log(JSON.stringify({ html: panneau }));
@@ -1083,14 +1128,14 @@ cat > "$AUX/ea2-orph.json" <<'JSON'
 JSON
 sed 's/"ageS":2400/"ageS":600/' "$AUX/ea2-orph.json" > "$AUX/ea2-orph-court.json"
 cat > "$AUX/ea2-verrou.json" <<JSON
-{"lock":{"present":true,"locks":[{"present":true,"owner":"$UUID_OWNER","step":"exec","scope":"depot","age_seconds":1,"lease_seconds":3000,"session_ids":["sess-presente"]}]},
+{"verrous":{"etat":"lue","plat":false,"liste":[{"ws":"","scope":"depot","phase":null,"tenu":true,"stale":false,"ageS":1,"ttl":1800,"progressAgeS":null,"owner":"$UUID_OWNER","step":"exec","leaseS":3000,"sansSession":false}]},
  "who":{"sources":{"sessions":{"etat":"lue"},"locks":{"etat":"lue"},"dags":{"etat":"lue"}},"workers":[
  {"kind":"lock","id":"$UUID_OWNER","task":"exec","tree":"depot","ageS":1,"stale":false},
  {"kind":"session","id":"sess-presente","etat":"actif","ageS":2,"tree":".","branch":"main"}]}}
 JSON
-sed 's/"sess-presente"\]/"sess-absente"]/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-absent.json"
-sed 's/"sess-presente"\]/]/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-vide.json"
-sed 's/"lease_seconds":3000,//' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-sanslease.json"
+sed 's/"sansSession":false/"sansSession":true/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-absent.json" # le serveur dit : aucune session de la collecte ne tient ce verrou
+sed 's/,"sansSession":false//' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-vide.json" # aucun verdict : le serveur n'a pas pu comparer (liste d'identifiants vide, collecte pas lue)
+sed 's/"leaseS":3000,//' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-sanslease.json"
 sed 's/"locks":{"etat":"lue"}/"locks":{"etat":"erreur"}/' "$AUX/ea2-verrou.json" > "$AUX/ea2-verrou-illisible.json"
 cat > "$AUX/ea2-vide.json" <<'JSON'
 {"who":{"sources":{"sessions":{"etat":"lue"},"locks":{"etat":"lue"},"dags":{"etat":"lue"}},"workers":[]}}
@@ -1099,10 +1144,10 @@ T70() { node "$AUX/vm70s.mjs" "${3:-$UI/70-vf-live.js}" "${4:-$RENDU}" "$AUX/$1"
 assert_eq "EA2.1 — orphelin du registre (PU-G-182) : l'agent consigné sans verrou tenu est montré, « orphelin ? » ; le nœud de DAG périmé reste écarté (P71.5-D-14, apparié)" "$(T70 ea2-orph.json '[j.html.includes("TACHE-ORPH"), j.html.includes("orphelin ?"), j.html.includes("NOEUD-PERIME")].join()')" "true,true,false"
 assert_eq "EA2.2 — enfant actif d'une session muette depuis 40 min : « orphelin ? » sur sa ligne (PU-G-182)" "$(T70 ea2-orph.json '/class="r-task">TACHE-ENFANT <span class="sr">\(([^)]*)\)/.exec(j.html)[1].includes("orphelin ?")')" "true"
 assert_eq "EA2.2b — apparié : la même session muette depuis 10 min ne marque pas l'enfant, et l'orphelin du registre reste dit une seule fois" "$(T70 ea2-orph-court.json '[/class="r-task">TACHE-ENFANT <span class="sr">\(([^)]*)\)/.exec(j.html)[1].includes("orphelin ?"), j.html.split("orphelin ?").length-1].join()')" "false,1"
-assert_eq "EA2.3 — « tenu depuis » lit la date de prise (lease_seconds 3000 s = 50 min), jamais le battement (age_seconds 1 s) : ligne du verrou ET ligne du driver (PU-G-179)" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length+"|"+j.html.includes("tenu depuis 1 s")')" "2|false"
-assert_eq "EA2.4 — lease_seconds absent : « tenu » sans durée, jamais un battement présenté comme une prise (PU-G-179)" "$(T70 ea2-verrou-sanslease.json '[j.html.includes("tenu depuis"), (j.html.match(/>tenu</g)||[]).length].join()')" "false,2"
-assert_eq "EA2.5 — verrou dont session_ids ne nomme aucune session de la collecte : « aucune session active », jamais « orphelin » ni « introuvable » (PU-G-179)" "$(T70 ea2-verrou-absent.json '[j.html.includes("aucune session active"), /orphelin|introuvable/.test(j.html.replace(/<[^>]*>/g, " "))].join()')" "true,false"
-assert_eq "EA2.6 — apparié : session présente ou session_ids vide : aucun verdict" "$(T70 ea2-verrou.json 'j.html.includes("aucune session active")')|$(T70 ea2-verrou-vide.json 'j.html.includes("aucune session active")')" "false|false"
+assert_eq "EA2.3 — « tenu depuis » lit la date de prise (leaseS 3000 s = 50 min), jamais le battement (ageS 1 s) : ligne du verrou ET ligne du driver (PU-G-179)" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length+"|"+j.html.includes("tenu depuis 1 s")')" "2|false"
+assert_eq "EA2.4 — leaseS absent : « tenu » sans durée, jamais un battement présenté comme une prise (PU-G-179)" "$(T70 ea2-verrou-sanslease.json '[j.html.includes("tenu depuis"), (j.html.match(/>tenu</g)||[]).length].join()')" "false,2"
+assert_eq "EA2.5 — verrou que le serveur dit sans session de la collecte (sansSession vrai) : « aucune session active », jamais « orphelin » ni « introuvable » (PU-G-179)" "$(T70 ea2-verrou-absent.json '[j.html.includes("aucune session active"), /orphelin|introuvable/.test(j.html.replace(/<[^>]*>/g, " "))].join()')" "true,false"
+assert_eq "EA2.6 — apparié : sansSession faux ou absent : aucun verdict" "$(T70 ea2-verrou.json 'j.html.includes("aucune session active")')|$(T70 ea2-verrou-vide.json 'j.html.includes("aucune session active")')" "false|false"
 assert_eq "EA2.7 — le driver se dit en clair : « Session qui pilote : », jamais l'identifiant brut du propriétaire, ni dans le driver ni dans la liste (PU-G-177)" "$(T70 ea2-verrou.json '[j.html.includes("Session qui pilote : "), j.html.includes("88f83d8b")].join()')" "true,false"
 assert_eq "EA2.8 — « Qui a la main » remplace « Verrous tenus », avec « rien à faire de votre côté » (PU-G-178)" "$(T70 ea2-verrou.json '[j.html.includes("Qui a la main"), j.html.includes("Verrous tenus"), j.html.includes("rien à faire de votre côté")].join()')" "true,false,true"
 assert_eq "EA2.9 — tout est lu : aucun pied de sources ; une source illisible : le pied la nomme, elle seule (PU-G-180)" "$(T70 ea2-verrou.json '[j.html.includes("Sessions et sous-agents"), j.html.includes("class=\"src\"")].join()')|$(T70 ea2-verrou-illisible.json '(/class="src">([^<]*)</.exec(j.html)||[])[1]')" "false,false|Source illisible : Verrous du dépôt"
@@ -1111,8 +1156,8 @@ assert_eq "EA2.10 — personne : « Personne ne travaille en ce moment », sans 
 mkdir -p "$MUT/avant"
 for f in 70-vf-live.js 71-vf-equipe-rendu.js; do git -C "$SCRIPTS" show "c7d96740:plugin/cockpit/skills/cockpit-moteur/assets/ui/$f" > "$MUT/avant/$f" 2>/dev/null; done
 assert_eq "EA2.11 — témoin rouge : le code d'avant (c7d96740) ne montre pas l'orphelin du registre, ne marque pas l'enfant et lit le battement" "$(T70 ea2-orph.json '[j.html.includes("TACHE-ORPH"), j.html.includes("orphelin ?")].join()' "$MUT/avant/70-vf-live.js" "$MUT/avant/71-vf-equipe-rendu.js")|$(T70 ea2-verrou.json 'j.html.includes("tenu depuis 50 min")' "$MUT/avant/70-vf-live.js" "$MUT/avant/71-vf-equipe-rendu.js")" "false,false|false"
-sed 's#lease_seconds#age_seconds#g' "$UI/70-vf-live.js" > "$MUT/70-lease.js"
-assert_eq "EA2.12 — mutant (lease_seconds lu comme age_seconds) : la durée de prise disparaît, détecté" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length' "$MUT/70-lease.js")" "0"
+sed 's#leaseS#ageS#g' "$UI/70-vf-live.js" > "$MUT/70-lease.js"
+assert_eq "EA2.12 — mutant (leaseS lu comme ageS) : la durée de prise disparaît, détecté" "$(T70 ea2-verrou.json '(j.html.match(/tenu depuis.50 min/g)||[]).length' "$MUT/70-lease.js")" "0"
 M "$UI/70-vf-live.js" "$MUT/70-orph.js" "orph = reste.filter((w) => w.orphan)" "orph = []"
 assert_eq "EA2.13 — mutant (orphelins du registre non listés) : détecté" "$(T70 ea2-orph.json 'j.html.includes("TACHE-ORPH")' "$MUT/70-orph.js")" "false"
 cat > "$AUX/ea2-rendu.mjs" <<'JS'
@@ -1129,13 +1174,13 @@ console.log(JSON.stringify({
   memeArbre: noms(R.arbre([s('aaaaaaaa-1111', '.'), s('bbbbbbbb-2222', '.')], h)),
   arbres: noms(R.arbre([s('aaaaaaaa-1111', '.'), s('bbbbbbbb-2222', '.claude/worktrees/wt1')], h)),
   une: noms(R.arbre([s('aaaaaaaa-1111', '.')], h)),
-  fini: noms(R.arbre([{ kind: 'subagent', id: 'cccccccc-3333', tree: '.', etat: 'termine', role: 'vf-coder', ageS: 5, dureeS: 360 }], h)),
+  fini: noms(R.arbre([{ kind: 'subagent', id: 'cccccccc-3333', tree: '.', etat: 'termine', role: 'vf-coder', ageS: 5, dureeS: 360 }, { kind: 'subagent', id: 'dddddddd-4444', parent: 'cccccccc-3333', tree: '.', etat: 'actif', task: 'enfant', ageS: 1 }], h)), // P73-D-14 : un terminé n'est listé dans le tiroir que s'il porte un agent en cours
   terminal: R.arbre([s('aaaaaaaa-1111', '.')], h).includes('M3 4.5'),
 }));
 JS
 ER() { node "$AUX/ea2-rendu.mjs" "${2:-$RENDU}" | node "$AUX/jq.mjs" "$1"; }
 assert_eq "EA2.14 — plusieurs « Session principale » se distinguent par l'arbre, puis par l'identifiant court quand l'arbre est le même ; une seule garde son titre (PU-G-186)" "$(ER 'JSON.stringify([j.memeArbre,j.arbres,j.une])')" '[["Session principale · main · aaaaaaaa","Session principale · main · bbbbbbbb"],["Session principale · main","Session principale · wt1"],["Session principale"]]'
-assert_eq "EA2.15 — agent terminé sans titre : « rôle · identifiant court » (PU-G-184)" "$(ER 'j.fini.join()')" "vf-coder · cccccccc"
+assert_eq "EA2.15 — agent terminé sans titre, parent d'un agent en cours : « rôle · identifiant court » (PU-G-184)" "$(ER 'j.fini[0]')" "vf-coder · cccccccc"
 assert_eq "EA2.16 — le bouton « Voir la dernière commande » ne porte plus le chevron et le tiret d'un terminal (PU-G-187) ; témoin : le code d'avant le portait" "$(ER 'j.terminal')|$(ER 'j.terminal' "$MUT/avant/71-vf-equipe-rendu.js")" "false|true"
 
 # --- EA3 (lot 9) : « À surveiller » (PU-G-181), commande longue (PU-G-183), titre /rename des sessions (PU-G-186) ---

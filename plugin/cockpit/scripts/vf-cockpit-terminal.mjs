@@ -8,8 +8,10 @@
 // Aucun secret dans l'argv ni l'environnement de l'enfant : jetons et environnement d'origine du shell passent par l'IPC.
 import fs from 'node:fs';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { fork } from 'node:child_process';
 import { realUnder, resoudreBinaire } from './vf-cockpit-paths.mjs';
+import { ecrireEtat } from './vf-cockpit-etat-ecrire.mjs';
 import { envEnfant } from './vf-cockpit-env.mjs';
 import { envShell } from './vf-cockpit-terminal-env.mjs';
 import { preparerPage } from './vf-cockpit-terminal-page.mjs';
@@ -17,6 +19,7 @@ import { TAILLE_MAX, resoudrePython3 } from './vf-cockpit-terminal-session.mjs';
 import { injectionTiroir } from './vf-cockpit-terminal-tiroir.mjs';
 import { injectionLancer } from './vf-cockpit-lancer-ui.mjs';
 import { definir } from './vf-cockpit-lancer-canal.mjs';
+import { ouvertureValide } from './vf-cockpit-terminal-amorce.mjs';
 
 const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
 const json = (res, statut, objet) => { res.writeHead(statut, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(objet)); };
@@ -46,7 +49,7 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
   if (plateforme === 'win32') { log('Terminal indisponible sous Windows.'); return inerte(true); }
   const moteur = process.env.VF_COCKPIT_ENGINE_DIR;
   const assistant = moteur && path.isAbsolute(moteur) ? path.join(moteur, 'terminal', 'vf-cockpit-pty.py') : null;
-  const ordinaire = (f) => { try { return fs.lstatSync(f).isFile() && !realUnder(f, path.join(root, '.vibeflow')); } catch { return false; } };
+  const ordinaire = (f) => { try { return fs.lstatSync(f).isFile() && !realUnder(f, path.join(root, '.vibeflow'), { siEchec: true }) } catch { return false } };
   if (!assistant || !ordinaire(assistant)) { log('assistant du terminal introuvable dans le moteur du cockpit : réinstaller le module cockpit.'); return inerte(false); }
   try { preparerPage({ engineDir: moteur }); } catch (e) { log(`${e.message}`); return inerte(false); }
 
@@ -57,9 +60,11 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
     injection: () => injectionTiroir({ indisponible: false }) + injectionLancer({ indisponible: false }),
     frameSrc: () => (portQ ? `; frame-src http://127.0.0.1:${portQ}` : ''),
     occupe: () => occupe,
+    ouvertureLanceur: (secret) => ouvertureValide(path.join(here, '.cache'), secret), // AUDC-B-03 bis : navigation inter-sites de la page de redirection du lanceur (secret d'ouverture + clé armée)
     routeP(req, res) { envoyer({ t: 'jetons', jetons: jetons() }); json(res, 200, etat === 'actif' ? { etat: 'actif', port: portQ } : { etat: 'arrete' }); return true; },
     demarrer(portP) {
-      const fichier = path.join(here || '.', 'vf-cockpit-terminal-processus.mjs');
+      // le processus du terminal vient du module, jamais de la sortie (AUDC-A-03)
+      const fichier = path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-terminal-processus.mjs');
       try {
         enfant = fork(fichier, [], { env: envDuProcessusTerminal(root), stdio: ['inherit', 'inherit', 'inherit', 'ipc'], serialization: 'json' });
       } catch (e) { log(`le serveur du terminal ne démarre pas (${e.code || 'erreur'}).`); return; }
@@ -70,9 +75,12 @@ export function preparerTerminal({ here, root, jetons = () => [], plateforme = p
         else if (m.t === 'echec') { etat = 'arrete'; occupe = false; }
         else if (m.t === 'pret' && Number.isInteger(m.port)) {
           portQ = m.port; etat = 'actif';
-          try { // server.json gagne la clé terminal { url } : jamais un secret
-            const f = path.join(here, '.cache', 'server.json'); const j = JSON.parse(fs.readFileSync(f, 'utf8'));
-            fs.writeFileSync(f, JSON.stringify({ ...j, terminal: { url: origineQ() } }, null, 2), { mode: 0o600 }); fs.chmodSync(f, 0o600);
+          const f = path.join(here, '.cache', 'server.json');
+          // server.json gagne la clé terminal { url } : jamais un secret ; écrit à côté puis renommé
+          // (ecoute0 : jamais vu tronqué ; fix2-x06 : jamais à travers un lien)
+          try {
+            const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+            ecrireEtat(f, JSON.stringify({ ...j, terminal: { url: origineQ() } }, null, 2));
           } catch { log('server.json illisible : l\'adresse du terminal n\'a pas pu être publiée.'); }
         }
       });

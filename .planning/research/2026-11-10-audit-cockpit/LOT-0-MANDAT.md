@@ -87,7 +87,7 @@ et déjà consignée au BACKLOG comme point de goût.
 - Dernière commande jamais dans le flux, un fichier ou l'export (P67-D-14) ; verbe et cible réduite, jamais un
   argument (P69-D-16) ; transcript sans sortie d'outil, jamais exporté (P69-D-19).
 - Titre par `custom-title` seul, jamais de titre généré (PU-G-162).
-- Ni couleur d'alerte, ni fond teinté : glyphe et mot (Q9, DESIGN § 9) ; un tiroir latéral ne pousse jamais la carte (Q12 ;
+- Ni couleur d'alerte, ni fond teinté : glyphe et mot (Q9, DESIGN § 9) ; un tiroir latéral ne pousse jamais la carte (PU-G-204 ;
   le tiroir du terminal, lui, réserve sa place sous la carte : P71-D-35).
 - Rien sans l'option `--terminal` (P71-D-02) : la pastille expliquée sans l'option est hors de ce lot.
 - Le double geste reste dû dans tous les cas (P72-D-14).

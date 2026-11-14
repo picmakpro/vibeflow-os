@@ -378,19 +378,11 @@ ou de `vf-new-lab`.
 - **Observé (lecture du code, sondes d'audit du lot 2 de la Phase 72) :** un script qui s'exécute dans la page Projet peut piloter le chat du cockpit : `POST /api/ask` est accepté avec le jeton de la page (`plugin/cockpit/scripts/vf-cockpit-server.mjs`, vers la l.113). Ce chat tourne en `dontAsk`, avec `--tools Read,Grep,Glob,Bash` et une liste blanche `--allowedTools` (`plugin/cockpit/scripts/vf-cockpit-agent.mjs`, vers les l.14-16).
 - **NON vérifié :** le contenu exact de la liste blanche Bash et ce qu'elle permet ; l'exécution réelle d'une commande par un chat piloté par script ; l'existence d'autres gardes.
 
+**Renvoi (2026-11-11) :** AUDC-A-01 et AUDC-B-02, fait (2026-11-11) : la reprise de session est bornée aux identifiants que le serveur a rendus et le débit à deux exécutions (429 au-delà). Le pilotage par un script de la page reste ouvert.
+
 **Déclencheur de reprise :** une passe de sécurité sur le chat du cockpit, ou toute phase qui touche `POST /api/ask`.
 
-## Cockpit : le `claude` lancé depuis le terminal reçoit `CLAUDE_EFFORT` et `CLAUDE_PID` de la session parente — NON VÉRIFIÉ (2026-11-06)
-
-**Priorité : non fixée.** À vérifier avec le vrai binaire avant toute décision.
-
-**Origine :** recette par juge de la Phase 72, 2026-11-06.
-- **Observé :** le `claude` lancé depuis le terminal du cockpit reçoit `CLAUDE_EFFORT` et `CLAUDE_PID`, ceux de la session Claude Code qui a démarré le serveur du cockpit. Le filtre de `plugin/cockpit/scripts/vf-cockpit-terminal-env.mjs` (vers la l.18, Phase 71) retire `CLAUDE_CODE_*` et `CLAUDECODE`, mais pas ces deux variables.
-- **NON vérifié :** que `CLAUDE_EFFORT` impose bien au `claude` lancé l'effort du parent (avec le vrai binaire).
-- **Attention :** retirer tout `CLAUDE_*` enlèverait aussi des réglages voulus, comme `CLAUDE_CONFIG_DIR` ; le filtre doit rester nominatif.
-
-**Déclencheur de reprise :** une passe sur l'environnement du shell du terminal, ou un lancement dont l'effort surprend.
-
+<!-- vf-archive: .planning/archives/backlog/racine-BACKLOG-2026-11-11.md — ## Cockpit : le `claude` lancé depuis le terminal reçoit `CLAUDE_EFFORT` et `CLAUDE_PID` de la session parente — NON VÉRIFIÉ (2026-11-06) — CLOS (2026-11-11, AUDC-B-06) -->
 ## Cockpit : une proposition qui ouvre le tiroir pendant que le focus est dans la barre de question range la barre (`#ask-input`) — UX MINEURE (2026-11-06)
 
 **Priorité : non fixée.** Aucune fuite.
@@ -461,6 +453,8 @@ ou de `vf-new-lab`.
 - **Fait :** « Lancée » n'apparaît plus sans signal (« Préparée depuis la carte. »), et le message d'envoi est borné à 120 s.
 - **Non fait :** suivre l'état annulée, expirée, remplacée jusqu'à la carte. Cela exige de toucher `vf-cockpit-lancer.mjs` ou `lancer-suivi.mjs`, ou de créer un nouveau canal.
 
+**Renvoi (2026-11-11) :** AUDC-M11, fait (2026-11-11) : seule l'annulation est traitée (statut remis à zéro, annonce vidée) ; expirée et remplacée restent ouvertes.
+
 **Déclencheur de reprise :** la prochaine phase qui touche le suivi des lancements.
 
 ## Cockpit : résumé en langage courant (PU-G-104) et titres de santé à variables (PU-G-080 part C) — DIFFÉRÉ (2026-11-07)
@@ -481,6 +475,8 @@ ou de `vf-new-lab`.
 - **PU-G-195 :** tiroir Git élargissable (l'étiquette complète au survol est faite).
 - **PU-G-007 :** libellé visible sur chaque icône dès 1 000 px (la part compatible est faite).
 - **PU-G-202, PU-G-168 :** non faites, hors lots ; à relire dans le registre.
+
+**Renvoi (2026-11-11) :** PU-G-202 : AUDC-M9, fait (2026-11-11) pour la coupure du serveur (« Direct coupé » à 5 s) ; PU-G-168 : AUDC-M4, PU-G-007 : AUDC-M5, PU-G-195 : AUDC-M12, ouverts (Phases 74 et 80).
 
 **Déclencheur de reprise :** une demande d'utilisateur sur l'un de ces points.
 
@@ -562,3 +558,306 @@ ou de `vf-new-lab`.
 - **Correction ponctuelle :** STATE basculé à la main sur `vibeflow-v2.0`, phase 69 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-03 : « vibeflow-v2.0, phase 69 (Recommandé) »), dans la PR qui inscrit les Phases 73 à 77.
 
 **Déclencheur de reprise :** la prochaine inscription d'un jalon, ou la Phase 64 (contrôles branchés en nœuds du plan de bataille).
+
+
+## Cockpit : limites consignées par le lot 0 de l'audit — DIFFÉRÉ (2026-11-11)
+
+**Origine :** mission « lot 0 de l'audit du cockpit », `.planning/research/2026-11-10-audit-cockpit/REGISTRE.md` (§ « Constats nés de la mission lot 0 »). Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée. Sécurité décrite par classe, jamais par recette.
+
+### Coupure du serveur sans fermeture de flux (D-M2, AUDC-M9)
+**Priorité : moyenne.** Une coupure qui ne ferme pas la connexion (flux muet) n'est pas détectée ; il faut une veille de silence côté page. **Plan :** 79-12 et 79-14 (Phase 79, planifiée le 2026-11-11). **Déclencheur de reprise :** Phase 79.
+
+### Métadonnées des dépôts imbriqués dans l'export (D-M5, AUDC-B-04)
+**Priorité : basse.** Branche, tête et worktree d'origine des dépôts imbriqués viennent d'une clé du moteur amont (`meta.repos`) et restent dans l'export. **Déclencheur de reprise :** la prochaine passe sur l'export ou sur le patch du moteur.
+
+### Requête du même site acceptée sur les pages sans jeton (D-M6, AUDC-B-03)
+**Priorité : basse.** Le texte de la règle dit « inter-sites » ; une requête du même site est acceptée. **Déclencheur de reprise :** une passe de sécurité sur les pages servies.
+
+### « Server returned 429 » affiché tel quel et session non purgée (D-M7, AUDC-B-02)
+**Priorité : basse.** La page montre le message brut du serveur et ne purge pas la session côté page ; non régressif. **Déclencheur de reprise :** Phase 80.
+
+### `stop` et `status` ignorent un serveur orphelin (D-M13, AUDC-H3)
+**Priorité : moyenne.** Quand `server.json` est perdu, les deux commandes ne voient pas le serveur resté à l'écoute. **Plan :** 79-06 (Phase 79, planifiée le 2026-11-11). **Déclencheur de reprise :** Phase 79.
+
+### Lien du lab vers un fichier interne protégé (D-M15, AUDC-A-02)
+**Priorité : moyenne.** Un lien du lab vers un fichier interne que le serveur protège par ailleurs n'est pas masqué ; hors de la lettre d'AUDC-A-02 (cible dans le lab). **Déclencheur de reprise :** Phase 79, première vague, avec la classe restée ouverte d'AUDC-A-02. **Plan :** 79-07 (Phase 79, planifiée le 2026-11-11).
+
+### Empreinte du code limitée à `serve.mjs` (AUDC-H3)
+**Priorité : basse.** La relance compare l'empreinte de `serve.mjs` seul ; un autre module modifié ne remplace pas le serveur. Le port n'est pas comparé. **Plan :** 79-06 (ligne « Lot 0, H3 » du registre ; AUDC-AM4 : 79-06 et 79-16 ; empreinte calculée sur les fichiers de code du module, P79-D-31), Phase 79, planifiée le 2026-11-11. **Déclencheur de reprise :** Phase 79 (serveur lancé depuis le module, AUDC-AM4).
+
+### Formes singulières du repli de lien sans gabarit au dictionnaire (AUDC-H4)
+**Priorité : basse.** Lacune préexistante du chrome : certaines formes singulières du texte de repli d'un lien n'ont pas de gabarit au dictionnaire et restent en anglais. **Déclencheur de reprise :** la prochaine passe sur le dictionnaire.
+
+### Lecture passive : pilotes et script shell hors du point unique (AUDC-A-04)
+**Priorité : basse.** Les pilotes nommés sont fermés par une liste de sous-commandes de lecture ; un script shell du socle lance git hors du point unique, sans effet mesuré. **Plan :** 79-07 (Phase 79, planifiée le 2026-11-11). **Déclencheur de reprise :** Phase 79, avec AUDC-A-03.
+
+### Sixième onglet qui ne charge plus (AUDC-H1)
+**Priorité : moyenne.** Un flux par page ne suffit pas au-delà de six pages ouvertes sur la même origine. **Plan :** 79-14 (ligne AUDC-H1 du registre ; Phase 79, planifiée le 2026-11-11). **Déclencheur de reprise :** Phase 79 (flux partagé entre onglets).
+
+### Tiroir du terminal resté rehaussé après « Annuler » (AUDC-M11)
+**Priorité : à arbitrer (goût, pour Samuel).** Après « Annuler », le tiroir garde la hauteur prise pour la proposition. **Déclencheur de reprise :** la prochaine recette de Samuel sur le lancement.
+
+
+## Cockpit : limites consignées par la Phase 79 — DIFFÉRÉ (2026-11-11)
+
+**Origine :** cadrage de la Phase 79, `.planning/workstreams/fiabilite/phases/VFDO-79-socle-du-cockpit-une-collecte-un-flux-une-route-d-tat/79-CONTEXT.md`. Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée.
+
+### Chemins absolus dans la route d'état (A38)
+**Priorité : moyenne.** `signal.root`, `equipe.root` et `equipe.workers[].cwd` restent des chemins absolus, de forme inchangée depuis la Phase 69, servis par `hello` et par `GET /api/vf/state`. Les masquer change la forme : schéma `@2`. Mots de l'amendement A38 (79-12) : « Limite nommée, inchangée depuis la Phase 69 : `signal.root`, `equipe.root` et `equipe.workers[].cwd` sont des chemins absolus de forme inchangée (C0 « Versions »), servis comme ils le sont déjà par `hello` ; les masquer demanderait un schéma `@2`, hors de cette phase (à verser au BACKLOG par la jointure). » Même sujet que l'entrée « Chemins absolus servis à la page locale » demandée à la jointure : une seule entrée, celle-ci. **Déclencheur de reprise :** la prochaine version de `cockpit-signal` ou de `cockpit-who`.
+
+### Renommage complet des pages et retrait de `vf-cockpit-rename.mjs` (P79-D-08)
+**Priorité : basse.** La Phase 79 écrit les noms VibeFlow dans les sources exécutées par Node ; les pages restent renommées comme du texte. Le renommage complet de `viewer.html` et `ui/*.js`, puis le retrait de `vf-cockpit-rename.mjs`, se font en geste séparé. **Déclencheur de reprise :** la fusion de la Phase 80.
+
+### Dernière action limitée à l'arbre principal, lab lui-même worktree lié (A46)
+**Priorité : basse.** La dernière action d'un agent (`who`, `doing`) garde sa règle : un fichier d'un worktree hors de l'arbre principal y reste « un fichier hors du lab » ; l'étendre touche le collecteur `who`. Un lab qui est lui-même un worktree lié prend pour arbre principal le premier arbre de git, comme `who`. (Le `nom` de worktree non unique est fermé par défaut dans la phase : deux worktrees vérifiés au même `nom` ne sont pas admis.) **Déclencheur de reprise :** Phase 73 (régie).
+
+### `127.0.0.1` et `localhost` tiennent deux flux (A43)
+**Priorité : basse.** Deux origines distinctes : le flux partagé entre onglets ne les réunit pas. **Déclencheur de reprise :** la prochaine passe sur le flux partagé.
+
+### Messages de `serve.mjs` en français sous `?lang=en` (A43)
+**Priorité : basse.** Les messages du serveur sont écrits en français à la source et le restent en mode anglais. **Déclencheur de reprise :** la prochaine passe sur `?lang=en`.
+
+### Identifiants de menace à aligner entre les plans de la Phase 79
+**Priorité : basse.** Chaque plan numérote ses menaces dans sa propre plage (`T-79-1NN` pour 79-01, plan × 100 + rang) ; l'alignement de la forme entre les 22 plans n'a pas été vérifié à la planification. **Déclencheur de reprise :** l'audit de sécurité de la première vague exécutée.
+
+## Cockpit : réserves consignées par les cadrages des Phases 73, 74, 75, 77 et 80 — DIFFÉRÉ (2026-11-11)
+
+**Origine :** rapports de cadrage `.planning/missions/2026-11-11-phase-73-cadrage.md`, `-74-`, `-75-`, `-77-` et `-80-` (sections « À verser par la jointure »), jointure du 2026-11-11. Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sauf la question P73-Q-01, tranchée plus bas.
+
+### Pastilles « modifiés » du tiroir Git sur fond d'avertissement, en tension avec Q9 (S-1 de la Phase 73, P73-Q-01) — CLOS, SANS OBJET (2026-11-13)
+**Priorité : non fixée.** Texte du rapport 73 : « Pastilles « modifiés » du tiroir Git sur fond d'avertissement, en tension avec Q9 (S-1 de la Phase 73). » Le tiroir Git de la Phase 78 pose « modifiés » sur un fond d'avertissement, en tension avec Q9 (« ni fond teinté ») ; la régie de la Phase 73 rend ses propres pastilles neutres (P73-D-10) et ne touche pas le tiroir. **Décision :** arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, réponse : « Les neutraliser (Recommandé) » — option (b) de P73-Q-01 : un correctif du tiroir Git, hors de la Phase 73, porté par l'exécution de la Phase 80. Le rapport 73 est antérieur à cette réponse et dit encore la question « en attente ». **Correction du 2026-11-13 (jointure J1) :** sans objet. La question posée à Samuel était fausse sur les faits (erreur de relais de la session principale) : les pastilles du tiroir Git sont neutres depuis P78-D-33 ; preuve par la Phase 80, segment a (amendement A de 80-06, mutant M-PASTILLE, juge de design). Rien n'est planifié pendant la Phase 80 au titre de cette question ; sa réponse reste citée dans `73-CONTEXT.md`. **Déclencheur de reprise :** aucun.
+
+### Notification du système pour le cockpit (AUDC-I09, part reportée par P73-D-15)
+**Priorité : non fixée.** Option éteinte par défaut, trois motifs, texte borné au motif et au nombre ; examen des bornes à faire (texte hors de la page). La Phase 73 livre le titre d'onglet et la pastille de favicon ; l'API de notification du système est reportée. **Déclencheur de reprise :** une demande d'utilisateur de la notification hors de la page, ou la prochaine passe sur le compositeur du titre.
+
+### Coût en devise et limites d'abonnement de 5 h et de 7 jours (Phase 74, P74-D-20, P74-D-24)
+**Priorité : non fixée.** Coût en devise au tarif public et limites d'abonnement de 5 h et de 7 jours (relais par la ligne d'état), écartés de la Phase 74 (P74-D-20, P74-D-24 ; questions P74-Q-02, P74-Q-03). La 74 lit le coût en jetons et en durée ; un montant demanderait une table de tarifs tenue à jour dans le module, et la Phase 52 pose « jamais estimé ». Les limites demandent un relais par le script de ligne d'état, hors de ce que lit le socle ; elles restent avec le plafond de coût (AUDC-I35). **Déclencheur de reprise :** le cadrage d'AUDC-I35 (plafond de coût), ou la Phase 52.
+
+### Constats de l'auditeur posés sur les cartes de l'onglet Code (AUDC-I36, troisième idée ; Phase 75, P75-D-19)
+**Priorité : non fixée.** `vf-auditer` n'écrit rien sur disque : ses constats ne vivent que dans des transcripts ou en prose dans les `*-SECURITY.md`. **Déclencheur de reprise :** un fichier de constats de `vf-auditer`, typé et versionné, existe. Recoupe Santé (AUDC-M8, Phase 80).
+
+### Retirer la lecture morte de `lastDesc` (Phase 77, P77-D-12)
+**Priorité : basse.** Retirer la lecture morte de `lastDesc` (`ui/00-vibeflow.js:211`), dont le producteur est retiré par la Phase 77 (P77-D-12). **Déclencheur de reprise :** la Phase 80, ou la prochaine phase qui touche `ui/00-vibeflow.js`.
+
+### Mode focus recomposé (AUDC-I27, sous-graphe par ELK ; Phase 80)
+**Priorité : non fixée.** En réserve après le worker de mise en page de la Phase 79 ; la Phase 80 livre seulement « cadrer la sélection et ses voisins » (80-12, P80-D-17). **Déclencheur de reprise :** le worker de mise en page de la Phase 79 (79-18) est livré.
+
+## Outillage de planning : deux écarts relevés par les cadrages 76 et 80 — DIFFÉRÉ (2026-11-11)
+
+**Origine :** rapports de cadrage des Phases 76 et 80 (« À verser par la jointure »), 2026-11-11. Aucun sujet existant de ce fichier ne porte l'un ou l'autre (recherche faite à la jointure).
+
+### `check-method-budget.sh` (`rangement_memoires`) juge une mémoire « hors index » par sous-chaîne (Phase 76)
+**Priorité : basse.** `check-method-budget.sh` (`rangement_memoires`) juge une mémoire « hors index » par sous-chaîne (`grep -qF` du nom de fichier) : `a.md` est trouvé dans `xa.md`. Le cockpit (Phase 76) juge par égalité exacte. À aligner. **Déclencheur de reprise :** la prochaine modification de `check-method-budget.sh`, ou l'exécution de la Phase 76.
+
+### Gate `check.decision-coverage-plan` : `could-not-parse` sur les identifiants préfixés `P80-D-NN` (Phase 80)
+**Priorité : basse.** Le gate rend `could-not-parse` sur les identifiants de décision préfixés `P80-D-NN` ; la couverture de P80-D-01..60 a été vérifiée à la main. Le préfixage est la convention de `CLAUDE.md` (ADR-075) : toute phase qui l'applique peut rencontrer la même réponse. À suivre ici, comme le demande le rapport 80. **Déclencheur de reprise :** la prochaine planification d'une phase dont les décisions sont préfixées, ou toute passe sur ce gate.
+
+## Cockpit : constats du lot 0 bis — DIFFÉRÉ (2026-11-11)
+
+**Origine :** rapport `.planning/missions/2026-11-11-audit-cockpit-lot-0-bis.md`, section « Limites et points ouverts ». Priorité et déclencheur : décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+
+### Isolation du dossier d'état par les suites qui lancent un vrai terminal
+**Priorité : basse.** Mots du rapport : « Rien n'oblige par machine une future suite qui lance un vrai terminal à isoler le dossier d'état. » **Déclencheur de reprise :** la prochaine passe sur le terminal ou le lancement.
+
+### Bloc défilant du bandeau : 7 px de dépassement sous son pied collant
+**Priorité : basse.** Mots du rapport : « Constat de la recette, sans lien avec M11 : le bloc défilant du bandeau dépasse de 7 px sous son pied collant. » **Déclencheur de reprise :** la prochaine passe sur le terminal ou le lancement.
+
+### « Confirmez-la dans le terminal » gardé environ 1 s après « Lancer »
+**Priorité : basse.** Mots du rapport : « Après « Lancer », le panneau de P garde « Confirmez-la dans le terminal » environ 1 s avant « Commande préparée ». » **Déclencheur de reprise :** la prochaine passe sur le terminal ou le lancement.
+
+## Outillage de flotte : cinq écarts relevés à la mission de jointure — DIFFÉRÉ (2026-11-11)
+
+**Priorité : non fixée.** **Origine :** session principale, 2026-11-11, pendant les cadrages simultanés des phases du cockpit.
+- **Mode à blanc de E7 :** le gate de sortie n'a pas de mode à blanc pour E7 ; le contrôler sans archiver demande une copie privée du dossier.
+- **Balayage par worktree :** le balayage des processus par worktree ne voit pas un serveur de test lancé depuis un dossier temporaire.
+- **Registre des agents par compartiment :** E1 compte les agents des missions sœurs, et un worker qui oublie `--phase` reste inscrit au compartiment (neuf entrées le 2026-11-11).
+- **Photo de départ unique :** la photo de départ du budget est unique et partagée par des missions simultanées ; E7 reste indéterminé.
+- **Plafond de sous-agents simultanés :** le plafond du harnais (20 par défaut, réglable) a fait sauter des contrôles à sept managers lancés ensemble.
+
+**Déclencheur de reprise :** la prochaine passe sur les gates de sortie de mission, le registre des agents ou l'hygiène des workers.
+
+## Sondes instables en CI : deux suites du cockpit — DIFFÉRÉ (2026-11-11)
+
+**Priorité : non fixée.** **Origine :** session principale, 2026-11-11.
+- `test-cockpit-lancer-bandeau.sh` : rouge puis vert, relevé pendant le lot 0 de l'audit.
+- `test-cockpit-responsive.sh`, cas R15c.2 : rouge sur la PR de release, vert au second passage, même code.
+
+Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesurer une fois le rendu posé, attendre la stabilité, ne jamais affaiblir la sonde. **Déclencheur de reprise :** un nouveau rouge d'une de ces deux suites, ou la prochaine passe sur leurs sondes.
+
+**Mise à jour du 2026-11-13 (jointure J1) :** R15c.2 a une cause : défaut de la sonde (`chrome-panneau-etroit.mjs` lisait `textContent` et tapait avant que le focus soit posé), corrigé par `f7214e6b` et `a821e66b` ; il a rougi dans TROIS runs (43197982172, 43300355064, 43384769046). LB.E11 à LB.E14 : toujours sans cause, instable connu (registre J1-19).
+
+**Seconde mise à jour du 2026-11-13 (jointure J1) :** LB.E11 à LB.E14 ont une cause : défaut de la sonde (le serveur factice de `test-cockpit-lancer-bandeau.sh` ne terminait pas l'ancien `GET /flux` à l'arrivée d'un flux neuf, que le serveur réel termine ; les pages quittées restent gelées avec leur flux dans le cache de retour arrière de Chrome, six connexions par hôte, `/entree` fait la queue). Corrigé par `3dc8f31f` (garde LB.D1, mutant M-FLUX-NON-REMPLACE) ; preuve : 4 rouges sur 4 avec un cache de retour arrière à dix pages, 0 rouge sur 3 passages corrigée, suite entière 163 PASS. NON établi : pourquoi le Chrome de la CI retient au moins cinq pages quand celui du poste en retient trois ; le serveur réel n'a pas été mesuré sous Chrome. La règle « relancer une fois » ne vaut plus pour LB.E1x : un rouge de cette suite est à diagnostiquer (registre J1-48).
+
+## Cockpit : journal des attentes par hook (AUDC-I18, P79-Q-04) — RETIRÉ (2026-11-13)
+
+**Priorité : non fixée.** **Origine :** décision déléguée par Samuel (message session principale, 2026-11-11 : « tranche pour chacun de ces points »), prise par la session principale ; versée par la jointure J1. Le journal d'événements par les hooks officiels (AUDC-I18) est retiré : « retirée, sonde verte » (sonde S0 du plan 79-19, tableau relu le 2026-11-11, § 5.3 du registre). SOCL-24 reste au ledger et se clôt par la sonde (« journal non construit »), au segment c de la Phase 79. **Déclencheur de réouverture :** une version de Claude Code qui cesse de publier les états `waiting` / `blocked` dans la vue d'agents officielle ; la sonde se rejoue alors.
+
+## Cockpit : constats versés par la jointure J1 (segments a de 79 et 80) — DIFFÉRÉ (2026-11-13)
+
+**Priorité : non fixée.** **Origine :** jointure J1 du 2026-11-13 ; le détail ligne à ligne, avec état et propriétaire, vit dans `.planning/research/2026-11-10-audit-cockpit/REGISTRE.md`, section « Constats versés par la jointure J1 » (J1-01 à J1-47) et § 5.3. Rien n'y est corrigé par la jointure.
+- **Interface (Phase 80, segment b) :** six mineurs du juge à captures (J1-01 à J1-06), couplage du seuil de 701 px (J1-28), `#vf-coin` ignoré par `obstacles()` (J1-29), frappe perdue après « / » (J1-30), liste du tiroir Git sous le plancher de 240 px sans CLI (J1-26), panneau tactile à 1 000 px et plus (J1-27, à trancher).
+- **Socle de test (79-b) :** dossiers temporaires et restes de Chrome laissés par les suites, alerte sonore du poste, erreurs de shell silencieuses, causes de rouges non consignées, durées de CI, cas sautés en CI dont O6.17d et O6.19, jamais prouvés (J1-17 à J1-23, J1-33, J1-34).
+- **Sécurité basse (lancement de 79-b), par classe :** cinq restes mineurs du lot 0 bis (J1-07 à J1-11).
+- **Méthode :** un attendu de mutant ne repose pas sur l'échec d'une commande externe, la CI se lit par ses jobs rouges, un écrivain par arbre pour les preuves, formes de commande qui suspendent un nœud, Docker démarré sans demande, limite du harnais (J1-35 à J1-37, J1-40 à J1-43).
+- **Reporté de J1 (consigne d'allègement, demande de Samuel, message session principale, 2026-11-13) :** étape 2 point 8, contrat « attribut neutre posé par le terminal », inversion de CL4.3 et `eviter()` rejoué à l'arrivée de la pastille (J1-49).
+- **Ouverts de J1 :** SU6.1 et M-PERSISTANT attendent `VF_COQUILLE` de 79-16 (J1-50) ; angle mort de la porte des chaînes, littéraux français accentués non vus (J1-51) ; ligne `AJOUT` manquante non vue par la suite vendor (J1-52).
+- **Design, nœud `docs` de la 71.5 (J1-53) :** jetons d'espacement absents des six fichiers Git et garde `css-jetons.mjs` à étendre ; P71.5-D-10 (gouttière du téléphone, 20 px contre 24) ; pulsation par l'opacité dans `70-vf-live.js` ; valeurs hors grille de `06-blueprint.js`.
+- **Mineurs de la revue de J1 (tête `faed809d`, verdict passed, une passe) :** (1) M-ASK-HAUT de `test-cockpit-git-pagination.sh` fige un compte exact de rangées (même famille que l'égalité à 115 px retirée par GP2.3b) : la propriété à la place ; (2) même suite, `$ASK_AVEC` non liée sous `GP_SEULEMENT=MUTANTS` ; (3) la trace « empreinte publiée = celle de la copie » prétend plus que ce qui est vérifié (l'empreinte ne hache pas `assets/ui/*.js`) ; clavier-canevas et coin sans comptage de page ; (4) sous `CL_SCRIPTS`/`CC_SCRIPTS`/`CN_SCRIPTS`, `cockpit_module_copie` copie toujours le dépôt, pas la racine rejouée ; (5) `04-vf-clavier-canevas.js` : `t('{} card', n)` sans pluriel anglais (`t.pl`).
+
+**Déclencheur de reprise :** le cadrage du segment b de la Phase 79 ou de la Phase 80, ou la prochaine passe sur le socle de test du cockpit.
+
+## Verrous par `mkdir` : non exclusifs sous les coreutils uutils jusqu'à 0.10.0 — DIFFÉRÉ (2026-11-13)
+
+**Priorité : à proposer à Samuel par la session principale.** **Origine :** constat de la session principale, 2026-11-12 ; registre J1-31. Sur Ubuntu 25.10 et 26.04 (donc le runner de la CI), `mkdir d` sans `-p` teste l'existence puis crée, et rend 0 si un autre processus a créé `d` entre les deux (lu dans le source de l'outil, versions 0.1.0 à 0.10.0, corrigé en 0.11.0). Preuve en CI : sonde KC2 de `plugin/conductor/scripts/tests/test-check-method-budget.sh`, run 43281286911, première tentative, shard 2 (deux passes d'archivage dans la section critique, l'archive de la gagnante supprimée par le retour arrière de l'autre) ; 2 rouges sur 89 runs mesurés. Sites du même type, hors tests : `plugin/conductor/scripts/check-method-budget.sh`, `plugin/consolidator/scripts/archive.sh` et `reindex.sh`, `plugin/conductor/scripts/check-plugin-update.sh`, `scripts/check-gsd-core-update.sh`. Non concernés : `driver-lock.sh` (départage par `ln -sn`) et `fs.mkdirSync` de Node. **Destination :** lot court à part, compartiment `fiabilite`. **Preuve attendue du correctif :** un faux `mkdir` en tête de PATH qui reproduit la sémantique fautive (rouge avant, vert après). En attendant, un rouge KC2 isolé en CI se relance, en le disant. **Déclencheur de reprise :** la décision de Samuel sur le lot, ou un nouveau rouge KC2.
+
+
+## Cockpit : mineurs de la revue du point de fusion 1 de la Phase 73 — DIFFÉRÉ (2026-11-13)
+
+**Priorité : non fixée.** **Origine :** revue `vf-reviewer` du point de fusion 1 de la Phase 73 (plans 73-01 à 73-04, PR #243), une passe ; les deux majeurs sont corrigés dans la branche de la phase.
+- **`dag` du verrou :** le serveur le projette en objet (`vf-cockpit-vie.mjs`) ; `72-vf-regie-modele.js` n'admet qu'une chaîne et le vide toujours : champ mort, marque « nœuds running » de P73-D-09 non livrée. Trancher : retirer `dag` de la liste blanche, ou admettre l'objet borné.
+- **Grammaires du modèle plus étroites que le serveur :** `wsOk` (`[a-z0-9-]`) et `phaseOk` (deux niveaux) contre `[A-Za-z0-9][A-Za-z0-9._-]*` et `1.2.3` : un compartiment à point ou une phase à trois niveaux se vide, deux missions peuvent partager une clé.
+- **Échec de lecture des arbres de la route `ailleurs` :** avalé sans trace, et la dernière bonne liste effacée.
+- **`fenetreDeStall` :** relit le script de garde (jusqu'à 256 Kio) en synchrone à chaque tour de 5 s ; mémoïser par date de modification.
+- **`attendAgents` :** calculé aussi pour les sessions terminées (lecture de transcript inutile).
+
+**Déclencheur de reprise :** la prochaine passe sur la collecte ou le modèle de la régie.
+
+## Cockpit : poids de la traçabilité dans le graphe Projet (P76-Q-03) — OPTION (a) GARDÉE, MESURÉE (2026-11-13)
+
+**Priorité : à juger à la recette.** **Origine :** plan 76-04, mesure de sa suite T9.8 (`76-04-SUMMARY.md`) ; P76-Q-03 gardée en option (a), décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée, prise par la session principale le 2026-11-13. Mesure sur ce dépôt : le graphe Projet passe de 1 538 945 à 2 824 073 octets (+1,29 Mo, trois fois l'estimation de 0,4 Mo du cadrage), dont 820 Ko de références de plans et de critères pour 87 phases (`nodes[].trace`). **Piste (b) :** les définitions des registres et les références de plans lues par la route `GET /api/vf/tracabilite`, à la demande, hors du graphe. **Déclencheur de reprise :** Samuel juge à la recette que l'onglet Projet est lent.
+
+## Cockpit : mineurs de la revue et de l'audit du point de fusion 1 de la Phase 76 — DIFFÉRÉ (2026-11-13)
+
+**Priorité : basse.** **Origine :** revue (`vf-reviewer`) et audit de sécurité (`vf-auditer`) des plans 76-01 à 76-05, une passe chacun, régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Majeur de la revue et constat haut de l'audit corrigés avant la fusion ; restent :
+- Revue m1 : les listes `requirements` des PLAN et SUMMARY projetées par la collecte ne passent pas par `servi`, alors que le contrat de 76-04 dit tout texte nettoyé.
+- Revue m2 : la recette est cherchée par `-RECETTE-*.md` (premier du tri) dans la traçabilité, par `-RECETTE-HUMAINE.md` dans `avancement.mjs` : un autre nom ferait diverger les deux lectures (P76-D-14).
+- Revue m4 : `name` d'une entrée de mémoire lu avec ses guillemets ; un `name: "x"` ne résout pas un lien `[[x]]` (aucun cas dans le dépôt).
+- Audit M-1 : la lecture synchrone des fichiers de mémoire n'a ni budget cumulé d'octets ni contrôle d'horloge entre fichiers ; l'échéance de la route ne couvre que git (le coût par fichier est borné depuis le correctif H-1). Un témoin déterministe demande une horloge injectée dans `calculer` (`vf-cockpit-trace.mjs`).
+- Audit M-2 : réponse en cache périmée après une écriture en place, non indexée, d'un fichier de mémoire (empreinte par dates de dossiers) ; limite déjà dite au cadrage, à écrire aussi au SUMMARY de 76-05.
+- Audit M-3 : les échecs ou troncatures des lectures git de la mémoire (chemins de HEAD, jours, non suivis) ne remontent pas dans `bornes.tronque` : la liste se donne pour complète.
+- Audit B-1 à B-3 : noms de fichiers suivis servis sans passer par `servi` ; fragments `cible` et `name` bornés mais issus du texte de la mémoire ; empreinte sans signal git quand `git.sig` est nul.
+
+**Déclencheur de reprise :** la prochaine passe sur la traçabilité du cockpit (76-08 ou la phase suivante qui la lit).
+
+## Cockpit : mineurs des plans 75-01 à 75-06 (Phase 75, activité posée sur le code) — DIFFÉRÉ (2026-11-13)
+
+**Priorité : basse.** **Origine :** exécution des plans 75-01 à 75-06, régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale).
+- 75-01 : `merge-base` absent de la liste fermée des sous-commandes git (`vf-cockpit-git-durci.mjs`) ; P75-D-10 tenu par `rev-list`, à revoir si la liste s'élargit.
+- 75-03 : gardes de forme à bords ouverts (bidi U+202E, U+200B, `%2e%2e`, `a\..\x`) : affichage seulement, les chemins ne sont jamais ouverts.
+- 75-03 : collisions de plans en texte brut (`./src/a` ≠ `src/a`).
+- 75-04 : un bloc de frontmatter de plus de 400 lignes est lu comme absent, sans compteur.
+- 75-05 : la partie synchrone de `contexteGardes` (parcours des suites) ne cède pas la main.
+- 75-06 : une carte prévue est créée pour tout chemin absent du lab, documents compris (pas de filtre par catégorie).
+- 75-06 (revue, m2) : `vf-cockpit-activite-prevues.mjs` crée une carte prévue pour des fichiers non code et des sous-dossiers ignorés ; filtrer par `classify()` et `arch.include`/`ignore`.
+- 75-0x (revue, m3) : le nœud `unassigned` vide ajouté par l'annotateur reste dans l'export autonome (`serve.mjs`).
+- 75-01 (revue, m4) : `vf-cockpit-activite-branches.mjs`, échéance globale de 15 s pour 66 paires ; plusieurs reprises de 60 s avant convergence sous charge, ce que dit `radar` (`branches-indisponible`).
+- 75-04 (revue, m6) : la lecture des listes en bloc peuple `vfTouch`, soit +885 Ko dans `graph.json` et dans l'`index.html` Code ; effet voulu, non mesuré.
+- 75-01 (revue, m5) : le tri de la base commune multiple (`baseCommune`, historiques en croix) n'a pas de témoin ; les quatre autres mutants de m5 ont leur témoin (G11).
+
+**Déclencheur de reprise :** la prochaine passe sur l'activité du cockpit (75-07 ou la phase suivante qui la lit).
+
+## Cockpit : mineurs des plans 74-01 à 74-05 et 74-07 (Phase 74, l'équipe dans le temps) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** exécution des plans 74-01 à 74-05 et 74-07, régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale) ; audit de 74-03 et deux passes de revue.
+- 74-03 (audit) : le critère de linéarité de X9 (`test-cockpit-fiche-texte.sh`) admet un ratio de 4 pour un doublement de N ; un tokenizer quadratique à petite constante resterait vert.
+- 74-04 : budget de nœuds SVG non tenu sur la fixture adversariale (40 voies de 500 segments à 24 h : 40 092 nœuds pour 26 240, un `title` par segment) ; rendu mesuré 79 ms, sous la limite de 150 ms.
+- 74-04 : S6 (survol) et S16 (`scrollLeft` de la piste) de `test-cockpit-frise-vue.sh` ont rougi chacune une fois sous forte charge du poste, vertes au passage suivant.
+- 74-04 et 74-07 : la première inscription `VF_ETAT.abonner('frise')` lit `/api/vf/frise` sans bornes.
+- 74-05 : un Échap déjà consommé par la régie (détail déplié dans la régie masquée) ne ferme pas la fiche ; il faut un second appui.
+- 74-07 (revue) : « + N branches » précède les commits dans l'ordre de tabulation du bandeau Dépôt (UI-SPEC § 2 et § 9 le veulent après).
+- 74-07 (revue) : les chiffres de la synthèse de coût ne sont pas en `--text` 500 (UI-SPEC § 5).
+
+**Déclencheur de reprise :** la prochaine passe sur la frise ou la fiche d'agent (74-06, 74-08 à 74-10, ou la recette de la Phase 74).
+
+## Cockpit : mineurs de la revue et de l'audit de la Phase 77 — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** une passe de `vf-reviewer` à chacun des deux points de fusion de la Phase 77 (têtes `cf945818` puis `d6bc84fb`) et une passe de `vf-auditer` (tête `cf945818`), régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Les majeurs (exécution d'un résolveur pris dans le lab observé, faux « rien de nouveau » sur une base git inconnue) sont corrigés dans la phase ; ce qui suit ne l'est pas.
+- **Route des jauges (77-03) :** un gate qui meurt après son en-tête (code autre que 0 ou 64, aucune ligne) donne onze jauges « non applicable » au lieu de « indisponible » ; le cache de 60 s garde aussi un résultat tout indisponible ; la liste fermée des verdicts se lit dans un objet ordinaire (jetons hérités du prototype acceptés : `Object.hasOwn` ou `Map`) ; `chemin` refuse `/`, `~` et une lettre de lecteur, pas les formes UNC ni les schémas (`file:`), côté serveur comme dans `74-vf-synthese-jauges.js` ; le délai de 10 s arrête le shell du gate, pas ses petits-enfants.
+- **Gates en TSV (77-01) :** la ligne TSV de densité est relue du rapport texte par un séparateur ` | ` qu'un nom de fichier peut contenir ; le gate de méthode suit un lien `.planning` sortant du lab (tailles seulement) ; la surcharge de test `VF_BUDGET_RESOLVER` est honorée hors des suites et l'environnement des gates lancés par le cockpit ne la retire pas (aucun cas ne la couvre) ; un gate copié à plat sans résolveur voisin rend le socle non vérifiable (dégradation voulue).
+- **Mémoire de visite (77-04, 77-08) :** un `vu` futur est accepté sans borne (rotation figée, date illisible pour une valeur extrême) ; au-delà de 8 192 octets (vers 165 phases) l'écriture est refusée et chaque visite redevient « première visite » sans le dire ; le bloc de visite ne s'abonne pas à `graphe` (fraîcheur différée au prochain `etat`, `who` ou `git`).
+- **Registre des blocs (77-06) :** `74-vf-synthese-burnup.js` et `74-vf-synthese-jauges.js` empilent leur entrée à chaque exécution du script au lieu de la remplacer (patron de `74-vf-synthese-visite.js`) ; la feuille `74-vf-synthese-style.js` est injectée au chargement, sur tout onglet.
+- **Blocages du STATE (77-02) :** le texte servi `t` masque les secrets mais garde un chemin absolu du poste, et le condensat `h` est calculé sur le texte non masqué.
+- **Bloc de visite et bloc coût (77-08, 77-07), seconde revue :** sur une base git inconnue, le bloc dit « Commits : non lus, le dépôt git est indisponible » alors que le dépôt est lisible, et « Tout vu » ne le rend jamais vide (libellé distinct à ajouter à l'UI-SPEC) ; `commitsArrives` rend « inconnu » quand le sommet manque des rangées lues, sans le dire ; le bloc coût relit `/api/vf/frise` tant que Projet est affiché, Synthèse fermée comprise (voulu par le plan) ; un 404 transitoire retire la section coût jusqu'au prochain aller-retour d'onglet.
+- **Design de la Synthèse (juge sur captures, 84/100, fin de phase) :** ligne-résumé de l'aperçu décalée de 12 px, interligne de 16 px et vide d'environ 50 px dessous (`74-vf-synthese.js`) ; bloc de visite réduit à son titre pendant la lecture (une ligne neutre à valider) ; `!important` sur la taille du `summary` (`74-vf-synthese-burnup.js`) et rayon de 8 px écrit en dur ; titres de bloc plus pâles que les têtes de groupe, blocs séparés par 24 px seulement : à arbitrer en recette (règle du viewer et de l'UI-SPEC).
+- **Libellé de Synthèse dès 1 600 px :** second palier de repli à poser dans `01-vf-responsive.js` (le bouton est en icône seule depuis la correction de R21 et R22 ; décision déléguée par Samuel, message session principale, 2026-11-08, prise par la session principale le 2026-11-14) ; à juger à la recette.
+- **Jauge « socle » :** en dépassement permanent sur le dépôt source alors que la baseline la tient pour égale ; la relation à la baseline est affichée à côté (77-06), le verdict n'est pas recalculé.
+
+**Déclencheur de reprise :** la prochaine phase qui touche la route des jauges, la mémoire de visite ou les blocs de la Synthèse.
+
+## Cockpit : mineurs de la revue du point de fusion 2 de la Phase 76 (pages 76-06 et 76-07) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** revue (`vf-reviewer`) des plans 76-06 et 76-07, une passe, verdict passed, aucun majeur ; régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale).
+- M1 : `74-vf-trace-sections.js` lit les exigences de l'entrée haute sans garde ; une réponse vide, indisponible ou en cours de collecte lève une erreur non rattrapée (console seule, l'entrée reste cachée).
+- M2 : les zones rendues de `74-vf-trace.js` ne sont élaguées qu'au rafraîchissement ; des conteneurs détachés restent retenus jusqu'à un événement ou au départ d'onglet (fuite bornée).
+- M3 : Échap retrouve la ligne d'origine par un sélecteur sans `CSS.escape` ; un chemin de preuve à guillemet ne rend pas le focus.
+- M4 : `ouvrirAgent` (`74-vf-trace-memoire.js`) avale l'échec de lecture ; un clic ne produit rien, ou une liste vide trompeuse pendant la collecte.
+- M5 : le marqueur d'injection des sondes ne couvre que le libellé d'exigence et les critères, pas les titres d'ADR, noms de mémoire ni sujets de commit (le code passe tout par `textContent`).
+- M6 : trois sondes Chrome à durcir : seuil de 150 ms contre une lecture à 40 ms (à-coup de CI), comparaison de défilement tautologique si le panneau ne défile pas, pause fixe sans témoin d'arrivée de l'événement.
+- Non sondé : l'état « collecte en cours » ne se relance que par la clé `planning` de `VF_ETAT` ; si la fin de la première collecte n'émet pas d'événement, la phrase reste jusqu'au prochain changement de panneau. À trancher avec le correctif de la clé `planning` annoncé par la Phase 79.
+
+**Déclencheur de reprise :** la passe du juge de design de fin de Phase 76, ou la prochaine retouche des fichiers `ui/74-vf-trace*.js`.
+
+## Cockpit : constats bas de l'audit de la régie (Phase 73, 73-05 et 73-07) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : non fixée.** **Origine :** audit `vf-auditer` de 73-05 et 73-07, une passe, verdict passed (aucun moyen ni haut).
+- **Témoins sensibles à la charge :** RG6.20 (témoin positif de la ligne verrou) et RG13.13 (aucun git relancé pendant dix lectures) rougissent en lot sous charge et verdissent seuls ; un faux rouge sur un témoin positif fait perdre la valeur du négatif qui le suit.
+- **Stockage « lu » :** la purge de 24 h ne vise que la clé du lab ouvert, au chargement ; les clés d'autres labs de la même origine ne sont jamais purgées.
+- **Identifiant du lecteur de repli :** pas de contrôle de forme côté page (la garde réelle est la route serveur).
+- **Lecteur de transcript :** une entrée nulle dans le fil lève une erreur non attrapée (pas de message « Indisponible »).
+- **Nom du lab voisin :** pas d'assainissement côté page des caractères de contrôle (assuré par le serveur).
+
+**Déclencheur de reprise :** la prochaine passe sur la page de la régie.
+- **Revue du point de fusion 2 de la Phase 73 (mineurs) :** `ouvrirRepli` émet `vf-agent:lu` même quand la lecture du transcript échoue, et deux clics rapprochés laissent le transcript le plus lent écraser le panneau ; `relireMissions` lance une lecture par événement `graphe` sans sérialisation (deux réponses croisées peuvent poser des missions plus anciennes).
+- **Durée d'un agent terminé (constat de la Phase 74) :** la régie calcule `dureeS` en tenue et compte les veilles de l'agent ; la spec ne tranche pas entre durée active et durée de tenue : à décider au prochain réglage de la régie.
+- **Juge design de fin de Phase 73 (74/100, passed ; mineurs) :** ligne 2 « nœud · arbre · branche » rendue sous Quoi au lieu de Qui, rôle sous la tâche au lieu d'avant ; colonne Quoi qui dérive de 361 à 376 px (grille par ligne) ; ligne de verrou plus bavarde que la spec § 6.1 ; ligne de phase `human_needed` avec le lien en double ; format de la ligne « ailleurs » et noms de lab en mono (§ 10) ; hors phase : à 800 px, la bascule de Projet recouvre son titre.
+
+## Cockpit : mineurs de l'exécution de la Phase 80 (plans 80-09 à 80-21, quatre revues, juge design) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** les rapports des exécuteurs, quatre passes de `vf-reviewer` aux points de fusion, le juge design sur captures (83/100, passed) et la vérification d'objectif de la Phase 80 (branche `feat/phase-80-trois-formes`) ; aucun n'appelle de correction avant la fusion.
+- 80-19 NOT_GUARD log\w* exclut login_required (hors périmètre, à verser au BACKLOG)
+- 80-16 responsive R7.5.0-2 rouges sous charge (90 s), à rejouer seuls au point de fusion
+- 80-09 freeArea() ne déduit pas #zoom au téléphone : une carte amenée dans le champ peut le recouvrir
+- git-entete 119/17 sur 68343e27 : à rejouer après 898511f0 au point de fusion
+- equipe EA2.x/EA3.x « reading lire » dans le tiroir Qui a la main après fusion 455da5e8 (79-17 partiel) : à rejouer sur la 79-17 finale
+- 80-10 OG2.2 réduit (tampon xterm d'une autre origine) ; retour sur Projet par clic sans ?vue=
+- git-tiroir 177/18 sous charge (p10) : à rejouer à poste calme au point de fusion
+- 80-13 chrome-session.mjs naviguer oublie vf-tiroirs:* (fichier commun, Gate-Touche)
+- revue1 : 00-vf-onglets.js:104 aller(nom,{fragment:'#s=…'}) pose l'adresse sans appliquer la sélection (clés moteur v,s,z,git à refuser ou appliquer ; à documenter pour 73/74/76)
+- revue1 : 00-vf-onglets.js:103 aller vers l'onglet courant avec fragment l'ignore en silence (à dire dans le contrat)
+- revue1 : 00-vf-onglets.js:114 après un chargement échoué, l'écouteur de clic du routeur n'est plus posé, les clics rechargent la page (coquille ou 80-21)
+- revue1 : viewer.html:1768 parentLab(owner) inséré brut dans rowFor(extra) (constantes serveur aujourd'hui ; échapper par h())
+- revue1 : 04-vf-canevas-champ.js:21 Math.max(200,…) peut dépasser la découpe droite quand le tiroir Git touche le bord
+- revue1 : viewer.html programmerZ (250 ms) peut écrire z dans l'adresse dépouillée avant le démontage (fenêtre étroite)
+- revue1 : 02-vf-reperes.js:131 childList sur body relance maj à chaque enfant direct (coût)
+- 80-14 hauteur du champ de palette 58 px au lieu de 44 (spec) : à trancher par une passe de jetons
+- 80-21 erratum 80-UI-SPEC § 5 : texte « Lecture impossible… » remplacé par celui de la coquille pour les trois onglets
+- revue2 : 00-vf-onglets.js:100 clic sur l'onglet affiché après échec : etat() reste en échec, rangées Réessayer persistantes (conforme au plan, à arbitrer)
+- revue2 : 02-vf-ligne-echec.js:36 slot.hidden=false jamais remis ; 02-vf-ligne-etat.js:70 cache le slot et la rangée d'échec avec (écart consigné 80-21)
+- revue2 : 00-vf-onglets.js:131 Précédent pendant un chargement en vol : fragment du même onglet avalé, entrée d'historique en double possible ; restituer (:73) sans borne
+- revue2 : chrome-surcouches.mjs:14 164 colonnes ; SU6.1 annonce « une seule entrée dans la pile » sans la mesurer, pas de contrôle [inert] après fermeture du tiroir rouvert
+- revue2 : viewer.html gagne 17 lignes > 160 colonnes (hors cliquet)
+- revue1 : SU4.6 ne voit pas un window.onkeydown = (ni avant ni après l'adaptation)
+- 80-21 : après un Réessayer par le routeur suite à un premier échec, le bouton Retour de Projet apparaît (différent d'un chargement à froid)
+- gel « palette > puis Échap puis aller » vu par p14 dans le harnais de chrome-palette (20 s sans réponse, aussi sur 75a527f9) : non reproduit par OG2.18/OG2.18d (lab onglets) — limite, cause non localisée
+- projet-visite R3.18 (presse-papiers) rouge sous charge, aussi sur la base 64fad93d
+- design 83/100 : logo .mark quasi invisible en thème sombre (viewer.html:106, invert seulement en clair ; antériorité à confirmer)
+- design : aide ? sans voile --scrim en sombre (la palette en a un, DESIGN § 5)
+- design : tiroir Git, ligne HEAD : pastille de branche tronquée « ma… » alors que le tiroir est large
+- design : liste Projet 1440 px, cellule État décalée de ~3 px vers le haut
+- design : pastilles du menu ⋯ en clair non vues (lab sans Santé ni Récent)
+- revue3 : 01-vf-responsive.js:253 ranger() ré-attache toute la rangée : un bouton d'en-tête focalisé perd le focus (addHeaderButton tardif, franchissement de 1280 px)
+- revue3 : slot.hidden de #vf-coin-etat a deux propriétaires (02-vf-ligne-echec.js:36 et 02-vf-ligne-etat.js:70)
+- revue3 : test-cockpit-coquille.sh C3.3 empreinte vide #ask-live/.vp-status et retire .vf-ech au lieu de comparer avant/après
+- revue3 : 01-vf-responsive.js:62 la règle :has du groupe vide ne teste que [hidden] ; libellé « Suivre » sur rangée vide si vf-lock manque
+- revue3 : chrome-palette.mjs:195 commentaire périmé (aller sans réponse après palette), contredit par OG2.18/OG2.18d
+- revue3 : 07-vf-raccourcis.js:105-114 indentation des continuations incohérente
+- revue3 : message du commit 62ab1e17 annonce « aller et le clic » ; seul aller est prouvé (EC4.1)
+- 80-18 : durées de ci-shard-suites.sh mesurées sur le poste sous charge : à remplacer par la mesure du premier run CI
+- revue4 : observateurs-cliquet.mjs:13 ne compte que `new MutationObserver(` ; 7 observateurs posés par l'aide obs()/observer() (77-vf-git-tiroir:253, 02-vf-coin:106-108, 02-vf-ligne-etat:82, 02-vf-reperes:130-131) lui échappent (outil de 79-17)
+- revue4 : ci-shard-suites.sh:63 commentaire contradictoire (« une suite à la fois … trois en parallèle »)
+- revue4 : test-cockpit-coquille.sh sans ligne de durée dans ci-shard-suites.sh (DEFAUT 7 s)
+- cycle-serveur AM7.6 au poste macOS cite test-cockpit-lien-vue.sh (80-13) : recherche de Chrome par $MAC non neutralisée par le sed ; vert en CI Linux
+- test-cockpit-responsive.sh : mutants R21m/R22m rougissent par erreur de syntaxe et non par absence du repli ; vraie mutation sur un lab avec Git à poser
+- N1 (amorce-navigateur) : borne de 25 s du lanceur contre 11 à 27 s de Chrome froid en CI ; EKR1/EK5.1 (equipe) : action qui lit la première zone .vf-doing, à cibler par [data-vf-doing]
+
+**Déclencheur de reprise :** la passe complète avant la release, ou la prochaine phase qui touche les onglets, la palette, le coin bas-droit ou le partage CI.

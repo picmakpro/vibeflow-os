@@ -9,9 +9,8 @@
   const { h, graph: G } = SC;
   const TAB = G.meta.vfTab === 'project' ? 'project' : G.meta.vfTab === 'equipe' ? 'equipe' : 'code';
   document.body.classList.add('vf-tab-' + TAB); // 70-12 (P70-D-20) : marqueur de l'onglet sur le corps de page (`vf-tab-code`, `vf-tab-project`, `vf-tab-equipe`), pour les règles de mise en page propres à un onglet
-  // titre de l'onglet du navigateur : « <nom> — Code », « <nom> — Projet » ou « Équipe · <nom> » (le viewer écrit « <nom> map », qui devenait le nom seul)
-  { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); document.title = TAB === 'equipe' ? `Équipe · ${nom}` : `${nom} — ${TAB === 'project' ? 'Projet' : 'Code'}`; }
-  const ST = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué' };
+  // titre de l'onglet du navigateur (AUDC-X7) : un seul format, « <Onglet> · <nom> » : l'onglet d'abord, parce qu'un onglet étroit coupe par la fin et que trois pages du même projet doivent se distinguer d'un coup d'œil (le viewer écrit « <nom> map », qui devenait le nom seul)
+  { const nom = String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''); window.__vfTitreBase = { onglet: TAB === 'equipe' ? 'Équipe' : TAB === 'project' ? 'Projet' : 'Code', nom }; } // 73-06 : 90-vf-titre.js compose et écrit le titre
   // P67-D-04 : logo VibeFlow clair ou sombre selon le thème du viewer (meta.vfLogos est posé par l'assemblage)
   const LOGOS = G.meta.vfLogos;
   if (LOGOS) {
@@ -78,7 +77,10 @@
     .foot .meta { white-space: normal; min-width: 0; border-radius: 12px; }
     .foot .vst { flex: none; }
     /* 71.5 (P71.5-D-18, D-28, N2) : ni anneau ni halo, une seule élévation ; l'état se lit dans le pied (glyphe + mot) et la graisse du titre. « En cours » : palier neutre plus marqué (--raise allégé), car --surface-hover ne se voit pas en clair */
-    .card.st-active, .card.st-recette, .node:hover .card.st-active, .node:hover .card.st-recette { background: color-mix(in srgb, var(--raise) 70%, var(--surface)); }
+    /* 80-16 (P80-D-31, AUDC-X5 b) : le palier neutre n'est posé qu'en sombre ; en clair la carte active reste sur --surface (jamais grisée) :
+       l'état se lit au glyphe, au mot et au titre */
+    :root:not([data-theme="light"]) .card.st-active, :root:not([data-theme="light"]) .card.st-recette, :root:not([data-theme="light"]) .node:hover .card.st-active,
+    :root:not([data-theme="light"]) .node:hover .card.st-recette { background: color-mix(in srgb, var(--raise) 70%, var(--surface)); }
     .card.st-active, .card.st-recette, .card.st-blocked { box-shadow: var(--shadow-card); }
     .card.st-active .title, .card.st-recette .title, .card.st-blocked .title { font-weight: 600; color: var(--text); }
     .card.st-done .title, .card.st-todo .title { font-weight: 500; color: var(--text-2); }
@@ -131,7 +133,7 @@
   // DG-15 (retours panel, lot 6) : le bloc « Santé » du panneau (20-health.js) contrôle le CODE (clés, points d'accès, fichiers oubliés) et son graphe n'a pas de `health` sur l'onglet Projet : il y disait « Aucun problème trouvé » à côté de lignes du planning non lues. Le bouton y est déjà masqué ; le bloc l'est avec lui.
   if (TAB === 'project') style.textContent += `#btn-health${window.FLOORPLAN_SERVER ? '' : ', #ask'} { display: none !important; } #panel .stats:not(.vf-stats) { display: none; } #panel .sec:has(> .list > a[data-hc-open]) { display: none; }`;
   // onglet Équipe (69-05, P69-PL-09) : ni bouton de santé ni barre de question (la question porte sur le code ou le projet)
-  if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; }';
+  if (TAB === 'equipe') style.textContent += '#btn-health, #ask { display: none !important; } #panel .stats:not(.vf-stats) { display: none; } #panel .sec:has(> .list > a[data-hc-open]) { display: none; }'; // AUDC-M3 : la santé contrôle le CODE ; sur Équipe elle disait « aucun problème » à côté de Code qui en montrait quatre (même retrait que Projet, DG-15)
   document.head.appendChild(style);
 
   // ---------- onglets ----------
@@ -139,7 +141,7 @@
   if (brand) {
     const tabs = document.createElement('nav');
     tabs.className = 'vf-tabs';
-    tabs.innerHTML = `<a href="index.html" class="${TAB === 'code' ? 'on' : ''}">Code</a><a href="project.html" class="${TAB === 'project' ? 'on' : ''}">Projet</a><a href="equipe.html" class="${TAB === 'equipe' ? 'on' : ''}">Équipe</a>`;
+    tabs.innerHTML = `<a href="index.html" class="${TAB === 'code' ? 'on' : ''}"${TAB === 'code' ? ' aria-current="page"' : ''}>Code</a><a href="project.html" class="${TAB === 'project' ? 'on' : ''}"${TAB === 'project' ? ' aria-current="page"' : ''}>Projet</a><a href="equipe.html" class="${TAB === 'equipe' ? 'on' : ''}"${TAB === 'equipe' ? ' aria-current="page"' : ''}>Équipe</a>`; // AUDC-X4 : l'onglet actif le dit aussi aux lecteurs d'écran
     brand.after(tabs);
   }
 
@@ -247,25 +249,6 @@
     if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(v).then(dit, repli); else repli();
   };
 
-  // ---------- pont entre onglets ----------
-  const fileOf = (id) => id && id.startsWith('f:') ? SC.files.get?.(id.slice(2)) || (G.files || []).find((f) => 'f:' + f.p === id) : null;
-  if (TAB === 'project') {
-    SC.addPanelSection('item', (id) => {
-      const f = fileOf(id);
-      if (!f || !f.touched || !f.touched.length) return '';
-      const rows = f.touched.slice(0, 40).map((p) => `<a class="vf-link" href="index.html#r=${encodeURIComponent(p)}"><span>→</span><code>${h(p)}</code></a>`).join('');
-      return `<div class="sec"><h3>Fichiers touchés dans l'onglet Code <span class="c">${f.touched.length}</span></h3>${rows}</div>`;
-    });
-  } else if (TAB === 'code') {
-    const touch = G.meta.vfTouch || {};
-    SC.addPanelSection('item', (id) => {
-      const f = fileOf(id);
-      const list = f && touch[f.p];
-      if (!list || !list.length) return '';
-      const rows = list.slice(0, 30).map((t) => `<a class="vf-link" href="project.html#r=${encodeURIComponent(t.ref)}"><span class="vst vst-${h(t.st).replace(/[^\w-]/g, '')}">${h(ST[t.st] || t.st)}</span><span>${h(t.label)}</span></a>`).join('');
-      return `<div class="sec"><h3>Touché par <span class="c">${list.length}</span></h3>${rows}</div>`;
-    });
-  }
   if (TAB === 'project') {
     const TECH = /^(Source :|Ligne de ROADMAP :|Avancement lu dans le worktree)/;
     SC.on('panel', () => {
@@ -283,7 +266,7 @@
     const r = new URLSearchParams(location.hash.slice(1)).get('r');
     if (!r) return;
     const id = /^[nf]:/.test(r) ? r : 'f:' + r;
-    if (SC.exists(id)) SC.reveal(id); else SC.toast(`Pas sur cette carte : ${r}`);
+    if (TAB === 'equipe' && window.__vfRegie?.arriver(r)) return; if (SC.exists(id)) SC.reveal(id); else SC.toast(`Pas sur cette carte : ${r}`);
   };
   // recette 68 R5 : la carte d'une mission abandonnée porte `st: todo` (le viewer n'a pas d'état « abandonnée ») et sa pastille disait « À faire ». Le socle écrit « abandonnée » dans le pied de la carte
   // (LIBELLES_MISSION) : la pastille de CETTE carte est réécrite en « Abandonnée », avant lecture par un lecteur d'écran. Idempotent : une pastille réécrite n'est plus `vst-todo`.

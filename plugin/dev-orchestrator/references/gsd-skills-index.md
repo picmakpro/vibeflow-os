@@ -1,5 +1,5 @@
 # GSD Skills Index (auto-généré — NE PAS ÉDITER)
-> Généré le 2026-09-07T23:01:50+02:00 par build-gsd-index.sh depuis @opengsd/gsd-core@1.13.0
+> Généré le 2026-11-13T08:52:16+01:00 par build-gsd-index.sh depuis @opengsd/gsd-core@1.21.0
 
 | Skill | Description |
 |-------|-------------|
@@ -53,7 +53,7 @@
 | gsd-profile-user | Generate developer behavioral profile and create Claude-discoverable artifacts |
 | gsd-progress | Check progress, advance workflow, or dispatch freeform intent — the unified GSD situational command |
 | gsd-quick | Execute a quick task with GSD guarantees (atomic commits, state tracking) but skip optional agents |
-| gsd-quick-batch | Batch several /gsd:quick-shaped tasks together — planned, dispatched, and merged as one run |
+| gsd-quick-batch | Batch several `/gsd-quick`-shaped tasks together — planned, dispatched, and merged as one run |
 | gsd-resume-work | Resume work from previous session with full context restoration |
 | gsd-review | Request cross-AI peer review of phase plans from external AI CLIs |
 | gsd-review-backlog | Review and promote backlog items to active milestone |

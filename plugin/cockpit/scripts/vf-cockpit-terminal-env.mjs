@@ -1,6 +1,6 @@
 // vf-cockpit-terminal-env — environnement et choix du shell du terminal intégré (71-01 en pose l'amorce, 71-03 le filtre complet).
 // Exports : envShell(env, secrets) -> copie de l'environnement ; choisirShell(env) -> chemin absolu du shell ; AJOUTS_TOUJOURS.
-// Liste NOIRE seulement (P71-D-03, D-14) : CLAUDECODE, CLAUDE_CODE_*, VF_COCKPIT_* et toute valeur qui contient un jeton du cockpit sont retirés ;
+// Liste NOIRE seulement (P71-D-03, D-14) : CLAUDECODE, CLAUDE_EFFORT, CLAUDE_PID, CLAUDE_CODE_*, VF_COCKPIT_* et toute valeur qui contient un jeton du cockpit sont retirés ;
 // le PATH d'origine du lanceur est restitué (VF_COCKPIT_PATH_ORIGINE, P71-D-03) ; le reste passe tel quel (NODE_OPTIONS compris : le cockpit ne le pose pas). Un jeton de moins de 16 caractères n'écarte rien (trop de faux positifs).
 import fs from 'node:fs';
 import os from 'node:os';
@@ -15,7 +15,7 @@ export function envShell(env, secrets = []) {
   const sortie = {};
   const interdits = secrets.filter((s) => typeof s === 'string' && s.length >= LONGUEUR_JETON);
   for (const [k, v] of Object.entries(env || {})) {
-    if (k === 'CLAUDECODE' || k.startsWith('CLAUDE_CODE_') || k.startsWith('VF_COCKPIT_')) continue;
+    if (k === 'CLAUDECODE' || k === 'CLAUDE_EFFORT' || k === 'CLAUDE_PID' || k.startsWith('CLAUDE_CODE_') || k.startsWith('VF_COCKPIT_')) continue; // CLAUDE_EFFORT et CLAUDE_PID : ceux de la session qui a lancé le serveur, jamais ceux du claude lancé dans le terminal (AUDC-B-06)
     if (typeof v === 'string' && interdits.some((s) => v.includes(s))) continue;
     sortie[k] = v;
   }

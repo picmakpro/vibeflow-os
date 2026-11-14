@@ -7,7 +7,6 @@
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
@@ -16,6 +15,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -72,10 +72,17 @@ const v = new Function('j', 'return (' + process.argv[3] + ')')(j);
 console.log(typeof v === 'string' ? v : JSON.stringify(v));
 JS
 cat > "$AUX/pg.mjs" <<'JS'
-// pg.mjs <dossier-sortie> <page.html> <expression sur g> : le graphe de la page (module d'embarquement de la sortie)
+// pg.mjs <dossier-sortie> <page.html> <expression sur g> : le graphe de la page (module d'embarquement du MODULE, dossier de scripts dans VF_PG_SCRIPTS ; la sortie ne porte que des données)
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const [, , out, file, expr] = process.argv; const m = await import(pathToFileURL(out + '/vf-cockpit-embed.mjs').href);
+const [, , out, file, expr] = process.argv; const m = await import(pathToFileURL(process.env.VF_PG_SCRIPTS + '/vf-cockpit-embed.mjs').href);
 console.log(String(new Function('g', 'return (' + expr + ')')(m.extraireGraphe(fs.readFileSync(file, 'utf8')))));
+JS
+export VF_PG_SCRIPTS="$SCRIPTS"   # 79-06 : pg.mjs importe l'embarquement du module, plus de la sortie
+cat > "$AUX/route.mjs" <<'JS'
+// route.mjs <port> <jeton> <onglet> : le corps (JSON) de GET /api/vf/graphe?onglet=… (79-15 : la donnée vit en mémoire, plus dans project.html)
+import http from 'node:http';
+const [, , port, jeton, onglet] = process.argv;
+http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/graphe?onglet=' + onglet, headers: { Host: `127.0.0.1:${port}`, 'x-vf-cockpit-token': jeton } }, (r) => { let b = ''; r.on('data', (c) => (b += c)); r.on('end', () => process.stdout.write(r.statusCode === 200 ? b : '{}')); }).on('error', () => process.stdout.write('{}'));
 JS
 cat > "$AUX/now.mjs" <<'JS'
 console.log(Date.now());
@@ -93,11 +100,8 @@ mklab() {
 }
 demarrer() { # demarrer <lab> [VAR=val ...] -> PORT, TOK, PTOK
   local L="$1"; shift; local OUT="$L/.vibeflow/cockpit"
-  rm -f "$OUT/.cache/server.json"
-  env "$@" node "$OUT/serve.mjs" --no-open --port $(libre) > "$WORK/serve.out" 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
+  cockpit_lancer "$L" "$@"; SRV="${VF_PID:-}"
+  PORT="${VF_PORT:-0}"
   TOK=$(node "$AUX/token.mjs" "$PORT" /); PTOK=$(node "$AUX/token.mjs" "$PORT" /project.html)
 }
 attendre_hello() { for _ in $(seq 1 80); do grep -q '"event":"hello"' "$1" 2>/dev/null && return 0; sleep 0.1; done; return 1; }
@@ -132,10 +136,12 @@ assert_eq "D2.2 — le patch nomme la carte de la phase 2" "$(node "$AUX/ev.mjs"
 assert_eq "D2.3 — le patch porte le résumé du projet (vf) quand il change" "$(node "$AUX/ev.mjs" "$WORK/e2.jsonl" 'typeof E.filter(e=>e.event==="patch")[0].data.vf')" "object"
 LAT=$(( $(node "$AUX/ev.mjs" "$WORK/e2.jsonl" 'E.filter(e=>e.event==="patch")[0].abs') - T0 ))
 assert_lt "D2.4 — latence du patch en ms" "$LAT" 5000
-# S2 : un patch non structurel réécrit aussi project.html (F5, nouvel onglet, réponses locales à jour)
-assert_eq "D2.5 — project.html SUR DISQUE porte la phase 2 faite (pas l'instantané du dernier structural)" "$(node "$AUX/pg.mjs" "$OUT" "$OUT/project.html" 'g.nodes.find(n=>n.id==="ph-2").st')" "done"
-node "$AUX/get.mjs" "$PORT" /project.html | sed '1,2d' > "$WORK/servi.html"
-assert_eq "D2.6 — GET /project.html sert la phase 2 faite (le serveur a rechargé la page)" "$(node "$AUX/pg.mjs" "$OUT" "$WORK/servi.html" 'g.nodes.find(n=>n.id==="ph-2").st')" "done"
+# S2 (79-15) : un patch ne réécrit plus project.html ; la donnée vit en mémoire et la route la porte
+node "$AUX/route.mjs" "$PORT" "$PTOK" projet > "$WORK/route-projet.json"
+assert_eq "D2.5 — project.html SUR DISQUE est INCHANGÉ (phase 2 toujours à faire) et la route porte la phase 2 faite" "$(node "$AUX/pg.mjs" "$OUT" "$OUT/project.html" 'g.nodes.find(n=>n.id==="ph-2").st!=="done"')|$(node "$AUX/json.mjs" "$WORK/route-projet.json" 'j.nodes.find(n=>n.id==="ph-2").st')" "true|done"
+# 79-16 : le document servi ne porte plus de donnée ; l'énoncé passe à la route, là où le moteur lit
+node "$AUX/route.mjs" "$PORT" "$PTOK" projet > "$WORK/route-projet2.json"
+assert_eq "D2.6 — GET /api/vf/graphe?onglet=projet sert la phase 2 faite (le serveur a rechargé la donnée)" "$(node "$AUX/json.mjs" "$WORK/route-projet2.json" 'j.nodes.find(n=>n.id==="ph-2").st')" "done"
 
 echo "=== D3 — PLAN ajouté -> structural, page réécrite et servie ==="
 assert_eq "D3.0 — témoin : le nouveau plan est absent de la page avant" "$(grep -c '02-01-PLAN.md' "$OUT/project.html")" "0"
@@ -145,10 +151,11 @@ mkdir -p "$LAB/.planning/phases/02-y"; printf '<objective>Faire la suite</object
 wait "$C"
 assert_eq "D3.1 — un événement structural est reçu" "$(node "$AUX/ev.mjs" "$WORK/e3.jsonl" 'E.filter(e=>e.event==="structural").length')" "1"
 assert_lt "D3.2 — latence du structural en ms" "$(( $(node "$AUX/ev.mjs" "$WORK/e3.jsonl" 'E.filter(e=>e.event==="structural")[0]?.abs||0') - T0 ))" 5000
-assert_eq "D3.3 — project.html sur disque contient le nouveau plan" "$([ "$(grep -c '02-01-PLAN.md' "$OUT/project.html")" -ge 1 ] && echo oui || echo non)" "oui"
-assert_eq "D3.4 — GET /project.html sert le nouveau plan" "$([ "$(node "$AUX/get.mjs" "$PORT" /project.html | grep -c '02-01-PLAN.md')" -ge 1 ] && echo oui || echo non)" "oui"
+node "$AUX/route.mjs" "$PORT" "$PTOK" projet > "$WORK/route-projet3.json"
+assert_eq "D3.3 — project.html sur disque ne contient pas le nouveau plan, la route le contient" "$(grep -c '02-01-PLAN.md' "$OUT/project.html")|$([ "$(grep -c '02-01-PLAN.md' "$WORK/route-projet3.json")" -ge 1 ] && echo oui || echo non)" "0|oui"
+assert_eq "D3.4 — GET /api/vf/graphe?onglet=projet sert le nouveau plan" "$([ "$(node "$AUX/route.mjs" "$PORT" "$PTOK" projet | grep -c '02-01-PLAN.md')" -ge 1 ] && echo oui || echo non)" "oui"
 assert_eq "D3.5 — le gabarit est conservé (titre de l'onglet et jeton du serveur)" "$(node "$AUX/get.mjs" "$PORT" /project.html | grep -c '<title>VibeFlow · Projet</title>')$(node "$AUX/token.mjs" "$PORT" /project.html | grep -c "$PTOK")" "11"
-assert_eq "D3.6 — l'écriture a été atomique : aucun .tmp résiduel" "$(ls "$OUT" | grep -c 'project.html.tmp')" "0"
+assert_eq "D3.6 — l'écriture a été atomique : aucun .tmp résiduel (project.html.tmp, projet.json.tmp) et projet.json est là" "$(ls "$OUT" | grep -c -E 'project.html.tmp|projet.json.tmp')|$([ -f "$OUT/projet.json" ] && echo present || echo absent)" "0|present"
 
 echo "=== D4 — corruption passagère d'un DAG : hystérésis ==="
 DAGF="$LAB/.planning/missions/MISSION-1-x.dag.json"; cp "$DAGF" "$WORK/dag.save"
@@ -157,7 +164,8 @@ attendre_hello "$WORK/e4.jsonl"
 printf '{"nodes":[' > "$DAGF"; sleep 0.45; cp "$WORK/dag.save" "$DAGF"
 wait "$C"
 assert_eq "D4.1 — aucun structural pendant la corruption passagère (3,5 s)" "$(node "$AUX/ev.mjs" "$WORK/e4.jsonl" 'E.filter(e=>e.event==="structural").length')" "0"
-assert_eq "D4.2 — la page n'a pas perdu la mission" "$([ "$(grep -c 'MISSION-1-x.dag.json#a' "$OUT/project.html")" -ge 1 ] && echo oui || echo non)" "oui"
+node "$AUX/route.mjs" "$PORT" "$PTOK" projet > "$WORK/route-projet4.json"
+assert_eq "D4.2 — la route n'a pas perdu la mission" "$([ "$(grep -c 'MISSION-1-x.dag.json#a' "$WORK/route-projet4.json")" -ge 1 ] && echo oui || echo non)" "oui"
 : > "$WORK/e4b.jsonl"; node "$AUX/sse.mjs" "$PORT" "$PTOK" 6000 structural "$WORK/e4b.jsonl" & C=$!
 attendre_hello "$WORK/e4b.jsonl"
 rm -f "$DAGF"

@@ -8,14 +8,17 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { planningLayout } from './vf-cockpit-paths.mjs';
-import { readPlanning, read, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
+import { readPlanning, lireConfine, lister, read, clip, sentence, num, fm, list } from './vf-cockpit-planning.mjs';
 import { texte } from './vf-cockpit-formats.mjs';
+import { listeImbriquee } from './vf-cockpit-frontmatter.mjs';
 import { trouverPhase, LIBELLES_RESTE, LIBELLES_MISSION, LIBELLES_ETAT } from './vf-cockpit-avancement.mjs';
 import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
 import { detectDrift, commandeCorrectif } from './vf-cockpit-drift.mjs';
 import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
+import { projeterTrace } from './vf-cockpit-trace-collecte.mjs';
+import { burnup } from './vf-cockpit-burnup.mjs';
 
-const ls = (d) => { try { return fs.readdirSync(d); } catch { return []; } };
+const ls = lister; // AUDC-A-02 : listage confiné au lab (un dossier lié hors du lab n'est pas listé)
 const DST = { done: 'done', running: 'active', ready: 'todo', blocked: 'todo', failed: 'blocked' }; // dag.sh : blocked = en attente des deps
 const pct = (a, b) => (b ? Math.round((100 * a) / b) : 0);
 // projection de l'état d'avancement sur les statuts du viewer : « à recetter » prend la teinte « en cours » mais son propre statut `recette` : glyphe et mot « À recetter » sur la carte (P69-D-25, P69-PL-02, P71.5-D-20) ; l'état exact reste dans avancement.etat
@@ -28,6 +31,14 @@ function piedJalon(ks) {
 
 // contenu de la première balise <objective> (indexOf : une balise sans fermeture ne fait pas rebalayer le texte pour chaque ouverture)
 const objectif = (t) => { const a = t.indexOf('<objective>'); if (a < 0) return undefined; const b = t.indexOf('</objective>', a + 11); return b < 0 ? undefined : t.slice(a + 11, b).replace(/^\s+/, ''); };
+
+// P75-D-24 : `files_modified` d'un plan (ligne ou bloc), borné à 200 chemins de 4 096 octets ;
+// l'excédent est compté dans `touchedIgnores`, jamais tronqué en silence
+const fichiersPlan = (txt) => {
+  const tous = listeImbriquee(txt, ['files_modified'], { max: 1 << 20 });
+  const gardes = tous.filter((c) => Buffer.byteLength(c) <= 4096).slice(0, 200);
+  return { touched: gardes, touchedIgnores: tous.length - gardes.length };
+};
 
 // PU-G-102 : le texte d'un jalon ou d'une phase vient du ROADMAP en markdown : commentaires d'archive (`<!-- vf-archive … -->`, fermés ou non), gras, accents graves et liens sont retirés à la SOURCE,
 // le panneau n'affiche jamais de balisage brut. Un commentaire jamais fermé court jusqu'à la fin du texte (un seul passage : coût linéaire).
@@ -45,11 +56,13 @@ function scinder(t, max) {
 
 // pied d'une carte de phase, part des exigences (PU-G-097, Q9 option A : mot en texte neutre, aucun glyphe ajouté — le pied n'a pas d'emplacement de pastille) :
 // une phase faite dont des exigences ne sont pas cochées dit « N exigence(s) non cochée(s) » (la pastille voisine dit « Fait ») au lieu de « 3/14 exigences », qui se lisait comme un travail à moitié fait
+// P80-C76-4 : le compte des exigences d'une phase, calculé UNE fois ici (pied de carte et champ `exigences`)
+const compteExigences = (reqs) => ({ faits: reqs.filter((r) => r.done).length, total: reqs.length });
 function piedExigences(etat, reqs) {
-  if (!reqs.length) return '';
-  const ouvertes = reqs.filter((r) => !r.done).length;
+  const { faits, total } = compteExigences(reqs); const ouvertes = total - faits;
+  if (!total) return '';
   if (etat === 'fait' && ouvertes) return `${ouvertes} exigence${ouvertes > 1 ? 's' : ''} non cochée${ouvertes > 1 ? 's' : ''}`;
-  return `${reqs.length - ouvertes}/${reqs.length} exigences`;
+  return `${faits}/${total} exigences`;
 }
 
 // PU-G-093 : l'état d'une phase est celui de sa carte (fichiers du dossier, P69-D-08) ; STATE.md ne dit que s'il s'accorde avec elle. Statuts de STATE compatibles avec chaque état de carte ;
@@ -58,11 +71,13 @@ const COMPAT_STATE = { planning: ['a-faire'], ready_to_plan: ['a-faire'], ready_
   verifying: ['a-recetter', 'en-cours'], ready_for_verification: ['a-recetter', 'en-cours'], complete: ['fait', 'a-recetter'], completed: ['fait', 'a-recetter'], closed: ['fait'], milestone_complete: ['fait'] };
 const etatPerime = (status, etat) => !!etat && Object.hasOwn(COMPAT_STATE, String(status ?? '').trim()) && !COMPAT_STATE[String(status).trim()].includes(etat);
 
-export function buildProjectGraph(root, { layout } = {}) {
-  root = path.resolve(root); layout = layout || planningLayout(root);
+// AUDC-A-02 : tout le planning se lit sous confinement à la racine réelle du lab — un lien symbolique sortant n'est jamais suivi
+export function buildProjectGraph(root, opts = {}) { root = path.resolve(root); return fs.existsSync(root) ? lireConfine(root, () => construireGraphe(root, opts)) : construireGraphe(root, opts); }
+function construireGraphe(root, { layout } = {}) {
+  layout = layout || planningLayout(root);
   // dérive de format mesurée AVANT la lecture : le panneau propose le correctif au lieu d'une carte vide sans explication
-  let drift; try { drift = detectDrift(root, layout); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}`, erreur: true }; }
-  const P = readPlanning(root, layout); const { rel, state, reqs } = P;
+  const P = readPlanning(root, layout, { trace: true }); const { rel, state, reqs } = P; // AUDC-H2 : lu UNE fois, le contrôle de format reçoit cette lecture
+  let drift; try { drift = detectDrift(root, layout, P); } catch (e) { drift = { constats: [], resume: `Contrôle de format impossible : ${e.message}`, erreur: true }; }
   P.phases = fusionner(P.phases, lireAilleurs(root)); // N5 : une phase menée dans un worktree du même dépôt prend l'avancement du worktree si elle y est plus avancée
   const { phases } = P;
   const nodes = [], files = [], links = [];
@@ -115,18 +130,24 @@ export function buildProjectGraph(root, { layout } = {}) {
     const planFiles = ls(dir).filter((f) => /-PLAN\.md$/.test(f)).sort();
     const sums = new Set(ls(dir).filter((f) => /-SUMMARY\.md$/.test(f)).map((f) => f.replace('-SUMMARY.md', '')));
     const av = ph.avancement;
+    const vagues = new Map((ph.plans || []).map((x) => [x.fichier, x.vague])); // P80-D-44 : posée par readPlanning
     const enCours = P.dags.filter((d) => d.phaseKey === ph.key && d.etat === 'running').flatMap((d) => d.nodes.filter((x) => x?.status === 'running')); // un plan non fait est actif si un nœud running d'une mission rattachée le désigne (P69-PL-04) ; seule une mission vivante désigne un plan actif (VFSG-06)
     const phReqs = ownReqs(ph); const id = phId(ph);
     const but = propre(ph.goal), ligne = propre(ph.line), { resume, reste: suite } = but ? scinder(but, 400) : { resume: sentence(ligne || ph.name, 200), reste: '' };
     node({ id, parent: msId, label: `Phase ${ph.n} · ${ph.name}`, kind: 'phase', num: ph.n, ws: ph.ws, summary: resume,
       details: [suite, av.reste.length ? `Reste : ${av.reste.map((c) => LIBELLES_RESTE[c]).join(', ')}.` : '', av.ailleurs ? `Avancement lu dans le worktree ${av.ailleurs.arbre}${av.ailleurs.branche ? ` (branche ${av.ailleurs.branche})` : ''} : plus avancé que celui de l'arbre courant.` : '', av.mission ? `Mission : ${av.mission.nom} (${LIBELLES_MISSION[av.mission.etat] || av.mission.etat}).` : '', ph.depends.length ? `Dépend de : Phase ${ph.depends.join(', ')}.` : '', ligne ? `Ligne de ROADMAP : ${ligne}` : '', `Source : ${ph.roadmap}${dir ? ` · dossier ${rel(dir)}` : ''}`].filter(Boolean).join('\n\n'),
-      st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', piedExigences(av.etat, phReqs), av.ailleurs ? `dans worktree ${av.ailleurs.arbre}` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [] });
+      st, foot: [av.etat === 'a-recetter' ? 'à recetter' : '', av.plans.total ? `${av.plans.faits}/${av.plans.total} plans` : '', av.correctifs ? `${av.correctifs} correctif${av.correctifs > 1 ? 's' : ''}` : '', piedExigences(av.etat, phReqs), av.ailleurs ? `dans worktree ${av.ailleurs.arbre}` : ''].filter(Boolean).join(' · ') || 'pas de plan', paths: dir ? [rel(dir)] : [],
+      // P80-D-06 : les comptes en champs ; la mission se réduit à { nom, etat } (A25 : aucune clé de verrou dans cockpit-project@1)
+      avancement: { version: av.version, etat: av.etat, plans: { ...av.plans }, correctifs: av.correctifs, reste: av.reste,
+        mission: av.mission ? { nom: av.mission.nom, etat: av.mission.etat } : null },
+      exigences: compteExigences(phReqs) });
     for (const pf of planFiles) {
       const txt = texte(read(path.join(dir, pf))); const meta = fm(txt); const pid = pf.replace('-PLAN.md', '');
       const obj = objectif(txt) || /^#\s+(.*)$/m.exec(txt)?.[1] || '';
-      const touched = list(meta.files_modified); const p = rel(path.join(dir, pf));
+      const { touched, touchedIgnores } = fichiersPlan(txt); const p = rel(path.join(dir, pf));
       file({ p, n: id, name: `${pid} — ${clip(obj.split('\n').find((l) => l.trim()) || '', 70)}`, d: sentence(obj, 220), st: sums.has(pid) || ph.done ? 'done' : enCours.some((x) => x.id === pid || (Array.isArray(x.scope) && x.scope.includes(p))) ? 'active' : 'todo',
-        foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, touched });
+        foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, ...(touched.length ? { touched } : {}), ...(touchedIgnores ? { touchedIgnores } : {}),
+        vague: vagues.get(pf) ?? null });
       for (const dep of list(meta.depends_on)) { const dp = planFiles.find((x) => x.startsWith(dep.length <= 3 ? `${pf.split('-')[0]}-${dep.padStart(2, '0')}` : dep)); if (dp) link('f:' + rel(path.join(dir, dp)), 'f:' + p, 'import', 'puis'); }
       for (const r of list(meta.requirements)) { const rq = reqOf(r, ph.ws); if (rq) link('f:' + p, 'f:' + reqPath(rq), 'data', 'couvre'); }
     }
@@ -156,7 +177,7 @@ export function buildProjectGraph(root, { layout } = {}) {
   const bl = node({ id: 'backlog', parent: null, label: 'Backlog', kind: 'backlog', summary: 'Ce qui est consigné, différé ou investigué, hors des jalons.' });
   for (const m of P.backlog.matchAll(/^## ([^\n]*)\n([\s\S]*?)(?=^## |(?![\s\S]))/gm)) {
     const [title, status] = m[1].split(/(?<!\s)\s+—\s+(?=[A-ZÉ]{4,}|consigné|mesuré)/);
-    file({ p: `.planning/BACKLOG.md#${title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 60)}`, n: bl, name: clip(title, 80), d: sentence(m[2].replace(/^>.*$/gm, ''), 220), st: /INVESTIGUÉ|mesuré/i.test(status || '') ? 'done' : 'todo', foot: clip(status || '', 40) });
+    file({ p: `.planning/BACKLOG.md#${title.toLowerCase().replace(/[^a-z0-9à-ÿ]+/g, '-').slice(0, 60)}`, n: bl, name: clip(title, 80), d: sentence(m[2].replace(/^>.*$/gm, ''), 220), st: /INVESTIGUÉ|mesuré/i.test(status || '') ? 'done' : 'todo', foot: '' }); // P80-D-07 : le statut n'est plus répété au pied, la pastille le dit
   }
   const sd = node({ id: 'seeds', parent: null, label: 'Graines', kind: 'graine', summary: 'Idées de jalons futurs, avec leurs déclencheurs.' });
   for (const s of P.seeds) file({ p: s.file, n: sd, name: clip(/^#\s+(.*)$/m.exec(s.text)?.[1] || path.basename(s.file), 80), d: sentence(s.text.replace(/^---[\s\S]*?---/, '').replace(/^#.*$/gm, ''), 220), st: 'todo' });
@@ -189,12 +210,22 @@ export function buildProjectGraph(root, { layout } = {}) {
   }
   tour.push({ ref: 'root', cible: '#vf-lock', kicker: 'Au travail', title: 'Qui est au travail', note: "Ce point en haut de la page s'anime quand quelqu'un travaille sur le projet, et reste éteint sinon ; un clic ouvre la liste. L'onglet Équipe en montre le détail." });
   const ids = new Set(nodes.map((n) => 'n:' + n.id)), fids = new Set(files.map((f) => 'f:' + f.p));
-  return {
+  const graphe = {
     schema: 'vibeflow/cockpit-project@1',
     meta: { generatedAt: new Date().toISOString(), rootName: path.basename(root), root, audience: 'everyone', agent: 'claude', repos: [], counts: { files: files.length, loc: 0 }, vfTab: 'project',
       kindIcons: KIND_ICONS, kindColors: KIND_COLORS,
-      kindLabels: { import: 'Dépend de', event: 'Enchaînement', data: 'Couvre', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient' },
-      vf: { milestone: state.milestone, phase: curPhase, phaseEtat, stateStale: perime, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, lastDesc: state.last_activity_desc, progress: state.progress,
+      kindLabels: { import: 'Dépend de', event: 'Enchaînement', data: 'Couvre', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient',
+      // 80-11 (P80-D-35, FORM-08) : le vocabulaire du planning dans le panneau, lu par le moteur sur l'onglet Projet
+      // (clés à préfixe, jamais un genre de lien)
+      'feuille:phase': 'Plan', 'feuille:exigences': 'Exigence', 'feuille:backlog': 'Entrée du backlog', 'feuille:graine': 'Graine',
+      'feuille:release': 'Release', 'feuille:mission': 'Étape', 'parent:phase': 'Dans la phase', 'parent:exigences': 'Exigences de la phase',
+      'parent:mission': 'Dans la mission', 'parent:backlog': 'Dans le backlog', 'parent:graine': 'Dans les graines', 'parent:release': 'Dans les releases',
+      'liste:phase': 'Plans', 'liste:exigences': 'Exigences', 'liste:backlog': 'Entrées', 'liste:graine': 'Graines', 'liste:release': 'Releases',
+      'liste:mission': 'Étapes', 'entrant:import': 'Dépend de', 'sortant:import': 'Attendu par', 'entrant:data': 'Couverte par',
+      'sortant:data': '', // '' : liste non rendue, la couche VF dit la couverture
+      'statut:exigences:done': 'Cochée', 'statut:exigences:todo': 'Non cochée', // le mot d'état d'une exigence (80-UI-SPEC § 4.2)
+      'ouvrir:phase': 'Ouvrir la phase', 'champ:statut': 'Statut', 'champ:vague': 'Vague', 'valeur:sans-vague': 'Sans vague' },
+      vf: { milestone: state.milestone, phase: curPhase, phaseEtat, stateStale: perime, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, progress: state.progress,
         milestones: msList.filter((m) => !m.horsJalon).map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),
         next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}`, etat: p.avancement.etat })) : [],
         drift: { resume: drift.resume, erreur: !!drift.erreur,
@@ -218,6 +249,14 @@ export function buildProjectGraph(root, { layout } = {}) {
     project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files, phaseEtat) },
     nodes, files, routes: [], links: links.filter((l) => [l.a, l.b].every((x) => (x.startsWith('n:') ? ids.has(x) : fids.has(x)))), flows, tour: tour.length >= 2 ? tour : [],
   };
+  // 77-02 (P77-D-13, P77-D-14, P77-D-10, P77-D-20) : burn-up du jalon mis en avant (le pourcentage est celui du pied de jalon, la fonction `pct` du fichier)
+  // et blocages du STATE (nettoyés et condensés, absents si la section manque)
+  const phasesBu = active ? active.ks.map((p) => ({ n: p.n, nom: p.name, line: p.line, etat: p.avancement.etat })) : [];
+  const bu = active ? burnup({ jalon: active.key, phases: phasesBu, pct }) : null;
+  if (bu) graphe.meta.vf.burnup = bu;
+  if (P.blocages) graphe.meta.vf.blocagesState = P.blocages;
+  // 76-04 (P76-D-31) : champs facultatifs de traçabilité posés sur le graphe ; le jalon mis en avant est celui de `active`, jamais recalculé ailleurs
+  return projeterTrace(graphe, P.trace, { jalonActif: active ? 'n:' + active.id : null, couper: clip, racine: root });
 }
 
 // libellés français des valeurs de `status:` que gsd-core écrit dans STATE.md ; table unique, reprise à l'identique par le navigateur (STATUT de 00-vibeflow.js, parité vérifiée par Q17)

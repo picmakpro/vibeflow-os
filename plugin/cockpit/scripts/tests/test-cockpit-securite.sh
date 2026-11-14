@@ -5,7 +5,6 @@
 #   E « < » du graphe · C échec franc sans le serveur du cockpit · T timeouts · R regex de chemin bornée
 # Chaque famille a son témoin (positif ou rouge) ; la suite rougit sur un module antérieur aux correctifs. Exit 0 si tout passe.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$SCRIPTS/../skills/cockpit-moteur"
@@ -13,6 +12,7 @@ WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
@@ -49,6 +49,7 @@ cat > "$AUX/fakeclaude" <<'JS'
 // faux claude : --version ; sinon consigne argv dans $VF_FAKE_DIR/call-N.json et répond une réponse structurée
 import fs from 'node:fs'; const a = process.argv.slice(2);
 if (a.includes('--version')) { console.log('9.9.9 (fake)'); process.exit(0); }
+if (a[0] === 'agents') process.exit(1); // la lecture de l'état officiel des sessions (onglet Équipe) n'est pas une demande à l'agent : ni consignée, ni comptée (jointure)
 const d = process.env.VF_FAKE_DIR; const n = fs.readdirSync(d).filter((f) => f.startsWith('call-')).length + 1;
 fs.writeFileSync(`${d}/call-${n}.json`, JSON.stringify({ argv: a }));
 console.log(JSON.stringify({ type: 'result', is_error: false, structured_output: { title: 't', answer: 'a', items: [] }, session_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' }));
@@ -89,11 +90,9 @@ MD
   node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build-$(basename "$L").out" 2>&1 || cat "$WORK/build-$(basename "$L").out"
 }
 srv() { # srv <sortie> [PATH-extra] -> SRV_PORT SRV_PID ; serveur depuis la sortie, avec les deux chemins du module (comme le lanceur)
-  local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && PATH="${2:+$2:}$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  local o="$1" lab; lab="$(cd "$1/../.." && pwd)"
+  COCKPIT_SORTIE="$o" cockpit_lancer "$lab" PATH="${2:+$2:}$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" ${SRV_ENV:+"$SRV_ENV"}
+  SRV_PID="${VF_PID:-}"; SRV_PORT="${VF_PORT:-0}"
 }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
 tok() { node "$AUX/req.mjs" "$1" GET "$2" | sed -n 's/.*VF_COCKPIT_SERVER={"token":"\([0-9a-f]*\)".*/\1/p' | head -1; }
@@ -112,19 +111,22 @@ done
 assert_eq "H2 — un 403 (sans jeton) porte aussi les en-têtes" "$(hdr "$PORT" /api/vf/etat | node "$AUX/ev.mjs" '!!j["content-security-policy"]&&j["x-frame-options"]==="DENY"')" "true"
 PAGE="$WORK/page.html"; node "$AUX/req.mjs" "$PORT" GET /project.html | sed '1,2d' > "$PAGE"; CSP="$(hdr "$PORT" /project.html | node "$AUX/ev.mjs" 'j["content-security-policy"]')"
 for d in "connect-src 'self'" "frame-ancestors 'none'" "form-action 'none'" "img-src 'self' data:" "base-uri 'none'"; do assert_has "H3 — la CSP de la page contient « $d »" "$CSP" "$d"; done
-assert_eq "H4 — script-src sans 'unsafe-inline' ni 'unsafe-eval' ni origine" "$(printf '%s' "$CSP" | tr ';' '\n' | grep -E '^ *script-src' | grep -cE "unsafe-|http|\*|'self'")" "0"
+# 79-16 (A40) : script-src n'a plus « aucune origine » : sans 'unsafe-', sans *, sans 'self', et EXACTEMENT une source de chemin http://<hôte>/_vf/ (comptée)
+src_ok() { printf '%s' "$1" | tr ';' '\n' | grep -E '^ *script-src' | tr ' ' '\n' | awk -v p="http://127.0.0.1:$PORT/_vf/" -v q="'" 'index($0,"unsafe-")||index($0,"*")||index($0,q "self" q){bad++} /^http/{h++; if ($0==p) ok++} END{print (bad+0)"|"(h+0)"|"(ok+0)}'; }
+assert_eq "H4 — script-src sans 'unsafe-', sans *, sans 'self', et exactement une source de chemin http://<hôte>/_vf/" "$(src_ok "$CSP")" "0|1|1"
 CSPE="$(hdr "$PORT" /equipe.html | node "$AUX/ev.mjs" 'j["content-security-policy"]')"
-assert_eq "H4bis — la CSP de /equipe.html : script-src présent, sans 'unsafe-inline' ni 'unsafe-eval' ni origine" "$(printf '%s' "$CSPE" | tr ';' '\n' | grep -E '^ *script-src' | grep -cE "unsafe-|http|\*|'self'")|$(printf '%s' "$CSPE" | tr ';' '\n' | grep -cE '^ *script-src')" "0|1"
+assert_eq "H4bis — la CSP de /equipe.html : script-src présent, sans 'unsafe-', sans *, sans 'self', exactement une source de chemin http://<hôte>/_vf/" "$(src_ok "$CSPE")|$(printf '%s' "$CSPE" | tr ';' '\n' | grep -cE '^ *script-src')" "0|1|1|1"
 cat > "$AUX/empreintes.mjs" <<'JS'
 import fs from 'node:fs'; import crypto from 'node:crypto';
 const h = fs.readFileSync(process.argv[2], 'utf8'), csp = process.argv[3];
 const sc = [...h.matchAll(/<script>([\s\S]*?)<\/script>/g)].map((m) => `'sha256-${crypto.createHash('sha256').update(m[1]).digest('base64')}'`);
-console.log(sc.length >= 6 && sc.every((s) => csp.includes(s)) ? 'tous' : `manque ${sc.filter((s) => !csp.includes(s)).length}/${sc.length}`);
+const ext = [...h.matchAll(/<script[^>]*\ssrc="([^"]*)"/g)].map((m) => m[1]); // 79-16 : le plancher est le compte réel des scripts en ligne (théme, classe, jeton : 3) ; aucun script à src hors du préfixe
+console.log(sc.length >= 2 && sc.every((s) => csp.includes(s)) && ext.every((u) => u.startsWith('/_vf/')) ? 'tous' : `manque ${sc.filter((s) => !csp.includes(s)).length}/${sc.length} hors-prefixe ${ext.filter((u) => !u.startsWith('/_vf/')).length}`);
 JS
-assert_eq "H5 — chaque script en ligne de la page a son empreinte dans la CSP" "$(node "$AUX/empreintes.mjs" "$PAGE" "$CSP")" "tous"
+assert_eq "H5 — chaque script en ligne du document a son empreinte dans la CSP, aucun script à src hors du préfixe /_vf/" "$(node "$AUX/empreintes.mjs" "$PAGE" "$CSP")" "tous"
 # mutant : les trois en-têtes neutralisés -> les assertions H1 doivent rougir
-cp -R "$OUT" "$WORK/sortie-mut"; sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-M1'#g; s#res.setHeader('X-Content-Type-Options'#res.setHeader('X-M2'#; s#res.setHeader('X-Frame-Options'#res.setHeader('X-M3'#" "$WORK/sortie-mut/serve.mjs"
-srv "$WORK/sortie-mut"; HM="$(hdr "$SRV_PORT" / "$(tok "$SRV_PORT" /)")"; unsrv
+cockpit_module_muter h6 serve.mjs "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-M1'#g; s#res.setHeader('X-Content-Type-Options'#res.setHeader('X-M2'#; s#res.setHeader('X-Frame-Options'#res.setHeader('X-M3'#"   # 79-06 : le serveur est celui du module, le mutant est une copie du module
+COCKPIT_MODULE="$COCKPIT_MODULE" srv "$OUT"; HM="$(hdr "$SRV_PORT" / "$(tok "$SRV_PORT" /)")"; unsrv; unset COCKPIT_MODULE
 assert_eq "H6 — témoin rouge : sans les setHeader, la page ne porte aucun des trois en-têtes" "$(printf '%s' "$HM" | node "$AUX/ev.mjs" '!!j["content-security-policy"]||!!j["x-frame-options"]||!!j["x-content-type-options"]')" "false"
 
 echo "=== B — corps JSON non objet : 400, le serveur survit ==="
@@ -137,18 +139,20 @@ done
 assert_eq "B1 — 15 combinaisons (5 corps × 3 routes) : toutes en 400" "$BADN" "0"
 assert_eq "B2 — témoin : le serveur répond encore (état)" "$(sta "$PORT" GET /api/vf/etat "$TOK")" "200"
 
-echo "=== S — session de reprise : un uuid, jamais un drapeau ==="
+echo "=== S — session de reprise : un identifiant rendu par ce serveur, jamais un drapeau ==="
 srv "$OUT" "$WORK/fk"; PORT=$SRV_PORT; PTOK="$(tok "$PORT" /project.html)"
 ask() { node "$AUX/req.mjs" "$PORT" POST /api/ask "$PTOK" "{\"question\":\"Pourquoi ce statut ?\",\"mode\":\"ask\",\"session\":\"$1\"}" > /dev/null; }
 rm -f "$WORK"/fkd/call-*; ask "--dangerously-skip-permissions"
-assert_eq "S1 — témoin : l'agent a été lancé une fois" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')" "1"
+# AUDC-A-01 : un identifiant que ce serveur n'a pas rendu est refusé (avant : la forme seule était contrôlée, et l'agent était lancé sans reprise)
+assert_eq "S1 — un identifiant en forme de drapeau est refusé : l'agent n'est pas lancé" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')" "0"
 cat > "$AUX/argv.mjs" <<'JS'
 import fs from 'node:fs'; const a = JSON.parse(fs.readFileSync(process.argv[2], 'utf8')).argv; const i = a.indexOf('--setting-sources');
 console.log(JSON.stringify({ drapeau: a.some((x) => /dangerously|^--resume/.test(x)), uuid: a.includes('--resume=aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee'), sources: i >= 0 && a[i + 1] === '' && a.includes('--strict-mcp-config') }));
 JS
-assert_eq "S2 — l'argv ne porte ni ce drapeau ni --resume" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-1.json" | node "$AUX/ev.mjs" 'j.drapeau')" "false"
+ask ""
+assert_eq "S2 — témoin : une première question sans session lance l'agent, l'argv ne porte ni ce drapeau ni --resume" "$(ls "$WORK"/fkd/call-*.json 2>/dev/null | wc -l | tr -d ' ')|$(node "$AUX/argv.mjs" "$WORK/fkd/call-1.json" | node "$AUX/ev.mjs" 'j.drapeau')" "1|false"
 ask "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"
-assert_eq "S3 — un uuid valide passe en --resume=<uuid>" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-2.json" | node "$AUX/ev.mjs" 'j.uuid')" "true"
+assert_eq "S3 — l'identifiant que ce serveur vient de rendre passe en --resume=<uuid>" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-2.json" | node "$AUX/ev.mjs" 'j.uuid')" "true"
 assert_eq "S4 — l'argv du confinement porte --setting-sources vide et --strict-mcp-config" "$(node "$AUX/argv.mjs" "$WORK/fkd/call-2.json" | node "$AUX/ev.mjs" 'j.sources')" "true"
 unsrv
 
@@ -241,9 +245,12 @@ assert_eq "O1.2 — le chemin du cd (secret-dir, /x, src) ne sort dans aucune de
 # Propriété (sur chaque sortie) : le marqueur n'apparaît QUE s'il a été placé dans le programme ou le premier argument ET que ce mot entier est simple (liste blanche écrite ici indépendamment du code),
 # sans « - » initial, et pour l'argument sans « = » — la limite acceptée. Graine fixe, affichée ; en échec : commande, sortie, graine. Témoin positif : le marqueur sort bien au moins une fois.
 cat > "$AUX/gen.mjs" <<'JS'
-// gen.mjs <scripts> <lab> <home> <graine> <n> : sort {n, fuites:[{cmd,out,slot,mot}], legit, ms} ; `commandeAffichee` (la fonction même que revealDoing applique) sur les n commandes, et le chemin disque complet sur 1 commande sur 100
-import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import path from 'node:path';
-const [, , scripts, lab, home, seedS, nS] = process.argv; const N = Number(nS);
+// gen.mjs <scripts> <lab> <home> <graine> <n> [sans-disque] : sort {n, fuites:[{cmd,out,slot,mot}], legit, ms, msCmd, disque:{n, ms, lancements}} ; `commandeAffichee` (la fonction même que revealDoing applique) sur les n commandes,
+// et le chemin disque complet sur 1 commande sur 100 (absent avec « sans-disque »). FB3.5 (79-06) : `ms` ne compte PAS le chemin disque (qui lance des processus, donc dépend de la charge) ; `msCmd` est le temps de `commandeAffichee` seul ;
+// le temps et le nombre de lancements du chemin disque sont rendus à part (`disque`), sans verdict.
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; import path from 'node:path'; import cp from 'node:child_process'; import { syncBuiltinESMExports } from 'node:module';
+const [, , scripts, lab, home, seedS, nS, sansDisque] = process.argv; const N = Number(nS);
+let lancements = 0; for (const f of ['spawnSync', 'execFileSync', 'execSync', 'spawn', 'execFile']) { const o = cp[f]; cp[f] = function (...a) { lancements++; return o.apply(this, a); }; } syncBuiltinESMExports(); // compte les processus lancés par le code mesuré (les importations nommées du module suivent la liaison vive)
 const { revealDoing, commandeAffichee } = await import(pathToFileURL(scripts + '/vf-cockpit-who.mjs').href);
 let a = Number(seedS) >>> 0; const rnd = () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };
 const pick = (xs) => xs[Math.floor(rnd() * xs.length)]; const MARK = 'ZqMark7391';
@@ -263,7 +270,7 @@ const OPS = [';', '&&', '|', '||', ';;', '&', '\n'];
 const home_d = path.join(home, '.claude', 'projects', '-lab'); fs.mkdirSync(home_d, { recursive: true });
 const sid = 'eeee0001-2222-3333-4444-555566667777'; const file = path.join(home_d, sid + '.jsonl');
 const line = (type, content) => JSON.stringify({ type, cwd: lab, sessionId: sid, timestamp: new Date().toISOString(), gitBranch: 'main', version: '2.1', message: { content } });
-const t0 = Date.now(); const fuites = []; let legit = 0, legitCd = 0;
+const t0 = Date.now(); const fuites = []; let legit = 0, legitCd = 0, nsCmd = 0n, msDisque = 0, nDisque = 0, lancDisque = 0;
 for (let n = 0; n < N; n++) {
   const nh = Math.floor(rnd() * 4), na = Math.floor(rnd() * 5);
   const comps = []; // {slot, texte}
@@ -284,15 +291,17 @@ for (let n = 0; n < N; n++) {
   let cmd = ''; comps.forEach((c, i) => { if (i === nh + 1 + na && nq) cmd += pick(SEP) + pick(OPS); cmd += (i ? pick(SEP) : '') + mots[i]; });
   cmd = pre + cmd;
   const slot = cdCible ? 'cd' : comps[cible].slot; const mot = cdCible ? '' : mots[cible];
-  let out = commandeAffichee(cmd);
-  if (n % 100 === 0) { // chemin complet (transcript -> revealDoing) : même sortie que la fonction directe
+  const c0 = process.hrtime.bigint(); let out = commandeAffichee(cmd); nsCmd += process.hrtime.bigint() - c0;
+  if (n % 100 === 0 && !sansDisque) {
+    const d0 = Date.now(), l0 = lancements; // chemin complet (transcript -> revealDoing) : même sortie que la fonction directe
     fs.writeFileSync(file, line('user', 'salut') + '\n' + line('assistant', [{ type: 'tool_use', name: 'Bash', input: { command: cmd } }]) + '\n');
     const disque = revealDoing(lab, sid, { home }).doing ?? ''; if (disque !== out) { out = `DIVERGENCE disque=${JSON.stringify(disque)} direct=${JSON.stringify(out)}`; fuites.push({ cmd, out, slot: 'chemin', mot: '' }); }
+    msDisque += Date.now() - d0; nDisque++; lancDisque += lancements - l0;
   }
   const permis = (!cd || cdSimple) && ((slot === 'prog' && BLANC.test(mot) && !mot.startsWith('-')) || (slot === 'arg0' && BLANC.test(mot) && !mot.startsWith('-') && !mot.includes('=')));
   if (out.includes(MARK)) { if (permis) { legit++; if (cd) legitCd++; } else fuites.push({ cmd, out, slot, mot }); }
 }
-console.log(JSON.stringify({ n: N, fuites: fuites.slice(0, 5), nFuites: fuites.length, legit, legitCd, ms: Date.now() - t0 }));
+console.log(JSON.stringify({ n: N, fuites: fuites.slice(0, 5), nFuites: fuites.length, legit, legitCd, ms: Date.now() - t0 - msDisque, msCmd: Math.round(Number(nsCmd) / 1e4) / 100, disque: { n: nDisque, ms: msDisque, lancements: lancDisque } }));
 JS
 SEED=20261103; NGEN=12000
 GEN="$(node "$AUX/gen.mjs" "$SCRIPTS" "$LAB" "$WORK/home" "$SEED" "$NGEN")"
@@ -300,7 +309,18 @@ echo "  graine=$SEED commandes=$NGEN ; sortie : $(printf '%s' "$GEN" | node "$AU
 assert_eq "FB3.3 — $NGEN commandes générées (graine $SEED) : le marqueur ne sort que placé dans le programme ou le premier argument ET simple (échec : commande, sortie, graine)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.nFuites+" fuite(s) : "+JSON.stringify(j.fuites.slice(0,2))+" graine='$SEED'"')" "0 fuite(s) : [] graine=$SEED"
 assert_eq "FB3.4 — témoin positif : le marqueur sort bien dans plus de 100 cas légitimes (programme ou premier argument simples), la mesure n'est pas à vide" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.legit > 100')" "true"
 assert_eq "FB3.6 — témoin positif du cd : le marqueur sort aussi, derrière un cd simple, dans plus de 10 cas légitimes (la branche cd du générateur n'est pas à vide)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.legitCd > 10')" "true"
-assert_eq "FB3.5 — le cas génératif tient en moins de 10 s" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.ms < 10000')" "true"
+assert_eq "FB3.5 — le cas génératif (sans le chemin disque) tient en moins de 10 s" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.ms < 10000')" "true"
+# FB3.5, amendement de 79-06 (décision de la session principale, 2026-11-12) : la propriété protégée est le temps de `commandeAffichee` seul sur le tirage complet (jamais quadratique en la longueur de la commande).
+# Mesure : 25 à 29 ms jouée seule, trois passes, charge machine 5,4 à 5,7 ; borne 1 000 ms, soit 34 fois la plus grande valeur seule (au moins 20 fois). Le chemin disque (revealDoing, 1 commande sur 100, ~4 processus chacune)
+# n'est plus chronométré dans `ms` : son temps et son nombre de lancements sont imprimés, sans verdict (sa durée suit la charge de la machine, pas le code de masque).
+echo "  commandeAffichee seule : $(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.msCmd+" ms pour "+j.n+" appels"') ; chemin disque (hors chronométrage, sans verdict) : $(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.disque.n+" appels de revealDoing, "+j.disque.lancements+" lancements de processus, "+j.disque.ms+" ms"')"
+assert_eq "FB3.7 — borne propre à la propriété protégée : commandeAffichee seule, sur le tirage complet, tient en moins de 1 000 ms (34 fois la valeur jouée seule)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.msCmd < 1000')" "true"
+assert_eq "FB3.8 — la mesure n'est pas à vide : le chemin disque a bien été joué et a lancé des processus (compteur de lancements > 0)" "$(printf '%s' "$GEN" | node "$AUX/ev.mjs" 'j.disque.n > 0 && j.disque.lancements > 0')" "true"
+# mutant : `commandeAffichee` rejoue sa réduction trois fois par caractère de la commande (coût quadratique en la longueur, comportement inchangé) ; la borne FB3.7 rougit avec une marge de 3 (un rejeu par caractère ne donnait que 1,06 s, trop près de la borne)
+cockpit_module_muter fb35 vf-cockpit-who.mjs 's#^export const commandeAffichee = (cmd) => masque(resume(String(cmd).slice(0, MAX_MASQUE))).slice(0, BORNE_COMMANDE);#export const commandeAffichee = (cmd) => { const s = String(cmd).slice(0, MAX_MASQUE); let r; for (let i = 0; i < 3 * s.length; i++) r = masque(resume(s)); return r.slice(0, BORNE_COMMANDE); };#'
+GENM="$(node "$AUX/gen.mjs" "$COCKPIT_MODULE/scripts" "$LAB" "$WORK/home" "$SEED" "$NGEN" sans-disque)"; unset COCKPIT_MODULE
+echo "  mutant FB3.7 : $(printf '%s' "$GENM" | node "$AUX/ev.mjs" '"fuites="+j.nFuites+" msCmd="+j.msCmd+" ms="+j.ms')"
+assert_eq "FB3.9 — mutant (réduction rejouée trois fois par caractère) : mêmes sorties (0 fuite, témoins positifs inchangés), mais commandeAffichee dépasse 1 000 ms : la borne FB3.7 rougit pour la bonne raison" "$(printf '%s' "$GENM" | node "$AUX/ev.mjs" 'j.nFuites+" "+(j.legit === 164)+" "+(j.msCmd < 1000)')" "0 true false"
 # MB : canal task de `bornes` (description d'un sous-agent, diffusée en SSE). Un cas par motif de MASQUES : chaque valeur doit sortir masquée, et retirer un motif fait rougir son cas.
 cat > "$AUX/mask-bornes.mjs" <<'JS'
 // mask-bornes.mjs <scripts> <lab> <home> : description de sous-agent -> task bornée et masquée, une par entrée de stdin (JSON)
@@ -363,23 +383,25 @@ node "$SCRIPTS/vf-cockpit-build.mjs" "$LZ" > "$WORK/z.out" 2>&1; assert_eq "Y3 �
 ln -s "$WORK/dehors.txt" "$OUT/creds.txt"; cp "$OUT/graph.json" "$OUT/copie.json"; ln -s "$OUT/copie.json" "$OUT/lien-interne.json"
 srv "$OUT"
 assert_eq "Y4 — le serveur ne sert pas un lien vers un fichier extérieur" "$(sta "$SRV_PORT" GET /creds.txt)" "404"
-assert_eq "Y5 — témoin : un lien qui reste dans le dossier est servi" "$(sta "$SRV_PORT" GET /lien-interne.json)" "200"
-assert_eq "Y6 — témoin : /graph.json est servi" "$(sta "$SRV_PORT" GET /graph.json)" "200"; unsrv
+assert_eq "Y5 — un lien qui reste dans le dossier n'est pas servi non plus (404) ; témoin positif : /_vf/moteur.js répond 200 dans le même serveur (A41 : aucun fichier de la sortie n'est servi)" "$(sta "$SRV_PORT" GET /lien-interne.json)|$(sta "$SRV_PORT" GET /_vf/moteur.js)" "404|200"
+assert_eq "Y6 — /graph.json n'est pas servi (404) alors qu'il existe sur disque (le constat de 79-15 : remote et chemin du lab)" "$(sta "$SRV_PORT" GET /graph.json)|$([ -s "$OUT/graph.json" ] && echo existe)" "404|existe"; unsrv
 
 echo "=== E — « < » du graphe : aucun <!-- ni <script dans les données ==="
 cat > "$AUX/emb.mjs" <<'JS'
 import { pathToFileURL } from 'node:url'; const m = await import(pathToFileURL(process.argv[2] + '/vf-cockpit-embed.mjs').href);
-const html = '<head></head><script>window.FLOORPLAN = null;</script><script>autre()</script>', txt = 'a <!-- b <script> c </script> d';
+const html = '<head></head><script>window.VF_COCKPIT = null;</script><script>autre()</script>', txt = 'a <!-- b <script> c </script> d';
 const out = m.insererGraphe(html, { details: txt, n: 'x' });
 console.log(JSON.stringify({ brut: /</.test(m.decouper(out).donnees), allerRetour: m.extraireGraphe(out).details === txt, scripts: (out.match(/<script/g) || []).length }));
 JS
 assert_eq "E1 — aucun « < » dans la zone de données, aller-retour exact, 2 balises script" "$(node "$AUX/emb.mjs" "$SCRIPTS" | node "$AUX/ev.mjs" 'j.brut+","+j.allerRetour+","+j.scripts')" "false,true,2"
 assert_eq "E2 — le moteur (build.mjs) échappe aussi chaque < en \\u003c" "$(grep -c "replace(/</g, '\\\\\\\\u003c')" "$ENG/scripts/build.mjs")" "1"
-assert_eq "E3 — l'export (serve.mjs) échappe de même" "$(grep -c "replace(/</g, '\\\\\\\\u003c')" "$ENG/assets/serve.mjs")" "1"
+assert_eq "E3 — l'export (serve.mjs) échappe de même" "$(grep -cF "JSON.stringify(out).replace(/</g, '\\\\u003c')" "$ENG/assets/serve.mjs")" "1"
+assert_eq "E3b — l'objet injecté dans les pages (version, modèle) échappe aussi chaque < (AUDC-B-06 1)" "$(grep -F 'window.VF_COCKPIT_SERVER=' "$ENG/assets/serve.mjs" | grep -cF "replace(/</g, '\\\\u003c')")" "1"
 
 echo "=== C — sans vf-cockpit-server.mjs : échec franc ==="
-cp -R "$OUT" "$WORK/sortie-sans"; rm -f "$WORK/sortie-sans/vf-cockpit-server.mjs"
-( cd "$LAB"; node "$WORK/sortie-sans/serve.mjs" --no-open --port $(libre) > "$WORK/c.out" 2>&1 & CP=$!; sleep 2; if kill -0 $CP 2>/dev/null; then echo vivant > "$WORK/c.etat"; vf_hyg_stop $CP; else echo mort > "$WORK/c.etat"; fi; wait $CP 2>/dev/null )
+CSANS="$(cockpit_module_copie)"; rm -f "$CSANS/scripts/vf-cockpit-server.mjs"   # 79-06 : une copie du module sans le serveur du cockpit
+COCKPIT_MODULE="$CSANS" COCKPIT_LOG="$WORK/c.out" cockpit_lancer "$LAB" 2>/dev/null; CRC=$?
+if [ "$CRC" = 1 ]; then echo mort > "$WORK/c.etat"; else echo vivant > "$WORK/c.etat"; cockpit_arreter; fi
 assert_eq "C1 — le serveur refuse de démarrer (jamais de repli sur l'agent amont)" "$(cat "$WORK/c.etat")" "mort"
 assert_has "C2 — message en français" "$(cat "$WORK/c.out")" "est absent"
 
@@ -412,18 +434,70 @@ assert_eq "R2 — témoin : un chemin ordinaire est toujours reconnu" "$(printf 
 
 echo "=== X — aucun champ du graphe n'est interprété (navigateur) ==="
 if [ -z "$CHROME" ]; then echo "  ⊘ X sauté : aucun navigateur (non compté comme réussi)"; else
-LX="$WORK/labX"; mklab "$LX"; node "$AUX/marquer.mjs" "$LX/.vibeflow/cockpit/project.html" "$WORK/urls.txt" "$LX/.vibeflow/cockpit"
+LX="$WORK/labX"; mklab "$LX"; node "$AUX/marquer.mjs" "$LX/.vibeflow/cockpit/project.html" "$WORK/urls.txt" "$SCRIPTS"
+# 79-15 (A42) : la page Projet est servie depuis l'instantané ; le réglage d'essai garde au serveur la source du gabarit (les marqueurs posés dans la page assemblée), sans fichier réécrit
+SRV_ENV="VF_COCKPIT_DONNEES_GABARIT=1"
 srv "$LX/.vibeflow/cockpit"; XP=$SRV_PORT; URLS=(); while read -r u; do URLS+=("http://127.0.0.1:$XP/$u"); done < "$WORK/urls.txt"
+# 79-16 : la page ne porte plus de donnée ; le témoin lit la donnée là où le moteur la lit, la route de l'onglet Projet
+assert_eq "X0 — témoin de présence : la donnée de l'onglet Projet (route) porte au moins 10 marqueurs data-f= distincts (le réglage d'essai opère)" "$([ "$(node "$AUX/req.mjs" "$XP" GET "/api/vf/graphe?onglet=projet" "$(tok "$XP" /project.html)" | grep -o 'data-f=[A-Za-z.]*' | sort -u | awk 'END{print NR}')" -ge 10 ] && echo oui || echo non)" "oui"
 EXPR='[...document.querySelectorAll("[onerror]")].map((e)=>e.getAttribute("data-f")||"?")'
 XR="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "${URLS[@]}")"; unsrv
 assert_eq "X1 — témoin : les ${#URLS[@]} adresses (accueil, conteneurs, éléments) ont été chargées" "$(printf '%s' "$XR" | node "$AUX/ev.mjs" 'j.resultats?j.resultats.length:"mesure indisponible : "+j.erreur')" "${#URLS[@]}"
 assert_eq "X2 — aucun marqueur n'est devenu un élément, dans AUCUN champ" "$(printf '%s' "$XR" | node "$AUX/ev.mjs" 'j.resultats?[...new Set(j.resultats.flatMap(r=>r.valeur||[]))]:"mesure indisponible : "+j.erreur')" "[]"
-LM="$WORK/labXm"; mkdir -p "$LM/.planning"; cp -R "$LX/.vibeflow" "$LM/.vibeflow"; sed -i.bak 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' "$LM/.vibeflow/cockpit/project.html"
+LM="$WORK/labXm"; mkdir -p "$LM/.planning"; cp -R "$LX/.vibeflow" "$LM/.vibeflow"
+# 79-16 : le mutant est une COPIE DU MODULE dont les sources de page perdent h() sur le pied de carte (la page vient du module, plus de la sortie)
+MXM="$(cockpit_module_copie "$WORK/mod-x3")"; cockpit_page_muter_dans "$MXM" 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' 2>/dev/null
 # lecture POSITIVE (le pied de carte « foot » doit être détecté) : le PRET par défaut (logo de l'en-tête) accepte deux relevés vides identiques ; on attend donc que les cartes de la vue soient dessinées
 PRET_CARTES="document.readyState === 'complete' && !!document.querySelector('header .brand .mark') && document.querySelector('header .brand .mark').naturalWidth > 0 && document.querySelectorAll('.card').length >= 1"
-srv "$LM/.vibeflow/cockpit"; XM="$(CDP_PRET="$PRET_CARTES" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-1" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-2")"; unsrv
+COCKPIT_MODULE="$MXM" srv "$LM/.vibeflow/cockpit"; XM="$(CDP_PRET="$PRET_CARTES" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-1" "http://127.0.0.1:$SRV_PORT/project.html#v=n:ph-2")"; unsrv
 assert_has "X3 — témoin rouge : sans h() sur le pied de carte, le champ « foot » est détecté" "$(printf '%s' "$XM" | node "$AUX/ev.mjs" 'j.resultats?[...new Set(j.resultats.flatMap(r=>r.valeur||[]))]:"mesure indisponible : "+j.erreur')" "foot"
+SRV_ENV=""
 fi
+
+
+echo "=== AM4 — le serveur est lancé depuis le module : un fichier planté dans la sortie ne s'exécute jamais (SOCL-07, A-03, 79-06) ==="
+# La sortie du lab est inscriptible par tout processus du lab : tant qu'elle fournit du code, un fichier planté vaut exécution. Chaque témoin négatif exige AUSSI un serveur vivant
+# (cockpit_vivant) : un serveur mort ne doit jamais passer pour un marqueur qui ne s'exécute pas. Témoin positif AM4.4 : le même marqueur dans une copie du MODULE s'exécute.
+mk_marqueur() { # <fichier à planter> <témoin> <module réel> : le marqueur s'exécute D'ABORD (import en tête), puis tout le module réel est ré-exporté : rien ne casse pour une autre raison que le marqueur
+  printf "import fs from 'node:fs';\nfs.writeFileSync('%s', 'exécuté');\n" "$2" > "$2.mjs"
+  printf "import 'file://%s';\nexport * from 'file://%s';\n" "$2.mjs" "$3" > "$1"
+}
+am4_lancer() { # <lab> [options] : lancement par l'aide (mode par défaut), dossiers du module posés comme le fait srv, état du mode terminal jetable
+  local l="$1"; shift
+  cockpit_lancer "$l" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" VF_COCKPIT_MODE_DIR="$WORK/etat" "$@"
+}
+am4_temoin() { # <fichier témoin> : « présent|absent vivant|mort » après une attente bornée par l'horloge (jamais une pause fixe)
+  attendre 2 test -e "$1"; printf '%s %s' "$([ -e "$1" ] && echo présent || echo absent)" "$(cockpit_vivant && echo vivant || echo mort)"
+}
+unset XDG_CACHE_HOME
+L41="$WORK/lab-am41"; mklab "$L41"; M41="$WORK/marq-am41"; mk_marqueur "$L41/.vibeflow/cockpit/vf-cockpit-server.mjs" "$M41" "$SCRIPTS/vf-cockpit-server.mjs"
+COCKPIT_LOG="$WORK/am41.out" am4_lancer "$L41" > /dev/null 2>&1; R41="$(am4_temoin "$M41")"; cockpit_arreter
+assert_eq "AM4.1 — un vf-cockpit-server.mjs planté dans la sortie ne s'exécute jamais (témoin absent ET serveur vivant : $R41)" "$R41" "absent vivant"
+L42="$WORK/lab-am42"; mklab "$L42"; M42="$WORK/marq-am42"; Q42="$L42/.vibeflow/cockpit/query.mjs"
+{ printf '%s\n' "void import('node:fs').then((m) => m.writeFileSync('$M42', 'exécuté'));"; cat "$Q42" 2> /dev/null; } > "$Q42.neuf"; mv "$Q42.neuf" "$Q42"
+COCKPIT_LOG="$WORK/am42.out" am4_lancer "$L42" > /dev/null 2>&1; R42="$(am4_temoin "$M42")"; cockpit_arreter
+assert_eq "AM4.2 — un cœur de requête planté dans <sortie>/query.mjs n'est jamais évalué (témoin absent ET serveur vivant : $R42)" "$R42" "absent vivant"
+L43="$WORK/lab-am43"; mklab "$L43"; M43="$WORK/marq-am43"; mk_marqueur "$L43/.vibeflow/cockpit/vf-cockpit-terminal-processus.mjs" "$M43" "$SCRIPTS/vf-cockpit-terminal-processus.mjs"
+COCKPIT_LOG="$WORK/am43.out" am4_lancer "$L43" --terminal > /dev/null 2>&1; R43="$(am4_temoin "$M43")"; cockpit_arreter
+assert_eq "AM4.3 — un processus de terminal planté dans la sortie n'est jamais lancé par fork (témoin absent ET serveur vivant : $R43)" "$R43" "absent vivant"
+L44="$WORK/lab-am44"; mklab "$L44"; M44="$WORK/marq-am44"; C44="$(cockpit_module_copie)"; mk_marqueur "$C44/scripts/vf-cockpit-server.mjs" "$M44" "$SCRIPTS/vf-cockpit-server.mjs"
+COCKPIT_MODULE="$C44" COCKPIT_LOG="$WORK/am44.out" am4_lancer "$L44" > /dev/null 2>&1; RC44=$?; attendre 2 test -e "$M44"
+assert_eq "AM4.4 — témoin positif : le même marqueur posé dans une copie du module s'exécute et le serveur de cette copie démarre (lancement rc=$RC44, serveur du module : $(head -c 160 "$WORK/am44.out" 2> /dev/null | tr '\n' ' '))" "$RC44 $([ -e "$M44" ] && echo présent || echo absent)" "0 présent"
+cockpit_arreter
+
+# ancre du mutant M-TERM (« le fork revient à la sortie ») : le fichier forké est celui du dossier du module, voisin de vf-cockpit-terminal.mjs (écrite ici, jouée avec le code ; rouge tant que le fork vise le dossier de la sortie)
+assert_eq "M-TERM.0 — ancre présente : le terminal forke vf-cockpit-terminal-processus.mjs pris à côté de son propre fichier (import.meta.url), jamais dans la sortie" "$(grep -cF "path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-terminal-processus.mjs'" "$SCRIPTS/vf-cockpit-terminal.mjs")" "1"
+
+# constat bas 1 (audit de 79-07) : realUnder est employé en polarité inverse (écarte si dedans) : un échec de résolution doit valoir « dedans » (siEchec: true). Aucun témoin d'effet n'est constructible (lstat(f).isFile() précède et résout le même fichier) : ancre structurelle et mutant
+TERM_L="$(grep -F 'const ordinaire = ' "$SCRIPTS/vf-cockpit-terminal.mjs")"
+assert_eq "REALUNDER.0 — la garde « assistant du terminal hors .vibeflow » appelle realUnder avec siEchec: true (polarité inverse : un échec de résolution écarte, fermé par défaut)" "$(printf '%s\n' "$TERM_L" | grep -cF 'realUnder(f, path.join(root, '"'"'.vibeflow'"'"'), { siEchec: true })')" "1"
+assert_eq "REALUNDER.1 — mutant (siEchec retiré) : l'ancre rougit (0 occurrence)" "$(printf '%s\n' "$TERM_L" | sed 's/, { siEchec: true }//' | grep -cF '{ siEchec: true }')" "0"
+
+# mutant M-TERM (79-06) : le fork revient à la sortie (le fichier du processus est cherché à côté de `here`) ; AM4.3 rougit : le marqueur planté dans la sortie s'exécute
+cockpit_module_muter mterm vf-cockpit-terminal.mjs "s#path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-terminal-processus.mjs')#path.join(here || '.', 'vf-cockpit-terminal-processus.mjs')#"; MT="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+LMT="$WORK/lab-mterm"; mklab "$LMT"; MMT="$WORK/marq-mterm"; mk_marqueur "$LMT/.vibeflow/cockpit/vf-cockpit-terminal-processus.mjs" "$MMT" "$SCRIPTS/vf-cockpit-terminal-processus.mjs"
+COCKPIT_MODULE="$MT" COCKPIT_LOG="$WORK/mterm.out" am4_lancer "$LMT" --terminal > /dev/null 2>&1; RMT="$(am4_temoin "$MMT")"; cockpit_arreter; unset COCKPIT_MODULE
+assert_eq "M-TERM — le fork revient à la sortie : la copie est valide (node --check) et AM4.3 rougit (le marqueur s'exécute : $RMT)" "$(node --check "$MT/scripts/vf-cockpit-terminal.mjs" 2> /dev/null && echo valide || echo invalide) $RMT" "valide présent vivant"
 
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="

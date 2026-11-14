@@ -25,16 +25,21 @@
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
-SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; export HERE_T
 ENG="$SCRIPTS/../skills/cockpit-moteur"; TA="$HERE_T/terminal-aux.mjs"
-WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/bin" "$WORK/run"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/bin" "$WORK/run"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 export CHROME_SESSION="$HERE_T/chrome-session.mjs"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
+# 79-06 : le code ne vit plus dans la sortie. MOD_DEPOT = racine du module du dépôt ; mod_de <sortie> = racine du module que COMMANDE cette sortie
+# (table posée par mutant() : sortie TAB module ; par défaut le module du dépôt). La table est lue par bash (awk) et par les petits scripts node.
+MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODS_TABLE="$WORK/.mods"; : > "$MODS_TABLE"; export MODS_TABLE MOD_DEPOT
+mod_de() { local m; m="$(awk -F'\t' -v s="${1:-}" '$1==s{m=$2} END{print m}' "$MODS_TABLE" 2>/dev/null)"; printf '%s\n' "${m:-$MOD_DEPOT}"; }
 PASS=0; FAIL=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
-assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
+assert_eq() { if [ "$#" -ne 3 ]; then echo "  ❌ FAIL — $1 (assert_eq a reçu $# arguments au lieu de 3 : expansion d'accolades de bash 3.2 ?)"; FAIL=$((FAIL+1)); elif [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 
 CHROME=""
 for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do
@@ -57,28 +62,37 @@ import fs from 'node:fs'; const j = JSON.parse(fs.readFileSync(0, 'utf8')); cons
 JS
 cat > "$AUX/harnais-msg.mjs" <<'JS'
 // harnais-msg.mjs <sortie> : table de accepteMessage (T17.4) ; une ligne « nom=oui|non » par cas, « ABSENT » si la fonction n'existe pas
-import { pathToFileURL } from 'node:url';
-const m = await import(pathToFileURL(`${process.argv[2]}/vf-cockpit-terminal-tiroir.mjs`).href);
-if (typeof m.accepteMessage !== 'function') { console.log('ABSENT'); process.exit(0); }
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; const SORTIE = process.argv[2];
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === SORTIE && r) racine = r; } } catch {}
+const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-tiroir.mjs`).href);
+// 79-11 : le filtre de messages est un fichier du moteur (tiroir-message.js), évalué par l'aide de test dans le module qui sert la sortie
+const { chargerFonctions } = await import(pathToFileURL(process.env.HERE_T + '/navigateur-charger.mjs').href);
+let accepteMessage; try { accepteMessage = chargerFonctions([`${racine}/skills/cockpit-moteur/assets/ui/tiroir/tiroir-message.js`]).accepteMessage; } catch { accepteMessage = undefined; }
+if (typeof accepteMessage !== 'function') { console.log('ABSENT'); process.exit(0); }
 const Q = 'http://127.0.0.1:4242', P = 'http://127.0.0.1:4141', F = {}, L = m.LISTE_MESSAGES || [];
 const base = { isTrusted: true, origin: Q, source: F, data: 'toggle' };
 const cas = [['accepte', {}], ['accepte-ready', { data: 'ready' }], ['origine-de-P', { origin: P }], ['origine-voisine', { origin: Q + '/' }], ['source-autre', { source: {} }], ['source-nulle', { source: null }],
   ['valeur-inconnue', { data: 'fermer-tout' }], ['objet', { data: { toggle: 1 } }], ['tableau', { data: ['toggle'] }], ['chaine-10000', { data: 'x'.repeat(10000) }],
   ['non-fiable', { isTrusted: false }], ['confiance-absente', { isTrusted: undefined }]];
-console.log(cas.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+console.log(cas.map(([n, d]) => `${n}=${accepteMessage({ ...base, ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
 // 72-14 : la phase 71 garde ses huit valeurs (ligne 2), la phase 72 ajoute des valeurs FIXES, déclarées ici (ligne 3), avec leur table de cas (ligne 4)
-const AJOUTS_72 = ['proposition'];
+const AJOUTS_72 = ['proposition', 'annulation', 'retrait']; // annulation : AUDC-M11 (audit du cockpit, lot 0), la proposition annulée dans Q se dit au panneau de P
 console.log('liste=' + [...L].filter((v) => !AJOUTS_72.includes(v)).sort().join(','));
 console.log('ajouts72=' + AJOUTS_72.filter((v) => L.includes(v)).sort().join(','));
 const casP = [['prop', {}], ['prop-suffixe', { data: 'proposition:ouvre' }], ['prop-majuscule', { data: 'Proposition' }], ['prop-espace', { data: 'proposition ' }],
   ['prop-10000', { data: 'proposition' + 'x'.repeat(9989) }], ['prop-origine-de-P', { origin: P }], ['prop-source-autre', { source: {} }], ['prop-non-fiable', { isTrusted: false }]];
-console.log(casP.map(([n, d]) => `${n}=${m.accepteMessage({ ...base, data: 'proposition', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+console.log(casP.map(([n, d]) => `${n}=${accepteMessage({ ...base, data: 'proposition', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+const casA = [['ann', {}], ['ann-suffixe', { data: 'annulation:x' }], ['ann-majuscule', { data: 'Annulation' }], ['ann-origine-de-P', { origin: P }], ['ann-source-autre', { source: {} }], ['ann-non-fiable', { isTrusted: false }]];
+console.log(casA.map(([n, d]) => `${n}=${accepteMessage({ ...base, data: 'annulation', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
+const casR = [['ret', {}], ['ret-suffixe', { data: 'retrait:x' }], ['ret-majuscule', { data: 'Retrait' }], ['ret-origine-de-P', { origin: P }], ['ret-source-autre', { source: {} }], ['ret-non-fiable', { isTrusted: false }]]; // AUDC-M11 : le bandeau a disparu de Q
+console.log(casR.map(([n, d]) => `${n}=${accepteMessage({ ...base, data: 'retrait', ...d }, Q, F, L) === true ? 'oui' : 'non'}`).join(' '));
 JS
 cat > "$AUX/harnais-liste-q.mjs" <<'JS'
 // harnais-liste-q.mjs <sortie> : la liste fermée de P égale l'ensemble des valeurs de la table MESSAGES du client de Q (72-14, contrat §8) ; une ligne JSON
-import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const m = await import(pathToFileURL(`${process.argv[2]}/vf-cockpit-terminal-tiroir.mjs`).href);
-const src = fs.readFileSync(`${process.argv[2]}/vf-cockpit-terminal-client.mjs`, 'utf8');
+import fs from 'node:fs'; import { pathToFileURL } from 'node:url'; const SORTIE = process.argv[2];
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === SORTIE && r) racine = r; } } catch {}
+const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-tiroir.mjs`).href);
+const src = fs.readFileSync(`${racine}/skills/cockpit-moteur/assets/ui/terminal/client.js`, 'utf8'); // 79-11 : le client est un fichier du moteur
 const bloc = (src.match(/const MESSAGES = Object\.freeze\(\{([\s\S]*?)\}\)/) || [, ''])[1];
 const paires = [...bloc.matchAll(/([A-Za-z]+):\s*'([^']+)'/g)].map((x) => [x[1], x[2]]);
 const Qv = paires.map((x) => x[1]).sort(), Pv = [...(m.LISTE_MESSAGES || [])].sort();
@@ -88,8 +102,9 @@ console.log(JSON.stringify({ q: Qv.length, p: Pv.length, egal: Qv.join(',') === 
 JS
 cat > "$AUX/scriptgen.mjs" <<'JS'
 // scriptgen.mjs <sortie> <indisponible 0|1> : faits statiques du script injecté (contenu du <script>) ; une ligne JSON
-import { pathToFileURL } from 'node:url';
-const m = await import(pathToFileURL(`${process.argv[2]}/vf-cockpit-terminal-tiroir.mjs`).href);
+import { pathToFileURL } from 'node:url'; import fs from 'node:fs'; const SORTIE = process.argv[2];
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === SORTIE && r) racine = r; } } catch {}
+const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-tiroir.mjs`).href);
 const h = m.injectionTiroir({ indisponible: process.argv[3] === '1' }) || '';
 const s = (h.match(/<script>([\s\S]*?)<\/script>/) || [, ''])[1];
 const adr = /https?:\/\//g;
@@ -103,9 +118,10 @@ console.log(JSON.stringify({
 JS
 cat > "$AUX/page-tiroir.mjs" <<'JS'
 // page-tiroir.mjs <sortie> <port> <indisponible 0|1> : serveur jetable qui sert une page portant injectionTiroir() sous n'importe quel chemin
-import http from 'node:http'; import { pathToFileURL } from 'node:url';
-const [, , sortie, port, indispo] = process.argv;
-const m = await import(pathToFileURL(`${sortie}/vf-cockpit-terminal-tiroir.mjs`).href);
+import http from 'node:http'; import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
+const [, , sortie, port, indispo] = process.argv; const SORTIE = sortie;
+let racine = process.env.MOD_DEPOT; try { for (const l of fs.readFileSync(process.env.MODS_TABLE, 'utf8').split('\n')) { const [s, r] = l.split('\t'); if (s === SORTIE && r) racine = r; } } catch {}
+const m = await import(pathToFileURL(`${racine}/scripts/vf-cockpit-terminal-tiroir.mjs`).href);
 const page = `<!doctype html><html><head><meta charset="utf-8"><script>window.VF_COCKPIT_SERVER={token:"t"};</script>${m.injectionTiroir({ indisponible: indispo === '1' }) || ''}</head><body><p id="x">page</p></body></html>`;
 http.createServer((q, r) => {
   if (q.url.startsWith('/api/')) { r.writeHead(200, { 'Content-Type': 'application/json' }); return r.end('{"etat":"arrete"}'); }
@@ -353,12 +369,48 @@ await executer(chrome, async (s) => {
         if (plein) { await clic('.vf-term-plein'); }
       };
       r.haut = {};
-      await cas('bas-evt', 0, 0, evenement, false);
-      await cas('bas-msg', 0, 0, message, false);
-      await cas('haut-evt', 2, 3, evenement, false);
-      await cas('haut-msg', 2, 3, message, false);
-      await cas('plein-evt', 0, 0, evenement, true);
-      await cas('plein-msg', 0, 0, message, true);
+      // Filtre de cas (mutants seulement) : A.seuls = liste de « h:<cas> » et « r:<reprise> » à rejouer ; absent = tout (code sain, inchangé). Chaque cas rejoué part d'un état refait (fermer, regler).
+      const veut = (k) => !A.seuls || A.seuls.includes(k);
+      if (veut('h:bas-evt')) await cas('bas-evt', 0, 0, evenement, false);
+      if (veut('h:bas-msg')) await cas('bas-msg', 0, 0, message, false);
+      if (veut('h:moyen-evt')) await cas('moyen-evt', 2, 3, evenement, false); // 424 px : sous la hauteur du bandeau (AUDC-M11), rehaussé
+      if (veut('h:moyen-msg')) await cas('moyen-msg', 2, 3, message, false);
+      if (veut('h:haut-evt')) await cas('haut-evt', 4, 0, evenement, false); // 544 px : déjà au-dessus de la hauteur du bandeau, jamais réduit
+      if (veut('h:haut-msg')) await cas('haut-msg', 4, 0, message, false);
+      if (veut('h:plein-evt')) await cas('plein-evt', 0, 0, evenement, true);
+      if (veut('h:plein-msg')) await cas('plein-msg', 0, 0, message, true);
+      // AUDC-M11 : « retrait » (le bandeau a disparu de Q) rend la hauteur d'avant la proposition ; la lecture suit une barrière d'ordre (deux états de Q, du même cadre, encadrent le message : le second lu = le message traité)
+      const ETAT = (t) => `document.querySelector('.vf-term-etat').textContent.includes(${JSON.stringify(t)})`;
+      const barriere = async (cause) => { await deQ('etat:termine'); await att(ETAT('Terminé'), 'état de départ de la barrière'); await cause(); await deQ('etat:connecte'); await att(ETAT('Connecté'), 'barrière franchie'); };
+      const retrait = () => barriere(() => deQ('retrait'));
+      r.reprise = {};
+      const fenetre = async (h) => { await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: h, deviceScaleFactor: 1, mobile: false }); await stabiliser(() => s.ev('window.innerHeight'), { max: 5000 }); };
+      const rcas = async (nom, grands, petits, entre, apres) => {
+        await fermer(); await regler(grands, petits); const avant = await s.ev(MES);
+        await message(); await attOuvre(); const haut = await stabiliser(() => s.ev(MES), { max: 5000 });
+        if (entre) await entre();
+        const milieu = await stabiliser(() => s.ev(MES), { max: 5000 }); await retrait(); const fin = await stabiliser(() => s.ev(MES), { max: 5000 });
+        r.reprise[nom] = { avantNow: avant.now, avantMemo: avant.memo, haut: haut.now, milieu: milieu.now, fin: fin.now, finPx: fin.px, finMemo: fin.memo, ouvert: fin.ouvert, plein: fin.plein };
+        if (apres) { await apres(); r.reprise[nom].apres = await stabiliser(() => s.ev(MES), { max: 5000 }); } // geste de l'utilisateur fini APRÈS le retrait (relâchement de la souris)
+      };
+      if (veut('r:bas')) await rcas('bas', 0, 0); if (veut('r:moyen')) await rcas('moyen', 2, 3); if (veut('r:haut')) await rcas('haut', 4, 0);
+      if (veut('r:clavier')) await rcas('clavier', 0, 0, async () => { await s.ev(`document.querySelector('.vf-term-poignee').focus()`); await touche('ArrowUp', 'ArrowUp', 38); });
+      if (veut('r:souris')) await rcas('souris', 0, 0, async () => { const c = await centre('.vf-term-poignee'); await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); for (let i = 1; i <= 4; i++) await souris('mouseMoved', c.x, c.y - 10 * i); await souris('mouseReleased', c.x, c.y - 40); });
+      if (veut('r:fenetre')) await rcas('fenetre', 0, 0, async () => { await fenetre(600); }, async () => { await fenetre(800); }); // la fenêtre se réduit PENDANT le bandeau : le plafond de la hauteur réglée (70 % de 600 px = 420) la baisse, c'est un changement de l'écran et non la reprise : « retrait » ne la remonte pas à 160
+      let prise = null; // glissement de la poignée À LA SOURIS commencé avant le « retrait » et fini après : le retrait n'en reprend pas la hauteur sous la main
+      if (veut('r:glisse')) await rcas('glisse', 0, 0, async () => { prise = await centre('.vf-term-poignee'); await souris('mouseMoved', prise.x, prise.y); await souris('mousePressed', prise.x, prise.y); for (let i = 1; i <= 4; i++) await souris('mouseMoved', prise.x, prise.y - 10 * i); }, async () => { await souris('mouseReleased', prise.x, prise.y - 40); });
+      if (veut('r:remplace')) await rcas('remplace', 0, 0, async () => { await barriere(() => message()); }); // une seconde proposition pendant le rehaussement : la hauteur d'origine reste celle d'avant la première
+      if (veut('r:plein')) await rcas('plein', 0, 0, async () => { await clic('.vf-term-plein'); });
+      if (veut('r:plein')) { if (await s.ev(`document.querySelector('.vf-term-tiroir').classList.contains('vf-term-plein-etat')`)) await clic('.vf-term-plein'); // retour à l'état normal : la hauteur interne, reprise pendant le plein écran, est celle que l'on retrouve
+      r.reprise.pleinApres = await stabiliser(() => s.ev(MES), { max: 5000 }); }
+      if (veut('r:seul')) { await fermer(); await regler(0, 0); const seul = await s.ev(MES); await retrait(); const seulFin = await stabiliser(() => s.ev(MES), { max: 5000 }); // « retrait » sans rehaussement : rien à reprendre
+      r.reprise.seul = { avant: seul.now, fin: seulFin.now, memo: seulFin.memo }; }
+      // fenêtre de 360 px : la hauteur du bandeau (300 px au moins) ne tient pas (276 px au plus) ; une seconde proposition trouve le tiroir encore sous 300 px et ne doit pas prendre cette hauteur rehaussée pour celle d'origine
+      if (veut('r:petit')) { await fermer(); await fenetre(360); await regler(0, 0); const pAvant = await stabiliser(() => s.ev(MES), { max: 5000 });
+      await message(); await attOuvre(); const pHaut = await stabiliser(() => s.ev(MES), { max: 5000 });
+      await barriere(() => message()); const pMilieu = await stabiliser(() => s.ev(MES), { max: 5000 });
+      await retrait(); const pFin = await stabiliser(() => s.ev(MES), { max: 5000 }); await fenetre(800);
+      r.reprise.petit = { avant: pAvant.now, haut: pHaut.now, milieu: pMilieu.now, fin: pFin.now, memo: pFin.memo }; }
     });
     r.violations = [...s.violations];
     return r;
@@ -427,12 +479,12 @@ await executer(chrome, async (s) => {
   });
   }
   await essai('tu14', async () => { // J4 : focus clavier de la poignée = bague autour du grip, pas deux bandes pleine largeur
-    await s.ev(`document.querySelector('.vf-term-plein').focus()`); await touche('Tab', 'Tab', 9, 8); // Maj+Tab depuis le bouton : le clavier amène le focus sur la poignée
+    await s.ev(`(document.querySelector('.vf-term-terminer:not([hidden])') || document.querySelector('.vf-term-plein')).focus()`); await touche('Tab', 'Tab', 9, 8); // Maj+Tab depuis le premier bouton de la barre (« Terminer la session » quand une session tourne, AUDC-M10, sinon Agrandir) : le clavier amène le focus sur la poignée
     r.tu14 = await attendreEtStabiliser(() => s.ev(`(() => { const p = document.querySelector('.vf-term-poignee'), g = document.querySelector('.vf-term-grip'), cp = getComputedStyle(p), cg = getComputedStyle(g), b = g.getBoundingClientRect(), q = p.getBoundingClientRect();
       return { sur_poignee: document.activeElement === p, fv: p.matches(':focus-visible'), poignee: cp.outlineStyle, grip: cg.outlineStyle + '/' + cg.outlineWidth, opaque: cg.opacity, grip_larg: Math.round(b.width), poignee_larg: Math.round(q.width) }; })()`), (v) => !!v && v.sur_poignee === true, { max: 5000 });
   });
   await essai('tu15', async () => { // J7 : sous pointer: coarse les boutons de la barre font au moins 44 px et la barre les contient ; sous pointeur fin, 28 px
-    const mesure = () => s.ev(`(() => { const bs = [...document.querySelectorAll('.vf-term-bouton')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }); return { coarse: matchMedia('(pointer: coarse)').matches, boutons: bs.join(','), barre: Math.round(document.querySelector('.vf-term-barre').getBoundingClientRect().height), pastille: parseFloat(getComputedStyle(document.querySelector('button.vf-term-pastille')).height) }; })()`);
+    const mesure = () => s.ev(`(() => { const bs = [...document.querySelectorAll('.vf-term-bouton:not(.vf-term-terminer)')].map((b) => { const r = b.getBoundingClientRect(); return Math.round(r.width) + 'x' + Math.round(r.height); }); const t = document.querySelector('.vf-term-terminer'); return { coarse: matchMedia('(pointer: coarse)').matches, boutons: bs.join(','), terminerH: t && !t.hidden ? Math.round(t.getBoundingClientRect().height) : -1, barre: Math.round(document.querySelector('.vf-term-barre').getBoundingClientRect().height), pastille: parseFloat(getComputedStyle(document.querySelector('button.vf-term-pastille')).height) }; })()`);
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: false });
     r.tu15 = { fin: await attendreEtStabiliser(mesure, (v) => !!v && v.coarse === false, { max: 5000 }) };
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1280, height: 800, deviceScaleFactor: 1, mobile: true }); await s.send('Emulation.setTouchEmulationEnabled', { enabled: true, maxTouchPoints: 1 });
@@ -778,22 +830,28 @@ mklab() {
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 }
 SRVN=0
-srv() { # srv <sortie> <0|1 terminal> -> SRV_PORT SRV_PID SRV_O SRV_OUT QP AMORCE ; serveur lancé directement depuis la sortie, comme le lanceur
+srv() { # srv <sortie> <0|1 terminal> -> SRV_PORT SRV_PID SRV_O SRV_OUT QP AMORCE ; serveur du MODULE de la sortie visée, lancé par l'aide
   local o="$1" term="${2:-1}" lab flag=(); lab="$(cd "$1/../.." && pwd)"
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN.out"; rm -f "$o/.cache/server.json" "$o/.cache/terminal-amorce"; mkdir -p "$o/.cache"
   if [ "$term" = 1 ]; then flag=(--terminal); AMORCE="$(amorce_neuve)"; (umask 077; printf '%s' "$AMORCE" > "$o/.cache/terminal-amorce"); fi
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open ${flag[@]+"${flag[@]}"} --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  if [ "$term" = 1 ]; then for _ in $(seq 1 50); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done; fi
-  SRV_PORT="$(sj j.port)"; SRV_PORT="${SRV_PORT:-0}"; QP="$(sj '(j.terminal&&j.terminal.url)||"http://127.0.0.1:0"')"; QP="${QP##*:}"
+  local pret=port; if [ "$term" = 1 ]; then pret=terminal; fi
+  COCKPIT_MODULE="$(mod_de "$o")" COCKPIT_PRET="$pret" COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" ${flag[@]+"${flag[@]}"}
+  SRV_PID="$VF_PID"; SRV_PORT="${VF_PORT:-0}"; QP="$(sj '(j.terminal&&j.terminal.url)||"http://127.0.0.1:0"')"; QP="${QP##*:}"
 }
 sj() { node "$AUX/ev.mjs" "$1" < "$SRV_O/.cache/server.json" 2>/dev/null; }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
-  cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : données) et MUT_MOD (racine de la copie du module) ; code 1 si la cible manque ou si la copie n'a pas changé
+  local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  case "$(basename "$2")" in
+    serve.mjs|graph-query.js|query-cli.mjs|vue.js|client.js|q.css|tiroir.js|tiroir-message.js|tiroir-construire.js|tiroir.css|lancer.js|lancer-extraire-chat.js|lancer-observer-chat.js|lancer-proposition.js|lancer.css|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" 2>/dev/null || { case "$2" in vf-cockpit-terminal-tiroir.mjs|vf-cockpit-lancer-ui.mjs) cockpit_module_muter_p "$1" "$3" ;; *) false ;; esac; } || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  # 79-16 : une page (index.html, project.html, equipe.html) vient du MODULE, plus de la sortie : le mutant est une copie du module dont les sources de page (viewer.html, ui/*.js) portent la substitution ;
+  # les motifs sont écrits contre la page assemblée (renommée) : l'aide renomme d'abord. La copie du lab (données) reste la sortie de la manche.
+  case "$(basename "$2")" in
+    index.html|project.html|equipe.html) MUT_MOD="$(cockpit_module_copie "$WORK/mod-$1")" || return 1; cockpit_page_muter_dans "$MUT_MOD" "$3" 2>/dev/null || return 1; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  return 1
 }
 sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; }
 navig() { node "$AUX/chrome-tiroir.mjs" "$CHROME" "$@"; } # navig <mode> <json>
@@ -821,9 +879,10 @@ run_flag() { # run_flag <sortie> <court 0|1> -> FJ FP FQ ; un serveur neuf, un a
   FJ="$(navig flag "{\"P\":$FP,\"Q\":$FQ,\"amorce\":\"$AMORCE\",\"marqueur\":\"$FMARQ\",\"fichierPid\":\"$WORK/run/shell.pid\",\"fichierM\":\"$WORK/run/m.txt\",\"TA\":\"$TA\",\"liste\":$LISTE_JSON,\"court\":$2}")"; unsrv
 }
 
-run_haut() { # run_haut <sortie> -> PJ ; comme run_prop, avec en plus le scénario de hauteur (PU-G-136)
+run_haut() { # run_haut <sortie> [cas rejoués, séparés par des virgules : « h:bas-evt,r:souris » ; absent = tous] -> PJ ; comme run_prop, avec en plus le scénario de hauteur (PU-G-136)
+  local seuls=''; if [ -n "${2:-}" ]; then seuls=",\"seuls\":[\"$(printf '%s' "$2" | sed 's/,/","/g')\"]"; fi
   srv "$1" 1; rm -f "$WORK/run/shell.pid"
-  PJ="$(navig proposition "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"fichierPid\":\"$WORK/run/shell.pid\",\"liste\":$LISTE_JSON,\"hauteur\":true}")"; unsrv
+  PJ="$(navig proposition "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"fichierPid\":\"$WORK/run/shell.pid\",\"liste\":$LISTE_JSON,\"hauteur\":true$seuls}")"; unsrv
 }
 
 run_prop() { # run_prop <sortie> -> PJ ; un serveur neuf, un amorçage neuf, un Chrome neuf (72-14 : valeur fixe proposition)
@@ -837,14 +896,14 @@ echo "=== ST — script injecté (statique) : TU.13, T17.6 ==="
 node "$AUX/scriptgen.mjs" "$OUT" 0 > "$WORK/sg.out" 2>&1; SG="$(tail -n 1 "$WORK/sg.out")"
 assert_eq "TU.13.0 — témoin : le script injecté existe (taille > 500), sa première ligne est l'en-tête VibeFlow (71-07), il vient avec sa feuille" "$(rj "$SG" '(j.taille>500)+"/"+j.premiere+"/"+j.style')" "true/// VibeFlow (71-07) : tiroir du terminal/true"
 assert_eq "TU.13 — aucune adresse web écrite en entier dans le script injecté, commentaires compris (témoin : le motif trouve une adresse plantée)" "$(rj "$SG" 'j.adresses+"/"+j.temoin')" "0/1"
-assert_eq "TU.13b — un seul fetch( et il vise /api/vf/terminal ; aucun cookie ; seules clés de stockage : vf.terminal.h et vf.terminal.open" "$(rj "$SG" '(j.taille>500)+"/"+j.fetchs+"/"+j.api+"/"+j.cookie+"/"+j.cles')" "true/1/true/0/vf.terminal.h,vf.terminal.open"
+assert_eq "TU.13b — deux fetch( seulement (l'état du terminal, puis « Terminer la session » depuis l'audit du cockpit, AUDC-M10), tous deux vers /api/vf/terminal ; aucun cookie ; seules clés de stockage : vf.terminal.h et vf.terminal.open" "$(rj "$SG" '(j.taille>500)+"/"+j.fetchs+"/"+j.api+"/"+j.cookie+"/"+j.cles')" "true/2/true/0/vf.terminal.h,vf.terminal.open"
 assert_eq "T17.6 — aucun postMessage( dans le script injecté (le sens P vers le cadre est fermé), aucun attribut allow posé, Échap jamais cité (le script est vivant)" "$(rj "$SG" '(j.taille>500)+"/"+j.postmsg+"/"+j.allow+"/"+j.echap')" "true/0/0/0"
 
 echo "=== T23 — point de la pastille fermée : jamais une teinte d'état sur --raise en clair (71.5, juge de rendu 2026-11-06 ; DESIGN.md §9) ==="
 cat > "$AUX/contraste-point.mjs" <<'JS'
 // contraste-point.mjs <style.mjs> <viewer.html> : rapport de contraste du point `.vf-term-point` sur --raise, thème sombre puis clair ; UNE ligne « sombre=N clair=N ».
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const { STYLE_TIROIR } = await import(pathToFileURL(process.argv[2]).href); const html = fs.readFileSync(process.argv[3], 'utf8');
+const STYLE_TIROIR = fs.readFileSync(process.argv[2], 'utf8'); const html = fs.readFileSync(process.argv[3], 'utf8');
 const bloc = (re) => { const m = re.exec(html); return m ? m[0] : ''; };
 const jetons = { sombre: bloc(/:root \{[\s\S]*?\n\}/), clair: bloc(/:root\[data-theme="light"\] \{[\s\S]*?\n\}/) };
 const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
@@ -858,10 +917,10 @@ for (const t of ['sombre', 'clair']) {
 }
 console.log(out.join(' '));
 JS
-CT="$(node "$AUX/contraste-point.mjs" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
+CT="$(node "$AUX/contraste-point.mjs" "$ENG/assets/ui/tiroir/tiroir.css" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
 assert_eq "T23.1 — le point de la pastille fermée fait au moins 3:1 sur --raise dans les deux thèmes (sombre inchangé : 8,6:1 ; clair : --recent-text 4,3:1, --recent faisait 2,9:1)" "$(echo "$CT" | awk '{ split($1,a,"="); split($2,b,"="); print (a[2]+0 >= 3 && b[2]+0 >= 3) ? "ok" : "ko" }') [$CT]" "ok [$CT]"
-MUTP="$WORK/mut-point-style.mjs"; sed 's|background: var(--recent-text); }|background: var(--recent); }|' "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" > "$MUTP"
-if cmp -s "$MUTP" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs"; then sans_effet "M-POINT-RECENT"; else
+MUTP="$WORK/mut-point-style.mjs"; sed 's|background: var(--recent-text); }|background: var(--recent); }|' "$ENG/assets/ui/tiroir/tiroir.css" > "$MUTP"
+if cmp -s "$MUTP" "$ENG/assets/ui/tiroir/tiroir.css"; then sans_effet "M-POINT-RECENT"; else
   CM="$(node "$AUX/contraste-point.mjs" "$MUTP" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
   assert_eq "M-POINT-RECENT — l'ancien point (--recent) rougit T23.1 : clair sous 3:1 (témoin : le sombre est lu)" "$(echo "$CM" | awk '{ split($1,a,"="); split($2,b,"="); print (a[2]+0 >= 3 && b[2]+0 < 3) ? "rouge" : "vert" }')" "rouge"
 fi
@@ -869,7 +928,7 @@ fi
 cat > "$AUX/contraste-etat.mjs" <<'JS'
 // contraste-etat.mjs <style.mjs> <viewer.html> : rapport de contraste de chaque point d'état de la barre (`.vf-term-etat-point`) sur --raise, par thème ; UNE ligne « sombre:defaut=N sombre:connecte=N ... clair:expire=N ». Résolution : dernière règle applicable (en clair, les règles `:root[data-theme="light"]` s'ajoutent aux règles de base).
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const { STYLE_TIROIR } = await import(pathToFileURL(process.argv[2]).href); const html = fs.readFileSync(process.argv[3], 'utf8');
+const STYLE_TIROIR = fs.readFileSync(process.argv[2], 'utf8'); const html = fs.readFileSync(process.argv[3], 'utf8');
 const bloc = (re) => { const m = re.exec(html); return m ? m[0] : ''; };
 const jetons = { sombre: bloc(/:root \{[\s\S]*?\n\}/), clair: bloc(/:root\[data-theme="light"\] \{[\s\S]*?\n\}/) };
 const lin = (c) => { c /= 255; return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4; };
@@ -894,15 +953,15 @@ for (const t of ['sombre', 'clair']) {
 }
 console.log(out.join(' '));
 JS
-CE="$(node "$AUX/contraste-etat.mjs" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
+CE="$(node "$AUX/contraste-etat.mjs" "$ENG/assets/ui/tiroir/tiroir.css" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
 assert_eq "T23.2 — les six points d'état de la barre (défaut, connecte, reconnexion, refuse, arrete, expire) font au moins 3:1 sur --raise dans les deux thèmes, douze mesures lues (clair : variantes -text, sombre inchangé ; DESIGN.md §9, P71.5-D-36)" "$(echo "$CE" | awk '{ n=0; bon=0; for (i=1;i<=NF;i++) { split($i,a,"="); n++; if (a[2]+0 >= 3) bon++ } print (n==12 && bon==12) ? "ok" : "ko" }') [$CE]" "ok [$CE]"
-MUTE="$WORK/mut-etat-style.mjs"; sed 's|:root\[data-theme="light"\] .vf-term-etat-point\[data-etat="connecte"\] { background: var(--recent-text); }|:root[data-theme="light"] .vf-term-etat-point[data-etat="connecte"] { background: var(--recent); }|' "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" > "$MUTE"
-if cmp -s "$MUTE" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs"; then sans_effet "M-ETAT-RECENT"; else
+MUTE="$WORK/mut-etat-style.mjs"; sed 's|:root\[data-theme="light"\] .vf-term-etat-point\[data-etat="connecte"\] { background: var(--recent-text); }|:root[data-theme="light"] .vf-term-etat-point[data-etat="connecte"] { background: var(--recent); }|' "$ENG/assets/ui/tiroir/tiroir.css" > "$MUTE"
+if cmp -s "$MUTE" "$ENG/assets/ui/tiroir/tiroir.css"; then sans_effet "M-ETAT-RECENT"; else
   CM="$(node "$AUX/contraste-etat.mjs" "$MUTE" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
   assert_eq "M-ETAT-RECENT — le point connecté en --recent sur --raise clair rougit T23.2 (clair:connecte sous 3:1, témoin : le sombre est lu)" "$(echo "$CM" | awk '{ for (i=1;i<=NF;i++) { split($i,a,"="); v[a[1]]=a[2]+0 } print (v["clair:connecte"] < 3 && v["sombre:connecte"] >= 3) ? "rouge" : "vert" }')" "rouge"
 fi
-MUTH="$WORK/mut-etat-medium.mjs"; sed 's|\(:root\[data-theme="light"\] .vf-term-etat-point\[data-etat="refuse"\] { background: \)var(--warn-text)|\1var(--sev-medium)|' "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs" > "$MUTH"
-if cmp -s "$MUTH" "$SCRIPTS/vf-cockpit-terminal-tiroir-style.mjs"; then sans_effet "M-ETAT-MEDIUM"; else
+MUTH="$WORK/mut-etat-medium.mjs"; sed 's|\(:root\[data-theme="light"\] .vf-term-etat-point\[data-etat="refuse"\] { background: \)var(--warn-text)|\1var(--sev-medium)|' "$ENG/assets/ui/tiroir/tiroir.css" > "$MUTH"
+if cmp -s "$MUTH" "$ENG/assets/ui/tiroir/tiroir.css"; then sans_effet "M-ETAT-MEDIUM"; else
   CM="$(node "$AUX/contraste-etat.mjs" "$MUTH" "$ENG/assets/viewer.html" 2>&1 | tail -n 1)"
   assert_eq "M-ETAT-MEDIUM — le point reconnexion/refus en --sev-medium sur --raise clair rougit T23.2 (clair:reconnexion sous 3:1, témoin : le sombre est lu)" "$(echo "$CM" | awk '{ for (i=1;i<=NF;i++) { split($i,a,"="); v[a[1]]=a[2]+0 } print (v["clair:reconnexion"] < 3 && v["sombre:reconnexion"] >= 3) ? "rouge" : "vert" }')" "rouge"
 fi
@@ -924,10 +983,12 @@ mut_msg M-MSG-LISTE 's|typeof e.data === .string. && liste.indexOf(e.data) >= 0|
 mut_msg M-MSG-CONFIANCE 's|if (!e \|\| e.isTrusted !== true) return false;|if (!e) return false;|' non-fiable
 
 echo "=== TP — valeur fixe « proposition » de Q vers P (72-14 ; P72-D-09, P71-D-18 ; contrat §8) ==="
-assert_eq "TP.1 — la liste de la phase 71 garde ses huit valeurs (ligne 2 du harnais), la phase 72 ajoute exactement une valeur fixe (ligne 3)" "$(sed -n 2p "$WORK/h.out") $(sed -n 3p "$WORK/h.out")" "liste=etat:arrete,etat:connecte,etat:expire,etat:reconnexion,etat:refuse,etat:termine,ready,toggle ajouts72=proposition"
+assert_eq "TP.1 — la liste de la phase 71 garde ses huit valeurs (ligne 2 du harnais), la phase 72 ajoute une valeur fixe (« proposition »), le lot 0 de l'audit deux autres (« annulation » puis « retrait », AUDC-M11) (ligne 3)" "$(sed -n 2p "$WORK/h.out") $(sed -n 3p "$WORK/h.out")" "liste=etat:arrete,etat:connecte,etat:expire,etat:reconnexion,etat:refuse,etat:termine,ready,toggle ajouts72=annulation,proposition,retrait"
 assert_eq "TP.2 — accepteMessage : « proposition » seule passe ; refusés : suffixe, majuscule, espace final, 10 000 caractères, origine de P, autre source, non fiable" "$(sed -n 4p "$WORK/h.out")" "prop=oui prop-suffixe=non prop-majuscule=non prop-espace=non prop-10000=non prop-origine-de-P=non prop-source-autre=non prop-non-fiable=non"
+assert_eq "TP.2c — AUDC-M11 : accepteMessage : « retrait » seul passe ; refusés : suffixe, majuscule, origine de P, autre source, non fiable" "$(sed -n 6p "$WORK/h.out")" "ret=oui ret-suffixe=non ret-majuscule=non ret-origine-de-P=non ret-source-autre=non ret-non-fiable=non"
 node "$AUX/harnais-liste-q.mjs" "$OUT" > "$WORK/hq.out" 2>&1
-assert_eq "TP.3 — câblage : LISTE_MESSAGES de P = ensemble des valeurs de la table MESSAGES du client de Q (neuf valeurs), et le client appelle emettre sur la clé de « proposition »" "$(tail -n 1 "$WORK/hq.out" | node "$AUX/ev.mjs" '"q="+j.q+" p="+j.p+" egal="+j.egal+" cle="+j.cle+" appel="+j.appel')" "q=9 p=9 egal=true cle=proposition appel=true"
+assert_eq "TP.2b — AUDC-M11 : accepteMessage : « annulation » seule passe ; refusés : suffixe, majuscule, origine de P, autre source, non fiable" "$(sed -n 5p "$WORK/h.out")" "ann=oui ann-suffixe=non ann-majuscule=non ann-origine-de-P=non ann-source-autre=non ann-non-fiable=non"
+assert_eq "TP.3 — câblage : LISTE_MESSAGES de P = ensemble des valeurs de la table MESSAGES du client de Q (onze valeurs), et le client appelle emettre sur la clé de « proposition »" "$(tail -n 1 "$WORK/hq.out" | node "$AUX/ev.mjs" '"q="+j.q+" p="+j.p+" egal="+j.egal+" cle="+j.cle+" appel="+j.appel')" "q=11 p=11 egal=true cle=proposition appel=true"
 mut_prop() { # mut_prop <libellé> <nom> <expression-sed> <cas qui doit passer à « oui » dans la ligne 4>
   if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
     node "$AUX/harnais-msg.mjs" "$MUT_OUT" > "$WORK/hm-$2.out" 2>&1
@@ -964,7 +1025,7 @@ assert_eq "T17.3 — MessageEvent forgé (origine de Q, source = le cadre) : ign
 assert_eq "T17.5 — espion : après une commande tapée dans le shell, tout message d'origine Q est dans la liste fermée ; ni le marqueur, ni le secret, ni l'amorçage n'y figurent (témoin : la commande a tourné)" "$(rj "$J" '"fichier="+j.t175.fichier+" hors_liste="+j.t175.hors_liste+" marqueur="+j.t175.marqueur+" secret="+j.t175.secret+" amorce="+j.t175.amorce+" ready_et_connecte="+(j.t175.vus.includes("ready")&&j.t175.vus.includes("etat:connecte"))')" "fichier=true hors_liste=0 marqueur=0 secret=0 amorce=0 ready_et_connecte=true"
 
 assert_eq "T20.4 (J4) — poignée focalisée au clavier : le contour est sur le grip (40 px, 2 px pleins, visible), jamais sur la poignée pleine largeur (témoin : :focus-visible est vrai)" "$(rj "$J" '"sur="+j.tu14.sur_poignee+" fv="+j.tu14.fv+" poignee="+j.tu14.poignee+" grip="+j.tu14.grip+" opaque="+j.tu14.opaque+" grip_larg="+j.tu14.grip_larg+" large="+(j.tu14.poignee_larg>400)')" "sur=true fv=true poignee=none grip=solid/2px opaque=1 grip_larg=40 large=true"
-assert_eq "T20.7 (J7) — pointeur fin : boutons de 28 px, barre de 36 px ; pointer: coarse (témoin : le média est vrai) : boutons d'au moins 44 px et barre qui les contient" "$(rj "$J" '"fin="+j.tu15.fin.coarse+" "+j.tu15.fin.boutons+" "+j.tu15.fin.barre+" / tactile="+j.tu15.tactile.coarse+" "+(j.tu15.tactile.boutons.split(",").every((b)=>b.split("x").every((n)=>Number(n)>=44)))+" "+(j.tu15.tactile.barre>=44)')" "fin=false 28x28,28x28 36 / tactile=true true true"
+assert_eq "T20.7 (J7) — pointeur fin : boutons carrés de 28 px (le bouton à mot « Terminer la session », AUDC-M10, est mesuré à part : 28 px de haut, au moins 44 au toucher), barre de 36 px ; pointer: coarse (témoin : le média est vrai) : boutons d'au moins 44 px et barre qui les contient" "$(rj "$J" '"fin="+j.tu15.fin.coarse+" "+j.tu15.fin.boutons+" "+j.tu15.fin.barre+" / tactile="+j.tu15.tactile.coarse+" "+(j.tu15.tactile.boutons.split(",").every((b)=>b.split("x").every((n)=>Number(n)>=44)))+" "+(j.tu15.tactile.barre>=44)+" terminer="+j.tu15.fin.terminerH+"/"+(j.tu15.tactile.terminerH>=44)')" "fin=false 28x28,28x28 36 / tactile=true true true terminer=28/true"
 assert_eq "T20.8 (F-A1-3) — la pastille « Terminal » fermée : 32 px au pointeur fin, au moins 44 px sous pointer: coarse (témoin : le média est vrai)" "$(rj "$J" '"fin="+j.tu15.fin.pastille+" / tactile="+j.tu15.tactile.coarse+" "+(j.tu15.tactile.pastille>=44)')" "fin=32 / tactile=true true"
 
 echo "=== TU.9 / TU.10 / TU.12 — localhost, Windows, autres pages ==="
@@ -1004,8 +1065,8 @@ mut_geom() { # mut_geom <nom> <fichier> <expression-sed> <groupe qui doit rougir
   else sans_effet "$1"; fi
 }
 mut_geom M-PASTILLE-SUR-ZOOM vf-cockpit-terminal-tiroir.mjs 's|() => \[montre ? rect(n) : null, rect(k)\]|() => [rect(k)]|' E2f # le zoom ne monte plus au-dessus de la pastille (lot C de la recette du 2026-11-08 : la ligne « if (recouvre) z.style.bottom » est devenue la liste d'obstacles du zoom dans eviter())
-mut_geom M-AJUSTE-SANS-TIROIR vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #stage {|body.vf-term-ouvert #stage-absent {|' G1F
-mut_geom M-ASK-RESTE vf-cockpit-terminal-tiroir-style.mjs 's|body.vf-term-ouvert #ask { display: none; }|body.vf-term-ouvert #ask { }|' G1ask
+mut_geom M-AJUSTE-SANS-TIROIR tiroir.css 's|body.vf-term-ouvert #stage {|body.vf-term-ouvert #stage-absent {|' G1F
+mut_geom M-ASK-RESTE tiroir.css 's|body.vf-term-ouvert #ask { display: none; }|body.vf-term-ouvert #ask { }|' G1ask
 mut_geom M-VISITE-RESTE vf-cockpit-terminal-tiroir.mjs 's|window.VibeFlowTour.end();|void 0;|' G1visite
 run_pastille "$OUT" 0; PA="$PJ"
 assert_eq "T21.7 (D-06) — tiroir fermé : la pastille ne recouvre ni la barre de question, ni la feuille de détail, ni le zoom, ni la visite, de 390 à 1280 px, panneau dans son état initial, basculé, rebasculé, visite affichée, et en état tactile" "$(rj "$PA" '(j.erreur||JSON.stringify(j.erreurs))+" "+JSON.stringify(j.mauvais)')" "{} []"
@@ -1020,7 +1081,7 @@ mut_pastille() { # mut_pastille <nom> <expression-sed> : le mutant doit laisser 
 mut_pastille M-PASTILLE-SUR-ASK 's|monter(n, window.innerHeight, () => \[rect(k)\]);|monter(n, window.innerHeight, () => []);|' # la pastille ne monte plus au-dessus de la barre (lot C de la recette du 2026-11-08 : la ligne « if (sur(...kb)) n.style.bottom » est devenue la liste d'obstacles de la pastille dans eviter())
 # M-PASTILLE-SANS-RAPPEL (recette du 2026-11-08, K3) : TOUS les rappels de la pastille passent par eviterTout (resize, vf-zoom-replie, MutationObserver de data-vf-visite, MutationObserver de la classe du corps - no-panel -, ResizeObserver de la barre, transitionend de la barre) ; le mutant vide eviterTout, donc les retire d'un coup. Les appels directs (ouvrir, fermer, puce, pose initiale) restent : la pastille est placée, mais plus jamais rappelée. Les formes précédentes ne retiraient que la barre et restaient vertes sous Linux (shard 5 puis shard 3), un autre rappel replaçant la pastille.
 # Garde de recensement : sept mentions d'eviterTout (la définition et ses six branchements) et six appels directs eviter(d.*) ; un nouveau rappel qui appellerait eviter() sans passer par eviterTout échapperait au mutant : ce compte rougit alors, le mutant est à élargir avant de le changer.
-assert_eq "T21.7r — recensement des rappels de la pastille : 7 mentions d'eviterTout (définition + resize, vf-zoom-replie, 2 MutationObserver, ResizeObserver, transitionend) et 6 appels directs eviter(d.*) (eviterTout x2, puce, ouvrir, fermer, pose initiale)" "$(grep -o 'eviterTout' "$SCRIPTS/vf-cockpit-terminal-tiroir.mjs" | wc -l | tr -d ' ')/$(grep -o 'eviter(d\.[a-z]*)' "$SCRIPTS/vf-cockpit-terminal-tiroir.mjs" | wc -l | tr -d ' ')" "7/6"
+assert_eq "T21.7r — recensement des rappels de la pastille : 7 mentions d'eviterTout (définition + resize, vf-zoom-replie, 2 MutationObserver, ResizeObserver, transitionend) et 6 appels directs eviter(d.*) (eviterTout x2, puce, ouvrir, fermer, pose initiale)" "$(grep -o 'eviterTout' "$ENG/assets/ui/tiroir/tiroir.js" | wc -l | tr -d ' ')/$(grep -o 'eviter(d\.[a-z]*)' "$ENG/assets/ui/tiroir/tiroir.js" | wc -l | tr -d ' ')" "7/6"
 mut_pastille M-PASTILLE-SANS-RAPPEL "s|const eviterTout = () => { eviter(d.pastille); eviter(d.puce); };|const eviterTout = () => {};|"
 
 run_axe "$OUT" 0; AX="$XJ"
@@ -1086,7 +1147,7 @@ if mutant framesrc vf-cockpit-terminal.mjs "s#frameSrc: () => (portQ ? \`; frame
 else sans_effet "M-FRAMESRC"; fi
 
 echo "=== M-MSG-DONNEE — client de Q qui joint du texte du terminal à un message (T17.5) ==="
-if mutant donnee vf-cockpit-terminal-client.mjs 's|term.write(m.value);|term.write(m.value); window.parent.postMessage(new TextDecoder().decode(m.value), cfg.origineP);|'; then
+if mutant donnee client.js 's|term.write(m.value);|term.write(m.value); window.parent.postMessage(new TextDecoder().decode(m.value), cfg.origineP);|'; then
   VF_TIROIR_MS=20000 run_flag "$MUT_OUT" 1; J="$FJ"
   assert_eq "M-MSG-DONNEE — le mutant rougit T17.5 : un message hors liste ou portant le marqueur arrive à P (témoin : la commande a tourné)" "$(rj "$J" '"fichier="+j.t175.fichier+" rouge="+(j.t175.hors_liste>=1||j.t175.marqueur>=1)')" "fichier=true rouge=true"
 else sans_effet "M-MSG-DONNEE"; fi
@@ -1106,30 +1167,51 @@ mut_prop_nav() { # mut_prop_nav <libellé> <nom> <expression-sed> <expression de
     assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
   else sans_effet "$1 $2"; fi
 }
-mut_prop_nav TP.10 M-LISTE-SANS-PROPOSITION "s|, 'proposition'\]);|]);|" '!(j.ouvre1&&j.ouvre1.ouvert)' "le tiroir ne s'ouvre plus (liste sans la valeur)"
+mut_prop_nav TP.10 M-LISTE-SANS-PROPOSITION "s|, 'proposition', 'annulation', 'retrait'\]);|, 'annulation', 'retrait']);|" '!(j.ouvre1&&j.ouvre1.ouvert)' "le tiroir ne s'ouvre plus (liste sans la valeur)"
 mut_prop_nav TP.11 M-PROPOSITION-COMME-ETAT 's|else if (e.data === .proposition.) proposer();||' '!(j.ouvre1&&j.ouvre1.barre==="Connecté")' "la barre perd son libellé « Connecté »"
 mut_prop_nav TP.12 M-FOCUS-VOLE 's|const proposer = () => { ouvrir(false);|const proposer = () => { ouvrir(true);|' '!(j.ouvre1&&j.ouvre1.focus==="temoin")' "le focus passe au cadre"
 
 echo "=== TH — la proposition ouvre le tiroir à 300 px au moins (PU-G-136) ==="
 run_haut "$OUT"; PH="$PJ"
 HV() { rj "$PH" "(()=>{const c=j.haut&&j.haut['$1'];if(!c)return 'absent';$2})()"; }
-assert_eq "TH.0 — témoin : aucune étape en erreur, les six cas ont été mesurés" "$(rj "$PH" '(j.erreur||JSON.stringify(j.erreurs))+" cas="+Object.keys(j.haut||{}).length')" "{} cas=6"
+assert_eq "TH.0 — témoin : aucune étape en erreur, les huit cas ont été mesurés" "$(rj "$PH" '(j.erreur||JSON.stringify(j.erreurs))+" cas="+Object.keys(j.haut||{}).length')" "{} cas=8"
 for ch in evt msg; do
   assert_eq "TH.1 ($ch) — tiroir fermé réglé à 160 px : la proposition l'ouvre à 300 px au moins (avant : 160), hauteur mesurée ET aria-valuenow" "$(HV bas-$ch 'return "avant="+c.avantNow+" ouvert="+c.ouvert+" now="+(c.now>=300)+" px="+(c.px>=300)')" "avant=160 ouvert=true now=true px=true"
-  assert_eq "TH.2 ($ch) — tiroir réglé à 424 px : la proposition le laisse à 424 (jamais réduit)" "$(HV haut-$ch 'return "avant="+c.avantNow+" now="+c.now+" px="+c.px')" "avant=424 now=424 px=424"
-  assert_eq "TH.3 ($ch) — la hauteur mémorisée (vf.terminal.h) n'est pas touchée par le rehaussement : 160 avant, 160 après (cas bas) ; 424 avant, 424 après (cas haut)" "$(HV bas-$ch 'return c.avantMemo+"/"+c.memo') $(HV haut-$ch 'return c.avantMemo+"/"+c.memo')" "160/160 424/424"
+  assert_eq "TH.2 ($ch) — tiroir réglé à 544 px (au-dessus de la hauteur du bandeau) : la proposition le laisse à 544 (jamais réduit)" "$(HV haut-$ch 'return "avant="+c.avantNow+" now="+c.now+" px="+c.px')" "avant=544 now=544 px=544"
+  assert_eq "TH.2b ($ch) — AUDC-M11 : tiroir réglé à 424 px (sous la hauteur du bandeau) : la proposition le rehausse à 480 px, 60 % de la fenêtre de 800 px (hauteur mesurée ET aria-valuenow), sans toucher la hauteur mémorisée" "$(HV moyen-$ch 'return "avant="+c.avantNow+" now="+c.now+" px="+c.px+" memo="+c.avantMemo+"/"+c.memo')" "avant=424 now=480 px=480 memo=424/424"
+  assert_eq "TH.3 ($ch) — la hauteur mémorisée (vf.terminal.h) n'est pas touchée par le rehaussement : 160 avant, 160 après (cas bas) ; 544 avant, 544 après (cas haut)" "$(HV bas-$ch 'return c.avantMemo+"/"+c.memo') $(HV haut-$ch 'return c.avantMemo+"/"+c.memo')" "160/160 544/544"
   assert_eq "TH.4 ($ch) — plein écran : la proposition ne rehausse pas (hauteur interne restée à 160, état plein conservé)" "$(HV plein-$ch 'return "avant="+c.avantNow+" now="+c.now+" plein="+c.plein+" ouvert="+c.ouvert+" memo="+c.memo')" "avant=160 now=160 plein=true ouvert=true memo=160"
 done
-mut_haut() { # mut_haut <libellé> <nom> <expression-sed> <expression de rougissement>
+RV() { rj "$PH" "(()=>{const c=j.reprise&&j.reprise['$1'];if(!c)return 'absent';$2})()"; }
+assert_eq "TH.20 — AUDC-M11 : « retrait » après une proposition : tiroir réglé à 160 px, monté à 480, repris à 160 ; réglé à 424, monté à 480, repris à 424 (hauteur mesurée ET aria-valuenow), mémoire inchangée, tiroir resté ouvert" "$(RV bas 'return [c.avantNow,c.haut,c.fin,c.finPx,c.avantMemo+">"+c.finMemo,c.ouvert].join("/")') $(RV moyen 'return [c.avantNow,c.haut,c.fin,c.finPx,c.avantMemo+">"+c.finMemo,c.ouvert].join("/")')" "160/480/160/160/160>160/true 424/480/424/424/424>424/true"
+assert_eq "TH.21 — tiroir déjà plus haut que le bandeau (544 px) : jamais rehaussé, « retrait » ne le change pas" "$(RV haut 'return [c.avantNow,c.haut,c.fin,c.avantMemo+">"+c.finMemo].join("/")')" "544/544/544/544>544"
+assert_eq "TH.22 — l'utilisateur règle le tiroir pendant le bandeau (clavier : 480 puis 504 px ; souris : 480 puis 520 px) : « retrait » ne l'écrase pas, sa hauteur reste et la mémoire la porte" "$(RV clavier 'return [c.haut,c.milieu,c.fin,c.finMemo].join("/")') $(RV souris 'return [c.haut,c.milieu,c.fin,c.finMemo].join("/")')" "480/504/504/504 480/520/520/520"
+assert_eq "TH.23 — une seconde proposition pendant le rehaussement ne fait pas oublier la hauteur d'origine : repris à 160 (pas à 480)" "$(RV remplace 'return [c.avantNow,c.haut,c.fin,c.avantMemo+">"+c.finMemo].join("/")')" "160/480/160/160>160"
+E24='(()=>{const c=j.reprise&&j.reprise.pleinApres;return c?[c.now,c.px,c.plein,c.memo].join("/"):"absent"})()' # une variable, pas d'expression à accolades dans l'argument : bash 3.2 les développe malgré les guillemets et assert_eq recevait six mots
+TH24A="$(RV plein 'return [c.avantNow,c.haut,c.fin,c.plein,c.avantMemo+">"+c.finMemo].join("/")')"; TH24B="$(rj "$PH" "$E24")"
+assert_eq "TH.24 — plein écran basculé pendant le bandeau : la reprise vaut pour la hauteur interne, retrouvée en quittant le plein écran (160 px), état plein conservé pendant ; mémoire inchangée" "$TH24A $TH24B" "160/480/160/true/160>160 160/160/false/160"
+assert_eq "TH.22c — AUDC-M11 : glissement de la poignée à la souris commencé pendant le bandeau, « retrait » reçu EN PLEIN glissement : la hauteur n'est pas reprise sous la main (480 puis 520 px), le relâchement la mémorise" "$(RV glisse 'return [c.haut,c.milieu,c.fin,c.apres.now,c.apres.memo].join("/")')" "480/520/520/520/520"
+assert_eq "TH.26 — AUDC-M11 : fenêtre de 360 px (le bandeau de 300 px ne tient pas : 276 px au plus), deux propositions de suite puis « retrait » : la seconde ne prend pas 276 px pour la hauteur d'origine, repris à 160 px, mémoire inchangée" "$(RV petit 'return [c.avant,c.haut,c.milieu,c.fin,c.memo].join("/")')" "160/276/276/160/160"
+assert_eq "TH.27 — AUDC-M11 : la fenêtre se réduit PENDANT le bandeau (800 puis 600 px) et fait baisser la hauteur (480 puis 420 px, plafond de 70 %) : « retrait » ne la remonte pas à la hauteur d'origine (420 px, pas 160), mémoire inchangée" "$(RV fenetre 'return [c.haut,c.milieu,c.fin,c.finMemo].join("/")')" "480/420/420/160"
+assert_eq "TH.25 — « retrait » sans rehaussement préalable : rien à reprendre, la hauteur (160 px) et la mémoire ne bougent pas" "$(RV seul 'return [c.avant,c.fin,c.memo].join("/")')" "160/160/160"
+mut_haut() { # mut_haut <libellé> <nom> <expression-sed> <expression de rougissement> <libellé du rouge> <cas rejoués : ceux que lit l'expression>
   if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
-    VF_TIROIR_MS=20000 run_haut "$MUT_OUT"
+    VF_TIROIR_MS=20000 run_haut "$MUT_OUT" "${6:-}"
     assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
   else sans_effet "$1 $2"; fi
 }
-mut_haut TH.9 M-HAUT-SANS-REHAUSSEMENT 's|if (!plein \&\& h < 300) { h = borne(300); appliquer(); }||' 'j.haut["bas-evt"].now<300&&j.haut["bas-msg"].now<300' "le tiroir reste sous 300 px par les deux chemins"
-mut_haut TH.10 M-HAUT-ECRASE-MEMO 's|h = borne(300); appliquer(); }|h = borne(300); appliquer(); memoH(); }|' 'j.haut["bas-evt"].memo!=="160"' "la hauteur mémorisée est écrasée"
-mut_haut TH.11 M-HAUT-REDUIT 's|if (!plein \&\& h < 300) { h = borne(300)|if (!plein) { h = borne(300)|' 'j.haut["haut-evt"].now!==424' "un tiroir à 424 px est ramené à 300"
-mut_haut TH.12 M-HAUT-EN-PLEIN 's|if (!plein \&\& h < 300)|if (h < 300)|' 'j.haut["plein-evt"].now>=300' "le plein écran est rehaussé"
+mut_haut TH.20 M-REPRISE-RETIREE-P "s|else if (e.data === 'retrait') reprendre();||" 'j.reprise.bas.fin===480&&j.reprise.moyen.fin===480&&j.reprise.plein.fin===480' "le tiroir ne reprend plus sa hauteur (reste à 480 px)" "r:bas,r:moyen,r:plein"
+mut_haut TH.22 M-REPRISE-ECRASE-CLAVIER "s|const memoH = () => { perso = true; reprise = null;|const memoH = () => { perso = true;|" 'j.reprise.clavier.fin===160' "la reprise écrase la hauteur réglée au clavier pendant le bandeau (retour à 160)" "r:bas,r:moyen,r:haut,r:clavier"
+mut_haut TH.22b M-REPRISE-ECRASE-SOURIS "s|const memoH = () => { perso = true; reprise = null;|const memoH = () => { perso = true;|;s|e.preventDefault(); reprise = null; const y0|e.preventDefault(); const y0|" 'j.reprise.souris.fin===160' "la reprise écrase un glissement à la souris pendant le bandeau (ni geste ni relâchement ne l'annulent : retour à 160)" "r:bas,r:moyen,r:haut,r:clavier,r:souris"
+mut_haut TH.22c M-REPRISE-ECRASE-GLISSEMENT "s|e.preventDefault(); reprise = null; const y0|e.preventDefault(); const y0|" 'j.reprise.glisse.fin===160' "le « retrait » reçu en plein glissement reprend la hauteur sous la main (160 au lieu de 520)" "r:glisse"
+mut_haut TH.27 M-REPRISE-NON-ANNULEE-PAR-FENETRE "s|if (v !== h) { h = v; reprise = null; appliquer(); }|if (v !== h) { h = v; appliquer(); }|" 'j.reprise.fenetre.fin===160' "la fenêtre qui se réduit pendant le bandeau n'annule pas la reprise : « retrait » écrase la hauteur (160 au lieu de 420)" "r:fenetre"
+mut_haut TH.26 M-REPRISE-OUBLIEE-AU-REMPLACEMENT "s|reprise === null \&\& h < Math.max(300, hautBandeau())|h < Math.max(300, hautBandeau())|" 'j.reprise.petit.fin===276' "la seconde proposition, trouvant le tiroir encore sous 300 px (fenêtre de 360 px), écrase la hauteur d'origine retenue (reprise à 276 au lieu de 160)" "r:petit"
+mut_haut TH.9 M-HAUT-SANS-REHAUSSEMENT 's|if (!plein \&\& h < 300) { h = borne(300); appliquer(); }||;s|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["bas-evt"].now<300&&j.haut["bas-msg"].now<300' "le tiroir reste sous 300 px par les deux chemins" "h:bas-evt,h:bas-msg"
+mut_haut TH.14 M-HAUT-BANDEAU-ECRASE-MEMO 's|h = borne(hautBandeau()); appliquer(); }|h = borne(hautBandeau()); appliquer(); memoH(); }|' 'j.haut["moyen-evt"].memo!=="424"' "le rehaussement au bandeau écrase la hauteur mémorisée (PU-G-136)" "h:moyen-evt"
+mut_haut TH.13 M-HAUT-SANS-BANDEAU 's|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["moyen-evt"].now<480&&j.haut["moyen-msg"].now<480' "un tiroir de 424 px n'est pas rehaussé à la hauteur du bandeau (AUDC-M11)" "h:moyen-evt,h:moyen-msg"
+mut_haut TH.10 M-HAUT-ECRASE-MEMO 's|h = borne(300); appliquer(); }|h = borne(300); appliquer(); memoH(); }|' 'j.haut["bas-evt"].memo!=="160"' "la hauteur mémorisée est écrasée" "h:bas-evt"
+mut_haut TH.11 M-HAUT-REDUIT 's|if (!plein \&\& h < 300) { h = borne(300)|if (!plein) { h = borne(300)|' 'j.haut["haut-evt"].now!==544' "un tiroir à 544 px est ramené à 300" "h:haut-evt"
+mut_haut TH.12 M-HAUT-EN-PLEIN 's|if (!plein \&\& h < 300)|if (h < 300)|' 'j.haut["plein-evt"].now>=300' "le plein écran est rehaussé" "h:plein-evt"
 fi
 
 vf_hyg_assert

@@ -5,7 +5,6 @@
 # La sonde et les pages jetables sont écrites par la suite dans mktemp. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home"
@@ -15,6 +14,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -112,13 +112,12 @@ assert_eq "R1.2 — témoin : un fetch externe est enregistré" "$(grep -c '^fet
 rm -f "$SONDE_OUT" "$SONDE_OUT.charge"
 lancer() { # lancer <serve.mjs> -> PORT, TOK, PTOK ; le serveur tourne sous la sonde
   rm -f "$OUT/.cache/server.json"
-  VF_SONDE_OUT="$SONDE_OUT" node --import "$AUX/sonde.mjs" "$1" --no-open --port $(libre) > "$WORK/serve.out" 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0)
+  COCKPIT_NODE_ARGS="--import $AUX/sonde.mjs" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$LAB" VF_SONDE_OUT="$SONDE_OUT" || true
+  SRV="$VF_PID"
+  PORT="$VF_PORT"
   TOK=$(node "$AUX/token.mjs" "$PORT" /); PTOK=$(node "$AUX/token.mjs" "$PORT" /project.html)
 }
-charger() { node "$AUX/get.mjs" "$PORT" / > "$WORK/page-code.html"; node "$AUX/get.mjs" "$PORT" /project.html > "$WORK/page-projet.html"; node "$AUX/get.mjs" "$PORT" /equipe.html > "$WORK/page-equipe.html"; node "$AUX/get.mjs" "$PORT" "/api/vf/transcript?id=inconnu-69" "$TOK" > "$WORK/transcript.json"; node "$AUX/sse.mjs" "$PORT" "$PTOK" 3000; node "$AUX/get.mjs" "$PORT" /api/vf/etat "$TOK" > "$WORK/etat.json"; }
+charger() { node "$AUX/get.mjs" "$PORT" / > "$WORK/page-code.html"; node "$AUX/get.mjs" "$PORT" /_vf/ui/69-vf-flux.js > "$WORK/flux-code.js"; node "$AUX/get.mjs" "$PORT" /project.html > "$WORK/page-projet.html"; node "$AUX/get.mjs" "$PORT" /equipe.html > "$WORK/page-equipe.html"; node "$AUX/get.mjs" "$PORT" "/api/vf/transcript?id=inconnu-69" "$TOK" > "$WORK/transcript.json"; node "$AUX/sse.mjs" "$PORT" "$PTOK" 3000; node "$AUX/get.mjs" "$PORT" /api/vf/etat "$TOK" > "$WORK/etat.json"; }
 lancer "$OUT/serve.mjs"; charger
 PORTS=$(node "$AUX/json.mjs" "$OUT/.cache/server.json" 'Object.keys(j).filter(k=>/port/i.test(k)).join(",")')
 assert_eq "R1.3 — la sonde était chargée dans le serveur" "$([ -s "$SONDE_OUT.charge" ] && echo oui || echo non)" "oui"
@@ -139,7 +138,8 @@ echo "=== R3 — un seul port, plus de paramètre live ==="
 assert_eq "R3.1 — aucune page ne mentionne le second port du spike" "$(cat "$WORK/page-code.html" "$WORK/page-projet.html" | grep -c '4379')" "0"
 assert_eq "R3.2 — aucune page ne lit un paramètre live" "$(cat "$WORK/page-code.html" "$WORK/page-projet.html" | grep -cE "get\('live'\)|[?&]live=")" "0"
 assert_eq "R3.3 — .cache/server.json (lu pendant l'exécution) ne déclare qu'un port" "$PORTS" "port"
-assert_eq "R3.4 — témoin : la page ouvre le flux par un chemin relatif" "$([ "$(grep -c "EventSource('/api/vf/events" "$WORK/page-code.html")" -ge 1 ] && echo oui || echo non)" "oui"
+# 79-14, 79-16 : la page est la coquille, le flux s'ouvre dans ui/69-vf-flux.js (listé par son manifeste, servi sous /_vf/) : la propriété reste « un seul flux, par un chemin relatif »
+assert_eq "R3.4 — témoin : la page ouvre le flux par un chemin relatif (le script du flux est dans son manifeste et ouvre '/api/vf/events', jamais une adresse complète)" "$([ "$(grep -c '69-vf-flux.js' "$WORK/page-code.html")" -ge 1 ] && [ "$(grep -c "('/api/vf/events?token=" "$WORK/flux-code.js")" = 1 ] && [ "$(grep -cE "https?://[^ ]*/api/vf/events" "$WORK/flux-code.js")" = 0 ] && echo oui || echo non)" "oui"
 
 vf_hyg_assert
 echo ""

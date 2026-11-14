@@ -8,7 +8,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { compileGlob, parseArgs, fmtNum, mapDir, keepOutOfGit } from './lib/common.mjs';
+import { compileGlob, regleDeNoeuds, rattacher, parseArgs, fmtNum, mapDir, keepOutOfGit } from './lib/common.mjs';
 import { fallbackFileName, fallbackRouteName, routeKey } from './lib/names.mjs';
 import { buildHealth } from './lib/health.mjs';
 import { buildPlanHealth } from './lib/blueprint.mjs';
@@ -114,32 +114,15 @@ const included = filesAll.filter((f) => include.includes(f.category) && !ignoreG
 const includedSet = new Set(included.map((f) => f.path));
 
 // ---------- assign files to nodes ----------
-// A node's `exclude` also applies to its descendants, so "web excludes tests" holds all the way down.
-const inheritedExcludes = (n, seen = new Set()) => {
-  if (!n || seen.has(n.id)) return [];
-  seen.add(n.id);
-  return [...(isStrArr(n.exclude) ? n.exclude : []), ...(n.parent ? inheritedExcludes(byId.get(n.parent), seen) : [])];
-};
-const matchers = nodes.filter((n) => n?.id && isStrArr(n.paths ?? [])).map((n, order) => ({
-  id: n.id, order, depth: depthOf.get(n.id) || 0,
-  paths: (n.paths || []).map(compileGlob), exclude: inheritedExcludes(n).map(compileGlob), hits: new Array((n.paths || []).length).fill(0),
-}));
+// vibeflow 75-06 : la règle (profondeur, spécificité, `exclude` hérité par les descendants) vit dans lib/common.mjs, appelée aussi par les cartes prévues
+const matchers = regleDeNoeuds(nodes);
 const owner = new Map();
 let ambiguous = 0;
 const ambiguousEx = [];
 for (const f of included) {
-  let best = null, bestKey = null, tie = null;
-  for (const m of matchers) {
-    if (m.exclude.some((g) => g.test(f.path))) continue;
-    let spec = -1;
-    m.paths.forEach((g, i) => { if (g.test(f.path)) { m.hits[i]++; spec = Math.max(spec, g.specificity); } });
-    if (spec < 0) continue;
-    const key = [m.depth, spec];
-    if (!best || key[0] > bestKey[0] || (key[0] === bestKey[0] && key[1] > bestKey[1])) { best = m; bestKey = key; tie = null; }
-    else if (key[0] === bestKey[0] && key[1] === bestKey[1]) tie = m.id;
-  }
-  if (tie) { ambiguous++; if (ambiguousEx.length < 3) ambiguousEx.push(`${f.path} (${best.id} vs ${tie})`); }
-  owner.set(f.path, best ? best.id : 'unassigned');
+  const { id: best, tie } = rattacher(matchers, f.path);
+  if (tie) { ambiguous++; if (ambiguousEx.length < 3) ambiguousEx.push(`${f.path} (${best} vs ${tie})`); }
+  owner.set(f.path, best);
 }
 for (const m of matchers) m.hits.forEach((h, i) => { if (!h) warn(`node "${m.id}" path "${m.paths[i].glob}" matches no included file`); });
 if (ambiguous) warn(`${ambiguous} file(s) matched two sibling nodes equally; the first declared won. Make globs more specific or add an exclude. e.g. ${ambiguousEx.join('; ')}`);
@@ -443,19 +426,20 @@ const page = (g) => template
   .replace(/__FLOORPLAN_TITLE__/g, () => escapeHtml(`${arch.project.name} map`))
   .replace(/__FLOORPLAN_LOGO__/g, () => svgUri('vibeflow-logo-clair.svg')) // vibeflow P12
   .replace(/__FLOORPLAN_FAVICON__/g, () => svgUri('vibeflow-logo-clair.svg')) // vibeflow P12
+  .replace('<!--__UI_I18N__-->', () => uiI18n) // vibeflow 79-10 : le traducteur et la table (blocs « // vibeflow:fr ») avant le script principal ; sans l'emplacement dans le gabarit, l'ancien ordre
   .replace('<!--__UI_EXTENSIONS__-->', () => uiScripts);
 const uiDir = path.join(SKILL_DIR, 'assets', 'ui');
-const uiScripts = fs.existsSync(uiDir) ? fs.readdirSync(uiDir).filter((n) => n.endsWith('.js')).sort().map((n) => `<script>/* ui/${n} */\n${fs.readFileSync(path.join(uiDir, n), 'utf8').replace(/<\/script/gi, '<\\/script')}</script>`).join('\n') : '';
+const uiTag = (n) => `<script>/* ui/${n} */\n${fs.readFileSync(path.join(uiDir, n), 'utf8').replace(/<\/script/gi, '<\\/script')}</script>`;
+const uiFiles = fs.existsSync(uiDir) ? fs.readdirSync(uiDir).filter((n) => n.endsWith('.js')).sort() : [];
+const uiFr = (n) => fs.readFileSync(path.join(uiDir, n), 'utf8').split('\n', 1)[0] === '// vibeflow:fr';
+const uiAvant = template.includes('<!--__UI_I18N__-->'); // seul un gabarit qui porte l'emplacement reçoit les blocs de traduction avant le script principal
+const uiI18n = uiAvant ? uiFiles.filter(uiFr).map(uiTag).join('\n') : '';
+const uiScripts = uiFiles.filter((n) => !uiAvant || !uiFr(n)).map(uiTag).join('\n');
 const html = page(graph);
 fs.writeFileSync(path.join(outDir, 'index.html'), html);
 // --artifact: a copy to publish to the Claude app, without this machine's absolute path (editor links)
 if (args.artifact) fs.writeFileSync(path.join(outDir, 'artifact.html'), page({ ...graph, meta: { ...graph.meta, root: null, agent: 'claude' } }));
-// Self-contained helpers next to the map: ask questions through the Claude Code CLI or Codex (serve.mjs)
-// and the graph lookups it hands to them (query.mjs). They need only Node, not this skill.
-fs.writeFileSync(path.join(outDir, 'query.mjs'), `${graphQuery}
-// ---- cli ----
-${fs.readFileSync(path.join(SKILL_DIR, 'assets', 'query-cli.mjs'), 'utf8')}`);
-fs.copyFileSync(path.join(SKILL_DIR, 'assets', 'serve.mjs'), path.join(outDir, 'serve.mjs'));
+// vibeflow 79-06 : la sortie ne porte que des données ; le serveur (serve.mjs) et le cœur de requête (graph-query.js, query-cli.mjs) restent dans le module.
 // a blueprint can be changed from the map: serve.mjs redraws it with this skill's plan.mjs and build.mjs
 if (scan.blueprint) { fs.mkdirSync(path.join(outDir, '.cache'), { recursive: true }); fs.writeFileSync(path.join(outDir, '.cache', 'skill.json'), JSON.stringify({ dir: SKILL_DIR })); }
 // the logo and tab icon are inlined so the map stays one self-contained file

@@ -11,6 +11,7 @@ import path from 'node:path';
 import { lancerGitAsync, finDans } from './vf-cockpit-paths.mjs';
 import { nettoie, brancheBaseAsync } from './vf-cockpit-arbres.mjs';
 import { masque } from './vf-cockpit-lecture.mjs';
+import { gitSortant } from './vf-cockpit-git-sortant.mjs';
 import { detailCommit, etatWorktrees, worktreeVerifie } from './vf-cockpit-git-details.mjs';
 import { FORMAT_JOURNAL, CHAMPS_REFS, MOTIF_SHA, lireJournal, lireRefs, lireWorktrees, ordonner, placer, etiquettes, teinte } from './vf-cockpit-git-graphe.mjs';
 import { cmdCd, cmdSwitch, cmdBranchSupprimer, cmdStashShow, cmdCommitInitial, cmdStatus } from './vf-cockpit-git-commandes.mjs';
@@ -31,7 +32,7 @@ const commande = (cmd, ...noms) => (cmd !== null && noms.every((n) => masque(n) 
 // MONO-VOL : une échéance plus longue ne doit pas empiler les lectures (le tiroir relit à chaque rafale de signal, filet de 5 s). Une lecture en cours pour un lab n'est jamais doublée : tout appel qui arrive
 // pendant qu'elle tourne partage UNE seule lecture suivante, lancée à sa fin (jamais deux en même temps, et jamais l'état d'avant un `git switch` rendu à un appel d'après).
 const EN_VOL = new Map();
-function monoVol(cle, lire) {
+export function monoVol(cle, lire) { // exporté tel quel (75-01 : la tâche d activité de 75-05 est mono-vol)
   const v = EN_VOL.get(cle);
   if (v) return v.suivante ??= v.cour.then(() => monoVol(cle, lire), () => monoVol(cle, lire));
   const cour = lire().finally(() => EN_VOL.delete(cle));
@@ -48,6 +49,7 @@ async function enteteDetail(lab, fin) {
   let muet = false;
   const git = async (...a) => { try { const r = await lancerGitAsync(lab, a, { fin }); if (r.delai) muet = true; return String(r.sortie ?? '').trim(); } catch { return ''; } };
   const vide = (etat, depot) => ({ etat, depot: nettoie(depot, 200), branche: null, worktree: null, detache: false, sha7: null });
+  if (gitSortant(lab)) return { entete: vide('absent', path.basename(path.resolve(lab))), muet }; // AUDC-A-02 : le .git du lab désigne un dépôt hors du lab : ni branche ni dépôt servis
   const commun = await git('rev-parse', '--path-format=absolute', '--git-common-dir');
   if (!commun) return { entete: vide(muet ? 'indisponible' : 'absent', path.basename(path.resolve(lab))), muet };
   const racine = path.basename(commun) === '.git' ? path.dirname(commun) : commun.replace(/[\\/]+$/, '').replace(/\.git$/, '');
@@ -60,7 +62,7 @@ async function enteteDetail(lab, fin) {
   if (sha7 && !muet) return { entete: { etat: 'ok', ...base, branche: null, detache: true, sha7: nettoie(sha7, 40) }, muet };
   return { entete: { etat: 'indisponible', ...base, branche: null, detache: false, sha7: null }, muet };
 }
-const enteteAsync = async (lab, fin) => (await enteteDetail(lab, fin)).entete;
+export const enteteAsync = async (lab, fin) => (await enteteDetail(lab, fin)).entete;
 
 const refLog = (r) => r.ref; // REF-QUALIFIEE : jamais un nom court (« -x » serait lu comme une option)
 const court = (ref) => ref.replace(/^refs\/(heads|remotes)\//, '');
@@ -185,7 +187,7 @@ async function assembler(lab, fin) {
   const parAuteur = new Map(); // agrégé en JS sur les commits déjà lus (aucun outil de comptage git)
   for (const c of commits) { const a = parAuteur.get(c.an) || { nom: net(c.an), commits: 0, dernier: 0 }; a.commits++; a.dernier = Math.max(a.dernier, c.at); parAuteur.set(c.an, a); }
   const cb = refOrigine ? compte(refs.find(estBase)?.ab2) : null;
-  const base = { nom: refBase ? net(court(refBase)) : null, locale: cb?.avance ?? null, distante: cb?.retard ?? null, divergent: !!cb && cb.avance > 0 && cb.retard > 0 };
+  const base = { nom: refBase ? net(court(refBase)) : null, locale: cb?.avance ?? null, distante: cb?.retard ?? null, divergent: !!cb && cb.avance > 0 && cb.retard > 0, h: refBase ? shaRef(refBase) : null };
   return { schema: SCHEMA, etat: 'ok', entete, base,
     worktrees: worktrees.map((w, i) => ({ nom: net(path.basename(w.chemin)), chemin: net(w.chemin), branche: w.branche ? net(court(w.branche)) : null, detache: w.detache, ici: w === ici, principal: i === 0, verifie: verifie.get(w),
       commande: w === ici || !verifie.get(w) ? null : commande(cmdCd(w.chemin), w.chemin) })),

@@ -1,7 +1,7 @@
 // vf-cockpit-lancer-post — mécanisme POST de la page P (Phase 72, LANC-03 ; P72-D-09, P72-D-10, P72-D-11).
 // Rôle : accepter, sur une TABLE explicite de chemins exacts, une requête dont l'hôte, l'origine, le jeton de page, le type de contenu, la taille et le
 // schéma du corps sont exactement ceux attendus, puis remettre au gestionnaire de la route une copie des SEULS champs déclarés. « La page propose,
-// le terminal dispose » : proposer doit être difficile à forger hors de la page, et ne donne, depuis la page, que le pouvoir de PROPOSER.
+// le terminal dispose » : proposer doit être difficile à forger hors de la page. Depuis la page, deux pouvoirs seulement : PROPOSER une commande (la confirmation et l'écriture au shell restent dans Q) et demander la FIN du shell (AUDC-M10, route « terminer »), tous deux par le même canal fermé vers Q (P72-D-10).
 // Interface : creerPost({ routes, jetons, journal }) -> { reconnait(url) (synchrone), traiter(req, res, url) (async, ne rejette jamais) }.
 //   routes  = { '<chemin exact>': { champs: { <nom>: { type: 'string', max, requis } }, gestionnaire: async (valide) => ({ statut, corps }) } }
 //   jetons  = () => liste des jetons de page acceptés (le module n'en connaît aucun autre) ; journal = (code) => … (ne reçoit QUE des codes de REFUS)
@@ -10,7 +10,7 @@
 // Aucun en-tête de partage entre origines : une requête de contrôle préalable reçoit 405. Aucun écouteur, aucune lecture de fichier, aucun accès à l'environnement.
 import { egal } from './vf-cockpit-terminal-amorce.mjs';
 
-export const ENTETE_JETON = 'x-floorplan-token'; // renommé à l'assemblage par renommerTexte (comme vf-cockpit-server.mjs) ; l'ancien nom est alors refusé
+export const ENTETE_JETON = 'x-vf-cockpit-token'; // renommé à l'assemblage par renommerTexte (comme vf-cockpit-server.mjs) ; l'ancien nom est alors refusé
 export const CORPS_MAX = 512;
 export const REFUS = Object.freeze({ hote: 403, methode: 405, origine: 403, jeton: 403, type: 415, taille: 413, corps: 400, schema: 400, interne: 500 });
 

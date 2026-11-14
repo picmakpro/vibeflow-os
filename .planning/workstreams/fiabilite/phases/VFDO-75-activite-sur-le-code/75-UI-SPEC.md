@@ -1,0 +1,243 @@
+# 75-UI-SPEC : l'activité posée sur la carte Code (contrat d'interface)
+
+Auteur : vf-crafter, 2026-11-11. Spec seule, aucun fichier de code touché. Les plans de la Phase 75 la citent par numéro de section.
+Décisions tenues, non rouvertes : P75-D-01 à D-06, D-13, D-15, D-17, D-18, D-20 ; Q9 et `DESIGN.md` § 9 ; P71.5-D-01, D-19, D-21, D-28, D-29 ; Q11, Q12, P78-D-04.
+Complété le 2026-11-11 après le second amendement de la Phase 79 (commit `6f66d878`, A21 à A28) : § 3.4, § 5.4, § 7.3.
+Générique : l'interface décrite ici est vérifiable à l'écran, les noms de classe (`.lm`…) sont des noms de travail. Texte FR : espace insécable avant `: ; ! ?` et `%`, et dans les nombres à partir de 1 000 ; aucun tiret long dans le texte d'interface ; point médian `·` comme séparateur.
+
+## 0. L'écran présent (relevé sur le code et les captures, lecture seule)
+
+- **« Travail récent » aujourd'hui** : le bouton d'en-tête `#btn-recent` (`ui/25-recent.js`), icône « récent » en `--recent`, pastille de compte pleine `--recent` + `--on-recent-text`. En bureau (> 999 px) il est dans l'en-tête, entre Santé (`#btn-health`) et « Par où commencer » (boussole), ouvre un tableau (`showBoard`). Jusqu'à 999 px il vit dans le menu « ⋯ » (`#vf-plus-menu`, `ui/02-vf-telephone.js`), entre « Santé » et « Par où commencer », pastille neutre `--on`. La bascule binaire est la ligne « Highlight recent work » (« Surligner le travail récent ») du menu « Types de liens » (`#legend`).
+- **Pied de carte** : `.foot` = `.meta` à gauche (taille : « 8 fichiers », « 3 endpoints »), à droite UN emplacement : `.vst` (statut) sinon `.rw` (« 2 récents »). Le pied n'existe que si la carte a une taille ou une pastille : une carte de fichier sans endpoint n'a aucun pied. Hauteur du pied : 20 (`--sp-20`) + gap 8 = `FOOT_H` 28 ; aux zooms `lod`, l'onglet Code n'a que `svg.lod-low .rw` (`viewer.html:227`) : les règles `.vst` de `lod-mid`/`lod-low` sont gardées par `TAB === 'project'` (`ui/00-vibeflow.js:119`). **Le CSS `lod-mid` du Code est donc à écrire**, `flex-wrap` du pied compris. `lod-low` masque déjà `.meta`.
+- **Ce que la retraite libère** : l'emplacement droit du pied (`.rw`, `.rw.soft`, `.card.recent`) et la ligne de la bascule (D-20).
+- **Sous-titre de la vue** : `#context p` (« 806 fichiers et 0 route lus dans le dépôt. »), 14 px, tient sur une ligne à 390 px (~ 270 px sur 358).
+
+## 1. Sélecteur de lentilles
+
+### 1.1 Place et forme
+| Largeur | Emplacement | Forme |
+|---|---|---|
+| > 999 px | exactement le créneau de `#btn-recent` : entre Santé et la boussole | bouton d'en-tête carré (même `addHeaderButton`), icône « lentille » (cercle et arc de reflet, 16 px, trait 1,75, `currentColor`, couleur `--text-2` : l'ancien trait `--recent` disparaît) ; ouvre un menu `#lens-menu` posé comme `#legend` : `top` 44, `right` 0, largeur 320, classe `.menu` ; **état actif** : lentille ≠ Aucune → l'état est dans le libellé (pas d'`aria-pressed` : bouton de menu) et le bouton prend le fond neutre `rgba(var(--ink), .07)` (celui du survol), aucune teinte ; identifiant **`#btn-lentilles`** (références `#btn-recent` à migrer : `ui/00-vibeflow.js:111`, `chrome-moteur-carte.mjs:245-246`, `test-cockpit-responsive.sh:90` et `:496`) |
+| ≤ 999 px | entrée du « ⋯ » à la place exacte de « Travail récent » (entre Santé et « Par où commencer ») | même mécanique que « Types de liens » : l'entrée clique le bouton d'origine, le menu se pose en `fixed` (`top` = `--hh` + 4, `left` 8, largeur `min(320px, 100% - 16px)`, `max-height 60vh`) ; une ligne de plus dans les sélecteurs de `viewer.html:274` et `:539` ; à ≤ 700 px la règle de `viewer.html:593` (pleine largeur, `right: 8`) s'applique aussi |
+**Plafond du menu (tous gabarits)** : `max-height: calc(100vh - var(--hh) - var(--sp-16)); overflow: auto; overscroll-behavior: contain` (Empreinte + filtre atteint ≈ 800 px) ; ≤ 999 px le `60vh` ci-dessus s'applique en plus, le plus petit gagne.
+Libellé du bouton et de l'entrée : le bouton porte un `.bl` « Lentille : Aucune » (lu en premier par `lib()` du « ⋯ » : pas de doublon avec l'`aria-label` ni avec le compte, qui est la pastille) ; libellés : **« Lentille : Aucune »**, **« Lentille : Points chauds »**… (l'état est dit dans le libellé, comme « Thème : Clair »). Infobulle : « Lentille d'activité sur le code ». Aucun bouton d'en-tête de plus, aucun onglet, rien ne pousse la carte (Q12 : le menu est un volant au-dessus du plan).
+Pastille de compte (D-20) : nombre de fichiers **en cours d'écriture** par un agent actif ; absente à 0. **Neutre partout, aucune exception** : au bureau comme dans le « ⋯ », la pastille neutre existante, `--on` sur `--on-text` (DESIGN § 2, « bouton plein, pastille »), jamais un fond teinté pour un état (DESIGN § 9, P71.5-D-19) ; l'ancien badge plein `--recent` disparaît. Elle se lit sans lentille active. `aria-label` du bouton : « Lentille : Aucune, 2 fichiers en cours d'écriture ». Le point du « ⋯ » (présence, jamais une somme, Q8) ne change pas. Question à Samuel : Q-75-5 du CONTEXT ; la spec se bâtit sur la règle en vigueur.
+Choix à l'ouverture de la page : **Aucune**, toujours. Rien n'est mémorisé (pas de nouveau stockage, pas de lentille « qui surprend » au rechargement).
+
+### 1.2 Contenu du menu (de haut en bas)
+1. Titre `.lh` (12 px, `--text-3`) : « Lentille d'activité sur le code ».
+2. **Seul conteneur `role="menu"`** : les cinq lignes `role="menuitemradio"` dans un `role="group"` nommé « Lentille » (le filtre d'agents, § 1.3, est un second groupe du même menu) ; `aria-checked`, hauteur 44 en toute largeur tactile (≥ 44 comme `.vf-pl-i`), padding `--inset-row`, rayon 12, survol `rgba(var(--ink), .07)`, ligne cochée = même fond + coche neutre 16 px (icône de trait, `currentColor`, aucune teinte). Libellé 13,5 px `--text` ; sous-libellé 12 px `--text-3` ; compte à droite (pastille neutre, 11 px, `--text-2`, chiffres tabulaires).
+
+| Libellé exact | Sous-libellé | Compte à droite |
+|---|---|---|
+| Aucune | Aucune marque de lentille | (rien) |
+| Points chauds | Ce qui change souvent et pèse lourd | fichiers du palier haut |
+| Couplage | Ce qui change avec le fichier choisi | (rien : relationnel) |
+| Gardes | Ce qu'une suite ou un gate nomme | fichiers sans témoin |
+| Empreinte | Ce que les agents lisent et écrivent | fichiers en cours d'écriture |
+
+3. Hors du `role="menu"` (même volant `#lens-menu`, sans rôle) : filet `--hair`, puis **légende de la lentille active** (`role="group"`, `aria-label="Légende de la lentille"`, § 1.3 ; rien sans lentille). Le titre `.lh` et la légende sont reliés au menu par `aria-describedby`.
+4. Hors du `role="menu"` aussi : filet, puis **ligne du radar** (12 px, `--text-3`, toujours présente, reliée par `aria-describedby`) : « Radar de collisions : 2 fichiers » ; « Radar de collisions : aucune collision vue » **seulement** quand le calcul est complet ; sinon la phrase de son état (§ 5.4). Jamais de zéro affirmé sur un calcul partiel.
+
+### 1.3 États des lignes et légende
+| État | Rendu | Règle |
+|---|---|---|
+| Disponible | ligne normale | |
+| **Indisponible** (erreur git, délai, sortie trop longue : P75-D-11, P78-D-22) | ligne en `--text-3` (couleur, jamais d'opacité ; `--text-4` tombait à 3,79:1 sur fond survolé), sans fond de survol, `aria-disabled="true"`, **reste focalisable**, entrer ne fait rien, `aria-describedby` vers « Indisponible pour l'instant » + « Nouvelle lecture au prochain changement du dépôt » (vrai : recalcul sur la signature de HEAD et des refs, P75-D-09) ; sous-libellé « Indisponible pour l'instant » | si c'est la lentille ACTIVE qui devient indisponible : les marques sont retirées (jamais un résultat partiel), la lentille reste cochée, la légende dit « Points chauds indisponibles pour l'instant. » |
+| **Absente sur ce lab** (Gardes sur un lab non VibeFlow, P75-D-17) | ligne grisée comme ci-dessus ; sous-libellé « Gardes non lues sur ce lab » ; jamais « tout est sans témoin » | la ligne reste visible pour dire pourquoi |
+| **Git absent** (hors dépôt, P75-D-11) | les lignes **Points chauds** et **Couplage** ne sont pas posées du tout ; le menu garde Aucune, Gardes, Empreinte | mêmes cartes, mêmes liens, aucune marque ; la hauteur des cartes de fichier est celle de la réserve du pied (+28, § 2.3), posée aussi sans git (P78-D-11 lue ainsi) |
+| **Connexion perdue** (`VF_ETAT.connexion`) | marques d'Empreinte retirées (jamais un « en cours » figé : il n'y a pas de minuteur) ; ligne Empreinte indisponible | légende : « Empreinte indisponible : connexion au cockpit perdue. Reprise automatique au retour de la connexion. » ; radar : « Radar incomplet : connexion perdue » ; Points chauds, Couplage et Gardes gardent leurs marques (dernier calcul) et leur légende ajoute « Dernière lecture conservée : connexion perdue. » |
+| **En cours de relecture** (`cibles.etat: "en-construction"`, quelques secondes) | ligne Empreinte : sous-libellé « En cours de relecture » ; légende : « Empreinte en cours de relecture, radar incomplet. Reprise dans quelques secondes. » ; radar : « Radar en cours de relecture » | les marques déjà connues restent ; la phrase dit que la liste n'est pas finie |
+| Fenêtre vide | légende « Aucune modification sur 90 jours » | aucune carte marquée ; un fichier sans modification dans la fenêtre ne porte **aucune marque** (jamais « 0 changement ») |
+
+Légende par lentille (les paliers se lisent par FORME, pas par la teinte ; chaque ligne = glyphe 16 px + texte 12 px `--text-2`) :
+- **Points chauds** : « Haut : tiers le plus changé et le plus gros » · « Moyen » · « Bas » ; puis « Commits des 90 derniers jours, hors fusions » ; si le plafond mord : « Fenêtre réduite à 5 000 commits » ; clone superficiel : « Historique partiel ».
+- **Couplage** : « Haut : 75 % et plus » · « Moyen : 50 à 74 % » · « Bas : 30 à 49 % » ; puis « Sélectionnez un fichier : ceux qui changent avec lui sont marqués. » (seule ligne affichée tant que rien n'est sélectionné ; sur un nœud : « Le couplage se lit sur un fichier. »).
+- **Gardes** : « Garde du dépôt : un gate, une suite ou un hook lui-même » · « Aucune suite ne le nomme » · « Nommé par n suites : pas de glyphe, le mot seul » ; puis « Lecture des noms cités par les suites et les gates, rien n'est exécuté ». L'emplacement du glyphe **n'est pas réservé** : sans glyphe, le mot s'aligne à droite du pied, comme toute marque.
+- **Empreinte** : quatre lignes, glyphe de § 2.1 + texte : « En écriture maintenant » · « Modifié par un agent vivant » · « Lu par un agent vivant » · « Fini il y a moins de 24 h » ; puis, en deux phrases distinctes, « Écritures par commande non vues. » et « Écritures hors du lab : 2 comptées, non dessinées. » ; « 3 hors carte. » quand des cibles n'ont pas de carte. Le filtre d'agents (D-13) s'ajoute **seulement** quand un rattachement existe : groupe « Agents », rangées radio « Toute l'équipe » (défaut) puis une rangée par mission rattachée (5 au plus) ; rôle `menuitemradio` dans un `role="group"` nommé « Agents », rangées dans le cycle `↓` `↑`, `Entrée` choisit **sans fermer** le menu.
+
+## 2. Marques de carte
+
+### 2.1 Glyphes (distincts des glyphes d'état existants : coche, demi-disque dans un anneau, anneau-point, anneau, anneau barré horizontal, anneau barré diagonal, disque plein « récent », anneau-i, triangle, losange-croix)
+Boîte 1,45 em (= celle de `.vst`, 16 px à l'échelle 1), même technique de masque SVG en `%23`, aucun hexadécimal ni `rgb(` dans le fichier (M5.3).
+| Sens | Forme (viewBox 16) | Couleur |
+|---|---|---|
+| Palier bas | `M2 14.5V9.5H5V14.5Z` (barre 3 × 5, ligne de base y = 14,5) | `--text-3` |
+| Palier moyen | la précédente + `M6.5 14.5V5.5H9.5V14.5Z` (3 × 9) | `--text-3` |
+| Palier haut | les deux + `M11 14.5V1.5H14V14.5Z` (3 × 13) ; aires 15, 42, 81 u² | `--text-3` |
+| Collision | **confluent**, trait 2, extrémités arrondies : `M3 2.5L8 8.5L13 2.5M8 8.5V14` | `--text-3` |
+| Est une garde | **bouclier plein** : `M8 1.5L13.5 3.8V8C13.5 11.3 11.2 13.3 8 14.5C4.8 13.3 2.5 11.3 2.5 8V3.8Z` | `--text-3` |
+| Sans témoin | **bouclier évidé** (même tracé, contour de trait 2, intérieur vide) barré de `M3.5 13L12.5 3` (trait 2,5, extrémités arrondies) : plein contre évidé, la silhouette distingue | `--text-3` |
+| Empreinte : en cours | **disque plein** `cx 8 cy 8 r 5` (10 hors tout) | `--recent` (§ 2.2) |
+| Empreinte : modifié | **triangle plein** `M8 2.5L13.5 13.5H2.5Z` (11 × 11) | `--text-3` |
+| Empreinte : lu | **carré creux** `rect x 4,25 y 4,25 côté 7,5`, trait 2,5 (10 hors tout, comme le rond) | `--text-4` |
+| Empreinte : fini | **tiret plein** `rect x 3 y 6,5 w 10 h 3` | `--text-4` |
+| Prévu (§ 7) | **anneau ouvert à trois arcs**, trait 2, r 5,5 : `M13.5 8A5.5 5.5 0 0 0 10.75 3.24M5.25 3.24A5.5 5.5 0 0 0 2.5 8M5.25 12.76A5.5 5.5 0 0 0 10.75 12.76` (arcs 60°, vides 60°, extrémités à plat) | `--st-todo` |
+Encre dans [1,5 ; 14,5]² pour les onze glyphes. **Une seule taille de glyphe aux paliers `lod` : 24 u** (`var(--sp-24)`) ; à l'ouverture 1,45 em (16 px). **Promesse de lecture abaissée à k = 0,42** (24 u ≈ 10,1 px, seuil d'entrée de `lod-low`) ; en dessous (k = 0,23 : 5,5 px, tiret à 0 pixel sur deux décalages) rien n'est promis : la marque est une tache de présence, la lecture passe au zoom ou au panneau (cohérent avec « la forme porte le palier » seulement à k ≥ 0,42). Distinctions : silhouettes pleines et distinctes pour l'Empreinte (rond, triangle, carré creux, tiret), nombre de barres pour les paliers ; la nuance de gris n'est qu'un renfort.
+
+### 2.2 Contraste (calculé, WCAG 2.x ; `--surface` / `--raise` / `--bg` = canvas)
+| Jeton | Sombre (surface · raise · bg) | Clair (surface · raise · bg) |
+|---|---|---|
+| `--text-3` (glyphes neutres) | 7,39 · 6,61 · 8,06 | 7,00 · 5,86 · 6,30 |
+| `--text-4` (lu, fini) | 4,58 · 4,09 · 4,99 | 5,74 · 4,81 · 5,17 |
+| `--recent` (en cours) | 9,62 · 8,60 · 10,49 | 3,48 · **2,91** · 3,13 |
+| `--recent-text` | (identique au `--recent`) | 5,12 · 4,28 · 4,61 |
+Tous les glyphes neutres tiennent ≥ 3:1 sur les trois fonds dans les deux thèmes. Seul `--recent` clair échoue sur `--raise` (2,91) : règle (DESIGN § 9) **sur `.card.module` (fond `--raise`) en thème clair, le glyphe « en cours » prend `--recent-text`** (4,28:1). Aucun nouveau jeton. Mot : `--text-2` (≥ 10:1), 11 px, 500.
+
+### 2.3 Place, géométrie invariante (P75-D-03)
+- **Place** : l'emplacement droit du pied, celui de `.rw`/`.vst`. Un élément `.lm` (glyphe + mot, sans fond, `gap` `--sp-6`, `line-height 16px`, hauteur 20) ; **padding de base `var(--sp-2) 0`**, comme `.vst` et `.rw` (`viewer.html:223`, `ui/00-vibeflow.js:46`) pour que le bord droit visible s'aligne ; `--inset-pill` n'est vertical que dans DESIGN § 5 ; le `.vst` de statut garde la priorité sur lui : une carte à statut (phase, prévue) ne porte pas de marque de lentille.
+- **Règle choisie : place RÉSERVÉE, pas contenu de même hauteur.** Raison : une carte de fichier sans endpoint n'a aucun pied, il n'existe donc aucun contenu à remplacer. Au **moment de la construction du graphe** (jamais au changement de lentille ni à une mise à jour en direct), toute carte marquable **de l'onglet Code seulement** (`TAB === 'code'` : `cardExtraH` et `FOOT_H`, `viewer.html:982-1006`, sont partagés avec Projet et Équipe ; fichier, nœud, prévue ; pas connecteur ni externe) reçoit un pied : `cardExtraH` compte `FOOT_H` pour elle même sans taille ni pastille, et le pied a une hauteur **fixée** : 20 à l'ouverture ; à `lod-mid` et `lod-low`, `height: calc(var(--sp-24) + var(--sp-4)) /* dérivé : pastille du zoom d'éloignement */` (28), marque posée ou non. Un `.lm` à glyphe de 1,45 em ferait 32,65 (17 px) ou 34 (18 px) : aux paliers `lod`, **padding `0 var(--sp-12)`, glyphe plafonné à `var(--sp-24)` (24)**, hauteur du pied inchangée. Témoin : Projet et Équipe, géométrie inchangée. Effet assumé, **une seule fois à l'ouverture** : les cartes qui n'avaient pas de pied grandissent de 28 ; le placement (ELK) tourne une fois, avec la construction. **Chiffre à relever, non mesurable sans navigateur** : n cartes de fichier sans pied par niveau × 28 = hauteur ajoutée ; l'exécution consigne n et la hauteur totale avant/après du niveau le plus chargé, à 1440 et 390, et l'échelle de l'ajustement automatique de la vue ; **Critère d'arrêt (G19 ; P75-D-25, décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée, prise par le manager)** : si le k d'ouverture change de palier (0,65 ou 0,42, `viewer.html:1347-1348`) à 1440 ou 390 px à cause de la réserve, l'exécution s'arrête et remonte au manager ; rejouer sans les affaiblir `chrome-moteur-carte`, `test-cockpit-responsive.sh` R1, R3, R19, R20, `chrome-equipe-clavier.mjs` (EK10) et le mutant `test-cockpit-equipe.sh:950`, qui doit rester rouge (71.5-SPEC-code § 4.2).
+- **Témoin** (P75-D-03) : géométrie de chaque carte (largeur, hauteur, x, y) et hauteur du pied, mesurées avant et après chaque bascule de lentille, après une mise à jour de l'empreinte, à 1440, 1024 et 390, aux trois paliers de zoom : identiques à 0 px.
+- **Largeur** : `.lm` rétrécit avant `.meta` (le mot s'ellipse, jamais le glyphe ; mot entier en infobulle et dans le nom accessible) ; `.meta` et `.vst` gardent leur règle actuelle (le mutant EK10.2 reste rouge). Pas de longueur maximale de gabarit : la règle d'ellipse seule fait foi (S8).
+
+### 2.4 Niveaux de zoom
+| Niveau | Rendu de la marque |
+|---|---|
+| Ouverture | glyphe 1,45 em + mot complet, 11 px |
+| `lod-mid` | glyphe (24 u) + **forme courte** (tableau 2.5), 17 px, padding `0 var(--sp-12)`, pied de 28 fixe ; `.meta` garde sa taille actuelle (11,5), `white-space: nowrap` ; pied en `flex-wrap: nowrap`, `.lm` et le groupe collision + `.lm` en `flex: none`, `.meta` seul s'ellipse |
+| `lod-low` | **glyphe seul** (24 u) ; mot, forme courte et chiffre masqués (`display: none`) ; la forme porte le palier **à k ≥ 0,42 seulement** (§ 2.1) ; au-delà, tache de présence |
+
+### 2.5 Mots chiffrés (gabarits ; un nombre au singulier prend le singulier)
+| Lentille | Carte de fichier (mot complet) | Forme courte (lod-mid) | Carte de nœud (agrégat, D-04) |
+|---|---|---|---|
+| Points chauds | « 41 changements » · « 1 changement » | « 41 » | palier maximal + « 3 chauds » (palier haut), sinon « 5 moyens », sinon « 8 peu changés » ; pas de somme |
+| Couplage (voisin) | « 78 % avec la sélection » | « 78 % » | aucun (pas d'agrégat) |
+| Gardes | « garde du dépôt » ; « aucune suite ne le nomme » ; « nommé par 3 suites » (sans glyphe) | « garde » · « sans témoin » · « nommé » | « 12 sur 40 sans témoin » (version courte du pied ; la phrase « 12 fichiers sur 40 sans témoin » est dans l'infobulle et le panneau) ; « tous nommés » si 0 |
+| Empreinte | « en écriture · vf-coder » · « modifié · vf-coder » · « lu · vf-coder » · « fini · vf-coder » ; plusieurs agents : « modifié · vf-coder et 2 autres » | « écrit » · « modifié » · « lu » · « fini » | glyphe du degré maximal + « 2 en écriture » · « 3 modifiés » · « 5 lus » · « 2 finis » (une forme par degré maximal) |
+| Collision | § 5.2 | « 2 » (nombre de sources, § 5.2) | « 2 fichiers » (unité : le fichier) |
+Formes courtes d'une carte de nœud à `lod-mid` : le compte seul (« 3 », « 12/40 », « 2 »). **Unité du radar partout : le fichier.**
+Infobulle (`title` du pied + ligne du panneau, jamais l'unique porteuse) : points chauds « 41 changements sur 90 jours · 1 203 lignes · rang 12 sur 340 » ; gardes : liste des 3 premières suites qui le nomment. Les cartes prévues, doc, suites et fixtures ne portent **aucune** marque de points chauds ni de gardes (pas de chiffre inventé). Le texte du mot est posé par `textContent` ; chemins, noms de branche, rôles et titres d'agent sont des données hostiles (chaîne XSS, P75-D-21).
+
+## 3. Empreinte
+
+### 3.1 Degrés (D-13) et teinte
+| Degré | Glyphe | Mot | Remarque |
+|---|---|---|---|
+| En cours | disque plein `--recent` | « en écriture · {nom} » | seule teinte de la phase ; dernier fichier écrit d'un agent actif ; respiration d'échelle (keyframe existant `vfrespire`, `.aw-pulse`, `ui/71-vf-equipe-rendu.js` : 1 → .82, 2,4 s, coupée en mouvement réduit), à réutiliser, jamais d'opacité |
+| Modifié | triangle plein `--text-3` | « modifié · {nom} » | agent vivant |
+| Lu | **carré en contour** `--text-4` | « lu · {nom} » (glyphe plus discret) | agent vivant, `Read` seul (A24) |
+| Fini | tiret plein `--text-4` | « fini · {nom} » | agent terminé dans les 24 h ; « grisé » = glyphe en `--text-4`, mot toujours `--text-2`, jamais d'opacité ; priorité d'affichage : en cours > modifié > lu > fini |
+Aucun minuteur côté page : l'état vient du flux (`window.VF_ETAT`, clé `frise`) ; clé `connexion` perdue : marques retirées (§ 1.3).
+
+### 3.2 Nom d'agent
+« rôle », puis « · nœud X » seulement si le rattachement existe, puis « · arbre » seulement si deux agents du même rôle sont vivants ; une session : son titre, sinon « session · arbre » ; jamais l'identifiant brut ; un agent non rattaché le dit (« vf-coder · non rattaché »), jamais deviné (P69-D-15). Sur la carte : le rôle seul (+ « et n autres »). Nom complet dans l'infobulle et la section « Agents sur ce fichier » du panneau ; les **finis** y sont repliés (`details` « Terminés dans les 24 h (n) », fermé, P69-D-18).
+
+### 3.3 Mentions de limite (toujours dites, jamais seulement en infobulle)
+« Écritures par commande non vues. » (légende, § 1.3) · « Écritures hors du lab : n comptées, non dessinées. » · « n hors carte. » (cibles sans carte : comptées, jamais affichées, D-14). Ces trois phrases sont aussi le pied de la section Collisions du panneau (§ 5.3).
+
+### 3.4 Écritures dans un arbre hors du dossier du lab (A22 : la cible devient « un fichier hors du lab »)
+Le radar et l'empreinte ne voient pas ces écritures. Texte, à deux endroits : légende de l'Empreinte (§ 3.3, deuxième phrase) et pied de la section Collisions : « Non vu par le radar : écritures par commande, écritures dans un arbre hors du dossier du lab (2 comptées). » Version courte, infobulle du compte de collisions (§ 5.4) : « Non vu : commandes, arbres hors du lab (2) ». Un compte à 0 n'écrit pas la clause « hors du lab ». Aucun chemin hors lab n'apparaît dans l'interface.
+
+## 4. Couplage à la sélection
+
+- Seule une **sélection de fichier** déclenche des marques (D-08). Les voisins (5 au plus, tri par degré décroissant) qui ont une carte **dans la vue courante** portent la marque `.lm` : glyphe du palier (barres, § 1.3) + « 78 % avec la sélection ». Un voisin hors de la vue n'est pas marqué (pas d'agrégat, D-04) : il apparaît dans le panneau seulement. Aucun lien ajouté au graphe (1 905 existent déjà) : les marques sont les seuls signes.
+- La carte **sélectionnée** garde son anneau de sélection neutre (déjà là) et prend dans son pied le mot « 3 voisins marqués » (sans glyphe ; compte les voisins **marqués**, c.-à-d. visibles dans la vue ; le panneau les liste tous) ; sans voisin : « aucun fichier lié ».
+- **Panneau de détail**, nouvelle section d'un fichier, après les sections actuelles : titre `h3` « Change souvent avec » + compte `.c` ; une rangée `.row` (cliquable, `data-go`) par voisin (5 au plus, puis « et 1 autre » en texte) : glyphe de palier · nom du fichier en mono, tronqué à gauche (ellipse du début pour garder le nom) · « 78 % » en `--text-2`, chiffres tabulaires ; infobulle : « Change avec ce fichier dans 78 % des commits, 12 révisions communes ». Vide : « Aucun fichier au-dessus des seuils (5 révisions communes, 30 %) ». Pied 12 px `--text-3` : « Sur 90 jours, d'après l'historique des commits » (+ « Historique partiel » le cas échéant).
+
+## 5. Radar de collisions
+
+### 5.1 Forme
+Glyphe **confluent** (neutre, forme distincte de tout glyphe d'état), mot, jamais de teinte d'alerte, jamais de fond. Les lectures n'entrent pas dans une collision (D-15).
+
+### 5.2 Gabarits de mot (carte)
+| Source | Mot |
+|---|---|
+| Deux agents | « écrit par 2 agents » (« 3 agents » au-delà) |
+| Deux branches | « modifié sur 2 branches » |
+| Deux plans de la même vague | « prévu par 2 plans, vague 3 » |
+Plusieurs sources sur un fichier : le pied n'affiche que la première (agents > branches > prévu) ; le nom accessible et le panneau les listent toutes. **Emplacement du mot** : sans lentille active, il occupe l'emplacement droit (libre). Quand la carte porte aussi une marque de lentille, le mot passe en **forme compacte** : glyphe + nombre **de sources de la source affichée** (agents, branches ou plans ; l'unité est dans l'infobulle et le nom accessible), posé avant la marque de lentille ; une carte sans marque de lentille (aucune lentille, ou fichier non marqué) garde le mot entier. Sur une carte **prévue**, le mot « prévu par 2 plans, vague 3 » prend l'emplacement **gauche** (celui de `.meta`, vide sur une prévue) et laisse `.vst « Prévu »` à droite.
+
+### 5.3 Section du panneau
+Titre « Collisions possibles » + compte. Une rangée **par fichier en collision** : glyphe · nom du fichier · ses gabarits de source · noms : agents « vf-coder (arbre phase-75) et vf-coder (arbre phase-76) » ; branches « feat/phase-75-… et feat/phase-76-… » (nom de branche en mono, tronqué au milieu) ; plans « 75-02 et 75-04 ». Sur un nœud : les collisions de ses fichiers, 5 au plus puis « et n autres » (cliquables, `data-go`). Pied : les phrases de limite de § 3.3 et § 3.4. Plafond de 12 HEAD : « Radar limité à 12 branches » quand il mord.
+
+### 5.4 Compte visible sans lentille, état « incomplet »
+- **Emplacement choisi : la rangée `.k` du contexte** (celle du « Code » au-dessus du titre, `inline-flex`, 12,5 px `--text-3`), à droite du mot « Code », en bouton-lien : glyphe confluent + « 3 fichiers en collision possible » (« 1 fichier… ») ; en plongée `.k` contient un nom de nœud (« Bibliothèque ») : le compte se pose **à droite du contenu de `.k`**. Le sous-titre `#context p` n'est **pas touché** (ni flex, ni ellipse). Il ouvre le panneau de détail (tiroir latéral : rien n'est poussé, Q12) sur la section « Collisions possibles ».
+- **Pourquoi là** : pas d'entrée d'en-tête de plus (D-02) ; la pastille de la lentille est prise par le compte « en écriture » ; le tiroir peut être fermé, donc ne convient pas à un compte lisible sans geste ; la rangée `.k` a de la place et ne dépend d'aucune phrase.
+- **Forme courte jusqu'à 999 px** (F2) : au-dessus de 999 px, glyphe + phrase ; à 999 px et moins (seuil du menu « ⋯ ») glyphe + **« 3 fichiers »** (mot visible : 358 px disponibles à 390 px) ; repli sur le chiffre seul **uniquement par mesure de débordement de `.k`** (largeur de contenu, jamais un `@media` : Q11), `aria-label` complet ; zone tactile 44 × 44 par pseudo-élément (comme `.ctx-more`), sans changer la hauteur de la rangée. Hauteur de `#context` mesurée avec et sans compte : identique par construction.
+- **Bouton** (F1) : couleur `--text-2`, survol `--text`, focus par anneau `--ring` 2 px posé en pseudo-élément comme `.ctx-more` ; `pointer-events: auto` (`#context` est en `none`). Le compte n'existe que sur l'onglet Code (`#context` est réécrit par l'en-tête git et par les en-têtes Projet et Équipe : il est reposé après chaque réécriture). Portée : **le dépôt entier**, identique dans toutes les vues du Code ; le compte compte les fichiers **ayant une carte** (prévus compris), jamais les cibles « hors carte ». Le panneau ouvert depuis le compte, sans sélection, montre « Base de code » avec la section « Collisions possibles » du dépôt (10 rangées, puis « et n autres », cliquables) ; avec un nœud sélectionné, les collisions de ses fichiers (§ 5.3).
+- À 0 collision, le compte n'est pas affiché (le zéro vit dans la ligne du radar du menu, § 1.2). **En construction ou calcul partiel** : le compte et la ligne du menu disent, **selon l'état** : « Radar en cours de relecture » (relecture au démarrage, reprise dans quelques secondes) ; « Radar incomplet : connexion perdue » (reprise automatique au retour de la connexion) ; « Radar incomplet : branches non lues » (lecture git impossible, les agents restent vus) ; ≤ 999 px : glyphe + « … » ; **jamais** « aucune collision » à ce moment. Infobulle : version courte de § 3.4.
+- **Annonce et focus** (F14 ; décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée) : le passage du compte de 0 à n est annoncé par la zone `role="status"` polie (« Radar : 3 fichiers en collision possible », « 1 fichier » au singulier) **à chaque passage de 0 à n** (0→n→0→n : deux annonces) ; les variations de n et le retour à 0 ne le sont pas. À l'ouverture du panneau depuis le compte, le focus va sur le **titre** de la section « Collisions possibles » (`tabindex="-1"`) ; la carte ne bouge pas (Q12).
+
+## 6. Gardes (D-16, D-17)
+
+- Fichiers des six classes de `check-gate-touche.sh` : glyphe **bouclier**, mot « garde du dépôt ». Fichier de code qu'une suite ou un gate nomme : pas de glyphe, mot « nommé par 3 suites » (la liste des 3 premières en infobulle). Fichier de code qu'aucune suite ni aucun gate ne nomme : glyphe **bouclier barré**, mot « aucune suite ne le nomme » ; jamais « non testé » (P69-D-09).
+- Carte de nœud : agrégat « 12 sur 40 sans témoin » + glyphe barré ; « tous nommés » sans glyphe si 0 ; la carte « non assignés » suit la même règle, son poids est dit dans la légende, jamais corrigé. Les cartes prévues, doc, suites et fixtures sont hors décompte.
+- Lab non VibeFlow : lentille absente et dite (§ 1.3). Panneau d'un fichier : section « Gardes » (« Nommé par : » + au plus 5 suites ou gates en mono, puis « et n autres » ; ou « Aucune suite ni aucun gate ne le nomme »). Le mot reste neutre ; seul le glyphe distingue, par la forme.
+
+## 7. Cartes « prévues » (D-18)
+
+### 7.1 Rendu
+Statut `prevu`, mécanisme `st-*` / `.vst` existant : classe `st-prevu` sur la carte, `.vst-prevu` dans le pied, mot **« Prévu »** (`STATE_WORD`), glyphe **anneau ouvert à trois arcs** (arcs de 60°, vides de 60°, extrémités à plat ; plus de pointillé) `--st-todo`, mot `--text-2`, 11 px 500. Carte : fond transparent, une seule intention : bordure 1,5 px pointillée `--hair-2`, **sans** ombre (`--shadow-card` retirée) ; le padding perd 1,5 px de compensation (`calc(var(--inset-card) - 1.5px) /* dérivé : bordure 1,5 */`) pour que le contenu ne bouge pas ; titre mono 500 `--text-2` ; icône nue `--text-3` (pas la couleur de famille : le fichier n'existe pas) ; description (`.desc` `--text-3`, une ligne) : « Créé par le plan 75-02 » ; au pluriel, ids triés : « Créé par les plans 75-02 et 75-04 », « Créé par les plans 75-02, 75-04 et 75-07 ». Aucun lien (la carte n'a pas d'arête).
+### 7.2 Actions absentes
+« Ouvrir » et « taille » n'existent pas sur une prévue (ni dans le menu contextuel, ni dans le panneau, ni de `.meta` de taille). Le panneau montre : titre, « Prévu par : 75-02, 75-04 » (plans en texte), « Ce fichier n'existe pas encore. ». Un chemin hors du lab ou malformé n'est pas dessiné (compté « n prévus ignorés » dans la légende de Gardes, où ils sont hors décompte).
+### 7.3 Fraîcheur
+Les cartes prévues ne se rafraîchissent qu'à l'assemblage du graphe ; les collisions « prévues » sont, elles, à jour. Textes : panneau d'une prévue, pied : « Carte lue à l'assemblage du graphe, il y a 12 min. » ; section Collisions, ligne d'un recoupement de plans : « Recoupement des plans : à jour. » Une carte prévue dont le fichier vient d'être créé reste « Prévu » jusqu'au prochain assemblage ; aucun texte ne prétend le contraire.
+
+## 8. Accessibilité
+
+- **Nom accessible de carte** : on **reprend la fonction unique de la Phase 80** (`80-UI-SPEC-NAVIGATION.md`, canevas `listbox` d'options, texte visible d'abord) : `<titre>, <mot d'état>, <compte du pied>, reliée à N carte(s)` ; la 75 y insère, **après le compte du pied et avant « reliée à… »**, le mot de lentille (complet) puis le mot de collision (complet). Exemples : « cockpit, 2 composants, 3 chauds, 2 fichiers en collision, reliée à 4 cartes » ; « vf-cockpit-git.mjs, 41 changements, reliée à 2 cartes ». Prévue (gabarit de la 80, sans arête) : « fichier.mjs, prévu, créé par le plan 75-02, aucune liaison ». Les marques visuelles du pied sont `aria-hidden`. Aucune information portée par la teinte seule.
+- **Ordre de lecture** : en-tête (bouton de lentille à sa place actuelle) → rangée « Code » et son compte de collisions, titre, sous-titre → cartes → panneau (sections : existantes, « Change souvent avec », « Gardes », « Agents sur ce fichier », « Collisions possibles »). Les marques ne sont pas des arrêts de tabulation.
+- **Annonce d'un changement de lentille** : on réutilise la zone `role="status"` existante `#ask-live` (`viewer.html:632`) **sans jamais la retirer** : le nettoyage (§ 13) ne retire que ce que la 75 pose. Textes, singulier compris : « Lentille Points chauds : 12 fichiers au palier haut. » (« 1 fichier ») ; « Lentille Gardes : 12 fichiers sans témoin. » ; « Lentille Empreinte : 2 fichiers en cours d'écriture. » ; « Lentille Couplage. » ; « Lentille Aucune. » ; « Lentille Points chauds indisponible. » ; couplage, à chaque nouvelle sélection (retardé de 300 ms) : « Couplage : 5 fichiers liés. ». Les mises à jour en direct de l'empreinte ne sont **pas** annoncées. Toutes les chaînes d'interface portent l'espace insécable (U+00A0) avant `: ; ! ? %` et dans les nombres ; la sonde S16 compare **après normalisation** (U+00A0 et U+202F ramenés à U+0020 des deux côtés), et un contrôle distinct vérifie la présence de l'espace insécable.
+- **Clavier dans le menu** (`#vf-plus-menu` n'a ni `Home`, ni `Fin`, ni `Espace`, `ui/02-vf-telephone.js:107` : la 75 les ajoute) : l'ouverture met le focus sur la ligne cochée ; `↓`/`↑` circulent (bouclent), `Home`/`Fin` aux extrémités ; une ligne désactivée reste atteignable et muette ; `Entrée` ou `Espace` sur une rangée du filtre d'agents choisit sans fermer ; ouvrir `#lens-menu` ferme `#legend` et `#flowmenu` (hors de la pile `VF_SURCOUCHES`) et inversement ; à ≤ 999 px l'ouvreur est le « ⋯ » (`#vf-plus`), qui reçoit le focus au retour ; `Entrée` ou `Espace` choisit, ferme le menu et rend le focus au bouton (au « ⋯ » quand le bouton est masqué, ≤ 999 px) ; `Échap` ferme et rend le focus ; clic hors du menu ferme. Focus visible `--ring` (2 px, décalage −2 comme `.vf-pl-i`). `aria-haspopup="menu"`, `aria-expanded`.
+- Mouvement réduit : aucune animation nouvelle hors la respiration du glyphe « en cours », coupée sous `prefers-reduced-motion`. Cibles ≥ 44 px (lignes du menu, compte de collisions). Le thème ne s'anime jamais (inchangé).
+
+## 9. Tokens utilisés (aucun nouveau jeton)
+| Jeton | Usage |
+|---|---|
+| `--text-2` · `--text-3` · `--text-4` | mot ; glyphes neutres ; lu, fini, sous-libellés |
+| `--recent` · `--recent-text` | glyphe « en cours » ; même glyphe sur `.card.module` en clair |
+| `--st-todo` · `--hair-2` · `--hair` | glyphe et bordure d'une carte prévue ; filets du menu |
+| `--surface` · `--raise` · `--bg` · `--menu-solid` · `--on` · `--on-text` · `--on-recent-text` · `--ring` | fonds de carte, menu, pastilles, focus |
+| `--sp-2/4/6/8/12/16/20/24` · `--inset-row` · `--inset-pill` | grille fermée (P71.5-D-01) ; le seul dérivé : pied 28 = `calc(var(--sp-24) + var(--sp-4))` commenté `/* dérivé */` |
+Interdits ici : tout `--sev-*` sur une marque, `--st-active`, `--st-blocked`, un fond teinté, liseré, anneau, halo, dégradé ; aucun jeton supprimé ni renommé (P71.5-D-29). `--recent` reste défini (il porte « en cours »). Le menu emploie `.menu`, `--shadow-float` : aucune nouvelle ombre, aucun rayon nouveau.
+
+## 10. Sondes visuelles à rejouer (juges à captures, à l'exécution ; navigateur partagé : aucune capture à la planification)
+Chaque sonde : clair et sombre, 1440, 1024, 390 ; une sonde verte sans témoin rouge ne prouve rien (mutant : retirer la règle, la sonde doit rougir).
+| # | Sonde | Attendu |
+|---|---|---|
+| S1 | Créneau : bouton (1440) et entrée du « ⋯ » (1024, 390) | à la place de l'ancien « Travail récent » ; libellé « Lentille : Aucune » ; pastille = fichiers en écriture |
+| S2 | Menu ouvert, cinq lentilles, clair et sombre | cinq lignes, légende de la lentille active, ligne radar ; rien ne pousse la carte (rect de la carte inchangé) |
+| S3 | États : indisponible, gardes absentes, git absent, relecture, fenêtre vide | les phrases exactes de § 1.3 ; git absent : mêmes cartes, mêmes liens, aucune marque |
+| S4 | Bascule de lentille ×5 puis mise à jour de l'empreinte ; Projet et Équipe | géométrie de toutes les cartes et pieds identique à 0 px (P75-D-03), aucun nouveau passage ELK ; **Projet et Équipe : géométrie inchangée** ; mutant : recalcul du pied au changement de lentille |
+| S5 | Contraste des glyphes (échantillon de pixels du masque) sur `--surface`, `--raise` (`.module`), `--bg` | ≥ 3:1 partout ; `--recent` clair sur `.module` pris par `--recent-text` |
+| S6 | Silhouettes des onze glyphes à **k = 0,42** (couverture 0,5, pire de 4 décalages sous-pixel), gris et daltonien | Jaccard ≥ 0,25 deux à deux pour les quatre silhouettes d'Empreinte, pour bouclier plein / évidé barré, et pour {confluent, bouclier plein, bouclier évidé} ; distance ≥ 0,25 au triangle `tolere` existant ; **encre minimale** ≥ 5 % de la boîte pour chaque glyphe. Mutants : glyphe vide (encre 0), triangle de 9,5 de haut, bouclier évidé sans diagonale |
+| S6b | Paliers de barres à k = 0,42 | nombre de hauteurs de colonne distinctes = nombre de barres (1, 2, 3), colonnes séparées d'une colonne éteinte ; palier bas à ≥ 0,25 du tiret. Mutants : barres de largeur 2, hauteurs 5/6/7. Si la largeur 3 échoue, élargir dans le viewBox et remesurer, jamais affaiblir |
+| S7 | Trois zooms (`lod` ouverture, `mid`, `low`) × chaque lentille | forme courte à `mid`, glyphe seul à `low`, bord droit de la marque dans la carte (marge ≥ 0, comme EK10), pas de rognage |
+| S8 | Largeur : mot le plus long (« aucune suite ne le nomme », « modifié · vf-coder et 2 autres »), nom hostile (U+2028, très long, balises) | ellipse du mot, jamais du glyphe ; texte posé en `textContent` ; la marque ne sort pas de la carte |
+| S9 | Couplage : sélection d'un fichier à 5 voisins, à 0, nœud sélectionné | marques seulement sur les voisins visibles ; section du panneau ; légende d'attente |
+| S10 | Collisions : compte de la rangée `.k` (1440, 1024, 390), en construction, 0 | `#context` de même hauteur avec et sans compte (forme courte ≤ 999 px) ; annonce unique 0 → n, focus sur le titre de section ; jamais « aucune collision » en relecture ; ouvre la section du panneau |
+| S11 | Carte prévue (+ avec collision de plans), paire « Prévu » / « À faire » à 16 px, 10 px et k = 0,42 : distance de Jaccard ≥ 0,25 ; mutant : anneau plein | bordure pointillée neutre, « Prévu » + glyphe pointillé, aucune action d'ouverture ni de taille, texte de fraîcheur |
+| S12 | Clavier : menu (↓ ↑ Home Fin Entrée Échap), focus rendu au bon bouton, annonce du changement | conforme § 8 ; zone `role="status"` mise à jour une fois |
+| S13 | Retrait : aucun `.rw`, aucune ligne « Surligner le travail récent » dans « Types de liens » | absent ; aucune règle `.recent`/`.recent-in` active |
+| S15 | Ouverture du panneau depuis le compte de collisions | rect de chaque carte et transformation de la vue inchangés (Q12) ; focus sur le titre de section |
+| S16 | Phrases exactes de § 3.4, § 5.4, § 7.3 et légende d'Empreinte, dans les deux thèmes | présentes mot pour mot, une par état |
+| S17 | Collision compacte avec une lentille active, 3 zooms | glyphe + nombre avant la marque de lentille ; bord droit dans la carte ; bord bas dans le pied (marge ≥ 0) à `lod-mid` et `lod-low` |
+| S18 | Compte de collisions à 800 px, panneau ouvert (`#context` plafonné) | forme courte, pas de rognage |
+| S14 | Chaque marque dans les deux thèmes sur `.card.module` et `.card.dir` | pas d'ombre ni de fond ajoutés ; `--recent` jamais seul sur `--raise` en clair |
+| S19 | Nom accessible d'une carte marquée, d'une collision, d'une prévue | gabarit de la 80 ; mot de lentille puis mot de collision avant « reliée à N cartes » ; prévue « …, aucune liaison » ; mutant : ordre inversé |
+Mutants nommés des autres sondes : S1 bouton hors du créneau ; S2 menu `position: static` (la carte bouge) ; S3 phrase d'état supprimée ; S5 `--recent` sur `.module` clair ; S7 `.lm` sans padding `lod` (pied à 34) ; S8 mot non ellipsé ; S9 voisin hors vue marqué ; S10 compte posé dans `#context p` ; S12 `Échap` sans retour du focus ; S13 `.rw` conservé ; S14 ombre ajoutée ; S15 carte déplacée à l'ouverture ; S16 espace insécable remplacée par U+0020 ; S17 collision toujours en mot entier ; S18 `.k` sans `nowrap`.
+
+## 11. Points tranchés par cette spec, à connaître des plans
+1. **Pied réservé à la construction** (§ 2.3) : changement de hauteur ponctuel des cartes sans pied (une fois, avec le placement).
+2. **Compte de collisions dans la rangée `.k`** (§ 5.4), sous-titre intact.
+3. **Collision compacte quand une lentille est active** (§ 5.2) : un seul emplacement de pied.
+4. **Agrégat de gardes en forme courte** dans le pied (« 12 sur 40 sans témoin ») ; la phrase de D-17 vit dans l'infobulle et le panneau.
+5. **Lentille non mémorisée** (Aucune au chargement) ; le menu est un volant de bureau et de « ⋯ » à la fois (même mécanique que « Types de liens »).
+6. **Paliers du couplage** : 30 à 49 / 50 à 74 / 75 et plus (aucun seuil nouveau pour la sélection des voisins : D-08 en garde le filtre).
+7. Dépendances « à revalider » de la 79 : l'empreinte vit sur A21 (signature des cibles), A22 (cible relative à l'arbre) et A24 (outils comptés) ; sans eux : phrases de § 3.4 et § 5.4 inchangées.
+
+## 12. Amendements à `DESIGN.md` (F8 ; à poser par l'exécution, dans le même lot que les marques ; tableaux du § 2 et format M10 intacts)
+1. **§ 2, « Graphe de code »** : ajouter une puce « Lentilles d'activité (Phase 75) : points chauds, couplage, gardes, empreinte marquent une carte par un glyphe neutre et un mot, jamais par une teinte ; la seule teinte est `--recent` (écriture en cours). »
+2. **§ 5, Carte** : retirer la variante `recent` (anneau, `.rw`, `.recent-in`, retirés par P75-D-20) ; ajouter `st-prevu` : fond transparent, bordure pointillée 1,5 px `--hair-2`, sans ombre, glyphe anneau à trois arcs `--st-todo`, mot « Prévu ».
+3. **§ 5, Pastille de statut** : « (`.vst`, `.rw`) » devient « (`.vst`) » ; ajouter la **marque de lentille** (`.lm`) : emplacement droit du pied, glyphe 1,45 em + mot 11 px `--text-2`, sans fond ; glyphes : barres 1/2/3 (largeur ≥ 3), confluent, bouclier, bouclier barré, rond plein, triangle plein, carré creux, tiret, anneau à trois arcs ; `lod-low` : glyphe seul.
+4. **§ 4, Carte** : un pied de 28 unités est réservé à toute carte marquable, posé à la construction du graphe (géométrie invariante au changement de lentille).
+5. **§ 7, Icônes** : la liste des glyphes de pastille s'allonge de ceux du point 3 ; l'exception « glyphe d'une pastille de statut » couvre le glyphe « en cours » de l'empreinte.
+6. **§ 9, Toujours** : « Sur `.card.module` en clair, un glyphe d'état prend la variante texte (`--recent-text`), jamais `--recent` (2,91:1). »
+7. **§ 5, composants** : le menu à rangées radio avec légende hors du `role="menu"` (`#lens-menu`) et le bouton-compte de la rangée `.k` (glyphe confluent, couleur `--text-2`, anneau `--ring` en pseudo-élément) ; la pastille de compte reste la pastille neutre `--on` existante, sans exception.
+8. **§ 2** : `--recent` = « récent, succès, en cours d'écriture ». **§ 6** : la respiration du glyphe passe des tiroirs aux cartes (glyphe « en cours »). **§ 4** : compensation de la bordure de 1,5 px de la carte prévue, `/* dérivé : bordure 1,5 */`.
+9. Le tableau « Statuts de travail » ne reçoit **pas** de ligne `--st-prevu` (le statut reprend `--st-todo`).
+
+## 13. Intégration à la coquille (Phases 79 et 80 ; règles reçues du manager le 2026-11-11)
+- **Initialisation par onglet** (A30 de la 79, commit `74501bb0`) : lentilles, empreinte, radar et compte de collisions s'initialisent par `VF_COQUILLE.surOnglet(rappel)` (le rappel reçoit `{onglet}`, appelé après le premier rendu puis à chaque changement d'onglet sans rechargement), jamais au seul chargement. Ils se posent quand l'onglet vaut Code ; la fonction rendue par le rappel, appelée avant le changement suivant, retire écouteurs, minuteries et DOM posé (bouton ou entrée de lentille, marques, compte, menu ; jamais `#ask-live`, qui n'est pas à la 75).
+- **Objet du moteur gelé** (Phase 80, `Object.freeze`) : rien n'est ajouté à l'objet global du moteur à l'exécution. Le canal de marquage (P75-D-05) vit dans un **espace de noms à part** (nom de travail `VF_MARQUES`) ; son point d'accroche dans le rendu des cartes (lecture de la table `id → marque`) est posé dans le **source du moteur** (fork assumé, AUDC-Q5, tracé dans `VENDORED.txt`).
+- **Surcouches** : le menu `#lens-menu` passe par `window.VF_SURCOUCHES` : `ouvrir(el, {modale: false, ouvreur, fermer})`, `dessus()`, `ouverte()` ; Échap, retour du focus et fermeture au clic extérieur viennent de la pile (ouvreur : `#btn-lentilles`, ou `#vf-plus` à ≤ 999 px) (le contrat du § 8 reste le résultat attendu).

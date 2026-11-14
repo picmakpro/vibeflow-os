@@ -4,7 +4,6 @@
 #   B task, cwd et chemin de session bornés et masqués · K files_modified: [constructor] · U lockText en lab plat · V remplacement sans $-motifs · W resynchronisation sur hello.seq
 # Chaque famille a son témoin ; la suite rougit sur un module antérieur aux correctifs. Exit 0 si tout passe.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; ENG="$SCRIPTS/../skills/cockpit-moteur"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/fk" "$WORK/fkd"
@@ -12,6 +11,7 @@ export REAL_HOME="$HOME"; export HOME="$WORK/home"
 export CHROME_SESSION="$(cd "$(dirname "$0")" && pwd)/chrome-session.mjs"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [${2:0:300}]"; FAIL=$((FAIL+1)); fi; }
@@ -30,16 +30,16 @@ cat > "$AUX/fakeclaude" <<'JS'
 #!/usr/bin/env node
 import fs from 'node:fs'; const a = process.argv.slice(2);
 if (a.includes('--version')) { console.log('9.9.9 (fake)'); process.exit(0); }
+if (a[0] === 'agents') process.exit(1); // la lecture de l'état officiel des sessions (onglet Équipe) n'est pas une question à l'agent : ni consignée, ni comptée (jointure)
 const d = process.env.VF_FAKE_DIR; const n = fs.readdirSync(d).filter((f) => f.startsWith('call-')).length + 1;
 fs.writeFileSync(`${d}/call-${n}.json`, JSON.stringify({ argv: a }));
 console.log(JSON.stringify({ type: 'result', is_error: false, structured_output: { title: 't', answer: 'réponse de l agent', items: [] }, session_id: 'aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee' }));
 JS
 chmod +x "$AUX/fakeclaude"; cp "$AUX/fakeclaude" "$WORK/fk/claude"
 build() { node "$SCRIPTS/vf-cockpit-build.mjs" "$1" --quiet > "$2" 2>&1; echo $?; }
-srv() { local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && PATH="$WORK/fk:$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID); for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"; }
+srv() { local o="$1" lab; lab="$(cd "$1/../.." && pwd)"
+  COCKPIT_SORTIE="$o" cockpit_lancer "$lab" PATH="$WORK/fk:$PATH" VF_FAKE_DIR="$WORK/fkd" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS"
+  SRV_PID="${VF_PID:-}"; SRV_PORT="${VF_PORT:-0}"; }
 tok() { node "$AUX/req.mjs" "$1" GET "$2" | sed -n 's/.*VF_COCKPIT_SERVER={"token":"\([0-9a-f]*\)".*/\1/p' | head -1; }
 
 echo "=== S1 — lab à un seul jalon (STATE milestone: v1.0, ROADMAP sans section de jalon) ==="
@@ -60,12 +60,12 @@ git -C "$L1" init -q && git -C "$L1" add -A && git -C "$L1" -c user.email=t@t -c
 assert_eq "S1.0 — assemblage du lab à un seul jalon" "$(build "$L1" "$WORK/b1.out")" "0"
 cat > "$AUX/ask.mjs" <<'JS'
 import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const [, , out] = process.argv; const A = await import(pathToFileURL(out + '/vf-cockpit-ask.mjs').href); const E = await import(pathToFileURL(out + '/vf-cockpit-embed.mjs').href);
+const [, , out, scripts] = process.argv; const A = await import(pathToFileURL(scripts + '/vf-cockpit-ask.mjs').href); const E = await import(pathToFileURL(scripts + '/vf-cockpit-embed.mjs').href);
 const G = E.extraireGraphe(fs.readFileSync(out + '/project.html', 'utf8')); const r = {};
 for (const q of ["Qu'est-ce qui reste ?", 'prochaine étape', 'next', 'Où en est-on ?']) { try { const a = A.answerLocally(G, q); r[q] = a ? (/undefined/.test(JSON.stringify(a)) ? 'undefined-dans-la-réponse' : 'réponse') : 'agent'; } catch (e) { r[q] = 'EXCEPTION ' + e.message.slice(0, 60); } }
 console.log(JSON.stringify(r));
 JS
-R1="$(node "$AUX/ask.mjs" "$L1/.vibeflow/cockpit")"
+R1="$(node "$AUX/ask.mjs" "$L1/.vibeflow/cockpit" "$SCRIPTS")"
 assert_eq "S1.1 — « reste », « prochaine étape », « next » : jamais d'exception ; « où en est-on » : une réponse sans « undefined »" "$(printf '%s' "$R1" | node "$AUX/ev.mjs" 'Object.values(j).filter(v=>/EXCEPTION|undefined/.test(v)).length')" "0"
 assert_eq "S1.2 — « Où en est-on ? » répond localement" "$(printf '%s' "$R1" | node "$AUX/ev.mjs" 'j["Où en est-on ?"]')" "réponse"
 assert_eq "S1.2b — CKPT-07 : « reste », « prochaine étape », « next » répondent localement (jalon unique, STATE non reconnu)" "$(printf '%s' "$R1" | node "$AUX/ev.mjs" 'Object.values(j).slice(0,3).join(",")')" "réponse,réponse,réponse"
@@ -111,9 +111,11 @@ echo "=== U — lockText de la page, lab plat ==="
 cat > "$AUX/locktext.mjs" <<'JS'
 import fs from 'node:fs'; const src = fs.readFileSync(process.argv[2], 'utf8');
 const a = src.indexOf('const lockText = '), b = src.indexOf('const KIND = '); const lockText = new Function(src.slice(a, b) + '; return lockText;')();
-const plat = lockText({ present: true, owner: 'rev', step: 'x', age_seconds: 3 });
-console.log(JSON.stringify({ plat: plat.cls, partitionne: lockText({ locks: [{ present: true, owner: 'm', step: 's' }] }).cls, libre: lockText({ present: false }).cls,
-  titrePlat: plat.title, titrePart: lockText({ locks: [{ present: true, scope: 'repo', ws: 'fiabilite', owner: 'm', step: 's' }] }).title, titreScope: lockText({ locks: [{ present: true, scope: 'repo', owner: 'm', step: 's' }] }).title }));
+// la page lit la projection en liste blanche de l'événement lock (A15) : { verrous: { etat, plat, liste: [{ ws, scope, owner, step, ageS, … }] } }
+const V = (liste, plat = false) => ({ verrous: { etat: 'lue', plat, liste } });
+const plat = lockText(V([{ ws: '', scope: null, owner: 'rev', step: 'x', ageS: 3 }], true));
+console.log(JSON.stringify({ plat: plat.cls, partitionne: lockText(V([{ ws: '', scope: null, owner: 'm', step: 's' }])).cls, libre: lockText(V([], true)).cls,
+  titrePlat: plat.title, titrePart: lockText(V([{ scope: 'repo', ws: 'fiabilite', owner: 'm', step: 's' }])).title, titreScope: lockText(V([{ scope: 'repo', ws: '', owner: 'm', step: 's' }])).title }));
 JS
 assert_eq "U1 — verrou plat : classe held ; partitionné : held ; absent : vide" "$(node "$AUX/locktext.mjs" "$ENG/assets/ui/70-vf-live.js" | node "$AUX/ev.mjs" 'j.plat+","+j.partitionne+","+j.libre')" "held,held,"
 assert_eq "U2 — infobulle du badge en lab plat : jamais « undefined », propriétaire et étape seuls" "$(node "$AUX/locktext.mjs" "$ENG/assets/ui/70-vf-live.js" | node "$AUX/ev.mjs" 'j.titrePlat')" "rev (x)"
@@ -164,12 +166,14 @@ cat > "$AUX/resync.mjs" <<'JS'
 import http from 'node:http'; import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
 const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
 const [, , chrome, sport, plan, serverJson] = process.argv; const live = new Set(); let blocked = false;
+let rport = 0; // 79-16 : la CSP de la coquille nomme l'hôte vu par le serveur (Host réécrit = le port du serveur) ; le relais la réécrit au port du relais, sinon le navigateur refuse les scripts de /_vf/
+const csp = (h) => { const c = h['content-security-policy']; return c ? { ...h, 'content-security-policy': c.split(`127.0.0.1:${sport}`).join(`127.0.0.1:${rport}`) } : h; };
 const relais = http.createServer((q, r) => {
   if (blocked && q.url.startsWith('/api/vf/events')) { q.socket.destroy(); return; } // une erreur réseau (pas un 503 : EventSource abandonne alors pour de bon)
-  const up = http.request({ host: '127.0.0.1', port: Number(sport), path: q.url, method: q.method, headers: { ...q.headers, host: `127.0.0.1:${sport}` } }, (ur) => { r.writeHead(ur.statusCode, ur.headers); ur.pipe(r); });
+  const up = http.request({ host: '127.0.0.1', port: Number(sport), path: q.url, method: q.method, headers: { ...q.headers, host: `127.0.0.1:${sport}` } }, (ur) => { r.writeHead(ur.statusCode, csp(ur.headers)); ur.pipe(r); });
   live.add(up); live.add(r); q.pipe(up); up.on('error', () => r.destroy()); r.on('close', () => { live.delete(up); live.delete(r); up.destroy(); });
 });
-await new Promise((ok) => relais.listen(0, '127.0.0.1', ok)); const rport = relais.address().port;
+await new Promise((ok) => relais.listen(0, '127.0.0.1', ok)); rport = relais.address().port;
 const token = JSON.parse(fs.readFileSync(serverJson, 'utf8')).token;
 const seqServeur = async () => { const r = await fetch(`http://127.0.0.1:${sport}/api/vf/etat`, { headers: { host: `127.0.0.1:${sport}`, 'x-vf-cockpit-token': token } }); return (await r.json()).seq; };
 await executer(chrome, async (s) => {

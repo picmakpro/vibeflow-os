@@ -22,6 +22,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -80,10 +81,11 @@ mk_lab() {
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module, ou TIROIR_SCRIPTS pour jouer la suite contre une copie) ; pose OUT, PORT ; démarre le serveur (SRV)
   env $ENVX "$NODE" "${2:-${TIROIR_SCRIPTS:-$SCRIPTS}}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
-  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  # 79-16 : la page vient du module que sert le serveur (/_vf/) : une copie mutée doit être CELLE QUE LANCE cockpit_lancer, pas seulement celle qui assemble
+  local mod=""; [ -n "${2:-${TIROIR_SCRIPTS:-}}" ] && mod="$(cd "${2:-$TIROIR_SCRIPTS}/.." && pwd -P)"
+  COCKPIT_MODULE="$mod" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true
+  SRV="$VF_PID"
+  PORT="$VF_PORT"
 }
 DEPOT="$WORK/depot"; mk_lab "$DEPOT"
 $GIT -C "$DEPOT" init -q -b main && $GIT -C "$DEPOT" add -A && $GIT -C "$DEPOT" commit -q -m init
@@ -221,7 +223,7 @@ out.mobile = await s.ev(`({ li: Math.round(document.querySelector('#vf-git-tiroi
 return out;
 JS
   R2="$(cdp "$AUX/d2.js" "$BASE")"
-  assert_eq "D2.1 — ordre des sections et état initial : Worktrees et Graphe ouvertes, Tags, Stash, Auteurs fermées avec compteur" "$(jq_ "$R2" 'j.sections.join("|")' 2>/dev/null)" "Worktrees:true:3|Graphe:true:|Tags:false:2|Stash:false:2|Auteurs et activité:false:3"
+  assert_eq "D2.1 — ordre des sections et état initial : Worktrees repliée au départ (P80-D-19), Graphe ouverte, Tags, Stash, Auteurs fermées avec compteur" "$(jq_ "$R2" 'j.sections.join("|")' 2>/dev/null)" "Worktrees:false:3|Graphe:true:|Tags:false:2|Stash:false:2|Auteurs et activité:false:3"
   assert_eq "D2.1 — PU-G-193 : « Worktrees » reste, avec sa définition constante au survol (title) et au focus (aria-description), identiques ; chaque « HEAD détaché » porte la sienne" "$(jq_ "$R2" '[/^Worktrees : copies de travail du dépôt/.test(j.aide.title), j.aide.title === j.aide.desc, /[<>]/.test(j.aide.title), j.aide.detache.length > 0 && j.aide.detache.every((t) => /^HEAD détaché : ce dossier/.test(t))].join("|")' 2>/dev/null)" "true|true|false|true"
   assert_eq "D2.1 — section sans donnée masquée (Tags, Stash), Graphe gardée même sans rangée" "$(jq_ "$R2" '[j.sansDonnee.join(","), j.grapheVide].join("|")' 2>/dev/null)" "Worktrees,Graphe,Auteurs et activité|true"
   assert_eq "D2.2 — 6 couloirs au plus (colonne de 96 px, nœud le plus à droite à 88) et « +17 » servi" "$(jq_ "$R2" '[j.graphe.largeurs.join(","), j.graphe.maxCx, j.graphe.plus].join("|")' 2>/dev/null)" "96|88|+17"
@@ -422,10 +424,9 @@ JS
   "$NODE" "${TIROIR_SCRIPTS:-$SCRIPTS}/vf-cockpit-build.mjs" "$TL" --quiet > "$WORK/build-term.out" 2>&1 || cat "$WORK/build-term.out"
   OUT_T="$TL/.vibeflow/cockpit"; mkdir -p "$OUT_T/.cache"; rm -f "$OUT_T/.cache/server.json"
   (umask 077; node -e "console.log(require('crypto').randomBytes(32).toString('hex'))" | tr -d '\n' > "$OUT_T/.cache/terminal-amorce")
-  ( cd "$TL" && SHELL=/bin/sh VF_COCKPIT_TERM_GRACE_MS=5000 VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="${TIROIR_SCRIPTS:-$SCRIPTS}" exec "$NODE" "$OUT_T/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-term.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$OUT_T/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  PORT_T="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT_T/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-term.out" cockpit_lancer "$TL" SHELL=/bin/sh VF_COCKPIT_TERM_GRACE_MS=5000 VF_COCKPIT_ENGINE_DIR="$SCRIPTS/../skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="${TIROIR_SCRIPTS:-$SCRIPTS}" --terminal || true
+  SRV="$VF_PID"
+  PORT_T="$VF_PORT"
   cat > "$AUX/d3t.js" <<'JS'
 const [base] = ARGS;
 await fenetre(1440, 900); await s.naviguer(base + '/'); await pret();
@@ -487,7 +488,7 @@ out.reqs = await s.ev(`window.__vfDetReqs.filter((r) => r.route === 'commit').ma
 out.jeton = await s.ev(`window.__vfDetReqs.filter((r) => r.route === 'commit').every((r) => r.headers['x-vf-cockpit-token'] === window.VF_COCKPIT_SERVER.token && !!window.VF_COCKPIT_SERVER.token)`);
 out.ouvert = await s.ev(`(() => { const d = document.querySelector('.vf-git-detail'), L = ${LIGNES}[2], q = (x) => d.querySelector(x), fl = [...d.querySelectorAll('.vf-git-d-fichiers > li')], reste = fl.filter((l) => l.classList.contains('vf-git-d-reste')), vrais = fl.filter((l) => !l.classList.contains('vf-git-d-reste'));
   const f1 = vrais[1], bin = vrais.find((l) => /binaire/.test(l.textContent)), ren = vrais.find((l) => /ancien-nom/.test(l.textContent));
-  return { apresRangee: d.previousElementSibling.lastElementChild === L && !d.closest('[role=listbox]'), nb: document.querySelectorAll('.vf-git-detail').length, sujet: q('.vf-git-d-sujet').textContent, msg: q('.vf-git-d-msg').textContent, ws: getComputedStyle(q('.vf-git-d-msg')).whiteSpace, poids: getComputedStyle(q('.vf-git-d-sujet')).fontWeight,
+  return { dansVolet: d.parentNode.id === 'vf-git-tiroir' && !!d.querySelector('[role=region]') && !d.closest('[role=listbox]') && !d.closest('.vf-git-corps'), nb: document.querySelectorAll('.vf-git-detail').length, sujet: q('.vf-git-d-sujet').textContent, msg: q('.vf-git-d-msg').textContent, ws: getComputedStyle(q('.vf-git-d-msg')).whiteSpace, poids: getComputedStyle(q('.vf-git-d-sujet')).fontWeight,
     meta: q('.vf-git-d-meta').textContent, sha: q('.vf-git-d-sha code').textContent, sel: getComputedStyle(q('.vf-git-d-sha code')).userSelect, titre: q('.vf-git-d-fichiers-t').textContent, nVrais: vrais.length, reste: reste.map((l) => l.textContent),
     plus: f1.querySelector('.vf-git-d-plus').textContent, moins: f1.querySelector('.vf-git-d-moins').textContent, cPlus: getComputedStyle(f1.querySelector('.vf-git-d-plus')).color, cMoins: getComputedStyle(f1.querySelector('.vf-git-d-moins')).color, attPlus: window.__couleur('--ok-text'), attMoins: window.__couleur('--err-text'),
     bin: !!bin, ren: ren ? ren.textContent : '', cmds: [...d.querySelectorAll('.vf-git-cmd code')].map((c) => c.textContent), region: q('[role=region]').getAttribute('aria-label'), diff: /^@@|^diff --git/m.test(d.textContent) }; })()`);
@@ -532,8 +533,8 @@ await s.attendre(`document.querySelectorAll('.vf-git-detail').length === 1`, 'Es
 out.espace = await s.ev(etat);
 // un seul détail à la fois : un clic sur une autre rangée déplace le détail
 await s.ev(`${LIGNES}[3].click()`);
-await s.attendre(`document.querySelectorAll('.vf-git-detail').length >= 1 && ${LIGNES}[3].parentNode.nextElementSibling.classList.contains('vf-git-detail')`, 'détail sous la rangée 3');
-out.unSeul = await attendreEtStabiliser(() => s.ev(`({ details: document.querySelectorAll('.vf-git-detail').length, sous3: ${LIGNES}[3].parentNode.lastElementChild === ${LIGNES}[3] && ${LIGNES}[3].parentNode.nextElementSibling.classList.contains('vf-git-detail') })`), (v) => v.details === 1, { max: 3000 });
+await s.attendre(`document.querySelectorAll('.vf-git-detail').length >= 1 && [...document.querySelectorAll('.vf-git-detail [role=region]')].some((r) => r.getAttribute('aria-label') === 'Détail du commit ' + ${LIGNES}[3].dataset.h.slice(0, 7))`, 'volet sur la rangée 3');
+out.unSeul = await attendreEtStabiliser(() => s.ev(`({ details: document.querySelectorAll('.vf-git-detail').length, volet3: (document.querySelector('.vf-git-detail [role=region]') || { getAttribute: () => '' }).getAttribute('aria-label') === 'Détail du commit ' + ${LIGNES}[3].dataset.h.slice(0, 7) && document.querySelector('.vf-git-detail').parentNode.id === 'vf-git-tiroir' && !document.querySelector('.vf-git-detail').closest('[role=listbox]') })`), (v) => v.details === 1, { max: 3000 });
 await s.ev(`${LIGNES}[3].click()`); await s.attendre(`document.querySelectorAll('.vf-git-detail').length === 0`, 'tout replié');
 out.libelle = await s.ev(`(() => { const r = window.VFGitTiroir.donnees().rangees[0], L = ${LIGNES}[0]; return { label: L.getAttribute('aria-label'), h7: r.h7, s: r.s }; })()`);
 // D8.2 : états des worktrees
@@ -568,7 +569,7 @@ await s.attendre(`${LIGNES}.length === 41`, 'rafraîchi : une rangée de plus');
 await pause(700);
 const c1 = await s.ev(cpt);
 out.deltas = { git: c1.git - c0.git, wt: c1.wt - c0.wt, commit: c1.commit - c0.commit };
-out.selection = await s.ev(`({ sel: ${LIGNES}.filter((l) => l.getAttribute('aria-selected') === 'true').map((l) => l.dataset.h), attendu: '${sha}', detailSous: !!document.querySelector('.vf-git-detail') && document.querySelector('.vf-git-detail').previousElementSibling.lastElementChild.dataset.h === '${sha}', premiere: ${LIGNES}[0].dataset.h, live: [...document.querySelectorAll('#vf-git-tiroir [aria-live]')].map((e) => e.textContent).join('|') })`);
+out.selection = await s.ev(`({ sel: ${LIGNES}.filter((l) => l.getAttribute('aria-selected') === 'true').map((l) => l.dataset.h), attendu: '${sha}', voletSha: !!document.querySelector('.vf-git-detail [role=region]') && document.querySelector('.vf-git-detail [role=region]').getAttribute('aria-label') === 'Détail du commit ' + '${sha}'.slice(0, 7) && document.querySelector('.vf-git-detail').parentNode.id === 'vf-git-tiroir', premiere: ${LIGNES}[0].dataset.h, live: [...document.querySelectorAll('#vf-git-tiroir [aria-live]')].map((e) => e.textContent).join('|') })`);
 out.ecartPos = Math.abs((await s.ev(pos)) - p0);
 // D9.2 : la sha sélectionnée disparaît
 await s.ev(`window.__vfGit.reponse = JSON.parse(JSON.stringify(window.__vfDet.apres)); window.__vfGit.reponse.rangees = window.__vfGit.reponse.rangees.filter((r) => r.h !== '${sha}'); document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: 'x' } }))`);
@@ -600,7 +601,7 @@ JS
   R7="$(cdp "$AUX/d7-complet.js" "$BASE")"
   assert_eq "D7.0 — témoin : aucun détail avant le clic" "$(jq_ "$R7" 'j.avant' 2>/dev/null)" "0"
   assert_eq "D7.1 — clic sur la 3e rangée : un GET /api/vf/git/commit?sha=<sha complet de la rangée>, avec le jeton de la page" "$(jq_ "$R7" 'j.reqs.join(",") === "GET /api/vf/git/commit?sha=" + j.sha && /^[0-9a-f]{40}$/.test(j.sha) && j.jeton' 2>/dev/null)" "true"
-  assert_eq "D7.1 — détail déplié juste sous la rangée, un seul" "$(jq_ "$R7" '[j.ouvert.apresRangee, j.ouvert.nb].join("|")' 2>/dev/null)" "true|1"
+  assert_eq "D7.1 — détail dans le volet bas du tiroir (P80-D-19), hors de la liste, un seul" "$(jq_ "$R7" '[j.ouvert.dansVolet, j.ouvert.nb].join("|")' 2>/dev/null)" "true|1"
   assert_eq "D7.1 — message entier (3 paragraphes), pre-wrap, sujet en 600" "$(jq_ "$R7" '[j.ouvert.sujet, j.ouvert.msg.includes("Second paragraphe."), j.ouvert.msg.includes("Premier paragraphe du corps"), j.ouvert.ws, j.ouvert.poids].join("|")' 2>/dev/null)" "Sujet du commit <b>gras</b>|true|true|pre-wrap|600"
   assert_eq "D7.1 — auteur et date longue « 5 nov. 2026, 14 h 32 », sha complet sélectionnable" "$(jq_ "$R7" '[/\d{1,2} \S+ 2026, \d{1,2} h \d{2}/.test(j.ouvert.meta), j.ouvert.meta.includes("<img src=x"), j.ouvert.sha === j.sha, j.ouvert.sel].join("|")' 2>/dev/null)" "true|true|true|text"
   assert_eq "D7.1 — « Fichiers (45) », 30 lignes puis « et 15 autres »" "$(jq_ "$R7" '[j.ouvert.titre, j.ouvert.nVrais, j.ouvert.reste.join("/")].join("|")' 2>/dev/null)" "Fichiers (45)|30|et 15 autres"
@@ -618,7 +619,7 @@ JS
   assert_eq "D8.1 — Fin : dernière rangée ; Début : première" "$(jq_ "$R8" '[j.fin.i, j.fin.sel.join(), j.debut.i, j.debut.sel.join()].join("|")' 2>/dev/null)" "39|39|0|0"
   assert_eq "D8.1 — Entrée ouvre le détail de la rangée sélectionnée ; Échap le replie, le tiroir reste ouvert, le focus reste sur la rangée" "$(jq_ "$R8" '[j.entree.i, j.entree.details, j.echap.details, j.echap.tiroir, j.echap.focusLigne, j.echap.i].join("|")' 2>/dev/null)" "1|1|0|true|true|1"
   assert_eq "D8.1 — Espace ouvre aussi le détail" "$(jq_ "$R8" 'j.espace.details' 2>/dev/null)" "1"
-  assert_eq "D8.1 — un seul détail ouvert : le clic sur une autre rangée déplace le détail" "$(jq_ "$R8" '[j.unSeul.details, j.unSeul.sous3].join("|")' 2>/dev/null)" "1|true"
+  assert_eq "D8.1 — un seul détail ouvert : le clic sur une autre rangée déplace le volet sur cette rangée" "$(jq_ "$R8" '[j.unSeul.details, j.unSeul.volet3].join("|")' 2>/dev/null)" "1|true"
   assert_eq "D8.1 — aria-label « <sha7>, <message>, branche <b>, il y a <t> »" "$(jq_ "$R8" '(new RegExp("^" + j.libelle.h7 + ", " + j.libelle.s + ", branche main, (il y a .+|à l.instant)$")).test(j.libelle.label)' 2>/dev/null)" "true"
   assert_eq "D8.2 — ouverture du tiroir : une seule requête /api/vf/git/worktrees" "$(jq_ "$R8" 'j.wtReqs' 2>/dev/null)" "1"
   assert_eq "D8.2 — pastilles : « 3 modifiés », « 2 non suivis », « ↑2 ↓1 » ; « propre » ; « 1 modifié »" "$(jq_ "$R8" 'j.wt.map((w) => w.txt.join("/")).join(" | ")' 2>/dev/null)" "3 modifiés/2 non suivis/↑2 ↓1 | propre | 1 modifié"
@@ -628,7 +629,7 @@ JS
   assert_eq "D8.x — 0 violation CSP, 0 erreur de page" "$(jq_ "$R8" '[j.csp, j.errs.length].join("|")' 2>/dev/null)" "0|0"
   R9="$(cdp "$AUX/d9-complet.js" "$BASE")"
   assert_eq "D9.1 — trois signaux en ~100 ms : une relecture de /api/vf/git, une de worktrees, aucune requête de détail (cache par sha)" "$(jq_ "$R9" '[j.deltas.git, j.deltas.wt, j.deltas.commit].join("|")' 2>/dev/null)" "1|1|0"
-  assert_eq "D9.1 — la même sha reste sélectionnée, son détail dessous, la nouvelle rangée est en tête" "$(jq_ "$R9" '[j.selection.sel.join() === j.selection.attendu, j.selection.detailSous, j.selection.premiere].join("|")' 2>/dev/null)" "true|true|2929292929292929292929292929292929292929"
+  assert_eq "D9.1 — la même sha reste sélectionnée, le volet reste ouvert sur cette sha, la nouvelle rangée est en tête" "$(jq_ "$R9" '[j.selection.sel.join() === j.selection.attendu, j.selection.voletSha, j.selection.premiere].join("|")' 2>/dev/null)" "true|true|2929292929292929292929292929292929292929"
   assert_eq "D9.1 — position à l'écran inchangée à ± 2 px, annonce « Historique mis à jour »" "$(jq_ "$R9" '[j.ecartPos <= 2, j.selection.live.includes("Historique mis à jour")].join("|")' 2>/dev/null)" "true|true"
   assert_eq "D9.2 — sha sélectionnée disparue : détail replié, aucune sélection, une rangée tabulable, aucune carte d'erreur" "$(jq_ "$R9" '[j.disparue.details, j.disparue.sel, j.disparue.tab, j.disparue.carte].join("|")' 2>/dev/null)" "0|0|1|false"
   assert_eq "D9.3 — tiroir fermé : un signal ne déclenche aucune requête" "$(jq_ "$R9" '[j.ferme.git, j.ferme.wt, j.ferme.commit].join("|")' 2>/dev/null)" "0|0|0"
@@ -829,6 +830,7 @@ await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-w
 const etats = `[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l')].map((w) => [...w.querySelectorAll('.vf-git-pastille')].map((p) => p.textContent).join('/'))`;
 out.enCours = await s.ev(etats);
 await s.attendre(`/lecture impossible/.test(document.querySelector('#vf-git-s-wt').textContent)`, 'état lu', 6000);
+await s.ev(`(() => { const b = document.querySelector('[aria-controls=vf-git-s-wt]'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); })()`); // Worktrees est repliée au départ (P80-D-19)
 out.lu = await s.ev(etats);
 out.avance = await s.ev(`(() => { const p = document.querySelector('#vf-git-s-wt .vf-git-p-mono'); return { txt: p.textContent, title: p.getAttribute('title'), aria: p.getAttribute('aria-label') }; })()`);
 await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }).catch(() => {}); // voir D2 : sans focus de fenêtre, aucun évènement « focus »
@@ -865,6 +867,7 @@ await s.attendre(`getComputedStyle(document.querySelector('#vf-git-ligne')).disp
 await s.ev(`document.querySelector('#vf-git-ligne').click()`);
 await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l').length >= 3`, 'tiroir ouvert, worktrees rendus');
 await attendreValeur(() => s.ev(`!!document.querySelector('#vf-git-s-wt .vf-git-etat-wt')`), (v) => v === true, { max: 6000 }); // états lus : plus de rendu à venir sous le focus
+await s.ev(`(() => { const b = document.querySelector('[aria-controls=vf-git-s-wt]'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); })()`); // Worktrees est repliée au départ (P80-D-19)
 const T = `document.querySelector('#vf-git-tiroir')`, DETACHE = `[...document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l .vf-git-mono')].find((x) => x.textContent === 'HEAD détaché')`;
 const BULLE = `(() => { const b = document.querySelector('.vf-git-bulle'); if (!b || b.hidden) return null; const r = b.getBoundingClientRect(); return { texte: b.textContent, vu: r.width > 0 && r.height > 0 && r.left >= 0 && r.top >= 0 && r.right <= innerWidth && r.bottom <= innerHeight, role: b.getAttribute('role') }; })()`;
 const lire = async (fin) => { let v; for (let i = 0; i < 20; i++) { v = await s.ev(BULLE); if (fin(v)) return v; await pause(100); } return v; };
@@ -882,6 +885,7 @@ await s.ev(`document.activeElement.blur()`);
 await lire((v) => v === null);
 await s.ev(`document.querySelector('#vf-git-ligne').click()`); await s.attendre(`${OUVERT} && document.querySelectorAll('#vf-git-s-wt .vf-git-wt-l').length >= 3`, 'tiroir rouvert, worktrees rendus');
 await attendreValeur(() => s.ev(`!!document.querySelector('#vf-git-s-wt .vf-git-etat-wt')`), (v) => v === true, { max: 6000 });
+await s.ev(`(() => { const b = document.querySelector('[aria-controls=vf-git-s-wt]'); if (b && b.getAttribute('aria-expanded') !== 'true') b.click(); })()`); // Worktrees est repliée au départ (P80-D-19)
 await s.ev(`${DETACHE}.focus()`);
 out.detache.bulle = await lire((v) => v !== null);
 out.detache.atteignable = await s.ev(`(() => { const m = ${DETACHE}; return { tab: m.tabIndex, desc: m.getAttribute('aria-description') === m.getAttribute('title'), actif: document.activeElement === m }; })()`);
@@ -1022,15 +1026,16 @@ EOF
   assert_eq "M-HTML — rougit D2.5 (un message rendu en HTML fait naître un <img>) alors que les 40 rangées sont là (pas une panne d'un autre ordre)" "$(jq_ "$RM" '[j.xss.img > 0, j.xss.lit.includes("false"), j.ouvert.rangees].join("|")' 2>/dev/null)" "true|true|40"
   mutant M-COPIE 77-vf-git-rendu.js "writeText(code.textContent)" "writeText(code.textContent.slice(0, -1))" d2.js
   assert_eq "M-COPIE — rougit D2.4 (le texte reçu par l'API n'est plus celui du <code>) alors que la copie a bien eu lieu" "$(jq_ "$RM" '[j.copie.spy === j.copie.affiche, typeof j.copie.spy, j.copie.retour].join("|")' 2>/dev/null)" "false|string|Copiée"
-  mutant M-AJUSTEMENT ../viewer.html "else if (ev.key === 'f' || ev.key === 'F') fit(true);" "else if (ev.key === 'f' || ev.key === 'F') { }" d3a-complet.js
+  mutant M-AJUSTEMENT ../viewer.html "else if (ev.key === 'f' || ev.key === 'F') cadrer();" "else if (ev.key === 'f' || ev.key === 'F') { }" d3a-complet.js
 assert_eq "M-AJUSTEMENT — rougit D3.3 (la touche f ne fait rien : ni changement de k ni ajustement animé fit(true)) alors que + et - marchent" "$(jq_ "$RM" '[j.zoom.plus, j.zoom.moins, j.zoom.fit].join("|")' 2>/dev/null)" "true|true|false"
-mutant M-GLOBAL-G 77-vf-git-tiroir.js "if (t && (t.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(t.tagName) >= 0)) return;" "if (false) return;" d3a-complet.js
+mutant M-GLOBAL-G 77-vf-git-tiroir.js "if (tg && (tg.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(tg.tagName) >= 0)) return;" "if (false) return;" d3a-complet.js
   assert_eq "M-GLOBAL-G — rougit D3.1 (g ouvre le tiroir depuis un champ de saisie) alors que g hors champ marche toujours" "$(jq_ "$RM" '[j.champ_input.ouvert, j.g1, j.g2].join("|")' 2>/dev/null)" "true|true|false"
   mutant M-HORS-DEPOT 77-vf-git-tiroir.js "if (!V || V.etat === 'absent' || !V.depot) return; // sans dépôt" "if (false) return; // sans dépôt" d3n-complet.js nogit
   assert_eq "M-HORS-DEPOT — rougit D3.1 hors dépôt (le tiroir existe alors qu'aucun ouvreur n'existe) alors que la page est rendue" "$(jq_ "$RM" '[j.tiroir, j.ligne].join("|")' 2>/dev/null)" "true|false"
   mutant M-DETAIL-HTML 77-vf-git-vue-detail.js "corpsMsg.textContent = m.length > 1 ? '\n' + m.slice(1).join('\n') : '';" "corpsMsg.innerHTML = m.length > 1 ? '\n' + m.slice(1).join('\n') : '';" d7-complet.js
   assert_eq "M-DETAIL-HTML — rougit D7.2 (un message rendu en HTML fait naître un <script> dans le détail) alors que le détail et ses 30 fichiers sont là" "$(jq_ "$RM" '[j.hostile.balises > 0, j.hostile.msgLit, j.ouvert.nb, j.ouvert.nVrais].join("|")' 2>/dev/null)" "true|false|1|30"
-  mutant M-SELECTION 77-vf-git-vue-detail.js "fermerDetail(); // un seul détail à la fois" "/* mutant : le détail précédent reste ouvert */" d8-complet.js
+  # deux garde-fous indépendants de « un seul détail » (80-06) : la fermeture explicite de ouvrirDetail ET la purge de monter() dans le volet ; le mutant retire les deux (sinon l'un masque l'autre)
+  MUT_AUX="77-vf-git-volet.js|for (const d of T.querySelectorAll('.vf-git-detail')) d.remove(); // un seul volet, même si l'appelant n'a pas fermé le précédent|/* mutant : le volet précédent reste monté */" mutant M-SELECTION 77-vf-git-vue-detail.js "fermerDetail(); // un seul détail à la fois" "/* mutant : le détail précédent reste ouvert */" d8-complet.js; MUT_AUX=
   assert_eq "M-SELECTION — rougit D8.1 (deux détails ouverts) alors que le clavier du graphe marche (↓ ↓ ↑ -> 2e rangée)" "$(jq_ "$RM" '[j.unSeul.details > 1, j.bas2haut1.i, j.entree.details].join("|")' 2>/dev/null)" "true|1|1"
   mutant M-RAFALE 77-vf-git-vue-detail.js "clearTimeout(minuterie); minuterie = setTimeout(rafraichir, RAFALE);" "rafraichir();" d9-complet.js
   assert_eq "M-RAFALE — rougit D9.1 (une relecture par signal : 3 et 3 au lieu de 1 et 1) alors que la sélection est conservée" "$(jq_ "$RM" '[j.deltas.git, j.deltas.wt, j.selection.sel.join() === j.selection.attendu].join("|")' 2>/dev/null)" "3|3|true"
@@ -1062,11 +1067,11 @@ mutant M-GLOBAL-G 77-vf-git-tiroir.js "if (t && (t.isContentEditable || ['INPUT'
   assert_eq "M-COCHE — rougit D15.5 (l'icône reste celle de la copie pendant le « Copiée ») alors que le retour textuel est là" "$(jq_ "$RM" '[j.iconeCoche === j.iconeAvant, j.retour].join("|")' 2>/dev/null)" "true|Copiée"
   mutant M-FOCUS-198 77-vf-git-tiroir.js ".vf-git-titre-t:focus-visible { outline: 2px solid var(--ring);" ".vf-git-titre-t:focus-visible { outline: none;" d17a-complet.js
   assert_eq "M-FOCUS-198 — rougit D17.1 (le titre a le focus mais plus d'anneau) alors que le focus est bien posé" "$(jq_ "$RM" '[j.focus.sur, j.focus.style === "none"].join("|")' 2>/dev/null)" "true|true"
-  mutant M-DETAIL-LISTE 77-vf-git-vue-detail.js "li.appendChild(zone); ol.after(li);" "li.appendChild(zone); ligne.after(li);" d17a-complet.js
+  mutant M-DETAIL-LISTE 77-vf-git-volet.js "T.insertBefore(volet, T.querySelector('.vf-git-live'));" "(T.querySelector('li[role=option]') || T).parentNode.append(volet);" d17a-complet.js
   assert_eq "M-DETAIL-LISTE — rougit D17.2 (le détail revient dans la liste) alors que la région reste reliée par aria-controls" "$(jq_ "$RM" '[j.detail.horsListe, j.detail.relie].join("|")' 2>/dev/null)" "false|true"
-  mutant M-LABEL-HTML 77-vf-git-rendu.js "const b = el('button', 'vf-git-btn', null, { type: 'button', 'aria-label': 'Copier la commande' + (nom ? ' ' + nom : '') });" "const b = (() => { const h = document.createElement('div'); h.innerHTML = '<button class=\"vf-git-btn\" type=\"button\" aria-label=\"Copier la commande' + (nom ? ' ' + nom : '') + '\"></button>'; return h.firstChild; })();" d17a-complet.js
+  mutant M-LABEL-HTML 77-vf-git-rendu.js "const b = el('button', 'vf-git-btn', null, { type: 'button', 'aria-label': t('Copy the command') + (nom ? ' ' + nom : '') });" "const b = (() => { const h = document.createElement('div'); h.innerHTML = '<button class=\"vf-git-btn\" type=\"button\" aria-label=\"' + t('Copy the command') + (nom ? ' ' + nom : '') + '\"></button>'; return h.firstChild; })();" d17a-complet.js
   assert_eq "M-LABEL-HTML — rougit D17.4 (le nom hostile écrit en HTML casse l'aria-label et ajoute des attributs) alors que les boutons existent et que la copie D17.5 fonctionne" "$(jq_ "$RM" '[j.hostile.label === j.hostile.attendu, j.attributs, j.copie.spy === j.hostile.code].join("|")' 2>/dev/null)" "false|false|true"
-  mutant M-ECHAP-390 77-vf-git-tiroir.js ".some((d) => getComputedStyle(d).visibility !== 'hidden')" ".some(() => true)" d17b-complet.js
+  mutant M-ECHAP-390 00-vf-surcouches.js "d.id !== 'panel' && visible(d) && " "" d17b-complet.js
   assert_eq "M-ECHAP-390 — rougit D17.6 (le panneau fermé du téléphone, role=dialog invisible, bloque Échap : le tiroir reste ouvert, le focus part sur le corps) alors que le tiroir s'ouvre" "$(jq_ "$RM" '[j.ouvert, j.ferme, j.focus].join("|")' 2>/dev/null)" "true|false|"
   mutant M-BULLE-ECHAP 77-vf-git-rendu.js "if (ev.key === 'Escape' && bulle && !bulle.hidden && ancre === e) {" "if (false) {" d18-complet.js
   assert_eq "M-BULLE-ECHAP — rougit D18.2 (la bulle n'a plus son Échap : le premier Échap atteint le tiroir et le ferme, la bulle disparaît avec lui) alors que la bulle s'était bien ouverte (D18.1)" "$(jq_ "$RM" '[!!j.detache.bulle && j.detache.bulle.vu, j.detache.apresEchap.bulle === null, j.detache.apresEchap.tiroir].join("|")' 2>/dev/null)" "true|true|false"

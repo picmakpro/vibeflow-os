@@ -18,7 +18,7 @@
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
-MOD="$SCRIPTS/vf-cockpit-lancer-post.mjs"; AMO="$SCRIPTS/vf-cockpit-terminal-amorce.mjs"; REN="$SCRIPTS/vf-cockpit-rename.mjs"
+MOD="$SCRIPTS/vf-cockpit-lancer-post.mjs"; AMO="$SCRIPTS/vf-cockpit-terminal-amorce.mjs"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/sain" "$WORK/ren"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
@@ -26,12 +26,6 @@ PASS=0; FAIL=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 
-cat > "$AUX/renomme.mjs" <<'JS'
-// renomme.mjs <rename.mjs> <source> <destination> : applique renommerTexte (le vrai) à une copie
-import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
-const [, , ren, src, dst] = process.argv; const m = await import(pathToFileURL(ren).href);
-fs.writeFileSync(dst, m.renommerTexte(fs.readFileSync(src, 'utf8')));
-JS
 cat > "$AUX/post.mjs" <<'JS'
 // post.mjs <dossier du module> <scénario> : serveur HTTP local (127.0.0.1, port éphémère) qui route vers reconnait/traiter du module ;
 // émet les requêtes du scénario par http.request (contrôle total des en-têtes) ; imprime UNE ligne par cas : « CAS <id> statut=… refus=… appels=… cors=… »
@@ -69,7 +63,7 @@ const serveur = http.createServer({ requireHostHeader: false }, async (req, res)
 });
 await new Promise((r) => serveur.listen(0, '127.0.0.1', r));
 const PORT = serveur.address().port;
-const ENT = process.env.ENT || 'x-floorplan-token';
+const ENT = process.env.ENT || 'x-vf-cockpit-token';
 const defaut = () => ({ methode: 'POST', chemin: '/api/vf/lancer', host: `127.0.0.1:${PORT}`, origin: `http://127.0.0.1:${PORT}`, jeton: JETON, ent: ENT, ct: 'application/json', corps: JSON.stringify({ cible: 'c1', verbe: 'v1' }), pieces: null, extra: {} });
 function rq(o0) {
   const o = { ...defaut(), ...o0 };
@@ -280,9 +274,9 @@ W12.1c|statut=500 refus=interne appels=0 cors=non corps={"refus":"interne"}|gest
 W12.1d|statut=202 refus=- appels=1 cors=non|témoin : le serveur continue de répondre après ces défauts
 W12.2a|proto=nul cles=cible,verbe|le gestionnaire reçoit un objet à prototype nul, sans champ facultatif absent
 W12.2b|proto=nul cles=chat,cible,verbe|idem avec chat : seuls les champs déclarés
-W13.1a|statut=202 refus=- appels=1 cors=non|après renommerTexte : l'en-tête x-vf-cockpit-token est lu (202)
-W13.1b|statut=403 refus=jeton appels=0 cors=non|après renommerTexte : l'ancien en-tête x-floorplan-token est refusé
-W13.1c|statut=403 refus=jeton appels=0 cors=non|après renommerTexte : mauvais jeton sous le nom renommé refusé
+W13.1a|statut=202 refus=- appels=1 cors=non|le module écrit l'en-tête x-vf-cockpit-token : il est lu (202)
+W13.1b|statut=403 refus=jeton appels=0 cors=non|le module écrit l'en-tête x-vf-cockpit-token : l'ancien x-floorplan-token est refusé
+W13.1c|statut=403 refus=jeton appels=0 cors=non|le module écrit l'en-tête x-vf-cockpit-token : un mauvais jeton sous ce nom est refusé
 W14.1a|statut=403 refus=hote appels=0 cors=non|Host faux ET Origin tierce : hote d'abord
 W14.1b|statut=403 refus=origine appels=0 cors=non|Origin tierce ET jeton faux : origine d'abord
 W14.1c|statut=403 refus=jeton appels=0 cors=non|jeton faux ET type faux : jeton d'abord
@@ -295,13 +289,10 @@ lancer() { # lancer <dossier du module> <scénario> <fichier de sortie> : un pro
   [ "$s" = "W13" ] && ent=1
   VF_POST_SORTIE="$o" node "$AUX/post.mjs" "$d" "$s" >/dev/null 2>"$o.err" & local p=$!; PIDS+=($p); wait "$p" 2>/dev/null; vf_hyg_stop "$p"; return 0
 }
-run_tous() { # run_tous <dossier du module> <dossier de sortie> : tous les scénarios ; W13 sur une copie passée par renommerTexte (le vrai)
-  local d="$1" out="$2" s; mkdir -p "$out" "$out/ren"
-  rm -rf "$out/ren"; mkdir -p "$out/ren"
-  [ -f "$d/vf-cockpit-terminal-amorce.mjs" ] && cp "$d/vf-cockpit-terminal-amorce.mjs" "$out/ren/"
-  [ -f "$d/vf-cockpit-lancer-post.mjs" ] && node "$AUX/renomme.mjs" "$REN" "$d/vf-cockpit-lancer-post.mjs" "$out/ren/vf-cockpit-lancer-post.mjs" 2>/dev/null
+run_tous() { # run_tous <dossier du module> <dossier de sortie> : tous les scénarios ; W13 lit le module tel quel (79-06 : le nom VibeFlow y est écrit une fois, plus de copie renommée)
+  local d="$1" out="$2" s; mkdir -p "$out"
   for s in $SCEN; do
-    if [ "$s" = "W13" ]; then ENT=x-vf-cockpit-token lancer "$out/ren" "$s" "$out/$s.out"; else lancer "$d" "$s" "$out/$s.out"; fi
+    if [ "$s" = "W13" ]; then ENT=x-vf-cockpit-token lancer "$d" "$s" "$out/$s.out"; else lancer "$d" "$s" "$out/$s.out"; fi
   done
 }
 ligne() { # ligne <dossier de sortie> <id> -> le résultat du cas (sans « CAS <id> »)

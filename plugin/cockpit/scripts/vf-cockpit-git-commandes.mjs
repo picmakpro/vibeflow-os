@@ -6,8 +6,9 @@
 // la commande copiée est toujours celle qui est affichée. Toute ref est précédée de --end-of-options (un nom en « - » n'est jamais une option).
 // Formes sondées sur git 2.50 (suite C2) : branch -d, show, switch --detach et switch acceptent --end-of-options.
 
-// la citation : entre guillemets simples, chaque guillemet simple devient '\'' (identique sous bash, zsh et sh)
-export const citer = (s) => "'" + s.replace(/'/g, "'\\''") + "'";
+// la citation : entre guillemets simples ; chaque guillemet simple devient '\'' et chaque barre oblique inverse '\\' (une barre non quotée, lue telle quelle),
+// identique sous bash, zsh, sh et fish (sous fish, « \' » et « \\ » sont des échappements DANS les guillemets simples : une barre finale ou doublée y changerait de sens)
+export const citer = (s) => "'" + s.replace(/['\\]/g, (c) => "'\\" + c + "'") + "'";
 
 // classe de `nettoie` (vf-cockpit-arbres.mjs) : C0, DEL et C1, U+2028/2029 et tout caractère de catégorie Cf (A8 : bidi, largeur nulle, U+FEFF, U+061C…) ; écrite en échappements, jamais en caractères
 export const AFFICHAGE_REFUSE = /[\u0000-\u001f\u007f-\u009f\u2028\u2029\p{Cf}]/u;

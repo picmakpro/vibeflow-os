@@ -13,20 +13,20 @@
 #   K17 compteurs et homonymes du travail récent (PU-G-054, PU-G-049)
 #   K18 l'infobulle ne revient pas après une navigation par la recherche, sur Code (1 440 et 768 px) et Projet (PU-G-035, recette du 2026-11-08)
 #   K19 titres de la recherche : vrai nom de fichier sur Code seulement, titre lisible sur Projet (PU-G-050) ; dossier à point en tête (recette du 2026-11-08)
-#   K12 nœud d'une mission : état réel en glyphe et mot, plus de « 0 » ni de « 0 lines » (PU-G-105) · K13 onglet Équipe à 390 px : une seule colonne (PU-G-176)
+#   K12 nœud d'une mission : état réel en glyphe et mot, plus de « 0 » ni de « 0 lines » (PU-G-105) · K13 onglet Équipe à 390 px : une seule colonne de lignes de la régie (PU-G-176, re-pointé 73-08)
 # Un chargement de page unique (chrome-moteur-carte.mjs, un Chrome, profil jetable) ; les assertions se lisent ensuite sur sa sortie JSON. Lab construit par la suite, dans mktemp.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$SCRIPTS/../skills/cockpit-moteur"
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
-if [ -z "$CHROME" ]; then echo "  ⊘ SUITE SAUTÉE : aucun navigateur (Chrome, Chromium) — le moteur de carte NON vérifié, non compté comme réussi"; exit 0; fi
+if [ -z "$CHROME" ]; then . "$(dirname "$0")/chrome-saut.sh"; vf_chrome_saut "  ⊘ SUITE SAUTÉE : aucun navigateur (Chrome, Chromium) — le moteur de carte NON vérifié, non compté comme réussi"; exit 0; fi
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1)); fi; }
 cat > "$AUX/ev.mjs" <<'JS'
@@ -71,12 +71,10 @@ mklab() { # mklab <dir> : un module avec un document et deux scripts qui s'appel
 LAB="$WORK/lab"; mklab "$LAB"
 node "$AUX/mk-agents.mjs" "$HOME" "$LAB" aaaa1111-2222-3333-4444-555555555555
 SCRIPTS_HOTE="$WORK/scripts-hote"; ln -s "$SCRIPTS" "$SCRIPTS_HOTE"
-O="$LAB/.vibeflow/cockpit"; rm -f "$O/.cache/server.json"
+O="$LAB/.vibeflow/cockpit"
 mkdir -p "$WORK/fauxbin"; cp "$SCRIPTS/tests/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude" # le moteur n'envoie aucune question sans « claude » sur le PATH du serveur (askState.engine) : la CI n'en a pas, le faux claude partagé des suites de lancement le remplace
-( cd "$LAB" && PATH="$WORK/fauxbin:$PATH" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE" exec node "$O/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-SRV_PID=$!; PIDS+=($SRV_PID)
-for _ in $(seq 1 300); do grep -q '"port"' "$O/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$O/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+cockpit_lancer "$LAB" PATH="$WORK/fauxbin:$PATH" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE"
+SRV_PID="${VF_PID:-}"; PORT="${VF_PORT:-0}"
 assert_eq "K0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
 R="$(REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-moteur-carte.mjs" "$CHROME" "http://127.0.0.1:$PORT" mgr1 2>"$WORK/mesure.err")"
 [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/mesure.json"
@@ -142,9 +140,9 @@ assert_eq "K12.5 — PU-G-100 : le panneau de la phase 2 dit « Dépend de » (l
 assert_eq "K12.6 — PU-G-100 : le panneau de la phase 1 dit « Utilisé par » (la phase 2), pas « Dépend de »" "$(E "j.sens.p1.titres.join('|') + ' : ' + j.sens.p1.lignes.join('|')")" "Utilisé par : Phase 2 · Suite"
 assert_eq "K12.7 — PU-G-100 : l'ordre des cartes de phase est celui d'avant (la phase 1 avant la phase 2, lien non inversé)" "$(E "j.sens.ordre.join('>')")" "n:ph-1>n:ph-2"
 echo "=== K13 — onglet Équipe à 390 px ==="
-assert_eq "K13.1 — contrôle positif : la session porte une grille d'au moins 3 cartes" "$(E 'j.equipe.cartes >= 3')" "true"
-assert_eq "K13.2 — une seule colonne de cartes" "$(E 'j.equipe.colonnes')" "1"
-assert_eq "K13.3 — aucune carte ne déborde de l'écran" "$(E 'j.equipe.debordent')" "0"
+assert_eq "K13.1 — contrôle positif : la régie porte une colonne d'au moins 3 lignes (nouveau support : lignes de la régie, plus des cartes du canevas)" "$(E 'j.equipe.cartes >= 3')" "true"
+assert_eq "K13.2 — une seule colonne de lignes (bord droit commun à 390 px)" "$(E 'j.equipe.colonnes')" "1"
+assert_eq "K13.3 — aucune ligne ne déborde de l'écran" "$(E 'j.equipe.debordent')" "0"
 echo "=== K14 — panneau de détail par défaut ==="
 assert_eq "K14.1 — à 768 px le panneau de détail est fermé par défaut" "$(E 'j.panneau.a768')" "false"
 assert_eq "K14.2 — contrôle positif : à 1 024 px il est ouvert par défaut" "$(E 'j.panneau.a1024')" "true"

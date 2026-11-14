@@ -12,22 +12,45 @@
   const bouton = () => document.getElementById('vf-lock');
   const ouvert = () => !!panneau.querySelector(':scope > .vf-whop') && !document.body.classList.contains('no-panel'); // le tiroir « Au travail » occupe le panneau, et le panneau est ouvert
   const ETROIT = window.matchMedia('(max-width: 1279px)'), git = () => window.VFGitTiroir; // 77-vf-git-tiroir.js se charge après ce fichier : lu à l'usage
-  let etaitOuvert = ouvert();
+  let etaitOuvert = ouvert(), aRestaurer = true, sansFocus = false;
+  // 80-13 : l'état ouvert est gardé en mémoire de session (au nom du lab) ; rouvert à l'arrivée sur un onglet, sans focus (rien ne le demande à l'humain)
+  const cleMemo = () => 'vf-tiroirs:' + String(((SC.graph || {}).project || {}).name || '').replace(/ — (Projet|Équipe)$/, '');
+  const lireMemo = () => { try { const j = JSON.parse(sessionStorage.getItem(cleMemo())); return !!j && j.travail === true; } catch { return false; } };
+  const ecrireMemo = (v) => {
+    try {
+      const k = cleMemo(), j = JSON.parse(sessionStorage.getItem(k));
+      sessionStorage.setItem(k, JSON.stringify({ ...(j && typeof j === 'object' ? j : {}), travail: v }));
+    } catch { /* stockage refusé */ }
+  };
+  const restaurer = (b) => { // une fois, au premier passage où le bouton existe (il est posé au premier événement du direct)
+    aRestaurer = false;
+    if (!lireMemo() || ouvert()) return;
+    // le clic de restauration ouvre le tiroir : il ne va pas à la section « Au travail » de la régie (70-vf-live.js lit ce drapeau)
+    sansFocus = true; window.__vfTiroirRestaure = true;
+    try { b.click(); etat(); } finally { sansFocus = false; window.__vfTiroirRestaure = false; }
+  };
   const etat = () => {
-    const b = bouton(), o = ouvert(); if (!b) return;
+    const b = bouton(); if (!b) return;
+    if (aRestaurer) restaurer(b);
+    const o = ouvert();
     b.setAttribute('aria-controls', 'panel'); b.setAttribute('aria-expanded', String(o));
+    if (o !== etaitOuvert) { // 80-02 : le tiroir s'inscrit dans la pile à l'ouverture et s'en retire au repli
+      ecrireMemo(o);
+      if (o) window.VF_SURCOUCHES.ouvrir(panneau, { fermer: () => document.getElementById('btn-panel').click() });
+      else window.VF_SURCOUCHES.fermer(panneau);
+    }
     if (o && !etaitOuvert && ETROIT.matches) { // « Au travail » s'ouvre sous 1280 px : Git se replie s'il était ouvert (sans voler le focus à autre chose), et le focus va au tiroir qui s'ouvre (Q12, PU-G-203 ; recette du 2026-11-08 : il restait sur le bouton « N au travail », 15 à 20 Tab pour entrer)
       const gitOuvert = !!git() && git().ouvert(); if (gitOuvert) git().fermer(true);
       const a = document.activeElement, titre = panneau.querySelector(':scope > .vf-whop h3');
       // le tiroir « Au travail » porte toujours son titre (le gabarit de 70-vf-live.js, seul producteur de .vf-whop, le pose) : l'ancienne branche « sinon, Git vient de se replier, le focus au bouton » n'était atteinte dans aucun scénario (revue du 2026-11-08, S8)
-      if (titre && !panneau.contains(a) && (gitOuvert || a === b || a === document.body || !a)) { titre.tabIndex = -1; titre.focus({ preventScroll: true }); }
+      const libre = gitOuvert || a === b || a === document.body || !a; // 80-13 : rouvert par la mémoire, il ne prend pas le focus
+      if (!sansFocus && titre && !panneau.contains(a) && libre) { titre.tabIndex = -1; titre.focus({ preventScroll: true }); }
     }
     etaitOuvert = o;
   };
   window.addEventListener('vf-git:etat', (e) => { if (e.detail && e.detail.ouvert && ETROIT.matches && ouvert()) document.getElementById('btn-panel').click(); }); // Git s'ouvre (le focus est déjà sur son titre) : « Au travail » se replie
-  const surcouche = () => !!document.querySelector('#palette.open, #flowmenu.open, #legend.open, #ctxmenu:not([hidden]), [role="dialog"]:not([hidden]), [aria-modal="true"]'); // une palette ou un menu ouvert prend l'Échap d'abord
   const echap = (e) => {
-    if (e.key !== 'Escape' || e.defaultPrevented || !ouvert() || surcouche()) return;
+    if (e.key !== 'Escape' || e.defaultPrevented || !ouvert() || window.VF_SURCOUCHES.couverte(panneau)) return; // la pile : une surcouche au-dessus prend l'Échap
     e.stopPropagation(); e.preventDefault(); // le viewer n'entend pas cet Échap : il ne remonte pas le canevas
     document.getElementById('btn-panel').click(); // la fermeture du viewer (animation, état mémorisé), pas une copie
     bouton()?.focus({ preventScroll: true });

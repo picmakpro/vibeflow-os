@@ -12,16 +12,16 @@
 # et les assertions se lisent ensuite dans l'ordre d'origine ; le fil d'Ariane (O2b) attend l'état posé de la page (géométrie identique sur deux images), plus une durée fixe de 500 ms.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$SCRIPTS/../skills/cockpit-moteur"
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
-if [ -z "$CHROME" ]; then echo "  ⊘ SUITE SAUTÉE : aucun navigateur (Chrome, Chromium) — CKPT-12 NON vérifié, non compté comme réussi"; exit 0; fi
+if [ -z "$CHROME" ]; then . "$(dirname "$0")/chrome-saut.sh"; vf_chrome_saut "  ⊘ SUITE SAUTÉE : aucun navigateur (Chrome, Chromium) — CKPT-12 NON vérifié, non compté comme réussi"; exit 0; fi
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0
 # Moteur de questions : sans `claude` sur le PATH du serveur, la barre de question porte l'avis « no_engine » et mesure 56 à 75 px de plus (CI Linux, run 42486502412, R14.4 et R17.2 :
 # 376 au lieu de 432 à 800 px, 256 au lieu de 312 à 768 px, 587 au lieu de 662 à 1 024 px ; reproduit sous macOS en retirant `claude` du PATH). Les positions absolues de la suite sont celles de la barre
@@ -44,7 +44,9 @@ const equipe = /equipe/.test(process.argv[3] || ''); // 70-12 : l'onglet Équipe
 // à 152 px, et seulement de 1 000 à 1 279 px (dernière largeur de la clé : « 1024 », « resize:1920:1024 »). Sans drapeau, ou hors de cette plage, le minimum reste 200 px, à l'identique.
 const larg = Number((String(process.argv[2]).match(/(\d+)$/) || [])[1]), git = /git/.test(process.argv[3] || '');
 const garde = (x) => { const r = /^recherche : (\d+) px, minimum 200$/.exec(x); return !(git && larg >= 1000 && larg <= 1279 && r && Number(r[1]) >= 152); };
-const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || /#panel/.test(m.m.surfaces || '')) && (equipe || /#ask/.test(m.m.surfaces || ''));
+// Phase 73 (juge design, spec § 1 et § 16.3) : sur Équipe la feuille du moteur est masquée ; son absence est le témoin, sa présence une violation
+const plein = m.m.enteteElements >= (bas ? 3 : 6) && (bas || equipe || /#panel/.test(m.m.surfaces || '')) && (equipe || /#ask/.test(m.m.surfaces || ''));
+if (plein && equipe && !bas && /#panel/.test(m.m.surfaces || '')) { console.log('panneau du moteur visible sur Équipe'); process.exit(0); }
 console.log(!plein ? 'mesure vide : ' + JSON.stringify(m.m) : m.v.filter(garde).length ? m.v.filter(garde).slice(0, 4).join(' | ') : 'aucune');
 JS
 # faux verrou de driver (HOME jetable) : un propriétaire au nom long, comme en vraie mission
@@ -75,12 +77,10 @@ mklab() { # mklab <dir> [sans-agent] [sans-git] : lab GSD sans STATE.md, deux ph
 }
 # le serveur reçoit les scripts par un lien nommé autrement que « scripts » : pas de conductor voisin, le faux driver-lock.sh de HOME répond (v1.1.1 : le conductor voisin passe avant)
 SCRIPTS_HOTE="$WORK/scripts-hote"; ln -s "$SCRIPTS" "$SCRIPTS_HOTE"
-srv() { # srv <sortie> -> SRV_PORT SRV_PID
-  local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+srv() { # srv <sortie> [<racine d'une copie du module : mutant de page, 79-16>] -> SRV_PORT SRV_PID
+  local o="$1" lab; lab="$(cd "$1/../.." && pwd)"
+  COCKPIT_MODULE="${2:-}" COCKPIT_SORTIE="$o" cockpit_lancer "$lab" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE"
+  SRV_PID="${VF_PID:-}"; SRV_PORT="${VF_PORT:-0}"
 }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
 mes() { REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME" "$@"; } # mes <url> <largeurs> <resize|-> [<captures>]
@@ -126,16 +126,27 @@ done
 SRV_PID=$PID_court; unsrv; SRV_PID=$PID_long; unsrv
 echo "=== R5, R6 — lab sans STATE.md : aucun champ vide ; titre de l'onglet ; traduction avant la peinture ==="
 srv "$LC/.vibeflow/cockpit"; PC=$SRV_PORT
-EXPR='({ titre: document.title, ctx: (document.getElementById("context")||{}).innerText||"", panneau: (document.getElementById("panel")||{}).innerText||"" })'
+EXPR='({ titre: document.title, ctx: (document.getElementById("context")||{}).innerText||"", panneau: (document.getElementById("panel")||{}).textContent||"" })'
 XP="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 2000 "$EXPR" "http://127.0.0.1:$PC/project.html" "http://127.0.0.1:$PC/index.html")"
 assert_eq "R5.1 — sous-titre du projet sans « ? » ni parenthèses vides" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" '/[?]|[(][)]/.test(j.resultats[0].valeur.ctx)')" "false"
 assert_eq "R5.2 — panneau d'ensemble sans bloc « Maintenant » ni « Phase — »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" '/Maintenant|Phase —/.test(j.resultats[0].valeur.panneau)')" "false"
 assert_has "R5.3 — témoin : le panneau montre bien les effectifs du lab" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[0].valeur.panneau')" "phases"
-assert_eq "R6.1 — titre de l'onglet Projet : « <nom> — Projet »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[0].valeur.titre')" "lab-court — Projet"
-assert_eq "R6.2 — titre de l'onglet Code : « <nom> — Code »" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[1].valeur.titre')" "lab-court — Code"
-EXPR='(async () => { const d = document.createElement("div"); d.textContent = "Thinking…"; document.body.appendChild(d); await Promise.resolve(); await Promise.resolve(); const t = d.textContent; d.remove(); return t; })()'
-XT="$(node "$HERE_T/chrome-cdp.mjs" "$CHROME" 1500 "$EXPR" "http://127.0.0.1:$PC/project.html")"; unsrv
-assert_eq "R6.3 — « Thinking… » inséré est traduit avant toute image (deux micro-tâches)" "$(printf '%s' "$XT" | node "$AUX/ev.mjs" 'j.resultats[0].valeur')" "Réflexion…"
+assert_eq "R6.1 — titre de l'onglet Projet : « Projet · <nom> » (format unique, AUDC-X7)" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[0].valeur.titre')" "Projet · lab-court"
+assert_eq "R6.2 — titre de l'onglet Code : « Code · <nom> » (format unique, AUDC-X7)" "$(printf '%s' "$XP" | node "$AUX/ev.mjs" 'j.resultats[1].valeur.titre')" "Code · lab-court"
+# R6.3 (79-10, amendement daté 2026-11-13, rv-1021) : le texte est inséré dans le DOM par le CHEMIN D'ÉMISSION RÉEL (une question posée dans le tiroir : submitAsk écrit « Thinking… » dans la feuille
+# avant le premier await), puis lu : français affiché. Lecture unique (garde window.__r63) : le relevé est répété jusqu'à stabilité, et une seconde soumission annulerait la première.
+EXPR63='(() => { if (window.__r63) return window.__r63; const i = document.querySelector("#ask-input"); i.value = "Combien de fichiers ?"; document.querySelector("#ask-form").requestSubmit(); const t = document.querySelector("#ask-sheet").innerText; return (window.__r63 = { fr: /Réflexion…/.test(t), en: /Thinking…/.test(t) }); })()'
+PRET63='document.readyState === "complete" && !!document.querySelector("header .brand .mark") && !document.querySelector("#ask-send").disabled' # le moteur de questions est détecté (faux claude du PATH)
+XT="$(CDP_PRET="$PRET63" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$EXPR63" "http://127.0.0.1:$PC/project.html")"; unsrv
+assert_eq "R6.3 — « Thinking… » écrit par le chemin d'émission réel (question posée dans le tiroir) est montré en français, jamais en anglais (79-10)" "$(printf '%s' "$XT" | node "$AUX/ev.mjs" 'JSON.stringify(j.resultats[0].valeur)')" '{"fr":true,"en":false}'
+# mutant (dans la suite) : la même page dont l'émission contourne le traducteur (« [t('Thinking…')] » devient « ['Thinking…'] ») : R6.3 doit rougir, c'est-à-dire lire l'anglais
+LM="$WORK/lab-mutant63"; mkdir -p "$LM"; ( cd "$LC" && tar -cf - . ) | ( cd "$LM" && tar -xf - )
+# 79-16 : la page vient du module ; le mutant est une COPIE du module dont les sources de page (viewer.html, ui/*.js) portent la substitution
+MODM63="$(cockpit_module_copie "$WORK/mod-r63")"; cockpit_page_muter_dans "$MODM63" "s/\[t('Thinking…')\]/['Thinking…']/g" 2>/dev/null
+MUT_N="$(cat "$MODM63/skills/cockpit-moteur/assets/viewer.html" "$MODM63"/skills/cockpit-moteur/assets/ui/*.js | grep -c "\['Thinking…'\]")"
+srv "$LM/.vibeflow/cockpit" "$MODM63"; PM=$SRV_PORT
+XM="$(CDP_PRET="$PRET63" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$EXPR63" "http://127.0.0.1:$PM/project.html")"; unsrv
+assert_eq "R6.3 mutant — avec l'émission qui contourne le traducteur ($MUT_N sites mutés), la même sonde lit « Thinking… » et non « Réflexion… » (la sonde sait voir l'anglais)" "$([ "$MUT_N" -ge 1 ] && printf '%s' "$XM" | node "$AUX/ev.mjs" 'JSON.stringify(j.resultats[0].valeur)' || echo "mutation sans effet")" '{"fr":false,"en":true}'
 
 # O2 (recette 3, arbitrage Samuel, AskUserQuestion session principale, 2026-11-03) : un fil d'Ariane profond (Vue d'ensemble / Historique / Phases) à 1 280 et 1 440 px.
 # Un segment de moins de 12 caractères n'est jamais rogné (scrollWidth <= clientWidth) ; si une troncature est nécessaire, elle porte sur un segment du MILIEU, jamais le premier ni le dernier.
@@ -251,10 +262,8 @@ done
 #   m3 le milieu au même poids que les bouts (1, au lieu de 100 000 : on ne tronque plus le milieu d'abord) -> « le premier est tronqué alors que le milieu garde plus de 64 px »
 mutant_o2b() { # mutant_o2b <nom> <nature> <ancien> <nouveau> : <ancien> doit exister dans la page (sinon FAIL nommé)
   local M="$WORK/mut-o2b-$1"; mkdir -p "$M/.planning/missions" "$M/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$M/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$M/.planning/missions/"
-  node -e "
-const fs=require('fs');let n=0;for(const f of ['index.html','project.html']){const p='$M/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');const o=process.argv[1],r=process.argv[2];if(!h.includes(o))continue;fs.writeFileSync(p,h.split(o).join(r));n++}
-if(!n){console.error('mutant $1 : motif introuvable');process.exit(1)}" "$3" "$4" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans la page"; return; }
-  srv "$M/.vibeflow/cockpit"; MUT_SRV+=("$SRV_PID"); MUT_ID+=("$1"); MUT_NAT+=("$2"); MUT_LIB+=("$5")
+  local MX; MX="$(cockpit_module_copie "$WORK/modx-o2b-$1")"; cockpit_page_muter_litteral "$MX" "$3" "$4" 2>/dev/null || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans les sources de page du module"; return; } # 79-16 : copie du module
+  srv "$M/.vibeflow/cockpit" "$MX"; MUT_SRV+=("$SRV_PID"); MUT_ID+=("$1"); MUT_NAT+=("$2"); MUT_LIB+=("$5")
   o2b_mesure "$SRV_PORT" 1280 > "$WORK/mut-o2b-$1.json" & MUT_PIDS+=($!) # les trois mutants se mesurent en même temps ; les verdicts tombent dans l'ordre d'origine (P70-D-18)
 }
 MUT_SRV=(); MUT_ID=(); MUT_NAT=(); MUT_LIB=(); MUT_PIDS=()
@@ -298,19 +307,17 @@ unsrv
 echo "=== R4 — témoin rouge : sans la mise en page du cockpit, la mesure rougit ==="
 LM="$WORK/lab-mutant"; mkdir -p "$LM/.planning" "$LM/.vibeflow" "$LM/.planning/missions"; cp -R "$LL/.vibeflow/cockpit" "$LM/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM/.planning/missions/"
 agent_actif "$LM"
-node -e "
-const fs=require('fs');for(const f of ['index.html','project.html']){const p='$LM/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');
-const n=h.replace(/<script>\/\* ui\/01-vf-responsive\.js \*\/[\s\S]*?<\/script>/,'<script>/* mutant */</script>');if(n===h){console.error('mutant : bloc 01-vf-responsive.js introuvable');process.exit(1)}fs.writeFileSync(p,n)}" || FAIL=$((FAIL+1))
-srv "$LM/.vibeflow/cockpit"; RM="$(mes "http://127.0.0.1:$SRV_PORT/project.html" 1440 - )"; unsrv
+# 79-16 : la page vient du module ; le témoin rouge est une COPIE du module dont ui/01-vf-responsive.js est vidé (la sortie ne porte que des données)
+MXR4="$(cockpit_module_copie "$WORK/modx-r4")"; printf '/* mutant */\n' > "$MXR4/skills/cockpit-moteur/assets/ui/01-vf-responsive.js"
+srv "$LM/.vibeflow/cockpit" "$MXR4"; RM="$(mes "http://127.0.0.1:$SRV_PORT/project.html" 1440 - )"; unsrv
 assert_has "R4.1 — témoin rouge : sans 01-vf-responsive.js, l'en-tête à 1 440 px est signalé" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" 'j.mesures["1440"].v.join(" | ")')" "en-tête"
 
 # R4.2 — témoin rouge de R-1 (recalculé en 70-04, P70-D-16 et P70-D-22 : borne de 342 px mesurée, badge « au travail » réduit à son point ; la place libre à 1 024 px va jusqu'à une borne de 380 px, mesurée : le mutant à 342 + 58 = 400 px reste rouge avec de la marge, alors que 342 + 36 tenait encore) : une colonne gauche de 400 px fait sortir le dernier bouton de l'onglet Code à 1 024 px
 LM2="$WORK/lab-mutant2"; mkdir -p "$LM2/.planning/missions" "$LM2/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$LM2/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$LM2/.planning/missions/"
 agent_actif "$LM2"   # sans agent actif le badge dit « Personne », plus étroit : la mesure ne verrait plus le même en-tête
-node -e "
-const fs=require('fs');const p='$LM2/.vibeflow/cockpit/index.html';const h=fs.readFileSync(p,'utf8');
-const n=h.replace('header .hl { flex: 1 1 0; min-width: 342px; }','header .hl { flex: 1 1 0; min-width: 400px; }');if(n===h){console.error('mutant : borne de 342 px introuvable');process.exit(1)}fs.writeFileSync(p,n)" || FAIL=$((FAIL+1))
-srv "$LM2/.vibeflow/cockpit"; RM2="$(RESP_INJECT="$INJ_CODE" mes "http://127.0.0.1:$SRV_PORT/index.html" 1024 - )"; unsrv
+# 79-16 : copie du module dont la borne de la colonne gauche passe de 342 à 400 px (la page vient du module)
+MXR42="$(cockpit_module_copie "$WORK/modx-r42")"; cockpit_page_muter_litteral "$MXR42" 'header .hl { flex: 1 1 0; min-width: 342px; }' 'header .hl { flex: 1 1 0; min-width: 400px; }' 2>/dev/null || FAIL=$((FAIL+1))
+srv "$LM2/.vibeflow/cockpit" "$MXR42"; RM2="$(RESP_INJECT="$INJ_CODE" mes "http://127.0.0.1:$SRV_PORT/index.html" 1024 - )"; unsrv
 assert_has "R4.2 — témoin rouge : avec la colonne gauche à 400 px, un bouton de l'en-tête sort de la fenêtre à 1 024 px (onglet Code)" "$(printf '%s' "$RM2" | node "$AUX/ev.mjs" 'j.mesures["1024"].v.join(" | ")')" "sort de la fenêtre"
 
 # R8 — témoin indépendant de la police ET de la plateforme : Chrome headless sous Linux n'a aucun périphérique de pointage (`pointer: none`) ; la mise en page
@@ -412,15 +419,13 @@ srv "$LC/.vibeflow/cockpit"; X="$(node "$AUX/d39-absent.mjs" "$CHROME" "http://1
 assert_eq "D39.7a — Git présent à 1 024 px : drapeau posé, plancher 152 px, invite courte « Chercher… » (témoin positif de l'état de départ)" "$(printf '%s' "$X" | node "$AUX/ev.mjs" '[j.avant.drapeau, j.avant.plancher, j.avant.invite, j.avant.stVisible].join("|")')" 'true|152px|"Chercher…"|false'
 assert_eq "D39.7b — la relecture de l'en-tête rend « absent » : drapeau retiré, plancher 200 px, invite d'origine rendue, ouvreur et seconde ligne cachés" "$(printf '%s' "$X" | node "$AUX/ev.mjs" '[j.apres.drapeau, j.apres.plancher, j.apres.invite, j.apres.stVisible, j.ouvreurCache].join("|")')" "false|200px|none|true|true"
 # mutants : chacun doit rougir un témoin de SA propre règle (copie du lab construit, une chaîne remplacée, échec si la chaîne est introuvable)
-mut39() { # mut39 <labSource> <dest> <ancien> <nouveau>
+mut39() { # mut39 <labSource> <dest> <ancien> <nouveau> : copie du lab (données) et COPIE DU MODULE (79-16) dont les sources de page portent la substitution ; MUT39_MOD = sa racine
   mkdir -p "$2/.planning/missions" "$2/.vibeflow"; cp -R "$1/.vibeflow/cockpit" "$2/.vibeflow/cockpit"; cp "$1/.planning/missions/demo.dag.json" "$2/.planning/missions/"; agent_actif "$2"
-  M39_A="$3" M39_B="$4" node -e "
-const fs=require('fs');for(const f of ['index.html','project.html']){const p='$2/.vibeflow/cockpit/'+f;const h=fs.readFileSync(p,'utf8');
-const n=h.split(process.env.M39_A).join(process.env.M39_B);if(n===h){console.error('mutant : chaîne introuvable');process.exit(1)}fs.writeFileSync(p,n)}"
+  MUT39_MOD="$(cockpit_module_copie "$WORK/modx-$(basename "$2")")" && cockpit_page_muter_litteral "$MUT39_MOD" "$3" "$4" 2>/dev/null
 }
 # mutant 1 : le plancher de 152 px s'applique aussi sans Git (le défaut de c743e356 : une règle posée avant la sortie « pas de dépôt » de 76-vf-git-entete.js, sans clé sur l'ouvreur)
 if mut39 "$LS" "$WORK/lab-mut39a" "if (!V || V.etat === 'absent' || !V.depot) return; // P78-D-11" "document.head.appendChild(Object.assign(document.createElement('style'), { textContent: '@media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) { header .hc { min-width: 152px; } }' })); if (!V || V.etat === 'absent' || !V.depot) return; // P78-D-11"; then
-  srv "$WORK/lab-mut39a/.vibeflow/cockpit"; X="$(mes39 $SRV_PORT 1024)"; unsrv
+  srv "$WORK/lab-mut39a/.vibeflow/cockpit" "$MUT39_MOD"; X="$(mes39 $SRV_PORT 1024)"; unsrv
   assert_eq "D39m1a — mutant « plancher de 152 px aussi SANS Git » : le plancher mesuré à 1 024 px sans Git est 152 px" "$(v39 "$X" 'j.resultats[0].valeur.plancher')" "152px"
   assert_eq "D39m1 — le même mutant : le témoin D39.5 (sans Git, 1 024 px) rougit" "$([ "$(v39 "$X" 'j.resultats[0].valeur.git + "/" + j.resultats[0].valeur.plancher + "/" + j.resultats[0].valeur.invite + "/" + j.resultats[0].valeur.stVisible')" != "false/200px/none/true" ] && echo rouge || echo vert)" "rouge"
 else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m1 : mutant non construit"; fi
@@ -429,14 +434,14 @@ if mut39 "$LC" "$WORK/lab-mut39b" '(max-width: 1279px) and (not (pointer: coarse
       header[data-vf-git] .hc' '(max-width: 1280px) and (not (pointer: coarse)) {
       header[data-vf-git] .hc'; then
   git -C "$WORK/lab-mut39b" init -q -b main # la page relit l'en-tête au chargement : la copie du lab doit rester un dépôt, sinon « absent » retire le drapeau avant la mesure
-  srv "$WORK/lab-mut39b/.vibeflow/cockpit"; X="$(mes39 $SRV_PORT 1280 git)"; unsrv
+  srv "$WORK/lab-mut39b/.vibeflow/cockpit" "$MUT39_MOD"; X="$(mes39 $SRV_PORT 1280 git)"; unsrv
   assert_eq "D39m2a — mutant « plancher de 152 px aussi à 1 280 px » : le plancher mesuré à 1 280 px est 152 px" "$(v39 "$X" 'j.resultats[0].valeur.plancher')" "152px"
   assert_eq "D39m2 — le même mutant : le témoin D39.4 (avec Git, 1 280 px) rougit" "$([ "$(v39 "$X" 'j.resultats[0].valeur.plancher + "/" + j.resultats[0].valeur.invite + "/" + j.resultats[0].valeur.stVisible')" != "200px/none/true" ] && echo rouge || echo vert)" "rouge"
 else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m2 : mutant non construit"; fi
 # mutant 3 (F6a) : le drapeau est posé sans condition, même quand la relecture rend « absent »
 if mut39 "$LC" "$WORK/lab-mut39c" "if (entete) entete.toggleAttribute('data-vf-git', d.etat !== 'absent');" "if (entete) entete.setAttribute('data-vf-git', '');"; then
   git -C "$WORK/lab-mut39c" init -q -b main
-  srv "$WORK/lab-mut39c/.vibeflow/cockpit"; X="$(node "$AUX/d39-absent.mjs" "$CHROME" "http://127.0.0.1:$SRV_PORT/index.html" 2>&1 | tail -1)"; unsrv
+  srv "$WORK/lab-mut39c/.vibeflow/cockpit" "$MUT39_MOD"; X="$(node "$AUX/d39-absent.mjs" "$CHROME" "http://127.0.0.1:$SRV_PORT/index.html" 2>&1 | tail -1)"; unsrv
   assert_eq "D39m3 — mutant « setAttribute inconditionnel » : rougit D39.7b (drapeau et plancher de 152 px restent après « absent ») alors que l'état de départ (D39.7a) est le bon" "$(printf '%s' "$X" | node "$AUX/ev.mjs" '[j.avant.drapeau, j.avant.plancher, j.apres.drapeau, j.apres.plancher, j.ouvreurCache].join("|")')" "true|152px|true|152px|true"
 else FAIL=$((FAIL+1)); echo "  ❌ FAIL — D39m3 : mutant non construit"; fi
 
@@ -468,11 +473,9 @@ done
 echo "=== R-M — carte d'une mission abandonnée : pastille « Abandonnée », pied dans la carte (sombre et clair) ==="
 mkdir -p "$WORK/locks-abs"; printf '#!/usr/bin/env bash\ncase "$1" in status) echo "{\\"present\\": false}";; orphans) echo "{\\"orphans\\":[]}";; esac\n' > "$WORK/locks-abs/driver-lock.sh"; chmod +x "$WORK/locks-abs/driver-lock.sh"
 LM="$WORK/lab-mission"; mklab "$LM" sans-agent
-o="$LM/.vibeflow/cockpit"; rm -f "$o/.cache/server.json"
-( cd "$LM" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$WORK/locks-abs" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-SRV_PID=$!; PIDS+=($SRV_PID)
-for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-PM="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+o="$LM/.vibeflow/cockpit"
+cockpit_lancer "$LM" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$WORK/locks-abs"
+SRV_PID="${VF_PID:-}"; PM="${VF_PORT:-0}"
 RM="$(REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-mission.mjs" "$CHROME" "http://127.0.0.1:$PM/project.html" dag-demo ${SHOTS:+"$SHOTS/mission"})"; unsrv
 assert_eq "R-M.0 — témoin : la mesure a eu lieu dans les deux thèmes, sur la carte abandonnée (data-theme sombre puis clair)" "$(printf '%s' "$RM" | node "$AUX/ev.mjs" '(j.erreur||"")+"|"+(j.sombre||{}).n+"|"+(j.sombre||{}).theme+"|"+(j.clair||{}).n+"|"+(j.clair||{}).theme')" "|1|dark|1|light"
 for th in sombre clair; do
@@ -540,9 +543,8 @@ node "$HERE_T/chrome-panneau-etroit.mjs" "$CHROME" "http://127.0.0.1:$P_c/projec
 R15C_SRV=(); R15C_ID=(); R15C_PIDS=()
 r15c_mutant() { # r15c_mutant <nom> <ancien> <nouveau> : <ancien> doit exister dans la page (sinon FAIL nommé)
   local M="$WORK/mut-r15c-$1"; rm -rf "$M"; cp -R "$LC" "$M"
-  node -e "
-const fs=require('fs');const p='$M/.vibeflow/cockpit/project.html';const h=fs.readFileSync(p,'utf8');const o=process.argv[1],r=process.argv[2];if(!h.includes(o)){console.error('mutant $1 : motif introuvable');process.exit(1)}fs.writeFileSync(p,h.split(o).join(r))" "$2" "$3" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant R15c.$1 : motif introuvable dans la page"; return; }
-  srv "$M/.vibeflow/cockpit"; R15C_SRV+=("$SRV_PID"); R15C_ID+=("$1")
+  local MX; MX="$(cockpit_module_copie "$WORK/modx-r15c-$1")"; cockpit_page_muter_litteral "$MX" "$2" "$3" 2>/dev/null || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant R15c.$1 : motif introuvable dans les sources de page du module"; return; } # 79-16 : copie du module
+  srv "$M/.vibeflow/cockpit" "$MX"; R15C_SRV+=("$SRV_PID"); R15C_ID+=("$1")
   node "$HERE_T/chrome-panneau-etroit.mjs" "$CHROME" "http://127.0.0.1:$SRV_PORT/project.html" > "$WORK/mut-r15c-$1.json" 2>&1 & R15C_PIDS+=($!)
 }
 r15c_mutant p1 "sansMemoire && k === 'panel' ? undefined : ecrire(k, v)" "ecrire(k, v)"
@@ -569,7 +571,9 @@ for onglet in index project equipe; do
   done
 done
 assert_eq "R13.3 — Code / 390 px, menu ouvert : une entrée par action présente (huit avec Travail récent et Écrans), libellé visible égal à celui du bouton d'origine, pastille reportée sur l'entrée et sur « ⋯ »" "$(mv_ "$WORK/r13-menu.json" '(()=>{const m=j.mesures["390"].m,s=m.sources,e=m.menu;if(!e)return "menu absent";const p=[];if(s.length<8)p.push("témoin : "+s.length+" actions seulement");if(!s.some((x)=>x.b))p.push("témoin : aucune pastille sur les boutons d origine");if(e.length!==s.length)p.push(e.length+" entrées pour "+s.length+" actions");s.forEach((x,i)=>{if(!e[i]||!e[i].t||e[i].t!==x.t)p.push("entrée "+i+" : ["+(e[i]&&e[i].t)+"] au lieu de ["+x.t+"]");if(e[i]&&e[i].b!==x.b)p.push("pastille de "+x.t+" : ["+(e[i]&&e[i].b)+"] au lieu de ["+x.b+"]")});if(s.some((x)=>x.b)&&!m.plusPastille)p.push("« ⋯ » sans pastille");return p.join(" ; ")||"aucune"})()')" "aucune"
-for onglet in index project equipe; do
+# 73-09 (P73-D-04) : la boucle du zoom en pile sort `equipe` : la page Équipe n'a plus de canevas, donc plus de zoom de canevas (P70-D-20 et UIFN-14 devenus sans objet, voir R14.7 et R17.1) ;
+# la propriété reste jugée, avec son témoin positif, sur Code et Projet
+for onglet in index project; do
   F="$WORK/r13-$onglet.json"
   assert_eq "R14.1 — $onglet / 390 px : le zoom n'est plus dans l'en-tête" "$(mv_ "$F" '(()=>{const z=j.mesures["390"].m.zoom;return z?z.entete+"|"+z.vis:"zoom absent"})()')" "false|true"
   assert_eq "R14.2 — $onglet / 390 px : pile verticale à gauche, au-dessus de la barre de question sans la recouvrir" "$(mv_ "$F" '(()=>{const m=j.mesures["390"].m,z=m.zoom;if(!z)return "zoom absent";const p=[];if(z.dir!=="column")p.push("direction "+z.dir);if(z.r[0]>=195)p.push("à droite (x="+z.r[0]+")");if(m.askRect&&z.r[1]+z.r[3]>m.askRect[1])p.push("bas du zoom "+(z.r[1]+z.r[3])+" > haut de la question "+m.askRect[1]);return p.join(" ; ")||"ok"})()')" "ok"
@@ -577,6 +581,7 @@ for onglet in index project equipe; do
     assert_eq "R14.3 — $onglet / $w px : chaque bouton de zoom a un nom accessible en français (différent de sa source anglaise)" "$(mv_ "$F" "(()=>{const z=j.mesures[\"$w\"].m.zoom;if(!z||!z.boutons.length)return 'zoom absent';return z.boutons.filter((b)=>!b.aria||/^(zoom out|fit to screen|zoom in)/i.test(b.aria)).map((b)=>b.id+' ['+b.aria+']').join(' | ')||'aucun'})()")" "aucun"
   done
 done
+assert_eq "R14.7 — equipe / 390 px : aucun contrôle de zoom visible (la page n'a plus de canevas ; témoin : la mesure a eu lieu à 390 px, R13.1 la lit aussi)" "$(mv_ "$WORK/r13-equipe.json" '(()=>{const m=j.mesures["390"].m;if(!m||!m.fenetre||m.fenetre[0]!==390)return "témoin : mesure absente";return m.zoom&&m.zoom.vis?"visible":"aucun"})()')" "aucun"
 for onglet in index project; do # sur l'onglet Équipe, la position du zoom à ≥ 701 px change en 70-12 (P70-D-20) : non jugée ici
   assert_eq "R14.4 — $onglet / 800 px : la position du zoom (x,y,largeur,hauteur) : la rangée au bord --edge, 8 au-dessus de la barre de question de 92 px (fenêtre de 800 x 600, cibles de 44 : 144 x 52) ; avant la recette du 2026-11-08 (lot C, PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px »), la pile du haut à droite [732,64,52,144]" "$(mv_ "$WORK/r13-$onglet.json" '(()=>{const z=j.mesures["800"].m.zoom;return z?z.r.join(","):"zoom absent"})()')" "16,432,144,52"
   assert_eq "R14.4b — $onglet / 800 px : le panneau de détail est fermé par défaut (PU-G-045) ; le zoom, au bord gauche depuis le lot C, ne dépend plus de lui" "$(mv_ "$WORK/r13-$onglet.json" 'j.mesures["800"].m.tiroir')" "false"
@@ -638,20 +643,29 @@ LE="$WORK/vibeflow-os-un-nom-de-projet-vraiment-tres-long-equipe"; mklab "$LE"; 
 srv "$LE/.vibeflow/cockpit"; P_e=$SRV_PORT; PID_e=$SRV_PID
 zoom_base() { case "$1" in 768) echo "16|312|144|52" ;; 1024) echo "16|662|114|42" ;; 1440) echo "16|842|114|42" ;; esac; } # x|y|largeur|hauteur du zoom de Code et de Projet (labs de la suite, sans le terminal donc sans pastille) : 1 440 px, celui de 794c6dba ; de 701 à 1 279 px (recette du 2026-11-08, lot C ; PU-G-021 ; arbitrage Samuel, AskUserQuestion session principale, 2026-11-08 : « La zone basse sous 1 280 px ») la rangée au bord --edge, 8 au-dessus de la barre de question (768 px : fenêtre de 480, barre de 92, cibles de 44 donc 144 x 52 ; 1 024 px : fenêtre de 768, barre de 40, 114 x 42)
 J_PAUSE_E='const p = (ms) => new Promise((r) => setTimeout(r, ms));'
-INJ_SESSION="(async () => { $J_PAUSE_E const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.dispatchEvent(new MouseEvent('dblclick', { bubbles: true })); for (let i = 0; i < 60 && !/^Session/.test(document.querySelector('#context .k')?.textContent || ''); i++) await p(50); await p(400); return true; })()"
 OPIDS=()
 mes "http://127.0.0.1:$P_e/equipe.html" 390,768,1024,1440 - > "$WORK/r17-equipe.json" & OPIDS+=($!)
-RESP_INJECT="$INJ_SESSION" mes "http://127.0.0.1:$P_e/equipe.html" 390,1024 - > "$WORK/r19-session.json" & OPIDS+=($!)
 mes "http://127.0.0.1:$P_e/project.html" 1024 - > "$WORK/r18-projet.json" & OPIDS+=($!)
 wait "${OPIDS[@]}"
 # R18 (PU-G-001, coque étroite 2026-11-06) : sous 1 280 px la racine du fil prend un libellé court et cède sa place au NOM DU DÉPÔT (masquée plutôt que rognée) ; le témoin ne dit donc plus « fil visible » mais « fil visible ou masqué par la règle » : un fil absent sans l'attribut de masquage reste un échec
 R18X='(() => { const f = document.getElementById("crumbs"), b = f && f.querySelector("button"), s = document.getElementById("search-btn"), v = (e) => e && e.getBoundingClientRect().width > 0 && getComputedStyle(e).display !== "none"; const rf = f && v(f) && v(b) ? f.getBoundingClientRect() : null, rs = s && v(s) ? s.getBoundingClientRect() : null; return { visible: !!rf, masque: !!(b && b.hasAttribute("data-vf-masque")), recherche: !!rs, recouvre: rf && rs ? Math.min(rf.right, rs.right) - Math.max(rf.left, rs.left) > 1 && Math.min(rf.bottom, rs.bottom) - Math.max(rf.top, rs.top) > 1 : false }; })()'
 for pg in equipe project; do CDP_VIEWPORT=1024x768 node "$HERE_T/chrome-cdp.mjs" "$CHROME" 800 "$R18X" "http://127.0.0.1:$P_e/$pg.html" > "$WORK/r18x-$pg.json"; done
+# 73-09 : la page Équipe est la régie : ses mesures se lisent sur section#vf-equipe (lignes, en-tête, première section, zoom éventuel) ; R19.2 les relit une fois la première ligne dépliée (clic idempotent : chrome-cdp relève jusqu'à deux relevés identiques)
+REGMES='const vis = (e) => { if (!e) return false; const r = e.getBoundingClientRect(), s = getComputedStyle(e); return r.width > 0 && r.height > 0 && s.display !== "none" && s.visibility !== "hidden" && !e.hidden; };
+  const rect = (e) => e.getBoundingClientRect(); const aire = (a, b) => { const x = Math.min(a.right, b.right) - Math.max(a.left, b.left), y = Math.min(a.bottom, b.bottom) - Math.max(a.top, b.top); return x > 0 && y > 0 ? Math.round(x * y) : 0; };
+  const lignes = () => [...document.querySelectorAll("section#vf-equipe li.vf-rg-lig")].filter(vis);
+  const mesure = () => { const e = document.querySelector("#vf-equipe-entete"), s1 = [...document.querySelectorAll("section#vf-equipe section[data-vf-section]")].find(vis), z = document.querySelector("#zoom");
+    return { lignes: lignes().length, entete: vis(e), section: !!s1, aire: vis(e) && s1 ? aire(rect(e), rect(s1)) : null, zoom: vis(z), zoomLignes: vis(z) ? lignes().filter((l) => aire(rect(z), rect(l)) > 0).length : 0 }; };'
+REGX='(async () => { const p = (ms) => new Promise((r) => setTimeout(r, ms)); '"$REGMES"' for (let i = 0; i < 100 && lignes().length < 1; i++) await p(100); await p(300); return mesure(); })()'
+REGX_OUVERT='(async () => { const p = (ms) => new Promise((r) => setTimeout(r, ms)); '"$REGMES"' for (let i = 0; i < 100 && lignes().length < 1; i++) await p(100); for (let i = 0; i < 100 && !window.__vfFiche; i++) await p(100); const b = document.querySelector("section#vf-equipe li.vf-rg-lig button[aria-expanded]"); if (b && b.getAttribute("aria-expanded") === "false") b.click(); await p(400); return { ouverte: !!b && !!(window.__vfFiche && window.__vfFiche.ouverte()), apres: (() => { const m = mesure(), f = document.querySelector(".vf-fiche"), e = document.querySelector("#vf-equipe-entete"); return vis(f) && vis(e) ? { ...m, section: true, aire: aire(rect(e), rect(f)) } : m; })() }; })()'
+regie_haut() { case "$1" in 390) echo 844 ;; 768) echo 480 ;; 1024) echo 768 ;; 1440) echo 900 ;; esac; } # hauteurs de chrome-responsive.mjs (HAUT)
+for w in 390 768 1024 1440; do CDP_VIEWPORT="${w}x$(regie_haut "$w")" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 300 "$REGX" "http://127.0.0.1:$P_e/equipe.html" > "$WORK/r17-regie-$w.json" 2> "$WORK/r17-regie-$w.err"; done
+for w in 390 1024; do CDP_VIEWPORT="${w}x$(regie_haut "$w")" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 300 "$REGX_OUVERT" "http://127.0.0.1:$P_e/equipe.html" > "$WORK/r19-regie-$w.json" 2> "$WORK/r19-regie-$w.err"; done
 SRV_PID=$PID_e; unsrv
-assert_eq "R17.0 — témoin : la fixture de l'onglet Équipe montre au moins une carte à 1 024 px" "$(mv_ "$WORK/r17-equipe.json" 'j.mesures["1024"].m.nCartes>=1')" "true"
+assert_eq "R17.0 — témoin : la fixture de l'onglet Équipe montre au moins une ligne de régie à 1 024 px (73-09 : plus de carte de canevas)" "$(mv_ "$WORK/r17-regie-1024.json" 'j.resultats[0].valeur.lignes>=1')" "true"
 for w in 768 1024 1440; do
-  assert_eq "R17.1 — Équipe / $w px : le zoom est la rangée en bas à gauche (x, écart au bas de la fenêtre, direction)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;const z=m.zoom;if(!z)return 'zoom absent';return z.r[0]+'|'+(m.fenetre[1]-(z.r[1]+z.r[3]))+'|'+z.dir})()")" "16|16|row"
-  assert_eq "R17.1b — Équipe / $w px : le zoom ne recouvre aucune carte" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1?String(m.zoomCartes):'témoin : aucune carte'})()")" "0"
+  assert_eq "R17.1 — Équipe / $w px : aucun zoom de canevas visible (témoin négatif : P70-D-20 est devenue sans objet, la page n'a plus de canevas ; la rangée en bas à gauche reste jugée, positive, sur Code et Projet par R17.2 ; témoin : au moins une ligne de régie est mesurée)" "$(mv_ "$WORK/r17-regie-$w.json" '(()=>{const v=j.resultats[0].valeur;return v.lignes>=1?String(v.zoom):"témoin : aucune ligne"})()')" "false"
+  assert_eq "R17.1b — Équipe / $w px : le zoom ne recouvre aucune ligne de régie (aucun zoom visible, donc aucune ligne recouverte)" "$(mv_ "$WORK/r17-regie-$w.json" '(()=>{const v=j.resultats[0].valeur;return v.lignes>=1?String(v.zoomLignes):"témoin : aucune ligne"})()')" "0"
   for onglet in index project; do
     assert_eq "R17.2 — $onglet / $w px : la position du zoom (x,y,largeur,hauteur) : celle de 794c6dba à 1 440 px ; de 768 à 1 024 px, la rangée au bord --edge posée 8 au-dessus de la barre de question, plus la pile du haut à droite (PU-G-021, lot C de la recette du 2026-11-08)" "$(mv_ "$WORK/r13-$onglet.json" "(()=>{const z=j.mesures[\"$w\"].m.zoom;return z?z.r.join('|'):'zoom absent'})()")" "$(zoom_base "$w")"
   done
@@ -660,10 +674,10 @@ for spec in "Équipe:equipe" "Projet:project"; do
   assert_eq "R18 — ${spec%%:*} / 1 024 px, lab au nom long : le fil d'Ariane ne recouvre pas la recherche (témoin : la recherche est visible, le fil est visible ou masqué par la règle de la racine)" "$(mv_ "$WORK/r18x-${spec#*:}.json" '(()=>{const v=j.resultats[0].valeur;if(!v.recherche)return "témoin : recherche absente";if(!v.visible&&!v.masque)return "témoin : fil absent sans masquage";return v.recouvre?"recouvrement":"aucun"})()')" "aucun"
 done
 for w in 390 768 1024 1440; do
-  assert_eq "R19.1 — Équipe / $w px, premier affichage : le titre ne recouvre pas la première carte (aire en px²)" "$(mv_ "$WORK/r17-equipe.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1&&m.titreRect?String(m.titreCarte):'témoin : titre ou carte absents'})()")" "0"
+  assert_eq "R19.1 — Équipe / $w px, premier affichage : l'en-tête de la régie (#vf-equipe-entete) ne recouvre pas la première section (aire en px²)" "$(mv_ "$WORK/r17-regie-$w.json" '(()=>{const v=j.resultats[0].valeur;return v.lignes>=1&&v.entete&&v.section?String(v.aire):"témoin : en-tête ou section absents"})()')" "0"
 done
 for w in 390 1024; do
-  assert_eq "R19.2 — Équipe / $w px, session ouverte : le titre ne recouvre pas la première carte (aire en px²)" "$(mv_ "$WORK/r19-session.json" "(()=>{const m=j.mesures[\"$w\"].m;return m.nCartes>=1&&m.titreRect?String(m.titreCarte):'témoin : titre ou carte absents'})()")" "0"
+  assert_eq "R19.2 — Équipe / $w px, première ligne ouverte (le nom ouvre la fiche, qui annule le dépliage de la régie, 74-10 ; contrat P73-C2 ; la fiche remplace les sections de la régie, la première surface sous l'en-tête est la fiche) : l'en-tête de la régie ne recouvre pas la première surface (aire en px²)" "$(mv_ "$WORK/r19-regie-$w.json" '(()=>{const v=j.resultats[0].valeur;return v.ouverte&&v.apres.entete&&v.apres.section?String(v.apres.aire):"témoin : fiche non ouverte, en-tête ou section absents"})()')" "0"
 done
 for w in 390 768 1024 1440; do
   mode=equipe-git; [ "$w" -lt 1000 ] && mode=equipe-bas # lab avec Git : le plancher de la recherche est de 152 px de 1 000 à 1 279 px (P78-D-39), comme pour Code et Projet (R1) ; le nom du dépôt entier prend la place avant (PU-G-001)
@@ -682,16 +696,12 @@ INJ_R22C="(async () => { $J_PAUSE $INJ_CODE; $(J_LIBELLE 99) $J_EXTRA await p(50
 INJ_R22P="(async () => { $J_PAUSE $INJ_CODE; $(J_LIBELLE 99) $J_EXTRA window.VibeFlow.reveal('n:ph-1'); for (let i = 0; i < 100; i++) { const u = document.getElementById('btn-up'); if (u && !u.hidden) break; await p(50); } await p(500); return true; })()"
 INJ_R23="(async () => { $J_PAUSE document.getElementById('vf-plus')?.click(); for (let i = 0; i < 40 && !(document.getElementById('vf-plus-menu')?.getBoundingClientRect().width > 0); i++) await p(50); await p(100); return true; })()"
 W21="1600,1610,1619,1625,1630,1635,1639"; W22="1640,1700,1800"
-mutant_suite() { # mutant_suite <dossier> <ancien> <nouveau> : seconde retouche, sur la copie déjà faite par mutant_page
-  node -e "
-const fs=require('fs');let n=0;for(const f of ['index.html','project.html','equipe.html']){const p='$WORK/mut-$1/.vibeflow/cockpit/'+f;if(!fs.existsSync(p))continue;const h=fs.readFileSync(p,'utf8');if(!h.includes(process.argv[1]))continue;fs.writeFileSync(p,h.split(process.argv[1]).join(process.argv[2]));n++}
-if(!n){console.error('mutant $1 : second motif introuvable');process.exit(1)}" "$2" "$3" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : second motif introuvable dans la page"; return 1; }
+mutant_suite() { # mutant_suite <dossier> <ancien> <nouveau> : seconde retouche, sur la copie du module déjà faite par mutant_page
+  cockpit_page_muter_litteral "$WORK/modx-$1" "$2" "$3" 2>/dev/null || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : second motif introuvable dans les sources de page du module"; return 1; }
 }
 mutant_page() { # mutant_page <dossier> <ancien> <nouveau> : copie de la page du lab long, <ancien> doit exister (sinon FAIL nommé)
   local M="$WORK/mut-$1"; mkdir -p "$M/.planning/missions" "$M/.vibeflow"; cp -R "$LL/.vibeflow/cockpit" "$M/.vibeflow/cockpit"; cp "$LL/.planning/missions/demo.dag.json" "$M/.planning/missions/"; agent_actif "$M"
-  node -e "
-const fs=require('fs');let n=0;for(const f of ['index.html','project.html','equipe.html']){const p='$M/.vibeflow/cockpit/'+f;if(!fs.existsSync(p))continue;const h=fs.readFileSync(p,'utf8');if(!h.includes(process.argv[1]))continue;fs.writeFileSync(p,h.split(process.argv[1]).join(process.argv[2]));n++}
-if(!n){console.error('mutant $1 : motif introuvable');process.exit(1)}" "$2" "$3" || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans la page"; return 1; }
+  rm -rf "$WORK/modx-$1"; cockpit_module_copie "$WORK/modx-$1" > /dev/null; cockpit_page_muter_litteral "$WORK/modx-$1" "$2" "$3" 2>/dev/null || { FAIL=$((FAIL+1)); echo "  ❌ FAIL — mutant $1 : motif introuvable dans les sources de page du module"; return 1; } # 79-16 : copie du module
 }
 # R21 : le repli mesuré rattrape seul un badge trop large ; le mutant retire donc la tranche (1 599 px) ET le repli, pour que la tranche soit ce qui est éprouvée
 mutant_page r21 '@media (min-width: 701px) and (max-width: 1639px)' '@media (min-width: 701px) and (max-width: 1599px)'; M21=$?
@@ -700,9 +710,9 @@ mutant_page r22 "badge.setAttribute('data-vf-point', '');" ''; M22=$?
 mutant_page r23 "src.disabled || src.getAttribute('aria-disabled') === 'true'" 'false'; M23=$?
 srv "$LL/.vibeflow/cockpit"; P_l=$SRV_PORT; PID_l=$SRV_PID
 srv "$LC/.vibeflow/cockpit"; P_c=$SRV_PORT; PID_c=$SRV_PID
-[ $M21 = 0 ] && { srv "$WORK/mut-r21/.vibeflow/cockpit"; P_m21=$SRV_PORT; PID_m21=$SRV_PID; }
-[ $M22 = 0 ] && { srv "$WORK/mut-r22/.vibeflow/cockpit"; P_m22=$SRV_PORT; PID_m22=$SRV_PID; }
-[ $M23 = 0 ] && { srv "$WORK/mut-r23/.vibeflow/cockpit"; P_m23=$SRV_PORT; PID_m23=$SRV_PID; }
+[ $M21 = 0 ] && { srv "$WORK/mut-r21/.vibeflow/cockpit" "$WORK/modx-r21"; P_m21=$SRV_PORT; PID_m21=$SRV_PID; }
+[ $M22 = 0 ] && { srv "$WORK/mut-r22/.vibeflow/cockpit" "$WORK/modx-r22"; P_m22=$SRV_PORT; PID_m22=$SRV_PID; }
+[ $M23 = 0 ] && { srv "$WORK/mut-r23/.vibeflow/cockpit" "$WORK/modx-r23"; P_m23=$SRV_PORT; PID_m23=$SRV_PID; }
 OPIDS=()
 RESP_INJECT="$INJ_R21" mes "http://127.0.0.1:$P_l/project.html" "$W21" - > "$WORK/r21.json" & OPIDS+=($!)
 RESP_INJECT="$INJ_R22C" mes "http://127.0.0.1:$P_l/index.html" "$W22" - > "$WORK/r22-code.json" & OPIDS+=($!)
@@ -781,10 +791,9 @@ assert_eq "R24.5 — racine à 1 279 px : nom non rogné, racine écrite « Ense
 # se pose quand même 8 px au-dessus de la barre telle qu'elle est (PU-G-021), jamais sur elle. Le PATH du serveur est un dossier de liens vers les seuls outils dont il a besoin (jamais celui du poste, qui peut porter un vrai `claude`).
 echo "=== R25 — sans moteur de questions : l'avis allonge la barre, le zoom reste 8 px au-dessus d'elle ==="
 SANS="$WORK/bin-sans-moteur"; mkdir -p "$SANS"; for b in node git sh bash env dirname date mkdir cat rm grep sed seq sleep ln cp chmod touch kill pwd printf tr awk ps pgrep head tail wc basename uname; do p="$(command -v $b 2>/dev/null)"; [ -n "$p" ] && ln -sf "$p" "$SANS/$b"; done
-r25_serveur() { PATH="$SANS" command -v claude >/dev/null 2>&1 && { echo "  ❌ le dossier sans moteur porte un claude"; FAIL=$((FAIL+1)); }; local o="$1" lab; lab="$(cd "$1/../.." && pwd)"; rm -f "$o/.cache/server.json"
-  ( cd "$lab" && PATH="$SANS" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE" exec node "$o/serve.mjs" --no-open --port $(libre) > "$o/../serve.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID); for _ in $(seq 1 100); do grep -q '"port"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  SRV_PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$o/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"; }
+r25_serveur() { PATH="$SANS" command -v claude >/dev/null 2>&1 && { echo "  ❌ le dossier sans moteur porte un claude"; FAIL=$((FAIL+1)); }; local o="$1" lab; lab="$(cd "$1/../.." && pwd)"
+  COCKPIT_SORTIE="$o" cockpit_lancer "$lab" PATH="$SANS" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE"
+  SRV_PID="${VF_PID:-}"; SRV_PORT="${VF_PORT:-0}"; }
 r25_serveur "$LC/.vibeflow/cockpit"; P_sm=$SRV_PORT; PID_sm=$SRV_PID
 OPIDS=()
 for onglet in index project; do mes "http://127.0.0.1:$P_sm/$onglet.html" 768,800,1024 - > "$WORK/r25-$onglet.json" & OPIDS+=($!); done

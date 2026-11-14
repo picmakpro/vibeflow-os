@@ -5,57 +5,76 @@
 (() => {
   const SC = window.Floorplan;
   if (!SC) return;
+  const t = window.__vfFrT;
 
   // [display name, plain explanation, aliases...]. Aliases are matched as whole words, ignoring case,
   // except those marked with a leading "=" (matched exactly, so "REST" doesn't fire on "the rest").
   const TERMS = [
-    ['API', 'The way programs talk to each other: one asks for something (prices, an order) and the other answers.', 'API', 'APIs', 'API client'],
-    ['Endpoint', 'One specific request the app can receive, like "mark this order shipped"; each has its own web address.', 'endpoint', 'endpoints'],
-    ['Webhook', 'A message another service sends your app automatically when something happens there, like "a payment went through".', 'webhook', 'webhooks'],
-    ['Server', 'A computer in the cloud that runs your app\'s behind-the-scenes work and answers requests from the screens.', 'server', 'servers', 'main server'],
-    ['Frontend', 'The part of the app people see and click: the screens, buttons and forms in the browser.', 'frontend', 'front end', 'front-end'],
-    ['Backend', 'The behind-the-scenes part of the app that stores the records, applies the rules and talks to other services.', 'backend', 'back end', 'back-end'],
-    ['Database', 'Where the app keeps its records (products, orders, customers) so nothing is lost when it restarts.', 'database', 'databases', 'DB'],
-    ['Record', 'One saved entry in the database, like a single order or customer; a table is the list of all records of one kind.', 'database record', 'database records', 'database table', 'database tables'],
-    ['Model', 'In code, a model describes how one kind of record (an order, a customer) is stored in the database.', 'model', 'models', 'ORM', 'ORM model', 'ORM models', 'data model'],
-    ['Query', 'A question the app asks the database, like "all orders from today that haven\'t shipped".', 'query', 'queries'],
-    ['Queue', 'A waiting line of tasks; work is dropped in and handled one by one in the background so nothing gets lost.', 'queue', 'queues', 'queued', 'outbox', 'message queue'],
-    ['Background job', 'A task that runs on its own behind the scenes, so people don\'t have to wait for it on screen.', 'background job', 'background jobs', 'background task', 'background tasks', 'worker', 'workers'],
-    ['Scheduled job', 'A task that runs automatically on a timetable, like every hour or every night.', 'cron', 'cron job', 'cron jobs', 'scheduled job', 'scheduled jobs', 'scheduler'],
-    ['Environment variable', 'A setting stored outside the code, such as which database or account to use, so it can differ between test and live.', 'environment variable', 'environment variables', 'env var', 'env vars', '.env'],
-    ['Secret', 'A password or key the app uses to sign in to another service; it must never be shared or put in the code.', 'secret', 'secrets', 'API key', 'API keys', 'credentials'],
-    ['Deploy', 'Putting a new version of the app live so people start using it.', 'deploy', 'deploys', 'deployed', 'deployment', 'deployments'],
-    ['Migration', 'A one-time change to how records are stored, like adding a new field to every order.', 'migration', 'migrations'],
-    ['Cache', 'A saved copy of something kept close by so it loads faster instead of being worked out again.', 'cache', 'cached', 'caching'],
-    ['Sign-in', 'Checking who someone is (usually with a password) before letting them in.', 'auth', 'authentication', 'login', 'log in', 'sign-in', 'sign in'],
-    ['Permissions', 'The rules for who is allowed to do what, like only managers issuing refunds.', 'permissions', 'authorization', 'roles', 'RBAC'],
-    ['Session', 'How the app remembers you are signed in, so you don\'t have to type your password on every screen.', 'session', 'sessions'],
-    ['Token', 'A temporary digital pass the app hands out after sign-in and checks on every request.', 'token', 'tokens', 'bearer token', 'access token'],
-    ['SDK', 'A ready-made kit of code a company provides so apps can talk to its service more easily.', 'SDK', 'SDKs'],
-    ['Repository', 'The folder that holds all of a project\'s code and its full history of changes.', 'repository', 'repositories', 'repo', 'repos'],
-    ['Component', 'A reusable building block of the screens, like a button, a table or a whole product editor.', 'component', 'components'],
-    ['Route', 'A web address the app answers: on the screens it\'s a page, on the server it\'s a kind of request.', 'route', 'routes', 'routing', 'App Router'],
-    ['Request', 'A message asking the server to do or fetch something; the server sends back a response with the result.', 'request', 'requests', 'response', 'responses'],
-    ['JSON', 'A simple text format programs use to send data to each other, like a labelled list.', 'JSON'],
-    ['REST', 'A common style for building APIs, where each web address stands for a kind of thing (orders, products).', '=REST', '=RESTful'],
-    ['HTTP method', 'The kind of request: GET reads something, POST creates, PUT or PATCH changes, DELETE removes.', 'HTTP method', 'HTTP methods', '=GET', '=POST', '=PUT', '=PATCH', '=DELETE'],
-    ['HTTP', 'The language browsers and servers use to talk over the web; HTTPS is the encrypted version.', 'HTTP', 'HTTPS'],
-    ['CDN', 'A network of servers around the world that delivers images and files quickly from somewhere near the visitor.', 'CDN', 'CDNs'],
-    ['Storage bucket', 'Cloud file storage for things like product images, uploads and exports.', 'storage bucket', 'bucket', 'buckets', 'S3', 'GCS', 'Cloud Storage'],
-    ['Pub/Sub', 'Google\'s message service: one part of the app posts an event and others pick it up to handle in the background.', 'Pub/Sub', 'PubSub'],
-    ['MCP', 'A standard way to connect AI assistants (like Claude or ChatGPT) to an app so they can look things up in it.', 'MCP', 'MCP server', 'Model Context Protocol'],
-    ['Next.js', 'A popular toolkit for building websites and web apps with React.', 'Next.js', 'NextJS'],
-    ['React', 'A popular library for building interactive screens out of reusable pieces.', '=React'],
-    ['Flask', 'A Python toolkit for building web servers.', 'Flask'],
-    ['SQLAlchemy', 'A Python toolkit that lets the code read and save database records without writing raw database commands.', 'SQLAlchemy'],
-    ['Postgres', 'A widely used database; RDS and Cloud SQL are Amazon\'s and Google\'s hosted versions of it.', 'Postgres', 'PostgreSQL', 'RDS', 'Cloud SQL'],
-    ['Docker', 'A way to package an app with everything it needs so it runs the same on any computer or cloud.', 'Docker', 'container', 'containers'],
-    ['Cloud Run', 'Google\'s service for running an app\'s servers and background jobs in the cloud without managing machines.', 'Cloud Run'],
-    ['Middleware', 'A check every request passes through on its way in, such as "is this person signed in?".', 'middleware'],
-    ['Blueprint', 'In Flask, a group of related requests bundled together, like all the order requests.', 'blueprint', 'blueprints'],
-    ['Tests', 'Automatic checks that the code still does what it should, run before changes go live.', 'test suite', 'unit test', 'unit tests', 'pytest', 'Vitest'],
-    ['Script', 'A small program run by hand for a one-off job, like fixing or importing data.', 'script', 'scripts'],
-    ['OAuth', 'The standard behind "Sign in with…" buttons: it lets one app use another on your behalf without sharing your password.', 'OAuth'],
+    ['API', t('The way programs talk to each other: one asks for something (prices, an order) and the other answers.'), 'API', 'APIs', 'API client'],
+    [t('Endpoint'), t('One specific request the app can receive, like "mark this order shipped"; each has its own web address.'), 'endpoint', 'endpoints'],
+    [t('Webhook'), t('A message another service sends your app automatically when something happens there, like "a payment went through".'),
+      'webhook', 'webhooks'],
+    [t('Server'), t('A computer in the cloud that runs your app\'s behind-the-scenes work and answers requests from the screens.'),
+      'server', 'servers', 'main server'],
+    [t('Frontend'), t('The part of the app people see and click: the screens, buttons and forms in the browser.'), 'frontend', 'front end', 'front-end'],
+    [t('Backend'), t('The behind-the-scenes part of the app that stores the records, applies the rules and talks to other services.'),
+      'backend', 'back end', 'back-end'],
+    [t('Database'), t('Where the app keeps its records (products, orders, customers) so nothing is lost when it restarts.'), 'database', 'databases', 'DB'],
+    [t('Record'), t('One saved entry in the database, like a single order or customer; a table is the list of all records of one kind.'),
+      'database record', 'database records', 'database table', 'database tables'],
+    [t('Model'), t('In code, a model describes how one kind of record (an order, a customer) is stored in the database.'),
+      'model', 'models', 'ORM', 'ORM model', 'ORM models', 'data model'],
+    [t('Query'), t('A question the app asks the database, like "all orders from today that haven\'t shipped".'), 'query', 'queries'],
+    [t('Queue'), t('A waiting line of tasks; work is dropped in and handled one by one in the background so nothing gets lost.'),
+      'queue', 'queues', 'queued', 'outbox', 'message queue'],
+    [t('Background job'), t('A task that runs on its own behind the scenes, so people don\'t have to wait for it on screen.'),
+      'background job', 'background jobs', 'background task', 'background tasks', 'worker', 'workers'],
+    [t('Scheduled job'), t('A task that runs automatically on a timetable, like every hour or every night.'),
+      'cron', 'cron job', 'cron jobs', 'scheduled job', 'scheduled jobs', 'scheduler'],
+    [t('Environment variable'), t('A setting stored outside the code, such as which database or account to use, so it can differ between test and live.'),
+      'environment variable', 'environment variables', 'env var', 'env vars', '.env'],
+    [t('Secret'), t('A password or key the app uses to sign in to another service; it must never be shared or put in the code.'),
+      'secret', 'secrets', 'API key', 'API keys', 'credentials'],
+    [t('Deploy'), t('Putting a new version of the app live so people start using it.'), 'deploy', 'deploys', 'deployed', 'deployment', 'deployments'],
+    [t('Migration'), t('A one-time change to how records are stored, like adding a new field to every order.'), 'migration', 'migrations'],
+    [t('Cache'), t('A saved copy of something kept close by so it loads faster instead of being worked out again.'), 'cache', 'cached', 'caching'],
+    [t('Sign-in'), t('Checking who someone is (usually with a password) before letting them in.'),
+      'auth', 'authentication', 'login', 'log in', 'sign-in', 'sign in'],
+    [t('Permissions'), t('The rules for who is allowed to do what, like only managers issuing refunds.'), 'permissions', 'authorization', 'roles', 'RBAC'],
+    [t('Session'), t('How the app remembers you are signed in, so you don\'t have to type your password on every screen.'), 'session', 'sessions'],
+    [t('Token'), t('A temporary digital pass the app hands out after sign-in and checks on every request.'), 'token', 'tokens', 'bearer token', 'access token'],
+    ['SDK', t('A ready-made kit of code a company provides so apps can talk to its service more easily.'), 'SDK', 'SDKs'],
+    [t('Repository'), t('The folder that holds all of a project\'s code and its full history of changes.'), 'repository', 'repositories', 'repo', 'repos'],
+    [t('Component'), t('A reusable building block of the screens, like a button, a table or a whole product editor.'), 'component', 'components'],
+    [t('Route'), t('A web address the app answers: on the screens it\'s a page, on the server it\'s a kind of request.'),
+      'route', 'routes', 'routing', 'App Router'],
+    [t('Request'), t('A message asking the server to do or fetch something; the server sends back a response with the result.'),
+      'request', 'requests', 'response', 'responses'],
+    ['JSON', t('A simple text format programs use to send data to each other, like a labelled list.'), 'JSON'],
+    ['REST', t('A common style for building APIs, where each web address stands for a kind of thing (orders, products).'), '=REST', '=RESTful'],
+    [t('HTTP method'), t('The kind of request: GET reads something, POST creates, PUT or PATCH changes, DELETE removes.'),
+      'HTTP method', 'HTTP methods', '=GET', '=POST', '=PUT', '=PATCH', '=DELETE'],
+    ['HTTP', t('The language browsers and servers use to talk over the web; HTTPS is the encrypted version.'), 'HTTP', 'HTTPS'],
+    ['CDN', t('A network of servers around the world that delivers images and files quickly from somewhere near the visitor.'), 'CDN', 'CDNs'],
+    [t('Storage bucket'), t('Cloud file storage for things like product images, uploads and exports.'),
+      'storage bucket', 'bucket', 'buckets', 'S3', 'GCS', 'Cloud Storage'],
+    ['Pub/Sub', t('Google\'s message service: one part of the app posts an event and others pick it up to handle in the background.'), 'Pub/Sub', 'PubSub'],
+    ['MCP', t('A standard way to connect AI assistants (like Claude or ChatGPT) to an app so they can look things up in it.'),
+      'MCP', 'MCP server', 'Model Context Protocol'],
+    ['Next.js', t('A popular toolkit for building websites and web apps with React.'), 'Next.js', 'NextJS'],
+    [t('React'), t('A popular library for building interactive screens out of reusable pieces.'), '=React'],
+    [t('Flask'), t('A Python toolkit for building web servers.'), 'Flask'],
+    [t('SQLAlchemy'), t('A Python toolkit that lets the code read and save database records without writing raw database commands.'), 'SQLAlchemy'],
+    [t('Postgres'), t('A widely used database; RDS and Cloud SQL are Amazon\'s and Google\'s hosted versions of it.'),
+      'Postgres', 'PostgreSQL', 'RDS', 'Cloud SQL'],
+    [t('Docker'), t('A way to package an app with everything it needs so it runs the same on any computer or cloud.'), 'Docker', 'container', 'containers'],
+    [t('Cloud Run'), t('Google\'s service for running an app\'s servers and background jobs in the cloud without managing machines.'), 'Cloud Run'],
+    [t('Middleware'), t('A check every request passes through on its way in, such as "is this person signed in?".'), 'middleware'],
+    [t('Blueprint'), t('In Flask, a group of related requests bundled together, like all the order requests.'), 'blueprint', 'blueprints'],
+    [t('Tests'), t('Automatic checks that the code still does what it should, run before changes go live.'),
+      'test suite', 'unit test', 'unit tests', 'pytest', 'Vitest'],
+    [t('Script'), t('A small program run by hand for a one-off job, like fixing or importing data.'), 'script', 'scripts'],
+    [t('OAuth'), t('The standard behind "Sign in with…" buttons: it lets one app use another on your behalf without sharing your password.'), 'OAuth'],
   ];
 
   const exact = new Map(), loose = new Map(), alts = [];
@@ -85,11 +104,11 @@
     for (const el of targets) {
       if (skipped(el, scope)) continue;
       const walker = document.createTreeWalker(el, NodeFilter.SHOW_TEXT, {
-        acceptNode: (t) => !t.nodeValue.trim() || skipped(t.parentElement, el) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
+        acceptNode: (n) => !n.nodeValue.trim() || skipped(n.parentElement, el) ? NodeFilter.FILTER_REJECT : NodeFilter.FILTER_ACCEPT,
       });
       const texts = [];
       while (walker.nextNode()) texts.push(walker.currentNode);
-      for (const t of texts) wrapIn(t, used);
+      for (const tn of texts) wrapIn(tn, used);
     }
   }
   function wrapIn(textNode, used) {
@@ -181,9 +200,9 @@
     if (now === true) go(); else hideT = setTimeout(go, 90);
   }
   const termAt = (ev) => ev.target instanceof Element ? ev.target.closest('.sc-term') : null;
-  document.addEventListener('mouseover', (ev) => { const t = termAt(ev); if (!t) return; clearTimeout(showT); showT = setTimeout(() => show(t), current ? 0 : 140); });
-  document.addEventListener('mouseout', (ev) => { const t = termAt(ev); if (t && !t.contains(ev.relatedTarget)) { clearTimeout(showT); hide(); } });
-  document.addEventListener('focusin', (ev) => { const t = termAt(ev); if (t) show(t); });
+  document.addEventListener('mouseover', (ev) => { const w = termAt(ev); if (!w) return; clearTimeout(showT); showT = setTimeout(() => show(w), current ? 0 : 140); });
+  document.addEventListener('mouseout', (ev) => { const w = termAt(ev); if (w && !w.contains(ev.relatedTarget)) { clearTimeout(showT); hide(); } });
+  document.addEventListener('focusin', (ev) => { const w = termAt(ev); if (w) show(w); });
   document.addEventListener('focusout', (ev) => { if (termAt(ev)) hide(); });
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape' && current) hide(true); });
   document.addEventListener('scroll', () => { if (current) hide(true); }, true);

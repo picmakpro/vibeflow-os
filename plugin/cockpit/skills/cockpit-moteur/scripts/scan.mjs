@@ -14,6 +14,7 @@ import { extract, callableCallsVia } from './lib/extract.mjs';
 import { findIssues } from './lib/health.mjs';
 import { findScreens } from './lib/screens.mjs';
 import { createResolver } from './lib/resolve.mjs';
+import { cheminPhysique } from './lib/vf-git-sortant.mjs';
 import { resolveRoutes, matchCalls } from './lib/routes.mjs';
 
 const args = parseArgs(process.argv.slice(2));
@@ -63,10 +64,21 @@ for (const p of found.loose) if (!seen.has(p) && !inMap(p)) { seen.add(p); fileL
 
 // ---------- 2. classify, read, extract ----------
 const files = [];
+const rootReal = cheminPhysique(root);
+if (rootReal === null) { console.error('scan: racine illisible ou introuvable'); process.exit(1); }
 for (const { path: p, repo } of fileList) {
   const abs = path.join(root, p);
   let st;
-  try { st = fs.statSync(abs); } catch { continue; }
+  // vibeflow AUDC-A-02, D-M15 : un lien n'est lu que si sa cible physique est un fichier retenu par la marche
+  // (liste git ou marche : ni dossier git, ni sortie du cockpit, ni fichier ignoré)
+  try {
+    st = fs.lstatSync(abs);
+    if (st.isSymbolicLink()) {
+      const r = cheminPhysique(abs);
+      if (r === null || !r.startsWith(rootReal + path.sep) || !seen.has(toPosix(path.relative(rootReal, r)))) continue;
+      st = fs.statSync(abs);
+    }
+  } catch { continue; }
   if (!st.isFile()) continue;
   const { category, lang } = classify(p, st.size);
   const f = { path: p, repo, category, lang, bytes: st.size, loc: 0 };

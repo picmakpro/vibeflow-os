@@ -4,7 +4,7 @@
 #   E0 fixtures et contrôles positifs (git réel) · E1 témoins : le piège se déclenche SANS la parade
 #   E2 shBorne durci (filtres, GIT_* hérités, options de lecture, journal d'argv) · E3 les lectures réelles du socle (who, arbres, planning, gitCommonDir)
 #   E4 lancerGit (ok, tronqué, hors dépôt, git absent, échéance) · E5 lancerGit sur le dépôt piégé (status ET log -p, GIT_DIR hérité)
-#   E6 garde « aucun importeur de child_process hors liste blanche, aucun git lancé hors vf-cockpit-paths.mjs » (A7, audit 2026-11-06 : récursive, 11 plantés, mutants de la garde) et ses témoins · E7 mutants (copies du dossier des scripts, jamais le module)
+#   E6 garde « aucun importeur de child_process hors liste blanche, aucun git lancé hors vf-cockpit-git-lanceur.mjs » (A7, audit 2026-11-06 : récursive, 11 plantés, mutants de la garde) et ses témoins · E7 mutants (copies du dossier des scripts, jamais le module)
 #   E9 audit 2026-11-06 : A1 (aucun filtre déclaré exécuté, 70 filtres, borne, liste illisible) et A2 (sous-modules : --ignore-submodules=all) · E8 le moteur vendorisé (envGit passé par l'assemblage, git() fermé par défaut sans le marqueur) et ses mutants M-GARDE, M-ENV-MOTEUR
 # Fixtures construites dans mktemp. Exit 0 si tout passe, 1 sinon.
 
@@ -196,20 +196,20 @@ assert_eq "E5.2a — témoin : la sortie est le log -p du VRAI dépôt (sujet r�
 R53="$(LG "$P" '{}' show --stat HEAD)"
 assert_eq "E5.3 — lancerGit show : sous-commande à options de lecture, aucun textconv lancé, sortie utile" "$(marque TEXTCONV)|$(G "$R53" '/SUJET-REEL/.test(j.sortie)')" "absent|true"; raz
 
-echo "=== E6 — garde : aucun appel git hors de vf-cockpit-paths.mjs (A7 : liste blanche des importeurs de child_process, balayage récursif) ==="
+echo "=== E6 — garde : aucun appel git hors de vf-cockpit-git-lanceur.mjs (A7 : liste blanche des importeurs de child_process, balayage récursif) ==="
 # garde.mjs <racine> [--exact] [--importeurs] : « fichier: raison » par violation, chemins relatifs à la racine.
 #  Règle 1 : tout fichier JS (mjs, cjs, js, jsx, mts, cts, ts, tsx), HORS dossiers tests, node_modules et .git, balayé RÉCURSIVEMENT, qui importe child_process (import, require, import dynamique,
-#            process.getBuiltinModule) doit figurer dans la liste blanche. Règle 2 : un importeur de la liste, autre que le socle (vf-cockpit-paths.mjs), ne lance rien dont un argument contient le mot git
+#            process.getBuiltinModule) doit figurer dans la liste blanche. Règle 2 : un importeur de la liste, autre que le socle (vf-cockpit-git-lanceur.mjs), ne lance rien dont un argument contient le mot git
 #            (appel direct, alias d'import, promisify, objet d'import, chaîne require(...).fn, identifiant résolu par sa déclaration) ; seule exception : common.mjs du moteur vendorisé, tant que sa garde
-#            VF_COCKPIT_GIT_DURCI (ligne PATCH de VENDORED.txt) est en tête de git(). --exact : une entrée de la liste qui n'importe plus child_process est périmée. --importeurs : liste les importeurs trouvés.
+#            VF_COCKPIT_GIT_DURCI (commentaire de provenance P27 de common.mjs, E8.4) est en tête de git(). --exact : une entrée de la liste qui n'importe plus child_process est périmée. --importeurs : liste les importeurs trouvés.
 #  Limite assumée (analyse textuelle, pas un AST) : un nom de module construit (« child_ » + « process »), un import(...).then(({ execFile }) => …) ou un eval ne sont pas suivis.
 cat > "$AUX/garde.mjs" <<'JS'
 import fs from 'node:fs';
 import path from 'node:path';
 const [, , racine, ...opts] = process.argv;
 const LISTE = {
-  'scripts/vf-cockpit-paths.mjs': 'socle',
-  'scripts/vf-cockpit.mjs': 'sans-git', 'scripts/vf-cockpit-build.mjs': 'sans-git', 'scripts/vf-cockpit-live.mjs': 'sans-git', 'scripts/vf-cockpit-terminal.mjs': 'sans-git', 'scripts/vf-cockpit-terminal-session.mjs': 'sans-git',
+  'scripts/vf-cockpit-git-lanceur.mjs': 'socle',
+  'scripts/vf-cockpit.mjs': 'sans-git', 'scripts/vf-cockpit-build.mjs': 'sans-git', 'scripts/vf-cockpit-terminal.mjs': 'sans-git', 'scripts/vf-cockpit-terminal-session.mjs': 'sans-git', 'scripts/vf-cockpit-etat-officiel.mjs': 'sans-git',
   'skills/cockpit-moteur/assets/serve.mjs': 'sans-git', 'skills/cockpit-moteur/scripts/open.mjs': 'sans-git', 'skills/cockpit-moteur/scripts/refresh.mjs': 'sans-git',
   'skills/cockpit-moteur/scripts/lib/common.mjs': 'git-garde',
 };
@@ -274,7 +274,7 @@ for (const l of opts.includes('--importeurs') ? trouves : sorties) console.log(l
 JS
 PLUGIN="$(cd "$SCRIPTS/.." && pwd)"
 GARDE="$(node "$AUX/garde.mjs" "$PLUGIN" --exact)"
-assert_eq "E6.1 — aucun importeur de child_process hors liste blanche, aucun lancement de git hors vf-cockpit-paths.mjs (arbre réel de plugin/cockpit, balayage récursif)" "${GARDE:-aucun}" "aucun"
+assert_eq "E6.1 — aucun importeur de child_process hors liste blanche, aucun lancement de git hors vf-cockpit-git-lanceur.mjs (arbre réel de plugin/cockpit, balayage récursif)" "${GARDE:-aucun}" "aucun"
 assert_eq "E6.1a — la garde a bien ouvert des fichiers : exactement les 10 importeurs de la liste sont trouvés (pas un dossier vide)" "$(node "$AUX/garde.mjs" "$PLUGIN" --importeurs | wc -l | tr -d ' ')" "10"
 # les onze fichiers plantés de l'audit (promisify, alias d'import, multiligne, autre nom de variable, chemin absolu, execSync, bash -c, témoin direct, .cjs, .js)
 PLANTES_NOMS="a-promisify.mjs b-promisify-var.mjs c-alias.mjs d-multiligne.mjs e-variable-autre-nom.mjs f-chemin-absolu.mjs g-shell.mjs h-bash-c.mjs i-temoin-direct.mjs j-cjs.cjs k-js.js"
@@ -302,29 +302,29 @@ assert_eq "E6.2a — un importeur hors liste SANS le mot git rougit aussi (la r�
 # E6.3 — règle 2 : sous le nom d'un importeur DE LA LISTE, chacun des onze contenus rougit pour son « git » (alias, promisify, multiligne, variable, chemin absolu, shell, bash -c, cjs)
 R63=""
 for n in $PLANTES_NOMS; do
-  PL="$WORK/e6-li"; rm -rf "$PL"; mkdir -p "$PL/scripts"; planter "$n" > "$PL/scripts/vf-cockpit-live.mjs"
-  R63="$R63$(node "$AUX/garde.mjs" "$PL" | grep -c 'scripts/vf-cockpit-live.mjs: lancement dont un argument contient git' | tr -d ' ')"
+  PL="$WORK/e6-li"; rm -rf "$PL"; mkdir -p "$PL/scripts"; planter "$n" > "$PL/scripts/vf-cockpit-build.mjs"
+  R63="$R63$(node "$AUX/garde.mjs" "$PL" | grep -c 'scripts/vf-cockpit-build.mjs: lancement dont un argument contient git' | tr -d ' ')"
 done
 assert_eq "E6.3 — règle 2 : sous le nom d'un importeur de la liste, les 11 contenus plantés sont tous signalés (1 chacun)" "$R63" "11111111111"
 # E6.4 — négatifs : la garde ne sur-signale pas
 PL="$WORK/e6-neg"; rm -rf "$PL"; mkdir -p "$PL/scripts" "$PL/skills/cockpit-moteur/scripts/lib" "$PL/scripts/tests" "$PL/autre"
-printf "import { execFileSync } from 'node:child_process';\nemit('git', {});\nexecFileSync('ps', ['-p', '1']);\n" > "$PL/scripts/vf-cockpit-live.mjs"
+printf "import { execFileSync } from 'node:child_process';\nemit('git', {});\nexecFileSync('ps', ['-p', '1']);\n" > "$PL/scripts/vf-cockpit-build.mjs"
 printf "import cp from 'node:child_process';\ncp.execFileSync('git', ['status']);\n" > "$PL/scripts/tests/outil.mjs"
 printf "const NATIFS = new Set(['child_process', 'cluster']);\n" > "$PL/autre/set.mjs"
 printf "import { execFileSync } from 'node:child_process';\nexport function git(cwd, args) {\n  if (process.env.VF_COCKPIT_GIT_DURCI !== '1') return null;\n  return execFileSync('git', ['-C', cwd, ...args]);\n}\n" > "$PL/skills/cockpit-moteur/scripts/lib/common.mjs"
 assert_eq "E6.4 — négatifs : « git » hors lancement (emit), dossier tests, simple chaîne child_process, common.mjs gardé : aucune violation" "$(node "$AUX/garde.mjs" "$PL")" ""
 printf "import { execFileSync } from 'node:child_process';\nexport function git(cwd, args) {\n  return execFileSync('git', ['-C', cwd, ...args]);\n}\n" > "$PL/skills/cockpit-moteur/scripts/lib/common.mjs"
 assert_eq "E6.4a — common.mjs SANS sa garde VF_COCKPIT_GIT_DURCI : signalé (l'exemption tient à la garde, pas au nom du fichier)" "$(node "$AUX/garde.mjs" "$PL")" "skills/cockpit-moteur/scripts/lib/common.mjs: lancement dont un argument contient git"
-assert_eq "E6.4b — l'exemption du socle est celle de vf-cockpit-paths.mjs et d'aucun autre fichier (même contenu sous un autre nom : signalé)" "$(rm -rf "$WORK/e6-sc"; mkdir -p "$WORK/e6-sc/scripts"; planter i-x > "$WORK/e6-sc/scripts/vf-cockpit-paths.mjs"; node "$AUX/garde.mjs" "$WORK/e6-sc"; rm -f "$WORK/e6-sc/scripts/vf-cockpit-paths.mjs"; planter i-x > "$WORK/e6-sc/scripts/vf-cockpit-intrus.mjs"; node "$AUX/garde.mjs" "$WORK/e6-sc")" "scripts/vf-cockpit-intrus.mjs: importeur de child_process hors liste blanche"
+assert_eq "E6.4b — l'exemption du socle est celle de vf-cockpit-git-lanceur.mjs et d'aucun autre fichier (même contenu sous un autre nom : signalé)" "$(rm -rf "$WORK/e6-sc"; mkdir -p "$WORK/e6-sc/scripts"; planter i-x > "$WORK/e6-sc/scripts/vf-cockpit-git-lanceur.mjs"; node "$AUX/garde.mjs" "$WORK/e6-sc"; rm -f "$WORK/e6-sc/scripts/vf-cockpit-git-lanceur.mjs"; planter i-x > "$WORK/e6-sc/scripts/vf-cockpit-intrus.mjs"; node "$AUX/garde.mjs" "$WORK/e6-sc")" "scripts/vf-cockpit-intrus.mjs: importeur de child_process hors liste blanche"
 # E6.5 — sur une COPIE de l'arbre réel : un importeur planté dans skills/…/assets/ui et un git lancé dans un importeur de la liste rougissent chacun, rien d'autre
-assert_eq "E6.5a — témoin : l'exécuteur asynchrone vit bien dans vf-cockpit-paths.mjs (execFile y est appelé : l'exemption est exercée)" "$(grep -c 'execFile(cmd' "$SCRIPTS/vf-cockpit-paths.mjs" | tr -d ' ')" "1"
+assert_eq "E6.5a — témoin : l'exécuteur asynchrone vit bien dans vf-cockpit-git-lanceur.mjs (execFile y est appelé : l'exemption est exercée)" "$(grep -c 'execFile(cmd' "$SCRIPTS/vf-cockpit-git-lanceur.mjs" | tr -d ' ')" "1"
 PC="$WORK/e6-copie"; rm -rf "$PC"; cp -R "$PLUGIN" "$PC"
 assert_eq "E6.5b — la copie de l'arbre réel passe la garde (--exact)" "$(node "$AUX/garde.mjs" "$PC" --exact)" ""
 planter k-x > "$PC/skills/cockpit-moteur/assets/ui/zz-intrus.js"
 assert_eq "E6.5c — un require('child_process').execFileSync('git') planté dans skills/cockpit-moteur/assets/ui/zz-intrus.js (hors scripts/*.mjs) rougit, seul" "$(node "$AUX/garde.mjs" "$PC")" "skills/cockpit-moteur/assets/ui/zz-intrus.js: importeur de child_process hors liste blanche"
 rm -f "$PC/skills/cockpit-moteur/assets/ui/zz-intrus.js"
-printf "\nexecFileSync('git', ['status']);\n" >> "$PC/scripts/vf-cockpit-live.mjs"
-assert_eq "E6.5d — un execFileSync('git', …) ajouté à vf-cockpit-live.mjs (importeur de la liste) rougit, seul" "$(node "$AUX/garde.mjs" "$PC")" "scripts/vf-cockpit-live.mjs: lancement dont un argument contient git"
+printf "\nexecFileSync('git', ['status']);\n" >> "$PC/scripts/vf-cockpit-build.mjs"
+assert_eq "E6.5d — un execFileSync('git', …) ajouté à vf-cockpit-build.mjs (importeur de la liste) rougit, seul" "$(node "$AUX/garde.mjs" "$PC")" "scripts/vf-cockpit-build.mjs: lancement dont un argument contient git"
 
 # E6.6 — mutants de la garde : chacun rougit SA sonde, pour la bonne raison (l'ancre existe, la sonde non mutée est verte)
 cat > "$AUX/mutg.mjs" <<'JS'
@@ -335,7 +335,7 @@ if (!t.includes(process.env.FROM)) { console.log('ancre absente'); process.exit(
 fs.writeFileSync(dst, t.replace(process.env.FROM, () => process.env.TO)); console.log('muté');
 JS
 mutg() { FROM="$2" TO="$3" node "$AUX/mutg.mjs" "$AUX/garde.mjs" "$AUX/garde-$1.mjs" 2>&1; }
-r63() { local g="$1" out="" n PL; for n in $PLANTES_NOMS; do PL="$WORK/e6-li"; rm -rf "$PL"; mkdir -p "$PL/scripts"; planter "$n" > "$PL/scripts/vf-cockpit-live.mjs"; out="$out$(node "$g" "$PL" | grep -c 'scripts/vf-cockpit-live.mjs: lancement dont un argument contient git' | tr -d ' ')"; done; echo "$out"; }
+r63() { local g="$1" out="" n PL; for n in $PLANTES_NOMS; do PL="$WORK/e6-li"; rm -rf "$PL"; mkdir -p "$PL/scripts"; planter "$n" > "$PL/scripts/vf-cockpit-build.mjs"; out="$out$(node "$g" "$PL" | grep -c 'scripts/vf-cockpit-build.mjs: lancement dont un argument contient git' | tr -d ' ')"; done; echo "$out"; }
 assert_eq "M-LISTE.0 — l'ancre existe" "$(mutg liste 'if (!nature) {' 'if (false) {')" "muté"
 assert_eq "M-LISTE — rougit E6.2a : l'importeur hors liste sans git n'est plus signalé" "$(node "$AUX/garde-liste.mjs" "$PH" | grep -c 'zz/sans-git.mjs')" "0"
 assert_eq "M-RECURSIF.0 — l'ancre existe" "$(mutg recursif 'if (!IGNORES.has(e.name)) parcourir(p);' '{}')" "muté"
@@ -356,7 +356,7 @@ const f = process.argv[2]; const t = fs.readFileSync(f, 'utf8');
 if (!t.includes(process.env.FROM)) { console.log('ancre absente'); process.exit(1); }
 fs.writeFileSync(f, t.replace(process.env.FROM, () => process.env.TO)); console.log('muté');
 JS
-mutant() { local d="$WORK/mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$d/"; FROM="$2" TO="$3" node "$AUX/mutsub.mjs" "$d/vf-cockpit-paths.mjs" 2>&1; }
+mutant() { local d="$WORK/mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$d/"; FROM="$2" TO="$3" node "$AUX/mutsub.mjs" "$d/vf-cockpit-git-lanceur.mjs" 2>&1; }
 sig_mut() { ( HOME="$HS" node "$AUX/sh.mjs" "$1" "$SG" "$SG" log -1 --format=%H 2>/dev/null ); }
 
 # M-ENV : le retrait des variables GIT_* hérités est supprimé -> E2.2 rend le sujet du leurre, E5 aussi
@@ -374,14 +374,20 @@ assert_eq "M-FILTRES — rougit E2.1 : le filtre déclaré par le dépôt est la
 node "$AUX/lg.mjs" "$MD" "$P" '{}' status --porcelain -- f.txt >/dev/null 2>&1
 assert_eq "M-FILTRES — rougit aussi E5.1 : le filtre est lancé par lancerGit" "$(marque PROC)" "posé"; raz
 
-# M-LECTURE : OPTIONS_LECTURE non insérées -> E2.4 et E5.2 voient le textconv se lancer, E2.4b la sortie gpg
-assert_eq "M-LECTURE.0 — l'ancre du mutant existe" "$(mutant lecture 'ins = OPTIONS_LECTURE[sous] || [];' 'ins = [];')" "muté"
+# M-LECTURE : OPTIONS_LECTURE non insérées ET pilotes non vidés (79-07, A-04 : le vidage ferme seul la classe, les deux protections sont indépendantes ; chacune retirée seule laisse E2.4 et E5.2 verts)
+# -> E2.4 et E5.2 voient le textconv se lancer, E2.4b la sortie gpg
+LK_VIDE='envGit(lab, { config: configFiltres(p.unites) })'
+assert_eq "M-LECTURE.0 — l'ancre du mutant existe (options de lecture, puis vidage de shBorne et de lancerGit)" "$(mutant lecture 'ins = OPTIONS_LECTURE[sous] || [];' 'ins = [];')|$(FROM="$LK_VIDE" TO='envGit(lab)' node "$AUX/mutsub.mjs" "$WORK/mut-lecture/vf-cockpit-git-lanceur.mjs")|$(FROM="$LK_VIDE" TO='envGit(lab)' node "$AUX/mutsub.mjs" "$WORK/mut-lecture/vf-cockpit-git-lanceur.mjs")" "muté|muté|muté"
 MD="$WORK/mut-lecture"
 node "$AUX/sh.mjs" "$MD" "$P" "$P" log -p -1 >/dev/null 2>&1
 assert_eq "M-LECTURE — rougit E2.4 : le textconv est lancé par shBorne" "$(marque TEXTCONV)" "posé"; raz
 node "$AUX/lg.mjs" "$MD" "$P" '{}' log -p -1 >/dev/null 2>&1
 assert_eq "M-LECTURE — rougit aussi E5.2 : le textconv est lancé par lancerGit" "$(marque TEXTCONV)" "posé"; raz
-assert_has "M-LECTURE — rougit aussi E2.4b : la sortie gpg de log.showSignature s'ajoute au hash" "$(sig_mut "$MD")" "SORTIE-GPG-FACTICE"
+# AUDC-A-04 : le programme de signature est aussi neutralisé par l'environnement (gpg.program, gpg.openpgp.program) : options de lecture retirées SEULES, la sortie gpg ne s'ajoute plus (deux protections)
+assert_eq "M-LECTURE — E2.4b : options de lecture retirées, mais gpg neutralisé par l'environnement : le hash reste seul (mis à jour en place, AUDC-A-04)" "$(sig_mut "$MD" | LC_ALL=C grep -c 'SORTIE-GPG-FACTICE')" "0"
+# la sonde E2.4b garde SON mutant : options de lecture retirées ET programmes de signature de l'environnement retirés -> la sortie gpg s'ajoute au hash
+assert_eq "M-LECTURE.2 — mutant double : ancres" "$(mutant lecture2 'ins = OPTIONS_LECTURE[sous] || [];' 'ins = [];')|$(FROM="['gpg.program', INERTE]," TO="" node "$AUX/mutsub.mjs" "$WORK/mut-lecture2/vf-cockpit-git-durci.mjs")|$(FROM="['gpg.openpgp.program', INERTE]," TO="" node "$AUX/mutsub.mjs" "$WORK/mut-lecture2/vf-cockpit-git-durci.mjs")" "muté|muté|muté"
+assert_has "M-LECTURE.2 — rougit E2.4b : la sortie gpg de log.showSignature s'ajoute au hash" "$(sig_mut "$WORK/mut-lecture2")" "SORTIE-GPG-FACTICE"
 
 # M-TRONQUE : ENOBUFS ignoré -> E4.2 ne voit plus la troncature
 assert_eq "M-TRONQUE.0 — l'ancre du mutant existe" "$(mutant tronque "tronque: e.code === 'ENOBUFS'" "tronque: false && e.code === 'ENOBUFS'")" "muté"
@@ -423,17 +429,18 @@ assert_eq "E8.3a — le scan a bien tourné sans marqueur et n'écrit aucun HEAD
 : > "$WORK/git.log"; rm -rf "$WORK/o83b"
 VF_COCKPIT_GIT_DURCI=1 PATH="$WORK/bin:$PATH" node "$MOTEUR/scripts/scan.mjs" "$LAB8" --out="$WORK/o83b/.cache/scan.json" >/dev/null 2>&1
 assert_has "E8.3b — témoin : avec le marqueur, l'emballage journalise des appels git (le journal vide de E8.3 prouve donc quelque chose)" "$(cat "$WORK/git.log")" "ARGV"
-# E8.4 — le numéro du patch est dans VENDORED.txt ET dans le commentaire de common.mjs
-NUMP="$(grep -o '// vibeflow P[0-9]*' "$MOTEUR/scripts/lib/common.mjs" | grep -o 'P[0-9]*' | sort -u | tr '\n' ' ')"
-LIGNEP="$(grep '^PATCH scripts/lib/common.mjs' "$MOTEUR/VENDORED.txt")"
-OKP=non; for n in $NUMP; do [[ "$LIGNEP" == *"$n"* ]] && [[ "$LIGNEP" == *VF_COCKPIT_GIT_DURCI* ]] && OKP=oui; done
-assert_eq "E8.4 — la ligne PATCH de common.mjs nomme un numéro présent dans le commentaire du fichier et décrit la garde" "$OKP" "oui"
+# E8.4 — la trace de provenance « // vibeflow P<n> : » est juste au-dessus de la garde de git() dans common.mjs et dit « environnement durci »
+trace_provenance() { awk '/VF_COCKPIT_GIT_DURCI/ && /process\.env/ {print prev; exit} {prev=$0}' "$1/scripts/lib/common.mjs" | grep -qE '^ *// vibeflow P[0-9]+ :.*environnement durci' && echo presente || echo absente; }
+assert_eq "E8.4 — la garde de git() est précédée d'un commentaire de provenance « // vibeflow P<n> : » qui dit « environnement durci »" "$(trace_provenance "$MOTEUR")" "presente"
 # mutants du moteur
 rm -rf "$WORK/mut-garde"; cp -R "$MOTEUR" "$WORK/mut-garde"
 assert_eq "M-GARDE.0 — l'ancre du mutant existe (garde présente dans le moteur)" "$(sans_garde "$WORK/mut-garde")" "muté"
 : > "$WORK/git.log"; rm -rf "$WORK/o8m"
 env -u VF_COCKPIT_GIT_DURCI PATH="$WORK/bin:$PATH" GIT_DIR="$L/.git" node "$WORK/mut-garde/scripts/scan.mjs" "$LAB8" --out="$WORK/o8m/.cache/scan.json" >/dev/null 2>&1
 assert_has "M-GARDE — rougit E8.3 : sans la garde le moteur lance git (journal non vide)" "$(cat "$WORK/git.log")" "ARGV"
+rm -rf "$WORK/mut-trace"; cp -R "$MOTEUR" "$WORK/mut-trace"
+assert_eq "M-TRACE.0 — l'ancre du mutant existe (marque de provenance P27 dans common.mjs)" "$(FROM="// vibeflow P27 :" TO="//" node "$AUX/mutsub.mjs" "$WORK/mut-trace/scripts/lib/common.mjs" 2>&1)" "muté"
+assert_eq "M-TRACE — rougit E8.4 : la copie sans la marque de provenance fait dire « absente »" "$(trace_provenance "$WORK/mut-trace")" "absente"
 MT="$WORK/mut-env-moteur"; rm -rf "$MT"; mkdir -p "$MT/scripts" "$MT/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$MT/scripts/"; cp -R "$MOTEUR" "$MT/skills/cockpit-moteur"
 assert_eq "M-ENV-MOTEUR.0 — l'ancre du mutant existe dans vf-cockpit-build.mjs" "$(FROM="env: etatMoteur(lab).env" TO="env: envEnfant(lab)" node "$AUX/mutsub.mjs" "$MT/scripts/vf-cockpit-build.mjs" 2>&1)" "muté"
 rm -rf "$LAB8/.vibeflow"; GIT_DIR="$L/.git" node "$MT/scripts/vf-cockpit-build.mjs" "$LAB8" --quiet >/dev/null 2>&1
@@ -477,13 +484,15 @@ assert_eq "E9.5 — 300 filtres (au-delà de la borne) : lancerGit et lancerGitA
 S9="$(node "$AUX/sh.mjs" "$SCRIPTS" "$F300" "$F300" status --porcelain 2>/dev/null)"
 assert_eq "E9.5a — shBorne status, 300 filtres : sortie vide (inconnu), aucun programme lancé" "$(marque F9)|${S9:-vide}" "absent|vide"; raz
 R="$(LG "$F300" '{}' log -1 --format=%s)"
-assert_eq "E9.5b — la borne ne vise que les sous-commandes filtrantes : log reste lu sur le même dépôt" "$(G "$R" 'j.ok+"|"+j.sortie.trim()')" "true|un"
+assert_eq "E9.5b — la borne vise toute sous-commande (79-07, A-04 : les pilotes sont vidés pour tout lancement) : log est refusé aussi sur le même dépôt" "$(G "$R" '[j.ok,j.refuse,JSON.stringify(j.sortie)].join(":")')" 'false:true:""'
 # liste des filtres illisible (git config en échec) : status n'est pas lancé non plus (un filtre inconnu n'est pas un filtre absent)
 mkdir -p "$WORK/bin-cfg"; printf '#!/bin/sh\ncase "$*" in *--get-regexp*) exit 2;; esac\nexec "%s" "$@"\n' "$GIT_REEL" > "$WORK/bin-cfg/git"; chmod +x "$WORK/bin-cfg/git"
 R="$(PATH="$WORK/bin-cfg:$PATH" LG "$F70" '{}' status --porcelain)"; R2="$(PATH="$WORK/bin-cfg:$PATH" LGA "$F70" '{}' status --porcelain)"
 assert_eq "E9.6 — liste des filtres illisible (git config --get-regexp rend 2) : status refusé en synchrone et en asynchrone, aucun programme lancé" "$(marque F9)|$(G "$R" '[j.ok,j.refuse].join(":")')|$(G "$R2" '[j.ok,j.refuse].join(":")')" "absent|false:true|false:true"; raz
 R="$(PATH="$WORK/bin-cfg:$PATH" LG "$F70" '{}' rev-parse HEAD)"
-assert_eq "E9.6a — témoin : le même emballage laisse passer les autres commandes (rev-parse ok) : le refus vient de la liste illisible" "$(G "$R" 'j.ok')" "true"
+assert_eq "E9.6a — toute sous-commande est refusée quand la liste est illisible (79-07, A-04) : rev-parse aussi" "$(G "$R" '[j.ok,j.refuse].join(":")')" "false:true"
+R="$(LG "$F70" '{}' rev-parse HEAD)"
+assert_eq "E9.6b — témoin : sans l'emballage, la liste du même dépôt est lisible et rev-parse est lu : le refus vient de la liste illisible" "$(G "$R" 'j.ok')" "true"
 
 # A2 : sous-modules — la config de .git/modules/<n>/config n'est jamais lue par un status lancé par le cockpit
 mk_sous_module() { # mk_sous_module <dossier> : super-dépôt `repo` + sous-module `sub` dont la configuration (sous .git/modules) déclare un filtre qui pose SUBCLEAN

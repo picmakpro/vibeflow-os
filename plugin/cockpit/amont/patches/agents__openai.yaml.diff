@@ -1,7 +1,0 @@
---- a/agents/openai.yaml
-+++ /dev/null
-@@ -1,4 +0,0 @@
--interface:
--  display_name: "Floorplan"
--  short_description: "Draw an interactive, plain-English map of this codebase"
--  default_prompt: "Use $floorplan to draw a floorplan of this codebase, or update the existing one, and open it."

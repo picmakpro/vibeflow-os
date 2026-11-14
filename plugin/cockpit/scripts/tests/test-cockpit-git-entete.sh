@@ -18,6 +18,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$HERE_T/hygiene.sh"; vf_hyg_init
+. "$HERE_T/socle-serveur.sh"
 
 PASS=0; FAIL=0; SKIP=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -69,10 +70,11 @@ mk_lab() { # $1 = dossier : lab GSD minimal, un commit
 build_serve() { # $1 = lab, $2 = dossier de scripts (défaut : le module) ; $ENVX = préfixe d'environnement ; pose OUT, PORT ; démarre le serveur (SRV)
   env $ENVX "$NODE" "${2:-$SCRIPTS}/vf-cockpit-build.mjs" "$1" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
   OUT="$1/.vibeflow/cockpit"
-  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"
+  # 79-16 : la page vient des sources du MODULE servi ; un mutant (copie passée en $2) n'agit que s'il est le module LANCÉ
+  if [ -n "${2:-}" ]; then COCKPIT_MODULE="${2%/scripts}" COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true
+  else COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$1" $ENVX ${ENVS:-} || true; fi
+  SRV="$VF_PID"
+  PORT="$VF_PORT"
 }
 
 # faux driver-lock.sh TENU (comme projet-commun.sh, socle de test-cockpit-projet-graphe.sh) : une mission dont un nœud est running n'est « en cours » que si son verrou est vivant (P68-D-05) ;
@@ -121,8 +123,7 @@ PRET="document.readyState === 'complete' && !!document.querySelector('#proj-name
 
 # --- copies privées du module pour les mutants et le témoin (VENDORED non nécessaire : le build lit assets/ui/*.js) ---
 mkmod() { # $1 = nom ; rend le dossier des scripts de la copie (frère : skills/cockpit-moteur)
-  local d="$WORK/mod-$1"; mkdir -p "$d/scripts" "$d/skills"
-  cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$d/skills/cockpit-moteur"
+  local d; d="$(cockpit_module_copie "$WORK/mod-$1")" || return 1   # 79-16 : la copie complète du module (le serveur lancé est celui de la copie, voir build_serve)
   echo "$d/scripts"
 }
 cat > "$AUX/mut.mjs" <<'JS'
@@ -142,7 +143,7 @@ const [base, page] = ARGS;
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow`, 'page rendue');
 return await s.ev(`(() => ({ nom: document.querySelector('#proj-name').textContent, entete: document.querySelector('header').textContent,
-  titre: document.title, attendu: window.VibeFlow.graph.meta.rootName,
+  titre: document.title, attendu: document.querySelector('#proj-name').textContent,
   ligne: (document.querySelector('.vf-git-ligne') || {}).textContent || null }))()`);
 JS
   for pg in / /project.html /equipe.html; do
@@ -150,15 +151,17 @@ JS
     assert_eq "H2.2 — $pg : #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
     assert_eq "H2.2 — $pg : aucun suffixe « — Projet » ni « — Équipe » dans l'en-tête" "$(jq_ "$R" '/ — (Projet|Équipe)/.test(j.entete) ? "suffixe" : "propre"' 2>/dev/null)" "propre"
     assert_eq "H2.2 — $pg : la seconde ligne dit la branche" "$(jq_ "$R" '/feat\/x/.test(j.ligne||"") ? "oui" : "non"' 2>/dev/null)" "oui"
-    case "$pg" in /project.html) assert_eq "H2.2 — titre de l'onglet du navigateur inchangé (R6.1)" "$(jq_ "$R" 'j.titre === j.attendu + " — Projet" ? "inchangé" : j.titre' 2>/dev/null)" "inchangé";; esac
+    case "$pg" in /project.html) assert_eq "H2.2 — titre de l'onglet du navigateur : « Projet · » puis le nom que l'en-tête affiche (AUDC-X7, forme unique)" "$(jq_ "$R" 'j.titre === "Projet · " + j.attendu ? "inchangé" : j.titre' 2>/dev/null)" "inchangé";; esac
   done
-  # H2.3 : une réécriture de project.html par le direct garde le nom du dépôt
-  printf '<objective>Second plan ajouté par le test H2.3</objective>\n' > "$WT/.planning/phases/01-x/01-02-PLAN.md" # un plan neuf change la structure : le direct réécrit project.html
-  for _ in $(seq 1 150); do grep -q 'Second plan ajouté par le test H2.3' "$OUT/project.html" 2>/dev/null && break; sleep 0.2; done
-  assert_eq "H2.3a — témoin : project.html a bien été réécrit par le direct" "$(grep -c 'Second plan ajouté par le test H2.3' "$OUT/project.html")" "1"
-  assert_eq "H2.3b — la page réécrite porte toujours meta.vfGit" "$(grep -c '"vfGit":{"etat":"ok"' "$OUT/project.html")" "1"
+  # H2.3 : un changement de planning garde le nom du dépôt (79-15 : la page est servie depuis la mémoire, project.html du disque ne bouge plus)
+  # 79-16 : le document de la coquille ne porte plus aucune donnée ; ce que la page servie porte (plans, meta.vfGit) se lit sur la route du graphe de l'onglet Projet
+  servi() { local tok; tok="$(node -e 'try{console.log(JSON.parse(require("fs").readFileSync(process.argv[1],"utf8")).token)}catch{}' "$OUT/.cache/server.json")"; node "$SCRIPTS/tests/graphe-client.mjs" get "$PORT" "/api/vf/graphe?onglet=projet" "$tok" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{try{process.stdout.write(JSON.parse(s).corps||"")}catch{}})'; }
+  printf '<objective>Second plan ajouté par le test H2.3</objective>\n' > "$WT/.planning/phases/01-x/01-02-PLAN.md" # un plan neuf change la structure : la page servie le porte, project.html du disque reste celui de l'assemblage
+  for _ in $(seq 1 150); do servi | grep -q 'Second plan ajouté par le test H2.3' && break; sleep 0.2; done
+  assert_eq "H2.3a — témoin : la page servie porte le second plan, project.html du disque est resté celui de l'assemblage" "$(servi | grep -c 'Second plan ajouté par le test H2.3')|$(grep -c 'Second plan ajouté par le test H2.3' "$OUT/project.html")" "1|0"
+  assert_eq "H2.3b — la page servie après le changement porte toujours meta.vfGit" "$(servi | grep -c '"vfGit":{"etat":"ok"')" "1"
   R="$(cdp "$AUX/h2.js" "$BASE" /project.html 2>&1 | tail -1)"
-  assert_eq "H2.3c — après réécriture, #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
+  assert_eq "H2.3c — après le changement, #proj-name = depot" "$(jq_ "$R" 'j.nom' 2>/dev/null)" "depot"
 
   echo "=== H3 — seconde ligne, événements, ouvreur ==="
   cat > "$AUX/h3.js" <<'JS'
@@ -237,7 +240,7 @@ for (const w of [375, 700, 768, 999, 1000, 1100, 1279, 1280, 1440]) {
   res[w] = await s.stable(`(() => { const l = document.querySelector('.vf-git-ligne'), o = document.querySelector('#vf-git-ouvreur'), h = document.querySelector('header');
     const r = o ? o.getBoundingClientRect() : { width: 0, height: 0 };
     return { ligneVisible: getComputedStyle(l).display !== 'none' && l.getBoundingClientRect().width > 0, ouvreurVisible: !!o && getComputedStyle(o).display !== 'none' && r.width > 0,
-      w: Math.round(r.width), h: Math.round(r.height), debord: h.scrollWidth > h.clientWidth + 1, premier: o ? o.parentElement.firstElementChild === o && o.parentElement.classList.contains('hr') : false,
+      w: Math.round(r.width), h: Math.round(r.height), appui: !!o && [[-21, 0], [21, 0], [0, -21], [0, 21]].every(([a, b]) => { const x = document.elementFromPoint(r.left + r.width / 2 + a, r.top + r.height / 2 + b); return !!x && (x === o || o.contains(x)); }), debord: h.scrollWidth > h.clientWidth + 1, premier: o ? o.parentElement.firstElementChild === o && o.parentElement.classList.contains('hr') : false,
       rangees: h.getBoundingClientRect().height > 80 ? 2 : 1,
       hors: [...document.querySelectorAll('header .hr > *')].filter((e) => e.getClientRects().length).filter((e) => e.getBoundingClientRect().right > innerWidth + 0.5).length,
       chevauche: (() => { const k = [...document.querySelectorAll('header .hr > *')].filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect()); let n = 0;
@@ -254,7 +257,8 @@ return res;
 JS
   R="$(cdp "$AUX/h4.js" "$BASE" 2>&1 | tail -1)"
   for w in 768 999 1000 1100 1279; do
-    assert_eq "H4.1 — ${w} px : ligne masquée, ouvreur 44 × 44 en tête de .hr (P78-D-34, icône de 701 à 1279 px)" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible, j['$w'].w, j['$w'].h, j['$w'].premier].join('|')" 2>/dev/null)" "false|true|44|44|true"
+    T=36; [ "$w" -lt 1000 ] && T=44
+    assert_eq "H4.1 — ${w} px : ligne masquée, ouvreur dessiné à ${T} × ${T} (--hdr-btn, comme ses voisins), zone d'appui de 44 × 44 au moins, en tête de .hr (P78-D-34, icône de 701 à 1279 px ; P80-D-56)" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible, j['$w'].w, j['$w'].h, j['$w'].premier, j['$w'].appui].join('|')" 2>/dev/null)" "false|true|${T}|${T}|true|true"
   done
   for w in 375 700; do
     assert_eq "H4.1 — ${w} px (téléphone) : ligne masquée, ouvreur absent de la rangée" "$(jq_ "$R" "[j['$w'].ligneVisible, j['$w'].ouvreurVisible].join('|')" 2>/dev/null)" "false|false"
@@ -346,15 +350,23 @@ JS
   R="$(cdp "$AUX/h6.js" "$BASE" /project.html 2>&1 | tail -1)"
   assert_eq "H6.2 — Projet : surtitre, titre « Jalon <jalon> », sous-titre = phases faites (le titre n'y est plus répété, voir H7.9)" "$(jq_ "$R" '[j.k, j.h1, j.p].join("|")' 2>/dev/null)" "Projet|Jalon vibeflow-test|1 phase faite sur 2."
   assert_eq "H6.3 — Projet : le titre ne répète pas le nom du projet" "$(jq_ "$R" '[j.h1.includes(j.nomProjet), /vf-ctx-titre/.test(j.cls)].join("|")' 2>/dev/null)" "false|true"
-  R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"
-  assert_eq "H6.2 — Équipe sans mission : « Aucune mission en cours », « L'équipe est au repos. »" "$(jq_ "$R" '[j.k, j.h1, j.p].join("|")' 2>/dev/null)" "Équipe|Aucune mission en cours|L'équipe est au repos."
+  # 73-09 (P73-D-04) : l'en-tête d'Équipe est celui de la régie : h1 du gabarit du lot 0 (#vf-equipe-entete h1) et sous-titre de la régie (.vf-rg-sous) à la place de la ligne « Agents : … » du bloc #context
+  cat > "$AUX/h6e.js" <<'JS'
+const [base] = ARGS;
+const { stabiliser } = await import(process.env.VF_CS); // aide commune (chrome-session.mjs)
+await s.naviguer(base + '/equipe.html');
+await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#vf-equipe-entete h1') && !!document.querySelector('#vf-equipe-entete h1').textContent`, 'en-tête de la régie');
+return await stabiliser(() => s.ev(`(() => { const e = document.querySelector('#vf-equipe-entete'); return { h1: e.querySelector('h1').textContent, p: (e.querySelector('.vf-rg-sous') || {}).textContent || '' }; })()`), { max: 10000 });
+JS
+  R="$(cdp "$AUX/h6e.js" "$BASE" 2>&1 | tail -1)"
+  assert_eq "H6.2 — Équipe sans mission : « Aucune mission en cours », sous-titre de la régie « Aucun agent en vie »" "$(jq_ "$R" '[j.h1, j.p].join("|")' 2>/dev/null)" "Aucune mission en cours|Aucun agent en vie"
   mkdir -p "$WT/.planning/missions"; printf '{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$WT/.planning/missions/MISSION-x.dag.json"
-  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "Mission : x" ] && break; sleep 0.5; done
+  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6e.js" "$BASE" 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "Mission : x" ] && break; sleep 0.5; done
   assert_eq "H6.2 — Équipe avec une mission en cours : « Mission : x »" "$(jq_ "$R" 'j.h1' 2>/dev/null)" "Mission : x"
   printf '{"nodes":[{"id":"a","step":"s","deps":[],"status":"running"}]}\n' > "$WT/.planning/missions/MISSION-y.dag.json"
-  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6.js" "$BASE" /equipe.html 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "2 missions en cours" ] && break; sleep 0.5; done
+  for _ in $(seq 1 40); do R="$(cdp "$AUX/h6e.js" "$BASE" 2>&1 | tail -1)"; [ "$(jq_ "$R" 'j.h1' 2>/dev/null)" = "2 missions en cours" ] && break; sleep 0.5; done
   assert_eq "H6.2 — Équipe avec deux missions : « 2 missions en cours »" "$(jq_ "$R" 'j.h1' 2>/dev/null)" "2 missions en cours"
-  assert_eq "H6.2 — PU-G-166 : sous le titre des missions, les agents sont nommés et comptés à part (« Agents : … actif · … en attente · … terminé »), jamais « actifs » seul" "$(jq_ "$R" 'j.p' 2>/dev/null)" "Agents : 0 actif · 0 en attente · 0 terminé depuis moins de 24 h."
+  assert_eq "H6.2 — PU-G-166 : sous le titre des missions, le sous-titre de la régie dit les agents à part (« Aucun agent en vie » ici), jamais « actifs » seul" "$(jq_ "$R" 'j.p' 2>/dev/null)" "Aucun agent en vie"
   cat > "$AUX/h64.js" <<'JS'
 const [base] = ARGS;
 const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
@@ -388,13 +400,13 @@ await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#proj-name') && !!window.VibeFlow && !!document.querySelector('#panel .pt')`, 'page et panneau rendus');
 return await stabiliser(() => s.ev(`(() => { const G = window.VibeFlow.graph, T = G.meta.vfTab, p = document.querySelector('#panel');
   return { nom: document.querySelector('#proj-name').textContent, pt: [...p.querySelectorAll('.pt')].map((e) => e.textContent), panneauWt: /wt-a/.test((() => { const c = p.cloneNode(true); c.querySelectorAll('.vf-cmd').forEach((e) => e.remove()); return c.textContent; })()), /* hors la commande de correctif du panneau Format, qui cite le chemin absolu du lab (PU-G-153) ; le titre et les en-têtes restent jugés */ suffixe: / — (Projet|Équipe)/.test(p.innerText),
-    titre: document.title, attendu: T === 'equipe' ? 'Équipe · ' + G.meta.rootName : G.meta.rootName + ' — ' + (T === 'project' ? 'Projet' : 'Code') }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
+    titre: document.title, attendu: (T === 'equipe' ? 'Équipe' : T === 'project' ? 'Projet' : 'Code') + ' · ' + document.querySelector('#proj-name').textContent }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
 JS
   ENVS="VF_COCKPIT_SCRIPTS_DIR=$WORK/locks" build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
   for pg in / /project.html /equipe.html; do
     R="$(cdp "$AUX/h7-nom.js" "$BASE" "$pg" 2>&1 | tail -1)"
     assert_eq "H7.1 — $pg (lab dans un worktree wt-a) : le panneau dit « depot », sans « wt-a » ni suffixe « — Projet » / « — Équipe »" "$(jq_ "$R" '[j.nom, j.pt.join("+"), j.panneauWt, j.suffixe].join("|")' 2>/dev/null)" "depot|depot|false|false"
-    assert_eq "H7.1 — $pg : le titre de l'onglet garde sa forme (nom du dossier du lab, R6.1 inchangé)" "$(jq_ "$R" 'j.titre === j.attendu ? "inchangé" : j.titre + " ≠ " + j.attendu' 2>/dev/null)" "inchangé"
+    assert_eq "H7.1 — $pg : le titre de l'onglet a la forme unique « <Onglet> · <nom du dossier du lab> » (AUDC-X7 ; le nom que l'en-tête affiche, celui du dépôt principal, jamais celui du worktree)" "$(jq_ "$R" 'j.titre === j.attendu ? "inchangé" : j.titre + " ≠ " + j.attendu' 2>/dev/null)" "inchangé"
   done
   # F6, F8, F11 : couleurs et anneau de focus de la seconde ligne
   cat > "$AUX/h7-ligne.js" <<'JS'
@@ -513,7 +525,7 @@ JS
   cat > "$AUX/h9.js" <<'JS'
 const [base, mode] = ARGS;
 const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = await import(process.env.VF_CS); // aides communes (chrome-session.mjs)
-if (mode === 'premiere') await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `window.__vfFetch.reponse = { schema: 'vibeflow/cockpit-git-entete@1', etat: 'indisponible', depot: 'depot', branche: null, worktree: null, detache: false, sha7: null }` }); // la lecture du chargement dit « indisponible » aussi : jamais de valeur connue
+if (mode === 'premiere') await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `window.__vfFetch.reponse = { schema: 'vibeflow/cockpit-git-entete@1', etat: 'indisponible', depot: 'depot', branche: null, worktree: null, detache: false, sha7: null }; { const f1 = window.fetch.bind(window); window.fetch = (u, i) => { const r = f1(u, i); return /\\/api\\/vf\\/graphe/.test(typeof u === 'string' ? u : u.url) ? r.then((x) => x.text().then((t) => new Response(t.split('"vfGit":{"etat":"ok"').join('"vfGit":{"etat":"indisponible"'), { status: x.status, headers: x.headers }))) : r; }; }` }); // la lecture du chargement dit « indisponible » aussi : jamais de valeur connue ; 79-16 : la page tient meta.vfGit de la route du graphe (plus du document), réécrite ici à l'arrivée
 await s.naviguer(base + '/');
 await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('.vf-git-ligne') && getComputedStyle(document.querySelector('.vf-git-ligne')).display !== 'none'`, 'seconde ligne visible');
@@ -538,7 +550,7 @@ if (mode === 'connue') {
   out.avant = await lecture({ etat: 'ok', branche: 'feat/memoire', worktree: 'wt-m' });
   // F6a (3e tour de la recette du 2026-11-08) : le titre de la vue n'est un arrêt de Tab que s'il porte une définition. Branche connue : titre atteignable (témoin) ; dépôt « indisponible » : plus de définition, donc plus d'arrêt, MÊME après un changement de classe du corps (ouverture/fermeture du tiroir Git) qui relance l'observateur de tabindex
   const titre = () => s.ev(`(() => { const h = document.querySelector('#context h1'); return h ? [h.hasAttribute('tabindex') ? h.getAttribute('tabindex') : 'aucun', h.hasAttribute('title') || h.hasAttribute('aria-description')].join('/') : 'absent'; })()`);
-  const classeDuCorps = async () => { await s.ev(`document.body.classList.add('vf-git-ouvert')`); await s.ev(`document.body.classList.remove('vf-git-ouvert')`); await s.ev(`new Promise((r) => setTimeout(r, 50))`); };
+  const classeDuCorps = async () => { await s.ev(`document.body.classList.add('vf-git-ouvert')`); await s.ev(`document.body.classList.remove('vf-git-ouvert')`); await s.ev(`window.dispatchEvent(new CustomEvent('vf-git:etat', { detail: { ouvert: false } }))`); await s.ev(`new Promise((r) => setTimeout(r, 50))`); }; // 79-17 : le tiroir pose ou retire la classe PUIS émet vf-git:etat, qui relance l'arrêt de tabulation (plus d'observateur de la classe)
   await attendreValeur(titre, (v) => v === '0/true', { max: 6000 }); out.titreConnu = await titre();
   out.muet = await lecture({ etat: 'indisponible' });
   await classeDuCorps(); out.titreIndispo = await attendreEtStabiliser(titre, (v) => v !== 'absent', { max: 6000 });
@@ -562,25 +574,15 @@ JS
   assert_eq "H9.1e — après « absent » puis « indisponible » : aucune ancienne branche ne réapparaît comme non confirmée (« Branche indisponible », sans mot)" "$(jq_ "$R9" '[j.apresAbsent.branche, j.apresAbsent.etat].join("|")' 2>/dev/null)" "Branche indisponible|"
   assert_eq "H9.1d — aucune erreur de page" "$(jq_ "$R9" 'j.errs.length' 2>/dev/null)" "0"
   assert_eq "H9.1f — F6a (3e tour) : le titre de la vue est un arrêt de Tab (tabindex 0) tant qu'il porte sa définition (branche connue, témoin) ; dépôt « indisponible », il n'en porte plus et n'est plus un arrêt, même après un changement de classe du corps qui relance l'observateur de tabindex (aucun tabindex, ni title ni aria-description)" "$(jq_ "$R9" '[j.titreConnu, j.titreIndispo].join("|")' 2>/dev/null)" "0/true|aucun/false"
-  # première lecture SANS valeur connue : la page servie dit déjà « indisponible » (le HTML posé est réécrit pour le test) -> « Branche indisponible », jamais masquée
-  env $ENVX "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$WT" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
-  OUT="$WT/.vibeflow/cockpit"
-  node "$AUX/mut.mjs" "$OUT/index.html" '"vfGit":{"etat":"ok"' '"vfGit":{"etat":"indisponible"' > "$WORK/h92.out" 2>&1 || cat "$WORK/h92.out"
-  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"; BASE="http://127.0.0.1:$PORT"
+  # première lecture SANS valeur connue : le graphe reçu par la page dit déjà « indisponible » (réponse de la route réécrite dans le navigateur par h9.js, mode premiere) -> « Branche indisponible », jamais masquée
+  build_serve "$WT"; BASE="http://127.0.0.1:$PORT"
   R92="$(cdp "$AUX/h9.js" "$BASE" premiere 2>&1 | tail -1)"; stop_srv
   assert_eq "H9.2 — première lecture sans valeur connue : « Branche indisponible », sans mot ajouté, ligne et ouvreur présents ; la lecture réussie suivante donne la branche" "$(jq_ "$R92" '[j.premiere.branche, j.premiere.etat, j.premiere.cachee, j.premiere.ouvreurCache, j.muet.branche, j.muet.ligneCachee, j.ok.branche].join("|")' 2>/dev/null)" "Branche indisponible||false|false|Branche indisponible|false|revenue"
 
   # F6a (3e tour) : mutant de la garde de tabindex (elle ne regarde plus la définition COURANTE mais le fait d'en avoir déjà porté une) -> le titre d'un dépôt « indisponible » redevient un arrêt de Tab muet (H9.1f rougit)
-  env $ENVX "$NODE" "$SCRIPTS/vf-cockpit-build.mjs" "$WT" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
-  OUT="$WT/.vibeflow/cockpit"
-  node "$AUX/mut.mjs" "$OUT/index.html" "if (!h1 || !h1.dataset.vfAide) return; if (document.body.classList.contains('vf-git-ouvert'))" "if (!h1 || !h1.dataset.vfAideLie) return; if (document.body.classList.contains('vf-git-ouvert'))" > "$WORK/h91f.out" 2>&1 || { cat "$WORK/h91f.out"; echo "  ❌ FAIL — M-TABINDEX-DEFINITION : mutation impossible" >&2; }
-  env $ENVX ${ENVS:-} "$NODE" "$OUT/serve.mjs" --no-open --port "$(libre)" > "$WORK/serve.out" 2>&1 &
-  SRV=$!; PIDS+=("$SRV")
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT="$(node -e "console.log(JSON.parse(require('fs').readFileSync('$OUT/.cache/server.json','utf8')).port)" 2>/dev/null || echo 0)"; BASE="http://127.0.0.1:$PORT"
+  MTI="$(mkmod mtabindex)"  # 79-16 : la garde est dans la source de page du module (ui/76), plus dans un document posé : le mutant est une copie du module, LANCÉE
+  mutate "$MTI/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "if (!h1 || !h1.dataset.vfAide) return; if (document.body.classList.contains('vf-git-ouvert'))" "if (!h1 || !h1.dataset.vfAideLie) return; if (document.body.classList.contains('vf-git-ouvert'))" || echo "  ❌ FAIL — M-TABINDEX-DEFINITION : mutation impossible" >&2
+  build_serve "$WT" "$MTI"; BASE="http://127.0.0.1:$PORT"
   RTI="$(cdp "$AUX/h9.js" "$BASE" connue 2>&1 | tail -1)"; stop_srv
   assert_eq "M-TABINDEX-DEFINITION — le mutant (le titre redevient un arrêt de Tab dès qu'il a porté une définition) rougit H9.1f : « 0/true|0/false » au lieu de « 0/true|aucun/false » (témoin : le témoin positif reste « 0/true »)" "$(jq_ "$RTI" '[j.titreConnu, j.titreIndispo].join("|")' 2>/dev/null)" "0/true|0/false"
 
@@ -645,9 +647,9 @@ JS
   mutate "$MK/../skills/cockpit-moteur/assets/ui/76-vf-git-entete.js" "if (d.etat === 'absent') { connue = null; ligne.hidden = true;" "if (d.etat === 'absent' || d.etat === 'indisponible') { connue = null; ligne.hidden = true;" || echo "  ❌ FAIL — M-MASQUE : mutation impossible" >&2
   build_serve "$WT" "$MK"; RMK="$(cdp "$AUX/h9.js" "http://127.0.0.1:$PORT" connue 2>&1 | tail -1)"; stop_srv
   assert_eq "M-MASQUE — rougit H9.1 (la ligne et l'ouvreur disparaissent sur une lecture non confirmée)" "$(jq_ "$RMK" '[j.muet.ligneCachee, j.muet.ouvreurCache].join("|")' 2>/dev/null)" "true|true"
-  # M-REPOS : l'index garde la liste des dépôts (retrait annulé dans une copie du build) -> H6.5 rougit
+  # M-REPOS : le graphe servi garde la liste des dépôts (retrait annulé dans une copie du module lancée ; 79-15 : il est servi depuis la mémoire, plus lu dans index.html) -> H6.5 rougit
   MR="$(mkmod mrepos)"
-  mutate "$MR/vf-cockpit-build.mjs" "insererGraphe(html, { ...g, meta: { ...g.meta, repos: [] } })" "insererGraphe(html, g)" || echo "  ❌ FAIL — M-REPOS : mutation impossible" >&2
+  mutate "$MR/vf-cockpit-graphe-fichier.mjs" "const g = { ...g0, meta: { ...g0.meta, repos: [] } };" "const g = g0;" || echo "  ❌ FAIL — M-REPOS : mutation impossible" >&2
   REPOS="$WORK/depot-repos"; mk_lab "$REPOS"; $GIT -C "$REPOS" init -q -b main && $GIT -C "$REPOS" add -A && $GIT -C "$REPOS" commit -q -m init
   build_serve "$REPOS" "$MR"; RMR="$(cdp "$AUX/h6.js" "http://127.0.0.1:$PORT" / 2>&1 | tail -1)"; stop_srv
   assert_eq "M-REPOS — rougit H6.5 (la liste « Dépôts » ou ses lignes réapparaissent)" "$(jq_ "$RMR" '(j.sections.filter((t) => /^(Repositories|Dépôts)/.test(t)).length + j.depots) > 0 ? "rouge" : "vert"' 2>/dev/null)" "rouge"

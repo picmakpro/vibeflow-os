@@ -13,15 +13,15 @@
 # en-têtes forgés) ; la partie navigateur (T16.0, T16.3-T16.5 : stockage, fenêtre, messages) est annoncée « ⊘ … NON vérifiée, non comptée ».
 # Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"; TA="$HERE_T/terminal-aux.mjs"
 ENG="$(cd "$SCRIPTS/../skills/cockpit-moteur" && pwd -P)"
-WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/bin"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude/scripts" "$WORK/bin"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
 export CHROME_SESSION="$HERE_T/chrome-session.mjs"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 PASS=0; FAIL=0; NONVERIF=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
@@ -102,21 +102,24 @@ printf -- '---\nwave: %s\n---\n<objective>Faire le socle</objective>\n' "$PAYLOA
 git -C "$LAB" init -q && git -C "$LAB" add -A && git -C "$LAB" -c user.email=t@t -c user.name=t commit -q -m init
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 SORTIE="$LAB/.vibeflow/cockpit"
-[ -f "$SORTIE/vf-cockpit-terminal.mjs" ] || echo "  ❌ la sortie construite ne porte pas vf-cockpit-terminal.mjs" >&2
+[ -f "$SORTIE/index.html" ] || echo "  ❌ la sortie construite ne porte pas index.html" >&2   # 79-06 : la sortie ne porte plus de code, seulement des données
+MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODM="$MOD_DEPOT"   # MODM = racine du module que commande la manche en cours (une copie quand la manche pose un mutant de code)
 
-# mutant <sortie> <M-ESC|M-CSP|M-ORIGINE-TERM|M-SECRET-TERM|M-ONGLET-TERM> : échoue si rien n'a changé (jamais un mutant sans effet)
+# mutant <sortie> <M-ESC|M-CSP|M-ORIGINE-TERM|M-SECRET-TERM|M-ONGLET-TERM> : échoue si rien n'a changé (jamais un mutant sans effet). M-ESC édite les PAGES de la copie de la sortie (des données) ;
+# les autres éditent la copie du module de la manche ($MODM, posée par manche()) : le code ne vit plus dans la sortie.
+pages_modm() { local a="$MODM/skills/cockpit-moteur/assets"; cat "$a/viewer.html" "$a"/ui/*.js; } # 79-16 : les sources de page sont celles de la copie du module (la sortie ne porte que des données)
 mutant() {
-  local o="$1" m="$2" before after
-  before="$(cat "$o/serve.mjs" "$o/index.html" "$o/project.html" "$o/vf-cockpit-terminal-processus.mjs" "$o/vf-cockpit-terminal-session.mjs" | cksum)"
+  local o="$1" m="$2" before after sv="$MODM/skills/cockpit-moteur/assets/serve.mjs" pr="$MODM/scripts/vf-cockpit-terminal-processus.mjs" se="$MODM/scripts/vf-cockpit-terminal-session.mjs"
+  before="$({ cat "$sv" "$pr" "$se"; pages_modm; } | cksum)"
   case "$m" in
-    M-ESC) for f in index.html project.html; do sed -i.bak 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' "$o/$f"; done ;;
-    M-CSP) sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-Mutant-Csp'#g" "$o/serve.mjs" ;;
-    M-ORIGINE-TERM) sed -i.bak "s/if (!page \&\& !navigateur) return /if (false) return /; s/else if (o !== origineQ())/else if (false)/" "$o/vf-cockpit-terminal-processus.mjs" ;;
-    M-SECRET-TERM) sed -i.bak "s/if (!egal(req.headers\['x-vf-terminal'\], secret)) return refus(res, 401, 'secret');//" "$o/vf-cockpit-terminal-processus.mjs" ;;
-    M-ONGLET-TERM) sed -i.bak "s/if (s.onglet !== onglet) return 409;//g" "$o/vf-cockpit-terminal-session.mjs" ;;
+    M-ESC) cockpit_page_muter_dans "$MODM" 's#<span class="meta">${h(size)}</span>#<span class="meta">${size}</span>#' 2>/dev/null ;;
+    M-CSP) sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-Mutant-Csp'#g" "$sv" ;;
+    M-ORIGINE-TERM) sed -i.bak "s/if (!page \&\& !navigateur) return /if (false) return /; s/else if (o !== origineQ())/else if (false)/" "$pr" ;;
+    M-SECRET-TERM) sed -i.bak "s/if (!egal(req.headers\['x-vf-terminal'\], secret)) return refus(res, 401, 'secret');//" "$pr" ;;
+    M-ONGLET-TERM) sed -i.bak "s/if (s.onglet !== onglet) return 409;//g" "$se" ;;
   esac
-  after="$(cat "$o/serve.mjs" "$o/index.html" "$o/project.html" "$o/vf-cockpit-terminal-processus.mjs" "$o/vf-cockpit-terminal-session.mjs" | cksum)"
-  [ "$before" != "$after" ] || { echo "  ❌ mutant $m sans effet (motif absent de la sortie)" >&2; return 1; }
+  after="$({ cat "$sv" "$pr" "$se"; pages_modm; } | cksum)"
+  [ "$before" != "$after" ] || { echo "  ❌ mutant $m sans effet (motif absent de la sortie ou du module)" >&2; return 1; }
 }
 nassistants() { ps -eo pid=,ppid=,args= | awk -v p="$1" '$2 == p && /vf-cockpit-pty\.py/ { n++ } END { print n + 0 }'; } # assistants du serveur (ancien étage)
 # P71-D-33 : les assistants sont désormais enfants du processus du terminal, lui-même enfant du serveur
@@ -126,14 +129,14 @@ assistants_srv() { local c n=0; for c in $(pgrep -P "$1" 2>/dev/null); do ps -o 
 # résultat : R_MARQUEUR R_AV R_AP R_ETAT R_XSS (JSON de la charge, ou { erreur })
 manche() {
   local label="$1"; shift
-  local o="$WORK/sortie-$label"; rm -rf "$o"; cp -R "$SORTIE" "$o"
+  local LM="$WORK/lab-$label"; rm -rf "$LM" "$WORK/mod-$label"; mkdir -p "$LM"; cp -R "$LAB/.planning" "$LM/.planning"; cp -R "$LAB/.vibeflow" "$LM/.vibeflow"; local o="$LM/.vibeflow/cockpit"   # 79-06 : le serveur du module exige --sortie=<lab>/.vibeflow/cockpit : un lab (données) par manche
+  MODM="$MOD_DEPOT"; if [ "$#" -gt 0 ]; then MODM="$(cockpit_module_copie "$WORK/mod-$label")" || { R_MARQUEUR="copie-du-module-impossible"; return; }; fi
   local m; for m in "$@"; do mutant "$o" "$m" || { R_MARQUEUR="mutant-sans-effet"; return; }; done
   rm -f "$MARQUEUR" "$o/.cache/server.json"; mkdir -p "$o/.cache"
   local amorce; amorce="$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")"; (umask 077; printf '%s' "$amorce" > "$o/.cache/terminal-amorce"; printf '%s' "$amorce" > "$WORK/amorce.copy")
-  ( cd "$LAB" && VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" exec node "$o/serve.mjs" --no-open --terminal --port "$(libre)" > "$WORK/serve-$label.out" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  local pid=$!; PIDS+=($pid)
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
-  local port q sec _c; port="$(node "$AUX/ev.mjs" j.port < "$o/.cache/server.json")"; q="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; q="${q##*:}"
+  COCKPIT_MODULE="$MODM" COCKPIT_PRET=terminal COCKPIT_LOG="$WORK/serve-$label.out" cockpit_lancer "$LM" --terminal
+  local pid="$VF_PID"
+  local port q sec _c; port="${VF_PORT:-0}"; q="$(node "$AUX/ev.mjs" '(j.terminal&&j.terminal.url)||""' < "$o/.cache/server.json")"; q="${q##*:}"
   read -r _c sec < <(node "$TA" amorcer "$q" "$WORK/amorce.copy" | tr '\n' ' ')
   [[ "$sec" =~ ^[0-9a-f]{64}$ ]] || { R_MARQUEUR="session-impossible"; vf_hyg_stop "$pid"; return; }
   node "$TA" flux "$q" "$sec" onglet-A "$WORK/flux-$label.bin" 120000 > "$WORK/flux-$label.log" 2>&1 & local fpid=$!; PIDS+=($fpid)
