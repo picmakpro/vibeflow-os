@@ -17,6 +17,8 @@ await executer(chrome, async (s) => {
     await s.naviguer(`${racine}/${page}?lang=${lang}`); await s.attendre(PRET, `page prête (${page})`);
     await s.attendre("!document.querySelector('#tour') || document.querySelector('#tour').hidden || !!document.querySelector('#tour').hidden", 'visite', 3000).catch(() => {});
     await s.ev("(() => { const t = document.querySelector('#tour'); if (t && !t.hidden) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); })()");
+    // la couche de collisions (75-08) pose des marques réelles sur le lab (deux plans sur src/a/neuf.mjs) : cette suite mesure la carte seule
+    await s.ev("(() => { if (window.VF_MARQUES) VF_MARQUES.retirer('activite-collisions'); return true; })()");
     return poser();
   };
   const aller = async (id) => {
