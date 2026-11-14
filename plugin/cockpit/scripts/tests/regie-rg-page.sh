@@ -115,15 +115,8 @@ rg_RG9_selection() {
 
 rg_RG11_page() {
   local o="$WORK/_" a b c
-  a="$(pg_sc '' '[{"clic":"'"$PG_BTN_RAPPORT"'"},{"nom":"e","obs":{}}]')"
-  pg_ok "RG11.10 — « Lire le rapport » : vf-agent:ouvrir (rapport, annulable) puis vf-agent:lu ; GET /api/vf/transcript?id= avec le jeton ; transcript en texte dans le panneau" "$a" \
-    'j.out.e.evts.map((x) => x.type + ":" + (x.declencheur || "") + ":" + x.cancelable).join(",") + "|" + j.out.e.fetchs.length + "|" + j.out.e.fetchs[0].url + "|" + j.out.e.fetchs[0].entetes.includes("tok-vm") + "|" + j.out.e.panneau.includes("texte du transcript factice")' \
-    "vf-agent:ouvrir:rapport:true,vf-agent:lu::false|1|/api/vf/transcript?id=$PG_F|true|true"
   b="$(pg_sc '' '[{"annuler":["rapport"]},{"clic":"'"$PG_BTN_RAPPORT"'"},{"nom":"e","obs":{}}]')"
   pg_ok "RG11.10 — annulé : aucune requête, aucun panneau, aucun vf-agent:lu" "$b" 'j.out.e.evts.map((x) => x.type).join(",") + "|" + j.out.e.fetchs.length + "|" + (j.out.e.panneau === "")' "vf-agent:ouvrir|0|true"
-  c="$(pg_sc '"surcouches":"pile"' '[{"clic":"'"$PG_BTN_RAPPORT"'"},{"nom":"e","obs":{}}]')"
-  pg_ok "RG11.10 — VF_SURCOUCHES présent : ouverture par VF_SURCOUCHES.ouvrir, ouvreur = le bouton de la ligne, non modale" "$c" \
-    'j.out.e.surcouches.filter((x) => x.op === "ouvrir").map((x) => x.ouvreur + ":" + x.tagOuvreur + ":" + x.modale).join()' "a-relire:$PG_F:BUTTON:false"
   pg_ok "RG15.7 — la régie n'émet vf-agent:lu que quand SON lecteur s'ouvre (jamais sur un ouvrir annulé)" "$b" 'j.out.e.evts.filter((x) => x.type === "vf-agent:lu").length' "0"
 }
 
@@ -199,8 +192,8 @@ rg15_echap() {
   local o d='li[data-vf-cle=\"au-travail:'"$PG_A"'\"] button.vf-rg-tog'
   local pre='{"clic":"'"$d"'"}' mana='{"saisie":"#search","valeur":"mana"}'
   local ex='{"nom":"EXN","obs":{"mode":"attr","sel":"'"$d"'","attr":"aria-expanded"}}'
-  # (réel) lecteur ouvert, pile simulée en capture sur window : la régie ne voit jamais l'appui
-  o="$(pg_sc '"surcouches":"pile"' '['"$pre"',{"clic":"'"$PG_BTN_RAPPORT"'"},'"$mana"',{"nom":"av","obs":{}},{"touche":"Escape","sur":"#search","nom":"p1"},{"nom":"ap","obs":{}},'"${ex/EXN/ex1}"',{"touche":"Escape","sur":"'"$d"'","nom":"p2"},'"${ex/EXN/ex2}"',{"nom":"f2","obs":{"mode":"focus"}},{"touche":"Escape","sur":"#search","nom":"p3"},{"nom":"r3","obs":{}},{"nom":"s3","obs":{"mode":"ser","sel":"#vf-equipe"}},{"touche":"Escape","sur":"#search","nom":"p4"},{"nom":"s4","obs":{"mode":"ser","sel":"#vf-equipe"}}]')"
+  # (réel) surcouche factice ouverte (le lecteur de repli est retiré, 73-C2), pile simulée en capture sur window : la régie ne voit jamais l'appui
+  o="$(pg_sc '"surcouches":"pile"' '['"$pre"',{"surcoucheFactice":true},'"$mana"',{"nom":"av","obs":{}},{"touche":"Escape","sur":"#search","nom":"p1"},{"nom":"ap","obs":{}},'"${ex/EXN/ex1}"',{"touche":"Escape","sur":"'"$d"'","nom":"p2"},'"${ex/EXN/ex2}"',{"nom":"f2","obs":{"mode":"focus"}},{"touche":"Escape","sur":"#search","nom":"p3"},{"nom":"r3","obs":{}},{"nom":"s3","obs":{"mode":"ser","sel":"#vf-equipe"}},{"touche":"Escape","sur":"#search","nom":"p4"},{"nom":"s4","obs":{"mode":"ser","sel":"#vf-equipe"}}]')"
   pg_ok "RG15.9 (réel) — lecteur ouvert : la pile le ferme (preventDefault) et l'appui n'atteint JAMAIS la régie ; détail et recherche inchangés" "$o" \
     'j.out.p1.prevenu + "|" + (j.out.ap.appels.keydown === j.out.av.appels.keydown) + "|" + j.out.ap.surcouches.some((x) => x.op === "fermee-par-pile") + "|" + j.out.ex1.join() + "|" + j.out.ap.recherche' "true|true|true|true|mana"
   pg_ok "RG15.9 — le lecteur fermé, trois appuis intacts : cran 2 (détail replié, focus au bouton du nom), cran 3 (recherche vidée), cran 4 (rien : DOM identique, defaultPrevented faux)" "$o" \
