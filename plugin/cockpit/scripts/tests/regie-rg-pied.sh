@@ -151,7 +151,7 @@ JS
   if cockpit_module_muter_page "pi-stock" 's@donneesAilleurs = Array.isArray(j.ailleurs) ? j.ailleurs : null;@donneesAilleurs = Array.isArray(j.ailleurs) ? (sessionStorage.setItem("vf-m", JSON.stringify(j.ailleurs)), j.ailleurs) : null;@' > /dev/null 2>&1
   then pi_mutant_fuite AILLEURS-PAGE-STOCKAGE "le pied garde la réponse dans sessionStorage"
   else unset COCKPIT_MODULE; assert_eq "M-AILLEURS-PAGE-STOCKAGE — le pied garde la réponse dans sessionStorage (ancre)" "ancre absente" "muté"; fi
-  if cockpit_module_muter "pi-flux" vf-cockpit-server.mjs 's@JSON.stringify(snap)}@JSON.stringify({ ...snap, ailleurs: ailleurs(os.homedir(), { racines: [\"/nulle-part-un\"] }) })}@' > /dev/null 2>&1
+  if cockpit_module_muter "pi-flux" vf-cockpit-server.mjs 's@JSON.stringify(snap)}@JSON.stringify({ ...snap, ailleurs: ailleurs(os.homedir(), { racines: [\"/nulle-part-un\"] }) })}@; s@^import fs from .node:fs.;@import fs from \"node:fs\"; import os from \"node:os\"; import { ailleurs } from \"./vf-cockpit-etat-officiel.mjs\";@' > /dev/null 2>&1
   then pi_mutant_fuite AILLEURS-FLUX "le direct ajoute la liste au hello"
   else unset COCKPIT_MODULE; assert_eq "M-AILLEURS-FLUX — le direct ajoute la liste au hello (ancre)" "ancre absente" "muté"; fi
 }
