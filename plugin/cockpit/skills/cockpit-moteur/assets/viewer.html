@@ -271,7 +271,8 @@ svg.dim .edge:not(.hl) { opacity: .1; }
 .menu { position: absolute; z-index: 30; min-width: 230px; padding: var(--sp-6); border-radius: 18px; display: none; transform-origin: top right; }
 .menu.open { display: block; animation: menuIn .22s var(--ease); }
 @keyframes menuIn { from { opacity: 0; transform: translateY(-4px) scale(.97); } }
-#flowmenu, #legend { top: 44px; right: 0; width: 320px; } /* dérivé : bouton 36 + 8 */
+#flowmenu, #legend, #lens-menu { top: 44px; right: 0; width: 320px; } /* dérivé : bouton 36 + 8 */
+#lens-menu { max-height: calc(100vh - var(--hh, 56px) - var(--sp-16)); overflow: auto; overscroll-behavior: contain; } /* le menu des lentilles (75-08) : plafonné, rien ne le pousse hors de l'écran ; <= 999 px le 60vh ci-dessous s'applique aussi */
 #flowmenu .r { padding: var(--inset-row); border-radius: 12px; cursor: pointer; transition: background .15s var(--ease); }
 #flowmenu .r:hover { background: rgba(var(--ink), .07); }
 #flowmenu .r b { font-weight: 500; display: block; }
@@ -536,7 +537,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
   .hr { flex: 0 0 auto; flex-wrap: wrap; }
   .brand #proj-name { display: none; }
   header .rel { position: static; } /* Flows and Filters open under the bar, inside the screen, wherever the bar wrapped */
-  #flowmenu, #legend { position: fixed; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: auto; width: min(320px, calc(100% - 2 * var(--sp-8))); max-height: 60vh; overflow: auto; }
+  #flowmenu, #legend, #lens-menu { position: fixed; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: auto; width: min(320px, calc(100% - 2 * var(--sp-8))); max-height: 60vh; overflow: auto; }
   .hr .btn { position: relative; padding: 0; justify-content: center; }
   .hr .btn .bl { display: none; }
   .hr .btn .badge { position: absolute; }
@@ -590,7 +591,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
   #loading { left: 50%; }
   header #zoom { position: static; flex: none; flex-direction: row; padding: 0; gap: 0; border-radius: 22px; } /* moved into the top row, left of the search icon */
   /* menus open as full-width cards under the bar */
-  #flowmenu, #legend { position: fixed; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: var(--sp-8); width: auto; max-height: 60vh; overflow: auto; }
+  #flowmenu, #legend, #lens-menu { position: fixed; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: var(--sp-8); width: auto; max-height: 60vh; overflow: auto; }
   body #tour { left: var(--sp-8); right: var(--sp-8); width: auto; }
 }
 @media (prefers-reduced-motion: reduce) and (max-width: 999px), (prefers-reduced-motion: reduce) and (pointer: coarse) {

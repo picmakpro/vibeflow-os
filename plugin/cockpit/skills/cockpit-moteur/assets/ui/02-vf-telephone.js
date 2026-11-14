@@ -18,7 +18,7 @@
     #vf-plus-menu { display: none; }
     .vf-nb { display: inline-block; max-width: 100%; word-break: break-all; } /* un mot à traits d'union tient en un bloc ; plus large que sa boîte, il se coupe n'importe où (70-05, P70-D-04) */
     @media (max-width: 999px) { /* amendement de P70-D-01 (2026-11-06) : le menu « ⋯ » dès 999 px */
-      #hdr-ext > button:not(#vf-lock), #theme-toggle, #btn-health, #flows-btn, #filters-btn { display: none !important; }
+      #hdr-ext > button:not(#vf-lock), #btn-lentilles, #theme-toggle, #btn-health, #flows-btn, #filters-btn { display: none !important; }
       #vf-plus { display: inline-flex; position: relative; }
       #vf-plus .badge, .vf-pl-i .badge { min-width: 16px; height: 16px; border-radius: 999px; background: var(--on); color: var(--on-text); font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 var(--sp-4); }
       #vf-plus .badge { position: absolute; top: var(--sp-8); right: var(--sp-8); min-width: 0; width: 8px; height: 8px; padding: 0; }
