@@ -16,7 +16,7 @@
   if (!SC || !CQ || typeof CQ.surOnglet !== 'function' || !E || typeof E.lireJson !== 'function') return; // page exportée ou sans coquille : rien
   window.__vfSyntheseBlocs = window.__vfSyntheseBlocs || [];
   const ORDRE = ['visite', 'burnup', 'methode', 'cout'], ICONE = '<path d="M4 19h16M5 15h4v-4h4V8h4V5"/>', panneau = document.getElementById('panel');
-  let installe = false, resume = null, bouton = null, suivi = null, ctx = null, ouvertA = null, premiere = false;
+  let installe = false, resume = null, bouton = null, ctx = null, ouvertA = null, premiere = false;
   const nettoyages = [];
 
   const lieu = () => JSON.stringify([SC.state.selected, SC.state.container]);
@@ -92,10 +92,12 @@
   const surBouton = (e) => { if (bouton && e.target === bouton) fermerAuClavier(e); };
 
   // ---------- installation par onglet ----------
+  const etat = () => { if (bouton) bouton.setAttribute('aria-expanded', String(ouverte())); };
+  const etatApres = () => setTimeout(etat, 0); // après le geste qui ouvre ou ferme le panneau
   function nettoyer() {
     installe = false;
     for (const n of nettoyages.splice(0).reverse()) { try { n(); } catch (e) { console.error('Synthèse : un nettoyage a levé : ' + (e && e.message)); } }
-    if (suivi) suivi.disconnect(); suivi = null;
+    document.removeEventListener('click', etatApres); document.removeEventListener('keydown', etatApres);
     panneau.removeEventListener('keydown', fermerAuClavier); document.removeEventListener('keydown', surBouton, true);
     if (ouverte()) SC.closePanel();
     if (bouton) bouton.remove();
@@ -106,9 +108,8 @@
     bouton = SC.addHeaderButton({ id: 'btn-synthese', label: 'Synthèse', svg: ICONE, title: nom(), onClick: () => (ouverte() ? SC.closePanel() : ouvrir()) });
     const sante = document.getElementById('btn-health'); if (sante) sante.after(bouton); // sinon la fin de l'en-tête : l'API fait foi, jamais une position
     bouton.setAttribute('aria-controls', 'panel'); etiqueter();
-    const etat = () => { if (bouton) bouton.setAttribute('aria-expanded', String(ouverte())); };
-    suivi = new MutationObserver(etat); suivi.observe(panneau, { childList: true });
-    suivi.observe(document.body, { attributes: true, attributeFilter: ['class'] }); etat();
+    etat(); // 79-17 : aucun observateur ; l'événement panel (plus bas), le clic et le clavier tiennent aria-expanded
+    document.addEventListener('click', etatApres); document.addEventListener('keydown', etatApres);
     panneau.addEventListener('keydown', fermerAuClavier); document.addEventListener('keydown', surBouton, true);
     const annoncer = (t) => { const sr = panneau.querySelector(':scope > .vf-sy .sr'); if (sr) sr.textContent = String(t); };
     const lireJson = (chemin) => { try { return E.lireJson(chemin).then((j) => j, () => null); } catch { return Promise.resolve(null); } };
@@ -124,7 +125,7 @@
       bind: (el) => {
         const b = el.querySelector('[data-vf-sy-resume]'); b.querySelector('.rn').textContent = resume.texte; b.addEventListener('click', ouvrir);
       } }));
-    SC.on('panel', () => { // une autre carte est choisie : la Synthèse se ferme
+    SC.on('panel', () => { etat(); // une autre carte est choisie : la Synthèse se ferme
       if (installe && ouvertA !== null && ouverte() && lieu() !== ouvertA) { ouvertA = null; SC.closePanel(); }
     });
   }
