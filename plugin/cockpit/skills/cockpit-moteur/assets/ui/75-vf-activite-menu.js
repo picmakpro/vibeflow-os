@@ -34,7 +34,7 @@
 
   const creer = (ctx) => {
     const { T, M, S, bouton, racine } = ctx, TX = T.TEXTES;
-    const menu = el('div', 'menu'), titre = el('div', 'lh', TX.titre), boite = el('div'), lentilles = el('div');
+    const menu = el('div', 'menu glass'), titre = el('div', 'lh', TX.titre), boite = el('div'), lentilles = el('div');
     const leg = el('div', 'sep'), radar = el('p', 'lradar');
     menu.id = 'lens-menu'; titre.id = 'lens-titre'; leg.id = 'lens-legende'; radar.id = 'lens-radar'; boite.id = 'lens-boite';
     boite.setAttribute('role', 'menu'); boite.setAttribute('aria-labelledby', 'lens-titre');
