@@ -67,7 +67,8 @@
     return {
       ok: true,
       frise: {
-        schema: SCHEMA, at: num(brut.at), depuis: num(brut.depuis), jusqua: num(brut.jusqua), fenetreS: num(brut.fenetreS),
+        schema: SCHEMA, at: typeof brut.at === 'string' ? num(Date.parse(brut.at)) : num(brut.at), // la route écrit une chaîne ISO
+        depuis: num(brut.depuis), jusqua: num(brut.jusqua), fenetreS: num(brut.fenetreS),
         source: { etat: txt(objet(brut.source).etat) }, tronque: brut.tronque === true,
         voiesOmises: Number.isInteger(brut.voiesOmises) ? brut.voiesOmises : null, voies: lues, ignores: ign.n,
       },

@@ -60,6 +60,10 @@ DEFAUT=7
 # Deux suites raccourcies (terminal-tiroir : mutants TH rejoués par cas ; terminal-xterm : attentes de 2 s sous mutant) sont remesurées sur
 # le run 43459074372 de la PR #241 : 955 s et 667 s.
 # Phase 75 : sept suites neuves (activite-*) mesurées par les nœuds d'exécution sur le poste, pas sur le runner ; à remesurer sur le premier run complet.
+# Phases 73 à 80 du cockpit : quatorze suites sans ligne, mesurées sur le run CI complet 43549334891 de la PR #249 (14 shards, même méthode
+# `##[group]` jusqu'à `PASS`). La suite coquille était ROUGE à cette mesure (fin = ligne `FAIL(rc=1)`) : à remesurer sur le premier run
+# vert. test-cockpit-mise-en-page.sh, rouge elle aussi (1194 s jusqu'au `FAIL`, durée d'un échec, pas d'une suite verte), n'a PAS de ligne :
+# elle retombe sur DEFAUT jusqu'à une mesure verte ; la poser à 1194 s en ferait une sixième suite lourde et romprait le cas C2 (n=6).
 durees() {
   cat <<'DUREES'
 1 plugin/_internal/runtime-adapter/tests/test-agent-to-codex.sh
@@ -106,6 +110,7 @@ durees() {
 139 plugin/cockpit/scripts/tests/test-cockpit-coin.sh
 379 plugin/cockpit/scripts/tests/test-cockpit-collecte.sh
 45 plugin/cockpit/scripts/tests/test-cockpit-confinement.sh
+250 plugin/cockpit/scripts/tests/test-cockpit-coquille.sh
 154 plugin/cockpit/scripts/tests/test-cockpit-couloirs.sh
 92 plugin/cockpit/scripts/tests/test-cockpit-cycle-serveur.sh
 27 plugin/cockpit/scripts/tests/test-cockpit-demander-bornes.sh
@@ -113,11 +118,18 @@ durees() {
 71 plugin/cockpit/scripts/tests/test-cockpit-direct.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-ecrans-recent.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-equipe-etats.sh
+75 plugin/cockpit/scripts/tests/test-cockpit-equipe-retraits.sh
 250 plugin/cockpit/scripts/tests/test-cockpit-equipe.sh
 490 plugin/cockpit/scripts/tests/test-cockpit-etat.sh
+20 plugin/cockpit/scripts/tests/test-cockpit-fiche-texte.sh
+32 plugin/cockpit/scripts/tests/test-cockpit-fiche.sh
 43 plugin/cockpit/scripts/tests/test-cockpit-flux-unique.sh
 4 plugin/cockpit/scripts/tests/test-cockpit-forme-claude.sh
 12 plugin/cockpit/scripts/tests/test-cockpit-fr-donnees.sh
+40 plugin/cockpit/scripts/tests/test-cockpit-frise-cout.sh
+1 plugin/cockpit/scripts/tests/test-cockpit-frise-modele.sh
+150 plugin/cockpit/scripts/tests/test-cockpit-frise-vue.sh
+215 plugin/cockpit/scripts/tests/test-cockpit-frise.sh
 69 plugin/cockpit/scripts/tests/test-cockpit-git-commandes.sh
 38 plugin/cockpit/scripts/tests/test-cockpit-git-config-depot.sh
 28 plugin/cockpit/scripts/tests/test-cockpit-git-details.sh
@@ -129,6 +141,7 @@ durees() {
 200 plugin/cockpit/scripts/tests/test-cockpit-git-signature.sh
 195 plugin/cockpit/scripts/tests/test-cockpit-git-tiroir.sh
 85 plugin/cockpit/scripts/tests/test-cockpit-git.sh
+44 plugin/cockpit/scripts/tests/test-cockpit-graphe.sh
 20 plugin/cockpit/scripts/tests/test-cockpit-hygiene.sh
 22 plugin/cockpit/scripts/tests/test-cockpit-index.sh
 60 plugin/cockpit/scripts/tests/test-cockpit-jauges.sh
@@ -147,6 +160,7 @@ durees() {
 81 plugin/cockpit/scripts/tests/test-cockpit-lancer-ui.sh
 196 plugin/cockpit/scripts/tests/test-cockpit-lancer-xss.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-lecture-fil.sh
+11 plugin/cockpit/scripts/tests/test-cockpit-magasin.sh
 5 plugin/cockpit/scripts/tests/test-cockpit-marque-blanche.sh
 49 plugin/cockpit/scripts/tests/test-cockpit-moteur-carte.sh
 3 plugin/cockpit/scripts/tests/test-cockpit-onglet-code.sh
@@ -160,6 +174,8 @@ durees() {
 1509 plugin/cockpit/scripts/tests/test-cockpit-projet.sh
 20 plugin/cockpit/scripts/tests/test-cockpit-questions.sh
 23 plugin/cockpit/scripts/tests/test-cockpit-reconnexion.sh
+243 plugin/cockpit/scripts/tests/test-cockpit-regie.sh
+35 plugin/cockpit/scripts/tests/test-cockpit-repli-retrait.sh
 6 plugin/cockpit/scripts/tests/test-cockpit-reseau.sh
 605 plugin/cockpit/scripts/tests/test-cockpit-responsive.sh
 89 plugin/cockpit/scripts/tests/test-cockpit-retard.sh
@@ -189,6 +205,13 @@ durees() {
 955 plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh
 27 plugin/cockpit/scripts/tests/test-cockpit-terminal-xss.sh
 667 plugin/cockpit/scripts/tests/test-cockpit-terminal-xterm.sh
+4 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-chaine.sh
+4 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-collecte.sh
+3 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-decisions.sh
+5 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-memoire.sh
+50 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-page.sh
+59 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-panneaux.sh
+31 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-route.sh
 28 plugin/cockpit/scripts/tests/test-cockpit-transcript.sh
 80 plugin/cockpit/scripts/tests/test-cockpit-vendor.sh
 10 plugin/cockpit/scripts/tests/test-cockpit-vie.sh

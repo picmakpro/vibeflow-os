@@ -7,9 +7,10 @@
 #   X1  balisage hostile en texte        X2  lien jamais actif                 X3  aucun accès innerHTML et consorts
 #   X4  sous-ensemble fermé              X5  filtres cumulables et compteur    X6  liste blanche, lignes sans texte
 #   X7  lireFil : schéma, erreur, inconnu X8  cible et nom d'outil hostiles    X9  temps borné et plafond
-#   X10 fusionnerEvenements (a à h)
+#   X10 fusionnerEvenements (a à h)   X12 corpus hostile : jeu fermé, aucun attribut, classes fixes   X13 genre hors du jeu fermé   X14 lien non fermé
 #   X11 mutants (copies des modules sous $WORK/mut-<nom>/) : a M-INNERHTML (X3), b M-LIEN (X2), c M-RENDU-TOUT (X6), d M-FILTRE-ET (X5),
-#       e M-BACKTRACK (X9), f M-FUSION-SANS-BORNE (X10), g M-FUSION-EN-CONSTRUCTION (X10), h M-INCONNU-VIDE (X7), i M-PLAFOND (X9) ;
+#       e M-BACKTRACK (X9), f M-FUSION-SANS-BORNE (X10), g M-FUSION-EN-CONSTRUCTION (X10), h M-INCONNU-VIDE (X7), i M-PLAFOND (X9),
+#       j M-AUTOLIEN (X12), k M-STYLE (X12), l M-GENRE-CLASSE (X13), m M-LIEN-OUVERT (X14), n M-LIEN-FAIBLE (X14) ;
 #       chaque mutant imprime « MUTANT-ROUGE <nom> <sonde> » quand sa sonde rougit, « MUTANT-VERT <nom> <sonde> » (plus un FAIL) sinon.
 # Exit 0 si tout passe, 1 sinon.
 
@@ -38,7 +39,7 @@ import { performance } from 'node:perf_hooks';
 const dir = process.argv[2];
 const FICHIERS = ['74-vf-fiche-md.js', '74-vf-fiche-texte.js'];
 let LOG;
-const reset = () => { LOG = { tags: [], texts: [], on: [], html: 0, attrs: [] }; };
+const reset = () => { LOG = { tags: [], texts: [], on: [], html: 0, attrs: [], classes: [], props: [] }; };
 const txt = (s) => ({ tag: '#text', data: String(s) });
 const texteDe = (n) => (n && n.tag === '#text' ? n.data : n && n.children ? n.children.map(texteDe).join('') : '');
 const trouver = (n, f, out = []) => { if (n && n.children) { if (f(n)) out.push(n); n.children.forEach((c) => trouver(c, f, out)); } return out; };
@@ -49,13 +50,14 @@ const mk = (tag, journal) => {
   e.append = (...ns) => ns.forEach((n) => e.appendChild(typeof n === 'string' ? txt(n) : n));
   e.setAttribute = (k, v) => { if (/^on/i.test(k)) LOG.on.push(k); LOG.attrs.push(k + '=' + v); };
   e.insertAdjacentHTML = () => { LOG.html++; };
-  e.classList = { add: (...c) => { e.className += ' ' + c.join(' '); } };
+  e.classList = { add: (...c) => { LOG.classes.push(...c); e.className += ' ' + c.join(' '); } };
   return new Proxy(e, {
     get: (t, k) => { if (k === 'innerHTML' || k === 'outerHTML') { LOG.html++; return ''; } if (k === 'textContent') return texteDe(t); return t[k]; },
     set: (t, k, v) => {
       if (k === 'innerHTML' || k === 'outerHTML') { LOG.html++; return true; }
       if (typeof k === 'string' && /^on/i.test(k)) LOG.on.push(k);
       if (k === 'textContent') { t.children = [txt(v)]; LOG.texts.push(String(v)); return true; }
+      if (k === 'className') LOG.classes.push(String(v)); else LOG.props.push(String(k));
       t[k] = v; return true;
     },
   });
@@ -73,7 +75,7 @@ const ctx = vm.createContext({ Intl, Date, window: {} });
 const absent = FICHIERS.filter((f) => !fs.existsSync(path.join(dir, f)));
 if (!absent.length) for (const f of FICHIERS) vm.runInContext(fs.readFileSync(path.join(dir, f), 'utf8'), ctx, { filename: f });
 out.push('absent ' + (absent.length ? 1 : 0));
-const KEYS = ['X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'X8', 'X9', 'X10', 'X10a', 'X10b', 'X10c', 'X10d', 'X10e', 'X10f', 'X10g', 'X10h'];
+const KEYS = ['X1', 'X2', 'X3', 'X4', 'X5', 'X6', 'X7', 'X8', 'X9', 'X12', 'X13', 'X14', 'X10', 'X10a', 'X10b', 'X10c', 'X10d', 'X10e', 'X10f', 'X10g', 'X10h'];
 if (absent.length) { KEYS.forEach((k) => ligne(k, 'absent')); console.log(out.join('\n')); process.exit(0); }
 
 const Md = ctx.window.__vfFicheMd, F = ctx.window.__vfFicheTexte;
@@ -170,6 +172,40 @@ sonde('X9', () => {
   const plafonne = gros.texte.includes('(tronqué)') && gros.texte.length <= 100020 && texteDe(mand).includes('(tronqué)') && texteDe(mand).length <= 100020;
   return (lents.length === 0 && lin.every((x) => x[3]) && plafonne) || { lents, lin, plafonne, len: gros.texte.length };
 });
+// X12 : corpus hostile (adresses nues, schémas, chevrons, format d'attribut) : jeu fermé de balises, aucun attribut, classes d'une liste fixe, rien dérivé du texte
+const BALISES = ['p', 'ul', 'ol', 'li', 'code', 'pre', 'em', 'strong', 'span'];
+const CLASSES = ['vf-fiche-code', 'vf-fiche-bloc', 'vf-fiche-tronque', 'vf-fiche-mandat', 'vf-fiche-ligne', 'vf-fiche-message', 'vf-fiche-humain',
+  'vf-fiche-compaction', 'vf-fiche-outil', 'vf-fiche-heure', 'vf-fiche-glyphe', 'vf-fiche-texte', 'vf-fiche-cible', 'vf-fiche-echec'];
+const CORPUS = ['http://evil.example/x et https://a.b/c?d=<script>', 'javascript:alert(1)', 'data:text/html;base64,PHNjcmlwdD4=', 'mailto:a@b.c',
+  '<https://auto.lien/x>', 'x" onmouseover="alert(1)" style="color:red', "' onfocus='x' href='y", '`style="x"` **onclick=1** *a" b* _src=x_',
+  '[a](data:text/html,x) ![i](http://x/y.png)', '- http://l\n1. mailto:z', '```\nhttp://e onclick=1\n```'];
+sonde('X12', () => {
+  const d = mkDoc();
+  for (const m of CORPUS) {
+    Md.markdown(m, d); Md.mandatDom(m, d);
+    F.ligneDom(msgL(T, m), d, {}); F.ligneDom(outL(T, { verbe: m, cible: m }), d, {});
+  }
+  const classes = LOG.classes.flatMap((c) => c.split(/\s+/).filter(Boolean));
+  const r = { tags: [...new Set(LOG.tags.filter((x) => !BALISES.includes(x)))], attrs: LOG.attrs.slice(0, 3), props: LOG.props.slice(0, 3),
+    classes: [...new Set(classes.filter((c) => !CLASSES.includes(c)))], on: LOG.on.length, html: LOG.html };
+  return (!r.tags.length && !LOG.attrs.length && !LOG.props.length && !r.classes.length && !r.on && !r.html && LOG.tags.length > 0) || r;
+});
+// X13 : un genre hors {message, humain, compaction, outil} ne donne ni classe dérivée ni contenu
+sonde('X13', () => {
+  const d = mkDoc(); const g = 'zz onclick=1" <b>';
+  const li = F.ligneDom({ t: iso(T), genre: g, texte: 'PIEGE-74', verbe: 'PIEGE-74', cible: 'PIEGE-74' }, d, { glyphe: () => null });
+  const clas = String(li.className);
+  return (!clas.includes('zz') && !clas.includes('onclick') && !LOG.classes.join(' ').includes('zz') && li.children.length === 0 && texteDe(li) === '') || { clas, n: li.children.length };
+});
+// X14 : lien à parenthèse non fermée (aucun « ) » plus loin) : rendu terminé sous délai dur, texte intact (la garde `dernier[')'] >= fermante + 2` évite la boucle infinie ; les deux derniers cas portent une `)` AVANT le lien, qu'une garde affaiblie en `>= 0` laisserait passer)
+sonde('X14', () => {
+  const cas = ['[a](b', 'voir [doc](https://x.y sans fermer', 'a [b](c [d](e', '[x]( et ](y', '(a) [b](c', 'f(x) puis [y](z'];
+  const r = cas.map((m) => {
+    try { ctx.__m = m; ctx.__d = mkDoc(); reset(); vm.runInContext('__r = window.__vfFicheMd.markdown(__m, __d)', ctx, { timeout: 1500 }); return texteDe(ctx.__r) === m; }
+    catch (e) { return 'délai : ' + m; }
+  });
+  return r.every((x) => x === true) || r;
+});
 // X10 : fusionnerEvenements
 {
   const fil = [msgL(T, 'a'), outL(T + 10000), msgL(T + 20000, 'b')];
@@ -245,6 +281,9 @@ sonde_ok "X6 — liste blanche : ni texte d'erreur ni entrée d'outil rendus ; l
 sonde_ok "X7 — lireFil : schéma d'abord, erreur et inconnu distincts d'un fil vide, genres de la route écartés et comptés, cible en code" X7
 sonde_ok "X8 — cible et nom d'outil hostiles rendus en texte, la cible dans un code" X8
 sonde_ok "X9 — tokenizer linéaire (N / 2N), moins de 300 ms sur emphase pathologique, plafond de 100 000 caractères avec mention" X9
+sonde_ok "X12 — corpus hostile (adresses nues, javascript:, data:, mailto:, chevrons, format d'attribut) : balises du jeu fermé, aucun attribut, classes d'une liste fixe" X12
+sonde_ok "X13 — un genre hors du jeu fermé ne produit ni classe dérivée ni contenu (liste blanche au rendu)" X13
+sonde_ok "X14 — lien à parenthèse non fermée : rendu terminé sous délai dur, texte intact (pas de boucle infinie)" X14
 sonde_ok "X10 — fusionnerEvenements : genres, valeurs non finies, borne, en-construction, plafond de 200, tri, pureté, fil sans date" X10
 for k in a b c d e f g h; do sonde_ok "X10$k — sous-cas $k de la fusion des événements" "X10$k"; done
 
@@ -271,6 +310,11 @@ mutant f M-FUSION-SANS-BORNE X10 X10c "$TX" 'if (ms < borne) continue;' ''
 mutant g M-FUSION-EN-CONSTRUCTION X10 X10d "$TX" "etatSource === 'en-construction'" "etatSource === '__jamais__'"
 mutant h M-INCONNU-VIDE X7 X7 "$TX" "return { ok: false, raison: 'inconnu' };" "return { ok: true, mandat: null, lignes: [], tronque: false, ecartes: 0 };"
 mutant i M-PLAFOND X9 X9 "$MD" 'const tronque = t.length > PLAFOND;' 'const tronque = false;'
+mutant j M-AUTOLIEN X12 X12 "$MD" 'tampon += c;' "if (texte.startsWith('http', i)) { let j = i; while (j < n && !blanc(texte[j])) j++; vider(); const a = doc.createElement('a'); a.setAttribute('href', texte.slice(i, j)); a.textContent = texte.slice(i, j); parent.appendChild(a); i = j; continue; } tampon += c;"
+mutant k M-STYLE X12 X12 "$MD" 'e.textContent = contenu;' "e.textContent = contenu; e.setAttribute('style', contenu);"
+mutant l M-GENRE-CLASSE X13 X13 "$TX" 'if (!GENRES.includes(ligne && ligne.genre)) return li;' ''
+mutant m M-LIEN-OUVERT X14 X14 "$MD" " && dernier[')'] >= fermante + 2" ''
+mutant n M-LIEN-FAIBLE X14 X14 "$MD" " && dernier[')'] >= fermante + 2" " && dernier[')'] >= 0"
 
 vf_hyg_assert
 

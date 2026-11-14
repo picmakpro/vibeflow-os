@@ -25,3 +25,11 @@ Rituel levé : régime allégé (consigne de Samuel, message session principale,
 
 ## Contrat consommé par une autre phase
 - 74-05 monte `window.__vfFicheTexte` ; le rappel `glyphe(nom)` reçoit `message|humain|compaction|outil|echec` et rend un nœud ou rien. 74-02 doit produire le corps `inconnu` sous la forme `erreur: 'inconnu'`. Le CSS `vf-fiche-*` reste à poser par 74-05 / 74-09 ; la ligne `AJOUT` de `VENDORED.txt` est celle de 74-09.
+
+## Correction après audit
+Correction après audit de sécurité (une passe, aucun constat haut), mandat ciblé du manager : (1, moyen) sonde X12, corpus hostile (adresses nues http et https, `javascript:`, `data:`, `mailto:`, autolien en chevrons, format d'attribut) sur `markdown`, `mandatDom` et `ligneDom` : balises du jeu fermé, aucun attribut posé, aucune propriété hors `className` et `textContent`, classes d'une liste fixe, jamais dérivées du texte ; mutants M-AUTOLIEN (adresse nue en `a` avec `href`) et M-STYLE (`setAttribute('style', contenu)`) rouges sur X12. (2, bas) `ligneDom` : liste blanche des genres au rendu, un genre hors {message, humain, compaction, outil} rend un `li` vide à la seule classe `vf-fiche-ligne` (sonde X13, mutant M-GENRE-CLASSE). X13 vu rouge avant le correctif (32 PASS / 2 FAIL). Suite : 34 PASS / 0 FAIL, douze `MUTANT-ROUGE`, aucun `MUTANT-VERT`, 17 s. Critère de linéarité de X9 inchangé (ratio 4, versé au BACKLOG par le manager).
+
+Correction après la revue du point de fusion : la clause `dernier[')'] >= fermante + 2` de `74-vf-fiche-md.js` était la seule garde contre une boucle infinie sur un lien à parenthèse non fermée, et sa suppression laissait la suite verte. Sonde X14 (quatre liens sans `)` plus loin, rendu sous délai dur de 1,5 s, texte rendu identique à l'entrée) et mutant M-LIEN-OUVERT (clause retirée) : rouge par le délai. Code inchangé. Suite : 36 PASS / 0 FAIL, treize `MUTANT-ROUGE`.
+
+## Correction après revue 2
+X14 porte deux cas avec une `)` antérieure au lien (`(a) [b](c`, `f(x) puis [y](z`) sous le même délai dur ; le mutant M-LIEN-FAIBLE (garde affaiblie en `dernier[')'] >= 0`, ancré) boucle sans fin et rougit X14. `test-cockpit-fiche-texte.sh` : 37 PASS, 0 FAIL, mutants M-LIEN-OUVERT et M-LIEN-FAIBLE rouges (37 s).

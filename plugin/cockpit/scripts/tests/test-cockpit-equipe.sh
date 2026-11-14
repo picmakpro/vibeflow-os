@@ -947,21 +947,14 @@ JSON
   ek_restaurer() { rm -f "$EKMOD"; }
   # EKC <action> <page> : une interaction, un Chromium ; la ligne JSON rendue est lue par G
   EKC() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EK_ACTION="$1" node "$HERE_EK/chrome-equipe-clavier.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ek-$1.json"; }
-  EKA1="equipe.html#r=n%3Aag-a1"
+  EKA1="equipe.html"   # 74 : sans ancre. Arriver à froid sur #r=n:ag-<id> ouvre la fiche (contrat P73-C2, T26.8), qui masque la vue : le bouton « Lire le rapport » n'est plus focalisable
   ek_demarrer
   assert_eq "EK0 — contrôle positif : serveur de la sortie démarré, page Équipe servie et fixture à deux agents lisibles" "$([ "$EK_PORT" -gt 0 ] && echo serveur)|$(node "$AUX/fetchp.mjs" "$EK_PORT" /equipe.html "$WORK/ek-equipe.html")" "serveur|200"
   # EK1 (UIFN-12) : Entrée sur « Lire le transcript » ne fait pas perdre le focus clavier
   EKC focus-transcript "$EKA1"
   assert_eq "EK1.0 — témoin : avant l'Entrée, l'élément actif est le bouton « Lire le rapport » d'une ligne terminée de la régie (la sonde sait lire le focus)" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||(j.avant.tag+"|"+j.avant.rapport)')" "BUTTON|true"
-  assert_eq "EK1 — après Entrée sur « Lire le rapport », le lecteur s'affiche ET l'élément actif reste dans la régie ou son panneau, jamais BODY" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.tag==="BODY"?"BODY":(j.apres.ou!=="hors"?"dans la régie ou son panneau":"hors de la régie : "+j.apres.tag)))')" "lu=true | actif=dans la régie ou son panneau"
-  EKC focus-transcript "equipe.html#r=n%3Aag-mgr1"
-  assert_eq "EK1.1 — arrivée sur un agent qui porte des agents, Entrée sur « Lire le rapport » lit le rapport, garde le focus dans la page et ne change pas la vue du viewer" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.ou!=="hors"?"dans la page":j.apres.tag)+" | vue "+(j.hashAvant===j.hashApres?"inchangée":"changée"))')" "lu=true | actif=dans la page | vue inchangée"
-  # EK2 (m1) : changer d'agent efface la clé de rechargement
-  EKC changer-agent "$EKA1"
-  assert_eq "EK2.1 — lire un rapport puis déplier une autre ligne ne laisse aucune clé de rechargement (avant : aucune ; après : aucune)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')" "null|null"
-  # EK3 (m10) : le sessionStorage ne garde que l'identifiant de l'agent
-  EKC recharger "$EKA1"
-  assert_eq "EK3.1 — le sessionStorage ne porte aucune clé vf-equipe-* (jamais le texte lu, qui est bien affiché)" "$(G "$WORK/ek-recharger.json" 'j.erreur||(JSON.stringify(j.entrees)+"|"+j.texteLu+"|"+j.fuite)')" '{}|true|false'
+  # EK1, EK1.1, EK2.1, EK3.1 et EKR2 exerçaient le lecteur de repli de la régie, retiré par 74-10 (contrat P73-C2) : la fiche porte les mêmes propriétés (focus, rien du fil en stockage, lecture qui survit aux who)
+  # dans test-cockpit-equipe-retraits.sh (R4 : T27.C1 et T27.C2 ; R5b : nom, Entrée, Espace, rapport, focus rendu à l'origine) et test-cockpit-fiche.sh ; l'absence du repli est prouvée par test-cockpit-repli-retrait.sh (RP1 à RP3).
   # EK4 (m8) : un tiroir fermé n'est pas rouvert par un nouveau who
   EKC ferme-puis-who "project.html#t"
   assert_eq "EK4.1 — le tiroir « Au travail » fermé n'est pas rouvert par un who qui change l'arbre (ouvert, fermé, rouvert)" "$(G "$WORK/ek-ferme-puis-who.json" 'j.erreur||(j.ouvert+"|"+j.ferme+"|"+j.rouvert)')" "true|true|false"
@@ -984,8 +977,6 @@ JSON
   EKR() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EKR_ACTION="$1" node "$HERE_EK/reposer-chrome.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ekr-$1.json"; }
   EKR reponse-puis-who "project.html#t"
   assert_eq "EKR1 — la réponse « Voir la dernière commande » reste affichée dans la ligne du bouton neuf quand un second who redessine le tiroir (le bouton a bien été remplacé)" "$(G "$WORK/ekr-reponse-puis-who.json" 'j.erreur||(j.remplace+"|"+j.texte+"|"+j.visible)')" "true|réponse fixe EKR1|true"
-  EKC lecteur-puis-who "$EKA1"
-  assert_eq "EKR2 — le lecteur de repli de la régie reste affiché (texte égal, non vide) quand un who met la ligne à jour (le who est bien pris en compte)" "$(G "$WORK/ek-lecteur-puis-who.json" 'j.erreur||(j.lu+"|"+j.remplace+"|"+(j.texte>0)+"|"+j.egal)')" "true|true|true|true"
   EKC badge "$EKA1"
   assert_eq "EK10 — mot d'état d'une ligne de la régie : il reste entièrement dans sa ligne à 390, 1024 et 1440 px (marge >= 0)" "$(G "$WORK/ek-badge.json" 'j.erreur||(["390","1024","1440"].map((l)=>typeof j[l]==="number"&&j[l]>=0?"ok":l+"="+j[l]).join(","))')" "ok,ok,ok"
   EKC echelle "equipe.html"
@@ -1027,14 +1018,8 @@ JSON
   # --- mutants : chacun posé dans la page servie, serveur relancé, le témoin DOIT rougir ---
   ek_mutant() { # $1 nom, $2 action, $3 page, $4 expression sur la sortie, $5 ancre, $6 remplacement -> « muté|<valeur> »
     local m; m="$(ek_muter "$5" "$6" "${7:-}" "${8:-}")"; ek_demarrer; EKC "$2" "$3"; local v; v="$(G "$WORK/ek-$2.json" "$4")"; vf_hyg_stop "$EK_PID"; ek_restaurer; echo "$m|$v"; }
-  assert_eq "EK2.2 — mutant (le lecteur de repli écrit vf-equipe-ouvert dans la page servie) : une clé de rechargement naît, détecté" "$(ek_mutant m1 changer-agent "$EKA1" 'j.erreur||(j.avant+"|"+j.apres)' 'emettre('"'"'vf-agent:lu'"'"', { id }, false);' "try { sessionStorage.setItem('vf-equipe-ouvert', id); } catch {} emettre('vf-agent:lu', { id }, false);")" "muté|a4|a4"
-  assert_eq "EK3.2 — mutant (le sessionStorage reçoit aussi le texte lu) : la fuite est détectée" "$(ek_mutant m10 recharger "$EKA1" 'j.erreur||(j.fuite+"|"+j.texteLu)' 'emettre('"'"'vf-agent:lu'"'"', { id }, false);' "try { sessionStorage.setItem('vf-equipe-ouvert', id + ' ' + JSON.stringify(d)); } catch {} emettre('vf-agent:lu', { id }, false);")" "muté|true|true"
   assert_eq "EK4.2 — mutant (garde « tiroir fermé » retirée de redessiner) : le who rouvre le tiroir, détecté" "$(ek_mutant m8 ferme-puis-who "project.html#t" 'j.erreur||(j.ouvert+"|"+j.ferme+"|"+j.rouvert)' "if (!document.querySelector('.vf-whop') || document.body.classList.contains('no-panel')) return;" 'if (false) return;')" "muté|true|true|true"
   assert_eq "EK5.2 — mutant (la commande est rendue en HTML) : un élément est créé, détecté" "$(ek_mutant m5 rendu-commande "project.html#t" 'j.erreur||(j.elements+"|"+j.injecte)' "z.textContent !== t) { z.textContent = t; z.hidden = false; }" "!z.dataset.ek) { z.dataset.ek = '1'; z.innerHTML = t; z.hidden = false; }")" "muté|1|true"
-  # l'ancre doit être propre au fichier de la régie qu'elle mute : le viewer porte d'autres gestionnaires, un mutant posé sur l'un d'eux serait un faux vert
-  EKANC1="if (declencheur === 'rapport') { ouvrirRepli(A, l.id, bouton, l.nom); return; }"
-  assert_eq "EK1.2 — mutant (l'ouverture du rapport change la vue du viewer, comme une Entrée non arrêtée) : la vue change, détecté" "$(ek_mutant f1 focus-transcript "equipe.html#r=n%3Aag-mgr1" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.ou!=="hors"?"dans la page":j.apres.tag)+" | vue "+(j.hashAvant===j.hashApres?"inchangée":"changée"))' "$EKANC1" "if (declencheur === 'rapport') { location.hash = '#r=n%3Aag-a1'; ouvrirRepli(A, l.id, bouton, l.nom); return; }")" "muté|lu=true | actif=dans la page | vue changée"
-  assert_eq "EK1.3 — mutant (le focus n'est plus posé sur le titre du lecteur, le bouton ayant quitté la ligne) : le rapport est lu mais le focus tombe sur BODY, détecté" "$(ek_mutant f2 focus-transcript "$EKA1" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "if (T) { T.tabIndex = -1; T.focus({ preventScroll: true }); }" "")" "muté|lu=true | actif=BODY"
   assert_eq "EK8.1 — mutant (le bouton focalisé du tiroir est désactivé pendant la lecture) : la commande est lue mais le focus tombe sur BODY, détecté" "$(ek_mutant f3 focus-doing-tiroir "project.html#t" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true'); // jamais \`disabled\` : un bouton focalisé désactivé perd le focus clavier (UIFN-12, même défaut" 'b.disabled = true; //')" "muté|lu=true | actif=BODY"
   assert_eq "EK8.2 — mutant (mise à jour en place et suivi du focus retirés : les lignes sont réinsérées à chaque rendu) : le focus tombe sur BODY, détecté" "$(ek_mutant r1 focus-puis-who "$EKA1" 'j.erreur||(j.apres.tag)' "lis.forEach((li, i) => { if (ul.childNodes[i] !== li) ul.insertBefore(li, ul.childNodes[i] || null); });" "lis.forEach((li, i) => { if (true) ul.insertBefore(li, ul.childNodes[i] || null); });" "if (garde && D.activeElement !== garde.el) {" "if (false) {")" "muté|BODY"
   assert_eq "EK9.2 — même mutant, tiroir « Au travail » : le focus tombe sur BODY, détecté" "$(ek_mutant r2 focus-tiroir "project.html#t" 'j.erreur||(j.apres.tag)' "SC.on('panel', () => { rendreFocus(); " "SC.on('panel', () => { ")" "muté|BODY"
@@ -1074,8 +1059,8 @@ JSON
   assert_eq "EK18.1 — mutant (le titre de la régie reçoit un tabindex) : masqué sous le tiroir Git, il devient un arrêt de Tab, détecté" "$(EK18M "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou);" "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou); h1.tabIndex = 0;" "true/true/true/true")" "muté|true/true/true/true"
   assert_eq "EK18.2 — mutant (l'en-tête de la régie porte un lien) : le lien, masqué sous le tiroir Git, redevient un arrêt de Tab, détecté" "$(EK18M "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou);" "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou); const lien = h('a', 'vf-link', 'x'); lien.setAttribute('href', '#'); entete.append(lien);" "true/true/true/true")" "muté|true/true/true/true"
   # témoins de la sonde de mutation elle-même
-  ek_demarrer; EKC changer-agent "$EKA1"; vf_hyg_stop "$EK_PID"
-  assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK2.1 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "null|null|identique"
+  ek_demarrer; EKC focus-transcript "$EKA1"; vf_hyg_stop "$EK_PID"; rm -f "$EKMOD"   # 74-10 : EK2.1 est retiré avec le repli ; le témoin rejoue la mesure d'EK1.0 sur la page remise à l'identique
+  assert_eq "EK6 — témoin de la sonde : la sortie restaurée après les mutants redonne le vert (EK1.0 rejoué sur la page remise à l'identique)" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||(j.avant.tag+"|"+j.avant.rapport)')|$(cmp -s "$WORK/project-ek.html.orig" "$OUTEK/project.html" && echo identique || echo differe)" "BUTTON|true|identique"
   assert_eq "EK7 — témoin de la sonde : un mutant dont l'ancre n'existe pas est refusé, aucune copie de module n'est posée, la page servie reste celle du module" "$(ek_muter 'ANCRE-QUI-N-EXISTE-PAS-70-11' 'x')|$([ ! -e "$EKMOD" ] && echo identique || echo differe)" "ancre absente|identique"
 fi
 
