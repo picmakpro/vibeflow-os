@@ -349,7 +349,7 @@ echo alpha > "$B/active-workstream"
 printf -- '- [x] **RND-02**: recherche\n- [ ] **NEW-01**: neuf\n\n| RND-02 | Phase 1 | Complete |\n| NEW-01 | Phase 2 | Pending |\n' | wr "$B/workstreams/alpha/REQUIREMENTS.md"
 printf -- '- [x] **RND-02**: recherche\n- [x] **OLD-09**: autre phase\n\n| RND-02 | Phase 1 | Complete |\n| OLD-09 | Phase 5 | Complete |\n' | wr "$B/milestones/v0-REQUIREMENTS.md"
 graph "$LD" "$WORK/gd.json"
-assert_eq "R1.9 — DG-10 : RND-02 (vivant + archive, même phase) n'est lue qu'UNE fois (RND-02 sous ph-1, jamais en double) ; l'exigence propre à l'archive (OLD-09, phase 5 sans carte) reste comptée : 3 exigences dont 2 cochées" "$(G "$WORK/gd.json" 'j.files.filter(f=>f.p.startsWith("req/")).map(f=>f.name).sort().join(",")')|$(G "$WORK/gd.json" 'j.meta.vf.counts.reqs+"/"+j.meta.vf.counts.reqsDone')" "NEW-01,RND-02|3/2"
+assert_eq "R1.9 — DG-10 : RND-02 (vivant + archive, même phase) n'est lue qu'UNE fois dans meta.vf.trace.exigences (RND-02 de la phase 1, jamais en double) ; l'exigence propre à l'archive (OLD-09, phase 5 sans carte) reste comptée : 3 exigences dont 2 cochées (76-08)" "$(G "$WORK/gd.json" 'j.meta.vf.trace.exigences.map(e=>e.id).sort().join(",")+"|"+j.meta.vf.trace.exigences.filter(e=>e.id==="RND-02").map(e=>e.phase).join()')|$(G "$WORK/gd.json" 'j.meta.vf.counts.reqs+"/"+j.meta.vf.counts.reqsDone')" "NEW-01,OLD-09,RND-02|1|3/2"
 
 # R2 (lot 6 « Projet », étape PR2 « panneau de phase et visite », 2026-11-06 ; arbitrage Samuel, message direct en session principale, 2026-11-06 : toutes les propositions du panel) : PU-G-091, 092, 102, 103, 106, 107 (+ 104 côté moteur). Sans navigateur.
 echo "=== R2 — panneau de phase et visite : visite expliquée, mission vivante du jalon, texte propre, aucune répétition, exigence lisible ==="
@@ -413,7 +413,7 @@ const j=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')), n=j.node
 const a=n.summary.replace(/…\$/,''), b=d.replace(/^…/,''), g=process.env.GOAL.replace(/\\s+/g,' ').trim();
 console.log([n.summary.length<=401, b.length>0, (a+' '+b).replace(/\\s+/g,' ').trim()===g||(a+b).replace(/\\s+/g,' ').trim()===g, !d.startsWith(a.slice(0,40))].join(','))" "$WORK/gk.json")" "true,true,true,true"
 # PU-G-106 : l'exigence se lit sur sa carte
-assert_eq "R2.9 — PU-G-106 : le pied d'une carte d'exigence est la phrase de l'exigence, plus « REQUIREMENTS.md »" "$(G "$WORK/gk.json" 'j.files.filter(f=>f.n==="ph-2.req").map(f=>f.foot).join("|")')" "À 700 px, l'en-tête tient sur une rangée.|Le panneau garde une aide."
+assert_eq "R2.9 — PU-G-106 : le libellé d'une exigence (meta.vf.trace.exigences, phase 2) est sa phrase, jamais « REQUIREMENTS.md » (76-08)" "$(G "$WORK/gk.json" 'j.meta.vf.trace.exigences.filter(e=>e.phase==="2").map(e=>e.libelle).join("|")')" "À 700 px, l'en-tête tient sur une rangée.|Le panneau garde une aide."
 UIK="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
 assert_eq "R2.10 — PU-G-107 / PU-G-104 / PU-G-106 : 00-vibeflow.js pose l'aide de navigation AVANT « Maintenant », construit le repli « Détails techniques » à l'ouverture du panneau et marque les cartes dont le pied répète la description" "$(node -e "
 const s=require('fs').readFileSync(process.argv[1],'utf8');
