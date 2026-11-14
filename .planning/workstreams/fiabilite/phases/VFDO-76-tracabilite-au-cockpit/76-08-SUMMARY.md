@@ -72,3 +72,8 @@ Rouges connus qui ne sont pas à ce plan : F7.4a de frise, W24.4 de who, N5.1 de
 - Recoupement avec AUDC-I25 de la Phase 80 (liste « à cocher » des exigences) : la porte rebranchée rend la même liste (R76.2a, PL2.2) ; rien à rouvrir.
 - Collision avec la 77 sur le `return` de `construireGraphe` (`lastDesc`) : non touchée ici.
 - Un lecteur de Projet ajouté par la 77 se revalide à son exécution (R76.3, R76.4 sur son propre diff).
+
+## Suite du mandat (manager de la Phase 76)
+
+- Négatif de la 76 : le motif `couvre` devient le mot entier `\bcouvre\b` (plan, verify et fails_when ; décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée, prise par le manager de la Phase 76 le 2026-11-14). Rejoué sur `ui/41-vf-projet-*.js` : 0 occurrence dans les huit fichiers. Témoin positif sur une copie jetable hors du dépôt, un lien `l.label === 'couvre'` réintroduit : vu (ligne 98 de la copie).
+- `scripts/tests/test-ci-shard-suites.sh` C5 et MUT-3 : verte sur 82aab6cc (242 suites, 22 PASS), rouge sur notre tête (253 suites). Les durées de nos huit suites 76 sont déjà mesurées ; les remplacer par les secondes des SUMMARY de 76-01 à 76-09 ou par d'autres valeurs documentées (cinq combinaisons essayées) laisse le dépassement à +1 ou +2 s (max 1213 à 1217 contre une borne de 1211 à 1216) : le dépassement ne vient pas de nos durées mais des suites des phases 73, 74, 75, 79 et 80, sans durée dans la table (défaut 7 s), que le mandat interdit de toucher. Aucun changement du fichier ; à lever par une remesure des durées de ces phases.
