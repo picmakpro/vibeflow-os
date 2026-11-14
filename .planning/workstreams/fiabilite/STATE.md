@@ -32,6 +32,8 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
+Phase: toutes les phases du jalon fusionnées dans integration/cockpit-audit ; passe finale v2.77.0 faite (PR vers integration/cockpit-audit)
+
 Toutes les phases du jalon (cockpit-audit, Phases 67-81 hors 81) sont fusionnées dans `integration/cockpit-audit`, puis la passe finale est faite (branche `fix/passe-finale-v2.77.0`, PR à venir vers `integration/cockpit-audit`). La suite est la fusion vers `release/v2.77.0`, puis la recette de Samuel. Rapport : `.planning/missions/2026-11-14-passe-finale-v2.77.0.md` ; mineurs : un seul sujet du BACKLOG.
 
 Compteurs (recomptés au ROADMAP le 2026-11-14) : 8 phases sur 16 cochées (50 %) ; 172 plans sur 172 cochés (100 %). Les cases des Phases 73 à 77, 79 et 80 restent décochées au ROADMAP : leurs plans sont tous exécutés et fusionnés, la case suit la publication. La Phase 81 est reportée (`AUDC-Q3`, 2026-11-11), sans plan.
