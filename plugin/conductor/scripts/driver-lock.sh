@@ -99,7 +99,7 @@
 # compartiment du disque, puis tout verrou de compartiment present sous le dossier commun sans dossier
 # de compartiment. Chaque entree est la ligne de status de CE verrou (ttl compris pour une entree
 # presente). Un nom de dossier ecarte par vf_ws_name_valid n'entre jamais dans le JSON : il est
-# compte sur stderr. --all n'est accepte que par status ; avec --ws ou --depot en lab partitionne
+# compte sur stderr. --all n'est accepte que par status et registry ; avec --ws ou --depot en lab partitionne
 # -> ws-invalid. Mode verrou unique : exactement la sortie de status.
 # REGISTRE PAR VERROU (P57-D-31) : en lab partitionne le registre des agents est le frere du verrou
 # resolu (vf-driver/ws/<sujet>/DRIVER.lock.children.jsonl) ; VF_DRIVER_CHILDREN n'est honoree qu'en
@@ -168,7 +168,7 @@ done
 
 # --all n'est accepte que par status et registry (P57-D-31, P79-D-17) : message d'usage sur stderr, rien sur stdout, exit 1.
 if [ "$ALL" = 1 ] && [ "$ACTION" != status ] && [ "$ACTION" != registry ]; then
-  echo "Usage: $0 status --all (--all n'est accepte que par status)" >&2
+  echo "Usage: $0 status|registry --all (--all n'est accepte que par status et registry)" >&2
   exit 1
 fi
 

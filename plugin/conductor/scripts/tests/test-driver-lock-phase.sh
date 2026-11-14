@@ -240,7 +240,7 @@ o="$(dl "$LA" sA registry --all --ws=alpha)"
 assert "PH-ARC.7 registry --all --ws refuse (ws-invalid)" "$o" '"error": "ws-invalid"'
 o="$(dl "$LA" sA orphans --all 2>&1)"; r=$?
 assert_exit "PH-ARC.7 orphans --all garde son refus d'usage (exit 1)" "$r" 1
-assert "PH-ARC.7 message d'usage de --all" "$o" "--all n'est accepte que par status"
+assert "PH-ARC.7 message d'usage de --all" "$o" "--all n'est accepte que par status et registry"
 LFA="$(mk_flat flatarc)"
 dl "$LFA" sA acquire --owner=mgrF --step=s >/dev/null
 dl "$LFA" sA register --agent=agf --role=vf-coder --node=nf >/dev/null
