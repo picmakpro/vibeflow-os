@@ -50,7 +50,7 @@ mklab() {
 - [x] **REQ-11**: Exigence complète du socle (P90-D-01, ADR-001, D-04, P95-D-09)
 - [ ] **REQ-12**: Exigence au SUMMARY illisible
 - [ ] **REQ-13**: Exigence sans SUMMARY mais avec sa ligne de traçabilité
-- [ ] **REQ-14**: Exigence sans SUMMARY et sans ligne de traçabilité
+- [ ] **REQ-14**: Exigence sans SUMMARY et sans ligne de traçabilité MARQ-EXIG-76
 - [ ] **REQ-15**: Troisième exigence sans SUMMARY
 - [x] **REQ-16**: Exigence cochée sans SUMMARY
 - [ ] **REQ-17**: Exigence Complete sans plan
@@ -178,8 +178,8 @@ assert_eq "C2.7 — exigence retirée du registre puis relue : « Cet objet n'ex
 assert_eq "C2.x — aucune section du second harnais n'a échoué par erreur de harnais" "$(E2 'JSON.stringify(j.erreurs)')" "{}"
 # export : ni le texte d'une exigence, ni celui d'un critère, ni la ligne d'une exigence ; témoin positif : ils sont dans les fichiers du lab et dans le panneau (C2.6a)
 cockpit_exporter "$LAB" "$WORK/export.html" > "$WORK/export.out" 2>&1
-assert_eq "C2.6b — l'export existe et ne porte ni le texte d'une exigence (REQ-501, REQ-14) ni celui d'un critère (XSS-CRIT-76) (le code de la 76 y est, inactif sans FLOORPLAN_SERVER)" "$([ -s "$WORK/export.html" ] && echo "$(grep -c 'onerror=' "$WORK/export.html")|$(grep -c 'XSS-CRIT-76' "$WORK/export.html")" || echo vide)" "0|0"
-assert_eq "C2.6c — témoin positif : les marqueurs sont dans les fichiers du lab" "$(grep -c 'onerror=' "$LAB/.planning/workstreams/x/REQUIREMENTS.md")|$(grep -c 'XSS-CRIT-76' "$LAB/.planning/workstreams/x/phases/05-cinq/05-01-PLAN.md")" "1|1"
+assert_eq "C2.6b — l'export existe et ne porte ni le texte d'une exigence (REQ-501, REQ-14) ni celui d'un critère (XSS-CRIT-76) ; marqueur propre au texte d'une exigence : MARQ-EXIG-76 (le code de la 76 y est, inactif sans FLOORPLAN_SERVER)" "$([ -s "$WORK/export.html" ] && echo "$(grep -c 'onerror=' "$WORK/export.html")|$(grep -c 'XSS-CRIT-76' "$WORK/export.html")|$(grep -c 'MARQ-EXIG-76' "$WORK/export.html")" || echo vide)" "0|0|0"
+assert_eq "C2.6c — témoin positif : les marqueurs sont dans les fichiers du lab" "$(grep -c 'onerror=' "$LAB/.planning/workstreams/x/REQUIREMENTS.md")|$(grep -c 'XSS-CRIT-76' "$LAB/.planning/workstreams/x/phases/05-cinq/05-01-PLAN.md")|$(grep -c 'MARQ-EXIG-76' "$LAB/.planning/workstreams/x/REQUIREMENTS.md")" "1|1|1"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
