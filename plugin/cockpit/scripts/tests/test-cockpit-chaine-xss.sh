@@ -18,6 +18,7 @@
 # mutants de CSP et de garde ; le maillon « échappement » est ici le rendu en textContent des fichiers 77 (M-GIT-TEXTE : innerHTML dans la copie de la sortie).
 #   C0g témoin (M-GIT-TEXTE + M-CSP + M-GARDE) -> la chaîne ABOUTIT · C1g code livré : rien n'aboutit · C2g textContent seul · C3g CSP seule · C4g garde seule
 # Sans navigateur le volet git est SAUTÉ et compté comme tel (jamais réussi) : une donnée git ne se rend que dans une page.
+# Volet ACTIVITÉ (Phase 75, ACTV-12) : chemin de fichier, nom de branche, rôle et description d'agent hostiles ; voir le volet plus bas (C0a à C4a, Q1.2).
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -118,6 +119,8 @@ mutant() {
     M-CSP) sed -i.bak "s#res.setHeader('Content-Security-Policy'#res.setHeader('X-Mutant-Csp'#g" "$sv" ;;
     M-GIT-TEXTE) cockpit_page_muter_dans "$MUT_MOD" "s#if (txt != null) e.textContent = String(txt);#if (txt != null) e.innerHTML = String(txt);#; s#corpsMsg.textContent = m.length#corpsMsg.innerHTML = m.length#" 2>/dev/null
       [ "$(pages_mod | grep -c 'e.innerHTML = String(txt);')" = 1 ] && [ "$(pages_mod | grep -c 'corpsMsg.innerHTML = m.length')" = 1 ] || { echo "  ❌ mutant M-GIT-TEXTE incomplet dans les sources de page du module" >&2; return 1; } ;;
+    M-TEXTE-ACT) cockpit_page_muter_dans "$MUT_MOD" "s#if (txt !== undefined) e.textContent = txt;#if (txt !== undefined) e.innerHTML = txt;#" 2>/dev/null
+      [ "$(pages_mod | grep -c 'e.innerHTML = txt;')" -ge 1 ] || { echo "  ❌ mutant M-TEXTE-ACT incomplet dans les sources de page du module" >&2; return 1; } ;;
     M-GARDE) sed -i.bak "s#const dir = engineDirFromLauncher();#let dir; try { dir = JSON.parse(fs.readFileSync(path.join(here, '.cache', 'skill.json'), 'utf8')).dir; } catch {}#; s#^try { fs.rmSync(path.join(here, '.cache', 'skill.json')#if (false) try { fs.rmSync(path.join(here, '.cache', 'skill.json')#" "$sv" ;;
   esac
   after="$({ cat "$sv"; pages_mod; } | cksum)"
@@ -334,6 +337,142 @@ echo "=== C4g — garde .cache SEULE (rendu en innerHTML et CSP retirés) : le s
 manche_g gardeg M-GIT-TEXTE M-CSP
 assert_eq "C4g.1 — témoin : la charge est dans le DOM (rendu en innerHTML, CSP retirée)" "$(oui_non "$R_CHARGES")" "oui"
 assert_eq "C4g.2 — maillon rompu : le script désigné par le lab n'est PAS exécuté (le moteur ne lit plus .cache/skill.json)" "$R_MARQUEUR" "non"
+fi
+fi
+
+# ============================== Volet ACTIVITÉ (Phase 75, ACTV-12) ==============================
+# Les DONNÉES d'activité (nom de fichier, nom de branche, rôle et description d'agent) traversent la route /api/vf/activite, le canal de marques, la marque, l'infobulle, le nom accessible,
+# le panneau, le compte du radar et la zone d'annonce. Même chaîne (script dans la page -> jeton -> POST /api/plan/undo -> script du lab), même faux moteur, mêmes mutants de CSP et de garde ;
+# le maillon « échappement » est ici le rendu en textContent du canal de marques (M-TEXTE-ACT : innerHTML dans la copie de la sortie).
+#   C0a témoin (M-TEXTE-ACT + M-CSP + M-GARDE) -> la chaîne ABOUTIT · C1a code livré : rien n'aboutit · C2a textContent seul · C3a CSP seule · C4a garde seule
+# Sans navigateur le volet est SAUTÉ et compté comme tel (jamais réussi). Mutant étiqueté « Q1.2 » : l'innerHTML dans la marque rend X1 rouge (Q1.2 = C0a rouge sur le code livré muté).
+if [ "${CHAINE_SEUL:-}" != "temoin" ]; then
+echo "=== Volet activité — données d'activité hostiles : C0a à C4a ==="
+if [ -z "$CHROME" ]; then skip "C0a à C4a (volet activité)" "pas de navigateur : une donnée d'activité ne se rend que dans une page"; else
+GA() { git -c user.email=t@t.test -c user.name=t "$@"; }
+PAYLOAD_JS_A="fetch('/api/plan/undo',{method:'POST',headers:{'x-vf-cockpit-token':VF_COCKPIT_SERVER.token}})"
+ATOB_A="eval(atob('$(printf '%s' "$PAYLOAD_JS_A" | base64 | tr -d '\n')'))"
+FICHIER_H="h<img src=x onerror=console.info(1)>.js";   # court : une cible de plus de 120 caractères est coupée par « … » et ne se joint plus à sa carte (P75-D-31) ; la charge qui s'exécute vit dans la branche, le rôle et le fichier prévu
+ BRANCHE_A="<svg/onload=$ATOB_A>"; ROLE_A="<img src=x onerror=$ATOB_A>"; TITRE_A="<img src=x onerror=$ATOB_A> __proto__"
+PREVU_H="src/p<img src=x onerror=$ATOB_A>.mjs"
+LABX="$WORK/labx"; mkdir -p "$LABX/src" "$LABX/plugin/demo" "$LABX/.planning/phases/01-x" "$LABX/evil/scripts"
+printf '{"name":"demo","version":"1.0.0"}\n' > "$LABX/plugin/demo/module.json"; printf '1.0.0\n' > "$LABX/plugin/demo/VERSION"
+printf 'export const util = () => 1;\n' > "$LABX/src/util.js"; printf 'export const a = 1;\n' > "$LABX/src/$FICHIER_H"
+printf 'export const p = 1;\n' > "$LABX/src/__proto__.js"; printf 'export const s = 1;\n' > "$LABX/src/x$(printf '\xe2\x80\xa8')y.js"
+printf -- '- [ ] **Phase 1: Socle** - premier jet\n' > "$LABX/.planning/ROADMAP.md"
+for n in 01 02; do printf -- '---\nphase: 1\nplan: "%s"\nwave: 1\nfiles_modified:\n  - %s\n---\n<objective>Faire le socle</objective>\n' "$n" "$PREVU_H" > "$LABX/.planning/phases/01-x/01-$n-PLAN.md"; done
+for s in plan build; do printf "import fs from 'node:fs'; fs.writeFileSync(%s,'executé par le serveur');\n" "'$WORK/MARQUEUR-SCRIPT-DU-LAB'" > "$LABX/evil/scripts/$s.mjs"; done
+GA -C "$LABX" init -q -b main; printf '.vibeflow\n' >> "$LABX/.git/info/exclude"; GA -C "$LABX" add -A; GA -C "$LABX" commit -q -m init
+for k in 1 2 3; do printf '// r%s\n' "$k" >> "$LABX/src/$FICHIER_H"; printf '// r%s\n' "$k" >> "$LABX/src/__proto__.js"; GA -C "$LABX" commit -q -am "c$k"; done
+node "$SCRIPTS/vf-cockpit-build.mjs" "$LABX" --quiet > "$WORK/build-x.out" 2>&1 || cat "$WORK/build-x.out"
+cat > "$AUX/mkroute.mjs" <<'JS'
+// mkroute.mjs <route.json> <fichier> <rôle> <description> : la vraie route du lab, à laquelle on ajoute une marque d'empreinte et une collision d'agents dont le rôle et la description sont hostiles
+// (la frise d'un vrai agent demande l'état officiel de `claude agents --json` : la page reçoit donc ces tuples par la même forme de route, poussée par l'amorce de la page)
+import fs from 'node:fs';
+const [, , f, fichier, role, desc] = process.argv; const j = JSON.parse(fs.readFileSync(f, 'utf8'));
+j.empreinte = { ...j.empreinte, etat: 'ok', incomplet: false, marques: [[fichier, 'en-cours', [role + ' · nœud ' + desc, desc + ' · non rattaché']]] };
+j.collisions = [...(j.collisions || []), [fichier, 'agents', [role, desc], null]];
+j.radar = { ...j.radar, total: (j.radar?.total || 0) + 1, incomplet: false, raisons: [] };
+process.stdout.write(JSON.stringify(j));
+JS
+cat > "$AUX/activite.mjs" <<'JS'
+// activite.mjs <chrome> <racine> : ouvre la page sous CSP, va sur le nœud qui porte le fichier hostile, choisit chaque lentille, relève le DOM
+// rend { charges, lentilles: { <id>: { marques, noms, panneau, compte, annonce } }, violations }
+import { pathToFileURL } from 'node:url';
+const { executer, pause } = await import(pathToFileURL(process.env.CHROME_SESSION).href);
+const [, , chrome, racine, routeJson] = process.argv;
+const fs = await import('node:fs');
+const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout && document.documentElement.dataset.vfPret === 'oui'";
+const SANS_VISITE = "(() => { const g = Storage.prototype.getItem; Storage.prototype.getItem = function (k) { const v = typeof k === 'string' && (k.indexOf('floorplan:tour-seen:') === 0 || k.indexOf('vibeflow-cockpit:visite:') === 0); return v ? 'true' : g.call(this, k); }; })()";
+const CHARGES = "document.querySelectorAll('[onerror], [onload], [onfocus], img[src=x], svg[onload]').length";
+await executer(chrome, async (s) => {
+  const STUB = `(() => { const d = ${fs.readFileSync(routeJson, 'utf8')}; const f0 = window.fetch; window.fetch = function (u, o) { return String(u).includes('/api/vf/activite') ? Promise.resolve(new Response(JSON.stringify(d), { status: 200, headers: { 'content-type': 'application/json' } })) : f0.apply(this, arguments); }; })()`;
+  await s.send('Page.addScriptToEvaluateOnNewDocument', { source: SANS_VISITE + ';' + STUB });
+  await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await s.naviguer(racine + '/index.html?lang=fr'); await s.attendre(PRET, 'page prête');
+  await s.ev("(() => { const t = document.querySelector('#tour'); if (t && !t.hidden) document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' })); })()");
+  await s.attendre("!!document.getElementById('btn-lentilles')", 'sélecteur posé'); await pause(1500);
+  const aller = async (id) => { await s.ev(`VibeFlow.go(${JSON.stringify(id)})`); try { await s.attendre(`VibeFlow.state.container === ${JSON.stringify(id)} && !!document.querySelector('#viewport .node')`, `vue ${id}`, 8000); } catch { return false; } await pause(600); return true; };
+  const cles = () => s.ev("JSON.stringify([...VibeFlow.state.chipEls.keys()])").then(JSON.parse);
+  let trouve = null;
+  for (const n of (await cles()).filter((k) => k.startsWith('n:')).sort((a, b) => (a === 'n:unassigned' ? -1 : b === 'n:unassigned' ? 1 : 0))) {
+    if (!(await aller(n))) continue; const c = await cles();
+    if (c.some((k) => k.startsWith('f:') && /onerror/.test(k))) { trouve = c.find((k) => k.startsWith('f:') && /onerror/.test(k)); break; }
+    const d = c.filter((k) => k.startsWith('d:'));
+    for (const x of d) { if (!(await aller(x))) continue; const cc = await cles(); const f = cc.find((k) => k.startsWith('f:') && /onerror/.test(k)); if (f) { trouve = f; break; } }
+    if (trouve) break;
+  }
+  const lentilles = {};
+  if (trouve) for (const id of ['chauds', 'empreinte', 'gardes']) {
+    await s.ev("(() => { const m = document.getElementById('lens-menu'); if (!m.classList.contains('open')) document.getElementById('btn-lentilles').click(); })()"); await pause(150);
+    await s.ev(`document.querySelector('#lens-menu .lr[data-id="${id}"]').click()`); await pause(900);
+    await s.ev(`VibeFlow.select(${JSON.stringify(trouve)})`); await pause(700);
+    lentilles[id] = await s.ev(`(() => { const g = VibeFlow.state.chipEls.get(${JSON.stringify(trouve)}); const lm = g ? [...g.querySelectorAll('.lm')] : [];
+      return { marques: lm.map((x) => [x.textContent, x.getAttribute('title') || '']), nom: g ? g.getAttribute('aria-label') : null, panneau: document.getElementById('panel').textContent,
+        compte: [...document.querySelectorAll('.vfa-compte')].map((x) => x.textContent + '|' + (x.title || '')), annonce: (document.getElementById('ask-live') || {}).textContent || '', charges: ${CHARGES} }; })()`);
+    await s.ev('VibeFlow.select(null)');
+  }
+  return { trouve: !!trouve, charges: await s.ev(CHARGES), lentilles, violations: [...s.violations] };
+}, { csp: true });
+JS
+# manche_a <étiquette> <mutants…> : copie du lab, agents, module muté, serveur, page, effets
+manche_a() {
+  local label="$1"; shift
+  local L="$WORK/labx-$label"; rm -rf "$L"; cp -R "$LABX" "$L"; local o="$L/.vibeflow/cockpit"
+  MUT_OUT="$o"; rm -rf "$WORK/mod-a-$label"; MUT_MOD="$(cockpit_module_copie "$WORK/mod-a-$label")" || { R_CHARGES="copie-du-module-impossible"; return; }
+  mkdir -p "$o/.cache/history/a"; printf '{"dir":"%s"}\n' "$LABX/evil" > "$o/.cache/skill.json"; printf '{}\n' > "$o/.cache/history/a/plan.json"; rm -f "$o/.cache/server.json"
+  local i=0 b wt   # deux worktrees vérifiés dont les branches modifient le même fichier : la collision « branches » porte le nom hostile
+  for b in "$BRANCHE_A" zz; do i=$((i+1)); wt="$WORK/wt-$label-$i"; rm -rf "$wt"; GA -C "$L" worktree add -q -b "$b" "$wt" main && { printf '// %s\n' "$i" >> "$wt/src/$FICHIER_H"; GA -C "$wt" commit -q -am b; }; done
+  local m; for m in "$@"; do mutant "$o" "$m" || { R_CHARGES="mutant-sans-effet"; return; }; done
+  rm -f "$WORK/MARQUEUR-SCRIPT-DU-LAB"
+  COCKPIT_MODULE="$MUT_MOD" COCKPIT_SORTIE="$o" COCKPIT_LOG="$WORK/serve-a-$label.out" cockpit_lancer "$L" VF_COCKPIT_ENGINE_DIR="$MUT_MOD/skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$MUT_MOD/scripts" || true
+  local pid="$VF_PID" fin=$((SECONDS + 60))
+  while [ "$SECONDS" -lt "$fin" ]; do   # la route lit git et la frise hors de la requête : on attend un état lu
+    cockpit_get /api/vf/activite > "$WORK/route-a.json"
+    [ "$(node -e "const j=JSON.parse(require('fs').readFileSync('$WORK/route-a.json','utf8'));console.log(j.git.etat==='ok'&&j.calcul==='pret'&&j.empreinte.etat==='ok'&&j.collisions.length>0)" 2>/dev/null)" = "true" ] && break; sleep 0.4
+  done
+  R_ROUTE="$(node -e "const j=JSON.parse(require('fs').readFileSync('$WORK/route-a.json','utf8'));const t=JSON.stringify(j);console.log([j.git.etat,j.collisions.length>0,/onerror=eval/.test(t),/svg\/onload=eval/.test(t)].join('|'))" 2>/dev/null || echo illisible)"
+  node "$AUX/mkroute.mjs" "$WORK/route-a.json" "src/$FICHIER_H" "$ROLE_A" "$TITRE_A" > "$WORK/route-patch.json"
+  local res; res="$(REAL_HOME="$REAL_HOME" node "$AUX/activite.mjs" "$CHROME" "http://127.0.0.1:$VF_PORT" "$WORK/route-patch.json")"
+  local want=""; case "$label" in temoina) want=marq ;; esac
+  fin=$((SECONDS + ${VF_CDP_ECHEANCE_S:-60}))
+  while [ "$SECONDS" -lt "$fin" ]; do [ -z "$want" ] && break; [ -f "$WORK/MARQUEUR-SCRIPT-DU-LAB" ] && break; sleep 0.2; done
+  sleep 1; vf_hyg_stop "$pid"
+  R_RES="$res"; R_CHARGES="$(printf '%s' "$res" | jq_ 'j.charges')"; R_TROUVE="$(printf '%s' "$res" | jq_ 'j.trouve')"; R_VIOL="$(printf '%s' "$res" | jq_ '(j.violations||[]).length')"
+  R_MARQUEUR=non; [ -f "$WORK/MARQUEUR-SCRIPT-DU-LAB" ] && R_MARQUEUR=oui
+  echo "     [$label] mesure : route=$R_ROUTE trouvé=$R_TROUVE charge-dans-le-DOM=$R_CHARGES violations=$R_VIOL script-du-lab-exécuté=$R_MARQUEUR ${res:0:120}"
+}
+oui_non() { [ "${1:-0}" -ge 1 ] 2>/dev/null && echo oui || echo non; }
+
+echo "=== C0a — témoin : rendu en innerHTML (M-TEXTE-ACT), CSP neutralisée (M-CSP), garde retirée (M-GARDE) : la chaîne doit ABOUTIR ==="
+manche_a temoina M-TEXTE-ACT M-CSP M-GARDE
+assert_eq "C0a.1 — le nom du fichier, le rôle ou la branche deviennent des éléments à gestionnaire d'événement dans la page" "$(oui_non "$R_CHARGES")" "oui"
+assert_eq "C0a.2 — le script désigné par le lab a été exécuté par POST /api/plan/undo : le marqueur existe (sinon la chaîne d'activité est aveugle)" "$R_MARQUEUR" "oui"
+echo "=== C1a — code livré : une donnée d'activité hostile n'aboutit nulle part ==="
+manche_a livrea
+assert_eq "C1a.0 — témoins de la VRAIE route : git lu, des collisions, le plan prévu et la branche hostiles servis tels quels (le lab n'est pas anodin)" "$R_ROUTE" "ok|true|true|true"
+assert_eq "C1a.1 — aucun élément à gestionnaire dans la page, quelle que soit la lentille (textContent)" "$R_CHARGES|$(printf '%s' "$R_RES" | jq_ 'Object.values(j.lentilles).map((l) => l.charges).join(",")')" "0|0,0,0"
+assert_eq "C1a.2 — aucun script du lab exécuté" "$R_MARQUEUR" "non"
+assert_eq "C1a.3 — la page fonctionne sous la CSP (la carte du fichier est trouvée, 0 violation)" "$R_TROUVE|$R_VIOL" "true|0"
+assert_eq "C1a.4 — le texte hostile apparaît LITTÉRALEMENT : le rôle dans la marque et son infobulle, le nom accessible de la carte (début du nom, coupé comme le moteur le coupe), le fichier et le rôle dans le panneau, le rôle et la branche dans le panneau" \
+  "$(printf '%s' "$R_RES" | jq_ '(() => { const e = j.lentilles.empreinte, h = /onerror=eval\(atob\(/; const tous = Object.values(j.lentilles).map((l) => l.panneau).join(" ");
+    return [e.marques.some((m) => h.test(m[0]) || h.test(m[1])), /<img/i.test(e.nom || ""), /onerror=console\.info\(1\)/.test(e.panneau) && h.test(e.panneau), /svg\/onload=eval/.test(tous)]; })()')" "[true,true,true,true]"
+assert_eq "C1a.5 — le compte du radar et la zone d'annonce ne portent aucune balise (texte seul)" "$(printf '%s' "$R_RES" | jq_ 'Object.values(j.lentilles).every((l) => l.compte.every((c) => !/[<>]/.test(c)) && !/[<>]/.test(l.annonce))')" "true"
+echo "=== C2a — textContent SEUL (CSP et garde retirées) ==="
+manche_a texte M-CSP M-GARDE
+assert_eq "C2a.1 — maillon rompu : 0 élément à gestionnaire dans la page" "$R_CHARGES" "0"
+assert_eq "C2a.2 — aucun script du lab exécuté (la carte du fichier est pourtant trouvée)" "$R_MARQUEUR|$R_TROUVE" "non|true"
+echo "=== C3a — CSP SEULE (rendu en innerHTML et garde retirés) : la balise existe, son code ne s'exécute pas ==="
+manche_a cspa M-TEXTE-ACT M-GARDE
+assert_eq "C3a.1 — témoin : la charge est bien dans la page (le rendu est en innerHTML)" "$(oui_non "$R_CHARGES")" "oui"
+assert_eq "C3a.2 — maillon rompu : aucun script du lab exécuté (la CSP bloque le gestionnaire)" "$R_MARQUEUR" "non"
+echo "=== C4a — garde .cache SEULE (rendu en innerHTML et CSP retirés) : le script part, mais celui du lab n'est PAS exécuté ==="
+manche_a gardea M-TEXTE-ACT M-CSP
+assert_eq "C4a.1 — témoin : la charge est dans la page (rendu en innerHTML, CSP retirée)" "$(oui_non "$R_CHARGES")" "oui"
+assert_eq "C4a.2 — maillon rompu : le script désigné par le lab n'est PAS exécuté (le moteur ne lit plus .cache/skill.json)" "$R_MARQUEUR" "non"
+echo "=== Q1.2 — mutant « innerHTML dans la marque » (CSP et garde livrées) : le volet doit le VOIR rouge ==="
+manche_a mutantmarque M-TEXTE-ACT
+assert_eq "Q1.2 — mutant « innerHTML dans la marque » : rouge (la charge entre dans la page : C1a.1 rougirait)" "$(oui_non "$R_CHARGES")|$R_MARQUEUR" "oui|non"
 fi
 fi
 
