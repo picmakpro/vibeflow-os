@@ -307,3 +307,20 @@ rg_RG17_titre() {
   q_ok "RG17.41 — navigateur : « (4) vous attendent » avec un agent et les trois questions, icône en data:image/svg+xml ; « (1) vous attend » avec les seules décisions appliquées et le même agent ; sans agent : aucun préfixe, icône d'origine ; focus non déplacé" "$o" \
     '[/^\(4\) vous attendent · /.test(j.quatre), j.icone4.startsWith("data:image/svg+xml"), /^\(1\) vous attend · /.test(j.un), !/^\(/.test(j.zero), j.hrefZero === j.hrefOrigine, j.focus].join("|")' "true|true|true|true|true|vf-t-focus"
 }
+
+# ---------- correctifs de revue du point de fusion 2 (source de la régie, 73-05) ----------
+rg_RG17_revue() {
+  local o SID=s0000000-aaaa-bbbb-cccc-111111111111
+  # R1 : une ancre n:se-<id> reçue avant le who est tenue, puis consommée au premier rendu où la ligne existe (défilement et focus), jamais un toast
+  o="$(q_sc '{mode:"page", page:{onglet:"equipe", source:"live", who:null, lock:null, etapes:[{"nom":"a","appel":"__vfRegie.arriver","args":["n:se-'$SID'"]},
+    {"nom":"autre","appel":"__vfRegie.arriver","args":["n:xx-1"]},{"poser":{"who":'"$Q_WHO"'}},{"nom":"f","obs":{"mode":"focus"}},{"nom":"d","obs":{"mode":"compte","sel":"li[data-vf-cle]"}}]}}')"
+  q_ok "RG17.R1 — ancre à froid : arriver rend true avant le montage des lignes, la ligne reçoit le focus quand le who arrive ; une ancre d'une autre forme rend false" "$o" \
+    '[j.out.a, j.out.autre, j.out.f.cle, j.out.d > 0].join("|")' "true|false|a-vous:$SID|true"
+  # R2 : le bouton « Tout marquer comme relu » qui porte le focus quitte la page : le focus va au titre de « Terminé, à relire »
+  # R3 : il marque tous les rapports à relire, pas les seuls huit affichés
+  local W12='{workers:[{kind:"session",id:"'$SID'",etat:"actif",titre:"Atelier",tree:".",ageS:5,dureeS:900}, ...Array.from({length:12},(_, i) => ({kind:"subagent",id:"a" + String(i).padStart(11,"0"),etat:"termine",parent:"'$SID'",role:"vf-reviewer",task:"Relire " + i,ageS:600 + i,dureeS:90,tree:"."}))]}'
+  o="$(q_sc '{mode:"page", lu:true, page:{onglet:"equipe", source:"live", who:'"$W12"', lock:null, etapes:[{"nom":"b0","obs":{"mode":"compte","sel":"[data-vf-tout]"}},
+    {"focus":"[data-vf-tout]"},{"clic":"[data-vf-tout]"},{"nom":"n","appel":"__tmCompte","args":[]},{"nom":"b1","obs":{"mode":"compte","sel":"[data-vf-tout]"}},{"nom":"f","obs":{"mode":"focus"}}]}}')"
+  q_ok "RG17.R2 — le bouton « Tout marquer comme relu » retiré alors qu'il porte le focus : le focus va au titre de la section « Terminé, à relire », jamais à body" "$o" '[j.out.b0, j.out.b1, j.out.f.tag, j.out.f.section].join("|")' "1|0|H2|a-relire"
+  q_ok "RG17.R3 — « Tout marquer comme relu » marque les douze rapports à relire, pas les huit affichés" "$o" 'j.out.n' "12"
+}

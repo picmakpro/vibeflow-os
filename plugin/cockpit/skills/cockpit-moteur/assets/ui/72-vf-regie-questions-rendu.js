@@ -141,7 +141,8 @@
       const racine = e.key === 'Escape' && t && t.closest ? t.closest('section#vf-equipe') : null;
       if (!racine) return;
       // l'événement toggle arrive après coup : un repli ouvert à l'instant se retrouve aussi dans le DOM
-      const d = tampon.slice().reverse().find((x) => x.isConnected && ouvert(x)) || [...racine.querySelectorAll('details[data-vf-repli]')].reverse().find(ouvert);
+      const d = tampon.slice().reverse().find((x) => x.isConnected && ouvert(x))
+        || [...racine.querySelectorAll('details[data-vf-repli]')].reverse().find(ouvert);
       if (!d) return; // garde:q-echap-rien
       d.open = false; d.removeAttribute('open'); suivre(d);
       const s = d.querySelector('summary'); if (s) s.focus({ preventScroll: true });

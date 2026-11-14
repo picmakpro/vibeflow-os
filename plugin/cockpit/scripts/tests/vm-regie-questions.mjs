@@ -20,6 +20,7 @@ if (S.mode === 'page') {
   const tmp = fs.mkdtempSync(path.join(process.env.TMPDIR || os.tmpdir(), 'vmq-'));
   const setup = path.join(tmp, 'setup.js');
   fs.writeFileSync(setup, `(() => { const G = window.Floorplan.graph; G.meta.vf = G.meta.vf || {}; ${S.questions === undefined ? '' : `G.meta.vf.questions = ${JSON.stringify(S.questions)};`}
+    ${S.lu ? "window.__vfRegieLu = { lus: () => new Set(window.__lus || []), marquer() {}, toutMarquer(ids) { window.__lus = [...(window.__lus || []), ...ids]; window.__tm = ids; } }; window.__tmCompte = () => (window.__tm || []).length;" : ''}
     window.__poserQuestions = (v) => { window.Floorplan.graph.meta.vf.questions = v; window.__vfRegieQuestions.relire(); };
     window.__ouvrir = (sel, ouvert) => { const d = document.querySelector(sel); d.open = !!ouvert; if (ouvert) d.setAttribute('open', ''); else d.removeAttribute('open'); d.dispatchEvent(new window.Event('toggle')); }; })();`);
   const ordre = fs.readdirSync(ui).filter((f) => /^(71-vf-equipe-rendu|72-vf-regie-(modele|pied|questions-[a-z]+|rendu|source))\.js$/.test(f)).sort();

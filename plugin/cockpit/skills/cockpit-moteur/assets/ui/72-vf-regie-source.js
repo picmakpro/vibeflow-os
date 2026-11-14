@@ -5,6 +5,7 @@
 (() => {
   const W = window, D = document, CLE = '72-vf-regie-source.js', CLE_VUE = 'vibeflow-cockpit:equipe-vue', DELAI_COUPE = 15000;
   const vues = [{ id: 'regie', libelle: 'Régie' }];
+  let attente = null; // ancre n:se-… / n:ag-… reçue avant le montage ou avant l'arrivée du who : consommée au premier rendu où la ligne existe
   let monte = null; // le montage de l'onglet courant : jamais gardé d'une exécution à l'autre (la clé sessionStorage est la seule mémoire)
 
   // ---------- registre des vues : la Phase 74 s'y déclare (frise) ----------
@@ -90,16 +91,21 @@
       if (recherche) ui.filtrer(recherche.value);
       P.maj({ direct: !sansDirect, aucun: !!m.etatPage, sources: who && who.sources, coupe: fige !== null ? (fige - recuA) / 1000 : null });
       toutMarquer(m);
+      if (attente && ancre(attente.id, attente.kind)) attente = null;
     };
     const toutMarquer = (m) => { // « Tout marquer comme relu » : seulement si le module « lu » existe, dès trois lignes à relire (jamais de bouton mort)
-      const lu = W.__vfRegieLu, ids = m.sections[2].lignes.map((l) => l.id), tete = ui.titre('a-relire') && ui.titre('a-relire').parentNode;
+      const lu = W.__vfRegieLu, ids = m.sections[2].ids || m.sections[2].lignes.map((l) => l.id);
+      const tete = ui.titre('a-relire') && ui.titre('a-relire').parentNode;
       if (lu && typeof lu.toutMarquer === 'function' && ids.length >= 3 && tete) {
         if (!tm) {
           tm = D.createElement('button'); tm.className = 'btn'; tm.setAttribute('type', 'button'); tm.setAttribute('data-vf-tout', ''); tete.append(tm);
         }
         if (tm.textContent !== 'Tout marquer comme relu') tm.textContent = 'Tout marquer comme relu';
         tm._ids = ids;
-      } else if (tm) { tm.remove(); tm = null; }
+      } else if (tm) { // le bouton qui porte le focus et quitte la page : le focus va au titre de sa section, jamais à body
+        const avait = D.activeElement === tm, t = ui.titre('a-relire');
+        tm.remove(); tm = null; if (avait && t) t.focus({ preventScroll: true });
+      }
     };
 
     // ---------- ouverture d'une ligne : événement annulable, le comportement suit seulement si personne ne l'annule ----------
@@ -123,7 +129,10 @@
     const fragment = () => {
       const h = String(W.location.hash || ''); luHash = h;
       const r = new URLSearchParams(h.slice(1)).get('r'), m = /^#vf-([a-z-]+)$/.exec(h);
-      if (r) { const a = /^n:(se|ag)-(.+)$/.exec(r); if (a) ancre(a[2], a[1] === 'se' ? 'session' : 'subagent'); } else if (m) aller(m[1]);
+      if (r) {
+        const a = /^n:(se|ag)-(.+)$/.exec(r), kind = a && (a[1] === 'se' ? 'session' : 'subagent');
+        if (a && !ancre(a[2], kind)) attente = { id: a[2], kind };
+      } else if (m) aller(m[1]);
     };
 
     // ---------- vues et bascule ----------
@@ -194,7 +203,12 @@
 
   // ---------- l'interface que lit 00-vibeflow.js (arrivée par #r=n:…) et le bouton « N au travail » ----------
   W.__vfRegie = {
-    arriver: (r) => { const m = monte && /^n:(se|ag)-(.+)$/.exec(String(r)); return m ? monte.ancre(m[2], m[1] === 'se' ? 'session' : 'subagent') : false; },
+    arriver: (r) => { // vrai pour toute ancre de ligne, même avant le montage : la ligne la consomme à son premier rendu
+      const m = /^n:(se|ag)-(.+)$/.exec(String(r)); if (!m) return false;
+      const kind = m[1] === 'se' ? 'session' : 'subagent';
+      if (!(monte && monte.ancre(m[2], kind))) attente = { id: m[2], kind };
+      return true;
+    },
     monte: () => monte !== null,
   };
   const C = W.VF_COQUILLE;

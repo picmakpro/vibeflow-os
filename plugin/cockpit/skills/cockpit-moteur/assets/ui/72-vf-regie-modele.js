@@ -193,7 +193,7 @@
       sec('au-travail', 'Au travail', 'Personne ne travaille en ce moment.', [...missions, ...travail],
         { pied: muets ? `${muets} muet${plur(muets, '', 's')} depuis plus de 30${NB}min, retiré${plur(muets, '', 's')}` : '' }),
       sec('a-relire', 'Terminé, à relire', 'Aucun rapport à relire.', aRelire.slice(0, 8).map((w) => ligne(w, 'a-relire', { lire: true })),
-        { compte: aRelire.length, autres: rr.n, autresTexte: rr.texte, relus: relus.map((w) => ligne(w, 'a-relire')),
+        { compte: aRelire.length, ids: aRelire.map((w) => w.id), autres: rr.n, autresTexte: rr.texte, relus: relus.map((w) => ligne(w, 'a-relire')),
           relusTitre: `Relus ou sans rapport · ${relus.length}` }),
       sec('au-repos', 'Au repos', 'Aucune session au repos.', repos.slice(0, 6).map((w) => ligne(w, 'au-repos', { sansArbre: true })),
         { compte: repos.length, autres: rp.n, autresTexte: rp.texte }),

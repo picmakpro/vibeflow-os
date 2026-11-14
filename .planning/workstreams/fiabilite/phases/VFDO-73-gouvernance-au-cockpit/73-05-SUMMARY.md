@@ -60,3 +60,9 @@ Rouges **hors liste**, non causés par la régie (à décider par le manager) :
 - Les passes à 8 s ont produit des faux rouges (« coquille prête dépassée ») : écartées, la mesure retenue est celle de 30 s.
 
 rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale)
+
+## Correctifs de revue (point de fusion 2, relais du manager, commités avec 73-11)
+- Ancre à froid : `__vfRegie.arriver(r)` rend true pour `^n:(se|ag)-` même non monté ; l'ancre est tenue et consommée au premier rendu où la ligne existe (défilement, focus), puis oubliée ; le fragment du montage la tient aussi si la ligne manque. Témoin RG17.R1 (rouge `false|false||true` puis vert), RG11.22 repasse au vert.
+- Focus de « Tout marquer comme relu » : le bouton retiré alors qu'il porte le focus rend le focus au titre de « Terminé, à relire » (P73-D-29, UIFN-12). Témoin RG17.R2.
+- « Tout marquer comme relu » marque tous les identifiants à relire (`ids` du modèle, +0 ligne), pas les huit affichés. Témoin RG17.R3 (rouge 8, vert 12).
+Écart : un seul commit pour les trois points (même fichier, hunks entrelacés).
