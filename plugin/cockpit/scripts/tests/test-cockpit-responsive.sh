@@ -83,9 +83,9 @@ srv() { # srv <sortie> [<racine d'une copie du module : mutant de page, 79-16>] 
 unsrv() { vf_hyg_stop "$SRV_PID"; }
 mes() { REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-responsive.mjs" "$CHROME" "$@"; } # mes <url> <largeurs> <resize|-> [<captures>]
 LARGES="1024,1280,1440,1920,2560"
-# boutons d'en-tête OPTIONNELS de l'onglet Code (Travail récent et Écrans n'existent que si le lab a un historique récent et des pages) : ajoutés par l'API
+# boutons d'en-tête OPTIONNELS de l'onglet Code (Écrans n'existe que si le lab a des pages ; le sélecteur de lentilles est posé par la page elle-même, 75-09b) : ajoutés par l'API
 # d'extension du viewer, avec leur libellé et leur icône d'origine, pour mesurer le pire en-tête réel — sans eux R-1 (bouton rogné à 1 024 px) restait invisible
-INJ_CODE="(() => { const SC = window.VibeFlow; SC.addHeaderButton({ id: 'btn-recent', label: 'Recent work', icon: 'recent', title: 'What was just worked on, on one board', onClick() {} }); SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); return true; })()"
+INJ_CODE="(() => { const SC = window.VibeFlow; SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); return true; })()"
 
 LC="$WORK/lab-court"; mklab "$LC"
 LS="$WORK/lab-sans-git"; mklab "$LS" "" sans-git # P78-D-39 : un lab sans Git à 1 024 px
@@ -179,7 +179,7 @@ done
 # recherche), et la troncature porte d'abord sur le milieu (le premier et le dernier ne sont rognés que lorsque les segments longs du milieu sont à leur plancher de 64 px).
 cat > "$AUX/o2b.js" <<'JS'
 (async () => { const pause = (ms) => new Promise((r) => setTimeout(r, ms)), SC = window.VibeFlow;
-  if (location.pathname.endsWith('index.html') && !document.getElementById('btn-recent')) { SC.addHeaderButton({ id: 'btn-recent', label: 'Recent work', icon: 'recent', title: 'What was just worked on, on one board', onClick() {} }); SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); }
+  if (location.pathname.endsWith('index.html') && !document.getElementById('screens-btn')) { SC.addHeaderButton({ id: 'screens-btn', label: 'Screens', icon: 'ui', title: 'Pick a screen of the app', onClick() {} }); }
   for (let i = 0; i < 100 && !/travail|Personne/.test((document.getElementById('vf-lock') || {}).textContent || ''); i++) await pause(50);
   // pose : la mise en page est posée quand deux images consécutives donnent la même géométrie (fil, en-tête, recherche) — l'état de la page, jamais une durée fixe (P70-D-18 : remplace pause(500))
   const sig = () => [...document.getElementById('crumbs').children].map((e) => { const r = e.getBoundingClientRect(); return e.tagName + e.textContent.length + ':' + r.left + ',' + r.width + ',' + (e.hasAttribute('data-vf-masque') ? 1 : 0); }).join('|') + '|' + document.querySelector('header').scrollWidth + '|' + document.getElementById('search-btn').getBoundingClientRect().left;
@@ -494,7 +494,7 @@ srv "$LC/.vibeflow/cockpit"; P_c=$SRV_PORT; PID_c=$SRV_PID
 srv "$LL/.vibeflow/cockpit"; P_l=$SRV_PORT; PID_l=$SRV_PID
 srv "$LH/.vibeflow/cockpit"; P_h=$SRV_PORT; PID_h=$SRV_PID
 J_PAUSE='const p = (ms) => new Promise((r) => setTimeout(r, ms));'
-J_BADGE="const bt = document.getElementById('btn-recent'); if (bt && !bt.querySelector('.badge')) { const s = document.createElement('span'); s.className = 'badge'; s.textContent = '3'; bt.appendChild(s); }"
+J_BADGE="const bt = document.getElementById('btn-lentilles'); if (bt && !bt.querySelector('.badge')) { const s = document.createElement('span'); s.className = 'badge'; s.textContent = '3'; bt.appendChild(s); }"
 INJ_MENU="(async () => { $J_PAUSE $INJ_CODE; $J_BADGE await p(300); document.getElementById('vf-plus')?.click(); for (let i = 0; i < 40 && !(document.getElementById('vf-plus-menu')?.getBoundingClientRect().width > 0); i++) await p(50); await p(100); return true; })()"
 INJ_DRILL="(async () => { $J_PAUSE window.VibeFlow.reveal('n:ph-1'); for (let i = 0; i < 100; i++) { const u = document.getElementById('btn-up'); if (u && !u.hidden) break; await p(50); } await p(300); return true; })()"
 J_OPEN="const nd = [...document.querySelectorAll('#svg g.node')].find((e) => e.getBoundingClientRect().width > 0); nd?.dispatchEvent(new MouseEvent('click', { bubbles: true })); for (let i = 0; i < 60 && getComputedStyle(document.getElementById('panel')).visibility !== 'visible'; i++) await p(50); await p(300);"
@@ -568,7 +568,8 @@ for onglet in index project equipe; do
     assert_eq "R13.4 — $onglet / $w px : trois onglets à 13 px, rail à 4 px (DESIGN.md §5, P70-D-16, P71.5-D-05)" "$(mv_ "$F" "(()=>{const o=j.mesures[\"$w\"].m.onglets;return o?o.n+'|'+o.police+'|'+o.piste:'onglets absents'})()")" "3|13px|4px/4px"
   done
 done
-assert_eq "R13.3 — Code / 390 px, menu ouvert : une entrée par action présente (huit avec Travail récent et Écrans), libellé visible égal à celui du bouton d'origine, pastille reportée sur l'entrée et sur « ⋯ »" "$(mv_ "$WORK/r13-menu.json" '(()=>{const m=j.mesures["390"].m,s=m.sources,e=m.menu;if(!e)return "menu absent";const p=[];if(s.length<8)p.push("témoin : "+s.length+" actions seulement");if(!s.some((x)=>x.b))p.push("témoin : aucune pastille sur les boutons d origine");if(e.length!==s.length)p.push(e.length+" entrées pour "+s.length+" actions");s.forEach((x,i)=>{if(!e[i]||!e[i].t||e[i].t!==x.t)p.push("entrée "+i+" : ["+(e[i]&&e[i].t)+"] au lieu de ["+x.t+"]");if(e[i]&&e[i].b!==x.b)p.push("pastille de "+x.t+" : ["+(e[i]&&e[i].b)+"] au lieu de ["+x.b+"]")});if(s.some((x)=>x.b)&&!m.plusPastille)p.push("« ⋯ » sans pastille");return p.join(" ; ")||"aucune"})()')" "aucune"
+assert_eq "R13.3 — Code / 390 px, menu ouvert : une entrée par action présente (huit avec le sélecteur de lentilles et Écrans), libellé visible égal à celui du bouton d'origine, pastille reportée sur l'entrée et sur « ⋯ »" "$(mv_ "$WORK/r13-menu.json" '(()=>{const m=j.mesures["390"].m,s=m.sources,e=m.menu;if(!e)return "menu absent";const p=[];if(s.length<8)p.push("témoin : "+s.length+" actions seulement");if(!s.some((x)=>x.b))p.push("témoin : aucune pastille sur les boutons d origine");if(e.length!==s.length)p.push(e.length+" entrées pour "+s.length+" actions");s.forEach((x,i)=>{if(!e[i]||!e[i].t||e[i].t!==x.t)p.push("entrée "+i+" : ["+(e[i]&&e[i].t)+"] au lieu de ["+x.t+"]");if(e[i]&&e[i].b!==x.b)p.push("pastille de "+x.t+" : ["+(e[i]&&e[i].b)+"] au lieu de ["+x.b+"]")});if(s.some((x)=>x.b)&&!m.plusPastille)p.push("« ⋯ » sans pastille");return p.join(" ; ")||"aucune"})()')" "aucune"
+assert_eq "Q9.1 — Code / 390 px : le sélecteur de lentilles est à la place de l'ancien bouton, juste après Santé (créneau d'en-tête et entrée du « ⋯ »)" "$(mv_ "$WORK/r13-menu.json" '(()=>{const ids=j.mesures["390"].m.sources.map((x)=>x.id),i=ids.indexOf("btn-lentilles");return i>0&&ids[i-1]==="btn-health"?"ok":"ordre : "+ids.join(",")})()')" "ok"
 for onglet in index project equipe; do
   F="$WORK/r13-$onglet.json"
   assert_eq "R14.1 — $onglet / 390 px : le zoom n'est plus dans l'en-tête" "$(mv_ "$F" '(()=>{const z=j.mesures["390"].m.zoom;return z?z.entete+"|"+z.vis:"zoom absent"})()')" "false|true"

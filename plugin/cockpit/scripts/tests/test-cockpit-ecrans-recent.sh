@@ -1,11 +1,12 @@
 #!/usr/bin/env bash
-# test-cockpit-ecrans-recent.sh — DG-02 (écran fantôme) et DG-03 (compteurs du travail récent), retours panel 2026-11-06.
+# test-cockpit-ecrans-recent.sh — DG-02 (écran fantôme) et DG-03 (compteurs des cartes marquées), retours panel 2026-11-06 ; couche déclarative retirée en 75-09b.
 #   E1 une route citée dans un commentaire n'est pas une route (// et /* */), la vraie route reste lue (témoin positif)
 #   E2 la marque de taille n'est pas le résumé d'un écran (buildScreens)
 #   E3 aucun écran : aucun bouton Écrans (rien à proposer, l'en-tête ne s'élargit pas) ; avec un écran, le bouton et le menu
 #   E4 la marque de taille n'est pas la description d'une carte de fichier (extract.mjs)
-#   R1 le badge de Travail récent compte des cartes (un fichier touché par deux tâches = une carte)
-#   R2 le panneau d'une partie compte les mêmes cartes que la carte (viewer.html : une par carte)
+#   R1 la pastille du sélecteur de lentilles compte des cartes (un fichier écrit par deux agents = une carte), lue sur la table des marques
+#   R2 l'agrégat du nœud sur le canal VF_MARQUES compte les mêmes cartes (une marque par carte)
+#   Q8 la page ne porte plus la couche retirée, le jeton --recent reste · Q8b le tableau générique showBoard reste · Q10 la fixture est une table de marques
 # Variable ECRANS_MOTEUR : un autre arbre de moteur (le témoin rouge se rejoue sur la base cb499810).
 # Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
@@ -57,12 +58,23 @@ assert_eq "E3.2 un écran : le bouton Screens est posé" "$(q "$J1" "j.buttons.m
 assert_eq "E3.3 sans écran : pas de section « Screens 0 » dans le panneau" "$(q "$J0" "j.sections.filter((s)=>s.html).length")" "0"
 assert_eq "E3.4 un écran : le menu le liste" "$(q "$J1" "j.menuOuvert.join('').includes('/vraie/:id')")" "true"
 
-echo "== R1/R2 comptes du travail récent =="
-JR="$(node "$H" "$MOTEUR/assets/ui/25-recent.js" "$FX/recent-doublons.json" 2>&1)"
-assert_eq "R1.1 badge : 3 cartes (4 entrées, a.js touché par deux tâches)" "$(q "$JR" "j.buttons[0].badge.join()")" "3"
-assert_eq "R1.2 panneau d'ensemble : même nombre que le badge" "$(q "$JR" "/Recent work <span class=\"c\">(\\d+)<\\/span>/.exec(j.sections.find((s)=>s.where==='overview').html)[1]")" "3"
-assert_eq "R2.1 panneau d'une partie : 3 modifiés à l'intérieur, comme la carte" "$(q "$JR" "/Recent work inside <span class=\"c\">(\\d+)<\\/span>/.exec(j.sections.find((s)=>s.where==='item').html)[1]")" "3"
-assert_eq "R2.2 panneau d'une partie : une ligne par carte" "$(q "$JR" "(j.sections.find((s)=>s.where==='item').html.match(/data-go=/g)||[]).length")" "3"
+echo "== R1/R2 comptes des cartes marquées (canal) =="
+UI="$MOTEUR/assets/ui"
+JR="$(node "$FX/canal-harness.mjs" "$UI/75-vf-activite-tables.js" "$UI/75-vf-marques.js" "$FX/recent-doublons.json" 2>&1)"
+assert_eq "R1.1 pastille du sélecteur : 3 cartes (4 écritures d'agents, a.js écrit par deux agents)" "$(q "$JR" "j.pastille")" "3"
+assert_eq "R1.2 table des marques : même nombre que la pastille, une rangée par carte" "$(q "$JR" "j.cartes")" "3"
+assert_eq "R2.1 agrégat du nœud sur le canal : 3 en écriture, comme les cartes" "$(q "$JR" "j.noeud.join(';')")" "3|3 en écriture|true"
+assert_eq "R2.2 canal : une seule marque sur la carte écrite par deux agents" "$(q "$JR" "j.fichier")" "1"
+
+echo "== Q8/Q8b/Q10 la couche retirée, showBoard et la fixture =="
+BTN="btn"; BTN="$BTN-recent"; NOR="no"; NOR="$NOR-recent"; TIP="recent"; TIP="${TIP}Tip"; HIL="Highlight"; HIL="$HIL recent work"
+PAGE="$MOTEUR/assets/viewer.html"
+assert_eq "Q8.1 aucune référence au bouton de l'ancienne couche dans la page ni dans ses modules (survol compris)" "$(grep -rl -- "$BTN" "$PAGE" "$UI" | wc -l | tr -d ' ')" "0"
+assert_eq "Q8.2 ni pastille, ni bascule, ni infobulle de l'ancienne couche dans la page et ses modules (les dictionnaires français sont retirés par 75-09c)" "$(grep -rlE --exclude='*vf-fr*' -- "\\.rw\\b|class=\"rw|$NOR|$TIP|$HIL" "$PAGE" "$UI" | wc -l | tr -d ' ')" "0"
+assert_eq "Q8.3 aucune règle de carte surlignée (.card.recent, .recent-in) n'est active" "$(grep -cE -- "\\.card\\.recent" "$PAGE")" "0"
+assert_eq "Q8.4 le jeton --recent reste défini (clair et sombre) et sert le glyphe « en écriture »" "$(grep -c -E -- '^ *--recent: ' "$PAGE")|$(grep -c -- 'var(--recent)' "$UI/75-vf-marques-glyphes.js")" "2|1"
+assert_eq "Q8b.1 showBoard (tableau générique du moteur) reste défini et exposé, appelé par Santé et par Écrans" "$(grep -c -E -- '^function showBoard|showBoard[,}]' "$PAGE" | awk '{print ($1>=2)?"ok":"non"}')|$(grep -c showBoard "$UI/20-health.js" | awk '{print ($1>=1)?"ok":"non"}')|$(grep -c showBoard "$UI/30-screens.js" | awk '{print ($1>=1)?"ok":"non"}')" "ok|ok|ok"
+assert_eq "Q10.1 la fixture est une table de marques : 4 écritures d'agents sur 3 fichiers (témoin positif du doublon)" "$(q "$(cat "$FX/recent-doublons.json")" "j.marques.reduce((n,m)=>n+m[2].length,0)+'/'+j.marques.length")" "4/3"
 
 echo "== E4 marque de taille dans la description d'une carte =="
 cat > "$WORK/doc.mjs" <<'JS'

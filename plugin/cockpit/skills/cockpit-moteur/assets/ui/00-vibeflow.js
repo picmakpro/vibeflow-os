@@ -108,7 +108,7 @@
     #context::before { inset: calc(-1 * (var(--hh, 64px) + 8px)) -80px -64px -36px; /* dérivé : halo, déborde du bloc */ background: rgba(var(--bg-rgb), .28); -webkit-backdrop-filter: blur(22px) saturate(1.6); backdrop-filter: blur(22px) saturate(1.6); -webkit-mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); mask-image: radial-gradient(ellipse 100% 100% at 0% 0%, #000 40%, transparent 100%), linear-gradient(to right, #000 40%, transparent 100%); -webkit-mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); mask-size: 100% calc(100% - var(--hh, 64px) + 14px), 100% calc(var(--hh, 64px) - 14px); -webkit-mask-position: 0 100%, 0 0; mask-position: 0 100%, 0 0; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; border: 0; border-radius: 0; box-shadow: none; } /* vf-couleur-ok: masque, seul l'alpha compte, jamais affiché */
     #context:empty { display: none; }
     /* 71.5 (N5) : au survol, le trait vert/neutre des boutons passe en --text-2 (le trait d'état tombe à 2,68:1 sur le fond de survol en clair) */
-    #btn-recent:hover svg.i, #btn-health.calm:hover svg.i { color: var(--text-2); }
+    #btn-lentilles:hover svg.i, #btn-health.calm:hover svg.i { color: var(--text-2); }
   `;
   // spike 005 : la barre de question reste visible quand serve.mjs (P7) sert l'onglet Projet
   // recette 69 : au zoom d'ouverture du jalon (lod-mid, ou lod-low plus loin) le pied des cartes (« à recetter · 9/9 plans … » et la pastille d'état) était masqué ou à 5 px :
