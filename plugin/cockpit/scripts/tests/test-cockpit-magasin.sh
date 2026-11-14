@@ -54,7 +54,8 @@ assert_eq "F6 — graphe : le dernier événement, deux onglets d'affilée donne
 assert_eq "F7 — structural : planning égale { seq, at }, at numérique même si la charge n'en porte pas" "$(J 'j.F7')" "9,number,at,seq"
 assert_eq "F8 — perte, reprise, retour : chaque transition notifie une fois (une répétition ne notifie pas)" "$(J 'j.F8')" "perdu,reprise,ouvert|ouvert"
 assert_eq "F9 — une charge mal formée (non objet, champ absent, nombres hors bornes) est ignorée sans lever, sans notifier" "$(J 'j.F9')" "aucune,true,true"
-assert_eq "F10 — vie, patch, reload : aucune clé touchée" "$(J 'j.F10')" "true"
+assert_eq "F10 — vie, reload : aucune clé touchée" "$(J 'j.F10')" "true"
+assert_eq "F11 — patch : les abonnés de planning sont notifiés, la clé égale { seq, at } (comme structural), sans le contenu du patch" "$(J 'j.F11')" '12|{"seq":12,"at":7}'
 
 echo "=== L — les lectures d'état et de frise ==="
 R="$(VM lectures)"
