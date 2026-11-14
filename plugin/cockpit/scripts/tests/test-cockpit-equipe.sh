@@ -739,12 +739,12 @@ RGU() { local f="$WORK/rgu-$RANDOM-$$.sc.json" o; o="${f%.sc.json}.out.json"
 # RGM <nom> <fichier> <ancre> <remplacement> : copie des fichiers ui de la régie dans $MUT/regie-<nom>/, une substitution ; rend « muté » ou « ancre absente / ambiguë »
 RGM() { local d="$MUT/regie-$1" f; rm -rf "$d"; mkdir -p "$d"; for f in 71-vf-equipe-rendu.js 72-vf-equipe.js 72-vf-regie-modele.js 72-vf-regie-pied.js 72-vf-regie-rendu.js 72-vf-regie-source.js; do cp "$UI/$f" "$d/"; done
   FROM="$3" TO="$4" node "$AUX/msub.mjs" "$d/$2"; }
-RG_PIEGE='[{"clic":"li[data-vf-agent=\"'"$RG_A"'\"] button[aria-expanded]"},{"clic":"li[data-vf-agent=\"b9b9b9b9b9b9\"] button[aria-expanded]"},{"nom":"t","obs":{"mode":"textes","sel":"#vf-equipe .vf-rg-nom, #vf-equipe .vf-rg-role, #vf-equipe .vf-rg-det, #vf-equipe .vf-rg-l2, #vf-equipe .vf-link"}},{"nom":"l1","obs":{"mode":"compte","sel":"li[data-vf-agent=\"'"$RG_A"'\"] a.vf-link"}},{"nom":"l2","obs":{"mode":"attr","sel":"li[data-vf-agent=\"b9b9b9b9b9b9\"] a.vf-link","attr":"href"}}]'
+RG_PIEGE='[{"nom":"t","obs":{"mode":"textes","sel":"#vf-equipe .vf-rg-nom, #vf-equipe .vf-rg-role, #vf-equipe .vf-rg-det, #vf-equipe .vf-rg-l2, #vf-equipe .vf-link"}},{"nom":"l1","obs":{"mode":"compte","sel":"li[data-vf-agent=\"'"$RG_A"'\"] a.vf-link"}}]'
 RG_CLES='{"nom":"cles","obs":{"mode":"attr","sel":"li[data-vf-cle]","attr":"data-vf-cle"}}'
 RG_E='{"nom":"e","obs":{}}'
 # expressions communes : pg = « 0 violation | texte échappé affiché | … » ; ok = rechargements | rendus du moteur | …
 RGV_PIEGE='j.erreur||(j.final.violations.length + "|" + j.out.t.some((s) => s.includes("<x-role>")) + "|" + j.out.t.some((s) => s.includes("non rattaché (<x-raison>)")) + "|" + j.out.l1)'
-RGV_NOEUD='j.erreur||(j.final.violations.length + "|" + j.out.t.some((s) => s.includes("nœud <x-noeud>")) + "|" + !j.out.l2.join().includes("<x-"))'
+RGV_NOEUD='j.erreur||(j.final.violations.length + "|" + j.out.t.some((s) => s.includes("nœud <x-noeud>")))'
 RGV_CLES='j.erreur||((j.final.rechargements || 0) + "|" + j.out.e.sc.filter((x) => x === "rerender").length + "|" + j.out.cles.includes("a-relire:'"$RG_F"'") + "|" + (new Set(j.out.cles).size === j.out.cles.length))'
 
 
@@ -866,7 +866,20 @@ M "$RENDU" "$MUT/71-attente.js" "'en attente'" "'en-attente'"
 assert_has "EUI2.21 — mutant : « en attente » devient « en-attente » -> détecté" "$(node "$AUX/libelles71.mjs" "$MUT/71-attente.js")" "pied en attente"
 M "$RENDU" "$MUT/71-noeud.js" 'Nœud ${h(w.rattachement.noeud)}' 'Nœud ${w.rattachement.noeud}'
 assert_has "EUI2.22 — mutant : noeud brut dans l'arbre -> détecté" "$(J71 "$MUT/71-noeud.js")" "balise piégée dans l'arbre"
-assert_eq "EUI2.23 — ligne d'un agent rattaché à un nœud et un DAG piégés : aucun HTML posé, nœud affiché en texte, lien encodé" "$(G "$(RGU "$UI" "$RG_PI" "$RG_PIEGE")" "$RGV_NOEUD")" "0|true|true"
+assert_eq "EUI2.23 — ligne d'un agent rattaché à un nœud et un DAG piégés : aucun HTML posé, nœud affiché en texte (la ligne de la régie ne porte plus de lien : le détail est retiré)" "$(G "$(RGU "$UI" "$RG_PI" "$RG_PIEGE")" "$RGV_NOEUD")" "0|true"
+cat > "$AUX/lienfiche.mjs" <<'JS'
+// lienfiche.mjs <74-vf-fiche-faits.js> : le href du lien « nœud » de la ligne de rattachement de la fiche, pour un agent à DAG et nœud piégés
+import fs from 'node:fs';
+import vm from 'node:vm';
+const ctx = vm.createContext({ window: {}, encodeURIComponent });
+vm.runInContext(fs.readFileSync(process.argv[2], 'utf8'), ctx, { timeout: 5000 });
+const r = ctx.window.__vfFicheFaits.rattachement(null, { worker: { kind: 'subagent', rattachement: { etat: 'rattache', dag: '<x-dag>', noeud: '<x-noeud>', source: 'registre' } }, signal: {}, parent: null });
+const lien = r.segments.flat().find((p) => p && typeof p === 'object' && p.href);
+console.log(lien ? lien.href : 'aucun lien');
+JS
+assert_eq "EUI2.23b — le lien de nœud existe dans la fiche (ligne de rattachement) : le DAG et le nœud piégés y sont encodés (encodeURIComponent), aucun « < » dans l'adresse" "$(node "$AUX/lienfiche.mjs" "$UI/74-vf-fiche-faits.js")" "project.html#r=f%3A%3Cx-dag%3E%23%3Cx-noeud%3E"
+M "$UI/74-vf-fiche-faits.js" "$MUT/74-lien-brut.js" "'project.html#r=' + encodeURIComponent(r)" "'project.html#r=' + r"
+assert_eq "EUI2.23c — mutant : le lien de la fiche n'encode plus le nœud -> détecté (l'adresse porte « < »)" "$(node "$AUX/lienfiche.mjs" "$MUT/74-lien-brut.js")" "project.html#r=f:<x-dag>#<x-noeud>"
 assert_eq "EUI2.25 — un agent passe d'actif à terminé : 0 rechargement, sa ligne passe dans « Terminé, à relire » (une seule ligne par clé)" "$(G "$(RGU "$UI" "$RG_W3" '[{"poser":{"who":'"$RG_W3C"'}},'"$RG_CLES"','"$RG_E"']')" 'j.erreur||((j.final.rechargements || 0) + "|" + j.out.cles.includes("a-relire:'"$RG_A"'") + "|" + j.out.cles.includes("au-travail:'"$RG_A"'") + "|" + (new Set(j.out.cles).size === j.out.cles.length))')" "0|true|false|true"
 RGM cle-sans-section 72-vf-regie-modele.js 'cle: `${sec}:${w.id}`' 'cle: `x:${w.id}`' > /dev/null || echo "MUTANT VIDE : clé sans section"
 assert_eq "EUI2.26 — mutant : la clé de ligne ne dit plus la section -> la ligne terminée garde la clé de l'actif, détecté" "$(G "$(RGU "$MUT/regie-cle-sans-section" "$RG_W3" '[{"poser":{"who":'"$RG_W3C"'}},'"$RG_CLES"','"$RG_E"']')" 'j.erreur||((j.final.rechargements || 0) + "|" + j.out.cles.includes("a-relire:'"$RG_A"'") + "|" + j.out.cles.includes("au-travail:'"$RG_A"'") + "|" + (new Set(j.out.cles).size === j.out.cles.length))')" "0|false|false|true"

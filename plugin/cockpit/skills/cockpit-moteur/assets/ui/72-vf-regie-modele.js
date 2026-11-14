@@ -138,7 +138,7 @@
       return rangee({ cle: `${sec}:${w.id}`, id: w.id, kind: w.kind, nom: nomDe(w), role: !sess && w.task ? w.role || 'Agent' : '',
         etat: e.etat, mot: e.mot, poids: e.poids, detail: sec === 'au-travail' && w.etat === 'attend' ? '' : e.detail, ligne2, duree: e.duree,
         action: lire ? 'lire-rapport' : null, niveau: o.niveau || 0, parent: o.parent ? o.parent.id : null, grise: !!o.grise,
-        noeud: n ? String(n.noeud) : '', age: nbf(w.ageS) ? w.ageS + ecoule(w, c) : null, lien: n ? ref(`f:${n.dag}#${n.noeud}`) : '',
+        noeud: n ? String(n.noeud) : '', age: nbf(w.ageS) ? w.ageS + ecoule(w, c) : null,
         impact: impact ? impact.n : null, infobulle: sec === 'a-vous' && !impact ? LIMITE : '' }, w.id);
     };
     const lignePhase = (p) => {
