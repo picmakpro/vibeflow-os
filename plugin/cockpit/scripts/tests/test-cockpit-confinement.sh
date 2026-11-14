@@ -445,6 +445,13 @@ if (cas === 'confiner') {
   fs.mkdirSync(path.join(lab, '.vibeflow'), { recursive: true }); fs.symlinkSync(dehors, path.join(lab, '.vibeflow', 'cockpit'));
   const l = await prendre(lab, path.join(lab, '.vibeflow', 'cockpit'));
   console.log(`temoin=${t} sortie-liee=${l} dehors=${liste(dehors)}`);
+} else if (cas === 'gitfile') {
+  const { signatureDuLab } = await imp('vf-cockpit-code-cache.mjs'); const { spawnSync } = await import('node:child_process'); const git = (...a) => spawnSync('git', a, { encoding: 'utf8' });
+  const sig = (l) => signatureDuLab({ lab: l, moteur: path.join(D, 'moteur'), etatGit: '' }), head = (g, r) => fs.writeFileSync(path.join(g, 'HEAD'), 'ref: refs/heads/' + r + '\n');
+  const ext = path.join(D, 'depot-ext'); fs.mkdirSync(lab, { recursive: true }); fs.mkdirSync(ext); git('init', '-q', '--separate-git-dir', path.join(ext, 'g'), lab); // le .git du lab est un gitfile vers le dossier extérieur
+  const s1 = sig(lab); head(path.join(ext, 'g'), 'autre'); const dehors = s1 === sig(lab) ? 'ignore' : 'lu';
+  const lab2 = path.join(D, 'lab2'); git('init', '-q', lab2); const t1 = sig(lab2); head(path.join(lab2, '.git'), 'autre');
+  console.log('temoin-dans-le-lab=' + (t1 === sig(lab2) ? 'ignore' : 'lu') + ' gitdir-hors-du-lab=' + dehors);
 } else if (cas === 'droits') {
   const { ouvrirSur } = await imp('vf-cockpit-lanceur-verrou.mjs'); fs.mkdirSync(lab);
   const mode = (f) => (fs.statSync(f).mode & 0o777).toString(8);
@@ -460,6 +467,7 @@ assert_eq "C3.2 — realUnder : un lien vers un frère au même préfixe n'est n
 assert_eq "C3.3 — ecrireIndex : .vibeflow lié vers l'extérieur, rien n'est créé dehors (témoin : sans lien l'index s'écrit)" "$(c3 index)" "temoin=true lien=false dehors=0"
 assert_eq "C3.4 — prendreVerrou : sortie liée vers l'extérieur, refus AVANT tout dossier créé dehors (témoin : sans lien le verrou se pose)" "$(c3 verrou)" "temoin=pose sortie-liee=leve dehors=0"
 assert_eq "C3.5 — ouvrirSur : un fichier préexistant en 0644 ou 0664 passe en 0600 avant toute écriture (témoin : un fichier neuf naît en 0600)" "$(c3 droits)" "neuf=600 prexistant=600 journal=600"
+assert_eq "C3.6 — signatureDuLab : un .git du lab qui désigne un dossier git hors du lab n'est pas lu (HEAD extérieur changé : signature inchangée) ; témoin : HEAD du lab changé, signature changée" "$(c3 gitfile)" "temoin-dans-le-lab=lu gitdir-hors-du-lab=ignore"
 # mutants : copie fraîche des modules, UNE occurrence remplacée ; chacun doit rougir son cas, pour la raison attendue (valeur de la ligne)
 c3mut() { local nom="$1" f="$2" de="$3" vers="$4" d="$WORK/c3-mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d"/ 2>/dev/null
   node -e 'const fs=require("fs");const [f,de,vers]=process.argv.slice(1);const s=fs.readFileSync(f,"utf8");const n=s.split(de).length-1;if(n!==1){console.log("ancre:"+n);process.exit(1)}fs.writeFileSync(f,s.replace(de,()=>vers))' "$d/$f" "$de" "$vers" > "$d.ancre" 2>&1 || { echo "ancre-ko $(cat "$d.ancre")"; return; }
@@ -475,6 +483,8 @@ M="$(c3mj verrou vf-cockpit-lanceur-verrou.mjs "confiner(lab, f); // d'abord : a
 assert_eq "C3.M4 — prendreVerrou sans jugement préalable : C3.4 rougit (le dossier .cache naît hors du lab)" "$([ -n "$M" ] && c3 verrou "$M" | grep -c 'dehors=[1-9]')" "1"
 M="$(c3mj droits vf-cockpit-lanceur-verrou.mjs 'fs.fchmodSync(fd, mode); ' '')"
 assert_eq "C3.M5 — ouvrirSur sans fchmod : C3.5 rougit (le fichier préexistant garde 0644)" "$([ -n "$M" ] && c3 droits "$M" | grep -c 'prexistant=644')" "1"
+M="$(c3mj gitfile vf-cockpit-code-cache.mjs "if (m && d === lab && gitSortant(lab, lab)) return null;" "if (m && false) return null;")"
+assert_eq "C3.M6 — signatureDuLab sans jugement du .git du lab : C3.6 rougit (le dossier git extérieur est lu)" "$([ -n "$M" ] && c3 gitfile "$M" | grep -c 'gitdir-hors-du-lab=lu')" "1"
 
 # ---------- GLOB : coût borné de la correspondance de motifs (79-21, P79-D-32, SOCL-26) ----------
 # Aucun serveur, aucun navigateur : scripts d'aide en heredoc dans $GL_AUX ; copie gelée de l'ancienne implémentation, équivalence générative à graine,

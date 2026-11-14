@@ -12,6 +12,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
 import { confiner } from './vf-cockpit-paths.mjs';
+import { gitSortant } from './vf-cockpit-git-sortant.mjs';
 
 export const MAX_ENTREES = 200000;
 const IGNORES = new Set(['.git', '.vibeflow', 'node_modules']);
@@ -36,7 +37,10 @@ function dossierGit(lab) {
     const g = path.join(d, '.git');
     try {
       const s = fs.statSync(g); if (s.isDirectory()) return g;
-      const m = /^gitdir:\s*(.+)$/m.exec(texte(g)); if (m) return path.resolve(d, m[1].trim());
+      const m = /^gitdir:\s*(.+)$/m.exec(texte(g));
+      // le gitfile du lab désigne un dossier git hors du lab : jamais lu (même règle que les lancements git)
+      if (m && d === lab && gitSortant(lab, lab)) return null;
+      if (m) return path.resolve(d, m[1].trim());
     } catch {}
     if (path.dirname(d) === d) return null;
   }
