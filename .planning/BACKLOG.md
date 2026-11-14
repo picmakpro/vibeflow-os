@@ -843,5 +843,8 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - revue4 : observateurs-cliquet.mjs:13 ne compte que `new MutationObserver(` ; 7 observateurs posés par l'aide obs()/observer() (77-vf-git-tiroir:253, 02-vf-coin:106-108, 02-vf-ligne-etat:82, 02-vf-reperes:130-131) lui échappent (outil de 79-17)
 - revue4 : ci-shard-suites.sh:63 commentaire contradictoire (« une suite à la fois … trois en parallèle »)
 - revue4 : test-cockpit-coquille.sh sans ligne de durée dans ci-shard-suites.sh (DEFAUT 7 s)
+- cycle-serveur AM7.6 au poste macOS cite test-cockpit-lien-vue.sh (80-13) : recherche de Chrome par $MAC non neutralisée par le sed ; vert en CI Linux
+- test-cockpit-responsive.sh : mutants R21m/R22m rougissent par erreur de syntaxe et non par absence du repli ; vraie mutation sur un lab avec Git à poser
+- N1 (amorce-navigateur) : borne de 25 s du lanceur contre 11 à 27 s de Chrome froid en CI ; EKR1/EK5.1 (equipe) : action qui lit la première zone .vf-doing, à cibler par [data-vf-doing]
 
 **Déclencheur de reprise :** la passe complète avant la release, ou la prochaine phase qui touche les onglets, la palette, le coin bas-droit ou le partage CI.
