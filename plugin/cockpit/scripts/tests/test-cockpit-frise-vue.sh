@@ -77,9 +77,9 @@ window.__declarer = []; window.__surOnglet = [];
     const rep = () => new Response(JSON.stringify(F.statut === 200 ? c : { erreur: F.statut === 400 ? 'bornes-invalides' : 'indisponible' }),
       { status: F.statut, headers: { 'content-type': 'application/json' } });
     return new Promise((ok) => setTimeout(() => ok(rep()), F.delai || 0)); }; }
-window.__kd = [];
+window.__kd = []; // les écouteurs de la vue elle-même : celui du curseur sur la racine (Échap) est compté par test-cockpit-frise-curseur.sh C12
 { const A = EventTarget.prototype.addEventListener, R = EventTarget.prototype.removeEventListener;
-  EventTarget.prototype.addEventListener = function (t, f, o) { if (t === 'keydown' && this.classList && this.classList.contains('vf-frise') && !window.__kd.some((x) => x[0] === this && x[1] === f)) window.__kd.push([this, f]); return A.call(this, t, f, o); };
+  EventTarget.prototype.addEventListener = function (t, f, o) { if (t === 'keydown' && this.classList && this.classList.contains('vf-frise') && !/74-vf-frise-curseur/.test(String(new Error().stack)) && !window.__kd.some((x) => x[0] === this && x[1] === f)) window.__kd.push([this, f]); return A.call(this, t, f, o); };
   EventTarget.prototype.removeEventListener = function (t, f, o) { if (t === 'keydown') window.__kd = window.__kd.filter((x) => !(x[0] === this && x[1] === f)); return R.call(this, t, f, o); }; }
 window.__nkd = () => window.__kd.filter((x) => x[0].isConnected).length;
 JS
