@@ -620,6 +620,39 @@ ou de `vf-new-lab`.
 ### Identifiants de menace à aligner entre les plans de la Phase 79
 **Priorité : basse.** Chaque plan numérote ses menaces dans sa propre plage (`T-79-1NN` pour 79-01, plan × 100 + rang) ; l'alignement de la forme entre les 22 plans n'a pas été vérifié à la planification. **Déclencheur de reprise :** l'audit de sécurité de la première vague exécutée.
 
+## Cockpit : mineurs et limites de l'exécution de la Phase 79 — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse sauf mention.** **Origine :** exécution de la Phase 79 (plans 79-12 à 79-22), audits de sécurité, revue et passe design du 2026-11-14 ; détail dans `.planning/missions/2026-11-14-phase-79-execution.md`. Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée. **Déclencheur de reprise :** la passe finale avant release, ou la prochaine passe sur le socle du cockpit.
+
+- AU13-03 (frise) : réponse bornée en nombre, pas en octets (pire cas ~20-25 Mo sérialisés sur le fil principal) ; plafond d'octets avec report dans `voiesOmises`, ou sonde d'échelle à 2 000 voies (F6.3).
+- AU13-04 (transcript) : `arbresGit` synchrone (1 à 3 processus git) à chaque requête qui garde un outil ; cache court ou variante asynchrone, compte de processus dans T24G2.
+- AU13-05 (frise, info) : `parent` et `noeud` ni bornés ni masqués à la projection ; mutant de sous-champ de la liste blanche.
+- AU13-06 (frise, info) : `arbre: null` confond « inconnu » et « principal » ; valeur dédiée possible.
+- AU13-07 (frise, info) : `enumerer` des projets joué deux fois par tour ; caps mémoire sans mutant nommé ; transcript relu sans plafond de taille par voie.
+- x13 F-02 (flux-etat, info) : `sigState` recalculé à chaque pose de frise.
+- AU16-03 (coquille) : C6 compare noms et comptes, jamais valeurs ; aucun mutant sur le retrait des minuteries, observateurs, flux, `delete W[k]`, `revenir`.
+- AU16-04 (coquille, info) : chaque document porte les trois jetons d'onglet ; `ptoken` identifie l'onglet sans cloisonner les droits (à écrire au threat model).
+- AU16-05 (export, info) : `exportMap` lit `<sortie>/index.html` sans `cheminPhysique` (limite 79-16-c) ; à confiner sous `here`.
+- AU22-01 (transcript, hérité) : un lien symbolique dans le dossier des sous-agents, ou un fichier remplacé après le tour, est lu sans repasser l'admission ; `lstat`/`realpath` confiné puis `fstat`, avec le durcissement de `collecteAgents`.
+- AU22-02 (lecture d'agent) : l'abandon côté route laisse la demande dans la file du fil ; échéance jointe ou annulation, témoin en rafales.
+- AU22-03 (frise F7, info) : pas de mutant sur `DELAI_MS` ni de témoin `isFile` (FIFO, dossier) dans `lireDansLeFil`.
+- AU22-04 (routes, info) : un futur lecteur HISTORIQUE à promesse sort sans `repondreGardee` ; tout nouveau lecteur à promesse prend le régime gardé.
+- x17 F3 (projet-visite) : R3.18 (presse-papiers) rouge une fois sous charge, non rejoué.
+- AU18-04 (mise en page) : aucun garde-temps par requête du worker (graphe pathologique = indicateur bloqué) ; `replier()` sans `terminate()`, worker abandonné dans le `catch` de construction.
+- AU18-05 (coquille-assets, info) : `cspFil`/`directiveWorker` injectent l'hôte tel quel ; seul l'appelant filtre l'hôte en amont ; refus local optionnel.
+- 79-18 F4 : W4.1 (écart de pouls) rouge sous charge extrême (load 100), vert sous load 20 ; T24F4.1 transcript à 2074 ms pour 2000 ms sous charge.
+- RV1-1 (revue) : le cliquet d'observateurs est aveugle aux formes `window.MutationObserver`, alias, aide `observer(MutationObserver, …)` et sous-dossiers de `ui/` ; reporté à la passe finale avant release (décision de la session principale, 2026-11-14).
+- RV1-3 (revue) : seuils d'horloge W4.1 (< 150 ms) de mise-en-page, F7.4 (p99 < 50 ms, max < 100 ms) de frise ; à surveiller en CI.
+- RV1-4 (revue) : lignes de plus de 160 colonnes ajoutées hors du cliquet : `viewer.html` (adaptateur du worker, 3 lignes) et aides de test de 79-18 et 79-22, contrairement aux plans.
+- pf2 (limite) : clé planning de `VF_ETAT` ; un changement de contenu pur (SUMMARY réécrit, ligne de tableau ajoutée) n'émet aucun patch, le diff de `vf-cockpit-live.mjs` ne compare que statut, pied et résumé. Le cliquet d'observateurs élargi passe `02-vf-coin.js` de 0 à 3, `02-vf-ligne-etat.js` de 0 à 1, `02-vf-reperes.js` de 0 à 2 (hausse réelle, à Samuel à la passe finale).
+- VB-1 : l'empreinte du module laisse `vendor/xterm` et `vendor/fonts` hors empreinte (même lacune qu'AU18-02).
+- VB-2 : retirer l'ancienne branche d'identité d'`estNotre` (T-79-603).
+- VB-3 (79-18-c) : paquet ELK chargé deux fois (page et worker) ; export composé depuis le module.
+- VB-4 (79-20) : la ligne du code 3 de `plugin/cockpit/skills/vf-cockpit/SKILL.md` n'est pas alignée sur le README (budget d'instructions).
+- D-M6 : défense en profondeur des en-têtes `Sec-Fetch-Site` hors `/api`, lecture de `Sec-Fetch-Site` sur `/api` et `Referrer-Policy: no-referrer` ; recommandation détaillée au rapport de la phase, à trancher par Samuel.
+- Design (passe fin de phase, 59/100, seuil 70, une passe, aucune correction dans la mission) — majeurs : écran d'échec de démarrage (bouton « Réessayer » natif de 22 px, coquille et onglets absents, chrome en anglais, mise en page mobile cassée, tiret orange parasite, message sans cause) ; captures « sombre » prises en clair (thème sombre non validé) ; en-tête différent pendant le calcul de la carte et `"memeDoc":false` au changement d'onglet (rechargement de document à vérifier, peut venir du script de capture) ; panneau latéral qui masque la colonne « Fait » de Projet, commande qui déborde.
+- Design — mineurs : contrôle de vue qui change de place, minimap sur une carte, état vide d'Équipe générique, cibles < 44 px sur desktop, « Vue d'ensemble » qui ressemble à un onglet. Le goût et la hiérarchie relèvent de la recette de Samuel.
+
 ## Cockpit : réserves consignées par les cadrages des Phases 73, 74, 75, 77 et 80 — DIFFÉRÉ (2026-11-11)
 
 **Origine :** rapports de cadrage `.planning/missions/2026-11-11-phase-73-cadrage.md`, `-74-`, `-75-`, `-77-` et `-80-` (sections « À verser par la jointure »), jointure du 2026-11-11. Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sauf la question P73-Q-01, tranchée plus bas.

@@ -1120,17 +1120,17 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | SOCL-14 | Phase 79 | Complete — 2026-11-13, plan 79-10 (segment a) |
 | SOCL-15 | Phase 79 | Complete — 2026-11-13, plan 79-11 (segment a) |
 | SOCL-16 | Phase 79 | Complete — 2026-11-13, plan 79-12 (segment a) |
-| SOCL-17 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-18 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-19 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-20 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-21 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-22 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-23 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-24 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-25 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
+| SOCL-17 | Phase 79 | Complete — 2026-11-14, plan 79-13 |
+| SOCL-18 | Phase 79 | Complete — 2026-11-14, plan 79-14 |
+| SOCL-19 | Phase 79 | Complete — 2026-11-14, plan 79-15 |
+| SOCL-20 | Phase 79 | Complete — 2026-11-14, plan 79-16 |
+| SOCL-21 | Phase 79 | Complete — 2026-11-14, plan 79-17 |
+| SOCL-22 | Phase 79 | Complete — 2026-11-14, plan 79-18 |
+| SOCL-23 | Phase 79 | Complete — 2026-11-14, plan 79-15 |
+| SOCL-24 | Phase 79 | Complete — 2026-11-14, plan 79-19 (sonde S0 : journal non construit) |
+| SOCL-25 | Phase 79 | Complete — 2026-11-14, plan 79-20 |
 | SOCL-26 | Phase 79 | Complete — 2026-11-13, plan 79-21 (segment a) |
-| SOCL-27 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
+| SOCL-27 | Phase 79 | Complete — 2026-11-14, plan 79-22 |
 | FORM-01 | Phase 80 | Complete — 2026-11-12 (Phase 80, segment a, 80-01 ; suites du plan vertes, SUMMARY posé ; branche feat/phase-80-trois-formes, PR vers integration/cockpit-audit) |
 | FORM-02 | Phase 80 | Pending |
 | FORM-03 | Phase 80 | Pending |
@@ -1879,17 +1879,17 @@ la Phase 80.
 - [x] **SOCL-14**: Les chaînes du moteur sont traduites au point d'émission ; plus aucun observateur global ne réécrit une donnée du lab ; `?lang=en` rend les libellés sources (AUDC-H4, P79-D-16, P79-D-24).
 - [x] **SOCL-15**: Plafond de 160 colonnes en cliquet par fichier ; le code navigateur sérialisé côté serveur est rangé en fichiers, injection toujours conditionnée par `--terminal` (AUDC-AM5, P79-D-19).
 - [x] **SOCL-16**: `GET /api/vf/state` (C2) sert l'instantané d'une collecte unique ; `vf-signal` le lit quand un serveur du lab vit et garde son émetteur sinon ; battement `vie` nommé (AUDC-I19, AM1, D-M2).
-- [ ] **SOCL-17**: `GET /api/vf/frise` (C3) et l'événement `frise` ; `cibles` en mémoire, réduites, sur le chemin réel ; fenêtre de 24 h (AUDC-I20, A21-A24, A28).
-- [ ] **SOCL-18**: Un seul flux d'événements par navigateur et par lab, partagé entre les onglets, reprise sans rechargement à la fermeture de l'onglet élu ; veille de silence de 45 s (AUDC-H1, I22, D-M2, P79-D-14).
-- [ ] **SOCL-19**: `GET /api/vf/graphe` (C5) et l'événement `graphe` ; le serveur ne réécrit plus `project.html` ; la page Équipe n'est plus reconstruite par requête (AUDC-AM1, I31, A5, A29).
-- [ ] **SOCL-20**: Coquille statique servie depuis le module et mise en cache, données en JSON, `chargerOnglet`, terminal posé une fois ; un script planté dans la sortie n'est jamais exécutable par la page (AUDC-AM2, I31, A2, A3).
-- [ ] **SOCL-21**: Magasin d'état côté page `VF_ETAT` (C4, A13) alimenté par le flux ; les observateurs de réparation des vues abonnées sont retirés, en cliquet (AUDC-AM6, I32).
-- [ ] **SOCL-22**: La mise en page du canevas tourne dans un worker servi par le module (`worker-src` restreint, jamais `blob:`) ; l'export garde la mise en page en ligne ; l'API du moteur reste la même (AUDC-AM3, M7, A4, P79-D-15).
-- [ ] **SOCL-23**: Ni l'index, ni l'état, ni la frise, ni les cibles, ni les verrous, ni le plan de mission publié n'entrent dans l'export autonome ; témoin à marqueur avec témoin positif (A25).
-- [ ] **SOCL-24**: Journal des attentes par hook `command` (I18 réduit, P79-D-22), précédé d'une sonde qui peut le rendre inutile ; jamais de commande, de texte ni de chemin dans le fichier.
-- [ ] **SOCL-25**: Documentation du module : README (code jamais lu depuis la sortie, limite de la pose projet, CSP, `vf-signal`), CHANGELOG, version mineure ; un ajout, un retrait nommés (P79-D-27).
+- [x] **SOCL-17**: `GET /api/vf/frise` (C3) et l'événement `frise` ; `cibles` en mémoire, réduites, sur le chemin réel ; fenêtre de 24 h (AUDC-I20, A21-A24, A28).
+- [x] **SOCL-18**: Un seul flux d'événements par navigateur et par lab, partagé entre les onglets, reprise sans rechargement à la fermeture de l'onglet élu ; veille de silence de 45 s (AUDC-H1, I22, D-M2, P79-D-14).
+- [x] **SOCL-19**: `GET /api/vf/graphe` (C5) et l'événement `graphe` ; le serveur ne réécrit plus `project.html` ; la page Équipe n'est plus reconstruite par requête (AUDC-AM1, I31, A5, A29).
+- [x] **SOCL-20**: Coquille statique servie depuis le module et mise en cache, données en JSON, `chargerOnglet`, terminal posé une fois ; un script planté dans la sortie n'est jamais exécutable par la page (AUDC-AM2, I31, A2, A3).
+- [x] **SOCL-21**: Magasin d'état côté page `VF_ETAT` (C4, A13) alimenté par le flux ; les observateurs de réparation des vues abonnées sont retirés, en cliquet (AUDC-AM6, I32).
+- [x] **SOCL-22**: La mise en page du canevas tourne dans un worker servi par le module (`worker-src` restreint, jamais `blob:`) ; l'export garde la mise en page en ligne ; l'API du moteur reste la même (AUDC-AM3, M7, A4, P79-D-15).
+- [x] **SOCL-23**: Ni l'index, ni l'état, ni la frise, ni les cibles, ni les verrous, ni le plan de mission publié n'entrent dans l'export autonome ; témoin à marqueur avec témoin positif (A25).
+- [x] **SOCL-24**: Journal des attentes par hook `command` (I18 réduit, P79-D-22), précédé d'une sonde qui peut le rendre inutile ; jamais de commande, de texte ni de chemin dans le fichier.
+- [x] **SOCL-25**: Documentation du module : README (code jamais lu depuis la sortie, limite de la pose projet, CSP, `vf-signal`), CHANGELOG, version mineure ; un ajout, un retrait nommés (P79-D-27).
 - [x] **SOCL-26**: La correspondance de motifs du moteur a un coût borné, au point unique, quelle que soit l'entrée fournie par le lab (motif à plusieurs `**`, chemin très long) ; preuve générative de croissance au plus linéaire (constat de la Phase 75, P79-D-32).
-- [ ] **SOCL-27**: `/api/vf/transcript` et `/api/vf/doing` retrouvent l'agent dans la table en mémoire de la collecte et lisent le fichier sans bloquer la boucle : N requêtes ne déclenchent aucune collecte ; aucun chemin ne sort, y compris sur le chemin d'erreur (AUDC-H2, A48, A50).
+- [x] **SOCL-27**: `/api/vf/transcript` et `/api/vf/doing` retrouvent l'agent dans la table en mémoire de la collecte et lisent le fichier sans bloquer la boucle : N requêtes ne déclenchent aucune collecte ; aucun chemin ne sort, y compris sur le chemin d'erreur (AUDC-H2, A48, A50).
 
 ### Trois onglets, trois formes (Phase 80 — posées au cadrage, 2026-11-11)
 > Dérivent de P80-D-01..60 (`80-CONTEXT.md` ; décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée, tranchées par panel sur faits établis ; P80-D-52 à P80-D-56 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11). Famille neuve `FORM`, réservée par le ROADMAP, vérifiée libre le 2026-11-11 (0 occurrence de `FORM-<n>` sous `.planning/` et `plugin/` à `f763b556`).
