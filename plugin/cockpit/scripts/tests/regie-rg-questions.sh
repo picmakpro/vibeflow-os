@@ -324,3 +324,12 @@ rg_RG17_revue() {
   q_ok "RG17.R2 — le bouton « Tout marquer comme relu » retiré alors qu'il porte le focus : le focus va au titre de la section « Terminé, à relire », jamais à body" "$o" '[j.out.b0, j.out.b1, j.out.f.tag, j.out.f.section].join("|")' "1|0|H2|a-relire"
   q_ok "RG17.R3 — « Tout marquer comme relu » marque les douze rapports à relire, pas les huit affichés" "$o" 'j.out.n' "12"
 }
+
+# ---------- les liens de la régie mènent à leur cible (00-vibeflow.js annule les clics sous [data-vf-section]) ----------
+rg_RG17_liens() {
+  rg_chrome || return 0
+  q_fixtures
+  local o="$WORK/q-chrome-liens.json"
+  q_chrome liens "$o"
+  q_ok "RG17.L1 — navigateur : un clic sur « Carte de la phase » puis sur le lien du nœud d'une ligne ouverte mène à project.html" "$o" '[j.carte, j.noeud].join("|")' "/project.html|/project.html"
+}
