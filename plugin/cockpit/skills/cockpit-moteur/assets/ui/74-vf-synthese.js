@@ -82,18 +82,18 @@
     if (debut) el.querySelector('.vf-sy h2').focus({ preventScroll: true });
   }
   function ouvrir() { if (!installe) return; ouvertA = lieu(); premiere = true; SC.showPanel(html(), lier); }
-  const echap = (e) => {
+  const fermerAuClavier = (e) => {
     if (e.key !== 'Escape' || e.defaultPrevented || !ouverte() || couverte()) return;
     e.stopPropagation(); e.preventDefault(); SC.closePanel(); if (bouton) bouton.focus({ preventScroll: true });
   };
-  const surBouton = (e) => { if (bouton && e.target === bouton) echap(e); };
+  const surBouton = (e) => { if (bouton && e.target === bouton) fermerAuClavier(e); };
 
   // ---------- installation par onglet ----------
   function nettoyer() {
     installe = false;
     for (const n of nettoyages.splice(0).reverse()) { try { n(); } catch (e) { console.error('Synthèse : un nettoyage a levé : ' + (e && e.message)); } }
     if (suivi) suivi.disconnect(); suivi = null;
-    panneau.removeEventListener('keydown', echap); document.removeEventListener('keydown', surBouton, true);
+    panneau.removeEventListener('keydown', fermerAuClavier); document.removeEventListener('keydown', surBouton, true);
     if (ouverte()) SC.closePanel();
     if (bouton) bouton.remove();
     bouton = null; resume = null; ctx = null;
@@ -106,7 +106,7 @@
     const etat = () => { if (bouton) bouton.setAttribute('aria-expanded', String(ouverte())); };
     suivi = new MutationObserver(etat); suivi.observe(panneau, { childList: true });
     suivi.observe(document.body, { attributes: true, attributeFilter: ['class'] }); etat();
-    panneau.addEventListener('keydown', echap); document.addEventListener('keydown', surBouton, true);
+    panneau.addEventListener('keydown', fermerAuClavier); document.addEventListener('keydown', surBouton, true);
     const annoncer = (t) => { const sr = panneau.querySelector(':scope > .vf-sy .sr'); if (sr) sr.textContent = String(t); };
     const lireJson = (chemin) => { try { return E.lireJson(chemin).then((j) => j, () => null); } catch { return Promise.resolve(null); } };
     ctx = { SC, graphe: () => SC.graph, ouvert: ouverte, majResume, annoncer, lireJson };
