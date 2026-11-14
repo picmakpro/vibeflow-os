@@ -4,6 +4,7 @@
 // auteur, texte de message, mandat, cible (forme `<chemin> (worktree <nom>)`) portent `<img src=x onerror=…>`, et un `Bash` porte la dernière
 // commande (CMD-SECRET-74). La charge des champs sans « / » (rôle, branche, cible) n'écrit que le marqueur window.__xss74 ; celle du message
 // de commit et du texte de message envoie en plus le jeton de la page à l'origine tierce <port-collecteur>. Avec `simple` : mêmes transcripts, texte inoffensif.
+// Le NOM d'un agent est piégé aussi : `description` du sous-agent (meta) et titre de la session (ligne `custom-title`), les deux noms que la frise, l'encart, le coût et la fiche affichent.
 // Identifiants : session sess-x1, sous-agent wk01. Aucune donnée du poste ; n'importe jamais le code testé.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -42,6 +43,8 @@ export const CHARGES = {
   message: SIMPLE ? 'message de commit' : `<img src=x onerror=${ATOB}>`,
   texte: SIMPLE ? 'texte' : `<img src=x onerror=${ATOB}> et [x](javascript:${MARQ})`,
   mandat: SIMPLE ? 'mandat' : `<img src=x onerror=${MARQ}>`,
+  desc: SIMPLE ? 'MARQ-DESC' : `MARQ-DESC <img src=x onerror=${MARQ}>`,
+  titre: SIMPLE ? 'titre' : `<img src=x onerror=${MARQ}>`,
 };
 
 // dépôt : branche piégée, commit au message et à l'auteur piégés
@@ -71,8 +74,9 @@ const proj = path.join(HOME, '.claude', 'projects', '-lab');
 const sub = path.join(proj, 'sess-x1', 'subagents');
 fs.mkdirSync(sub, { recursive: true });
 const ecrire = (f, lignes) => fs.writeFileSync(f, lignes.map((o) => JSON.stringify(o)).join('\n') + '\n');
-ecrire(path.join(proj, 'sess-x1.jsonl'), [humain('sess-x1', 80000, 'MARQ-TEXTE'), ...assistant('sess-x1', 1800, CHARGES.texte, outilsDe), ...assistant('sess-x1', 600, 'fin', [])]);
+ecrire(path.join(proj, 'sess-x1.jsonl'), [humain('sess-x1', 80000, 'MARQ-TEXTE'), ...assistant('sess-x1', 1800, CHARGES.texte, outilsDe), ...assistant('sess-x1', 600, 'fin', []),
+  { type: 'custom-title', customTitle: CHARGES.titre, sessionId: 'sess-x1' }]);
 const sa = { isSidechain: true, agentId: 'wk01' };
 ecrire(path.join(sub, 'agent-wk01.jsonl'), [humain('sess-x1', 1500, CHARGES.mandat, sa), ...assistant('sess-x1', 1400, CHARGES.texte, outilsDe, sa), ...assistant('sess-x1', 700, 'fin', [], sa)]);
-fs.writeFileSync(path.join(sub, 'agent-wk01.meta.json'), JSON.stringify({ agentType: CHARGES.role, description: 'MARQ-DESC', spawnDepth: 1, toolUseId: 'toolu_wk01', requestShape: 'foreground', finished: true }));
+fs.writeFileSync(path.join(sub, 'agent-wk01.meta.json'), JSON.stringify({ agentType: CHARGES.role, description: CHARGES.desc, spawnDepth: 1, toolUseId: 'toolu_wk01', requestShape: 'foreground', finished: true }));
 console.log(JSON.stringify({ charges: CHARGES, atob: ATOB }));
