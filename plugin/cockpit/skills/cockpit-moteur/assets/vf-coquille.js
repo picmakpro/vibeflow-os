@@ -10,6 +10,7 @@
   const D = document, H = D.documentElement, ONGLETS = ['code', 'projet', 'equipe'];
   const PAR_ADRESSE = { '/': 'code', '/index.html': 'code', '/project.html': 'projet', '/equipe.html': 'equipe' };
   const TITRES = { code: 'VibeFlow · Code', projet: 'VibeFlow · Projet', equipe: 'VibeFlow · Équipe' };
+  let cause = ''; // pourquoi la dernière lecture a échoué, dite sur l'écran d'échec
   const MESSAGE_LECTURE = 'Lecture impossible : les données de cet onglet n\'ont pas pu être lues.';
   const P = window.VF_PORTEE;
   let manifeste = null, squelette = null, affiche = null, porte = null, file = Promise.resolve(), enLot = false, enDemarrage = false;
@@ -58,23 +59,49 @@
   async function lireGraphe(nom) {
     const entetes = { 'x-vf-cockpit-token': window.VF_COCKPIT_SERVER?.jetons?.[nom] || '' };
     if (retenu[nom]) entetes['If-None-Match'] = retenu[nom].etag;
-    let r; try { r = await fetch('/api/vf/graphe?onglet=' + nom, { headers: entetes }); } catch { throw new Error(MESSAGE_LECTURE); }
+    let r;
+    try { r = await fetch('/api/vf/graphe?onglet=' + nom, { headers: entetes }); } catch {
+      cause = 'Le serveur du cockpit ne répond pas. Vérifiez qu\'il tourne toujours, puis réessayez.'; throw new Error(MESSAGE_LECTURE);
+    }
     if (r.status === 200) { const texte = await r.text(); retenu[nom] = { etag: r.headers.get('ETag') || '', texte }; }
-    else if (r.status !== 304 || !retenu[nom]) throw new Error(MESSAGE_LECTURE);
+    else if (r.status !== 304 || !retenu[nom]) {
+      cause = 'Le serveur du cockpit a répondu ' + r.status + ' au lieu des données. Relancez-le, puis réessayez.'; throw new Error(MESSAGE_LECTURE);
+    }
     return JSON.parse(retenu[nom].texte);
   }
 
   // ---- l'échec d'un chargement (A55) : l'état, l'événement annulable, et au premier chargement le texte fixe avec « Réessayer » ----
   function afficherEchec(nom) {
     if (D.getElementById('vf-coquille-echec')) return;
-    const n = D.createElement('div'), t = D.createElement('p'), b = D.createElement('button');
-    n.id = 'vf-coquille-echec'; n.setAttribute('role', 'status');
-    n.style.cssText = 'position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;'
-      + 'gap:12px;padding:24px;text-align:center';
+    const n = D.createElement('div'), c = D.createElement('div'), h = D.createElement('h1'), t = D.createElement('p'), q = D.createElement('p'),
+      b = D.createElement('button'), s = D.createElement('style');
+    n.id = 'vf-coquille-echec'; n.setAttribute('role', 'alert'); n.lang = 'fr';
+    // un écran propre à la coquille (DESIGN.md, « Graphite ») : plein viseur, fond plein (rien du cockpit qui n'a pas démarré ne reste visible),
+    // police et jetons du cockpit, cible de 44 px, colonne lisible de 320 px à 1440 px
+    s.textContent = '#vf-coquille-echec { position: fixed; inset: 0; z-index: 2147483000; display: flex; align-items: center; justify-content: center;'
+      + ' box-sizing: border-box; padding: max(var(--sp-16, 16px), env(safe-area-inset-top, 0px)) var(--sp-16, 16px) var(--sp-16, 16px);'
+      + ' overflow: auto; }'
+      // le nœud reste sans fond ni couleur propres (il suit le thème) ; la carte porte la couleur et, par son ombre étalée, masque tout ce qui reste derrière
+      + ' #vf-coquille-echec .vf-ce { width: 100%; max-width: 440px; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--sp-12, 12px);'
+      + ' padding: var(--sp-24, 24px); border-radius: var(--r-card, 14px); background: var(--surface, #1a1a1c); color: var(--text, #ededed);'
+      + ' font-family: var(--sans, system-ui, sans-serif); box-shadow: var(--shadow-card, 0 1px 2px rgba(0, 0, 0, .3)); }'
+      // le squelette (barre de recherche, panneau, flux…) n'a rien à montrer : ni visible, ni atteignable au clavier, tant que l'écran est là
+      + ' body.vf-ce-actif > :not(#stage):not(script):not(style), body.vf-ce-actif #stage > :not(#vf-coquille-echec) { visibility: hidden !important; }'
+      + ' body.vf-ce-actif #vf-coquille-echec { visibility: visible; }'
+      + ' #vf-coquille-echec h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.015em; }'
+      + ' #vf-coquille-echec p { margin: 0; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }'
+      + ' #vf-coquille-echec .vf-ce-cause { color: var(--text-2, #a8a8a8); }'
+      + ' #vf-coquille-echec button { align-self: flex-start; min-height: 44px; min-width: 44px; margin-top: var(--sp-8, 8px); padding: 0 var(--sp-20, 20px);'
+      + ' border: 1px solid var(--hair-2, #3a3a3d); border-radius: var(--r-ctl, 10px); background: var(--surface, #1a1a1c); color: inherit; font: inherit;'
+      + ' font-weight: 600; cursor: pointer; }'
+      + ' #vf-coquille-echec button:focus-visible { outline: 2px solid var(--ring, #8fb4ff); outline-offset: 2px; }'
+      + ' @media (max-width: 700px) { #vf-coquille-echec { align-items: flex-start; } #vf-coquille-echec button { align-self: stretch; } }';
+    h.textContent = 'Le cockpit n\'a pas pu démarrer';
     t.textContent = MESSAGE_LECTURE; // garde:coquille-echec-corps
+    q.className = 'vf-ce-cause'; q.textContent = cause || 'La cause n\'a pas été relevée ; réessayez, puis consultez le terminal du cockpit.';
     b.type = 'button'; b.textContent = 'Réessayer';
     b.addEventListener('click', () => { chargerOnglet(nom).catch(() => {}); });
-    n.append(t, b); (D.getElementById('stage') || D.body).appendChild(n);
+    c.className = 'vf-ce'; c.append(h, t, q, b); n.append(s, c); (D.getElementById('stage') || D.body).appendChild(n); D.body.classList.add('vf-ce-actif');
   }
   function echec(nom, motif) {
     etat = { onglet: nom, phase: 'echec', motif };
@@ -113,7 +140,7 @@
     etat = { onglet: nom, phase: 'chargement', motif: null };
     let graphe;
     try { graphe = await lireGraphe(nom); } catch (e) { echec(nom, 'lecture'); throw e; }
-    D.getElementById('vf-coquille-echec')?.remove();
+    D.getElementById('vf-coquille-echec')?.remove(); D.body.classList.remove('vf-ce-actif');
     H.dataset.vfPret = 'non';
     for (const ins of [...inscriptions].reverse()) nettoyer(ins); // les fonctions rendues par les rappels, avant le démontage
     // les rappels inscrits par les scripts de l'onglet affiché (au démarrage) s'en vont avec lui : ses scripts sont ré-exécutés et s'inscriront de nouveau
