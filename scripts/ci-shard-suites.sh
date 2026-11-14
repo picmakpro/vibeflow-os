@@ -110,6 +110,7 @@ durees() {
 71 plugin/cockpit/scripts/tests/test-cockpit-direct.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-ecrans-recent.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-equipe-etats.sh
+75 plugin/cockpit/scripts/tests/test-cockpit-equipe-retraits.sh
 250 plugin/cockpit/scripts/tests/test-cockpit-equipe.sh
 490 plugin/cockpit/scripts/tests/test-cockpit-etat.sh
 19 plugin/cockpit/scripts/tests/test-cockpit-fiche-texte.sh
@@ -162,6 +163,7 @@ durees() {
 1509 plugin/cockpit/scripts/tests/test-cockpit-projet.sh
 20 plugin/cockpit/scripts/tests/test-cockpit-questions.sh
 23 plugin/cockpit/scripts/tests/test-cockpit-reconnexion.sh
+35 plugin/cockpit/scripts/tests/test-cockpit-repli-retrait.sh
 6 plugin/cockpit/scripts/tests/test-cockpit-reseau.sh
 605 plugin/cockpit/scripts/tests/test-cockpit-responsive.sh
 89 plugin/cockpit/scripts/tests/test-cockpit-retard.sh
