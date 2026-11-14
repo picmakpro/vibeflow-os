@@ -60,6 +60,7 @@ DEFAUT=7
 # Deux suites raccourcies (terminal-tiroir : mutants TH rejoués par cas ; terminal-xterm : attentes de 2 s sous mutant) sont remesurées sur
 # le run 43459074372 de la PR #241 : 955 s et 667 s.
 # Phase 75 : sept suites neuves (activite-*) mesurées par les nœuds d'exécution sur le poste, pas sur le runner ; à remesurer sur le premier run complet.
+# Phase 74 : quatre suites neuves (frise-curseur, equipe-retraits, repli-retrait, frise-bornes) mesurées par les nœuds d'exécution sur le poste, pas sur le runner ; à remesurer sur le premier run complet.
 durees() {
   cat <<'DUREES'
 1 plugin/_internal/runtime-adapter/tests/test-agent-to-codex.sh
@@ -108,6 +109,7 @@ durees() {
 71 plugin/cockpit/scripts/tests/test-cockpit-direct.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-ecrans-recent.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-equipe-etats.sh
+75 plugin/cockpit/scripts/tests/test-cockpit-equipe-retraits.sh
 250 plugin/cockpit/scripts/tests/test-cockpit-equipe.sh
 490 plugin/cockpit/scripts/tests/test-cockpit-etat.sh
 19 plugin/cockpit/scripts/tests/test-cockpit-fiche-texte.sh
@@ -115,7 +117,9 @@ durees() {
 43 plugin/cockpit/scripts/tests/test-cockpit-flux-unique.sh
 4 plugin/cockpit/scripts/tests/test-cockpit-forme-claude.sh
 12 plugin/cockpit/scripts/tests/test-cockpit-fr-donnees.sh
+56 plugin/cockpit/scripts/tests/test-cockpit-frise-bornes.sh
 40 plugin/cockpit/scripts/tests/test-cockpit-frise-cout.sh
+61 plugin/cockpit/scripts/tests/test-cockpit-frise-curseur.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-frise-modele.sh
 150 plugin/cockpit/scripts/tests/test-cockpit-frise-vue.sh
 69 plugin/cockpit/scripts/tests/test-cockpit-git-commandes.sh
@@ -159,6 +163,7 @@ durees() {
 1509 plugin/cockpit/scripts/tests/test-cockpit-projet.sh
 20 plugin/cockpit/scripts/tests/test-cockpit-questions.sh
 23 plugin/cockpit/scripts/tests/test-cockpit-reconnexion.sh
+35 plugin/cockpit/scripts/tests/test-cockpit-repli-retrait.sh
 6 plugin/cockpit/scripts/tests/test-cockpit-reseau.sh
 605 plugin/cockpit/scripts/tests/test-cockpit-responsive.sh
 89 plugin/cockpit/scripts/tests/test-cockpit-retard.sh
