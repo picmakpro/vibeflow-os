@@ -430,14 +430,14 @@ Plans:
 
 Plans:
 
-- [ ] 77-01-PLAN.md — gates, `--format=tsv` dans `check-method-budget.sh` et `check-instruction-budget.sh`, lecture seule, texte identique octet pour octet (v1)
-- [ ] 77-02-PLAN.md — données du planning de la collecte, dates du burn-up et blocages du STATE, retrait de `lastDesc` (v1)
-- [ ] 77-03-PLAN.md — route `GET /api/vf/methode`, lancement asynchrone borné, cache de 60 s, un seul appel en cours (v2)
-- [ ] 77-04-PLAN.md — modules purs du calcul « depuis votre dernière visite » et de la mémoire de visite (v2)
-- [ ] 77-05-PLAN.md — coquille de la Synthèse (bouton, panneau, registre des blocs, ligne-résumé) et banc navigateur commun (v3)
-- [ ] 77-06-PLAN.md — blocs burn-up du jalon et santé de la méthode (v4)
-- [ ] 77-08-PLAN.md — bloc « Depuis votre dernière visite », feuille neutre, README et CHANGELOG du module (v5)
-- [ ] 77-07-PLAN.md — coût par phase et par étage sur les dernières 24 h (v6, à revalider après les Phases 79 et 74)
+- [x] 77-01-PLAN.md — gates, `--format=tsv` dans `check-method-budget.sh` et `check-instruction-budget.sh`, lecture seule, texte identique octet pour octet (v1)
+- [x] 77-02-PLAN.md — données du planning de la collecte, dates du burn-up et blocages du STATE, retrait de `lastDesc` (v1)
+- [x] 77-03-PLAN.md — route `GET /api/vf/methode`, lancement asynchrone borné, cache de 60 s, un seul appel en cours (v2)
+- [x] 77-04-PLAN.md — modules purs du calcul « depuis votre dernière visite » et de la mémoire de visite (v2)
+- [x] 77-05-PLAN.md — coquille de la Synthèse (bouton, panneau, registre des blocs, ligne-résumé) et banc navigateur commun (v3)
+- [x] 77-06-PLAN.md — blocs burn-up du jalon et santé de la méthode (v4)
+- [x] 77-08-PLAN.md — bloc « Depuis votre dernière visite », feuille neutre, README et CHANGELOG du module (v5)
+- [x] 77-07-PLAN.md — coût par phase et par étage sur les dernières 24 h (v6, à revalider après les Phases 79 et 74)
 
 ### Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-11-11-jointure.md — Phase 78 (corps) -->

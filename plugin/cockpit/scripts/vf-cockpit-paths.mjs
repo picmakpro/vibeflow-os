@@ -73,14 +73,14 @@ export const realUnder = (p, dir, { siEchec = false } = {}) => {
 };
 // T-67-06 : jamais un script pris dans l'arbre observé. Comparaison sur realpath (un lien `.claude/scripts -> plugin/x` ne passe pas) :
 // aucun candidat sous le lab, sauf le dossier de scripts du module (posé par le lanceur) s'il n'est pas dans la sortie .vibeflow/ du lab.
-export function driverLockScript({ scriptsDir, labRoot, home } = {}) {
+export function driverLockScript({ scriptsDir, labRoot, home, nom = 'driver-lock.sh' } = {}) {
   const sortie = labRoot ? path.join(labRoot, '.vibeflow') : null;
   const cands = [];
-  if (scriptsDir) cands.push({ c: path.join(scriptsDir, 'driver-lock.sh'), module: true });
+  if (scriptsDir) cands.push({ c: path.join(scriptsDir, nom), module: true });
   // le conductor voisin du module (…/plugin/cockpit/scripts -> …/plugin/conductor/scripts) passe avant la copie installée, qui peut dater d'avant
   // les verrous par phase (recette 69) ; cherché seulement depuis un dossier nommé …/cockpit/scripts, jamais depuis un dossier de scripts quelconque
-  if (scriptsDir && path.basename(scriptsDir) === 'scripts' && path.basename(path.dirname(scriptsDir)) === 'cockpit') cands.push({ c: path.join(scriptsDir, '..', '..', 'conductor', 'scripts', 'driver-lock.sh'), module: true });
-  if (home) cands.push({ c: path.join(home, '.claude', 'scripts', 'driver-lock.sh'), module: false });
+  if (scriptsDir && path.basename(scriptsDir) === 'scripts' && path.basename(path.dirname(scriptsDir)) === 'cockpit') cands.push({ c: path.join(scriptsDir, '..', '..', 'conductor', 'scripts', nom), module: true });
+  if (home) cands.push({ c: path.join(home, '.claude', 'scripts', nom), module: false });
   for (const { c, module } of cands) {
     if (!isFile(c)) continue;
     if (labRoot && module && sortie && realUnder(c, sortie, { siEchec: true })) continue;

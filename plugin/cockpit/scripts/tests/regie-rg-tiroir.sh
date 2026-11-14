@@ -49,6 +49,9 @@ rg_RG11_tiroir() {
   # RG11.23 — 70-vf-live.js (P73-D-26) : la garde vit sur la seule ligne du bouton, aucune autre ligne ne parle de la régie, le fichier ne grandit pas (299 lignes au départ du plan, limite 300)
   assert_eq "RG11.23 — 70-vf-live.js : la ligne du bouton porte la garde et l'événement, aucune autre ligne ne les porte, ni lecture de l'onglet sur cette ligne, au plus 299 lignes" \
     "$(grep -n 'addHeaderButton' "$UI/70-vf-live.js" | awk -F: '$0 ~ /__vfRegie\?\.monte\?\.\(\)/ && $0 ~ /vf-regie:aller/ && $0 !~ /vfTab/ && $0 !~ /vf-tab-/ {n++} END{print n+0}')|$(grep -c -e 'vf-regie:aller' -e '__vfRegie' "$UI/70-vf-live.js")|$([ "$(awk 'END{print NR}' "$UI/70-vf-live.js")" -le 299 ] && echo ok || echo grand)" "1|1|ok"
+  # RG11.24 — fin de phase : plus aucun producteur de data-vf-transcript ni de .vf-transcript dans ui/, donc plus de règle de feuille ni de sélecteur de focus qui les vise dans 70-vf-live.js
+  assert_eq "RG11.24 — 70-vf-live.js ne cite plus ni data-vf-transcript, ni vfTranscript, ni .vf-transcript (règles de feuille et sélecteurs de focus morts retirés)" \
+    "$(grep -c -e 'data-vf-transcript' -e 'vfTranscript' -e 'vf-transcript' "$UI/70-vf-live.js")" "0"
 }
 
 rg_RG11_tiroir_chrome() {

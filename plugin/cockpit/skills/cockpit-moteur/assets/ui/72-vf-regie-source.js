@@ -58,7 +58,8 @@
       sec.append(t, lecteur); p.replaceChildren(sec);
     });
     const P = D.getElementById('panel'), O = W.VF_SURCOUCHES;
-    if (O && P) O.ouvrir(P, { modale: false, ouvreur, fermer: () => { SC.closePanel(); O.fermer(P); } });
+    if (P && P.classList) P.classList.add('vf-rg-lecteur'); // la feuille masque le contenu par défaut du moteur ; seul le lecteur la montre
+    if (O && P) O.ouvrir(P, { modale: false, ouvreur, fermer: () => { if (P.classList) P.classList.remove('vf-rg-lecteur'); SC.closePanel(); O.fermer(P); } });
     // 73-08 (UIFN-12) : le bouton quitte la ligne une fois le rapport lu ; le focus passe au titre du lecteur, jamais à body
     const T = P && P.querySelector('.pt'); if (T) { T.tabIndex = -1; T.focus({ preventScroll: true }); }
     emettre('vf-agent:lu', { id }, false);
@@ -152,10 +153,13 @@
 
     // ---------- clavier, clic, recherche ----------
     ecouter(racine, 'click', (e) => {
+      // 00-vibeflow.js annule le clic de tout élément sous [data-vf-section] (lien, résumé de repli) : il s'arrête ici, sans preventDefault
+      if (e.target && e.target.closest && e.target.closest('a[href], summary')) { e.stopPropagation(); return; }
       const b = e.target && e.target.closest ? e.target.closest('button, [data-vf-tout]') : null, li = b && b.closest('li[data-vf-cle]');
       if (!b) return;
       if (b.hasAttribute('data-vf-tout')) { if (tm && W.__vfRegieLu) { W.__vfRegieLu.toutMarquer(tm._ids); rendre(); } return; }
       if (li && b.classList.contains('vf-rg-tog')) ouvrir(li, 'nom', b);
+      else if (li && b.classList.contains('vf-rg-caret')) ui.replier(li.getAttribute('data-vf-cle'));
       else if (li && b === li._b) ouvrir(li, 'rapport', b);
     });
     ecouter(D, 'keydown', (e) => {
@@ -198,6 +202,7 @@
       for (const t of minuteries.splice(0)) { clearInterval(t); clearTimeout(t); }
       if (tCoupe !== null) clearTimeout(tCoupe);
       nettoyerPied(); nettoyerQ(); racine.remove(); D.body.classList.remove('vf-regie-montee');
+      const pn = D.getElementById('panel'); if (pn && pn.classList) pn.classList.remove('vf-rg-lecteur');
     };
   }
 

@@ -105,6 +105,25 @@ pi_fuite() {
 }
 PI_SONDE_FUITE='(function(){ const f = Object.keys(j.trouve).filter((k) => j.trouve[k].length); return (f.length ? f.join(",") : "aucune"); })()'
 
+# RG18 (correctifs de fin de phase, juge design) : la page à 1 440 px et le pied, MESURÉS (CDP) contre les jetons par sonde ; sans Chrome : NON VÉRIFIÉ
+rg_RG18_design() {
+  rg_chrome || return 0
+  pi_lab_arbres; pi_page design "$WORK/lab-arb" "$WORK/pi-design.json" ""
+  local D="$WORK/pi-design.json"
+  pi_ok "RG18.1 — sur Équipe à 1 440 px, le panneau latéral du moteur (« Base de code », Santé) n'est pas affiché" "$D" 'j.page.panneau' "false"
+  pi_ok "RG18.2 — le nom est le bouton d'ouverture ; une feuille et une session seule n'ont aucun caret, une ligne reste de 44 à 56 px" "$D" \
+    '[j.page.nomOuvre, j.page.caretFeuille, j.page.caretSeule, j.page.hFeuille >= 44 && j.page.hFeuille <= 56, j.page.hSeule >= 44 && j.page.hSeule <= 56, j.page.hParent >= 44 && j.page.hParent <= 56].join("|")' "true|0|0|true|true|true"
+  pi_ok "RG18.2 — le parent qui a des enfants porte un seul caret de 44 × 44, nommé « Sous-agents, 2 »" "$D" '[j.page.caretParent, j.page.caretTaille, j.page.caretLabel].join("|")' "1|44x44|Sous-agents, 2"
+  pi_ok "RG18.2 — le caret replie puis rouvre les sous-agents (aria-expanded suit)" "$D" '[j.replie.exp, j.replie.fils, j.rouvert.exp, j.rouvert.fils !== "none"].join("|")' "false|none|true|true"
+  pi_ok "RG18.3 — le caret est nu : de la couleur du nom de la ligne, jamais de la teinte d'état" "$D" 'j.page.couleurCaret' "true"
+  pi_ok "RG18.4 — le détail en flux : --raise, --r-ctl, --inset-box, gap --sp-8 (relevés contre une sonde aux jetons)" "$D" '[j.detail.fond, j.detail.rayon, j.detail.marge, j.detail.ecart].join("|")' "true|true|true|true"
+  pi_ok "RG18.5 — arbres de travail : lignes de 44 à 56 px, repère d'ouverture dans le résumé (couleur du texte), pastilles sans fond" "$D" \
+    '[j.pied.hauteurs.length, j.pied.hauteurs.every((x) => x >= 44 && x <= 56), j.pied.marque, j.pied.couleurMarque, j.pied.pastilles.length > 0 && j.pied.pastilles.every((c) => c === "rgba(0, 0, 0, 0)")].join("|")' "3|true|1|true|true"
+  pi_ok "RG18.6 — l'arbre a son fil de 1 px (--fil) et son coude de rayon 8" "$D" '[j.arbre.contenu, j.arbre.largeur, j.arbre.couleur, j.arbre.bas, j.arbre.rayon].join("|")' "true|1px|true|1px|8px"
+  assert_eq "RG18.7 — ni tiret cadratin ni repli « — » dans la ligne d'arbre (spec § 16.12), ni dans le rendu" \
+    "$(grep -c "'—'" "$UI/72-vf-regie-pied.js" 2>/dev/null)|$(pi_g "$D" 'j.pied.tiret')" "0|false"
+}
+
 rg_RG13_page() {
   # ---------- RG13.35 (sans navigateur) : la réponse de la route n'a que les clés déclarées au contrat ----------
   cat > "$AUX/pi-contrat.mjs" <<'JS'

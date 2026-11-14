@@ -182,8 +182,9 @@ graph "$L3" "$WORK/c3.json"
 echo "=== PC3 — contrat ==="
 assert_eq "PC3.1 — « recette » dans statuts, émis par le lab à recetter, tout st émis y figure" \
   "$(node "$AUX/stok.mjs" "$IFACE" "$WORK/c3.json")" "true|true|"
+# 77-02 : burnup et blocagesState (facultatifs de meta.vf) inscrits à la suite de ceux de 76-04, sans changement de version
 assert_eq "PC3.2 — optionnels juste après statuts ; requis, meta et version inchangés" "$(node "$AUX/ifc.mjs" "$IFACE")" \
-  '{"noeud":["avancement","exigences","trace"],"element":["vague"],"metaVf":["trace","registres","jalonActif","questions"]}|1|{"requis":["id","label","kind"]}|{"requis":["p","n","name"]}'\
+  '{"noeud":["avancement","exigences","trace"],"element":["vague"],"metaVf":["trace","registres","jalonActif","questions","burnup","blocagesState"]}|1|{"requis":["id","label","kind"]}|{"requis":["p","n","name"]}'\
 '|{"requis":["vfTab","vf","kindLabels"]}|1'
 # base du diff : le commit du plan lui-même (L non vide) ou, avant lui, HEAD et l'arbre ; tout échec git = HISTORIQUE-ABSENT, jamais sauté
 base_contrat() { # écrit $WORK/avant.json et $WORK/apres.json

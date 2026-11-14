@@ -78,6 +78,48 @@ await executer(chrome, async (s) => {
     await pause(500);
     return { ligne: l || null, section: await s.ev("document.getElementById('vf-equipe').textContent"), titre: await s.ev('document.title'), nonGet: nonGet(), exc };
   }
+  if (scenario === 'design') {
+    // 73 correctifs de fin de phase : mesures de la page à 1 440 px (panneau, hauteur de ligne, caret, détail, arbre) et du pied (arbres de travail), comparées aux JETONS par sonde
+    await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+    await s.naviguer(url + '#sans-visite');
+    await s.attendre(PRET, 'régie montée et flux ouvert');
+    const P = ID(0), A1 = 'a1b2c3d4e5f6', A2 = 'b9b9b9b9b9b9';
+    const kid = (id, role) => ({ kind: 'subagent', id, etat: 'actif', parent: P, role, task: 'Tâche ' + role, ageS: 5, dureeS: 60, tree: '.' });
+    await pousser([sess(P, 'actif', { ageS: 5 }), kid(A1, 'vf-coder'), kid(A2, 'vf-tester'), sess(ID(1), 'attend')]);
+    const Q = `const q = (x, r = document) => r.querySelector(x), li = (k) => q('#vf-equipe li[data-vf-cle="au-travail:' + k + '"]');`;
+    await attendreValeur(() => s.ev(`(() => { ${Q} return !!li('${A1}') && !!li('${A2}') && !!li('${P}'); })()`), Boolean, { max: 9000 });
+    await pause(400);
+    const page = await s.ev(`(() => { ${Q}
+      const pan = q('#panel'), cs = getComputedStyle(pan), r = pan.getBoundingClientRect();
+      const row = (e) => Math.round(q('.vf-rg-row', e).getBoundingClientRect().height), feuille = li('${A1}'), parent = li('${P}'), seule = q('#vf-equipe li[data-vf-cle="au-travail:${ID(1)}"]');
+      const cr = q('.vf-rg-caret', parent), nom = q('.vf-rg-nom', parent), svg = cr && cr.querySelector('svg'), rc = cr && cr.getBoundingClientRect();
+      return { panneau: r.width > 0 && cs.display !== 'none' && cs.visibility !== 'hidden' && cs.opacity !== '0', hFeuille: row(feuille), hParent: row(parent), hSeule: seule ? row(seule) : -1,
+        caretFeuille: feuille.querySelectorAll('.vf-rg-caret').length, caretSeule: seule ? seule.querySelectorAll('.vf-rg-caret').length : -1, caretParent: parent.querySelectorAll('.vf-rg-caret').length,
+        caretTaille: rc ? Math.round(rc.width) + 'x' + Math.round(rc.height) : null, caretLabel: cr ? cr.getAttribute('aria-label') : null,
+        couleurCaret: svg && getComputedStyle(svg).color === getComputedStyle(nom).color, nomOuvre: !!q('button.vf-rg-tog .vf-rg-nom', feuille) }; })()`);
+    // le coude et le fil de l'arbre, puis le détail : relevés contre des sondes posées à la jetons
+    const arbre = await s.ev(`(() => { ${Q}
+      const f = li('${A1}'), a = getComputedStyle(f, '::after'), sonde = document.createElement('div');
+      sonde.style.cssText = 'border-left:1px solid var(--fil);border-bottom-left-radius:8px;position:absolute;visibility:hidden'; q('#vf-equipe').append(sonde);
+      const s = getComputedStyle(sonde), out = { contenu: a.content !== 'none', largeur: a.borderLeftWidth, couleur: a.borderLeftColor === s.borderLeftColor, bas: a.borderBottomWidth, rayon: a.borderBottomLeftRadius };
+      sonde.remove(); return out; })()`);
+    await s.ev(`(() => { ${Q} q('button.vf-rg-tog', li('${A1}')).click(); })()`);
+    const detail = await attendreValeur(() => s.ev(`(() => { ${Q}
+      const d = q('.vf-rg-plus', li('${A1}')); if (!d) return null; const c = getComputedStyle(d), sonde = document.createElement('div');
+      sonde.style.cssText = 'display:flex;flex-direction:column;background:var(--raise);border-radius:var(--r-ctl);padding:var(--inset-box);gap:var(--sp-8);position:absolute;visibility:hidden'; q('#vf-equipe').append(sonde);
+      const s = getComputedStyle(sonde), out = { fond: c.backgroundColor === s.backgroundColor, rayon: c.borderTopLeftRadius === s.borderTopLeftRadius, marge: c.paddingTop === s.paddingTop && c.paddingLeft === s.paddingLeft, ecart: c.rowGap === s.rowGap };
+      sonde.remove(); return out; })()`), Boolean, { max: 6000 });
+    // le caret replie les sous-agents
+    await s.ev(`(() => { ${Q} q('.vf-rg-caret', li('${P}')).click(); })()`); await pause(300);
+    const replie = await s.ev(`(() => { ${Q} return { exp: q('.vf-rg-caret', li('${P}')).getAttribute('aria-expanded'), fils: getComputedStyle(li('${A1}')).display }; })()`);
+    await s.ev(`(() => { ${Q} q('.vf-rg-caret', li('${P}')).click(); })()`); await pause(300);
+    const rouvert = await s.ev(`(() => { ${Q} return { exp: q('.vf-rg-caret', li('${P}')).getAttribute('aria-expanded'), fils: getComputedStyle(li('${A1}')).display }; })()`);
+    await ouvrirBloc(); await lignesBloc(3); await pause(300);
+    const pied = await s.ev(`(() => { const d = document.querySelector('#vf-equipe details.vf-rg-arbres'), sm = d.querySelector('summary'), svg = sm.querySelector('svg'), L = [...d.querySelectorAll('.vf-rg-arbre')];
+      return { hauteurs: L.map((l) => Math.round(l.getBoundingClientRect().height)), marque: sm.querySelectorAll('svg').length, couleurMarque: !!svg && getComputedStyle(svg).color === getComputedStyle(sm).color,
+        pastilles: [...d.querySelectorAll('.vf-rg-arbre-pastille')].map((p) => getComputedStyle(p).backgroundColor), tiret: L.some((l) => l.textContent.includes('\\u2014')) }; })()`);
+    return { page, arbre, detail, replie, rouvert, pied, exc };
+  }
   if (scenario === 'fr') {
     await pousser([sess(ID(0), 'actif'), { kind: 'subagent', id: 'a0000000-aaaa-bbbb-cccc-222222222222', etat: 'actif', parent: ID(0), role: 'Health', task: 'Files', ageS: 30, dureeS: 30, tree: '.' }]);
     const texte = await attendreValeur(() => s.ev("document.getElementById('vf-equipe').textContent"), (t) => /Files/.test(t) && /Health/.test(t), { max: 6000 });

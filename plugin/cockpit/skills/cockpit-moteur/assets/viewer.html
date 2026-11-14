@@ -683,7 +683,37 @@ if (typeof ELK === 'undefined') { document.body.innerHTML = `<p style="padding:2
 const NS = 'http://www.w3.org/2000/svg';
 const $ = (s) => document.querySelector(s);
 const svg = $('#svg'), vp = $('#viewport'), panel = $('#panel');
-const elk = new ELK();
+// vibeflow 79-18 (SOCL-22) : le calcul de mise en page tourne dans un worker du module quand la coquille est là ; sinon (export en fichier,
+// navigateur sans worker) ou si le worker échoue, il tourne en ligne comme avant. Même forme d'appel : elk.layout(graphe) -> promesse du graphe positionné.
+const elk = (() => {
+  let ligne = null, fil = null, avertie = false, n = 0; const attente = new Map();
+  const enLigne = (g) => (ligne ||= new ELK()).layout(g);
+  const replier = () => { // un worker qui échoue : toutes les requêtes en attente et les suivantes se calculent en ligne, un seul avertissement de texte fixe
+    if (!fil) return; fil = null;
+    if (!avertie) { avertie = true; console.warn('vf-cockpit : mise en page en ligne (le fil de calcul n\'a pas démarré)'); }
+    for (const [id, p] of [...attente]) { attente.delete(id); enLigne(p.graphe).then(p.ok, p.ko); }
+  };
+  // le préfixe vient du manifeste de la coquille ; le nom du fichier est écrit en deux morceaux : l'export autonome embarque ce script et ne doit porter aucune trace du worker
+  let man = null; try { man = JSON.parse(document.getElementById('vf-coquille-manifeste').textContent); } catch { man = null; }
+  if (man && typeof man.prefixe === 'string' && window.VF_COQUILLE && typeof window.VF_COQUILLE === 'object' && typeof Worker === 'function' && /^https?:$/.test(location.protocol)) {
+    try {
+      fil = new Worker(man.prefixe + 'elk-' + 'fil.js'); // construit en avance : son démarrage recouvre l'attente des polices
+      fil.onerror = (e) => { e.preventDefault(); replier(); };
+      fil.onmessage = (e) => { // une réponse est une donnée non fiable : forme vérifiée avant toute pose
+        const d = e.data, p = d && Number.isInteger(d.id) ? attente.get(d.id) : null; if (!p) return; attente.delete(d.id);
+        if (typeof d.erreur === 'string') p.ko(new Error(d.erreur.slice(0, 200)));
+        else if (d.resultat && Array.isArray(d.resultat.children)) p.ok(d.resultat); else p.ko(new Error(t('Invalid layout reply')));
+      };
+      const off = window.VF_COQUILLE.surOnglet(() => () => { // l'onglet s'en va : le worker meurt avec lui, rien n'est résolu ni rejeté (le moteur démonté n'écrit plus)
+        const f = fil; fil = null; attente.clear(); if (f) f.terminate(); off(); // garde:mep-fuite
+      });
+    } catch { fil = null; avertie = true; console.warn('vf-cockpit : mise en page en ligne (le fil de calcul n\'a pas démarré)'); }
+  }
+  return { layout: (graphe) => (!fil ? enLigne(graphe) : new Promise((ok, ko) => {
+    const id = n++; attente.set(id, { ok, ko, graphe });
+    try { fil.postMessage({ id, graphe }); } catch { attente.delete(id); enLigne(graphe).then(ok, ko); } // garde:mep-envoi
+  })) };
+})();
 const KINDS = ['import', 'http', 'call', 'rpc', 'event', 'queue', 'data', 'config'];
 // connection names: plain by default, developer terms when "Show technical detail" is on
 const KIND_TECH = { contains: t('Contains'), import: t('Imports'), http: 'HTTP', call: t('Calls'), rpc: 'RPC', event: t('Events'), queue: t('Queues'), data: t('Data'), config: t('Config') };
@@ -1147,7 +1177,7 @@ async function render(opts = {}) {
   const token = ++renderToken;
   hideTip(); // the cards are about to be redrawn
   const view = buildView(state.container);
-  // vibeflow AUDC-M7 : le calcul tourne sur le fil principal, une temporisation ne s'y déclenche jamais pendant un gros niveau (2,3 s de canevas blanc à 70 cartes) : pour une navigation seulement (go, premier rendu : jamais un redessin en direct, qui garde la temporisation), l'indicateur est allumé tout de suite (sans fondu) et peint (une image) AVANT le calcul
+  // vibeflow AUDC-M7 : le calcul tourne dans un worker du module (79-18), ou sur le fil principal en repli ; une temporisation ne se déclenche pas à temps pendant un calcul en ligne sur un gros niveau (2,3 s de canevas blanc à 70 cartes) : pour une navigation seulement (go, premier rendu : jamais un redessin en direct, qui garde la temporisation), l'indicateur est allumé tout de suite (sans fondu) et peint (une image) AVANT le calcul
   const gros = !!opts.nav && view.visible.length >= 24, indicateur = $('#loading');
   const loading = gros ? 0 : setTimeout(() => indicateur.classList.add('on'), 160);
   if (gros) { indicateur.classList.add('on', 'now'); await new Promise((ok) => { const tm = setTimeout(ok, 120); requestAnimationFrame(() => setTimeout(() => { clearTimeout(tm); ok(); }, 0)); }); }

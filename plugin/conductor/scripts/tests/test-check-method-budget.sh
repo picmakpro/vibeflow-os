@@ -47,6 +47,9 @@
 #   MU25-MU29 — mutants de l'archivage : filtre de clos, refus de source sale, filtre --ws, session de --auto, protection
 #   MU30-MU39 — mutants de la correction 41.3-03 : TRANCHÉ clos, jalon non livré, section d'état ouvert, pointeur, verrou,
 #        relecture de la source, preuve multiset, relecture de l'archive, pointeur active-workstream, étendue de X9
+#   TF1-TF13 — sortie machine --format=tsv (contrat #vf-budget@1, Phase 77) : forme, huit types, chemins relatifs, valeur la plus
+#        haute (P77-D-23), refus 64, lecture seule, aucun réseau, aucun rangement, texte identique à la copie figée du gate (A/B)
+#   MF1-MF8 — mutants de la sortie TSV : chacun rougit le cas TF qui le vise
 #   L1 — étiquettes : aucun identifiant de cas réutilisé d'une section à l'autre
 #   Q5 — anti-vert-à-vide
 #
@@ -1144,6 +1147,150 @@ x9_etendue() { # <script> : imprime ok, ou la raison
 }
 assert "X9 — étendue : la région exemptée tient dans la borne et ne porte que les fonctions attendues" "$(x9_etendue "$CHECK")" "ok"
 
+echo ""
+echo "=== TF — sortie machine --format=tsv, contrat #vf-budget@1 (P77-D-03, P77-D-23) ==="
+# Contrat : en-tête `#vf-budget@1<TAB>check-method-budget`, puis une ligne à six champs par mesure déjà calculée ; lecture seule,
+# sans réseau, sans rangement ; le texte du mode par défaut ne change pas d'un octet (copie figée du gate à la base).
+TF_TYPES="state state-prose backlog-ouverts backlog-entree backlog-clos roadmap memory-index worktrees"
+tf_run() { # <script> <racine> <options...> : sortie standard seule
+  VF_BUDGET_GH="$WRAPBIN/gh" FAKE_GH_PRS="$PRS" FAKE_GH_USER=sam bash "$1" --root "$2" "${@:3}" 2>/dev/null
+}
+TFR="$WORK_DIR/tfr"; mk_part "$TFR"
+{ echo "# Roadmap"; echo; echo "contenu"; } > "$TFR/.planning/ROADMAP.md"
+mkdir -p "$TFR/.claude/agent-memory/ag"; seq 1 12 | sed 's/^/- entrée /' > "$TFR/.claude/agent-memory/ag/MEMORY.md"
+kcommit "$TFR"; G -C "$TFR" worktree add "$TFR/.claude/worktrees/wt1" -b wt1
+TFR_TSV="$(tf_run "$CHECK" "$TFR" --format=tsv)"; TFR_RC=$?
+TFR_TXT="$(tf_run "$CHECK" "$TFR" --no-remote)"
+tf2_obs() { # <script> : nombre d'écarts au contrat de forme (six champs, types, unités et verdicts de la liste fermée)
+  local out n bad
+  out="$(tf_run "$1" "$TFR" --format=tsv)"
+  n="$(printf '%s\n' "$out" | awk 'NR > 1' | grep -c .)"
+  bad="$(printf '%s\n' "$out" | awk -F'\t' 'NR > 1 { ok = (NF == 6)
+      if (!index(" state state-prose backlog-ouverts backlog-entree backlog-clos roadmap memory-index worktrees ", " " $1 " ")) ok = 0
+      if (!index(" Ko lignes sujets worktrees ", " " $5 " ")) ok = 0
+      if (!index(" OK DEPASSE NON-VERIFIABLE NON-APPLICABLE ", " " $6 " ")) ok = 0
+      if ($3 != "-" && $3 !~ /^[0-9]+$/) ok = 0
+      if ($4 != "-" && $4 !~ /^[0-9]+$/) ok = 0
+      if (!ok) b++ } END { print b + 0 }')"
+  [ "$n" -gt 0 ] && echo "ecarts=$bad lignes=$n" || echo "ecarts=vide lignes=0"
+}
+tf4_obs() { # <script> : champs commençant par / ou ~ (la fixture a des lignes de mesure)
+  local out n bad
+  out="$(tf_run "$1" "$TFR" --format=tsv)"
+  n="$(printf '%s\n' "$out" | awk 'NR > 1' | grep -c .)"
+  bad="$(printf '%s\n' "$out" | awk -F'\t' '{ for (i = 1; i <= NF; i++) if ($i ~ /^[\/~]/) b++ } END { print b + 0 }')"
+  [ "$n" -gt 0 ] && echo "absolus=$bad" || echo "absolus=vide"
+}
+tf6_obs() { # <script> : lignes state et leur budget sous VF_STATE_BUDGET_KB=1
+  local out
+  out="$(VF_STATE_BUDGET_KB=1 tf_run "$1" "$TFR" --format=tsv)"
+  printf '%s\n' "$out" | awk -F'\t' '$1 == "state" { n++; if ($4 == 1) k++ } END { if (n > 0 && n == k) print "budget1=ok(" n ")"; else print "budget1=non(" n + 0 "/" k + 0 ")" }'
+}
+TF7D="$WORK_DIR/tf7"; mk_repo "$TF7D"; mkdir -p "$TF7D/.planning"
+{ printf '# Etat\n\n'; for i in 1 2 3 4 5; do echo "prose $i"; done; } > "$TF7D/.planning/STATE.md"
+{ echo "# Backlog"; echo; echo "## Long — DIFFÉRÉ"; for i in $(seq 1 44); do echo "l$i"; done; } > "$TF7D/.planning/BACKLOG.md"
+kcommit "$TF7D"
+tf7_obs() { # <script> : valeur et verdict de state-prose et de backlog-entree
+  local out
+  out="$(tf_run "$1" "$TF7D" --format=tsv)"
+  printf '%s\n' "$out" | awk -F'\t' '$1 == "state-prose" { p = $3 "/" $6 } $1 == "backlog-entree" { e = $3 "/" $6 } END { print "prose=" p " entree=" e }'
+}
+tf_fp() { { ktree "$1"; git -C "$1" status --porcelain; } | cksum; }
+tf9_obs() { # <script> : empreinte de l'arbre (fichiers, .planning compris) et du git status avant/après trois --format=tsv
+  local s="$1" d="$WORK_DIR/tf9-obs" a b
+  rm -rf "$d"; cp -R "$RA" "$d"; a="$(tf_fp "$d")"
+  VF_ARCHIVE_DATE="$KD" bash "$s" --root "$d" --format=tsv >/dev/null 2>&1
+  VF_ARCHIVE_DATE="$KD" bash "$s" --root "$d" --format=tsv --quiet >/dev/null 2>&1
+  VF_ARCHIVE_DATE="$KD" bash "$s" --root "$d" --format=tsv --strict >/dev/null 2>&1
+  b="$(tf_fp "$d")"
+  if [ "$a" = "$b" ]; then echo "arbre=identique"; else echo "arbre=modifie"; fi
+}
+tf10_obs() { # <script> : le faux gh (hors du dépôt) est-il appelé par --format=tsv sans --no-remote ? (« vide » : aucune ligne de mesure rendue)
+  local out
+  : > "$FAKE_GH_LOG"
+  out="$(tf_run "$1" "$RG" --format=tsv)"
+  if [ -z "$(printf '%s\n' "$out" | awk 'NR > 1')" ]; then echo "gh=vide"
+  elif [ -s "$FAKE_GH_LOG" ]; then echo "gh=appele"; else echo "gh=absent"; fi
+}
+tf11_obs() { # <script> : verbes de rangement lancés par --format=tsv (journal de l'enveloppe, lignes ajoutées par cet appel)
+  local n0 out
+  n0="$(grep -c . "$RO_LOG")"
+  out="$(tf_run "$1" "$RG" --format=tsv --no-remote)"
+  if [ -z "$(printf '%s\n' "$out" | awk 'NR > 1')" ]; then echo "verbes=vide"; return 0; fi
+  echo "verbes=[$(tail -n +$((n0 + 1)) "$RO_LOG" | grep -oE '\[(stash|for-each-ref|ls-files)\]' | LC_ALL=C sort -u | tr -d '\n')]"
+}
+PREDIR="$WORK_DIR/pre"; mkdir -p "$PREDIR"
+PRESRC="$(pwd)/scripts/tests/fixtures/check-method-budget-pre-4a246c4c.sh"
+if [ -f "$PRESRC" ]; then cp "$PRESRC" "$PREDIR/check-method-budget.sh"
+else git -C "$(pwd)/../.." show 4a246c4c:plugin/conductor/scripts/check-method-budget.sh > "$PREDIR/check-method-budget.sh" 2>/dev/null; fi
+cp "$(pwd)/../planning-core/scripts/workstream-policy.sh" "$PREDIR/workstream-policy.sh"
+cp "$(pwd)/scripts/check-divergence.sh" "$PREDIR/check-divergence.sh"
+AB_FIX=("${FIXTURES[@]}" "$KB" "$KM" "$KR" "$K4" "$TFR")
+ab_one() { # <script> <fixture> <options...> : sortie texte (racine remplacée par un jeton) puis le code de retour
+  local s="$1" r="$2"
+  shift 2
+  VF_BUDGET_GH="$WRAPBIN/gh" FAKE_GH_PRS="$PRS" FAKE_GH_USER=sam bash "$s" --root "$r" "$@" 2>&1 | sed "s|$r|<R>|g"
+  echo "rc=${PIPESTATUS[0]}"
+}
+ab_obs() { # <script> : nombre de couples (fixture, options) dont la sortie texte ou le rc diffère de la copie figée
+  local s="$1" n=0 d=0 r m
+  for r in "${AB_FIX[@]}"; do
+    for m in "--no-remote" "--strict --quiet --owner sam"; do
+      n=$((n + 1))
+      ab_one "$PREDIR/check-method-budget.sh" "$r" $m > "$WORK_DIR/ab.a"
+      ab_one "$s" "$r" $m > "$WORK_DIR/ab.b"
+      cmp -s "$WORK_DIR/ab.a" "$WORK_DIR/ab.b" || d=$((d + 1))
+    done
+  done
+  echo "diff=$d/$n"
+}
+
+assert "TF1 — --format=tsv rend 0" "rc=$TFR_RC" "rc=0"
+assert "TF1 — la première ligne est l'en-tête du contrat et nomme le gate" "$(printf '%s\n' "$TFR_TSV" | sed -n 1p | tr '\t' '|')" "#vf-budget@1|check-method-budget"
+assert "TF2 — chaque ligne a six champs, types, unités et verdicts de la liste fermée, valeurs entières ou « - »" "$(tf2_obs "$CHECK")" "ecarts=0 "
+assert "TF3 — les huit types sont présents sur la fixture riche" "$(printf '%s\n' "$TFR_TSV" | awk -F'\t' 'NR > 1 { print $1 }' | LC_ALL=C sort -u | tr '\n' ' ')" "backlog-clos backlog-entree backlog-ouverts memory-index roadmap state state-prose worktrees "
+assert "TF4 — sonde positive : la sortie texte de la même fixture porte la racine absolue" "$TFR_TXT" "$TFR"
+assert "TF4 — aucun champ ne commence par / ni par ~" "$(tf4_obs "$CHECK")" "absolus=0"
+for tf5 in "state|STATE ok :|STATE DÉPASSÉ :" "backlog-ouverts|BACKLOG ok :|BACKLOG DÉPASSÉ :" "roadmap|ROADMAP ok :|ROADMAP DÉPASSÉ :" "memory-index|MEMORY ok :|MEMORY DÉPASSÉ :" "worktrees|worktrees ok :|worktrees DÉPASSÉ :"; do
+  tf5_t="${tf5%%|*}"; tf5_r="${tf5#*|}"; tf5_a="${tf5_r%%|*}"; tf5_b="${tf5_r#*|}"
+  tf5_nt="$(printf '%s\n' "$TFR_TSV" | awk -F'\t' -v t="$tf5_t" '$1 == t' | grep -c .)"
+  tf5_nx="$(printf '%s\n' "$TFR_TXT" | grep -cF -e "$tf5_a" -e "$tf5_b")"
+  assert "TF5 — $tf5_t : autant de lignes TSV que de lignes de mesure du mode texte (texte $tf5_nx, TSV $tf5_nt, non nul)" "n=$tf5_nt" "n=$tf5_nx"
+  refute "TF5 — $tf5_t : la mesure existe (jamais un ensemble vide)" "n=$tf5_nt" "n=0"
+done
+assert "TF6 — VF_STATE_BUDGET_KB=1 : budget 1 sur toutes les lignes state, au moins une lue (un ensemble vide ne passe pas)" "$(tf6_obs "$CHECK")" "budget1=ok("
+assert "TF7 — P77-D-23 : paragraphe de 5 lignes sous le plafond de 12 : valeur 5 OK ; entrée de 45 lignes : valeur 45 DEPASSE" "$(tf7_obs "$CHECK")" "prose=5/OK entree=45/DEPASSE"
+for tf8 in "--format=tsv --auto" "--format=tsv --archive backlog" "--format=tsv --dry-run" "--format=tsv --auto --dry-run" "--format=json" "--format="; do
+  tf8_out="$(bash "$CHECK" --root "$TFR" $tf8 2>"$WORK_DIR/tf8.err")"; tf8_rc=$?
+  assert_rc "TF8 — « $tf8 » rend 64" "$tf8_rc" 64
+  assert "TF8 — « $tf8 » : sortie standard vide" "out=[$tf8_out]" "out=[]"
+  assert "TF8 — « $tf8 » : message nommé sur la sortie d'erreur" "$(cat "$WORK_DIR/tf8.err")" "[budget]"
+done
+assert "TF8 — le refus d'une option d'écriture dit pourquoi" "$(bash "$CHECK" --root "$TFR" --format=tsv --auto 2>&1 >/dev/null)" "lecture seule"
+assert "TF8 — le refus d'un autre format le nomme" "$(bash "$CHECK" --root "$TFR" --format=json 2>&1 >/dev/null)" "format inconnu : json"
+TF9P="$WORK_DIR/tf9-pos"; rm -rf "$TF9P"; cp -R "$RA" "$TF9P"; TF9A="$(tf_fp "$TF9P")"
+VF_ARCHIVE_DATE="$KD" bash "$CHECK" --root "$TF9P" --no-remote --auto >/dev/null 2>&1
+[ "$(tf_fp "$TF9P")" = "$TF9A" ] && TF9PV="arbre=identique" || TF9PV="arbre=modifie"
+assert "TF9 — sonde positive : --auto en mode texte modifie l'arbre de la même fixture" "$TF9PV" "arbre=modifie"
+assert "TF9 — lecture seule : trois --format=tsv laissent .planning/ et git status identiques" "$(tf9_obs "$CHECK")" "arbre=identique"
+: > "$FAKE_GH_LOG"
+FAKE_GH_PRS="$PRS" rg_run --owner sam > /dev/null
+if [ -s "$FAKE_GH_LOG" ]; then TF10P="gh=appele"; else TF10P="gh=absent"; fi
+assert "TF10 — sonde positive : le mode texte sans --no-remote appelle le faux gh (posé hors de la fixture)" "$TF10P" "gh=appele"
+assert "TF10 — --format=tsv sans --no-remote n'appelle jamais gh" "$(tf10_obs "$CHECK")" "gh=absent"
+TF11P="$(n0="$(grep -c . "$RO_LOG")"; FAKE_GH_PRS="$PRS" rg_run --owner sam --no-remote > /dev/null; tail -n +$((n0 + 1)) "$RO_LOG" | grep -oE '\[(stash|for-each-ref|ls-files)\]' | LC_ALL=C sort -u | tr -d '\n')"
+assert "TF11 — sonde positive : le mode texte lance stash, for-each-ref et ls-files" "$TF11P" "[for-each-ref][ls-files][stash]"
+assert "TF11 — --format=tsv ne lance aucun verbe de rangement" "$(tf11_obs "$CHECK")" "verbes=[]"
+TF12N="$(ab_obs "$CHECK")"
+assert "TF12 — A/B : sortie texte et rc identiques à la copie figée (cmp) sur toutes les fixtures (ensemble vide exclu)" "$TF12N" "diff=0/"
+TF12T="${TF12N#diff=0/}"
+[ "${TF12T:-0}" -ge 24 ] && TF12S=suffisant || TF12S=insuffisant
+assert "TF12 — au moins douze fixtures, deux jeux d'options chacune" "$TF12S" "suffisant"
+tf13_bad="$(printf '%s\n' "$TFR_TSV" | awk -F'\t' 'NR == 1 { if ($0 != "#vf-budget@1\tcheck-method-budget") b++; next } { if (NF != 6 || index($0, "[budget]")) b++ } END { print b + 0 }')"
+assert "TF13 — toute ligne de la sortie standard est l'en-tête ou une ligne à six champs (aucune ligne [budget])" "bad=$tf13_bad" "bad=0"
+tf13_rg="$(tf_run "$CHECK" "$RG" --format=tsv | awk -F'\t' 'NR > 1 && (NF != 6 || index($0, "[budget]")) { b++ } END { print b + 0 }')"
+assert "TF13 — idem sur le dépôt aux branches distantes, aux stash et aux mémoires (rien du rangement)" "bad=$tf13_rg" "bad=0"
+
 
 echo ""
 echo "=== MU — mutants (QUAL-01) ==="
@@ -1462,6 +1609,37 @@ kills "MUD1 garde des dossiers de phase retirée : DLWS1 rougit (le bloc est arc
 MUD1B="$WORK_DIR/dlws2b"; mk_repo "$MUD1B"; mkdir -p "$MUD1B/.planning/phases/12-autre-chose"; mk_roadmap_ph "$MUD1B/.planning/ROADMAP.md" "56 57"; kcommit "$MUD1B"
 OUT="$(VF_ROADMAP_BUDGET_KB=1 CHECK_UNDER="$MUD1" krun "$MUD1B" --no-remote --archive roadmap)"
 assert "MUD1 — le mutant ne rougit QUE le cas des dossiers présents : DLWS2 (aucun dossier) reste archivé" "$OUT" "ARCHIVÉ : .planning/ROADMAP.md"
+
+# MF1-MF8 — mutants de la sortie TSV (P77-D-18) : chacun doit changer le script, passer bash -n, et rougir l'assertion TF qui le vise
+SCRIPT="$CHECK"
+MF1="$(mut mf1 '  EMAXV=1' '  EMAXV=1; AUTO=1')"; RM=$?
+assert_rc "MF1 opposable" "$RM" 0
+kills "MF1 AUTO=1 forcé en mode TSV : TF9 rougit (l'archivage tourne et modifie l'arbre)" "$(tf9_obs "$MF1")" "arbre=modifie" "TF9 — trois --format=tsv laissent l'arbre identique"
+MF2="$(mut mf2 '  [ "$FORMAT" = tsv ] || rangement' '  rangement "$repo" "$base" "$wt_branches"')"; RM=$?
+assert_rc "MF2 opposable" "$RM" 0
+kills "MF2 passe de rangement rétablie en mode TSV : TF11 rougit (for-each-ref lancé)" "$(tf11_obs "$MF2")" "[for-each-ref]" "TF11 — aucun verbe de rangement"
+MF3="$(mut mf3 '  tsv_cmp state ' '  tsv_cmp etat "$(rel "$f")" "$kb" "$STATE_KB" Ko')"; RM=$?
+assert_rc "MF3 opposable" "$RM" 0
+kills_absent "MF3 type state renommé etat : TF2 rougit (type hors liste fermée)" "$(tf2_obs "$MF3")" "ecarts=0 " "TF2 — types de la liste fermée"
+MF4="$(mut mf4 '  tsv_cmp state ' '  tsv_cmp state "$f" "$kb" "$STATE_KB" Ko')"; RM=$?
+assert_rc "MF4 opposable" "$RM" 0
+kills_absent "MF4 chemin absolu émis : TF4 rougit (champ commençant par /)" "$(tf4_obs "$MF4")" "absolus=0" "TF4 — aucun champ absolu"
+MF5A="$(mut mf5a '  NO_REMOTE=1' '  :')"; RM=$?
+assert_rc "MF5a opposable" "$RM" 0
+SCRIPT="$MF5A"; MF5="$(mut mf5 '  [ "$FORMAT" = tsv ] || rangement' '  rangement "$repo" "$base" "$wt_branches"')"; RM=$?; SCRIPT="$CHECK"
+assert_rc "MF5 opposable (sur MF5a)" "$RM" 0
+kills "MF5 --no-remote implicite ET passe de rangement retirés : TF10 rougit (le faux gh est appelé)" "$(tf10_obs "$MF5")" "gh=appele" "TF10 — gh jamais appelé"
+MF6A="$(mut mf6a '    [ "$a" = M ] && { smax="$b"; continue; }' '    [ "$a" = M ] && { continue; }')"; RM=$?
+assert_rc "MF6a opposable" "$RM" 0
+SCRIPT="$MF6A"; MF6="$(mut mf6 '          M) bmax="$a" ;;' '          M) : ;;')"; RM=$?; SCRIPT="$CHECK"
+assert_rc "MF6 opposable (sur MF6a)" "$RM" 0
+kills_absent "MF6 valeur la plus haute retirée (STATE et BACKLOG) : TF7 rougit (valeurs 5 et 45 perdues)" "$(tf7_obs "$MF6")" "prose=5/OK entree=45/DEPASSE" "TF7 — valeurs les plus hautes"
+MF7="$(mut mf7 '    say "STATE ok :' '    say "STATE bon : $f fait $kb Ko (budget $STATE_KB Ko)"')"; RM=$?
+assert_rc "MF7 opposable" "$RM" 0
+kills_absent "MF7 libellé d'un say changé : TF12 rougit (le texte diffère de la copie figée)" "$(ab_obs "$MF7")" "diff=0/" "TF12 — texte identique à la copie figée"
+MF8="$(mut mf8 '  tsv_cmp state ' '  tsv_cmp state "$(rel "$f")" "$kb" 8 Ko')"; RM=$?
+assert_rc "MF8 opposable" "$RM" 0
+kills "MF8 budget en dur en mode TSV (VF_STATE_BUDGET_KB ignorée) : TF6 rougit" "$(tf6_obs "$MF8")" "budget1=non" "TF6 — budget effectif de l'environnement"
 
 echo ""
 echo "=== L1 — étiquettes : un identifiant de cas ne migre pas d'une section à l'autre ==="

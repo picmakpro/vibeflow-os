@@ -85,6 +85,24 @@ await executer(chrome, async (s) => {
     await echap(); await pause(400);
     return { ouvert, ferme, focusResume, secondFocus: await resume(), secondOuvert: await s.ev(`document.querySelector('${REPLI}').open`) };
   }
+  if (scenario === 'liens') { // un clic réel sur les liens de la régie doit mener à leur cible (00-vibeflow.js annule les clics sous [data-vf-section])
+    const W = { phasesHumaines: [{ phase: '90', ws: '', ref: 'n:ph-90' }], workers: [{ ...AGENT, etat: 'actif', rattachement: { etat: 'rattache', dag: 'D1', noeud: 'N1' } }] };
+    const cible = async (sel, avant) => {
+      await s.ev(`document.querySelector(${JSON.stringify(sel)}).click()`);
+      return attendreValeur(() => s.ev('location.pathname'), (p) => /project\.html$/.test(p), { max: 6000 });
+    };
+    const PH = "li[data-vf-cle^=\"a-vous:phase\"] a";
+    const pousseW = async (sel) => { await s.attendre("!!window.VF_ETAT && window.VF_ETAT.lire('connexion') === 'ouvert'", 'hello reçu');
+      for (let i = 0; i < 5; i++) { await s.ev(`window.__es.find((x) => x.url.includes('/api/vf/events')).__emit('who', { who: ${JSON.stringify(W)} })`); await pause(300); if (await s.ev(`!!document.querySelector(${JSON.stringify(sel)})`)) return; } };
+    await pousseW(PH);
+    const carte = await cible(PH);
+    await ouvrir(); await pousseW('button.vf-rg-tog');
+    await s.attendre("document.querySelector('button.vf-rg-tog')", 'ligne agent');
+    await s.ev("document.querySelector('button.vf-rg-tog').click()"); 
+    await s.attendre("!!document.querySelector('.vf-rg-plus a.vf-link')", 'lien du nœud');
+    const noeud = await cible('.vf-rg-plus a.vf-link');
+    return { carte, noeud };
+  }
   if (scenario === 'titre') {
     const titre = () => s.ev('document.title'), href = () => s.ev("(document.querySelector('link[rel~=\"icon\"]') || {}).href || ''");
     const hrefOrigine = await href();

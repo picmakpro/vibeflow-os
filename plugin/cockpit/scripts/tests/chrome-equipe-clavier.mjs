@@ -18,7 +18,7 @@
 //   tab-titre         : (EK18, S6, revue du 2026-11-08) 1 440 px : vraies touches Tab, le titre de la régie (#vf-equipe-entete) n'est un arrêt ni Git fermé, ni Git ouvert, ni refermé → { ferme, ouvert, referme, verdict } · libelles (EK11) : ligne des sources du tiroir et infobulle de la recherche → { src, titre }
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
 import { executer } from './chrome-session.mjs';
-import { parcoursTab } from './chrome-parcours-tab.mjs';
+import { parcoursTab, secondeVue } from './chrome-parcours-tab.mjs';
 const [, , chrome, url] = process.argv;
 const ACTION = process.env.EK_ACTION || '';
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
@@ -27,8 +27,7 @@ const INJ = `(() => { const R = window.EventSource; window.__es = []; window.Eve
   constructor(u, o) { super(u, o); this.__l = {}; window.__es.push(this); }
   addEventListener(n, f, o) { (this.__l[n] ||= []).push(f); super.addEventListener(n, f, o); }
   __emit(n, d) { for (const f of this.__l[n] || []) f({ data: JSON.stringify(d) }); } }; })();`;
-const DECRIRE = `const dec = (e) => e ? { tag: e.tagName, id: e.id || '', transcript: (e.dataset && e.dataset.vfTranscript) || '', rapport: !!(e.closest && e.closest('.vf-rg-act')), ou: !e.closest ? 'hors' : e.closest('#panel') ? 'panneau' : e.closest('#vf-equipe') ? 'regie' : 'hors', dansTiroir: !!(e.closest && e.closest('#panel')) } : null;`;
-const LU = "(() => { const z = document.querySelector('.vf-transcript'); return !!z && z.textContent.length > 0; })()";
+const DECRIRE = `const dec = (e) => e ? { tag: e.tagName, id: e.id || '', rapport: !!(e.closest && e.closest('.vf-rg-act')), ou: !e.closest ? 'hors' : e.closest('#panel') ? 'panneau' : e.closest('#vf-equipe') ? 'regie' : 'hors', dansTiroir: !!(e.closest && e.closest('#panel')) } : null;`;
 const RAPPORT = '#vf-equipe li[data-vf-cle^=a-relire] .vf-rg-act button'; // 73-08 : « Lire le rapport » d'une ligne terminée (régie)
 const LECTEUR = `!!document.querySelector('#panel .sec h4') && !document.querySelector('${RAPPORT}')`; // le lecteur de repli de la régie est affiché (mandat ou fil) ET la ligne est marquée lue (son bouton a quitté la ligne)
 const LIGNES = '#vf-equipe li[data-vf-cle]';
@@ -236,7 +235,7 @@ await executer(chrome, async (s) => {
   if (ACTION === 'tab-titre') { // (EK18, S6 de la revue du 2026-11-08) à 1 440 px, avec le tiroir Git ouvert, le titre de la vue (masqué dessous) n'est plus un arrêt de Tab ; fermé, il l'est de nouveau (la définition du titre reste atteignable au clavier, PU-G-193)
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
     await s.attendre("!!window.VFGitTiroir && !!document.querySelector('#vf-equipe-entete h1')", 'tiroir Git et titre de la régie');
-    await calme();
+    await calme(); if (process.env.EK_VUE === '2') { await secondeVue(s); await calme(); }
     const detail = {}; // les arrêts visités à chaque parcours (balise, id ou classe, texte court, tabindex, visibilité) : le DIAG de la suite les montre quand le verdict n'est pas celui attendu
     // parcours de Tab (départ explicite, cycle borné, arrêts visités rangés dans detail[nom] pour le DIAG) : voir chrome-parcours-tab.mjs
     const parcours = (nom) => parcoursTab(s, touche, detail, nom);

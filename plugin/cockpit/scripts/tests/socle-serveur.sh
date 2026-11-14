@@ -129,6 +129,7 @@ _cockpit_module_cible() { # <racine> <nom de base> -> chemin du fichier dans la 
     serve.mjs|graph-query.js|query-cli.mjs) printf '%s\n' "$1/skills/cockpit-moteur/assets/$2" ;;
     vue.js|client.js|q.css) printf '%s\n' "$1/skills/cockpit-moteur/assets/ui/terminal/$2" ;;
     tiroir.js|tiroir-message.js|tiroir-construire.js|tiroir.css|lancer.js|lancer-extraire-chat.js|lancer-observer-chat.js|lancer-proposition.js|lancer.css) printf '%s\n' "$1/skills/cockpit-moteur/assets/ui/tiroir/$2" ;;   # 79-11 : tiroir et lancement de la page hôte   # 79-11 : code navigateur de la page de Q, rangé en fichiers du moteur
+    elk-fil.js) printf '%s\n' "$1/skills/cockpit-moteur/assets/$2" ;;   # 79-18 : le worker de mise en page (servi sous /_vf/)
     viewer.html|vf-coquille.js|vf-coquille-portee.js) printf '%s\n' "$1/skills/cockpit-moteur/assets/$2" ;;   # 79-16 : gabarit et client de la coquille
     [0-9][0-9]-*.js) printf '%s\n' "$1/skills/cockpit-moteur/assets/ui/$2" ;;   # 79-16 : une extension de page (servie sous /_vf/ui/)
     vf-cockpit-*) printf '%s\n' "$1/scripts/$2" ;;
