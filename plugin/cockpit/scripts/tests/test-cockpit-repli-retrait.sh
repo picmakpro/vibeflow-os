@@ -67,12 +67,12 @@ export default async function (h) {
     document.addEventListener('vf-agent:ouvrir', (e) => window.__ouv.push([e.detail && e.detail.declencheur, e.defaultPrevented])); });
   await h.section('RP3', async () => {
     await h.attendre(`!!document.querySelector('${RAPPORT}')`, 'bouton « Lire le rapport » de la ligne terminée', 8000);
-    const avant = await h.ev(() => ({ fiche: !!window.__vfFiche, panneau: (document.getElementById('panel') || {}).textContent || '' }));
+    const avant = await h.ev(() => ({ sec: document.querySelectorAll('#panel .sec .pt').length, fiche: !!window.__vfFiche, panneau: (document.getElementById('panel') || {}).textContent || '' }));
     await h.ev((s) => document.querySelector(s).click(), RAPPORT);
     await h.ev(() => new Promise((ok) => setTimeout(ok, 900)));
-    const r = await h.ev(() => ({ panneau: (document.getElementById('panel') || {}).textContent || '', req: window.__req.filter((u) => /transcript/.test(u)).length, lus: window.__lus.length,
+    const r = await h.ev((a0) => ({ panneau: (document.getElementById('panel') || {}).textContent || '', req: window.__req.filter((u) => /transcript/.test(u)).length, lus: window.__lus.length,
       ouv: window.__ouv.map((x) => x.join(':')), surcouche: !!(window.VF_SURCOUCHES && typeof window.VF_SURCOUCHES.ouverte === 'function' && window.VF_SURCOUCHES.ouverte()),
-      lecteur: document.querySelectorAll('#panel .sec .pt').length }));
+      lecteur: document.querySelectorAll('#panel .sec .pt').length - a0 }), avant.sec);
     h.egal('RP3', 'sans fiche, un vf-agent:ouvrir « rapport » non annulé : l\'événement est émis, mais ni panneau, ni surcouche, ni requête de transcript, ni vf-agent:lu',
       [avant.fiche, r.ouv, r.panneau === avant.panneau, r.lecteur, r.surcouche, r.req, r.lus], [false, ['rapport:false'], true, 0, false, 0, 0]);
   });
