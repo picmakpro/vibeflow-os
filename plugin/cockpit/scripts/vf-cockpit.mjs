@@ -177,7 +177,7 @@ async function demarrer(lab, sortie, o) {
   if (o.terminal) args.push('--terminal');
   // port stable par lab (O4) : --port de l'utilisateur d'abord, sinon l'empreinte du lab ; le repli port+1 reste celui du serveur
   args.push('--port', String(o.port || portPrefere(lab)));
-  args.push(`--sortie=${fs.realpathSync(sortie)}`); // DERNIER argument : la sortie du lab ne porte que des données, le serveur est celui du module
+  args.push(`--sortie=${fs.realpathSync.native(sortie)}`); // DERNIER argument : la sortie du lab ne porte que des données, le serveur est celui du module
   // le serveur ne se fie qu'à ces deux chemins, posés ici depuis le module (jamais lus dans un .cache/ du lab) ; le dossier de scripts est celui de CE fichier,
   // jamais une variable VF_COCKPIT_SCRIPTS_DIR héritée de l'environnement du lanceur (AUDC-B-06)
   const env = { ...envEnfant(lab), VF_COCKPIT_ENGINE_DIR: engineDir(HERE).chemin || '', VF_COCKPIT_SCRIPTS_DIR: HERE };
