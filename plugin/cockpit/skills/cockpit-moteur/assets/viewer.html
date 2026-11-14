@@ -86,6 +86,7 @@
   --recent-text: #007f3d;
   --on: #161616; --on-hover: #000; --on-text: #fff; --on-sev-text: #161616;
   --ok: var(--recent); --sev-high: #f2384a; --sev-medium: #b88100; --sev-low: #666666;
+  --st-active: #a37100; /* 80-16 (P80-D-31, AUDC-X5 a) : glyphe « En cours » clair, 3,84:1 sur --bg et 4,27:1 sur --surface (--sev-medium en donnait 3,06 et 3,40) ; --st-recette le suit */
   --warn-bg: rgba(var(--ink), .05); --warn-text: #986300; --warn-sheet: var(--menu-solid);
   --ok-bg: var(--note-bg); --ok-text: var(--recent-text); --err-text: #da1637;
   --dir-bg: rgba(255, 255, 255, .7); --menu-solid: rgba(255, 255, 255, .96); --well: rgba(0, 0, 0, .06);
@@ -240,7 +241,9 @@ svg.lod-low .meta, svg.lod-low .anote { visibility: hidden; }
 svg.lod-low .desc { display: none; }
 svg.lod-low .title { font-size: 22px; white-space: normal; }
 svg.dim .node:not(.hl) .card { box-shadow: none; }
-svg.dim .node:not(.hl) .card > * { opacity: .55; transition: opacity .3s var(--ease); }
+/* 80-16 (AUDC-X5 c) : texte estompé à .72 avec --text-3 et --text-4 ramenés à --text-2 (≥ 4,5:1 composé) ; la pastille d'état (.vst, .rw) reste pleine */
+svg.dim .node:not(.hl) .card { --text-3: var(--text-2); --text-4: var(--text-2); }
+svg.dim .node:not(.hl) .card > :not(.foot), svg.dim .node:not(.hl) .card .foot > :not(.vst):not(.rw) { opacity: .72; transition: opacity .3s var(--ease); }
 
 /* ---------- edges ---------- */
 .edges { animation: fadeIn .7s var(--ease) .12s both; }
@@ -382,6 +385,8 @@ body.no-panel #panel-resize { opacity: 0; pointer-events: none; }
 .stats div { background: none; padding: 0; }
 .stats b { display: block; font-size: 17px; font-weight: 600; font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
 .stats span { font-size: 12px; color: var(--text-3); }
+.vf-champs { display: flex; flex-wrap: wrap; gap: var(--sp-8) var(--sp-24); margin-bottom: var(--sp-12); } .vf-champs div { background: none; padding: 0; }
+.vf-champs span { display: block; font-size: 12px; color: var(--text-3); } .vf-champs b { display: block; font-size: 13px; font-weight: 500; }
 .bar { display: flex; height: 6px; border-radius: 999px; overflow: hidden; margin: var(--sp-12) 0 var(--sp-8); gap: var(--sp-4); }
 .bar span { border-radius: 999px; }
 .legend-row { display: flex; flex-wrap: wrap; gap: var(--sp-4) var(--sp-12); font-size: 12px; color: var(--text-2); }
@@ -522,8 +527,8 @@ header .btn:focus-visible, #zoom button:focus-visible { outline: 2px solid var(-
 html.wk .node foreignObject { overflow: hidden; }
 html.wk .card, html.wk .card * { position: static !important; transform: none !important; animation: none !important; transition: none !important; will-change: auto !important; }
 html.wk .card { overflow: visible; }
-html.wk svg.dim .node:not(.hl) .card > * { opacity: 1; }
-html.wk svg.dim .node:not(.hl) foreignObject { opacity: .28; }
+html.wk svg.dim .node:not(.hl) .card > *, html.wk svg.dim .node:not(.hl) .card .foot > * { opacity: 1; }
+html.wk svg.dim .node:not(.hl) foreignObject { opacity: .72; }
 /* ---------- phones and tablets: windows under 1000 px and touch screens under 1280 px (a mouse at 1000 px and wider is untouched) ---------- */
 @media (max-width: 999px), (max-width: 1279px) and (pointer: coarse) {
   #btn-up, .brand { flex: none; }
@@ -685,6 +690,9 @@ const KIND_TECH = { contains: t('Contains'), import: t('Imports'), http: 'HTTP',
 const KIND_PLAIN = { contains: t('Contains'), import: t('Uses'), http: t('Web requests'), call: t('Calls'), rpc: t('Calls'), event: t('Events'),
   queue: t('Background jobs'), data: t('Reads & writes data'), config: t('Settings') };
 if (G.meta.kindLabels) { Object.assign(KIND_PLAIN, G.meta.kindLabels); Object.assign(KIND_TECH, G.meta.kindLabels); } // vibeflow P1
+// 80-11 (P80-D-08, P80-D-35) : sur l'onglet Projet les libellés de type, de section et de champ viennent de meta.kindLabels (clés à préfixe) ;
+// une clé absente = repli actuel
+const PROJ = G.meta?.vfTab === 'project', KL = (k) => (PROJ ? G.meta.kindLabels?.[k] : undefined);
 // 79-10 : le titre du panneau d'un lien, par genre de lien (une entrée de table par combinaison) ;
 // un genre dont le graphe fournit le libellé (onglet Projet) garde « libellé + connection »
 const KIND_CONN_TECH = { import: t('Imports connection'), http: t('HTTP connection'), call: t('Calls connection'), rpc: t('RPC connection'),
@@ -1379,22 +1387,73 @@ function freeArea() {
   const bottom = open && sheet ? $('#panel').offsetHeight + 24 : $('#ask').offsetHeight + 36;
   return { x: 16, y: top, w: Math.max(200, r.width - panelW - 32), h: Math.max(140, r.height - top - bottom) };
 }
-function fit(animate) {
-  const b = state.bounds; if (!b) return;
-  const a = freeArea();
-  // floor, Code tab only: card names stay at 11 px or more (13 px connector labels are the smallest names), even if that means not showing everything.
-  // The Project tab keeps its own zoom steps (ui/00-vibeflow.js) and the responsive suite wants its cards inside the free area.
-  const kFit = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1), k = /\/(index\.html)?$/.test(location.pathname) ? Math.max(kFit, 11 / 13) : kFit;
-  // what does not fit is cropped on the right and at the bottom: the top-left corner (where a view starts) stays in sight
-  const x = b.w * k + 40 * k > a.w ? a.x - (b.x - 20) * k : a.x + (a.w - b.w * k) / 2 - b.x * k;
-  const y = b.h * k + 20 * k > a.h ? a.y - (b.y - 10) * k : a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k;
-  setT({ k, x, y }, animate);
+// The tab whose graph is loaded, never read from the address (the shell serves the three tabs under any of them, 80-09): the shell's own answer
+// while it loads, then `onglet()`, else the graph's `meta.vfTab` (project | equipe; absent or any other value = code). Returns code | projet | equipe.
+function loadedTab() {
+  const C = window.VF_COQUILLE;
+  if (C && typeof C.onglet === 'function') {
+    const e = typeof C.etat === 'function' ? C.etat() : null, o = e && e.phase === 'chargement' && e.onglet ? e.onglet : C.onglet();
+    if (o) return o;
+  }
+  const v = G.meta && G.meta.vfTab;
+  return v === 'project' ? 'projet' : v === 'equipe' ? 'equipe' : 'code';
+}
+let readingProvider = null; // the VF layer's reading field: () => one rectangle or an array of candidate rectangles (NAVIGATION 4.6)
+/** The reading field's candidates {x, y, w, h}: the provider's (bounded like freeArea, a throwing provider is ignored), else the free area. */
+function readingAreas() {
+  if (readingProvider) {
+    try {
+      const r = [].concat(readingProvider()).filter((c) => c && [c.x, c.y, c.w, c.h].every(Number.isFinite) && c.w >= 200 && c.h >= 140);
+      if (r.length) return r;
+    } catch (e) { console.error('floorplan reading area', e); }
+  }
+  return [freeArea()];
+}
+/** The one framing formula (80-09). Pure: { k, x, y } that shows the cards `ids` of the level (else all of it) in the best reading-field candidate.
+ *  `plancher` (default: only on the Code tab) keeps card names at 11 px or more, even if that means not showing everything. */
+function cadrage({ plancher, zone, ids } = {}) {
+  const list = ids && ids.length && state.layout ? state.layout.children.filter((c) => ids.includes(c.id)) : [];
+  const b = list.length
+    ? { x: Math.min(...list.map((c) => c.x)), y: Math.min(...list.map((c) => c.y)), w: 0, h: 0 }
+    : state.bounds;
+  if (!b) return null;
+  if (list.length) { b.w = Math.max(...list.map((c) => c.x + c.width)) - b.x; b.h = Math.max(...list.map((c) => c.y + c.height)) - b.y; }
+  const floor = plancher === undefined ? loadedTab() === 'code' : plancher;
+  const put = (a) => {
+    const kFit = Math.min(a.w / (b.w + 40), a.h / (b.h + 20), 1.1), k = floor ? Math.max(kFit, 11 / 13) : kFit;
+    // what does not fit is cropped on the right and at the bottom: the top-left corner (where a view starts) stays in sight
+    return { kFit, k, x: b.w * k + 40 * k > a.w ? a.x - (b.x - 20) * k : a.x + (a.w - b.w * k) / 2 - b.x * k,
+      y: b.h * k + 20 * k > a.h ? a.y - (b.y - 10) * k : a.y + Math.max(0, (a.h - b.h * k) / 2) - b.y * k };
+  };
+  const { k, x, y } = (zone ? [zone] : readingAreas()).map(put).reduce((p, q) => (q.kFit > p.kFit ? q : p));
+  return { k, x, y };
+}
+function fit(animate) { const m = cadrage(); if (m) setT(m, animate); }
+/** Where a keyboard or button zoom is centred: the selected card if its centre is in the reading field, else the middle of the largest candidate. */
+function zoomCentre() {
+  const areas = readingAreas(), { k, x, y } = state.t;
+  const c = typeof state.selected === 'string' && state.layout && state.layout.children.find((n) => n.id === state.selected);
+  if (c) {
+    const px = (c.x + c.width / 2) * k + x, py = (c.y + c.height / 2) * k + y;
+    if (areas.some((a) => px >= a.x && px <= a.x + a.w && py >= a.y && py <= a.y + a.h)) return [px, py];
+  }
+  const a = areas.reduce((p, q) => (q.w * q.h > p.w * p.h ? q : p));
+  return [a.x + a.w / 2, a.y + a.h / 2];
 }
 function zoomBy(f, cx, cy) {
-  const r = stageRect();
-  cx ??= r.width / 2; cy ??= r.height / 2;
+  if (cx === undefined || cy === undefined) [cx, cy] = zoomCentre();
   const k = clamp(state.t.k * f, 0.08, 2.5);
   setT({ k, x: cx - (cx - state.t.x) * (k / state.t.k), y: cy - (cy - state.t.y) * (k / state.t.k) }, false);
+}
+/** A transformation applied through the engine's own path (levels of detail, columns): never animated; non-finite values are refused (80-09). */
+function transformer(m) {
+  if (!m || ![m.k, m.x, m.y].every(Number.isFinite)) return false;
+  setT({ k: clamp(m.k, 0.08, 2.5), x: m.x, y: m.y }, false); return true;
+}
+/** The one input guard: no shortcut from an INPUT, TEXTAREA, SELECT or contenteditable element (80-09). */
+function enSaisie(ev) {
+  const e = ev && ev.target;
+  return !!e && (/^(INPUT|TEXTAREA|SELECT)$/.test(e.tagName) || e.isContentEditable === true);
 }
 // Ctrl + wheel (and the trackpad pinch, which sends ctrlKey) zooms around the cursor; a plain wheel or two-finger scroll pans
 svg.addEventListener('wheel', (ev) => {
@@ -1656,9 +1715,25 @@ const routeRow = (ri, extra = '') => {
 };
 const listSec = (title, rows, count, max = 30, note = '') => rows.length ? `<div class="sec"><h3>${h(title)} <span class="c">${count ?? rows.length}</span></h3>${note ? `<p class="pd">${h(note)}</p>` : ''}<div class="list">${rows.slice(0, max).join('')}${rows.length > max ? `<div class="more">${t('+{} more', rows.length - max)}</div>` : ''}</div></div>` : '';
 const pathBox = (p) => `<div class="pp"><span>${h(p).split('/').map((x) => `<span class="sg">${x}</span>`).join('/<wbr>')}</span><button data-copy="${h(p)}" title="${t('Copy')}" aria-label="${t('Copy path')}">${iconI('copy')}</button></div>`;
+const kindLab = (i, kind) => (i.f && KL('feuille:' + nodes.get(i.f.n)?.kind)) || kindFr(kind); // 80-11 : « Plan », « Exigence »… sur Projet
+const ouvrirLab = (i) => (i.type === 'node' && KL('ouvrir:' + i.kind)) || t('Open');
+const rowsFiles = (fl) => fl.map((f) => rowFor('f:' + f.p, f.st ? statePill(f.st) : PLAN ? '' : fmt(f.loc)));
+// la liste des éléments d'un nœud : sur Projet, ceux du nœud puis ceux de ses sous-nœuds, chaque liste titrée par kindLabels['liste:<type>']
+// et sans compte (80-UI-SPEC § 4.2) ; un nœud sans titre de liste n'en rend aucune (le jalon : ses phases suffisent)
+const filesSec = (n, fl) => {
+  if (!PROJ) return listSec(PLAN ? 'Planned files' : t('Files'), rowsFiles(fl), fl.length, 25);
+  if (!KL('liste:' + n?.kind)) return '';
+  const sous = [...nodes.values()].filter((c) => c.parent === n.id);
+  const liste = (o) => {
+    const ti = KL('liste:' + o.kind);
+    return ti ? listSec(ti, rowsFiles(fl.filter((f) => f.n === o.id)), '', 25) : '';
+  };
+  return [n, ...sous].map(liste).join('');
+};
+const parentLab = (owner) => (PROJ ? KL('parent:' + owner.kind) || '' : 'module');
 function header(i) {
   const kind = i.type === 'node' ? i.kind : i.type === 'symbol' ? i.symKind : i.type === 'route' ? t('Endpoint') : i.type === 'module' ? t('file') : i.type;
-  return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kindFr(kind))}</span></div>
+  return `<div class="ph"><span class="ico" style="--c:${colorOf(i)}">${icon(iconKey(i))}</span><span class="kindlabel">${h(kindLab(i, kind))}</span></div>
     <h2 class="pt">${h(i.name)}</h2>${i.desc ? `<p class="pd">${h(i.desc)}</p>` : `<p class="pd empty">${t('No description yet.')}</p>`}`;
 }
 
@@ -1765,11 +1840,24 @@ function connections(item) {
   return { out: rows(out), inn: rows(inn) };
 }
 
+// 80-11 : statut (glyphe + mot) et vague d'un élément du planning ; la vague seulement pour ce qui en porte une (champ présent, nul = sans vague)
+const champs = (f, owner) => {
+  const w = KL('statut:' + owner?.kind + ':' + f.st) || STATE_WORD[f.st] || f.st, nb = Number.isInteger(f.vague);
+  const v = nb ? KL('champ:vague') + ' ' + f.vague : KL('valeur:sans-vague'), cls = h(f.st).replace(/[^\w-]/g, '');
+  const st = f.st ? `<span class="vst vst-${cls}">${h(w)}</span>` : '';
+  return `<div class="vf-champs"><div><span>${h(KL('champ:statut') || '')}</span><b>${st}</b></div>`
+    + ('vague' in f && v ? `<div><span>${h(KL('champ:vague') || '')}</span><b>${h(v)}</b></div>` : '') + '</div>';
+};
+// 80-11 : sur Projet, les liens d'une feuille par sens puis par genre, titrés par kindLabels['entrant:<genre>'] / ['sortant:<genre>'] ;
+// une étiquette vide n'est pas rendue
+const parSens = (ls, sens, autre) => { const m = new Map(); for (const l of ls) m.set(l.k, [...(m.get(l.k) || []), l]);
+  return [...m].map(([k, g]) => { const ti = KL(sens + ':' + k); return ti === '' ? '' : listSec(ti ?? (sens === 'entrant' ? t('Depends on') : t('Used by')),
+    g.map((l) => rowFor(autre(l), '', `var(--k-${l.k})`))); }).join(''); };
 function itemPanel(item, viaConnector) {
   const i = info(item);
   let html = `<div class="sec">${header(i)}`;
   const actions = [];
-  if (drillable(item) && state.container !== item) actions.push(`<button class="btn soft" data-open="${h(item)}">${iconI('drill')}${t('Open')}</button>`);
+  if (drillable(item) && state.container !== item) actions.push(`<button class="btn soft" data-open="${h(item)}">${iconI('drill')}${ouvrirLab(i)}</button>`);
   if (viaConnector || (parentOf.get(item) !== state.container && state.container !== item)) actions.push(`<button class="btn soft" data-go="${h(item)}">${t('Show on map')}</button>`);
   if (i.type === 'node' || i.type === 'dir') {
     const n = i.n, s = statsOf(item);
@@ -1777,7 +1865,7 @@ function itemPanel(item, viaConnector) {
     if (n?.paths?.length || i.d) html += pathBox(i.d ? i.d.path + '/' : n.paths.join('  '));
     if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
     html += '</div>';
-    if (s?.files) {
+    if (s?.files && !PROJ) {
       const langs = Object.entries(n?.stats.langs || {}).sort((a, b) => b[1] - a[1]).slice(0, 5);
       const tot = langs.reduce((a, [, v]) => a + v, 0) || 1;
       const palette = ['#a78bfa', '#38bdf8', '#34d399', '#fbbf24', '#f472b6'];
@@ -1792,7 +1880,7 @@ function itemPanel(item, viaConnector) {
     const depFirst = G.meta?.vfTab === 'project';
     html += listSec(depFirst ? t('Depends on') : t('Used by'), c.inn) + listSec(depFirst ? t('Used by') : t('Depends on'), c.out);
     const fl = (i.d ? i.d.files : G.files.filter((f) => chain('f:' + f.p).includes(item))).slice().sort((a, b) => b.loc - a.loc);
-    html += listSec(PLAN ? 'Planned files' : t('Files'), fl.map((f) => rowFor('f:' + f.p, f.st ? statePill(f.st) : PLAN ? '' : fmt(f.loc))), fl.length, 25);
+    html += filesSec(n, fl);
   } else if (i.type === 'file' || i.type === 'module') {
     const f = i.f, fid = 'f:' + f.p, url = editorUrl(f.p);
     if (f.note) html += `<div class="callout">${h(f.note)}</div>`;
@@ -1801,15 +1889,16 @@ function itemPanel(item, viaConnector) {
     if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}${t('Open in editor')}</a>`);
     if (actions.length) html += `<div class="actions">${actions.join('')}</div>`;
     const owner = nodes.get(f.n);
-    html += `</div><div class="sec"><div class="stats">${PLAN ? `<div><b>${fmt(G.links.filter((l) => l.a === fid).length)}</b><span>${t('uses')}</span></div>` : `<div><b>${fmt(f.loc)}</b><span>${t.mot(f.loc, 'lines')}</span></div>`}<div><b>${(routesByFile.get(f.p) || []).length}</b><span>${t.mot((routesByFile.get(f.p) || []).length, 'endpoints')}</span></div><div><b>${fmt(G.links.filter((l) => l.b === 'f:' + f.p).length)}</b><span>${t('used by')}</span></div></div>
-      ${owner ? `<div class="list" style="margin-top:var(--sp-12)">${rowFor('n:' + owner.id, 'module')}</div>` : ''}</div>`;
+    html += `</div><div class="sec">${PROJ ? champs(f, owner) : `<div class="stats">${PLAN ? `<div><b>${fmt(G.links.filter((l) => l.a === fid).length)}</b><span>${t('uses')}</span></div>` : `<div><b>${fmt(f.loc)}</b><span>${t.mot(f.loc, 'lines')}</span></div>`}<div><b>${(routesByFile.get(f.p) || []).length}</b><span>${t.mot((routesByFile.get(f.p) || []).length, 'endpoints')}</span></div><div><b>${fmt(G.links.filter((l) => l.b === 'f:' + f.p).length)}</b><span>${t('used by')}</span></div></div>`}
+      ${owner ? `<div class="list" style="margin-top:var(--sp-12)">${rowFor('n:' + owner.id, parentLab(owner))}</div>` : ''}</div>`;
     html += listSec(t('Endpoints'), (routesByFile.get(f.p) || []).map((ri) => routeRow(ri)), undefined, 60);
     const inL = G.links.filter((l) => l.b === fid), outL = G.links.filter((l) => l.a === fid);
     // the same words in both modes (PU-G-058): the technical switch adds the Exports list below, it never renames what is already there
-    const doc = /\.(md|mdx|markdown|rst|txt)$/i.test(f.p) && !/(^|\/)SKILL\.md$|(^|\/)agents\//.test(f.p); // a document mentions files, it doesn't call or depend on them; an agent or a skill really dispatches (PU-G-072)
+    const doc = !PROJ && /\.(md|mdx|markdown|rst|txt)$/i.test(f.p) && !/(^|\/)SKILL\.md$|(^|\/)agents\//.test(f.p); // a document mentions files, it doesn't call or depend on them; an agent or a skill really dispatches (PU-G-072)
     const rowL = (l, other) => rowFor(other, doc ? (l.calls?.length ? plural(l.calls.length, 'mention') : t('Mention')) : l.calls?.length ? plural(l.calls.length, 'call') : KIND_PLAIN[l.k] || l.k, `var(--k-${l.k})`);
-    html += listSec(t('Used by'), inL.map((l) => rowL(l, l.a)));
-    html += doc ? listSec(t('Mentions'), outL.map((l) => rowL(l, l.b)), undefined, 30, t('The files, folders and pages this document names or links to.')) : listSec(t('Depends on'), outL.map((l) => rowL(l, l.b)));
+    if (PROJ) html += parSens(inL, 'entrant', (l) => l.a) + parSens(outL, 'sortant', (l) => l.b);
+    else html += listSec(t('Used by'), inL.map((l) => rowL(l, l.a)));
+    if (!PROJ) html += doc ? listSec(t('Mentions'), outL.map((l) => rowL(l, l.b)), undefined, 30, t('The files, folders and pages this document names or links to.')) : listSec(t('Depends on'), outL.map((l) => rowL(l, l.b)));
     const handlers = new Set((routesByFile.get(f.p) || []).map((ri) => routes[ri].h));
     if (technical()) html += listSec('Exports', (f.s || []).map((s, k) => [s, k]).filter(([s]) => !handlers.has(s[0])).map(([s, k]) => `<a class="row" ${parentOf.has(`s:${f.p}#${k}`) ? `data-go="s:${h(f.p)}#${k}"` : ''}><span class="dot" style="background:var(--n-symbol)"></span><span class="rt"><div class="rn" style="font-family:var(--mono);font-size:12px">${h(s[0])}</div>${s[4] ? `<div class="rd">${h(s[4])}</div>` : ''}</span><span class="rc">${h(s[1])} · L${s[2]}</span></a>`), undefined, 60);
   } else if (i.type === 'route') {
@@ -2474,7 +2563,7 @@ phoneQuery.addEventListener('change', placeZoom); placeZoom();
 $('#btn-panel').onclick = () => setPanel(document.body.classList.contains('no-panel'));
 Object.assign(state.kinds, store.get('kinds', {}));
 window.addEventListener('keydown', (ev) => {
-  if (pal.classList.contains('open') || ev.target.tagName === 'INPUT') return;
+  if (pal.classList.contains('open') || enSaisie(ev)) return;
   if (ev.key === '/' || (ev.key === 'k' && (ev.metaKey || ev.ctrlKey))) { ev.preventDefault(); openPalette(); }
   else if (ev.key === 'Backspace') { ev.preventDefault(); up(); }
   else if (ev.key === 'Escape') {
@@ -2485,13 +2574,14 @@ window.addEventListener('keydown', (ev) => {
     else if (ev.target === document.body || ev.target === document.documentElement || svg.contains(ev.target)) { if (state.selected) select(null); else up(); }
   }
   else if (G.meta?.vfTab === 'equipe' && /^[fFpP=+-]$/.test(ev.key)) { /* Équipe : ni cadrage, ni tiroir, ni zoom par la frappe (PU-G-137, Q8) */ }
+  else if ((ev.metaKey || ev.ctrlKey || ev.altKey) && /^[fFpP=+-]$/.test(ev.key)) { /* une lettre seule : jamais avec ⌘, Ctrl ou Alt */ }
   else if (ev.key === 'f' || ev.key === 'F') fit(true);
   else if (ev.key === 'p' || ev.key === 'P') $('#btn-panel').click();
   else if (ev.key === 'Enter' && typeof state.selected === 'string') open(state.selected);
   else if (state.flow && ev.key === 'ArrowRight') $('#fl-next')?.click();
   else if (state.flow && ev.key === 'ArrowLeft') $('#fl-prev')?.click();
-  else if (ev.key === '=' || ev.key === '+') zoomBy(1.2);
-  else if (ev.key === '-') zoomBy(0.83);
+  else if (ev.key === '=' || ev.key === '+') zoomBy(1.25);
+  else if (ev.key === '-') zoomBy(0.8);
 });
 // ======================= extension API =======================
 // Features in assets/ui/*.js are inlined after this script and talk to the viewer only through
@@ -2557,6 +2647,8 @@ window.Floorplan = Object.freeze({
   go, reveal, select, open, up, fit, render: (o) => render({ keepTransform: true, ...o }), refreshPanel: () => renderPanel(),
   showBoard, playFlow, startFlow, stopFlow: () => { if (state.flow) stopFlow(); },
   freeArea: () => freeArea(),
+  // 80-09 : cadrage unique, champ de lecture, garde de saisie, transformation par le chemin du moteur
+  cadrage, enSaisie, transformer, setReadingArea(fn) { readingProvider = typeof fn === 'function' ? fn : null; },
   closeMenus: () => { closeMenu(); fm.classList.remove('open'); legendEl.classList.remove('open'); },
   // asking
   addAskContext, ask: (text) => { closeSheet(); askInput.value = text; submitAsk(); }, askEngine: () => askState.engine,

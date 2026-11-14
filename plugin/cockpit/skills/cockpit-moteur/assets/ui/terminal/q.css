@@ -67,7 +67,17 @@ button { font: inherit; color: inherit; }
 .vf-q-depasse { flex: 1 1 100%; }
 .vf-q-reste { flex: 1 1 100%; display: flex; align-items: center; gap: var(--sp-8); }
 /* bandeau de proposition (72 LB2, réglages du 2026-11-06) : contrôles aux variables de Q, texte neutre ; sorti de la vue au lot 8 LB3 pour lui rendre ses lignes */
-#proposition-mode { border: thin solid var(--hair-2); border-radius: var(--r-ctl); background: var(--raise-2); color: var(--text); color-scheme: inherit; font: inherit; }
+/* 80-17 (P80-D-20, AUDC-F1) : mêmes valeurs que #vf-modele (assets/ui/03-vf-charte.js) ; autre origine, donc des valeurs
+   en dur, seule exception à « aucune valeur en dur » ; chevron en dégradés, aucune URL */
+#proposition-mode { appearance: none; -webkit-appearance: none; box-sizing: border-box; height: 28px; padding: 0 var(--sp-24) 0 var(--sp-8);
+  border: 1px solid var(--hair-2); border-radius: 8px; background-color: var(--raise); color: var(--text); color-scheme: inherit; font: inherit;
+  --vf-chev: var(--text-3);
+  --vf-trait: transparent calc(50% - .75px), var(--vf-chev) calc(50% - .75px), var(--vf-chev) calc(50% + .75px), transparent calc(50% + .75px);
+  background-image: linear-gradient(to bottom left, var(--vf-trait)), linear-gradient(to bottom right, var(--vf-trait));
+  background-repeat: no-repeat; background-size: 5px 5px; background-position: right 14px center, right 9px center; }
+#proposition-mode:disabled { color: var(--text-4); opacity: 1; --vf-chev: var(--text-4);
+  --vf-trait: transparent calc(50% - .75px), var(--vf-chev) calc(50% - .75px), var(--vf-chev) calc(50% + .75px), transparent calc(50% + .75px); }
+@media (pointer: coarse) { #proposition-mode { height: 36px; } }
 #proposition input[type="checkbox"] { accent-color: var(--on); color-scheme: inherit; }
 #proposition-lancer[aria-disabled="true"], #proposition-lancer[aria-disabled="true"]:hover { cursor: not-allowed; background: var(--raise-2); color: var(--text-3); }
 .vf-lancer-armement { display: none; } #proposition:has(#proposition-lancer[aria-disabled="true"]) .vf-lancer-armement { display: inline; }

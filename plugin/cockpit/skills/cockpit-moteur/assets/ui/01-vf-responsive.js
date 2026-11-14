@@ -105,7 +105,6 @@
       header[data-vf-git] .hc { flex-basis: 72px; } /* l'ouvreur Git ajoute 48 px à la rangée : la recherche en cède autant (même règle que 76-vf-git-entete.js), pour que l'en-tête se replie aux MÊMES largeurs avec et sans Git (témoin F5, Phase 78) */
     }
     @media (min-width: 1000px) and (max-width: 1279px) and (not (pointer: coarse)) {
-      header #theme-toggle { width: 36px; height: 36px; padding: 0; justify-content: center; } /* l'ouvreur Git garde ses 44 px (P78-D-34) */
       header .hl { flex: 1 1 auto; } /* la colonne gauche prend la largeur naturelle de son contenu et c'est la RECHERCHE (poids 100 000, plancher de 152 px de P78-D-39) qui cède la première, comme dès 1 280 px */
       header .hc { flex: 0 100000 400px; }
       
