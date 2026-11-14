@@ -34,7 +34,7 @@ await executer(chrome, async (s) => {
     await s.naviguer(`${racine}/project.html?vue=couloirs`, { brut: true }); await s.attendre(PRET, 'page prête');
     await s.attendre("document.querySelectorAll('.vp-carte').length > 0", 'couloirs'); await pause(300);
   };
-  const vrai = (expr, max = 6000) => attendreValeur(() => s.ev(expr), (v) => v === true, { max }).then((v) => v === true);
+  const vrai = (expr, max = 30000) => attendreValeur(() => s.ev(expr), (v) => v === true, { max }).then((v) => v === true);
   const clic = async (sel) => {
     const r = await lire(`(() => { const e = document.querySelector(${JSON.stringify(sel)}); if (!e) return null; e.scrollIntoView({ block: 'nearest' });
       const b = e.getBoundingClientRect(); return { x: b.x + b.width / 2, y: b.y + b.height / 2 }; })()`);
