@@ -18,4 +18,4 @@ Rituel levé : régime allégé (consigne de Samuel, message session principale,
 
 ## Suites jouées
 
-`test-cockpit-ecrans-recent.sh` vert (18 PASS, 2 s) ; `test-cockpit-vendor.sh` vert (253 PASS, 239 s, jeton) ; `test-cockpit-chaine-xss.sh` vert (34 PASS, 167 s) ; `test-cockpit-coquille.sh` 111/3, identique à la base (1 001 s) ; `test-cockpit-responsive.sh` 377/3 puis cause de R13.3 corrigée (1 764 s sous charge) ; `check-machine-paths.sh`, cliquet de colonnes verts.
+`test-cockpit-ecrans-recent.sh` vert (18 PASS, 2 s) ; `test-cockpit-vendor.sh` vert (253 PASS, 239 s, jeton) ; `test-cockpit-chaine-xss.sh` vert (34 PASS, 167 s) ; `test-cockpit-coquille.sh` 111/3, identique à la base (1 001 s) ; `test-cockpit-responsive.sh` 377/3 puis, la cause de R13.3 corrigée (filtre de `chrome-responsive.mjs`), REJOUÉ APRÈS 75-09c : 380 PASS / 0 FAIL, R13.3, R19, R20 et Q9.1 verts (1 299 s, jeton) ; `check-machine-paths.sh`, cliquet de colonnes verts.
