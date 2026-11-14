@@ -31,3 +31,13 @@ Aucun fichier `77-vf-git-*` ni `74-vf-frise*.js` (74-04) modifié (diff par fich
 - 74-09 : ajouter les lignes `AJOUT` de `VENDORED.txt` et l'inscription au partage de `ci-shard-suites.sh` pour `74-vf-frise-depot.js`, `74-vf-frise-depot-voies.js`, `74-vf-cout.js`, `74-vf-cout-tableau.js` et la suite `test-cockpit-frise-cout.sh` (non posées ici).
 - 74-04 / 74-05 : les sondes S6, S17 et S19 de `test-cockpit-frise-vue.sh` ne connaissent pas le second abonné `frise` ni le `__vfFiche` réel de la fiche ; à rapprocher dans le plan de la fiche.
 - Les extensions `depot` et `cout` lisent `ctx.emplacement`, `ctx.nodes.lignes` (`.vf-frise-synthese`) et `ctx.nodes.sr` (liste `ul`) : toute refonte de ces nœuds par 74-04 ou 74-06 les touche.
+
+## Correction après revue
+Régime allégé inchangé (rituel levé : consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Suite écrite d'abord et vue rouge (`144bc3b5`, 8 échecs D15 à D17), puis corrigée.
+- Propriété 1 (focus conservé) : chaque contrôle porte une clé `data-foc` (bascule « Regrouper par », dépli, commit, « Réessayer », « + N branches ») ; le redessin la relit sur le contrôle actif et la retrouve par comparaison d'attribut (D15, cinq contrôles, un événement frise chacun).
+- Propriété 2 (aucune donnée de frise) : le tableau de la lecture précédente restait sous la carte d'erreur ou le vide. Écart de périmètre assumé, UNE ligne dans `74-vf-frise.js` : la branche sans voie (erreur, chargement, vide) vide l'emplacement `cout`. « Détail du coût » vivait déjà dans le bloc de synthèse que la frise vide (D16, 503 puis fenêtre vide).
+- Propriété 3 (sélecteur) : le dépli ne construit plus de sélecteur avec le fichier de la mission ; une mission au fichier `x"y.md` ne lève rien et le bouton garde le focus (D17).
+- Trouvé en jouant la suite de la frise : S16 rouge après la fusion. Cause réelle dans le Dépôt : un commit à l'instant « maintenant » débordait la piste de 6 px (zone de saisie de 44 px), le défilement initial n'était plus au maximum. Position bornée à la piste, commits ramenés au même point groupés, sonde D2 ajoutée ; la rangée Dépôt garde aussi une hauteur minimale en chargement et en échec (n'était pas la cause, gardé).
+- Versés au BACKLOG par le manager, non touchés : « + N branches » avant les commits dans le DOM, chiffres de la synthèse sans emphase.
+
+Suites jouées (tête commitée `e1146c6f`) : test-cockpit-frise-cout.sh 91 réussis, 0 échec (43 s) ; test-cockpit-frise-vue.sh 101 réussis, 1 échec (138 s) : S10 (« Frise mise à jour » jamais annoncée) rouge sous charge, rejoué seul : 11 réussis, 0 échec. Les sept rouges S6, S17 et S19 du premier jeu ont disparu avec la correction de la fiche.
