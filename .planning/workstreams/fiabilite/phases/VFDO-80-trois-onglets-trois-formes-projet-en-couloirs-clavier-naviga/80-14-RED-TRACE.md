@@ -12,3 +12,12 @@ Rouges attendus (tous constatés) :
 
 Verts à vide sur la base, déclarés (ils n'ont pas de témoin rouge) : PA2.7 (aucun mot anglais : le texte est vide), PA2.8b (la ligne du terminal n'est pas
 parmi les huit usuelles : il n'y a aucune usuelle), PA0, PA0t, PA9t, H0. PA2.8b et PA2.7 prennent leur sens une fois PA2.1 et PA2.8 verts.
+
+## Correction ciblée de revue (M3, M4, mineurs)
+
+Rouge de M3 (PA4.1) sur la tête d'avant la correction (module `git archive` de 77d2d8a74, section `pa4` seule) : `ajouter({ id, onglets, libelle, action, palette: true })` sans `touche`
+est refusé sans message (`ajoutees` = [false, false], `erreurs` = 0) ; `{ …, visible: true }` est accepté, puis `sourceActions` lève et tout le groupe Actions disparaît.
+Après correction : `ajoutees` = [true, true], 3 `console.error` (visible ignoré, libellé manquant, onglets invalides), actions natives présentes, retrait effectif, `autre` = 0 après deux allers-retours (PA4.2).
+
+M4 (PA4.3), mutant à la main sur une copie du module : `h()` retiré de `it.libelle` et `it.detail` dans `rowSource` de `viewer.html` : la section rend `img` = 3 (trois balises `<img>` dans `#results`), `texte` = 0 :
+PA4.3 rougit (attendu `img` = 0, `texte` >= 3). Sans mutant : `img` = 0, `texte` = 3, `window.__p` indéfini. Le fichier du dépôt n'est pas touché (copie sous le dossier de travail).

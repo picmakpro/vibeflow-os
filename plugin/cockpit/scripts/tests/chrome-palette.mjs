@@ -11,13 +11,17 @@ const HUIT = ["Ajuster à l'écran", 'Cadrer la sélection et ses voisins', "Mon
   "Ouvrir l'historique Git", 'Afficher les raccourcis'];
 const TERMINAL = "Le terminal s'active avec --terminal";
 // who de fixture : le mandat et le titre ne doivent jamais s'afficher (P69-D-16)
-const WHO = [{ kind: 'subagent', id: 'a1b2c3d4e5f6', role: 'vf-coder', tree: 't', source: 'registered', task: 'MANDAT-SECRET', titre: 'TITRE-SECRET' }];
+// T-80-29 : un nom de phase, un rôle d'agent et un libellé d'extension hostiles doivent s'afficher en texte
+const HOSTILE = '<img src=x onerror=window.__p=1>';
+const WHO = [{ kind: 'subagent', id: 'a1b2c3d4e5f6', role: 'vf-coder', tree: 't', source: 'registered', task: 'MANDAT-SECRET', titre: 'TITRE-SECRET' },
+  { kind: 'subagent', id: 'f0e1d2c3b4a5', role: HOSTILE, tree: 't', source: 'registered' }];
 
 await executer(chrome, async (s) => {
   const o = { erreurs: {}, pa1: {}, pa2: {}, pa3: {} }, reqs = [];
   await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }); await s.send('Network.enable');
   s.ecouter('Network.requestWillBeSent', (p) => reqs.push({ m: p.request.method, u: new URL(p.request.url).pathname, t: p.type }));
-  const sec = async (nom, f) => { try { await f(); } catch (e) { o.erreurs[nom] = String(e.message).slice(0, 160); } };
+  const sec = async (nom, f) => { if (process.env.PA_SEC && !process.env.PA_SEC.split(',').includes(nom)) return; try { await f();
+      } catch (e) { o.erreurs[nom] = String(e.message).slice(0, 160); } };
   const lire = async (expr) => { const v = await s.ev(`JSON.stringify(${expr})`); return v === undefined ? null : JSON.parse(v); };
   const vue = (w, h, mobile) => s.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile });
   const touche = async (key, mod = 0) => {
@@ -48,8 +52,11 @@ await executer(chrome, async (s) => {
       await s.attendre(`VF_ONGLETS.courant() === ${JSON.stringify(nom)} && ${PRET}`, `onglet ${nom}`); await pause(700); };
   const envoi = (depuis) => reqs.slice(depuis).filter((r) => r.m === 'POST' || (r.u.startsWith('/api/') && !r.u.startsWith('/api/vf/'))).length;
   // le magasin est lu à la saisie par `window.VF_ETAT` : un `who` de fixture, le reste du magasin réel
-  const aide = () => s.ev(`(() => { const r = window.VF_ETAT; window.VF_ETAT = Object.freeze({ ...r,
-      lire: (c) => (c === 'who' ? { workers: ${JSON.stringify(WHO)} } : r.lire(c)) }); return 1; })()`);
+  const aide = () => s.ev(`(() => { const r = window.VF_ETAT, H = ${JSON.stringify(HOSTILE)}; window.__etat0 = r; window.VF_ETAT = Object.freeze({ ...r,
+      lire: (c) => { const v = r.lire(c); if (c === 'who') return { workers: ${JSON.stringify(WHO)} };
+        return c === 'etat' && v && v.signal ? { ...v, signal: { ...v.signal, phases: [...v.signal.phases, { key: 'x|9', n: '9', ws: null,
+            nom: H }] } } : v; } });
+      return 1; })()`);
   const choisirLigne = async (lib) => { // flèches puis Entrée sur la rangée de ce libellé
     const i = (await lignes()).findIndex((l) => l.lib === lib); if (i < 0) throw new Error(`rangée absente : ${lib}`);
     for (let k = 0; k < i; k++) await touche('ArrowDown'); await touche('Enter');
@@ -158,7 +165,7 @@ await executer(chrome, async (s) => {
       "ed: document.querySelector('#results .ed').textContent, " +
       "live: document.getElementById('pal-live').textContent })");
     await s.ev("document.getElementById('search').select()");
-    await s.send('Input.insertText', { text: '<img src=x onerror=window.__p=1>' }); await pause(500);
+    await s.send('Input.insertText', { text: '<img src=zz onerror=window.__p=1>' }); await pause(500);
     o.pa3.hostile = await lire("({ p: typeof window.__p, img: document.querySelectorAll('#results img').length, " +
       "texte: document.querySelector('#results .en').textContent })");
     await touche('Escape');
@@ -182,6 +189,33 @@ await executer(chrome, async (s) => {
     await poser(''); const v = (await lignes()).map((x) => x.lib); await touche('Escape'); await poser('terminal');
         const t = (await lignes()).map((x) => x.lib);
     o.pa3.doubles = { huit: HUIT.map((x) => v.filter((y) => y === x).length), terminal: t.filter((x) => x === TERMINAL).length };
+  });
+  await sec('pa4', async () => { // M3 : ajouter() valide ou neutralise, retrait, deux allers-retours ; M4 : texte hostile de phase, d'agent, d'extension
+    // (les allers-retours d'onglet passent AVANT la première ouverture de la palette : constat de ce plan, une palette ouverte puis fermée avant
+    // VF_ONGLETS.aller laisse la promesse sans réponse, y compris sur la tête d'avant ce plan : hors périmètre)
+    await charger('index.html');
+    const A = (e) => `(window.__r = window.__r || {}, window.__r[${JSON.stringify(e.id || 'x')}] = VF_RACCOURCIS.ajouter({ ...${JSON.stringify(e)},
+        action: () => {} }))`;
+    const base = { onglets: ['code'], palette: true }, libs = async () => (await lignes()).map((l) => l.lib);
+    await s.ev(A({ ...base, id: 'e-quitte', libelle: 'Autre action' }));
+    for (const n of ['projet', 'code', 'projet', 'code']) await onglet(n);
+    await poser('>'); const apres = await libs(); await touche('Escape');
+    o.pa4 = { apres: { zoom: apres.filter((x) => x === 'Zoom avant').length, autre: apres.filter((x) => x === 'Autre action').length } };
+    await aide(); await s.attendre("!!(VF_ETAT.lire('etat').signal && VF_ETAT.lire('etat').signal.phases.length)", 'phases');
+    await s.ev("window.__ce = []; console.error = (...a) => window.__ce.push(a.join(' ')); 1");
+    for (const e of [{ ...base, id: 'e-ok', libelle: 'Mon action' }, { ...base, id: 'e-vis', libelle: 'Autre action', visible: true },
+      { ...base, id: 'e-xss', libelle: HOSTILE }, { id: 'e-sans', onglets: ['code'] }, { ...base, id: 'e-ong', libelle: 'Z',
+          onglets: ['x'] }]) await s.ev(A(e));
+    await poser('>'); const tous = await libs();
+    const natifs = [HUIT[0], HUIT[3], HUIT[4], HUIT[5], HUIT[6]].every((x) => tous.includes(x));
+    Object.assign(o.pa4, { erreurs: await lire('window.__ce.length'), natifs, ajoutees: ['Mon action', 'Autre action'].map((x) => tous.includes(x)),
+        refusee: tous.includes('Z') });
+    await touche('Escape'); await s.ev("window.__r['e-ok'](); 1"); await poser('>mon action'); o.pa4.retiree = !(await libs()).includes('Mon action');
+    await s.ev("document.getElementById('search').select()"); await s.send('Input.insertText', { text: 'img' }); await pause(500);
+    o.pa4.xss = await lire("({ p: typeof window.__p, img: document.querySelectorAll('#results img').length, " +
+      "groupes: [...document.querySelectorAll('#results .gt')].map((g) => g.textContent), " +
+      "texte: document.getElementById('results').innerText.split('<img').length - 1 })");
+    await touche('Escape');
   });
   return o;
 });

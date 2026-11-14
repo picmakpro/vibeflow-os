@@ -2038,7 +2038,7 @@ function runSearch(muet) {
   const brut = sInput.value, modeA = brut.trimStart().startsWith('>'), q = modeA ? brut.trimStart().slice(1) : brut;
   const terms = q.trim().toLowerCase().split(/\s+/).filter(Boolean), vide = !terms.length;
   palMode.hidden = !modeA; palSlash.hidden = brut !== '';
-  const par = {};
+  const par = Object.create(null); // a source's group name is only a key here, never an identifier
   let scored = [];
   if (modeA) { /* le mode actions : les actions seules */ }
   else if (vide) scored = (kids.get('root') || []).map((id) => [1, index.find((x) => x.id === id)]).filter((x) => x[1]);
@@ -2065,7 +2065,7 @@ function runSearch(muet) {
   const titres = tous.length > 1; // an heading only when two groups at least have results
   sItems = tous.flatMap((g) => par[g]); sActive = 0;
   let n = 0;
-  sRes.innerHTML = tous.map((g) => `<div role="group" aria-labelledby="pal-g-${g}"><div class="gt" id="pal-g-${g}"${titres ? '' : ' hidden'}>${h(g === 'entites' ? t('Entities') : par[g][0].titre || g)}</div>${
+  sRes.innerHTML = tous.map((g, gi) => `<div role="group" aria-labelledby="pal-g-${gi}"><div class="gt" id="pal-g-${gi}"${titres ? '' : ' hidden'}>${h(g === 'entites' ? t('Entities') : par[g][0].titre || g)}</div>${
     par[g].map((it) => { const i = n++; return `<div class="r" role="option" id="pal-o-${i}" aria-selected="false" data-i="${i}">${it.ent ? rowEntite(it.ent) : rowSource(it)}</div>`; }).join('')}</div>`).join('')
     || (vide ? `<div class="empty"><div class="en">${t('No matches')}</div></div>`
       : `<div class="empty"><div class="en">${t('No matches for “{}”', h(q.trim()))}</div><div class="ed">${t('Try a file name, or type {} for actions.', '>')}</div></div>`);

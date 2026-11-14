@@ -123,6 +123,13 @@ OK07=false; [ "$C07" = 200 ] && grep -qF VF_RACCOURCIS "$WORK/f07.js" && OK07=tr
 OK79=false; [ "$C79" = 200 ] && grep -qF 'vibeflow:fr' "$WORK/f79.js" && OK79=true
 chk "PA3.5 — les deux fichiers sont servis (200, corps attendu) et chargés ; après deux allers-retours, chaque action une fois, la ligne du terminal une fois" \
   "[$OK07, $OK79, j.pa3.ressources, j.pa3.doubles]" '[true,true,[true,true],{"huit":[1,1,1,1,1,1,1,1],"terminal":1}]'
+chk "PA4.1 — ajouter() : une entrée sans touche est acceptée, visible non fonction et entrée invalide neutralisées avec console.error, \
+les actions natives restent, le retrait retire" \
+  "[j.pa4.natifs, j.pa4.ajoutees, j.pa4.refusee, j.pa4.erreurs >= 3, j.pa4.retiree]" "[true,[true,true],false,true,true]"
+chk "PA4.2 — après deux allers-retours d${AP}onglet : chaque action native une fois, l${AP}ajout de l${AP}onglet quitté a disparu" \
+  "[j.pa4.apres.zoom, j.pa4.apres.autre]" "[1,0]"
+chk "PA4.3 — T-80-29 : un nom de phase, un rôle d${AP}agent et un libellé d${AP}extension hostiles s${AP}affichent en texte, window.__p indéfini" \
+  "[j.pa4.xss.p, j.pa4.xss.img, j.pa4.xss.groupes, j.pa4.xss.texte >= 3]" '["undefined",0,["Actions","Phases","Agents"],true]'
 chk "PA9 — témoin : aucune section du pilote n${AP}a échoué" "Object.entries(j.erreurs).map(([k, v]) => k + ' ' + v).join(' | ')" ""
 
 echo "=== PA2.8t — avec --terminal : même rangée, même texte, aucun nœud du terminal créé par la palette ==="
