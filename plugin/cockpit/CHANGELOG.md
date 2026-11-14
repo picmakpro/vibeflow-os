@@ -197,12 +197,12 @@ Aucun bump de version à ce stade (un seul bump pour la vague, à la jointure). 
 - **Fiche d'un agent** plein cadre (nom, « Lire le rapport », voie de la frise) : faits, mandat à la demande, fil daté filtrable (Messages, Outils, Erreurs), markdown fermé rendu en nœuds DOM (jamais un lien actif). Le champ facultatif `echec: true` d'une ligne d'outil du fil réduit (`cockpit-transcript@2`) vient de `is_error`, apparié par identifiant d'appel exact.
 - **Coût** en jetons et en durées sur la fenêtre, par agent, mission ou étage ; un message de l'API écrit sur plusieurs lignes est compté une fois ; rien n'est estimé, aucun montant.
 - **Relecture au curseur** : repère au clavier, au pointeur et au toucher, encart « À cet instant », fichiers à l'instant lus sous plafond, « Voir sur la carte » (couche exclusive `relecture` du canal de marques de la 75).
-- **Retraits** : le lecteur de repli de la régie et l'export de transcript qui le servait (contrat P73-C2) ; la fiche est le seul lecteur du fil.
+- **Retraits** : le lecteur de repli de la régie et l'export de transcript qui le servait (contrat P73-C2) ; la fiche est le seul lecteur du fil. Le détail qui s'ouvrait sous une ligne de la régie est retiré aussi : la fiche annule l'ouverture, il n'était plus atteignable. Ses champs (nœud, phase, branche, arbre, identifiant court, fichiers modifiés, lancement depuis la carte) se lisent tous dans la fiche, y compris au clavier ; la ligne de la régie ne se déplie plus (plus de `aria-expanded` sur le nom, plus d'Échap de repli), le nom ouvre la fiche.
 - **Bornes** (`test-cockpit-frise-bornes.sh`) : routes en GET seul derrière Host, Origin et jeton ; `{ seq, at, sig }` seuls dans le flux, clés `doing`, `mandat`, `messages`, `outils`, `fil` refusées à toute profondeur ; ni frise, ni fiche, ni fil dans l'export ; aucune requête hors `127.0.0.1` ; la dernière commande nulle part ; chaîne XSS étendue (donnée piégée, rendu en texte sous la CSP, témoin C0 sur copie vulnérable) ; champs lus déclarés au contrat de forme (bloquant) ; une ligne `AJOUT` de `VENDORED.txt` par module `ui/74-vf-*.js`, en ordre. Dix mutants sur copie du module, chacun rougit sa sonde.
 - **Suites** : `test-cockpit-frise-modele.sh`, `-fiche-texte.sh`, `-frise-vue.sh`, `-fiche.sh`, `-frise-curseur.sh`, `-frise-cout.sh`, `-equipe-retraits.sh`, `-repli-retrait.sh`, `-frise-bornes.sh`, inscrites au partage de la CI.
 - **Limites dites** : 24 h ; aucune action sur une session ; nœuds et titres de mission piégés joués par la fiche (`test-cockpit-fiche.sh` P14), pas par la chaîne sur serveur réel.
 
-### Retiré
+### Retiré — Phase 77 (77-02)
 - **La prose du STATE sous « Maintenant » (77-02, SYNT-09)** : `meta.vf` ne recopie plus `last_activity_desc` ; la synthèse datée la remplace (un ajout, un retrait).
 
 ### Ajouté — Phase 79
