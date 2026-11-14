@@ -798,3 +798,16 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - Vérification : aucun test ne branche la vraie collecte des questions sur la lecture de la régie (fixture F2 de `regie-rg-questions.sh` traduite à la main) ; contrôle manuel fait le 2026-11-14 sur ce dépôt, forme conforme. À figer par un test bout en bout.
 
 **Déclencheur de reprise :** la prochaine retouche de la régie de la Phase 73 ou de `vf-cockpit-questions-attente.mjs`.
+
+## Cockpit : mineurs du juge de design de fin de Phase 76 (traçabilité) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** `vf-design-judge`, une passe sur captures à 1440, 1024 et 390 px, deux thèmes, 75/100 passed ; régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Le bloquant (défilement horizontal des panneaux d'objet) et les deux majeurs (identifiant de phase écrasé au Jalon, marqueur de pliage absent) sont corrigés ; restent :
+- Bilans à plusieurs emplacements (Mémoire, maillons non lus du Jalon) : le retour à la ligne coupe un emplacement entre son nombre et son mot.
+- Panneau d'une décision : le bouton de phase dit deux fois le numéro (« Phase 90, Phase 90 · P90 »).
+- « + N autres exigences » décalé de 12 px par rapport aux lignes ; entrée haute sans indice de clic et avec un vide bas plus grand que les autres sections.
+- Légende : « Légende : » 3 px plus bas que les paires ; texte après un octogone sans retrait à la ligne ; dans « Chaîne », chemins et puces à égale distance de deux maillons.
+- Chemins copiables coupés par la fin (le nom du fichier disparaît) : couper le début ou les dossiers intermédiaires.
+- Lignes-boutons (dont la ligne de commit) sans indice de cliquabilité.
+- Phase 80 (signalé) : l'en-tête de la feuille à 390 px laisse voir en transparence le texte qui défile dessous.
+
+**Déclencheur de reprise :** la recette de Samuel sur l'onglet Projet, ou la prochaine retouche des fichiers `ui/74-vf-trace*.js`.
