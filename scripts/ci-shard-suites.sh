@@ -152,6 +152,7 @@ durees() {
 109 plugin/cockpit/scripts/tests/test-cockpit-projet-liste.sh
 649 plugin/cockpit/scripts/tests/test-cockpit-projet-visite.sh
 1509 plugin/cockpit/scripts/tests/test-cockpit-projet.sh
+26 plugin/cockpit/scripts/tests/test-cockpit-questions-attente.sh
 20 plugin/cockpit/scripts/tests/test-cockpit-questions.sh
 23 plugin/cockpit/scripts/tests/test-cockpit-reconnexion.sh
 6 plugin/cockpit/scripts/tests/test-cockpit-reseau.sh
@@ -178,6 +179,13 @@ durees() {
 955 plugin/cockpit/scripts/tests/test-cockpit-terminal-tiroir.sh
 27 plugin/cockpit/scripts/tests/test-cockpit-terminal-xss.sh
 667 plugin/cockpit/scripts/tests/test-cockpit-terminal-xterm.sh
+29 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-chaine.sh
+29 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-collecte.sh
+4 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-decisions.sh
+9 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-memoire.sh
+53 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-page.sh
+58 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-panneaux.sh
+48 plugin/cockpit/scripts/tests/test-cockpit-tracabilite-route.sh
 28 plugin/cockpit/scripts/tests/test-cockpit-transcript.sh
 80 plugin/cockpit/scripts/tests/test-cockpit-vendor.sh
 10 plugin/cockpit/scripts/tests/test-cockpit-vie.sh

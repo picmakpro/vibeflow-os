@@ -114,3 +114,16 @@ cibles brutes d'avant (--porte-brut) : f:req/deux/DEUX-01 f:req/un/UN-01 f:req/u
      obtenu:  [false]
   Résultats : 133 PASS / 1 FAIL
 ==================================
+
+## Après le retrait (tête 5de90fab7)
+R76.2a : la sortie normalisée de --porte sur le lab de référence est identique à 76-08-PORTE-AVANT.json (cmp -s : identique) ; sha256 = 2d315587389cd22b019bd68e41b539360357c57b70247f1959dc86583ec2dd7b
+R76.2b : sortie --porte-brut d'après : 11 exigences lues, cibles distinctes :  (avant : f:req/… non nulles)
+R76.1, R76.2a, R76.2b, R76.2b', R76.4a à R76.4g, P1.4, P5.3, R1.9, R2.9 : verts (test-cockpit-projet-graphe.sh)
+C8.0, C8.1 : verts après le retrait (test-cockpit-tracabilite-page.sh, 76-08-COUVERTE-AVANT.txt, 9 lignes)
+PL2.1, PL2.2, PL2.9 (test-cockpit-projet-liste.sh, 51 PASS) et PV2.1, PV2.5, PV2.7 (test-cockpit-projet-vocabulaire.sh, 18 PASS) : verts, non modifiés (PV2.3 réécrit : plus de carte d'exigence)
+Négatif de la 80, motif strict du plan (\.req\b | 'data' | couvre | kind…'exigences') sur ui/41-vf-projet-*.js : UNE occurrence, 41-vf-projet-vue.js:191, le mot « recouvre » d'un commentaire sur le tiroir Git (aucun rapport avec le nœud) ; corps de la porte et marqueurs : aucune occurrence. Fichier de la 80 non touché (hors périmètre) ; constat remonté au retour.
+
+## R76.0 — inventaire d'après (TROUVEES = 57, 76 avant) : occurrences restantes de vf-cockpit-project.mjs, vf-cockpit-ask.mjs, ui/41-vf-projet-*.js
+OCCURRENCE plugin/cockpit/scripts/vf-cockpit-project.mjs:94:[.req] const ownReqs = (ph) => [...reqs.values()].filter((r) => r.phase === ph.n && (r.wsKey === '*' ? archiveDe(ph, 
+OCCURRENCE plugin/cockpit/scripts/vf-cockpit-project.mjs:241:[.req] counts: { phases: phases.size, plans: files.filter((f) => f.p.endsWith('-PLAN.md')).length, reqs: reqs.size, r
+OCCURRENCE plugin/cockpit/skills/cockpit-moteur/assets/ui/41-vf-projet-vue.js:191:[couvre] if (d !== debutPose) { // le tiroir Git recouvre le bord gauche : une extrémité de début, la vue ne bouge pas

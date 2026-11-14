@@ -779,3 +779,12 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - **Nom du lab voisin :** pas d'assainissement côté page des caractères de contrôle (assuré par le serveur).
 
 **Déclencheur de reprise :** la prochaine passe sur la page de la régie.
+
+## Cockpit : la clé `planning` de VF_ETAT n'avance pas sur une exigence ajoutée seule — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** Aucune donnée fausse : une lecture à jour attend le rechargement de la page. **Origine :** Phase 76 (76-08), limite demandée par la session principale (décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée, prise par la session principale le 2026-11-14).
+- **Observé :** la clé `planning` de `VF_ETAT` n'avance que sur un changement de statut, de pied, de résumé ou de structure des nœuds. Un SUMMARY réécrit sur place, ou une ligne ajoutée à un tableau de ROADMAP ou de REQUIREMENTS, n'émet aucun `patch` : `vf-cockpit-live.mjs` ne compare que le statut, le pied et le résumé. Une exigence ajoutée sans l'un de ces changements n'apparaît donc qu'au rechargement de la page (section Traçabilité, panneau d'exigence).
+- **Mesure :** faite par la Phase 79 en livrant `246598c3`.
+- **Pas de correctif dans ce jalon.** Dite dans le README du module, à la suite de la description de la route `vibeflow/cockpit-trace@1`.
+
+**Déclencheur de reprise :** la prochaine phase qui touche `vf-cockpit-live.mjs` ou la comparaison des `patch`, ou un testeur qui ne voit pas une exigence neuve sans recharger.
