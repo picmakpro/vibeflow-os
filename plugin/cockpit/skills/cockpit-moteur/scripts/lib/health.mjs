@@ -13,6 +13,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { git, compileGlob } from './common.mjs';
+import { cheminPhysique } from './vf-git-sortant.mjs';
 
 const lineIndex = (src) => {
   const starts = [0];
@@ -545,6 +546,7 @@ const plural = (n, w, ws) => `${n} ${n === 1 ? w : ws || w + 's'}`;
 const nl = (n) => `${n.toLocaleString('fr-FR')} ligne${n === 1 ? '' : 's'}`;
 
 export function buildHealth({ graph, scan, arch, root }) {
+  racineLue = root;
   const issues = [];
   const nodeById = new Map(graph.nodes.map((n) => [n.id, n]));
   const fileByPath = new Map(graph.files.map((f) => [f.p, f]));
@@ -1372,8 +1374,12 @@ function firebaseRtdbRules(src, now) {
   return out;
 }
 
+let racineLue = null; // racine du lab de l'appel en cours de buildHealth (L5m-01)
 function readHead(file, max) {
-  const fd = fs.openSync(file, 'r');
+  // L5m-01 : jamais lu hors de la racine réelle du lab (chemin d'une liste qui remonte, ancêtre lié), quel que soit l'appelant
+  const r = cheminPhysique(file), rr = cheminPhysique(racineLue);
+  if (r === null || rr === null || !r.startsWith(rr + path.sep)) throw new Error('hors du lab');
+  const fd = fs.openSync(r, 'r');
   try { const buf = Buffer.alloc(max); const n = fs.readSync(fd, buf, 0, max, 0); return buf.subarray(0, n).toString('utf8'); } finally { fs.closeSync(fd); }
 }
 function stemOf(p) {

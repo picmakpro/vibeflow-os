@@ -463,16 +463,44 @@ lk_mut_moteur() { # NOM ANCRE REMPLACEMENT : construit une copie du lab, l'assem
   o="$l/lab/.vibeflow/cockpit"
   echo "cfg=$(compte "$MK_CFG" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") cac=$(compte "$MK_CAC" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") ign=$(compte "$MK_IGN" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") ext=$(compte "$MK_EXT" "$o/index.html" "$o/project.html" "$o/graph.json" "$o/architecture.json") pos=$([ "$(compte "$MK_POS" "$o/index.html")" -ge 1 ] && [ "$(compte 'src/interne.sh' "$o/graph.json")" -ge 1 ] && [ "$(compte "$MK_LEU" "$o/index.html")" -ge 1 ] && echo oui || echo non)"
 }
-lk_mut_moteur membre "|| !seen.has(toPosix(path.relative(rootReal, r)))" "" > "$AUX/mm-membre.val"
+lk_mut_moteur membre "|| seen.has(toPosix(path.relative(rootReal, r)));" "|| true;" > "$AUX/mm-membre.val"
 assert_eq "M-MEMBRE.0 — l'ancre du mutant existe (le lien est jugé sur l'appartenance de sa cible à la liste du moteur)" "$(cat "$AUX/mm-membre.res")" "muté"
 LK_MM="$(cat "$AUX/mm-membre.val")"
 assert_eq "M-MEMBRE — rougit A8, A9 et A10 (le lien n'est plus jugé que sur « sa cible est dans le lab » : configuration du dossier git, sortie du cockpit et fichier ignoré sortent) ; A12 reste vert (la cible extérieure est encore refusée)" "$(printf '%s' "$LK_MM" | sed 's/ pos=.*//')" "cfg=4 cac=4 ign=4 ext=0"
 assert_eq "M-MEMBRE — témoins positifs verts (A11) : fichier normal, lien interne vers un fichier listé et leurre intérieur toujours décrits" "$(printf '%s' "$LK_MM" | sed 's/.* pos=//')" "oui"
-lk_mut_moteur js "const r = cheminPhysique(abs);" "const r = fs.realpathSync(abs);" > "$AUX/mm-js.val"
+lk_mut_moteur js "const r = cheminPhysique(attendu);" "const r = fs.realpathSync(attendu);" > "$AUX/mm-js.val"
 assert_eq "M-JS-SCAN.0 — l'ancre du mutant existe (la résolution d'un lien passe par cheminPhysique)" "$(cat "$AUX/mm-js.res")" "muté"
 LK_MJ="$(cat "$AUX/mm-js.val")"
 assert_eq "M-JS-SCAN — rougit A12 (la résolution redevient le realpath JS qui replie « .. » : le fichier extérieur sort) ; A8, A9 et A10 restent verts (l'appartenance à la liste les écarte encore)" "$(printf '%s' "$LK_MJ" | sed 's/ pos=.*//')" "cfg=0 cac=0 ign=0 ext=4"
 assert_eq "M-JS-SCAN — témoins positifs verts (A11)" "$(printf '%s' "$LK_MJ" | sed 's/.* pos=//')" "oui"
+
+echo "=== A15 — chaque chemin de la liste du moteur est confiné à la racine réelle, composants compris (L5m-01, D-M15) ==="
+# classe : l'index d'un lab peut nommer un chemin qui sort de la racine (`..`) ou qui traverse un dossier intermédiaire lié ; le dernier élément n'est alors pas un lien
+# et seule la résolution de TOUS les composants le voit. Index forgé octet par octet (git refuse d'y inscrire de tels chemins).
+cat > "$AUX/idx.cjs" <<'JS'
+const fs = require('fs'), c = require('crypto'); const [, , idx, ...paths] = process.argv;
+const sha = Buffer.from('e69de29bb2d1d6434b8b29ae775ad8c2e48c5391', 'hex');
+const ents = paths.sort().map((p) => { const pb = Buffer.from(p); const len = 62 + pb.length; const b = Buffer.alloc(len + 8 - (len % 8)); b.writeUInt32BE(0o100644, 24); sha.copy(b, 40); b.writeUInt16BE(Math.min(pb.length, 0xfff), 60); pb.copy(b, 62); return b; });
+const h = Buffer.alloc(12); h.write('DIRC'); h.writeUInt32BE(2, 4); h.writeUInt32BE(ents.length, 8);
+const body = Buffer.concat([h, ...ents]); fs.writeFileSync(idx, Buffer.concat([body, c.createHash('sha1').update(body).digest()]));
+JS
+MK_UP="MKREMONTE-HORS-DE-LA-RACINE"; MK_INT="MKDOSSIER-LIE-SORTANT"; MK_P15="MKPOSITIF-FICHIER-NORMAL-A15"
+LK_F="$LK_RACINE/a15"; mkdir -p "$LK_F/lab/src" "$LK_F/dehors"; mkplan "$LK_F/lab"
+printf '#!/bin/sh\n# %s : fichier hors du lab, nommé par un chemin qui remonte.\necho ok\n' "$MK_UP" > "$LK_RACINE/remonte15.sh"
+printf '#!/bin/sh\n# %s : fichier hors du lab, derrière un dossier lié.\necho ok\n' "$MK_INT" | wr "$LK_F/dehors/x.sh"
+printf '#!/bin/sh\n# %s : fichier normal du lab.\necho ok\n' "$MK_P15" > "$LK_F/lab/src/normal.sh"
+G "$LK_F/lab" init -q; ln -s "$LK_F/dehors" "$LK_F/lab/a"
+node "$AUX/idx.cjs" "$LK_F/lab/.git/index" ../../remonte15.sh .planning/ROADMAP.md a/x.sh src/normal.sh
+lk_a15_sortie() { # RACINE-DU-MODULE : assemble le lab forgé avec ce module, rend « up=… int=… pos=… »
+  local o="$LK_F/lab/.vibeflow/cockpit" f; rm -rf "$o"; node "$1/vf-cockpit-build.mjs" "$LK_F/lab" --quiet > "$AUX/a15.out" 2>&1
+  f=("$o/index.html" "$o/graph.json" "$o/architecture.json" "$o/.cache/scan.json")
+  echo "up=$(compte "$MK_UP" "${f[@]}") int=$(compte "$MK_INT" "${f[@]}") pos=$([ "$(compte "$MK_P15" "$o/index.html")" -ge 1 ] && echo oui || echo non)"
+}
+assert_eq "A15.1 — entrée d'index qui remonte hors de la racine, puis dossier intermédiaire lié vers l'extérieur : aucun des deux contenus n'est dans les pages ni dans scan.json ; témoin positif : le fichier normal est décrit" "$(lk_a15_sortie "$SCRIPTS")" "up=0 int=0 pos=oui"
+LK_MM15="$WORK/mm-a15"; rm -rf "$LK_MM15"; mkdir -p "$LK_MM15/scripts" "$LK_MM15/skills"; cp "$SCRIPTS"/*.mjs "$SCRIPTS/vf-cockpit-interface.json" "$LK_MM15/scripts/"; cp -R "$SCRIPTS/../skills/cockpit-moteur" "$LK_MM15/skills/cockpit-moteur"
+FROM="function lisibleDansLab(p) {" TO="function lisibleDansLab(p) { if (!fs.lstatSync(path.join(root, p), { throwIfNoEntry: false })?.isSymbolicLink()) return true;" node "$AUX/mutsub.mjs" "$LK_MM15/skills/cockpit-moteur/scripts/scan.mjs" > "$AUX/mm-a15.res" 2>&1
+assert_eq "M-DERNIER-ELEMENT.0 — l'ancre du mutant existe (la garde de confinement est la fonction lisibleDansLab de scan.mjs)" "$(cat "$AUX/mm-a15.res")" "muté"
+assert_eq "M-DERNIER-ELEMENT — rougit A15.1 : jugée sur le seul dernier élément (et seulement s'il est un lien), la garde laisse sortir les deux fichiers extérieurs ; le témoin positif reste vert" "$(lk_a15_sortie "$LK_MM15/scripts")" "up=5 int=5 pos=oui"
 
 echo "=== G18 — verrou de pilotage, gitdir et inclusion à maillon divergent (gitSortant) ==="
 LK_Y="$LK_RACINE/g18"
