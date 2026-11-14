@@ -499,6 +499,17 @@ import { instructions } from '$SCRIPTS/vf-cockpit-ask.mjs';
 const G = JSON.parse(fs.readFileSync('$WORK/q76g.json', 'utf8')), i = instructions({ ...G, project: { name: 'x' } });
 console.log([!/\\.req|f:req\\//.test(i), i.includes('meta.vf.trace.exigences')].join());")|$(H locg "$SCRIPTS" "$WORK/q76g.json" "Qu'est-ce qui reste dans le jalon ?" | "$NODE" -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);console.log(j!==null&&j.engine==='local'&&!j.items.some(i=>i.id.includes('req/'))&&j.items.length>0)})")" "true,true|true"
 
+# Q76.3 (revue finale M2) : la jumelle d'archive (ws '*', sans phase) d'une exigence vivante de même identifiant n'est pas une exigence distincte
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const G = JSON.parse(fs.readFileSync('$WORK/q76g.json', 'utf8'));
+G.meta.vf.trace.exigences.push({ id: 'REQ-01', ws: '*', coche: true, phase: null, libelle: 'jumelle d archive' }, { id: 'ARC-01', ws: '*', coche: true, phase: null, libelle: 'archive seule' });
+fs.writeFileSync('$WORK/q76j.json', JSON.stringify(G));"
+H locg "$SCRIPTS" "$WORK/q76j.json" "REQ-01 ?" > "$WORK/q76b.json"
+H locg "$SCRIPTS" "$WORK/q76j.json" "ARC-01 ?" > "$WORK/q76c.json"
+assert_eq "Q76.3 — « REQ-01 ? » avec une jumelle d'archive : UNE exigence (réponse de l'exigence vivante, pas « 2 exigences … une par compartiment ») ; témoin : une exigence d'archive seule reste répondue" \
+  "$(H json "$WORK/q76b.json" "j !== null && !j.answer.includes('une par compartiment') && j.answer.includes('non cochée') && j.answer.includes('[[n:ph-1]]'))")|$(H json "$WORK/q76c.json" "j !== null && j.answer.includes('ARC-01')")" "true|true"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
