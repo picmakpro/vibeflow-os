@@ -78,7 +78,7 @@ dc_manque() { # <ERE> <dossier ou fichiers…> : noms nommés par le README et a
 }
 
 dc_verifier() {
-  local R="$1" CHK="$2" i=0 k c d l n s m v1 v2 v3 v4
+  local R="$1" CHK="$2" i=0 k c d l n s m v1 v2 v3 v4 a t j h
   v1="$(dc_lire "$R" version)"; v2="$(dc_lire "$R" json)"; v3="$(dc_lire "$R" entete)"; v4="$(dc_lire "$R" titre)"
   if [ -n "$v1" ] && [ "$v1" = "$v2" ] && [ "$v1" = "$v3" ] && [ "$v1" = "$v4" ]; then echo "OK V12.1a $v1"
   else echo "ROUGE V12.1a attendu=VERSION:[$v1] obtenu=module.json:[$v2] README:[$v3] CHANGELOG:[$v4]"; fi
@@ -101,6 +101,12 @@ dc_verifier() {
     s="${n##*/}"; grep -q -E "/api/vf/$s([^a-z]|\$)" "$R"/scripts/*.mjs 2>/dev/null || m="$m $n"
   done
   if [ -z "$m" ]; then echo "OK V12.3c routes nommees presentes"; else echo "ROUGE V12.3c attendu=routes-du-code obtenu=absentes:$m"; fi
+  a=(); for t in "${DC_RETRAITS[@]}"; do a+=(-e "$t"); done
+  n="$(grep -c -F "${a[@]}" "$R/README.md")"
+  if [ "$n" = 0 ]; then echo "OK V12.4 aucun jeton retire dans le README"; else echo "ROUGE V12.4 attendu=0 obtenu=$n lignes portent un jeton retire"; fi
+  if grep -q -F 'journal des attentes' "$R/README.md"; then j=1; else j=0; fi
+  if [ -f "$R/hooks/hooks.json" ]; then h=1; else h=0; fi
+  if [ "$j" = "$h" ]; then echo "OK V12.5 journal=$j fragment=$h"; else echo "ROUGE V12.5 attendu=journal:$h(fragment) obtenu=journal:$j(README)"; fi
 }
 
 dc_etat() {

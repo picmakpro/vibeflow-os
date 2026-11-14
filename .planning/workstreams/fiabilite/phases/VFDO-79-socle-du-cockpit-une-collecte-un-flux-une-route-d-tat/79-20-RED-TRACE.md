@@ -65,3 +65,8 @@ VERT-EMBLEE V12.3a, V12.3b, V12.3c : le README de la base ne nomme que des modul
 - V12.1a avant le bump : OK v1.4.0 (les quatre numéros). Après : OK v1.5.0 (VERSION, `module.json`, en-tête du README, premier titre `## v1.5.0 — 2026-11-14 — non publié` du CHANGELOG).
 - Suite vendor jouée après le tableau : 28 PASS de V12 (V12.0a, 0b, 1a, 1b, 2a à 2h, 3a à 3c, 12 témoins, V12.7) et aucun FAIL de V12. Deux FAIL hors V12 (V11.Q6b, V11.P5, empreinte du module sur copie) : le voisin 79-18 modifiait `vf-cockpit-module.mjs` dans l'arbre partagé pendant ce rejeu (fix `42c41fbd1`, AU18-02) ; rejeu plus tard.
 - `bash scripts/check-version-sync.sh` : exit 0 (module aligné, compteur de suites 244 dans les deux README racine).
+
+## Tâche 2 : témoins des retraits et du journal (avant la réécriture du README)
+ROUGE-BASE V12.4 attendu=0 obtenu=10 (dix lignes du README portent un jeton retiré : l'en-tête, qui en portait une onzième, a été corrigé à la tâche 1 avec le type du module)
+VERT-EMBLEE V12.5 : `plugin/cockpit/hooks/hooks.json` n'existe pas (sonde S0 OUI) et le README ne parle pas du journal des attentes ; gardé par V12.6n (texte planté sans fragment) et V12.6o (fragment planté, README muet), tous deux rouges sur copie.
+Suite vendor rejouée : 283 PASS / 3 FAIL : V12.4 (rouge voulu) et V11.Q6b, V11.P5 (voisin 79-18 : empreinte du module, dossier partagé en cours d'écriture).

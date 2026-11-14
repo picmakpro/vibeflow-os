@@ -710,6 +710,8 @@ else
   assert_eq "V12.3a — chaque scripts/vf-cockpit-*.mjs nommé par le README existe" "$(dc_etat "$WORK/v12-reel.txt" V12.3a)" "ok"
   assert_eq "V12.3b — chaque test-cockpit-*.sh nommé par le README existe" "$(dc_etat "$WORK/v12-reel.txt" V12.3b)" "ok"
   assert_eq "V12.3c — chaque /api/vf/<segment> nommé par le README figure dans scripts/*.mjs" "$(dc_etat "$WORK/v12-reel.txt" V12.3c)" "ok"
+  assert_eq "V12.4 — aucun jeton retiré dans le README (appareil de patchs, nombres en lettres, modules retirés)" "$(dc_etat "$WORK/v12-reel.txt" V12.4)" "ok"
+  assert_eq "V12.5 — le README parle du journal des attentes si et seulement si hooks/hooks.json existe" "$(dc_etat "$WORK/v12-reel.txt" V12.5)" "ok"
   # témoins : une mutation sur une copie jetable fait rougir le contrôle qui la vise (copie inchangée = échec « mutation sans effet »)
   V12B="$WORK/v12-base"; dc_copie_base "$V12B" "$RACINE_DOC" "$CHKSIZE"
   # v12_temoin <id> <libellé> <mutation> [arguments] : la mutation reçoit la copie en premier argument
@@ -732,9 +734,12 @@ else
   v12_temoin V12.3b "suite inexistante plantée dans le README" dc_ajouter README.md 'La suite `test-cockpit-inexistante-zz.sh`.'
   v12_temoin V12.3c "route inexistante plantée dans le README" dc_ajouter README.md 'La route `/api/vf/zzinexistant`.'
   v12_temoin V12.2b "source d'un extracteur supprimée de la copie (le chiffre rougit, il ne disparaît pas)" dc_retirer scripts/vf-cockpit-flux-etat.mjs
+  v12_temoin V12.4 "jeton retiré planté dans le README" dc_ajouter README.md 'Voir SYNCHRO.md pour la resynchronisation.'
+  v12_temoin V12.5 "texte du journal planté sans fragment de hooks" dc_ajouter README.md 'Le journal des attentes est écrit sous .cache/.'
+  v12_temoin V12.5 "fragment de hooks planté dans une copie dont le README est muet" dc_creer hooks/hooks.json
   dc_verifier "$V12B" "$V12B/chk/check-file-size.sh" > "$V12B.txt"
-  assert_eq "V12.7 — copie non mutée : zéro écart, treize contrôles lus (témoin positif)" \
-    "$(grep -c '^ROUGE' "$V12B.txt")/$(grep -c '^OK' "$V12B.txt")" "0/13"
+  assert_eq "V12.7 — copie non mutée : zéro écart, quinze contrôles lus (témoin positif)" \
+    "$(grep -c '^ROUGE' "$V12B.txt")/$(grep -c '^OK' "$V12B.txt")" "0/15"
 fi
 
 echo ""
