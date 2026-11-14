@@ -75,6 +75,7 @@ export const WHO = [
   { id: 'sess-1', kind: 'session', etat: 'au-repos', titre: 'Session principale', branch: 'feat/x', tree: '.', ageS: 300 },
   { id: 'mg-1', kind: 'subagent', role: 'vf-dev-manager', task: 'Piloter la phase 74', parent: 'sess-1', etat: 'actif', ageS: 10, branch: 'feat/x', tree: '.' },
   agent('wk-1', 'vf-coder', 'Écrire la fiche', 'termine', 1800), agent('wk-2', 'vf-coder', 'Rédiger les faits', 'actif', 20), agent('wk-5', 'vf-reviewer', 'Relire la jointure', 'termine', 18000),
+  agent('wk-6', 'vf-reviewer', 'Relire la frise', 'termine', 17000),
 ];
 export const ORIGINE = (id) => `#vf-equipe li[data-vf-agent="${id}"] .vf-rg-tog`;
 export const RAPPORT = (id) => `#vf-equipe li[data-vf-agent="${id}"] .vf-rg-act button`;
@@ -162,7 +163,7 @@ export default async function (h) {
   });
   // R5b : nom (clic, Entrée, Espace) et rapport — la 74 annule, ouvre par la fiche, rend le focus à l'origine
   await h.section('R5b', async () => {
-    const cas = [['nom', 'clic', 'wk-2', ORIGINE('wk-2')], ['nom', 'Entrée', 'wk-2', ORIGINE('wk-2')], ['nom', 'Espace', 'wk-2', ORIGINE('wk-2')], ['rapport', 'clic', 'wk-5', RAPPORT('wk-5')]];
+    const cas = [['nom', 'clic', 'wk-2', ORIGINE('wk-2')], ['nom', 'Entrée', 'wk-2', ORIGINE('wk-2')], ['nom', 'Espace', 'wk-2', ORIGINE('wk-2')], ['rapport', 'clic', 'wk-5', RAPPORT('wk-5')], ['rapport', 'Entrée', 'wk-6', RAPPORT('wk-6')]];
     for (const [decl, geste, id, sel] of cas) {
       await h.ev(() => { window.__ouv = []; window.__lus = []; });
       if (geste === 'clic') await h.ev((s) => document.querySelector(s).click(), sel);
@@ -171,7 +172,7 @@ export default async function (h) {
       const o = await h.ev(OUVERTS);
       const r = await h.ev(() => ({ ouverte: !!(window.__vfFiche && window.__vfFiche.ouverte()), lus: window.__lus.slice(), repli: document.querySelectorAll('#panel [data-vf-repli], #panel .vf-transcript, .vf-rg-lecteur').length }));
       h.egal('R5b', `${decl} (${geste}) : vf-agent:ouvrir annulé (defaultPrevented), la fiche s'ouvre, le lecteur de repli de la 73 ne s'ouvre pas, vf-agent:lu seulement pour un terminé`,
-        [o.map((x) => x.slice(0, 3)), r.ouverte, r.repli, r.lus], [[[decl, id, true]], true, 0, id === 'wk-5' ? ['wk-5'] : []]);
+        [o.map((x) => x.slice(0, 3)), r.ouverte, r.repli, r.lus], [[[decl, id, true]], true, 0, decl === 'rapport' ? [id] : []]);
       await h.echap();
       await h.attendre("!document.querySelector('.vf-fiche')", 'fiche fermée', 8000);
       // le bouton « Lire le rapport » d'un terminé disparaît quand l'agent est marqué lu : le focus revient alors dans la régie, jamais sur BODY
@@ -212,7 +213,7 @@ $line
 EOF
 }
 # sonde_rouge <sonde> : 0 si la sortie de la dernière lecture contient une sonde KO dont l'identifiant commence par <sonde>
-sonde_rouge() { printf '%s\n' "$SORTIE" | awk -F'\t' -v s="$1" '$1 == "KO" && index($2, s) == 1 { f = 1 } END { exit f ? 0 : 1 }'; }
+sonde_rouge() { printf '%s\n' "$SORTIE" | awk -F'\t' -v s="$1" -v l="${2:-}" '$1 == "KO" && index($2, s) == 1 && index($3, l) > 0 { f = 1 } END { exit f ? 0 : 1 }'; }
 
 # ---------- R6 (garde, sans navigateur) : aucun nœud de la carte « Terminés » dans le graphe du canevas ----------
 cat > "$AUX/carte.mjs" <<'JS'
@@ -249,18 +250,19 @@ else
 
   if [ -z "${RETRAITS_SANS_MUTANTS:-}" ] && [ -z "${RETRAITS_SANS_FICHE:-}" ]; then
     echo "=== mutants (copies du module ; chacun rougit sa sonde) ==="
-    mutant_page() { # <nom> <sonde> <fichier> <expression sed>
-      local nom="$1" sonde="$2" fic="$3" expr="$4"
+    mutant_page() { # <nom> <sonde> <fichier> <expression sed> [fragment de libellé que la sonde rouge doit porter]
+      local nom="$1" sonde="$2" fic="$3" expr="$4" frag="${5:-}"
       if ! cockpit_module_muter "$nom" "$fic" "$expr"; then echo "  ❌ FAIL — $nom — mutation non posée (ancre absente)"; FAIL=$((FAIL+1)); unset COCKPIT_MODULE; return; fi
       demarrer "$nom"
       if [ "${VF_PORT:-0}" -le 0 ]; then echo "  ❌ FAIL — $nom — serveur du mutant non démarré"; FAIL=$((FAIL+1)); unset COCKPIT_MODULE; return; fi
       local sav_p=$PASS sav_f=$FAIL; joue "$VF_PORT" > "$WORK/mut-$nom.out"; PASS=$sav_p; FAIL=$sav_f
-      if sonde_rouge "$sonde"; then echo "MUTANT-ROUGE $nom $sonde"; PASS=$((PASS+1)); else echo "MUTANT-VERT $nom $sonde"; echo "  ❌ FAIL — $nom — la sonde $sonde n'a pas rougi"; FAIL=$((FAIL+1)); fi
+      if sonde_rouge "$sonde" "$frag"; then echo "MUTANT-ROUGE $nom $sonde"; PASS=$((PASS+1)); else echo "MUTANT-VERT $nom $sonde"; echo "  ❌ FAIL — $nom — la sonde $sonde n'a pas rougi"; FAIL=$((FAIL+1)); fi
       cockpit_arreter "$VF_PID"; unset COCKPIT_MODULE
     }
     mutant_page M-BOUTON-REVENU R1 72-vf-regie-rendu.js "s#'Lire le rapport');#'Lire le rapport'); b.setAttribute('data-vf-transcript', '');#"
     mutant_page M-DUREE-VEILLES-REVENUE R3 74-vf-fiche-faits.js "s#\['Au travail', f(d, 'travailS', (x) => M().fmtDuree(x))\]#['Au travail', M().fmtDuree(v ? v.dureeS : null)]#"
     mutant_page M-NON-ANNULE R5b 74-vf-fiche.js "s#e.preventDefault(); ouvrir(d.id, elementDe(d));#ouvrir(d.id, elementDe(d));#"
+    mutant_page M-RAPPORT-NON-ANNULE-CLAVIER R5b 74-vf-fiche.js "s#DECL = \['nom', 'ancre', 'rapport'\]#DECL = ['nom', 'ancre']#" "rapport (Entrée)"
     # M-CARTE-REVENUE : sans navigateur, sur une copie du module
     if cockpit_module_muter M-CARTE-REVENUE vf-cockpit-equipe-carte.mjs "s#nodes: \[\], files: \[\]#nodes: [{ id: '~termines', kind: 'terminés' }], files: []#"; then
       if [ "$(carte "$COCKPIT_MODULE")" != "$R6_ATTENDU" ]; then echo "MUTANT-ROUGE M-CARTE-REVENUE R6"; PASS=$((PASS+1)); else echo "MUTANT-VERT M-CARTE-REVENUE R6"; echo "  ❌ FAIL — M-CARTE-REVENUE — R6 n'a pas rougi"; FAIL=$((FAIL+1)); fi

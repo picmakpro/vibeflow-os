@@ -113,7 +113,7 @@ echo "=== RP0 — préalable : l'annulation des déclencheurs nom, ancre et rapp
 RET="$(RETRAITS_SANS_MUTANTS=1 bash "$HERE_T/test-cockpit-equipe-retraits.sh" 2>&1)"
 cpt() { printf '%s\n' "$RET" | grep -c "$1" || true; }
 RP0_OBT="nom=$(cpt '✅ PASS — R5b — nom (') rapport=$(cpt '✅ PASS — R5b — rapport (') ancre=$(cpt '✅ PASS — R5 — #r=n:ag') echecs=$(printf '%s\n' "$RET" | grep -cE '❌ FAIL — R5b? ' || true)"
-assert_eq "RP0 — R5 (ancre) et R5b (nom clic, Entrée, Espace ; rapport) de test-cockpit-equipe-retraits.sh verts : « retrait interdit : annulation non prouvée » sinon" "$RP0_OBT" "nom=6 rapport=2 ancre=1 echecs=0"
+assert_eq "RP0 — R5 (ancre) et R5b (nom clic, Entrée, Espace ; rapport) de test-cockpit-equipe-retraits.sh verts : « retrait interdit : annulation non prouvée » sinon" "$RP0_OBT" "nom=6 rapport=4 ancre=1 echecs=0"
 
 # ---------- RP1, RP2 ----------
 echo "=== RP1, RP2 — le lecteur de repli et l'export transcript ne sont plus dans les modules d'interface ==="
