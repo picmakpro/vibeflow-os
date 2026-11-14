@@ -808,7 +808,7 @@ for (const [nid, list] of filesByNode) {
   for (const [key, fs] of groups) {
     if (!key || fs.length < 2) { fs.forEach((f) => addChild(parent, 'f:' + f.p)); continue; }
     const did = `d:${nid}|${key}`;
-    dirs.set(did, { node: nid, path: key, files: fs });
+    dirs.set(did, { node: nid, path: key, files: fs.filter((f) => f.st !== 'prevu') }); // 75-07 : un dossier ne compte pas les fichiers prévus
     addChild(parent, did);
     fs.forEach((f) => addChild(did, 'f:' + f.p));
   }
@@ -1674,9 +1674,10 @@ function renderLegend(view) {
 }
 
 // ======================= inspector =======================
-const editorUrl = (p, line = 1) => G.meta.root && !PLAN ? `vscode://file/${encodeURI(G.meta.root.replace(/\\/g, '/'))}/${encodeURI(p)}:${line}` : null;
+const editorUrl = (p, line = 1) => G.meta.root && !PLAN && files.get(p)?.st !== 'prevu' ? // 75-07 : un fichier prévu n'existe pas, rien à ouvrir
+   `vscode://file/${encodeURI(G.meta.root.replace(/\\/g, '/'))}/${encodeURI(p)}:${line}` : null;
 // the real state of an item (project missions, plans, requirements): the same glyph + word as on its card, in place of a size in lines of code that is always 0 there (PU-G-105)
-const STATE_WORD = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué' };
+const STATE_WORD = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué', prevu: 'Prévu' };
 const statePill = (st) => `<span class="vst vst-${h(st).replace(/[^\w-]/g, '')}">${h(STATE_WORD[st] || st)}</span>`;
 const rowFor = (item, extra = '', dotColor) => {
   const i = info(item);
@@ -1828,6 +1829,10 @@ function itemPanel(item, viaConnector) {
   } else if (i.type === 'file' || i.type === 'module') {
     const f = i.f, fid = 'f:' + f.p, url = editorUrl(f.p);
     if (f.note) html += `<div class="callout">${h(f.note)}</div>`;
+    if (f.st === 'prevu') { // 75-07 : un fichier prévu par des plans non faits : ni « ouvrir » ni taille, la fraîcheur de la carte dite
+      const min = G.meta?.vfPrevuAt ? Math.max(0, Math.round((Date.now() - Date.parse(G.meta.vfPrevuAt)) / 60000)) : null;
+      html += `<div class="callout">${h(`Prévu par : ${(f.prevuPar || []).join(', ')}. Ce fichier n’existe pas encore.${min === null || Number.isNaN(min) ? '' : ` Carte lue à l’assemblage du graphe, il y a ${min} min.`}`)}</div>`;
+    }
     if (f.tooLarge) html += `<div class="callout">${t('Too big for Floorplan to read, so what it uses, its endpoints and any secrets in it weren’t checked. Ask Claude or Codex to update the floorplan with a bigger file limit to include it.')}</div>`;
     html += pathBox(f.p);
     if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}${t('Open in editor')}</a>`);

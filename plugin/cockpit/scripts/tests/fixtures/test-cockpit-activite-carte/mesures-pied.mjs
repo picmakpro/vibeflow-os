@@ -87,6 +87,12 @@ export const mesuresPied = {
       barres: ['bas', 'moyen', 'haut'].map((k, i) => [k, i + 1, sil[k].map((b) => barres(colonnes(b)))]), ink: r.ink,
     };
   },
+  // D14 (S11) : la paire « Prévu » / « À faire » (anneau à trois arcs contre anneau) à 16 px, 10 px et k = 0,42
+  async d14sil(c) {
+    await c.vue(1440, 900); await c.charger('index.html'); const o = {};
+    for (const [nom, K, G] of [['16px', 16, 18], ['10px', 10, 12], ['k042', 24 * 0.42, 12]]) { const sil = JSON.parse(await c.s.ev(rasterJs(K, G))).sil; o[nom] = Math.round(dist(sil.prevu, sil.todo) * 1000) / 1000; }
+    return o;
+  },
   // D10 : contraste des glyphes, deux thèmes ; --recent seulement pour « en cours », --recent-text sur .module
   async d10(c) {
     await c.vue(1440, 900); await c.charger('index.html'); const o = {};

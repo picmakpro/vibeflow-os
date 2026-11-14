@@ -1,6 +1,7 @@
 // mesures.mjs — les mesures navigateur du plan 75-07, une fonction par section ; chaque fonction rend un objet JSON simple que lit la suite.
 // Appelée par chrome-activite-carte.mjs avec un contexte { s, vue, charger, aller, poser, zoom, SNAP, racine, sid, stabiliser, attendreValeur }.
 import { mesuresPied } from './mesures-pied.mjs';
+import { mesuresNom } from './mesures-nom.mjs';
 
 const DIR_B = 'd:d-src|src/b', NOEUD = 'n:d-src';
 const HOSTILE = '<img src=x onerror=window.__xss=1>"\'</script> __proto__';
@@ -50,4 +51,5 @@ export const sections = {
   },
 
   ...mesuresPied,
+  ...mesuresNom,
 };

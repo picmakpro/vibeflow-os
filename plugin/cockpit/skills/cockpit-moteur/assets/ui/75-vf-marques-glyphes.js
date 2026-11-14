@@ -62,9 +62,9 @@
     svg.lod-mid .lw, svg.lod-low .lw, svg.lod-low .lc { display: none; }
     svg.lod-mid .lm-n .lw { display: inline; }
     svg.lod-mid .lc { display: inline; }
-    /* carte « prévue » : fond transparent, bordure pointillée neutre, sans ombre ; le padding perd la bordure : le contenu ne bouge pas */
-    .card.st-prevu { background: transparent; box-shadow: none; border: 1.5px dashed var(--hair-2); /* dérivé : bordure 1,5 */
-      padding: calc(var(--inset-card) - 1.5px); }
+    /* carte « prévue » : fond transparent, contour pointillé neutre de 1,5 px, sans ombre. Le contour est un outline, qui ne prend aucune place :
+       le contenu ne bouge pas (une bordure de 1,5 px serait arrondie à 1 px par le navigateur et déplacerait le contenu d'un demi-pixel) */
+    .card.st-prevu { background: transparent; box-shadow: none; outline: 1.5px dashed var(--hair-2); outline-offset: -1.5px; }
     .node:hover .card.st-prevu, .node.sel .card.st-prevu { background: transparent; box-shadow: none; }
     .card.st-prevu .title { font-weight: 500; color: var(--text-2); }
     .card.st-prevu .ico { color: var(--text-3); }`;

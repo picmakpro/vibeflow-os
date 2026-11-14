@@ -1,6 +1,6 @@
 // chrome-activite-carte.mjs — témoins navigateur de test-cockpit-activite-carte.sh (Phase 75, plan 75-07), dans un vrai Chrome headless sans affichage.
 // Usage : node chrome-activite-carte.mjs <chrome> <racine-du-serveur> <sections> [<identifiant-de-session-équipe>]
-//   <sections> : liste séparée par des virgules, parmi d3 d4 (tâche 1), d6 d8 d9 d10 d11 d17 (tâche 2),.
+//   <sections> : liste séparée par des virgules, parmi d3 d4 (tâche 1), d6 d8 d9 d10 d11 d17 (tâche 2), d13 d14 d14sil d15 d16 (tâche 3).
 //   Rend UNE ligne JSON { <section>: valeur } ou { erreur }. Chaque mesure est interrogée dans la page, une fois la mise en page posée (worker : A4).
 import { executer, stabiliser, attendreValeur } from './chrome-session.mjs';
 import { sections } from './fixtures/test-cockpit-activite-carte/mesures.mjs';

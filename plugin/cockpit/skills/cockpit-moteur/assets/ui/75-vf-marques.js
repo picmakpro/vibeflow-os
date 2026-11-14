@@ -113,6 +113,25 @@
     return e;
   };
   const estCollision = (m) => m.glyphe === 'confluent';
+  // nom accessible (P75-D-06) : celui de la fonction unique de la Phase 80, avec, avant « reliée à N cartes », le mot de lentille puis les mots de collision
+  // (toutes les sources, dans l'ordre de priorité) ; une prévue dit « prévu, créé par … » ; reposé à chaque passage, après celui de la Phase 80
+  const nommes = new WeakSet();
+  const nommer = (id, g, len, col) => {
+    const N = window.VF_CANEVAS, prevue = !!g.querySelector('.card.st-prevu');
+    if (!N || typeof N.nomDeCarte !== 'function' || !g.hasAttribute('aria-label')) return;
+    if (!len && !col.length && !prevue && !nommes.has(g)) return;
+    const base = N.nomDeCarte(id), i = base.lastIndexOf(', ');
+    let nomFinal = base;
+    if (i > 0) {
+      let tete = base.slice(0, i);
+      const desc = g.querySelector('.card.st-prevu .desc');
+      if (desc && tete.endsWith(', Prévu')) tete = `${tete.slice(0, -7)}, prévu, ${desc.textContent.trim().replace(/^./, (c) => c.toLowerCase())}`;
+      const mots = [...(len ? [len.mot] : []), ...col.map((m) => (m.agrege ? `${m.mot} en collision` : m.mot))];
+      nomFinal = [tete, ...mots, base.slice(i + 2)].join(', ');
+    }
+    g.setAttribute('aria-label', nomFinal);
+    if (len || col.length || prevue) nommes.add(g); else nommes.delete(g);
+  };
   const peindre = ({ table }) => {
     const M = moteur(), cs = M && M.state && M.state.chipEls;
     if (!(cs instanceof Map)) return;
@@ -123,6 +142,7 @@
       for (const n of pied.querySelectorAll('.lmg')) n.remove();
       const ms = par.get(id) || [], statut = !!pied.querySelector('.vst'); // une carte à statut (.vst) ne porte pas de marque de lentille
       const col = ms.filter(estCollision), len = statut ? null : ms.find((m) => !estCollision(m));
+      nommer(id, g, len, col);
       if (!col.length && !len) continue;
       const groupe = el('span', statut ? 'lmg lmg-g' : 'lmg', undefined, { 'aria-hidden': 'true' });
       if (col.length) groupe.append(marquePied(col[0], !!len));

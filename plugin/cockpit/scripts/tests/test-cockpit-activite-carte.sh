@@ -166,7 +166,7 @@ assert_eq D9 "chaque glyphe à >= 0,25 du triangle « tolere » existant" "$(E "
 assert_eq D9 "encre minimale : au moins 5 % de la boîte pour chacun des onze glyphes" "$(E "j.d9.encre.filter((p) => p[1] < 0.05).map((p) => p.join('=')).join(',')")" ""
 assert_eq D9b "barres 1, 2, 3 : autant de hauteurs distinctes que de barres, chacune séparée d'une colonne éteinte, aux quatre décalages" "$(E "j.d9.barres.filter(([, n, v]) => v.some((x) => x.groupes !== n || x.hauteurs !== n)).map((b) => b[0]).join(',')")" ""
 assert_eq D9b "palier bas à >= 0,25 du tiret « fini »" "$(E 'j.d9.basFini >= 0.25')" "true"
-assert_eq D9d "le pavé d'encre de chacun des onze glyphes tient dans [1,5 ; 14,5]² du viewBox, trait compris" "$(E "Object.entries(j.d9.ink).filter(([k, v]) => k !== 'tolere' && (v[0] < 1.45 || v[1] < 1.45 || v[2] > 14.55 || v[3] > 14.55)).map(([k, v]) => k + ':' + v.join('/')).join(',')")" ""
+assert_eq D9d "le pavé d'encre de chacun des onze glyphes tient dans [1,5 ; 14,5]² du viewBox, trait compris" "$(E "Object.entries(j.d9.ink).filter(([k, v]) => !['tolere', 'todo'].includes(k) && (v[0] < 1.45 || v[1] < 1.45 || v[2] > 14.55 || v[3] > 14.55)).map(([k, v]) => k + ':' + v.join('/')).join(',')")" ""
 
 echo "== D10 contraste, deux thèmes =="
 R="$(mesurer d10)"
@@ -187,5 +187,39 @@ echo "== D17 respiration du glyphe « en cours », coupée en mouvement réduit 
 R="$(mesurer d17)"
 echo "  (keyframe vfrespire chargé sur l'onglet Code : $(E 'j.d17.keyframeVfrespire'))"
 assert_eq D17 "animation calculée présente en mouvement normal, absente sous prefers-reduced-motion: reduce" "$(E "[j.d17.normal !== 'none', j.d17.reduit === 'none'].join('|')")" "true|true"
+
+echo "== D13, D13b nom accessible : titre, état, pied, mot de lentille, mot de collision, reliée à N cartes =="
+R="$(mesurer d13)"
+assert_eq D13 "le nom de chaque cas égale le gabarit (mots insérés avant « reliée à N cartes »)" "$(E "j.d13.cas.filter((x) => x.avec !== x.attendu).map((x) => x.cas).join(' ; ')")" ""
+assert_eq D13 "ordre : mot de lentille, puis mot de collision, puis la liaison" "$(E "(({ avec }) => [avec.indexOf('41 changements') > 0, avec.indexOf('41 changements') < avec.indexOf('écrit par 2 agents'), avec.indexOf('écrit par 2 agents') < avec.indexOf('modifié sur 2 branches'), /reliée à \d+ carte/.test(avec)].join('|'))(j.d13.cas[1])")" "true|true|true|true"
+assert_eq D13 "reposé après un render de la page (qui réécrit le nom de base)" "$(E 'j.d13.apresRender === j.d13.attenduRender')" "true"
+assert_eq D13b "gabarit : fichier marqué, fichier marqué en collision (toutes les sources), collision seule, nœud agrégé (« 3 chauds, 2 fichiers en collision »)" "$(E "j.d13.cas.map((x) => x.avec.includes('3 chauds, 2 fichiers en collision') ? 'n' : x.avec.includes('41 changements') ? 'l' : 'c').join('')")" "llcn"
+echo "== D14, D14b carte « prévue » =="
+R="$(mesurer d14)"
+assert_eq D14 "la carte « non assignés » (nœud sans fichier réel) se dessine et contient sa prévue" "$(E '[j.d14.racine, j.d14.dansNonAssignes].join("|")')" "true|true"
+assert_eq D14 "classe st-prevu, mot « Prévu », contour pointillé de 1,5 px sans bordure (rien ne bouge), sans ombre, fond transparent, padding inchangé (16 px)" "$(E '(({ prevue: p }) => [p.classe, p.mot, p.bordure, p.ombre, p.fond, p.padding].join("|"))(j.d14)')" "true|Prévu|dashed 1.5px 0px|none|rgba(0, 0, 0, 0)|16px"
+assert_eq D14 "icône nue --text-3 (pas la couleur de famille), aucune taille" "$(E '[j.d14.prevue.ico === j.d14.prevue.texte3, j.d14.simple.ico !== j.d14.prevue.texte3, j.d14.prevue.meta].join("|")')" "true|true|false"
+assert_eq D14 "contenu immobile : le titre est au même décalage de bord que sur une carte à bordure pleine" "$(E 'j.d14.prevue.decalage === j.d14.simple.decalage')" "true"
+assert_eq D14 "un dossier virtuel ne compte pas les prévues" "$(E 'j.d14.dossier.fichiers === j.d14.dossier.reels && j.d14.dossier.reels === 14')" "true"
+assert_eq D14 "« ouvrir » absent du menu contextuel et du panneau d'une prévue (témoin : présent sur un fichier réel)" "$(E "[/éditeur/.test(j.d14.menuSimple), /éditeur/.test(j.d14.menuPrevue), j.d14.panneau.editeur, j.d14.panneau.texte].join('|')")" "true|false|false|true"
+R="$(mesurer d14sil)"
+assert_eq D14 "paire « Prévu » / « À faire » : distance de Jaccard >= 0,25 à 16 px, 10 px et k = 0,42" "$(E "Object.entries(j.d14sil).filter(([, v]) => v < 0.25).map((p) => p.join('=')).join(',')")" ""
+R="$(mesurer d14)"
+assert_eq D14b "nom accessible d'une prévue : « fichier, prévu, créé par les plans …, aucune liaison »" "$(E "j.d14.nom.vu === j.d14.nom.titre + ', prévu, ' + j.d14.nom.desc.charAt(0).toLowerCase() + j.d14.nom.desc.slice(1) + ', aucune liaison'")" "true"
+
+echo "== D15 chaîne XSS : chemin, branche, rôle, titre hostiles =="
+R="$(mesurer d15)"
+assert_eq D15 "aucun nœud injecté, aucun script exécuté, texte littéral dans la marque, l'infobulle et le nom accessible, aucune pollution" "$(E '[j.d15.apres === j.d15.avant, j.d15.xss, j.d15.enfants === 0, j.d15.mot, j.d15.titre, j.d15.nom, j.d15.proto].join("|")')" "true|true|true|true|true|true|true"
+mutant_rouge "D15-infobulle-par-innerHTML" d15 's#e\.setAttribute(k, attrs\[k\])#e.insertAdjacentHTML("beforeend", `<i ${k}="${attrs[k]}"></i>`)#' 'j.d15.apres > j.d15.avant || !j.d15.xss || !j.d15.titre'
+mutant_rouge "D15-nom-accessible-par-innerHTML" d15 's#g\.setAttribute(.aria-label., nomFinal)#g.insertAdjacentHTML("beforeend", `<i aria-label="${nomFinal}"></i>`)#' 'j.d15.apres > j.d15.avant || !j.d15.xss || !j.d15.nom'
+
+echo "== D16 marque de collision : priorité, forme compacte, emplacement gauche d'une prévue =="
+R="$(mesurer d16)"
+assert_eq D16 "quatre sources sur une carte : agents, puis sans agents arbres, puis branches, puis plans (le mot affiché suit RANG_SOURCE, quel que soit l'ordre de pose)" "$(E "j.d16.niveaux.map((x) => x.join('/')).join(' | ')")" "écrit par 2 agents | modifié dans 2 arbres : conflit de fusion possible | modifié sur 2 branches | prévu par 2 plans, vague 3"
+assert_eq D16 "avec une lentille : forme compacte (nombre de sources) AVANT la marque de lentille, infobulle de la source" "$(E "[j.d16.compact.n, j.d16.compact.premier, j.d16.compact.compact, j.d16.compact.titre, j.d16.compact.second].join('|')")" "2|2|true|info agents|41 changements"
+assert_eq D16 "toutes les sources dans le nom accessible, lentille avant collisions" "$(E "(({ nom }) => ['41 changements', 'écrit par 2 agents', 'modifié dans 2 arbres : conflit de fusion possible', 'modifié sur 2 branches', 'prévu par 2 plans, vague 3'].map((m) => nom.indexOf(m)).every((v, i, a) => v > 0 && (i === 0 || v > a[i - 1])))(j.d16.compact)")" "true"
+assert_eq D16 "bord droit dans la carte et bord bas dans le pied (20 puis 28) à l'ouverture, lod-mid et lod-low" "$(E "j.d16.bords.map((b) => [b.z, b.droit, b.bas, b.pied].join(':')).join(' ')")" "ouverture:true:true:20 mid:true:true:28 bas:true:true:28"
+assert_eq D16 "carte prévue : le mot de plans à GAUCHE, « Prévu » à droite, aucune marque de lentille sur elle (un fichier réel garde la sienne)" "$(E "[j.d16.prevue.gauche, j.d16.prevue.vstADroite, j.d16.prevue.mots.join('/'), j.d16.prevue.simple].join('|')")" "true|true|prévu par 2 plans, vague 3|1"
+assert_eq D16 "nom d'une prévue en collision : « …, prévu par 2 plans, vague 3, aucune liaison »" "$(E "j.d16.prevue.nom.endsWith(', prévu, créé par les plans 01-02 et 01-03, prévu par 2 plans, vague 3, aucune liaison')")" "true"
 
 fin

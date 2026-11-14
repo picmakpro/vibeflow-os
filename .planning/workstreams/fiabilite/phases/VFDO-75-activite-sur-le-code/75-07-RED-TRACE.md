@@ -96,3 +96,27 @@ D17 : le keyframe `vfrespire` n'est PAS chargé sur l'onglet Code (`71-vf-equipe
 (mêmes valeurs : 1 → .82, 2,4 s) et sa coupure sous `prefers-reduced-motion` ; animation calculée `vfm-respire` en mouvement normal, `none` en mouvement réduit.
 Voisines rejouées sans les affaiblir : `test-cockpit-moteur-carte.sh` (vert), `test-cockpit-equipe.sh` (vert, EK10 et le mutant d'équipe compris), `test-cockpit-responsive.sh` (R1 et R3 verts ; reste de la suite : voir le SUMMARY).
 Mutants de D6b, D7, D8b, D9, D10, D11b, D12, D17 : levés (régime allégé).
+
+## Tâche 3 — D13 à D16 (nom accessible, prévues, chaîne XSS, collisions)
+
+Rouge sur la tête de la tâche 2 (`1f018a28`, module copié par `git archive`, `COCKPIT_MODULE`) : les témoins de D3 à D12 et D17 sont verts, D13 rouge :
+
+```
+  ❌ FAIL — D13 : le nom de chaque cas égale le gabarit (mots insérés avant « reliée à N cartes »)
+     attendu: []
+     obtenu:  [fichier : lentille ; fichier : lentille puis collision (toutes les sources) ; fichier : collision seule ; nœud : agrégat de lentille et de collision]
+BILAN : 72 PASS, 1 FAIL
+```
+
+Vert ensuite : `BILAN : 91 PASS, 0 FAIL`. Chaîne XSS (exception au régime allégé : témoin rouge puis vert ET mutant vu rouge) :
+
+- D15 vert sur le module réel : aucun `img`, `script`, `i[title]`, `i[aria-label]` de plus dans le plan, `window.__xss` indéfini, mot, infobulle et nom accessible littéraux (chaîne `"><img src=x onerror=…><script>…`, U+2028, `__proto__`, 250 caractères).
+- `MUTANT-ROUGE — D15-infobulle-par-innerHTML` : l'attribut `title` de la marque posé par une chaîne HTML (`insertAdjacentHTML`) : un `img` apparaît, `__xss` est posé.
+- `MUTANT-ROUGE — D15-nom-accessible-par-innerHTML` : l'`aria-label` de la carte posé par une chaîne HTML : même effet.
+- `MUTANT-ROUGE — D3-texte-par-innerHTML` (tâche 1) rejoué dans la même suite.
+
+Constat sur la fonction de nom de la Phase 80 : elle existe (`window.VF_CANEVAS.nomDeCarte`, `ui/04-vf-clavier-canevas.js`, objet gelé) et pose le nom à chaque `render` ; le canal la RELIT, y insère les mots avant la
+dernière virgule (« reliée à N cartes » ou « aucune liaison ») et repose l'attribut après le passage de la 80 (son écouteur `render` est inscrit avant celui du canal) ; D13 vérifie le nom reposé après un `rerender()`.
+Écart de mécanisme, dit : la carte prévue porte un `outline` pointillé de 1,5 px et non une bordure compensée au padding : le navigateur arrondit une bordure de 1,5 px à 1 px, même à densité 2 dans un
+`foreignObject` à l'échelle du plan, et le contenu bougeait d'un demi-pixel (D14 « contenu immobile » a rougi) ; un `outline` ne prend aucune place, le contenu est immobile par construction.
+Mutants de D13, D14, D14b, D16 : levés (régime allégé).
