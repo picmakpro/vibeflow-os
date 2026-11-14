@@ -2,7 +2,7 @@
 // Pur DOM : createElement et textContent seuls, jamais de HTML construit (le modèle rend des chaînes brutes). Une ligne est un li gardé par sa clé ;
 // une mise à jour n'écrit que ce qui change. Pose window.__vfRegieRendu = { monter(racine) } ; monter rend l'objet qui sert la source.
 (() => {
-  const QR = window.__vfRegieQuestions || {}, D = document, SVG = 'http://www.w3.org/2000/svg', NB = ' ';
+  const QR = window.__vfRegieQuestions || {}, D = document, SVG = 'http://www.w3.org/2000/svg';
   const h = (tag, cls, txt) => { const e = D.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
   const ecrire = (e, t) => { if (e.textContent !== t) e.textContent = t; };
   const attr = (e, k, v) => { if (e.getAttribute(k) !== v) e.setAttribute(k, v); };
@@ -61,14 +61,6 @@
     };
     // une ligne est repliée quand un de ses ancêtres l'est ; parentDe = id d'un agent → id de son parent (lignes de l'arbre seulement)
     const replie = (l) => { let p = l.parent, k = 0; while (p && k++ < 3) { if (replies.has(p)) return true; p = parentDe.get(p); } return false; };
-    const plus = (li, l, ouvert) => {
-      if (!ouvert) { if (li._p) { li._p.remove(); li._p = null; } return; }
-      const t = [`Identifiant${NB}: ${String(l.id).slice(0, 8)}`, ...l.ligne2], k = t.join('\n') + l.lien;
-      if (!li._p) { li._p = h('div', 'vf-rg-plus'); li.append(li._p); }
-      if (li._p._k === k) return;
-      li._p._k = k; li._p.replaceChildren(...t.map((x) => h('p', 'vf-rg-l2', x)));
-      if (l.lien) { const a = h('a', 'vf-link', 'Nœud' + (l.attrs.noeud ? NB + l.attrs.noeud : '')); a.setAttribute('href', l.lien); li._p.append(a); }
-    };
     const mission = (li, l) => {
       const r = li._r, k = l.nom + '|' + l.marques.map((m) => m.texte).join('|');
       if (!r.m) { r.m = h('div', 'vf-rg-mission'); li.replaceChildren(r.m); }
@@ -99,7 +91,6 @@
         b.setAttribute('aria-labelledby', `${b.id} ${r.id}`); r.act.append(b);
       } else if (l.action !== 'lire-rapport' && li._b) { li._b.remove(); li._b = null; }
       if (l.kind === 'phase' && l.lien && !li._a) { li._a = h('a', 'vf-link', 'Carte de la phase'); li._a.setAttribute('href', l.lien); r.act.append(li._a); }
-      plus(li, l, ouvert);
     };
     const synchro = (ul, lis) => {
       lis.forEach((li, i) => { if (ul.childNodes[i] !== li) ul.insertBefore(li, ul.childNodes[i] || null); });
@@ -168,7 +159,7 @@
       }
     };
 
-    // ---------- recherche, détail en flux, bascule ----------
+    // ---------- recherche, ouverture de la ligne, bascule ----------
     const filtrer = (q) => {
       q = norme(q).trim(); let total = 0;
       for (const [cle, li] of cache) {
@@ -206,7 +197,7 @@
     };
     return { rendre, filtrer, premiere, basculer, replier, bascule, vue, entete,
       ligne: (cle) => cache.get(cle) || null, lignes: (id) => [...cache.values()].filter((li) => li._ln && (li.getAttribute('data-vf-agent') === id)),
-      ouverte: (li) => (li && li._p ? li._p : null), titre: (id) => (secs.has(id) ? secs.get(id).h2 : null), deplie: () => [...ouverts] };
+      titre: (id) => (secs.has(id) ? secs.get(id).h2 : null), deplie: () => [...ouverts] };
   }
   window.__vfRegieRendu = { monter, glyphe };
 })();
