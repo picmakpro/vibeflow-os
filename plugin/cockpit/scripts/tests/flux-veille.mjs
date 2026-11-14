@@ -56,6 +56,22 @@ const S = {
     const autres = ts.filter((t) => t !== nouveau); const relais = autres.every((t) => t.recus.some((r) => r.nom === 'who' && r.data === marque));
     return { avantPerte, pertes, apresVol, urlJeton, ancien, relais };
   },
+  async elu(eluAbandonne = true) { // RV6 : un élu dont la page a abandonné (flux fermé, plus de sondage) ne répond pas `pong` : un suiveur reprend le flux au retour du serveur
+    const m = creerMonde({ graine: 5 }); const E = m.ouvrirOnglet(f69, { jeton: 'jeton-E-xxxxxxxx' }); E.ouvrir(); await m.vide(); await m.vide();
+    const F = m.ouvrirOnglet(f69, { jeton: 'jeton-F-xxxxxxxx' }); F.ouvrir(); await m.vide(); await m.vide();
+    await m.emettre(E, 'hello', { seq: 1 }); await m.erreurFlux(E); // serveur arrêté : l'élu perd, les deux sources de page se ferment
+    await m.avancer(301000); // au-delà de reco.fin : 70 de l'élu a abandonné (sinon il rouvre sa source à son sondage vivant)
+    if (!eluAbandonne) await rouvrir(m, E);
+    await rouvrir(m, F); const v0 = m.M.vols;
+    for (let i = 0; i < 40; i++) { // dix minutes : le serveur revenu envoie `vie` sur tout flux réel ouvert ; à chaque perte, 70 du suiveur sonde (vivant) et rouvre
+      for (const e of m.fluxOuverts()) for (const f of (e.l.vie || [])) f({ data: '{"seq":1}' });
+      await m.vide(); await m.vide(); const p = F.pertes, pe = E.pertes; await m.avancer(15000);
+      if (F.pertes > p) await rouvrir(m, F);
+      if (!eluAbandonne && E.pertes > pe) await rouvrir(m, E);
+    }
+    const ouverts = m.fluxOuverts(); if (ouverts.length) { for (const f of (ouverts.at(-1).l.who || [])) f({ data: JSON.stringify({ seq: 9, who: { workers: [] } }) }); await m.vide(); await m.vide(); }
+    return { vols: m.M.vols - v0, fluxReels: ouverts.length, suiveurRecoitWho: F.recus.some((r) => r.nom === 'who'), connF: F.vm.connexion() };
+  },
   async sain() { // RV3 : élu qui répond, serveur muet pour un suiveur sourd : jamais volé
     const m = creerMonde({ graine: 3 }); const ts = await ouvrirN(m, 2); const e = elu(ts); const s = ts.find((t) => t !== e);
     await m.emettre(e, 'hello', { seq: 1 }); s.sourd = true;
@@ -65,5 +81,5 @@ const S = {
   },
 };
 if (!S[scenario]) { console.log(JSON.stringify({ erreur: `scénario inconnu : ${scenario}` })); process.exit(0); }
-try { console.log(JSON.stringify(await S[scenario]())); } catch (x) { console.log(JSON.stringify({ erreur: String(x && x.message).slice(0, 200) })); }
+try { console.log(JSON.stringify(await S[scenario](scenario === 'elu' ? process.argv[4] !== 'rouvre' : undefined))); } catch (x) { console.log(JSON.stringify({ erreur: String(x && x.message).slice(0, 200) })); }
 process.exit(0);
