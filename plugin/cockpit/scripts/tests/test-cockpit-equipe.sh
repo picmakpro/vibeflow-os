@@ -878,7 +878,7 @@ const lien = r.segments.flat().find((p) => p && typeof p === 'object' && p.href)
 console.log(lien ? lien.href : 'aucun lien');
 JS
 assert_eq "EUI2.23b — le lien de nœud existe dans la fiche (ligne de rattachement) : le DAG et le nœud piégés y sont encodés (encodeURIComponent), aucun « < » dans l'adresse" "$(node "$AUX/lienfiche.mjs" "$UI/74-vf-fiche-faits.js")" "project.html#r=f%3A%3Cx-dag%3E%23%3Cx-noeud%3E"
-M "$UI/74-vf-fiche-faits.js" "$MUT/74-lien-brut.js" "'project.html#r=' + encodeURIComponent(r)" "'project.html#r=' + r"
+cp "$UI/74-vf-fiche-faits.js" "$MUT/74-lien-brut.js"; FROM="+ encodeURIComponent(r);" TO="+ r;" node "$AUX/msub.mjs" "$MUT/74-lien-brut.js" > /dev/null || echo "MUTANT VIDE : lien de la fiche sans encodage"
 assert_eq "EUI2.23c — mutant : le lien de la fiche n'encode plus le nœud -> détecté (l'adresse porte « < »)" "$(node "$AUX/lienfiche.mjs" "$MUT/74-lien-brut.js")" "project.html#r=f:<x-dag>#<x-noeud>"
 assert_eq "EUI2.25 — un agent passe d'actif à terminé : 0 rechargement, sa ligne passe dans « Terminé, à relire » (une seule ligne par clé)" "$(G "$(RGU "$UI" "$RG_W3" '[{"poser":{"who":'"$RG_W3C"'}},'"$RG_CLES"','"$RG_E"']')" 'j.erreur||((j.final.rechargements || 0) + "|" + j.out.cles.includes("a-relire:'"$RG_A"'") + "|" + j.out.cles.includes("au-travail:'"$RG_A"'") + "|" + (new Set(j.out.cles).size === j.out.cles.length))')" "0|true|false|true"
 RGM cle-sans-section 72-vf-regie-modele.js 'cle: `${sec}:${w.id}`' 'cle: `x:${w.id}`' > /dev/null || echo "MUTANT VIDE : clé sans section"
