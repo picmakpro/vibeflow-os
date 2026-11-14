@@ -134,7 +134,8 @@ await executer(chrome, async (s) => {
       const e1 = await etat(); await s.ev('__e.casse = 0'); const n1 = e1.fetchs;
       const r = await s.ev("VF_ONGLETS.aller('code').then(() => 'resolu', (e) => 'rejet ' + e.message)");
       await s.attendre(PRET, 'Code rechargé'); const e2 = await rien(500);
-      o.ec4 = { motif: e1.etat.motif, phase: e1.etat.phase, aff: e1.aff, r, pret: e2.etat.phase, aff2: e2.aff, lectures: e2.fetchs - n1, p: e2.p, dn: e2.n - e1.n };
+      o.ec4 = { motif: e1.etat.motif, phase: e1.etat.phase, aff: e1.aff, r, pret: e2.etat.phase, aff2: e2.aff,
+        lectures: e2.fetchs - n1, p: e2.p, dn: e2.n - e1.n };
     });
   }
 
@@ -146,7 +147,11 @@ await executer(chrome, async (s) => {
         const e1 = await etat(), niv = await lire(`(() => { const b = document.querySelector('#vf-onglets-echec button');
           return { texte: (document.querySelector('#vf-onglets-echec p') || {}).textContent,
           role: (document.querySelector('#vf-onglets-echec') || { getAttribute: () => null }).getAttribute('role'), bouton: b ? b.textContent : null,
-          anim: document.getAnimations().length, repli: !!document.getElementById('vf-coquille-echec') }; })()`);
+          anim: document.getAnimations().length, repli: !!document.getElementById('vf-coquille-echec'),
+          panneau: (document.getElementById('panel') || { getClientRects: () => [] }).getClientRects().length > 0,
+          anglais: [...document.querySelectorAll('button, input, span, [aria-label]')].filter((e) => e.getClientRects().length > 0
+            && /Search files|^Flows$|Ask anything|checking/.test((e.textContent || '') + (e.getAttribute('aria-label') || '')
+              + (e.placeholder || ''))).length }; })()`);
         const r = { e1, niv };
         await s.ev('__e.echec = 1'); await touche('Enter', 'Enter', 13); await s.attendre('__e.fetchs.length >= 2', 'seconde lecture'); await pause(500);
         r.encore = await etat(); await s.ev('__e.echec = 0'); const n = r.encore.n;

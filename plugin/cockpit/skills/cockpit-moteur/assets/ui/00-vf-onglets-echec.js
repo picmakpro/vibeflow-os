@@ -23,6 +23,8 @@
       font: inherit; font-weight: 500; color: var(--text); background: rgba(var(--ink), .08); }
     #${ID} button:hover { background: rgba(var(--ink), .12); }
     #${ID} button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+    /* le gabarit brut (libellés anglais, dictionnaire non chargé, panneau sans contenu) ne dit rien : seul le nom du projet reste */
+    #panel, #panel-resize, #ask, #zoom, #context, #loading, #flowbar, header .hc, header .hr, header #btn-up, header #crumbs { display: none !important; }
   `;
   const noeud = (balise, classe, texte) => {
     const n = document.createElement(balise);

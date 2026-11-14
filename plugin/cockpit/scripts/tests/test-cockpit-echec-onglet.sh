@@ -59,10 +59,10 @@ assert_eq "EC2.2 — script persistant : un objet gelé { montrer, retirer }, UN
   "$(E2 '[j.ec22.un, j.ec22.gele, j.ec22.cles.join(), j.ec22.ecoutes.join(), j.ec22.noeuds, j.ec22.lectures.length, j.ec22.marqueur]')" \
   '[true,true,"montrer,retirer","vf:coquille-echec",0,0,true]'
 for n in projet code equipe; do
-  assert_eq "EC2.1 ($n) — un seul message, la boîte, « Réessayer » a le focus, annulé, aucun repli de la coquille, aucune animation" \
+  assert_eq "EC2.1 ($n) — un seul message, la boîte, « Réessayer » a le focus, annulé, aucun repli, aucune animation, ni panneau vide ni libellé anglais" \
     "$(E2 "[j.ec21$n.e1.etat.phase, j.ec21$n.e1.aff, j.ec21$n.e1.prevented.join(), j.ec21$n.niv.texte, j.ec21$n.niv.role, j.ec21$n.niv.bouton,
-      j.ec21$n.e1.ae, j.ec21$n.e1.lectures, j.ec21$n.niv.repli, j.ec21$n.niv.anim]")" \
-    "[\"echec\",null,\"true\",\"$TEXTE\",\"status\",\"Réessayer\",\"BUTTON\",1,false,0]"
+      j.ec21$n.e1.ae, j.ec21$n.e1.lectures, j.ec21$n.niv.repli, j.ec21$n.niv.anim, j.ec21$n.niv.panneau, j.ec21$n.niv.anglais]")" \
+    "[\"echec\",null,\"true\",\"$TEXTE\",\"status\",\"Réessayer\",\"BUTTON\",1,false,0,false,0]"
   assert_eq "EC2.1b ($n) — encore en échec : la boîte revient, focus sur « Réessayer » ; levée : onglet chargé, boîte retirée, aucune entrée de plus" \
     "$(E2 "[j.ec21$n.encore.boite, j.ec21$n.encore.ae, j.ec21$n.fin.etat.phase, j.ec21$n.fin.boite, j.ec21$n.fin.ech, j.ec21$n.dn <= 0]")" \
     '[true,"BUTTON","pret",false,null,true]'
