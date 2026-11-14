@@ -369,14 +369,16 @@ await executer(chrome, async (s) => {
         if (plein) { await clic('.vf-term-plein'); }
       };
       r.haut = {};
-      await cas('bas-evt', 0, 0, evenement, false);
-      await cas('bas-msg', 0, 0, message, false);
-      await cas('moyen-evt', 2, 3, evenement, false); // 424 px : sous la hauteur du bandeau (AUDC-M11), rehaussé
-      await cas('moyen-msg', 2, 3, message, false);
-      await cas('haut-evt', 4, 0, evenement, false); // 544 px : déjà au-dessus de la hauteur du bandeau, jamais réduit
-      await cas('haut-msg', 4, 0, message, false);
-      await cas('plein-evt', 0, 0, evenement, true);
-      await cas('plein-msg', 0, 0, message, true);
+      // Filtre de cas (mutants seulement) : A.seuls = liste de « h:<cas> » et « r:<reprise> » à rejouer ; absent = tout (code sain, inchangé). Chaque cas rejoué part d'un état refait (fermer, regler).
+      const veut = (k) => !A.seuls || A.seuls.includes(k);
+      if (veut('h:bas-evt')) await cas('bas-evt', 0, 0, evenement, false);
+      if (veut('h:bas-msg')) await cas('bas-msg', 0, 0, message, false);
+      if (veut('h:moyen-evt')) await cas('moyen-evt', 2, 3, evenement, false); // 424 px : sous la hauteur du bandeau (AUDC-M11), rehaussé
+      if (veut('h:moyen-msg')) await cas('moyen-msg', 2, 3, message, false);
+      if (veut('h:haut-evt')) await cas('haut-evt', 4, 0, evenement, false); // 544 px : déjà au-dessus de la hauteur du bandeau, jamais réduit
+      if (veut('h:haut-msg')) await cas('haut-msg', 4, 0, message, false);
+      if (veut('h:plein-evt')) await cas('plein-evt', 0, 0, evenement, true);
+      if (veut('h:plein-msg')) await cas('plein-msg', 0, 0, message, true);
       // AUDC-M11 : « retrait » (le bandeau a disparu de Q) rend la hauteur d'avant la proposition ; la lecture suit une barrière d'ordre (deux états de Q, du même cadre, encadrent le message : le second lu = le message traité)
       const ETAT = (t) => `document.querySelector('.vf-term-etat').textContent.includes(${JSON.stringify(t)})`;
       const barriere = async (cause) => { await deQ('etat:termine'); await att(ETAT('Terminé'), 'état de départ de la barrière'); await cause(); await deQ('etat:connecte'); await att(ETAT('Connecté'), 'barrière franchie'); };
@@ -391,24 +393,24 @@ await executer(chrome, async (s) => {
         r.reprise[nom] = { avantNow: avant.now, avantMemo: avant.memo, haut: haut.now, milieu: milieu.now, fin: fin.now, finPx: fin.px, finMemo: fin.memo, ouvert: fin.ouvert, plein: fin.plein };
         if (apres) { await apres(); r.reprise[nom].apres = await stabiliser(() => s.ev(MES), { max: 5000 }); } // geste de l'utilisateur fini APRÈS le retrait (relâchement de la souris)
       };
-      await rcas('bas', 0, 0); await rcas('moyen', 2, 3); await rcas('haut', 4, 0);
-      await rcas('clavier', 0, 0, async () => { await s.ev(`document.querySelector('.vf-term-poignee').focus()`); await touche('ArrowUp', 'ArrowUp', 38); });
-      await rcas('souris', 0, 0, async () => { const c = await centre('.vf-term-poignee'); await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); for (let i = 1; i <= 4; i++) await souris('mouseMoved', c.x, c.y - 10 * i); await souris('mouseReleased', c.x, c.y - 40); });
-      await rcas('fenetre', 0, 0, async () => { await fenetre(600); }, async () => { await fenetre(800); }); // la fenêtre se réduit PENDANT le bandeau : le plafond de la hauteur réglée (70 % de 600 px = 420) la baisse, c'est un changement de l'écran et non la reprise : « retrait » ne la remonte pas à 160
+      if (veut('r:bas')) await rcas('bas', 0, 0); if (veut('r:moyen')) await rcas('moyen', 2, 3); if (veut('r:haut')) await rcas('haut', 4, 0);
+      if (veut('r:clavier')) await rcas('clavier', 0, 0, async () => { await s.ev(`document.querySelector('.vf-term-poignee').focus()`); await touche('ArrowUp', 'ArrowUp', 38); });
+      if (veut('r:souris')) await rcas('souris', 0, 0, async () => { const c = await centre('.vf-term-poignee'); await souris('mouseMoved', c.x, c.y); await souris('mousePressed', c.x, c.y); for (let i = 1; i <= 4; i++) await souris('mouseMoved', c.x, c.y - 10 * i); await souris('mouseReleased', c.x, c.y - 40); });
+      if (veut('r:fenetre')) await rcas('fenetre', 0, 0, async () => { await fenetre(600); }, async () => { await fenetre(800); }); // la fenêtre se réduit PENDANT le bandeau : le plafond de la hauteur réglée (70 % de 600 px = 420) la baisse, c'est un changement de l'écran et non la reprise : « retrait » ne la remonte pas à 160
       let prise = null; // glissement de la poignée À LA SOURIS commencé avant le « retrait » et fini après : le retrait n'en reprend pas la hauteur sous la main
-      await rcas('glisse', 0, 0, async () => { prise = await centre('.vf-term-poignee'); await souris('mouseMoved', prise.x, prise.y); await souris('mousePressed', prise.x, prise.y); for (let i = 1; i <= 4; i++) await souris('mouseMoved', prise.x, prise.y - 10 * i); }, async () => { await souris('mouseReleased', prise.x, prise.y - 40); });
-      await rcas('remplace', 0, 0, async () => { await barriere(() => message()); }); // une seconde proposition pendant le rehaussement : la hauteur d'origine reste celle d'avant la première
-      await rcas('plein', 0, 0, async () => { await clic('.vf-term-plein'); });
-      if (await s.ev(`document.querySelector('.vf-term-tiroir').classList.contains('vf-term-plein-etat')`)) await clic('.vf-term-plein'); // retour à l'état normal : la hauteur interne, reprise pendant le plein écran, est celle que l'on retrouve
-      r.reprise.pleinApres = await stabiliser(() => s.ev(MES), { max: 5000 });
-      await fermer(); await regler(0, 0); const seul = await s.ev(MES); await retrait(); const seulFin = await stabiliser(() => s.ev(MES), { max: 5000 }); // « retrait » sans rehaussement : rien à reprendre
-      r.reprise.seul = { avant: seul.now, fin: seulFin.now, memo: seulFin.memo };
+      if (veut('r:glisse')) await rcas('glisse', 0, 0, async () => { prise = await centre('.vf-term-poignee'); await souris('mouseMoved', prise.x, prise.y); await souris('mousePressed', prise.x, prise.y); for (let i = 1; i <= 4; i++) await souris('mouseMoved', prise.x, prise.y - 10 * i); }, async () => { await souris('mouseReleased', prise.x, prise.y - 40); });
+      if (veut('r:remplace')) await rcas('remplace', 0, 0, async () => { await barriere(() => message()); }); // une seconde proposition pendant le rehaussement : la hauteur d'origine reste celle d'avant la première
+      if (veut('r:plein')) await rcas('plein', 0, 0, async () => { await clic('.vf-term-plein'); });
+      if (veut('r:plein')) { if (await s.ev(`document.querySelector('.vf-term-tiroir').classList.contains('vf-term-plein-etat')`)) await clic('.vf-term-plein'); // retour à l'état normal : la hauteur interne, reprise pendant le plein écran, est celle que l'on retrouve
+      r.reprise.pleinApres = await stabiliser(() => s.ev(MES), { max: 5000 }); }
+      if (veut('r:seul')) { await fermer(); await regler(0, 0); const seul = await s.ev(MES); await retrait(); const seulFin = await stabiliser(() => s.ev(MES), { max: 5000 }); // « retrait » sans rehaussement : rien à reprendre
+      r.reprise.seul = { avant: seul.now, fin: seulFin.now, memo: seulFin.memo }; }
       // fenêtre de 360 px : la hauteur du bandeau (300 px au moins) ne tient pas (276 px au plus) ; une seconde proposition trouve le tiroir encore sous 300 px et ne doit pas prendre cette hauteur rehaussée pour celle d'origine
-      await fermer(); await fenetre(360); await regler(0, 0); const pAvant = await stabiliser(() => s.ev(MES), { max: 5000 });
+      if (veut('r:petit')) { await fermer(); await fenetre(360); await regler(0, 0); const pAvant = await stabiliser(() => s.ev(MES), { max: 5000 });
       await message(); await attOuvre(); const pHaut = await stabiliser(() => s.ev(MES), { max: 5000 });
       await barriere(() => message()); const pMilieu = await stabiliser(() => s.ev(MES), { max: 5000 });
       await retrait(); const pFin = await stabiliser(() => s.ev(MES), { max: 5000 }); await fenetre(800);
-      r.reprise.petit = { avant: pAvant.now, haut: pHaut.now, milieu: pMilieu.now, fin: pFin.now, memo: pFin.memo };
+      r.reprise.petit = { avant: pAvant.now, haut: pHaut.now, milieu: pMilieu.now, fin: pFin.now, memo: pFin.memo }; }
     });
     r.violations = [...s.violations];
     return r;
@@ -877,9 +879,10 @@ run_flag() { # run_flag <sortie> <court 0|1> -> FJ FP FQ ; un serveur neuf, un a
   FJ="$(navig flag "{\"P\":$FP,\"Q\":$FQ,\"amorce\":\"$AMORCE\",\"marqueur\":\"$FMARQ\",\"fichierPid\":\"$WORK/run/shell.pid\",\"fichierM\":\"$WORK/run/m.txt\",\"TA\":\"$TA\",\"liste\":$LISTE_JSON,\"court\":$2}")"; unsrv
 }
 
-run_haut() { # run_haut <sortie> -> PJ ; comme run_prop, avec en plus le scénario de hauteur (PU-G-136)
+run_haut() { # run_haut <sortie> [cas rejoués, séparés par des virgules : « h:bas-evt,r:souris » ; absent = tous] -> PJ ; comme run_prop, avec en plus le scénario de hauteur (PU-G-136)
+  local seuls=''; if [ -n "${2:-}" ]; then seuls=",\"seuls\":[\"$(printf '%s' "$2" | sed 's/,/","/g')\"]"; fi
   srv "$1" 1; rm -f "$WORK/run/shell.pid"
-  PJ="$(navig proposition "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"fichierPid\":\"$WORK/run/shell.pid\",\"liste\":$LISTE_JSON,\"hauteur\":true}")"; unsrv
+  PJ="$(navig proposition "{\"P\":$SRV_PORT,\"Q\":$QP,\"amorce\":\"$AMORCE\",\"fichierPid\":\"$WORK/run/shell.pid\",\"liste\":$LISTE_JSON,\"hauteur\":true$seuls}")"; unsrv
 }
 
 run_prop() { # run_prop <sortie> -> PJ ; un serveur neuf, un amorçage neuf, un Chrome neuf (72-14 : valeur fixe proposition)
@@ -1191,24 +1194,24 @@ assert_eq "TH.22c — AUDC-M11 : glissement de la poignée à la souris commenc�
 assert_eq "TH.26 — AUDC-M11 : fenêtre de 360 px (le bandeau de 300 px ne tient pas : 276 px au plus), deux propositions de suite puis « retrait » : la seconde ne prend pas 276 px pour la hauteur d'origine, repris à 160 px, mémoire inchangée" "$(RV petit 'return [c.avant,c.haut,c.milieu,c.fin,c.memo].join("/")')" "160/276/276/160/160"
 assert_eq "TH.27 — AUDC-M11 : la fenêtre se réduit PENDANT le bandeau (800 puis 600 px) et fait baisser la hauteur (480 puis 420 px, plafond de 70 %) : « retrait » ne la remonte pas à la hauteur d'origine (420 px, pas 160), mémoire inchangée" "$(RV fenetre 'return [c.haut,c.milieu,c.fin,c.finMemo].join("/")')" "480/420/420/160"
 assert_eq "TH.25 — « retrait » sans rehaussement préalable : rien à reprendre, la hauteur (160 px) et la mémoire ne bougent pas" "$(RV seul 'return [c.avant,c.fin,c.memo].join("/")')" "160/160/160"
-mut_haut() { # mut_haut <libellé> <nom> <expression-sed> <expression de rougissement>
+mut_haut() { # mut_haut <libellé> <nom> <expression-sed> <expression de rougissement> <libellé du rouge> <cas rejoués : ceux que lit l'expression>
   if mutant "$2" vf-cockpit-terminal-tiroir.mjs "$3"; then
-    VF_TIROIR_MS=20000 run_haut "$MUT_OUT"
+    VF_TIROIR_MS=20000 run_haut "$MUT_OUT" "${6:-}"
     assert_eq "$1 $2 — le mutant rougit : $5 (témoin : aucune erreur de scénario)" "$(rj "$PJ" '(j.erreur||JSON.stringify(j.erreurs))+" rouge="+('"$4"')')" "{} rouge=true"
   else sans_effet "$1 $2"; fi
 }
-mut_haut TH.20 M-REPRISE-RETIREE-P "s|else if (e.data === 'retrait') reprendre();||" 'j.reprise.bas.fin===480&&j.reprise.moyen.fin===480&&j.reprise.plein.fin===480' "le tiroir ne reprend plus sa hauteur (reste à 480 px)"
-mut_haut TH.22 M-REPRISE-ECRASE-CLAVIER "s|const memoH = () => { perso = true; reprise = null;|const memoH = () => { perso = true;|" 'j.reprise.clavier.fin===160' "la reprise écrase la hauteur réglée au clavier pendant le bandeau (retour à 160)"
-mut_haut TH.22b M-REPRISE-ECRASE-SOURIS "s|const memoH = () => { perso = true; reprise = null;|const memoH = () => { perso = true;|;s|e.preventDefault(); reprise = null; const y0|e.preventDefault(); const y0|" 'j.reprise.souris.fin===160' "la reprise écrase un glissement à la souris pendant le bandeau (ni geste ni relâchement ne l'annulent : retour à 160)"
-mut_haut TH.22c M-REPRISE-ECRASE-GLISSEMENT "s|e.preventDefault(); reprise = null; const y0|e.preventDefault(); const y0|" 'j.reprise.glisse.fin===160' "le « retrait » reçu en plein glissement reprend la hauteur sous la main (160 au lieu de 520)"
-mut_haut TH.27 M-REPRISE-NON-ANNULEE-PAR-FENETRE "s|if (v !== h) { h = v; reprise = null; appliquer(); }|if (v !== h) { h = v; appliquer(); }|" 'j.reprise.fenetre.fin===160' "la fenêtre qui se réduit pendant le bandeau n'annule pas la reprise : « retrait » écrase la hauteur (160 au lieu de 420)"
-mut_haut TH.26 M-REPRISE-OUBLIEE-AU-REMPLACEMENT "s|reprise === null \&\& h < Math.max(300, hautBandeau())|h < Math.max(300, hautBandeau())|" 'j.reprise.petit.fin===276' "la seconde proposition, trouvant le tiroir encore sous 300 px (fenêtre de 360 px), écrase la hauteur d'origine retenue (reprise à 276 au lieu de 160)"
-mut_haut TH.9 M-HAUT-SANS-REHAUSSEMENT 's|if (!plein \&\& h < 300) { h = borne(300); appliquer(); }||;s|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["bas-evt"].now<300&&j.haut["bas-msg"].now<300' "le tiroir reste sous 300 px par les deux chemins"
-mut_haut TH.14 M-HAUT-BANDEAU-ECRASE-MEMO 's|h = borne(hautBandeau()); appliquer(); }|h = borne(hautBandeau()); appliquer(); memoH(); }|' 'j.haut["moyen-evt"].memo!=="424"' "le rehaussement au bandeau écrase la hauteur mémorisée (PU-G-136)"
-mut_haut TH.13 M-HAUT-SANS-BANDEAU 's|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["moyen-evt"].now<480&&j.haut["moyen-msg"].now<480' "un tiroir de 424 px n'est pas rehaussé à la hauteur du bandeau (AUDC-M11)"
-mut_haut TH.10 M-HAUT-ECRASE-MEMO 's|h = borne(300); appliquer(); }|h = borne(300); appliquer(); memoH(); }|' 'j.haut["bas-evt"].memo!=="160"' "la hauteur mémorisée est écrasée"
-mut_haut TH.11 M-HAUT-REDUIT 's|if (!plein \&\& h < 300) { h = borne(300)|if (!plein) { h = borne(300)|' 'j.haut["haut-evt"].now!==544' "un tiroir à 544 px est ramené à 300"
-mut_haut TH.12 M-HAUT-EN-PLEIN 's|if (!plein \&\& h < 300)|if (h < 300)|' 'j.haut["plein-evt"].now>=300' "le plein écran est rehaussé"
+mut_haut TH.20 M-REPRISE-RETIREE-P "s|else if (e.data === 'retrait') reprendre();||" 'j.reprise.bas.fin===480&&j.reprise.moyen.fin===480&&j.reprise.plein.fin===480' "le tiroir ne reprend plus sa hauteur (reste à 480 px)" "r:bas,r:moyen,r:plein"
+mut_haut TH.22 M-REPRISE-ECRASE-CLAVIER "s|const memoH = () => { perso = true; reprise = null;|const memoH = () => { perso = true;|" 'j.reprise.clavier.fin===160' "la reprise écrase la hauteur réglée au clavier pendant le bandeau (retour à 160)" "r:bas,r:moyen,r:haut,r:clavier"
+mut_haut TH.22b M-REPRISE-ECRASE-SOURIS "s|const memoH = () => { perso = true; reprise = null;|const memoH = () => { perso = true;|;s|e.preventDefault(); reprise = null; const y0|e.preventDefault(); const y0|" 'j.reprise.souris.fin===160' "la reprise écrase un glissement à la souris pendant le bandeau (ni geste ni relâchement ne l'annulent : retour à 160)" "r:bas,r:moyen,r:haut,r:clavier,r:souris"
+mut_haut TH.22c M-REPRISE-ECRASE-GLISSEMENT "s|e.preventDefault(); reprise = null; const y0|e.preventDefault(); const y0|" 'j.reprise.glisse.fin===160' "le « retrait » reçu en plein glissement reprend la hauteur sous la main (160 au lieu de 520)" "r:glisse"
+mut_haut TH.27 M-REPRISE-NON-ANNULEE-PAR-FENETRE "s|if (v !== h) { h = v; reprise = null; appliquer(); }|if (v !== h) { h = v; appliquer(); }|" 'j.reprise.fenetre.fin===160' "la fenêtre qui se réduit pendant le bandeau n'annule pas la reprise : « retrait » écrase la hauteur (160 au lieu de 420)" "r:fenetre"
+mut_haut TH.26 M-REPRISE-OUBLIEE-AU-REMPLACEMENT "s|reprise === null \&\& h < Math.max(300, hautBandeau())|h < Math.max(300, hautBandeau())|" 'j.reprise.petit.fin===276' "la seconde proposition, trouvant le tiroir encore sous 300 px (fenêtre de 360 px), écrase la hauteur d'origine retenue (reprise à 276 au lieu de 160)" "r:petit"
+mut_haut TH.9 M-HAUT-SANS-REHAUSSEMENT 's|if (!plein \&\& h < 300) { h = borne(300); appliquer(); }||;s|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["bas-evt"].now<300&&j.haut["bas-msg"].now<300' "le tiroir reste sous 300 px par les deux chemins" "h:bas-evt,h:bas-msg"
+mut_haut TH.14 M-HAUT-BANDEAU-ECRASE-MEMO 's|h = borne(hautBandeau()); appliquer(); }|h = borne(hautBandeau()); appliquer(); memoH(); }|' 'j.haut["moyen-evt"].memo!=="424"' "le rehaussement au bandeau écrase la hauteur mémorisée (PU-G-136)" "h:moyen-evt"
+mut_haut TH.13 M-HAUT-SANS-BANDEAU 's|if (!plein \&\& h < hautBandeau()) { h = borne(hautBandeau()); appliquer(); }||' 'j.haut["moyen-evt"].now<480&&j.haut["moyen-msg"].now<480' "un tiroir de 424 px n'est pas rehaussé à la hauteur du bandeau (AUDC-M11)" "h:moyen-evt,h:moyen-msg"
+mut_haut TH.10 M-HAUT-ECRASE-MEMO 's|h = borne(300); appliquer(); }|h = borne(300); appliquer(); memoH(); }|' 'j.haut["bas-evt"].memo!=="160"' "la hauteur mémorisée est écrasée" "h:bas-evt"
+mut_haut TH.11 M-HAUT-REDUIT 's|if (!plein \&\& h < 300) { h = borne(300)|if (!plein) { h = borne(300)|' 'j.haut["haut-evt"].now!==544' "un tiroir à 544 px est ramené à 300" "h:haut-evt"
+mut_haut TH.12 M-HAUT-EN-PLEIN 's|if (!plein \&\& h < 300)|if (h < 300)|' 'j.haut["plein-evt"].now>=300' "le plein écran est rehaussé" "h:plein-evt"
 fi
 
 vf_hyg_assert

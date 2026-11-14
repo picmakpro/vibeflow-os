@@ -40,6 +40,9 @@ import { lireState, LECTEURS } from './vf-cockpit-state.mjs';
 import { brancherFluxEtat, VIE_MS } from './vf-cockpit-flux-etat.mjs';
 import { lireFrise } from './vf-cockpit-frise.mjs';
 import { brancherFluxFrise } from './vf-cockpit-frise-direct.mjs';
+import { routeActivite } from './vf-cockpit-activite.mjs';
+import { lireTracabilite } from './vf-cockpit-trace.mjs';
+import { lireAilleurs } from './vf-cockpit-route-ailleurs.mjs';
 
 let INTERDITS = []; // une seule source : le contrat, lu une fois au chargement
 try { const l = JSON.parse(fs.readFileSync(path.join(path.dirname(fileURLToPath(import.meta.url)), 'vf-cockpit-interface.json'), 'utf8')).schemas?.['vibeflow/cockpit-who@2']?.interdits; if (Array.isArray(l)) INTERDITS = l.filter((k) => typeof k === 'string' && k); } catch { INTERDITS = []; }
@@ -98,6 +101,8 @@ function ouvrirFlux(c, req, url, res) {
 
 // la table des routes (A10) : une ligne par route, ordre alphabétique par chemin ; sans régime = gardée
 export const ROUTES = [
+  ['/api/vf/activite', routeActivite],
+  ['/api/vf/ailleurs', lireAilleurs],
   ['/api/vf/doing', lireDoing, HISTORIQUE],
   ['/api/vf/etat', lireEtat, HISTORIQUE],
   ['/api/vf/events', ouvrirFlux, FLUX],
@@ -106,6 +111,7 @@ export const ROUTES = [
   ['/api/vf/journal', lireJournal, HISTORIQUE],
   ['/api/vf/modeles', lireModeles, HISTORIQUE],
   ['/api/vf/state', lireState],
+  ['/api/vf/tracabilite', lireTracabilite],
   ['/api/vf/transcript', lireTranscript, HISTORIQUE],
 ];
 

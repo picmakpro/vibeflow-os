@@ -702,9 +702,56 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - **Reporté de J1 (consigne d'allègement, demande de Samuel, message session principale, 2026-11-13) :** étape 2 point 8, contrat « attribut neutre posé par le terminal », inversion de CL4.3 et `eviter()` rejoué à l'arrivée de la pastille (J1-49).
 - **Ouverts de J1 :** SU6.1 et M-PERSISTANT attendent `VF_COQUILLE` de 79-16 (J1-50) ; angle mort de la porte des chaînes, littéraux français accentués non vus (J1-51) ; ligne `AJOUT` manquante non vue par la suite vendor (J1-52).
 - **Design, nœud `docs` de la 71.5 (J1-53) :** jetons d'espacement absents des six fichiers Git et garde `css-jetons.mjs` à étendre ; P71.5-D-10 (gouttière du téléphone, 20 px contre 24) ; pulsation par l'opacité dans `70-vf-live.js` ; valeurs hors grille de `06-blueprint.js`.
+- **Mineurs de la revue de J1 (tête `faed809d`, verdict passed, une passe) :** (1) M-ASK-HAUT de `test-cockpit-git-pagination.sh` fige un compte exact de rangées (même famille que l'égalité à 115 px retirée par GP2.3b) : la propriété à la place ; (2) même suite, `$ASK_AVEC` non liée sous `GP_SEULEMENT=MUTANTS` ; (3) la trace « empreinte publiée = celle de la copie » prétend plus que ce qui est vérifié (l'empreinte ne hache pas `assets/ui/*.js`) ; clavier-canevas et coin sans comptage de page ; (4) sous `CL_SCRIPTS`/`CC_SCRIPTS`/`CN_SCRIPTS`, `cockpit_module_copie` copie toujours le dépôt, pas la racine rejouée ; (5) `04-vf-clavier-canevas.js` : `t('{} card', n)` sans pluriel anglais (`t.pl`).
 
 **Déclencheur de reprise :** le cadrage du segment b de la Phase 79 ou de la Phase 80, ou la prochaine passe sur le socle de test du cockpit.
 
 ## Verrous par `mkdir` : non exclusifs sous les coreutils uutils jusqu'à 0.10.0 — DIFFÉRÉ (2026-11-13)
 
 **Priorité : à proposer à Samuel par la session principale.** **Origine :** constat de la session principale, 2026-11-12 ; registre J1-31. Sur Ubuntu 25.10 et 26.04 (donc le runner de la CI), `mkdir d` sans `-p` teste l'existence puis crée, et rend 0 si un autre processus a créé `d` entre les deux (lu dans le source de l'outil, versions 0.1.0 à 0.10.0, corrigé en 0.11.0). Preuve en CI : sonde KC2 de `plugin/conductor/scripts/tests/test-check-method-budget.sh`, run 43281286911, première tentative, shard 2 (deux passes d'archivage dans la section critique, l'archive de la gagnante supprimée par le retour arrière de l'autre) ; 2 rouges sur 89 runs mesurés. Sites du même type, hors tests : `plugin/conductor/scripts/check-method-budget.sh`, `plugin/consolidator/scripts/archive.sh` et `reindex.sh`, `plugin/conductor/scripts/check-plugin-update.sh`, `scripts/check-gsd-core-update.sh`. Non concernés : `driver-lock.sh` (départage par `ln -sn`) et `fs.mkdirSync` de Node. **Destination :** lot court à part, compartiment `fiabilite`. **Preuve attendue du correctif :** un faux `mkdir` en tête de PATH qui reproduit la sémantique fautive (rouge avant, vert après). En attendant, un rouge KC2 isolé en CI se relance, en le disant. **Déclencheur de reprise :** la décision de Samuel sur le lot, ou un nouveau rouge KC2.
+
+
+## Cockpit : mineurs de la revue du point de fusion 1 de la Phase 73 — DIFFÉRÉ (2026-11-13)
+
+**Priorité : non fixée.** **Origine :** revue `vf-reviewer` du point de fusion 1 de la Phase 73 (plans 73-01 à 73-04, PR #243), une passe ; les deux majeurs sont corrigés dans la branche de la phase.
+- **`dag` du verrou :** le serveur le projette en objet (`vf-cockpit-vie.mjs`) ; `72-vf-regie-modele.js` n'admet qu'une chaîne et le vide toujours : champ mort, marque « nœuds running » de P73-D-09 non livrée. Trancher : retirer `dag` de la liste blanche, ou admettre l'objet borné.
+- **Grammaires du modèle plus étroites que le serveur :** `wsOk` (`[a-z0-9-]`) et `phaseOk` (deux niveaux) contre `[A-Za-z0-9][A-Za-z0-9._-]*` et `1.2.3` : un compartiment à point ou une phase à trois niveaux se vide, deux missions peuvent partager une clé.
+- **Échec de lecture des arbres de la route `ailleurs` :** avalé sans trace, et la dernière bonne liste effacée.
+- **`fenetreDeStall` :** relit le script de garde (jusqu'à 256 Kio) en synchrone à chaque tour de 5 s ; mémoïser par date de modification.
+- **`attendAgents` :** calculé aussi pour les sessions terminées (lecture de transcript inutile).
+
+**Déclencheur de reprise :** la prochaine passe sur la collecte ou le modèle de la régie.
+
+## Cockpit : poids de la traçabilité dans le graphe Projet (P76-Q-03) — OPTION (a) GARDÉE, MESURÉE (2026-11-13)
+
+**Priorité : à juger à la recette.** **Origine :** plan 76-04, mesure de sa suite T9.8 (`76-04-SUMMARY.md`) ; P76-Q-03 gardée en option (a), décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée, prise par la session principale le 2026-11-13. Mesure sur ce dépôt : le graphe Projet passe de 1 538 945 à 2 824 073 octets (+1,29 Mo, trois fois l'estimation de 0,4 Mo du cadrage), dont 820 Ko de références de plans et de critères pour 87 phases (`nodes[].trace`). **Piste (b) :** les définitions des registres et les références de plans lues par la route `GET /api/vf/tracabilite`, à la demande, hors du graphe. **Déclencheur de reprise :** Samuel juge à la recette que l'onglet Projet est lent.
+
+## Cockpit : mineurs de la revue et de l'audit du point de fusion 1 de la Phase 76 — DIFFÉRÉ (2026-11-13)
+
+**Priorité : basse.** **Origine :** revue (`vf-reviewer`) et audit de sécurité (`vf-auditer`) des plans 76-01 à 76-05, une passe chacun, régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Majeur de la revue et constat haut de l'audit corrigés avant la fusion ; restent :
+- Revue m1 : les listes `requirements` des PLAN et SUMMARY projetées par la collecte ne passent pas par `servi`, alors que le contrat de 76-04 dit tout texte nettoyé.
+- Revue m2 : la recette est cherchée par `-RECETTE-*.md` (premier du tri) dans la traçabilité, par `-RECETTE-HUMAINE.md` dans `avancement.mjs` : un autre nom ferait diverger les deux lectures (P76-D-14).
+- Revue m4 : `name` d'une entrée de mémoire lu avec ses guillemets ; un `name: "x"` ne résout pas un lien `[[x]]` (aucun cas dans le dépôt).
+- Audit M-1 : la lecture synchrone des fichiers de mémoire n'a ni budget cumulé d'octets ni contrôle d'horloge entre fichiers ; l'échéance de la route ne couvre que git (le coût par fichier est borné depuis le correctif H-1). Un témoin déterministe demande une horloge injectée dans `calculer` (`vf-cockpit-trace.mjs`).
+- Audit M-2 : réponse en cache périmée après une écriture en place, non indexée, d'un fichier de mémoire (empreinte par dates de dossiers) ; limite déjà dite au cadrage, à écrire aussi au SUMMARY de 76-05.
+- Audit M-3 : les échecs ou troncatures des lectures git de la mémoire (chemins de HEAD, jours, non suivis) ne remontent pas dans `bornes.tronque` : la liste se donne pour complète.
+- Audit B-1 à B-3 : noms de fichiers suivis servis sans passer par `servi` ; fragments `cible` et `name` bornés mais issus du texte de la mémoire ; empreinte sans signal git quand `git.sig` est nul.
+
+**Déclencheur de reprise :** la prochaine passe sur la traçabilité du cockpit (76-08 ou la phase suivante qui la lit).
+
+## Cockpit : mineurs des plans 75-01 à 75-06 (Phase 75, activité posée sur le code) — DIFFÉRÉ (2026-11-13)
+
+**Priorité : basse.** **Origine :** exécution des plans 75-01 à 75-06, régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale).
+- 75-01 : `merge-base` absent de la liste fermée des sous-commandes git (`vf-cockpit-git-durci.mjs`) ; P75-D-10 tenu par `rev-list`, à revoir si la liste s'élargit.
+- 75-03 : gardes de forme à bords ouverts (bidi U+202E, U+200B, `%2e%2e`, `a\..\x`) : affichage seulement, les chemins ne sont jamais ouverts.
+- 75-03 : collisions de plans en texte brut (`./src/a` ≠ `src/a`).
+- 75-04 : un bloc de frontmatter de plus de 400 lignes est lu comme absent, sans compteur.
+- 75-05 : la partie synchrone de `contexteGardes` (parcours des suites) ne cède pas la main.
+- 75-06 : une carte prévue est créée pour tout chemin absent du lab, documents compris (pas de filtre par catégorie).
+- 75-06 (revue, m2) : `vf-cockpit-activite-prevues.mjs` crée une carte prévue pour des fichiers non code et des sous-dossiers ignorés ; filtrer par `classify()` et `arch.include`/`ignore`.
+- 75-0x (revue, m3) : le nœud `unassigned` vide ajouté par l'annotateur reste dans l'export autonome (`serve.mjs`).
+- 75-01 (revue, m4) : `vf-cockpit-activite-branches.mjs`, échéance globale de 15 s pour 66 paires ; plusieurs reprises de 60 s avant convergence sous charge, ce que dit `radar` (`branches-indisponible`).
+- 75-04 (revue, m6) : la lecture des listes en bloc peuple `vfTouch`, soit +885 Ko dans `graph.json` et dans l'`index.html` Code ; effet voulu, non mesuré.
+- 75-01 (revue, m5) : le tri de la base commune multiple (`baseCommune`, historiques en croix) n'a pas de témoin ; les quatre autres mutants de m5 ont leur témoin (G11).
+
+**Déclencheur de reprise :** la prochaine passe sur l'activité du cockpit (75-07 ou la phase suivante qui la lit).

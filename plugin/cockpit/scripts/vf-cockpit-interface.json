@@ -31,10 +31,10 @@
     },
     "vibeflow/cockpit-who@2": {
       "requis": { "at": "string", "root": "string", "trees": "array", "fresh": "number", "fenetre": "number", "busy": "boolean", "workers": "array", "sources": "object" },
-      "optionnels": ["sortisSilence"],
+      "optionnels": ["sortisSilence", "phasesHumaines", "fenetreStallS"],
       "travailleur": {
         "requis": ["kind", "id", "tree", "source"],
-        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "finMotif", "action", "rattachement", "enCours"],
+        "optionnels": ["role", "task", "titre", "parent", "depth", "background", "branch", "treeBy", "cwd", "ageS", "lastAt", "stale", "orphan", "children", "dag", "etat", "dureeS", "finAt", "finMotif", "action", "rattachement", "enCours", "attendAgents", "lancee", "detient", "retient"],
         "motifsFin": ["echec", "arret"],
         "etats": ["actif", "en-attente", "au-repos", "attend", "termine"]
       },
@@ -47,12 +47,13 @@
       "etatsSource": ["lue", "absente", "erreur", "forme-inconnue"]
     },
     "vibeflow/cockpit-project@1": {
+      "description": "Champs facultatifs de traçabilité (76-04, P76-D-31, A32 de la 79) : `trace` d'un nœud de phase (plans, correctifs, verification, recette, preuves), `meta.vf.trace` (exigences dont `cites`, étapes, registresSansPhase, ou { erreur: true } si la lecture a échoué), `meta.vf.registres` (définitions des registres par phase), `meta.vf.jalonActif`. Tout texte y est nettoyé, masqué et sans chemin du poste. La version du schéma ne monte pas.",
       "requis": { "schema": "string", "meta": "object", "project": "object", "nodes": "array", "files": "array", "links": "array", "flows": "array" },
       "noeud": { "requis": ["id", "label", "kind"] },
       "element": { "requis": ["p", "n", "name"] },
       "lien": { "requis": ["a", "b", "k"] },
       "statuts": ["done", "active", "recette", "todo", "blocked"],
-      "optionnels": { "noeud": ["avancement", "exigences"], "element": ["vague"] },
+      "optionnels": { "noeud": ["avancement", "exigences", "trace"], "element": ["vague"], "metaVf": ["trace", "registres", "jalonActif"] },
       "meta": { "requis": ["vfTab", "vf", "kindLabels"] }
     },
     "vibeflow/cockpit-transcript@2": {
@@ -101,6 +102,23 @@
       "cibles": { "requis": ["etat", "tronque", "ecritures", "lectures"], "etats": ["ok", "en-construction"] },
       "interdits": ["doing", "mandat", "messages", "outils", "fil"]
     },
+    "vibeflow/cockpit-activite@1": {
+      "description": "activité sur le code, lue en mémoire (75-05, GET /api/vf/activite) : points chauds, couplage, gardes, empreinte des agents, radar de collisions ; tableaux de tuples, jamais un chemin, une branche, un rôle ou un titre comme clé d'objet ; jamais dans l'export autonome (A25)",
+      "requis": { "schema": "string", "at": "string", "etat": "string", "calcul": "string", "git": "object", "branches": "object", "gardes": "object", "empreinte": "object", "collisions": "array", "radar": "object" },
+      "etats": ["ok", "en-calcul", "indisponible"],
+      "calcul": ["pret", "en-cours"],
+      "git": { "etats": ["ok", "vide", "indisponible", "absent", "en-lecture"], "tuples": { "chauds": ["chemin", "commits", "loc", "rang", "palier"], "couplage": ["a", "b", "communes", "degre"] } },
+      "branches": { "etats": ["ok", "indisponible", "absent", "en-lecture"] },
+      "gardes": { "etats": ["ok", "non-lues", "indisponible", "en-lecture", "tronque"], "tuples": { "gardes": ["chemin", "suites", "estGarde"] } },
+      "empreinte": { "etats": ["ok", "en-construction", "tronque", "indisponible"], "degres": ["en-cours", "modifie", "lu", "fini"], "tuples": { "marques": ["chemin", "degre", "noms"] } },
+      "collisions": { "sources": ["agents", "arbres", "branches", "plans"], "tuple": ["chemin", "source", "noms", "vague"], "plafond": 500 },
+      "bornes": { "octets": 8388608, "noms": 10, "chemin": 300, "vague": 40, "chauds": 1000, "couplage": 2000, "gardes": 3000, "marques": 2000, "reprise": 60 },
+      "radar": { "raisons": ["en-construction", "tronque", "cibles-coupees", "agents-indisponible", "plans-indisponible", "branches-indisponible", "plans-tronques", "collisions-tronquees", "chemins-ecartes", "reponse-trop-grosse"] },
+      "cles": ["schema", "at", "etat", "calcul", "git", "branches", "gardes", "empreinte", "collisions", "radar", "fenetre", "jours", "commits", "plafond", "plafondAtteint", "partiel",
+        "chauds", "couplage", "paliers", "tetes", "estGarde", "prevusIgnores", "incomplet", "limite", "marques", "horsCarte", "horsLab", "coupees", "rejetes", "ignorees",
+        "voiesTronquees", "voiesCiblesTronquees", "raisons", "total", "tronque", "sansVague", "plansTronques", "limites", "nomsTronques", "cheminsEcartes", "marquesTronquees"],
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"]
+    },
     "vibeflow/cockpit-git@1": {
       "description": "topologie Git du lab pour le tiroir (78-05, GET /api/vf/git) : requis vaut pour etat ok ; les autres etats ne portent que schema, etat, entete (sauf absent : schema, etat, entete) et commandes. auteurs : agrégés sur la fenêtre de commits lue (500 de la base et des branches non mergées), pas sur tout l'historique : l'écran ne doit pas dire « tous les auteurs ». refsIgnorees : nombre de refs sans date (tag vers un blob ou un arbre) écartées, le reste du graphe est lu",
       "requis": { "schema": "string", "etat": "string", "entete": "object", "base": "object", "worktrees": "array", "rangees": "array", "couloirsMax": "number", "replies": "number", "refsIgnorees": "number", "horsFenetre": "array", "mergees": "array", "tags": "array", "stash": "array", "auteurs": "array", "parBranche": "array", "bornes": "object", "commandes": "object" },
@@ -127,6 +145,23 @@
       "requis": { "schema": "string", "etat": "string", "depot": "string" },
       "optionnels": ["branche", "worktree", "detache", "sha7"],
       "etats": ["ok", "indisponible", "absent"]
+    },
+    "vibeflow/cockpit-ailleurs@1": {
+      "description": "P73-D-16, REGI-13 : les sessions « vous attend » HORS des arbres du lab, comptées par NOM de lab. Aucun chemin, identifiant de session, titre ni nom de session n'en sort.",
+      "requis": { "schema": "string", "ailleurs": "any" },
+      "entree": { "requis": ["lab", "n"] },
+      "interdits": ["cwd", "sessionId", "id", "name", "titre", "chemin"]
+    },
+    "vibeflow/cockpit-trace@1": {
+      "description": "traçabilité du cockpit (76-05, GET /api/vf/tracabilite?vue=jalon|phase|exigence|decision|adr|memoire|entree[&cle=…]) : une vue par requête, lue dans l'instantané de la collecte (jalon, phase, exigence, registres) ou par les lectures propres de la route (docs/ADR.md, commits citants, mémoire des agents). Des codes d'état et des clés ouvrables, jamais de copy. etat : ok, vide (rien à montrer, ou collecte: en-cours), absent (objet inconnu, 200), indisponible (lecture en échec). bornes.tronque : vrai dès qu'une lecture a atteint sa borne ou son échéance, une réponse bornée ne se donne jamais pour complète. absences : adr, compartiment, memoire (absente | ignoree | null), nonSuivis, git, etapes. memoire.compteurs : contrat fourni à la Phase 77 (entrees, agents, horsIndex, liensCasses, sansEntrant, cheminsAbsents, resolusParNom, entreesCitantAbsent). Aucune clé description, corps ni texte : la route ne sert jamais le contenu d'un fichier de mémoire.",
+      "requis": { "schema": "string", "etat": "string", "vue": "string", "bornes": "object" },
+      "optionnels": { "cle": "string", "collecte": "string", "absences": "object", "jalon": "object", "phase": "object", "exigence": "object", "adrs": "array", "adr": "object", "registres": "array", "decision": "object", "commits": "array", "memoire": "object", "agent": "object", "entree": "object", "erreur": "string" },
+      "etats": ["ok", "vide", "absent", "indisponible"],
+      "ligneExigence": { "requis": ["id", "ws", "cle", "libelle", "coche", "maillons", "mot", "contradictions", "mentions", "niveauPhase"] },
+      "maillon": { "requis": ["etat", "niveau", "sources"] },
+      "commit": { "requis": ["h7", "jour", "sujet"] },
+      "entreeMemoire": { "requis": ["cle", "chemin", "agent", "name", "type", "jour", "sortants", "entrants", "nbSortants", "nbEntrants", "horsIndex", "sansEntrant", "cheminsAbsents"] },
+      "interdits": ["doing", "mandat", "messages", "outils", "fil", "description", "corps", "texte"]
     }
   },
   "claudeCode": {

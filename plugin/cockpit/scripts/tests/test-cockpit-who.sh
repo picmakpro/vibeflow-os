@@ -609,6 +609,8 @@ const imp = (f) => import(pathToFileURL(path.join(S, f)).href);
 const who = (await imp('vf-cockpit-who.mjs')).collectWho(lab, { home, scriptsDir: noscripts, fresh: 600 });
 const who2 = (await imp('vf-cockpit-who.mjs')).collectWho(lab2, { home, scriptsDir: noscripts, fresh: 600 });
 const { buildEquipeGraph } = await imp('vf-cockpit-equipe-carte.mjs');
+// 73-03 : la collecte retire désormais bidi et largeur nulle de la branche ; la garde de la CARTE (M-W23-BRANCHE) se sonde sur une branche brute réinjectée
+for (const x of who2.workers) if (x.id === 's9') x.branch = 'feat/' + String.fromCodePoint(0x202e) + 'evil' + String.fromCodePoint(0x200b) + 'x';
 const graph = buildEquipeGraph(who, { nom: 'x' }), graph2 = buildEquipeGraph(who2, { nom: 'x' });
 const n = (id, g = graph) => g.nodes.find((x) => x.id === 'se-' + id), w = (id) => who.workers.find((x) => x.id === id);
 const CTRL = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]'), CF = /\p{Cf}/u, json = JSON.stringify({ who, graph }), h = n('s3')?.label || '', hw = w('s3')?.titre;

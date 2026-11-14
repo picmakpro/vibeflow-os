@@ -21,6 +21,7 @@ import { signatureGit } from './vf-cockpit-git-signature.mjs';
 import { creerCollecte } from './vf-cockpit-collecte.mjs';
 import { poser } from './vf-cockpit-instantane.mjs';
 import { whoSig } from './vf-cockpit-who-signature.mjs';
+import { poserLancees } from './vf-cockpit-who.mjs';
 
 const IGNORE = /(^|\/)\.git(\/|$)|\.tmp$|~$|\.swp$/;
 const POLL_MS = 2000, DEBOUNCE_MS = 300, HOLD_MS = 600, NET_MS = 5000;
@@ -60,6 +61,7 @@ export { whoSig };
 export function startLive({
   root, sortie, onEvent = () => {}, log = () => {}, mode = process.env.VF_COCKPIT_WATCH || 'auto',
   aClient = () => true, nbClients = () => 0, garde = () => false, collecteur = creerCollecte, // garde:live-garde-defaut
+  lancees = () => null, // 73-03 : rend la Map courante des lancements (session -> { phase, ws, verbe }), posée sur le `who` reçu du fil
 }) {
   root = path.resolve(root);
   const common = gitCommonDir(root);
@@ -75,6 +77,7 @@ export function startLive({
   let graph = null, idx = new Map(), who = { workers: [], sources: {} }, semeeTour = false;
   // A15 : projection des verrous, rang et date de leur dernière pose, signal du dernier tour
   let verrous = { etat: 'absente', plat: false, liste: [] }, lockSeq = 0, lockAt = Date.now(), signalTour = null;
+  let lecturesPlanning = 0; // 73-03 : lectures du planning de regie comptées par le fil (une par reconstruction du graphe), exposé par etat()
   let gitSig = null, gitSemee = false, gitInfo = null, projetGarde = null; // 78-09 ; gitInfo : { sig, at } posé dans l'instantané (A47)
   const collecte = collecteur({ racine: root, sortie, scriptsDir, home: os.homedir(), log });
   const snapshot = () => ({ seq: state.seq, lock: { seq: lockSeq, at: lockAt, verrous }, who });
@@ -117,18 +120,23 @@ export function startLive({
     verrous = n; lockSeq = ++state.seq; lockAt = Date.now(); emit('lock', { seq: lockSeq, at: lockAt, verrous });
   };
   const surTour = ({ verrous: n, equipe: nw, signal: sg }) => {
+    // garde:live-lancees — la ligne de lancement est posée avant la garde d'émission
+    if (Array.isArray(nw?.workers)) { try { poserLancees(nw.workers, lancees()); } catch (e) { log('error', `lancements : ${e.message}`); } }
     if (!garde({ verrous: n, equipe: nw, signal: sg })) { // garde:live-garde-tour — avant toute pose et toute émission
       refusee = true; log('error', 'tour refusé : contenu interdit, état précédent gardé'); return;
     }
     refusee = false;
     if (sg) signalTour = sg; // le signal de ce tour (toujours posé : son `at` avance même quand rien ne change)
     if (!semeeTour) { semeeTour = true; who = nw; verrous = n; lockAt = Date.now(); poserInstantane(); return; }
-    if (whoSig(nw) !== whoSig(who)) { who = nw; emit('who', { seq: ++state.seq, at: Date.now(), who }); }
+    // le who le plus récent est gardé À CHAQUE tour (âges frais pour tout nouvel onglet) ; l'événement ne part qu'au changement de signature
+    const change = whoSig(nw) !== whoSig(who); who = nw;
+    if (change) emit('who', { seq: ++state.seq, at: Date.now(), who });
     surVerrous(n);
     poserInstantane();
   };
   collecte.surResultat((m) => {
     if (stopped || !m) return;
+    if (Number.isInteger(m.lecturesPlanning)) lecturesPlanning = m.lecturesPlanning;
     try {
       if (m.type === 'planning') {
         if (m.erreur) log('error', `graphe illisible, état précédent gardé : ${String(m.erreur).slice(0, 200)}`); else refreshSur(m.graphe, m.motifs || []);
@@ -204,6 +212,7 @@ export function startLive({
       mode: state.mode, seq: state.seq, derniereMaj: state.derniereMaj, collecte: { ...(({ etat, ...c }) => ({ ...c, etat: refusee && etat === 'ok' ? 'partielle' : etat }))(collecte.etat()), mode: state.mode, clients: nbClients() },
     }),
     snapshot,
+    lecturesPlanning: () => lecturesPlanning, // 73-03 : diagnostic seul, hors de etat() (donc de /api/vf/etat)
     // à la connexion d'un onglet : l'instantané n'a pas bougé depuis un moment (aucune collecte sans onglet), un tour le remet à jour avant d'être servi ; au plus un tour par période du filet
     reveil() { if (!stopped && Date.now() - dernierTour >= NET_MS) { try { tour(); } catch (e) { log('error', `réveil : ${e.message}`); } } },
     pret: (ms = 5000) => collecte.pret(ms), // vrai quand aucune demande n'est en vol, faux après `ms` : le serveur retient `hello` jusque-là
