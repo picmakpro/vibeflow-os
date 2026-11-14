@@ -445,6 +445,13 @@ if (cas === 'confiner') {
   fs.mkdirSync(path.join(lab, '.vibeflow'), { recursive: true }); fs.symlinkSync(dehors, path.join(lab, '.vibeflow', 'cockpit'));
   const l = await prendre(lab, path.join(lab, '.vibeflow', 'cockpit'));
   console.log(`temoin=${t} sortie-liee=${l} dehors=${liste(dehors)}`);
+} else if (cas === 'droits') {
+  const { ouvrirSur } = await imp('vf-cockpit-lanceur-verrou.mjs'); fs.mkdirSync(lab);
+  const mode = (f) => (fs.statSync(f).mode & 0o777).toString(8);
+  const neuf = path.join(lab, 'neuf.json'), vieux = path.join(lab, 'vieux.json'), journal = path.join(lab, 'vieux.log');
+  fs.writeFileSync(vieux, 'ancien'); fs.chmodSync(vieux, 0o644); fs.writeFileSync(journal, 'a\n'); fs.chmodSync(journal, 0o664);
+  for (const [f, o] of [[neuf, {}], [vieux, {}], [journal, { ajout: true }]]) { const fd = ouvrirSur(lab, f, o); if (fd !== null) fs.closeSync(fd); }
+  console.log(`neuf=${mode(neuf)} prexistant=${mode(vieux)} journal=${mode(journal)}`);
 }
 JS
 c3() { node "$WORK/c3.mjs" "${2:-$SCRIPTS}" "$1" "$WORK" 2>&1 | head -1; }
@@ -452,6 +459,7 @@ assert_eq "C3.1 — confiner : un frère au même préfixe que le lab (lab-voisi
 assert_eq "C3.2 — realUnder : un lien vers un frère au même préfixe n'est ni lu ni pris pour un pointeur de compartiment (témoin : un fichier du lab est lu)" "$(c3 realunder)" 'temoin=DANS-LE-LAB lien="" realUnder=false actif=null'
 assert_eq "C3.3 — ecrireIndex : .vibeflow lié vers l'extérieur, rien n'est créé dehors (témoin : sans lien l'index s'écrit)" "$(c3 index)" "temoin=true lien=false dehors=0"
 assert_eq "C3.4 — prendreVerrou : sortie liée vers l'extérieur, refus AVANT tout dossier créé dehors (témoin : sans lien le verrou se pose)" "$(c3 verrou)" "temoin=pose sortie-liee=leve dehors=0"
+assert_eq "C3.5 — ouvrirSur : un fichier préexistant en 0644 ou 0664 passe en 0600 avant toute écriture (témoin : un fichier neuf naît en 0600)" "$(c3 droits)" "neuf=600 prexistant=600 journal=600"
 # mutants : copie fraîche des modules, UNE occurrence remplacée ; chacun doit rougir son cas, pour la raison attendue (valeur de la ligne)
 c3mut() { local nom="$1" f="$2" de="$3" vers="$4" d="$WORK/c3-mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d"/ 2>/dev/null
   node -e 'const fs=require("fs");const [f,de,vers]=process.argv.slice(1);const s=fs.readFileSync(f,"utf8");const n=s.split(de).length-1;if(n!==1){console.log("ancre:"+n);process.exit(1)}fs.writeFileSync(f,s.replace(de,()=>vers))' "$d/$f" "$de" "$vers" > "$d.ancre" 2>&1 || { echo "ancre-ko $(cat "$d.ancre")"; return; }
@@ -465,6 +473,8 @@ M="$(c3mj m09 vf-cockpit-index-cache.mjs "confiner(lab, path.join(a, 'x')); // l
 assert_eq "C3.M9 — ecrireIndex sans jugement de l'ancêtre : C3.3 rougit (des dossiers naissent hors du lab)" "$([ -n "$M" ] && c3 index "$M" | grep -c 'dehors=[1-9]')" "1"
 M="$(c3mj verrou vf-cockpit-lanceur-verrou.mjs "confiner(lab, f); // d'abord : aucun dossier n'est créé hors du lab (une sortie liée vers l'extérieur est refusée avant tout mkdir)" '')"
 assert_eq "C3.M4 — prendreVerrou sans jugement préalable : C3.4 rougit (le dossier .cache naît hors du lab)" "$([ -n "$M" ] && c3 verrou "$M" | grep -c 'dehors=[1-9]')" "1"
+M="$(c3mj droits vf-cockpit-lanceur-verrou.mjs 'fs.fchmodSync(fd, mode); ' '')"
+assert_eq "C3.M5 — ouvrirSur sans fchmod : C3.5 rougit (le fichier préexistant garde 0644)" "$([ -n "$M" ] && c3 droits "$M" | grep -c 'prexistant=644')" "1"
 
 # ---------- GLOB : coût borné de la correspondance de motifs (79-21, P79-D-32, SOCL-26) ----------
 # Aucun serveur, aucun navigateur : scripts d'aide en heredoc dans $GL_AUX ; copie gelée de l'ancienne implémentation, équivalence générative à graine,

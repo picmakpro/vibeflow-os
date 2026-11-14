@@ -19,7 +19,11 @@ export function ouvrirSur(lab, f, { ajout = false, mode = 0o600 } = {}) {
       if (st.isSymbolicLink() || (p === path.resolve(f) && (!st.isFile() || st.nlink !== 1))) return null;
     }
     const fd = fs.openSync(f, fs.constants.O_WRONLY | fs.constants.O_CREAT | BAS | (ajout ? fs.constants.O_APPEND : 0), mode);
-    try { const st = fs.fstatSync(fd); if (st.isFile() && st.nlink === 1) { if (!ajout) fs.ftruncateSync(fd, 0); return fd; } } catch {}
+    // les droits d'un fichier préexistant sont resserrés sur le descripteur avant toute écriture (le mode d'ouverture ne vaut qu'à la création)
+    try {
+      const st = fs.fstatSync(fd);
+      if (st.isFile() && st.nlink === 1) { fs.fchmodSync(fd, mode); if (!ajout) fs.ftruncateSync(fd, 0); return fd; }
+    } catch {}
     fs.closeSync(fd);
   } catch {}
   return null;
