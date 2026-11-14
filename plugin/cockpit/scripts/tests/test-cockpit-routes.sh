@@ -413,7 +413,13 @@ assert_eq "M-503 — le code 503 remplacé par 200 sur la ligne garde:reponse-50
 node "$SCRIPTS/vf-cockpit.mjs" stop --lab "$LABSRV" >/dev/null 2>&1
 echo "=== forme ==="
 n=0; for f in vf-cockpit-routes vf-cockpit-server vf-cockpit-build; do p="$SCRIPTS/$f.mjs"; if [ -f "$p" ]; then c=$(awk 'END{print NR}' "$p"); [ "$c" -lt 250 ] || n=$((n+1)); else n=$((n+1)); fi; done
-assert_eq "F.1 — aucun des trois fichiers n'atteint 250 lignes ; le module de routes n'a aucune ligne de plus de 160 colonnes ni le littéral de l'en-tête de jeton" "$n|$(awk 'length($0)>160' "$SCRIPTS/vf-cockpit-routes.mjs" 2>/dev/null | wc -l | tr -d ' ')|$(grep -c 'x-floorplan-token' "$SCRIPTS/vf-cockpit-routes.mjs" 2>/dev/null)" "0|0|0"
+# nom de l'en-tête en vigueur lu de ENTETE_JETON (vf-cockpit-lancer-post.mjs), jamais recopié ici ; vide = jamais « zéro littéral » (fermé par défaut : -e '' sélectionne toutes les lignes)
+entete_vigueur() { node --input-type=module -e "import('$1/vf-cockpit-lancer-post.mjs').then((m)=>console.log(typeof m.ENTETE_JETON==='string'?m.ENTETE_JETON:''))" 2>/dev/null; }
+litteraux_entete() { local c; c="$(entete_vigueur "$1")"; echo "$(grep -c -F -e 'x-floorplan-token' -e "$c" "$1/vf-cockpit-routes.mjs" 2>/dev/null)$([ -n "$c" ] && echo "" || echo "-nom-illisible")"; }
+assert_eq "F.1 — aucun des trois fichiers n'atteint 250 lignes ; le module de routes n'a aucune ligne de plus de 160 colonnes ni le littéral de l'en-tête de jeton (l'ancien x-floorplan-token ET le nom en vigueur, lu de ENTETE_JETON)" "$n|$(awk 'length($0)>160' "$SCRIPTS/vf-cockpit-routes.mjs" 2>/dev/null | wc -l | tr -d ' ')|$(litteraux_entete "$SCRIPTS")" "0|0|0"
+assert_eq "F.1b — témoin : le nom en vigueur est lu (non vide) et le module de routes l'importe au lieu de l'écrire" "$([ -n "$(entete_vigueur "$SCRIPTS")" ] && echo lu || echo illisible)|$(grep -cF "import { ENTETE_JETON } from './vf-cockpit-lancer-post.mjs'" "$SCRIPTS/vf-cockpit-routes.mjs")" "lu|1"
+FM="$(copie f1m)"; sed -i.bak "s/entete = ENTETE_JETON,/entete = '$(entete_vigueur "$SCRIPTS")',/" "$FM/vf-cockpit-routes.mjs"; rm -f "$FM/vf-cockpit-routes.mjs.bak"
+assert_eq "M-ENTETE-LITTERAL — le littéral du nom en vigueur écrit dans le module de routes à la place de l'import : la copie est valide et F.1 rougit (1 ligne portant le littéral)" "$(node --check "$FM/vf-cockpit-routes.mjs" 2> /dev/null && echo valide || echo invalide) $(litteraux_entete "$FM")" "valide 1"
 vf_hyg_assert
 if [ "$PASS" -eq 0 ]; then echo "  ❌ FAIL — aucune assertion jouée (vert à vide)"; exit 1; fi
 echo ""; echo "Résultats : $PASS PASS / $FAIL FAIL"
