@@ -44,7 +44,10 @@
       fichiers: [['Écrits', v ? compte(ci, ci ? ci.ecritures : []) : INC], ['Lus', v ? compte(ci, ci ? ci.lectures : []) : INC]],
       identite: [['Rôle', (v && v.role) || (w && w.role) || ((v ? v.kind : w && w.kind) === 'session' ? 'Session' : INC), false],
         ['Nœud du plan', noeudDe(v, w), true], ['Arbre', v ? (v.arbre == null ? 'arbre principal' : v.arbre) : INC, true],
-        ['Branche', (w && w.branch) || INC, true], ['Modèle', v && v.modeles.length ? v.modeles.join(', ') : INC, false]],
+        ['Branche', (w && w.branch) || INC, true], ['Modèle', v && v.modeles.length ? v.modeles.join(', ') : INC, false],
+        // les champs de la ligne 2 de la régie (nowrap, ellipse) : la fiche les porte en entier ; absents quand la source n'en dit rien
+        ...(e.id ? [['Identifiant', court(e.id), true]] : []), ...(e.modifies > 0 ? [['Fichiers modifiés', String(e.modifies), false]] : []),
+        ...(e.lancee ? [['Lancée depuis la carte', e.lancee, false]] : [])],
     };
   }
 

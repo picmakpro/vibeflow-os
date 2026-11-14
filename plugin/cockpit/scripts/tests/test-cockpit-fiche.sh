@@ -6,6 +6,7 @@
 #   P1 ouverture  P2 session et sous-agent  P3 faits (a à f)  P4 rattachement  P5 fil (a états, b fusion, c corps inconnu)  P6 direct  P7 bornes  P8 fermeture et Échap
 #   P9 lien du parent  P10 deux colonnes  P11 aucune fuite  P12 forme du code (statique)  P13 mouvement, contrastes, focus  P14 donnée hostile
 #   P15 cycle de vie  P16 vf-agent:lu  P17 les trois déclencheurs de la régie  P18 aller-retour d'onglet  P19 clic sur la bascule fiche ouverte
+#   P20 la ligne 2 d'un agent (nowrap, ellipse, coupée à l'écran) se lit en entier dans la fiche ouverte au clavier (P73-D-30) ; un champ sans équivalent rougit
 # Plan 74-05 non marqué audit : le régime allégé de la session principale (2026-11-13) ne demande aucun mutant ; la suite n'en joue pas.
 # Chrome headless en CDP (SAUTÉ, jamais compté réussi, sans navigateur). Exit 0 si tout passe, 1 sinon.
 
@@ -652,6 +653,50 @@ export default async function (h) {
   });
 }
 JS
+cat > "$AUX/s20.mjs" <<'JS'
+import { voies, WHO, corps, msg, FAITS } from './fix.mjs';
+export const ids = ['P20'];
+const QUI = WHO.map((w) => (w.id === 'sess-1' ? { ...w, lancee: { phase: '74', ws: 'fiabilite', verbe: 'executer' } } : w));
+// la ligne 2 d'une ligne d'agent (nowrap, ellipse) : ses champs, découpés sans casser la phrase de lancement, et si elle est coupée à l'écran
+const L2 = (id) => { const l = document.querySelector(`#vf-equipe li[data-vf-agent="${id}"] .vf-rg-l2`); if (!l) return null;
+  const cs = getComputedStyle(l), parts = [];
+  for (const p of l.textContent.replace(/\s/g, ' ').split(' · ')) { if (parts.length && /^Lancée depuis/.test(parts[parts.length - 1])) parts[parts.length - 1] += ' · ' + p; else parts.push(p); }
+  return { parts, coupee: l.scrollWidth > l.clientWidth, ellipse: cs.textOverflow === 'ellipsis' && cs.whiteSpace === 'nowrap' }; };
+const RATT = () => document.querySelector('.vf-fiche-ratt').textContent.replace(/\s/g, ' ');
+export default async function (h) {
+  for (const largeur of [1280, 390]) {
+    await h.monter({ voies, who: QUI, largeur, fil: (now) => ({ 'sess-1': corps('sess-1', [msg(now, 5, 'a')]), 'wk-2': corps('wk-2', [msg(now, 5, 'b')]), 'wk-4': corps('wk-4', [msg(now, 5, 'c')]) }) });
+    await h.ev(() => { window.__vfRegiePied.nonCommite = () => ({ 'feat/x': 3 }); document.dispatchEvent(new CustomEvent('vf-regie:redessiner')); });
+    await h.attendre(() => !!document.querySelector('#vf-equipe li[data-vf-agent="wk-2"] .vf-rg-l2') && /3 modifiés/.test(document.querySelector('#vf-equipe li[data-vf-agent="wk-2"] .vf-rg-l2').textContent.replace(/\s/g, ' ')), 'ligne 2 posée', 8000);
+    await h.section('P20', async () => {
+      const ecarts = [], coupes = {};
+      for (const id of ['sess-1', 'wk-2', 'wk-4']) {
+        const l2 = await h.ev(L2, id);
+        coupes[id] = l2.coupee;
+        if (!l2.ellipse) ecarts.push(`${id} : ligne 2 ni nowrap ni ellipse`);
+        await h.ev((s) => document.querySelector(s).focus(), `#vf-equipe li[data-vf-agent="${id}"] .vf-rg-tog`);
+        await h.touche('Enter', 'Enter', 13, '\r'); await h.fiche();
+        const f = await h.ev(FAITS), ratt = await h.ev(RATT), m = f.m;
+        if (m.Identifiant !== id.slice(0, 8)) ecarts.push(`${id} : identifiant « ${m.Identifiant} »`);
+        for (const p of l2.parts) {
+          let g;
+          if ((g = /^nœud (.+)$/.exec(p))) { if (!ratt.includes(`nœud ${g[1]}`)) ecarts.push(`${id} : « ${p} » absent de la fiche`); }
+          else if ((g = /^(\d+) modifiés?$/.exec(p))) { if (m['Fichiers modifiés'] !== g[1]) ecarts.push(`${id} : « ${p} » : fiche « ${m['Fichiers modifiés']} »`); }
+          else if ((g = /^arbre (.+)$/.exec(p))) { if (m.Arbre !== g[1]) ecarts.push(`${id} : « ${p} » : fiche « ${m.Arbre} »`); }
+          else if ((g = /^branche (.+)$/.exec(p))) { if (m.Branche !== g[1]) ecarts.push(`${id} : « ${p} » : fiche « ${m.Branche} »`); }
+          else if ((g = /^Lancée depuis la carte : (.+)$/.exec(p))) { if (m['Lancée depuis la carte'] !== g[1]) ecarts.push(`${id} : « ${p} » : fiche « ${m['Lancée depuis la carte']} »`); }
+          else if (p === 'non lié à une phase du projet') { if (!/Pas lié à une phase du projet/.test(ratt)) ecarts.push(`${id} : « ${p} » absent de la fiche`); }
+          else ecarts.push(`${id} : champ « ${p} » sans équivalent connu dans la fiche`);
+        }
+        await h.fermer();
+      }
+      h.egal('P20', `largeur ${largeur} : tout champ de la ligne 2 d'un agent (session, sous-agent rattaché, non lié) se lit en entier dans la fiche ouverte au clavier, ainsi que l'identifiant court ; aucun champ sans équivalent`,
+        ecarts, []);
+      h.sonde('P20.a', `largeur ${largeur} : témoin positif, la ligne 2 de la session (branche, fichiers modifiés, lancement) est bel et bien coupée à l'écran : la fiche est sa seule vue pleine`, coupes['sess-1'] === true, JSON.stringify(coupes));
+    });
+  }
+}
+JS
 
 # ---------- lancement ----------
 LAB="$WORK/lab"; mkdir -p "$LAB/src" "$LAB/.planning/phases/01-x"
@@ -723,6 +768,7 @@ else
   echo "=== P8, P17, P19 — fermeture, Échap, déclencheurs de la régie, bascule de vue ==="; joue s8 "$PORT" P8 P17 P19
   echo "=== P10, P11, P13, P14 — colonnes, fuites, mouvement et contrastes, donnée hostile ==="; joue s10 "$PORT" P10 P11 P13 P14
   echo "=== P15, P16, P18 — cycle de vie, vf-agent:lu, aller-retour d'onglet ==="; joue s15 "$PORT" P15 P16 P18
+  echo "=== P20 — la ligne 2 d'un agent se lit en entier dans la fiche, au clavier ==="; joue s20 "$PORT" P20
   assert_eq "S0 — aucun fichier du lab modifié (somme du dossier avant/après)" "$(somme_lab)" "$avant"
   cockpit_arreter "$SRV"; SRV=""
 fi
