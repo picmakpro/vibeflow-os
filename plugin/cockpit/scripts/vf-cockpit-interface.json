@@ -47,13 +47,13 @@
       "etatsSource": ["lue", "absente", "erreur", "forme-inconnue"]
     },
     "vibeflow/cockpit-project@1": {
-      "description": "Champs facultatifs de traçabilité (76-04, P76-D-31, A32 de la 79) : `trace` d'un nœud de phase (plans, correctifs, verification, recette, preuves), `meta.vf.trace` (exigences dont `cites`, étapes, registresSansPhase, ou { erreur: true } si la lecture a échoué), `meta.vf.registres` (définitions des registres par phase), `meta.vf.jalonActif`. Tout texte y est nettoyé, masqué et sans chemin du poste. La version du schéma ne monte pas.",
+      "description": "Champs facultatifs de traçabilité (76-04, P76-D-31, A32 de la 79) : `trace` d'un nœud de phase (plans, correctifs, verification, recette, preuves), `meta.vf.trace` (exigences dont `cites`, étapes, registresSansPhase, ou { erreur: true } si la lecture a échoué), `meta.vf.registres` (définitions des registres par phase), `meta.vf.jalonActif`. Tout texte y est nettoyé, masqué et sans chemin du poste. La version du schéma ne monte pas. Burn-up et blocages du STATE (77-02, P77-D-13, P77-D-14, P77-D-20), facultatifs de `meta.vf`, sans changement de version (C0) : `burnup` { jalon, clos, total, pct, ouverture, serie [{ d, perimetre, clos, closes }], closesSansDate, inscritesSansDate } (dates de la ligne de checklist du ROADMAP, jamais estimées ; `pct` = celui du pied de jalon), `blocagesState` [{ h, t }] (puces de « Blockers/Concerns » du STATE du compartiment actif, `t` nettoyé et borné, `h` condensat de 12 hexadécimaux ; absent si la section manque) ; le texte des blocages part avec la page exportée, comme la prose qu'il remplace.",
       "requis": { "schema": "string", "meta": "object", "project": "object", "nodes": "array", "files": "array", "links": "array", "flows": "array" },
       "noeud": { "requis": ["id", "label", "kind"] },
       "element": { "requis": ["p", "n", "name"] },
       "lien": { "requis": ["a", "b", "k"] },
       "statuts": ["done", "active", "recette", "todo", "blocked"],
-      "optionnels": { "noeud": ["avancement", "exigences", "trace"], "element": ["vague"], "metaVf": ["trace", "registres", "jalonActif"] },
+      "optionnels": { "noeud": ["avancement", "exigences", "trace"], "element": ["vague"], "metaVf": ["trace", "registres", "jalonActif", "burnup", "blocagesState"] },
       "meta": { "requis": ["vfTab", "vf", "kindLabels"] }
     },
     "vibeflow/cockpit-transcript@2": {
@@ -120,7 +120,7 @@
       "interdits": ["doing", "mandat", "messages", "outils", "fil"]
     },
     "vibeflow/cockpit-git@1": {
-      "description": "topologie Git du lab pour le tiroir (78-05, GET /api/vf/git) : requis vaut pour etat ok ; les autres etats ne portent que schema, etat, entete (sauf absent : schema, etat, entete) et commandes. auteurs : agrégés sur la fenêtre de commits lue (500 de la base et des branches non mergées), pas sur tout l'historique : l'écran ne doit pas dire « tous les auteurs ». refsIgnorees : nombre de refs sans date (tag vers un blob ou un arbre) écartées, le reste du graphe est lu",
+      "description": "topologie Git du lab pour le tiroir (78-05, GET /api/vf/git) : requis vaut pour etat ok ; les autres etats ne portent que schema, etat, entete (sauf absent : schema, etat, entete) et commandes. auteurs : agrégés sur la fenêtre de commits lue (500 de la base et des branches non mergées), pas sur tout l'historique : l'écran ne doit pas dire « tous les auteurs ». refsIgnorees : nombre de refs sans date (tag vers un blob ou un arbre) écartées, le reste du graphe est lu base.h (facultatif, P77-D-21, plan 77-04) : SHA de 40 caractères du sommet de la branche de base.",
       "requis": { "schema": "string", "etat": "string", "entete": "object", "base": "object", "worktrees": "array", "rangees": "array", "couloirsMax": "number", "replies": "number", "refsIgnorees": "number", "horsFenetre": "array", "mergees": "array", "tags": "array", "stash": "array", "auteurs": "array", "parBranche": "array", "bornes": "object", "commandes": "object" },
       "etats": ["ok", "vide", "indisponible", "absent"],
       "rangee": { "requis": ["h", "h7", "p", "at", "an", "s", "col", "entrants", "sortants", "largeur", "ouvertBas", "fusion", "racine", "teinte", "refs", "refsPlus"] },
@@ -140,6 +140,15 @@
         "types": { "chemin": "string", "nom": "string", "verifie": "boolean", "modifies": "number|null", "nonSuivis": "number|null", "plus": "boolean", "propre": "boolean|null", "avance": "number|null", "retard": "number|null", "avanceOrigin": "number|null", "retardOrigin": "number|null", "commande": "string|null" } },
       "etats": ["ok", "indisponible"],
       "interdits": ["email", "diff", "patch"]
+    },
+    "vibeflow/cockpit-jauges@1": {
+      "description": "les onze jauges de la Santé de la méthode, à la demande (77-03, GET /api/vf/methode ; jamais dans la collecte) : traduction du TSV `#vf-budget@1` des gates check-method-budget et check-instruction-budget, sans recalcul ; verdict d'une jauge = celui de sa mesure la plus grave ; `indispo` (avec sa cause) quand la source n'a pas répondu, `na` quand le lab n'a pas ce corpus ; une valeur absente vaut null, jamais 0 ; un chemin du poste n'est jamais servi (null) ; mesures bornées à 200 par jauge (`tronque`) ; `baseline` seulement pour `socle`",
+      "requis": { "schema": "string", "at": "string", "sources": "object", "jauges": "array" },
+      "jauge": { "requis": ["type", "groupe", "unite", "verdict", "cause", "mesures", "tronque", "baseline"] },
+      "verdicts": ["ok", "surveiller", "depasse", "na", "indispo", "format"],
+      "causes": ["absent", "ancien", "delai", "format", "echec"],
+      "types": ["state", "state-prose", "backlog-ouverts", "backlog-entree", "backlog-clos", "roadmap", "memory-index", "worktrees", "agent", "skill", "socle"],
+      "interdits": ["doing", "mandat", "messages", "outils", "fil"]
     },
     "vibeflow/cockpit-git-entete@1": {
       "requis": { "schema": "string", "etat": "string", "depot": "string" },

@@ -68,9 +68,9 @@ skills/cockpit-moteur/assets/ui/01-vf-responsive.js 63
 skills/cockpit-moteur/assets/ui/02-vf-telephone.js 54
 skills/cockpit-moteur/assets/ui/03-vf-accessibilite.js 6
 skills/cockpit-moteur/assets/ui/39-vf-tour-placement.js 26
-skills/cockpit-moteur/assets/ui/70-vf-live.js 60
+skills/cockpit-moteur/assets/ui/70-vf-live.js 59
 skills/cockpit-moteur/assets/ui/71-vf-equipe-rendu.js 58
-skills/cockpit-moteur/assets/ui/72-vf-equipe.js 29
+skills/cockpit-moteur/assets/ui/72-vf-equipe.js 28
 skills/cockpit-moteur/assets/ui/73-vf-tiroir-travail.js 12
 skills/cockpit-moteur/assets/ui/75-vf-modele.js 6
 skills/cockpit-moteur/assets/ui/76-vf-git-entete.js 38

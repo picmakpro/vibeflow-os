@@ -126,7 +126,7 @@
   let dernier = '';
   const whoPanel = () => { dernier = htmlTiroir(); SC.showPanel(dernier); appliquerReplis(); };
   // tant que le tiroir est ouvert il suit le flux : redessiné à chaque `who` qui change l'arbre, l'état ou la dernière action (pas d'image identique), en gardant le défilement
-  // et l'état replié ou déplié des « Terminés » ; les commandes demandées sont reposées par l'observateur ci-dessous
+  // et l'état replié ou déplié des « Terminés » ; les commandes demandées sont reposées par le rappel de l'événement `panel` ci-dessous
   const cleDe = (d) => d.closest('[data-vf-agent]')?.dataset.vfAgent || ''; // le bloc « Terminés » est repéré par l'agent qui le porte (stable quand un terminé s'y ajoute)
   const redessiner = () => {
     if (!document.querySelector('.vf-whop') || document.body.classList.contains('no-panel')) return; // tiroir fermé ou remplacé : on ne le rouvre pas
@@ -142,14 +142,14 @@
   // AUDC-D3 : entre deux poussées, l'âge des agents avance dans la page : le tiroir ouvert est recalculé toutes les 30 s (aucun dessin si le texte est identique)
   if (typeof setInterval === 'function') setInterval(() => { if (!document.hidden) redessiner(); }, 30000); // `typeof` : le harnais vm de test-cockpit-equipe.sh (EUI) n'a pas de minuterie
   // révélation ponctuelle : la réponse reste affichée tant que sa ligne l'est. Elle est gardée en mémoire de la page seulement (ni graphe, ni stockage, ni export) et reposée
-  // par un observateur dès que le bouton réapparaît : le tiroir et le panneau d'un agent sont redessinés à chaque `who`, et une réponse qui arrive pendant un redessin
+  // par l'événement `panel` du moteur dès que le panneau est redessiné : le tiroir et le panneau d'un agent sont redessinés à chaque `who`, et une réponse qui arrive pendant un redessin
   // ne doit pas tomber dans une ligne détachée (recette 2026-11-03)
   const demandes = new Map();
   const poser = (b) => {
     const t = demandes.get(b.dataset.vfDoing), z = b.nextElementSibling;
     if (t !== undefined && z && z.classList.contains('vf-doing') && z.textContent !== t) { z.textContent = t; z.hidden = false; }
   };
-  // observé : le panneau seulement (la carte du code compte des milliers d'éléments redessinés en rafale) ; rien à reposer tant qu'aucune commande n'a été demandée
+  // rien à reposer tant qu'aucune commande n'a été demandée
   // focus clavier (UIFN-12) : chaque `who` redessine le panneau et le tiroir, le bouton focalisé est remplacé et le focus tombe sur le corps de la page.
   // On retient la clé du bouton « Voir la dernière commande » / « Lire le transcript » qui a le focus ; après un redessin, si le focus est perdu, il revient au bouton de même clé.
   // Un focus qui s'en va ailleurs (bouton encore dans la page) efface la clé : jamais de focus volé à quelqu'un qui est parti.
@@ -163,7 +163,7 @@
     const b = cleFocus === 'titre' ? document.querySelector('#panel > .vf-whop h3') : [...document.querySelectorAll(DANS_PANNEAU)].find((x) => cleBtn(x) === cleFocus);
     if (b) { if (cleFocus === 'titre') b.tabIndex = -1; b.focus({ preventScroll: true }); }
   };
-  new MutationObserver(() => { rendreFocus(); if (demandes.size) for (const b of document.querySelectorAll('#panel [data-vf-doing]')) poser(b); }).observe(document.getElementById('panel') || document.documentElement, { childList: true, subtree: true });
+  SC.on('panel', () => { rendreFocus(); if (demandes.size) for (const b of document.querySelectorAll('#panel [data-vf-doing]')) poser(b); }); // 79-17 : l'événement panel du moteur, synchrone après chaque dessin du panneau
   document.addEventListener('click', (ev) => {
     const r = ev.target.closest?.('.vf-whop [data-vf-repli]');
     if (!r) return;
@@ -264,11 +264,11 @@
     es.addEventListener('hello', (e) => {
       probe.connected = true; const d = JSON.parse(e.data);
       if (TAB === 'project' && lastSeq !== null && typeof d.seq === 'number' && d.seq !== lastSeq) { probe.resync = (probe.resync || 0) + 1; location.reload(); return; }
-      vu(d); setWho(d.who); showLock(d.lock);
+      vu(d); // 79-17 : who et lock du hello sont posés par le magasin d'état (VF_ETAT), qui lit le même flux
     });
     es.addEventListener('reload', () => { if (window.FLOORPLAN_RELOAD) window.FLOORPLAN_RELOAD(); else location.reload(); }); // AUDC-H1 : la carte reconstruite recharge la page par ce flux (le viewer n'en ouvre plus un second)
-    es.addEventListener('who', (e) => setWho(vu(JSON.parse(e.data)).who));
-    es.addEventListener('lock', (e) => showLock(vu(JSON.parse(e.data))));
+    es.addEventListener('who', (e) => vu(JSON.parse(e.data))); // le magasin d'état pose le who ; ici seule la séquence est retenue (resynchronisation)
+    es.addEventListener('lock', (e) => vu(JSON.parse(e.data))); // idem : seule la séquence est retenue ici
     es.addEventListener('git', (e) => { const d = vu(JSON.parse(e.data)); document.dispatchEvent(new CustomEvent('vf-git:signal', { detail: { sig: d.sig } })); }); // 78-09 : signal sans contenu, l'en-tête et le tiroir relisent leurs routes
     es.addEventListener('patch', (e) => {
       const d = vu(JSON.parse(e.data));
@@ -284,5 +284,16 @@
     es.addEventListener('structural', (e) => { vu(JSON.parse(e.data)); probe.structural++; if (TAB === 'project') { SC.toast('Projet modifié : rechargement'); setTimeout(() => location.reload(), 400); } });
     es.onerror = () => { es.close(); perdu('direct', connecter); };
   };
+  // 79-17 (SOCL-21) : who, lock et connexion se lisent dans le magasin d'état, puis on s'y abonne (perdu : « Direct coupé », ouvert : l'état courant).
+  // Sous la coquille, une fois l'onglet rendu (71 se charge après ce fichier) ; la désinscription est rendue à `surOnglet` (79-16)
+  const E = window.VF_ETAT, CQ = window.VF_COQUILLE;
+  const surConnexion = (c) => { if (c === 'perdu') showLock(null, true); else if (c === 'ouvert') showLock(); };
+  const brancher = () => {
+    if (E.lire('who')) setWho(E.lire('who'));
+    if (E.lire('lock')) showLock(E.lire('lock'));
+    const off = [E.abonner('who', setWho), E.abonner('lock', (l) => showLock(l)), E.abonner('connexion', surConnexion)];
+    return () => { for (const f of off) f(); };
+  };
+  if (CQ && typeof CQ.surOnglet === 'function') CQ.surOnglet(brancher); else brancher();
   connecter();
 })();

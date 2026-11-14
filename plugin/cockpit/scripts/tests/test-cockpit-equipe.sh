@@ -380,6 +380,7 @@ assert_eq "EP.2 — les 40 sous-agents (20 actifs, 20 terminés depuis moins de 
 echo "=== E23 — onglet Équipe : page, graphe, onglets, libellés (P69-D-17 ; CKPT-23) ==="
 UI="$SCRIPTS/../skills/cockpit-moteur/assets/ui"
 export VF_FLUX_JS="$UI/69-vf-flux.js"
+export VF_ETAT_JS="$UI/70-vf-etat.js" # 79-17 : le magasin d'état se charge entre le flux et 70 (ordre alphabétique de la page)
 cat > "$AUX/fetchp.mjs" <<'JS'
 // fetchp.mjs <port> <chemin> <sortie> : écrit le corps dans <sortie>, rend le statut ; « ERR <code> » si la connexion échoue
 import http from 'node:http';
@@ -654,7 +655,7 @@ const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 class ES { constructor() { ES.last = this; this.l = {}; } addEventListener(n, f) { this.l[n] = f; } close() {} }
 let bouton = null, panneau = '';
 const el = () => ({ setAttribute() {}, appendChild() {}, remove() {}, style: {} });
-const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
+const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, on() {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
   addHeaderButton: (o) => { bouton = { ...o, className: '', innerHTML: '', setAttribute() {} }; return bouton; } };
 const document = { createElement: el, head: { appendChild() {} }, body: { appendChild() {}, classList: { contains: () => false } }, documentElement: {}, addEventListener() {}, dispatchEvent: () => true, getElementById: () => null, querySelectorAll: () => [], querySelector: () => null };
 const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' } };
@@ -662,6 +663,7 @@ const ctx = vm.createContext({ window, document, MutationObserver: class { obser
 try {
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(process.env.VF_FLUX_JS, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_ETAT_JS, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
   const w = [{ kind: 'subagent', id: 'a', etat: 'actif', tree: '.' }, { kind: 'subagent', id: 'f', etat: 'termine', tree: '.', parent: 'a' }, { kind: 'subagent', id: 'w', etat: 'en-attente', tree: '.' }, { kind: 'lock', id: 'v', tree: '.' }, { kind: 'dag-node', id: 'd', tree: '.', etat: 'actif' }, { kind: 'registered', id: 'r', tree: '.' }]; // un actif, un terminé, un en attente, puis ce qui n'est pas un agent
   ES.last.l.who({ data: JSON.stringify({ seq: 1, who: { workers: w, sources: {} } }) });
@@ -933,6 +935,13 @@ JSON
   EKC focus-tiroir "project.html#t"
   assert_eq "EK9.0 — témoin : le bouton du tiroir avait le focus et le événement who l'a bien remplacé" "$(G "$WORK/ek-focus-tiroir.json" 'j.erreur||(j.focalise+"|"+j.remplace)')" "true|true"
   assert_eq "EK9 — après le redessin du tiroir « Au travail » par un événement who, le focus est rendu au bouton « Voir la dernière commande » de la même ligne" "$(G "$WORK/ek-focus-tiroir.json" 'j.erreur||(j.apres.tag==="BODY"?"BODY":(j.apres.estLeBouton?"le bouton":"autre : "+j.apres.tag))')" "le bouton"
+  # EKR (79-17, SOCL-21) : ce que le panneau reposait après un redessin par un observateur de mutations — la réponse « dernière commande » du tiroir et le transcript lu —
+  # est reposé par l'événement panel du moteur ; caractérisations VERTES avant et après le retrait des observateurs (le témoin rouge du retrait est le cliquet, section O de test-cockpit-magasin.sh)
+  EKR() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EKR_ACTION="$1" node "$HERE_EK/reposer-chrome.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ekr-$1.json"; }
+  EKR reponse-puis-who "project.html#t"
+  assert_eq "EKR1 — la réponse « Voir la dernière commande » reste affichée dans la ligne du bouton neuf quand un second who redessine le tiroir (le bouton a bien été remplacé)" "$(G "$WORK/ekr-reponse-puis-who.json" 'j.erreur||(j.remplace+"|"+j.texte+"|"+j.visible)')" "true|réponse fixe EKR1|true"
+  EKR transcript-puis-who "$EKA1"
+  assert_eq "EKR2 — le transcript lu reste affiché (texte égal, non vide) dans la zone du bouton neuf quand un who redessine le panneau d'un agent (le bouton a bien été remplacé)" "$(G "$WORK/ekr-transcript-puis-who.json" 'j.erreur||(j.lu+"|"+j.remplace+"|"+(j.texte>0)+"|"+j.egal)')" "true|true|true|true"
   EKC badge "$EKA1"
   assert_eq "EK10 — pied long (« actif · … · lance un agent general-purpose ») : le badge d'état reste entièrement dans sa carte à 390, 1024 et 1440 px (marge >= 0)" "$(G "$WORK/ek-badge.json" 'j.erreur||(["390","1024","1440"].map((l)=>typeof j[l]==="number"&&j[l]>=0?"ok":l+"="+j[l]).join(","))')" "ok,ok,ok"
   EKC echelle "equipe.html"
@@ -981,8 +990,8 @@ JSON
   assert_eq "EK1.2 — mutant (l'Entrée du bouton n'est plus arrêtée avant le viewer) : le viewer descend dans le nœud du manager (la vue change), détecté" "$(ek_mutant f1 focus-transcript "equipe.html#r=n%3Aag-mgr1"  'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag+" | vue "+(j.hashAvant===j.hashApres?"inchangée":"changée"))' "$EKANC1" "${EKANC1/ev.stopPropagation();/void 0;}")" "muté|lu=true | actif=BUTTON | vue changée"
   assert_eq "EK1.3 — mutant (le bouton focalisé est désactivé pendant la lecture) : le transcript est lu mais le focus tombe sur BODY, détecté" "$(ek_mutant f2 focus-transcript "$EKA1" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true'); // jamais \`disabled\` : un bouton désactivé perd le focus clavier (UIFN-12)" 'b.disabled = true;')" "muté|lu=true | actif=BODY"
   assert_eq "EK8.1 — mutant (le bouton focalisé du tiroir est désactivé pendant la lecture) : la commande est lue mais le focus tombe sur BODY, détecté" "$(ek_mutant f3 focus-doing-tiroir "project.html#t" 'j.erreur||("lu="+j.lu+" | actif="+j.apres.tag)' "b.setAttribute('aria-disabled', 'true'); // jamais \`disabled\` : un bouton focalisé désactivé perd le focus clavier (UIFN-12, même défaut" 'b.disabled = true; //')" "muté|lu=true | actif=BODY"
-  assert_eq "EK8.2 — mutant (le focus n'est plus rendu après un redessin) : il tombe sur BODY, détecté" "$(ek_mutant r1 focus-puis-who "$EKA1" 'j.erreur||(j.apres.tag)' 'new MutationObserver(() => { rendreFocus(); ' 'new MutationObserver(() => { ')" "muté|BODY"
-  assert_eq "EK9.2 — même mutant, tiroir « Au travail » : le focus tombe sur BODY, détecté" "$(ek_mutant r2 focus-tiroir "project.html#t" 'j.erreur||(j.apres.tag)' 'new MutationObserver(() => { rendreFocus(); ' 'new MutationObserver(() => { ')" "muté|BODY"
+  assert_eq "EK8.2 — mutant (le focus n'est plus rendu après un redessin) : il tombe sur BODY, détecté" "$(ek_mutant r1 focus-puis-who "$EKA1" 'j.erreur||(j.apres.tag)' "SC.on('panel', () => { rendreFocus(); " "SC.on('panel', () => { ")" "muté|BODY"
+  assert_eq "EK9.2 — même mutant, tiroir « Au travail » : le focus tombe sur BODY, détecté" "$(ek_mutant r2 focus-tiroir "project.html#t" 'j.erreur||(j.apres.tag)' "SC.on('panel', () => { rendreFocus(); " "SC.on('panel', () => { ")" "muté|BODY"
   assert_eq "EK10.2 — mutant (la règle du pied retirée de la page servie) : le badge sort de sa carte à 1440 px, détecté" "$(ek_mutant r3 badge "$EKA1" 'j.erreur||(j["1440"]<0?"rogné":"dans la carte")' ".foot .meta { min-width: 0; overflow: hidden; text-overflow: ellipsis; } .foot .vst { flex: none; }" '.foot .meta { }' ".foot .meta { white-space: normal; min-width: 0; border-radius: 12px; }" '.foot .meta { }')" "muté|rogné"
   assert_eq "EK11.2 — mutant (les clés de la collecte affichées telles quelles) : « sessions : lue » reparaît, détecté" "$(ek_mutant r4 libelles "equipe.html#t" 'j.erreur||(/\b(sessions|locks|dags)\b/.test(j.src)?"anglais":"français")' '.map(([k]) => SOURCES[k] || k);' '.map(([k]) => k);')" "muté|anglais"
   assert_eq "EK16.8 — mutant (le focus du titre n'est plus rendu après un redessin du tiroir) : le focus tombe sur BODY, détecté" "$(EK_LARGEUR=1024 EK_ORDRE=git-puis-travail ek_mutant r6 un-lateral "project.html#t" 'j.erreur||(j.etapes.redessin.travail?"T":"-")+":"+j.etapes.redessin.focus' "cleFocus === 'titre' ? document.querySelector('#panel > .vf-whop h3') :" "cleFocus === 'titre' ? null :")" "muté|T:BODY"
@@ -1068,7 +1077,7 @@ const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(
 class ES { constructor() { ES.last = this; this.l = {}; } addEventListener(n, f) { this.l[n] = f; } close() {} }
 let bouton = null, panneau = '';
 const el = () => ({ setAttribute() {}, appendChild() {}, remove() {}, style: {} });
-const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
+const SC = { graph: { meta: { vfTab: 'equipe' }, nodes: [], files: [] }, h, toast() {}, rerender: async () => {}, on() {}, addPanelSection() {}, showPanel: (x) => { panneau = x; },
   addHeaderButton: (o) => { bouton = { ...o, className: '', innerHTML: '', setAttribute() {} }; return bouton; } };
 const document = { createElement: el, head: { appendChild() {} }, body: { appendChild() {}, classList: { contains: () => false } }, documentElement: {}, addEventListener() {}, dispatchEvent: () => true, getElementById: () => null, querySelectorAll: () => [], querySelector: () => null };
 const window = { Floorplan: SC, FLOORPLAN_SERVER: { token: 't' } };
@@ -1077,6 +1086,7 @@ try {
   const S = JSON.parse(fs.readFileSync(scen, 'utf8'));
   vm.runInContext(fs.readFileSync(f71, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(process.env.VF_FLUX_JS, 'utf8'), ctx, { timeout: 5000 });
+  vm.runInContext(fs.readFileSync(process.env.VF_ETAT_JS, 'utf8'), ctx, { timeout: 5000 });
   vm.runInContext(fs.readFileSync(f70, 'utf8'), ctx, { timeout: 5000 });
   if (S.verrous) ES.last.l.lock({ data: JSON.stringify({ seq: 1, at: Date.now(), verrous: S.verrous }) });
   ES.last.l.who({ data: JSON.stringify({ seq: 2, who: S.who }) });

@@ -541,7 +541,7 @@ if (mode === 'connue') {
   out.avant = await lecture({ etat: 'ok', branche: 'feat/memoire', worktree: 'wt-m' });
   // F6a (3e tour de la recette du 2026-11-08) : le titre de la vue n'est un arrêt de Tab que s'il porte une définition. Branche connue : titre atteignable (témoin) ; dépôt « indisponible » : plus de définition, donc plus d'arrêt, MÊME après un changement de classe du corps (ouverture/fermeture du tiroir Git) qui relance l'observateur de tabindex
   const titre = () => s.ev(`(() => { const h = document.querySelector('#context h1'); return h ? [h.hasAttribute('tabindex') ? h.getAttribute('tabindex') : 'aucun', h.hasAttribute('title') || h.hasAttribute('aria-description')].join('/') : 'absent'; })()`);
-  const classeDuCorps = async () => { await s.ev(`document.body.classList.add('vf-git-ouvert')`); await s.ev(`document.body.classList.remove('vf-git-ouvert')`); await s.ev(`new Promise((r) => setTimeout(r, 50))`); };
+  const classeDuCorps = async () => { await s.ev(`document.body.classList.add('vf-git-ouvert')`); await s.ev(`document.body.classList.remove('vf-git-ouvert')`); await s.ev(`window.dispatchEvent(new CustomEvent('vf-git:etat', { detail: { ouvert: false } }))`); await s.ev(`new Promise((r) => setTimeout(r, 50))`); }; // 79-17 : le tiroir pose ou retire la classe PUIS émet vf-git:etat, qui relance l'arrêt de tabulation (plus d'observateur de la classe)
   await attendreValeur(titre, (v) => v === '0/true', { max: 6000 }); out.titreConnu = await titre();
   out.muet = await lecture({ etat: 'indisponible' });
   await classeDuCorps(); out.titreIndispo = await attendreEtStabiliser(titre, (v) => v !== 'absent', { max: 6000 });
