@@ -945,22 +945,30 @@ JSON
     printf '%s' "$c" > "$EKMOD"; echo muté
   }
   ek_restaurer() { rm -f "$EKMOD"; }
+  # EKC_REPLI <action> <page> (74-08) : EKC contre une copie du module SANS la fiche (ui/74-vf-fiche*.js) ; le lecteur de repli de la 73 y vit encore (retiré par 74-10), la fiche porte la même propriété
+  # dans test-cockpit-equipe-retraits.sh (R2, R5b). Le serveur courant est arrêté puis relancé après : les autres témoins EK se jouent, eux, sur la page complète.
+  ek_repli_module() { [ -d "$WORK/mod-ek-sf" ] || { local c; c="$(cockpit_module_copie "$WORK/mod-ek-sf")" && rm -f "$c"/skills/cockpit-moteur/assets/ui/74-vf-fiche*.js; }; }
+  EKC_REPLI() {
+    local mem; mem="$(cat "$EKMOD" 2>/dev/null)"; vf_hyg_stop "$EK_PID"; ek_repli_module; printf '%s' "$WORK/mod-ek-sf" > "$EKMOD"
+    ek_demarrer; EKC "$1" "$2"; vf_hyg_stop "$EK_PID"
+    if [ -n "$mem" ]; then printf '%s' "$mem" > "$EKMOD"; else rm -f "$EKMOD"; fi; ek_demarrer
+  }
   # EKC <action> <page> : une interaction, un Chromium ; la ligne JSON rendue est lue par G
   EKC() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EK_ACTION="$1" node "$HERE_EK/chrome-equipe-clavier.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ek-$1.json"; }
   EKA1="equipe.html#r=n%3Aag-a1"
   ek_demarrer
   assert_eq "EK0 — contrôle positif : serveur de la sortie démarré, page Équipe servie et fixture à deux agents lisibles" "$([ "$EK_PORT" -gt 0 ] && echo serveur)|$(node "$AUX/fetchp.mjs" "$EK_PORT" /equipe.html "$WORK/ek-equipe.html")" "serveur|200"
   # EK1 (UIFN-12) : Entrée sur « Lire le transcript » ne fait pas perdre le focus clavier
-  EKC focus-transcript "$EKA1"
+  EKC_REPLI focus-transcript "$EKA1"
   assert_eq "EK1.0 — témoin : avant l'Entrée, l'élément actif est le bouton « Lire le rapport » d'une ligne terminée de la régie (la sonde sait lire le focus)" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||(j.avant.tag+"|"+j.avant.rapport)')" "BUTTON|true"
   assert_eq "EK1 — après Entrée sur « Lire le rapport », le lecteur s'affiche ET l'élément actif reste dans la régie ou son panneau, jamais BODY" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.tag==="BODY"?"BODY":(j.apres.ou!=="hors"?"dans la régie ou son panneau":"hors de la régie : "+j.apres.tag)))')" "lu=true | actif=dans la régie ou son panneau"
-  EKC focus-transcript "equipe.html#r=n%3Aag-mgr1"
+  EKC_REPLI focus-transcript "equipe.html#r=n%3Aag-mgr1"
   assert_eq "EK1.1 — arrivée sur un agent qui porte des agents, Entrée sur « Lire le rapport » lit le rapport, garde le focus dans la page et ne change pas la vue du viewer" "$(G "$WORK/ek-focus-transcript.json" 'j.erreur||("lu="+j.lu+" | actif="+(j.apres.ou!=="hors"?"dans la page":j.apres.tag)+" | vue "+(j.hashAvant===j.hashApres?"inchangée":"changée"))')" "lu=true | actif=dans la page | vue inchangée"
   # EK2 (m1) : changer d'agent efface la clé de rechargement
-  EKC changer-agent "$EKA1"
+  EKC_REPLI changer-agent "$EKA1"
   assert_eq "EK2.1 — lire un rapport puis déplier une autre ligne ne laisse aucune clé de rechargement (avant : aucune ; après : aucune)" "$(G "$WORK/ek-changer-agent.json" 'j.erreur||(j.avant+"|"+j.apres)')" "null|null"
   # EK3 (m10) : le sessionStorage ne garde que l'identifiant de l'agent
-  EKC recharger "$EKA1"
+  EKC_REPLI recharger "$EKA1"
   assert_eq "EK3.1 — le sessionStorage ne porte aucune clé vf-equipe-* (jamais le texte lu, qui est bien affiché)" "$(G "$WORK/ek-recharger.json" 'j.erreur||(JSON.stringify(j.entrees)+"|"+j.texteLu+"|"+j.fuite)')" '{}|true|false'
   # EK4 (m8) : un tiroir fermé n'est pas rouvert par un nouveau who
   EKC ferme-puis-who "project.html#t"
@@ -984,7 +992,7 @@ JSON
   EKR() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EKR_ACTION="$1" node "$HERE_EK/reposer-chrome.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ekr-$1.json"; }
   EKR reponse-puis-who "project.html#t"
   assert_eq "EKR1 — la réponse « Voir la dernière commande » reste affichée dans la ligne du bouton neuf quand un second who redessine le tiroir (le bouton a bien été remplacé)" "$(G "$WORK/ekr-reponse-puis-who.json" 'j.erreur||(j.remplace+"|"+j.texte+"|"+j.visible)')" "true|réponse fixe EKR1|true"
-  EKC lecteur-puis-who "$EKA1"
+  EKC_REPLI lecteur-puis-who "$EKA1"
   assert_eq "EKR2 — le lecteur de repli de la régie reste affiché (texte égal, non vide) quand un who met la ligne à jour (le who est bien pris en compte)" "$(G "$WORK/ek-lecteur-puis-who.json" 'j.erreur||(j.lu+"|"+j.remplace+"|"+(j.texte>0)+"|"+j.egal)')" "true|true|true|true"
   EKC badge "$EKA1"
   assert_eq "EK10 — mot d'état d'une ligne de la régie : il reste entièrement dans sa ligne à 390, 1024 et 1440 px (marge >= 0)" "$(G "$WORK/ek-badge.json" 'j.erreur||(["390","1024","1440"].map((l)=>typeof j[l]==="number"&&j[l]>=0?"ok":l+"="+j[l]).join(","))')" "ok,ok,ok"
