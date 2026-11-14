@@ -16,6 +16,7 @@ import { lancerGitAsync, finDans } from './vf-cockpit-paths.mjs';
 
 const BUDGET_MS = 8; // tranche de calcul avant de rendre la main à la boucle d'événements du serveur (calculerGardes cède entre deux fichiers)
 const PLAFOND_TRAVAIL = 30e6; // motifs x fichiers ; au-delà : `tronque`, jamais une liste partielle présentée comme complète
+const CAR_PAR_MOTIF = 64; // le même plafond compte aussi les caractères des motifs : une longueur moyenne de motif de 64 le laisse inchangé
 const MAX_ENTREES = 20000; // entrées parcourues sous plugin/ et scripts/ ; au-delà : indisponible, jamais une liste partielle
 const IGNORES = new Set(['.git', 'node_modules']);
 const comparer = (a, b) => Buffer.compare(Buffer.from(a), Buffer.from(b)); // LC_ALL=C : l'ordre des octets UTF-8 = celui des points de code
@@ -66,14 +67,24 @@ export function decouvrirSuites(lab) {
 }
 
 // Gates : jetons `[\w./-]*check-[\w.-]+\.sh` de ci.yml (lus à la main : une RegExp à étoile en tête est quadratique),
-// « ./ » retiré, gardés s'ils sont suivis.
+// « ./ » retiré, gardés s'ils sont suivis. Coût linéaire par jeton : les positions de « check- », de « / » et de « .sh » sont relevées UNE fois,
+// puis parcourues par deux pointeurs qui ne reculent jamais (jamais de tranche ni de recherche refaite pour chaque « check- »).
+const positions = (t, sub) => { const a = []; for (let i = t.indexOf(sub); i >= 0; i = t.indexOf(sub, i + 1)) a.push(i); return a; };
 export function gatesDeCi(lab, suivis) {
   const out = new Set();
   for (const run of read(path.join(lab, '.github/workflows/ci.yml')).split(/[^\w./-]+/)) {
-    for (let p = run.lastIndexOf('check-'); p >= 0; p = p > 0 ? run.lastIndexOf('check-', p - 1) : -1) {
-      const barre = run.indexOf('/', p + 6), seg = run.slice(p + 6, barre < 0 ? run.length : barre), k = seg.lastIndexOf('.sh');
-      if (k < 1) continue;
-      let j = run.slice(0, p + 6 + k + 3); if (j.startsWith('./')) j = j.slice(2);
+    const cs = positions(run, 'check-'); if (!cs.length) continue;
+    const sl = positions(run, '/'), sh = positions(run, '.sh');
+    let si = sl.length, hi = sh.length - 1;
+    // de la dernière occurrence à la première ; la première qui porte un « .sh » avant la prochaine « / » est retenue
+    for (let c = cs.length - 1; c >= 0; c--) {
+      const p = cs[c];
+      while (si > 0 && sl[si - 1] >= p + 6) si--; // première « / » à partir de p + 6 (elle ne peut que reculer quand p recule)
+      const e = si < sl.length ? sl[si] : run.length;
+      while (hi >= 0 && sh[hi] + 3 > e) hi--; // dernier « .sh » qui tient avant e
+      const q = hi >= 0 ? sh[hi] : -1;
+      if (q < p + 7) continue; // il faut au moins un caractère entre « check- » et « .sh »
+      let j = run.slice(0, q + 3); if (j.startsWith('./')) j = j.slice(2);
       if (suivis.has(j)) out.add(j);
       break;
     }
@@ -82,24 +93,32 @@ export function gatesDeCi(lab, suivis) {
 }
 
 // --- correspondance glob de `case` : * (traverse /), ?, [..], \x ; UN point de reprise (la dernière étoile), jamais de retour arrière exponentiel ---
-function unite(p, i, c) { // le jeton de motif en `i` accepte-t-il le caractère c ? → { ok, next }
+// Une classe « [ » est lue UNE fois par appel (mémo par position) : une classe non fermée ne se relit pas jusqu'au bout du motif à chaque caractère.
+function classe(p, i, cache) { // la classe qui s'ouvre en i : { ferme:false } (non fermée : « [ » littéral) ou { ferme, neg, uniques, plages, next }
+  let r = cache.get(i); if (r) return r;
+  let j = i + 1; const neg = p[j] === '!' || p[j] === '^'; if (neg) j++;
+  const d = j, uniques = new Set(), plages = [];
+  for (; j < p.length && (p[j] !== ']' || j === d); j++) {
+    if (p[j + 1] === '-' && j + 2 < p.length && p[j + 2] !== ']') { plages.push([p[j], p[j + 2]]); j += 2; } else uniques.add(p[j]);
+  }
+  r = j >= p.length ? { ferme: false } : { ferme: true, neg, uniques, plages, next: j + 1 };
+  cache.set(i, r); return r;
+}
+function unite(p, i, c, cache) { // le jeton de motif en `i` accepte-t-il le caractère c ? → { ok, next }
   const k = p[i];
   if (k === '?') return { ok: true, next: i + 1 };
   if (k === '\\' && i + 1 < p.length) return { ok: p[i + 1] === c, next: i + 2 };
   if (k !== '[') return { ok: k === c, next: i + 1 };
-  let j = i + 1; const neg = p[j] === '!' || p[j] === '^'; if (neg) j++;
-  const d = j; let trouve = false;
-  for (; j < p.length && (p[j] !== ']' || j === d); j++) {
-    if (p[j + 1] === '-' && j + 2 < p.length && p[j + 2] !== ']') { if (c >= p[j] && c <= p[j + 2]) trouve = true; j += 2; } else if (p[j] === c) trouve = true;
-  }
-  if (j >= p.length) return { ok: c === '[', next: i + 1 }; // classe non fermée : « [ » littéral
-  return { ok: trouve !== neg, next: j + 1 };
+  const cl = classe(p, i, cache);
+  if (!cl.ferme) return { ok: c === '[', next: i + 1 };
+  const trouve = cl.uniques.has(c) || cl.plages.some(([a, b]) => c >= a && c <= b);
+  return { ok: trouve !== cl.neg, next: cl.next };
 }
 export function globLineaire(p, s) {
-  let i = 0, j = 0, etoileP = -1, etoileS = 0;
+  let i = 0, j = 0, etoileP = -1, etoileS = 0; const cache = new Map();
   while (j < s.length) {
     if (p[i] === '*') { while (p[i] === '*') i++; etoileP = i; etoileS = j; continue; }
-    const r = i < p.length ? unite(p, i, s[j]) : null;
+    const r = i < p.length ? unite(p, i, s[j], cache) : null;
     if (r && r.ok) { i = r.next; j++; continue; }
     if (etoileP < 0) return false;
     i = etoileP; j = ++etoileS;
@@ -195,6 +214,9 @@ export async function calculerGardes(lab, carteCode, opts = {}) {
   const r = opts.ctx ? { etat: 'ok', ctx: opts.ctx } : await contexteGardes(lab, opts);
   if (r.etat !== 'ok') return vide(r.etat);
   const fichiers = Array.isArray(carteCode.files) ? carteCode.files : [];
+  // le plafond compte aussi la longueur des motifs (une classe non fermée coûte en caractères, pas en nombre)
+  let car = 0; for (const m of r.ctx.globs.keys()) car += m.length + 1;
+  if (car * fichiers.length > (opts.plafond ?? PLAFOND_TRAVAIL) * CAR_PAR_MOTIF) return vide('tronque'); // garde:gardes-plafond-longueur
   if (r.ctx.globs.size * fichiers.length > (opts.plafond ?? PLAFOND_TRAVAIL)) return vide('tronque'); // garde:gardes-plafond
   const budget = opts.budgetMs ?? BUDGET_MS, gardes = [], garde = [];
   let debut = Date.now();

@@ -15,9 +15,30 @@ export function dateIso(s) {
   return d.getUTCFullYear() === +m[1] && d.getUTCMonth() === +m[2] - 1 && d.getUTCDate() === +m[3];
 }
 
+const BLANC = (c) => c === ' ' || c === '\t';
+// retire `[ \t]*\.[ \t]*$` : le point final et les blancs qui l'entourent ; sans point final, la valeur reste telle
+// quelle (lu à la main : la RegExp non ancrée au début est quadratique sur les blancs)
+function sansPointFinal(v) {
+  let e = v.length; while (e > 0 && BLANC(v[e - 1])) e--;
+  if (e === 0 || v[e - 1] !== '.') return v;
+  e--; while (e > 0 && BLANC(v[e - 1])) e--;
+  return v.slice(0, e);
+}
+// coupe sur `[ \t]*;[ \t]*(?=\([a-z]\)[ \t])` : un « ; » suivi (après ses blancs) de `(x)` et d'un blanc ; chaque caractère est lu un nombre borné de fois
+function separer(v) {
+  const parts = []; let debut = 0;
+  for (let i = v.indexOf(';'); i >= 0; i = v.indexOf(';', i + 1)) {
+    let k = i + 1; while (k < v.length && BLANC(v[k])) k++;
+    if (!(v[k] === '(' && /^[a-z]$/.test(v[k + 1] ?? '') && v[k + 2] === ')' && BLANC(v[k + 3] ?? ''))) continue;
+    let s = i; while (s > debut && BLANC(v[s - 1])) s--;
+    parts.push(v.slice(debut, s)); debut = k;
+  }
+  parts.push(v.slice(debut)); return parts;
+}
+
 // `(a) … ; (b) … .` : au moins deux options, lettres consécutives depuis `a`
 export function lireOptions(v) {
-  const parts = String(v).replace(/[ \t]*\.[ \t]*$/, '').split(/[ \t]*;[ \t]*(?=\([a-z]\)[ \t])/);
+  const parts = separer(sansPointFinal(String(v)));
   const out = [];
   for (let i = 0; i < parts.length; i++) {
     const m = /^\(([a-z])\)[ \t]+(\S.*)$/.exec(parts[i]);

@@ -214,7 +214,7 @@ function pyRoutes(src, f, out) {
     guardedVars.set(m[1], m[2]);
     if (m[1] === 'app') out.push({ k: 'global-guard', framework: 'flask', name: m[2], line: defIdx + 1 });
   }
-  for (const m of src.matchAll(/^\s*(\w+)\s*=\s*(?:\w+\.)?APIRouter\(([^)]*(?:\([^)]*\)[^)]*)*)\)/gm)) {
+  for (const m of src.matchAll(/^[^\S\r\n\u2028\u2029]*(\w+)\s*=\s*(?:\w+\.)?APIRouter\(([^)]*(?:\([^)]*\)[^)]*)*)\)/gm)) {
     const dep = /dependencies\s*=\s*\[[^\]]*Depends\(\s*([\w.]+)/.exec(m[2]);
     if (dep && isGuardDep(dep[1].split('.').pop())) guardedVars.set(m[1], dep[1]);
   }
@@ -247,7 +247,7 @@ function pyRoutes(src, f, out) {
   const decoratorish = (body) => /wraps|decorat|def\s+\w+\(\s*\*args|return\s+\w+\s*$/m.test(body);
   for (let pass = 0; pass < 2; pass++) for (const d of defs) {
     if (localGuards.has(d.name) || !decoratorish(d.body)) continue;
-    const applied = [...d.body.matchAll(/^\s*@([\w.]+)/gm)].map((m) => m[1].split('.').pop());
+    const applied = [...d.body.matchAll(/^[^\S\r\n\u2028\u2029]*@([\w.]+)/gm)].map((m) => m[1].split('.').pop());
     const wraps = applied.some((a) => isGuardName(a) || localGuards.has(a));
     if (isGuardName(d.name) || wraps) { localGuards.add(d.name); out.push({ k: 'guard-def', name: d.name, line: d.line, ...(wraps && !isGuardName(d.name) ? { wrapper: true } : {}) }); }
   }
@@ -452,8 +452,8 @@ function findCors(src, f, out) {
       if (/\borigins["']?\s*[:=]\s*(?!(['"])\*\1)/.test(opts)) continue; // a list of allowed sites (origins=… or "origins": …)
       add(m.index, 'CORS(app) avec toutes les origines autorisées', /supports_credentials\s*=\s*True/.test(opts));
     }
-    const all = /^\s*CORS_(?:ALLOW_ALL_ORIGINS|ORIGIN_ALLOW_ALL)\s*=\s*True\b/m.exec(src);
-    if (all) add(all.index, 'CORS_ALLOW_ALL_ORIGINS = True', /^\s*CORS_ALLOW_CREDENTIALS\s*=\s*True\b/m.test(src));
+    const all = /^[^\S\r\n\u2028\u2029]*CORS_(?:ALLOW_ALL_ORIGINS|ORIGIN_ALLOW_ALL)\s*=\s*True\b/m.exec(src);
+    if (all) add(all.index, 'CORS_ALLOW_ALL_ORIGINS = True', /^[^\S\r\n\u2028\u2029]*CORS_ALLOW_CREDENTIALS\s*=\s*True\b/m.test(src));
   }
 }
 
@@ -500,9 +500,9 @@ function findSql(src, f, out) {
   for (const x of found.sort((a, b) => a.i - b.i)) { const { i, ...rest } = x; out.push({ ...rest, line: at(i) }); }
 }
 
-const USES_FIREBASE = /\bfrom\s+['"]firebase(?:-admin|-functions)?(?:\/[\w./-]+)?['"]|require\(\s*['"]firebase(?:-admin|-functions)?(?:\/[\w./-]+)?['"]\s*\)|^\s*(?:import|from)\s+firebase_admin\b|@firebase\//m;
-const USES_STRIPE = /\bfrom\s+['"]stripe['"]|require\(\s*['"]stripe['"]\s*\)|^\s*import\s+stripe\b|@stripe\//m;
-const USES_SUPABASE = /@supabase\/(?:supabase-js|ssr|auth-helpers[\w-]*)|from\s+supabase\s+import|^\s*import\s+supabase\b/m;
+const USES_FIREBASE = /\bfrom\s+['"]firebase(?:-admin|-functions)?(?:\/[\w./-]+)?['"]|require\(\s*['"]firebase(?:-admin|-functions)?(?:\/[\w./-]+)?['"]\s*\)|^[^\S\r\n\u2028\u2029]*(?:import|from)\s+firebase_admin\b|@firebase\//m;
+const USES_STRIPE = /\bfrom\s+['"]stripe['"]|require\(\s*['"]stripe['"]\s*\)|^[^\S\r\n\u2028\u2029]*import\s+stripe\b|@stripe\//m;
+const USES_SUPABASE = /@supabase\/(?:supabase-js|ssr|auth-helpers[\w-]*)|from\s+supabase\s+import|^[^\S\r\n\u2028\u2029]*import\s+supabase\b/m;
 
 // ---------- per-file entry point ----------
 
