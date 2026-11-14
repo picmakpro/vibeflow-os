@@ -70,10 +70,11 @@
         if (!r) { r = rangee(l.id); lentilles.insertBefore(r, lentilles.children[i] || null); }
         r.querySelector('b').textContent = l.nom; r.querySelector('.lt span').textContent = l.sous;
         const n = r.querySelector('.ln'), d = r.querySelector('.vh');
+        d.id = 'lens-d-' + l.id; // l'ensemble des identifiants du document ne dépend pas de l'état de calcul : seul le lien aria-describedby suit
         n.textContent = l.compte === null || l.compte === undefined ? '' : String(l.compte); n.hidden = !n.textContent;
         r.setAttribute('aria-checked', String(l.coche));
-        if (l.etat === 'ok') { r.removeAttribute('aria-disabled'); r.removeAttribute('aria-describedby'); d.textContent = ''; d.id = ''; } else {
-          r.setAttribute('aria-disabled', 'true'); d.id = 'lens-d-' + l.id; r.setAttribute('aria-describedby', d.id);
+        if (l.etat === 'ok') { r.removeAttribute('aria-disabled'); r.removeAttribute('aria-describedby'); d.textContent = ''; } else {
+          r.setAttribute('aria-disabled', 'true'); r.setAttribute('aria-describedby', d.id);
           d.textContent = (l.description || [l.sous]).join('. ');
         }
       });
