@@ -54,8 +54,12 @@ export const fichiersExecution = (scriptsDir) => fs.readdirSync(scriptsDir).filt
 // motifs du code évalué (constantes ; 79-16 : les ressources de page y sont) ; dossier de scripts puis assets du moteur, puis les fichiers de code navigateur
 const MOTIFS_SCRIPTS = [/^vf-cockpit-.*\.mjs$/, /^vf-cockpit-interface\.json$/];
 // 79-16 : le gabarit et le client de la coquille ; les extensions de page de premier niveau (servies sous /_vf/ui/), jamais les sous-dossiers
-const MOTIFS_MOTEUR = [/^serve\.mjs$/, /^graph-query\.js$/, /^query-cli\.mjs$/, /^viewer\.html$/, /^vf-coquille(-portee)?\.js$/];
+const MOTIFS_MOTEUR = [/^serve\.mjs$/, /^graph-query\.js$/, /^query-cli\.mjs$/, /^viewer\.html$/, /^vf-coquille(-portee)?\.js$/,
+  /^elk-fil\.js$/]; // 79-18 (AU18-02) : le worker de mise en page, servi sous /_vf/ : un fil changé rend le serveur en cours périmé
 const MOTIFS_UI = [/\.js$/];
+// 79-18 (AU18-02) : le paquet ELK, importé par le worker (assets/vendor/, hors des motifs de premier niveau) : 1,5 Mo lus et hachés à chaque `open`
+// (quelques millisecondes mesurées), contre un serveur qui garderait un paquet périmé ; une liste close d'UN fichier, jamais le dossier vendor entier
+const FICHIERS_VENDUS = ['elk.bundled.js'];
 const dedans = (d, motifs) => fs.readdirSync(d).filter((f) => motifs.some((re) => re.test(f)));
 
 // [clé, chemin] triés par clé ; lève si un dossier est illisible
@@ -66,6 +70,7 @@ export function fichiersCodeEvalue(dossierScripts, dossierMoteur) {
   for (const f of dedans(assets, MOTIFS_MOTEUR)) lot.push([`assets/${f}`, path.join(assets, f)]);
   const ui = path.join(assets, 'ui');
   for (const f of dedans(ui, MOTIFS_UI).filter((n) => fs.statSync(path.join(ui, n)).isFile())) lot.push([`assets/ui/${f}`, path.join(ui, f)]);
+  for (const f of FICHIERS_VENDUS) lot.push([`assets/vendor/${f}`, path.join(assets, 'vendor', f)]); // garde:empreinte-vendus
   // code navigateur rangé en fichiers (79-11) : une seule source, la liste close du lecteur ; un fichier illisible rend l'empreinte nulle
   for (const [dossier, nom] of FICHIERS_NAVIGATEUR) lot.push([`assets/ui/${dossier}/${nom}`, path.join(assets, 'ui', dossier, nom)]);
   return lot.sort((a, b) => (a[0] < b[0] ? -1 : a[0] > b[0] ? 1 : 0));

@@ -36,6 +36,8 @@
     body details[open] > summary::before { transform: rotate(90deg); }
     ${liste(DIS, ':focus-visible')} { outline-offset: -2px; }
     @media (pointer: coarse) { ${liste(PETIT)} { min-height: 44px; } }
+    /* cible tactile de la Synthèse (77-06), derrière la règle de 32 px */
+    @media (max-width: 999px) { body #panel .vf-sy details.vf-tech > summary { min-height: 44px; } }
     @media (prefers-reduced-motion: reduce) { ${liste(DIS, '::before')} { transition: none; } }
     /* F1 : le sélecteur du modèle de l'agent (barre de question) ; chevron bas en dégradé, jamais une image */
     body #vf-modele { appearance: none; -webkit-appearance: none; box-sizing: border-box; height: 28px; max-width: 140px; text-overflow: ellipsis;

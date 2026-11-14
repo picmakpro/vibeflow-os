@@ -79,11 +79,15 @@ async function alimentation() {
   const avant = CLES.map((c) => JSON.stringify(E.lire(c))).join('~'); const notifs = Object.values(recu).reduce((a, x) => a + x.length, 0);
   const mauvais = { who: [null, 'x', 5, [], {}, { who: null }, { who: [] }, { who: 'x' }], lock: [null, {}, { seq: 1 }, { verrous: 'x' }, { seq: -1, at: 1, verrous: {} }],
     git: [null, {}, { seq: 1 }, { seq: 1, sig: 5 }, { seq: 1e99, at: 1, sig: 'a' }, { seq: NaN, at: 1, sig: 'a' }],
-    graphe: [null, {}, { seq: 1, at: 1, onglet: 5, sig: 'a' }, { seq: 1, at: 1, onglet: 'code' }], structural: [null, {}, { seq: 'x' }, { seq: -3 }, []] };
+    graphe: [null, {}, { seq: 1, at: 1, onglet: 5, sig: 'a' }, { seq: 1, at: 1, onglet: 'code' }], structural: [null, {}, { seq: 'x' }, { seq: -3 }, []],
+    patch: [null, {}, { seq: 'x' }, { seq: -3 }, []] };
   let leve = 'aucune'; try { for (const [n, liste] of Object.entries(mauvais)) for (const c of liste) m.emettre(n, c); } catch (e) { leve = e.message; }
   R.F9 = [leve, avant === CLES.map((c) => JSON.stringify(E.lire(c))).join('~'), notifs === Object.values(recu).reduce((a, x) => a + x.length, 0)].join();
-  const av2 = CLES.map((c) => JSON.stringify(E.lire(c))).join('~'); for (const n of ['vie', 'patch', 'reload']) m.emettre(n, { seq: 99, at: 1 });
+  const av2 = CLES.map((c) => JSON.stringify(E.lire(c))).join('~'); for (const n of ['vie', 'reload']) m.emettre(n, { seq: 99, at: 1 });
   R.F10 = av2 === CLES.map((c) => JSON.stringify(E.lire(c))).join('~');
+  // patch : le contenu du graphe change sans changement de structure (vf-cockpit-live.mjs) ; la clé planning prend { seq, at } comme pour structural
+  const pl = []; E.abonner('planning', (v) => pl.push(v.seq)); m.emettre('patch', { seq: 12, at: 7, patch: [{ op: 'replace' }], vf: { x: 1 } });
+  R.F11 = [pl.join(), JSON.stringify(E.lire('planning'))].join('|');
   return R;
 }
 

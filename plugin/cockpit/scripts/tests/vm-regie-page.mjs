@@ -2,7 +2,7 @@
 // Charge, dans l'ordre donné (défaut : l'ordre de nom du moteur), les fichiers ui/ du scénario dans le DOM réduit de vm-dom.mjs.
 // Scénario : { onglet, source: 'etat'|'live', coquille: null|{ onglet0 }, surcouches: null|'pile'|'terminal', ouverteForcee, onglets, fichiers, who, lock, hash, sessionStorage, transcript, serveur, etapes }.
 // Étapes (résultat rangé sous `nom` s'il est donné) : poser {who,lock} · avancer ms · clic sel [indice] · focus sel · touche key [sur] [prevenu] · saisie sel valeur · evenement type detail [annulable]
-//   · hash h · onglet nom · vfOnglet nom hash · declarerVue {id,libelle} · annuler [déclencheurs] · marquer sel · raz · appel chemin args · reexecuter · obs {mode,sel,…}.
+//   · hash h · onglet nom · aller nom [fragment] (VRAI VF_ONGLETS, scénario `onglets`) · vfOnglet nom hash (vf:onglet à la main : rejeu d'un événement identique) · declarerVue {id,libelle} · annuler [déclencheurs] · marquer sel · raz · appel chemin args · reexecuter · obs {mode,sel,…}.
 // Formes simulées des objets des phases 79 et 80 (VF_ETAT, VF_COQUILLE, VF_SURCOUCHES) : une seule fonction chacune, à aligner sur le code livré.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -22,7 +22,8 @@ const el = (tag, id, parent = D.body) => { const e = D.createElement(tag); if (i
 const stage = el('div', 'stage'), zoom = el('div', 'zoom'), resultats = el('div', 'results'), panneau = el('div', 'panel'); el('div', 'hdr-ext'); const recherche = el('input', 'search');
 const ong0 = S.coquille ? S.coquille.onglet0 || S.onglet || 'equipe' : S.onglet || 'equipe';
 D.body.className = 'vf-tab-' + ong0;
-const loc = { hash: S.hash || '', pathname: '/equipe.html', reload() { journal.rechargements = (journal.rechargements || 0) + 1; } };
+const CHEMIN = { code: '/', projet: '/project.html', equipe: '/equipe.html' };
+const loc = { hash: S.hash || '', pathname: S.onglets ? CHEMIN[S.coquille && S.coquille.onglet0 || S.onglet || 'equipe'] : '/equipe.html', search: '', reload() { journal.rechargements = (journal.rechargements || 0) + 1; } };
 const mem = (init) => { const m = new Map(Object.entries(init || {})); return { getItem: (k) => (m.has(k) ? m.get(k) : null), setItem: (k, v) => { journal.stockage.push(k); m.set(k, String(v)); }, removeItem: (k) => m.delete(k), _m: m }; };
 const session = mem(S.sessionStorage), local = mem({});
 const h = (s) => String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -48,7 +49,6 @@ if (S.source === 'etat') W.VF_ETAT = { lire: (k) => (k === 'who' ? etat.who : k 
 etat.who = S.who || null; etat.lock = S.lock || null;
 if (S.source !== 'etat') W.__vfLive = { who: etat.who, whoAt: horloge.now, lock: etat.lock, connected: true };
 if (S.lus) W.__vfRegieLu = { lus: () => new Set(S.lus), marquer() {} }; // état « lu » simulé (90-vf-titre.js) : les identifiants du scénario
-if (S.onglets) W.VF_ONGLETS = { aller() {} };
 Object.defineProperty(W, 'VF_PANNEAU', { get() { compteurs.panneauLu++; return undefined; }, configurable: true });
 // VF_SURCOUCHES simulé (80-02) : 'pile' ferme la surcouche du dessus à Échap (capture sur window, preventDefault puis stopPropagation) ; 'terminal' : ouverte() vrai, l'appui passe intact
 if (S.surcouches) {
@@ -66,8 +66,20 @@ const nettoyer = (i) => { const f = i.nettoyage; i.nettoyage = null; if (f) f();
 if (S.coquille) { W.VF_COQUILLE = { onglet: () => affiche, surOnglet(rappel, o) { const cle = o && o.cle;
   const old = cle === undefined ? null : ins.find((x) => x.cle === cle); if (old) { nettoyer(old); ins.splice(ins.indexOf(old), 1); }
   const i = { rappel, cle, nettoyage: null }; ins.push(i); journal.inscriptions = ins.map((x) => x.cle); appeler(i); return () => { nettoyer(i); ins.splice(ins.indexOf(i), 1); }; } }; }
+// onglets : le VRAI ui/00-vf-onglets.js (80-10) est chargé avant la régie ; la coquille simulée lui sert chargerOnglet (démontage de l'ancien onglet, rappels rejoués, comme l'étape `onglet`) et etat
+if (S.onglets && W.VF_COQUILLE) {
+  const hist = { pushes: journal.pushes = [], pushState(_, __, u) { hist.pushes.push(u); const i = u.indexOf('#'); loc.pathname = i < 0 ? u : u.slice(0, i); loc.hash = i < 0 ? '' : u.slice(i); },
+    replaceState(_, __, u) { const i = u.indexOf('#'); loc.hash = i < 0 ? '' : u.slice(i); } };
+  W.history = hist; SC.state = { selected: null };
+  // témoin : le focus tel qu'il est à l'arrivée de vf:onglet, avant tout écouteur de la page (posé le premier) ; consigné à chaque émission
+  const avantVf = () => { (journal.avantVfOnglet ||= []).push(ficheFocus()); }; avantVf._h = true; D.addEventListener('vf:onglet', avantVf);
+  // le DOM réduit n'applique pas le CSS : 72-vf-regie-style.js masque #stage (display: none) sous body.vf-tab-equipe.vf-regie-montee, où focus() ne prend pas ; le repli de 80-10 (focaliser) ne vole donc pas le focus de la régie
+  const focusStage = stage.focus.bind(stage); stage.focus = (o) => { if (!/\bvf-regie-montee\b/.test(D.body.className)) focusStage(o); };
+  W.VF_COQUILLE.etat = () => ({ phase: 'pret', motif: null, onglet: affiche });
+  W.VF_COQUILLE.chargerOnglet = async (nom) => { for (const i of ins.slice()) nettoyer(i); affiche = nom; SC.graph.meta.vfTab = nom; D.body.className = D.body.className.replace(/vf-tab-\w+/, 'vf-tab-' + nom); for (const i of ins.slice()) appeler(i); };
+}
 const ctx = vm.createContext(W);
-const charger = () => { for (const f of FICHIERS) vm.runInContext(fs.readFileSync(path.join(ui, f), 'utf8'), ctx, { filename: f, timeout: 5000 }); };
+const charger = () => { for (const f of S.onglets && !W.VF_ONGLETS ? ['00-vf-onglets.js', ...FICHIERS] : FICHIERS) vm.runInContext(fs.readFileSync(path.join(ui, f), 'utf8'), ctx, { filename: f, timeout: 5000 }); };
 // journal des événements de la page et annulation demandée
 let annulees = new Set();
 const consigner = (ev) => { journal.evts.push({ type: ev.type, id: ev.detail && ev.detail.id, kind: ev.detail && ev.detail.kind, declencheur: ev.detail && ev.detail.declencheur, cancelable: ev.cancelable }); };
@@ -111,6 +123,7 @@ try {
       else if (e.touche) { const cible = e.sur ? q(e.sur) : D.activeElement; const ev = new Evt('keydown', { bubbles: true, cancelable: true, key: e.touche }); if (e.prevenu) ev.preventDefault(); if (e.sur && !e.prevenu) cible.focus(); cible.dispatchEvent(ev); r = { prevenu: ev.defaultPrevented }; }
       else if (e.saisie) { const c = q(e.saisie); c.value = e.valeur; c.dispatchEvent(new Evt('input', { bubbles: true })); }
       else if (e.evenement) { const ev = new Evt(e.evenement, { bubbles: true, cancelable: !!e.annulable, detail: e.detail }); (e.sur === 'window' ? W : D).dispatchEvent(ev); r = { prevenu: ev.defaultPrevented }; }
+      else if (e.aller) { r = await W.VF_ONGLETS.aller(e.aller, e.fragment === undefined ? undefined : { fragment: e.fragment }).then(() => ({ ok: true }), (x) => ({ erreur: String((x && x.message) || x) })); } // le VRAI aller de 00-vf-onglets.js (scénario `onglets`)
       else if (e.vfOnglet) { if (e.hash !== undefined) loc.hash = e.hash; D.dispatchEvent(new Evt('vf:onglet', { detail: { onglet: e.vfOnglet } })); }
       else if (e.hash !== undefined) { loc.hash = e.hash; W.dispatchEvent(new Evt('hashchange')); }
       else if (e.onglet) { affiche = e.onglet; SC.graph.meta.vfTab = e.onglet; D.body.className = D.body.className.replace(/vf-tab-\w+/, 'vf-tab-' + e.onglet); for (const i of ins.slice()) nettoyer(i); for (const i of ins.slice()) appeler(i); }

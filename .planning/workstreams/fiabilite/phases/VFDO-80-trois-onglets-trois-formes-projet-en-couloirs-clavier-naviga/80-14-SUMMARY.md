@@ -53,3 +53,11 @@ rituel levé : régime allégé (consigne de Samuel, message session principale,
 ## CHANGELOG demandé (80-18)
 Cockpit : la recherche (`/`, ⌘K) devient une palette de commandes : vues, actions (ajuster, cadrer, monter, détail, zoom, Git, aide, basculer, question, lien), onglets, phases et agents des autres onglets,
 au clavier, avec ses rôles ARIA ; `>` ne garde que les actions ; aucune action n'envoie rien ; un registre unique des raccourcis (`window.VF_RACCOURCIS`) nourrit la palette et l'aide.
+
+## Correction ciblée de revue (M3, M4, mineurs)
+- M3 : `VF_RACCOURCIS.ajouter` copie champ par champ (liste fermée), accepte l'absence de `touche`, neutralise `visible` non fonction, `palette` sans action, `usuelle` hors 1 à 8 et `groupe` invalide, refuse l'entrée invalide ;
+  chaque cas par `console.error` ; `sourceActions` protège `visible()` par un `try` : une entrée d'extension ne retire plus jamais les actions natives. PA4.1, PA4.2.
+- M4 : PA4.3 injecte `<img src=x onerror=window.__p=1>` comme nom de phase, rôle d'agent et libellé d'extension ; le mutant « `h()` retiré de `rowSource` » le rougit (trace dans `80-14-RED-TRACE.md`).
+- Mineurs : « Afficher les raccourcis » porte `avant: true` et `visible: () => !!window.VF_AIDE` ; dans `viewer.html` le groupe d'une source ne sert plus d'identifiant (`pal-g-<rang>`) et `par` est sans prototype.
+- Constat hors périmètre : une palette ouverte puis fermée (Échap) avant `VF_ONGLETS.aller` laisse la promesse sans réponse, y compris sur 75a527f9b (avant ce plan) ; PA4 joue les allers-retours avant la première ouverture.
+- Suites une fois (avec le jeton Chrome) : palette 28/0, aide 18/0, chrome-fr 141/0, vendor 252/0.

@@ -111,8 +111,7 @@ assert_eq "SF2.1b — aucun mot témoin anglais dans title, detail, notes et fix
 assert_eq "SF2.2 — noms propres gardés tels quels : Stripe, Firebase, Supabase, variable, fichier" "$(lire "$WORK/genres.json" "$NOMS"'return r')" "[]"
 assert_eq "SF2.2b — le constat du fichier .env cite .gitignore, .env.example et git rm --cached" "$(lire "$WORK/genres.json" "$NOMS$NOMS_FIX"'return r')" "[]"
 
-CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable \
-  chromium chromium-browser; do
+CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do
   [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi
 done
 if [ -z "$CHROME" ]; then

@@ -53,7 +53,7 @@
     .vf-aide-modale { position: fixed; z-index: 60; top: 50%; left: 50%; transform: translate(-50%, -50%); box-sizing: border-box;
       width: min(720px, calc(100vw - 32px)); max-height: 80vh; overflow-x: hidden; overflow-y: auto; padding: var(--sp-24);
       background: var(--surface); color: var(--text); border: 1px solid var(--hair-2); border-radius: var(--r-panel);
-      box-shadow: 0 24px 64px rgba(0, 0, 0, .35); }
+      box-shadow: var(--shadow-float); }
     .vf-aide-modale:focus, .vf-aide-modale h2:focus { outline: none; }
     .vf-aide-modale h2:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
     .vf-aide-tete { display: flex; align-items: baseline; gap: var(--sp-12); flex-wrap: wrap; margin-bottom: var(--sp-16); }

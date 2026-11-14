@@ -218,6 +218,7 @@ const jetons = { code: token, projet: VF.ptoken, equipe: token };
 const injection = (adresse) => `<script>window.VF_COCKPIT_SERVER=${JSON.stringify({ token: adresse === '/project.html' ? VF.ptoken : token, cli: !!cli, engine, want, model: model || null, change: canChange, unFlux: true, jetons }).replace(/</g, '\\u003c')};</script>` + (TERM ? TERM.injection() : '');
 let coquille; try { coquille = (await depuisModule('vf-cockpit-coquille.mjs')).creerCoquille({ dossierMoteur: moteurDir, injection }); } catch (e) { refus(e.message); }
 const { servirAsset } = await depuisModule('vf-cockpit-coquille-assets.mjs');
+const { directiveWorker } = await depuisModule('vf-cockpit-mise-en-page.mjs'); // vibeflow 79-18 : worker-src au préfixe du module
 function load() {
   const g = JSON.parse(fs.readFileSync(path.join(here, 'graph.json'), 'utf8'));
   const coreSrc = fs.readFileSync(path.join(code, 'graph-query.js'), 'utf8'); // le cœur de requête vient du module, jamais de la sortie (AM4.2)
@@ -544,15 +545,15 @@ const bad = (res) => { res.writeHead(400, { 'Content-Type': 'application/json' }
 // vibeflow P17 : en-têtes de toutes les réponses. La page ne charge que ses scripts en ligne (empreintes), aucune origine tierce,
 // ne se laisse pas encadrer, n'envoie aucun formulaire. Les polices et logos sont des data: ; les styles en ligne sont admis (36 attributs style).
 const BASE_CSP = "default-src 'none'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'";
-const cspDe = (hashes, source) => { // vibeflow 79-15 : une seule fonction bâtit la chaîne, de la liste d'empreintes ; 79-16 : et de la source du préfixe de /_vf/ (A40), jamais 'self'
-  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')} ${source}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;
+const cspDe = (hashes, source, worker) => { // vibeflow 79-15 : une seule fonction bâtit la chaîne, de la liste d'empreintes ; 79-16 : et de la source du préfixe de /_vf/ (A40), jamais 'self'
+  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')} ${source}; ${worker}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;
   return csp;
 };
 const hoteDe = (res) => res.req.headers.host.toLowerCase(); // l'hôte a déjà passé le contrôle exact de route() : 127.0.0.1:<port> ou localhost:<port>
 // vibeflow 79-16 : le document de la coquille d'une adresse (GET et HEAD), CSP = empreintes de SES scripts en ligne + la source du préfixe
 const sendDoc = (req, res, adresse) => {
   const d = coquille.document(adresse);
-  res.setHeader('Content-Security-Policy', cspDe(d.haches, coquille.prefixeScripts(hoteDe(res))) + (TERM ? TERM.frameSrc() : ''));
+  res.setHeader('Content-Security-Policy', cspDe(d.haches, coquille.prefixeScripts(hoteDe(res)), directiveWorker(hoteDe(res))) + (TERM ? TERM.frameSrc() : ''));
   res.writeHead(200, { 'Content-Type': TYPES['.html'], 'Cache-Control': 'no-store', 'Content-Length': d.longueur });
   res.end(req.method === 'HEAD' ? undefined : d.octets);
 };
@@ -636,9 +637,10 @@ function route(req, res) {
     res.writeHead(404); return res.end();
   }
   if (servirAsset(req, res, coquille.table)) return; // vibeflow 79-16 : les scripts de la coquille, table fermée (aucun fichier de la sortie n'est servi)
-  if (coquille.document(url.pathname)) { // vibeflow 79-16 : le même document aux quatre adresses de page, GET et HEAD seulement
+  const brut = String(req.url || '').split('?')[0]; // AU16-01 : chemin BRUT comme servirAsset, pas new URL (alias `.`, `//x/`)
+  if (coquille.document(brut)) { // vibeflow 79-16 : le même document aux quatre adresses de page, GET et HEAD seulement
     if (req.method !== 'GET' && req.method !== 'HEAD') { res.writeHead(405, { Allow: 'GET, HEAD' }); return res.end(); }
-    return sendDoc(req, res, url.pathname);
+    return sendDoc(req, res, brut);
   }
   res.writeHead(404); return res.end(); // garde:coquille-404
 }

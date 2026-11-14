@@ -1,0 +1,252 @@
+#!/usr/bin/env bash
+# test-cockpit-activite-lentilles.sh — Phase 75, plan 75-08 : le sélecteur de lentilles, le menu, le panneau et le compte du radar (ACTV-01, ACTV-02, ACTV-06, ACTV-07, ACTV-08, ACTV-10).
+# Moitié sans navigateur (`vm`, les fonctions PURES de ui/75-vf-activite-tables.js) : tables de marques, états, phrases, annonces ; moitié navigateur (un Chrome sans affichage,
+# lab construit par la suite, avec un vrai historique git) : bouton, menu, clavier, marques, panneau, compte de `.k`, `surOnglet`. La route /api/vf/activite est lue pour de vrai (Points
+# chauds, onglets, fraîcheur) ou remplacée par la page (états, empreinte, collisions : la même forme, poussée par un événement `git` du flux).
+# Régime allégé (mandat commun de la Phase 75) : seuls les mutants de la chaîne XSS sont joués (MUTANT-ROUGE — <nom>).
+# Variables : TABLES_JS (autre fichier de tables : le témoin rouge se rejoue sur la base, où il n'existe pas), SECTIONS (liste de sections navigateur : t1,t2,t3,t4).
+# Forme : « PASS — <id> : <texte> », « ❌ FAIL — <id> : <texte> », ligne finale « BILAN : <n> PASS, <m> FAIL » ; sort en 1 au premier FAIL.
+set -uo pipefail
+HERE="$(cd "$(dirname "$0")" && pwd)"
+MODULE_UI="$HERE/../../skills/cockpit-moteur/assets/ui"
+TABLES="${TABLES_JS:-$MODULE_UI/75-vf-activite-tables.js}"
+FX="$HERE/fixtures/test-cockpit-activite-lentilles"
+SECTIONS="${SECTIONS:-t1,t2,t3,t4}"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"
+cleanup() { type vf_hyg_fin > /dev/null 2>&1 && vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
+PASS=0; FAIL=0
+NB=$'\xc2\xa0'
+
+fin() { echo "BILAN : $PASS PASS, $FAIL FAIL"; [ "$FAIL" -eq 0 ]; exit $?; }
+assert_eq() { # id texte obtenu attendu
+  if [ "$3" = "$4" ]; then echo "  ✅ PASS — $1 : $2"; PASS=$((PASS+1))
+  else echo "  ❌ FAIL — $1 : $2"; echo "     attendu: [${4:0:600}]"; echo "     obtenu:  [${3:0:600}]"; FAIL=$((FAIL+1)); fin; fi
+}
+wantsection() { case ",$SECTIONS," in *",$1,"*) return 0 ;; esac; return 1; }
+
+mkdir -p "$WORK/aux"; AUX="$WORK/aux"
+cat > "$AUX/vv.mjs" <<'JS'
+import fs from 'node:fs'; const [, , f, cle, expr] = process.argv;
+const ligne = fs.readFileSync(f, 'utf8').split('\n').find((l) => l.startsWith(cle + '=')); if (ligne === undefined) { console.log('observation absente : ' + cle); process.exit(0); }
+const brut = ligne.slice(cle.length + 1); let j; try { j = JSON.parse(brut); } catch { j = brut; }
+const v = new Function('j', 'return (' + expr + ')')(j); console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+cat > "$AUX/ev.mjs" <<'JS'
+import fs from 'node:fs'; let j; try { j = JSON.parse(fs.readFileSync(0, 'utf8')); } catch { console.log('sortie illisible'); process.exit(0); }
+if (j.erreur) { console.log('mesure indisponible : ' + j.erreur); process.exit(0); }
+const v = new Function('j', 'return (' + process.argv[2] + ')')(j); console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+
+# ====================== moitié sans navigateur : les tables pures ======================
+OUT="$WORK/observations.txt"
+node "$FX/tables-harness.mjs" "$TABLES" > "$OUT" 2> "$WORK/erreur.txt"; RC=$?
+if [ "$RC" -ne 0 ]; then echo "  ❌ FAIL — L0 : le harnais a échoué (code $RC)"; sed 's/^/     /' "$WORK/erreur.txt" | head -20; FAIL=$((FAIL+1)); fin; fi
+V() { node "$AUX/vv.mjs" "$OUT" "$1" "$2"; }
+assert_eq L0 "le module des tables existe et expose ses fonctions pures" "$(grep -c '^absent=true' "$OUT")" "0"
+
+echo "== L2 la table de Points chauds : de la route aux rangées =="
+assert_eq L2 "un fichier, un palier (haut, moyen, bas), « 41 changements » et son infobulle chiffrée (espace insécable des milliers)" \
+  "$(V L2.chauds 'j.map((r) => r.slice(1).join("|")).join(" ; ")')" "haut|barres|41 changements|41 changements sur 90 jours · 1${NB}203 lignes · rang 12 sur 7 ; moyen|barres|5 changements|5 changements sur 90 jours · 300 lignes · rang 20 sur 7 ; bas|barres|1 changement|1 changement sur 90 jours · 10 lignes · rang 30 sur 7"
+assert_eq L2 "un fichier prévu, un doc, une suite et une fixture n'ont aucune marque de Points chauds" "$(V L2.sans-marque 'j.length')" "0"
+assert_eq L2 "un nombre au singulier prend le singulier (mot et infobulle)" "$(V L2.singulier 'j.join(" | ")')" "1 changement | 1 changement sur 90 jours · 10 lignes · rang 30 sur 7"
+assert_eq L2 "git absent : la lentille n'est pas posée du tout (cachée, retombe sur Aucune, aucune rangée)" "$(V L2.git-absent 'j.join("|")')" "cachee|aucune|"
+assert_eq L2 "fenêtre vide : aucune rangée, la légende dit « Aucune modification sur 90 jours »" "$(V L2.fenetre-vide 'j.flat().join("|")')" "0|Aucune modification sur 90 jours"
+assert_eq L1b "pastille : le nombre de fichiers en écriture (1), jamais une somme ; l'aria-label dit l'état, 0 à la connexion perdue" "$(V L1.pastille 'j.join("|")')" "1|Lentille${NB}: Aucune, 1 fichier en cours d'écriture|Lentille${NB}: Points chauds|0"
+
+echo "== L8, L9, L10 les tables des trois autres lentilles =="
+assert_eq L8 "couplage : la sélectionnée « 2 voisins marqués », les voisins visibles avec leur palier et « 78 % avec la sélection » ; le voisin hors vue n'est pas marqué" "$(V L8.couplage 'j.map((r) => [r[0], r[1] || "", r[3]].join("|")).join(" ; ")')" "f:src/a.js||2 voisins marqués ; f:src/b.js|haut|78${NB}% avec la sélection ; f:src/c.js|moyen|55${NB}% avec la sélection"
+assert_eq L8 "voisin hors vue : jamais de rangée pour lui (ni lien, ni agrégat)" "$(V L8.hors-vue 'j.join(",")')" "f:src/a.js,f:src/c.js"
+assert_eq L8 "nœud sélectionné ou rien de sélectionné : aucune rangée ; fichier sans voisin : « aucun fichier lié »" "$(V L8.noeud-et-vide 'j.flat().join("|")')" "0|0|aucun fichier lié"
+assert_eq L8 "légende du couplage : l'attente seule, puis « Le couplage se lit sur un fichier. » sur un nœud, puis les trois paliers" "$(V L8.legende 'j.map((l) => l.join(" / ")).join(" ## ")')" "-:Sélectionnez un fichier${NB}: ceux qui changent avec lui sont marqués. ## -:Le couplage se lit sur un fichier. ## haut:Haut${NB}: 75${NB}% et plus / moyen:Moyen${NB}: 50 à 74${NB}% / bas:Bas${NB}: 30 à 49${NB}%"
+assert_eq L9 "gardes : bouclier pour une garde, bouclier barré pour « aucune suite ne le nomme », « nommé par 3 suites » sans glyphe, agrégat de nœud « 1 sur 4 sans témoin » ; docs, suites, fixtures, prévus hors décompte" "$(V L9.gardes 'j.map((r) => r.slice(0, 1).concat(r.slice(2, 4)).join("|")).join(" ; ")')" "f:src/a.js|sans-temoin|aucune suite ne le nomme ; f:src/b.js||nommé par 3 suites ; f:src/c.js||nommé par 1 suite ; f:scripts/check-x.sh|bouclier|garde du dépôt ; n:x|sans-temoin|1 sur 4 sans témoin"
+assert_eq L9 "lab non VibeFlow : la lentille est absente et dite « Gardes non lues sur ce lab », jamais « tout est sans témoin »" "$(V L9.etats 'j.join("|")')" "absente|Gardes non lues sur ce lab"
+assert_eq L10 "empreinte : « en écriture · vf-coder », « modifié · vf-coder et 2 autres », « lu · vf-coder » (le rôle seul sur la carte, le nom complet dans l'infobulle)" "$(V L10.empreinte 'j.map((r) => [r[1], r[3]].join("|")).join(" ; ")')" "en-cours|en écriture · vf-coder ; modifie|modifié · vf-coder et 2 autres ; lu|lu · vf-coder"
+assert_eq L10 "l'infobulle porte les noms complets (« · nœud », « · non rattaché ») ; le filtre « Agents » propose les missions rattachées (5 au plus) et ne garde que leurs fichiers" "$(V L10.filtre 'j.flat(2).join("|")')" "75-08|80-01|f:src/c.js"
+assert_eq L10 "sans aucun rattachement : pas de filtre d'agents" "$(V L10.sans-rattachement 'j.length')" "0"
+assert_eq L10 "légende d'Empreinte : les mentions de limite en toutes lettres, en phrases distinctes (la clause « hors du lab » seulement quand elle compte)" "$(V L10.legende 'j.join(" / ")')" "Écritures par commande non vues. / Écritures hors du lab${NB}: 2 comptées, non dessinées. / 3 hors carte."
+assert_eq L10 "sans écriture hors du lab ni cible hors carte : la seule phrase des commandes" "$(V L10.legende-zero 'j.join(" / ")')" "Écritures par commande non vues."
+assert_eq L10 "empreinte en cours de relecture : phrase, sous-libellé, marques connues gardées" "$(V L10.relecture 'j.join("|")')" "Empreinte en cours de relecture, radar incomplet. Reprise dans quelques secondes.|En cours de relecture|true"
+assert_eq L10c "« Écritures hors du lab : n comptées, non dessinées. » : accord au singulier, pied long et infobulle courte du compte (un compte à 0 n'écrit pas la clause)" "$(V L10c.hors-lab 'j.join(" ## ")')" "Écritures hors du lab${NB}: 1 comptée, non dessinée. ## Écritures hors du lab${NB}: 2 comptées, non dessinées. ## Non vu par le radar${NB}: écritures par commande, écritures dans un arbre hors du dossier du lab (2 comptées). ## Non vu par le radar${NB}: écritures par commande. ## Non vu${NB}: commandes, arbres hors du lab (2)"
+
+echo "== L6 les états : indisponible, relecture, connexion perdue, git absent =="
+assert_eq L6 "indisponible (git, gardes, empreinte) : ligne indisponible, description en deux phrases, lentille active retirée, légende « … indisponibles pour l'instant. », annonce dédiée" "$(V L6.indispo 'j.map((x) => [x[0], x[1], x[2].length, x[3], x[4], /indisponible/.test(x[5][0]), x[6]].join("|")).join(" ## ")')" "indispo|Indisponible pour l'instant|2|true|0|true|Lentille Points chauds indisponible. ## indispo|Indisponible pour l'instant|2|true|0|true|Lentille Gardes indisponible. ## indispo|Indisponible pour l'instant|2|true|0|true|Lentille Empreinte indisponible."
+assert_eq L6 "git pas encore lu : les lentilles git disent « En cours de lecture » (jamais une lentille vide)" "$(V L6.lecture 'j.join(" ## ")')" "ok:Aucune marque de lentille|lecture:En cours de lecture|lecture:En cours de lecture|lecture:En cours de lecture|lecture:En cours de lecture ## En cours de lecture"
+assert_eq L6 "le radar dit son état : relecture, branches non lues, historique tronqué, cibles coupées, calcul pas fini ; « aucune collision vue » SEULEMENT calcul complet ; sinon le compte" "$(V L6.radar 'j.join(" ## ")')" "Radar en cours de relecture ## Radar incomplet${NB}: branches non lues ## Radar incomplet${NB}: historique tronqué. ## Radar incomplet${NB}: cibles coupées. ## Radar en cours de relecture ## Radar de collisions${NB}: aucune collision vue ## Radar de collisions${NB}: 4 fichiers"
+assert_eq L6 "connexion perdue : « Radar incomplet : connexion perdue » même sans collision connue ; jamais « aucune collision » ; sans donnée : relecture" "$(V L6.radar-perdu 'j.join(" ## ")')" "Radar incomplet${NB}: connexion perdue ## Radar incomplet${NB}: connexion perdue ## Radar en cours de relecture"
+assert_eq L6 "connexion perdue : Points chauds et Gardes gardent leurs marques et leur légende ajoute « Dernière lecture conservée : connexion perdue. »" "$(V L6.perdue-garde-les-marques 'j.map((x) => x.join("|")).join(" ## ")')" "true|Dernière lecture conservée${NB}: connexion perdue. ## true|Dernière lecture conservée${NB}: connexion perdue."
+assert_eq L6 "connexion perdue : marques d'Empreinte retirées (aucune rangée), légende de connexion, pastille à 0, radar incomplet" "$(V L10.perdue 'j.map((x) => [x[1], x[0].join("/"), x[2], x[3]].join("|")).join(" ## ")')" "0|Empreinte indisponible${NB}: connexion au cockpit perdue. Reprise automatique au retour de la connexion.|Radar incomplet${NB}: connexion perdue|true ## 3|Haut${NB}: tiers le plus changé et le plus gros/Moyen/Bas/Commits des 90 derniers jours, hors fusions/Dernière lecture conservée${NB}: connexion perdue.|Radar incomplet${NB}: connexion perdue|false"
+assert_eq L6 "git absent : les lignes Points chauds et Couplage ne sont pas posées du tout (le menu garde Aucune, Gardes, Empreinte)" "$(V L6.git-absent-menu 'j.join(",")')" "aucune,gardes,empreinte"
+assert_eq L6 "la légende de Points chauds dit le plafond de 5 000 commits et l'historique partiel" "$(V L6.legende-chauds 'j[0].slice(4).join(" / ")')" "Fenêtre réduite à 5${NB}000 commits / Historique partiel"
+assert_eq L9 "légende de Gardes : bouclier, bouclier barré, mot seul, lecture sans exécution, « n prévus ignorés »" "$(V L6.legende-gardes 'j.join(" ## ")')" "bouclier:Garde du dépôt${NB}: un gate, une suite ou un hook lui-même ## sans-temoin:Aucune suite ne le nomme ## -:Nommé par n suites${NB}: pas de glyphe, le mot seul ## -:Lecture des noms cités par les suites et les gates, rien n'est exécuté ## -:2 prévus ignorés"
+
+echo "== L11 annonces =="
+assert_eq L11 "texte de chaque annonce (singulier compris), « Couplage : 5 fichiers liés. », « Radar : 3 fichiers en collision possible »" "$(V L11.annonces 'j.join(" ## ")')" "Lentille Points chauds${NB}: 1 fichier au palier haut. ## Lentille Gardes${NB}: 1 fichier sans témoin. ## Lentille Empreinte${NB}: 1 fichier en cours d'écriture. ## Lentille Couplage. ## Lentille Aucune. ## Lentille Points chauds indisponible. ## Couplage${NB}: 5 fichiers liés. ## Radar${NB}: 3 fichiers en collision possible ## Radar${NB}: 1 fichier en collision possible"
+assert_eq L11 "singulier : « 1 fichier au palier haut », « 1 fichier en cours d'écriture »" "$(V L11.singulier 'j.join(" ## ")')" "Lentille Points chauds${NB}: 1 fichier au palier haut. ## Lentille Empreinte${NB}: 1 fichier en cours d'écriture."
+
+echo "== L12 phrases exactes : espace insécable avant : ; ! ? %, nombres à partir de 1 000 =="
+assert_eq L12 "aucune chaîne du module n'a une espace ordinaire avant : ; ! ? %" "$(V L12.nbsp 'j.length')" "0"
+assert_eq L12 "1 203, 5 000 : espace insécable des milliers ; 12 : rien" "$(V L12.milliers 'j.join("|")')" "1<nbsp>203|5<nbsp>000|12"
+assert_eq L12b "tableau fixe emplacement -> chaîne : une seule rédaction par emplacement (les objets de textes du module égalent le tableau de la spec)" "$(V L12.textes '[j.titre, j.indispo, j.reessai, j.gardesAbsentes, j.relecture, j.lecture, j.vide, j.fenetre, j.partiel, j.attente, j.noeud, j.commandes, j.radarAucune, j.radarBranchesMax, j.plansAJour].join(" ## ")')" "Lentille d'activité sur le code ## Indisponible pour l'instant ## Nouvelle lecture au prochain changement du dépôt ## Gardes non lues sur ce lab ## En cours de relecture ## En cours de lecture ## Aucune modification sur 90 jours ## Commits des 90 derniers jours, hors fusions ## Historique partiel ## Sélectionnez un fichier${NB}: ceux qui changent avec lui sont marqués. ## Le couplage se lit sur un fichier. ## Écritures par commande non vues. ## Radar de collisions${NB}: aucune collision vue ## Radar limité à 12 branches ## Recoupement des plans${NB}: à jour."
+
+echo "== L13 mots de collision (table pure) =="
+assert_eq L13 "un fichier, une rangée par source : « écrit par 2 agents », « modifié sur 2 branches », « modifié dans 2 arbres : conflit de fusion possible » (mot distinct), « prévu par 2 plans, vague 3 », sans vague : « prévu par 2 plans »" "$(V L13.collisions 'j.map((r) => [r[0], r[1], r[3]].join("|")).join(" ## ")')" "f:src/a.js|agents|écrit par 2 agents ## f:src/a.js|branches|modifié sur 2 branches ## f:src/b.js|arbres|modifié dans 2 arbres${NB}: conflit de fusion possible ## f:src/c.js|plans|prévu par 2 plans, vague 3 ## f:src/neuf.js|plans|prévu par 2 plans"
+assert_eq L13 "au-delà de deux : « écrit par 3 agents » ; une sentinelle « hors du lab » (aucune carte) n'est jamais une collision ; le fichier est l'unité" "$(V L13.trois-agents 'j')|$(V L13.hors-carte 'j.length')|$(V L13.fichiers 'j.join(",")')" "écrit par 3 agents|0|src/a.js,src/b.js,src/c.js,src/neuf.js"
+assert_eq L15 "le radar compte les FICHIERS (4), « 1 fichier » au singulier, zéro seulement quand le calcul est complet" "$(V L15.radar '[j[0].n, j[0].texte, j[0].ligne, j[1], j[2]].join("|")')" "4|4 fichiers en collision possible|Radar de collisions${NB}: 4 fichiers|1 fichier en collision possible|zero"
+
+# ====================== moitié navigateur ======================
+[ -z "${VM_SEUL:-}" ] || fin # VM_SEUL=1 : la moitié sans navigateur seule (mise au point)
+CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" > /dev/null 2>&1; then CHROME="$c"; break; fi; done
+if [ -z "$CHROME" ]; then . "$HERE/chrome-saut.sh"; vf_chrome_saut "  ⊘ MOITIÉ NAVIGATEUR SAUTÉE : aucun navigateur (Chrome, Chromium) — le sélecteur, le menu et le panneau NON vérifiés, non comptés comme réussis"; fin; fi
+SCRIPTS="$(cd "$HERE/.." && pwd)"
+mkdir -p "$WORK/home/.claude"; export REAL_HOME="$HOME"; export HOME="$WORK/home"
+. "$HERE/hygiene.sh"; vf_hyg_init
+. "$HERE/socle-serveur.sh"
+. "$FX/mk-lab.sh"
+LAB="$WORK/lab"; mklentilles "$LAB"
+cockpit_lancer "$LAB"; PORT="${VF_PORT:-0}"
+assert_eq L0 "serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
+mesurer() { REAL_HOME="$REAL_HOME" node "$HERE/chrome-activite-lentilles.mjs" "$CHROME" "http://127.0.0.1:$VF_PORT" "$1" > "$WORK/mesure-$1.json" 2> "$WORK/mesure-$1.err"; cat "$WORK/mesure-$1.json"; }
+E() { printf '%s' "$R" | node "$AUX/ev.mjs" "$1"; }
+
+mutant_rouge() { # mutant_rouge <nom> <expression sed sur chaque source de page> <expression js vraie quand la suite a VU le mutant> ; le serveur du mutant est arrêté ensuite
+  local nom="$1" sed_="$2" vu="$3" RM rc
+  if ! cockpit_module_muter_page "$nom" "$sed_"; then echo "  ❌ FAIL — MUTANT : $nom : la mutation n'a rien changé (ancre périmée)"; FAIL=$((FAIL+1)); fin; fi
+  cockpit_lancer "$LAB"; rc=$?
+  if [ "$rc" -ne 0 ]; then echo "  ❌ FAIL — MUTANT : $nom : le serveur du mutant ne démarre pas (code $rc)"; FAIL=$((FAIL+1)); fin; fi
+  RM="$(mesurer t3x)"; cockpit_arreter; unset COCKPIT_MODULE; export VF_PORT="$PORT"
+  if [ "$(printf '%s' "$RM" | node "$AUX/ev.mjs" "$vu")" = "true" ]; then echo "  MUTANT-ROUGE — $nom"; else echo "  ❌ FAIL — MUTANT : $nom : le mutant n'est pas vu rouge"; FAIL=$((FAIL+1)); fin; fi
+}
+cat > "$AUX/balayage.mjs" <<'JS'
+// L21 : aucune valeur en dur. Chaque déclaration font-size, line-height, font-weight, gap, margin, padding passe par un jeton (var(--…)) ou porte un commentaire « dérivé » sur sa ligne.
+import fs from 'node:fs';
+const RE = /\b(font-size|line-height|font-weight|gap|margin|padding)\s*:\s*([^;}]*)/g;
+export const balayer = (texte) => { const mal = [];
+  texte.split('\n').forEach((l, i) => { if (/^\s*\/\//.test(l)) return; for (const m of l.matchAll(RE)) if (!m[2].includes('var(--') && !/\/\*\s*dérivé/.test(l)) mal.push((i + 1) + ': ' + m[0].trim()); });
+  return mal; };
+if (process.argv[2] === '--temoin') { console.log(balayer('#x { line-height: 17px; }').length + '|' + balayer('#x { line-height: 17px; } /* dérivé : test */').length + '|' + balayer('#x { gap: var(--sp-8); }').length); process.exit(0); }
+console.log(JSON.stringify(process.argv.slice(2).flatMap((f) => balayer(fs.readFileSync(f, 'utf8')).map((x) => f.split('/').pop() + ' ' + x))));
+JS
+
+if wantsection t1; then
+echo "== L1 le sélecteur : bouton, place, libellé, état, rien n'est mémorisé =="
+R="$(mesurer t1)"
+assert_eq L1 "bouton posé : « Lentille : Aucune » (.bl), menu, aria-expanded, SANS aria-pressed, infobulle exacte" "$(E "[j.t1.bouton.bl, j.t1.bouton.haspopup, j.t1.bouton.expanded, j.t1.bouton.pressed, j.t1.bouton.title].join('|')")" "Lentille${NB}: Aucune|menu|false|false|Lentille d'activité sur le code"
+assert_eq L1 "créneau : juste après Santé, avant « Par où commencer »" "$(E "[j.t1.bouton.avant, j.t1.bouton.apres].join('|')")" "btn-health|tour-btn"
+assert_eq L1 "à l'ouverture de la page : Aucune, aucune marque, aucun nom accessible de pastille" "$(E "[j.t1.ariaInactif, j.t1.bouton.rond].join('|')")" "Lentille${NB}: Aucune|0"
+assert_eq L1 "jusqu'à 999 px : le bouton quitte l'en-tête, l'entrée du « ⋯ » est juste après Santé" "$(E "[j.t1.plus.bouton, j.t1.plus.entrees.indexOf('Lentille${NB}: Aucune') === j.t1.plus.entrees.indexOf('Santé') + 1, j.t1.plus.entrees.includes('Lentille${NB}: Aucune')].join('|')")" "none|true|true"
+assert_eq L1 "budget de l'en-tête : bouton carré (36 px), à 1 024 px l'en-tête ne déborde pas (scrollWidth <= largeur) et #btn-panel reste dans la fenêtre" "$(E "[Math.round(j.t1.entete[2]), j.t1.entete1024[0] <= j.t1.entete1024[1], j.t1.entete1024[2] <= j.t1.entete1024[3]].join('|')")" "36|true|true"
+assert_eq L1 "localStorage : aucune clé neuve, ni au chargement ni après le choix d'une lentille" "$(E "[j.t1.ls[0] === j.t1.ls[1], !j.t1.ls[1].toLowerCase().includes('lentille')].join('|')")" "true|true"
+assert_eq L20 "état actif : libellé « Lentille : Points chauds », fond neutre de survol, disque plein dans la lentille (r = 3 contre 0) — le signe n'est pas le survol" "$(E "[j.t1.actif.bl, /, 0\\.07\\)\$/.test(j.t1.actif.fond), j.t1.fondInactif === 'rgba(0, 0, 0, 0)', j.t1.actif.rond, j.t1.bouton.rond].join('|')")" "Lentille${NB}: Points chauds|true|true|3|0"
+assert_eq L20 "choisir une ligne ferme le menu, rend le focus au bouton, aria-expanded repasse à faux, la couche de marques est celle de la lentille" "$(E "[j.t1.actif.ferme, j.t1.actif.focus, j.t1.actif.expanded, j.t1.actif.active].join('|')")" "true|true|false|activite"
+
+echo "== L2 Points chauds sur la route réelle : mots, paliers, infobulles, nœuds =="
+assert_eq L2 "src/a/m14.js (12 commits, palier haut) : « 12 changements », glyphe de palier haut, infobulle chiffrée" "$(E "((m) => [m.n, m.mot, m.glyphe.includes('lg-haut'), m.titre].join('|'))(j.t1.marques['f:src/a/m14.js'])")" "1|12 changements|true|12 changements sur 90 jours · 14 lignes · rang 1 sur 31"
+assert_eq L2 "src/a/m04.js (2 commits, palier moyen) : « 2 changements » ; une seule marque par carte partout" "$(E "[j.t1.marques['f:src/a/m04.js'].mot, j.t1.marques['f:src/a/m04.js'].glyphe.includes('lg-moyen'), Object.values(j.t1.marques).every((m) => m.n <= 1)].join('|')")" "2 changements|true|true"
+assert_eq L2 "carte prévue : aucune marque de lentille ; une suite : aucune marque ; un gate : sa marque" "$(E "[j.t1.prevue, j.t1.marques['f:src/a/neuf.mjs'].n, j.t1.sansMarque].join('|')")" "0|0|[0,1]"
+assert_eq L2 "carte de nœud : le palier maximal et son nombre, jamais une somme (« 11 chauds », « 14 moyens »)" "$(E "JSON.parse(j.t1.noeud).map(([id, m]) => id + '=' + m).join(' ; ')")" "d:d-src|src/a=11 chauds ; d:d-src|src/b=14 moyens"
+assert_eq L19 "le palier est aussi dit par le texte : le nom accessible porte « palier haut » (moyen : « palier moyen »), à la place du mot de lentille" "$(E "[j.t1.nom.includes('12 changements, palier haut, '), j.t1.nomMoyen.includes('4 changements, palier moyen, ')].join('|')")" "true|true"
+assert_eq L19 "le rang figure dans la ligne du panneau du fichier (« rang 1 sur 31 »), pas seulement dans le title" "$(E "j.t1.panneau.includes('12 changements sur 90 jours · 14 lignes · rang 1 sur 31')")" "true"
+
+assert_eq L1b "pastille neutre : le nombre de fichiers en écriture (1) sur le fond --on, jamais --recent ; l'aria-label dit l'état" "$(E "[j.t1.badge.txt, j.t1.badge.fond === j.t1.badge.on, j.t1.badge.fond !== j.t1.badge.recent, j.t1.badge.aria].join('|')")" "1|true|true|Lentille${NB}: Points chauds, 1 fichier en cours d'écriture"
+
+echo "== L4 fraîcheur sans sondage =="
+assert_eq L4 "calcul fini : ZÉRO requête sur 10 s" "$(E 'j.t1.sondage')" "0"
+assert_eq L4 "calcul en cours : une lecture par seconde, 15 au plus, puis arrêt (aucune lecture ensuite)" "$(E '[j.t1.relectures[0] >= 10 && j.t1.relectures[0] <= 16, j.t1.relectures[1]].join("|")')" "true|0"
+
+echo "== L3, L22 surOnglet : Code, Projet, Code, Projet, Code =="
+assert_eq L3 "sur Projet : ni bouton, ni menu, ni compte, ni marque, ni feuille de style, aucune couche ; #ask-live toujours présent" "$(E "[0, 2].map((i) => { const v = j.t1.visites[i]; return [v.onglet, v.boutons, v.menus, v.compte, v.live, v.lm, v.styles, String(v.active)].join(','); }).join(' ; ')")" "projet,0,0,0,true,0,0,null ; projet,0,0,0,true,0,0,null"
+assert_eq L22 "sur Code, deux fois : un seul bouton, un seul menu, un seul compte, quatre feuilles, #ask-live présent" "$(E "[1, 3].map((i) => { const v = j.t1.visites[i]; return [v.onglet, v.boutons, v.menus, v.compte, v.live, v.styles].join(','); }).join(' ; ')")" "code,1,1,1,true,4 ; code,1,1,1,true,4"
+assert_eq L22 "VF_ETAT.abonnes() identique à chaque visite du même onglet (aucun abonnement ne double)" "$(E "[JSON.stringify(j.t1.visites[0].abonnes) === JSON.stringify(j.t1.visites[2].abonnes), JSON.stringify(j.t1.visites[1].abonnes) === JSON.stringify(j.t1.visites[3].abonnes)].join('|')")" "true|true"
+# depuis 73 et 74, Projet porte déjà ses propres abonnements à frise, git et planning (régie, traçabilité) : l'écart n'est plus la mesure de la couche ;
+# elle se juge sur Code, où elle est seule à les poser : au moins ceux de Projet, au moins un chacun, et connexion de plus
+assert_eq L3 "Code abonne frise, git, planning (au moins ceux de Projet, au moins un) et connexion (un de plus que Projet), et rend ses abonnements en le quittant" "$(E "['frise', 'git', 'planning', 'connexion'].map((k) => { const p = j.t1.visites[0].abonnes[k], c = j.t1.visites[1].abonnes[k]; return k === 'connexion' ? c - p >= 1 : c >= p && c >= 1; }).join('|')")" "true|true|true|true"
+assert_eq L22 "retour sur Code : réinitialisé (Aucune), puis la lentille choisie ne double aucune marque ; menu, compte et inscription présents" "$(E "[j.t1.libelleRetour, Object.values(j.t1.retour).every((m) => m.n <= 1), j.t1.retour['f:src/a/m14.js'].mot, j.t1.parties].join('|')")" "Lentille${NB}: Points chauds|true|14 changements|[true,true,true]"
+fi
+
+if wantsection t2; then
+echo "== L5 le menu : seul conteneur role=menu, titre, légende et radar HORS du menu =="
+R="$(mesurer t2)"
+assert_eq L5 "role=menu sur le SEUL conteneur des rangées ; groupes « Lentille » et « Agents » ; légende en groupe nommé ; titre, légende et radar hors du menu et reliés par aria-describedby" "$(E "[j.t2.menu.roles.join(), j.t2.menu.groupes.join(), j.t2.menu.hors.join(), j.t2.menu.decrit, j.t2.menu.titre].join('|')")" "lens-boite|Lentille,Agents,Légende de la lentille|true,true,true|lens-titre lens-legende lens-radar|Lentille d'activité sur le code"
+assert_eq L5 "cinq rangées aux libellés, sous-libellés et comptes de la spec (5 au palier haut, 12 sans témoin, 1 en écriture) ; Aucune cochée" "$(E "j.t2.lignes.map((l) => [l[0], l[1], l[2], l[3], l[4]].join('/')).join(' ## ')")" "aucune/Aucune/Aucune marque de lentille//true ## chauds/Points chauds/Ce qui change souvent et pèse lourd/5/false ## couplage/Couplage/Ce qui change avec le fichier choisi//false ## gardes/Gardes/Ce qu'une suite ou un gate nomme/12/false ## empreinte/Empreinte/Ce que les agents lisent et écrivent/1/false"
+assert_eq L5 "ligne du radar : « Radar de collisions : 3 fichiers » ; le menu est un volant au-dessus du plan (position absolute) : le rect de chaque carte est inchangé à l'ouverture" "$(E "[j.t2.textes.radar, j.t2.menu.position, j.t2.rects[0]].join('|')")" "Radar de collisions${NB}: 3 fichiers|absolute|true"
+assert_eq L5 "« aucune collision vue » SEULEMENT calcul complet ; branches non lues, historique tronqué, cibles coupées, relecture : la phrase de l'état" "$(E "[j.t2.complet.radar, j.t2.branches.radar, j.t2.tronque.radar, j.t2.coupees.radar, j.t2.relecture.radar].join(' ## ')")" "Radar de collisions${NB}: aucune collision vue ## Radar incomplet${NB}: branches non lues ## Radar incomplet${NB}: historique tronqué. ## Radar incomplet${NB}: cibles coupées. ## Radar en cours de relecture"
+assert_eq L6 "ligne indisponible : sous-libellé « Indisponible pour l'instant », aria-disabled, FOCALISABLE (tabIndex 0, pas disabled), décrite par les deux phrases, restée cochée, marques retirées, légende dite" "$(E "(() => { const l = j.t2.indispoActive.lignes[1]; return [l[2], l[5], l[6], l[7], l[8], j.t2.indispoActive.coche, String(j.t2.indispoActive.active), j.t2.indispoActive.legende[0]].join('|'); })()")" "Indisponible pour l'instant|true|0|false|Indisponible pour l'instant. Nouvelle lecture au prochain changement du dépôt|true|null|Points chauds indisponibles pour l'instant."
+assert_eq L6 "ligne indisponible : couleur --text-3 (jamais --text-4), contraste >= 4,5:1 sur fond survolé ; entrer ne fait rien (la coche, le menu et le focus restent)" "$(E "[j.t2.indispoActive.couleurs.every((x) => x === j.t2.couleur.texte3), j.t2.couleur.texte3 !== j.t2.couleur.texte4, j.t2.couleur.ratio >= 4.5, j.t2.clicIndispo.join('/')].join('|')")" "true|true|true|chauds/chauds/true/true"
+assert_eq L6 "gardes non lues : ligne grisée « Gardes non lues sur ce lab » ; git absent : Points chauds et Couplage ne sont pas posées ; git pas encore lu : « En cours de lecture »" "$(E "[j.t2.gardesAbsentes.lignes[3][2] + '/' + j.t2.gardesAbsentes.lignes[3][5], j.t2.gitAbsent.lignes.map((l) => l[0]).join(), j.t2.gitEnLecture.lignes[1][2], j.t2.gitEnLecture.lignes[2][2]].join('|')")" "Gardes non lues sur ce lab/true|aucune,gardes,empreinte|En cours de lecture|En cours de lecture"
+assert_eq L6 "relecture : sous-libellé « En cours de relecture », légende de l'empreinte en cours de relecture, radar en cours de relecture, les marques déjà connues restent" "$(E "[j.t2.relecture.lignes[4][2], j.t2.relecture.legende[0], j.t2.relecture.radar, j.t2.relecture.marques].join(' ## ')")" "En cours de relecture ## Empreinte en cours de relecture, radar incomplet. Reprise dans quelques secondes. ## Radar en cours de relecture ## activite"
+assert_eq L6 "fenêtre vide : « Aucune modification sur 90 jours » ; cibles coupées : dite par la légende d'Empreinte ET par le radar (une seule rédaction)" "$(E "[j.t2.gitVide.legende[0], j.t2.coupees.limites[3], j.t2.coupees.radar].join(' ## ')")" "Aucune modification sur 90 jours ## Radar incomplet${NB}: cibles coupées. ## Radar incomplet${NB}: cibles coupées."
+assert_eq L6 "connexion perdue : marques d'Empreinte retirées, ligne Empreinte indisponible, légende de connexion, radar « connexion perdue », pastille retirée" "$(E "[Object.values(j.t2.perdue.pendant).filter(Boolean).length, j.t2.perdue.legende[0], j.t2.perdue.radar, j.t2.perdue.lignes[4][2] + '/' + j.t2.perdue.lignes[4][5], j.t2.perdue.badge === ''].join(' ## ')")" "0 ## Empreinte indisponible${NB}: connexion au cockpit perdue. Reprise automatique au retour de la connexion. ## Radar incomplet${NB}: connexion perdue ## Indisponible pour l'instant/true ## true"
+assert_eq L6 "connexion perdue : Points chauds garde ses 14 marques et sa légende ajoute « Dernière lecture conservée : connexion perdue. »" "$(E "[Object.values(j.t2.perdue.chauds.marques).filter(Boolean).length, j.t2.perdue.chauds.legende.slice(-1)[0], j.t2.perdue.chauds.radar].join(' ## ')")" "14 ## Dernière lecture conservée${NB}: connexion perdue. ## Radar incomplet${NB}: connexion perdue"
+assert_eq L8 "couplage sur la route poussée : légende d'attente seule ; à la sélection, les voisins VISIBLES (palier 75, 50, 30) avec « 78 % avec la sélection », la sélectionnée « 4 voisins marqués » ; le voisin hors de la vue n'est pas marqué" "$(E "(() => { const m = j.t2.couplage.selection, v = (id) => m[id] ? m[id].join('/') : '-'; return [j.t2.couplage.attente[0], v('f:src/a/m01.js'), v('f:src/a/m02.js'), v('f:src/a/m03.js'), v('f:src/a/m04.js'), v('f:src/a/m07.js'), v('f:src/a/m05.js'), v('f:src/b/n01.js')].join(' ## '); })()")" "Sélectionnez un fichier${NB}: ceux qui changent avec lui sont marqués. ## 4 voisins marqués/neutre ## 100${NB}% avec la sélection/haut ## 78${NB}% avec la sélection/haut ## 55${NB}% avec la sélection/moyen ## 40${NB}% avec la sélection/bas ## - ## -"
+assert_eq L8 "aucun lien ajouté au graphe ; nœud sélectionné : « Le couplage se lit sur un fichier. », aucune marque ; avec un fichier : les trois paliers" "$(E "[j.t2.couplage.liens[0] === j.t2.couplage.liens[1], j.t2.couplage.noeud.join(), j.t2.couplage.noeudMarques, j.t2.couplage.legende.length].join('|')")" "true|Le couplage se lit sur un fichier.|0|3"
+assert_eq L9 "gardes sur la route poussée : « nommé par 2 suites », « aucune suite ne le nomme » (bouclier barré), « garde du dépôt » (bouclier), agrégat de nœud « 12 sur 14 sans témoin », prévue sans marque" "$(E "(() => { const g = j.t2.gardes, v = (o, id) => o[id] ? o[id].join('/') : '-'; return [v(g.fichiers, 'f:src/a/m01.js'), v(g.fichiers, 'f:src/a/m05.js'), v(g.scripts, 'f:scripts/check-lab.sh'), v(g.noeuds, 'd:d-src|src/a'), v(g.fichiers, 'f:src/a/neuf.mjs')].join(' ## '); })()")" "nommé par 2 suites/neutre ## aucune suite ne le nomme/sans-temoin ## garde du dépôt/bouclier ## 12 sur 14 sans témoin/sans-temoin ## -"
+assert_eq L9 "légende de Gardes : bouclier, bouclier barré, mot seul, lecture sans exécution, « 1 prévu ignoré »" "$(E "j.t2.gardes.legende.join(' ## ')")" "Garde du dépôt${NB}: un gate, une suite ou un hook lui-même ## Aucune suite ne le nomme ## Nommé par n suites${NB}: pas de glyphe, le mot seul ## Lecture des noms cités par les suites et les gates, rien n'est exécuté ## 1 prévu ignoré"
+assert_eq L10 "empreinte sur la route poussée : en écriture, modifié (et 2 autres), lu, fini (glyphes de degré) ; agrégat de nœud : le degré MAXIMAL et son nombre, jamais une somme (« 1 en écriture », « 3 modifiés »)" "$(E "(() => { const e = j.t2.empreinte, v = (o, id) => o[id] ? o[id].join('/') : '-'; return [v(e.fichiers, 'f:src/a/m01.js'), v(e.fichiers, 'f:src/a/m02.js'), v(e.fichiers, 'f:src/a/m03.js'), v(e.fichiers, 'f:src/a/m04.js'), v(e.noeuds, 'd:d-src|src/a'), v(e.agregat, 'd:d-src|src/a')].join(' ## '); })()")" "en écriture · vf-coder/en-cours ## modifié · vf-coder et 2 autres/modifie ## lu · vf-coder/lu ## fini · vf-coder/fini ## 1 en écriture/en-cours ## 3 modifiés/modifie"
+assert_eq L10 "légende d'Empreinte : quatre degrés (glyphes) puis les trois mentions de limite ; filtre « Agents » seulement avec un rattachement (missions 75-08 et 80-01)" "$(E "[j.t2.empreinte.menu.glyphes.join(), j.t2.empreinte.menu.limites.join(' / '), j.t2.empreinte.menu.agents.map((a) => a[0]).join(), j.t2.sansRattachement].join(' ## ')")" "en-cours,modifie,lu,fini ## Écritures par commande non vues. / Écritures hors du lab${NB}: 2 comptées, non dessinées. / 1 hors carte. ## Toute l'équipe,75-08,80-01 ## true"
+assert_eq L10b "menu d'Empreinte avec un rattachement à 1440 x 900 : sans défilement, sous le plafond ; le filtre d'agents et les phrases de limite sont dans un details FERMÉ ; le details s'ouvre au clavier" "$(E "[j.t2.hauteur.defile, j.t2.hauteur.h <= j.t2.hauteur.plafond, j.t2.hauteur.details.join(), j.t2.ouvreAuClavier].join('|')")" "false|true|false,false|true"
+assert_eq L10 "filtre d'agents : Entrée choisit SANS fermer le menu (coche, focus gardés, seules les marques de la mission 75-08 restent) ; Espace sur « Toute l'équipe » les rend toutes" "$(E "[j.t2.filtre.coche, j.t2.filtre.ouvert, j.t2.filtre.focus, Object.values(j.t2.filtre.marques).filter(Boolean).length, j.t2.filtre.tous.join('/')].join('|')")" "true|true|75-08|2|true/4"
+assert_eq L11 "annonces par #ask-live (zone EXISTANTE, jamais retirée ni remplacée) : une par choix de lentille, chiffres et singulier compris" "$(E "j.t2.annonces.suite.slice(0, 5).join(' ## ') + '|' + j.t2.annonces.meme")" "Lentille Points chauds${NB}: 5 fichiers au palier haut. ## Lentille Gardes${NB}: 12 fichiers sans témoin. ## Lentille Empreinte${NB}: 1 fichier en cours d'écriture. ## Lentille Couplage. ## Lentille Aucune.|true"
+assert_eq L11 "les mises à jour d'empreinte ne sont PAS annoncées ; une lentille active devenue indisponible l'est ; le couplage, retardé de 300 ms (rien à 150 ms, puis « Couplage : 2 fichiers liés. »)" "$(E "[j.t2.annonces.maj[1] - j.t2.annonces.maj[0], j.t2.annonces.indispo, j.t2.annonces.couplage.join('/')].join('|')")" "0|Lentille Points chauds indisponible.|0/Couplage${NB}: 2 fichiers liés."
+assert_eq L12 "chaque phrase de la spec, comparée après normalisation des espaces insécables, est celle de son emplacement ; et une espace insécable précède chaque : ; ! ? % (contrôle distinct)" "$(E "(() => { const n = (x) => x.replace(/[\\u00a0\\u202f]/g, ' '); const t = j.t2; const P = [[t.indispoActive.legende[0], \"Points chauds indisponibles pour l'instant.\"], [t.indispoActive.lignes[1][8], \"Indisponible pour l'instant. Nouvelle lecture au prochain changement du dépôt\"], [t.gardesAbsentes.lignes[3][2], 'Gardes non lues sur ce lab'], [t.gitVide.legende[0], 'Aucune modification sur 90 jours'], [t.relecture.legende[0], 'Empreinte en cours de relecture, radar incomplet. Reprise dans quelques secondes.'], [t.perdue.legende[0], 'Empreinte indisponible : connexion au cockpit perdue. Reprise automatique au retour de la connexion.'], [t.perdue.chauds.legende[4], 'Dernière lecture conservée : connexion perdue.'], [t.perdue.radar, 'Radar incomplet : connexion perdue'], [t.branches.radar, 'Radar incomplet : branches non lues'], [t.tronque.radar, 'Radar incomplet : historique tronqué.'], [t.coupees.radar, 'Radar incomplet : cibles coupées.'], [t.complet.radar, 'Radar de collisions : aucune collision vue'], [t.limites.radar, 'Radar de collisions : 3 fichiers'], [t.limites.limites[1], 'Écritures hors du lab : 2 comptées, non dessinées.'], [t.perdue.chauds.legende[0], 'Haut : tiers le plus changé et le plus gros'], [t.couplage.legende[0], 'Haut : 75 % et plus'], [t.couplage.legende[1], 'Moyen : 50 à 74 %'], [t.couplage.legende[2], 'Bas : 30 à 49 %'], [t.gardes.legende[0], 'Garde du dépôt : un gate, une suite ou un hook lui-même'], [t.gardes.legende[2], 'Nommé par n suites : pas de glyphe, le mot seul'], [t.couplage.attente[0], 'Sélectionnez un fichier : ceux qui changent avec lui sont marqués.'], [t.annonces.suite[0], 'Lentille Points chauds : 5 fichiers au palier haut.'], [t.annonces.suite[1], 'Lentille Gardes : 12 fichiers sans témoin.'], [t.annonces.suite[2], \"Lentille Empreinte : 1 fichier en cours d'écriture.\"]]; return [P.filter(([a, b]) => n(a) !== b).map((x) => x[1]), P.filter(([a, b]) => (b.match(/ [:;!?%]/g) || []).length !== (a.match(/\\u00a0[:;!?%]/g) || []).length).map((x) => x[1]), P.length]; })()")" '[[],[],24]'
+assert_eq L12b "aucune phrase à un emplacement qui n'est pas le sien : le pied long et l'infobulle courte du radar ne sont pas dans le menu ; chaque phrase de limite y figure une seule fois" "$(E "[JSON.stringify(j.t2.empreinte.menu).includes('Non vu'), j.t2.limites.limites.filter((x) => x.startsWith('Écritures hors du lab')).length].join('|')")" "false|1"
+
+echo "== L7 le clavier du menu =="
+R="$(mesurer t7)"
+assert_eq L7 "ouverture sur la ligne cochée ; ↓ ↑ bouclent (Aucune → … → Empreinte → Aucune), Home et Fin aux extrémités" "$(E "[j.t7.ouverture.join(), j.t7.fleches.join()].join(' ## ')")" "aucune,true ## chauds,couplage,gardes,empreinte,aucune,empreinte,aucune,empreinte"
+assert_eq L7 "ligne désactivée : atteignable et muette (Entrée ne fait rien : le menu reste ouvert, aucune marque)" "$(E "j.t7.desactivee.map(String).join('|')")" "chauds|true|null"
+assert_eq L7 "Entrée choisit, ferme, rend le focus au bouton ; Espace de même (et ouverture sur la ligne cochée)" "$(E "[j.t7.entree.join(), j.t7.focusCoche, j.t7.espace.join()].join(' ## ')")" "false,true,activite ## chauds ## false,true,Lentille${NB}: Couplage"
+assert_eq L7 "Échap ferme et rend le focus ; un clic extérieur ferme" "$(E "[j.t7.echap.join(), j.t7.dehors].join('|')")" "false,true|false"
+assert_eq L7 "exclusion mutuelle avec #legend (hors pile) : ouvrir l'un ferme l'autre, dans les deux sens" "$(E "[j.t7.legende.join(), j.t7.reciproque.join()].join('|')")" "false,true|true,false"
+assert_eq L7 "à 900 px : l'ouvreur est le « ⋯ » (menu fixe sous l'en-tête) ; Échap et Entrée rendent le focus au « ⋯ »" "$(E "[j.t7.tablette.ouvert, j.t7.tablette.position, j.t7.tablette.focus, j.t7.tablette.echap.join(), j.t7.tablette.entree.join()].join('|')")" "true|fixed|aucune|false,true|false,true,activite"
+fi
+
+if wantsection t3; then
+echo "== L13 la marque de collision sur les cartes, de bout en bout =="
+R="$(mesurer t3)"
+assert_eq L13 "sur la route poussée : « écrit par 2 agents », « modifié dans 2 arbres : conflit de fusion possible » (mot DISTINCT), « prévu par 2 plans, vague 3 » ; un fichier sans collision n'en porte pas" "$(E "[j.t3.mots['f:src/a/m05.js'], j.t3.mots['f:src/a/m06.js'], j.t3.mots['f:src/a/neuf.mjs'], j.t3.mots['f:src/a/m01.js'].length].join(' ## ')")" "écrit par 2 agents ## modifié dans 2 arbres${NB}: conflit de fusion possible ## prévu par 2 plans, vague 3 ## 0"
+assert_eq L13 "sur une carte prévue, le mot de plans prend l'emplacement GAUCHE et « Prévu » reste à droite" "$(E 'j.t3.prevue')" "lmg lmg-g|vst vst-prevu"
+
+echo "== L14 les sections du panneau =="
+assert_eq L14 "panneau d'un fichier : Points chauds, « Change souvent avec », Gardes, « Agents sur ce fichier » (dans cet ordre, après les sections du moteur)" "$(E "j.t3.fichier.map((x) => x[1]).join(' ## ')")" "Points chauds ## Change souvent avec 2 ## Gardes ## Agents sur ce fichier 1"
+assert_eq L14 "le rang est dans la ligne du panneau (« rang 14 sur 14 ») ; voisins : rangées cliquables (data-go), nom en mono tronqué à GAUCHE (direction rtl), « 78 % », pied « Sur 90 jours, d'après l'historique des commits »" "$(E "[j.t3.chaudsPanneau.lignes[0], j.t3.couplage.go.join(), j.t3.rtl, j.t3.couplage.lignes.join(' / '), j.t3.couplage.pieds[0]].join(' ## ')")" "1 changement sur 90 jours · 10 lignes · rang 14 sur 14 ## f:src/a/m02.js,f:src/a/m03.js ## rtl ## src/a/m02.js100${NB}% / src/a/m03.js78${NB}% ## Sur 90 jours, d'après l'historique des commits"
+assert_eq L14 "sans voisin : « Aucun fichier au-dessus des seuils (5 révisions communes, 30 %) » ; clone superficiel : « Historique partiel » au pied" "$(E "[j.t3.vide.pieds[0], j.t3.partiel].join(' ## ')")" "Aucun fichier au-dessus des seuils (5 révisions communes, 30${NB}%) ## Sur 90 jours, d'après l'historique des commits · Historique partiel"
+assert_eq L14 "Gardes : « Nommé par : 2 suites » ; « Aucune suite ni aucun gate ne le nomme » ; Agents : le degré et le nom complet, les FINIS repliés dans un details fermé « Terminés dans les 24 h (1) »" "$(E "[j.t3.gardes.lignes[0], j.t3.gardes5.lignes[0], j.t3.agents.lignes[0], j.t3.fini.details.map((d) => d.join('/')).join(), j.t3.fini.lignes.length].join(' ## ')")" "Nommé par${NB}: 2 suites ## Aucune suite ni aucun gate ne le nomme ## en écriture · vf-coder · nœud 75-08 ## false/Terminés dans les 24 h (1) ## 1"
+assert_eq L14 "Collisions possibles REGROUPÉES PAR FICHIER : une rangée par fichier avec ses sources (agents puis branches), cliquable ; pied = la phrase LONGUE des limites (2 comptées)" "$(E "(() => { const c = j.t3.collisionFichier; return [c.titre, c.lignes.length, c.lignes[0].includes('écrit par 2 agents · vf-coder · phase-75 et vf-coder · phase-76'), c.lignes[0].includes('modifié sur 2 branches · feat/a et feat/b'), c.go.join(), c.pieds[0]].join(' ## '); })()")" "Collisions possibles 1 ## 1 ## true ## true ## f:src/a/m05.js ## Non vu par le radar${NB}: écritures par commande, écritures dans un arbre hors du dossier du lab (2 comptées)."
+assert_eq L14 "carte prévue : la ligne d'un recoupement de plans dit « Recoupement des plans : à jour. »" "$(E "j.t3.collisionPrevue.lignes[0].includes('prévu par 2 plans, vague 3 · 75-02 et 75-04') + '|' + j.t3.collisionPrevue.lignes[0].includes('Recoupement des plans${NB}: à jour.')")" "true|true"
+assert_eq L14 "nœud : les collisions de ses fichiers (3), cliquables ; au-delà de 5 : « et 2 autres » et « Radar limité à 12 branches. » quand le plafond mord ; dépôt entier : 10 rangées puis « et 2 autres »" "$(E "[j.t3.noeud.titre, j.t3.noeud.go.length, j.t3.noeud7.lignes.length, j.t3.noeud7.pieds[0], j.t3.noeud7.pieds[1].endsWith('Radar limité à 12 branches.'), j.t3.racine.titre, j.t3.racine.lignes.length, j.t3.racine.pieds[0]].join(' ## ')")" "Collisions possibles 3 ## 3 ## 5 ## et 2 autres ## true ## Collisions possibles 12 ## 10 ## et 2 autres"
+
+echo "== L15 le compte du radar dans la rangée .k =="
+assert_eq L15 "au-dessus de 999 px : glyphe + « 3 fichiers en collision possible », bouton-lien DANS .k (jamais dans #context p), aria-label complet, infobulle courte, zone tactile 44 x 44" "$(E "[j.t3.compte.texte, j.t3.compte.aria, j.t3.compte.dansK, j.t3.compte.dansP, j.t3.compte.titre, j.t3.compte.tactile.map((x) => Math.round(x) >= 44).join()].join(' ## ')")" "3 fichiers en collision possible ## 3 fichiers en collision possible ## true ## false ## Non vu${NB}: commandes, arbres hors du lab (2) ## true,true"
+assert_eq L15 "#context a la même hauteur avec et sans compte ; le sous-titre #context p n'est pas touché ; à 0 : le compte est absent" "$(E "[j.t3.compteHauteur.join(), j.t3.compte.p === j.t3.compteZero.p, j.t3.compteZero.cache].join('|')")" "$(E 'j.t3.compteHauteur[0] + "," + j.t3.compteHauteur[0] + "," + j.t3.compteHauteur[0]')|true|true"
+assert_eq L15 "1 024 px : la phrase ; 900 et 390 px : « 3 fichiers » (le mot reste visible) ; le chiffre seul seulement quand .k manque de place (mesure), aria-label complet partout" "$(E "[j.t3.largeurs[1024].texte, j.t3.largeurs[900].texte, j.t3.largeurs[390].texte, j.t3.etroit.texte, j.t3.etroit.aria, j.t3.s18.texte, j.t3.s18.deborde].join(' ## ')")" "3 fichiers en collision possible ## 3 fichiers ## 3 fichiers ## 3 ## 3 fichiers en collision possible ## 3 fichiers ## false"
+assert_eq L15 "pendant une relecture : « Radar en cours de relecture » (jamais « aucune collision »), jusqu'à 999 px : « … » ; l'aria-label dit toujours l'état" "$(E "[j.t3.compteRelecture.texte, j.t3.compteRelecture.aria, j.t3.largeurs.relecture.texte, j.t3.largeurs.relecture.aria].join(' ## ')")" "Radar en cours de relecture ## Radar en cours de relecture ## … ## Radar en cours de relecture"
+
+echo "== L16 l'ouverture du panneau, l'annonce unique =="
+assert_eq L16 "le compte ouvre le panneau sur « Collisions possibles » : le rect de chaque carte et la transformation de la vue sont inchangés (Q12), le focus va au TITRE de la section (tabindex -1)" "$(E "[j.t3.ouverture.ouvert, j.t3.ouverture.cartes, j.t3.ouverture.vue, j.t3.ouverture.focus].join(' ## ')")" "true ## true ## true ## H3|collisions|-1|Collisions possibles 3"
+assert_eq L16 "sélection sans collision : le panneau montre le dépôt entier (« Base de code »), focus sur le titre de la section" "$(E "[j.t3.ouvertureSansCollision.focus, j.t3.ouvertureSansCollision.titre].join(' ## ')")" "H3|collisions ## Base de code"
+assert_eq L16 "annonce à CHAQUE passage de 0 vers n : la suite 0, n, 0, n produit DEUX annonces ; une variation de n (3 vers 4) et un retour à 0 n'en produisent aucune" "$(E "[j.t3.annonces.suite.join(), j.t3.annonces.textes.join(' ## ')].join(' | ')")" "0,1,1,2,2,2 | Radar${NB}: 3 fichiers en collision possible ## Radar${NB}: 3 fichiers en collision possible"
+
+echo "== L17 chaîne XSS =="
+assert_eq L17 "chemin, branche, rôle, titre hostiles (balises, guillemets, </script>, U+2028, __proto__, 5 000 caractères) : aucun nœud injecté, aucun script exécuté, texte littéral dans la marque, la table, le panneau et le menu, aucune pollution" "$(E "[j.t3.xss.avant === j.t3.xss.apres, j.t3.xss.menuAgents.join('/'), j.t3.xss.xss, j.t3.xss.litteral.join(), j.t3.xss.proto, j.t3.xss.menu].join('|')")" "true|0/4|true|true,true,true,true,true|true|false"
+mutant_rouge "XSS-texte-par-innerHTML-helper-el" 's/if (txt !== undefined) e\.textContent = txt;/if (txt !== undefined) e.innerHTML = txt;/' 'j.t3x.apres > j.t3x.avant || !j.t3x.xss || !j.t3x.litteral.every(Boolean)'
+mutant_rouge "XSS-nom-d-agent-par-innerHTML" "s/r\\.querySelector('b')\\.textContent = a\\.nom/r.querySelector('b').innerHTML = a.nom/" 'j.t3x.apres > j.t3x.avant || j.t3x.menuAgents[0] > 0 || !j.t3x.xss'
+
+echo "== L18 surOnglet retire sections, compte et marques =="
+assert_eq L18 "sur Code : sections du panneau, compte et marques présents ; sur Projet : plus rien (jamais #ask-live) ; retour sur Code : aucun doublon" "$(E "[j.t3.avantQuitter.join(), j.t3.projet.join(), j.t3.code.join(), j.t3.retour.join()].join(' ## ')")" "4,1,2 ## 0,0,0,true ## 4,1,2,true ## 1,1,1"
+fi
+
+if wantsection t4; then
+echo "== L22 correctifs de fin de phase : légende stable, surface du menu, section Collisions visible =="
+R="$(mesurer t4)"
+assert_eq L22 "légende : à un événement sans changement (git, frise, planning, mêmes données), le <details> « limites » est le MÊME nœud, reste ouvert, garde le focus ; le menu reste ouvert" "$(E "[j.t4.avant, j.t4.memeDonnee].map((x) => x.join()).join('|')")" "true,true,true,true|true,true,true,true"
+assert_eq L22 "légende : quand ses lignes changent (relecture de l'empreinte), elle est reconstruite et dit la relecture ; elle revient avec ses limites ensuite" "$(E "[j.t4.change.join(), j.t4.revient.join()].join('|')")" "false,true|1,false"
+assert_eq L22 "#lens-menu : fond non transparent et ombre non nulle, identiques à #legend, à 1440, 1024 et 390 px, thèmes sombre et clair" "$(E "Object.entries(j.t4.surface).map(([k, v]) => k + ':' + v.join()).join(' ')")" "dark-1440:true,true,true,true dark-1024:true,true,true,true dark-390:true,true,true,true light-1440:true,true,true,true light-1024:true,true,true,true light-390:true,true,true,true"
+assert_eq L22 "le compte ouvre le panneau : le titre de « Collisions possibles » est dans le champ du panneau à 1440 et à 390 px" "$(E "[j.t4.visible[1440], j.t4.visible[390]].map((v) => v && v[0]).join('|')")" "true|true"
+fi
+
+echo "== L21 aucune valeur en dur dans les fichiers CSS et JS neufs =="
+assert_eq L21 "témoin : un « line-height: 17px » en dur est vu (1), le même avec un commentaire dérivé ou un jeton ne l'est pas (0, 0)" "$(node "$AUX/balayage.mjs" --temoin)" "1|0|0"
+assert_eq L21 "interlignes, graisses, tailles, écarts et marges des cinq fichiers : un jeton var(--…) ou un commentaire « dérivé », partout" "$(node "$AUX/balayage.mjs" "$MODULE_UI"/75-vf-activite.js "$MODULE_UI"/75-vf-activite-menu.js "$MODULE_UI"/75-vf-activite-tables.js "$MODULE_UI"/75-vf-activite-panneau.js "$MODULE_UI"/75-vf-activite-collisions.js)" "[]"
+assert_eq L21 "aucun innerHTML, aucun setInterval, aucun localStorage, aucun aria-pressed, ni RANG_SOURCE (la priorité n'est calculée que par le canal) dans les cinq fichiers" "$(cat "$MODULE_UI"/75-vf-activite*.js | grep -c 'innerHTML\|setInterval\|localStorage\|aria-pressed\|RANG_SOURCE')" "0"
+
+fin

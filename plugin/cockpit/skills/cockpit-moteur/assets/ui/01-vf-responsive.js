@@ -6,7 +6,7 @@
 //     sans périphérique de pointage (Chrome headless sous Linux : `pointer: none`), où l'en-tête restait en grille et débordait à 1 024 px (CI, run 41370886002) ;
 //   - en-tête (>= 1 000 px) : une ligne souple ; la gauche cède la première (nom de projet tronqué avec une ellipse), la recherche garde 200 px,
 //     la droite garde son contenu ; sous 1 600 px les boutons d'action passent en icône seule (le libellé reste dans l'infobulle) ;
-//   - bornes mesurées à 1 024 px sur l'onglet Code AVEC ses boutons optionnels (Travail récent, Écrans) : aucun bouton ne sort de la fenêtre ;
+//   - bornes mesurées à 1 024 px sur l'onglet Code AVEC ses boutons optionnels (sélecteur de lentilles, Écrans) : aucun bouton ne sort de la fenêtre ;
 //   - infobulle : tout bouton d'en-tête sans `title` reprend son libellé (le viewer n'en pose pas sur « Parcours »), car sous 1 600 px il n'est plus qu'une icône ;
 //   - zoom en rangée au bord gauche, au-dessus de la pastille « Terminal » et de la barre de question, de 701 à 1 279 px (comme dès 1 280 px) ;
 //   - logo VibeFlow : le viewer inverse le logo clair du thème (il attend un logo blanc) ; nos deux logos ont déjà le bon contraste ;
@@ -26,7 +26,7 @@
     .brand .mark, :root[data-theme="light"] .brand .mark, :root[data-theme="light"] #madewith .mark { filter: none !important; }
     @media (min-width: 1280px), (min-width: 1000px) and (not (pointer: coarse)) {
       header { display: flex; grid-template-columns: none; }
-      header .hl { flex: 1 1 0; min-width: 342px; } /* P70-D-16 : marque 84 + écart 4 + marge des onglets 12 + onglets 196 (13 px, rail à 4 px, padding 12 px : 124 de texte, rail et écarts + 6 x 12) + écart 4 + remonter 36 = 336, borne gardée à 342 (6 de marge) : le plus étroit qui ne rogne ni les onglets ni « Remonter » (mesuré dans Chrome à 1 024 px, onglet Code avec Travail récent et Écrans, badge réduit à son point par P70-D-22) */
+      header .hl { flex: 1 1 0; min-width: 342px; } /* P70-D-16 : marque 84 + écart 4 + marge des onglets 12 + onglets 196 (13 px, rail à 4 px, padding 12 px : 124 de texte, rail et écarts + 6 x 12) + écart 4 + remonter 36 = 336, borne gardée à 342 (6 de marge) : le plus étroit qui ne rogne ni les onglets ni « Remonter » (mesuré dans Chrome à 1 024 px, onglet Code avec le sélecteur de lentilles et Écrans, badge réduit à son point par P70-D-22) */
       header .hc { flex: 0 1 400px; min-width: 200px; justify-content: stretch; }
       header .hr { flex: 1 1 0; min-width: min-content; }
       header .brand { flex: 0 6 auto; min-width: 84px; }
@@ -60,6 +60,7 @@
     .vf-hdr-groupe { display: flex; flex-direction: column; align-items: flex-start; gap: var(--sp-2); }
     .vf-hdr-groupe:not(:has(> .vf-hdr-rangee > :not([hidden]))) { display: none; }
     .vf-hdr-groupe + .vf-hdr-groupe { margin-inline-start: var(--sp-8); }
+    header[data-vf-serre] .vf-hdr-groupe + .vf-hdr-groupe { margin-inline-start: 0; }
     .vf-hdr-lib { font-size: 12px; line-height: 1; color: var(--text-3); padding-inline: var(--sp-4); white-space: nowrap; }
     .vf-hdr-rangee { display: flex; align-items: center; gap: var(--sp-4); }
     @media (min-width: 701px) and (max-width: 1639px) { header #vf-lock .dot { width: 16px; height: 16px; border-radius: 0; clip-path: var(--vf-sessions); } }
@@ -209,7 +210,8 @@
   // 80-20 (P80-D-53, P80-D-59) : trois groupes libellés dès 1 280 px. Les boutons sont DÉPLACÉS (jamais clonés : id, menu .rel et ordre relatif gardés) ;
   // un bouton posé plus tard rejoint son groupe par son id, sinon « Affichage ». Sous 1 280 px le rangement est défait (ordre et parents d'origine).
   // L'écouteur `change` vit dans le rappel de surOnglet.
-  const GROUPES = [['lire', 'Read', ['flows-btn', 'screens-btn', 'filters-btn', 'tour-btn']], ['suivre', 'Follow', ['btn-recent', 'btn-health', 'vf-lock']],
+  const GROUPES = [['lire', 'Read', ['flows-btn', 'screens-btn', 'filters-btn', 'tour-btn']],
+    ['suivre', 'Follow', ['btn-recent', 'btn-health', 'btn-synthese', 'vf-lock']], // 77 : Synthèse juste après Santé
     ['affichage', 'Display', ['btn-export', 'theme-toggle', 'btn-panel']]];
   const mq1280 = window.matchMedia('(min-width: 1280px)'), tr = window.__vfFrT || ((x) => x), extHdr = document.getElementById('hdr-ext');
   let origine = null; // [unité, parent d'origine] dans l'ordre du document, relevé avant son rangement
@@ -261,13 +263,22 @@
   const replie = () => {
     const badge = document.getElementById('vf-lock'); if (!badge || !hd) return;
     badge.removeAttribute('data-vf-point'); // on mesure avec le badge entier
+    hd.removeAttribute('data-vf-serre');
     if (!matchMedia('(min-width: 701px)').matches) return;
     if (fil) ajuste0();
     const dehors = [...hd.querySelectorAll('button')].some((b) => b.offsetWidth > 0 && (b.getBoundingClientRect().right > innerWidth + 0.5 || b.getBoundingClientRect().left < -0.5));
     if (dehors || hd.scrollWidth > innerWidth + 1 || (fil && fil.offsetWidth > 0 && fil.scrollWidth > fil.clientWidth + 1)) badge.setAttribute('data-vf-point', '');
   };
+  // Phase 80 : badge déjà au point et fil encore rogné (trois groupes de 80-20, « 99 au travail » + un bouton, 1 640 px) : l'écart entre groupes cède
+  const serrer = () => {
+    const badge = document.getElementById('vf-lock'); if (!badge || !hd || !mq1280.matches || !badge.hasAttribute('data-vf-point')) return;
+    if (fil) ajuste0();
+    const sorti = (x) => x.offsetWidth > 0 && (x.getBoundingClientRect().right > innerWidth + 0.5 || x.getBoundingClientRect().left < -0.5);
+    const rogne = fil && fil.offsetWidth > 0 && fil.scrollWidth > fil.clientWidth + 1;
+    if ([...hd.querySelectorAll('button')].some(sorti) || hd.scrollWidth > innerWidth + 1 || rogne) hd.setAttribute('data-vf-serre', '');
+  };
   if (colDroite && hd) {
-    let q = 0; replieRaf = () => { if (!q) q = requestAnimationFrame(() => { q = 0; ranger(); replie(); }); };
+    let q = 0; replieRaf = () => { if (!q) q = requestAnimationFrame(() => { q = 0; ranger(); replie(); serrer(); }); };
     new MutationObserver(replieRaf).observe(colDroite, { childList: true, characterData: true, subtree: true }); // création du badge, changement de son libellé, bouton ajouté
     window.addEventListener('resize', replieRaf); window.addEventListener('load', replieRaf); if (document.fonts?.ready) document.fonts.ready.then(replieRaf);
     replieRaf();

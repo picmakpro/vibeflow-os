@@ -355,10 +355,7 @@ const G = { nodes: [
   nd('ms-v3', { kind: 'milestone', label: 'v3', st: 'active', foot: '1 clos · 3 à faire · 25 %' }),
   nd('ph-1', { label: 'Phase 1 · Fondations', num: '1', st: 'done', parent: 'ms-v2', foot: '2/2 plans' }),
   nd('ph-72', { label: 'Phase 72 · Lancer le travail', num: '72', st: 'recette', parent: 'ms-v2', foot: 'à recetter · ' + foot72 }),
-  nd('ph-1.req', { kind: 'exigences', label: 'Exigences', st: 'active', parent: 'ph-1', foot: '1/2' }),
-], files: [
-  { p: 'req/AA-01', n: 'ph-1.req', name: 'AA-01', st: 'active', d: 'mot '.repeat(15) + 'centralisation de la suite' },
-], links: [], meta: { vf: { milestone: 'v2', phase: '72', status: 'ready_to_plan', lastActivity: '2026-11-05', milestones: [{ key: 'v2', id: 'n:ms-v2' }, { key: 'v3', id: 'n:ms-v3' }], drift: { nonComprisesN: 4, corrigeable: true, regles: [{ regle: 'ligne-non-comprise', n: 4 }, { regle: 'autre', n: 2 }], nonComprises: [{ fichier: '.planning/ROADMAP.md', ligne: 486, extrait: 'Une ligne qui ressemble à un champ mais qui n est pas lisible ' + 'x'.repeat(30) + 'gauche ensuite' }, { fichier: '.planning/REQUIREMENTS.md', ligne: 12, extrait: 'court' }] } } } };
+], files: [], links: [], meta: { vf: { milestone: 'v2', trace: { exigences: [{ id: 'AA-01', ws: null, coche: false, phase: '1', libelle: 'mot '.repeat(15) + 'centralisation de la suite' }] }, phase: '72', status: 'ready_to_plan', lastActivity: '2026-11-05', milestones: [{ key: 'v2', id: 'n:ms-v2' }, { key: 'v3', id: 'n:ms-v3' }], drift: { nonComprisesN: 4, corrigeable: true, regles: [{ regle: 'ligne-non-comprise', n: 4 }, { regle: 'autre', n: 2 }], nonComprises: [{ fichier: '.planning/ROADMAP.md', ligne: 486, extrait: 'Une ligne qui ressemble à un champ mais qui n est pas lisible ' + 'x'.repeat(30) + 'gauche ensuite' }, { fichier: '.planning/REQUIREMENTS.md', ligne: 12, extrait: 'court' }] } } } };
 fs.writeFileSync('$WORK/q18g.json', JSON.stringify(G));
 const H = JSON.parse(JSON.stringify(G)); H.meta.vf.drift = { nonComprisesN: 0, regles: [], nonComprises: [] }; fs.writeFileSync('$WORK/q18h.json', JSON.stringify(H));
 "
@@ -372,10 +369,10 @@ assert_eq "Q18.5 — la phase en recette ne répète pas « à recetter » dans 
 H locg "$SCRIPTS" "$WORK/q18g.json" "Que contient la phase 72 ?" > "$WORK/q18p.json"
 assert_eq "Q18.6 — la carte d'une phase en recette : « à recetter » une fois, pas « sans statut »" "$(H json "$WORK/q18p.json" "!/sans statut|recetter · à recetter/.test(j.answer)")" "true"
 H locg "$SCRIPTS" "$WORK/q18g.json" "Qu'est-ce qui est en cours ?" > "$WORK/q18c.json"
-assert_eq "Q18.7 — « en cours » : aucune exigence d'une phase faite" "$(H json "$WORK/q18c.json" "!j.answer.includes('ph-1.req') && !j.items.some((i) => i.id.includes('ph-1.req') || i.id.includes('req/AA-01'))")" "true"
+assert_eq "Q18.7 — « en cours » : aucune exigence d'une phase faite (les exigences n'ont plus de carte, 76-08)" "$(H json "$WORK/q18c.json" "!j.answer.includes('AA-01') && !j.items.some((i) => i.id.includes('req/'))")" "true"
 assert_eq "Q18.8 — « en cours » : les jalons en cours restent listés" "$(H json "$WORK/q18c.json" "j.answer.includes('[[n:ms-v3]]') && j.answer.includes('[[n:ms-v2]]')")" "true"
 H locg "$SCRIPTS" "$WORK/q18g.json" "Quelles sont les exigences de la phase 1 ?" > "$WORK/q18r.json"
-assert_eq "Q18.9 — témoin rouge/vert PU-G-147 : la coupe à 70 caractères ne laisse pas de mot tronqué (« centr »)" "$(H json "$WORK/q18r.json" '!/centr/.test(j.answer)')" "true"
+assert_eq "Q18.9 — témoin rouge/vert PU-G-147 : l'exigence est listée (lue dans meta.vf.trace) et la coupe à 70 caractères ne laisse pas de mot tronqué (« centr »)" "$(H json "$WORK/q18r.json" 'j.answer.includes("AA-01") && !/centr/.test(j.answer)')" "true"
 assert_eq "Q18.10 — la coupe à 90 caractères d'une note s'arrête sur un mot entier (« … mot… », jamais « … in… »)" "$(H json "$WORK/q18a.json" "(() => { const n = j.items.find((i) => i.id === 'n:ph-72').note; return n.endsWith(' mot…') })()")" "true"
 assert_eq "Q18.11 — une note coupée reste sous 90 caractères" "$(H json "$WORK/q18a.json" 'j.items.every((i) => i.note.length <= 90)')" "true"
 for fq in "qu'est-ce que ça veut dire, « lignes du planning non comprises » ?" "Pourquoi des lignes non comprises dans le planning ?" "C'est quoi les lignes non comprises ?"; do
@@ -392,12 +389,16 @@ assert_eq "Q18.17 — témoin de linéarité : 40 000 « ligne » sans « non co
 import { answerLocally } from '$SCRIPTS/vf-cockpit-ask.mjs';
 const t = Date.now(); answerLocally({ nodes: [], files: [], links: [], meta: { vf: {} } }, 'ligne '.repeat(40000) + 'x'); console.log(Date.now() - t < 2000);")" "true"
 
-# Q18.18 — PU-G-147 (recette du 2026-11-08) : le pied d'une exigence (sentence, 120 car.) se coupe au mot entier ; témoin rouge sur 82de0712 : « … puis avec le vr… »
-assert_eq "Q18.18 — la phrase d'une exigence coupée à 120 caractères ne finit pas dans un mot (« vr… » pour « vrai »), et reste sous 120" "$("$NODE" --input-type=module -e "
-import { sentence } from '$SCRIPTS/vf-cockpit-planning.mjs';
-const t = 'Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local.';
-const a = sentence(t, 120), mot = a.replace(/…\$/, '').split(' ').pop();
-console.log(a.endsWith('…') && a.length <= 120 && t.split(' ').includes(mot) && /\\S…\$/.test(a));")" "true"
+# Q18.18 — PU-G-147 (recette du 2026-11-08), 76-08 : le libellé d'une exigence servi dans meta.vf.trace.exigences (coupé à 220) se coupe au mot entier ; témoin rouge sur 82de0712 : « … puis avec le vr… »
+mkdir -p "$WORK/lab76q/.planning/phases/01-un"
+export TEXTE76Q="Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local. Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local."
+printf '# Roadmap\n\n- [ ] **Phase 1: Un** - a\n\n### Phase 1: Un\n**Goal**: but\n' > "$WORK/lab76q/.planning/ROADMAP.md"
+printf -- '- [ ] **LONG-01**: %s\n\n| LONG-01 | Phase 1 | Pending |\n' "$TEXTE76Q" > "$WORK/lab76q/.planning/REQUIREMENTS.md"
+printf '<objective>x</objective>\n' > "$WORK/lab76q/.planning/phases/01-un/01-01-PLAN.md"
+assert_eq "Q18.18 — le libellé d'exigence servi (meta.vf.trace) coupé à 220 caractères ne finit pas dans un mot, reste sous 220 et finit par un mot entier du texte" "$("$NODE" --input-type=module -e "
+import { buildProjectGraph } from '$SCRIPTS/vf-cockpit-project.mjs';
+const e = buildProjectGraph('$WORK/lab76q').meta.vf.trace.exigences[0], t = process.env.TEXTE76Q, a = e.libelle, mot = a.replace(/…\$/, '').split(' ').pop();
+console.log(a.endsWith('…') && a.length <= 220 && t.split(' ').includes(mot) && /\\S…\$/.test(a));")" "true"
 
 # Q18.19 à Q18.21 — PU-G-150 (recette du 2026-11-08) : la réponse « Format » répond aussi aux formulations naturelles et au mot du panneau (« Non lu »), sans capter une question sans rapport
 for fq in "Quelle est la commande pour corriger les lignes non comprises ?" "Quelles lignes du planning ne sont pas comprises ?" "Quelles lignes du planning ne sont pas lues ?" "Pourquoi les chiffres sont-ils peut-être incomplets ?" "Quelles lignes sont non lues ?"; do
@@ -415,8 +416,9 @@ done
 import fs from 'node:fs';
 const nd = (id, o) => ({ id, label: id, kind: 'phase', st: 'todo', parent: null, ...o });
 const bl = (n) => Array.from({ length: n }, (_, i) => ({ p: 'dag/' + i, n: 'ph-2', name: 'b' + i, st: 'blocked', d: 'x' }));
-const mk = (nb) => ({ nodes: [nd('ms-v2', { kind: 'milestone', label: 'v2', st: 'active' }), nd('ph-2', { label: 'Phase 2 · Deux', num: '2', st: 'active', parent: 'ms-v2' }), nd('ph-2.req', { kind: 'exigences', label: 'Exigences', st: 'active', parent: 'ph-2' })],
-  files: [...bl(nb), { p: 'req/B-01', n: 'ph-2.req', name: 'B-01', st: 'todo', d: 'un' }, { p: 'req/B-02', n: 'ph-2.req', name: 'B-02', st: 'todo', d: 'deux' }], links: [], meta: { vf: { milestone: 'v2', phase: '2' } } });
+const ex = (id, l) => ({ id, ws: null, coche: false, phase: '2', libelle: l });
+const mk = (nb) => ({ nodes: [nd('ms-v2', { kind: 'milestone', label: 'v2', st: 'active' }), nd('ph-2', { label: 'Phase 2 · Deux', num: '2', st: 'active', parent: 'ms-v2' })],
+  files: bl(nb), links: [], meta: { vf: { milestone: 'v2', phase: '2', trace: { exigences: [ex('B-01', 'un'), ex('B-02', 'deux')] } } } });
 fs.writeFileSync('$WORK/q19-1.json', JSON.stringify(mk(1))); fs.writeFileSync('$WORK/q19-4.json', JSON.stringify(mk(4)));"
 H locg "$SCRIPTS" "$WORK/q19-4.json" "Qu'est-ce qui bloque ?" > "$WORK/q19a.json"
 H locg "$SCRIPTS" "$WORK/q19-1.json" "Qu'est-ce qui bloque ?" > "$WORK/q19b.json"
@@ -443,10 +445,11 @@ const g = buildProjectGraph('$WORK/lab20'), f = g.files.find((x) => x.name.start
 const obj = 'Scaffolder le monorepo, le packaging et la chaîne de construction afin de livrer une première version installable et lisible';
 const part = f.name.split(' — ').slice(1).join(' — '), tete = part.replace(/…\$/, '');
 console.log(part.endsWith('…') && part.length <= 70 && obj.startsWith(tete) && obj[tete.length] === ' ');")" "true"
-assert_eq "Q20.2 — R1 : la coupe du pied d'exigence et celle du nom sont la MÊME fonction (clip = clipMot sur 5 longueurs)" "$("$NODE" --input-type=module -e "
+assert_eq "Q20.2 — R1 : la coupe du libellé d'exigence servi (meta.vf.trace) et celle du nom sont la MÊME fonction (clip = clipMot sur 5 longueurs ; libellé servi = clip(texte, 220))" "$(TEXTE76Q="$TEXTE76Q" "$NODE" --input-type=module -e "
 import { clip, clipMot } from '$SCRIPTS/vf-cockpit-planning.mjs';
-const t = 'un deux trois quatre cinq six sept huit neuf dix onze douze';
-console.log([5, 12, 20, 33, 80].every((n) => clip(t, n) === clipMot(t, n)));")" "true"
+import { buildProjectGraph } from '$SCRIPTS/vf-cockpit-project.mjs';
+const t = 'un deux trois quatre cinq six sept huit neuf dix onze douze', e = buildProjectGraph('$WORK/lab76q').meta.vf.trace.exigences[0];
+console.log([5, 12, 20, 33, 80].every((n) => clip(t, n) === clipMot(t, n)) && e.libelle === clip(process.env.TEXTE76Q, 220));")" "true"
 assert_eq "Q20.3 — R3 : une coupe qui tombe exactement sur une espace garde le mot entier avant elle (« aaaa bbbb… »), une coupe dans un mot le retire (« aaaa… »)" "$("$NODE" --input-type=module -e "
 import { clipMot } from '$SCRIPTS/vf-cockpit-planning.mjs';
 console.log(clipMot('aaaa bbbb cccc', 10) + '|' + clipMot('aaaa bbbbb', 9));")" "aaaa bbbb…|aaaa…"
@@ -477,6 +480,35 @@ import { sentence } from '$SCRIPTS/vf-cockpit-build.mjs';
 const t = 'Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local.';
 const a = sentence(t, 120), mot = a.replace(/…\$/, '').split(' ').pop();
 console.log(a.endsWith('…') && a.length <= 120 && t.split(' ').includes(mot));")" "true"
+
+# Q76.1 (76-08, P76-D-25) : les exigences n'ont plus de carte ; le chat local les lit dans meta.vf.trace.exigences et ne cite que des cartes qui existent
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const ph = { id: 'ph-1', label: 'Phase 1 · Socle', kind: 'phase', num: '1', st: 'active', parent: 'ms-v1', foot: '0/1 exigences' };
+const G = { nodes: [{ id: 'ms-v1', label: 'v1', kind: 'jalon', st: 'active', parent: null }, ph], files: [], links: [],
+  meta: { vf: { milestone: 'v1', phase: '1', trace: { exigences: [{ id: 'REQ-01', ws: null, coche: false, phase: '1', libelle: 'Première exigence du socle' }] } } } };
+fs.writeFileSync('$WORK/q76g.json', JSON.stringify(G));"
+H locg "$SCRIPTS" "$WORK/q76g.json" "REQ-01 ?" > "$WORK/q76a.json"
+assert_eq "Q76.1 — « REQ-01 ? » : réponse locale qui nomme REQ-01, sa case (« non cochée ») et la carte de sa phase [[n:ph-1]] ; chaque items[].id existe dans le graphe" \
+  "$(H json "$WORK/q76a.json" "j !== null && [j.engine, j.answer.includes('REQ-01'), j.answer.includes('non cochée'), j.answer.includes('[[n:ph-1]]'), j.items.length > 0 && j.items.every((i) => i.id === 'n:ph-1')].join()")" "local,true,true,true,true"
+
+# Q76.2 (76-08) : la consigne de l'agent ne parle plus d'un nœud ni d'une carte d'exigence ; « reste » ne liste aucun élément req/
+assert_eq "Q76.2 — instructions(G) : ni « .req » ni « f:req/ », et la phrase « meta.vf.trace.exigences » ; « Qu'est-ce qui reste dans le jalon ? » ne liste aucun élément req/" "$("$NODE" --input-type=module -e "
+import fs from 'node:fs';
+import { instructions } from '$SCRIPTS/vf-cockpit-ask.mjs';
+const G = JSON.parse(fs.readFileSync('$WORK/q76g.json', 'utf8')), i = instructions({ ...G, project: { name: 'x' } });
+console.log([!/\\.req|f:req\\//.test(i), i.includes('meta.vf.trace.exigences')].join());")|$(H locg "$SCRIPTS" "$WORK/q76g.json" "Qu'est-ce qui reste dans le jalon ?" | "$NODE" -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);console.log(j!==null&&j.engine==='local'&&!j.items.some(i=>i.id.includes('req/'))&&j.items.length>0)})")" "true,true|true"
+
+# Q76.3 (revue finale M2) : la jumelle d'archive (ws '*', sans phase) d'une exigence vivante de même identifiant n'est pas une exigence distincte
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const G = JSON.parse(fs.readFileSync('$WORK/q76g.json', 'utf8'));
+G.meta.vf.trace.exigences.push({ id: 'REQ-01', ws: '*', coche: true, phase: null, libelle: 'jumelle d archive' }, { id: 'ARC-01', ws: '*', coche: true, phase: null, libelle: 'archive seule' });
+fs.writeFileSync('$WORK/q76j.json', JSON.stringify(G));"
+H locg "$SCRIPTS" "$WORK/q76j.json" "REQ-01 ?" > "$WORK/q76b.json"
+H locg "$SCRIPTS" "$WORK/q76j.json" "ARC-01 ?" > "$WORK/q76c.json"
+assert_eq "Q76.3 — « REQ-01 ? » avec une jumelle d'archive : UNE exigence (réponse de l'exigence vivante, pas « 2 exigences … une par compartiment ») ; témoin : une exigence d'archive seule reste répondue" \
+  "$(H json "$WORK/q76b.json" "j !== null && !j.answer.includes('une par compartiment') && j.answer.includes('non cochée') && j.answer.includes('[[n:ph-1]]')")|$(H json "$WORK/q76c.json" "j !== null && j.answer.includes('ARC-01')")" "true|true"
 
 vf_hyg_assert
 echo ""

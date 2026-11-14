@@ -11,6 +11,11 @@ import { executer, pause } from './chrome-session.mjs';
 import { SONDE } from './coquille-sonde.mjs';
 
 const [, , mode, chrome, ...args] = process.argv;
+// la visite du premier passage s'ouvre d'elle-même ~700 ms après « ready » (40-tour.js : « tour-seen », 75-vf-modele.js : « vibeflow-cockpit:visite ») : selon la charge elle tombe avant ou
+// après un relevé et ajoute des nœuds, un attribut de <html> et des observateurs au document comparé (C6, C8 : ids, balises, attrsHtml, vivants). Ces clés sont lues comme posées.
+const SANS_VISITE = "(() => { const g = Storage.prototype.getItem; Storage.prototype.getItem = function (k) {"
+  + " const vue = typeof k === 'string' && (k.indexOf('floorplan:tour-seen:') === 0 || k.indexOf('vibeflow-cockpit:visite:') === 0);"
+  + " return vue ? 'true' : g.call(this, k); }; })()";
 const SOMMAIRE = `(() => { const V = window.VibeFlow; return { tab: V?.graph?.meta?.vfTab ?? null, layout: !!V?.state?.layout, noeuds: V?.graph?.nodes?.length ?? null,
   vus: (V?.graph?.nodes || []).map((n) => n.id + '|' + (n.st || '')), onglet: window.VF_COQUILLE?.onglet?.() ?? null, pret: document.documentElement.dataset.vfPret ?? null, titre: document.title, etat: window.VF_COQUILLE?.etat?.() ?? null }; })()`;
 
@@ -29,7 +34,7 @@ if (mode === 'charger') {
   const [url, fichier] = args; const corps = fs.readFileSync(fichier, 'utf8');
   const entete = corps.split('\n').slice(0, 6), amorce = entete.filter((l) => l.startsWith('// amorce: ')).map((l) => l.slice(11)).join('\n');
   await executer(chrome, async (s) => {
-    await s.send('Page.addScriptToEvaluateOnNewDocument', { source: SONDE + '\n' + amorce });
+    await s.send('Page.addScriptToEvaluateOnNewDocument', { source: SANS_VISITE + ';\n' + SONDE + '\n' + amorce });
     await s.send('Network.enable'); await s.send('Runtime.enable');
     const reseau = [], erreurs = [];
     s.ecouter('Runtime.exceptionThrown', (p) => erreurs.push(String(p.exceptionDetails?.exception?.description || p.exceptionDetails?.text).slice(0, 200)));

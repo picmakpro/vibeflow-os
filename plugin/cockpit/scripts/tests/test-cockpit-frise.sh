@@ -481,7 +481,8 @@ assert_eq "F7.0 — agents-table exporte ses cinq noms ; collectWho appelle surA
 # mesures de l'ancien chemin : une lecture du transcript volumineux sur la boucle
 DUREE_LECTURE="$(ag_node duree "$SCRIPTS" "$AGLAB" "$AGHOME" big1)"
 echo "  (durée d'une lecture de $(du -k "$AGHOME/.claude/projects/-lab/sess-ag-0001/subagents/agent-big1.jsonl" | cut -f1) Kio sur la boucle, ancien chemin : ${DUREE_LECTURE} ms)"
-assert_ge "F7.4a — la fixture volumineuse est assez lourde : une lecture sur la boucle dure au moins 100 ms (la fixture se règle sur la mesure, jamais le seuil : VF_AGENTS_MIO)" "${DUREE_LECTURE:-0}" 100
+OCTETS_BIG1="$(wc -c < "$AGHOME/.claude/projects/-lab/sess-ag-0001/subagents/agent-big1.jsonl" | tr -d ' ')"
+assert_ge "F7.4a — la fixture volumineuse est assez lourde : le transcript big1 pèse au moins 8 Mio (8 388 608 octets), taille fixée et mesurée, jamais une durée de lecture qui dépend de la vitesse du poste (la fixture se règle par VF_AGENTS_MIO, jamais le seuil)" "${OCTETS_BIG1:-0}" 8388608
 
 # F7.2b — la borne de la table (en processus), puis son mutant
 B_SAIN="$(ag_node borne "$COPIE")"; echo "$B_SAIN" > "$WORK/ag-borne.json"

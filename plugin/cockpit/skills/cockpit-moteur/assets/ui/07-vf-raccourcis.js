@@ -63,7 +63,7 @@
   const TOUS = NOMS, PR = ['projet'], PARTOUT = 'Partout', LA_CARTE = 'La carte', COULOIRS = 'Projet : couloirs et liste';
   const L_QUESTION = 'Poser une question à l\'agent', TEXTE_TERMINAL = 'Le terminal s\'active avec --terminal';
   def('rechercher', PARTOUT, TOUS, '/ ou ⌘K', 'Rechercher');
-  def('aide', PARTOUT, TOUS, '?', 'Afficher les raccourcis', P(aide, 8));
+  def('aide', PARTOUT, TOUS, '?', 'Afficher les raccourcis', { ...P(aide, 8, () => !!window.VF_AIDE), avant: true });
   def('git', PARTOUT, TOUS, 'G', 'Ouvrir l\'historique Git', P(git, 7, () => !!window.VFGitTiroir));
   def('echap', PARTOUT, TOUS, 'Échap', 'Fermer ou remonter d\'un cran');
   def('tab', PARTOUT, TOUS, 'Tab', 'Zone suivante');
@@ -91,14 +91,30 @@
   // P80-D-55 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) : texte constant, aucune action, rien lu sur le terminal
   def('terminal', PARTOUT, TOUS, null, TEXTE_TERMINAL, { palette: true, info: true });
   const copie = (e) => Object.freeze({ ...e, onglets: Object.freeze(e.onglets.slice()) });
+  // ajouter : une entrée valide est copiée champ par champ (liste fermée) ; un champ facultatif invalide est neutralisé, une entrée invalide refusée,
+  // chaque cas avec un console.error : une entrée d'extension ne retire ni ne casse jamais les actions natives
+  const refus = (m) => { console.error('VF_RACCOURCIS.ajouter : ' + m); return () => {}; };
   const ajouter = (e) => {
-    const ok = e && typeof e === 'object' && typeof e.id === 'string' && e.id && !entrees.some((x) => x.id === e.id)
-      && typeof e.libelle === 'string' && e.libelle && Array.isArray(e.onglets) && e.onglets.every((o) => NOMS.includes(o))
-      && (e.touche === null || typeof e.touche === 'string') && (e.action == null || typeof e.action === 'function');
-    if (!ok) return () => {};
-    const x = { groupe: PARTOUT, touche: null, action: null, palette: false, ...e, onglets: e.onglets.slice() };
+    if (!e || typeof e !== 'object') return refus('entrée absente');
+    if (typeof e.id !== 'string' || !e.id) return refus('id manquant');
+    if (entrees.some((x) => x.id === e.id)) return refus('id déjà pris : ' + e.id);
+    if (typeof e.libelle !== 'string' || !e.libelle) return refus('libellé manquant : ' + e.id);
+    if (!Array.isArray(e.onglets) || !e.onglets.length || !e.onglets.every((o) => NOMS.includes(o))) return refus('onglets invalides : ' + e.id);
+    if (e.touche != null && typeof e.touche !== 'string') return refus('touche invalide : ' + e.id);
+    if (e.action != null && typeof e.action !== 'function') return refus('action invalide : ' + e.id);
+    const x = { id: e.id, groupe: PARTOUT, onglets: e.onglets.slice(), touche: e.touche == null ? null : e.touche, libelle: e.libelle, action: e.action ||
+        null, palette: false };
+    if (typeof e.groupe === 'string' && e.groupe) x.groupe = e.groupe;
+        else if (e.groupe !== undefined) console.error('VF_RACCOURCIS.ajouter : groupe ignoré : ' + e.id);
+    if (e.palette === true && (x.action || e.info === true)) x.palette = true;
+    else if (e.palette !== undefined && e.palette !== false) console.error('VF_RACCOURCIS.ajouter : palette ignorée (sans action) : ' + e.id);
+    if (typeof e.visible === 'function') x.visible = e.visible;
+        else if (e.visible !== undefined) console.error('VF_RACCOURCIS.ajouter : visible ignoré : ' + e.id);
+    if (Number.isInteger(e.usuelle) && e.usuelle >= 1 && e.usuelle <= 8) x.usuelle = e.usuelle;
+        else if (e.usuelle !== undefined) console.error('VF_RACCOURCIS.ajouter : usuelle ignorée : ' + e.id);
+    for (const k of ['info', 'libre', 'avant']) if (e[k] === true) x[k] = true;
     entrees.push(x);
-    return () => { const i = entrees.indexOf(x); if (i >= 0) entrees.splice(i, 1); };
+    return () => { const k = entrees.indexOf(x); if (k >= 0) entrees.splice(k, 1); };
   };
   window.VF_RACCOURCIS = Object.freeze({
     entrees: (o) => entrees.filter((e) => o === undefined || e.onglets.includes(o)).map(copie),
@@ -114,7 +130,9 @@
   };
   const rang = (e) => (e.usuelle ? e.usuelle : 100);
   const sourceActions = (c) => {
-    const o = onglet(), liste = entrees.filter((e) => e.palette && e.onglets.includes(o) && (!e.visible || e.visible()));
+    const o = onglet(), vu = (e) => { try { return !e.visible || !!e.visible(); } catch (x) { console.error('VF_RACCOURCIS : visible() a levé : ' + e.id);
+        return false; } };
+    const liste = entrees.filter((e) => e.palette && e.onglets.includes(o) && vu(e));
     const gardes = liste.filter((e) => (c.vide ? (c.actions ? !e.info : !!e.usuelle) : accepte(e, c)));
     return gardes.sort((a, b) => rang(a) - rang(b)).map((e) => ({ groupe: 'actions', titre: 'Actions', id: e.id, libelle: e.libelle,
       touches: e.touche && !e.info ? [e.touche.split(' ou ')[0]] : [], icone: ICONES[e.id] || 'right', info: !!e.info, avant: !!e.avant,

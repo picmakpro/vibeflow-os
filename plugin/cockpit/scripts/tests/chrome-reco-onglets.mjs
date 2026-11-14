@@ -14,6 +14,9 @@ await executer(chrome, async (s) => {
   await s.attendre('!!(window.__vfLive && window.__vfLive.connected) && window.VF_FLUX.role() !== null', 'onglet 1 connecté');
   await o2.attendre('!!(window.__vfLive && window.__vfLive.connected) && window.VF_FLUX.role() !== null', 'onglet 2 connecté');
   const roles = [await s.ev('window.VF_FLUX.role()'), await o2.ev('window.VF_FLUX.role()')];
+  // sous charge, la coquille peut ne pas avoir posé la pastille quand le serveur s'arrête : la mesure N5.1 l'attend dans les deux onglets (N5.1)
+  await s.attendre("!!document.getElementById('vf-lock')", 'pastille #vf-lock de l\'onglet 1');
+  await o2.attendre("!!document.getElementById('vf-lock')", 'pastille #vf-lock de l\'onglet 2');
   process.kill(Number(pid), 'SIGTERM');
   const t0 = Date.now(); const tOff = [null, null];
   while (Date.now() - t0 < 10000 && tOff.includes(null)) {

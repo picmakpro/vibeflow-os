@@ -41,7 +41,8 @@ await executer(chrome, async (s) => {
   await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `(${espion.toString()})()` });
   const charger = async (page, base = racine) => {
     await s.naviguer(`${base}/${page}?lang=en`); await s.attendre(PRET, `page prête (${page})`);
-    await s.attendre("!!document.querySelector('#viewport .node')", `cartes (${page})`);
+    // 73 : sur l'onglet Équipe la régie est montée (body.vf-regie-montee) et remplace les cartes : la page est prête quand l'un OU l'autre est là
+    await s.attendre("!!document.querySelector('#viewport .node') || (document.body.classList.contains('vf-regie-montee') && !!document.querySelector('section#vf-equipe'))", `cartes ou régie (${page})`);
     await pause(1300); // la visite guidée démarre seule 700 ms après `ready` au premier passage : on la laisse venir, puis Échap la ferme
     if (!o.auto) {
       o.auto = JSON.parse(await s.ev(`JSON.stringify({ actif: !!(window.VibeFlowTour && window.VibeFlowTour.active()),

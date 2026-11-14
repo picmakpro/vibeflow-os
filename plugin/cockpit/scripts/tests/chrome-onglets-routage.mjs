@@ -8,7 +8,7 @@ import vm from 'node:vm';
 import { executer, pause, stabiliser } from './chrome-session.mjs';
 const [, , chrome, racine, mode, fichier, filtre] = process.argv;
 const SEL = filtre ? new Set(filtre.split(',')) : null;
-const AMORCE = `(() => { const A = window.__o = { pop: 0, push: 0, repl: 0, fetchs: [], directs: 0, evs: [], rej: 0, echec: 0, cerr: [] };
+const AMORCE = `(() => { const A = window.__o = { pop: 0, push: 0, repl: 0, fetchs: [], ong: {}, directs: 0, evs: [], rej: 0, echec: 0, cerr: [] };
   const ce = console.error; console.error = function (...a) { A.cerr.push(String(a[0]).slice(0, 120)); return ce.apply(this, a); };
   const ael = EventTarget.prototype.addEventListener;
   EventTarget.prototype.addEventListener = function (t, ...r) {
@@ -16,7 +16,7 @@ const AMORCE = `(() => { const A = window.__o = { pop: 0, push: 0, repl: 0, fetc
   for (const k of ['pushState', 'replaceState']) { const o = History.prototype[k];
     History.prototype[k] = function (...a) { A[k === 'pushState' ? 'push' : 'repl']++; return o.apply(this, a); }; }
   const f = window.fetch;
-  window.fetch = function (u, ...r) { if (String(u).includes('/api/vf/graphe')) { A.fetchs.push(String(u));
+  window.fetch = function (u, ...r) { if (String(u).includes('/api/vf/graphe')) { A.fetchs.push(String(u)); const m = /onglet=([a-z]+)/.exec(String(u)); if (m) A.ong[m[1]] = (A.ong[m[1]] || 0) + 1;
     if (/00-vf-onglets/.test(new Error().stack)) A.directs++;
     if (A.echec) return Promise.reject(new TypeError('forcé')); } return f.call(this, u, ...r); };
   addEventListener('unhandledrejection', () => A.rej++);
@@ -26,7 +26,7 @@ const SANS_VISITE = "(() => { const g = Storage.prototype.getItem; Storage.proto
   + " return vue ? 'true' : g.call(this, k); }; })()";
 const ETAT = `({ p: location.pathname, h: location.hash, n: history.length, t: document.title, o: performance.timeOrigin,
   pret: document.documentElement.dataset.vfPret, evs: __o.evs.length, last: __o.evs[__o.evs.length - 1] || null, push: __o.push, repl: __o.repl,
-  fetchs: __o.fetchs.length, rej: __o.rej, directs: __o.directs, sel: VibeFlow.state.selected, cont: VibeFlow.state.container, tk: VibeFlow.state.t,
+  fetchs: __o.fetchs.length, ong: Object.assign({}, __o.ong), rej: __o.rej, directs: __o.directs, sel: VibeFlow.state.selected, cont: VibeFlow.state.container, tk: VibeFlow.state.t,
   git: (document.querySelector('#vf-git-ligne') || { getAttribute: () => null }).getAttribute('aria-expanded'),
   live: (document.querySelector('.vp-status') || document.getElementById('ask-live') || {}).textContent || '', ae: (() => { const a = document.activeElement;
     return !a ? null : a === document.body ? 'body' : a.id || (a.dataset && a.dataset.id) || (a.closest && a.closest('svg') ? 'carte' : a.tagName); })() })`;
@@ -148,7 +148,11 @@ await executer(chrome, async (s) => {
         n: history.length, push: __o.push }); })()`));
       const bad = JSON.parse(await s.ev(`(async () => { const rs = []; for (const x of ['vf-x', '', '#a b', '#' + 'x'.repeat(1024), 7])
         rs.push(await VF_ONGLETS.aller('projet', { fragment: x }).then(() => 'ok', () => 'rejet')); return JSON.stringify(rs); })()`));
-      o.og211 = { r, bad, e0, apres: await etat() };
+      const apres = await etat();
+      // témoin du compteur : un GET de plus vers l'onglet cible s'y compte, un GET vers un autre onglet non
+      await s.ev(`fetch('/api/vf/graphe?onglet=projet').catch(() => 0)`); const ap = await etat();
+      await s.ev(`fetch('/api/vf/graphe?onglet=equipe').catch(() => 0)`); const te = await etat();
+      o.og211 = { r, bad, e0, apres, temoin: [ap.ong.equipe || 0, te.ong.equipe || 0] };
     });
     await sec('og212', async () => {
       const av = await etat(); const r0 = av.repl; const e = await retour('history.back()', (await lire('__o.evs.length')) + 1);
@@ -191,6 +195,54 @@ await executer(chrome, async (s) => {
       await s.ev(`(() => { VF_ONGLETS.aller('equipe').catch(() => 0); history.back(); })()`);
       await s.attendre('__o.evs.length >= 4', 'deux arrivées'); await pause(800);
       o.og217 = { ...(await etat()), onglet: await lire('VF_COQUILLE.onglet()') };
+    });
+  }
+
+  if (mode === 'og218') { // palette ouverte puis fermée par Échap, puis aller : la promesse se règle et la page répond (bornes : un gel ne gèle pas la suite)
+    const borne = (p, ms = 8000) => Promise.race([p, pause(ms).then(() => 'gel')]);
+    const touche = async (key, code, vk, text, modifiers = 0) => {
+      for (const type of ['keyDown', 'keyUp']) {
+        const txt = text && type === 'keyDown' ? { text } : {};
+        await s.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, modifiers, ...txt });
+      }
+    };
+    await sec('og218', async () => {
+      o.og218 = [];
+      const cas = [['/', '/', 'projet'], ['/', 'k', 'equipe'], ['/project.html?vue=couloirs', '/', 'code'], ['/equipe.html', 'k', 'projet']];
+      for (const [depart, ouvrir, cible] of cas) {
+        await charger(depart); await s.ev('document.body.focus()');
+        if (ouvrir === 'k') await touche('k', 'KeyK', 75, 'k', 2); else await touche('/', 'Slash', 191, '/');
+        await pause(500); const ouverte = await lire(`document.getElementById('palette').classList.contains('open')`);
+        await touche('Escape', 'Escape', 27); await pause(500);
+        const attente = `new Promise((ok) => setTimeout(() => ok('attente'), 5000))`;
+        const aller = `VF_ONGLETS.aller('${cible}').then(() => 'regle', () => 'rejet')`;
+        const r = await borne(s.ev(`(async () => JSON.stringify(await Promise.race([${aller}, ${attente}])))()`), 12000);
+        const vivante = await borne(s.ev('1 + 1'), 5000);
+        o.og218.push({ depart, ouvrir, cible, ouverte, r: typeof r === 'string' ? JSON.parse(r) : r, vivante });
+        if (o.og218[o.og218.length - 1].vivante === 'gel') break;
+      }
+    });
+  }
+
+  if (mode === 'og218d') { // variante D de p14 : « / », « > » (actions), Échap, puis aller IMMÉDIATEMENT ; promesse et page se mesurent à part
+    const borne = (p, ms) => Promise.race([p, pause(ms).then(() => 'gel')]);
+    const touche = async (key, code, vk, text) => {
+      for (const type of ['keyDown', 'keyUp']) {
+        const txt = text && type === 'keyDown' ? { text } : {};
+        await s.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, ...txt });
+      }
+    };
+    await sec('og218d', async () => {
+      await charger('/index.html'); await s.ev('document.body.focus()'); await touche('/', 'Slash', 191, '/');
+      const prete = `document.getElementById('palette').classList.contains('open') && document.activeElement && document.activeElement.id === 'search'`;
+      await s.attendre(prete, 'palette et #search');
+      await s.send('Input.insertText', { text: '>' });
+      await stabiliser(() => s.ev(`document.getElementById('results').innerHTML.length`), { pas: 150, max: 4000 });
+      await touche('Escape', 'Escape', 27);
+      const attente = s.ev(`(async () => { await VF_ONGLETS.aller('projet'); return 'regle'; })()`);
+      const vivante = await borne(s.ev('1 + 1'), 5000); // lu PENDANT l'attente de la promesse
+      const r = await borne(attente, 15000);
+      o.og218d = { r, vivante, p: await borne(s.ev('location.pathname'), 3000) };
     });
   }
 

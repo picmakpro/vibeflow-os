@@ -77,11 +77,11 @@ const CORPUS = ['Calls · 3', 'up ·', '3 calls', '1 call', 'Show 2 changes', '1
   'Claude Code and GSD', '3 files and endpoints still use generated names: they are named after their file, with no description. To describe them, run this command again.', 'Press Play to follow it through the code, one step at a time.',
   'It also relies on Stripe and Postgres. They sit at the edge of the map; the lines show which parts talk to them.', 'Replay this tour any time from', 'at the top.', 'the tour button (icon)', 'There is no tour for the Team tab', 'A one-minute tour of this project',
   'Answers come from the Claude Code CLI on this computer, which can read the source', 'Nothing stood out. This is a quick automatic check, not a full Anthropic review.',
-  'Inside kpi-analyst', 'Updated 3 minutes ago', 'Recent work: Recent work', '2×click', 'right-click', 'click'];
+  'Inside kpi-analyst', 'Updated 3 minutes ago', 'Health: Health', '2×click', 'right-click', 'click'];
 const jugement = (e) => { const o = tr(e); if (o == null || o === e) return `non traduit : [${e}]`; const pb = [TEMOINS.test(o) && `mot anglais « ${(TEMOINS.exec(o) || [])[0]} »`, ...FAUTES.map(([re, nom]) => re.test(o) && nom)].filter(Boolean); return pb.length ? `[${e}] → [${o}] : ${pb.join(', ')}` : 'ok'; };
 const f11 = CORPUS.map(jugement);
 // recette 2026-11-04 (juge Playwright, P70-D-04) : formes exactes ; l'ordre des gabarits ne doit pas faire revenir « il y a 3 mis à jour minutes »
-const suite = [tr('Updated 3 minutes ago'), tr('Inside kpi-analyst'), tr('Inside equipe-produit'), tr('Recent work: Recent work'), tr('2×click'), tr('right-click'), tr('Top of the world'), tr('click')];
+const suite = [tr('Updated 3 minutes ago'), tr('Inside kpi-analyst'), tr('Inside equipe-produit'), tr('Health: Health'), tr('2×click'), tr('right-click'), tr('Top of the world'), tr('click')];
 // lot Langue (rcm lot 4, 2026-11-06) : formes lues par le panel — LG1 anglais résiduel, LG2 libellés reformulés
 const lg = ['Readme and 7 more', 'A, B and 1 more', 'You asked: foo', 'You asked:', 'Exported Nov 5, 2026', 'Unassigned', 'Everything behind /products/:id', 'The screen itself', '9 connections.', '1 connection.', 'Calls connection', '115 files · 48k lines', '1.3k lines', '1 lines', 'Changed · Phase 61', '10 changed', '1 changed', 'Matched by', 'more', 'Back to map', 'Nothing stood out. This is a quick automatic check, not a full security review.', '10 changed inside · Phase 61', "Qu'est-ce qui bloque ?", "Qu'est-ce qui est en cours ?"].map((e) => tr(e));
 console.log(JSON.stringify({ mauvaisGabarits, f11, suite, lg, svc: [code.__vfFrType('service'), code.__vfFrType('Service')], corpus: CORPUS, inventaire: inv.length, liste: inv, dict: Object.keys(dico).length, motifs: code.__vfFrTraduire.motifs, gabarits: code.__vfFrTraduire.gabarits, exclusions: excl.length,
@@ -167,7 +167,10 @@ done
 echo "[F13] recette 2026-11-04 : durée, en-tête de carte, doublon de fil d'Ariane, indications de souris (P70-D-04)"
 assert_eq "F13.1 : « Updated 3 minutes ago » → la durée n'est pas coupée (« Mis à jour il y a 3 minutes »)" "$(lire "$WORK/m.json" 'j.suite[0]')" "Mis à jour il y a 3 minutes"
 assert_eq "F13.2 : « Inside <nom du lab> » → « Dans <nom> », le nom du lab reste intact" "$(lire "$WORK/m.json" 'j.suite.slice(1,3)')" '["Dans kpi-analyst","Dans equipe-produit"]'
-assert_eq "F13.3 : « Recent work: Recent work » (fil d'Ariane) ne dit qu'une fois « Travail récent »" "$(lire "$WORK/m.json" 'j.suite[3]')" "Travail récent"
+assert_eq "F13.3 : « Health: Health » (fil d'Ariane) ne dit qu'une fois « Santé »" "$(lire "$WORK/m.json" 'j.suite[3]')" "Santé"
+# 75-09c (Q13) : plus d'entrée de dictionnaire pour la couche retirée (aucune entrée orpheline : un faux « non traduit » ou un reste mort)
+RB="Recent"; RB="$RB work"; RC="Changed"; RC="$RC@pastille"
+assert_eq "Q13.1 — aucun dictionnaire du chrome ne porte d'entrée de la couche retirée (titre, bascule, « à l'intérieur », pastille)" "$(grep -c -E "'$RB'|'Highlight $RB'|\"$RB inside\"|\"$RC\"" "$SCRIPTS"/../skills/cockpit-moteur/assets/ui/7[89]-vf-fr-dict-*.js | awk -F: '{n+=$NF} END {print n+0}')" "0"
 assert_eq "F13.4 : indications de souris « 2×click », « right-click », « click » en français" "$(lire "$WORK/m.json" '[...j.suite.slice(4,6), j.suite[7]]')" '["2×clic","clic droit","clic"]'
 assert_eq "F13.5 : le gabarit libre « Inside {} » n'abîme pas une autre donnée (« Top of the world » reste intacte)" "$(lire "$WORK/m.json" 'j.suite[6]')" "null"
 
@@ -244,7 +247,7 @@ const [, , page, mode] = process.argv; // mode : essai (table d'essai posée par
 const html = fs.readFileSync(page, 'utf8');
 const blocs = [...html.matchAll(/<script>(?:\/\* ui\/[\w.-]+ \*\/\s*)?\/\/ vibeflow:fr[\s\S]*?<\/script>/g)].map((m) => m[0].replace(/^<script>|<\/script>$/g, ''));
 const moteur = blocs.find((b) => /__vfFrTraduire\s*=/.test(b));
-const ESSAI = { Hello: 'Bonjour', '{} call': '{} appel|{} appels', 'Nothing stood out. This is a quick automatic check, not a full {} review.': "Rien de saillant. C'est un contrôle automatique rapide, pas une revue complète de {}.", Changed: 'Touché', 'Changed@pastille': 'Récent', lines: 'lignes' };
+const ESSAI = { Hello: 'Bonjour', '{} call': '{} appel|{} appels', 'Nothing stood out. This is a quick automatic check, not a full {} review.': "Rien de saillant. C'est un contrôle automatique rapide, pas une revue complète de {}.", Changed: 'Touché', 'Changed@pastille': 'Nouveau', lines: 'lignes' };
 function monde(tab, anglais, essai) {
   const noop = () => {}; const el = () => ({ style: {}, textContent: '', appendChild: noop, setAttribute: noop, getAttribute: () => null, querySelectorAll: () => [], closest: () => null });
   const ctx = { console, URLSearchParams, location: { search: anglais ? '?lang=en' : '' }, performance: { now: () => 0 }, NodeFilter: { SHOW_TEXT: 4 }, requestAnimationFrame: noop, MutationObserver: class { observe() {} }, document: { documentElement: {}, head: el(), body: el(), title: '', createElement: el, querySelector: () => el(), createTreeWalker: () => ({ nextNode: () => null }) } };
@@ -380,7 +383,7 @@ assert_eq "F19.1 : __vfFrT est une fonction" "$(lire "$WORK/t19e.json" 'j.foncti
 assert_eq "F19.2 : clé exacte (« Hello » : « Bonjour »)" "$(lire "$WORK/t19e.json" 'j.cle')" "Bonjour"
 assert_eq "F19.3 : variables et formes (« {} call » : 1 appel, 3 appels)" "$(lire "$WORK/t19e.json" 'j.formes')" '["1 appel","3 appels"]'
 assert_eq "F19.4 : élision et contraction de « de » devant la variable (d'Anthropic, du CLI)" "$(lire "$WORK/t19e.json" 'j.liaison')" '["Rien de saillant. C'"'"'est un contrôle automatique rapide, pas une revue complète d'"'"'Anthropic.","Rien de saillant. C'"'"'est un contrôle automatique rapide, pas une revue complète du CLI."]'
-assert_eq "F19.5 : @contexte (« Changed@pastille » : Récent) et repli sur la clé sans contexte (Touché)" "$(lire "$WORK/t19e.json" 'j.contexte')" '["Récent","Touché"]'
+assert_eq "F19.5 : @contexte (« Changed@pastille » : Nouveau) et repli sur la clé sans contexte (Touché)" "$(lire "$WORK/t19e.json" 'j.contexte')" '["Nouveau","Touché"]'
 assert_eq "F19.6 : t.pl et t.mot, singulier à 1" "$(lire "$WORK/t19e.json" 'j.pluriels')" '["1 appel","3 appels","ligne","lignes"]'
 assert_eq "F19.7 : t.k (« 1.3k » : « 1,3 k », espace insécable)" "$(lire "$WORK/t19e.json" 'String(j.k).replace(/\u00a0/g, "_")')" "1,3_k"
 assert_eq "F19.8 : t.type (« Library » : « Bibliothèque », une donnée inconnue : null)" "$(lire "$WORK/t19e.json" 'j.type')" '["Bibliothèque",null]'

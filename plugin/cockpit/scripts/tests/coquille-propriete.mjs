@@ -4,6 +4,7 @@
 //   gardes <dossier-des-scripts> <dossier-de-travail>   rend { cas: { nom: { verdict, oracle, ok } }, identites } sur une ligne JSON
 //   detecteur-pages <dossier-des-suites> <fichier-d-exceptions>   les écritures (sed -i, cp, redirection, writeFileSync) qui visent index.html, project.html ou equipe.html
 //        d'une sortie, hors exceptions (une par ligne : « fichier|fragment de la ligne|motif ») ; première ligne « touches=N exceptions=M », puis une ligne par écriture non excusée
+// Identités : +  deux orthographes d'un même module (lien vers sa racine) = une identité.
 // Classes : chaîne vers l'intérieur de .vibeflow/ (refus), vers l'extérieur (accord), pendante (refus), en boucle (refus), saine (accord), deux orthographes
 // d'un même lab (même identité), un lab préfixe d'un autre (deux identités).
 import fs from 'node:fs';
@@ -58,9 +59,10 @@ for (const [nom, d, l] of [['interieur', vf, lab], ['lien-vers-interieur', dedan
   cas[nom] = { verdict: v, oracle: o, ok: v === o };
 }
 // identités : deux orthographes d'un même lab = une identité ; un lab préfixe d'un autre = deux identités
-const id = (s) => { try { const x = identiteServeur(scripts, s); return x ? JSON.stringify({ serve: x.serve, sortie: x.sortie }) : 'null'; } catch { return 'null'; } }; // `sortieEcrite` (ancienne forme) n'est pas l'identité
+const id = (s, sc = scripts) => { try { const x = identiteServeur(sc, s); return x ? JSON.stringify({ serve: x.serve, sortie: x.sortie }) : 'null'; } catch { return 'null'; } }; // `sortieEcrite` (ancienne forme) n'est pas l'identité
 const labBis = mk('lab-bis', '.vibeflow', 'cockpit');
 const sortieLien = path.join(autreOrthographe, '.vibeflow', 'cockpit');
-const i1 = id(vf), i2 = id(sortieLien), i3 = id(labBis);
-const identites = { memeLab: i1 !== 'null' && i1 === i2, prefixe: i1 !== 'null' && i3 !== 'null' && i1 !== i3, pendante: id(path.join(pendant, 'x')) === 'null' };
+const lienModule = lien(path.resolve(scripts, '..'), 'lien-module'); // le même module par une autre orthographe : une identité (le chemin de serve.mjs est jugé physiquement lui aussi)
+const i1 = id(vf), i2 = id(sortieLien), i3 = id(labBis), i4 = id(vf, path.join(lienModule, 'scripts'));
+const identites = { memeLab: i1 !== 'null' && i1 === i2, prefixe: i1 !== 'null' && i3 !== 'null' && i1 !== i3, pendante: id(path.join(pendant, 'x')) === 'null', memeModule: i1 !== 'null' && i1 === i4 };
 console.log(JSON.stringify({ cas, identites }));

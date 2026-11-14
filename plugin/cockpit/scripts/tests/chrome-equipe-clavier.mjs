@@ -18,7 +18,7 @@
 //   tab-titre         : (EK18, S6, revue du 2026-11-08) 1 440 px : vraies touches Tab, le titre de la régie (#vf-equipe-entete) n'est un arrêt ni Git fermé, ni Git ouvert, ni refermé → { ferme, ouvert, referme, verdict } · libelles (EK11) : ligne des sources du tiroir et infobulle de la recherche → { src, titre }
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
 import { executer } from './chrome-session.mjs';
-import { parcoursTab } from './chrome-parcours-tab.mjs';
+import { parcoursTab, secondeVue } from './chrome-parcours-tab.mjs';
 const [, , chrome, url] = process.argv;
 const ACTION = process.env.EK_ACTION || '';
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
@@ -27,8 +27,7 @@ const INJ = `(() => { const R = window.EventSource; window.__es = []; window.Eve
   constructor(u, o) { super(u, o); this.__l = {}; window.__es.push(this); }
   addEventListener(n, f, o) { (this.__l[n] ||= []).push(f); super.addEventListener(n, f, o); }
   __emit(n, d) { for (const f of this.__l[n] || []) f({ data: JSON.stringify(d) }); } }; })();`;
-const DECRIRE = `const dec = (e) => e ? { tag: e.tagName, id: e.id || '', transcript: (e.dataset && e.dataset.vfTranscript) || '', rapport: !!(e.closest && e.closest('.vf-rg-act')), ou: !e.closest ? 'hors' : e.closest('#panel') ? 'panneau' : e.closest('#vf-equipe') ? 'regie' : 'hors', dansTiroir: !!(e.closest && e.closest('#panel')) } : null;`;
-const LU = "(() => { const z = document.querySelector('.vf-transcript'); return !!z && z.textContent.length > 0; })()";
+const DECRIRE = `const dec = (e) => e ? { tag: e.tagName, id: e.id || '', rapport: !!(e.closest && e.closest('.vf-rg-act')), ou: !e.closest ? 'hors' : e.closest('#panel') ? 'panneau' : e.closest('#vf-equipe') ? 'regie' : 'hors', dansTiroir: !!(e.closest && e.closest('#panel')) } : null;`;
 const RAPPORT = '#vf-equipe li[data-vf-cle^=a-relire] .vf-rg-act button'; // 73-08 : « Lire le rapport » d'une ligne terminée (régie)
 const LECTEUR = `!!document.querySelector('#panel .sec h4') && !document.querySelector('${RAPPORT}')`; // le lecteur de repli de la régie est affiché (mandat ou fil) ET la ligne est marquée lue (son bouton a quitté la ligne)
 const LIGNES = '#vf-equipe li[data-vf-cle]';
@@ -111,11 +110,12 @@ await executer(chrome, async (s) => {
     await s.ev(`(() => { const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }, M = { kind: 'subagent', id: 'M1', etat: 'actif', role: 'vf-dev-manager', tree: '.', parent: 'S1', task: 'manager', dureeS: 60 };
       window.__es.find((e) => e.url.includes('/api/vf/events')).__emit('who', { seq: 5000, at: Date.now(), who: { workers: [S, M], sources: {} } }); })()`);
     await s.ev("document.querySelector('#vf-lock').click()");
-    await s.attendre("!!document.querySelector('.vf-whop [data-vf-doing]')", 'bouton « Voir la dernière commande » du tiroir');
+    const ZB = ".vf-whop [data-vf-doing=\"M1\"]"; // la ligne du bouton cliqué (M1), jamais la première zone de la page
+    await s.attendre(`!!document.querySelector('${ZB}')`, 'bouton « Voir la dernière commande » du tiroir');
     await s.ev(`(() => { const R = window.fetch.bind(window); window.fetch = (u, o) => String(u).includes('/api/vf/doing') ? Promise.resolve({ ok: true, json: async () => ({ doing: '<b id=ek-injecte>gras</b>' }) }) : R(u, o); })()`); // le serveur ne rend jamais de balisage (résumé de la commande) : on le fait rendre à la page, pour prouver SON rendu
-    await s.ev("document.querySelector('.vf-whop [data-vf-doing]').click()");
-    await s.attendre("(() => { const z = document.querySelector('.vf-whop .vf-doing'); return !!z && !z.hidden && z.textContent.length > 0; })()", 'commande affichée');
-    return await s.stable(`(() => { const z = document.querySelector('.vf-whop .vf-doing'); return { elements: z.querySelectorAll('*').length, injecte: !!document.getElementById('ek-injecte'), texte: z.textContent, zone: z.innerHTML.slice(0, 120) }; })()`, 'zone de commande stable');
+    await s.ev(`document.querySelector('${ZB}').click()`);
+    await s.attendre(`(() => { const z = document.querySelector('${ZB} + .vf-doing'); return !!z && !z.hidden && z.textContent.length > 0; })()`, 'commande affichée');
+    return await s.stable(`(() => { const z = document.querySelector('${ZB} + .vf-doing'); return { elements: z.querySelectorAll('*').length, injecte: !!document.getElementById('ek-injecte'), texte: z.textContent, zone: z.innerHTML.slice(0, 120) }; })()`, 'zone de commande stable');
   }
   if (ACTION === 'focus-doing-tiroir') {
     const corps = `const flux = () => window.__es.find((e) => e.url.includes('/api/vf/events'));
@@ -124,13 +124,13 @@ await executer(chrome, async (s) => {
     await s.ev(`(() => { ${corps} flux().__emit('who', { seq: 5000, at: Date.now(), who: { workers: [S, M], sources: {} } });
       const R = window.fetch.bind(window); window.fetch = (u, o) => String(u).includes('/api/vf/doing') ? new Promise((r) => setTimeout(() => r({ ok: true, json: async () => ({ doing: 'ls -la (témoin EK8)' }) }), 150)) : R(u, o); })()`);
     await s.ev("document.querySelector('#vf-lock').click()");
-    await s.attendre("!!document.querySelector('.vf-whop [data-vf-doing]')", 'bouton « Voir la dernière commande » du tiroir');
-    await s.ev(`window.__b = document.querySelector('.vf-whop [data-vf-doing]'); window.__b.focus(); window.__tr = []; (() => { ${DECRIRE}
+    const ZB = '.vf-whop [data-vf-doing="M1"]'; await s.attendre(`!!document.querySelector('${ZB}')`, 'bouton du tiroir (ligne de M1, jamais la première de la page)');
+    await s.ev(`window.__b = document.querySelector('${ZB}'); window.__b.focus(); window.__tr = []; (() => { ${DECRIRE}
       const rel = () => { const a = document.activeElement; return JSON.stringify([a ? a.tagName : null, !!window.__b.disabled, a === window.__b, document.contains(window.__b)]); };
       let prec = ''; window.__iv = setInterval(() => { const r = rel(); if (r !== prec) { window.__tr.push(r); prec = r; } }, 10); })()`);
     const avant = await s.ev(`(() => { ${DECRIRE} const e = document.activeElement; return Object.assign(dec(e), { doing: (e && e.dataset && e.dataset.vfDoing) || '' }); })()`);
     await touche('Enter', 'Enter', 13, '\r');
-    const lu = await s.attendre("(() => { const z = document.querySelector('.vf-whop .vf-doing'); return !!z && !z.hidden && z.textContent.includes('témoin EK8'); })()", 'commande affichée', 8000).then(() => true, () => false);
+    const lu = await s.attendre(`(() => { const z = document.querySelector('${ZB} + .vf-doing'); return !!z && !z.hidden && z.textContent.includes('témoin EK8'); })()`, 'commande affichée', 8000).then(() => true, () => false);
     const apres = await s.stable(`(() => { ${DECRIRE} const e = document.activeElement; return Object.assign(dec(e), { doing: (e && e.dataset && e.dataset.vfDoing) || '' }); })()`, 'élément actif stable');
     const trace = await s.ev('(() => { clearInterval(window.__iv); return window.__tr; })()');
     return { avant, apres, lu, trace };
@@ -141,7 +141,7 @@ await executer(chrome, async (s) => {
       const emettre = (workers) => flux().__emit('who', { seq: seq++, at: Date.now(), who: { workers, sources: {} } });
       const S = { kind: 'session', id: 'S1', etat: 'actif', tree: '.', task: 'session' }, M = { kind: 'subagent', id: 'M1', etat: 'actif', role: 'vf-dev-manager', tree: '.', parent: 'S1', task: 'manager', dureeS: 60 };
       const C = (task) => ({ kind: 'subagent', id: 'C1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task, dureeS: 5 });`;
-    const SEL = tiroir ? '.vf-whop [data-vf-doing]' : RAPPORT;
+    const SEL = tiroir ? '.vf-whop [data-vf-doing="M1"]' : RAPPORT; // la ligne du manager M1, jamais la première de la page
     if (tiroir) {
       await s.attendre("!!window.__es && !!window.__es.find((e) => e.url.includes('/api/vf/events')) && !!document.querySelector('#vf-lock')", 'flux et badge');
       await s.ev(`(() => { ${corps} emettre([S, M, C('un')]); })()`);
@@ -236,7 +236,7 @@ await executer(chrome, async (s) => {
   if (ACTION === 'tab-titre') { // (EK18, S6 de la revue du 2026-11-08) à 1 440 px, avec le tiroir Git ouvert, le titre de la vue (masqué dessous) n'est plus un arrêt de Tab ; fermé, il l'est de nouveau (la définition du titre reste atteignable au clavier, PU-G-193)
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
     await s.attendre("!!window.VFGitTiroir && !!document.querySelector('#vf-equipe-entete h1')", 'tiroir Git et titre de la régie');
-    await calme();
+    await calme(); if (process.env.EK_VUE === '2') { await secondeVue(s); await calme(); }
     const detail = {}; // les arrêts visités à chaque parcours (balise, id ou classe, texte court, tabindex, visibilité) : le DIAG de la suite les montre quand le verdict n'est pas celui attendu
     // parcours de Tab (départ explicite, cycle borné, arrêts visités rangés dans detail[nom] pour le DIAG) : voir chrome-parcours-tab.mjs
     const parcours = (nom) => parcoursTab(s, touche, detail, nom);

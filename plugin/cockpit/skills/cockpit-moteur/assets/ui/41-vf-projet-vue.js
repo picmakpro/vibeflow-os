@@ -273,9 +273,9 @@
         avantVisite = null; basculer(f, { url: false }); } });
       mo.observe(carteVisite, { attributes: true, attributeFilter: ['hidden', 'class', 'style'] }); pose.push(() => mo.disconnect());
     }
-    ro = new ResizeObserver(mesurerBas); const mo2 = new MutationObserver(mesurerBas);
-    ro.observe(stage); mo2.observe(document.body, { attributes: true, attributeFilter: ['class'] }); mo2.observe(stage, { childList: true });
-    pose.push(() => { ro.disconnect(); mo2.disconnect(); ro = null; });
+    ro = new ResizeObserver(() => { cancelAnimationFrame(rafBas); rafBas = requestAnimationFrame(mesurerBas); }); const mo2 = new MutationObserver(mesurerBas);
+    let rafBas = 0; ro.observe(stage); mo2.observe(document.body, { attributes: true, attributeFilter: ['class'] }); mo2.observe(stage, { childList: true });
+    pose.push(() => { cancelAnimationFrame(rafBas); ro.disconnect(); mo2.disconnect(); ro = null; });
     ecoute(window, 'vf-git:etat', mesurerBas); ecoute(window, 'resize', mesurerBas);
     let derniere = null;
     // la sélection vient de l'état du panneau : aria-current suit, et la carte choisie est ramenée hors du panneau et du tiroir (instantané)

@@ -947,7 +947,7 @@ JSON
   ek_restaurer() { rm -f "$EKMOD"; }
   # EKC <action> <page> : une interaction, un Chromium ; la ligne JSON rendue est lue par G
   EKC() { ek_rafraichir; VF_CDP_ECHEANCE_MS=30000 EK_ACTION="$1" node "$HERE_EK/chrome-equipe-clavier.mjs" "$EKCHROME" "http://127.0.0.1:$EK_PORT/$2" 2>/dev/null > "$WORK/ek-$1.json"; }
-  EKA1="equipe.html#r=n%3Aag-a1"
+  EKA1="equipe.html"   # 74 : sans ancre. Arriver à froid sur #r=n:ag-<id> ouvre la fiche (contrat P73-C2, T26.8), qui masque la vue : le bouton « Lire le rapport » n'est plus focalisable
   ek_demarrer
   assert_eq "EK0 — contrôle positif : serveur de la sortie démarré, page Équipe servie et fixture à deux agents lisibles" "$([ "$EK_PORT" -gt 0 ] && echo serveur)|$(node "$AUX/fetchp.mjs" "$EK_PORT" /equipe.html "$WORK/ek-equipe.html")" "serveur|200"
   # EK1 (UIFN-12) : Entrée sur « Lire le transcript » ne fait pas perdre le focus clavier
@@ -1052,6 +1052,9 @@ JSON
   ek18_diag() { local v; v="$(G "$WORK/ek-tab-titre.json" 'j.verdict')"; [ "$v" = "$1" ] && return 0; echo "  DIAG EK18 [$2] verdict=$v attendu=$1 ; arrêts visités :" >&2; G "$WORK/ek-tab-titre.json" "Object.entries(j.detail||{}).map(([k,v])=>'    '+k+' : '+v.join(' | ')).join('\n')" >&2; }
   ek_demarrer; EKC tab-titre "equipe.html"; vf_hyg_stop "$EK_PID"; ek18_diag "false/false/true/false" témoin
   assert_eq "EK18 — 1 440 px, vraies touches Tab : le titre de la régie n'est un arrêt ni Git fermé, ni Git ouvert (alors que d'autres arrêts existent : témoin), ni Git refermé" "$(G "$WORK/ek-tab-titre.json" "$EK18V")" "false/false/true/false"
+  # EK18.3 : une seconde vue déclarée (Frise) ajoute la bascule [role=tab] à l'en-tête ; la sonde la distingue du titre, qui reste mesuré comme arrêt de Tab (témoin : sans la seconde vue, EK18 est vert ci-dessus)
+  ek_demarrer; EK_VUE=2 EKC tab-titre "equipe.html"; vf_hyg_stop "$EK_PID"; ek18_diag "false/false/true/false" "deux vues"
+  assert_eq "EK18.3 — une seconde vue déclarée (bascule « Régie / Frise » dans l'en-tête) : les onglets de la bascule ne sont pas le titre, le titre n'est un arrêt de Tab ni Git fermé, ni Git ouvert, ni refermé" "$(G "$WORK/ek-tab-titre.json" "$EK18V")" "false/false/true/false"
   EK18M() { local m; m="$(ek_muter "$1" "$2")"; ek_demarrer; EKC tab-titre "equipe.html"; local v; v="$(G "$WORK/ek-tab-titre.json" "$EK18V")"; vf_hyg_stop "$EK_PID"; ek_restaurer; ek18_diag "$3" "mutant"; echo "$m|$v"; }
   assert_eq "EK18.1 — mutant (le titre de la régie reçoit un tabindex) : masqué sous le tiroir Git, il devient un arrêt de Tab, détecté" "$(EK18M "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou);" "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou); h1.tabIndex = 0;" "true/true/true/true")" "muté|true/true/true/true"
   assert_eq "EK18.2 — mutant (l'en-tête de la régie porte un lien) : le lien, masqué sous le tiroir Git, redevient un arrêt de Tab, détecté" "$(EK18M "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou);" "entete.id = 'vf-equipe-entete'; entete.append(h1, sous, verrou); const lien = h('a', 'vf-link', 'x'); lien.setAttribute('href', '#'); entete.append(lien);" "true/true/true/true")" "muté|true/true/true/true"

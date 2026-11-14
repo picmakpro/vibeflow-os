@@ -18,9 +18,9 @@
   K.surOnglet(() => {
     const slot = document.getElementById('vf-coin-etat');
     if (!slot) return undefined;
-    let ligne = null, style = null;
+    let ligne = null, style = null, cache = false;
     const retirer = () => {
-      if (ligne) { ligne.remove(); ligne = null; }
+      if (ligne) { ligne.remove(); ligne = null; slot.hidden = cache; }
       if (style) { style.remove(); style = null; }
     };
     const poser = () => {
@@ -33,7 +33,7 @@
       b.type = 'button'; b.textContent = 'Réessayer';
       b.addEventListener('click', () => { V.reessayer().catch(() => {}); });
       ligne.append(document.createTextNode('Lecture impossible · '), b);
-      slot.appendChild(ligne); slot.hidden = false;
+      cache = slot.hidden; slot.appendChild(ligne); slot.hidden = false;
     };
     document.addEventListener('vf:coquille-echec', poser); document.addEventListener('vf:onglet', poser);
     poser();

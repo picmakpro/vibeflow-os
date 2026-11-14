@@ -117,6 +117,9 @@ await executer(chrome, async (s) => {
     // JT1.5 : l'extension est une extension de page, chargée une fois par arrivée sur l'onglet (entrées de ressources), jamais persistante
     await sec('jt15', async () => {
       await charger('');
+      // le tampon des entrées de ressources est borné à 250 : la page en pose déjà près de 100 ; sans cette marge il se remplit, plus rien ne se compte
+      // et « chargé à chaque arrivée » se lit comme « jamais rechargé » (la mesure, pas le chargement)
+      await s.ev('performance.setResourceTimingBufferSize(5000)');
       const n = () => lire("JSON.stringify(['/ui/01-vf-ensemble.js', '/ui/00-vibeflow.js'].map((f) => "
         + "performance.getEntriesByType('resource').filter((e) => e.name.endsWith('/_vf' + f)).length))");
       const aller = async (nom) => { await s.ev(`VF_COQUILLE.chargerOnglet(${JSON.stringify(nom)}).then(() => 1)`); await pause(300); };

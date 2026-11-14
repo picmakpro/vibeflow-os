@@ -15,6 +15,7 @@ import crypto from 'node:crypto';
 import { cheminPhysique } from './vf-cockpit-git-sortant.mjs';
 import { correspond } from './vf-cockpit-graphe.mjs';
 import { renommerTexte } from './vf-cockpit-rename.mjs';
+import { ENTREE_FIL } from './vf-cockpit-mise-en-page.mjs';
 
 export const PREFIXE = '/_vf/';
 const TAILLE_MAX = 6 * 1024 * 1024;
@@ -59,6 +60,8 @@ export function lireAssets(dossierMoteur, { moteur } = {}) {
   fichiers.push(entree('coquille.js', 'coquille', lire('vf-coquille.js', { renommer: false })));
   fichiers.push(entree('graph-query.js', 'bibliotheque', lire('graph-query.js')));
   fichiers.push(entree('vendor/elk.bundled.js', 'bibliotheque', lire(path.join('vendor', 'elk.bundled.js'), { renommer: false })));
+  // 79-18 : le worker de mise en page, classe à part, avec sa politique propre // garde:mep-table
+  fichiers.push({ ...entree(ENTREE_FIL.nom, ENTREE_FIL.classe, lire(ENTREE_FIL.nom, { renommer: false })), csp: ENTREE_FIL.csp });
   let noms;
   try { noms = fs.readdirSync(path.join(assets, 'ui'), { withFileTypes: true }).filter((d) => !d.isDirectory() && d.name.endsWith('.js')).map((d) => d.name); }
   catch { throw refus('dossier ui/ du moteur illisible : refus de démarrer.'); }
@@ -73,6 +76,8 @@ export function lireAssets(dossierMoteur, { moteur } = {}) {
 }
 
 const ENTETES = { 'Content-Type': 'text/javascript; charset=utf-8', 'Cache-Control': 'no-cache' };
+// l'hôte est celui que le contrôle de route a déjà validé
+const politique = (f, req) => (f.csp ? { 'Content-Security-Policy': f.csp(String(req.headers.host || '').toLowerCase()) } : {});
 export function servirAsset(req, res, table) {
   const p = String(req.url || '').split('?')[0]; // le chemin BRUT : jamais normalisé (`..`, `%2e%2e` ne désignent rien), jamais décodé
   if (!p.startsWith(PREFIXE)) return false;
@@ -80,9 +85,10 @@ export function servirAsset(req, res, table) {
   const f = table.get(p); // garde:coquille-404
   if (!f) { res.writeHead(404); res.end(); return true; }
   if (correspond(req.headers['if-none-match'], f.etag)) {
-    res.writeHead(304, { ETag: f.etag, 'Cache-Control': ENTETES['Cache-Control'] }); res.end(); return true;
+    res.writeHead(304, { ETag: f.etag, 'Cache-Control': ENTETES['Cache-Control'], ...politique(f, req) }); res.end(); return true;
   }
-  res.writeHead(200, { ...ENTETES, ETag: f.etag, 'Content-Length': f.octets.length });
+  const propre = politique(f, req); // 79-18 : la politique propre d'une entrée (le worker), avant le premier octet
+  res.writeHead(200, { ...ENTETES, ...propre, ETag: f.etag, 'Content-Length': f.octets.length });
   res.end(req.method === 'HEAD' ? undefined : f.octets);
   return true;
 }

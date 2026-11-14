@@ -2,7 +2,7 @@
 // vf-cockpit-project — graphe Projet du cockpit (promu du spike 002, généralisé : lab plat, partitionné, sans jalons).
 // Export : buildProjectGraph(root, { layout }) -> schéma vibeflow/cockpit-project@1 (format du viewer :
 //   nodes, files, links, flows, tour, routes, meta, project). CLI : node vf-cockpit-project.mjs <root> (JSON compact).
-// Hiérarchie : jalon -> phase -> plans + exigences ; missions (DAG) rattachées à leur phase ; backlog, graines, releases.
+// Hiérarchie : jalon -> phase -> plans ; missions (DAG) rattachées à leur phase ; backlog, graines, releases.
 // Identité d'une phase = (compartiment, numéro) : `ph-<N>` si le numéro est unique dans le lab, sinon `ph-<N>@<ws>`.
 import fs from 'node:fs';
 import path from 'node:path';
@@ -16,6 +16,7 @@ import { KIND_ICONS, KIND_COLORS } from './vf-cockpit-types.mjs';
 import { detectDrift, commandeCorrectif } from './vf-cockpit-drift.mjs';
 import { lireAilleurs, fusionner } from './vf-cockpit-ailleurs.mjs';
 import { projeterTrace } from './vf-cockpit-trace-collecte.mjs';
+import { burnup } from './vf-cockpit-burnup.mjs';
 
 const ls = lister; // AUDC-A-02 : listage confiné au lab (un dossier lié hors du lab n'est pas listé)
 const DST = { done: 'done', running: 'active', ready: 'todo', blocked: 'todo', failed: 'blocked' }; // dag.sh : blocked = en attente des deps
@@ -87,9 +88,14 @@ function construireGraphe(root, { layout } = {}) {
   const count = new Map(); for (const ph of phases.values()) count.set(ph.n, (count.get(ph.n) || 0) + 1);
   const phId = (ph) => (count.get(ph.n) > 1 && ph.ws ? `ph-${ph.n}@${ph.ws}` : `ph-${ph.n}`);
   const dirOf = (ph) => P.phaseDirs.get(`${ph.ws || ''}|${ph.n}`) || P.phaseDirs.get(`*|${ph.n}`);
-  const reqOf = (id, ws) => reqs.get(`${ws || ''}|${id}`) || reqs.get(`*|${id}`);
-  const reqPath = (r) => `req/${r.ws ? r.ws + '/' : ''}${r.id}`;
-  const ownReqs = (ph) => [...reqs.values()].filter((r) => r.phase === ph.n && (r.wsKey === '*' || r.wsKey === (ph.ws || '')));
+  // 76-08 (revue finale M1) : UNE seule attribution phase/exigence, celle de la collecte (meta.vf.trace.exigences) : le pied, le champ `exigences`,
+  // la porte de la 80 et le chat la lisent ; une exigence d'archive (ws '*') se rattache au nœud que la collecte a désigné (cleNoeud, 438a2ef6),
+  // jamais par le numéro seul. Sans traçabilité lue (erreur de collecte), repli sur la phase du tableau de traçabilité.
+  const traceEx = P.trace && Array.isArray(P.trace.exigences) ? P.trace.exigences : null;
+  const dePhase = (ph) => (e) => (e.ws === '*' ? e.cleNoeud === `${ph.ws || ''}|${ph.n}`
+    : String(e.phase) === String(ph.n) && (e.ws || null) === (ph.ws || null));
+  const ownReqs = (ph) => (traceEx ? traceEx.filter(dePhase(ph)).map((e) => ({ id: e.id, done: e.coche }))
+    : [...reqs.values()].filter((r) => r.phase === ph.n && (r.wsKey === '*' || r.wsKey === (ph.ws || ''))));
   const phaseStatus = (ph) => PROJECTION_ST[ph.avancement.etat] || 'todo'; // l'avancement vient des fichiers, jamais du STATE (CKPT-18)
 
   // jalons : ceux de la section « ## Milestones », sinon un jalon synthétique « Phases » ; les phases orphelines y vont aussi
@@ -148,11 +154,6 @@ function construireGraphe(root, { layout } = {}) {
         foot: `vague ${meta.wave || '?'}${touched.length ? ` · ${touched.length} fichiers` : ''}`, note: touched.length ? `Fichiers touchés : ${touched.slice(0, 12).join(', ')}${touched.length > 12 ? ` … (+${touched.length - 12})` : ''}` : undefined, ...(touched.length ? { touched } : {}), ...(touchedIgnores ? { touchedIgnores } : {}),
         vague: vagues.get(pf) ?? null });
       for (const dep of list(meta.depends_on)) { const dp = planFiles.find((x) => x.startsWith(dep.length <= 3 ? `${pf.split('-')[0]}-${dep.padStart(2, '0')}` : dep)); if (dp) link('f:' + rel(path.join(dir, dp)), 'f:' + p, 'import', 'puis'); }
-      for (const r of list(meta.requirements)) { const rq = reqOf(r, ph.ws); if (rq) link('f:' + p, 'f:' + reqPath(rq), 'data', 'couvre'); }
-    }
-    if (phReqs.length) {
-      const rId = node({ id: `${id}.req`, parent: id, label: 'Exigences', kind: 'exigences', summary: `${phReqs.filter((r) => r.done).length} cochées sur ${phReqs.length}.`, foot: `${phReqs.filter((r) => r.done).length}/${phReqs.length}`, st: phReqs.every((r) => r.done) ? 'done' : phReqs.some((r) => r.done) ? 'active' : 'todo' });
-      for (const r of phReqs) file({ p: reqPath(r), n: rId, name: r.id, d: sentence(r.text, 220), st: r.done ? 'done' : 'todo', foot: sentence(propre(r.text), 120) || r.file.split('/').pop() }); // PU-G-106 : le pied dit l'exigence elle-même, plus « REQUIREMENTS.md »
     }
   }
   // PU-G-100 (mis de côté) : le sens dépendance -> dépendant est celui que le viewer lit pour ranger les cartes (les entrants à gauche, « Utilisé par » ; les sortants à droite) : l'inverser corrige le panneau mais retourne l'ordre des cartes (mesuré en navigateur) ; le libellé « Utilisé par » est du viewer vendorisé, hors périmètre
@@ -213,18 +214,16 @@ function construireGraphe(root, { layout } = {}) {
     schema: 'vibeflow/cockpit-project@1',
     meta: { generatedAt: new Date().toISOString(), rootName: path.basename(root), root, audience: 'everyone', agent: 'claude', repos: [], counts: { files: files.length, loc: 0 }, vfTab: 'project',
       kindIcons: KIND_ICONS, kindColors: KIND_COLORS,
-      kindLabels: { import: 'Dépend de', event: 'Enchaînement', data: 'Couvre', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient',
+      kindLabels: { import: 'Dépend de', event: 'Enchaînement', queue: 'Étape suivante', call: 'Dispatche', contains: 'Contient',
       // 80-11 (P80-D-35, FORM-08) : le vocabulaire du planning dans le panneau, lu par le moteur sur l'onglet Projet
       // (clés à préfixe, jamais un genre de lien)
-      'feuille:phase': 'Plan', 'feuille:exigences': 'Exigence', 'feuille:backlog': 'Entrée du backlog', 'feuille:graine': 'Graine',
-      'feuille:release': 'Release', 'feuille:mission': 'Étape', 'parent:phase': 'Dans la phase', 'parent:exigences': 'Exigences de la phase',
+      'feuille:phase': 'Plan', 'feuille:backlog': 'Entrée du backlog', 'feuille:graine': 'Graine',
+      'feuille:release': 'Release', 'feuille:mission': 'Étape', 'parent:phase': 'Dans la phase',
       'parent:mission': 'Dans la mission', 'parent:backlog': 'Dans le backlog', 'parent:graine': 'Dans les graines', 'parent:release': 'Dans les releases',
-      'liste:phase': 'Plans', 'liste:exigences': 'Exigences', 'liste:backlog': 'Entrées', 'liste:graine': 'Graines', 'liste:release': 'Releases',
-      'liste:mission': 'Étapes', 'entrant:import': 'Dépend de', 'sortant:import': 'Attendu par', 'entrant:data': 'Couverte par',
-      'sortant:data': '', // '' : liste non rendue, la couche VF dit la couverture
-      'statut:exigences:done': 'Cochée', 'statut:exigences:todo': 'Non cochée', // le mot d'état d'une exigence (80-UI-SPEC § 4.2)
+      'liste:phase': 'Plans', 'liste:backlog': 'Entrées', 'liste:graine': 'Graines', 'liste:release': 'Releases',
+      'liste:mission': 'Étapes', 'entrant:import': 'Dépend de', 'sortant:import': 'Attendu par',
       'ouvrir:phase': 'Ouvrir la phase', 'champ:statut': 'Statut', 'champ:vague': 'Vague', 'valeur:sans-vague': 'Sans vague' },
-      vf: { milestone: state.milestone, phase: curPhase, phaseEtat, stateStale: perime, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, lastDesc: state.last_activity_desc, progress: state.progress,
+      vf: { milestone: state.milestone, phase: curPhase, phaseEtat, stateStale: perime, phaseName: state.current_phase_name, status: state.status, lastActivity: state.last_activity, progress: state.progress,
         milestones: msList.filter((m) => !m.horsJalon).map((m) => ({ key: m.key, st: m.st, done: m.done, total: m.ks.length, id: 'n:' + m.id })),
         next: active ? active.ks.filter((p) => !p.done).map((p) => ({ id: 'n:' + phId(p), label: `Phase ${p.n} · ${p.name}`, etat: p.avancement.etat })) : [],
         drift: { resume: drift.resume, erreur: !!drift.erreur,
@@ -248,6 +247,12 @@ function construireGraphe(root, { layout } = {}) {
     project: { name: `${P.projectName} — Projet`, summary: resume(state, curPhase, phases.size, files, phaseEtat) },
     nodes, files, routes: [], links: links.filter((l) => [l.a, l.b].every((x) => (x.startsWith('n:') ? ids.has(x) : fids.has(x)))), flows, tour: tour.length >= 2 ? tour : [],
   };
+  // 77-02 (P77-D-13, P77-D-14, P77-D-10, P77-D-20) : burn-up du jalon mis en avant (le pourcentage est celui du pied de jalon, la fonction `pct` du fichier)
+  // et blocages du STATE (nettoyés et condensés, absents si la section manque)
+  const phasesBu = active ? active.ks.map((p) => ({ n: p.n, nom: p.name, line: p.line, etat: p.avancement.etat })) : [];
+  const bu = active ? burnup({ jalon: active.key, phases: phasesBu, pct }) : null;
+  if (bu) graphe.meta.vf.burnup = bu;
+  if (P.blocages) graphe.meta.vf.blocagesState = P.blocages;
   // 76-04 (P76-D-31) : champs facultatifs de traçabilité posés sur le graphe ; le jalon mis en avant est celui de `active`, jamais recalculé ailleurs
   return projeterTrace(graphe, P.trace, { jalonActif: active ? 'n:' + active.id : null, couper: clip, racine: root });
 }

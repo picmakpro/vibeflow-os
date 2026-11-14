@@ -16,7 +16,7 @@ PG_WHO='{"workers":[
  {"kind":"subagent","id":"f0f0f0f0f0f0","etat":"termine","parent":"s0000000-aaaa-bbbb-cccc-111111111111","role":"vf-reviewer","task":"Relire le plan","ageS":600,"dureeS":90,"tree":"."},
  {"kind":"subagent","id":"b9b9b9b9b9b9","etat":"actif","parent":"s0000000-aaaa-bbbb-cccc-111111111111","role":"vf-coder","task":"Écrire le rendu","ageS":5,"dureeS":30,"tree":"."}]}'
 PG_LOCK='[{"ws":"fiab","scope":"phase","phase":"73","step":"exec-73","owner":"vf-dev-manager-p73","present":true,"age_seconds":30,"lease_seconds":120}]'
-PG_BTN_A='li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"] button[aria-expanded]'
+PG_BTN_A='li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"] button.vf-rg-tog'
 PG_BTN_RAPPORT='li[data-vf-cle=\"a-relire:f0f0f0f0f0f0\"] .vf-rg-act button'
 
 # pg_sc <membres JSON en plus, ou vide> <étapes JSON> : écrit un scénario (les clés répétées l'emportent) et rend le chemin de sa sortie après exécution
@@ -58,10 +58,16 @@ rg_RG1_page() {
   pg_ok "RG1.11 — vf-regie:aller { section: 'au-travail' } : focus sur le titre (tabindex -1) ; section inconnue : aucune exception" "$o" 'j.out.f.tag + "|" + j.out.f.section + "|" + j.out.ti.join(",") + "|" + (j.out.x.erreur || "sans erreur")' "H2|au-travail|-1|sans erreur"
   o="$(pg_sc '"hash":"#vf-a-relire"' '[{"nom":"f0","obs":{"mode":"focus"}},{"focus":"#search"},{"poser":{"who":'"$PG_WHO"'}},{"nom":"f1","obs":{"mode":"focus"}}]')"
   pg_ok "RG1.11 — fragment #vf-a-relire au montage : focus sur le titre de « Terminé, à relire », une seule fois (une poussée suivante ne le reprend pas)" "$o" 'j.out.f0.tag + "|" + j.out.f0.section + "|" + j.out.f1.tag' "H2|a-relire|INPUT"
-  # vue au retour de vf:onglet (80-10 non livré : le repli décrit au plan, l'événement de document vf:onglet émis après pushState)
-  o="$(pg_sc '"coquille":{"onglet0":"code"},"onglets":true,"hash":"#vf-au-repos"' '[{"onglet":"equipe"},{"nom":"f1","obs":{"mode":"focus"}},{"vfOnglet":"equipe","hash":"#vf-a-relire"},{"nom":"f2","obs":{"mode":"focus"}},{"focus":"#search"},{"vfOnglet":"equipe"},{"nom":"f3","obs":{"mode":"focus"}}]')"
-  pg_ok "RG1.12 — arrivée par onglet : au rappel de surOnglet le fragment est encore celui de l'onglet précédent (aucune action) ; à vf:onglet il est lu UNE fois ; un second vf:onglet identique ne refait rien" "$o" \
-    '(j.out.f1.section || "aucune") + "|" + j.out.f2.section + "|" + j.out.f3.tag' "aucune|a-relire|INPUT"
+  # vue au retour de vf:onglet : le VRAI VF_ONGLETS.aller de 00-vf-onglets.js (80-10), sur une coquille simulée qui lui sert chargerOnglet
+  local ar='"coquille":{"onglet0":"code"},"onglets":true,"hash":"#vf-au-repos"'
+  o="$(pg_sc "$ar" '[{"nom":"f0","obs":{"mode":"focus"}},{"aller":"equipe","fragment":"#vf-a-relire","nom":"r"},{"nom":"f1","obs":{"mode":"focus"}},{"nom":"e","obs":{}},{"focus":"#search"},{"vfOnglet":"equipe"},{"nom":"f2","obs":{"mode":"focus"}}]')"
+  pg_ok "RG1.12 — VF_ONGLETS.aller('equipe', { fragment: '#vf-a-relire' }) depuis Code : le focus va une fois au titre de « Terminé, à relire » ; au rappel de surOnglet (avant vf:onglet) l'ancien fragment ne déclenche rien ; un second vf:onglet identique ne refait rien" "$o" \
+    '(j.out.f0.section || "aucune") + "|" + j.out.r.ok + "|" + (j.out.e.avantVfOnglet[0].section || "aucune") + "|" + j.out.f1.section + "|" + j.out.e.corps.includes("vf-tab-equipe") + "|" + j.out.e.pushes.join(",") + "|" + j.out.f2.tag' "aucune|true|aucune|a-relire|true|/equipe.html#vf-a-relire|INPUT"
+  o="$(pg_sc "$ar" '[{"aller":"equipe","fragment":"#vf-a-relire"},{"focus":"#search"},{"raz":true},{"aller":"equipe","fragment":"#vf-au-repos","nom":"r"},{"nom":"f","obs":{"mode":"focus"}},{"nom":"e","obs":{}}]')"
+  pg_ok "RG1.12 — aller vers l'onglet déjà affiché avec un fragment : ignoré par 80-10, aucune action de la régie (focus laissé, ni poussée d'historique ni vf:onglet de plus)" "$o" \
+    'j.out.r.ok + "|" + j.out.f.tag + "|" + j.out.e.pushes.length + "|" + j.out.e.avantVfOnglet.length' "true|INPUT|1|1"
+  o="$(pg_sc "$ar" '[{"aller":"equipe","fragment":"#vf-a-relire"},{"focus":"#search"},{"avancer":1000},{"nom":"f","obs":{"mode":"focus"}}]')"
+  pg_ok "RG1.12 — le fragment n'est lu qu'à vf:onglet : la minuterie de repli du montage (luHash nul) ne reprend pas le focus une fois la lecture faite" "$o" 'j.out.f.tag' "INPUT"
 }
 
 rg_RG2_page() {
@@ -91,7 +97,7 @@ rg_RG9_page() {
   w1='{"workers":[{"kind":"session","id":"'"$x"'","etat":"actif","titre":"Atelier X","tree":".","ageS":10,"dureeS":40}]}'
   w2='{"workers":[{"kind":"session","id":"'"$x"'","etat":"attend","titre":"Atelier X","tree":".","ageS":20,"dureeS":100,"retient":{"n":2,"portee":"noeuds"}}]}'
   w3='{"workers":[{"kind":"session","id":"'"$x"'","etat":"au-repos","titre":"Atelier X","tree":".","ageS":30,"dureeS":100}]}'
-  local btn='li[data-vf-cle=\"au-travail:'"$x"'\"] button[aria-expanded]'
+  local btn='li[data-vf-cle=\"au-travail:'"$x"'\"] button.vf-rg-tog'
   o="$(pg_sc '"who":'"$w1" '[{"marquer":"li[data-vf-cle=\"au-travail:'"$x"'\"]"},{"focus":"'"$btn"'"},{"poser":{"who":'"$w2"'}},{"nom":"f2","obs":{"mode":"focus"}},{"nom":"m2","obs":{"mode":"marques","sel":"li[data-vf-cle=\"au-travail:'"$x"'\"]"}},{"nom":"cles2","obs":{"mode":"attr","sel":"li[data-vf-cle]","attr":"data-vf-cle"}},{"poser":{"who":'"$w3"'}},{"nom":"f3","obs":{"mode":"focus"}}]')"
   pg_ok "RG9.20 — une ligne passe d'« Au travail » à « À vous » : même noeud (mise à jour en place), une seule li par clé, focus resté sur la ligne de l'arbre, jamais sur sa jumelle ; aucun rechargement" "$o" \
     'j.out.f2.cle + "|" + j.out.m2 + "|" + (new Set(j.out.cles2).size === j.out.cles2.length) + "|" + j.out.cles2.length + "|" + (j.final.rechargements || 0)' "au-travail:$x|1|true|2|0"
@@ -143,7 +149,7 @@ rg_RG15_page() {
   pg_ok "RG15.8 — valeur inconnue ou absente : « Régie »" "$o" 'j.out.sel.join()' "true,false"
   o="$(pg_sc '' '[{"nom":"ag","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-agent"}},{"nom":"no","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-noeud"}},{"nom":"et","obs":{"mode":"sansAttr","sel":"li[data-vf-cle]","attr":"data-vf-etat"}},{"nom":"vn","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-noeud"}},{"nom":"ve","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-etat"}},{"nom":"va","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:a1b2c3d4e5f6\"]","attr":"data-vf-agent"}}]')"
   pg_ok "RG15.2 — data-vf-agent, data-vf-noeud et data-vf-etat sur chaque ligne ; valeurs d'une ligne rattachée" "$o" 'j.out.ag + "|" + j.out.no + "|" + j.out.et + "|" + j.out.va + "|" + j.out.vn + "|" + j.out.ve' "0|0|0|$PG_A|N2|actif"
-  o="$(pg_sc '' '[{"annuler":[]},{"clic":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]"},{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]","attr":"aria-expanded"}},{"nom":"det","obs":{"mode":"textes","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-plus"}},{"nom":"lien","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-plus a","attr":"href"}},{"touche":"Escape","sur":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]","nom":"esc"},{"nom":"ex2","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]","attr":"aria-expanded"}},{"nom":"f","obs":{"mode":"focus"}}]')"
+  o="$(pg_sc '' '[{"annuler":[]},{"clic":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog"},{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","attr":"aria-expanded"}},{"nom":"det","obs":{"mode":"textes","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-plus"}},{"nom":"lien","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] .vf-rg-plus a","attr":"href"}},{"touche":"Escape","sur":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","nom":"esc"},{"nom":"ex2","obs":{"mode":"attr","sel":"li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog","attr":"aria-expanded"}},{"nom":"f","obs":{"mode":"focus"}}]')"
   pg_ok "RG15.3 — le nom, non annulé : vf-agent:ouvrir (nom) puis détail en flux (identifiant court, branche, arbre, lien Nœud) avec aria-expanded ; Échap replie et rend le focus au bouton" "$o" \
     'j.out.e.evts[0].declencheur + "|" + j.out.ex.join() + "|" + ["s0000000","feat/x","main","Nœud"].map((s) => j.out.det.join(" ").includes(s)).join() + "|" + j.out.lien.join().includes("project.html#r=") + "|" + j.out.ex2.join() + "|" + j.out.f.tag + ":" + j.out.f.cle' \
     "nom|true|true,true,true,true|true|false|BUTTON:au-travail:$PG_SID"
@@ -160,8 +166,8 @@ rg_RG15_page() {
 }
 
 rg15_annule() {
-  local av='li[data-vf-cle=\"a-vous:'"$PG_SID"'\"] button[aria-expanded]'
-  local o ouv='li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button[aria-expanded]' ar='{"appel":"__vfRegie.arriver","args":["n:se-'"$PG_SID"'"]}'
+  local av='li[data-vf-cle=\"a-vous:'"$PG_SID"'\"] button.vf-rg-tog'
+  local o ouv='li[data-vf-cle=\"au-travail:'"$PG_SID"'\"] button.vf-rg-tog' ar='{"appel":"__vfRegie.arriver","args":["n:se-'"$PG_SID"'"]}'
   o="$(pg_sc '' '[{"annuler":["nom","ancre","rapport"]},{"focus":"#search"},{"clic":"'"$ouv"'"},{"clic":"'"$PG_BTN_RAPPORT"'"},'"$ar"',{"nom":"e","obs":{}},{"nom":"ex","obs":{"mode":"attr","sel":"'"$ouv"'","attr":"aria-expanded"}},{"nom":"det","obs":{"mode":"compte","sel":".vf-rg-plus"}},{"nom":"f","obs":{"mode":"focus"}}]')"
   pg_ok "RG15.6 — vf-agent:ouvrir annulé (nom, rapport, ancre) : détail dans son état (replié), aucun lecteur, aucune requête, aucun vf-agent:lu, aucun défilement" "$o" \
     'j.out.e.evts.map((x) => x.type + ":" + x.declencheur).join() + "|" + j.out.ex.join() + "|" + j.out.det + "|" + j.out.e.fetchs.length + "|" + j.out.e.panneau.length + "|" + j.out.e.defilements.length' \
@@ -189,7 +195,7 @@ rg15_cycle() {
 }
 
 rg15_echap() {
-  local o d='li[data-vf-cle=\"au-travail:'"$PG_A"'\"] button[aria-expanded]'
+  local o d='li[data-vf-cle=\"au-travail:'"$PG_A"'\"] button.vf-rg-tog'
   local pre='{"clic":"'"$d"'"}' mana='{"saisie":"#search","valeur":"mana"}'
   local ex='{"nom":"EXN","obs":{"mode":"attr","sel":"'"$d"'","attr":"aria-expanded"}}'
   # (réel) surcouche factice ouverte (le lecteur de repli est retiré, 73-C2), pile simulée en capture sur window : la régie ne voit jamais l'appui

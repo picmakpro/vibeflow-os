@@ -544,6 +544,10 @@ Faits établis par la recherche qui corrigent la forme de décisions déjà pris
   leurs extensions réexécutées, et les tiroirs gardés se réinscrivent à leur réouverture, FORM-15/16).
   (b) **Routage des onglets** : `ui/00-vf-onglets.js` (80-10) porte aussi `vf-coquille: persistant` et une garde
   d'unicité : un seul écouteur `popstate`, un seul `VF_ONGLETS` ; `aller(nom)` garde sa promesse (premier rendu).
+  (b′) **Amendement du 2026-11-14 (80-21 ; décision déléguée par Samuel, message session principale, 2026-11-08,
+  option recommandée, prise le 2026-11-14)** : trois fichiers portent le marqueur, pas deux — `00-vf-surcouches.js`,
+  `00-vf-onglets.js` et `00-vf-onglets-echec.js` (vue « Lecture impossible » d'un changement d'onglet, qui doit
+  survivre à l'onglet qu'elle remplace) ; les conditions d'A53 ci-dessous valent pour les trois.
   (c) **Pile Retour du panneau** (`42-vf-panneau-retour.js`, 80-08) : extension d'onglet ordinaire, réexécutée ;
   `VF_PANNEAU` est recréé vide à chaque arrivée sur Projet, ce qui est le comportement voulu (pile vidée au changement
   d'onglet) ; les appelants lisent `window.VF_PANNEAU` au moment de l'appel, jamais une référence gardée.

@@ -70,7 +70,7 @@ function lancer(cmd, args, cwd, env, maxBuffer) {
 // Variante ASYNCHRONE de l'exécuteur (P78-D-32) : mêmes options, même environnement, même sémantique de résultat que `lancer`, mais la boucle du serveur reste libre pendant que git travaille.
 // L'échéance globale `FIN` est une variable de portée synchrone : elle ne survit pas à un `await`. L'appelant asynchrone passe donc sa date butoir (`fin`, en ms epoch) à chaque appel.
 export const finDans = (ms) => Date.now() + ms;
-function lancerAsync(cmd, args, cwd, env, maxBuffer, fin) {
+export function lancerAsync(cmd, args, cwd, env, maxBuffer, fin) {
   const reste = Math.min(10000, (fin ?? Date.now() + 10000) - Date.now());
   if (!(reste >= 1)) return Promise.resolve({ sortie: '', code: null, tronque: false, absent: false, echeance: true, delai: true });
   return new Promise((resolve) => {

@@ -187,7 +187,7 @@ async function assembler(lab, fin) {
   const parAuteur = new Map(); // agrégé en JS sur les commits déjà lus (aucun outil de comptage git)
   for (const c of commits) { const a = parAuteur.get(c.an) || { nom: net(c.an), commits: 0, dernier: 0 }; a.commits++; a.dernier = Math.max(a.dernier, c.at); parAuteur.set(c.an, a); }
   const cb = refOrigine ? compte(refs.find(estBase)?.ab2) : null;
-  const base = { nom: refBase ? net(court(refBase)) : null, locale: cb?.avance ?? null, distante: cb?.retard ?? null, divergent: !!cb && cb.avance > 0 && cb.retard > 0 };
+  const base = { nom: refBase ? net(court(refBase)) : null, locale: cb?.avance ?? null, distante: cb?.retard ?? null, divergent: !!cb && cb.avance > 0 && cb.retard > 0, h: refBase ? shaRef(refBase) : null };
   return { schema: SCHEMA, etat: 'ok', entete, base,
     worktrees: worktrees.map((w, i) => ({ nom: net(path.basename(w.chemin)), chemin: net(w.chemin), branche: w.branche ? net(court(w.branche)) : null, detache: w.detache, ici: w === ici, principal: i === 0, verifie: verifie.get(w),
       commande: w === ici || !verifie.get(w) ? null : commande(cmdCd(w.chemin), w.chemin) })),

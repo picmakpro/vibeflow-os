@@ -87,6 +87,7 @@
       poser('graphe', { seq: c.seq, at: instant(c.at), onglet: c.onglet, sig: c.sig });
     },
     structural: (c) => { if (objet(c) && sans(c, ['seq'])) poser('planning', { seq: c.seq, at: instant(c.at) }); },
+    patch: (c) => { if (objet(c) && sans(c, ['seq'])) poser('planning', { seq: c.seq, at: instant(c.at) }); }, // contenu changé sans structure : même forme
     etat: (c) => { if (objet(c)) lireEtat(); },
     frise: (c) => { if (objet(c)) lireFriseSiInscrit(); },
   };

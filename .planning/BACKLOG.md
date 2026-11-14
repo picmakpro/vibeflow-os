@@ -620,6 +620,39 @@ ou de `vf-new-lab`.
 ### Identifiants de menace à aligner entre les plans de la Phase 79
 **Priorité : basse.** Chaque plan numérote ses menaces dans sa propre plage (`T-79-1NN` pour 79-01, plan × 100 + rang) ; l'alignement de la forme entre les 22 plans n'a pas été vérifié à la planification. **Déclencheur de reprise :** l'audit de sécurité de la première vague exécutée.
 
+## Cockpit : mineurs et limites de l'exécution de la Phase 79 — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse sauf mention.** **Origine :** exécution de la Phase 79 (plans 79-12 à 79-22), audits de sécurité, revue et passe design du 2026-11-14 ; détail dans `.planning/missions/2026-11-14-phase-79-execution.md`. Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée. **Déclencheur de reprise :** la passe finale avant release, ou la prochaine passe sur le socle du cockpit.
+
+- AU13-03 (frise) : réponse bornée en nombre, pas en octets (pire cas ~20-25 Mo sérialisés sur le fil principal) ; plafond d'octets avec report dans `voiesOmises`, ou sonde d'échelle à 2 000 voies (F6.3).
+- AU13-04 (transcript) : `arbresGit` synchrone (1 à 3 processus git) à chaque requête qui garde un outil ; cache court ou variante asynchrone, compte de processus dans T24G2.
+- AU13-05 (frise, info) : `parent` et `noeud` ni bornés ni masqués à la projection ; mutant de sous-champ de la liste blanche.
+- AU13-06 (frise, info) : `arbre: null` confond « inconnu » et « principal » ; valeur dédiée possible.
+- AU13-07 (frise, info) : `enumerer` des projets joué deux fois par tour ; caps mémoire sans mutant nommé ; transcript relu sans plafond de taille par voie.
+- x13 F-02 (flux-etat, info) : `sigState` recalculé à chaque pose de frise.
+- AU16-03 (coquille) : C6 compare noms et comptes, jamais valeurs ; aucun mutant sur le retrait des minuteries, observateurs, flux, `delete W[k]`, `revenir`.
+- AU16-04 (coquille, info) : chaque document porte les trois jetons d'onglet ; `ptoken` identifie l'onglet sans cloisonner les droits (à écrire au threat model).
+- AU16-05 (export, info) : `exportMap` lit `<sortie>/index.html` sans `cheminPhysique` (limite 79-16-c) ; à confiner sous `here`.
+- AU22-01 (transcript, hérité) : un lien symbolique dans le dossier des sous-agents, ou un fichier remplacé après le tour, est lu sans repasser l'admission ; `lstat`/`realpath` confiné puis `fstat`, avec le durcissement de `collecteAgents`.
+- AU22-02 (lecture d'agent) : l'abandon côté route laisse la demande dans la file du fil ; échéance jointe ou annulation, témoin en rafales.
+- AU22-03 (frise F7, info) : pas de mutant sur `DELAI_MS` ni de témoin `isFile` (FIFO, dossier) dans `lireDansLeFil`.
+- AU22-04 (routes, info) : un futur lecteur HISTORIQUE à promesse sort sans `repondreGardee` ; tout nouveau lecteur à promesse prend le régime gardé.
+- x17 F3 (projet-visite) : R3.18 (presse-papiers) rouge une fois sous charge, non rejoué.
+- AU18-04 (mise en page) : aucun garde-temps par requête du worker (graphe pathologique = indicateur bloqué) ; `replier()` sans `terminate()`, worker abandonné dans le `catch` de construction.
+- AU18-05 (coquille-assets, info) : `cspFil`/`directiveWorker` injectent l'hôte tel quel ; seul l'appelant filtre l'hôte en amont ; refus local optionnel.
+- 79-18 F4 : W4.1 (écart de pouls) rouge sous charge extrême (load 100), vert sous load 20 ; T24F4.1 transcript à 2074 ms pour 2000 ms sous charge.
+- RV1-1 (revue) : le cliquet d'observateurs est aveugle aux formes `window.MutationObserver`, alias, aide `observer(MutationObserver, …)` et sous-dossiers de `ui/` ; reporté à la passe finale avant release (décision de la session principale, 2026-11-14).
+- RV1-3 (revue) : seuils d'horloge W4.1 (< 150 ms) de mise-en-page, F7.4 (p99 < 50 ms, max < 100 ms) de frise ; à surveiller en CI.
+- RV1-4 (revue) : lignes de plus de 160 colonnes ajoutées hors du cliquet : `viewer.html` (adaptateur du worker, 3 lignes) et aides de test de 79-18 et 79-22, contrairement aux plans.
+- pf2 (limite) : clé planning de `VF_ETAT` ; un changement de contenu pur (SUMMARY réécrit, ligne de tableau ajoutée) n'émet aucun patch, le diff de `vf-cockpit-live.mjs` ne compare que statut, pied et résumé. Le cliquet d'observateurs élargi passe `02-vf-coin.js` de 0 à 3, `02-vf-ligne-etat.js` de 0 à 1, `02-vf-reperes.js` de 0 à 2 (hausse réelle, à Samuel à la passe finale).
+- VB-1 : l'empreinte du module laisse `vendor/xterm` et `vendor/fonts` hors empreinte (même lacune qu'AU18-02).
+- VB-2 : retirer l'ancienne branche d'identité d'`estNotre` (T-79-603).
+- VB-3 (79-18-c) : paquet ELK chargé deux fois (page et worker) ; export composé depuis le module.
+- VB-4 (79-20) : la ligne du code 3 de `plugin/cockpit/skills/vf-cockpit/SKILL.md` n'est pas alignée sur le README (budget d'instructions).
+- D-M6 : défense en profondeur des en-têtes `Sec-Fetch-Site` hors `/api`, lecture de `Sec-Fetch-Site` sur `/api` et `Referrer-Policy: no-referrer` ; recommandation détaillée au rapport de la phase, à trancher par Samuel.
+- Design (passe fin de phase, 59/100, seuil 70, une passe, aucune correction dans la mission) — majeurs : écran d'échec de démarrage (bouton « Réessayer » natif de 22 px, coquille et onglets absents, chrome en anglais, mise en page mobile cassée, tiret orange parasite, message sans cause) ; captures « sombre » prises en clair (thème sombre non validé) ; en-tête différent pendant le calcul de la carte et `"memeDoc":false` au changement d'onglet (rechargement de document à vérifier, peut venir du script de capture) ; panneau latéral qui masque la colonne « Fait » de Projet, commande qui déborde.
+- Design — mineurs : contrôle de vue qui change de place, minimap sur une carte, état vide d'Équipe générique, cibles < 44 px sur desktop, « Vue d'ensemble » qui ressemble à un onglet. Le goût et la hiérarchie relèvent de la recette de Samuel.
+
 ## Cockpit : réserves consignées par les cadrages des Phases 73, 74, 75, 77 et 80 — DIFFÉRÉ (2026-11-11)
 
 **Origine :** rapports de cadrage `.planning/missions/2026-11-11-phase-73-cadrage.md`, `-74-`, `-75-`, `-77-` et `-80-` (sections « À verser par la jointure »), jointure du 2026-11-11. Décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sauf la question P73-Q-01, tranchée plus bas.
@@ -753,6 +786,16 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - 75-01 (revue, m4) : `vf-cockpit-activite-branches.mjs`, échéance globale de 15 s pour 66 paires ; plusieurs reprises de 60 s avant convergence sous charge, ce que dit `radar` (`branches-indisponible`).
 - 75-04 (revue, m6) : la lecture des listes en bloc peuple `vfTouch`, soit +885 Ko dans `graph.json` et dans l'`index.html` Code ; effet voulu, non mesuré.
 - 75-01 (revue, m5) : le tri de la base commune multiple (`baseCommune`, historiques en croix) n'a pas de témoin ; les quatre autres mutants de m5 ont leur témoin (G11).
+- 75-08 : `VF_MARQUES` n'a ni marque sans glyphe ni suppression d'agrégat de nœud (75-08 utilise le glyphe neutre).
+- 75-08 : `/api/vf/activite` sert le nombre de suites gardiennes, pas leurs noms (la spec en voulait 5).
+- 75-07 : écarts de géométrie face à 75-UI-SPEC (barres à 2, tige à 13,5, contour pointillé de la prévue), au goût de la recette.
+- 75-08 : étiquette `.bl` du sélecteur masquée à tout gabarit et section « Points chauds » du panneau absente de la spec § 4, au goût de la recette.
+- 75-10 : un lab hors dépôt rend `gardes.etat = indisponible` (ligne Gardes désactivée), la spec dit « présente » ; à trancher.
+- 75-10 (fin de phase) : la phrase des Gardes « hors dépôt » promet une relecture qui n'aura pas lieu ; une phrase propre, ou des gardes lues sans git.
+- 75-08 (fin de phase) : `on` et `addPanelSection` du moteur ne se défont pas ; au retour sur Code les sections du panneau d'un passage précédent restent mortes (limite du moteur, le relais des écouteurs de 75-08 n'en couvre que la moitié).
+- 75-08 (fin de phase) : la chaîne XSS des agents est passée par une route amorcée, et le nom accessible n'est vérifié que sur son début.
+- 75-07 (juge design) : le palier bas des barres est peu lisible à l'ouverture.
+- 75-0x (juge design) : à 390 px la vue d'un dossier s'ouvre avec des cartes coupées à droite ; à vérifier.
 
 **Déclencheur de reprise :** la prochaine passe sur l'activité du cockpit (75-07 ou la phase suivante qui la lit).
 
@@ -778,3 +821,128 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - 74-10 (audit) : actions d'essai mortes dans `chrome-equipe-clavier.mjs` (`focus-transcript`, `lecteur-puis-who`, `changer-agent`, `recharger`) qui visent le lecteur retiré.
 
 **Déclencheur de reprise :** la prochaine passe sur la frise ou la fiche d'agent (74-06, 74-08 à 74-10, ou la recette de la Phase 74).
+
+## Cockpit : mineurs de la revue et de l'audit de la Phase 77 — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** une passe de `vf-reviewer` à chacun des deux points de fusion de la Phase 77 (têtes `cf945818` puis `d6bc84fb`) et une passe de `vf-auditer` (tête `cf945818`), régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Les majeurs (exécution d'un résolveur pris dans le lab observé, faux « rien de nouveau » sur une base git inconnue) sont corrigés dans la phase ; ce qui suit ne l'est pas.
+- **Route des jauges (77-03) :** un gate qui meurt après son en-tête (code autre que 0 ou 64, aucune ligne) donne onze jauges « non applicable » au lieu de « indisponible » ; le cache de 60 s garde aussi un résultat tout indisponible ; la liste fermée des verdicts se lit dans un objet ordinaire (jetons hérités du prototype acceptés : `Object.hasOwn` ou `Map`) ; `chemin` refuse `/`, `~` et une lettre de lecteur, pas les formes UNC ni les schémas (`file:`), côté serveur comme dans `74-vf-synthese-jauges.js` ; le délai de 10 s arrête le shell du gate, pas ses petits-enfants.
+- **Gates en TSV (77-01) :** la ligne TSV de densité est relue du rapport texte par un séparateur ` | ` qu'un nom de fichier peut contenir ; le gate de méthode suit un lien `.planning` sortant du lab (tailles seulement) ; la surcharge de test `VF_BUDGET_RESOLVER` est honorée hors des suites et l'environnement des gates lancés par le cockpit ne la retire pas (aucun cas ne la couvre) ; un gate copié à plat sans résolveur voisin rend le socle non vérifiable (dégradation voulue).
+- **Mémoire de visite (77-04, 77-08) :** un `vu` futur est accepté sans borne (rotation figée, date illisible pour une valeur extrême) ; au-delà de 8 192 octets (vers 165 phases) l'écriture est refusée et chaque visite redevient « première visite » sans le dire ; le bloc de visite ne s'abonne pas à `graphe` (fraîcheur différée au prochain `etat`, `who` ou `git`).
+- **Registre des blocs (77-06) :** `74-vf-synthese-burnup.js` et `74-vf-synthese-jauges.js` empilent leur entrée à chaque exécution du script au lieu de la remplacer (patron de `74-vf-synthese-visite.js`) ; la feuille `74-vf-synthese-style.js` est injectée au chargement, sur tout onglet.
+- **Blocages du STATE (77-02) :** le texte servi `t` masque les secrets mais garde un chemin absolu du poste, et le condensat `h` est calculé sur le texte non masqué.
+- **Bloc de visite et bloc coût (77-08, 77-07), seconde revue :** sur une base git inconnue, le bloc dit « Commits : non lus, le dépôt git est indisponible » alors que le dépôt est lisible, et « Tout vu » ne le rend jamais vide (libellé distinct à ajouter à l'UI-SPEC) ; `commitsArrives` rend « inconnu » quand le sommet manque des rangées lues, sans le dire ; le bloc coût relit `/api/vf/frise` tant que Projet est affiché, Synthèse fermée comprise (voulu par le plan) ; un 404 transitoire retire la section coût jusqu'au prochain aller-retour d'onglet.
+- **Design de la Synthèse (juge sur captures, 84/100, fin de phase) :** ligne-résumé de l'aperçu décalée de 12 px, interligne de 16 px et vide d'environ 50 px dessous (`74-vf-synthese.js`) ; bloc de visite réduit à son titre pendant la lecture (une ligne neutre à valider) ; `!important` sur la taille du `summary` (`74-vf-synthese-burnup.js`) et rayon de 8 px écrit en dur ; titres de bloc plus pâles que les têtes de groupe, blocs séparés par 24 px seulement : à arbitrer en recette (règle du viewer et de l'UI-SPEC).
+- **Libellé de Synthèse dès 1 600 px :** second palier de repli à poser dans `01-vf-responsive.js` (le bouton est en icône seule depuis la correction de R21 et R22 ; décision déléguée par Samuel, message session principale, 2026-11-08, prise par la session principale le 2026-11-14) ; à juger à la recette.
+- **Jauge « socle » :** en dépassement permanent sur le dépôt source alors que la baseline la tient pour égale ; la relation à la baseline est affichée à côté (77-06), le verdict n'est pas recalculé.
+
+**Déclencheur de reprise :** la prochaine phase qui touche la route des jauges, la mémoire de visite ou les blocs de la Synthèse.
+
+## Cockpit : mineurs de la revue du point de fusion 2 de la Phase 76 (pages 76-06 et 76-07) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** revue (`vf-reviewer`) des plans 76-06 et 76-07, une passe, verdict passed, aucun majeur ; régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale).
+- M1 : `74-vf-trace-sections.js` lit les exigences de l'entrée haute sans garde ; une réponse vide, indisponible ou en cours de collecte lève une erreur non rattrapée (console seule, l'entrée reste cachée).
+- M2 : les zones rendues de `74-vf-trace.js` ne sont élaguées qu'au rafraîchissement ; des conteneurs détachés restent retenus jusqu'à un événement ou au départ d'onglet (fuite bornée).
+- M3 : Échap retrouve la ligne d'origine par un sélecteur sans `CSS.escape` ; un chemin de preuve à guillemet ne rend pas le focus.
+- M4 : `ouvrirAgent` (`74-vf-trace-memoire.js`) avale l'échec de lecture ; un clic ne produit rien, ou une liste vide trompeuse pendant la collecte.
+- M5 : le marqueur d'injection des sondes ne couvre que le libellé d'exigence et les critères, pas les titres d'ADR, noms de mémoire ni sujets de commit (le code passe tout par `textContent`).
+- M6 : trois sondes Chrome à durcir : seuil de 150 ms contre une lecture à 40 ms (à-coup de CI), comparaison de défilement tautologique si le panneau ne défile pas, pause fixe sans témoin d'arrivée de l'événement.
+- Non sondé : l'état « collecte en cours » ne se relance que par la clé `planning` de `VF_ETAT` ; si la fin de la première collecte n'émet pas d'événement, la phrase reste jusqu'au prochain changement de panneau. À trancher avec le correctif de la clé `planning` annoncé par la Phase 79.
+
+**Déclencheur de reprise :** la passe du juge de design de fin de Phase 76, ou la prochaine retouche des fichiers `ui/74-vf-trace*.js`.
+
+## Cockpit : constats bas de l'audit de la régie (Phase 73, 73-05 et 73-07) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : non fixée.** **Origine :** audit `vf-auditer` de 73-05 et 73-07, une passe, verdict passed (aucun moyen ni haut).
+- **Témoins sensibles à la charge :** RG6.20 (témoin positif de la ligne verrou) et RG13.13 (aucun git relancé pendant dix lectures) rougissent en lot sous charge et verdissent seuls ; un faux rouge sur un témoin positif fait perdre la valeur du négatif qui le suit.
+- **Stockage « lu » :** la purge de 24 h ne vise que la clé du lab ouvert, au chargement ; les clés d'autres labs de la même origine ne sont jamais purgées.
+- **Identifiant du lecteur de repli :** pas de contrôle de forme côté page (la garde réelle est la route serveur).
+- **Lecteur de transcript :** une entrée nulle dans le fil lève une erreur non attrapée (pas de message « Indisponible »).
+- **Nom du lab voisin :** pas d'assainissement côté page des caractères de contrôle (assuré par le serveur).
+
+**Déclencheur de reprise :** la prochaine passe sur la page de la régie.
+
+## Cockpit : la clé `planning` de VF_ETAT n'avance pas sur une exigence ajoutée seule — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** Aucune donnée fausse : une lecture à jour attend le rechargement de la page. **Origine :** Phase 76 (76-08), limite demandée par la session principale (décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée, prise par la session principale le 2026-11-14).
+- **Observé :** la clé `planning` de `VF_ETAT` n'avance que sur un changement de statut, de pied, de résumé ou de structure des nœuds. Un SUMMARY réécrit sur place, ou une ligne ajoutée à un tableau de ROADMAP ou de REQUIREMENTS, n'émet aucun `patch` : `vf-cockpit-live.mjs` ne compare que le statut, le pied et le résumé. Une exigence ajoutée sans l'un de ces changements n'apparaît donc qu'au rechargement de la page (section Traçabilité, panneau d'exigence).
+- **Mesure :** faite par la Phase 79 en livrant `246598c3`.
+- **Pas de correctif dans ce jalon.** Dite dans le README du module, à la suite de la description de la route `vibeflow/cockpit-trace@1`.
+
+**Déclencheur de reprise :** la prochaine phase qui touche `vf-cockpit-live.mjs` ou la comparaison des `patch`, ou un testeur qui ne voit pas une exigence neuve sans recharger.
+
+## Cockpit : mineurs de la revue finale et de la vérification de but de la Phase 76 (76-08, 76-09) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** revue finale (`vf-reviewer`) et vérification de but (`gsd-verifier`), une passe chacune ; régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Les deux majeurs de la revue (attribution phase/exigence unique, jumelle d'archive dans le chat) et le rouge C8.1 sont corrigés ; restent :
+- m1 : si la collecte de traçabilité échoue (`meta.vf.trace.erreur`), la porte des exigences rend vide et le chat dit « 0 exigence » au lieu de « lecture indisponible ».
+- m2 : `lireQuestions` coupe la liste à 200 par numéro de phase croissant ; les questions en attente récentes tombent d'abord (bilan et `tronque` restent justes ; inatteint aujourd'hui).
+- m3 : une question mal formée n'a ni `ws` ni `titre` ; le lecteur de la régie (Phase 73) doit le tolérer, non vérifié par un test.
+- Vérification : aucun test ne branche la vraie collecte des questions sur la lecture de la régie (fixture F2 de `regie-rg-questions.sh` traduite à la main) ; contrôle manuel fait le 2026-11-14 sur ce dépôt, forme conforme. À figer par un test bout en bout.
+
+**Déclencheur de reprise :** la prochaine retouche de la régie de la Phase 73 ou de `vf-cockpit-questions-attente.mjs`.
+
+## Cockpit : mineurs du juge de design de fin de Phase 76 (traçabilité) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** `vf-design-judge`, une passe sur captures à 1440, 1024 et 390 px, deux thèmes, 75/100 passed ; régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Le bloquant (défilement horizontal des panneaux d'objet) et les deux majeurs (identifiant de phase écrasé au Jalon, marqueur de pliage absent) sont corrigés ; restent :
+- Bilans à plusieurs emplacements (Mémoire, maillons non lus du Jalon) : le retour à la ligne coupe un emplacement entre son nombre et son mot.
+- Panneau d'une décision : le bouton de phase dit deux fois le numéro (« Phase 90, Phase 90 · P90 »).
+- « + N autres exigences » décalé de 12 px par rapport aux lignes ; entrée haute sans indice de clic et avec un vide bas plus grand que les autres sections.
+- Légende : « Légende : » 3 px plus bas que les paires ; texte après un octogone sans retrait à la ligne ; dans « Chaîne », chemins et puces à égale distance de deux maillons.
+- Chemins copiables coupés par la fin (le nom du fichier disparaît) : couper le début ou les dossiers intermédiaires.
+- Lignes-boutons (dont la ligne de commit) sans indice de cliquabilité.
+- Phase 80 (signalé) : l'en-tête de la feuille à 390 px laisse voir en transparence le texte qui défile dessous.
+
+**Déclencheur de reprise :** la recette de Samuel sur l'onglet Projet, ou la prochaine retouche des fichiers `ui/74-vf-trace*.js`.
+- **Revue du point de fusion 2 de la Phase 73 (mineurs) :** `ouvrirRepli` émet `vf-agent:lu` même quand la lecture du transcript échoue, et deux clics rapprochés laissent le transcript le plus lent écraser le panneau ; `relireMissions` lance une lecture par événement `graphe` sans sérialisation (deux réponses croisées peuvent poser des missions plus anciennes).
+- **Durée d'un agent terminé (constat de la Phase 74) :** la régie calcule `dureeS` en tenue et compte les veilles de l'agent ; la spec ne tranche pas entre durée active et durée de tenue : à décider au prochain réglage de la régie.
+- **Juge design de fin de Phase 73 (74/100, passed ; mineurs) :** ligne 2 « nœud · arbre · branche » rendue sous Quoi au lieu de Qui, rôle sous la tâche au lieu d'avant ; colonne Quoi qui dérive de 361 à 376 px (grille par ligne) ; ligne de verrou plus bavarde que la spec § 6.1 ; ligne de phase `human_needed` avec le lien en double ; format de la ligne « ailleurs » et noms de lab en mono (§ 10) ; hors phase : à 800 px, la bascule de Projet recouvre son titre.
+
+## Cockpit : mineurs de l'exécution de la Phase 80 (plans 80-09 à 80-21, quatre revues, juge design) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** les rapports des exécuteurs, quatre passes de `vf-reviewer` aux points de fusion, le juge design sur captures (83/100, passed) et la vérification d'objectif de la Phase 80 (branche `feat/phase-80-trois-formes`) ; aucun n'appelle de correction avant la fusion.
+- 80-19 NOT_GUARD log\w* exclut login_required (hors périmètre, à verser au BACKLOG)
+- 80-16 responsive R7.5.0-2 rouges sous charge (90 s), à rejouer seuls au point de fusion
+- 80-09 freeArea() ne déduit pas #zoom au téléphone : une carte amenée dans le champ peut le recouvrir
+- git-entete 119/17 sur 68343e27 : à rejouer après 898511f0 au point de fusion
+- equipe EA2.x/EA3.x « reading lire » dans le tiroir Qui a la main après fusion 455da5e8 (79-17 partiel) : à rejouer sur la 79-17 finale
+- 80-10 OG2.2 réduit (tampon xterm d'une autre origine) ; retour sur Projet par clic sans ?vue=
+- git-tiroir 177/18 sous charge (p10) : à rejouer à poste calme au point de fusion
+- 80-13 chrome-session.mjs naviguer oublie vf-tiroirs:* (fichier commun, Gate-Touche)
+- revue1 : 00-vf-onglets.js:104 aller(nom,{fragment:'#s=…'}) pose l'adresse sans appliquer la sélection (clés moteur v,s,z,git à refuser ou appliquer ; à documenter pour 73/74/76)
+- revue1 : 00-vf-onglets.js:103 aller vers l'onglet courant avec fragment l'ignore en silence (à dire dans le contrat)
+- revue1 : 00-vf-onglets.js:114 après un chargement échoué, l'écouteur de clic du routeur n'est plus posé, les clics rechargent la page (coquille ou 80-21)
+- revue1 : viewer.html:1768 parentLab(owner) inséré brut dans rowFor(extra) (constantes serveur aujourd'hui ; échapper par h())
+- revue1 : 04-vf-canevas-champ.js:21 Math.max(200,…) peut dépasser la découpe droite quand le tiroir Git touche le bord
+- revue1 : viewer.html programmerZ (250 ms) peut écrire z dans l'adresse dépouillée avant le démontage (fenêtre étroite)
+- revue1 : 02-vf-reperes.js:131 childList sur body relance maj à chaque enfant direct (coût)
+- 80-14 hauteur du champ de palette 58 px au lieu de 44 (spec) : à trancher par une passe de jetons
+- 80-21 erratum 80-UI-SPEC § 5 : texte « Lecture impossible… » remplacé par celui de la coquille pour les trois onglets
+- revue2 : 00-vf-onglets.js:100 clic sur l'onglet affiché après échec : etat() reste en échec, rangées Réessayer persistantes (conforme au plan, à arbitrer)
+- revue2 : 02-vf-ligne-echec.js:36 slot.hidden=false jamais remis ; 02-vf-ligne-etat.js:70 cache le slot et la rangée d'échec avec (écart consigné 80-21)
+- revue2 : 00-vf-onglets.js:131 Précédent pendant un chargement en vol : fragment du même onglet avalé, entrée d'historique en double possible ; restituer (:73) sans borne
+- revue2 : chrome-surcouches.mjs:14 164 colonnes ; SU6.1 annonce « une seule entrée dans la pile » sans la mesurer, pas de contrôle [inert] après fermeture du tiroir rouvert
+- revue2 : viewer.html gagne 17 lignes > 160 colonnes (hors cliquet)
+- revue1 : SU4.6 ne voit pas un window.onkeydown = (ni avant ni après l'adaptation)
+- 80-21 : après un Réessayer par le routeur suite à un premier échec, le bouton Retour de Projet apparaît (différent d'un chargement à froid)
+- gel « palette > puis Échap puis aller » vu par p14 dans le harnais de chrome-palette (20 s sans réponse, aussi sur 75a527f9) : non reproduit par OG2.18/OG2.18d (lab onglets) — limite, cause non localisée
+- projet-visite R3.18 (presse-papiers) rouge sous charge, aussi sur la base 64fad93d
+- design 83/100 : logo .mark quasi invisible en thème sombre (viewer.html:106, invert seulement en clair ; antériorité à confirmer)
+- design : aide ? sans voile --scrim en sombre (la palette en a un, DESIGN § 5)
+- design : tiroir Git, ligne HEAD : pastille de branche tronquée « ma… » alors que le tiroir est large
+- design : liste Projet 1440 px, cellule État décalée de ~3 px vers le haut
+- design : pastilles du menu ⋯ en clair non vues (lab sans Santé ni Récent)
+- revue3 : 01-vf-responsive.js:253 ranger() ré-attache toute la rangée : un bouton d'en-tête focalisé perd le focus (addHeaderButton tardif, franchissement de 1280 px)
+- revue3 : slot.hidden de #vf-coin-etat a deux propriétaires (02-vf-ligne-echec.js:36 et 02-vf-ligne-etat.js:70)
+- revue3 : test-cockpit-coquille.sh C3.3 empreinte vide #ask-live/.vp-status et retire .vf-ech au lieu de comparer avant/après
+- revue3 : 01-vf-responsive.js:62 la règle :has du groupe vide ne teste que [hidden] ; libellé « Suivre » sur rangée vide si vf-lock manque
+- revue3 : chrome-palette.mjs:195 commentaire périmé (aller sans réponse après palette), contredit par OG2.18/OG2.18d
+- revue3 : 07-vf-raccourcis.js:105-114 indentation des continuations incohérente
+- revue3 : message du commit 62ab1e17 annonce « aller et le clic » ; seul aller est prouvé (EC4.1)
+- 80-18 : durées de ci-shard-suites.sh mesurées sur le poste sous charge : à remplacer par la mesure du premier run CI
+- revue4 : observateurs-cliquet.mjs:13 ne compte que `new MutationObserver(` ; 7 observateurs posés par l'aide obs()/observer() (77-vf-git-tiroir:253, 02-vf-coin:106-108, 02-vf-ligne-etat:82, 02-vf-reperes:130-131) lui échappent (outil de 79-17)
+- revue4 : ci-shard-suites.sh:63 commentaire contradictoire (« une suite à la fois … trois en parallèle »)
+- revue4 : test-cockpit-coquille.sh sans ligne de durée dans ci-shard-suites.sh (DEFAUT 7 s)
+- cycle-serveur AM7.6 au poste macOS cite test-cockpit-lien-vue.sh (80-13) : recherche de Chrome par $MAC non neutralisée par le sed ; vert en CI Linux
+- test-cockpit-responsive.sh : mutants R21m/R22m rougissent par erreur de syntaxe et non par absence du repli ; vraie mutation sur un lab avec Git à poser
+- N1 (amorce-navigateur) : borne de 25 s du lanceur contre 11 à 27 s de Chrome froid en CI ; EKR1/EK5.1 (equipe) : action qui lit la première zone .vf-doing, à cibler par [data-vf-doing]
+
+**Déclencheur de reprise :** la passe complète avant la release, ou la prochaine phase qui touche les onglets, la palette, le coin bas-droit ou le partage CI.

@@ -13,16 +13,21 @@
   function lireExigences(phaseId) {
     const vide = { exigences: [], couverture: {} };
     try {
+      // 76-08 (P76-D-25) : lu dans meta.vf.trace.exigences (id, libelle, coche, phase, ws) et nodes[].trace.plans[] (fichier, exigences), posés par la
+      // collecte ; une exigence d'archive (ws '*') se rattache au nœud que la collecte a désigné (cleNoeud), jamais par le numéro seul ;
+      // `cible` : null (aucune carte)
       const G = window.Floorplan.graph, id = String(phaseId || '').replace(/^n:/, '');
-      if (!(G.nodes || []).some((n) => n.id === id && n.kind === 'phase')) return vide;
-      const exigences = (G.files || []).filter((f) => f.n === id + '.req').map((f) => ({ id: String(f.name), texte: String(f.d || ''),
-        cochee: f.st === 'done', cible: 'f:' + f.p }))
+      const n = (G.nodes || []).find((x) => x.id === id && x.kind === 'phase'), tr = G.meta && G.meta.vf && G.meta.vf.trace;
+      if (!n || !tr || !Array.isArray(tr.exigences)) return vide;
+      const cle = (n.ws || '') + '|' + n.num;
+      const exigences = tr.exigences.filter((e) => (e.ws === '*' ? e.cleNoeud === cle : String(e.phase) === String(n.num) && (e.ws || null) === (n.ws || null)))
+        .map((e) => ({ id: String(e.id), texte: String(e.libelle || ''), cochee: e.coche === true, cible: null }))
         .sort((a, b) => a.id.localeCompare(b.id, 'fr', { numeric: true }));
-      const parCible = new Map(exigences.map((e) => [e.cible, e])), plans = new Set((G.files || []).filter((f) => f.n === id &&
-        /-PLAN\.md$/.test(f.p)).map((f) => 'f:' + f.p));
-      const couverture = {};
-      for (const l of G.links || []) if (l.k === 'data' && l.label === 'couvre' && plans.has(l.a) && parCible.has(l.b)) (couverture[l.a] = couverture[l.a] ||
-        []).push(parCible.get(l.b));
+      const parId = new Map(exigences.map((e) => [e.id, e])), couverture = {};
+      for (const p of (n.trace && n.trace.plans) || []) {
+        const lues = (p.exigences || []).filter((i) => parId.has(i)).map((i) => parId.get(i));
+        if (lues.length) couverture['f:' + p.fichier] = lues;
+      }
       return { exigences, couverture };
     } catch (e) { void e; return vide; }
   }

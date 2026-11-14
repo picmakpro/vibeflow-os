@@ -29,13 +29,15 @@
     vues.set(nom, v);
   };
 
+  // le titre n'est écrit que par 90-vf-titre.js (préfixe « vous attend » compris) : ici on lui donne l'onglet affiché, sans lui on ne fait rien
   const titrer = (nom) => {
     const SC = moteur(), p = SC && SC.graph && SC.graph.project, n = String((p && p.name) || '').replace(/ — (Projet|Équipe)$/, '');
-    if (!document.title.startsWith(LIBELLE[nom] + ' · ')) document.title = LIBELLE[nom] + ' · ' + n;
+    const T = window.__vfTitre, b = window.__vfTitreBase;
+    if (T && typeof T.composer === 'function' && b) { b.onglet = LIBELLE[nom]; if (!b.nom) b.nom = n; T.composer(); }
   };
   const dire = (texte) => { // la zone status de Projet quand elle existe, sinon celle de la barre de question (aucune lecture ici)
     const F = window.VF_PROJET, z = document.getElementById('ask-live');
-    if (F && typeof F.annoncer === 'function') F.annoncer(texte); else if (z) z.textContent = texte;
+    if (F && typeof F.annoncer === 'function') F.annoncer(texte); else if (z) { z.textContent = ''; z.textContent = texte; } // remise à zéro
   };
   const annoncer = (nom) => dire(LIBELLE[nom]);
   // 80-21 : l'échec d'un chargement est lu dans la coquille à chaque appel (rien n'est gardé ici) ; `affiche` : l'onglet resté affiché, ou null
@@ -97,7 +99,10 @@
   const chargerMaintenant = (nom, { pop = false, fragment = null, adresse = '' }) => {
     const ici = location.pathname + location.search + location.hash;
     if (pop && ici !== adresse) history.replaceState(null, '', adresse); // la dernière demande de l'humain gagne
-    if (nom === C.onglet()) return Promise.resolve(); // une demande vers l'onglet affiché, devenue la dernière : rien à charger (un fragment n'y a pas d'effet)
+    // après un échec de DÉMARRAGE (motif nul) onglet() garde l'ancien nom alors que son document est démonté : il faut le recharger
+    const demonte = C.etat().phase === 'echec' && C.etat().motif === null;
+    // une demande vers l'onglet affiché, devenue la dernière : rien à charger (un fragment n'y a pas d'effet)
+    if (nom === C.onglet() && !demonte) return Promise.resolve();
     const precedent = C.onglet(), git = gitOuvert(), avant = location.hash;
     // le moteur d'arrivée lit l'adresse au premier rendu : le fragment de l'onglet quitté (v, s, z, git) ne doit pas s'y appliquer. Il est mémorisé, retiré
     // pendant le chargement (replaceState, aucune entrée d'historique) et remis à l'identique, chargement rejeté ou non (l'entrée quittée le garde).
@@ -109,8 +114,8 @@
     return C.chargerOnglet(nom).then(() => {
       if (!pop && avant) history.replaceState(null, '', location.pathname + location.search + avant); // l'entrée quittée garde son fragment
       const chemin = CHEMIN[nom] + (fragment !== null ? fragment : hashes.get(nom) || '');
-      if (!pop && !(precedent === null && PAR_CHEMIN[location.pathname] === nom)) history.pushState(null, '', chemin);
-      else if (!pop && fragment !== null) history.replaceState(null, '', chemin); // relance d'un premier chargement en échec : l'entrée existe déjà
+      if (!pop && PAR_CHEMIN[location.pathname] !== nom) history.pushState(null, '', chemin);
+      else if (!pop && fragment !== null) history.replaceState(null, '', chemin); // relance après un échec : l'entrée existe déjà
       return arriver(nom, precedent, !pop && fragment === null, git);
     }, (e) => {
       const a = C.onglet();
