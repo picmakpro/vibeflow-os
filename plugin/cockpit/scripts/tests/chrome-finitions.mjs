@@ -61,15 +61,13 @@ const EQUIPE = `JSON.stringify((() => { const b = getComputedStyle(document.body
     return [q, c.fontFamily === b.fontFamily, /tabular-nums/.test(c.fontVariantNumeric), c.fontWeight]; }); })())`;
 const LOCK = `JSON.stringify((() => { const e = document.getElementById('vf-lock'), c = getComputedStyle(e), b = getComputedStyle(document.body);
   return [c.fontFamily === b.fontFamily, /tabular-nums/.test(c.fontVariantNumeric), c.fontWeight]; })())`;
-// deux sources de pastilles, comme les posent 20-health.js et 25-recent.js (le bouton, puis la pastille, puis les variables de teinte, dans le même tour)
+// la pastille de Santé, comme la pose 20-health.js (le bouton, puis la pastille, puis les variables de teinte, dans le même tour)
 const POSER = `(() => { const SC = window.VibeFlow;
   const bouton = (id) => document.getElementById(id)
     || SC.addHeaderButton({ id, svg: '<circle cx="12" cy="12" r="4"/>', title: id + ' de test', onClick() {} });
-  const sante = bouton('btn-health'), recent = bouton('btn-recent');
-  for (const [b, texte] of [[sante, '3'], [recent, '2']]) { b.hidden = false; b.querySelector('.badge')?.remove();
+  const sante = bouton('btn-health');
+  for (const [b, texte] of [[sante, '3']]) { b.hidden = false; b.querySelector('.badge')?.remove();
     const p = document.createElement('span'); p.className = 'badge'; p.textContent = texte; b.appendChild(p); }
-  // la teinte de Récent vient de la feuille de 25-recent.js (#btn-recent .badge), absente ici sans donnée : posée comme elle la pose
-  recent.querySelector('.badge').style.cssText = 'background: var(--recent); color: var(--on-recent-text)';
   sante.style.setProperty('--hc-badge', 'var(--sev-medium)'); sante.style.setProperty('--hc-badge-text', 'var(--on-sev-text)'); return true; })()`;
 const PASTILLES = `JSON.stringify((() => { const J = window.__j, ouvreur = document.getElementById('vf-plus');
   const point = () => { const e = document.querySelector('#vf-plus .badge'); return e ? J.rgb(getComputedStyle(e).backgroundColor) : null; };
@@ -80,9 +78,8 @@ const PASTILLES = `JSON.stringify((() => { const J = window.__j, ouvreur = docum
     const e = it && it.querySelector('.badge'); if (!e) return null;
     const c = getComputedStyle(e);
     return { fond: J.rgb(c.backgroundColor), texte: J.rgb(c.color), ratio: J.ratio(J.norm(c.color), J.norm(c.backgroundColor)) }; };
-  return { sante: lire('btn-health'), recent: lire('btn-recent'), point: avant,
-    attendu: { sante: [J.jeton('--sev-medium'), J.jeton('--on-sev-text')],
-      recent: [J.jeton('--recent'), J.jeton('--on-recent-text')], on: J.jeton('--on') } }; })())`;
+  return { sante: lire('btn-health'), point: avant,
+    attendu: { sante: [J.jeton('--sev-medium'), J.jeton('--on-sev-text')], on: J.jeton('--on') } }; })())`;
 const MESURE = `(() => { const R = (e) => { if (!e || e.hidden) return null; const b = e.getBoundingClientRect();
     return b.width > 0 && b.height > 0 ? { left: b.left, right: b.right, top: b.top, bottom: b.bottom } : null; };
   const a = document.activeElement, k = a && a.closest ? a.closest('.vp-carte, .vp-ligne') : null, c = R(k), p = document.getElementById('panel');

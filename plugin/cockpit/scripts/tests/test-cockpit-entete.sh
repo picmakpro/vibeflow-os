@@ -32,7 +32,7 @@ LAB="$WORK/lab"; mklab "$LAB"; mkdir -p "$LAB/src" "$LAB/lib"
 for i in 1 2 3 4 5 6; do
   printf 'export const v%s = %s;\n' "$i" "$i" > "$LAB/src/m$i.js"; printf '# n%s\n' "$i" > "$LAB/lib/n$i.md"
 done
-# un travail récent : le bouton « Travail récent » est posé
+# un plan qui nomme un fichier du lab (le sélecteur de lentilles a de quoi travailler)
 printf -- '---\nfiles_modified: [src/m1.js]\n---\n<objective>Écran</objective>\n' > "$LAB/.planning/phases/02-ecran/02-01-PLAN.md"
 git -C "$LAB" add -A && git -C "$LAB" -c user.email=t@t -c user.name=t commit -q -m fichiers
 build_serve "$LAB" --terminal
@@ -80,16 +80,16 @@ for w in 1440 1600; do for onglet in code codeClair projet equipe; do
 done; done
 assert_eq "EN2.1b — en français (?lang=fr) les libellés sont Lire, Suivre, Affichage (dictionnaire du chrome)" \
   "$(E "j.fr.libs.join()" "$R2")" "Lire,Suivre,Affichage"
-IDS='["vf-git-ouvreur","theme-toggle","btn-health","btn-recent","tour-btn","btn-export","vf-lock","flows-btn","filters-btn","btn-panel","vf-plus"]'
+IDS='["vf-git-ouvreur","theme-toggle","btn-health","btn-lentilles","tour-btn","btn-export","vf-lock","flows-btn","filters-btn","btn-panel","vf-plus"]'
 for w in 1279 1100 800 390; do
   assert_eq "EN2.2 ($w px) — aucun groupe ni libellé, ordre DOM des boutons de .hr inchangé" \
     "$(E "[j.inv[$w].groupes, j.inv[$w].libs, JSON.stringify(j.inv[$w].ids)]" "$R2")" "[0,0,\"$(printf '%s' "$IDS" | sed 's/"/\\"/g')\"]"
 done
 RECTS="$(cat_json <<'EOF'
-[[["vf-git-ouvreur",867,14,36,36],["theme-toggle",907,14,36,36],["btn-health",947,14,36,36],["btn-recent",987,14,36,36],
+[[["vf-git-ouvreur",867,14,36,36],["theme-toggle",907,14,36,36],["btn-health",947,14,36,36],["btn-lentilles",987,14,36,36],
 ["tour-btn",1027,14,36,36],["btn-export",1067,14,36,36],["vf-lock",1107,14,36,36],["flows-btn",1147,14,36,36],
 ["filters-btn",1187,14,36,36],["btn-panel",1227,14,36,36]],
-[["vf-git-ouvreur",688,14,36,36],["theme-toggle",728,14,36,36],["btn-health",768,14,36,36],["btn-recent",808,14,36,36],
+[["vf-git-ouvreur",688,14,36,36],["theme-toggle",728,14,36,36],["btn-health",768,14,36,36],["btn-lentilles",808,14,36,36],
 ["tour-btn",848,14,36,36],["btn-export",888,14,36,36],["vf-lock",928,14,36,36],["flows-btn",968,14,36,36],
 ["filters-btn",1008,14,36,36],["btn-panel",1048,14,36,36]],
 [["vf-git-ouvreur",592,6,44,44],["vf-lock",640,6,44,44],["btn-panel",696,6,44,44],["vf-plus",744,6,44,44]],
@@ -104,8 +104,8 @@ assert_eq "EN2.2c — de 1440 à 1100 px sans recharger : les groupes sont défa
 assert_eq "EN2.3 — fil d'Ariane : chaque .sep porte un svg aria-hidden et aucun « / » ; l'en-tête ne déborde pas" \
   "$(E "[1440, 800].map((w) => [j.chev[w].n >= 1, j.chev[w].svg, j.chev[w].texte])
     .concat([[1440, 800, 390].map((w) => j.chev[w].deborde)])" "$R2")" '[[true,true,""],[true,true,""],[false,false,false]]'
-assert_eq "EN2.4 — Parcours n'a plus le triangle de lecture, Travail récent n'a plus l'air d'un chargement" \
-  "$(E "[j.icones.flows !== 'M7 5v14l11-7z', !/M12 3v3M12 18v3/.test(j.icones.recent), /^M3 12a9 9/.test(j.icones.recent)]" "$R2")" '[true,true,true]'
+assert_eq "EN2.4 — Parcours n'a plus le triangle de lecture" \
+  "$(E "[j.icones.flows !== 'M7 5v14l11-7z']" "$R2")" '[true]'
 POINT='{"clip":"@","w":#,"bl":"%","ligne":"220px","nom":"220px"}'
 POINT_A="$(printf '%s' "$POINT" | sed 's/@/path(/; s/#/16/; s/%/none/')"; POINT_B="$(printf '%s' "$POINT" | sed 's/@/none/; s/#/8/; s/%/block/')"
 assert_eq "EN2.4b — #vf-lock : glyphe de sessions de 701 à 1 639 px (libellé masqué), point et libellé au-delà ; troncature à 220 px gardée" \

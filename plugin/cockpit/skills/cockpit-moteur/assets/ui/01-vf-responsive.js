@@ -211,11 +211,11 @@
   // un bouton posé plus tard rejoint son groupe par son id, sinon « Affichage ». Sous 1 280 px le rangement est défait (ordre et parents d'origine).
   // L'écouteur `change` vit dans le rappel de surOnglet.
   const GROUPES = [['lire', 'Read', ['flows-btn', 'screens-btn', 'filters-btn', 'tour-btn']],
-    ['suivre', 'Follow', ['btn-recent', 'btn-health', 'btn-synthese', 'vf-lock']], // 77 : Synthèse juste après Santé
+    ['suivre', 'Follow', ['btn-lentilles', 'btn-health', 'btn-synthese', 'vf-lock']], // 77 : Synthèse après Santé ; 75 : lentilles avant Santé
     ['affichage', 'Display', ['btn-export', 'theme-toggle', 'btn-panel']]];
   const mq1280 = window.matchMedia('(min-width: 1280px)'), tr = window.__vfFrT || ((x) => x), extHdr = document.getElementById('hdr-ext');
   let origine = null; // [unité, parent d'origine] dans l'ordre du document, relevé avant son rangement
-  const SEL = ':scope > .rel, :scope > button, :scope > .vf-hdr-groupe > .vf-hdr-rangee > *, #hdr-ext > button';
+  const SEL = ':scope > .rel, :scope > button, :scope > .vf-hdr-groupe > .vf-hdr-rangee > *, #hdr-ext > button, #hdr-ext > .rel';
   const unites = () => (colDroite ? [...colDroite.querySelectorAll(SEL)].filter((e) => e.id !== 'vf-plus' && e.id !== 'vf-git-ouvreur') : []);
   const cleDe = (e) => (e.classList.contains('rel') ? (e.querySelector('button') || e).id : e.id);
   const deranger = () => {
@@ -232,7 +232,11 @@
     if (!mq1280.matches) { deranger(); return; }
     origine = origine || [];
     // un bouton posé plus tard suit les autres
-    for (const e of unites()) if (!origine.some((x) => x[0] === e)) origine.push([e, e.parentElement === extHdr ? extHdr : colDroite]);
+    // un bouton posé plus tard garde sa place d'origine s'il la déclare (data-vf-apres : l'id d'un bouton qu'il suit), sinon il vient en dernier
+    for (const e of unites()) if (!origine.some((x) => x[0] === e)) {
+      const k = e.dataset && e.dataset.vfApres ? origine.findIndex((x) => cleDe(x[0]) === e.dataset.vfApres) : -1;
+      origine.splice(k < 0 ? origine.length : k + 1, 0, [e, e.parentElement === extHdr ? extHdr : colDroite]);
+    }
     const cibles = [];
     for (const [cle, lib] of GROUPES) {
       let g = colDroite.querySelector(`:scope > [data-vf-groupe="${cle}"]`);

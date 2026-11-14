@@ -61,7 +61,7 @@
     const style = document.createElement('style');
     style.id = ID; style.textContent = CSS; document.head.appendChild(style);
     const racine = document.createElement('div');
-    racine.className = 'rel'; racine.id = 'vfa-rel';
+    racine.className = 'rel'; racine.id = 'vfa-rel'; racine.dataset.vfApres = 'btn-health'; // sa place d'origine (le regroupement de l'en-tête la lit)
     const bouton = M.addHeaderButton({ id: 'btn-lentilles', label: T.F.bouton('Aucune'), svg: LENTILLE, title: T.TEXTES.infobulle,
       onClick: () => { const p = parties.get('menu'); if (p && p.inst) p.inst.basculer(); } });
     bouton.classList.add('icon'); // carré : l'étiquette `.bl` reste (le « ⋯ » la lit), l'en-tête garde son budget

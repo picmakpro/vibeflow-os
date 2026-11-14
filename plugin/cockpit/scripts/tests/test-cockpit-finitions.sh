@@ -83,13 +83,11 @@ assert_eq "FI3.1 — #vf-lock : police du texte, chiffres tabulaires, graisse 50
   "$(E '[j.lock, j.mono]' "$R3")" '[[true,true,"500"],true]'
 assert_eq "FI3.1b — Équipe (.aw-driver .n, .r-t, .r-meta b, .r-verr .n) : police du texte, chiffres tabulaires, graisse 500" \
   "$(E 'j.equipe.map((e) => e.slice(1))' "$R3")" '[[true,true,"500"],[true,true,"500"],[true,true,"500"],[true,true,"500"]]'
-assert_eq "FI3.2 — thème clair à 800 px : pastille Santé du menu « ⋯ » à la teinte --hc-badge (texte --on-sev-text), Récent à --recent \
-(texte --on-recent-text), contraste ≥ 4,5:1, point de « ⋯ » de la teinte la plus haute" \
+assert_eq "FI3.2 — thème clair à 800 px : pastille Santé du menu « ⋯ » à la teinte --hc-badge (texte --on-sev-text), contraste ≥ 4,5:1, point de « ⋯ » de la teinte la plus haute" \
   "$(E '(() => { const p = j.pastilles, a = p.attendu; return [p.sante && p.sante.fond === a.sante[0],
 p.sante && p.sante.texte === a.sante[1], p.sante && p.sante.ratio >= 4.5,
-    p.recent && p.recent.fond === a.recent[0], p.recent && p.recent.texte === a.recent[1],
-p.recent && p.recent.ratio >= 4.5, p.point === a.sante[0], p.point !== a.on]; })()' "$R3")" \
-  '[true,true,true,true,true,true,true,true]'
+    p.point === a.sante[0], p.point !== a.on]; })()' "$R3")" \
+  '[true,true,true,true,true]'
 R34="$(mesurer fi34)"; sonde "$R34"
 assert_eq "FI3.4 — zone basse à 390 et 800 px (couloirs et liste, feuille de détail ouverte puis fermée, pastille « Terminal ») : après \
 Fin, l'élément focalisé n'intersecte ni #ask, ni la pastille, ni la feuille ; aucun défilement horizontal" \

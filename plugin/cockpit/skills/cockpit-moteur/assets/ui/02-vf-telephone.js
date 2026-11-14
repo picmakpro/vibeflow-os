@@ -20,6 +20,7 @@
     @media (max-width: 999px) { /* amendement de P70-D-01 (2026-11-06) : le menu « ⋯ » dès 999 px */
       #hdr-ext > button:not(#vf-lock), #btn-lentilles, #theme-toggle, #btn-health, #flows-btn, #filters-btn { display: none !important; }
       #vf-plus { display: inline-flex; position: relative; }
+      #vfa-rel { display: contents; } /* bouton masqué, menu focalisable : l'enveloppe n'est plus un flex item (écart) */
       #vf-plus .badge, .vf-pl-i .badge { min-width: 16px; height: 16px; border-radius: 999px; background: var(--vf-pl-teinte, var(--on)); color: var(--vf-pl-texte, var(--on-text)); font-size: 10px; font-weight: 600; display: grid; place-items: center; padding: 0 var(--sp-4); }
       #vf-plus .badge { position: absolute; top: var(--sp-8); right: var(--sp-8); min-width: 0; width: 8px; height: 8px; padding: 0; }
       #vf-plus-voile { position: fixed; inset: 0; z-index: 39; background: var(--scrim); } /* DESIGN.md §5 : un menu se pose toujours sur un voile --scrim */
@@ -61,7 +62,7 @@
   const court = (b) => b.id === 'theme-toggle' ? lib(b).split(/[(.]/)[0].trim() : lib(b);
   const pastille = (b) => (b.querySelector('.badge')?.textContent || '').trim();
   // P80-D-20 (AUDC-F5) : la pastille du menu et le point de « ⋯ » prennent la teinte de la pastille du bureau
-  // (Santé : --hc-badge, Récent : --recent), relue telle que rendue
+  // (Santé : --hc-badge), relue telle que rendue
   const colorer = (el, src) => {
     const e = src && src.querySelector('.badge'); if (!e) return;
     const c = getComputedStyle(e); el.style.setProperty('--vf-pl-teinte', c.backgroundColor); el.style.setProperty('--vf-pl-texte', c.color);
