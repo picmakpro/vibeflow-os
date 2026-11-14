@@ -190,10 +190,12 @@ panne.actif = true;
 const c33 = await un('code'); const intact = await empreinte(); panne.actif = false; const suite = await un('projet');
 const j0 = await s.ev('__s.journal.length');
 const c34 = await s.ev(`(async () => { const a = VF_COQUILLE.chargerOnglet('code'), b = VF_COQUILLE.chargerOnglet('equipe'); await Promise.all([a, b]); return { onglet: VF_COQUILLE.onglet(), j: __s.journal.slice(${j0}) }; })()`);
+// 73-08 : l'onglet Équipe n'a plus de canevas ni de lecture de graphe ; le témoin du 304 se joue sur Code, déjà lu plus haut (c31, c34)
+await s.ev(`VF_COQUILLE.chargerOnglet('code')`);
 await s.ev(`(VibeFlow.graph.nodes[0].MQ16 = 'MQ16-MUTE', 1)`); const nr = reseau.length;
-await s.ev(`VF_COQUILLE.chargerOnglet('equipe')`);
-const gr = reseau.slice(nr).filter((x) => /api\/vf\/graphe/.test(x.url)).pop() || {};
-const c35 = { inm: !!gr.inm, statut: gr.statut, neuf: await s.ev(`JSON.stringify(VibeFlow.graph).includes('MQ16-MUTE') ? 'mute' : 'neuf'`) };
+await s.ev(`VF_COQUILLE.chargerOnglet('code')`);
+const gr = reseau.slice(nr).filter((x) => /api\/vf\/graphe\?onglet=code$/.test(x.url))[0] || {}; // la lecture demandée par chargerOnglet('code') ; le moteur de Code en demande d'autres (onglet=projet) ensuite
+const c35 = {  inm: !!gr.inm, statut: gr.statut, neuf: await s.ev(`JSON.stringify(VibeFlow.graph).includes('MQ16-MUTE') ? 'mute' : 'neuf'`) };
 return { c31, c32: { rej: c32, req: [avant.n, apres.n], h: [avant.h, apres.h], onglet: [avant.onglet, apres.onglet] }, c33, intact: [intact.h === apres.h, intact.onglet === apres.onglet, intact.tab === apres.tab], suite, c34, c35, viol: s.violations.length };
 JS
 chrome avec "http://127.0.0.1:$PORT/project.html" "$AUX/c3.js" > "$WORK/c3.json"
@@ -351,7 +353,7 @@ echo "=== C6 — après des changements d'onglet, le document équivaut à un ch
 cat > "$AUX/c6froid.js" <<'JS'
 await s.attendre(`document.documentElement.dataset.vfPret === 'oui'`, 'document prêt');
 // la pastille #vf-lock naît du premier évènement du flux du direct : elle arrive APRÈS « pret », en un temps que la charge allonge ; mesurer une fois posée
-await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await s.attendre(`__s.complet()`, 'état complet de l\'onglet (régie, ou en-tête git, ou panneau de retour et synthèse)');
 const emp = await s.stable('__s.empreinte()', 'empreinte du document à froid'); // mesurer une fois posé : deux relevés consécutifs égaux, jamais une pause fixe
 return { emp, prof: await s.ev(`__s.profondeurFetch()`) };
 JS
@@ -359,7 +361,7 @@ cat > "$AUX/c6seq.js" <<'JS'
 const res = [];
 for (const nom of (JSON.parse('SUITE'))) {
   await s.ev(`VF_COQUILLE.chargerOnglet('${nom}')`);
-  await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+  await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await s.attendre(`__s.complet()`, 'état complet de l\'onglet (régie, ou en-tête git, ou panneau de retour et synthèse)');
   res.push({ nom, emp: await s.stable('__s.empreinte()', 'empreinte après ' + nom), prof: await s.ev(`__s.profondeurFetch()`) });
 }
 return res;
@@ -477,7 +479,7 @@ cat > "$AUX/c8c.js" <<'JS'
 await pause(300); panne.actif = false;
 await s.ev(`document.querySelector('#vf-coquille-echec button').click()`);
 await s.attendre(`VF_COQUILLE.etat().phase === 'pret'`, 'retour à pret après Réessayer');
-await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await s.attendre(`__s.complet()`, 'état complet de l\'onglet (régie, ou en-tête git, ou panneau de retour et synthèse)');
 const empC = await s.stable('__s.empreinte()', 'empreinte après Réessayer');
 return { ...(await s.ev(MESURE)), emp: empC, prof: await s.ev('__s.profondeurFetch()') };
 JS
@@ -489,7 +491,7 @@ return await s.ev(MESURE);
 JS
 cat > "$AUX/c8e.js" <<'JS'
 // panne: non
-await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await pause(700); const avant = await s.ev(MESURE);
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await s.attendre(`__s.complet()`, 'état complet de l\'onglet (régie, ou en-tête git, ou panneau de retour et synthèse)'); await pause(700); const avant = await s.ev(MESURE);
 panne.actif = true;
 const rej = await s.ev(`VF_COQUILLE.chargerOnglet('code').then(() => 'resolu', (e) => String(e.message))`); await pause(300);
 const apres = await s.ev(MESURE); panne.actif = false;
@@ -498,7 +500,7 @@ return { avant, rej, apres, suite };
 JS
 cat > "$AUX/c8f.js" <<'JS'
 // panne: non
-await s.attendre(`document.documentElement.dataset.vfPret === 'oui'`, 'document prêt'); await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); const empF = await s.stable('__s.empreinte()', 'empreinte du chargement normal'); return { ...(await s.ev(MESURE)), emp: empF, prof: await s.ev('__s.profondeurFetch()') };
+await s.attendre(`document.documentElement.dataset.vfPret === 'oui'`, 'document prêt'); await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await s.attendre(`__s.complet()`, 'état complet de l\'onglet (régie, ou en-tête git, ou panneau de retour et synthèse)'); const empF = await s.stable('__s.empreinte()', 'empreinte du chargement normal'); return { ...(await s.ev(MESURE)), emp: empF, prof: await s.ev('__s.profondeurFetch()') };
 JS
 cat > "$AUX/c8verdict.mjs" <<'JS'
 // c8verdict.mjs <dossier> : les contrôles de C8 qui échouent (noms), un par ligne ; vide = tout vert
