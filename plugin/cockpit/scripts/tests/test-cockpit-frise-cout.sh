@@ -472,7 +472,8 @@ export default async function (h) {
     h.egal('D14', 'témoin : un seul bandeau, une seule section, un seul abonnement git (les abonnés frise sont ceux des autres modules, jamais ceux de la 74-07)', [a.cout, a.depot, a.racines, a.tire, a.gitSans, a.ab.frise >= 1], [1, 1, 1, 1, 1, true]);
     await h.ev("window.VF_COQUILLE.chargerOnglet('code').then(() => 1)"); await ou('code');
     const loin = await h.ev(() => window.VF_ETAT.abonnes());
-    h.egal('D14', 'hors de l\'onglet Équipe : plus aucun abonnement git', loin.git, 0);
+    // sur Code, 75-vf-activite.js abonne `git` (contrat de 75-08) : seul cet abonné reste, ceux de la régie et de la 74-07 sont partis
+    h.egal('D14', 'hors de l\'onglet Équipe : plus aucun abonnement git de la régie ni de la 74-07 (reste le seul abonné de l\'activité de la 75 sur Code)', loin.git, 1);
     await h.ev("window.VF_COQUILLE.chargerOnglet('equipe').then(() => 1)"); await ou('equipe'); await h.attendreFrise();
     const b = await lire();
     await h.cycle('code'); await h.attendreFrise();

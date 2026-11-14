@@ -202,7 +202,7 @@ body.in-flow #context { opacity: 0; }
 .ico svg { width: 16px; height: 16px; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 .title { font-size: 15px; font-weight: 600; letter-spacing: -.015em; line-height: 1.3; overflow: hidden; min-width: 0; flex: 1; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 2; overflow-wrap: anywhere; }
 .card > .title { flex: none; } /* an endpoint's name, on its own row under the method and path */
-/* footer: size on the left, recent-work pill on the right, pinned to the bottom of the card */
+/* footer: size on the left, state pill on the right, pinned to the bottom of the card */
 .foot { margin-top: auto; display: flex; align-items: center; justify-content: space-between; gap: var(--sp-8); min-height: var(--sp-20); }
 .foot .meta { align-self: center; }
 svg.lod-low .foot .meta { visibility: hidden; }
@@ -218,15 +218,6 @@ svg.lod-low .foot .meta { visibility: hidden; }
 .node:hover .card.external { background: rgba(var(--ink), .03); }
 .card.dir { background: var(--dir-bg); box-shadow: inset 0 0 0 1px rgba(var(--ink), .05); }
 .card.module { background: var(--raise); }
-/* recent work: cards Claude just changed (green ring + tag), and the parts that contain them (soft ring + count) */
-/* 71.5 (P71.5-D-18) : une carte récente n'a ni anneau ni halo, une seule élévation (--shadow-card, --shadow-lift au survol) ; le récent se dit par la pastille .rw */
-.card.recent, .card.recent-in { box-shadow: var(--shadow-card); }
-/* 71.5 (P71.5-D-18, N1) : pastille sans fond, glyphe (disque plein --recent) + mot --text-2 ; padding horizontal nul hors paliers lod pour que le bord visible s'aligne sur le titre */
-.rw { flex: none; display: inline-flex; align-items: center; gap: var(--sp-6); font-size: 11px; font-weight: 500; line-height: 16px; color: var(--text-2); background: none; border-radius: 999px; padding: var(--sp-2) 0; white-space: nowrap; }
-.rw::before { content: ""; width: .9em; height: .9em; flex: none; background: var(--recent); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='black'/%3E%3C/svg%3E") center / contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Ccircle cx='8' cy='8' r='5' fill='black'/%3E%3C/svg%3E") center / contain no-repeat; }
-.rw.soft { font-weight: 500; }
-body.no-recent .rw { display: none; }
-svg.lod-low .rw { font-size: 18px; padding: var(--sp-4) var(--sp-12); line-height: 20px; } /* dérivé : pastille du zoom d'éloignement, hauteur 28 en unités du graphe */
 .card.has-note .title::after { content: ""; display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: var(--sev-medium); margin-left: var(--sp-8); vertical-align: middle; }
 .card.connector { flex-direction: row; align-items: center; gap: var(--sp-8); padding: 0 var(--sp-12) 0 var(--sp-8); border-radius: var(--r-card); background: var(--raise); } /* optique : icône à fond teinté à gauche (8), glyphe nu à droite (12) */
 .card.connector .ico { width: auto; height: auto; }
@@ -275,7 +266,8 @@ svg.dim .edge:not(.hl) { opacity: .1; }
 .menu { position: absolute; z-index: 30; min-width: 230px; padding: var(--sp-6); border-radius: 18px; display: none; transform-origin: top right; }
 .menu.open { display: block; animation: menuIn .22s var(--ease); }
 @keyframes menuIn { from { opacity: 0; transform: translateY(-4px) scale(.97); } }
-#flowmenu, #legend { top: 44px; right: 0; width: 320px; } /* dérivé : bouton 36 + 8 */
+#flowmenu, #legend, #lens-menu { top: 44px; right: 0; width: 320px; } /* dérivé : bouton 36 + 8 */
+#lens-menu { max-height: calc(100vh - var(--hh, 56px) - var(--sp-16)); overflow: auto; overscroll-behavior: contain; } /* le menu des lentilles (75-08) : plafonné, rien ne le pousse hors de l'écran ; <= 999 px le 60vh ci-dessous s'applique aussi */
 #flowmenu .r { padding: var(--inset-row); border-radius: 12px; cursor: pointer; transition: background .15s var(--ease); }
 #flowmenu .r:hover { background: rgba(var(--ink), .07); }
 #flowmenu .r b { font-weight: 500; display: block; }
@@ -333,10 +325,6 @@ svg.dim .edge:not(.hl) { opacity: .1; }
 #tooltip .td { color: var(--text-2); }
 #tooltip .tp { color: var(--text-3); font-family: var(--mono); font-size: 11.5px; margin-top: var(--sp-4); word-break: break-all; white-space: pre-line; }
 #tooltip .th { display: flex; gap: var(--sp-8); margin-top: var(--sp-8); color: var(--text-3); font-size: 11.5px; }
-#tooltip .trw { margin-top: var(--sp-8); padding: var(--inset-row); border-radius: 11px; background: var(--note-bg); }
-#tooltip .trh { display: flex; align-items: center; gap: var(--sp-6); color: var(--text-2); font-size: 11.5px; font-weight: 600; }
-#tooltip .trh::before { content: ""; width: 8px; height: 8px; border-radius: 50%; background: var(--recent); flex: none; }
-#tooltip .trn { color: var(--text); margin-top: var(--sp-4); }
 #tooltip .th span { display: inline-flex; gap: var(--sp-6); align-items: center; }
 #loading { position: absolute; left: calc((100% - var(--pw)) / 2); top: 50%; transform: translate(-50%, -50%); padding: var(--sp-8) var(--sp-16); border-radius: 999px; font-size: 12.5px; color: var(--text-2); opacity: 0; transition: opacity .3s var(--ease); pointer-events: none; }
 #loading.on { opacity: 1; }
@@ -553,7 +541,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .72; }
   .hr { flex: 0 0 auto; flex-wrap: wrap; }
   .brand #proj-name { display: none; }
   header .rel { position: static; } /* Flows and Filters open under the bar, inside the screen, wherever the bar wrapped */
-  #flowmenu, #legend { position: fixed; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: auto; width: min(320px, calc(100% - 2 * var(--sp-8))); max-height: 60vh; overflow: auto; }
+  #flowmenu, #legend, #lens-menu { position: fixed; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: auto; width: min(320px, calc(100% - 2 * var(--sp-8))); max-height: 60vh; overflow: auto; }
   .hr .btn { position: relative; padding: 0; justify-content: center; }
   .hr .btn .bl { display: none; }
   .hr .btn .badge { position: absolute; }
@@ -607,7 +595,7 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .72; }
   #loading { left: 50%; }
   header #zoom { position: static; flex: none; flex-direction: row; padding: 0; gap: 0; border-radius: 22px; } /* moved into the top row, left of the search icon */
   /* menus open as full-width cards under the bar */
-  #flowmenu, #legend { position: fixed; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: var(--sp-8); width: auto; max-height: 60vh; overflow: auto; }
+  #flowmenu, #legend, #lens-menu { position: fixed; top: calc(var(--hh, 56px) + var(--sp-4)); left: var(--sp-8); right: var(--sp-8); width: auto; max-height: 60vh; overflow: auto; }
   body #tour { left: var(--sp-8); right: var(--sp-8); width: auto; }
 }
 @media (prefers-reduced-motion: reduce) and (max-width: 999px), (prefers-reduced-motion: reduce) and (pointer: coarse) {
@@ -829,7 +817,7 @@ for (const [nid, list] of filesByNode) {
   for (const [key, fs] of groups) {
     if (!key || fs.length < 2) { fs.forEach((f) => addChild(parent, 'f:' + f.p)); continue; }
     const did = `d:${nid}|${key}`;
-    dirs.set(did, { node: nid, path: key, files: fs });
+    dirs.set(did, { node: nid, path: key, files: fs.filter((f) => f.st !== 'prevu') }); // 75-07 : un dossier ne compte pas les fichiers prévus
     addChild(parent, did);
     fs.forEach((f) => addChild(did, 'f:' + f.p));
   }
@@ -854,17 +842,6 @@ function chain(item) {
   chainCache.set(item, out);
   return out;
 }
-// Recent work (G.recent): the cards Claude just changed, and how many changes sit inside each part
-const recentTasks = G.recent?.tasks || [];
-const recentBy = new Map();
-for (const it of G.recent?.items || []) { if (!parentOf.has(it.id)) continue; if (!recentBy.has(it.id)) recentBy.set(it.id, []); recentBy.get(it.id).push(it); }
-const recentIn = new Map();
-for (const id of recentBy.keys()) for (const a of chain(id).slice(1)) if (a !== 'root') { if (!recentIn.has(a)) recentIn.set(a, []); recentIn.get(a).push(id); }
-const recentOf = (item) => recentBy.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item);
-const recentLabel = (list) => (list.some((x) => x.change === 'new') ? t('New') : t('Changed@pastille'));
-let recentShown = !!store.get('recent-hl', true);
-const setRecentShown = (on) => { recentShown = on; store.set('recent-hl', on); document.body.classList.toggle('no-recent', !on); };
-document.body.classList.toggle('no-recent', !recentShown);
 const symOf = (item) => { const m = /^s:(.*)#(\d+)$/.exec(item); const f = files.get(m[1]); return { f, s: f.s[+m[2]] }; };
 function humanize(s) { s = s.replace(/[_\-.]+/g, ' ').replace(/([a-z])([A-Z])/g, '$1 $2').trim(); return s.charAt(0).toUpperCase() + s.slice(1); }
 
@@ -1041,10 +1018,10 @@ function buildView(container) {
 // [width, min height]
 const SIZES = { node: [300, 128], dir: [272, 110], file: [284, 110], module: [284, 110], route: [300, 128], symbol: [260, 100] };
 const NOTE_H = 60;   // .anote : 2 x 18,1 de texte + 2 x 8 de padding + 8 de gap de carte
-const FOOT_H = 28;   // the footer row: size on the left, recent-work pill on the right (min-height 20 + gap 8)
+const FOOT_H = 28;   // the footer row: size on the left, state pill on the right (min-height 20 + gap 8)
 const TITLE2_H = 10; // a title that wraps onto a second line
 const GUTTER = 24; // room around each card for its shadow, selection ring and hover lift (matches --gutter, 24 : P71.5-D-09)
-/** Footer pieces: the card's size (modules / files / endpoints) and its recent-work pill. Empty when neither applies. */
+/** Footer pieces: the card's size (modules / files / endpoints) and its state pill. Empty when neither applies. */
 function cardFoot(item) {
   const i = info(item);
   let size = '';
@@ -1054,9 +1031,10 @@ function cardFoot(item) {
   else if (i.type === 'file') { const nr = (routesByFile.get(i.f.p) || []).length; size = nr ? plural(nr, 'endpoint') : ''; }
   if (i.n?.foot || i.f?.foot) size = i.n?.foot || i.f?.foot; // vibeflow P2
   const vst = i.n?.st || i.f?.st;
-  const rec = recentOf(item), inside = recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item);
-  const pill = vst ? `<span class="vst vst-${h(vst).replace(/[^\w-]/g, '')}">${h(STATE_WORD[vst] || vst)}</span>` : rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${t('{} changed', inside.length)}</span>` : '';
-  return size || pill ? `<div class="foot">${size ? `<span class="meta">${h(size)}</span>` : '<span></span>'}${pill}</div>` : '';
+  const pill = vst ? `<span class="vst vst-${h(vst).replace(/[^\w-]/g, '')}">${h(STATE_WORD[vst] || vst)}</span>` : '';
+  // 75-07 (P75-D-03, P75-D-25) : place RÉSERVÉE à la marque de lentille, sur l'onglet Code seulement (Projet et Équipe : géométrie inchangée), posée à la construction du graphe, jamais au changement de lentille
+  const reserve = !['project', 'equipe'].includes(G.meta?.vfTab) && (['dir', 'file', 'module'].includes(i.type) || (i.type === 'node' && i.n.kind !== 'external'));
+  return size || pill || reserve ? `<div class="foot">${size ? `<span class="meta">${h(size)}</span>` : '<span></span>'}${pill}</div>` : '';
 }
 /** Extra height a card needs beyond its base size: a footer, and a title long enough to wrap. */
 function cardExtraH(item) {
@@ -1095,8 +1073,6 @@ function cardHTML(item) {
   const note = answerNote(item);
   const noteHTML = note ? `<div class="anote"><b>${note.n}</b><span>${h(note.text)}</span></div>` : '';
   if (i.n?.st || i.f?.st) cls += ' st-' + String(i.n?.st || i.f?.st).replace(/[^\w-]/g, ''); // vibeflow P3, P16 : la classe ne porte que des caractères de mot
-  if (recentOf(item)) cls += ' recent';
-  else if (recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item)) cls += ' recent-in';
   return `<div class="card ${cls}" style="--c:${colorOf(i)}"><div class="head">${head}</div>${title}${desc}${noteHTML}${cardFoot(item)}</div>`;
 }
 function connectorHTML(c) {
@@ -1118,20 +1094,7 @@ function cardTip(id) {
   const sv = i.n?.st || i.f?.st;
   const size = sv ? '' : !st?.files ? '' : PLAN ? (i.type === 'file' || i.type === 'module' ? 'planned' : plural(st.files, 'planned file')) : i.type === 'file' || i.type === 'module' ? t('{} lines', fmt(st.loc)) : `${plural(st.files, 'file')} · ${t('{} lines', fmt(st.loc))}`;
   const hints = [drillable(id) && state.container !== id ? `<span><span class="kbd">${t('2×click')}</span> ${t('open')}</span>` : '', `<span><span class="kbd">${t('right-click')}</span><span class="sep">:</span> ${t('more')}</span>`].join('');
-  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kindFr(kind))}${size ? ` · ${size}` : ''}</div>${sv ? `<div class="td">${statePill(sv)}</div>` : ''}${where ? `<div class="tp">${h(where)}</div>` : ''}${recentTip(id)}${tipHints(hints)}`;
-}
-/** Hover lines for recent work: what changed on this card and how it serves the request, or what changed inside it. */
-function recentTip(id) {
-  if (!recentShown) return '';
-  const key = id.startsWith('m:') ? 'f:' + id.slice(2) : id;
-  const task = (ix) => h(recentTasks[ix]?.title || t('Recent work'));
-  const rec = recentBy.get(key);
-  if (rec) return rec.map((x) => `<div class="trw"><div class="trh">${x.change === 'new' ? `${t('New')} · ${task(x.task)}` : t('Changed · {}', task(x.task))}</div>${x.note ? `<div class="trn">${h(x.note)}</div>` : ''}</div>`).join('');
-  const inside = recentIn.get(key);
-  if (!inside) return '';
-  const tasks = [...new Set(inside.flatMap((x) => recentBy.get(x).map((r) => r.task)))];
-  const names = inside.slice(0, 3).map((x) => info(x).name);
-  return `<div class="trw"><div class="trh">${t('{} changed inside · {}', inside.length, tasks.map(task).join(', '))}</div><div class="trn">${h(names.join(', '))}${inside.length > 3 ? ` ${inside.length === 4 ? t('and 1 more') : t('and {} more', inside.length - 3)}` : ''}</div></div>`;
+  return `<div class="tt">${h(i.name)}</div><div class="td" style="text-transform:capitalize">${h(kindFr(kind))}${size ? ` · ${size}` : ''}</div>${sv ? `<div class="td">${statePill(sv)}</div>` : ''}${where ? `<div class="tp">${h(where)}</div>` : ''}${tipHints(hints)}`;
 }
 
 // ======================= layout =======================
@@ -1770,12 +1733,6 @@ function renderLegend(view) {
     L.appendChild(lab);
   }
   L.appendChild(techRow());
-  if (recentBy.size) {
-    const lab = document.createElement('label'); lab.className = 'tech' + (recentShown ? '' : ' off');
-    lab.innerHTML = `<input type="checkbox" ${recentShown ? 'checked' : ''}><span>${t('Highlight recent work')}</span><span class="tog" style="margin-left:auto"></span>`;
-    lab.querySelector('input').onchange = (ev) => { setRecentShown(ev.target.checked); lab.classList.toggle('off', !ev.target.checked); };
-    L.appendChild(lab);
-  }
   const fb = $('#filters-btn');
   fb.querySelector('.badge')?.remove();
   if (off) fb.insertAdjacentHTML('beforeend', `<span class="badge">${off}</span>`);
@@ -1783,9 +1740,10 @@ function renderLegend(view) {
 }
 
 // ======================= inspector =======================
-const editorUrl = (p, line = 1) => G.meta.root && !PLAN ? `vscode://file/${encodeURI(G.meta.root.replace(/\\/g, '/'))}/${encodeURI(p)}:${line}` : null;
+const editorUrl = (p, line = 1) => G.meta.root && !PLAN && files.get(p)?.st !== 'prevu' ? // 75-07 : un fichier prévu n'existe pas, rien à ouvrir
+   `vscode://file/${encodeURI(G.meta.root.replace(/\\/g, '/'))}/${encodeURI(p)}:${line}` : null;
 // the real state of an item (project missions, plans, requirements): the same glyph + word as on its card, in place of a size in lines of code that is always 0 there (PU-G-105)
-const STATE_WORD = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué' };
+const STATE_WORD = { done: 'Fait', active: 'En cours', recette: 'À recetter', todo: 'À faire', blocked: 'Bloqué', prevu: 'Prévu' };
 const statePill = (st) => `<span class="vst vst-${h(st).replace(/[^\w-]/g, '')}">${h(STATE_WORD[st] || st)}</span>`;
 const rowFor = (item, extra = '', dotColor) => {
   const i = info(item);
@@ -1966,6 +1924,10 @@ function itemPanel(item, viaConnector) {
   } else if (i.type === 'file' || i.type === 'module') {
     const f = i.f, fid = 'f:' + f.p, url = editorUrl(f.p);
     if (f.note) html += `<div class="callout">${h(f.note)}</div>`;
+    if (f.st === 'prevu') { // 75-07 : un fichier prévu par des plans non faits : ni « ouvrir » ni taille, la fraîcheur de la carte dite
+      const min = G.meta?.vfPrevuAt ? Math.max(0, Math.round((Date.now() - Date.parse(G.meta.vfPrevuAt)) / 60000)) : null;
+      html += `<div class="callout">${h(`Prévu par : ${(f.prevuPar || []).join(', ')}. Ce fichier n’existe pas encore.${min === null || Number.isNaN(min) ? '' : ` Carte lue à l’assemblage du graphe, il y a ${min} min.`}`)}</div>`;
+    }
     if (f.tooLarge) html += `<div class="callout">${t('Too big for Floorplan to read, so what it uses, its endpoints and any secrets in it weren’t checked. Ask Claude or Codex to update the floorplan with a bigger file limit to include it.')}</div>`;
     html += pathBox(f.p);
     if (url) actions.push(`<a class="btn soft" href="${url}">${iconI('open')}${t('Open in editor')}</a>`);

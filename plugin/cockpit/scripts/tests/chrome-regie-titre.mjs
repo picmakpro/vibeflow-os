@@ -136,7 +136,7 @@ await executer(chrome, async (s) => {
     await ouvrir(); await pret();
     const l = await attendreValeur(() => s.ev(LUS), (x) => x.length > 0 && Object.keys(JSON.parse(x[0].v)).length <= 200, { max: 8000 });
     const o = l && l[0] ? JSON.parse(l[0].v) : {};
-    return { lab: typeof lab, apres: Object.keys(o).length, vieux: 'vieux1' in o, nn: 'nn1' in o, mauvais: 'mauvais id!' in o, recent: 'ok0000' in o };
+    return { lab: typeof lab, apres: Object.keys(o).length, vieux: 'vieux1' in o, nn: 'nn1' in o, mauvais: 'mauvais id!' in o, garde: 'ok0000' in o };
   }
   if (scenario === 'lu-refuse') {
     await pousser([sess(SID, 'attend'), ...finis(3, 'e')]);

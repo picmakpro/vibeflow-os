@@ -374,10 +374,16 @@ assert_eq "L8 — stop avec pid 1 : le script du lab n'est toujours pas exécut�
 
 echo "=== Y — liens symboliques ==="
 LY="$WORK/labY"; mklab "$LY"; echo SECRET-ORIGINAL > "$WORK/dehors.txt"; echo '{"x":1}' > "$WORK/dehors-graph.json"
-rm -f "$LY/.vibeflow/cockpit/recent-work.json" "$LY/.vibeflow/cockpit/graph.json"; ln -s "$WORK/dehors.txt" "$LY/.vibeflow/cockpit/recent-work.json"; ln -s "$WORK/dehors-graph.json" "$LY/.vibeflow/cockpit/graph.json"
+rm -f "$LY/.vibeflow/cockpit/.gitignore" "$LY/.vibeflow/cockpit/graph.json"; ln -s "$WORK/dehors.txt" "$LY/.vibeflow/cockpit/.gitignore"; ln -s "$WORK/dehors-graph.json" "$LY/.vibeflow/cockpit/graph.json"
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LY" > "$WORK/y.out" 2>&1; RC=$?
 assert_eq "Y1 — l'assemblage refuse (code 4) et nomme le lien symbolique" "$RC:$(grep -c 'lien symbolique' "$WORK/y.out")" "4:1"
 assert_eq "Y2 — les fichiers cibles hors du lab sont intacts" "$(cat "$WORK/dehors.txt")$(cat "$WORK/dehors-graph.json")" 'SECRET-ORIGINAL{"x":1}'
+# 75-09a (Q3) : le lien sur .gitignore SEUL (graph.json remis en fichier) est refusé avant toute écriture ; témoin rouge : verifierSortie neutralisé, la cible hors du lab est réécrite
+rm -f "$LY/.vibeflow/cockpit/graph.json"; echo '{"x":1}' > "$LY/.vibeflow/cockpit/graph.json"
+node "$SCRIPTS/vf-cockpit-build.mjs" "$LY" > "$WORK/q3.out" 2>&1; RCQ3=$?
+assert_eq "Q3.1 — lien symbolique sur .gitignore seul : refus (code 4), dehors.txt jamais réécrit" "$RCQ3:$(grep -c 'lien symbolique' "$WORK/q3.out"):$(cat "$WORK/dehors.txt")" "4:1:SECRET-ORIGINAL"
+cockpit_module_muter q3 vf-cockpit-build.mjs 's#verifierSortie(lab, #(() => 0)(lab, #g' && node "$COCKPIT_MODULE/scripts/vf-cockpit-build.mjs" "$LY" > "$WORK/q3m.out" 2>&1; unset COCKPIT_MODULE
+assert_eq "Q3.2 — mutant (verifierSortie neutralisé) : dehors.txt est réécrit, la sonde Q3.1 rougirait" "$([ "$(cat "$WORK/dehors.txt")" = SECRET-ORIGINAL ] && echo intact || echo réécrit)" "réécrit"
 LZ="$WORK/labZ"; mkdir -p "$LZ/.planning" "$WORK/dossier-dehors"; ln -s "$WORK/dossier-dehors" "$LZ/.vibeflow"
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LZ" > "$WORK/z.out" 2>&1; assert_eq "Y3 — .vibeflow lien vers un dossier extérieur : refus, rien n'y est écrit" "$?:$(ls -A "$WORK/dossier-dehors" | wc -l | tr -d ' ')" "4:0"
 ln -s "$WORK/dehors.txt" "$OUT/creds.txt"; cp "$OUT/graph.json" "$OUT/copie.json"; ln -s "$OUT/copie.json" "$OUT/lien-interne.json"

@@ -1081,19 +1081,19 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | ACTV-10 | Phase 75 | Pending — 2026-11-11 (cadrage) |
 | ACTV-11 | Phase 75 | Pending — 2026-11-11 (cadrage) |
 | ACTV-12 | Phase 75 | Pending — 2026-11-11 (cadrage) |
-| TRAC-01 | Phase 76 | Pending |
-| TRAC-02 | Phase 76 | Pending |
-| TRAC-03 | Phase 76 | Pending |
-| TRAC-04 | Phase 76 | Pending |
-| TRAC-05 | Phase 76 | Pending |
-| TRAC-06 | Phase 76 | Pending |
-| TRAC-07 | Phase 76 | Pending |
-| TRAC-08 | Phase 76 | Pending |
-| TRAC-09 | Phase 76 | Pending |
-| TRAC-10 | Phase 76 | Pending |
-| TRAC-11 | Phase 76 | Pending |
-| TRAC-12 | Phase 76 | Pending |
-| TRAC-13 | Phase 76 | Pending |
+| TRAC-01 | Phase 76 | Complete |
+| TRAC-02 | Phase 76 | Complete |
+| TRAC-03 | Phase 76 | Complete |
+| TRAC-04 | Phase 76 | Complete |
+| TRAC-05 | Phase 76 | Complete |
+| TRAC-06 | Phase 76 | Complete |
+| TRAC-07 | Phase 76 | Complete |
+| TRAC-08 | Phase 76 | Complete |
+| TRAC-09 | Phase 76 | Complete |
+| TRAC-10 | Phase 76 | Complete |
+| TRAC-11 | Phase 76 | Complete |
+| TRAC-12 | Phase 76 | Complete |
+| TRAC-13 | Phase 76 | Complete |
 | SYNT-01 | Phase 77 | Complete — 2026-11-14, plans 77-05, 77-06 (PR #242) |
 | SYNT-02 | Phase 77 | Complete — 2026-11-14, plans 77-01 (PR #242) |
 | SYNT-03 | Phase 77 | Complete — 2026-11-14, plans 77-03 (PR #242) |
@@ -1120,17 +1120,17 @@ Spec : `docs/superpowers/specs/2026-07-25-rescope-vf-planning-gsd-design.md`. AD
 | SOCL-14 | Phase 79 | Complete — 2026-11-13, plan 79-10 (segment a) |
 | SOCL-15 | Phase 79 | Complete — 2026-11-13, plan 79-11 (segment a) |
 | SOCL-16 | Phase 79 | Complete — 2026-11-13, plan 79-12 (segment a) |
-| SOCL-17 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-18 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-19 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-20 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-21 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-22 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-23 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-24 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
-| SOCL-25 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
+| SOCL-17 | Phase 79 | Complete — 2026-11-14, plan 79-13 |
+| SOCL-18 | Phase 79 | Complete — 2026-11-14, plan 79-14 |
+| SOCL-19 | Phase 79 | Complete — 2026-11-14, plan 79-15 |
+| SOCL-20 | Phase 79 | Complete — 2026-11-14, plan 79-16 |
+| SOCL-21 | Phase 79 | Complete — 2026-11-14, plan 79-17 |
+| SOCL-22 | Phase 79 | Complete — 2026-11-14, plan 79-18 |
+| SOCL-23 | Phase 79 | Complete — 2026-11-14, plan 79-15 |
+| SOCL-24 | Phase 79 | Complete — 2026-11-14, plan 79-19 (sonde S0 : journal non construit) |
+| SOCL-25 | Phase 79 | Complete — 2026-11-14, plan 79-20 |
 | SOCL-26 | Phase 79 | Complete — 2026-11-13, plan 79-21 (segment a) |
-| SOCL-27 | Phase 79 | Pending — 2026-11-11 (cadrage et planification de la Phase 79) |
+| SOCL-27 | Phase 79 | Complete — 2026-11-14, plan 79-22 |
 | FORM-01 | Phase 80 | Complete — 2026-11-12 (Phase 80, segment a, 80-01 ; suites du plan vertes, SUMMARY posé ; branche feat/phase-80-trois-formes, PR vers integration/cockpit-audit) |
 | FORM-02 | Phase 80 | Complete — 2026-11-14 (Phase 80, 80-02, 80-14 ; suites du plan vertes, SUMMARY posé ; branche feat/phase-80-trois-formes) |
 | FORM-03 | Phase 80 | Complete — 2026-11-14 (Phase 80, 80-09, 80-15 ; suites du plan vertes, SUMMARY posé ; branche feat/phase-80-trois-formes) |
@@ -1832,19 +1832,19 @@ la Phase 80.
 ### Traçabilité au cockpit (Phase 76 — posées au cadrage, 2026-11-11)
 > Dérivent de P76-D-01..37 (`76-CONTEXT.md` ; décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée, sauf P76-D-32 à P76-D-34 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11). Famille neuve `TRAC` (vérifiée libre le 2026-11-11 dans tous les ledgers et dans tout le dépôt). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code ; lecture seule, aucun réseau, rien dans l'export.
 
-- [ ] **TRAC-01**: Section « Traçabilité » du panneau d'une phase : une ligne par exigence rattachée (table de traçabilité du ledger, à défaut `requirements:` d'un PLAN), une bande de quatre maillons lus (plan, SUMMARY, VERIFICATION, recette), chacun avec son niveau (exigence ou phase), et le premier trou dit en un mot ; absence simple en glyphe et mot neutres (P76-D-04, P76-D-13, P76-D-14).
-- [ ] **TRAC-02**: Contradictions du ledger montrées, jamais corrigées : case cochée sans SUMMARY lu et statut « Complete » sans plan lu en glyphe à trait corail et mot ; case non cochée avec SUMMARY lu, exigence sans ligne de traçabilité et ligne sans exigence en mot neutre ; jamais de fond teinté ni de texte coloré (P76-D-04, P76-D-15, P76-D-15bis).
-- [ ] **TRAC-03**: Vue d'ensemble « Jalon » : une ligne par phase du jalon actif avec le nombre de trous par maillon ; la ligne ouvre le panneau de la phase (P76-D-02, P76-D-05).
-- [ ] **TRAC-04**: Preuves de vérification attachées à la phase et à ses plans (AUDC-I33) : fichiers VERIFICATION (et `status:`), recette (et statut), RED-TRACE, SECURITY, VALIDATION, en liens vers leurs chemins relatifs, et critères `must_haves` des PLAN quand ils existent ; jamais un contenu de transcript ni une preuve déduite (P76-D-24).
-- [ ] **TRAC-05**: Décisions : ADR de `docs/ADR.md` et définitions des registres `*-CONTEXT.md` des dossiers de phase (préfixées, ou nues qualifiées par la phase de leur registre) ; section « Décisions » de la vue d'ensemble agrégée par ADR puis par registre ; panneau d'une ADR ou d'une décision avec ses voisins lus (phase, ADR citées, décisions et commits qui la citent) (P76-D-16, P76-D-17).
-- [ ] **TRAC-06**: Commits citants : un passage `git log` borné (référence résolue en sha, `--max-count=2000`, point git durci, asynchrone), corps des messages lu pour extraire les identifiants puis jeté ; on sert sha court, jour et sujet ; une décision nue n'est reliée à aucun commit ; borne atteinte ou délai dépassé : `tronque` ; un commit s'ouvre dans le tiroir Git (P76-D-03, P76-D-10).
-- [ ] **TRAC-07**: Mémoire des agents, périmètre et champs : seuls les fichiers suivis sous `.claude/agent-memory/`, lus par le point confiné ; montrés : `name`, agent, `metadata.type`, jour du dernier commit, nombre de liens entrants et sortants ; jamais `description`, corps, `~/` ni chemin absolu ; `.claude/` non suivi : état vide qui le dit avec un nombre, sans noms (P76-D-19, P76-D-20).
-- [ ] **TRAC-08**: Mémoire des agents, liens et états : extraction hors code et hors classes POSIX, résolution par `name:` puis par nom de fichier (état propre, compté), « cassé » sinon ; états distincts « hors index » (égalité exacte), « sans lien entrant » (filtre neutre) et « cite un chemin absent » (relatif au dépôt, absent de HEAD, présent dans l'historique lu) ; aucun verdict « périmée » tiré d'une date (P76-D-21, P76-D-22, P76-D-23).
-- [ ] **TRAC-09**: Navigation de proche en proche : chaque objet a un panneau qui liste ses voisins lus, ouverts d'un geste ; Retour par la pile commune de la Phase 80 (sans fil d'Ariane propre), ancre par objet ; clavier complet (focus natif, Échap) ; au plus 30 voisins d'une sorte puis « + N autres » ; aucun canevas, aucun quatrième onglet, aucune modification de `viewer.html` (P76-D-01, P76-D-02, P76-D-03, P76-D-05).
-- [ ] **TRAC-10**: Route `GET /api/vf/tracabilite` à la demande, schéma `vibeflow/cockpit-trace@1` déclaré au contrat de forme et au README (champs et `interdits`), règles C0 de la Phase 79 (hôte, `Origin`, jeton en temps constant, GET seul, `no-store`, garde `porteInterdit` sur la réponse, 503 si elle se déclenche), paramètres validés (400 sinon), cache par empreinte, un calcul en vol ; le planning lu dans l'instantané de la collecte (manques ajoutés en champs facultatifs de `cockpit-project@1`), ADR, commits et mémoire par lecture confinée bornée (P76-D-06 à P76-D-09, P76-D-31).
-- [ ] **TRAC-11**: Confidentialité et dégradation : aucune donnée de la phase dans l'export ni dans une page autonome ; aucun chemin absolu ni `~/` dans une réponse ; tout texte venu des fichiers rendu en `textContent` ; lab sans `docs/ADR.md`, sans compartiment, sans mémoire, sans git ou à traçabilité « Étape N » : une ligne neutre qui le dit, rien ne casse ailleurs (P76-D-11, P76-D-12).
-- [ ] **TRAC-12**: Un ajout, un retrait et non-régression : le nœud enfant « Exigences » et ses cartes d'exigence quittent le graphe Projet (le compte « x/y exigences » du pied reste) ; ligne au `CHANGELOG.md` du module ; toutes les suites du cockpit vertes sous macOS et Linux, compteur de suites des README à jour (P76-D-25, P76-D-27, P76-D-29).
-- [ ] **TRAC-13**: Questions en attente : la lecture du planning lit les entrées au format C76-Q1 des sections « À Samuel » des registres de phase et pose le champ facultatif `meta.vf.questions` de `cockpit-project@1` (C76-Q2) ; une entrée hors grammaire est « mal formée » avec son défaut, jamais « en attente » ; une question n'est « tranchée » ou « appliquée » (option recommandée appliquée sous délégation, contestable) que par sa ligne `État` canonique ; identifiant en double, phase incohérente, citation incohérente, fichier absent et section vide ont chacun leur témoin rouge ; la régie de la Phase 73 consomme la liste, « en attente » dans « À vous », « appliquée » à part (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; P76-D-34 à P76-D-37).
+- [x] **TRAC-01**: Section « Traçabilité » du panneau d'une phase : une ligne par exigence rattachée (table de traçabilité du ledger, à défaut `requirements:` d'un PLAN), une bande de quatre maillons lus (plan, SUMMARY, VERIFICATION, recette), chacun avec son niveau (exigence ou phase), et le premier trou dit en un mot ; absence simple en glyphe et mot neutres (P76-D-04, P76-D-13, P76-D-14).
+- [x] **TRAC-02**: Contradictions du ledger montrées, jamais corrigées : case cochée sans SUMMARY lu et statut « Complete » sans plan lu en glyphe à trait corail et mot ; case non cochée avec SUMMARY lu, exigence sans ligne de traçabilité et ligne sans exigence en mot neutre ; jamais de fond teinté ni de texte coloré (P76-D-04, P76-D-15, P76-D-15bis).
+- [x] **TRAC-03**: Vue d'ensemble « Jalon » : une ligne par phase du jalon actif avec le nombre de trous par maillon ; la ligne ouvre le panneau de la phase (P76-D-02, P76-D-05).
+- [x] **TRAC-04**: Preuves de vérification attachées à la phase et à ses plans (AUDC-I33) : fichiers VERIFICATION (et `status:`), recette (et statut), RED-TRACE, SECURITY, VALIDATION, en liens vers leurs chemins relatifs, et critères `must_haves` des PLAN quand ils existent ; jamais un contenu de transcript ni une preuve déduite (P76-D-24).
+- [x] **TRAC-05**: Décisions : ADR de `docs/ADR.md` et définitions des registres `*-CONTEXT.md` des dossiers de phase (préfixées, ou nues qualifiées par la phase de leur registre) ; section « Décisions » de la vue d'ensemble agrégée par ADR puis par registre ; panneau d'une ADR ou d'une décision avec ses voisins lus (phase, ADR citées, décisions et commits qui la citent) (P76-D-16, P76-D-17).
+- [x] **TRAC-06**: Commits citants : un passage `git log` borné (référence résolue en sha, `--max-count=2000`, point git durci, asynchrone), corps des messages lu pour extraire les identifiants puis jeté ; on sert sha court, jour et sujet ; une décision nue n'est reliée à aucun commit ; borne atteinte ou délai dépassé : `tronque` ; un commit s'ouvre dans le tiroir Git (P76-D-03, P76-D-10).
+- [x] **TRAC-07**: Mémoire des agents, périmètre et champs : seuls les fichiers suivis sous `.claude/agent-memory/`, lus par le point confiné ; montrés : `name`, agent, `metadata.type`, jour du dernier commit, nombre de liens entrants et sortants ; jamais `description`, corps, `~/` ni chemin absolu ; `.claude/` non suivi : état vide qui le dit avec un nombre, sans noms (P76-D-19, P76-D-20).
+- [x] **TRAC-08**: Mémoire des agents, liens et états : extraction hors code et hors classes POSIX, résolution par `name:` puis par nom de fichier (état propre, compté), « cassé » sinon ; états distincts « hors index » (égalité exacte), « sans lien entrant » (filtre neutre) et « cite un chemin absent » (relatif au dépôt, absent de HEAD, présent dans l'historique lu) ; aucun verdict « périmée » tiré d'une date (P76-D-21, P76-D-22, P76-D-23).
+- [x] **TRAC-09**: Navigation de proche en proche : chaque objet a un panneau qui liste ses voisins lus, ouverts d'un geste ; Retour par la pile commune de la Phase 80 (sans fil d'Ariane propre), ancre par objet ; clavier complet (focus natif, Échap) ; au plus 30 voisins d'une sorte puis « + N autres » ; aucun canevas, aucun quatrième onglet, aucune modification de `viewer.html` (P76-D-01, P76-D-02, P76-D-03, P76-D-05).
+- [x] **TRAC-10**: Route `GET /api/vf/tracabilite` à la demande, schéma `vibeflow/cockpit-trace@1` déclaré au contrat de forme et au README (champs et `interdits`), règles C0 de la Phase 79 (hôte, `Origin`, jeton en temps constant, GET seul, `no-store`, garde `porteInterdit` sur la réponse, 503 si elle se déclenche), paramètres validés (400 sinon), cache par empreinte, un calcul en vol ; le planning lu dans l'instantané de la collecte (manques ajoutés en champs facultatifs de `cockpit-project@1`), ADR, commits et mémoire par lecture confinée bornée (P76-D-06 à P76-D-09, P76-D-31).
+- [x] **TRAC-11**: Confidentialité et dégradation : aucune donnée de la phase dans l'export ni dans une page autonome ; aucun chemin absolu ni `~/` dans une réponse ; tout texte venu des fichiers rendu en `textContent` ; lab sans `docs/ADR.md`, sans compartiment, sans mémoire, sans git ou à traçabilité « Étape N » : une ligne neutre qui le dit, rien ne casse ailleurs (P76-D-11, P76-D-12).
+- [x] **TRAC-12**: Un ajout, un retrait et non-régression : le nœud enfant « Exigences » et ses cartes d'exigence quittent le graphe Projet (le compte « x/y exigences » du pied reste) ; ligne au `CHANGELOG.md` du module ; toutes les suites du cockpit vertes sous macOS et Linux, compteur de suites des README à jour (P76-D-25, P76-D-27, P76-D-29).
+- [x] **TRAC-13**: Questions en attente : la lecture du planning lit les entrées au format C76-Q1 des sections « À Samuel » des registres de phase et pose le champ facultatif `meta.vf.questions` de `cockpit-project@1` (C76-Q2) ; une entrée hors grammaire est « mal formée » avec son défaut, jamais « en attente » ; une question n'est « tranchée » ou « appliquée » (option recommandée appliquée sous délégation, contestable) que par sa ligne `État` canonique ; identifiant en double, phase incohérente, citation incohérente, fichier absent et section vide ont chacun leur témoin rouge ; la régie de la Phase 73 consomme la liste, « en attente » dans « À vous », « appliquée » à part (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 ; P76-D-34 à P76-D-37).
 
 ### Santé de la méthode et synthèse (Phase 77 — posées au cadrage, 2026-11-11)
 > Dérivent de P77-D-01..18 (`77-CONTEXT.md` ; décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée ; aucun arbitrage neuf). Famille neuve `SYNT`, vérifiée libre le 2026-11-11 sur `f763b556` (`.planning/` entier, ledgers de compartiment et archives compris). Jalon `vibeflow-v2.0`. Chaque exigence porte son témoin rouge, joué avant le code.
@@ -1879,17 +1879,17 @@ la Phase 80.
 - [x] **SOCL-14**: Les chaînes du moteur sont traduites au point d'émission ; plus aucun observateur global ne réécrit une donnée du lab ; `?lang=en` rend les libellés sources (AUDC-H4, P79-D-16, P79-D-24).
 - [x] **SOCL-15**: Plafond de 160 colonnes en cliquet par fichier ; le code navigateur sérialisé côté serveur est rangé en fichiers, injection toujours conditionnée par `--terminal` (AUDC-AM5, P79-D-19).
 - [x] **SOCL-16**: `GET /api/vf/state` (C2) sert l'instantané d'une collecte unique ; `vf-signal` le lit quand un serveur du lab vit et garde son émetteur sinon ; battement `vie` nommé (AUDC-I19, AM1, D-M2).
-- [ ] **SOCL-17**: `GET /api/vf/frise` (C3) et l'événement `frise` ; `cibles` en mémoire, réduites, sur le chemin réel ; fenêtre de 24 h (AUDC-I20, A21-A24, A28).
-- [ ] **SOCL-18**: Un seul flux d'événements par navigateur et par lab, partagé entre les onglets, reprise sans rechargement à la fermeture de l'onglet élu ; veille de silence de 45 s (AUDC-H1, I22, D-M2, P79-D-14).
-- [ ] **SOCL-19**: `GET /api/vf/graphe` (C5) et l'événement `graphe` ; le serveur ne réécrit plus `project.html` ; la page Équipe n'est plus reconstruite par requête (AUDC-AM1, I31, A5, A29).
-- [ ] **SOCL-20**: Coquille statique servie depuis le module et mise en cache, données en JSON, `chargerOnglet`, terminal posé une fois ; un script planté dans la sortie n'est jamais exécutable par la page (AUDC-AM2, I31, A2, A3).
-- [ ] **SOCL-21**: Magasin d'état côté page `VF_ETAT` (C4, A13) alimenté par le flux ; les observateurs de réparation des vues abonnées sont retirés, en cliquet (AUDC-AM6, I32).
-- [ ] **SOCL-22**: La mise en page du canevas tourne dans un worker servi par le module (`worker-src` restreint, jamais `blob:`) ; l'export garde la mise en page en ligne ; l'API du moteur reste la même (AUDC-AM3, M7, A4, P79-D-15).
-- [ ] **SOCL-23**: Ni l'index, ni l'état, ni la frise, ni les cibles, ni les verrous, ni le plan de mission publié n'entrent dans l'export autonome ; témoin à marqueur avec témoin positif (A25).
-- [ ] **SOCL-24**: Journal des attentes par hook `command` (I18 réduit, P79-D-22), précédé d'une sonde qui peut le rendre inutile ; jamais de commande, de texte ni de chemin dans le fichier.
-- [ ] **SOCL-25**: Documentation du module : README (code jamais lu depuis la sortie, limite de la pose projet, CSP, `vf-signal`), CHANGELOG, version mineure ; un ajout, un retrait nommés (P79-D-27).
+- [x] **SOCL-17**: `GET /api/vf/frise` (C3) et l'événement `frise` ; `cibles` en mémoire, réduites, sur le chemin réel ; fenêtre de 24 h (AUDC-I20, A21-A24, A28).
+- [x] **SOCL-18**: Un seul flux d'événements par navigateur et par lab, partagé entre les onglets, reprise sans rechargement à la fermeture de l'onglet élu ; veille de silence de 45 s (AUDC-H1, I22, D-M2, P79-D-14).
+- [x] **SOCL-19**: `GET /api/vf/graphe` (C5) et l'événement `graphe` ; le serveur ne réécrit plus `project.html` ; la page Équipe n'est plus reconstruite par requête (AUDC-AM1, I31, A5, A29).
+- [x] **SOCL-20**: Coquille statique servie depuis le module et mise en cache, données en JSON, `chargerOnglet`, terminal posé une fois ; un script planté dans la sortie n'est jamais exécutable par la page (AUDC-AM2, I31, A2, A3).
+- [x] **SOCL-21**: Magasin d'état côté page `VF_ETAT` (C4, A13) alimenté par le flux ; les observateurs de réparation des vues abonnées sont retirés, en cliquet (AUDC-AM6, I32).
+- [x] **SOCL-22**: La mise en page du canevas tourne dans un worker servi par le module (`worker-src` restreint, jamais `blob:`) ; l'export garde la mise en page en ligne ; l'API du moteur reste la même (AUDC-AM3, M7, A4, P79-D-15).
+- [x] **SOCL-23**: Ni l'index, ni l'état, ni la frise, ni les cibles, ni les verrous, ni le plan de mission publié n'entrent dans l'export autonome ; témoin à marqueur avec témoin positif (A25).
+- [x] **SOCL-24**: Journal des attentes par hook `command` (I18 réduit, P79-D-22), précédé d'une sonde qui peut le rendre inutile ; jamais de commande, de texte ni de chemin dans le fichier.
+- [x] **SOCL-25**: Documentation du module : README (code jamais lu depuis la sortie, limite de la pose projet, CSP, `vf-signal`), CHANGELOG, version mineure ; un ajout, un retrait nommés (P79-D-27).
 - [x] **SOCL-26**: La correspondance de motifs du moteur a un coût borné, au point unique, quelle que soit l'entrée fournie par le lab (motif à plusieurs `**`, chemin très long) ; preuve générative de croissance au plus linéaire (constat de la Phase 75, P79-D-32).
-- [ ] **SOCL-27**: `/api/vf/transcript` et `/api/vf/doing` retrouvent l'agent dans la table en mémoire de la collecte et lisent le fichier sans bloquer la boucle : N requêtes ne déclenchent aucune collecte ; aucun chemin ne sort, y compris sur le chemin d'erreur (AUDC-H2, A48, A50).
+- [x] **SOCL-27**: `/api/vf/transcript` et `/api/vf/doing` retrouvent l'agent dans la table en mémoire de la collecte et lisent le fichier sans bloquer la boucle : N requêtes ne déclenchent aucune collecte ; aucun chemin ne sort, y compris sur le chemin d'erreur (AUDC-H2, A48, A50).
 
 ### Trois onglets, trois formes (Phase 80 — posées au cadrage, 2026-11-11)
 > Dérivent de P80-D-01..60 (`80-CONTEXT.md` ; décisions déléguées par Samuel, message session principale, 2026-11-08, option recommandée, tranchées par panel sur faits établis ; P80-D-52 à P80-D-56 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11). Famille neuve `FORM`, réservée par le ROADMAP, vérifiée libre le 2026-11-11 (0 occurrence de `FORM-<n>` sous `.planning/` et `plugin/` à `f763b556`).

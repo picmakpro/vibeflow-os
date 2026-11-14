@@ -53,8 +53,10 @@ await executer(chrome, async (s) => {
       await charger('project.html', '?vue=graphe');
       o.pv21 = await choisir(await idDe('01-02')); o.pv21b = await choisir(await idDe('01-01'));
       o.pv22 = await choisir(await idDe('01-03'));
-      const R1 = await lire("JSON.stringify(VibeFlow.graph.files.filter((f) => f.name === 'R-1').map((f) => 'f:' + f.p)[0])");
-      o.pv23 = await choisir(R1);
+      // 76-08 : l'exigence n'a plus de carte ; elle se lit dans la traçabilité (meta.vf.trace.exigences) et dans la section « Exigences couvertes » du plan (pv21)
+      o.pv23 = await lire("JSON.stringify({ carte: VibeFlow.graph.files.filter((f) => f.name === 'R-1' || f.p.startsWith('req/')).length,"
+        + " noeud: VibeFlow.graph.nodes.filter((n) => n.kind === 'exigences' || /\\.req$/.test(n.id)).length,"
+        + " trace: VibeFlow.graph.meta.vf.trace.exigences.filter((e) => e.id === 'R-1').length })");
       o.pv24 = await choisir('n:ph-1');
     });
     await sec('pv26', async () => {

@@ -134,13 +134,6 @@ if (fs.existsSync(descDir)) {
   }
 }
 
-// what changed since the last build, for recent.mjs (marking recent work on the map)
-fs.writeFileSync(path.join(outDir, '.cache', 'changes.json'), JSON.stringify({
-  since: old.meta.generatedAt, at: new Date().toISOString(),
-  files: { new: created, edited: edited.filter((p) => !created.includes(p)), moved: [...renames].map(([a, b]) => ({ from: a, to: b })), deleted },
-  routes: { new: [...newRoutes], removed: goneRoutes.filter((k) => !routeMoves.has(k)), moved: [...routeMoves].map(([a, b]) => ({ from: a, to: b })) },
-}, null, 2));
-
 // ---------- 5. rebuild (no tokens) ----------
 let buildOut = '';
 let buildOk = true;
@@ -170,7 +163,6 @@ if (!buildOk) todo.push('Fix the build errors above in architecture.json (usuall
 if (/unassigned, by directory/.test(buildOut)) todo.push('New files landed outside every node: add globs (or a node) in architecture.json for the directories listed under "unassigned".');
 if (/Run describe/.test(buildOut)) todo.push('Run describe.mjs: it writes worksheets for only the new and flagged items. Fill them in (drop each "review" field once the entry is accurate), then run build.mjs.');
 if (created.length + deleted.length > Math.max(20, before.size * 0.15)) todo.push('This is a large change: re-read the summaries of the modules that gained or lost many files, and check the flows still hold.');
-todo.push('Mark recent work: run recent.mjs, rewrite recent-work.json for what was just worked on (an empty "tasks" list if nothing was), then run build.mjs.');
 L.push('NEXT');
 todo.forEach((t, i) => L.push(`  ${i + 1}. ${t}`));
 console.log(L.join('\n'));

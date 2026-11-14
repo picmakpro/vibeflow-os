@@ -107,7 +107,7 @@
 - [ ] Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire (inscrite 2026-11-03, jalon vibeflow-v2.0 ; cadrée et planifiée 2026-11-11, 9 plans)
 - [ ] Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up (inscrite 2026-11-03, jalon vibeflow-v2.0) — planifiée 2026-11-11 (8 plans)
 - [x] Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git (inscrite 2026-11-05, jalon vibeflow-v2.0) — complete 2026-11-06 : 11/11 plans, GITC-01..14 cochées, publiée en `v2.76.0`
-- [ ] Phase 79: Socle du cockpit — une collecte, un flux, une route d'état (inscrite 2026-11-11, jalon vibeflow-v2.0) — 13/22 plans faits (segment a fusionné 2026-11-13) ; restent 79-13 à 79-20, 79-22
+- [ ] Phase 79: Socle du cockpit — une collecte, un flux, une route d'état (inscrite 2026-11-11, jalon vibeflow-v2.0) — 22/22 plans faits (SOCL-24 clos par la sonde S0)
 - [ ] Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation (inscrite 2026-11-11, jalon vibeflow-v2.0) — 21/21 plans faits (2026-11-14, branche feat/phase-80-trois-formes) ; FORM-17 attend la CI Linux
 - [ ] Phase 81: Agir sur une session depuis le cockpit (inscrite 2026-11-11, jalon vibeflow-v2.0, reportée : `AUDC-Q3` tranchée « plus tard » le 2026-11-11)
 
@@ -139,11 +139,11 @@
 | 72. Lancer du travail depuis les cartes du cockpit | vibeflow-v2.0 | 16/16 | Complete — PR #214, LANC-12 décochée, release `v2.76.0` | 2026-11-06 |
 | 73. Gouvernance au cockpit — arbitrages en attente, worktrees et verrous | vibeflow-v2.0 | 11/11 | In progress | - |
 | 74. L'équipe dans le temps — swim-lanes, coût, replay | vibeflow-v2.0 | 6/10 | In Progress | - |
-| 75. L'activité posée sur le code — hotspots, couplage, gardes, empreinte | vibeflow-v2.0 | 6/12 | In Progress | - |
-| 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 7/9 | In Progress | - |
+| 75. L'activité posée sur le code — hotspots, couplage, gardes, empreinte | vibeflow-v2.0 | 12/12 | Complete | 2026-11-14 |
+| 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 9/9 | Complete    | - |
 | 77. Santé de la méthode et synthèse — jauges, dernière visite, burn-up | vibeflow-v2.0 | 0/8 | Planned | - |
 | 78. Git dans le cockpit | vibeflow-v2.0 | 11/11 | Complete — PR #216, release `v2.76.0` | 2026-11-06 |
-| 79. Socle du cockpit — une collecte, un flux, une route d'état | vibeflow-v2.0 | 13/22 | In progress — segment a fusionné (PR #238) | - |
+| 79. Socle du cockpit — une collecte, un flux, une route d'état | vibeflow-v2.0 | 22/22 | In progress — plans faits, lot en cours | - |
 | 80. Trois onglets, trois formes — Projet en couloirs, clavier, navigation | vibeflow-v2.0 | 8/21 | In progress — segment a fusionné (PR #237) | - |
 
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-09-30.md — ✅ agentique-v1.0 — Durcissement du moteur d'équipes agentique (Phases 15→29, 18 et 25 reportées) — SHIPPED 2026-08-15 -->
@@ -372,12 +372,12 @@ Plans:
 - [x] 75-04-PLAN.md — `files_modified` borné jusqu'à l'instantané, avec la vague de la Phase 80 (v1)
 - [x] 75-05-PLAN.md — Route `/api/vf/activite`, schéma `cockpit-activite@1`, témoin d'export (v2)
 - [x] 75-06-PLAN.md — Cartes « prévues » : annotateur, règle de rattachement extraite, export sans les prévues (v3)
-- [ ] 75-07-PLAN.md — Canal de marquage, pied réservé, glyphes, nom accessible, rendu des prévues (v4)
-- [ ] 75-08-PLAN.md — Sélecteur de lentilles, menu, panneau, compte du radar (v5)
-- [ ] 75-09a-PLAN.md — Retrait côté assemblage et moteur : `recent-work.json`, `recent.mjs`, étape de `refresh.mjs`, sonde Y reportée (v6)
-- [ ] 75-09b-PLAN.md — Retrait côté page et jetons : `25-recent.js`, `#btn-recent`, survol, suites `ecrans-recent` et `responsive` adaptées (v7)
-- [ ] 75-09c-PLAN.md — Retrait : dictionnaires, `moteur-carte`, `chrome-moteur-carte`, `chrome-fr`, grep d'inventaire à zéro (v8)
-- [ ] 75-10-PLAN.md — Chaîne XSS étendue, sans git, DESIGN.md, CHANGELOG, compteur de suites (v9)
+- [x] 75-07-PLAN.md — Canal de marquage, pied réservé, glyphes, nom accessible, rendu des prévues (v4)
+- [x] 75-08-PLAN.md — Sélecteur de lentilles, menu, panneau, compte du radar (v5)
+- [x] 75-09a-PLAN.md — Retrait côté assemblage et moteur : `recent-work.json`, `recent.mjs`, étape de `refresh.mjs`, sonde Y reportée (v6)
+- [x] 75-09b-PLAN.md — Retrait côté page et jetons : `25-recent.js`, `#btn-recent`, survol, suites `ecrans-recent` et `responsive` adaptées (v7)
+- [x] 75-09c-PLAN.md — Retrait : dictionnaires, `moteur-carte`, `chrome-moteur-carte`, `chrome-fr`, grep d'inventaire à zéro (v8)
+- [x] 75-10-PLAN.md — Chaîne XSS étendue, sans git, DESIGN.md, CHANGELOG, compteur de suites (v9)
 
 ### Phase 76: Traçabilité au cockpit — exigences, décisions, mémoire
 
@@ -406,8 +406,8 @@ Plans:
 - [x] 76-05-PLAN.md — Route `GET /api/vf/tracabilite` (v3)
 - [x] 76-06-PLAN.md — Page : section de phase, preuves, Jalon, panneau d'exigence (v4)
 - [x] 76-07-PLAN.md — Page : Décisions, Mémoire, panneaux d'ADR, de décision, d'entrée, commits (v5)
-- [ ] 76-08-PLAN.md — Retrait du nœud `.req`, puis clôture (v6)
-- [ ] 76-09-PLAN.md — Questions en attente : lecture des sections « À Samuel » et champ `meta.vf.questions` (v4)
+- [x] 76-08-PLAN.md — Retrait du nœud `.req`, puis clôture (v6)
+- [x] 76-09-PLAN.md — Questions en attente : lecture des sections « À Samuel » et champ `meta.vf.questions` (v4)
 
 ### Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up
 
@@ -475,16 +475,16 @@ Plans:
 - [x] 79-10-PLAN.md — Traduction au point d'émission (vague 3)
 - [x] 79-11-PLAN.md — Plafond en colonnes et code navigateur rangé (vague 4)
 - [x] 79-12-PLAN.md — Route d'état et vf-signal par la route (vague 4)
-- [ ] 79-13-PLAN.md — Route de frise et cibles en mémoire (vague 5)
-- [ ] 79-14-PLAN.md — Flux partagé entre onglets et veille de silence (vague 5)
-- [ ] 79-15-PLAN.md — Route graphe, fin de la réécriture de project.html, témoin d'export (vague 6)
-- [ ] 79-16-PLAN.md — Coquille statique servie du module (vague 7)
-- [ ] 79-17-PLAN.md — Magasin d'état côté page (vague 8)
-- [ ] 79-18-PLAN.md — Mise en page dans un worker (vague 9)
-- [ ] 79-19-PLAN.md — Journal des attentes par hook, détachable (vague 10)
-- [ ] 79-20-PLAN.md — Documentation et version du module (vague 11)
+- [x] 79-13-PLAN.md — Route de frise et cibles en mémoire (vague 5)
+- [x] 79-14-PLAN.md — Flux partagé entre onglets et veille de silence (vague 5)
+- [x] 79-15-PLAN.md — Route graphe, fin de la réécriture de project.html, témoin d'export (vague 6)
+- [x] 79-16-PLAN.md — Coquille statique servie du module (vague 7)
+- [x] 79-17-PLAN.md — Magasin d'état côté page (vague 8)
+- [x] 79-18-PLAN.md — Mise en page dans un worker (vague 9)
+- [x] 79-19-PLAN.md — Journal des attentes : S0 OUI, sans code (vague 10)
+- [x] 79-20-PLAN.md — Documentation et version du module (vague 11)
 - [x] 79-21-PLAN.md — Coût borné de la correspondance de motifs du moteur (vague 3)
-- [ ] 79-22-PLAN.md — Transcript et détail par la table en mémoire de la collecte (vague 8)
+- [x] 79-22-PLAN.md — Transcript et détail par la table en mémoire de la collecte (vague 8)
 
 ### Phase 80: Trois onglets, trois formes — Projet en couloirs, clavier, navigation
 
