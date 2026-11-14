@@ -108,7 +108,6 @@
     @media (max-width: 700px) { .vf-git-tiroir { top: calc(var(--hh, 56px) + 4px); } }
     @media (prefers-reduced-motion: reduce) { .vf-git-tiroir.vf-git-entree { animation: none; } .vf-git-sec-t svg { transition: none; } }
   `;
-  document.head.appendChild(style);
 
   const tiroir = R.el('aside', 'vf-git-tiroir glass', null, { id: 'vf-git-tiroir', role: 'complementary', 'aria-label': t('Git history') }), barre = R.el('div', 'vf-git-barre');
   const titre = R.el('h2', 'vf-git-titre-t', t('Git history'), { tabindex: '-1' }), fermerB = R.el('button', 'vf-git-fermer', null, { type: 'button', 'aria-label': t('Close the Git history') });
@@ -117,8 +116,6 @@
   barre.append(titre, fermerB);
   tiroir.append(barre, R.el('p', 'vf-git-aide', 'Lecture seule. Chaque action est une commande à copier.'), corps, live);
   tiroir.hidden = true;
-  document.body.appendChild(tiroir);
-  if (window.VFGitPoignee) window.VFGitPoignee.monter(tiroir); // 77-vf-git-poignee.js (chargée avant) : largeur réglable, 80-06
 
   let ouvert = false, donnees = null, seq = 0, avant = null;
   const etatPages = { n: 0 }; // rangées montrées (80-06) : gardé d'une relecture à l'autre
@@ -141,7 +138,6 @@
     }
     if (haut < Infinity) tiroir.style.bottom = Math.max(16, Math.round(H - haut + 8)) + 'px';
   };
-  if (window.ResizeObserver && document.querySelector('#stage')) new ResizeObserver(() => eviter()).observe(document.querySelector('#stage')); // la scène bouge quand un panneau bas s'ouvre, se ferme ou se redimensionne
 
   const montrer = (j) => {
     donnees = j;
@@ -217,12 +213,11 @@
   const basculer = () => (ouvert ? fermer() : ouvrir());
   tiroir.addEventListener('animationend', () => tiroir.classList.remove('vf-git-entree'));
   fermerB.addEventListener('click', fermer);
-  window.addEventListener('vf-git:basculer', basculer);
 
   const echap = (e) => { if (ouvert && e.key === 'Escape' && !e.defaultPrevented && !window.VF_SURCOUCHES.couverte(tiroir)) { e.stopPropagation(); e.preventDefault(); fermer(); } };
   tiroir.addEventListener('keydown', echap);
-  document.addEventListener('keydown', (e) => { const l = ligne(), o = ouvreur(), p = plus(); if ((l && l === e.target) || (o && o === e.target) || (p && p === e.target)) echap(e); }, true);
-  window.addEventListener('keydown', (e) => { // touche g : ni dans un champ, ni palette ouverte, ni avec Ctrl, Alt ou Meta, ni sans ouvreur
+  const surOuvreur = (e) => { const l = ligne(), o = ouvreur(), p = plus(); if ((l && l === e.target) || (o && o === e.target) || (p && p === e.target)) echap(e); };
+  const surTouche = (e) => { // touche g : ni dans un champ, ni palette ouverte, ni avec Ctrl, Alt ou Meta, ni sans ouvreur
     if ((e.key !== 'g' && e.key !== 'G') || e.ctrlKey || e.altKey || e.metaKey || e.shiftKey || e.isComposing) return;
     const tg = e.target;
     if (tg && (tg.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].indexOf(tg.tagName) >= 0)) return;
@@ -230,10 +225,25 @@
     const l = ligne(), o = ouvreur();
     if (!(l && !l.hidden) && !(o && !o.hidden)) return;
     e.preventDefault(); basculer();
-  });
-  window.addEventListener('resize', eviter);
+  };
   const reevaluer = () => { eviter(); if (donnees && donnees.etat === 'ok') montrer(donnees); };
-  MOBILE.addEventListener('change', reevaluer);
-  new MutationObserver(eviter).observe(document.body, { attributes: true, attributeFilter: ['class', 'style'] }); // le Terminal s'ouvre ou se ferme : la réserve basse change
+  const brancher = () => { // A51 : tout ce qui se branche sur le global (feuille, nœud du corps, écouteurs, observateurs) est posé ici et retiré avec l'onglet
+    const pose = [], sur = (c, ty, f, o) => { c.addEventListener(ty, f, o); pose.push(() => c.removeEventListener(ty, f, o)); };
+    const obs = (O, cible, opts, fn) => { const o = new O(fn); o.observe(cible, opts); pose.push(() => o.disconnect()); };
+    document.head.appendChild(style); document.body.appendChild(tiroir);
+    const demonter = window.VFGitPoignee && window.VFGitPoignee.monter(tiroir); // 77-vf-git-poignee.js (chargée avant) : largeur réglable, 80-06
+    const scene = document.querySelector('#stage'); // la scène bouge quand un panneau bas s'ouvre, se ferme ou se redimensionne
+    if (window.ResizeObserver && scene) obs(ResizeObserver, scene, undefined, () => eviter());
+    sur(window, 'vf-git:basculer', basculer); sur(document, 'keydown', surOuvreur, true); sur(window, 'keydown', surTouche);
+    sur(window, 'resize', eviter); sur(MOBILE, 'change', reevaluer);
+    obs(MutationObserver, document.body, { childList: true, attributes: true, attributeFilter: ['class', 'style'] }, eviter); // le Terminal s'ouvre ou se ferme, sa pastille arrive : la réserve basse change
+    return () => {
+      pose.splice(0).forEach((f) => f()); if (ouvert) fermer(true);
+      if (demonter) demonter();
+      tiroir.remove(); style.remove();
+    };
+  };
+  const C = window.VF_COQUILLE;
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(brancher, { cle: '77-vf-git-tiroir.js' }); else brancher();
   window.VFGitTiroir = Object.freeze({ ouvrir, fermer, ouvert: () => ouvert, recharger, donnees: () => donnees, ouvrirSur });
 })();

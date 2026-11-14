@@ -4,10 +4,10 @@
 #   SU2 export : 15 Tab restent dans la boîte, Maj+Tab boucle, inert posé puis levé (jamais celui d'un témoin), focus rendu ; palette : 30 Tab
 #   SU3 panneau fermé : aucun focalisable (1440 px), focus rendu au bouton, mouvement réduit
 #   SU4 tiroirs et Échap : dessus de pile, palette sur tiroir, contrat Échap consommé (Code, Équipe, Terminal), ordre des écouteurs, cas interdit
-#   SU5 les trois listes recopiées ont disparu · SU6 coquille de la 79 (en attente : témoin exécutable après la 79)
+#   SU5 les trois listes recopiées ont disparu · SU6 coquille de la 79 : la pile est un persistant (deux allers-retours Code / Projet : même objet, un seul écouteur)
 #   Mutants (copie COMPLÈTE du module par cockpit_module_copie, page rebâtie depuis la copie, serveur lancé par socle-serveur.sh sur COCKPIT_MODULE ;
 #   jamais le module du dépôt, jamais un lien) : M-INERT-TOUT, M-PIEGE, M-PALETTE, M-ECHAP-VIDE, M-SANS-PREVENT, M-UNICITE, M-LEVEE, M-PROPRIO,
-#   M-TIROIR-COUVERT, M-FLUX, M-BULLE, M-RIEN, M-IDPANEL, M-RENDRE, M-TOUR ; M-PERSISTANT après la 79
+#   M-TIROIR-COUVERT, M-FLUX, M-BULLE, M-RIEN, M-IDPANEL, M-RENDRE, M-TOUR, M-PERSISTANT (marqueur retiré)
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
 set -uo pipefail
 libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; }
@@ -88,10 +88,10 @@ O="$LAB/.vibeflow/cockpit"; serve "$LAB"; PORT="$SERVED"
 assert_eq "A0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
 TL="$WORK/lab-term"; mklab "$TL"; serve "$TL" --terminal; PORT_T="$SERVED"
 pilote() { # pilote <port> <module> <racine-terminal> <sections>
-  REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-surcouches.mjs" "$CHROME" "http://127.0.0.1:$1" "$2" "${3:-}" "${4:-su1,su2,su3,su4,su7}" 2>"$WORK/mesure.err"
+  REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-surcouches.mjs" "$CHROME" "http://127.0.0.1:$1" "$2" "${3:-}" "${4:-su1,su2,su3,su4,su6,su7}" 2>"$WORK/mesure.err"
 }
 # SU_SECTIONS : mise au point (sections jouées) ; SU_SANS_MUTANTS=1 saute les mutants
-R="$(pilote "$PORT" "$PILE" "http://127.0.0.1:$PORT_T" "${SU_SECTIONS:-su1,su2,su3,su4,su7}")"
+R="$(pilote "$PORT" "$PILE" "http://127.0.0.1:$PORT_T" "${SU_SECTIONS:-su1,su2,su3,su4,su6,su7}")"
 [ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/mesure.json"
 [ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }
 E() { printf '%s' "$R" | node "$AUX/ev.mjs" "$1"; }
@@ -156,24 +156,30 @@ echo "=== SU5 — les listes recopiées ont disparu (retrait 4) ==="
 assert_eq "SU5.1 — « #palette.open, #flowmenu.open » absent de 02, 73 et 77 (baseline : 1 dans chacun)" \
   "$(cd "$UI" && grep -lF '#palette.open, #flowmenu.open' 02-vf-telephone.js 73-vf-tiroir-travail.js 77-vf-git-tiroir.js | tr '\n' ',')" ""
 echo "=== SU6 — coquille de la 79 ==="
-echo "  ⏳ ATTENTE — SU6.1 (coquille de la 79 absente : window.VF_COQUILLE n'est définie nulle part, 79-16 n'est pas livrée à la jointure J1 ; témoin exécutable après elle, exigé vert par la jointure)"
+ok "SU6.1 — deux allers-retours Code / Projet, tiroir Git ouvert avant le départ : VF_SURCOUCHES est le même objet, UN seul écouteur Échap en capture posé par la pile, le tiroir est retiré de la pile avec l'onglet" \
+  "j.su6.avant && j.su6.identite && j.su6.pile === 1 && j.su6.onglet === 'code' && j.su6.retire"
+if [ "$(E 'j.su6.terminal && j.su6.terminal.sautee ? 1 : 0')" = "1" ]; then
+  echo "  ⊘ SU6.1b SAUTÉ — Terminal non lancé : $(E 'j.su6.terminal.sautee') (non compté comme réussi)"
+else
+  ok "SU6.1b — Terminal rouvert après les allers-retours, focus dans sa région : la pile n'agit pas (defaultPrevented faux, vue appelée)" \
+    'j.su6.terminal && j.su6.terminal.temoin[0] === false && j.su6.terminal.vue === 1'
+fi
 echo "=== Mutants (copie du module, page rebâtie, serveur sur la copie) ==="
 [ -z "${SU_SANS_MUTANTS:-}" ] || { echo "  ⊘ mutants sautés (SU_SANS_MUTANTS) : mise au point seulement"; vf_hyg_assert; exit 0; }
-mutant() { # mutant <nom> <sections> <motif sed> <assertion> : copie du module, motif appliqué DANS LA COPIE, page rebâtie depuis elle, serveur sur la copie, attend ROUGE
-  local nom="$1" sec="$2" motif="$3" test="$4" ml="$WORK/lab-mut-$1" nj nh port RM M f
+mutant() { # mutant <nom> <sections> <motif sed> <assertion> : copie du module, motif appliqué DANS LA COPIE, serveur sur la copie (empreinte publiée = celle de la copie), attend ROUGE
+  local nom="$1" sec="$2" motif="$3" test="$4" ml="$WORK/lab-mut-$1" nj port RM M f
   rm -rf "$ml" "$WORK/mod-$nom"; cp -R "$LAB" "$ml" # un lab entier : le tiroir Git a besoin de son dépôt
   M="$(cockpit_module_copie "$WORK/mod-$nom")" || { echo "  ❌ FAIL — mutant $nom : copie du module impossible"; FAIL=$((FAIL+1)); return; }
   f="$M/skills/cockpit-moteur/assets/ui/00-vf-surcouches.js"
   sed -i.bak "$motif" "$f"; rm -f "$f.bak"
   node "$M/scripts/vf-cockpit-build.mjs" "$ml" --quiet > "$WORK/build-mut-$nom.out" 2>&1 || cat "$WORK/build-mut-$nom.out"
-  nj="$(node "$AUX/chg.mjs" "$PILE" "$f")"; nh="$(node "$AUX/chg.mjs" "$O/index.html" "$ml/.vibeflow/cockpit/index.html")"
-  { [ "$nj" -ge 1 ] && [ "$nj" = "$nh" ]; } || {
-    echo "  ❌ FAIL — mutant $nom : $nj ligne(s) du module, $nh de la page rebâtie (attendu : égales, au moins une)"; FAIL=$((FAIL+1)); return; }
+  nj="$(node "$AUX/chg.mjs" "$PILE" "$f")" # les scripts ui/ sont servis par la coquille (/_vf/), plus inlinés dans la page : la copie doit avoir changé, et c'est elle qui est chargée (code 5)
+  [ "$nj" -ge 1 ] || { echo "  ❌ FAIL — mutant $nom : la copie du module n'a pas changé ($nj ligne)"; FAIL=$((FAIL+1)); return; }
   COCKPIT_MODULE="$M" serve "$ml"; port="$SERVED"
   [ "$SERVED_RC" = 0 ] || { echo "  ❌ FAIL — mutant $nom : serveur non lancé sur la copie (code $SERVED_RC ; 5 = la copie n'est pas celle qui est chargée)"; FAIL=$((FAIL+1)); return; }
   RM="$(pilote "$port" "$f" "" "$sec")"; cockpit_arreter
   if [ "$(printf '%s' "$RM" | node "$AUX/ev.mjs" "$test")" = "false" ]; then
-    echo "  ✅ PASS — $nom : le mutant rougit (assertion « $test » = false ; copie chargée : empreinte publiée = celle de la copie ; $nj ligne(s) changée(s) dans le module, autant dans la page servie)"; PASS=$((PASS+1)); MUTANTS=$((MUTANTS+1))
+    echo "  ✅ PASS — $nom : le mutant rougit (assertion « $test » = false ; copie chargée : empreinte publiée = celle de la copie ; $nj ligne(s) changée(s) dans le module servi)"; PASS=$((PASS+1)); MUTANTS=$((MUTANTS+1))
   else echo "  ❌ FAIL — $nom : le mutant ne rougit pas"; echo "     sortie: ${RM:0:400}"; FAIL=$((FAIL+1)); fi
 }
 mutant M-INERT-TOUT su2 's#for (const x of e.inertes)#for (const x of document.querySelectorAll("[inert]"))#' \
@@ -195,7 +201,7 @@ mutant M-RIEN su7 's|if (rien(t) \&\& !flux|if (!flux|' 'j.su7.rien'
 mutant M-IDPANEL su7 "s|d.id !== 'panel' \&\& ||" 'j.su7.feuille === '"'"'{"role":"dialog:true","ouverte":false}'"'"
 mutant M-RENDRE su7 's|if (e.rendu) rendre(e);|void 0;|' 'j.su7.rendre'
 mutant M-TOUR su7 's|if (tv \&\& !dT \&\& refs.tourBtn)|if (false)|' 'j.su7.tour.arrets.every(Boolean)'
-echo "  ⏳ ATTENTE — M-PERSISTANT (marqueur vf-coquille: persistant retiré : exécutable après 79-16 (coquille non livrée à la jointure J1), exigé rouge par la jointure)"
+mutant M-PERSISTANT su6 's#^// vf-coquille: persistant$#// vf-coquille : retiré#' 'j.su6.identite && j.su6.pile === 1'
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

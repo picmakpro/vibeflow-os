@@ -6,6 +6,7 @@
 //     (racine du module, voir vf-cockpit-module.mjs) que le serveur remplace au lancement : la fonction reste pure.
 // Identité d'une phase = (compartiment, numéro) : « phase N » se résout par le champ `num` des nœuds de phase ; si plusieurs
 // compartiments portent ce numéro, la réponse les liste avec leur compartiment et ne choisit pas au hasard.
+// Les exigences n'ont pas de carte (76-08, P76-D-25) : elles se lisent dans `meta.vf.trace.exigences`, et la réponse ne cite que la carte de leur phase.
 // Exports : projectIndex(G), answerLocally(G, question), instructions(G).
 import { statutLisible } from './vf-cockpit-project.mjs';
 const ST = { done: 'fait', active: 'en cours', todo: 'à faire', blocked: 'bloqué', recette: 'à recetter' };
@@ -41,7 +42,23 @@ export function projectIndex(G) {
   return { N, F, kids, files, ref, label, get, under };
 }
 
-const line = (I, x, note) => `- [[${I.ref(x)}]]${/\.req$/.test(x.id || '') ? ` (${String(x.id).slice(3, -4).replace(/^/, 'phase ')})` : ''} · ${etat(x)}${note ? ' · ' + note : ''}`;
+const line = (I, x, note) => `- [[${I.ref(x)}]] · ${etat(x)}${note ? ' · ' + note : ''}`;
+// les exigences du graphe (champ facultatif posé par la collecte ; absent ou en erreur : aucune) et la carte de phase qui les porte
+// (une exigence d'archive : le nœud que la collecte a désigné)
+// une exigence d'archive (ws '*') jumelle d'une exigence vivante de même identifiant n'est pas une exigence distincte
+// (la collecte la rattache à la vivante : 438a2ef6)
+const exigencesDe = (G) => {
+  const xs = Array.isArray(G.meta?.vf?.trace?.exigences) ? G.meta.vf.trace.exigences : [];
+  const vivantes = new Set(xs.filter((e) => e.ws !== '*').map((e) => e.id));
+  return xs.filter((e) => e.ws !== '*' || !vivantes.has(e.id));
+};
+const phaseDe = (G, e) => G.nodes.find((n) => n.kind === 'phase'
+  && (e.ws === '*' ? e.cleNoeud === `${n.ws || ''}|${n.num}` : String(n.num) === String(e.phase) && (n.ws || null) === (e.ws || null)));
+const caseDe = (e) => (e.coche ? 'cochée' : 'non cochée');
+const ligneExigence = (I, G, e, avecWs) => {
+  const p = phaseDe(G, e), ws = avecWs && e.ws && e.ws !== '*' ? ` · compartiment ${e.ws}` : '';
+  return `- **${e.id}** · ${caseDe(e)}${p ? ` · portée par [[${I.ref(p)}]]` : ''}${ws}${e.libelle ? ` · ${coupe(e.libelle, 70)}` : ''}`;
+};
 const item = (I, x, note) => ({ id: I.ref(x), note: coupe(note || etat(x), 90) });
 const answer = (title, md, items, followups = []) => ({ title, answer: md, items: items.slice(0, 14), steps: [], followups, engine: 'local' });
 // accord des statuts (L1, arbitrage Samuel, AskUserQuestion session principale, 2026-11-08, consigné en § 10 du rapport GLOBAL de la recette (3da818fe)) : « 1 bloqué », « 4 bloqués », « 27 faits » ; « en cours », « à faire », « à recetter » sont invariables
@@ -82,7 +99,7 @@ export function answerLocally(G, question) {
   const mi = /\bmission\s+([\w.-]+)/.exec(q)?.[1];
   const mission = mi && (I.N.get('dag-MISSION-' + mi.toUpperCase()) || I.N.get('dag-MISSION-' + mi));
   const reqId = /\b([A-Z][A-Z0-9]{1,7}-\d{2,3})\b/.exec(question)?.[1];
-  const reqs = reqId ? G.files.filter((f) => f.p === 'req/' + reqId || (f.p.startsWith('req/') && f.p.endsWith('/' + reqId))) : [];
+  const reqs = reqId ? exigencesDe(G).filter((e) => e.id === reqId) : [];
   const req = reqs.length === 1 ? reqs[0] : null;
   // chemin ancré (début ou séparateur avant, fin ou ponctuation après), segments séparés par `/` : borné, jamais de retour arrière en cascade
   const pathHit = /(?:^|[\s'"`(])([\w.-]+(?:\/[\w.-]+)+\.(?:sh|md|mjs|js|json|ts|yml))(?=$|[\s'"`),;:?!])/.exec(question)?.[1];
@@ -92,30 +109,28 @@ export function answerLocally(G, question) {
     return answer(`Phase ${ph} : ${phases.length} compartiments`, `Plusieurs compartiments portent une « Phase ${ph} » ; dis lequel :\n${phases.map((p) => line(I, p, `compartiment ${p.ws || 'racine'}`)).join('\n')}`,
       phases.map((p) => item(I, p, `compartiment ${p.ws || 'racine'}`)), phases.map((p) => `Qu'est-ce qui reste dans la phase ${ph} du compartiment ${p.ws || 'racine'} ?`));
   }
-  if (reqs.length > 1) return answer(reqId, `${reqs.length} exigences portent l'identifiant **${reqId}** (une par compartiment) :\n${reqs.map((r) => line(I, r, r.p.split('/').slice(1, -1).join('/') || 'racine')).join('\n')}`, reqs.map((r) => item(I, r)));
+  if (reqs.length > 1) return answer(reqId, `${reqs.length} exigences portent l'identifiant **${reqId}** (une par compartiment) :\n${reqs.map((e) => ligneExigence(I, G, e, true)).join('\n')}`, reqs.map((e) => phaseDe(G, e)).filter(Boolean).map((p) => item(I, p)));
   if (/\bphase\s+\d/.test(q) && !phase) return answer(`Phase ${ph} introuvable`, `Aucune carte « Phase ${ph} » dans le graphe Projet (ni ROADMAP active, ni jalon archivé).`, []);
 
   if (req) {
-    const owner = I.N.get(req.n), phaseNode = owner?.parent && I.N.get(owner.parent);
-    return answer(reqId, `**${reqId}** · ${ST[req.st] || 'sans statut'}${phaseNode ? ` · portée par [[${I.ref(phaseNode)}]]` : ''}.\n\n${req.d || ''}`,
-      [item(I, req), ...(phaseNode ? [item(I, phaseNode)] : [])], phaseNode ? [`Qu'est-ce qui reste dans la ${phaseNode.label.split(' · ')[0].toLowerCase()} ?`] : []);
+    const phaseNode = phaseDe(G, req);
+    return answer(reqId, `**${reqId}** · ${caseDe(req)}${phaseNode ? ` · portée par [[${I.ref(phaseNode)}]]` : ''}.\n\n${req.libelle || ''}`,
+      phaseNode ? [item(I, phaseNode)] : [], phaseNode ? [`Qu'est-ce qui reste dans la ${phaseNode.label.split(' · ')[0].toLowerCase()} ?`] : []);
   }
   if (pathHit) {
     const plans = G.files.filter((f) => (f.touched || []).includes(pathHit));
     if (!plans.length) return answer('Aucun plan', `Aucun plan ni nœud de mission ne déclare avoir touché \`${pathHit}\` (champ \`files_modified\`).`, []);
     return answer(`Qui a touché ${pathHit.split('/').pop()}`, `${plans.length} ${pl(plans.length, 'plan déclare', 'plans déclarent')} \`${pathHit}\` :\n${plans.slice(0, 12).map((p) => line(I, p)).join('\n')}`, plans.map((p) => item(I, p)));
   }
-  // le groupe d'exigences d'une phase faite garde « en cours » tant que des cases restent décochées : ce n'est pas du travail en cours
-  const exigPhaseFaite = (x) => { const g = I.N.get(x.id || x.n); return !!g && /\.req$/.test(g.id) && I.N.get(g.parent)?.st === 'done'; };
   const pool = target ? I.under(target.id) : [...G.nodes, ...G.files];
   const scope = target ? ` dans [[${I.ref(target)}]]` : '';
   if (/bloqu|coince|en echec|echoue/.test(q)) {
     const xs = pool.filter((x) => x.st === 'blocked');
-    if (!xs.length) { const act = pool.filter((x) => x.st === 'active' && !exigPhaseFaite(x)); return answer('Rien de bloqué', `Rien n'est bloqué${scope}. En cours : ${act.length}.\n${act.slice(0, 8).map((x) => line(I, x)).join('\n')}`, act.map((x) => item(I, x))); }
+    if (!xs.length) { const act = pool.filter((x) => x.st === 'active'); return answer('Rien de bloqué', `Rien n'est bloqué${scope}. En cours : ${act.length}.\n${act.slice(0, 8).map((x) => line(I, x)).join('\n')}`, act.map((x) => item(I, x))); }
     return answer(`${xs.length} ${pl(xs.length, 'bloqué', 'bloqués')}`, `${xs.length} ${pl(xs.length, 'élément bloqué', 'éléments bloqués')}${scope} (étape de mission en échec) :\n${xs.map((x) => line(I, x, I.label(I.N.get(x.n || x.parent) || {}) || '')).join('\n')}`, xs.map((x) => item(I, x)));
   }
   if (/en cours|actif|au travail|qui travaille/.test(q)) {
-    const xs = pool.filter((x) => x.st === 'active' && !exigPhaseFaite(x));
+    const xs = pool.filter((x) => x.st === 'active');
     return answer(`${xs.length} en cours`, xs.length ? `En cours${scope} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}` : `Rien en cours${scope} d'après .planning/. Pour les agents réellement au travail, voir le badge d'en-tête.`, xs.map((x) => item(I, x)));
   }
   if (/reste|a faire|prochain|suivant|restant|ensuite|next/.test(q)) {
@@ -126,13 +141,13 @@ export function answerLocally(G, question) {
       const reste = phases.filter((x) => x.st === 'todo' || x.st === 'active');
       return answer('Reste', reste.length ? `${reste.length} ${pl(reste.length, 'phase', 'phases')} à finir (aucun jalon courant reconnu) :\n${reste.slice(0, 12).map((x) => line(I, x)).join('\n')}${reste.length > 12 ? `\n- … et ${reste.length - 12} ${pl(reste.length - 12, 'autre', 'autres')}` : ''}` : 'Toutes les phases du planning sont terminées.', reste.map((x) => item(I, x)));
     }
-    const xs = (t ? I.under(t.id) : pool).filter((x) => x !== t && (x.st === 'todo' || x.st === 'active') && (x.id ? x.kind === 'phase' || /^dag-/.test(x.id) : !x.p.startsWith('req/') || /^ph-/.test(t?.id || '')));
+    const xs = (t ? I.under(t.id) : pool).filter((x) => x !== t && (x.st === 'todo' || x.st === 'active') && (x.id ? x.kind === 'phase' || /^dag-/.test(x.id) : true));
     return answer(`Reste${t ? ' · ' + I.label(t).split(' · ')[0] : ''}`, `${xs.length} à finir dans [[${I.ref(t)}]]${t?.foot ? ` (${t.foot})` : ''} :\n${xs.slice(0, 12).map((x) => line(I, x)).join('\n')}${xs.length > 12 ? `\n- … et ${xs.length - 12} ${pl(xs.length - 12, 'autre', 'autres')}` : ''}`,
       [item(I, t), ...xs.map((x) => item(I, x))], xs[0] ? [`Qu'est-ce qui bloque ${dans(I.label(t).split(' · ')[0])} ?`] : []);
   }
   if (/exigence/.test(q) && phase) {
-    const xs = I.files.get(phase.id + '.req') || [];
-    return answer(`Exigences · Phase ${ph}`, `${xs.length} ${pl(xs.length, 'exigence', 'exigences')} pour [[${I.ref(phase)}]] (${count(xs)}) :\n${xs.slice(0, 14).map((x) => line(I, x, coupe(x.d, 70))).join('\n')}`, xs.map((x) => item(I, x)));
+    const xs = exigencesDe(G).filter((e) => phaseDe(G, e) === phase), faites = xs.filter((e) => e.coche).length;
+    return answer(`Exigences · Phase ${ph}`, `${xs.length} ${pl(xs.length, 'exigence', 'exigences')} pour [[${I.ref(phase)}]] (${faites} ${pl(faites, 'cochée', 'cochées')}) :\n${xs.slice(0, 14).map((e) => `- **${e.id}** · ${caseDe(e)}${e.libelle ? ` · ${coupe(e.libelle, 70)}` : ''}`).join('\n')}`, [item(I, phase)]);
   }
   if (target) {
     const sub = I.under(target.id).filter((x) => x !== target);
@@ -167,7 +182,7 @@ export function answerLocally(G, question) {
 export function instructions(G) {
   return [
     `Tu réponds à des questions sur l'avancement du projet « ${G.project.name} » (méthode VibeFlow, planning dans .planning/), pour quelqu'un qui explore la carte interactive de ce planning. Réponds en français.`,
-    'Cartes de la carte : jalons (n:ms-<clé>), phases (n:ph-<N>), groupe des exigences d\'une phase (n:ph-<N>.req), missions (n:dag-MISSION-<N>), Historique, Backlog, Graines, Releases ; éléments : plans (f:<chemin du PLAN.md>), exigences (f:req/<ID>), étapes de mission, entrées de backlog, tags (f:tag/<vX>).',
+    'Cartes de la carte : jalons (n:ms-<clé>), phases (n:ph-<N>), missions (n:dag-MISSION-<N>), Historique, Backlog, Graines, Releases ; éléments : plans (f:<chemin du PLAN.md>), étapes de mission, entrées de backlog, tags (f:tag/<vX>). Les exigences n\'ont pas de carte : elles se lisent dans meta.vf.trace.exigences ou dans REQUIREMENTS.md.',
     'Chaque carte porte un statut st (done = fait, active = en cours, todo = à faire, blocked = étape de mission en échec) et un pied foot (progression, vague, nombre de fichiers). « blocked » de dag.sh (attend ses dépendances) est déjà ramené à todo.',
     'Interroge la carte depuis le shell : `node <module>/scripts/vf-cockpit-query.mjs overview`, `find "<mots>"`, `show <id>`, ' +
     '`status <done|active|todo|blocked> [--in <id>]`, `path <idA> <idB>`. Chaque résultat est du JSON avec ids et statuts. ' +

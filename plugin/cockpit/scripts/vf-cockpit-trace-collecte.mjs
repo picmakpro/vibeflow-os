@@ -10,6 +10,7 @@ import { traceDuLedger, citationsLigne } from './vf-cockpit-trace-ledger.mjs';
 import { ligneStatutRecette, recetteFaite } from './vf-cockpit-avancement.mjs';
 import { servi } from './vf-cockpit-trace-texte.mjs';
 import { definitionsRegistre } from './vf-cockpit-registres.mjs';
+import { projeterQuestions } from './vf-cockpit-questions-attente.mjs';
 
 // identifiant d'exigence en mot entier (ni précédé ni suivi d'une lettre, d'un chiffre ou d'un tiret) : `P76-D-13` ou `ADR-073` n'en sont pas
 // confondus avec un maillon
@@ -148,6 +149,7 @@ export function projeterTrace(graphe, trace, { jalonActif = null, couper = coupe
     const exigence = (e) => ({ ...e, libelle: sv(e.libelle, 220), statut: sv(e.statut, 200) });
     vf.trace = { exigences: trace.exigences.map(exigence), etapes: trace.ledger.etapes, ledgers: trace.ledger.n, registresSansPhase };
     vf.registres = registres;
+    projeterQuestions(graphe, trace, { servi, racine, phases: new Map([...noeuds].map(([k, n]) => [k, n.id])) }); // 76-09 : meta.vf.questions (C76-Q2)
   } catch {
     for (const n of graphe.nodes) delete n.trace;
     vf.trace = { erreur: true }; delete vf.registres;

@@ -78,3 +78,21 @@ requirements-completed: [TRAC-05, TRAC-06, TRAC-07, TRAC-08, TRAC-09, TRAC-11]
 | `scripts/check-version-sync.sh` | exit 0, § 9 vert (238 suites) | 1 s |
 
 Temps total des suites de la tête : environ 338 s (hors les rejeux de développement de la suite neuve).
+
+## Correctifs du juge de design
+
+Un passage du juge de design (75/100, passed) a demandé trois corrections ciblées ; un commit par point, test d'abord vu rouge (sondes Chrome des suites existantes), puis code, puis vert.
+
+1. Bloquant, défilement horizontal des panneaux d'objet (`f270a216d`) : le gabarit ne posait pas l'inset de 20 px des `.sec` ; les lignes pleines à marge négative débordaient de 12 px. Rouge : 30 mesures
+   (cinq panneaux, 1 440, 1 024 et 390 px, titre mono de 3 lignes et chemin de pied long compris), scrollWidth 372 pour 360, 360 pour 348, 374 pour 362, deux bords gauches et deux bords droits. Correctif : le
+   conteneur du panneau porte `--inset-panel`, les `.sec` ne le doublent plus. Vert : C3.10a, C3.10b, C3.10c.
+2. Majeur, Jalon (`5be44b573`) : « Phase 3 » écrasé en « P… » sur une phase à nom long. Rouge : C1.13a (identifiant tronqué à 1 440 et 390 px). Correctif : l'identifiant ne rétrécit plus (`flex: none`), la
+   pastille d'état non plus. Vert : C1.13a ; le lab de page donne un nom long à la phase 3 (aucune assertion ne lit son nom).
+3. Majeur, repliables (`2d14d781c`) : aucun indicateur de pliage. Rouge : C3.11a, C3.11b, C3.11c, C1.13b (pseudo-élément absent). Correctif : chevron au trait de 16 px, au gabarit de `03-vf-charte.js`, tourné de
+   90 degrés ouvert, couleur `--text-3`, aucune couleur ajoutée. Vert : les quatre assertions, clair et sombre.
+
+- Écart : le plan de test du juge cite les sondes `test-cockpit-tracabilite-page.sh` et `-panneaux.sh` ; la sonde du Jalon est dans la première (lab de page), les autres dans la seconde.
+- Aucun contrat consommé par une autre phase n'est changé.
+- rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale) : pas de mutant, pas de rejeu suite par suite.
+- Suites jouées une fois sur la tête commitée `2d14d781c` : `test-cockpit-tracabilite-page.sh` 58 PASS / 0 FAIL (64 s), `test-cockpit-tracabilite-panneaux.sh` 60 PASS / 0 FAIL (78 s),
+  `test-cockpit-chrome-fr.sh` 141 PASS / 0 FAIL (35 s), `test-cockpit-vendor.sh` 253 PASS / 0 FAIL (125 s) ; total 302 s.

@@ -112,6 +112,6 @@
   };
   window.__vfProjetClavier = Object.freeze({ appliquer, poser, ramener, ordre, repli, memoire, cle });
   const C = window.VF_COQUILLE, demarrer = () => (vivant ? undefined : init());
-  if (C && typeof C.surOnglet === 'function') C.surOnglet(init); // P80-D-42 : la coquille, sinon `ready` (ou le premier rendu, s'il l'a devancé)
+  if (C && typeof C.surOnglet === 'function') C.surOnglet(init, { cle: '41-vf-projet-clavier.js' }); // la coquille (A51), sinon `ready`
   else if (state.layout) demarrer(); else { SC.on('ready', demarrer); SC.on('render', demarrer); }
 })();

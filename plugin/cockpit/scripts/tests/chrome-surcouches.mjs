@@ -1,7 +1,7 @@
 // chrome-surcouches.mjs — mesures de la pile de surcouches (80-02 : FORM-02, AUDC-M6), dans un vrai Chrome sans tête.
 // Usage : node chrome-surcouches.mjs <chrome> <racine> <source-pile> [<racine-terminal>] [<sections>]
-//   <source-pile> : texte du module ui/00-vf-surcouches.js (SU1.3 le réévalue) ; <sections> : su1,su2,su3,su4 (défaut : toutes).
-// Rend une ligne JSON { su1, su2, su3, su4 } ; chaque section est lisible seule. SU6 n'est pas mesuré ici (coquille de la 79).
+//   <source-pile> : texte du module ui/00-vf-surcouches.js (SU1.3 le réévalue) ; <sections> : su1,su2,su3,su4,su6,su7 (défaut : toutes).
+// Rend une ligne JSON { su1, su2, su3, su4, su6, su7 } ; chaque section est lisible seule (su6 : la coquille de la 79, deux allers-retours Code / Projet).
 import fs from 'node:fs';
 import { executer, pause } from './chrome-session.mjs';
 const [, , chrome, racine, source, racineTerm, quoi = 'su1,su2,su3,su4,su7'] = process.argv;
@@ -11,7 +11,7 @@ const SEL = "a[href], button, input, select, textarea, summary, [tabindex]";
 
 // posé avant tout script de la page : journal des écouteurs (type, capture, cible, fichier de l'extension qui l'a posé) + écouteur du « cas interdit »
 function espion() {
-  window.__ec = []; window.__interdit = [];
+  window.__ec = []; window.__interdit = []; window.__su6 = null; // __su6 : posée AVANT toute portée d'onglet, donc jamais défaite par la coquille
   const nom = () => {
     const c = document.currentScript; if (!c) return '';
     if (c.src) return c.src.split('/').pop();
@@ -175,6 +175,32 @@ await executer(chrome, async (s) => {
       } catch (e) { r.terminal = { sautee: String(e.message) }; }
     }
     o.su4 = r;
+  }
+  if (veut('su6')) { // coquille de la 79 : la pile est un persistant ; deux allers-retours Code / Projet ne la recréent pas, ne doublent pas son écouteur
+    const r = {}; const tiroir = "document.getElementById('vf-git-tiroir')";
+    await charger('index.html', racineTerm || racine);
+    await s.ev('window.__su6 = window.VF_SURCOUCHES; window.VFGitTiroir.ouvrir(); 1');
+    await s.attendre(`!!${tiroir} && !${tiroir}.hidden`, 'tiroir Git ouvert avant le départ');
+    r.avant = await s.ev(`!!window.VF_SURCOUCHES && window.VF_SURCOUCHES.dessus() === ${tiroir}`);
+    for (const nom of ['projet', 'code', 'projet', 'code']) { await s.ev(`VF_COQUILLE.chargerOnglet('${nom}').then(() => 1)`); await pause(300); }
+    await s.attendre("!!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout", 'moteur rendu sur Code');
+    const ec = await s.ev('JSON.stringify(window.__ec)').then(JSON.parse), N = 'nom';
+    r.pile = ec.filter((x) => x[N] === '00-vf-surcouches.js' && x.t === 'keydown' && x.cap && x.cible === 'window').length;
+    r.identite = await s.ev('!!window.__su6 && window.VF_SURCOUCHES === window.__su6');
+    r.onglet = await s.ev('window.VF_COQUILLE.onglet()');
+    r.retire = await s.ev(`${tiroir}.hidden === true && !window.VF_SURCOUCHES.ouverte() && window.VF_SURCOUCHES.dessus() === null`);
+    if (racineTerm) { // le Terminal, posé une fois : ouvert (ou resté ouvert), un Échap dans sa région passe intact à la vue
+      try {
+        if (!(await s.ev("document.body.classList.contains('vf-term-ouvert')"))) {
+          await s.attendre("!!document.querySelector('.vf-term-pastille') && !document.querySelector('.vf-term-pastille').hidden", 'pastille', 15000);
+          await s.ev("document.querySelector('.vf-term-pastille').click()");
+        }
+        await s.attendre("document.body.classList.contains('vf-term-ouvert') && !document.querySelector('.vf-term-tiroir').hidden", 'Terminal ouvert');
+        await s.ev("document.querySelector('.vf-term-tiroir .vf-term-poignee').focus()"); await poser(); await echap(); await pause(300);
+        const q = await relever(); r.terminal = { temoin: q.t, vue: q.v };
+      } catch (e) { r.terminal = { sautee: String(e.message) }; }
+    }
+    o.su6 = r;
   }
   if (veut('su7')) { // corrections de la revue : inert qui reste, deux propriétaires, tiroirs couverts, gardes d'Échap, visite modale
     const r = {}; const tiroirOuvert = "!document.getElementById('vf-git-tiroir').hidden";

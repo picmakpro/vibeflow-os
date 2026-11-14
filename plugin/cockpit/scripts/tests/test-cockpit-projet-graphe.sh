@@ -55,7 +55,7 @@ echo "=== P1 — lab plat au gabarit GSD ==="
 assert_eq "P1.1 — ph-1 done, ph-2 todo (le STATE ne pilote plus le statut : aucun plan fait en phase 2, CKPT-18)" "$(G "$WORK/g1.json" 'j.nodes.filter(n=>/^ph-\d$/.test(n.id)).map(n=>n.id+":"+n.st).join(",")')" "ph-1:done,ph-2:todo"
 assert_eq "P1.2 — plan 01-01 done, 02-01 todo (aucun nœud running ne le désigne, CKPT-18)" "$(G "$WORK/g1.json" 'j.files.filter(f=>/^0\d-01 /.test(f.name)).map(f=>f.name.slice(0,5)+":"+f.st).join(",")')" "01-01:done,02-01:todo"
 assert_eq "P1.3 — lien ph-1 vers ph-2 de type import" "$(G "$WORK/g1.json" 'j.links.filter(l=>l.a==="n:ph-1"&&l.b==="n:ph-2"&&l.k==="import").length')" "1"
-assert_eq "P1.4 — exigence AUTH-01 sous ph-1.req" "$(G "$WORK/g1.json" 'j.files.filter(f=>f.n==="ph-1.req").map(f=>f.name).join(",")')" "AUTH-01"
+assert_eq "P1.4 — exigence AUTH-01 rattachée à la phase 1 (lue dans meta.vf.trace.exigences, 76-08)" "$(G "$WORK/g1.json" 'j.meta.vf.trace.exigences.filter(e=>e.phase==="1").map(e=>e.id).join(",")')" "AUTH-01"
 assert_eq "P1.5 — jalon v1.0 MVP actif, pied « 1 clos · 0 à recetter · 1 à faire · 50 % » (CKPT-16)" "$(G "$WORK/g1.json" 'j.nodes.filter(n=>n.id==="ms-v1.0-mvp").map(n=>n.st+"|"+n.foot).join(",")')" "active|1 clos · 0 à recetter · 1 à faire · 50 %"
 assert_eq "P1.6 — meta.vf.phase = 2" "$(G "$WORK/g1.json" 'j.meta.vf.phase')" "2"
 
@@ -132,7 +132,7 @@ graph "$L5" "$WORK/g5.json"
 echo "=== P5 — identité (compartiment, numéro) ==="
 assert_eq "P5.1 — deux phases distinctes" "$(G "$WORK/g5.json" 'j.nodes.filter(n=>n.kind==="phase").map(n=>n.id).sort().join(",")')" "ph-1@deux,ph-1@un"
 assert_eq "P5.2 — chaque plan dans son compartiment" "$(G "$WORK/g5.json" 'j.files.filter(f=>f.p.endsWith("PLAN.md")).map(f=>f.n+"="+f.p.split("/")[2]).sort().join(",")')" "ph-1@deux=deux,ph-1@un=un"
-assert_eq "P5.3 — chaque exigence dans son compartiment" "$(G "$WORK/g5.json" 'j.files.filter(f=>f.p.startsWith("req/")).map(f=>f.n+"="+f.name).sort().join(",")')" "ph-1@deux.req=DEUX-01,ph-1@un.req=UN-01"
+assert_eq "P5.3 — chaque exigence dans son compartiment (ws lu dans meta.vf.trace.exigences, 76-08)" "$(G "$WORK/g5.json" 'j.meta.vf.trace.exigences.map(e=>e.ws+"="+e.id).sort().join(",")')" "deux=DEUX-01,un=UN-01"
 
 # ---------- P6 — ROADMAP à la française : lu malgré la dérive, dérive détectée, correctif proposé ----------
 # Cas réel (lab Scroll-Off, 2026-11-03) : « Phase N : » partout, aucune phase lue, carte vide sans explication.
@@ -349,7 +349,7 @@ echo alpha > "$B/active-workstream"
 printf -- '- [x] **RND-02**: recherche\n- [ ] **NEW-01**: neuf\n\n| RND-02 | Phase 1 | Complete |\n| NEW-01 | Phase 2 | Pending |\n' | wr "$B/workstreams/alpha/REQUIREMENTS.md"
 printf -- '- [x] **RND-02**: recherche\n- [x] **OLD-09**: autre phase\n\n| RND-02 | Phase 1 | Complete |\n| OLD-09 | Phase 5 | Complete |\n' | wr "$B/milestones/v0-REQUIREMENTS.md"
 graph "$LD" "$WORK/gd.json"
-assert_eq "R1.9 — DG-10 : RND-02 (vivant + archive, même phase) n'est lue qu'UNE fois (RND-02 sous ph-1, jamais en double) ; l'exigence propre à l'archive (OLD-09, phase 5 sans carte) reste comptée : 3 exigences dont 2 cochées" "$(G "$WORK/gd.json" 'j.files.filter(f=>f.p.startsWith("req/")).map(f=>f.name).sort().join(",")')|$(G "$WORK/gd.json" 'j.meta.vf.counts.reqs+"/"+j.meta.vf.counts.reqsDone')" "NEW-01,RND-02|3/2"
+assert_eq "R1.9 — DG-10 : RND-02 (vivant + archive, même phase) n'est lue qu'UNE fois dans meta.vf.trace.exigences (RND-02 de la phase 1, jamais en double) ; l'exigence propre à l'archive (OLD-09, phase 5 sans carte) reste comptée : 3 exigences dont 2 cochées (76-08)" "$(G "$WORK/gd.json" 'j.meta.vf.trace.exigences.map(e=>e.id).sort().join(",")+"|"+j.meta.vf.trace.exigences.filter(e=>e.id==="RND-02").map(e=>e.phase).join()')|$(G "$WORK/gd.json" 'j.meta.vf.counts.reqs+"/"+j.meta.vf.counts.reqsDone')" "NEW-01,OLD-09,RND-02|1|3/2"
 
 # R2 (lot 6 « Projet », étape PR2 « panneau de phase et visite », 2026-11-06 ; arbitrage Samuel, message direct en session principale, 2026-11-06 : toutes les propositions du panel) : PU-G-091, 092, 102, 103, 106, 107 (+ 104 côté moteur). Sans navigateur.
 echo "=== R2 — panneau de phase et visite : visite expliquée, mission vivante du jalon, texte propre, aucune répétition, exigence lisible ==="
@@ -413,7 +413,7 @@ const j=JSON.parse(require('fs').readFileSync(process.argv[1],'utf8')), n=j.node
 const a=n.summary.replace(/…\$/,''), b=d.replace(/^…/,''), g=process.env.GOAL.replace(/\\s+/g,' ').trim();
 console.log([n.summary.length<=401, b.length>0, (a+' '+b).replace(/\\s+/g,' ').trim()===g||(a+b).replace(/\\s+/g,' ').trim()===g, !d.startsWith(a.slice(0,40))].join(','))" "$WORK/gk.json")" "true,true,true,true"
 # PU-G-106 : l'exigence se lit sur sa carte
-assert_eq "R2.9 — PU-G-106 : le pied d'une carte d'exigence est la phrase de l'exigence, plus « REQUIREMENTS.md »" "$(G "$WORK/gk.json" 'j.files.filter(f=>f.n==="ph-2.req").map(f=>f.foot).join("|")')" "À 700 px, l'en-tête tient sur une rangée.|Le panneau garde une aide."
+assert_eq "R2.9 — PU-G-106 : le libellé d'une exigence (meta.vf.trace.exigences, phase 2) est sa phrase, jamais « REQUIREMENTS.md » (76-08)" "$(G "$WORK/gk.json" 'j.meta.vf.trace.exigences.filter(e=>e.phase==="2").map(e=>e.libelle).join("|")')" "À 700 px, l'en-tête tient sur une rangée.|Le panneau garde une aide."
 UIK="$SCRIPTS/../skills/cockpit-moteur/assets/ui/00-vibeflow.js"
 assert_eq "R2.10 — PU-G-107 / PU-G-104 / PU-G-106 : 00-vibeflow.js pose l'aide de navigation AVANT « Maintenant », construit le repli « Détails techniques » à l'ouverture du panneau et marque les cartes dont le pied répète la description" "$(node -e "
 const s=require('fs').readFileSync(process.argv[1],'utf8');
@@ -663,5 +663,70 @@ mut7 cr-objectif vf-cockpit-project.mjs "objectif(txt) ||" "/<objective>\\s*([\\
 assert_eq "P10.4 (R2) — mutant (ancienne coupe de l'intertitre de BACKLOG rétablie) : le test de croissance rougit, par buildProjectGraph" "$(cat "$WORK/ancre-cr3.txt")|$(CROISSANCE_FORME='## T◇— x' node "$CROISSANCE" "$WORK/mut-cr-backlog" | grep -c 'échec(s) sur')" "muté|1"
 assert_eq "P10.5 (R2) — mutant (ancienne regex de <objective> rétablie) : le test de croissance rougit, par buildProjectGraph" "$(cat "$WORK/ancre-cr4.txt")|$(CROISSANCE_FORME='※' node "$CROISSANCE" "$WORK/mut-cr-objectif" | grep -c 'échec(s) sur')" "muté|1"
 assert_eq "P10.2 — mutant (ancienne regex des parenthèses rétablie, ancre présente) : le test de croissance rougit" "$(cat "$WORK/ancre-cr1.txt")|$(CROISSANCE_FORME='Depends on:** (' node "$CROISSANCE" "$WORK/mut-cr-paren" | grep -c 'échec(s) sur')" "muté|1"
+
+# ---------- R76 — retrait du nœud « Exigences » (76-08, P76-D-25, P76-D-39) : graphe sans nœud, porte des exigences rebranchée, lanceur des suites ----------
+# Preuve de COMPORTEMENT, jamais un grep (P76-D-39) : la sortie de window.VF_EXIGENCES.lireExigences (retrait-lecteurs.mjs --porte) sur le lab de référence est celle d'AVANT le retrait
+# (76-08-PORTE-AVANT.json), à `cible` près ; la `cible` brute, elle, passe de `f:req/…` à null.
+echo "=== R76 — graphe sans nœud Exigences ; porte des exigences ; lanceur des suites ==="
+RET="$TESTS_DIR/retrait-lecteurs.mjs"; REJ="$TESTS_DIR/rejouer-suites.sh"
+PHASE76="$TESTS_DIR/../../../../.planning/workstreams/fiabilite/phases/VFDO-76-tracabilite-au-cockpit"
+assert_eq "R76.1 — graphe du lab g1 : aucun nœud « exigences », aucun identifiant en .req, aucune carte req/, aucun lien « couvre » ; le pied de ph-1 dit « exigences » ; témoin : AUTH-01 est dans meta.vf.trace.exigences (phase 1)" \
+  "$(G "$WORK/g1.json" '[j.nodes.filter(n=>n.kind==="exigences").length, j.nodes.filter(n=>/\.req$/.test(n.id)).length, j.files.filter(f=>f.p.startsWith("req/")).length, j.links.filter(l=>l.label==="couvre").length, j.nodes.find(n=>n.id==="ph-1").foot.includes("exigences"), j.meta.vf.trace.exigences.some(e=>e.id==="AUTH-01"&&e.phase==="1")].join("|")')" "0|0|0|0|true|true"
+node "$RET" --lab-reference "$WORK/ref76"; node "$RET" --porte "$WORK/ref76" > "$WORK/porte-apres.json"; node "$RET" --porte-brut "$WORK/ref76" > "$WORK/porte-brut-ref.json"
+node "$RET" --porte-brut "$L1" > "$WORK/porte-brut-l1.json"
+assert_eq "R76.2a — porte des exigences : la sortie normalisée de lireExigences sur le lab de référence (id, texte, cochee, ordre, couverture) est celle d'avant le retrait" \
+  "$(cmp -s "$WORK/porte-apres.json" "$PHASE76/76-08-PORTE-AVANT.json" && echo identique || echo différente)" "identique"
+CIBLE='(()=>{const c=Object.values(j).flatMap(p=>[...(p.exigences||[]),...Object.values(p.couverture||{}).flat()]).map(e=>e.cible);const x=c.find(v=>v!==null);return c.length>0&&x===undefined?"ok":x!==undefined?"cible-non-nulle: "+x:"aucune-exigence-lue"})()'
+assert_eq "R76.2b — la cible brute d'une exigence lue par la porte est null (la 76 n'a pas d'élément d'exigence) : lab g1 (AUTH-01)" "$(G "$WORK/porte-brut-l1.json" "$CIBLE")" "ok"
+assert_eq "R76.2b' — idem sur le lab de référence, couverture comprise (au moins une exigence lue : témoin positif)" "$(G "$WORK/porte-brut-ref.json" "$CIBLE")" "ok"
+
+# lanceur rejouer-suites.sh (76-08) : quatre codes, leur ORDRE de priorité 3 > 1 > 4 ; suites factices, aucune vraie suite jouée
+fausses() { # fausses <dossier> <suite:contenu>… : écrit les suites factices (un contenu = le corps du script) ; rend le dossier vide si aucun argument
+  local d="$1" s; shift; rm -rf "$d"; mkdir -p "$d"; for s in "$@"; do printf '%s\n' "${s#*:}" > "$d/${s%%:*}"; done
+}
+rejouer() { bash "$REJ" apres "$1/sorties" "$1" > "$1.sortie" 2>&1; echo "$?"; } # rend le code de sortie du lanceur ; sa sortie est dans <dossier>.sortie
+OK_='exit 0'; KO_='exit 1'; NEUF_='touch "$(dirname "$0")/test-zz.sh"; exit 0'; AM7_='echo "  ❌ FAIL — AM7 aucun navigateur (Chrome, Chromium) en CI" >&2; exit 1'
+fausses "$WORK/f1" "test-a.sh:$OK_" "test-b.sh:$OK_" "test-c.sh:$OK_"
+assert_eq "R76.4a — trois suites vertes, jouées et présentes : code 0, PRESENTES=3" "$(rejouer "$WORK/f1")|$(grep -c '^PRESENTES=3$' "$WORK/f1.sortie")" "0|1"
+fausses "$WORK/f2" "test-a.sh:$OK_" "test-b.sh:$OK_" "test-c.sh:$OK_" "test-d.sh:$KO_"
+assert_eq "R76.4b — une suite rouge : code 1 et le journal dit « FINI test-d.sh rc=1 »" "$(rejouer "$WORK/f2")|$(grep -c '^FINI test-d.sh rc=1$' "$WORK/f2/sorties/journal.txt")" "1|1"
+fausses "$WORK/f3" "test-a.sh:$OK_" "test-b.sh:$NEUF_" "test-c.sh:$OK_"
+assert_eq "R76.4c — une suite crée une suite pendant sa course (joué différent de présent) : code 4 et JOUE-DIFFERENT-PRESENT" "$(rejouer "$WORK/f3")|$(grep -c '^JOUE-DIFFERENT-PRESENT$' "$WORK/f3.sortie")" "4|1"
+fausses "$WORK/f4" "test-a.sh:$OK_" "test-b.sh:$NEUF_" "test-d.sh:$KO_"
+assert_eq "R76.4d — priorité du code 1 sur le code 4 : une suite rouge ET un ensemble joué différent du présent : code 1, et JOUE-DIFFERENT-PRESENT est tout de même imprimé" "$(rejouer "$WORK/f4")|$(grep -c '^JOUE-DIFFERENT-PRESENT$' "$WORK/f4.sortie")" "1|1"
+fausses "$WORK/f5" "test-a.sh:$OK_" "test-b.sh:$NEUF_" "test-d.sh:$KO_" "test-e.sh:$AM7_"
+assert_eq "R76.4e — priorité du code 3 sur les codes 1 et 4 : Chrome absent (ligne d'échec AM7), une suite rouge, un ensemble différent : code 3 et CHROME-ABSENT" "$(rejouer "$WORK/f5")|$(grep -c '^CHROME-ABSENT$' "$WORK/f5.sortie")" "3|1"
+fausses "$WORK/f6" "test-a.sh:echo '=== AM7 — en CI, un saut de Chrome échoue' ; exit 0"
+assert_eq "R76.4f — la seule ligne d'en-tête « === AM7 — en CI » n'est pas un Chrome absent : code 0" "$(rejouer "$WORK/f6")" "0"
+fausses "$WORK/f7"
+assert_eq "R76.4g — un dossier sans suite ne passe pas à vide : code 4" "$(rejouer "$WORK/f7")" "4"
+
+# R76.6 (revue finale M1) : UNE seule attribution phase/exigence pour le pied, le champ exigences et la porte. Lab fabriqué : REQ-01 cochée sans ligne de traçabilité, citée par
+# le plan de la phase 1 (la collecte la rattache par le plan) ; une exigence d'archive ARC-01 (phase 3 à la traçabilité) citée par le plan de la phase 3, absente du ledger vivant.
+L766="$WORK/r766"; B="$L766/.planning"
+wr "$B/ROADMAP.md" <<'MD'
+- [ ] **Phase 1: Un** - a
+- [ ] **Phase 3: Trois** - c
+
+### Phase 1: Un
+**Goal**: but un
+
+### Phase 3: Trois
+**Goal**: but trois
+MD
+printf -- '- [x] **REQ-01**: exigence sans ligne de traçabilité\n' > "$B/REQUIREMENTS.md"
+printf -- '- [ ] **ARC-01**: exigence d archive\n\n| ARC-01 | Phase 3 | Pending |\n' | wr "$B/milestones/v0-REQUIREMENTS.md"
+printf -- '---\nrequirements: [REQ-01]\n---\n<objective>un</objective>\n' | wr "$B/phases/01-un/01-01-PLAN.md"
+printf -- '---\nrequirements: [ARC-01]\n---\n<objective>trois</objective>\n' | wr "$B/phases/03-trois/03-01-PLAN.md"
+graph "$L766" "$WORK/g766.json"; node "$RET" --porte-brut "$L766" > "$WORK/porte766.json"
+cat > "$AUX/r766.mjs" <<'JS'
+import fs from 'node:fs';
+const [, , gf, pf] = process.argv, g = JSON.parse(fs.readFileSync(gf, 'utf8')), p = JSON.parse(fs.readFileSync(pf, 'utf8'));
+console.log(['ph-1', 'ph-3'].map((id) => {
+  const n = g.nodes.find((x) => x.id === id), l = p[id].exigences;
+  return [n.exigences.faits + '/' + n.exigences.total, l.filter((e) => e.cochee).length + '/' + l.length, (/(\d+\/\d+) exigences/.exec(n.foot) || [])[1]].join('=');
+}).join(','));
+JS
+assert_eq "R76.6 — le champ exigences {faits,total}, le pied « x/y exigences » et les lignes de la porte disent la même chose pour chaque phase (ph-1 : 1/1 ; ph-3 : 0/1)" "$(node "$AUX/r766.mjs" "$WORK/g766.json" "$WORK/porte766.json")" "1/1=1/1=1/1,0/1=0/1=0/1"
 
 bilan
