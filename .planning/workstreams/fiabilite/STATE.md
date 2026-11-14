@@ -1,20 +1,20 @@
 ---
 gsd_state_version: "1.0"
 milestone: vibeflow-v2.0
-current_phase: 79
-current_phase_name: Socle du cockpit — une collecte, un flux, une route d'état
+current_phase: 80
+current_phase_name: Trois onglets, trois formes — Projet en couloirs, clavier, navigation
 status: executing
-last_updated: "2026-11-13T13:30:00.000Z"
-last_activity: 2026-11-13
-last_activity_desc: Segments a des Phases 79 (13 plans) et 80 (8 plans) fusionnés dans integration/cockpit-audit (jointure J1) ; restent 79-13 à 79-20, 79-22, 80-09 à 80-21, puis 73 à 77 ; gel des publications ; 81 reportée
-state_head: 2a9e1be9
+last_updated: "2026-11-14T22:00:00.000Z"
+last_activity: 2026-11-14
+last_activity_desc: Passe finale faite sur fix/passe-finale-v2.77.0 (PR à venir vers integration/cockpit-audit) ; suite = fusion vers release/v2.77.0, puis recette de Samuel ; gel des publications ; 81 reportée
+state_head: ea5dc16f
 progress:
   total_phases: 16
   completed_phases: 8
   total_plans: 172
-  completed_plans: 109
+  completed_plans: 172
 milestone_name: « le cockpit VibeFlow » — Phases 67-81 —
-stopped_at: "integration/cockpit-audit : segments a de 79 (PR #238) et 80 (PR #237) fusionnés le 2026-11-13 ; PR #235 ouverte ; gel des publications"
+stopped_at: "Toutes les phases du jalon cockpit-audit sont fusionnées dans integration/cockpit-audit ; passe finale faite, PR à venir ; gel des publications"
 ---
 
 # Project State
@@ -32,19 +32,14 @@ See: .planning/PROJECT.md
 
 ## Current Position
 
-Phase: 79 faite (22/22 plans), 80 en cours (segment a fusionné dans `integration/cockpit-audit`, 80-01 à 80-08) ; restent 80-09 à 80-21, puis 73 à 77. Sept phases cadrées le 2026-11-11 (93 plans, 109 exigences ; jointure, arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 : « Oui, dans la branche de travail (Recommandé) »). Dernière phase close : 72.
+Toutes les phases du jalon (cockpit-audit, Phases 67-81 hors 81) sont fusionnées dans `integration/cockpit-audit`, puis la passe finale est faite (branche `fix/passe-finale-v2.77.0`, PR à venir vers `integration/cockpit-audit`). La suite est la fusion vers `release/v2.77.0`, puis la recette de Samuel. Rapport : `.planning/missions/2026-11-14-passe-finale-v2.77.0.md` ; mineurs : un seul sujet du BACKLOG.
 
-Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 109 plans exécutés sur 172 (la 71.5 est une mission design, sans plan GSD ; 72 plans planifiés, non exécutés).
+Compteurs (recomptés au ROADMAP le 2026-11-14) : 8 phases sur 16 cochées (50 %) ; 172 plans sur 172 cochés (100 %). Les cases des Phases 73 à 77, 79 et 80 restent décochées au ROADMAP : leurs plans sont tous exécutés et fusionnés, la case suit la publication. La Phase 81 est reportée (`AUDC-Q3`, 2026-11-11), sans plan.
 
-- Publié : 67 en `v2.75.0` (2026-11-03) ; 68, 69, 70, 71, 71.5, 72 et 78 en `v2.76.0` (2026-11-06, PR de release #217, module `cockpit` v1.4.0). `VERSION` reste `v2.76.0`.
-- Non publié, sur `release/v2.77.0` (PR #226 ouverte, non mergée) : panel, recette du 2026-11-08 et correctifs, audit du cockpit.
+- Publié : 67 en `v2.75.0` (2026-11-03) ; 68, 69, 70, 71, 71.5, 72 et 78 en `v2.76.0` (2026-11-06, PR #217, module `cockpit` v1.4.0). `VERSION` reste `v2.76.0`.
+- Non publié, sur `release/v2.77.0` (PR #226 ouverte, non mergée) : panel, recette du 2026-11-08, correctifs, audit du cockpit, phases 73 à 77, 79 et 80 puis passe finale.
 - Gel des publications : décision de Samuel du 2026-11-08 (`.planning/missions/2026-11-08-recette-correctifs.md`) ; levée du gel, merge, bump, tag et release restent ses gestes.
-- Exécution : segments b et c de 79 et 80, puis 73, 74, 75, 76, 77 ; 81 reportée (`AUDC-Q3` « plus tard », 2026-11-11).
-- Phase 76 : 76-01 à 76-09 faits (2026-11-14).
-- Phase 73 : 73-01 à 73-11 exécutés (PR #243 et #248 fusionnées, la seconde dans le lot #249) ; RG1.12 rebranché sur `VF_ONGLETS.aller` (80-10) ; vérification de but faite (human_needed : CI Linux, sonde réelle de `claude agents`).
-- Phase 75 : 12/12 plans exécutés (2026-11-14)
-- Phase 74 : 10/10 plans exécutés (2026-11-14), en attente de fusion dans `integration/cockpit-audit` ; PR #247 (74-01 à 74-05, 74-07) et seconde PR pour le reste ; TEMP-01 à TEMP-11 cochées, TEMP-12 partielle.
-- Phase 80 : 80-01 à 80-21 exécutés (2026-11-14, branche `feat/phase-80-trois-formes`, PR vers le lot 242-246-248-238) ; FORM-17 attend la CI Linux.
+- TEMP-12 (Phase 74) cochée sur la CI verte de la tête du lot (run 43610046755, `1ac5bae5`). FORM-17 (Phase 80) attend la CI Linux. AM7.6 rouge en local à l'identique sur la base, la CI tranche.
 - Dettes nommées : UIFN-10 et LANC-12 (voir Pending) ; étapes 4 et 5 de la recette de la 68 reportées (P68-D-35).
 
 ## Accumulated Context
@@ -63,20 +58,16 @@ Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 10
 
 <!-- vf-archive: .planning/archives/state/fiabilite-STATE-2026-11-11-jointure.md -->
 
-- 2026-11-11 — Phase 73 cadrée et planifiée (P73-D-01..36 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée) : 11 plans en 8 vagues, REGI-01..17 ; `priseS` résolu par A36/A39 (plus de question vers la 79).
-- 2026-11-11 — Phases 74 et 76 cadrées et planifiées (10 et 9 plans ; P74-D-46 et P76-D-32 à D-34 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).
-- 2026-11-11 — Phase 75 cadrée et planifiée (P75-D-01..31 ; P75-D-28 et P75-D-29 arbitrages Samuel, AskUserQuestion session principale, 2026-11-11) ; P75-Q-06 (amendements de DESIGN.md) en attente, bloque 75-10.
-- 2026-11-11 — Phase 77 cadrée, planifiée : SYNT-01..10, P77-Q-01 et P77-Q-02 par décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; exécutée 2026-11-14, PR #242.
-- 2026-11-13 — Phase 80, segment a (80-01 à 80-08) : PR #237, fusionné ; P80-D-52..56 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11.
-- 2026-11-14 — Phase 79, 22/22 plans (segment a : PR #238 fusionné) ; SOCL-01..27, SOCL-24 par la sonde S0 (79-19 sans code) ; Q-03 : P79-D-33 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) ; Q-01, Q-02 : décision déléguée (message session principale, 2026-11-08), option recommandée ; Q-04 : retrait d'AUDC-I18, sonde verte (décision déléguée par Samuel (message session principale, 2026-11-11 : « tranche pour chacun de ces points »), prise par la session principale).
-- 2026-11-14 — Phase 74, pas d'interface morte : décision déléguée (message session principale, 2026-11-08, option recommandée ; prise par la session principale le 2026-11-14) ; la fiche porte la carte de la phase et le lien du nœud, le détail de ligne de la régie est retiré.
-- 2026-11-14 — Phase 74, sonde W1 : décision déléguée (message session principale, 2026-11-08, option recommandée ; prise par le manager de la Phase 74 le 2026-11-14) ; W1 compte les `role=tab` hors de la bascule Vue de l'équipe (contrat 74-UI-SPEC).
+- 2026-11-11 — Phases 73 à 77 cadrées et planifiées (P73-D-01..36, P74-D-46, P75-D-01..31, P76-D-32 à D-34, SYNT-01..10) : arbitrages Samuel, AskUserQuestion session principale, 2026-11-11, ou décisions déléguées (message session principale, 2026-11-08), option recommandée. Exécutées le 2026-11-14.
+- 2026-11-13 — Phase 80, segment a : PR #237 fusionné ; P80-D-52..56 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11.
+- 2026-11-14 — Phase 79, 22/22 plans (PR #238 fusionné) ; Q-03 : P79-D-33 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) ; Q-01, Q-02, Q-04 : décision déléguée (message session principale, 2026-11-08 et 2026-11-11), option recommandée.
+- 2026-11-14 — Phase 74 : pas d'interface morte, sonde W1 comptant les `role=tab` hors de la bascule (décisions déléguées, message session principale, 2026-11-08, option recommandée).
+- 2026-11-14 — Passe finale : une passe complète avant la fusion vers la branche de release (arbitrage Samuel, message session principale, 2026-11-14) ; cliquet d'observateurs élargi, option a (même canal et même date).
 
 ### Pending Todos
 
 - Sortie du gel (gestes de Samuel) : merge de la PR #226, bump `v2.77.0`, relecture adverse SOBR-04 du diff `plugin/` depuis `v2.76.0`, tag, release GitHub, `check-release-tag.sh --remote`.
-- Consignes d'exécution laissées aux missions d'exécution (rapports `.planning/missions/2026-11-11-phase-NN-cadrage.md`) : tâches de la jointure 79×80 (rapport 80, point 9) ; signature `definitionsRegistre` et `phase: null` de C76-Q2 (rapport 76, points 8-9) ; durées des suites neuves dans `scripts/ci-shard-suites.sh` après exécution, trailer `Gate-Touche` (rapport 75, point 9).
-- Pastilles « modifiés » du tiroir Git : P73-Q-01 « Les neutraliser » (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11), sans objet : neutres depuis P78-D-33 (preuve 80-a, 2026-11-13).
+- Fusion de la PR de la passe finale vers `integration/cockpit-audit`, puis vers `release/v2.77.0` ; recette de Samuel.
 - Ledger : UIFN-10 décochée (captures hors dépôt sans empreinte) ; LANC-12 décochée (recette au vrai `claude` non jouée, `AUDC-Q1`).
 - SEED-004 (retrait de `vf-cockpit`) : déclencheur atteint depuis `v2.75.0`, graine `dormant`.
 - `equipe-produit-v1.0` (57-66) non clos : 63 à 66 non cadrées, COLB-08, ARCG-01 et ARCG-09 partielles, réexamen de la 62 le 2027-01-31.
@@ -108,6 +99,6 @@ Tableau complet dans les archives (section `### Quick Tasks Completed`) ; les no
 
 **Resume file:** .planning/workstreams/fiabilite/ROADMAP.md (§ Milestone vibeflow-v2.0, « Audit du 2026-11-10 ») .
 
-Last session: 2026-11-13 — jointure J1 : segments a de 79 et 80 fusionnés ; registre de l'audit et planning à jour.
+Last session: 2026-11-14 — passe finale faite ; PR vers `integration/cockpit-audit` à venir, puis fusion vers `release/v2.77.0`.
 
 ## Performance Metrics

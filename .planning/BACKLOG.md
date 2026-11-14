@@ -946,3 +946,37 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - N1 (amorce-navigateur) : borne de 25 s du lanceur contre 11 à 27 s de Chrome froid en CI ; EKR1/EK5.1 (equipe) : action qui lit la première zone .vf-doing, à cibler par [data-vf-doing]
 
 **Déclencheur de reprise :** la passe complète avant la release, ou la prochaine phase qui touche les onglets, la palette, le coin bas-droit ou le partage CI.
+
+## Passe finale v2.77.0 : mineurs (2026-11-14)
+
+**Priorité : basse.** Aucun n'a de conséquence mesurée ; ils partent avec la prochaine release fonctionnelle. Un seul sujet pour toute la passe (budget de méthode déjà dépassé). Majeurs, mutants et notes SOBR-04 : `.planning/missions/2026-11-14-passe-finale-v2.77.0.md`.
+
+**Origine :** passe finale avant `v2.77.0` (lots L1 à L5, EX, DL ; arbitrage Samuel, message session principale, 2026-11-14, « une passe complète avant la fusion vers la branche de release »).
+
+- **Serveur et routes (L1)** :
+  - Défense en profondeur : `/doing` et `/transcript` (régime historique) n'ont que le portail de `serve.mjs`, sans le contrôle d'accès intérieur des autres routes ; l'option `controle` de `repondreGardee` fait juger un autre objet que les octets émis.
+  - Courses : `server.json` jugé par `lstat` puis relu sans revérifier type ni taille (`signal-serveur:88`) ; port sondé non lié au PID reconnu (`serveur-vivant:100`) ; `retirerTemporairesEtat` supprime le temporaire en vol d'un second serveur (`etat-ecrire:27`) ; reprise d'un verrou périmé en trois temps (`lanceur-verrou:54`) ; `lstat` puis lecture sans `O_NOFOLLOW`, même compte (`graphe-fichier:37`, `regie-lecture:59`) ; relecture redondante (`planning:172`, coût seul).
+  - Confinement : `.git` en dossier hors du lab, et `.git` en lien dans un dossier ANCÊTRE du lab, non jugés (`code-cache`) ; `cfg` inséré par `JSON.stringify` sans échapper « < » (`terminal-tiroir:26`, constantes aujourd'hui).
+  - Traces et index : un chemin du poste précédé d'un schéma ou de « // » n'est pas masqué (`trace-texte:13`) ; noms d'agent et de mémoire rendus bruts, caractères de contrôle et bidi (`trace-memoire:80`) ; fichier shallow lu sans plafond ni contrôle de fichier régulier (`activite-git:101`) ; aucun budget d'octets global sur la mémoire (`trace:88`) ; identifiants sans borne écrits puis écartés (`index-voie:61`) ; lecture d'un trait sans budget par tour (`index:51`) ; temporaires d'index laissés si le fil est tué (`index-cache:124`).
+  - Familles de RegExp super-linéaires hors boucle du serveur (`extract`, `screens`, `claudemd`, `health:464/484/492/493`) ; `who.mjs:221` borné à 4 000 caractères ; `globLineaire` quadratique sur une classe à très nombreuses plages.
+- **Coquille, magasin, direct (L2, L3)** :
+  - **Palette** : l'aller est résolu en 32 à 45 s sous charge ; armer la borne de 30 s AVANT le chargement des scripts (`coquille:122-129`). Non reproduit par deux nœuds, aucune promesse perdue trouvée.
+  - Worker ELK d'un démarrage raté jamais terminé (`coquille:150`) ; `surOnglet` posé pendant un échec appelé seulement à l'arrivée suivante (`coquille:49`) ; `slot.hidden` disputé entre `02-vf-ligne-etat` et `02-vf-ligne-echec` ; `fit()` synchrone à chaque mutation de l'en-tête (`05-theme:76`).
+  - `70-vf-live` : une levée de `showLock` avalée empêche le sondage de démarrer (`:249`) ; `ageDe` et `ligneOrph` lisent `w.ageS` brut, sans le temps écoulé depuis la réception ; rejeu hello/who sur l'onglet Projet, inscription `surOnglet` jamais retirée, garde de relais sur le jeton courant, `EventSource` natif laissé ouvert (69/70) ; un élu entre perdu et réouverture ne répond plus pong (vol de verrou possible dans la fenêtre, sans conséquence mesurée).
+- **Serve et outils (L5)** :
+  - `recent-work.json` et `references/schema.md` § recent work, reliquats (`serve.mjs:437`) ; `ps` sans `-ww` dans `--stop` ; `ASK_DELAI` ne libère pas la place d'un enfant qui ignore SIGTERM.
+  - `41-vf-projet-liste:30` : deux comptes interpolés sans `h()` ; `77-vf-git-tiroir.js:253` : observateur de `body` qui force la mise en page pendant le glissement du terminal (L5u-04).
+  - `check-method-budget.sh:599` : sortie TSV « OK » pour un STATE illisible ; `driver-lock.sh:1441` : archive du registre laissée dans un lab plat ; `worktree-procs.sh:123` (mode `/proc`) : sélection sur un cwd non échappé ; bloc « Fin de mandat » contradictoire pour un juge en lecture seule (`prd-gate`, `vf-design-judge`, `vf-auditer`, `vf-reviewer`).
+- **Équipe, fiche, synthèse, visite (L4, EX, DL)** :
+  - `72-vf-regie-rendu:92` : lien « Carte de la phase » jamais mis à jour ni retiré ; `74-vf-frise:77` : `feuilles()` en O(n²) à chaque rendu ; `74-vf-fiche:66` : `Promise.all` sans `catch`, fiche figée sur « Lecture du fil » ; `74-vf-frise-encart:66` : encart redessiné à chaque `pointermove`.
+  - `74-vf-synthese-cout:46` (et ~132) : la copie de repli `totaux` garde `?? 0` ; libellé « au moins inconnu jetons » maladroit.
+  - `74-vf-synthese-visite:94` : libellé « dépôt git indisponible » dans le cas non-lus (V9, V11, V12 l'épinglent) ; `74-vf-trace:103` : sélecteur d'attribut construit depuis le lab ; `74-vf-trace-memoire:70` : clic muet sur échec de lecture, lecture en double.
+  - `VF_ETAT.lireJson` sans délai : une requête sans réponse fige le bloc de visite et l'activité (L4c-07, EX-03) ; `01-vf-responsive:162` : `requestAnimationFrame` non journalisé par la portée ; `75-vf-activite-panneau:123` : cinq sections reconstruites à chaque événement ; `04-vf-clavier-canevas:211` : `recadrer` branché toute la vie de l'onglet sous 1000 px.
+  - `02-vf-telephone.js` et `viewer.html` : deux blocs de nettoyage des requêtes média, à mutualiser.
+- **Tests** :
+  - m13, m16, m17 (mutants magasin et reconnexion) ne sont couverts que par des suites Chrome : écrire la version Node (sonde de la page vivante) ; EC1.5a/b/c derrière le saut « aucun navigateur » de `test-cockpit-echec-onglet.sh` : à extraire en suite Node.
+  - Charge : W8.1 (mise en page, graines 1 et 2) rouge sous charge locale ; W4.2 a le même chevauchement de borne que W4.1 (jamais rouge en CI) ; PA2.1/PA2.1b (palette) intermittents ; RG13.13 (`regie-rg-ailleurs.sh:190`) sensible à la charge ; AM7.6 (`test-cockpit-cycle-serveur.sh`, lien-vue rc=0 sans Chrome) rouge en local à l'identique sur la base, à confirmer en CI.
+  - M-CALME (`regie-rg-modele.sh:260`) : mutant embarqué ancré sur le texte exact de la ligne (couverture comportementale ajoutée par la passe).
+- **Observateurs** : remplacer par des événements les observateurs de mutations de `02-vf-coin.js` (3), `02-vf-reperes.js` (2) et `02-vf-ligne-etat.js` (1), puis abaisser la baseline : (1) un événement de transformation émis par `applyTransform` de `viewer.html` (style de `#viewport`, lu par coin et repères) ; (2) un événement du changement de classe de `body` (coin, repères) ; (3) un événement émis par le chemin `fetch` de `76-vf-git-entete.js` (vers la ligne 210, `lire(j)` sans événement ; lu par la ligne d'état) ; (4) un événement pour `70-vf-live.js:249` (`showLock(null, true)`, hors du magasin ; lu par la ligne d'état). Une fois les quatre émis, abonnements via `SC.on` / `VF_ETAT` et suppression des observateurs. Trous de couverture à combler avec : `coin:106/107/108` et ligne d'état (`#vf-git-ligne` seul).
+
+**Déclencheur de reprise :** la prochaine release fonctionnelle du cockpit, ou la prochaine phase qui touche la coquille, le magasin d'état ou la couche de repères.
