@@ -1,8 +1,9 @@
 # regie-rg-page.sh — fragment du plan 73-05, SOURCÉ par test-cockpit-regie.sh (ne définit que des fonctions) : la page Équipe (régie) jouée en vm (vm-regie-page.mjs),
 #   RG0_ordre_page (ordre de chargement, sortie assemblée) · RG1_page (conteneur, ancre de section, vue au retour de `vf:onglet`) · RG2_page (source unique)
 #   RG9_page (mise à jour en place, durées) · RG11_page (lecteur de repli) · RG14_page (un seul style de bouton, nom unique, aucun HTML construit)
-#   RG15_page (accroches de la Phase 74 : bascule, attributs, ancres, annulation, Échap, ré-exécution) · RG16_page (recherche).
-# Mutants : aucun dans ce fragment (régime allégé) ; ceux des gardes de non-fuite du verrou viendront avec les sections navigateur.
+#   RG15_page (accroches de la Phase 74 : bascule, attributs, ancres, annulation, Échap, ré-exécution) · RG16_page (recherche) ·
+#   RG90_mut_page (bloc « RG-MUT » : trous de couverture trouvés par mutants, passe finale, nœud M6 : compteur « Ailleurs » en sessions, bouton d'action réservé au rapport).
+# Mutants : seulement dans RG90_mut_page (régime allégé ailleurs) ; ceux des gardes de non-fuite du verrou viendront avec les sections navigateur.
 # Fixtures : noms et identifiants inventés. Les formes simulées de VF_ETAT, VF_COQUILLE et VF_SURCOUCHES sont dans vm-regie-page.mjs (à aligner sur le code livré).
 # Contrat du DOM attendu de la régie (écrit ici AVANT le code) : section#vf-equipe[role=main] > #vf-equipe-entete (h1, .vf-rg-sous, bascule role=tablist) puis .vf-vue[data-vf-vue] ;
 #   section.vf-rg-sec[data-vf-section] > h2 (tabindex -1) ; li.vf-rg-lig[data-vf-cle][data-vf-agent][data-vf-noeud][data-vf-etat] ; .vf-rg-nom (le nom, une fois) ; button.vf-rg-tog (le nom, ouvre la fiche : aucun aria-expanded) ;
@@ -288,4 +289,30 @@ rg_RG6_chrome() {
     assert_eq "M-VERROU-PAGE-BRUT — l'objet lock brut dans un attribut de la page : la non-fuite rougit (mutant tué)" "$([ "$v" != "0|0|0|0" ] && [[ "$v" != ERR:* ]] && echo tue || echo "survivant:$v")" "tue"
   else assert_eq "M-VERROU-PAGE-BRUT — ancre présente dans les sources de page" "$(cat "$WORK/mut-verrou.err")" "muté"; fi
   unset COCKPIT_MODULE
+}
+
+# RG-MUT (passe finale, M6) : deux survivants de mutation sur la page, jouée hors navigateur. Les mutants sont posés dans une COPIE du dossier ui.
+# pg_mut_ailleurs <dossier ui> : le texte de la ligne « Ailleurs sur ce poste », deux labs voisins à 3 + 1 sessions (une session par lab ne distingue pas un compte de labs d'un compte de sessions)
+pg_mut_ailleurs() {
+  local f="$WORK/pg-mut-ail.sc.json"
+  printf '{"onglet":"equipe","source":"etat","who":%s,"transcript":{"schema":"vibeflow/cockpit-ailleurs@1","ailleurs":[{"lab":"alpha","n":3},{"lab":"beta","n":1}]},"etapes":[{"avancer":50},{"nom":"a","obs":{"mode":"textes","sel":".vf-rg-ailleurs"}}]}' "$PG_WHO" > "$f"
+  node "$TESTS_DIR/vm-regie-page.mjs" "$1" "$f" 2>&1 | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let j;try{j=JSON.parse(s)}catch{console.log("ERR:sortie "+s.slice(0,120));return}console.log(j.out&&j.out.a?j.out.a.join("/"):"ERR:"+JSON.stringify(j).slice(0,160))})' | tr '\240' ' '
+}
+# pg_mut_action <dossier ui> : nombre de boutons d'action au premier rendu et après une poussée identique (une seule ligne porte un rapport : le sous-agent terminé)
+pg_mut_action() {
+  local f="$WORK/pg-mut-act.sc.json"
+  printf '{"onglet":"equipe","source":"live","who":%s,"lock":null,"etapes":[{"nom":"b","obs":{"mode":"compte","sel":"li[data-vf-cle] .vf-rg-act button"}},{"nom":"l","obs":{"mode":"compte","sel":"li[data-vf-cle]"}},{"poser":{"who":%s}},{"nom":"b2","obs":{"mode":"compte","sel":"li[data-vf-cle] .vf-rg-act button"}}]}' "$PG_WHO" "$PG_WHO" > "$f"
+  node "$TESTS_DIR/vm-regie-page.mjs" "$1" "$f" 2>&1 | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{let j;try{j=JSON.parse(s)}catch{console.log("ERR:sortie "+s.slice(0,120));return}const o=j.out;console.log(o&&o.b!==undefined?o.b+"/"+o.b2+" sur "+o.l+" lignes":"ERR:"+JSON.stringify(j).slice(0,160))})'
+}
+RG_MUT_AIL_SAIN='Ailleurs sur ce poste : 4 sessions vous attendent, dans « alpha » et « beta ».'
+rg_RG90_mut_page() {
+  assert_eq "RG-MUT.4 — « Ailleurs sur ce poste » compte les SESSIONS (3 + 1 = 4), pas les labs (2) : plusieurs sessions par lab" "$(pg_mut_ailleurs "$UI")" "$RG_MUT_AIL_SAIN"
+  local a; a="$(pg_mut_action "$UI")"
+  assert_eq "RG-MUT.5 — un seul bouton d'action (celui du rapport à relire), au premier rendu comme après une poussée ; les autres lignes n'en portent aucun" "${a%% sur *}" "1/1"
+  assert_has "RG-MUT.5 — la page porte plusieurs lignes (le décompte à 1 n'est pas un vert à vide)" "$a" " sur "
+  assert_eq "RG-MUT.5 — plus d'une ligne sans bouton" "$([ "${a##* sur }" != "1 lignes" ] && [ "${a##* sur }" != "0 lignes" ] && echo oui || echo non)" "oui"
+  if [ -f "$UI/72-vf-regie-pied.js" ] && [ -f "$UI/72-vf-regie-rendu.js" ]; then
+    rg_mutant "MUT-AILLEURS-LABS" "compteur « Ailleurs » : labs au lieu de sessions" "$UI" "72-vf-regie-pied.js" 'liste.reduce((s, e) => s + e.n, 0)' 'liste.reduce((s, e) => s + 1, 0)' pg_mut_ailleurs "$RG_MUT_AIL_SAIN"
+    rg_mutant "MUT-ACTION-PARTOUT" "bouton « Lire le rapport » rendu sur toute ligne" "$UI" "72-vf-regie-rendu.js" "if (l.action === 'lire-rapport' && !li._b) {" "if (l.action !== 'aucune' && !li._b) {" pg_mut_action "$a"
+  else assert_eq "M-MUT-AILLEURS-LABS, M-MUT-ACTION-PARTOUT — pied et rendu présents pour muter" "absent" "présent"; fi
 }

@@ -2,7 +2,8 @@
 #   RG0_ordre_modele (ordre de chargement sur la sortie assemblée) · RG1_modele (sections, clés, vides, sous-titre, REGI-01) · RG2_modele (liste blanche : deux formes, REGI-02)
 #   RG4_modele (À vous, REGI-04) · RG5_modele (tri et libellés d'impact, REGI-05) · RG6_modele (verrou : liste blanche et ligne de mission, REGI-06)
 #   RG7_modele (marques de gouvernance, REGI-07) · RG8_modele (ligne 2) · RG9_modele (états et seuils, REGI-09) · RG10_modele (attend ses agents, REGI-10)
-#   RG11_modele (à relire, REGI-11) · RG14_modele (feuille, REGI-14).
+#   RG11_modele (à relire, REGI-11) · RG14_modele (feuille, REGI-14) · RG90_mut_modele (bloc « RG-MUT » : trous de couverture trouvés par mutants, passe finale, nœud M6 :
+#   état bloqué, borne de 24 h, seuil de silence à l'égalité ; cas de COMPORTEMENT sur la valeur de seuil, pas des ancres).
 # Mutants (M-<NOM>, une assertion chacun) : seulement pour une garde (liste blanche du verrou, clé, orphelin sans action, glyphes uniques) et pour les seuils nommés au plan.
 # Fixtures : noms et identifiants inventés ; sentinelles de chemin construites à l'exécution. Espaces insécables rendus en espaces simples par le harnais (sauf RG9.8).
 
@@ -311,4 +312,39 @@ console.log(pb.length ? pb.join(' ; ') : 'ok');
 JS
   assert_eq "RG14.0 — jetons existants seuls (css-jetons.mjs : couleur, espacement, rayon)" "$(node "$TESTS_DIR/css-jetons.mjs" "$f" > "$WORK/jetons.out" 2>&1; echo $?)" "0"
   assert_eq "RG14.0 — pas de --st-recette, pas de style de bouton hors la hauteur de .btn, masquage seulement sous .vf-regie-montee" "$(node "$AUX/feuille.mjs" "$f")" "ok"
+}
+
+# RG-MUT (passe finale, M6) : cinq survivants de mutation, un cas de comportement chacun ; ceux du modèle ici (m07, m09, m10), ceux de la page dans regie-rg-page.sh (m14, m15).
+# Les valeurs de seuil sont jouées À L'ÉGALITÉ (CALME_S = 120 de 71-vf-equipe-rendu.js ; JOUR = 86 400), jamais autour : un `>=` devenu `>` ou un `<` devenu `<=` change la sortie.
+rgm_mut_sc() {
+  local sc="$WORK/sc90.json" W24 WB cxn='{"now":1000000000000,"recuA":1000000000000,"fenetre":null,"lus":null,"nonCommite":{},"missions":[]}'
+  WB='{"workers":[{"kind":"session","id":"s-1","etat":"bloque","titre":"Atelier","tree":".","ageS":30}]}'
+  W24='{"workers":[{"kind":"session","id":"s-1","etat":"actif","titre":"A","tree":".","ageS":10},
+ {"kind":"subagent","id":"a-24h","etat":"termine","parent":"s-1","role":"vf-coder","task":"Vieux","ageS":86400,"dureeS":60,"tree":"."},
+ {"kind":"subagent","id":"a-moins","etat":"termine","parent":"s-1","role":"vf-coder","task":"Frais","ageS":86399,"dureeS":60,"tree":"."}]}'
+  rgm_json "$(rgm_ev subagent bloque '"ageS":30,"dureeS":120' "$cxn")" "$(rgm_modele "$WB" null "$cxn")" "$(rgm_modele "$W24" null "$cxn")" \
+    "$(rgm_ev subagent actif '"ageS":119,"action":{"verbe":"lit","cible":"x"}' "$cxn")" "$(rgm_ev subagent actif '"ageS":120,"action":{"verbe":"lit","cible":"x"}' "$cxn")" > "$sc"
+}
+# rgm_mut_lire <fichier de sortie> : les cinq lectures du scénario, une chaîne
+rgm_mut_lire() {
+  g "$1" '(()=>{ const l = (j[1].sections[1].lignes.find((x)=>x.id==="s-1")||{}), s = j[2].sections[2];
+    return [j[0].mot, j[0].etat, j[0].duree.prefixe, l.mot, l.etat, "|", s.ids.join(","), s.relus.map((x)=>x.id).join(","), "|", j[3].etat, "/", j[4].mot.replace(/\s+/g," ").startsWith("silencieux depuis"), j[4].etat].join(" ") })()'
+}
+RGM_MUT_SAIN='bloqué bloque depuis bloqué bloque | a-moins  | actif / true surveiller'
+rgm_sonde_mut() { rgm_mut_sc; rgm_play "$1" "$WORK/sc90.json" "$WORK/o90.mut"; rgm_mut_lire "$WORK/o90.mut"; }
+
+rg_RG90_mut_modele() {
+  local o="$WORK/o90.json"
+  rgm_mut_sc; rgm_play "$UI" "$WORK/sc90.json" "$o"
+  assert_eq "RG-MUT.1 — état « bloque » : mot, glyphe et préfixe de durée d'un sous-agent, mot et glyphe de la ligne d'une session" \
+    "$(g "$o" '[j[0].mot,j[0].etat,j[0].duree.prefixe,(j[1].sections[1].lignes.find((x)=>x.id==="s-1")||{}).mot,(j[1].sections[1].lignes.find((x)=>x.id==="s-1")||{}).etat].join("|")')" "bloqué|bloque|depuis|bloqué|bloque"
+  assert_eq "RG-MUT.2 — borne de 24 h exclusive : terminé il y a 86 400 s n'est plus à relire (ni dans les lignes, ni dans les relus) ; 86 399 s l'est" \
+    "$(g "$o" '(()=>{const s=j[2].sections[2]; return s.ids.join(",")+"|"+s.relus.map((x)=>x.id).join(",")})()')" "a-moins|"
+  assert_eq "RG-MUT.3 — seuil de silence inclusif : actif sans commande, 119 s encore actif, 120 s (= CALME_S) « silencieux depuis 2 min »" \
+    "$(g "$o" 'j[3].etat+"|"+j[4].mot.replace(/\s+/g," ")+"|"+j[4].etat')" "actif|silencieux depuis 2 min|surveiller"
+  if [ -f "$UI/72-vf-regie-modele.js" ]; then
+    rg_mutant "MUT-BLOQUE" "état « bloque » plus reconnu" "$UI" "72-vf-regie-modele.js" "if (w.etat === 'bloque') return S(G.bloque" "if (w.etat === 'bloquee') return S(G.bloque" rgm_sonde_mut "$RGM_MUT_SAIN"
+    rg_mutant "MUT-JOUR" "borne de 24 h devenue inclusive" "$UI" "72-vf-regie-modele.js" 'w.ageS < JOUR, vieux' 'w.ageS <= JOUR, vieux' rgm_sonde_mut "$RGM_MUT_SAIN"
+    rg_mutant "MUT-CALME-EGAL" "seuil de silence devenu exclusif" "$UI" "72-vf-regie-modele.js" '!cmd && age != null && age >= r.CALME_S' '!cmd && age != null && age > r.CALME_S' rgm_sonde_mut "$RGM_MUT_SAIN"
+  else assert_eq "M-MUT-* — modèle présent pour muter" "absent" "présent"; fi
 }
