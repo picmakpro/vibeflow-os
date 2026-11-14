@@ -45,7 +45,7 @@ const SONDES = (theme) => `(() => { document.documentElement.setAttribute('data-
     const { c, p } = carte(cls); out.fond[nom] = rgb(getComputedStyle(c).backgroundColor); out.couleurs[nom] = {};
     for (const k of ${JSON.stringify(CLES)}) { const g = document.createElement('i'); g.className = 'lg lg-' + k; p.append(g); out.couleurs[nom][k] = rgb(getComputedStyle(g).backgroundColor); }
   }
-  const t = document.createElement('i'); t.style.cssText = 'color:var(--recent)'; zone.append(t); out.recent = rgb(getComputedStyle(t).color); t.style.color = 'var(--recent-text)'; out.recentTexte = rgb(getComputedStyle(t).color);
+  const t = document.createElement('i'); t.style.cssText = 'color:var(--recent)'; zone.append(t); out.vert = rgb(getComputedStyle(t).color); t.style.color = 'var(--recent-text)'; out.recentTexte = rgb(getComputedStyle(t).color);
   zone.remove(); return JSON.stringify(out); })()`;
 
 const GEOM = `JSON.stringify({ L: VibeFlow.state.layout.children.map((c) => [c.id, Math.round(c.x), Math.round(c.y), c.width, c.height]), F: [...document.querySelectorAll('#viewport .node')].map((g) => { const f = g.querySelector('.card .foot'), c = g.querySelector('.card'); return [f ? f.offsetHeight : null, c ? c.offsetWidth : null, c ? c.offsetHeight : null]; }), k: Math.round(VibeFlow.state.t.k * 1000) / 1000, H: Math.round(VibeFlow.state.bounds.h), W: Math.round(VibeFlow.state.bounds.w) })`;
@@ -101,9 +101,9 @@ export const mesuresPied = {
       for (const [fond, cles] of Object.entries(p.couleurs)) for (const [k, col] of Object.entries(cles)) {
         const cibles = k === 'en-cours' ? (fond === 'raise' ? [p.fond.raise] : [p.fond.surface, p.bg]) : [p.fond.surface, p.fond.raise, p.bg];
         min[`${fond}:${k}`] = Math.round(Math.min(...cibles.map((b) => contraste(col, b))) * 100) / 100;
-        if (k !== 'en-cours' && (col.join() === p.recent.join() || col.join() === p.recentTexte.join())) recentHors.push(`${fond}:${k}`);
+        if (k !== 'en-cours' && (col.join() === p.vert.join() || col.join() === p.recentTexte.join())) recentHors.push(`${fond}:${k}`);
       }
-      o[th] = { min, recentHors, enCoursSurRaise: p.couleurs.raise['en-cours'].join() === p.recentTexte.join(), enCoursSurSurface: p.couleurs.surface['en-cours'].join() === p.recent.join() };
+      o[th] = { min, recentHors, enCoursSurRaise: p.couleurs.raise['en-cours'].join() === p.recentTexte.join(), enCoursSurSurface: p.couleurs.surface['en-cours'].join() === p.vert.join() };
     }
     await c.s.ev("document.documentElement.setAttribute('data-theme', 'dark')");
     return o;

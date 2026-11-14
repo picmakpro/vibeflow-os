@@ -141,7 +141,6 @@ window.__vfFrDict = Object.assign(window.__vfFrDict || {}, {
   "Back: {}": "Retour : {}",
   "Backlog@project": "Backlog",
   "Branch {}": "Branche {}",
-  "Changed@pastille": "Récent",
   "Close the Git history": "Fermer l'historique Git",
   "Commits@git": "Commits",
   "Copy failed": "Copie impossible",
