@@ -127,8 +127,9 @@ rq GET /project.html "$WORK/doc-p2.html"
 assert_eq "K4.2 — /project.html servi après la plantation ne contient pas le script planté" "$(node "$OR" marque "$WORK/doc-p2.html" __plante16)" "non"
 
 echo "=== K5 — le service statique de la sortie est retiré (A41) ==="
-K5="$(for u in /graph.json /projet.json /recent-work.json /architecture.json /custom-flows.json /LICENSE /LICENCES-TIERCES.txt /lien-interne.json /creds.txt /.cache/server.json; do rq GET "$u" "$WORK/x.out"; a="$RQ_CODE"; rq GET "$u" "$WORK/x.out" --jeton "$TOKP"; printf '%s/%s ' "$a" "$RQ_CODE"; done)"
-assert_eq "K5.1 — /graph.json, /projet.json, /recent-work.json, /architecture.json, /custom-flows.json, licences, lien interne, lien sortant, .cache/server.json : 404 sans jeton comme avec" "$K5" "$(printf '404/404 %.0s' $(seq 1 10))"
+RWJ="/recent"; RWJ="$RWJ-work.json" # 75-09b : le fichier de la couche retirée (nom en deux morceaux)
+K5="$(for u in /graph.json /projet.json $RWJ /architecture.json /custom-flows.json /LICENSE /LICENCES-TIERCES.txt /lien-interne.json /creds.txt /.cache/server.json; do rq GET "$u" "$WORK/x.out"; a="$RQ_CODE"; rq GET "$u" "$WORK/x.out" --jeton "$TOKP"; printf '%s/%s ' "$a" "$RQ_CODE"; done)"
+assert_eq "K5.1 — /graph.json, /projet.json, le fichier de l'ancienne couche « travail récent » (retirée), /architecture.json, /custom-flows.json, licences, lien interne, lien sortant, .cache/server.json : 404 sans jeton comme avec" "$K5" "$(printf '404/404 %.0s' $(seq 1 10))"
 assert_eq "K5.1 — témoin de présence : graph.json, le lien interne et le fichier visé par le lien sortant existent sur disque" "$([ -s "$OUT/graph.json" ] && [ -e "$OUT/lien-interne.json" ] && [ -s "$WORK/creds-hors.txt" ] && echo oui || echo non)" "oui"
 assert_eq "K5.2 — ni le remote du dépôt, ni le chemin du lab, ni un jeton dans le document ou un fichier de /_vf/ (ils sont dans graph.json, K0.2)" "$(node "$OR" contient "$PORT" "$WORK/doc-p.html" MQ16-REMOTE "$LAB" "$TOKC" "$TOKP" | sed 's/^document$//;s/,document//;s/document,//')" ""
 
@@ -642,12 +643,12 @@ else assert_eq "M-SORTIE-LEXICALE — mutant sans effet (ancre absente)" "sans e
 unset COCKPIT_MODULE
 
 echo "=== K6 — le module servi est celui que cockpit_lancer démarre (A48, point 41) ==="
-base_srv; rq GET /_vf/ui/25-recent.js "$WORK/k6-base.js"; E0="$(hv etag)"
+base_srv; rq GET /_vf/ui/30-screens.js "$WORK/k6-base.js"; E0="$(hv etag)"
 cockpit_arreter
-if cockpit_module_muter k6 ui/25-recent.js '1s|^|/* MQ16-MUTANT */ |'; then
-  MUT6="$COCKPIT_MODULE"; demarrer "$LAB"; rq GET /_vf/ui/25-recent.js "$WORK/k6-mut.js"; E1="$(hv etag)"
+if cockpit_module_muter k6 ui/30-screens.js '1s|^|/* MQ16-MUTANT */ |'; then
+  MUT6="$COCKPIT_MODULE"; demarrer "$LAB"; rq GET /_vf/ui/30-screens.js "$WORK/k6-mut.js"; E1="$(hv etag)"
   assert_eq "K6.1 — le ui/*.js muté dans la copie est celui servi sous /_vf/ (contenu et étiquette changés)" "$(node "$OR" marque "$WORK/k6-mut.js" MQ16-MUTANT)|$([ "$E0" != "$E1" ] && [ -n "$E1" ] && echo diff || echo meme)" "oui|diff"
-  assert_eq "K6.1 — témoin : le module d'origine ne porte pas la mutation, la copie diffère par cmp" "$(node "$OR" marque "$ENG/assets/ui/25-recent.js" MQ16-MUTANT)|$(node "$OR" marque "$WORK/k6-base.js" MQ16-MUTANT)|$(cmp -s "$ENG/assets/ui/25-recent.js" "$MUT6/skills/cockpit-moteur/assets/ui/25-recent.js" && echo egal || echo diff)" "non|non|diff"
+  assert_eq "K6.1 — témoin : le module d'origine ne porte pas la mutation, la copie diffère par cmp" "$(node "$OR" marque "$ENG/assets/ui/30-screens.js" MQ16-MUTANT)|$(node "$OR" marque "$WORK/k6-base.js" MQ16-MUTANT)|$(cmp -s "$ENG/assets/ui/30-screens.js" "$MUT6/skills/cockpit-moteur/assets/ui/30-screens.js" && echo egal || echo diff)" "non|non|diff"
 else assert_eq "K6.1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
 echo "=== K2 (liens et liste) — un lien hors du moteur refuse le démarrage ; un fichier ajouté avant le démarrage entre dans la liste ==="

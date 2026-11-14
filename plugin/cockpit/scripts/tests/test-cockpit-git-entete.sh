@@ -334,7 +334,7 @@ const { stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } = awai
 await s.naviguer(base + page);
 await s.attendre(`document.readyState === 'complete' && !!document.querySelector('#context h1') && !!window.VibeFlow`, 'bloc de vue rendu');
 return await stabiliser(() => s.ev(`(() => { const c = document.querySelector('#context'), G = window.VibeFlow.graph;
-  return { k: c.querySelector('.k').textContent, h1: c.querySelector('h1').textContent, p: (c.querySelector('p') || {}).textContent || '', cls: c.querySelector('h1').className,
+  return { k: [...c.querySelector('.k').childNodes].filter((n) => !(n.classList && n.classList.contains('vfa-compte'))).map((n) => n.textContent).join(''), h1: c.querySelector('h1').textContent, p: (c.querySelector('p') || {}).textContent || '', cls: c.querySelector('h1').className,
     nomProjet: String(G.project.name || '').replace(/ — (Projet|Équipe)$/, ''), resume: G.project.summary,
     sections: [...document.querySelectorAll('#panel h3')].map((h) => h.textContent), depots: document.querySelectorAll('#panel .rp').length }; })()`), { max: 10000 }); // mesure posée (deux relevés identiques), plus de délai fixe
 JS

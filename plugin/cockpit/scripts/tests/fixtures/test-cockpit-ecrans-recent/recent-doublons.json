@@ -1,12 +1,9 @@
 {
-  "exists": ["f:a.js", "f:b.js", "f:c.js", "p:part"],
-  "chains": { "f:a.js": ["f:a.js", "p:part"], "f:b.js": ["f:b.js", "p:part"], "f:c.js": ["f:c.js", "p:part"] },
-  "itemId": "p:part",
-  "graph": { "recent": { "updatedAt": "2026-11-06T00:00:00Z",
-    "tasks": [ { "title": "Tâche A", "request": "a", "summary": "sa" }, { "title": "Tâche B", "request": "b", "summary": "sb" } ],
-    "items": [
-      { "id": "f:a.js", "task": 0, "change": "changed", "note": "a/A" },
-      { "id": "f:a.js", "task": 1, "change": "changed", "note": "a/B" },
-      { "id": "f:b.js", "task": 0, "change": "new", "note": "b/A" },
-      { "id": "f:c.js", "task": 1, "change": "changed", "note": "c/B" } ] } }
+  "fichiers": ["a.js", "b.js", "c.js"],
+  "chains": { "f:a.js": ["f:a.js", "n:part", "root"], "f:b.js": ["f:b.js", "n:part", "root"], "f:c.js": ["f:c.js", "n:part", "root"] },
+  "marques": [
+    ["a.js", "en-cours", ["vf-coder · nœud 1", "vf-reviewer · nœud 2"]],
+    ["b.js", "en-cours", ["vf-coder · nœud 1"]],
+    ["c.js", "en-cours", ["vf-reviewer · nœud 2"]]
+  ]
 }

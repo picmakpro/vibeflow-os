@@ -6,7 +6,7 @@
 //     sans périphérique de pointage (Chrome headless sous Linux : `pointer: none`), où l'en-tête restait en grille et débordait à 1 024 px (CI, run 41370886002) ;
 //   - en-tête (>= 1 000 px) : une ligne souple ; la gauche cède la première (nom de projet tronqué avec une ellipse), la recherche garde 200 px,
 //     la droite garde son contenu ; sous 1 600 px les boutons d'action passent en icône seule (le libellé reste dans l'infobulle) ;
-//   - bornes mesurées à 1 024 px sur l'onglet Code AVEC ses boutons optionnels (Travail récent, Écrans) : aucun bouton ne sort de la fenêtre ;
+//   - bornes mesurées à 1 024 px sur l'onglet Code AVEC ses boutons optionnels (sélecteur de lentilles, Écrans) : aucun bouton ne sort de la fenêtre ;
 //   - infobulle : tout bouton d'en-tête sans `title` reprend son libellé (le viewer n'en pose pas sur « Parcours »), car sous 1 600 px il n'est plus qu'une icône ;
 //   - zoom en rangée au bord gauche, au-dessus de la pastille « Terminal » et de la barre de question, de 701 à 1 279 px (comme dès 1 280 px) ;
 //   - logo VibeFlow : le viewer inverse le logo clair du thème (il attend un logo blanc) ; nos deux logos ont déjà le bon contraste ;
@@ -26,7 +26,7 @@
     .brand .mark, :root[data-theme="light"] .brand .mark, :root[data-theme="light"] #madewith .mark { filter: none !important; }
     @media (min-width: 1280px), (min-width: 1000px) and (not (pointer: coarse)) {
       header { display: flex; grid-template-columns: none; }
-      header .hl { flex: 1 1 0; min-width: 342px; } /* P70-D-16 : marque 84 + écart 4 + marge des onglets 12 + onglets 196 (13 px, rail à 4 px, padding 12 px : 124 de texte, rail et écarts + 6 x 12) + écart 4 + remonter 36 = 336, borne gardée à 342 (6 de marge) : le plus étroit qui ne rogne ni les onglets ni « Remonter » (mesuré dans Chrome à 1 024 px, onglet Code avec Travail récent et Écrans, badge réduit à son point par P70-D-22) */
+      header .hl { flex: 1 1 0; min-width: 342px; } /* P70-D-16 : marque 84 + écart 4 + marge des onglets 12 + onglets 196 (13 px, rail à 4 px, padding 12 px : 124 de texte, rail et écarts + 6 x 12) + écart 4 + remonter 36 = 336, borne gardée à 342 (6 de marge) : le plus étroit qui ne rogne ni les onglets ni « Remonter » (mesuré dans Chrome à 1 024 px, onglet Code avec le sélecteur de lentilles et Écrans, badge réduit à son point par P70-D-22) */
       header .hc { flex: 0 1 400px; min-width: 200px; justify-content: stretch; }
       header .hr { flex: 1 1 0; min-width: min-content; }
       header .brand { flex: 0 6 auto; min-width: 84px; }
