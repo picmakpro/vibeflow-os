@@ -445,6 +445,22 @@ if [ "${QPORT:-0}" -gt 0 ]; then
   assert_eq "C7.1 — /project.html#t=<amorce> : le fragment est effacé de l'adresse, un seul cadre, d'origine celle de Q" "$(oj '[j.avant.hash,j.avant.cadres,j.avant.origine]' < "$WORK/c7.json")" "[\"\",1,\"http://127.0.0.1:$QPORT\"]"
   assert_eq "C7.2 — après six changements d'onglet : mêmes pastille et même cadre (marque posée sur l'élément), un seul cadre, aucune navigation de cadre de plus, fragment jamais revenu, l'amorce n'a servi qu'une fois" "$(oj '[j.apres.marques,j.apres.cadres,j.apres.navigations,j.apres.hash,j.amorces]' < "$WORK/c7.json")" '[["x","x"],1,0,"",1]'
   assert_eq "C7.3 — le raccourci du tiroir (Ctrl+Maj+Espace) bascule encore vf-term-ouvert sur body" "$(oj 'j.bascule' < "$WORK/c7.json")" "true"
+  # L5u-01 : la section « Lancer du travail » (inscrite auprès du moteur) suit l'onglet : le moteur est ré-exécuté à chaque onglet, sa table de sections est neuve
+  cat > "$AUX/c7-lanceur.js" <<'JS'
+const T = (e) => s.ev(e);
+const aller = async (nom) => { await T(`VF_COQUILLE.chargerOnglet('${nom}')`); await s.attendre(`VF_COQUILLE.onglet() === '${nom}' && document.documentElement.dataset.vfPret === 'oui'`, `onglet ${nom} rendu`); };
+const section = async () => { await T(`(VibeFlow.select('n:ph-1'), VibeFlow.refreshPanel(), 1)`); return T(`!!document.querySelector('#panel [data-vf-lancer]')`); };
+const lu = () => T(`!!document.querySelector('#panel [data-vf-lancer]')`);
+const r = [];
+if ((await T(`VF_COQUILLE.onglet()`)) !== 'projet') { await T(`history.replaceState(null, '', location.pathname + '#s=n:ph-1')`); await aller('projet'); r.push(await lu()); } // fiche choisie par l'adresse : le panneau est dessiné dès l'arrivée
+r.push(await section());
+for (const nom of ['code', 'projet']) { await aller(nom); if (nom === 'projet') r.push(await section()); }
+return r;
+JS
+  chrome avec "http://127.0.0.1:$PORT/project.html" "$AUX/c7-lanceur.js" > "$WORK/c7-lanceur-p.json"
+  chrome avec "http://127.0.0.1:$PORT/" "$AUX/c7-lanceur.js" > "$WORK/c7-lanceur-c.json"
+  assert_eq "C7.7 — Projet → Code → Projet : la section « Lancer du travail » est dans le panneau de la fiche avant et après le détour" "$(oj 'j' < "$WORK/c7-lanceur-p.json")" '[true,true]'
+  assert_eq "C7.8 — session ouverte sur Code : la section « Lancer du travail » est dans le panneau dessiné dès la première arrivée sur Projet (fiche choisie par l'adresse), puis après un choix, et encore après Code → Projet" "$(oj 'j' < "$WORK/c7-lanceur-c.json")" '[true,true,true]'
 else assert_eq "C7 — le serveur --terminal n'a pas démarré (port de Q absent)" "sans terminal" "terminal"; fi
 cockpit_arreter
 echo "=== C8 — échec d'un chargement d'onglet : jamais une page blanche, jamais le corps de la réponse (A55) ==="

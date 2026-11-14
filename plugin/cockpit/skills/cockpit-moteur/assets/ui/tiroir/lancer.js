@@ -1,5 +1,9 @@
 function scriptLancer(cfg, extraire, installer, corpsProp) {
-  if (location.pathname !== '/project.html') return; // garde:chemin
+  // L5u-01 : sous la coquille, le document est le même pour les trois onglets (le moteur est ré-exécuté à chaque onglet, table de sections neuve) :
+  // la garde d'adresse ne vaut que pour le document d'avant la coquille, et l'inscription de la section suit l'onglet (surOnglet), pas l'adresse d'arrivée
+  // et l'inscription de la section suit l'onglet (surOnglet), pas l'adresse d'arrivée
+  const K = window.VF_COQUILLE, sousCoquille = !!K && typeof K.surOnglet === 'function';
+  if (!sousCoquille && location.pathname !== '/project.html') return; // garde:chemin
   if (location.hostname !== '127.0.0.1') return;
   let chat = null; // identifiant de la conversation du chat : variable de fermeture, jamais écrite ailleurs (ni stockage, ni page, ni adresse, ni message)
   if (cfg.chatLivre === true) installer(window, (id) => { chat = id; }, extraire);
@@ -129,10 +133,27 @@ function scriptLancer(cfg, extraire, installer, corpsProp) {
   // Entrée sur un bouton de la section : le viewer l'écoute aussi sur window (ouvrir le nœud sélectionné) et redessine le panneau avant le clic ; la touche garde son action native
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Enter' && ev.target && ev.target.closest && ev.target.closest('[data-vf-lancer]')) ev.stopPropagation(); }); // garde:entree
 
+  // les objets du moteur qui portent déjà la section : un moteur par onglet, une inscription chacun
+  const inscrits = new WeakSet();
   const enregistrer = (essais) => {
     const vf = window.VibeFlow;
-    if (vf && typeof vf.addPanelSection === 'function') { vf.addPanelSection('item', section); return; }
+    if (vf && typeof vf.addPanelSection === 'function') {
+      if (inscrits.has(vf)) return false;
+      inscrits.add(vf); vf.addPanelSection('item', section); return true;
+    }
     if (essais < 50) setTimeout(() => enregistrer(essais + 1), 100);
+    return false;
   };
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => enregistrer(0)); else enregistrer(0);
+  // première arrivée sur Projet : l'inscription se fait au chargement, avant le premier rendu du moteur (comme avant la coquille) ;
+  // les arrivées suivantes passent par surOnglet, une fois l'onglet rendu
+  if (!sousCoquille || location.pathname === '/project.html') {
+    if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => enregistrer(0)); else enregistrer(0);
+  }
+  // inscrite après le premier rendu : le panneau déjà dessiné (fiche choisie par l'adresse) n'a pas la section, il est redessiné
+  if (sousCoquille) {
+    K.surOnglet(({ onglet }) => {
+      if (onglet !== 'projet' || !enregistrer(50) || typeof window.VibeFlow.refreshPanel !== 'function') return;
+      try { window.VibeFlow.refreshPanel(); } catch (e) { void e; }
+    }, { cle: 'tiroir-lancer' });
+  }
 }
