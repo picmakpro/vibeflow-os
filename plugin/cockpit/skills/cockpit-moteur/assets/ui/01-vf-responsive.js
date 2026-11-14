@@ -6,7 +6,7 @@
 //     sans périphérique de pointage (Chrome headless sous Linux : `pointer: none`), où l'en-tête restait en grille et débordait à 1 024 px (CI, run 41370886002) ;
 //   - en-tête (>= 1 000 px) : une ligne souple ; la gauche cède la première (nom de projet tronqué avec une ellipse), la recherche garde 200 px,
 //     la droite garde son contenu ; sous 1 600 px les boutons d'action passent en icône seule (le libellé reste dans l'infobulle) ;
-//   - bornes mesurées à 1 024 px sur l'onglet Code AVEC ses boutons optionnels (Travail récent, Écrans) : aucun bouton ne sort de la fenêtre ;
+//   - bornes mesurées à 1 024 px sur l'onglet Code AVEC ses boutons optionnels (sélecteur de lentilles, Écrans) : aucun bouton ne sort de la fenêtre ;
 //   - infobulle : tout bouton d'en-tête sans `title` reprend son libellé (le viewer n'en pose pas sur « Parcours »), car sous 1 600 px il n'est plus qu'une icône ;
 //   - zoom en rangée au bord gauche, au-dessus de la pastille « Terminal » et de la barre de question, de 701 à 1 279 px (comme dès 1 280 px) ;
 //   - logo VibeFlow : le viewer inverse le logo clair du thème (il attend un logo blanc) ; nos deux logos ont déjà le bon contraste ;
@@ -26,7 +26,7 @@
     .brand .mark, :root[data-theme="light"] .brand .mark, :root[data-theme="light"] #madewith .mark { filter: none !important; }
     @media (min-width: 1280px), (min-width: 1000px) and (not (pointer: coarse)) {
       header { display: flex; grid-template-columns: none; }
-      header .hl { flex: 1 1 0; min-width: 342px; } /* P70-D-16 : marque 84 + écart 4 + marge des onglets 12 + onglets 196 (13 px, rail à 4 px, padding 12 px : 124 de texte, rail et écarts + 6 x 12) + écart 4 + remonter 36 = 336, borne gardée à 342 (6 de marge) : le plus étroit qui ne rogne ni les onglets ni « Remonter » (mesuré dans Chrome à 1 024 px, onglet Code avec Travail récent et Écrans, badge réduit à son point par P70-D-22) */
+      header .hl { flex: 1 1 0; min-width: 342px; } /* P70-D-16 : marque 84 + écart 4 + marge des onglets 12 + onglets 196 (13 px, rail à 4 px, padding 12 px : 124 de texte, rail et écarts + 6 x 12) + écart 4 + remonter 36 = 336, borne gardée à 342 (6 de marge) : le plus étroit qui ne rogne ni les onglets ni « Remonter » (mesuré dans Chrome à 1 024 px, onglet Code avec le sélecteur de lentilles et Écrans, badge réduit à son point par P70-D-22) */
       header .hc { flex: 0 1 400px; min-width: 200px; justify-content: stretch; }
       header .hr { flex: 1 1 0; min-width: min-content; }
       header .brand { flex: 0 6 auto; min-width: 84px; }
@@ -211,11 +211,11 @@
   // un bouton posé plus tard rejoint son groupe par son id, sinon « Affichage ». Sous 1 280 px le rangement est défait (ordre et parents d'origine).
   // L'écouteur `change` vit dans le rappel de surOnglet.
   const GROUPES = [['lire', 'Read', ['flows-btn', 'screens-btn', 'filters-btn', 'tour-btn']],
-    ['suivre', 'Follow', ['btn-recent', 'btn-health', 'btn-synthese', 'vf-lock']], // 77 : Synthèse juste après Santé
+    ['suivre', 'Follow', ['btn-lentilles', 'btn-health', 'btn-synthese', 'vf-lock']], // 77 : Synthèse après Santé ; 75 : lentilles avant Santé
     ['affichage', 'Display', ['btn-export', 'theme-toggle', 'btn-panel']]];
   const mq1280 = window.matchMedia('(min-width: 1280px)'), tr = window.__vfFrT || ((x) => x), extHdr = document.getElementById('hdr-ext');
   let origine = null; // [unité, parent d'origine] dans l'ordre du document, relevé avant son rangement
-  const SEL = ':scope > .rel, :scope > button, :scope > .vf-hdr-groupe > .vf-hdr-rangee > *, #hdr-ext > button';
+  const SEL = ':scope > .rel, :scope > button, :scope > .vf-hdr-groupe > .vf-hdr-rangee > *, #hdr-ext > button, #hdr-ext > .rel';
   const unites = () => (colDroite ? [...colDroite.querySelectorAll(SEL)].filter((e) => e.id !== 'vf-plus' && e.id !== 'vf-git-ouvreur') : []);
   const cleDe = (e) => (e.classList.contains('rel') ? (e.querySelector('button') || e).id : e.id);
   const deranger = () => {
@@ -232,7 +232,11 @@
     if (!mq1280.matches) { deranger(); return; }
     origine = origine || [];
     // un bouton posé plus tard suit les autres
-    for (const e of unites()) if (!origine.some((x) => x[0] === e)) origine.push([e, e.parentElement === extHdr ? extHdr : colDroite]);
+    // un bouton posé plus tard garde sa place d'origine s'il la déclare (data-vf-apres : l'id d'un bouton qu'il suit), sinon il vient en dernier
+    for (const e of unites()) if (!origine.some((x) => x[0] === e)) {
+      const k = e.dataset && e.dataset.vfApres ? origine.findIndex((x) => cleDe(x[0]) === e.dataset.vfApres) : -1;
+      origine.splice(k < 0 ? origine.length : k + 1, 0, [e, e.parentElement === extHdr ? extHdr : colDroite]);
+    }
     const cibles = [];
     for (const [cle, lib] of GROUPES) {
       let g = colDroite.querySelector(`:scope > [data-vf-groupe="${cle}"]`);

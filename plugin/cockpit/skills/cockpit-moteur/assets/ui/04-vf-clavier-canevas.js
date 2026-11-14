@@ -208,9 +208,21 @@
     }, true);
     SC.on('render', surRender); SC.on('panel', () => { if (vivant && !equipe()) surPanel(); });
     surRender();
-    // le coin ne se pose qu'après le premier rendu : une vue qui était exactement le cadrage de la zone libre est recadrée dans le champ de lecture (80-09)
+    // le coin ne se pose qu'après le premier rendu : une vue qui était exactement le cadrage de la zone libre est recadrée dans le champ de lecture (80-09).
+    // Il peut se poser après ce point (hauteur de #ask, taille de la fenêtre lues plus tard) : le recadrage est rejoué à chaque render et panel, et par
+    // une relance bornée (180 images, environ 3 s) jusqu'à ce que le coin soit posé. Aucun observateur. Un geste de l'utilisateur rend la vue différente
+    // du cadrage de la zone libre : le recadrage ne la reprend plus.
     const egal = (p, q) => !!p && !!q && Math.abs(p.k - q.k) <= p.k * 0.005 && Math.abs(p.x - q.x) <= 1 && Math.abs(p.y - q.y) <= 1;
-    if (egal(state.t, SC.cadrage({ zone: SC.freeArea() })) && !egal(state.t, SC.cadrage())) SC.fit(false);
+    let coinAttendu = true, images = 0, relance = 0;
+    const recadrer = () => {
+      if (!coinAttendu || !vivant) return;
+      if (egal(state.t, SC.cadrage({ zone: SC.freeArea() })) && !egal(state.t, SC.cadrage())) SC.fit(false);
+      const coin = document.getElementById('vf-coin');
+      if (coin && !coin.hidden && coin.offsetWidth) coinAttendu = false;
+    };
+    const veille = () => { relance = 0; recadrer(); if (coinAttendu && ++images < 180) relance = requestAnimationFrame(veille); };
+    SC.on('render', recadrer); SC.on('panel', recadrer); pose.push(() => cancelAnimationFrame(relance));
+    veille();
     return () => { vivant = false; pose.splice(0).forEach((f) => f()); };
   };
   window.VF_CANEVAS = Object.freeze({ nomDeCarte, carteItinerante, focaliser, champDeLecture, champsDeCadrage, amenerDansLeChamp, deplacer, voisin,

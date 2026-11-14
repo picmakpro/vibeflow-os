@@ -2,7 +2,7 @@
 
 **Gathered:** 2026-11-11
 **Status:** Cadrée (2026-11-11) — frontière de questions vide côté mission ; section « À Samuel » au format C76-Q1 : P75-Q-03 et P75-Q-04 tranchées
-le 2026-11-11, P75-Q-01, 02 et 05 appliquées par délégation, P75-Q-06 (amendements de `DESIGN.md`) en attente, bloque 75-10 ; bâtie sur les contrats figés de la Phase 79 (branche `feat/phase-79-socle-cockpit`, commit
+le 2026-11-11, P75-Q-01, 02 et 05 appliquées par délégation, P75-Q-06 (amendements de `DESIGN.md`) tranchée le 2026-11-14 (P75-D-32), applique 75-10 ; bâtie sur les contrats figés de la Phase 79 (branche `feat/phase-79-socle-cockpit`, commit
 `3119d82a`, `79-CONTEXT.md` § « Contrats fournis », C0 à C6, amendés par `2ae6607a` (A1-A14) et `6f66d878` (A21-A28)) ;
 les sept manques relayés à la 79 sont fermés par A21 à A27 (section « Contrats de la Phase 79 retenus »).
 
@@ -226,6 +226,9 @@ et ne sont pas rouverts.
   « Radar incomplet : historique tronqué. ») ; texte fixé ici en complément de `75-UI-SPEC.md`, qui ne le porte pas,
   et repris par 75-08 L6.
 
+- **P75-D-32 (amendements de `DESIGN.md`, P75-Q-06).** Les neuf amendements listés à P75-Q-06 sont appliqués tels quels par 75-10 (option (a)) ; l'arbitrage est porté par l'État de P75-Q-06. Les écarts de géométrie relevés par 75-07
+  (barres écartées de 2, tige du confluent à 13,5, contour pointillé de la carte prévue, glyphe neutre en carré creux) ne sont PAS couverts : `DESIGN.md` écrit ce qui est livré, la différence avec la spec est consignée au SUMMARY de 75-10, le goût reste à la recette de Samuel.
+
 ### Gardes
 
 - **P75-D-16 (source).** Règle de citation déjà jouée par la CI (`scripts/ci-suites-perimetre.sh`, arbitrage Samuel,
@@ -388,8 +391,8 @@ de la session principale et les réponses de Samuel du 2026-11-11 les citent.
   de la bordure de 1,5 px de la carte prévue ; 9) tableau « Statuts de travail » : aucune ligne `--st-prevu` ajoutée.
   Options : (a) appliquer les neuf amendements tels que listés ; (b) n'en appliquer qu'une partie, à désigner par numéro ; (c) n'en appliquer aucun, `DESIGN.md` reste tel quel et l'écart est consigné.
   Recommandation : (a) — chaque amendement décrit ce que la phase livre ; sans eux, le code et la direction divergent.
-  Bloque : 75-10
-  État : en attente
+  Bloque : rien (levée)
+  État : tranchée — arbitrage Samuel (message session principale, 2026-11-14), option (a) — P75-D-32
 </to_samuel>
 
 <phase79_contract>

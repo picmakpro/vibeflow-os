@@ -15,7 +15,7 @@
     @media (max-width: 700px) { .vf-frise { --frise-col: 120px; } }
     .vf-frise [hidden] { display: none; }
     .vf-frise line, .vf-frise polyline { fill: none; }
-    .vf-frise .sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+    .vf-frise .sr, .vf-frise .vf-frise-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
     .vf-frise .mono { font-family: var(--mono); font-size: 11.5px; line-height: 14px; }
     .vf-frise .vf-donnee { font-family: var(--sans); font-size: 12.5px; line-height: 16px; }
     .vf-frise-sonde { position: absolute; visibility: hidden; height: 0; }

@@ -134,7 +134,8 @@
       const st = D.createElement('style'); st.setAttribute('data-vf-regie-questions', ''); st.textContent = STYLE; D.head.appendChild(st);
     }
     tampon.length = 0;
-    // P73-D-33 : écouté en remontée sur document ; un appui déjà pris (surcouche, détail en flux) est ignoré ; rien à replier : ni appui pris ni focus déplacé
+    // P73-D-33 : écouté en remontée sur document ; un appui déjà pris (surcouche, fiche, recherche vidée) est ignoré ;
+    // rien à replier : ni appui pris ni focus déplacé
     const surEchap = (e) => {
       if (e.defaultPrevented) return; // garde:q-echap-prevenu
       const t = e.target;

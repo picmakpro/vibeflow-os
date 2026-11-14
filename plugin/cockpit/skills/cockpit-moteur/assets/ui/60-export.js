@@ -33,7 +33,6 @@
   const PARTS = [
     { id: 'flows', label: t('Flows and the tour'), hint: t('The guided walkthroughs, including ones you requested.'), on: true, has: G.flows.length > 0 || (G.tour || []).length > 0 },
     { id: 'notes', label: t('Notes pinned to files'), hint: t('The notes shown on file cards.'), on: true, has: G.files.some((f) => f.note) },
-    { id: 'recent', label: t('Recent work'), hint: t('What was just changed, and why.'), on: false, has: !!G.recent?.items?.length },
     PLAN
       ? { id: 'health', label: t('Design review'), hint: t('The decisions the plan still leaves open.'), on: false, has: !!G.health?.issues?.length }
       : {

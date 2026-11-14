@@ -68,7 +68,7 @@
     }
     if (out == null) for (const [re, f] of R) { if (re.test(t)) { out = t.replace(re, f); break; } }
     if (out == null && t.includes(' · ')) { const seg = t.split(' · ').map((x) => noyau(x)); if (seg.some((x) => x != null)) out = seg.map((x, i) => x ?? t.split(' · ')[i]).join(' · '); }
-    if (out == null && /^[^:]{3,}: ./.test(t)) { const i = t.indexOf(': '); const g = noyau(t.slice(0, i)), d = noyau(t.slice(i + 2)); if (g != null || d != null) { const a = g ?? t.slice(0, i), b = d ?? t.slice(i + 2); out = a === b && t.slice(0, i) === t.slice(i + 2) ? a : a + ' : ' + b; } } // « Recent work: Recent work » (fil d'Ariane d'un tableau sans titre propre) ne le dit qu'une fois
+    if (out == null && /^[^:]{3,}: ./.test(t)) { const i = t.indexOf(': '); const g = noyau(t.slice(0, i)), d = noyau(t.slice(i + 2)); if (g != null || d != null) { const a = g ?? t.slice(0, i), b = d ?? t.slice(i + 2); out = a === b && t.slice(0, i) === t.slice(i + 2) ? a : a + ' : ' + b; } } // « X: X » (fil d'Ariane d'un tableau sans titre propre) ne le dit qu'une fois
     // pluriel composé à l'exécution (« files », « screens ») : le singulier du dictionnaire, un « s » en plus
     if (out == null && /^[A-Za-z]{3,}s$/.test(t) && T[t.slice(0, -1)] != null) out = T[t.slice(0, -1)] + 's';
     return out;

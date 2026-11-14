@@ -157,7 +157,7 @@ export default async function (h) {
       const f = document.querySelector('.vf-fiche'); return { fiches: document.querySelectorAll('.vf-fiche').length, titre: f ? f.getAttribute('aria-label') : null,
         deplie: tog ? tog.getAttribute('aria-expanded') : null, defil: window.__scrolls }; });
     h.egal('R5', '#r=n:ag-wk-2 : la régie émet vf-agent:ouvrir (ancre), la fiche l\'annule et s\'ouvre UNE fois sur cet agent ; la régie ne défile pas et ne déplie pas la ligne',
-      [o.map((x) => x.slice(0, 3)), r.fiches, /Fiche de/.test(r.titre || ''), r.deplie, r.defil], [[['ancre', 'wk-2', true]], 1, true, 'false', 0]);
+      [o.map((x) => x.slice(0, 3)), r.fiches, /Fiche de/.test(r.titre || ''), r.deplie, r.defil], [[['ancre', 'wk-2', true]], 1, true, null, 0]);
     await h.ev(() => { history.replaceState(null, '', location.pathname); });
     await h.fermer().catch(() => {});
   });

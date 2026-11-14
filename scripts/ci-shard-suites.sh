@@ -63,6 +63,7 @@ DEFAUT=7
 # neutre, onglets, palette, projet-vocabulaire, sante-fr, zoom-garde) : mesure locale macOS du 2026-11-14, une suite à la fois sous le jeton
 # Chrome du poste (trois en parallèle), à remplacer par la mesure CI du premier run complet qui les joue.
 # Phase 75 : sept suites neuves (activite-*) mesurées par les nœuds d'exécution sur le poste, pas sur le runner ; à remesurer sur le premier run complet.
+# Phase 74 : quatre suites neuves (frise-curseur, equipe-retraits, repli-retrait, frise-bornes) mesurées par les nœuds d'exécution sur le poste, pas sur le runner ; à remesurer sur le premier run complet.
 # Phases 73 à 80 du cockpit : quatorze suites sans ligne, mesurées sur le run CI complet 43549334891 de la PR #249 (14 shards, même méthode
 # `##[group]` jusqu'à `PASS`). La suite coquille était ROUGE à cette mesure (fin = ligne `FAIL(rc=1)`) : à remesurer sur le premier run
 # vert. test-cockpit-mise-en-page.sh, rouge elle aussi (1194 s jusqu'au `FAIL`, durée d'un échec, pas d'une suite verte), n'a PAS de ligne :
@@ -91,13 +92,16 @@ durees() {
 0 plugin/_internal/tests/test-windows-crlf.sh
 0 plugin/business-pilot-bundle/scripts/tests/test-business-pilot-bundle.sh
 10 plugin/cockpit/scripts/tests/test-cockpit-accessibilite.sh
+118 plugin/cockpit/scripts/tests/test-cockpit-activite-carte.sh
 5 plugin/cockpit/scripts/tests/test-cockpit-activite-chemins.sh
 49 plugin/cockpit/scripts/tests/test-cockpit-activite-empreinte.sh
 9 plugin/cockpit/scripts/tests/test-cockpit-activite-gardes.sh
 10 plugin/cockpit/scripts/tests/test-cockpit-activite-git.sh
+182 plugin/cockpit/scripts/tests/test-cockpit-activite-lentilles.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-activite-planning.sh
 5 plugin/cockpit/scripts/tests/test-cockpit-activite-prevues.sh
 214 plugin/cockpit/scripts/tests/test-cockpit-activite-route.sh
+130 plugin/cockpit/scripts/tests/test-cockpit-activite-sans-git.sh
 54 plugin/cockpit/scripts/tests/test-cockpit-aide.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-ailleurs.sh
 66 plugin/cockpit/scripts/tests/test-cockpit-amorce-navigateur.sh
@@ -131,7 +135,9 @@ durees() {
 43 plugin/cockpit/scripts/tests/test-cockpit-flux-unique.sh
 4 plugin/cockpit/scripts/tests/test-cockpit-forme-claude.sh
 12 plugin/cockpit/scripts/tests/test-cockpit-fr-donnees.sh
+170 plugin/cockpit/scripts/tests/test-cockpit-frise-bornes.sh
 40 plugin/cockpit/scripts/tests/test-cockpit-frise-cout.sh
+61 plugin/cockpit/scripts/tests/test-cockpit-frise-curseur.sh
 1 plugin/cockpit/scripts/tests/test-cockpit-frise-modele.sh
 150 plugin/cockpit/scripts/tests/test-cockpit-frise-vue.sh
 215 plugin/cockpit/scripts/tests/test-cockpit-frise.sh
@@ -183,6 +189,7 @@ durees() {
 649 plugin/cockpit/scripts/tests/test-cockpit-projet-visite.sh
 33 plugin/cockpit/scripts/tests/test-cockpit-projet-vocabulaire.sh
 1509 plugin/cockpit/scripts/tests/test-cockpit-projet.sh
+26 plugin/cockpit/scripts/tests/test-cockpit-questions-attente.sh
 20 plugin/cockpit/scripts/tests/test-cockpit-questions.sh
 23 plugin/cockpit/scripts/tests/test-cockpit-reconnexion.sh
 243 plugin/cockpit/scripts/tests/test-cockpit-regie.sh

@@ -119,7 +119,7 @@ rg_RG11_lu() {
   ti_ok "RG11.11 — survol de « Lire le rapport » : rien d'écrit ; clic : la clé vf-regie-lus:<lab> porte l'identifiant et une heure, la ligne passe aux « Relus ou sans rapport »" "$WORK/ti-lu.json" \
     'j.survol.length + "|" + j.cle.startsWith("vf-regie-lus:") + "|" + j.ids.join() + "|" + j.heureOk + "|" + j.avant + "|" + j.apres + "|" + /^Relus ou sans rapport/.test(j.relus)' "0|true|f0f0f0f0f0f0|true|1|0|true"
   ti_ok "RG11.12 — stockage préparé (24 h, valeur non numérique, identifiant hors forme, 250 valides) : au chargement les trois premières sont jetées, 200 au plus restent" "$WORK/ti-purge.json" \
-    '(j.apres > 0 && j.apres <= 200) + "|" + j.vieux + "|" + j.nn + "|" + j.mauvais + "|" + j.recent' "true|false|false|false|true"
+    '(j.apres > 0 && j.apres <= 200) + "|" + j.vieux + "|" + j.nn + "|" + j.mauvais + "|" + j.garde' "true|false|false|false|true"
   ti_ok "RG11.13 — stockage refusé : toutes les lignes sont à relire, aucune exception, pas de « Tout marquer comme relu »" "$WORK/ti-refuse.json" \
     'j.lignes + "|" + j.bouton + "|" + j.exceptions' "3|false|0"
   ti_ok "RG11.14 — aucune requête autre que GET sur le scénario lu (survol, clic)" "$WORK/ti-lu.json" \

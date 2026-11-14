@@ -116,7 +116,10 @@ rg_RG18_design() {
   pi_ok "RG18.2 — le parent qui a des enfants porte un seul caret de 44 × 44, nommé « Sous-agents, 2 »" "$D" '[j.page.caretParent, j.page.caretTaille, j.page.caretLabel].join("|")' "1|44x44|Sous-agents, 2"
   pi_ok "RG18.2 — le caret replie puis rouvre les sous-agents (aria-expanded suit)" "$D" '[j.replie.exp, j.replie.fils, j.rouvert.exp, j.rouvert.fils !== "none"].join("|")' "false|none|true|true"
   pi_ok "RG18.3 — le caret est nu : de la couleur du nom de la ligne, jamais de la teinte d'état" "$D" 'j.page.couleurCaret' "true"
-  pi_ok "RG18.4 — le détail en flux : --raise, --r-ctl, --inset-box, gap --sp-8 (relevés contre une sonde aux jetons)" "$D" '[j.detail.fond, j.detail.rayon, j.detail.marge, j.detail.ecart].join("|")' "true|true|true|true"
+  pi_ok "RG18.4 — le détail de ligne n'existe plus ; le nom ouvre la fiche, dont la ligne de rattachement porte le lien du nœud vers project.html, souligné, de la couleur --text-2 (relevé contre une sonde aux jetons)" "$D" \
+    '[j.fiche.texte2, j.fiche.heritee, j.fiche.souligne, j.fiche.href, j.fiche.plus].join("|")' "true|true|true|true|0"
+  assert_eq "RG18.4 — aucun fichier de la régie ne construit ni ne style plus le détail de ligne (.vf-rg-plus)" \
+    "$(cat "$UI"/72-vf-regie-*.js | grep -c 'vf-rg-plus')" "0"
   pi_ok "RG18.5 — arbres de travail : lignes de 44 à 56 px, repère d'ouverture dans le résumé (couleur du texte), pastilles sans fond" "$D" \
     '[j.pied.hauteurs.length, j.pied.hauteurs.every((x) => x >= 44 && x <= 56), j.pied.marque, j.pied.couleurMarque, j.pied.pastilles.length > 0 && j.pied.pastilles.every((c) => c === "rgba(0, 0, 0, 0)")].join("|")' "3|true|1|true|true"
   pi_ok "RG18.6 — l'arbre a son fil de 1 px (--fil) et son coude de rayon 8" "$D" '[j.arbre.contenu, j.arbre.largeur, j.arbre.couleur, j.arbre.bas, j.arbre.rayon].join("|")' "true|1px|true|1px|8px"

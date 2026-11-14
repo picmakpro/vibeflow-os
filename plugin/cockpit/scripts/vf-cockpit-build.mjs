@@ -139,6 +139,8 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd, annotate
   fs.mkdirSync(sortie, { recursive: true });
   verifierSortie(lab, sortie);
   purgerCodeAncien(sortie); // avant toute écriture : la sortie n'est jamais source de code (P79-D-26)
+  // 75-09a (ACTV-12) : couche retirée ; le fichier d'un assemblage antérieur est effacé (le lien, jamais sa cible)
+  fs.rmSync(path.join(sortie, 'recent' + '-work.json'), { force: true });
 
   const ferme = etatMoteur(lab).ferme; // R6 : dit dans le résumé quand git du moteur reste fermé
   // AB1 : un lab inchangé (fichiers, index git, environnement git et code du moteur) ne relance pas le scan ;
@@ -151,17 +153,6 @@ export function assembler({ lab: labArg, quiet = false, scriptsDir: sd, annotate
   }
   const arch = ecrireArchitecture({ lab, sortie });
   const project = buildProjectGraph(lab);
-  // travail récent : les deux dernières phases exécutées du jalon en cours (plans à SUMMARY)
-  const phaseNodes = project.nodes.filter((n) => n.kind === 'phase');
-  const recent = phaseNodes.filter((n) => project.files.some((f) => f.n === n.id && f.st === 'done' && f.touched?.length))
-    .sort((a, b) => parseFloat(b.num) - parseFloat(a.num)).slice(0, 2);
-  const scanFiles = new Set(JSON.parse(read(path.join(sortie, '.cache', 'scan.json'))).files.map((f) => f.path));
-  fs.writeFileSync(path.join(sortie, 'recent-work.json'), JSON.stringify({ updatedAt: new Date().toISOString(), tasks: recent.map((ph) => {
-    const items = new Map();
-    for (const f of project.files.filter((x) => x.n === ph.id && x.touched)) for (const p of f.touched) if (scanFiles.has(p) && !p.startsWith('.planning/') && !items.has(p)) items.set(p, { ref: p, change: 'changed', note: `${f.name}` });
-    return { title: ph.label.length > 160 ? ph.label.slice(0, 159).replace(/\s+\S*$/, '') + '…' : ph.label, // entier jusqu'à 160 caractères (le panneau et le sous-titre passent à la ligne), au-delà coupé à un espace avec « … »
-      request: ph.summary, summary: ph.foot, items: [...items.values()].slice(0, 40) };
-  }) }, null, 2));
   run(eng.chemin, 'build.mjs', lab, '--no-claude-md');
   fs.writeFileSync(path.join(sortie, '.gitignore'), GITIGNORE); // deux lignes : commentaire VibeFlow puis *
 

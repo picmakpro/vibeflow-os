@@ -29,7 +29,7 @@ JS
 J() { node "$AUX/j.mjs" "$1" "$2" 2>/dev/null || echo "illisible"; }
 # col.mjs <scripts> <lab> <mode> [cle] : lecture du lab par les modules de <scripts>
 #   modes : graphe (le graphe Projet réel) · plan (option trace de readPlanning) · vue <cle> (vue de phase réelle contre celle du harnais de 76-01)
-#           equiv (les deux porteurs des exigences de la phase 1) · poids (octets et durées, sur le lab donné)
+#           equiv (meta.vf.trace contre les fichiers sources de la phase 1, lus à part) · poids (octets et durées, sur le lab donné)
 cat > "$AUX/col.mjs" <<'JS'
 import fs from 'node:fs';
 import path from 'node:path';
@@ -60,12 +60,14 @@ async function sortie() {
     const vues = {}; for (const c of (cle || '').split(',').filter(Boolean)) { const r = vue({ vue: 'exigence', cle: c, projet: g, modele: null }); vues[c] = r.statut + '/' + (r.corps.erreur || r.corps.etat); }
     return { phases, vues };
   }
-  if (mode === 'equiv') {
-    const anc = g.files.filter((f) => f.n === 'ph-1.req').map((f) => ({ id: f.name, st: f.st, d: f.d }));
+  if (mode === 'equiv') { // 76-08 : le nœud « Exigences » est retiré ; l'ancien porteur est remplacé par une lecture INDÉPENDANTE des fichiers sources du lab (cases du REQUIREMENTS, champ requirements des plans)
+    const base = path.join(racine, '.planning/workstreams/x'), dir = path.join(base, 'phases/01-un');
+    const anc = [...fs.readFileSync(path.join(base, 'REQUIREMENTS.md'), 'utf8').matchAll(/^- \[( |x)\] \*\*([A-Z]+-\d+)\*\*: (.*)$/gm)].map((m) => ({ id: m[2], st: m[1] === 'x' ? 'done' : 'todo', d: m[3] }));
     const nou = g.meta.vf.trace.exigences.filter((e) => e.phase === '1');
     const ph = g.nodes.find((n) => n.id === 'ph-1');
     const plans = g.files.filter((f) => f.n === 'ph-1' && /-PLAN\.md$/.test(f.p)).map((f) => {
-      const a = g.links.filter((l) => l.label === 'couvre' && l.a === 'f:' + f.p).map((l) => l.b.split('/').pop()).sort();
+      const src = fs.readFileSync(path.join(dir, path.basename(f.p)), 'utf8'), ligne = /^requirements: \[(.*)\]$/m.exec(src);
+      const a = ligne ? ligne[1].split(',').map((x) => x.trim()).filter(Boolean).sort() : [];
       const pl = ph.trace.plans.find((x) => x.fichier === f.p);
       return { p: f.p.split('/').pop(), anc: a, nou: pl ? [...pl.exigences].sort() : null };
     });
@@ -236,7 +238,7 @@ assert_eq "T9.10 cites de REQ-01 : une décision préfixée, un ADR, une nue" "$
 assert_eq "T9.10b cites de REQ-02 : trois listes vides" "$(J "$G10" "JSON.stringify(j.meta.vf.trace.exigences.find(e=>e.id==='REQ-02').cites)")" '{"decisions":[],"adrs":[],"nues":[]}'
 assert_eq "T9.10c témoin positif : la ligne du ledger contient les trois citations" "$(grep -c 'P90-D-01, ADR-001, D-04' "$(ledger "$L10")")" "1"
 
-echo "=== T9.11 — équivalence des deux porteurs des exigences (P80-C76-6) ==="
+echo "=== T9.11 — équivalence de meta.vf.trace et des fichiers sources des exigences (P80-C76-6 ; 76-08 : le nœud « Exigences » est retiré, la lecture indépendante des fichiers le remplace) ==="
 L11="$WORK/l11"; lab_base "$L11" 1
 wr "$(ledger "$L11")" <<'MD'
 # Exigences

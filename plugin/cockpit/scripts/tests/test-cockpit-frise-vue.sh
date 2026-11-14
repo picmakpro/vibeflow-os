@@ -77,9 +77,9 @@ window.__declarer = []; window.__surOnglet = [];
     const rep = () => new Response(JSON.stringify(F.statut === 200 ? c : { erreur: F.statut === 400 ? 'bornes-invalides' : 'indisponible' }),
       { status: F.statut, headers: { 'content-type': 'application/json' } });
     return new Promise((ok) => setTimeout(() => ok(rep()), F.delai || 0)); }; }
-window.__kd = [];
+window.__kd = []; // les écouteurs de la vue elle-même : celui du curseur sur la racine (Échap) est compté par test-cockpit-frise-curseur.sh C12
 { const A = EventTarget.prototype.addEventListener, R = EventTarget.prototype.removeEventListener;
-  EventTarget.prototype.addEventListener = function (t, f, o) { if (t === 'keydown' && this.classList && this.classList.contains('vf-frise') && !window.__kd.some((x) => x[0] === this && x[1] === f)) window.__kd.push([this, f]); return A.call(this, t, f, o); };
+  EventTarget.prototype.addEventListener = function (t, f, o) { if (t === 'keydown' && this.classList && this.classList.contains('vf-frise') && !/74-vf-frise-curseur/.test(String(new Error().stack)) && !window.__kd.some((x) => x[0] === this && x[1] === f)) window.__kd.push([this, f]); return A.call(this, t, f, o); };
   EventTarget.prototype.removeEventListener = function (t, f, o) { if (t === 'keydown') window.__kd = window.__kd.filter((x) => !(x[0] === this && x[1] === f)); return R.call(this, t, f, o); }; }
 window.__nkd = () => window.__kd.filter((x) => x[0].isConnected).length;
 JS
@@ -378,6 +378,12 @@ export default async function (h) {
     h.sonde('S11', 'les pistes (svg de courbe, d\'axe et de voies) sont aria-hidden', m.caches, String(m.caches));
     h.egal('S11', 'h3.sr « Frise en liste, sur les dernières 1 h 30, lecture horloge »', m.titre, 'Frise en liste, sur les dernières 1 h 30, lecture horloge');
     h.sonde('S11', 'un élément par voie et par segment affiché', m.voies === m.rangs && m.segs === m.dessines && m.dessines > 0, JSON.stringify(m));
+    // la liste est hors écran (motif .sr) mais reste lue ; elle ne repousse rien : l'encart suit directement la légende
+    const o = await h.ev(() => { const sr = document.querySelector('.vf-frise-sr'), cs = getComputedStyle(sr), r = sr.getBoundingClientRect(), leg = document.querySelector('.vf-frise-legende').getBoundingClientRect(), enc = document.querySelector('.vf-encart');
+      return { pos: cs.position, w: r.width, h: r.height, ov: cs.overflow, lue: cs.display !== 'none' && cs.visibility !== 'hidden' && !sr.hidden && !sr.closest('[aria-hidden=true]') && sr.querySelectorAll('li').length > 0,
+        ecart: enc ? Math.round(enc.getBoundingClientRect().top - leg.bottom) : null }; });
+    h.sonde('S11', 'la liste .sr est hors écran (position absolute, 1 px, overflow hidden) et reste lue (ni display none, ni aria-hidden)', o.pos === 'absolute' && o.w <= 1 && o.h <= 1 && o.ov === 'hidden' && o.lue, JSON.stringify(o));
+    h.sonde('S11', 'l\'encart suit directement la légende (aucun bloc de 400 px entre les deux)', o.ecart !== null && o.ecart >= 0 && o.ecart <= 32, JSON.stringify(o));
   });
 }
 JS
@@ -426,10 +432,10 @@ const mesure = () => { const R = document.querySelector('.vf-frise'), cs = (e) =
     for (const s of ['Top', 'Right', 'Bottom', 'Left']) if (parseFloat(c['border' + s + 'Width']) > 0 && c['border' + s + 'Style'] !== 'none') out.add(c['border' + s + 'Color']); }
   const rgb = (x) => { const m = /rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?/.exec(x); return m ? { k: m[1] + ',' + m[2] + ',' + m[3], a: m[4] === undefined ? 1 : Number(m[4]) } : null; };
   const v = (n) => rgb(window.__couleur(n)).k, ink = rgb(window.__couleur('rgb(var(--ink))')).k;
-  const etats = { actif: v('--st-active'), recent: v('--recent'), sev: v('--sev-high') }, neutres = ['--text', '--text-2', '--text-3', '--text-4', '--hair', '--hair-2', '--raise', '--raise-2', '--surface'].map(v).concat([ink]);
+  const etats = { actif: v('--st-active'), fin: v('--recent'), sev: v('--sev-high') }, neutres = ['--text', '--text-2', '--text-3', '--text-4', '--hair', '--hair-2', '--raise', '--raise-2', '--surface'].map(v).concat([ink]);
   const trouves = [...out].map(rgb).filter(Boolean).filter((c) => c.a > 0), hors = trouves.filter((c) => !Object.values(etats).includes(c.k) && !neutres.includes(c.k)).map((c) => c.k);
   const couleur = (sel, p) => { const e = R.querySelector(sel); return e ? cs(e)[p] : null; };
-  return { hors, vus: { actif: trouves.some((c) => c.k === etats.actif), recent: trouves.some((c) => c.k === etats.recent), sev: trouves.some((c) => c.k === etats.sev) },
+  return { hors, vus: { actif: trouves.some((c) => c.k === etats.actif), fin: trouves.some((c) => c.k === etats.fin), sev: trouves.some((c) => c.k === etats.sev) },
     surface: window.__couleur('--surface'), axe: couleur('.vf-frise-rang-axe text.vf-frise-grad', 'fill'), travail: couleur('[data-etat="travail"]', 'fill'), agents: couleur('[data-etat="agents"]', 'stroke'),
     repos: couleur('[data-etat="repos"]', 'stroke'), croix: (() => { const g = R.querySelector('[data-evt="erreur"] *'); return g ? (cs(g).stroke !== 'none' ? cs(g).stroke : cs(g).fill) : null; })(),
     coche: (() => { const g = R.querySelector('[data-evt="rapport"] *'); return g ? (cs(g).stroke !== 'none' ? cs(g).stroke : cs(g).fill) : null; })() }; };
@@ -438,7 +444,7 @@ export default async function (h) {
     for (const theme of ['dark', 'light']) {
       await h.monter({ voies, media: [{ name: 'prefers-color-scheme', value: theme }] });
       const m = await h.ev(mesure);
-      h.sonde('S14', `thème ${theme} : les couleurs résolues ⊂ {--st-active, --recent, --sev-high} + neutres (aucune par nœud), les trois sont présentes`, m.hors.length === 0 && m.vus.actif && m.vus.recent && m.vus.sev, JSON.stringify([m.hors, m.vus]));
+      h.sonde('S14', `thème ${theme} : les couleurs résolues ⊂ {--st-active, --recent, --sev-high} + neutres (aucune par nœud), les trois sont présentes`, m.hors.length === 0 && m.vus.actif && m.vus.fin && m.vus.sev, JSON.stringify([m.hors, m.vus]));
       const r = (a, b) => Math.round(h.ratio(a, b) * 100) / 100;
       const cr = { axe: r(m.axe, m.surface), travail: r(m.travail, m.surface), agents: r(m.agents, m.surface), repos: r(m.repos, m.surface), croix: r(m.croix, m.surface), coche: r(m.coche, m.surface) };
       h.sonde('S14', `thème ${theme} : texte d'axe ≥ 4,5:1 ; barres et traits ≥ 3:1 sur --surface`, cr.axe >= 4.5 && Object.entries(cr).filter(([k]) => k !== 'axe').every(([, x]) => x >= 3), JSON.stringify(cr));

@@ -121,13 +121,15 @@ await executer(chrome, async (s) => {
     await charger(); await phase(3); await ouvrir('REQ-02'); o.e9sans = await lire(`${PAN}`);
     await charger(); await phase(2); await ouvrir('REQ-01'); o.e9aucune = await lire(`${PAN}`);
   });
-  await sec('e5', async () => { // C2.5 : section Jalon ouverte : une ligne ajoutée au tableau dans le lab remplace le contenu, section ouverte ; fermée : aucune requête
+  await sec('e5', async () => { // C2.5 : section Jalon ouverte : un plan retiré du lab remplace le contenu, section ouverte, défilement gardé ; fermée : aucune requête
     await charger(1440, 500); await s.ev("VibeFlow.go('root')"); await pause(400); await clic('#panel details[data-vf-trace-jalon] > summary');
     await vrai("!!document.querySelector('#panel details[data-vf-trace-jalon] .vf-trace-ligne')");
     const ph2 = "[...document.querySelectorAll('#panel details[data-vf-trace-jalon] .vf-trace-ligne')].map((b) => __tr.nb(b.textContent)).find((t) => t.startsWith('Phase 1'))";
     o.e5avant = await lire(ph2); await s.ev("document.getElementById('panel').scrollTop = 40"); const haut = await lire("document.getElementById('panel').scrollTop");
-    const reg = `${lab}/.planning/workstreams/x/REQUIREMENTS.md`, original = fs.readFileSync(reg, 'utf8'); // une exigence retirée du registre : la ligne de la phase 1 le dit (l'événement planning suit un changement de structure du graphe)
-    fs.writeFileSync(reg, original.split('\n').filter((l) => !l.includes('REQ-12')).join('\n'));
+    // 76-08 : le nœud « Exigences » n'existe plus, retirer une exigence ne change plus la STRUCTURE du graphe (un patch, sans rechargement) ; l'événement planning suit un changement de structure :
+    // un plan retiré (la carte disparaît) dit la même chose à la ligne de la phase 1 (le maillon « plan » de REQ-12 passe de lu à manquant)
+    const reg = `${lab}/.planning/workstreams/x/phases/01-socle/01-02-PLAN.md`, original = fs.readFileSync(reg, 'utf8');
+    fs.unlinkSync(reg);
     o.e5change = await attendreValeur(() => lire(`${ph2}`), (v) => v && v !== o.e5avant, { max: 25000 }) !== o.e5avant;
     o.e5apres = await lire(`({ ouvert: document.querySelector('#panel details[data-vf-trace-jalon]').open, haut: document.getElementById('panel').scrollTop === ${haut || 0} })`);
     await clic('#panel details[data-vf-trace-jalon] > summary'); await pause(300); reqs.length = 0;

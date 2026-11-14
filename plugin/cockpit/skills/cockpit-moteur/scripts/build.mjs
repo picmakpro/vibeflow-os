@@ -238,41 +238,6 @@ if (arch.tour !== undefined) {
     if (ref) outTour.push({ ref, title: isStr(s.title) ? s.title : '', note: isStr(s.note) ? s.note : '' });
   });
 }
-// "Recent work": what Claude just changed, per task, framed against what the user asked for
-// (floorplan/recent-work.json, rewritten on every make/update). Stale refs are warnings, never errors.
-let outRecent = null;
-const recentFile = path.join(outDir, 'recent-work.json');
-if (fs.existsSync(recentFile)) {
-  let rw = null;
-  try { rw = JSON.parse(fs.readFileSync(recentFile, 'utf8')); } catch (e) { warn(`recent-work.json is not valid JSON: ${e.message}`); }
-  const routeIdx = new Map(routesIn.map((r, i) => [routeKey(r), i]));
-  const resolveRecent = (ref) => {
-    if (!isStr(ref)) return null;
-    const s = ref.trim().replace(/^\.\//, '').replace(/^(route:|file:)/, '');
-    if (/^n:/.test(s)) return byId.has(s.slice(2)) ? s : null;
-    if (/^f:/.test(s)) return includedSet.has(s.slice(2)) ? s : null;
-    if (byId.has(s)) return 'n:' + s;
-    if (includedSet.has(s)) return 'f:' + s;
-    const m = /^([A-Za-z]+)\s+(\/\S*)$/.exec(s);
-    if (m && routeIdx.has(`${m[1].toUpperCase()} ${m[2]}`)) return `r:${routeIdx.get(`${m[1].toUpperCase()} ${m[2]}`)}`;
-    return null;
-  };
-  if (rw && !Array.isArray(rw.tasks)) warn('recent-work.json needs a "tasks" array (an empty one clears the highlights)');
-  else if (rw) {
-    const tasks = [], items = [], missing = [];
-    rw.tasks.forEach((t, ti) => {
-      if (!isStr(t?.title)) return warn(`recent-work.json tasks[${ti}] needs a title`);
-      tasks.push({ title: t.title, request: isStr(t.request) ? t.request : '', summary: isStr(t.summary) ? t.summary : '', ...(isStr(t.status) ? { status: t.status } : {}) });
-      for (const it of Array.isArray(t.items) ? t.items : []) {
-        const id = resolveRecent(it?.ref);
-        if (!id) { missing.push(it?.ref); continue; }
-        items.push({ id, task: tasks.length - 1, change: it.change === 'new' ? 'new' : 'changed', note: isStr(it.note) ? it.note : '' });
-      }
-    });
-    if (missing.length) warn(`recent-work.json: ${missing.length} ref(s) aren't on the map and were left out (use a file path, a node id or "METHOD /path"): ${missing.slice(0, 5).map(String).join(', ')}${missing.length > 5 ? '…' : ''}`);
-    outRecent = { updatedAt: isStr(rw.updatedAt) ? rw.updatedAt : fs.statSync(recentFile).mtime.toISOString(), tasks, items };
-  }
-}
 const notes = new Map();
 annotations.forEach((a, i) => {
   if (!isStr(a?.path) || !isStr(a?.note)) return err(`annotations[${i}] needs path and note`);
@@ -395,7 +360,6 @@ const graph = {
   links: [...links.values()],
   flows: outFlows,
   tour: outTour,
-  ...(outRecent?.items.length ? { recent: outRecent } : {}),
 };
 // extension hooks, computed from the finished graph plus the raw scan
 // a blueprint has no code to check, so its Health is a design review of the plan (computed after screens)
@@ -453,9 +417,6 @@ if (hs && (hs.high || hs.medium || hs.low)) {
   for (const i of graph.health.issues.filter((x) => x.severity !== 'low').slice(0, 8)) report.push(`  [${i.severity}] ${i.title}`);
 }
 if (graph.screens?.length) report.push(`SCREENS  ${graph.screens.length} detected`);
-report.push(graph.recent
-  ? `RECENT WORK  ${graph.recent.items.length} card(s) highlighted across ${graph.recent.tasks.length} task(s)`
-  : `RECENT WORK  none highlighted${fs.existsSync(recentFile) ? '' : ' (no recent-work.json)'}`);
 // point future Claude Code sessions in this project at the map. Codex has no personal, uncommitted
 // equivalent (AGENTS.md is shared with the team), so a map built by Codex leaves the project's notes alone.
 if (agent === 'codex') report.push('AGENT  Codex: questions on the map run through Codex');
