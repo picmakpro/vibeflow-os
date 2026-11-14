@@ -168,13 +168,13 @@ export default async function (h) {
       await h.ev(() => { window.__ouv = []; window.__lus = []; });
       if (geste === 'clic') await h.ev((s) => document.querySelector(s).click(), sel);
       else { await h.ev((s) => document.querySelector(s).focus(), sel); if (geste === 'Entrée') await h.touche('Enter', 'Enter', 13, '\r'); else await h.touche(' ', 'Space', 32, ' '); }
-      await h.attendre(BAS, 'fiche posée', 8000);
+      await h.attendre(BAS, 'fiche posée', 8000).catch(() => {}); // un cas rouge se dit par son libellé, il n'interrompt pas les suivants
       const o = await h.ev(OUVERTS);
       const r = await h.ev(() => ({ ouverte: !!(window.__vfFiche && window.__vfFiche.ouverte()), lus: window.__lus.slice(), repli: document.querySelectorAll('#panel [data-vf-repli], #panel .vf-transcript, .vf-rg-lecteur').length }));
       h.egal('R5b', `${decl} (${geste}) : vf-agent:ouvrir annulé (defaultPrevented), la fiche s'ouvre, le lecteur de repli de la 73 ne s'ouvre pas, vf-agent:lu seulement pour un terminé`,
         [o.map((x) => x.slice(0, 3)), r.ouverte, r.repli, r.lus], [[[decl, id, true]], true, 0, decl === 'rapport' ? [id] : []]);
       await h.echap();
-      await h.attendre("!document.querySelector('.vf-fiche')", 'fiche fermée', 8000);
+      await h.attendre("!document.querySelector('.vf-fiche')", 'fiche fermée', 8000).catch(() => {});
       // le bouton « Lire le rapport » d'un terminé disparaît quand l'agent est marqué lu : le focus revient alors dans la régie, jamais sur BODY
       const foc = await h.ev((s, d) => (d === 'rapport' ? !!document.activeElement && document.activeElement !== document.body && !!document.activeElement.closest('#vf-equipe')
         : document.activeElement === document.querySelector(s)), sel, decl);
