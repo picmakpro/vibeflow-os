@@ -3,8 +3,9 @@
 // La coquille signale chaque échec de lecture par `vf:coquille-echec` (annulable ; detail { onglet, initial }) et par VF_COQUILLE.etat(). Ce script écoute
 // l'évènement, l'annule (jamais deux messages) puis : sans onglet affiché (`initial`), pose une boîte « Lecture impossible » dont « Réessayer » prend le
 // focus ; avec un onglet affiché, annonce l'échec (VF_ONGLETS.annoncer) et laisse la palette et la ligne d'état offrir « Réessayer ».
-// Évaluation : l'objet gelé et UNE écoute de document ; ni style, ni nœud (posés au premier `montrer`), aucune lecture du moteur ; rien n'est gardé ici,
-// l'échec se lit dans VF_COQUILLE.etat(). Texte posé par textContent seulement ; jamais le message de rejet ni le corps de la réponse (T-80-63).
+// Évaluation : l'objet gelé, UNE écoute de document et UNE inscription surOnglet (la boîte et sa feuille de style s'en vont à toute arrivée, par ce
+// script ou par un autre) ; ni style, ni nœud (posés au premier `montrer`), aucune lecture du moteur ; rien n'est gardé ici, l'échec se lit dans
+// VF_COQUILLE.etat(). Texte posé par textContent seulement ; jamais le message de rejet ni le corps de la réponse (T-80-63).
 (() => {
   if (window.VF_ONGLETS_ECHEC) return;
   const TEXTE = 'Lecture impossible : les données de cet onglet n\'ont pas pu être lues.';
@@ -55,5 +56,7 @@
     if (V && typeof V.annoncer === 'function') V.annoncer(a && LIBELLE[a] ? `${TEXTE} L'onglet ${LIBELLE[a]} reste affiché.` : TEXTE);
   });
 
+  const K = window.VF_COQUILLE;
+  if (K && typeof K.surOnglet === 'function') K.surOnglet(() => { retirer(); }, { cle: '00-vf-onglets-echec.js' });
   window.VF_ONGLETS_ECHEC = Object.freeze({ montrer, retirer });
 })();

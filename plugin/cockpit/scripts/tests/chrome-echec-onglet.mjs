@@ -7,7 +7,11 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { executer, pause, stabiliser } from './chrome-session.mjs';
 const [, , chrome, racine, mode, fichier] = process.argv;
-const amorce = (e0) => `(() => { const A = window.__e = { echec: ${e0}, fetchs: [], posts: 0, evs: [], prevented: [] };
+const amorce = (e0) => `(() => { const A = window.__e = { echec: ${e0}, casse: 0, fetchs: [], posts: 0, evs: [], prevented: [] };
+  const ap = HTMLHeadElement.prototype.appendChild; // casse : un script de l'onglet n'arrive jamais (échec de DÉMARRAGE, après la lecture)
+  HTMLHeadElement.prototype.appendChild = function (n) {
+    if (A.casse && n.tagName === 'SCRIPT' && /\\/ui\\/30-screens\\.js/.test(n.src)) { setTimeout(() => n.onerror && n.onerror(new Event('error'))); return n; }
+    return ap.call(this, n); };
   const f = window.fetch;
   window.fetch = function (u, o) { const m = String((o && o.method) || 'GET').toUpperCase(); if (m !== 'GET') A.posts++;
     if (String(u).includes('/api/vf/graphe')) { A.fetchs.push(String(u)); if (A.echec) return Promise.reject(new TypeError('forcé')); }
@@ -122,6 +126,18 @@ await executer(chrome, async (s) => {
     });
   }
 
+  if (mode === 'ec4') {
+    await sec('ec4', async () => {
+      await poser(0); await charger('/'); await s.attendre(PRET, 'Code prêt');
+      await s.ev('__e.casse = 1'); await clic('nav.vf-tabs a[href="project.html"]');
+      await s.attendre("VF_COQUILLE.etat().phase === 'echec'", 'échec de démarrage'); await pause(300);
+      const e1 = await etat(); await s.ev('__e.casse = 0'); const n1 = e1.fetchs;
+      const r = await s.ev("VF_ONGLETS.aller('code').then(() => 'resolu', (e) => 'rejet ' + e.message)");
+      await s.attendre(PRET, 'Code rechargé'); const e2 = await rien(500);
+      o.ec4 = { motif: e1.etat.motif, phase: e1.etat.phase, aff: e1.aff, r, pret: e2.etat.phase, aff2: e2.aff, lectures: e2.fetchs - n1, p: e2.p, dn: e2.n - e1.n };
+    });
+  }
+
   if (mode === 'ec2') {
     await sec('ec22', async () => { o.ec22 = evalIsolee(); });
     for (const [nom, chemin, tab] of [['projet', '/project.html', 'project.html'], ['code', '/', 'index.html'], ['equipe', '/equipe.html', 'equipe.html']]) {
@@ -135,7 +151,10 @@ await executer(chrome, async (s) => {
         await s.ev('__e.echec = 1'); await touche('Enter', 'Enter', 13); await s.attendre('__e.fetchs.length >= 2', 'seconde lecture'); await pause(500);
         r.encore = await etat(); await s.ev('__e.echec = 0'); const n = r.encore.n;
         await touche('Enter', 'Enter', 13); await s.attendre(PRET, 'onglet chargé'); r.fin = await rien(700); r.dn = r.fin.n - n;
-        o['ec21' + nom] = r; await poser(0);
+        o['ec21' + nom] = r; await poser(1); await charger(chemin, { echec: true }); // une arrivée par un autre chemin que le bouton
+        await s.ev('__e.echec = 0'); await s.ev(`VF_COQUILLE.chargerOnglet(${JSON.stringify(nom)})`);
+        await s.attendre(PRET, 'chargé hors du bouton');
+        r.residu = await lire("[!!document.getElementById('vf-onglets-echec'), !!document.getElementById('vf-onglets-echec-style')]"); await poser(0);
       });
     }
   }

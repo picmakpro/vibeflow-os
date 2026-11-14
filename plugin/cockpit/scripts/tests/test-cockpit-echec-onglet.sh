@@ -66,9 +66,15 @@ for n in projet code equipe; do
   assert_eq "EC2.1b ($n) — encore en échec : la boîte revient, focus sur « Réessayer » ; levée : onglet chargé, boîte retirée, aucune entrée de plus" \
     "$(E2 "[j.ec21$n.encore.boite, j.ec21$n.encore.ae, j.ec21$n.fin.etat.phase, j.ec21$n.fin.boite, j.ec21$n.fin.ech, j.ec21$n.dn <= 0]")" \
     '[true,"BUTTON","pret",false,null,true]'
+  assert_eq "EC2.3 ($n) — une arrivée hors du bouton (chargerOnglet) ne laisse ni boîte ni feuille de style" "$(E2 "j.ec21$n.residu")" '[false,false]'
 done
+echo "=== EC4 — échec de démarrage : l'onglet d'origine se recharge ==="
+R4="$(mesurer ec4)"; sonde "$R4"
+assert_eq "EC4.1 — après un échec de démarrage, aller vers l'onglet d'origine le recharge (pas « rien à charger »), sans entrée d'historique de plus" \
+  "$(E '[j.ec4.motif, j.ec4.phase, j.ec4.aff, j.ec4.r, j.ec4.pret, j.ec4.aff2, j.ec4.lectures >= 1, j.ec4.p, j.ec4.dn]' "$R4")" \
+  '[null,"echec","code","resolu","pret","code",true,"/",0]'
 echo "=== Sans erreur de pilote ==="
-ERR=""; for r in "$R1" "$R2"; do ERR="$ERR$(E 'Object.entries(j.erreurs).map((x) => x[0] + "=" + x[1]).join()' "$r")"; done
+ERR=""; for r in "$R1" "$R2" "$R4"; do ERR="$ERR$(E 'Object.entries(j.erreurs).map((x) => x[0] + "=" + x[1]).join()' "$r")"; done
 assert_eq "EC9 — aucune section du pilote n'a échoué" "$ERR" ""
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
