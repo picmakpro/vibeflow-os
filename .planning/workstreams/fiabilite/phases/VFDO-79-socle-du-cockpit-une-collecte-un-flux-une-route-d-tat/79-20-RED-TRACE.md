@@ -70,3 +70,11 @@ VERT-EMBLEE V12.3a, V12.3b, V12.3c : le README de la base ne nomme que des modul
 ROUGE-BASE V12.4 attendu=0 obtenu=10 (dix lignes du README portent un jeton retiré : l'en-tête, qui en portait une onzième, a été corrigé à la tâche 1 avec le type du module)
 VERT-EMBLEE V12.5 : `plugin/cockpit/hooks/hooks.json` n'existe pas (sonde S0 OUI) et le README ne parle pas du journal des attentes ; gardé par V12.6n (texte planté sans fragment) et V12.6o (fragment planté, README muet), tous deux rouges sur copie.
 Suite vendor rejouée : 283 PASS / 3 FAIL : V12.4 (rouge voulu) et V11.Q6b, V11.P5 (voisin 79-18 : empreinte du module, dossier partagé en cours d'écriture).
+
+## Tâche 2 : README réécrit (état final des comptes, `grep -c -F`, lignes)
+- Jetons retirés : 10 lignes à la baseline, 0 à la fin (V12.4 OK). Jetons de détachement de 79-19 (`vf-cockpit-attentes`, `journal-attentes`) : 0. « journal des attentes » : 0, fragment de hooks absent (V12.5 OK).
+- Repères, baseline 0 → fin : `/api/vf/state` 3, `/api/vf/frise` 2, `/api/vf/graphe` 2, `worker-src` 2, `/_vf/` 5, `VF_ETAT` 1, `VF_FLUX` 1, `VF_COQUILLE` 2, `emission-refusee` 1, `cockpit-state@1` 2, `cockpit-frise@1` 2, `cockpit-index@1` 2, `BroadcastChannel` 1, `voiesOmises` 1, `attend-humain` 1, `VF_COCKPIT_DONNEES_GABARIT` 1, `cockpit_module_copie` 1, `pose projet` 1, « la sortie du cockpit n'est jamais source de code » 1, « Chiffres tenus par le code » 1 (le titre).
+- README : 389 lignes à la baseline, 436 à la fin (plafond du plan : 500).
+- Écart au plan R10 : les cinq cas du corps `inconnu` sont ceux du SUMMARY de 79-22 (avant le premier tour, agent né depuis le dernier tour ou sorti de la fenêtre, fichier disparu, exception de lecture, file pleine ou délai) ; un identifiant mal formé reste un 400 `id-invalide` (le plan disait « identifiant refusé » parmi les cinq).
+- Écart : « Retiré » du plan nomme des modules du moteur que le README n'a jamais cités ; seuls les jetons de V12.4 sont gardés.
+- `dc_verifier` sur la racine réelle : 15 contrôles OK. `check-machine-paths.sh` : exit 0. `check-version-sync.sh` : exit 0.
