@@ -3,7 +3,7 @@
 #   A  l'API (clés fermées, abonnement, ordre, isolation, gel, valeur posée avant la notification)           F  l'alimentation par le flux partagé (hello, who, lock, git, graphe, planning, connexion)
 #   L  les lectures d'état et de frise (une requête en vol, un rattrapage) J  jeton et lecture JSON bornée aux routes de l'API
 #   K  (Chrome) un who et un changement de planning, du flux à l'écran    C  (Chrome) la vie à travers six changements d'onglet
-#   O  le cliquet des observateurs de mutations, par fichier de ui/         R  les observateurs de réparation retirés
+#   O  le cliquet des observateurs de mutations, par fichier de ui/ et ses sous-dossiers  R  les observateurs de réparation retirés
 # A, F, L, J, O, R sans navigateur ; K et C dans Chrome headless : sans navigateur elles sont SAUTÉES hors CI et ÉCHOUENT en CI (jamais un vert à vide).
 set -uo pipefail
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
@@ -132,7 +132,7 @@ else
   assert_eq "C4.2 — le retour pose ouvert, la pastille n'est plus « Direct coupé » et dit l'état que le serveur redonne au hello (personne : le who d'essai n'est pas le sien)" "$(J 'j.retour.join("|")')" "ouvert|Personne"
 fi
 
-echo "=== O — le cliquet des observateurs de mutations, par fichier de ui/ ==="
+echo "=== O — le cliquet des observateurs de mutations, par fichier de ui/ et de ses sous-dossiers ==="
 CLQ="$HERE_T/observateurs-cliquet.mjs"; BASE="$HERE_T/observateurs-baseline.txt"
 cq() { node "$CLQ" "$@" 2>&1; echo "rc=$?"; }
 assert_eq "O1.1 — le vrai dossier ui/ contre la baseline versionnée : conforme (code 0)" "$(cq juger "$UI" "$BASE" | tail -1)" "rc=0"
@@ -164,6 +164,23 @@ for forme in 'obs(MutationObserver, document.body, {}, () => {});' 'const MO = w
 done
 rm -f "$FX/ui/e.js"
 assert_eq "O2.7 — dossier illisible, baseline illisible, usage : code 2, jamais 0 (fermé par défaut)" "$(cq juger "$FX/nulle-part" "$FX/base.txt" | tail -1)|$(cq juger "$FX/ui" "$FX/nulle-part.txt" | tail -1)|$(cq juger | tail -1)" "rc=2|rc=2|rc=2"
+
+# O3 — le compteur descend dans les sous-dossiers de ui/ (arbitrage (a) de Samuel) ; clé = chemin relatif, aucun lien symbolique suivi
+FS="$WORK/cliquet-sous"; mkdir -p "$FS/ui/sous" "$FS/dehors"; printf 'const a = 1;\n' > "$FS/ui/a.js"
+printf 'new MutationObserver(() => {});\nnew MutationObserver(() => {});\n' > "$FS/ui/sous/x.js"
+printf 'sous/x.js 2\n' > "$FS/avec.txt"; printf '# entête\n' > "$FS/sans.txt"
+assert_eq "O3.1 — sous-dossier ui/sous/x.js à 2 observateurs : conforme avec « sous/x.js 2 » (rc=0) ; sans l'entrée : HAUSSE sous/x.js réel=2 baseline=0, rc=1" "$(cq juger "$FS/ui" "$FS/avec.txt" | tail -1)|$(cq juger "$FS/ui" "$FS/sans.txt" | grep -E 'HAUSSE sous/x.js réel=2 baseline=0|rc=1' | tr '\n' ' ')" "rc=0|HAUSSE sous/x.js réel=2 baseline=0 rc=1 "
+assert_eq "O3.2 — mesurer sur cette fixture liste la clé relative exacte « sous/x.js 2 » et rien d'autre" "$(node "$CLQ" mesurer "$FS/ui" 2>&1)" "sous/x.js 2"
+printf 'new MutationObserver(() => {});\n' > "$FS/dehors/d.js"; ln -s "$FS/dehors" "$FS/ui/lien"; ln -s "$FS/dehors/d.js" "$FS/ui/fichier-lie.js"
+assert_eq "O3.3 — un lien symbolique de ui/ vers un dossier ou un fichier extérieur n'est pas compté (aucune sortie de ui/)" "$(node "$CLQ" mesurer "$FS/ui" 2>&1)" "sous/x.js 2"
+# M-PLAT : copie jetable du compteur qui ramène la mesure au seul niveau plat (la descente dans les sous-dossiers neutralisée)
+MP="$WORK/m-plat.mjs"; node -e "
+const fs = require('fs'); const t = fs.readFileSync(process.argv[1], 'utf8'); const a = 'if (e.isDirectory()) descendre(cle);';
+if (!t.includes(a)) { console.error('ancre absente'); process.exit(3); } fs.writeFileSync(process.argv[2], t.replace(a, 'if (false) descendre(cle);'));" "$CLQ" "$MP"
+assert_eq "M-PLAT.0 — le mutant est bien muté (la descente est coupée) et diffère de l'original" "$(grep -c -F 'if (false) descendre(cle);' "$MP")|$(cmp -s "$CLQ" "$MP" && echo identique || echo different)" "1|different"
+mq() { node "$MP" "$@" 2>&1; echo "rc=$?"; }
+assert_eq "M-PLAT.1 — mutant tué : O3.1 rougit (sans l'entrée, plus aucune HAUSSE ; avec l'entrée, plus conforme)" "$(mq juger "$FS/ui" "$FS/sans.txt" | grep -c 'HAUSSE')|$(mq juger "$FS/ui" "$FS/avec.txt" | tail -1)" "0|rc=1"
+assert_eq "M-PLAT.2 — mutant tué : le vrai dossier contre la vraie baseline rend PERIMEE tiroir/tiroir.js réel=0 baseline=3" "$(mq juger "$UI" "$BASE" | grep -c -F 'PERIMEE tiroir/tiroir.js réel=0 baseline=3')" "1"
 
 echo "=== R — les observateurs de réparation retirés, un événement existant à la place de chacun ==="
 A70="$UI/70-vf-live.js"; A72="$UI/72-vf-equipe.js"; A76="$UI/76-vf-git-entete.js"

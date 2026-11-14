@@ -1,4 +1,4 @@
-# observateurs-baseline.txt — observateurs de mutations (constructeur nu ou qualifié, alias du constructeur, aide qui le construit) par fichier de ui/*.js (79-17, SOCL-21). Format : <fichier> <n>, trié, n > 0.
+# observateurs-baseline.txt — observateurs de mutations (constructeur nu ou qualifié, alias du constructeur, aide qui le construit) par fichier de ui/ et de ses sous-dossiers, clé = chemin relatif (79-17, SOCL-21). Format : <chemin relatif> <n>, trié par octets, n > 0.
 # La baseline est serrée (réel = baseline). Une baisse : node plugin/cockpit/scripts/tests/observateurs-cliquet.mjs abaisser <dossier ui> <ce fichier>.
 # Une hausse exige dans le message du commit une citation d'arbitrage (canal et date) : la règle est « un ajout, un retrait », jamais un relèvement muet.
 00-vf-surcouches.js 1
@@ -14,3 +14,4 @@
 42-vf-panneau-retour.js 1
 73-vf-tiroir-travail.js 1
 77-vf-git-tiroir.js 1
+tiroir/tiroir.js 3
