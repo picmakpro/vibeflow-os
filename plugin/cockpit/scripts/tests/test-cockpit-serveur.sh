@@ -100,6 +100,17 @@ assert_eq "S1.1 — sans jeton : 403" "$(status "$PORT" /api/vf/etat)" "403"
 assert_eq "S1.2 — mauvais jeton : 403" "$(status "$PORT" /api/vf/etat "" "ffffffffffffffffffffffffffffffff")" "403"
 assert_eq "S1.3 — jeton de la page Code : 200" "$(status "$PORT" /api/vf/etat "" "$TOK")" "200"
 assert_eq "S1.4 — jeton de la page Projet : 200" "$(status "$PORT" /api/vf/etat "" "$PTOK")" "200"
+cat > "$AUX/jetons.mjs" <<'JS'
+// jetons.mjs <port> <jeton> : statuts de /api/vf/etat pour le jeton entier, son premier caractère, sa moitié, sa longueur moins un, puis le jeton suivi d'un caractère en trop
+import http from 'node:http';
+const [, , port, t] = process.argv;
+const st = (j) => new Promise((ok) => http.get({ host: '127.0.0.1', port: Number(port), path: '/api/vf/etat', headers: { Host: `127.0.0.1:${port}`, 'x-vf-cockpit-token': j } }, (r) => { r.resume(); r.on('end', () => ok(r.statusCode)); }).on('error', () => ok('ERR')));
+const essais = [t, t.slice(0, 1), t.slice(0, t.length >> 1), t.slice(0, -1), t + '0'];
+console.log((await Promise.all(essais.map(st))).join(' '));
+JS
+echo "=== S1b — le jeton se compare en entier : préfixe strict et suffixe en trop refusés (classe « jeton par préfixe ») ==="
+assert_eq "S1.5 — jeton de la page Code : entier 200 ; 1 caractère, moitié, longueur moins un, suffixe en trop : 403" "$(node "$AUX/jetons.mjs" "$PORT" "$TOK")" "200 403 403 403 403"
+assert_eq "S1.6 — jeton de la page Projet : entier 200 ; 1 caractère, moitié, longueur moins un, suffixe en trop : 403" "$(node "$AUX/jetons.mjs" "$PORT" "$PTOK")" "200 403 403 403 403"
 
 echo "=== S2 — Host étranger ==="
 for p in / /project.html "/api/vf/events?token=$TOK" "/api/vf/etat"; do
@@ -534,6 +545,29 @@ cockpit_module_muter mf4sor serve.mjs 's# retirerTemporairesEtat(stateFile); };#
 assert_eq "M-TMP-SORTIE — le balayage à la sortie du serveur retiré (une seule ligne) : la copie est valide, AM6.F4-C3 rougit sur la sortie seule" "$(valide "$MF4D") $(c3_sur "$MF4D")" "valide démarrage=0 sortie=2 arrêt=0 leurres=2"
 cockpit_module_muter mf4arr serve.mjs '/^  retirerTemporairesEtat(stateFile);$/d'; MF4E="$COCKPIT_MODULE"; unset COCKPIT_MODULE
 assert_eq "M-TMP-ARRET — le balayage de \`--stop\` retiré (une seule ligne) : la copie est valide, AM6.F4-C3 rougit sur \`--stop\` seul" "$(valide "$MF4E") $(c3_sur "$MF4E")" "valide démarrage=0 sortie=0 arrêt=2 leurres=2"
+
+echo "=== MJ — mutants de la comparaison de jeton : un préfixe (ou un suffixe) accepté est vu pour chacun des deux jetons ==="
+jetons_sur() { # <racine du module muté> [Code|Projet] : « Code[…] Projet[…] » (ou la seule ligne demandée) rejoué sur un serveur de ce module (lab copié, jetons lus dans les deux pages)
+  local L="$WORK/lab-mj-$RANDOM" t p; am4_lab "$L"
+  COCKPIT_MODULE="$1" cockpit_lancer "$L" || { echo "serveur non lancé"; return; }
+  t="$(node "$AUX/token.mjs" "$VF_PORT" /)"; p="$(node "$AUX/token.mjs" "$VF_PORT" /project.html)"
+  # un mutant de comparaison n'ouvre que le jeton qu'il vise ; l'autre ligne n'est pas lue (le premier caractère des deux jetons peut coïncider : 1 chance sur 16)
+  case "${2:-}" in Code) echo "Code[$(node "$AUX/jetons.mjs" "$VF_PORT" "$t")]" ;; Projet) echo "Projet[$(node "$AUX/jetons.mjs" "$VF_PORT" "$p")]" ;;
+    *) echo "Code[$(node "$AUX/jetons.mjs" "$VF_PORT" "$t")] Projet[$(node "$AUX/jetons.mjs" "$VF_PORT" "$p")]" ;; esac; cockpit_arreter
+}
+OKJ="Code[200 403 403 403 403] Projet[200 403 403 403 403]"
+assert_eq "MJ.0 — témoin : le module du dépôt rend la grille attendue (entier admis, tout le reste refusé) pour les deux jetons" "$(jetons_sur "$(cockpit_module_copie)")" "$OKJ"
+PREF='return x.length > 0 \&\& x.length <= y.length \&\& crypto.timingSafeEqual(x, y.subarray(0, x.length)); }'
+SUFF='return y.length > 0 \&\& x.length >= y.length \&\& crypto.timingSafeEqual(x.subarray(0, y.length), y); }'
+ANC='return x.length === y.length \&\& crypto.timingSafeEqual(x, y); }'
+cockpit_module_muter mjp1 vf-cockpit-server.mjs "s#$ANC#$PREF#"; MJ1="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-JETON-PROJET-PREFIXE — memeJeton (jeton de la page Projet) compare par préfixe : la copie est valide, S1.6 rougit (1 caractère, moitié, longueur moins un : 200)" "$(node --check "$MJ1/scripts/vf-cockpit-server.mjs" 2> /dev/null && echo valide || echo invalide) $(jetons_sur "$MJ1" Projet)" "valide Projet[200 200 200 200 403]"
+cockpit_module_muter mjs1 vf-cockpit-server.mjs "s#$ANC#$SUFF#"; MJ2="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-JETON-PROJET-SUFFIXE — memeJeton accepte un jeton suivi de caractères en trop : la copie est valide, S1.6 rougit (suffixe : 200)" "$(node --check "$MJ2/scripts/vf-cockpit-server.mjs" 2> /dev/null && echo valide || echo invalide) $(jetons_sur "$MJ2" Projet)" "valide Projet[200 403 403 403 200]"
+cockpit_module_muter mjp2 serve.mjs "s#$ANC#$PREF#"; MJ3="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-JETON-CODE-PREFIXE — sameToken (jeton de la page Code) compare par préfixe : la copie est valide, S1.5 rougit (1 caractère, moitié, longueur moins un : 200)" "$(node --check "$MJ3/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(jetons_sur "$MJ3" Code)" "valide Code[200 200 200 200 403]"
+cockpit_module_muter mjs2 serve.mjs "s#$ANC#$SUFF#"; MJ4="$COCKPIT_MODULE"; unset COCKPIT_MODULE
+assert_eq "M-JETON-CODE-SUFFIXE — sameToken accepte un jeton suivi de caractères en trop : la copie est valide, S1.5 rougit (suffixe : 200)" "$(node --check "$MJ4/skills/cockpit-moteur/assets/serve.mjs" 2> /dev/null && echo valide || echo invalide) $(jetons_sur "$MJ4" Code)" "valide Code[200 403 403 403 200]"
 
 vf_hyg_assert
 echo ""
