@@ -53,3 +53,5 @@
 
 rituel levé : régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale) — mutants non joués (M-BADGE, M-POUSSE, M-DOUBLE, M-SHOWPANEL,
 M-ECHAP, M-REGISTRE, M-ONGLET, M-SANS-CLE) ; la coquille ne rend aucun texte venu du serveur (`textContent` partout, aucune garde d'échappement à muter).
+
+Correction après CI (EK15.3 de test-cockpit-equipe.sh) : le littéral « panneau.addEventListener('keydown', echap); » figurait deux fois dans la page (73 et 74) et rendait « ancre ambiguë » ; la fonction de la Synthèse est renommée `fermerAuClavier`, sans changement de comportement.
