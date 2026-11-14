@@ -31,12 +31,18 @@ function texte(f) {
   } catch { return ''; } finally { if (fd >= 0) try { fs.closeSync(fd); } catch {} }
 }
 
-// le dossier git du lab (`.git` dossier ou fichier `gitdir:`), en remontant : un lab peut être un sous-dossier du dépôt
+// le dossier git du lab (`.git` dossier, lien vers un dossier ou fichier `gitdir:`), en remontant : un lab peut être un sous-dossier du dépôt
 function dossierGit(lab) {
   for (let d = lab; ; d = path.dirname(d)) {
     const g = path.join(d, '.git');
     try {
-      const s = fs.statSync(g); if (s.isDirectory()) return g;
+      const s = fs.statSync(g);
+      if (s.isDirectory()) {
+        // un `.git` du lab en LIEN vers un dossier git : jugé comme le gitfile (jamais lu s'il sort du lab) ;
+        // un autre type (tube, périphérique) passe par `texte`
+        if (d === lab && fs.lstatSync(g).isSymbolicLink() && gitSortant(lab, lab)) return null; // garde:code-cache-lien
+        return g;
+      }
       const m = /^gitdir:\s*(.+)$/m.exec(texte(g));
       // le gitfile du lab désigne un dossier git hors du lab : jamais lu (même règle que les lancements git)
       if (m && d === lab && gitSortant(lab, lab)) return null;
