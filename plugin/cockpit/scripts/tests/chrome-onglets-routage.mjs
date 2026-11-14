@@ -220,6 +220,28 @@ await executer(chrome, async (s) => {
     });
   }
 
+  if (mode === 'og218d') { // variante D de p14 : « / », « > » (actions), Échap, puis aller IMMÉDIATEMENT ; promesse et page se mesurent à part
+    const borne = (p, ms) => Promise.race([p, pause(ms).then(() => 'gel')]);
+    const touche = async (key, code, vk, text) => {
+      for (const type of ['keyDown', 'keyUp']) {
+        const txt = text && type === 'keyDown' ? { text } : {};
+        await s.send('Input.dispatchKeyEvent', { type, key, code, windowsVirtualKeyCode: vk, ...txt });
+      }
+    };
+    await sec('og218d', async () => {
+      await charger('/index.html'); await s.ev('document.body.focus()'); await touche('/', 'Slash', 191, '/');
+      const prete = `document.getElementById('palette').classList.contains('open') && document.activeElement && document.activeElement.id === 'search'`;
+      await s.attendre(prete, 'palette et #search');
+      await s.send('Input.insertText', { text: '>' });
+      await stabiliser(() => s.ev(`document.getElementById('results').innerHTML.length`), { pas: 150, max: 4000 });
+      await touche('Escape', 'Escape', 27);
+      const attente = s.ev(`(async () => { await VF_ONGLETS.aller('projet'); return 'regle'; })()`);
+      const vivante = await borne(s.ev('1 + 1'), 5000); // lu PENDANT l'attente de la promesse
+      const r = await borne(attente, 15000);
+      o.og218d = { r, vivante, p: await borne(s.ev('location.pathname'), 3000) };
+    });
+  }
+
   if (mode === 'og3') {
     await sec('og3', async () => {
       await charger('/'); const id = await premier(); await s.ev(`VibeFlow.select(${JSON.stringify(id)})`); await pause(300);
