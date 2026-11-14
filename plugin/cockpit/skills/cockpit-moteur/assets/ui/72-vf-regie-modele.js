@@ -81,8 +81,10 @@
 
   // P73-D-07 : trois rangs (impact connu > 0 décroissant, inconnu, connu = 0), puis la plus ancienne attente, le nom, l'identifiant ; comparateur total
   const rangDe = (l) => (l.impact == null ? 1 : l.impact > 0 ? 0 : 2);
+  const rangT = (l) => (l.kind === 'question' ? l.rang - 1 : rangDe(l)); // 73-11 : une question prend le rang 2 ou 3
   const cmp = (a, b) => (a < b ? -1 : a > b ? 1 : 0);
-  const trierAVous = (ls) => ls.slice().sort((a, b) => rangDe(a) - rangDe(b) || (rangDe(a) === 0 ? b.impact - a.impact : 0)
+  const trierAVous = (ls) => ls.slice().sort((a, b) => rangT(a) - rangT(b) || (rangT(a) === 0 ? b.impact - a.impact : 0)
+    || (a.kind === 'question') - (b.kind === 'question') || (a.kind === 'question' ? a.ordre - b.ordre : 0) // à ancienneté d'abord, puis les questions
     || (b.age || 0) - (a.age || 0) || cmp(a.nom, b.nom) || cmp(a.id, b.id));
 
   const phasesDe = (who) => (who && Array.isArray(who.phasesHumaines) ? who.phasesHumaines : [])
@@ -143,8 +145,9 @@
         detail: 'impact inconnu', ligne2: aRef ? ['carte de la phase'] : [], lien: aRef ? ref(p.ref) : '', infobulle: LIMITE });
     };
 
-    // À vous : deux sources seulement (sessions qui attendent, phases à vérification humaine)
-    const avous = trierAVous([...sessionsQuiAttendent(who).map((w) => ligne(w, 'a-vous')), ...phasesDe(who).map(lignePhase)]);
+    // À vous : sessions qui attendent, phases à vérification humaine, et (73-11, P73-D-37) questions en attente des cadrages quand le contexte les porte
+    const Q = window.__vfRegieQuestions, qs = c.questions && Q ? Q.lignes(c.questions) : [];
+    const avous = trierAVous([...sessionsQuiAttendent(who).map((w) => ligne(w, 'a-vous')), ...phasesDe(who).map(lignePhase), ...qs]);
 
     // Au travail : lignes de mission (verrous tenus hors dépôt), puis l'arbre, deux niveaux au plus
     const vs = verrous(lock), glyphe = 'surveiller';
@@ -184,8 +187,9 @@
     const sec = (id, titre, vide, lignes, o = {}) => ({ id, titre, aide: '', compte: lignes.filter((l) => l.kind !== 'mission').length, vide, lignes,
       autres: 0, autresTexte: '', relus: [], relusTitre: '', pied: '', ...o });
     const sections = [
-      sec('a-vous', 'À vous', 'Rien ne vous attend.', avous,
-        { aide: 'classé par ce que chaque attente retient dans le plan', pied: `${LIMITE} Sans plan visible, il n'est pas mesuré.` }),
+      sec('a-vous', 'À vous', c.questions && Q ? Q.vide(c.questions) : 'Rien ne vous attend.', avous,
+        { questions: c.questions && Q ? Q.bloc(c.questions) : null, aide: 'classé par ce que chaque attente retient dans le plan',
+          pied: `${LIMITE} Sans plan visible, il n'est pas mesuré.` }),
       sec('au-travail', 'Au travail', 'Personne ne travaille en ce moment.', [...missions, ...travail],
         { pied: muets ? `${muets} muet${plur(muets, '', 's')} depuis plus de 30${NB}min, retiré${plur(muets, '', 's')}` : '' }),
       sec('a-relire', 'Terminé, à relire', 'Aucun rapport à relire.', aRelire.slice(0, 8).map((w) => ligne(w, 'a-relire', { lire: true })),
@@ -194,7 +198,7 @@
       sec('au-repos', 'Au repos', 'Aucune session au repos.', repos.slice(0, 6).map((w) => ligne(w, 'au-repos', { sansArbre: true })),
         { compte: repos.length, autres: rp.n, autresTexte: rp.texte }),
     ];
-    const enVie = W.filter((w) => w.etat !== 'termine').length, p = avous.length, q = aRelire.length;
+    const enVie = W.filter((w) => w.etat !== 'termine').length, p = avous.length - qs.length, q = aRelire.length;
     const sousTitre = [enVie > 0 ? `${enVie} ${plur(enVie, 'agent', 'agents')}` : 'Aucun agent en vie',
       p ? `${p} ${plur(p, 'vous attend', 'vous attendent')}` : '', q ? `${q} à relire` : ''].filter(Boolean).join(' · ');
     const h1 = r.titreEquipe(c.missions, { actif: W.filter(r.actif).length });
