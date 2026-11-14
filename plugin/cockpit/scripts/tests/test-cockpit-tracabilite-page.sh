@@ -37,8 +37,8 @@ mklab() {
   local L="$1" B="$1/.planning/workstreams/x" P
   mkdir -p "$B"
   { printf '# Roadmap\n\n## Milestones\n\n- 🚧 **v1** - Phases 1-3 (in progress)\n\n## Phases\n\n'
-    for i in 1 2 3; do printf -- '- [ ] **Phase %s: P%s** - p\n' "$i" "$i"; done; printf '\n'
-    for i in 1 2 3; do printf '### Phase %s: P%s\n**Goal**: but %s\n**Depends on**: Nothing\n\n' "$i" "$i" "$i"; done
+    for i in 1 2 3; do printf -- '- [ ] **Phase %s: P%s%s** - p\n' "$i" "$i" "$([ "$i" = 3 ] && printf ' nom de phase très long qui dépasse la largeur du panneau de projet et doit être coupé par une ellipse')"; done; printf '\n'
+    for i in 1 2 3; do printf '### Phase %s: P%s%s\n**Goal**: but %s\n**Depends on**: Nothing\n\n' "$i" "$i" "$([ "$i" = 3 ] && printf ' nom de phase très long qui dépasse la largeur du panneau de projet et doit être coupé par une ellipse')" "$i"; done
     printf -- '- [ ] **Phase 90: P90** - p\n\n### Phase 90: P90\n**Goal**: but 90\n**Depends on**: Nothing\n'
     printf -- '- [ ] **Phase 5: P5** - p\n\n### Phase 5: P5\n**Goal**: but 5\n**Depends on**: Nothing\n'; } > "$B/ROADMAP.md"
   printf -- '---\nmilestone: v1\nstatus: executing\ncurrent_phase: 1\n---\n' > "$B/STATE.md"
@@ -50,7 +50,7 @@ mklab() {
 - [x] **REQ-11**: Exigence complète du socle (P90-D-01, ADR-001, D-04, P95-D-09)
 - [ ] **REQ-12**: Exigence au SUMMARY illisible
 - [ ] **REQ-13**: Exigence sans SUMMARY mais avec sa ligne de traçabilité
-- [ ] **REQ-14**: Exigence sans SUMMARY et sans ligne de traçabilité
+- [ ] **REQ-14**: Exigence sans SUMMARY et sans ligne de traçabilité MARQ-EXIG-76
 - [ ] **REQ-15**: Troisième exigence sans SUMMARY
 - [x] **REQ-16**: Exigence cochée sans SUMMARY
 - [ ] **REQ-17**: Exigence Complete sans plan
@@ -132,10 +132,25 @@ assert_eq "C1.10a — avant 150 ms rien n'est montré ; au-delà : aria-busy, tr
 assert_eq "C1.10b — route refusée : boîte « La traçabilité est indisponible », cause, « Réessayer » de 12,5 px et 32 px ; il relit" "$(E1 'j.c110erreur.texte+"|"+j.c110erreur.taille+"|"+j.c110erreur.haut+"|"+j.c110erreur.pasDeLigne+"|"+j.c110reessai')" "La traçabilité est indisponible La lecture du dépôt a échoué ou dépassé le délai. Réessayer|12.5px|32|true|true"
 assert_eq "C1.10c — phase sans exigence : la phrase dit sa cause et ce qui la lèverait" "$(E1 'j.c110vide')" "Aucune exigence rattachée à cette phase. Une ligne du tableau de traçabilité du registre des exigences, ou le champ « requirements » d'un plan, la rattache."
 assert_eq "C1.11 — quatre tailles de texte seulement sous .vf-trace, aucune couleur ni espacement en dur, aucune variable inventée, aucun tiret cadratin, aucune violation de CSP" "$(E1 'j.c111.tailles.split(",").every(t=>["11.5","12.5","13.5","20"].includes(t))+"|"+j.c111.css+"|"+j.c111.couleurs+"|"+j.c111.espaces+"|"+j.c111.interdits+"|"+j.c111.cadratin+"|"+j.c111violations')" "true|true|0|0|0|false|0"
+assert_eq "C1.13a — Jalon, phase 3 à nom long (1 440 px et 390 px) : « Phase 3 » entier, nom coupé par une ellipse, pastille d'état à droite (12 px du bord de la ligne)" "$(E1 '[1440,390].map(w=>{const c=j.c113[w]; return c?[c.nom,c.entier,c.coupe,c.droite].join("/"):"absent"}).join("|")')" "Phase 3/true/true/true|Phase 3/true/true/true"
+assert_eq "C1.13b — repli « Preuves attachées » : indicateur de pliage (pseudo-élément de 16 px) tourné de 90° à l'ouverture" "$(E1 '(()=>{const c=j.c113preuves; const m=(c.t.match(/-?[\d.e-]+/g)||[]).map(Number); return [c.content,c.w,Math.abs(m[0])<.001&&Math.round(m[1])===1].join("/")})()')" '""/16px/true'
 assert_eq "C1.12a — bureau : section ≤ 888 px (repli fermé) et ≤ 1 306 px (ouvert), bornes de l'UI-SPEC § 2.3, aucun défilement horizontal, carte non poussée" "$(E1 '(j.c112b.ferme<=888)+"|"+(j.c112b.ouvert<=1306)+"|"+j.c112b.defilement+"|"+j.c112b.carte')" "true|true|true|true"
 assert_eq "C1.12b — feuille de 390 px : section ≤ 614 px (repli fermé) et ≤ 968 px (ouvert), bornes de l'UI-SPEC § 2.3, aucun défilement horizontal" "$(E1 '(j.c112f.ferme<=614)+"|"+(j.c112f.ouvert<=968)+"|"+j.c112f.defilement')" "true|true|true"
 assert_eq "C1.x — aucune section n'a échoué par erreur de harnais" "$(E1 'JSON.stringify(j.erreurs)')" "{}"
 
+
+# --- C8 (76-08, R76.3) : la couverture d'une exigence. AVANT le retrait du nœud « Exigences », la section « Couverte par » du panneau d'une carte `req/…` la disait ; le panneau
+# d'exigence de la traçabilité doit dire au moins les mêmes plans. 76-08-COUVERTE-AVANT.txt (une ligne `<exigence><TAB><plan>`) a été capturé AVANT le retrait, sur CE lab (COUVERTE_CAPTURE=<fichier> la réécrit) ---
+H3="$WORK/h3.json"; node "$HERE_T/chrome-tracabilite-couverture.mjs" "$CHROME" "http://127.0.0.1:$VF_PORT" > "$H3" 2> "$WORK/h3.err"
+E3() { node "$AUX/ev.mjs" "$1" < "$H3"; }
+[ -n "${SONDE:-}" ] && { cat "$H3"; cat "$WORK/h3.err"; }
+COUV_AVANT="$HERE_T/../../../../.planning/workstreams/fiabilite/phases/VFDO-76-tracabilite-au-cockpit/76-08-COUVERTE-AVANT.txt"
+[ -z "${COUVERTE_CAPTURE:-}" ] || E3 'j.avant.join("\n")' > "$COUVERTE_CAPTURE"
+echo "=== C8 — couverture d'une exigence (retrait du nœud Exigences) ==="
+assert_eq "C8.0 — témoin positif : le panneau d'exigence de la 76 liste des plans (au moins trois lignes, dont une exigence à trois plans) et le harnais n'a pas échoué" \
+  "$(E3 '(j.apres||[]).length>=3 && Math.max(...Object.values(j.apres.reduce((m,l)=>{const k=l.split("\t")[0];m[k]=(m[k]||0)+1;return m},{})))>=3')" "true"
+assert_eq "C8.1 — chaque plan que « Couverte par » listait avant le retrait est listé par le panneau d'exigence de la 76 (comm vide ; la capture d'avant a au moins trois lignes)" \
+  "$([ "$(wc -l < "$COUV_AVANT" 2> /dev/null | tr -d ' ')" -ge 3 ] && echo "manque : [$(comm -23 <(sort "$COUV_AVANT") <(E3 'j.apres.join("\n")' | sort))]" || echo "capture d'avant absente ou trop courte")" "manque : []"
 
 # --- panneau d'une exigence, liste paginée, pile, clavier, onglets, confidentialité (second harnais, sur le même lab : e5 et e7 modifient ses fichiers, en dernier) ---
 H2="$WORK/h2.json"; node "$HERE_T/chrome-tracabilite-exigence.mjs" "$CHROME" "http://127.0.0.1:$VF_PORT" "$LAB" ${SECTIONS2:-} > "$H2" 2> "$WORK/h2.err"
@@ -160,13 +175,13 @@ assert_eq "C2.9b — P95-D-09 sans définition : texte non interactif « sans d�
 assert_eq "C2.9c — un clic sur la ligne P90-D-01 appelle window.VFTrace.ouvrir('decision', clé)" "$(E2 'JSON.stringify(j.e9appel)')" '["decision","P90-D-01:ph-90"]'
 assert_eq "C2.9d — un clic sur une preuve ouvre « Preuves de la Phase 1 » positionné sur elle (aria-current, chemin relatif copiable) ; le contenu du fichier n'est ni dans le DOM ni dans les réponses (témoin : il est dans le fichier du lab)" "$(E2 'JSON.stringify(j.e9preuve.cur)+"|"+j.e9preuve.corps+"|"+j.e9preuve.reseau+"|"+j.e9fichier')" '[".planning/workstreams/x/phases/01-socle/01-VERIFICATION.md"]|false|false|true'
 assert_eq "C2.9e — REQ-02 sans citation : « aucune décision citée » et ce qui la lèverait ; REQ-01 sans preuve : « Aucune preuve lue pour cette exigence… »" "$(E2 'j.e9sans.texte.includes("aucune décision citée")+"|"+j.e9sans.texte.includes("Un identifiant Pnn-D-nn ou ADR-nnn dans la ligne de l\u0027exigence au registre des exigences la relierait.")+"|"+j.e9aucune.texte.includes("Aucune preuve lue pour cette exigence. VERIFICATION, recette ou trace rouge dans le dossier de la phase la relierait.")')" "true|true|true"
-assert_eq "C2.5 — section Jalon ouverte : une exigence retirée du registre du lab remplace le contenu, la section reste ouverte, le défilement est gardé ; refermée : aucune requête vue=jalon" "$(E2 'j.e5change+"|"+j.e5apres.ouvert+"|"+j.e5apres.haut+"|"+j.e5ferme')" "true|true|true|0"
+assert_eq "C2.5 — section Jalon ouverte : un plan retiré du lab (changement de structure ; une exigence retirée n'en est plus un depuis 76-08) remplace le contenu, la section reste ouverte, le défilement est gardé ; refermée : aucune requête vue=jalon" "$(E2 'j.e5change+"|"+j.e5apres.ouvert+"|"+j.e5apres.haut+"|"+j.e5ferme')" "true|true|true|0"
 assert_eq "C2.7 — exigence retirée du registre puis relue : « Cet objet n'existe plus dans le dépôt. Le bouton Retour de l'en-tête rouvre la vue précédente. »" "$(E2 '(j.e7||"").includes("Cet objet n\u0027existe plus dans le dépôt. Le bouton Retour de l\u0027en-tête rouvre la vue précédente.")')" "true"
 assert_eq "C2.x — aucune section du second harnais n'a échoué par erreur de harnais" "$(E2 'JSON.stringify(j.erreurs)')" "{}"
 # export : ni le texte d'une exigence, ni celui d'un critère, ni la ligne d'une exigence ; témoin positif : ils sont dans les fichiers du lab et dans le panneau (C2.6a)
 cockpit_exporter "$LAB" "$WORK/export.html" > "$WORK/export.out" 2>&1
-assert_eq "C2.6b — l'export existe et ne porte ni le texte d'une exigence (REQ-501, REQ-14) ni celui d'un critère (XSS-CRIT-76) (le code de la 76 y est, inactif sans FLOORPLAN_SERVER)" "$([ -s "$WORK/export.html" ] && echo "$(grep -c 'onerror=' "$WORK/export.html")|$(grep -c 'XSS-CRIT-76' "$WORK/export.html")" || echo vide)" "0|0"
-assert_eq "C2.6c — témoin positif : les marqueurs sont dans les fichiers du lab" "$(grep -c 'onerror=' "$LAB/.planning/workstreams/x/REQUIREMENTS.md")|$(grep -c 'XSS-CRIT-76' "$LAB/.planning/workstreams/x/phases/05-cinq/05-01-PLAN.md")" "1|1"
+assert_eq "C2.6b — l'export existe et ne porte ni le texte d'une exigence (REQ-501, REQ-14) ni celui d'un critère (XSS-CRIT-76) ; marqueur propre au texte d'une exigence : MARQ-EXIG-76 (le code de la 76 y est, inactif sans FLOORPLAN_SERVER)" "$([ -s "$WORK/export.html" ] && echo "$(grep -c 'onerror=' "$WORK/export.html")|$(grep -c 'XSS-CRIT-76' "$WORK/export.html")|$(grep -c 'MARQ-EXIG-76' "$WORK/export.html")" || echo vide)" "0|0|0"
+assert_eq "C2.6c — témoin positif : les marqueurs sont dans les fichiers du lab" "$(grep -c 'onerror=' "$LAB/.planning/workstreams/x/REQUIREMENTS.md")|$(grep -c 'XSS-CRIT-76' "$LAB/.planning/workstreams/x/phases/05-cinq/05-01-PLAN.md")|$(grep -c 'MARQ-EXIG-76' "$LAB/.planning/workstreams/x/REQUIREMENTS.md")" "1|1|1"
 vf_hyg_assert
 echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
 [ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }

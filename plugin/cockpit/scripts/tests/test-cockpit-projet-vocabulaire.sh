@@ -65,10 +65,8 @@ assert_eq "PV2.2 — plan : « Statut » (mot) et « Vague 2 » / « Sans vague 
     /Sans vague/.test(j.pv22.txt), /Vague 1/.test(j.pv21b.txt), j.pv21.stats,
     /lignes|points d.accès|utilisé par/i.test(j.pv21.txt)]')" \
   '[true,true,true,true,0,false]'
-assert_eq "PV2.3 — exigence R-1 : type « Exigence », titre = identifiant, texte une seule fois, « Couverte par » (01-02)" \
-  "$(E2 '[j.pv23.kind, j.pv23.titre, j.pv23.txt.split("premier texte").length - 1,
-    j.pv23.secs.filter((s) => s.h === "Couverte par").map((s) => s.rows.length)]')" \
-  '["Exigence","R-1",1,[1]]'
+assert_eq "PV2.3 — exigence R-1 (76-08) : plus de carte ni de nœud d'exigence dans le graphe ; elle se lit une fois dans meta.vf.trace.exigences (et dans « Exigences couvertes », PV2.1)" \
+  "$(E2 '[j.pv23.carte, j.pv23.noeud, j.pv23.trace]')" '[0,0,1]'
 assert_eq "PV2.4 — phase : section « Plans », bouton « Ouvrir la phase »" \
   "$(E2 '[j.pv24.secs.map((s) => s.h).includes("Plans"), j.pv24.actions.includes("Ouvrir la phase")]')" '[true,true]'
 assert_eq "PV2.6 — l'extension est servie sous /_vf/ et aucun script en ligne ne porte son code" \

@@ -850,6 +850,38 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - **Nom du lab voisin :** pas d'assainissement côté page des caractères de contrôle (assuré par le serveur).
 
 **Déclencheur de reprise :** la prochaine passe sur la page de la régie.
+
+## Cockpit : la clé `planning` de VF_ETAT n'avance pas sur une exigence ajoutée seule — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** Aucune donnée fausse : une lecture à jour attend le rechargement de la page. **Origine :** Phase 76 (76-08), limite demandée par la session principale (décision déléguée par Samuel, message session principale, 2026-11-08, option recommandée, prise par la session principale le 2026-11-14).
+- **Observé :** la clé `planning` de `VF_ETAT` n'avance que sur un changement de statut, de pied, de résumé ou de structure des nœuds. Un SUMMARY réécrit sur place, ou une ligne ajoutée à un tableau de ROADMAP ou de REQUIREMENTS, n'émet aucun `patch` : `vf-cockpit-live.mjs` ne compare que le statut, le pied et le résumé. Une exigence ajoutée sans l'un de ces changements n'apparaît donc qu'au rechargement de la page (section Traçabilité, panneau d'exigence).
+- **Mesure :** faite par la Phase 79 en livrant `246598c3`.
+- **Pas de correctif dans ce jalon.** Dite dans le README du module, à la suite de la description de la route `vibeflow/cockpit-trace@1`.
+
+**Déclencheur de reprise :** la prochaine phase qui touche `vf-cockpit-live.mjs` ou la comparaison des `patch`, ou un testeur qui ne voit pas une exigence neuve sans recharger.
+
+## Cockpit : mineurs de la revue finale et de la vérification de but de la Phase 76 (76-08, 76-09) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** revue finale (`vf-reviewer`) et vérification de but (`gsd-verifier`), une passe chacune ; régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Les deux majeurs de la revue (attribution phase/exigence unique, jumelle d'archive dans le chat) et le rouge C8.1 sont corrigés ; restent :
+- m1 : si la collecte de traçabilité échoue (`meta.vf.trace.erreur`), la porte des exigences rend vide et le chat dit « 0 exigence » au lieu de « lecture indisponible ».
+- m2 : `lireQuestions` coupe la liste à 200 par numéro de phase croissant ; les questions en attente récentes tombent d'abord (bilan et `tronque` restent justes ; inatteint aujourd'hui).
+- m3 : une question mal formée n'a ni `ws` ni `titre` ; le lecteur de la régie (Phase 73) doit le tolérer, non vérifié par un test.
+- Vérification : aucun test ne branche la vraie collecte des questions sur la lecture de la régie (fixture F2 de `regie-rg-questions.sh` traduite à la main) ; contrôle manuel fait le 2026-11-14 sur ce dépôt, forme conforme. À figer par un test bout en bout.
+
+**Déclencheur de reprise :** la prochaine retouche de la régie de la Phase 73 ou de `vf-cockpit-questions-attente.mjs`.
+
+## Cockpit : mineurs du juge de design de fin de Phase 76 (traçabilité) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** `vf-design-judge`, une passe sur captures à 1440, 1024 et 390 px, deux thèmes, 75/100 passed ; régime allégé (consigne de Samuel, message session principale, 2026-11-13, appliquée par la session principale). Le bloquant (défilement horizontal des panneaux d'objet) et les deux majeurs (identifiant de phase écrasé au Jalon, marqueur de pliage absent) sont corrigés ; restent :
+- Bilans à plusieurs emplacements (Mémoire, maillons non lus du Jalon) : le retour à la ligne coupe un emplacement entre son nombre et son mot.
+- Panneau d'une décision : le bouton de phase dit deux fois le numéro (« Phase 90, Phase 90 · P90 »).
+- « + N autres exigences » décalé de 12 px par rapport aux lignes ; entrée haute sans indice de clic et avec un vide bas plus grand que les autres sections.
+- Légende : « Légende : » 3 px plus bas que les paires ; texte après un octogone sans retrait à la ligne ; dans « Chaîne », chemins et puces à égale distance de deux maillons.
+- Chemins copiables coupés par la fin (le nom du fichier disparaît) : couper le début ou les dossiers intermédiaires.
+- Lignes-boutons (dont la ligne de commit) sans indice de cliquabilité.
+- Phase 80 (signalé) : l'en-tête de la feuille à 390 px laisse voir en transparence le texte qui défile dessous.
+
+**Déclencheur de reprise :** la recette de Samuel sur l'onglet Projet, ou la prochaine retouche des fichiers `ui/74-vf-trace*.js`.
 - **Revue du point de fusion 2 de la Phase 73 (mineurs) :** `ouvrirRepli` émet `vf-agent:lu` même quand la lecture du transcript échoue, et deux clics rapprochés laissent le transcript le plus lent écraser le panneau ; `relireMissions` lance une lecture par événement `graphe` sans sérialisation (deux réponses croisées peuvent poser des missions plus anciennes).
 - **Durée d'un agent terminé (constat de la Phase 74) :** la régie calcule `dureeS` en tenue et compte les veilles de l'agent ; la spec ne tranche pas entre durée active et durée de tenue : à décider au prochain réglage de la régie.
 - **Juge design de fin de Phase 73 (74/100, passed ; mineurs) :** ligne 2 « nœud · arbre · branche » rendue sous Quoi au lieu de Qui, rôle sous la tâche au lieu d'avant ; colonne Quoi qui dérive de 361 à 376 px (grille par ligne) ; ligne de verrou plus bavarde que la spec § 6.1 ; ligne de phase `human_needed` avec le lien en double ; format de la ligne « ailleurs » et noms de lab en mono (§ 10) ; hors phase : à 800 px, la bascule de Projet recouvre son titre.

@@ -186,6 +186,7 @@ durees() {
 649 plugin/cockpit/scripts/tests/test-cockpit-projet-visite.sh
 33 plugin/cockpit/scripts/tests/test-cockpit-projet-vocabulaire.sh
 1509 plugin/cockpit/scripts/tests/test-cockpit-projet.sh
+26 plugin/cockpit/scripts/tests/test-cockpit-questions-attente.sh
 20 plugin/cockpit/scripts/tests/test-cockpit-questions.sh
 23 plugin/cockpit/scripts/tests/test-cockpit-reconnexion.sh
 243 plugin/cockpit/scripts/tests/test-cockpit-regie.sh

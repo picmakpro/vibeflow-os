@@ -140,7 +140,7 @@
 | 73. Gouvernance au cockpit — arbitrages en attente, worktrees et verrous | vibeflow-v2.0 | 11/11 | In progress | - |
 | 74. L'équipe dans le temps — swim-lanes, coût, replay | vibeflow-v2.0 | 6/10 | In Progress | - |
 | 75. L'activité posée sur le code — hotspots, couplage, gardes, empreinte | vibeflow-v2.0 | 12/12 | Complete | 2026-11-14 |
-| 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 7/9 | In Progress | - |
+| 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 9/9 | Complete    | - |
 | 77. Santé de la méthode et synthèse — jauges, dernière visite, burn-up | vibeflow-v2.0 | 0/8 | Planned | - |
 | 78. Git dans le cockpit | vibeflow-v2.0 | 11/11 | Complete — PR #216, release `v2.76.0` | 2026-11-06 |
 | 79. Socle du cockpit — une collecte, un flux, une route d'état | vibeflow-v2.0 | 22/22 | In progress — plans faits, lot en cours | - |
@@ -406,8 +406,8 @@ Plans:
 - [x] 76-05-PLAN.md — Route `GET /api/vf/tracabilite` (v3)
 - [x] 76-06-PLAN.md — Page : section de phase, preuves, Jalon, panneau d'exigence (v4)
 - [x] 76-07-PLAN.md — Page : Décisions, Mémoire, panneaux d'ADR, de décision, d'entrée, commits (v5)
-- [ ] 76-08-PLAN.md — Retrait du nœud `.req`, puis clôture (v6)
-- [ ] 76-09-PLAN.md — Questions en attente : lecture des sections « À Samuel » et champ `meta.vf.questions` (v4)
+- [x] 76-08-PLAN.md — Retrait du nœud `.req`, puis clôture (v6)
+- [x] 76-09-PLAN.md — Questions en attente : lecture des sections « À Samuel » et champ `meta.vf.questions` (v4)
 
 ### Phase 77: Santé de la méthode et synthèse — jauges, dernière visite, burn-up
 
