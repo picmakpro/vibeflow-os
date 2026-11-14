@@ -47,13 +47,13 @@ JS
 rg_RG12_titre() {
   # ---------- structure (sans navigateur) : qui écrit document.title, et le compositeur sans observateur ni marqueur persistant ----------
   cat > "$AUX/titre-structure.mjs" <<'JS'
-// titre-structure.mjs <dossier ui> <mode> : mode « ecrivains » = fichiers ui/*.js qui affectent document.title (hors commentaires) hors 90-vf-titre.js, 80-vf-fr.js et 00-vf-onglets.js (repli sans compositeur, RG12.9 prouve qu'avec lui il n'écrit pas) ;
+// titre-structure.mjs <dossier ui> <mode> : mode « ecrivains » = fichiers ui/*.js qui affectent document.title (hors commentaires) hors 90-vf-titre.js et 80-vf-fr.js ;
 // mode « compositeur » = « ok » si 90-vf-titre.js existe, sans `new MutationObserver` ni `.observe(` (hors commentaires) ni marqueur persistant dans ses huit premières lignes
 import fs from 'node:fs'; import path from 'node:path';
 const [, , dir, mode] = process.argv;
 const nu = (t) => t.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:"'`])\/\/.*$/gm, '$1');
 if (mode === 'ecrivains') {
-  const r = fs.readdirSync(dir).filter((n) => n.endsWith('.js') && !['90-vf-titre.js', '80-vf-fr.js', '00-vf-onglets.js'].includes(n) && /document\.title\s*=[^=]/.test(nu(fs.readFileSync(path.join(dir, n), 'utf8'))));
+  const r = fs.readdirSync(dir).filter((n) => n.endsWith('.js') && !['90-vf-titre.js', '80-vf-fr.js'].includes(n) && /document\.title\s*=[^=]/.test(nu(fs.readFileSync(path.join(dir, n), 'utf8'))));
   console.log(r.join(',') || 'aucun');
 } else {
   let t; try { t = fs.readFileSync(path.join(dir, '90-vf-titre.js'), 'utf8'); } catch { console.log('fichier absent'); process.exit(0); }
@@ -62,7 +62,7 @@ if (mode === 'ecrivains') {
   console.log(pb.length ? 'faux:' + pb.join(',') : 'ok');
 }
 JS
-  assert_eq "RG12.6 — dans ui/*.js, hors commentaires, document.title n'est affecté que par 90-vf-titre.js (et 80-vf-fr.js, 00-vf-onglets.js en repli)" "$(node "$AUX/titre-structure.mjs" "$UI" ecrivains)" "aucun"
+  assert_eq "RG12.6 — dans ui/*.js, hors commentaires, document.title n'est affecté que par 90-vf-titre.js (et 80-vf-fr.js)" "$(node "$AUX/titre-structure.mjs" "$UI" ecrivains)" "aucun"
   assert_eq "RG12.7 — 90-vf-titre.js : ni observateur du <title> ni marqueur « persistant » (P73-D-38, A53)" "$(node "$AUX/titre-structure.mjs" "$UI" compositeur)" "ok"
 
   # ---------- navigateur ----------
@@ -100,7 +100,13 @@ JS
   tm TITRE-SANS-WHO "compositeur non abonné au who : le titre ne suit plus une poussée (RG12.1)" "s/E\.abonner('who', composer)/(() => () => {})()/" 'j.deux.equipe.startsWith("(2) vous attendent")'
   tm TITRE-SANS-ONGLET "compositeur sans écouteur de vf:onglet : l'aller d'onglet de la Phase 80 écrase le titre composé (RG12.8)" "s/ecouter(D, 'vf:onglet', composer);/void 0;/" 'j.aller.startsWith("(2) vous attendent")'
   tm TITRE-NETTOIE "nettoyage par onglet sans désabonnement : les abonnés au who s'accumulent (RG12.2)" "s/for (const f of defaire\.splice(0)) f();/for (const f of defaire.splice(0)) void f;/" '(j.abonnes[0] === j.abonnes[3]) + "|" + (j.abonnes[1] === j.abonnes[4])'
-  tm TITRE-REPLI-ECRASE "00-vf-onglets.js sans le return de la branche compositeur : le repli écrit le titre nu avant que vf:onglet ne le recompose (RG12.9)" "s/T\.composer(); return; }/T.composer(); }/" 'j.fidelesN.join() + "|" + j.fideles0.join() + "|" + j.intermediaires.length'
+  # mutant : titrer réécrit l'écriture directe du titre. RG12.6 (structure, sur la copie mutée) et RG12.9 (navigateur) doivent rougir tous deux
+  ex='j.fidelesN.join() + "|" + j.fideles0.join() + "|" + j.intermediaires.length'; sain="$(ti_g "$T" "$ex")"; f="$WORK/ti-mut-REPLI.json"
+  if cockpit_module_muter_page "ti-REPLI" "s/T\.composer(); }\$/T.composer(); document.title = LIBELLE[nom] + ' · ' + n; }/" > /dev/null 2>&1; then
+    local ui6; ui6="$(dirname "$(find "$COCKPIT_MODULE" -name 00-vf-onglets.js -print -quit)")"; got="$(node "$AUX/titre-structure.mjs" "$ui6" ecrivains)"
+    ti_page titre "$f"; unset COCKPIT_MODULE; assert_eq "M-TITRE-REPLI — titrer qui écrit le titre : RG12.6 rougit (structure)" "$([ "$got" = aucun ] && echo survivant || echo "tué:$got")" "tué:00-vf-onglets.js"
+    assert_eq "M-TITRE-REPLI — titrer qui écrit le titre : RG12.9 rougit (sonde saine $sain)" "$([ "$(ti_g "$f" "$ex")" = "$sain" ] && echo survivant || echo tué)" "tué"
+  else assert_eq "M-TITRE-REPLI — ancre" "ancre absente" "muté"; fi
 }
 
 rg_RG11_lu() {

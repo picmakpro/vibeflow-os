@@ -29,13 +29,11 @@
     vues.set(nom, v);
   };
 
-  // le titre est composé par 90-vf-titre.js (préfixe « vous attend » compris) : on lui donne l'onglet affiché ; sans lui, repli autonome
-  // repli défensif, aucun cas réel établi (un script illisible rejette chargerOnglet avant titrer) ; RG12.9 prouve qu'il n'écrase rien
+  // le titre n'est écrit que par 90-vf-titre.js (préfixe « vous attend » compris) : ici on lui donne l'onglet affiché, sans lui on ne fait rien
   const titrer = (nom) => {
     const SC = moteur(), p = SC && SC.graph && SC.graph.project, n = String((p && p.name) || '').replace(/ — (Projet|Équipe)$/, '');
     const T = window.__vfTitre, b = window.__vfTitreBase;
-    if (T && typeof T.composer === 'function' && b) { b.onglet = LIBELLE[nom]; if (!b.nom) b.nom = n; T.composer(); return; }
-    if (!document.title.startsWith(LIBELLE[nom] + ' · ')) document.title = LIBELLE[nom] + ' · ' + n;
+    if (T && typeof T.composer === 'function' && b) { b.onglet = LIBELLE[nom]; if (!b.nom) b.nom = n; T.composer(); }
   };
   const dire = (texte) => { // la zone status de Projet quand elle existe, sinon celle de la barre de question (aucune lecture ici)
     const F = window.VF_PROJET, z = document.getElementById('ask-live');
