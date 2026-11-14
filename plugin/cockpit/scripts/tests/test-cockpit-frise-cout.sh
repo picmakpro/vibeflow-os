@@ -483,9 +483,9 @@ export default async function (h) {
     const b = await lire();
     await h.cycle('code'); await h.attendreFrise();
     const c = await lire();
-    h.egal('D14', 'après DEUX changements d\'onglet : une seule section, un seul bandeau, aucun abonnement doublé (git, frise, etat)', [c.cout, c.depot, c.racines, c.tire, c.gitSans, c.ab.frise, c.ab.etat],
+    h.egal('D14', 'après DEUX changements d\'onglet : une seule section, un seul bandeau, aucun abonnement doublé (git, frise, etat)', [c.cout, c.depot, c.racines, c.tire, c.ab.git, c.ab.frise, c.ab.etat],
       [1, 1, 1, 1, 1, a.ab.frise, a.ab.etat]);
-    h.egal('D14', 'les deux changements d\'onglet donnent le même état que le premier', [b.cout, b.depot, b.gitSans, b.ab.frise, b.ab.etat], [1, 1, 1, a.ab.frise, a.ab.etat]);
+    h.egal('D14', 'les deux changements d\'onglet donnent le même état que le premier', [b.cout, b.depot, b.ab.git, b.ab.frise, b.ab.etat], [1, 1, 1, a.ab.frise, a.ab.etat]);
     const s = await h.ev(() => window.__surOnglet.filter((x) => /^74-vf-(frise-depot|cout)\.js$/.test(x)));
     h.sonde('D14', 'surOnglet appelé avec { cle: \'74-vf-frise-depot.js\' } et { cle: \'74-vf-cout.js\' } à chaque arrivée, jamais sans clé', s.filter((x) => x === '74-vf-frise-depot.js').length >= 3
       && s.filter((x) => x === '74-vf-cout.js').length >= 3, JSON.stringify(s));
