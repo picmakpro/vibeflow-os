@@ -1,0 +1,111 @@
+#!/usr/bin/env bash
+# test-cockpit-accessibilite.sh — finitions d'interface immédiates du lot 0 de l'audit du cockpit (AUDC-M7, X4, X6, X7), sans réseau.
+#   M7 « Mise en page… » est posé ET peint avant le calcul de mise en page d'un niveau de 70 cartes (jamais un indicateur derrière le calcul)
+#   X4 un seul anneau de focus sur tout le parcours au clavier, champ de question compris ; aria-current sur l'onglet actif ; une seule région principale visible (main, [role=main] : la régie pose role=main sur Équipe)
+#   X6 en mouvement réduit : plus de fondu de plongée, plus d'animation décorative (compte des animations actives)
+#   X7 un seul format de titre d'onglet du navigateur sur les trois pages : « <Onglet> · <nom> » (précédé de « (N) vous attendent · » quand N sessions attendent, P73-D-15), le même nom de lab (celui du dossier) sur les trois,
+#      même quand le titre de PROJECT.md diffère (l'en-tête, lui, affiche le titre de PROJECT.md sur Projet et Équipe : ce n'est pas lui qui fait foi)
+# Un Chrome, un profil jetable (chrome-accessibilite.mjs) ; les assertions se lisent sur sa sortie JSON. Lab construit par la suite, dans mktemp.
+# Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
+set -uo pipefail
+export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
+SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
+ENG="$SCRIPTS/../skills/cockpit-moteur"
+CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
+if [ -z "$CHROME" ]; then . "$(dirname "$0")/chrome-saut.sh"; vf_chrome_saut "  ⊘ SUITE SAUTÉE : aucun navigateur (Chrome, Chromium) — les finitions d'interface NON vérifiées, non comptées comme réussies"; exit 0; fi
+WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home/.claude"
+export REAL_HOME="$HOME"; export HOME="$WORK/home"
+PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
+. "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
+PASS=0; FAIL=0
+assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [${2:0:600}]"; FAIL=$((FAIL+1)); fi; }
+cat > "$AUX/ev.mjs" <<'JS'
+import fs from 'node:fs'; let j; try { j = JSON.parse(fs.readFileSync(0, 'utf8')); } catch { console.log('sortie illisible'); process.exit(0); }
+if (j.erreur) { console.log('mesure indisponible : ' + j.erreur); process.exit(0); }
+const v = new Function('j', 'return (' + process.argv[2] + ')')(j); console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+# session d'équipe : un manager et deux workers actifs (la page Équipe n'est servie que s'il y a de quoi la bâtir)
+cat > "$AUX/mk-agents.mjs" <<'JS'
+import fs from 'node:fs'; import path from 'node:path';
+const [, , home, lab, sid] = process.argv; const now = Date.now();
+const dir = path.join(home, '.claude', 'projects', '-lab'); const sub = path.join(dir, sid, 'subagents'); fs.mkdirSync(sub, { recursive: true });
+const iso = (ms) => new Date(ms).toISOString(); const base = (o) => ({ cwd: lab, sessionId: sid, gitBranch: 'main', version: '2.1.317', ...o });
+const put = (f, lignes) => fs.writeFileSync(f, lignes.map((l) => JSON.stringify(l)).join('\n') + '\n');
+put(path.join(dir, sid + '.jsonl'), [base({ type: 'user', timestamp: iso(now - 600000), message: { content: 'salut' } }), base({ type: 'assistant', timestamp: iso(now - 5000), message: { content: [{ type: 'tool_use', name: 'Bash', input: { command: 'echo bonjour' } }] } })]);
+const agents = [{ id: 'mgr1', d: 1, role: 'vf-dev-manager' }, { id: 'act1', d: 2, parent: 'mgr1', role: 'vf-coder' }, { id: 'act2', d: 2, parent: 'mgr1', role: 'vf-coder' }];
+for (const a of agents) {
+  const meta = { agentType: a.role, isBuiltIn: false, launchedWithDefaults: false, description: 'tâche synthétique ' + a.id, toolUseId: 'toolu_' + a.id, spawnDepth: a.d, requestShape: 'background', requestNonInteractive: true };
+  if (a.d >= 2) meta.parentAgentId = a.parent;
+  fs.writeFileSync(path.join(sub, `agent-${a.id}.meta.json`), JSON.stringify(meta));
+  put(path.join(sub, `agent-${a.id}.jsonl`), [base({ type: 'user', isSidechain: true, agentId: a.id, parentUuid: null, timestamp: iso(now - 300000), message: { role: 'user', content: 'mandat de ' + a.id } }), base({ type: 'assistant', isSidechain: true, agentId: a.id, timestamp: iso(now - 4000), message: { content: [{ type: 'tool_use', name: 'Read', input: { file_path: '/x' } }] } })]);
+}
+JS
+mklab() { # un module, 70 notes dans un même dossier (un niveau de 70 cartes), une phase
+  local L="$1" B="$1/.planning"; mkdir -p "$L/src" "$L/plugin/mod/scripts" "$B/phases/01-socle" "$L/lots"
+  printf 'export const u = () => 1;\n' > "$L/src/util.js"
+  printf '{"name":"mod","type":"skill","description":"Un module de test."}\n' > "$L/plugin/mod/module.json"; echo 1.0.0 > "$L/plugin/mod/VERSION"
+  printf '# Module\n\nLancer `run.sh`.\n' > "$L/plugin/mod/README.md"
+  printf '#!/usr/bin/env bash\necho run\n' > "$L/plugin/mod/scripts/run.sh"
+  for i in $(seq -w 1 70); do printf '# Note %s\n' "$i" > "$L/lots/n$i.md"; done
+  printf '# Titre du projet (diffère du dossier)\n' > "$B/PROJECT.md"
+  printf '# Roadmap\n\n## Jalon démo\n\n- [x] **Phase 1: Socle** - premier jet\n\n### Phase 1: Socle\n**Depends on**: Nothing (first phase)\n' > "$B/ROADMAP.md"
+  printf -- '---\nfiles_modified: [plugin/mod/README.md]\n---\n<objective>Faire le socle</objective>\n' > "$B/phases/01-socle/01-01-PLAN.md"; echo ok > "$B/phases/01-socle/01-01-SUMMARY.md"
+  git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
+  node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
+}
+LAB="$WORK/lab"; mklab "$LAB"
+node "$AUX/mk-agents.mjs" "$HOME" "$LAB" aaaa1111-2222-3333-4444-555555555555
+SCRIPTS_HOTE="$WORK/scripts-hote"; ln -s "$SCRIPTS" "$SCRIPTS_HOTE"
+O="$LAB/.vibeflow/cockpit"
+mkdir -p "$WORK/fauxbin"; cp "$SCRIPTS/tests/temoins/fauxbin-claude/claude" "$WORK/fauxbin/claude"; chmod +x "$WORK/fauxbin/claude" # sans « claude » sur le PATH du serveur, le champ de question reste désactivé
+cockpit_lancer "$LAB" PATH="$WORK/fauxbin:$PATH" VF_COCKPIT_ENGINE_DIR="$ENG" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS_HOTE"
+SRV_PID="${VF_PID:-}"; PORT="${VF_PORT:-0}"
+assert_eq "A0 — serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo non)" "oui"
+R="$(REAL_HOME="$REAL_HOME" node "$HERE_T/chrome-accessibilite.mjs" "$CHROME" "http://127.0.0.1:$PORT" 2>"$WORK/mesure.err")"
+[ -n "${KEEP:-}" ] && printf '%s\n' "$R" > "$WORK/mesure.json"
+[ -n "${SONDE:-}" ] && { printf '%s\n' "$R"; cat "$WORK/mesure.err"; }
+E() { printf '%s' "$R" | node "$AUX/ev.mjs" "$1"; }
+
+echo "=== M7 — « Mise en page… » posé et peint avant le calcul (AUDC-M7) ==="
+assert_eq "M7.0 — témoin : le calcul mesuré est celui d'un niveau d'au moins 70 cartes" "$(E 'j.m7.gros && j.m7.gros.cartes >= 70')" "true"
+assert_eq "M7.1 — quand le calcul démarre, l'indicateur est déjà allumé" "$(E 'j.m7.gros.allume')" "true"
+assert_eq "M7.2 — … et opaque (pas un fondu qui n'a pas commencé)" "$(E 'j.m7.gros.opacite')" "1"
+assert_eq "M7.3 — … et au moins une image a été produite depuis qu'il est allumé (il est peint, pas seulement posé)" "$(E 'j.m7.gros.images >= 1')" "true"
+assert_eq "M7.4 — un petit niveau (témoin : moins de 24 cartes) ne clignote pas : l'indicateur reste éteint, sa temporisation de 160 ms inchangée" "$(E 'j.m7.petit.cartes > 0 && j.m7.petit.cartes < 24 && j.m7.petit.allume === false')" "true"
+assert_eq "M7.5 — un redessin en direct du même niveau (témoin : au moins 70 cartes) ne fait pas clignoter l'indicateur : éteint quand le calcul démarre, sa temporisation inchangée" "$(E 'j.m7.direct.cartes >= 70 && j.m7.direct.allume === false')" "true"
+echo "=== X7 — un seul format de titre d'onglet (AUDC-X7) ==="
+assert_eq "X7.1 — Code : « Code · <nom de l'en-tête> »" "$(E "j.x7.code.titre === 'Code · ' + j.x7.code.nom")" "true"
+assert_eq "X7.2 — Projet : « Projet · <nom de l'en-tête> »" "$(E "j.x7.projet.titre === 'Projet · ' + j.x7.projet.nom")" "true"
+assert_eq "X7.3 — Équipe : « Équipe · <nom de l'en-tête> », précédé de « (N) vous attendent · » quand des sessions attendent (P73-D-15, plan 73-09)" "$(E "j.x7.equipe.titre.replace(/^\\(\\d+\\) vous attendent? · /, '') === 'Équipe · ' + j.x7.equipe.nom")" "true"
+assert_eq "X7.3b — le préfixe dit le nombre de lignes de « À vous » ; à zéro, aucun préfixe : le format « Équipe · <nom> » reste exact" "$(E "((/^\\((\\d+)\\) /.exec(j.x7.equipe.titre) || [0, '0'])[1] | 0) === j.x7.equipe.attendent && (j.x7.equipe.attendent > 0 || j.x7.equipe.titre === 'Équipe · ' + j.x7.equipe.nom)")" "true"
+assert_eq "X7.4 — témoin : le nom de l'en-tête est lu et non vide sur les trois pages, et c'est le nom du dossier (le titre de PROJECT.md du lab de test en diffère)" "$(E "[j.x7.code, j.x7.projet, j.x7.equipe].every((p) => p.nom === '$(basename "$LAB")')")" "true"
+assert_eq "X7.5 — le même nom de lab sur les trois titres" "$(E "new Set([j.x7.code, j.x7.projet, j.x7.equipe].map((p) => p.titre.split(' · ').slice(1).join(' · '))).size")" "1"
+echo "=== X4 — un seul anneau de focus, repères d'accessibilité (AUDC-X4) ==="
+for PG in code projet equipe; do
+  assert_eq "X4.0 ($PG) — témoin : le parcours au clavier atteint au moins 8 éléments" "$(E "j.x4.$PG.length >= 8")" "true"
+  assert_eq "X4.1 ($PG) — chaque arrêt du parcours porte un anneau — arrêts sans anneau : " "$(E "j.x4.$PG.filter((a) => !a.anneau).map((a) => a.cle).join(',')")" ""
+  assert_eq "X4.2 ($PG) — un seul style d'anneau sur tout le parcours (largeur, trait, couleur)" "$(E "new Set(j.x4.$PG.map((a) => a.anneau)).size")" "1"
+done
+assert_eq "X4.2b — le même style d'anneau sur les trois pages" "$(E "new Set([...j.x4.code, ...j.x4.projet, ...j.x4.equipe].map((a) => a.anneau)).size")" "1"
+assert_eq "X4.3 — témoin : le champ de question est dans le parcours de la page Code, et il a son anneau" "$(E "j.x4.code.filter((a) => a.cle === 'ask-input').map((a) => !!a.anneau).join()")" "true"
+assert_eq "X4.4 — aria-current=page sur l'onglet actif, et sur lui seul (Code, Projet, Équipe)" "$(E "[j.x7.code.courants.join(), j.x7.projet.courants.join(), j.x7.equipe.courants.join()].join('|')")" "Code=page|Projet=page|Équipe=page"
+assert_eq "X4.5 — une seule région principale visible (main, [role=main]) par page (Code, Projet, Équipe)" "$(E "[j.x7.code.mains, j.x7.projet.mains, j.x7.equipe.mains].join('|')")" "1|1|1"
+assert_eq "M-X45-DEUX-MAIN — mutant (une seconde région principale visible injectée dans chaque page) : le critère de X4.5 (compte = 1) devient faux, le compte est 2" "$(E "[j.x7.code.mainDeux, j.x7.projet.mainDeux, j.x7.equipe.mainDeux].map((n) => n === 1).join('|') + ' ' + [j.x7.code.mainDeux, j.x7.projet.mainDeux, j.x7.equipe.mainDeux].join('|')")" "false|false|false 2|2|2"
+echo "=== X6 — mouvement réduit (AUDC-X6) ==="
+assert_eq "X6.0 — témoin : sans préférence, la plongée anime (plus de 20 animations actives) sur un niveau de 70 cartes" "$(E 'j.x6.temoin.cartes >= 70 && j.x6.temoin.actives > 20')" "true"
+assert_eq "X6.1 — en mouvement réduit, aucune animation active au repos" "$(E 'j.x6.reduit.repos')" "0"
+assert_eq "X6.2 — … ni pendant la plongée (niveau de 70 cartes bien posé)" "$(E 'j.x6.reduit.cartes >= 70 && j.x6.reduit.actives')" "0"
+assert_eq "X6.3 — … le fondu et le mouvement de caméra de la plongée durent 0 s" "$(E "j.x6.reduit.transitions.split(',').every((d) => parseFloat(d) === 0)")" "true"
+assert_eq "X6.4 — témoin : la carte repérée par la plongée porte son contour (classe flash posée)" "$(E 'j.x6.reduit.flash.pose')" "true"
+assert_eq "X6.5 — ce contour est STATIQUE : aucune animation, contour de 2 px visible (pas transparent)" "$(E "j.x6.reduit.flash.mesure && j.x6.reduit.flash.mesure.anim === 'none' && j.x6.reduit.flash.mesure.largeur === '2px' && !/rgba\\(0, 0, 0, 0\\)|transparent/.test(j.x6.reduit.flash.mesure.contour)")" "true"
+assert_eq "X6.6 — … et il est retiré ensuite (aucun état ne reste posé)" "$(E 'j.x6.reduit.flash.perdu')" "true"
+assert_eq "X6.7 — l'attente de « Demander » reste un anneau lisible (13 px, un quart coloré), sans mouvement" "$(E "j.x6.reduit.attente.anim === 'none' && j.x6.reduit.attente.actives === 0 && j.x6.reduit.attente.largeur >= 13 && j.x6.reduit.attente.quartColore")" "true"
+assert_eq "X6.8 — une entrée qui attend animationend (tiroir Git, terminal) perd sa classe quand même" "$(E 'j.x6.reduit.entree')" "true"
+echo "=== S — un premier rendu supplanté émet quand même « ready » (garde de disponibilité) ==="
+assert_eq "S1 — témoin : le second rendu a bien été demandé pendant le premier (au moins deux calculs de mise en page)" "$(E 'j.sup.calculs >= 2')" "true"
+assert_eq "S2 — la coquille se dit prête malgré le rendu supplanté ($(E 'j.sup.erreur || "ok"'))" "$(E 'j.sup.pret')" "true"
+vf_hyg_assert
+echo ""; echo "=================================="; echo "  Résultats : $PASS PASS / $FAIL FAIL"; echo "=================================="
+[ $((PASS+FAIL)) -eq 0 ] && { echo "  ❌ ÉCHEC ANTI-VERT-À-VIDE"; exit 1; }
+[ "$FAIL" -eq 0 ] && exit 0 || exit 1

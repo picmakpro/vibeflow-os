@@ -99,6 +99,10 @@
 #         vf-auto, §5 de product-routing.md (gate architecture avant découpage), champ de brief « Phases
 #         ajoutées » ; commande citée jouée contre le gate réel, liens vers les scripts ; ablation, ordre,
 #         inversions (BRIEF, solo). La pose par le manager n'est prouvée que par le texte (P60-PL-26).
+#   T46 — SOCL-05 (P79-D-18, A16) : la ligne Nœud du gabarit du digest est lue exactement par le lecteur réel
+#         du cockpit (aller-retour génératif, fenêtre de 8 000 caractères, limite du remap `id::étape`) ; le
+#         kernel dit le nœud dans chaque mandat et la publication du plan de mission ; aucun corps d'agent
+#         ne porte la ligne ; mutants (lecteurs copiés avec tous leurs scripts, ablations bornées à la zone).
 #
 # Historique de numérotation : T3/T12/T13/T14 ont changé de sémantique à la v2.0.0 (les
 # anciens tests de collision de descriptions, de préséance et de synchro de la table vf-dev
@@ -8031,6 +8035,313 @@ if [ -n "$T45_SD" ]; then
   t414_mutant "T45 mutant (f) : option --architecture remplacée par --arch dans la §5" t45_ref_link "$T45_REF" "$T45_TMP/ref-opt.md"
   sed 's/check-architecture\.sh/check-architecture-x.sh/' "$T45_REF" > "$T45_TMP/ref-ren.md"
   t414_mutant "T45 mutant (f) : check-architecture.sh renommé dans la §5" t45_ref_link "$T45_REF" "$T45_TMP/ref-ren.md"
+fi
+
+# ---------------------------------------------------------------------------
+# T46 — SOCL-05 (P79-D-18, A16) : la doctrine écrit le nœud du plan de bataille dans chaque mandat, sous la
+# forme exacte que lit le cockpit (`citationsDuMandat`, module cockpit), et fait publier au manager le résumé
+# de son plan de mission à côté du verrou. Aucun corps d'agent n'est modifié ; la ligne du gabarit n'est
+# définie qu'une fois (contrat), le kernel y renvoie.
+#   (a1) la ligne Nœud suit `- Mission :` dans le bloc de digest (≤ 30 lignes) ;
+#   (a2) aller-retour GÉNÉRATIF gabarit -> lecteur réel : 1 500 identifiants à graine fixe, sept classes
+#        couvertes, oracle écrit dans le helper et indépendant du lecteur ;
+#   (a3) la fenêtre des 8 000 premiers caractères ; (a4) la limite du remap `id::étape` (vrai `dag.sh add`) ;
+#   (a5) les huit ancres de la zone « Digest de mission ».
+# Un lecteur muté est une COPIE de tous les `scripts/*.mjs` du module cockpit (une copie partielle ferait
+# échouer un import ajouté plus tard) ; une copie NON mutée faite pareil est d'abord acceptée (témoin positif de
+# la copie) et un échec d'import (code 3) est un `ko` du témoin, jamais un refus de mutant.
+# ---------------------------------------------------------------------------
+T46_TMP="$T414_TMP/t46"; mkdir -p "$T46_TMP"
+T46_CONTRAT="$REFS_DIR/mission-contracts.md"
+T46_LECTEUR="$REPO/cockpit/scripts/vf-cockpit-transcript.mjs"
+T46_DAG="$REPO/conductor/scripts/dag.sh"
+T46_NODE="$(command -v node 2>/dev/null || true)"
+T46_PY="$(command -v python3 2>/dev/null || true)"
+T46_HELPER="$T46_TMP/aller-retour.mjs"
+T46_ZS='^## Digest de mission'
+T46_ZE='^## '
+T46_ANCRES_A=('citationsDuMandat' '[A-Za-z0-9][A-Za-z0-9._-]{0,63}' '8 000' 'added' 'remapped' '::' 'identifiants distincts' 'register --node')
+
+cat > "$T46_HELPER" <<'T46EOF'
+// aller-retour : <lecteur> <ligne du gabarit> <mode> [<id>]
+import { pathToFileURL } from 'node:url';
+const [, , lecteur, ligne, mode, idArg] = process.argv;
+let citationsDuMandat;
+try { ({ citationsDuMandat } = await import(pathToFileURL(lecteur).href)); if (typeof citationsDuMandat !== 'function') throw new Error('citationsDuMandat absent'); }
+catch (e) { console.log('IMPORT ' + String(e && e.message).slice(0, 160)); process.exit(3); }
+const remplir = (id) => ligne.replace(/<[^>]*>/, () => id);
+const PREFIXE = 'Mission : essai\n', SUFFIXE = '\n- Étape courante : 1\n';
+if (mode === 'generatif') {
+  let s = 79;
+  const rnd = (n) => { s = (Math.imul(s, 1103515245) + 12345) >>> 0; return (s >>> 8) % n; };
+  const AL = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789', AL2 = AL + '._-';
+  const alnum = () => AL[rnd(AL.length)];
+  const corps = (n) => { let r = ''; for (let i = 0; i < n; i++) r += AL2[rnd(AL2.length)]; return r; };
+  const classes = ['court', 'moyen', 'plein', 'trop-long', 'debut-separateur', 'deux-points', 'hors-alphabet'];
+  const gen = (c) => {
+    if (c === 'court') return alnum() + corps(rnd(8));
+    if (c === 'moyen') return alnum() + corps(8 + rnd(55));
+    if (c === 'plein') return alnum() + corps(63);
+    if (c === 'trop-long') return alnum() + corps(64 + rnd(6));
+    if (c === 'debut-separateur') return '._-'[rnd(3)] + corps(rnd(20));
+    if (c === 'deux-points') return alnum() + corps(rnd(10)) + ':' + corps(rnd(10));
+    const b = alnum() + corps(rnd(10)), x = ['é', ' ', '`', '/', 'œ'][rnd(5)], p = rnd(b.length + 1);
+    return b.slice(0, p) + x + b.slice(p);
+  };
+  const vus = {}, N = 1500;
+  for (let i = 0; i < N; i++) {
+    const c = classes[i % classes.length], id = gen(c);
+    vus[c] = (vus[c] || 0) + 1;
+    const lu = citationsDuMandat(PREFIXE + remplir(id) + SUFFIXE);
+    const exact = lu.length === 1 && lu[0] === id;
+    const attendu = /^[A-Za-z0-9][A-Za-z0-9._-]{0,63}$/.test(id);
+    if (exact !== attendu) { console.log('ECART classe=' + c + ' longueur=' + id.length + ' ' + JSON.stringify(id) + ' lu=' + JSON.stringify(lu) + ' attendu=' + attendu); process.exit(1); }
+  }
+  const couvertes = Object.keys(vus).filter((c) => vus[c] >= 20).sort();
+  if (couvertes.length !== classes.length) { console.log('ECART couverture ' + JSON.stringify(vus)); process.exit(1); }
+  console.log('OK n=' + N + ' classes=' + couvertes.join(',') + ' graine=79');
+} else if (mode === 'fenetre') {
+  const m = (off) => 'x'.repeat(off - 1) + '\n' + remplir('revue-p3') + '\n';
+  console.log('lu7900=' + JSON.stringify(citationsDuMandat(m(7900))) + ' lu8100=' + JSON.stringify(citationsDuMandat(m(8100))));
+} else if (mode === 'lire') {
+  console.log('lu=' + JSON.stringify(citationsDuMandat(PREFIXE + remplir(idArg) + SUFFIXE)));
+} else { console.log('mode inconnu'); process.exit(2); }
+T46EOF
+
+# La ligne qui suit `- Mission :` dans le bloc de digest (vide si le bloc ou la ligne manquent).
+t46_ligne_gabarit() { # <contrat>
+  awk '/^DIGEST [(]cache/ { on = 1; next } on && /^- Mission :/ { m = 1; next } m { print; exit }' "$1"
+}
+t46_prereq() { # rc 1 + message si un outil du témoin manque
+  [ -n "$T46_NODE" ] || { printf 'node introuvable'; return 1; }
+  [ -f "$T46_LECTEUR" ] || { printf 'lecteur du cockpit introuvable'; return 1; }
+  [ -f "$T46_CONTRAT" ] || { printf 'mission-contracts.md introuvable'; return 1; }
+}
+t46_ligne() { # (a1) <contrat>
+  local l n
+  l="$(t46_ligne_gabarit "$1")"
+  [ -n "$l" ] || { printf 'bloc DIGEST ou ligne « - Mission : » introuvable'; return 1; }
+  printf '%s' "$l" | "$GREP" -qE '^- Nœud : `[^`]+`$' || { printf 'la ligne qui suit « - Mission : » est « %s », pas la ligne Nœud' "$(printf '%s' "$l" | cut -c1-60)"; return 1; }
+  n="$(awk '/^DIGEST [(]cache/ { on = 1; next } on && /^```/ { exit } on { n++ } END { print n + 0 }' "$1")"
+  [ "$n" -le 30 ] || { printf 'bloc de digest à %s lignes (> 30)' "$n"; return 1; }
+}
+t46_node_helper() { # <lecteur> <ligne> <mode> [<id>] — imprime la sortie du helper, rc du helper
+  "$T46_NODE" "$T46_HELPER" "$1" "$2" "$3" ${4:+"$4"} 2>&1
+}
+t46_doc_roundtrip() { # (a2, côté doctrine) <contrat> — lecteur réel
+  local l out rc
+  t46_prereq || return 1
+  l="$(t46_ligne_gabarit "$1")"
+  case "$l" in *Nœud*) ;; *) printf 'ligne Nœud introuvable après « - Mission : »'; return 1 ;; esac
+  out="$(t46_node_helper "$T46_LECTEUR" "$l" generatif)"; rc=$?
+  [ "$rc" -eq 0 ] && case "$out" in 'OK n='*) return 0 ;; esac
+  printf '%s' "$out" | head -c 300; return 1
+}
+t46_lecteur_roundtrip() { # (a2, côté lecteur) <lecteur> — contrat réel ; 3 = import impossible
+  local l out rc n
+  [ -n "$T46_NODE" ] || { printf 'node introuvable'; return 1; }
+  l="$(t46_ligne_gabarit "$T46_CONTRAT")"
+  case "$l" in *Nœud*) ;; *) printf 'ligne Nœud introuvable dans le contrat'; return 1 ;; esac
+  out="$(t46_node_helper "$1" "$l" generatif)"; rc=$?
+  [ "$rc" -eq 3 ] && { printf '%s' "$out" | head -c 200; return 3; }
+  [ "$rc" -eq 0 ] || { printf '%s' "$out" | head -c 300; return 1; }
+  n="${out#OK n=}"; n="${n%% *}"
+  [ "${n:-0}" -ge 1000 ] 2>/dev/null || { printf 'moins de 1 000 identifiants (%s)' "$out"; return 1; }
+  case "$out" in *'classes=court,debut-separateur,deux-points,hors-alphabet,moyen,plein,trop-long '*) return 0 ;; esac
+  printf 'sept classes non toutes couvertes (%s)' "$out"; return 1
+}
+t46_fenetre() { # (a3) <lecteur> — contrat réel
+  local l out rc
+  [ -n "$T46_NODE" ] || { printf 'node introuvable'; return 1; }
+  l="$(t46_ligne_gabarit "$T46_CONTRAT")"
+  case "$l" in *Nœud*) ;; *) printf 'ligne Nœud introuvable dans le contrat'; return 1 ;; esac
+  out="$(t46_node_helper "$1" "$l" fenetre)"; rc=$?
+  [ "$rc" -eq 3 ] && { printf '%s' "$out" | head -c 200; return 3; }
+  [ "$out" = 'lu7900=["revue-p3"] lu8100=[]' ] && return 0
+  printf 'attendu lu7900=["revue-p3"] lu8100=[], obtenu %s' "$out" | head -c 200; return 1
+}
+t46_remap() { # (a4) <contrat> — vrai dag.sh ; le lecteur réel mesure la limite
+  local d="$T46_TMP/remap" l out lu z miss
+  rm -rf "$d"; mkdir -p "$d"
+  [ -f "$T46_DAG" ] || { printf 'dag.sh introuvable'; return 1; }
+  bash "$T46_DAG" init --file="$d/d.json" >/dev/null 2>&1 || { printf 'dag.sh init refusé'; return 1; }
+  bash "$T46_DAG" add --file="$d/d.json" --id=revue-p3 --step=a >/dev/null 2>&1 || { printf 'dag.sh add (1) refusé'; return 1; }
+  out="$(bash "$T46_DAG" add --file="$d/d.json" --id=revue-p3 --step=b --stage=s1 2>&1)"
+  case "$out" in *'"added": "revue-p3::s1"'*) ;; *) printf 'dag.sh add : added attendu revue-p3::s1, obtenu %s' "$(printf '%s' "$out" | tr -d '\n' | head -c 120)"; return 1 ;; esac
+  case "$out" in *'"remapped": true'*) ;; *) printf 'dag.sh add : remapped attendu true'; return 1 ;; esac
+  l="$(t46_ligne_gabarit "$1")"
+  case "$l" in *Nœud*) ;; *) printf 'ligne Nœud introuvable après « - Mission : »'; return 1 ;; esac
+  lu="$(t46_node_helper "$T46_LECTEUR" "$l" lire 'revue-p3::s1')"
+  [ "$lu" = 'lu=[]' ] || { printf 'identifiant remappé revue-p3::s1 : attendu lu=[], obtenu %s' "$lu"; return 1; }
+  lu="$(t46_node_helper "$T46_LECTEUR" "$l" lire 'revue-p3')"
+  [ "$lu" = 'lu=["revue-p3"]' ] || { printf 'identifiant revue-p3 : attendu lu=["revue-p3"], obtenu %s' "$lu"; return 1; }
+  z="$(t414_zone "$1" "$T46_ZS" "$T46_ZE")"
+  miss="$(t414_missing "$z" 'added' 'remapped' '::' 'identifiants distincts')" || { printf 'limite du remap absente de la zone : %s' "$miss"; return 1; }
+}
+t46_doc_ancres() { # (a5) <contrat>
+  local z miss
+  z="$(t414_zone "$1" "$T46_ZS" "$T46_ZE")"
+  [ -n "$z" ] || { printf 'zone « Digest de mission » introuvable'; return 1; }
+  miss="$(t414_missing "$z" "${T46_ANCRES_A[@]}")" || { printf 'absent de la zone : %s' "$miss"; return 1; }
+}
+# Mutant de lecteur : copie de tous les scripts du module cockpit, mutation par sed (expression de base).
+t46_lecteur_mutant() { # <étiquette> <fonction> <nom> <expression sed>
+  local label="$1" fn="$2" nom="$3" expr="$4" d0="$T46_TMP/$3-ref" dm="$T46_TMP/$3-mut" rc out
+  rm -rf "$d0" "$dm"; mkdir -p "$d0" "$dm"
+  command cp "$REPO"/cockpit/scripts/*.mjs "$d0"/ && command cp "$REPO"/cockpit/scripts/*.mjs "$dm"/ || { ko "$label : copie du module cockpit impossible"; return; }
+  sed "$expr" "$d0/vf-cockpit-transcript.mjs" > "$dm/vf-cockpit-transcript.mjs.neuf" && mv "$dm/vf-cockpit-transcript.mjs.neuf" "$dm/vf-cockpit-transcript.mjs"
+  out="$("$fn" "$d0/vf-cockpit-transcript.mjs" 2>&1)"; rc=$?
+  if [ "$rc" -ne 0 ]; then ko "$label : témoin positif de la copie non mutée absent (rc=$rc) — $(printf '%s' "$out" | head -c 100)"; return; fi
+  if cmp -s "$d0/vf-cockpit-transcript.mjs" "$dm/vf-cockpit-transcript.mjs"; then ko "$label : mutant identique à la copie (la mutation n'a rien mordu)"; return; fi
+  out="$("$fn" "$dm/vf-cockpit-transcript.mjs" 2>&1)"; rc=$?
+  case "$rc" in
+    0) ko "$label NON DISCRIMINANTE : le lecteur muté est encore accepté" ;;
+    3) ko "$label : le lecteur muté ne s'importe pas (échec d'import, pas un refus) — $(printf '%s' "$out" | head -c 100)" ;;
+    *) ok "$label (DISCRIMINANT) : mutant refusé — $(printf '%s' "$out" | head -c 110)" ;;
+  esac
+}
+
+# ---- T46 partie b : le kernel (nœud dans le mandat, plan de mission publié, verbes du verrou) ----
+T46_K="$REPO/conductor/references/team-kernel.md"
+T46_DL="$REPO/conductor/scripts/driver-lock.sh"
+T46_VERBE_PUB='publish-plan'   # nom posé par le plan 79-03 (A16), relu dans `--help` et dans 79-03-SUMMARY
+T46_KZS='^## Nœud dans le mandat'
+T46_KZE='^## '
+T46_ANCRES_B=('ligne `Nœud`' 'dev-orchestrator-references/mission-contracts.md' '§Digest de mission' 'dag.sh add' 'remapped'
+  'plan de mission' 'à côté du verrou' 'dag.sh init' 'dag.sh mark' 'status --all' 'jamais le texte libre'
+  'ne bloque pas la mission' 'le disque fait foi')
+
+t46_verbes_help() { # verbes documentés par `driver-lock.sh --help` (lignes d'usage indentées), un par ligne
+  (cd "$T46_TMP" && bash "$T46_DL" --help 2>&1) | awk '/^ +driver-lock\.sh [a-z][a-z-]*/ { print $2 }' | sort -u
+}
+t46_kernel_ancres() { # (b1) <kernel>
+  local z miss
+  z="$(t414_zone "$1" "$T46_KZS" "$T46_KZE")"
+  [ -n "$z" ] || { printf 'section « Nœud dans le mandat » introuvable'; return 1; }
+  miss="$(t414_missing "$z" "${T46_ANCRES_B[@]}")" || { printf 'absent de la section : %s' "$miss"; return 1; }
+}
+t46_voie_unique() { # (b2) <kernel> — la ligne du gabarit est au contrat, une fois ; le kernel ne la porte pas
+  local n
+  n="$("$GREP" -c '^- Nœud : ' "$T46_CONTRAT")"
+  [ "$n" -eq 1 ] || { printf 'le contrat porte %s ligne(s) « - Nœud : » (attendu 1)' "$n"; return 1; }
+  "$GREP" -q '^- Nœud : ' "$1" && { printf 'le kernel recopie la ligne du gabarit'; return 1; }
+  "$GREP" -qF '<id du nœud DAG>' "$1" && { printf 'le kernel porte l espace réservé du gabarit'; return 1; }
+  return 0
+}
+t46_verbes_cites() { # (b3) <kernel>
+  local z verbs cites v inconnus=""
+  z="$(t414_zone "$1" "$T46_KZS" "$T46_KZE")"
+  [ -n "$z" ] || { printf 'section « Nœud dans le mandat » introuvable'; return 1; }
+  verbs="$(t46_verbes_help)"
+  [ "$(printf '%s\n' "$verbs" | "$GREP" -c .)" -ge 13 ] || { printf '--help ne documente pas treize verbes (%s)' "$(printf '%s' "$verbs" | tr '\n' ' ')"; return 1; }
+  cites="$(printf '%s' "$z" | "$GREP" -oE 'driver-lock\.sh [a-z][a-z-]*' | awk '{ print $2 }' | sort -u)"
+  for v in $cites; do
+    printf '%s\n' "$verbs" | "$GREP" -qx -- "$v" || inconnus="$inconnus $v"
+  done
+  [ -z "$inconnus" ] || { printf 'verbe cité inconnu de --help :%s' "$inconnus"; return 1; }
+  printf '%s\n' "$cites" | "$GREP" -qx -- "$T46_VERBE_PUB" || { printf 'verbe de publication « %s » non cité dans la section' "$T46_VERBE_PUB"; return 1; }
+  printf '%s\n' "$verbs" | "$GREP" -qx -- "$T46_VERBE_PUB" || { printf 'verbe de publication « %s » absent de --help' "$T46_VERBE_PUB"; return 1; }
+}
+t46_ligne_verrou() { # (b4) <kernel> — chaque verbe de --help est mot entier dans la ligne « Verrou de driver »
+  local z v absents="" verbs
+  z="$(t414_zone "$1" '^[|] [*][*]Verrou de driver[*][*] [|]' '^[|] [*][*]Plan de bataille[*][*] [|]')"
+  [ -n "$z" ] || { printf 'ligne « Verrou de driver » introuvable'; return 1; }
+  verbs="$(t46_verbes_help)"
+  [ "$(printf '%s\n' "$verbs" | "$GREP" -c .)" -ge 13 ] || { printf '--help ne documente pas treize verbes'; return 1; }
+  for v in $verbs; do
+    printf '%s' "$z" | "$GREP" -qw -- "$v" || absents="$absents $v"
+  done
+  [ -z "$absents" ] || { printf 'verbe(s) de --help absent(s) de la ligne « Verrou de driver » :%s' "$absents"; return 1; }
+}
+t46_agent_propre() { # (c) <fichier> — ni la ligne du gabarit ni l'espace réservé
+  "$GREP" -qE '^- Nœud : |<id du nœud DAG>' "$1" && { printf 'le fichier porte la ligne du gabarit'; return 1; }
+  return 0
+}
+t46_agents_tous() { # (c) — tous les corps d'agent du dépôt ; vide-contre-vide refusé
+  local f n=0 sales=""
+  for f in "$REPO"/*/agents/*.md "$REPO"/*/AGENT.md; do
+    [ -f "$f" ] || continue
+    n=$((n+1)); t46_agent_propre "$f" >/dev/null 2>&1 || sales="$sales $(basename "$(dirname "$f")")/$(basename "$f")"
+  done
+  [ "$n" -ge 10 ] || { printf 'seulement %s corps d agent trouvés (balayage à vide)' "$n"; return 1; }
+  [ -z "$sales" ] || { printf 'corps d agent portant la ligne :%s' "$sales"; return 1; }
+  printf '%s corps d agent' "$n"
+}
+
+if [ ! -f "$MOD/AGENT.md" ]; then
+  skip "T46 : disposition lab installé (pas de source du module cockpit ni du contrat à relire) — bloc non joué"
+else
+  t46_out="$(t46_prereq)" && T46_PRET=1 || T46_PRET=0
+  if [ "$T46_PRET" -eq 0 ]; then
+    ko "T46 : prérequis absents en disposition source — $t46_out (saut compté rouge)"
+  else
+    t46_out="$(t46_ligne "$T46_CONTRAT")" && ok "T46 (a1) : la ligne Nœud suit « - Mission : » dans le bloc de digest (≤ 30 lignes)" \
+      || ko "T46 (a1) : attendu — ligne « - Nœud : \`…\` » juste après « - Mission : » ; obtenu — $t46_out"
+    t46_out="$(t46_doc_roundtrip "$T46_CONTRAT")" && ok "T46 (a2) : aller-retour gabarit -> lecteur réel, génératif (graine 79, 1 500 identifiants, sept classes)" \
+      || ko "T46 (a2) : attendu — ligne du gabarit lue exactement [id] ssi l'id tient dans le motif ; obtenu — $t46_out"
+    t46_out="$(t46_lecteur_roundtrip "$T46_LECTEUR")" && ok "T46 (a2) témoin de couverture : n ≥ 1 000 et les sept classes court, moyen, plein, trop-long, debut-separateur, deux-points, hors-alphabet" \
+      || ko "T46 (a2) couverture : $t46_out"
+    t46_out="$(t46_fenetre "$T46_LECTEUR")" && ok "T46 (a3) : fenêtre de 8 000 caractères — ligne à 7 900 lue, à 8 100 non lue" \
+      || ko "T46 (a3) : attendu — fenêtre de 8 000 caractères ; obtenu — $t46_out"
+    if [ -z "$T46_PY" ]; then
+      skip "T46 (a4) : python3 introuvable (dag.sh en dépend)"
+    else
+      t46_out="$(t46_remap "$T46_CONTRAT")" && ok "T46 (a4) : vrai dag.sh add — added revue-p3::s1, remapped vrai, hors motif donc non lu ; revue-p3 lu ; limite écrite dans la zone" \
+        || ko "T46 (a4) : attendu — limite du remap mesurée et écrite ; obtenu — $t46_out"
+    fi
+    t46_out="$(t46_doc_ancres "$T46_CONTRAT")" && ok "T46 (a5) : la zone « Digest de mission » porte les ${#T46_ANCRES_A[@]} ancres (forme lue, fenêtre, remap, voix unique)" \
+      || ko "T46 (a5) : attendu — ${#T46_ANCRES_A[@]} ancres dans la zone ; obtenu — $t46_out"
+
+    # Mutants de la partie a
+    sed 's/^- Nœud : `<id du nœud DAG>`$/- Nœud : <id du nœud DAG>/' "$T46_CONTRAT" > "$T46_TMP/c-m1.md"
+    t414_mutant "T46 mutant (a2) m1 : accents graves retirés de la ligne du gabarit" t46_doc_roundtrip "$T46_CONTRAT" "$T46_TMP/c-m1.md"
+    t414_move_before "$T46_CONTRAT" "$T46_TMP/c-m2.md" '^DIGEST [(]cache' '- Nœud : ' '```'
+    t414_mutant "T46 mutant (a1) m2 : ligne Nœud déplacée en fin de bloc" t46_ligne "$T46_CONTRAT" "$T46_TMP/c-m2.md"
+    t46_lecteur_mutant "T46 mutant (a2) m3 : lecteur à motif {0,31} au lieu de {0,63}" t46_lecteur_roundtrip m3 's/{0,63}/{0,31}/g'
+    t46_lecteur_mutant "T46 mutant (a3) m4 : lecteur à fenêtre de 4 000" t46_fenetre m4 's/slice(0, 8000)/slice(0, 4000)/'
+    t46_lecteur_mutant "T46 mutant (a3) m5 : lecteur à fenêtre de 16 000" t46_fenetre m5 's/slice(0, 8000)/slice(0, 16000)/'
+    t46_k=5
+    for t46_a in "${T46_ANCRES_A[@]}"; do
+      t46_k=$((t46_k+1))
+      t414_ablate "$T46_CONTRAT" "$T46_TMP/c-m$t46_k.md" "$t46_a" "$T46_ZS" "$T46_ZE"
+      t414_mutant "T46 mutant (a5) m$t46_k : zone « Digest de mission » privée de « $t46_a »" t46_doc_ancres "$T46_CONTRAT" "$T46_TMP/c-m$t46_k.md"
+    done
+
+    # ---- partie b : kernel ----
+    t46_out="$(t46_kernel_ancres "$T46_K")" && ok "T46 (b1) : le kernel porte la section « Nœud dans le mandat, plan de mission publié » et ses ${#T46_ANCRES_B[@]} ancres" \
+      || ko "T46 (b1) : attendu — section neuve du kernel avec ${#T46_ANCRES_B[@]} ancres ; obtenu — $t46_out"
+    t46_out="$(t46_voie_unique "$T46_K")" && ok "T46 (b2) : la ligne du gabarit n'est définie qu'au contrat (une fois), le kernel n'en porte ni la ligne ni l'espace réservé" \
+      || ko "T46 (b2) : attendu — voix unique (ADR-057) ; obtenu — $t46_out"
+    t46_out="$(t46_verbes_cites "$T46_K")" && ok "T46 (b3) : chaque driver-lock.sh <verbe> cité dans la section existe dans --help, et « $T46_VERBE_PUB » est cité" \
+      || ko "T46 (b3) : attendu — verbes cités connus de --help dont $T46_VERBE_PUB ; obtenu — $t46_out"
+    t46_out="$(t46_ligne_verrou "$T46_K")" && ok "T46 (b4) : la ligne « Verrou de driver » nomme chacun des $(t46_verbes_help | "$GREP" -c .) verbes que --help documente (mark-progress, registry, $T46_VERBE_PUB compris)" \
+      || ko "T46 (b4) : attendu — ligne « Verrou de driver » alignée sur --help ; obtenu — $t46_out"
+    t46_out="$(t46_agents_tous)" && ok "T46 (c) : aucun corps d'agent ($t46_out) ne porte la ligne du gabarit ni l'espace réservé" \
+      || ko "T46 (c) : attendu — aucun corps d'agent ne porte la ligne ; obtenu — $t46_out"
+
+    # Mutants de la partie b
+    t46_k=0
+    for t46_a in "${T46_ANCRES_B[@]}"; do
+      t46_k=$((t46_k+1))
+      t414_ablate "$T46_K" "$T46_TMP/k-b1-$t46_k.md" "$t46_a" "$T46_KZS" "$T46_KZE"
+      t414_mutant "T46 mutant (b1) $t46_k : section du kernel privée de « $t46_a »" t46_kernel_ancres "$T46_K" "$T46_TMP/k-b1-$t46_k.md"
+    done
+    awk -v zs="$T46_KZS" '{ print } !d && $0 ~ zs { print ""; print "- Nœud : `<id du nœud DAG>`"; d = 1 }' "$T46_K" > "$T46_TMP/k-b2.md"
+    t414_mutant "T46 mutant (b2) : kernel avec la ligne du gabarit recopiée" t46_voie_unique "$T46_K" "$T46_TMP/k-b2.md"
+    sed 's/driver-lock\.sh publish-plan/driver-lock.sh publier-fantome/' "$T46_K" > "$T46_TMP/k-b3a.md"
+    t414_mutant "T46 mutant (b3) : verbe de publication remplacé par un verbe fantôme" t46_verbes_cites "$T46_K" "$T46_TMP/k-b3a.md"
+    sed 's/driver-lock\.sh publish-plan/driver-lock.sh status/' "$T46_K" > "$T46_TMP/k-b3b.md"
+    t414_mutant "T46 mutant (b3) : verbe de publication remplacé par status (plus cité)" t46_verbes_cites "$T46_K" "$T46_TMP/k-b3b.md"
+    sed '/^| \*\*Verrou de driver\*\* |/s/ ; publish-plan pour le plan de mission//' "$T46_K" > "$T46_TMP/k-b4.md"
+    t414_mutant "T46 mutant (b4) : verbe de publication retiré de la ligne « Verrou de driver »" t46_ligne_verrou "$T46_K" "$T46_TMP/k-b4.md"
+    T46_MGR="$REPO/dev-orchestrator/agents/vf-dev-manager.md"
+    if [ -f "$T46_MGR" ]; then
+      { cat "$T46_MGR"; printf '%s\n' '- Nœud : `<id du nœud DAG>`'; } > "$T46_TMP/mgr-c.md"
+      t414_mutant "T46 mutant (c) : vf-dev-manager.md avec la ligne du gabarit ajoutée" t46_agent_propre "$T46_MGR" "$T46_TMP/mgr-c.md"
+    else
+      ko "T46 mutant (c) : vf-dev-manager.md introuvable en disposition source"
+    fi
+  fi
 fi
 
 # ---------------------------------------------------------------------------

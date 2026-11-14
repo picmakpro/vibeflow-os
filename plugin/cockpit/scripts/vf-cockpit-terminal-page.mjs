@@ -1,16 +1,16 @@
 // vf-cockpit-terminal-page — page servie par le serveur du terminal Q (71-01 pour l'amorce, 71-05 pour la page finale).
 // Exports : EMPREINTES_XTERM · EMPREINTES_BOITE · preparerPage({ engineDir }) · pageTerminal({ theme, origineP }) -> { html, csp }.
 // preparerPage lit le vendor xterm du moteur (VF_COCKPIT_ENGINE_DIR/assets/vendor/xterm) et le vérifie contre le code ET SHA256SUMS : une
-// altération lève une erreur, et le serveur de Q refuse de démarrer (TERM-10). pageTerminal assemble tout en ligne (P71-D-16) : deux <style>
+// altération lève une erreur, et le serveur de Q refuse de démarrer (TERM-10). La vue, le client et la feuille de Q sont des fichiers du moteur
+// (assets/ui/terminal/vue.js, client.js, q.css), lus comme texte par le lecteur fermé vf-cockpit-navigateur.mjs après les contrôles du vendor
+// (79-11). pageTerminal assemble tout en ligne (P71-D-16) : deux <style>
 // (polices et feuille de Q, puis xterm.css à l'octet), quatre <script> sans attribut (xterm, addon-fit, vue, client) dont la CSP porte les
-// empreintes recalculées, aucun <link>, aucune police réseau. Le thème (P71-D-19) vaut `light` si la valeur reçue est exactement `light`,
+// empreintes recalculées sur le texte final, aucun <link>, aucune police réseau. Le thème (P71-D-19) vaut `light` si la valeur reçue est exactement `light`,
 // sinon sombre ; la valeur reçue n'est jamais insérée. Aucun autre paramètre d'adresse n'est lu (P71-D-15).
 import fs from 'node:fs';
 import path from 'node:path';
 import crypto from 'node:crypto';
-import { STYLE_Q } from './vf-cockpit-terminal-style.mjs';
-import { clientTerminal } from './vf-cockpit-terminal-client.mjs';
-import { vueTerminal } from './vf-cockpit-terminal-vue.mjs';
+import { lireFeuille, lireFonction } from './vf-cockpit-navigateur.mjs';
 
 // sha256 épinglés (@xterm/xterm 6.0.0, @xterm/addon-fit 0.11.0) ; 71-11 les vérifie aussi côté dépôt (V9)
 export const EMPREINTES_XTERM = Object.freeze({
@@ -31,7 +31,7 @@ const PLAGES = {
   'latin-ext': 'U+0100-02BA,U+02BD-02C5,U+02C7-02CC,U+02CE-02D7,U+02DD-02FF,U+0304,U+0308,U+0329,U+1D00-1DBF,U+1E00-1E9F,U+1EF2-1EFF,U+2020,U+20A0-20AB,U+20AD-20C0,U+2113,U+2C60-2C7F,U+A720-A7FF',
 };
 const sha256 = (b) => crypto.createHash('sha256').update(b).digest('hex');
-let vendor = null; // { js, fit, css, polices } après preparerPage
+let vendor = null; // { js, fit, css, polices, vue, client, styleQ } après preparerPage
 const memo = new Map(); // CSP et page par thème et origine de P
 
 export function preparerPage({ engineDir } = {}) {
@@ -53,7 +53,17 @@ export function preparerPage({ engineDir } = {}) {
   });
   const polices = Object.entries(PLAGES).map(([sous, plage]) =>
     `@font-face{font-family:"JetBrains Mono";font-style:normal;font-display:block;font-weight:100 900;unicode-range:${plage};src:url(data:font/woff2;base64,${lire('fonts', `jetbrains-mono-${sous}-wght-normal.woff2`).toString('base64')}) format("woff2")}`).concat(boite).join('\n');
-  vendor = { js: fichiers['xterm.js'].toString('utf8'), fit: fichiers['addon-fit.js'].toString('utf8'), css: fichiers['xterm.css'].toString('utf8'), polices };
+  let q;
+  try {
+    const moteur = engineDir;
+    q = {
+      vue: lireFonction('terminal', 'vue.js', { moteur }),
+      client: lireFonction('terminal', 'client.js', { moteur }),
+      styleQ: lireFeuille('terminal', 'q.css', { moteur }),
+    };
+  } catch { throw new Error('fichiers du terminal absents du moteur du cockpit : réinstaller le module cockpit.'); }
+  const [js, fit, css] = ['xterm.js', 'addon-fit.js', 'xterm.css'].map((nom) => fichiers[nom].toString('utf8'));
+  vendor = { js, fit, css, polices, ...q };
   memo.clear();
 }
 
@@ -70,8 +80,8 @@ export function pageTerminal({ theme, origineP = "'none'" } = {}) {
   const attr = clair ? ' data-theme="light"' : '';
   const cfg = JSON.stringify({ origineP, theme: clair ? 'light' : 'dark' }).replace(/</g, '\\u003c'); // jamais une valeur d'adresse
   let html = `<!doctype html>\n<html lang="fr"${attr}><head><meta charset="utf-8"><meta name="referrer" content="no-referrer"><title>Terminal</title>\n`
-    + `<style>${vendor.polices}\n${STYLE_Q}</style>\n<style>${vendor.css}</style>\n</head><body><div id="annonce" class="vf-q-sr" role="status" aria-live="polite"></div><div id="terminal"></div><div id="etat" hidden></div>\n`
-    + `<script>${vendor.js}</script>\n<script>${vendor.fit}</script>\n<script>(${vueTerminal.toString()})(${cfg});</script>\n<script>(${clientTerminal.toString()})(${cfg});</script>\n</body></html>\n`;
+    + `<style>${vendor.polices}\n${vendor.styleQ}</style>\n<style>${vendor.css}</style>\n</head><body><div id="annonce" class="vf-q-sr" role="status" aria-live="polite"></div><div id="terminal"></div><div id="etat" hidden></div>\n`
+    + `<script>${vendor.js}</script>\n<script>${vendor.fit}</script>\n<script>(${vendor.vue})(${cfg});</script>\n<script>(${vendor.client})(${cfg});</script>\n</body></html>\n`;
   const csp = cspDe(html);
   const r = { html, csp };
   memo.set(cle, r);

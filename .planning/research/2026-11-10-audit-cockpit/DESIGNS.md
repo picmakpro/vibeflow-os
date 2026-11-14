@@ -170,7 +170,7 @@ réponses du 2026-11-06, pas les décisions `AUDC-Q…` ouvertes par l'audit.
   rejetées, « pastel lumineux » retenu, « le halo ne revient pas », plus d'anneau coloré, barres neutres sauf en cours
   (P71.5-D-12, D-19, D-21, D-27, D-28).
 - Grille d'espacements fermée : « ni 10, ni 14, ni 22 » (P71.5-D-01).
-- Points de rupture inchangés (Q11) ; un tiroir latéral ne pousse jamais la carte (Q12 ; le tiroir du terminal, lui, réserve sa
+- Points de rupture inchangés (Q11) ; un tiroir latéral ne pousse jamais la carte (PU-G-204 ; le tiroir du terminal, lui, réserve sa
   place sous la carte : P71-D-35) ; « Flou gardé, texte court » sous le titre (Q10).
 - Le bouton n'exécute jamais (Q4) ; une proposition ne prend jamais le focus (Q5) ; pas de repli « copier la commande »
   pour un lancement (Q14).

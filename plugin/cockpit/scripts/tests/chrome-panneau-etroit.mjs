@@ -71,15 +71,17 @@ await executer(chrome, async (s) => {
 
   // P2 : par la palette (« / », saisie, Entrée), au clavier réel, le focus entre dans le panneau ouvert
   await vider(); await charger(768);
-  const nom = await s.ev(`(() => { const e = ${CARTE}; const t = (e.textContent || '').split(/\\s+/).find((m) => /^[A-Za-zÀ-ÿ]{4,}$/.test(m)); return t || ''; })()`);
+  const nom = await s.ev(`(() => { const t = (${CARTE})?.querySelector('.title'); return t ? t.textContent.trim() : ''; })()`); // le titre visible de la carte (le textContent collait l'icône au titre : « PhasesPhases », aucun résultat)
   await s.ev('document.activeElement && document.activeElement.blur()');
-  await touche(s, '/'); await s.attendre("document.getElementById('palette').classList.contains('open')", 'palette ouverte');
-  await s.send('Input.insertText', { text: nom }); await pause(400); await touche(s, 'Enter');
+  await touche(s, '/'); await s.attendre("document.getElementById('palette').classList.contains('open') && document.activeElement === document.getElementById('search')", 'palette ouverte, saisie focalisée'); // openPalette focalise la saisie par setTimeout(0) : taper avant, c'est taper dans le vide
+  await s.send('Input.insertText', { text: nom });
+  const actif = await attendreValeur(() => s.ev("(document.querySelector('#results .r.active .rn') || {}).textContent || ''"), (v) => v === nom, { max: 4000 }); // la saisie a pris : le résultat actif est la carte visée (l'aide ne lève jamais : au délai elle rend la dernière lecture, l'assertion juge)
+  await touche(s, 'Enter');
   const o2 = await attendreOuvert(true);
   const foc = await attendreValeur(() => s.ev("document.getElementById('panel').contains(document.activeElement)"), (v) => v === true, { max: 4000 }).catch(() => false);
   await pause(1200); // le recentrage de la carte (reveal) rend le focus à la carte après l'animation : on juge une fois posé
   const foc2 = await s.ev("document.getElementById('panel').contains(document.activeElement)");
-  out.p2 = [!!nom, o2, foc, foc2].join('|');
+  out.p2 = [!!nom && actif === nom, o2, foc, foc2].join('|');
 
   // P3 : « Détail » ferme, un rendu de la MÊME sélection 150 ms plus tard ne rouvre rien ; choisir une AUTRE carte rouvre (témoin)
   await vider(); await charger(768);

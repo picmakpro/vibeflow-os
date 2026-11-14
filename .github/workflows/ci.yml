@@ -29,12 +29,15 @@ concurrency:
 
 # Nombre de shards du job de tests : SEULE déclaration. Le shard vérifie que la matrice réelle (strategy.job-total)
 # lui est égale, l'agrégateur rejoue la partition avec la même valeur (revue de la PR #181, m1).
-# 9 shards (mission « CI sélective », mesure du 2026-11-07, run 42400570610) : 194 suites, 9085 s de suites au total, dont
-# test-cockpit-projet.sh 1509 s et test-cockpit-terminal-xterm.sh 692 s (réservées, voir scripts/ci-shard-suites.sh).
-# Une fois `projet` découpée en trois suites d'environ 540 s, le shard le plus chargé estimé tient à 1063 s (17,7 min) ;
-# à 8 shards il en faudrait 1215 s (20,3 min). Le coût fixe d'un shard (checkout, node, moteur GSD) est de 15 à 20 s.
+# 14 shards (demande de Samuel, message session principale, 2026-11-13 : raccourcir le run sans retirer de test). Mesure
+# du 2026-11-13, run 43408047589 : 218 suites, 12765 s de suites au total, dont test-cockpit-terminal-tiroir.sh 1201 s et
+# test-cockpit-terminal-xterm.sh 988 s, plus trois suites de 605 à 649 s ; ces cinq-là sont réservées, chacune seule sur son
+# shard (voir scripts/ci-shard-suites.sh). Aucun nombre de shards ne met le plus chargé sous 15 min : tiroir seule fait 20 min.
+# Charge estimée du plus chargé : 9 shards 2444 s (40,7 min), 12 shards 1397 s, 13 shards 1222 s, 14 shards 1201 s (20,0 min,
+# le plancher imposé par tiroir), 16 shards 1201 s aussi. 14 est donc le plus petit nombre qui atteint ce plancher.
+# Le coût fixe d'un shard (checkout, node, moteur GSD) est de 15 à 20 s.
 env:
-  SHARDS: "9"
+  SHARDS: "14"
 
 jobs:
   # ----------------------------------------------------------------------------------------------
@@ -176,7 +179,7 @@ jobs:
       fail-fast: false
       matrix:
         # Doit compter exactement SHARDS entrées (env du workflow) : vérifié à l'étape « Lancer les suites du shard ».
-        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8]
+        shard: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]
     steps:
       - uses: actions/checkout@v4
         with:

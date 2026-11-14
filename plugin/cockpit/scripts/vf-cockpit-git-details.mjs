@@ -6,6 +6,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { lancerGitAsync, filtresDeclaresAsync, finDans } from './vf-cockpit-paths.mjs';
+import { cheminPhysique } from './vf-cockpit-git-sortant.mjs';
 import { nettoie, brancheBaseAsync } from './vf-cockpit-arbres.mjs';
 import { masque } from './vf-cockpit-lecture.mjs';
 import { MOTIF_SHA, lireWorktrees } from './vf-cockpit-git-graphe.mjs';
@@ -62,7 +63,10 @@ export function lireStatusV2(sortie, { max = BORNES_DETAILS.statut } = {}) {
 
 function tronqueOctets(texte, max) {
   if (Buffer.byteLength(texte) <= max) return { texte, tronque: false };
-  return { texte: Buffer.from(texte).subarray(0, max).toString('utf8').replace(/�+$/, ''), tronque: true }; // une coupe au milieu d'un caractère n'en laisse pas de fragment
+  let coupe = Buffer.from(texte).subarray(0, max).toString('utf8'), e = coupe.length;
+  // une coupe au milieu d'un caractère n'en laisse pas de fragment (lu à la fin : une RegExp `+$` est quadratique)
+  while (e > 0 && coupe[e - 1] === '\ufffd') e--;
+  return { texte: coupe.slice(0, e), tronque: true };
 }
 
 export async function detailCommit(lab, sha) {
@@ -82,7 +86,8 @@ export async function detailCommit(lab, sha) {
     if ((!lg.ok && !lg.tronque) || c.length < 7 || c[0] !== sha) return ko200;
     const p = c[1] === '' ? [] : c[1].split(' ');
     if (!p.every(motifLong)) return ko200;
-    const brut = c.slice(6).join('\0').replace(/\0$/, '').replace(/\s+$/, '');
+    // trimEnd : même ensemble de blancs que `\s`, sans le coût quadratique d'un `\s+$` sur un long message
+    const brut = c.slice(6).join('\0').replace(/\0$/, '').trimEnd();
     const m = tronqueOctets(masque(brut.replace(ILLISIBLE_G, ''), BORNES_DETAILS.message * 2), BORNES_DETAILS.message);
     const dt = await git(['diff-tree', '-r', '-z', '--numstat', '-M', `-l${BORNES_DETAILS.renommages}`, '--no-commit-id', ...(p.length ? [`${sha}^1`, sha] : ['--root', sha]), '--'], { maxBuffer: BORNES_DETAILS.octetsNumstat }); // merge : contre le PREMIER parent seulement ; racine : --root
     const ns = dt.ok ? lireNumstat(dt.sortie) : ko('diff-tree');
@@ -103,9 +108,14 @@ const sha = async (lab, ref, fin) => { const r = await lancerGitAsync(lab, ['rev
 // P78-D-38 (A3, audit 2026-11-06) : un worktree n'est lu que si son lien retour est vérifié. `git worktree list` rend le chemin écrit dans `<commun>/worktrees/<id>/gitdir`, fichier qu'un dépôt
 // piégé peut forger pour désigner un dossier arbitraire du poste. Vérifié = `<chemin>/.git` est (a) le dépôt principal : un dossier (jamais un lien symbolique) dont le chemin réel est le dossier commun,
 // ou (b) un fichier `gitdir: <X>` dont X, résolu, est EXACTEMENT `<commun>/worktrees/<id>` et dont le fichier `gitdir` désigne en retour ce `.git`. Tout le reste : « non vérifié » (lecture seule, fs seul, aucun git).
-const reelOuNull = (p) => { try { return fs.realpathSync(p); } catch { return null; } };
+const joindre = (base, valeur) => (path.isAbsolute(valeur) ? valeur : base + path.sep + valeur); // sans normalisation : le noyau résout
+// SOCL-10 : la résolution physique unique (nul = non résolu). Le nom et les lignes qui l'emploient sont gardés : ancres de mutation de
+// test-cockpit-git-details.sh (X7).
+const reelOuNull = (p) => cheminPhysique(p);
 export function worktreeVerifie(communReel, chemin) {
   if (typeof communReel !== 'string' || typeof chemin !== 'string') return false;
+  communReel = reelOuNull(communReel); // chaque comparaison porte sur des chemins résolus par le noyau ; un échec = non vérifié
+  if (communReel === null) return false;
   if (reelOuNull(chemin) === communReel) return true; // dépôt nu : le dossier commun lui-même
   const dotgit = path.join(chemin, '.git');
   try {
@@ -114,7 +124,7 @@ export function worktreeVerifie(communReel, chemin) {
     if (!st.isFile() || st.size > 4096) return false;
     const m = /^gitdir: (.+)$/.exec(fs.readFileSync(dotgit, 'utf8').replace(/\r?\n$/, ''));
     if (!m) return false;
-    const admin = reelOuNull(path.resolve(chemin, m[1]));
+    const admin = reelOuNull(joindre(chemin, m[1]));
     if (!admin || path.dirname(admin) !== path.join(communReel, 'worktrees')) return false;
     const retour = fs.readFileSync(path.join(admin, 'gitdir'), 'utf8').replace(/\r?\n$/, '');
     return reelOuNull(retour) === reelOuNull(dotgit) && reelOuNull(dotgit) !== null;

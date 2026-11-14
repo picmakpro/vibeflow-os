@@ -146,6 +146,7 @@ seule).
   (`q.listen(0, …)`, `vf-cockpit-terminal-processus.mjs`), donc le stockage du navigateur de l'origine Q est perdu à chaque
   démarrage du cockpit, et P72-D-02bis (« le dernier mode choisi ») n'était pas tenu d'une relance à l'autre. La règle de
   P72-D-02bis « jamais lisible ni écrivable par la page P » reste entière.
+  *Amendé par AUDC-B-05 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11 : « Le ranger hors du projet (Recommandé) ») : le support est le dossier d'état du poste, projet par projet, et non plus un fichier du lab ; une archive reçue ne peut plus apporter de présélection. Le reste de P72-D-20 et de P72-D-02bis tient (9b58a6c6).*
 - **P72-D-21 (reprise du chat : geste humain exigé ; arbitrage Samuel, AskUserQuestion, session principale Claude Code, 2026-11-06 ; précise
   P72-D-03, constat d'audit F-1).** Mot pour mot : « Geste humain exigé (Recommandé) ». L'identifiant de conversation n'est retenu que si la
   question au chat a été envoyée par un vrai geste humain dans la page (activation utilisateur du navigateur), avec un témoin XSS qui tente la

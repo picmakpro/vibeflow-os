@@ -276,7 +276,7 @@ import fs from 'node:fs';
 const [, , src, dst, kind, de, vers] = process.argv;
 let s = fs.readFileSync(src, 'utf8');
 const ligne = (debut, f) => { const l = s.split('\n'); const k = l.findIndex((x) => x.startsWith(debut)); if (k < 0) process.exit(5); l[k] = f(l[k]); s = l.join('\n'); };
-if (kind === 'M-CITE') { const a = s.indexOf(".replace(/'/g"); const b = s.indexOf('+ "\'"', a); if (a < 0 || b < 0) process.exit(5); s = s.slice(0, a) + ' ' + s.slice(b); }
+if (kind === 'M-CITE') { const a = s.indexOf(".replace(/['"); const e = s.indexOf(') + "\'"', a); if (a < 0 || e < 0) process.exit(5); s = s.slice(0, a) + ' ' + s.slice(e + 2); }
 else if (kind === 'M-EOO') ligne('export const cmdSwitch', (x) => { if (!x.includes('--end-of-options ')) process.exit(5); return x.replace('--end-of-options ', ''); });
 else if (kind === 'M-BIDI') ligne('export const AFFICHAGE_REFUSE', () => 'export const AFFICHAGE_REFUSE = /(?!)/;');
 else if (kind === 'PLAGE') ligne('export const AFFICHAGE_REFUSE', (x) => { if (x.split(de).length !== 2) process.exit(5); return x.replace(de, vers); });

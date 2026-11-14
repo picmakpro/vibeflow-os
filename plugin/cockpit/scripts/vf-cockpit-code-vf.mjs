@@ -20,6 +20,32 @@ const SUB = { agents: ['Agents', 'ui', 'Les rôles incarnés ou dispatchés.'], 
 const kindOf = (type) => (/doc-only/.test(type) ? 'config' : /agent/.test(type) ? 'service' : 'library');
 const firstSentence = (s) => { s = String(s || '').replace(/\s+/g, ' ').trim(); const i = s.search(/[.!?](\s|$)/); return i > 20 ? s.slice(0, i + 1) : s; }; // la première phrase entière : un texte de visite n'est jamais coupé (P70-D-02)
 
+// mentions `<nom>.sh` : par suite maximale de [\w.-] (une RegExp `[\w.-]+\.sh\b` est quadratique sur une longue
+// suite de points), la mention s'arrête au DERNIER « .sh » suivi d'une fin de mot
+// et précédé d'au moins un caractère (un « .sh » est lu en reculant, jamais une RegExp rejouée depuis chaque début)
+const BLANC = /\s/;
+const scriptsCites = (txt) => {
+  const out = [];
+  for (const m of txt.matchAll(/[\w.-]+/g)) {
+    const r = m[0];
+    for (let q = r.lastIndexOf('.sh'); q > 0; q = r.lastIndexOf('.sh', q - 1)) if (!/\w/.test(r[q + 3] ?? '')) { out.push(r.slice(0, q + 3)); break; }
+  }
+  return out;
+};
+// lignes `source <fichier>` ou `. <fichier>` : le reste de la ligne après le mot et ses blancs ; lu UNE fois par fichier (une RegExp
+// à `\s*` en tête, rejouée par mention, est quadratique sur de longues suites de lignes vides)
+const lignesSource = (txt) => {
+  const rests = [];
+  for (const l of txt.split('\n')) {
+    let i = 0; while (i < l.length && BLANC.test(l[i])) i++;
+    const t = l.startsWith('source', i) ? i + 6 : l.startsWith('.', i) ? i + 1 : -1;
+    if (t < 0 || t >= l.length || !BLANC.test(l[t])) continue;
+    let e = t; while (e < l.length && BLANC.test(l[e])) e++;
+    rests.push(l.slice(e));
+  }
+  return rests;
+};
+
 export function architectureVibeflow({ lab, sortie }) {
   const read = (p) => lireGarde(path.join(lab, p)); // lecture bornée : jamais un fichier non régulier
   const scan = JSON.parse(fs.readFileSync(path.join(sortie, '.cache', 'scan.json'), 'utf8'));
@@ -76,10 +102,11 @@ export function architectureVibeflow({ lab, sortie }) {
   for (const f of files) {
     if (!/\.(sh|md)$/.test(f) || (f.endsWith('.md') && !f.startsWith('plugin/') && !f.startsWith('scripts/'))) continue;
     const txt = read(f);
-    for (const m of new Set(txt.match(/[\w.-]+\.sh\b/g) || [])) {
+    let sources = null;
+    for (const m of new Set(scriptsCites(txt))) {
       const to = resolve(f, m);
       if (!to || to === f) continue;
-      const isSource = new RegExp(`(^|\\n)\\s*(source|\\.)\\s+[^\\n]*${m.replace(/\./g, '\\.')}`).test(txt);
+      const isSource = (sources ??= lignesSource(txt)).some((r) => r.includes(m));
       edge(f, to, isSource ? 'import' : 'call', isSource ? 'source' : 'appelle');
     }
   }

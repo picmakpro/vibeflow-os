@@ -10,6 +10,7 @@
 #   LB.E  client réel + serveur factice du contrat §4 + faux P sous Chrome (E1 à E7, E9 à E11, puis E8 cadre masqué)
 #   LB.F  F1 (focus) : faux P à champ de saisie, frappes abc, fenêtre focalisée puis non focalisée ; SP-1 : clic Lancer, tiroir fermé, le bandeau apparaît dans Q
 #   LB.P  le serveur factice écoute un port >= 4600 et différent de 4456
+#   LB.D  doublure, sans navigateur : le serveur factice tient la règle du flux du serveur réel (vf-cockpit-terminal-session.mjs, attacher : le nouveau flux remplace l'ancien)
 #   M-*   vingt-six mutants, plus six du lot 8 LB3-S, plus huit de la revue du 2026-11-08 (S1, S2, S3, S4, P5), plus quatre du 3e tour (F2, F4, F6b ; le mutant de réserve M-RESERVE-PIED vise désormais F3) (copies des sources, « mutant sans effet » = FAIL)
 # Sans Chrome : les sections statiques et les doublures tournent, la suite annonce SUITE SAUTÉE (navigateur) pour V et E.
 # Variables : VF_CLIENT_MS (échéance d'une attente navigateur, 20000 par défaut) · VF_LB_PORTS=bas-haut (plage de ports du serveur factice ; sinon ports libres du système).
@@ -21,12 +22,12 @@ SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && p
 ENG="$SCRIPTS/../skills/cockpit-moteur"
 WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home" "$WORK/run"
 export REAL_HOME="$HOME"; export HOME="$WORK/home"
-export CHROME_SESSION="$HERE_T/chrome-session.mjs"; export LB_DONNEES="$AUX/donnees.mjs"
+export CHROME_SESSION="$HERE_T/chrome-session.mjs"; export LB_DONNEES="$AUX/donnees.mjs"; export HERE_T
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
 PASS=0; FAIL=0
 court() { if [ "${#1}" -gt 300 ]; then printf '%s […] %s' "${1:0:140}" "${1: -140}"; else printf '%s' "$1"; fi; }
-assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
+assert_eq() { if [ "$#" -ne 3 ]; then echo "  ❌ FAIL — $1 (assert_eq a reçu $# arguments au lieu de 3 : expansion d'accolades de bash 3.2 ?)"; FAIL=$((FAIL+1)); elif [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$(court "$3")]"; echo "     obtenu:  [$(court "$2")]"; FAIL=$((FAIL+1)); fi; }
 sans_effet() { assert_eq "$1 — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; }
 
 CHROME=""
@@ -160,7 +161,7 @@ globalThis.fetch = (u, o = {}) => {
   if (url === '/flux') return new Promise(() => {});
   return Promise.resolve(rep(204, null));
 };
-const m = await import(pathToFileURL(chemin).href);
+const m = (await import(pathToFileURL(process.env.HERE_T + '/navigateur-charger.mjs').href)).chargerFonctions([chemin]); // 79-11 : le client est un fichier du moteur
 const demarrer = () => m.clientTerminal({ origineP: 'http://127.0.0.1:1', theme: 'dark' });
 const nData = () => J.vue.filter(Boolean).length, nNull = () => J.vue.filter((x) => x === null).length;
 const nMsg = () => J.msgs.filter((x) => x.m === 'proposition').length;
@@ -272,12 +273,16 @@ cat > "$AUX/faux.mjs" <<'JS'
 // Q factice : GET / (page rendue par le module du dossier), /flux, /etat, /taille, /entree (octets consignés en hexadécimal dans <run>/entree.log), /proposition, /lancer, /annuler,
 // avec les contrôles de Q (Host exact, secret 401, Origin exacte pour tout POST 403, GET admis sans Origin si Sec-Fetch-Site vaut same-origin) et l'armement côté serveur (425).
 // P factice : page vide à espion de messages ; POST /__scenario { prop, lancers } et GET /__journal (hors de la table fermée de Q).
+// /flux : UN flux à la fois, comme le serveur réel (vf-cockpit-terminal-session.mjs, attacher : « même onglet : le nouveau flux remplace l'ancien »). Sans cette règle, chaque page que
+// la sonde quitte (naviguer) reste gelée dans le cache de retour arrière de Chrome avec son flux ouvert, jusqu'à 60 s ; chaque flux tient une des six connexions que Chrome accorde à un
+// hôte, et à cinq flux tenus le cadre mesuré n'a plus de connexion pour /taille, /proposition ni /entree : l'Entrée fraîche arrive après la fenêtre de mesure (LB.E11 à E14 rouges par
+// intermittence en CI, runs 42989224903 et 43408047589 ; mesuré le 2026-11-13). Garde : LB.D1 et M-FLUX-NON-REMPLACE.
 import http from 'node:http'; import fs from 'node:fs'; import { pathToFileURL } from 'node:url';
 const [, , dossier, moteur, portQ, portP, secret, run] = process.argv;
 const page = await import(pathToFileURL(`${dossier}/vf-cockpit-terminal-page.mjs`).href);
 page.preparerPage({ engineDir: moteur });
 const OQ = `http://127.0.0.1:${portQ}`, OP = `http://127.0.0.1:${portP}`;
-const journal = [], premiere = {}; let scen = { prop: null, lancers: [] }, finEtat = false; // scen.fin : le premier /flux se termine aussitôt et /etat dit la session terminée (bouton « Relancer le shell »)
+const journal = [], premiere = {}; let scen = { prop: null, lancers: [] }, finEtat = false, fluxCourant = null; // scen.fin : le premier /flux se termine aussitôt et /etat dit la session terminée (bouton « Relancer le shell »)
 const lire = (req) => new Promise((ok) => { const c = []; req.on('data', (d) => c.push(d)); req.on('end', () => ok(Buffer.concat(c))); });
 const q = http.createServer(async (req, res) => {
   const chemin = new URL(req.url, OQ).pathname, corps = await lire(req);
@@ -293,7 +298,7 @@ const q = http.createServer(async (req, res) => {
   if (req.method === 'GET' && (req.headers.origin ? req.headers.origin !== OQ : req.headers['sec-fetch-site'] !== 'same-origin')) return fin(403);
   const json = (st, o) => fin(st, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, JSON.stringify(o));
   if (req.method === 'GET' && chemin === '/etat') return json(200, finEtat ? { etat: 'ok', session: 'terminee', code: 0 } : { etat: 'ok', session: 'vivante' });
-  if (req.method === 'GET' && chemin === '/flux') { note(200); res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' }); if (scen.fin) { scen.fin = false; finEtat = true; return res.end(); } finEtat = false; res.write('$ '); return; }
+  if (req.method === 'GET' && chemin === '/flux') { note(200); const ancien = fluxCourant; fluxCourant = res; if (ancien) { try { ancien.end(); } catch {} } res.writeHead(200, { 'Content-Type': 'application/octet-stream', 'Cache-Control': 'no-store' }); if (scen.fin) { scen.fin = false; finEtat = true; return res.end(); } finEtat = false; res.write('$ '); return; }
   if (req.method === 'POST' && chemin === '/taille') return fin(204);
   if (req.method === 'POST' && chemin === '/entree') { fs.appendFileSync(`${run}/entree.log`, corps.toString('hex') + '\n'); return fin(204); }
   if (req.method === 'GET' && chemin === '/proposition') {
@@ -318,7 +323,8 @@ const q = http.createServer(async (req, res) => {
 let injPage = '';
 if (process.env.FAUX_INJ) {
   const t = await import(pathToFileURL(`${process.env.FAUX_INJ}/vf-cockpit-terminal-tiroir.mjs`).href), l = await import(pathToFileURL(`${process.env.FAUX_INJ}/vf-cockpit-lancer-ui.mjs`).href);
-  injPage = t.injectionTiroir({}) + l.injectionLancer({});
+  const mot = fs.existsSync(`${process.env.FAUX_INJ}/moteur`) ? `${process.env.FAUX_INJ}/moteur` : undefined; // 79-11 : une copie mutée porte son moteur réduit ; sinon le moteur du module
+  injPage = t.injectionTiroir({ moteur: mot }) + l.injectionLancer({ moteur: mot });
 }
 const CIBLES = { actif: true, cibles: [{ id: 'ph-1', kind: 'phase', principal: 'planifier', verbes: ['planifier'], bloquants: [], avertissements: [], lancee: false }] };
 const pageSp1 = () => `<!doctype html><title>P factice</title><script>window.VF_COCKPIT_SERVER={token:'t'};window.__msgs=[];addEventListener('message',function(e){window.__msgs.push({o:e.origin,d:String(e.data).slice(0,60)})});window.__secs=[];window.VibeFlow={addPanelSection:function(w,f){window.__secs.push(f)}};</script><div id="panel"></div>${injPage}<script>(function t(){var f=window.__secs[0];if(!f)return void setTimeout(t,50);var r=f('n:ph-1'),z=document.getElementById('panel');z.innerHTML=r.html;r.bind(z)})()</script>`;
@@ -336,8 +342,28 @@ const p = http.createServer(async (req, res) => {
 await new Promise((ok) => q.listen(Number(portQ), '127.0.0.1', ok)); await new Promise((ok) => p.listen(Number(portP), '127.0.0.1', ok));
 fs.writeFileSync(`${run}/pret`, `${process.pid}\n`);
 JS
+cat > "$AUX/flux-remplace.mjs" <<'JS'
+// flux-remplace.mjs <portQ> <secret> : deux GET /flux successifs contre le serveur factice, sans navigateur ; UNE ligne « <premier terminé>/<second terminé> ».
+// Le premier flux doit être TERMINÉ par le serveur à l'arrivée du second (attendu, jamais supposé : relu jusqu'à 3 s) ; le second doit rester ouvert (témoin).
+import http from 'node:http';
+const [, , portQ, secret] = process.argv;
+const entetes = { 'X-VF-Terminal': secret, 'X-VF-Onglet': 'a'.repeat(32), Origin: `http://127.0.0.1:${portQ}` };
+const pause = (ms) => new Promise((r) => setTimeout(r, ms));
+const ouvrir = () => new Promise((ok, ko) => {
+  const rq = http.get({ host: '127.0.0.1', port: Number(portQ), path: '/flux', headers: entetes, agent: false }, (res) => {
+    const f = { fini: false }; res.on('data', () => ok(f)); res.on('end', () => { f.fini = true; ok(f); }); res.on('error', () => {});
+  });
+  rq.on('error', ko); setTimeout(() => ko(new Error('flux sans réponse en 5 s')), 5000);
+});
+try {
+  const a = await ouvrir(), b = await ouvrir();
+  for (let i = 0; i < 30 && !a.fini; i++) await pause(100);
+  console.log(`${a.fini}/${b.fini}`);
+} catch (e) { console.log('plante: ' + e.message); }
+process.exit(0);
+JS
 cat > "$AUX/chrome-bandeau.mjs" <<'JS'
-// chrome-bandeau.mjs <chrome> <mode> <json> : scénarios navigateur du bandeau de proposition ; UNE ligne JSON. Modes : vue (LB.V) · client (LB.E1 à E7) · froid (LB.E8).
+// chrome-bandeau.mjs <chrome> <mode> <json> : scénarios navigateur du bandeau de proposition ; UNE ligne JSON. Modes : vue (LB.V) · client (LB.E1 à E7) · froid (LB.E8) · reprise (LB.R, AUDC-M11).
 // Q factice dans un cadre sandbox de P factice, plein viewport (ou de taille nulle), secret posé dans le stockage de Q ; gestes par Input.dispatchMouseEvent seulement.
 // Chaque étape est isolée (essai) : une mesure indisponible est nommée dans `erreurs`, jamais un résultat vide.
 // Bornes d'attente : les plafonds d'attente POSITIVE sont à MS (20 s par défaut) : sur un produit cassé, N essais perdus × 20 s peuvent dépasser l'échéance globale de la session (VF_CDP_GLOBAL_MS, 600 s) ;
@@ -978,6 +1004,58 @@ await executer(chrome, async (s) => {
     return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
   }
 
+  if (mode === 'reprise') {
+    // AUDC-M11 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11, « Redescendre ensuite ») : tiroir RÉEL de P et Q RÉEL de bout en bout, fenêtre de 700 px (hauteur du bandeau : 60 % = 420 px).
+    // Chaque cas règle la hauteur du tiroir au clavier, fait arriver une proposition (le tiroir monte à 420 px), retire le bandeau par la cause voulue, puis lit la hauteur UNE FOIS le message « retrait » reçu (borné, jamais une pause fixe) et stable.
+    await scenario({ prop: null });
+    await s.naviguer(`${OQ}/`); await s.ev(`localStorage.setItem('vf.terminal.secret', ${JSON.stringify(secret)})`);
+    await s.naviguer(`${OP}/project.html?sp1=1`); await s.attendre(`document.readyState === 'complete'`, 'page P', AM);
+    const POIGNEE = `document.querySelector('.vf-term-poignee')`;
+    const MES = `({ now: Number(${POIGNEE}.getAttribute('aria-valuenow')), px: Math.round(document.querySelector('.vf-term-tiroir').getBoundingClientRect().height), memo: localStorage.getItem('vf.terminal.h'), ouvert: !document.querySelector('.vf-term-tiroir').hidden })`;
+    const mesure = () => stabiliser(() => s.ev(MES), { max: 5000 });
+    const touche = async (key, modifiers = 0) => { for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key, code: key, windowsVirtualKeyCode: { Home: 36, ArrowUp: 38 }[key], modifiers }); };
+    const regler = async (grands, petits) => { await s.ev(`${POIGNEE}.focus()`); await touche('Home'); for (let i = 0; i < grands; i++) await touche('ArrowUp', 8); for (let i = 0; i < petits; i++) await touche('ArrowUp'); }; // Home = 160 px, Maj+flèche = 96, flèche = 24
+    const msgs = (d) => s.ev(`window.__msgs.filter((m) => m.d === ${JSON.stringify(d)}).length`);
+    const apresMsg = (d, n) => attendreEtStabiliser(() => msgs(d), (v) => v >= n, { pas: 150, max: 6000 }); // le message est reçu PUIS le compte est stable ; l'attente n'est jamais fatale (un message absent rend le compte, l'assertion juge)
+    const clicCadre = async (expr) => { const dans = await positionPosee(q.ev, expr), ext = await positionPosee(s.ev, `document.querySelector('.vf-term-tiroir iframe')`); if (!dans || !ext) throw new Error('élément du cadre introuvable'); const c = { x: ext.x + dans.cx, y: ext.y + dans.cy };
+      await s.send('Input.dispatchMouseEvent', { type: 'mouseMoved', x: c.x, y: c.y }); await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: c.x, y: c.y, button: 'left', clickCount: 1 }); await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: c.x, y: c.y, button: 'left', clickCount: 1 }); };
+    await essai('ouvrir', async () => { await s.attendre(`!!document.querySelector('button.vf-term-pastille')`, 'pastille Terminal', AM); await s.ev(`document.querySelector('button.vf-term-pastille').click()`); await s.attendre(`!!document.querySelector('.vf-term-tiroir iframe')`, 'cadre du tiroir', MS); await trouverCtx(s, AM); });
+    let n = 0; r.reprise = {};
+    const cas = (nom, grands, petits, cause, entre) => essai(nom, async () => {
+      if (grands !== null) await regler(grands, petits); const avant = await mesure(), id = ID(300 + (++n)), r0 = await msgs('retrait'), p0 = await msgs('proposition');
+      await scenario({ prop: valide(id, Object.assign({ arme_apres_ms: 600 }, cause === 'expirer' ? { expire_ms: 3000 } : {})), lancers: [] });
+      await q.attendre(`!!document.getElementById('proposition') && document.getElementById('proposition').dataset.id === ${JSON.stringify(id)}`, 'bandeau de la proposition', MS);
+      await apresMsg('proposition', p0 + 1);
+      const haut = await attendreEtStabiliser(() => s.ev(MES), (v) => v.now >= 420, { max: 5000 });
+      if (entre) await entre();
+      if (cause === 'annuler' || cause === 'utilisateur') await q.ev(`${ANNULER}.click()`);
+      else if (cause === 'lancer') { await attendreArme(); await clicCadre(LANCER); await q.attendre(`!document.getElementById('proposition')`, 'bandeau retiré après le lancement', MS); }
+      else if (cause === 'expirer') await q.attendre(`!!document.querySelector('#proposition[data-etat=expiree]')`, 'bandeau expiré', 15000);
+      const recus = await apresMsg('retrait', r0 + 1), fin = await mesure();
+      if (cause === 'expirer') { await q.ev(`[...document.querySelectorAll('#proposition button')].find((b) => b.textContent === 'Fermer').click()`); } // « Fermer » le bandeau expiré : la hauteur est déjà reprise, aucun second message
+      const apresFermer = cause === 'expirer' ? await stabiliser(() => msgs('retrait'), { pas: 300, max: 3000 }) : recus;
+      r.reprise[nom] = [avant.now, haut.now, recus - r0, apresFermer - r0, fin.now, fin.px, avant.memo + '>' + fin.memo, fin.ouvert].join('/');
+    });
+    // avant/haut/retraits/retraits-apres-Fermer/fin/px/mémo/ouvert
+    await cas('defaut', null, 0, 'annuler'); // page neuve, aucune hauteur réglée ni mémorisée : 36 % de 700 px = 252 px par défaut
+    await cas('annuler', 0, 0, 'annuler');
+    await cas('lancer', 1, 2, 'lancer');
+    await cas('expirer', 0, 0, 'expirer');
+    await cas('utilisateur', 0, 0, 'utilisateur', async () => { await s.ev(`${POIGNEE}.focus()`); await touche('ArrowUp'); await s.attendre(`Number(${POIGNEE}.getAttribute('aria-valuenow')) === 444`, 'hauteur réglée par l\'utilisateur', MS); });
+    await cas('assez-haut', 3, 0, 'annuler');
+    await essai('remplace', async () => { // une proposition qui en remplace une autre pendant le rehaussement : aucun « retrait », la hauteur d'origine n'est pas oubliée
+      await regler(0, 0); const avant = await mesure(), r0 = await msgs('retrait'), p0 = await msgs('proposition');
+      for (const k of [1, 2]) {
+        const id = ID(400 + k); await scenario({ prop: valide(id, { arme_apres_ms: 600 }), lancers: [] });
+        await q.attendre(`!!document.getElementById('proposition') && document.getElementById('proposition').dataset.id === ${JSON.stringify(id)}`, 'bandeau ' + k, MS); await apresMsg('proposition', p0 + k);
+      }
+      const haut = await attendreEtStabiliser(() => s.ev(MES), (v) => v.now >= 420, { max: 5000 }), entre = (await stabiliser(() => msgs('retrait'), { pas: 300, max: 3000 })) - r0;
+      await q.ev(`${ANNULER}.click()`); await apresMsg('retrait', r0 + 1); const fin = await mesure();
+      r.reprise.remplace = [avant.now, haut.now, entre, fin.now, avant.memo + '>' + fin.memo].join('/');
+    });
+    return JSON.parse(JSON.stringify(r).split(secret).join('<secret>'));
+  }
+
   if (mode === 'froid') {
     await scenario({ prop: valide(ID_A), lancers: [] }); await q.naviguer(`${OQ}/?theme=dark`, 'nulle');
     const recus = async () => JSON.parse(await s.ev('JSON.stringify(window.__msgs)')).filter((m) => m.d === 'proposition');
@@ -1000,22 +1078,26 @@ JS
 
 # --- outils de la suite ---------------------------------------------------------------------------------------------------------------------------------
 rj() { printf '%s\n' "$1" | node "$AUX/ev.mjs" "$2" 2>/dev/null; }
+rep_() { rj "$RJ" "(j.erreur ? 'plante: ' + j.erreur : (j.reprise || {})['$1'] === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.reprise['$1'])"; } # rep_ <cas> : la ligne d'un cas de LB.R
+rouge_rep() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : (j.reprise || {})['$2'] === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.reprise['$2'] === '$3' ? 'sain' : 'rouge')"; } # rouge_rep <sortie> <cas> <valeur saine> : « rouge » seulement si la mesure existe ET s'écarte de la forme saine
 # verdict d'une sonde : « sain » si l'expression est vraie, « rouge » si elle est fausse, « plante » si le scénario a rendu une erreur (jamais un rouge pour une mauvaise raison)
 verdict() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : ($2) ? 'sain' : 'rouge')"; }
+# 79-11 : vue, client et feuille de Q sont des fichiers du moteur ; une copie mutée = le module de la page (page et lecteur) + un moteur réduit (le vendor lié, le dossier terminal copié)
+moteur_de() { if [ -d "$1/moteur" ]; then printf '%s\n' "$1/moteur"; else printf '%s\n' "$ENG"; fi; } # moteur_de <dossier-des-modules> : le moteur de la copie mutée, sinon celui du dépôt
 mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_DIR ; code 1 si la cible manque ou si la copie n'a pas changé
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"
-  for x in page style vue client; do cp "$SCRIPTS/vf-cockpit-terminal-$x.mjs" "$d/"; done
-  MUT_DIR="$d"; f="$d/$2"; [ -f "$f" ] || return 1
+  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d/moteur/assets/ui"
+  cp "$SCRIPTS/vf-cockpit-terminal-page.mjs" "$SCRIPTS/vf-cockpit-navigateur.mjs" "$d/"; cp -R "$ENG/assets/ui/terminal" "$d/moteur/assets/ui/terminal"; ln -s "$ENG/assets/vendor" "$d/moteur/assets/vendor"
+  MUT_DIR="$d"; case "$2" in vue.js|client.js|q.css) f="$d/moteur/assets/ui/terminal/$2" ;; *) f="$d/$2" ;; esac; [ -f "$f" ] || return 1
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
-doubles() { node "$AUX/doubles.mjs" "$1/vf-cockpit-terminal-client.mjs" "$2" 2>&1 | tail -1; } # doubles <dossier> <scénario>
+doubles() { node "$AUX/doubles.mjs" "$(moteur_de "$1")/assets/ui/terminal/client.js" "$2" 2>&1 | tail -1; } # doubles <dossier> <scénario>
 FN=0; VF_CLIENT_MS0="${VF_CLIENT_MS:-}"
 faux() { # faux <dossier-des-modules> -> FQ FP FSEC FRUN FPID ; un seul processus, deux ports
   # un mutant (modules ou injection copiés) peut casser l'amorçage : ses attentes restent à 20 s (jamais l'AMORCE de 600 s) ; la suite normale garde l'amorçage large
   if [ "$1" != "$SCRIPTS" ] || [ "${FAUX_INJ:-$SCRIPTS}" != "$SCRIPTS" ]; then export VF_CLIENT_MS=20000; elif [ -n "$VF_CLIENT_MS0" ]; then export VF_CLIENT_MS="$VF_CLIENT_MS0"; else unset VF_CLIENT_MS; fi
   port; FQ="$PORT"; port; FP="$PORT"; FSEC="$(node -e "console.log(require('crypto').randomBytes(32).toString('hex'))")"
   FN=$((FN+1)); FRUN="$WORK/run/$FN"; mkdir -p "$FRUN"
-  FAUX_INJ="${FAUX_INJ:-}" node "$AUX/faux.mjs" "$1" "$ENG" "$FQ" "$FP" "$FSEC" "$FRUN" > "$FRUN/faux.out" 2>&1 < /dev/null &
+  FAUX_INJ="${FAUX_INJ:-}" node "${FAUX_MJS:-$AUX/faux.mjs}" "$1" "$(moteur_de "$1")" "$FQ" "$FP" "$FSEC" "$FRUN" > "$FRUN/faux.out" 2>&1 < /dev/null &
   FPID=$!; PIDS+=($FPID)
   for _ in $(seq 1 100); do [ -s "$FRUN/pret" ] && break; sleep 0.1; done
 }
@@ -1028,14 +1110,14 @@ run_vue() { faux "$1"; VJ="$(navig vue "${2:-}")"; unfaux; } # run_vue <dossier>
 # --- LB.S : statique ------------------------------------------------------------------------------------------------------------------------------------
 echo "=== LB.S — scripts propres de la page servie (statique) ==="
 node "$AUX/pagegen.mjs" "$SCRIPTS" "$ENG" dark "$WORK/page.html"; ST="$(node "$AUX/stat.mjs" "$WORK/page.html")"
-LV="$(node "$AUX/lignes.mjs" "$SCRIPTS/vf-cockpit-terminal-vue.mjs")"; LC="$(node "$AUX/lignes.mjs" "$SCRIPTS/vf-cockpit-terminal-client.mjs")"
+LV="$(node "$AUX/lignes.mjs" "$ENG/assets/ui/terminal/vue.js")"; LC="$(node "$AUX/lignes.mjs" "$ENG/assets/ui/terminal/client.js")"
 assert_eq "LB.S0 — témoin : la page de Q a ses quatre <script> et ses scripts propres sont vivants (propres > 200)" "$(rj "$ST" 'j.scripts+"/"+(j.propres>200)')" "4/true"
 assert_eq "LB.S1 — adresse : location.search = 2, URLSearchParams = 0, searchParams = 0, location.href = 0 (baselines mesurées avant ce plan)" "$(rj "$ST" 'j.search+"/"+j.urlsp+"/"+j.searchp+"/"+j.href')" "2/0/0/0"
 assert_eq "LB.S1 — canal : écouteurs de messages entrants = 0, postMessage( = 1 (dans emettre), postMessage avec l'étoile = 0" "$(rj "$ST" 'j.ecoute+"/"+j.postmsg+"/"+j.etoile')" "0/1/0"
 assert_eq "LB.S1 — aucune écriture innerHTML, outerHTML ni insertAdjacentHTML ; aucun appel à confirm(" "$(rj "$ST" 'j.html+"/"+j.confirm')" "0/0"
 assert_eq "LB.S1 — lignes de littéral de couleur : vue 6 / client 0 ; .style : 0 / 0 ; cssText : 0 / 0 ; rgb( ou hsl( : vue 3 / client 0 ; <chiffre>px : vue 0 / client 1" \
   "$(rj "$LV" 'j.couleur+"/"+j.style+"/"+j.css+"/"+j.rgb+"/"+j.px')|$(rj "$LC" 'j.couleur+"/"+j.style+"/"+j.css+"/"+j.rgb+"/"+j.px')" "6/0/0/3/0|0/0/0/0/1"
-assert_eq "LB.S2 — la table MESSAGES a exactement neuf clés dont proposition ; l'unique postMessage( vise cfg.origineP" "$(rj "$ST" 'j.cles+"/"+j.proposition+"/"+j.cible')" "9/true/true"
+assert_eq "LB.S2 — la table MESSAGES a exactement onze clés (neuf, plus annulation puis retrait depuis AUDC-M11) dont proposition ; l'unique postMessage( vise cfg.origineP" "$(rj "$ST" 'j.cles+"/"+j.proposition+"/"+j.cible')" "11/true/true"
 assert_eq "LB.S3 — client <= 290 lignes, vue <= 302 lignes (le chiffre mesuré : client $(rj "$LC" j.lignes), vue $(rj "$LV" j.lignes)) ; le plafond a été relevé de 280/215 par le lot 8 (LB2), qui ajoute à la vue les phrases en clair, une explication par mode et pour la case du chat, le compte à rebours et le bandeau expiré ; celui de la vue est passé de 290 à 310 pour la consigne « Appuyez sur Entrée » qui reste visible après la préparation (P5, revue du 2026-11-08 : décision déléguée par Samuel, message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5, option recommandée : relever le plafond plutôt que compresser le code) ; F6c (3e tour) : remis au plus juste, 301 lignes mesurées plus une ligne d'avance, car les correctifs F2, F4 et F6b tiennent dans des lignes existantes ou dans la feuille de style (décision déléguée par Samuel, message session principale, 2026-11-08, consignée en § 10 du rapport GLOBAL, 599a42a5, option recommandée : remettre le plafond au plus juste après les ajouts)" "$(rj "$LC" 'j.lignes<=290')/$(rj "$LV" 'j.lignes<=302')" "true/true"
 assert_eq "LB.S4 — aucun fiabilite ni gouvernance dans la vue ni le client ; aucun appel confirm(" "$(rj "$LV" 'j.compartiments+"/"+j.confirm')|$(rj "$LC" 'j.compartiments+"/"+j.confirm')" "0/0|0/0"
 regles_prop() { grep -F '#proposition' "$1"; } # les règles de la proposition dans la feuille de Q : toutes portent #proposition
@@ -1054,8 +1136,8 @@ nb_lot() { [ "$(regles_lot "$1" | wc -l | tr -d ' ')" -ge 15 ] && echo ok || ech
 #  560px x1  : largeur de la carte sur un cadre bas ; aucune variable
 #  240px x1  : seuil de la requête de média (max-height) ; une propriété personnalisée ne s'emploie pas dans une requête de média
 EXC_PX_LOT="12.5px 12.5px 240px 44px 560px "
-assert_eq "LB.S4 — aucune valeur de style en dur (R3, plan 72-08, élargi au lot 8 LB3-S2) : (1) aucun littéral de couleur, rgb( ni hsl( dans les règles ajoutées par le lot (témoin : elles sont trouvées) ; (2) leurs littéraux en px sont EXACTEMENT les exceptions nommées (12.5px x2 taille de texte, 44px hauteur du bandeau d'état, 560px largeur de carte, 240px seuil de média) ; (3) la page et le tiroir ne sont pas modifiés (git)" "$(nb_lot "$SCRIPTS/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$SCRIPTS/vf-cockpit-terminal-style.mjs")/$(px_lot "$SCRIPTS/vf-cockpit-terminal-style.mjs")/$(git -C "$SCRIPTS" status --porcelain -- vf-cockpit-terminal-page.mjs vf-cockpit-terminal-tiroir.mjs | wc -l | tr -d ' ')" "ok/0/$EXC_PX_LOT/0"
-assert_eq "LB.S5 — échelle de DESIGN.md (§3 texte courant dense 12-12,5 px, §7 pictos 16 x 16) : aucune taille en em dans les règles de la proposition ; témoin : l'aide et les modes sont à 12.5px et le picto à 16 px par le jeton --sp-16 (F6 : plus de littéral)" "$(echem_prop "$SCRIPTS/vf-cockpit-terminal-style.mjs")/$(regles_prop "$SCRIPTS/vf-cockpit-terminal-style.mjs" | grep -c 'font-size: 12.5px')/$(regles_prop "$SCRIPTS/vf-cockpit-terminal-style.mjs" | grep -c 'svg.i { width: var(--sp-16); height: var(--sp-16)')" "0/2/1"
+assert_eq "LB.S4 — aucune valeur de style en dur (R3, plan 72-08, élargi au lot 8 LB3-S2) : (1) aucun littéral de couleur, rgb( ni hsl( dans les règles ajoutées par le lot (témoin : elles sont trouvées) ; (2) leurs littéraux en px sont EXACTEMENT les exceptions nommées (12.5px x2 taille de texte, 44px hauteur du bandeau d'état, 560px largeur de carte, 240px seuil de média) ; (3) la page et le tiroir ne sont pas modifiés (git)" "$(nb_lot "$ENG/assets/ui/terminal/q.css")/$(couleurs_lot "$ENG/assets/ui/terminal/q.css")/$(px_lot "$ENG/assets/ui/terminal/q.css")/$(git -C "$SCRIPTS" status --porcelain -- vf-cockpit-terminal-page.mjs vf-cockpit-terminal-tiroir.mjs | wc -l | tr -d ' ')" "ok/0/$EXC_PX_LOT/0"
+assert_eq "LB.S5 — échelle de DESIGN.md (§3 texte courant dense 12-12,5 px, §7 pictos 16 x 16) : aucune taille en em dans les règles de la proposition ; témoin : l'aide et les modes sont à 12.5px et le picto à 16 px par le jeton --sp-16 (F6 : plus de littéral)" "$(echem_prop "$ENG/assets/ui/terminal/q.css")/$(regles_prop "$ENG/assets/ui/terminal/q.css" | grep -c 'font-size: 12.5px')/$(regles_prop "$ENG/assets/ui/terminal/q.css" | grep -c 'svg.i { width: var(--sp-16); height: var(--sp-16)')" "0/2/1"
 
 # --- LB.C : client sans navigateur -----------------------------------------------------------------------------------------------------------------------
 echo "=== LB.C — client de Q, doublures sans navigateur ==="
@@ -1170,209 +1252,232 @@ if [ -n "$CHROME" ]; then
   FAUX_INJ="$SCRIPTS" faux "$SCRIPTS"; SJ1="$(navig sp1 '"emu":true')"; unfaux
   assert_eq "LB.F3 — SP-1 : page rechargée sans fragment, tiroir fermé (aucun cadre avant), clic Lancer sur une carte : 202, cadre de Q monté, bandeau dans Q, le focus de P n'est pas pris par le cadre" \
     "$(rj "$SJ1" "(j.erreur ? 'plante: ' + j.erreur : j.sp1 !== undefined ? j.sp1 : 'erreur: ' + ((j.erreurs || {}).sp1 || 'étape absente'))")" "0/true/true/true"
+  # LB.R — AUDC-M11 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) : le tiroir reprend sa hauteur quand le bandeau disparaît de Q ; chaque cas : avant/haut/retraits/retraits après « Fermer »/fin/px/mémo/ouvert
+  FAUX_INJ="$SCRIPTS" faux "$SCRIPTS"; RJ="$(navig reprise)"; unfaux
+  assert_eq "LB.R0 — témoin : aucune étape en erreur, les sept cas ont été mesurés" "$(rj "$RJ" '(j.erreur||JSON.stringify(j.erreurs))+" cas="+Object.keys(j.reprise||{}).length')" "{} cas=7"
+  assert_eq "LB.R7 — hauteur par défaut jamais réglée (page neuve, rien en mémoire) : le tiroir monte de 252 à 420 px puis reprend 252 px, et la mémoire reste VIDE (la reprise ne fait pas passer la hauteur pour un réglage de l'utilisateur)" "$(rep_ defaut)" "252/420/1/1/252/252/null>null/true"
+  assert_eq "LB.R1 — « Annuler » : le tiroir monte de 160 à 420 px, puis reprend 160 px (hauteur mesurée ET aria-valuenow), un seul message retrait, hauteur mémorisée intacte (160 avant, 160 après), tiroir resté ouvert" "$(rep_ annuler)" "160/420/1/1/160/160/160>160/true"
+  assert_eq "LB.R2 — lancement (clic de confiance sur « Préparer », 204) : de 304 à 420 px, puis reprend 304 px, un seul retrait, mémo intacte" "$(rep_ lancer)" "304/420/1/1/304/304/304>304/true"
+  assert_eq "LB.R3 — expiration (compte à rebours de 3 s) : le bandeau expiré remplace le bandeau, le tiroir reprend 160 px à ce moment ; « Fermer » sur le bandeau expiré n'émet pas un second retrait" "$(rep_ expirer)" "160/420/1/1/160/160/160>160/true"
+  assert_eq "LB.R4 — l'utilisateur règle le tiroir au clavier pendant le bandeau (420 puis 444 px) : « Annuler » ne l'écrase pas, 444 px reste, la mémoire porte sa hauteur (160 avant, 444 après)" "$(rep_ utilisateur)" "160/420/1/1/444/444/160>444/true"
+  assert_eq "LB.R5 — tiroir déjà assez haut (448 px, au-dessus des 420 du bandeau) : jamais rehaussé, rien n'est repris à « Annuler » (448 avant, pendant et après), mémo intacte" "$(rep_ assez-haut)" "448/448/1/1/448/448/448>448/true"
+  assert_eq "LB.R6 — une proposition en remplace une autre pendant le rehaussement : aucun retrait n'est émis par le remplacement (0), la hauteur d'origine n'est pas oubliée (160 à la fin, après « Annuler »)" "$(rj "$RJ" "(j.erreur ? 'plante: ' + j.erreur : (j.reprise || {}).remplace === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.reprise.remplace)")" "160/420/0/160/160>160"
   assert_eq "LB.P — le serveur factice écoute des ports >= 4600 et différents de 4456 (Q $FQ0, P $FP0)" "$([ "$FQ0" -ge 4600 ] && [ "$FP0" -ge 4600 ] && [ "$FQ0" -ne 4456 ] && [ "$FP0" -ne 4456 ] && [ "$FQ0" -ne "$FP0" ] && echo oui || echo non)" "oui"
+fi
+
+# --- LB.D : la doublure tient la règle du flux du serveur réel (sans navigateur) -------------------------------------------------------------------------
+echo "=== LB.D — serveur factice : un flux à la fois ==="
+faux "$SCRIPTS"; DJ="$(node "$AUX/flux-remplace.mjs" "$FQ" "$FSEC" 2>&1 | tail -1)"; unfaux
+assert_eq "LB.D1 — deux GET /flux successifs : le serveur factice TERMINE le premier à l'arrivée du second (règle du serveur réel, vf-cockpit-terminal-session.mjs : le nouveau flux remplace l'ancien) ; témoin : le second reste ouvert ; cadre : <premier terminé>/<second terminé>" "$DJ" "true/false"
+sed 's/if (ancien) { try { ancien.end(); } catch {} }//' "$AUX/faux.mjs" > "$AUX/faux-mut.mjs"
+if cmp -s "$AUX/faux.mjs" "$AUX/faux-mut.mjs"; then sans_effet "M-FLUX-NON-REMPLACE"; else
+  FAUX_MJS="$AUX/faux-mut.mjs" faux "$SCRIPTS"; MJ="$(node "$AUX/flux-remplace.mjs" "$FQ" "$FSEC" 2>&1 | tail -1)"; unfaux
+  assert_eq "M-FLUX-NON-REMPLACE — le mutant (le serveur factice ne termine plus l'ancien flux : une page quittée garderait sa connexion) rougit LB.D1 : le premier flux reste ouvert (témoin : la sonde s'exécute, le second flux est ouvert)" "$MJ" "false/false"
 fi
 
 # --- mutants ---------------------------------------------------------------------------------------------------------------------------------------------
 echo "=== M-* — vingt-six mutants, plus six de LB3-S (copies des sources) ==="
-if mutant entree-auto vf-cockpit-terminal-client.mjs "/garde:apres-usage/s#.*#if (terminal) terminal.focus(); fetch('/entree', { method: 'POST', headers: entetes(), body: new Uint8Array([13]) });#"; then
+if mutant entree-auto client.js "/garde:apres-usage/s#.*#if (terminal) terminal.focus(); fetch('/entree', { method: 'POST', headers: entetes(), body: new Uint8Array([13]) });#"; then
   assert_eq "M-ENTREE-AUTO — le mutant rougit LB.C5 : un octet part à /entree après le 204 (témoin : le scénario s'exécute, le lancement est accepté)" "$(verdict "$(doubles "$MUT_DIR" focus)" 'j.st==="ok" && j.entrees===0')" "rouge"
 else sans_effet "M-ENTREE-AUTO"; fi
-if mutant armement-ignore vf-cockpit-terminal-vue.mjs "/garde:armement/s/'true'/'false'/"; then
+if mutant armement-ignore vue.js "/garde:armement/s/'true'/'false'/"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v3"]'; assert_eq "M-ARMEMENT-IGNORE — le mutant rougit LB.V3 : un clic avant l'armement appelle cb.lancer (témoin : le bandeau s'affiche, la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v3 === 'tôt/0/[\"default\"]' ? 'sain' : j.v3 ? 'rouge' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"; }
 else sans_effet "M-ARMEMENT-IGNORE"; fi
-if mutant texte-serveur vf-cockpit-terminal-client.mjs "/garde:corps-lancer/s/{ id: courante, mode }/{ id: courante, mode, ligne: 'claude --session-id' }/"; then
+if mutant texte-serveur client.js "/garde:corps-lancer/s/{ id: courante, mode }/{ id: courante, mode, ligne: 'claude --session-id' }/"; then
   assert_eq "M-TEXTE-AU-SERVEUR — le mutant rougit LB.C3 : le corps de POST /lancer n'est plus {id,mode} (témoin : la requête part)" "$(verdict "$(doubles "$MUT_DIR" statuts)" 'j.cas[0].nreq===1 && j.cas[0].req.b===JSON.stringify({id:j.cas[0].req.id,mode:"acceptEdits"})')" "rouge"
 else sans_effet "M-TEXTE-AU-SERVEUR"; fi
-if mutant mode-non-relu vf-cockpit-terminal-client.mjs "/garde:mode-relu/s#.*#return v || 'default';#"; then
+if mutant mode-non-relu client.js "/garde:mode-relu/s#.*#return v || 'default';#"; then
   assert_eq "M-MODE-NON-RELU — le mutant rougit LB.C4 : bypassPermissions devient la présélection (témoin : les valeurs valides sont lues)" "$(verdict "$(doubles "$MUT_DIR" mode)" 'j.lu[1]==="bypassPermissions=>default" && j.lu[9]==="acceptEdits=>acceptEdits"')" "rouge"
 else sans_effet "M-MODE-NON-RELU"; fi
-if mutant message-avec-donnees vf-cockpit-terminal-client.mjs "/garde:emission/s#emettre('proposition')#window.parent.postMessage('proposition:' + p.id, cfg.origineP)#"; then
+if mutant message-avec-donnees client.js "/garde:emission/s#emettre('proposition')#window.parent.postMessage('proposition:' + p.id, cfg.origineP)#"; then
   assert_eq "M-MESSAGE-AVEC-DONNEES — le mutant rougit LB.C2 : le message porte l'identifiant (témoin : la proposition s'affiche)" "$(verdict "$(doubles "$MUT_DIR" suivi)" 'j.a1.n===1 && j.msg.n===3 && j.msg.strict')" "rouge"
-  node "$AUX/pagegen.mjs" "$MUT_DIR" "$ENG" dark "$WORK/m-donnees.html"; assert_eq "M-MESSAGE-AVEC-DONNEES — le mutant rougit aussi LB.S2 : le postMessage( ne vise plus la seule émission fixe (deux appels)" "$(rj "$(node "$AUX/stat.mjs" "$WORK/m-donnees.html")" 'j.postmsg===1 && j.cible')" "false"
+  node "$AUX/pagegen.mjs" "$MUT_DIR" "$(moteur_de "$MUT_DIR")" dark "$WORK/m-donnees.html"; assert_eq "M-MESSAGE-AVEC-DONNEES — le mutant rougit aussi LB.S2 : le postMessage( ne vise plus la seule émission fixe (deux appels)" "$(rj "$(node "$AUX/stat.mjs" "$WORK/m-donnees.html")" 'j.postmsg===1 && j.cible')" "false"
 else sans_effet "M-MESSAGE-AVEC-DONNEES"; fi
-if mutant message-repete vf-cockpit-terminal-client.mjs "/garde:emission/s/if (nouveau) //"; then
+if mutant message-repete client.js "/garde:emission/s/if (nouveau) //"; then
   assert_eq "M-MESSAGE-REPETE — le mutant rougit LB.C2 : un message à chaque sondage au lieu d'un par identifiant (témoin : la proposition s'affiche)" "$(verdict "$(doubles "$MUT_DIR" suivi)" 'j.a1.n===1 && j.a2.msgs===1 && j.b.msgs===2')" "rouge"
 else sans_effet "M-MESSAGE-REPETE"; fi
-if mutant usage-reste vf-cockpit-terminal-vue.mjs "/garde:retrait-usage/s/st === 'ok' || //"; then
+if mutant usage-reste vue.js "/garde:retrait-usage/s/st === 'ok' || //"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v7"]'; assert_eq "M-USAGE-RESTE — le mutant rougit LB.V7 : le bandeau reste après un lancement accepté (témoin : les autres statuts s'exécutent)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : /^ok=KO/.test(j.v7 || '') && /;occupe=ok;/.test(j.v7) ? 'rouge' : j.v7 ? 'sain' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"; }
 else sans_effet "M-USAGE-RESTE"; fi
-if mutant aucune-ignoree vf-cockpit-terminal-client.mjs "/garde:aucune/d"; then
+if mutant aucune-ignoree client.js "/garde:aucune/d"; then
   assert_eq "M-AUCUNE-IGNOREE — le mutant rougit LB.C2 : « aucune » ne retire plus le bandeau (témoin : le bandeau s'est affiché)" "$(verdict "$(doubles "$MUT_DIR" suivi)" 'j.a1.n===1 && j.c.nulls===1')" "rouge"
 else sans_effet "M-AUCUNE-IGNOREE"; fi
-if mutant clic-non-fiable vf-cockpit-terminal-vue.mjs "/garde:clic-fiable/s/ev.isTrusted !== true || //"; then
+if mutant clic-non-fiable vue.js "/garde:clic-fiable/s/ev.isTrusted !== true || //"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v4"]'; assert_eq "M-CLIC-NON-FIABLE — le mutant rougit LB.V4 : un click() programmatique appelle cb.lancer (témoin : le bandeau est affiché et armé, la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v4 === '0/1' ? 'sain' : j.v4 ? 'rouge' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"; }
 else sans_effet "M-CLIC-NON-FIABLE"; fi
-if mutant innerhtml vf-cockpit-terminal-vue.mjs "/garde:texte/s|.*|const t = el('span', 'vf-q-texte'); t.innerHTML = 'Lancement proposé : ' + p.intention; b.appendChild(t);|"; then
+if mutant innerhtml vue.js "/garde:texte/s|.*|const t = el('span', 'vf-q-texte'); t.innerHTML = 'Lancement proposé : ' + p.intention; b.appendChild(t);|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v5"]'; assert_eq "M-INNERHTML — le mutant rougit LB.V5 : l'intention hostile devient un nœud img (témoin : le bandeau s'affiche, la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v5 === 'true/true/0/undefined/0/false/0/0' ? 'sain' : j.v5 ? 'rouge' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"; }
 else sans_effet "M-INNERHTML"; fi
-if mutant prop-au-dessus vf-cockpit-terminal-vue.mjs "/garde:collage-dessus/s|.*|document.body.appendChild(b);|"; then
+if mutant prop-au-dessus vue.js "/garde:collage-dessus/s|.*|document.body.appendChild(b);|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v6"]'; assert_eq "M-PROP-AU-DESSUS — le mutant rougit LB.V6 : le bandeau passe au-dessus du collage (témoin : les deux sont affichés)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v6 === 'true/true' ? 'sain' : j.v6 ? 'rouge' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"; }
 else sans_effet "M-PROP-AU-DESSUS"; fi
-if mutant param-url vf-cockpit-terminal-client.mjs "/garde:mode-lecture/s#.*#const v = new URLSearchParams(location.search).get('mode') || p.mode_retenu; // garde:mode-lecture#"; then
-  node "$AUX/pagegen.mjs" "$MUT_DIR" "$ENG" dark "$WORK/m-url.html"; assert_eq "M-PARAM-URL — le mutant rougit LB.S1 : URLSearchParams lu dans le client (témoin : la page est vivante)" "$(rj "$(node "$AUX/stat.mjs" "$WORK/m-url.html")" '(j.urlsp===0 && j.search===2) ? "sain" : (j.propres>200 ? "rouge" : "plante")')" "rouge"
+if mutant param-url client.js "/garde:mode-lecture/s#.*#const v = new URLSearchParams(location.search).get('mode') || p.mode_retenu; // garde:mode-lecture#"; then
+  node "$AUX/pagegen.mjs" "$MUT_DIR" "$(moteur_de "$MUT_DIR")" dark "$WORK/m-url.html"; assert_eq "M-PARAM-URL — le mutant rougit LB.S1 : URLSearchParams lu dans le client (témoin : la page est vivante)" "$(rj "$(node "$AUX/stat.mjs" "$WORK/m-url.html")" '(j.urlsp===0 && j.search===2) ? "sain" : (j.propres>200 ? "rouge" : "plante")')" "rouge"
   if [ -n "$CHROME" ]; then faux "$MUT_DIR"; MJ="$(navig client '"only":["e6"]')"; unfaux
     assert_eq "M-PARAM-URL — le mutant rougit aussi LB.E6 (Chrome) : la présélection suit le paramètre d'adresse (acceptEdits/0 au lieu de plan/0 ; témoin : la sonde s'exécute)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e6 !== undefined ? j.e6 : 'erreur: ' + ((j.erreurs || {}).e6 || 'étape absente'))")" "acceptEdits/0"; fi
 else sans_effet "M-PARAM-URL"; fi
-if mutant sondage-apres-visible vf-cockpit-terminal-client.mjs "/garde:sondage-precoce/d;/garde:pret/s/afficher();/lire(); setInterval(lire, PROPOSITION_MS); afficher();/"; then
+if mutant sondage-apres-visible client.js "/garde:sondage-precoce/d;/garde:pret/s/afficher();/lire(); setInterval(lire, PROPOSITION_MS); afficher();/"; then
   assert_eq "M-SONDAGE-APRES-VISIBLE — le mutant rougit LB.C7 : aucun message ne part pendant la phase masquée (témoin : après l'ouverture la proposition s'affiche)" "$(verdict "$(doubles "$MUT_DIR" froid)" 'j.masque.msgs===1')" "rouge"
 else sans_effet "M-SONDAGE-APRES-VISIBLE"; fi
-if mutant retard-reaffiche vf-cockpit-terminal-client.mjs "/garde:fermee/d"; then
+if mutant retard-reaffiche client.js "/garde:fermee/d"; then
   assert_eq "M-RETARD-REAFFICHE — le mutant rougit LB.C2 : un sondage en retard remonte la proposition consommée (témoin : le lancement est accepté)" "$(verdict "$(doubles "$MUT_DIR" retard)" 'j.ok.st==="ok" && j.ok.dv===0 && j.ok.dm===0')" "rouge"
 else sans_effet "M-RETARD-REAFFICHE"; fi
 
-if mutant visite-ignoree vf-cockpit-terminal-client.mjs "/garde:visite/d"; then
+if mutant visite-ignoree client.js "/garde:visite/d"; then
   [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e9"]')"; unfaux; assert_eq "M-VISITE-IGNOREE — le mutant rougit LB.E9 : la proposition d'une visite précédente est montrée puis remplacée (témoin : la sonde s'exécute et le même cadre rechargé la retrouve)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e9 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e9 === '0/0/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-VISITE-IGNOREE"; fi
-if mutant bandeau-fixe vf-cockpit-terminal-style.mjs "s|body #proposition { position: static;|body #proposition { position: fixed;|"; then
+if mutant bandeau-fixe q.css "s|body #proposition { position: static;|body #proposition { position: fixed;|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v16"]'; assert_eq "M-BANDEAU-FIXE — le mutant (le bandeau recouvre de nouveau le terminal) rougit LB.V16 (témoin : la sonde s'exécute et rend un résultat)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v16 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v16 === '124/true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-BANDEAU-FIXE"; fi
-if mutant entree-tenue vf-cockpit-terminal-client.mjs "/entreeTenue) { if (e.type/d"; then
+if mutant entree-tenue client.js "/entreeTenue) { if (e.type/d"; then
   [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e10"]')"; unfaux; assert_eq "M-ENTREE-TENUE — le mutant (la retenue des répétitions d'Entrée est retirée) rougit LB.E10 : des octets CR atteignent le shell (témoin : la sonde s'exécute et rend un résultat)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e10 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e10 === 'xterm-helper-textarea/0/1' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ENTREE-TENUE"; fi
-if mutant pression-fraiche vf-cockpit-terminal-client.mjs "s/if (e.type === 'keyup' || !e.repeat) entreeTenue = false;/if (e.type === 'keyup') entreeTenue = false;/"; then
+if mutant pression-fraiche client.js "s/if (e.type === 'keyup' || !e.repeat) entreeTenue = false;/if (e.type === 'keyup') entreeTenue = false;/"; then
   [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e10b"]')"; unfaux; assert_eq "M-PRESSION-FRAICHE — le mutant (la retenue ne se lève plus à une pression fraîche, seulement au relâchement) rougit LB.E10b : l'Entrée fraîche du cas du tap est avalée, 0 \\r au lieu de 1 (témoin : la sonde s'exécute)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e10b === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e10b === '1' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-PRESSION-FRAICHE"; fi
 e12_verdict() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : j.e12 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e12.split('|').map((x) => x.split(':')[1] === '0/1' ? 'sain' : 'rouge').join(','))"; }
 # LB3-S3 (F1, F2) : la retenue n'a plus qu'un point d'armement, la prise de focus du terminal (l'événement focus de son textarea) ; les gardes restantes sont la clause de la touche (M-ENTREE-TENUE) et la pression fraîche (M-PRESSION-FRAICHE)
 # UN mutant retire le point fixe : il doit rougir le témoin de CHAQUE chemin de prise de focus (Préparer E10, les quatre boutons de Q E12, le bouton du parent E13, le retour d'onglet E14), et lui seul laisse sain le cas du tap E10b
-if mutant point-fixe-focus vf-cockpit-terminal-client.mjs "/term.textarea.addEventListener('focus'/d"; then
+if mutant point-fixe-focus client.js "/term.textarea.addEventListener('focus'/d"; then
   [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e10","e10b","e12","e13","e14"]')"; unfaux
     assert_eq "M-POINT-FIXE-PREPARER — le mutant (la prise de focus du terminal n'arme plus la retenue) rougit LB.E10, « Préparer » (témoin : E10b, le cas du tap, reste sain)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e10 === undefined || j.e10b === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : (j.e10 === 'xterm-helper-textarea/0/1' ? 'sain' : 'rouge') + '/' + (j.e10b === '1' ? 'sain' : 'rouge'))")" "rouge/sain"
     assert_eq "M-POINT-FIXE-BOUTONS-Q — le même mutant rougit LB.E12 pour CHACUN des quatre boutons de Q (annuler, abandonner, coller, relancer)" "$(e12_verdict "$MJ")" "rouge,rouge,rouge,rouge"
     assert_eq "M-POINT-FIXE-PARENT — le même mutant rougit LB.E13 (bouton de P qui appelle iframe.focus())" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e13 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e13 === 'pastille-t/0/0/1' ? 'sain' : 'rouge')")" "rouge"
     assert_eq "M-POINT-FIXE-ONGLET — le même mutant rougit LB.E14 (retour d'onglet, événement focus de la fenêtre)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e14 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e14 === '0/1' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-POINT-FIXE-FOCUS"; fi
-if mutant ref-constante vf-cockpit-terminal-client.mjs "s#p.duree_ms - p.expire_ms > VISITE_MS#120000 - p.expire_ms > VISITE_MS#"; then
+if mutant ref-constante client.js "s#p.duree_ms - p.expire_ms > VISITE_MS#120000 - p.expire_ms > VISITE_MS#"; then
   [ -n "$CHROME" ] && { faux "$MUT_DIR"; MJ="$(navig client '"only":["e11"]')"; unfaux; assert_eq "M-REF-CONSTANTE — le mutant (référence d'âge codée à 120 s au lieu de la durée servie) rougit LB.E11 (témoin : la sonde s'exécute)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : j.e11 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.e11 === 'true/0/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-REF-CONSTANTE"; fi
-if mutant preparer-avant vf-cockpit-terminal-vue.mjs "s#b.appendChild(pied); b.appendChild(msg);#b.insertBefore(pied, b.children[3]); b.appendChild(msg);#"; then
+if mutant preparer-avant vue.js "s#b.appendChild(pied); b.appendChild(msg);#b.insertBefore(pied, b.children[3]); b.appendChild(msg);#"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v19"]'; assert_eq "M-PREPARER-AVANT — le mutant (Préparer remonte avant la commande exacte) rougit LB.V19 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v19 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v19 === 'true.true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-PREPARER-AVANT"; fi
-if mutant etat-recouvert vf-cockpit-terminal-style.mjs "s#order: 2; z-index: auto;#order: 2; z-index: 1;#"; then
+if mutant etat-recouvert q.css "s#order: 2; z-index: auto;#order: 2; z-index: 1;#"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v19"]'; assert_eq "M-ETAT-RECOUVERT — le mutant (la proposition reprend un z-index) rougit LB.V19 : elle masque la carte ou le bandeau d'état (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v19 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v19 === 'true.true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ETAT-RECOUVERT"; fi
-if mutant pied-colle vf-cockpit-terminal-style.mjs "s#.vf-q-pied { position: sticky; bottom: 0;#.vf-q-pied { position: static; bottom: 0;#"; then
+if mutant pied-colle q.css "s#.vf-q-pied { position: sticky; bottom: 0;#.vf-q-pied { position: static; bottom: 0;#"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v21"]'; assert_eq "M-PIED-COLLE — le mutant (le pied n'est plus collé au bas du bandeau) rougit LB.V21 : « Préparer dans le terminal » repasse sous le pli à 300 px (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v21 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v21 === '300/0/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-PIED-COLLE"; fi
-if mutant etat-sous-pied vf-cockpit-terminal-style.mjs "s#\#etat .vf-q-bandeau, \#etat .vf-q-carte { z-index: 1; }#\#etat .vf-q-bandeau, \#etat .vf-q-carte { z-index: auto; }#"; then
+if mutant etat-sous-pied q.css "s#\#etat .vf-q-bandeau, \#etat .vf-q-carte { z-index: 1; }#\#etat .vf-q-bandeau, \#etat .vf-q-carte { z-index: auto; }#"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v19"]'; assert_eq "M-ETAT-SOUS-PIED — le mutant (la carte et le bandeau d'état perdent leur z-index) rougit LB.V19 : le pied collé, élément positionné, les recouvre (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v19 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v19 === 'true.true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ETAT-SOUS-PIED"; fi
-if mutant reserve-pied vf-cockpit-terminal-style.mjs 's#^\#proposition { scroll-padding-bottom: calc(var(--sp-32) + var(--sp-8)); }#\#proposition { }#'; then
+if mutant reserve-pied q.css 's#^\#proposition { scroll-padding-bottom: calc(var(--sp-32) + var(--sp-8)); }#\#proposition { }#'; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v22"]'; assert_eq "M-RESERVE-PIED — le mutant (la fenêtre de défilement n'a plus de réserve sous le pied) rougit LB.V22 : un arrêt de Tab passe sous le pied collé (case du chat à 300 px, 124 px) (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v22 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v22 === '$V22_SAIN' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-RESERVE-PIED"; fi
-if mutant reserve-pied-tactile vf-cockpit-terminal-style.mjs 's#^@media (pointer: coarse) { \#proposition { scroll-padding-bottom: calc(var(--sp-32) + var(--sp-12) + var(--sp-8)); } }#@media (pointer: coarse) { \#proposition { } }#'; then
+if mutant reserve-pied-tactile q.css 's#^@media (pointer: coarse) { \#proposition { scroll-padding-bottom: calc(var(--sp-32) + var(--sp-12) + var(--sp-8)); } }#@media (pointer: coarse) { \#proposition { } }#'; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v22c"]'; assert_eq "M-RESERVE-PIED-TACTILE — le mutant (la règle pointer: coarse du remplissage de défilement est vidée : 52 px deviennent 40) rougit LB.V22c : un arrêt de Tab passe sous le pied de 44 px (témoin : la sonde s'exécute et le média est vrai)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v22c === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v22c === 'coarse=true;$V22_SAIN' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-RESERVE-PIED-TACTILE"; fi
-if mutant pied-sans-fond vf-cockpit-terminal-style.mjs 's#sticky; bottom: 0; background: var(--raise); }#sticky; bottom: 0; }#'; then
+if mutant pied-sans-fond q.css 's#sticky; bottom: 0; background: var(--raise); }#sticky; bottom: 0; }#'; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v23"]'; assert_eq "M-PIED-SANS-FOND — le mutant (le pied collé perd son fond) rougit LB.V23 : le fond n'est plus opaque (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v23 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v23 === 'sticky/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-PIED-SANS-FOND"; fi
-if mutant refus-sans-defilement vf-cockpit-terminal-vue.mjs '/msg.scrollIntoView/d'; then
+if mutant refus-sans-defilement vue.js '/msg.scrollIntoView/d'; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v24"]'; assert_eq "M-REFUS-SANS-DEFILEMENT — le mutant (la raison du refus n'est plus ramenée dans le champ) rougit LB.V24 : elle reste sous le pli à 300 px (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v24 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v24 === '300/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-REFUS-SANS-DEFILEMENT"; fi
 for m in "consigne-absente|s#annoncer(ANNONCE_PREPAREE); montrerConsigne(rest); }#annoncer(ANNONCE_PREPAREE); }#|la consigne n'est jamais montrée" "consigne-sans-entree|s#(ev.key === 'Enter' \&\& !ev.repeat \&\& ev.target#(false \&\& ev.target#|Entrée ne retire plus la consigne" "consigne-sans-echeance|s#if (reste > 0) finConsigne = setTimeout(retirerConsigne, reste);##|la fin du compte à rebours ne retire plus la consigne"; do
   MN="${m%%|*}"; MR="${m#*|}"; MS_="${MR%%|*}"; MD="${MR#*|}"; MU="$(printf %s "$MN" | tr a-z A-Z)" # bash 3.2 : pas de ${var^^}
-  if mutant "$MN" vf-cockpit-terminal-vue.mjs "$MS_"; then
+  if mutant "$MN" vue.js "$MS_"; then
     [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v25"]'; assert_eq "M-${MU} — le mutant ($MD) rougit LB.V25 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v25 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v25 === 'entree:true:true:absente;compte-a-rebours:true:true:absente' ? 'sain' : 'rouge')")" "rouge"; }
   else sans_effet "M-${MU}"; fi
 done
 # 3e tour (F2, F4, F6b) : un mutant par garde, chacun doit rougir LB.V25b (la consigne survit à une Entrée tenue ; une proposition puis une carte la remplacent ; elle reste au-dessus du bandeau d'état)
-for m in "consigne-tenue|s#(ev.key === 'Enter' \&\& !ev.repeat \&\& ev.target#(ev.key === 'Enter' \&\& ev.target#|une Entrée tenue retire la consigne" "proposition-garde-consigne|s#retirerProposition(); retirerAccueil(); retirerConsigne();#retirerProposition(); retirerAccueil();#|une nouvelle proposition laisse la consigne" "carte-garde-consigne|/const c = CARTES\[type\]/{n;s#retirerConsigne();##;}|une carte laisse la consigne"; do
+for m in "consigne-tenue|s#(ev.key === 'Enter' \&\& !ev.repeat \&\& ev.target#(ev.key === 'Enter' \&\& ev.target#|une Entrée tenue retire la consigne" "proposition-garde-consigne|s#retirerProposition(true); retirerAccueil(); retirerConsigne();#retirerProposition(true); retirerAccueil();#|une nouvelle proposition laisse la consigne" "carte-garde-consigne|/const c = CARTES\[type\]/{n;s#retirerConsigne();##;}|une carte laisse la consigne"; do
   MN="${m%%|*}"; MR="${m#*|}"; MS_="${MR%%|*}"; MD="${MR#*|}"; MU="$(printf %s "$MN" | tr a-z A-Z)"
-  if mutant "$MN" vf-cockpit-terminal-vue.mjs "$MS_"; then
+  if mutant "$MN" vue.js "$MS_"; then
     [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v25b"]'; assert_eq "M-${MU} — le mutant ($MD) rougit LB.V25b (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v25b === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v25b === '$V25B_SAIN' ? 'sain' : 'rouge')")" "rouge"; }
   else sans_effet "M-${MU}"; fi
 done
-if mutant consigne-sous-etat vf-cockpit-terminal-style.mjs 's#, body:has(\#etat .vf-q-bandeau) \#consigne { margin-bottom#  { margin-bottom#'; then
+if mutant consigne-sous-etat q.css 's#, body:has(\#etat .vf-q-bandeau) \#consigne { margin-bottom#  { margin-bottom#'; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v25b"]'; assert_eq "M-CONSIGNE-SOUS-ETAT — le mutant (la consigne perd la marge du bandeau d'état) rougit LB.V25b : elle passe dessous (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v25b === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v25b === '$V25B_SAIN' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-CONSIGNE-SOUS-ETAT"; fi
-if mutant strings-commente vf-cockpit-terminal-client.mjs 's#^\( *\)if (Terminal.strings)#\1// if (Terminal.strings)#'; then
+if mutant strings-commente client.js 's#^\( *\)if (Terminal.strings)#\1// if (Terminal.strings)#'; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v26"]'; assert_eq "M-STRINGS-COMMENTE — le mutant (la ligne Terminal.strings est commentée) rougit LB.V26 : le champ s'annonce « Terminal input » (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v26 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v26 === 'Saisie du terminal' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-STRINGS-COMMENTE"; fi
-if mutant strings-apres-open vf-cockpit-terminal-client.mjs '/^ *if (Terminal.strings)/{h;d;};/term.open(/G'; then
+if mutant strings-apres-open client.js '/^ *if (Terminal.strings)/{h;d;};/term.open(/G'; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v26"]'; assert_eq "M-STRINGS-APRES-OPEN — le mutant (la ligne Terminal.strings est posée après term.open()) rougit LB.V26 : le champ est déjà nommé en anglais (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v26 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v26 === 'Saisie du terminal' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-STRINGS-APRES-OPEN"; fi
-if mutant couleur-proposition vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: #fff; border: thin solid|"; then
-  assert_eq "M-COULEUR-PROPOSITION — le mutant (un littéral de couleur dans une règle de la proposition) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+if mutant couleur-proposition q.css "s|^#proposition-mode { appearance: none;|#proposition-mode { color: #fff; appearance: none;|"; then
+  assert_eq "M-COULEUR-PROPOSITION — le mutant (un littéral de couleur dans une règle de la proposition) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-PROPOSITION"; fi
-if mutant couleur-accueil vf-cockpit-terminal-style.mjs "s|^#accueil .vf-q-texte { font-weight: 400;|#accueil .vf-q-texte { background: rgba(0, 0, 0, .5); font-weight: 400;|"; then
-  assert_eq "M-COULEUR-ACCUEIL — le mutant (un rgba( dans la règle de l'accueil, hors #proposition) rougit LB.S4 élargi (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+if mutant couleur-accueil q.css "s|^#accueil .vf-q-texte { font-weight: 400;|#accueil .vf-q-texte { background: rgba(0, 0, 0, .5); font-weight: 400;|"; then
+  assert_eq "M-COULEUR-ACCUEIL — le mutant (un rgba( dans la règle de l'accueil, hors #proposition) rougit LB.S4 élargi (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-ACCUEIL"; fi
-if mutant couleur-nom vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: red; border: thin solid|"; then
-  assert_eq "M-COULEUR-NOM — le mutant (un nom de couleur, red, dans une règle de la proposition) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+if mutant couleur-nom q.css "s|^#proposition-mode { appearance: none;|#proposition-mode { color: red; appearance: none;|"; then
+  assert_eq "M-COULEUR-NOM — le mutant (un nom de couleur, red, dans une règle de la proposition) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-NOM"; fi
-if mutant couleur-transparent vf-cockpit-terminal-style.mjs "s|^#accueil .vf-q-texte { font-weight: 400;|#accueil .vf-q-texte { background: transparent; font-weight: 400;|"; then
-  assert_eq "M-COULEUR-TRANSPARENT — le mutant (transparent dans la règle de l accueil) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+if mutant couleur-transparent q.css "s|^#accueil .vf-q-texte { font-weight: 400;|#accueil .vf-q-texte { background: transparent; font-weight: 400;|"; then
+  assert_eq "M-COULEUR-TRANSPARENT — le mutant (transparent dans la règle de l accueil) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-TRANSPARENT"; fi
-if mutant couleur-courante vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: currentColor; border: thin solid|"; then
-  assert_eq "M-COULEUR-COURANTE — le mutant (currentColor hors du picto, « stroke: currentColor » restant seul autorisé) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+if mutant couleur-courante q.css "s|^#proposition-mode { appearance: none;|#proposition-mode { color: currentColor; appearance: none;|"; then
+  assert_eq "M-COULEUR-COURANTE — le mutant (currentColor hors du picto, « stroke: currentColor » restant seul autorisé) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-COURANTE"; fi
-if mutant couleur-oklch vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: oklch(60% .1 20); border: thin solid|"; then
-  assert_eq "M-COULEUR-OKLCH — le mutant (une fonction moderne, oklch() rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+if mutant couleur-oklch q.css "s|^#proposition-mode { appearance: none;|#proposition-mode { color: oklch(60% .1 20); appearance: none;|"; then
+  assert_eq "M-COULEUR-OKLCH — le mutant (une fonction moderne, oklch() rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-OKLCH"; fi
-if mutant couleur-color-mix vf-cockpit-terminal-style.mjs "s|^#proposition-mode { border: thin solid|#proposition-mode { color: color-mix(in srgb, var(--text) 50%, var(--on)); border: thin solid|"; then
-  assert_eq "M-COULEUR-COLOR-MIX — le mutant (color-mix() rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(couleurs_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+if mutant couleur-color-mix q.css "s|^#proposition-mode { appearance: none;|#proposition-mode { color: color-mix(in srgb, var(--text) 50%, var(--on)); appearance: none;|"; then
+  assert_eq "M-COULEUR-COLOR-MIX — le mutant (color-mix() rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(couleurs_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-COULEUR-COLOR-MIX"; fi
-if mutant px-proposition vf-cockpit-terminal-style.mjs "s|#proposition .vf-q-pied { justify-content: flex-end; }|#proposition .vf-q-pied { justify-content: flex-end; padding: 6px; }|"; then
-  assert_eq "M-PX-PROPOSITION — le mutant (un px de plus dans une règle de la proposition) rougit LB.S4 : l'ensemble des px n'est plus celui des exceptions nommées (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(px_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/12.5px 12.5px 240px 44px 560px 6px "
+if mutant px-proposition q.css "s|#proposition .vf-q-pied { justify-content: flex-end; }|#proposition .vf-q-pied { justify-content: flex-end; padding: 6px; }|"; then
+  assert_eq "M-PX-PROPOSITION — le mutant (un px de plus dans une règle de la proposition) rougit LB.S4 : l'ensemble des px n'est plus celui des exceptions nommées (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(px_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/12.5px 12.5px 240px 44px 560px 6px "
 else sans_effet "M-PX-PROPOSITION"; fi
-if mutant px-carte vf-cockpit-terminal-style.mjs "s|.vf-q-carte { max-height: calc(100% - var(--sp-16));|.vf-q-carte { max-height: calc(100% - 16px);|"; then
-  assert_eq "M-PX-CARTE — le mutant (la carte tassée repasse en 16px au lieu du jeton --sp-16) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(px_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/12.5px 12.5px 16px 240px 44px 560px "
+if mutant px-carte q.css "s|.vf-q-carte { max-height: calc(100% - var(--sp-16));|.vf-q-carte { max-height: calc(100% - 16px);|"; then
+  assert_eq "M-PX-CARTE — le mutant (la carte tassée repasse en 16px au lieu du jeton --sp-16) rougit LB.S4 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(px_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/12.5px 12.5px 16px 240px 44px 560px "
 else sans_effet "M-PX-CARTE"; fi
-if mutant px-svg vf-cockpit-terminal-style.mjs "s|#proposition svg.i { width: var(--sp-16); height: var(--sp-16);|#proposition svg.i { width: 16px; height: var(--sp-16);|"; then
-  assert_eq "M-PX-SVG — le mutant (le picto repasse en 16px) rougit LB.S4 et LB.S5 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(px_lot "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(regles_prop "$MUT_DIR/vf-cockpit-terminal-style.mjs" | grep -c 'svg.i { width: var(--sp-16); height: var(--sp-16)')" "ok/12.5px 12.5px 16px 240px 44px 560px /0"
+if mutant px-svg q.css "s|#proposition svg.i { width: var(--sp-16); height: var(--sp-16);|#proposition svg.i { width: 16px; height: var(--sp-16);|"; then
+  assert_eq "M-PX-SVG — le mutant (le picto repasse en 16px) rougit LB.S4 et LB.S5 (témoin : les règles sont trouvées)" "$(nb_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(px_lot "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(regles_prop "$MUT_DIR/moteur/assets/ui/terminal/q.css" | grep -c 'svg.i { width: var(--sp-16); height: var(--sp-16)')" "ok/12.5px 12.5px 16px 240px 44px 560px /0"
 else sans_effet "M-PX-SVG"; fi
-if mutant taille-em vf-cockpit-terminal-style.mjs "s|#proposition .vf-q-aide { font-size: 12.5px;|#proposition .vf-q-aide { font-size: .92em;|"; then
-  assert_eq "M-TAILLE-EM — le mutant (la taille de l'aide repasse en .92em) rougit LB.S5 (témoin : les règles sont trouvées)" "$(nb_prop "$MUT_DIR/vf-cockpit-terminal-style.mjs")/$(echem_prop "$MUT_DIR/vf-cockpit-terminal-style.mjs")" "ok/1"
+if mutant taille-em q.css "s|#proposition .vf-q-aide { font-size: 12.5px;|#proposition .vf-q-aide { font-size: .92em;|"; then
+  assert_eq "M-TAILLE-EM — le mutant (la taille de l'aide repasse en .92em) rougit LB.S5 (témoin : les règles sont trouvées)" "$(nb_prop "$MUT_DIR/moteur/assets/ui/terminal/q.css")/$(echem_prop "$MUT_DIR/moteur/assets/ui/terminal/q.css")" "ok/1"
 else sans_effet "M-TAILLE-EM"; fi
-if mutant copie-autre-texte vf-cockpit-terminal-vue.mjs "s|r.selectNodeContents(k.querySelector('.vf-q-commande'))|r.selectNodeContents(k.querySelector('.vf-q-titre'))|"; then
+if mutant copie-autre-texte vue.js "s|r.selectNodeContents(k.querySelector('.vf-q-commande'))|r.selectNodeContents(k.querySelector('.vf-q-titre'))|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v17"]'; assert_eq "M-COPIE-AUTRE-TEXTE — le mutant (le bouton copie un autre texte que la commande affichée) rougit LB.V17 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v17 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v17 === 'true/true/true|true|Copiée|Commande copiée.|true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-COPIE-AUTRE-TEXTE"; fi
-if mutant accueil-recouvre vf-cockpit-terminal-style.mjs "s|body #accueil { position: static;|body #accueil { position: fixed;|"; then
+if mutant accueil-recouvre q.css "s|body #accueil { position: static;|body #accueil { position: fixed;|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-RECOUVRE — le mutant (l'accueil recouvre de nouveau le bas du terminal) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ACCUEIL-RECOUVRE"; fi
-if mutant accueil-sans-frappe vf-cockpit-terminal-vue.mjs "s/ if (n === 'keydown' \&\& ev.target.*closest('#terminal')) fermerAccueil();//"; then
+if mutant accueil-sans-frappe vue.js "s/ if (n === 'keydown' \&\& ev.target.*closest('#terminal')) fermerAccueil();//"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-SANS-FRAPPE — le mutant (la première frappe ne range plus l'accueil) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ACCUEIL-SANS-FRAPPE"; fi
-if mutant accueil-range-deplace-focus vf-cockpit-terminal-vue.mjs "s/ retirerAccueil(); }; \/\/ première frappe/ retirerAccueil(); document.activeElement.blur(); }; \/\/ première frappe/"; then
+if mutant accueil-range-deplace-focus vue.js "s/ retirerAccueil(); }; \/\/ première frappe/ retirerAccueil(); document.activeElement.blur(); }; \/\/ première frappe/"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-RANGE-DEPLACE-FOCUS — le mutant (ranger l'accueil retire le focus au terminal : la frappe est perdue) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ACCUEIL-RANGE-DEPLACE-FOCUS"; fi
-if mutant accueil-compris-focalise vf-cockpit-terminal-vue.mjs "s/ c.addEventListener('mousedown', (ev) => ev.preventDefault());//"; then
+if mutant accueil-compris-focalise vue.js "s/ c.addEventListener('mousedown', (ev) => ev.preventDefault());//"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v20"]'; assert_eq "M-ACCUEIL-COMPRIS-FOCALISE — le mutant (« Compris » reprend le focus au clic puis disparaît avec lui) rougit LB.V20 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v20 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v20 === 'true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ACCUEIL-COMPRIS-FOCALISE"; fi
-if mutant modes-apres vf-cockpit-terminal-vue.mjs "s#b.appendChild(pied); b.appendChild(msg);#b.appendChild(pied); b.appendChild(msg); b.appendChild(modes);#"; then
+if mutant modes-apres vue.js "s#b.appendChild(pied); b.appendChild(msg);#b.appendChild(pied); b.appendChild(msg); b.appendChild(modes);#"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v19"]'; assert_eq "M-MODES-APRES — le mutant (la liste des modes, dont le « Risqué », revient APRÈS « Préparer ») rougit LB.V19 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v19 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v19 === 'true.true.true.true.true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-MODES-APRES"; fi
-if mutant accueil-focus vf-cockpit-terminal-vue.mjs "s|'vf-q-secondaire')); document.body.appendChild(b);|'vf-q-secondaire')); document.body.appendChild(b); b.querySelector('button').focus();|"; then
+if mutant accueil-focus vue.js "s|'vf-q-secondaire')); document.body.appendChild(b);|'vf-q-secondaire')); document.body.appendChild(b); b.querySelector('button').focus();|"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v18"]'; assert_eq "M-ACCUEIL-FOCUS — le mutant (l'accueil prend le focus) rougit LB.V18 (témoin : la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v18 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v18 === 'true/true/true/true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-ACCUEIL-FOCUS"; fi
-if mutant manipule-ignore vf-cockpit-terminal-vue.mjs "/garde:manipule/d"; then
+if mutant manipule-ignore vue.js "/garde:manipule/d"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v15"]'; assert_eq "M-MANIPULE-IGNORE — le mutant rougit LB.V15 : un bandeau manipulé est remplacé sous la main (témoin : le bandeau s'affiche et la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v15 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.v15 === 'true/true/true/true/true' ? 'sain' : 'rouge')")" "rouge"; }
 else sans_effet "M-MANIPULE-IGNORE"; fi
-if mutant expiration-silencieuse vf-cockpit-terminal-vue.mjs "s/const EXPIRE_PROCHE_MS = 3000;/const EXPIRE_PROCHE_MS = -1;/"; then
+if mutant expiration-silencieuse vue.js "s/const EXPIRE_PROCHE_MS = 3000;/const EXPIRE_PROCHE_MS = -1;/"; then
   [ -n "$CHROME" ] && { run_vue "$MUT_DIR" '"only":["v13"]'; assert_eq "M-EXPIRATION-SILENCIEUSE — le mutant rougit LB.V13 : une disparition annoncée à 2 s de l'échéance efface le bandeau sans le dire (témoin : le compte à rebours et le message d'expiration existent)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v13 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : /^Expire dans 1 min 30 s\|timer/.test(j.v13) && /expiree\/true$/.test(j.v13) ? 'sain' : /^Expire dans 1 min 30 s\|timer/.test(j.v13) ? 'rouge' : 'plante: ' + j.v13)")" "rouge"; }
 else sans_effet "M-EXPIRATION-SILENCIEUSE"; fi
-mutant_inj() { # mutant_inj <nom> <fichier> <expression-sed> -> MUT_DIR ; copie du tiroir et de l'interface de lancement ; code 1 si la cible manque ou n'a pas changé
-  local d="$WORK/mut-$1" f x; rm -rf "$d"; mkdir -p "$d"
-  for x in terminal-tiroir terminal-tiroir-ui terminal-tiroir-style lancer-ui lancer-style; do cp "$SCRIPTS/vf-cockpit-$x.mjs" "$d/"; done
+mutant_inj() { # mutant_inj <nom> <fichier> <expression-sed> -> MUT_DIR ; copie du tiroir et de l'interface de lancement (modules et fichiers rangés) ; code 1 si la cible manque ou n'a pas changé
+  local d="$WORK/mut-$1" f g r=1; rm -rf "$d"; mkdir -p "$d/moteur/assets/ui"
+  cp "$SCRIPTS/vf-cockpit-terminal-tiroir.mjs" "$SCRIPTS/vf-cockpit-lancer-ui.mjs" "$SCRIPTS/vf-cockpit-navigateur.mjs" "$d/"; cp -R "$ENG/assets/ui/tiroir" "$d/moteur/assets/ui/tiroir"
   MUT_DIR="$d"; f="$d/$2"; [ -f "$f" ] || return 1
-  cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
+  for g in "$f" "$d"/moteur/assets/ui/tiroir/*; do # 79-11 : le code de P est rangé en fichiers du moteur ; la mutation s'applique au module et à chaque fichier rangé qu'elle modifie
+    cp "$g" "$g.orig"; sed -i.bak "$3" "$g"; if cmp -s "$g" "$g.orig"; then rm -f "$g.orig" "$g.bak"; else rm -f "$g.orig" "$g.bak"; r=0; fi
+  done
+  return $r
 }
 rouge_f1() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : j.f1 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.f1 === 'abc/champP/0' ? 'sain' : 'rouge')"; }
 rouge_sp1() { rj "$1" "(j.erreur ? 'plante: ' + j.erreur : j.sp1 === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.sp1 === '0/true/true/true' ? 'sain' : 'rouge')"; }
 if [ -n "$CHROME" ]; then
-  if mutant focus-client vf-cockpit-terminal-client.mjs "s/if (!document.hasFocus || document.hasFocus()) term.focus();/term.focus();/"; then
+  if mutant focus-client client.js "s/if (!document.hasFocus || document.hasFocus()) term.focus();/term.focus();/"; then
     faux "$MUT_DIR"; MJ="$(navig focus '"emu":false')"; unfaux
     assert_eq "M-FOCUS-CLIENT — le mutant rougit LB.F2 : le client reprend le focus sans condition, les frappes de P atteignent le shell (témoin : le scénario s'exécute jusqu'aux frappes)" "$(rouge_f1 "$MJ")" "rouge"
   else sans_effet "M-FOCUS-CLIENT"; fi
-  if mutant focus-vue vf-cockpit-terminal-vue.mjs "s/if (premier \&\& document.hasFocus()) annuler.focus();/if (premier) annuler.focus();/"; then
+  if mutant focus-vue vue.js "s/if (premier \&\& document.hasFocus()) annuler.focus();/if (premier) annuler.focus();/"; then
     faux "$MUT_DIR"; MJ="$(navig focus '"emu":true')"; unfaux
     assert_eq "M-FOCUS-VUE — le mutant rougit LB.F1 : Annuler prend le focus au champ de P à l'arrivée d'une proposition (témoin : le scénario s'exécute jusqu'aux frappes)" "$(rouge_f1 "$MJ")" "rouge"
   else sans_effet "M-FOCUS-VUE"; fi
-  if mutant focus-carte vf-cockpit-terminal-vue.mjs "s/if (document.hasFocus()) (b || k).focus();/(b || k).focus();/"; then
+  if mutant focus-carte vue.js "s/if (document.hasFocus()) (b || k).focus();/(b || k).focus();/"; then
     assert_eq "M-FOCUS-CARTE — le mutant rougit LB.F5 : la carte prend le focus de P, les frappes ne vont plus au champ de P (témoin : la carte est montée, le scénario va jusqu'aux frappes)" "$(verdict_l2 "$(l2 false carte "$MUT_DIR")")" "rouge"
   else sans_effet "M-FOCUS-CARTE"; fi
-  if mutant focus-bandeau-vue vf-cockpit-terminal-vue.mjs "s/if (r \&\& document.hasFocus()) r.focus();/if (r) r.focus();/"; then
+  if mutant focus-bandeau-vue vue.js "s/if (r \&\& document.hasFocus()) r.focus();/if (r) r.focus();/"; then
     assert_eq "M-FOCUS-BANDEAU — le mutant rougit LB.F7 : le bandeau prend le focus de P, les frappes ne vont plus au champ de P (témoin : le bandeau est monté, le scénario va jusqu'aux frappes)" "$(verdict_l2 "$(l2 false bandeau "$MUT_DIR")")" "rouge"
   else sans_effet "M-FOCUS-BANDEAU"; fi
   if mutant_inj sp1-signal vf-cockpit-lancer-ui.mjs '/garde:propose/d'; then
@@ -1383,15 +1488,36 @@ if [ -n "$CHROME" ]; then
     FAUX_INJ="$MUT_DIR" faux "$SCRIPTS"; MJ="$(navig sp1 '"emu":true')"; unfaux
     assert_eq "M-SP1-ECOUTE — le mutant rougit LB.F3 : le tiroir n'écoute plus le signal (témoin : la carte a affiché le message d'envoi)" "$(rouge_sp1 "$MJ")" "rouge"
   else sans_effet "M-SP1-ECOUTE"; fi
-  if mutant texte-retire vf-cockpit-terminal-vue.mjs "s/'lancement-recent': 'Cette cible a déjà été lancée récemment.', //"; then
+  # LB.R — mutants de AUDC-M11 (chaque mutant doit rougir le cas visé ; témoin : le cas est mesuré, jamais « plante »)
+  if mutant_inj reprise-retiree vf-cockpit-terminal-tiroir.mjs "s|else if (e.data === 'retrait') reprendre();||"; then
+    FAUX_INJ="$MUT_DIR" faux "$SCRIPTS"; MJ="$(navig reprise '"only":["ouvrir","annuler"]')"; unfaux
+    assert_eq "M-REPRISE-RETIREE — le mutant rougit LB.R1 : le tiroir ne reprend plus sa hauteur après « Annuler » (reste à 420 px)" "$(rouge_rep "$MJ" annuler '160/420/1/1/160/160/160>160/true')" "rouge"
+  else sans_effet "M-REPRISE-RETIREE"; fi
+  if mutant_inj reprise-touche-memo vf-cockpit-terminal-tiroir.mjs "s|h = borne(v); appliquer(); };|h = borne(v); appliquer(); memoH(); };|"; then
+    FAUX_INJ="$MUT_DIR" faux "$SCRIPTS"; MJ="$(navig reprise '"only":["ouvrir","defaut"]')"; unfaux
+    assert_eq "M-REPRISE-TOUCHE-MEMO — le mutant rougit LB.R7 : la reprise écrit la hauteur dans la mémoire (252 au lieu de rien)" "$(rouge_rep "$MJ" defaut '252/420/1/1/252/252/null>null/true')" "rouge"
+  else sans_effet "M-REPRISE-TOUCHE-MEMO"; fi
+  if mutant_inj reprise-ecrase-usager vf-cockpit-terminal-tiroir.mjs "s|const memoH = () => { perso = true; reprise = null;|const memoH = () => { perso = true;|"; then
+    FAUX_INJ="$MUT_DIR" faux "$SCRIPTS"; MJ="$(navig reprise '"only":["ouvrir","utilisateur"]')"; unfaux
+    assert_eq "M-REPRISE-ECRASE-USAGER — le mutant rougit LB.R4 : la reprise écrase la hauteur réglée par l'utilisateur pendant le bandeau (160 px au lieu de 444)" "$(rouge_rep "$MJ" utilisateur '160/420/1/1/444/444/160>444/true')" "rouge"
+  else sans_effet "M-REPRISE-ECRASE-USAGER"; fi
+  if mutant retrait-non-emis client.js "s|document.addEventListener('vf-q-retrait', () => emettre('retrait'));||"; then
+    FAUX_INJ="$SCRIPTS" faux "$MUT_DIR"; MJ="$(navig reprise '"only":["ouvrir","annuler"]')"; unfaux
+    assert_eq "M-RETRAIT-NON-EMIS — le mutant rougit LB.R1 : Q n'émet plus rien quand le bandeau disparaît, le tiroir reste rehaussé" "$(rouge_rep "$MJ" annuler '160/420/1/1/160/160/160>160/true')" "rouge"
+  else sans_effet "M-RETRAIT-NON-EMIS"; fi
+  if mutant remplace-emet vue.js "s|retirerProposition(true); retirerAccueil();|retirerProposition(); retirerAccueil();|"; then
+    FAUX_INJ="$SCRIPTS" faux "$MUT_DIR"; MJ="$(navig reprise '"only":["ouvrir","remplace"]')"; unfaux
+    assert_eq "M-REMPLACE-EMET — le mutant rougit LB.R6 : le remplacement d'une proposition par une autre émet un retrait (le tiroir redescendrait entre deux bandeaux)" "$(rj "$MJ" "(j.erreur ? 'plante: ' + j.erreur : (j.reprise || {}).remplace === undefined ? 'plante: ' + JSON.stringify(j.erreurs) : j.reprise.remplace === '160/420/0/160/160>160' ? 'sain' : 'rouge')")" "rouge"
+  else sans_effet "M-REMPLACE-EMET"; fi
+  if mutant texte-retire vue.js "s/'lancement-recent': 'Cette cible a déjà été lancée récemment.', //"; then
     run_vue "$MUT_DIR" "\"only\":[\"v9\"],\"codes\":$CODES"
     assert_eq "M-ST2-TEXTE — le mutant rougit LB.V9 : un code de la table de cibles n'a plus de texte dans la vue (témoin : la liste dérivée a ses $NCODES codes et la sonde s'exécute)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : j.v9 === '$NCODES/' ? 'sain' : /^$NCODES\\/./.test(j.v9 || '') ? 'rouge' : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"
   else sans_effet "M-ST2-TEXTE"; fi
-  if mutant note-ancienne vf-cockpit-terminal-vue.mjs "s/Claude Code suit les réglages de votre poste ou du projet ; un projet ne peut imposer ni « tout autoriser » ni auto (Claude Code 2\.1\.257 et plus)\./le réglage de votre poste s'applique, y compris « tout autoriser » s'il est configuré./"; then
+  if mutant note-ancienne vue.js "s/Claude Code suit les réglages de votre poste ou du projet ; un projet ne peut imposer ni « tout autoriser » ni auto (Claude Code 2\.1\.257 et plus)\./le réglage de votre poste s'applique, y compris « tout autoriser » s'il est configuré./"; then
     run_vue "$MUT_DIR" '"only":["v1"]'
     assert_eq "M-NOTE-ANCIENNE — le mutant rougit LB.V1 : l'ancienne note du mode hérité (faux pour le mode venu du projet) n'est plus celle attendue (témoin : le bandeau s'affiche, la sonde s'exécute)" "$(m1="$(rj "$VJ" 'j.v1')"; if [ -z "$m1" ] || [ "$m1" = "undefined" ]; then echo plante; elif [ "$m1" = "$(vv v1)" ]; then echo sain; else echo rouge; fi)" "rouge"
   else sans_effet "M-NOTE-ANCIENNE"; fi
-  if mutant occupe-ancien vf-cockpit-terminal-vue.mjs "s/occupe: \"Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Préparer dans le terminal.\"/occupe: \"Un programme occupe le terminal : quittez-le, puis cliquez sur Préparer dans le terminal. Rien n'a été écrit.\"/"; then
+  if mutant occupe-ancien vue.js "s/occupe: \"Le terminal n'a pas pris la demande (programme au premier plan, autre lancement, autre onglet ou contrôle bloquant). Rien n'a été écrit ; vérifiez, puis cliquez sur Préparer dans le terminal.\"/occupe: \"Un programme occupe le terminal : quittez-le, puis cliquez sur Préparer dans le terminal. Rien n'a été écrit.\"/"; then
     run_vue "$MUT_DIR" '"only":["v7"]'
     assert_eq "M-OCCUPE-ANCIEN — le mutant rougit LB.V7 : l'ancien texte du 409, qui nomme une cause unique, n'est plus celui attendu (témoin : les autres statuts s'exécutent)" "$(rj "$VJ" "(j.erreur ? 'plante: ' + j.erreur : /;sans-session=ok;/.test(j.v7 || '') ? (/occupe=ok;/.test(j.v7) ? 'sain' : 'rouge') : 'plante: ' + JSON.stringify(j.erreurs))")" "rouge"
   else sans_effet "M-OCCUPE-ANCIEN"; fi

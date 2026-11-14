@@ -3,7 +3,7 @@
 //   UN Chrome, plusieurs pages (en anglais : ?lang=en, pour que les libellés du moteur soient lus tels qu'il les écrit, sans le dictionnaire).
 //   Chaque mesure est interrogée dans la page (jamais une durée fixe pour décider d'un état). Rend une ligne JSON { <clé>: valeur } ou { erreur }.
 //   Clés : panneau · modale · noms · stats · document · encart · echap · rangees · feuille · retour · jalon · pastille · info · bague · halo · equipe
-//   M5 : colonnes · titres · retour059 · reponse · recent · dedoublon
+//   M5 : colonnes · titres · retour059 · reponse · tableau · dedoublon
 import { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } from './chrome-session.mjs';
 const [, , chrome, racine, equipeSession] = process.argv;
 const BASE = racine;
@@ -188,10 +188,9 @@ await executer(chrome, async (s) => {
   const ouvertA = async (w, h) => { await vue(w, h); await charger('index.html'); return stabiliser(() => s.ev("!document.body.classList.contains('no-panel') && document.querySelector('#btn-panel').getAttribute('aria-expanded') === 'true'"), { pas: 150, max: 3000 }); };
   o.panneau = { a768: await ouvertA(768, 1024), a1024: await ouvertA(1024, 768) };
 
-  // ---------- onglet Équipe à 390 px : une seule colonne (PU-G-176) ----------
-  await vue(390, 844, true); await charger('equipe.html');
-  await aller('n:ag-' + equipeSession);
-  o.equipe = JSON.parse(await stabiliser(() => s.ev(`JSON.stringify((() => { const cs = [...document.querySelectorAll('#viewport .node .card')].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0); return { cartes: cs.length, colonnes: new Set(cs.map((r) => Math.round(r.left / 20))).size, debordent: cs.filter((r) => r.right > innerWidth + 1 || r.left < -1).length }; })())`), { pas: 150, max: 5000 }));
+  // ---------- onglet Équipe à 390 px : une seule colonne (PU-G-176 ; 73-08 : la régie a remplacé le canevas de cartes, les lignes de la régie portent la propriété) ----------
+  await vue(390, 844, true); await s.naviguer(U('equipe.html')); await s.attendre(PRET, 'page prête (equipe.html)'); await poserVue(); // la page n'a plus de carte : on n'attend pas `#viewport .node`
+  o.equipe = JSON.parse(await stabiliser(() => s.ev(`JSON.stringify((() => { const cs = [...document.querySelectorAll('#vf-equipe li[data-vf-cle]')].map((e) => e.getBoundingClientRect()).filter((r) => r.width > 0); return { cartes: cs.length, colonnes: new Set(cs.map((r) => Math.round(r.right / 20))).size, debordent: cs.filter((r) => r.right > innerWidth + 1 || r.left < -1).length }; })())`), { pas: 150, max: 5000 }));
   // ---------- M5 : diagnostics de viewer.html (DG-12 colonnes, DG-04 vue de réponse, DG-03 compteurs, PU-G-049 homonymes) ----------
   await vue(1280, 720); await charger('index.html');
   // DG-12 / PU-G-040 : une carte sans aucun lien, dans la vue d'une partie qui a des liens avec l'extérieur, se range dans la colonne « Inside … », jamais sous « Used by »
@@ -239,18 +238,19 @@ await executer(chrome, async (s) => {
   const suivant = await stabiliser(feuille, { pas: 150, max: 5000 }); // la pause d'au-dessus reste : fenêtre d'absence du bouton et du tableau d'avant
   o.reponse = { frais, premier, suivant };
 
-  // DG-03 / PU-G-054 : le badge de Travail récent et le titre du tableau disent le même nombre ; un tableau coupé à 24 cartes le dit
+  // DG-03 / PU-G-054 : le titre d'un tableau dit le nombre de cartes qu'il porte ; un tableau coupé à 24 cartes le dit (la coupe est générique : kind neutre, 75-09c)
   await charger('index.html');
   const titreTableau = () => s.ev("document.querySelector('#context .k').innerText.replace(/\\s+/g, ' ').trim()");
-  o.recent = { badge: await attendreEtStabiliser(() => s.ev("document.querySelector('#btn-recent .badge').innerText"), (v) => v !== null && v !== undefined && String(v).trim().length > 0, { pas: 150, max: 5000 }) };
-  await s.ev("document.querySelector('#btn-recent').click()"); await s.attendre("VibeFlow.state.container === 'q:answer' && !!document.querySelector('#viewport .node')", 'tableau du travail récent'); await poserVue();
-  o.recent.titre = await attendreEtStabiliser(titreTableau, (v) => v === `Recent work · ${o.recent.badge} cards`, { pas: 150, max: 5000 });
+  const tableau = (ids) => s.ev(`VibeFlow.showBoard({ kind: 'Board', title: 'Board', items: ${ids} })`).then(() => s.attendre("VibeFlow.state.container === 'q:answer' && !!document.querySelector('#viewport .node')", 'tableau')).then(() => poserVue());
+  await tableau("[...VibeFlow.files.keys()].slice(0, 3).map((k) => 'f:' + k)");
+  o.tableau = { cartes: await s.ev('VibeFlow.state.answer.items.length') };
+  o.tableau.titre = await attendreEtStabiliser(titreTableau, (v) => v === `Board · ${o.tableau.cartes} cards`, { pas: 150, max: 5000 });
   const nbFichiers = await s.ev('VibeFlow.files.size');
-  await s.ev("VibeFlow.showBoard({ kind: 'Recent work', title: 'Recent work', items: [...VibeFlow.files.keys()].map((k) => 'f:' + k) })");
-  o.recent.coupe = { titre: await attendreEtStabiliser(titreTableau, (v) => v === `Recent work · 24 of ${nbFichiers} cards`, { pas: 150, max: 5000 }), fichiers: nbFichiers, cartes: await s.ev('VibeFlow.state.answer.items.length') };
+  await tableau("[...VibeFlow.files.keys()].map((k) => 'f:' + k)");
+  o.tableau.coupe = { titre: await attendreEtStabiliser(titreTableau, (v) => v === `Board · 24 of ${nbFichiers} cards`, { pas: 150, max: 5000 }), fichiers: nbFichiers, cartes: await s.ev('VibeFlow.state.answer.items.length') };
 
-  // PU-G-049 : les lignes « Recent work inside » portent le dossier parent des homonymes (deux README)
-  await charger('index.html'); await aller('n:m-mod');
-  o.dedoublon = JSON.parse(await attendreEtStabiliser(() => s.ev(`JSON.stringify((() => { const h = [...document.querySelectorAll('#panel h3')].find((x) => /^Recent work inside/.test(x.innerText)); return { section: !!h, noms: h ? [...h.parentElement.querySelectorAll('.rn')].map((x) => x.innerText.trim()) : [] }; })())`), (v) => JSON.parse(v).section && JSON.parse(v).noms.length === 2, { pas: 150, max: 5000 }));
+  // PU-G-049 : les cartes d'un tableau portent le dossier parent des homonymes (deux README)
+  await tableau("['f:plugin/mod/README.md', 'f:plugin/mod/scripts/README.md']");
+  o.dedoublon = { noms: await s.ev("[...document.querySelectorAll('#viewport .node .title')].map((x) => x.innerText.trim())") };
   return o;
 }, { csp: false });

@@ -2,7 +2,7 @@
 // vf-cockpit-who — « qui est au travail ? » (socle du cockpit, P67-D-12, promu du spike 004). Lecture seule.
 // Exports : collectWho(root, opts) -> schéma vibeflow/cockpit-who@2 (JAMAIS de champ `doing`, P67-D-14)
 //           revealDoing(root, id, opts) -> schéma vibeflow/cockpit-doing@1 (dernière commande, à la demande)
-//           revealTranscript(root, id, opts) -> schéma vibeflow/cockpit-transcript@1 (mandat, messages, outils : jamais une sortie d'outil, P69-D-19)
+//           revealTranscript(root, id, opts) -> schéma vibeflow/cockpit-transcript@2 (mandat d'agent, fil daté de messages et d'outils : jamais une sortie d'outil, P69-D-19)
 //           agentsConnus(root, opts) -> sessions et sous-agents seuls (collecte allégée d'un clic, T-69-06) ; commandeAffichee(cmd)
 // Quatre sources disque : sessions Claude Code (~/.claude/projects), sous-agents (meta.json), verrous et
 // registre (driver-lock.sh, résolu hors de l'arbre observé : T-67-06), DAG de mission (nœuds running).
@@ -15,9 +15,13 @@ import { fileURLToPath, pathToFileURL } from 'node:url';
 import { driverLockScript, gitCommonDir, resolveScriptsDir, planningLayout, GIT_SUR, shBorne } from './vf-cockpit-paths.mjs';
 import { ls, mtime, readJson, cherche, masque, MAX_MASQUE, ID_RE, premiereLigne } from './vf-cockpit-lecture.mjs';
 import { FENETRE, collecteAgents, indexDesNoeuds, rattacher } from './vf-cockpit-equipe.mjs';
-import { lireDags } from './vf-cockpit-planning.mjs';
-import { arbresGit } from './vf-cockpit-arbres.mjs';
+import { lireDags, lireConfine } from './vf-cockpit-planning.mjs';
+import { arbresGit, nettoie } from './vf-cockpit-arbres.mjs';
+import { lireRegistre, fusionnerRegistre } from './vf-cockpit-registre.mjs';
+import { demander, lire } from './vf-cockpit-etat-officiel.mjs';
 import { reduireTranscript } from './vf-cockpit-transcript.mjs';
+import { entreeLanceeValide } from './vf-cockpit-lancer-suivi.mjs';
+import { poserRegie, fenetreDeStall, phasesHumainesSortie } from './vf-cockpit-regie-lecture.mjs';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const sh = shBorne; // timeout, échéance globale de l'émetteur (F-06) et PATH assaini (H-1, 4e argument = le lab) : un git ou un bash bloqué ne gèle pas la boucle
@@ -54,7 +58,7 @@ function dernierArbre(fichier, trees, cite) {
 }
 
 // contexte de collecte des sessions et sous-agents : arbres git du lab, portée, étiquettes
-function contexte(root, { fresh, now, home }) {
+function contexte(root, { fresh, now, home, officiel = false }) {
   root = path.resolve(root);
   const arbres = arbresGit(root); // l'analyse de la liste des arbres git vit dans vf-cockpit-arbres.mjs
   const branchOf = new Map(arbres.map((a) => [a.chemin, a.branche]));
@@ -75,7 +79,10 @@ function contexte(root, { fresh, now, home }) {
   };
 
   const projects = path.join(home, '.claude', 'projects');
-  return { root, trees, label, collecte: () => collecteAgents({ projects, now, fresh, fenetre: FENETRE, inScope, label, branche, byActivity, CC, tail, formeOk, root }) };
+  return { root, trees, label, collecte: () => {
+    if (officiel) demander({ home, cwd: root }); // asynchrone : la collecte ne l'attend jamais (AUDC-V8)
+    return collecteAgents({ projects, now, fresh, fenetre: FENETRE, inScope, label, branche, byActivity, CC, tail, formeOk, root, officiel: officiel ? lire(home) : null });
+  } };
 }
 
 // sessions et sous-agents seuls : pas de verrous, de registre ni de DAG (un clic ne rejoue pas toute la collecte)
@@ -86,8 +93,8 @@ export function agentsConnus(root, { fresh = 180, now = Date.now(), home = os.ho
 const rolesDe = (ws) => new Map(ws.filter((w) => w.kind === 'subagent' && typeof w.role === 'string' && w.role).map((w) => [w.id, w.role]));
 
 // collecte interne : les travailleurs gardent `_tr` (chemin du transcript) hors de la sortie publique
-function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir } = {}) {
-  const cx = contexte(root, { fresh, now, home }); root = cx.root;
+function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 1800, now = Date.now(), home = os.homedir(), scriptsDir, verrous, officiel = false, regie } = {}) { // AUDC-H2 : `verrous` = le statut déjà lu par l'appelant (un seul appel au verrou par cycle) ; AUDC-D1 : `officiel` = la vue du cockpit lit les seules sources officielles
+  const cx = contexte(root, { fresh, now, home, officiel }); root = cx.root;
   const { trees, label } = cx; const sources = {}; const workers = [];
   // 1 + 2 — sessions et sous-agents, en arbre (vf-cockpit-equipe.mjs : fenêtre de 24 h, forme Claude Code lue du contrat)
   const eq = cx.collecte();
@@ -99,12 +106,15 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
 
   // 3 — verrous et registre (script résolu hors de l'arbre observé)
   const dl = driverLockScript({ scriptsDir: scriptsDir || resolveScriptsDir(HERE), labRoot: root, home });
-  const common = gitCommonDir(root) || '';
+  const common = gitCommonDir(root) || ''; let bruts = { locks: [] }; // statut brut des verrous : la détention se décide dessus (P73-D-08), il ne sort jamais
   if (dl.etat === 'absent') sources.locks = { etat: 'absente' };
   else {
     const DL = dl.chemin; let st = {};
-    try { st = JSON.parse(sh('bash', [DL, 'status', '--all'], root, root)); } catch { sources.locks = { etat: 'erreur' }; }
+    if (verrous && typeof verrous === 'object' && !verrous.error && verrous.available !== false) st = verrous; // lu une fois par le direct : jamais relu ici
+    else if (verrous && verrous.error) sources.locks = { etat: 'erreur' };
+    else try { st = JSON.parse(sh('bash', [DL, 'status', '--all'], root, root)); } catch { sources.locks = { etat: 'erreur' }; }
     st = { ...st, locks: Array.isArray(st?.locks) ? st.locks : st?.present ? [st] : [] }; // lab plat : `status --all` rend l'objet d'UN verrou, sans `locks`
+    bruts = st;
     // ws et phase partent en argument d'un script : grammaire EXACTE de driver-lock.sh, sinon la cible est écartée (champs libres masqués et bornés par collectWho).
     // ws = vf_ws_name_valid (alphanumérique en tête, puis alphanumérique . _ -, jamais `..`) ; phase = vf_dl_phase_valid (chiffres séparés par des points : 69, 41.1, 1.2.3)
     const WS_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/, PH_RE = /^[0-9]+(\.[0-9]+)*$/, ok = (ws, ph) => (ws === '' || WS_RE.test(ws) && !ws.includes('..')) && (ph === '' || PH_RE.test(ph));
@@ -117,14 +127,17 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
       const held = (st.locks || []).some((l) => l.present && !l.stale && (l.ws || '') === ws && String(l.phase || '') === ph);
       for (const a of Array.isArray(o.orphans) ? o.orphans : []) { if (typeof a?.agent_id !== 'string' || !ID_RE.test(a.agent_id)) continue; reg++; if (presents.has(a.agent_id)) { registre.set(a.agent_id, { noeud: a.node || '', role: a.role, ws }); continue; } workers.push({ kind: 'registered', id: a.agent_id, role: a.role, task: a.node || '', parent: a.parent || '', depth: a.depth ?? null, tree: ws ? `compartiment ${ws}${ph ? ` phase ${ph}` : ''}` : 'dépôt', ageS: a.age_seconds, stale: !held, orphan: !held, source: 'registre' }); }
     }
+    // D5 : un agent clos, verrou relâché, reste rattaché à son nœud (registre courant et archive de 24 h)
+    if (presents.size) fusionnerRegistre(registre, presents, lireRegistre({ chemin: DL, racine: root }));
     sources.locks ||= { etat: 'lue', held: (st.locks || []).filter((x) => x.present).length, registered: reg };
   }
 
   // rattachement des sous-agents aux nœuds de mission (P69-D-15) : une seule découverte de DAG (lireDags), partagée avec le source 4
   let dags = [];
-  try { dags = lireDags(root, planningLayout(root)); } catch {}
+  try { dags = lireConfine(root, () => lireDags(root, planningLayout(root))); } catch {} // AUDC-A-02 : un DAG lié hors du lab n'est pas lu
   const trDe = new Map(workers.filter((w) => w.kind === 'subagent' && w._tr).map((w) => [w.id, w._tr]));
   rattacher(workers, { index: indexDesNoeuds(dags), registre, mandatDe: (id) => { const c = trDe.has(id) ? premiereLigne(trDe.get(id))?.message?.content : ''; return typeof c === 'string' ? c : ''; } });
+  poserRegie(workers, { brut: bruts, dags, phases: regie?.phases }); // P73-D-35 : detient, retient, attendAgents sur les sessions
 
   // 4 — DAG : nœuds running, dans les DAG du lab (lireDags : .planning, compartiments, missions, phases) et dans le dossier commun des verrous
   const fichiers = dags.map((g) => { const fp = path.join(root, g.file); return { d: path.dirname(fp), f: path.basename(fp), nodes: g.nodes }; });
@@ -145,27 +158,53 @@ function gather(root, { fresh = 180, ttl = Number(process.env.VF_DRIVER_TTL) || 
     for (const n of nodes.filter((x) => x.status === 'running')) { running++; if (stale) staleNodes++; workers.push({ kind: 'dag-node', id: n.id, role: n.stage || '', task: String(n.step || ''), tree: path.relative(root, d) || d, dag: f, ageS: age, stale, source: 'dag' }); }
   }
   sources.dags = { etat: 'lue', files: nDags, running, stale: staleNodes };
-  return { at: new Date(now).toISOString(), root, trees: trees.map(label), fresh, fenetre: FENETRE, workers, sources, _registre: registre };
+  return { at: new Date(now).toISOString(), root, trees: trees.map(label), fresh, fenetre: FENETRE, workers, sources, sortisSilence: eq.sortisSilence, fenetreStallS: fenetreDeStall({ scriptsDir: scriptsDir || resolveScriptsDir(HERE), labRoot: root, home }), _registre: registre };
 }
 
 export function collectWho(root, opts = {}) {
   const g = gather(root, opts);
+  try { opts.surAgents?.(g.workers, rolesDe(g.workers)); } catch {} // 79-22 : alimente la table du fil, avant le retrait de `_tr`
   // tout champ libre vient d'un fichier que d'autres écrivent : chaîne masquée et bornée, sinon absent (F2) ; les nombres sont finis ou absents ; un identifiant hors forme exclut le travailleur
   const bornes = (v, n) => masque(v).slice(0, n);
-  const LIBRES = { titre: 80, task: 160, cwd: 200, role: 80, branch: 200, tree: 200, lastAt: 40, parent: 128, dag: 200, treeBy: 20 }, NOMBRES = ['ageS', 'depth', 'dureeS', 'children'];
+  const LIBRES = { titre: 80, task: 160, cwd: 200, role: 80, branch: 200, tree: 200, lastAt: 40, parent: 128, dag: 200, treeBy: 20 }, NOMBRES = ['ageS', 'depth', 'dureeS', 'children', 'attendAgents'];
   const IDS = new Set(['session', 'subagent', 'registered']);
   const workers = g.workers.filter((w) => typeof w.id === 'string' && (!IDS.has(w.kind) || ID_RE.test(w.id))).map(({ _tr, ...w }) => {
     w.id = bornes(w.id, 128);
     for (const [k, n] of Object.entries(LIBRES)) if (k in w) { if (typeof w[k] === 'string') w[k] = bornes(w[k], k === 'task' && w.kind === 'dag-node' ? 100 : n); else delete w[k]; }
     for (const k of NOMBRES) if (k in w && !(Number.isFinite(w[k]) || (k === 'depth' && w[k] === null))) delete w[k];
+    // P73-D-22 : contrôles, sens d'écriture et largeur nulle retirés de la branche à l'émission (le titre l'est déjà en amont, nettoieTitre)
+    if (typeof w.branch === 'string') w.branch = nettoie(w.branch, LIBRES.branch); // garde:nettoie
     const sous = (o, bornesDe) => { const r = {}; for (const [k, n] of Object.entries(bornesDe)) if (typeof o?.[k] === 'string') r[k] = bornes(o[k], n); return r; }; // objets imbriqués : mêmes règles
+    if (w.detient) w.detient = sous(w.detient, { ws: 40, phase: 20 }); // garde:detient — seule la paire { ws, phase } sort (P73-D-08)
+    const r = w.retient; // { n, portee } : un entier et une portée de liste fermée, sinon absent
+    if (r) w.retient = Number.isInteger(r.n) && r.n >= 0 && ['noeuds', 'mission'].includes(r.portee) ? { n: r.n, portee: r.portee } : undefined;
+    for (const k of ['detient', 'retient']) if (k in w && (!w[k] || (k === 'detient' && !Object.keys(w[k]).length))) delete w[k];
+    if ('attendAgents' in w && !(Number.isInteger(w.attendAgents) && w.attendAgents >= 1 && w.attendAgents <= 999)) delete w.attendAgents;
     if (w.rattachement) w.rattachement = sous(w.rattachement, { etat: 20, source: 20, raison: 20, dag: 200, noeud: 128 });
     if (w.action) w.action = sous(w.action, { verbe: 80, cible: 120 });
     return w;
   });
+  poserLancees(workers, opts.lancees); // P73-D-21 : la ligne de lancement des sessions lancées depuis la carte
   const sources = { ...g.sources };
   if (typeof sources.sessions?.path === 'string') sources.sessions = { ...sources.sessions, path: sources.sessions.path.replace(opts.home || os.homedir(), '~') };
-  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees.map((t) => bornes(t, 200)), fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine'), workers, sources };
+  return { schema: 'vibeflow/cockpit-who@2', at: g.at, root: g.root, trees: g.trees.map((t) => bornes(t, 200)), fresh: g.fresh, fenetre: g.fenetre, busy: workers.some((w) => !w.stale && w.etat !== 'termine' && w.etat !== 'au-repos' && w.etat !== 'attend'), workers, sources, sortisSilence: Number.isInteger(g.sortisSilence) ? g.sortisSilence : 0, ...regieSortie(g, opts) };
+}
+
+// champs de premier niveau de la regie, facultatifs : absents quand ils n'ont pas de valeur (P73-D-35)
+const regieSortie = (g, opts) => {
+  const ph = phasesHumainesSortie(opts.regie?.phasesHumaines, (v, n) => masque(v).slice(0, n));
+  return { ...(ph.length ? { phasesHumaines: ph } : {}), ...(Number.isInteger(g.fenetreStallS) ? { fenetreStallS: g.fenetreStallS } : {}) };
+};
+
+// P73-D-21 : `lancee` { phase, ws, verbe } sur une SESSION seulement, après revalidation à l'émission ;
+// le registre des lancements est en mémoire du serveur, jamais lu du disque
+export function poserLancees(workers, lancees) {
+  if (!(lancees instanceof Map)) return;
+  for (const w of workers) {
+    const e = w.kind === 'session' ? lancees.get(w.id) : undefined; // garde:lancee-session
+    if (!(e && entreeLanceeValide(e))) continue; // garde:lancee-valide
+    w.lancee = { phase: e.phase.slice(0, 20), ...(typeof e.ws === 'string' && e.ws ? { ws: e.ws } : {}), verbe: e.verbe }; // garde:lancee
+  }
 }
 
 // P67-D-14 : la dernière commande ne sort que par cette révélation ponctuelle (T-67-05), réduite au programme et à son premier argument (décision de Samuel, AskUserQuestion session principale, 2026-11-02).
@@ -209,22 +248,31 @@ const lastDoing = (f) => cherche(f, (d) => (d.type === 'assistant' ? lastCommand
 // identifiant au format strict ET présent dans une collecte fraîche : aucun chemin construit depuis l'entrée (T-67-07)
 export function revealDoing(root, id, opts = {}) {
   if (typeof id !== 'string' || !ID_RE.test(id)) return { schema: 'vibeflow/cockpit-doing@1', id: String(id), doing: null, erreur: 'id-invalide' };
-  const w = gather(root, opts).workers.find((x) => (x.kind === 'session' || x.kind === 'subagent') && x.id === id && x._tr);
+  const t = opts.table ? opts.table(id) : null; // 79-22 : `table` (id -> { genre, fichier, roles } ou nul) remplace la collecte par requête
+  const w = opts.table ? t && { _tr: t.fichier }
+    : gather(root, opts).workers.find((x) => (x.kind === 'session' || x.kind === 'subagent') && x.id === id && x._tr);
   if (!w) return { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'inconnu' };
   const doing = lastDoing(w._tr);
   return doing ? { schema: 'vibeflow/cockpit-doing@1', id, doing } : { schema: 'vibeflow/cockpit-doing@1', id, doing: null, erreur: 'sans-action' };
 }
 
-// P69-D-19 : le transcript d'un agent connu, réduit à son mandat, ses messages et ses outils (liste blanche, vf-cockpit-transcript.mjs) ; le chemin vient de la collecte, jamais de l'entrée (T-69-02)
+// P69-D-19 : le transcript d'un agent connu, réduit à son mandat (agent) et à son fil daté de messages et d'outils (liste blanche, vf-cockpit-transcript.mjs) ; le chemin vient de la collecte, jamais de l'entrée (T-69-02)
 export function revealTranscript(root, id, opts = {}) {
-  const S = 'vibeflow/cockpit-transcript@1';
+  const S = 'vibeflow/cockpit-transcript@2';
   if (typeof id !== 'string' || !ID_RE.test(id)) return { schema: S, id: String(id).slice(0, 128), erreur: 'id-invalide' };
-  try { return reveler(root, id, opts, S); } catch { return { schema: S, id, erreur: 'inconnu' }; } // aucune exception ne remonte à l'appelant (F3)
+  try { return reveler(root, id, opts, S); } catch (e) { // F3 : aucune exception ne remonte ; avec `table`, le `try` est celui du fil (79-22)
+    if (opts.table) throw e;
+    return { schema: S, id, erreur: 'inconnu' };
+  }
 }
 function reveler(root, id, opts, S) {
+  if (opts.table) {
+    const t = opts.table(id), r = t && reduireTranscript(t.fichier, { root: path.resolve(root), roles: t.roles, kind: t.genre });
+    return t ? { schema: S, id, ...r } : { schema: S, id, erreur: 'inconnu' };
+  }
   const connus = new Map(agentsConnus(root, opts).filter((x) => (x.kind === 'session' || x.kind === 'subagent') && x._tr).map((x) => [x.id, x]));
   const w = connus.get(id);
-  return w ? { schema: S, id, ...reduireTranscript(w._tr, { root: path.resolve(root), roles: rolesDe([...connus.values()]) }) } : { schema: S, id, erreur: 'inconnu' };
+  return w ? { schema: S, id, ...reduireTranscript(w._tr, { root: path.resolve(root), roles: rolesDe([...connus.values()]), kind: w.kind }) } : { schema: S, id, erreur: 'inconnu' };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(fs.realpathSync(process.argv[1])).href) {

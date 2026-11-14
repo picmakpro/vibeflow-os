@@ -5,6 +5,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import { GIT_SUR, shBorne, lancerGit } from './vf-cockpit-paths.mjs';
+import { gitSortant } from './vf-cockpit-git-sortant.mjs';
 import { nettoie } from './vf-cockpit-arbres.mjs';
 
 const reel = (p) => { try { return fs.realpathSync(p); } catch { return path.resolve(p); } };
@@ -18,6 +19,7 @@ export function enteteGit(lab, { sh = shBorne } = {}) {
     return String(sh('git', [...GIT_SUR, '-C', lab, ...a], undefined, lab) ?? '').trim();
   } catch { return ''; } };
   const vide = (etat, depot) => ({ etat, depot: nettoie(depot, 200), branche: null, worktree: null, detache: false, sha7: null });
+  if (gitSortant(lab)) return vide('absent', path.basename(path.resolve(lab))); // AUDC-A-02 : le .git du lab désigne un dépôt hors du lab : ni branche ni dépôt lus
   const commun = git('rev-parse', '--path-format=absolute', '--git-common-dir');
   if (!commun) return vide(muet ? 'indisponible' : 'absent', path.basename(path.resolve(lab)));
   const racine = path.basename(commun) === '.git' ? path.dirname(commun) : commun.replace(/[\\/]+$/, '').replace(/\.git$/, '');

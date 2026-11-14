@@ -2,23 +2,23 @@
 // vf-cockpit-terminal.mjs (dans le processus de serve.mjs) le lance par child_process.fork : Q n'est plus sur la boucle d'événements de serve.mjs,
 // dont le travail synchrone (minuterie de 5 s) gelait frappes et sortie. Canal parent/enfant = l'IPC de fork (jamais l'argv, jamais l'environnement) :
 //   parent -> enfant : { t:'init', engineDir, root, here, jetons, portP, envOrigine } · { t:'jetons', jetons } · { t:'arret' }
-//     · { t:'cibles', cibles } (liste fermée recalculée par P) · { t:'proposition', cible, verbe, chat?, bloquants, avertissements } (72-10 ; P72-D-10, D-12)
+//     · { t:'terminer' } (fin de la session du shell, AUDC-M10) · { t:'cibles', cibles } (liste fermée recalculée par P) · { t:'proposition', cible, verbe, chat?, bloquants, avertissements } (72-10 ; P72-D-10, D-12)
 //   enfant -> parent : { t:'pret', port } · { t:'occupe', v } · { t:'echec', code } · { t:'lancee', cible, verbe, session, at } (la ligne a été écrite au shell)
 // Lancement (72-10) : GET /proposition, POST /lancer { id, mode, chat? } et POST /annuler { id } sous les contrôles des routes voisines. La ligne ne vient JAMAIS du client (P72-D-13) :
 // elle est composée par l'état de Q (vf-cockpit-lancer-q.mjs) ; elle est écrite au shell sans retour chariot, une fois, seulement armée et le shell au repos ; aucune ligne ni UUID n'est journalisé.
-// Mode retenu (72-16 ; P72-D-20) : Q écrit le mode d'un lancement ACCEPTÉ dans <sortie>/.cache/terminal-mode (vf-cockpit-lancer-mode.mjs) et le sert dans GET /proposition (mode_retenu) ; jamais transmis par l'IPC.
+// Mode retenu (72-16 ; P72-D-20) : Q écrit le mode d'un lancement ACCEPTÉ dans le dossier d'état du poste, par projet (vf-cockpit-lancer-mode.mjs ; AUDC-B-05) et le sert dans GET /proposition (mode_retenu) ; jamais transmis par l'IPC.
 // Contrôles, amorçage, session unique, grâce, tampon : inchangés (voir vf-cockpit-terminal-session.mjs). Le parent meurt (même par SIGKILL) :
 // l'IPC se ferme, ou le ppid change, et l'enfant arrête toute la session puis sort. Arrêt volontaire du parent (message `arret`) : état « arret »,
 // les flux sont fermés, GET /etat répond { etat: 'arret' } pendant ARRET_MS (au moins 1 s) puis l'enfant sort. Aucun octet du terminal n'est journalisé.
 import http from 'node:http';
 import fs from 'node:fs';
 import path from 'node:path';
-import { FICHIER_AMORCE, FICHIER_OUVRIR, DUREE_AMORCE_MS, nouveauSecret, egal, consommerAmorce } from './vf-cockpit-terminal-amorce.mjs';
+import { FICHIER_AMORCE, FICHIER_OUVRIR, FICHIER_SECRET_OUVRIR, DUREE_AMORCE_MS, nouveauSecret, egal, consommerAmorce } from './vf-cockpit-terminal-amorce.mjs';
 import { creerSessions, resoudrePython3, TAILLE_MAX } from './vf-cockpit-terminal-session.mjs';
 import { preparerPage, pageTerminal } from './vf-cockpit-terminal-page.mjs';
 import { creerEtatLancer } from './vf-cockpit-lancer-q.mjs';
 import * as gabarit from './vf-cockpit-lancer-gabarit.mjs';
-import { FICHIER_MODE, creerMemoireMode } from './vf-cockpit-lancer-mode.mjs';
+import { creerMemoireModePoste } from './vf-cockpit-lancer-mode.mjs';
 
 const log = (m) => console.error(`vf-cockpit (terminal) : ${m}`);
 const json = (res, statut, objet) => { res.writeHead(statut, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(JSON.stringify(objet)); };
@@ -51,8 +51,9 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
   const secret = nouveauSecret();
   const fichierAmorce = path.join(here, '.cache', FICHIER_AMORCE);
   const fichierOuvrir = path.join(here, '.cache', FICHIER_OUVRIR);
-  const retirerOuvrir = () => { try { fs.unlinkSync(fichierOuvrir); } catch {} };
-  const balayerOuvrir = () => { try { const st = fs.lstatSync(fichierOuvrir); if (Date.now() - st.mtimeMs > DUREE_AMORCE_MS) retirerOuvrir(); } catch {} };
+  const fichierSecret = path.join(here, '.cache', FICHIER_SECRET_OUVRIR); // AUDC-B-03 bis : meurt avec la clé et la page de redirection
+  const retirerOuvrir = () => { try { fs.unlinkSync(fichierOuvrir); } catch {} try { fs.unlinkSync(fichierSecret); } catch {} };
+  const balayerOuvrir = () => { try { const st = fs.lstatSync(fichierOuvrir); if (Date.now() - st.mtimeMs > DUREE_AMORCE_MS) retirerOuvrir(); } catch {} try { const st = fs.lstatSync(fichierSecret); if (Date.now() - st.mtimeMs > DUREE_AMORCE_MS) fs.unlinkSync(fichierSecret); } catch {} };
   preparerPage({ engineDir });
   // P71-D-34 puis P71-D-36 (R3) : python3 se vérifie à CHAQUE lancement de shell (premier démarrage, « Relancer le shell », nouvelle session), jamais une fois pour toutes :
   // il peut disparaître en cours de session. Journalisé une fois par absence (remise à zéro quand il revient), annoncé par /etat. Une session déjà vivante n'en dépend pas.
@@ -65,7 +66,7 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
   let proprietaire = null;
   const gabaritQ = gabarit;
   const lq = creerEtatLancer({ gabarit: gabaritQ });
-  const memoireMode = creerMemoireMode({ fichier: path.join(here, '.cache', FICHIER_MODE) }); // garde:mode-support
+  const memoireMode = creerMemoireModePoste({ racine: root }); // garde:mode-support : le dossier d'état du poste, par projet (AUDC-B-05), jamais le dossier du lab
   const recevoirCibles = (l) => lq.definirCibles(l);
   const recevoirProposition = (m) => lq.proposer(m);
   const lireProposition = () => { const p = lq.lire(); return p.etat === 'en-attente' ? { ...p, mode_retenu: memoireMode.lire() } : p; }; // garde:mode-servi
@@ -184,7 +185,9 @@ function demarrerQ({ engineDir, root, here, jetons: jetons0, portP, envOrigine }
   const ppid0 = process.ppid;
   process.on('disconnect', () => { if (phase !== 'arret') sortir(); });
   setInterval(() => { if (process.ppid !== ppid0 && phase !== 'arret') sortir(); }, 500).unref();
-  return { jetons: (j) => { jetons = j || []; }, cibles: recevoirCibles, proposition: recevoirProposition, arret };
+  // AUDC-M10 : fin volontaire de la SESSION (le shell), jamais du serveur : flux fermé, EOF et signal à l'assistant, la place reste prise jusqu'à la mort de l'ancien shell (une attache entre-temps : 503), puis une attache neuve lance un autre shell. Sans session : sans effet.
+  const terminer = () => { if (phase !== 'arret') sessions.fermer(); };
+  return { jetons: (j) => { jetons = j || []; }, cibles: recevoirCibles, proposition: recevoirProposition, arret, terminer };
 }
 
 if (process.send) {
@@ -196,6 +199,7 @@ if (process.send) {
     else if (msg.t === 'jetons' && Q) Q.jetons(msg.jetons);
     else if (msg.t === 'cibles' && Q) Q.cibles(msg.cibles);
     else if (msg.t === 'proposition' && Q) Q.proposition(msg);
+    else if (msg.t === 'terminer' && Q) Q.terminer();
     else if (msg.t === 'arret' && Q) Q.arret();
   });
   for (const sig of ['SIGINT', 'SIGHUP']) process.on(sig, () => {}); // le groupe du terminal du lanceur signale aussi l'enfant : c'est le parent qui décide

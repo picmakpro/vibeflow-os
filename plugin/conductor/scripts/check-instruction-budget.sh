@@ -21,7 +21,17 @@
 # depot : 64 reste reserve a l'erreur d'usage, jamais 2.
 #
 # Usage:
-#   check-instruction-budget.sh [--path <dir>]
+#   check-instruction-budget.sh [--path <dir>] [--format=tsv]
+#
+# Sortie machine (--format=tsv, contrat #vf-budget@1, Phase 77, P77-D-03, P77-D-05) : LECTURE SEULE, sur la sortie
+# standard l'en-tete `#vf-budget@1<TAB>check-instruction-budget`, puis une ligne par mesure deja calculee, six champs
+# separes par une tabulation : type (agent, skill, socle, socle-baseline), chemin relatif a --path (`.` = la racine,
+# `-` = sans objet), valeur (`-` si NON-VERIFIABLE ou NON-APPLICABLE), budget effectif (`-` pour socle-baseline), unite
+# (lignes, jetons), verdict (OK, AVERTISSEMENT, DEPASSE, NON-VERIFIABLE, NON-APPLICABLE ; EGALE, AU-DESSUS, EN-DESSOUS pour
+# socle-baseline, relation de la baseline lue a la mesure du socle). Le verdict d'un agent est celui des LIGNES seules (le
+# ratchet d'instructions n'est pas une jauge). Un lab sans corpus d'agents distribue rend, au lieu d'une sortie vide, trois
+# lignes NON-APPLICABLE (agent, skill, socle) sans valeur, et garde le code 2. Les codes de sortie et le rapport texte
+# (sans l'option) ne changent pas. Tout autre --format= : 64.
 #
 # Exit codes (contrat interne, tous enumeres, aucun implicite — patron check-divergence.sh) :
 #   0  = ARME et aucun depassement (peut porter un verdict AVERTISSEMENT-ADR029 non bloquant,
@@ -38,6 +48,7 @@
 # production (CI, hook, humain) les laisse absentes :
 #   VF_BUDGET_PLANNING_DIR   — redirige le dossier .planning (sentinelle + baseline)
 #   VF_BUDGET_BASELINE_FILE  — redirige le chemin du fichier de baselines
+#   VF_BUDGET_RESOLVER       — redirige le resolveur de dependances (jamais pris sous --path)
 #
 # SKILL.md (Phase 43, FABR-09, D-Q4). Seconde decouverte, INDEPENDANTE de celle des agents (D-03
 # inchangee) : recursive sous chaque module de plugin/*/, sauf un module ENTIEREMENT exclu quand
@@ -80,6 +91,7 @@
 set -uo pipefail
 
 ROOT="."
+FORMAT="text"
 
 while [ "$#" -gt 0 ]; do
   case "$1" in
@@ -89,6 +101,8 @@ while [ "$#" -gt 0 ]; do
         exit 64
       fi
       ROOT="$2"; shift 2 ;;
+    --format=tsv) FORMAT=tsv; shift ;;
+    --format=*) echo "[check-instruction-budget] format inconnu : ${1#--format=} (attendu : tsv)" >&2; exit 64 ;;
     -h|--help) grep '^# ' "$0" | sed 's/^# //'; exit 0 ;;
     *) echo "[check-instruction-budget] argument inconnu : $1" >&2; exit 64 ;;
   esac
@@ -157,6 +171,12 @@ FOUND=$(awk 'END{print NR}' "$FILES_LIST" 2>/dev/null || echo 0)
 [ -n "$FOUND" ] || FOUND=0
 if [ "$FOUND" -eq 0 ]; then
   echo "[check-instruction-budget] aucun fichier d'agent distribue decouvert — non verifiable" >&2
+  if [ "$FORMAT" = tsv ]; then
+    printf '#vf-budget@1\tcheck-instruction-budget\n'
+    printf 'agent\t-\t-\t%s\tlignes\tNON-APPLICABLE\n' "$VF_BUDGET_LINE_CAP"
+    printf 'skill\t-\t-\t%s\tlignes\tNON-APPLICABLE\n' "$VF_SKILL_LINE_CAP"
+    printf 'socle\t-\t-\t%s\tjetons\tNON-APPLICABLE\n' "$VF_BOOTSTRAP_TOKEN_CAP"
+  fi
   exit 2
 fi
 
@@ -545,7 +565,10 @@ BOOTSTRAP_VERDICT="NON-APPLICABLE"
 
 if [ -f "$ROOT/plugin/conductor/module.json" ]; then
   BOOTSTRAP_APPLICABLE=1
-  RESOLVER="$ROOT/plugin/_internal/resolve-deps.sh"
+  # Jamais un programme pris sous --path (le lab observe, il ne fournit que des donnees) : le resolveur se
+  # resout depuis le dossier de CE gate. Absent a cote du gate (gate installe a plat) : socle NON-VERIFIABLE,
+  # dit, jamais execute depuis le lab. VF_BUDGET_RESOLVER : surcharge pour les fixtures de test uniquement.
+  RESOLVER="${VF_BUDGET_RESOLVER:-$(cd "$(dirname "$0")" && pwd)/../../_internal/resolve-deps.sh}"
   if [ ! -f "$RESOLVER" ]; then
     BOOTSTRAP_NONVERIF=1
     echo "[check-instruction-budget] BOOTSTRAP : non verifiable — resolveur absent : $RESOLVER" >&2
@@ -686,6 +709,32 @@ sentinel_state="ABSENTE"; [ "$ARMED" -eq 1 ] && sentinel_state="PRESENTE"
 baseline_state="ABSENT"; [ "$BASELINE_MISSING" -eq 0 ] && baseline_state="PRESENT"
 armed_label="non"; [ "$ARMED" -eq 1 ] && armed_label="oui"
 
+if [ "$FORMAT" = tsv ]; then
+  # Sortie machine : derivee des fichiers de rapport ci-dessus (memes mesures, memes verdicts), jamais d'un second calcul.
+  printf '#vf-budget@1\tcheck-instruction-budget\n'
+  awk -F' [|] ' -v cap="$VF_BUDGET_LINE_CAP" '{
+    v = $6; if (v == "NON-VERIFIABLE") { n = "-"; d = "NON-VERIFIABLE" }
+    else { n = $2; if (v == "DEPASSEMENT-ADR029") d = "DEPASSE"; else if (index(v, "AVERTISSEMENT-ADR029")) d = "AVERTISSEMENT"; else d = "OK" }
+    printf "agent\t%s\t%s\t%s\tlignes\t%s\n", $1, n, cap, d }' "$REPORT"
+  awk -F' [|] ' '{
+    v = $4; if (v == "NON-VERIFIABLE") { n = "-"; d = "NON-VERIFIABLE" } else { n = $2; d = (v == "DEPASSEMENT-SKILL-ADR029") ? "DEPASSE" : "OK" }
+    printf "skill\t%s\t%s\t%s\tlignes\t%s\n", $1, n, $3, d }' "$SKILL_REPORT"
+  if [ "$BOOTSTRAP_APPLICABLE" -eq 0 ]; then
+    printf 'socle\t-\t-\t%s\tjetons\tNON-APPLICABLE\n' "$VF_BOOTSTRAP_TOKEN_CAP"
+  elif [ "$BOOTSTRAP_NONVERIF" -eq 1 ]; then
+    printf 'socle\t.\t-\t%s\tjetons\tNON-VERIFIABLE\n' "$VF_BOOTSTRAP_TOKEN_CAP"
+  else
+    case "$BOOTSTRAP_VERDICT" in OK) tsv_socle=OK ;; *) tsv_socle=DEPASSE ;; esac
+    printf 'socle\t.\t%s\t%s\tjetons\t%s\n' "$BOOTSTRAP_TOKENS" "$VF_BOOTSTRAP_TOKEN_CAP" "$tsv_socle"
+    if [ "$BOOTSTRAP_HAS_BASELINE" -eq 1 ]; then
+      if [ "$BOOTSTRAP_TOKENS" -gt "$BOOTSTRAP_BASELINE_VALUE" ]; then tsv_rel=AU-DESSUS
+      elif [ "$BOOTSTRAP_TOKENS" -lt "$BOOTSTRAP_BASELINE_VALUE" ]; then tsv_rel=EN-DESSOUS
+      else tsv_rel=EGALE; fi
+      printf 'socle-baseline\t-\t%s\t-\tjetons\t%s\n' "$BOOTSTRAP_BASELINE_VALUE" "$tsv_rel"
+    fi
+  fi
+  exit "$RC"
+fi
 echo "[check-instruction-budget] corpus decouvert : $FOUND fichier(s) sous plugin/*/agents/*.md + plugin/*/AGENT.md"
 echo "[check-instruction-budget] sentinelle : $SENTINEL ($sentinel_state)"
 echo "[check-instruction-budget] baseline : $BASELINE ($baseline_state)"

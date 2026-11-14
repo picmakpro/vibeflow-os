@@ -1,5 +1,5 @@
 // vf-cockpit-avancement — avancement d'une phase, calculé en bibliothèque du socle (CKPT-13 à CKPT-17 ; P69-D-01 à P69-D-09).
-// Exports : ETATS, RESTE, ETATS_MISSION, LIBELLES_ETAT, LIBELLES_RESTE, LIBELLES_MISSION, decompte, trouverPhase, rattacherMission, etatMission, reste, avancement.
+// Exports : ETATS, RESTE, ETATS_MISSION, LIBELLES_ETAT, LIBELLES_RESTE, LIBELLES_MISSION, decompte, trouverPhase, rattacherMission, etatMission, reste, avancement, ligneStatutRecette, recetteFaite.
 // Contrat figé en version 2 (déclaré dans vf-cockpit-interface.json, clé `avancement`, lu par la Phase 68 ; VFSG-06, P68-D-16) :
 //   { version: 2, etat, plans: { faits, total }, correctifs, mission: { nom, etat, vie } | null, reste: [codes] } — ajouts de champs seulement.
 //   `vie` = { tenu, stale, progressAgeS, ttl } (verrou lu) ou null ; absent quand l'appelant ne lit pas les verrous.
@@ -77,8 +77,8 @@ export function reste({ ph, fichiers, lire, vivante }) {
   if (!vivante && !fs.some((f) => f.endsWith('-PLAN.md'))) { if (!fs.some((f) => f.endsWith('-CONTEXT.md'))) r.push('cadrage'); r.push('plan', 'execution'); }
   const rec = fs.filter((f) => f.endsWith('-RECETTE-HUMAINE.md')).sort()[0];
   if (rec) {
-    const ligne = String((lire && lire(rec)) || '').split('\n').find((l) => l.startsWith('**Statut :')) || '';
-    if (!ligne.split(/[^\p{L}\p{N}]+/u).includes('FAITE')) r.push('recette');
+    const ligne = ligneStatutRecette((lire && lire(rec)) || '');
+    if (!recetteFaite(ligne)) r.push('recette');
   }
   if (!fs.some((f) => f.endsWith('-VERIFICATION.md'))) r.push('verification');
   r.push('cloture');
@@ -102,3 +102,9 @@ export function avancement({ ph, fichiers, missions, lire } = {}) {
   const etat = ph?.done ? 'fait' : total > 0 && faits === total ? 'a-recetter' : faits > 0 || lance ? 'en-cours' : 'a-faire';
   return { version: 2, etat, plans: { faits, total }, correctifs, mission: choisir(ms), reste: reste({ ph, fichiers, lire, vivante: lance }) };
 }
+
+// Statut d'une recette (P76-D-14 : la règle de reste() est réutilisée par la traçabilité, jamais réécrite) :
+// la ligne qui commence par `**Statut :`, '' sinon ;
+// la recette est faite quand le mot FAITE y figure en mot entier (découpe sur tout ce qui n'est ni lettre ni chiffre).
+export function ligneStatutRecette(txt) { return String(txt || '').split('\n').find((l) => l.startsWith('**Statut :')) || ''; }
+export function recetteFaite(ligne) { return String(ligne || '').split(/[^\p{L}\p{N}]+/u).includes('FAITE'); }

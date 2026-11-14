@@ -1,5 +1,8 @@
 // vf-cockpit-vie — la vie d'une mission : son verrou de driver est-il tenu, ou son progrès récent ? (VFSG-06 ; P68-D-05, P68-D-16, P68-D-22, P68-D-23, P68-D-26, P68-D-27, P68-D-33)
-// Exports : lireVerrous(root, { scriptsDir, home, sh }) -> { etat: 'lue'|'absente'|'erreur', plat, liste: [{ ws, scope, phase, tenu, stale, ageS, ttl, progressAgeS, owner }] }
+// Exports : lireVerrous(root, { scriptsDir, home, sh }) -> { etat: 'lue'|'absente'|'erreur', plat, liste: [{ ws, scope, phase, step, tenu, stale,
+//             ageS, ttl, progressAgeS, owner, childrenRunning, leaseS, dag, sansSession? }] }
+//           verrousDe(st, { sessions }) -> la même forme, depuis l'objet brut de `status --all` (pur ; `sessions` : ensemble des sessions de la
+//             collecte, A15 : `sansSession`) ; dagDe(dag) -> plan revalidé ou null
 //           vieDe({ ws, phase }, verrous) -> { tenu, stale, progressAgeS, ttl } | null (source illisible : la mission est « inconnu »)
 //           estVivante(vie) · normPhase(valeur)
 // Lecture du verrou par shell-out borné (driver-lock.sh status --all, repli sur status pour un script d'avant --all, script résolu hors de l'arbre observé : T-67-06) ;
@@ -30,7 +33,44 @@ export function estVivante(vie) {
   return typeof vie.progressAgeS === 'number' && vie.progressAgeS >= 0 && typeof vie.ttl === 'number' && vie.progressAgeS < vie.ttl;
 }
 
-const garde = (l) => ({ ws: chaine(l.ws) ?? '', scope: chaine(l.scope), phase: chaine(l.phase), tenu: true, stale: bool(l.stale), ageS: num(l.age_seconds), ttl: num(l.ttl), progressAgeS: age(l.progress_age_seconds), owner: chaine(l.owner) });
+// A15, A16 : le plan publié du verrou (`dag`) est relu et revalidé : jamais recopié. Identifiants et dépendances de forme `[A-Za-z0-9._:-]{1,64}`,
+// statut de liste fermée, 200 nœuds et 32 dépendances au plus, `ws` et `phase` par les grammaires du script de verrou, `at` entier ;
+// un nœud hors forme est écarté.
+const ID_DAG = /^[A-Za-z0-9._:-]{1,64}$/, STATUTS_DAG = new Set(['blocked', 'ready', 'running', 'done', 'failed']);
+const WS_RE = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+const idOk = (x) => typeof x === 'string' && ID_DAG.test(x);
+export function dagDe(d) {
+  if (!d || typeof d !== 'object' || !Array.isArray(d.nodes)) return null;
+  const nodes = [];
+  for (const n of d.nodes) {
+    if (nodes.length >= 200) break;
+    if (!n || !idOk(n.id) || !STATUTS_DAG.has(n.status)) continue;
+    nodes.push({ id: n.id, deps: (Array.isArray(n.deps) ? n.deps : []).filter(idOk).slice(0, 32), status: n.status });
+  }
+  const ws = typeof d.ws === 'string' && WS_RE.test(d.ws) && !d.ws.includes('..') ? d.ws : '';
+  return { ws, phase: typeof d.phase === 'string' && PH_RE.test(d.phase) ? d.phase : '', at: Number.isInteger(d.at) ? d.at : null, nodes };
+}
+const sansSession = (ids, sessions) => Array.isArray(ids) && ids.length > 0 && !ids.some((i) => sessions.has(i)); // garde:verrou-sanssession
+const garde = (l, sessions) => ({
+  ws: chaine(l.ws) ?? '', scope: chaine(l.scope), phase: chaine(l.phase), tenu: true, stale: bool(l.stale), ageS: num(l.age_seconds), ttl: num(l.ttl),
+  progressAgeS: age(l.progress_age_seconds), owner: chaine(l.owner), step: chaine(l.step), childrenRunning: num(l.children_running),
+  leaseS: num(l.lease_seconds), dag: dagDe(l.dag), ...(sessions ? { sansSession: sansSession(l.session_ids, sessions) } : {}),
+});
+
+// verrousDe : la sortie brute de `status --all` (ou de `status` en lab plat) rendue en liste de verrous TENUS ; seuls les champs ci-dessus en sortent
+// (aucun chemin, aucun emplacement, aucune liste d'identifiants de session).
+export function verrousDe(st, { sessions } = {}) {
+  const vide = (etat, plat = false) => ({ etat, plat, liste: [] });
+  if (!st || typeof st !== 'object' || Array.isArray(st)) return vide('erreur');
+  if (st.available === false) return vide('absente');
+  if (Array.isArray(st.locks)) {
+    const tenus = st.locks.filter((l) => l && typeof l === 'object' && l.present === true);
+    return { etat: 'lue', plat: false, liste: tenus.map((l) => garde(l, sessions)) };
+  }
+  if (st.present === true) return { etat: 'lue', plat: true, liste: [garde(st, sessions)] };
+  if (st.present === false) return vide('lue', true);
+  return vide('erreur');
+}
 
 // lireVerrous : `status --all` ; lab plat = l'objet d'UN verrou (plat: true) ; les entrées absentes sont écartées.
 export function lireVerrous(root, { scriptsDir, home, lab = root, sh: run0 = sh } = {}) {
@@ -43,11 +83,7 @@ export function lireVerrous(root, { scriptsDir, home, lab = root, sh: run0 = sh 
   // F-04 : un script d'avant `--all` (avant 32438005) répond « Unknown arg: --all » sur stderr, stdout vide ; en lab plat le verbe de base `status` répond alors l'objet d'UN verrou.
   // Repli seulement sur une sortie VIDE (un refus), et seulement si la réponse ne porte ni `scope` ni `locks` : un script qui connaît la portée aurait répondu à `--all`, son `status` nu ne dit qu'un verrou parmi d'autres.
   if (!st && brut.trim() === '') { st = objet(run('bash', [dl.chemin, 'status'], root)); if (st && ('scope' in st || 'locks' in st)) st = null; }
-  if (!st) return { etat: 'erreur', plat: false, liste: [] };
-  if (Array.isArray(st.locks)) return { etat: 'lue', plat: false, liste: st.locks.filter((l) => l && typeof l === 'object' && l.present === true).map(garde) };
-  if (st.present === true) return { etat: 'lue', plat: true, liste: [garde(st)] };
-  if (st.present === false) return { etat: 'lue', plat: true, liste: [] };
-  return { etat: 'erreur', plat: false, liste: [] };
+  return verrousDe(st);
 }
 
 const sans = { tenu: false, stale: null, progressAgeS: null, ttl: null };

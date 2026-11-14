@@ -35,9 +35,9 @@ assert_eq "S1.6 — seulement des mineurs : « Nothing urgent », aucun nombre" 
 echo "=== S2 — clé dans un fichier de test (PU-G-081) ==="
 assert_eq "S2.1 — la clé de format réel est toujours signalée en test" "$(val "$R" g081.present)" "true"
 assert_eq "S2.2 — mais au ton baissé : « à corriger » (medium), jamais « important »" "$(val "$R" g081.severite)" "medium"
-assert_eq "S2.3 — le titre dit que la clé est probablement factice" "$(val "$R" g081.titre)" "A key in aws.test.js is probably fake"
-assert_eq "S2.4 — le détail dit « probably fake »" "$(val "$R" g081.detail_factice)" "true"
-assert_eq "S2.5 — le détail n'a plus le ton d'alarme (« get into … as you »)" "$(val "$R" g081.detail_alarmiste)" "false"
+assert_eq "S2.3 — le titre dit que la clé est probablement factice" "$(val "$R" g081.titre)" "Une clé dans aws.test.js est probablement factice"
+assert_eq "S2.4 — le détail dit « probablement factice »" "$(val "$R" g081.detail_factice)" "true"
+assert_eq "S2.5 — le détail n'a plus le ton d'alarme (« Quiconque peut voir le code … »)" "$(val "$R" g081.detail_alarmiste)" "false"
 assert_eq "S2.6 — témoin : la même clé dans le code de l'app reste « important »" "$(val "$R" g081.reel.severite)" "high"
 assert_eq "S2.7 — témoin : et garde le ton d'alarme" "$(val "$R" g081.reel.alarmiste)" "true"
 assert_eq "S2.8 — témoin : sans le mot « factice »" "$(val "$R" g081.reel.factice)" "false"
@@ -76,7 +76,7 @@ mutant() {
   assert_ne "M.$nom — la clé $cle rougit sur le mutant" "$(val "$d.out" "$cle")" "$(val "$R" "$cle")"
 }
 echo "=== M — mutations ==="
-mutant 079-titre assets/ui/20-health.js "SC.plural(total, 'thing')" "SC.plural(urgent, 'thing')" g079.titre
+mutant 079-titre assets/ui/20-health.js "t.pl(total, 'thing')" "t.pl(urgent, 'thing')" g079.titre
 mutant 079-pastille assets/ui/20-health.js "total > 99 ? '99+' : String(total)" "urgent > 99 ? '99+' : String(urgent)" g079.pastille
 mutant 081-severite scripts/lib/health.mjs "const allTest = group.every((g) => g.list.every((s) => s.test));" "const allTest = false;" g081.severite
 mutant 081-titre scripts/lib/health.mjs "const allTest = group.every((g) => g.list.every((s) => s.test));" "const allTest = false;" g081.titre
@@ -84,8 +84,8 @@ mutant 082-gros scripts/lib/health.mjs "&& !THIRD_PARTY.test(f.p) && !/(^|" "&& 
 mutant 082-inutilises scripts/lib/health.mjs "TEST_FILE.test(f.p) || THIRD_PARTY.test(f.p) ||" "TEST_FILE.test(f.p) ||" g082.inutilises
 mutant 083-moteur scripts/lib/health.mjs "if (usesSupabase) services.push('Supabase');" "services.push('Supabase');" g083.aucun
 mutant 083-ui assets/ui/20-health.js "\${!PLAN && services.length ?" "\${!PLAN ?" g083.ui.phrase_vide
-mutant 083-liste-figee assets/ui/20-health.js "services.join(', ')}.\`)}</p>\` : ''}" "services.join(', ')}. Supabase, Firebase, Stripe.\`)}</p>\` : ''}" g083.ui.avec_supabase
-mutant 084 assets/ui/20-health.js "'Health (security only)' : 'Health'" "'Health' : 'Health'" g084.projet
+mutant 083-liste-figee assets/ui/20-health.js "services.join(', ')))}</p>\` : ''}" "services.join(', ') + '. Supabase, Firebase, Stripe')))}</p>\` : ''}" g083.ui.avec_supabase
+mutant 084 assets/ui/20-health.js "t('Health (security only)') : t('Health')" "t('Health') : t('Health')" g084.projet
 
 echo
 echo "=== Bilan : $PASS passés, $FAIL en échec ==="

@@ -10,17 +10,17 @@
 #   S4    expiration de la grâce : une nouvelle session ne démarre qu'après la fin de l'ancienne (jamais deux assistants)
 #   N5    fermeture bornée : un assistant qui ignore SIGTERM reçoit SIGKILL et la place est rendue (réglage de test VF_COCKPIT_TERM_FERMETURE_MS)
 #   T15.3 le tampon est aussi vidé à la fin de la grâce       CP   contre-pression sur la réponse : un lecteur à l'arrêt bloque la production du shell
-#   M-*   mutants (copies de la sortie, jamais le module) : M-GRACE0, M-UNIQUE, M-PROPRIO, M-IDLE, M-TAMPON, M-JOURNAL, M-GRACE-DEFAUT, M-EXPIRATION, M-TAMPON-GRACE, M-CONTREPRESSION, M-SANS-SIGKILL
+#   M-*   mutants (copies du module par cockpit_module_muter) : M-GRACE0, M-UNIQUE, M-PROPRIO, M-IDLE, M-TAMPON, M-JOURNAL, M-GRACE-DEFAUT, M-EXPIRATION, M-TAMPON-GRACE, M-CONTREPRESSION, M-SANS-SIGKILL
 # Chaque témoin négatif a son contrôle positif ; un mutant sans effet est un FAIL. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"; HERE_T="$(cd "$(dirname "$0")" && pwd)"
 ENG="$SCRIPTS/../skills/cockpit-moteur"; TA="$HERE_T/terminal-aux.mjs"
-WORK="$(mktemp -d)"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home" "$WORK/bin" "$WORK/tmp-serveur"
+WORK="$(mktemp -d "${TMPDIR:-/tmp}/tmp.XXXXXX")"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"; mkdir -p "$AUX" "$WORK/home" "$WORK/bin" "$WORK/tmp-serveur"
 export HOME="$WORK/home"
 PIDS=(); cleanup() { vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"; }; trap cleanup EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"
 # P71-D-33 : Q tourne dans un processus enfant du serveur ; « les enfants du serveur » = les assistants, enfants de ce processus (pgrep -P ne voit qu'un étage)
 pgrep() { if [ "$1" = "-P" ] && [ $# -eq 2 ]; then local c; for c in $(command pgrep -P "$2"); do if ps -o command= -p "$c" 2>/dev/null | grep -q 'vf-cockpit-terminal-processus.mjs'; then command pgrep -P "$c"; else echo "$c"; fi; done; else command pgrep "$@"; fi; }
 PASS=0; FAIL=0
@@ -73,20 +73,31 @@ mklab() { # mklab <dir> : lab GSD minimal, construit ; sortie dans <dir>/.vibefl
   node "$SCRIPTS/vf-cockpit.mjs" build --lab "$L" > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 }
 SRVN=0; GRACE_T=3000
-srv() { # srv <sortie> [arguments du serveur…] -> SRV_PID SRV_O SRV_OUT QP SEC ; serveur lancé directement avec --terminal, comme le lanceur
-  local o="$1"; shift; local lab; lab="$(cd "$o/../.." && pwd)"
+# 79-06 : le code ne vit plus dans la sortie. MOD_DEPOT = racine du module du dépôt ; mod_de <sortie> = racine du module que COMMANDE cette sortie
+# (table posée par mutant() : sortie TAB module ; par défaut le module du dépôt).
+MOD_DEPOT="$(cd "$SCRIPTS/.." && pwd -P)"; MODS_TABLE="$WORK/.mods"; : > "$MODS_TABLE"; export MODS_TABLE MOD_DEPOT
+mod_de() { local m; m="$(awk -F'\t' -v s="${1:-}" '$1==s{m=$2} END{print m}' "$MODS_TABLE" 2>/dev/null)"; printf '%s\n' "${m:-$MOD_DEPOT}"; }
+srv() { # srv <sortie> [arguments du serveur…] -> SRV_PID SRV_O SRV_OUT QP SEC ; serveur du MODULE de la sortie visée, lancé avec --terminal par l'aide
+  local o="$1"; shift; local lab mod; lab="$(cd "$o/../.." && pwd)"; mod="$(mod_de "$o")"
+  if [ -n "${ENG_SRV:-}" ]; then # moteur dont l'assistant est remplacé (ENG_SRV) : une copie du module (celui de la sortie, muté ou non) dont le moteur est ce moteur — l'empreinte publiée reste celle de la copie visée
+    local mc="$WORK/modsrv-$((SRVN+1))"; rm -rf "$mc"; mc="$(cockpit_module_copie "$mc")" || return 1
+    ( cd "$mod/scripts" && tar -cf - --exclude=tests . ) | ( cd "$mc/scripts" && tar -xf - ) && rm -rf "$mc/skills/cockpit-moteur" && cp -R "$ENG_SRV" "$mc/skills/cockpit-moteur" || return 1; mod="$mc"
+  fi
   SRVN=$((SRVN+1)); SRV_O="$o"; SRV_OUT="$WORK/serve-$SRVN.out"; rm -f "$o/.cache/server.json"; mkdir -p "$o/.cache"
   local amorce; amorce="$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")"; (umask 077; printf '%s' "$amorce" > "$o/.cache/terminal-amorce"); (umask 077; printf '%s' "$amorce" > "$WORK/amorce-$SRVN")
-  ( cd "$lab" && PATH="${PATH_SRV:-$PATH}" VF_COCKPIT_ENGINE_DIR="${ENG_SRV:-$ENG}" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" VF_COCKPIT_TERM_GRACE_MS="$GRACE_T" VF_COCKPIT_TERM_FERMETURE_MS="${FERM_T:-}" TMPDIR="$WORK/tmp-serveur" exec node "$o/serve.mjs" --no-open --terminal "$@" --port "$(libre)" > "$SRV_OUT" 2>&1 ) </dev/null >/dev/null 2>&1 &
-  SRV_PID=$!; PIDS+=($SRV_PID)
-  for _ in $(seq 1 100); do grep -q '"terminal"' "$o/.cache/server.json" 2>/dev/null && break; sleep 0.1; done
+  COCKPIT_MODULE="$mod" COCKPIT_PRET=terminal COCKPIT_LOG="$SRV_OUT" cockpit_lancer "$lab" PATH="${PATH_SRV:-$PATH}" VF_COCKPIT_TERM_GRACE_MS="$GRACE_T" VF_COCKPIT_TERM_FERMETURE_MS="${FERM_T:-}" TMPDIR="$WORK/tmp-serveur" --terminal "$@"
+  SRV_PID="$VF_PID"
   QP="$(sj '(j.terminal&&j.terminal.url)||""')"; QP="${QP##*:}"; SEC=""
   if [ -n "$QP" ]; then SEC="$(node "$TA" amorcer "$QP" "$WORK/amorce-$SRVN" | sed -n 2p)"; fi
 }
 unsrv() { vf_hyg_stop "$SRV_PID"; }
-mutant() { # mutant <nom> <fichier-relatif-à-la-sortie> <expression-sed> -> MUT_OUT ; code 1 si la cible manque ou si la copie n'a pas changé
-  local d="$WORK/mut-$1" f; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
-  MUT_OUT="$d/.vibeflow/cockpit"; f="$MUT_OUT/$2"; [ -f "$f" ] || return 1
+mutant() { # mutant <nom> <fichier> <expression-sed> -> MUT_OUT (copie du lab : données) et MUT_MOD (racine de la copie du module) ; code 1 si la cible manque ou si la copie n'a pas changé
+  local d="$WORK/mut-$1" f; rm -rf "$d" "$WORK/mod-$1"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"
+  MUT_OUT="$d/.vibeflow/cockpit"; MUT_MOD=""
+  case "$(basename "$2")" in
+    serve.mjs|graph-query.js|query-cli.mjs|vf-cockpit-*) cockpit_module_muter "$1" "$2" "$3" || return 1; MUT_MOD="$COCKPIT_MODULE"; unset COCKPIT_MODULE; printf '%s\t%s\n' "$MUT_OUT" "$MUT_MOD" >> "$MODS_TABLE"; return 0 ;;
+  esac
+  f="$d/.vibeflow/cockpit/$2"; [ -f "$f" ] || return 1   # page de la copie du lab (donnée) : même chemin que MUT_OUT/<fichier>
   cp "$f" "$f.orig"; sed -i.bak "$3" "$f"; local r=0; cmp -s "$f" "$f.orig" && r=1; rm -f "$f.orig" "$f.bak"; return $r
 }
 copie() { local d="$WORK/cp-$1"; rm -rf "$d"; mkdir -p "$d"; cp -R "$LAB/.planning" "$d/.planning"; cp -R "$LAB/.vibeflow" "$d/.vibeflow"; MUT_OUT="$d/.vibeflow/cockpit"; }
@@ -226,8 +237,8 @@ unsrv
 
 echo "=== Sp2 — grâce par défaut, lue sans override d'environnement ==="
 grace_lue() { # grace_lue <sortie> [valeur de VF_COCKPIT_TERM_GRACE_MS] : GRACE_MS que le module de la sortie calcule
-  if [ $# -ge 2 ]; then VF_COCKPIT_TERM_GRACE_MS="$2" node --input-type=module -e "import { pathToFileURL } from 'node:url'; const m = await import(pathToFileURL(process.argv[1] + '/vf-cockpit-terminal-session.mjs').href); console.log(m.GRACE_MS);" "$1"
-  else env -u VF_COCKPIT_TERM_GRACE_MS node --input-type=module -e "import { pathToFileURL } from 'node:url'; const m = await import(pathToFileURL(process.argv[1] + '/vf-cockpit-terminal-session.mjs').href); console.log(m.GRACE_MS);" "$1"; fi
+  if [ $# -ge 2 ]; then VF_COCKPIT_TERM_GRACE_MS="$2" node --input-type=module -e "import { pathToFileURL } from 'node:url'; const m = await import(pathToFileURL(process.argv[1] + '/vf-cockpit-terminal-session.mjs').href); console.log(m.GRACE_MS);" "$(mod_de "$1")/scripts"
+  else env -u VF_COCKPIT_TERM_GRACE_MS node --input-type=module -e "import { pathToFileURL } from 'node:url'; const m = await import(pathToFileURL(process.argv[1] + '/vf-cockpit-terminal-session.mjs').href); console.log(m.GRACE_MS);" "$(mod_de "$1")/scripts"; fi
 }
 assert_eq "Sp2.1 — sans override, la grâce par défaut vaut 30000 ms (P71-D-19)" "$(grace_lue "$OUT")" "30000"
 assert_eq "Sp2.2 — témoin : un réglage de test valide (250) est pris en compte ; hors plage (50, 40000) ou illisible (abc) : retour au défaut 30000" "$(grace_lue "$OUT" 250) $(grace_lue "$OUT" 50) $(grace_lue "$OUT" 40000) $(grace_lue "$OUT" abc)" "250 30000 30000 30000"
@@ -427,7 +438,7 @@ if mutant disparu vf-cockpit-terminal-processus.mjs "s/const pythonAbsent = () =
   assert_eq "M-PYTHON-FIGE — le mutant (python3 vérifié une seule fois, au démarrage) rougit R3.1 : la relance ne dit plus « indisponible »" "$([[ "$R3M" == *"etat=indisponible"* ]] && echo identique || echo rouge)" "rouge"
 else assert_eq "M-PYTHON-FIGE — mutant sans effet (cible absente ou inchangée)" "sans effet" "effet"; fi
 
-# mutants W1 : copies de la sortie
+# mutants W1 : copies du module
 if mutant parentmort vf-cockpit-terminal-processus.mjs "s/process.on('disconnect', () => { if (phase !== 'arret') sortir(); });//; s/if (process.ppid !== ppid0 \&\& phase !== 'arret') sortir();//"; then
   srv "$MUT_OUT"; f="$WORK/f-mpm.bin"; flux "$f" 40000; attendre_python; QPID="$(proc_q "$SRV_PID")"; APID="$(command pgrep -P "$QPID" | sed -n 1p)"
   kill -KILL "$SRV_PID"; wait "$SRV_PID" 2>/dev/null; morts 4 "$QPID"; MPM="$(vivant_w "${QPID:-0}")"; vf_hyg_stop "$FL"; [ -n "$QPID" ] && kill -KILL "$QPID" 2>/dev/null; [ -n "$APID" ] && kill -KILL "$APID" 2>/dev/null

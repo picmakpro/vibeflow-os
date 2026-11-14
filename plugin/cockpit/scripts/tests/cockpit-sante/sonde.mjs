@@ -33,14 +33,14 @@ const sec = par(t, 'secret')[0];
 out('g081.present', !!sec);
 out('g081.severite', sec ? sec.severity : 'absent');
 out('g081.titre', sec ? sec.title : '');
-out('g081.detail_factice', !!sec && /probably fake/.test(sec.detail));
-out('g081.detail_alarmiste', !!sec && /get into/.test(sec.detail));
+out('g081.detail_factice', !!sec && /probablement factice/.test(sec.detail));
+out('g081.detail_alarmiste', !!sec && /Quiconque peut voir le code/.test(sec.detail));
 // témoin : la même clé dans le code de l'application reste grave et alarmiste
 const r = depot([{ p: 'src/aws.js', src: `const k = "${AWS}";\n` }]);
 const sr = par(r, 'secret')[0];
 out('g081.reel.severite', sr ? sr.severity : 'absent');
-out('g081.reel.alarmiste', !!sr && /get into/.test(sr.detail));
-out('g081.reel.factice', !!sr && /probably fake/.test(sr.detail));
+out('g081.reel.alarmiste', !!sr && /Quiconque peut voir le code/.test(sr.detail));
+out('g081.reel.factice', !!sr && /probablement factice/.test(sr.detail));
 
 // G-082 : fichiers tiers exclus des conseils « très gros » et « inutilisé »
 const g = depot([
@@ -70,7 +70,10 @@ function panneau({ issues, services, vfTab, plan = false }) {
     state: { selected: null, container: null }, iconI: () => '', icon: () => '', exists: () => false, on() {}, closePanel() {}, canChange: () => false,
     addHeaderButton: (o) => { const b = Object.assign(el(), o); boutons.push(b); return b; }, addPanelSection: (n, f) => { sections[n] = f; }, showPanel: (html) => panneaux.push(html),
   };
-  const ctx = { window: { Floorplan: SC }, document: { createElement: el, head: { appendChild() {} } }, JSON };
+  // 79-10 : le traducteur du moteur, sous forme neutre (la clé remplie, comme sous ?lang=en) : l'extension le lit au chargement
+  const tf = (k, ...v) => k.replace(/@[\w-]+$/, '').split('{}').reduce((x, q, i) => (i ? x + String(v[i - 1] ?? '') + q : x + q), '');
+  Object.assign(tf, { pl: (n, w) => `${n} ${w}${n === 1 ? '' : 's'}`, mot: (n, k) => k, k: (x) => x, type: () => null, constat: (x) => x });
+  const ctx = { window: { Floorplan: SC, __vfFrT: tf }, document: { createElement: el, head: { appendChild() {} } }, JSON };
   vm.runInNewContext(fs.readFileSync(path.join(moteur, 'assets/ui/20-health.js'), 'utf8'), ctx);
   boutons[0].onClick();
   return { liste: panneaux[0] || '', apercu: sections.overview ? sections.overview().html : '', bouton: boutons[0] };

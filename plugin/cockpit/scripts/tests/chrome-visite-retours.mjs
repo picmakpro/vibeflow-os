@@ -6,7 +6,7 @@
 //   tiroir   : le tiroir Git est ouvert pendant la visite, puis UNE seule Échap réelle : le tiroir doit être fermé
 //   fin      : fin de visite avec le terminal (pastille) après un redimensionnement PENDANT la visite (fin-sans : sans redimensionnement) : le zoom, la pastille et la barre ne se recouvrent pas
 //   focus    : clic souris réel sur le bouton de visite (rouvre la visite), puis une flèche : le bouton ne doit pas porter d'anneau (:focus-visible) ;
-//              activé au clavier (Entrée), il le garde
+//              activé au clavier (Entrée) : visite modale (bouton inerte, sans focus) ; à la fermeture le focus et l'anneau lui reviennent
 // Rend une ligne JSON ou { erreur }.
 import { executer, pause, stabiliser, attendreValeur, attendreEtStabiliser, positionPosee } from './chrome-session.mjs';
 const [, , chrome, url0, largeur = '1440', scenario = 'visite', page = ''] = process.argv;
@@ -41,13 +41,16 @@ await executer(chrome, async (s) => {
   }
   if (scenario === 'focus') {
     await s.ev('window.VibeFlowTour.end()'); await attendreValeur(() => s.ev(OUVERTE), (v) => v === false, { max: 3000 });
-    const info = () => s.ev("(() => { const b = document.getElementById('tour-btn'); return { actif: document.activeElement === b, fv: b.matches(':focus-visible'), ouverte: window.VibeFlowTour.active() }; })()");
+    const info = () => s.ev("(() => { const b = document.getElementById('tour-btn'); return { actif: document.activeElement === b, fv: b.matches(':focus-visible'), ouverte: window.VibeFlowTour.active(), inerte: !!b.closest('[inert]') }; })()");
     await clic('#tour-btn'); await s.attendre(OUVERTE, 'visite rouverte à la souris'); await positionPosee(s.ev, "document.getElementById('tour')");
     const souris0 = await info(); await touche('ArrowRight'); await pause(300); const souris1 = await stabiliser(info, { pas: 120, max: 3000 }); // la pause reste : fv doit rester FAUX (absence d'anneau)
     await s.ev('window.VibeFlowTour.end()'); await attendreValeur(() => s.ev(OUVERTE), (v) => v === false, { max: 3000 });
     await touche('Tab'); await s.ev("document.getElementById('tour-btn').focus()"); await touche('Enter');
     const clavier = await attendreEtStabiliser(info, (v) => v && v.ouverte === true, { pas: 150, max: 3000 });
-    return { souris0, souris1, clavier };
+    // 80-02 (P80-D-11, Q5) : la visite ouverte par le bouton est modale, le bouton est inerte pendant qu'elle dure ; à sa fermeture le focus lui revient (et son anneau, l'ouverture étant au clavier)
+    await s.ev('window.VibeFlowTour.end()'); await attendreValeur(() => s.ev(OUVERTE), (v) => v === false, { max: 3000 });
+    const retour = await attendreEtStabiliser(info, (v) => v && v.ouverte === false && v.actif === true, { pas: 150, max: 3000 }).catch(() => info());
+    return { souris0, souris1, clavier, retour };
   }
   if (scenario === 'fin' || scenario === 'fin-sans') {
     // I-1 (intégration, revue du lot A) : pendant la visite, une règle !important (ui/02, data-vf-visite) masque le style en ligne du zoom ; si la fenêtre bouge, eviter() (terminal-tiroir) le vide faute de recouvrement visible,

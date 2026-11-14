@@ -1,7 +1,10 @@
 // Shared helpers: paths, globs, file classification, git, and codebase discovery.
+// vibeflow:allow-large-file (code vendorisé, VENDORED.txt ; 75-06 : la règle de rattachement d'un fichier à un nœud, extraite de build.mjs)
 import fs from 'node:fs';
 import path from 'node:path';
 import { execFileSync } from 'node:child_process';
+import { gitSortant } from './vf-git-sortant.mjs'; // vibeflow AUDC-A-02
+import { automateDe, MAX_MOTIF } from './vf-glob.mjs'; // vibeflow SOCL-26
 
 export const toPosix = (p) => p.replace(/\\/g, '/');
 export const rel = (from, to) => toPosix(path.relative(from, to)) || '.';
@@ -10,7 +13,8 @@ export const rel = (from, to) => toPosix(path.relative(from, to)) || '.';
 
 const GLOB_CHARS = /[*?{[]/;
 
-export function globToRegExp(glob) {
+// Source de regex (sans ancres) d'un motif : le fragment que lit l'automate de vf-glob.mjs.
+export function globSource(glob) {
   const g = toPosix(glob).replace(/^\.\//, '').replace(/\/$/, '');
   let re = '';
   let braces = 0;
@@ -46,20 +50,48 @@ export function globToRegExp(glob) {
     re += c.replace(/[.+^$()|\\\]]/g, '\\$&');
     i++;
   }
-  return new RegExp('^' + re + '$');
+  return re;
 }
 
 /** Compile a glob. A pattern with no wildcards also matches everything under it as a directory. */
 export function compileGlob(glob) {
   const g = toPosix(glob).replace(/^\.\//, '').replace(/\/$/, '');
-  const literalPrefix = g.split(GLOB_CHARS)[0];
+  const premier = g.search(GLOB_CHARS); // vibeflow SOCL-26 : le préfixe littéral se lit sans découper le motif entier
   if (!GLOB_CHARS.test(g)) {
     return { glob, specificity: g.length, test: (p) => p === g || p.startsWith(g + '/') };
   }
+  if (g.length > MAX_MOTIF) { // vibeflow SOCL-26 : motif au-delà du plafond, jamais traduit ; un avis d'une ligne, ne correspond à rien
+    console.error(`cockpit : motif de plus de ${MAX_MOTIF} caractères ignoré (${JSON.stringify(g.slice(0, 40))}…)`);
+    return { glob, specificity: premier, test: () => false };
+  }
   // A glob that names directories (src/components/{a,b}) also matches everything beneath them.
-  const re = globToRegExp(g);
-  const under = globToRegExp(g + '/**');
-  return { glob, specificity: literalPrefix.length, test: (p) => re.test(p) || under.test(p) };
+  return { glob, specificity: premier, test: automateDe(globSource(g), globSource(g + '/**')) };
+}
+
+// ---------- rattachement d'un fichier à un nœud (vibeflow 75-06) : la règle de build.mjs, UNE fois, appelée par le moteur ET par l'annotateur des cartes prévues ----------
+const strs = (v) => Array.isArray(v) && v.every((x) => typeof x === 'string');
+/** Les motifs de chaque nœud, avec sa profondeur (chaîne de `parent`) ; le `exclude` d'un nœud vaut aussi pour ses descendants. */
+export function regleDeNoeuds(nodes) {
+  const byId = new Map(nodes.filter((n) => n && typeof n.id === 'string' && n.id).map((n) => [n.id, n]));
+  const chaine = (n, seen = new Set()) => (!n || seen.has(n.id) ? [] : (seen.add(n.id), [n, ...chaine(byId.get(n.parent), seen)])); // le nœud et ses ancêtres, sans boucle
+  return nodes.filter((n) => n?.id && strs(n.paths ?? [])).map((n, order) => {
+    const ch = chaine(n);
+    return { id: n.id, order, depth: ch.length - 1, paths: (n.paths || []).map(compileGlob), exclude: ch.flatMap((x) => (strs(x.exclude) ? x.exclude : [])).map(compileGlob),
+      hits: new Array((n.paths || []).length).fill(0) };
+  });
+}
+/** Le nœud d'un chemin : profondeur d'abord, puis spécificité. { id ('unassigned' sans nœud), tie (id d'un nœud à égalité parfaite, ou null) }. */
+export function rattacher(matchers, chemin) {
+  let best = null, bk = null, tie = null;
+  for (const m of matchers) {
+    if (m.exclude.some((g) => g.test(chemin))) continue;
+    let spec = -1;
+    m.paths.forEach((g, i) => { if (g.test(chemin)) { m.hits[i]++; spec = Math.max(spec, g.specificity); } });
+    if (spec < 0) continue;
+    if (!best || m.depth > bk[0] || (m.depth === bk[0] && spec > bk[1])) { best = m; bk = [m.depth, spec]; tie = null; }
+    else if (m.depth === bk[0] && spec === bk[1]) tie = m.id;
+  }
+  return { id: best ? best.id : 'unassigned', tie };
 }
 
 // ---------- file classification ----------
@@ -204,8 +236,9 @@ export function discover(root, { includeWorktrees = false, maxLooseFiles = 5000 
   const loose = [];
   const skipped = [];
 
+  // vibeflow AUDC-A-02 : un dépôt dont les métadonnées git ne sont pas celles du lab (dossier git ou commun hors du lab, lien symbolique, alternates, core.worktree étranger) n'est pas lu (lib/vf-git-sortant.mjs)
   const walk = (dir, depth) => {
-    if (fs.existsSync(path.join(dir, '.git'))) {
+    if (fs.existsSync(path.join(dir, '.git')) && !gitSortant(dir, root)) {
       repos.push({ abs: dir, path: rel(root, dir), worktreeOf: worktreeMain(dir) });
       return;
     }

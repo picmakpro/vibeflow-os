@@ -1,0 +1,2 @@
+{"cwd":"@AUTRE@","sessionId":"sess-bbbb0001","version":"2.1.322","type":"user","timestamp":"2026-11-01T09:00:00.000Z","message":{"role":"user","content":"bonjour"}}
+{"cwd":"@AUTRE@","sessionId":"sess-bbbb0001","version":"2.1.322","type":"assistant","timestamp":"2026-11-01T09:00:05.000Z","message":{"id":"msg_b1","model":"claude-test-1","role":"assistant","stop_reason":"end_turn","usage":{"input_tokens":1,"output_tokens":1,"cache_read_input_tokens":1,"cache_creation_input_tokens":1},"content":[{"type":"text","text":"x"}]}}

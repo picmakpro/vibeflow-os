@@ -89,13 +89,15 @@ export const nettoieTitre = (t) => {
   return masqueCoupe(propre, BORNE_TITRE).trim();
 };
 const CACHE_TITRES = new Map();
+const TITRE_PAR_DEFAUT = /^new session$/i; // valeur par défaut de `custom-title` (application de bureau de Claude Code), mesurée sur 407 lignes d'une session ouverte
 // le titre le plus récent l'emporte, même vide (l'utilisateur a pu le vider) ; un échec de lecture n'est jamais mémorisé comme « pas de titre »
 export const titreSession = (f) => {
   let st; try { st = fs.statSync(f); } catch { return ''; }
   const c = CACHE_TITRES.get(f); if (c && c.mt === st.mtimeMs && c.size === st.size) return c.titre;
   const etat = {}, r = cherche(f, (d) => (d.type === 'custom-title' && typeof d.customTitle === 'string' ? { t: d.customTitle } : null), [FENETRES[0]], etat);
   if (etat.erreur) return '';
-  const titre = nettoieTitre(r ? r.t : '');
+  const propre = nettoieTitre(r ? r.t : '');
+  const titre = TITRE_PAR_DEFAUT.test(propre) ? '' : propre; // AUDC-D6 : la valeur par défaut écrite par l'application de bureau n'est pas un nom choisi ; jamais de titre généré (PU-G-162)
   if (CACHE_TITRES.size >= 4000) CACHE_TITRES.clear();
   CACHE_TITRES.set(f, { mt: st.mtimeMs, size: st.size, titre });
   return titre;

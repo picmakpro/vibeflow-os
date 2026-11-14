@@ -3,13 +3,12 @@
 #   Q1 forme courante locale · Q2 raisonnement -> agent confiné (argv = combinaison mesurée) · Q3 onglet Code, même confinement
 #   Q4 modèle : préséance et liste fermée · Q5 question piégée inoffensive · Q6 le modèle ne laisse aucune trace
 #   Q7 seul Claude Code est lancé · Q8 syntaxe et jeton de /api/vf/modeles · Q9 CLI de requête · Q10 identité de phase
-#   Q11 ARGS_CONFINEMENT = « Combinaison retenue » de la mesure (dépôt seulement)
+#   Q11 ARGS_CONFINEMENT = « Combinaison retenue » de la mesure la plus récente (dépôt de dev seulement ; Q11.0 : jamais sautée dans le dépôt)
 #   Q18 retours panel lot 7 (PU-G-096 un état par phase · PU-G-147 coupe au mot · PU-G-150 lignes non comprises)
 #   Q15 « Où en est-on ? » sans STATE.md · Q16 statut lisible (réponse locale, sous-titre) · Q17 parité des tables de statuts
 # Faux binaires claude et codex (node) en tête du PATH ; aucun vrai appel. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
-libre() { node -e "const s=require('net').createServer().listen(0,'127.0.0.1',()=>{console.log(s.address().port);s.close()})"; } # port libre choisi à l'exécution (jamais un tirage au hasard : trois suites en parallèle se heurtaient)
 export GIT_CONFIG_NOSYSTEM=1 GIT_CONFIG_GLOBAL=/dev/null
 SCRIPTS="$(cd "$(dirname "$0")/.." && pwd)"
 WORK="$(mktemp -d)"; mkdir -p "$WORK/aux" "$WORK/home"; WORK="$(cd "$WORK" && pwd -P)"; AUX="$WORK/aux"
@@ -18,6 +17,7 @@ SRV=""
 stop_srv() { [ -n "$SRV" ] && { vf_hyg_stop "$SRV"; }; SRV=""; }
 trap 'stop_srv; vf_hyg_fin; [ -n "${KEEP:-}" ] || rm -rf "$WORK"' EXIT
 . "$(dirname "$0")/hygiene.sh"; vf_hyg_init
+. "$(dirname "$0")/socle-serveur.sh"  # cockpit_lancer : le serveur de la sortie du lab, lancé, attendu et arrêté par l'aide commune (A6)
 PASS=0; FAIL=0
 assert_eq() { if [ "$2" = "$3" ]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu: [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
 assert_has() { if [[ "$2" == *"$3"* ]]; then echo "  ✅ PASS — $1"; PASS=$((PASS+1)); else echo "  ❌ FAIL — $1"; echo "     attendu (sous-chaîne): [$3]"; echo "     obtenu:  [$2]"; FAIL=$((FAIL+1)); fi; }
@@ -47,6 +47,21 @@ else if (cmd === 'get') http.get({ host: '127.0.0.1', port: Number(a[0]), path: 
 else if (cmd === 'json') console.log(String(new Function('j', 'return (' + a[1] + ')')(J(a[0]))));
 else if (cmd === 'loc') { const g = (await import(pathToFileURL(path.join(a[0], 'vf-cockpit-project.mjs')).href)).buildProjectGraph(a[1]); console.log(JSON.stringify((await import(pathToFileURL(path.join(a[0], 'vf-cockpit-ask.mjs')).href)).answerLocally(g, a[2]))); }
 else if (cmd === 'locg') console.log(JSON.stringify((await import(pathToFileURL(path.join(a[0], 'vf-cockpit-ask.mjs')).href)).answerLocally(J(a[1]), a[2]))); // locg <scripts> <graphe.json> <question> : réponse locale sur un graphe fabriqué
+else if (cmd === 'mut') process.stdout.write(fs.readFileSync(a[0], 'utf8').split(a[1]).join(a[2])); // mut <fichier> <ancre> <remplacement> : la mutation d'un texte exact (rien ne change si l'ancre est absente)
+else if (cmd === 'subm') process.stdout.write(fs.readFileSync(a[0], 'utf8').split('<module>').join(a[1])); // subm <fichier> <dossier> : le gabarit <module> remplacé par le dossier du module calculé par la suite
+else if (cmd === 'q115') { // q115 <scripts> <module> : verdict de la substitution de argsAgent (ok | jeton | regle:… | exception:…) ; les règles attendues sont écrites ICI, jamais lues du code de production
+  const A = await import(pathToFileURL(path.join(a[0], 'vf-cockpit-agent.mjs')).href), mod = a[1];
+  const want = [`Bash(node ${mod}/scripts/vf-cockpit-query.mjs:*)`, `Bash(node ${mod}/skills/cockpit-moteur/assets/query-cli.mjs:*)`];
+  try {
+    const r = A.argsAgent([], { modele: 'haiku', dossierModule: mod }), bash = r.filter((x) => x.startsWith('Bash('));
+    console.log(r.some((x) => x.includes('<module>')) ? 'jeton' : bash.join('|') !== want.join('|') ? 'regle:' + bash.join('|') : 'ok');
+  } catch (e) { console.log('exception:' + String(e.message).slice(0, 80)); }
+}
+else if (cmd === 'q116') { // q116 <scripts> <dossier…> : « admis » ou « refus » pour chaque dossier ; « @indefini » = aucun dossier
+  const A = await import(pathToFileURL(path.join(a[0], 'vf-cockpit-agent.mjs')).href), v = [];
+  for (const d of a.slice(1)) { try { A.argsAgent([], { modele: 'haiku', dossierModule: d === '@indefini' ? undefined : d }); v.push('admis'); } catch { v.push('refus'); } }
+  console.log(v.join(','));
+}
 else if (cmd === 'cst') console.log((await import(pathToFileURL(path.join(a[0], 'vf-cockpit-agent.mjs')).href)).ARGS_CONFINEMENT.join('\n'));
 else if (cmd === 'sub') { // sub <call.json> <liste-attendue> : la liste est-elle une sous-suite contiguë, dans l'ordre, de l'argv ?
   const argv = J(a[0]).argv, want = fs.readFileSync(a[1], 'utf8').split('\n'); if (want.at(-1) === '') want.pop(); // un élément vide est légitime (--setting-sources "") : seul le saut de ligne final disparaît
@@ -60,6 +75,7 @@ mkfake() { # mkfake <dossier> <nom>
 const fs = require('fs'); const D = process.env.VF_FAKE_DIR;
 const n = fs.readdirSync(D).filter((f) => /^call-\d+\.json$/.test(f)).length + 1;
 if (process.argv[2] === '--version') { fs.writeFileSync(`${D}/call-${n}.json`, JSON.stringify({ argv: ['--version'] })); console.log('2.1.316 (Claude Code)'); process.exit(0); }
+if (process.argv[2] === 'agents') process.exit(1); // la lecture de l'état officiel des sessions (onglet Équipe) n'est pas une demande à l'agent : ni consignée, ni comptée (jointure)
 let stdin = ''; process.stdin.on('data', (c) => (stdin += c));
 process.stdin.on('end', () => { fs.writeFileSync(`${D}/call-${n}.json`, JSON.stringify({ argv: process.argv.slice(2), cwd: process.cwd(), stdin })); console.log(JSON.stringify({ type: 'result', is_error: false, result: JSON.stringify({ title: 'Faux', answer: 'FAUX-AGENT-REPONSE', items: [], steps: [], followups: [] }), session_id: 'fake-session' })); });
 JS
@@ -73,12 +89,10 @@ printf '<objective>Faire le socle</objective>\n' > "$LAB/.planning/phases/01-x/0
 git -C "$LAB" init -q && git -C "$LAB" add -A && git -C "$LAB" -c user.email=t@t -c user.name=t commit -q -m init
 node "$SCRIPTS/vf-cockpit-build.mjs" "$LAB" --quiet > "$WORK/build.out" 2>&1 || cat "$WORK/build.out"
 OUT="$LAB/.vibeflow/cockpit"; LABR="$(cd "$LAB" && pwd -P)"
-demarrer() { # demarrer <dossier-faux> <PATH> [VAR=val ...] -> PORT, TOK, PTOK ; VF_FAKE_DIR = <dossier-faux>
-  local FK="$1" P="$2"; shift 2; stop_srv; rm -f "$OUT/.cache/server.json"; [ -n "${NOCLEAR:-}" ] || rm -f "$FK"/call-*.json
-  env PATH="$P" VF_FAKE_DIR="$FK" "$@" "$NODE" "$OUT/serve.mjs" --no-open --port $(libre) > "$WORK/serve.out" 2>&1 &
-  SRV=$!
-  for _ in $(seq 1 100); do [ -s "$OUT/.cache/server.json" ] && break; sleep 0.1; done
-  PORT=$(H json "$OUT/.cache/server.json" 'j.port' 2>/dev/null || echo 0); TOK=$(H tok "$PORT" /); PTOK=$(H tok "$PORT" /project.html)
+demarrer() { # demarrer <dossier-faux> <PATH> [VAR=val ...] -> PORT, TOK, PTOK ; VF_FAKE_DIR = <dossier-faux> ; le serveur est lancé par cockpit_lancer (NOM=valeur passés tels quels)
+  local FK="$1" P="$2"; shift 2; stop_srv; [ -n "${NOCLEAR:-}" ] || rm -f "$FK"/call-*.json
+  COCKPIT_LOG="$WORK/serve.out" cockpit_lancer "$LAB" PATH="$P" VF_FAKE_DIR="$FK" VF_COCKPIT_ENGINE_DIR="$MODDIR/skills/cockpit-moteur" VF_COCKPIT_SCRIPTS_DIR="$SCRIPTS" "$@" || echo "     (cockpit_lancer : le serveur de la suite n'a pas démarré, code $?)" >&2
+  SRV="$VF_PID"; PORT="$VF_PORT"; TOK=$(H tok "$PORT" /); PTOK=$(H tok "$PORT" /project.html)
   [ -n "${NOCLEAR:-}" ] || rm -f "$FK"/call-*.json # le --version du démarrage n'est pas une question
 }
 poser() { # poser <jeton> <question> [extra-json] -> $WORK/ev.jsonl
@@ -86,10 +100,18 @@ poser() { # poser <jeton> <question> [extra-json] -> $WORK/ev.jsonl
 }
 FK="$WORK/fk"; mkfake "$FK" claude; BASEPATH="$FK:$PATH"
 # --- combinaison attendue : extraite de la mesure (dépôt) ou comparée à la constante (lab) ---
-MESURE=""; [ -f "$SCRIPTS/../amont/synchro.sh" ] && MESURE="$(find "$SCRIPTS/../../../.planning" -name '67-MESURE-claude-p.md' 2>/dev/null | head -1)"
+# racine_depot : racine du dépôt de dev quand le module est posé sous plugin/cockpit de cette racine ET qu'elle porte .planning/ ; rien sinon
+racine_depot() { local m r; m="$(cd "$SCRIPTS/.." && pwd -P)"; r="$(cd "$SCRIPTS/../../.." 2>/dev/null && pwd -P)"; [ -n "$r" ] && [ "$m" = "$r/plugin/cockpit" ] && [ -d "$r/.planning" ] && printf '%s' "$r"; }
+DEPOT="$(racine_depot)"
+# mesure_de <racine> : la mesure du confinement au plus grand numéro de phase sous .planning/ (tri numérique du préfixe, jamais lexical ni par date) ; rien s'il n'y en a pas
+mesure_de() { find "$1/.planning" -name '*-MESURE-claude-p.md' 2>/dev/null | awk -F/ '{ n=$NF; sub(/-.*/, "", n); printf "%012d\t%s\n", n+0, $0 }' | LC_ALL=C sort | tail -1 | cut -f2-; }
+MESURE=""; [ -n "$DEPOT" ] && MESURE="$(mesure_de "$DEPOT")"
 H cst "$SCRIPTS" > "$WORK/const.txt"
 if [ -n "$MESURE" ]; then awk '/^## Combinaison retenue$/{f=1;next} /^## /{f=0} f && /^- `/' "$MESURE" | sed 's/^- `//; s/`$//' > "$WORK/attendu.txt"; echo "  (combinaison attendue lue dans la mesure)"
 else cp "$WORK/const.txt" "$WORK/attendu.txt"; echo "  (mesure absente : comparaison à la constante)"; fi
+
+MODDIR="$(cd "$SCRIPTS/.." && pwd -P)"  # dossier du module (parent du dossier de scripts, chemin réel) : calculé ICI, jamais lu du code de production
+H subm "$WORK/attendu.txt" "$MODDIR" > "$WORK/attendu-sub.txt"  # la combinaison attendue avec le gabarit <module> remplacé (Q2.2, Q3.2)
 
 demarrer "$FK" "$BASEPATH"
 echo "=== Q1 — forme courante : locale, sans agent ==="
@@ -99,13 +121,13 @@ assert_eq "Q1.2 — le faux claude n'est pas appelé" "$(H ncalls "$FK")" "0"
 echo "=== Q2 — raisonnement : agent confiné ==="
 poser "$PTOK" "Pourquoi la phase 1 a-t-elle ce statut ?"
 assert_eq "Q2.1 — le faux claude est appelé une fois" "$(H ncalls "$FK")" "1"
-assert_eq "Q2.2 — l'argv contient la combinaison attendue, contiguë et dans l'ordre" "$(H sub "$FK/call-1.json" "$WORK/attendu.txt")" "true"
+assert_eq "Q2.2 — l'argv contient la combinaison attendue (gabarit <module> remplacé par le dossier du module), contiguë et dans l'ordre" "$(H sub "$FK/call-1.json" "$WORK/attendu-sub.txt")" "true"
 echo "     argv consigné : $(H call "$FK" 1 'JSON.stringify(c.argv.map(x=>x.length>48?x.slice(0,36)+"…":x))')"
 assert_eq "Q2.3 — mode de permission explicite, aucun Bash nu" "$(H call "$FK" 1 'c.argv.includes("--permission-mode")&&!c.argv.includes("Bash")')" "true"
-assert_eq "Q2.4 — tout Bash( désigne l'un des deux scripts de requête" "$(H call "$FK" 1 'c.argv.filter(x=>x.startsWith("Bash(")).every(x=>/^Bash\(node \.vibeflow\/cockpit\/(vf-cockpit-)?query\.mjs:\*\)$/.test(x))')" "true"
+assert_eq "Q2.4 — tout Bash( désigne l'un des deux scripts de requête DU MODULE (forme exacte de la mesure), aucune règle relative à la sortie" "$(H call "$FK" 1 "(() => { const b = c.argv.filter(x=>x.startsWith('Bash(')); return b.length === 2 && b.includes('Bash(node $MODDIR/scripts/vf-cockpit-query.mjs:*)') && b.includes('Bash(node $MODDIR/skills/cockpit-moteur/assets/query-cli.mjs:*)'); })()")" "true"
 assert_eq "Q2.5 — dossier courant = racine du lab" "$(H call "$FK" 1 'c.cwd')" "$LABR"
 assert_eq "Q2.6 — la réponse du faux agent est relayée" "$(H ev "$WORK/ev.jsonl" 'E.filter(e=>e.event==="answer").map(e=>e.data.answer).join(",")')" "FAUX-AGENT-REPONSE"
-assert_eq "Q2.7 — l'onglet Projet reçoit la consigne Projet (le script de requête VibeFlow)" "$(H call "$FK" 1 'c.argv.some(x=>x.includes("vf-cockpit-query.mjs overview"))')" "true"
+assert_eq "Q2.7 — l'onglet Projet reçoit la consigne Projet : elle nomme le script de requête du module, sans jeton <module> ni chemin relatif à la sortie" "$(H call "$FK" 1 "c.argv.some(x=>x.includes('node $MODDIR/scripts/vf-cockpit-query.mjs overview')) && !c.argv.some(x=>x.includes('<module>') || x.includes('.vibeflow/cockpit'))")" "true"
 echo "=== Q2b — la forme courante reste locale en pleine conversation avec l'agent (recette 67, V1 : le navigateur renvoie la session après toute réponse de l'agent) ==="
 SESS="$(H ev "$WORK/ev.jsonl" 'E.filter(e=>e.event==="answer").map(e=>e.data.session||"").join(",")')"
 assert_eq "Q2b.1 — la réponse de l'agent porte un identifiant de session (témoin : la suite plus bas est bien envoyée avec une session)" "$([ -n "$SESS" ] && echo oui || echo non)" "oui"
@@ -115,8 +137,9 @@ assert_eq "Q2b.3 — le faux claude n'est pas rappelé (toujours 1 appel : celui
 echo "=== Q3 — onglet Code : même confinement ==="
 poser "$TOK" "Combien de fichiers de code ?"
 assert_eq "Q3.1 — l'agent est appelé (aucune voie locale côté Code)" "$(H ncalls "$FK")" "2"
-assert_eq "Q3.2 — même combinaison de confinement" "$(H sub "$FK/call-2.json" "$WORK/attendu.txt")" "true"
+assert_eq "Q3.2 — même combinaison de confinement" "$(H sub "$FK/call-2.json" "$WORK/attendu-sub.txt")" "true"
 assert_eq "Q3.3 — l'onglet Code garde sa consigne (pas celle du Projet)" "$(H call "$FK" 2 'c.argv.some(x=>x.includes("vf-cockpit-query.mjs overview"))')" "false"
+assert_eq "Q3.4 — la consigne de l'onglet Code nomme le script de requête du moteur du module, sans jeton <module> ni chemin relatif à la sortie" "$(H call "$FK" 2 "c.argv.some(x=>x.includes('node $MODDIR/skills/cockpit-moteur/assets/query-cli.mjs overview')) && !c.argv.some(x=>x.includes('<module>') || x.includes('.vibeflow/cockpit') || x.includes('floorplan/query.mjs'))")" "true"
 
 echo "=== Q4 — modèle : préséance et liste fermée ==="
 assert_eq "Q4.1 — ni sélecteur ni variable : --model sonnet" "$(H call "$FK" 2 'c.argv.slice(-2).join(" ")')" "--model sonnet"
@@ -157,9 +180,9 @@ printf '%s' "$(H call "$FK" 1 'c.stdin')" > "$WORK/stdin-vu.txt"
 assert_eq "Q5.3 — l'entrée standard porte la question octet pour octet" "$(cmp -s "$WORK/stdin-vu.txt" "$WORK/piege-exact.txt" && echo identique || echo different)" "identique"
 
 echo "=== Q6 — le modèle ne laisse aucune trace ==="
-demarrer "$WORK/fk2" "$WORK/fk2:$PATH"; node "$OUT/serve.mjs" --export "$WORK/export-avant.html" > /dev/null 2>&1
+demarrer "$WORK/fk2" "$WORK/fk2:$PATH"; cockpit_exporter "${OUT%/.vibeflow/cockpit}" "$WORK/export-avant.html" > /dev/null 2>&1
 poser "$PTOK" "Pourquoi ?" '{"model":"opus"}'
-node "$OUT/serve.mjs" --export "$WORK/export-apres.html" > /dev/null 2>&1
+cockpit_exporter "${OUT%/.vibeflow/cockpit}" "$WORK/export-apres.html" > /dev/null 2>&1
 TRACES=$(grep -rl '"model"[[:space:]]*:[[:space:]]*"opus"' "$OUT" 2>/dev/null | grep -c .); OPUS=$(grep -l 'opus' "$OUT/graph.json" "$OUT"/.cache/*.json 2>/dev/null | grep -c .)
 assert_eq "Q6.1 — aucun fichier de la sortie ne garde le choix (clé model, graph.json, .cache)" "$TRACES$OPUS" "00"
 sed 's/"at":"[^"]*"//g' "$WORK/export-avant.html" > "$WORK/ea.html"; sed 's/"at":"[^"]*"//g' "$WORK/export-apres.html" > "$WORK/eb.html" # seul l'horodatage de l'export diffère
@@ -180,11 +203,44 @@ assert_eq "Q8.2 — node --check 75-vf-modele.js" "$(node --check "$SCRIPTS/../s
 assert_eq "Q8.3 — /api/vf/modeles sans jeton : 403" "$(H get "$PORT" /api/vf/modeles | sed -n 1p)" "403"
 stop_srv
 
-echo "=== Q9 — CLI de requête ==="
+echo "=== Q13 — le dossier du module est refusé : l'agent est indisponible, dit en français, sans appel (SOCL-09, P79-D-09) ==="
+mkdir -p "$WORK/mod x y/scripts"; mkfake "$WORK/fk13" claude
+demarrer "$WORK/fk13" "$WORK/fk13:$PATH" VF_COCKPIT_SCRIPTS_DIR="$WORK/mod x y/scripts"
+poser "$TOK" "Pourquoi ?"
+assert_eq "Q13.1 — dossier de module avec une espace : le faux claude n'est pas appelé" "$(H ncalls "$WORK/fk13")" "0"
+assert_eq "Q13.2 — l'événement d'échec est en français et nomme le module" "$(H ev "$WORK/ev.jsonl" 'E.filter(e=>e.event==="failure").map(e=>/module/.test(e.data.message)&&/[éè]/.test(e.data.message)?"oui":"non:"+e.data.message).join(",")')" "oui"
+demarrer "$WORK/fk13" "$WORK/fk13:$PATH" VF_COCKPIT_SCRIPTS_DIR=
+poser "$TOK" "Pourquoi ?"
+assert_eq "Q13.3 — aucun dossier de scripts du module : fermé par défaut, le faux claude n'est pas appelé" "$(H ncalls "$WORK/fk13")" "0"
+assert_eq "Q13.4 — même échec en français" "$(H ev "$WORK/ev.jsonl" 'E.filter(e=>e.event==="failure").map(e=>/module/.test(e.data.message)?"oui":"non:"+e.data.message).join(",")')" "oui"
+stop_srv
+
+echo "=== Q9 — scripts de requête : lancés par leur chemin dans le module, depuis le lab ==="
 cd "$LAB"
-assert_eq "Q9.1 — overview : JSON à clé now, exit 0" "$(node .vibeflow/cockpit/vf-cockpit-query.mjs overview > "$WORK/o.json"; echo $?)$(H json "$WORK/o.json" '"now" in j')" "0true"
-assert_eq "Q9.2 — status done : JSON à clé items, exit 0" "$(node .vibeflow/cockpit/vf-cockpit-query.mjs status done > "$WORK/s.json"; echo $?)$(H json "$WORK/s.json" 'Array.isArray(j.items)&&j.items.length>0')" "0true"
-assert_eq "Q9.3 — commande inconnue : exit 1" "$(node .vibeflow/cockpit/vf-cockpit-query.mjs nimporte > /dev/null 2>&1; echo $?)" "1"
+assert_eq "Q9.1 — overview : JSON à clé now, exit 0" "$(node "$SCRIPTS/vf-cockpit-query.mjs" overview > "$WORK/o.json" 2>/dev/null; echo $?)$(H json "$WORK/o.json" '"now" in j' 2>/dev/null)" "0true"
+assert_eq "Q9.2 — status done : JSON à clé items, exit 0" "$(node "$SCRIPTS/vf-cockpit-query.mjs" status done > "$WORK/s.json" 2>/dev/null; echo $?)$(H json "$WORK/s.json" 'Array.isArray(j.items)&&j.items.length>0' 2>/dev/null)" "0true"
+node "$SCRIPTS/vf-cockpit-query.mjs" nimporte > "$WORK/inc.out" 2>/dev/null; RCINC=$?
+assert_eq "Q9.3 — commande inconnue : exit 1 ET la liste des commandes (un plantage ne passe pas pour un refus)" "$RCINC $(grep -c '^commandes : overview' "$WORK/inc.out")" "1 1"
+QCLI="$MODDIR/skills/cockpit-moteur/assets/query-cli.mjs"
+assert_eq "Q9.4 — query-cli (moteur du module) : overview rend un JSON à clés project et counts, exit 0 ; find rend un résultat qui nomme util" "$(node "$QCLI" overview > "$WORK/qo.json" 2>/dev/null; echo $?)$(H json "$WORK/qo.json" '"project" in j&&"counts" in j' 2>/dev/null) $(node "$QCLI" find util 2>/dev/null | grep -q util && echo oui || echo non)" "0true oui"
+mkdir -p "$WORK/lab95/.vibeflow/cockpit" "$WORK/dehors95"
+GJCODE='try { process.getBuiltinModule("fs").writeFileSync("PWNED-Q95", "x"); } catch {} process.exit(7);' # du code qui a un effet visible dans n'importe quel contexte d'évaluation
+printf '%s\n' "$GJCODE" > "$WORK/lab95/.vibeflow/cockpit/graph.json"
+( cd "$WORK/lab95" && node "$QCLI" overview > "$WORK/q95.out" 2>/dev/null; echo $? > "$WORK/q95.rc" )
+assert_eq "Q9.5 — graph.json qui ressemble à du code : lu comme une donnée, jamais évalué (exit 1, JSON à clé error, aucun fichier PWNED créé)" "$(cat "$WORK/q95.rc") $(H json "$WORK/q95.out" '"error" in j' 2>/dev/null) $(find "$WORK/lab95" -name 'PWNED*' | grep -c .)" "1 true 0"
+MQ2="$WORK/mut-q97"; rm -rf "$MQ2"; mkdir -p "$MQ2"; cp "$MODDIR/skills/cockpit-moteur/assets/query-cli.mjs" "$MODDIR/skills/cockpit-moteur/assets/graph-query.js" "$MQ2/"
+ANC_E="const G = JSON.parse(fs.readFileSync(file, 'utf8'));"; ANC_C="if (!file.startsWith(lab + path.sep)) throw new Error('graph.json is outside the lab: refused');"
+assert_eq "Q9.7.0 — ancres des mutants de query-cli : lecture de graph.json et contrôle de confinement, chacune une fois" "$(grep -cF -- "$ANC_E" "$QCLI")|$(grep -cF -- "$ANC_C" "$QCLI")" "1|1"
+H mut "$QCLI" "$ANC_E" "const G = (new Function(fs.readFileSync(file, 'utf8'))(), {});" > "$MQ2/query-cli.mjs"
+( cd "$WORK/lab95" && node "$MQ2/query-cli.mjs" overview > /dev/null 2>&1 )
+assert_eq "Q9.7 — mutant « graph.json évalué » : la sonde de Q9.5 le voit (le fichier PWNED apparaît) ; sans mutant (Q9.5) il n'apparaît pas" "$(find "$WORK/lab95" -name 'PWNED*' | grep -c .)" "1"
+rm -f "$WORK/lab95"/PWNED*
+printf '{"project":{"name":"DEHORS-95"},"nodes":[],"files":[]}\n' > "$WORK/dehors95/graph.json"; rm -f "$WORK/lab95/.vibeflow/cockpit/graph.json"; ln -s "$WORK/dehors95/graph.json" "$WORK/lab95/.vibeflow/cockpit/graph.json"
+( cd "$WORK/lab95" && node "$QCLI" overview > "$WORK/q96.out" 2>/dev/null; echo $? > "$WORK/q96.rc" )
+assert_eq "Q9.6 — graph.json lien vers un fichier hors du lab : refusé (exit 1, JSON à clé error), le contenu du fichier visé n'est jamais rendu" "$(cat "$WORK/q96.rc") $(H json "$WORK/q96.out" '"error" in j' 2>/dev/null) $(grep -c 'DEHORS-95' "$WORK/q96.out")" "1 true 0"
+H mut "$QCLI" "$ANC_C" "" > "$MQ2/query-cli.mjs"
+( cd "$WORK/lab95" && node "$MQ2/query-cli.mjs" overview > "$WORK/q98.out" 2>/dev/null )
+assert_eq "Q9.8 — mutant « contrôle de confinement retiré » : la sonde de Q9.6 le voit (le contenu du fichier hors du lab est rendu)" "$(grep -c 'DEHORS-95' "$WORK/q98.out")" "1"
 cd "$WORK"
 
 echo "=== Q10 — identité de phase ==="
@@ -248,6 +304,14 @@ const a = Object.keys(S).sort().join(','), b = Object.keys(B).sort().join(',');
 console.log(a && a === b && Object.keys(S).every((k) => S[k] === B[k]) ? 'identiques' : 'divergent ' + a + ' | ' + b);")" "identiques"
 
 echo "=== Q11 — constante = mesure ==="
+if [ -n "$DEPOT" ]; then
+  assert_eq "Q11.0a — dépôt de dev : la mesure du confinement est trouvée (un saut ici passerait pour un vert)" "$([ -n "$MESURE" ] && echo oui || echo non)" "oui"
+fi
+# Q11.0b : la mesure retenue est celle au plus grand numéro de phase (tri numérique : un tri lexical rendrait 9)
+FD="$WORK/fauxdepot"; mkdir -p "$FD/.planning/a" "$FD/.planning/b" "$FD/.planning/c"
+AVANT="$(mesure_de "$FD")"; [ -n "$AVANT" ] && AVANT=trouvée || AVANT=vide
+: > "$FD/.planning/a/9-MESURE-claude-p.md"; : > "$FD/.planning/b/67-MESURE-claude-p.md"; : > "$FD/.planning/c/100-MESURE-claude-p.md"
+assert_eq "Q11.0b — mesure_de : vide sans fichier, puis le plus grand numéro de phase (9, 67, 100)" "$AVANT|$(basename "$(mesure_de "$FD")")" "vide|100-MESURE-claude-p.md"
 if [ -n "$MESURE" ]; then
   assert_eq "Q11.1 — la liste extraite de la mesure compte au moins 3 éléments" "$([ "$(grep -c . "$WORK/attendu.txt")" -ge 3 ] && echo oui || echo non)" "oui"
   assert_eq "Q11.2 — ARGS_CONFINEMENT = Combinaison retenue, élément par élément et dans l'ordre" "$(cmp -s "$WORK/const.txt" "$WORK/attendu.txt" && echo identique || echo different)" "identique"
@@ -255,6 +319,31 @@ if [ -n "$MESURE" ]; then
   assert_eq "Q11.3 — témoin rouge : la même comparaison contre la liste amputée de son dernier élément signale l'écart" "$(cmp -s "$WORK/const.txt" "$WORK/amputee.txt" && echo identique || echo different)" "different"
   assert_eq "Q11.4 — la comparaison a porté sur une constante non vide et un fichier attendu non vide" "$([ -s "$WORK/const.txt" ] && [ -s "$WORK/attendu.txt" ] && echo oui || echo non)" "oui"
 else echo "  ⊘ Q11 sauté : mesure absente du dépôt installé (non comptée comme réussie)"; fi
+
+# Q11.5 à Q11.7 — la substitution du gabarit, prouvée à part (Q11.2 compare gabarit contre gabarit et ne la voit pas)
+assert_eq "Q11.5 — argsAgent(dossier du module) : aucun jeton <module>, deux règles Bash au chemin attendu (calculé par la suite)" "$(H q115 "$SCRIPTS" "$MODDIR")" "ok"
+assert_eq "Q11.6 — un dossier admis, puis refus (exception) d'un dossier relatif, avec espace, parenthèses, virgule, signe égal, deux-points, étoile, jeton, vide, absent" "$(H q116 "$SCRIPTS" "$MODDIR" rel/dir "/tmp/a b" "/tmp/a(b)" "/tmp/a,b" "/tmp/a=b" "/tmp/a:b" "/tmp/a*b" "/tmp/<module>" "" @indefini)" "admis,refus,refus,refus,refus,refus,refus,refus,refus,refus,refus"
+MQ="$WORK/mut-q117"
+# copie jetable : les fichiers demandes ET la fermeture transitive de leurs imports relatifs (`from './x.mjs'`) ; un import neuf est suivi sans toucher la suite (79-11 : lecteur du code navigateur ; 79-16 : git sortant)
+mq_copie() {
+  rm -rf "$MQ"; mkdir -p "$MQ"
+  local file dep vus="" file_list=("$SCRIPTS/vf-cockpit-agent.mjs" "$SCRIPTS/vf-cockpit-module.mjs" "$SCRIPTS/vf-cockpit-navigateur.mjs")
+  while [ ${#file_list[@]} -gt 0 ]; do
+    file="${file_list[0]}"; file_list=("${file_list[@]:1}")
+    case " $vus " in *" $file "*) continue;; esac
+    vus="$vus $file"; cp "$file" "$MQ/" 2>/dev/null || continue
+    for dep in $(sed -nE "s/^[[:space:]]*(import|export)[^'\"]*from[[:space:]]+'\.\/([^']+)'.*/\2/p" "$file"); do
+      file_list=("${file_list[@]}" "$(dirname "$file")/$dep")
+    done
+  done
+}
+ANC_A='.map((e) => substituerModule(e, dossierModule))'; ANC_B='() => d)'
+assert_eq "Q11.7.0 — ancres des mutants : chacune présente une fois (agent : substitution ; module : valeur de remplacement)" "$(grep -cF -- "$ANC_A" "$SCRIPTS/vf-cockpit-agent.mjs" 2>/dev/null)|$(grep -cF -- "$ANC_B" "$SCRIPTS/vf-cockpit-module.mjs" 2>/dev/null)" "1|1"
+mq_copie; assert_eq "Q11.7.1 — témoin : la copie non mutée passe Q11.5" "$(H q115 "$MQ" "$MODDIR")" "ok"
+mq_copie; H mut "$SCRIPTS/vf-cockpit-agent.mjs" "$ANC_A" ".map((e) => e)" > "$MQ/vf-cockpit-agent.mjs" 2>/dev/null
+assert_eq "Q11.7.2 — mutant « jeton non substitué » : Q11.5 rougit parce que le jeton reste dans l'argv (et la copie a changé)" "$([ -s "$MQ/vf-cockpit-agent.mjs" ] && ! cmp -s "$SCRIPTS/vf-cockpit-agent.mjs" "$MQ/vf-cockpit-agent.mjs" && echo change || echo identique-ou-vide) $(H q115 "$MQ" "$MODDIR")" "change jeton"
+mq_copie; H mut "$SCRIPTS/vf-cockpit-module.mjs" "$ANC_B" "() => path.dirname(d))" > "$MQ/vf-cockpit-module.mjs" 2>/dev/null
+assert_eq "Q11.7.3 — mutant « mauvais dossier » : Q11.5 rougit parce que les règles portent un autre chemin (et la copie a changé)" "$([ -s "$MQ/vf-cockpit-module.mjs" ] && ! cmp -s "$SCRIPTS/vf-cockpit-module.mjs" "$MQ/vf-cockpit-module.mjs" && echo change || echo identique-ou-vide) $(H q115 "$MQ" "$MODDIR" | cut -c1-6)" "change regle:"
 
 echo "=== Q18 — retours panel lot 7 : un état par phase, coupe au mot, lignes non comprises (PU-G-096, 147, 150) ==="
 "$NODE" --input-type=module -e "
@@ -266,10 +355,7 @@ const G = { nodes: [
   nd('ms-v3', { kind: 'milestone', label: 'v3', st: 'active', foot: '1 clos · 3 à faire · 25 %' }),
   nd('ph-1', { label: 'Phase 1 · Fondations', num: '1', st: 'done', parent: 'ms-v2', foot: '2/2 plans' }),
   nd('ph-72', { label: 'Phase 72 · Lancer le travail', num: '72', st: 'recette', parent: 'ms-v2', foot: 'à recetter · ' + foot72 }),
-  nd('ph-1.req', { kind: 'exigences', label: 'Exigences', st: 'active', parent: 'ph-1', foot: '1/2' }),
-], files: [
-  { p: 'req/AA-01', n: 'ph-1.req', name: 'AA-01', st: 'active', d: 'mot '.repeat(15) + 'centralisation de la suite' },
-], links: [], meta: { vf: { milestone: 'v2', phase: '72', status: 'ready_to_plan', lastActivity: '2026-11-05', milestones: [{ key: 'v2', id: 'n:ms-v2' }, { key: 'v3', id: 'n:ms-v3' }], drift: { nonComprisesN: 4, corrigeable: true, regles: [{ regle: 'ligne-non-comprise', n: 4 }, { regle: 'autre', n: 2 }], nonComprises: [{ fichier: '.planning/ROADMAP.md', ligne: 486, extrait: 'Une ligne qui ressemble à un champ mais qui n est pas lisible ' + 'x'.repeat(30) + 'gauche ensuite' }, { fichier: '.planning/REQUIREMENTS.md', ligne: 12, extrait: 'court' }] } } } };
+], files: [], links: [], meta: { vf: { milestone: 'v2', trace: { exigences: [{ id: 'AA-01', ws: null, coche: false, phase: '1', libelle: 'mot '.repeat(15) + 'centralisation de la suite' }] }, phase: '72', status: 'ready_to_plan', lastActivity: '2026-11-05', milestones: [{ key: 'v2', id: 'n:ms-v2' }, { key: 'v3', id: 'n:ms-v3' }], drift: { nonComprisesN: 4, corrigeable: true, regles: [{ regle: 'ligne-non-comprise', n: 4 }, { regle: 'autre', n: 2 }], nonComprises: [{ fichier: '.planning/ROADMAP.md', ligne: 486, extrait: 'Une ligne qui ressemble à un champ mais qui n est pas lisible ' + 'x'.repeat(30) + 'gauche ensuite' }, { fichier: '.planning/REQUIREMENTS.md', ligne: 12, extrait: 'court' }] } } } };
 fs.writeFileSync('$WORK/q18g.json', JSON.stringify(G));
 const H = JSON.parse(JSON.stringify(G)); H.meta.vf.drift = { nonComprisesN: 0, regles: [], nonComprises: [] }; fs.writeFileSync('$WORK/q18h.json', JSON.stringify(H));
 "
@@ -283,10 +369,10 @@ assert_eq "Q18.5 — la phase en recette ne répète pas « à recetter » dans 
 H locg "$SCRIPTS" "$WORK/q18g.json" "Que contient la phase 72 ?" > "$WORK/q18p.json"
 assert_eq "Q18.6 — la carte d'une phase en recette : « à recetter » une fois, pas « sans statut »" "$(H json "$WORK/q18p.json" "!/sans statut|recetter · à recetter/.test(j.answer)")" "true"
 H locg "$SCRIPTS" "$WORK/q18g.json" "Qu'est-ce qui est en cours ?" > "$WORK/q18c.json"
-assert_eq "Q18.7 — « en cours » : aucune exigence d'une phase faite" "$(H json "$WORK/q18c.json" "!j.answer.includes('ph-1.req') && !j.items.some((i) => i.id.includes('ph-1.req') || i.id.includes('req/AA-01'))")" "true"
+assert_eq "Q18.7 — « en cours » : aucune exigence d'une phase faite (les exigences n'ont plus de carte, 76-08)" "$(H json "$WORK/q18c.json" "!j.answer.includes('AA-01') && !j.items.some((i) => i.id.includes('req/'))")" "true"
 assert_eq "Q18.8 — « en cours » : les jalons en cours restent listés" "$(H json "$WORK/q18c.json" "j.answer.includes('[[n:ms-v3]]') && j.answer.includes('[[n:ms-v2]]')")" "true"
 H locg "$SCRIPTS" "$WORK/q18g.json" "Quelles sont les exigences de la phase 1 ?" > "$WORK/q18r.json"
-assert_eq "Q18.9 — témoin rouge/vert PU-G-147 : la coupe à 70 caractères ne laisse pas de mot tronqué (« centr »)" "$(H json "$WORK/q18r.json" '!/centr/.test(j.answer)')" "true"
+assert_eq "Q18.9 — témoin rouge/vert PU-G-147 : l'exigence est listée (lue dans meta.vf.trace) et la coupe à 70 caractères ne laisse pas de mot tronqué (« centr »)" "$(H json "$WORK/q18r.json" 'j.answer.includes("AA-01") && !/centr/.test(j.answer)')" "true"
 assert_eq "Q18.10 — la coupe à 90 caractères d'une note s'arrête sur un mot entier (« … mot… », jamais « … in… »)" "$(H json "$WORK/q18a.json" "(() => { const n = j.items.find((i) => i.id === 'n:ph-72').note; return n.endsWith(' mot…') })()")" "true"
 assert_eq "Q18.11 — une note coupée reste sous 90 caractères" "$(H json "$WORK/q18a.json" 'j.items.every((i) => i.note.length <= 90)')" "true"
 for fq in "qu'est-ce que ça veut dire, « lignes du planning non comprises » ?" "Pourquoi des lignes non comprises dans le planning ?" "C'est quoi les lignes non comprises ?"; do
@@ -303,12 +389,16 @@ assert_eq "Q18.17 — témoin de linéarité : 40 000 « ligne » sans « non co
 import { answerLocally } from '$SCRIPTS/vf-cockpit-ask.mjs';
 const t = Date.now(); answerLocally({ nodes: [], files: [], links: [], meta: { vf: {} } }, 'ligne '.repeat(40000) + 'x'); console.log(Date.now() - t < 2000);")" "true"
 
-# Q18.18 — PU-G-147 (recette du 2026-11-08) : le pied d'une exigence (sentence, 120 car.) se coupe au mot entier ; témoin rouge sur 82de0712 : « … puis avec le vr… »
-assert_eq "Q18.18 — la phrase d'une exigence coupée à 120 caractères ne finit pas dans un mot (« vr… » pour « vrai »), et reste sous 120" "$("$NODE" --input-type=module -e "
-import { sentence } from '$SCRIPTS/vf-cockpit-planning.mjs';
-const t = 'Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local.';
-const a = sentence(t, 120), mot = a.replace(/…\$/, '').split(' ').pop();
-console.log(a.endsWith('…') && a.length <= 120 && t.split(' ').includes(mot) && /\\S…\$/.test(a));")" "true"
+# Q18.18 — PU-G-147 (recette du 2026-11-08), 76-08 : le libellé d'une exigence servi dans meta.vf.trace.exigences (coupé à 220) se coupe au mot entier ; témoin rouge sur 82de0712 : « … puis avec le vr… »
+mkdir -p "$WORK/lab76q/.planning/phases/01-un"
+export TEXTE76Q="Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local. Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local."
+printf '# Roadmap\n\n- [ ] **Phase 1: Un** - a\n\n### Phase 1: Un\n**Goal**: but\n' > "$WORK/lab76q/.planning/ROADMAP.md"
+printf -- '- [ ] **LONG-01**: %s\n\n| LONG-01 | Phase 1 | Pending |\n' "$TEXTE76Q" > "$WORK/lab76q/.planning/REQUIREMENTS.md"
+printf '<objective>x</objective>\n' > "$WORK/lab76q/.planning/phases/01-un/01-01-PLAN.md"
+assert_eq "Q18.18 — le libellé d'exigence servi (meta.vf.trace) coupé à 220 caractères ne finit pas dans un mot, reste sous 220 et finit par un mot entier du texte" "$("$NODE" --input-type=module -e "
+import { buildProjectGraph } from '$SCRIPTS/vf-cockpit-project.mjs';
+const e = buildProjectGraph('$WORK/lab76q').meta.vf.trace.exigences[0], t = process.env.TEXTE76Q, a = e.libelle, mot = a.replace(/…\$/, '').split(' ').pop();
+console.log(a.endsWith('…') && a.length <= 220 && t.split(' ').includes(mot) && /\\S…\$/.test(a));")" "true"
 
 # Q18.19 à Q18.21 — PU-G-150 (recette du 2026-11-08) : la réponse « Format » répond aussi aux formulations naturelles et au mot du panneau (« Non lu »), sans capter une question sans rapport
 for fq in "Quelle est la commande pour corriger les lignes non comprises ?" "Quelles lignes du planning ne sont pas comprises ?" "Quelles lignes du planning ne sont pas lues ?" "Pourquoi les chiffres sont-ils peut-être incomplets ?" "Quelles lignes sont non lues ?"; do
@@ -326,8 +416,9 @@ done
 import fs from 'node:fs';
 const nd = (id, o) => ({ id, label: id, kind: 'phase', st: 'todo', parent: null, ...o });
 const bl = (n) => Array.from({ length: n }, (_, i) => ({ p: 'dag/' + i, n: 'ph-2', name: 'b' + i, st: 'blocked', d: 'x' }));
-const mk = (nb) => ({ nodes: [nd('ms-v2', { kind: 'milestone', label: 'v2', st: 'active' }), nd('ph-2', { label: 'Phase 2 · Deux', num: '2', st: 'active', parent: 'ms-v2' }), nd('ph-2.req', { kind: 'exigences', label: 'Exigences', st: 'active', parent: 'ph-2' })],
-  files: [...bl(nb), { p: 'req/B-01', n: 'ph-2.req', name: 'B-01', st: 'todo', d: 'un' }, { p: 'req/B-02', n: 'ph-2.req', name: 'B-02', st: 'todo', d: 'deux' }], links: [], meta: { vf: { milestone: 'v2', phase: '2' } } });
+const ex = (id, l) => ({ id, ws: null, coche: false, phase: '2', libelle: l });
+const mk = (nb) => ({ nodes: [nd('ms-v2', { kind: 'milestone', label: 'v2', st: 'active' }), nd('ph-2', { label: 'Phase 2 · Deux', num: '2', st: 'active', parent: 'ms-v2' })],
+  files: bl(nb), links: [], meta: { vf: { milestone: 'v2', phase: '2', trace: { exigences: [ex('B-01', 'un'), ex('B-02', 'deux')] } } } });
 fs.writeFileSync('$WORK/q19-1.json', JSON.stringify(mk(1))); fs.writeFileSync('$WORK/q19-4.json', JSON.stringify(mk(4)));"
 H locg "$SCRIPTS" "$WORK/q19-4.json" "Qu'est-ce qui bloque ?" > "$WORK/q19a.json"
 H locg "$SCRIPTS" "$WORK/q19-1.json" "Qu'est-ce qui bloque ?" > "$WORK/q19b.json"
@@ -354,10 +445,11 @@ const g = buildProjectGraph('$WORK/lab20'), f = g.files.find((x) => x.name.start
 const obj = 'Scaffolder le monorepo, le packaging et la chaîne de construction afin de livrer une première version installable et lisible';
 const part = f.name.split(' — ').slice(1).join(' — '), tete = part.replace(/…\$/, '');
 console.log(part.endsWith('…') && part.length <= 70 && obj.startsWith(tete) && obj[tete.length] === ' ');")" "true"
-assert_eq "Q20.2 — R1 : la coupe du pied d'exigence et celle du nom sont la MÊME fonction (clip = clipMot sur 5 longueurs)" "$("$NODE" --input-type=module -e "
+assert_eq "Q20.2 — R1 : la coupe du libellé d'exigence servi (meta.vf.trace) et celle du nom sont la MÊME fonction (clip = clipMot sur 5 longueurs ; libellé servi = clip(texte, 220))" "$(TEXTE76Q="$TEXTE76Q" "$NODE" --input-type=module -e "
 import { clip, clipMot } from '$SCRIPTS/vf-cockpit-planning.mjs';
-const t = 'un deux trois quatre cinq six sept huit neuf dix onze douze';
-console.log([5, 12, 20, 33, 80].every((n) => clip(t, n) === clipMot(t, n)));")" "true"
+import { buildProjectGraph } from '$SCRIPTS/vf-cockpit-project.mjs';
+const t = 'un deux trois quatre cinq six sept huit neuf dix onze douze', e = buildProjectGraph('$WORK/lab76q').meta.vf.trace.exigences[0];
+console.log([5, 12, 20, 33, 80].every((n) => clip(t, n) === clipMot(t, n)) && e.libelle === clip(process.env.TEXTE76Q, 220));")" "true"
 assert_eq "Q20.3 — R3 : une coupe qui tombe exactement sur une espace garde le mot entier avant elle (« aaaa bbbb… »), une coupe dans un mot le retire (« aaaa… »)" "$("$NODE" --input-type=module -e "
 import { clipMot } from '$SCRIPTS/vf-cockpit-planning.mjs';
 console.log(clipMot('aaaa bbbb cccc', 10) + '|' + clipMot('aaaa bbbbb', 9));")" "aaaa bbbb…|aaaa…"
@@ -388,6 +480,35 @@ import { sentence } from '$SCRIPTS/vf-cockpit-build.mjs';
 const t = 'Usage réel et non-régression : de bout en bout dans Chromium avec un faux claude dans le PATH (suites), puis avec le vrai claude local.';
 const a = sentence(t, 120), mot = a.replace(/…\$/, '').split(' ').pop();
 console.log(a.endsWith('…') && a.length <= 120 && t.split(' ').includes(mot));")" "true"
+
+# Q76.1 (76-08, P76-D-25) : les exigences n'ont plus de carte ; le chat local les lit dans meta.vf.trace.exigences et ne cite que des cartes qui existent
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const ph = { id: 'ph-1', label: 'Phase 1 · Socle', kind: 'phase', num: '1', st: 'active', parent: 'ms-v1', foot: '0/1 exigences' };
+const G = { nodes: [{ id: 'ms-v1', label: 'v1', kind: 'jalon', st: 'active', parent: null }, ph], files: [], links: [],
+  meta: { vf: { milestone: 'v1', phase: '1', trace: { exigences: [{ id: 'REQ-01', ws: null, coche: false, phase: '1', libelle: 'Première exigence du socle' }] } } } };
+fs.writeFileSync('$WORK/q76g.json', JSON.stringify(G));"
+H locg "$SCRIPTS" "$WORK/q76g.json" "REQ-01 ?" > "$WORK/q76a.json"
+assert_eq "Q76.1 — « REQ-01 ? » : réponse locale qui nomme REQ-01, sa case (« non cochée ») et la carte de sa phase [[n:ph-1]] ; chaque items[].id existe dans le graphe" \
+  "$(H json "$WORK/q76a.json" "j !== null && [j.engine, j.answer.includes('REQ-01'), j.answer.includes('non cochée'), j.answer.includes('[[n:ph-1]]'), j.items.length > 0 && j.items.every((i) => i.id === 'n:ph-1')].join()")" "local,true,true,true,true"
+
+# Q76.2 (76-08) : la consigne de l'agent ne parle plus d'un nœud ni d'une carte d'exigence ; « reste » ne liste aucun élément req/
+assert_eq "Q76.2 — instructions(G) : ni « .req » ni « f:req/ », et la phrase « meta.vf.trace.exigences » ; « Qu'est-ce qui reste dans le jalon ? » ne liste aucun élément req/" "$("$NODE" --input-type=module -e "
+import fs from 'node:fs';
+import { instructions } from '$SCRIPTS/vf-cockpit-ask.mjs';
+const G = JSON.parse(fs.readFileSync('$WORK/q76g.json', 'utf8')), i = instructions({ ...G, project: { name: 'x' } });
+console.log([!/\\.req|f:req\\//.test(i), i.includes('meta.vf.trace.exigences')].join());")|$(H locg "$SCRIPTS" "$WORK/q76g.json" "Qu'est-ce qui reste dans le jalon ?" | "$NODE" -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);console.log(j!==null&&j.engine==='local'&&!j.items.some(i=>i.id.includes('req/'))&&j.items.length>0)})")" "true,true|true"
+
+# Q76.3 (revue finale M2) : la jumelle d'archive (ws '*', sans phase) d'une exigence vivante de même identifiant n'est pas une exigence distincte
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const G = JSON.parse(fs.readFileSync('$WORK/q76g.json', 'utf8'));
+G.meta.vf.trace.exigences.push({ id: 'REQ-01', ws: '*', coche: true, phase: null, libelle: 'jumelle d archive' }, { id: 'ARC-01', ws: '*', coche: true, phase: null, libelle: 'archive seule' });
+fs.writeFileSync('$WORK/q76j.json', JSON.stringify(G));"
+H locg "$SCRIPTS" "$WORK/q76j.json" "REQ-01 ?" > "$WORK/q76b.json"
+H locg "$SCRIPTS" "$WORK/q76j.json" "ARC-01 ?" > "$WORK/q76c.json"
+assert_eq "Q76.3 — « REQ-01 ? » avec une jumelle d'archive : UNE exigence (réponse de l'exigence vivante, pas « 2 exigences … une par compartiment ») ; témoin : une exigence d'archive seule reste répondue" \
+  "$(H json "$WORK/q76b.json" "j !== null && !j.answer.includes('une par compartiment') && j.answer.includes('non cochée') && j.answer.includes('[[n:ph-1]]')")|$(H json "$WORK/q76c.json" "j !== null && j.answer.includes('ARC-01')")" "true|true"
 
 vf_hyg_assert
 echo ""
