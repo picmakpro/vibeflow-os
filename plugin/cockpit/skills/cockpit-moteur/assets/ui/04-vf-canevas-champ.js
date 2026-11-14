@@ -12,13 +12,13 @@
     for (const x of (state.edgeEls ? state.edgeEls.values() : [])) { if (x.e.a === id) s.add(x.e.b); else if (x.e.b === id) s.add(x.e.a); }
     return [...s].filter(rect);
   };
-  // tiroir Git ouvert : la plus grande découpe du champ de cadrage, à droite du tiroir (sinon null : le champ de cadrage du moteur)
+  // tiroir Git ouvert : la plus grande découpe du champ de cadrage une fois le tiroir retiré de chacune (sinon null : le champ de cadrage du moteur)
   const zoneSansTiroir = (C) => {
     const tir = document.getElementById('vf-git-tiroir');
     if (!tir || tir.hidden || !tir.offsetWidth) return null;
     const d = tir.getBoundingClientRect().right + 16 - document.getElementById('svg').getBoundingClientRect().left;
-    const a = C.champsDeCadrage().sort((p, q) => q.w * q.h - p.w * p.h)[0];
-    return d > a.x ? { x: d, y: a.y, w: Math.max(200, a.x + a.w - d), h: a.h } : a;
+    return C.champsDeCadrage().map((a) => (d > a.x ? { x: d, y: a.y, w: Math.max(200, a.x + a.w - d), h: a.h } : a))
+      .sort((p, q) => q.w * q.h - p.w * p.h)[0];
   };
   // feuille ou doigt : la carte sélectionnée ne reste ni sous #zoom ni sous la pastille « Terminal » (NAVIGATION 4.6) ; la plus petite translation
   // qui l'en sort et la garde dans le champ (sinon la plus petite), k inchangé
@@ -30,7 +30,8 @@
       if (!r || c.right <= r.left || r.right <= c.left || c.bottom <= r.top || r.bottom <= c.top) continue;
       const dans = (d) => C.champsDeCadrage().some((a) => c.left + (d.x || 0) >= o.left + a.x - 1 && c.right + (d.x || 0) <= o.left + a.x + a.w + 1
         && c.top + (d.y || 0) >= o.top + a.y - 1 && c.bottom + (d.y || 0) <= o.top + a.y + a.h + 1);
-      const d = [{ x: r.left - c.right }, { x: r.right - c.left }, { y: r.top - c.bottom }, { y: r.bottom - c.top }]
+      // 1 px de jeu : bord contre bord, l'arrondi des rectangles suffit à les faire se couper
+      const d = [{ x: r.left - c.right - 1 }, { x: r.right - c.left + 1 }, { y: r.top - c.bottom - 1 }, { y: r.bottom - c.top + 1 }]
         .sort((p, s) => Math.abs(p.x ?? p.y) - Math.abs(s.x ?? s.y));
       C.deplacer(d.find(dans) || d[0]);
     }
