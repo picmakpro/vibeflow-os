@@ -65,7 +65,7 @@
           `Change avec ce fichier dans ${deg}${T.NB}% des commits, ${T.pl(com, 'révision commune', 'révisions communes')}`));
       }
       if (vs.length > MAX_NOEUD) s.appendChild(el('div', 'vfa-pied', F.etAutres(vs.length - MAX_NOEUD)));
-      s.appendChild(pied(TX.pied90, D.git.fenetre && D.git.fenetre.partiel ? TX.partiel + '.' : ''));
+      s.appendChild(el('p', 'vfa-pied', [TX.pied90, D.git.fenetre && D.git.fenetre.partiel ? TX.partiel : ''].filter(Boolean).join(' · ')));
       return s;
     };
     const gardes = (id) => {

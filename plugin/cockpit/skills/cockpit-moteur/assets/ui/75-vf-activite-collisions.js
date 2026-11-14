@@ -15,8 +15,8 @@
   const CLE = '75-vf-activite-collisions.js', ID = 'vfa-collisions-style';
   const CSS = `
     #context .vfa-compte { position: relative; pointer-events: auto; display: inline-flex; align-items: center; gap: var(--sp-6);
-      margin-left: var(--sp-8); padding: var(--sp-2) 0; border: 0; background: none; font: inherit; color: var(--text-2);
-      cursor: pointer; white-space: nowrap; }
+      margin-left: var(--sp-8); border: 0; background: none; font: inherit; color: var(--text-2); cursor: pointer; white-space: nowrap;
+      padding: 0; /* dérivé : aucun espace, la rangée garde sa hauteur */ }
     #context .vfa-compte[hidden] { display: none; }
     #context .vfa-compte:hover { color: var(--text); }
     #context .vfa-compte .lg { width: var(--sp-16); height: var(--sp-16); margin: calc(-1 * var(--sp-4)) 0; }
@@ -41,14 +41,19 @@
       if (!radar || bouton.hidden || !k) return;
       const ok = radar.etat === 'ok';
       txt.textContent = court.matches ? (ok ? F.compteCourt(radar.n) : '…') : radar.texte;
-      if (k.scrollWidth > k.clientWidth + 1) txt.textContent = ok ? String(radar.n) : '…';
+      const boite = document.getElementById('context'); // `.k` ne rétrécit pas sous son contenu : c'est la boîte de #context qui borne
+      if (boite && txt.getBoundingClientRect().right > boite.getBoundingClientRect().right + 1) txt.textContent = ok ? String(radar.n) : '…';
     };
     const place = () => {
       const k = document.querySelector('#context .k');
       if (k && bouton.parentNode !== k) { k.appendChild(bouton); ajuster(); }
     };
     const ouvrir = () => {
-      if (document.body.classList.contains('no-panel')) { const b = document.getElementById('btn-panel'); if (b) b.click(); }
+      if (document.body.classList.contains('no-panel')) { // sans setPanel : il rappellerait fit() et pousserait la carte (Q12), le tiroir se pose par-dessus
+        document.body.classList.remove('no-panel');
+        const b = document.getElementById('btn-panel');
+        if (b) b.setAttribute('aria-expanded', 'true');
+      }
       M.refreshPanel();
       let h = document.querySelector('#panel [data-vfa-titre="collisions"]');
       if (!h && ctx.partage.collisionsRacine) {

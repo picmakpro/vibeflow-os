@@ -28,3 +28,21 @@ Base du rouge : `95f9b75a` pour le navigateur ; tête de la tâche 1 (`323a1bf6`
 | base, navigateur (`TABLES_JS=<tmp>/tables-nouveau.js`), 38 témoins purs verts puis `L5` | `lens-boite|Lentille,Agents,Légende de la lentille|true,true,true|lens-titre lens-legende lens-radar|Lentille d'activité sur le code` | `mesure indisponible : attente de « sélecteur posé et première lecture » dépassée (20000 ms)` ; `BILAN : 38 PASS, 1 FAIL` | pas de `#btn-lentilles` ni de `#lens-menu` sur la base (même cause que la tâche 1, témoins de la tâche 2 : L5 à L12) |
 
 Même mesure sur la tête de la tâche 2 : `67 PASS, 0 FAIL` (`SECTIONS=t2`, 43 s). Écart : le code de la tâche 2 (états, clavier, légendes) est dans les fichiers livrés par le commit de la tâche 1 ; l'état intermédiaire est donc une copie mutée, pas un commit antérieur.
+
+## Tâche 3 : marques de collision, sections du panneau, compte du radar dans `.k`, annonce, chaîne XSS
+
+Base du rouge : `0b30d7ae` (tête de la tâche 2), AVEC LES DEUX FICHIERS DE LA TÂCHE retirés de la copie (`git archive 0b30d7ae plugin/cockpit`, puis `rm ui/75-vf-activite-panneau.js ui/75-vf-activite-collisions.js`),
+témoins de la tâche 3 posés (`SECTIONS=t3`).
+
+| Rouge | Attendu | Obtenu | Bonne raison |
+|---|---|---|---|
+| copie sans `-panneau.js` ni `-collisions.js` | `L13 : écrit par 2 agents ## modifié dans 2 arbres : conflit de fusion possible ## prévu par 2 plans, vague 3 ## 0` | `mesure indisponible : Cannot read properties of null (reading 'pied…')` ; `BILAN : 38 PASS, 1 FAIL` | la mesure lit le pied d'une section `#panel [data-vfa=…]` qui n'existe plus : sans le fichier du panneau, aucune section n'est posée (le canal et les tables de la tâche 1 restent verts) |
+
+Mutants (seuls joués, chaîne XSS, `MUTANT-ROUGE` dans la sortie de la suite) :
+
+| Mutant | Mutation (sur chaque source de page de la copie du module) | Vu rouge parce que |
+|---|---|---|
+| `XSS-texte-par-innerHTML-helper-el` | `if (txt !== undefined) e.textContent = txt;` devient `e.innerHTML = txt;` (aides `el` du menu, du panneau et du canal) | un nœud `<img src=x onerror=…>` est injecté (compte d'éléments plus haut) ou `window.__xss` posé |
+| `XSS-nom-d-agent-par-innerHTML` | `r.querySelector('b').textContent = a.nom` devient `.innerHTML = a.nom` (rangée du filtre d'agents) | la mission `<img src=x onerror=window.__xss=1>` ajoute un élément dans `#lens-menu` (`menuAgents[0] > 0`) |
+
+Même mesure sur la tête de la tâche 3 : `59 PASS, 0 FAIL` pour `SECTIONS=t3` (50 s, avec les deux mutants). Écart : le code des deux fichiers de la tâche 3 est dans le commit de la tâche 1 ; le rouge est celui d'une copie sans eux, pas celui d'un commit antérieur.

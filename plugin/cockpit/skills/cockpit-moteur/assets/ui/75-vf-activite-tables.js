@@ -79,7 +79,8 @@
   const MOT_DEGRE = { 'en-cours': 'en écriture', modifie: 'modifié', lu: 'lu', fini: 'fini' };
   const SOURCES = ['agents', 'arbres', 'branches', 'plans'];
   const role = (n) => String(n).split(' · ')[0];
-  const missionDe = (n) => { const m = / · nœud (.+?)(?: · |$)/.exec(String(n)); return m ? m[1] : null; };
+  // [\s\S] : un nom hostile peut porter U+2028, que `.` ne traverse pas
+  const missionDe = (n) => { const m = / · nœud ([\s\S]+?)(?: · |$)/.exec(String(n)); return m ? m[1] : null; };
   const missions = (d) => {
     const s = new Set();
     for (const [, , noms] of (d.empreinte && d.empreinte.marques) || []) for (const n of noms || []) { const m = missionDe(n); if (m) s.add(m); }

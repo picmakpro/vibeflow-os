@@ -11,6 +11,7 @@ mklentilles() {
     printf 'export const f%s = () => %s;\nexport const g%s = () => %s;\nexport const h%s = () => %s;\n' "$i" "$i" "$i" "$i" "$i" "$i" > "$L/src/a/m$i.js"
     printf 'import { f01 } from "../a/m01.js";\nexport const g%s = f01;\n' "$i" > "$L/src/b/n$i.js"
   done
+  hostile='h<img src=x onerror=window.__xss=1>"x.js'; printf 'export const h = 1;\n' > "$L/src/b/$hostile" # nom de fichier hostile (balises, guillemet)
   printf '#!/usr/bin/env bash\necho garde\n' > "$L/scripts/check-lab.sh"
   printf '#!/usr/bin/env bash\n# nomme src/a/m01.js et src/a/m02.js\nsrc/a/m01.js src/a/m02.js\n' > "$L/scripts/tests/test-lab.sh"
   printf -- '- [ ] **Phase 1: Socle** - en cours\n' > "$L/.planning/ROADMAP.md"

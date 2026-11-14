@@ -108,6 +108,25 @@ assert_eq L0 "serveur du lab démarré" "$([ "$PORT" -gt 0 ] && echo oui || echo
 mesurer() { REAL_HOME="$REAL_HOME" node "$HERE/chrome-activite-lentilles.mjs" "$CHROME" "http://127.0.0.1:$VF_PORT" "$1" > "$WORK/mesure-$1.json" 2> "$WORK/mesure-$1.err"; cat "$WORK/mesure-$1.json"; }
 E() { printf '%s' "$R" | node "$AUX/ev.mjs" "$1"; }
 
+mutant_rouge() { # mutant_rouge <nom> <expression sed sur chaque source de page> <expression js vraie quand la suite a VU le mutant> ; le serveur du mutant est arrêté ensuite
+  local nom="$1" sed_="$2" vu="$3" RM rc
+  if ! cockpit_module_muter_page "$nom" "$sed_"; then echo "  ❌ FAIL — MUTANT : $nom : la mutation n'a rien changé (ancre périmée)"; FAIL=$((FAIL+1)); fin; fi
+  cockpit_lancer "$LAB"; rc=$?
+  if [ "$rc" -ne 0 ]; then echo "  ❌ FAIL — MUTANT : $nom : le serveur du mutant ne démarre pas (code $rc)"; FAIL=$((FAIL+1)); fin; fi
+  RM="$(mesurer t3x)"; cockpit_arreter; unset COCKPIT_MODULE; export VF_PORT="$PORT"
+  if [ "$(printf '%s' "$RM" | node "$AUX/ev.mjs" "$vu")" = "true" ]; then echo "  MUTANT-ROUGE — $nom"; else echo "  ❌ FAIL — MUTANT : $nom : le mutant n'est pas vu rouge"; FAIL=$((FAIL+1)); fin; fi
+}
+cat > "$AUX/balayage.mjs" <<'JS'
+// L21 : aucune valeur en dur. Chaque déclaration font-size, line-height, font-weight, gap, margin, padding passe par un jeton (var(--…)) ou porte un commentaire « dérivé » sur sa ligne.
+import fs from 'node:fs';
+const RE = /\b(font-size|line-height|font-weight|gap|margin|padding)\s*:\s*([^;}]*)/g;
+export const balayer = (texte) => { const mal = [];
+  texte.split('\n').forEach((l, i) => { if (/^\s*\/\//.test(l)) return; for (const m of l.matchAll(RE)) if (!m[2].includes('var(--') && !/\/\*\s*dérivé/.test(l)) mal.push((i + 1) + ': ' + m[0].trim()); });
+  return mal; };
+if (process.argv[2] === '--temoin') { console.log(balayer('#x { line-height: 17px; }').length + '|' + balayer('#x { line-height: 17px; } /* dérivé : test */').length + '|' + balayer('#x { gap: var(--sp-8); }').length); process.exit(0); }
+console.log(JSON.stringify(process.argv.slice(2).flatMap((f) => balayer(fs.readFileSync(f, 'utf8')).map((x) => f.split('/').pop() + ' ' + x))));
+JS
+
 if wantsection t1; then
 echo "== L1 le sélecteur : bouton, place, libellé, état, rien n'est mémorisé =="
 R="$(mesurer t1)"
@@ -177,5 +196,45 @@ assert_eq L7 "Échap ferme et rend le focus ; un clic extérieur ferme" "$(E "[j
 assert_eq L7 "exclusion mutuelle avec #legend (hors pile) : ouvrir l'un ferme l'autre, dans les deux sens" "$(E "[j.t7.legende.join(), j.t7.reciproque.join()].join('|')")" "false,true|true,false"
 assert_eq L7 "à 900 px : l'ouvreur est le « ⋯ » (menu fixe sous l'en-tête) ; Échap et Entrée rendent le focus au « ⋯ »" "$(E "[j.t7.tablette.ouvert, j.t7.tablette.position, j.t7.tablette.focus, j.t7.tablette.echap.join(), j.t7.tablette.entree.join()].join('|')")" "true|fixed|aucune|false,true|false,true,activite"
 fi
+
+if wantsection t3; then
+echo "== L13 la marque de collision sur les cartes, de bout en bout =="
+R="$(mesurer t3)"
+assert_eq L13 "sur la route poussée : « écrit par 2 agents », « modifié dans 2 arbres : conflit de fusion possible » (mot DISTINCT), « prévu par 2 plans, vague 3 » ; un fichier sans collision n'en porte pas" "$(E "[j.t3.mots['f:src/a/m05.js'], j.t3.mots['f:src/a/m06.js'], j.t3.mots['f:src/a/neuf.mjs'], j.t3.mots['f:src/a/m01.js'].length].join(' ## ')")" "écrit par 2 agents ## modifié dans 2 arbres${NB}: conflit de fusion possible ## prévu par 2 plans, vague 3 ## 0"
+assert_eq L13 "sur une carte prévue, le mot de plans prend l'emplacement GAUCHE et « Prévu » reste à droite" "$(E 'j.t3.prevue')" "lmg lmg-g|vst vst-prevu"
+
+echo "== L14 les sections du panneau =="
+assert_eq L14 "panneau d'un fichier : Points chauds, « Change souvent avec », Gardes, « Agents sur ce fichier » (dans cet ordre, après les sections du moteur)" "$(E "j.t3.fichier.map((x) => x[1]).join(' ## ')")" "Points chauds ## Change souvent avec 2 ## Gardes ## Agents sur ce fichier 1"
+assert_eq L14 "le rang est dans la ligne du panneau (« rang 14 sur 14 ») ; voisins : rangées cliquables (data-go), nom en mono tronqué à GAUCHE (direction rtl), « 78 % », pied « Sur 90 jours, d'après l'historique des commits »" "$(E "[j.t3.chaudsPanneau.lignes[0], j.t3.couplage.go.join(), j.t3.rtl, j.t3.couplage.lignes.join(' / '), j.t3.couplage.pieds[0]].join(' ## ')")" "1 changement sur 90 jours · 10 lignes · rang 14 sur 14 ## f:src/a/m02.js,f:src/a/m03.js ## rtl ## src/a/m02.js100${NB}% / src/a/m03.js78${NB}% ## Sur 90 jours, d'après l'historique des commits"
+assert_eq L14 "sans voisin : « Aucun fichier au-dessus des seuils (5 révisions communes, 30 %) » ; clone superficiel : « Historique partiel » au pied" "$(E "[j.t3.vide.pieds[0], j.t3.partiel].join(' ## ')")" "Aucun fichier au-dessus des seuils (5 révisions communes, 30${NB}%) ## Sur 90 jours, d'après l'historique des commits · Historique partiel"
+assert_eq L14 "Gardes : « Nommé par : 2 suites » ; « Aucune suite ni aucun gate ne le nomme » ; Agents : le degré et le nom complet, les FINIS repliés dans un details fermé « Terminés dans les 24 h (1) »" "$(E "[j.t3.gardes.lignes[0], j.t3.gardes5.lignes[0], j.t3.agents.lignes[0], j.t3.fini.details.map((d) => d.join('/')).join(), j.t3.fini.lignes.length].join(' ## ')")" "Nommé par${NB}: 2 suites ## Aucune suite ni aucun gate ne le nomme ## en écriture · vf-coder · nœud 75-08 ## false/Terminés dans les 24 h (1) ## 1"
+assert_eq L14 "Collisions possibles REGROUPÉES PAR FICHIER : une rangée par fichier avec ses sources (agents puis branches), cliquable ; pied = la phrase LONGUE des limites (2 comptées)" "$(E "(() => { const c = j.t3.collisionFichier; return [c.titre, c.lignes.length, c.lignes[0].includes('écrit par 2 agents · vf-coder · phase-75 et vf-coder · phase-76'), c.lignes[0].includes('modifié sur 2 branches · feat/a et feat/b'), c.go.join(), c.pieds[0]].join(' ## '); })()")" "Collisions possibles 1 ## 1 ## true ## true ## f:src/a/m05.js ## Non vu par le radar${NB}: écritures par commande, écritures dans un arbre hors du dossier du lab (2 comptées)."
+assert_eq L14 "carte prévue : la ligne d'un recoupement de plans dit « Recoupement des plans : à jour. »" "$(E "j.t3.collisionPrevue.lignes[0].includes('prévu par 2 plans, vague 3 · 75-02 et 75-04') + '|' + j.t3.collisionPrevue.lignes[0].includes('Recoupement des plans${NB}: à jour.')")" "true|true"
+assert_eq L14 "nœud : les collisions de ses fichiers (3), cliquables ; au-delà de 5 : « et 2 autres » et « Radar limité à 12 branches. » quand le plafond mord ; dépôt entier : 10 rangées puis « et 2 autres »" "$(E "[j.t3.noeud.titre, j.t3.noeud.go.length, j.t3.noeud7.lignes.length, j.t3.noeud7.pieds[0], j.t3.noeud7.pieds[1].endsWith('Radar limité à 12 branches.'), j.t3.racine.titre, j.t3.racine.lignes.length, j.t3.racine.pieds[0]].join(' ## ')")" "Collisions possibles 3 ## 3 ## 5 ## et 2 autres ## true ## Collisions possibles 12 ## 10 ## et 2 autres"
+
+echo "== L15 le compte du radar dans la rangée .k =="
+assert_eq L15 "au-dessus de 999 px : glyphe + « 3 fichiers en collision possible », bouton-lien DANS .k (jamais dans #context p), aria-label complet, infobulle courte, zone tactile 44 x 44" "$(E "[j.t3.compte.texte, j.t3.compte.aria, j.t3.compte.dansK, j.t3.compte.dansP, j.t3.compte.titre, j.t3.compte.tactile.map((x) => Math.round(x) >= 44).join()].join(' ## ')")" "3 fichiers en collision possible ## 3 fichiers en collision possible ## true ## false ## Non vu${NB}: commandes, arbres hors du lab (2) ## true,true"
+assert_eq L15 "#context a la même hauteur avec et sans compte ; le sous-titre #context p n'est pas touché ; à 0 : le compte est absent" "$(E "[j.t3.compteHauteur.join(), j.t3.compte.p === j.t3.compteZero.p, j.t3.compteZero.cache].join('|')")" "$(E 'j.t3.compteHauteur[0] + "," + j.t3.compteHauteur[0] + "," + j.t3.compteHauteur[0]')|true|true"
+assert_eq L15 "1 024 px : la phrase ; 900 et 390 px : « 3 fichiers » (le mot reste visible) ; le chiffre seul seulement quand .k manque de place (mesure), aria-label complet partout" "$(E "[j.t3.largeurs[1024].texte, j.t3.largeurs[900].texte, j.t3.largeurs[390].texte, j.t3.etroit.texte, j.t3.etroit.aria, j.t3.s18.texte, j.t3.s18.deborde].join(' ## ')")" "3 fichiers en collision possible ## 3 fichiers ## 3 fichiers ## 3 ## 3 fichiers en collision possible ## 3 fichiers ## false"
+assert_eq L15 "pendant une relecture : « Radar en cours de relecture » (jamais « aucune collision »), jusqu'à 999 px : « … » ; l'aria-label dit toujours l'état" "$(E "[j.t3.compteRelecture.texte, j.t3.compteRelecture.aria, j.t3.largeurs.relecture.texte, j.t3.largeurs.relecture.aria].join(' ## ')")" "Radar en cours de relecture ## Radar en cours de relecture ## … ## Radar en cours de relecture"
+
+echo "== L16 l'ouverture du panneau, l'annonce unique =="
+assert_eq L16 "le compte ouvre le panneau sur « Collisions possibles » : le rect de chaque carte et la transformation de la vue sont inchangés (Q12), le focus va au TITRE de la section (tabindex -1)" "$(E "[j.t3.ouverture.ouvert, j.t3.ouverture.cartes, j.t3.ouverture.vue, j.t3.ouverture.focus].join(' ## ')")" "true ## true ## true ## H3|collisions|-1|Collisions possibles 3"
+assert_eq L16 "sélection sans collision : le panneau montre le dépôt entier (« Base de code »), focus sur le titre de la section" "$(E "[j.t3.ouvertureSansCollision.focus, j.t3.ouvertureSansCollision.titre].join(' ## ')")" "H3|collisions ## Base de code"
+assert_eq L16 "annonce à CHAQUE passage de 0 vers n : la suite 0, n, 0, n produit DEUX annonces ; une variation de n (3 vers 4) et un retour à 0 n'en produisent aucune" "$(E "[j.t3.annonces.suite.join(), j.t3.annonces.textes.join(' ## ')].join(' | ')")" "0,1,1,2,2,2 | Radar${NB}: 3 fichiers en collision possible ## Radar${NB}: 3 fichiers en collision possible"
+
+echo "== L17 chaîne XSS =="
+assert_eq L17 "chemin, branche, rôle, titre hostiles (balises, guillemets, </script>, U+2028, __proto__, 5 000 caractères) : aucun nœud injecté, aucun script exécuté, texte littéral dans la marque, la table, le panneau et le menu, aucune pollution" "$(E "[j.t3.xss.avant === j.t3.xss.apres, j.t3.xss.menuAgents.join('/'), j.t3.xss.xss, j.t3.xss.litteral.join(), j.t3.xss.proto, j.t3.xss.menu].join('|')")" "true|0/4|true|true,true,true,true,true|true|false"
+mutant_rouge "XSS-texte-par-innerHTML-helper-el" 's/if (txt !== undefined) e\.textContent = txt;/if (txt !== undefined) e.innerHTML = txt;/' 'j.t3x.apres > j.t3x.avant || !j.t3x.xss || !j.t3x.litteral.every(Boolean)'
+mutant_rouge "XSS-nom-d-agent-par-innerHTML" "s/r\\.querySelector('b')\\.textContent = a\\.nom/r.querySelector('b').innerHTML = a.nom/" 'j.t3x.apres > j.t3x.avant || j.t3x.menuAgents[0] > 0 || !j.t3x.xss'
+
+echo "== L18 surOnglet retire sections, compte et marques =="
+assert_eq L18 "sur Code : sections du panneau, compte et marques présents ; sur Projet : plus rien (jamais #ask-live) ; retour sur Code : aucun doublon" "$(E "[j.t3.avantQuitter.join(), j.t3.projet.join(), j.t3.code.join(), j.t3.retour.join()].join(' ## ')")" "4,1,2 ## 0,0,0,true ## 4,1,2,true ## 1,1,1"
+fi
+
+echo "== L21 aucune valeur en dur dans les fichiers CSS et JS neufs =="
+assert_eq L21 "témoin : un « line-height: 17px » en dur est vu (1), le même avec un commentaire dérivé ou un jeton ne l'est pas (0, 0)" "$(node "$AUX/balayage.mjs" --temoin)" "1|0|0"
+assert_eq L21 "interlignes, graisses, tailles, écarts et marges des cinq fichiers : un jeton var(--…) ou un commentaire « dérivé », partout" "$(node "$AUX/balayage.mjs" "$MODULE_UI"/75-vf-activite.js "$MODULE_UI"/75-vf-activite-menu.js "$MODULE_UI"/75-vf-activite-tables.js "$MODULE_UI"/75-vf-activite-panneau.js "$MODULE_UI"/75-vf-activite-collisions.js)" "[]"
+assert_eq L21 "aucun innerHTML, aucun setInterval, aucun localStorage, aucun aria-pressed, ni RANG_SOURCE (la priorité n'est calculée que par le canal) dans les cinq fichiers" "$(cat "$MODULE_UI"/75-vf-activite*.js | grep -c 'innerHTML\|setInterval\|localStorage\|aria-pressed\|RANG_SOURCE')" "0"
 
 fin
