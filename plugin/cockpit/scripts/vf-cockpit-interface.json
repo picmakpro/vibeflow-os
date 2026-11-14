@@ -47,13 +47,13 @@
       "etatsSource": ["lue", "absente", "erreur", "forme-inconnue"]
     },
     "vibeflow/cockpit-project@1": {
-      "description": "Champs facultatifs de traçabilité (76-04, P76-D-31, A32 de la 79) : `trace` d'un nœud de phase (plans, correctifs, verification, recette, preuves), `meta.vf.trace` (exigences dont `cites`, étapes, registresSansPhase, ou { erreur: true } si la lecture a échoué), `meta.vf.registres` (définitions des registres par phase), `meta.vf.jalonActif`. Tout texte y est nettoyé, masqué et sans chemin du poste. La version du schéma ne monte pas.",
+      "description": "Champs facultatifs de traçabilité (76-04, P76-D-31, A32 de la 79) : `trace` d'un nœud de phase (plans, correctifs, verification, recette, preuves), `meta.vf.trace` (exigences dont `cites`, étapes, registresSansPhase, ou { erreur: true } si la lecture a échoué), `meta.vf.registres` (définitions des registres par phase), `meta.vf.jalonActif`, `meta.vf.questions` (76-09, C76-Q2 : { liste, bilan, tronque }, champ absent si aucun registre lu n'a de section « À Samuel » ; etat ∈ en-attente, appliquee, tranchee, a-verifier, mal-formee). Tout texte y est nettoyé, masqué et sans chemin du poste. La version du schéma ne monte pas.",
       "requis": { "schema": "string", "meta": "object", "project": "object", "nodes": "array", "files": "array", "links": "array", "flows": "array" },
       "noeud": { "requis": ["id", "label", "kind"] },
       "element": { "requis": ["p", "n", "name"] },
       "lien": { "requis": ["a", "b", "k"] },
       "statuts": ["done", "active", "recette", "todo", "blocked"],
-      "optionnels": { "noeud": ["avancement", "exigences", "trace"], "element": ["vague"], "metaVf": ["trace", "registres", "jalonActif"] },
+      "optionnels": { "noeud": ["avancement", "exigences", "trace"], "element": ["vague"], "metaVf": ["trace", "registres", "jalonActif", "questions"] },
       "meta": { "requis": ["vfTab", "vf", "kindLabels"] }
     },
     "vibeflow/cockpit-transcript@2": {

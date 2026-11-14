@@ -141,11 +141,11 @@ chk('t4', 'chaque valeur de DEFAUTS est un défaut attendu quelque part ou nomm�
 
 // T13.10 — nettoyage et longueurs
 { const sv = (s, k) => T.servi(s, k, { racine: '/lab/racine' }); const home = os.homedir(); const long = 'x'.repeat(400);
-  const o = E({ titre: `Chemin /lab/racine/.planning/a et ${home}/z et ~/.claude/x et /private/tmp/x ${long}`, q: `Voir /lab/racine/y ${long}`,
+  const o = E({ titre: `Chemin /lab/racine/.planning/a et ${home}/z et ~/.claude/x et /var/folders/x ${long}`, q: `Voir /lab/racine/y ${long}`,
     opt: `Options : (a) ${long} ; (b) ${home}/o .`,
     etat: `État : tranchée — arbitrage Samuel, canal x, 2026-11-11 — option (a) — « ${long} »` });
   const r = lireQuestions({ contextes: [CTX(SEC([o]))], phases: PH, servi: sv }); const e = r.liste[0], ser = JSON.stringify(r);
-  chk('t10', 'aucun chemin du poste ni ~/', !ser.includes('/lab/racine/') && !ser.includes(home) && !ser.includes('~/') && !ser.includes('/private/') && e.etat === 'tranchee');
+  chk('t10', 'aucun chemin du poste ni ~/', !ser.includes('/lab/racine/') && !ser.includes(home) && !ser.includes('~/') && !ser.includes('/var/folders/') && e.etat === 'tranchee');
   chk('t10', 'longueurs : 80, 240, 160, 240', e.titre.length <= 80 && e.question.length <= 240 && e.options[0].texte.length <= 160 && e.tranchee.citation.length <= 240);
   const p = L([CTX(SEC([E({ titre: 'Un chemin /lab/racine/ici sans nettoyage' })]))]);
   chk('t10', 'témoin positif : sans servi injecté le texte passe tel quel', p.liste[0].titre.includes('/lab/racine/')); }
