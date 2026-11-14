@@ -31,6 +31,9 @@ AJOUT assets/ui/71-vf-equipe-rendu.js
 AJOUT assets/ui/72-vf-equipe.js
 AJOUT assets/ui/72-vf-regie-modele.js
 AJOUT assets/ui/72-vf-regie-pied.js
+AJOUT assets/ui/72-vf-regie-questions-lecture.js
+AJOUT assets/ui/72-vf-regie-questions-rendu.js
+AJOUT assets/ui/72-vf-regie-questions-source.js
 AJOUT assets/ui/72-vf-regie-rendu.js
 AJOUT assets/ui/72-vf-regie-source.js
 AJOUT assets/ui/72-vf-regie-style.js

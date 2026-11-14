@@ -14,7 +14,8 @@
   // ---------- titre et pastille ----------
   const compte = () => {
     const M = W.__vfRegieModele, E = W.VF_ETAT, who = E ? E.lire('who') : (W.__vfLive || {}).who;
-    try { return M && typeof M.aVous === 'function' ? M.aVous(who || null) : 0; } catch { return 0; }
+    const Q = W.__vfRegieQuestions; // 73-11 : les questions en attente sont des lignes de « À vous », donc comptées (jamais les appliquées)
+    try { return (M && typeof M.aVous === 'function' ? M.aVous(who || null) : 0) + (Q && typeof Q.compte === 'function' ? Q.compte() : 0); } catch { return 0; }
   };
   const point = () => { // un point plein neutre, couleur du texte du thème, calculé ici : aucune requête, aucun chiffre
     const c = W.getComputedStyle(D.body).color;
@@ -93,6 +94,7 @@
     let vivant = true;
     if (E) defaire.push(E.abonner('who', composer)); else ecouter(D, 'vf-who', composer);
     ecouter(D, 'vf-git:signal', composer);
+    ecouter(D, 'vf-regie:redessiner', composer); // 73-11 : l'état des questions a changé
     ecouter(W, 'floorplan-theme-change', composer); // la couleur du point suit le thème
     ecouter(D, 'vf-agent:lu', (e) => marquer(e.detail && e.detail.id));
     if (!W.VF_COQUILLE && W.Floorplan && typeof W.Floorplan.on === 'function') W.Floorplan.on('ready', composer);

@@ -20,7 +20,10 @@ const PRET = "document.readyState === 'complete' && !!document.getElementById('v
 const SID = 's0000000-aaaa-bbbb-cccc-111111111111';
 const AGENT = { kind: 'session', id: SID, etat: 'attend', titre: 'Atelier alpha', tree: '.', ageS: 120, dureeS: 900 };
 const PUSH = (w) => `window.__es.find((x) => x.url.includes('/api/vf/events')).__emit('who', { who: { workers: ${JSON.stringify(w)} } })`;
-const INJECTER = (v) => `(() => { const G = window.Floorplan.graph; G.meta.vf = G.meta.vf || {}; G.meta.vf.questions = ${JSON.stringify(v)}; window.__vfRegieQuestions.relire(); })()`;
+// la valeur passe par la route du graphe Projet (VF_ETAT.lireJson), la même que celle de la 76 : l'enveloppe de la page Équipe ne porte pas le champ
+const INJECTER = (v) => `(() => { window.__qval = ${JSON.stringify(v)}; if (!window.__qf) { window.__qf = true; const f = window.fetch;
+  window.fetch = (u, o) => (String(u).includes('onglet=projet') ? Promise.resolve(new Response(JSON.stringify({ meta: { vf: { questions: window.__qval } } }), { status: 200, headers: { 'content-type': 'application/json' } })) : f.call(window, u, o)); }
+  window.__vfRegieQuestions.relire(); })()`;
 const NB = (s) => s.length;
 const REPLI = 'details[data-vf-repli="decisions"]';
 
@@ -32,7 +35,8 @@ await executer(chrome, async (s) => {
     await s.attendre("!!window.VF_ETAT && window.VF_ETAT.lire('connexion') === 'ouvert'", 'hello reçu');
     for (let i = 0; i < 5; i++) { await s.ev(PUSH(w)); if (await s.ev(`window.VF_ETAT.lire('who').workers.length === ${w.length}`)) return; await pause(300); }
   };
-  const injecter = async (v, n) => { await s.ev(INJECTER(v)); await attendreValeur(() => s.ev("document.querySelectorAll('li[data-vf-question]').length"), (x) => x === n, { max: 8000 }); };
+  const injecter = async (v, n) => { // une lecture initiale peut être en vol : on relit jusqu'à ce que la valeur soit prise
+    for (let i = 0; i < 8; i++) { await s.ev(INJECTER(v)); if (await attendreValeur(() => s.ev("document.querySelectorAll('li[data-vf-question]').length"), (x) => x === n, { max: 1500 }) === n) return; } };
   const cle = (id) => `li[data-vf-cle="a-vous:${id}"]`;
   await ouvrir();
 
@@ -68,10 +72,11 @@ await executer(chrome, async (s) => {
   if (scenario === 'echap') {
     await injecter(F1, 3);
     await s.attendre(`!!document.querySelector('${REPLI} summary')`, 'repli des décisions');
+    await s.ev(`document.querySelector('${REPLI} summary').scrollIntoView({ block: 'center' })`);
     const p = await positionPosee(s.ev, `document.querySelector('${REPLI} summary')`);
     await s.send('Input.dispatchMouseEvent', { type: 'mousePressed', x: p.cx, y: p.cy, button: 'left', clickCount: 1 });
     await s.send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: p.cx, y: p.cy, button: 'left', clickCount: 1 });
-    const ouvert = await attendreValeur(() => s.ev(`document.querySelector('${REPLI}').open`), (x) => x === true, { max: 6000 }) === true;
+        const ouvert = await attendreValeur(() => s.ev(`document.querySelector('${REPLI}').open`), (x) => x === true, { max: 6000 }) === true;
     const echap = async () => { for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 }); };
     await echap();
     const ferme = await attendreValeur(() => s.ev(`document.querySelector('${REPLI}').open`), (x) => x === false, { max: 6000 }) === false;

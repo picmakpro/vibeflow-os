@@ -93,11 +93,11 @@ rg_RG17_lecture() {
     'j.out.m.sections.map((s) => s.id).join(",") + "|" + j.out.m.sections[0].vide + "|" + j.out.m.sections[0].compte' "a-vous,au-travail,a-relire,au-repos|Rien ne vous attend.|0"
   o="$(q_sc '{mode:"pur", etapes:[{nom:"n", fn:"normaliser", args:[F1]}]}')"
   q_ok "RG17.1 — partition de F1 : en attente, appliquées, à vérifier, mal formées, ignorées, tranchées comptées, tronquée, lue" "$o" \
-    'const n = j.out.n; [n.source, n.enAttente.map((e) => e.id).join(","), n.appliquees.map((e) => e.id).join(","), n.aVerifier.map((e) => e.id).join(","), n.malFormees.map((e) => e.id).join(","), n.ignorees, n.bilan.tranchees, n.tronque].join("|")' \
+    '(() => { const n = j.out.n; return [n.source, n.enAttente.map((e) => e.id).join(","), n.appliquees.map((e) => e.id).join(","), n.aVerifier.map((e) => e.id).join(","), n.malFormees.map((e) => e.id).join(","), n.ignorees, n.bilan.tranchees, n.tronque].join("|"); })()' \
     "lue|P90-Q-01,P90-Q-02,P91-Q-01|P90-Q-03|P90-Q-05,P90-Q-06|P90-Q-07,P90-Q-09|2|1|true"
   o="$(q_sc '(() => { const ids = [["mal-formee"], ["a-verifier"], ["tranchee"], ["appliquee"], ["zzz"], [""], ["En-Attente"]];
-    const mauvaises = [{ options: "x" }, { options: [{ cle: "a", texte: "seule" }] }, { options: [{ cle: "a", texte: "u" }, { cle: "c", texte: "v" }] }, { recommandation: "z" }, { question: "" }, { titre: "" }, { bloque: [{ type: "rien" }] }, { bloque: "x" }, { phase: "x" }];
-    const es = [E("P2-Q-01"), ...ids.map(([s], i) => E("P1-Q-0" + (i + 1), { etat: s })), ...mauvaises.map((m, i) => E("P3-Q-0" + (i + 1), m)), E("x-1")];
+    const mauvaises = [{ options: "x" }, { options: [{ cle: "a", texte: "seule" }] }, { options: [{ cle: "a", texte: "u" }, { cle: "c", texte: "v" }] }, { recommandation: "z" }, { question: "" }, { titre: "" }, { bloque: [{ type: "rien" }] }, { bloque: "x" }];
+    const es = [E("P2-Q-01"), ...ids.map(([s], i) => E("P1-Q-0" + (i + 1), { etat: s })), ...mauvaises.map((m, i) => E("P3-Q-0" + (i + 1), m)), E("x-1", { phase: null })];
     return { mode: "pur", etapes: [{ nom: "n", fn: "normaliser", args: [L(...es)] }] }; })()')"
   q_ok "RG17.2 — fermé par défaut : seule l'entrée bien formée de la liste reste en attente (états autres à forme complète, formes défaillantes, identifiant hors forme)" "$o" \
     'j.out.n.enAttente.map((e) => e.id).join(",") + "|" + (j.out.n.enAttente.length === 1 ? "une" : "plusieurs")' "P2-Q-01|une"
@@ -108,8 +108,8 @@ rg_RG17_lecture() {
     {nom:"d", mod:"modele", fn:"modele", args:['"$WHO"', null, {now:1, missions:[], questions:{$norm: L(E("P91-Q-01",{bloque:[{type:"phase",n:"92"}]}), E("P90-Q-02"), E("P90-Q-01",{bloque:[{type:"phase",n:"91"}]}))}}]},
     {nom:"x", mod:"modele", fn:"modele", args:['"$WHO"', null, {now:1, missions:[], questions:{$norm: L(E("P72-Q-01",{bloque:[{type:"phase",n:"1"}]}), E("P10-Q-01",{bloque:[{type:"phase",n:"1"}]}), E("P71.5-Q-01",{bloque:[{type:"phase",n:"1"}]}), E("P9-Q-01",{bloque:[{type:"phase",n:"1"}]}), E("P71.10-Q-01",{bloque:[{type:"phase",n:"1"}]}), E("P71-Q-01",{bloque:[{type:"phase",n:"1"}]}))}}]}]}')"
   q_ok "RG17.3 — classement par rang puis ancienneté puis questions triées par la page ; compte, clés, sous-titre inchangé, reçues dans le désordre" "$o" \
-    'const cles = (m) => m.sections[0].lignes.map((l) => l.cle.replace("a-vous:", "")).join(","); [cles(j.out.a), j.out.a.sections[0].compte, j.out.a.entete.sousTitre === j.out.b.entete.sousTitre, cles(j.out.b), cles(j.out.d), cles(j.out.x)].join("|")' \
-    "s1,s2,s4,P90-Q-01,P91-Q-01,s3,P90-Q-02|7|true|s1,s2,s4,s3|s1,s2,s4,P90-Q-01,P91-Q-01,s3,P90-Q-02|s1,s2,s4,P71-Q-01,P71.5-Q-01,P71.10-Q-01,P72-Q-01,P9-Q-01,P10-Q-01,s3"
+    '(() => { const cles = (m) => m.sections[0].lignes.map((l) => l.cle.replace("a-vous:", "")).join(","); return [cles(j.out.a), j.out.a.sections[0].compte, j.out.a.entete.sousTitre === j.out.b.entete.sousTitre, cles(j.out.b), cles(j.out.d), cles(j.out.x)].join("|"); })()' \
+    "s1,s2,s4,P90-Q-01,P91-Q-01,s3,P90-Q-02|7|true|s1,s2,s4,s3|s1,s2,s4,P90-Q-01,P91-Q-01,s3,P90-Q-02|s1,s2,s4,P9-Q-01,P10-Q-01,P71-Q-01,P71.5-Q-01,P71.10-Q-01,P72-Q-01,s3"
   o="$(q_sc '{mode:"pur", etapes:[{nom:"f1", fn:"nEnAttente", args:[{$norm: F1}]}, {nom:"f2", fn:"nEnAttente", args:[{$norm: F2}]},
     {nom:"ap", fn:"nEnAttente", args:[{$norm: L(E("P1-Q-01",{etat:"appliquee", appliquee:{canal:"c", date:"d", option:"a", decision:"P1-D-01"}}))}]},
     {nom:"ab", fn:"nEnAttente", args:[{$norm: null}]}, {nom:"il", fn:"nEnAttente", args:[{$norm: "x"}]}]}')"
@@ -125,7 +125,7 @@ rg_RG17_lecture() {
     {nom:"s", fn:"lignes", args:[{$norm: L(E("P90-Q-01",{phase:null}), E("P91-Q-01",{phase:"ph-91@atelier"}))}]}]}')"
   q_ok "RG17.6 — le lien de phase est celui de 73-04 pour une ligne de phase ; null et valeurs hors forme : aucun lien, « Phase 90, sans carte dans Projet »" "$o" \
     '[j.out.l1 === j.out.m.sections[0].lignes.find((l) => l.cle.includes("phase:::90") || l.cle.includes(":90")).lien, j.out.l2 === j.out.m.sections[0].lignes.find((l) => l.cle.includes("atelier")).lien, j.out.n, j.out.h1, j.out.h2, j.out.h3, j.out.s[0].lienTexte, j.out.s[1].lienTexte].join("|")' \
-    "true|true|null|null|null|null|Phase 90, sans carte dans Projet|Voir la phase 91 dans Projet"
+    "true|true|||||Phase 90, sans carte dans Projet|Voir la phase 91 dans Projet"
   o="$(q_sc '(() => { const x = "x".repeat(1000), op = Array.from({ length: 40 }, (_, i) => ({ cle: i < 26 ? String.fromCharCode(97 + i) : "z", texte: "o" + "y".repeat(300) }));
     const gros = Array.from({ length: 205 }, (_, i) => E("P1-Q-" + (100 + i)));
     const fich = ["/etc/x", "../x", "~/x", "a" + String.fromCharCode(92) + "b", ".planning/ok/x.md"].map((f, i) => ({ id: "P4-Q-0" + (i + 1), etat: "mal-formee", phase: "ph-4", fichier: f, ligne: 3, defauts: [] }));
@@ -135,7 +135,7 @@ rg_RG17_lecture() {
   q_ok "RG17.7 — bornes : 80, 240, 160, 26 options, 200 entrées ; fichier absolu, .., ~, \\ : null ; formes de champ et sources" "$o" \
     '(() => { const e = j.out.a.enAttente[0], f = j.out.f.malFormees.map((m) => m.fichier);
       return [e.titre.length, e.question.length, e.options[0].texte.length, e.options.length, j.out.g.enAttente.length, f.join(","), [1, 2, 3, 4, 5, 6].map((i) => j.out["s" + i].source).join(","), j.out.s7.source, j.out.s8.length].join("|"); })()' \
-    "80|240|160|26|200|null,null,null,null,.planning/ok/x.md|illisible,illisible,illisible,illisible,absente,absente|lue|0"
+    "80|240|160|26|200|,,,,.planning/ok/x.md|illisible,illisible,illisible,illisible,absente,absente|lue|0"
 }
 
 # sondes des mutants de la lecture : fonction (dossier ui) -> sortie
@@ -251,7 +251,7 @@ rg_RG17_page() {
     {"appel":"__poserQuestions","args":[F1SANS]},{"nom":"f2","obs":{"mode":"focus"}},{"nom":"txt","obs":{"mode":"textes","sel":"'"$L3"' .vf-rg-nom"}}]')"
   q_ok "RG17.18 — repli ouvert à travers un redessin (N changé), focus gardé sur un lien, puis rendu au titre de « À vous » si la ligne disparaît" "$o" \
     '(() => { const a = j.out; return [a.sm[0], a.op[0] !== null, a.k.join(","), a.f1.cle, a.f1.tag, a.f2.tag, a.f2.section].join("|"); })()' \
-    "Décisions prises pour vous, contestables (2)|true|decisions-prises:P90-Q-03,decisions-prises:P90-Q-08|a-vous:P90-Q-01|A|H2|a-vous"
+    "Décisions prises pour vous, contestables (2)|true|decisions-prises:P90-Q-03,decisions-prises:P90-Q-08,a-verifier:P90-Q-05,a-verifier:P90-Q-06|a-vous:P90-Q-01|A|H2|a-vous"
   o="$(q_page 'F1' '[{"saisie":"#search","valeur":"format"},{"nom":"v","obs":{"mode":"visiblesAttr","sel":"'"$Q_AVOUS"' li[data-vf-question]","attr":"data-vf-cle"}},{"saisie":"#search","valeur":""},{"nom":"t","obs":{"mode":"visiblesAttr","sel":"'"$Q_AVOUS"' li[data-vf-question]","attr":"data-vf-cle"}}]')"
   q_ok "RG17.19 — recherche d'un mot du titre : seule la ligne qui le porte reste ; champ vidé : tout revient" "$o" '[j.out.v.join(","), j.out.t.length].join("|")' "a-vous:P90-Q-01|3"
   o="$(q_page 'F1' '[{"nom":"b","obs":{"mode":"compte","sel":"'"$Q_AVOUS"' li[data-vf-question] button, '"$Q_AVOUS"' [data-vf-repli] button, '"$Q_AVOUS"' [data-vf-repli] .btn, li[data-vf-question] .btn, li[data-vf-question] [role=button], [data-vf-repli] input, li[data-vf-question] input"}},
@@ -274,7 +274,7 @@ rg_RG17_reelpage() {
   # mutant de non-fuite : un balisage inséré à la place de texte est vu par le DOM réduit (violations)
   q_sonde_html() { q_g "$(q_page 'F1' '[{"nom":"x","obs":{"mode":"compte","sel":"li[data-vf-question]"}}]' '' "$1")" 'j.out.x + "|" + j.final.violations.length'; }
   assert_eq "RG17.40 — hors navigateur : trois lignes de question rendues, aucun balisage construit (innerHTML, insertAdjacentHTML)" "$(q_sonde_html "$UI")" "3|0"
-  rg_mutant Q-HTML "balisage inséré à la place de texte" "$UI" 72-vf-regie-questions-rendu.js "if (e.textContent !== t) e.textContent = t; // garde:q-texte" "e.innerHTML = t; // garde:q-texte" q_sonde_html "3|0"
+  rg_mutant Q-HTML "balisage inséré à la place de texte" "$UI" 72-vf-regie-questions-rendu.js "{ if (e.textContent !== t) e.textContent = t; }" "{ e.innerHTML = t; }" q_sonde_html "3|0"
 }
 
 # ---------- navigateur ----------

@@ -65,7 +65,8 @@
 
   function monter() {
     if (!D.body) return () => {};
-    const A = adaptateur(), P = W.__vfRegiePied, R = W.__vfRegieRendu, racine = D.createElement('section'), recherche = D.getElementById('search');
+    const QS = W.__vfRegieQuestions || {}, A = adaptateur(), P = W.__vfRegiePied, R = W.__vfRegieRendu;
+    const racine = D.createElement('section'), recherche = D.getElementById('search');
     racine.id = 'vf-equipe'; racine.setAttribute('role', 'main'); racine.setAttribute('aria-busy', 'true');
     D.body.append(racine); D.body.classList.add('vf-regie-montee');
     const ui = R.monter(racine), nettoyerPied = P.monter(racine), retraits = [], minuteries = [];
@@ -83,7 +84,8 @@
       if (perdu && fige === null && tCoupe === null) tCoupe = setTimeout(() => { tCoupe = null; rendre(); }, DELAI_COUPE - (now - coupeT0));
       const recuA = A.whoAt() || recu, lus = W.__vfRegieLu && typeof W.__vfRegieLu.lus === 'function' ? W.__vfRegieLu.lus() : null;
       if (!who && !sansDirect) { P.maj({ lecture: true, muet: now - lectureT0 < 150 }); return; }
-      const m = M.modele(who || { workers: [] }, A.lock(), { now: fige !== null ? fige : now, recuA, lus, missions, nonCommite: P.nonCommite() });
+      const m = M.modele(who || { workers: [] }, A.lock(), { now: fige !== null ? fige : now, recuA, lus, missions, nonCommite: P.nonCommite(),
+        questions: QS.etat ? QS.etat() : undefined });
       ui.rendre(m, { sections: !sansDirect });
       if (recherche) ui.filtrer(recherche.value);
       P.maj({ direct: !sansDirect, aucun: !!m.etatPage, sources: who && who.sources, coupe: fige !== null ? (fige - recuA) / 1000 : null });
@@ -161,6 +163,7 @@
     if (recherche) ecouter(recherche, 'input', () => ui.filtrer(recherche.value));
     ecouter(D, 'vf-regie:aller', (e) => aller(e.detail && e.detail.section));
     ecouter(D, 'vf-regie:redessiner', () => rendre());
+    const nettoyerQ = QS.monter ? QS.monter(racine) : () => {}; // 73-11 : Échap des replis, après celui du détail en flux
     ecouter(D, 'vf:onglet', (e) => { if (e.detail && e.detail.onglet === 'equipe' && String(W.location.hash || '') !== luHash) fragment(); });
     const relireMissions = () => { // l'enveloppe d'Équipe a changé : on relit ses missions, le dessin suit ; une lecture refusée garde les missions connues
       if (A.graphePose() !== 'equipe') return;
@@ -185,7 +188,7 @@
       for (const r of retraits.splice(0)) r();
       for (const t of minuteries.splice(0)) { clearInterval(t); clearTimeout(t); }
       if (tCoupe !== null) clearTimeout(tCoupe);
-      nettoyerPied(); racine.remove(); D.body.classList.remove('vf-regie-montee');
+      nettoyerPied(); nettoyerQ(); racine.remove(); D.body.classList.remove('vf-regie-montee');
     };
   }
 

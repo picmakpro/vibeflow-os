@@ -2,7 +2,7 @@
 // Pur DOM : createElement et textContent seuls, jamais de HTML construit (le modèle rend des chaînes brutes). Une ligne est un li gardé par sa clé ;
 // une mise à jour n'écrit que ce qui change. Pose window.__vfRegieRendu = { monter(racine) } ; monter rend l'objet qui sert la source.
 (() => {
-  const D = document, SVG = 'http://www.w3.org/2000/svg', NB = ' ';
+  const QR = window.__vfRegieQuestions || {}, D = document, SVG = 'http://www.w3.org/2000/svg', NB = ' ';
   const h = (tag, cls, txt) => { const e = D.createElement(tag); if (cls) e.className = cls; if (txt) e.textContent = txt; return e; };
   const ecrire = (e, t) => { if (e.textContent !== t) e.textContent = t; };
   const attr = (e, k, v) => { if (e.getAttribute(k) !== v) e.setAttribute(k, v); };
@@ -109,14 +109,15 @@
       const vd = m.entete.verrouDepot; ecrire(verrou, vd ? [vd.texte, ...vd.marques.map((x) => x.texte)].join(' · ') : ''); cacher(verrou, !vd);
       cacher(corps, o.sections === false);
       const vus = new Set(), ligne = (l) => {
-        let li = cache.get(l.cle); if (!li) { li = creerLigne(l); cache.set(l.cle, li); }
-        majLigne(li, l); vus.add(l.cle); return li;
+        let li = cache.get(l.cle); if (!li) { li = l.kind === 'question' ? QR.noeud() : creerLigne(l); cache.set(l.cle, li); }
+        if (l.kind === 'question') QR.maj(li, l); else majLigne(li, l); vus.add(l.cle); return li;
       };
       for (const s of m.sections) {
         const r = secs.get(s.id) || (secs.set(s.id, creerSec(s.id)), secs.get(s.id));
         classe(r.sec, 'vf-rg-sec' + (s.id === 'a-vous' ? ' vf-rg-sec-avous' : ''));
         ecrire(r.h2, s.titre); ecrire(r.compte, String(s.compte)); ecrire(r.aide, s.aide);
-        synchro(r.ul, s.lignes.map(ligne)); ecrire(r.vide, s.vide); cacher(r.vide, s.lignes.length > 0);
+        synchro(r.ul, s.lignes.map(ligne)); ecrire(r.vide, s.vide); cacher(r.vide, s.lignes.length > 0 || !s.vide);
+        if (s.questions) QR.pied(r.sec, s.questions); // 73-11 : le pied des questions en attente
         ecrire(r.pied, [s.pied, s.autresTexte].filter(Boolean).join(' ')); cacher(r.pied, !r.pied.textContent);
         ecrire(r.sm, s.relusTitre); synchro(r.ulr, s.relus.map(ligne)); cacher(r.det, s.relus.length === 0);
       }
