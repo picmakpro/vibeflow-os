@@ -190,7 +190,7 @@ export default async function (h) {
     const lire = async (id) => { await h.fermer().catch(() => {}); await h.ouvrir(id);
       return h.ev(() => { const r = document.querySelector('.vf-fiche-ratt'), t = r.textContent.replace(/\s/g, ' ').replace(/ +/g, ' ').trim();
         return { t, liens: [...r.querySelectorAll('a')].map((a) => a.getAttribute('href')), boutons: [...r.querySelectorAll('button')].map((b) => b.textContent) }; }); };
-    const u = (x) => `project.html#r=${encodeURIComponent(x)}`;
+    const u = function (x) { return 'project.html#r=' + encodeURIComponent(x); };
     const w1 = await lire('wk-1'), mg = await lire('mg-1'), w3 = await lire('wk-3'), w4 = await lire('wk-4'), se = await lire('sess-1');
     h.egal('P4', 'worker rattaché : « Worker de vf-dev-manager · nœud exec-lot-a · Phase 74 », trois liens (fiche du parent, nœud, phase)',
       [w1.t, w1.boutons, w1.liens], ['Worker de vf-dev-manager · nœud exec-lot-a · Phase 74', ['vf-dev-manager'], [u('f:m1.md#exec-lot-a'), u('n:ph-74')]]);
