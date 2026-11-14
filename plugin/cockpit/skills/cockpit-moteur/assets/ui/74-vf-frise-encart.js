@@ -4,10 +4,11 @@
 // fichiers.js, rendu seulement ici). « · déduit » seulement sur l'état PRÉSENT d'une voie sans `etatOfficiel` (P74-D-39). Le bouton « Voir sur la
 // carte » n'appelle que window.__vfFrise.voirSurLaCarte. Rien ne se dessine au chargement : le rappel de surOnglet enregistre l'extension, écoute le
 // curseur (événements vf-frise:curseur et vf-frise:relache posés par 74-vf-frise-curseur.js) et rend son nettoyage ; chaque contrôle porte `data-foc`,
-// restitué quand la zone redessine sous le focus.
+// restitué quand la zone redessine sous le focus. Forme (UI-SPEC § 3) : filet --hair et --gap-section sous la légende, titre h3 et bouton « Retirer le
+// curseur » à droite, puis trois groupes (voies, nœuds portés, fichiers) en colonnes dès 1 000 px, empilés en dessous.
 (() => {
   'use strict';
-  const W = window, D = document, NB = '\u00a0', MAX = 8;
+  const W = window, D = document, NB = '\u00a0', MAX = 8, SVGNS = 'http://www.w3.org/2000/svg';
   const MOT = { travail: 'au travail', 'attend-humain': 'vous attend', 'attend-agents': 'attend ses agents', repos: 'au repos', 'pas-lance': 'pas encore lancé',
     termine: 'terminé' };
   const h = (tag, cls, txt) => { const e = D.createElement(tag); if (cls) e.className = cls; if (txt !== undefined) e.textContent = txt; return e; };
@@ -15,14 +16,20 @@
   if (D.head && !D.head.querySelector('style[data-vf-encart]')) {
     const st = D.createElement('style'); st.setAttribute('data-vf-encart', '');
     st.textContent = `
-      .vf-encart { margin: var(--sp-12) 0 0; color: var(--text); font-size: 12.5px; line-height: 16px; }
-      .vf-encart-titre { margin: 0 0 var(--sp-8); font: 600 13px/18px var(--sans); color: var(--text); }
-      .vf-encart h4 { margin: var(--sp-12) 0 var(--sp-4); font: 600 12.5px/16px var(--sans); color: var(--text); }
+      .vf-encart { margin: var(--gap-section) 0 0; padding: var(--sp-16) 0 0; border-top: 1px solid var(--hair); color: var(--text); font-size: 12.5px;
+        line-height: 16px; }
+      .vf-encart-tete { display: flex; align-items: center; justify-content: space-between; gap: var(--sp-12); margin: 0 0 var(--sp-12); }
+      .vf-encart-titre { margin: 0; font: 600 15px/20px var(--sans); letter-spacing: -.015em; color: var(--text); }
+      .vf-encart-cols { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--sp-16); }
+      @media (min-width: 1000px) { .vf-encart-cols { grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--sp-24); } }
+      .vf-encart h4 { margin: 0 0 var(--sp-4); font: 500 12.5px/16px var(--sans); color: var(--text-3); }
       .vf-encart ul { margin: 0; padding: 0; list-style: none; }
       .vf-encart li { padding: var(--sp-2) 0; }
+      .vf-encart-voies li { display: flex; align-items: center; gap: var(--sp-8); }
       .vf-encart-aide, .vf-encart-note, .vf-encart-etat, .vf-encart-bilan { margin: var(--sp-4) 0; color: var(--text-3); }
-      .vf-encart-carte { margin-top: var(--sp-8); min-height: 28px; padding: var(--sp-4) var(--sp-12); border: 0; border-radius: 8px; background: var(--raise);
-        color: var(--text); font: 500 13px/18px var(--sans); cursor: pointer; }
+      .vf-encart-carte, .vf-encart-retirer { margin-top: var(--sp-8); min-height: 28px; padding: var(--sp-4) var(--sp-12); border: 0; border-radius: 8px;
+        background: var(--raise); color: var(--text); font: 500 13px/18px var(--sans); cursor: pointer; }
+      .vf-encart-retirer { flex: none; margin: 0; }
       .vf-encart button:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
       @media (pointer: coarse) { .vf-encart button { min-height: 44px; } }`;
     D.head.appendChild(st);
@@ -33,6 +40,26 @@
     const n = k === null ? null : [...zone.querySelectorAll('[data-foc]')].find((x) => x.getAttribute('data-foc') === k);
     if (n) n.focus({ preventScroll: true });
   };
+  // état de voie -> clé de la table de glyphes de la régie (la même correspondance que la colonne de la frise ; la frise n'a aucun jeu propre)
+  const CLE_ETAT = { travail: 'actif', 'attend-humain': 'attend', 'attend-agents': 'en-attente', repos: 'au-repos', termine: 'termine',
+    'pas-lance': 'au-repos' };
+  const glyphe = (etat) => {
+    const R = W.__vfEquipeRendu;
+    if (!R || !R.GLYPHE_ETAT || typeof R.glyphe !== 'function') return null;
+    const cle = R.GLYPHE_ETAT[CLE_ETAT[etat]] || 'repos', src = R.glyphe(cle, '').replace('<svg ', `<svg xmlns="${SVGNS}" `);
+    const s = D.importNode(new DOMParser().parseFromString(src, 'image/svg+xml').documentElement, true);
+    s.setAttribute('class', 'vf-frise-glyphe'); s.setAttribute('data-glyphe', cle);
+    return s;
+  };
+  const groupe = (titre, ...contenu) => { const g = h('section', 'vf-encart-col'); g.append(h('h4', '', titre), ...contenu); return g; };
+  const retirer = () => {
+    const F = W.__vfFrise;
+    if (!F) return;
+    F.poserCurseur(null);
+    if (typeof F.finirRelecture === 'function') F.finirRelecture();
+    const rep = D.querySelector('.vf-frise [role=slider]');
+    if (rep) rep.focus({ preventScroll: true });
+  };
   const aide = () => h('p', 'vf-encart-aide',
     `Posez le curseur sur la frise pour relire un instant${NB}: un clic dans les pistes, ou la flèche gauche. Échap revient à maintenant.`);
 
@@ -41,6 +68,8 @@
     for (const r of ctx.rangs) {
       const v = r.voie, li = h('li'), nom = (ctx.nomsParId && ctx.nomsParId.get(r.id)) || v.id, etat = M.etatA(v, t);
       li.setAttribute('data-id', v.id);
+      const g = glyphe(etat);
+      if (g) li.append(g);
       li.append(h('span', 'mono', nom), ` ${MOT[etat] || etat}${present && v.etatOfficiel === null ? ' · déduit' : ''}`);
       ul.append(li);
     }
@@ -114,8 +143,12 @@
       const racine = h('div', 'vf-encart');
       if (t === null) racine.append(aide());
       else {
-        racine.append(h('h3', 'vf-encart-titre', `À cet instant, ${ctx.modele.fmtHeure(t, { phrase: true })}`), voies(ctx, t),
-          ...noeuds(ctx, t), fichiers(st, ctx, t));
+        const tete = h('div', 'vf-encart-tete'), b = h('button', 'vf-encart-retirer', 'Retirer le curseur');
+        b.type = 'button'; b.setAttribute('data-foc', 'retirer'); b.addEventListener('click', retirer);
+        tete.append(h('h3', 'vf-encart-titre', `À cet instant, ${ctx.modele.fmtHeure(t, { phrase: true })}`), b);
+        const cols = h('div', 'vf-encart-cols');
+        cols.append(groupe('Les voies', voies(ctx, t)), groupe('Nœuds du plan portés', ...noeuds(ctx, t)), fichiers(st, ctx, t));
+        racine.append(tete, cols);
       }
       e.replaceChildren(racine);
     });

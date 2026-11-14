@@ -5,6 +5,7 @@
 # canal de marquage de la 75 (VF_MARQUES) et la navigation d'onglets de la 80 (VF_ONGLETS) sont les vrais.
 #   C1 repère clavier  C2 pointeur  C3 trait et sortie de fenêtre  C4 voies  C5 nœuds portés  C6 fichiers  C6b analyse du suffixe et cibles coupées
 #   C7 plafond de lectures  C8 « Voir sur la carte » (canal de la 75)  C8c routage d'onglet  C9 aucune persistance  C10 forme du code  C11 tactile  C12 cycle de vie
+#   C13 encart conforme à UI-SPEC § 3 (correction de fin de phase)  C14 la pose sur le canal est exclusive (3e argument)
 # Écart de contrat (écrit au SUMMARY) : « décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; prise par la session principale le 2026-11-13 ;
 # amende l'arrangement de P74-D-47 (le rebranchement de "Voir sur la carte" passe de 75-07 à 74-06) » : plus de C8b (aucun showBoard), C8 lit le canal de la 75.
 # Plan non marqué audit : pas de mutants (rituel levé : régime allégé). Chrome headless en CDP (SAUTÉ, jamais compté réussi, sans navigateur). Exit 0 si tout passe, 1 sinon.
@@ -63,10 +64,18 @@ window.__fiche = [];
     chargerOnglet: (...a) => { window.__charger.push(a[0]); return x.chargerOnglet(...a); },
     surOnglet: (r, o) => { const m = /74-vf-frise-(curseur|encart|fichiers|carte)\.js/.exec(String(new Error().stack));
       window.__surOnglet.push({ cle: o && o.cle, source: m ? m[0] : null }); return x.surOnglet(r, o); } }) : x; } }); }
-window.__kdC = [];
-{ const A = EventTarget.prototype.addEventListener, R = EventTarget.prototype.removeEventListener;
-  EventTarget.prototype.addEventListener = function (t, f, o) { if (t === 'keydown' && this === document && /74-vf-frise-curseur/.test(String(new Error().stack))) window.__kdC.push(f); return A.call(this, t, f, o); };
-  EventTarget.prototype.removeEventListener = function (t, f, o) { if (t === 'keydown' && this === document) window.__kdC = window.__kdC.filter((x) => x !== f); return R.call(this, t, f, o); }; }
+window.__kdC = []; window.__ecDoc = [];
+// __ecDoc : les écouteurs de `document` posés par curseur et encart, par couple (type, fonction, capture), ôtés SEULEMENT par un retrait que le module fait
+// lui-même (sa pile nomme son fichier) : le démontage de la portée de la coquille (vf-coquille-portee.js) défait tout écouteur resté, il masquerait la fuite ;
+// un retrait qui oublie la capture ne les ôte pas
+{ const A = EventTarget.prototype.addEventListener, R = EventTarget.prototype.removeEventListener, cap = (o) => (typeof o === 'boolean' ? o : !!(o && o.capture));
+  EventTarget.prototype.addEventListener = function (t, f, o) { const pile = String(new Error().stack);
+    if (t === 'keydown' && this === document && /74-vf-frise-curseur/.test(pile)) window.__kdC.push(f);
+    if (this === document && /74-vf-frise-(curseur|encart)/.test(pile)) window.__ecDoc.push([t, f, cap(o)]);
+    return A.call(this, t, f, o); };
+  EventTarget.prototype.removeEventListener = function (t, f, o) { if (t === 'keydown' && this === document) window.__kdC = window.__kdC.filter((x) => x !== f);
+    if (this === document && /74-vf-frise-(curseur|encart)/.test(String(new Error().stack))) window.__ecDoc = window.__ecDoc.filter((x) => !(x[0] === t && x[1] === f && x[2] === cap(o)));
+    return R.call(this, t, f, o); }; }
 { const f0 = window.fetch.bind(window);
   const rep = (st, o) => new Response(JSON.stringify(o), { status: st, headers: { 'content-type': 'application/json' } });
   window.fetch = (u, i) => { const url = typeof u === 'string' ? u : u.url; window.__urls.push([url, (i && i.method) || 'GET']);
@@ -522,6 +531,85 @@ export default async function (h) {
     const cles = new Set(s.map((x) => x.cle));
     h.sonde('C12', 'quatre modules inscrits, chacun avec une clé égale à son nom de fichier (extension comprise)', cles.size === 4 && s.every((x) => x.source === x.cle) && ['curseur', 'encart', 'fichiers', 'carte'].every((n) => cles.has(`74-vf-frise-${n}.js`)), JSON.stringify([...cles]));
     h.sonde('C12', 'finirRelecture appelée à chaque départ de l\'onglet Équipe (deux)', m.fin >= 2, String(m.fin));
+    // aucun écouteur de `document` ne survit au départ de l'onglet Équipe (témoin positif : il y en a quatre tant qu'on y est)
+    const noms = () => h.ev(() => window.__ecDoc.map((x) => x[0] + (x[2] ? ':capture' : '')).sort());
+    h.egal('C12', 'témoin : sur Équipe, quatre écouteurs de document (keydown en capture, deux vf-frise:curseur, vf-frise:relache)', await noms(), ['keydown:capture', 'vf-frise:curseur', 'vf-frise:curseur', 'vf-frise:relache']);
+    await h.ev(() => window.VF_COQUILLE.chargerOnglet('code').then(() => 1));
+    await h.attendre("window.VF_COQUILLE.onglet() === 'code' && document.documentElement.dataset.vfPret === 'oui'", 'onglet code');
+    h.egal('C12', 'après le départ vers Code : chaque écouteur de document posé par le curseur et l\'encart a été retiré par le module lui-même (capture comprise)', await noms(), []);
+  });
+}
+JS
+
+cat > "$AUX/c13.mjs" <<'JS'
+import { MIN, poser, curseur, texte } from './commun.mjs';
+export const ids = ['C13'];
+const mesure = (h) => h.ev(() => {
+  const E = document.querySelector('.vf-encart'), cs = (e) => getComputedStyle(e), r = (e) => e.getBoundingClientRect(), leg = document.querySelector('.vf-frise-legende');
+  const sonde = (v) => { const i = document.createElement('i'); i.style.cssText = `position:absolute;visibility:hidden;width:var(${v})`; document.body.appendChild(i); const w = r(i).width; i.remove(); return w; };
+  const t = E.querySelector('h3'), b = [...E.querySelectorAll('button')].find((x) => x.textContent === 'Retirer le curseur');
+  const hs = Object.fromEntries([...E.querySelectorAll('h4')].map((x) => [x.textContent, x]));
+  const col = (n) => (hs[n] ? r(hs[n].parentElement) : null);
+  const G = window.__vfEquipeRendu.GLYPHE_ETAT, glyphe = (id) => { const s = E.querySelector(`.vf-encart-voies [data-id="${id}"] > svg`); return s ? s.getAttribute('data-glyphe') : null; };
+  return { titre: [cs(t).fontSize, cs(t).fontWeight, cs(t).lineHeight],
+    bouton: b ? { h: r(b).height, aDroite: r(b).left >= r(t).right && Math.abs((r(b).top + r(b).height / 2) - (r(t).top + r(t).height / 2)) < 20, bord: Math.round(r(E).right - r(b).right) } : null,
+    inter: ['Les voies', 'Nœuds du plan portés'].map((n) => hs[n] ? [cs(hs[n]).fontSize, cs(hs[n]).fontWeight, cs(hs[n]).color === window.__couleur('--text-3')] : null),
+    cols: ['Les voies', 'Nœuds du plan portés', 'Fichiers écrits autour de cet instant'].map(col).map((c) => c && [Math.round(c.top), Math.round(c.left)]),
+    glyphes: [['wk-2', G.actif], ['mg-1', G['en-attente']], ['sess-1', G['au-repos']], ['wk-1', G.termine]].map(([id, att]) => [glyphe(id), att]),
+    sansGlyphe: [...E.querySelectorAll('.vf-encart-voies li')].filter((li) => !li.querySelector(':scope > svg')).length,
+    filet: [cs(E).borderTopWidth, cs(E).borderTopStyle, cs(E).borderTopColor === window.__couleur('--hair')],
+    ecart: [Math.round(r(E).top - r(leg).bottom), Math.round(sonde('--gap-section'))] };
+});
+export default async function (h) {
+  await h.section('C13', async () => {
+    await h.monter({});
+    const now = await h.ev(() => window.__vfFrise.donnees().jusqua);
+    await poser(h, now - 25 * MIN);
+    const m = await mesure(h);
+    h.egal('C13', 'h3 « À cet instant » : 15 px, 600, interligne 20 px', m.titre, ['15px', '600', '20px']);
+    h.sonde('C13', 'bouton « Retirer le curseur » : 28 px de haut, à droite du titre, sur la même ligne, contre le bord de l\'encart', !!m.bouton && m.bouton.h === 28 && m.bouton.aDroite && m.bouton.bord <= 2, JSON.stringify(m.bouton));
+    h.egal('C13', 'intertitres « Les voies » et « Nœuds du plan portés » : 12,5 px, 500, --text-3', m.inter, [['12.5px', '500', true], ['12.5px', '500', true]]);
+    h.sonde('C13', 'dès 1 000 px : trois colonnes (même haut, de gauche à droite)', m.cols.every(Boolean) && m.cols[0][0] === m.cols[1][0] && m.cols[1][0] === m.cols[2][0] && m.cols[0][1] < m.cols[1][1] && m.cols[1][1] < m.cols[2][1], JSON.stringify(m.cols));
+    h.egal('C13', 'un glyphe de la régie (GLYPHE_ETAT) en tête de chaque voie : travail, attend ses agents, repos, terminé', [m.glyphes.map((x) => x[0]), m.sansGlyphe], [m.glyphes.map((x) => x[1]), 0]);
+    h.sonde('C13', 'filet --hair de 1 px en haut et --gap-section entre la légende et l\'encart', m.filet.join() === '1px,solid,true' && m.ecart[0] === m.ecart[1] && m.ecart[1] > 0, JSON.stringify([m.filet, m.ecart]));
+    // la restitution du focus : le bouton redessiné reprend le focus (data-foc)
+    await h.ev(() => { const b = [...document.querySelectorAll('.vf-encart button')].find((x) => x.textContent === 'Retirer le curseur'); window.__anc = b; b.focus(); });
+    await h.emettre(9);
+    await h.attendre(() => !window.__anc.isConnected, 'encart redessiné');
+    h.egal('C13', 'l\'encart redessiné sous le focus le rend au bouton « Retirer le curseur » (data-foc)', await h.ev(() => [document.activeElement.getAttribute('data-foc'), document.activeElement === window.__anc]), ['retirer', false]);
+    // le geste : le bouton retire le curseur, l'encart redit l'aide, le focus revient au repère
+    await h.ev(() => [...document.querySelectorAll('.vf-encart button')].find((x) => x.textContent === 'Retirer le curseur').click());
+    h.egal('C13', 'le bouton retire le curseur ; l\'encart redit comment en poser un ; le focus va au repère', [await curseur(h), /Posez le curseur/.test(await texte(h)), await h.ev(() => document.activeElement.getAttribute('role'))], [null, true, 'slider']);
+    // étroit : empilés
+    await h.monter({ largeur: 900 });
+    const n2 = await h.ev(() => window.__vfFrise.donnees().jusqua);
+    await poser(h, n2 - 25 * MIN);
+    const e = await mesure(h);
+    h.sonde('C13', 'sous 1 000 px : les trois groupes sont empilés (même bord gauche, hauts croissants)', e.cols.every(Boolean) && e.cols[0][1] === e.cols[1][1] && e.cols[1][1] === e.cols[2][1] && e.cols[0][0] < e.cols[1][0] && e.cols[1][0] < e.cols[2][0], JSON.stringify(e.cols));
+    // tactile : 44
+    await h.monter({ largeur: 390, hauteur: 800, coarse: true });
+    const n3 = await h.ev(() => window.__vfFrise.donnees().jusqua);
+    await poser(h, n3 - 25 * MIN);
+    h.egal('C13', 'en pointer: coarse : le bouton « Retirer le curseur » fait 44 px de haut', (await mesure(h)).bouton.h, 44);
+  });
+}
+JS
+cat > "$AUX/c14.mjs" <<'JS'
+import { MIN, poser, encartPret, fil } from './commun.mjs';
+import { fix, filCa2 } from './c8.mjs';
+export const ids = ['C14'];
+export default async function (h) {
+  await h.section('C14', async () => {
+    await h.monter({ voies: fix });
+    const now = await h.ev(() => window.__vfFrise.donnees().jusqua);
+    await fil(h, 'ca-2', filCa2(now)); await poser(h, now - 30 * MIN); await encartPret(h);
+    // un espion du canal de la 75 : il lit les trois arguments de poser
+    await h.ev(() => { window.__poses = []; window.__geste = true;
+      window.VF_MARQUES = { poser: (...a) => { window.__poses.push(JSON.parse(JSON.stringify([a.length, a[0], a[2]]))); return true; }, retirer: () => {} };
+      window.VF_ONGLETS = { aller: () => Promise.resolve(), courant: () => 'equipe' };
+      document.querySelector('.vf-encart-carte').click(); });
+    await h.attendre(() => window.__poses.length > 0, 'pose sur le canal', 8000);
+    h.egal('C14', 'VF_MARQUES.poser reçoit trois arguments : la couche `relecture` et { exclusif: true }', await h.ev(() => window.__poses[0]), [3, 'relecture', { exclusif: true }]);
   });
 }
 JS
@@ -579,7 +667,7 @@ ECARTS="$(statique "$UI")"
 assert_eq "C10 — quatre modules : jetons, aucun réseau direct, ni statut de DAG, ni showBoard, ≤ 299 lignes, ≤ 160 colonnes, aucun persistant" "${ECARTS:-aucun écart}" "aucun écart"
 
 if [ -z "$CHROME" ]; then
-  skip "C1 à C9, C11, C12" "pas de navigateur"
+  skip "C1 à C9, C11 à C14" "pas de navigateur"
 else
   demarrer base; PORT="$VF_PORT"; SRV="$VF_PID"
   assert_eq "C0 — contrôle positif : serveur de la suite démarré, page Équipe servie" "$([ "$PORT" -gt 0 ] && echo serveur)" "serveur"
@@ -597,6 +685,8 @@ else
   echo "=== C9 — aucune persistance ==="; joue c9 "$PORT" C9
   echo "=== C11 — tactile ==="; joue c11 "$PORT" C11
   echo "=== C12 — cycle de vie ==="; joue c12 "$PORT" C12
+  echo "=== C13 — encart conforme à la spécification (§ 3) ==="; joue c13 "$PORT" C13
+  echo "=== C14 — canal de marquage : couche exclusive ==="; joue c14 "$PORT" C14
   cockpit_arreter "$SRV"; SRV=""
 fi
 
