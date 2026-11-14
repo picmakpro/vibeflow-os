@@ -67,6 +67,9 @@ await executer(chrome, async (s) => {
     const signal = deux(await titre());
     await s.ev("document.title = 'x map'"); await pousser(attendent(2));
     const moteur = await attendreValeur(titre, (t) => /^\(2\) vous attendent · Projet · /.test(t), { max: 6000 });
+    // simule l'aller d'onglet de la Phase 80 : le titre brut est écrit, puis l'événement de document `vf:onglet` est émis
+    await s.ev("document.title = 'Projet · brut'; document.dispatchEvent(new CustomEvent('vf:onglet', { detail: { onglet: 'projet', precedent: 'equipe' } }))");
+    const aller = await attendreValeur(titre, (t) => /^\(2\) vous attendent · Projet · /.test(t), { max: 3000 });
     await pousser(attendent(1));
     const un = await attendreValeur(titre, (t) => /^\(1\)/.test(t), { max: 6000 });
     const av = reqs.length;
@@ -75,7 +78,7 @@ await executer(chrome, async (s) => {
     const pastille = await href(), reseau = reqs.slice(av).filter((r) => !r.u.startsWith('data:') && /icon|favicon|\.svg|image/i.test(r.u)).map((r) => r.u);
     await pousser([]);
     const retour = await attendreValeur(titre, (t) => /^Projet · /.test(t), { max: 6000 });
-    return { navs: navs.slice(n0), zero, change: pastille !== zero.href, deux: titres, abonnes, sansRecharge, focus, signal, moteur, un, pastille: pastille.slice(0, 40), sansChiffre: !/<text/.test(decodeURIComponent(pastille)),
+    return { navs: navs.slice(n0), zero, change: pastille !== zero.href, deux: titres, abonnes, sansRecharge, focus, signal, moteur, aller, un, pastille: pastille.slice(0, 40), sansChiffre: !/<text/.test(decodeURIComponent(pastille)),
       reseau, csp: s.violations.slice(), retour, hrefRetour: await href(), nonGet: nonGet() };
   }
   if (scenario === 'lu') {

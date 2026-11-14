@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # test-cockpit-coquille.sh — la coquille statique du cockpit (79-16, SOCL-20 ; C5, A1 à A3, A30, A37, A40, A41, A48, A51, A53, A55).
 #   K0 témoins · K1 document aux quatre adresses · K2 fichiers de /_vf/ (table fermée, ETag, 304, lien) · K3 CSP · K4 E9 (fichier planté) · K5 service retiré
-#   K6 module servi = module lancé · A37 gardes de chemin · C1 à C8 navigateur (onglet rendu, adresses, chargerOnglet, surOnglet, persistants, classe, terminal, échec)
+#   K6 module servi = module lancé · A37 gardes de chemin · C1 à C9 navigateur (onglet rendu, adresses, chargerOnglet, surOnglet, persistants, classe, terminal, échec de lecture, échec de démarrage)
 #   P aide de mutation de page · M-* mutants (copies du module par cockpit_module_muter, jamais le module du dépôt)
 # Lab neutre dans mktemp, HOME jetable, isolation git. Le code testé est celui du dossier de cette suite. Exit 0 si tout passe, 1 sinon.
 set -uo pipefail
@@ -75,16 +75,16 @@ node "$OR" csp "$WORK/doc-p.html" "$K1CSP" "http://127.0.0.1:$PORT/_vf/" > "$WOR
 assert_eq "K3.1 — empreintes de script-src = celles des scripts en ligne du corps servi ; une seule autre source, http://127.0.0.1:<port>/_vf/ ; valeur servie = valeur reconstruite" "$(oj '[j.egales,JSON.stringify(j.autres),j.servi===j.attendu].join("|")' < "$WORK/csp.json")" "true|[\"http://127.0.0.1:$PORT/_vf/\"]|true"
 assert_eq "K3.1 — script-src sans 'self', sans 'unsafe-', sans *" "$(oj '/\x27self\x27|unsafe-|\*/.test(j.servi)?"interdit":"propre"' < "$WORK/csp.json")" "propre"
 cat > "$AUX/ligne.mjs" <<'JS'
-// ligne.mjs <serve.mjs> : la ligne « const csp = » du serveur égale la copie figée de v2.75.0 avec la seule insertion de la source du préfixe
+// ligne.mjs <serve.mjs> : la ligne « const csp = » du serveur égale la copie figée de v2.75.0 avec les deux seules insertions (source du préfixe, directive de worker)
 import fs from 'node:fs'; import { execFileSync } from 'node:child_process';
 const [, , serve, aux] = process.argv;
 const ancien = "  const csp = `default-src 'none'; script-src ${[...new Set(hashes)].join(' ')}; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'`;";
 const ligne = fs.readFileSync(serve, 'utf8').split('\n').find((x) => x.startsWith('  const csp = ')) || '';
-const attendu = ancien.replace(".join(' ')}; style-src", ".join(' ')} ${source}; style-src");
+const attendu = ancien.replace(".join(' ')}; style-src", ".join(' ')} ${source}; ${worker}; style-src"); // les DEUX insertions de la phase : la source du préfixe (79-16) et le worker (79-18)
 const figee = execFileSync('node', [aux, 'ligne-csp-v275'], { encoding: 'utf8' }).trimEnd();
 console.log([ligne === attendu ? 'serveur' : 'serveur-different', figee === attendu ? 'figee' : 'figee-differente'].join(' '));
 JS
-assert_eq "K3.3 — la ligne « const csp = » de serve.mjs ne diffère de la copie de v2.75.0 que par la source du préfixe, et terminal-aux en porte la copie figée neuve" "$(node "$AUX/ligne.mjs" "$ENG/assets/serve.mjs" "$TA")" "serveur figee"
+assert_eq "K3.3 — la ligne « const csp = » de serve.mjs ne diffère de la copie de v2.75.0 que par la source du préfixe et la directive de worker (deux insertions exactes), et terminal-aux en porte la copie figée neuve" "$(node "$AUX/ligne.mjs" "$ENG/assets/serve.mjs" "$TA")" "serveur figee"
 
 echo "=== K1 (suite) — les quatre adresses, les méthodes, les jetons ==="
 rq GET / "$WORK/doc-r.html"; rq GET /index.html "$WORK/doc-i.html"; rq GET /equipe.html "$WORK/doc-e.html"; rq GET /project.html "$WORK/doc-p.html"
@@ -104,6 +104,10 @@ assert_eq "K1.5 — Sec-Fetch-Site: cross-site : 403 sur les quatre adresses et 
 echo "=== K2 (suite) — table fermée, lien symbolique, liste calculée au démarrage ==="
 FERME="$(for u in /_vf/ /_vf//moteur.js /_vf/../serve.mjs /_vf/ui/../moteur.js /_vf/%2e%2e/serve.mjs '/_vf/moteur.js%00' /_vf/MOTEUR.js /_vf/ui/ "/_vf/$(printf 'a%.0s' $(seq 1 4096))"; do rq GET "$u" "$WORK/x.out"; printf '%s ' "$RQ_CODE"; done)"
 assert_eq "K2.3 — table fermée : /_vf/, //, .., ui/.., %2e%2e, NUL, majuscules, ui/, 4 Kio → 404 chacun" "$FERME" "404 404 404 404 404 404 404 404 404 "
+ALIAS="$(for u in //x/ //x/project.html /./project.html /./ //project.html /project.html/ /equipe.html/. /index.html/../project.html; do rq GET "$u" "$WORK/x.out"; printf '%s ' "$RQ_CODE"; done)"
+assert_eq "K2.3 (AU16-01) — seules les quatre adresses déclarées répondent : //x/, //x/project.html, /./project.html, /./, //project.html, barre finale, segment .. → 404 (chemin brut, comme /_vf/)" "$ALIAS" "404 404 404 404 404 404 404 404 "
+rq GET "/project.html?x=1" "$WORK/x.out"
+assert_eq "K2.3 (AU16-01) — témoin positif : /project.html?x=1 répond 200 (la requête est coupée avant le jugement)" "$RQ_CODE" "200"
 rq GET "/_vf/moteur.js?x=1" "$WORK/x.out"; Q1="$RQ_CODE"; rq POST /_vf/moteur.js "$WORK/x.out"
 assert_eq "K2.3 — témoin positif : ?x=1 est ignoré (200) ; K2.4 — POST /_vf/moteur.js : 405" "$Q1|$RQ_CODE" "200|405"
 # fichiers plantés dans la SORTIE, après le démarrage (E9, A40)
@@ -145,13 +149,13 @@ fi
 
 Q="$(printf '\047')"  # apostrophe : les expressions sed des mutants la portent
 cat > "$AUX/lien-sortie.mjs" <<'JS'
-// lien-sortie.mjs <serve.mjs> <sortie> : lance le serveur sur une sortie donnée par un chemin non réel ; « refus » (sortie 1, message) ou « demarre » (tué après 8 s)
+// lien-sortie.mjs <serve.mjs> <sortie> [<motif du message>, défaut « chemin r »] : lance le serveur sur une sortie donnée par un chemin non réel ; « refus » (sortie 1, message) ou « demarre » (tué après 8 s)
 import { spawn } from 'node:child_process';
-const [, , serve, sortie] = process.argv;
+const [, , serve, sortie, motif = 'chemin r'] = process.argv;
 const c = spawn(process.execPath, [serve, '--no-open', '--port', '0', `--sortie=${sortie}`], { stdio: ['ignore', 'ignore', 'pipe'] });
 let err = ''; c.stderr.on('data', (d) => { err += d; });
 const t = setTimeout(() => { c.kill('SIGKILL'); console.log('demarre'); }, 8000);
-c.on('exit', (code) => { clearTimeout(t); console.log(code === 1 && /chemin r/.test(err) ? 'refus' : `autre ${code}`); });
+c.on('exit', (code) => { clearTimeout(t); console.log(code === 1 && new RegExp(motif).test(err) ? 'refus' : `autre ${code}`); });
 JS
 if [ -n "$CHROME" ]; then
 echo "=== C2 à C5 — changer d'onglet dans le même document ==="
@@ -345,15 +349,18 @@ if cockpit_module_muter cle vf-coquille.js "s|const remplacee = .*// garde:coqui
 else assert_eq "M-CLE — mutant sans effet (ancre garde:coquille-cle absente)" "sans effet" "effet"; fi
 echo "=== C6 — après des changements d'onglet, le document équivaut à un chargement à froid (par classes) ==="
 cat > "$AUX/c6froid.js" <<'JS'
-await pause(400);
-const emp = await s.ev(`__s.empreinte()`);
+await s.attendre(`document.documentElement.dataset.vfPret === 'oui'`, 'document prêt');
+// la pastille #vf-lock naît du premier évènement du flux du direct : elle arrive APRÈS « pret », en un temps que la charge allonge ; mesurer une fois posée
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+const emp = await s.stable('__s.empreinte()', 'empreinte du document à froid'); // mesurer une fois posé : deux relevés consécutifs égaux, jamais une pause fixe
 return { emp, prof: await s.ev(`__s.profondeurFetch()`) };
 JS
 cat > "$AUX/c6seq.js" <<'JS'
 const res = [];
 for (const nom of (JSON.parse('SUITE'))) {
-  await s.ev(`VF_COQUILLE.chargerOnglet('${nom}')`); await pause(400);
-  res.push({ nom, emp: await s.ev(`__s.empreinte()`), prof: await s.ev(`__s.profondeurFetch()`) });
+  await s.ev(`VF_COQUILLE.chargerOnglet('${nom}')`);
+  await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+  res.push({ nom, emp: await s.stable('__s.empreinte()', 'empreinte après ' + nom), prof: await s.ev(`__s.profondeurFetch()`) });
 }
 return res;
 JS
@@ -376,7 +383,7 @@ froids() { # <dossier de sortie des fichiers> : les trois chargements à froid d
 }
 suite_classes() { # <préfixe des froids> <suite JSON> : les classes qui diffèrent, sur un document chargé depuis /project.html
   sed "s|SUITE|$2|" "$AUX/c6seq.js" > "$AUX/c6seq-x.js"; chrome avec "http://127.0.0.1:$PORT/project.html" "$AUX/c6seq-x.js" > "$WORK/c6suite.json"
-  node "$AUX/classes.mjs" "$1-code.json" "$1-projet.json" "$1-equipe.json" "$WORK/c6suite.json" | oj 'j.classes.join(",")||"aucune"'
+  C6DETAIL=1 node "$AUX/classes.mjs" "$1-code.json" "$1-projet.json" "$1-equipe.json" "$WORK/c6suite.json" | tee -a "${C6JOURNAL:-/dev/null}" | oj 'j.classes.join(",")||"aucune"'
 }
 base_srv; froids "$WORK/froid"
 assert_eq "C6.0 — témoin : les trois chargements à froid portent des écouteurs et des identifiants (l'empreinte n'est pas vide)" "$(for o in code projet equipe; do oj '[Object.keys(j.emp.ecouteurs).length>5,j.emp.corps.ids.length>20,j.emp.tete.length>5]' < "$WORK/froid-$o.json"; done | tr '\n' ' ')" "[true,true,true] [true,true,true] [true,true,true] "
@@ -390,12 +397,13 @@ JS
 CPX="$(cockpit_module_copie)"; printf '%s\n' '(() => { const f = window.fetch; window.fetch = function (...a) { return f.apply(this, a); }; })();' > "$CPX/skills/cockpit-moteur/assets/ui/96-vf-fixture-fetch.js"
 COCKPIT_MODULE="$CPX" demarrer "$LAB"; chrome avec "http://127.0.0.1:$PORT/project.html" "$AUX/c6fetch.js" > "$WORK/c6fetch-t.json"; cockpit_arreter; unset COCKPIT_MODULE
 assert_eq "C6.2 — témoin du mutant M-FETCH : une extension de test enveloppe fetch à chaque onglet ; la profondeur reste la même à chaque onglet (le remplacement est défait à chaque changement) et l'enveloppe est vue (profondeur au moins 1)" "$(oj '[new Set(j).size===1,j[0]>=1]' < "$WORK/c6fetch-t.json")" "[true,true]"
-for m in "ecouteurs|balises,ecouteurs|s|for (const \[c, t, f, o\] of j.ecouteurs) REL.call(c, t, f, o); // garde:coquille-demontage-ecouteurs|;|" \
+for m in "ecouteurs|ecouteurs|s|for (const \[c, t, f, o\] of j.ecouteurs) REL.call(c, t, f, o); // garde:coquille-demontage-ecouteurs|;|" \
          "corps|balises,ids,vivants|s|for (const n of \[...D.body.childNodes\]) if (!etrangers.has(n)) n.remove(); // garde:coquille-corps|;|" \
-         "head|balises,tete|s|for (const n of apres.tete) if (!j.avant.tete.has(n)) n.remove(); // garde:coquille-head|;|"; do
+         "head|tete|s|for (const n of apres.tete) if (!j.avant.tete.has(n)) n.remove(); // garde:coquille-head|;|"; do
   nom="${m%%|*}"; reste="${m#*|}"; att="${reste%%|*}"; expr="${reste#*|}"
   if cockpit_module_muter "$nom" vf-coquille-portee.js "$expr"; then
-    demarrer "$LAB"; assert_eq "M-$(echo "$nom" | tr a-z A-Z) — rougit les classes « $att » (la sienne et ses effets directs : des gestionnaires ou des observateurs d'un moteur mort qui agissent encore), aucune autre, sur code, projet, equipe depuis /project.html" "$(suite_classes "$WORK/froid" '["code","projet","equipe"]')" "$att"; cockpit_arreter; unset COCKPIT_MODULE
+    # le document porte le chemin du module (<code> du lancement, coupé après chaque « / » par un <wbr>) : la copie mutée vit sous un autre chemin que le dépôt, donc le nombre de <wbr> diffère de celui du serveur de base selon la profondeur de CHAQUE disposition (dépôt, worktree, export) ; la référence à froid est prise sur le serveur muté lui-même
+    demarrer "$LAB"; froids "$WORK/froidm"; assert_eq "M-$(echo "$nom" | tr a-z A-Z) — rougit les classes « $att » (les siennes seules : la visite du premier passage, qui réveillait selon la charge les gestionnaires d'un moteur mort, est lue comme faite), aucune autre, sur code, projet, equipe depuis /project.html" "$(suite_classes "$WORK/froidm" '["code","projet","equipe"]')" "$att"; cockpit_arreter; unset COCKPIT_MODULE
   else assert_eq "M-$(echo "$nom" | tr a-z A-Z) — mutant sans effet (ancre absente)" "sans effet" "effet"; fi
 done
 CPY="$(cockpit_module_copie)"; cp "$CPX/skills/cockpit-moteur/assets/ui/96-vf-fixture-fetch.js" "$CPY/skills/cockpit-moteur/assets/ui/"
@@ -468,8 +476,10 @@ cat > "$AUX/c8c.js" <<'JS'
 // panne: oui
 await pause(300); panne.actif = false;
 await s.ev(`document.querySelector('#vf-coquille-echec button').click()`);
-await s.attendre(`VF_COQUILLE.etat().phase === 'pret'`, 'retour à pret après Réessayer'); await pause(400);
-return { ...(await s.ev(MESURE)), emp: await s.ev('__s.empreinte()'), prof: await s.ev('__s.profondeurFetch()') };
+await s.attendre(`VF_COQUILLE.etat().phase === 'pret'`, 'retour à pret après Réessayer');
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); 
+const empC = await s.stable('__s.empreinte()', 'empreinte après Réessayer');
+return { ...(await s.ev(MESURE)), emp: empC, prof: await s.ev('__s.profondeurFetch()') };
 JS
 cat > "$AUX/c8d.js" <<'JS'
 // echec: true
@@ -479,7 +489,7 @@ return await s.ev(MESURE);
 JS
 cat > "$AUX/c8e.js" <<'JS'
 // panne: non
-await pause(700); const avant = await s.ev(MESURE);
+await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); await pause(700); const avant = await s.ev(MESURE);
 panne.actif = true;
 const rej = await s.ev(`VF_COQUILLE.chargerOnglet('code').then(() => 'resolu', (e) => String(e.message))`); await pause(300);
 const apres = await s.ev(MESURE); panne.actif = false;
@@ -488,7 +498,7 @@ return { avant, rej, apres, suite };
 JS
 cat > "$AUX/c8f.js" <<'JS'
 // panne: non
-await pause(300); return { ...(await s.ev(MESURE)), emp: await s.ev('__s.empreinte()'), prof: await s.ev('__s.profondeurFetch()') };
+await s.attendre(`document.documentElement.dataset.vfPret === 'oui'`, 'document prêt'); await s.attendre(`!!document.getElementById('vf-lock')`, 'pastille du direct (premier évènement du flux)'); const empF = await s.stable('__s.empreinte()', 'empreinte du chargement normal'); return { ...(await s.ev(MESURE)), emp: empF, prof: await s.ev('__s.profondeurFetch()') };
 JS
 cat > "$AUX/c8verdict.mjs" <<'JS'
 // c8verdict.mjs <dossier> : les contrôles de C8 qui échouent (noms), un par ligne ; vide = tout vert
@@ -534,19 +544,100 @@ if [ -n "$CHROME" ]; then
 fi
 fi
 
+echo "=== C9 — un démarrage d'onglet en échec laisse la coquille pilotable : l'écouteur du routeur est reposé, un clic ne recharge pas le document ==="
+# défaut de 79-16, relevé par la revue de la Phase 80 : le démarrage en échec défaisait les rappels de surOnglet (nettoyage avant le démontage) sans jamais les rappeler
+cat > "$AUX/c9-routeur.js" <<'JS'
+// vf-coquille: persistant
+(() => {
+  window.__fixR = { poses: 0, clics: 0, actifs: 0, doc: Math.random() }; // doc : identité du document (une portée défait les propriétés de window posées après l'élection, pas celles d'un persistant)
+  VF_COQUILLE.surOnglet(() => {
+    const clic = (ev) => { const a = ev.target && ev.target.closest ? ev.target.closest('a[data-fixr]') : null; if (!a) return; ev.preventDefault(); window.__fixR.clics += 1; VF_COQUILLE.chargerOnglet(a.dataset.fixr).catch(() => {}); };
+    document.addEventListener('click', clic, true); window.__fixR.poses += 1; window.__fixR.actifs += 1;
+    return () => { document.removeEventListener('click', clic, true); window.__fixR.actifs -= 1; };
+  }, { cle: '00-vf-zz-fixture-routeur.js' });
+})();
+JS
+cat > "$AUX/c9mesure.js" <<'JS'
+const CLIC = (nom) => `(() => { const a = document.createElement('a'); a.href = '/${nom}.html'; a.dataset.fixr = '${nom}'; a.textContent = 'x'; document.body.appendChild(a); a.click(); return 1; })()`;
+const LIRE = `({ doc: window.__fixR ? window.__fixR.doc : null, ...(window.__fixR || {}), etat: window.VF_COQUILLE ? VF_COQUILLE.etat() : null })`;
+const ECHEC = "!window.__fixR || window.__fixR.doc !== DOC || VF_COQUILLE.etat().phase === 'echec'", PRET = "!!window.VF_COQUILLE && VF_COQUILLE.etat().phase === 'pret'";
+// attente bornée (10 s) qui ne lève jamais : un clic qui recharge le document perd la marque de window, la mesure le dit au lieu d'attendre l'échéance globale
+const attends = async (expr) => { for (let i = 0; i < 40; i++) { let v = false; try { v = await s.ev(expr); } catch {} if (v) return true; await pause(250); } return false; };
+let DOC = null; // identité du document d'origine, lue par chaque scénario avant son premier clic
+const apresClic = async (nom, attendu) => { await s.ev(CLIC(nom)); await pause(500); const m = await s.ev(LIRE); await attends(attendu); return { meme: m.doc === DOC, clics: m.clics, apres: await s.ev(LIRE) }; };
+JS
+cat > "$AUX/c9a.js" <<'JS'
+// echec: true
+// amorce: sessionStorage.setItem('fixPasReady', '1'); window.VF_COQUILLE_REGLAGES = { delaiMs: 2000 };
+const e0 = await s.ev(LIRE); DOC = e0.doc;
+const c1 = await apresClic('equipe', ECHEC);
+const c2 = await apresClic('projet', ECHEC);
+await s.ev(`sessionStorage.removeItem('fixPasReady')`);
+const c3 = await apresClic('code', PRET);
+return { e0, c1, c2, c3 };
+JS
+cat > "$AUX/c9b.js" <<'JS'
+// amorce: sessionStorage.removeItem('fixPasReady'); window.VF_COQUILLE_REGLAGES = { delaiMs: 2000 };
+await s.attendre(PRET, 'premier onglet prêt');
+DOC = (await s.ev(LIRE)).doc; await s.ev(`sessionStorage.setItem('fixPasReady', '1')`);
+const rej = await s.ev(`VF_COQUILLE.chargerOnglet('equipe').then(() => 'resolu', () => 'rejete')`); const e0 = await s.ev(LIRE);
+const c1 = await apresClic('projet', ECHEC);
+const c2 = await apresClic('equipe', ECHEC);
+await s.ev(`sessionStorage.removeItem('fixPasReady')`);
+const c3 = await apresClic('projet', PRET);
+return { rej, e0, c1, c2, c3 };
+JS
+c9_jouer() { # <module> <dossier de sortie> : joue a (2 lignes d'en-tête) et b (1) sur un serveur lancé sur ce module
+  mkdir -p "$2"; COCKPIT_MODULE="$1" demarrer "$LAB"
+  local x n; for x in a b; do n=1; [ "$x" = a ] && n=2
+    { head -n "$n" "$AUX/c9$x.js"; cat "$AUX/c9mesure.js"; tail -n +"$((n+1))" "$AUX/c9$x.js"; } > "$2/c9$x.js"; chrome avec "http://127.0.0.1:$PORT/project.html" "$2/c9$x.js" > "$2/c9$x.json"; done
+  cockpit_arreter; unset COCKPIT_MODULE
+}
+c9_verdict() { # <dossier> : « a b », chacun = [écouteur posé après l'échec, clic 1 sans rechargement, clic 2 sans rechargement, écouteur reposé après le second échec, retour à pret sans rechargement]
+  local x r=""; for x in a b; do r="$r$(oj "[j.e0?.actifs===1, j.c1?.meme===true&&j.c1?.clics===1, j.c2?.meme===true&&j.c2?.clics===2, j.c2?.apres?.actifs===1, j.c3?.meme===true&&j.c3?.apres?.etat?.phase==='pret']" < "$1/c9$x.json") "; done; printf '%s' "$r"
+}
+cockpit_arreter
+if cockpit_module_muter pret9 viewer.html "s|emit('ready', {});|if (!sessionStorage.getItem('fixPasReady')) emit('ready', {});|" && [ -n "$CHROME" ]; then
+  CP9="$COCKPIT_MODULE"; unset COCKPIT_MODULE; cp "$AUX/c9-routeur.js" "$CP9/skills/cockpit-moteur/assets/ui/00-vf-zz-fixture-routeur.js"
+  c9_jouer "$CP9" "$WORK/c9base"
+  assert_eq "C9.1 / C9.2 — après un démarrage en échec (premier chargement, puis changement d'onglet), l'écouteur du routeur est posé : chaque clic passe par chargerOnglet (compteur de la fixture) sans recharger le document (identité du document posée par un persistant), et un clic vers un onglet sain rend l'état pret" "$(c9_verdict "$WORK/c9base")" "[true,true,true,true,true] [true,true,true,true,true] "
+  cp "$CP9/skills/cockpit-moteur/assets/vf-coquille.js" "$WORK/vf-coquille-c9.avant"
+  sed -i.bak "s|lot(\[...inscriptions\]); // garde:coquille-relance|;|" "$CP9/skills/cockpit-moteur/assets/vf-coquille.js"
+  if ! cmp -s "$WORK/vf-coquille-c9.avant" "$CP9/skills/cockpit-moteur/assets/vf-coquille.js"; then
+    c9_jouer "$CP9" "$WORK/c9mut"
+    assert_eq "M-RELANCE — la relance retirée : C9.1 et C9.2 rougissent (le clic recharge le document, l'écouteur n'est pas reposé), le retour à pret ne vient plus de la coquille (aucune marque)" "$(c9_verdict "$WORK/c9mut")" "[false,false,false,false,false] [false,false,false,false,false] "
+  else assert_eq "M-RELANCE — mutant sans effet (ancre garde:coquille-relance absente)" "sans effet" "effet"; fi
+else assert_eq "C9 — mutant du moteur sans effet ou Chrome absent" "sans effet" "effet"; fi
+unset COCKPIT_MODULE
+
 echo "=== A37 — les gardes de chemin jugent la résolution physique, jamais la forme écrite ==="
 node "$TESTS/coquille-propriete.mjs" gardes "$SCRIPTS" "$WORK/a37" > "$WORK/a37.json" 2>"$WORK/a37.err"
 assert_eq "A37.1 — moduleAdmis : le verdict égale celui du noyau (realpath natif) pour neuf dispositions de liens (intérieur, chaîne, extérieur, pendant, boucle, sain, deux orthographes)" "$(oj 'Object.entries(j.cas).filter(([,c])=>!c.ok).map(([n])=>n).join(",")||"tous"' < "$WORK/a37.json")" "tous"
-assert_eq "A37.2 — identité du serveur : deux orthographes d'un même lab = une identité ; un lab préfixe d'un autre = deux identités ; une sortie pendante n'a pas d'identité" "$(oj '[j.identites.memeLab,j.identites.prefixe,j.identites.pendante]' < "$WORK/a37.json")" "[true,true,true]"
+assert_eq "A37.2 — identité du serveur : deux orthographes d'un même lab = une identité, deux orthographes d'un même module = une identité ; un lab préfixe d'un autre = deux identités ; une sortie pendante n'a pas d'identité" "$(oj '[j.identites.memeLab,j.identites.prefixe,j.identites.pendante,j.identites.memeModule]' < "$WORK/a37.json")" "[true,true,true,true]"
 assert_eq "A37.3 — couverture : au moins quatre refus et trois accords parmi les dispositions (la propriété n'est pas vide)" "$(oj '[Object.values(j.cas).filter(c=>c.oracle==="refus").length>=4,Object.values(j.cas).filter(c=>c.oracle==="accord").length>=3]' < "$WORK/a37.json")" "[true,true]"
 ln -sfn "$OUT" "$WORK/lien-sortie"
 assert_eq "A37.4 — serve.mjs --sortie= donné par un chemin qui traverse un lien : refus (code 1, message)" "$(node "$AUX/lien-sortie.mjs" "$ENG/assets/serve.mjs" "$WORK/lien-sortie")" "refus"
+mkdir -p "$WORK/pend/.vibeflow"; ln -sfn "$WORK/nexiste-pas" "$WORK/pend/.vibeflow/cockpit"   # AU16-02 : une sortie PENDANTE à la bonne forme (<lab>/.vibeflow/cockpit) : seule la résolution physique la refuse
+PEND="--sortie= est introuvable"
+assert_eq "A37.5 — serve.mjs --sortie= pendante, de la forme <lab>/.vibeflow/cockpit : refus (code 1, « introuvable »), jamais un jugement sur la forme écrite" "$(node "$AUX/lien-sortie.mjs" "$ENG/assets/serve.mjs" "$WORK/pend/.vibeflow/cockpit" "$PEND")" "refus"
 mut_a37() { # <nom> <sed> : le modèle de jugement muté, rejoué sur les mêmes dispositions
   cockpit_module_muter "$1" vf-cockpit-module.mjs "$2" || return 1
   rm -rf "$WORK/a37m"; node "$TESTS/coquille-propriete.mjs" gardes "$COCKPIT_MODULE/scripts" "$WORK/a37m" 2>/dev/null | oj 'Object.entries(j.cas).filter(([,c])=>!c.ok).map(([n])=>n).join(",")||"tous"'
 }
 assert_eq "M-LEXICAL — moduleAdmis jugeant des chemins normalisés : rougit A37.1 sur les liens (vers l'intérieur, chaîne, vers l'extérieur, pendant, boucle), jamais sur les cas sains" "$(mut_a37 lexical 's|const r = cheminPhysique(d); // garde:coquille-chemin|const r = path.resolve(d);|')" "lien-vers-interieur,chaine-de-deux,lien-vers-exterieur,pendant,boucle"
 assert_eq "M-ECHEC-OUVERT — un échec de résolution vaut accord : rougit A37.1 sur le lien pendant et la boucle" "$(mut_a37 ouvert 's|if (r === null) throw refus(.dossier du module introuvable : refus..); // garde:coquille-echec|if (r === null) continue;|')" "pendant,boucle"
+mut_id() { # <nom> <sed> : identiteServeur muté, rejoué sur les mêmes dispositions ; rend les quatre verdicts d'A37.2
+  cockpit_module_muter "$1" vf-cockpit-serveur-vivant.mjs "$2" || return 1
+  rm -rf "$WORK/a37i"; node "$TESTS/coquille-propriete.mjs" gardes "$COCKPIT_MODULE/scripts" "$WORK/a37i" 2>/dev/null | oj '[j.identites.memeLab,j.identites.prefixe,j.identites.pendante,j.identites.memeModule].join()'
+}
+assert_eq "M-IDENTITE-SORTIE (AU16-02) — identiteServeur jugeant la sortie par path.resolve : A37.2 rougit (deux orthographes d'un lab, sortie pendante), le reste vert" "$(mut_id idsortie 's|reelle = cheminPhysique(sortie);|reelle = path.resolve(sortie);|')" "false,true,false,true"
+assert_eq "M-IDENTITE-SERVE (AU16-02) — identiteServeur jugeant serve.mjs par path.resolve : A37.2 rougit (deux orthographes d'un module), le reste vert" "$(mut_id idserve 's|const serve = cheminPhysique(path.join(moteur, .assets., .serve.mjs.)), reelle|const serve = path.resolve(path.join(moteur, "assets", "serve.mjs")), reelle|')" "true,true,true,false"
+assert_eq "M-IDENTITE-LEXICALE (AU16-02) — les deux à la forme lexicale (path.resolve) : A37.2 rougit sur les trois identités qui dépendent de la résolution" "$(mut_id idlex 's|const serve = cheminPhysique(path.join(moteur, .assets., .serve.mjs.)), reelle = cheminPhysique(sortie);|const serve = path.resolve(path.join(moteur, "assets", "serve.mjs")), reelle = path.resolve(sortie);|')" "false,true,false,false"
+if cockpit_module_muter sortielex serve.mjs 's#^if (!here) refus(.*);$#if (!here) here = path.resolve(sortieArg);#'; then
+  SM="$(node "$AUX/lien-sortie.mjs" "$COCKPIT_MODULE/skills/cockpit-moteur/assets/serve.mjs" "$WORK/pend/.vibeflow/cockpit" "$PEND")|$(node "$AUX/lien-sortie.mjs" "$COCKPIT_MODULE/skills/cockpit-moteur/assets/serve.mjs" "$WORK/lien-sortie")"
+  assert_eq "M-SORTIE-LEXICALE (AU16-02) — la garde « if (!here) refus » remplacée par un repli sur la forme écrite : A37.5 rougit (le refus d'une sortie pendante disparaît), A37.4 reste vert (le contrôle de forme du lien le tient seul)" "$SM" "autre 1|refus"
+else assert_eq "M-SORTIE-LEXICALE — mutant sans effet (ancre absente)" "sans effet" "effet"; fi
+unset COCKPIT_MODULE
 
 echo "=== K6 — le module servi est celui que cockpit_lancer démarre (A48, point 41) ==="
 base_srv; rq GET /_vf/ui/25-recent.js "$WORK/k6-base.js"; E0="$(hv etag)"
@@ -571,6 +662,15 @@ base_srv; rq GET /project.html "$WORK/x.out"; CSPB="$(hv content-security-policy
 COCKPIT_MODULE="$CP3" demarrer "$LAB"; rq GET /project.html "$WORK/doc-c3.html"; CSP3="$(hv content-security-policy | sed "s/'sha256-[^']*'//g; s/:$PORT/:PORT/g; s/  */ /g")"; rq GET /_vf/ui/zz-vf-plante-avant.js "$WORK/x.out"
 assert_eq "K2.6 — le même nom ajouté AVANT le démarrage est servi (200), nommé au manifeste, sans que la CSP change (hors empreintes et port)" "$RQ_CODE|$(node "$OR" manifeste "$WORK/doc-c3.html" | oj 'j.noms.includes("ui/zz-vf-plante-avant.js")')|$([ "$CSP3" = "$CSPB" ] && echo meme || echo diff)" "200|true|meme"
 cockpit_arreter
+
+echo "=== M-PATHNAME (AU16-01) — la route du document jugeant url.pathname au lieu du chemin brut ==="
+if cockpit_module_muter pathname serve.mjs "s#const brut = String(req.url || '').split('?')\[0\];#const brut = url.pathname;#"; then
+  demarrer "$LAB"
+  PM="$(for u in //x/ //x/project.html /./project.html /./ //project.html /project.html/ /equipe.html/. /index.html/../project.html /project.html / /index.html /equipe.html; do rq GET "$u" "$WORK/x.out"; printf '%s ' "$RQ_CODE"; done)"
+  assert_eq "M-PATHNAME — url.pathname remis : les alias //x/, //x/project.html, /./project.html, /./, //project.html, /index.html/../project.html répondent 200 (K2.3 AU16-01 rouge), les quatre adresses restent 200, la barre finale reste 404" "$PM" "200 200 200 200 200 404 404 200 200 200 200 200 "
+  cockpit_arreter
+else assert_eq "M-PATHNAME — mutant sans effet (ancre absente)" "sans effet" "effet"; fi
+unset COCKPIT_MODULE
 
 echo "=== M-MARQUEUR — un marqueur de gabarit absent : le serveur refuse de démarrer et le nomme ==="
 if cockpit_module_muter marq viewer.html 's|/\*__FONTS__\*/||'; then

@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 # test-cockpit-accessibilite.sh — finitions d'interface immédiates du lot 0 de l'audit du cockpit (AUDC-M7, X4, X6, X7), sans réseau.
 #   M7 « Mise en page… » est posé ET peint avant le calcul de mise en page d'un niveau de 70 cartes (jamais un indicateur derrière le calcul)
-#   X4 un seul anneau de focus sur tout le parcours au clavier, champ de question compris ; aria-current sur l'onglet actif ; un seul <main>
+#   X4 un seul anneau de focus sur tout le parcours au clavier, champ de question compris ; aria-current sur l'onglet actif ; une seule région principale visible (main, [role=main] : la régie pose role=main sur Équipe)
 #   X6 en mouvement réduit : plus de fondu de plongée, plus d'animation décorative (compte des animations actives)
-#   X7 un seul format de titre d'onglet du navigateur sur les trois pages : « <Onglet> · <nom> », le même nom de lab (celui du dossier) sur les trois,
+#   X7 un seul format de titre d'onglet du navigateur sur les trois pages : « <Onglet> · <nom> » (précédé de « (N) vous attendent · » quand N sessions attendent, P73-D-15), le même nom de lab (celui du dossier) sur les trois,
 #      même quand le titre de PROJECT.md diffère (l'en-tête, lui, affiche le titre de PROJECT.md sur Projet et Équipe : ce n'est pas lui qui fait foi)
 # Un Chrome, un profil jetable (chrome-accessibilite.mjs) ; les assertions se lisent sur sa sortie JSON. Lab construit par la suite, dans mktemp.
 # Sans navigateur : la suite se déclare SAUTÉE (exit 0, message explicite) — jamais un vert à vide. Exit 0 si tout passe.
@@ -77,7 +77,8 @@ assert_eq "M7.5 — un redessin en direct du même niveau (témoin : au moins 70
 echo "=== X7 — un seul format de titre d'onglet (AUDC-X7) ==="
 assert_eq "X7.1 — Code : « Code · <nom de l'en-tête> »" "$(E "j.x7.code.titre === 'Code · ' + j.x7.code.nom")" "true"
 assert_eq "X7.2 — Projet : « Projet · <nom de l'en-tête> »" "$(E "j.x7.projet.titre === 'Projet · ' + j.x7.projet.nom")" "true"
-assert_eq "X7.3 — Équipe : « Équipe · <nom de l'en-tête> »" "$(E "j.x7.equipe.titre === 'Équipe · ' + j.x7.equipe.nom")" "true"
+assert_eq "X7.3 — Équipe : « Équipe · <nom de l'en-tête> », précédé de « (N) vous attendent · » quand des sessions attendent (P73-D-15, plan 73-09)" "$(E "j.x7.equipe.titre.replace(/^\\(\\d+\\) vous attendent? · /, '') === 'Équipe · ' + j.x7.equipe.nom")" "true"
+assert_eq "X7.3b — le préfixe dit le nombre de lignes de « À vous » ; à zéro, aucun préfixe : le format « Équipe · <nom> » reste exact" "$(E "((/^\\((\\d+)\\) /.exec(j.x7.equipe.titre) || [0, '0'])[1] | 0) === j.x7.equipe.attendent && (j.x7.equipe.attendent > 0 || j.x7.equipe.titre === 'Équipe · ' + j.x7.equipe.nom)")" "true"
 assert_eq "X7.4 — témoin : le nom de l'en-tête est lu et non vide sur les trois pages, et c'est le nom du dossier (le titre de PROJECT.md du lab de test en diffère)" "$(E "[j.x7.code, j.x7.projet, j.x7.equipe].every((p) => p.nom === '$(basename "$LAB")')")" "true"
 assert_eq "X7.5 — le même nom de lab sur les trois titres" "$(E "new Set([j.x7.code, j.x7.projet, j.x7.equipe].map((p) => p.titre.split(' · ').slice(1).join(' · '))).size")" "1"
 echo "=== X4 — un seul anneau de focus, repères d'accessibilité (AUDC-X4) ==="
@@ -89,7 +90,8 @@ done
 assert_eq "X4.2b — le même style d'anneau sur les trois pages" "$(E "new Set([...j.x4.code, ...j.x4.projet, ...j.x4.equipe].map((a) => a.anneau)).size")" "1"
 assert_eq "X4.3 — témoin : le champ de question est dans le parcours de la page Code, et il a son anneau" "$(E "j.x4.code.filter((a) => a.cle === 'ask-input').map((a) => !!a.anneau).join()")" "true"
 assert_eq "X4.4 — aria-current=page sur l'onglet actif, et sur lui seul (Code, Projet, Équipe)" "$(E "[j.x7.code.courants.join(), j.x7.projet.courants.join(), j.x7.equipe.courants.join()].join('|')")" "Code=page|Projet=page|Équipe=page"
-assert_eq "X4.5 — un seul <main> par page (Code, Projet, Équipe)" "$(E "[j.x7.code.main, j.x7.projet.main, j.x7.equipe.main].join('|')")" "1|1|1"
+assert_eq "X4.5 — une seule région principale visible (main, [role=main]) par page (Code, Projet, Équipe)" "$(E "[j.x7.code.mains, j.x7.projet.mains, j.x7.equipe.mains].join('|')")" "1|1|1"
+assert_eq "M-X45-DEUX-MAIN — mutant (une seconde région principale visible injectée dans chaque page) : le critère de X4.5 (compte = 1) devient faux, le compte est 2" "$(E "[j.x7.code.mainDeux, j.x7.projet.mainDeux, j.x7.equipe.mainDeux].map((n) => n === 1).join('|') + ' ' + [j.x7.code.mainDeux, j.x7.projet.mainDeux, j.x7.equipe.mainDeux].join('|')")" "false|false|false 2|2|2"
 echo "=== X6 — mouvement réduit (AUDC-X6) ==="
 assert_eq "X6.0 — témoin : sans préférence, la plongée anime (plus de 20 animations actives) sur un niveau de 70 cartes" "$(E 'j.x6.temoin.cartes >= 70 && j.x6.temoin.actives > 20')" "true"
 assert_eq "X6.1 — en mouvement réduit, aucune animation active au repos" "$(E 'j.x6.reduit.repos')" "0"

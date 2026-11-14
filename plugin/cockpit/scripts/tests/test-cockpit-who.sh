@@ -581,7 +581,7 @@ echo "=== W23 — titre de carte de session : le custom-title (/rename), jamais 
 # arbitrage Samuel, AskUserQuestion session principale, 2026-11-06 : liste blanche de lecture amendée pour le seul champ customTitle
 cat > "$AUX/w23-titre.mjs" <<'JS'
 import fs from 'node:fs'; import path from 'node:path'; import { execFileSync } from 'node:child_process'; import { pathToFileURL } from 'node:url';
-const [, , S, base] = process.argv;
+const [, , S, base, TESTS, UI] = process.argv; // TESTS : dossier de vm-regie-page.mjs ; UI : assets/ui du moteur (jamais copiés par un mutant de who.mjs)
 const home = path.join(base, 'home'), noscripts = path.join(base, 'noscripts'), proj = path.join(home, '.claude', 'projects', 'slug');
 fs.mkdirSync(noscripts, { recursive: true }); fs.mkdirSync(proj, { recursive: true });
 const mkLab = (nom, branche) => { const d = path.join(base, nom); fs.mkdirSync(d, { recursive: true }); const g = (...a) => execFileSync('git', ['-C', d, ...a], { stdio: 'pipe' });
@@ -608,12 +608,23 @@ session('s10', [ct('s10', 'Old'), ct('s10', '')]); session('s11', [ct('s11', 'Ol
 const imp = (f) => import(pathToFileURL(path.join(S, f)).href);
 const who = (await imp('vf-cockpit-who.mjs')).collectWho(lab, { home, scriptsDir: noscripts, fresh: 600 });
 const who2 = (await imp('vf-cockpit-who.mjs')).collectWho(lab2, { home, scriptsDir: noscripts, fresh: 600 });
-const { buildEquipeGraph } = await imp('vf-cockpit-equipe-carte.mjs');
-// 73-03 : la collecte retire désormais bidi et largeur nulle de la branche ; la garde de la CARTE (M-W23-BRANCHE) se sonde sur une branche brute réinjectée
-for (const x of who2.workers) if (x.id === 's9') x.branch = 'feat/' + String.fromCodePoint(0x202e) + 'evil' + String.fromCodePoint(0x200b) + 'x';
-const graph = buildEquipeGraph(who, { nom: 'x' }), graph2 = buildEquipeGraph(who2, { nom: 'x' });
-const n = (id, g = graph) => g.nodes.find((x) => x.id === 'se-' + id), w = (id) => who.workers.find((x) => x.id === id);
-const CTRL = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]'), CF = /\p{Cf}/u, json = JSON.stringify({ who, graph }), h = n('s3')?.label || '', hw = w('s3')?.titre;
+// 73-09 (P73-D-22) : les propriétés se lisent sur who@2 (collectWho, titre et branche nettoyés à l'ÉMISSION) et sur le texte de la ligne de la régie (page Équipe jouée hors navigateur par vm-regie-page.mjs) ;
+// plus aucune lecture de buildEquipeGraph. Le libellé d'une session sans titre est « Session principale » (suivi de son lieu quand plusieurs sessions le portent) ; la branche est dite par la ligne (« branche <b> »).
+const regie = (wh, ids, ouverts = []) => {
+  const etapes = [...ouverts.map((id) => ({ clic: `li[data-vf-agent="${id}"] button[aria-expanded]` })),
+    ...ids.flatMap((id) => [['n', '.vf-rg-nom'], ['l', '.vf-rg-l2'], ['p', '.vf-rg-plus']].map(([k, c]) => ({ nom: `${k}:${id}`, obs: { mode: 'textes', sel: `li[data-vf-agent="${id}"] ${c}` } }))),
+    { nom: 'page', obs: { mode: 'textes', sel: '.vf-rg-lig' } }];
+  const f = path.join(base, `sc-${ids.join('-') || 'x'}-${ouverts.join('-')}.json`);
+  fs.writeFileSync(f, JSON.stringify({ onglet: 'equipe', source: 'live', who: wh, lock: null, etapes }));
+  const r = JSON.parse(execFileSync('node', [path.join(TESTS, 'vm-regie-page.mjs'), UI, f], { encoding: 'utf8' }));
+  if (r.erreur) throw new Error(r.erreur);
+  return r.out;
+};
+const IDS = ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's10', 's11', 's12'];
+const R1 = regie(who, IDS, ['s1']), R2 = regie(who2, ['s9'], ['s9']);
+const nom = (R, id) => (R['n:' + id] || [])[0] ?? '', pref = (t) => t.split(' · ')[0], sp = (t) => String(t).replace(/\s/g, ' ');
+const w = (id) => who.workers.find((x) => x.id === id), w9 = who2.workers.find((x) => x.id === 's9');
+const CTRL = new RegExp('[\\u0000-\\u001f\\u007f-\\u009f\\u2028\\u2029]'), CF = /\p{Cf}/u, json = JSON.stringify({ who, regie: R1 }), h = nom(R1, 's3'), hw = w('s3')?.titre;
 // mémo et lecture ratée : directement sur lecture.mjs
 const L = await imp('vf-cockpit-lecture.mjs'), mf = path.join(base, 'memo.jsonl'), uf = path.join(base, 'illisible.jsonl');
 const ecris = (f, t) => fs.writeFileSync(f, JSON.stringify({ type: 'custom-title', customTitle: t }) + '\n');
@@ -623,29 +634,30 @@ ecris(uf, 'ZZ'); fs.chmodSync(uf, 0); const u1 = L.titreSession(uf); fs.chmodSyn
 const { whoSig } = await imp('vf-cockpit-live.mjs'), deux = JSON.parse(JSON.stringify(who)); deux.workers.find((x) => x.id === 's1').titre = 'Autre nom';
 const iface = JSON.parse(fs.readFileSync(path.join(S, 'vf-cockpit-interface.json'), 'utf8')).schemas['vibeflow/cockpit-who@2'].travailleur;
 const permis = new Set([...iface.requis, ...iface.optionnels]), nonDeclares = [...new Set(who.workers.flatMap((x) => Object.keys(x)).filter((k) => !permis.has(k)))];
-console.log(JSON.stringify({ t1a: n('s1')?.label, t1b: n('s5')?.label, t1c: !!n('s1')?.details.includes('Identifiant : s1'), t2a: n('s2')?.label, t2b: json.includes('TITRE-IA-SECRET-MODELE'),
+console.log(JSON.stringify({ t1a: nom(R1, 's1'), t1b: pref(nom(R1, 's5')), t1c: sp((R1['p:s1'] || []).join(' ')).includes('Identifiant : s1'), t1d: [w('s1')?.titre, w('s5')?.titre === undefined], t2a: pref(nom(R1, 's2')), t2b: json.includes('TITRE-IA-SECRET-MODELE'),
   t3a: [h.startsWith('<img src=x'), h.length <= 80, CTRL.test(h), h.includes('A1b2C3d4'), /\[masqué\]/.test(h)], t3b: [typeof hw === 'string' && hw.length <= 80, CTRL.test(hw || ''), String(hw).includes('A1b2C3d4')],
-  t3cf: [CF.test(h), CF.test(hw || '')], t4: [n('s4')?.label, json.includes('TITRE-TROP-LOIN')],
-  t6: [(n('s6')?.label || '').includes('ghp_'), (n('s6')?.label || '').length <= 80, (n('s6')?.label || '').length],
-  t7: [n('s7')?.label.isWellFormed(), String(w('s7')?.titre).isWellFormed(), n('s7')?.label.length],
-  t8: [n('s9', graph2)?.label, n('s9', graph2)?.details.includes('Branche : feat/evilx'), CF.test(JSON.stringify(graph2))],
-  t10: [n('s10')?.label, n('s11')?.label, n('s12')?.label], t11: [m1, m2, m3], t12: [u1, u2], t13: nonDeclares, t14: [whoSig(who) !== whoSig(deux), whoSig(who) === whoSig(JSON.parse(JSON.stringify(who)))] }));
+  t3cf: [CF.test(h), CF.test(hw || '')], t4: [pref(nom(R1, 's4')), json.includes('TITRE-TROP-LOIN')],
+  t6: [nom(R1, 's6').includes('ghp_'), nom(R1, 's6').length <= 80, nom(R1, 's6').length],
+  t7: [nom(R1, 's7').isWellFormed(), String(w('s7')?.titre).isWellFormed(), nom(R1, 's7').length],
+  t8: [w9?.branch, sp((R2['p:s9'] || []).join(' ')).includes('branche feat/evilx'), CF.test(JSON.stringify(who2) + JSON.stringify(R2))],
+  t10: [pref(nom(R1, 's10')), pref(nom(R1, 's11')), nom(R1, 's12')], t11: [m1, m2, m3], t12: [u1, u2], t13: nonDeclares, t14: [whoSig(who) !== whoSig(deux), whoSig(who) === whoSig(JSON.parse(JSON.stringify(who)))] }));
 JS
-w23() { node "$AUX/w23-titre.mjs" "$1" "$2" > "$2.json" 2>"$2.err"; }
+TESTS23="$(cd "$(dirname "$0")" && pwd)"; UI23="$SCRIPTS/../skills/cockpit-moteur/assets/ui"
+w23() { node "$AUX/w23-titre.mjs" "$1" "$2" "$TESTS23" "$UI23" > "$2.json" 2>"$2.err"; }
 g23() { node "$AUX/get.mjs" "$1.json" "$2"; }
 mkdir -p "$WORK/w23a" && w23 "$SCRIPTS" "$WORK/w23a"
 assert_eq "W23.0 — contrôle positif : la fabrique rend un JSON lisible" "$(g23 "$WORK/w23a" 'typeof j.t1b')" "string"
-assert_eq "W23.1 — custom-title -> titre de la carte ; sans titre -> « Session principale · <branche> »" "$(g23 "$WORK/w23a" '[j.t1a,j.t1b].join("|")')" "Mon chantier carte|Session principale · ma-branche"
-assert_eq "W23.2 — l'identifiant de session passe au détail de la carte" "$(g23 "$WORK/w23a" 'j.t1c')" "true"
-assert_eq "W23.3 — ai-title seul : aucun titre lu, carte « Session principale · <branche> », l'ai-title n'est nulle part dans la sortie" "$(g23 "$WORK/w23a" '[j.t2a,j.t2b].join("|")')" "Session principale · ma-branche|false"
-assert_eq "W23.4 — custom-title hostile (balises, contrôles, U+2028, 500 car., secret) : texte inerte, ≤ 80, sans contrôle, masqué (carte)" "$(g23 "$WORK/w23a" 'j.t3a.join(",")')" "true,true,false,false,true"
+assert_eq "W23.1 — custom-title -> titre de who@2 et nom de la ligne de régie ; sans titre -> pas de titre, ligne « Session principale » (73-09 : lu sur la régie, plus sur la carte)" "$(g23 "$WORK/w23a" '[j.t1a,j.t1b,j.t1d.join("/")].join("|")')" "Mon chantier carte|Session principale|Mon chantier carte/true"
+assert_eq "W23.2 — l'identifiant de session passe au détail de la ligne de régie (ligne dépliée)" "$(g23 "$WORK/w23a" 'j.t1c')" "true"
+assert_eq "W23.3 — ai-title seul : aucun titre lu, ligne « Session principale », l'ai-title n'est nulle part dans who@2 ni dans la régie" "$(g23 "$WORK/w23a" '[j.t2a,j.t2b].join("|")')" "Session principale|false"
+assert_eq "W23.4 — custom-title hostile (balises, contrôles, U+2028, 500 car., secret) : texte inerte, ≤ 80, sans contrôle, masqué (nom de la ligne de régie)" "$(g23 "$WORK/w23a" 'j.t3a.join(",")')" "true,true,false,false,true"
 assert_eq "W23.5 — custom-title hostile : le champ titre de la collecte est ≤ 80, sans contrôle, masqué" "$(g23 "$WORK/w23a" 'j.t3b.join(",")')" "true,false,false"
-assert_eq "W23.6 — custom-title hors de la fenêtre de 256 Kio : non lu, pas d'escalade de lecture" "$(g23 "$WORK/w23a" 'j.t4.join("|")')" "Session principale · ma-branche|false"
-assert_eq "W23.7 — la classe entière : U+202E, U+200B et U+E0041 (Cf) ne sortent ni dans le libellé ni dans le titre" "$(g23 "$WORK/w23a" 'j.t3cf.join(",")')" "false,false"
+assert_eq "W23.6 — custom-title hors de la fenêtre de 256 Kio : non lu, pas d'escalade de lecture" "$(g23 "$WORK/w23a" 'j.t4.join("|")')" "Session principale|false"
+assert_eq "W23.7 — la classe entière : U+202E, U+200B et U+E0041 (Cf) ne sortent ni dans le nom de la ligne ni dans le titre" "$(g23 "$WORK/w23a" 'j.t3cf.join(",")')" "false,false"
 assert_eq "W23.8 — un secret à cheval sur la borne de 80 est masqué avant la coupe : aucun fragment « ghp_ », ≤ 80, le secret entier est retiré (69 car. restent)" "$(g23 "$WORK/w23a" 'j.t6.join(",")')" "false,true,69"
 assert_eq "W23.9 — une coupe à 80 ne laisse jamais une moitié de paire de substitution (libellé et titre bien formés, 79 unités)" "$(g23 "$WORK/w23a" 'j.t7.join(",")')" "true,true,79"
-assert_eq "W23.10 — la branche du libellé passe par la classe d'affichage : bidi et largeur nulle retirés (libellé, détail, graphe entier)" "$(g23 "$WORK/w23a" 'j.t8.join("|")')" "Session principale · feat/evilx|true|false"
-assert_eq "W23.11 — le titre le plus récent l'emporte, même vide ou blanc (l'utilisateur l'a vidé) : jamais l'ancien" "$(g23 "$WORK/w23a" 'j.t10.join("|")')" "Session principale · ma-branche|Session principale · ma-branche|New"
+assert_eq "W23.10 — la branche est nettoyée à l'émission (who@2) : bidi et largeur nulle retirés du champ, de la ligne de régie dépliée (« branche feat/evilx ») et de toute la sortie (who@2 et page)" "$(g23 "$WORK/w23a" 'j.t8.join("|")')" "feat/evilx|true|false"
+assert_eq "W23.11 — le titre le plus récent l'emporte, même vide ou blanc (l'utilisateur l'a vidé) : jamais l'ancien" "$(g23 "$WORK/w23a" 'j.t10.join("|")')" "Session principale|Session principale|New"
 assert_eq "W23.12 — le mémo est invalidé par la taille (même date) ET par la date (même taille)" "$(g23 "$WORK/w23a" 'j.t11.join("|")')" "AAAAAA|BBBBBBB|CCCCCCC"
 assert_eq "W23.13 — un fichier illisible n'est pas mémorisé comme « pas de titre » : chmod 000 puis 644 relit" "$(g23 "$WORK/w23a" 'j.t12.join("|")')" "|ZZ"
 assert_eq "W23.14 — toute clé d'un travailleur est déclarée au contrat vf-cockpit-interface.json (requis ∪ optionnels), titre compris" "$(g23 "$WORK/w23a" 'j.t13.join(",")')" ""
@@ -666,7 +678,7 @@ assert_eq "M-W23-SANSMASQUE — mutant (couper sans masquer) : W23.8 rougit (fra
 mut23 paire $L23 "return d >= 0xd800 && d <= 0xdbff ? r.slice(0, -1) : r; //" "return r; //"
 assert_eq "M-W23-PAIRE — mutant (coupe sans garde de paire de substitution) : W23.9 rougit" "$(g23 "$WORK/w23-paire-b" 'j.t7.join(",")')" "false,false,80"
 mut23 vide $L23 "(d.type === 'custom-title' && typeof d.customTitle === 'string' ? { t: d.customTitle } : null)" "(d.type === 'custom-title' && typeof d.customTitle === 'string' && d.customTitle.trim() ? { t: d.customTitle } : null)"
-assert_eq "M-W23-VIDE — mutant (un titre vide est ignoré) : W23.11 rougit (l'ancien « Old » ressort)" "$(g23 "$WORK/w23-vide-b" 'j.t10.join("|")')" "Old|Session principale · ma-branche|New"
+assert_eq "M-W23-VIDE — mutant (un titre vide est ignoré) : W23.11 rougit (l'ancien « Old » ressort)" "$(g23 "$WORK/w23-vide-b" 'j.t10.join("|")')" "Old|Session principale|New"
 mut23 memo $L23 "if (c && c.mt === st.mtimeMs && c.size === st.size) return c.titre;" "if (c) return c.titre;"
 assert_eq "M-W23-MEMO — mutant (mémo jamais invalidé) : W23.12 rougit" "$(g23 "$WORK/w23-memo-b" 'j.t11.join("|")')" "AAAAAA|AAAAAA|AAAAAA"
 mut23 memotaille $L23 "c.mt === st.mtimeMs && c.size === st.size) return c.titre;" "c.mt === st.mtimeMs) return c.titre;"
@@ -676,10 +688,10 @@ assert_eq "M-W23-MEMO-DATE — mutant (mémo invalidé par la taille seule) : W2
 mut23 erreur $L23 "  if (etat.erreur) return '';
 " ""
 assert_eq "M-W23-ERREUR — mutant (échec de lecture mémorisé comme « pas de titre ») : W23.13 rougit" "$(g23 "$WORK/w23-erreur-b" 'j.t12.join("|")')" "|"
-mut23 branche vf-cockpit-equipe-carte.mjs "['Session principale', nettoieTitre(branche)]" "['Session principale', w.branch]"
-assert_eq "M-W23-BRANCHE — mutant (branche brute dans le libellé) : W23.10 rougit" "$(g23 "$WORK/w23-branche-b" 'j.t8[0]')" "$(node -e 'console.log("Session principale · feat/"+String.fromCodePoint(0x202e)+"evil"+String.fromCodePoint(0x200b)+"x")')"
-mut23 branchedet vf-cockpit-equipe-carte.mjs "const branche = retireAffichage(w.branch);" "const branche = w.branch || '';"
-assert_eq "M-W23-BRANCHE-DETAIL — mutant (branche brute dans le détail et le résumé) : W23.10 rougit sur le détail" "$(g23 "$WORK/w23-branchedet-b" 'j.t8[1]')" "false"
+mut23 branche vf-cockpit-who.mjs "w.branch = nettoie(w.branch, LIBRES.branch);" "w.branch = w.branch;"
+assert_eq "M-W23-BRANCHE — mutant (nettoyage de la branche à l'émission retiré, ancre garde:nettoie de who.mjs) : W23.10 rougit sur le champ de who@2" "$(g23 "$WORK/w23-branche-b" 'j.t8[0]')" "$(node -e 'console.log("feat/"+String.fromCodePoint(0x202e)+"evil"+String.fromCodePoint(0x200b)+"x")')"
+mut23 branchedet vf-cockpit-who.mjs "w.branch = nettoie(w.branch, LIBRES.branch);" "w.branch = bornes(w.branch, LIBRES.branch);"
+assert_eq "M-W23-BRANCHE-DETAIL — mutant (masque et borne seuls : le masque ne retire ni bidi ni largeur nulle) : W23.10 rougit sur la ligne de régie dépliée" "$(g23 "$WORK/w23-branchedet-b" 'j.t8[1]')" "false"
 mut23 iface vf-cockpit-interface.json '"task", "titre",' '"task",'
 assert_eq "M-W23-IFACE — mutant (contrat sans « titre ») : W23.14 rougit" "$(g23 "$WORK/w23-iface-b" 'j.t13.join(",")')" "titre"
 mut23 sig vf-cockpit-who-signature.mjs "'lastAt']" "'lastAt', 'titre']"
@@ -732,6 +744,7 @@ const GEN = {
   'bearer-u2028': (n) => rep('Bearer' + LS + a(15) + LS, n), akia: (n) => rep('AKIA', n), 'akia-presque': (n) => rep('AKIA' + 'A'.repeat(15) + LS, n), xox: (n) => rep('xoxb', n), pat: (n) => rep('github_pat_', n), 'pat-presque': (n) => rep('github_pat_' + a(19) + LS, n),
 };
 const mesure = (f) => { let best = Infinity; for (let e = 0; e < essais; e++) { let reps = 1, t = 0; for (;;) { const t0 = performance.now(); for (let i = 0; i < reps; i++) f(); t = performance.now() - t0; if (t >= 30 || reps >= 256 || t * reps > 400 && reps > 1) break; reps = Math.min(256, Math.max(reps * 2, Math.ceil(reps * 40 / Math.max(t, 0.05)))); } best = Math.min(best, t / reps); } return best; };
+const PLANCHER = 20; // ms : un ReDoS réel à 100 000 caractères coûte des secondes, il dépasse ce plancher de plusieurs ordres de grandeur
 const rapports = []; const pire = { r: 0, nom: '', t1: 0, t2: 0 }; let lent = 0;
 // masque et coupe lisent toute l'entrée (rapport 2N/N) ; titre, arbres et commande bornent l'entrée AVANT les masques (4 000 car.) : leur temps est constant, jugé en absolu (noyé de bruit en rapport)
 const LECTEURS = { masque: (t) => () => L.masque(t, t.length), coupe: (t) => () => L.masqueCoupe(t, t.length >> 1), titre: (t) => () => L.nettoieTitre(t), arbres: (t) => () => A.nettoie(t, 200), commande: (t) => () => W.commandeAffichee(t) };
@@ -739,6 +752,7 @@ const BORNES = new Set(['titre', 'arbres', 'commande']);
 for (const [g, mk] of Object.entries(GEN)) for (const [lec, mkf] of Object.entries(LECTEURS)) {
   let t1 = mesure(mkf(mk(N))), t2 = mesure(mkf(mk(2 * N))), r = t2 / Math.max(t1, 0.001);
   if (BORNES.has(lec)) { if (t2 > 100) lent++; rapports.push(1); continue; }
+  if (Math.max(t1, t2) < PLANCHER) { rapports.push(1); continue; } // sous le plancher de mesure (20 ms) la croissance n'est pas jugée : à 0,04 ms le bruit d'horloge domine le rapport
   if (r > 3) { t1 = Math.min(t1, mesure(mkf(mk(N)))); t2 = Math.min(t2, mesure(mkf(mk(2 * N)))); r = t2 / Math.max(t1, 0.001); } // une seconde mesure avant de conclure : la charge du poste déforme une mesure, jamais deux
   rapports.push(r); if (r > pire.r) { pire.r = r; pire.nom = g + '/' + lec; pire.t1 = t1; pire.t2 = t2; }
 }

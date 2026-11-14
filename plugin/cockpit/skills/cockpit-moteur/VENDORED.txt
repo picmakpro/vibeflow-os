@@ -6,6 +6,7 @@ Ce fichier est aussi la sentinelle de détection du moteur (engineDir, vf-cockpi
 
 AJOUT LICENCES-TIERCES.txt
 AJOUT VENDORED.txt
+AJOUT assets/elk-fil.js
 AJOUT assets/ui/00-vf-surcouches.js
 AJOUT assets/ui/00-vibeflow.js
 AJOUT assets/ui/01-vf-responsive.js
@@ -31,6 +32,9 @@ AJOUT assets/ui/71-vf-equipe-rendu.js
 AJOUT assets/ui/72-vf-equipe.js
 AJOUT assets/ui/72-vf-regie-modele.js
 AJOUT assets/ui/72-vf-regie-pied.js
+AJOUT assets/ui/72-vf-regie-questions-lecture.js
+AJOUT assets/ui/72-vf-regie-questions-rendu.js
+AJOUT assets/ui/72-vf-regie-questions-source.js
 AJOUT assets/ui/72-vf-regie-rendu.js
 AJOUT assets/ui/72-vf-regie-source.js
 AJOUT assets/ui/72-vf-regie-style.js
@@ -51,6 +55,22 @@ AJOUT assets/ui/74-vf-frise-pistes.js
 AJOUT assets/ui/74-vf-frise-source.js
 AJOUT assets/ui/74-vf-frise-style.js
 AJOUT assets/ui/74-vf-frise.js
+AJOUT assets/ui/74-vf-synthese-burnup.js
+AJOUT assets/ui/74-vf-synthese-calcul.js
+AJOUT assets/ui/74-vf-synthese-cout.js
+AJOUT assets/ui/74-vf-synthese-jauges.js
+AJOUT assets/ui/74-vf-synthese-memoire.js
+AJOUT assets/ui/74-vf-synthese-style.js
+AJOUT assets/ui/74-vf-synthese-visite.js
+AJOUT assets/ui/74-vf-synthese.js
+AJOUT assets/ui/74-vf-trace-decisions.js
+AJOUT assets/ui/74-vf-trace-exigence.js
+AJOUT assets/ui/74-vf-trace-liste.js
+AJOUT assets/ui/74-vf-trace-memoire.js
+AJOUT assets/ui/74-vf-trace-rendu.js
+AJOUT assets/ui/74-vf-trace-sections.js
+AJOUT assets/ui/74-vf-trace-style.js
+AJOUT assets/ui/74-vf-trace.js
 AJOUT assets/ui/75-vf-modele.js
 AJOUT assets/ui/76-vf-git-entete.js
 AJOUT assets/ui/77-vf-git-poignee.js

@@ -5,6 +5,11 @@
 import { executer, pause, stabiliser, attendreValeur } from './chrome-session.mjs';
 const [, , chrome, racine] = process.argv;
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
+// 73-09 : la page Équipe n'a plus de canevas de cartes (plan 73-08) : elle est prête quand la régie est montée et porte des lignes ; son contenu se lit sur section#vf-equipe
+const PRET_EQUIPE = "document.readyState === 'complete' && !!document.querySelector('section#vf-equipe #vf-equipe-entete')";
+const LIGNES_REGIE = "document.querySelectorAll('section#vf-equipe li.vf-rg-lig').length";
+// régions principales VISIBLES (« main, [role=main] » : la régie pose role=main sur section#vf-equipe) : exactement une par page (X4.5)
+const MAINS = "[...document.querySelectorAll('main, [role=main]')].filter((e) => { const r = e.getBoundingClientRect(), c = getComputedStyle(e); return r.width > 0 && r.height > 0 && c.display !== 'none' && c.visibility !== 'hidden' && !e.hidden; }).length";
 const VUE_POSEE = "(() => { const v = document.querySelector('#viewport'); return !!v && v.style.opacity !== '0' && !v.classList.contains('anim'); })()";
 
 await executer(chrome, async (s) => {
@@ -12,8 +17,13 @@ await executer(chrome, async (s) => {
   const vue = (w, h) => s.send('Emulation.setDeviceMetricsOverride', { width: w, height: h, deviceScaleFactor: 1, mobile: false });
   const lireVue = () => s.ev("JSON.stringify({ c: VibeFlow.state.container, n: document.querySelectorAll('#viewport .node').length })");
   const charger = async (page, nom) => {
-    await s.naviguer(`${racine}/${page}?lang=en`); await s.attendre(PRET, `page prête (${nom})`);
-    await s.attendre("!!document.querySelector('#viewport .node')", `cartes (${nom})`); await s.attendre(VUE_POSEE, `vue posée (${nom})`); await stabiliser(lireVue, { pas: 120, max: 5000 });
+    // 79-16 : si la coquille ne se dit jamais prête, l'échec porte l'état de la page (diagnostic d'une panne vue seulement en CI, aucune assertion touchée)
+    try { await s.naviguer(`${racine}/${page}?lang=en`); } catch (e) {
+      let d = 'état illisible'; try { d = await s.ev("JSON.stringify({ href: location.href, rs: document.readyState, pret: document.documentElement.dataset.vfPret, etat: window.VF_COQUILLE && VF_COQUILLE.etat(), moteur: !!window.VibeFlow, erreurs: window.__err, scripts: document.scripts.length, t: Math.round(performance.now()) })"); } catch {}
+      throw new Error(`${e.message} — ${d}`); }
+    if (page === 'equipe.html') { await s.attendre(PRET_EQUIPE, `régie montée (${nom})`); await s.attendre(`${LIGNES_REGIE} >= 1`, `lignes de la régie (${nom})`); await stabiliser(() => s.ev(`JSON.stringify(${LIGNES_REGIE})`), { pas: 120, max: 5000 }); }
+    else { await s.attendre(PRET, `page prête (${nom})`);
+      await s.attendre("!!document.querySelector('#viewport .node')", `cartes (${nom})`); await s.attendre(VUE_POSEE, `vue posée (${nom})`); await stabiliser(lireVue, { pas: 120, max: 5000 }); }
     // la visite guidée s'ouvre au premier passage (profil jetable) : Échap la ferme, pour ne mesurer que la page
     await s.send('Input.dispatchKeyEvent', { type: 'keyDown', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 }); await s.send('Input.dispatchKeyEvent', { type: 'keyUp', key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
     await pause(200);
@@ -21,15 +31,18 @@ await executer(chrome, async (s) => {
   await vue(1440, 900); await s.send('Emulation.setFocusEmulationEnabled', { enabled: true }); // sans lui, requestAnimationFrame ne tourne pas dans un Chrome sans tête non focalisé
 
   // ---------- M7 : l'indicateur de mise en page est posé et peint avant le calcul ----------
-  // Le calcul (ELK) tourne sur le fil principal : tant qu'il dure, plus rien ne se peint. La sonde s'installe avant les scripts de la page,
-  // enveloppe ELK.prototype.layout et relève, À L'INSTANT où le calcul démarre, l'état de #loading et le nombre d'images produites depuis qu'il est allumé.
+  // Le calcul (ELK) tourne dans un worker (79-18), sinon en ligne sur le fil principal. La sonde s'installe avant les scripts de la page,
+  // enveloppe l'envoi de la requête au worker ET ELK.prototype.layout (un seul relevé par mesure) et relève, À L'INSTANT où le calcul démarre, l'état de #loading et le nombre d'images produites depuis qu'il est allumé.
   await s.send('Page.addScriptToEvaluateOnNewDocument', { source: `(() => {
+    window.__err = []; addEventListener('error', (e) => window.__err.push(String(e.message) + ' ' + (e.filename || (e.target && e.target.src) || '')), true); addEventListener('unhandledrejection', (e) => window.__err.push('rejet ' + String(e.reason && e.reason.message || e.reason)));
     window.__img = 0; const tic = () => { window.__img++; requestAnimationFrame(tic); }; requestAnimationFrame(tic);
     new MutationObserver((ms) => { for (const m of ms) { const e = m.target; if (e.id === 'loading' && e.classList.contains('on') && window.__m7 && window.__m7.allume === undefined) window.__m7.allume = window.__img; } })
       .observe(document, { attributes: true, attributeFilter: ['class'], subtree: true });
+    const relever = (g) => { const m = window.__m7; if (m && m.calcul === undefined) { const l = document.querySelector('#loading');
+      m.calcul = { cartes: ((g && g.children) || []).length, allume: !!l && l.classList.contains('on'), opacite: l ? getComputedStyle(l).opacity : null, images: m.allume === undefined ? null : window.__img - m.allume }; } };
     let E; Object.defineProperty(window, 'ELK', { configurable: true, get() { return E; }, set(v) { E = v; if (!v || !v.prototype || v.prototype.__vfSonde) return; v.prototype.__vfSonde = true; const orig = v.prototype.layout;
-      v.prototype.layout = function (...a) { const m = window.__m7; if (m && m.calcul === undefined) { const l = document.querySelector('#loading'); m.calcul = { cartes: ((a[0] && a[0].children) || []).length, allume: !!l && l.classList.contains('on'), opacite: l ? getComputedStyle(l).opacity : null, images: m.allume === undefined ? null : window.__img - m.allume }; }
-        return orig.apply(this, a); }; } });
+      v.prototype.layout = function (...a) { relever(a[0]); return orig.apply(this, a); }; } }); // le calcul en ligne (export, repli) : le premier relevé gagne
+    const pm = Worker.prototype.postMessage; Worker.prototype.postMessage = function (m, ...r) { relever(m && m.graphe); return pm.call(this, m, ...r); }; // 79-18 : l'envoi de la requête au worker
   })()` });
   await charger('index.html', 'm7');
   const mesurerNiveau = async (aller, nom) => {
@@ -48,7 +61,9 @@ await executer(chrome, async (s) => {
   o.x7 = {};
   for (const [cle, page] of [['code', 'index.html'], ['projet', 'project.html'], ['equipe', 'equipe.html']]) {
     await charger(page, page);
-    o.x7[cle] = JSON.parse(await s.ev(`JSON.stringify({ titre: document.title, main: document.querySelectorAll('main').length, courants: [...document.querySelectorAll('[aria-current]')].map((e) => e.textContent.trim() + '=' + e.getAttribute('aria-current')), nom: document.querySelector('#proj-name').textContent })`));
+    o.x7[cle] = JSON.parse(await s.ev(`JSON.stringify({ titre: document.title, main: document.querySelectorAll('main').length, mains: ${MAINS}, attendent: document.querySelectorAll('section#vf-equipe section[data-vf-section="a-vous"] li').length, courants: [...document.querySelectorAll('[aria-current]')].map((e) => e.textContent.trim() + '=' + e.getAttribute('aria-current')), nom: document.querySelector('#proj-name').textContent })`));
+    // témoin de X4.5 : une seconde région principale visible, injectée, porte le compte à 2 (X4.5 rougit sur ce compte), puis elle est retirée
+    o.x7[cle].mainDeux = await s.ev(`(() => { const d = document.createElement('div'); d.id = 'vf-essai-main'; d.setAttribute('role', 'main'); d.textContent = 'x'; document.body.appendChild(d); const n = ${MAINS}; d.remove(); return n; })()`);
   }
 
   // ---------- X4 : un seul anneau de focus sur tout le parcours au clavier (trois pages) ----------

@@ -137,10 +137,10 @@
 | 71. Terminal intégré au cockpit | vibeflow-v2.0 | 11/11 | Complete — PR #203 et #209, release `v2.76.0` | 2026-11-05 |
 | 71.5. Réexamen du design system du cockpit | vibeflow-v2.0 | mission design, sans plan GSD | Complete — PR #213, release `v2.76.0` | 2026-11-06 |
 | 72. Lancer du travail depuis les cartes du cockpit | vibeflow-v2.0 | 16/16 | Complete — PR #214, LANC-12 décochée, release `v2.76.0` | 2026-11-06 |
-| 73. Gouvernance au cockpit — arbitrages en attente, worktrees et verrous | vibeflow-v2.0 | 4/11 | In progress | - |
+| 73. Gouvernance au cockpit — arbitrages en attente, worktrees et verrous | vibeflow-v2.0 | 10/11 | In progress | - |
 | 74. L'équipe dans le temps — swim-lanes, coût, replay | vibeflow-v2.0 | 6/10 | In Progress | - |
 | 75. L'activité posée sur le code — hotspots, couplage, gardes, empreinte | vibeflow-v2.0 | 6/12 | In Progress | - |
-| 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 5/9 | In Progress | - |
+| 76. Traçabilité au cockpit — exigences, décisions, mémoire | vibeflow-v2.0 | 7/9 | In Progress | - |
 | 77. Santé de la méthode et synthèse — jauges, dernière visite, burn-up | vibeflow-v2.0 | 0/8 | Planned | - |
 | 78. Git dans le cockpit | vibeflow-v2.0 | 11/11 | Complete — PR #216, release `v2.76.0` | 2026-11-06 |
 | 79. Socle du cockpit — une collecte, un flux, une route d'état | vibeflow-v2.0 | 13/22 | In progress — segment a fusionné (PR #238) | - |
@@ -295,12 +295,12 @@ Plans:
 - [x] 73-02-PLAN.md — `ailleurs()` et route `GET /api/vf/ailleurs`
 - [x] 73-03-PLAN.md — Champs de gouvernance de who@2 dans la collecte, LR.1 à LR.6
 - [x] 73-04-PLAN.md — Modèle de la régie (sans DOM), feuille, exports de 71
-- [ ] 73-05-PLAN.md — Page de la régie : adaptateur, accroches de la Phase 74, états de page
-- [ ] 73-06-PLAN.md — Compositeur du titre, pastille de favicon, état « lu »
-- [ ] 73-07-PLAN.md — Pied : arbres de travail, « ailleurs », non-fuite de bout en bout
-- [ ] 73-08-PLAN.md — Retrait du canevas d'Équipe, côté serveur et côté page
-- [ ] 73-09-PLAN.md — Correspondance LE → LR, témoins W23 et de page re-pointés
-- [ ] 73-10-PLAN.md — Tiroir hors d'Équipe, README, CHANGELOG, toutes les suites
+- [x] 73-05-PLAN.md — Page de la régie : adaptateur, accroches de la Phase 74, états de page
+- [x] 73-06-PLAN.md — Compositeur du titre, pastille de favicon, état « lu »
+- [x] 73-07-PLAN.md — Pied : arbres de travail, « ailleurs », non-fuite de bout en bout
+- [x] 73-08-PLAN.md — Retrait du canevas d'Équipe, côté serveur et côté page
+- [x] 73-09-PLAN.md — Correspondance LE → LR, témoins W23 et de page re-pointés
+- [x] 73-10-PLAN.md — Tiroir hors d'Équipe, README, CHANGELOG, toutes les suites
 - [ ] 73-11-PLAN.md — Questions en attente des cadrages dans « À vous », décisions prises pour vous à part (REGI-17)
 
 ### Phase 74: L'équipe dans le temps — swim-lanes, coût, replay
@@ -404,8 +404,8 @@ Plans:
 - [x] 76-03-PLAN.md — Mémoire des agents : entrées, liens, états (v2)
 - [x] 76-04-PLAN.md — Branchement dans la collecte (champs facultatifs de `cockpit-project@1`) (v2)
 - [x] 76-05-PLAN.md — Route `GET /api/vf/tracabilite` (v3)
-- [ ] 76-06-PLAN.md — Page : section de phase, preuves, Jalon, panneau d'exigence (v4)
-- [ ] 76-07-PLAN.md — Page : Décisions, Mémoire, panneaux d'ADR, de décision, d'entrée, commits (v5)
+- [x] 76-06-PLAN.md — Page : section de phase, preuves, Jalon, panneau d'exigence (v4)
+- [x] 76-07-PLAN.md — Page : Décisions, Mémoire, panneaux d'ADR, de décision, d'entrée, commits (v5)
 - [ ] 76-08-PLAN.md — Retrait du nœud `.req`, puis clôture (v6)
 - [ ] 76-09-PLAN.md — Questions en attente : lecture des sections « À Samuel » et champ `meta.vf.questions` (v4)
 
@@ -430,14 +430,14 @@ Plans:
 
 Plans:
 
-- [ ] 77-01-PLAN.md — gates, `--format=tsv` dans `check-method-budget.sh` et `check-instruction-budget.sh`, lecture seule, texte identique octet pour octet (v1)
-- [ ] 77-02-PLAN.md — données du planning de la collecte, dates du burn-up et blocages du STATE, retrait de `lastDesc` (v1)
-- [ ] 77-03-PLAN.md — route `GET /api/vf/methode`, lancement asynchrone borné, cache de 60 s, un seul appel en cours (v2)
-- [ ] 77-04-PLAN.md — modules purs du calcul « depuis votre dernière visite » et de la mémoire de visite (v2)
-- [ ] 77-05-PLAN.md — coquille de la Synthèse (bouton, panneau, registre des blocs, ligne-résumé) et banc navigateur commun (v3)
-- [ ] 77-06-PLAN.md — blocs burn-up du jalon et santé de la méthode (v4)
-- [ ] 77-08-PLAN.md — bloc « Depuis votre dernière visite », feuille neutre, README et CHANGELOG du module (v5)
-- [ ] 77-07-PLAN.md — coût par phase et par étage sur les dernières 24 h (v6, à revalider après les Phases 79 et 74)
+- [x] 77-01-PLAN.md — gates, `--format=tsv` dans `check-method-budget.sh` et `check-instruction-budget.sh`, lecture seule, texte identique octet pour octet (v1)
+- [x] 77-02-PLAN.md — données du planning de la collecte, dates du burn-up et blocages du STATE, retrait de `lastDesc` (v1)
+- [x] 77-03-PLAN.md — route `GET /api/vf/methode`, lancement asynchrone borné, cache de 60 s, un seul appel en cours (v2)
+- [x] 77-04-PLAN.md — modules purs du calcul « depuis votre dernière visite » et de la mémoire de visite (v2)
+- [x] 77-05-PLAN.md — coquille de la Synthèse (bouton, panneau, registre des blocs, ligne-résumé) et banc navigateur commun (v3)
+- [x] 77-06-PLAN.md — blocs burn-up du jalon et santé de la méthode (v4)
+- [x] 77-08-PLAN.md — bloc « Depuis votre dernière visite », feuille neutre, README et CHANGELOG du module (v5)
+- [x] 77-07-PLAN.md — coût par phase et par étage sur les dernières 24 h (v6, à revalider après les Phases 79 et 74)
 
 ### Phase 78: Git dans le cockpit — en-tête, graphe des worktrees et branches, données Git
 <!-- vf-archive: .planning/archives/roadmap/fiabilite-ROADMAP-2026-11-11-jointure.md — Phase 78 (corps) -->

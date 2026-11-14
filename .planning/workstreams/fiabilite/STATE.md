@@ -40,8 +40,8 @@ Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 10
 - Non publié, sur `release/v2.77.0` (PR #226 ouverte, non mergée) : panel, recette du 2026-11-08 et correctifs, audit du cockpit.
 - Gel des publications : décision de Samuel du 2026-11-08 (`.planning/missions/2026-11-08-recette-correctifs.md`) ; levée du gel, merge, bump, tag et release restent ses gestes.
 - Exécution : segments b et c de 79 et 80, puis 73, 74, 75, 76, 77 ; 81 reportée (`AUDC-Q3` « plus tard », 2026-11-11).
-- Phase 73 : 73-01 à 73-04 exécutés (branche `feat/phase-73-gouvernance-regie`) ; 73-05 à 73-11 attendent 79-16, 79-17 et 79-22.
-- Phase 76 : 76-01 à 76-05 faits (2026-11-13).
+- Phase 76 : 76-01 à 76-07 faits (2026-11-14).
+- Phase 73 : 73-01 à 73-10 exécutés (branche `feat/phase-73-gouvernance-regie`) ; 73-11 en cours ; RG1.12 attend 80-10.
 - Phase 75 : 75-01 à 75-06 exécutés (2026-11-13), 75-07 à 75-10 restent.
 - Phase 74 : 74-01 à 74-05 et 74-07 exécutés (2026-11-14) ; 74-06, 74-08, 74-10, 74-09 restent.
 - Dettes nommées : UIFN-10 et LANC-12 (voir Pending) ; étapes 4 et 5 de la recette de la 68 reportées (P68-D-35).
@@ -65,7 +65,7 @@ Jalon `vibeflow-v2.0` (Phases 67-81, 16 phases) : 8 phases publiées sur 16 ; 10
 - 2026-11-11 — Phase 73 cadrée et planifiée (P73-D-01..36 : décisions déléguées par Samuel (message session principale, 2026-11-08), option recommandée) : 11 plans en 8 vagues, REGI-01..17 ; `priseS` résolu par A36/A39 (plus de question vers la 79).
 - 2026-11-11 — Phases 74 et 76 cadrées et planifiées (10 et 9 plans ; P74-D-46 et P76-D-32 à D-34 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11).
 - 2026-11-11 — Phase 75 cadrée et planifiée (P75-D-01..31 ; P75-D-28 et P75-D-29 arbitrages Samuel, AskUserQuestion session principale, 2026-11-11) ; P75-Q-06 (amendements de DESIGN.md) en attente, bloque 75-10.
-- 2026-11-11 — Phase 77 cadrée et planifiée : 8 plans, 6 vagues, SYNT-01..10, P77-Q-01 et P77-Q-02 appliquées par décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée.
+- 2026-11-11 — Phase 77 cadrée, planifiée : SYNT-01..10, P77-Q-01 et P77-Q-02 par décision déléguée par Samuel (message session principale, 2026-11-08), option recommandée ; exécutée 2026-11-14, PR #242.
 - 2026-11-13 — Phase 80, segment a (80-01 à 80-08) : PR #237, fusionné ; P80-D-52..56 : arbitrage Samuel, AskUserQuestion session principale, 2026-11-11.
 - 2026-11-13 — Phase 79, segment a (79-01 à 79-12, 79-21) : PR #238, fusionné ; SOCL-01..27, C0-C6, A1-A55 ; Q-03 : P79-D-33 (arbitrage Samuel, AskUserQuestion session principale, 2026-11-11) ; Q-01, Q-02 : décision déléguée (message session principale, 2026-11-08), option recommandée ; Q-04 : retrait d'AUDC-I18, sonde verte, à rouvrir si Claude Code cesse de publier `waiting`/`blocked` (décision déléguée par Samuel (message session principale, 2026-11-11 : « tranche pour chacun de ces points »), prise par la session principale).
 

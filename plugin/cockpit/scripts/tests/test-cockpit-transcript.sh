@@ -9,6 +9,9 @@
 #       mutants M-JETON (contrôle du jeton neutralisé) et M-PORTE (garde d'émission neutralisée) : les négatifs savent rougir
 #   T24D38 echec d'un appel d'outil dans le fil (drapeau d'erreur vrai, appariement par identifiant, jamais le contenu) ; six mutants
 #   T26 rendu en texte (vm, puis Chrome s'il est présent) et CSP de /equipe.html égale à celle de v2.75.0
+# Phase 73 : propriété → nouveau support (P73-D-04, plan 73-10). La carte d'un agent, son panneau et ses boutons « Lire le transcript » / « Voir la dernière commande » ont quitté l'onglet Équipe (plan 73-08) :
+#   T26.7, T26.8, T27.B2, T27.C1, T27.C2, T27.F1 et T27.F3 se jouent sur la ligne de régie (focus, « Lire le rapport » depuis « Terminé, à relire », actifs de la régie, filtre de la recherche) ;
+#   T27.A suit le pli des terminés du tiroir devenu le lien « N à relire dans Équipe ». Aucun identifiant supprimé.
 # Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -429,30 +432,19 @@ JS
 node "$AUX/vm-rendu.mjs" "$RENDU" "$AUX/pilote-transcript-n.js" > "$WORK/vm-tn.json"
 assert_eq "T26.5 — PU-G-170 : le transcript dit « lance une commande (Bash) × 14 » pour 14 appels, et rien après un appel seul" "$(G "$WORK/vm-tn.json" 'j.erreur||j.textes.filter((t)=>/\(Bash\)|\(Read\)/.test(t)).map((t)=>t.replace(/^\d\d:\d\d:\d\d /,"")).join("|")')" "lance une commande (Bash) × 14|lit src/a.js (Read)"
 assert_eq "T26.4 — arbre() avec l'échappement standard : la description piégée sort en &lt;img, jamais en <img" "$(G "$WORK/vm-a.json" 'j.erreur||(String(j.retour).includes("&lt;img")+"|"+!String(j.retour).includes("<img"))')" "true|true"
-CSPV="default-src 'none'; script-src http://127.0.0.1:PORTX/_vf/; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
+CSPV="default-src 'none'; script-src http://127.0.0.1:PORTX/_vf/; worker-src http://127.0.0.1:PORTX/_vf/elk-fil.js; style-src 'unsafe-inline'; img-src 'self' data:; font-src data:; connect-src 'self'; frame-ancestors 'none'; base-uri 'none'; form-action 'none'; object-src 'none'"
 rafraichir
 demarrer "$OUT" "$H"; PORT="$SRV_PORT"
 csp_de() { RQ GET "$1" | sed -n 2p | node "$AUX/jq.mjs" 'j["content-security-policy"]||"aucun en-tête"' | node "$AUX/csp.mjs"; }
-CSPV="${CSPV//PORTX/$PORT}" # 79-16 (A40) : la chaîne de v2.75.0, les empreintes retirées, plus la source du préfixe de /_vf/ (hôte et port du serveur)
-assert_eq "T26.0 — contrôle positif : la CSP réduite de /project.html vaut la chaîne de v2.75.0 plus la source du préfixe" "$(csp_de /project.html)" "$CSPV"
-assert_eq "T26.5 — la CSP réduite de /equipe.html vaut la chaîne de v2.75.0 plus la source du préfixe" "$(csp_de /equipe.html)" "$CSPV"
+CSPV="${CSPV//PORTX/$PORT}" # 79-16 (A40) : la chaîne de v2.75.0, les empreintes retirées, plus la source du préfixe de /_vf/ et la directive de worker au même préfixe (79-18 ; hôte et port du serveur)
+assert_eq "T26.0 — contrôle positif : la CSP réduite de /project.html vaut la chaîne de v2.75.0 plus la source du préfixe et le worker" "$(csp_de /project.html)" "$CSPV"
+assert_eq "T26.5 — la CSP réduite de /equipe.html vaut la chaîne de v2.75.0 plus la source du préfixe et le worker" "$(csp_de /equipe.html)" "$CSPV"
 assert_eq "T26.6 — elle est égale à celle de /project.html réduite" "$(csp_de /equipe.html)" "$(csp_de /project.html)"
 CHROME=""; for c in "${CHROME_BIN:-}" "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome" google-chrome google-chrome-stable chromium chromium-browser; do [ -n "$c" ] || continue; if [ -x "$c" ] || command -v "$c" >/dev/null 2>&1; then CHROME="$c"; break; fi; done
 if [ -z "$CHROME" ]; then
   echo "  ⊘ T26.7 SAUTÉ : aucun navigateur — non compté comme réussi"
 else
-  cat > "$AUX/chrome-t26.js" <<'JS'
-(async () => {
-  const attendre = async (sel) => { for (let i = 0; i < 100 && !document.querySelector(sel); i++) await new Promise((r) => setTimeout(r, 100)); return document.querySelector(sel); };
-  if (!document.querySelector('.vf-transcript')) { const b = await attendre('[data-vf-transcript]'); if (!b) return { erreur: 'bouton Lire le transcript absent' }; b.click(); }
-  const c = await attendre('.vf-transcript'); if (!c) return { erreur: 'conteneur .vf-transcript absent' };
-  return { img: c.querySelectorAll('img').length, texte: c.textContent.includes('<img src=x onerror='), sel: window.VibeFlow.state.selected };
-})()
-JS
-  rafraichir
-  VF_CDP_ECHEANCE_MS=20000 CDP_PRET="document.readyState === 'complete'" node "$HERE_T/chrome-cdp.mjs" "$CHROME" 500 "$(cat "$AUX/chrome-t26.js")" "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg" > "$WORK/chrome-t26.json" 2>&1
-  assert_eq "T26.7 — Chrome : le transcript d'un agent au message <img onerror> s'affiche en texte (0 élément img, la source lisible)" "$(G "$WORK/chrome-t26.json" 'j.erreur||(j.resultats[0].valeur.erreur||("img="+j.resultats[0].valeur.img+"|texte="+j.resultats[0].valeur.texte))')" "img=0|texte=true"
-  assert_eq "T26.8 — Chrome : arriver sur equipe.html#r=n:ag-ximg sélectionne la carte visée (state.selected), quel que soit l'ordre de livraison du flux (F2)" "$(G "$WORK/chrome-t26.json" 'j.erreur||(j.resultats[0].valeur.erreur||String(j.resultats[0].valeur.sel))')" "n:ag-ximg"
+  # T26.7 et T26.8 : re-pointés (Phase 73, P73-D-04) sur la régie ; ils se jouent plus bas, une fois chrome-inj.mjs et CI() définis (mêmes identifiants)
 
   # ---- recette 69 (A, B, C ; F1 à F3 du volet 2) : le vrai navigateur, les vrais scripts, un flux `who` livré à la main par un EventSource enveloppé ----
   cat > "$AUX/chrome-inj.mjs" <<'JS'
@@ -492,14 +484,14 @@ JS
   document.querySelector('#vf-lock').click();
   const titre = () => { const h3 = document.querySelector('.vf-whop h3'); return h3 ? h3.textContent + '|' + ((document.querySelector('.vf-whop .aw-count') || {}).textContent || 'effectif absent') : 'tiroir absent'; };
   const avant = await attendre(() => /3 actifs/.test(titre()) && titre(), 5000) || titre(); // le tiroir porte l'état émis avant de le mesurer
-  const d = document.querySelector('.vf-whop details.vf-termines'); if (d) d.open = true;
   emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F]);
   const apres = await attendre(() => titre() !== avant && titre(), 3000) || titre();
-  const dans = !!document.querySelector('.vf-whop details.vf-termines [data-vf-agent="C1"]');
-  const ouvert = !!(document.querySelector('.vf-whop details.vf-termines') || {}).open;
+  const dans = !document.querySelector('.vf-whop [data-vf-agent="C1"]'); // P73-D-14 : le terminé n'est plus listé dans le tiroir, le lien le compte
+  const lien = await attendre(() => { const a = document.querySelector('.vf-whop a[href*="vf-a-relire"]'); return a && a.textContent.indexOf('2 à relire') >= 0 && a.textContent; }, 3000) || 'lien absent';
+  const pli = document.querySelectorAll('.vf-whop details.vf-termines').length;
   emettre([S, M, { ...C, etat: 'termine', dureeS: 45 }, F, { kind: 'subagent', id: 'N1', etat: 'actif', role: 'vf-coder', tree: '.', parent: 'M1', task: 'nouveau', dureeS: 1 }]);
   const nouveau = !!(await attendre(() => document.querySelector('.vf-whop [data-vf-agent="N1"]'), 5000));
-  return [avant, apres, 'C1 replié=' + dans, 'Terminés resté ouvert=' + ouvert, 'N1 visible=' + nouveau].join(' | ');
+  return [avant, apres, 'C1 hors du tiroir=' + dans, 'lien=' + lien, 'plis=' + pli, 'N1 visible=' + nouveau].join(' | ');
 })()
 JS
   # B : un lien de nœud ou d'agent de la MÊME page révèle et sélectionne sa cible sans rechargement
@@ -514,60 +506,99 @@ JS
   return 'sélection=' + VF.state.selected + ' | sans rechargement=' + (window.__marque === marque);
 })()
 JS
-  # C : le contenu demandé (transcript, dernière commande) reste affiché quel que soit le nombre de `who`, même quand ils arrivent pendant la requête ; disparaît avec l'agent
-  cat > "$AUX/sc-c.js" <<JS
+  # B2 (re-pointé sur la régie, P73-D-04) : le lien d'une carte d'agent de la MÊME page donne le focus à sa ligne de régie sans rechargement
+  cat > "$AUX/sc-b2.js" <<JS
 (async () => { $COMMUN
-  const VF = window.VibeFlow; if (!await attendre(() => flux() && VF && VF.state && VF.state.selected === 'n:ag-ximg' && document.querySelector('[data-vf-transcript]'))) return 'panneau absent';
-  const base = window.__vfLive.who.workers; let n = 0;
-  const bouge = () => emettre(base.map((w) => ({ ...w, ageS: (w.ageS || 0) + ++n })));
-  const long = () => { const z = document.querySelector('.vf-transcript'); return z ? z.textContent.length : -1; };
-  const cmd = () => { const z = document.querySelector('.vf-doing'); return z ? z.textContent.length : -1; };
-  document.querySelector('[data-vf-transcript]').click(); bouge(); await sleep(60); bouge();     // `who` pendant la requête
-  document.querySelector('[data-vf-doing]').click(); bouge(); await sleep(60); bouge();
-  const t1 = await attendre(() => long() > 0 && long(), 6000) || long(), c1 = await attendre(() => cmd() > 0 && cmd(), 6000) || cmd();
-  for (let i = 0; i < 4; i++) { bouge(); await sleep(250); }
-  const t2 = long(), c2 = cmd();
-  VF.select('n:ag-ag1');
-  await attendre(() => !document.querySelector('.vf-transcript'), 5000); // la disparition est le résultat attendu : on l'attend, plus de délai fixe
-  const apres = !document.querySelector('.vf-transcript');
-  return ['transcript lu=' + (t1 > 0), 'transcript après 4 who=' + (t2 > 0), 'commande lue=' + (c1 > 0), 'commande après 4 who=' + (c2 > 0), 'disparu avec l\'agent=' + apres].join(' | ');
+  if (!await attendre(() => flux() && document.querySelector('#vf-equipe') && document.body.classList.contains('vf-regie-montee') && document.querySelector('li[data-vf-cle="au-travail:ag1"]'))) return 'ligne absente';
+  const cle = () => { const a = document.activeElement, li = a && a.closest && a.closest('li[data-vf-cle]'); return li ? li.dataset.vfCle : '-'; };
+  const marque = Math.random(); window.__marque = marque;
+  const a = document.createElement('a'); a.href = 'equipe.html#r=' + encodeURIComponent('n:ag-ag1'); document.body.appendChild(a); a.click(); a.remove();
+  await attendre(() => cle() === 'au-travail:ag1', 5000);
+  return 'focus=' + cle() + ' | sans rechargement=' + (window.__marque === marque);
 })()
 JS
-  # C bis : un rechargement de la page (structure de l'équipe changée, « Map updated ») rouvre le transcript de l'agent affiché : deux navigations successives
+  # C : un rapport ouvert depuis « Terminé, à relire » reste affiché quel que soit le nombre de `who` ; rien du transcript n'est gardé dans un stockage du navigateur
+  # (l'ancien support : transcript et dernière commande demandés depuis la carte d'un agent, retirés de l'onglet Équipe par le plan 73-08)
+  cat > "$AUX/sc-c.js" <<JS
+(async () => { $COMMUN
+  if (!await attendre(() => flux() && document.querySelector('#vf-equipe') && document.body.classList.contains('vf-regie-montee'))) return 'régie absente';
+  const base = window.__vfLive.who.workers; let n = 0;
+  const fin = (ws) => ws.map((w) => (w.id === 'ximg' ? { ...w, etat: 'termine' } : w));
+  const bouge = () => emettre(fin(base).map((w) => ({ ...w, ageS: (w.ageS || 0) + ++n })));
+  emettre(fin(base));
+  const btn = await attendre(() => document.querySelector('li[data-vf-cle="a-relire:ximg"] .vf-rg-act button'));
+  if (!btn) return 'bouton Lire le rapport absent';
+  btn.click();
+  const long = () => { const p = document.getElementById('panel'); return p && /Fil des échanges|Mandat/.test(p.textContent) ? p.textContent.length : -1; }; // le lecteur : ses intertitres, jamais le titre d'un autre panneau
+  const t1 = await attendre(() => long() > 0 && long(), 6000) || long();
+  for (let i = 0; i < 4; i++) { bouge(); await sleep(250); }
+  const t2 = long();
+  const garde = [...Object.values(localStorage), ...Object.values(sessionStorage)].some((v) => String(v).includes('onerror'));
+  return ['rapport lu=' + (t1 > 0), 'rapport après 4 who=' + (t2 > 0), 'rien du transcript en stockage=' + !garde].join(' | ');
+})()
+JS
+  # C bis : un rechargement de la page rouvre le rapport demandé de nouveau, jamais son contenu gardé : deux navigations successives (l'état « lu » est retiré entre les deux pour que la ligne garde son bouton)
   cat > "$AUX/sc-c2.js" <<JS
 (async () => { $COMMUN
-  if (!await attendre(() => document.querySelector('[data-vf-transcript]'))) return 'panneau absent';
-  const long = () => { const z = document.querySelector('.vf-transcript'); return z ? z.textContent.length : -1; };
-  if (window.__i === 0) { document.querySelector('[data-vf-transcript]').click(); return 'ouvert=' + ((await attendre(() => long() > 0 && long(), 6000)) > 0); }
-  return 'rouvert après rechargement=' + ((await attendre(() => long() > 0 && long(), 6000)) > 0);
+  if (!await attendre(() => flux() && document.querySelector('#vf-equipe') && document.body.classList.contains('vf-regie-montee'))) return 'régie absente';
+  const fin = (ws) => ws.map((w) => (w.id === 'ximg' ? { ...w, etat: 'termine' } : w));
+  const long = () => { const p = document.getElementById('panel'); return p && /Fil des échanges|Mandat/.test(p.textContent) ? p.textContent.length : -1; }; // le lecteur : ses intertitres, jamais le titre d'un autre panneau
+  const rien = long() < 0;
+  emettre(fin(window.__vfLive.who.workers));
+  const btn = await attendre(() => document.querySelector('li[data-vf-cle="a-relire:ximg"] .vf-rg-act button'));
+  if (!btn) return 'bouton Lire le rapport absent';
+  btn.click();
+  const lu = (await attendre(() => long() > 0 && long(), 6000)) > 0;
+  if (window.__i === 0) { for (const k of Object.keys(localStorage)) if (k.indexOf('vf-regie-lus:') === 0) localStorage.removeItem(k); return 'ouvert=' + lu; }
+  return 'rien gardé=' + rien + ' | rouvert après rechargement=' + lu;
 })()
 JS
   # F1 (volet 2) : le badge égale les actifs de l'onglet Équipe, ni verrou ni nœud de DAG ; F2 : titre de l'onglet ; F3 : libellé du champ de recherche
   cat > "$AUX/sc-f.js" <<JS
 (async () => { $COMMUN
-  const VF = window.VibeFlow; if (!await attendre(() => flux() && VF && VF.state && VF.state.layout && document.querySelector('#vf-lock'))) return 'page absente';
+  const VF = window.VibeFlow; if (!await attendre(() => flux() && document.querySelector('#vf-equipe') && document.body.classList.contains('vf-regie-montee') && document.querySelector('#vf-lock'))) return 'page absente';
   const base = window.__vfLive.who.workers.filter((w) => w.kind === 'session' || w.kind === 'subagent');
   emettre([...base, { kind: 'lock', id: 'v1', tree: '.', task: 'verrou' }, { kind: 'dag-node', id: 'd1', tree: '.', task: 'nœud', etat: 'actif' }, { kind: 'registered', id: 'r1', tree: '.', task: 'registre' }]);
   await attendre(() => window.__vfLive.who.workers.some((w) => w.id === 'v1'), 5000); await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))); // l'état émis est appliqué et rendu
-  await attendre(() => { const b = ((document.querySelector('#vf-lock .bl') || {}).textContent || '').replace(/\\D/g, ''), st = ((document.querySelector('.vf-stats b') || {}).textContent || '').replace(/\\D/g, ''); return b !== '' && b === st; }, 5000);
+  const actifs = () => document.querySelectorAll('#vf-equipe li[data-vf-cle^="au-travail:"][data-vf-etat="actif"]').length;
+  await attendre(() => { const b = ((document.querySelector('#vf-lock .bl') || {}).textContent || '').replace(/\\D/g, ''); return b !== '' && Number(b) === actifs(); }, 5000);
   const badge = (document.querySelector('#vf-lock .bl') || {}).textContent || '';
-  const stat = (document.querySelector('.vf-stats b') || {}).textContent || '';
   const lib = (document.querySelector('#search-btn .st') || {}).textContent || '';
   document.querySelector('#search-btn').click(); const si = document.querySelector('#search'); si.value = 'vf-dev-manager'; si.dispatchEvent(new Event('input'));
-  await attendre(() => document.querySelectorAll('#results .r').length > 0, 5000);
-  const trouves = document.querySelectorAll('#results .r').length;
-  return ['badge=' + badge.replace(/\\D/g, ''), 'actifs=' + stat, 'titre=' + document.title, 'libelle=' + lib, 'trouves=' + (trouves > 0)].join(' | ');
+  const vus = () => [...document.querySelectorAll('#vf-equipe li[data-vf-cle]')].filter((l) => !l.hidden && l.getClientRects().length > 0).length;
+  await attendre(() => vus() > 0, 5000);
+  return ['badge=' + badge.replace(/\\D/g, ''), 'actifs=' + actifs(), 'titre=' + document.title, 'libelle=' + lib, 'trouves=' + (vus() > 0)].join(' | ');
 })()
 JS
   CI() { VF_CDP_ECHEANCE_MS=30000 node "$AUX/chrome-inj.mjs" "$CHROME" "$AUX/$1" "${@:2}" 2>/dev/null | G /dev/stdin 'j.erreur||j.resultats.map((r)=>r.valeur).join(" ;; ")'; }
+  # T26.7 et T26.8, re-pointés sur la régie (P73-D-04) : arriver sur #r=n:ag-ximg donne le focus à la ligne de régie de l'agent (T26.8) ; une fois l'agent terminé, « Lire le rapport »
+  # montre son transcript en texte (T26.7). Ancien support : la carte de l'agent, son panneau et son bouton « Lire le transcript » (retirés par le plan 73-08).
+  cat > "$AUX/sc-t26.js" <<JS
+(async () => { $COMMUN
+  if (!await attendre(() => flux() && document.querySelector('#vf-equipe') && document.body.classList.contains('vf-regie-montee'))) return 'régie absente';
+  const cle = () => { const a = document.activeElement, li = a && a.closest && a.closest('li[data-vf-cle]'); return li ? li.dataset.vfCle : '-'; };
+  const focus = await attendre(() => cle() !== '-' && cle(), 8000) || cle();
+  const fin = (ws) => ws.map((w) => (w.id === 'ximg' ? { ...w, etat: 'termine' } : w));
+  emettre(fin(window.__vfLive.who.workers));
+  const btn = await attendre(() => document.querySelector('li[data-vf-cle="a-relire:ximg"] .vf-rg-act button'));
+  if (!btn) return 'focus=' + focus + ' | bouton Lire le rapport absent';
+  btn.click();
+  const lu = await attendre(() => { const p = document.getElementById('panel'); return p && /Fil des échanges|Mandat/.test(p.textContent) && p.textContent; }, 6000) || '';
+  return 'focus=' + focus + ' | img=' + document.querySelectorAll('#panel img').length + ' | texte=' + (lu.indexOf('<img src=x onerror=') >= 0);
+})()
+JS
   rafraichir
-  assert_eq "T27.A — recette : le tiroir « Au travail » ouvert suit le flux (titre, bloc « Terminés » replié et resté ouvert, nouvel agent visible) sur trois événements who" "$(CI sc-a.js "http://127.0.0.1:$PORT/project.html#t")" "Au travail|3 actifs · 1 terminé | Au travail|2 actifs · 2 terminés | C1 replié=true | Terminés resté ouvert=true | N1 visible=true"
+  RT="$(CI sc-t26.js "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg")"
+  assert_eq "T26.7 — Chrome : le rapport d'un agent terminé au message <img onerror> s'affiche en texte depuis « Terminé, à relire » (0 élément img, la source lisible)" "$(echo "$RT" | sed -E 's/^focus=.* \| (img=[0-9]+) \| (texte=.*)$/\1|\2/')" "img=0|texte=true"
+  assert_eq "T26.8 — Chrome : arriver sur equipe.html#r=n:ag-ximg donne le focus à la ligne de régie de cet agent (F2), quel que soit l'ordre de livraison du flux" "$(echo "$RT" | sed -E 's/^focus=([^ ]*) .*$/\1/')" "au-travail:ximg"
+  rafraichir
+  assert_eq "T27.A — recette : le tiroir « Au travail » ouvert suit le flux (titre, terminé hors du tiroir et compté par le lien « N à relire dans Équipe », nouvel agent visible) sur trois événements who" "$(CI sc-a.js "http://127.0.0.1:$PORT/project.html#t")" "Au travail|3 actifs · 1 terminé | Au travail|2 actifs · 2 terminés | C1 hors du tiroir=true | lien=2 à relire dans Équipe | plis=0 | N1 visible=true"
   assert_eq "T27.B1 — recette : cliquer le lien d'un nœud de mission sur project.html le sélectionne sans rechargement" "$(CI sc-b.js "http://127.0.0.1:$PORT/project.html#t")" "sélection=f:.planning/missions/m1.dag.json#revue-p3 | sans rechargement=true"
-  assert_eq "T27.B2 — recette : cliquer le lien d'une carte d'agent sur equipe.html la sélectionne sans rechargement" "$(CI sc-b.js "http://127.0.0.1:$PORT/equipe.html#t")" "sélection=n:ag-ag1 | sans rechargement=true"
+  assert_eq "T27.B2 — recette : cliquer le lien d'une carte d'agent sur equipe.html donne le focus à sa ligne de régie sans rechargement" "$(CI sc-b2.js "http://127.0.0.1:$PORT/equipe.html#t")" "focus=au-travail:ag1 | sans rechargement=true"
   rafraichir
-  assert_eq "T27.C1 — recette : transcript et dernière commande demandés pendant des who restent affichés après quatre autres who, et disparaissent avec l'agent" "$(CI sc-c.js "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg")" "transcript lu=true | transcript après 4 who=true | commande lue=true | commande après 4 who=true | disparu avec l'agent=true"
+  assert_eq "T27.C1 — recette : le rapport ouvert depuis « Terminé, à relire » reste affiché après quatre autres who, et rien du transcript n'est gardé dans un stockage du navigateur" "$(CI sc-c.js "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg")" "rapport lu=true | rapport après 4 who=true | rien du transcript en stockage=true"
   rafraichir
-  assert_eq "T27.C2 — recette : après un rechargement de la page, le transcript de l'agent affiché est redemandé (jamais son contenu gardé)" "$(CI sc-c2.js "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg" "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg")" "ouvert=true ;; rouvert après rechargement=true"
+  assert_eq "T27.C2 — recette : après un rechargement de la page, rien n'est affiché et le rapport est redemandé à la lecture (jamais son contenu gardé)" "$(CI sc-c2.js "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg" "http://127.0.0.1:$PORT/equipe.html#r=n%3Aag-ximg")" "ouvert=true ;; rien gardé=true | rouvert après rechargement=true"
   rafraichir
   RF="$(CI sc-f.js "http://127.0.0.1:$PORT/equipe.html#t")"
   assert_eq "T27.F1 — recette : le badge « au travail » égale les actifs de l'onglet Équipe, même avec un verrou, un nœud de DAG et un enregistrement dans la collecte (apparié : le nombre est non nul)" "$(echo "$RF" | sed -E 's/^badge=([0-9]+) \| actifs=([0-9]+) .*/\1 \2/' | awk '{print ($1==$2 && $1>0) ? "égaux" : "badge=" $1 " actifs=" $2}')" "égaux"

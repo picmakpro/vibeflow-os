@@ -5,6 +5,7 @@
 (() => {
   const W = window, D = document, CLE = '72-vf-regie-source.js', CLE_VUE = 'vibeflow-cockpit:equipe-vue', DELAI_COUPE = 15000;
   const vues = [{ id: 'regie', libelle: 'Régie' }];
+  let attente = null; // ancre n:se-… / n:ag-… reçue avant le montage ou avant l'arrivée du who : consommée au premier rendu où la ligne existe
   let monte = null; // le montage de l'onglet courant : jamais gardé d'une exécution à l'autre (la clé sessionStorage est la seule mémoire)
 
   // ---------- registre des vues : la Phase 74 s'y déclare (frise) ----------
@@ -29,9 +30,14 @@
       whoAt: () => (E ? null : L().whoAt),
       perdu: () => (E ? !!E.lire('connexion') && E.lire('connexion') !== 'ouvert' : L().connected === false && !!L().who),
       ecouter: (f) => {
-        if (E) return ['who', 'lock', 'connexion'].map((k) => E.abonner(k, () => f(k)));
+        if (E) return ['who', 'lock', 'connexion', 'graphe'].map((k) => E.abonner(k, () => f(k)));
         D.addEventListener('vf-who', f); return [() => D.removeEventListener('vf-who', f)];
       },
+      // les missions en cours : meta.vf.missions de l'enveloppe de l'onglet (le graphe posé par la coquille),
+      // relue par la route quand VF_ETAT annonce que l'enveloppe a changé
+      missions: (g) => { const v = g && g.meta && g.meta.vf; return Array.isArray(v && v.missions) ? v.missions.filter((m) => typeof m === 'string') : []; },
+      graphe: () => (E ? E.lireJson('/api/vf/graphe?onglet=equipe') : Promise.resolve(null)),
+      graphePose: () => (E && E.lire('graphe') && E.lire('graphe').onglet) || null,
       transcript: (id) => {
         const chemin = '/api/vf/transcript?id=' + encodeURIComponent(id);
         if (E) return E.lireJson(chemin);
@@ -52,16 +58,21 @@
       sec.append(t, lecteur); p.replaceChildren(sec);
     });
     const P = D.getElementById('panel'), O = W.VF_SURCOUCHES;
-    if (O && P) O.ouvrir(P, { modale: false, ouvreur, fermer: () => { SC.closePanel(); O.fermer(P); } });
+    if (P && P.classList) P.classList.add('vf-rg-lecteur'); // la feuille masque le contenu par défaut du moteur ; seul le lecteur la montre
+    if (O && P) O.ouvrir(P, { modale: false, ouvreur, fermer: () => { if (P.classList) P.classList.remove('vf-rg-lecteur'); SC.closePanel(); O.fermer(P); } });
+    // 73-08 (UIFN-12) : le bouton quitte la ligne une fois le rapport lu ; le focus passe au titre du lecteur, jamais à body
+    const T = P && P.querySelector('.pt'); if (T) { T.tabIndex = -1; T.focus({ preventScroll: true }); }
     emettre('vf-agent:lu', { id }, false);
   }
 
   function monter() {
     if (!D.body) return () => {};
-    const A = adaptateur(), P = W.__vfRegiePied, R = W.__vfRegieRendu, racine = D.createElement('section'), recherche = D.getElementById('search');
+    const QS = W.__vfRegieQuestions || {}, A = adaptateur(), P = W.__vfRegiePied, R = W.__vfRegieRendu;
+    const racine = D.createElement('section'), recherche = D.getElementById('search');
     racine.id = 'vf-equipe'; racine.setAttribute('role', 'main'); racine.setAttribute('aria-busy', 'true');
     D.body.append(racine); D.body.classList.add('vf-regie-montee');
     const ui = R.monter(racine), nettoyerPied = P.monter(racine), retraits = [], minuteries = [];
+    let missions = A.missions((W.Floorplan && W.Floorplan.graph) || W.VF_COCKPIT);
     let vivant = true, recu = Date.now(), coupeT0 = null, fige = null, tCoupe = null, lectureT0 = Date.now(), choisie = 'regie', luHash = null, tm = null;
     const sess = (k) => { try { return W.sessionStorage.getItem(k); } catch { return null; } };
     const ecouter = (cible, type, f) => { cible.addEventListener(type, f); retraits.push(() => cible.removeEventListener(type, f)); };
@@ -75,21 +86,27 @@
       if (perdu && fige === null && tCoupe === null) tCoupe = setTimeout(() => { tCoupe = null; rendre(); }, DELAI_COUPE - (now - coupeT0));
       const recuA = A.whoAt() || recu, lus = W.__vfRegieLu && typeof W.__vfRegieLu.lus === 'function' ? W.__vfRegieLu.lus() : null;
       if (!who && !sansDirect) { P.maj({ lecture: true, muet: now - lectureT0 < 150 }); return; }
-      const m = M.modele(who || { workers: [] }, A.lock(), { now: fige !== null ? fige : now, recuA, lus, missions: [] });
+      const m = M.modele(who || { workers: [] }, A.lock(), { now: fige !== null ? fige : now, recuA, lus, missions, nonCommite: P.nonCommite(),
+        questions: QS.etat ? QS.etat() : undefined });
       ui.rendre(m, { sections: !sansDirect });
       if (recherche) ui.filtrer(recherche.value);
       P.maj({ direct: !sansDirect, aucun: !!m.etatPage, sources: who && who.sources, coupe: fige !== null ? (fige - recuA) / 1000 : null });
       toutMarquer(m);
+      if (attente && ancre(attente.id, attente.kind)) attente = null;
     };
     const toutMarquer = (m) => { // « Tout marquer comme relu » : seulement si le module « lu » existe, dès trois lignes à relire (jamais de bouton mort)
-      const lu = W.__vfRegieLu, ids = m.sections[2].lignes.map((l) => l.id), tete = ui.titre('a-relire') && ui.titre('a-relire').parentNode;
+      const lu = W.__vfRegieLu, ids = m.sections[2].ids || m.sections[2].lignes.map((l) => l.id);
+      const tete = ui.titre('a-relire') && ui.titre('a-relire').parentNode;
       if (lu && typeof lu.toutMarquer === 'function' && ids.length >= 3 && tete) {
         if (!tm) {
           tm = D.createElement('button'); tm.className = 'btn'; tm.setAttribute('type', 'button'); tm.setAttribute('data-vf-tout', ''); tete.append(tm);
         }
         if (tm.textContent !== 'Tout marquer comme relu') tm.textContent = 'Tout marquer comme relu';
         tm._ids = ids;
-      } else if (tm) { tm.remove(); tm = null; }
+      } else if (tm) { // le bouton qui porte le focus et quitte la page : le focus va au titre de sa section, jamais à body
+        const avait = D.activeElement === tm, t = ui.titre('a-relire');
+        tm.remove(); tm = null; if (avait && t) t.focus({ preventScroll: true });
+      }
     };
 
     // ---------- ouverture d'une ligne : événement annulable, le comportement suit seulement si personne ne l'annule ----------
@@ -113,7 +130,10 @@
     const fragment = () => {
       const h = String(W.location.hash || ''); luHash = h;
       const r = new URLSearchParams(h.slice(1)).get('r'), m = /^#vf-([a-z-]+)$/.exec(h);
-      if (r) { const a = /^n:(se|ag)-(.+)$/.exec(r); if (a) ancre(a[2], a[1] === 'se' ? 'session' : 'subagent'); } else if (m) aller(m[1]);
+      if (r) {
+        const a = /^n:(se|ag)-(.+)$/.exec(r), kind = a && (a[1] === 'se' ? 'session' : 'subagent');
+        if (a && !ancre(a[2], kind)) attente = { id: a[2], kind };
+      } else if (m) aller(m[1]);
     };
 
     // ---------- vues et bascule ----------
@@ -133,10 +153,13 @@
 
     // ---------- clavier, clic, recherche ----------
     ecouter(racine, 'click', (e) => {
+      // 00-vibeflow.js annule le clic de tout élément sous [data-vf-section] (lien, résumé de repli) : il s'arrête ici, sans preventDefault
+      if (e.target && e.target.closest && e.target.closest('a[href], summary')) { e.stopPropagation(); return; }
       const b = e.target && e.target.closest ? e.target.closest('button, [data-vf-tout]') : null, li = b && b.closest('li[data-vf-cle]');
       if (!b) return;
       if (b.hasAttribute('data-vf-tout')) { if (tm && W.__vfRegieLu) { W.__vfRegieLu.toutMarquer(tm._ids); rendre(); } return; }
       if (li && b.classList.contains('vf-rg-tog')) ouvrir(li, 'nom', b);
+      else if (li && b.classList.contains('vf-rg-caret')) ui.replier(li.getAttribute('data-vf-cle'));
       else if (li && b === li._b) ouvrir(li, 'rapport', b);
     });
     ecouter(D, 'keydown', (e) => {
@@ -153,8 +176,18 @@
     if (recherche) ecouter(recherche, 'input', () => ui.filtrer(recherche.value));
     ecouter(D, 'vf-regie:aller', (e) => aller(e.detail && e.detail.section));
     ecouter(D, 'vf-regie:redessiner', () => rendre());
+    const nettoyerQ = QS.monter ? QS.monter(racine) : () => {}; // 73-11 : Échap des replis, après celui du détail en flux
     ecouter(D, 'vf:onglet', (e) => { if (e.detail && e.detail.onglet === 'equipe' && String(W.location.hash || '') !== luHash) fragment(); });
-    for (const d of A.ecouter((cle) => { if (cle === 'who') recu = Date.now(); rendre(); })) retraits.push(d);
+    const relireMissions = () => { // l'enveloppe d'Équipe a changé : on relit ses missions, le dessin suit ; une lecture refusée garde les missions connues
+      if (A.graphePose() !== 'equipe') return;
+      A.graphe().then((j) => { if (!vivant || !j) return; missions = A.missions(j); rendre(); }, () => {});
+    };
+    const surEtat = (cle) => {
+      if (cle === 'graphe') { relireMissions(); return; }
+      if (cle === 'who') { recu = Date.now(); P.surWho(); }
+      rendre();
+    };
+    for (const d of A.ecouter(surEtat)) retraits.push(d);
     minuteries.push(setInterval(rendre, 30000));
 
     monte = { declaree: () => declaree(), ancre };
@@ -168,13 +201,19 @@
       for (const r of retraits.splice(0)) r();
       for (const t of minuteries.splice(0)) { clearInterval(t); clearTimeout(t); }
       if (tCoupe !== null) clearTimeout(tCoupe);
-      nettoyerPied(); racine.remove(); D.body.classList.remove('vf-regie-montee');
+      nettoyerPied(); nettoyerQ(); racine.remove(); D.body.classList.remove('vf-regie-montee');
+      const pn = D.getElementById('panel'); if (pn && pn.classList) pn.classList.remove('vf-rg-lecteur');
     };
   }
 
   // ---------- l'interface que lit 00-vibeflow.js (arrivée par #r=n:…) et le bouton « N au travail » ----------
   W.__vfRegie = {
-    arriver: (r) => { const m = monte && /^n:(se|ag)-(.+)$/.exec(String(r)); return m ? monte.ancre(m[2], m[1] === 'se' ? 'session' : 'subagent') : false; },
+    arriver: (r) => { // vrai pour toute ancre de ligne, même avant le montage : la ligne la consomme à son premier rendu
+      const m = /^n:(se|ag)-(.+)$/.exec(String(r)); if (!m) return false;
+      const kind = m[1] === 'se' ? 'session' : 'subagent';
+      if (!(monte && monte.ancre(m[2], kind))) attente = { id: m[2], kind };
+      return true;
+    },
     monte: () => monte !== null,
   };
   const C = W.VF_COQUILLE;
