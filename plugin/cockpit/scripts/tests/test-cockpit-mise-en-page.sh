@@ -160,6 +160,16 @@ echo "=== W9 — le protocole est borné : { id, graphe } dans un sens, { id, re
 assert_eq "W9.1 — clés des requêtes dans {id, graphe}, des réponses dans {id, resultat, erreur}, aucune des cinq clés interdites à aucune profondeur ; témoin : des messages ont bien été balayés" "$(printf '%s %s' "$SEQ_ALL" "$(printf '%s' "$TR" | oj 'JSON.stringify([j.worker.resume.reqTop, j.worker.resume.repTop, j.worker.resume.interdites, j.worker.resume.req])')" | node -e 'let s="";process.stdin.on("data",d=>s+=d).on("end",()=>{const L=s.trim().split(/ (?=\[)/).map((x)=>JSON.parse(x));console.log(L.length>=5&&L.every(([q,r,i,n])=>n>0&&i===0&&q.every((k)=>["id","graphe"].includes(k))&&r.every((k)=>["id","resultat","erreur"].includes(k))))})')" "true"
 assert_eq "W9.2 — témoin positif : une requête de test qui porte une clé interdite est signalée par le balayage" "$(printf '%s' "$TR" | oj 'j.worker.temoinCle.interdites >= 1')" "true"
 
+echo "=== W10 — l'empreinte du module couvre le fil et son paquet : un serveur dont l'un des deux a changé est jugé périmé (AU18-02) ==="
+emp() { node --input-type=module -e "const m=await import('file://$1/scripts/vf-cockpit-module.mjs');console.log(m.empreinteModule({dossierScripts:'$1/scripts',dossierMoteur:'$1/skills/cockpit-moteur'})||'nul')"; }
+chg() { # chg <racine d'une copie du module> <fichier sous assets/> : l'empreinte avant et après un ajout au fichier -> « change » ou « <avant>/<après> »
+  local a b; a="$(emp "$1")"; printf '\n// un octet de plus\n' >> "$1/skills/cockpit-moteur/assets/$2"; b="$(emp "$1")"
+  if [[ "$a" =~ ^[0-9a-f]{12}$ && "$b" =~ ^[0-9a-f]{12}$ ]]; then [ "$a" != "$b" ] && echo change || echo identique; else echo "$a/$b"; fi
+}
+E1="$WORK/emp1"; cockpit_module_copie "$E1" > /dev/null; E2="$WORK/emp2"; cockpit_module_copie "$E2" > /dev/null
+assert_eq "W10.1 — un octet de plus dans elk-fil.js change l'empreinte du module (deux empreintes de 12 hexadécimaux)" "$(chg "$E1" elk-fil.js)" "change"
+assert_eq "W10.2 — un octet de plus dans vendor/elk.bundled.js (le paquet que le fil importe) change l'empreinte du module" "$(chg "$E2" vendor/elk.bundled.js)" "change"
+
 echo "=== X — mutants : chaque garde rougit pour sa seule raison (copies du module, jamais le module du dépôt) ==="
 verif_csp() { # l'état des gardes de CSP sur le serveur lancé : W1.2 W1.3 W2.1 W2.2 W2.3 (ok|ko)
   local r="" H U CSP e1 e2; rq GET /_vf/elk-fil.js "$WORK/x.out"; [ "$(hv content-security-policy)" = "default-src 'none'; script-src http://127.0.0.1:$PORT/_vf/vendor/elk.bundled.js" ] && r="$r W1.2=ok" || r="$r W1.2=ko"
@@ -207,6 +217,13 @@ assert_eq "X-INTERROMPU — la terminaison rejette les requêtes en attente : W8
 mutant X-A4-VIDE page x "s#p.ok(d.resultat)#p.ok(p.graphe)#"
 M3="$(chrome tracer)"
 assert_eq "X-A4-VIDE — l'adaptateur résout avec le graphe de la requête (sans positions) : W6.1 et W6.3 rouges" "$MR|$(printf '%s' "$M3" | oj '[(() => { const r = j.worker.rendus; return !!r && r.ids.length > 0 && r.pos.every((p) => p.slice(1).every(Number.isFinite)); })(), (() => { const r = j.worker.rendus; return !!r && !!r.derniere && JSON.stringify([...r.pos].sort()) === JSON.stringify([...r.derniere].sort()); })()]')" "0|[false,false]"
+
+vemp() { # vemp <nom> <expression sed sur vf-cockpit-module.mjs> <fichier sous assets/> : « change » ou « identique » sur la copie du module muté (aucun serveur)
+  cockpit_module_muter "$1" vf-cockpit-module.mjs "$2" > /dev/null 2>&1 || { echo "copie inchangée"; unset COCKPIT_MODULE; return; }
+  local r="$COCKPIT_MODULE"; unset COCKPIT_MODULE; chg "$r" "$3"
+}
+assert_eq "X-EMP-FIL — le motif de elk-fil.js ne désigne plus le fil : un octet de plus dans le fil ne change plus l'empreinte, W10.1 rouge" "$(vemp X-EMP-FIL 's#/\^elk-fil#/^elk-fiX#' elk-fil.js)" "identique"
+assert_eq "X-EMP-PAQUET — le paquet vendor/elk.bundled.js retiré de l'empreinte : un octet de plus dans le paquet ne change plus l'empreinte, W10.2 rouge" "$(vemp X-EMP-PAQUET '/garde:empreinte-vendus/d' vendor/elk.bundled.js)" "identique"
 cockpit_arreter; unset COCKPIT_MODULE
 
 cockpit_arreter; unset COCKPIT_MODULE
