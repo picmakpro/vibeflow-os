@@ -433,11 +433,17 @@ if (cas === 'confiner') {
   fs.symlinkSync(path.join(voisin, 'secret.md'), path.join(lab, 'lien.md')); fs.symlinkSync(path.join(voisin, 'pointeur'), path.join(B, 'active-workstream'));
   const t = lireConfine(lab, () => read(path.join(lab, 'interne.md'))).trim(), lu = lireConfine(lab, () => read(path.join(lab, 'lien.md'))).trim();
   console.log(`temoin=${t} lien=${JSON.stringify(lu)} realUnder=${realUnder(path.join(voisin, 'secret.md'), lab)} actif=${planningLayout(lab).actif}`);
+} else if (cas === 'index') {
+  const { ecrireIndex } = await imp('vf-cockpit-index-cache.mjs'); const lab2 = path.join(D, 'lab2'); fs.mkdirSync(lab); fs.mkdirSync(dehors); fs.mkdirSync(lab2);
+  const idx = (l) => ecrireIndex(path.join(l, '.vibeflow', 'cockpit', '.cache', 'index-transcripts.json'), l, { schema: 'x', voies: [] });
+  const t = idx(lab2); fs.symlinkSync(dehors, path.join(lab, '.vibeflow')); const r = idx(lab);
+  console.log(`temoin=${t} lien=${r} dehors=${liste(dehors)}`);
 }
 JS
 c3() { node "$WORK/c3.mjs" "${2:-$SCRIPTS}" "$1" "$WORK" 2>&1 | head -1; }
 assert_eq "C3.1 — confiner : un frère au même préfixe que le lab (lab-voisin) est refusé, rien n'y est écrit (témoin : une cible du lab passe)" "$(c3 confiner)" "temoin=accepte voisin=refuse ecrits=0"
 assert_eq "C3.2 — realUnder : un lien vers un frère au même préfixe n'est ni lu ni pris pour un pointeur de compartiment (témoin : un fichier du lab est lu)" "$(c3 realunder)" 'temoin=DANS-LE-LAB lien="" realUnder=false actif=null'
+assert_eq "C3.3 — ecrireIndex : .vibeflow lié vers l'extérieur, rien n'est créé dehors (témoin : sans lien l'index s'écrit)" "$(c3 index)" "temoin=true lien=false dehors=0"
 # mutants : copie fraîche des modules, UNE occurrence remplacée ; chacun doit rougir son cas, pour la raison attendue (valeur de la ligne)
 c3mut() { local nom="$1" f="$2" de="$3" vers="$4" d="$WORK/c3-mut-$1"; rm -rf "$d"; mkdir -p "$d"; cp "$SCRIPTS"/*.mjs "$SCRIPTS"/*.json "$d"/ 2>/dev/null
   node -e 'const fs=require("fs");const [f,de,vers]=process.argv.slice(1);const s=fs.readFileSync(f,"utf8");const n=s.split(de).length-1;if(n!==1){console.log("ancre:"+n);process.exit(1)}fs.writeFileSync(f,s.replace(de,()=>vers))' "$d/$f" "$de" "$vers" > "$d.ancre" 2>&1 || { echo "ancre-ko $(cat "$d.ancre")"; return; }
@@ -447,6 +453,8 @@ M="$(c3mj m01 vf-cockpit-paths.mjs '(parent !== racine && !parent.startsWith(rac
 assert_eq "C3.M1 — confiner sans séparateur : C3.1 rougit (le frère est accepté)" "$([ -n "$M" ] && c3 confiner "$M" | grep -c 'voisin=accepte')" "1"
 M="$(c3mj m02 vf-cockpit-paths.mjs 'r === d || r.startsWith(d + path.sep);' 'r === d || r.startsWith(d);')"
 assert_eq "C3.M2 — realUnder sans séparateur : C3.2 rougit (le lien vers le frère est lu)" "$([ -n "$M" ] && c3 realunder "$M" | grep -c 'lien="SECRET"')" "1"
+M="$(c3mj m09 vf-cockpit-index-cache.mjs "confiner(lab, path.join(a, 'x')); // le plus proche ancêtre existant est dans le lab, jamais un lien qui en sort" '')"
+assert_eq "C3.M9 — ecrireIndex sans jugement de l'ancêtre : C3.3 rougit (des dossiers naissent hors du lab)" "$([ -n "$M" ] && c3 index "$M" | grep -c 'dehors=[1-9]')" "1"
 
 # ---------- GLOB : coût borné de la correspondance de motifs (79-21, P79-D-32, SOCL-26) ----------
 # Aucun serveur, aucun navigateur : scripts d'aide en heredoc dans $GL_AUX ; copie gelée de l'ancienne implémentation, équivalence générative à graine,
