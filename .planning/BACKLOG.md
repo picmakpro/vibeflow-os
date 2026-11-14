@@ -797,3 +797,51 @@ Pas de cause établie. À traiter selon la doctrine des sondes du cockpit : mesu
 - **Revue du point de fusion 2 de la Phase 73 (mineurs) :** `ouvrirRepli` émet `vf-agent:lu` même quand la lecture du transcript échoue, et deux clics rapprochés laissent le transcript le plus lent écraser le panneau ; `relireMissions` lance une lecture par événement `graphe` sans sérialisation (deux réponses croisées peuvent poser des missions plus anciennes).
 - **Durée d'un agent terminé (constat de la Phase 74) :** la régie calcule `dureeS` en tenue et compte les veilles de l'agent ; la spec ne tranche pas entre durée active et durée de tenue : à décider au prochain réglage de la régie.
 - **Juge design de fin de Phase 73 (74/100, passed ; mineurs) :** ligne 2 « nœud · arbre · branche » rendue sous Quoi au lieu de Qui, rôle sous la tâche au lieu d'avant ; colonne Quoi qui dérive de 361 à 376 px (grille par ligne) ; ligne de verrou plus bavarde que la spec § 6.1 ; ligne de phase `human_needed` avec le lien en double ; format de la ligne « ailleurs » et noms de lab en mono (§ 10) ; hors phase : à 800 px, la bascule de Projet recouvre son titre.
+
+## Cockpit : mineurs de l'exécution de la Phase 80 (plans 80-09 à 80-21, quatre revues, juge design) — DIFFÉRÉ (2026-11-14)
+
+**Priorité : basse.** **Origine :** les rapports des exécuteurs, quatre passes de `vf-reviewer` aux points de fusion, le juge design sur captures (83/100, passed) et la vérification d'objectif de la Phase 80 (branche `feat/phase-80-trois-formes`) ; aucun n'appelle de correction avant la fusion.
+- 80-19 NOT_GUARD log\w* exclut login_required (hors périmètre, à verser au BACKLOG)
+- 80-16 responsive R7.5.0-2 rouges sous charge (90 s), à rejouer seuls au point de fusion
+- 80-09 freeArea() ne déduit pas #zoom au téléphone : une carte amenée dans le champ peut le recouvrir
+- git-entete 119/17 sur 68343e27 : à rejouer après 898511f0 au point de fusion
+- equipe EA2.x/EA3.x « reading lire » dans le tiroir Qui a la main après fusion 455da5e8 (79-17 partiel) : à rejouer sur la 79-17 finale
+- 80-10 OG2.2 réduit (tampon xterm d'une autre origine) ; retour sur Projet par clic sans ?vue=
+- git-tiroir 177/18 sous charge (p10) : à rejouer à poste calme au point de fusion
+- 80-13 chrome-session.mjs naviguer oublie vf-tiroirs:* (fichier commun, Gate-Touche)
+- revue1 : 00-vf-onglets.js:104 aller(nom,{fragment:'#s=…'}) pose l'adresse sans appliquer la sélection (clés moteur v,s,z,git à refuser ou appliquer ; à documenter pour 73/74/76)
+- revue1 : 00-vf-onglets.js:103 aller vers l'onglet courant avec fragment l'ignore en silence (à dire dans le contrat)
+- revue1 : 00-vf-onglets.js:114 après un chargement échoué, l'écouteur de clic du routeur n'est plus posé, les clics rechargent la page (coquille ou 80-21)
+- revue1 : viewer.html:1768 parentLab(owner) inséré brut dans rowFor(extra) (constantes serveur aujourd'hui ; échapper par h())
+- revue1 : 04-vf-canevas-champ.js:21 Math.max(200,…) peut dépasser la découpe droite quand le tiroir Git touche le bord
+- revue1 : viewer.html programmerZ (250 ms) peut écrire z dans l'adresse dépouillée avant le démontage (fenêtre étroite)
+- revue1 : 02-vf-reperes.js:131 childList sur body relance maj à chaque enfant direct (coût)
+- 80-14 hauteur du champ de palette 58 px au lieu de 44 (spec) : à trancher par une passe de jetons
+- 80-21 erratum 80-UI-SPEC § 5 : texte « Lecture impossible… » remplacé par celui de la coquille pour les trois onglets
+- revue2 : 00-vf-onglets.js:100 clic sur l'onglet affiché après échec : etat() reste en échec, rangées Réessayer persistantes (conforme au plan, à arbitrer)
+- revue2 : 02-vf-ligne-echec.js:36 slot.hidden=false jamais remis ; 02-vf-ligne-etat.js:70 cache le slot et la rangée d'échec avec (écart consigné 80-21)
+- revue2 : 00-vf-onglets.js:131 Précédent pendant un chargement en vol : fragment du même onglet avalé, entrée d'historique en double possible ; restituer (:73) sans borne
+- revue2 : chrome-surcouches.mjs:14 164 colonnes ; SU6.1 annonce « une seule entrée dans la pile » sans la mesurer, pas de contrôle [inert] après fermeture du tiroir rouvert
+- revue2 : viewer.html gagne 17 lignes > 160 colonnes (hors cliquet)
+- revue1 : SU4.6 ne voit pas un window.onkeydown = (ni avant ni après l'adaptation)
+- 80-21 : après un Réessayer par le routeur suite à un premier échec, le bouton Retour de Projet apparaît (différent d'un chargement à froid)
+- gel « palette > puis Échap puis aller » vu par p14 dans le harnais de chrome-palette (20 s sans réponse, aussi sur 75a527f9) : non reproduit par OG2.18/OG2.18d (lab onglets) — limite, cause non localisée
+- projet-visite R3.18 (presse-papiers) rouge sous charge, aussi sur la base 64fad93d
+- design 83/100 : logo .mark quasi invisible en thème sombre (viewer.html:106, invert seulement en clair ; antériorité à confirmer)
+- design : aide ? sans voile --scrim en sombre (la palette en a un, DESIGN § 5)
+- design : tiroir Git, ligne HEAD : pastille de branche tronquée « ma… » alors que le tiroir est large
+- design : liste Projet 1440 px, cellule État décalée de ~3 px vers le haut
+- design : pastilles du menu ⋯ en clair non vues (lab sans Santé ni Récent)
+- revue3 : 01-vf-responsive.js:253 ranger() ré-attache toute la rangée : un bouton d'en-tête focalisé perd le focus (addHeaderButton tardif, franchissement de 1280 px)
+- revue3 : slot.hidden de #vf-coin-etat a deux propriétaires (02-vf-ligne-echec.js:36 et 02-vf-ligne-etat.js:70)
+- revue3 : test-cockpit-coquille.sh C3.3 empreinte vide #ask-live/.vp-status et retire .vf-ech au lieu de comparer avant/après
+- revue3 : 01-vf-responsive.js:62 la règle :has du groupe vide ne teste que [hidden] ; libellé « Suivre » sur rangée vide si vf-lock manque
+- revue3 : chrome-palette.mjs:195 commentaire périmé (aller sans réponse après palette), contredit par OG2.18/OG2.18d
+- revue3 : 07-vf-raccourcis.js:105-114 indentation des continuations incohérente
+- revue3 : message du commit 62ab1e17 annonce « aller et le clic » ; seul aller est prouvé (EC4.1)
+- 80-18 : durées de ci-shard-suites.sh mesurées sur le poste sous charge : à remplacer par la mesure du premier run CI
+- revue4 : observateurs-cliquet.mjs:13 ne compte que `new MutationObserver(` ; 7 observateurs posés par l'aide obs()/observer() (77-vf-git-tiroir:253, 02-vf-coin:106-108, 02-vf-ligne-etat:82, 02-vf-reperes:130-131) lui échappent (outil de 79-17)
+- revue4 : ci-shard-suites.sh:63 commentaire contradictoire (« une suite à la fois … trois en parallèle »)
+- revue4 : test-cockpit-coquille.sh sans ligne de durée dans ci-shard-suites.sh (DEFAUT 7 s)
+
+**Déclencheur de reprise :** la passe complète avant la release, ou la prochaine phase qui touche les onglets, la palette, le coin bas-droit ou le partage CI.
