@@ -149,7 +149,7 @@ echo "== D6b, D8, D8b la réserve est bornée à l'onglet Code, et ne change auc
 mesurer d8 mgr1 > "$WORK/d8-base.json"; cockpit_arreter; unset COCKPIT_MODULE; export VF_PORT="$PORT"
 mesurer d8 mgr1 > "$WORK/d8-reel.json"
 assert_eq D6b "Projet : géométrie de chaque carte (x, y, largeur, hauteur, pied) IDENTIQUE à celle du module sans réserve" "$(node "$AUX/cmp.mjs" "$WORK/d8-base.json" "$WORK/d8-reel.json" 'a.d8.projet.length > 150 && a.d8.projet === b.d8.projet')" "true"
-assert_eq D6b "Équipe : même géométrie, identique à 0 px" "$(node "$AUX/cmp.mjs" "$WORK/d8-base.json" "$WORK/d8-reel.json" 'a.d8.equipe.length > 150 && a.d8.equipe === b.d8.equipe')" "true"
+assert_eq D6b "Équipe (page sans canevas depuis 73-08) : même géométrie de la section et de ses éléments, identique à 0 px" "$(node "$AUX/cmp.mjs" "$WORK/d8-base.json" "$WORK/d8-reel.json" 'a.d8.equipe.length > 150 && a.d8.equipe === b.d8.equipe')" "true"
 assert_eq D6b "témoin positif : sur Code la réserve change bien la hauteur des cartes sans pied (le sans réserve en compte, le réel aucune)" "$(node "$AUX/cmp.mjs" "$WORK/d8-base.json" "$WORK/d8-reel.json" 'a.d8.code.some((x) => x.sansPied > 0) && b.d8.code.every((x) => x.sansPied === 0)')" "true"
 echo "  D8 (chiffres, avant → après la réserve) :"
 node "$AUX/cmp.mjs" "$WORK/d8-base.json" "$WORK/d8-reel.json" 'a.d8.code.map((x, i) => `${x.w} px ${x.cont} : ${x.cartes} cartes, ${x.sansPied} sans pied, hauteur ${x.H} → ${b.d8.code[i].H}, largeur ${x.W} → ${b.d8.code[i].W}, k ${x.k} → ${b.d8.code[i].k}`).join("\n")' | sed 's/^/    /'

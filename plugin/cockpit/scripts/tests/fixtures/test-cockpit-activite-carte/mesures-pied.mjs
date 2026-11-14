@@ -48,6 +48,7 @@ const SONDES = (theme) => `(() => { document.documentElement.setAttribute('data-
   const t = document.createElement('i'); t.style.cssText = 'color:var(--recent)'; zone.append(t); out.vert = rgb(getComputedStyle(t).color); t.style.color = 'var(--recent-text)'; out.recentTexte = rgb(getComputedStyle(t).color);
   zone.remove(); return JSON.stringify(out); })()`;
 
+const GEOM_EQUIPE = `JSON.stringify([...document.querySelectorAll('section#vf-equipe, section#vf-equipe *')].map((e) => { const r = e.getBoundingClientRect(); return [e.tagName, e.id, Math.round(r.x), Math.round(r.y), Math.round(r.width), Math.round(r.height)]; }))`;
 const GEOM = `JSON.stringify({ L: VibeFlow.state.layout.children.map((c) => [c.id, Math.round(c.x), Math.round(c.y), c.width, c.height]), F: [...document.querySelectorAll('#viewport .node')].map((g) => { const f = g.querySelector('.card .foot'), c = g.querySelector('.card'); return [f ? f.offsetHeight : null, c ? c.offsetWidth : null, c ? c.offsetHeight : null]; }), k: Math.round(VibeFlow.state.t.k * 1000) / 1000, H: Math.round(VibeFlow.state.bounds.h), W: Math.round(VibeFlow.state.bounds.w) })`;
 
 export const mesuresPied = {
@@ -74,7 +75,13 @@ export const mesuresPied = {
       }
     }
     await c.vue(1440, 900); await c.charger('project.html'); await c.stabiliser(() => s.ev(GEOM), { pas: 200, max: 12000 }); o.projet = await s.ev(GEOM);
-    if (c.sid) { await c.charger('equipe.html'); await c.aller('n:ag-' + c.sid); await c.stabiliser(() => s.ev(GEOM), { pas: 200, max: 12000 }); o.equipe = await s.ev(GEOM); }
+    // depuis 73-08 la page Équipe n'a plus de canevas ni de carte : elle est prête quand body.vf-regie-montee et section#vf-equipe sont là,
+    // et ce qui se compare est la géométrie de la section et de tout ce qu'elle contient
+    if (c.sid) {
+      await s.naviguer(`${c.racine}/equipe.html?lang=fr`);
+      await s.attendre("document.readyState === 'complete' && document.body.classList.contains('vf-regie-montee') && !!document.querySelector('section#vf-equipe')", 'page Équipe montée');
+      await c.stabiliser(() => s.ev(GEOM_EQUIPE), { pas: 200, max: 12000 }); o.equipe = await s.ev(GEOM_EQUIPE);
+    }
     return o;
   },
   // D9, D9b, D9d : silhouettes à k = 0,42, paliers de barres, pavé d'encre dans le viewBox
