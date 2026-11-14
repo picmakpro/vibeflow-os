@@ -18,7 +18,7 @@
 //   tab-titre         : (EK18, S6, revue du 2026-11-08) 1 440 px : vraies touches Tab, le titre de la régie (#vf-equipe-entete) n'est un arrêt ni Git fermé, ni Git ouvert, ni refermé → { ferme, ouvert, referme, verdict } · libelles (EK11) : ligne des sources du tiroir et infobulle de la recherche → { src, titre }
 // Rend une ligne JSON { ... } ou { erreur }. Socle : chrome-session.mjs (une instance de Chrome, fermée proprement).
 import { executer } from './chrome-session.mjs';
-import { parcoursTab } from './chrome-parcours-tab.mjs';
+import { parcoursTab, secondeVue } from './chrome-parcours-tab.mjs';
 const [, , chrome, url] = process.argv;
 const ACTION = process.env.EK_ACTION || '';
 const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
@@ -235,7 +235,7 @@ await executer(chrome, async (s) => {
   if (ACTION === 'tab-titre') { // (EK18, S6 de la revue du 2026-11-08) à 1 440 px, avec le tiroir Git ouvert, le titre de la vue (masqué dessous) n'est plus un arrêt de Tab ; fermé, il l'est de nouveau (la définition du titre reste atteignable au clavier, PU-G-193)
     await s.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 800, deviceScaleFactor: 1, mobile: false });
     await s.attendre("!!window.VFGitTiroir && !!document.querySelector('#vf-equipe-entete h1')", 'tiroir Git et titre de la régie');
-    await calme();
+    await calme(); if (process.env.EK_VUE === '2') { await secondeVue(s); await calme(); }
     const detail = {}; // les arrêts visités à chaque parcours (balise, id ou classe, texte court, tabindex, visibilité) : le DIAG de la suite les montre quand le verdict n'est pas celui attendu
     // parcours de Tab (départ explicite, cycle borné, arrêts visités rangés dans detail[nom] pour le DIAG) : voir chrome-parcours-tab.mjs
     const parcours = (nom) => parcoursTab(s, touche, detail, nom);
