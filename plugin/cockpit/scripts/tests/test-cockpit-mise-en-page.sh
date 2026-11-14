@@ -126,7 +126,8 @@ SEQ_ALL=""; SOMME_FUITES="$(printf '%s' "$TR" | oj 'j.worker.resume.fuites')"
 
 echo "=== W5 — le worker rend ce que rend le calcul en ligne (propriété à graine) ==="
 EQ="$(chrome equivalence)"; [ -n "${KEEP:-}" ] && printf '%s\n' "$EQ" > "$WORK/equivalence.json"
-assert_eq "W5.1 — moteur entier, trois niveaux (code, lots, équipe) : positions des cartes et sections des arêtes égales entre le mode worker et le mode en ligne ; le mode worker a bien construit un worker, le mode en ligne aucun" "$(printf '%s' "$EQ" | oj 'Object.entries(j.niveaux).map(([k, v]) => k + ":" + (v.cartes > 0 && v.egalCartes && v.egalAretes && v.construitsWorker === 1 && v.construitsLigne === 0)).join(" ")')" "code:true lots:true equipe:true"
+assert_eq "W5.1 — moteur entier, deux niveaux de mise en page (code, lots) : positions des cartes et sections des arêtes égales entre le mode worker et le mode en ligne ; le mode worker a bien construit un worker, le mode en ligne aucun" "$(printf '%s' "$EQ" | oj 'Object.entries(j.niveaux).filter(([k]) => k !== "equipe").map(([k, v]) => k + ":" + (v.cartes > 0 && v.egalCartes && v.egalAretes && v.construitsWorker === 1 && v.construitsLigne === 0)).join(" ")')" "code:true lots:true"
+assert_eq "W5.1 (équipe, 73-08) — témoin : la page Équipe n'a plus de mise en page : zéro carte, le worker construit une fois en mode worker comme sur les autres niveaux, aucun en mode en ligne (un canevas rendu à Équipe rougit par les cartes)" "$(printf '%s' "$EQ" | oj '(() => { const v = j.niveaux.equipe; return v ? [v.cartes, v.construitsWorker, v.construitsLigne] : "absent"; })()')" "[0,1,0]"
 for G in $GRAINES; do
   prop graphes "$CHROME" "http://127.0.0.1:$PORT" "$G"
   echo "  $PG"

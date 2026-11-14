@@ -13,7 +13,7 @@ import { sonde, charger, VUE_POSEE, LIRE } from './mise-en-page-sonde.mjs';
 const [, , chrome, racine, mode, arg] = process.argv;
 const SECRETS = [process.env.MEP_LAB || '', 'MQ18-LAB'].filter(Boolean);
 const LOTS = "VibeFlow.reveal('f:lots/m05.js')";
-const POSITIONS = "(() => { const l = VibeFlow.state.layout; return { cartes: l.children.map((n) => [n.id, n.x, n.y, n.width, n.height]).sort(), "
+const POSITIONS = "(() => { const l = VibeFlow.state.layout || { children: [], edges: [] }; return { cartes: l.children.map((n) => [n.id, n.x, n.y, n.width, n.height]).sort(), "
   + "aretes: (l.edges || []).map((e) => [e.id, JSON.stringify(e.sections || [])]).sort() }; })()";
 
 // une page neuve sous la sonde : la fenêtre est posée AVANT la navigation (la coquille attend le démarrage du moteur, qui lit innerWidth)

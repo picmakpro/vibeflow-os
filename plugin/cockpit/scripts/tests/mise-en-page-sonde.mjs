@@ -10,6 +10,8 @@ import { pause, stabiliser } from './chrome-session.mjs';
 
 export const INTERDITES = ['doing', 'mandat', 'messages', 'outils', 'fil'];
 export const PRET = "document.readyState === 'complete' && !!window.VibeFlow && !!window.VibeFlow.state && !!window.VibeFlow.state.layout";
+// 73-08 : l'onglet Équipe n'a plus de canevas ; il est posé quand la régie est montée (la page n'a alors ni mise en page ni cartes)
+export const REGIE = "document.body.classList.contains('vf-regie-montee') && !!document.querySelector('section#vf-equipe')";
 export const VUE_POSEE = "(() => { const v = document.querySelector('#viewport'); return !!v && v.style.opacity !== '0' && !v.classList.contains('anim'); })()";
 // l'état lu pour juger qu'une page est posée : onglet, conteneur, nombre de cartes et somme de leurs positions (stable = mise en page posée)
 export const LIRE = "JSON.stringify([window.VF_COQUILLE && window.VF_COQUILLE.onglet(), window.VibeFlow && window.VibeFlow.state && window.VibeFlow.state.container, "
@@ -66,7 +68,8 @@ export const sonde = ({ sansWorker = false, secrets = [], longueur = 260 } = {})
 
 // charge une adresse, attend la page posée (cartes, vue, état stable), ferme la visite guidée (Échap) ; la taille de fenêtre est posée AVANT par l'appelant
 export async function charger(s, url) {
-  await s.naviguer(url); await s.attendre(PRET, 'page prête'); await s.attendre("!!document.querySelector('#viewport .node')", 'cartes');
+  await s.naviguer(url); await s.attendre(`(${PRET}) || (document.readyState === 'complete' && ${REGIE})`, 'page prête');
+  await s.attendre(`!!document.querySelector('#viewport .node') || (${REGIE})`, 'cartes ou régie');
   await s.attendre(VUE_POSEE, 'vue posée'); await stabiliser(() => s.ev(LIRE), { pas: 120, max: 8000 });
   for (const type of ['keyDown', 'keyUp']) await s.send('Input.dispatchKeyEvent', { type, key: 'Escape', code: 'Escape', windowsVirtualKeyCode: 27, nativeVirtualKeyCode: 27 });
   await pause(200);
