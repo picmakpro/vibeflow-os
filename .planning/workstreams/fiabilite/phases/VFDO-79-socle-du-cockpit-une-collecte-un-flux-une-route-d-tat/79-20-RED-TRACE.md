@@ -78,3 +78,10 @@ Suite vendor rejouée : 283 PASS / 3 FAIL : V12.4 (rouge voulu) et V11.Q6b, V11.
 - Écart au plan R10 : les cinq cas du corps `inconnu` sont ceux du SUMMARY de 79-22 (avant le premier tour, agent né depuis le dernier tour ou sorti de la fenêtre, fichier disparu, exception de lecture, file pleine ou délai) ; un identifiant mal formé reste un 400 `id-invalide` (le plan disait « identifiant refusé » parmi les cinq).
 - Écart : « Retiré » du plan nomme des modules du moteur que le README n'a jamais cités ; seuls les jetons de V12.4 sont gardés.
 - `dc_verifier` sur la racine réelle : 15 contrôles OK. `check-machine-paths.sh` : exit 0. `check-version-sync.sh` : exit 0.
+
+## Tâche 3 : CHANGELOG, description de `module.json`, compteur
+- CHANGELOG, section en tête : titre `## v1.5.0 — 2026-11-14 — non publié` ; cinq titres `### … — Phase 79` ; 16 puces sous « Retiré » (plan : au moins douze) ; « aucun bump de version à ce stade » : 0 occurrence dans la section ; `## Non publié` : 0 ; la citation de canal et de date des décisions déléguées : 3 occurrences ; jetons de détachement de 79-19 : 0.
+- `module.json` : JSON valide, description complétée d'une phrase, version v1.5.0, type « skill + scripts + moteur (fork de floorplan) ».
+- COMPTEUR-AVANT 244 (README.md l.65 et README.fr.md l.67, première occurrence) ; COMPTEUR-APRES 244 ; nombre réel du gate (`find plugin scripts -path '*/tests/test-*.sh'`) : 244. `check-version-sync.sh` vert : aucun des deux README racine n'a été touché.
+- Balayage de prose (section, README, `module.json`, trace) : 0 chemin du poste, identifiant de session ni marqueur de fixture ; témoin positif : une ligne plantée est comptée (1). `check-machine-paths.sh` : exit 0.
+- Fichiers qui citent les deux jetons de détachement hors `.planning/` : 0 à AVANT-20, 0 à HEAD.
