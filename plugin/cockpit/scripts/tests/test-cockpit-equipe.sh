@@ -14,6 +14,8 @@
 #   EUI rendu de l'arbre hors navigateur (vm) : imbrication, terminés repliés, liens dans les deux sens, pied (CKPT-19 à 22 ; P69-D-14 à P69-D-18)
 #   EK  clavier et témoins mineurs de l'onglet Équipe dans un vrai Chromium : focus après Entrée sur « Lire le transcript », mutants de comportement (UIFN-12, UIFN-13)
 # 69-04 ajoute E23 et EUI.
+# Phase 73 : propriété → nouveau support (P73-D-04, plan 73-10). EUI.3 : le pli « Terminés depuis moins de 24 h » du tiroir devient le lien « N à relire dans Équipe » (compté avec l'état « lu »,
+#   ancre equipe.html#vf-a-relire) ; EUI2.20 : le libellé du bloc des terminés devient celui du lien. Les témoins du canevas et du panneau d'item avaient suivi la régie au plan 73-08.
 # Phase 73 (plan 73-08, P73-D-04) : le canevas de cartes d'Équipe est retiré ; chaque témoin du canevas suit la régie (même propriété, nouveau support), aucun n'est supprimé. Propriété -> support :
 #   E23.4 enveloppe : « 0 carte, meta conservée » · EUI2.8, 2.9, 2.23, 2.24 entrées piégées et mutants « pied brut », « nœud brut » : ligne de la régie (vm-regie-page.mjs ; mutants sur 72-vf-regie-rendu.js)
 #   EUI2.10 à 2.13, 2.25, 2.26 rechargement et signature : 0 rechargement, mise à jour en place, clé de ligne (mutants de clé) · EUI2.14 à 2.16 arrivée sur une carte : ancre de la ligne, une fois · EUI2.18c effectifs : sous-titre de la régie
@@ -541,7 +543,7 @@ node "$AUX/vm-rendu.mjs" "$RENDU" "$AUX/pilote-pied.js" "$AUX/workers-eui.json" 
 G "$WORK/vm-arbre.json" 'j.erreur||j.retour' > "$WORK/arbre.html"
 assert_eq "EUI.1 — arbre : w1 est imbriqué sous mgr1 et mgr1 sous la session" "$(node "$AUX/nid.mjs" "$WORK/arbre.html" w1 mgr1)" "mgr1,$SID"
 assert_eq "EUI.2 — le tiroir (70-vf-live.js) appelle __vfEquipeRendu.arbre" "$([ "$(grep -c '__vfEquipeRendu\.arbre' "$UI/70-vf-live.js")" -ge 1 ] && echo appelle || echo non)" "appelle"
-assert_eq "EUI.3 — fin2h est dans un details.vf-termines fermé dont le résumé dit « Terminés depuis moins de 24 h »" "$(node "$AUX/nid.mjs" "$WORK/arbre.html" --termine fin2h)" "ferme|resume"
+assert_eq "EUI.3 — fin2h n'est plus listé dans le tiroir (aucun details.vf-termines) ; le lien « 1 à relire dans Équipe » le compte et mène à equipe.html#vf-a-relire (P73-D-14)" "$(node "$AUX/nid.mjs" "$WORK/arbre.html" fin2h)|$(grep -c 'vf-termines' "$WORK/arbre.html" | tr -d ' ')|$(grep -o '<a [^>]*href="equipe.html#vf-a-relire"[^>]*>[^<]*</a>' "$WORK/arbre.html" | sed -E 's/<[^>]*>//g')" "absent|0|1 à relire dans Équipe"
 assert_has "EUI.4 — un agent rattaché porte le lien vers son nœud de mission" "$(cat "$WORK/arbre.html")" 'href="project.html#r=f%3A.planning%2Fmissions%2Fm1.dag.json%23revue-p3"'
 assert_eq "EUI.5 — agentsDuNoeud : le lien vers la carte de w1 pour le nœud rattaché, une chaîne vide pour un nœud sans agent" "$(G "$WORK/vm-noeud.json" 'j.erreur||(String(j.retour.a).includes("equipe.html#r=n%3Aag-w1")+"|"+JSON.stringify(j.retour.b))')" 'true|""'
 assert_eq "EUI.6 — pied(a-bash) dit « actif » et « lance une commande »" "$(G "$WORK/vm-pied.json" 'j.erreur||(String(j.retour).includes("actif")+"|"+String(j.retour).includes("lance une commande"))')" "true|true"
@@ -851,14 +853,14 @@ try {
   const R = ctx.window.__vfEquipeRendu;
   const S = { kind: 'session', id: 'S', etat: 'actif', tree: '.' }, A = { kind: 'subagent', id: 'A', etat: 'en-attente', parent: 'S', tree: '.' }, F = { kind: 'subagent', id: 'F', etat: 'termine', parent: 'S', tree: '.' };
   const html = R.arbre([S, A, F], h);
-  for (const [nom, attendu] of [['titre session', 'Session principale'], ['rôle sous-agent', '<b>Agent</b>'], ['mot lu « en attente »', '(en attente'], ['mot visible « en attente »', ' · en attente'], ['mot lu « terminé »', '(terminé)'], ['titre du bloc des terminés', 'Terminés depuis moins de 24 h (1)']]) if (!html.includes(attendu)) ko.push(nom);
+  for (const [nom, attendu] of [['titre session', 'Session principale'], ['rôle sous-agent', '<b>Agent</b>'], ['mot lu « en attente »', '(en attente'], ['mot visible « en attente »', ' · en attente'], ['mot lu « terminé »', '(terminé)'], ['lien des terminés (P73-D-14)', '1 à relire dans Équipe']]) if (!html.includes(attendu)) ko.push(nom);
   if (!R.pied(A).startsWith('en attente')) ko.push('pied en attente : ' + R.pied(A));
   if (!R.pied(F).startsWith('terminé')) ko.push('pied terminé : ' + R.pied(F));
   if (!R.pied(S).startsWith('actif')) ko.push('pied actif : ' + R.pied(S));
 } catch (e) { ko.push('exécution : ' + String(e.message).slice(0, 100)); }
 console.log(ko.length ? ko.join(' ; ') : 'ok');
 JS
-assert_eq "EUI2.20 — libellés exacts : Session principale, rôle, « en attente » (lu et visible), « terminé », bloc « Terminés depuis moins de 24 h (1) »" "$(node "$AUX/libelles71.mjs" "$RENDU")" "ok"
+assert_eq "EUI2.20 — libellés exacts : Session principale, rôle, « en attente » (lu et visible), « terminé », lien « 1 à relire dans Équipe »" "$(node "$AUX/libelles71.mjs" "$RENDU")" "ok"
 M "$RENDU" "$MUT/71-attente.js" "'en attente'" "'en-attente'"
 assert_has "EUI2.21 — mutant : « en attente » devient « en-attente » -> détecté" "$(node "$AUX/libelles71.mjs" "$MUT/71-attente.js")" "pied en attente"
 M "$RENDU" "$MUT/71-noeud.js" 'Nœud ${h(w.rattachement.noeud)}' 'Nœud ${w.rattachement.noeud}'

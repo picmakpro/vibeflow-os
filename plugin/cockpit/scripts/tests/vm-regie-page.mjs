@@ -30,20 +30,24 @@ const hand = {}, noeuds = [];
 const appelSC = (n, f) => (...a) => { journal.sc.push(n); return f ? f(...a) : undefined; };
 const SC = { selected: null, graph: { meta: { vfTab: ong0, vf: {} }, nodes: noeuds, project: { name: 'p' } }, h, setOverview: appelSC('setOverview'), addPanelSection() {}, rerender: appelSC('rerender', async () => {}),
   on: (e, f) => { (hand[e] ||= []).push(f); }, exists: (id) => noeuds.includes(id), reveal: (id) => journal.reveals.push(id), toast: (m) => journal.toasts.push(m), closePanel() { journal.sc.push('closePanel'); panneau.replaceChildren(); },
+  addHeaderButton(o) { const b = el('button', o.id); b.addEventListener('click', o.onClick); journal.sc.push('addHeaderButton'); return b; },
   showPanel(html, bind) { journal.sc.push('showPanel'); journal.panneauHtml = html; panneau.replaceChildren(); if (bind) bind(panneau); } };
 const tick = () => new Promise((r) => setImmediate(r));
 // fetch factice : enregistre l'URL et les en-têtes, rend le transcript du scénario
 const fetchF = async (url, opts = {}) => { if (!/\/api\/vf\/(ailleurs|git)/.test(String(url))) journal.fetchs.push({ url: String(url), entetes: Object.values((opts && opts.headers) || {}) }); return { ok: true, status: 200, json: async () => S.transcript || { fil: [{ genre: 'message', texte: 'texte du transcript factice' }] } }; };
+// VF_FLUX minimal (79-14) : 70-vf-live.js ouvre le flux partagé ; ici un flux sans événement
+W.VF_FLUX = { ouvrir: () => ({ addEventListener() {}, close() {} }) };
 Object.assign(W, { Floorplan: SC, FLOORPLAN_SERVER: S.serveur === false ? undefined : { token: JETON }, location: loc, sessionStorage: session, localStorage: local, fetch: fetchF,
   EventSource: class { addEventListener() {} close() {} } });
 // VF_ETAT simulé d'après ui/70-vf-etat.js (79-17) : lire(cle) (who = l'objet, lock = { seq, verrous: { liste } }, connexion = 'ouvert'|'perdu'|'reprise'), abonner(cle, rappel) rend
 // le désabonnement, abonnes(), jeton(), lireJson(chemin) (GET avec l'en-tête x-vf-cockpit-token)
-const notifier = (cle) => { for (const f of [...(abos.get(cle) || [])]) f(); };
+const notifier = (cle, v) => { for (const f of [...(abos.get(cle) || [])]) f(v); }; // comme VF_ETAT : la valeur posée est passée au rappel
 if (S.source === 'etat') W.VF_ETAT = { lire: (k) => (k === 'who' ? etat.who : k === 'lock' ? { seq: 1, verrous: { etat: 'lue', plat: false, liste: etat.lock || [] } } : k === 'connexion' ? etat.connexion : null),
   abonner: (k, f) => { if (!abos.has(k)) abos.set(k, new Set()); abos.get(k).add(f); return () => abos.get(k).delete(f); }, jeton: () => JETON, abonnes: () => ({}),
   lireJson: async (url) => { const r = await fetchF(url, { headers: { 'x-vf-cockpit-token': JETON } }); return r.json(); } };
 etat.who = S.who || null; etat.lock = S.lock || null;
 if (S.source !== 'etat') W.__vfLive = { who: etat.who, whoAt: horloge.now, lock: etat.lock, connected: true };
+if (S.lus) W.__vfRegieLu = { lus: () => new Set(S.lus), marquer() {} }; // état « lu » simulé (90-vf-titre.js) : les identifiants du scénario
 if (S.onglets) W.VF_ONGLETS = { aller() {} };
 Object.defineProperty(W, 'VF_PANNEAU', { get() { compteurs.panneauLu++; return undefined; }, configurable: true });
 // VF_SURCOUCHES simulé (80-02) : 'pile' ferme la surcouche du dessus à Échap (capture sur window, preventDefault puis stopPropagation) ; 'terminal' : ouverte() vrai, l'appui passe intact
@@ -99,8 +103,8 @@ try {
     let r;
     try {
       if (e.poser) { etat.who = e.poser.who; if (e.poser.lock !== undefined) etat.lock = e.poser.lock;
-        if (S.source === 'etat') { notifier('who'); notifier('lock'); } else { W.__vfLive.who = etat.who; W.__vfLive.whoAt = horloge.now; W.__vfLive.lock = etat.lock; D.dispatchEvent(new Evt('vf-who')); } }
-      else if (e.conn) { if (S.source === 'etat') { etat.connexion = e.conn; notifier('connexion'); } else { W.__vfLive.connected = e.conn === 'ouvert'; D.dispatchEvent(new Evt('vf-who')); } }
+        if (S.source === 'etat') { notifier('who', etat.who); notifier('lock', { seq: 1, verrous: { etat: 'lue', plat: false, liste: etat.lock || [] } }); } else { W.__vfLive.who = etat.who; W.__vfLive.whoAt = horloge.now; W.__vfLive.lock = etat.lock; D.dispatchEvent(new Evt('vf-who')); } }
+      else if (e.conn) { if (S.source === 'etat') { etat.connexion = e.conn; notifier('connexion', e.conn); } else { W.__vfLive.connected = e.conn === 'ouvert'; D.dispatchEvent(new Evt('vf-who')); } }
       else if (e.avancer !== undefined) dom.avancer(e.avancer);
       else if (e.clic) q(e.clic, e.indice || 0).click();
       else if (e.focus) q(e.focus, e.indice || 0).focus();
