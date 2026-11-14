@@ -65,7 +65,7 @@
     }
     if (r.status === 200) { const texte = await r.text(); retenu[nom] = { etag: r.headers.get('ETag') || '', texte }; }
     else if (r.status !== 304 || !retenu[nom]) {
-      cause = 'Le serveur du cockpit a répondu ' + r.status + ' au lieu des données.'; throw new Error(MESSAGE_LECTURE);
+      cause = 'Le serveur du cockpit a répondu ' + r.status + ' au lieu des données. Relancez-le, puis réessayez.'; throw new Error(MESSAGE_LECTURE);
     }
     return JSON.parse(retenu[nom].texte);
   }
@@ -84,9 +84,12 @@
       // le nœud reste sans fond ni couleur propres (il suit le thème) ; la carte porte la couleur et, par son ombre étalée, masque tout ce qui reste derrière
       + ' #vf-coquille-echec .vf-ce { width: 100%; max-width: 440px; box-sizing: border-box; display: flex; flex-direction: column; gap: var(--sp-12, 12px);'
       + ' padding: var(--sp-24, 24px); border-radius: var(--r-card, 14px); background: var(--surface, #1a1a1c); color: var(--text, #ededed);'
-      + ' font-family: var(--sans, system-ui, sans-serif); box-shadow: 0 0 0 100vmax var(--bg, #0b0b0c); }'
+      + ' font-family: var(--sans, system-ui, sans-serif); box-shadow: var(--shadow-card, 0 1px 2px rgba(0, 0, 0, .3)); }'
+      // le squelette (barre de recherche, panneau, flux…) n'a rien à montrer : ni visible, ni atteignable au clavier, tant que l'écran est là
+      + ' body.vf-ce-actif > :not(#stage):not(script):not(style), body.vf-ce-actif #stage > :not(#vf-coquille-echec) { visibility: hidden !important; }'
+      + ' body.vf-ce-actif #vf-coquille-echec { visibility: visible; }'
       + ' #vf-coquille-echec h1 { margin: 0; font-size: 20px; font-weight: 600; letter-spacing: -.015em; }'
-      + ' #vf-coquille-echec p { margin: 0; font-size: 14px; line-height: 1.5; overflow-wrap: anywhere; }'
+      + ' #vf-coquille-echec p { margin: 0; font-size: 15px; line-height: 1.5; overflow-wrap: anywhere; }'
       + ' #vf-coquille-echec .vf-ce-cause { color: var(--text-2, #a8a8a8); }'
       + ' #vf-coquille-echec button { align-self: flex-start; min-height: 44px; min-width: 44px; margin-top: var(--sp-8, 8px); padding: 0 var(--sp-20, 20px);'
       + ' border: 1px solid var(--hair-2, #3a3a3d); border-radius: var(--r-ctl, 10px); background: var(--surface, #1a1a1c); color: inherit; font: inherit;'
@@ -98,7 +101,7 @@
     q.className = 'vf-ce-cause'; q.textContent = cause || 'La cause n\'a pas été relevée ; réessayez, puis consultez le terminal du cockpit.';
     b.type = 'button'; b.textContent = 'Réessayer';
     b.addEventListener('click', () => { chargerOnglet(nom).catch(() => {}); });
-    c.className = 'vf-ce'; c.append(h, t, q, b); n.append(s, c); (D.getElementById('stage') || D.body).appendChild(n);
+    c.className = 'vf-ce'; c.append(h, t, q, b); n.append(s, c); (D.getElementById('stage') || D.body).appendChild(n); D.body.classList.add('vf-ce-actif');
   }
   function echec(nom, motif) {
     etat = { onglet: nom, phase: 'echec', motif };
@@ -137,7 +140,7 @@
     etat = { onglet: nom, phase: 'chargement', motif: null };
     let graphe;
     try { graphe = await lireGraphe(nom); } catch (e) { echec(nom, 'lecture'); throw e; }
-    D.getElementById('vf-coquille-echec')?.remove();
+    D.getElementById('vf-coquille-echec')?.remove(); D.body.classList.remove('vf-ce-actif');
     H.dataset.vfPret = 'non';
     for (const ins of [...inscriptions].reverse()) nettoyer(ins); // les fonctions rendues par les rappels, avant le démontage
     // les rappels inscrits par les scripts de l'onglet affiché (au démarrage) s'en vont avec lui : ses scripts sont ré-exécutés et s'inscriront de nouveau
