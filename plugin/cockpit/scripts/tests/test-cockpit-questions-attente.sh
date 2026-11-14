@@ -67,7 +67,7 @@ const CTX = (txt, key = '|90', ws = '', fichier = 'p/90-CONTEXT.md') => ({ key, 
 const PH = new Map([['|90', 'ph-90'], ['a|90', 'ph-90@a'], ['b|90', 'ph-90@b'], ['fiabilite|76', 'ph-76@fiabilite']]);
 const L = (ctxs, o = {}) => lireQuestions({ contextes: ctxs, phases: PH, ...o });
 const un = (entree, avant) => { const r = L([CTX(SEC([entree], avant))]); return { r, e: r.liste[0] }; };
-const MAL = ['id', 'phase', 'fichier', 'ligne', 'defauts'];
+const MAL = ['id', 'phase', 'fichier', 'ligne', 'etat', 'defauts']; // + etat : la page lit etat === 'mal-formee'
 
 // T13.4 — un cas par valeur fermée de defauts, tous mal formés, témoin positif voisin
 const cas4 = [
