@@ -89,7 +89,7 @@ if (mode === 'temoin') {
     await s.send('Emulation.setFocusEmulationEnabled', { enabled: true });
     const pose = async () => { await s.attendre("document.documentElement.dataset.vfPret === 'oui'", 'onglet prêt'); await s.attendre(VUE_POSEE, 'vue posée'); await stabiliser(() => s.ev(LIRE), { pas: 150, max: 12000 }); };
     const etat = async () => JSON.parse(await s.ev(`JSON.stringify({ r: JSON.parse(window.__mep.resume()), onglet: VF_COQUILLE.onglet(), hash: location.hash,
-      pos: VibeFlow.state.layout.children.map((n) => [n.id, n.x, n.y, n.width, n.height]).sort(), texte: document.querySelector('#empty').textContent })`));
+      pos: ((VibeFlow.state.layout && VibeFlow.state.layout.children) || []).map((n) => [n.id, n.x, n.y, n.width, n.height]).sort(), texte: document.querySelector('#empty').textContent })`));
     // une suite jouée dans un document neuf ; sansWorker : le même moteur en mode en ligne, l'ORACLE (même suite, mêmes états internes : aucune dérive d'état d'onglet ne s'y mêle)
     const jouer = async (si, su, sansWorker) => {
       const { identifier } = await s.send('Page.addScriptToEvaluateOnNewDocument', { source: sonde({ secrets: SECRETS, sansWorker }) });
