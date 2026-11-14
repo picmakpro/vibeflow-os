@@ -65,3 +65,34 @@ Vert après le peintre de `ui/75-vf-marques.js` (`peindre`, branché par défaut
 D4 : 18 séries (1440, 1024 et 390 px ; deux conteneurs ; trois paliers de zoom), chacune avec poser, retirer, cinq bascules et une mise à jour de la couche ; la mise en page en worker
 est attendue stable (`stabiliser`, deux relevés identiques) avant chaque relevé. Les cartes de fichier d'un dossier n'ont pas encore de pied à ce stade (neuf séries sans marque, comptées
 comme telles) : la réserve du pied (tâche 2) porte la mesure aux 18 séries.
+
+## Tâche 2 — D6 à D12, D17 (pied réservé, glyphes, contraste, zooms)
+
+Rouge sur la tête de la tâche 1 (`8d3459ba`) : D4 attend 18 séries marquées et en obtient 9 (les cartes de fichier d'un dossier n'ont pas de pied, la marque n'a nulle part où se poser) ;
+D6 : 31 cartes de fichier dont 30 sans pied (obtenu : hauteurs `[null, 20]` sur `src/a`, `[null]` sur `src/b`, aux trois zooms ; attendu 20, 20, 28, 28).
+
+Constats de la mesure (le témoin D9b a rougi d'abord, puis a été corrigé et re-mesuré, jamais affaibli) :
+- D9b rouge avec la géométrie de la spec (barres de 3, écart de 1,5 unité : 0,945 px à k = 0,42, aucune colonne éteinte garantie) : `bas,moyen,haut` en défaut. Correction demandée par la spec
+  (« élargir dans le viewBox et remesurer ») : barres en x = 1,5 / 6,5 / 11,5, largeur 3, écart 2 ; aires et hauteurs inchangées. Le critère « autant de hauteurs distinctes que de barres » se lit
+  sur la colonne la plus haute de chaque barre (les colonnes de bord, à demi couvertes, varient d'un pixel selon le décalage).
+- D9d : le confluent de la spec (tige jusqu'à y = 14, capuchon rond) sortait de [1,5 ; 14,5] ; tige ramenée à y = 13,5. Le bouclier évidé est le tracé du bouclier décalé de 1 vers l'intérieur
+  (trait de 2 : le sommet reste à y = 1,5).
+- Pavé d'encre, contraste et silhouettes : verts dès la première mesure (le contraste est calculé sur les couleurs résolues dans la page, deux thèmes ; `--recent` n'est employé que par « en cours »,
+  `--recent-text` sur `.card.module`).
+
+D8 (chiffres consignés, avant → après la réserve, lab de la suite : un nœud de 33 fichiers en deux dossiers virtuels) :
+
+```
+1440 px root : 2 cartes, 0 sans pied, hauteur 472 → 472, largeur 380 → 380, k 1.1 → 1.1
+1440 px n:d-src : 2 cartes, 0 sans pied, hauteur 218 → 218, largeur 754 → 754, k 1.1 → 1.1
+1440 px d:d-src|src/a : 16 cartes, 14 sans pied, hauteur 2206 → 2598, largeur 644 → 644, k 0.846 → 0.846
+1440 px d:d-src|src/b : 17 cartes, 16 sans pied, hauteur 2340 → 2788, largeur 644 → 644, k 0.846 → 0.846
+390 px : mêmes valeurs (k 0.852 / 0.846 / 0.846 / 0.846)
+```
+
+D8b : aucun k d'ouverture ne change de palier (0,65 et 0,42) à 1440 ni à 390 px : `ARRET-D25` non déclenché. Projet et Équipe : géométrie IDENTIQUE à 0 px à celle du module copié avec la réserve
+neutralisée (D6b ; copie par `cockpit_module_muter_page`, ancre `const reserve = `) ; témoin positif : sur Code le module sans réserve compte des cartes sans pied, le réel n'en compte aucune.
+D17 : le keyframe `vfrespire` n'est PAS chargé sur l'onglet Code (`71-vf-equipe-rendu.js` ne se pose que sur Équipe) : `75-vf-marques-glyphes.js` pose son propre keyframe `vfm-respire`
+(mêmes valeurs : 1 → .82, 2,4 s) et sa coupure sous `prefers-reduced-motion` ; animation calculée `vfm-respire` en mouvement normal, `none` en mouvement réduit.
+Voisines rejouées sans les affaiblir : `test-cockpit-moteur-carte.sh` (vert), `test-cockpit-equipe.sh` (vert, EK10 et le mutant d'équipe compris), `test-cockpit-responsive.sh` (R1 et R3 verts ; reste de la suite : voir le SUMMARY).
+Mutants de D6b, D7, D8b, D9, D10, D11b, D12, D17 : levés (régime allégé).

@@ -1035,7 +1035,9 @@ function cardFoot(item) {
   const vst = i.n?.st || i.f?.st;
   const rec = recentOf(item), inside = recentIn.get(item.startsWith('m:') ? 'f:' + item.slice(2) : item);
   const pill = vst ? `<span class="vst vst-${h(vst).replace(/[^\w-]/g, '')}">${h(STATE_WORD[vst] || vst)}</span>` : rec ? `<span class="rw">${recentLabel(rec)}</span>` : inside ? `<span class="rw soft">${t('{} changed', inside.length)}</span>` : '';
-  return size || pill ? `<div class="foot">${size ? `<span class="meta">${h(size)}</span>` : '<span></span>'}${pill}</div>` : '';
+  // 75-07 (P75-D-03, P75-D-25) : place RÉSERVÉE à la marque de lentille, sur l'onglet Code seulement (Projet et Équipe : géométrie inchangée), posée à la construction du graphe, jamais au changement de lentille
+  const reserve = !['project', 'equipe'].includes(G.meta?.vfTab) && (['dir', 'file', 'module'].includes(i.type) || (i.type === 'node' && i.n.kind !== 'external'));
+  return size || pill || reserve ? `<div class="foot">${size ? `<span class="meta">${h(size)}</span>` : '<span></span>'}${pill}</div>` : '';
 }
 /** Extra height a card needs beyond its base size: a footer, and a title long enough to wrap. */
 function cardExtraH(item) {

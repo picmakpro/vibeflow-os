@@ -95,8 +95,14 @@ import fs from 'node:fs'; let j; try { j = JSON.parse(fs.readFileSync(0, 'utf8')
 if (j.erreur) { console.log('mesure indisponible : ' + j.erreur); process.exit(0); }
 const v = new Function('j', 'return (' + process.argv[2] + ')')(j); console.log(typeof v === 'string' ? v : JSON.stringify(v));
 JS
-LAB="$WORK/lab"; mklab75 "$LAB"
-mesurer() { REAL_HOME="$REAL_HOME" node "$HERE/chrome-activite-carte.mjs" "$CHROME" "http://127.0.0.1:$VF_PORT" "$1" > "$WORK/mesure.json" 2> "$WORK/mesure.err"; cat "$WORK/mesure.json"; } # sections en $1 ; le serveur courant (VF_PORT)
+LAB="$WORK/lab"; mklab75 "$LAB"; LABG="$WORK/lab-nogit"; mklab75 "$LABG" nogit
+node "$FX/mk-agents.mjs" "$HOME" "$LAB" aaaa1111-2222-3333-4444-555555555555
+cat > "$AUX/cmp.mjs" <<'JS'
+import fs from 'node:fs'; const [, , fa, fb, expr] = process.argv; const lire = (f) => { try { const j = JSON.parse(fs.readFileSync(f, 'utf8')); return j.erreur ? { erreur: j.erreur } : j; } catch { return { erreur: 'illisible' }; } };
+const a = lire(fa), b = lire(fb); if (a.erreur || b.erreur) { console.log('mesure indisponible : ' + (a.erreur || b.erreur)); process.exit(0); }
+const v = new Function('a', 'b', 'return (' + expr + ')')(a, b); console.log(typeof v === 'string' ? v : JSON.stringify(v));
+JS
+mesurer() { REAL_HOME="$REAL_HOME" node "$HERE/chrome-activite-carte.mjs" "$CHROME" "http://127.0.0.1:$VF_PORT" "$1" "${2:-}" > "$WORK/mesure.json" 2> "$WORK/mesure.err"; cat "$WORK/mesure.json"; } # sections en $1 (et la session d'équipe en $2) ; le serveur courant (VF_PORT)
 E() { printf '%s' "$R" | node "$AUX/ev.mjs" "$1"; }
 mutant_rouge() { # mutant_rouge <nom> <sections> <expression de mutation sed, sur chaque source de page> <expression js : vraie quand la suite a VU le mutant> ; le serveur du mutant est arrêté ensuite
   local nom="$1" sec="$2" sed_="$3" vu="$4" RM
@@ -122,9 +128,64 @@ mutant_rouge "D3-texte-par-innerHTML" d3 's/e\.textContent = txt/e.innerHTML = t
 echo "== D4 géométrie invariante, aucun render() après une pose =="
 R="$(mesurer d4)"
 assert_eq D4 "trois largeurs, deux conteneurs, trois paliers de zoom : 18 séries mesurées" "$(E 'j.d4.length')" "18"
-assert_eq D4 "la pose a marqué des cartes dans chaque série qui en a un pied (mesure non aveugle ; les cartes de fichier sans pied : tâche 2)" "$(E 'j.d4.filter((x) => x.marques > 0).length')" "9"
+assert_eq D4 "la pose a marqué des cartes dans chacune des 18 séries (mesure non aveugle : toute carte marquable a son pied)" "$(E 'j.d4.filter((x) => x.marques > 0).length')" "18"
 assert_eq D4 "géométrie des cartes et hauteur des pieds identiques à 0 px après poser, retirer, cinq bascules et une mise à jour" "$(E 'j.d4.filter((x) => x.ecarts.length).length')" "0"
 assert_eq D4 "aucun événement render après les poses" "$(E 'j.d4.filter((x) => x.renders > 0).length')" "0"
 mutant_rouge "D4-pose-relance-le-placement" d4 's/const change = () => { index = null; dessiner(); };/const change = () => { index = null; dessiner(); if (moteur() \&\& moteur().rerender) moteur().rerender(); };/' 'j.d4.some((x) => x.renders > 0)'
+
+echo "== D6 le pied est réservé à la construction, sans lentille =="
+R="$(mesurer d6)"
+FICH='(c, z) => Object.values(j.d6).flatMap((o) => o[z]).filter((x) => x[0] === "f:")'
+assert_eq D6 "toute carte de fichier de l'onglet Code a un pied de 20 à l'ouverture, sans lentille ni taille" "$(E "(${FICH})(0, 'ouverture').every((x) => x[1] === 20)")" "true"
+assert_eq D6 "28 à lod-mid et à lod-low" "$(E "(${FICH})(0, 'mid').every((x) => x[1] === 28) && (${FICH})(0, 'bas').every((x) => x[1] === 28)")" "true"
+assert_eq D6 "témoin positif : il y a des cartes de fichier (31) et des connecteurs sans aucun pied" "$(E "[(${FICH})(0, 'ouverture').length, Object.values(j.d6).flatMap((o) => o.ouverture).filter((x) => x[0] === 'x:').length > 0, Object.values(j.d6).flatMap((o) => o.ouverture).filter((x) => x[0] === 'x:').every((x) => x[1] === null)].join('|')")" "31|true|true"
+echo "== D7 la réserve ne dépend ni de la lentille ni de git =="
+PORT_GIT="$VF_PORT"; cockpit_lancer "$LABG"; R7="$(mesurer d6)"; export VF_PORT="$PORT_GIT"
+printf '%s' "$R" > "$WORK/r-git.json"; printf '%s' "$R7" > "$WORK/r-nogit.json"
+assert_eq D7 "lab sans git : mêmes pieds, au même instant (aucune lentille posée dans les deux cas)" "$(node "$AUX/cmp.mjs" "$WORK/r-git.json" "$WORK/r-nogit.json" 'JSON.stringify(a.d6) === JSON.stringify(b.d6) && Object.keys(a.d6).length === 2')" "true"
+cockpit_module_muter_page sans-reserve 's/const reserve = /const reserve = false \&\& /' || { ok_ko "D6b : la mutation « sans réserve » n'a rien changé"; }
+cockpit_lancer "$LAB"; PORT_BASE="$VF_PORT"
+echo "== D6b, D8, D8b la réserve est bornée à l'onglet Code, et ne change aucun palier de zoom =="
+mesurer d8 mgr1 > "$WORK/d8-base.json"; cockpit_arreter; unset COCKPIT_MODULE; export VF_PORT="$PORT"
+mesurer d8 mgr1 > "$WORK/d8-reel.json"
+assert_eq D6b "Projet : géométrie de chaque carte (x, y, largeur, hauteur, pied) IDENTIQUE à celle du module sans réserve" "$(node "$AUX/cmp.mjs" "$WORK/d8-base.json" "$WORK/d8-reel.json" 'a.d8.projet.length > 150 && a.d8.projet === b.d8.projet')" "true"
+assert_eq D6b "Équipe : même géométrie, identique à 0 px" "$(node "$AUX/cmp.mjs" "$WORK/d8-base.json" "$WORK/d8-reel.json" 'a.d8.equipe.length > 150 && a.d8.equipe === b.d8.equipe')" "true"
+assert_eq D6b "témoin positif : sur Code la réserve change bien la hauteur des cartes sans pied (le sans réserve en compte, le réel aucune)" "$(node "$AUX/cmp.mjs" "$WORK/d8-base.json" "$WORK/d8-reel.json" 'a.d8.code.some((x) => x.sansPied > 0) && b.d8.code.every((x) => x.sansPied === 0)')" "true"
+echo "  D8 (chiffres, avant → après la réserve) :"
+node "$AUX/cmp.mjs" "$WORK/d8-base.json" "$WORK/d8-reel.json" 'a.d8.code.map((x, i) => `${x.w} px ${x.cont} : ${x.cartes} cartes, ${x.sansPied} sans pied, hauteur ${x.H} → ${b.d8.code[i].H}, largeur ${x.W} → ${b.d8.code[i].W}, k ${x.k} → ${b.d8.code[i].k}`).join("\n")' | sed 's/^/    /'
+PAL='(k) => (k < 0.42 ? "bas" : k < 0.65 ? "mid" : "ouverture")'
+if [ "$(node "$AUX/cmp.mjs" "$WORK/d8-base.json" "$WORK/d8-reel.json" "a.d8.code.every((x, i) => (${PAL})(x.k) === (${PAL})(b.d8.code[i].k))")" != true ]; then echo "  ARRET-D25 : la réserve du pied change le palier de zoom d'ouverture (0,65 ou 0,42) : arrêt, à remonter au manager"; FAIL=$((FAIL+1)); fin; fi
+assert_eq D8b "le k d'ouverture reste dans son palier (0,65 et 0,42) à 1440 et à 390 px, sur les quatre niveaux" "oui" "oui"
+
+echo "== D9 silhouettes à k = 0,42, paliers de barres, pavé d'encre =="
+R="$(mesurer d9)"
+assert_eq D9 "les quatre silhouettes d'Empreinte : distance de Jaccard >= 0,25 deux à deux" "$(E "j.d9.empreinte.filter((p) => p[1] < 0.25).map((p) => p.join('=')).join(',')")" ""
+assert_eq D9 "bouclier plein contre bouclier évidé barré : >= 0,25" "$(E "j.d9.boucliers.filter((p) => p[1] < 0.25).map((p) => p.join('=')).join(',')")" ""
+assert_eq D9 "{confluent, bouclier plein, bouclier évidé} deux à deux : >= 0,25" "$(E "j.d9.trio.filter((p) => p[1] < 0.25).map((p) => p.join('=')).join(',')")" ""
+assert_eq D9 "chaque glyphe à >= 0,25 du triangle « tolere » existant" "$(E "j.d9.tolere.filter((p) => p[1] < 0.25).map((p) => p.join('=')).join(',')")" ""
+assert_eq D9 "encre minimale : au moins 5 % de la boîte pour chacun des onze glyphes" "$(E "j.d9.encre.filter((p) => p[1] < 0.05).map((p) => p.join('=')).join(',')")" ""
+assert_eq D9b "barres 1, 2, 3 : autant de hauteurs distinctes que de barres, chacune séparée d'une colonne éteinte, aux quatre décalages" "$(E "j.d9.barres.filter(([, n, v]) => v.some((x) => x.groupes !== n || x.hauteurs !== n)).map((b) => b[0]).join(',')")" ""
+assert_eq D9b "palier bas à >= 0,25 du tiret « fini »" "$(E 'j.d9.basFini >= 0.25')" "true"
+assert_eq D9d "le pavé d'encre de chacun des onze glyphes tient dans [1,5 ; 14,5]² du viewBox, trait compris" "$(E "Object.entries(j.d9.ink).filter(([k, v]) => k !== 'tolere' && (v[0] < 1.45 || v[1] < 1.45 || v[2] > 14.55 || v[3] > 14.55)).map(([k, v]) => k + ':' + v.join('/')).join(',')")" ""
+
+echo "== D10 contraste, deux thèmes =="
+R="$(mesurer d10)"
+for TH in dark light; do
+  assert_eq D10 "thème $TH : chaque glyphe >= 3:1 sur --surface, --raise et le canevas (en cours : --recent sur --surface et le canevas, --recent-text sur .module)" "$(E "Object.entries(j.d10.$TH.min).filter(([, v]) => v < 3).map((p) => p.join('=')).join(',')")" ""
+  assert_eq D10 "thème $TH : --recent n'est employé que par « en cours » ; sur .module le glyphe « en cours » prend --recent-text" "$(E "[j.d10.$TH.recentHors.length, j.d10.$TH.enCoursSurRaise, j.d10.$TH.enCoursSurSurface].join('|')")" "0|true|true"
+done
+
+echo "== D11 trois zooms, D3b largeur, D11b pied de lod-mid, D12 aucun fond =="
+R="$(mesurer d11)"
+assert_eq D11 "ouverture : glyphe de 1,45 em (16 px), mot complet, pied de 20, bord droit dans la carte, bord bas dans le pied" "$(E "(({ a }) => [Math.abs(a.lgPx - 16) <= 1, a.lw !== 'none', a.lc === 'none', a.pied === 20, a.droit, a.bas].join('|'))(j.d11.zooms.ouverture)")" "true|true|true|true|true|true"
+assert_eq D11 "lod-mid : glyphe de 24 unités, forme courte, padding 0 12, pied de 28" "$(E "(({ a }) => [a.lgPx === 24, a.lw === 'none', a.lc !== 'none', a.pad === '12px|12px|0px', a.pied === 28, a.droit, a.bas].join('|'))(j.d11.zooms.mid)")" "true|true|true|true|true|true|true"
+assert_eq D11 "lod-low : glyphe seul (24 unités), mot et forme courte masqués, pied de 28" "$(E "(({ a }) => [a.lgPx === 24, a.lw === 'none', a.lc === 'none', a.pied === 28, a.droit, a.bas].join('|'))(j.d11.zooms.bas)")" "true|true|true|true|true|true"
+assert_eq D3 "S8 : un mot très long s'ellipse à l'ouverture, le glyphe garde sa taille et la marque reste dans la carte" "$(E "(({ b }) => [b.ellipse, b.lgPx > 14, b.droit, b.mot === 300].join('|'))(j.d11.zooms.ouverture)")" "true|true|true|true"
+assert_eq D11b "lod-mid : un .meta long s'ellipse sans faire sortir la marque ni déborder le pied de 28" "$(E "[j.d11.metaLong.ellipse, j.d11.metaLong.droit, j.d11.metaLong.bas, j.d11.metaLong.pied].join('|')")" "true|true|true|28"
+assert_eq D12 "la marque n'ajoute ni fond, ni image, ni ombre, ni liseré, ni contour, ni rayon ; l'ombre de la carte est inchangée" "$(E "j.d11.style.marque.every((x) => x === 'rgba(0, 0, 0, 0)|none|none|0px|none|0px') && j.d11.style.carteAvant === j.d11.style.carteApres")" "true"
+echo "== D17 respiration du glyphe « en cours », coupée en mouvement réduit =="
+R="$(mesurer d17)"
+echo "  (keyframe vfrespire chargé sur l'onglet Code : $(E 'j.d17.keyframeVfrespire'))"
+assert_eq D17 "animation calculée présente en mouvement normal, absente sous prefers-reduced-motion: reduce" "$(E "[j.d17.normal !== 'none', j.d17.reduit === 'none'].join('|')")" "true|true"
 
 fin

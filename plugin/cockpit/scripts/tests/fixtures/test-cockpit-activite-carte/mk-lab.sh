@@ -1,5 +1,5 @@
 # mk-lab.sh — le lab des témoins navigateur de test-cockpit-activite-carte.sh (à sourcer ; $SCRIPTS = scripts/ du module, $WORK posés par la suite).
-#   mklab75 <dossier> : un nœud « src » de 33 fichiers (au-delà de GROUP_AT = 24 : deux dossiers virtuels src/a et src/b), des noms HOSTILES
+#   mklab75 <dossier> [nogit] : (nogit : le dossier n'est pas un dépôt git) un nœud « src » de 33 fichiers (au-delà de GROUP_AT = 24 : deux dossiers virtuels src/a et src/b), des noms HOSTILES
 #   (balises, très long, U+2028), deux plans non faits qui prévoient des fichiers absents (dont un hors de tout nœud : carte « non assignés »).
 mklab75() {
   local L="$1" P="$1/.planning/phases/01-socle" i hostile long sep
@@ -14,6 +14,6 @@ mklab75() {
   printf -- '- [ ] **Phase 1: Socle** - en cours\n' > "$L/.planning/ROADMAP.md"
   printf -- '---\nphase: 1\nplan: "02"\nwave: 1\nfiles_modified:\n  - src/a/neuf.mjs\n  - autre/orphelin.mjs\n---\n<objective>Premier plan</objective>\n' > "$P/01-02-PLAN.md"
   printf -- '---\nphase: 1\nplan: "03"\nwave: 1\nfiles_modified:\n  - src/a/neuf.mjs\n---\n<objective>Second plan</objective>\n' > "$P/01-03-PLAN.md"
-  git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init
+  [ "${2:-}" = nogit ] || { git -C "$L" init -q && git -C "$L" add -A && git -C "$L" -c user.email=t@t -c user.name=t commit -q -m init; }
   node "$SCRIPTS/vf-cockpit-build.mjs" "$L" --quiet > "$WORK/build-$(basename "$L").out" 2>&1 || cat "$WORK/build-$(basename "$L").out"
 }
