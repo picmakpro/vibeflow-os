@@ -137,6 +137,19 @@ assert_eq "C1.12b — feuille de 390 px : section ≤ 614 px (repli fermé) et �
 assert_eq "C1.x — aucune section n'a échoué par erreur de harnais" "$(E1 'JSON.stringify(j.erreurs)')" "{}"
 
 
+# --- C8 (76-08, R76.3) : la couverture d'une exigence. AVANT le retrait du nœud « Exigences », la section « Couverte par » du panneau d'une carte `req/…` la disait ; le panneau
+# d'exigence de la traçabilité doit dire au moins les mêmes plans. 76-08-COUVERTE-AVANT.txt (une ligne `<exigence><TAB><plan>`) a été capturé AVANT le retrait, sur CE lab (COUVERTE_CAPTURE=<fichier> la réécrit) ---
+H3="$WORK/h3.json"; node "$HERE_T/chrome-tracabilite-couverture.mjs" "$CHROME" "http://127.0.0.1:$VF_PORT" > "$H3" 2> "$WORK/h3.err"
+E3() { node "$AUX/ev.mjs" "$1" < "$H3"; }
+[ -n "${SONDE:-}" ] && { cat "$H3"; cat "$WORK/h3.err"; }
+COUV_AVANT="$HERE_T/../../../../.planning/workstreams/fiabilite/phases/VFDO-76-tracabilite-au-cockpit/76-08-COUVERTE-AVANT.txt"
+[ -z "${COUVERTE_CAPTURE:-}" ] || E3 'j.avant.join("\n")' > "$COUVERTE_CAPTURE"
+echo "=== C8 — couverture d'une exigence (retrait du nœud Exigences) ==="
+assert_eq "C8.0 — témoin positif : le panneau d'exigence de la 76 liste des plans (au moins trois lignes, dont une exigence à trois plans) et le harnais n'a pas échoué" \
+  "$(E3 '(j.apres||[]).length>=3 && Math.max(...Object.values(j.apres.reduce((m,l)=>{const k=l.split("\t")[0];m[k]=(m[k]||0)+1;return m},{})))>=3')" "true"
+assert_eq "C8.1 — chaque plan que « Couverte par » listait avant le retrait est listé par le panneau d'exigence de la 76 (comm vide ; la capture d'avant a au moins trois lignes)" \
+  "$([ "$(wc -l < "$COUV_AVANT" 2> /dev/null | tr -d ' ')" -ge 3 ] && echo "manque : [$(comm -23 <(sort "$COUV_AVANT") <(E3 'j.apres.join("\n")' | sort))]" || echo "capture d'avant absente ou trop courte")" "manque : []"
+
 # --- panneau d'une exigence, liste paginée, pile, clavier, onglets, confidentialité (second harnais, sur le même lab : e5 et e7 modifient ses fichiers, en dernier) ---
 H2="$WORK/h2.json"; node "$HERE_T/chrome-tracabilite-exigence.mjs" "$CHROME" "http://127.0.0.1:$VF_PORT" "$LAB" ${SECTIONS2:-} > "$H2" 2> "$WORK/h2.err"
 E2() { node "$AUX/ev.mjs" "$1" < "$H2"; }

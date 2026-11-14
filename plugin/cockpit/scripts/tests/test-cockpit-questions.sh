@@ -478,6 +478,17 @@ const t = 'Usage réel et non-régression : de bout en bout dans Chromium avec u
 const a = sentence(t, 120), mot = a.replace(/…\$/, '').split(' ').pop();
 console.log(a.endsWith('…') && a.length <= 120 && t.split(' ').includes(mot));")" "true"
 
+# Q76.1 (76-08, P76-D-25) : les exigences n'ont plus de carte ; le chat local les lit dans meta.vf.trace.exigences et ne cite que des cartes qui existent
+"$NODE" --input-type=module -e "
+import fs from 'node:fs';
+const ph = { id: 'ph-1', label: 'Phase 1 · Socle', kind: 'phase', num: '1', st: 'active', parent: 'ms-v1', foot: '0/1 exigences' };
+const G = { nodes: [{ id: 'ms-v1', label: 'v1', kind: 'jalon', st: 'active', parent: null }, ph], files: [], links: [],
+  meta: { vf: { milestone: 'v1', phase: '1', trace: { exigences: [{ id: 'REQ-01', ws: null, coche: false, phase: '1', libelle: 'Première exigence du socle' }] } } } };
+fs.writeFileSync('$WORK/q76g.json', JSON.stringify(G));"
+H locg "$SCRIPTS" "$WORK/q76g.json" "REQ-01 ?" > "$WORK/q76a.json"
+assert_eq "Q76.1 — « REQ-01 ? » : réponse locale qui nomme REQ-01, sa case (« non cochée ») et la carte de sa phase [[n:ph-1]] ; chaque items[].id existe dans le graphe" \
+  "$(H json "$WORK/q76a.json" "j !== null && [j.engine, j.answer.includes('REQ-01'), j.answer.includes('non cochée'), j.answer.includes('[[n:ph-1]]'), j.items.length > 0 && j.items.every((i) => i.id === 'n:ph-1')].join()")" "local,true,true,true,true"
+
 vf_hyg_assert
 echo ""
 echo "=================================="
