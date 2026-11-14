@@ -96,7 +96,7 @@ export const curseur = (h) => h.ev(() => window.__vfFrise.donnees().curseurMs);
 export const focus = (h) => h.ev(() => { const e = document.querySelector('.vf-frise [role=slider]'); if (e) e.focus(); return !!e && document.activeElement === e; });
 export const pas = (h) => h.ev(() => { const d = window.__vfFrise.donnees(); return (d.jusqua - d.depuis) / 90; });
 export const poser = (h, ms) => h.ev((m) => { window.__vfFrise.poserCurseur(m); return true; }, ms);
-export const souris = (h, type, x, y, buttons = 0) => h.s.send('Input.dispatchMouseEvent', { type, x, y, button: buttons ? 'left' : 'none', buttons, clickCount: 1 });
+export const souris = (h, type, x, y, buttons = 0) => h.s.send('Input.dispatchMouseEvent', { type, x, y, button: type === 'mouseReleased' || buttons ? 'left' : 'none', buttons, clickCount: 1 });
 export const xDe = (h, ms, ligne = 0) => h.ev((m, l) => { const d = window.__vfFrise.donnees(), p = document.querySelector('svg.vf-frise-pistes'); p.scrollIntoView({ block: 'center' });
   const r = p.getBoundingClientRect(); return { x: Math.round(r.left + d.ctx.x(m)), y: Math.round(r.top + 12 + l * 32), mpp: (d.jusqua - d.depuis) / d.ctx.largeur }; }, ms, ligne);
 export const texte = (h, sel = '.vf-encart') => h.ev((s) => { const e = document.querySelector(s); return e ? e.innerText.replace(/\s+/g, ' ').trim() : null; }, sel);
@@ -288,7 +288,7 @@ export default async function (h) {
     await encartPret(h);
     h.egal('C6', 'seule la voie « incertaine » lit son fil : une requête, pour fa-3 (fa-1 certaine dans la fenêtre, fa-2 certaine avant)', await idsTr(h), ['fa-3']);
     const l = await voyants(h);
-    h.egal('C6', 'liste : x1.js (table), z.js, w.js du worktree wt-a (fil) ; ni la cible coupée ni « hors du lab »', l.map((x) => x.join('@')).sort(), ['null@x1.js', 'null@z.js', 'wt-a@w.js']);
+    h.egal('C6', 'liste : x1.js (table), z.js, w.js du worktree wt-a (fil) ; ni la cible coupée ni « hors du lab »', l.map((x) => x.map(String).join('@')).sort(), ['null@x1.js', 'null@z.js', 'wt-a@w.js']);
     await h.ev(() => { window.__tr.delai = 40; });
     // plus de huit fichiers
     await h.monter({ voies: (n, F) => { const dd = (m) => n - m * MIN; return [F.voie({ id: 'big', debut: dd(40), fin: dd(20), fini: true, segments: [[dd(40), dd(20), 'travail']],
@@ -340,7 +340,7 @@ export default async function (h) {
     const now = await h.ev(() => window.__vfFrise.donnees().jusqua), d = (m) => now - m * MIN;
     await fil(h, 'fl', [el(d(30), 's.js (worktree wt-b)'), el(d(30), 'q.js (worktree wt(c))'), el(d(30), 'r.js (worktree <b>x</b>)'), el(d(30), 'c1…'), el(d(30), 'c2… (worktree wt-b)'), el(d(30), 'un fichier hors du lab'), el(d(30), 'plain.js')]);
     await poser(h, d(30)); await encartPret(h);
-    const l = (await voyants(h)).map((x) => x.join('@')).sort();
+    const l = (await voyants(h)).map((x) => x.map(String).join('@')).sort();
     h.egal('C6b', 'route de frise : « doc (worktree x) » reste tel quel (arbre null) ; fil : suffixe en fin de chaîne lu en { arbre, cible }, parenthèses et balisage restent du texte',
       l, ['<b>x</b>@r.js', 'null@doc (worktree x)', 'null@plain.js', 'wt(c)@q.js', 'wt-b@s.js']);
     const t = await texte(h);
@@ -362,9 +362,9 @@ export default async function (h) {
     const now = await h.ev(() => window.__vfFrise.donnees().jusqua), d = (m) => now - m * MIN;
     for (let i = 1; i <= 8; i++) await fil(h, `iv-${i}`, [el(d(30), `p${i}.js`)]);
     await h.ev(() => { window.__tr.delai = 80; });
-    await poser(h, d(10)); await encartPret(h);
     await h.ev(() => { window.__tr.reqs.length = 0; window.__tr.max = 0; document.querySelector('.vf-frise [role=slider]').focus(); });
-    await h.ev(() => { const s = document.querySelector('.vf-frise [role=slider]'); for (let i = 0; i < 90; i++) s.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowLeft', bubbles: true })); });
+    await h.ev(() => { const s = document.querySelector('.vf-frise [role=slider]'), k = (key) => s.dispatchEvent(new KeyboardEvent('keydown', { key, bubbles: true }));
+      for (let i = 0; i < 60; i++) k('ArrowLeft'); for (let i = 0; i < 30; i++) k('ArrowRight'); });
     h.egal('C7', 'un glissement de 90 pas en moins de 250 ms ne lit rien pendant le glissement', await nbTr(h), 0);
     await h.pause(1800);
     const n = await nbTr(h), mx = await h.ev(() => window.__tr.max);
@@ -373,7 +373,8 @@ export default async function (h) {
     h.sonde('C7', 'liste partielle : « 2 voies non lues », jamais une liste vide ; « Voir sur la carte » présent', /2 voies non lues/.test(t) && (await h.ev(() => document.querySelectorAll('.vf-encart-liste li').length)) === 6 && (await h.ev(() => !!document.querySelector('.vf-encart-carte'))), t);
     // second déplacement sans événement frise : zéro lecture (cache)
     await h.ev(() => { window.__tr.reqs.length = 0; }); await focus(h); await touche(h, K.gauche); await h.pause(900);
-    h.egal('C7', 'un second déplacement sans événement `frise` relit zéro fil en cache (six voies lues restent en cache, deux jamais lues sont relues au plus)', (await nbTr(h)) <= 2, String(await nbTr(h)));
+    const ids2 = await idsTr(h);
+    h.sonde('C7', 'un second déplacement sans événement `frise` relit zéro fil en cache : seules iv-7 et iv-8, jamais lues, sont relues', ids2.every((x) => /iv-[78]/.test(x)), JSON.stringify(ids2));
     // après un événement frise : cache gardé pour fin inchangée, vidé pour fin bougée
     await h.ev(() => { window.__tr.reqs.length = 0; });
     await h.emettre(31); await h.pause(1600); await focus(h); await touche(h, K.gauche); await h.pause(1400);
