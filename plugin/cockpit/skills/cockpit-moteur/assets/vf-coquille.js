@@ -1,6 +1,7 @@
 // VibeFlow (79-16, SOCL-20) : le client de la coquille. Le document ne porte aucune donnée : la coquille lit celle d'un onglet par GET /api/vf/graphe,
 // pose les scripts de /_vf/ (liste du manifeste ; classes : bibliothèque, persistant, i18n, moteur, onglet) puis le moteur, et rend la main quand il a
 // fait son premier rendu. Ordre au premier chargement : bibliothèques, persistants (ordre d'octets du nom), puis l'onglet (i18n, moteur, extensions).
+// Une liste de scripts est préchargée d'un coup (téléchargements en parallèle), puis posée script par script (exécution dans l'ordre).
 // Un changement d'onglet démonte l'onglet affiché (vf-coquille-portee.js), puis ré-exécute le moteur et les scripts d'onglet ; les persistants restent.
 // Le fragment de l'adresse n'est jamais écrit ici. Premier script de la tête : son écoute de DOMContentLoaded précède celle du tiroir du terminal,
 // donc le squelette du corps est pris avant qu'il y ajoute ses nœuds.
@@ -23,8 +24,17 @@
   // tunnel les scripts de l'onglet prennent plusieurs secondes et un plafond compté depuis le début montrerait les états intermédiaires.
   const PLAFOND = 1500, ATTENDU = 600, CALME = 6; // ms ; ms d'attente du badge au plus ; images immobiles d'affilée
   let jetonPorte = 0;
+  // l'indicateur de chargement (viewer.html le dessine) : html[data-vf-attente] vaut « debut » dès le début d'un chargement, « longue » 300 ms après,
+  // « porte » une fois l'onglet prêt (seule la porte fermée le montre encore) ; retiré avec la porte, donc par toute sortie en échec
+  const LONGUE = 300; // ms : au bureau l'indicateur ne paraît qu'au-delà ; sur téléphone la porte fermée le montre aussitôt
+  let jetonAttente = 0;
+  const debutAttente = () => {
+    if (!P || H.dataset.vfAttente === 'debut' || H.dataset.vfAttente === 'longue') return;
+    const mien = ++jetonAttente; H.dataset.vfAttente = 'debut';
+    P.natif.setTimeout(() => { if (mien === jetonAttente && H.dataset.vfAttente === 'debut') H.dataset.vfAttente = 'longue'; }, LONGUE);
+  };
   const leverPorte = () => {
-    jetonPorte++;
+    jetonPorte++; jetonAttente++; delete H.dataset.vfAttente;
     if (H.dataset.vfPorte === 'ouverte') return;
     H.dataset.vfPorte = 'ouverte'; window.dispatchEvent(new Event('vf:porte-ouverte'));
   };
@@ -48,7 +58,7 @@
     };
     requestAnimationFrame(image);
   }
-  if (P) fermerPorte(); // sans la portée la coquille ne démarre pas : la porte reste ouverte, jamais une page masquée sans recours
+  if (P) { fermerPorte(); debutAttente(); } // sans la portée la coquille ne démarre pas : la porte reste ouverte, jamais une page masquée sans recours
   const delai = () => { const n = window.VF_COQUILLE_REGLAGES?.delaiMs; return Number.isInteger(n) && n >= 1000 && n <= 120000 ? n : 30000; };
   const nomsDe = (...classes) => manifeste.fichiers.filter((f) => classes.includes(f.classe)).map((f) => f.nom);
   const erreur = (m, e) => console.error(`VibeFlow coquille : ${m} : ${e && e.message}`);
@@ -58,7 +68,15 @@
     s.src = manifeste.prefixe + nom; s.onload = () => ok(); s.onerror = () => ko(new Error('script de la coquille illisible : ' + nom));
     D.head.appendChild(s);
   });
-  const enchainer = async (noms) => { for (const n of noms) await poser(n); };
+  // les téléchargements partent tous d'un coup (préchargement : rien ne s'exécute), puis chaque script est posé à son tour et prend la réponse
+  // préchargée : l'ordre d'exécution et l'arrêt au premier script illisible restent ceux de la pose une à une, sans un aller-retour par script
+  const precharger = (nom) => {
+    const l = D.createElement('link'); l.rel = 'preload'; l.as = 'script'; l.href = manifeste.prefixe + nom; D.head.appendChild(l); return l;
+  };
+  const enchainer = async (noms) => {
+    const liens = noms.map(precharger); // garde:coquille-prechargement
+    try { for (const n of noms) await poser(n); } finally { for (const l of liens) l.remove(); }
+  };
 
   // ---- surOnglet : rappels appelés une fois par arrivée, nettoyage rendu appelé avant le changement suivant ----
   const nettoyer = (ins) => { const f = ins.nettoyage; ins.nettoyage = null; if (f) { try { f(); } catch (e) { erreur('un nettoyage a levé', e); } } };
@@ -173,7 +191,7 @@
   }
 
   async function sequence(nom, initial) {
-    etat = { onglet: nom, phase: 'chargement', motif: null };
+    etat = { onglet: nom, phase: 'chargement', motif: null }; debutAttente();
     let graphe;
     try { graphe = await lireGraphe(nom); } catch (e) { echec(nom, 'lecture'); throw e; }
     D.getElementById('vf-coquille-echec')?.remove(); D.body.classList.remove('vf-ce-actif');
@@ -188,7 +206,7 @@
     }
     enDemarrage = false;
     affiche = nom; etat = { onglet: nom, phase: 'pret', motif: null };
-    H.dataset.vfPret = 'oui';
+    H.dataset.vfPret = 'oui'; jetonAttente++; if (H.dataset.vfAttente) H.dataset.vfAttente = 'porte';
     lot([...inscriptions]);
     leverQuandPose();
   }

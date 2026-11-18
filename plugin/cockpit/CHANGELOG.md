@@ -17,6 +17,21 @@ Demande de Samuel (relayée par le brief de la session principale, 2026-11-18) :
 - **Visite guidée** : sa première ouverture attend la porte ouverte (`vf:porte-ouverte`), en plus du délai de 700 ms.
 - **Suite `test-cockpit-premier-rendu.sh`** (PR1 à PR5) : un seul état d'en-tête visible et rien avant « ready », une seule place du zoom
   avant la visite, une seule transformation de la carte, bureau non masqué, échec visible ; rouge sur la base sans la porte (6 sur 8).
+- **Chargement parallèle** (même demande, ouverture lente à travers un tunnel : 11,6 s contre 0,4 s en local) : la coquille posait ses
+  111 scripts `/_vf/` un par un, un aller-retour chacun. `enchainer` précharge désormais toute la liste d'un coup (`<link rel=preload
+  as=script>`, téléchargements en parallèle), puis pose les scripts un à un comme avant : chacun reprend la réponse préchargée, l'ordre
+  d'exécution (bibliothèques, persistants, puis i18n, moteur, onglet) et l'arrêt au premier script illisible ne changent pas. Liens retirés
+  une fois la liste posée. À 150 ms simulées par requête, porte ouverte en 1,0 s au lieu de 17,1 s (Code, Projet) et changement d'onglet
+  en 0,7 s au lieu de 15,9 s. Les scripts insérés d'un coup avec `async = false` donnaient le même temps mais exécutaient encore les
+  scripts suivant un script en échec : écartés.
+- **Indicateur de chargement** : l'anneau de `.spin`, plus lent, au centre (`::after` de la racine, jetons `--hair-2` et `--text-3`, hors du
+  corps et de l'en-tête, sous l'écran d'échec et masqué avec lui), piloté par `html[data-vf-attente]` (`debut`, `longue` après 300 ms,
+  `porte` une fois l'onglet prêt). Téléphone : visible tant que la porte est fermée ; partout : visible au-delà de 300 ms de chargement,
+  y compris pendant la lecture d'un changement d'onglet. Retiré avec la porte, donc par toute sortie en échec ; immobile en mouvement
+  réduit. `data-vf-attente` rejoint les attributs gardés au démontage.
+- **Suite `test-cockpit-premier-rendu.sh`** étendue (PR6, PR7 ; modes `tunnel`, `tunnel-bureau`, `tunnel-echec` de
+  `chrome-premier-rendu.mjs`) : au moins 8 requêtes `/_vf/` en vol, aucun script demandé deux fois hors `vendor/elk.bundled.js`, aucun
+  refus de CSP, porte ouverte en moins de 5 s, indicateur vu et retiré ; rouge sur la base (5 sur 8).
 
 ### Passe finale avant v2.77.0
 Correctifs de durcissement et de couverture, par classe ; aucun bump de version (gel des publications). Les six modules aux agents modifiés ont leur entrée de CHANGELOG (bump patch), le conductor la sienne (message d'usage de `--all`).
