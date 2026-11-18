@@ -602,6 +602,13 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .72; }
   #panel, body.no-panel #panel, #viewport.anim, #ask, #flowbar, #zoom button { transition: none; }
   #panel > *, #ask-warn { animation: none; }
 }
+/* vibeflow : porte du premier rendu sur téléphone. vf-coquille.js pose data-vf-porte="fermee" avant le corps et l'ouvre une fois la page posée
+   (onglet prêt, en-tête et zoom immobiles) : la page apparaît dans son état final, jamais dans les états intermédiaires de la mise en page.
+   Opacité, pas visibility ni display : les mesures restent justes ; l'écran d'échec de la coquille n'est jamais masqué. Sans coquille, rien. */
+@media (max-width: 700px) {
+  html[data-vf-porte="fermee"] body > :not(#stage):not(script):not(style),
+  html[data-vf-porte="fermee"] #stage > :not(#vf-coquille-echec) { opacity: 0 !important; }
+}
 </style>
 </head>
 <body>

@@ -275,7 +275,11 @@
     if (auto) return;
     auto = true;
     if (SC.store.get(SEEN, false) || location.hash.length > 1) return;
-    setTimeout(() => { if (!active() && !SC.state.flow && SC.state.container === 'root') start(); }, 700);
+    const lancer = () => { if (!active() && !SC.state.flow && SC.state.container === 'root') start(); };
+    // vibeflow : sur téléphone la page reste masquée jusqu'à ce qu'elle soit posée (vf-coquille.js) ; la visite ne s'ouvre qu'une fois la page montrée
+    const fermee = () => document.documentElement.dataset.vfPorte === 'fermee' && matchMedia('(max-width: 700px)').matches; // bureau : inchangé
+    const apresPorte = () => (fermee() ? window.addEventListener('vf:porte-ouverte', lancer, { once: true }) : lancer());
+    setTimeout(apresPorte, 700);
   };
   SC.on('ready', maybeAuto);
   if (SC.state.layout) maybeAuto();
