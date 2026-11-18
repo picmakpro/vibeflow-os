@@ -46,6 +46,10 @@ const inMap = (p) => {
 };
 const ignoredByDir = (p) => p.split('/').some((seg) => HARD_IGNORE_DIRS.has(seg)) || inMap(p);
 
+// vibeflow (dépôts imbriqués) : un dépôt imbriqué est lu par sa propre liste ; dans celle de son parent, son entrée (dossier non suivi
+// « app/ » ou lien de sous-module « app ») et tout chemin sous lui sont écartés, chaque fichier n'a qu'un dépôt
+const sousImbrique = (r, p) => p.endsWith('/') || found.repos.some(({ path: d }) => d !== '.' && d !== r.path
+  && (r.path === '.' || d.startsWith(r.path + '/')) && (p === d || p.startsWith(d + '/')));
 for (const r of found.repos) {
   const listed = gitFiles(r.abs);
   const info = gitInfo(r.abs);
@@ -53,7 +57,7 @@ for (const r of found.repos) {
   let count = 0;
   for (const f of listed || []) {
     const p = prefix + f;
-    if (seen.has(p) || ignoredByDir(p)) continue;
+    if (seen.has(p) || ignoredByDir(p) || sousImbrique(r, p)) continue;
     seen.add(p);
     fileList.push({ path: p, repo: r.path });
     count++;
