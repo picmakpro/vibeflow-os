@@ -9,7 +9,7 @@ scripts/vf-cockpit-ask.mjs 35
 scripts/vf-cockpit-avancement.mjs 7
 scripts/vf-cockpit-build.mjs 14
 scripts/vf-cockpit-code-vf.mjs 13
-scripts/vf-cockpit-code.mjs 5
+scripts/vf-cockpit-code.mjs 3
 scripts/vf-cockpit-drift.mjs 13
 scripts/vf-cockpit-embed.mjs 1
 scripts/vf-cockpit-equipe-carte.mjs 10

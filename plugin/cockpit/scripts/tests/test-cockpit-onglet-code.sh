@@ -4,6 +4,7 @@
 #   C4 dossier de plugin/ sans module.json : nœud infra générique + enfant tests (sans liste de noms)
 #   C2 lab neutre : architecture brute · C3 aucun assemblage n'appelle `claude` (faux binaire consignant tout appel)
 #   C5 accord de « fichier de code » dans le résumé d'un dossier : 1 fichier, 2 fichiers (UIFN-06, 70-01)
+#   C8 dépôt imbriqué ignoré par la racine : lu par sa liste git, découpé en cartes de dépôt, de dossier et d'espace de travail
 # Labs jetables dans mktemp, isolation git, HOME jetable. Exit 0 si tout passe, 1 sinon.
 
 set -uo pipefail
@@ -153,6 +154,41 @@ assert_eq "C7.3 — un « <lab> » de la prose reste intact (liste fermée de ba
 assert_eq "C7.4 — texte sans accents : conservé tel quel, marqué « extrait brut »" "$(desc sans-accent.md)" "Une regle auto-scopee est une convention chargee sur certains fichiers, a chaque etape. (extrait brut)"
 assert_eq "C7.5 — texte anglais sans accents : jamais marqué (mots français seulement)" "$(desc anglais.md)" "This reference is complete and different from the other one in every detail."
 assert_eq "C7.6 — aucun résumé de l'index ne commence par « > » ou « < »" "$(donnee "$LR" 'j.files.filter(f=>f.d&&/^[<>]/.test(f.d)).length')" "0"
+
+echo "=== C8 — dépôt imbriqué que la racine ignore (discover() du moteur) : lu, découpé par espaces de travail ==="
+LI="$WORK/imbrique"; mklab "$LI" neutre
+printf 'app/\n' > "$LI/.gitignore"; git -C "$LI" add -A && git -C "$LI" -c user.email=t@t -c user.name=t commit -q -m ignore
+A="$LI/app"; mkdir -p "$A/apps/mobile/src" "$A/apps/web/src" "$A/packages/core/src" "$A/supabase/functions" "$A/build" "$A/.claude/worktrees/wt"
+for w in apps/mobile apps/web packages/core; do echo '{}' > "$A/$w/package.json"; printf 'export const x = 1;\n' > "$A/$w/src/i.ts"; done
+printf 'export const f = 1;\n' > "$A/supabase/functions/f.ts"; printf 'export const r = 1;\n' > "$A/racine.ts"
+printf 'SECRET=1\n' > "$A/.env"; printf 'export const s = 1;\n' > "$A/ignore.ts"; printf '.env\nignore.ts\n' > "$A/.gitignore"
+printf 'export const w = 1;\n' > "$A/.claude/worktrees/wt/copie.ts"; git -C "$A/.claude/worktrees/wt" init -q
+git -C "$A" init -q && git -C "$A" add -A && git -C "$A" -c user.email=t@t -c user.name=t commit -q -m app
+# un dépôt sous app/ dont le .git désigne un dossier git hors du lab : jamais lu (gitSortant)
+D="$WORK/dehors"; mkdir -p "$D"; printf 'export const d = 1;\n' > "$D/dehors.ts"; git -C "$D" init -q && git -C "$D" add -A && git -C "$D" -c user.email=t@t -c user.name=t commit -q -m d
+mkdir -p "$A/ext"; printf 'gitdir: %s/.git\n' "$D" > "$A/ext/.git"; printf 'export const e = 1;\n' > "$A/ext/e.ts"
+# un core.fsmonitor exécutable posé dans la config d'app : l'environnement durci du moteur ne le lance jamais
+TEMOIN="$WORK/fsmonitor.lance"; printf '#!/bin/sh\ntouch "%s"\n' "$TEMOIN" > "$WORK/fsm.sh"; chmod +x "$WORK/fsm.sh"; git -C "$A" config core.fsmonitor "$WORK/fsm.sh"
+assert_eq "C8.0 — l'assemblage rend 0" "$(assembler "$LI")" "0"
+assert_eq "C8.0b — le fsmonitor d'app n'a pas été lancé par l'assemblage" "$([ -e "$TEMOIN" ] && echo lance || echo jamais)" "jamais"
+git -C "$A" ls-files > /dev/null 2>&1
+assert_eq "C8.0c — témoin : le même fsmonitor est bien lancé par un git ordinaire" "$([ -e "$TEMOIN" ] && echo lance || echo jamais)" "lance"
+git -C "$A" config --unset core.fsmonitor
+SC="$LI/.vibeflow/cockpit/.cache/scan.json"; AR="$LI/.vibeflow/cockpit/architecture.json"
+jq_() { node -e 'const j=JSON.parse(require("fs").readFileSync(process.argv[1],"utf8"));console.log(new Function("j","return ("+process.argv[2]+")")(j))' "$1" "$2"; }
+assert_eq "C8.1 — deux dépôts lus, la racine puis app (le worktree sous .claude/ n'en est pas un)" "$(jq_ "$SC" 'j.repos.map(r=>r.path).join(",")')" ".,app"
+assert_eq "C8.2 — les fichiers d'app portent son chemin et son dépôt" "$(jq_ "$SC" 'j.files.filter(f=>f.path==="app/apps/web/src/i.ts"&&f.repo==="app").length')" "1"
+assert_eq "C8.3 — ce que app ignore reste hors de la carte (.env, ignore.ts)" "$(jq_ "$SC" 'j.files.filter(f=>/^app\/(\.env|ignore\.ts)$/.test(f.path)).length')" "0"
+assert_eq "C8.4 — aucun fichier compté deux fois, aucune entrée « app/ » de la racine" "$(jq_ "$SC" 'j.files.length-new Set(j.files.map(f=>f.path)).size+j.files.filter(f=>f.path.endsWith("/")).length')" "0"
+assert_eq "C8.4b — le dépôt dont le .git sort du lab n'est pas lu (ni dépôt, ni fichier de dehors, ni entrée « ext/ »)" "$(jq_ "$SC" 'j.repos.filter(r=>r.path==="app/ext").length+j.files.filter(f=>/dehors|^app\/ext/.test(f.path)).length')" "0"
+assert_eq "C8.5 — aucun dossier sous un dépôt signalé comme écarté (build/, .claude/)" "$(jq_ "$SC" 'j.skipped.filter(s=>s.path.startsWith("app/")).length')" "0"
+assert_eq "C8.6 — une carte par espace de travail, sous son conteneur, sous le dépôt" "$(jq_ "$AR" 'j.nodes.filter(n=>n.parent).map(n=>n.id+"<"+n.parent).sort().join(" ")')" "d-app-apps-mobile<d-app-apps d-app-apps-web<d-app-apps d-app-apps<r-app d-app-packages<r-app d-app-supabase<r-app"
+assert_eq "C8.7 — pas de carte « dossier app » de premier niveau en double du dépôt" "$(jq_ "$AR" 'j.nodes.filter(n=>n.id==="d-app").length')" "0"
+assert_eq "C8.8 — un seul espace (packages/core) ne fait pas de carte d'espace" "$(jq_ "$AR" 'j.nodes.filter(n=>n.id==="d-app-packages-core").length')" "0"
+LC="$WORK/cote"; mkdir -p "$LC/.planning/phases/01-x"; printf -- '- [ ] **Phase 1: Socle** - premier jet\n' > "$LC/.planning/ROADMAP.md"
+for r in front back; do mkdir -p "$LC/$r/apps/a" "$LC/$r/apps/b"; for w in a b; do echo '{}' > "$LC/$r/apps/$w/package.json"; printf 'export const v = 1;\n' > "$LC/$r/apps/$w/i.ts"; done
+  git -C "$LC/$r" init -q && git -C "$LC/$r" add -A && git -C "$LC/$r" -c user.email=t@t -c user.name=t commit -q -m init; done
+assert_eq "C8.9 — dépôts côte à côte sous un dossier sans git : une carte de dossier chacun, inchangé" "$(assembler "$LC")|$(jq_ "$LC/.vibeflow/cockpit/architecture.json" 'j.nodes.map(n=>n.id+(n.parent?"<"+n.parent:"")).join(",")')" "0|d-back,d-front"
 
 echo "=== C3 — aucun appel à claude pendant l'assemblage ==="
 assert_eq "C3.1 — le faux claude n'a été appelé par aucun assemblage (C1, C2 et le témoin)" "$([ -s "$VF_FAKE_LOG" ] && wc -l < "$VF_FAKE_LOG" | tr -d ' ' || echo 0)" "0"

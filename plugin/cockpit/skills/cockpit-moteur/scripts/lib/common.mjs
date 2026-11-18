@@ -227,9 +227,11 @@ function worktreeMain(dir) {
 // ---------- discovery ----------
 
 /**
- * Walk the codebase root and find every git repo in it. Repos are not descended into
- * (git ls-files covers them). Loose files outside any repo are collected too.
+ * Walk the codebase root and find every git repo in it. Loose files outside any repo are collected too.
  * Linked worktrees of a repo that is itself in the codebase are skipped as duplicates.
+ * vibeflow (nested repos) : a repo is still descended into, only to find the repos nested in it (a sub-repo the parent
+ * ignores, a submodule); inside a repo nothing is collected as loose (git ls-files of that repo covers its files,
+ * and what it ignores stays out of the map) and no directory is reported as skipped.
  */
 export function discover(root, { includeWorktrees = false, maxLooseFiles = 5000 } = {}) {
   const repos = [];
@@ -237,30 +239,30 @@ export function discover(root, { includeWorktrees = false, maxLooseFiles = 5000 
   const skipped = [];
 
   // vibeflow AUDC-A-02 : un dépôt dont les métadonnées git ne sont pas celles du lab (dossier git ou commun hors du lab, lien symbolique, alternates, core.worktree étranger) n'est pas lu (lib/vf-git-sortant.mjs)
-  const walk = (dir, depth) => {
+  const walk = (dir, depth, inRepo) => {
     if (fs.existsSync(path.join(dir, '.git')) && !gitSortant(dir, root)) {
       repos.push({ abs: dir, path: rel(root, dir), worktreeOf: worktreeMain(dir) });
-      return;
+      inRepo = true; // on descend encore, pour les seuls dépôts imbriqués
     }
     if (depth > 8) return;
     let entries;
     try { entries = fs.readdirSync(dir, { withFileTypes: true }); } catch { return; }
-    if (entries.filter((e) => e.isFile()).length > 500) { skipped.push({ path: rel(root, dir), reason: 'over 500 files outside git (data dump?)' }); return; }
+    if (entries.filter((e) => e.isFile()).length > 500) { if (!inRepo) skipped.push({ path: rel(root, dir), reason: 'over 500 files outside git (data dump?)' }); return; }
     for (const e of entries) {
       const abs = path.join(dir, e.name);
       if (e.isSymbolicLink()) continue;
       if (e.isDirectory()) {
         if (WALK_IGNORE_DIRS.has(e.name) || (e.name.startsWith('.') && e.name !== '.github')) {
-          if (!['.git', 'node_modules', '__pycache__'].includes(e.name)) skipped.push({ path: rel(root, abs), reason: 'ignored directory' });
+          if (!inRepo && !['.git', 'node_modules', '__pycache__'].includes(e.name)) skipped.push({ path: rel(root, abs), reason: 'ignored directory' });
           continue;
         }
-        walk(abs, depth + 1);
-      } else if (e.isFile()) {
+        walk(abs, depth + 1, inRepo);
+      } else if (e.isFile() && !inRepo) {
         if (loose.length < maxLooseFiles) loose.push(rel(root, abs));
       }
     }
   };
-  walk(root, 0);
+  walk(root, 0, false);
 
   // Drop worktree duplicates.
   const norm = (p) => toPosix(path.resolve(p)).toLowerCase();
