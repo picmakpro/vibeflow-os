@@ -6,6 +6,18 @@ Phase 79 « Socle du cockpit — une collecte, un flux, une route d'état » (ja
 
 Retours du panel d'utilisateurs du cockpit (2026-11-06, registre `.planning/missions/2026-11-06-panel-utilisateurs-GLOBAL.md`, PU-G-001 à PU-G-204) : correctifs et réglages, aucune capacité nouvelle en soi. Réponses de Samuel aux 14 questions du registre, formulaire unique : arbitrage Samuel, AskUserQuestion session principale, 2026-11-06. Libellés choisis : Q1 « Icônes dans le menu ⋯ », Q3 « Termes Git + définition », Q4 « Préparer, puis Entrée », Q5 « Non, annoncé seulement », Q6 « Tout visible, expliqué », Q7 « Oui, 120 s visibles », Q8 « Non, Projet et Code », Q9 « Règle actuelle », Q10 « Flou gardé, texte court », Q11 « Inchangés » (et PU-G-045 « Fermer sous 1000 px », même jour), Q12 « Un seul latéral sous 1280 px » puis « Non, lecture étroite », Q13 « Inchangé, mieux dit », Q14 « Oui pour ces trois ». Même canal et même jour : PU-G-162 « Branche + ton nom /rename », DG-09 « Non, garder l'exclusion », PU-G-026 « Projet sans plancher », PU-G-001 « Garder ce compromis », PU-G-086 « Rien ne change », focus sur « Annuler » « Garder l'exception », Entrée tenue « Corriger maintenant », masque des secrets « Corriger maintenant ». Même canal, 2026-11-07 : Entrée tenue « Étendre à tous ».
 
+### Premier rendu sur téléphone
+Demande de Samuel (relayée par le brief de la session principale, 2026-11-18) : sur téléphone le cockpit s'affiche directement dans son état final. Aucun bump.
+- **Porte du premier rendu** : `vf-coquille.js` pose `data-vf-porte="fermee"` avant le corps ; sous 700 px la tête (`viewer.html`) met
+  l'en-tête, la scène et le reste du corps à l'opacité 0 (jamais `visibility` ni `display`, les mesures restent justes). La porte s'ouvre
+  quand l'onglet est prêt, l'en-tête, le zoom et la carte immobiles six images d'affilée et le badge « au travail » posé (600 ms au plus),
+  au plus tard 1,5 s après « ready », et par toute sortie en échec (l'écran « Lecture impossible » reste visible). Le plafond part de
+  « ready », pas du chargement : à travers un tunnel les scripts de l'onglet prennent plusieurs secondes. `data-vf-porte` rejoint les
+  attributs de `html` que le démontage d'onglet ne touche pas ; un changement d'onglet referme la porte. Bureau inchangé.
+- **Visite guidée** : sa première ouverture attend la porte ouverte (`vf:porte-ouverte`), en plus du délai de 700 ms.
+- **Suite `test-cockpit-premier-rendu.sh`** (PR1 à PR5) : un seul état d'en-tête visible et rien avant « ready », une seule place du zoom
+  avant la visite, une seule transformation de la carte, bureau non masqué, échec visible ; rouge sur la base sans la porte (6 sur 8).
+
 ### Passe finale avant v2.77.0
 Correctifs de durcissement et de couverture, par classe ; aucun bump de version (gel des publications). Les six modules aux agents modifiés ont leur entrée de CHANGELOG (bump patch), le conductor la sienne (message d'usage de `--all`).
 - **Lecteurs de texte du lab** : les lecteurs qui parcouraient un texte du lab en temps non borné sont rendus linéaires ; suite `test-cockpit-texte-lineaire.sh` (sonde générative de linéarité).

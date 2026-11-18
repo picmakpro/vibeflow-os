@@ -17,6 +17,38 @@
   let etat = { onglet: null, phase: 'chargement', motif: null };
   const retenu = {}; // onglet -> { etag, texte } : la dernière réponse 200 (le 304 ré-analyse ce texte, jamais un objet muté par le moteur)
   const inscriptions = [], differes = [];
+  // ---- la porte du premier rendu (téléphone) : posée ici, avant le corps ; la tête ne masque l'en-tête et la scène que sous 700 px (viewer.html) ----
+  // levée quand la page est posée (onglet prêt, en-tête et zoom immobiles, badge « au travail » posé), au plus tard PLAFOND ms après « ready »,
+  // et par toute sortie en échec : jamais une page laissée invisible. Le plafond est compté depuis « ready », pas depuis le chargement : à travers un
+  // tunnel les scripts de l'onglet prennent plusieurs secondes et un plafond compté depuis le début montrerait les états intermédiaires.
+  const PLAFOND = 1500, ATTENDU = 600, CALME = 6; // ms ; ms d'attente du badge au plus ; images immobiles d'affilée
+  let jetonPorte = 0;
+  const leverPorte = () => {
+    jetonPorte++;
+    if (H.dataset.vfPorte === 'ouverte') return;
+    H.dataset.vfPorte = 'ouverte'; window.dispatchEvent(new Event('vf:porte-ouverte'));
+  };
+  const fermerPorte = () => { jetonPorte++; H.dataset.vfPorte = 'fermee'; };
+  const signature = () => {
+    const r = (e) => { const b = e.getBoundingClientRect(); return [b.x, b.y, b.width, b.height].map(Math.round).join(','); };
+    const hd = D.querySelector('body > header'), z = D.getElementById('zoom'), vp = D.getElementById('viewport');
+    const boutons = hd ? [...hd.querySelectorAll('button, a')].map(r).join(' ') : '';
+    return [boutons, z ? r(z) : '', vp ? vp.style.transform || vp.getAttribute('transform') || '' : ''].join('|');
+  };
+  function leverQuandPose() {
+    if (H.dataset.vfPorte !== 'fermee') return;
+    const mien = ++jetonPorte, t0 = performance.now(), natif = P.natif;
+    natif.setTimeout(() => { if (mien === jetonPorte) leverPorte(); }, PLAFOND);
+    let prec = '', calme = 0;
+    const image = () => {
+      if (mien !== jetonPorte) return;
+      const s = signature(); calme = s === prec ? calme + 1 : 0; prec = s;
+      const badge = !!D.getElementById('vf-lock') || performance.now() - t0 > ATTENDU;
+      if (calme >= CALME && badge) leverPorte(); else requestAnimationFrame(image);
+    };
+    requestAnimationFrame(image);
+  }
+  if (P) fermerPorte(); // sans la portée la coquille ne démarre pas : la porte reste ouverte, jamais une page masquée sans recours
   const delai = () => { const n = window.VF_COQUILLE_REGLAGES?.delaiMs; return Number.isInteger(n) && n >= 1000 && n <= 120000 ? n : 30000; };
   const nomsDe = (...classes) => manifeste.fichiers.filter((f) => classes.includes(f.classe)).map((f) => f.nom);
   const erreur = (m, e) => console.error(`VibeFlow coquille : ${m} : ${e && e.message}`);
@@ -108,7 +140,7 @@
     c.className = 'vf-ce'; c.append(h, t, q, b); n.append(s, c); (D.getElementById('stage') || D.body).appendChild(n); D.body.classList.add('vf-ce-actif');
   }
   function echec(nom, motif) {
-    etat = { onglet: nom, phase: 'echec', motif };
+    etat = { onglet: nom, phase: 'echec', motif }; leverPorte();
     if (motif !== 'lecture') return;
     const initial = affiche === null;
     const ev = new CustomEvent('vf:coquille-echec', { cancelable: true, detail: { onglet: nom, initial } });
@@ -145,19 +177,20 @@
     let graphe;
     try { graphe = await lireGraphe(nom); } catch (e) { echec(nom, 'lecture'); throw e; }
     D.getElementById('vf-coquille-echec')?.remove(); D.body.classList.remove('vf-ce-actif');
-    H.dataset.vfPret = 'non';
+    H.dataset.vfPret = 'non'; fermerPorte();
     for (const ins of [...inscriptions].reverse()) nettoyer(ins); // les fonctions rendues par les rappels, avant le démontage
     // les rappels inscrits par les scripts de l'onglet affiché (au démarrage) s'en vont avec lui : ses scripts sont ré-exécutés et s'inscriront de nouveau
     for (const ins of inscriptions.splice(0)) if (ins.demarrage) ins.actif = false; else inscriptions.push(ins);
     P.demonter();
     P.ouvrir(squelette); enDemarrage = true;
     try { await demarrerOnglet(nom, graphe, initial); } catch (e) {
-      enDemarrage = false; etat = { onglet: nom, phase: 'echec', motif: null }; reprendre(); throw e;
+      enDemarrage = false; etat = { onglet: nom, phase: 'echec', motif: null }; leverPorte(); reprendre(); throw e;
     }
     enDemarrage = false;
     affiche = nom; etat = { onglet: nom, phase: 'pret', motif: null };
     H.dataset.vfPret = 'oui';
     lot([...inscriptions]);
+    leverQuandPose();
   }
 
   function chargerOnglet(nom) {
@@ -173,10 +206,10 @@
   });
 
   D.addEventListener('DOMContentLoaded', () => {
-    try { manifeste = JSON.parse(D.getElementById('vf-coquille-manifeste').textContent); } catch { return; }
+    try { manifeste = JSON.parse(D.getElementById('vf-coquille-manifeste').textContent); } catch { leverPorte(); return; }
     const orig = [...D.body.childNodes];
     squelette = { orig, copie: orig.map((n) => n.cloneNode(true)) };
     H.dataset.vfPret = 'non';
-    file = enchainer(nomsDe('bibliotheque', 'persistant')).then(() => sequence(PAR_ADRESSE[location.pathname] || 'code', true)).catch(() => {});
+    file = enchainer(nomsDe('bibliotheque', 'persistant')).then(() => sequence(PAR_ADRESSE[location.pathname] || 'code', true)).catch(() => { leverPorte(); });
   }, { once: true });
 })();
