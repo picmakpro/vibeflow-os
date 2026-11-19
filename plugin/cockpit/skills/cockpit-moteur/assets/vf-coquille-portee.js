@@ -15,7 +15,7 @@
   const natif = { addEventListener: (c, ...a) => AEL.apply(c, a), removeEventListener: (c, ...a) => REL.apply(c, a), EventSource: W.EventSource,
     setTimeout: W.setTimeout.bind(W), setInterval: W.setInterval.bind(W), clearTimeout: W.clearTimeout.bind(W), clearInterval: W.clearInterval.bind(W) };
   let premiere = true, journal = null, dernier = null, sq = null, observeur = null;
-  const GARDES = new Set(['data-theme', 'lang', 'data-vf-pret', 'data-vf-porte']); // attributs de html que le démontage ne touche pas
+  const GARDES = new Set(['data-theme', 'lang', 'data-vf-pret', 'data-vf-porte', 'data-vf-attente']); // attributs de html que le démontage ne touche pas
   const etrangers = new Set(); // nœuds du corps qui ne sont pas au moteur (tiroir, lanceur) : posés hors de toute portée
   const attrs = (e) => Object.fromEntries([...e.attributes].map((a) => [a.name, a.value]));
   const etat = () => ({ props: new Set(Object.getOwnPropertyNames(W)), tete: new Set(D.head.children), html: attrs(H), body: attrs(D.body) });

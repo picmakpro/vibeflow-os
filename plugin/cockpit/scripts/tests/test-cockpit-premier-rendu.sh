@@ -7,6 +7,11 @@
 #   PR3 carte : visite déjà vue, une seule transformation visible (aucun saut des cartes au premier cadrage)
 #   PR4 bureau (1 280 px, souris) : la porte ne masque rien, l'en-tête est visible pendant le chargement comme avant
 #   PR5 échec de lecture : l'écran « Lecture impossible » est visible, la porte ouverte
+#   PR6 tunnel (scripts /_vf/ retenus 150 ms chacun) : les scripts se téléchargent en parallèle (plusieurs requêtes /_vf/ en vol), aucun deux fois
+#       (hors le paquet de mise en page, lu par la page et par son fil), aucun refus de la CSP, la porte ouverte en moins de 5 s (Code, Projet,
+#       changement d'onglet ; plus de 15 s sur la base, un script à la fois)
+#   PR7 indicateur de chargement : sur téléphone visible porte fermée, retiré à son ouverture, immobile en mouvement réduit ; au bureau, il ne paraît
+#       qu'après 300 ms et s'en va quand l'onglet est prêt ; jamais avec l'écran d'échec
 # Mesure : chrome-premier-rendu.mjs, une image par requestAnimationFrame, scripts /_vf/ ralentis de 40 ms chacun (un tunnel).
 # PR_SCRIPTS = dossier de scripts à bâtir (rejeu sur une autre copie, la base sans la porte rougit PR1 à PR3).
 # Sans navigateur : SUITE SAUTÉE (exit 0, message explicite), jamais un vert à vide.
@@ -60,6 +65,27 @@ echo "=== PR5 — échec de lecture (téléphone) ==="
 RE="$(mesurer echec)"; sonde "$RE"
 assert_eq "PR5.1 — l'écran « Lecture impossible » est visible, la porte ouverte" \
   "$(E "[j.echec.images.at(-1)[2], j.echec.images.at(-1)[7]]" "$RE")" '["ouverte",true]'
+echo "=== PR6 et PR7 — tunnel : scripts /_vf/ retenus 150 ms chacun ==="
+RTT="$(mesurer tunnel)"; sonde "$RTT"; RTB="$(mesurer tunnel-bureau)"; sonde "$RTB"; RTE="$(mesurer tunnel-echec)"; sonde "$RTE"
+C3='["code","projet","changement"]'
+assert_eq "PR6.1 — téléchargements en parallèle : au moins 8 requêtes /_vf/ en vol en même temps (Code, Projet, changement d'onglet ; 2 sur la base)" \
+  "$(E "$C3.map((k) => j[k].enVolMax >= 8)" "$RTT")" '[true,true,true]'
+assert_eq "PR6.2 — aucun script demandé deux fois, hors vendor/elk.bundled.js (la page et son fil) : le préchargement est repris par la pose" \
+  "$(E "$C3.map((k) => j[k].doubles.every((u) => u === 'vendor/elk.bundled.js'))" "$RTT")" '[true,true,true]'
+assert_eq "PR6.3 — aucun refus de la politique de contenu (téléphone, bureau)" \
+  "$(E "$C3.map((k) => j[k].csp.length)" "$RTT") $(E "$C3.map((k) => j[k].csp.length)" "$RTB")" '[0,0,0] [0,0,0]'
+assert_eq "PR6.4 — porte ouverte en moins de 5 s à 150 ms par requête (Code, Projet, changement d'onglet)" \
+  "$(E "$C3.map((k) => (j[k].porte > 0 && j[k].porte < 5000) || j[k].porte)" "$RTT")" '[true,true,true]'
+assert_eq "PR7.1 — téléphone : l'indicateur est visible porte fermée et retiré à son ouverture (Code, Projet, changement d'onglet)" \
+  "$(E "$C3.map((k) => [j[k].indic.some((x) => x[1] && x[2] === 'fermee'), j[k].indic.every((x) => !x[1] || x[2] === 'fermee' || x[2] === ''), j[k].indic.at(-1)[1]])" "$RTT")" \
+  '[[true,true,false],[true,true,false],[true,true,false]]'
+assert_eq "PR7.2 — téléphone : l'indicateur tourne, et reste immobile en mouvement réduit" \
+  "$(E "[j.code.anim.join().includes('vfAttente'), j.reduit.indic.some((x) => x[1]), j.reduit.anim.join()]" "$RTT")" '[true,true,"none"]'
+assert_eq "PR7.3 — bureau : l'indicateur paraît après 300 ms de chargement au plus tôt, et s'en va (Code, Projet)" \
+  "$(E "['code', 'projet'].map((k) => { const v = j[k].indic.find((x) => x[1]); return [!!v && v[0] >= 300, j[k].indic.at(-1)[1]]; })" "$RTB")" \
+  '[[true,false],[true,false]]'
+assert_eq "PR7.4 — échec de lecture : l'indicateur n'est jamais visible avec l'écran d'échec, et il est retiré" \
+  "$(E "[j.echec.surEchec, j.echec.indic.at(-1)[1]]" "$RTE")" '[false,false]'
 vf_hyg_stop "$SRV"
 echo "--- premier rendu : $PASS PASS, $FAIL FAIL"
 [ "$FAIL" -eq 0 ]

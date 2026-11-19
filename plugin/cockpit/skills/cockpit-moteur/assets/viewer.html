@@ -609,6 +609,19 @@ html.wk svg.dim .node:not(.hl) foreignObject { opacity: .72; }
   html[data-vf-porte="fermee"] body > :not(#stage):not(script):not(style),
   html[data-vf-porte="fermee"] #stage > :not(#vf-coquille-echec) { opacity: 0 !important; }
 }
+/* vibeflow : l'indicateur de chargement de la coquille (html[data-vf-attente], vf-coquille.js) : l'anneau de .spin, plus lent, au centre,
+   pseudo-élément de la racine, hors du corps (aucune mesure de la mise en page ne le voit), sous l'écran d'échec et jamais avec lui. Partout : visible quand un chargement dure
+   plus de 300 ms ; téléphone : aussi tant que la porte est fermée. Mouvement réduit : anneau immobile. Retiré avec l'attribut, à l'ouverture de la porte. */
+html[data-vf-attente]::after { content: ''; position: fixed; left: 50%; top: 50%; z-index: 2147482000; width: 20px; height: 20px; margin: -10px 0 0 -10px;
+  box-sizing: border-box; border-radius: 50%; border: 2px solid var(--hair-2); border-top-color: var(--text-3); pointer-events: none;
+  opacity: 0; visibility: hidden; }
+/* une seule déclaration d'animation pour les deux cas : passer de l'un à l'autre ne la relance pas (aucun clignotement) */
+html[data-vf-attente]::after { animation: vfAttenteIn .3s var(--ease) both, spin 1.2s linear infinite; }
+html[data-vf-attente="longue"]::after { visibility: visible; }
+@media (max-width: 700px) { html[data-vf-attente][data-vf-porte="fermee"]::after { visibility: visible; } }
+html:has(body.vf-ce-actif)::after { display: none !important; }
+@keyframes vfAttenteIn { to { opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { html[data-vf-attente]::after { animation: none !important; opacity: 1; } }
 </style>
 </head>
 <body>
